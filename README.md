@@ -3,16 +3,47 @@
 Pure-Go, stdlib-only HTML→PDF (and HTML→image) converter — a work-alike for
 [wkhtmltopdf](https://wkhtmltopdf.org/) built for **controlled reports**:
 invoices, statements, tables, multi-page documents with headers/footers,
-TOCs and PDF outlines. No third-party Go modules, no Chrome/WebKit, no cgo.
+TOCs and PDF outlines.
+
+**Built from scratch.** No third-party Go modules, no third-party PDF/HTML/CSS
+APIs or services, no Chrome/WebKit embedding, no cgo. Every stage of the
+pipeline (load → parse → style → layout → paint → PDF write) is implemented
+in this repository against the Go standard library only.
 
 - **Go standard library only** — `go.mod` has zero dependencies
 - Two static binaries: `gowkhtmltopdf` (PDF) and `gowkhtmltoimage` (PNG/JPEG)
 - Idiomatic Go library API (`gowkhtmltopdf` root package)
 - Deterministic output: identical input bytes → identical PDF bytes
+- **License:** [MIT](LICENSE) — Copyright (c) 2026 Chinmay Sawant
 
 **Status:** MVP (v0.1.0). Phases 0–9 of the [canonical plan](plans/00-canonical-pure-go-rewrite.md)
 are implemented; remaining gaps are listed under
 [Deferred / not planned](#deferred--not-planned).
+
+---
+
+## How this project was built (AI-assisted, stdlib-only)
+
+This codebase is a **clean-room pure-Go rewrite**, not a binding to
+wkhtmltopdf/Qt/WebKit and not a wrapper around any commercial HTML→PDF API.
+
+| Stage | Tooling | Role |
+|---|---|---|
+| Plans & architecture | **Grok 4.5 (high)** | Phase ledgers under [`plans/`](plans/), scope freeze, feasibility, and the execution map |
+| Bulk implementation (~90%) | **DeepSeek** | Phases of settings/CLI, loader, PDF writer, HTML/CSS/layout, pagination, HF/TOC, image mode, library API, hardening |
+| Last-mile correctness (~10%) | **Grok 4.5** | Workable, viewer-valid PDFs: Flate/zlib, Catalog outlines, CLI page-scoped flags, glyph `/Widths` (1000-unit em), Latin-1 text encoding; `make samples` green |
+
+DeepSeek was able to drive most of the phase implementation and could emit
+PDF *files*, but the output was not reliably **workable** in real viewers
+(empty/malformed catalogs, wrong stream compression, broken font advances).
+Handing the final pass to Grok 4.5 with a concrete gate — run `make samples`,
+fix whatever fails, and open generated PDFs — closed that last gap. Font
+letter-spacing is fixed for Latin text; complex pages (e.g. full Wikipedia
+articles) still need follow-up for Unicode/CID fonts and richer CSS.
+
+None of that changes the product rule: **no third-party APIs or modules in
+the runtime** — only the Go stdlib and the embedded Liberation Sans font
+asset shipped in-tree.
 
 ---
 
@@ -216,8 +247,9 @@ remains **not planned**.
 
 ## License
 
+[MIT License](LICENSE) — Copyright (c) 2026 **Chinmay Sawant**.
+
 Independent clean-room reimplementation of the wkhtmltopdf CLI/behavior
 (wkhtmltopdf itself is LGPL; see the license note in
 [plans/00-canonical-pure-go-rewrite.md](plans/00-canonical-pure-go-rewrite.md)).
-The Go code is intended to be MIT-licensed; a LICENSE file has not been
-committed yet.
+This project does **not** link to or redistribute wkhtmltopdf, Qt, or WebKit.
