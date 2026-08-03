@@ -3,8 +3,8 @@
 **gowkhtmltopdf** is a pure-Go, **stdlib-only** converter that turns HTML into
 PDF (and optionally PNG/JPEG). It is a clean-room work-alike of the
 [wkhtmltopdf](https://wkhtmltopdf.org/) CLI surface, aimed at **controlled
-server-generated reports**—invoices, statements, multi-page tables, headers
-and footers, table of contents, and PDF bookmarks—not full browser parity.
+server-generated reports** - invoices, statements, multi-page tables, headers
+and footers, table of contents, and PDF bookmarks - not full browser parity.
 
 ## Design principles
 

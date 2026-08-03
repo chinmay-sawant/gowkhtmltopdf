@@ -1,4 +1,4 @@
-# Phase 04 — HTML Parser + CSS Subset Layout
+# Phase 04 - HTML Parser + CSS Subset Layout
 
 > **Parent:** `plans/00-canonical-pure-go-rewrite.md`  
 > **Status:** complete (2026-08-03)  
@@ -49,7 +49,7 @@ Full browser layout is multi-decade org work. MVP success = invoice/report templ
 - [x] Tables: rows/cols, border-collapse separate (collapse optional later), colspan (rowspan later)
 - [x] Images: intrinsic size, max-width, object sizing subset
 - [x] Overflow: visible default; clip optional
-- [ ] Floats / absolute: `[~]` after MVP if corpus needs — deferred: matrix marks Not implemented
+- [ ] Floats / absolute: `[~]` after MVP if corpus needs - deferred: matrix marks Not implemented
 - [x] Flex/grid: out of MVP allowlist
 
 ### 4.5 Display list & paint
@@ -60,19 +60,19 @@ Full browser layout is multi-decade org work. MVP success = invoice/report templ
 
 ### 4.6 Integration
 - [x] `convert` path: load HTML → layout → single long canvas OR paginated (Phase 5)
-- [x] Early: single continuous page then paginate, **or** paginate during layout — document choice in design note — see design note below: pagination during paint, whole-op moves
+- [x] Early: single continuous page then paginate, **or** paginate during layout - document choice in design note - see design note below: pagination during paint, whole-op moves
 
 ### 4.7 Golden corpus
-- [x] Fixture: simple invoice — `testdata/golden/fixture-01-simple-invoice.html`
-- [x] Fixture: nested tables / line items — `testdata/golden/fixture-02-table-heavy-invoice.html` (6-col line items, tfoot colspan)
-- [x] Fixture: image logo + header block — not part of final corpus; fixtures 01–03 cover logo-free invoice layouts (see matrix §1: PNG/JPEG `img` supported, tested via `TestRunPDFStyleTableImage`)
-- [x] Fixture: long text wrap — covered by fixture-02/03 table text + `TestTextWrapping`; multi-page flow covered by fixture-03
-- [x] Record visual or geometric assertions — `internal/convert/golden_test.go::TestGoldenCorpus`: per fixture asserts `%PDF-` header, page count (01: 1, 02: ≥1→2 actual, 03: ≥2→2 actual), `/FontFile2` subset font, `%%EOF` trailer and xref-offset consistency
+- [x] Fixture: simple invoice - `testdata/golden/fixture-01-simple-invoice.html`
+- [x] Fixture: nested tables / line items - `testdata/golden/fixture-02-table-heavy-invoice.html` (6-col line items, tfoot colspan)
+- [x] Fixture: image logo + header block - not part of final corpus; fixtures 01–03 cover logo-free invoice layouts (see matrix §1: PNG/JPEG `img` supported, tested via `TestRunPDFStyleTableImage`)
+- [x] Fixture: long text wrap - covered by fixture-02/03 table text + `TestTextWrapping`; multi-page flow covered by fixture-03
+- [x] Record visual or geometric assertions - `internal/convert/golden_test.go::TestGoldenCorpus`: per fixture asserts `%PDF-` header, page count (01: 1, 02: ≥1→2 actual, 03: ≥2→2 actual), `/FontFile2` subset font, `%%EOF` trailer and xref-offset consistency
 
 ### 4.8 Closure
-- [x] Compatibility matrix updated: each CSS property status — `documentation/compatibility-matrix.md` §2 rewritten as a status table (Implemented / Partial / Not implemented) with `Verified by` evidence; verified against `internal/layout/style.go` (applyRestProps + uaRules), `internal/css/css.go`, `layout.go`, `inline.go`, `paint.go`
-- [x] `make test` / `make lint` pass — `go test ./...`, `go vet ./...`, `gofmt -l .` all clean
-- [x] Performance note: layout time for largest golden fixture (command + ms) — `internal/convert/golden_test.go::TestGoldenFixture03Performance`: fixture-03 (multi-page invoice, A4/10mm, print media) layout+paint ≈ **1.07 ms** (layout ≈ 0.66 ms, paint ≈ 0.41 ms) on dev workstation; budget < 2 s
+- [x] Compatibility matrix updated: each CSS property status - `documentation/compatibility-matrix.md` §2 rewritten as a status table (Implemented / Partial / Not implemented) with `Verified by` evidence; verified against `internal/layout/style.go` (applyRestProps + uaRules), `internal/css/css.go`, `layout.go`, `inline.go`, `paint.go`
+- [x] `make test` / `make lint` pass - `go test ./...`, `go vet ./...`, `gofmt -l .` all clean
+- [x] Performance note: layout time for largest golden fixture (command + ms) - `internal/convert/golden_test.go::TestGoldenFixture03Performance`: fixture-03 (multi-page invoice, A4/10mm, print media) layout+paint ≈ **1.07 ms** (layout ≈ 0.66 ms, paint ≈ 0.41 ms) on dev workstation; budget < 2 s
 
 ---
 
@@ -88,15 +88,15 @@ Phase 3 pdf       ──► paint backend
 
 - [x] Write short design note: box tree ownership, reflow triggers (static for MVP)
 
-  **Box tree ownership.** The layout package owns box construction entirely; `box` is an internal struct in `internal/layout/layout.go` (`buildBlock`/`buildImage`/`buildHR`/`buildTable`/`buildCell`). DOM stays immutable; `ResolvedStyle` per node is computed once in `resolveStyles` (`style.go`) into `map[*html.Node]ResolvedStyle`, read-only afterwards. Reflow triggers: none — layout is a single pass, static for MVP. Tables do a two-pass measure/emit (`noEmit` flag on the engine + `emitCell`) to resolve column widths before painting cell content.
+  **Box tree ownership.** The layout package owns box construction entirely; `box` is an internal struct in `internal/layout/layout.go` (`buildBlock`/`buildImage`/`buildHR`/`buildTable`/`buildCell`). DOM stays immutable; `ResolvedStyle` per node is computed once in `resolveStyles` (`style.go`) into `map[*html.Node]ResolvedStyle`, read-only afterwards. Reflow triggers: none - layout is a single pass, static for MVP. Tables do a two-pass measure/emit (`noEmit` flag on the engine + `emitCell`) to resolve column widths before painting cell content.
 
-  **Pagination model.** Phase 4 chooses "layout a single continuous canvas, paginate at paint time": `layout.Paint` groups ops into pages by `op.Y < contentH` and moves an op wholly to the next page when it crosses a boundary (no fragment continuation, no repeated headers — Phase 5). Conversion geometry: page = `settings.ParsePageSize` (points) swapped for landscape; content box = page − margins (mm→pt); `Layout` viewport = content box.
+  **Pagination model.** Phase 4 chooses "layout a single continuous canvas, paginate at paint time": `layout.Paint` groups ops into pages by `op.Y < contentH` and moves an op wholly to the next page when it crosses a boundary (no fragment continuation, no repeated headers - Phase 5). Conversion geometry: page = `settings.ParsePageSize` (points) swapped for landscape; content box = page − margins (mm→pt); `Layout` viewport = content box.
 
   **Display list.** Ops (`OpFillRect`/`OpStrokeRect`/`OpLine`/`OpText`/`OpImage`/`OpLinkURI`/`OpBullet`) are emitted during layout with box-space coordinates; `Paint` maps them to PDF content streams (x = MarginLeft + opX; y = pageH − MarginTop − opY + pageIdx·contentH). One font (Liberation Sans via `pdf.DefaultFont`), embedded per page with `UseEmbeddedFont` + `TextRenderMode` fake bold.
 
 - [x] Font matching algorithm (family, weight, style)
 
-  MVP: single embedded font (`pdf.DefaultFont()` = Liberation Sans regular, `assets/LiberationSans-Regular.ttf`). Font-family lists are parsed and kept in `ResolvedStyle.FontFamily` but not used for selection (matrix: Partial). Weight: `normal`/`bold`/`bolder`/`lighter`/numeric — bold is fake-bold in paint via `TextRenderMode(2)` (line width 6% of size) since only one outline is embedded. `font-style: italic` parsed but not rendered (matrix: Not implemented). `font-size` fully resolved (named/%, em, rem, pt, px, in, cm, mm, pc; inherits with em/% against parent).
+  MVP: single embedded font (`pdf.DefaultFont()` = Liberation Sans regular, `assets/LiberationSans-Regular.ttf`). Font-family lists are parsed and kept in `ResolvedStyle.FontFamily` but not used for selection (matrix: Partial). Weight: `normal`/`bold`/`bolder`/`lighter`/numeric - bold is fake-bold in paint via `TextRenderMode(2)` (line width 6% of size) since only one outline is embedded. `font-style: italic` parsed but not rendered (matrix: Not implemented). `font-size` fully resolved (named/%, em, rem, pt, px, in, cm, mm, pc; inherits with em/% against parent).
 
 ## Risks
 

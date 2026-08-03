@@ -10,7 +10,7 @@ The engine converts HTML into a PDF. The HTML document is the primary
 attack surface:
 
 - A document can name arbitrary network resources (`http`, `https`,
-  `data:`, and — subject to the ACL — `file:`).
+  `data:`, and - subject to the ACL - `file:`).
 - A document **cannot execute code**. There is no JavaScript engine and no
   process execution anywhere in the tree (no `os/exec` usage; grepping for
   `exec.Command` returns nothing outside test helpers that parse the CLI).
@@ -82,7 +82,7 @@ processes. The trust envelope of any local reader applies.
 
 - **Connect timeout**: 30 s (`DefaultConnectTimeout`, `net.Dialer.Timeout`).
 - **Whole-request timeout**: per-page `--timeout` seconds, default 60 s
-  (`DefaultResponseTimeout`), enforced via `http.Client.Timeout` — covers
+  (`DefaultResponseTimeout`), enforced via `http.Client.Timeout` - covers
   TLS handshake, headers and body read. `--timeout 0` selects the default.
 - **Context cancellation**: `Load(ctx, ...)` and `FetchSub(ctx, ...)` thread
   the caller's context into every request
@@ -103,8 +103,8 @@ processes. The trust envelope of any local reader applies.
 
 ## 5. Data exfiltration channels
 
-- Every URL referenced in the HTML — images, stylesheets, the primary page
-  itself — can be fetched. A document can cause fetches to any reachable
+- Every URL referenced in the HTML - images, stylesheets, the primary page
+  itself - can be fetched. A document can cause fetches to any reachable
   host, **including `http://localhost` and RFC1918 addresses**; this is
   upstream wkhtmltopdf/Qt behaviour and is intentionally not restricted.
   The mitigation is input trust, not network filtering.
@@ -138,7 +138,7 @@ processes. The trust envelope of any local reader applies.
   the 100 MiB body cap; both are on by default.
 - Sanitise HTML before conversion, or convert only HTML you author.
 
-## 7.1 Embedding in web apps (Gin / similar) — short scenarios
+## 7.1 Embedding in web apps (Gin / similar) - short scenarios
 
 Full write-up: **[integration-security.md](integration-security.md)**.
 
@@ -150,7 +150,7 @@ optionally a file reader) on behalf of whoever controls the input.
 | Pattern | Risk | Preferred? |
 |---------|------|------------|
 | Gin renders **your** template → convert that HTML/path | Low | **Yes** |
-| Gin passes `c.Query("url")` (arbitrary) into convert | **High (SSRF)** — server can hit localhost, cloud metadata, RFC1918 | No |
+| Gin passes `c.Query("url")` (arbitrary) into convert | **High (SSRF)** - server can hit localhost, cloud metadata, RFC1918 | No |
 | HTML references extra `img`/`link` URLs | Server fetches them too (second-hop SSRF) | Avoid untrusted HTML |
 | Local file access on + user-influenced path/`file:` | **High (file read)** into PDF | Keep default deny |
 | Many concurrent converts / huge pages | DoS (CPU/RAM) | Rate-limit + timeouts |
@@ -168,12 +168,12 @@ substitute for not letting strangers drive server-side fetches.
 
 | Control | Location |
 |---|---|
-| ACL: default deny, allow prefixes, symlink/traversal resolution | `internal/load/load.go` — `AccessController.Allowed`, `resolvePath`, `fileAccessAllowed` |
-| `file://` host restriction | `internal/load/load.go` — `filePathFromURL` (used by `loadFile`; `FetchSub` host check) |
-| Body cap, HTTP (header + read side) | `internal/load/load.go` — `loadHTTP` |
-| Body cap, file | `internal/load/load.go` — `loadFile` |
-| Redirect cap | `internal/load/load.go` — `initClient` / `CheckRedirect` |
-| Connect timeout | `internal/load/load.go` — `DefaultConnectTimeout`, `net.Dialer` |
-| Response timeout | `internal/load/load.go` — `loadHTTP` `client.Timeout`, `DefaultResponseTimeout` |
-| Context cancellation | `internal/load/load.go` — `http.NewRequestWithContext` in `loadHTTP` |
-| No JS / no exec | whole repo — no `os/exec`; flags accepted and ignored, `WarnJSStubs`, `WaitJSDelay` |
+| ACL: default deny, allow prefixes, symlink/traversal resolution | `internal/load/load.go` - `AccessController.Allowed`, `resolvePath`, `fileAccessAllowed` |
+| `file://` host restriction | `internal/load/load.go` - `filePathFromURL` (used by `loadFile`; `FetchSub` host check) |
+| Body cap, HTTP (header + read side) | `internal/load/load.go` - `loadHTTP` |
+| Body cap, file | `internal/load/load.go` - `loadFile` |
+| Redirect cap | `internal/load/load.go` - `initClient` / `CheckRedirect` |
+| Connect timeout | `internal/load/load.go` - `DefaultConnectTimeout`, `net.Dialer` |
+| Response timeout | `internal/load/load.go` - `loadHTTP` `client.Timeout`, `DefaultResponseTimeout` |
+| Context cancellation | `internal/load/load.go` - `http.NewRequestWithContext` in `loadHTTP` |
+| No JS / no exec | whole repo - no `os/exec`; flags accepted and ignored, `WarnJSStubs`, `WaitJSDelay` |

@@ -1,6 +1,6 @@
 # gowkhtmltopdf
 
-Pure-Go, stdlib-only HTML→PDF (and HTML→image) converter — a work-alike for
+Pure-Go, stdlib-only HTML→PDF (and HTML→image) converter - a work-alike for
 [wkhtmltopdf](https://wkhtmltopdf.org/) built for **controlled reports**:
 invoices, statements, tables, multi-page documents with headers/footers,
 TOCs and PDF outlines.
@@ -10,11 +10,11 @@ APIs or services, no Chrome/WebKit embedding, no cgo. Every stage of the
 pipeline (load → parse → style → layout → paint → PDF write) is implemented
 in this repository against the Go standard library only.
 
-- **Go standard library only** — `go.mod` has zero dependencies
+- **Go standard library only** - `go.mod` has zero dependencies
 - Two static binaries: `gowkhtmltopdf` (PDF) and `gowkhtmltoimage` (PNG/JPEG)
 - Idiomatic Go library API (`gowkhtmltopdf` root package)
 - Deterministic output: identical input bytes → identical PDF bytes
-- **License:** [MIT](LICENSE) — Copyright (c) 2026 Chinmay Sawant
+- **License:** [MIT](LICENSE) - Copyright (c) 2026 Chinmay Sawant
 
 **Status:** MVP (v0.1.0). Phases 0–9 of the [canonical plan](plans/00-canonical-pure-go-rewrite.md)
 are implemented; remaining gaps are listed under
@@ -28,7 +28,7 @@ are implemented; remaining gaps are listed under
 ## Overview
 
 gowkhtmltopdf turns **server-generated HTML** into multi-page PDFs without a
-browser process. It is designed for report-style documents—not for pixel-perfect
+browser process. It is designed for report-style documents - not for pixel-perfect
 clones of arbitrary websites.
 
 | You need… | This project |
@@ -37,7 +37,7 @@ clones of arbitrary websites.
 | Headers, footers, TOC, PDF bookmarks | Yes |
 | Zero native deps / offline static binary | Yes |
 | Full CSS (flex, grid, floats) or JavaScript | No (see deferred) |
-| CJK / complex Unicode fonts | Not yet (Latin + subset today) |
+| CJK / complex Unicode fonts | Not yet (Latin Liberation family; CID later) |
 
 ```text
 HTML (file | URL | stdin)
@@ -82,13 +82,13 @@ wkhtmltopdf/Qt/WebKit and not a wrapper around any commercial HTML→PDF API.
 DeepSeek was able to drive most of the phase implementation and could emit
 PDF *files*, but the output was not reliably **workable** in real viewers
 (empty/malformed catalogs, wrong stream compression, broken font advances).
-Handing the final pass to Grok 4.5 with a concrete gate — run `make samples`,
-fix whatever fails, and open generated PDFs — closed that last gap. Font
+Handing the final pass to Grok 4.5 with a concrete gate - run `make samples`,
+fix whatever fails, and open generated PDFs - closed that last gap. Font
 letter-spacing is fixed for Latin text; complex pages (e.g. full Wikipedia
 articles) still need follow-up for Unicode/CID fonts and richer CSS.
 
 None of that changes the product rule: **no third-party APIs or modules in
-the runtime** — only the Go stdlib and the embedded Liberation Sans font
+the runtime** - only the Go stdlib and the embedded Liberation Sans font
 asset shipped in-tree.
 
 ---
@@ -111,14 +111,14 @@ embedding in Gin/APIs: **[documentation/integration-security.md](documentation/i
 
 ## Install & build
 
-Requires Go 1.26+. Build is fully offline — no modules are downloaded.
+Requires Go 1.26+. Build is fully offline - no modules are downloaded.
 
 ```sh
 # both binaries, static (no cgo anywhere in the graph):
 CGO_ENABLED=0 go build ./cmd/gowkhtmltopdf ./cmd/gowkhtmltoimage
 ```
 
-Reproducible build — always build with `CGO_ENABLED=0` (the default here
+Reproducible build - always build with `CGO_ENABLED=0` (the default here
 anyway, since there is no cgo); the resulting binaries are statically
 linked ELF/Mach-O executables with no runtime library requirements.
 
@@ -141,7 +141,7 @@ gowkhtmltopdf [GLOBAL OPTIONS] [OBJECT]... <output file>
 ```
 
 Basic conversion (note: `--enable-local-file-access` belongs *after* a
-`page`/`cover` keyword — page-scoped flags open the current object):
+`page`/`cover` keyword - page-scoped flags open the current object):
 
 ```sh
 gowkhtmltopdf page --enable-local-file-access invoice.html invoice.pdf
@@ -175,7 +175,7 @@ gowkhtmltoimage --format jpg --quality 90 --height 800 report.html report.jpg
 ```
 
 Image mode renders a 1024 px smart-width viewport by default; text uses a
-bitmap font (no anti-aliasing — see limits).
+bitmap font (no anti-aliasing - see limits).
 
 ### Library API (Go)
 
@@ -216,7 +216,7 @@ assemble → write).
 
 - **Command:** `go test ./internal/convert -run TestTenPageTableReportPerformance -v`
 - **Machine:** go1.26.4 linux/amd64, Linux x86_64, 13th Gen Intel Core i7-13700HX (24 threads), 2026-08-03
-- **Budget asserted in CI:** < 5 s per run (generous — catches
+- **Budget asserted in CI:** < 5 s per run (generous - catches
   order-of-magnitude regressions only)
 
 CPU profiling (stdlib pprof):
@@ -255,17 +255,18 @@ remains **not planned**.
 
 | Deferred | Status / reason | Next gate |
 |---|---|---|
-| JavaScript / WebKit features (`--enable-javascript`, `--run-script`, `--window-status`, plugins) | No JS engine in stdlib; flags accepted with warnings; `<script>` stripped at load | Not planned |
-| Floats / positioned layout (`float`, `clear`, `position: relative/absolute/fixed`) | Parsed but treated as in-flow | Intermediate roadmap (floats/position) |
-| Flexbox / Grid (`display: flex|grid`) | Not in the CSS allowlist; elements degrade to initial `inline` | Intermediate roadmap (partial flex) |
-| Richer selectors (attribute `[attr=…]`, `:first-child`, `:nth-child`, `:hover`…) | Dropped at tokenization; `:nth-child(even)` matches all rows | Intermediate roadmap (richer selectors) |
-| CJK fonts / complex-script shaping | Single embedded Latin font; no HarfBuzz-class shaping in stdlib | Intermediate roadmap (better CJK fonts) |
+| JavaScript / WebKit features (`--enable-javascript`, `--run-script`, `--window-status`, plugins) | No JS engine in stdlib; flags accepted with warnings; `<script>` stripped at load | Phase 22 staged (see post-MVP roadmap) |
+| Floats / positioned layout (`float`, `clear`, `position: relative/absolute/fixed`) | Parsed but treated as in-flow | Phase 16–17 |
+| Flexbox / Grid (`display: flex|grid`) | Not in the CSS allowlist; elements degrade to initial `inline` | Phase 17 (partial flex); grid deferred |
+| Richer selectors (attribute `[attr=…]`, `:first-child`, `:nth-child`, sibling `+`/`~`) | **Shipped** for presence/exact attr, first/last/nth-child, siblings | Hover/link pseudos still ignored |
+| Multi-font bold/italic (Liberation Sans family) | **Shipped** - Regular/Bold/Italic/BoldItalic embedded | Further families: phase 19 |
+| CJK fonts / complex-script shaping | Latin Liberation family only; no HarfBuzz-class shaping in stdlib | Phase 19 |
 | AcroForm forms (`--enable-forms`) | No form model in the PDF writer | Intermediate roadmap (forms) |
 | XSLT TOC stylesheets (`--xsl-style-sheet`) | No XSLT in stdlib; flag warns + ignores; default Go-template TOC used | Not planned |
 | SVG image output (`--format svg`) | No stdlib SVG encoder | Not planned |
 | BMP image output | No demand; PNG/JPEG covered by `image/*` | Not planned |
 | SOCKS5 proxy | stdlib `net/http` has no SOCKS5; HTTP(S) proxy only | Not planned |
-| Text anti-aliasing in image mode | Image mode renders a 5×7 bitmap font (no glyph rasterizer); PDF mode is vector | Not planned |
+| Text anti-aliasing in image mode | **Shipped** pure-Go TTF outline raster with coverage AA (same faces as PDF) | Residual: no FreeType hinting |
 | Inline `<a href="#x">` source-rect links | TOC forward/back links work; inline anchors skipped (inline elements produce no boxes) | Intermediate roadmap |
 | Cross-object URL map (`urlToPageObj`) | Same-document anchors only | Intermediate roadmap |
 | `resolveRelativeLinks` | Flag accepted, not implemented | Intermediate roadmap |
@@ -304,7 +305,7 @@ remains **not planned**.
 
 ## License
 
-[MIT License](LICENSE) — Copyright (c) 2026 **Chinmay Sawant**.
+[MIT License](LICENSE) - Copyright (c) 2026 **Chinmay Sawant**.
 
 Independent clean-room reimplementation of the wkhtmltopdf CLI/behavior
 (wkhtmltopdf itself is LGPL; see the license note in

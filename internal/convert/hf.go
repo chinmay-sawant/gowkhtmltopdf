@@ -284,7 +284,21 @@ func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hf setti
 	c.Save()
 	c.Rect(0, bandTop, page.Width(), bandH)
 	c.Clip()
-	fontUsed := false
+	fontNames := map[*pdf.Font]string{}
+	nextFont := 0
+	resName := func(f *pdf.Font) string {
+		if f == nil {
+			return "F0"
+		}
+		if n, ok := fontNames[f]; ok {
+			return n
+		}
+		n := "HF" + strconv.Itoa(nextFont)
+		nextFont++
+		fontNames[f] = n
+		c.UseEmbeddedFont(n, f)
+		return n
+	}
 	for i := range res.Ops {
 		op := &res.Ops[i]
 		x := geom.marginLeft + op.X
@@ -314,20 +328,18 @@ func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hf setti
 			c.LineTo(x+op.W, yTop-(op.Y+op.H))
 			c.Stroke()
 		case layout.OpText, layout.OpBullet:
-			if !fontUsed {
-				c.UseEmbeddedFont("F0", op.Font)
-				fontUsed = true
-			}
+			name := resName(op.Font)
 			c.SetFillColor(op.R, op.G, op.B)
-			c.SetFont("F0", op.Size)
+			c.SetFont(name, op.Size)
 			c.BeginText()
 			c.TextAt(x, yTop-op.Y)
-			if op.Bold {
+			fakeBold := op.Bold && (op.Font == nil || !op.Font.Bold())
+			if fakeBold {
 				c.SetLineWidth(op.Size * 0.06)
 				c.TextRenderMode(2)
 			}
 			c.TextShow(op.Text)
-			if op.Bold {
+			if fakeBold {
 				c.TextRenderMode(0)
 			}
 			c.EndText()
@@ -432,7 +444,7 @@ func sectionOf(headings []*outline.Heading, page int) (section, subsection strin
 // drawHeadersFooters is the final pass that paints the effective text/HTML
 // header and footer of every page once the whole document exists (so [topage]
 // and the page indices are final). Cover pages are skipped. Errors loading an
-// HTML header/footer here only warn — the body content is already painted.
+// HTML header/footer here only warn - the body content is already painted.
 func drawHeadersFooters(ctx context.Context, loader *load.Loader, font *pdf.Font, doc *pdf.Document, cmd *cli.Command, tocs, bodies []*objectState, tocTotal int, headings []*outline.Heading, log io.Writer) {
 	total := doc.PageCount()
 	type owner struct {

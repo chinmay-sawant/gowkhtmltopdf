@@ -272,8 +272,18 @@ func TestMatch(t *testing.T) {
 		{"body div p", plain, true},
 		{"html body > div p.note", note, true},
 		{"b", div, false},
-		{"a:hover", note, false},
-		{"[x]", note, true}, // attribute selectors ignored → universal
+		{"a:hover", note, false}, // interactive pseudo ignored → match as p
+		{"[x]", note, false},     // attribute required; note has no x
+		{"[id]", second, true},
+		{"[id=second]", second, true},
+		{"[id=nope]", second, false},
+		{"p:first-child", note, true},
+		{"p:first-child", plain, false},
+		{"p:last-child", plain, false}, // last element child of div is span
+		{"span:last-child", div.FirstChild("span"), true},
+		{"p:nth-child(even)", plain, true},
+		{"p:nth-child(odd)", note, true},
+		{"p:nth-child(2)", plain, true},
 	}
 	for _, tc := range cases {
 		sel, ok := parseSelector(tc.sel)
@@ -283,6 +293,50 @@ func TestMatch(t *testing.T) {
 		if got := Match(sel, tc.node); got != tc.want {
 			t.Errorf("Match(%q) = %v, want %v", tc.sel, got, tc.want)
 		}
+	}
+}
+
+func TestSiblingCombinators(t *testing.T) {
+	root := treeFor(t, `<html><body><div><p id="a">A</p><span>x</span><p id="b">B</p><p id="c">C</p></div></body></html>`)
+	div := root.FirstChild("html").FirstChild("body").FirstChild("div")
+	var a, b, c *html.Node
+	for _, ch := range div.Children {
+		if ch.Type != html.ElementNode || ch.Name != "p" {
+			continue
+		}
+		switch ch.Attribute("id") {
+		case "a":
+			a = ch
+		case "b":
+			b = ch
+		case "c":
+			c = ch
+		}
+	}
+	if a == nil || b == nil || c == nil {
+		t.Fatal("missing siblings")
+	}
+	// p + p matches b (after span? no - + is next element sibling; a+span not p+p)
+	// structure: p#a, span, p#b, p#c → p+p matches c (prev is p#b), and not b (prev is span)
+	sel, ok := parseSelector("p + p")
+	if !ok {
+		t.Fatal("parse")
+	}
+	if Match(sel, b) {
+		t.Error("p+p should not match b (previous element is span)")
+	}
+	if !Match(sel, c) {
+		t.Error("p+p should match c")
+	}
+	sel, ok = parseSelector("p ~ p")
+	if !ok {
+		t.Fatal("parse ~")
+	}
+	if !Match(sel, b) || !Match(sel, c) {
+		t.Error("p~p should match b and c")
+	}
+	if Match(sel, a) {
+		t.Error("p~p should not match first p")
 	}
 }
 

@@ -238,7 +238,7 @@ func kidsRefs(t *testing.T, data []byte) []int {
 }
 
 // objectDict returns the dict body of indirect object ref (uncompressed test
-// builds only — the body is plain text).
+// builds only - the body is plain text).
 func objectDict(t *testing.T, data []byte, ref int) []byte {
 	t.Helper()
 	marker := fmt.Sprintf("%d 0 obj\n", ref)

@@ -1,4 +1,4 @@
-# Exploration 03 — Loader & WebKit Surface
+# Exploration 03 - Loader & WebKit Surface
 
 > **Agent:** explore · multipage loader  
 > **Primary files:** `multipageloader.cc` (~853 LOC), `loadsettings.*`, `websettings.*`
@@ -31,7 +31,7 @@
 ## Security notes
 
 - Local files blocked by default; `--allow` allowlist  
-- Upstream **ignores all SSL errors** — pure-Go rewrite should not copy blindly  
+- Upstream **ignores all SSL errors** - pure-Go rewrite should not copy blindly  
 - Cookie extras lack strong domain/path scoping  
 
 ## WebKit surface to replace

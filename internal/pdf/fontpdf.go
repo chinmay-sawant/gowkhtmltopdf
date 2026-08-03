@@ -7,11 +7,6 @@ import (
 	"strings"
 )
 
-// fontKey identifies a subset in the document font cache.
-type fontKey struct {
-	runes string // joined runes the subset covers
-}
-
 // embeddedFont is one subset embedded in the document.
 type embeddedFont struct {
 	subset  *subsetResult
@@ -21,12 +16,17 @@ type embeddedFont struct {
 }
 
 // ensureFont subsets f for runes and emits the font objects once per subset.
-// Returns the font dict ref to use in page resources.
+// Returns the font dict ref to use in page resources. Cache keys include the
+// face identity so Regular and Bold never share a subset.
 func (d *Document) ensureFont(f *Font, used []rune) (string, error) {
 	if len(used) == 0 {
 		used = []rune{' '}
 	}
-	key := runesKey(used)
+	baseName := f.PostScriptName
+	if baseName == "" {
+		baseName = "LiberationSans"
+	}
+	key := baseName + "|" + runesKey(used)
 	if ref, ok := d.fontCache[key]; ok {
 		return ref, nil
 	}
@@ -56,26 +56,41 @@ func (d *Document) ensureFont(f *Font, used []rune) (string, error) {
 	if f.Bold() {
 		flags |= 4
 	}
+	pdfName := pdfNameToken(baseName)
 	d.setDict(ef.descRef, fmt.Sprintf(
-		"<< /Type /FontDescriptor /FontName /LiberationSans /Flags %d /FontBBox [%d %d %d %d] /ItalicAngle %d /Ascent %d /Descent %d /CapHeight %d /StemV 80 /FontFile2 %s >>",
-		flags, xMin, yMin, xMax, yMax, italicAngle,
+		"<< /Type /FontDescriptor /FontName /%s /Flags %d /FontBBox [%d %d %d %d] /ItalicAngle %d /Ascent %d /Descent %d /CapHeight %d /StemV 80 /FontFile2 %s >>",
+		pdfName, flags, xMin, yMin, xMax, yMax, italicAngle,
 		f.Ascent(), f.Descent(), f.CapHeight(), ef.ref))
 
 	// font dict: simple TrueType; char codes are Latin-1 rune values resolved
 	// by the subset cmap. PDF /Widths are in 1/1000 em, not raw TrueType
-	// units (typically 2048/em) — without the scale, every glyph advances
-	// ~2× too far and text looks letter-spaced ("A c m e" instead of "Acme").
+	// units (typically 2048/em) - without the scale, every glyph advances
+	// ~2x too far and text looks letter-spaced ("A c m e" instead of "Acme").
 	first, last, widths := subsetWidths(sub, f.UnitsPerEm())
 	ws := make([]string, len(widths))
 	for i, w := range widths {
 		ws[i] = num(w)
 	}
 	d.setDict(ef.fontRef, fmt.Sprintf(
-		"<< /Type /Font /Subtype /TrueType /BaseFont /LiberationSans /FirstChar %d /LastChar %d /Widths [%s] /FontDescriptor %s /Encoding /WinAnsiEncoding /ToUnicode %s >>",
-		first, last, strings.Join(ws, " "), ef.descRef, d.ensureToUnicode(sub)))
+		"<< /Type /Font /Subtype /TrueType /BaseFont /%s /FirstChar %d /LastChar %d /Widths [%s] /FontDescriptor %s /Encoding /WinAnsiEncoding /ToUnicode %s >>",
+		pdfName, first, last, strings.Join(ws, " "), ef.descRef, d.ensureToUnicode(sub)))
 
 	d.fontCache[key] = ef.fontRef
 	return ef.fontRef, nil
+}
+
+// pdfNameToken keeps only characters safe in a PDF name token.
+func pdfNameToken(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+			b.WriteRune(r)
+		}
+	}
+	if b.Len() == 0 {
+		return "Font"
+	}
+	return b.String()
 }
 
 // subsetWidths returns (firstCode, lastCode, widths) with widths indexed by

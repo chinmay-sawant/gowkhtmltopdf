@@ -11,7 +11,7 @@ import (
 // has no case for it, so a skipped op paints nothing; paginateOps and
 // isSplittable likewise ignore it. The op keeps its slot in the Ops slice
 // because the layout engine's box tree stores op indices (opStart/opEnd)
-// that Paint relies on — removing entries would corrupt pagination.
+// that Paint relies on - removing entries would corrupt pagination.
 const linkOpSkip = layout.OpKind(255)
 
 // stripLinkURIs neutralizes external link ops in place. Called before

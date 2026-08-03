@@ -1,4 +1,4 @@
-# Exploration 02 — PDF Converter Engine
+# Exploration 02 - PDF Converter Engine
 
 > **Agent:** explore · PDF deep dive  
 > **Primary files:** `src/lib/pdfconverter.cc` (~1215 LOC), `outline.cc`, `pdfsettings.*`
@@ -11,9 +11,9 @@
 
 ## Object model
 
-- `page URL` — normal  
-- `cover URL` — page with HF cleared, excluded from outline  
-- `toc` — generated HTML from outline XML + XSLT  
+- `page URL` - normal  
+- `cover URL` - page with HF cleared, excluded from outline  
+- `toc` - generated HTML from outline XML + XSLT  
 
 ## Settings (high level)
 

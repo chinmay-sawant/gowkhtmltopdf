@@ -1,4 +1,4 @@
-# Phase 01 — Settings Model & CLI Skeleton
+# Phase 01 - Settings Model & CLI Skeleton
 
 > **Parent:** `plans/00-canonical-pure-go-rewrite.md`  
 > **Status:** complete (2026-08-03)  
@@ -56,9 +56,9 @@ CLI + settings alone are ~8–12 person-weeks of the full project (explore agent
 - [x] TOC: xsl-style-sheet, toc-header-text, disable-toc-links, disable-dotted-lines, toc-text-size-shrink, toc-level-indentation
 
 #### Runtime UX
-- [~] Stderr progress bars when log ≥ Info — deferred to Phase 5 (progress phases ship with the convert pipeline)
-- [x] Exit codes: 0 success; 2 on HTTP 404; 3 on 401; 1 otherwise — `settings.HttpErrorCode` + `HttpError` wired; full path live once loads land (Phase 2)
-- [~] `--read-args-from-stdin` batch loop with shell-like tokenize — flag accepted; batch loop deferred (Phase 9 tooling)
+- [~] Stderr progress bars when log ≥ Info - deferred to Phase 5 (progress phases ship with the convert pipeline)
+- [x] Exit codes: 0 success; 2 on HTTP 404; 3 on 401; 1 otherwise - `settings.HttpErrorCode` + `HttpError` wired; full path live once loads land (Phase 2)
+- [~] `--read-args-from-stdin` batch loop with shell-like tokenize - flag accepted; batch loop deferred (Phase 9 tooling)
 
 ### 1.3 Tests
 - [x] Table-driven: flag string → expected settings field
@@ -95,5 +95,5 @@ CLI + settings alone are ~8–12 person-weeks of the full project (explore agent
 
 ## Known upstream quirks (decide: mirror vs fix)
 
-- [x] `--no-custom-header-propagation` bug (sets true): **fixed** — our `--no-` negation sets the option false; documented as an intentional divergence (upstream typo in `pdfcommandlineparser.cc`)
-- [x] Bare `--` end-of-options typo (`argv[arg][2] == '0'`): **fixed** — `--` is treated as end-of-options; remaining args are positionals
+- [x] `--no-custom-header-propagation` bug (sets true): **fixed** - our `--no-` negation sets the option false; documented as an intentional divergence (upstream typo in `pdfcommandlineparser.cc`)
+- [x] Bare `--` end-of-options typo (`argv[arg][2] == '0'`): **fixed** - `--` is treated as end-of-options; remaining args are positionals

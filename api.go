@@ -170,7 +170,7 @@ type Converter struct {
 
 	// OnInfo, OnWarn and OnError receive the conversion's log lines,
 	// classified by content ("warning:" prefixed lines go to OnWarn,
-	// error lines to OnError, everything else — including phase lines — to
+	// error lines to OnError, everything else - including phase lines - to
 	// OnInfo). They may be nil.
 	OnInfo  func(string)
 	OnWarn  func(string)
@@ -325,7 +325,7 @@ func (c *ImageConverter) AddObject(page string) *ImageConverter {
 }
 
 // Object returns the settings of the page to convert (the one passed to the
-// most recent AddObject), so per-page load options can be set — for example
+// most recent AddObject), so per-page load options can be set - for example
 // "load.blocklocalfileaccess" = "false" to allow local inputs.
 func (c *ImageConverter) Object() *ObjectSettings {
 	return c.object

@@ -1,7 +1,7 @@
 // Package outline builds the document outline (PDF bookmarks) from heading
 // elements and their layout locations: collection, location lookup, sorting,
 // level-stack tree construction, and the wkhtmltopdf-compatible --dump-outline
-// XML. It is pure tree construction — converting canvas coordinates into PDF
+// XML. It is pure tree construction - converting canvas coordinates into PDF
 // page space and wiring page object refs is the caller's job (internal/convert
 // does it where the page geometry is known).
 package outline
@@ -125,8 +125,8 @@ type Options struct {
 	Include func(n *html.Node) bool
 }
 
-// BuildTree sorts headings by (page, y, x) — within a page, y-down order so a
-// heading higher on the page comes first — and assembles them into a
+// BuildTree sorts headings by (page, y, x) - within a page, y-down order so a
+// heading higher on the page comes first - and assembles them into a
 // level-stack tree whose root children are the top-level headings.
 //
 // Heuristic for non-monotonic sequences: a heading at level L becomes a child
@@ -180,7 +180,7 @@ func BuildTree(headings []*Heading, opts Options) *Node {
 	return root
 }
 
-// Flatten returns the tree's nodes in depth-first document order — the order
+// Flatten returns the tree's nodes in depth-first document order - the order
 // the TOC lists its entries in, with each node's clamped level.
 func (n *Node) Flatten() []*Node {
 	var out []*Node

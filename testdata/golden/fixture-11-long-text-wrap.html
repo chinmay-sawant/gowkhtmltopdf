@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
   fixture-11-long-text-wrap
-  Proves: paragraph-heavy continuous prose — text wraps at the content
+  Proves: paragraph-heavy continuous prose - text wraps at the content
   width, line-height and justified alignment are applied (justify parses
   and degrades to left rendering, per the matrix), and long unbroken tokens
   are handled. Five dense pages of prose force pagination mid-paragraph
@@ -11,7 +11,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Whitepaper — Pagination Behaviour</title>
+  <title>Whitepaper - Pagination Behaviour</title>
   <style>
     body { font-family: sans-serif; font-size: 10pt; color: #1c1c1c; margin: 0; }
     h1 { font-size: 16pt; color: #1a3d6d; margin: 0 0 4px 0; }
@@ -149,7 +149,7 @@
   releases, and any change to the wrapping algorithm will show up as a
   page-count change in this fixture.</p>
   <p>This final paragraph is intentionally wordy and repeats the document
-  title — "How Long Documents Paginate" — a second time so that the
+  title - "How Long Documents Paginate" - a second time so that the
   searchable text of the PDF contains a stable marker string for any
   content-extraction check in future phases. The whitepaper is published
   under the project documentation umbrella and maintained together with
@@ -165,7 +165,7 @@
   <p>All measurements in this whitepaper were taken on an A4 page with
   ten millimetre margins on every side, the default geometry of the
   golden corpus. The content column is therefore always 190 millimetres
-  wide — approximately 539 points — regardless of which fixture is being
+  wide - approximately 539 points - regardless of which fixture is being
   converted. The line breaker wraps text at that column, so the wrapping
   behaviour described in section one is reproducible on any machine that
   runs the corpus.</p>
@@ -177,7 +177,7 @@
   access, which is a requirement for CI environments that build the
   project behind a firewall.</p>
   <p>Readers who want to extend the corpus with their own fixture should
-  follow the established naming convention — fixture-NN-description.html —
+  follow the established naming convention - fixture-NN-description.html  - 
   add the expected page envelope to the runner's bounds table, and verify
   the conversion with the command shown in the repository documentation.
   New fixtures should exercise at least one feature that the existing

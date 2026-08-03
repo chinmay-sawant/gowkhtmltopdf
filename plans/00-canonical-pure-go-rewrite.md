@@ -1,11 +1,12 @@
-# 00 — Pure-Go wkhtmltopdf Rewrite (Canonical Execution Ledger)
+# 00 - Pure-Go wkhtmltopdf Rewrite (Canonical Execution Ledger)
 
-> **Parent:** none — root plan  
+> **Parent:** none - root plan  
 > **Status:** Phases 0–9 complete (2026-08-03); MVP v0.1.0 tagged after final verification  
 > **Estimated effort:** MVP 18–28 person-months · Intermediate 45–70 PM · Full parity not realistic (stdlib-only)  
 > **Constraint:** pure Golang, **Go standard library only** (no third-party modules, no Chrome/WebKit, no cgo)  
 > **Source analyzed:** `wkhtmltopdf/` (v0.12.7-dev) via 5 explore subagents  
-> **Evidence:** `plans/exploration/*`, phase details in `plans/phases/*`
+> **Evidence:** `plans/exploration/*`, phase details in `plans/phases/*`  
+> **Post-MVP work:** active ledger → [`10-canonical-post-mvp-roadmap.md`](10-canonical-post-mvp-roadmap.md) (phases 10–23; quick-win order). Do not reopen completed MVP rows here for quality work - record there.
 
 ---
 
@@ -17,7 +18,7 @@ This ledger tracks a complete rewrite of [wkhtmltopdf](wkhtmltopdf/) as a pure-G
 2. A **PDF writer** (objects, fonts, images, links, outlines)
 3. **CLI + settings + load orchestration** compatible with 0.12.x where feasible
 
-**Honest product goal (MVP):** render **controlled** report/invoice HTML (no JS, documented CSS subset) to PDF in a single static binary — not drop-in parity for arbitrary web pages.
+**Honest product goal (MVP):** render **controlled** report/invoice HTML (no JS, documented CSS subset) to PDF in a single static binary - not drop-in parity for arbitrary web pages.
 
 Full WebKit-class parity under stdlib-only is **out of scope** as a dated milestone; see README estimates.
 
@@ -81,7 +82,7 @@ Phase 0 Scope → 1 Settings/CLI → 2 Loader → 3 PDF Writer
 - [x] Root `README.md` with estimates (this delivery)
 
 ### 0.3 Closure
-- [x] Review sign-off on allowlist before any layout code — signed 2026-08-03 (evidence: `go build ./...` + `make test` + `make lint` all pass; fixtures 01–03 committed under `testdata/golden/`)
+- [x] Review sign-off on allowlist before any layout code - signed 2026-08-03 (evidence: `go build ./...` + `make test` + `make lint` all pass; fixtures 01–03 committed under `testdata/golden/`)
 
 ---
 
@@ -143,12 +144,12 @@ Phase 0 Scope → 1 Settings/CLI → 2 Loader → 3 PDF Writer
 - [x] Indirect objects, xref, trailer, catalog, pages tree
 - [x] Content streams: text, path, images, transforms, graphics state
 - [x] Flate compression toggle (`useCompression`)
-- [~] Page geometry: MediaBox, named sizes (A4…), custom size, orientation, margins — MediaBox done; named sizes owned by settings/layout
+- [~] Page geometry: MediaBox, named sizes (A4…), custom size, orientation, margins - MediaBox done; named sizes owned by settings/layout
 
 ### 3.2 Fonts & images
 - [x] TrueType load + simple Latin metrics + subset embed + ToUnicode
 - [x] JPEG pass-through + PNG decode → image XObject
-- [~] imageDPI / imageQuality knobs (best-effort) — DPI scaling at layout; JPEG re-encode quality deferred
+- [~] imageDPI / imageQuality knobs (best-effort) - DPI scaling at layout; JPEG re-encode quality deferred
 
 ### 3.3 Annotations & structure
 - [x] Link annotations (URI + GoTo)
@@ -158,14 +159,14 @@ Phase 0 Scope → 1 Settings/CLI → 2 Loader → 3 PDF Writer
 
 ### 3.4 Closure
 - [x] Unit tests: multi-page PDF validates (manual pdfinfo / structure tests)
-- [x] Benchmark fixture: write 50-page text PDF (record command + time) — `go test -bench=BenchmarkWrite50Pages`: ~20 ms/op (~2 MB/s), deterministic output
+- [x] Benchmark fixture: write 50-page text PDF (record command + time) - `go test -bench=BenchmarkWrite50Pages`: ~20 ms/op (~2 MB/s), deterministic output
 
 ---
 
 ## Phase 4: HTML Parser + CSS Subset Layout
 
 > Detail: [phases/phase-04-html-css-layout.md](phases/phase-04-html-css-layout.md)  
-> **Critical path — largest phase**
+> **Critical path - largest phase**
 
 ### 4.1 HTML subset
 - [ ] Tokenizer + tree builder for allowlisted tags
@@ -235,7 +236,7 @@ Phase 0 Scope → 1 Settings/CLI → 2 Loader → 3 PDF Writer
 - [ ] PDF bookmarks with `outlineDepth`
 - [ ] Simple TOC HTML generation (replace XSLT with Go templates; default TOC look)
 - [ ] Optional `dumpOutline` XML (wkhtmltopdf namespace)
-- [ ] `[~]` Custom user XSL: deferred — no XSLT2 in stdlib; document unsupported or provide limited Go template hooks
+- [ ] `[~]` Custom user XSL: deferred - no XSLT2 in stdlib; document unsupported or provide limited Go template hooks
 
 ### 6.3 Links
 - [ ] Internal fragment → GoTo
@@ -259,7 +260,7 @@ Phase 0 Scope → 1 Settings/CLI → 2 Loader → 3 PDF Writer
 ### 7.1 CLI + pipeline
 - [ ] `gowkhtmltoimage` flags: width/height/crop/format/quality/smart-width/transparent
 - [ ] Layout once → rasterize page (stdlib `image`, `image/png`, `image/jpeg`)
-- [ ] Smart-width binary search approximation (no scrollbar API — use content width)
+- [ ] Smart-width binary search approximation (no scrollbar API - use content width)
 - [ ] SVG output: `[~]` deferred or minimal vector export
 
 ### 7.2 Closure
@@ -278,7 +279,7 @@ Phase 0 Scope → 1 Settings/CLI → 2 Loader → 3 PDF Writer
 - [ ] String settings map for binding parity
 
 ### 8.2 C-shaped compatibility (optional)
-- [ ] `[~]` cgo/shared lib ABI for `wkhtmltopdf_*` — only if needed by consumers; not required for CLI MVP
+- [ ] `[~]` cgo/shared lib ABI for `wkhtmltopdf_*` - only if needed by consumers; not required for CLI MVP
 
 ### 8.3 Closure
 - [ ] Example programs matching `examples/pdf_c_api.c` flow in Go
@@ -379,6 +380,6 @@ flowchart TD
 
 - `[ ]` not started or not proven  
 - `[x]` implemented and validated with current evidence  
-- `[~]` deferred/partial — reason and next gate recorded  
+- `[~]` deferred/partial - reason and next gate recorded  
 
 **Update rule:** mark a row `[x]` only after the matching source/test proof exists; record command + outcome on closure gates.

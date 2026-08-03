@@ -9,10 +9,10 @@ Related PR: https://github.com/chinmay-sawant/gowkhtmltopdf/pull/1
 
 ## Child issues
 
-- [ ] #3 — Image-mode PNG raster quality (fixture-01 analysis)
-- [ ] #4 — Residual font / word spacing (PDF + layout)
-- [ ] #5 — Wikipedia-class / common-site CSS (Ana de Armas)
-- [ ] #6 — Multi-font support (beyond Liberation Sans Regular)
+- [ ] #3 - Image-mode PNG raster quality (fixture-01 analysis)
+- [ ] #4 - Residual font / word spacing (PDF + layout)
+- [ ] #5 - Wikipedia-class / common-site CSS (Ana de Armas)
+- [ ] #6 - Multi-font support (beyond Liberation Sans Regular)
 
 ## Scope (in)
 

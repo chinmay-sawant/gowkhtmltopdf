@@ -290,8 +290,8 @@ func (l *Loader) loadFile(ctx context.Context, path string, lp settings.LoadPage
 }
 
 // filePathFromURL extracts the local filesystem path from a file:// URL
-// (or passes a plain path through). Remote file hosts — anything other
-// than the empty host and localhost — are refused.
+// (or passes a plain path through). Remote file hosts - anything other
+// than the empty host and localhost - are refused.
 func filePathFromURL(path string) (string, error) {
 	u, err := url.Parse(path)
 	if err != nil || u.Scheme != "file" {

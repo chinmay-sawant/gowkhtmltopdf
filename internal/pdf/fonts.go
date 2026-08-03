@@ -6,8 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-
-	"gowkhtmltopdf/internal/pdf/assets"
 )
 
 // Font is a parsed TrueType/OpenType font (table-directory view). It exposes
@@ -15,6 +13,10 @@ import (
 // subset the font into the PDF.
 type Font struct {
 	data []byte
+
+	// PostScriptName is the PDF /BaseFont label (e.g. LiberationSans-Bold).
+	// Empty when the font was loaded without a registry name.
+	PostScriptName string
 
 	unitsPerEm    int16
 	indexToLocFmt int16
@@ -33,13 +35,8 @@ type Font struct {
 	advance []int32           // advance width in font units per glyph
 }
 
-// DefaultFont returns the embedded Liberation Sans regular font.
-func DefaultFont() (*Font, error) {
-	return ParseTTF(bytes.Clone(assets.LiberationSansRegularTTF))
-}
-
 // ParseTTF parses a TrueType (or OpenType with TrueType outlines) font file.
-// CFF-based fonts return an error — this writer targets TrueType outlines.
+// CFF-based fonts return an error - this writer targets TrueType outlines.
 func ParseTTF(data []byte) (*Font, error) {
 	if len(data) < 12 {
 		return nil, errors.New("font: file too short")

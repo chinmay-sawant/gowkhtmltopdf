@@ -139,7 +139,7 @@ func matchAnySelector(sels []css.Selector, n *html.Node) bool {
 }
 
 // flatHeadings concatenates the per-object heading lists in object order,
-// assigns stable synthetic anchors, and sorts by (page, y, x) — the order
+// assigns stable synthetic anchors, and sorts by (page, y, x) - the order
 // both the outline tree and the [section]/[subsection] lookup use.
 func flatHeadings(bodies []*objectState) []*outline.Heading {
 	var all []*outline.Heading

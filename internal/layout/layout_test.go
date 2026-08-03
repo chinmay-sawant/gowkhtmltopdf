@@ -379,8 +379,10 @@ func TestTextWrapping(t *testing.T) {
 	// a long sentence in a 60pt box must wrap into multiple lines
 	res := layoutHTML(t, `<html><body><div>the quick brown fox jumps over the lazy dog</div></body></html>`, s)
 	texts := opsOfKind(res, OpText)
-	if len(texts) < 6 {
-		t.Fatalf("expected many word ops, got %d: %+v", len(texts), texts)
+	// Same-style words on one line coalesce into a single text op, so we
+	// expect one op per wrapped line rather than one op per word.
+	if len(texts) < 3 {
+		t.Fatalf("expected >= 3 line ops after wrap, got %d: %+v", len(texts), texts)
 	}
 	// group ops by line: consecutive ops with the same (rounded) baseline
 	var lines [][]Op
@@ -578,7 +580,7 @@ func TestTableColspan(t *testing.T) {
 	if !(c1.X > wide.X) {
 		t.Errorf("third column x=%v must start right of wide (x=%v)", c1.X, wide.X)
 	}
-	// "a" at col 0, "b" at col 1, "c" at col 2 — b must sit between a and c
+	// "a" at col 0, "b" at col 1, "c" at col 2 - b must sit between a and c
 	a, b, c := texts[2], texts[3], texts[4]
 	if !(a.X < b.X && b.X < c.X) {
 		t.Errorf("column order broken: %v %v %v", a.X, b.X, c.X)
@@ -742,11 +744,13 @@ func TestZoom(t *testing.T) {
 	if len(fills) != 1 {
 		t.Fatalf("zoom 2 fills = %+v, want 1", fills)
 	}
-	if !near(fills[0].X, 12) {
-		t.Errorf("zoom 2 div x = %v, want 12 (body margin 6pt scaled)", fills[0].X)
+	// Background paints the border box after the div's own margin (CSS box
+	// model): body margin 12 + div margin 20 = 32; width 100pt * zoom 2 = 200.
+	if !near(fills[0].X, 32) {
+		t.Errorf("zoom 2 div x = %v, want 32 (body 12 + div margin 20)", fills[0].X)
 	}
-	if !near(fills[0].X+fills[0].W, 212) {
-		t.Errorf("zoom 2 div right edge = %v, want 212 (div x 12 + width 200)", fills[0].X+fills[0].W)
+	if !near(fills[0].X+fills[0].W, 232) {
+		t.Errorf("zoom 2 div right edge = %v, want 232 (x 32 + width 200)", fills[0].X+fills[0].W)
 	}
 }
 
@@ -899,7 +903,7 @@ func TestTableRowNoSplit(t *testing.T) {
 	if err := Paint(doc, res, paintOpts()); err != nil {
 		t.Fatal(err)
 	}
-	// find the row texts (r1, r2, r3 — padded cells emit them)
+	// find the row texts (r1, r2, r3 - padded cells emit them)
 	pages := map[string]int{}
 	for i, op := range res.Ops {
 		if op.Kind == OpText {

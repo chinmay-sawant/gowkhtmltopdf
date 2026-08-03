@@ -1,4 +1,4 @@
-# gowkhtmltopdf — HTML/CSS Compatibility Matrix (MVP Allowlist)
+# gowkhtmltopdf - HTML/CSS Compatibility Matrix (MVP Allowlist)
 
 > **Parent:** `plans/00-canonical-pure-go-rewrite.md` (Phase 0.1)
 > **Status:** frozen for MVP; amendments go through plan review
@@ -30,8 +30,8 @@ as its inline text (per the note column).
 | `img` | Replaced element; **PNG/JPEG only** (intrinsic dims `layout.go:352`; GIF not detected → skipped) |
 | `a` | Hyperlink (`href`) for `http/https/mailto` targets (`inline.go:226,305`); internal anchors deferred to Phase 6 |
 | `strong`, `em`, `b`, `i`, `u`, `small` | `b`/`strong` bold (fake bold), `u` underline, `small` smaller; `em`/`i` parse italic but render upright (no italic font yet, §2.3) |
-| `pre`, `code` | `pre` honors `white-space: pre`; `code` has no monospace rule — single embedded font for all families (§2.3) |
-| `blockquote` | Block-level only — no indent margins (UA rule `style.go:714-717`) |
+| `pre`, `code` | `pre` honors `white-space: pre`; `code` has no monospace rule - single embedded font for all families (§2.3) |
+| `blockquote` | Block-level only - no indent margins (UA rule `style.go:714-717`) |
 | `header`, `footer`, `main`, `section`, `article`, `aside`, `nav` | Treated as `div` (semantic aliases) |
 
 ## 2. Supported CSS properties
@@ -41,10 +41,10 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 `paint.go`, and the tests in `internal/layout/layout_test.go` /
 `internal/convert/golden_test.go` as of Phase 4):
 
-- **Implemented** — parsed and consumed by layout.
-- **Partial** — parsed and used in a subset of the declared cases; the rest
+- **Implemented** - parsed and consumed by layout.
+- **Partial** - parsed and used in a subset of the declared cases; the rest
   degrades silently.
-- **Not implemented** — parsed and dropped, or not parsed at all; the
+- **Not implemented** - parsed and dropped, or not parsed at all; the
   declaration is ignored (graceful, per the contract).
 
 ### 2.1 Box model
@@ -66,20 +66,20 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 |----------|--------|---------------------|
 | `display` (`block\|inline\|none\|list-item\|table\|table-row\|table-cell\|table-row-group\|table-header-group\|table-footer-group`) | Implemented | `style.go:295-301`; consumed `layout.go:158-171, 243-261`; `none` test `TestDisplayNone`; tables test `TestTableLayout` |
 | `display: inline-block` | Partial | parsed, but degrades to block layout (`layout.go:255` only treats `inline` as inline); `<img>` gets `inline-block` via UA rule and works only because `img` is special-cased |
-| `display: table-caption`, `table-column(-group)` | Not implemented | parsed (`style.go:299`); no caption/column model in `buildTable` (`layout.go:382`) — `<caption>` does not render |
-| `float` (`left\|right`) | Not implemented | parsed (`style.go:306-310`); only consumer is `layout.go:255`, which treats a floated element as plain in-flow inline — no float positioning. `layout.go:8` declares floats out of scope |
+| `display: table-caption`, `table-column(-group)` | Not implemented | parsed (`style.go:299`); no caption/column model in `buildTable` (`layout.go:382`) - `<caption>` does not render |
+| `float` (`left\|right`) | Not implemented | parsed (`style.go:306-310`); only consumer is `layout.go:255`, which treats a floated element as plain in-flow inline - no float positioning. `layout.go:8` declares floats out of scope |
 | `clear` (`left\|right\|both`) | Not implemented | parsed (`style.go:311-315`), never consumed |
-| `position` (`static\|relative`) | Not implemented | parsed (`style.go:302-305`), never consumed — everything is `static`; `relative` produces no shift |
+| `position` (`static\|relative`) | Not implemented | parsed (`style.go:302-305`), never consumed - everything is `static`; `relative` produces no shift |
 | `position: fixed` / `absolute` | Not implemented | ignored → `static` (consistent with §5) |
 
 ### 2.3 Text & fonts
 
 | Property | Status | Notes / verified by |
 |----------|--------|---------------------|
-| `font-family` (named + generic) | Partial | parsed + inherited (`style.go:261-265`, `css.go:899`); layout renders every run with the single embedded Liberation Sans (`inline.go:154`) — no family selection |
-| `font-size` | Implemented | `style.go:258-260`, `fontSize` `style.go:561` (px/pt/em/%/rem/in/cm/mm/pc + keywords); `%`/`em` resolve against parent; test `TestFontSizeEmInherit` |
-| `font-weight` (`normal\|bold\|100-900`) | Implemented | `style.go:266-281`; ≥700 renders fake bold via stroke text render mode (`paint.go:130-133`); test `TestBoldUnderline` |
-| `font-style` (`italic\|oblique`) | Not implemented | parsed (`style.go:282-284`) into `FontItalic`, never consumed by layout/paint (no slant) |
+| `font-family` (named + generic) | Partial | parsed + inherited; embedded Liberation Sans family (regular/bold/italic/bold-italic). Named remote families fall back until font discovery (phase 19) |
+| `font-size` | Implemented | `style.go` `fontSize` (px/pt/em/%/rem/in/cm/mm/pc + keywords); `%`/`em` resolve against parent; test `TestFontSizeEmInherit` |
+| `font-weight` (`normal\|bold\|100-900`) | Implemented | ≥700 selects Liberation Sans **Bold** (or BoldItalic); fake stroke bold only if a bold face is missing; tests `TestRealBoldFaceOps`, `TestBoldFaceInInvoicePDF` |
+| `font-style` (`italic\|oblique`) | Implemented | selects Liberation Sans Italic / BoldItalic (`pdf.FaceSet.Resolve`); test `TestRealBoldFaceOps` |
 | `text-align` (`left\|right\|center\|justify`) | Partial | `style.go:412-420`; consumed `inline.go:118-126` for left/right/center; `justify` parses but renders as left |
 | `text-decoration` (`none\|underline\|line-through`) | Implemented | `style.go:433-441`; drawn `inline.go:156-161`; test `TestBoldUnderline` |
 | `text-indent` | Not implemented | parsed (`style.go:444-445`), never consumed |
@@ -103,7 +103,7 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 
 | Property | Status | Notes / verified by |
 |----------|--------|---------------------|
-| `border-collapse` (`collapse\|separate`) | Not implemented (separate only) | parsed (`style.go:446-449`), never consumed — `buildTable` always uses the separate model with `BorderSpacing` (`layout.go:450, 500`) |
+| `border-collapse` (`collapse\|separate`) | Not implemented (separate only) | parsed (`style.go:446-449`), never consumed - `buildTable` always uses the separate model with `BorderSpacing` (`layout.go:450, 500`) |
 | `border-spacing` | Implemented | `style.go:450-451`; used `layout.go:450-455, 500` |
 | `caption-side` | Not implemented | absent from `applyRestProps`; `<caption>` elements are not rendered (see `display: table-caption`) |
 | `table-layout` (`auto\|fixed`) | Not implemented (auto only) | parsed (`style.go:452-455`), never consumed |
@@ -112,7 +112,7 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 
 | Property | Status | Notes / verified by |
 |----------|--------|---------------------|
-| `page-break-before/after/inside` (`auto\|always\|avoid`) | Implemented (print pipeline) | parsed into `style.PageBreak*`; honored as canvas-Y flow shifts by the phase-5 paginator — `beforeAlways` `paint.go:203`, `afterBreaks` `paint.go:236`, `avoidInside` `paint.go:179`; tests `TestPageBreakParsing`, `TestPageBreakBeforeAlways`, `TestPageBreakInsideAvoid` |
+| `page-break-before/after/inside` (`auto\|always\|avoid`) | Implemented (print pipeline) | parsed into `style.PageBreak*`; honored as canvas-Y flow shifts by the phase-5 paginator - `beforeAlways` `paint.go:203`, `afterBreaks` `paint.go:236`, `avoidInside` `paint.go:179`; tests `TestPageBreakParsing`, `TestPageBreakBeforeAlways`, `TestPageBreakInsideAvoid` |
 | `orphans`, `widows` | Not implemented | absent from `applyRestProps` |
 
 ### Feature checklist (page geometry, tables, pagination)
@@ -121,14 +121,15 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 |---------|--------|---------------------|
 | Page size (A4/Letter/…), landscape, margins (mm) | Implemented | `settings.ParsePageSize` (`settings/pagesize.go:39`), `convert.pageGeometry` (`convert.go:138`) |
 | `colspan` | Yes | `colSpan` `layout.go:618-622`; test `TestTableColspan` |
-| `rowspan` | No | attribute ignored — only `colspan` is read |
+| `rowspan` | No | attribute ignored - only `colspan` is read |
 | `border-collapse` | Separate only | see §2.5 |
 | Pagination | Fragment + whole-op (phase 5) | rect-type ops (fill/stroke/line) split at page boundaries; text/images/links move wholly (line-level) (`paint.go:107-150`); `page-break-before/after: always`, `page-break-inside: avoid`, table rows never split (`paint.go:179-336`); element → (page, rect) map in `Result.Locations` for Phase 6. See "Pagination (phase 5)" note below. |
 | Floats / absolute positioning | No | see §2.2; degrade to in-flow layout |
 | Flexbox / Grid | No | `display:flex|grid` not in the allowlist → ignored, element keeps the initial `inline` display (`style.go:295-301`; see §5) |
 | JavaScript | No | stripped at load; `--enable-javascript` accepted + warning (Phase 1) |
+| Image-mode text | TTF outline raster | same Liberation faces as PDF; pure-Go coverage AA (`internal/imageout/ttfraster.go`); 5×7 bitmap only if an op has no font |
 
-**Pagination (phase 5).** Implemented 2026-08-03 (`internal/layout/paint.go`): fragmentation is box-aware — rect-type ops crossing a page boundary are split at the boundary, while text, images and links move wholly to the next page (text is already line-level, so glyphs never split). `page-break-before/after: always` and `page-break-inside: avoid` are honored via canvas-Y flow shifts (`shiftFlowY` `paint.go:156`), and table rows never split (`rowsIntact` `paint.go:290`). `Result.Locations` (`paint.go:341`) carries element boxes (page + rect) for Phase 6 outline/TOC/links. Remaining partials: `--zoom` is accepted and `layout.Options.Zoom` works (`TestZoom` `layout_test.go:726`), but the convert pipeline does not forward it yet; smart-shrinking detects over-wide content and warns without re-layout (`convert.go:218-229`); table-header repeat across pages not implemented; orphan/widow control not implemented.
+**Pagination (phase 5).** Implemented 2026-08-03 (`internal/layout/paint.go`): fragmentation is box-aware - rect-type ops crossing a page boundary are split at the boundary, while text, images and links move wholly to the next page (text is already line-level, so glyphs never split). `page-break-before/after: always` and `page-break-inside: avoid` are honored via canvas-Y flow shifts (`shiftFlowY` `paint.go:156`), and table rows never split (`rowsIntact` `paint.go:290`). `Result.Locations` (`paint.go:341`) carries element boxes (page + rect) for Phase 6 outline/TOC/links. Remaining partials: `--zoom` is accepted and `layout.Options.Zoom` works (`TestZoom` `layout_test.go:726`), but the convert pipeline does not forward it yet; smart-shrinking detects over-wide content and warns without re-layout (`convert.go:218-229`); table-header repeat across pages not implemented; orphan/widow control not implemented.
 
 ## 3. Supported units
 
@@ -146,7 +147,7 @@ Status legend as in §2; resolution sites: `fontSize` `style.go:561`,
 | `rem` | Implemented | 16 px reference (`style.go:593, 657, 694`) |
 | `%` | Implemented | containing block for box/margins; parent font-size for `font-size` |
 | `vw`, `vh` | Partial | resolved for width/height/min/max (`lengthBox` `style.go:662-663`) only; ignored for margins/padding/font-size |
-| `ex`, `ch` | Not implemented | accepted by the parser (`css.go:731`) but never resolved by `style.go` — declaration dropped |
+| `ex`, `ch` | Not implemented | accepted by the parser (`css.go:731`) but never resolved by `style.go` - declaration dropped |
 | `vmin`, `vmax`, `dpi`-style | Not implemented | rejected at parse |
 
 ## 4. Supported selector syntax (cascade)
@@ -158,10 +159,10 @@ Status legend as in §2; evidence in `internal/css/css.go`.
 | Element (`h1`, `p`, …), class (`.foo`), ID (`#bar`) | Implemented | `parseCompound` `css.go:444`; matching `Match` `css.go:518`; test `css_test.go::TestMatch` |
 | Universal (`*`) | Implemented | `css.go:456-459` |
 | Descendant (`div p`), child (`ul > li`) | Implemented | combinators `css.go:356-362`; matching `css.go:528-543` |
-| Sibling (`a + b`, `a ~ b`) | Partial | parsed (`css.go:357-360`) but matched as descendant (`css.go:534` default branch) |
-| Attribute (`[href]`, `[href="…"]`) | Not implemented | dropped from the compound during tokenizing (`css.go:396-405`); `[x]` alone becomes `*` |
-| `:first-child`, `:last-child`, `:nth-child(n)` | Not implemented | dropped during tokenizing (`css.go:406-421`) — note `tbody tr:nth-child(even)` in fixture-02 matches **all** rows |
-| `:link`, `:visited`, `:hover`, `:active`, `:focus` | Not implemented (accepted, ignored) | dropped with the other pseudo-classes; no interaction states in print |
+| Sibling (`a + b`, `a ~ b`) | Implemented | next-sibling `+` and subsequent-sibling `~` (`css.Match`); test `TestSiblingCombinators` |
+| Attribute (`[href]`, `[href="…"]`) | Implemented | presence `[attr]` and exact `[attr=value]` (quoted or bare); other ops not yet |
+| `:first-child`, `:last-child`, `:nth-child(n)` | Implemented | `odd`/`even`/`an+b`/integer; tests `TestMatch`, `TestNthChildZebraSheet` |
+| `:link`, `:visited`, `:hover`, `:active`, `:focus` | Not implemented (accepted, ignored) | ignored for print; compound still matches without them |
 | `::before` / `::after` | Not implemented | dropped with the other pseudo-classes |
 | `!important` | Implemented | `css.go:664-688`; separate cascade layer `style.go:221-247`; test `css_test.go::TestParseImportant` |
 | Specificity (ID > class > element), inline `style` wins, `!important` overrides | Implemented | `Specificity` `css.go:578`; inline style priority `style.go:233-239`; test `css_test.go::TestSpecificity` |
@@ -190,7 +191,7 @@ Status legend as in §2; evidence in `internal/css/css.go`.
 | Rule | Value |
 |------|-------|
 | Local file access | **Blocked by default** (`--enable-local-file-access` opt-in; `--allow` path allowlist walk) |
-| Untrusted HTML | **Not supported** — same warning as upstream `docs/status.md`; use with HTML you control only |
+| Untrusted HTML | **Not supported** - same warning as upstream `docs/status.md`; use with HTML you control only |
 | Remote URL fetch | `net/http` defaults: connect + response timeouts, redirect limit, `blockLocalFileAccess` covers `file://` and localhost refs |
 | SSRF posture | No automatic form submission; POST only via explicit `--post` flags; no cookies auto-forwarded from site contexts |
 
@@ -204,15 +205,15 @@ intent**: each flag's dotted setting was traced from the `Set` surface
 setting has no consumer are marked **Ignored**, even when upstream
 wkhtmltopdf honors them.
 
-- **Supported** — parsed, wired into settings, and the setting is consumed
+- **Supported** - parsed, wired into settings, and the setting is consumed
   by the PDF/image pipeline; exercised end-to-end in `internal/convert`
   tests (incl. `TestGoldenCorpusAllFixtures`), `internal/cli` parse tests,
   or the CLI smoke run.
-- **Partial** — accepted and stored, but only part of the upstream
+- **Partial** - accepted and stored, but only part of the upstream
   behavior is honored (note column says which).
-- **Ignored** — accepted and stored, never consumed; no effect on output
+- **Ignored** - accepted and stored, never consumed; no effect on output
   (mostly `web.*` / `load.*` JS-era settings).
-- **Error** — rejected. No flag in the table is rejected at parse, but
+- **Error** - rejected. No flag in the table is rejected at parse, but
   `--<unknown>` → `unknown option`, invalid enum/length values → error, and
   a bogus `--page-size` fails at conversion time. `--bogus-flag` is
   exercised by `TestUnknownFlagErrors`.
@@ -267,7 +268,7 @@ wkhtmltopdf honors them.
 
 | Flag | Mode | Status |
 |------|------|--------|
-| `--enable-javascript`, `--disable-javascript` | Both | Ignored (JS stripped at load; no engine — the warning stub `load.WarnJSStubs` is not wired into the pipeline) |
+| `--enable-javascript`, `--disable-javascript` | Both | Ignored (JS stripped at load; no engine - the warning stub `load.WarnJSStubs` is not wired into the pipeline) |
 | `--enable-local-file-access`, `--disable-local-file-access` | Both | Supported (local-file ACL; security policy §6 + golden runner) |
 | `--allow` | PDF | Supported (ACL allow-prefix list) |
 | `--background`, `--no-background` | Both | Supported (paint gate; golden runner sets it on) |
@@ -288,7 +289,7 @@ wkhtmltopdf honors them.
 | `--username`, `--password` | Both | Supported (HTTP basic auth) |
 | `--custom-header-propagation`, `--no-custom-header-propagation` | Both | Ignored (`RepeatCustomHeaders` stored, never read) |
 | `--timeout` | Both | Supported (HTTP response timeout) |
-| `--external-links`, `--no-external-links` | PDF | Partial (the `stripLinkURIs` path exists, but `applyObjectDefaults` ORs the default on, so the off state is unreachable from the CLI — documented quirk in `convert.go`) |
+| `--external-links`, `--no-external-links` | PDF | Partial (the `stripLinkURIs` path exists, but `applyObjectDefaults` ORs the default on, so the off state is unreachable from the CLI - documented quirk in `convert.go`) |
 | `--internal-links`, `--no-internal-links` | PDF | Ignored (layout never emits internal link ops) |
 | `--produce-forms` | PDF | Ignored (no AcroForm support in the PDF writer) |
 
@@ -310,13 +311,13 @@ wkhtmltopdf honors them.
 | `--header-spacing`, `--footer-spacing` | PDF | Supported (band measurement) |
 | `--header-line`, `--footer-line` | PDF | Supported (separator line) |
 | `--header-font-name`, `--footer-font-name` | PDF | Partial (stored; every font renders as the embedded Liberation Sans) |
-| `--header-html`, `--footer-html` | PDF | Supported (URL values; raw-markup values rejected with a warning — upstream-compatible; `TestHTMLHeader`, `TestHTMLHeaderRawMarkupRejected`) |
+| `--header-html`, `--footer-html` | PDF | Supported (URL values; raw-markup values rejected with a warning - upstream-compatible; `TestHTMLHeader`, `TestHTMLHeaderRawMarkupRejected`) |
 
 ### 7.8 TOC objects
 
 | Flag | Mode | Status |
 |------|------|--------|
-| `--xsl-style-sheet` | PDF | Partial (accepted; warning emitted, built-in Go template used instead — no XSLT in stdlib) |
+| `--xsl-style-sheet` | PDF | Partial (accepted; warning emitted, built-in Go template used instead - no XSLT in stdlib) |
 | `--toc-header-text` | PDF | Supported (`TestTOC`) |
 | `--toc-text-size-shrink` | PDF | Supported |
 | `--disable-toc-links` | PDF | Supported |

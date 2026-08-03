@@ -1,6 +1,6 @@
 ## Context
 
-**Parent epic:** #2 — [epic: post-MVP rendering quality — image mode, fonts, CSS for real sites](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/2)
+**Parent epic:** #2 - [epic: post-MVP rendering quality - image mode, fonts, CSS for real sites](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/2)
 
 **Siblings under #2:** #3 (image-mode PNG) · #4 (font spacing) · #5 (Wikipedia CSS) · #6 (multi-font)
 
@@ -23,7 +23,7 @@ Note: fixture-01 HTML is **text-only** (no `<img>` logo). The defect is **image-
 
 Image mode intentionally uses a **5×7 public-domain bitmap font** because the Go stdlib has no text rasterizer:
 
-- `internal/imageout/font.go` — `font5x7` / Adafruit-style table; `glyphCols=5`, `glyphRows=8`, `glyphAdvance=6`
+- `internal/imageout/font.go` - `font5x7` / Adafruit-style table; `glyphCols=5`, `glyphRows=8`, `glyphAdvance=6`
 - Scale: `size/12` nearest-neighbour (`drawString`); **no anti-aliasing**
 - Bold: draw glyph twice with 1 px offset (fake bold)
 - Layout still measures text with **Liberation Sans** metrics (`pdf.Font` / layout engine); image paint uses **fixed bitmap advances** → **metric mismatch** → spacing looks wrong even when PDF looks better

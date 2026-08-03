@@ -1,6 +1,6 @@
 ## Context
 
-**Parent epic:** #2 — [epic: post-MVP rendering quality — image mode, fonts, CSS for real sites](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/2)
+**Parent epic:** #2 - [epic: post-MVP rendering quality - image mode, fonts, CSS for real sites](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/2)
 
 **Siblings under #2:** #3 (image-mode PNG) · #4 (font spacing) · #5 (Wikipedia CSS) · #6 (multi-font)
 
@@ -9,7 +9,7 @@ Today the engine effectively validates **one** embedded face:
 | Mode | Font |
 |------|------|
 | PDF | Liberation Sans **Regular** only (`internal/pdf/assets/LiberationSans-Regular.ttf`), subset embedded |
-| Image | 5×7 ASCII bitmap (`internal/imageout/font.go`) — not even the TTF |
+| Image | 5×7 ASCII bitmap (`internal/imageout/font.go`) - not even the TTF |
 
 Bold is **faked** (PDF: fill+stroke text mode; image: double draw). Italic is largely upright.  
 Non-Latin / CJK / many Unicode punctuation paths fold to `?` or WinAnsi stand-ins (`pdfString` / `winAnsiFold`).

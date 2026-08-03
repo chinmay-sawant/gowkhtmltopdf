@@ -47,7 +47,7 @@ r.GET("/pdf", func(c *gin.Context) {
 })
 ```
 
-### A — Preferred: convert **your** HTML only (low risk)
+### A - Preferred: convert **your** HTML only (low risk)
 
 ```text
 User → Gin → render YOUR template (html/template) with YOUR data
@@ -65,7 +65,7 @@ User → Gin → render YOUR template (html/template) with YOUR data
 
 **This is the intended product use:** invoices, statements, server-side reports.
 
-### B — User supplies `?url=` (high risk: SSRF)
+### B - User supplies `?url=` (high risk: SSRF)
 
 ```go
 userURL := c.Query("url") // attacker-controlled
@@ -93,7 +93,7 @@ passes user URLs through.
   untrusted pages.
 - Prefer a **separate worker** with locked-down egress.
 
-### C — Hostile HTML with extra resource URLs (SSRF hop 2)
+### C - Hostile HTML with extra resource URLs (SSRF hop 2)
 
 Even if the main page is “https://example.com/ok.html”, the HTML may contain:
 
@@ -105,7 +105,7 @@ Even if the main page is “https://example.com/ok.html”, the HTML may contain
 The loader will attempt those fetches from **your** process. Treat any HTML
 you did not author as able to **drive egress**.
 
-### D — Local files enabled + user input (high risk: file read)
+### D - Local files enabled + user input (high risk: file read)
 
 Defaults block local files. If the app enables:
 
@@ -124,7 +124,7 @@ then content may be read as the **process user** and end up in the PDF.
 Keep local access **off** for untrusted input; if you need templates on disk,
 use a **narrow `--allow` prefix**, not a global enable on a multi-tenant API.
 
-### E — Resource exhaustion (DoS)
+### E - Resource exhaustion (DoS)
 
 Large pages, many images, concurrent conversions: CPU/memory for layout/PDF.
 Timeouts and a ~100 MiB body cap help, but Gin still needs **rate limits** and
@@ -152,7 +152,7 @@ concurrency caps on the convert endpoint.
 Sketch (Gin + preferred path):
 
 ```go
-// Pseudocode — preferred
+// Pseudocode - preferred
 func invoicePDF(c *gin.Context) {
     data := loadInvoice(c) // authz checked
     html := renderTemplate("invoice.html", data) // YOU control markup
@@ -181,7 +181,7 @@ func invoicePDF(c *gin.Context) {
 
 ## Does the same apply to original wkhtmltopdf?
 
-**Yes — same problem class.**
+**Yes - same problem class.**
 
 | Concern | wkhtmltopdf | gowkhtmltopdf |
 |---------|-------------|----------------|
@@ -200,6 +200,6 @@ both tools.
 
 ## See also
 
-- [THREAT-MODEL.md](THREAT-MODEL.md) — ACL matrix, timeouts, controls inventory  
-- [library-api.md](library-api.md) — `NewConverter` settings  
-- [getting-started.md](getting-started.md) — local file opt-in  
+- [THREAT-MODEL.md](THREAT-MODEL.md) - ACL matrix, timeouts, controls inventory  
+- [library-api.md](library-api.md) - `NewConverter` settings  
+- [getting-started.md](getting-started.md) - local file opt-in  

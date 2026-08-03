@@ -11,7 +11,7 @@ wkhtmltopdf-compatible CLI and library API.
 
 ### Added
 
-- **Settings + CLI (phases 0-1):** wkhtmltopdf-compatible flag surface —
+- **Settings + CLI (phases 0-1):** wkhtmltopdf-compatible flag surface  - 
   global options, `page`/`cover`/`toc` object grammar, `-V`/`--version`,
   exit-code mapping; dotted-name settings model with defaults matching
   pdfsettings.cc.
@@ -31,8 +31,8 @@ wkhtmltopdf-compatible CLI and library API.
   with `[page]`/`[frompage]`/`[title]`/… placeholders, table of contents,
   PDF outline, internal/external links.
 - **Image converter (phase 7):** `gowkhtmltoimage` PNG/JPEG raster output
-  (bitmap-font text, no anti-aliasing — see limits).
-- **Library API (phase 8):** `gowkhtmltopdf` root package —
+  (bitmap-font text, no anti-aliasing - see limits).
+- **Library API (phase 8):** `gowkhtmltopdf` root package  - 
   `NewConverter`/`AddObject`/`Convert`/`Output`,
   `NewImageConverter`, settings `Set`/`Get`.
 - **Release gates (phase 9):** 10-page table-report performance budget
@@ -46,7 +46,7 @@ wkhtmltopdf-compatible CLI and library API.
 - Single embedded font (Liberation Sans subset) for all font families; no
   CJK/complex-script shaping; italics render upright, `ol` markers are
   bullets.
-- Image mode renders text with a 5x7 bitmap font — no anti-aliasing, no
+- Image mode renders text with a 5x7 bitmap font - no anti-aliasing, no
   glyph rasterizer.
 - No XSLT TOC stylesheets, no AcroForm forms, no SVG/BMP output, no SOCKS5
   proxy, no PDF encryption/PDF-A.

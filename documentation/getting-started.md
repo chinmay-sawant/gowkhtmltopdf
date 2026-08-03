@@ -35,7 +35,7 @@ Local files are **blocked by default** (security ACL). Opt in with
 ```
 
 Open `/tmp/invoice.pdf` in any PDF viewer. Committed samples live in
-[`output/`](../output/) — regenerate with `make samples`.
+[`output/`](../output/) - regenerate with `make samples`.
 
 ## Remote URL
 
@@ -51,7 +51,7 @@ server-generated HTML.
 
 **If you embed this in Gin (or any API):** do **not** pass arbitrary user
 `?url=` values into the converter without host allowlists and network
-isolation — that is classic **SSRF** (your server fetches internal hosts).
+isolation - that is classic **SSRF** (your server fetches internal hosts).
 The **preferred** pattern is to generate HTML yourself, then convert that.
 The same class of issue exists for **upstream wkhtmltopdf**. See
 [integration-security.md](integration-security.md).

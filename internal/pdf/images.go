@@ -11,7 +11,7 @@ import (
 func jpegLengthMarkers(b byte) bool {
 	// SOF0-SOF15 (except DHT C4, DAC CC, RST0-D7, TEM 01), SOI D8, EOI D9,
 	// SOS DA, DQT DB, DRI DD, DNL DC, DHP DE, EXP DF, APP0-APP15 E0-EF,
-	// COM FE, DHT C4, DAC CC — all have a 2-byte length after the marker.
+	// COM FE, DHT C4, DAC CC - all have a 2-byte length after the marker.
 	switch {
 	case b == 0x01, b == 0xD8, b == 0xD9:
 		return false

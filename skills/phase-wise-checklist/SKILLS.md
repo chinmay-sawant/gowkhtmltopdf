@@ -14,9 +14,9 @@ Create one canonical plan under `plans/` and treat it as a live execution ledger
 3. Start with the required plan shape:
 
    ```markdown
-   # <Hierarchy> — <Title>
+   # <Hierarchy> - <Title>
 
-   > **Parent:** `<path>` — reference
+   > **Parent:** `<path>` - reference
    > **Status:** current state
    > **Estimated effort:** estimate
 

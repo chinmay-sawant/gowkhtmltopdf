@@ -1,6 +1,6 @@
 ## Context
 
-**Parent epic:** #2 — [epic: post-MVP rendering quality — image mode, fonts, CSS for real sites](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/2)
+**Parent epic:** #2 - [epic: post-MVP rendering quality - image mode, fonts, CSS for real sites](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/2)
 
 **Siblings under #2:** #3 (image-mode PNG) · #4 (font spacing) · #5 (Wikipedia CSS) · #6 (multi-font)
 
@@ -16,7 +16,7 @@ Evidence: `output/fixture-01-simple-invoice.pdf` / `.png`, showcase and multi-pa
 
 ## Scope (in)
 
-1. Audit layout text ops (`internal/layout/inline.go`) — word splitting, space width, trailing space on runs.
+1. Audit layout text ops (`internal/layout/inline.go`) - word splitting, space width, trailing space on runs.
 2. Align **paint** advances with **layout** advances for PDF (Liberation Sans) and document any intentional differences.
 3. Revisit fake bold: compensate advance or use a real bold face (coordinate with multi-font issue).
 4. Consider coalescing adjacent text ops on the same baseline into fewer `Tj` strings (smaller streams, fewer gaps).

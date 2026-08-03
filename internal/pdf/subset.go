@@ -48,7 +48,7 @@ func subsetFont(f *Font, used []rune) (*subsetResult, error) {
 		}
 		outlines[newID] = f.glyphOutline(old)
 	}
-	// remap composite components (on clones — never mutate source tables)
+	// remap composite components (on clones - never mutate source tables)
 	cloned := make([][]byte, len(outlines))
 	for i, o := range outlines {
 		cloned[i] = bytes.Clone(o)

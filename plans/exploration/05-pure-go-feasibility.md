@@ -1,7 +1,7 @@
-# Exploration 05 — Pure-Go Feasibility (Stdlib Only)
+# Exploration 05 - Pure-Go Feasibility (Stdlib Only)
 
 > **Agent:** explore · feasibility  
-> **Constraint:** Go standard library only — no modules, no Chrome, no cgo
+> **Constraint:** Go standard library only - no modules, no Chrome, no cgo
 
 ---
 
@@ -20,7 +20,7 @@
 | HTTP/file loader | Mostly | 0.5–2 |
 | HTML parser | No (build subset) | 1–6 |
 | CSS + layout | No | 8–14+ |
-| JavaScript | No — **omit** | 0 |
+| JavaScript | No - **omit** | 0 |
 | Fonts/shaping | Almost no | 3–6 Latin |
 | Images JPEG/PNG/GIF | Yes | 0.5–1 |
 | SVG/WebP | No | defer |

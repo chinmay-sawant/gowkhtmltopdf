@@ -1,4 +1,4 @@
-# Phase 00 — Scope Freeze & Project Foundations
+# Phase 00 - Scope Freeze & Project Foundations
 
 > **Parent:** `plans/00-canonical-pure-go-rewrite.md`  
 > **Status:** complete (2026-08-03)  
