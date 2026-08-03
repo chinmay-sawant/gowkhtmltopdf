@@ -432,7 +432,7 @@ func sectionOf(headings []*outline.Heading, page int) (section, subsection strin
 // drawHeadersFooters is the final pass that paints the effective text/HTML
 // header and footer of every page once the whole document exists (so [topage]
 // and the page indices are final). Cover pages are skipped. Errors loading an
-// HTML header/footer here only warn — the body content is already painted.
+// HTML header/footer here only warn - the body content is already painted.
 func drawHeadersFooters(ctx context.Context, loader *load.Loader, font *pdf.Font, doc *pdf.Document, cmd *cli.Command, tocs, bodies []*objectState, tocTotal int, headings []*outline.Heading, log io.Writer) {
 	total := doc.PageCount()
 	type owner struct {

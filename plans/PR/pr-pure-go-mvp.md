@@ -33,17 +33,17 @@ Built **from scratch** with **zero third-party Go modules or HTML→PDF APIs** (
 
 ### Last-mile viewer-valid PDFs
 
-- **zlib `/FlateDecode`** — content/font streams use `compress/zlib` (RFC 1950), not raw DEFLATE
-- **Catalog `/Outlines`** — outline refs finalized *before* Catalog is written (`/Outlines N 0 R`)
-- **CLI page-scoped pending** — no ghost empty page when `--enable-local-file-access … toc …` runs (`make samples` showcase)
-- **Glyph `/Widths`** — scale TTF advances by `1000/unitsPerEm` (fixes letter-spacing like `A c m e`)
-- **Latin-1 `pdfString`** — encode per rune; fold common Unicode punctuation; subset matches string bytes
+- **zlib `/FlateDecode`** - content/font streams use `compress/zlib` (RFC 1950), not raw DEFLATE
+- **Catalog `/Outlines`** - outline refs finalized *before* Catalog is written (`/Outlines N 0 R`)
+- **CLI page-scoped pending** - no ghost empty page when `--enable-local-file-access … toc …` runs (`make samples` showcase)
+- **Glyph `/Widths`** - scale TTF advances by `1000/unitsPerEm` (fixes letter-spacing like `A c m e`)
+- **Latin-1 `pdfString`** - encode per rune; fold common Unicode punctuation; subset matches string bytes
 
 ### Docs / license / tooling
 
-- **MIT License** — Copyright (c) 2026 Chinmay Sawant (`LICENSE`)
-- **README** — clean-room / no third-party APIs; AI build story (Grok plans + last-mile, DeepSeek ~90% phases); deferred list
-- **`make samples`** — regenerate fixture PDFs, TOC/HF showcase, sample PNG
+- **MIT License** - Copyright (c) 2026 Chinmay Sawant (`LICENSE`)
+- **README** - clean-room / no third-party APIs; AI build story (Grok plans + last-mile, DeepSeek ~90% phases); deferred list
+- **`make samples`** - regenerate fixture PDFs, TOC/HF showcase, sample PNG
 - **`output/` gitignored**
 
 ### Package map (short)
@@ -66,7 +66,7 @@ Built **from scratch** with **zero third-party Go modules or HTML→PDF APIs** (
 | **Memory** | Report-sized documents; full corpus loads in tests |
 | **Behavior / correctness** | Viewer-valid Latin PDFs; deterministic bytes for fixed creation time |
 | **API / CLI** | New binaries + library; wkhtmltopdf-style flags (JS-era flags accepted as no-ops) |
-| **Dependencies** | **None** — Go stdlib only; `CGO_ENABLED=0` |
+| **Dependencies** | **None** - Go stdlib only; `CGO_ENABLED=0` |
 | **Binary size / build time** | Static binaries; offline build |
 
 ---
@@ -83,7 +83,7 @@ Built **from scratch** with **zero third-party Go modules or HTML→PDF APIs** (
 
 - [x] `make test` / `go test ./...`
 - [x] `go test ./internal/pdf/ ./internal/cli/ ./internal/convert/` after last-mile fixes
-- [x] `make samples` — fixtures + showcase TOC/HF/outline open in Ghostscript
+- [x] `make samples` - fixtures + showcase TOC/HF/outline open in Ghostscript
 - [x] URL smoke: `gowkhtmltopdf https://en.wikipedia.org/wiki/Ana_de_Armas` produces multi-page PDF (Latin OK; non-Latin still limited)
 - [ ] CI green on PR (`make test`, `make lint`, `CGO_ENABLED=0` builds)
 
@@ -135,7 +135,7 @@ Wikipedia URL conversion succeeds (~24 pages); non-Latin language names still sh
 - Richer CSS: floats/position, flex/grid, richer selectors
 - Table header repeat, smart-shrinking re-layout, inline `#` link rects
 - Coalesce word-by-word `BT`/`ET` text ops
-- Full WebKit parity — **not planned**
+- Full WebKit parity - **not planned**
 
 ---
 

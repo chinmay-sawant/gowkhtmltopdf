@@ -448,7 +448,7 @@ func mergedReplaces(obj *settings.PdfObject, g settings.PdfGlobal) map[string]st
 // measuredWidth returns the effective content width of a layout result: the
 // reported Result.Width, raised to the widest visual op extent when the
 // report only mirrors the viewport (layout currently sets Result.Width to
-// Options.Width — see internal/layout/layout.go — so over-wide fixed-width
+// Options.Width - see internal/layout/layout.go - so over-wide fixed-width
 // boxes show up only as op extents). Text and link ops never force a page
 // wider, so they are ignored; rects and images are what push content out.
 func measuredWidth(res *layout.Result) float64 {

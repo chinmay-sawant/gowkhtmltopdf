@@ -1,4 +1,4 @@
-# Phase 17 — Broader CSS: Position / Float Refinement / Partial Flex
+# Phase 17 - Broader CSS: Position / Float Refinement / Partial Flex
 
 > **Parent:** `plans/10-canonical-post-mvp-roadmap.md`  
 > **Status:** not started  
@@ -11,7 +11,7 @@
 
 ## Overview
 
-Expand layout beyond invoice float-lite toward **partial flex**, refined **position**, and remaining float edge cases. Grid remains out of scope unless product amends. Goal: enough CSS for many report and simple marketing layouts—not Wikipedia chrome parity.
+Expand layout beyond invoice float-lite toward **partial flex**, refined **position**, and remaining float edge cases. Grid remains out of scope unless product amends. Goal: enough CSS for many report and simple marketing layouts - not Wikipedia chrome parity.
 
 ## Executive Summary
 
@@ -39,10 +39,10 @@ Expand layout beyond invoice float-lite toward **partial flex**, refined **posit
 
 - [ ] `position: relative` + `top`/`right`/`bottom`/`left` offsets applied at paint or layout
 - [ ] Stacking: document z-order rules (simple tree order if no z-index)
-- [ ] `[~]` `z-index` — only if needed
+- [ ] `[~]` `z-index` - only if needed
 - [ ] `position: absolute`: containing block = nearest positioned ancestor or initial; out of flow
 - [ ] Absolute with `left`/`top`/`width`/`height` subset for badges/watermarks
-- [ ] `[~]` `position: fixed` — page-fixed in print is hard; prefer CLI HF; implement only with clear print semantics
+- [ ] `[~]` `position: fixed` - page-fixed in print is hard; prefer CLI HF; implement only with clear print semantics
 - [ ] Matrix §2.2 updates
 
 ### 17.3 Partial flexbox (report-friendly)
@@ -54,8 +54,8 @@ Expand layout beyond invoice float-lite toward **partial flex**, refined **posit
 - [ ] `align-items`: stretch | flex-start | center | flex-end (subset)
 - [ ] `gap` / `row-gap` / `column-gap` simple lengths
 - [ ] Children: honor `flex-grow` 0/1 basic; `[~]` full flex algorithm deferred
-- [ ] `[~]` `flex-wrap: wrap` — stage 2 if needed
-- [ ] `[~]` `order` — optional
+- [ ] `[~]` `flex-wrap: wrap` - stage 2 if needed
+- [ ] `[~]` `order` - optional
 - [ ] Tests: 3-column metric row; header bar with space-between
 - [ ] Path: new flex layout path in `internal/layout/`
 - [ ] Matrix: flex Partial with listed properties only

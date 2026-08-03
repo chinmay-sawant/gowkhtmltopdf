@@ -1,4 +1,4 @@
-# Exploration 01 — Architecture & Core Pipeline
+# Exploration 01 - Architecture & Core Pipeline
 
 > **Agent:** explore · architecture  
 > **Source tree:** `wkhtmltopdf/` v0.12.7-dev  

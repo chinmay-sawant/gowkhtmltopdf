@@ -1,4 +1,4 @@
-# Phase 11 — Library API for Go Embedders
+# Phase 11 - Library API for Go Embedders
 
 > **Parent:** `plans/10-canonical-post-mvp-roadmap.md`  
 > **Status:** not started (MVP Phase 8 API already shipped)  
@@ -11,7 +11,7 @@
 
 ## Overview
 
-MVP already exposes an idiomatic Go API. This phase makes it **safe and obvious** for other Go applications to import and use: better docs, integration recipes, small API gaps, and verification that the public surface is embedder-ready—without third-party plugins or C ABI.
+MVP already exposes an idiomatic Go API. This phase makes it **safe and obvious** for other Go applications to import and use: better docs, integration recipes, small API gaps, and verification that the public surface is embedder-ready - without third-party plugins or C ABI.
 
 ## Executive Summary
 
@@ -46,7 +46,7 @@ MVP already exposes an idiomatic Go API. This phase makes it **safe and obvious*
   - Outline / TOC flags from library
   - Image converter full example (width, format, quality)
   - Callbacks: OnInfo/OnWarn/OnError/OnPhase/OnProgress
-- [ ] Add **HTTP handler recipe** in docs (stdlib `net/http` only—no Gin dependency in this module)
+- [ ] Add **HTTP handler recipe** in docs (stdlib `net/http` only - no Gin dependency in this module)
 - [ ] Cross-link `documentation/integration-security.md` (SSRF, local file ACL)
 - [ ] Module install story: `go get` / replace / version tags when published
 
@@ -57,7 +57,7 @@ MVP already exposes an idiomatic Go API. This phase makes it **safe and obvious*
   - Expected: `Output() []byte` without leaving temp files on success
   - Proof: unit test + no leftover files in `os.TempDir` pattern test
 - [ ] Optional helper: `ConvertHTML(ctx, html []byte, global settings…) ([]byte, error)` if it reduces boilerplate without hiding ACL
-- [ ] Optional helper: `ConvertFile` / `ConvertURL` thin wrappers—only if docs alone are insufficient
+- [ ] Optional helper: `ConvertFile` / `ConvertURL` thin wrappers - only if docs alone are insufficient
 - [ ] Ensure `HttpErrorCode()` behavior is documented and tested (or marked stub honestly)
 - [ ] Do **not** add cgo / shared-lib ABI (phase 8.4 remains `[~]`)
 

@@ -39,7 +39,7 @@ func DefaultFont() (*Font, error) {
 }
 
 // ParseTTF parses a TrueType (or OpenType with TrueType outlines) font file.
-// CFF-based fonts return an error — this writer targets TrueType outlines.
+// CFF-based fonts return an error - this writer targets TrueType outlines.
 func ParseTTF(data []byte) (*Font, error) {
 	if len(data) < 12 {
 		return nil, errors.New("font: file too short")

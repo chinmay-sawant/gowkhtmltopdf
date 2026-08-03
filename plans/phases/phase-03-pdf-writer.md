@@ -1,4 +1,4 @@
-# Phase 03 — PDF Object Model & Writer
+# Phase 03 - PDF Object Model & Writer
 
 > **Parent:** `plans/00-canonical-pure-go-rewrite.md`  
 > **Status:** complete (2026-08-03)  
@@ -10,7 +10,7 @@
 
 ## Overview
 
-Implement a **stdlib-only PDF writer**. Upstream does **not** implement PDF — it uses `QPrinter`. We must own the entire PDF object model.
+Implement a **stdlib-only PDF writer**. Upstream does **not** implement PDF - it uses `QPrinter`. We must own the entire PDF object model.
 
 ## Executive Summary
 
@@ -39,12 +39,12 @@ Minimal PDF 1.4 with text, images, compression, links, and outlines is ~2–4 PM
 - [x] Simple font or Type0/CID for Unicode
 - [x] Subset glyphs used on page
 - [x] ToUnicode CMap for copy-paste
-- [x] Ship or load one default Latin font (embed bytes in repo as asset via `//go:embed` — stdlib)
+- [x] Ship or load one default Latin font (embed bytes in repo as asset via `//go:embed` - stdlib)
 
 ### 3.4 Images
 - [x] JPEG: DCTDecode pass-through when possible
 - [x] PNG: decode with `image/png`, re-encode Flate RGB (+ soft mask for alpha)
-- [~] Scale/DPI helpers for imageDPI setting — layout computes target rect; writer paints into it
+- [~] Scale/DPI helpers for imageDPI setting - layout computes target rect; writer paints into it
 
 ### 3.5 Annotations & outline
 - [x] Annots array: Link with `/URI` or `/GoTo`
@@ -54,12 +54,12 @@ Minimal PDF 1.4 with text, images, compression, links, and outlines is ~2–4 PM
 
 ### 3.6 Settings wiring hooks
 - [x] Compression on/off
-- [~] Page size helpers (A4 etc. in points) — `internal/settings` owns sizes; layout converts
+- [~] Page size helpers (A4 etc. in points) - `internal/settings` owns sizes; layout converts
 - [x] Grayscale: convert colors at paint time
 
 ### 3.7 Explicit defer
-- [x] `[~]` Encryption — not in upstream
-- [x] `[~]` AcroForm — Phase 9+ optional
+- [x] `[~]` Encryption - not in upstream
+- [x] `[~]` AcroForm - Phase 9+ optional
 - [x] `[~]` ICC / PDF/A
 
 ### 3.8 Tests & proof

@@ -1,4 +1,4 @@
-# Phase 13 — Typography: Spacing Stability
+# Phase 13 - Typography: Spacing Stability
 
 > **Parent:** `plans/10-canonical-post-mvp-roadmap.md`  
 > **Status:** not started  
@@ -38,8 +38,8 @@ After the 1000-unit `/Widths` fix, Latin text is readable but residual **word/le
 - [ ] Consistent space width: use font space glyph advance (not ad-hoc constant) unless justified
 - [ ] Trailing space on runs: do not double-count or drop inconsistently across line breaks
 - [ ] Optional: coalesce adjacent same-style words on one baseline into one text op (fewer gaps, smaller streams)
-- [ ] `letter-spacing` already implemented — regression test remains green
-- [ ] `[~]` `word-spacing` CSS — implement only if invoice fixtures need it; else leave matrix Not implemented
+- [ ] `letter-spacing` already implemented - regression test remains green
+- [ ] `[~]` `word-spacing` CSS - implement only if invoice fixtures need it; else leave matrix Not implemented
 - [ ] Path: `internal/layout/inline.go`, `paint.go`
 
 ### 13.3 PDF paint alignment

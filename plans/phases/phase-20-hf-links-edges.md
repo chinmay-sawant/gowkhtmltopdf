@@ -1,4 +1,4 @@
-# Phase 20 — Headers/Footers & Links Edge Cases
+# Phase 20 - Headers/Footers & Links Edge Cases
 
 > **Parent:** `plans/10-canonical-post-mvp-roadmap.md`  
 > **Status:** not started  
@@ -11,7 +11,7 @@
 
 ## Overview
 
-Close known **edge gaps** listed in README deferred table for headers/footers, anchors, and relative links—without redesigning the Phase 6 model.
+Close known **edge gaps** listed in README deferred table for headers/footers, anchors, and relative links - without redesigning the Phase 6 model.
 
 ## Executive Summary
 

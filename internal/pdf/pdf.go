@@ -135,7 +135,7 @@ func (d *Document) PageCount() int { return len(d.pages) }
 // PageRef returns the object reference string of the page at index idx, or
 // "" when idx is out of range. Page objects are allocated at AddPage time and
 // their refs are stable, so this is safe to call after all AddPage calls and
-// before Write — e.g. to wire outline destinations and link annotations.
+// before Write - e.g. to wire outline destinations and link annotations.
 func (d *Document) PageRef(idx int) string {
 	if idx < 0 || idx >= len(d.pages) {
 		return ""
@@ -153,9 +153,9 @@ func (d *Document) PageAt(idx int) *Page {
 }
 
 // ReorderPages replaces the page order, e.g. for copies/collate assembly.
-// Page objects are self-contained — their /Contents stream and /Annots live
+// Page objects are self-contained - their /Contents stream and /Annots live
 // on the page itself and the pages tree is a flat single-level /Kids list
-// built at finalize — so permuting d.pages is sufficient. order must be a
+// built at finalize - so permuting d.pages is sufficient. order must be a
 // permutation of the current page indices; anything else is an error.
 func (d *Document) ReorderPages(order []int) error {
 	if d.finalized {
@@ -585,7 +585,7 @@ func flateBytes(raw []byte) []byte {
 	return buf.Bytes()
 }
 
-// SortOutlines sorts children by (pageIndex, y, x) — used by layout/outline.
+// SortOutlines sorts children by (pageIndex, y, x) - used by layout/outline.
 func SortOutlines(nodes []*Outline) {
 	sort.SliceStable(nodes, func(i, j int) bool {
 		return outlineLess(nodes[i], nodes[j])

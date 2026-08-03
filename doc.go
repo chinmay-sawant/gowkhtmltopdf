@@ -33,7 +33,7 @@
 // # Local file access
 //
 // The security ACL blocks local file reads by default. To convert a local
-// file, enable access explicitly — both the global flag and the object-level
+// file, enable access explicitly - both the global flag and the object-level
 // block must be toggled, mirroring the CLI's --enable-local-file-access and
 // --block-local-file-access pair:
 //

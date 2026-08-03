@@ -2,8 +2,8 @@
 
 | File | Role |
 |------|------|
-| [00-canonical-pure-go-rewrite.md](00-canonical-pure-go-rewrite.md) | **MVP ledger** (phases 0–9) — complete for v0.1.0 |
-| [10-canonical-post-mvp-roadmap.md](10-canonical-post-mvp-roadmap.md) | **Active post-MVP execution ledger** — update status here |
+| [00-canonical-pure-go-rewrite.md](00-canonical-pure-go-rewrite.md) | **MVP ledger** (phases 0–9) - complete for v0.1.0 |
+| [10-canonical-post-mvp-roadmap.md](10-canonical-post-mvp-roadmap.md) | **Active post-MVP execution ledger** - update status here |
 | [phases/](phases/) | Per-phase atomic checklists (MVP 00–09 + post-MVP 10–23) |
 | [exploration/](exploration/) | Multi-agent analysis snapshots (read-only evidence) |
 | [PR/](PR/) | PR/issue body archives |
@@ -24,8 +24,8 @@ Ordered for **quick wins first**, still stdlib-only (no third-party libraries or
 |------:|-------|------|
 | 10 | [HTML/CSS fidelity documentation](phases/phase-10-fidelity-docs.md) | 1 |
 | 11 | [Library API for Go embedders](phases/phase-11-library-api-embedders.md) | 1 |
-| 12 | [Typography — real bold/italic](phases/phase-12-typography-faces.md) | 1 |
-| 13 | [Typography — spacing](phases/phase-13-typography-spacing.md) | 1 |
+| 12 | [Typography - real bold/italic](phases/phase-12-typography-faces.md) | 1 |
+| 13 | [Typography - spacing](phases/phase-13-typography-spacing.md) | 1 |
 | 14 | [PDF images robust path](phases/phase-14-pdf-images.md) | 1 |
 | 15 | [Image mode TTF/AA raster](phases/phase-15-image-mode-raster.md) | 1 |
 | 16 | [Invoice CSS (selectors + float lite)](phases/phase-16-invoice-css.md) | 1 |
@@ -39,7 +39,7 @@ Ordered for **quick wins first**, still stdlib-only (no third-party libraries or
 
 **Tier 1** (solid report engine): phases 10–16.  
 **Tier 2** (leave wkhtmltopdf for most jobs): phases 17–20.  
-**Tier 3** (compete on open web): phase 23 deferred — use Chrome/Playwright for that class of problem.
+**Tier 3** (compete on open web): phase 23 deferred - use Chrome/Playwright for that class of problem.
 
 ---
 

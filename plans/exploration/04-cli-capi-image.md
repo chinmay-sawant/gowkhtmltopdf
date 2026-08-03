@@ -1,4 +1,4 @@
-# Exploration 04 — CLI, C API, Image Tool
+# Exploration 04 - CLI, C API, Image Tool
 
 > **Agent:** explore · CLI/C API/image  
 > **Primary:** `src/pdf/*`, `src/image/*`, `src/shared/*`, `pdf.h`, `image.h`

@@ -1,4 +1,4 @@
-# testdata/golden — Golden Fixture Corpus
+# testdata/golden - Golden Fixture Corpus
 
 > **Parent:** `plans/00-canonical-pure-go-rewrite.md` (Phase 0.3, extended 9.1)
 > **Purpose:** deterministic HTML in → PDF out, measured against pass criteria.

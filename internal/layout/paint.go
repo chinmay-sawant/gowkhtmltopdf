@@ -150,8 +150,8 @@ func paginateOps(res *Result, contentH float64) []int {
 	return opPage
 }
 
-// shiftFlowY moves the ops of the target range [from,to] — plus every op
-// strictly below fromY — down by dy canvas points. Ops of earlier boxes that
+// shiftFlowY moves the ops of the target range [from,to] - plus every op
+// strictly below fromY - down by dy canvas points. Ops of earlier boxes that
 // touch fromY exactly (collapsed margins) are left alone so the page-break
 // fixpoint converges instead of dragging boundary ops along each iteration.
 // Box.y is kept in sync for boxes whose top moved.

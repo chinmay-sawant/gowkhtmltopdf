@@ -17,7 +17,7 @@ import (
 
 // effectiveTOC overlays the object-level TOC settings on the global ones.
 // Scalars replace when set; booleans OR (a false object flag cannot be
-// distinguished from "unset" — documented).
+// distinguished from "unset" - documented).
 func effectiveTOC(o settings.PdfObject, g settings.PdfGlobal) settings.TableOfContent {
 	t := g.TOC
 	if o.TOC.FontScale != 0 {
@@ -170,7 +170,7 @@ func paintCount(res *layout.Result, g hfGeom) int {
 }
 
 // layoutTOC generates and lays out the TOC document for one TOC object.
-// Entry page numbers are offset by tocGuess — the assumed number of pages the
+// Entry page numbers are offset by tocGuess - the assumed number of pages the
 // TOC objects will occupy at the front of the document.
 func layoutTOC(font *pdf.Font, st *objectState, entries []*outline.Node, tocGuess int, cmd *cli.Command, log io.Writer) (*html.Node, *layout.Result, error) {
 	toc := st.toc

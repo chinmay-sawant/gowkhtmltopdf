@@ -1,4 +1,4 @@
-# Phase 19 — Fonts / i18n: Discovery, Folder Fonts, CJK / Unicode
+# Phase 19 - Fonts / i18n: Discovery, Folder Fonts, CJK / Unicode
 
 > **Parent:** `plans/10-canonical-post-mvp-roadmap.md`  
 > **Status:** not started  
@@ -29,7 +29,7 @@ Beyond bundled Liberation faces: **discover fonts** from a user-supplied folder 
 ### 19.1 Font discovery
 
 - [ ] Settings/CLI: `--font-path` / dotted key for **one or more directories** to scan for `.ttf`/`.otf` (TTF subset first; OTF only if parser supports)
-- [ ] Scan is **opt-in** (do not read all system fonts by default—startup + privacy)
+- [ ] Scan is **opt-in** (do not read all system fonts by default - startup + privacy)
 - [ ] Optional documented defaults per OS (e.g. `/usr/share/fonts`) behind explicit flag `--use-system-fonts`
 - [ ] Index: family name from name table → file path; weight/style heuristics from subfamily
 - [ ] Tests with fonts under `testdata/fonts/` (commit small OFL samples only)
@@ -53,10 +53,10 @@ Beyond bundled Liberation faces: **discover fonts** from a user-supplied folder 
 
 ### 19.4 Unicode / CJK embedding
 
-- [ ] Design: PDF Type0/CID-keyed font **or** multiple simple fonts with ToUnicode — pick one and document
-- [ ] Embed subset of glyphs actually used (CJK subsets can be large—budget pages)
+- [ ] Design: PDF Type0/CID-keyed font **or** multiple simple fonts with ToUnicode - pick one and document
+- [ ] Embed subset of glyphs actually used (CJK subsets can be large - budget pages)
 - [ ] Layout width using face metrics for CJK code points (advance per glyph; no vertical text yet)
-- [ ] `[~]` Vertical writing mode — deferred
+- [ ] `[~]` Vertical writing mode - deferred
 - [ ] Test: Japanese/Chinese sample string renders (not all `?`) in PDF
 - [ ] Wikipedia language list smoke improves when faces present
 
@@ -77,7 +77,7 @@ Beyond bundled Liberation faces: **discover fonts** from a user-supplied folder 
 - [ ] Matrix Unicode / font-family / @font-face sections
 - [ ] Fidelity: CJK “best-effort horizontal” language
 - [ ] README CJK deferred row updated when shipped
-- [ ] Threat model: font file parse is untrusted input—fuzz or size caps note
+- [ ] Threat model: font file parse is untrusted input - fuzz or size caps note
 
 ### 19.8 Closure gates
 

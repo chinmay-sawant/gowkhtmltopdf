@@ -63,7 +63,7 @@ func (d *Document) ensureFont(f *Font, used []rune) (string, error) {
 
 	// font dict: simple TrueType; char codes are Latin-1 rune values resolved
 	// by the subset cmap. PDF /Widths are in 1/1000 em, not raw TrueType
-	// units (typically 2048/em) — without the scale, every glyph advances
+	// units (typically 2048/em) - without the scale, every glyph advances
 	// ~2× too far and text looks letter-spaced ("A c m e" instead of "Acme").
 	first, last, widths := subsetWidths(sub, f.UnitsPerEm())
 	ws := make([]string, len(widths))

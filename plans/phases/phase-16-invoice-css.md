@@ -1,4 +1,4 @@
-# Phase 16 — CSS Invoices Actually Use (Selectors + Float Lite)
+# Phase 16 - CSS Invoices Actually Use (Selectors + Float Lite)
 
 > **Parent:** `plans/10-canonical-post-mvp-roadmap.md`  
 > **Status:** not started  
@@ -11,7 +11,7 @@
 
 ## Overview
 
-MVP CSS is enough for simple invoices but templates often need **richer selectors** (`:nth-child`, attributes), **inline-block**, **simple floats**, and **border-box**. This phase expands the **report-friendly** subset—not full flex/grid (phase 17).
+MVP CSS is enough for simple invoices but templates often need **richer selectors** (`:nth-child`, attributes), **inline-block**, **simple floats**, and **border-box**. This phase expands the **report-friendly** subset - not full flex/grid (phase 17).
 
 ## Executive Summary
 
@@ -31,7 +31,7 @@ MVP CSS is enough for simple invoices but templates often need **richer selector
 ### 16.1 Selector expansion
 
 - [ ] Implement attribute selectors subset: `[attr]`, `[attr="value"]` (exact)
-- [ ] `[~]` `[attr~=]`, `[attr|=]`, `[attr^=]`, `[attr$=]`, `[attr*=]` — only if fixtures need
+- [ ] `[~]` `[attr~=]`, `[attr|=]`, `[attr^=]`, `[attr$=]`, `[attr*=]` - only if fixtures need
 - [ ] `:first-child`, `:last-child`
 - [ ] `:nth-child(n)` / `odd` / `even` / `an+b` simple subset
 - [ ] Fix sibling combinators: `A + B`, `A ~ B` match correctly (not descendant)
@@ -65,7 +65,7 @@ MVP CSS is enough for simple invoices but templates often need **richer selector
 
 ### 16.5 Small selector/CSS wins that invoices use
 
-- [ ] `text-align: justify` — either implement simple or leave Partial documented
+- [ ] `text-align: justify` - either implement simple or leave Partial documented
 - [ ] `vertical-align` on table cells baseline/middle/top subset if cheap
 - [ ] Ensure zebra table fixture works with `:nth-child(even)` (fix fixture-02 comment)
 
@@ -77,10 +77,10 @@ MVP CSS is enough for simple invoices but templates often need **richer selector
 
 ### 16.7 Explicit non-goals this phase
 
-- [~] Full flexbox — phase 17  
-- [~] CSS Grid — deferred  
-- [~] `position: absolute/fixed` — phase 17 if needed  
-- [~] `transform` / filters / animations — not planned  
+- [~] Full flexbox - phase 17  
+- [~] CSS Grid - deferred  
+- [~] `position: absolute/fixed` - phase 17 if needed  
+- [~] `transform` / filters / animations - not planned  
 
 ### 16.8 Docs & fidelity
 

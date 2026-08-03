@@ -1,10 +1,10 @@
 ## Context
 
-**Parent epic:** #2 — [epic: post-MVP rendering quality — image mode, fonts, CSS for real sites](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/2)
+**Parent epic:** #2 - [epic: post-MVP rendering quality - image mode, fonts, CSS for real sites](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/2)
 
 **Siblings under #2:** #3 (image-mode PNG) · #4 (font spacing) · #5 (Wikipedia CSS) · #6 (multi-font)
 
-MVP CSS is a **documented subset** for controlled reports (boxes, tables, basic text). Real websites—especially Wikipedia—use richer CSS (flex/grid-ish layouts via modern rules, complex selectors, multi-column chrome, language lists, sticky nav, etc.). Converting them produces multi-page PDFs that open but **do not look like the site**.
+MVP CSS is a **documented subset** for controlled reports (boxes, tables, basic text). Real websites - especially Wikipedia - use richer CSS (flex/grid-ish layouts via modern rules, complex selectors, multi-column chrome, language lists, sticky nav, etc.). Converting them produces multi-page PDFs that open but **do not look like the site**.
 
 ### Concrete example
 
@@ -19,8 +19,8 @@ go run ./cmd/gowkhtmltopdf \
 | File | `output/wiki-ana-de-armas.pdf` (~1.3 MB, many pages) committed as smoke artifact |
 | Latin body text | Partially present; nav/TOC chrome dominates early pages |
 | Layout | Sidebar/nav/search/appearance UI dumped as linear flow |
-| Non-Latin language names | Often `?` (single Latin font — sibling font issue) |
-| JS UI | Ignored (no JS engine — by design) |
+| Non-Latin language names | Often `?` (single Latin font - sibling font issue) |
+| JS UI | Ignored (no JS engine - by design) |
 
 URL: **https://en.wikipedia.org/wiki/Ana_de_Armas**
 
@@ -30,7 +30,7 @@ This is the **acceptance fixture** for “most-used website CSS” progress: not
 
 1. Inventory Wikipedia (Vector/Minerva-ish) CSS constructs that break layout; map to matrix gaps (flex, grid, float, position, media queries, complex selectors).  
 2. Prioritize a **report-friendly subset expansion** that also helps common sites (e.g. simple flex row, float lite, `display` values, `:nth-child`, attribute selectors).  
-3. Optionally add “chrome stripping” / reader-mode heuristics for known wiki DOM (product decision — document in issue comments).  
+3. Optionally add “chrome stripping” / reader-mode heuristics for known wiki DOM (product decision - document in issue comments).  
 4. Golden or smoke: store minimal HTML snapshot or documented command for Ana de Armas; assert page count band + presence of title string in content stream.  
 5. Update `documentation/compatibility-matrix.md` as properties land.
 

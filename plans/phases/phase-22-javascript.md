@@ -1,4 +1,4 @@
-# Phase 22 — JavaScript Support (Staged, Stdlib-Only)
+# Phase 22 - JavaScript Support (Staged, Stdlib-Only)
 
 > **Parent:** `plans/10-canonical-post-mvp-roadmap.md`  
 > **Status:** not started  
@@ -11,7 +11,7 @@
 
 ## Overview
 
-Users asked for **full JavaScript support**. Under the project rule (Go stdlib only, no plugins, no Chrome), a complete ES + DOM + Web APIs stack is a **multi-year product**—closer to writing a browser than a PDF tool. This phase is **honest and staged**: ship only what can be proven safe and useful; gate “full support” behind a formal plan amendment if constraints change.
+Users asked for **full JavaScript support**. Under the project rule (Go stdlib only, no plugins, no Chrome), a complete ES + DOM + Web APIs stack is a **multi-year product** - closer to writing a browser than a PDF tool. This phase is **honest and staged**: ship only what can be proven safe and useful; gate “full support” behind a formal plan amendment if constraints change.
 
 ## Executive Summary
 
@@ -31,11 +31,11 @@ Users asked for **full JavaScript support**. Under the project rule (Go stdlib o
 ### 22.0 Constraint & security freeze (must complete first)
 
 - [ ] Written policy: scripts **off by default**; enable only with explicit flag
-- [ ] Threat model update: script can be SSRF/exfil vector if network APIs exposed—default deny
+- [ ] Threat model update: script can be SSRF/exfil vector if network APIs exposed - default deny
 - [ ] Decision record: remain pure-stdlib **or** amend plan to allow an engine (would be a new ledger)
 - [ ] No stage may `os/exec` a browser or load third-party `.so`
 
-### 22.1 Stage A — Honest flags & delay semantics (quick win)
+### 22.1 Stage A - Honest flags & delay semantics (quick win)
 
 - [ ] Document all JS-related flags as: ignored / sleep-only / stripped
 - [ ] `--javascript-delay`: keep as post-load **sleep** only; test timing
@@ -44,17 +44,17 @@ Users asked for **full JavaScript support**. Under the project rule (Go stdlib o
 - [ ] Matrix + CLI help strings accurate (no false “enabled”)
 - [ ] Effort: days–1 week
 
-### 22.2 Stage B — Report-oriented non-JS alternatives (quick product value)
+### 22.2 Stage B - Report-oriented non-JS alternatives (quick product value)
 
 Many “JS needs” for invoices are actually:
 
 - [ ] Server-side data already in HTML (document pattern)
-- [ ] Optional **Go template** pre-pass for embedders (library helper)—not browser JS
+- [ ] Optional **Go template** pre-pass for embedders (library helper) - not browser JS
 - [ ] CSS print rules instead of JS show/hide where possible
 - [ ] Do **not** claim this is JavaScript
 - [ ] Effort: 1–2 weeks if product wants
 
-### 22.3 Stage C — Research spike: pure-Go ES subset (go/no-go)
+### 22.3 Stage C - Research spike: pure-Go ES subset (go/no-go)
 
 - [ ] Spike goals: parse + evaluate tiny expression language **or** minimal ES5 subset **without** deps
 - [ ] Scope candidates (pick one for spike):
@@ -67,7 +67,7 @@ Many “JS needs” for invoices are actually:
   - **No-go:** mark full JS `[~]` → point to Phase 23 / external tools
 - [ ] Effort: 2–6 weeks research; implementation separate estimate
 
-### 22.4 Stage C.1 — Minimal script subset (only if Stage C go)
+### 22.4 Stage C.1 - Minimal script subset (only if Stage C go)
 
 - [ ] Enable path: `--enable-javascript` actually runs subset after parse, before layout
 - [ ] Sandbox: no filesystem, no process, no raw network (or network only via existing loader ACL)
@@ -78,7 +78,7 @@ Many “JS needs” for invoices are actually:
 - [ ] Security review checklist signed
 - [ ] Effort: months for even a tiny DOM
 
-### 22.5 Stage D — Full browser JS/DOM (deferred)
+### 22.5 Stage D - Full browser JS/DOM (deferred)
 
 - [~] Full ES + HTML5 DOM + layout readback + timers + XHR  
   **Reason:** unbounded; stdlib-only reimplementation is the wrong tool  
@@ -95,7 +95,7 @@ Many “JS needs” for invoices are actually:
 
 ### 22.7 Closure gates (per stage)
 
-- [ ] Stage A: docs-only or flag wording — lint/test if code touched
+- [ ] Stage A: docs-only or flag wording - lint/test if code touched
 - [ ] Stage B/C.1: `make lint` + `make test` recorded
 - [ ] Parent Phase 22 rows reflect stage status (`[x]` / `[~]`)
 - [ ] Handoff: if no-go, active work ends at Phase 21 + Tier 2 polish

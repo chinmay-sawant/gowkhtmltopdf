@@ -1,4 +1,4 @@
-# Phase 23 — Tier 3: Compete on the Open Web (Deferred Ledger)
+# Phase 23 - Tier 3: Compete on the Open Web (Deferred Ledger)
 
 > **Parent:** `plans/10-canonical-post-mvp-roadmap.md`  
 > **Status:** `[~]` intentionally deferred  
@@ -65,7 +65,7 @@ This file is the **sole deferred ledger** for Tier 3 so active phases do not sil
 
 Do **not** silently edit this file into active work. Create a **new** canonical ledger (e.g. `plans/11-browser-backed-optional.md`) and mark this phase:
 
-- [~] Superseded by `<new ledger path>` — date, link
+- [~] Superseded by `<new ledger path>` - date, link
 
 Options to document if ever needed (not endorsements):
 

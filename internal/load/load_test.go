@@ -706,8 +706,8 @@ func TestRedirectLimitExact(t *testing.T) {
 }
 
 // TestHTTPLocalhostAllowedByDesign documents the intended SSRF posture:
-// the loader fetches any URL the document references — including
-// http://localhost — exactly like upstream wkhtmltopdf. Only file:// reads
+// the loader fetches any URL the document references - including
+// http://localhost - exactly like upstream wkhtmltopdf. Only file:// reads
 // are gated by the ACL.
 func TestHTTPLocalhostAllowedByDesign(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

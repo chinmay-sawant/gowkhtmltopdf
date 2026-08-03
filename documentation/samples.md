@@ -48,4 +48,4 @@ Always re-open a regenerated PDF in a real viewer when changing the PDF writer.
 - Latin report HTML: readable text, sane letter-spacing, multi-page tables  
 - TOC/outline showcase: navigable bookmarks, page headers/footers  
 - Wikipedia-class pages: may open as multi-page PDFs but **layout and
-  non-Latin fonts are incomplete** — tracked as follow-up (CID fonts, CSS)
+  non-Latin fonts are incomplete** - tracked as follow-up (CID fonts, CSS)

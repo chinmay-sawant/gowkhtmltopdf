@@ -1,4 +1,4 @@
-# Phase 14 — Images in PDF: Robust Path
+# Phase 14 - Images in PDF: Robust Path
 
 > **Parent:** `plans/10-canonical-post-mvp-roadmap.md`  
 > **Status:** not started  
@@ -11,7 +11,7 @@
 
 ## Overview
 
-MVP already embeds PNG/JPEG. This phase hardens the **path for logos and image grids**: sizing, missing resources, decoding edge cases, and tests—so report templates can rely on images without silent weirdness.
+MVP already embeds PNG/JPEG. This phase hardens the **path for logos and image grids**: sizing, missing resources, decoding edge cases, and tests - so report templates can rely on images without silent weirdness.
 
 ## Executive Summary
 
@@ -38,7 +38,7 @@ MVP already embeds PNG/JPEG. This phase hardens the **path for logos and image g
 
 - [ ] `<img>` with CSS `width`/`height` only
 - [ ] `<img>` with intrinsic size only
-- [ ] `<img>` with both (CSS wins per defined rule—document rule)
+- [ ] `<img>` with both (CSS wins per defined rule - document rule)
 - [ ] `max-width` / `min-width` on images regression
 - [ ] Broken/missing file: placeholder or skip **without crash**; log warn
 - [ ] Zero-byte / corrupt image: skip + warn
@@ -46,7 +46,7 @@ MVP already embeds PNG/JPEG. This phase hardens the **path for logos and image g
 
 ### 14.3 Logo & grid fixtures
 
-- [ ] fixture-07: logo present in PDF (`/Subtype /Image`) — strengthen assert if weak
+- [ ] fixture-07: logo present in PDF (`/Subtype /Image`) - strengthen assert if weak
 - [ ] fixture-20: multi-image grid all embedded or documented skips
 - [ ] Optional new fixture: remote vs local logo under ACL (local blocked by default)
 - [ ] Table cell containing logo sizes reasonably

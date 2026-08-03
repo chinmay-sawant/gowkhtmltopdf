@@ -1,4 +1,4 @@
-# Phase 15 — Image Mode: Real TTF / AA Raster (Replace 5×7)
+# Phase 15 - Image Mode: Real TTF / AA Raster (Replace 5×7)
 
 > **Parent:** `plans/10-canonical-post-mvp-roadmap.md`  
 > **Status:** not started  
@@ -20,7 +20,7 @@
 | 5×7 font, nearest-neighbour scale | `internal/imageout/font.go` |
 | Paint path | `internal/imageout/imageout.go` |
 | Sample looks broken | `output/fixture-01-simple-invoice.png` (~6 colors, block glyphs) |
-| Stdlib has no text rasterizer | by design — we implement outline fill |
+| Stdlib has no text rasterizer | by design - we implement outline fill |
 
 ---
 
@@ -43,7 +43,7 @@
 
 - [ ] Implement glyph raster with anti-aliasing (greyscale coverage ≥ 1 bit AA)
 - [ ] Scale by font size in pt → device px (document DPI assumption, e.g. 96)
-- [ ] Subpixel optional — default greyscale is enough
+- [ ] Subpixel optional - default greyscale is enough
 - [ ] Bold: prefer real face; fallback double-draw only if face missing
 - [ ] Italic: prefer real face; no fake shear unless documented fallback
 - [ ] Cache rasterized glyphs per (face, size, rune) for perf

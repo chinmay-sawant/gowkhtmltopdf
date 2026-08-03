@@ -578,7 +578,7 @@ func TestTableColspan(t *testing.T) {
 	if !(c1.X > wide.X) {
 		t.Errorf("third column x=%v must start right of wide (x=%v)", c1.X, wide.X)
 	}
-	// "a" at col 0, "b" at col 1, "c" at col 2 — b must sit between a and c
+	// "a" at col 0, "b" at col 1, "c" at col 2 - b must sit between a and c
 	a, b, c := texts[2], texts[3], texts[4]
 	if !(a.X < b.X && b.X < c.X) {
 		t.Errorf("column order broken: %v %v %v", a.X, b.X, c.X)
@@ -899,7 +899,7 @@ func TestTableRowNoSplit(t *testing.T) {
 	if err := Paint(doc, res, paintOpts()); err != nil {
 		t.Fatal(err)
 	}
-	// find the row texts (r1, r2, r3 — padded cells emit them)
+	// find the row texts (r1, r2, r3 - padded cells emit them)
 	pages := map[string]int{}
 	for i, op := range res.Ops {
 		if op.Kind == OpText {

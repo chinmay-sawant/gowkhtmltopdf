@@ -23,4 +23,4 @@ Phase-by-phase execution notes live under [`../plans/`](../plans/), not here:
 
 ## License
 
-[MIT](../LICENSE) — Copyright (c) 2026 Chinmay Sawant.
+[MIT](../LICENSE) - Copyright (c) 2026 Chinmay Sawant.

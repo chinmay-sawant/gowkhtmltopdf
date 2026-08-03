@@ -244,9 +244,9 @@ func TestPDFStringLatin1NotUTF8(t *testing.T) {
 	if got != "(\\267x)" {
 		t.Errorf("pdfString(bullet) = %q, want (\\267x)", got)
 	}
-	// Em dash folds to ASCII hyphen.
-	if pdfString("—") != "(-)" {
-		t.Errorf("pdfString(emdash) = %q", pdfString("—"))
+	// Em dash (U+2014) folds to ASCII hyphen for WinAnsi output.
+	if pdfString("\u2014") != "(-)" {
+		t.Errorf("pdfString(emdash) = %q", pdfString("\u2014"))
 	}
 }
 

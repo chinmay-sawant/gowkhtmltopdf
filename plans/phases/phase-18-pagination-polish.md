@@ -1,4 +1,4 @@
-# Phase 18 — Pagination Polish (Table Header Repeat & Smarter Breaks)
+# Phase 18 - Pagination Polish (Table Header Repeat & Smarter Breaks)
 
 > **Parent:** `plans/10-canonical-post-mvp-roadmap.md`  
 > **Status:** not started  
@@ -11,7 +11,7 @@
 
 ## Overview
 
-MVP pagination fragments boxes, honors `page-break-*`, and keeps table rows intact—but does **not** repeat `<thead>` on continued pages, and lacks orphan/widow control. This phase closes high-value print gaps for multi-page tables and long reports.
+MVP pagination fragments boxes, honors `page-break-*`, and keeps table rows intact - but does **not** repeat `<thead>` on continued pages, and lacks orphan/widow control. This phase closes high-value print gaps for multi-page tables and long reports.
 
 ## Executive Summary
 
@@ -33,7 +33,7 @@ MVP pagination fragments boxes, honors `page-break-*`, and keeps table rows inta
 - [ ] On page break inside `tbody`, re-emit header row(s) at top of next page content box
 - [ ] Header height reserved so body rows do not overlap
 - [ ] Multi-header-row `thead` supported
-- [ ] Nested tables: define behavior (repeat only innermost broken table or all—document)
+- [ ] Nested tables: define behavior (repeat only innermost broken table or all - document)
 - [ ] Test: multi-page table fixture asserts header text appears on pages 2+
 - [ ] Path: `internal/layout/paint.go` pagination / table fragment path
 

@@ -24,7 +24,7 @@ func BenchmarkWrite50Pages(b *testing.B) {
 			c.SetFont("F1", 11)
 			c.TextAt(50, 800)
 			for l := 0; l < 40; l++ {
-				c.TextShow(fmt.Sprintf("Page %d line %d — the quick brown fox jumps over the lazy dog", i, l))
+				c.TextShow(fmt.Sprintf("Page %d line %d - the quick brown fox jumps over the lazy dog", i, l))
 				c.TextNextLine()
 			}
 			c.EndText()

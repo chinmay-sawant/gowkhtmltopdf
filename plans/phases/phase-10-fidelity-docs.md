@@ -1,4 +1,4 @@
-# Phase 10 — HTML/CSS Fidelity Documentation
+# Phase 10 - HTML/CSS Fidelity Documentation
 
 > **Parent:** `plans/10-canonical-post-mvp-roadmap.md`  
 > **Status:** not started  

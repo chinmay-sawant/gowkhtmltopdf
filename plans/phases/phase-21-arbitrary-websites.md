@@ -1,4 +1,4 @@
-# Phase 21 — Arbitrary Websites & “Paste Any URL → Decent Print”
+# Phase 21 - Arbitrary Websites & “Paste Any URL → Decent Print”
 
 > **Parent:** `plans/10-canonical-post-mvp-roadmap.md`  
 > **Status:** not started  
@@ -17,7 +17,7 @@ Target **Wikipedia and marketing sites** with a product bar of **“decent print
 
 | Artifact | Role |
 |----------|------|
-| `output/wiki-ana-de-armas.pdf` | Current smoke — layout poor |
+| `output/wiki-ana-de-armas.pdf` | Current smoke - layout poor |
 | Matrix CSS gaps | flex/float/selectors/fonts |
 | No JS | SPA/marketing hydration missing (phase 22) |
 

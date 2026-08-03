@@ -1,4 +1,4 @@
-# Phase 12 — Typography: Real Bold (and Italic) Faces
+# Phase 12 - Typography: Real Bold (and Italic) Faces
 
 > **Parent:** `plans/10-canonical-post-mvp-roadmap.md`  
 > **Status:** not started  
@@ -69,7 +69,7 @@ Replace **fake bold** (PDF text render mode 2 stroke) and upright “italic” w
 
 ### 12.6 CSS font-family partial wiring
 
-- [ ] Honor generic families: `sans-serif` → Liberation Sans; optional `serif`/`monospace` only if faces bundled—else fallback + document
+- [ ] Honor generic families: `sans-serif` → Liberation Sans; optional `serif`/`monospace` only if faces bundled - else fallback + document
 - [ ] Named family match case-insensitive against registry
 - [ ] Unknown family → default sans (no crash)
 - [ ] Matrix §2.3 update: font-family Partial → improved notes

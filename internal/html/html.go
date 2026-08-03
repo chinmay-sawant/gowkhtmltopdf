@@ -356,7 +356,7 @@ func tokenize(src string) ([]token, error) {
 				return nil, err
 			}
 			if end < 0 {
-				// no closing '>' — treat the rest as text
+				// no closing '>' - treat the rest as text
 				toks = append(toks, token{kind: tokText, data: src[i:]})
 				i = n
 				continue

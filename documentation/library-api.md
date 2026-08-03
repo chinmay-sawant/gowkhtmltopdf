@@ -43,7 +43,7 @@ _ = ic.Set("format", "png")
 _ = ic.Set("width", "1024")
 _ = ic.Global().Set("enablelocalfileaccess", "true") // if available on image settings surface
 
-// Set page URL/path and convert — see examples/image for the exact setters
+// Set page URL/path and convert - see examples/image for the exact setters
 // for your version (mirrors CLI image flags).
 ```
 

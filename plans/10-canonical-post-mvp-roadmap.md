@@ -1,7 +1,7 @@
-# 10 — Post-MVP Quality & Capability Roadmap (Canonical Execution Ledger)
+# 10 - Post-MVP Quality & Capability Roadmap (Canonical Execution Ledger)
 
 > **Parent:** `plans/00-canonical-pure-go-rewrite.md` (MVP phases 0–9 complete, v0.1.0)  
-> **Status:** active — phases 10+ not started  
+> **Status:** active - phases 10+ not started  
 > **Estimated effort:** Tier 1 ~4–8 mo · Tier 2 ~6–12 mo additional · Tier 3 deferred (not planned as pure-stdlib goal)  
 > **Constraint:** pure Golang, **Go standard library only** (no third-party modules, no Chrome/WebKit, no cgo, no plugins)  
 > **Ordering principle:** **quick wins first** (docs/API polish → typography → image mode → invoice CSS → broader CSS → fonts/i18n → web heuristics → JS research). Dependency edges still respected within each phase.  
@@ -23,9 +23,9 @@ MVP ships a usable **report/invoice** pipeline (load → HTML/CSS subset → lay
 
 | Tier | Goal | This ledger |
 |------|------|-------------|
-| **Tier 1** | Solid report engine — “better for our use” | Phases 10–16 (must) |
+| **Tier 1** | Solid report engine - “better for our use” | Phases 10–16 (must) |
 | **Tier 2** | Leave wkhtmltopdf for most jobs | Phases 17–20 |
-| **Tier 3** | Compete on the open web | Phase 23 — **deferred**; Chrome/Playwright territory |
+| **Tier 3** | Compete on the open web | Phase 23 - **deferred**; Chrome/Playwright territory |
 
 **Hard non-goals unless this ledger is amended:**
 
@@ -77,10 +77,10 @@ MVP ships a usable **report/invoice** pipeline (load → HTML/CSS subset → lay
 |------:|-------|------|---------------|---------------|--------|
 | 10 | HTML/CSS fidelity documentation | 1 | [phases/phase-10-fidelity-docs.md](phases/phase-10-fidelity-docs.md) | 3–7 days | `[ ]` |
 | 11 | Library API for Go embedders | 1 | [phases/phase-11-library-api-embedders.md](phases/phase-11-library-api-embedders.md) | 1–2 wk | `[ ]` |
-| 12 | Typography — real bold/italic faces | 1 | [phases/phase-12-typography-faces.md](phases/phase-12-typography-faces.md) | 2–4 wk | `[ ]` |
-| 13 | Typography — spacing stability | 1 | [phases/phase-13-typography-spacing.md](phases/phase-13-typography-spacing.md) | 1–2 wk | `[ ]` |
-| 14 | Images in PDF — robust path | 1 | [phases/phase-14-pdf-images.md](phases/phase-14-pdf-images.md) | 1–2 wk | `[ ]` |
-| 15 | Image mode — real TTF/AA raster | 1 | [phases/phase-15-image-mode-raster.md](phases/phase-15-image-mode-raster.md) | 3–6 wk | `[ ]` |
+| 12 | Typography - real bold/italic faces | 1 | [phases/phase-12-typography-faces.md](phases/phase-12-typography-faces.md) | 2–4 wk | `[ ]` |
+| 13 | Typography - spacing stability | 1 | [phases/phase-13-typography-spacing.md](phases/phase-13-typography-spacing.md) | 1–2 wk | `[ ]` |
+| 14 | Images in PDF - robust path | 1 | [phases/phase-14-pdf-images.md](phases/phase-14-pdf-images.md) | 1–2 wk | `[ ]` |
+| 15 | Image mode - real TTF/AA raster | 1 | [phases/phase-15-image-mode-raster.md](phases/phase-15-image-mode-raster.md) | 3–6 wk | `[ ]` |
 | 16 | CSS invoices use (selectors + float lite) | 1 | [phases/phase-16-invoice-css.md](phases/phase-16-invoice-css.md) | 3–6 wk | `[ ]` |
 | 17 | Broader CSS (position/float, partial flex) | 2 | [phases/phase-17-broader-css.md](phases/phase-17-broader-css.md) | 2–4 mo | `[ ]` |
 | 18 | Pagination polish (thead repeat, breaks) | 2 | [phases/phase-18-pagination-polish.md](phases/phase-18-pagination-polish.md) | 3–6 wk | `[ ]` |
@@ -154,7 +154,7 @@ MVP ships a usable **report/invoice** pipeline (load → HTML/CSS subset → lay
 
 ---
 
-## Phase 12: Typography — Real Bold (and Italic)
+## Phase 12: Typography - Real Bold (and Italic)
 
 > Detail: [phases/phase-12-typography-faces.md](phases/phase-12-typography-faces.md)  
 > **Tier 1 #1** · Related issues: multi-font, font-spacing
@@ -174,7 +174,7 @@ MVP ships a usable **report/invoice** pipeline (load → HTML/CSS subset → lay
 
 ---
 
-## Phase 13: Typography — Spacing Stability
+## Phase 13: Typography - Spacing Stability
 
 > Detail: [phases/phase-13-typography-spacing.md](phases/phase-13-typography-spacing.md)  
 > **Tier 1 #1 (spacing)** · Related: issue font-spacing
@@ -189,7 +189,7 @@ MVP ships a usable **report/invoice** pipeline (load → HTML/CSS subset → lay
 
 ---
 
-## Phase 14: Images in PDF — Robust Path
+## Phase 14: Images in PDF - Robust Path
 
 > Detail: [phases/phase-14-pdf-images.md](phases/phase-14-pdf-images.md)  
 > **Tier 1 #4**
@@ -204,7 +204,7 @@ MVP ships a usable **report/invoice** pipeline (load → HTML/CSS subset → lay
 
 ---
 
-## Phase 15: Image Mode — Real Raster (Not 5×7)
+## Phase 15: Image Mode - Real Raster (Not 5×7)
 
 > Detail: [phases/phase-15-image-mode-raster.md](phases/phase-15-image-mode-raster.md)  
 > **Tier 1 #2** · Related: issue image-mode-raster-quality
@@ -249,7 +249,7 @@ MVP ships a usable **report/invoice** pipeline (load → HTML/CSS subset → lay
 
 ### 17.2 Partial flex
 - [ ] `display: flex` row + basic `justify-content` / `align-items` / `gap` subset
-- [ ] `[~]` flex-wrap, flex-grow complexity — staged
+- [ ] `[~]` flex-wrap, flex-grow complexity - staged
 - [ ] Grid remains out of allowlist unless amended
 
 ### 17.3 Closure
@@ -309,7 +309,7 @@ MVP ships a usable **report/invoice** pipeline (load → HTML/CSS subset → lay
 ## Phase 21: Arbitrary Websites / “Paste Any URL”
 
 > Detail: [phases/phase-21-arbitrary-websites.md](phases/phase-21-arbitrary-websites.md)  
-> **Not full parity** — “decent print” bar
+> **Not full parity** - “decent print” bar
 
 ### 21.1 Product bar
 - [ ] Define “decent print”: title + main article body readable; chrome reduced
@@ -337,8 +337,8 @@ MVP ships a usable **report/invoice** pipeline (load → HTML/CSS subset → lay
 ### 22.2 Incremental capability
 - [ ] Stage A: keep `--javascript-delay` as post-load wait only (document)
 - [ ] Stage B: optional pure-Go **expression/template** hooks if product needs (not full JS)
-- [ ] Stage C: research pure-Go ES interpreter scope (stdlib-only) — spike, go/no-go
-- [ ] `[~]` Stage D: full browser JS/DOM — **not planned** under stdlib; would require plan amendment (embed runtime or abandon constraint)
+- [ ] Stage C: research pure-Go ES interpreter scope (stdlib-only) - spike, go/no-go
+- [ ] `[~]` Stage D: full browser JS/DOM - **not planned** under stdlib; would require plan amendment (embed runtime or abandon constraint)
 
 ### 22.3 Closure for any shipped stage
 - [ ] Security review (script must not escape sandbox / FS)
@@ -346,12 +346,12 @@ MVP ships a usable **report/invoice** pipeline (load → HTML/CSS subset → lay
 
 ---
 
-## Phase 23: Tier 3 — Compete on Open Web (Deferred)
+## Phase 23: Tier 3 - Compete on Open Web (Deferred)
 
 > Detail: [phases/phase-23-tier3-deferred.md](phases/phase-23-tier3-deferred.md)
 
 ### 23.1 Explicit deferral
-- [~] Real browser or large CSS/JS stack — people use Chrome headless / Playwright; pure-stdlib reimplementation is the wrong goal for open-web parity  
+- [~] Real browser or large CSS/JS stack - people use Chrome headless / Playwright; pure-stdlib reimplementation is the wrong goal for open-web parity  
   **Owner boundary:** product decision only; next gate = amend constraint or accept external engine  
   **Pointer:** this row is the sole Tier-3 ledger; do not re-open in active Tier-1/2 phases without amendment
 

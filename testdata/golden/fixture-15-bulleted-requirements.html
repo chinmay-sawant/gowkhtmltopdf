@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
   fixture-15-bulleted-requirements
-  Proves: markdown-ish content rendered as HTML — a requirements list with
+  Proves: markdown-ish content rendered as HTML - a requirements list with
   nested bullets, bold/emphasis inline runs, an id="req-*" anchor on each
   item, and a compact acceptance-criteria table. Inline <a href="#...">
   anchors are not wired into PDF destinations (documented), but the anchors
@@ -11,7 +11,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Requirements — Ordering API v2</title>
+  <title>Requirements - Ordering API v2</title>
   <style>
     body { font-family: sans-serif; font-size: 10pt; color: #222; margin: 0; line-height: 1.4; }
     h1 { font-size: 15pt; color: #1a3d6d; margin: 0 0 6px 0; }
@@ -26,16 +26,16 @@
   </style>
 </head>
 <body>
-  <h1>Requirements — Ordering API v2</h1>
+  <h1>Requirements - Ordering API v2</h1>
   <p class="meta">Document REQ-API-2.0 · Owner: Platform Team · Status: approved</p>
 
   <h2>Functional requirements</h2>
   <ul>
-    <li id="req-01"><span class="req-id">REQ-01</span> — The API must accept
+    <li id="req-01"><span class="req-id">REQ-01</span> - The API must accept
     orders with up to 250 line items per request.</li>
-    <li id="req-02"><span class="req-id">REQ-02</span> — Every order must
+    <li id="req-02"><span class="req-id">REQ-02</span> - Every order must
     receive a globally unique order id and a created timestamp.</li>
-    <li id="req-03"><span class="req-id">REQ-03</span> — The API must
+    <li id="req-03"><span class="req-id">REQ-03</span> - The API must
     validate prices against the current price list and reject stale ones:
       <ul>
         <li>price list version sent with the request,</li>
@@ -43,18 +43,18 @@
         <li>price list refresh propagates in under 60 seconds.</li>
       </ul>
     </li>
-    <li id="req-04"><span class="req-id">REQ-04</span> — <em>Idempotency:</em>
+    <li id="req-04"><span class="req-id">REQ-04</span> - <em>Idempotency:</em>
     replaying a request with the same idempotency key returns the original
     response without creating a duplicate order.</li>
   </ul>
 
   <h2>Non-functional requirements</h2>
   <ul>
-    <li id="req-05"><span class="req-id">REQ-05</span> — p95 latency below
+    <li id="req-05"><span class="req-id">REQ-05</span> - p95 latency below
     350 ms for order submission under 100 req/s sustained load.</li>
-    <li id="req-06"><span class="req-id">REQ-06</span> — Availability target
+    <li id="req-06"><span class="req-id">REQ-06</span> - Availability target
     of 99.9 % per calendar month.</li>
-    <li id="req-07"><span class="req-id">REQ-07</span> — All order payloads
+    <li id="req-07"><span class="req-id">REQ-07</span> - All order payloads
     logged with correlation ids for audit purposes.</li>
   </ul>
 
