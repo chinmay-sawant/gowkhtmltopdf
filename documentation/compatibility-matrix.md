@@ -76,10 +76,10 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 
 | Property | Status | Notes / verified by |
 |----------|--------|---------------------|
-| `font-family` (named + generic) | Partial | parsed + inherited (`style.go:261-265`, `css.go:899`); layout renders every run with the single embedded Liberation Sans (`inline.go:154`) - no family selection |
-| `font-size` | Implemented | `style.go:258-260`, `fontSize` `style.go:561` (px/pt/em/%/rem/in/cm/mm/pc + keywords); `%`/`em` resolve against parent; test `TestFontSizeEmInherit` |
-| `font-weight` (`normal\|bold\|100-900`) | Implemented | `style.go:266-281`; ≥700 renders fake bold via stroke text render mode (`paint.go:130-133`); test `TestBoldUnderline` |
-| `font-style` (`italic\|oblique`) | Not implemented | parsed (`style.go:282-284`) into `FontItalic`, never consumed by layout/paint (no slant) |
+| `font-family` (named + generic) | Partial | parsed + inherited; embedded Liberation Sans family (regular/bold/italic/bold-italic). Named remote families fall back until font discovery (phase 19) |
+| `font-size` | Implemented | `style.go` `fontSize` (px/pt/em/%/rem/in/cm/mm/pc + keywords); `%`/`em` resolve against parent; test `TestFontSizeEmInherit` |
+| `font-weight` (`normal\|bold\|100-900`) | Implemented | ≥700 selects Liberation Sans **Bold** (or BoldItalic); fake stroke bold only if a bold face is missing; tests `TestRealBoldFaceOps`, `TestBoldFaceInInvoicePDF` |
+| `font-style` (`italic\|oblique`) | Implemented | selects Liberation Sans Italic / BoldItalic (`pdf.FaceSet.Resolve`); test `TestRealBoldFaceOps` |
 | `text-align` (`left\|right\|center\|justify`) | Partial | `style.go:412-420`; consumed `inline.go:118-126` for left/right/center; `justify` parses but renders as left |
 | `text-decoration` (`none\|underline\|line-through`) | Implemented | `style.go:433-441`; drawn `inline.go:156-161`; test `TestBoldUnderline` |
 | `text-indent` | Not implemented | parsed (`style.go:444-445`), never consumed |
@@ -127,6 +127,7 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 | Floats / absolute positioning | No | see §2.2; degrade to in-flow layout |
 | Flexbox / Grid | No | `display:flex|grid` not in the allowlist → ignored, element keeps the initial `inline` display (`style.go:295-301`; see §5) |
 | JavaScript | No | stripped at load; `--enable-javascript` accepted + warning (Phase 1) |
+| Image-mode text | TTF outline raster | same Liberation faces as PDF; pure-Go coverage AA (`internal/imageout/ttfraster.go`); 5×7 bitmap only if an op has no font |
 
 **Pagination (phase 5).** Implemented 2026-08-03 (`internal/layout/paint.go`): fragmentation is box-aware - rect-type ops crossing a page boundary are split at the boundary, while text, images and links move wholly to the next page (text is already line-level, so glyphs never split). `page-break-before/after: always` and `page-break-inside: avoid` are honored via canvas-Y flow shifts (`shiftFlowY` `paint.go:156`), and table rows never split (`rowsIntact` `paint.go:290`). `Result.Locations` (`paint.go:341`) carries element boxes (page + rect) for Phase 6 outline/TOC/links. Remaining partials: `--zoom` is accepted and `layout.Options.Zoom` works (`TestZoom` `layout_test.go:726`), but the convert pipeline does not forward it yet; smart-shrinking detects over-wide content and warns without re-layout (`convert.go:218-229`); table-header repeat across pages not implemented; orphan/widow control not implemented.
 
@@ -158,10 +159,10 @@ Status legend as in §2; evidence in `internal/css/css.go`.
 | Element (`h1`, `p`, …), class (`.foo`), ID (`#bar`) | Implemented | `parseCompound` `css.go:444`; matching `Match` `css.go:518`; test `css_test.go::TestMatch` |
 | Universal (`*`) | Implemented | `css.go:456-459` |
 | Descendant (`div p`), child (`ul > li`) | Implemented | combinators `css.go:356-362`; matching `css.go:528-543` |
-| Sibling (`a + b`, `a ~ b`) | Partial | parsed (`css.go:357-360`) but matched as descendant (`css.go:534` default branch) |
-| Attribute (`[href]`, `[href="…"]`) | Not implemented | dropped from the compound during tokenizing (`css.go:396-405`); `[x]` alone becomes `*` |
-| `:first-child`, `:last-child`, `:nth-child(n)` | Not implemented | dropped during tokenizing (`css.go:406-421`) - note `tbody tr:nth-child(even)` in fixture-02 matches **all** rows |
-| `:link`, `:visited`, `:hover`, `:active`, `:focus` | Not implemented (accepted, ignored) | dropped with the other pseudo-classes; no interaction states in print |
+| Sibling (`a + b`, `a ~ b`) | Implemented | next-sibling `+` and subsequent-sibling `~` (`css.Match`); test `TestSiblingCombinators` |
+| Attribute (`[href]`, `[href="…"]`) | Implemented | presence `[attr]` and exact `[attr=value]` (quoted or bare); other ops not yet |
+| `:first-child`, `:last-child`, `:nth-child(n)` | Implemented | `odd`/`even`/`an+b`/integer; tests `TestMatch`, `TestNthChildZebraSheet` |
+| `:link`, `:visited`, `:hover`, `:active`, `:focus` | Not implemented (accepted, ignored) | ignored for print; compound still matches without them |
 | `::before` / `::after` | Not implemented | dropped with the other pseudo-classes |
 | `!important` | Implemented | `css.go:664-688`; separate cascade layer `style.go:221-247`; test `css_test.go::TestParseImportant` |
 | Specificity (ID > class > element), inline `style` wins, `!important` overrides | Implemented | `Specificity` `css.go:578`; inline style priority `style.go:233-239`; test `css_test.go::TestSpecificity` |

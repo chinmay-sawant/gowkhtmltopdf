@@ -78,7 +78,21 @@ func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 	for pageIdx, idxs := range res.Pages {
 		p := doc.AddPage(opts.PageWidth, opts.PageHeight)
 		c := p.Content()
-		fontUsed := false
+		fontNames := map[*pdf.Font]string{}
+		nextFont := 0
+		resName := func(f *pdf.Font) string {
+			if f == nil {
+				return "F0"
+			}
+			if n, ok := fontNames[f]; ok {
+				return n
+			}
+			n := "F" + itoa(nextFont)
+			nextFont++
+			fontNames[f] = n
+			c.UseEmbeddedFont(n, f)
+			return n
+		}
 		for _, idx := range idxs {
 			op := &res.Ops[idx]
 			switch op.Kind {
@@ -89,11 +103,7 @@ func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 			case OpLine:
 				drawLine(c, op, pageIdx, contentH, opts, p.Height())
 			case OpText, OpBullet:
-				if !fontUsed {
-					c.UseEmbeddedFont("F0", op.Font)
-					fontUsed = true
-				}
-				drawText(c, op, pageIdx, contentH, opts, p.Height())
+				drawText(c, op, pageIdx, contentH, opts, p.Height(), resName(op.Font))
 			case OpImage:
 				drawImage(p, c, op, pageIdx, contentH, opts)
 			case OpLinkURI:
@@ -414,21 +424,40 @@ func drawLine(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintO
 	c.Stroke()
 }
 
-func drawText(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintOptions, pageH float64) {
+func drawText(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintOptions, pageH float64, fontName string) {
 	x, y := canvasToPDF(op.X, op.Y, pageIdx, contentH, opts, pageH)
 	c.SetFillColor(op.R, op.G, op.B)
-	c.SetFont("F0", op.Size)
+	if fontName == "" {
+		fontName = "F0"
+	}
+	c.SetFont(fontName, op.Size)
 	c.BeginText()
 	c.TextAt(x, y)
-	if op.Bold {
+	// Fake bold only when CSS wants bold but the face is not a real bold TTF.
+	fakeBold := op.Bold && (op.Font == nil || !op.Font.Bold())
+	if fakeBold {
 		c.SetLineWidth(op.Size * 0.06)
-		c.TextRenderMode(2) // fill + stroke: fake bold
+		c.TextRenderMode(2) // fill + stroke
 	}
 	c.TextShow(op.Text)
-	if op.Bold {
+	if fakeBold {
 		c.TextRenderMode(0)
 	}
 	c.EndText()
+}
+
+func itoa(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	var b [12]byte
+	i := len(b)
+	for n > 0 {
+		i--
+		b[i] = byte('0' + n%10)
+		n /= 10
+	}
+	return string(b[i:])
 }
 
 func drawImage(p *pdf.Page, c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintOptions) {

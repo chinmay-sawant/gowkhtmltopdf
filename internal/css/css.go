@@ -2,11 +2,10 @@
 // declarations-and-rules parser, selector matching against the html tree,
 // specificity ordering, and value helpers (lengths, colors, font families).
 //
-// Scope: `*`, type, `.class`, `#id`, descendant and child combinators,
+// Scope: `*`, type, `.class`, `#id`, attribute selectors ([attr]/[attr=val]),
+// :first-child/:last-child/:nth-child, descendant/child/sibling combinators,
 // `@media print|screen` filtering, `!important`, inline style attributes.
-// Attribute selectors and pseudo-classes are ignored (the compound they
-// appear in keeps matching without them). Everything else degrades to
-// skip-without-panic: parse errors never crash the renderer.
+// Unsupported constructs degrade without panicking.
 package css
 
 import (
@@ -35,13 +34,28 @@ type Selector struct {
 }
 
 // SelectorPart is one compound selector. Combinator describes how it links to
-// the following part: "" for the first part, ">" for a child combinator, " "
-// for a descendant combinator.
+// the following part: "" for the first part, ">" child, "+" next-sibling,
+// "~" subsequent-sibling, " " descendant.
 type SelectorPart struct {
 	Tag        string
 	Classes    []string
 	ID         string
+	Attrs      []AttrSelector
+	Pseudos    []PseudoClass
 	Combinator string
+}
+
+// AttrSelector is [name] or [name=value] (exact match).
+type AttrSelector struct {
+	Name  string
+	Op    string // "" presence, "=" exact
+	Value string
+}
+
+// PseudoClass is :first-child, :last-child, or :nth-child(...).
+type PseudoClass struct {
+	Name string // lower-case, without leading ':'
+	Arg  string // nth-child argument, lower-case, trimmed
 }
 
 // Declaration is one property: value pair.
@@ -335,8 +349,8 @@ func splitTopLevel(s string, sep byte) []string {
 	return out
 }
 
-// parseSelector parses one compound chain, e.g. "div.a#b > p.c". Pseudo
-// classes (:hover) and attribute selectors ([x]) are dropped.
+// parseSelector parses one compound chain, e.g. "div.a#b > p.c" or
+// "tr:nth-child(even)".
 func parseSelector(s string) (Selector, bool) {
 	var sel Selector
 	s = strings.TrimSpace(s)
@@ -394,17 +408,43 @@ func splitSelectorChain(s string) []string {
 			flush()
 			out = append(out, string(c))
 		case c == '[':
+			// keep [attr] / [attr=value] inside the compound
 			j := strings.IndexByte(s[i:], ']')
 			if j < 0 {
 				cur.WriteByte(c)
 			} else {
-				if cur.Len() == 0 && len(out) == 0 {
-					cur.WriteByte('*') // "[x]" alone means universal
+				if cur.Len() == 0 && (len(out) == 0 || out[len(out)-1] == " " ||
+					out[len(out)-1] == ">" || out[len(out)-1] == "+" || out[len(out)-1] == "~") {
+					cur.WriteByte('*')
 				}
+				cur.WriteString(s[i : i+j+1])
 				i += j
 			}
 		case c == ':':
-			// pseudo class or pseudo element: skip to next ident end
+			// keep :pseudo / :nth-child(n) inside the compound; drop ::pseudo-elements
+			if i+1 < len(s) && s[i+1] == ':' {
+				// ::before etc. - skip
+				i += 2
+				for i < len(s) && !isSelBreak(s[i]) {
+					if s[i] == '(' {
+						j := strings.IndexByte(s[i:], ')')
+						if j < 0 {
+							i = len(s)
+							break
+						}
+						i += j
+						break
+					}
+					i++
+				}
+				i--
+				break
+			}
+			if cur.Len() == 0 && (len(out) == 0 || out[len(out)-1] == " " ||
+				out[len(out)-1] == ">" || out[len(out)-1] == "+" || out[len(out)-1] == "~") {
+				cur.WriteByte('*')
+			}
+			start := i
 			i++
 			for i < len(s) && !isSelBreak(s[i]) {
 				if s[i] == '(' {
@@ -413,11 +453,12 @@ func splitSelectorChain(s string) []string {
 						i = len(s)
 						break
 					}
-					i += j
+					i += j + 1
 					break
 				}
 				i++
 			}
+			cur.WriteString(s[start:i])
 			i--
 		case c == '\\':
 			// escape: keep next char literally
@@ -438,9 +479,8 @@ func isSelBreak(b byte) bool {
 		b == '~' || b == ' ' || b == '\t' || b == '\n' || b == '\r'
 }
 
-// parseCompound parses "tag#id.class1.class2" into a SelectorPart. A
-// "tag" of "*" or "" means universal. Names must be valid CSS ident
-// characters; anything else makes the compound invalid.
+// parseCompound parses "tag#id.class1.class2[attr]:nth-child(even)" into a
+// SelectorPart. A tag of "*" or "" means universal.
 func parseCompound(s string) (SelectorPart, bool) {
 	s = strings.TrimSpace(s)
 	if s == "" {
@@ -449,7 +489,7 @@ func parseCompound(s string) (SelectorPart, bool) {
 	var part SelectorPart
 	i := 0
 	// tag name first
-	for i < len(s) && !isIDClassDot(s[i]) {
+	for i < len(s) && !isCompoundBreak(s[i]) {
 		i++
 	}
 	part.Tag = s[:i]
@@ -462,7 +502,7 @@ func parseCompound(s string) (SelectorPart, bool) {
 		switch s[i] {
 		case '#':
 			j := i + 1
-			for j < len(s) && !isIDClassDot(s[j]) {
+			for j < len(s) && !isCompoundBreak(s[j]) {
 				j++
 			}
 			id := s[i+1 : j]
@@ -473,7 +513,7 @@ func parseCompound(s string) (SelectorPart, bool) {
 			i = j
 		case '.':
 			j := i + 1
-			for j < len(s) && !isIDClassDot(s[j]) {
+			for j < len(s) && !isCompoundBreak(s[j]) {
 				j++
 			}
 			if j > i+1 {
@@ -484,11 +524,79 @@ func parseCompound(s string) (SelectorPart, bool) {
 				part.Classes = append(part.Classes, cls)
 			}
 			i = j
+		case '[':
+			j := strings.IndexByte(s[i:], ']')
+			if j < 0 {
+				return SelectorPart{}, false
+			}
+			attr, ok := parseAttrSelector(s[i : i+j+1])
+			if !ok {
+				return SelectorPart{}, false
+			}
+			part.Attrs = append(part.Attrs, attr)
+			i += j + 1
+		case ':':
+			if i+1 < len(s) && s[i+1] == ':' {
+				return SelectorPart{}, false // pseudo-elements not supported
+			}
+			j := i + 1
+			for j < len(s) && s[j] != '(' && !isCompoundBreak(s[j]) {
+				j++
+			}
+			name := strings.ToLower(s[i+1 : j])
+			arg := ""
+			if j < len(s) && s[j] == '(' {
+				k := strings.IndexByte(s[j:], ')')
+				if k < 0 {
+					return SelectorPart{}, false
+				}
+				arg = strings.ToLower(strings.TrimSpace(s[j+1 : j+k]))
+				j = j + k + 1
+			}
+			// unsupported interactive/link pseudos: ignore (match without them)
+			switch name {
+			case "first-child", "last-child", "nth-child":
+				part.Pseudos = append(part.Pseudos, PseudoClass{Name: name, Arg: arg})
+			case "link", "visited", "hover", "active", "focus", "not":
+				// accepted and ignored for print
+			default:
+				// unknown: ignore
+			}
+			i = j
 		default:
 			return SelectorPart{}, false
 		}
 	}
 	return part, true
+}
+
+func parseAttrSelector(s string) (AttrSelector, bool) {
+	// s includes brackets: [href] or [href="x"] or [href=x]
+	if len(s) < 3 || s[0] != '[' || s[len(s)-1] != ']' {
+		return AttrSelector{}, false
+	}
+	inner := strings.TrimSpace(s[1 : len(s)-1])
+	if inner == "" {
+		return AttrSelector{}, false
+	}
+	eq := strings.IndexByte(inner, '=')
+	if eq < 0 {
+		if !validIdent(inner) {
+			return AttrSelector{}, false
+		}
+		return AttrSelector{Name: strings.ToLower(inner)}, true
+	}
+	name := strings.TrimSpace(inner[:eq])
+	val := strings.TrimSpace(inner[eq+1:])
+	if !validIdent(name) {
+		return AttrSelector{}, false
+	}
+	if len(val) >= 2 {
+		if (val[0] == '"' && val[len(val)-1] == '"') || (val[0] == '\'' && val[len(val)-1] == '\'') {
+			val = val[1 : len(val)-1]
+		}
+	}
+	return AttrSelector{Name: strings.ToLower(name), Op: "=", Value: val}, true
 }
 
 // validIdent reports whether s is a valid CSS identifier (letters, digits,
@@ -510,11 +618,13 @@ func validIdent(s string) bool {
 	return true
 }
 
-func isIDClassDot(b byte) bool { return b == '#' || b == '.' }
+func isCompoundBreak(b byte) bool {
+	return b == '#' || b == '.' || b == '[' || b == ':'
+}
 
 // Match reports whether the selector matches the element node. Matching runs
 // right to left: the last part must match n, earlier parts must match
-// ancestors per their combinators.
+// ancestors/siblings per their combinators.
 func Match(s Selector, n *html.Node) bool {
 	if n == nil || n.Type != html.ElementNode || len(s.Parts) == 0 {
 		return false
@@ -523,12 +633,32 @@ func Match(s Selector, n *html.Node) bool {
 		return false
 	}
 	cur := n
+	// Combinator is stored on the right-hand part of each pair (how that
+	// part attaches to the previous). Walk left using Parts[i+1].Combinator.
 	for i := len(s.Parts) - 2; i >= 0; i-- {
 		part := s.Parts[i]
-		switch part.Combinator {
+		switch s.Parts[i+1].Combinator {
 		case ">":
 			cur = cur.Parent
 			if cur == nil || cur.Type != html.ElementNode || !matchPart(part, cur) {
+				return false
+			}
+		case "+":
+			prev := previousElementSibling(cur)
+			if prev == nil || !matchPart(part, prev) {
+				return false
+			}
+			cur = prev
+		case "~":
+			found := false
+			for sib := previousElementSibling(cur); sib != nil; sib = previousElementSibling(sib) {
+				if matchPart(part, sib) {
+					cur = sib
+					found = true
+					break
+				}
+			}
+			if !found {
 				return false
 			}
 		default: // descendant
@@ -563,7 +693,151 @@ func matchPart(p SelectorPart, n *html.Node) bool {
 			}
 		}
 	}
+	for _, a := range p.Attrs {
+		val, ok := "", false
+		if n.Attrs != nil {
+			val, ok = n.Attrs[a.Name]
+		}
+		if a.Op == "" {
+			if !ok {
+				return false
+			}
+			continue
+		}
+		if !ok || val != a.Value {
+			return false
+		}
+	}
+	for _, ps := range p.Pseudos {
+		if !matchPseudo(ps, n) {
+			return false
+		}
+	}
 	return true
+}
+
+func matchPseudo(ps PseudoClass, n *html.Node) bool {
+	switch ps.Name {
+	case "first-child":
+		return previousElementSibling(n) == nil
+	case "last-child":
+		return nextElementSibling(n) == nil
+	case "nth-child":
+		idx := elementIndex(n)
+		return matchNth(ps.Arg, idx)
+	default:
+		return true
+	}
+}
+
+func previousElementSibling(n *html.Node) *html.Node {
+	if n == nil || n.Parent == nil {
+		return nil
+	}
+	var prev *html.Node
+	for _, c := range n.Parent.Children {
+		if c == n {
+			return prev
+		}
+		if c.Type == html.ElementNode {
+			prev = c
+		}
+	}
+	return nil
+}
+
+func nextElementSibling(n *html.Node) *html.Node {
+	if n == nil || n.Parent == nil {
+		return nil
+	}
+	seen := false
+	for _, c := range n.Parent.Children {
+		if c == n {
+			seen = true
+			continue
+		}
+		if seen && c.Type == html.ElementNode {
+			return c
+		}
+	}
+	return nil
+}
+
+// elementIndex is 1-based among element siblings.
+func elementIndex(n *html.Node) int {
+	if n == nil || n.Parent == nil {
+		return 1
+	}
+	i := 0
+	for _, c := range n.Parent.Children {
+		if c.Type != html.ElementNode {
+			continue
+		}
+		i++
+		if c == n {
+			return i
+		}
+	}
+	return 0
+}
+
+// matchNth implements :nth-child(an+b) / odd / even for 1-based index.
+func matchNth(arg string, index int) bool {
+	arg = strings.TrimSpace(strings.ToLower(arg))
+	if arg == "" {
+		return false
+	}
+	if arg == "odd" {
+		return index%2 == 1
+	}
+	if arg == "even" {
+		return index%2 == 0
+	}
+	// plain integer
+	if n, err := strconv.Atoi(arg); err == nil {
+		return index == n
+	}
+	// an+b / n+b / -n+b / an
+	a, b := 0, 0
+	if strings.Contains(arg, "n") {
+		parts := strings.SplitN(arg, "n", 2)
+		as := strings.TrimSpace(parts[0])
+		bs := ""
+		if len(parts) == 2 {
+			bs = strings.TrimSpace(parts[1])
+		}
+		switch as {
+		case "", "+":
+			a = 1
+		case "-":
+			a = -1
+		default:
+			var err error
+			a, err = strconv.Atoi(as)
+			if err != nil {
+				return false
+			}
+		}
+		if bs == "" {
+			b = 0
+		} else {
+			var err error
+			b, err = strconv.Atoi(bs)
+			if err != nil {
+				return false
+			}
+		}
+		if a == 0 {
+			return index == b
+		}
+		// index = a*k + b for integer k >= 0
+		if (index-b)%a != 0 {
+			return false
+		}
+		k := (index - b) / a
+		return k >= 0
+	}
+	return false
 }
 
 func classSet(n *html.Node) map[string]bool {
@@ -574,13 +848,13 @@ func classSet(n *html.Node) map[string]bool {
 	return set
 }
 
-// Specificity returns (a, b, c): ID count, class count, type count.
+// Specificity returns (a, b, c): ID count, class/attribute/pseudo count, type count.
 func Specificity(s Selector) (a, b, c int) {
 	for _, p := range s.Parts {
 		if p.ID != "" {
 			a++
 		}
-		b += len(p.Classes)
+		b += len(p.Classes) + len(p.Attrs) + len(p.Pseudos)
 		if p.Tag != "*" {
 			c++
 		}

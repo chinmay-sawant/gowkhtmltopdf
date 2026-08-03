@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"gowkhtmltopdf/internal/html"
+	"gowkhtmltopdf/internal/pdf"
 )
 
 // inlineItem is one atomic piece of inline content.
@@ -75,9 +76,13 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 		trimmed := strings.TrimRight(last.text, " ")
 		if trimmed != last.text {
 			last.text = trimmed
-			last.w = e.measureText(trimmed, last.style.FontSize*e.scale) + last.style.LetterSpacing*e.scale*float64(len([]rune(trimmed)))
+			last.w = e.measureTextFace(trimmed, last.style)
 		}
 	}
+
+	// Coalesce adjacent same-style text runs into one op so PDF/image paint
+	// advances match layout (avoids word-by-word Tj gaps).
+	line = coalesceTextItems(line)
 
 	// line metrics
 	maxAscent, maxDescent := 0.0, 0.0
@@ -150,8 +155,9 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 			continue
 		}
 		c := it.style.Color
+		face := e.faceFor(it.style)
 		e.add(Op{Kind: OpText, X: lx, Y: baseline, W: it.w, H: it.h,
-			Text: it.text, Font: e.font, Size: it.style.FontSize * e.scale, Bold: it.style.FontWeight >= 700,
+			Text: it.text, Font: face, Size: it.style.FontSize * e.scale, Bold: it.style.FontWeight >= 700,
 			R: c[0], G: c[1], B: c[2]})
 		if it.style.TextDecoration == "underline" {
 			e.add(Op{Kind: OpLine, X: lx, Y: baseline + it.descent*0.25, W: it.w, H: 0, R: c[0], G: c[1], B: c[2]})
@@ -255,8 +261,40 @@ func (e *engine) collectInlineNode(n *html.Node, out *[]inlineItem) {
 func availWForInline() float64 { return 1 << 30 }
 
 func (e *engine) textItem(text string, st ResolvedStyle) inlineItem {
-	w := e.measureText(text, st.FontSize*e.scale) + st.LetterSpacing*e.scale*float64(len([]rune(text)))
+	w := e.measureTextFace(text, st)
 	return inlineItem{text: text, style: st, w: w, h: lineHeightOf(&st) * e.scale}
+}
+
+// coalesceTextItems merges consecutive non-image text runs that share style
+// and href so one text op paints the whole phrase.
+func coalesceTextItems(line []inlineItem) []inlineItem {
+	if len(line) < 2 {
+		return line
+	}
+	out := make([]inlineItem, 0, len(line))
+	out = append(out, line[0])
+	for i := 1; i < len(line); i++ {
+		cur := line[i]
+		prev := &out[len(out)-1]
+		if !cur.img && !prev.img && !cur.forceBreak && cur.href == prev.href &&
+			sameInlineStyle(prev.style, cur.style) {
+			prev.text += cur.text
+			prev.w += cur.w
+			continue
+		}
+		out = append(out, cur)
+	}
+	return out
+}
+
+func sameInlineStyle(a, b ResolvedStyle) bool {
+	return a.FontSize == b.FontSize &&
+		a.FontWeight == b.FontWeight &&
+		a.FontItalic == b.FontItalic &&
+		a.LetterSpacing == b.LetterSpacing &&
+		a.Color == b.Color &&
+		a.TextDecoration == b.TextDecoration &&
+		a.WhiteSpace == b.WhiteSpace
 }
 
 func lineHeightOf(st *ResolvedStyle) float64 {
@@ -283,11 +321,30 @@ func collapseWS(s string) string {
 	return strings.TrimRight(b.String(), " ")
 }
 
-// measureText returns the width of s in points at the given size.
+// measureText returns the width of s in points at the given size using the
+// engine default face (for call sites without a style).
 func (e *engine) measureText(s string, size float64) float64 {
+	return e.measureWith(e.font, s, size, 0)
+}
+
+// measureTextFace measures s with the face selected for st.
+func (e *engine) measureTextFace(s string, st ResolvedStyle) float64 {
+	size := st.FontSize * e.scale
+	return e.measureWith(e.faceFor(st), s, size, st.LetterSpacing*e.scale)
+}
+
+func (e *engine) measureWith(face *pdf.Font, s string, size, letterSpacing float64) float64 {
+	if face == nil {
+		face = e.font
+	}
 	var total float64
+	n := 0
 	for _, r := range s {
-		total += e.font.AdvanceInPoints(r, size)
+		total += face.AdvanceInPoints(r, size)
+		n++
+	}
+	if letterSpacing != 0 && n > 0 {
+		total += letterSpacing * float64(n)
 	}
 	return total
 }

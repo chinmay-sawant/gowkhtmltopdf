@@ -379,8 +379,10 @@ func TestTextWrapping(t *testing.T) {
 	// a long sentence in a 60pt box must wrap into multiple lines
 	res := layoutHTML(t, `<html><body><div>the quick brown fox jumps over the lazy dog</div></body></html>`, s)
 	texts := opsOfKind(res, OpText)
-	if len(texts) < 6 {
-		t.Fatalf("expected many word ops, got %d: %+v", len(texts), texts)
+	// Same-style words on one line coalesce into a single text op, so we
+	// expect one op per wrapped line rather than one op per word.
+	if len(texts) < 3 {
+		t.Fatalf("expected >= 3 line ops after wrap, got %d: %+v", len(texts), texts)
 	}
 	// group ops by line: consecutive ops with the same (rounded) baseline
 	var lines [][]Op

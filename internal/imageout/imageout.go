@@ -1,8 +1,9 @@
 // Package imageout converts HTML to a raster image (PNG or JPEG) for the
 // gowkhtmltoimage command: it loads one document, lays it out with the shared
 // layout engine, rasterizes the display list with stdlib image/draw, and
-// encodes the result. Text is rendered with the embedded bitmap font in
-// font.go (the stdlib has no text rasterizer).
+// encodes the result. Text is drawn from the same embedded TrueType faces
+// as PDF mode (pure-Go outline raster with simple anti-aliasing); a 5x7
+// bitmap remains as a last-resort fallback when no font is attached to an op.
 package imageout
 
 import (
@@ -258,8 +259,18 @@ func paint(img *image.NRGBA, op *layout.Op) {
 		c := color.NRGBA{
 			R: uint8(op.R * 255), G: uint8(op.G * 255), B: uint8(op.B * 255), A: 255,
 		}
-		drawString(img, int(math.Round(op.X*ptToPx)), int(math.Round(op.Y*ptToPx)),
-			op.Text, op.Size, op.Bold, c)
+		bx := int(math.Round(op.X * ptToPx))
+		by := int(math.Round(op.Y * ptToPx))
+		if op.Font != nil {
+			// Real TTF raster: advances match layout/PDF face metrics.
+			ttfDrawString(img, bx, by, op.Text, op.Size, op.Font, c)
+			// Fake bold only if the face is not already bold.
+			if op.Bold && !op.Font.Bold() {
+				ttfDrawString(img, bx+1, by, op.Text, op.Size, op.Font, c)
+			}
+		} else {
+			drawString(img, bx, by, op.Text, op.Size, op.Bold, c)
+		}
 
 	case layout.OpImage:
 		var src image.Image

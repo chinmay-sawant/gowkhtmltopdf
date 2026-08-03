@@ -100,12 +100,23 @@ type Op struct {
 
 type engine struct {
 	opts   Options
-	font   *pdf.Font
+	font   *pdf.Font // default/regular face (metrics fallback)
+	faces  *pdf.FaceSet
 	styles map[*html.Node]ResolvedStyle
 	ops    []Op
 	noEmit bool // measurement mode: compute geometry without emitting ops
 	height float64
 	scale  float64 // zoom factor applied to style lengths (>= 1)
+}
+
+// faceFor selects the TrueType face for a resolved style (bold/italic).
+func (e *engine) faceFor(st ResolvedStyle) *pdf.Font {
+	if e.faces != nil {
+		if f := e.faces.Resolve(st.FontWeight, st.FontItalic); f != nil {
+			return f
+		}
+	}
+	return e.font
 }
 
 // scalePt applies the engine zoom factor to a style length in points.
@@ -131,17 +142,18 @@ func Layout(root *html.Node, opts Options) (*Result, error) {
 	if root == nil {
 		return nil, errors.New("layout: nil root")
 	}
+	faces, err := pdf.LoadDefaultFaces()
+	if err != nil {
+		return nil, err
+	}
 	font := opts.Font
 	if font == nil {
-		var err error
-		font, err = pdf.DefaultFont()
-		if err != nil {
-			return nil, err
-		}
+		font = faces.Regular
 	}
 	e := &engine{
 		opts:   opts,
 		font:   font,
+		faces:  faces,
 		styles: resolveStyles(root, opts.Sheets, opts.Media, opts.Width, opts.Height),
 		scale:  zoomScale(opts.Zoom),
 	}

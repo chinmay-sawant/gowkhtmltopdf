@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Ana de Armas - Vendored wiki-like fixture</title>
+  <style>
+    /* Chrome that should not dominate print when display:none matches */
+    nav.site-nav { display: none; }
+    .mw-jump-link { display: none; }
+    aside.tools { display: none; }
+    body { font-family: sans-serif; font-size: 11pt; color: #202122; margin: 16px; }
+    h1.firstHeading { font-size: 22pt; font-weight: bold; margin: 0 0 12px 0; }
+    p { margin: 0 0 10px 0; line-height: 1.5; }
+    table.infobox { float: right; width: 220px; border: 1px solid #a2a9b1; background: #f8f9fa; margin: 0 0 12px 12px; font-size: 10pt; }
+    table.infobox th { background: #eaecf0; text-align: left; padding: 4px; }
+    table.infobox td { padding: 4px; }
+    /* zebra rows via nth-child */
+    table.infobox tr:nth-child(even) td { background-color: #f0f0f0; }
+    .mw-parser-output > p:first-child { font-weight: bold; }
+  </style>
+</head>
+<body>
+  <a class="mw-jump-link" href="#content">Jump to content</a>
+  <nav class="site-nav">
+    <ul>
+      <li>Main page</li>
+      <li>Contents</li>
+      <li>Current events</li>
+      <li>Random article</li>
+      <li>About Wikipedia</li>
+    </ul>
+  </nav>
+  <aside class="tools">Appearance / Languages / Donate</aside>
+  <main id="content">
+    <h1 class="firstHeading">Ana de Armas</h1>
+    <table class="infobox">
+      <tr><th colspan="2">Ana de Armas</th></tr>
+      <tr><td>Born</td><td>30 April 1988</td></tr>
+      <tr><td>Occupation</td><td>Actress</td></tr>
+      <tr><td>Years active</td><td>2006-present</td></tr>
+    </table>
+    <div class="mw-parser-output">
+      <p>Ana Celia de Armas Caso is a Cuban and Spanish actress. She began her career in Cuba and later moved to Spain, then to Hollywood.</p>
+      <p>She is known for roles in Blade Runner 2049, Knives Out, No Time to Die, and Blonde. This fixture is a reduced static snapshot for CI; it is not a live Wikipedia page.</p>
+      <p>Print expectations: the article title and body appear early; site navigation chrome is suppressed via display:none rules.</p>
+    </div>
+  </main>
+</body>
+</html>

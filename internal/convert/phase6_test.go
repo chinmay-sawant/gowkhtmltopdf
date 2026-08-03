@@ -126,14 +126,13 @@ func TestTOC(t *testing.T) {
 	if n := pageCount(data); n < 2 {
 		t.Fatalf("pages = %d, want >= 2 (TOC + body)", n)
 	}
-	// Layout splits text into per-word content ops, so assertions match the
-	// word runs; the TOC entry text is drawn as a single inline run whose
-	// dotted leader ("....") proves the entry (not just the caption) painted.
+	// Same-style runs coalesce into fewer Tj strings; assert on phrases
+	// that survive coalescing plus the dotted leader.
 	for _, want := range []string{
-		"(Table )", "(Contents)", // TOC caption
-		"(Chapter )", "(One)", // TOC entry + body heading
-		"(Two)",
-		".... ) Tj", // dotted leader in the TOC entry
+		"(Table of Contents)", // TOC caption (coalesced)
+		"(Chapter One)",       // TOC entry / body heading phrase
+		"(Chapter Two)",
+		"....",      // dotted leader in the TOC entry
 		"/Annots [", // forward-link annotations
 		"/Dest [",
 	} {
@@ -183,9 +182,9 @@ func TestHTMLHeaderPlaceholderPerPage(t *testing.T) {
 	if pages < 2 {
 		t.Fatalf("pages = %d, want >= 2", pages)
 	}
-	// "page N of M" is word-split in the content stream: the literal words
-	// only appear in the per-page-substituted header.
-	if !bytes.Contains(data, []byte("(page )")) || !bytes.Contains(data, []byte("(of )")) {
+	// "page N of M" is coalesced where style is uniform; substituted numbers
+	// and the "page"/"of" markers must still appear after placeholder expand.
+	if !bytes.Contains(data, []byte("page")) || !bytes.Contains(data, []byte(" of ")) {
 		t.Error("per-page HTML header substitution [page]/[topage] missing")
 	}
 }

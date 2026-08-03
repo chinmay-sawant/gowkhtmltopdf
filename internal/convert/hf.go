@@ -284,7 +284,21 @@ func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hf setti
 	c.Save()
 	c.Rect(0, bandTop, page.Width(), bandH)
 	c.Clip()
-	fontUsed := false
+	fontNames := map[*pdf.Font]string{}
+	nextFont := 0
+	resName := func(f *pdf.Font) string {
+		if f == nil {
+			return "F0"
+		}
+		if n, ok := fontNames[f]; ok {
+			return n
+		}
+		n := "HF" + strconv.Itoa(nextFont)
+		nextFont++
+		fontNames[f] = n
+		c.UseEmbeddedFont(n, f)
+		return n
+	}
 	for i := range res.Ops {
 		op := &res.Ops[i]
 		x := geom.marginLeft + op.X
@@ -314,20 +328,18 @@ func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hf setti
 			c.LineTo(x+op.W, yTop-(op.Y+op.H))
 			c.Stroke()
 		case layout.OpText, layout.OpBullet:
-			if !fontUsed {
-				c.UseEmbeddedFont("F0", op.Font)
-				fontUsed = true
-			}
+			name := resName(op.Font)
 			c.SetFillColor(op.R, op.G, op.B)
-			c.SetFont("F0", op.Size)
+			c.SetFont(name, op.Size)
 			c.BeginText()
 			c.TextAt(x, yTop-op.Y)
-			if op.Bold {
+			fakeBold := op.Bold && (op.Font == nil || !op.Font.Bold())
+			if fakeBold {
 				c.SetLineWidth(op.Size * 0.06)
 				c.TextRenderMode(2)
 			}
 			c.TextShow(op.Text)
-			if op.Bold {
+			if fakeBold {
 				c.TextRenderMode(0)
 			}
 			c.EndText()

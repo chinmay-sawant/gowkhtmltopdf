@@ -37,7 +37,7 @@ clones of arbitrary websites.
 | Headers, footers, TOC, PDF bookmarks | Yes |
 | Zero native deps / offline static binary | Yes |
 | Full CSS (flex, grid, floats) or JavaScript | No (see deferred) |
-| CJK / complex Unicode fonts | Not yet (Latin + subset today) |
+| CJK / complex Unicode fonts | Not yet (Latin Liberation family; CID later) |
 
 ```text
 HTML (file | URL | stdin)
@@ -255,17 +255,18 @@ remains **not planned**.
 
 | Deferred | Status / reason | Next gate |
 |---|---|---|
-| JavaScript / WebKit features (`--enable-javascript`, `--run-script`, `--window-status`, plugins) | No JS engine in stdlib; flags accepted with warnings; `<script>` stripped at load | Not planned |
-| Floats / positioned layout (`float`, `clear`, `position: relative/absolute/fixed`) | Parsed but treated as in-flow | Intermediate roadmap (floats/position) |
-| Flexbox / Grid (`display: flex|grid`) | Not in the CSS allowlist; elements degrade to initial `inline` | Intermediate roadmap (partial flex) |
-| Richer selectors (attribute `[attr=…]`, `:first-child`, `:nth-child`, `:hover`…) | Dropped at tokenization; `:nth-child(even)` matches all rows | Intermediate roadmap (richer selectors) |
-| CJK fonts / complex-script shaping | Single embedded Latin font; no HarfBuzz-class shaping in stdlib | Intermediate roadmap (better CJK fonts) |
+| JavaScript / WebKit features (`--enable-javascript`, `--run-script`, `--window-status`, plugins) | No JS engine in stdlib; flags accepted with warnings; `<script>` stripped at load | Phase 22 staged (see post-MVP roadmap) |
+| Floats / positioned layout (`float`, `clear`, `position: relative/absolute/fixed`) | Parsed but treated as in-flow | Phase 16–17 |
+| Flexbox / Grid (`display: flex|grid`) | Not in the CSS allowlist; elements degrade to initial `inline` | Phase 17 (partial flex); grid deferred |
+| Richer selectors (attribute `[attr=…]`, `:first-child`, `:nth-child`, sibling `+`/`~`) | **Shipped** for presence/exact attr, first/last/nth-child, siblings | Hover/link pseudos still ignored |
+| Multi-font bold/italic (Liberation Sans family) | **Shipped** - Regular/Bold/Italic/BoldItalic embedded | Further families: phase 19 |
+| CJK fonts / complex-script shaping | Latin Liberation family only; no HarfBuzz-class shaping in stdlib | Phase 19 |
 | AcroForm forms (`--enable-forms`) | No form model in the PDF writer | Intermediate roadmap (forms) |
 | XSLT TOC stylesheets (`--xsl-style-sheet`) | No XSLT in stdlib; flag warns + ignores; default Go-template TOC used | Not planned |
 | SVG image output (`--format svg`) | No stdlib SVG encoder | Not planned |
 | BMP image output | No demand; PNG/JPEG covered by `image/*` | Not planned |
 | SOCKS5 proxy | stdlib `net/http` has no SOCKS5; HTTP(S) proxy only | Not planned |
-| Text anti-aliasing in image mode | Image mode renders a 5×7 bitmap font (no glyph rasterizer); PDF mode is vector | Not planned |
+| Text anti-aliasing in image mode | **Shipped** pure-Go TTF outline raster with coverage AA (same faces as PDF) | Residual: no FreeType hinting |
 | Inline `<a href="#x">` source-rect links | TOC forward/back links work; inline anchors skipped (inline elements produce no boxes) | Intermediate roadmap |
 | Cross-object URL map (`urlToPageObj`) | Same-document anchors only | Intermediate roadmap |
 | `resolveRelativeLinks` | Flag accepted, not implemented | Intermediate roadmap |
