@@ -399,10 +399,17 @@ func canvasToPDF(opX, opY float64, pageIdx int, contentH float64, opts PaintOpti
 
 func drawFill(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintOptions, pageH float64) {
 	x, y := canvasToPDF(op.X, op.Y+op.H, pageIdx, contentH, opts, pageH)
-	if op.Alpha < 1 {
-		c.SetOpacity(op.Alpha)
+	r, g, b := op.R, op.G, op.B
+	// Pre-composite translucent fills against white paper. Relying on PDF
+	// ExtGState alone left rgba(…) bands looking like solid dark blue when
+	// the graphics state was missing or not reset (fixture-14 .alpha).
+	if op.Alpha > 0 && op.Alpha < 1 {
+		a := op.Alpha
+		r = r*a + (1 - a) // white backdrop
+		g = g*a + (1 - a)
+		b = b*a + (1 - a)
 	}
-	c.SetFillColor(op.R, op.G, op.B)
+	c.SetFillColor(r, g, b)
 	c.Rect(x, y, op.W, op.H)
 	c.Fill()
 }
