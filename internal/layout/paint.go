@@ -93,6 +93,9 @@ func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 			c.UseEmbeddedFont(n, f)
 			return n
 		}
+		// Unique image resource names per page: reusing "I0" for every
+		// image made later images overwrite earlier ones (fixture-20).
+		nextImg := 0
 		for _, idx := range idxs {
 			op := &res.Ops[idx]
 			switch op.Kind {
@@ -105,7 +108,9 @@ func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 			case OpText, OpBullet:
 				drawText(c, op, pageIdx, contentH, opts, p.Height(), resName(op.Font))
 			case OpImage:
-				drawImage(p, c, op, pageIdx, contentH, opts)
+				name := "I" + itoa(nextImg)
+				nextImg++
+				drawImage(p, c, op, pageIdx, contentH, opts, name)
 			case OpLinkURI:
 				drawLink(p, op, pageIdx, contentH, opts)
 			}
@@ -460,12 +465,15 @@ func itoa(n int) string {
 	return string(b[i:])
 }
 
-func drawImage(p *pdf.Page, c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintOptions) {
+func drawImage(p *pdf.Page, c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintOptions, name string) {
 	x, y := canvasToPDF(op.X, op.Y+op.H, pageIdx, contentH, opts, p.Height())
+	if name == "" {
+		name = "I0"
+	}
 	if op.IsJPEG {
-		_ = c.AddJPEGImage("I0", x, y, op.W, op.H, op.Image)
+		_ = c.AddJPEGImage(name, x, y, op.W, op.H, op.Image)
 	} else {
-		_ = c.AddPNGImage("I0", x, y, op.W, op.H, op.Image)
+		_ = c.AddPNGImage(name, x, y, op.W, op.H, op.Image)
 	}
 }
 

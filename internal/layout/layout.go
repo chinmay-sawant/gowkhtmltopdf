@@ -282,6 +282,11 @@ func (e *engine) buildBlock(n *html.Node, st ResolvedStyle, availW, x, y float64
 	var blocks, inlines []*html.Node
 	e.partition(n.Children, &blocks, &inlines)
 
+	// Content ops are recorded first so we know the box height; background
+	// and borders are then inserted *before* those ops so paint order is
+	// bg → borders → children (otherwise fills cover text).
+	contentStart := len(e.ops)
+
 	cy := e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)
 	prevBottom := 0.0
 
@@ -307,7 +312,7 @@ func (e *engine) buildBlock(n *html.Node, st ResolvedStyle, availW, x, y float64
 
 	// list marker
 	if n.Name == "li" && b.firstBaseline > 0 {
-		e.add(Op{Kind: OpBullet, X: x + 4, Y: b.firstBaseline, Text: "\u2022", Font: e.font, Size: e.scalePt(st.FontSize), R: st.Color[0], G: st.Color[1], B: st.Color[2]})
+		e.add(Op{Kind: OpBullet, X: contentX + 4, Y: b.firstBaseline, Text: "\u2022", Font: e.font, Size: e.scalePt(st.FontSize), R: st.Color[0], G: st.Color[1], B: st.Color[2]})
 	}
 
 	if st.Height >= 0 && cy < e.scalePt(st.Height) {
@@ -321,12 +326,43 @@ func (e *engine) buildBlock(n *html.Node, st ResolvedStyle, availW, x, y float64
 	}
 	b.h = cy
 
+	e.prependChrome(contentStart, st, b.x, y, b.w, b.h)
+	return b
+}
+
+// prependChrome inserts background + border ops at insertAt so they paint
+// under any content ops already appended for this box.
+func (e *engine) prependChrome(insertAt int, st ResolvedStyle, x, y, w, h float64) {
+	if e.noEmit {
+		return
+	}
+	var chrome []Op
 	if st.BGColor[3] > 0 && e.opts.Background {
-		e.add(Op{Kind: OpFillRect, X: b.x, Y: y, W: b.w, H: b.h,
+		chrome = append(chrome, Op{Kind: OpFillRect, X: x, Y: y, W: w, H: h,
 			R: st.BGColor[0], G: st.BGColor[1], B: st.BGColor[2], Alpha: st.BGColor[3]})
 	}
-	e.emitBorders(st, b.x, y, b.w, b.h)
-	return b
+	// borders (same geometry as emitBorders)
+	wt, wr, wb, wl := e.scalePt(st.BorderTop.Width), e.scalePt(st.BorderRight.Width), e.scalePt(st.BorderBottom.Width), e.scalePt(st.BorderLeft.Width)
+	if wt > 0 && st.BorderTop.Style != "none" {
+		chrome = append(chrome, Op{Kind: OpLine, X: x, Y: y, W: w, H: 0, Width: wt, R: st.BorderTop.Color[0], G: st.BorderTop.Color[1], B: st.BorderTop.Color[2]})
+	}
+	if wr > 0 && st.BorderRight.Style != "none" {
+		chrome = append(chrome, Op{Kind: OpLine, X: x + w, Y: y, W: 0, H: h, Width: wr, R: st.BorderRight.Color[0], G: st.BorderRight.Color[1], B: st.BorderRight.Color[2]})
+	}
+	if wb > 0 && st.BorderBottom.Style != "none" {
+		chrome = append(chrome, Op{Kind: OpLine, X: x, Y: y + h, W: w, H: 0, Width: wb, R: st.BorderBottom.Color[0], G: st.BorderBottom.Color[1], B: st.BorderBottom.Color[2]})
+	}
+	if wl > 0 && st.BorderLeft.Style != "none" {
+		chrome = append(chrome, Op{Kind: OpLine, X: x, Y: y, W: 0, H: h, Width: wl, R: st.BorderLeft.Color[0], G: st.BorderLeft.Color[1], B: st.BorderLeft.Color[2]})
+	}
+	if len(chrome) == 0 {
+		return
+	}
+	// insert chrome before content ops
+	tail := append([]Op(nil), e.ops[insertAt:]...)
+	e.ops = e.ops[:insertAt]
+	e.ops = append(e.ops, chrome...)
+	e.ops = append(e.ops, tail...)
 }
 
 // partition splits children into block-level and inline nodes.
@@ -519,7 +555,8 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 		return tb
 	}
 
-	// measure each cell's max-content width
+	// measure each cell's max-content width; colspan cells contribute their
+	// content width evenly across the spanned columns (min floor per col).
 	colW := make([]float64, nCols)
 	var cellData [][]*box
 	for _, r := range rows {
@@ -527,10 +564,35 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 		var cells []*box
 		for _, cellNode := range r {
 			span := colSpan(cellNode)
+			if span < 1 {
+				span = 1
+			}
+			if col+span > nCols {
+				span = nCols - col
+				if span < 1 {
+					span = 1
+				}
+			}
 			cell := e.buildCell(cellNode, col, span)
 			cells = append(cells, cell)
-			if span == 1 && cell.contentW > colW[col] {
-				colW[col] = cell.contentW
+			if span == 1 {
+				if cell.contentW > colW[col] {
+					colW[col] = cell.contentW
+				}
+			} else if span > 1 {
+				// Prefer existing single-col measurements; only grow if the
+				// spanned content needs more total space than current sum.
+				var sum float64
+				for k := 0; k < span && col+k < nCols; k++ {
+					sum += colW[col+k]
+				}
+				need := cell.contentW
+				if need > sum {
+					extra := (need - sum) / float64(span)
+					for k := 0; k < span && col+k < nCols; k++ {
+						colW[col+k] += extra
+					}
+				}
 			}
 			col += span
 		}

@@ -299,6 +299,7 @@ func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hf setti
 		c.UseEmbeddedFont(n, f)
 		return n
 	}
+	nextImg := 0
 	for i := range res.Ops {
 		op := &res.Ops[i]
 		x := geom.marginLeft + op.X
@@ -345,10 +346,12 @@ func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hf setti
 			c.EndText()
 		case layout.OpImage:
 			y := yTop - (op.Y + op.H)
+			imgName := "HFI" + strconv.Itoa(nextImg)
+			nextImg++
 			if op.IsJPEG {
-				_ = c.AddJPEGImage("I0", x, y, op.W, op.H, op.Image)
+				_ = c.AddJPEGImage(imgName, x, y, op.W, op.H, op.Image)
 			} else {
-				_ = c.AddPNGImage("I0", x, y, op.W, op.H, op.Image)
+				_ = c.AddPNGImage(imgName, x, y, op.W, op.H, op.Image)
 			}
 		case layout.OpLinkURI:
 			// links inside HTML headers/footers are not carried over to the

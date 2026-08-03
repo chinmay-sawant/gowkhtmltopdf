@@ -556,6 +556,10 @@ func winAnsiFold(r rune) rune {
 		return '.'
 	case '\u00A0', '\u2009', '\u200A', '\u2008', '\u2002', '\u2003':
 		return ' '
+	case '\u00D7', '\u2715', '\u2716': // multiplication / cross marks → ASCII x
+		return 'x'
+	case '\u00F7': // division sign
+		return '/'
 	}
 	return r
 }
