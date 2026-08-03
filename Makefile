@@ -34,7 +34,8 @@ golden-update:
 # showcase PDF (TOC + headers/footers + outline) and a PNG from the image
 # converter. Sample files under output/ are committed as viewer smoke artifacts.
 samples:
-	rm -f output/*.pdf output/*.png
+	# Wipe regenerable fixture samples only (keep optional URL smokes like wiki-*.pdf)
+	rm -f output/fixture-*.pdf output/fixture-*.png output/showcase-*.pdf
 	for f in testdata/golden/fixture-*.html; do \
 		name=$$(basename "$$f" .html); \
 		go run ./cmd/gowkhtmltopdf --enable-local-file-access "$$f" "output/$$name.pdf"; \
