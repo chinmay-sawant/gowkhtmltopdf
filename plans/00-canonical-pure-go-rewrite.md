@@ -50,7 +50,7 @@ Phase 0 Scope → 1 Settings/CLI → 2 Loader → 3 PDF Writer
 |------:|-------|---------------|----------------------|--------|
 | 0 | Scope freeze & project foundations | [phases/phase-00-scope-foundations.md](phases/phase-00-scope-foundations.md) | 0.5–1 mo | `[x]` 2026-08-03 |
 | 1 | Settings model & CLI skeleton | [phases/phase-01-settings-cli.md](phases/phase-01-settings-cli.md) | 1–1.5 mo | `[x]` 2026-08-03 |
-| 2 | Resource loader & network | [phases/phase-02-loader-network.md](phases/phase-02-loader-network.md) | 0.75–1.5 mo | `[ ]` |
+| 2 | Resource loader & network | [phases/phase-02-loader-network.md](phases/phase-02-loader-network.md) | 0.75–1.5 mo | `[x]` 2026-08-03 |
 | 3 | PDF object model & writer | [phases/phase-03-pdf-writer.md](phases/phase-03-pdf-writer.md) | 2–3 mo | `[ ]` |
 | 4 | HTML parser + CSS subset layout | [phases/phase-04-html-css-layout.md](phases/phase-04-html-css-layout.md) | 6–12 mo | `[ ]` |
 | 5 | Print pagination & page breaks | [phases/phase-05-pagination-print.md](phases/phase-05-pagination-print.md) | 2–4 mo | `[ ]` |

@@ -391,6 +391,18 @@ func objectSetters(o *PdfObject) map[string]setter {
 	return s
 }
 
+// HttpErrorCode maps an HTTP status to the wkhtmltopdf exit-code convention
+// (utilities.cc): 404 → 2, 401 → 3, everything else stays 1.
+func HttpErrorCode(status int) int {
+	switch status {
+	case 404:
+		return 2
+	case 401:
+		return 3
+	}
+	return 1
+}
+
 // ImageGlobal.Set applies an image-mode dotted settings key.
 func (g *ImageGlobal) Set(name, value string) error {
 	setters := map[string]setter{
@@ -410,16 +422,4 @@ func (g *ImageGlobal) Set(name, value string) error {
 		return fmt.Errorf("unknown image setting %q", name)
 	}
 	return fn(value)
-}
-
-// HttpErrorCode maps an HTTP status to the wkhtmltopdf exit-code convention
-// (utilities.cc): 404 → 2, 401 → 3, everything else stays 1.
-func HttpErrorCode(status int) int {
-	switch status {
-	case 404:
-		return 2
-	case 401:
-		return 3
-	}
-	return 1
 }
