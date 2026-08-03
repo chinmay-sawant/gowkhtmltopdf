@@ -54,7 +54,7 @@ Built **from scratch** with **zero third-party Go modules or HTML→PDF APIs** (
 | root `api.go` | Library API |
 | `internal/{settings,cli,load,html,css,layout,pdf,outline,convert,imageout}` | Pipeline |
 | `testdata/golden/` | 20 report-style fixtures |
-| `docs/`, `plans/` | Matrix, threat model, phase ledgers |
+| `documentation/`, `plans/` | Matrix, threat model, phase ledgers |
 
 ---
 

@@ -21,7 +21,7 @@ Upstream maintainers already steer report users to WeasyPrint/Prince and dynamic
 ## Checklist
 
 ### 0.1 HTML/CSS allowlist document
-- [x] Create `docs/compatibility-matrix.md` (or `plans/compatibility-matrix.md`)
+- [x] Create `documentation/compatibility-matrix.md` (or `plans/compatibility-matrix.md`)
 - [x] List supported tags: `html,head,body,title,meta,style,link,div,span,p,br,hr,h1-h6,ul,ol,li,table,thead,tbody,tfoot,tr,th,td,img,a,strong,em,b,i,u,small,pre,code,blockquote`
 - [x] List supported CSS properties (box model, font, color, border, text-align, display block/inline/table, page-break-*)
 - [x] List supported units: `px, pt, mm, cm, in, em, %`
@@ -59,7 +59,7 @@ Upstream maintainers already steer report users to WeasyPrint/Prince and dynamic
 - [x] `.gitignore` for binaries, coverage, temp
 
 ### 0.5 Closure gates
-- [x] Allowlist reviewed (human sign-off recorded 2026-08-03 on `docs/compatibility-matrix.md`)
+- [x] Allowlist reviewed (human sign-off recorded 2026-08-03 on `documentation/compatibility-matrix.md`)
 - [x] Scaffold builds: `go build ./...` (empty mains ok)
 - [x] Proof: `go test ./...` exits 0 on empty packages
       Evidence 2026-08-03: `go build ./... && go vet ./... && go test ./...` exit 0; `make test` and `make lint` both pass.
@@ -75,7 +75,7 @@ None. Must complete before Phase 4 design freezes.
 | Artifact | Path |
 |----------|------|
 | Canonical parent update | Phase 0 rows in `plans/00-canonical-pure-go-rewrite.md` |
-| Compatibility matrix | `docs/compatibility-matrix.md` |
+| Compatibility matrix | `documentation/compatibility-matrix.md` |
 | Module scaffold | repo root |
 
 ## Risks

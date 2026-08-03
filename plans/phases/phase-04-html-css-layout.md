@@ -70,7 +70,7 @@ Full browser layout is multi-decade org work. MVP success = invoice/report templ
 - [x] Record visual or geometric assertions — `internal/convert/golden_test.go::TestGoldenCorpus`: per fixture asserts `%PDF-` header, page count (01: 1, 02: ≥1→2 actual, 03: ≥2→2 actual), `/FontFile2` subset font, `%%EOF` trailer and xref-offset consistency
 
 ### 4.8 Closure
-- [x] Compatibility matrix updated: each CSS property status — `docs/compatibility-matrix.md` §2 rewritten as a status table (Implemented / Partial / Not implemented) with `Verified by` evidence; verified against `internal/layout/style.go` (applyRestProps + uaRules), `internal/css/css.go`, `layout.go`, `inline.go`, `paint.go`
+- [x] Compatibility matrix updated: each CSS property status — `documentation/compatibility-matrix.md` §2 rewritten as a status table (Implemented / Partial / Not implemented) with `Verified by` evidence; verified against `internal/layout/style.go` (applyRestProps + uaRules), `internal/css/css.go`, `layout.go`, `inline.go`, `paint.go`
 - [x] `make test` / `make lint` pass — `go test ./...`, `go vet ./...`, `gofmt -l .` all clean
 - [x] Performance note: layout time for largest golden fixture (command + ms) — `internal/convert/golden_test.go::TestGoldenFixture03Performance`: fixture-03 (multi-page invoice, A4/10mm, print media) layout+paint ≈ **1.07 ms** (layout ≈ 0.66 ms, paint ≈ 0.41 ms) on dev workstation; budget < 2 s
 

@@ -24,7 +24,7 @@ wkhtmltopdf multi-doc “merge” is one continuous print session, not PDF conca
 - [x] Compute content box from page size + margins (UnitReal → points) — `convert.pageGeometry` (`internal/convert/convert.go:265`), margins mm→pt via `mmToPt` (`convert.go:22,192-195`); A4 − 10 mm golden geometry asserted in `golden_test.go:63-66,147-155`
 - [x] Orientation swap width/height — landscape swap in `pageGeometry` (`convert.go:278-280`)
 - [x] Custom page width/height when both set — explicit `size.width/height` win over named size (`convert.go:270-272`)
-- [x] DPI/zoom: define CSS px ↔ pt mapping (document: 96 CSS px/inch default) — mapping defined as 1 px = 0.75 pt (`layout/style.go` `pxToPt`; documented in `docs/compatibility-matrix.md` §3); zoom application tracked under 5.3
+- [x] DPI/zoom: define CSS px ↔ pt mapping (document: 96 CSS px/inch default) — mapping defined as 1 px = 0.75 pt (`layout/style.go` `pxToPt`; documented in `documentation/compatibility-matrix.md` §3); zoom application tracked under 5.3
 
 ### 5.2 Fragmentation
 - [x] Split block flow into page-sized fragments — `paginateOps` (`paint.go:115`); rect-type ops crossing a boundary split by `Paint` (`paint.go:50-62`); test `TestBoundaryFillSplit` (`layout_test.go:849`)

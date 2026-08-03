@@ -17,14 +17,14 @@ Evidence-backed quality bar for shipping MVP. Do not mark parent plan complete w
 ### 9.1 Corpus & correctness
 - [x] ≥20 golden HTML→PDF fixtures covering: invoices, tables, images, multi-page, HF, TOC, links — 20 fixtures in `testdata/golden/` (01–20: invoices, tables+colspan, images, page-breaks, lists, pre, typography, cover, margins/sizing), each with a comment header; assets `logo.png`, `style-05.css`
 - [x] Regression script: `go test ./testdata/golden/...` or `make golden` — `make golden` = `go test ./internal/convert/ -run 'TestGoldenCorpus' -v`; `TestGoldenCorpusAllFixtures` walks all fixtures, asserts PDF structure + per-fixture page envelopes + feature xobjects
-- [x] Flag support matrix complete (supported / partial / ignored / error) — docs/compatibility-matrix.md §7: 109 flags classified (~71 Supported, 5 Partial, 33 Ignored, 0 Error); every dotted key traced to its consumer
+- [x] Flag support matrix complete (supported / partial / ignored / error) — documentation/compatibility-matrix.md §7: 109 flags classified (~71 Supported, 5 Partial, 33 Ignored, 0 Error); every dotted key traced to its consumer
 - [x] Compatibility matrix matches actual code — verified against `applyRestProps`/`uaRules`/consumers; stale zoom note corrected
 
 ### 9.2 Security
 - [x] Local file ACL tests (deny by default) — internal/load tests incl. symlink escape (fixed), path traversal (raw + %2e%2e), file:// hosts, subresource ACL
 - [x] Remote URL: timeouts, max redirects, max bytes — connect 30s + request 60s defaults; redirect cap (off-by-one fixed); MaxBodySize enforced on HTTP (Content-Length + read-side) and files (was unbounded); tests: oversized bodies, redirect limit, slow server, ctx cancel mid-read
 - [x] No JS execution paths remain — audit: zero os/exec outside test helpers; --enable-javascript accepted but inert (warned)
-- [x] Document threat model in README — docs/THREAT-MODEL.md (trust boundary, ACL matrix, network behavior, exfiltration, out-of-scope, container guidance)
+- [x] Document threat model in README — documentation/THREAT-MODEL.md (trust boundary, ACL matrix, network behavior, exfiltration, out-of-scope, container guidance)
 
 ### 9.3 Performance (record measurements — execution ≠ proof)
 - [x] Cold run: 10-page table report — command, machine, time, PDF bytes — internal/convert/perf_test.go TestTenPageTableReportPerformance: full RunPDF pipeline, 10-page report; cold ≈ 111 ms, warm ≈ 100 ms, 96,341 bytes; machine go1.26.4 linux/amd64 i7-13700HX; numbers in test comment + README

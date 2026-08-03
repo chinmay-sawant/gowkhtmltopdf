@@ -69,7 +69,7 @@ Phase 0 Scope → 1 Settings/CLI → 2 Loader → 3 PDF Writer
 > Detail: [phases/phase-00-scope-foundations.md](phases/phase-00-scope-foundations.md)
 
 ### 0.1 Product contract
-- [x] Write HTML/CSS **allowlist** (supported tags, properties, units) → `docs/compatibility-matrix.md`
+- [x] Write HTML/CSS **allowlist** (supported tags, properties, units) → `documentation/compatibility-matrix.md`
 - [x] Document **explicit non-goals**: JS engine, full CSS, WebP, full SVG, PDF encryption, AcroForm parity
 - [x] Define golden fixture corpus directory layout `testdata/golden/`
 - [x] Freeze security policy: `blockLocalFileAccess=true` by default; no untrusted HTML claims

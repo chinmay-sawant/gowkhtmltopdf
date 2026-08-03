@@ -31,7 +31,7 @@ Examples:
 
 Description:
   Controlled HTML to PDF conversion with a documented CSS subset
-  (see docs/compatibility-matrix.md). No JavaScript.
+  (see documentation/compatibility-matrix.md). No JavaScript.
 
 %s
 `, flagList(m))

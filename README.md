@@ -20,8 +20,8 @@ in this repository against the Go standard library only.
 are implemented; remaining gaps are listed under
 [Deferred / not planned](#deferred--not-planned).
 
-**Docs:** start at **[docs/overview.md](docs/overview.md)** (full index:
-[docs/README.md](docs/README.md)).
+**Docs:** start at **[documentation/overview.md](documentation/overview.md)** (full index:
+[documentation/README.md](documentation/README.md)).
 
 ---
 
@@ -56,14 +56,14 @@ make build
 
 | Path | What |
 |------|------|
-| [docs/getting-started.md](docs/getting-started.md) | Install and first conversion |
-| [docs/cli.md](docs/cli.md) | CLI flags and multi-object grammar |
-| [docs/library-api.md](docs/library-api.md) | Go API |
-| [docs/architecture.md](docs/architecture.md) | Package map and pipeline |
-| [docs/samples.md](docs/samples.md) | Golden fixtures and `output/` |
+| [documentation/getting-started.md](documentation/getting-started.md) | Install and first conversion |
+| [documentation/cli.md](documentation/cli.md) | CLI flags and multi-object grammar |
+| [documentation/library-api.md](documentation/library-api.md) | Go API |
+| [documentation/architecture.md](documentation/architecture.md) | Package map and pipeline |
+| [documentation/samples.md](documentation/samples.md) | Golden fixtures and `output/` |
 | [output/](output/) | Sample PDFs/PNG checked into the repo |
-| [docs/compatibility-matrix.md](docs/compatibility-matrix.md) | Support matrix |
-| [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md) | Security / ACL |
+| [documentation/compatibility-matrix.md](documentation/compatibility-matrix.md) | Support matrix |
+| [documentation/THREAT-MODEL.md](documentation/THREAT-MODEL.md) | Security / ACL |
 
 ---
 
@@ -102,8 +102,8 @@ grayscale, compression), text headers/footers with `[page]`-style
 placeholders, TOC, PDF outlines, internal/external links, copies/collate.
 
 The authoritative per-element/per-property status is
-**[docs/compatibility-matrix.md](docs/compatibility-matrix.md)**.
-Security posture: **[docs/THREAT-MODEL.md](docs/THREAT-MODEL.md)**.
+**[documentation/compatibility-matrix.md](documentation/compatibility-matrix.md)**.
+Security posture: **[documentation/THREAT-MODEL.md](documentation/THREAT-MODEL.md)**.
 
 ---
 
@@ -283,15 +283,15 @@ remains **not planned**.
 
 | Document | Purpose |
 |---|---|
-| **[docs/README.md](docs/README.md)** | **Documentation index** |
-| [docs/overview.md](docs/overview.md) | Product overview and design principles |
-| [docs/getting-started.md](docs/getting-started.md) | Install, first PDF, library snippet |
-| [docs/architecture.md](docs/architecture.md) | Pipeline and packages |
-| [docs/cli.md](docs/cli.md) | CLI usage |
-| [docs/library-api.md](docs/library-api.md) | Go library API |
-| [docs/samples.md](docs/samples.md) | Fixtures and committed samples |
-| [docs/compatibility-matrix.md](docs/compatibility-matrix.md) | Per-element/per-property support matrix |
-| [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md) | Security / threat model |
+| **[documentation/README.md](documentation/README.md)** | **Documentation index** |
+| [documentation/overview.md](documentation/overview.md) | Product overview and design principles |
+| [documentation/getting-started.md](documentation/getting-started.md) | Install, first PDF, library snippet |
+| [documentation/architecture.md](documentation/architecture.md) | Pipeline and packages |
+| [documentation/cli.md](documentation/cli.md) | CLI usage |
+| [documentation/library-api.md](documentation/library-api.md) | Go library API |
+| [documentation/samples.md](documentation/samples.md) | Fixtures and committed samples |
+| [documentation/compatibility-matrix.md](documentation/compatibility-matrix.md) | Per-element/per-property support matrix |
+| [documentation/THREAT-MODEL.md](documentation/THREAT-MODEL.md) | Security / threat model |
 | [plans/00-canonical-pure-go-rewrite.md](plans/00-canonical-pure-go-rewrite.md) | Canonical execution ledger (phase status) |
 | [plans/phases/](plans/phases/) | Per-phase ledgers (details + deferral notes) |
 | [skills/PR_TEMPLATE/](skills/PR_TEMPLATE/) | Pull-request body template |
