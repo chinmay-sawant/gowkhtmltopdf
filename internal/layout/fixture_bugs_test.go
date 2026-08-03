@@ -1,6 +1,7 @@
 package layout
 
 import (
+	"encoding/base64"
 	"os"
 	"strings"
 	"testing"
@@ -8,6 +9,39 @@ import (
 	"gowkhtmltopdf/internal/css"
 	"gowkhtmltopdf/internal/html"
 )
+
+func TestBackgroundPaintsUnderText(t *testing.T) {
+	// Regression: block backgrounds must be emitted before text ops so
+	// yellow/blue notice boxes do not cover their labels.
+	s, err := css.Parse(`.notice { background-color: #fff3d6; color: #233043; padding: 8px }`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := html.Parse(`<html><body><div class="notice">Important notice text</div></body></html>`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := Layout(root, Options{Width: 400, Height: 200, Sheets: []*css.Stylesheet{s}, Background: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var firstFill, firstText int = -1, -1
+	for i, op := range res.Ops {
+		if op.Kind == OpFillRect && firstFill < 0 && op.R > 0.9 {
+			firstFill = i
+		}
+		if op.Kind == OpText && strings.Contains(op.Text, "Important") {
+			firstText = i
+			break
+		}
+	}
+	if firstFill < 0 || firstText < 0 {
+		t.Fatalf("fill=%d text=%d ops=%+v", firstFill, firstText, res.Ops)
+	}
+	if firstFill > firstText {
+		t.Errorf("background op index %d after text %d - text would be covered", firstFill, firstText)
+	}
+}
 
 func TestTableCellBackgroundHeight(t *testing.T) {
 	s, err := css.Parse(`th { background-color: #1a3d6d; color: #fff } td { background-color: #f2f6fa }`)
@@ -178,4 +212,51 @@ func TestFixture16HeaderBG(t *testing.T) {
 	if n < 4 {
 		t.Errorf("dark header/table fills with real height = %d, want >= 4", n)
 	}
+}
+
+func TestMultiImageUniqueOps(t *testing.T) {
+	pngA := mustDecodeB64(t, "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAIAAAACUFjqAAAAEklEQVR4nGP8z8AARIDajAoAAgwAAf8C/tH9n9kAAAAASUVORK5CYII=")
+	pngB := mustDecodeB64(t, "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAIAAAACUFjqAAAAEklEQVR4nGN4z8AAQTDqMSoAAgwAAZ0B/vG0cU0AAAAASUVORK5CYII=")
+	root, err := html.Parse(`<html><body>
+<p><img src="a.png"></p><p><img src="b.png"></p>
+</body></html>`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := Layout(root, Options{
+		Width: 200, Height: 200, Background: true,
+		Images: func(src string) ([]byte, error) {
+			if src == "a.png" {
+				return pngA, nil
+			}
+			if src == "b.png" {
+				return pngB, nil
+			}
+			return nil, os.ErrNotExist
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sizes [][2]int
+	for _, op := range res.Ops {
+		if op.Kind == OpImage {
+			sizes = append(sizes, [2]int{op.ImgW, op.ImgH})
+			if len(op.Image) < 20 {
+				t.Error("empty image bytes")
+			}
+		}
+	}
+	if len(sizes) != 2 {
+		t.Fatalf("images = %v, want 2", sizes)
+	}
+}
+
+func mustDecodeB64(t *testing.T, s string) []byte {
+	t.Helper()
+	b, err := base64.StdEncoding.DecodeString(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
 }
