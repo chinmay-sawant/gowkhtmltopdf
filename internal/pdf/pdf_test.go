@@ -232,6 +232,53 @@ func TestLinkAnnotations(t *testing.T) {
 	}
 }
 
+func TestPDFStringLatin1NotUTF8(t *testing.T) {
+	// Middle dot must be one WinAnsi byte 0xB7, not UTF-8 C2 B7.
+	got := pdfString("a·b")
+	want := "(a\\267b)"
+	if got != want {
+		t.Errorf("pdfString(a·b) = %q, want %q", got, want)
+	}
+	// Bullet folds to middle dot.
+	got = pdfString("•x")
+	if got != "(\\267x)" {
+		t.Errorf("pdfString(bullet) = %q, want (\\267x)", got)
+	}
+	// Em dash folds to ASCII hyphen.
+	if pdfString("—") != "(-)" {
+		t.Errorf("pdfString(emdash) = %q", pdfString("—"))
+	}
+}
+
+func TestSubsetWidthsArePDFUnits(t *testing.T) {
+	f, err := DefaultFont()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sub, err := subsetFont(f, []rune("A "))
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, _, w := subsetWidths(sub, f.UnitsPerEm())
+	g, ok := sub.glyphIDs['A']
+	if !ok {
+		t.Fatal("subset missing glyph for A")
+	}
+	raw := sub.widths[g]
+	aWidth := w[int('A')-first]
+	scaled := raw * 1000 / float64(f.UnitsPerEm())
+	// 'A' is ~667 in 1000-unit em for Liberation Sans (TTF advance ~1366 at 2048/em).
+	if aWidth < 200 || aWidth > 900 {
+		t.Errorf("A width in PDF units = %v, want ~500-700", aWidth)
+	}
+	if aWidth != scaled {
+		t.Errorf("width %v != scaled %v", aWidth, scaled)
+	}
+	if raw > 0 && aWidth >= raw {
+		t.Errorf("PDF width %v should be smaller than raw TTF units %v", aWidth, raw)
+	}
+}
+
 func TestOutlines(t *testing.T) {
 	d := fixedDoc(t)
 	d.SetCompression(false)

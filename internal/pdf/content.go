@@ -189,9 +189,16 @@ func (c *Content) TextRenderMode(mode int) {
 }
 
 // TextShow draws a string in the current font, recording its runes for the
-// subsetter.
+// subsetter. Non-Latin-1 code points are folded (see winAnsiFold) so the
+// recorded runes match the single-byte codes written by pdfString.
 func (c *Content) TextShow(s string) {
 	for _, r := range s {
+		if r > 0xFF {
+			r = winAnsiFold(r)
+		}
+		if r > 0xFF {
+			r = '?'
+		}
 		c.used[c.curFont] = append(c.used[c.curFont], r)
 	}
 	c.buf.WriteString(pdfString(s) + " Tj\n")
@@ -204,6 +211,12 @@ func (c *Content) TextShowAdj(s string, kern []int) {
 		return
 	}
 	for _, r := range s {
+		if r > 0xFF {
+			r = winAnsiFold(r)
+		}
+		if r > 0xFF {
+			r = '?'
+		}
 		c.used[c.curFont] = append(c.used[c.curFont], r)
 	}
 	var b strings.Builder

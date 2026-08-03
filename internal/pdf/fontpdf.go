@@ -62,8 +62,10 @@ func (d *Document) ensureFont(f *Font, used []rune) (string, error) {
 		f.Ascent(), f.Descent(), f.CapHeight(), ef.ref))
 
 	// font dict: simple TrueType; char codes are Latin-1 rune values resolved
-	// by the subset cmap
-	first, last, widths := subsetWidths(sub)
+	// by the subset cmap. PDF /Widths are in 1/1000 em, not raw TrueType
+	// units (typically 2048/em) — without the scale, every glyph advances
+	// ~2× too far and text looks letter-spaced ("A c m e" instead of "Acme").
+	first, last, widths := subsetWidths(sub, f.UnitsPerEm())
 	ws := make([]string, len(widths))
 	for i, w := range widths {
 		ws[i] = num(w)
@@ -77,10 +79,14 @@ func (d *Document) ensureFont(f *Font, used []rune) (string, error) {
 }
 
 // subsetWidths returns (firstCode, lastCode, widths) with widths indexed by
-// char code; codes without a glyph get 0.
-func subsetWidths(sub *subsetResult) (int, int, []float64) {
+// char code in PDF 1000-unit em space; codes without a glyph get 0.
+func subsetWidths(sub *subsetResult, unitsPerEm int16) (int, int, []float64) {
 	if len(sub.glyphIDs) == 0 {
 		return 0, 0, nil
+	}
+	upm := float64(unitsPerEm)
+	if upm <= 0 {
+		upm = 1000
 	}
 	first, last := 0xFF, 0
 	for r := range sub.glyphIDs {
@@ -95,7 +101,8 @@ func subsetWidths(sub *subsetResult) (int, int, []float64) {
 	widths := make([]float64, last-first+1)
 	for r, g := range sub.glyphIDs {
 		if int(g) < len(sub.widths) {
-			widths[int(r)-first] = sub.widths[g]
+			// PDF glyph space: 1000 units = 1 em.
+			widths[int(r)-first] = sub.widths[g] * 1000 / upm
 		}
 	}
 	return first, last, widths

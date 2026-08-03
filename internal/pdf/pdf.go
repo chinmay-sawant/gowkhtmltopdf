@@ -508,11 +508,23 @@ func outlineCount(root *Outline) int {
 	return c
 }
 
+// pdfString encodes s as a PDF literal string for a simple WinAnsi/Latin-1
+// font. It walks runes (not UTF-8 bytes): each code point ≤ U+00FF becomes
+// one string byte so it matches the subset cmap and /Widths indices. Code
+// points above U+00FF are folded via winAnsiFold (common punctuation) or
+// replaced with '?'; emitting raw UTF-8 bytes made viewers show mojibake
+// and missing glyphs (e.g. "·" as "\302\267").
 func pdfString(s string) string {
 	var b strings.Builder
 	b.WriteByte('(')
-	for i := 0; i < len(s); i++ {
-		c := s[i]
+	for _, r := range s {
+		if r > 0xFF {
+			r = winAnsiFold(r)
+		}
+		if r > 0xFF {
+			r = '?'
+		}
+		c := byte(r)
 		switch {
 		case c == '(' || c == ')' || c == '\\':
 			b.WriteByte('\\')
@@ -525,6 +537,27 @@ func pdfString(s string) string {
 	}
 	b.WriteByte(')')
 	return b.String()
+}
+
+// winAnsiFold maps common Unicode punctuation that appears in HTML/CSS to a
+// single-byte Latin-1/WinAnsi stand-in. Unmapped runes are returned unchanged
+// (caller substitutes '?').
+func winAnsiFold(r rune) rune {
+	switch r {
+	case '\u2013', '\u2014': // en/em dash
+		return '-'
+	case '\u2018', '\u2019': // curly single quotes
+		return '\''
+	case '\u201C', '\u201D': // curly double quotes
+		return '"'
+	case '\u2022', '\u2023', '\u25E6', '\u2043': // bullets
+		return '\u00B7' // middle dot
+	case '\u2026': // ellipsis
+		return '.'
+	case '\u00A0', '\u2009', '\u200A', '\u2008', '\u2002', '\u2003':
+		return ' '
+	}
+	return r
 }
 
 func pdfDate(t time.Time) string {
