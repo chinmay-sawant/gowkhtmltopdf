@@ -231,7 +231,7 @@ func (d *Document) finalize() error {
 
 	// pages tree root
 	d.setDict(pagesRef, fmt.Sprintf(
-		"<< /Type /Pages /Kids [%s] /Count %d >>",
+		"<< /Type /Pages\n/Kids [%s]\n/Count %d >>",
 		strings.Join(pageRefs, " "), len(pageRefs)))
 
 	catalogParts := []string{
@@ -330,7 +330,7 @@ func (d *Document) finalizePage(p *Page, pagesRef string) {
 		parts = append(parts, "/Annots ["+strings.Join(refs, " ")+"]")
 	}
 	parts = append(parts, ">>")
-	d.setDict(p.ref, strings.Join(parts, " "))
+	d.setDict(p.ref, strings.Join(parts, "\n"))
 }
 
 func (d *Document) buildAnnots(p *Page) {

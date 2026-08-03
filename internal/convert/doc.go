@@ -1,6 +1,6 @@
 // Package convert orchestrates the load → layout → paginate → print
-// pipeline (mirrors PdfConverterPrivate). Phase 1 ships the CLI surface
-// with an explicit not-ready error; later phases fill in the steps.
+// pipeline (mirrors PdfConverterPrivate): one pdf.Document for the whole
+// job, one page object laid out and painted into it per input.
 package convert
 
 import (

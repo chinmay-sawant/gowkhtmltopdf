@@ -161,6 +161,12 @@ func (c *Content) TextLeading(leading float64) {
 // TextNextLine moves to the next line (TL).
 func (c *Content) TextNextLine() { c.buf.WriteString("T*\n") }
 
+// TextRenderMode sets the text rendering mode (0 = fill, 2 = fill + stroke).
+// Mode 2 with a small line width yields a fake bold.
+func (c *Content) TextRenderMode(mode int) {
+	c.buf.WriteString(strconv.Itoa(mode) + " Tr\n")
+}
+
 // TextShow draws a string in the current font, recording its runes for the
 // subsetter.
 func (c *Content) TextShow(s string) {

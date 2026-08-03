@@ -399,6 +399,9 @@ func init() {
 // object keyword apply to the first page).
 func pageScoped(glob func(g *settings.PdfGlobal, val string) error, obj func(o *settings.PdfObject, val string) error) flagApplier {
 	return func(c *Command, cur *objectCtx, val string) error {
+		if err := glob(&c.Global, val); err != nil {
+			return err
+		}
 		if cur.obj == nil {
 			cur.obj = cur.object(c)
 		}
