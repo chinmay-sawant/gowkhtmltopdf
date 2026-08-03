@@ -61,34 +61,41 @@ type AccessController struct {
 	AllowPrefixes []string
 }
 
-// NewAccessController builds the controller from global + object load
-// settings: access is allowed iff the global flag is on AND the object's
-// blockLocalFileAccess is off, or an allow prefix matches.
-func NewAccessController(g settings.PdfGlobal, lp settings.LoadPage) *AccessController {
-	return &AccessController{AllowPrefixes: append([]string{}, g.Allow...)}
-}
-
-// Allowed reports whether path may be read.
+// Allowed reports whether path may be read. The candidate path and every
+// allow prefix are both resolved to their real, symlink-free locations
+// before the prefix comparison, so a symlink planted inside an allowed
+// directory cannot escape to a file outside it; `..` components and
+// percent-encoded forms resolve to the same real path the subsequent read
+// would follow. Paths that do not exist fall back to their cleaned
+// absolute form (reading them fails anyway).
 func (a *AccessController) Allowed(path string) bool {
-	abs, err := filepath.Abs(path)
-	if err != nil {
+	abs := resolvePath(path)
+	if abs == "" {
 		return false
 	}
-	abs = filepath.Clean(abs)
 	for _, p := range a.AllowPrefixes {
 		if p == "" {
 			continue
 		}
-		ap, err := filepath.Abs(p)
-		if err != nil {
-			ap = p
-		}
-		ap = filepath.Clean(ap)
+		ap := resolvePath(p)
 		if abs == ap || strings.HasPrefix(abs, ap+string(filepath.Separator)) {
 			return true
 		}
 	}
 	return false
+}
+
+// resolvePath returns the clean absolute form of path, following symlinks
+// when the path exists, and "" when it cannot be made absolute.
+func resolvePath(path string) string {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return ""
+	}
+	if resolved, err := filepath.EvalSymlinks(abs); err == nil {
+		return filepath.Clean(resolved)
+	}
+	return filepath.Clean(abs)
 }
 
 // IsHTML reports whether s looks like inline HTML rather than a URL/path.
@@ -200,7 +207,10 @@ func (l *Loader) initClient() {
 		Transport: transport,
 		Jar:       jar,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= l.MaxRedirects {
+			// Go's client counts the requests made so far in via, so the
+			// MaxRedirects-th redirect (len(via) == MaxRedirects) is the
+			// last one allowed to complete.
+			if len(via) > l.MaxRedirects {
 				return fmt.Errorf("stopped after %d redirects", l.MaxRedirects)
 			}
 			return nil
@@ -248,28 +258,52 @@ func (l *Loader) Load(ctx context.Context, input string, lp settings.LoadPage) (
 }
 
 func (l *Loader) loadFile(ctx context.Context, path string, lp settings.LoadPage) (*Resource, error) {
-	p := strings.TrimPrefix(path, "file://")
-	p, err := url.PathUnescape(p)
+	p, err := filePathFromURL(path)
 	if err != nil {
-		p = strings.TrimPrefix(path, "file://")
+		return nil, err
 	}
 	if !l.fileAccessAllowed(p, lp) {
 		return nil, fmt.Errorf("%w: %s", ErrAccessDenied, p)
 	}
 	// blockLocalFileAccess=true blocks local reads even for the primary page
 	// unless the user explicitly enabled local access.
-	b, err := os.ReadFile(p)
+	f, err := os.Open(p)
 	if err != nil {
 		return nil, err
+	}
+	defer f.Close()
+	b, err := io.ReadAll(io.LimitReader(f, l.MaxBodySize+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(b)) > l.MaxBodySize {
+		return nil, fmt.Errorf("file %s exceeds max body size %d", p, l.MaxBodySize)
 	}
 	return &Resource{
 		Kind:        KindFile,
 		URL:         "file://" + filepath.ToSlash(filepath.Clean(p)),
-		Base:        "file://" + filepath.ToSlash(filepath.Dir(p)),
+		Base:        "file://" + filepath.ToSlash(filepath.Dir(p)) + "/",
 		Body:        b,
 		ContentType: mime.TypeByExtension(filepath.Ext(p)),
 		StatusCode:  200,
 	}, nil
+}
+
+// filePathFromURL extracts the local filesystem path from a file:// URL
+// (or passes a plain path through). Remote file hosts — anything other
+// than the empty host and localhost — are refused.
+func filePathFromURL(path string) (string, error) {
+	u, err := url.Parse(path)
+	if err != nil || u.Scheme != "file" {
+		return path, nil
+	}
+	if u.Host != "" && u.Host != "localhost" {
+		return "", fmt.Errorf("blocked file access to %q", path)
+	}
+	if u.Path != "" {
+		return u.Path, nil
+	}
+	return strings.TrimPrefix(path, "file://"), nil
 }
 
 // fileAccessAllowed implements the frozen security policy: blocked by
@@ -338,10 +372,20 @@ func (l *Loader) loadHTTP(ctx context.Context, target string, lp settings.LoadPa
 		}
 	}
 
-	limited := io.LimitReader(resp.Body, l.MaxBodySize)
-	b, err := io.ReadAll(limited)
+	// Enforce the body cap: reject oversized bodies outright rather than
+	// silently truncating them. Content-Length short-circuits the download
+	// when present; the read-side limit is the authoritative check for
+	// chunked or unknown-length responses.
+	if resp.ContentLength > l.MaxBodySize {
+		return nil, fmt.Errorf("response from %s exceeds max body size %d (Content-Length %d)",
+			u.String(), l.MaxBodySize, resp.ContentLength)
+	}
+	b, err := io.ReadAll(io.LimitReader(resp.Body, l.MaxBodySize+1))
 	if err != nil {
 		return nil, err
+	}
+	if int64(len(b)) > l.MaxBodySize {
+		return nil, fmt.Errorf("response from %s exceeds max body size %d", u.String(), l.MaxBodySize)
 	}
 	ctype := resp.Header.Get("Content-Type")
 	final := resp.Request.URL.String()

@@ -1,4 +1,4 @@
-.PHONY: test lint build fmt golden-update clean
+.PHONY: test lint build fmt golden golden-update clean
 
 # Phase 00 scaffold: stdlib-only module. No external deps expected.
 
@@ -14,6 +14,16 @@ build:
 
 fmt:
 	gofmt -w .
+
+# Phase 9.1: golden corpus. TestGoldenCorpusAllFixtures walks every
+# testdata/golden/*.html fixture, converts it through the full pipeline
+# (load -> parse -> style -> layout -> paint -> write) and asserts the PDF
+# structure (%PDF-, %%EOF, xref offset), the embedded font, the per-fixture
+# page envelope and the feature expectations (images, URI annotations).
+# TestGoldenCorpus covers the first three fixtures plus the fixture-03
+# layout+paint performance budget.
+golden:
+	go test ./internal/convert/ -run 'TestGoldenCorpus' -v
 
 golden-update:
 	@echo "golden-update: implemented in Phase 3 (PDF writer)"; true

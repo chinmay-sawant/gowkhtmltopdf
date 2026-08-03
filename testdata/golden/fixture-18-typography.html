@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<!--
+  fixture-18-typography
+  Proves: the full inline typography surface — h1..h6, strong/b, em/i
+  (italic parses; renders upright), u, s/strike/del (line-through), small,
+  blockquote (block-level), code, sub/sup are not in the allowlist, and
+  hr. Also letter-spacing and line-height on a styled paragraph.
+  Expected: 1 page.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Typography Specimen</title>
+  <style>
+    body { font-family: sans-serif; font-size: 10pt; color: #222; margin: 0; line-height: 1.45; }
+    h1 { font-size: 18pt; color: #1a3d6d; margin: 0 0 4px 0; }
+    h2 { font-size: 15pt; color: #1a3d6d; margin: 14px 0 4px 0; }
+    h3 { font-size: 13pt; color: #1a3d6d; margin: 12px 0 4px 0; }
+    h4 { font-size: 11pt; color: #333; margin: 10px 0 2px 0; }
+    h5, h6 { font-size: 10pt; color: #555; margin: 8px 0 2px 0; }
+    p { margin: 0 0 8px 0; }
+    blockquote { border-left: 3px solid #1a3d6d; padding-left: 12px; color: #444; margin: 10px 0; }
+    .spaced { letter-spacing: 0.5px; }
+    .tight { line-height: 1.15; }
+  </style>
+</head>
+<body>
+  <h1>Heading level 1 — document title</h1>
+  <h2>Heading level 2 — section</h2>
+  <h3>Heading level 3 — subsection</h3>
+  <h4>Heading level 4 — sub-subsection</h4>
+  <h5>Heading level 5</h5>
+  <h6>Heading level 6</h6>
+
+  <p>Inline runs: <strong>bold via strong</strong>, <b>bold via b</b>,
+  <em>italic via em</em>, <i>italic via i</i> (renders upright — no slant
+  font yet), <u>underlined</u>, <s>struck through</s>,
+  <del>deleted text</del>, and <small>small text</small> inline.
+  <code>code runs</code> share the embedded sans-serif font.</p>
+
+  <p class="spaced">This paragraph applies letter-spacing: 0.5px, which
+  widens every run proportionally to its character count.</p>
+
+  <p class="tight">This paragraph uses line-height: 1.15 for a compact
+  two-line block that stays tight: first line of the compact paragraph,
+  second line of the compact paragraph.</p>
+
+  <blockquote>
+    <p>Blockquote: the quarterly results exceeded guidance for the fourth
+    consecutive period, driven by the services segment. — CEO commentary</p>
+  </blockquote>
+
+  <p>Hierarchy of headings feeds the PDF outline: every h1–h6 element
+  above becomes an outline entry, in document order, with the heading
+  level preserved.</p>
+</body>
+</html>

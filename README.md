@@ -1,218 +1,223 @@
 # gowkhtmltopdf
 
-Pure-Go rewrite plan for [wkhtmltopdf](wkhtmltopdf/) — convert HTML to PDF (and images) **without third-party libraries** (Go **standard library only**: no module dependencies, no Chrome/WebKit, no cgo).
+Pure-Go, stdlib-only HTML→PDF (and HTML→image) converter — a work-alike for
+[wkhtmltopdf](https://wkhtmltopdf.org/) built for **controlled reports**:
+invoices, statements, tables, multi-page documents with headers/footers,
+TOCs and PDF outlines. No third-party Go modules, no Chrome/WebKit, no cgo.
 
-This repository currently contains:
+- **Go standard library only** — `go.mod` has zero dependencies
+- Two static binaries: `gowkhtmltopdf` (PDF) and `gowkhtmltoimage` (PNG/JPEG)
+- Idiomatic Go library API (`gowkhtmltopdf` root package)
+- Deterministic output: identical input bytes → identical PDF bytes
 
-| Path | Contents |
-|------|----------|
-| [`wkhtmltopdf/`](wkhtmltopdf/) | Upstream wkhtmltopdf 0.12.7-dev sources (analysis target) |
-| [`plans/`](plans/) | Canonical phase-wise execution ledger + phase reports |
-| [`skills/phase-wise-checklist/`](skills/phase-wise-checklist/) | Planning skill used for ledgers |
-| **This README** | Scope, architecture summary, **time estimates** |
-
-**Implementation has not started.** Plans are evidence-backed from a multi-agent source analysis of the C++/Qt tree.
-
----
-
-## Critical reality check
-
-**wkhtmltopdf is not a PDF engine.** It is a thin orchestration layer (~10.6k lines of application C++) on top of:
-
-- **Qt WebKit** — HTML/CSS/JS layout and print pagination (`QWebPage`, patched `QWebPrinter`)
-- **Qt print** — PDF emission (`QPrinter` / `QPainter`, including links, forms, outlines)
-
-A pure-stdlib Go rewrite is therefore **not** “port the C++.” It is **build a document layout engine + PDF writer**, then re-home the CLI/settings/load pipeline.
-
-| Goal | Feasible under stdlib-only? |
-|------|------------------------------|
-| CLI + settings + loader orchestration | Yes |
-| PDF writer (text, images, links, outlines) | Yes (substantial) |
-| Controlled invoice/report HTML → PDF (no JS, CSS subset) | Yes, **hard**, multi-year for one senior |
-| Drop-in parity for arbitrary web pages / JS | **No** (not on a product timeline) |
-
-Upstream maintainers already recommend WeasyPrint/Prince for controlled reports and Puppeteer for JS-heavy pages (`wkhtmltopdf/docs/status.md`). Our MVP aligns with the **controlled report** niche — implemented in pure Go.
+**Status:** MVP (v0.1.0). Phases 0–9 of the [canonical plan](plans/00-canonical-pure-go-rewrite.md)
+are implemented; remaining gaps are listed under
+[Deferred / not planned](#deferred--not-planned).
 
 ---
 
-## Time estimates
+## Feature status
 
-Assumptions:
+Supported: no-JavaScript server-generated HTML, a documented CSS subset
+(boxes, margins/padding/borders, tables with `colspan`, lists, images,
+colors/backgrounds, `page-break-*`), local files (ACL-protected) and
+HTTP(S) fetch, multi-page PDF (page size, margins, orientation,
+grayscale, compression), text headers/footers with `[page]`-style
+placeholders, TOC, PDF outlines, internal/external links, copies/collate.
 
-- Engineers: senior, already comfortable with systems/PDF/fonts or willing to learn mid-flight  
-- Constraint: **Go stdlib only** (inflates cost vs allowing pure-Go modules)  
-- Full-time focus; ~20% schedule risk buffer not fully included in ranges  
-- “Done” for MVP = golden corpus of controlled templates, not WebKit pixel parity  
-
-### By product scope
-
-| Scope | What you get | Person-months | Solo senior (calendar) | 2 seniors (calendar) |
-|-------|--------------|---------------|------------------------|----------------------|
-| **A. CLI + settings shell** | Flag-compatible CLI, settings structs, convert stub | 2–3 PM | **2–3 months** | **1–1.5 months** |
-| **B. MVP reports** | Subset HTML/CSS → multi-page PDF, text HF, basic outline/TOC, loader, golden tests | **18–28 PM** | **18–30 months** | **10–18 months** |
-| **C. Intermediate** | HTML HF, richer CSS (floats/partial flex), better tables/breaks, image CLI polished | **45–70 PM** | **~3.5–6 years** | **~2–3.5 years** |
-| **D. Full wkhtmltopdf / WebKit-like** | JS, modern CSS, complex scripts, print edge cases | **200–500+ PM** (still incomplete) | **Not credible** | **Not credible** |
-
-### By implementation phase (canonical plan)
-
-See [`plans/00-canonical-pure-go-rewrite.md`](plans/00-canonical-pure-go-rewrite.md).
-
-| Phase | Work | Solo calendar (order) |
-|------:|------|------------------------|
-| 0 | Scope freeze, allowlist, module scaffold | 0.5–1 month |
-| 1 | Settings + full CLI parse surface | 1–1.5 months |
-| 2 | Multi-resource loader / network / ACL | 0.75–1.5 months |
-| 3 | PDF object model, fonts, images, links | 2–3 months |
-| 4 | **HTML + CSS subset layout** (critical path) | **6–12 months** |
-| 5 | Print pagination, multi-object assembly | 2–4 months |
-| 6 | Headers/footers, TOC, outlines, links | 2–4 months |
-| 7 | `wkhtmltoimage`-style raster CLI | 1–2 months |
-| 8 | Idiomatic Go library API | 1–1.5 months |
-| 9 | Golden corpus, security, release gates | 2–4 months (overlap) |
-
-**MVP ship path:** Phases **0–6 + 9** (Phase 7–8 can trail).  
-**Long pole:** Phase 4 (layout). Parallelize Phase 3 (PDF) with Phase 1–2.
-
-### Component cost (stdlib-only)
-
-| Component | Stdlib coverage | Effort (person-months) |
-|-----------|-----------------|------------------------|
-| HTTP / file / cookies / proxy / ACL | High (`net/http`, `crypto/tls`) | 0.5–2 |
-| HTML subset parser | None useful | 1–6 |
-| CSS parse + cascade + box/table layout | None | **8–14** (MVP) · 30–80+ (richer) |
-| JavaScript + DOM | None | **Omit for MVP** · 24–48+ for toy ES5 |
-| Font load + Latin subset embed | None | 3–6 |
-| Complex script shaping (HarfBuzz-class) | None | 18–36+ (avoid) |
-| JPEG/PNG/GIF | Yes (`image/*`) | 0.5–1 |
-| SVG / WebP | No | Defer |
-| PDF writer + compression | `compress/flate` only | 2–4 core · +3–6 fonts/links |
-| Page fragmentation / print CSS | None | 2–4 (MVP) · 12–24+ (high fidelity) |
-| HF / TOC / outline app logic | N/A | 2–5 |
-| CLI + settings + exit codes | N/A | 2–3 |
-
-### Effort if policy changed (reference only)
-
-Not the current mandate, but useful for comparison:
-
-| Policy | MVP calendar (solo) | Why different |
-|--------|---------------------|---------------|
-| **Stdlib only** (this project) | 18–30 months | Reimplement HTML/PDF/fonts |
-| Pure-Go modules allowed (still no Chrome) | ~12–20 months | Reuse HTML parser/PDF/font pkgs; **layout still custom** |
-| Headless Chrome / chromedp driver | ~1–3 months for CLI wrapper | Not a pure engine; not stdlib-only |
+The authoritative per-element/per-property status is
+**[docs/compatibility-matrix.md](docs/compatibility-matrix.md)**.
+Security posture: **[docs/THREAT-MODEL.md](docs/THREAT-MODEL.md)**.
 
 ---
 
-## Architecture (target)
+## Install & build
 
-```
-cmd/gowkhtmltopdf ──► settings + CLI
-                         │
-                         ▼
-                   convert (phases)
-                    │         │
-                    ▼         ▼
-                  load      layout (HTML/CSS subset)
-                    │         │
-                    │         ▼
-                    │      paginate + outline/HF/TOC
-                    │         │
-                    └────────►│
-                              ▼
-                         pdf writer ──► file / stdout / bytes
+Requires Go 1.26+. Build is fully offline — no modules are downloaded.
+
+```sh
+# both binaries, static (no cgo anywhere in the graph):
+CGO_ENABLED=0 go build ./cmd/gowkhtmltopdf ./cmd/gowkhtmltoimage
 ```
 
-Upstream pipeline mirrored from `PdfConverterPrivate`:
+Reproducible build — always build with `CGO_ENABLED=0` (the default here
+anyway, since there is no cgo); the resulting binaries are statically
+linked ELF/Mach-O executables with no runtime library requirements.
 
-1. Load pages (and measure HTML headers/footers if needed)  
-2. Count pages (layout + pagination)  
-3. Load TOC (optional)  
-4. Resolve links  
-5. Load headers/footers  
-6. Print / write PDF  
+Version stamping (see [Versioning](#versioning)):
+
+```sh
+go build -ldflags "-X gowkhtmltopdf/internal/cli.Version=$(cat VERSION)" ./cmd/gowkhtmltopdf
+```
 
 ---
 
-## Plans index
+## Usage
+
+### gowkhtmltopdf (HTML → PDF)
+
+```
+gowkhtmltopdf [GLOBAL OPTIONS] [OBJECT]... <output file>
+  OBJECT: [PAGE OPTIONS] page <input> | [TOC OPTIONS] toc | [COVER OPTIONS] cover <input>
+  Output "-" writes the PDF to stdout. Run --help / --extended-help for all flags.
+```
+
+Basic conversion (note: `--enable-local-file-access` belongs *after* a
+`page`/`cover` keyword — page-scoped flags open the current object):
+
+```sh
+gowkhtmltopdf page --enable-local-file-access invoice.html invoice.pdf
+gowkhtmltopdf --page-size A4 --orientation Landscape report.html report.pdf
+gowkhtmltopdf --enable-local-file-access --quiet report.html report.pdf -   # to stdout
+```
+
+Multi-object document with header/footer, TOC, and outline:
+
+```sh
+gowkhtmltopdf \
+  --header-left "gowkhtmltopdf" --header-right "[title]" --header-line \
+  --footer-center "[page] / [topage]" --footer-line \
+  --toc --toc-header-text "Report contents" --disable-dotted-lines \
+  --outline --outline-depth 4 --title "Invoice Report" \
+  toc page --enable-local-file-access cover.html \
+      page --enable-local-file-access chapter1.html \
+      page --enable-local-file-access chapter2.html \
+  book.pdf
+```
+
+Placeholders in text headers/footers: `[page]`, `[topage]`, `[frompage]`,
+`[date]`, `[time]`, `[title]`, `[doctitle]`, `[webpage]`, `[section]`,
+`[subsection]`; arbitrary text via `--replace key value`.
+
+### gowkhtmltoimage (HTML → PNG/JPEG)
+
+```sh
+gowkhtmltoimage --width 1024 page --enable-local-file-access report.html report.png
+gowkhtmltoimage --format jpg --quality 90 --height 800 report.html report.jpg
+```
+
+Image mode renders a 1024 px smart-width viewport by default; text uses a
+bitmap font (no anti-aliasing — see limits).
+
+### Library API (Go)
+
+`import gowkhtmltopdf` (root package, module `gowkhtmltopdf`):
+
+```go
+c := gowkhtmltopdf.NewConverter()
+c.Global().Set("size.pagesize", "A4")
+c.Global().Set("margin.top", "15")
+c.Global().Set("enablelocalfileaccess", "true")
+
+obj := gowkhtmltopdf.NewObjectSettings().SetPage("invoice.html")
+obj.Set("load.blocklocalfileaccess", "false")
+c.AddObject(obj)
+
+if err := c.Convert(context.Background()); err != nil { panic(err) }
+os.WriteFile("out.pdf", c.Output(), 0o644)
+```
+
+`NewImageConverter` mirrors this for PNG/JPEG output (`AddObject(page)`,
+`Set("format", "png"|"jpg")`, `Convert`, `Output`). Worked examples:
+[examples/pdf](examples/pdf/) and [examples/image](examples/image/).
+
+---
+
+## Performance
+
+Phase 9.3 gate: a 10-page invoice table report (10 sections × 40
+line-item rows, repeated `<thead>`, `page-break-before` sections) through
+the full pipeline (load → parse → style → layout → paginate → paint →
+assemble → write).
+
+| Measurement | Value |
+|---|---|
+| Cold run (first of two) | **~140 ms** (120–149 ms across runs) |
+| Warm run (second) | **~156 ms** (96–203 ms across runs) |
+| Output size | **96,341 bytes** (10 pages, byte-identical every run) |
+
+- **Command:** `go test ./internal/convert -run TestTenPageTableReportPerformance -v`
+- **Machine:** go1.26.4 linux/amd64, Linux x86_64, 13th Gen Intel Core i7-13700HX (24 threads), 2026-08-03
+- **Budget asserted in CI:** < 5 s per run (generous — catches
+  order-of-magnitude regressions only)
+
+CPU profiling (stdlib pprof):
+
+```sh
+go test ./internal/convert -run TestTenPageTableReportPerformance \
+  -cpuprofile /tmp/cpu.pprof
+go tool pprof -top /tmp/cpu.pprof
+```
+
+---
+
+## Versioning
+
+`VERSION` (currently `0.1.0`) is the single source of truth for the
+release number. The CLI `--version` output is stamped at build time with
+`-X`; an unstamped build reports the `0.1.0-dev` fallback:
+
+```sh
+go build -ldflags "-X gowkhtmltopdf/internal/cli.Version=$(cat VERSION)" ./cmd/gowkhtmltopdf ./cmd/gowkhtmltoimage
+./gowkhtmltopdf --version   # Name: gowkhtmltopdf / Version: 0.1.0
+```
+
+Release history: [CHANGELOG.md](CHANGELOG.md).
+
+---
+
+## Deferred / not planned
+
+Every deliberate deferral from the phase ledgers (`[~]` items), with its
+next gate. The **Intermediate roadmap** (post-MVP, from
+[plans/phases/phase-09-hardening-closure.md](plans/phases/phase-09-hardening-closure.md)):
+floats/position +2–4 mo, partial flex +2–3 mo, better CJK fonts +1–2 mo,
+AcroForm forms +1–2 mo, richer selectors +1–2 mo. Full WebKit parity
+remains **not planned**.
+
+| Deferred | Status / reason | Next gate |
+|---|---|---|
+| JavaScript / WebKit features (`--enable-javascript`, `--run-script`, `--window-status`, plugins) | No JS engine in stdlib; flags accepted with warnings; `<script>` stripped at load | Not planned |
+| Floats / positioned layout (`float`, `clear`, `position: relative/absolute/fixed`) | Parsed but treated as in-flow | Intermediate roadmap (floats/position) |
+| Flexbox / Grid (`display: flex|grid`) | Not in the CSS allowlist; elements degrade to initial `inline` | Intermediate roadmap (partial flex) |
+| Richer selectors (attribute `[attr=…]`, `:first-child`, `:nth-child`, `:hover`…) | Dropped at tokenization; `:nth-child(even)` matches all rows | Intermediate roadmap (richer selectors) |
+| CJK fonts / complex-script shaping | Single embedded Latin font; no HarfBuzz-class shaping in stdlib | Intermediate roadmap (better CJK fonts) |
+| AcroForm forms (`--enable-forms`) | No form model in the PDF writer | Intermediate roadmap (forms) |
+| XSLT TOC stylesheets (`--xsl-style-sheet`) | No XSLT in stdlib; flag warns + ignores; default Go-template TOC used | Not planned |
+| SVG image output (`--format svg`) | No stdlib SVG encoder | Not planned |
+| BMP image output | No demand; PNG/JPEG covered by `image/*` | Not planned |
+| SOCKS5 proxy | stdlib `net/http` has no SOCKS5; HTTP(S) proxy only | Not planned |
+| Text anti-aliasing in image mode | Image mode renders a 5×7 bitmap font (no glyph rasterizer); PDF mode is vector | Not planned |
+| Inline `<a href="#x">` source-rect links | TOC forward/back links work; inline anchors skipped (inline elements produce no boxes) | Intermediate roadmap |
+| Cross-object URL map (`urlToPageObj`) | Same-document anchors only | Intermediate roadmap |
+| `resolveRelativeLinks` | Flag accepted, not implemented | Intermediate roadmap |
+| HTML header/footer links on body pages | HTML HF renders text only; links not carried over | Intermediate roadmap |
+| `[topage]` with copies | HF baked before duplication; value correct for single copies | Intermediate roadmap |
+| `[subject]` placeholder | Expands empty (no setting field upstream either) | Not planned |
+| `dump-outline` TOC page offset | Dump is body-relative; TOC pages not included in offsets | Intermediate roadmap |
+| Table header repeat across pages | MVP omits (upstream needed Qt patches) | Intermediate roadmap |
+| Smart-shrinking scale-to-width re-layout | Over-width warning only; `Options.Zoom` not wired into `renderObject` | Intermediate roadmap |
+| PDF encryption / PDF/A / ICC | Absent or irrelevant upstream too | Not planned |
+| C ABI (`wkhtmltopdf_*` cgo exports) | Stdlib mandate forbids cgo | Only if consumer demand |
+| `--read-args-from-stdin` batch loop | Flag accepted; batch loop not implemented | Not planned |
+
+---
+
+## Documents
 
 | Document | Purpose |
-|----------|---------|
-| **[plans/00-canonical-pure-go-rewrite.md](plans/00-canonical-pure-go-rewrite.md)** | **Canonical live execution ledger** (checkboxes) |
-| [plans/phases/phase-00-scope-foundations.md](plans/phases/phase-00-scope-foundations.md) | Scope, allowlist, scaffold |
-| [plans/phases/phase-01-settings-cli.md](plans/phases/phase-01-settings-cli.md) | Settings + CLI |
-| [plans/phases/phase-02-loader-network.md](plans/phases/phase-02-loader-network.md) | Loader / network |
-| [plans/phases/phase-03-pdf-writer.md](plans/phases/phase-03-pdf-writer.md) | PDF writer |
-| [plans/phases/phase-04-html-css-layout.md](plans/phases/phase-04-html-css-layout.md) | HTML/CSS layout |
-| [plans/phases/phase-05-pagination-print.md](plans/phases/phase-05-pagination-print.md) | Pagination / multi-object |
-| [plans/phases/phase-06-headers-toc-outline.md](plans/phases/phase-06-headers-toc-outline.md) | HF / TOC / outlines / links |
-| [plans/phases/phase-07-image-converter.md](plans/phases/phase-07-image-converter.md) | Image CLI |
-| [plans/phases/phase-08-library-api.md](plans/phases/phase-08-library-api.md) | Go API |
-| [plans/phases/phase-09-hardening-closure.md](plans/phases/phase-09-hardening-closure.md) | Release gates |
-| [plans/exploration/](plans/exploration/) | Multi-agent analysis notes |
+|---|---|
+| [plans/00-canonical-pure-go-rewrite.md](plans/00-canonical-pure-go-rewrite.md) | Canonical execution ledger (phase status) |
+| [plans/phases/](plans/phases/) | Per-phase ledgers (details + deferral notes) |
+| [docs/compatibility-matrix.md](docs/compatibility-matrix.md) | Per-element/per-property support matrix |
+| [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md) | Security / threat model |
+| [CHANGELOG.md](CHANGELOG.md) | Release history |
+| [examples/](examples/) | Library-API example programs |
 
-Plan format follows [`skills/phase-wise-checklist/SKILLS.md`](skills/phase-wise-checklist/SKILLS.md).
+## License
 
----
-
-## MVP product contract (recommended)
-
-**Supported (goal):**
-
-- Server-generated HTML (templates), **no JavaScript**
-- Documented CSS subset (box model, fonts, colors, tables, basic text, page-break-*)
-- Local files (with ACL) and HTTP(S) fetch
-- Multi-page PDF: page size, margins, orientation, grayscale, compression
-- Text headers/footers with `[page]`-style placeholders
-- PDF outlines + simple TOC
-- Internal/external links
-- Single static binary (`CGO_ENABLED=0`)
-
-**Explicitly out of MVP:**
-
-- JS execution / SPAs / `window.status` real waits  
-- Full CSS (Grid, modern Flex, filters, transforms, web fonts runtime)  
-- Custom XSLT TOC stylesheets (no XSLT in stdlib; Go templates instead)  
-- PDF encryption, PDF/A, duplex (also absent or irrelevant upstream)  
-- Pixel-identical output vs Qt WebKit  
-- Safe rendering of **untrusted** HTML (same warning as upstream)
-
----
-
-## Exploration method
-
-Five read-only explore subagents covered:
-
-1. Architecture & conversion pipeline  
-2. PDF converter, settings, outline/TOC  
-3. MultiPageLoader, network, WebKit dependency surface  
-4. CLI flags, C API, image converter  
-5. Pure-Go stdlib feasibility & calendar estimates  
-
-Findings are summarized under [`plans/exploration/`](plans/exploration/) and rolled into the canonical ledger.
-
----
-
-## Working with the plans
-
-1. Treat **`plans/00-canonical-pure-go-rewrite.md`** as the single source of status.  
-2. Mark checklist rows `[x]` only with test/command evidence.  
-3. Use `[~]` for intentional deferrals with a next gate.  
-4. After non-doc code exists: run `make test` and `make lint` before closing a phase.  
-5. Phase detail files are subordinate ledgers; do not leave duplicate active work.
-
----
-
-## License note
-
-Upstream wkhtmltopdf is LGPL. A clean-room pure-Go implementation should avoid copying non-trivial C++/Qt code; reimplement from observed **behavior and public CLI/API contracts**. Choose a license for new Go code when implementation starts.
-
----
-
-## Bottom line
-
-| Question | Answer |
-|----------|--------|
-| How long to rebuild **glue + CLI**? | ~2–3 months solo |
-| How long for a **useful pure-Go report PDF tool** (stdlib only)? | **~1.5–2.5 years solo**, **~1–1.5 years with two seniors** |
-| How long for **true wkhtmltopdf/WebKit parity** in pure Go? | **Not a realistic project goal** |
-
-Start at **Phase 0** in the [canonical plan](plans/00-canonical-pure-go-rewrite.md): freeze the HTML/CSS allowlist before writing a layout engine.
+Independent clean-room reimplementation of the wkhtmltopdf CLI/behavior
+(wkhtmltopdf itself is LGPL; see the license note in
+[plans/00-canonical-pure-go-rewrite.md](plans/00-canonical-pure-go-rewrite.md)).
+The Go code is intended to be MIT-licensed; a LICENSE file has not been
+committed yet.

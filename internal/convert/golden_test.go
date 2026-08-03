@@ -31,28 +31,44 @@ var goldenFixtures = []struct {
 	{"multi-page invoice", "fixture-03-multi-page-invoice.html", 2},
 }
 
+// goldenPath resolves a fixture (or fixture asset) inside the golden corpus.
 func goldenPath(file string) string {
 	return filepath.Join("..", "..", "testdata", "golden", file)
+}
+
+// goldenDir is the corpus directory itself.
+func goldenDir() string {
+	return filepath.Join("..", "..", "testdata", "golden")
 }
 
 // commandForFixture builds a cli.Command that converts a golden fixture:
 // A4 page, 10 mm margins, backgrounds on, local file access enabled so the
 // fixture's relative links and images resolve (same ACL shape as newCommand).
+// The whole corpus directory is copied next to the fixture (html, css, png),
+// so relative references in the fixture keep working after the copy.
 func commandForFixture(t *testing.T, file string) *cli.Command {
 	t.Helper()
 	dir := t.TempDir()
-	dest := filepath.Join(dir, filepath.Base(file))
-	content, err := os.ReadFile(goldenPath(file))
+	entries, err := os.ReadDir(goldenDir())
 	if err != nil {
-		t.Fatalf("read fixture %s: %v", file, err)
+		t.Fatalf("read golden dir: %v", err)
 	}
-	if err := os.WriteFile(dest, content, 0o644); err != nil {
-		t.Fatalf("write fixture: %v", err)
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		content, err := os.ReadFile(goldenPath(e.Name()))
+		if err != nil {
+			t.Fatalf("read %s: %v", e.Name(), err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, e.Name()), content, 0o644); err != nil {
+			t.Fatalf("write %s: %v", e.Name(), err)
+		}
 	}
 	cmd := &cli.Command{
 		Global: settings.DefaultPdfGlobal(),
 		Objects: []settings.PdfObject{
-			{Page: dest, Load: settings.DefaultLoadPage()},
+			{Page: filepath.Join(dir, file), Load: settings.DefaultLoadPage()},
 		},
 		Output: filepath.Join(t.TempDir(), "out.pdf"),
 	}
@@ -115,6 +131,110 @@ func TestGoldenCorpus(t *testing.T) {
 			// zero <img> elements), so there is no /Subtype /Image assertion.
 			assertPDFStructure(t, data)
 		})
+	}
+}
+
+// fixtureBounds is the per-fixture page envelope and feature expectation
+// for TestGoldenCorpusAllFixtures. maxPages 0 means "no upper bound".
+type fixtureBounds struct {
+	minPages int
+	maxPages int
+	images   bool // expect >= 1 embedded /Subtype /Image xobject
+	uris     bool // expect >= 1 URI link annotation (/S /URI)
+}
+
+// fixturePageBounds maps a fixture file name to its expected page envelope.
+// Bounds are recorded from the phase-9.1 measurement pass and pin the
+// pagination behaviour across releases: a change to wrapping, table layout
+// or page-break handling that moves a fixture out of its envelope fails.
+var fixturePageBounds = map[string]fixtureBounds{
+	"fixture-01-simple-invoice.html":        {minPages: 1, maxPages: 1},
+	"fixture-02-table-heavy-invoice.html":   {minPages: 2, maxPages: 2},
+	"fixture-03-multi-page-invoice.html":    {minPages: 2, maxPages: 0},
+	"fixture-04-two-column-layout.html":     {minPages: 1, maxPages: 1},
+	"fixture-05-linked-stylesheet.html":     {minPages: 1, maxPages: 1},
+	"fixture-06-external-link.html":         {minPages: 1, maxPages: 1, uris: true},
+	"fixture-07-image-logo.html":            {minPages: 1, maxPages: 1, images: true},
+	"fixture-08-forced-page-breaks.html":    {minPages: 5, maxPages: 5},
+	"fixture-09-multi-section-doc.html":     {minPages: 2, maxPages: 0},
+	"fixture-10-table-colspan.html":         {minPages: 1, maxPages: 1},
+	"fixture-11-long-text-wrap.html":        {minPages: 3, maxPages: 0},
+	"fixture-12-lists.html":                 {minPages: 1, maxPages: 1},
+	"fixture-13-pre-code-block.html":        {minPages: 1, maxPages: 1},
+	"fixture-14-colorful-report.html":       {minPages: 1, maxPages: 1},
+	"fixture-15-bulleted-requirements.html": {minPages: 1, maxPages: 2},
+	"fixture-16-invoice-with-css.html":      {minPages: 3, maxPages: 3},
+	"fixture-17-cover-and-content.html":     {minPages: 2, maxPages: 2},
+	"fixture-18-typography.html":            {minPages: 1, maxPages: 1},
+	"fixture-19-margin-and-sizing.html":     {minPages: 1, maxPages: 1},
+	"fixture-20-image-grid.html":            {minPages: 1, maxPages: 1, images: true},
+}
+
+// fixtureHeaderOK enforces the corpus hygiene rule: every fixture starts
+// with a DOCTYPE and its opening comment header names the fixture.
+func fixtureHeaderOK(t *testing.T, file string, data []byte) {
+	t.Helper()
+	name := strings.TrimSuffix(file, ".html")
+	lines := strings.Split(string(data), "\n")
+	if len(lines) > 6 {
+		lines = lines[:6]
+	}
+	head := strings.Join(lines, "\n")
+	if !strings.HasPrefix(head, "<!DOCTYPE html>") {
+		t.Errorf("fixture %s must start with a DOCTYPE", file)
+	}
+	if !strings.Contains(head, "<!--") || !strings.Contains(head, name) {
+		t.Errorf("fixture %s: opening comment header must name the fixture (found %q)", file, head)
+	}
+}
+
+// TestGoldenCorpusAllFixtures walks every *.html fixture in
+// testdata/golden, converts each through the same pipeline as
+// TestGoldenCorpus, and asserts the structural PDF invariants (%PDF-,
+// /FontFile2, xref offset, %%EOF), the per-fixture page envelope from
+// fixturePageBounds, and the feature expectations (embedded images, URI
+// annotations). This is the test the `make golden` target runs.
+func TestGoldenCorpusAllFixtures(t *testing.T) {
+	entries, err := os.ReadDir(goldenDir())
+	if err != nil {
+		t.Fatalf("read golden dir: %v", err)
+	}
+	fixtureCount := 0
+	for _, e := range entries {
+		file := e.Name()
+		if e.IsDir() || !strings.HasSuffix(file, ".html") {
+			continue
+		}
+		fixtureCount++
+		t.Run(file, func(t *testing.T) {
+			content, err := os.ReadFile(goldenPath(file))
+			if err != nil {
+				t.Fatalf("read fixture: %v", err)
+			}
+			fixtureHeaderOK(t, file, content)
+
+			cmd := commandForFixture(t, file)
+			data := runPDF(t, cmd)
+
+			n := pageCount(data)
+			b := fixturePageBounds[file]
+			if n < b.minPages || (b.maxPages > 0 && n > b.maxPages) {
+				t.Errorf("pages = %d, want [%d, %d]", n, b.minPages, b.maxPages)
+			}
+			if !bytes.Contains(data, []byte("/FontFile2")) {
+				t.Error("expected embedded subset font (/FontFile2)")
+			}
+			if b.images && !bytes.Contains(data, []byte("/Subtype /Image")) {
+				t.Error("expected an embedded image xobject (/Subtype /Image)")
+			}
+			if b.uris && !bytes.Contains(data, []byte("/S /URI")) {
+				t.Error("expected a URI link annotation (/S /URI)")
+			}
+			assertPDFStructure(t, data)
+		})
+	}
+	if fixtureCount < 20 {
+		t.Errorf("golden corpus has %d html fixtures, want >= 20", fixtureCount)
 	}
 }
 

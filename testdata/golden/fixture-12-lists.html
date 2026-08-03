@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<!--
+  fixture-12-lists
+  Proves: ul/ol/li at three nesting levels with styles — bullets for every
+  list item (ol renders bullets too, per the matrix), padding-left driven
+  indentation, list-item margins, and styled markers. Also exercises
+  list items containing paragraphs and inline emphasis.
+  Expected: 1 page.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Project Kickoff — Checklist</title>
+  <style>
+    body { font-family: sans-serif; font-size: 10pt; color: #222; margin: 0; }
+    h1 { font-size: 15pt; color: #1a3d6d; margin: 0 0 6px 0; }
+    h2 { font-size: 11pt; color: #1a3d6d; margin: 12px 0 4px 0; }
+    ul, ol { margin: 4px 0 10px 0; padding-left: 28px; }
+    li { margin: 2px 0; line-height: 1.35; }
+    ul ul, ol ol, ul ol, ol ul { margin: 2px 0; }
+    .checked li { font-size: 9.5pt; }
+    .tight { margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Project Kickoff Checklist — Merger Integration</h1>
+
+  <h2>Before the kickoff meeting</h2>
+  <ul class="checked">
+    <li>Invite the steering committee and the two workstream leads.</li>
+    <li>Book the board room and video bridge for 90 minutes.</li>
+    <li>Distribute the integration plan draft:
+      <ul>
+        <li>IT landscape inventory (owners, SLAs, sunset dates).</li>
+        <li>HR onboarding timeline for transferred staff.</li>
+        <li>Legal checklist for data processing agreements.</li>
+      </ul>
+    </li>
+    <li>Collect open questions from the Q&amp;A channel:
+      <ul>
+        <li>License terms for the legacy ERP add-ons.</li>
+        <li>Office consolidation decision for the Hamburg site.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h2>During the meeting</h2>
+  <ol>
+    <li>Confirm the integration principles and the escalation path.</li>
+    <li>Walk through the plan section by section:
+      <ol>
+        <li>Week 1–2: environment freeze and access provisioning.</li>
+        <li>Week 3–4: data migration dry runs.</li>
+        <li>Week 5–6: cutover, shadow run, and sign-off.</li>
+      </ol>
+    </li>
+    <li>Agree on the weekly status cadence (Mondays, 09:00).</li>
+    <li>Assign owners for every open action item.</li>
+  </ol>
+
+  <h2>After the meeting</h2>
+  <ul>
+    <li>Publish the minutes within two working days.</li>
+    <li>Open the tracker and file every action item.</li>
+    <li>Schedule the first weekly status meeting.</li>
+  </ul>
+
+  <p style="font-size: 9pt; color: #666">Note: ordered lists render with
+  bullet markers in this build; the decimal numbering is not implemented.
+  Nested lists indent via padding-left on ul/ol.</p>
+</body>
+</html>

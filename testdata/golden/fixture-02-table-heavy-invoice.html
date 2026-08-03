@@ -1,4 +1,13 @@
 <!DOCTYPE html>
+<!--
+  fixture-02-table-heavy-invoice
+  Proves: a wide, long table (15 line items) with thead/tbody/tfoot,
+  borders on every cell, alternating row backgrounds via the (pseudo-class
+  degraded) nth-child selector, and a colspan subtotal row in tfoot. The
+  table overflows the first page, so the row-uncut pagination rule pushes
+  the tail to a second page.
+  Expected: exactly 2 pages.
+-->
 <html>
 <head>
   <meta charset="utf-8">

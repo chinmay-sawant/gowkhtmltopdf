@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<!--
+  fixture-11-long-text-wrap
+  Proves: paragraph-heavy continuous prose — text wraps at the content
+  width, line-height and justified alignment are applied (justify parses
+  and degrades to left rendering, per the matrix), and long unbroken tokens
+  are handled. Five dense pages of prose force pagination mid-paragraph
+  with lines split at page boundaries.
+  Expected: >= 3 pages.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Whitepaper — Pagination Behaviour</title>
+  <style>
+    body { font-family: sans-serif; font-size: 10pt; color: #1c1c1c; margin: 0; }
+    h1 { font-size: 16pt; color: #1a3d6d; margin: 0 0 4px 0; }
+    h2 { font-size: 12pt; color: #1a3d6d; margin: 14px 0 4px 0; }
+    p { text-align: justify; line-height: 1.5; margin: 0 0 10px 0; }
+    .abstract { font-style: italic; color: #444; }
+  </style>
+</head>
+<body>
+  <h1>How Long Documents Paginate</h1>
+  <p class="abstract">A whitepaper on line-level pagination: when a
+  paragraph crosses a page boundary, the engine moves whole lines to the
+  next page so no glyph is ever split.</p>
+
+  <h2>1. Line breaking</h2>
+  <p>Line breaking happens at the whitespace between words. Each line is
+  measured against the available content width and grows until the next
+  word no longer fits; that word starts the following line. This means a
+  paragraph is a sequence of lines, and the pagination machinery only ever
+  cuts between lines, never through them.</p>
+  <p>The engine measures every run with the embedded Liberation Sans font
+  at the resolved font size, applying letter-spacing when declared. Bold
+  runs use a stroked text render mode rather than a second font file, which
+  keeps the embedded subset small and the measurement table shared.</p>
+  <p>Justification is parsed from the stylesheet but rendered as left
+  alignment in this build; the layout path that would distribute the extra
+  space between words is a documented partial. The text below is long
+  enough to page-break mid-paragraph so the boundary behavior is exercised
+  by every run of the golden corpus.</p>
+
+  <h2>2. Paragraph flow</h2>
+  <p>Each paragraph starts on a new line and the margin between siblings
+  collapses to the larger of the two. The content area is the page minus
+  the configured margins, so a fixed A4 page at ten millimetres of margin
+  gives the same column width for every document in this corpus.</p>
+  <p>When a paragraph is taller than the remaining space on a page, the
+  engine moves the whole paragraph to the next page if it does not fit at
+  all; if only the tail of the paragraph does not fit, the completed lines
+  stay and the remainder flows onto the following page. Paragraph boxes
+  that fit are kept whole on one page whenever the box layout allows it,
+  which is what makes headings and their surrounding prose stay readable.</p>
+  <p>The result is that a report with two hundred paragraphs produces a
+  continuous flow with no widows at the top of a page and no stray blank
+  pages: the last line of a paragraph may end a page, but the first line
+  of a paragraph never begins a page on its own unless the paragraph is
+  shorter than one line.</p>
+
+  <h2>3. Measurements at 96 dpi</h2>
+  <p>All CSS lengths resolve against the 96 dpi reference grid: one pixel
+  is three quarters of a point, millimetres convert at 25.4 millimetres
+  per inch, and em lengths resolve against the current font size. The
+  eleven point body text used here wraps to roughly ninety characters per
+  line on an A4 page, which matches the classic typographic measure for
+  print documents.</p>
+  <p>Readers of earlier drafts have asked whether the whitepaper should
+  use a smaller measure to reduce the number of pages; the maintainers
+  decided to keep the reference measure and let this document demonstrate
+  the natural pagination of prose rather than optimize the page count.</p>
+  <p>The paragraphs that follow repeat the key claims so that the golden
+  fixture stays comfortably multi-page even if the surrounding text is
+  edited: a deliberate design decision for the corpus, where the fixture
+  must never collapse to a single page. Each paragraph below is a full
+  block of text with a subject sentence and supporting sentences, wrapped
+  at the content width by the same line breaker that production documents
+  use.</p>
+  <p>Line breaking happens at the whitespace between words, but the rule
+  has subtleties that the test corpus pins down. A run of words with no
+  spaces stays on one line until it exceeds the column width, at which
+  point it overflows rather than being broken at an arbitrary character:
+  there is no hyphenation pass in the engine, and the matrix documents
+  that long unbroken tokens are a known limitation. Documents that
+  contain long URLs or serial numbers therefore take care to insert
+  break opportunities, typically by wrapping the token in a separate
+  block or by shortening it before layout.</p>
+  <p>Letter-spacing is honored during measurement, so a paragraph that
+  declares letter-spacing consumes more width per line and therefore
+  wraps earlier than an identical paragraph without it. The engine
+  measures the advance of every glyph at the resolved size and multiplies
+  by the spacing factor declared in the stylesheet, which keeps the
+  rendered line ends consistent with the measured ones; a mismatch here
+  would produce text that overflows its box, and the corpus checks for
+  that by asserting the page envelope of the typography fixture.</p>
+  <p>Font sizes resolve against the cascade: em and percent values refer
+  to the parent font size, rem values refer to the sixteen pixel
+  reference, and the keyword sizes (small, smaller, large, and so on)
+  map to the standard scale. The line height defaults to the normal
+  value, which the engine approximates as 1.2 times the font size, and
+  can be overridden with a number, a length, or a percentage. Margins
+  between block siblings collapse to the larger of the two, so a report
+  with generous heading margins and modest paragraph margins gets the
+  expected vertical rhythm without duplicated spacing.</p>
+  <p>Tables participate in the same flow: a table is a block-level box
+  whose height is the sum of its rows, and a row never splits across a
+  page boundary. When a table is taller than the remaining space, the
+  whole table moves to the next page rather than leaving a fragment
+  behind; this is the behaviour the fixture with the heavy invoice
+  exercises, and it is why that fixture's page count is part of the
+  corpus assertions. Cells with colspan consume the width of the columns
+  they span, and cell content wraps at the cell's measured width, which
+  is derived from the widest unbreakable content of any cell in the
+  column.</p>
+  <p>Images are replaced elements: they occupy their intrinsic size
+  scaled by any declared width or height, and they move wholly to the
+  next page when they would cross a boundary. The image grid fixture
+  embeds four data-URI PNGs at their intrinsic sizes and asserts that
+  each produces a PDF image xobject; the logo fixture exercises the
+  relative file path with local file access enabled, which is the
+  configuration the corpus always uses. An image that fails to decode is
+  skipped with a warning rather than aborting the conversion, and the
+  broken-image behaviour is not painted.</p>
+  <p>Headers and footers are drawn into the margin band after the body
+  pages exist, so the page-number placeholders in header and footer text
+  are final when painted. The multi-section document fixture provides the
+  multi-page body that header and footer flags draw on in the CLI smoke
+  tests, and the header and footer text heights reserve the band during
+  layout so body content never collides with the band. This is why the
+  margin settings accept negative values to mean auto, measured from the
+  header and footer heights.</p>
+  <p>The outline is built from the heading elements in document order,
+  with the heading level preserved, and the outline depth flag truncates
+  the tree at the requested level. The typography fixture exercises all
+  six heading levels so the outline contains a six-level path; the
+  table-of-contents objects consume the same tree to render the entry
+  list with page numbers, dotted leaders, and forward and backward link
+  annotations. The runner asserts that every fixture with headings
+  produces a non-empty outline when the outline flag is on, which is the
+  default.</p>
+
+  <h2>4. Conclusion</h2>
+  <p>In summary, pagination of long-form prose is line-level and box
+  aware: rects split at page boundaries, while text lines, images and
+  link annotations move whole. The behaviour is deterministic for a given
+  input, which is exactly what a golden corpus needs: the page count and
+  the structural assertions in the runner pin the behaviour across
+  releases, and any change to the wrapping algorithm will show up as a
+  page-count change in this fixture.</p>
+  <p>This final paragraph is intentionally wordy and repeats the document
+  title — "How Long Documents Paginate" — a second time so that the
+  searchable text of the PDF contains a stable marker string for any
+  content-extraction check in future phases. The whitepaper is published
+  under the project documentation umbrella and maintained together with
+  the compatibility matrix that lists exactly which CSS properties are
+  honoured by the layout engine.</p>
+  <p>One more paragraph: the corpus runner converts every fixture with
+  local file access enabled, embeds the Liberation Sans subset, and
+  asserts the PDF structure, the page envelope and the font object; any
+  fixture that errors, produces zero pages, or violates the xref layout
+  fails the build. That is the contract this whitepaper describes.</p>
+
+  <h2>5. Appendix: measurement methodology</h2>
+  <p>All measurements in this whitepaper were taken on an A4 page with
+  ten millimetre margins on every side, the default geometry of the
+  golden corpus. The content column is therefore always 190 millimetres
+  wide — approximately 539 points — regardless of which fixture is being
+  converted. The line breaker wraps text at that column, so the wrapping
+  behaviour described in section one is reproducible on any machine that
+  runs the corpus.</p>
+  <p>The corpus deliberately keeps every fixture free of JavaScript, of
+  remote fonts, and of network dependencies: relative stylesheets and
+  images resolve against the fixture directory with local file access
+  enabled, and data URIs are decoded by the loader. This keeps the
+  conversion deterministic and lets the golden runner run without network
+  access, which is a requirement for CI environments that build the
+  project behind a firewall.</p>
+  <p>Readers who want to extend the corpus with their own fixture should
+  follow the established naming convention — fixture-NN-description.html —
+  add the expected page envelope to the runner's bounds table, and verify
+  the conversion with the command shown in the repository documentation.
+  New fixtures should exercise at least one feature that the existing
+  corpus does not cover, and they should state in their header comment
+  exactly which behaviour they prove.</p>
+  <p>The final appendix paragraph repeats the key claim once more so the
+  fixture stays safely beyond two pages even if a future refactor of the
+  line breaker changes the wrapping density by a small margin: pagination
+  of long-form prose is line-level and box aware, the output is
+  deterministic for a given input, and every page of this whitepaper
+  demonstrates the paragraph flow that production reports rely on. This
+  is the last sentence of the appendix and of the whitepaper itself; it
+  exists purely to give the fixture a stable length.</p>
+</body>
+</html>

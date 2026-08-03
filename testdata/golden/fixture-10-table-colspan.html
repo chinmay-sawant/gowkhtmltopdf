@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<!--
+  fixture-10-table-colspan
+  Proves: the table subset at its most demanding — nested tables inside
+  cells, multi-column colspan (2 and 4), th cells in header rows, and a
+  tfoot total row. Column widths are measured from max-content cells;
+  explicit cell widths set via attributes/style.
+  Expected: 1 page.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Quotation Q-2024-081 — Pricing Grid</title>
+  <style>
+    body { font-family: sans-serif; font-size: 9pt; color: #222; margin: 0; }
+    h1 { font-size: 15pt; color: #1a3d6d; margin: 0 0 6px 0; }
+    p.meta { font-size: 9pt; color: #666; margin: 0 0 10px 0; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+    th, td { border: 1px solid #999; padding: 4px 6px; text-align: left; vertical-align: top; }
+    th { background-color: #e8eef5; color: #1a3d6d; }
+    .num { text-align: right; }
+    .sub { background-color: #f4f6f8; }
+    table.inner { width: 100%; margin: 0; border-collapse: collapse; }
+    table.inner th, table.inner td { border: none; border-bottom: 1px dotted #bbb; padding: 2px 4px; background-color: transparent; }
+    .total td { border-top: 2px solid #1a3d6d; font-weight: bold; background-color: #eef3f9; }
+  </style>
+</head>
+<body>
+  <h1>Quotation Q-2024-081</h1>
+  <p class="meta">Nordwind Industries GmbH · Valid until 2024-12-31 · Terms: net 30 days</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th colspan="4">Position summary</th>
+      </tr>
+      <tr>
+        <th style="width: 8%">Pos.</th>
+        <th style="width: 42%">Description</th>
+        <th style="width: 12%">Qty</th>
+        <th style="width: 14%">Unit price</th>
+        <th style="width: 24%">Line total</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td>Gateway X200, including:
+          <table class="inner">
+            <tr><td>X200 base unit</td><td class="num">1×</td></tr>
+            <tr><td>Antenna set, outdoor</td><td class="num">1×</td></tr>
+            <tr><td>Wall mount kit</td><td class="num">1×</td></tr>
+          </table>
+        </td>
+        <td>5</td>
+        <td class="num">1,240.00 EUR</td>
+        <td class="num">6,200.00 EUR</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td>Annual gateway subscription, incl. updates</td>
+        <td>5</td>
+        <td class="num">180.00 EUR</td>
+        <td class="num">900.00 EUR</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td>Installation and commissioning, per site</td>
+        <td>3</td>
+        <td class="num">350.00 EUR</td>
+        <td class="num">1,050.00 EUR</td>
+      </tr>
+    </tbody>
+    <tfoot>
+      <tr class="total">
+        <td colspan="4">Total (excl. VAT)</td>
+        <td class="num">8,150.00 EUR</td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <table>
+    <tr><th colspan="4">Optional line items</th></tr>
+    <tr><td>Spare antenna set</td><td class="num">45.00 EUR</td><td class="num">per unit</td><td class="num">recommended</td></tr>
+    <tr><td>Extended support, 24/7</td><td class="num">290.00 EUR</td><td class="num">per month</td><td class="num">optional</td></tr>
+  </table>
+
+  <p style="font-size: 8pt; color: #666">Prices exclude VAT. Delivery
+  ex-works Nordwind Rotterdam. This quotation contains nested tables
+  (position 1) and header/footer colspan rows.</p>
+</body>
+</html>

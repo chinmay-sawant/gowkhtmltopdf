@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<!--
+  fixture-17-cover-and-content
+  Proves: a cover-style first page (full-page centered block, no margins
+  offset on the cover itself) followed by content that starts on page 2
+  via page-break-before: always. Exercises the outline on the content
+  headings and centered text on the cover.
+  Expected: exactly 2 pages.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Annual Report 2024 — Nordwind Industries</title>
+  <style>
+    body { font-family: sans-serif; font-size: 10pt; color: #1c1c1c; margin: 0; }
+    .cover { text-align: center; padding-top: 160px; }
+    .cover .rule { border-top: 4px solid #1a3d6d; width: 40%; margin: 18px auto; }
+    .cover h1 { font-size: 22pt; color: #1a3d6d; margin: 0 0 6px 0; }
+    .cover .sub { font-size: 12pt; color: #555; }
+    .cover .year { font-size: 10pt; color: #777; margin-top: 40px; }
+    .content { page-break-before: always; }
+    .content h1 { font-size: 16pt; color: #1a3d6d; border-bottom: 2px solid #1a3d6d; padding-bottom: 4px; }
+    .content h2 { font-size: 12pt; color: #1a3d6d; }
+    p { margin: 0 0 8px 0; line-height: 1.45; }
+  </style>
+</head>
+<body>
+  <div class="cover">
+    <h1>Annual Report 2024</h1>
+    <p class="sub">Nordwind Industries GmbH</p>
+    <div class="rule"></div>
+    <p>Fiscal year ending 31 December 2024<br>
+    Prepared for the annual general meeting</p>
+    <p class="year">Published March 2025 · Rotterdam</p>
+  </div>
+
+  <div class="content">
+    <h1>1. Letter to the shareholders</h1>
+    <p>Dear shareholders,</p>
+    <p>2024 was a year of consolidation. Revenue grew 6.2 % to EUR 412
+    million, operating margin reached 11.4 %, and the order backlog stands
+    at a record EUR 178 million. The integration of the sensor division
+    was completed ahead of schedule, and the new production line in
+    Rotterdam started series production in October.</p>
+
+    <h2>1.1 Highlights</h2>
+    <p>Twelve new customers in the energy sector, two framework contracts
+    with European grid operators, and the first large-scale deployment of
+    the telemetry platform with 40,000 connected devices.</p>
+
+    <h2>1.2 Outlook</h2>
+    <p>For 2025 the board targets revenue growth between 8 % and 11 % and
+    an operating margin between 12 % and 13 %, supported by the ramp of
+    the second production line and the expansion of the service business.</p>
+
+    <h1>2. Financial statements (summary)</h1>
+    <p>The full financial statements are available on the investor
+    relations site. The summary below shows the key figures in EUR
+    millions: revenue 412, EBITDA 89, net income 47, equity ratio 38 %,
+    net debt to EBITDA 1.1.</p>
+
+    <p class="year" style="font-size: 8pt; color: #777">This report is part
+    of the golden corpus: the cover page proves centered typography and a
+    full-page layout, and the content page proves page-break-before after
+    a cover block.</p>
+  </div>
+</body>
+</html>

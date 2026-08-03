@@ -1,11 +1,15 @@
 package load
 
 import (
+	"bufio"
 	"context"
+	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -371,5 +375,352 @@ func TestRedirectLimit(t *testing.T) {
 	_, err := l.Load(context.Background(), srv.URL, defaultLP())
 	if err == nil {
 		t.Fatal("redirect loop must error")
+	}
+}
+
+// --- security: file:// scheme, path traversal, symlink escape ---
+
+func TestACLFileURL(t *testing.T) {
+	dir := t.TempDir()
+	f := filepath.Join(dir, "page.html")
+	if err := os.WriteFile(f, []byte("<html>ok</html>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// default policy denies file:// loads
+	if _, err := NewLoader(settings.LoadGlobal{}).Load(context.Background(), "file://"+f, defaultLP()); err == nil {
+		t.Error("default policy must deny file:// loads")
+	}
+
+	lp := defaultLP()
+	lp.BlockLocalFileAccess = false
+	l := NewLoader(settings.LoadGlobal{})
+	l.EnableLocalFileAccess = true
+
+	res, err := l.Load(context.Background(), "file://"+f, lp)
+	if err != nil {
+		t.Fatalf("file:// load: %v", err)
+	}
+	if !strings.Contains(string(res.Body), "ok") {
+		t.Errorf("body = %q", res.Body)
+	}
+
+	// file://localhost/... is the same machine
+	if _, err := l.Load(context.Background(), "file://localhost"+f, lp); err != nil {
+		t.Errorf("file://localhost load: %v", err)
+	}
+
+	// a remote file host is refused outright
+	if _, err := l.Load(context.Background(), "file://evil.example.com"+f, lp); err == nil {
+		t.Error("remote file host must be refused")
+	}
+}
+
+func TestACLPathTraversal(t *testing.T) {
+	dir := t.TempDir()
+	public := filepath.Join(dir, "public")
+	if err := os.MkdirAll(public, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	secret := filepath.Join(dir, "secret.html")
+	if err := os.WriteFile(secret, []byte("secret"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	in := filepath.Join(public, "a.html")
+	if err := os.WriteFile(in, []byte("ok"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	l := NewLoader(settings.LoadGlobal{})
+	l.Allow = []string{public}
+
+	// a file inside the prefix stays readable
+	if _, err := l.Load(context.Background(), in, defaultLP()); err != nil {
+		t.Fatalf("inside prefix: %v", err)
+	}
+
+	// ../ escape as a plain path
+	esc := public + "/../secret.html"
+	if _, err := l.Load(context.Background(), esc, defaultLP()); err == nil {
+		t.Error("path traversal escape must be denied")
+	}
+
+	// ../ escape via a file:// URL, raw and percent-encoded
+	for _, u := range []string{
+		"file://" + public + "/../secret.html",
+		"file://" + public + "/%2e%2e/secret.html",
+	} {
+		if _, err := l.Load(context.Background(), u, defaultLP()); err == nil {
+			t.Errorf("traversal via %q must be denied", u)
+		}
+	}
+}
+
+func TestACLSymlinkEscape(t *testing.T) {
+	dir := t.TempDir()
+	public := filepath.Join(dir, "public")
+	if err := os.MkdirAll(public, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	secret := filepath.Join(dir, "secret.html")
+	if err := os.WriteFile(secret, []byte("secret"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	real := filepath.Join(public, "real.html")
+	if err := os.WriteFile(real, []byte("ok"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	escapeLink := filepath.Join(public, "escape.html")
+	if err := os.Symlink(secret, escapeLink); err != nil {
+		t.Skipf("symlinks unsupported: %v", err)
+	}
+	inLink := filepath.Join(public, "in.html")
+	if err := os.Symlink(real, inLink); err != nil {
+		t.Skipf("symlinks unsupported: %v", err)
+	}
+
+	l := NewLoader(settings.LoadGlobal{})
+	l.Allow = []string{public}
+
+	// a symlink inside the prefix pointing outside it must be denied
+	if _, err := l.Load(context.Background(), escapeLink, defaultLP()); err == nil {
+		t.Error("symlink escape must be denied")
+	}
+	// a symlink pointing inside the prefix stays allowed
+	if _, err := l.Load(context.Background(), inLink, defaultLP()); err != nil {
+		t.Errorf("symlink inside prefix: %v", err)
+	}
+}
+
+func TestSubresourceFileACL(t *testing.T) {
+	dir := t.TempDir()
+	page := filepath.Join(dir, "page.html")
+	if err := os.WriteFile(page, []byte("<html>x</html>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	img := filepath.Join(dir, "x.png")
+	if err := os.WriteFile(img, []byte("PNG"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	base := "file://" + dir + "/page.html"
+
+	l := NewLoader(settings.LoadGlobal{})
+	if _, err := l.FetchSub(context.Background(), base, "x.png", defaultLP()); err == nil {
+		t.Error("file subresource must be denied by default")
+	}
+
+	lp := defaultLP()
+	lp.BlockLocalFileAccess = false
+	l2 := NewLoader(settings.LoadGlobal{})
+	l2.EnableLocalFileAccess = true
+	res, err := l2.FetchSub(context.Background(), base, "x.png", lp)
+	if err != nil {
+		t.Fatalf("enabled: %v", err)
+	}
+	if string(res.Body) != "PNG" {
+		t.Errorf("body = %q", res.Body)
+	}
+}
+
+// --- security: body caps, timeouts, redirects ---
+
+// lyingContentLength opens a raw TCP server that advertises a Content-Length
+// far above the cap but sends almost nothing: the loader must reject it on
+// the header alone, without reading the body.
+func lyingContentLength(t *testing.T) string {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { ln.Close() })
+	go func() {
+		c, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		defer c.Close()
+		br := bufio.NewReader(c)
+		for {
+			line, err := br.ReadString('\n')
+			if err != nil {
+				return
+			}
+			if line == "\r\n" || line == "\n" {
+				break
+			}
+		}
+		c.Write([]byte("HTTP/1.1 200 OK\r\nContent-Length: 8192\r\nConnection: close\r\n\r\n"))
+		c.Write(make([]byte, 128))
+	}()
+	return "http://" + ln.Addr().String()
+}
+
+func TestMaxBodySizeHTTP(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/big": // chunked, no Content-Length
+			w.Write(make([]byte, 4096))
+		case "/exact":
+			w.Write(make([]byte, 1024))
+		case "/small":
+			w.Write(make([]byte, 64))
+		}
+	}))
+	defer srv.Close()
+
+	liar := lyingContentLength(t)
+
+	l := NewLoader(settings.LoadGlobal{})
+	l.MaxBodySize = 1024
+
+	for _, u := range []string{srv.URL + "/big", liar} {
+		_, err := l.Load(context.Background(), u, defaultLP())
+		if err == nil {
+			t.Errorf("%s: oversized body must be rejected", u)
+			continue
+		}
+		if !strings.Contains(err.Error(), "max body size") {
+			t.Errorf("%s: err = %v", u, err)
+		}
+	}
+	for _, p := range []string{"/exact", "/small"} {
+		res, err := l.Load(context.Background(), srv.URL+p, defaultLP())
+		if err != nil {
+			t.Errorf("%s: %v", p, err)
+			continue
+		}
+		if len(res.Body) > 1024 {
+			t.Errorf("%s: body length %d", p, len(res.Body))
+		}
+	}
+}
+
+func TestMaxBodySizeFile(t *testing.T) {
+	dir := t.TempDir()
+	big := filepath.Join(dir, "big.html")
+	if err := os.WriteFile(big, make([]byte, 4096), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ok := filepath.Join(dir, "ok.html")
+	if err := os.WriteFile(ok, make([]byte, 64), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	lp := defaultLP()
+	lp.BlockLocalFileAccess = false
+	l := NewLoader(settings.LoadGlobal{})
+	l.EnableLocalFileAccess = true
+	l.MaxBodySize = 1024
+
+	_, err := l.Load(context.Background(), big, lp)
+	if err == nil {
+		t.Error("oversized local file must be rejected")
+	} else if !strings.Contains(err.Error(), "max body size") {
+		t.Errorf("err = %v", err)
+	}
+	if _, err := l.Load(context.Background(), ok, lp); err != nil {
+		t.Errorf("small file: %v", err)
+	}
+}
+
+func TestSlowServerTimeout(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(3 * time.Second)
+		w.Write([]byte("too late"))
+	}))
+	defer srv.Close()
+
+	lp := defaultLP()
+	lp.Timeout = 1
+	l := NewLoader(settings.LoadGlobal{})
+	start := time.Now()
+	_, err := l.Load(context.Background(), srv.URL, lp)
+	if err == nil {
+		t.Fatal("slow server must time out")
+	}
+	if d := time.Since(start); d > 2500*time.Millisecond {
+		t.Errorf("timeout took %v", d)
+	}
+}
+
+func TestContextCancelAbortsBodyRead(t *testing.T) {
+	started := make(chan struct{})
+	release := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.WriteHeader(http.StatusOK)
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+		close(started)
+		<-release // hang until the test lets go
+	}))
+	defer srv.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	l := NewLoader(settings.LoadGlobal{})
+	errCh := make(chan error, 1)
+	go func() {
+		_, err := l.Load(ctx, srv.URL, defaultLP())
+		errCh <- err
+	}()
+	<-started
+	cancel()
+	select {
+	case err := <-errCh:
+		if err == nil {
+			t.Fatal("cancelled context must abort the load")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("load did not abort after context cancellation")
+	}
+	close(release)
+}
+
+func TestRedirectLimitExact(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n, err := strconv.Atoi(strings.TrimPrefix(r.URL.Path, "/r/"))
+		if err != nil || n <= 0 {
+			w.Write([]byte("done"))
+			return
+		}
+		http.Redirect(w, r, fmt.Sprintf("/r/%d", n-1), http.StatusFound)
+	}))
+	defer srv.Close()
+
+	l := NewLoader(settings.LoadGlobal{})
+	l.MaxRedirects = 2
+
+	res, err := l.Load(context.Background(), srv.URL+"/r/2", defaultLP())
+	if err != nil {
+		t.Fatalf("exactly MaxRedirects redirects must succeed: %v", err)
+	}
+	if string(res.Body) != "done" {
+		t.Errorf("body = %q", res.Body)
+	}
+
+	if _, err := l.Load(context.Background(), srv.URL+"/r/3", defaultLP()); err == nil {
+		t.Error("one more than MaxRedirects must fail")
+	}
+}
+
+// TestHTTPLocalhostAllowedByDesign documents the intended SSRF posture:
+// the loader fetches any URL the document references — including
+// http://localhost — exactly like upstream wkhtmltopdf. Only file:// reads
+// are gated by the ACL.
+func TestHTTPLocalhostAllowedByDesign(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("localhost ok"))
+	}))
+	defer srv.Close()
+
+	l := NewLoader(settings.LoadGlobal{})
+	res, err := l.Load(context.Background(), srv.URL, defaultLP())
+	if err != nil {
+		t.Fatalf("http://127.0.0.1 must be fetchable: %v", err)
+	}
+	if string(res.Body) != "localhost ok" {
+		t.Errorf("body = %q", res.Body)
 	}
 }

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<!--
+  fixture-19-margin-and-sizing
+  Proves: the box model — fixed width/height boxes, min/max constraints,
+  margins and padding, and border boxes. Uses content-box semantics for
+  explicit widths (box-sizing is not implemented); percent widths resolve
+  against the content width.
+  Expected: 1 page.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Layout Grid — Sizing Specimen</title>
+  <style>
+    body { font-family: sans-serif; font-size: 9.5pt; color: #222; margin: 0; }
+    h1 { font-size: 15pt; color: #1a3d6d; margin: 0 0 10px 0; }
+    .fixed { width: 240px; height: 60px; background-color: #dbe7f3; border: 1px solid #7d9cbf; padding: 8px; margin-bottom: 10px; }
+    .pct { width: 60%; background-color: #e9f2e9; border: 1px solid #8fb08f; padding: 6px 10px; margin-bottom: 10px; }
+    .min { min-width: 200px; min-height: 40px; background-color: #f6eedd; border: 1px solid #c9b57e; padding: 6px; margin-bottom: 10px; }
+    .max { max-width: 320px; background-color: #f3e3e8; border: 1px solid #c08fa0; padding: 6px; margin-bottom: 10px; }
+    .boxed { width: 180px; padding: 12px 16px; border: 3px solid #1a3d6d; margin: 10px 0 14px 0; }
+    .grid { width: 100%; border-collapse: collapse; }
+    .grid td { border: 1px solid #c9d4de; padding: 5px 8px; vertical-align: top; }
+  </style>
+</head>
+<body>
+  <h1>Sizing &amp; Box Model Specimen</h1>
+
+  <div class="fixed">Fixed box: width 240 px, height 60 px. Content is
+  clipped by height when it overflows (no overflow handling yet).</div>
+
+  <div class="pct">Percentage box: width 60 % of the content width, height
+  auto. The text below wraps at the computed width.</div>
+
+  <div class="min">Min-constraint box: min-width 200 px and min-height
+  40 px. With short content the box is pushed to the minimums.</div>
+
+  <div class="max">Max-constraint box: max-width 320 px. The paragraph
+  inside is short enough to leave the width at auto, below the cap; a
+  longer paragraph would wrap at 320 px.</div>
+
+  <div class="boxed">Border box: explicit width 180 px (content-box
+  semantics — padding and border add on top), 3 px border, 12/16 px
+  padding. Margins separate it from the following grid.</div>
+
+  <table class="grid">
+    <tr><td><strong>Rule</strong></td><td><strong>Value</strong></td></tr>
+    <tr><td>1 px</td><td>0.75 pt at 96 dpi</td></tr>
+    <tr><td>Box model</td><td>width/height explicit = content-box; auto width = border-box-ish</td></tr>
+    <tr><td>Margins</td><td>collapse between siblings (larger wins)</td></tr>
+  </table>
+</body>
+</html>

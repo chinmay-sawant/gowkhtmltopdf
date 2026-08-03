@@ -913,3 +913,46 @@ func TestTableRowNoSplit(t *testing.T) {
 		t.Errorf("row pages = %v, want strictly increasing", pages)
 	}
 }
+
+func TestPageBreakBeforeStacked(t *testing.T) {
+	// Regression: a page-break-before box stacked directly on the previous
+	// block (collapsed margins → previous boundary op at exactly the section
+	// top) used to drag that op along each fixpoint iteration, drifting one
+	// page per iteration (fixture-08 produced 26 pages instead of 5).
+	// Four sections, zero margins: intro + 4 section pages = 5 pages.
+	s := sheet(t, `body { margin: 0 } .section { page-break-before: always }`)
+	var sb strings.Builder
+	sb.WriteString(`<html><body><h1>Intro</h1>`)
+	for i := 0; i < 4; i++ {
+		sb.WriteString(`<div class="section"><h2>Section `)
+		sb.WriteString(string(rune('A' + i)))
+		sb.WriteString(`</h2><p>content</p></div>`)
+	}
+	sb.WriteString(`</body></html>`)
+	res := layoutHTML(t, sb.String(), s)
+	doc := pdf.NewDocument()
+	if err := Paint(doc, res, paintOpts()); err != nil {
+		t.Fatal(err)
+	}
+	for p, idxs := range res.Pages {
+		if len(idxs) == 0 {
+			t.Errorf("page %d empty", p)
+		}
+	}
+	if len(res.Pages) != 5 {
+		t.Errorf("pages = %d, want 5 (no fixpoint drift)", len(res.Pages))
+	}
+	// each section on its own page, strictly after the intro
+	intro := pageOf(t, res, "Intro")
+	if intro != 0 {
+		t.Errorf("intro on page %d, want 0", intro)
+	}
+	prev := intro
+	for i := 0; i < 4; i++ {
+		p := pageOf(t, res, string(rune('A'+i)))
+		if p != prev+1 {
+			t.Errorf("section %d on page %d, want %d", i, p, prev+1)
+		}
+		prev = p
+	}
+}

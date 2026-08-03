@@ -194,6 +194,150 @@ Status legend as in §2; evidence in `internal/css/css.go`.
 | Remote URL fetch | `net/http` defaults: connect + response timeouts, redirect limit, `blockLocalFileAccess` covers `file://` and localhost refs |
 | SSRF posture | No automatic form submission; POST only via explicit `--post` flags; no cookies auto-forwarded from site contexts |
 
+## 7. CLI flag support matrix (Phase 9.1)
+
+Extracted from every `add(...)` call in `internal/cli/flags.go` (109 flags;
+each bool flag also accepts `--no-<flag>`). Status is **ground truth, not
+intent**: each flag's dotted setting was traced from the `Set` surface
+(`internal/settings/reflect.go`) to its consumers in `internal/convert`,
+`internal/load`, `internal/imageout` and `internal/layout`. Flags whose
+setting has no consumer are marked **Ignored**, even when upstream
+wkhtmltopdf honors them.
+
+- **Supported** — parsed, wired into settings, and the setting is consumed
+  by the PDF/image pipeline; exercised end-to-end in `internal/convert`
+  tests (incl. `TestGoldenCorpusAllFixtures`), `internal/cli` parse tests,
+  or the CLI smoke run.
+- **Partial** — accepted and stored, but only part of the upstream
+  behavior is honored (note column says which).
+- **Ignored** — accepted and stored, never consumed; no effect on output
+  (mostly `web.*` / `load.*` JS-era settings).
+- **Error** — rejected. No flag in the table is rejected at parse, but
+  `--<unknown>` → `unknown option`, invalid enum/length values → error, and
+  a bogus `--page-size` fails at conversion time. `--bogus-flag` is
+  exercised by `TestUnknownFlagErrors`.
+
+### 7.1 Documentation flags
+
+| Flag | Mode | Status |
+|------|------|--------|
+| `--help`, `--version`, `--license`, `--extended-help` | Both | Supported (handled by the parser; prints and exits 0) |
+| `--man`, `--html` | Both | Ignored (parsed, stored on the command, never consumed) |
+
+### 7.2 Global page/PDF flags
+
+| Flag | Mode | Status |
+|------|------|--------|
+| `--quiet` | Both | Supported (suppresses progress; `TestRunPDFQuiet`) |
+| `--log-level` | Both | Ignored (stored; the pipeline has no level filtering) |
+| `--collate`, `--copies` | PDF | Supported (`TestRunPDFCopiesCollate`, `TestRunPDFCopiesNonCollate`) |
+| `--orientation` | PDF | Supported (page geometry swap) |
+| `--page-size` | PDF | Supported (A4/Letter/…; golden runner) |
+| `--grayscale` | PDF | Ignored (wired to `colormode`→`ColorMode`, which no pipeline code reads; the PDF grayscale switch is fed by the library-side `grayscale` key only) |
+| `--lowquality` | PDF | Ignored (stored, no consumer) |
+| `--title` | PDF | Supported (PDF /Title info) |
+| `--margin-top/bottom/left/right` | PDF | Supported (page geometry + golden runner) |
+| `--dpi` | PDF | Ignored (layout uses a fixed 96 dpi reference) |
+| `--page-width`, `--page-height` | PDF | Supported (`pageGeometry` override) |
+| `--image-quality` | Both | Ignored (stored; image mode uses `--quality`) |
+| `--image-dpi` | PDF | Ignored (stored, no consumer) |
+| `--no-pdf-compression` | PDF | Supported (uncompressed streams; used by tests) |
+| `--use-xserver` | Both | Ignored (stored, no consumer) |
+| `--cookie-jar` | Both | Ignored (loader always uses an in-memory jar) |
+| `--read-args-from-stdin` | Both | Ignored (argv-only parsing; `-` output is covered, not stdin args) |
+
+### 7.3 Pagination & smart shrinking
+
+| Flag | Mode | Status |
+|------|------|--------|
+| `--page-offset` | PDF | Supported (header/footer and TOC page numbers) |
+| `--smart-shrinking` | PDF | Supported (re-layout with zoom; `TestRunPDFSmartShrinking`) |
+| `--enable-smart-shrinking`, `--disable-smart-shrinking` | PDF | Supported (same key) |
+
+### 7.4 Outline
+
+| Flag | Mode | Status |
+|------|------|--------|
+| `--outline` | PDF | Supported (`TestOutlineWiring`, `TestOutlineDisabled`) |
+| `--outline-depth` | PDF | Supported (outline tree truncation) |
+| `--dump-outline` | PDF | Supported (wkhtmltopdf XML to stdout) |
+| `--dump-default-toc-xsl` | PDF | Supported (built-in template description to stdout) |
+
+### 7.5 Web & load (page-scoped)
+
+| Flag | Mode | Status |
+|------|------|--------|
+| `--enable-javascript`, `--disable-javascript` | Both | Ignored (JS stripped at load; no engine — the warning stub `load.WarnJSStubs` is not wired into the pipeline) |
+| `--enable-local-file-access`, `--disable-local-file-access` | Both | Supported (local-file ACL; security policy §6 + golden runner) |
+| `--allow` | PDF | Supported (ACL allow-prefix list) |
+| `--background`, `--no-background` | Both | Supported (paint gate; golden runner sets it on) |
+| `--enable-plugins`, `--disable-plugins` | Both | Ignored (stored, no consumer) |
+| `--default-encoding` | Both | Ignored (UTF-8 assumed throughout) |
+| `--minimum-font-size` | Both | Ignored (stored, no consumer) |
+| `--user-style-sheet` | Both | Ignored (stored, no consumer) |
+| `--print-media-type`, `--no-print-media-type` | Both | Ignored (layout always runs with `Media: "print"`; the flag cannot change that) |
+| `--media-type` | Both | Ignored (same) |
+| `--javascript-delay` | Both | Ignored (`WaitJSDelay` is never invoked) |
+| `--window-status`, `--run-script` | Both | Ignored (stored; warning stub not wired) |
+| `--zoom` | Both | Supported (forwarded to `layout.Options.Zoom` in `convert.go`) |
+| `--stop-slow-scripts`, `--no-stop-slow-scripts` | Both | Ignored (no JS) |
+| `--debug-javascript`, `--no-debug-javascript` | Both | Ignored (no JS) |
+| `--load-error-handling` | Both | Supported (abort/skip/ignore in the loader) |
+| `--load-media-error-handling` | Both | Ignored (both appliers are no-ops) |
+| `--proxy` | Both | Partial (global proxy wired into the HTTP transport; object-level `load.proxy` is stored but not applied) |
+| `--username`, `--password` | Both | Supported (HTTP basic auth) |
+| `--custom-header-propagation`, `--no-custom-header-propagation` | Both | Ignored (`RepeatCustomHeaders` stored, never read) |
+| `--timeout` | Both | Supported (HTTP response timeout) |
+| `--external-links`, `--no-external-links` | PDF | Partial (the `stripLinkURIs` path exists, but `applyObjectDefaults` ORs the default on, so the off state is unreachable from the CLI — documented quirk in `convert.go`) |
+| `--internal-links`, `--no-internal-links` | PDF | Ignored (layout never emits internal link ops) |
+| `--produce-forms` | PDF | Ignored (no AcroForm support in the PDF writer) |
+
+### 7.6 Pair flags (two values)
+
+| Flag | Mode | Status |
+|------|------|--------|
+| `--cookie <name> <value>` | Both | Supported (HTTP cookies) |
+| `--custom-header <name> <value>` | Both | Supported (HTTP headers) |
+| `--post <name> <value>` | Both | Supported (POST form bodies) |
+| `--replace <name> <value>` | PDF | Supported (header/footer substitution) |
+
+### 7.7 Header & footer
+
+| Flag | Mode | Status |
+|------|------|--------|
+| `--header-left/center/right`, `--footer-left/center/right` | PDF | Supported (text HFs; `TestTextHeaderFooter`) |
+| `--header-font-size`, `--footer-font-size` | PDF | Supported |
+| `--header-spacing`, `--footer-spacing` | PDF | Supported (band measurement) |
+| `--header-line`, `--footer-line` | PDF | Supported (separator line) |
+| `--header-font-name`, `--footer-font-name` | PDF | Partial (stored; every font renders as the embedded Liberation Sans) |
+| `--header-html`, `--footer-html` | PDF | Supported (URL values; raw-markup values rejected with a warning — upstream-compatible; `TestHTMLHeader`, `TestHTMLHeaderRawMarkupRejected`) |
+
+### 7.8 TOC objects
+
+| Flag | Mode | Status |
+|------|------|--------|
+| `--xsl-style-sheet` | PDF | Partial (accepted; warning emitted, built-in Go template used instead — no XSLT in stdlib) |
+| `--toc-header-text` | PDF | Supported (`TestTOC`) |
+| `--toc-text-size-shrink` | PDF | Supported |
+| `--disable-toc-links` | PDF | Supported |
+| `--disable-dotted-lines` | PDF | Supported |
+| `--toc-level-indentation` | PDF | Supported |
+| `--toc-forward-links` | PDF | Supported (`TestTOC`) |
+| `--toc-back-links` | PDF | Supported (`TestTOC`) |
+
+### 7.9 Image mode (`gowkhtmltoimage`)
+
+| Flag | Mode | Status |
+|------|------|--------|
+| `--width`, `--height` | Image | Supported (viewport/min canvas; `TestImageFlags`) |
+| `--crop-x`, `--crop-y`, `--crop-w`, `--crop-h` | Image | Supported (output crop) |
+| `--format` | Image | Supported (explicit png/jpg vs output-extension sniffing) |
+| `--quality` | Image | Supported (JPEG encoder) |
+| `--transparent` | Image | Supported (PNG alpha; JPEG falls back to white with a warning) |
+| `--smart-width`, `--no-smart-width` | Image | Supported (grow-to-fit viewport) |
+
+Short flags: `-q -g -O -s -T -B -L -R -c -t` alias the long forms in §7.2.
+
 ---
 
 ## Amendment process

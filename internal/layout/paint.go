@@ -150,13 +150,20 @@ func paginateOps(res *Result, contentH float64) []int {
 	return opPage
 }
 
-// shiftFlowY moves every op and box at or below fromY down by dy canvas
-// points. Ops below a box in flow follow it when the box moves; box.y is kept
-// in sync so break policies stay stable across fixpoint iterations.
-func shiftFlowY(res *Result, fromY, dy float64) {
+// shiftFlowY moves the ops of the target range [from,to] — plus every op
+// strictly below fromY — down by dy canvas points. Ops of earlier boxes that
+// touch fromY exactly (collapsed margins) are left alone so the page-break
+// fixpoint converges instead of dragging boundary ops along each iteration.
+// Box.y is kept in sync for boxes whose top moved.
+func shiftFlowY(res *Result, from, to int, fromY, dy float64) {
+	for i := from; i <= to; i++ {
+		res.Ops[i].Y += dy
+	}
 	for i := range res.Ops {
-		if res.Ops[i].Y >= fromY {
-			res.Ops[i].Y += dy
+		if i < from || i > to {
+			if res.Ops[i].Y > fromY {
+				res.Ops[i].Y += dy
+			}
 		}
 	}
 	if res.root == nil {
@@ -164,7 +171,7 @@ func shiftFlowY(res *Result, fromY, dy float64) {
 	}
 	var walk func(b *box)
 	walk = func(b *box) {
-		if b.y >= fromY {
+		if b.y > fromY || (b.y == fromY && b.opStart >= from && b.opEnd <= to) {
 			b.y += dy
 		}
 		for _, c := range b.children {
@@ -189,7 +196,7 @@ func avoidInside(res *Result, contentH float64) bool {
 			lo := int(b.y / contentH)
 			hi := int((b.y + b.h) / contentH)
 			if hi > lo && b.h <= contentH+0.01 {
-				shiftFlowY(res, b.y, float64(hi)*contentH-b.y)
+				shiftFlowY(res, b.opStart, b.opEnd, b.y, float64(hi)*contentH-b.y)
 				changed = true
 			}
 		}
@@ -215,7 +222,7 @@ func beforeAlways(res *Result, contentH float64) bool {
 			if loPage <= lastPage {
 				dy := float64(lastPage+1)*contentH - b.y
 				if dy > 0 {
-					shiftFlowY(res, b.y, dy)
+					shiftFlowY(res, b.opStart, b.opEnd, b.y, dy)
 					return true
 				}
 			}
@@ -268,7 +275,7 @@ func afterBreaks(res *Result, contentH float64) bool {
 		case b.style.PageBreakAfter == "always":
 			dy := float64(lastPage+1)*contentH - next.y
 			if dy > 0 {
-				shiftFlowY(res, next.y, dy)
+				shiftFlowY(res, next.opStart, next.opEnd, next.y, dy)
 				changed = true
 			}
 		case b.style.PageBreakAfter == "avoid":
@@ -276,7 +283,7 @@ func afterBreaks(res *Result, contentH float64) bool {
 			if next.h <= remaining {
 				dy := lastY - next.y
 				if dy < -0.001 {
-					shiftFlowY(res, next.y, dy)
+					shiftFlowY(res, next.opStart, next.opEnd, next.y, dy)
 					changed = true
 				}
 			}
@@ -326,7 +333,7 @@ func rowsIntact(res *Result, contentH float64) bool {
 			}
 			lo, hi := int(rowTop/contentH), int(rowBottom/contentH)
 			if hi > lo {
-				shiftFlowY(res, rowTop, float64(hi)*contentH-rowTop)
+				shiftFlowY(res, first, last, rowTop, float64(hi)*contentH-rowTop)
 				changed = true
 			}
 		}

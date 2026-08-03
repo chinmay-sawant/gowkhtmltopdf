@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<!--
+  fixture-09-multi-section-doc
+  Proves: a long multi-section report that paginates naturally across
+  several pages (no forced breaks) — the "header/footer fixture" of the
+  corpus. Headers and footers are CLI flags, not HTML, so the golden runner
+  exercises them via the CLI harness; this document provides the multi-page
+  body those flags draw on. Sections also feed the outline (h1/h2 headings).
+  Expected: >= 2 pages.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Quarterly Engineering Report — Q3 2024</title>
+  <style>
+    body { font-family: sans-serif; font-size: 10pt; color: #222; margin: 0; line-height: 1.4; }
+    h1 { font-size: 16pt; color: #1a3d6d; margin: 14px 0 6px 0; }
+    h2 { font-size: 12pt; color: #1a3d6d; margin: 12px 0 4px 0; }
+    p { margin: 0 0 8px 0; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #c9d4de; padding: 3px 5px; text-align: left; }
+    th { background-color: #e8eef5; }
+    .num { text-align: right; }
+  </style>
+</head>
+<body>
+  <h1>Engineering Report — Q3 2024</h1>
+  <p>Prepared by the Engineering Planning Office for the steering
+  committee. This document summarizes the deliverables of the third
+  quarter, the resource usage, and the outlook for Q4.</p>
+
+  <h2>1. Delivered work packages</h2>
+  <p>Nine of eleven planned work packages shipped in Q3. The two deferred
+  packages (WP-04 telemetry gateway, WP-09 field calibration kit) were
+  moved to Q4 with an approved scope change.</p>
+  <table>
+    <tr><th>WP</th><th>Title</th><th class="num">Effort (h)</th><th>Status</th></tr>
+    <tr><td>WP-01</td><td>Firmware 2.4 baseline</td><td class="num">320</td><td>Done</td></tr>
+    <tr><td>WP-02</td><td>Power supply redesign</td><td class="num">410</td><td>Done</td></tr>
+    <tr><td>WP-03</td><td>Sensor calibration rig</td><td class="num">260</td><td>Done</td></tr>
+    <tr><td>WP-05</td><td>HMI software 3.1</td><td class="num">380</td><td>Done</td></tr>
+    <tr><td>WP-06</td><td>EMC pre-compliance campaign</td><td class="num">190</td><td>Done</td></tr>
+    <tr><td>WP-07</td><td>Packaging redesign</td><td class="num">120</td><td>Done</td></tr>
+    <tr><td>WP-08</td><td>Field trial documentation</td><td class="num">140</td><td>Done</td></tr>
+    <tr><td>WP-10</td><td>Spare parts portfolio</td><td class="num">90</td><td>Done</td></tr>
+    <tr><td>WP-11</td><td>Service documentation</td><td class="num">230</td><td>Done</td></tr>
+  </table>
+
+  <h2>2. Resource usage</h2>
+  <p>Engineering capacity was 2,140 hours in Q3; 1,930 hours were booked
+  against work packages, 120 hours went to support of the production ramp,
+  and 90 hours were unassigned. Overtime stayed within the approved
+  envelope of 5 %.</p>
+
+  <h2>3. Risks and mitigations</h2>
+  <p>The supply chain for the new power module remains the top risk. The
+  second-source qualification is under way; the target date for full
+  second-sourcing is 2025-02-01. The EMC campaign confirmed margins above
+  6 dB on all conducted and radiated tests.</p>
+  <p>The HMI software team reported a usability finding from the field
+  trial regarding the alarm list; the fix is scheduled for the 3.1.2
+  maintenance release in October.</p>
+
+  <h2>4. Outlook for Q4</h2>
+  <p>Q4 focuses on the two deferred packages, the production ramp of the
+  redesigned power supply, and the preparation of the 2025 platform
+  review. A mid-quarter checkpoint is scheduled for calendar week 46, and
+  the final steering committee meeting of the year takes place on
+  2024-12-17.</p>
+  <p>The engineering planning office will publish the Q4 work package
+  breakdown by 2024-10-08. Any remaining questions can be directed to the
+  program office; the escalation path is unchanged from the Q2 report.</p>
+  <p>Approved by the engineering director on 2024-10-02, revision A. The
+  next report in this series covers Q4 2024 and is due on 2025-01-10.</p>
+</body>
+</html>
