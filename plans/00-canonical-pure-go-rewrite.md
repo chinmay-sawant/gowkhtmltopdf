@@ -5,7 +5,8 @@
 > **Estimated effort:** MVP 18–28 person-months · Intermediate 45–70 PM · Full parity not realistic (stdlib-only)  
 > **Constraint:** pure Golang, **Go standard library only** (no third-party modules, no Chrome/WebKit, no cgo)  
 > **Source analyzed:** `wkhtmltopdf/` (v0.12.7-dev) via 5 explore subagents  
-> **Evidence:** `plans/exploration/*`, phase details in `plans/phases/*`
+> **Evidence:** `plans/exploration/*`, phase details in `plans/phases/*`  
+> **Post-MVP work:** active ledger → [`10-canonical-post-mvp-roadmap.md`](10-canonical-post-mvp-roadmap.md) (phases 10–23; quick-win order). Do not reopen completed MVP rows here for quality work—record there.
 
 ---
 
