@@ -2,7 +2,7 @@ package convert
 
 import (
 	"bytes"
-	"compress/flate"
+	"compress/zlib"
 	"context"
 	"encoding/base64"
 	"errors"
@@ -456,7 +456,7 @@ func TestRunPDFSmartShrinking(t *testing.T) {
 	t.Error("expected a font size below 6pt in the shrunk PDF (zoom applied)")
 }
 
-// decodeStreams decompresses every FlateDecode stream in a PDF byte blob.
+// decodeStreams decompresses every FlateDecode (zlib) stream in a PDF byte blob.
 func decodeStreams(data []byte) []byte {
 	var out []byte
 	for {
@@ -471,7 +471,10 @@ func decodeStreams(data []byte) []byte {
 		}
 		raw := data[:end]
 		data = data[end+len("endstream"):]
-		r := flate.NewReader(bytes.NewReader(raw))
+		r, err := zlib.NewReader(bytes.NewReader(raw))
+		if err != nil {
+			continue
+		}
 		dec, derr := io.ReadAll(r)
 		r.Close()
 		if derr == nil {

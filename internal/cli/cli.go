@@ -52,9 +52,16 @@ type flagSpec struct {
 
 type objectCtx struct {
 	obj *settings.PdfObject
+	// pending holds page-scoped settings seen before any object keyword
+	// (upstream "address remapping"). It is promoted into a real object when
+	// the first page/cover is created or when free positionals resolve. TOC
+	// objects do not consume pending, so `--enable-local-file-access toc page
+	// in.html out.pdf` does not leave an empty ghost page.
+	pending *settings.PdfObject
 }
 
-// object returns the current object, creating an empty one if needed.
+// object returns the current object, creating one if needed (promoting
+// pending page-scoped settings when present).
 func (ctx *objectCtx) object(c *Command) *settings.PdfObject {
 	if ctx.obj == nil {
 		return ctx.newObject(c)
@@ -62,8 +69,23 @@ func (ctx *objectCtx) object(c *Command) *settings.PdfObject {
 	return ctx.obj
 }
 
-// newObject always appends a fresh object and makes it current.
+// newObject appends a page/cover object and makes it current. If page-scoped
+// flags were collected before any object keyword, they seed this object.
 func (ctx *objectCtx) newObject(c *Command) *settings.PdfObject {
+	if ctx.pending != nil {
+		c.Objects = append(c.Objects, *ctx.pending)
+		ctx.pending = nil
+	} else {
+		c.Objects = append(c.Objects, settings.PdfObject{})
+	}
+	ctx.obj = &c.Objects[len(c.Objects)-1]
+	return ctx.obj
+}
+
+// newFreshObject appends a new object without consuming pending page-scoped
+// settings. Used for toc so pre-object page flags apply to the first real
+// page that follows, not to the TOC entry itself.
+func (ctx *objectCtx) newFreshObject(c *Command) *settings.PdfObject {
 	c.Objects = append(c.Objects, settings.PdfObject{})
 	ctx.obj = &c.Objects[len(c.Objects)-1]
 	return ctx.obj
@@ -151,7 +173,7 @@ func (c *Command) positional(arg string, cur *objectCtx, free *[]string) error {
 		obj.Header, obj.Footer = settings.HeaderFooter{}, settings.HeaderFooter{}
 		return nil
 	case "toc":
-		obj := cur.newObject(c)
+		obj := cur.newFreshObject(c)
 		obj.IsTableOfContent = true
 		obj.UseOutline = false
 		return nil
@@ -167,13 +189,28 @@ func (c *Command) positional(arg string, cur *objectCtx, free *[]string) error {
 }
 
 // resolveFree assigns queued positionals: last → output, others → implicit
-// page objects.
+// page objects. Pending page-scoped settings (from flags before any object
+// keyword) are applied to the first free page URL.
 func (c *Command) resolveFree(cur *objectCtx, free []string) error {
 	if len(free) == 0 {
 		return c.validate()
 	}
 	c.Output = free[len(free)-1]
 	for _, u := range free[:len(free)-1] {
+		// Prefer filling an already-opened empty page/cover object.
+		if cur.obj != nil && cur.obj.Page == "" && !cur.obj.IsTableOfContent {
+			cur.obj.Page = u
+			continue
+		}
+		// Next: promote pending pre-object page settings into this page.
+		if cur.pending != nil {
+			o := *cur.pending
+			o.Page = u
+			c.Objects = append(c.Objects, o)
+			cur.pending = nil
+			cur.obj = &c.Objects[len(c.Objects)-1]
+			continue
+		}
 		cur.newObject(c).Page = u
 	}
 	return c.validate()

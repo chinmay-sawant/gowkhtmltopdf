@@ -2,7 +2,7 @@ package pdf
 
 import (
 	"bytes"
-	"compress/flate"
+	"compress/zlib"
 	"fmt"
 	"io"
 	"regexp"
@@ -154,11 +154,15 @@ func checkStreams(t *testing.T, objs map[int][]byte) {
 		dict := string(body[:idx])
 		data := bytes.TrimSuffix(body[idx+len("stream\n"):], []byte("\nendstream"))
 		if strings.Contains(dict, "/FlateDecode") {
-			zr := flate.NewReader(bytes.NewReader(data))
+			zr, err := zlib.NewReader(bytes.NewReader(data))
+			if err != nil {
+				t.Errorf("zlib stream header failed: %v", err)
+				continue
+			}
 			dec, err := io.ReadAll(zr)
 			zr.Close()
 			if err != nil {
-				t.Errorf("flate stream failed: %v", err)
+				t.Errorf("zlib stream failed: %v", err)
 				continue
 			}
 			if len(dec) == 0 {

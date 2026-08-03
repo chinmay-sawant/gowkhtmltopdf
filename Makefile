@@ -1,4 +1,4 @@
-.PHONY: test lint build fmt golden golden-update clean
+.PHONY: test lint build fmt golden golden-update samples clean
 
 # Phase 00 scaffold: stdlib-only module. No external deps expected.
 
@@ -10,7 +10,9 @@ lint:
 	@out="$$(gofmt -l .)"; if [ -n "$$out" ]; then echo "gofmt needed:"; echo "$$out"; exit 1; fi
 
 build:
-	go build ./...
+	mkdir -p bin
+	go build -o bin/gowkhtmltopdf ./cmd/gowkhtmltopdf
+	go build -o bin/gowkhtmltoimage ./cmd/gowkhtmltoimage
 
 fmt:
 	gofmt -w .
@@ -27,6 +29,19 @@ golden:
 
 golden-update:
 	@echo "golden-update: implemented in Phase 3 (PDF writer)"; true
+
+# Regenerate the sample outputs in output/: one PDF per golden fixture, a
+# showcase PDF (TOC + headers/footers + outline) and a PNG from the image
+# converter. output/ is gitignored.
+samples:
+	rm -f output/*.pdf output/*.png
+	for f in testdata/golden/fixture-*.html; do \
+		name=$$(basename "$$f" .html); \
+		go run ./cmd/gowkhtmltopdf --enable-local-file-access "$$f" "output/$$name.pdf"; \
+	done
+	go run ./cmd/gowkhtmltopdf --enable-local-file-access --outline --outline-depth 2 --header-left "gowkhtmltopdf demo — [title]" --header-right "page [page]/[topage]" --footer-center "[section]" toc testdata/golden/fixture-16-invoice-with-css.html output/showcase-toc-hf-outline.pdf
+	go run ./cmd/gowkhtmltoimage --enable-local-file-access testdata/golden/fixture-01-simple-invoice.html output/fixture-01-simple-invoice.png
+	ls -la output/ | awk '{print $$5, $$9}' | tail -25
 
 clean:
 	rm -rf testdata/golden/out

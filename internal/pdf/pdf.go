@@ -6,7 +6,7 @@ package pdf
 
 import (
 	"bytes"
-	"compress/flate"
+	"compress/zlib"
 	"errors"
 	"fmt"
 	"io"
@@ -307,6 +307,14 @@ func (d *Document) finalize() error {
 		"<< /Type /Pages\n/Kids [%s]\n/Count %d >>",
 		strings.Join(pageRefs, " "), len(pageRefs)))
 
+	// Outlines must be finalized before the catalog dict is written so
+	// outlineRoot.refStr is assigned; otherwise /Outlines is emitted with an
+	// empty value and the Catalog dictionary is malformed (viewers show no
+	// content / fail to open the file).
+	if d.outlineRoot != nil {
+		d.finalizeOutlines(d.outlineRoot)
+	}
+
 	catalogParts := []string{
 		"<< /Type /Catalog",
 		"/Pages " + pagesRef,
@@ -339,11 +347,6 @@ func (d *Document) finalize() error {
 	// per-page objects
 	for _, p := range d.pages {
 		d.finalizePage(p, pagesRef)
-	}
-
-	// outlines
-	if d.outlineRoot != nil {
-		d.finalizeOutlines(d.outlineRoot)
 	}
 
 	d.catalogRef = catalogRef
@@ -538,11 +541,14 @@ func num(v float64) string {
 	return s
 }
 
+// flateBytes compresses raw with zlib (RFC 1950). PDF /FlateDecode streams
+// require the zlib wrapper, not raw DEFLATE (RFC 1951); viewers reject the
+// latter and the page appears empty.
 func flateBytes(raw []byte) []byte {
 	var buf bytes.Buffer
-	fw, _ := flate.NewWriter(&buf, flate.DefaultCompression)
-	_, _ = fw.Write(raw)
-	_ = fw.Close()
+	zw, _ := zlib.NewWriterLevel(&buf, zlib.DefaultCompression)
+	_, _ = zw.Write(raw)
+	_ = zw.Close()
 	return buf.Bytes()
 }
 

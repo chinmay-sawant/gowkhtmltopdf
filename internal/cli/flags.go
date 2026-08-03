@@ -394,18 +394,24 @@ func init() {
 	}
 }
 
-// pageScoped routes a flag to the current object when one exists, else to
-// the first object (upstream address remapping: page settings before any
-// object keyword apply to the first page).
+// pageScoped routes a flag to the current object when one exists, else
+// accumulates it as pending first-page settings (upstream address remapping:
+// page settings before any object keyword apply to the first page). Pending
+// settings are not inserted into Objects until a real page/cover is created,
+// so a leading --enable-local-file-access does not leave an empty ghost page
+// when the next token is toc/cover/page.
 func pageScoped(glob func(g *settings.PdfGlobal, val string) error, obj func(o *settings.PdfObject, val string) error) flagApplier {
 	return func(c *Command, cur *objectCtx, val string) error {
 		if err := glob(&c.Global, val); err != nil {
 			return err
 		}
-		if cur.obj == nil {
-			cur.obj = cur.object(c)
+		if cur.obj != nil {
+			return obj(cur.obj, val)
 		}
-		return obj(cur.obj, val)
+		if cur.pending == nil {
+			cur.pending = &settings.PdfObject{}
+		}
+		return obj(cur.pending, val)
 	}
 }
 

@@ -256,6 +256,27 @@ func TestOutlines(t *testing.T) {
 			t.Errorf("missing %q", want)
 		}
 	}
+	// Catalog must reference the outlines object: `/Outlines <n> 0 R`, never
+	// an empty value which leaves the dictionary malformed.
+	if !regexp.MustCompile(`/Outlines \d+ 0 R`).MatchString(out) {
+		t.Errorf("catalog missing /Outlines N 0 R; snippet around Outlines: %q",
+			outlineSnippet(out))
+	}
+	if strings.Contains(out, "/Outlines  /PageMode") || strings.Contains(out, "/Outlines /PageMode") {
+		t.Error("catalog has empty /Outlines value")
+	}
+}
+
+func outlineSnippet(out string) string {
+	i := strings.Index(out, "/Outlines")
+	if i < 0 {
+		return "(no /Outlines)"
+	}
+	end := i + 40
+	if end > len(out) {
+		end = len(out)
+	}
+	return out[i:end]
 }
 
 func TestInfoDict(t *testing.T) {

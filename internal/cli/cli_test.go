@@ -320,3 +320,50 @@ func TestValidateNoInput(t *testing.T) {
 		t.Error("toc-only must error (no input page)")
 	}
 }
+
+// Page-scoped flags before object keywords must not leave an empty ghost
+// page when the next token is toc (or cover/page). They apply to the first
+// real page instead; header flags before any object stay global.
+func TestPageScopedBeforeTOCNoGhost(t *testing.T) {
+	cmd := parse(t,
+		"--enable-local-file-access",
+		"--header-left", "Demo",
+		"--footer-center", "[page]",
+		"toc",
+		"in.html",
+		"out.pdf",
+	)
+	if len(cmd.Objects) != 2 {
+		t.Fatalf("objects = %d, want 2 (toc + page); got %+v", len(cmd.Objects), cmd.Objects)
+	}
+	if !cmd.Objects[0].IsTableOfContent {
+		t.Errorf("object 0 should be toc: %+v", cmd.Objects[0])
+	}
+	if cmd.Objects[1].Page != "in.html" {
+		t.Errorf("object 1 page = %q", cmd.Objects[1].Page)
+	}
+	if cmd.Objects[1].Load.BlockLocalFileAccess {
+		t.Error("enable-local-file-access must land on the first real page")
+	}
+	if !cmd.Global.EnableLocalFileAccess {
+		t.Error("enable-local-file-access must set the global flag")
+	}
+	// Header/footer before any object keyword remain global so every object
+	// (including the TOC) inherits them via HeaderFor/FooterFor.
+	if cmd.Global.Header.Left != "Demo" || cmd.Global.Footer.Center != "[page]" {
+		t.Errorf("global hf = header%+v footer%+v", cmd.Global.Header, cmd.Global.Footer)
+	}
+	if cmd.Objects[1].HeaderSet {
+		t.Error("header must not bind to the page object when set before any object")
+	}
+}
+
+func TestPageScopedBeforePageKeyword(t *testing.T) {
+	cmd := parse(t, "--enable-javascript", "page", "in.html", "out.pdf")
+	if len(cmd.Objects) != 1 {
+		t.Fatalf("objects = %d, want 1; got %+v", len(cmd.Objects), cmd.Objects)
+	}
+	if cmd.Objects[0].Page != "in.html" || !cmd.Objects[0].Web.JavaScript {
+		t.Errorf("page = %+v", cmd.Objects[0])
+	}
+}
