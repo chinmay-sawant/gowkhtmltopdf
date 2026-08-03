@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Statement 2024-Q2 — Multi-Page</title>
+  <style>
+    body { font-family: sans-serif; font-size: 10pt; color: #111; }
+    h1 { font-size: 16pt; color: #1a3d6d; border-bottom: 2px solid #1a3d6d; padding-bottom: 4px; }
+    h2 { font-size: 12pt; color: #1a3d6d; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #bbb; padding: 3px 5px; }
+    thead th { background-color: #e8eef5; }
+    .section { page-break-before: always; }
+    .keep { page-break-inside: avoid; }
+    .summary { page-break-after: avoid; }
+    .footnote { font-size: 8pt; color: #666; }
+  </style>
+</head>
+<body>
+  <h1>Account Statement — Q2 2024</h1>
+  <p>Account: DE-8899-1234 · Period: 2024-04-01 to 2024-06-30</p>
+
+  <div class="section">
+    <h2>1. Summary</h2>
+    <div class="keep summary">
+      <table>
+        <tbody>
+          <tr><td>Opening balance</td><td class="num">1,250.00 EUR</td></tr>
+          <tr><td>Invoiced (this period)</td><td class="num">4,812.75 EUR</td></tr>
+          <tr><td>Payments received</td><td class="num">-3,940.00 EUR</td></tr>
+          <tr><td><strong>Closing balance</strong></td><td class="num"><strong>2,122.75 EUR</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>2. Transactions</h2>
+    <table>
+      <thead>
+        <tr><th>Date</th><th>Reference</th><th>Description</th><th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>2024-04-02</td><td>INV-2024-0100</td><td>Consulting services, March</td><td class="num">1,800.00</td><td class="num"></td><td class="num">1,800.00</td></tr>
+        <tr><td>2024-04-05</td><td>PAY-2024-0112</td><td>Payment received</td><td class="num"></td><td class="num">-1,500.00</td><td class="num">300.00</td></tr>
+        <tr><td>2024-04-12</td><td>INV-2024-0115</td><td>Maintenance contract, Q2</td><td class="num">450.00</td><td class="num"></td><td class="num">750.00</td></tr>
+        <tr><td>2024-04-18</td><td>INV-2024-0121</td><td>Field service, April</td><td class="num">620.00</td><td class="num"></td><td class="num">1,370.00</td></tr>
+        <tr><td>2024-05-02</td><td>INV-2024-0130</td><td>Consulting services, April</td><td class="num">1,800.00</td><td class="num"></td><td class="num">3,170.00</td></tr>
+        <tr><td>2024-05-07</td><td>PAY-2024-0140</td><td>Payment received</td><td class="num"></td><td class="num">-1,200.00</td><td class="num">1,970.00</td></tr>
+        <tr><td>2024-05-15</td><td>INV-2024-0145</td><td>Onboarding workshops</td><td class="num">980.00</td><td class="num"></td><td class="num">2,950.00</td></tr>
+        <tr><td>2024-05-22</td><td>INV-2024-0150</td><td>Expense pass-through, May</td><td class="num">162.75</td><td class="num"></td><td class="num">3,112.75</td></tr>
+        <tr><td>2024-06-03</td><td>PAY-2024-0160</td><td>Payment received</td><td class="num"></td><td class="num">-1,240.00</td><td class="num">1,872.75</td></tr>
+        <tr><td>2024-06-10</td><td>INV-2024-0165</td><td>Consulting services, May</td><td class="num">1,800.00</td><td class="num"></td><td class="num">3,672.75</td></tr>
+        <tr><td>2024-06-12</td><td>INV-2024-0170</td><td>Annual license renewal</td><td class="num">240.00</td><td class="num"></td><td class="num">3,912.75</td></tr>
+        <tr><td>2024-06-20</td><td>PAY-2024-0180</td><td>Payment received</td><td class="num"></td><td class="num">-1,790.00</td><td class="num">2,122.75</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>3. Notes</h2>
+    <p>All amounts in EUR. Statement generated automatically; discrepancies
+       must be reported within 30 days.</p>
+    <p class="footnote">gowkhtmltopdf golden fixture 03 — multi-page with
+       explicit page-break sections and avoid-break blocks.</p>
+  </div>
+</body>
+</html>

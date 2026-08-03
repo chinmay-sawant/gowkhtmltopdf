@@ -1,2 +1,16 @@
 wkhtmltopdf
 
+# binaries
+/gowkhtmltopdf
+/gowkhtmltoimage
+cmd/gowkhtmltopdf/gowkhtmltopdf
+cmd/gowkhtmltoimage/gowkhtmltoimage
+
+# test artifacts
+/coverage.out
+/coverage.html
+testdata/golden/out/
+
+# editor / OS noise
+.DS_Store
+*.swp
