@@ -14,6 +14,8 @@ type inlineItem struct {
 	w, h       float64 // text: run width + line height; image: placed size
 	ascent     float64
 	descent    float64
+	marginL    float64 // leading horizontal margin (e.g. span margin-left)
+	marginR    float64 // trailing horizontal margin
 	img        bool
 	imgData    []byte
 	imgJPEG    bool
@@ -41,6 +43,9 @@ func (e *engine) layoutInline(b *box, nodes []*html.Node, availW, x, y float64) 
 	ly := y
 	lastBreak := 0
 	lineW := 0.0
+	itemAdvance := func(it *inlineItem) float64 {
+		return it.marginL + it.w + it.marginR
+	}
 	for i := 0; i < len(items); i++ {
 		it := &items[i]
 		if it.forceBreak {
@@ -49,12 +54,13 @@ func (e *engine) layoutInline(b *box, nodes []*html.Node, availW, x, y float64) 
 			lineW = 0
 			continue
 		}
-		if lineW > 0 && lineW+it.w > availW && !nowrap(it.style.WhiteSpace) {
+		adv := itemAdvance(it)
+		if lineW > 0 && lineW+adv > availW && !nowrap(it.style.WhiteSpace) {
 			ly += e.emitLine(b, items, lastBreak, i, availW, x, ly)
 			lastBreak = i
 			lineW = 0
 		}
-		lineW += it.w
+		lineW += adv
 	}
 	ly += e.emitLine(b, items, lastBreak, len(items), availW, x, ly)
 	return ly - y
@@ -113,7 +119,7 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 
 	totalW := 0.0
 	for i := range line {
-		totalW += line[i].w
+		totalW += line[i].marginL + line[i].w + line[i].marginR
 	}
 
 	textAlign := "left"
@@ -132,6 +138,7 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 
 	for i := range line {
 		it := &line[i]
+		lx += it.marginL
 		if it.blockBox != nil {
 			dx := lx - it.blockBox.x
 			dy := baseline - it.h - it.blockBox.y
@@ -139,7 +146,7 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 				e.ops[k].X += dx
 				e.ops[k].Y += dy
 			}
-			lx += it.blockBox.w
+			lx += it.blockBox.w + it.marginR
 			continue
 		}
 		if it.img {
@@ -151,7 +158,7 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 			if it.href != "" {
 				e.add(Op{Kind: OpLinkURI, X: lx, Y: top, W: it.w, H: it.h, URI: it.href})
 			}
-			lx += it.w
+			lx += it.w + it.marginR
 			continue
 		}
 		c := it.style.Color
@@ -168,7 +175,7 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 		if it.href != "" {
 			e.add(Op{Kind: OpLinkURI, X: lx, Y: baseline - it.ascent, W: it.w, H: it.ascent + it.descent, URI: it.href})
 		}
-		lx += it.w
+		lx += it.w + it.marginR
 	}
 
 	if b != nil && b.firstBaseline == 0 {
@@ -224,6 +231,7 @@ func (e *engine) collectInlineNode(n *html.Node, out *[]inlineItem) {
 			*out = append(*out, inlineItem{
 				img: true, imgData: ib.imgData, imgJPEG: ib.imgJPEG,
 				imgW: ib.imgW, imgH: ib.imgH, w: ib.w, h: ib.h, style: st,
+				marginL: e.scalePt(st.MarginLeft), marginR: e.scalePt(st.MarginRight),
 			})
 			return
 		}
@@ -235,6 +243,12 @@ func (e *engine) collectInlineNode(n *html.Node, out *[]inlineItem) {
 			before := len(*out)
 			for _, c := range n.Children {
 				e.collectInlineNode(c, out)
+			}
+			// Horizontal margins on inline elements (e.g. .co { margin-left: 10px }
+			// after a logo) apply to the first/last generated items.
+			if before < len(*out) {
+				(*out)[before].marginL += e.scalePt(st.MarginLeft)
+				(*out)[len(*out)-1].marginR += e.scalePt(st.MarginRight)
 			}
 			if href != "" {
 				for i := before; i < len(*out); i++ {
@@ -280,6 +294,8 @@ func coalesceTextItems(line []inlineItem) []inlineItem {
 			sameInlineStyle(prev.style, cur.style) {
 			prev.text += cur.text
 			prev.w += cur.w
+			// first item keeps marginL; last item's marginR wins
+			prev.marginR = cur.marginR
 			continue
 		}
 		out = append(out, cur)

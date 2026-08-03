@@ -16,7 +16,8 @@ type ResolvedStyle struct {
 	Position        string  // "static" | "relative"
 	Float           string  // "none" | "left" | "right"
 	Clear           string  // "none" | "left" | "right" | "both"
-	Width           float64 // -1 = auto
+	Width           float64 // -1 = auto; absolute length in pt when WidthPercent < 0
+	WidthPercent    float64 // >=0 means width is that % of the containing block at layout time
 	Height          float64
 	MinWidth        float64
 	MaxWidth        float64
@@ -72,6 +73,7 @@ func initialStyle() ResolvedStyle {
 		Float:          "none",
 		Clear:          "none",
 		Width:          -1,
+		WidthPercent:   -1,
 		Height:         -1,
 		MinWidth:       0,
 		MaxWidth:       -1,
@@ -342,8 +344,17 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext)
 				st.Clear = value
 			}
 		case "width":
-			if v, ok := lengthBox(value, fs, ctx.viewportW, "auto"); ok {
+			if value == "auto" {
+				st.Width = -1
+				st.WidthPercent = -1
+			} else if v, unit, ok := css.ParseLength(value); ok && unit == "%" {
+				// Resolve % against the layout containing block (availW), not
+				// the viewport — nested width:100% must fill the parent cell.
+				st.WidthPercent = v
+				st.Width = -1
+			} else if v, ok := lengthBox(value, fs, ctx.viewportW, "auto"); ok {
 				st.Width = v
+				st.WidthPercent = -1
 			}
 		case "height":
 			if v, ok := lengthBox(value, fs, ctx.viewportH, "auto"); ok {

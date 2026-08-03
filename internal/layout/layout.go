@@ -241,7 +241,9 @@ func (e *engine) buildBlock(n *html.Node, st ResolvedStyle, availW, x, y float64
 	if b.w < 0 {
 		b.w = 0
 	}
-	if st.Width >= 0 {
+	if st.WidthPercent >= 0 {
+		b.w = availW * st.WidthPercent / 100
+	} else if st.Width >= 0 {
 		b.w = e.scalePt(st.Width)
 	}
 	if st.MinWidth > 0 && b.w < e.scalePt(st.MinWidth) {
@@ -251,7 +253,8 @@ func (e *engine) buildBlock(n *html.Node, st ResolvedStyle, availW, x, y float64
 		b.w = e.scalePt(st.MaxWidth)
 	}
 	// Horizontal margin: auto centers (or pushes) a definite-width box.
-	if st.Width >= 0 && (st.MarginLeftAuto || st.MarginRightAuto) {
+	definiteW := st.Width >= 0 || st.WidthPercent >= 0
+	if definiteW && (st.MarginLeftAuto || st.MarginRightAuto) {
 		free := availW - b.w
 		if free < 0 {
 			free = 0
@@ -286,6 +289,9 @@ func (e *engine) buildBlock(n *html.Node, st ResolvedStyle, availW, x, y float64
 
 	cy := e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)
 	cy = e.flowChildren(b, n.Children, st, contentW, contentX, y, cy)
+	// padding-bottom is inside the border box (space above border-bottom /
+	// letterhead rules — fixture-07/16).
+	cy += e.scalePt(st.PaddingBottom)
 
 	// list marker
 	if n.Name == "li" && b.firstBaseline > 0 {
@@ -378,6 +384,20 @@ func (e *engine) isInlineChild(n *html.Node) bool {
 	return cs.Display == "inline" || n.Name == "img" || cs.Float != "none"
 }
 
+// onlyCollapsibleWS reports whether every node is a text node of only
+// whitespace (collapses between blocks and must not kill margin collapse).
+func onlyCollapsibleWS(nodes []*html.Node) bool {
+	if len(nodes) == 0 {
+		return true
+	}
+	for _, n := range nodes {
+		if n.Type != html.TextNode || strings.TrimSpace(n.Text) != "" {
+			return false
+		}
+	}
+	return true
+}
+
 // flowChildren lays out children in document order: runs of inlines, then
 // block boxes, alternating as they appear. Using blocks-then-inlines put
 // nested tables above their preceding text (fixture-10 "Gateway… including").
@@ -392,11 +412,24 @@ func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedSty
 			i++
 			continue
 		}
+		// Skip pure whitespace text so it does not interrupt margin collapse
+		// between block siblings (fixture-19 margin-bottom between divs).
+		if n.Type == html.TextNode && strings.TrimSpace(n.Text) == "" {
+			i++
+			continue
+		}
 		if e.isInlineChild(n) {
 			var run []*html.Node
 			for i < len(children) {
 				c := children[i]
 				if c.Type == html.ElementNode && e.styles[c].Display == "none" {
+					i++
+					continue
+				}
+				if c.Type == html.TextNode && strings.TrimSpace(c.Text) == "" {
+					// keep interior whitespace inside an inline run, but a
+					// run that is only WS is dropped below.
+					run = append(run, c)
 					i++
 					continue
 				}
@@ -406,13 +439,19 @@ func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedSty
 				run = append(run, c)
 				i++
 			}
+			if onlyCollapsibleWS(run) {
+				continue
+			}
 			if len(run) > 0 {
 				pb := parent
 				if pb == nil {
 					pb = &box{style: st}
 				}
-				cy += e.layoutInline(pb, run, contentW, contentX, y+cy)
-				prevBottom = 0
+				h := e.layoutInline(pb, run, contentW, contentX, y+cy)
+				cy += h
+				if h > 0 {
+					prevBottom = 0
+				}
 			}
 			continue
 		}
@@ -669,8 +708,14 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 	sum += spacing * float64(nCols+1)
 	sum += e.scalePt(st.BorderLeft.Width) + e.scalePt(st.BorderRight.Width) + e.scalePt(st.PaddingLeft) + e.scalePt(st.PaddingRight)
 	tableW := availW
-	if st.Width >= 0 {
+	if st.WidthPercent >= 0 {
+		// width:% of the containing block (parent cell / block), not viewport
+		tableW = availW * st.WidthPercent / 100
+	} else if st.Width >= 0 {
 		tableW = e.scalePt(st.Width)
+		if tableW > availW && availW > 0 {
+			tableW = availW
+		}
 	} else if sum < availW {
 		tableW = sum
 	}
