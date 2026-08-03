@@ -234,9 +234,13 @@ func isTableDisplay(d string) bool {
 
 // buildBlock lays out a block-level box.
 func (e *engine) buildBlock(n *html.Node, st ResolvedStyle, availW, x, y float64) *box {
+	ml, mr := e.scalePt(st.MarginLeft), e.scalePt(st.MarginRight)
 	b := &box{node: n, style: st, kind: "block", x: x, y: y}
-	innerW := availW - e.scalePt(st.MarginLeft) - e.scalePt(st.MarginRight)
-	b.w = innerW
+	// Default: fill remaining width after horizontal margins.
+	b.w = availW - ml - mr
+	if b.w < 0 {
+		b.w = 0
+	}
 	if st.Width >= 0 {
 		b.w = e.scalePt(st.Width)
 	}
@@ -246,10 +250,34 @@ func (e *engine) buildBlock(n *html.Node, st ResolvedStyle, availW, x, y float64
 	if st.MaxWidth >= 0 && b.w > e.scalePt(st.MaxWidth) {
 		b.w = e.scalePt(st.MaxWidth)
 	}
+	// Horizontal margin: auto centers (or pushes) a definite-width box.
+	if st.Width >= 0 && (st.MarginLeftAuto || st.MarginRightAuto) {
+		free := availW - b.w
+		if free < 0 {
+			free = 0
+		}
+		switch {
+		case st.MarginLeftAuto && st.MarginRightAuto:
+			ml = free / 2
+			mr = free - ml
+		case st.MarginLeftAuto:
+			ml = free - mr
+			if ml < 0 {
+				ml = 0
+			}
+		case st.MarginRightAuto:
+			mr = free - ml
+			if mr < 0 {
+				mr = 0
+			}
+		}
+	}
+	b.x = x + ml
 	contentW := b.w - e.scalePt(st.PaddingLeft) - e.scalePt(st.PaddingRight) - e.scalePt(st.BorderLeft.Width) - e.scalePt(st.BorderRight.Width)
 	if contentW < 0 {
 		contentW = 0
 	}
+	contentX := b.x + e.scalePt(st.BorderLeft.Width) + e.scalePt(st.PaddingLeft)
 
 	var blocks, inlines []*html.Node
 	e.partition(n.Children, &blocks, &inlines)
@@ -260,7 +288,7 @@ func (e *engine) buildBlock(n *html.Node, st ResolvedStyle, availW, x, y float64
 	for _, cn := range blocks {
 		cs := e.styles[cn]
 		cy += collapseMargins(prevBottom, e.scalePt(cs.MarginTop))
-		cb := e.build(cn, contentW, x+e.scalePt(st.MarginLeft)+e.scalePt(st.BorderLeft.Width)+e.scalePt(st.PaddingLeft), y+cy)
+		cb := e.build(cn, contentW, contentX, y+cy)
 		if cb == nil {
 			prevBottom = 0
 			continue
@@ -274,7 +302,7 @@ func (e *engine) buildBlock(n *html.Node, st ResolvedStyle, availW, x, y float64
 	}
 
 	if len(inlines) > 0 {
-		cy += e.layoutInline(b, inlines, contentW, x+e.scalePt(st.MarginLeft)+e.scalePt(st.BorderLeft.Width)+e.scalePt(st.PaddingLeft), y+cy)
+		cy += e.layoutInline(b, inlines, contentW, contentX, y+cy)
 	}
 
 	// list marker
@@ -294,10 +322,10 @@ func (e *engine) buildBlock(n *html.Node, st ResolvedStyle, availW, x, y float64
 	b.h = cy
 
 	if st.BGColor[3] > 0 && e.opts.Background {
-		e.add(Op{Kind: OpFillRect, X: x, Y: y, W: b.w, H: b.h,
+		e.add(Op{Kind: OpFillRect, X: b.x, Y: y, W: b.w, H: b.h,
 			R: st.BGColor[0], G: st.BGColor[1], B: st.BGColor[2], Alpha: st.BGColor[3]})
 	}
-	e.emitBorders(st, x, y, b.w, b.h)
+	e.emitBorders(st, b.x, y, b.w, b.h)
 	return b
 }
 
@@ -559,6 +587,14 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 			}
 			rowX += cellW + spacing
 			tb.children = append(tb.children, cell)
+		}
+		// Row height must land on every cell so backgrounds/borders paint
+		// with non-zero height (emitCell uses b.h, not contentH).
+		if rowH <= 0 {
+			rowH = 1
+		}
+		for _, cell := range cells {
+			cell.h = rowH
 		}
 		cy += rowH + spacing
 	}

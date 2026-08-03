@@ -744,11 +744,13 @@ func TestZoom(t *testing.T) {
 	if len(fills) != 1 {
 		t.Fatalf("zoom 2 fills = %+v, want 1", fills)
 	}
-	if !near(fills[0].X, 12) {
-		t.Errorf("zoom 2 div x = %v, want 12 (body margin 6pt scaled)", fills[0].X)
+	// Background paints the border box after the div's own margin (CSS box
+	// model): body margin 12 + div margin 20 = 32; width 100pt * zoom 2 = 200.
+	if !near(fills[0].X, 32) {
+		t.Errorf("zoom 2 div x = %v, want 32 (body 12 + div margin 20)", fills[0].X)
 	}
-	if !near(fills[0].X+fills[0].W, 212) {
-		t.Errorf("zoom 2 div right edge = %v, want 212 (div x 12 + width 200)", fills[0].X+fills[0].W)
+	if !near(fills[0].X+fills[0].W, 232) {
+		t.Errorf("zoom 2 div right edge = %v, want 232 (x 32 + width 200)", fills[0].X+fills[0].W)
 	}
 }
 

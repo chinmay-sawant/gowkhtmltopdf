@@ -26,6 +26,8 @@ type ResolvedStyle struct {
 	MarginRight     float64
 	MarginBottom    float64
 	MarginLeft      float64
+	MarginLeftAuto  bool // margin-left: auto (horizontal centering with right auto)
+	MarginRightAuto bool // margin-right: auto
 	PaddingTop      float64
 	PaddingRight    float64
 	PaddingBottom   float64
@@ -364,15 +366,15 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext)
 				st.MaxHeight = v
 			}
 		case "margin":
-			setFour(st, value, &st.MarginTop, &st.MarginRight, &st.MarginBottom, &st.MarginLeft, fs, ctx.viewportW)
+			setFourMargin(st, value, fs, ctx.viewportW)
 		case "margin-top":
 			st.MarginTop = marginLen(value, fs, ctx.viewportW)
 		case "margin-right":
-			st.MarginRight = marginLen(value, fs, ctx.viewportW)
+			st.MarginRight, st.MarginRightAuto = marginLenAuto(value, fs, ctx.viewportW)
 		case "margin-bottom":
 			st.MarginBottom = marginLen(value, fs, ctx.viewportW)
 		case "margin-left":
-			st.MarginLeft = marginLen(value, fs, ctx.viewportW)
+			st.MarginLeft, st.MarginLeftAuto = marginLenAuto(value, fs, ctx.viewportW)
 		case "padding":
 			setFour(st, value, &st.PaddingTop, &st.PaddingRight, &st.PaddingBottom, &st.PaddingLeft, fs, ctx.viewportW)
 		case "padding-top":
@@ -524,6 +526,36 @@ func parseFontShorthand(st *ResolvedStyle, value string) {
 			}
 		}
 		return
+	}
+}
+
+// setFourMargin applies a margin shorthand and tracks horizontal auto.
+func setFourMargin(st *ResolvedStyle, value string, fs, ctxW float64) {
+	v := strings.Fields(value)
+	st.MarginLeftAuto, st.MarginRightAuto = false, false
+	switch len(v) {
+	case 0:
+		return
+	case 1:
+		st.MarginTop = marginLen(v[0], fs, ctxW)
+		st.MarginRight, st.MarginRightAuto = marginLenAuto(v[0], fs, ctxW)
+		st.MarginBottom = marginLen(v[0], fs, ctxW)
+		st.MarginLeft, st.MarginLeftAuto = marginLenAuto(v[0], fs, ctxW)
+	case 2:
+		st.MarginTop = marginLen(v[0], fs, ctxW)
+		st.MarginRight, st.MarginRightAuto = marginLenAuto(v[1], fs, ctxW)
+		st.MarginBottom = marginLen(v[0], fs, ctxW)
+		st.MarginLeft, st.MarginLeftAuto = marginLenAuto(v[1], fs, ctxW)
+	case 3:
+		st.MarginTop = marginLen(v[0], fs, ctxW)
+		st.MarginRight, st.MarginRightAuto = marginLenAuto(v[1], fs, ctxW)
+		st.MarginBottom = marginLen(v[2], fs, ctxW)
+		st.MarginLeft, st.MarginLeftAuto = marginLenAuto(v[1], fs, ctxW)
+	default:
+		st.MarginTop = marginLen(v[0], fs, ctxW)
+		st.MarginRight, st.MarginRightAuto = marginLenAuto(v[1], fs, ctxW)
+		st.MarginBottom = marginLen(v[2], fs, ctxW)
+		st.MarginLeft, st.MarginLeftAuto = marginLenAuto(v[3], fs, ctxW)
 	}
 }
 
@@ -704,6 +736,14 @@ func lengthBox(value string, fs, containing float64, autoValue string) (float64,
 	return 0, false
 }
 
+// marginLenAuto parses a horizontal margin; auto yields (0, true).
+func marginLenAuto(value string, fs, ctxW float64) (float64, bool) {
+	if value == "auto" {
+		return 0, true
+	}
+	return marginLen(value, fs, ctxW), false
+}
+
 // marginLen parses a margin/padding/letter-spacing length in points; 0 when
 // unparseable. Percentages resolve against the containing width.
 func marginLen(value string, fs, ctxW float64) float64 {
@@ -753,11 +793,22 @@ func uaRules(name string) []css.Declaration {
 		"nav", "form", "fieldset", "figure", "figcaption", "blockquote",
 		"address", "dl", "dd", "menu", "details", "summary":
 		return []css.Declaration{{Prop: "display", Value: "block"}}
-	case "p", "pre":
+	case "p":
 		return []css.Declaration{
 			{Prop: "display", Value: "block"},
 			{Prop: "margin", Value: "1em 0"},
 		}
+	case "pre":
+		// Match browser UA: preserve newlines/spaces; monospace is a
+		// soft preference (we fall back to Liberation Sans metrics).
+		return []css.Declaration{
+			{Prop: "display", Value: "block"},
+			{Prop: "margin", Value: "1em 0"},
+			{Prop: "white-space", Value: "pre"},
+			{Prop: "font-family", Value: "monospace"},
+		}
+	case "code", "kbd", "samp":
+		return []css.Declaration{{Prop: "font-family", Value: "monospace"}}
 	case "h1":
 		return []css.Declaration{{Prop: "display", Value: "block"}, {Prop: "font-size", Value: "2em"}, {Prop: "margin", Value: "0.67em 0"}, {Prop: "font-weight", Value: "bold"}}
 	case "h2":
