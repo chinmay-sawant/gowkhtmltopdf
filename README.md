@@ -64,6 +64,7 @@ make build
 | [output/](output/) | Sample PDFs/PNG checked into the repo |
 | [documentation/compatibility-matrix.md](documentation/compatibility-matrix.md) | Support matrix |
 | [documentation/THREAT-MODEL.md](documentation/THREAT-MODEL.md) | Security / ACL |
+| [documentation/integration-security.md](documentation/integration-security.md) | Gin/web embedding: SSRF, local files, preferred patterns |
 
 ---
 
@@ -103,7 +104,8 @@ placeholders, TOC, PDF outlines, internal/external links, copies/collate.
 
 The authoritative per-element/per-property status is
 **[documentation/compatibility-matrix.md](documentation/compatibility-matrix.md)**.
-Security posture: **[documentation/THREAT-MODEL.md](documentation/THREAT-MODEL.md)**.
+Security posture: **[documentation/THREAT-MODEL.md](documentation/THREAT-MODEL.md)**;
+embedding in Gin/APIs: **[documentation/integration-security.md](documentation/integration-security.md)**.
 
 ---
 
@@ -292,6 +294,7 @@ remains **not planned**.
 | [documentation/samples.md](documentation/samples.md) | Fixtures and committed samples |
 | [documentation/compatibility-matrix.md](documentation/compatibility-matrix.md) | Per-element/per-property support matrix |
 | [documentation/THREAT-MODEL.md](documentation/THREAT-MODEL.md) | Security / threat model |
+| [documentation/integration-security.md](documentation/integration-security.md) | Gin/HTTP integration security (SSRF, preferred patterns; same class as wkhtmltopdf) |
 | [plans/00-canonical-pure-go-rewrite.md](plans/00-canonical-pure-go-rewrite.md) | Canonical execution ledger (phase status) |
 | [plans/phases/](plans/phases/) | Per-phase ledgers (details + deferral notes) |
 | [skills/PR_TEMPLATE/](skills/PR_TEMPLATE/) | Pull-request body template |

@@ -49,6 +49,13 @@ HTTP(S) fetch uses timeouts, redirect limits, and size caps. Complex public
 sites (heavy CSS/JS) will not look like a browser; the product target is
 server-generated HTML.
 
+**If you embed this in Gin (or any API):** do **not** pass arbitrary user
+`?url=` values into the converter without host allowlists and network
+isolation — that is classic **SSRF** (your server fetches internal hosts).
+The **preferred** pattern is to generate HTML yourself, then convert that.
+The same class of issue exists for **upstream wkhtmltopdf**. See
+[integration-security.md](integration-security.md).
+
 ## Image output
 
 ```sh

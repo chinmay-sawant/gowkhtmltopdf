@@ -138,6 +138,32 @@ processes. The trust envelope of any local reader applies.
   the 100 MiB body cap; both are on by default.
 - Sanitise HTML before conversion, or convert only HTML you author.
 
+## 7.1 Embedding in web apps (Gin / similar) — short scenarios
+
+Full write-up: **[integration-security.md](integration-security.md)**.
+
+**Happy path people assume:** user hits Gin → converter fetches a URL → PDF
+returned. That is fine only when **you** control the URL/HTML. The issue is
+not “displaying PDF”; it is that the **server** becomes an HTTP client (and
+optionally a file reader) on behalf of whoever controls the input.
+
+| Pattern | Risk | Preferred? |
+|---------|------|------------|
+| Gin renders **your** template → convert that HTML/path | Low | **Yes** |
+| Gin passes `c.Query("url")` (arbitrary) into convert | **High (SSRF)** — server can hit localhost, cloud metadata, RFC1918 | No |
+| HTML references extra `img`/`link` URLs | Server fetches them too (second-hop SSRF) | Avoid untrusted HTML |
+| Local file access on + user-influenced path/`file:` | **High (file read)** into PDF | Keep default deny |
+| Many concurrent converts / huge pages | DoS (CPU/RAM) | Rate-limit + timeouts |
+
+**Preferred:** generate HTML server-side → convert **trusted** bytes/path →
+return `application/pdf`. Do **not** expose “convert any URL” without host
+allowlists and network isolation.
+
+**Same for upstream wkhtmltopdf:** the same SSRF / local-file classes apply
+if the app design is “user URL → convert.” wkhtmltopdf also runs a real
+JS engine (additional surface); gowkhtmltopdf does not. Neither tool is a
+substitute for not letting strangers drive server-side fetches.
+
 ## 8. Controls inventory
 
 | Control | Location |

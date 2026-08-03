@@ -80,3 +80,19 @@ load policy.
 
 A `Converter` instance is not required to be safe for concurrent `Convert`
 calls. Create one converter per job or serialize use.
+
+## Security when embedding (Gin / HTTP APIs)
+
+The converter fetches the page and its subresources **from your process**.
+That is safe for **HTML you generate**; it is dangerous if you pass
+**user-controlled URLs** (SSRF) or enable **local file access** for untrusted
+input.
+
+**Preferred:** render your template → convert that file/HTML → return PDF.  
+**Avoid:** `convert(c.Query("url"))` for arbitrary users without allowlists
+and network isolation.
+
+Same design risk class as **upstream wkhtmltopdf** if you pipe user URLs into
+either tool. Details and Gin scenarios:
+**[integration-security.md](integration-security.md)** and
+**[THREAT-MODEL.md](THREAT-MODEL.md)** §7.1.

@@ -9,6 +9,7 @@ User and design docs for the pure-Go, stdlib-only HTML→PDF / HTML→image engi
 | [architecture.md](architecture.md) | Package map and conversion pipeline |
 | [cli.md](cli.md) | `gowkhtmltopdf` / `gowkhtmltoimage` usage |
 | [library-api.md](library-api.md) | Go library (`NewConverter`, settings) |
+| [integration-security.md](integration-security.md) | **Gin/web apps:** SSRF, local files, preferred patterns (also vs wkhtmltopdf) |
 | [samples.md](samples.md) | Golden fixtures and committed `output/` samples |
 | [compatibility-matrix.md](compatibility-matrix.md) | Per-element / per-property support |
 | [THREAT-MODEL.md](THREAT-MODEL.md) | Security model and local-file ACL |
