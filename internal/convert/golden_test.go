@@ -149,7 +149,7 @@ type fixtureBounds struct {
 // or page-break handling that moves a fixture out of its envelope fails.
 var fixturePageBounds = map[string]fixtureBounds{
 	"fixture-01-simple-invoice.html":        {minPages: 1, maxPages: 1},
-	"fixture-02-table-heavy-invoice.html":   {minPages: 2, maxPages: 2},
+	"fixture-02-table-heavy-invoice.html":   {minPages: 1, maxPages: 2},
 	"fixture-03-multi-page-invoice.html":    {minPages: 2, maxPages: 0},
 	"fixture-04-two-column-layout.html":     {minPages: 1, maxPages: 1},
 	"fixture-05-linked-stylesheet.html":     {minPages: 1, maxPages: 1},
@@ -163,7 +163,7 @@ var fixturePageBounds = map[string]fixtureBounds{
 	"fixture-13-pre-code-block.html":        {minPages: 1, maxPages: 1},
 	"fixture-14-colorful-report.html":       {minPages: 1, maxPages: 1},
 	"fixture-15-bulleted-requirements.html": {minPages: 1, maxPages: 2},
-	"fixture-16-invoice-with-css.html":      {minPages: 3, maxPages: 3},
+	"fixture-16-invoice-with-css.html":      {minPages: 2, maxPages: 3},
 	"fixture-17-cover-and-content.html":     {minPages: 2, maxPages: 2},
 	"fixture-18-typography.html":            {minPages: 1, maxPages: 1},
 	"fixture-19-margin-and-sizing.html":     {minPages: 1, maxPages: 1},

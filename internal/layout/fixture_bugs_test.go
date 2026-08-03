@@ -10,6 +10,130 @@ import (
 	"gowkhtmltopdf/internal/html"
 )
 
+func TestRowBackgroundShowsThroughCells(t *testing.T) {
+	// tr.good { background } must paint on cells that have no own bg.
+	s, err := css.Parse(`
+		td { border: 1px solid #000; }
+		.good { background-color: #e2f2e2; color: #1f5c2e }
+		.warn { background-color: #fdf3d7; color: #7a5c00 }
+	`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := html.Parse(`<html><body><table>
+		<tr class="good"><td>On-time</td><td>96%</td></tr>
+		<tr class="warn"><td>Turns</td><td>7.8</td></tr>
+	</table></body></html>`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := Layout(root, Options{Width: 400, Height: 300, Sheets: []*css.Stylesheet{s}, Background: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var green, yellow int
+	for _, op := range res.Ops {
+		if op.Kind != OpFillRect || op.H < 1 {
+			continue
+		}
+		// #e2f2e2
+		if op.G > 0.9 && op.R > 0.8 && op.R < 0.95 && op.B > 0.8 {
+			green++
+		}
+		// #fdf3d7 ≈ warm yellow
+		if op.R > 0.95 && op.G > 0.9 && op.B < 0.9 {
+			yellow++
+		}
+	}
+	if green < 2 {
+		t.Errorf("good-row cell fills = %d, want >= 2", green)
+	}
+	if yellow < 2 {
+		t.Errorf("warn-row cell fills = %d, want >= 2", yellow)
+	}
+}
+
+func TestRGBABackgroundCompositesLight(t *testing.T) {
+	s, err := css.Parse(`.alpha { background-color: rgba(15, 58, 95, 0.15); padding: 8px }`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := html.Parse(`<html><body><div class="alpha">Alpha band</div></body></html>`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := Layout(root, Options{Width: 400, Height: 200, Sheets: []*css.Stylesheet{s}, Background: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Layout still stores source rgba; paint composites. Assert layout alpha.
+	found := false
+	for _, op := range res.Ops {
+		if op.Kind == OpFillRect && op.Alpha > 0.1 && op.Alpha < 0.3 {
+			found = true
+			// source rgb should be the dark blue channels, not already white
+			if op.R > 0.2 || op.B < 0.3 {
+				t.Errorf("unexpected source rgba fill R=%v B=%v A=%v", op.R, op.B, op.Alpha)
+			}
+		}
+	}
+	if !found {
+		t.Error("expected translucent fill op from rgba(...)")
+	}
+}
+
+func TestNestedTableNoMeasureLeak(t *testing.T) {
+	// Nested tables must not emit ops during the outer measure pass, and
+	// must keep document order (text before nested table in the same cell).
+	root, err := html.Parse(`<html><body><table>
+		<tr><th colspan="2">Header</th></tr>
+		<tr><td>1</td><td>outer-label
+			<table><tr><td>inner-a</td><td>inner-b</td></tr></table>
+		</td></tr>
+	</table></body></html>`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := Layout(root, Options{Width: 500, Height: 400, Background: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var headerY, labelY, innerY float64
+	var sawHeader, sawLabel, sawInner bool
+	for _, op := range res.Ops {
+		if op.Kind != OpText {
+			continue
+		}
+		if strings.Contains(op.Text, "Header") {
+			headerY, sawHeader = op.Y, true
+		}
+		if strings.Contains(op.Text, "outer-label") {
+			labelY, sawLabel = op.Y, true
+		}
+		if strings.Contains(op.Text, "inner-a") {
+			innerY, sawInner = op.Y, true
+		}
+	}
+	if !sawHeader || !sawLabel || !sawInner {
+		t.Fatalf("missing text header=%v label=%v inner=%v", sawHeader, sawLabel, sawInner)
+	}
+	if !(innerY > headerY) {
+		t.Errorf("inner table Y=%.1f should be below header Y=%.1f", innerY, headerY)
+	}
+	if !(innerY > labelY) {
+		t.Errorf("inner table Y=%.1f should be below outer-label Y=%.1f (document order)", innerY, labelY)
+	}
+	n := 0
+	for _, op := range res.Ops {
+		if op.Kind == OpText && strings.Contains(op.Text, "inner-a") {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Errorf("inner-a text ops = %d, want 1 (no double emit)", n)
+	}
+}
+
 func TestBackgroundPaintsUnderText(t *testing.T) {
 	// Regression: block backgrounds must be emitted before text ops so
 	// yellow/blue notice boxes do not cover their labels.

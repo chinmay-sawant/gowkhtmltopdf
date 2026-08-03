@@ -279,36 +279,13 @@ func (e *engine) buildBlock(n *html.Node, st ResolvedStyle, availW, x, y float64
 	}
 	contentX := b.x + e.scalePt(st.BorderLeft.Width) + e.scalePt(st.PaddingLeft)
 
-	var blocks, inlines []*html.Node
-	e.partition(n.Children, &blocks, &inlines)
-
 	// Content ops are recorded first so we know the box height; background
 	// and borders are then inserted *before* those ops so paint order is
 	// bg → borders → children (otherwise fills cover text).
 	contentStart := len(e.ops)
 
 	cy := e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)
-	prevBottom := 0.0
-
-	for _, cn := range blocks {
-		cs := e.styles[cn]
-		cy += collapseMargins(prevBottom, e.scalePt(cs.MarginTop))
-		cb := e.build(cn, contentW, contentX, y+cy)
-		if cb == nil {
-			prevBottom = 0
-			continue
-		}
-		cy += cb.h
-		prevBottom = e.scalePt(cs.MarginBottom)
-		b.children = append(b.children, cb)
-		if e.opts.DebugBoxes {
-			e.add(Op{Kind: OpStrokeRect, X: cb.x, Y: cb.y, W: cb.w, H: cb.h, R: 1, G: 0, B: 0})
-		}
-	}
-
-	if len(inlines) > 0 {
-		cy += e.layoutInline(b, inlines, contentW, contentX, y+cy)
-	}
+	cy = e.flowChildren(b, n.Children, st, contentW, contentX, y, cy)
 
 	// list marker
 	if n.Name == "li" && b.firstBaseline > 0 {
@@ -384,6 +361,85 @@ func (e *engine) partition(children []*html.Node, blocks, inlines *[]*html.Node)
 		}
 		*blocks = append(*blocks, c)
 	}
+}
+
+// isInlineChild reports whether n participates in an inline formatting context.
+func (e *engine) isInlineChild(n *html.Node) bool {
+	if n.Type == html.TextNode {
+		return true
+	}
+	if n.Type != html.ElementNode {
+		return false
+	}
+	cs := e.styles[n]
+	if cs.Display == "none" {
+		return false
+	}
+	return cs.Display == "inline" || n.Name == "img" || cs.Float != "none"
+}
+
+// flowChildren lays out children in document order: runs of inlines, then
+// block boxes, alternating as they appear. Using blocks-then-inlines put
+// nested tables above their preceding text (fixture-10 "Gateway… including").
+// Returns the advanced content height (cy end − cy start contribution is
+// encoded as the final cy relative to start; callers pass starting cy).
+func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedStyle, contentW, contentX, y, cy float64) float64 {
+	prevBottom := 0.0
+	i := 0
+	for i < len(children) {
+		n := children[i]
+		if n.Type == html.ElementNode && e.styles[n].Display == "none" {
+			i++
+			continue
+		}
+		if e.isInlineChild(n) {
+			var run []*html.Node
+			for i < len(children) {
+				c := children[i]
+				if c.Type == html.ElementNode && e.styles[c].Display == "none" {
+					i++
+					continue
+				}
+				if !e.isInlineChild(c) {
+					break
+				}
+				run = append(run, c)
+				i++
+			}
+			if len(run) > 0 {
+				pb := parent
+				if pb == nil {
+					pb = &box{style: st}
+				}
+				cy += e.layoutInline(pb, run, contentW, contentX, y+cy)
+				prevBottom = 0
+			}
+			continue
+		}
+		// block-level
+		if n.Type != html.ElementNode {
+			i++
+			continue
+		}
+		cs := e.styles[n]
+		cy += collapseMargins(prevBottom, e.scalePt(cs.MarginTop))
+		cb := e.build(n, contentW, contentX, y+cy)
+		if cb == nil {
+			prevBottom = 0
+			i++
+			continue
+		}
+		cy += cb.h
+		prevBottom = e.scalePt(cs.MarginBottom)
+		if parent != nil {
+			parent.children = append(parent.children, cb)
+			if e.opts.DebugBoxes {
+				e.add(Op{Kind: OpStrokeRect, X: cb.x, Y: cb.y, W: cb.w, H: cb.h, R: 1, G: 0, B: 0})
+			}
+		}
+		i++
+	}
+	return cy
 }
 
 func collapseMargins(a, b float64) float64 {
@@ -600,7 +656,12 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 	}
 
 	// table width
+	// border-collapse: collapse suppresses the separate-border gap so colspan
+	// header rows and body cells share edges instead of looking double-lined.
 	spacing := e.scalePt(st.BorderSpacing)
+	if st.BorderCollapse == "collapse" {
+		spacing = 0
+	}
 	sum := 0.0
 	for _, w := range colW {
 		sum += w
@@ -681,19 +742,42 @@ func (e *engine) buildCell(n *html.Node, col, span int) *box {
 	st := e.styles[n]
 	b := &box{node: n, style: st, kind: "cell", col: col, span: span}
 	b.contentW = e.measureCellContent(n, st)
+	// Preserve the caller's noEmit flag. Nested tables call buildCell during
+	// an outer measure pass; restoring false mid-measure leaked ops at
+	// wrong positions (fixture-10 nested table borders/text).
+	was := e.noEmit
 	e.noEmit = true
 	b.contentH = e.layoutCell(n, st, b.contentW)
-	e.noEmit = false
+	e.noEmit = was
 	return b
+}
+
+// cellBG returns the background to paint for a cell: the cell's own color,
+// or the parent table-row's background when the cell is transparent (CSS
+// does not inherit background, but row backgrounds show through empty
+// cells in browsers — required for tr.good / tr.warn / tr.bad).
+func (e *engine) cellBG(b *box) (r, g, bl, a float64, ok bool) {
+	st := b.style
+	if st.BGColor[3] > 0 {
+		return st.BGColor[0], st.BGColor[1], st.BGColor[2], st.BGColor[3], true
+	}
+	if b.node != nil && b.node.Parent != nil {
+		if ps, has := e.styles[b.node.Parent]; has && ps.Display == "table-row" && ps.BGColor[3] > 0 {
+			return ps.BGColor[0], ps.BGColor[1], ps.BGColor[2], ps.BGColor[3], true
+		}
+	}
+	return 0, 0, 0, 0, false
 }
 
 // emitCell paints a placed cell's background, borders and content.
 func (e *engine) emitCell(b *box) {
 	st := b.style
 	start := len(e.ops)
-	if st.BGColor[3] > 0 && e.opts.Background {
-		e.add(Op{Kind: OpFillRect, X: b.x, Y: b.y, W: b.w, H: b.h,
-			R: st.BGColor[0], G: st.BGColor[1], B: st.BGColor[2], Alpha: st.BGColor[3]})
+	if e.opts.Background {
+		if r, g, bl, a, ok := e.cellBG(b); ok {
+			e.add(Op{Kind: OpFillRect, X: b.x, Y: b.y, W: b.w, H: b.h,
+				R: r, G: g, B: bl, Alpha: a})
+		}
 	}
 	e.emitBorders(st, b.x, b.y, b.w, b.h)
 	contentW := b.w - e.scalePt(st.PaddingLeft) - e.scalePt(st.PaddingRight) - e.scalePt(st.BorderLeft.Width) - e.scalePt(st.BorderRight.Width)
@@ -702,24 +786,10 @@ func (e *engine) emitCell(b *box) {
 	}
 	cx := b.x + e.scalePt(st.PaddingLeft) + e.scalePt(st.BorderLeft.Width)
 	cy := b.y + e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)
-	var blocks, inlines []*html.Node
-	e.partition(b.node.Children, &blocks, &inlines)
-	prevBottom := 0.0
-	for _, cn := range blocks {
-		cs := e.styles[cn]
-		cy += collapseMargins(prevBottom, e.scalePt(cs.MarginTop))
-		cb := e.build(cn, contentW, cx, cy)
-		if cb == nil {
-			prevBottom = 0
-			continue
-		}
-		cy += cb.h + e.scalePt(cs.MarginBottom)
-		prevBottom = e.scalePt(cs.MarginBottom)
-	}
-	if len(inlines) > 0 {
-		pb := &box{style: st, firstBaseline: 0}
-		e.layoutInline(pb, inlines, contentW, cx, cy)
-	}
+	// flowChildren advances cy; cell content is rooted at absolute y=b.y so
+	// pass y=0 and absolute positions via contentX / cy as canvas coords.
+	_ = e.flowChildren(&box{style: st}, b.node.Children, st, contentW, cx, 0, cy)
+	// Note: flowChildren uses y+cy for block placement; with y=0 that is cy.
 	b.opStart, b.opEnd = start, len(e.ops)-1
 }
 
@@ -758,24 +828,7 @@ func (e *engine) layoutCell(n *html.Node, st ResolvedStyle, width float64) float
 		contentW = 0
 	}
 	cy := e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)
-	var blocks, inlines []*html.Node
-	e.partition(n.Children, &blocks, &inlines)
-	prevBottom := 0.0
-	for _, cn := range blocks {
-		cs := e.styles[cn]
-		cy += collapseMargins(prevBottom, e.scalePt(cs.MarginTop))
-		cb := e.build(cn, contentW, 0, cy)
-		if cb == nil {
-			prevBottom = 0
-			continue
-		}
-		cy += cb.h + e.scalePt(cs.MarginBottom)
-		prevBottom = e.scalePt(cs.MarginBottom)
-	}
-	if len(inlines) > 0 {
-		pb := &box{style: st}
-		cy += e.layoutInline(pb, inlines, contentW, 0, cy)
-	}
+	cy = e.flowChildren(nil, n.Children, st, contentW, 0, 0, cy)
 	return cy + e.scalePt(st.PaddingBottom) + e.scalePt(st.BorderBottom.Width)
 }
 
