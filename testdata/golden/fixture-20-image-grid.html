@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<!--
+  fixture-20-image-grid
+  Proves: an image grid — several data: URI PNGs at their intrinsic sizes
+  (32x32, 48x48, 64x64, 96x48), laid out in a table grid with captions.
+  Every image embeds as a /Subtype /Image xobject; intrinsic dimensions
+  are preserved unless width/height styles override. The runner asserts
+  the image xobjects exist and the page count stays 1.
+  Expected: 1 page, >= 4 embedded /Subtype /Image xobjects.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Color Palette — Swatches</title>
+  <style>
+    body { font-family: sans-serif; font-size: 9.5pt; color: #222; margin: 0; }
+    h1 { font-size: 15pt; color: #1a3d6d; margin: 0 0 8px 0; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #c9d4de; padding: 8px; text-align: center; vertical-align: middle; }
+    th { background-color: #e8eef5; color: #0f3a5f; }
+    .cap { font-size: 8.5pt; color: #555; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Product color palette — swatch grid</h1>
+  <table>
+    <tr>
+      <th colspan="2">Approved palette</th>
+    </tr>
+    <tr>
+      <td>
+        <p><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAAMklEQVR4nGI5YWPDQEvARFPTRy0YtWDUglELRi0YtWDUglELRi0YtWDUAioCQAAAAP//23wBg9/GOvoAAAAASUVORK5CYII=" alt="signal red swatch"></p>
+        <p class="cap">Signal red — 32×32 px, intrinsic size</p>
+      </td>
+      <td>
+        <p><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAIAAADYYG7QAAAAT0lEQVR4nOzOIRHAMBRAsd1u2r7OSS0vebAFiYJ8889zk/d0YCdUhIpQESpCRagIFaEiVISKUBEqQkWoCBWhIlSEilARKkJFqAiVFQAA//9h0wGPjfh6qAAAAABJRU5ErkJggg==" alt="moss green swatch"></p>
+        <p class="cap">Moss green — 48×48 px, intrinsic size</p>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <p><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAaUlEQVR4nOzPUQkAIQDA0OMwlknMaUBD+PEQ9hJsY679vezXAbca0BrQGtAa0BrQGtAa0BrQGtAa0BrQGtAa0BrQGtAa0BrQGtAa0BrQGtAa0BrQGtAa0BrQGtAa0BrQGtAa0E4AAAD//wTZAc2SJ3znAAAAAElFTkSuQmCC" alt="steel blue swatch"></p>
+        <p class="cap">Steel blue — 64×64 px, intrinsic size</p>
+      </td>
+      <td>
+        <p><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAAAwCAIAAABhdOiYAAAA9klEQVR4nOzYsQkCQRQGYXlnFZZhbnRNGJvbll1cCzZgG6aC+bEwwcLyLzcXHl/w86Jlzpfb89T63uvW/H/d1kP5iloT6BsHmmj9AL8/0FzrB/iKWhPoK2pNoK+oNYG+otYE+uXz+OasCfTtd9As6wf4xoEmWj/A7w801/oBvqLWBPqKWhPoK2pNoK+oNYF+ef3uOWsCvT0IvD3IHtTn7UHg7UHg7UHg7UHg7UHg7UHg7UH2oD5vDwJvDwJvDwJvDwJvDwJvDwJvD7IH9Xl7EHh7EHh7EHh7EHh7EHh7EHh7kD2oz9uDwNuDwNuDwNuDwP8DAAD//5YQYuKJTYHUAAAAAElFTkSuQmCC" alt="hazard stripe swatch"></p>
+        <p class="cap">Hazard stripe — 96×48 px, intrinsic size</p>
+      </td>
+    </tr>
+  </table>
+
+  <p style="font-size: 8.5pt; color: #555">Every swatch above is a data:
+  URI PNG decoded by the loader; none of them fetches from the network.
+  The grid cell width is controlled by the table, while each image keeps
+  its intrinsic pixel size.</p>
+</body>
+</html>

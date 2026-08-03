@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<!--
+  fixture-04-two-column-layout
+  Proves: side-by-side column layout without floats (engine has no float
+  positioning). Columns are a width-fixed table with two cells, each holding
+  an independent block stack. Also exercises per-cell backgrounds, table
+  borders and block spacing inside cells.
+  Expected: 1 page.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Two-Column Layout — Product Brief</title>
+  <style>
+    body { font-family: sans-serif; font-size: 10pt; color: #222; margin: 0; }
+    h1 { font-size: 16pt; color: #1a3d6d; margin: 0 0 8px 0; }
+    table.columns { width: 100%; border-collapse: separate; border-spacing: 10px 0; table-layout: fixed; }
+    table.columns td { vertical-align: top; padding: 10px; }
+    td.left { background-color: #eef3f9; border: 1px solid #c5d5e8; }
+    td.right { background-color: #f7f4ee; border: 1px solid #e2d5bd; }
+    h2 { font-size: 11pt; margin: 0 0 6px 0; color: #1a3d6d; }
+    p { margin: 0 0 8px 0; line-height: 1.35; }
+    .meta { font-size: 9pt; color: #666; }
+  </style>
+</head>
+<body>
+  <h1>Product Brief — Widget 2.0</h1>
+  <p class="meta">Prepared by Product Management · Classification: internal</p>
+
+  <table class="columns">
+    <tr>
+      <td class="left" style="width: 50%">
+        <h2>Executive summary</h2>
+        <p>Widget 2.0 replaces the 1.x line with a fully modular architecture.
+        The core module is 40 % lighter, the interface module is swappable in
+        the field, and the service interval doubled to 24 months.</p>
+        <p>Pricing for the entry configuration is unchanged. The premium
+        configuration adds the telemetry module and a five-year warranty.</p>
+      </td>
+      <td class="right" style="width: 50%">
+        <h2>Key numbers</h2>
+        <p><strong>Weight:</strong> 12.4 kg (was 20.1 kg)<br>
+        <strong>Service interval:</strong> 24 months<br>
+        <strong>MTBF:</strong> 18,000 h<br>
+        <strong>Warranty:</strong> 2 years standard</p>
+        <p class="meta">All figures validated by the engineering review of
+        2024-08-01, revision C.</p>
+      </td>
+    </tr>
+  </table>
+
+  <p style="margin-top: 10px">The two-column body above is a table with two
+  fixed-width cells; the engine renders floats as in-flow blocks, so tables
+  are the supported way to build multi-column documents.</p>
+</body>
+</html>

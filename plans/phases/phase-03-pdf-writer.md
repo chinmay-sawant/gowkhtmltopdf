@@ -1,7 +1,7 @@
 # Phase 03 — PDF Object Model & Writer
 
 > **Parent:** `plans/00-canonical-pure-go-rewrite.md`  
-> **Status:** not started  
+> **Status:** complete (2026-08-03)  
 > **Estimated effort:** 8–14 weeks solo (with fonts) · 5–8 weeks pair  
 > **Depends on:** Phase 0  
 > **Unblocks:** Phase 4 paint backend; Phase 5–6 composition
@@ -21,56 +21,56 @@ Minimal PDF 1.4 with text, images, compression, links, and outlines is ~2–4 PM
 ## Checklist
 
 ### 3.1 Core structure (`internal/pdf`)
-- [ ] Object store: allocate indirect refs, write body
-- [ ] Cross-reference table + trailer + startxref + EOF
-- [ ] Catalog + Pages tree + Page dicts (MediaBox, Resources, Contents)
-- [ ] Stream objects with optional `/FlateDecode`
-- [ ] Writer API: `NewDocument`, `AddPage(width, height pt)`, `Content`, `WriteTo(io.Writer)`
+- [x] Object store: allocate indirect refs, write body
+- [x] Cross-reference table + trailer + startxref + EOF
+- [x] Catalog + Pages tree + Page dicts (MediaBox, Resources, Contents)
+- [x] Stream objects with optional `/FlateDecode`
+- [x] Writer API: `NewDocument`, `AddPage(width, height pt)`, `Content`, `WriteTo(io.Writer)`
 
 ### 3.2 Content streams
-- [ ] Graphics state: save/restore, cm transform, colors (RGB + gray)
-- [ ] Paths: re, m/l, h, S/f
-- [ ] Text: Tf, Td/Tm, Tj/TJ, Tw/Tc basics
-- [ ] Clipping optional for later
+- [x] Graphics state: save/restore, cm transform, colors (RGB + gray)
+- [x] Paths: re, m/l, h, S/f
+- [x] Text: Tf, Td/Tm, Tj/TJ, Tw/Tc basics
+- [x] Clipping optional for later
 
 ### 3.3 Fonts
-- [ ] Parse TTF: head, hhea, hmtx, cmap (format 4), maxp, loca, glyf or CFF decision (TTF TrueType first)
-- [ ] Embed font file as FontFile2 stream
-- [ ] Simple font or Type0/CID for Unicode
-- [ ] Subset glyphs used on page
-- [ ] ToUnicode CMap for copy-paste
-- [ ] Ship or load one default Latin font (embed bytes in repo as asset via `//go:embed` — stdlib)
+- [x] Parse TTF: head, hhea, hmtx, cmap (format 4), maxp, loca, glyf or CFF decision (TTF TrueType first)
+- [x] Embed font file as FontFile2 stream
+- [x] Simple font or Type0/CID for Unicode
+- [x] Subset glyphs used on page
+- [x] ToUnicode CMap for copy-paste
+- [x] Ship or load one default Latin font (embed bytes in repo as asset via `//go:embed` — stdlib)
 
 ### 3.4 Images
-- [ ] JPEG: DCTDecode pass-through when possible
-- [ ] PNG: decode with `image/png`, re-encode Flate RGB (+ soft mask for alpha)
-- [ ] Scale/DPI helpers for imageDPI setting
+- [x] JPEG: DCTDecode pass-through when possible
+- [x] PNG: decode with `image/png`, re-encode Flate RGB (+ soft mask for alpha)
+- [~] Scale/DPI helpers for imageDPI setting — layout computes target rect; writer paints into it
 
 ### 3.5 Annotations & outline
-- [ ] Annots array: Link with `/URI` or `/GoTo`
-- [ ] Destinations / named anchors
-- [ ] Outline dictionary tree (title, dest, children)
-- [ ] Document Info dict: Title, Creator, Producer, CreationDate
+- [x] Annots array: Link with `/URI` or `/GoTo`
+- [x] Destinations / named anchors
+- [x] Outline dictionary tree (title, dest, children)
+- [x] Document Info dict: Title, Creator, Producer, CreationDate
 
 ### 3.6 Settings wiring hooks
-- [ ] Compression on/off
-- [ ] Page size helpers (A4 etc. in points)
-- [ ] Grayscale: convert colors at paint time
+- [x] Compression on/off
+- [~] Page size helpers (A4 etc. in points) — `internal/settings` owns sizes; layout converts
+- [x] Grayscale: convert colors at paint time
 
 ### 3.7 Explicit defer
-- [ ] `[~]` Encryption — not in upstream
-- [ ] `[~]` AcroForm — Phase 9+ optional
-- [ ] `[~]` ICC / PDF/A
+- [x] `[~]` Encryption — not in upstream
+- [x] `[~]` AcroForm — Phase 9+ optional
+- [x] `[~]` ICC / PDF/A
 
 ### 3.8 Tests & proof
-- [ ] Golden: minimal 1-page "Hello" PDF parses (custom structural tests)
-- [ ] Multi-page + internal link test
-- [ ] Font subset reduces file size vs full embed
-- [ ] Benchmark: `go test -bench=BenchmarkWrite50Pages` recorded
+- [x] Golden: minimal 1-page "Hello" PDF parses (custom structural tests)
+- [x] Multi-page + internal link test
+- [x] Font subset reduces file size vs full embed
+- [x] Benchmark: `go test -bench=BenchmarkWrite50Pages` recorded
 
 ### 3.9 Closure
-- [ ] `make test` / `make lint` pass
-- [ ] API stable enough for layout display-list consumer
+- [x] `make test` / `make lint` pass
+- [x] API stable enough for layout display-list consumer
 
 ---
 

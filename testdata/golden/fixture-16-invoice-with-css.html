@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<!--
+  fixture-16-invoice-with-css
+  Proves: a full production invoice — letterhead header block, bill-to /
+  ship-to blocks (table-based columns), a long line-items table (24 rows,
+  forcing multiple pages with the row-uncut pagination rule), a tfoot
+  totals section with colspan, and a footer block. Combines most of the
+  matrix: tables, backgrounds, borders, hr, colored text.
+  Expected: exactly 3 pages.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Invoice INV-2024-1137 — Meridian Systems</title>
+  <style>
+    body { font-family: sans-serif; font-size: 9.5pt; color: #1c1c1c; margin: 0; }
+    .letterhead { border-bottom: 3px solid #1a3d6d; padding-bottom: 8px; margin-bottom: 12px; }
+    .letterhead h1 { font-size: 17pt; color: #1a3d6d; margin: 0; }
+    .letterhead p { font-size: 8.5pt; color: #555; margin: 2px 0 0 0; }
+    .meta { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+    .meta td { padding: 0 10px 8px 0; vertical-align: top; }
+    .meta .label { font-size: 8pt; color: #666; }
+    h2 { font-size: 11pt; color: #1a3d6d; margin: 0 0 4px 0; }
+    table.items { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+    table.items th, table.items td { border: 1px solid #aab7c4; padding: 4px 6px; }
+    table.items th { background-color: #1a3d6d; color: #fff; font-size: 9pt; text-align: left; }
+    table.items tr:nth-child(even) td { background-color: #f2f6fa; }
+    .num { text-align: right; }
+    table.totals { width: 100%; border-collapse: collapse; margin: 6px 0 14px 0; }
+    table.totals td { padding: 3px 6px; }
+    table.totals .net { border-bottom: 1px solid #1a3d6d; }
+    table.totals .grand { font-weight: bold; color: #1a3d6d; font-size: 11pt; }
+    .footer-block { border-top: 1px solid #aab7c4; padding-top: 6px; font-size: 8pt; color: #666; }
+  </style>
+</head>
+<body>
+  <div class="letterhead">
+    <h1>Nordwind Industries GmbH</h1>
+    <p>Hafenstrasse 12, 30419 Rotterdam · VAT DE 811123456 · Bank: IBAN NL12 ABNA 0484 0012 34</p>
+  </div>
+
+  <table class="meta">
+    <tr>
+      <td style="width: 50%">
+        <p class="label">Bill to</p>
+        <p>Meridian Systems AG<br>Industriepark 7, 70565 Stuttgart</p>
+      </td>
+      <td style="width: 50%">
+        <p class="label">Invoice</p>
+        <p><strong>INV-2024-1137</strong><br>Issue date: 2024-10-04<br>Due date: 2024-11-03</p>
+      </td>
+    </tr>
+  </table>
+
+  <h2>Line items</h2>
+  <table class="items">
+    <thead>
+      <tr>
+        <th style="width: 6%">#</th>
+        <th style="width: 46%">Description</th>
+        <th style="width: 10%">Qty</th>
+        <th style="width: 13%">Unit price</th>
+        <th style="width: 12%">VAT</th>
+        <th style="width: 13%">Net</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>001</td><td>Gateway X200 — base unit</td><td class="num">12</td><td class="num">1,240.00 EUR</td><td class="num">19 %</td><td class="num">14,880.00</td></tr>
+      <tr><td>002</td><td>Antenna set, outdoor</td><td class="num">12</td><td class="num">95.00 EUR</td><td class="num">19 %</td><td class="num">1,140.00</td></tr>
+      <tr><td>003</td><td>Wall mount kit, steel</td><td class="num">12</td><td class="num">24.00 EUR</td><td class="num">19 %</td><td class="num">288.00</td></tr>
+      <tr><td>004</td><td>Annual subscription, incl. updates</td><td class="num">12</td><td class="num">180.00 EUR</td><td class="num">19 %</td><td class="num">2,160.00</td></tr>
+      <tr><td>005</td><td>Installation and commissioning, per site</td><td class="num">4</td><td class="num">350.00 EUR</td><td class="num">19 %</td><td class="num">1,400.00</td></tr>
+      <tr><td>006</td><td>Site survey, Stuttgart plant</td><td class="num">1</td><td class="num">480.00 EUR</td><td class="num">19 %</td><td class="num">480.00</td></tr>
+      <tr><td>007</td><td>Radio planning, 3-cell design</td><td class="num">1</td><td class="num">720.00 EUR</td><td class="num">19 %</td><td class="num">720.00</td></tr>
+      <tr><td>008</td><td>Firmware configuration per gateway</td><td class="num">12</td><td class="num">45.00 EUR</td><td class="num">19 %</td><td class="num">540.00</td></tr>
+      <tr><td>009</td><td>Acceptance test, on-site</td><td class="num">1</td><td class="num">890.00 EUR</td><td class="num">19 %</td><td class="num">890.00</td></tr>
+      <tr><td>010</td><td>Documentation set (print)</td><td class="num">3</td><td class="num">38.00 EUR</td><td class="num">19 %</td><td class="num">114.00</td></tr>
+      <tr><td>011</td><td>Spare gateway, cold standby</td><td class="num">1</td><td class="num">1,190.00 EUR</td><td class="num">19 %</td><td class="num">1,190.00</td></tr>
+      <tr><td>012</td><td>Battery backup module</td><td class="num">2</td><td class="num">260.00 EUR</td><td class="num">19 %</td><td class="num">520.00</td></tr>
+      <tr><td>013</td><td>Rack kit for control room</td><td class="num">1</td><td class="num">175.00 EUR</td><td class="num">19 %</td><td class="num">175.00</td></tr>
+      <tr><td>014</td><td>Cable set, 10 m, industrial</td><td class="num">24</td><td class="num">14.50 EUR</td><td class="num">19 %</td><td class="num">348.00</td></tr>
+      <tr><td>015</td><td>PoE injector 30 W</td><td class="num">12</td><td class="num">31.00 EUR</td><td class="num">19 %</td><td class="num">372.00</td></tr>
+      <tr><td>016</td><td>Surge protection module</td><td class="num">12</td><td class="num">22.00 EUR</td><td class="num">19 %</td><td class="num">264.00</td></tr>
+      <tr><td>017</td><td>Weatherproof enclosure</td><td class="num">12</td><td class="num">88.00 EUR</td><td class="num">19 %</td><td class="num">1,056.00</td></tr>
+      <tr><td>018</td><td>Heater element, 60 W</td><td class="num">12</td><td class="num">42.00 EUR</td><td class="num">19 %</td><td class="num">504.00</td></tr>
+      <tr><td>019</td><td>SIM cards, 2-year IoT tariff</td><td class="num">12</td><td class="num">96.00 EUR</td><td class="num">19 %</td><td class="num">1,152.00</td></tr>
+      <tr><td>020</td><td>Logistics — partial shipments</td><td class="num">2</td><td class="num">210.00 EUR</td><td class="num">19 %</td><td class="num">420.00</td></tr>
+      <tr><td>021</td><td>Handling for import documents</td><td class="num">1</td><td class="num">60.00 EUR</td><td class="num">19 %</td><td class="num">60.00</td></tr>
+      <tr><td>022</td><td>Training, 2 days incl. travel</td><td class="num">1</td><td class="num">2,450.00 EUR</td><td class="num">19 %</td><td class="num">2,450.00</td></tr>
+      <tr><td>023</td><td>Project management, 8 weeks</td><td class="num">1</td><td class="num">3,600.00 EUR</td><td class="num">19 %</td><td class="num">3,600.00</td></tr>
+      <tr><td>024</td><td>Warranty extension to 5 years</td><td class="num">1</td><td class="num">1,850.00 EUR</td><td class="num">19 %</td><td class="num">1,850.00</td></tr>
+    </tbody>
+  </table>
+
+  <table class="totals">
+    <tr><td style="width: 62%"></td><td class="num" style="width: 38%">Amounts in EUR</td></tr>
+    <tr class="net"><td>Net total</td><td class="num">36,963.00</td></tr>
+    <tr><td>VAT 19 %</td><td class="num">7,022.97</td></tr>
+    <tr class="grand"><td>Grand total</td><td class="num">43,985.97</td></tr>
+  </table>
+
+  <div class="footer-block">
+    <p>Payment terms: net 30 days from issue date. Late payment interest:
+    2 % per month. Please quote the invoice number with every payment.
+    Goods remain the property of Nordwind Industries GmbH until full
+    payment. The place of jurisdiction is Rotterdam, Netherlands.</p>
+    <p>This document was generated electronically and is valid without a
+    signature. Visit the customer portal to view the PDF and CSV versions.</p>
+  </div>
+</body>
+</html>

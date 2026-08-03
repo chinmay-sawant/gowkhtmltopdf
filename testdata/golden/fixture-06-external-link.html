@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<!--
+  fixture-06-external-link
+  Proves: external <a href> targets (https://example.com/…, mailto:) become
+  PDF URI annotations on the rendered text, while a relative linked
+  stylesheet styles the document. The link rects are asserted structurally
+  (the PDF contains /URI and the annotation dicts) by the golden runner.
+  Expected: 1 page.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Partner Handbook — External Links</title>
+  <link rel="stylesheet" href="style-05.css">
+</head>
+<body>
+  <h1>Partner Handbook</h1>
+  <p class="byline">Nordwind Industries Partner Program · Edition 2024-3</p>
+
+  <h2>Getting started</h2>
+  <p>Register on the portal at
+  <a href="https://example.com/partners/register">example.com/partners/register</a>
+  and complete the compliance questionnaire. After approval you receive the
+  partner kit by mail.</p>
+
+  <h2>Resources</h2>
+  <table>
+    <tr><th>Resource</th><th>Location</th></tr>
+    <tr><td>Partner portal</td><td><a href="https://example.com/partners">https://example.com/partners</a></td></tr>
+    <tr><td>Price lists</td><td><a href="https://example.com/partners/pricing">https://example.com/partners/pricing</a></td></tr>
+    <tr><td>Support</td><td><a href="mailto:support@example.com">support@example.com</a></td></tr>
+    <tr><td>Status page</td><td><a href="https://status.example.com">https://status.example.com</a></td></tr>
+  </table>
+
+  <h2>Contact</h2>
+  <p>Questions about the program go to
+  <a href="mailto:partners@example.com">partners@example.com</a>. Incident
+  reports are filed through the portal, not by mail.</p>
+
+  <div class="footer-note">External URIs render as PDF link annotations; the
+  engine never fetches the link targets.</div>
+</body>
+</html>

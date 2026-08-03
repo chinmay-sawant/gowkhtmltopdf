@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<!--
+  fixture-08-forced-page-breaks
+  Proves: page-break-before: always (four sections start on fresh pages),
+  page-break-inside: avoid (the .keep boxes stay whole — each is smaller
+  than one page, so the count is deterministic), and page-break-after: avoid
+  (the summary stays with the table that follows). The intro page plus the
+  four section pages = 5 pages. Sections stack directly on the previous
+  block (no margin gap) — regression for the pagination fixpoint drift
+  where boundary-aligned ops were dragged along one page per iteration.
+  Expected: exactly 5 pages.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Operations Manual — Paged Sections</title>
+  <style>
+    body { font-family: sans-serif; font-size: 10pt; color: #222; margin: 0; }
+    h1 { font-size: 16pt; color: #1a3d6d; margin: 0 0 6px 0; }
+    h2 { font-size: 12pt; color: #1a3d6d; margin: 0 0 6px 0; }
+    .section { page-break-before: always; }
+    .keep { page-break-inside: avoid; border: 1px solid #c5d5e8; background-color: #f3f7fc; padding: 8px 10px; }
+    .after-avoid { page-break-after: avoid; }
+    p { margin: 0 0 8px 0; line-height: 1.4; }
+    .pg { font-size: 9pt; color: #666; }
+  </style>
+</head>
+<body>
+  <h1>Facility Operations Manual</h1>
+  <p class="pg">Document FM-2024-01 · Revision B</p>
+  <p>This manual is divided into four sections. Each section starts on a
+  new page because the layout engine honors <code>page-break-before:
+  always</code>.</p>
+
+  <div class="section">
+    <h2>1. Shift handover</h2>
+    <p>The outgoing shift logs every intervention in the shift book,
+    including unresolved alarms and open work orders. The incoming shift
+    verifies the log within the first thirty minutes.</p>
+    <div class="keep">
+      <p><strong>Handover checklist</strong> — lock status, fire panel,
+      loading bay gates, cold storage temperature, shift book signed.</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>2. Weekly inspection</h2>
+    <p>The weekly inspection covers the hydraulic unit, the compressor
+    room, and the roof drainage. Inspections are recorded in the
+    maintenance system with photographs.</p>
+    <div class="keep">
+      <p><strong>Inspection routing</strong> — start at the electrical
+      room, continue through the compressor room, end on the roof.</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>3. Emergency response</h2>
+    <p>In case of an emergency the operator follows the response matrix on
+    the control room wall and calls the duty number first, then the site
+    security desk. The fire alarm drill runs every quarter.</p>
+    <div class="keep">
+      <p><strong>Emergency numbers</strong> — duty engineer: 555-0100,
+      security desk: 555-0199, facility manager: 555-0122.</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>4. Documentation &amp; forms</h2>
+    <p class="after-avoid">All forms are available from the document server
+    under /operations/forms. Paper copies are stored in the archive room,
+    shelf D, binders 14 to 21.</p>
+    <div class="keep">
+      <p><strong>Forms index</strong> — FM-101 shift book, FM-102 permit
+      to work, FM-103 incident report, FM-104 maintenance request.</p>
+    </div>
+  </div>
+</body>
+</html>

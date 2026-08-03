@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<!--
+  fixture-07-image-logo
+  Proves: images two ways — a relative PNG file (logo.png in the fixture
+  directory, 160x48, fetched with local file access) and a data: URI PNG.
+  Both embed as /Subtype /Image xobjects; the relative one is fetched
+  through the loader, the data: one is decoded inline. Intrinsic sizes are
+  preserved by the layout engine.
+  Expected: 1 page, at least one /Subtype /Image.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Nordwind Industries — Letterhead</title>
+  <style>
+    body { font-family: sans-serif; font-size: 10pt; color: #222; margin: 0; }
+    .letterhead { border-bottom: 3px solid #1a3d6d; padding-bottom: 8px; margin-bottom: 14px; }
+    .letterhead img { vertical-align: middle; }
+    .letterhead .co { display: inline; font-size: 15pt; font-weight: bold; color: #1a3d6d; margin-left: 10px; }
+    .sig { margin-top: 26px; border-top: 1px solid #999; padding-top: 6px; font-size: 9pt; color: #555; }
+  </style>
+</head>
+<body>
+  <div class="letterhead">
+    <img src="logo.png" alt="Nordwind logo">
+    <span class="co">Nordwind Industries GmbH</span>
+  </div>
+
+  <p>Dear Ms. Weber,</p>
+
+  <p>thank you for your order of 2024-09-02. The shipment leaves our
+  Rotterdam warehouse today and is expected at your Hamburg facility on
+  2024-09-06, subject to customs clearance.</p>
+
+  <p>As requested, we include a preview of the product marking applied to
+  the pallets:</p>
+
+  <p><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEgAAAAgCAIAAAA+KKknAAAAkElEQVR4nGL5/v0Lw3AETAPtAFqBUY8NNcBCfyuV3Srh7Lu72mlky8iLMeRwxQS0C2lqgWEbY6MeG2qAyqUiZs4cqNw4GmP0BfjLZGSAK0UM2xgb9dhQA6MeG2pg1GNDDYx6bKiBQdryoLyFOWxjbNRjQw3gzGPkpfLBMxYybGOMcXTsfoiBUY8NNQAIAAD//83YGGzaB0VhAAAAAElFTkSuQmCC"
+       alt="data-uri marking preview"></p>
+
+  <p>Please confirm receipt within 48 hours so we can close the order in
+  our system.</p>
+
+  <div class="sig">
+    <p>Best regards,<br>K. Andersen<br>Export Logistics, Nordwind Industries GmbH</p>
+  </div>
+</body>
+</html>

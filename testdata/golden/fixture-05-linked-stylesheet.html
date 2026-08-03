@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<!--
+  fixture-05-linked-stylesheet
+  Proves: <link rel="stylesheet" href="style-05.css"> resolution — a relative
+  stylesheet in the fixture directory is fetched through the loader with
+  local file access enabled, and its rules drive the layout (fonts, colors,
+  table borders, the notice box). The document itself carries no <style>.
+  Expected: 1 page.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Release Notes 2.4 — Linked Stylesheet</title>
+  <link rel="stylesheet" href="style-05.css">
+</head>
+<body>
+  <h1>Release Notes — Widget Suite 2.4</h1>
+  <p class="byline">Published 2024-08-15 · Build 2.4.0-184</p>
+
+  <div class="notice">Important: this release changes the on-disk format of
+  configuration files. Backup existing configurations before upgrading.</div>
+
+  <h2>New features</h2>
+  <table>
+    <tr><th>Area</th><th>What changed</th><th>Docs</th></tr>
+    <tr><td>Dashboard</td><td>New capacity view with trend lines</td><td>WK-1101</td></tr>
+    <tr><td>API</td><td>Rate limit headers exposed on every response</td><td>WK-1102</td></tr>
+    <tr><td>CLI</td><td>Batch export for up to 10,000 records</td><td>WK-1103</td></tr>
+  </table>
+
+  <h2>Bug fixes</h2>
+  <p>Fixed a race in the scheduler that could stall nightly reports on
+  multi-core hosts (WK-1094). Fixed an off-by-one in the pager that hid the
+  last row of long lists (WK-1098).</p>
+
+  <div class="footer-note">All styling for this document comes from the
+  linked stylesheet style-05.css — there is no inline style block.</div>
+</body>
+</html>

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<!--
+  fixture-14-colorful-report
+  Proves: color and background rendering — background colors on divs, table
+  header rows, and highlighted cells; rgba() background alpha; colored
+  borders; hr rules; and colored text runs. Backgrounds only paint when
+  --background is on (the golden runner sets it, matching the CLI default).
+  Expected: 1 page.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>KPI Dashboard — September 2024</title>
+  <style>
+    body { font-family: sans-serif; font-size: 10pt; color: #222; margin: 0; }
+    h1 { font-size: 16pt; color: #0f3a5f; margin: 0 0 8px 0; }
+    .banner { background-color: #0f3a5f; color: #ffffff; padding: 10px 14px; margin-bottom: 12px; }
+    .banner h2 { margin: 0; font-size: 12pt; }
+    .banner p { margin: 2px 0 0 0; color: #cfe0f0; font-size: 9pt; }
+    .kpis { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+    .kpis th, .kpis td { border: 2px solid #0f3a5f; padding: 6px 10px; text-align: left; }
+    .kpis th { background-color: #d9e6f2; color: #0f3a5f; }
+    .good { background-color: #e2f2e2; color: #1f5c2e; }
+    .warn { background-color: #fdf3d7; color: #7a5c00; }
+    .bad  { background-color: #fbe4e4; color: #8c1f1f; }
+    .alpha { background-color: rgba(15, 58, 95, 0.15); padding: 6px 10px; margin: 8px 0 12px 0; }
+    hr { border: 1px solid #0f3a5f; margin: 14px 0; }
+    .foot { font-size: 8pt; color: #6b7684; border-top: 2px solid #0f3a5f; padding-top: 6px; }
+  </style>
+</head>
+<body>
+  <div class="banner">
+    <h2>September 2024 — Executive Dashboard</h2>
+    <p>Reporting period 2024-09-01 to 2024-09-30 · refreshed daily at 06:00 UTC</p>
+  </div>
+
+  <table class="kpis">
+    <tr><th>KPI</th><th>Value</th><th>Target</th><th>Trend</th></tr>
+    <tr class="good"><td>On-time delivery</td><td>96.4 %</td><td>95 %</td><td>above target</td></tr>
+    <tr class="good"><td>First-pass yield</td><td>98.1 %</td><td>97 %</td><td>above target</td></tr>
+    <tr class="warn"><td>Inventory turns</td><td>7.8</td><td>8.0</td><td>close to target</td></tr>
+    <tr class="bad"><td>Outstanding escalations</td><td>4</td><td>0</td><td>needs action</td></tr>
+  </table>
+
+  <div class="alpha">Alpha-blended band: the engineering review requested a
+  translucent callout for the risk register; rgba() backgrounds are painted
+  with the declared alpha.</div>
+
+  <hr>
+
+  <h2 style="color: #0f3a5f">Comments</h2>
+  <p>The delivery performance recovered after the September ramp; the
+  four open escalations concern the same supplier and are tracked in
+  ticket group <strong style="color: #8c1f1f">ESC-2024-09</strong>. Inventory
+  turns are within tolerance of the target.</p>
+
+  <div class="foot">Source: operations data warehouse · Authorized for
+  distribution to the management circle only.</div>
+</body>
+</html>

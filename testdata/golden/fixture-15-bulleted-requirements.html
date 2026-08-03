@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<!--
+  fixture-15-bulleted-requirements
+  Proves: markdown-ish content rendered as HTML — a requirements list with
+  nested bullets, bold/emphasis inline runs, an id="req-*" anchor on each
+  item, and a compact acceptance-criteria table. Inline <a href="#...">
+  anchors are not wired into PDF destinations (documented), but the anchors
+  feed the outline pass via the heading structure.
+  Expected: 1-2 pages.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Requirements — Ordering API v2</title>
+  <style>
+    body { font-family: sans-serif; font-size: 10pt; color: #222; margin: 0; line-height: 1.4; }
+    h1 { font-size: 15pt; color: #1a3d6d; margin: 0 0 6px 0; }
+    p.meta { font-size: 9pt; color: #666; margin: 0 0 10px 0; }
+    ul { margin: 4px 0 10px 0; padding-left: 26px; }
+    li { margin: 3px 0; }
+    .req-id { font-weight: bold; color: #1a3d6d; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #b9c6d2; padding: 4px 6px; text-align: left; }
+    th { background-color: #e8eef5; }
+    .note { font-size: 8.5pt; color: #666; }
+  </style>
+</head>
+<body>
+  <h1>Requirements — Ordering API v2</h1>
+  <p class="meta">Document REQ-API-2.0 · Owner: Platform Team · Status: approved</p>
+
+  <h2>Functional requirements</h2>
+  <ul>
+    <li id="req-01"><span class="req-id">REQ-01</span> — The API must accept
+    orders with up to 250 line items per request.</li>
+    <li id="req-02"><span class="req-id">REQ-02</span> — Every order must
+    receive a globally unique order id and a created timestamp.</li>
+    <li id="req-03"><span class="req-id">REQ-03</span> — The API must
+    validate prices against the current price list and reject stale ones:
+      <ul>
+        <li>price list version sent with the request,</li>
+        <li>400 error with the offending line item on mismatch,</li>
+        <li>price list refresh propagates in under 60 seconds.</li>
+      </ul>
+    </li>
+    <li id="req-04"><span class="req-id">REQ-04</span> — <em>Idempotency:</em>
+    replaying a request with the same idempotency key returns the original
+    response without creating a duplicate order.</li>
+  </ul>
+
+  <h2>Non-functional requirements</h2>
+  <ul>
+    <li id="req-05"><span class="req-id">REQ-05</span> — p95 latency below
+    350 ms for order submission under 100 req/s sustained load.</li>
+    <li id="req-06"><span class="req-id">REQ-06</span> — Availability target
+    of 99.9 % per calendar month.</li>
+    <li id="req-07"><span class="req-id">REQ-07</span> — All order payloads
+    logged with correlation ids for audit purposes.</li>
+  </ul>
+
+  <h2>Acceptance criteria</h2>
+  <table>
+    <tr><th>Criteria</th><th>Verification</th></tr>
+    <tr><td>REQ-01, REQ-02</td><td>Load test with 250 line items completes with p95 &lt; 350 ms</td></tr>
+    <tr><td>REQ-03</td><td>Stale price list returns 400 with line item reference</td></tr>
+    <tr><td>REQ-04</td><td>Replayed key returns identical body and status 200</td></tr>
+    <tr><td>REQ-05 – REQ-07</td><td>Verified by the perf harness and audit log review</td></tr>
+  </table>
+
+  <p class="note">This fixture renders bulleted requirements in a
+  markdown-like shape; nested lists indent, bold ids stand out, and the
+  acceptance table closes the document.</p>
+</body>
+</html>

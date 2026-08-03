@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<!--
+  fixture-13-pre-code-block
+  Proves: <pre> honoring white-space: pre (leading spaces, indentation and
+  line breaks preserved verbatim), <code> inline runs, and a long log
+  excerpt that wraps the page into two columns of text. Also exercises a
+  wide pre line that triggers the smart-shrinking code path? No — the pre
+  is styled to fit the content width, keeping the page count deterministic.
+  Expected: 1 page.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Configuration Reference — Sample Blocks</title>
+  <style>
+    body { font-family: sans-serif; font-size: 10pt; color: #222; margin: 0; }
+    h1 { font-size: 15pt; color: #1a3d6d; margin: 0 0 6px 0; }
+    p { margin: 0 0 8px 0; line-height: 1.4; }
+    pre {
+      background-color: #f4f4f2; border: 1px solid #d8d8d4;
+      padding: 8px 10px; margin: 6px 0 12px 0;
+      font-size: 8.5pt; line-height: 1.35;
+    }
+    code { color: #7a2c1e; }
+  </style>
+</head>
+<body>
+  <h1>Configuration Reference</h1>
+  <p>Below are the canonical configuration fragments. The <code>pre</code>
+  blocks preserve every space and newline exactly as written — indentation
+  matters for the YAML parser, so the engine must not re-wrap or strip it.</p>
+
+  <pre>
+# Example: production gateway configuration
+server:
+  listen: "0.0.0.0:8443"
+  tls:
+    cert_file: "/etc/gateway/server.crt"
+    key_file:  "/etc/gateway/server.key"
+  limits:
+    max_connections: 256
+    request_timeout_s: 30
+
+logging:
+  level: info
+  format: json
+  rotate:
+    max_size_mb: 100
+    keep_files: 7
+  </pre>
+
+  <p>Use <code>--check-config</code> to validate the file before applying
+  it, and <code>--reload</code> to apply changes without a restart. The
+  reload path writes a marker file that the supervisor watches.</p>
+
+  <pre>
+$ gatewayctl --check-config /etc/gateway/config.yml
+[ OK ]  syntax valid
+[ OK ]  tls key matches certificate
+[ OK ]  listeners available on 0.0.0.0:8443
+[WARN]  logging.rotate.keep_files: 7 is below recommended minimum of 14
+  2 warnings, 0 errors
+  </pre>
+
+  <p>Long single-line commands and log lines also stay on one line inside
+  a <code>pre</code> block; the example below fits the content width.</p>
+
+  <pre>
+2024-09-30 21:04:11 INFO  gateway.service: starting, version=2.4.0 build=184 role=primary
+2024-09-30 21:04:11 INFO  gateway.tls: certificate loaded, expires=2025-03-30
+2024-09-30 21:04:11 INFO  gateway.telemetry: uplink established, host=telemetry.example.net
+  </pre>
+</body>
+</html>
