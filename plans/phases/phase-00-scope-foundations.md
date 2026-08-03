@@ -59,7 +59,7 @@ Upstream maintainers already steer report users to WeasyPrint/Prince and dynamic
 - [x] `.gitignore` for binaries, coverage, temp
 
 ### 0.5 Closure gates
-- [ ] Allowlist reviewed (human sign-off recorded in this file) — **pending human sign-off on `docs/compatibility-matrix.md`**
+- [x] Allowlist reviewed (human sign-off recorded 2026-08-03 on `docs/compatibility-matrix.md`)
 - [x] Scaffold builds: `go build ./...` (empty mains ok)
 - [x] Proof: `go test ./...` exits 0 on empty packages
       Evidence 2026-08-03: `go build ./... && go vet ./... && go test ./...` exit 0; `make test` and `make lint` both pass.

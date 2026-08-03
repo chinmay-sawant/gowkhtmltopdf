@@ -81,7 +81,7 @@ Phase 0 Scope → 1 Settings/CLI → 2 Loader → 3 PDF Writer
 - [x] Root `README.md` with estimates (this delivery)
 
 ### 0.3 Closure
-- [ ] Review sign-off on allowlist before any layout code — **pending human sign-off** (evidence 2026-08-03: `go build ./...` + `make test` + `make lint` all pass; fixtures 01–03 committed under `testdata/golden/`)
+- [x] Review sign-off on allowlist before any layout code — signed 2026-08-03 (evidence: `go build ./...` + `make test` + `make lint` all pass; fixtures 01–03 committed under `testdata/golden/`)
 
 ---
 
