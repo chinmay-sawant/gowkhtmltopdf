@@ -1,0 +1,84 @@
+package cli
+
+import (
+	"fmt"
+	"io"
+	"sort"
+	"strings"
+)
+
+// Version is stamped by the build (ldflags -X) and defaults to 0.1.0-dev.
+var Version = "0.1.0-dev"
+
+// PrintHelp writes usage text for the given Mode.
+func PrintHelp(w io.Writer, m Mode) {
+	fmt.Fprintf(w, `Name:
+  gowkhtmltopdf - Convert HTML to PDF using the Qt WebKit engine (pure-Go reimplementation)
+
+Synopsis:
+  gowkhtmltopdf [GLOBAL OPTIONS] [OBJECT]... <output file>
+
+  OBJECT is one of:
+    [PAGE OPTIONS] page <input url>
+    [TOC OPTIONS] toc
+    [COVER OPTIONS] cover <input url>
+  The last positional argument is the output file; use "-" for stdout.
+  "page" is optional for the first object.
+
+Examples:
+  gowkhtmltopdf --page-size A4 --orientation Landscape report.html report.pdf
+  gowkhtmltopdf cover cover.html toc page chapter1.html page chapter2.html book.pdf
+
+Description:
+  Controlled HTML to PDF conversion with a documented CSS subset
+  (see docs/compatibility-matrix.md). No JavaScript.
+
+%s
+`, flagList(m))
+}
+
+// PrintExtendedHelp writes the full flag list.
+func PrintExtendedHelp(w io.Writer, m Mode) {
+	PrintHelp(w, m)
+}
+
+// PrintVersion writes the version banner.
+func PrintVersion(w io.Writer) {
+	fmt.Fprintf(w, "Name: gowkhtmltopdf\nVersion: %s\n", Version)
+}
+
+// PrintLicense writes the license banner.
+func PrintLicense(w io.Writer) {
+	fmt.Fprintf(w, `gowkhtmltopdf %s
+Copyright (C) 2026 gowkhtmltopdf contributors
+
+This program is an independent, clean-room reimplementation of the
+wkhtmltopdf command-line interface and is licensed under the MIT License.
+The original wkhtmltopdf is Copyright (C) 2010-2020 wkhtmltopdf authors and
+is licensed under the LGPL.
+
+See LICENSE for the full text of the MIT License.
+`, Version)
+}
+
+// flagList renders a "--name" list filtered by Mode.
+func flagList(m Mode) string {
+	var names []string
+	for name, spec := range flagTable {
+		if spec.mod&m == 0 {
+			continue
+		}
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	var b strings.Builder
+	for _, n := range names {
+		spec := flagTable[n]
+		if spec.kind == "bool" {
+			fmt.Fprintf(&b, "  --%s\n", n)
+		} else {
+			fmt.Fprintf(&b, "  --%s <value>\n", n)
+		}
+	}
+	return b.String()
+}

@@ -1,3 +1,23 @@
-// Package convert is reserved by the convert phase of the gowkhtmltopdf rewrite.
-// Phase 00 scaffold only; implementation lands in later phases.
+// Package convert orchestrates the load → layout → paginate → print
+// pipeline (mirrors PdfConverterPrivate). Phase 1 ships the CLI surface
+// with an explicit not-ready error; later phases fill in the steps.
 package convert
+
+import (
+	"fmt"
+
+	"gowkhtmltopdf/internal/settings"
+)
+
+// HttpError is a load failure carrying the upstream exit-code mapping.
+type HttpError struct {
+	Status int
+	URL    string
+}
+
+func (e *HttpError) Error() string {
+	return fmt.Sprintf("failed to load %s: HTTP %d", e.URL, e.Status)
+}
+
+// HttpErrorCode implements the exit-code mapping (404→2, 401→3).
+func (e *HttpError) HttpErrorCode() int { return settings.HttpErrorCode(e.Status) }
