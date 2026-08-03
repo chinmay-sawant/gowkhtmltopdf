@@ -1,6 +1,8 @@
 ## Context
 
-**Parent epic:** _(link after create)_
+**Parent epic:** #2 — [epic: post-MVP rendering quality — image mode, fonts, CSS for real sites](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/2)
+
+**Siblings under #2:** #3 (image-mode PNG) · #4 (font spacing) · #5 (Wikipedia CSS) · #6 (multi-font)
 
 `make samples` writes `output/fixture-01-simple-invoice.png` via `gowkhtmltoimage`. Visual inspection of that PNG shows the invoice **layout is roughly correct** (columns, colors, header hierarchy) but the **raster result looks broken / non-production**: blocky text, odd letter/word spacing, and a “chunky pixel” look that users describe as images not displaying properly.
 
@@ -68,7 +70,9 @@ Not: missing JPEG decoder for fixture-01 (there is no image resource in that HTM
 
 ## References
 
+- Relates to #2 (parent epic)
 - Artifact: `output/fixture-01-simple-invoice.png`  
 - Code: `internal/imageout/font.go`, `internal/imageout/imageout.go`  
 - Docs: `documentation/samples.md`, `documentation/cli.md` (image mode)  
 - Related: PDF path embeds images for `fixture-07` / `fixture-20` (`/Subtype /Image` present); this issue is PNG **raster** quality
+

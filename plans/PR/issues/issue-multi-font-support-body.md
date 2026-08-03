@@ -1,6 +1,8 @@
 ## Context
 
-**Parent epic:** _(link after create)_
+**Parent epic:** #2 — [epic: post-MVP rendering quality — image mode, fonts, CSS for real sites](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/2)
+
+**Siblings under #2:** #3 (image-mode PNG) · #4 (font spacing) · #5 (Wikipedia CSS) · #6 (multi-font)
 
 Today the engine effectively validates **one** embedded face:
 
@@ -51,6 +53,8 @@ Users expect:
 
 ## References
 
+- Relates to #2 (parent epic)
 - Asset: `internal/pdf/assets/LiberationSans-Regular.ttf`  
 - Encoding: `pdfString` / simple font Latin-1 limits  
 - Deferred: README “CJK fonts / complex-script shaping”  
+

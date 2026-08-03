@@ -1,6 +1,8 @@
 ## Context
 
-**Parent epic:** _(link after create)_
+**Parent epic:** #2 — [epic: post-MVP rendering quality — image mode, fonts, CSS for real sites](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/2)
+
+**Siblings under #2:** #3 (image-mode PNG) · #4 (font spacing) · #5 (Wikipedia CSS) · #6 (multi-font)
 
 After last-mile PDF fixes (zlib Flate, Catalog outlines, `/Widths` scaled to **1000 units/em**, Latin-1 `pdfString`), Latin text is readable and no longer “A c m e” letter-spaced by ~2×. Residual **spacing issues** remain in samples:
 
@@ -42,6 +44,8 @@ Evidence: `output/fixture-01-simple-invoice.pdf` / `.png`, showcase and multi-pa
 
 ## References
 
+- Relates to #2 (parent epic)
 - Prior fix: commit history “correct glyph advances and Latin-1 text encoding”  
 - Samples: `output/fixture-01-simple-invoice.pdf`  
 - Paint: `drawText` fake bold in `internal/layout/paint.go`
+

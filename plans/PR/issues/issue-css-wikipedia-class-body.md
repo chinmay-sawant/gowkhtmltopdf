@@ -1,6 +1,8 @@
 ## Context
 
-**Parent epic:** _(link after create)_
+**Parent epic:** #2 — [epic: post-MVP rendering quality — image mode, fonts, CSS for real sites](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/2)
+
+**Siblings under #2:** #3 (image-mode PNG) · #4 (font spacing) · #5 (Wikipedia CSS) · #6 (multi-font)
 
 MVP CSS is a **documented subset** for controlled reports (boxes, tables, basic text). Real websites—especially Wikipedia—use richer CSS (flex/grid-ish layouts via modern rules, complex selectors, multi-column chrome, language lists, sticky nav, etc.). Converting them produces multi-page PDFs that open but **do not look like the site**.
 
@@ -54,7 +56,9 @@ This is the **acceptance fixture** for “most-used website CSS” progress: not
 
 ## References
 
+- Relates to #2 (parent epic)
 - URL: https://en.wikipedia.org/wiki/Ana_de_Armas  
 - Sample PDF: `output/wiki-ana-de-armas.pdf`  
 - Docs: `documentation/compatibility-matrix.md`, `documentation/overview.md`  
 - Related PR #1 samples section  
+
