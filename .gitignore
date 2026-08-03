@@ -14,3 +14,6 @@ testdata/golden/out/
 # editor / OS noise
 .DS_Store
 *.swp
+
+# generated sample output
+/output/
