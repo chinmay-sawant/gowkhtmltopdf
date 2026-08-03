@@ -20,6 +20,51 @@ in this repository against the Go standard library only.
 are implemented; remaining gaps are listed under
 [Deferred / not planned](#deferred--not-planned).
 
+**Docs:** start at **[docs/overview.md](docs/overview.md)** (full index:
+[docs/README.md](docs/README.md)).
+
+---
+
+## Overview
+
+gowkhtmltopdf turns **server-generated HTML** into multi-page PDFs without a
+browser process. It is designed for report-style documents—not for pixel-perfect
+clones of arbitrary websites.
+
+| You need… | This project |
+|-----------|----------------|
+| Invoices / tables / page breaks in pure Go | Yes |
+| Headers, footers, TOC, PDF bookmarks | Yes |
+| Zero native deps / offline static binary | Yes |
+| Full CSS (flex, grid, floats) or JavaScript | No (see deferred) |
+| CJK / complex Unicode fonts | Not yet (Latin + subset today) |
+
+```text
+HTML (file | URL | stdin)
+        → load → parse → CSS → layout → paginate → paint
+        → PDF 1.4  (or PNG/JPEG in image mode)
+```
+
+**Quick taste:**
+
+```sh
+make build
+./bin/gowkhtmltopdf --enable-local-file-access \
+  testdata/golden/fixture-01-simple-invoice.html /tmp/invoice.pdf
+# Committed samples: output/   |  regenerate: make samples
+```
+
+| Path | What |
+|------|------|
+| [docs/getting-started.md](docs/getting-started.md) | Install and first conversion |
+| [docs/cli.md](docs/cli.md) | CLI flags and multi-object grammar |
+| [docs/library-api.md](docs/library-api.md) | Go API |
+| [docs/architecture.md](docs/architecture.md) | Package map and pipeline |
+| [docs/samples.md](docs/samples.md) | Golden fixtures and `output/` |
+| [output/](output/) | Sample PDFs/PNG checked into the repo |
+| [docs/compatibility-matrix.md](docs/compatibility-matrix.md) | Support matrix |
+| [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md) | Security / ACL |
+
 ---
 
 ## How this project was built (AI-assisted, stdlib-only)
@@ -238,12 +283,21 @@ remains **not planned**.
 
 | Document | Purpose |
 |---|---|
-| [plans/00-canonical-pure-go-rewrite.md](plans/00-canonical-pure-go-rewrite.md) | Canonical execution ledger (phase status) |
-| [plans/phases/](plans/phases/) | Per-phase ledgers (details + deferral notes) |
+| **[docs/README.md](docs/README.md)** | **Documentation index** |
+| [docs/overview.md](docs/overview.md) | Product overview and design principles |
+| [docs/getting-started.md](docs/getting-started.md) | Install, first PDF, library snippet |
+| [docs/architecture.md](docs/architecture.md) | Pipeline and packages |
+| [docs/cli.md](docs/cli.md) | CLI usage |
+| [docs/library-api.md](docs/library-api.md) | Go library API |
+| [docs/samples.md](docs/samples.md) | Fixtures and committed samples |
 | [docs/compatibility-matrix.md](docs/compatibility-matrix.md) | Per-element/per-property support matrix |
 | [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md) | Security / threat model |
+| [plans/00-canonical-pure-go-rewrite.md](plans/00-canonical-pure-go-rewrite.md) | Canonical execution ledger (phase status) |
+| [plans/phases/](plans/phases/) | Per-phase ledgers (details + deferral notes) |
+| [skills/PR_TEMPLATE/](skills/PR_TEMPLATE/) | Pull-request body template |
 | [CHANGELOG.md](CHANGELOG.md) | Release history |
 | [examples/](examples/) | Library-API example programs |
+| [output/](output/) | Regenerable sample PDFs/PNG (`make samples`) |
 
 ## License
 

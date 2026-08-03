@@ -1,6 +1,7 @@
 wkhtmltopdf
 
 # binaries
+/bin/
 /gowkhtmltopdf
 /gowkhtmltoimage
 cmd/gowkhtmltopdf/gowkhtmltopdf
@@ -15,5 +16,3 @@ testdata/golden/out/
 .DS_Store
 *.swp
 
-# generated sample output
-/output/

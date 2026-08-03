@@ -32,7 +32,7 @@ golden-update:
 
 # Regenerate the sample outputs in output/: one PDF per golden fixture, a
 # showcase PDF (TOC + headers/footers + outline) and a PNG from the image
-# converter. output/ is gitignored.
+# converter. Sample files under output/ are committed as viewer smoke artifacts.
 samples:
 	rm -f output/*.pdf output/*.png
 	for f in testdata/golden/fixture-*.html; do \
