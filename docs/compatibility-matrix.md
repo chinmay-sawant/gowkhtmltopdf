@@ -112,7 +112,7 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 
 | Property | Status | Notes / verified by |
 |----------|--------|---------------------|
-| `page-break-before/after/inside` (`auto\|always\|avoid`) | Not implemented | absent from `applyRestProps`; pagination is Phase 5 (see feature checklist below) — fixture-03's `page-break-*` classes have no effect, yet it still paginates via content overflow |
+| `page-break-before/after/inside` (`auto\|always\|avoid`) | Implemented (print pipeline) | parsed into `style.PageBreak*`; honored as canvas-Y flow shifts by the phase-5 paginator — `beforeAlways` `paint.go:203`, `afterBreaks` `paint.go:236`, `avoidInside` `paint.go:179`; tests `TestPageBreakParsing`, `TestPageBreakBeforeAlways`, `TestPageBreakInsideAvoid` |
 | `orphans`, `widows` | Not implemented | absent from `applyRestProps` |
 
 ### Feature checklist (page geometry, tables, pagination)
@@ -123,10 +123,12 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 | `colspan` | Yes | `colSpan` `layout.go:618-622`; test `TestTableColspan` |
 | `rowspan` | No | attribute ignored — only `colspan` is read |
 | `border-collapse` | Separate only | see §2.5 |
-| Pagination | Whole-op move | an op crossing a page boundary moves wholly to the next page, no fragment continuation (`paint.go:36-54`); `page-break-*`, repeated table headers, orphan/widow control = Phase 5 |
+| Pagination | Fragment + whole-op (phase 5) | rect-type ops (fill/stroke/line) split at page boundaries; text/images/links move wholly (line-level) (`paint.go:107-150`); `page-break-before/after: always`, `page-break-inside: avoid`, table rows never split (`paint.go:179-336`); element → (page, rect) map in `Result.Locations` for Phase 6. See "Pagination (phase 5)" note below. |
 | Floats / absolute positioning | No | see §2.2; degrade to in-flow layout |
 | Flexbox / Grid | No | `display:flex|grid` not in the allowlist → ignored, element keeps the initial `inline` display (`style.go:295-301`; see §5) |
 | JavaScript | No | stripped at load; `--enable-javascript` accepted + warning (Phase 1) |
+
+**Pagination (phase 5).** Implemented 2026-08-03 (`internal/layout/paint.go`): fragmentation is box-aware — rect-type ops crossing a page boundary are split at the boundary, while text, images and links move wholly to the next page (text is already line-level, so glyphs never split). `page-break-before/after: always` and `page-break-inside: avoid` are honored via canvas-Y flow shifts (`shiftFlowY` `paint.go:156`), and table rows never split (`rowsIntact` `paint.go:290`). `Result.Locations` (`paint.go:341`) carries element boxes (page + rect) for Phase 6 outline/TOC/links. Remaining partials: `--zoom` is accepted and `layout.Options.Zoom` works (`TestZoom` `layout_test.go:726`), but the convert pipeline does not forward it yet; smart-shrinking detects over-wide content and warns without re-layout (`convert.go:218-229`); table-header repeat across pages not implemented; orphan/widow control not implemented.
 
 ## 3. Supported units
 

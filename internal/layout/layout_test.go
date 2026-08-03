@@ -28,8 +28,13 @@ func mustParse(t *testing.T, src string) *html.Node {
 
 func layoutHTML(t *testing.T, src string, sheets ...*css.Stylesheet) *Result {
 	t.Helper()
+	return layoutHTMLZoom(t, src, 0, sheets...)
+}
+
+func layoutHTMLZoom(t *testing.T, src string, zoom float64, sheets ...*css.Stylesheet) *Result {
+	t.Helper()
 	root := mustParse(t, src)
-	res, err := Layout(root, Options{Width: testViewport, Height: 800, Sheets: sheets, Background: true})
+	res, err := Layout(root, Options{Width: testViewport, Height: 800, Sheets: sheets, Background: true, Zoom: zoom})
 	if err != nil {
 		t.Fatalf("Layout: %v", err)
 	}
@@ -64,6 +69,215 @@ func firstText(res *Result) Op {
 		}
 	}
 	return Op{}
+}
+
+// findBox returns the first box in document order whose node is an element
+// with the given name.
+func findBox(t *testing.T, res *Result, name string) *box {
+	t.Helper()
+	var found *box
+	var walk func(b *box)
+	walk = func(b *box) {
+		if found != nil {
+			return
+		}
+		if b.node != nil && b.node.Type == html.ElementNode && b.node.Name == name {
+			found = b
+			return
+		}
+		for _, c := range b.children {
+			walk(c)
+		}
+	}
+	walk(res.root)
+	if found == nil {
+		t.Fatalf("no box for <%s> in box tree", name)
+	}
+	return found
+}
+
+func TestBoxRanges(t *testing.T) {
+	s := sheet(t, `div { padding: 5pt; border: 2pt solid black }`)
+	res := layoutHTML(t, `<html><body><div><p>hello world</p></div></body></html>`, s)
+	div := findBox(t, res, "div")
+	if div.opStart > div.opEnd {
+		t.Fatalf("div op range empty: [%d, %d]", div.opStart, div.opEnd)
+	}
+	// every index in the range must map to a real op
+	for i := div.opStart; i <= div.opEnd; i++ {
+		if i < 0 || i >= len(res.Ops) {
+			t.Fatalf("div range index %d outside Ops (len %d)", i, len(res.Ops))
+		}
+	}
+	if len(div.children) == 0 {
+		t.Fatal("div has no box children")
+	}
+	p := findBox(t, res, "p")
+	if p.opStart > p.opEnd {
+		t.Fatalf("p op range empty: [%d, %d]", p.opStart, p.opEnd)
+	}
+	// children ranges nest inside the parent range
+	if p.opStart < div.opStart || p.opEnd > div.opEnd {
+		t.Errorf("p range [%d, %d] not nested in div [%d, %d]", p.opStart, p.opEnd, div.opStart, div.opEnd)
+	}
+
+	// noEmit interplay: table/cell ranges (built via the measure pass) must
+	// map to ops that actually exist
+	tres := layoutHTML(t, `<html><body><table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table></body></html>`)
+	tb := findBox(t, tres, "table")
+	if tb.opStart > tb.opEnd {
+		t.Fatalf("table op range empty: [%d, %d]", tb.opStart, tb.opEnd)
+	}
+	for i := tb.opStart; i <= tb.opEnd; i++ {
+		if i < 0 || i >= len(tres.Ops) {
+			t.Fatalf("table range index %d outside Ops (len %d)", i, len(tres.Ops))
+		}
+	}
+	if len(tb.children) != 4 {
+		t.Fatalf("table children = %d, want 4 cells", len(tb.children))
+	}
+	for _, cell := range tb.children {
+		if cell.opStart > cell.opEnd {
+			t.Fatalf("cell op range empty: [%d, %d]", cell.opStart, cell.opEnd)
+		}
+		if cell.opStart < tb.opStart || cell.opEnd > tb.opEnd {
+			t.Errorf("cell range [%d, %d] not nested in table [%d, %d]", cell.opStart, cell.opEnd, tb.opStart, tb.opEnd)
+		}
+	}
+}
+
+func TestTableRowRanges(t *testing.T) {
+	res := layoutHTML(t, `<html><body><table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table></body></html>`)
+	tb := findBox(t, res, "table")
+	if len(tb.rows) != 2 {
+		t.Fatalf("table rows = %d, want 2", len(tb.rows))
+	}
+	rowRange := func(row []*box) (int, int) {
+		if len(row) == 0 {
+			return -1, -2
+		}
+		return row[0].opStart, row[len(row)-1].opEnd
+	}
+	r0s, r0e := rowRange(tb.rows[0])
+	r1s, r1e := rowRange(tb.rows[1])
+	// each row's op range covers (overlaps) its cells' ranges
+	for _, cell := range tb.rows[0] {
+		if cell.opStart < r0s || cell.opEnd > r0e {
+			t.Errorf("row 0 cell range [%d, %d] outside row range [%d, %d]", cell.opStart, cell.opEnd, r0s, r0e)
+		}
+	}
+	for _, cell := range tb.rows[1] {
+		if cell.opStart < r1s || cell.opEnd > r1e {
+			t.Errorf("row 1 cell range [%d, %d] outside row range [%d, %d]", cell.opStart, cell.opEnd, r1s, r1e)
+		}
+	}
+	// ops are emitted in document order: row 0 ends before row 1 starts
+	if !(r0e < r1s) {
+		t.Errorf("row 0 ends at op %d, row 1 starts at op %d; want row0 end < row1 start", r0e, r1s)
+	}
+}
+
+func TestElementLocations(t *testing.T) {
+	res := layoutHTML(t, `<html><body><h1>title</h1><p>body text</p><table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table></body></html>`)
+	doc := pdf.NewDocument()
+	doc.SetCreationTime(epoch)
+	err := Paint(doc, res, PaintOptions{PageWidth: 595, PageHeight: 842, MarginTop: 28.35, MarginBottom: 28.35, MarginLeft: 28.35, MarginRight: 28.35})
+	if err != nil {
+		t.Fatalf("Paint: %v", err)
+	}
+	// h1, p, table + 4 cells (plus html/body)
+	if len(res.Locations) < 6 {
+		t.Fatalf("Locations = %d entries, want >= 6", len(res.Locations))
+	}
+	var h1 *ElementLocation
+	for i := range res.Locations {
+		if res.Locations[i].Node.Name == "h1" {
+			h1 = &res.Locations[i]
+			break
+		}
+	}
+	if h1 == nil {
+		t.Fatal("no h1 location")
+	}
+	if h1.Page != 0 {
+		t.Errorf("h1 page = %d, want 0", h1.Page)
+	}
+	if h1.X < 0 || h1.W <= 0 || h1.H <= 0 || h1.Y < 0 {
+		t.Errorf("h1 rect = (%.2f,%.2f) %.2fx%.2f, want X>=0, W>0, H>0, Y>=0", h1.X, h1.Y, h1.W, h1.H)
+	}
+	// document order: h1 before p before table, table cells in order
+	names := make([]string, 0, len(res.Locations))
+	for _, loc := range res.Locations {
+		names = append(names, loc.Node.Name)
+	}
+	h1i, pi, ti := indexOf(names, "h1"), indexOf(names, "p"), indexOf(names, "table")
+	if h1i < 0 || pi < 0 || ti < 0 {
+		t.Fatalf("missing h1/p/table in %v", names)
+	}
+	if !(h1i < pi && pi < ti) {
+		t.Errorf("document order broken in %v", names)
+	}
+	var tds []ElementLocation
+	for _, loc := range res.Locations {
+		if loc.Node.Name == "td" {
+			tds = append(tds, loc)
+		}
+	}
+	if len(tds) != 4 {
+		t.Fatalf("td locations = %d, want 4", len(tds))
+	}
+	for i := 1; i < len(tds); i++ {
+		if tds[i].Y < tds[i-1].Y {
+			t.Errorf("td %d y=%.2f above td %d y=%.2f (document order)", i, tds[i].Y, i-1, tds[i-1].Y)
+		}
+	}
+
+	// multi-page doc: some elements land on page 1
+	var sb strings.Builder
+	sb.WriteString("<html><body>")
+	for i := 0; i < 60; i++ {
+		sb.WriteString("<p>paragraph of text number ")
+		sb.WriteString(string(rune('a' + i%26)))
+		sb.WriteString(" with some words to wrap</p>")
+	}
+	sb.WriteString("</body></html>")
+	res2 := layoutHTML(t, sb.String())
+	doc2 := pdf.NewDocument()
+	doc2.SetCreationTime(epoch)
+	if err := Paint(doc2, res2, PaintOptions{PageWidth: 595, PageHeight: 842, MarginTop: 28.35, MarginBottom: 28.35, MarginLeft: 28.35, MarginRight: 28.35}); err != nil {
+		t.Fatalf("Paint long doc: %v", err)
+	}
+	if len(res2.Pages) < 2 {
+		t.Fatalf("Pages = %d, want >= 2", len(res2.Pages))
+	}
+	total := 0
+	for _, page := range res2.Pages {
+		total += len(page)
+	}
+	if total != len(res2.Ops) {
+		t.Errorf("Pages cover %d ops, Ops has %d", total, len(res2.Ops))
+	}
+	saw0, saw1 := false, false
+	for _, loc := range res2.Locations {
+		if loc.Page == 0 {
+			saw0 = true
+		}
+		if loc.Page == 1 {
+			saw1 = true
+		}
+	}
+	if !saw0 || !saw1 {
+		t.Errorf("page distribution: page0=%v page1=%v, want both", saw0, saw1)
+	}
+}
+
+func indexOf(seq []string, s string) int {
+	for i, v := range seq {
+		if v == s {
+			return i
+		}
+	}
+	return -1
 }
 
 func TestBlockStacking(t *testing.T) {
@@ -506,5 +720,196 @@ func TestHRElement(t *testing.T) {
 	}
 	if !near(fills[0].W, testViewport-12) {
 		t.Errorf("hr width = %v, want %v (viewport minus body margins)", fills[0].W, testViewport-12)
+	}
+}
+
+func TestZoom(t *testing.T) {
+	s := sheet(t, `div { width: 100pt; margin: 10pt; background-color: #000 }`)
+	src := `<html><body><div>abc</div></body></html>`
+
+	// zoom 1: text starts at body margin 6pt + div margin 10pt
+	res1 := layoutHTMLZoom(t, src, 1, s)
+	if !near(firstText(res1).X, 16) {
+		t.Errorf("zoom 1 text x = %v, want 16 (body 6 + margin 10)", firstText(res1).X)
+	}
+
+	// zoom 2: everything doubles (body 12 + margin 20)
+	res2 := layoutHTMLZoom(t, src, 2, s)
+	if !near(firstText(res2).X, 32) {
+		t.Errorf("zoom 2 text x = %v, want 32 (12 + 20)", firstText(res2).X)
+	}
+	fills := opsOfKind(res2, OpFillRect)
+	if len(fills) != 1 {
+		t.Fatalf("zoom 2 fills = %+v, want 1", fills)
+	}
+	if !near(fills[0].X, 12) {
+		t.Errorf("zoom 2 div x = %v, want 12 (body margin 6pt scaled)", fills[0].X)
+	}
+	if !near(fills[0].X+fills[0].W, 212) {
+		t.Errorf("zoom 2 div right edge = %v, want 212 (div x 12 + width 200)", fills[0].X+fills[0].W)
+	}
+}
+
+func TestPageBreakParsing(t *testing.T) {
+	s := sheet(t, `div.brk { page-break-before: always } div.avoid { break-inside: avoid } p.aft { break-after: always }`)
+	src := `<html><body><div class="brk">x</div><div class="avoid">y</div><p class="aft">z</p></body></html>`
+
+	// parsing must not panic or stall layout
+	res := layoutHTML(t, src, s)
+	if len(opsOfKind(res, OpText)) != 3 {
+		t.Fatalf("texts = %+v, want 3", opsOfKind(res, OpText))
+	}
+
+	root := mustParse(t, src)
+	styles := resolveStyles(root, []*css.Stylesheet{s}, "", testViewport, 800)
+	for n, st := range styles {
+		if n.Type != html.ElementNode {
+			continue
+		}
+		switch n.Attribute("class") {
+		case "brk":
+			if st.PageBreakBefore != "always" {
+				t.Errorf("div.brk page-break-before = %q, want always", st.PageBreakBefore)
+			}
+		case "avoid":
+			if st.PageBreakInside != "avoid" {
+				t.Errorf("div.avoid break-inside = %q, want avoid", st.PageBreakInside)
+			}
+		case "aft":
+			if st.PageBreakAfter != "always" {
+				t.Errorf("p.aft break-after = %q, want always", st.PageBreakAfter)
+			}
+		}
+	}
+}
+
+// paintOpts is a full-page-content geometry for pagination tests.
+func paintOpts() PaintOptions {
+	return PaintOptions{PageWidth: 595, PageHeight: 842} // contentH = 842
+}
+
+// pageOf returns the page (0-based) of the first op whose text contains want.
+func pageOf(t *testing.T, res *Result, want string) int {
+	t.Helper()
+	for i, op := range res.Ops {
+		if op.Kind == OpText && strings.Contains(op.Text, want) {
+			for p, idxs := range res.Pages {
+				for _, idx := range idxs {
+					if idx == i {
+						return p
+					}
+				}
+			}
+		}
+	}
+	t.Fatalf("op %q not found in any page", want)
+	return -1
+}
+
+func TestPageBreakBeforeAlways(t *testing.T) {
+	// div1's text sits on page 1 (padding pushes it past the boundary);
+	// div2 (break-before: always) must start on a fresh page: page 2.
+	s := sheet(t, `div.a { padding-top: 850pt; height: 900pt } div.brk { page-break-before: always }`)
+	res := layoutHTML(t, `<html><body><div class="a">one</div><div class="brk">two</div></body></html>`, s)
+	doc := pdf.NewDocument()
+	if err := Paint(doc, res, paintOpts()); err != nil {
+		t.Fatal(err)
+	}
+	p1 := pageOf(t, res, "one")
+	p2 := pageOf(t, res, "two")
+	if p1 != 1 {
+		t.Errorf("first div on page %d, want 1", p1)
+	}
+	if p2 != 2 {
+		t.Errorf("second div (break-before) on page %d, want 2", p2)
+	}
+}
+
+func TestPageBreakInsideAvoid(t *testing.T) {
+	// div1: y 6..506; div2 (avoid): y 506..906 spans pages 0-1, fits one page
+	// (h=400) → moves wholly to page 1.
+	s := sheet(t, `div.a { height: 500pt } div.b { height: 400pt; page-break-inside: avoid }`)
+	res := layoutHTML(t, `<html><body><div class="a">x</div><div class="b">y</div></body></html>`, s)
+	doc := pdf.NewDocument()
+	if err := Paint(doc, res, paintOpts()); err != nil {
+		t.Fatal(err)
+	}
+	pb := pageOf(t, res, "y")
+	if pb != 1 {
+		t.Errorf("avoid-inside div on page %d, want 1", pb)
+	}
+	// every "y" text op must be on that single page
+	for i, op := range res.Ops {
+		if op.Kind == OpText && op.Text == "y" && pageOfIdx(t, res, i) != pb {
+			t.Errorf("avoid box op on page %d, want %d", pageOfIdx(t, res, i), pb)
+		}
+	}
+}
+
+func TestBoundaryFillSplit(t *testing.T) {
+	// colored div starts at y=700 (after 694pt spacer), h=400 → its fill
+	// crosses the boundary at 842 and must split into two clipped rects.
+	s := sheet(t, `div.a { height: 694pt } div.b { height: 400pt; background-color: #000 }`)
+	res := layoutHTML(t, `<html><body><div class="a">x</div><div class="b">y</div></body></html>`, s)
+	doc := pdf.NewDocument()
+	if err := Paint(doc, res, paintOpts()); err != nil {
+		t.Fatal(err)
+	}
+	var fillIdx []int
+	for i, op := range res.Ops {
+		if op.Kind == OpFillRect {
+			fillIdx = append(fillIdx, i)
+		}
+	}
+	if len(fillIdx) != 2 {
+		t.Fatalf("fills = %d, want 2 (split at boundary)", len(fillIdx))
+	}
+	f0, f1 := res.Ops[fillIdx[0]], res.Ops[fillIdx[1]]
+	if !near(f0.Y, 700) || !near(f0.H, 142) {
+		t.Errorf("first fill = y %v h %v, want y 700 h 142 (clipped to boundary)", f0.Y, f0.H)
+	}
+	if !near(f1.Y, 842) || !near(f1.H, 258) {
+		t.Errorf("second fill = y %v h %v, want y 842 h 258", f1.Y, f1.H)
+	}
+	if p0, p1 := pageOfIdx(t, res, fillIdx[0]), pageOfIdx(t, res, fillIdx[1]); p0 != 0 || p1 != 1 {
+		t.Errorf("split fills on pages %d and %d, want 0 and 1", p0, p1)
+	}
+}
+
+// pageOfIdx returns the page of the op at index i.
+func pageOfIdx(t *testing.T, res *Result, i int) int {
+	t.Helper()
+	for p, idxs := range res.Pages {
+		for _, idx := range idxs {
+			if idx == i {
+				return p
+			}
+		}
+	}
+	t.Fatalf("op %d not found in any page", i)
+	return -1
+}
+
+func TestTableRowNoSplit(t *testing.T) {
+	// three tall rows (padding forces ~750pt rows); each must land on its own
+	// page without splitting.
+	s := sheet(t, `td { padding: 500pt; font-size: 12pt }`)
+	res := layoutHTML(t, `<html><body><table><tr><td>r1</td></tr><tr><td>r2</td></tr><tr><td>r3</td></tr></table></body></html>`, s)
+	doc := pdf.NewDocument()
+	if err := Paint(doc, res, paintOpts()); err != nil {
+		t.Fatal(err)
+	}
+	// find the row texts (r1, r2, r3 — padded cells emit them)
+	pages := map[string]int{}
+	for i, op := range res.Ops {
+		if op.Kind == OpText {
+			pages[op.Text] = pageOfIdx(t, res, i)
+		}
+	}
+	if len(pages) < 3 {
+		t.Fatalf("row texts = %v", pages)
+	}
+	if !(pages["r1"] < pages["r2"] && pages["r2"] < pages["r3"]) {
+		t.Errorf("row pages = %v, want strictly increasing", pages)
 	}
 }

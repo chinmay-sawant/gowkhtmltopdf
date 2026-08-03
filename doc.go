@@ -1,0 +1,49 @@
+// Package gowkhtmltopdf converts HTML documents to PDF (and to raster
+// images) from Go, using only the standard library. It is a pure-Go
+// reimplementation of the wkhtmltopdf command-line tools; no Qt, no Cgo, no
+// external binaries.
+//
+// # Quick start
+//
+//	import gowkhtmltopdf "gowkhtmltopdf"
+//
+//	c := gowkhtmltopdf.NewConverter()
+//	c.Global().Set("size.pagesize", "A4")
+//	c.Global().Set("orientation", "portrait")
+//	c.Global().Set("enablelocalfileaccess", "true")
+//
+//	obj := gowkhtmltopdf.NewObjectSettings().SetPage("report.html")
+//	obj.Set("load.blocklocalfileaccess", "false") // pair with the global flag
+//	c.AddObject(obj)
+//
+//	if err := c.Convert(context.Background()); err != nil {
+//		log.Fatal(err)
+//	}
+//	os.WriteFile("report.pdf", c.Output(), 0o644)
+//
+// # Settings
+//
+// Global and object settings are set and read by wkhtmltopdf-style dotted
+// names, e.g. "size.pagesize", "margin.top", "orientation", "web.background",
+// "header.left" or "load.jsdelay". Set returns an error for unknown names;
+// Get returns (value, false) for names that have no scalar representation.
+// The exact name list mirrors the CLI surface documented by
+// gowkhtmltopdf --help.
+//
+// # Local file access
+//
+// The security ACL blocks local file reads by default. To convert a local
+// file, enable access explicitly — both the global flag and the object-level
+// block must be toggled, mirroring the CLI's --enable-local-file-access and
+// --block-local-file-access pair:
+//
+//	c.Global().Set("enablelocalfileaccess", "true")
+//	obj.Set("load.blocklocalfileaccess", "false")
+//
+// # Thread safety
+//
+// A Converter (and ImageConverter) is not safe for concurrent Convert calls:
+// use one converter per conversion, or guard access with a mutex. Settings
+// may be freely read while idle. Each Convert run is fully context-aware;
+// cancel the context to abort an in-flight conversion.
+package gowkhtmltopdf

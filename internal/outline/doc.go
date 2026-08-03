@@ -1,3 +1,2 @@
-// Package outline is reserved by the outline phase of the gowkhtmltopdf rewrite.
-// Phase 00 scaffold only; implementation lands in later phases.
+// Package outline is documented in outline.go.
 package outline

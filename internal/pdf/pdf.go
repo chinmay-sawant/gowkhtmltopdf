@@ -7,6 +7,7 @@ package pdf
 import (
 	"bytes"
 	"compress/flate"
+	"errors"
 	"fmt"
 	"io"
 	"sort"
@@ -126,6 +127,78 @@ func (d *Document) AddPage(width, height float64) *Page {
 	p.content.doc = d
 	d.pages = append(d.pages, p)
 	return p
+}
+
+// PageCount returns the number of pages currently in the document.
+func (d *Document) PageCount() int { return len(d.pages) }
+
+// PageRef returns the object reference string of the page at index idx, or
+// "" when idx is out of range. Page objects are allocated at AddPage time and
+// their refs are stable, so this is safe to call after all AddPage calls and
+// before Write — e.g. to wire outline destinations and link annotations.
+func (d *Document) PageRef(idx int) string {
+	if idx < 0 || idx >= len(d.pages) {
+		return ""
+	}
+	return d.pages[idx].ref
+}
+
+// PageAt returns the Page at index idx, or nil when out of range. Used to
+// attach annotations (AddLinkDest/AddLinkURI) after painting.
+func (d *Document) PageAt(idx int) *Page {
+	if idx < 0 || idx >= len(d.pages) {
+		return nil
+	}
+	return d.pages[idx]
+}
+
+// ReorderPages replaces the page order, e.g. for copies/collate assembly.
+// Page objects are self-contained — their /Contents stream and /Annots live
+// on the page itself and the pages tree is a flat single-level /Kids list
+// built at finalize — so permuting d.pages is sufficient. order must be a
+// permutation of the current page indices; anything else is an error.
+func (d *Document) ReorderPages(order []int) error {
+	if d.finalized {
+		return errors.New("pdf: reorder: document already finalized")
+	}
+	if len(order) != len(d.pages) {
+		return fmt.Errorf("pdf: reorder: order has %d entries, document has %d pages",
+			len(order), len(d.pages))
+	}
+	seen := make([]bool, len(d.pages))
+	next := make([]*Page, len(d.pages))
+	for i, idx := range order {
+		if idx < 0 || idx >= len(d.pages) {
+			return fmt.Errorf("pdf: reorder: index %d out of range (0..%d)", idx, len(d.pages)-1)
+		}
+		if seen[idx] {
+			return fmt.Errorf("pdf: reorder: index %d appears more than once", idx)
+		}
+		seen[idx] = true
+		next[i] = d.pages[idx]
+	}
+	d.pages = next
+	return nil
+}
+
+// DuplicatePage appends a fresh page object that paints the same content as
+// the page at index i: same size, a new /Contents object with the same
+// stream bytes, and independent copies of the link annotations. Font and
+// image resources are shared with the source (they are read-only after
+// painting), so both pages resolve to the same XObjects. Used to materialize
+// copies/collate page runs before ReorderPages.
+func (d *Document) DuplicatePage(i int) (*Page, error) {
+	if d.finalized {
+		return nil, errors.New("pdf: duplicate: document already finalized")
+	}
+	if i < 0 || i >= len(d.pages) {
+		return nil, fmt.Errorf("pdf: duplicate: page index %d out of range (0..%d)", i, len(d.pages)-1)
+	}
+	src := d.pages[i]
+	p := d.AddPage(src.width, src.height)
+	p.content = cloneContent(src.content)
+	p.annots = append([]annotation(nil), src.annots...)
+	return p, nil
 }
 
 // Width returns the page width in points.

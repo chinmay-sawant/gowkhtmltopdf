@@ -44,6 +44,27 @@ func NewContent() *Content {
 // Bytes returns the raw (uncompressed) content stream.
 func (c *Content) Bytes() []byte { return c.buf.Bytes() }
 
+// cloneContent returns a copy of c that paints the same operators. Font,
+// image and rune maps are shared with the source: they are only written
+// during painting (before clone time) and at finalize, where writes are
+// idempotent, so both pages resolve to the same resource objects. A fresh
+// bytes.Buffer is used because Buffer values must not be copied after use.
+func cloneContent(c *Content) *Content {
+	nc := &Content{
+		fontUses:  c.fontUses,
+		fontDefs:  c.fontDefs,
+		fontFiles: c.fontFiles,
+		used:      c.used,
+		curFont:   c.curFont,
+		imageUses: c.imageUses,
+		imageRefs: c.imageRefs,
+		opacity:   c.opacity,
+		doc:       c.doc,
+	}
+	nc.buf.Write(c.buf.Bytes())
+	return nc
+}
+
 // graphics state
 
 // Save restores the graphics state stack.

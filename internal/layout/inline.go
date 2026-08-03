@@ -75,7 +75,7 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 		trimmed := strings.TrimRight(last.text, " ")
 		if trimmed != last.text {
 			last.text = trimmed
-			last.w = e.measureText(trimmed, last.style.FontSize) + last.style.LetterSpacing*float64(len([]rune(trimmed)))
+			last.w = e.measureText(trimmed, last.style.FontSize*e.scale) + last.style.LetterSpacing*e.scale*float64(len([]rune(trimmed)))
 		}
 	}
 
@@ -89,9 +89,9 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 			}
 			continue
 		}
-		as := e.fontAscent(it.style.FontSize)
-		de := e.fontDescent(it.style.FontSize)
-		lh := lineHeightOf(&it.style)
+		as := e.fontAscent(it.style.FontSize * e.scale)
+		de := e.fontDescent(it.style.FontSize * e.scale)
+		lh := lineHeightOf(&it.style) * e.scale
 		extra := (lh - as - de) / 2
 		if as+extra > maxAscent {
 			maxAscent = as + extra
@@ -151,7 +151,7 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 		}
 		c := it.style.Color
 		e.add(Op{Kind: OpText, X: lx, Y: baseline, W: it.w, H: it.h,
-			Text: it.text, Font: e.font, Size: it.style.FontSize, Bold: it.style.FontWeight >= 700,
+			Text: it.text, Font: e.font, Size: it.style.FontSize * e.scale, Bold: it.style.FontWeight >= 700,
 			R: c[0], G: c[1], B: c[2]})
 		if it.style.TextDecoration == "underline" {
 			e.add(Op{Kind: OpLine, X: lx, Y: baseline + it.descent*0.25, W: it.w, H: 0, R: c[0], G: c[1], B: c[2]})
@@ -255,8 +255,8 @@ func (e *engine) collectInlineNode(n *html.Node, out *[]inlineItem) {
 func availWForInline() float64 { return 1 << 30 }
 
 func (e *engine) textItem(text string, st ResolvedStyle) inlineItem {
-	w := e.measureText(text, st.FontSize) + st.LetterSpacing*float64(len([]rune(text)))
-	return inlineItem{text: text, style: st, w: w, h: lineHeightOf(&st)}
+	w := e.measureText(text, st.FontSize*e.scale) + st.LetterSpacing*e.scale*float64(len([]rune(text)))
+	return inlineItem{text: text, style: st, w: w, h: lineHeightOf(&st) * e.scale}
 }
 
 func lineHeightOf(st *ResolvedStyle) float64 {

@@ -1,7 +1,7 @@
 # 00 — Pure-Go wkhtmltopdf Rewrite (Canonical Execution Ledger)
 
 > **Parent:** none — root plan  
-> **Status:** Phases 0–4 complete (2026-08-03); Phases 5+ not started  
+> **Status:** Phases 0–8 complete (2026-08-03); Phase 9 remaining  
 > **Estimated effort:** MVP 18–28 person-months · Intermediate 45–70 PM · Full parity not realistic (stdlib-only)  
 > **Constraint:** pure Golang, **Go standard library only** (no third-party modules, no Chrome/WebKit, no cgo)  
 > **Source analyzed:** `wkhtmltopdf/` (v0.12.7-dev) via 5 explore subagents  
@@ -53,10 +53,10 @@ Phase 0 Scope → 1 Settings/CLI → 2 Loader → 3 PDF Writer
 | 2 | Resource loader & network | [phases/phase-02-loader-network.md](phases/phase-02-loader-network.md) | 0.75–1.5 mo | `[x]` 2026-08-03 |
 | 3 | PDF object model & writer | [phases/phase-03-pdf-writer.md](phases/phase-03-pdf-writer.md) | 2–3 mo | `[x]` 2026-08-03 |
 | 4 | HTML parser + CSS subset layout | [phases/phase-04-html-css-layout.md](phases/phase-04-html-css-layout.md) | 6–12 mo | `[x]` 2026-08-03 |
-| 5 | Print pagination & page breaks | [phases/phase-05-pagination-print.md](phases/phase-05-pagination-print.md) | 2–4 mo | `[ ]` |
-| 6 | Headers/footers, TOC, outlines, links | [phases/phase-06-headers-toc-outline.md](phases/phase-06-headers-toc-outline.md) | 2–4 mo | `[ ]` |
-| 7 | Image converter (`wkhtmltoimage`) | [phases/phase-07-image-converter.md](phases/phase-07-image-converter.md) | 1–2 mo | `[ ]` |
-| 8 | Go library API (+ optional C-shaped API) | [phases/phase-08-library-api.md](phases/phase-08-library-api.md) | 1–1.5 mo | `[ ]` |
+| 5 | Print pagination & page breaks | [phases/phase-05-pagination-print.md](phases/phase-05-pagination-print.md) | 2–4 mo | `[x]` 2026-08-03 |
+| 6 | Headers/footers, TOC, outlines, links | [phases/phase-06-headers-toc-outline.md](phases/phase-06-headers-toc-outline.md) | 2–4 mo | `[x]` 2026-08-03 |
+| 7 | Image converter (`wkhtmltoimage`) | [phases/phase-07-image-converter.md](phases/phase-07-image-converter.md) | 1–2 mo | `[x]` 2026-08-03 |
+| 8 | Go library API (+ optional C-shaped API) | [phases/phase-08-library-api.md](phases/phase-08-library-api.md) | 1–1.5 mo | `[x]` 2026-08-03 |
 | 9 | Hardening, corpus, closure gates | [phases/phase-09-hardening-closure.md](phases/phase-09-hardening-closure.md) | 2–4 mo | `[ ]` |
 
 **Calendar (solo FT):** MVP exit after phases 0–6 + partial 9 ≈ **18–30 months**.  

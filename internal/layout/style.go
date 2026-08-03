@@ -1,6 +1,7 @@
 package layout
 
 import (
+	"sort"
 	"strings"
 
 	"gowkhtmltopdf/internal/css"
@@ -11,45 +12,48 @@ import (
 // consumes, in points (or unitless where noted). Only the phase-04 subset is
 // modeled; everything else keeps its initial value.
 type ResolvedStyle struct {
-	Display        string
-	Position       string  // "static" | "relative"
-	Float          string  // "none" | "left" | "right"
-	Clear          string  // "none" | "left" | "right" | "both"
-	Width          float64 // -1 = auto
-	Height         float64
-	MinWidth       float64
-	MaxWidth       float64
-	MinHeight      float64
-	MaxHeight      float64
-	MarginTop      float64
-	MarginRight    float64
-	MarginBottom   float64
-	MarginLeft     float64
-	PaddingTop     float64
-	PaddingRight   float64
-	PaddingBottom  float64
-	PaddingLeft    float64
-	BorderTop      border
-	BorderRight    border
-	BorderBottom   border
-	BorderLeft     border
-	Color          [3]float64
-	BGColor        [4]float64 // rgba, 0..1
-	FontFamily     []string
-	FontSize       float64 // pts
-	FontWeight     int
-	FontItalic     bool
-	LineHeight     float64 // pts; 0 = "normal"
-	TextAlign      string  // "left" | "right" | "center" | "justify"
-	VerticalAlign  string  // "baseline" | "top" | "middle" | "bottom"
-	WhiteSpace     string  // "normal" | "nowrap" | "pre"
-	TextDecoration string  // "none" | "underline" | "line-through"
-	LetterSpacing  float64
-	TextIndent     float64
-	BorderCollapse string // "separate" | "collapse"
-	BorderSpacing  float64
-	TableLayout    string // "auto" | "fixed"
-	IsReplaced     bool   // img, hr
+	Display         string
+	Position        string  // "static" | "relative"
+	Float           string  // "none" | "left" | "right"
+	Clear           string  // "none" | "left" | "right" | "both"
+	Width           float64 // -1 = auto
+	Height          float64
+	MinWidth        float64
+	MaxWidth        float64
+	MinHeight       float64
+	MaxHeight       float64
+	MarginTop       float64
+	MarginRight     float64
+	MarginBottom    float64
+	MarginLeft      float64
+	PaddingTop      float64
+	PaddingRight    float64
+	PaddingBottom   float64
+	PaddingLeft     float64
+	BorderTop       border
+	BorderRight     border
+	BorderBottom    border
+	BorderLeft      border
+	Color           [3]float64
+	BGColor         [4]float64 // rgba, 0..1
+	FontFamily      []string
+	FontSize        float64 // pts
+	FontWeight      int
+	FontItalic      bool
+	LineHeight      float64 // pts; 0 = "normal"
+	TextAlign       string  // "left" | "right" | "center" | "justify"
+	VerticalAlign   string  // "baseline" | "top" | "middle" | "bottom"
+	WhiteSpace      string  // "normal" | "nowrap" | "pre"
+	TextDecoration  string  // "none" | "underline" | "line-through"
+	LetterSpacing   float64
+	TextIndent      float64
+	BorderCollapse  string // "separate" | "collapse"
+	BorderSpacing   float64
+	TableLayout     string // "auto" | "fixed"
+	IsReplaced      bool   // img, hr
+	PageBreakBefore string // "" | "always" | "avoid"
+	PageBreakAfter  string // "" | "always" | "avoid"
+	PageBreakInside string // "" | "always" | "avoid"
 }
 
 type border struct {
@@ -288,9 +292,31 @@ func applyFontProps(st *ResolvedStyle, raw map[string]string, parent *ResolvedSt
 }
 
 // applyRestProps resolves every non-font property once the font size is known.
+// Properties are applied in a fixed order: the shorthand groups first, then
+// every other property alphabetically. raw is a map, so iterating it directly
+// would be nondeterministic and could let a shorthand (e.g. UA "margin")
+// clobber a winning longhand (e.g. author "margin-bottom") depending on map
+// iteration order.
 func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext) {
 	fs := st.FontSize
-	for prop, value := range raw {
+	shorthands := []string{"margin", "padding", "border", "border-width", "border-style", "border-color"}
+	isShorthand := map[string]bool{}
+	for _, p := range shorthands {
+		isShorthand[p] = true
+	}
+	var rest []string
+	for prop := range raw {
+		if !isShorthand[prop] {
+			rest = append(rest, prop)
+		}
+	}
+	sort.Strings(rest)
+	props := append(append([]string{}, shorthands...), rest...)
+	for _, prop := range props {
+		value, ok := raw[prop]
+		if !ok {
+			continue
+		}
 		switch prop {
 		case "display":
 			switch value {
@@ -452,6 +478,18 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext)
 		case "table-layout":
 			if value == "fixed" || value == "auto" {
 				st.TableLayout = value
+			}
+		case "page-break-before", "break-before":
+			if value == "always" || value == "avoid" {
+				st.PageBreakBefore = value
+			}
+		case "page-break-after", "break-after":
+			if value == "always" || value == "avoid" {
+				st.PageBreakAfter = value
+			}
+		case "page-break-inside", "break-inside":
+			if value == "always" || value == "avoid" {
+				st.PageBreakInside = value
 			}
 		}
 	}

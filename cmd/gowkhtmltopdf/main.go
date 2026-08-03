@@ -2,8 +2,10 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 
 	"gowkhtmltopdf/internal/cli"
@@ -45,7 +47,13 @@ func run(argv []string) int {
 		return cli.ExitError
 	}
 
-	if err := convert.RunPDF(cmd, os.Stderr); err != nil {
+	// --quiet suppresses progress/info/warning output but never errors, which
+	// are always printed to stderr below.
+	logw := io.Writer(os.Stderr)
+	if cmd.Global.Quiet {
+		logw = io.Discard
+	}
+	if err := convert.RunPDFContext(context.Background(), cmd, logw, nil); err != nil {
 		fmt.Fprintf(os.Stderr, "gowkhtmltopdf: %v\n", err)
 		if hc, ok := err.(interface{ HttpErrorCode() int }); ok {
 			return hc.HttpErrorCode()

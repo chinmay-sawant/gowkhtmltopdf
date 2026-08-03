@@ -2,11 +2,15 @@ package pdf
 
 import (
 	"bytes"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 )
+
+// kidsRe matches the pages tree /Kids array.
+var kidsRe = regexp.MustCompile(`/Kids \[([^\]]+)\]`)
 
 func fixedDoc(t *testing.T) *Document {
 	t.Helper()
@@ -281,5 +285,138 @@ func TestOutlineCountAndSort(t *testing.T) {
 	}
 	if got := outlineCount(&Outline{Children: []*Outline{{}, {Children: []*Outline{{}}}}}); got != 3 {
 		t.Errorf("outlineCount = %d, want 3", got)
+	}
+}
+
+func TestWriteToMemoryBuffer(t *testing.T) {
+	d := fixedDoc(t)
+	d.SetCompression(false)
+	p := d.AddPage(200, 200)
+	p.Content().TextShow("memory buffer")
+	var buf bytes.Buffer
+	if err := d.Write(&buf); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	if buf.Len() == 0 {
+		t.Fatal("buffer is empty")
+	}
+	if !bytes.HasPrefix(buf.Bytes(), []byte("%PDF-")) {
+		t.Fatal("buffer does not contain a PDF")
+	}
+	if !bytes.Contains(buf.Bytes(), []byte("(memory buffer)")) {
+		t.Error("buffer output is missing the content stream")
+	}
+}
+
+// kidsRefs extracts the page refs listed in the pages tree /Kids array.
+func kidsRefs(t *testing.T, out string) []string {
+	t.Helper()
+	m := kidsRe.FindStringSubmatch(out)
+	if m == nil {
+		t.Fatalf("no /Kids array in output")
+	}
+	fields := strings.Fields(m[1])
+	var refs []string
+	for i := 0; i+2 < len(fields); i += 3 {
+		refs = append(refs, strings.Join(fields[i:i+3], " "))
+	}
+	return refs
+}
+
+func TestReorderPagesKidsOrder(t *testing.T) {
+	d := fixedDoc(t)
+	pA := d.AddPage(100, 100)
+	pB := d.AddPage(100, 100)
+	pC := d.AddPage(100, 100)
+	if err := d.ReorderPages([]int{2, 0, 1}); err != nil {
+		t.Fatalf("ReorderPages: %v", err)
+	}
+	out := string(writePDF(t, d))
+	kids := kidsRefs(t, out)
+	want := []string{pC.ref, pA.ref, pB.ref}
+	if strings.Join(kids, " ") != strings.Join(want, " ") {
+		t.Errorf("/Kids = %v, want %v", kids, want)
+	}
+	// every page object still owns its original content stream
+	for _, p := range []*Page{pA, pB, pC} {
+		if !strings.Contains(out, "/Contents "+p.contentRef) {
+			t.Errorf("page %s lost its content stream %s", p.ref, p.contentRef)
+		}
+	}
+}
+
+func TestDuplicatePage(t *testing.T) {
+	d := fixedDoc(t)
+	d.SetCompression(false)
+	pA := d.AddPage(100, 100)
+	pA.Content().TextShow("AAA")
+	pB := d.AddPage(200, 200)
+	pB.Content().TextShow("BBB")
+
+	dup, err := d.DuplicatePage(0)
+	if err != nil {
+		t.Fatalf("DuplicatePage: %v", err)
+	}
+	if dup.Width() != 100 || dup.Height() != 100 {
+		t.Errorf("duplicate size = %g x %g, want 100 x 100", dup.Width(), dup.Height())
+	}
+	if d.PageCount() != 3 {
+		t.Fatalf("PageCount = %d, want 3", d.PageCount())
+	}
+	if dup.ref == pA.ref || dup.contentRef == pA.contentRef {
+		t.Error("duplicate must have its own page and content objects")
+	}
+
+	out := string(writePDF(t, d))
+	// kids must be [A B A'] and every page keeps its own content stream
+	kids := kidsRefs(t, out)
+	wantKids := []string{pA.ref, pB.ref, dup.ref}
+	if strings.Join(kids, " ") != strings.Join(wantKids, " ") {
+		t.Errorf("/Kids = %v, want %v", kids, wantKids)
+	}
+	for _, p := range []*Page{pA, pB, dup} {
+		if !strings.Contains(out, "/Contents "+p.contentRef) {
+			t.Errorf("page %s lost its content stream %s", p.ref, p.contentRef)
+		}
+	}
+	// both copies of A paint the same text
+	if c := bytes.Count([]byte(out), []byte("(AAA)")); c != 2 {
+		t.Errorf("(AAA) appears %d times, want 2", c)
+	}
+
+	if _, err := d.DuplicatePage(5); err == nil {
+		t.Error("DuplicatePage(5): expected error for out-of-range index")
+	}
+	if _, err := d.DuplicatePage(-1); err == nil {
+		t.Error("DuplicatePage(-1): expected error for negative index")
+	}
+}
+
+func TestReorderPagesValidation(t *testing.T) {
+	d := fixedDoc(t)
+	d.AddPage(100, 100)
+	d.AddPage(100, 100)
+	for _, order := range [][]int{
+		{0},       // wrong length
+		{0, 1, 2}, // wrong length
+		{-1, 0},   // negative index
+		{2, 0},    // out of range
+		{0, 0},    // duplicate index
+	} {
+		if err := d.ReorderPages(order); err == nil {
+			t.Errorf("ReorderPages(%v): expected error, got nil", order)
+		}
+	}
+	// failed reorders must leave the page order untouched
+	if got := kidsRefs(t, string(writePDF(t, d))); len(got) != 2 {
+		t.Errorf("pages corrupted by failed reorders: %v", got)
+	}
+	// reordering after Write (finalize) must fail
+	var buf bytes.Buffer
+	if err := d.Write(&buf); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	if err := d.ReorderPages([]int{1, 0}); err == nil {
+		t.Error("ReorderPages after finalize: expected error, got nil")
 	}
 }

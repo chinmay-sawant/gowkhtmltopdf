@@ -28,8 +28,9 @@ type Options struct {
 	Sheets     []*css.Stylesheet
 	Media      string // "print" or "screen"; "" = apply "all" rules only
 	Images     func(src string) ([]byte, error)
-	Background bool // paint background colors
-	DebugBoxes bool // outline every box for test/golden output
+	Background bool    // paint background colors
+	DebugBoxes bool    // outline every box for test/golden output
+	Zoom       float64 // zoom factor; style lengths are scaled by it (any positive value, < 1 shrinks)
 }
 
 // Result is a display list plus the canvas bounds.
@@ -37,6 +38,28 @@ type Result struct {
 	Ops    []Op
 	Width  float64
 	Height float64
+
+	root *box // element box tree, kept for Paint (Locations)
+
+	// Pages maps page index → indices into Ops of the ops painted on that
+	// page. Filled by Paint using its pagination semantics (an op goes to
+	// the page containing its top edge; ops crossing a page boundary move
+	// wholly to the next page).
+	Pages [][]int
+	// Locations lists every element box in document order with the page its
+	// first op landed on and its canvas rect. Filled by Paint; boxes without
+	// ops use the page of their y position.
+	Locations []ElementLocation
+}
+
+// ElementLocation describes where one element box landed after pagination.
+// X/Y/W/H are in canvas coordinates (y down from the top of the page content
+// area); Page is the page index the box's first op was painted on.
+type ElementLocation struct {
+	Node *html.Node
+	Page int
+	X, Y float64
+	W, H float64
 }
 
 // OpKind discriminates display-list operations.
@@ -82,6 +105,19 @@ type engine struct {
 	ops    []Op
 	noEmit bool // measurement mode: compute geometry without emitting ops
 	height float64
+	scale  float64 // zoom factor applied to style lengths (>= 1)
+}
+
+// scalePt applies the engine zoom factor to a style length in points.
+func (e *engine) scalePt(v float64) float64 { return v * e.scale }
+
+// zoomScale returns the effective zoom factor: any positive opts.Zoom
+// (values below 1 shrink; 0 means no zoom).
+func zoomScale(z float64) float64 {
+	if z > 0 {
+		return z
+	}
+	return 1
 }
 
 func (e *engine) add(op Op) {
@@ -107,10 +143,11 @@ func Layout(root *html.Node, opts Options) (*Result, error) {
 		opts:   opts,
 		font:   font,
 		styles: resolveStyles(root, opts.Sheets, opts.Media, opts.Width, opts.Height),
+		scale:  zoomScale(opts.Zoom),
 	}
 
 	b := e.build(root, opts.Width, 0, 0)
-	res := &Result{Ops: e.ops, Width: opts.Width, Height: opts.Height}
+	res := &Result{Ops: e.ops, Width: opts.Width, Height: opts.Height, root: b}
 	if b != nil {
 		res.Height = b.y + b.h
 	}
@@ -122,17 +159,24 @@ func Layout(root *html.Node, opts Options) (*Result, error) {
 
 // box is one laid-out box.
 type box struct {
-	node          *html.Node
-	style         ResolvedStyle
-	x, y          float64 // border-box top-left
-	w, h          float64 // border-box size
-	kind          string  // "block" | "table" | "cell" | "replaced"
-	children      []*box
-	firstBaseline float64
+	node  *html.Node
+	style ResolvedStyle
+	x, y  float64 // border-box top-left
+	w, h  float64 // border-box size
+	kind  string  // "block" | "table" | "cell" | "replaced"
+	// opStart/opEnd bound the inclusive range of e.ops indices that this
+	// box's subtree emitted. opEnd < opStart means the box emitted nothing
+	// (e.g. boxes built during a noEmit measure pass).
+	opStart, opEnd int
+	children       []*box
+	firstBaseline  float64
 	// table cells
 	col, span int
 	contentW  float64
 	contentH  float64
+	// rows[i] holds the cell boxes of table row i, in document order. The
+	// row's op range is from rows[i][0].opStart to rows[i][len-1].opEnd.
+	rows [][]*box
 	// replaced
 	imgSrc  string
 	imgData []byte
@@ -149,16 +193,22 @@ func (e *engine) build(n *html.Node, availW, x, y float64) *box {
 	if st.Display == "none" {
 		return nil
 	}
+	start := len(e.ops)
+	var b *box
 	switch n.Name {
 	case "img":
-		return e.buildImage(n, st, x, y)
+		b = e.buildImage(n, st, x, y)
 	case "hr":
-		return e.buildHR(n, st, availW, x, y)
+		b = e.buildHR(n, st, availW, x, y)
 	}
-	if isTableDisplay(st.Display) {
-		return e.buildTable(n, st, availW, x, y)
+	if b == nil && isTableDisplay(st.Display) {
+		b = e.buildTable(n, st, availW, x, y)
 	}
-	return e.buildBlock(n, st, availW, x, y)
+	if b == nil {
+		b = e.buildBlock(n, st, availW, x, y)
+	}
+	b.opStart, b.opEnd = start, len(e.ops)-1
+	return b
 }
 
 func isTableDisplay(d string) bool {
@@ -173,18 +223,18 @@ func isTableDisplay(d string) bool {
 // buildBlock lays out a block-level box.
 func (e *engine) buildBlock(n *html.Node, st ResolvedStyle, availW, x, y float64) *box {
 	b := &box{node: n, style: st, kind: "block", x: x, y: y}
-	innerW := availW - st.MarginLeft - st.MarginRight
+	innerW := availW - e.scalePt(st.MarginLeft) - e.scalePt(st.MarginRight)
 	b.w = innerW
 	if st.Width >= 0 {
-		b.w = st.Width
+		b.w = e.scalePt(st.Width)
 	}
-	if st.MinWidth > 0 && b.w < st.MinWidth {
-		b.w = st.MinWidth
+	if st.MinWidth > 0 && b.w < e.scalePt(st.MinWidth) {
+		b.w = e.scalePt(st.MinWidth)
 	}
-	if st.MaxWidth >= 0 && b.w > st.MaxWidth {
-		b.w = st.MaxWidth
+	if st.MaxWidth >= 0 && b.w > e.scalePt(st.MaxWidth) {
+		b.w = e.scalePt(st.MaxWidth)
 	}
-	contentW := b.w - st.PaddingLeft - st.PaddingRight - st.BorderLeft.Width - st.BorderRight.Width
+	contentW := b.w - e.scalePt(st.PaddingLeft) - e.scalePt(st.PaddingRight) - e.scalePt(st.BorderLeft.Width) - e.scalePt(st.BorderRight.Width)
 	if contentW < 0 {
 		contentW = 0
 	}
@@ -192,19 +242,19 @@ func (e *engine) buildBlock(n *html.Node, st ResolvedStyle, availW, x, y float64
 	var blocks, inlines []*html.Node
 	e.partition(n.Children, &blocks, &inlines)
 
-	cy := st.PaddingTop + st.BorderTop.Width
+	cy := e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)
 	prevBottom := 0.0
 
 	for _, cn := range blocks {
 		cs := e.styles[cn]
-		cy += collapseMargins(prevBottom, cs.MarginTop)
-		cb := e.build(cn, contentW, x+st.MarginLeft+st.BorderLeft.Width+st.PaddingLeft, y+cy)
+		cy += collapseMargins(prevBottom, e.scalePt(cs.MarginTop))
+		cb := e.build(cn, contentW, x+e.scalePt(st.MarginLeft)+e.scalePt(st.BorderLeft.Width)+e.scalePt(st.PaddingLeft), y+cy)
 		if cb == nil {
 			prevBottom = 0
 			continue
 		}
 		cy += cb.h
-		prevBottom = cs.MarginBottom
+		prevBottom = e.scalePt(cs.MarginBottom)
 		b.children = append(b.children, cb)
 		if e.opts.DebugBoxes {
 			e.add(Op{Kind: OpStrokeRect, X: cb.x, Y: cb.y, W: cb.w, H: cb.h, R: 1, G: 0, B: 0})
@@ -212,22 +262,22 @@ func (e *engine) buildBlock(n *html.Node, st ResolvedStyle, availW, x, y float64
 	}
 
 	if len(inlines) > 0 {
-		cy += e.layoutInline(b, inlines, contentW, x+st.MarginLeft+st.BorderLeft.Width+st.PaddingLeft, y+cy)
+		cy += e.layoutInline(b, inlines, contentW, x+e.scalePt(st.MarginLeft)+e.scalePt(st.BorderLeft.Width)+e.scalePt(st.PaddingLeft), y+cy)
 	}
 
 	// list marker
 	if n.Name == "li" && b.firstBaseline > 0 {
-		e.add(Op{Kind: OpBullet, X: x + 4, Y: b.firstBaseline, Text: "\u2022", Font: e.font, Size: st.FontSize, R: st.Color[0], G: st.Color[1], B: st.Color[2]})
+		e.add(Op{Kind: OpBullet, X: x + 4, Y: b.firstBaseline, Text: "\u2022", Font: e.font, Size: e.scalePt(st.FontSize), R: st.Color[0], G: st.Color[1], B: st.Color[2]})
 	}
 
-	if st.Height >= 0 && cy < st.Height {
-		cy = st.Height
+	if st.Height >= 0 && cy < e.scalePt(st.Height) {
+		cy = e.scalePt(st.Height)
 	}
-	if st.MinHeight > 0 && cy < st.MinHeight {
-		cy = st.MinHeight
+	if st.MinHeight > 0 && cy < e.scalePt(st.MinHeight) {
+		cy = e.scalePt(st.MinHeight)
 	}
-	if st.MaxHeight >= 0 && cy > st.MaxHeight {
-		cy = st.MaxHeight
+	if st.MaxHeight >= 0 && cy > e.scalePt(st.MaxHeight) {
+		cy = e.scalePt(st.MaxHeight)
 	}
 	b.h = cy
 
@@ -271,17 +321,18 @@ func collapseMargins(a, b float64) float64 {
 }
 
 func (e *engine) emitBorders(st ResolvedStyle, x, y, w, h float64) {
-	if st.BorderTop.Width > 0 && st.BorderTop.Style != "none" {
-		e.add(Op{Kind: OpLine, X: x, Y: y, W: w, H: 0, Width: st.BorderTop.Width, R: st.BorderTop.Color[0], G: st.BorderTop.Color[1], B: st.BorderTop.Color[2]})
+	wt, wr, wb, wl := e.scalePt(st.BorderTop.Width), e.scalePt(st.BorderRight.Width), e.scalePt(st.BorderBottom.Width), e.scalePt(st.BorderLeft.Width)
+	if wt > 0 && st.BorderTop.Style != "none" {
+		e.add(Op{Kind: OpLine, X: x, Y: y, W: w, H: 0, Width: wt, R: st.BorderTop.Color[0], G: st.BorderTop.Color[1], B: st.BorderTop.Color[2]})
 	}
-	if st.BorderRight.Width > 0 && st.BorderRight.Style != "none" {
-		e.add(Op{Kind: OpLine, X: x + w, Y: y, W: 0, H: h, Width: st.BorderRight.Width, R: st.BorderRight.Color[0], G: st.BorderRight.Color[1], B: st.BorderRight.Color[2]})
+	if wr > 0 && st.BorderRight.Style != "none" {
+		e.add(Op{Kind: OpLine, X: x + w, Y: y, W: 0, H: h, Width: wr, R: st.BorderRight.Color[0], G: st.BorderRight.Color[1], B: st.BorderRight.Color[2]})
 	}
-	if st.BorderBottom.Width > 0 && st.BorderBottom.Style != "none" {
-		e.add(Op{Kind: OpLine, X: x, Y: y + h, W: w, H: 0, Width: st.BorderBottom.Width, R: st.BorderBottom.Color[0], G: st.BorderBottom.Color[1], B: st.BorderBottom.Color[2]})
+	if wb > 0 && st.BorderBottom.Style != "none" {
+		e.add(Op{Kind: OpLine, X: x, Y: y + h, W: w, H: 0, Width: wb, R: st.BorderBottom.Color[0], G: st.BorderBottom.Color[1], B: st.BorderBottom.Color[2]})
 	}
-	if st.BorderLeft.Width > 0 && st.BorderLeft.Style != "none" {
-		e.add(Op{Kind: OpLine, X: x, Y: y, W: 0, H: h, Width: st.BorderLeft.Width, R: st.BorderLeft.Color[0], G: st.BorderLeft.Color[1], B: st.BorderLeft.Color[2]})
+	if wl > 0 && st.BorderLeft.Style != "none" {
+		e.add(Op{Kind: OpLine, X: x, Y: y, W: 0, H: h, Width: wl, R: st.BorderLeft.Color[0], G: st.BorderLeft.Color[1], B: st.BorderLeft.Color[2]})
 	}
 }
 
@@ -297,34 +348,34 @@ func (e *engine) buildImage(n *html.Node, st ResolvedStyle, x, y float64) *box {
 			}
 		}
 	}
-	b.w = pxToPt(float64(b.imgW))
-	b.h = pxToPt(float64(b.imgH))
+	b.w = e.scalePt(pxToPt(float64(b.imgW)))
+	b.h = e.scalePt(pxToPt(float64(b.imgH)))
 	// width/height HTML attributes are pixel values at 96dpi
 	if v, err := strconv.Atoi(n.Attribute("width")); err == nil && v > 0 {
 		if n.Attribute("height") == "" && st.Height < 0 && b.w > 0 {
-			b.h = b.h * pxToPt(float64(v)) / b.w
+			b.h = b.h * e.scalePt(pxToPt(float64(v))) / b.w
 		}
-		b.w = pxToPt(float64(v))
+		b.w = e.scalePt(pxToPt(float64(v)))
 	}
 	if v, err := strconv.Atoi(n.Attribute("height")); err == nil && v > 0 {
 		if n.Attribute("width") == "" && st.Width < 0 && b.h > 0 {
-			b.w = b.w * pxToPt(float64(v)) / b.h
+			b.w = b.w * e.scalePt(pxToPt(float64(v))) / b.h
 		}
-		b.h = pxToPt(float64(v))
+		b.h = e.scalePt(pxToPt(float64(v)))
 	}
 	if st.Width >= 0 {
-		b.w = st.Width
+		b.w = e.scalePt(st.Width)
 	}
 	if st.Height >= 0 {
-		b.h = st.Height
+		b.h = e.scalePt(st.Height)
 	}
-	if st.MaxWidth >= 0 && b.w > st.MaxWidth {
-		b.h = b.h * st.MaxWidth / b.w
-		b.w = st.MaxWidth
+	if st.MaxWidth >= 0 && b.w > e.scalePt(st.MaxWidth) {
+		b.h = b.h * e.scalePt(st.MaxWidth) / b.w
+		b.w = e.scalePt(st.MaxWidth)
 	}
-	if st.MaxHeight >= 0 && b.h > st.MaxHeight {
-		b.w = b.w * st.MaxHeight / b.h
-		b.h = st.MaxHeight
+	if st.MaxHeight >= 0 && b.h > e.scalePt(st.MaxHeight) {
+		b.w = b.w * e.scalePt(st.MaxHeight) / b.h
+		b.h = e.scalePt(st.MaxHeight)
 	}
 	return b
 }
@@ -332,9 +383,9 @@ func (e *engine) buildImage(n *html.Node, st ResolvedStyle, x, y float64) *box {
 func (e *engine) buildHR(n *html.Node, st ResolvedStyle, availW, x, y float64) *box {
 	b := &box{node: n, style: st, kind: "replaced", x: x, y: y, w: availW}
 	if st.Width >= 0 {
-		b.w = st.Width
+		b.w = e.scalePt(st.Width)
 	}
-	b.h = st.BorderTop.Width + st.BorderBottom.Width
+	b.h = e.scalePt(st.BorderTop.Width) + e.scalePt(st.BorderBottom.Width)
 	if b.h <= 0 {
 		b.h = 1
 	}
@@ -447,16 +498,16 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 	}
 
 	// table width
-	spacing := st.BorderSpacing
+	spacing := e.scalePt(st.BorderSpacing)
 	sum := 0.0
 	for _, w := range colW {
 		sum += w
 	}
 	sum += spacing * float64(nCols+1)
-	sum += st.BorderLeft.Width + st.BorderRight.Width + st.PaddingLeft + st.PaddingRight
+	sum += e.scalePt(st.BorderLeft.Width) + e.scalePt(st.BorderRight.Width) + e.scalePt(st.PaddingLeft) + e.scalePt(st.PaddingRight)
 	tableW := availW
 	if st.Width >= 0 {
-		tableW = st.Width
+		tableW = e.scalePt(st.Width)
 	} else if sum < availW {
 		tableW = sum
 	}
@@ -478,10 +529,10 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 		}
 	}
 	tb.w = tableW
-	cy := st.PaddingTop + st.BorderTop.Width
+	cy := e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)
 	for _, cells := range cellData {
 		rowH := 0.0
-		rowX := st.PaddingLeft + st.BorderLeft.Width
+		rowX := e.scalePt(st.PaddingLeft) + e.scalePt(st.BorderLeft.Width)
 		for _, cell := range cells {
 			cell.x = x + rowX
 			cell.y = y + cy
@@ -499,7 +550,8 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 		}
 		cy += rowH + spacing
 	}
-	tb.h = cy + st.PaddingBottom + st.BorderBottom.Width
+	tb.rows = cellData
+	tb.h = cy + e.scalePt(st.PaddingBottom) + e.scalePt(st.BorderBottom.Width)
 
 	if st.BGColor[3] > 0 && e.opts.Background {
 		e.add(Op{Kind: OpFillRect, X: x, Y: y, W: tb.w, H: tb.h,
@@ -528,35 +580,37 @@ func (e *engine) buildCell(n *html.Node, col, span int) *box {
 // emitCell paints a placed cell's background, borders and content.
 func (e *engine) emitCell(b *box) {
 	st := b.style
+	start := len(e.ops)
 	if st.BGColor[3] > 0 && e.opts.Background {
 		e.add(Op{Kind: OpFillRect, X: b.x, Y: b.y, W: b.w, H: b.h,
 			R: st.BGColor[0], G: st.BGColor[1], B: st.BGColor[2], Alpha: st.BGColor[3]})
 	}
 	e.emitBorders(st, b.x, b.y, b.w, b.h)
-	contentW := b.w - st.PaddingLeft - st.PaddingRight - st.BorderLeft.Width - st.BorderRight.Width
+	contentW := b.w - e.scalePt(st.PaddingLeft) - e.scalePt(st.PaddingRight) - e.scalePt(st.BorderLeft.Width) - e.scalePt(st.BorderRight.Width)
 	if contentW < 0 {
 		contentW = 0
 	}
-	cx := b.x + st.PaddingLeft + st.BorderLeft.Width
-	cy := b.y + st.PaddingTop + st.BorderTop.Width
+	cx := b.x + e.scalePt(st.PaddingLeft) + e.scalePt(st.BorderLeft.Width)
+	cy := b.y + e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)
 	var blocks, inlines []*html.Node
 	e.partition(b.node.Children, &blocks, &inlines)
 	prevBottom := 0.0
 	for _, cn := range blocks {
 		cs := e.styles[cn]
-		cy += collapseMargins(prevBottom, cs.MarginTop)
+		cy += collapseMargins(prevBottom, e.scalePt(cs.MarginTop))
 		cb := e.build(cn, contentW, cx, cy)
 		if cb == nil {
 			prevBottom = 0
 			continue
 		}
-		cy += cb.h + cs.MarginBottom
-		prevBottom = cs.MarginBottom
+		cy += cb.h + e.scalePt(cs.MarginBottom)
+		prevBottom = e.scalePt(cs.MarginBottom)
 	}
 	if len(inlines) > 0 {
 		pb := &box{style: st, firstBaseline: 0}
 		e.layoutInline(pb, inlines, contentW, cx, cy)
 	}
+	b.opStart, b.opEnd = start, len(e.ops)-1
 }
 
 // measureCellContent returns the max-content width of the cell.
@@ -567,7 +621,7 @@ func (e *engine) measureCellContent(n *html.Node, st ResolvedStyle) float64 {
 		switch n.Type {
 		case html.TextNode:
 			for _, word := range strings.Fields(n.Text) {
-				w := e.measureText(word, fs)
+				w := e.measureText(word, fs*e.scale)
 				if w > maxW {
 					maxW = w
 				}
@@ -583,36 +637,36 @@ func (e *engine) measureCellContent(n *html.Node, st ResolvedStyle) float64 {
 		}
 	}
 	measure(n, st.FontSize)
-	maxW += st.PaddingLeft + st.PaddingRight + st.BorderLeft.Width + st.BorderRight.Width
+	maxW += e.scalePt(st.PaddingLeft) + e.scalePt(st.PaddingRight) + e.scalePt(st.BorderLeft.Width) + e.scalePt(st.BorderRight.Width)
 	return maxW
 }
 
 // layoutCell measures the height of a cell's content (no ops emitted).
 func (e *engine) layoutCell(n *html.Node, st ResolvedStyle, width float64) float64 {
-	contentW := width - st.PaddingLeft - st.PaddingRight - st.BorderLeft.Width - st.BorderRight.Width
+	contentW := width - e.scalePt(st.PaddingLeft) - e.scalePt(st.PaddingRight) - e.scalePt(st.BorderLeft.Width) - e.scalePt(st.BorderRight.Width)
 	if contentW < 0 {
 		contentW = 0
 	}
-	cy := st.PaddingTop + st.BorderTop.Width
+	cy := e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)
 	var blocks, inlines []*html.Node
 	e.partition(n.Children, &blocks, &inlines)
 	prevBottom := 0.0
 	for _, cn := range blocks {
 		cs := e.styles[cn]
-		cy += collapseMargins(prevBottom, cs.MarginTop)
+		cy += collapseMargins(prevBottom, e.scalePt(cs.MarginTop))
 		cb := e.build(cn, contentW, 0, cy)
 		if cb == nil {
 			prevBottom = 0
 			continue
 		}
-		cy += cb.h + cs.MarginBottom
-		prevBottom = cs.MarginBottom
+		cy += cb.h + e.scalePt(cs.MarginBottom)
+		prevBottom = e.scalePt(cs.MarginBottom)
 	}
 	if len(inlines) > 0 {
 		pb := &box{style: st}
 		cy += e.layoutInline(pb, inlines, contentW, 0, cy)
 	}
-	return cy + st.PaddingBottom + st.BorderBottom.Width
+	return cy + e.scalePt(st.PaddingBottom) + e.scalePt(st.BorderBottom.Width)
 }
 
 func colSpan(n *html.Node) int {
