@@ -51,7 +51,7 @@ Phase 0 Scope → 1 Settings/CLI → 2 Loader → 3 PDF Writer
 | 0 | Scope freeze & project foundations | [phases/phase-00-scope-foundations.md](phases/phase-00-scope-foundations.md) | 0.5–1 mo | `[x]` 2026-08-03 |
 | 1 | Settings model & CLI skeleton | [phases/phase-01-settings-cli.md](phases/phase-01-settings-cli.md) | 1–1.5 mo | `[x]` 2026-08-03 |
 | 2 | Resource loader & network | [phases/phase-02-loader-network.md](phases/phase-02-loader-network.md) | 0.75–1.5 mo | `[x]` 2026-08-03 |
-| 3 | PDF object model & writer | [phases/phase-03-pdf-writer.md](phases/phase-03-pdf-writer.md) | 2–3 mo | `[ ]` |
+| 3 | PDF object model & writer | [phases/phase-03-pdf-writer.md](phases/phase-03-pdf-writer.md) | 2–3 mo | `[x]` 2026-08-03 |
 | 4 | HTML parser + CSS subset layout | [phases/phase-04-html-css-layout.md](phases/phase-04-html-css-layout.md) | 6–12 mo | `[ ]` |
 | 5 | Print pagination & page breaks | [phases/phase-05-pagination-print.md](phases/phase-05-pagination-print.md) | 2–4 mo | `[ ]` |
 | 6 | Headers/footers, TOC, outlines, links | [phases/phase-06-headers-toc-outline.md](phases/phase-06-headers-toc-outline.md) | 2–4 mo | `[ ]` |
@@ -140,25 +140,25 @@ Phase 0 Scope → 1 Settings/CLI → 2 Loader → 3 PDF Writer
 > Detail: [phases/phase-03-pdf-writer.md](phases/phase-03-pdf-writer.md)
 
 ### 3.1 Core PDF
-- [ ] Indirect objects, xref, trailer, catalog, pages tree
-- [ ] Content streams: text, path, images, transforms, graphics state
-- [ ] Flate compression toggle (`useCompression`)
-- [ ] Page geometry: MediaBox, named sizes (A4…), custom size, orientation, margins
+- [x] Indirect objects, xref, trailer, catalog, pages tree
+- [x] Content streams: text, path, images, transforms, graphics state
+- [x] Flate compression toggle (`useCompression`)
+- [~] Page geometry: MediaBox, named sizes (A4…), custom size, orientation, margins — MediaBox done; named sizes owned by settings/layout
 
 ### 3.2 Fonts & images
-- [ ] TrueType load + simple Latin metrics + subset embed + ToUnicode
-- [ ] JPEG pass-through + PNG decode → image XObject
-- [ ] imageDPI / imageQuality knobs (best-effort)
+- [x] TrueType load + simple Latin metrics + subset embed + ToUnicode
+- [x] JPEG pass-through + PNG decode → image XObject
+- [~] imageDPI / imageQuality knobs (best-effort) — DPI scaling at layout; JPEG re-encode quality deferred
 
 ### 3.3 Annotations & structure
-- [ ] Link annotations (URI + GoTo)
-- [ ] Named destinations / anchors
-- [ ] Document outline (`/Outlines`)
-- [ ] Metadata: title, creator string `gowkhtmltopdf …`
+- [x] Link annotations (URI + GoTo)
+- [x] Named destinations / anchors
+- [x] Document outline (`/Outlines`)
+- [x] Metadata: title, creator string `gowkhtmltopdf …`
 
 ### 3.4 Closure
-- [ ] Unit tests: multi-page PDF validates (manual pdfinfo / structure tests)
-- [ ] Benchmark fixture: write 50-page text PDF (record command + time)
+- [x] Unit tests: multi-page PDF validates (manual pdfinfo / structure tests)
+- [x] Benchmark fixture: write 50-page text PDF (record command + time) — `go test -bench=BenchmarkWrite50Pages`: ~20 ms/op (~2 MB/s), deterministic output
 
 ---
 
