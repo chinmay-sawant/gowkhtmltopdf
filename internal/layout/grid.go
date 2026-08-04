@@ -34,12 +34,12 @@ func (e *engine) buildGrid(n *html.Node, st ResolvedStyle, availW, x, y float64)
 	contentX := b.x + e.scalePt(st.BorderLeft.Width) + e.scalePt(st.PaddingLeft)
 	contentStart := len(e.ops)
 	cy := e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)
+	gap := e.scalePt(st.Gap)
 
-	cols := parseGridTracks(st.GridTemplateColumns, contentW, e)
+	cols := parseGridTracks(st.GridTemplateColumns, contentW, gap, e)
 	if len(cols) == 0 {
 		cols = []float64{contentW}
 	}
-	gap := e.scalePt(st.Gap)
 	var kids []*html.Node
 	for _, c := range n.Children {
 		if c.Type != html.ElementNode {
@@ -100,7 +100,9 @@ func (e *engine) buildGrid(n *html.Node, st ResolvedStyle, availW, x, y float64)
 }
 
 // parseGridTracks parses a lite subset of grid-template-columns.
-func parseGridTracks(raw string, contentW float64, e *engine) []float64 {
+// columnGap is subtracted from contentW before distributing fr/equal tracks
+// so (n tracks + n-1 gaps) fit the content box.
+func parseGridTracks(raw string, contentW, columnGap float64, e *engine) []float64 {
 	raw = strings.TrimSpace(raw)
 	if raw == "" || raw == "none" {
 		return nil
@@ -114,7 +116,7 @@ func parseGridTracks(raw string, contentW float64, e *engine) []float64 {
 		if len(parts) == 2 {
 			n, err := strconv.Atoi(strings.TrimSpace(parts[0]))
 			if err == nil && n > 0 && n < 64 {
-				return expandTracks(n, strings.TrimSpace(parts[1]), contentW, e)
+				return expandTracks(n, strings.TrimSpace(parts[1]), contentW, columnGap, e)
 			}
 		}
 	}
@@ -146,7 +148,11 @@ func parseGridTracks(raw string, contentW float64, e *engine) []float64 {
 		tracks = append(tracks, track{fr: 1, fixed: -1})
 		frSum += 1
 	}
-	avail := contentW - fixedSum
+	gapTotal := 0.0
+	if len(tracks) > 1 {
+		gapTotal = columnGap * float64(len(tracks)-1)
+	}
+	avail := contentW - fixedSum - gapTotal
 	if avail < 0 {
 		avail = 0
 	}
@@ -163,10 +169,18 @@ func parseGridTracks(raw string, contentW float64, e *engine) []float64 {
 	return out
 }
 
-func expandTracks(n int, track string, contentW float64, e *engine) []float64 {
+func expandTracks(n int, track string, contentW, columnGap float64, e *engine) []float64 {
 	out := make([]float64, n)
+	gapTotal := 0.0
+	if n > 1 {
+		gapTotal = columnGap * float64(n-1)
+	}
+	avail := contentW - gapTotal
+	if avail < 0 {
+		avail = 0
+	}
 	if strings.HasSuffix(track, "fr") || track == "" {
-		each := contentW / float64(n)
+		each := avail / float64(n)
 		for i := range out {
 			out[i] = each
 		}
@@ -179,7 +193,7 @@ func expandTracks(n int, track string, contentW float64, e *engine) []float64 {
 		}
 		return out
 	}
-	each := contentW / float64(n)
+	each := avail / float64(n)
 	for i := range out {
 		out[i] = each
 	}

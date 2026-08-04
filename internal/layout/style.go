@@ -518,6 +518,14 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext)
 			if r, g, b, a, ok := css.ParseColor(value); ok {
 				st.BGColor = [4]float64{float64(r) / 255, float64(g) / 255, float64(b) / 255, a}
 			}
+		case "background":
+			// Shorthand: take the first parseable color token (ignore images/repeat).
+			for _, tok := range strings.Fields(value) {
+				if r, g, b, a, ok := css.ParseColor(tok); ok {
+					st.BGColor = [4]float64{float64(r) / 255, float64(g) / 255, float64(b) / 255, a}
+					break
+				}
+			}
 		case "line-height":
 			st.LineHeight = lineHeight(value, st.FontSize)
 		case "text-align":

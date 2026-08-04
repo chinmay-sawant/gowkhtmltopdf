@@ -192,16 +192,92 @@ func (c *Content) TextRenderMode(mode int) {
 }
 
 // TextShow draws a string in the current font, recording its runes for the
-// subsetter. Latin-1 strings keep the simple WinAnsi path. Any code point
-// outside Latin-1 (after folding) switches this draw onto a Type0 sibling
-// resource (name+"_u") so Identity-H Unicode CIDs can be emitted without
-// breaking earlier Latin content on the same face.
+// subsetter. Mixed CJK+Latin is split: Unicode glyphs the face provides go
+// through Type0; Latin that the face lacks (typical for CJK fallback fonts)
+// is drawn with an embedded Liberation fallback so ASCII does not become tofu.
 func (c *Content) TextShow(s string) {
 	s = ShapeText(s)
-	if c.textNeedsType0(s) {
-		c.textShowType0(s)
+	f := c.fontFiles[c.curFont]
+	if f == nil || !c.textNeedsType0(s) {
+		c.textShowSimple(s)
 		return
 	}
+	type run struct {
+		s     string
+		type0 bool
+	}
+	var runs []run
+	var buf strings.Builder
+	mode := -1 // -1 unset, 0 simple, 1 type0
+	flush := func() {
+		if buf.Len() == 0 {
+			return
+		}
+		runs = append(runs, run{s: buf.String(), type0: mode == 1})
+		buf.Reset()
+	}
+	for _, r := range s {
+		has := f.GlyphID(r) != 0
+		next := 0
+		if r > 0xFF {
+			next = 1
+		} else if !has {
+			next = 0 // missing Latin on CJK face → Liberation
+		}
+		if mode < 0 {
+			mode = next
+		} else if next != mode {
+			flush()
+			mode = next
+		}
+		buf.WriteRune(r)
+	}
+	flush()
+	// Keep the caller's face as the Type0 source. Latin fallback may switch
+	// curFont to FL; Type0 must still subset the original Unicode face, not FL_u.
+	base := strings.TrimSuffix(c.curFont, "_u")
+	size := c.curSize
+	for _, rn := range runs {
+		if rn.type0 {
+			if c.curFont != base && c.curFont != base+"_u" {
+				c.SetFont(base, size)
+			}
+			c.textShowType0(rn.s)
+			continue
+		}
+		name := base
+		if face := c.fontFiles[base]; face != nil {
+			for _, r := range rn.s {
+				if face.GlyphID(r) == 0 {
+					name = c.ensureLatinFallback()
+					break
+				}
+			}
+		}
+		if c.curFont != name {
+			c.SetFont(name, size)
+		}
+		c.textShowSimple(rn.s)
+	}
+	if c.curFont != base {
+		c.SetFont(base, size)
+	}
+}
+
+func (c *Content) ensureLatinFallback() string {
+	const name = "FL"
+	if c.fontFiles[name] != nil {
+		return name
+	}
+	lf, err := DefaultFont()
+	if err != nil || lf == nil {
+		return c.curFont
+	}
+	c.UseEmbeddedFont(name, lf)
+	return name
+}
+
+func (c *Content) textShowSimple(s string) {
 	for _, r := range s {
 		if r > 0xFF {
 			r = winAnsiFold(r)
@@ -230,9 +306,11 @@ func (c *Content) textNeedsType0(s string) bool {
 }
 
 func (c *Content) textShowType0(s string) {
-	base := c.curFont
+	base := strings.TrimSuffix(c.curFont, "_u")
 	uname := base + "_u"
 	if f := c.fontFiles[base]; f != nil {
+		c.UseEmbeddedFont(uname, f)
+	} else if f := c.fontFiles[c.curFont]; f != nil && c.curFont == uname {
 		c.UseEmbeddedFont(uname, f)
 	}
 	if c.curFont != uname {

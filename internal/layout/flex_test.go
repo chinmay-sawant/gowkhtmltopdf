@@ -33,12 +33,17 @@ func TestPositionRelativeAbsolute(t *testing.T) {
 	src := `<html><body>
 <div style="position:relative;top:10pt;left:20pt">rel</div>
 <div style="position:relative;height:40pt">
-  <div style="position:absolute;top:5pt;left:15pt;width:50pt">abs</div>
+  <div style="position:absolute;top:5pt;left:15pt;width:50pt;background:#fff3e0">abs</div>
+  in-flow
 </div>
 </body></html>`
 	res := layoutHTML(t, src)
 	var foundAbs, foundRel bool
-	for _, op := range res.Ops {
+	var absTextIdx, flowTextIdx, absFillIdx = -1, -1, -1
+	for i, op := range res.Ops {
+		if op.Kind == OpFillRect && op.R > 0.9 && op.G > 0.9 && op.B > 0.8 {
+			absFillIdx = i
+		}
 		if op.Kind != OpText {
 			continue
 		}
@@ -48,9 +53,13 @@ func TestPositionRelativeAbsolute(t *testing.T) {
 		}
 		if strings.Contains(op.Text, "abs") {
 			foundAbs = true
+			absTextIdx = i
 			if op.X < 10 {
 				t.Errorf("abs x=%.1f, want offset", op.X)
 			}
+		}
+		if strings.Contains(op.Text, "in-flow") {
+			flowTextIdx = i
 		}
 	}
 	if !foundRel {
@@ -58,5 +67,11 @@ func TestPositionRelativeAbsolute(t *testing.T) {
 	}
 	if !foundAbs {
 		t.Error("absolute text not found")
+	}
+	if flowTextIdx >= 0 && absFillIdx >= 0 && absFillIdx < flowTextIdx {
+		t.Errorf("absolute fill op %d before in-flow text %d (overlay must paint above)", absFillIdx, flowTextIdx)
+	}
+	if flowTextIdx >= 0 && absTextIdx >= 0 && absTextIdx < flowTextIdx {
+		t.Errorf("absolute text op %d before in-flow text %d", absTextIdx, flowTextIdx)
 	}
 }

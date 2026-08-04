@@ -186,18 +186,30 @@ func remapComposite(b []byte, oldToNew map[uint16]uint16) {
 		return
 	}
 	pos := 10
-	for pos+4 <= len(b) {
+	for {
+		if pos+4 > len(b) {
+			break
+		}
 		flags := binary.BigEndian.Uint16(b[pos : pos+2])
 		old := binary.BigEndian.Uint16(b[pos+2 : pos+4])
 		if n, ok := oldToNew[old]; ok {
 			binary.BigEndian.PutUint16(b[pos+2:pos+4], n)
 		}
-		argBytes := 2
-		if flags&0x0001 != 0 {
-			argBytes = 4
+		pos += 4
+		if flags&0x0001 != 0 { // ARG_1_AND_2_ARE_WORDS
+			pos += 4
+		} else {
+			pos += 2
 		}
-		pos += 4 + argBytes
-		if flags&0x0008 == 0 {
+		switch {
+		case flags&0x0008 != 0: // WE_HAVE_A_SCALE
+			pos += 2
+		case flags&0x0040 != 0: // WE_HAVE_AN_X_AND_Y_SCALE
+			pos += 4
+		case flags&0x0080 != 0: // WE_HAVE_A_TWO_BY_TWO
+			pos += 8
+		}
+		if flags&0x0020 == 0 { // MORE_COMPONENTS
 			break
 		}
 	}

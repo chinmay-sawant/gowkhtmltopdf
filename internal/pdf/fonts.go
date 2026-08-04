@@ -184,68 +184,63 @@ func (f *Font) parseCmap() error {
 			offset:   int(binary.BigEndian.Uint32(rec[4:8])),
 		})
 	}
-	// preference: MS Unicode (3,1) then (3,10) then Unicode (0,x)
-	order := [][2]int{{3, 1}, {3, 10}, {0, 0}, {0, 1}, {0, 2}, {0, 3}, {0, 4}, {0, 5}}
-	var best *sub
+	// Merge all Unicode-capable subtables so CJK + Hangul + Latin are
+	// covered (DroidSansFallback puts Hangul in a format-12 table while
+	// format-4 (3,1) alone is incomplete).
+	f.cmap = map[uint32]uint16{}
+	order := [][2]int{{3, 10}, {3, 1}, {0, 4}, {0, 3}, {0, 5}, {0, 2}, {0, 1}, {0, 0}}
+	parsed := 0
 	for _, o := range order {
 		for i := range subs {
-			if subs[i].platform == o[0] && subs[i].encoding == o[1] {
-				best = &subs[i]
-				break
+			if subs[i].platform != o[0] || subs[i].encoding != o[1] {
+				continue
+			}
+			if subs[i].offset < 0 || subs[i].offset+2 > len(t) {
+				continue
+			}
+			st := t[subs[i].offset:]
+			format := int(binary.BigEndian.Uint16(st[0:2]))
+			before := len(f.cmap)
+			switch format {
+			case 4:
+				_ = f.parseCmap4(st)
+			case 12:
+				_ = f.parseCmap12(st)
+			case 6:
+				if len(st) >= 10 {
+					first := binary.BigEndian.Uint16(st[6:8])
+					count := int(binary.BigEndian.Uint16(st[8:10]))
+					if 10+2*count <= len(st) {
+						for j := 0; j < count; j++ {
+							g := binary.BigEndian.Uint16(st[10+j*2:])
+							if g != 0 {
+								if _, ok := f.cmap[uint32(first)+uint32(j)]; !ok {
+									f.cmap[uint32(first)+uint32(j)] = g
+								}
+							}
+						}
+					}
+				}
+			case 0:
+				if len(st) >= 262 {
+					for j := 0; j < 256; j++ {
+						if g := st[6+j]; g != 0 {
+							if _, ok := f.cmap[uint32(j)]; !ok {
+								f.cmap[uint32(j)] = uint16(g)
+							}
+						}
+					}
+				}
+			}
+			if len(f.cmap) > before {
+				parsed++
 			}
 		}
-		if best != nil {
-			break
-		}
-	}
-	if best == nil {
-		return errors.New("font: no Unicode cmap subtable")
-	}
-	if best.offset < 0 || best.offset+2 > len(t) {
-		return errors.New("font: cmap subtable out of range")
-	}
-	format := int(binary.BigEndian.Uint16(t[best.offset : best.offset+2]))
-	f.cmap = map[uint32]uint16{}
-	st := t[best.offset:]
-	switch format {
-	case 0:
-		if len(st) < 262 {
-			return errors.New("font: truncated cmap format 0")
-		}
-		for i := 0; i < 256; i++ {
-			if g := st[6+i]; g != 0 {
-				f.cmap[uint32(i)] = uint16(g)
-			}
-		}
-	case 4:
-		if err := f.parseCmap4(st); err != nil {
-			return err
-		}
-	case 6:
-		if len(st) < 10 {
-			return errors.New("font: truncated cmap format 6")
-		}
-		first := binary.BigEndian.Uint16(st[6:8])
-		count := int(binary.BigEndian.Uint16(st[8:10]))
-		if 10+2*count > len(st) {
-			return errors.New("font: truncated cmap format 6")
-		}
-		for i := 0; i < count; i++ {
-			g := binary.BigEndian.Uint16(st[10+i*2:])
-			if g != 0 {
-				f.cmap[uint32(first)+uint32(i)] = g
-			}
-		}
-	case 12:
-		if err := f.parseCmap12(st); err != nil {
-			return err
-		}
-	default:
-		return fmt.Errorf("font: unsupported cmap format %d", format)
 	}
 	if len(f.cmap) == 0 {
 		return errors.New("font: empty cmap")
 	}
+	_ = parsed
 	return nil
 }
 
@@ -270,6 +265,9 @@ func (f *Font) parseCmap4(st []byte) error {
 		idDelta := int32(int16(binary.BigEndian.Uint16(st[deltaOff+i*2 : deltaOff+i*2+2])))
 		idRange := int32(binary.BigEndian.Uint16(st[rangeOff+i*2 : rangeOff+i*2+2]))
 		for cp := start; cp <= end; cp++ {
+			if _, exists := f.cmap[cp]; exists {
+				continue
+			}
 			var glyph int32
 			if idRange == 0 {
 				glyph = (int32(cp) + idDelta) & 0xFFFF
@@ -303,6 +301,9 @@ func (f *Font) parseCmap12(st []byte) error {
 		end := binary.BigEndian.Uint32(rec[4:8])
 		startGlyph := binary.BigEndian.Uint32(rec[8:12])
 		for cp := start; cp <= end; cp++ {
+			if _, exists := f.cmap[cp]; exists {
+				continue
+			}
 			g := startGlyph + (cp - start)
 			if g < uint32(f.numGlyphs) {
 				f.cmap[cp] = uint16(g)
@@ -460,7 +461,6 @@ func (f *Font) compositeGlyphIDs(g uint16) []uint16 {
 	if numContours >= 0 {
 		return out // simple glyph
 	}
-	// composite: flags at 10, glyph index at 12, args, then more components
 	pos := 10
 	for {
 		if pos+4 > len(b) {
@@ -469,12 +469,21 @@ func (f *Font) compositeGlyphIDs(g uint16) []uint16 {
 		flags := binary.BigEndian.Uint16(b[pos : pos+2])
 		child := binary.BigEndian.Uint16(b[pos+2 : pos+4])
 		out = append(out, child)
-		argBytes := 2
-		if flags&0x0001 != 0 {
-			argBytes = 4 // ARG_1_AND_2_ARE_WORDS
+		pos += 4
+		if flags&0x0001 != 0 { // ARG_1_AND_2_ARE_WORDS
+			pos += 4
+		} else {
+			pos += 2
 		}
-		pos += 4 + argBytes
-		if flags&0x0008 == 0 { // MORE_COMPONENTS
+		switch {
+		case flags&0x0008 != 0: // WE_HAVE_A_SCALE
+			pos += 2
+		case flags&0x0040 != 0: // WE_HAVE_AN_X_AND_Y_SCALE
+			pos += 4
+		case flags&0x0080 != 0: // WE_HAVE_A_TWO_BY_TWO
+			pos += 8
+		}
+		if flags&0x0020 == 0 { // MORE_COMPONENTS
 			break
 		}
 	}

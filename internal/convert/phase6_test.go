@@ -49,6 +49,23 @@ func TestTextHeaderFooter(t *testing.T) {
 	if !bytes.Contains(data, []byte("doc T")) {
 		t.Error("[title] placeholder not substituted in footer")
 	}
+	// Baselines must sit inside the page (ascent below top, descent above bottom).
+	// The previous sign error placed headers at pageH+ascent and footers at -descent.
+	re := regexp.MustCompile(`([\d.]+)\s+([\d.\-]+)\s+Td\n\((Page \d+/|doc T)`)
+	matches := re.FindAllSubmatch(data, -1)
+	if len(matches) == 0 {
+		t.Fatal("no header/footer Td positions found")
+	}
+	pageH := 841.89 // A4 default
+	for _, m := range matches {
+		y, err := strconv.ParseFloat(string(m[2]), 64)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if y < 0 || y > pageH {
+			t.Errorf("HF baseline y=%.3f for %q is outside page [0, %.2f]", y, m[3], pageH)
+		}
+	}
 }
 
 func TestPlaceholderReplace(t *testing.T) {

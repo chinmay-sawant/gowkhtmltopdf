@@ -156,8 +156,8 @@ func (d *Document) ensureFontType0(f *Font, used []rune) (string, error) {
 	for _, row := range rows {
 		wParts = append(wParts, fmt.Sprintf("%d [%s]", row.r, num(row.w)))
 	}
-	mapRaw := flateBytes(cidMap)
-	d.setDict(mapRef, fmt.Sprintf("<< /Length %d /Filter /FlateDecode >>", len(mapRaw)))
+	mapRaw := cidMap // keep uncompressed; some viewers mishandle Flate CIDToGIDMap
+	d.setDict(mapRef, fmt.Sprintf("<< /Length %d >>", len(mapRaw)))
 	d.setStream(mapRef, mapRaw)
 
 	d.setDict(cidRef, fmt.Sprintf(

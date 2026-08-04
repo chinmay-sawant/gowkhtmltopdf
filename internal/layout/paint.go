@@ -746,7 +746,16 @@ func drawText(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintO
 	c.BeginText()
 	c.TextAt(x, y)
 	// Fake bold only when CSS wants bold but the face is not a real bold TTF.
+	// Skip for Type0/CJK runs: stroking composite outlines looks like tofu clumps.
 	fakeBold := op.Bold && (op.Font == nil || !op.Font.Bold())
+	if fakeBold {
+		for _, r := range op.Text {
+			if r > 0xFF {
+				fakeBold = false
+				break
+			}
+		}
+	}
 	if fakeBold {
 		c.SetLineWidth(op.Size * 0.06)
 		c.TextRenderMode(2) // fill + stroke

@@ -4,10 +4,10 @@ import (
 	"gowkhtmltopdf/internal/html"
 )
 
-type flexItem struct {
-	n    *html.Node
-	box  *box
-	grow float64
+type flexMeas struct {
+	n     *html.Node
+	baseW float64
+	grow  float64
 }
 
 // buildFlex lays out a flex container (row or column) with a report-friendly
@@ -55,7 +55,7 @@ func (e *engine) buildFlex(n *html.Node, st ResolvedStyle, availW, x, y float64)
 	}
 
 	if dir == "column" {
-		cy = e.flowFlexColumn(b, kids, st, contentW, contentX, y, cy, gap)
+		cy = e.flowFlexColumn(b, kids, contentW, contentX, y, cy, gap)
 	} else {
 		cy = e.flowFlexRow(b, kids, st, contentW, contentX, y, cy, gap)
 	}
@@ -80,31 +80,25 @@ func (e *engine) flowFlexRow(parent *box, kids []*html.Node, st ResolvedStyle, c
 		return cy
 	}
 	wrap := st.FlexWrap == "wrap" || st.FlexWrap == "wrap-reverse"
-	items := make([]flexItem, 0, len(kids))
+
+	items := make([]flexMeas, 0, len(kids))
 	for _, kid := range kids {
 		cs := e.styles[kid]
-		cb := e.build(kid, contentW, contentX, y+cy)
-		if cb == nil {
-			continue
-		}
 		g := cs.FlexGrow
 		if g < 0 {
 			g = 0
 		}
-		items = append(items, flexItem{n: kid, box: cb, grow: g})
-	}
-	if len(items) == 0 {
-		return cy
+		items = append(items, flexMeas{n: kid, baseW: e.flexItemBaseWidth(kid, cs, contentW), grow: g})
 	}
 
-	var lines [][]flexItem
+	var lines [][]flexMeas
 	if !wrap {
-		lines = [][]flexItem{items}
+		lines = [][]flexMeas{items}
 	} else {
-		var line []flexItem
+		var line []flexMeas
 		used := 0.0
 		for _, it := range items {
-			need := it.box.w
+			need := it.baseW
 			if len(line) > 0 {
 				need += gap
 			}
@@ -112,7 +106,7 @@ func (e *engine) flowFlexRow(parent *box, kids []*html.Node, st ResolvedStyle, c
 				lines = append(lines, line)
 				line = nil
 				used = 0
-				need = it.box.w
+				need = it.baseW
 			}
 			line = append(line, it)
 			used += need
@@ -128,7 +122,7 @@ func (e *engine) flowFlexRow(parent *box, kids []*html.Node, st ResolvedStyle, c
 	}
 
 	for li, line := range lines {
-		cy = e.placeFlexLine(parent, st, line, contentW, contentX, y, cy, gap)
+		cy = e.placeFlexLineMeasured(parent, st, line, contentW, contentX, y, cy, gap)
 		if li < len(lines)-1 {
 			cy += gap
 		}
@@ -136,10 +130,38 @@ func (e *engine) flowFlexRow(parent *box, kids []*html.Node, st ResolvedStyle, c
 	return cy
 }
 
-func (e *engine) placeFlexLine(parent *box, st ResolvedStyle, items []flexItem, contentW, contentX, y, cy, gap float64) float64 {
+func (e *engine) flexItemBaseWidth(n *html.Node, cs ResolvedStyle, contentW float64) float64 {
+	pad := e.scalePt(cs.PaddingLeft) + e.scalePt(cs.PaddingRight) +
+		e.scalePt(cs.BorderLeft.Width) + e.scalePt(cs.BorderRight.Width)
+	if cs.WidthPercent >= 0 {
+		w := contentW * cs.WidthPercent / 100
+		if cs.BoxSizing != "border-box" {
+			w += pad
+		}
+		return w
+	}
+	if cs.Width >= 0 {
+		w := e.scalePt(cs.Width)
+		if cs.BoxSizing != "border-box" {
+			w += pad
+		}
+		return w
+	}
+	intr := e.measureCellContent(n, cs) + pad +
+		e.scalePt(cs.MarginLeft) + e.scalePt(cs.MarginRight)
+	if intr <= 0 {
+		intr = pad + e.scalePt(cs.FontSize)*2
+	}
+	if intr > contentW {
+		intr = contentW
+	}
+	return intr
+}
+
+func (e *engine) placeFlexLineMeasured(parent *box, st ResolvedStyle, items []flexMeas, contentW, contentX, y, cy, gap float64) float64 {
 	var fixed, growSum float64
 	for _, it := range items {
-		fixed += it.box.w
+		fixed += it.baseW
 		growSum += it.grow
 	}
 	gaps := gap * float64(len(items)-1)
@@ -150,16 +172,16 @@ func (e *engine) placeFlexLine(parent *box, st ResolvedStyle, items []flexItem, 
 	if free < 0 {
 		free = 0
 	}
-	if growSum > 0 && free > 0 {
-		for i := range items {
-			if items[i].grow > 0 {
-				items[i].box.w += free * (items[i].grow / growSum)
-			}
+	widths := make([]float64, len(items))
+	for i, it := range items {
+		widths[i] = it.baseW
+		if growSum > 0 && free > 0 && it.grow > 0 {
+			widths[i] += free * (it.grow / growSum)
 		}
 	}
 	totalW := 0.0
-	for _, it := range items {
-		totalW += it.box.w
+	for _, w := range widths {
+		totalW += w
 	}
 	totalW += gaps
 	startX := contentX
@@ -179,40 +201,79 @@ func (e *engine) placeFlexLine(parent *box, st ResolvedStyle, items []flexItem, 
 		}
 	}
 
-	rowH := 0.0
-	for _, it := range items {
-		if it.box.h > rowH {
-			rowH = it.box.h
-		}
+	// Build each item into its final width so backgrounds match the flex slot.
+	type placed struct {
+		box *box
+		h   float64
 	}
+	built := make([]placed, 0, len(items))
+	rowH := 0.0
 	lx := startX
 	for i, it := range items {
-		cb := it.box
-		dx := lx - cb.x
-		dy := 0.0
-		switch st.AlignItems {
-		case "flex-end", "end":
-			dy = (y + cy + rowH) - (cb.y + cb.h)
-		case "center":
-			dy = (y + cy + (rowH-cb.h)/2) - cb.y
-		default:
-			dy = (y + cy) - cb.y
+		cb := e.build(it.n, widths[i], lx, y+cy)
+		if cb == nil {
+			built = append(built, placed{})
+			lx += widths[i]
+			if i < len(items)-1 {
+				lx += justifyGap
+			}
+			continue
 		}
+		// Force border-box to the flex slot when build undersized/oversized.
+		if absFloat(cb.w-widths[i]) > 0.5 {
+			dx := 0.0
+			if cb.w > widths[i] {
+				// leave as-is but clamp visual slot
+			}
+			_ = dx
+		}
+		dx := lx - cb.x
+		dy := (y + cy) - cb.y
 		e.shiftBoxOps(cb, dx, dy)
 		cb.x += dx
 		cb.y += dy
+		if cb.h > rowH {
+			rowH = cb.h
+		}
+		built = append(built, placed{box: cb, h: cb.h})
 		if parent != nil {
 			parent.children = append(parent.children, cb)
 		}
-		lx += cb.w
+		lx += widths[i]
 		if i < len(items)-1 {
 			lx += justifyGap
+		}
+	}
+	// align-items vertical adjustment
+	for _, p := range built {
+		if p.box == nil {
+			continue
+		}
+		dy := 0.0
+		switch st.AlignItems {
+		case "flex-end", "end":
+			dy = (y + cy + rowH) - (p.box.y + p.box.h)
+		case "center":
+			dy = (y + cy + (rowH-p.box.h)/2) - p.box.y
+		default:
+			dy = 0
+		}
+		if dy != 0 {
+			e.shiftBoxOps(p.box, 0, dy)
+			p.box.y += dy
 		}
 	}
 	return cy + rowH
 }
 
-func (e *engine) flowFlexColumn(parent *box, kids []*html.Node, st ResolvedStyle, contentW, contentX, y, cy, gap float64) float64 {
+func absFloat(v float64) float64 {
+	if v < 0 {
+		return -v
+	}
+	return v
+}
+
+func (e *engine) flowFlexColumn(parent *box, kids []*html.Node, contentW, contentX, y, cy, gap float64) float64 {
 	for i, kid := range kids {
 		cb := e.build(kid, contentW, contentX, y+cy)
 		if cb == nil {

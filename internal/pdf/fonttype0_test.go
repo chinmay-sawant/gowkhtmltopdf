@@ -85,3 +85,42 @@ func TestFamilyNamesLiberation(t *testing.T) {
 		t.Errorf("family names = %v, want Liberation*", names)
 	}
 }
+
+func TestType0MixedLatinFallback(t *testing.T) {
+	path := "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf"
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Skip("system CJK font not available:", err)
+	}
+	f, err := ParseTTF(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.PostScriptName = "DroidSansFallback"
+	d := fixedDoc(t)
+	d.SetCompression(false)
+	p := d.AddPage(500, 200)
+	c := p.Content()
+	c.UseEmbeddedFont("F0", f)
+	c.BeginText()
+	c.SetFont("F0", 14)
+	c.TextAt(20, 100)
+	c.TextShow("Hello 中文 world")
+	c.EndText()
+	out := string(writePDF(t, d))
+	if strings.Contains(out, "/FL_u") {
+		t.Fatal("Latin fallback must not grow a Type0 sibling FL_u")
+	}
+	if !strings.Contains(out, "/F0_u") {
+		t.Fatal("expected Type0 sibling F0_u for CJK run")
+	}
+	if !strings.Contains(out, "/FL ") {
+		t.Fatal("expected Liberation Latin fallback resource FL")
+	}
+	if !strings.Contains(out, "(Hello )") && !strings.Contains(out, "(Hello)") {
+		t.Fatal("expected simple-show Latin run")
+	}
+	if !strings.Contains(out, "<4E2D6587>") {
+		t.Fatal("expected Identity-H CIDs for 中文")
+	}
+}

@@ -552,6 +552,10 @@ func onlyCollapsibleWS(nodes []*html.Node) bool {
 func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedStyle, contentW, contentX, y, cy float64) float64 {
 	prevBottom := 0.0
 	floats := newFloatState(contentX, contentW)
+	var deferred []*html.Node
+	// Absolute/fixed containing-block origin is the content edge at entry.
+	// Do not use the post-flow cy or deferred boxes sit below in-flow siblings.
+	absOriginY := y + cy
 	i := 0
 	for i < len(children) {
 		n := children[i]
@@ -566,11 +570,9 @@ func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedSty
 			continue
 		}
 		if n.Type == html.ElementNode && (e.styles[n].Position == "absolute" || e.styles[n].Position == "fixed") {
-			ab := e.build(n, contentW, contentX, y+cy)
-			if ab != nil && parent != nil {
-				parent.children = append(parent.children, ab)
-			}
-			prevBottom = 0
+			// Defer out-of-flow boxes so they paint above in-flow content
+			// (absolute overlays sit on top of later siblings' text).
+			deferred = append(deferred, n)
 			i++
 			continue
 		}
@@ -653,6 +655,12 @@ func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedSty
 			}
 		}
 		i++
+	}
+	for _, n := range deferred {
+		ab := e.build(n, contentW, contentX, absOriginY)
+		if ab != nil && parent != nil {
+			parent.children = append(parent.children, ab)
+		}
 	}
 	return floats.extentCy(y, cy)
 }

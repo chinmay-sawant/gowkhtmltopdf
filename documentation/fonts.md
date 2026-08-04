@@ -41,6 +41,10 @@ for CJK.
 - **CJK (Han / kana / hangul)** works when a capable TTF is on the font
   path: characters render, but vertical writing modes, ruby, and complex
   line-breaking are not claimed.
+- **Mixed Latin + CJK:** Latin glyphs missing from a CJK face (common with
+  Droid Sans Fallback) are drawn with the embedded Liberation face; CJK
+  continues on the Type0 sibling of the original face. Hangul needs a
+  Hangul-capable face — many “Fallback” fonts ship without it.
 - **Arabic / Hebrew:** a best-effort **RTL run reverse** is applied at
   emit time so character order is closer to visual RTL. **Joining,
   ligation, and mark positioning are NOT implemented** — production

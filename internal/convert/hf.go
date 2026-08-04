@@ -138,9 +138,9 @@ func drawTextHF(page *pdf.Page, hf settings.HeaderFooter, geom hfGeom, parms hfP
 	// footer text sits with its bottom edge `spacing` above the page bottom.
 	var baseY float64
 	if isHeader {
-		baseY = page.Height() - spacing + ascent
+		baseY = page.Height() - spacing - ascent
 	} else {
-		baseY = spacing - descent
+		baseY = spacing + descent
 	}
 
 	c.SetFillColor(0, 0, 0)

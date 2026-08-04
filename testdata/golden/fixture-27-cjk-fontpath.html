@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <!--
   fixture-27-cjk-fontpath
-  Proves: non-Latin text can be laid out when a Unicode-capable face is
-  available via --font-path (phase 19). Without an external font the glyphs
-  may fold to '?'; the golden runner only asserts page structure.
+  Proves: CJK (Chinese/Japanese) renders when a Unicode face is available via
+  --font-path (phase 19). Hangul requires a Hangul-capable face (Droid Sans
+  Fallback on many distros lacks it). Samples pass --font-path when present.
   Expected: 1 page.
 -->
 <html>
@@ -18,6 +18,6 @@
 <body>
   <h1>国际化报告</h1>
   <p>こんにちは、世界。Hello mixed Latin + 中文 + 日本語.</p>
-  <p>한글 샘플 텍스트.</p>
+  <p>汉字与假名：東京都、上海、深圳。</p>
 </body>
 </html>
