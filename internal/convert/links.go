@@ -1,6 +1,9 @@
 package convert
 
 import (
+	"strings"
+
+	"gowkhtmltopdf/internal/cli"
 	"gowkhtmltopdf/internal/html"
 	"gowkhtmltopdf/internal/layout"
 	"gowkhtmltopdf/internal/outline"
@@ -14,13 +17,11 @@ import (
 // that Paint relies on - removing entries would corrupt pagination.
 const linkOpSkip = layout.OpKind(255)
 
-// stripLinkURIs neutralizes external link ops in place. Called before
-// painting when the object's --disable-external-links (ExternalLinks=false)
-// flag is set. Internal link ops are never emitted by the layout engine, so
-// --disable-local-links has nothing to filter (documented in applyTOCLinks).
+// stripLinkURIs neutralizes external (http/https/mailto) link ops in place.
+// Same-document fragment links (#id) are left for applyInternalLinks.
 func stripLinkURIs(ops []layout.Op) []layout.Op {
 	for i := range ops {
-		if ops[i].Kind == layout.OpLinkURI {
+		if ops[i].Kind == layout.OpLinkURI && !strings.HasPrefix(ops[i].URI, "#") {
 			ops[i].Kind = linkOpSkip
 			ops[i].URI = ""
 		}
@@ -68,11 +69,10 @@ func tocAnchorLocations(root *html.Node, res *layout.Result) map[string]layout.E
 // each body heading becomes a GoTo annotation back to its TOC entry. Both are
 // skipped when the anchor side is missing.
 //
-// Arbitrary same-document <a href="#frag"> links in body HTML are NOT wired:
-// the layout engine emits link ops only for external hrefs and inline <a>
-// elements produce no boxes, so the source rect is unavailable. Named
-// destinations for every heading still exist via the outline and the TOC
-// links, which covers the report use case.
+// Arbitrary same-document <a href="#frag"> links in body HTML are wired by
+// applyInternalLinks: layout emits OpLinkURI with a "#frag" URI for inline
+// anchors that have a paint box (text runs), and convert resolves them to
+// GoTo destinations via element id / heading locations.
 func applyTOCLinks(doc *pdf.Document, tocs []*objectState, bodies []*objectState, tocTotal int, headings []*outline.Heading) {
 	if len(tocs) == 0 {
 		return
@@ -135,4 +135,74 @@ func locationOf(st *objectState, node *html.Node) layout.ElementLocation {
 		}
 	}
 	return layout.ElementLocation{}
+}
+
+// applyInternalLinks turns OpLinkURI ops whose URI is a same-document
+// fragment (#id) into GoTo annotations. Destinations are element boxes with
+// a matching id attribute. When LocalLinks is false, fragment ops are skipped.
+func applyInternalLinks(doc *pdf.Document, bodies []*objectState, tocTotal int, cmd *cli.Command) {
+	if doc == nil {
+		return
+	}
+	_ = cmd
+	idLoc := map[string]struct {
+		st  *objectState
+		loc layout.ElementLocation
+	}{}
+	for _, st := range bodies {
+		if st == nil || st.res == nil {
+			continue
+		}
+		for _, loc := range st.res.Locations {
+			if loc.Node == nil {
+				continue
+			}
+			if id := loc.Node.Attribute("id"); id != "" {
+				idLoc[id] = struct {
+					st  *objectState
+					loc layout.ElementLocation
+				}{st, loc}
+			}
+		}
+	}
+	for _, st := range bodies {
+		if st == nil || st.res == nil || st.geom.contentH <= 0 {
+			continue
+		}
+		useLocal := st.obj.LocalLinks
+		for i := range st.res.Ops {
+			op := &st.res.Ops[i]
+			if op.Kind != layout.OpLinkURI || !strings.HasPrefix(op.URI, "#") {
+				continue
+			}
+			frag := strings.TrimPrefix(op.URI, "#")
+			op.Kind = linkOpSkip
+			op.URI = ""
+			if !useLocal || frag == "" {
+				continue
+			}
+			dest, ok := idLoc[frag]
+			if !ok {
+				continue
+			}
+			srcPageIdx := tocTotal + st.offset + int(op.Y/st.geom.contentH)
+			srcPage := doc.PageAt(srcPageIdx)
+			if srcPage == nil {
+				continue
+			}
+			srcLoc := layout.ElementLocation{
+				Page: int(op.Y / st.geom.contentH),
+				X:    op.X, Y: op.Y, W: op.W, H: op.H,
+			}
+			if srcLoc.H <= 0 {
+				srcLoc.H = 10
+			}
+			if srcLoc.W <= 0 {
+				srcLoc.W = 10
+			}
+			destPage := tocTotal + dest.st.offset + dest.loc.Page
+			dx, dy := destPoint(dest.loc, dest.st.geom)
+			srcPage.AddLinkDest(pageRect(srcLoc, st.geom), destPage, dx, dy)
+		}
+	}
 }

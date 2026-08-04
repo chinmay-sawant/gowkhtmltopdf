@@ -282,6 +282,18 @@ func init() {
 		func(g *settings.PdfGlobal, val string) error { return nil },
 		func(o *settings.PdfObject, val string) error { return o.Set("locallinks", val) },
 	))
+	add("resolve-relative-links", ModePDF, "bool", func(c *Command, cur *objectCtx, val string) error {
+		return c.Global.Set("resolverelativelinks", val)
+	})
+	add("keep-relative-links", ModePDF, "bool", func(c *Command, cur *objectCtx, val string) error {
+		return c.Global.Set("resolverelativelinks", "false")
+	})
+	add("font-path", ModeBoth, "value", func(c *Command, cur *objectCtx, val string) error {
+		return c.Global.Set("fontpath", val)
+	})
+	add("use-system-fonts", ModeBoth, "bool", func(c *Command, cur *objectCtx, val string) error {
+		return c.Global.Set("usesystemfonts", val)
+	})
 	add("produce-forms", ModePDF, "bool", pageScoped(
 		func(g *settings.PdfGlobal, val string) error { return g.Set("produceforms", val) },
 		func(o *settings.PdfObject, val string) error { return o.Set("produceforms", val) },

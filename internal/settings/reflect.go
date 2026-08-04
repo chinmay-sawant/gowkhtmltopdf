@@ -288,6 +288,9 @@ func globalSetters(g *PdfGlobal) map[string]setter {
 		"defaultencoding":              setString(&g.DefaultEncoding),
 		"cookiejar":                    setString(&g.Load.CookieJar),
 		"proxy":                        setString(&g.Load.Proxy),
+		"usesystemfonts":               setBool(&g.UseSystemFonts),
+		"resolverelativelinks":         setBool(&g.ResolveRelativeLinks),
+		"fontpath":                     appendString(&g.FontPaths),
 	}
 	// margins
 	for _, e := range []string{"top", "bottom", "left", "right"} {

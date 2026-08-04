@@ -1,7 +1,7 @@
 # Phase 17 - Broader CSS: Position / Float Refinement / Partial Flex
 
 > **Parent:** `plans/10-canonical-post-mvp-roadmap.md`  
-> **Status:** not started  
+> **Status:** done (core) on `feature/tier-2`  
 > **Estimated effort:** 2–4 months  
 > **Depends on:** Phase 16 float lite + selectors  
 > **Unblocks:** Phase 21 arbitrary websites; Tier 2 “leave wkhtmltopdf for most jobs”  

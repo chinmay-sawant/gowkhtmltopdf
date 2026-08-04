@@ -200,15 +200,21 @@ func (n *Node) Flatten() []*Node {
 // and backLink attributes carry the heading's synthetic anchor. Valid XML,
 // no CDATA.
 func DumpOutlineXML(root *Node) []byte {
+	return DumpOutlineXMLOffset(root, 0)
+}
+
+// DumpOutlineXMLOffset is DumpOutlineXML with a page offset (e.g. TOC page
+// count) added to every item's page number so dump matches final PDF pages.
+func DumpOutlineXMLOffset(root *Node, pageOffset int) []byte {
 	var b strings.Builder
 	b.WriteString("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
 	b.WriteString("<outline xmlns=\"http://wkhtmltopdf.org/outline\">\n")
-	dumpNode(root, &b, 1)
+	dumpNode(root, &b, 1, pageOffset)
 	b.WriteString("</outline>\n")
 	return []byte(b.String())
 }
 
-func dumpNode(n *Node, b *strings.Builder, depth int) {
+func dumpNode(n *Node, b *strings.Builder, depth, pageOffset int) {
 	pad := strings.Repeat("  ", depth)
 	for _, c := range n.Children {
 		h := c.Heading
@@ -219,7 +225,7 @@ func dumpNode(n *Node, b *strings.Builder, depth int) {
 		b.WriteString("<item title=\"")
 		b.WriteString(xmlEscape(h.Title))
 		b.WriteString("\" page=\"")
-		b.WriteString(strconv.Itoa(h.Page + 1))
+		b.WriteString(strconv.Itoa(h.Page + 1 + pageOffset))
 		b.WriteString("\" link=\"")
 		b.WriteString(h.Anchor)
 		b.WriteString("\" backLink=\"")
@@ -229,7 +235,7 @@ func dumpNode(n *Node, b *strings.Builder, depth int) {
 			continue
 		}
 		b.WriteString("\">\n")
-		dumpNode(c, b, depth+1)
+		dumpNode(c, b, depth+1, pageOffset)
 		b.WriteString(pad)
 		b.WriteString("</item>\n")
 	}

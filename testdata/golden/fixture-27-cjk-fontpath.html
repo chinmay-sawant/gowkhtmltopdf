@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<!--
+  fixture-27-cjk-fontpath
+  Proves: non-Latin text can be laid out when a Unicode-capable face is
+  available via --font-path (phase 19). Without an external font the glyphs
+  may fold to '?'; the golden runner only asserts page structure.
+  Expected: 1 page.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>CJK Sample</title>
+  <style>
+    body { font-family: "Droid Sans Fallback", "Noto Sans CJK SC", sans-serif; font-size: 14pt; }
+    h1 { font-size: 18pt; }
+  </style>
+</head>
+<body>
+  <h1>国际化报告</h1>
+  <p>こんにちは、世界。Hello mixed Latin + 中文 + 日本語.</p>
+  <p>한글 샘플 텍스트.</p>
+</body>
+</html>

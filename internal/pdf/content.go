@@ -16,6 +16,7 @@ type Content struct {
 	fontFiles map[string]*Font  // resource name -> parsed font (embedded)
 	used      map[string][]rune // resource name -> runes seen
 	curFont   string            // active font from last SetFont
+	curSize   float64           // active font size from last SetFont
 	imageUses map[string]string // resource name -> image object ref
 	imageRefs map[string]*imageResource
 	opacity   float64 // 0 disables
@@ -56,6 +57,7 @@ func cloneContent(c *Content) *Content {
 		fontFiles: c.fontFiles,
 		used:      c.used,
 		curFont:   c.curFont,
+		curSize:   c.curSize,
 		imageUses: c.imageUses,
 		imageRefs: c.imageRefs,
 		opacity:   c.opacity,
@@ -143,6 +145,7 @@ func (c *Content) Transform(a, b, c2, d, e, f float64) {
 // SetFont selects a registered font resource by name and size.
 func (c *Content) SetFont(name string, size float64) {
 	c.curFont = name
+	c.curSize = size
 	c.buf.WriteString(fmt.Sprintf("/%s %s Tf\n", name, num(size)))
 }
 
@@ -189,9 +192,15 @@ func (c *Content) TextRenderMode(mode int) {
 }
 
 // TextShow draws a string in the current font, recording its runes for the
-// subsetter. Non-Latin-1 code points are folded (see winAnsiFold) so the
-// recorded runes match the single-byte codes written by pdfString.
+// subsetter. Latin-1 strings keep the simple WinAnsi path. Any code point
+// outside Latin-1 (after folding) switches this draw onto a Type0 sibling
+// resource (name+"_u") so Identity-H Unicode CIDs can be emitted without
+// breaking earlier Latin content on the same face.
 func (c *Content) TextShow(s string) {
+	if c.textNeedsType0(s) {
+		c.textShowType0(s)
+		return
+	}
 	for _, r := range s {
 		if r > 0xFF {
 			r = winAnsiFold(r)
@@ -204,10 +213,48 @@ func (c *Content) TextShow(s string) {
 	c.buf.WriteString(pdfString(s) + " Tj\n")
 }
 
+func (c *Content) textNeedsType0(s string) bool {
+	if _, ok := c.fontFiles[c.curFont]; !ok {
+		return false
+	}
+	for _, r := range s {
+		if r > 0xFF {
+			r = winAnsiFold(r)
+		}
+		if r > 0xFF {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *Content) textShowType0(s string) {
+	base := c.curFont
+	uname := base + "_u"
+	if f := c.fontFiles[base]; f != nil {
+		c.UseEmbeddedFont(uname, f)
+	}
+	if c.curFont != uname {
+		c.SetFont(uname, c.curSize)
+	}
+	for _, r := range s {
+		if r > 0xFFFF {
+			r = '?'
+		}
+		c.used[uname] = append(c.used[uname], r)
+	}
+	c.buf.WriteString(pdfHexCIDs(s) + " Tj\n")
+}
+
 // TextShowAdj draws text with per-char adjustments (kerning offsets in 1/1000 em).
 func (c *Content) TextShowAdj(s string, kern []int) {
 	if len(kern) == 0 {
 		c.TextShow(s)
+		return
+	}
+	if c.textNeedsType0(s) {
+		// Kerning with Type0 is best-effort: draw without adjustments.
+		c.textShowType0(s)
 		return
 	}
 	for _, r := range s {

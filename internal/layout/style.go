@@ -2,6 +2,7 @@ package layout
 
 import (
 	"sort"
+	"strconv"
 	"strings"
 
 	"gowkhtmltopdf/internal/css"
@@ -13,10 +14,23 @@ import (
 // modeled; everything else keeps its initial value.
 type ResolvedStyle struct {
 	Display         string
-	Position        string  // "static" | "relative"
+	Position        string  // "static" | "relative" | "absolute"
 	Float           string  // "none" | "left" | "right"
 	Clear           string  // "none" | "left" | "right" | "both"
 	BoxSizing       string  // "content-box" | "border-box"
+	Top             float64 // position offsets (pt); 0 = unset for absolute uses Auto flags
+	Right           float64
+	Bottom          float64
+	Left            float64
+	TopAuto         bool
+	RightAuto       bool
+	BottomAuto      bool
+	LeftAuto        bool
+	FlexDirection   string  // "row" | "column"
+	JustifyContent  string  // flex-start | flex-end | center | space-between
+	AlignItems      string  // stretch | flex-start | center | flex-end
+	Gap             float64 // flex gap (pt)
+	FlexGrow        float64
 	Width           float64 // -1 = auto; absolute length in pt when WidthPercent < 0
 	WidthPercent    float64 // >=0 means width is that % of the containing block at layout time
 	Height          float64
@@ -74,6 +88,13 @@ func initialStyle() ResolvedStyle {
 		Float:          "none",
 		Clear:          "none",
 		BoxSizing:      "content-box",
+		TopAuto:        true,
+		RightAuto:      true,
+		BottomAuto:     true,
+		LeftAuto:       true,
+		FlexDirection:  "row",
+		JustifyContent: "flex-start",
+		AlignItems:     "stretch",
 		Width:          -1,
 		WidthPercent:   -1,
 		Height:         -1,
@@ -328,12 +349,44 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext)
 			switch value {
 			case "block", "inline", "none", "list-item", "table", "table-row", "table-cell",
 				"table-row-group", "table-header-group", "table-footer-group",
-				"inline-block", "table-caption", "table-column", "table-column-group":
+				"inline-block", "table-caption", "table-column", "table-column-group",
+				"flex", "inline-flex":
 				st.Display = value
 			}
 		case "position":
-			if value == "static" || value == "relative" {
+			switch value {
+			case "static", "relative", "absolute":
 				st.Position = value
+			}
+		case "top":
+			st.Top, st.TopAuto = marginLenAuto(value, fs, ctx.viewportH)
+		case "right":
+			st.Right, st.RightAuto = marginLenAuto(value, fs, ctx.viewportW)
+		case "bottom":
+			st.Bottom, st.BottomAuto = marginLenAuto(value, fs, ctx.viewportH)
+		case "left":
+			st.Left, st.LeftAuto = marginLenAuto(value, fs, ctx.viewportW)
+		case "flex-direction":
+			if value == "row" || value == "column" {
+				st.FlexDirection = value
+			}
+		case "justify-content":
+			switch value {
+			case "flex-start", "flex-end", "center", "space-between", "start", "end":
+				st.JustifyContent = value
+			}
+		case "align-items":
+			switch value {
+			case "stretch", "flex-start", "flex-end", "center", "start", "end":
+				st.AlignItems = value
+			}
+		case "gap", "column-gap", "row-gap":
+			if v, ok := lengthBox(value, fs, ctx.viewportW, "none"); ok && v >= 0 {
+				st.Gap = v
+			}
+		case "flex-grow":
+			if v, err := strconv.ParseFloat(strings.TrimSpace(value), 64); err == nil && v >= 0 {
+				st.FlexGrow = v
 			}
 		case "float":
 			switch value {
@@ -841,7 +894,11 @@ func uaRules(name string) []css.Declaration {
 		return []css.Declaration{{Prop: "display", Value: "list-item"}}
 	case "table":
 		return []css.Declaration{{Prop: "display", Value: "table"}, {Prop: "border-spacing", Value: "2px"}}
-	case "thead", "tbody", "tfoot":
+	case "thead":
+		return []css.Declaration{{Prop: "display", Value: "table-header-group"}}
+	case "tfoot":
+		return []css.Declaration{{Prop: "display", Value: "table-footer-group"}}
+	case "tbody":
 		return []css.Declaration{{Prop: "display", Value: "table-row-group"}}
 	case "tr":
 		return []css.Declaration{{Prop: "display", Value: "table-row"}}

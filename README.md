@@ -257,26 +257,26 @@ parity remains **not planned**.
 | Deferred | Status / reason | Next gate |
 |---|---|---|
 | JavaScript / WebKit features (`--enable-javascript`, `--run-script`, `--window-status`, plugins) | No JS engine in stdlib; flags accepted with warnings; `<script>` stripped at load | Phase 22 staged (see post-MVP roadmap) |
-| Floats / positioned layout (`float`, `clear`, `position: relative/absolute/fixed`) | **Float lite + clear shipped** (invoice chrome); `position` still in-flow | Phase 17 for position/float refinements |
-| Flexbox / Grid (`display: flex|grid`) | Not in the CSS allowlist; elements degrade to initial `inline` | Phase 17 (partial flex); grid deferred |
+| Floats / positioned layout (`float`, `clear`, `position: relative/absolute/fixed`) | **Float lite + clear + relative/absolute lite** | Fixed/`sticky` still deferred |
+| Flexbox / Grid (`display: flex|grid`) | **Partial flex** (row/column, justify, align, gap, flex-grow); grid deferred | Phase 17 remainder / product grid decision |
 | Richer selectors (attribute `[attr=…]`, `:first-child`, `:nth-child`, sibling `+`/`~`) | **Shipped** for presence/exact attr, first/last/nth-child, siblings | Hover/link pseudos still ignored |
-| Multi-font bold/italic (Liberation Sans family) | **Shipped** - Regular/Bold/Italic/BoldItalic embedded | Further families: phase 19 |
-| CJK fonts / complex-script shaping | Latin Liberation family only; no HarfBuzz-class shaping in stdlib | Phase 19 |
+| Multi-font bold/italic (Liberation Sans family) | **Shipped** - Regular/Bold/Italic/BoldItalic embedded | Further families: `--font-path` (phase 19) |
+| CJK fonts / complex-script shaping | **Type0/CID path + `--font-path` / `--use-system-fonts`**; no HarfBuzz shaping | Arabic/Indic still not claimed |
 | AcroForm forms (`--enable-forms`) | No form model in the PDF writer | Intermediate roadmap (forms) |
 | XSLT TOC stylesheets (`--xsl-style-sheet`) | No XSLT in stdlib; flag warns + ignores; default Go-template TOC used | Not planned |
 | SVG image output (`--format svg`) | No stdlib SVG encoder | Not planned |
 | BMP image output | No demand; PNG/JPEG covered by `image/*` | Not planned |
 | SOCKS5 proxy | stdlib `net/http` has no SOCKS5; HTTP(S) proxy only | Not planned |
 | Text anti-aliasing in image mode | **Shipped** pure-Go TTF outline raster with coverage AA (same faces as PDF) | Residual: no FreeType hinting |
-| Inline `<a href="#x">` source-rect links | TOC forward/back links work; inline anchors skipped (inline elements produce no boxes) | Intermediate roadmap |
-| Cross-object URL map (`urlToPageObj`) | Same-document anchors only | Intermediate roadmap |
-| `resolveRelativeLinks` | Flag accepted, not implemented | Intermediate roadmap |
-| HTML header/footer links on body pages | HTML HF renders text only; links not carried over | Intermediate roadmap |
-| `[topage]` with copies | HF baked before duplication; value correct for single copies | Intermediate roadmap |
+| Inline `<a href="#x">` source-rect links | **Shipped** for inline text runs with paint boxes; GoTo via `applyInternalLinks` | Cases without geometry still skipped |
+| Cross-object URL map (`urlToPageObj`) | Same-document anchors within multi-object jobs via body offsets | Full cross-object URL map still lite |
+| `resolveRelativeLinks` | **Shipped** (`--resolve-relative-links` / `--keep-relative-links`) | — |
+| HTML header/footer links on body pages | HTML HF renders text; link annotations on body HF still limited | Phase 20 remainder |
+| `[topage]` with copies | **Corrected** when HF drawn after copies | — |
 | `[subject]` placeholder | Expands empty (no setting field upstream either) | Not planned |
-| `dump-outline` TOC page offset | Dump is body-relative; TOC pages not included in offsets | Intermediate roadmap |
-| Table header repeat across pages | MVP omits (upstream needed Qt patches) | Intermediate roadmap |
-| Smart-shrinking scale-to-width re-layout | Over-width warning only; `Options.Zoom` not wired into `renderObject` | Intermediate roadmap |
+| `dump-outline` TOC page offset | **TOC offset included** via `DumpOutlineXMLOffset` | — |
+| Table header repeat across pages | **Shipped** (`table-header-group` / `<thead>` repeat) | Nested-table edge cases documented |
+| Smart-shrinking scale-to-width re-layout | **Wired** via `Options.Zoom` + smart-shrink re-layout | — |
 | PDF encryption / PDF/A / ICC | Absent or irrelevant upstream too | Not planned |
 | C ABI (`wkhtmltopdf_*` cgo exports) | Stdlib mandate forbids cgo | Only if consumer demand |
 | `--read-args-from-stdin` batch loop | Flag accepted; batch loop not implemented | Not planned |

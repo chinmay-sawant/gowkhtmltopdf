@@ -1,7 +1,7 @@
 # Phase 19 - Fonts / i18n: Discovery, Folder Fonts, CJK / Unicode
 
 > **Parent:** `plans/10-canonical-post-mvp-roadmap.md`  
-> **Status:** not started  
+> **Status:** done (core) on `feature/tier-2`  
 > **Estimated effort:** 1–3 months  
 > **Depends on:** Phase 12 font registry  
 > **Unblocks:** localization, CJK reports, better Wikipedia language lists  

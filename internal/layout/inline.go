@@ -288,8 +288,11 @@ func (e *engine) collectInlineNode(n *html.Node, out *[]inlineItem) {
 		}
 		if st.Display == "inline" {
 			href := ""
-			if n.Name == "a" && isExternalHref(n.Attribute("href")) {
-				href = n.Attribute("href")
+			if n.Name == "a" {
+				h := n.Attribute("href")
+				if isExternalHref(h) || isInternalHref(h) {
+					href = h
+				}
 			}
 			before := len(*out)
 			for _, c := range n.Children {
@@ -456,8 +459,14 @@ func (e *engine) fontDescent(size float64) float64 {
 }
 
 // isExternalHref reports whether a link target should become a URI
-// annotation (http/https/mailto). Local links are out of scope for phase 04.
+// annotation (http/https/mailto). Local same-document fragments are handled
+// separately as internal GoTo links.
 func isExternalHref(href string) bool {
 	low := strings.ToLower(href)
 	return strings.HasPrefix(low, "http://") || strings.HasPrefix(low, "https://") || strings.HasPrefix(low, "mailto:")
+}
+
+// isInternalHref reports a same-document fragment link (#id).
+func isInternalHref(href string) bool {
+	return strings.HasPrefix(href, "#") && len(href) > 1
 }

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<!--
+  fixture-23-thead-repeat
+  Proves: <thead> repeats on continuation pages of a multi-page table
+  (phase 18). Many line-item rows force pagination; header labels must
+  appear on every page that shows body rows.
+  Expected: ≥2 pages.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Thead repeat statement</title>
+  <style>
+    body { font-family: sans-serif; font-size: 9pt; margin: 0; color: #222; }
+    h1 { font-size: 14pt; color: #1a3d6d; margin: 0 0 8px 0; }
+    table.items { width: 100%; border-collapse: collapse; }
+    table.items th, table.items td {
+      border: 1px solid #aab7c4; padding: 5px 6px; text-align: left;
+    }
+    table.items th { background-color: #1a3d6d; color: #fff; font-size: 9pt; }
+    .num { text-align: right; }
+  </style>
+</head>
+<body>
+  <h1>Statement ST-23-1001</h1>
+  <table class="items">
+    <thead>
+      <tr>
+        <th style="width:8%">Line</th>
+        <th style="width:52%">Description</th>
+        <th style="width:15%">Qty</th>
+        <th style="width:25%">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>01</td><td>Widget Alpha - base unit #1</td><td class="num">2</td><td class="num">37.00</td></tr>
+      <tr><td>02</td><td>Widget Beta - outdoor kit #2</td><td class="num">3</td><td class="num">74.00</td></tr>
+      <tr><td>03</td><td>Mounting bracket set #3</td><td class="num">4</td><td class="num">111.00</td></tr>
+      <tr><td>04</td><td>Power supply 24V #4</td><td class="num">5</td><td class="num">148.00</td></tr>
+      <tr><td>05</td><td>Cable harness 10m #5</td><td class="num">1</td><td class="num">185.00</td></tr>
+      <tr><td>06</td><td>Commissioning day rate #6</td><td class="num">2</td><td class="num">222.00</td></tr>
+      <tr><td>07</td><td>Site survey #7</td><td class="num">3</td><td class="num">259.00</td></tr>
+      <tr><td>08</td><td>Radio planning package #8</td><td class="num">4</td><td class="num">296.00</td></tr>
+      <tr><td>09</td><td>Firmware license annual #9</td><td class="num">5</td><td class="num">333.00</td></tr>
+      <tr><td>10</td><td>Spare battery module #10</td><td class="num">1</td><td class="num">370.00</td></tr>
+      <tr><td>11</td><td>Training session #11</td><td class="num">2</td><td class="num">407.00</td></tr>
+      <tr><td>12</td><td>Documentation pack #12</td><td class="num">3</td><td class="num">444.00</td></tr>
+      <tr><td>13</td><td>Extended warranty #13</td><td class="num">4</td><td class="num">481.00</td></tr>
+      <tr><td>14</td><td>Remote support #14</td><td class="num">5</td><td class="num">518.00</td></tr>
+      <tr><td>15</td><td>Gateway spare #15</td><td class="num">1</td><td class="num">555.00</td></tr>
+      <tr><td>16</td><td>Antenna upgrade #16</td><td class="num">2</td><td class="num">592.00</td></tr>
+      <tr><td>17</td><td>Rack kit #17</td><td class="num">3</td><td class="num">629.00</td></tr>
+      <tr><td>18</td><td>Acceptance test #18</td><td class="num">4</td><td class="num">666.00</td></tr>
+      <tr><td>19</td><td>Travel allowance #19</td><td class="num">5</td><td class="num">703.00</td></tr>
+      <tr><td>20</td><td>Project management #20</td><td class="num">1</td><td class="num">740.00</td></tr>
+      <tr><td>21</td><td>Integration adapter #21</td><td class="num">2</td><td class="num">777.00</td></tr>
+      <tr><td>22</td><td>Labeling and packaging #22</td><td class="num">3</td><td class="num">814.00</td></tr>
+      <tr><td>23</td><td>Calibration set #23</td><td class="num">4</td><td class="num">851.00</td></tr>
+      <tr><td>24</td><td>Close-out report #24</td><td class="num">5</td><td class="num">888.00</td></tr>
+      <tr><td>25</td><td>Spare antenna cable #25</td><td class="num">1</td><td class="num">925.00</td></tr>
+      <tr><td>26</td><td>Indoor repeater unit #26</td><td class="num">2</td><td class="num">962.00</td></tr>
+      <tr><td>27</td><td>PoE injector #27</td><td class="num">3</td><td class="num">999.00</td></tr>
+      <tr><td>28</td><td>Surge protector #28</td><td class="num">4</td><td class="num">1036.00</td></tr>
+      <tr><td>29</td><td>Grounding kit #29</td><td class="num">5</td><td class="num">1073.00</td></tr>
+      <tr><td>30</td><td>Weatherproof enclosure #30</td><td class="num">1</td><td class="num">1110.00</td></tr>
+      <tr><td>31</td><td>Widget Alpha - base unit #31</td><td class="num">2</td><td class="num">1147.00</td></tr>
+      <tr><td>32</td><td>Widget Beta - outdoor kit #32</td><td class="num">3</td><td class="num">1184.00</td></tr>
+      <tr><td>33</td><td>Mounting bracket set #33</td><td class="num">4</td><td class="num">1221.00</td></tr>
+      <tr><td>34</td><td>Power supply 24V #34</td><td class="num">5</td><td class="num">1258.00</td></tr>
+      <tr><td>35</td><td>Cable harness 10m #35</td><td class="num">1</td><td class="num">1295.00</td></tr>
+      <tr><td>36</td><td>Commissioning day rate #36</td><td class="num">2</td><td class="num">1332.00</td></tr>
+      <tr><td>37</td><td>Site survey #37</td><td class="num">3</td><td class="num">1369.00</td></tr>
+      <tr><td>38</td><td>Radio planning package #38</td><td class="num">4</td><td class="num">1406.00</td></tr>
+      <tr><td>39</td><td>Firmware license annual #39</td><td class="num">5</td><td class="num">1443.00</td></tr>
+      <tr><td>40</td><td>Spare battery module #40</td><td class="num">1</td><td class="num">1480.00</td></tr>
+      <tr><td>41</td><td>Training session #41</td><td class="num">2</td><td class="num">1517.00</td></tr>
+      <tr><td>42</td><td>Documentation pack #42</td><td class="num">3</td><td class="num">1554.00</td></tr>
+      <tr><td>43</td><td>Extended warranty #43</td><td class="num">4</td><td class="num">1591.00</td></tr>
+      <tr><td>44</td><td>Remote support #44</td><td class="num">5</td><td class="num">1628.00</td></tr>
+      <tr><td>45</td><td>Gateway spare #45</td><td class="num">1</td><td class="num">1665.00</td></tr>
+      <tr><td>46</td><td>Antenna upgrade #46</td><td class="num">2</td><td class="num">1702.00</td></tr>
+      <tr><td>47</td><td>Rack kit #47</td><td class="num">3</td><td class="num">1739.00</td></tr>
+      <tr><td>48</td><td>Acceptance test #48</td><td class="num">4</td><td class="num">1776.00</td></tr>
+      <tr><td>49</td><td>Travel allowance #49</td><td class="num">5</td><td class="num">1813.00</td></tr>
+      <tr><td>50</td><td>Project management #50</td><td class="num">1</td><td class="num">1850.00</td></tr>
+      <tr><td>51</td><td>Integration adapter #51</td><td class="num">2</td><td class="num">1887.00</td></tr>
+      <tr><td>52</td><td>Labeling and packaging #52</td><td class="num">3</td><td class="num">1924.00</td></tr>
+      <tr><td>53</td><td>Calibration set #53</td><td class="num">4</td><td class="num">1961.00</td></tr>
+      <tr><td>54</td><td>Close-out report #54</td><td class="num">5</td><td class="num">1998.00</td></tr>
+      <tr><td>55</td><td>Spare antenna cable #55</td><td class="num">1</td><td class="num">2035.00</td></tr>
+      <tr><td>56</td><td>Indoor repeater unit #56</td><td class="num">2</td><td class="num">2072.00</td></tr>
+      <tr><td>57</td><td>PoE injector #57</td><td class="num">3</td><td class="num">2109.00</td></tr>
+      <tr><td>58</td><td>Surge protector #58</td><td class="num">4</td><td class="num">2146.00</td></tr>
+      <tr><td>59</td><td>Grounding kit #59</td><td class="num">5</td><td class="num">2183.00</td></tr>
+      <tr><td>60</td><td>Weatherproof enclosure #60</td><td class="num">1</td><td class="num">2220.00</td></tr>
+    </tbody>
+  </table>
+</body>
+</html>

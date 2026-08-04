@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -50,6 +51,7 @@ func RunPDFContext(ctx context.Context, cmd *cli.Command, log io.Writer, progres
 	if err != nil {
 		return fmt.Errorf("default font: %w", err)
 	}
+	registry := loadFontRegistry(cmd, log)
 
 	report := func(phase string, percent int) {
 		if progress != nil {
@@ -79,7 +81,7 @@ func RunPDFContext(ctx context.Context, cmd *cli.Command, log io.Writer, progres
 			tocs = append(tocs, st)
 			continue
 		}
-		st, err := renderObject(ctx, loader, font, doc, cmd, obj, i, log)
+		st, err := renderObject(ctx, loader, font, registry, doc, cmd, obj, i, log)
 		if err != nil {
 			return err
 		}
@@ -124,7 +126,7 @@ func RunPDFContext(ctx context.Context, cmd *cli.Command, log io.Writer, progres
 		// --dump-outline writes the wkhtmltopdf XML to stdout; the CLI sets
 		// the Command field, the reflect surface sets Global.DumpOutline.
 		if cmd.DumpOutline || cmd.Global.DumpOutline {
-			if _, err := os.Stdout.Write(outline.DumpOutlineXML(outTree)); err != nil {
+			if _, err := os.Stdout.Write(outline.DumpOutlineXMLOffset(outTree, tocTotal)); err != nil {
 				return fmt.Errorf("dump outline: %w", err)
 			}
 		}
@@ -137,8 +139,7 @@ func RunPDFContext(ctx context.Context, cmd *cli.Command, log io.Writer, progres
 	if len(tocs) > 0 {
 		applyTOCLinks(doc, tocs, bodies, tocTotal, headings)
 	}
-
-	drawHeadersFooters(ctx, loader, font, doc, cmd, tocs, bodies, tocTotal, headings, log)
+	applyInternalLinks(doc, bodies, tocTotal, cmd)
 
 	var ranges []pageRange
 	for _, tr := range tocs {
@@ -167,6 +168,9 @@ func RunPDFContext(ctx context.Context, cmd *cli.Command, log io.Writer, progres
 			}
 		}
 	}
+
+	// Headers/footers after copies so [page]/[topage] reflect the final page set.
+	drawHeadersFooters(ctx, loader, font, doc, cmd, tocs, bodies, tocTotal, headings, log)
 
 	var out io.Writer = os.Stdout
 	closeOut := func() error { return nil }
@@ -290,7 +294,7 @@ func initTOCState(ctx context.Context, loader *load.Loader, font *pdf.Font, cmd 
 // renderObject loads, lays out and paints one body object into doc and
 // returns the per-object state the later passes need (nil when the load
 // policy skipped the object).
-func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, doc *pdf.Document, cmd *cli.Command, obj *settings.PdfObject, idx int, log io.Writer) (*objectState, error) {
+func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, registry *pdf.Registry, doc *pdf.Document, cmd *cli.Command, obj *settings.PdfObject, idx int, log io.Writer) (*objectState, error) {
 	res, err := loader.Load(ctx, obj.Page, obj.Load)
 	if err != nil {
 		return nil, fmt.Errorf("object %d (%s): load: %w", idx+1, obj.Page, err)
@@ -351,6 +355,7 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, doc 
 		Width:      st.geom.pageW - st.geom.marginLeft - st.geom.marginRight,
 		Height:     st.geom.contentH,
 		Font:       font,
+		Registry:   registry,
 		Sheets:     sheets,
 		Media:      "print",
 		Zoom:       obj.Load.ZoomFactor,
@@ -380,6 +385,7 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, doc 
 					Width:      contentW,
 					Height:     st.geom.pageH - st.geom.marginTop - st.geom.marginBottom,
 					Font:       font,
+					Registry:   registry,
 					Sheets:     sheets,
 					Media:      "print",
 					Zoom:       effZoom,
@@ -391,6 +397,10 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, doc 
 				}
 			}
 		}
+	}
+
+	if cmd.Global.ResolveRelativeLinks {
+		resolveRelativeLinkURIs(lres.Ops, st.base)
 	}
 
 	// --no-external-links strips URI link ops before painting (the object
@@ -572,4 +582,49 @@ func DefaultTOCXSL() string {
   </xsl:template>
 </xsl:stylesheet>
 `
+}
+
+// resolveRelativeLinkURIs rewrites non-absolute, non-fragment OpLinkURI
+// values against the page base URL when --resolve-relative-links is on
+// (default). Fragments (#id) and scheme URLs are left unchanged.
+func resolveRelativeLinkURIs(ops []layout.Op, base string) {
+	if base == "" {
+		return
+	}
+	bu, err := url.Parse(base)
+	if err != nil || bu == nil {
+		return
+	}
+	for i := range ops {
+		if ops[i].Kind != layout.OpLinkURI || ops[i].URI == "" {
+			continue
+		}
+		u := ops[i].URI
+		if strings.HasPrefix(u, "#") || strings.Contains(u, "://") || strings.HasPrefix(strings.ToLower(u), "mailto:") {
+			continue
+		}
+		ref, err := url.Parse(u)
+		if err != nil {
+			continue
+		}
+		ops[i].URI = bu.ResolveReference(ref).String()
+	}
+}
+
+// loadFontRegistry builds the opt-in font registry from --font-path and
+// optional --use-system-fonts. Returns nil when nothing was configured.
+func loadFontRegistry(cmd *cli.Command, log io.Writer) *pdf.Registry {
+	var dirs []string
+	dirs = append(dirs, cmd.Global.FontPaths...)
+	if cmd.Global.UseSystemFonts {
+		dirs = append(dirs, pdf.DefaultSystemFontDirs()...)
+	}
+	if len(dirs) == 0 {
+		return nil
+	}
+	reg := pdf.ScanFontDirs(dirs)
+	if log != nil && log != io.Discard && !cmd.Global.Quiet {
+		fmt.Fprintf(log, "info: scanned %d font path(s)\n", len(dirs))
+	}
+	return reg
 }

@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
+	"unicode/utf16"
 )
 
 // Font is a parsed TrueType/OpenType font (table-directory view). It exposes
@@ -337,6 +339,75 @@ func (f *Font) GlyphID(r rune) uint16 {
 		return g
 	}
 	return 0
+}
+
+// FamilyNames returns CSS-friendly family names from the font's name table
+// (NameIDs 1 and 16 when present). Empty when the name table is missing.
+func (f *Font) FamilyNames() []string {
+	t, ok := f.tables["name"]
+	if !ok || len(t) < 6 {
+		return nil
+	}
+	count := int(binary.BigEndian.Uint16(t[2:4]))
+	strOff := int(binary.BigEndian.Uint16(t[4:6]))
+	seen := map[string]bool{}
+	var out []string
+	add := func(s string) {
+		s = strings.TrimSpace(s)
+		if s == "" || seen[s] {
+			return
+		}
+		seen[s] = true
+		out = append(out, s)
+	}
+	for i := 0; i < count; i++ {
+		rec := 6 + i*12
+		if rec+12 > len(t) {
+			break
+		}
+		platform := binary.BigEndian.Uint16(t[rec : rec+2])
+		encoding := binary.BigEndian.Uint16(t[rec+2 : rec+4])
+		nameID := binary.BigEndian.Uint16(t[rec+6 : rec+8])
+		length := int(binary.BigEndian.Uint16(t[rec+8 : rec+10]))
+		offset := int(binary.BigEndian.Uint16(t[rec+10 : rec+12]))
+		if nameID != 1 && nameID != 16 && nameID != 4 && nameID != 6 {
+			continue
+		}
+		start := strOff + offset
+		if start < 0 || start+length > len(t) {
+			continue
+		}
+		raw := t[start : start+length]
+		var s string
+		switch {
+		case platform == 3 && (encoding == 1 || encoding == 10):
+			s = decodeUTF16BE(raw)
+		case platform == 0:
+			s = decodeUTF16BE(raw)
+		case platform == 1:
+			s = string(raw)
+		default:
+			continue
+		}
+		if nameID == 1 || nameID == 16 {
+			add(s)
+		}
+		if f.PostScriptName == "" && (nameID == 6 || nameID == 4) {
+			f.PostScriptName = strings.ReplaceAll(s, " ", "")
+		}
+	}
+	return out
+}
+
+func decodeUTF16BE(b []byte) string {
+	if len(b)%2 != 0 {
+		return string(b)
+	}
+	u := make([]uint16, len(b)/2)
+	for i := range u {
+		u[i] = binary.BigEndian.Uint16(b[i*2:])
+	}
+	return string(utf16.Decode(u))
 }
 
 // Advance returns the horizontal advance width in font units for a rune.

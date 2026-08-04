@@ -469,8 +469,27 @@ func drawHeadersFooters(ctx context.Context, loader *load.Loader, font *pdf.Font
 	now := time.Now()
 	date := now.Format("2006-01-02")
 	clock := now.Format("15:04:05")
-	for p := 0; p < total && p < len(owners); p++ {
-		own := owners[p]
+	logicalN := len(owners)
+	copies := cmd.Global.Copies
+	if copies < 1 {
+		copies = 1
+	}
+	for p := 0; p < total; p++ {
+		var own owner
+		switch {
+		case logicalN == 0:
+			continue
+		case copies <= 1 || total == logicalN:
+			if p >= logicalN {
+				continue
+			}
+			own = owners[p]
+		case cmd.Global.Collate:
+			own = owners[p%logicalN]
+		default:
+			// non-collate: copies of page i are contiguous
+			own = owners[p/copies]
+		}
 		if own.st.obj.IsCover {
 			continue
 		}

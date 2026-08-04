@@ -57,10 +57,83 @@ func subsetFont(f *Font, used []rune) (*subsetResult, error) {
 	outlines = cloned
 
 	// rune -> new glyph id, deduped and sorted (Latin-1 codes only for
-	// simple-font embedding; Type0/CID is deferred)
+	// simple-font embedding; use subsetFontUnicode for Type0)
 	res := &subsetResult{glyphIDs: map[rune]uint16{}}
 	for _, r := range used {
 		if !simpleFontRune(r) {
+			continue
+		}
+		old := f.GlyphID(r)
+		if old == 0 {
+			continue
+		}
+		res.glyphIDs[r] = oldToNew[old]
+	}
+	for r := range res.glyphIDs {
+		res.runes = append(res.runes, r)
+	}
+	sort.Slice(res.runes, func(i, j int) bool { return res.runes[i] < res.runes[j] })
+
+	sub := &subsetter{f: f, glyphs: glyphs, outlines: outlines, advances: advances}
+	sub.mappings = make([]codeGlyph, 0, len(res.glyphIDs))
+	for r, g := range res.glyphIDs {
+		sub.mappings = append(sub.mappings, codeGlyph{code: uint16(r), glyph: g})
+	}
+	sort.Slice(sub.mappings, func(i, j int) bool { return sub.mappings[i].code < sub.mappings[j].code })
+	data, err := sub.build()
+	if err != nil {
+		return nil, err
+	}
+	res.data = data
+	res.widths = make([]float64, len(advances))
+	for i, a := range advances {
+		res.widths[i] = float64(a)
+	}
+	return res, nil
+}
+
+// subsetFontUnicode is like subsetFont but keeps glyph mappings for the full
+// Unicode BMP (needed for Type0 CIDToGIDMap). Codes above U+FFFF are skipped.
+func subsetFontUnicode(f *Font, used []rune) (*subsetResult, error) {
+	glyphSet := map[uint16]bool{0: true}
+	for _, r := range used {
+		if r > 0xFFFF {
+			continue
+		}
+		g := f.GlyphID(r)
+		if g == 0 {
+			continue
+		}
+		collectGlyph(f, g, glyphSet)
+	}
+	glyphs := make([]uint16, 0, len(glyphSet))
+	for g := range glyphSet {
+		glyphs = append(glyphs, g)
+	}
+	sort.Slice(glyphs, func(i, j int) bool { return glyphs[i] < glyphs[j] })
+
+	oldToNew := map[uint16]uint16{}
+	advances := make([]int32, 0, len(glyphs))
+	outlines := make([][]byte, len(glyphs))
+	for newID, old := range glyphs {
+		oldToNew[old] = uint16(newID)
+		if int(old) < len(f.advance) {
+			advances = append(advances, f.advance[old])
+		} else {
+			advances = append(advances, 0)
+		}
+		outlines[newID] = f.glyphOutline(old)
+	}
+	cloned := make([][]byte, len(outlines))
+	for i, o := range outlines {
+		cloned[i] = bytes.Clone(o)
+		remapComposite(cloned[i], oldToNew)
+	}
+	outlines = cloned
+
+	res := &subsetResult{glyphIDs: map[rune]uint16{}}
+	for _, r := range used {
+		if r > 0xFFFF {
 			continue
 		}
 		old := f.GlyphID(r)

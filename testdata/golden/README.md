@@ -51,6 +51,11 @@ proves. Page envelopes are pinned in `internal/convert/golden_test.go`
 | 20 | Image grid: four data: URI PNGs at intrinsic sizes | 1 |
 | 21 | Detailed multi-section ops report (KPIs, WPs, invoice extract, REQs) | ≥3 |
 | 22 | Float lite invoice chrome: float left/right + clear, inline-block badge, border-box | 1 |
+| 23 | Multi-page table with repeating `<thead>` on continuation pages (phase 18) | ≥2 |
+| 24 | Same-document `<a href="#id">` → PDF GoTo annotations (phase 20) | 2 |
+| 25 | Partial flex row: justify-content, gap, flex-grow (phase 17) | 1 |
+| 26 | Position lite: relative offsets + absolute overlay (phase 17) | 1 |
+| 27 | CJK/Unicode sample (pair with `--font-path` for real glyphs; phase 19) | 1 |
 
 ## Pass criteria (MVP)
 
