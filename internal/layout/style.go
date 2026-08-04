@@ -13,65 +13,68 @@ import (
 // consumes, in points (or unitless where noted). Only the phase-04 subset is
 // modeled; everything else keeps its initial value.
 type ResolvedStyle struct {
-	Display         string
-	Position        string  // "static" | "relative" | "absolute"
-	Float           string  // "none" | "left" | "right"
-	Clear           string  // "none" | "left" | "right" | "both"
-	BoxSizing       string  // "content-box" | "border-box"
-	Top             float64 // position offsets (pt); 0 = unset for absolute uses Auto flags
-	Right           float64
-	Bottom          float64
-	Left            float64
-	TopAuto         bool
-	RightAuto       bool
-	BottomAuto      bool
-	LeftAuto        bool
-	FlexDirection   string  // "row" | "column"
-	JustifyContent  string  // flex-start | flex-end | center | space-between
-	AlignItems      string  // stretch | flex-start | center | flex-end
-	Gap             float64 // flex gap (pt)
-	FlexGrow        float64
-	Width           float64 // -1 = auto; absolute length in pt when WidthPercent < 0
-	WidthPercent    float64 // >=0 means width is that % of the containing block at layout time
-	Height          float64
-	MinWidth        float64
-	MaxWidth        float64
-	MinHeight       float64
-	MaxHeight       float64
-	MarginTop       float64
-	MarginRight     float64
-	MarginBottom    float64
-	MarginLeft      float64
-	MarginLeftAuto  bool // margin-left: auto (horizontal centering with right auto)
-	MarginRightAuto bool // margin-right: auto
-	PaddingTop      float64
-	PaddingRight    float64
-	PaddingBottom   float64
-	PaddingLeft     float64
-	BorderTop       border
-	BorderRight     border
-	BorderBottom    border
-	BorderLeft      border
-	Color           [3]float64
-	BGColor         [4]float64 // rgba, 0..1
-	FontFamily      []string
-	FontSize        float64 // pts
-	FontWeight      int
-	FontItalic      bool
-	LineHeight      float64 // pts; 0 = "normal"
-	TextAlign       string  // "left" | "right" | "center" | "justify"
-	VerticalAlign   string  // "baseline" | "top" | "middle" | "bottom"
-	WhiteSpace      string  // "normal" | "nowrap" | "pre"
-	TextDecoration  string  // "none" | "underline" | "line-through"
-	LetterSpacing   float64
-	TextIndent      float64
-	BorderCollapse  string // "separate" | "collapse"
-	BorderSpacing   float64
-	TableLayout     string // "auto" | "fixed"
-	IsReplaced      bool   // img, hr
-	PageBreakBefore string // "" | "always" | "avoid"
-	PageBreakAfter  string // "" | "always" | "avoid"
-	PageBreakInside string // "" | "always" | "avoid"
+	Display             string
+	Position            string  // "static" | "relative" | "absolute"
+	Float               string  // "none" | "left" | "right"
+	Clear               string  // "none" | "left" | "right" | "both"
+	BoxSizing           string  // "content-box" | "border-box"
+	Top                 float64 // position offsets (pt); 0 = unset for absolute uses Auto flags
+	Right               float64
+	Bottom              float64
+	Left                float64
+	TopAuto             bool
+	RightAuto           bool
+	BottomAuto          bool
+	LeftAuto            bool
+	FlexDirection       string  // "row" | "column"
+	FlexWrap            string  // "nowrap" | "wrap" | "wrap-reverse"
+	JustifyContent      string  // flex-start | flex-end | center | space-between
+	AlignItems          string  // stretch | flex-start | center | flex-end
+	Gap                 float64 // flex/grid gap (pt)
+	FlexGrow            float64
+	GridTemplateColumns string // raw grid-template-columns value
+	GridTemplateRows    string
+	Width               float64 // -1 = auto; absolute length in pt when WidthPercent < 0
+	WidthPercent        float64 // >=0 means width is that % of the containing block at layout time
+	Height              float64
+	MinWidth            float64
+	MaxWidth            float64
+	MinHeight           float64
+	MaxHeight           float64
+	MarginTop           float64
+	MarginRight         float64
+	MarginBottom        float64
+	MarginLeft          float64
+	MarginLeftAuto      bool // margin-left: auto (horizontal centering with right auto)
+	MarginRightAuto     bool // margin-right: auto
+	PaddingTop          float64
+	PaddingRight        float64
+	PaddingBottom       float64
+	PaddingLeft         float64
+	BorderTop           border
+	BorderRight         border
+	BorderBottom        border
+	BorderLeft          border
+	Color               [3]float64
+	BGColor             [4]float64 // rgba, 0..1
+	FontFamily          []string
+	FontSize            float64 // pts
+	FontWeight          int
+	FontItalic          bool
+	LineHeight          float64 // pts; 0 = "normal"
+	TextAlign           string  // "left" | "right" | "center" | "justify"
+	VerticalAlign       string  // "baseline" | "top" | "middle" | "bottom"
+	WhiteSpace          string  // "normal" | "nowrap" | "pre"
+	TextDecoration      string  // "none" | "underline" | "line-through"
+	LetterSpacing       float64
+	TextIndent          float64
+	BorderCollapse      string // "separate" | "collapse"
+	BorderSpacing       float64
+	TableLayout         string // "auto" | "fixed"
+	IsReplaced          bool   // img, hr
+	PageBreakBefore     string // "" | "always" | "avoid"
+	PageBreakAfter      string // "" | "always" | "avoid"
+	PageBreakInside     string // "" | "always" | "avoid"
 }
 
 type border struct {
@@ -93,6 +96,7 @@ func initialStyle() ResolvedStyle {
 		BottomAuto:     true,
 		LeftAuto:       true,
 		FlexDirection:  "row",
+		FlexWrap:       "nowrap",
 		JustifyContent: "flex-start",
 		AlignItems:     "stretch",
 		Width:          -1,
@@ -350,12 +354,12 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext)
 			case "block", "inline", "none", "list-item", "table", "table-row", "table-cell",
 				"table-row-group", "table-header-group", "table-footer-group",
 				"inline-block", "table-caption", "table-column", "table-column-group",
-				"flex", "inline-flex":
+				"flex", "inline-flex", "grid", "inline-grid":
 				st.Display = value
 			}
 		case "position":
 			switch value {
-			case "static", "relative", "absolute":
+			case "static", "relative", "absolute", "fixed", "sticky":
 				st.Position = value
 			}
 		case "top":
@@ -369,6 +373,10 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext)
 		case "flex-direction":
 			if value == "row" || value == "column" {
 				st.FlexDirection = value
+			}
+		case "flex-wrap":
+			if value == "nowrap" || value == "wrap" || value == "wrap-reverse" {
+				st.FlexWrap = value
 			}
 		case "justify-content":
 			switch value {
@@ -388,6 +396,10 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext)
 			if v, err := strconv.ParseFloat(strings.TrimSpace(value), 64); err == nil && v >= 0 {
 				st.FlexGrow = v
 			}
+		case "grid-template-columns":
+			st.GridTemplateColumns = value
+		case "grid-template-rows":
+			st.GridTemplateRows = value
 		case "float":
 			switch value {
 			case "left", "right", "none":

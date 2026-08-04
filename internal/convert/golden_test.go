@@ -175,6 +175,7 @@ var fixturePageBounds = map[string]fixtureBounds{
 	"fixture-25-flex-row.html":              {minPages: 1, maxPages: 1},
 	"fixture-26-position-lite.html":         {minPages: 1, maxPages: 1},
 	"fixture-27-cjk-fontpath.html":          {minPages: 1, maxPages: 1},
+	"fixture-28-flex-wrap-grid-fixed.html":  {minPages: 2, maxPages: 2},
 }
 
 // fixtureHeaderOK enforces the corpus hygiene rule: every fixture starts

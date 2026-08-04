@@ -36,12 +36,16 @@ for CJK.
 
 ## Honest shaping limits
 
-- **No HarfBuzz / no OpenType shaping.** Glyphs are placed left-to-right
-  with advance widths only.
+- **No HarfBuzz / no OpenType shaping.** Glyphs are placed with advance
+  widths only.
 - **CJK (Han / kana / hangul)** works when a capable TTF is on the font
   path: characters render, but vertical writing modes, ruby, and complex
   line-breaking are not claimed.
-- **Arabic, Indic, and other complex scripts** are **not claimed**: no
-  reordering, ligation, or mark positioning.
-- **`@font-face` network downloads** are out of scope; local `src` may
-  land later under the same ACL rules as other file loads.
+- **Arabic / Hebrew:** a best-effort **RTL run reverse** is applied at
+  emit time so character order is closer to visual RTL. **Joining,
+  ligation, and mark positioning are NOT implemented** — production
+  Arabic/Indic output is **not claimed**.
+- **Indic and other complex scripts** are **not claimed**.
+- **`@font-face`:** local `url(...ttf)` sources are loaded under the same
+  ACL as other subresources; `.woff`/network downloads are skipped with a
+  warning.

@@ -17,7 +17,16 @@ import (
 
 // Stylesheet is a parsed stylesheet. Rules keep their source order.
 type Stylesheet struct {
-	Rules []Rule
+	Rules     []Rule
+	FontFaces []FontFace
+}
+
+// FontFace is one @font-face rule (local src subset).
+type FontFace struct {
+	Family string
+	Src    string // raw src value (may contain url(...) or local(...))
+	Weight string
+	Style  string
 }
 
 // Rule is one rule set: selectors plus a declaration block.
@@ -96,7 +105,7 @@ func Parse(src string) (*Stylesheet, error) {
 					return nil, err
 				}
 				s.Rules = append(s.Rules, rules...)
-			case strings.HasPrefix(low, "@page"), strings.HasPrefix(low, "@font-face"):
+			case strings.HasPrefix(low, "@page"):
 				open := strings.IndexByte(src, '{')
 				if open < 0 {
 					src = ""
@@ -107,6 +116,20 @@ func Parse(src string) (*Stylesheet, error) {
 					return nil, err
 				}
 				src = rest
+			case strings.HasPrefix(low, "@font-face"):
+				open := strings.IndexByte(src, '{')
+				if open < 0 {
+					src = ""
+					continue
+				}
+				block, rest, err := takeBlock(src, open)
+				if err != nil {
+					return nil, err
+				}
+				src = rest
+				if ff := parseFontFace(block); ff.Family != "" || ff.Src != "" {
+					s.FontFaces = append(s.FontFaces, ff)
+				}
 			default:
 				if end := strings.IndexByte(src, ';'); end >= 0 {
 					src = src[end+1:]
@@ -152,6 +175,52 @@ func Parse(src string) (*Stylesheet, error) {
 		order++
 	}
 	return s, nil
+}
+
+func parseFontFace(block string) FontFace {
+	var ff FontFace
+	for _, d := range parseDeclarations(block) {
+		switch strings.ToLower(d.Prop) {
+		case "font-family":
+			fams := ParseFontFamily(d.Value)
+			if len(fams) > 0 {
+				ff.Family = fams[0]
+			} else {
+				ff.Family = strings.Trim(d.Value, " \"'")
+			}
+		case "src":
+			ff.Src = d.Value
+		case "font-weight":
+			ff.Weight = d.Value
+		case "font-style":
+			ff.Style = d.Value
+		}
+	}
+	return ff
+}
+
+// FontFaceURLs extracts url(...) references from an @font-face src value.
+func FontFaceURLs(src string) []string {
+	var out []string
+	low := src
+	for {
+		i := strings.Index(strings.ToLower(low), "url(")
+		if i < 0 {
+			break
+		}
+		rest := low[i+4:]
+		end := strings.IndexByte(rest, ')')
+		if end < 0 {
+			break
+		}
+		raw := strings.TrimSpace(rest[:end])
+		raw = strings.Trim(raw, `"'`)
+		if raw != "" {
+			out = append(out, raw)
+		}
+		low = rest[end+1:]
+	}
+	return out
 }
 
 // parseRuleList parses the rules inside a @media block body.

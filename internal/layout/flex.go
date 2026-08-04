@@ -4,8 +4,14 @@ import (
 	"gowkhtmltopdf/internal/html"
 )
 
+type flexItem struct {
+	n    *html.Node
+	box  *box
+	grow float64
+}
+
 // buildFlex lays out a flex container (row or column) with a report-friendly
-// subset: justify-content, align-items, gap, and flex-grow 0/1.
+// subset: justify-content, align-items, gap, flex-grow 0/1, and flex-wrap.
 func (e *engine) buildFlex(n *html.Node, st ResolvedStyle, availW, x, y float64) *box {
 	ml, mr := e.scalePt(st.MarginLeft), e.scalePt(st.MarginRight)
 	b := &box{node: n, style: st, kind: "block", x: x + ml, y: y}
@@ -73,17 +79,10 @@ func (e *engine) flowFlexRow(parent *box, kids []*html.Node, st ResolvedStyle, c
 	if len(kids) == 0 {
 		return cy
 	}
-	type item struct {
-		n    *html.Node
-		box  *box
-		grow float64
-	}
-	items := make([]item, 0, len(kids))
-	var fixed float64
-	var growSum float64
+	wrap := st.FlexWrap == "wrap" || st.FlexWrap == "wrap-reverse"
+	items := make([]flexItem, 0, len(kids))
 	for _, kid := range kids {
 		cs := e.styles[kid]
-		// Measure with a generous width; definite widths win inside build.
 		cb := e.build(kid, contentW, contentX, y+cy)
 		if cb == nil {
 			continue
@@ -92,31 +91,70 @@ func (e *engine) flowFlexRow(parent *box, kids []*html.Node, st ResolvedStyle, c
 		if g < 0 {
 			g = 0
 		}
-		items = append(items, item{n: kid, box: cb, grow: g})
-		fixed += cb.w
-		growSum += g
+		items = append(items, flexItem{n: kid, box: cb, grow: g})
 	}
 	if len(items) == 0 {
 		return cy
 	}
+
+	var lines [][]flexItem
+	if !wrap {
+		lines = [][]flexItem{items}
+	} else {
+		var line []flexItem
+		used := 0.0
+		for _, it := range items {
+			need := it.box.w
+			if len(line) > 0 {
+				need += gap
+			}
+			if len(line) > 0 && used+need > contentW+1e-6 {
+				lines = append(lines, line)
+				line = nil
+				used = 0
+				need = it.box.w
+			}
+			line = append(line, it)
+			used += need
+		}
+		if len(line) > 0 {
+			lines = append(lines, line)
+		}
+		if st.FlexWrap == "wrap-reverse" {
+			for i, j := 0, len(lines)-1; i < j; i, j = i+1, j-1 {
+				lines[i], lines[j] = lines[j], lines[i]
+			}
+		}
+	}
+
+	for li, line := range lines {
+		cy = e.placeFlexLine(parent, st, line, contentW, contentX, y, cy, gap)
+		if li < len(lines)-1 {
+			cy += gap
+		}
+	}
+	return cy
+}
+
+func (e *engine) placeFlexLine(parent *box, st ResolvedStyle, items []flexItem, contentW, contentX, y, cy, gap float64) float64 {
+	var fixed, growSum float64
+	for _, it := range items {
+		fixed += it.box.w
+		growSum += it.grow
+	}
 	gaps := gap * float64(len(items)-1)
+	if gaps < 0 {
+		gaps = 0
+	}
 	free := contentW - fixed - gaps
 	if free < 0 {
 		free = 0
 	}
-	// Distribute free space via flex-grow, then justify-content for remainder.
-	usedGrow := 0.0
 	if growSum > 0 && free > 0 {
 		for i := range items {
 			if items[i].grow > 0 {
-				extra := free * (items[i].grow / growSum)
-				items[i].box.w += extra
-				usedGrow += extra
+				items[i].box.w += free * (items[i].grow / growSum)
 			}
-		}
-		free -= usedGrow
-		if free < 0 {
-			free = 0
 		}
 	}
 	totalW := 0.0
@@ -133,15 +171,12 @@ func (e *engine) flowFlexRow(parent *box, kids []*html.Node, st ResolvedStyle, c
 		startX = contentX + (contentW-totalW)/2
 	case "space-between":
 		if len(items) > 1 {
-			justifyGap = gap
 			rem := contentW - (totalW - gaps)
 			if rem > 0 {
 				justifyGap = rem / float64(len(items)-1)
 			}
 			startX = contentX
 		}
-	default: // flex-start
-		startX = contentX
 	}
 
 	rowH := 0.0
@@ -160,7 +195,7 @@ func (e *engine) flowFlexRow(parent *box, kids []*html.Node, st ResolvedStyle, c
 			dy = (y + cy + rowH) - (cb.y + cb.h)
 		case "center":
 			dy = (y + cy + (rowH-cb.h)/2) - cb.y
-		default: // stretch / flex-start: top-align
+		default:
 			dy = (y + cy) - cb.y
 		}
 		e.shiftBoxOps(cb, dx, dy)
@@ -194,10 +229,10 @@ func (e *engine) flowFlexColumn(parent *box, kids []*html.Node, st ResolvedStyle
 	return cy
 }
 
-// applyRelativeOffset shifts a positioned:relative box and its ops by top/left
-// (right/bottom when the corresponding auto flags are set).
+// applyRelativeOffset shifts a positioned:relative (or sticky-lite) box and
+// its ops by top/left (right/bottom when the corresponding auto flags are set).
 func (e *engine) applyRelativeOffset(b *box) {
-	if b == nil || b.style.Position != "relative" {
+	if b == nil || (b.style.Position != "relative" && b.style.Position != "sticky") {
 		return
 	}
 	st := b.style

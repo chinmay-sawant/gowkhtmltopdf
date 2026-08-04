@@ -197,6 +197,7 @@ func (c *Content) TextRenderMode(mode int) {
 // resource (name+"_u") so Identity-H Unicode CIDs can be emitted without
 // breaking earlier Latin content on the same face.
 func (c *Content) TextShow(s string) {
+	s = ShapeText(s)
 	if c.textNeedsType0(s) {
 		c.textShowType0(s)
 		return

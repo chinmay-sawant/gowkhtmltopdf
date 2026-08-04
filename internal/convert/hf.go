@@ -354,9 +354,29 @@ func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hf setti
 				_ = c.AddPNGImage(imgName, x, y, op.W, op.H, op.Image)
 			}
 		case layout.OpLinkURI:
-			// links inside HTML headers/footers are not carried over to the
-			// body pages (the per-page rect bookkeeping is not worth it for
-			// the MVP); the op is skipped.
+			// Carry HTML HF link annotations onto the body page band.
+			y1 := yTop - (op.Y + op.H)
+			y2 := yTop - op.Y
+			if y2 < y1 {
+				y1, y2 = y2, y1
+			}
+			rect := [4]float64{x, y1, x + op.W, y2}
+			if op.W <= 0 {
+				rect[2] = x + 10
+			}
+			if op.H <= 0 {
+				rect[1] = yTop - op.Y - 10
+			}
+			uri := op.URI
+			if uri == "" {
+				break
+			}
+			if len(uri) > 0 && uri[0] == '#' {
+				// Same-document fragments in HF: best-effort URI leave as-is;
+				// convert may not resolve HF GoTo targets to body ids.
+				break
+			}
+			page.AddLinkURI(rect, uri)
 		}
 	}
 	c.Restore()

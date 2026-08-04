@@ -310,6 +310,7 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 	}
 
 	sheets := collectSheets(ctx, loader, root, res.Base, obj.Load, idx+1, log)
+	registry = mergeFontFaces(ctx, loader, registry, sheets, res.Base, obj.Load, idx+1, log)
 
 	pageW, pageH, err := pageGeometry(cmd.Global)
 	if err != nil {
@@ -625,6 +626,50 @@ func loadFontRegistry(cmd *cli.Command, log io.Writer) *pdf.Registry {
 	reg := pdf.ScanFontDirs(dirs)
 	if log != nil && log != io.Discard && !cmd.Global.Quiet {
 		fmt.Fprintf(log, "info: scanned %d font path(s)\n", len(dirs))
+	}
+	return reg
+}
+
+// mergeFontFaces loads local @font-face url(...) TTF sources into the
+// registry (network/woff skipped). ACL follows FetchSub.
+func mergeFontFaces(ctx context.Context, loader *load.Loader, reg *pdf.Registry, sheets []*css.Stylesheet, base string, lp settings.LoadPage, idx int, log io.Writer) *pdf.Registry {
+	for _, sheet := range sheets {
+		if sheet == nil {
+			continue
+		}
+		for _, ff := range sheet.FontFaces {
+			for _, u := range css.FontFaceURLs(ff.Src) {
+				low := strings.ToLower(u)
+				if strings.HasSuffix(low, ".woff") || strings.HasSuffix(low, ".woff2") || strings.HasSuffix(low, ".eot") {
+					fmt.Fprintf(log, "warning: object %d: @font-face src %q skipped (TTF/OTF only)\n", idx, u)
+					continue
+				}
+				if strings.Contains(low, "://") && !strings.HasPrefix(low, "file:") {
+					fmt.Fprintf(log, "warning: object %d: @font-face network src %q skipped\n", idx, u)
+					continue
+				}
+				r, err := loader.FetchSub(ctx, base, u, lp)
+				if err != nil {
+					fmt.Fprintf(log, "warning: object %d: @font-face src %q: %v\n", idx, u, err)
+					continue
+				}
+				f, err := pdf.ParseTTF(r.Body)
+				if err != nil {
+					fmt.Fprintf(log, "warning: object %d: @font-face src %q: %v\n", idx, u, err)
+					continue
+				}
+				if ff.Family != "" {
+					f.PostScriptName = strings.ReplaceAll(ff.Family, " ", "")
+				}
+				if reg == nil {
+					reg = pdf.NewRegistry()
+				}
+				reg.AddFont(f)
+				if ff.Family != "" {
+					reg.AddFamilyAlias(ff.Family, f)
+				}
+			}
+		}
 	}
 	return reg
 }

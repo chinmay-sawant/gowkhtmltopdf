@@ -99,6 +99,10 @@ type Op struct {
 	ImgW   int
 	ImgH   int
 	IsJPEG bool
+
+	// Fixed marks ops from position:fixed boxes; Paint stamps them on every
+	// page at viewport-relative coordinates.
+	Fixed bool
 }
 
 type engine struct {
@@ -231,11 +235,19 @@ func (e *engine) build(n *html.Node, availW, x, y float64) *box {
 	case "hr":
 		b = e.buildHR(n, st, availW, x, y)
 	}
-	if b == nil && (st.Display == "flex" || st.Display == "inline-flex") {
-		b = e.buildFlex(n, st, availW, x, y)
+	// Out-of-flow positioning wraps the display type so fixed/absolute flex
+	// and grid containers still get the right formatting context.
+	if b == nil && st.Position == "fixed" {
+		b = e.buildFixed(n, st, availW, x, y)
 	}
 	if b == nil && st.Position == "absolute" {
 		b = e.buildAbsolute(n, st, availW, x, y)
+	}
+	if b == nil && (st.Display == "flex" || st.Display == "inline-flex") {
+		b = e.buildFlex(n, st, availW, x, y)
+	}
+	if b == nil && (st.Display == "grid" || st.Display == "inline-grid") {
+		b = e.buildGrid(n, st, availW, x, y)
 	}
 	if b == nil && isTableDisplay(st.Display) {
 		b = e.buildTable(n, st, availW, x, y)
@@ -243,10 +255,13 @@ func (e *engine) build(n *html.Node, availW, x, y float64) *box {
 	if b == nil {
 		b = e.buildBlock(n, st, availW, x, y)
 	}
-	if b != nil && st.Position == "relative" {
+	if b != nil && (st.Position == "relative" || st.Position == "sticky") {
 		e.applyRelativeOffset(b)
 	}
 	b.opStart, b.opEnd = start, len(e.ops)-1
+	if b != nil && st.Position == "fixed" {
+		e.markOpsFixed(b.opStart, b.opEnd)
+	}
 	return b
 }
 
@@ -359,8 +374,7 @@ func (e *engine) buildBlock(n *html.Node, st ResolvedStyle, availW, x, y float64
 // (availW/x/y passed from the caller).
 func (e *engine) buildAbsolute(n *html.Node, st ResolvedStyle, availW, x, y float64) *box {
 	start := len(e.ops)
-	// Lay out as a block first at a throwaway origin, then move into place.
-	b := e.buildBlock(n, st, availW, x, y)
+	b := e.buildInFlowDisplay(n, st, availW, x, y)
 	if b == nil {
 		return nil
 	}
@@ -374,13 +388,71 @@ func (e *engine) buildAbsolute(n *html.Node, st ResolvedStyle, availW, x, y floa
 	if !st.TopAuto {
 		ay = y + e.scalePt(st.Top)
 	} else if !st.BottomAuto {
-		// Without a definite containing-block height, treat bottom as top offset.
 		ay = y + e.scalePt(st.Bottom)
 	}
 	dx, dy := ax-b.x, ay-b.y
 	b.x, b.y = ax, ay
 	e.shiftBoxOps(b, dx, dy)
 	return b
+}
+
+// buildFixed places an out-of-flow box against the initial containing block
+// (viewport origin). Ops are marked Fixed so Paint stamps them on every page.
+func (e *engine) buildFixed(n *html.Node, st ResolvedStyle, availW, x, y float64) *box {
+	_ = availW
+	_ = x
+	_ = y
+	cbW := e.opts.Width
+	if cbW <= 0 {
+		cbW = availW
+	}
+	start := len(e.ops)
+	b := e.buildInFlowDisplay(n, st, cbW, 0, 0)
+	if b == nil {
+		return nil
+	}
+	b.opStart, b.opEnd = start, len(e.ops)-1
+	ax, ay := 0.0, 0.0
+	if !st.LeftAuto {
+		ax = e.scalePt(st.Left)
+	} else if !st.RightAuto {
+		ax = cbW - b.w - e.scalePt(st.Right)
+	}
+	if !st.TopAuto {
+		ay = e.scalePt(st.Top)
+	} else if !st.BottomAuto {
+		ay = e.opts.Height - b.h - e.scalePt(st.Bottom)
+		if ay < 0 {
+			ay = e.scalePt(st.Bottom)
+		}
+	}
+	dx, dy := ax-b.x, ay-b.y
+	b.x, b.y = ax, ay
+	e.shiftBoxOps(b, dx, dy)
+	return b
+}
+
+// buildInFlowDisplay builds flex/grid/table/block ignoring position.
+func (e *engine) buildInFlowDisplay(n *html.Node, st ResolvedStyle, availW, x, y float64) *box {
+	if st.Display == "flex" || st.Display == "inline-flex" {
+		return e.buildFlex(n, st, availW, x, y)
+	}
+	if st.Display == "grid" || st.Display == "inline-grid" {
+		return e.buildGrid(n, st, availW, x, y)
+	}
+	if isTableDisplay(st.Display) {
+		return e.buildTable(n, st, availW, x, y)
+	}
+	return e.buildBlock(n, st, availW, x, y)
+}
+
+func (e *engine) markOpsFixed(start, end int) {
+	if end < start {
+		return
+	}
+	for i := start; i <= end && i < len(e.ops); i++ {
+		e.ops[i].Fixed = true
+	}
 }
 
 // prependChrome inserts background + border ops at insertAt so they paint
@@ -431,7 +503,7 @@ func (e *engine) partition(children []*html.Node, blocks, inlines *[]*html.Node)
 		if cs.Display == "none" {
 			continue
 		}
-		if cs.Float != "none" || cs.Position == "absolute" {
+		if cs.Float != "none" || cs.Position == "absolute" || cs.Position == "fixed" {
 			*blocks = append(*blocks, c)
 			continue
 		}
@@ -452,7 +524,7 @@ func (e *engine) isInlineChild(n *html.Node) bool {
 		return false
 	}
 	cs := e.styles[n]
-	if cs.Display == "none" || cs.Float != "none" || cs.Position == "absolute" {
+	if cs.Display == "none" || cs.Float != "none" || cs.Position == "absolute" || cs.Position == "fixed" {
 		return false
 	}
 	return cs.Display == "inline" || cs.Display == "inline-block" || cs.Display == "inline-flex" || n.Name == "img"
@@ -493,13 +565,11 @@ func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedSty
 			i++
 			continue
 		}
-		if n.Type == html.ElementNode && e.styles[n].Position == "absolute" {
-			cs := e.styles[n]
+		if n.Type == html.ElementNode && (e.styles[n].Position == "absolute" || e.styles[n].Position == "fixed") {
 			ab := e.build(n, contentW, contentX, y+cy)
 			if ab != nil && parent != nil {
 				parent.children = append(parent.children, ab)
 			}
-			_ = cs
 			prevBottom = 0
 			i++
 			continue

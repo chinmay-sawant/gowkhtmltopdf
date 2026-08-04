@@ -257,11 +257,11 @@ parity remains **not planned**.
 | Deferred | Status / reason | Next gate |
 |---|---|---|
 | JavaScript / WebKit features (`--enable-javascript`, `--run-script`, `--window-status`, plugins) | No JS engine in stdlib; flags accepted with warnings; `<script>` stripped at load | Phase 22 staged (see post-MVP roadmap) |
-| Floats / positioned layout (`float`, `clear`, `position: relative/absolute/fixed`) | **Float lite + clear + relative/absolute lite** | Fixed/`sticky` still deferred |
-| Flexbox / Grid (`display: flex|grid`) | **Partial flex** (row/column, justify, align, gap, flex-grow); grid deferred | Phase 17 remainder / product grid decision |
+| Floats / positioned layout (`float`, `clear`, `position: relative/absolute/fixed`) | **Float lite + relative/absolute/fixed**; sticky ≈ relative offsets | Sticky pagination stickiness still lite |
+| Flexbox / Grid (`display: flex|grid`) | **Partial flex** (incl. wrap) + **grid lite** (`grid-template-columns` / gap) | Nested grid / spans deferred |
 | Richer selectors (attribute `[attr=…]`, `:first-child`, `:nth-child`, sibling `+`/`~`) | **Shipped** for presence/exact attr, first/last/nth-child, siblings | Hover/link pseudos still ignored |
 | Multi-font bold/italic (Liberation Sans family) | **Shipped** - Regular/Bold/Italic/BoldItalic embedded | Further families: `--font-path` (phase 19) |
-| CJK fonts / complex-script shaping | **Type0/CID path + `--font-path` / `--use-system-fonts`**; no HarfBuzz shaping | Arabic/Indic still not claimed |
+| CJK fonts / complex-script shaping | **Type0/CID + font-path**; RTL run reverse best-effort | Arabic joining / Indic **not claimed** |
 | AcroForm forms (`--enable-forms`) | No form model in the PDF writer | Intermediate roadmap (forms) |
 | XSLT TOC stylesheets (`--xsl-style-sheet`) | No XSLT in stdlib; flag warns + ignores; default Go-template TOC used | Not planned |
 | SVG image output (`--format svg`) | No stdlib SVG encoder | Not planned |
@@ -271,7 +271,7 @@ parity remains **not planned**.
 | Inline `<a href="#x">` source-rect links | **Shipped** for inline text runs with paint boxes; GoTo via `applyInternalLinks` | Cases without geometry still skipped |
 | Cross-object URL map (`urlToPageObj`) | Same-document anchors within multi-object jobs via body offsets | Full cross-object URL map still lite |
 | `resolveRelativeLinks` | **Shipped** (`--resolve-relative-links` / `--keep-relative-links`) | — |
-| HTML header/footer links on body pages | HTML HF renders text; link annotations on body HF still limited | Phase 20 remainder |
+| HTML header/footer links on body pages | **HTML HF external URI links carried** onto body pages | Fragment GoTo from HF still limited |
 | `[topage]` with copies | **Corrected** when HF drawn after copies | — |
 | `[subject]` placeholder | Expands empty (no setting field upstream either) | Not planned |
 | `dump-outline` TOC page offset | **TOC offset included** via `DumpOutlineXMLOffset` | — |

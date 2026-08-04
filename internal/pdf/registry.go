@@ -35,6 +35,19 @@ func (r *Registry) AddFont(f *Font) {
 	}
 }
 
+// AddFamilyAlias registers f under an explicit CSS family name.
+func (r *Registry) AddFamilyAlias(family string, f *Font) {
+	if r == nil || f == nil {
+		return
+	}
+	key := strings.ToLower(strings.TrimSpace(family))
+	key = strings.Trim(key, `"'`)
+	if key == "" {
+		return
+	}
+	r.byFamily[key] = append(r.byFamily[key], f)
+}
+
 // Lookup returns a face matching family list + weight/italic, or nil.
 func (r *Registry) Lookup(families []string, weight int, italic bool) *Font {
 	if r == nil {

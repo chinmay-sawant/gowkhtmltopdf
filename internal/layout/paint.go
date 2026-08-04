@@ -41,10 +41,21 @@ func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 
 	opPage := paginateOps(res, contentH)
 
+	// Fixed ops are stamped on every page at viewport-relative coords.
+	var fixedIdx []int
+	for i := range res.Ops {
+		if res.Ops[i].Fixed {
+			fixedIdx = append(fixedIdx, i)
+		}
+	}
+
 	// assemble final page lists, splitting rect ops at page boundaries
 	res.Pages = nil
 	perPage := map[int][]int{}
 	for i := range res.Ops {
+		if res.Ops[i].Fixed {
+			continue
+		}
 		op := &res.Ops[i]
 		p := opPage[i]
 		if isSplittable(op) {
@@ -68,6 +79,13 @@ func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 		if p > maxP {
 			maxP = p
 		}
+	}
+	if len(fixedIdx) > 0 && maxP < 0 {
+		maxP = 0
+	}
+	if len(perPage) == 0 && len(fixedIdx) > 0 {
+		maxP = 0
+		perPage[0] = nil
 	}
 	res.Pages = make([][]int, maxP+1)
 	for p := 0; p <= maxP; p++ {
@@ -93,27 +111,31 @@ func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 			c.UseEmbeddedFont(n, f)
 			return n
 		}
-		// Unique image resource names per page: reusing "I0" for every
-		// image made later images overwrite earlier ones (fixture-20).
 		nextImg := 0
-		for _, idx := range idxs {
-			op := &res.Ops[idx]
+		paintOp := func(op *Op, pg int) {
 			switch op.Kind {
 			case OpFillRect:
-				drawFill(c, op, pageIdx, contentH, opts, p.Height())
+				drawFill(c, op, pg, contentH, opts, p.Height())
 			case OpStrokeRect:
-				drawStroke(c, op, pageIdx, contentH, opts, p.Height())
+				drawStroke(c, op, pg, contentH, opts, p.Height())
 			case OpLine:
-				drawLine(c, op, pageIdx, contentH, opts, p.Height())
+				drawLine(c, op, pg, contentH, opts, p.Height())
 			case OpText, OpBullet:
-				drawText(c, op, pageIdx, contentH, opts, p.Height(), resName(op.Font))
+				drawText(c, op, pg, contentH, opts, p.Height(), resName(op.Font))
 			case OpImage:
 				name := "I" + itoa(nextImg)
 				nextImg++
-				drawImage(p, c, op, pageIdx, contentH, opts, name)
+				drawImage(p, c, op, pg, contentH, opts, name)
 			case OpLinkURI:
-				drawLink(p, op, pageIdx, contentH, opts)
+				drawLink(p, op, pg, contentH, opts)
 			}
+		}
+		for _, idx := range idxs {
+			paintOp(&res.Ops[idx], pageIdx)
+		}
+		// Fixed layer: page-local coords (pageIdx 0 math on every page).
+		for _, idx := range fixedIdx {
+			paintOp(&res.Ops[idx], 0)
 		}
 	}
 	return nil
@@ -131,6 +153,9 @@ func paginateOps(res *Result, contentH float64) []int {
 	ops := res.Ops
 	for i := range ops {
 		op := &ops[i]
+		if op.Fixed {
+			continue
+		}
 		switch op.Kind {
 		case OpText, OpBullet, OpImage, OpLinkURI:
 			opH := op.H
@@ -180,6 +205,9 @@ func paginateOps(res *Result, contentH float64) []int {
 // Box.y is kept in sync for boxes whose top moved.
 func shiftFlowY(res *Result, from, to int, fromY, dy float64) {
 	for i := from; i <= to; i++ {
+		if i >= 0 && i < len(res.Ops) && res.Ops[i].Fixed {
+			continue
+		}
 		res.Ops[i].Y += dy
 	}
 	for i := range res.Ops {

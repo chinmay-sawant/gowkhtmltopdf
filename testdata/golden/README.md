@@ -56,6 +56,7 @@ proves. Page envelopes are pinned in `internal/convert/golden_test.go`
 | 25 | Partial flex row: justify-content, gap, flex-grow (phase 17) | 1 |
 | 26 | Position lite: relative offsets + absolute overlay (phase 17) | 1 |
 | 27 | CJK/Unicode sample (pair with `--font-path` for real glyphs; phase 19) | 1 |
+| 28 | flex-wrap, CSS grid lite, position:fixed stamp | 2 |
 
 ## Pass criteria (MVP)
 
