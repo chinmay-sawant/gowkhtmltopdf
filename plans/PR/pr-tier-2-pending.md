@@ -1,9 +1,9 @@
 ## Summary
 
-Closes Tier 2 follow-ups after #16, plus the three pending polish items:
-stdlib-compatible Arabic joining / Indic honesty (plan amendment, no HarfBuzz),
-Hangul-capable face path for fixture-27, and fuller flex / grid spans /
-rotated CJK vertical.
+Closes Tier 2 follow-ups after #16: HTML entities, fuller flex/grid/z-index,
+stdlib-safe Arabic joining + Hangul face path, vertical CJK rotation, and
+TrueType subset fixes so composite CJK (e.g. `東京都、`) renders cleanly in
+PDF viewers to match the HTML.
 
 ---
 
@@ -36,6 +36,15 @@ rotated CJK vertical.
 - `writing-mode: vertical-rl|lr`: stacked Latin upright + **90° rotated** ideographic/Hangul/kana
 - **Arabic presentation-form joining** + Lam-Alef in `ShapeText` (not OpenType)
 - Hangul: vendored OFL subset under `testdata/fonts/` + fixture-27; `--font-path` in samples/golden
+- Per-rune CSS `font-family` fallback (Droid for Han, Noto KR for Hangul)
+
+### PDF font subsetting (CJK fidelity)
+
+- Pad `glyf`/`loca` to **4-byte** boundaries (unaligned offsets corrupted composites in viewers)
+- Preserve **LSB** in subset `hmtx`
+- **Strip TrueType hint bytecode** from simple/composite outlines (subsets omit `fpgm`/`prep`/`cvt`)
+- Keep **full-em** CJK punctuation metrics (half-em compression cramped `東京都、` vs HTML+Droid)
+- Regression: `TestSubsetGlyfFourByteAligned`; regenerate sample PDFs
 
 ---
 
@@ -43,9 +52,12 @@ rotated CJK vertical.
 
 | Area | Impact |
 |------|--------|
-| **Behavior / correctness** | Entities, flex shrink/order/min-max, z-index, grid spans, Arabic joining, vertical rotate, Hangul glyphs |
-| **Dependencies** | None (stdlib); test font is OFL subset only |
+| **Behavior / correctness** | Entities, flex/grid/z-index, Arabic joining, vertical rotate, Hangul+CJK glyphs, clean PDF CJK outlines |
+| **Performance** | Unchanged layout path; slightly smaller embedded fonts after hint strip |
+| **Memory** | Negligible |
 | **API / CLI** | Unchanged flags; font-path accepts TT-flavored otf |
+| **Dependencies** | None (stdlib); test font is OFL subset only |
+| **Binary size / build time** | Sample PDFs smaller from hint-stripped subsets |
 
 ---
 
@@ -60,15 +72,26 @@ rotated CJK vertical.
 ## Test plan
 
 - [x] `go test ./...`
+- [x] `make lint` / CI `test + lint` + `static build (CGO_ENABLED=0)`
 - [x] Fixture-08 heading shows `Documentation & forms`
-- [x] Fixture-27 with `testdata/fonts` embeds `NotoSansKR` Type0 Hangul glyphs
+- [x] Fixture-27 with `testdata/fonts` + Droid: Han/kana + Hangul Type0 glyphs
 - [x] Arabic joining unit tests; vertical CJK `RotateDeg=90`; grid `span 2` + nested
+- [x] Subset glyf 4-byte aligned + hints stripped; `東京都、` spacing matches HTML+Droid
 
 ### Commands
 
 ```sh
 make test
 make lint
+make samples
+```
+
+---
+
+## Screenshots / sample output
+
+```
+output/fixture-27-cjk-fontpath.pdf — 国际化报告 / こんにちは / 汉字与假名：東京都、上海、深圳。 / 안녕하세요
 ```
 
 ---
@@ -80,9 +103,31 @@ make lint
 
 ---
 
-## Follow-ups (still out of scope)
+## PR metadata checklist (author)
+
+- [x] Self-assigned (`--assignee @me`)
+- [x] Labels applied (`enhancement`, `documentation`)
+- [x] Related issues filled
+- [x] Filled body under `plans/PR/pr-tier-2-pending.md`
+
+---
+
+## Follow-ups (out of scope)
 
 - Real HarfBuzz / OpenType GSUB/GPOS (would need deps + cgo — rejected by amendment)
 - Full Indic matra reordering / mark positioning
 - Full CSS Grid (areas, dense packing, row spans) / iterative flex content sizing
 - Full CSS vertical typesetting (tate-chu-yoko, upright CJK, etc.)
+- OpenType `halt`/`palt` for fonts that expose them (Droid has no halt; HTML+Droid is full-em)
+
+---
+
+## Reviewer checklist
+
+- [ ] Behavior matches summary and test plan
+- [ ] No unrelated changes in diff
+- [ ] Public API / CLI changes documented
+- [ ] New rules have fixture coverage when applicable
+- [ ] PR has assignee and labels
+- [ ] Related issues use correct Closes/Relates keywords
+- [ ] No secrets committed
