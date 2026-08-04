@@ -1,0 +1,73 @@
+# Auto-detect text files and normalize line endings where appropriate
+* text=auto
+
+# Force LF for shell scripts and Makefiles
+*.sh text eol=lf
+Makefile text eol=lf
+makefile text eol=lf
+
+# Force CRLF for PowerShell scripts on Windows
+*.ps1 text eol=crlf
+
+# Mark common binary formats
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.tar.gz binary
+*.tar binary
+*.gz binary
+*.bz2 binary
+*.7z binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.wasm binary
+
+# Exclude build/vendored/generated directories from language statistics
+/bin/** linguist-vendored
+/dist/** linguist-vendored
+/vendor/** linguist-vendored
+/frontend/node_modules/** linguist-vendored
+/frontend/dist/** linguist-vendored
+
+# Ensure exported archives don't include local development files
+/.vscode/** export-ignore
+/.idea/** export-ignore
+/.venv/** export-ignore
+
+# Prefer Go in GitHub language stats: mark non-Go bulk as vendored
+*.js linguist-vendored
+*.jsx linguist-vendored
+*.ts linguist-vendored
+*.tsx linguist-vendored
+*.css linguist-vendored
+*.html linguist-vendored
+*.json linguist-vendored
+*.yml linguist-vendored
+*.yaml linguist-vendored
+*.toml linguist-vendored
+*.lock linguist-vendored
+*.svg linguist-vendored
+*.txt linguist-vendored
+*.py linguist-vendored
+*.rs linguist-vendored
+*.sh linguist-vendored
+*.ps1 linguist-vendored
+Makefile linguist-vendored
+makefile linguist-vendored
+
+# Module lockfile is generated
+go.sum linguist-generated
+
+/documents/** linguist-vendored
+/plans/** linguist-vendored
+/scripts/chunks/** linguist-vendored
+/scripts/findings/** linguist-vendored
+
+# Docs stay in the repo for clones but are omitted from export archives
+*.md export-ignore

@@ -119,6 +119,20 @@ func TestRunPDFStyleTableImage(t *testing.T) {
 	}
 }
 
+func TestRunPDFWebImagesFalse(t *testing.T) {
+	pngB64 := pngDataURL(t, 12, 12)
+	html := `<html><body><p>noimg</p><img src="` + pngB64 + `"></body></html>`
+	cmd, _ := newCommand(t, html, filepath.Join(t.TempDir(), "out.pdf"))
+	cmd.Global.Web.Images = false
+	data := runPDF(t, cmd)
+	if !bytes.HasPrefix(data, []byte("%PDF-")) {
+		t.Fatal("output is not a PDF")
+	}
+	if bytes.Contains(data, []byte("/Subtype /Image")) {
+		t.Error("web.images=false should not embed image XObjects")
+	}
+}
+
 func TestRunPDFLinkedStylesheet(t *testing.T) {
 	cmd, dir := newCommand(t, `<html><head><link rel="stylesheet" href="style.css"></head><body><div class="box">styled</div></body></html>`, filepath.Join(t.TempDir(), "out.pdf"))
 	if err := os.WriteFile(filepath.Join(dir, "style.css"), []byte(".box { background-color: #000000; }"), 0o644); err != nil {

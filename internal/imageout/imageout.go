@@ -433,6 +433,9 @@ func Run(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 
 	cache := map[string][]byte{}
 	imagesFn := func(src string) ([]byte, error) {
+		if !cmd.Image.Web.Images {
+			return nil, fmt.Errorf("images disabled")
+		}
 		if b, ok := cache[src]; ok {
 			return b, nil
 		}

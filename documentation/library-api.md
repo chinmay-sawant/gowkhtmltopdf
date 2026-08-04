@@ -2,6 +2,21 @@
 
 Module: `gowkhtmltopdf` (import path same as module name).
 
+## Install
+
+```sh
+# when published / tagged:
+go get gowkhtmltopdf@v0.1.0
+
+# local checkout (this repo today):
+go mod edit -replace gowkhtmltopdf=/path/to/gowkhtmltopdf
+go get gowkhtmltopdf@v0.0.0
+```
+
+`go.mod` has **zero** third-party `require` entries (stdlib only). Pin a
+tagged release once the module is published to a reachable path; until then
+use `replace` against a checkout.
+
 ## PDF converter
 
 ```go
@@ -26,6 +41,17 @@ if err := c.Convert(context.Background()); err != nil {
 }
 pdf := c.Output() // []byte
 ```
+
+### In-memory HTML (`ConvertHTML`)
+
+```go
+pdf, err := gowkhtmltopdf.ConvertHTML(ctx, []byte(`<html><body><h1>Hi</h1></body></html>`), nil)
+// optional GlobalSettings for page size / margins / web.images, etc.
+```
+
+Does not hide ACL: linked local images/CSS still need the enable +
+`blocklocalfileaccess=false` pair on a full `Converter` when those assets
+are files.
 
 ### Multi-object
 
@@ -55,6 +81,7 @@ Worked examples:
 ## Settings model
 
 - Dotted keys: `size.pagesize`, `margin.top`, `header.left`, `load.*`, `web.*`, …
+- `web.images=false` on **global** settings disables `<img>` fetch/paint in PDF and image mode
 - Unknown names: `Set` returns an error  
 - Defaults mirror upstream wkhtmltopdf where implemented  
 

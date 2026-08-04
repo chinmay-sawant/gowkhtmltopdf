@@ -46,30 +46,37 @@ func (e *engine) layoutInline(b *box, nodes []*html.Node, availW, x, y float64) 
 	itemAdvance := func(it *inlineItem) float64 {
 		return it.marginL + it.w + it.marginR
 	}
+	type lineSpan struct{ start, end int }
+	var spans []lineSpan
 	for i := 0; i < len(items); i++ {
 		it := &items[i]
 		if it.forceBreak {
-			ly += e.emitLine(b, items, lastBreak, i, availW, x, ly)
+			spans = append(spans, lineSpan{lastBreak, i})
 			lastBreak = i + 1
 			lineW = 0
 			continue
 		}
 		adv := itemAdvance(it)
 		if lineW > 0 && lineW+adv > availW && !nowrap(it.style.WhiteSpace) {
-			ly += e.emitLine(b, items, lastBreak, i, availW, x, ly)
+			spans = append(spans, lineSpan{lastBreak, i})
 			lastBreak = i
 			lineW = 0
 		}
 		lineW += adv
 	}
-	ly += e.emitLine(b, items, lastBreak, len(items), availW, x, ly)
+	spans = append(spans, lineSpan{lastBreak, len(items)})
+	for i, sp := range spans {
+		ly += e.emitLine(b, items, sp.start, sp.end, availW, x, ly, i == len(spans)-1)
+	}
 	return ly - y
 }
 
 func nowrap(ws string) bool { return ws == "nowrap" }
 
 // emitLine renders items[start:end) as one line and returns its height.
-func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x, y float64) float64 {
+// lastLine is true for the final line of the inline formatting context (used
+// so text-align:justify leaves the last line start-aligned).
+func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x, y float64, lastLine bool) float64 {
 	line := make([]inlineItem, end-start)
 	copy(line, items[start:end])
 	if len(line) == 0 {
@@ -86,15 +93,23 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 		}
 	}
 
+	textAlign := "left"
+	if b != nil && b.style.TextAlign != "" {
+		textAlign = b.style.TextAlign
+	}
+
 	// Coalesce adjacent same-style text runs into one op so PDF/image paint
-	// advances match layout (avoids word-by-word Tj gaps).
-	line = coalesceTextItems(line)
+	// advances match layout (avoids word-by-word Tj gaps). Skip when
+	// justifying — gaps are distributed between word items.
+	if textAlign != "justify" {
+		line = coalesceTextItems(line)
+	}
 
 	// line metrics
 	maxAscent, maxDescent := 0.0, 0.0
 	for i := range line {
 		it := &line[i]
-		if it.img {
+		if it.img || it.blockBox != nil {
 			if it.h > maxAscent {
 				maxAscent = it.h
 			}
@@ -122,16 +137,20 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 		totalW += line[i].marginL + line[i].w + line[i].marginR
 	}
 
-	textAlign := "left"
-	if b != nil && b.style.TextAlign != "" {
-		textAlign = b.style.TextAlign
-	}
 	var lx float64
+	justifyGap := 0.0
 	switch textAlign {
 	case "right":
 		lx = x + availW - totalW
 	case "center":
 		lx = x + (availW-totalW)/2
+	case "justify":
+		lx = x
+		// Simple justify: distribute leftover space between items on
+		// non-final lines that have more than one advance unit.
+		if !lastLine && availW > totalW && len(line) > 1 {
+			justifyGap = (availW - totalW) / float64(len(line)-1)
+		}
 	default:
 		lx = x
 	}
@@ -147,10 +166,22 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 				e.ops[k].Y += dy
 			}
 			lx += it.blockBox.w + it.marginR
+			if i < len(line)-1 {
+				lx += justifyGap
+			}
 			continue
 		}
 		if it.img {
 			top := baseline - it.h
+			va := it.style.VerticalAlign
+			switch va {
+			case "top":
+				top = y
+			case "middle":
+				top = y + (lh-it.h)/2
+			case "bottom":
+				top = y + lh - it.h
+			}
 			if it.imgData != nil {
 				e.add(Op{Kind: OpImage, X: lx, Y: top, W: it.w, H: it.h,
 					Image: it.imgData, ImgW: it.imgW, ImgH: it.imgH, IsJPEG: it.imgJPEG})
@@ -159,6 +190,9 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 				e.add(Op{Kind: OpLinkURI, X: lx, Y: top, W: it.w, H: it.h, URI: it.href})
 			}
 			lx += it.w + it.marginR
+			if i < len(line)-1 {
+				lx += justifyGap
+			}
 			continue
 		}
 		c := it.style.Color
@@ -176,6 +210,9 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 			e.add(Op{Kind: OpLinkURI, X: lx, Y: baseline - it.ascent, W: it.w, H: it.ascent + it.descent, URI: it.href})
 		}
 		lx += it.w + it.marginR
+		if i < len(line)-1 {
+			lx += justifyGap
+		}
 	}
 
 	if b != nil && b.firstBaseline == 0 {
@@ -235,6 +272,20 @@ func (e *engine) collectInlineNode(n *html.Node, out *[]inlineItem) {
 			})
 			return
 		}
+		if st.Display == "inline-block" {
+			avail := e.inlineBlockAvail(n, st)
+			opStart := len(e.ops)
+			cb := e.build(n, avail, 0, 0)
+			opEnd := len(e.ops)
+			if cb != nil {
+				*out = append(*out, inlineItem{
+					img: true, w: cb.w, h: cb.h, style: st,
+					blockBox: cb, opStart: opStart, opEnd: opEnd,
+					marginL: e.scalePt(st.MarginLeft), marginR: e.scalePt(st.MarginRight),
+				})
+			}
+			return
+		}
 		if st.Display == "inline" {
 			href := ""
 			if n.Name == "a" && isExternalHref(n.Attribute("href")) {
@@ -269,6 +320,37 @@ func (e *engine) collectInlineNode(n *html.Node, out *[]inlineItem) {
 			})
 		}
 	}
+}
+
+// inlineBlockAvail returns the containing-block width used to lay out an
+// inline-block: specified width when present, otherwise shrink-to-fit capped
+// at a generous max so auto-width badges size to their content.
+func (e *engine) inlineBlockAvail(n *html.Node, st ResolvedStyle) float64 {
+	if st.WidthPercent >= 0 {
+		// Percent of viewport is a best-effort stand-in; real containing
+		// block width is not threaded into collectInline.
+		if e.opts.Width > 0 {
+			return e.opts.Width * st.WidthPercent / 100
+		}
+	}
+	if st.Width >= 0 {
+		// buildBlock applies box-sizing to the specified width; pass enough
+		// avail that auto-fill does not stretch a definite-width box.
+		w := e.scalePt(st.Width)
+		if st.BoxSizing != "border-box" {
+			w += e.scalePt(st.PaddingLeft) + e.scalePt(st.PaddingRight) +
+				e.scalePt(st.BorderLeft.Width) + e.scalePt(st.BorderRight.Width)
+		}
+		return w + e.scalePt(st.MarginLeft) + e.scalePt(st.MarginRight)
+	}
+	intr := e.measureCellContent(n, st)
+	intr += e.scalePt(st.PaddingLeft) + e.scalePt(st.PaddingRight) +
+		e.scalePt(st.BorderLeft.Width) + e.scalePt(st.BorderRight.Width) +
+		e.scalePt(st.MarginLeft) + e.scalePt(st.MarginRight)
+	if intr < 1 {
+		intr = 1
+	}
+	return intr
 }
 
 // availWForInline is a generous width for block-in-inline measurement.

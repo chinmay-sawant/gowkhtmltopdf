@@ -28,7 +28,7 @@ as its inline text (per the note column).
 | `h1`–`h6` | Heading levels; outline source (Phase 6) |
 | `ul`, `ol`, `li` | Simple lists: bullet markers. `ol` renders bullets too (decimal markers not implemented; always `•`, `layout.go:220`) |
 | `table`, `thead`, `tbody`, `tfoot`, `tr`, `th`, `td` | Table subset; see §4/§2.5 (colspan yes, rowspan no) |
-| `img` | Replaced element; **PNG/JPEG only** (intrinsic dims `layout.go:352`; GIF not detected → skipped) |
+| `img` | Replaced element; **PNG/JPEG only**. JPEG is DCTDecode pass-through (no re-encode). PNG is decoded to DeviceRGB; alpha becomes a soft-mask (`/SMask`) when present (`internal/pdf/images.go`). Layout uses a fixed 96 dpi CSS px→pt map; `--dpi` / `--image-dpi` / `--image-quality` are stored but ignored for PDF embedding. `web.images=false` (global) skips fetch/paint (`TestRunPDFWebImagesFalse`). Subresource size capped by loader `MaxBodySize` (default 100 MiB) |
 | `a` | Hyperlink (`href`) for `http/https/mailto` targets (`inline.go:226,305`); internal anchors deferred to Phase 6 |
 | `strong`, `em`, `b`, `i`, `u`, `small` | `b`/`strong` → bold face; `em`/`i` → italic face (Liberation family, §2.3); `u` underline; `small` smaller; fake stroke bold only if a bold face is missing |
 | `pre`, `code` | `pre` honors `white-space: pre`; `code` has no monospace rule - single embedded font for all families (§2.3) |
@@ -58,19 +58,19 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 | `border-width`, `border-style`, `border-color` | Implemented | `style.go:380-401`; `thin\|medium\|thick` widths `style.go:546` |
 | `width`, `height` | Implemented | `style.go:316-323`; consumed in `layout.go:176-191` (block) and `layout.go:315-320` (images) |
 | `min-width`, `min-height`, `max-width`, `max-height` | Implemented | `style.go:324-339`; enforced `layout.go:181-186, 321-328`; `%` resolves against viewport approximation |
-| `box-sizing` (`content-box\|border-box`) | Not implemented | absent from `applyRestProps` (`style.go:291-458`). Default behavior is mixed: auto width is border-box-ish, explicit width is content-box (`layout.go:176-191`) |
+| `box-sizing` (`content-box\|border-box`) | Implemented | parsed `style.go`; default `content-box` (specified width is content width); `border-box` makes width include padding+border (`layout.go` `buildBlock`); test `TestBoxSizingBorderBox` |
 | `overflow` (`visible\|hidden`) | Not implemented | absent from `applyRestProps`; no clipping anywhere |
 
 ### 2.2 Display & flow
 
 | Property | Status | Notes / verified by |
 |----------|--------|---------------------|
-| `display` (`block\|inline\|none\|list-item\|table\|table-row\|table-cell\|table-row-group\|table-header-group\|table-footer-group`) | Implemented | `style.go:295-301`; consumed `layout.go:158-171, 243-261`; `none` test `TestDisplayNone`; tables test `TestTableLayout` |
-| `display: inline-block` | Partial | parsed, but degrades to block layout (`layout.go:255` only treats `inline` as inline); `<img>` gets `inline-block` via UA rule and works only because `img` is special-cased |
-| `display: table-caption`, `table-column(-group)` | Not implemented | parsed (`style.go:299`); no caption/column model in `buildTable` (`layout.go:382`) - `<caption>` does not render |
-| `float` (`left\|right`) | Not implemented | parsed (`style.go:306-310`); only consumer is `layout.go:255`, which treats a floated element as plain in-flow inline - no float positioning. `layout.go:8` declares floats out of scope |
-| `clear` (`left\|right\|both`) | Not implemented | parsed (`style.go:311-315`), never consumed |
-| `position` (`static\|relative`) | Not implemented | parsed (`style.go:302-305`), never consumed - everything is `static`; `relative` produces no shift |
+| `display` (`block\|inline\|none\|list-item\|table\|table-row\|table-cell\|table-row-group\|table-header-group\|table-footer-group`) | Implemented | `style.go`; consumed in layout; `none` test `TestDisplayNone`; tables test `TestTableLayout` |
+| `display: inline-block` | Implemented (lite) | atomic inline box with width/height/margins; shrink-to-fit when width auto; test `TestInlineBlockBesideText` |
+| `display: table-caption`, `table-column(-group)` | Not implemented | parsed; no caption/column model in `buildTable` - `<caption>` does not render |
+| `float` (`left\|right`) | Implemented (lite) | out-of-flow pack to side; stacks on same side; simple exclusion for following in-flow content; test `TestFloatLeftRightClear`, fixture-22 |
+| `clear` (`left\|right\|both`) | Implemented (lite) | advances past named float bottoms (`float.go`); test `TestFloatLeftRightClear` |
+| `position` (`static\|relative`) | Not implemented | parsed, never consumed - everything is `static`; `relative` produces no shift |
 | `position: fixed` / `absolute` | Not implemented | ignored → `static` (consistent with §5) |
 
 ### 2.3 Text & fonts
@@ -81,15 +81,15 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 | `font-size` | Implemented | `style.go` `fontSize` (px/pt/em/%/rem/in/cm/mm/pc + keywords); `%`/`em` resolve against parent; test `TestFontSizeEmInherit` |
 | `font-weight` (`normal\|bold\|100-900`) | Implemented | ≥700 selects Liberation Sans **Bold** (or BoldItalic); fake stroke bold only if a bold face is missing; tests `TestRealBoldFaceOps`, `TestBoldFaceInInvoicePDF` |
 | `font-style` (`italic\|oblique`) | Implemented | selects Liberation Sans Italic / BoldItalic (`pdf.FaceSet.Resolve`); test `TestRealBoldFaceOps` |
-| `text-align` (`left\|right\|center\|justify`) | Partial | `style.go:412-420`; consumed `inline.go:118-126` for left/right/center; `justify` parses but renders as left |
-| `text-decoration` (`none\|underline\|line-through`) | Implemented | `style.go:433-441`; drawn `inline.go:156-161`; test `TestBoldUnderline` |
-| `text-indent` | Not implemented | parsed (`style.go:444-445`), never consumed |
-| `line-height` (number, length, `normal`) | Implemented | `style.go:410-411`, `lineHeight` `style.go:607`; consumed `inline.go:262-267`; test `TestMarginCollapse` |
-| `letter-spacing` | Implemented | `style.go:442-443`, consumed in run width `inline.go:258` |
+| `text-align` (`left\|right\|center\|justify`) | Implemented (justify lite) | left/right/center; `justify` distributes leftover space between word items on non-final lines (`inline.go`); test `TestTextAlignJustify` |
+| `text-decoration` (`none\|underline\|line-through`) | Implemented | drawn in `inline.go`; test `TestBoldUnderline` |
+| `text-indent` | Not implemented | parsed, never consumed |
+| `line-height` (number, length, `normal`) | Implemented | consumed in line metrics; test `TestMarginCollapse` |
+| `letter-spacing` | Implemented | consumed in run width |
 | `word-spacing` | Not implemented | absent from `applyRestProps` |
 | `text-transform` | Not implemented | absent from `applyRestProps` |
-| `vertical-align` (`baseline\|top\|middle\|bottom`) | Not implemented | parsed (`style.go:421-425`), never consumed by line layout |
-| `white-space` (`normal\|nowrap\|pre\|pre-wrap`) | Partial | `style.go:426-432`; normal/nowrap/pre implemented (`inline.go:62, 188-207`); `pre-wrap`/`pre-line` collapse to `pre`; test `TestWhiteSpacePre` |
+| `vertical-align` (`baseline\|top\|middle\|bottom`) | Partial | table cells: top/middle/bottom offset within row (`emitCell`); inline replaced: top/middle/bottom vs baseline; test `TestTableCellVerticalAlignMiddle` |
+| `white-space` (`normal\|nowrap\|pre\|pre-wrap`) | Partial | normal/nowrap/pre implemented; `pre-wrap`/`pre-line` collapse to `pre`; test `TestWhiteSpacePre` |
 
 ### 2.4 Color & background
 
@@ -125,8 +125,8 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 | `rowspan` | No | attribute ignored - only `colspan` is read |
 | `border-collapse` | Separate only | see §2.5 |
 | Pagination | Fragment + whole-op (phase 5) | rect-type ops (fill/stroke/line) split at page boundaries; text/images/links move wholly (line-level) (`paint.go:107-150`); `page-break-before/after: always`, `page-break-inside: avoid`, table rows never split (`paint.go:179-336`); element → (page, rect) map in `Result.Locations` for Phase 6. See "Pagination (phase 5)" note below. |
-| Floats / absolute positioning | No | see §2.2; degrade to in-flow layout |
-| Flexbox / Grid | No | `display:flex|grid` not in the allowlist → ignored, element keeps the initial `inline` display (`style.go:295-301`; see §5) |
+| Floats / absolute positioning | Float lite yes; absolute/fixed no | see §2.2; absolute/fixed degrade to in-flow |
+| Flexbox / Grid | No | `display:flex|grid` not in the allowlist → ignored, element keeps the initial `inline` display (see §5) |
 | JavaScript | No | stripped at load; `--enable-javascript` accepted + warning (Phase 1) |
 | Image-mode text | TTF outline raster | same Liberation faces as PDF; pure-Go coverage AA (`internal/imageout/ttfraster.go`); 5×7 bitmap only if an op has no font |
 
@@ -241,8 +241,8 @@ wkhtmltopdf honors them.
 | `--margin-top/bottom/left/right` | PDF | Supported (page geometry + golden runner) |
 | `--dpi` | PDF | Ignored (layout uses a fixed 96 dpi reference) |
 | `--page-width`, `--page-height` | PDF | Supported (`pageGeometry` override) |
-| `--image-quality` | Both | Ignored (stored; image mode uses `--quality`) |
-| `--image-dpi` | PDF | Ignored (stored, no consumer) |
+| `--image-quality` | Both | Ignored for PDF (JPEG pass-through; no re-encode). Image mode uses `--quality` |
+| `--image-dpi` | PDF | Ignored (stored; paint size comes from layout CSS px @ 96 dpi) |
 | `--no-pdf-compression` | PDF | Supported (uncompressed streams; used by tests) |
 | `--use-xserver` | Both | Ignored (stored, no consumer) |
 | `--cookie-jar` | Both | Ignored (loader always uses an in-memory jar) |

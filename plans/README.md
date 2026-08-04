@@ -23,12 +23,12 @@ Ordered for **quick wins first**, still stdlib-only (no third-party libraries or
 | Phase | Title | Tier | Status (2026-08-04) |
 |------:|-------|------|---------------------|
 | 10 | [HTML/CSS fidelity documentation](phases/phase-10-fidelity-docs.md) | 1 | **done** (`documentation/fidelity.md`) |
-| 11 | [Library API for Go embedders](phases/phase-11-library-api-embedders.md) | 1 | partial (core DX shipped) |
+| 11 | [Library API for Go embedders](phases/phase-11-library-api-embedders.md) | 1 | **done** |
 | 12 | [Typography - real bold/italic](phases/phase-12-typography-faces.md) | 1 | **done** |
 | 13 | [Typography - spacing](phases/phase-13-typography-spacing.md) | 1 | **done** |
-| 14 | [PDF images robust path](phases/phase-14-pdf-images.md) | 1 | partial |
+| 14 | [PDF images robust path](phases/phase-14-pdf-images.md) | 1 | **done** |
 | 15 | [Image mode TTF/AA raster](phases/phase-15-image-mode-raster.md) | 1 | **done** |
-| 16 | [Invoice CSS (selectors + float lite)](phases/phase-16-invoice-css.md) | 1 | partial (selectors done; float lite open) |
+| 16 | [Invoice CSS (selectors + float lite)](phases/phase-16-invoice-css.md) | 1 | **done** |
 | 17 | [Broader CSS (position / partial flex)](phases/phase-17-broader-css.md) | 2 |
 | 18 | [Pagination polish (thead repeat)](phases/phase-18-pagination-polish.md) | 2 |
 | 19 | [Fonts / i18n / discovery / CJK](phases/phase-19-fonts-i18n.md) | 2 |
@@ -37,7 +37,7 @@ Ordered for **quick wins first**, still stdlib-only (no third-party libraries or
 | 22 | [JavaScript (staged)](phases/phase-22-javascript.md) | 2→3 |
 | 23 | [Tier 3 open-web (deferred)](phases/phase-23-tier3-deferred.md) | 3 `[~]` |
 
-**Tier 1** (solid report engine): phases 10–16.  
+**Tier 1** (solid report engine): phases 10–16 — **closed** 2026-08-04.  
 **Tier 2** (leave wkhtmltopdf for most jobs): phases 17–20.  
 **Tier 3** (compete on open web): phase 23 deferred - use Chrome/Playwright for that class of problem.
 

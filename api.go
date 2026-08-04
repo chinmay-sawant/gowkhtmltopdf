@@ -261,6 +261,29 @@ func (c *Converter) Output() []byte {
 	return append([]byte(nil), c.output...)
 }
 
+// ConvertHTML is a one-shot helper: convert an in-memory HTML document to
+// PDF bytes without creating a temp input file. global may be nil (defaults
+// apply). Local file / subresource ACL is unchanged — linked local assets
+// still need enablelocalfileaccess + load.blocklocalfileaccess=false.
+func ConvertHTML(ctx context.Context, html []byte, global *GlobalSettings) ([]byte, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if len(html) == 0 {
+		return nil, errors.New("gowkhtmltopdf: empty HTML")
+	}
+	c := NewConverter()
+	if global != nil {
+		c.global = global
+	}
+	obj := NewObjectSettings().SetPage(string(html))
+	c.AddObject(obj)
+	if err := c.Convert(ctx); err != nil {
+		return nil, err
+	}
+	return c.Output(), nil
+}
+
 // HttpErrorCode returns the wkhtmltopdf-style HTTP error exit code for the
 // last conversion (2 for a 404, 3 for a 401). The pure-Go pipeline does not
 // yet classify load failures into those codes, so this always returns 0;
