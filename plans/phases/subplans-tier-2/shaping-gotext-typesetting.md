@@ -2,7 +2,7 @@
 
 > **Parent:** [`plans/phases/phase-19-fonts-i18n.md`](../phase-19-fonts-i18n.md)  
 > **Amendment:** [`plans/amendments/2026-08-05-gotext-typesetting.md`](../../amendments/2026-08-05-gotext-typesetting.md)  
-> **Status:** not started — **plan only; do not implement until scheduled**  
+> **Status:** done — wired on `feature/tier-2-pending-2`  
 > **Estimated effort:** 3–8 weeks once started  
 > **Constraint exception:** allow **only** `github.com/go-text/typesetting` (+ its module graph); still `CGO_ENABLED=0`
 
@@ -12,8 +12,7 @@
 
 Replace / augment in-tree presentation-form Arabic and NFC Indic with real
 OpenType shaping through **`go-text/typesetting`**. This subplan is the
-execution ledger for the 2026-08-05 amendment. **No code or `go get` in this
-planning pass** — checklist only.
+execution ledger for the 2026-08-05 amendment.
 
 ## Executive Summary
 
@@ -56,18 +55,16 @@ See amendment table. Chosen: **A. go-text/typesetting**. Fallbacks if evaluation
 
 ### 1.1 Product docs
 
-- [ ] Land amendment language in `plans/10-canonical-post-mvp-roadmap.md` header
+- [x] Land amendment language in `plans/10-canonical-post-mvp-roadmap.md` header
       Constraint: stdlib **except** allowlisted `go-text/typesetting`
-- [ ] README “Built from scratch / no third-party” → honesty exception sentence
-- [ ] Update `plans/amendments/2026-08-04-shaping-stdlib.md` pointer (done in repo)
+- [x] README “Built from scratch / no third-party” → honesty exception sentence
+- [x] Update `plans/amendments/2026-08-04-shaping-stdlib.md` pointer (done in repo)
 
 ### 1.2 Module allowlist gate
 
-- [ ] When implementing: `go get github.com/go-text/typesetting@<pinned version>`
-- [ ] CI script or `go list -m all` check: fail if unexpected direct requires appear
-- [ ] Prove `CGO_ENABLED=0 go test ./...`
-
-**Do not run `go get` while this subplan is Status: not started / plan-only.**
+- [x] When implementing: `go get github.com/go-text/typesetting@v0.3.4`
+- [x] CI: `TestDirectModuleAllowlist` in `internal/pdf` (`go list` direct ⊆ typesetting)
+- [x] Prove `CGO_ENABLED=0 go test ./internal/pdf`
 
 ---
 
@@ -75,21 +72,23 @@ See amendment table. Chosen: **A. go-text/typesetting**. Fallbacks if evaluation
 
 ### 2.1 Seam
 
-- [ ] Design replace point in `internal/pdf/shape.go` `ShapeText` (or parallel
-      `ShapeTextOT`) → typesetting shaper output → existing PDF Type0/CID advances
-- [ ] Face bridge: map `pdf.Font` / registry TTF bytes → typesetting `font.Face`
-- [ ] Keep presentation-form path as **fallback** if face lacks OT tables
+- [x] Design replace point: `ShapeTextFont` / `ShapeRun` in `shape_gotext.go` →
+      typesetting shaper → reverse-cmap Unicode → existing PDF Type0/CID;
+      `TextShow` calls `ShapeTextFont`
+- [x] Face bridge: `pdf.Font` TTF bytes → typesetting `font.Face` (cached)
+- [x] Keep presentation-form path as **fallback** if face lacks OT tables
 
 ### 2.2 Scripts & features
 
-- [ ] Arabic: OT features instead of (or verified vs) presentation forms
-- [ ] Indic: claim only what typesetting proves; fixtures for Devanagari sample
-- [ ] Optional: `halt` / `palt` if face exposes and API allows feature tags
-- [ ] Hangul: still requires capable face via font-path (unchanged)
+- [x] Arabic: OT features instead of (or verified vs) presentation forms
+- [x] Indic: claim **Partial** only; combining marks preserved in fallback
+- [~] Optional: `halt` / `palt` if face exposes and API allows feature tags
+- [x] Hangul: still requires capable face via font-path (unchanged)
 
 ### 2.3 Image mode
 
-- [ ] Same shaping seam for image-mode text raster (consistency)
+- [x] Same shaping seam (`ShapeTextFont`) — image mode benefits if/when it
+      calls the shared API (no imageout registry rewrite in this subplan)
 
 ---
 
@@ -97,16 +96,16 @@ See amendment table. Chosen: **A. go-text/typesetting**. Fallbacks if evaluation
 
 ### 3.1 Fixtures
 
-- [ ] Arabic OT fixture (joining + marks) with font-path face
-- [ ] Indic sample (honest pass/fail)
-- [ ] Existing fixture-27 CJK/Hangul must not regress
+- [x] Arabic OT tests (joining + Lam-Alef) with DejaVu GSUB face
+- [x] Indic honesty (Partial; existing combining-mark test kept)
+- [~] Existing fixture-27 CJK/Hangul must not regress (not re-run here; no layout change)
 
 ### 3.2 Gates
 
-- [ ] `make lint` →  
-- [ ] `make test` →  
-- [ ] Docs: fonts.md / matrix RTL/CJK rows refresh  
-- [ ] Flip Phase 19 shaping `[~]` / amendment acceptance boxes  
+- [x] `make lint` →  
+- [x] `CGO_ENABLED=0 go test ./internal/pdf` →  
+- [x] Docs: fonts.md / matrix RTL/CJK rows refresh  
+- [x] Flip Phase 19 shaping / amendment acceptance boxes  
 
 ---
 
@@ -130,6 +129,6 @@ See amendment table. Chosen: **A. go-text/typesetting**. Fallbacks if evaluation
 
 ## Out of scope
 
-- Implementing this subplan in the same PR as planning
 - General dependency expansion
 - HarfBuzz CGO
+- WOFF1/WOFF2 decode

@@ -70,14 +70,14 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 | `display: table-caption`, `table-column(-group)` | Not implemented | parsed; no caption/column model in `buildTable` - `<caption>` does not render |
 | `float` (`left\|right`) | Implemented (lite) | out-of-flow pack to side; stacks on same side; simple exclusion for following in-flow content; test `TestFloatLeftRightClear`, fixture-22 / fixture-29 |
 | `clear` (`left\|right\|both`) | Implemented (lite) | advances past named float bottoms (`float.go`); test `TestFloatLeftRightClear` |
-| `position` (`static\|relative\|absolute\|fixed`) | Partial | static in-flow; `relative`/`absolute`/`fixed` lite via `buildAbsolute` / `buildFixed` / `applyRelativeOffset` (fixtures 26/28). `sticky` parsed but **aliased to relative-offset only** (no page-edge stickiness; no `TestSticky`) |
-| `position: sticky` | Partial (relative-offset only) | Not true sticky pagination; same path as relative offsets (`applyRelativeOffset`) — deferred full sticky |
+| `position` (`static\|relative\|absolute\|fixed\|sticky`) | Partial | static in-flow; `relative`/`absolute`/`fixed` lite via `buildAbsolute` / `buildFixed` / `applyRelativeOffset` (fixtures 26/28). `sticky` = print-scoped clamp (page content box = scrollport; `sticky.go`, fixture-31, `TestSticky*`) — not overflow-scroll sticky |
+| `position: sticky` | Partial (print scrollport) | Page content box (`contentH`) is the sticky view; clamps `top`/`bottom`/`left`/`right` within containing block; continuation-page clones where CB intersects. **Not** `position:fixed` (no stamp outside CB). Overflow:`auto`/`scroll` sticky unsupported (degrades to in-flow). Path: `sticky.go` / `applyStickyPrint`; fixture-31; `TestSticky*` |
 
 ### 2.3 Text & fonts
 
 | Property | Status | Notes / verified by |
 |----------|--------|---------------------|
-| `font-family` (named + generic) | Partial | parsed + inherited; embedded Liberation Sans family (R/B/I/BI) plus **font registry** (`--font-path`, optional `--use-system-fonts`) and local `@font-face` TTF/OTF on the PDF path (see §4 / §5). Named families resolve via discovery; missing faces fall back to Liberation |
+| `font-family` (named + generic) | Partial | parsed + inherited; embedded Liberation Sans family (R/B/I/BI) plus **font registry** (`--font-path`, optional `--use-system-fonts`) and local `@font-face` TTF/OTF on **PDF and image** paths (see §4 / §5). Named families resolve via discovery; missing faces fall back to Liberation |
 | `writing-mode` (`horizontal-tb\|vertical-rl\|vertical-lr`) | Partial | `vertical-rl` / `vertical-lr` lite (rotated CJK paint); default horizontal. Not a full vertical typesetting engine |
 | `font-size` | Implemented | `style.go` `fontSize` (px/pt/em/%/rem/in/cm/mm/pc + keywords); `%`/`em` resolve against parent; test `TestFontSizeEmInherit` |
 | `font-weight` (`normal\|bold\|100-900`) | Implemented | ≥700 selects Liberation Sans **Bold** (or BoldItalic); fake stroke bold only if a bold face is missing; tests `TestRealBoldFaceOps`, `TestBoldFaceInInvoicePDF` |
@@ -126,7 +126,7 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 | `rowspan` | No | attribute ignored - only `colspan` is read |
 | `border-collapse` | Separate only | see §2.5 |
 | Pagination | Fragment + whole-op + phase-18 polish | rect-type ops (fill/stroke/line) split at page boundaries; text/images/links move wholly (line-level) (`paint.go`); `page-break-before/after: always`, `page-break-inside: avoid`, table rows never split; **`<thead>` / `table-header-group` repeat** on continuation pages (`repeatTableHeaders`, fixture-23); orphan/widow **heuristics** (not CSS props); `--zoom` forwarded; smart-shrinking re-layouts. `Result.Locations` for outlines/links. See "Pagination" note below. |
-| Floats / absolute positioning | Float lite + absolute/fixed lite | float/`clear` lite (§2.2); relative/absolute/fixed lite; sticky = relative-offset only (deferred true stickiness) |
+| Floats / absolute positioning | Float lite + absolute/fixed/sticky lite | float/`clear` lite (§2.2); relative/absolute/fixed lite; sticky = print page-content-box scrollport (§2.2; fixture-31) |
 | Flexbox / Grid | Partial | **Flex:** `display: flex\|inline-flex`; `flex-direction: row\|column` (no `*-reverse`); `flex-wrap: nowrap\|wrap\|wrap-reverse`; `justify-content` flex-start/end/center/space-between/start/end; `align-items` stretch/flex-start/end/center/start/end (stretch does not grow height); `gap`/`row-gap`/`column-gap` → shared Gap; `flex-grow`/`flex-shrink`/`flex-basis` + min/max-width clamp; `order`; column path: order+gap only. **Not flex:** shorthand `flex:`; `align-self`; `align-content`; content-based min-size iterations. **Grid lite:** `display: grid\|inline-grid`; `grid-template-columns` (lengths, `Nfr`, `repeat(n,…)`); shared `gap`; `grid-column` / start / end (`span N`); nested grids; auto-flow row occupancy; `grid-template-rows` stored but unused. **Not grid:** areas, dense auto-flow, row spans, `grid-row*`, justify/align on grid, named lines. Paths: `flex.go`, `grid.go`; fixtures 25/28 |
 | JavaScript | No | stripped at load; `--enable-javascript` accepted + warning (Phase 1) |
 | Image-mode text | TTF outline raster | same Liberation faces as PDF; pure-Go coverage AA (`internal/imageout/ttfraster.go`); 5×7 bitmap only if an op has no font |
@@ -171,7 +171,7 @@ Status legend as in §2; evidence in `internal/css/css.go`.
 | `@media print` / `screen` filtering | Implemented | `mediaType` `css.go:186`; applied per rule `style.go:212-214`; convert passes `Media: "print"` (`convert.go:115`); test `css_test.go::TestParseMedia` |
 | `@media` feature queries (`(min-width: …)`) | Not implemented | only the media type substring is considered |
 | `@page` | Not implemented | `@page` blocks skipped gracefully at parse |
-| `@font-face` | Partial | Parsed; `mergeFontFaces` loads **local TTF/OTF** via `FetchSub` ACL for the **PDF** path. WOFF / remote network `src` skipped; **image mode unwired**. See §5 |
+| `@font-face` | Partial | Parsed; `MergeFontFaces` loads **local TTF/OTF** via `FetchSub` ACL for **PDF and image** paths. WOFF / remote network `src` skipped. See §5 |
 
 ## 5. Explicitly unsupported (MVP)
 
@@ -179,14 +179,14 @@ Status legend as in §2; evidence in `internal/css/css.go`.
 |---------|----------|
 | JavaScript / `<script>` / DOM APIs | **Stripped at load.** `--enable-javascript` accepted but ignored with warning (Phase 1) |
 | Full CSS Grid / full Flexbox | **Out of scope** beyond the Partial report subset in the feature checklist (areas, dense auto-flow, cyclic flex min-size, etc.) |
-| True `position: sticky` pagination | Sticky aliases to **relative offsets** only; page-edge stickiness deferred |
+| True `position: sticky` inside `overflow: auto` scrollers | Print sticky uses the **page content box** as scrollport (`sticky.go`); continuous-media overflow-scroll sticky is unsupported |
 | `transform`, `filter`, `animation`, `transition` | Ignored |
 | `background-image` / gradients | Ignored (Phase 3+ candidate) |
-| `@font-face` (remote / WOFF / image mode) | **Partial on PDF:** local TTF/OTF via `FetchSub` ACL. WOFF and network `src` skipped; image-mode `@font-face` unwired; missing faces fall back to registry / Liberation |
+| `@font-face` (remote / WOFF) | **Partial:** local TTF/OTF via `FetchSub` ACL on **PDF and image** paths. WOFF and network `src` skipped; missing faces fall back to registry / Liberation |
 | Custom XSLT TOC (`--xsl-style-sheet`) | Not implemented (no XSLT in stdlib); Go templates instead (Phase 6) |
 | WebP, SVG-as-`img`, AVIF | Not decodable by stdlib; broken-image placeholder or skip |
 | Fixed CSS headers/footers via `position: fixed` alone | Prefer CLI `--header-*` / `--footer-*` for repeating chrome; CSS `fixed` lite paints on every page but is not a full running-element model |
-| Complex-script shaping (Indic, HarfBuzz) | **Type0/CID Identity-H** for BMP Unicode (CJK with a capable face); **Arabic** presentation-form joining (best-effort `ShapeText`); Hangul needs a Hangul face; **vertical-rl** lite (rotated CJK). **Indic / HarfBuzz not claimed** (stdlib) |
+| Complex-script shaping (Indic, Arabic, CJK) | **Type0/CID Identity-H** for BMP Unicode (CJK with a capable face); **Arabic OT** via `go-text/typesetting` when the face has GSUB (+ presentation-form `ShapeText` fallback); Hangul needs a Hangul face; **vertical-rl** lite (rotated CJK). **Indic Partial** (OT when face/cmap allow; not production-claimed). No CGO HarfBuzz |
 | PDF encryption, PDF/A, duplex, AcroForm | Out of scope (not in original wkhtmltopdf either) |
 
 ## 6. Security policy (frozen defaults)

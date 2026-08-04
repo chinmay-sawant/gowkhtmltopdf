@@ -1,6 +1,8 @@
 .PHONY: test lint build fmt golden golden-update samples clean
 
-# Phase 00 scaffold: stdlib-only module. No external deps expected.
+# Phase 00 scaffold: stdlib + allowlisted go-text/typesetting only.
+# Direct third-party requires must stay ⊆ {github.com/go-text/typesetting}
+# (enforced by internal/pdf.TestDirectModuleAllowlist).
 
 test:
 	go test ./...

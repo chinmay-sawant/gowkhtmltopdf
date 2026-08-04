@@ -14,7 +14,7 @@ import (
 // modeled; everything else keeps its initial value.
 type ResolvedStyle struct {
 	Display             string
-	Position            string  // "static" | "relative" | "absolute"
+	Position            string  // "static" | "relative" | "absolute" | "fixed" | "sticky"
 	Float               string  // "none" | "left" | "right"
 	Clear               string  // "none" | "left" | "right" | "both"
 	BoxSizing           string  // "content-box" | "border-box"

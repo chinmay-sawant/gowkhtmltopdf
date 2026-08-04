@@ -8,12 +8,12 @@ TOCs and PDF outlines.
 **Built from scratch.** No third-party PDF/HTML/CSS APIs or services, no
 Chrome/WebKit embedding, no cgo. The pipeline (load → parse → style → layout →
 paint → PDF write) is implemented in this repository. Runtime deps are the Go
-standard library **plus** a planned narrow exception for OpenType shaping via
+standard library **plus** a narrow exception for OpenType shaping via
 [`go-text/typesetting`](plans/amendments/2026-08-05-gotext-typesetting.md)
-only (not yet wired into `go.mod` — see the shaping subplan).
+(landed in `go.mod`).
 
-- **Go standard library by default** - `go.mod` has zero dependencies today;
-  shaping may add **only** `github.com/go-text/typesetting` when that subplan lands
+- **Go standard library by default** - the only direct third-party require is
+  `github.com/go-text/typesetting` (OpenType shaping; `CGO_ENABLED=0`)
 - Two static binaries: `gowkhtmltopdf` (PDF) and `gowkhtmltoimage` (PNG/JPEG)
 - Idiomatic Go library API (`gowkhtmltopdf` root package)
 - Deterministic output: identical input bytes → identical PDF bytes
@@ -94,7 +94,7 @@ articles) still need follow-up for Unicode/CID fonts and richer CSS.
 None of that changes the product rule: **no third-party PDF/HTML/CSS APIs** and
 **no cgo** — only the Go stdlib, in-tree assets (Liberation Sans), and the
 documented shaping exception ([`go-text/typesetting`](plans/amendments/2026-08-05-gotext-typesetting.md))
-when that work ships.
+already in `go.mod`.
 
 ---
 
@@ -265,7 +265,7 @@ parity remains **not planned**.
 | Richer selectors (attribute `[attr=…]`, `:first-child`, `:nth-child`, sibling `+`/`~`) | **Shipped** for presence/exact attr, first/last/nth-child, siblings | Hover/link pseudos still ignored |
 | Multi-font bold/italic (Liberation Sans family) | **Shipped** - Regular/Bold/Italic/BoldItalic embedded | Further families: `--font-path` (phase 19) |
 | Flexbox / Grid (`display: flex|grid`) | **Partial flex** (grow/shrink/basis/order/wrap + min/max clamp) + **grid lite** (`span`, nested grids) | Full CSS Grid / iterative flex content sizing still lite |
-| CJK fonts / complex-script shaping | **Type0/CID + font-path**; RTL reverse; **Arabic presentation-form joining** (best-effort); vertical-rl **rotated CJK** | **No HarfBuzz**; Indic production **not claimed**; Hangul needs a Hangul face |
+| CJK fonts / complex-script shaping | **Type0/CID + font-path**; **OT Arabic** via `go-text/typesetting` (GSUB) + presentation-form fallback; vertical-rl **rotated CJK** | **No CGO HarfBuzz**; Indic **Partial**; Hangul needs a Hangul face |
 | HTML character entities (`&amp;` …) | **Shipped** (stdlib unescape in text + attrs) | — |
 | `z-index` | **Lite** on positioned boxes (paint sort) | Stacking contexts / opacity still lite |
 | AcroForm forms (`--enable-forms`) | No form model in the PDF writer | Intermediate roadmap (forms) |

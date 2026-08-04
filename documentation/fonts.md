@@ -1,7 +1,9 @@
 # Fonts, discovery, and Unicode shaping limits
 
 > Phase 19 notes for operators and integrators.
-> Plan amendment: [`plans/amendments/2026-08-04-shaping-stdlib.md`](../plans/amendments/2026-08-04-shaping-stdlib.md).
+> Plan amendments: [`2026-08-04-shaping-stdlib.md`](../plans/amendments/2026-08-04-shaping-stdlib.md)
+> (interim), [`2026-08-05-gotext-typesetting.md`](../plans/amendments/2026-08-05-gotext-typesetting.md)
+> (OT via typesetting).
 
 ## Bundled faces
 
@@ -43,24 +45,32 @@ for CJK.
 
 ## Honest shaping limits
 
-- **No HarfBuzz / no OpenType GSUB/GPOS** (stdlib-only + `CGO_ENABLED=0`).
-  Real HarfBuzz remains out of scope; see the plan amendment above.
-- **Arabic / Hebrew:** RTL run reverse **plus** best-effort **Arabic
-  presentation-form joining** (initial/medial/final/isolated) and Lam-Alef
-  ligatures in `ShapeText`. This is **not** OpenType shaping — faces without
-  Presentation Forms glyphs will still look disconnected.
-- **Indic and other complex scripts** are **not claimed** (combining marks
-  kept after base; no matra reordering).
+> Amendment: [`plans/amendments/2026-08-05-gotext-typesetting.md`](../plans/amendments/2026-08-05-gotext-typesetting.md)
+> (`CGO_ENABLED=0`; allowlisted module only).
+
+- **OpenType shaping via [`go-text/typesetting`](https://github.com/go-text/typesetting)**
+  when the active face has a **GSUB** table. `TextShow` / `ShapeTextFont` run
+  the pure-Go HarfBuzz port, then reverse-cmap shaped glyphs to Unicode CIDs
+  for Type0 Identity-H. Real CGO HarfBuzz remains out of scope.
+- **Arabic / Hebrew:** OT joining + ligation (e.g. Lam-Alef) when GSUB is
+  present and reverse-cmap covers the glyphs. **Fallback** (no face / no GSUB
+  / unmapped glyph): RTL run reverse plus best-effort **presentation-form**
+  joining in `ShapeText`. Faces without Presentation Forms **and** without
+  usable GSUB reverse-cmap will still look disconnected.
+- **Indic and other complex scripts:** **Partial** — OT applies when the face
+  and reverse-cmap succeed; production Indic quality is **not** claimed beyond
+  that (fallback keeps combining marks after the base; no in-tree matra
+  reordering).
 - **CJK (Han / kana / Hangul)** works when a capable TTF is on the font
   path. `writing-mode: vertical-rl|lr` rotates ideographic / Hangul / kana
   glyphs 90° (sideways) and stacks Latin upright — not full CSS vertical
   typesetting.
 - **Mixed Latin + CJK:** Latin glyphs missing from a CJK face are drawn with
   embedded Liberation; CJK continues on the Type0 sibling of the original face.
-- **`@font-face` (PDF Partial):** local `url(...ttf|otf)` under loader ACL
+- **`@font-face` (Partial):** local `url(...ttf|otf)` under loader ACL
   (`--enable-local-file-access` / `--allow`) is fetched via `FetchSub`,
-  parsed, and registered for the document. **Image mode does not call
-  `mergeFontFaces` (N/A).** `.woff` / `.woff2` / `https://` / `data:` src are
-  skipped with a warning. `font-weight` / `font-style` on `@font-face` are
-  parsed but **ignored** at register time (alias is family name only).
+  parsed, and registered for the document on **both PDF and image** paths
+  (`convert.MergeFontFaces`). `.woff` / `.woff2` / `https://` / `data:` src
+  are skipped with a warning. `font-weight` / `font-style` on `@font-face`
+  are parsed but **ignored** at register time (alias is family name only).
   Remote webfonts and WOFF decode remain deferred.

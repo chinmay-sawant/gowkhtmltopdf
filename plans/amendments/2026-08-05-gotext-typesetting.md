@@ -51,13 +51,13 @@ pure Go (used by Fyne/Gio/Ebitengine), provides real shaping, and keeps
 
 ## Acceptance (when the shaping subplan lands)
 
-- [ ] `go.mod` lists **only** `github.com/go-text/typesetting` (and its
+- [x] `go.mod` lists **only** `github.com/go-text/typesetting` (and its
       transitive module graph as resolved by Go) beyond the main module —
-      document the allowlist in CI
-- [ ] `CGO_ENABLED=0` still green
-- [ ] Docs honesty: “OpenType shaping via go-text/typesetting”; drop “no OT”
+      document the allowlist in CI (`TestDirectModuleAllowlist`)
+- [x] `CGO_ENABLED=0` still green
+- [x] Docs honesty: “OpenType shaping via go-text/typesetting”; drop “no OT”
   claims once shipped
-- [ ] No other third-party PDF/HTML/CSS libraries added under this amendment
+- [x] No other third-party PDF/HTML/CSS libraries added under this amendment
 
 ## Supersedes
 

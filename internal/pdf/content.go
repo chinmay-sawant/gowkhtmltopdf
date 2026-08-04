@@ -201,8 +201,8 @@ func (c *Content) TextRenderMode(mode int) {
 // through Type0; Latin that the face lacks (typical for CJK fallback fonts)
 // is drawn with an embedded Liberation fallback so ASCII does not become tofu.
 func (c *Content) TextShow(s string) {
-	s = ShapeText(s)
 	f := c.fontFiles[c.curFont]
+	s = ShapeTextFont(s, f)
 	if f == nil || !c.textNeedsType0(s) {
 		c.textShowSimple(s)
 		return

@@ -56,7 +56,7 @@ func TestFontFaceLocalEmbed(t *testing.T) {
 	if !bytes.Contains(data, []byte("/FontFile2")) {
 		t.Error("expected embedded subset font (/FontFile2)")
 	}
-	// mergeFontFaces sets PostScriptName from font-family → /BaseFont /Custom
+	// MergeFontFaces sets PostScriptName from font-family → /BaseFont /Custom
 	if !bytes.Contains(data, []byte("/BaseFont /Custom")) {
 		t.Errorf("expected /BaseFont /Custom from @font-face; log=%q", log.String())
 	}

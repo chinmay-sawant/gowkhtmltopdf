@@ -32,8 +32,9 @@ and footers, table of contents, and PDF bookmarks - not full browser parity.
   float lite, and relative/absolute/fixed — not full CSS3; see the
   [compatibility matrix](compatibility-matrix.md))
 - A JavaScript runtime (`<script>` is stripped; flags are no-ops)
-- A full Unicode / complex-script stack (Type0/CID + Arabic joining best-effort;
-  no HarfBuzz; Indic not claimed — see [fonts.md](fonts.md))
+- A full Unicode / complex-script stack (Type0/CID + Arabic OT via
+  `go-text/typesetting` with presentation-form fallback; Indic Partial —
+  see [fonts.md](fonts.md))
 - Pixel-identical WebKit/wkhtmltopdf output
 
 See the [fidelity guide](fidelity.md) for tiers and claims language, the

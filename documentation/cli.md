@@ -49,6 +49,8 @@ Custom: `--replace name value`.
 
 - Multi-page tables with `<thead>` / `table-header-group` **repeat** the header
   row(s) on continuation pages (fixture-23).
+- `position: sticky` clamps to the page content box (print scrollport) within
+  the containing block (fixture-31); not overflow-scroll sticky.
 - `--zoom` scales layout (forwarded to the layout engine).
 - `--smart-shrinking` may **re-layout** with an effective zoom when content is
   wider than the page.
@@ -58,7 +60,8 @@ Custom: `--replace name value`.
 ### Fonts & links
 
 - `--font-path <dir>` adds font search directories; `--use-system-fonts` opts
-  into system font dirs (off by default for determinism).
+  into system font dirs (off by default for determinism). Same flags and
+  local `@font-face` ACL apply to `gowkhtmltoimage`.
 - `--resolve-relative-links` / `--keep-relative-links` control whether relative
   `href` values are resolved against the page URL.
 - Body `#id` internal links emit GoTo annotations when geometry is available;

@@ -212,6 +212,8 @@ func paginateOps(res *Result, contentH float64) []int {
 	}
 	// After flow has settled, clone <thead> onto continuation pages.
 	repeatTableHeaders(res, contentH)
+	// Print-scoped sticky: clamp to page content box + containing block.
+	applyStickyPrint(res, contentH)
 	opPage := make([]int, len(res.Ops))
 	for i := range res.Ops {
 		opPage[i] = int(res.Ops[i].Y / contentH)

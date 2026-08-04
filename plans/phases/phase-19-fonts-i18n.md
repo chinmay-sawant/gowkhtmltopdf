@@ -27,7 +27,7 @@ not OpenType GSUB/GPOS / HarfBuzz.
 | No folder scan | Opt-in `--font-path` / `--use-system-fonts` | **Shipped** |
 | No complex script | Best-effort Arabic joining; Hangul via face | **Shipped** (stdlib) |
 | CJK PDF garbled composites | Aligned glyf + strip hints | **Shipped** (#17) |
-| `@font-face` | Local `src` under ACL | **Partial** (PDF wired + audited; image mode N/A) |
+| `@font-face` | Local `src` under ACL | **Partial** (PDF + image local TTF/OTF; WOFF/remote deferred) |
 
 ---
 
@@ -59,7 +59,7 @@ not OpenType GSUB/GPOS / HarfBuzz.
 - [x] Register face for document lifetime consistently with `--font-path` (PDF registry alias)
 - [ ] Matrix §4 `@font-face` still “Not implemented” in places — **pending honesty update** (shared pass)
 - [~] Remote / WOFF download — **out of scope** unless policy amended
-- [~] Image-mode `@font-face` — **unwired** (fonts.md: N/A)
+- [x] Image-mode `@font-face` — wired via `convert.MergeFontFaces` (`imageout` + `fontface_test.go`)
 - [x] `font-weight` / `font-style` on `@font-face` ignored at register (documented)
 - [x] `data:` `@font-face` src rejected in `mergeFontFaces`
 
@@ -92,6 +92,7 @@ not OpenType GSUB/GPOS / HarfBuzz.
 ### 19.7 Image mode
 
 - [x] Image-mode wires `--font-path` registry (`internal/imageout`)
+- [x] Image-mode local `@font-face` via shared `convert.MergeFontFaces`
 - [x] Missing glyph: tofu/`?` policy consistent with PDF path
 
 ### 19.8 Docs
@@ -122,7 +123,7 @@ not OpenType GSUB/GPOS / HarfBuzz.
 | OpenType `halt`/`palt` / full Indic | → [`subplans-tier-2/shaping-gotext-typesetting.md`](subplans-tier-2/shaping-gotext-typesetting.md) + [`amendments/2026-08-05-gotext-typesetting.md`](../amendments/2026-08-05-gotext-typesetting.md) (**plan only**) |
 | Bundle full Noto CJK | **[~] no** — `--font-path` is enough |
 | WOFF/WOFF2 | **[~] not required** for typesetting; see shaping subplan WOFF clarification |
-| Image-mode `@font-face` | → [`subplans-tier-2/image-mode-fontface.md`](subplans-tier-2/image-mode-fontface.md) |
+| Image-mode `@font-face` | **Done** — [`subplans-tier-2/image-mode-fontface.md`](subplans-tier-2/image-mode-fontface.md) |
 
 ---
 
