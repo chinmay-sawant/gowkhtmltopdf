@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<!--
+  fixture-21-detailed-report
+  Proves: a multi-section operational report that reuses report-style patterns
+  from the golden corpus (letterhead, KPI colors, multi-section prose, tables,
+  nested lists, totals). Natural pagination, outline headings, and mixed table
+  density. Expected: >= 3 pages.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Annual Operations Report - FY2024 - Meridian Systems</title>
+  <style>
+    body { font-family: sans-serif; font-size: 9.5pt; color: #1c1c1c; margin: 0; line-height: 1.4; }
+    .letterhead { border-bottom: 3px solid #1a3d6d; padding-bottom: 8px; margin-bottom: 12px; }
+    .letterhead h1 { font-size: 17pt; color: #1a3d6d; margin: 0; }
+    .letterhead p { font-size: 8.5pt; color: #555; margin: 2px 0 0 0; }
+    .banner { background-color: #0f3a5f; color: #ffffff; padding: 10px 14px; margin-bottom: 12px; }
+    .banner h2 { margin: 0; font-size: 12pt; }
+    .banner p { margin: 2px 0 0 0; color: #cfe0f0; font-size: 9pt; }
+    h1 { font-size: 15pt; color: #1a3d6d; margin: 14px 0 6px 0; }
+    h2 { font-size: 12pt; color: #1a3d6d; margin: 12px 0 4px 0; }
+    h3 { font-size: 10.5pt; color: #1a3d6d; margin: 10px 0 4px 0; }
+    p { margin: 0 0 8px 0; }
+    p.meta { font-size: 9pt; color: #666; margin: 0 0 10px 0; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+    th, td { border: 1px solid #aab7c4; padding: 4px 6px; text-align: left; }
+    th { background-color: #1a3d6d; color: #fff; font-size: 9pt; }
+    tr:nth-child(even) td { background-color: #f2f6fa; }
+    .num { text-align: right; }
+    .good { background-color: #e2f2e2; color: #1f5c2e; }
+    .warn { background-color: #fdf3d7; color: #7a5c00; }
+    .bad  { background-color: #fbe4e4; color: #8c1f1f; }
+    .alpha { background-color: rgba(15, 58, 95, 0.15); padding: 6px 10px; margin: 8px 0 12px 0; }
+    ul { margin: 4px 0 10px 0; padding-left: 26px; }
+    li { margin: 3px 0; }
+    .req-id { font-weight: bold; color: #1a3d6d; }
+    .section-break { page-break-before: always; }
+    .totals { width: 100%; border-collapse: collapse; margin: 6px 0 14px 0; }
+    .totals td { padding: 3px 6px; border: none; }
+    .totals .net { border-bottom: 1px solid #1a3d6d; }
+    .totals .grand { font-weight: bold; color: #1a3d6d; font-size: 11pt; }
+    .footer-block { border-top: 1px solid #aab7c4; padding-top: 6px; font-size: 8pt; color: #666; }
+    .foot { font-size: 8pt; color: #6b7684; border-top: 2px solid #0f3a5f; padding-top: 6px; margin-top: 12px; }
+    hr { border: 1px solid #0f3a5f; margin: 14px 0; }
+  </style>
+</head>
+<body>
+  <div class="letterhead">
+    <h1>Nordwind Industries GmbH</h1>
+    <p>Hafenstrasse 12, 30419 Rotterdam · VAT DE 811123456 · Bank: IBAN NL12 ABNA 0484 0012 34</p>
+  </div>
+
+  <div class="banner">
+    <h2>FY2024 Annual Operations Report</h2>
+    <p>Prepared for Meridian Systems AG · Reporting period 2024-01-01 to 2024-12-31 · Rev B</p>
+  </div>
+
+  <p class="meta">Document OPS-FY2024-AR · Owner: Engineering Planning Office ·
+  Status: approved · Distribution: management circle and program office</p>
+
+  <h1>1. Executive summary</h1>
+  <p>This annual report consolidates deliverables, resource usage, commercial
+  activity, quality indicators, and open requirements for the Meridian Systems
+  engagement. Nine of eleven planned engineering work packages shipped in the
+  year. On-time delivery finished above target. Four supplier escalations
+  remain open and are tracked under ESC-2024-09.</p>
+  <p>Commercial invoices issued under INV-2024-1137 and related change orders
+  total 43,985.97 EUR including VAT for the gateway deployment program.
+  Capacity utilization stayed within the approved overtime envelope of 5 %.</p>
+
+  <div class="alpha">Callout: second-source qualification for the power module
+  is the top residual risk. Target date for full second-sourcing is 2025-02-01.
+  EMC pre-compliance margins remain above 6 dB on conducted and radiated tests.</div>
+
+  <h1>2. Key performance indicators</h1>
+  <table>
+    <tr><th>KPI</th><th>Value</th><th>Target</th><th>Trend</th></tr>
+    <tr class="good"><td>On-time delivery</td><td>96.4 %</td><td>95 %</td><td>above target</td></tr>
+    <tr class="good"><td>First-pass yield</td><td>98.1 %</td><td>97 %</td><td>above target</td></tr>
+    <tr class="warn"><td>Inventory turns</td><td>7.8</td><td>8.0</td><td>close to target</td></tr>
+    <tr class="bad"><td>Outstanding escalations</td><td>4</td><td>0</td><td>needs action</td></tr>
+    <tr class="good"><td>p95 order API latency</td><td>280 ms</td><td>350 ms</td><td>within budget</td></tr>
+    <tr class="good"><td>Availability (calendar month avg)</td><td>99.94 %</td><td>99.9 %</td><td>above target</td></tr>
+  </table>
+
+  <h1>3. Delivered work packages</h1>
+  <p>Engineering capacity was planned against eleven work packages. Two
+  packages (WP-04 telemetry gateway, WP-09 field calibration kit) were
+  deferred into the next fiscal year with an approved scope change.</p>
+  <table>
+    <tr><th>WP</th><th>Title</th><th class="num">Effort (h)</th><th>Status</th></tr>
+    <tr><td>WP-01</td><td>Firmware 2.4 baseline</td><td class="num">320</td><td>Done</td></tr>
+    <tr><td>WP-02</td><td>Power supply redesign</td><td class="num">410</td><td>Done</td></tr>
+    <tr><td>WP-03</td><td>Sensor calibration rig</td><td class="num">260</td><td>Done</td></tr>
+    <tr><td>WP-05</td><td>HMI software 3.1</td><td class="num">380</td><td>Done</td></tr>
+    <tr><td>WP-06</td><td>EMC pre-compliance campaign</td><td class="num">190</td><td>Done</td></tr>
+    <tr><td>WP-07</td><td>Packaging redesign</td><td class="num">120</td><td>Done</td></tr>
+    <tr><td>WP-08</td><td>Field trial documentation</td><td class="num">140</td><td>Done</td></tr>
+    <tr><td>WP-10</td><td>Spare parts portfolio</td><td class="num">90</td><td>Done</td></tr>
+    <tr><td>WP-11</td><td>Service documentation</td><td class="num">230</td><td>Done</td></tr>
+    <tr><td>WP-04</td><td>Telemetry gateway</td><td class="num">0</td><td>Deferred</td></tr>
+    <tr><td>WP-09</td><td>Field calibration kit</td><td class="num">0</td><td>Deferred</td></tr>
+  </table>
+
+  <h2>3.1 Resource usage</h2>
+  <p>Engineering capacity was 2,140 hours in the peak quarter reviewed for
+  this program; 1,930 hours were booked against work packages, 120 hours
+  went to support of the production ramp, and 90 hours were unassigned.
+  Overtime stayed within the approved envelope of 5 %.</p>
+  <p>The HMI software team reported a usability finding from the field
+  trial regarding the alarm list; the fix shipped in maintenance release
+  3.1.2. Service documentation package WP-11 closed with full coverage of
+  installation, commissioning, and first-line support procedures.</p>
+
+  <div class="section-break"></div>
+
+  <h1>4. Commercial summary (invoice extract)</h1>
+  <p>Bill to: Meridian Systems AG, Industriepark 7, 70565 Stuttgart.
+  Reference invoice <strong>INV-2024-1137</strong>, issue date 2024-10-04,
+  due date 2024-11-03. Line items below are the primary deployment package;
+  change orders are listed in the program ledger.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 6%">#</th>
+        <th style="width: 46%">Description</th>
+        <th style="width: 10%">Qty</th>
+        <th style="width: 18%">Unit price</th>
+        <th style="width: 20%">Net</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>001</td><td>Gateway X200 - base unit</td><td class="num">12</td><td class="num">1,240.00 EUR</td><td class="num">14,880.00</td></tr>
+      <tr><td>002</td><td>Antenna set, outdoor</td><td class="num">12</td><td class="num">95.00 EUR</td><td class="num">1,140.00</td></tr>
+      <tr><td>003</td><td>Wall mount kit, steel</td><td class="num">12</td><td class="num">24.00 EUR</td><td class="num">288.00</td></tr>
+      <tr><td>004</td><td>Annual subscription, incl. updates</td><td class="num">12</td><td class="num">180.00 EUR</td><td class="num">2,160.00</td></tr>
+      <tr><td>005</td><td>Installation and commissioning, per site</td><td class="num">4</td><td class="num">350.00 EUR</td><td class="num">1,400.00</td></tr>
+      <tr><td>006</td><td>Site survey, Stuttgart plant</td><td class="num">1</td><td class="num">480.00 EUR</td><td class="num">480.00</td></tr>
+      <tr><td>007</td><td>Radio planning, 3-cell design</td><td class="num">1</td><td class="num">720.00 EUR</td><td class="num">720.00</td></tr>
+      <tr><td>008</td><td>Firmware configuration per gateway</td><td class="num">12</td><td class="num">45.00 EUR</td><td class="num">540.00</td></tr>
+      <tr><td>009</td><td>Acceptance test, on-site</td><td class="num">1</td><td class="num">890.00 EUR</td><td class="num">890.00</td></tr>
+      <tr><td>010</td><td>Documentation set (print)</td><td class="num">3</td><td class="num">38.00 EUR</td><td class="num">114.00</td></tr>
+      <tr><td>011</td><td>Spare gateway, cold standby</td><td class="num">1</td><td class="num">1,190.00 EUR</td><td class="num">1,190.00</td></tr>
+      <tr><td>012</td><td>Battery backup module</td><td class="num">2</td><td class="num">260.00 EUR</td><td class="num">520.00</td></tr>
+      <tr><td>013</td><td>Training, 2 days incl. travel</td><td class="num">1</td><td class="num">2,450.00 EUR</td><td class="num">2,450.00</td></tr>
+      <tr><td>014</td><td>Project management, 8 weeks</td><td class="num">1</td><td class="num">3,600.00 EUR</td><td class="num">3,600.00</td></tr>
+      <tr><td>015</td><td>Warranty extension to 5 years</td><td class="num">1</td><td class="num">1,850.00 EUR</td><td class="num">1,850.00</td></tr>
+    </tbody>
+  </table>
+
+  <table class="totals">
+    <tr><td style="width: 62%"></td><td class="num" style="width: 38%">Amounts in EUR</td></tr>
+    <tr class="net"><td>Net total (selected lines)</td><td class="num">32,222.00</td></tr>
+    <tr><td>VAT 19 %</td><td class="num">6,122.18</td></tr>
+    <tr class="grand"><td>Subtotal incl. VAT (extract)</td><td class="num">38,344.18</td></tr>
+  </table>
+  <p>Full invoice INV-2024-1137 grand total remains <strong>43,985.97 EUR</strong>
+  including all line items and logistics charges listed in the commercial
+  archive.</p>
+
+  <div class="section-break"></div>
+
+  <h1>5. Platform requirements status</h1>
+  <p class="meta">Document REQ-API-2.0 · Owner: Platform Team · Status: approved</p>
+
+  <h2>5.1 Functional requirements</h2>
+  <ul>
+    <li id="req-01"><span class="req-id">REQ-01</span> - The API must accept
+    orders with up to 250 line items per request. Status: verified in load test.</li>
+    <li id="req-02"><span class="req-id">REQ-02</span> - Every order must
+    receive a globally unique order id and a created timestamp. Status: live.</li>
+    <li id="req-03"><span class="req-id">REQ-03</span> - The API must
+    validate prices against the current price list and reject stale ones:
+      <ul>
+        <li>price list version sent with the request,</li>
+        <li>400 error with the offending line item on mismatch,</li>
+        <li>price list refresh propagates in under 60 seconds.</li>
+      </ul>
+    </li>
+    <li id="req-04"><span class="req-id">REQ-04</span> - <em>Idempotency:</em>
+    replaying a request with the same idempotency key returns the original
+    response without creating a duplicate order. Status: verified.</li>
+  </ul>
+
+  <h2>5.2 Non-functional requirements</h2>
+  <ul>
+    <li id="req-05"><span class="req-id">REQ-05</span> - p95 latency below
+    350 ms for order submission under 100 req/s sustained load.</li>
+    <li id="req-06"><span class="req-id">REQ-06</span> - Availability target
+    of 99.9 % per calendar month.</li>
+    <li id="req-07"><span class="req-id">REQ-07</span> - All order payloads
+    logged with correlation ids for audit purposes.</li>
+  </ul>
+
+  <h2>5.3 Acceptance criteria</h2>
+  <table>
+    <tr><th>Criteria</th><th>Verification</th><th>Result</th></tr>
+    <tr><td>REQ-01, REQ-02</td><td>Load test with 250 line items, p95 &lt; 350 ms</td><td class="good">Pass</td></tr>
+    <tr><td>REQ-03</td><td>Stale price list returns 400 with line item reference</td><td class="good">Pass</td></tr>
+    <tr><td>REQ-04</td><td>Replayed key returns identical body and status 200</td><td class="good">Pass</td></tr>
+    <tr><td>REQ-05 to REQ-07</td><td>Perf harness and audit log review</td><td class="good">Pass</td></tr>
+  </table>
+
+  <h1>6. Risks, mitigations, and outlook</h1>
+  <h3>6.1 Risks</h3>
+  <p>The supply chain for the new power module remains the top risk. The
+  four open escalations concern the same supplier and are tracked in ticket
+  group <strong style="color: #8c1f1f">ESC-2024-09</strong>. Inventory turns
+  are within tolerance of the target and do not require executive action.</p>
+  <h3>6.2 Outlook</h3>
+  <p>The next fiscal year focuses on the two deferred packages, the production
+  ramp of the redesigned power supply, and preparation of the 2025 platform
+  review. A mid-year checkpoint is scheduled for calendar week 26, and the
+  final steering committee meeting of the next year is planned for 2025-12-16.</p>
+  <p>The engineering planning office will publish the FY2025 work package
+  breakdown by 2025-01-15. Escalation path is unchanged from the prior report.
+  Approved by the engineering director on 2025-01-08, revision B.</p>
+
+  <hr>
+  <div class="footer-block">
+    <p>Payment terms for open invoices: net 30 days from issue date. Late
+    payment interest: 2 % per month. Quote the invoice number with every
+    payment. Goods remain the property of Nordwind Industries GmbH until
+    full payment. Place of jurisdiction: Rotterdam, Netherlands.</p>
+    <p>This document was generated electronically for the golden corpus and
+    is valid as a sample multi-section report without a wet signature.</p>
+  </div>
+  <div class="foot">Source: operations data warehouse, commercial ledger, and
+  REQ-API-2.0 register · Authorized for distribution to the management circle only.</div>
+</body>
+</html>

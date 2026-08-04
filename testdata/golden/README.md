@@ -13,7 +13,7 @@ testdata/golden/
   fixture-01-simple-invoice.html       # single page, minimal CSS
   fixture-02-table-heavy-invoice.html  # wide table, borders, many rows
   fixture-03-multi-page-invoice.html   # >1 page, page-break usage
-  fixture-04-*.html .. fixture-20-*.html   # phase-9.1 corpus (see inventory)
+  fixture-04-*.html .. fixture-21-*.html   # phase-9.1 corpus + detailed report
   out/                  # generated PDFs (gitignored)
 ```
 
@@ -49,6 +49,7 @@ proves. Page envelopes are pinned in `internal/convert/golden_test.go`
 | 18 | Typography: h1–h6, strong/em/u/s/small, blockquote, code | 1 |
 | 19 | Box model: fixed/min/max widths, margins, padding, borders | 1 |
 | 20 | Image grid: four data: URI PNGs at intrinsic sizes | 1 |
+| 21 | Detailed multi-section ops report (KPIs, WPs, invoice extract, REQs) | ≥3 |
 
 ## Pass criteria (MVP)
 
