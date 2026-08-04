@@ -45,7 +45,7 @@ report and simple marketing layouts - not Wikipedia chrome parity.
 - [x] Lite `z-index` on positioned boxes
 - [x] `position: absolute`: containing block subset; out of flow; `left`/`top`/`right`/`bottom`/`width`/`height` subset
 - [x] `position: fixed` lite (stamped on every page in paint)
-- [~] `position: sticky` - deferred
+- [~] `position: sticky` — deferred to [`subplans-tier-2/sticky-print.md`](subplans-tier-2/sticky-print.md) (print-scoped full sticky)
 - [x] Matrix §2.2 / fidelity “MVP gap” rows — refreshed via shared doc-honesty pass
 
 ### 17.3 Partial flexbox (report-friendly)
@@ -70,15 +70,15 @@ report and simple marketing layouts - not Wikipedia chrome parity.
 - [x] Occupancy placement; `grid-column: span N` / start–end
 - [x] Nested grids
 - [x] Tests: `grid_test.go`, `fixture-28-flex-wrap-grid-fixed`
-- [~] Full CSS Grid (areas, dense auto-flow, row spans, `fr` complexity) — **out of scope**
+- [~] Full CSS Grid (areas, dense auto-flow, row spans, `fr` complexity) — see [`subplans-tier-2/flex-grid-full.md`](subplans-tier-2/flex-grid-full.md)
 
 ### 17.5 Explicitly not this phase (still deferred)
 
 - [~] Multi-column `column-count`
-- [~] Sticky positioning
+- [~] Sticky positioning — see [`subplans-tier-2/sticky-print.md`](subplans-tier-2/sticky-print.md)
 - [~] Transforms, filters, animations, transitions
 - [~] Container queries, `:has()`
-- [~] Full flex algorithm (content-based min-size iterations, percentage cyclic sizing)
+- [~] Full flex algorithm (content-based min-size iterations, percentage cyclic sizing) — see [`subplans-tier-2/flex-grid-full.md`](subplans-tier-2/flex-grid-full.md)
 
 ### 17.6 Fixtures & corpus
 
@@ -109,8 +109,8 @@ report and simple marketing layouts - not Wikipedia chrome parity.
 | Item | Notes |
 |------|--------|
 | Compatibility-matrix / fidelity MVP-gap rows | **[x]** Shared doc-honesty pass |
-| Sticky positioning | Explicitly deferred (`[~]`) |
-| Full Grid / full Flex | Deferred (stdlib report subset only) |
+| Sticky positioning | → [`subplans-tier-2/sticky-print.md`](subplans-tier-2/sticky-print.md) |
+| Full Grid / full Flex | → [`subplans-tier-2/flex-grid-full.md`](subplans-tier-2/flex-grid-full.md) |
 | Richer float+table interaction fixtures | **New** `fixture-29-float-beside-table.html` (do not edit 22) |
 
 ---

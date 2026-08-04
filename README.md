@@ -5,12 +5,15 @@ Pure-Go, stdlib-only HTML→PDF (and HTML→image) converter - a work-alike for
 invoices, statements, tables, multi-page documents with headers/footers,
 TOCs and PDF outlines.
 
-**Built from scratch.** No third-party Go modules, no third-party PDF/HTML/CSS
-APIs or services, no Chrome/WebKit embedding, no cgo. Every stage of the
-pipeline (load → parse → style → layout → paint → PDF write) is implemented
-in this repository against the Go standard library only.
+**Built from scratch.** No third-party PDF/HTML/CSS APIs or services, no
+Chrome/WebKit embedding, no cgo. The pipeline (load → parse → style → layout →
+paint → PDF write) is implemented in this repository. Runtime deps are the Go
+standard library **plus** a planned narrow exception for OpenType shaping via
+[`go-text/typesetting`](plans/amendments/2026-08-05-gotext-typesetting.md)
+only (not yet wired into `go.mod` — see the shaping subplan).
 
-- **Go standard library only** - `go.mod` has zero dependencies
+- **Go standard library by default** - `go.mod` has zero dependencies today;
+  shaping may add **only** `github.com/go-text/typesetting` when that subplan lands
 - Two static binaries: `gowkhtmltopdf` (PDF) and `gowkhtmltoimage` (PNG/JPEG)
 - Idiomatic Go library API (`gowkhtmltopdf` root package)
 - Deterministic output: identical input bytes → identical PDF bytes
@@ -88,9 +91,10 @@ fix whatever fails, and open generated PDFs - closed that last gap. Font
 letter-spacing is fixed for Latin text; complex pages (e.g. full Wikipedia
 articles) still need follow-up for Unicode/CID fonts and richer CSS.
 
-None of that changes the product rule: **no third-party APIs or modules in
-the runtime** - only the Go stdlib and the embedded Liberation Sans font
-asset shipped in-tree.
+None of that changes the product rule: **no third-party PDF/HTML/CSS APIs** and
+**no cgo** — only the Go stdlib, in-tree assets (Liberation Sans), and the
+documented shaping exception ([`go-text/typesetting`](plans/amendments/2026-08-05-gotext-typesetting.md))
+when that work ships.
 
 ---
 

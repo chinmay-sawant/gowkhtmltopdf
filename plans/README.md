@@ -5,7 +5,7 @@
 | [00-canonical-pure-go-rewrite.md](00-canonical-pure-go-rewrite.md) | **MVP ledger** (phases 0–9) - complete for v0.1.0 |
 | [10-canonical-post-mvp-roadmap.md](10-canonical-post-mvp-roadmap.md) | **Active post-MVP execution ledger** - update status here |
 | [phases/](phases/) | Per-phase atomic checklists (MVP 00–09 + post-MVP 10–23) |
-| [phases/subplans-tier-2/](phases/subplans-tier-2/) | Post-#17 leftovers for phases 17–20 (shared doc honesty + per-phase) |
+| [phases/subplans-tier-2/](phases/subplans-tier-2/) | Tier 2 subplans: closed pending + sticky/flex-grid/shaping/image-fontface; nested HF → v0.3.0 |
 | [exploration/](exploration/) | Multi-agent analysis snapshots (read-only evidence) |
 | [PR/](PR/) | PR/issue body archives |
 

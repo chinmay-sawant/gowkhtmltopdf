@@ -119,10 +119,10 @@ not OpenType GSUB/GPOS / HarfBuzz.
 |------|--------|
 | `@font-face` local wiring vs matrix | **Audited** PDF Partial (`fontface_test.go` + fonts.md); matrix label → shared pass |
 | Compatibility-matrix i18n / CJK rows | Update for Type0, Arabic joining, vertical lite, subset fixes |
-| OpenType `halt`/`palt` | **[~] not planned** (needs OT feature consumer) |
-| Full Indic / HarfBuzz | **[~] rejected** by amendment unless product changes constraints |
-| Bundle full Noto CJK | **[~] no** — prefer user `--font-path`; CI keeps tiny Hangul subset only |
-| WOFF/WOFF2 | **[~] deferred** — skip in `mergeFontFaces` |
+| OpenType `halt`/`palt` / full Indic | → [`subplans-tier-2/shaping-gotext-typesetting.md`](subplans-tier-2/shaping-gotext-typesetting.md) + [`amendments/2026-08-05-gotext-typesetting.md`](../amendments/2026-08-05-gotext-typesetting.md) (**plan only**) |
+| Bundle full Noto CJK | **[~] no** — `--font-path` is enough |
+| WOFF/WOFF2 | **[~] not required** for typesetting; see shaping subplan WOFF clarification |
+| Image-mode `@font-face` | → [`subplans-tier-2/image-mode-fontface.md`](subplans-tier-2/image-mode-fontface.md) |
 
 ---
 
@@ -137,7 +137,7 @@ not OpenType GSUB/GPOS / HarfBuzz.
 
 ## Out of scope
 
-- WOFF/WOFF2 (unless pure-Go decode added later)
-- HarfBuzz / CGO / third-party shaping modules
+- WOFF/WOFF2 (optional later; not required for `go-text/typesetting`)
+- CGO HarfBuzz / any third-party module **except** allowlisted `go-text/typesetting`
 - Auto-download Google Fonts
 - Shipping multi-megabyte CJK faces in the default binary

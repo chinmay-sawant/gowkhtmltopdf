@@ -80,7 +80,7 @@ model.
 |------|--------|
 | HTML HF → body **fragment** (`#id`) GoTo | **Shipped** — `drawHTMLHF` + `buildBodyIDIndex` + `remapPageForCopies` |
 | Shared matrix/fidelity refresh | Cross-cutting with phases 17–19 honesty pass |
-| Full HTML HF as nested documents | Out of scope (Phase 6 model stands) |
+| Full HTML HF as nested documents | **[~]** deferred to **v0.3.0** — [`subplans-tier-2/nested-hf-v0.3.0.md`](subplans-tier-2/nested-hf-v0.3.0.md) |
 
 ---
 
@@ -96,4 +96,5 @@ model.
 ## Out of scope
 
 - Full HTML HF as nested full browser documents
+- Nested HF **document** model — deferred to v0.3.0 ([`nested-hf-v0.3.0.md`](subplans-tier-2/nested-hf-v0.3.0.md))
 - PDF named actions beyond GoTo/URI
