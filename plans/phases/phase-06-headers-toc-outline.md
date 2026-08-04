@@ -45,7 +45,7 @@ Port outline extraction, PDF bookmarks, text/HTML headers & footers, TOC generat
 - [x] Generate TOC HTML from outline via **Go templates** (default look from `tocstylesheet.cc` semantics)
 - [x] Settings: caption, dotted lines, indentation, fontScale, forwardLinks - CaptionText/Indentation/FontScale/DottedLines/ForwardLinks/BackLinks honored
 - [x] Re-layout TOC; if page count changes, re-number (fixed-point loop with max iterations) - fixed-point, max 2 iterations; TOC pages prepended via ReorderPages so `[page]`, outline dests and TOC numbers include TOC pages
-- [x] `[~]` Custom `--xsl-style-sheet`: unsupported - error or ignore with warning - warns + ignores
+- [~] Custom `--xsl-style-sheet`: unsupported - error or ignore with warning - warns + ignores
 
 ### 6.5 Links
 - [x] Internal: same-document anchors + cross-object URL map (`urlToPageObj`) - MVP: TOC forward/back links (block entries + heading boxes → AddLinkDest); arbitrary inline `<a href="#x">` source rects skipped (inline elements produce no boxes; documented TODO); cross-object map deferred
@@ -53,7 +53,7 @@ Port outline extraction, PDF bookmarks, text/HTML headers & footers, TOC generat
 - [x] Flags: useLocalLinks, useExternalLinks, resolveRelativeLinks - ExternalLinks gate neutralizes OpLinkURI ops (OpKind sentinel); LocalLinks read; resolveRelativeLinks deferred
 
 ### 6.6 Forms
-- [ ] `[~]` `produceForms` deferred - optional post-MVP AcroForm text/checkbox only - deferred as planned
+- [~] `produceForms` deferred - optional post-MVP AcroForm text/checkbox only - deferred as planned
 
 ### 6.7 Tests
 - [x] Heading outline structure test - TestOutlineTreeNesting, TestOutlineTreeSortAndClamp, TestOutlineTreeLevelStackAcrossPages, TestOutlineDepth, TestOutlineExclude, TestOutlineCollectTitlesAndAnchors

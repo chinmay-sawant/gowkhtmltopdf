@@ -1,7 +1,8 @@
 # Phase 14 - Images in PDF: Robust Path
 
 > **Parent:** `plans/10-canonical-post-mvp-roadmap.md`  
-> **Status:** not started  
+> **Status:** partial (2026-08-04) - PNG/JPEG path + golden fixtures solid; audit/docs polish remain  
+
 > **Estimated effort:** 1–2 weeks  
 > **Depends on:** Phase 3 image XObjects; fixtures 07, 20  
 > **Unblocks:** logo-heavy invoices; marketing-ish pages with static images  
@@ -28,28 +29,28 @@ MVP already embeds PNG/JPEG. This phase hardens the **path for logos and image g
 
 ### 14.1 Decode & embed audit
 
-- [ ] Audit `internal/pdf/images.go` + load path for img bytes
-- [ ] Document supported formats: PNG, JPEG only (matrix already says; keep honest)
-- [ ] JPEG pass-through vs re-encode path: document quality/DPI knobs state
+- [x] Audit `internal/pdf/images.go` + load path for img bytes (JPEG DCT pass-through, PNG Flate/RGB)
+- [x] Document supported formats: PNG, JPEG only (matrix §1 / §5)
+- [ ] JPEG pass-through vs re-encode path: document quality/DPI knobs state (knobs still best-effort/ignored)
 - [ ] PNG with alpha: document how alpha is represented (or flattened)
 - [ ] Large image guard: max decode size / memory note (align with load MaxBodySize)
 
 ### 14.2 Layout replaced-element robustness
 
-- [ ] `<img>` with CSS `width`/`height` only
-- [ ] `<img>` with intrinsic size only
-- [ ] `<img>` with both (CSS wins per defined rule - document rule)
-- [ ] `max-width` / `min-width` on images regression
-- [ ] Broken/missing file: placeholder or skip **without crash**; log warn
-- [ ] Zero-byte / corrupt image: skip + warn
-- [ ] Path: `internal/layout/layout.go`, `internal/load`, `internal/pdf/images.go`
+- [x] `<img>` with CSS `width`/`height` only (`layout_test` image sizing)
+- [x] `<img>` with intrinsic size only
+- [x] `<img>` with both (CSS wins per defined rule - document rule) - code path exists; rule could be clearer in matrix
+- [ ] `max-width` / `min-width` on images regression (explicit test still thin)
+- [x] Broken/missing file: placeholder or skip **without crash** (`Images` callback error → no paint)
+- [x] Zero-byte / corrupt image: skip + warn (`TestAddInvalidImage`)
+- [x] Path: `internal/layout/layout.go`, `internal/load`, `internal/pdf/images.go`
 
 ### 14.3 Logo & grid fixtures
 
-- [ ] fixture-07: logo present in PDF (`/Subtype /Image`) - strengthen assert if weak
-- [ ] fixture-20: multi-image grid all embedded or documented skips
+- [x] fixture-07: logo present in PDF (`/Subtype /Image`) - golden `images: true`
+- [x] fixture-20: multi-image grid all embedded or documented skips - golden `images: true`
 - [ ] Optional new fixture: remote vs local logo under ACL (local blocked by default)
-- [ ] Table cell containing logo sizes reasonably
+- [x] Table cell containing logo sizes reasonably (fixture-07 letterhead pattern)
 
 ### 14.4 CLI / settings
 
@@ -58,16 +59,16 @@ MVP already embeds PNG/JPEG. This phase hardens the **path for logos and image g
 
 ### 14.5 Docs
 
-- [ ] Matrix §1 `img` row + §5 unsupported formats
-- [ ] Fidelity: “solid path for logos/grids” after tests green
-- [ ] Library docs: how to allow local logo path
+- [x] Matrix §1 `img` row + §5 unsupported formats
+- [ ] Fidelity: “solid path for logos/grids” after tests green (fidelity.md pending phase 10)
+- [x] Library docs: how to allow local logo path (ACL pair in library-api / integration-security)
 
 ### 14.6 Closure gates
 
-- [ ] `make lint` →
-- [ ] `make test` →
-- [ ] Parent Phase 14 checked
-- [ ] Next: **Phase 15** (image mode raster) or **16** (invoice CSS)
+- [x] `make lint` → green (2026-08-04 reconcile)
+- [x] `make test` → green
+- [ ] Parent Phase 14 checked (remaining audit/docs items above)
+- [x] Next: **Phase 15** (image mode raster) - **shipped**; or **16** (invoice CSS)
 
 ---
 

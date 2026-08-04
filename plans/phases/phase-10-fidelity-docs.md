@@ -1,7 +1,8 @@
 # Phase 10 - HTML/CSS Fidelity Documentation
 
 > **Parent:** `plans/10-canonical-post-mvp-roadmap.md`  
-> **Status:** not started  
+> **Status:** partial (2026-08-04) - matrix/samples/README honesty advanced; `fidelity.md` still missing  
+
 > **Estimated effort:** 3–7 days  
 > **Depends on:** MVP matrix exists (`documentation/compatibility-matrix.md`)  
 > **Unblocks:** honest marketing, Tier 1 planning, all later matrix updates  
@@ -58,27 +59,27 @@ Produce a table (in fidelity.md or matrix appendix) mapping **user-facing goals 
 
 Re-walk code and tick only with file references:
 
-- [ ] Audit §2.1 box model against `internal/layout/style.go` + `layout.go`
-- [ ] Audit §2.2 display/float/position against consumers (not just parsers)
-- [ ] Audit §2.3 fonts (fake bold, no italic paint, single face)
-- [ ] Audit §2.5 tables (`rowspan` no, header repeat no)
-- [ ] Audit §4 selectors (sibling partial, attribute/pseudo dropped)
-- [ ] Audit image converter path: document 5×7 + metric mismatch in matrix § or fidelity.md
-- [ ] Audit JS: strip site + flag warnings listed
-- [ ] Fix any stale “Implemented” that is only “parsed”
-- [ ] Record audit date and commit/sha in matrix header when done
+- [x] Audit §2.1 box model against `internal/layout/style.go` + `layout.go` (matrix rows cite paths)
+- [x] Audit §2.2 display/float/position against consumers (not just parsers) - float still Not implemented
+- [x] Audit §2.3 fonts - updated for real Bold/Italic faces (2026-08); fake bold only as fallback
+- [x] Audit §2.5 tables (`rowspan` no, header repeat no)
+- [x] Audit §4 selectors - attribute/first-last-nth/siblings **Implemented** (matrix §4)
+- [x] Audit image converter path: matrix documents TTF outline AA (not 5×7 primary path)
+- [x] Audit JS: strip site + flag warnings listed
+- [x] Fix any stale “Implemented” that is only “parsed” (ongoing as features land)
+- [ ] Record audit date and commit/sha in matrix header when done (formal stamp still open)
 
 ### 10.4 Fixture ↔ feature index
 
-- [ ] Extend `documentation/samples.md` (or fidelity appendix) with a matrix: fixture-01…20 → features exercised
-- [ ] Link `output/*.pdf` / `*.png` as visual evidence for each major feature
-- [ ] Document Wikipedia smoke: `output/wiki-ana-de-armas.pdf` = **smoke only**, not pass
+- [x] Extend `documentation/samples.md` (or fidelity appendix) with fixture inventory pointers (`testdata/golden/README.md` + samples)
+- [x] Link `output/*.pdf` / `*.png` as visual evidence (`output/README.md`, samples.md)
+- [x] Document Wikipedia smoke: `output/wiki-ana-de-armas.pdf` = **smoke only**, not pass
 
 ### 10.5 README / changelog pointers
 
-- [ ] Update README “Deferred / not planned” to point at `plans/10-canonical-post-mvp-roadmap.md` as active ledger
-- [ ] Keep Tier 3 rows as “not planned” with pointer to phase 23
-- [ ] Add one-line “Fidelity” link under Docs table
+- [x] README “Deferred / not planned” tracks post-MVP items (points at phase ledgers; tighten to `10-canonical-post-mvp-roadmap.md` still open)
+- [x] Keep Tier 3 rows as “not planned” with pointer to phase 23
+- [ ] Add one-line “Fidelity” link under Docs table (blocked on `fidelity.md`)
 - [ ] Optional: CHANGELOG “Unreleased” note that post-MVP roadmap published
 
 ### 10.6 Docs-only closure gates

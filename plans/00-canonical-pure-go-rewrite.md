@@ -92,23 +92,23 @@ Phase 0 Scope → 1 Settings/CLI → 2 Loader → 3 PDF Writer
 > Evidence: `wkhtmltopdf/src/lib/*settings*`, `src/pdf/pdfarguments.cc`, `src/shared/*`
 
 ### 1.1 Settings structs (parity with C++)
-- [ ] Port `PdfGlobal`, `PdfObject`, `Margin`, `Size`, `HeaderFooter`, `TableOfContent` defaults
-- [ ] Port `LoadGlobal`, `LoadPage`, `Proxy`, `PostItem`, `Web`
-- [ ] Port `ImageGlobal`, `CropSettings` defaults
-- [ ] UnitReal parser (`mm|cm|m|in|pt|px|…`) matching `pdfsettings.cc`
-- [ ] PageSize / Orientation / ColorMode / LoadErrorHandling / LogLevel enums + string maps
-- [ ] Dotted-name `Get`/`Set` reflection map (C API keys: `margin.top`, `load.jsdelay`, …)
+- [x] Port `PdfGlobal`, `PdfObject`, `Margin`, `Size`, `HeaderFooter`, `TableOfContent` defaults
+- [x] Port `LoadGlobal`, `LoadPage`, `Proxy`, `PostItem`, `Web`
+- [x] Port `ImageGlobal`, `CropSettings` defaults
+- [x] UnitReal parser (`mm|cm|m|in|pt|px|…`) matching `pdfsettings.cc`
+- [x] PageSize / Orientation / ColorMode / LoadErrorHandling / LogLevel enums + string maps
+- [x] Dotted-name `Get`/`Set` reflection map (C API keys: `margin.top`, `load.jsdelay`, …)
 
 ### 1.2 CLI parser
-- [ ] ArgHandler-style flag table for all PDF flags (accept & store)
-- [ ] Multi-object grammar: global opts → `page`/`cover`/`toc` → output
-- [ ] Cover semantics: clear HF, `includeInOutline=false`
-- [ ] `--help` / `-h`, `--version` / `-V`, `--quiet`, `--log-level`
-- [ ] Progress feedback to stderr (Info+); exit codes 0/1/2/3 (`utilities.cc`)
-- [ ] Golden tests: argv → settings struct for high-traffic flags
+- [x] ArgHandler-style flag table for all PDF flags (accept & store)
+- [x] Multi-object grammar: global opts → `page`/`cover`/`toc` → output
+- [x] Cover semantics: clear HF, `includeInOutline=false`
+- [x] `--help` / `-h`, `--version` / `-V`, `--quiet`, `--log-level`
+- [x] Progress feedback to stderr (Info+); exit codes 0/1/2/3 (`utilities.cc`)
+- [x] Golden tests: argv → settings struct for high-traffic flags
 
 ### 1.3 Closure
-- [ ] `make test` green for settings + CLI (no convert yet; convert may stub)
+- [x] `make test` green for settings + CLI (no convert yet; convert may stub)
 
 ---
 
@@ -118,21 +118,21 @@ Phase 0 Scope → 1 Settings/CLI → 2 Loader → 3 PDF Writer
 > Evidence: `multipageloader.cc`, `loadsettings.*`
 
 ### 2.1 Input resolution
-- [ ] URL guess: file path, `http(s)`, host:port, stdin `-`, inline data → temp file semantics
-- [ ] Concurrent multi-resource load (all start together; aggregate progress)
-- [ ] Temp file create/cleanup (`TempFile` parity)
+- [x] URL guess: file path, `http(s)`, host:port, stdin `-`, inline data → temp file semantics
+- [x] Concurrent multi-resource load (all start together; aggregate progress)
+- [x] Temp file create/cleanup (`TempFile` parity)
 
 ### 2.2 Network features
-- [ ] `net/http` client: custom headers, basic auth, POST urlencoded + multipart
-- [ ] Cookie jar file + per-request cookies
-- [ ] Proxy (http/socks5 grammar) + bypass hosts
-- [ ] Client TLS cert (PEM) support
-- [ ] Local file ACL: default block + `--allow` path walk
-- [ ] Load error handling: abort / skip / ignore (+ media extension list)
-- [ ] `jsdelay` / `windowStatus` / `runScript` as **no-ops or documented stubs** until JS exists (MVP: jsdelay = pure sleep after load)
+- [x] `net/http` client: custom headers, basic auth, POST urlencoded + multipart
+- [x] Cookie jar file + per-request cookies
+- [x] Proxy (http/socks5 grammar) + bypass hosts
+- [x] Client TLS cert (PEM) support
+- [x] Local file ACL: default block + `--allow` path walk
+- [x] Load error handling: abort / skip / ignore (+ media extension list)
+- [x] `jsdelay` / `windowStatus` / `runScript` as **no-ops or documented stubs** until JS exists (MVP: jsdelay = pure sleep after load)
 
 ### 2.3 Closure
-- [ ] Tests with `net/http/httptest` + local fixtures; ACL unit tests
+- [x] Tests with `net/http/httptest` + local fixtures; ACL unit tests
 
 ---
 
@@ -169,28 +169,28 @@ Phase 0 Scope → 1 Settings/CLI → 2 Loader → 3 PDF Writer
 > **Critical path - largest phase**
 
 ### 4.1 HTML subset
-- [ ] Tokenizer + tree builder for allowlisted tags
-- [ ] Encoding: UTF-8 + `defaultEncoding` override
-- [ ] Ignore/strip `<script>`; no DOM JS API
-- [ ] Resource discovery: `<img src>`, `<link rel=stylesheet>`, inline `style`
+- [x] Tokenizer + tree builder for allowlisted tags
+- [x] Encoding: UTF-8 + `defaultEncoding` override
+- [x] Ignore/strip `<script>`; no DOM JS API
+- [x] Resource discovery: `<img src>`, `<link rel=stylesheet>`, inline `style`
 
 ### 4.2 CSS subset
-- [ ] Parse stylesheet + inline style + user stylesheet
-- [ ] Cascade: specificity (type/class/id/descendant), inheritance
-- [ ] Box model: margin/padding/border/width/height/min/max (px/pt/mm/em/%)
-- [ ] Display: block, inline, inline-block, none, table/*
-- [ ] Fonts, colors, text-align, line-height, white-space basics
-- [ ] Background color (images later); borders
+- [x] Parse stylesheet + inline style + user stylesheet
+- [x] Cascade: specificity (type/class/id/descendant), inheritance
+- [x] Box model: margin/padding/border/width/height/min/max (px/pt/mm/em/%)
+- [x] Display: block, inline, inline-block, none, table/*
+- [x] Fonts, colors, text-align, line-height, white-space basics
+- [x] Background color (images later); borders
 
 ### 4.3 Layout
-- [ ] Normal flow (block + inline formatting contexts)
-- [ ] Table layout (auto + fixed subset)
-- [ ] Replaced elements (images with intrinsic size)
-- [ ] Paint to display list (not full-page bitmap)
+- [x] Normal flow (block + inline formatting contexts)
+- [x] Table layout (auto + fixed subset)
+- [x] Replaced elements (images with intrinsic size)
+- [x] Paint to display list (not full-page bitmap)
 
 ### 4.4 Closure
-- [ ] Golden layout tests for invoice corpus (box positions within tolerance)
-- [ ] Compatibility matrix updated with pass/fail per property
+- [x] Golden layout tests for invoice corpus (box positions within tolerance)
+- [x] Compatibility matrix updated with pass/fail per property
 
 ---
 
@@ -199,25 +199,25 @@ Phase 0 Scope → 1 Settings/CLI → 2 Loader → 3 PDF Writer
 > Detail: [phases/phase-05-pagination-print.md](phases/phase-05-pagination-print.md)
 
 ### 5.1 Fragmentation
-- [ ] Vertical pagination into page content boxes (respect margins)
-- [ ] `page-break-before/after` on blocks
-- [ ] `page-break-inside: avoid` best-effort (rows, `.no-break`)
-- [ ] Orphans/widows simple heuristics (optional)
+- [x] Vertical pagination into page content boxes (respect margins)
+- [x] `page-break-before/after` on blocks
+- [x] `page-break-inside: avoid` best-effort (rows, `.no-break`)
+- [x] Orphans/widows simple heuristics (optional)
 
 ### 5.2 Print media
-- [ ] `@media print` vs screen (`printMediaType`)
-- [ ] `@page` size/margin (subset)
-- [ ] Zoom factor apply
-- [ ] Smart-shrinking: either implement scale-to-fit **or** document as unsupported
+- [x] `@media print` vs screen (`printMediaType`)
+- [x] `@page` size/margin (subset)
+- [x] Zoom factor apply
+- [x] Smart-shrinking: either implement scale-to-fit **or** document as unsupported
 
 ### 5.3 Multi-object assembly
-- [ ] Sequential objects in one PDF session (cover | page | page)
-- [ ] Copies + collate loops
-- [ ] Grayscale conversion option
-- [ ] Page numbering base + `pageOffset`
+- [x] Sequential objects in one PDF session (cover | page | page)
+- [x] Copies + collate loops
+- [x] Grayscale conversion option
+- [x] Page numbering base + `pageOffset`
 
 ### 5.4 Closure
-- [ ] Multi-page table fixture golden test
+- [x] Multi-page table fixture golden test
 
 ---
 
@@ -227,28 +227,28 @@ Phase 0 Scope → 1 Settings/CLI → 2 Loader → 3 PDF Writer
 > Evidence: `outline.cc`, `pdfconverter.cc` HF/TOC paths
 
 ### 6.1 Text headers/footers
-- [ ] left/center/right text + font + line + spacing
-- [ ] Placeholder substitution: `[page] [frompage] [topage] [webpage] [section] [subsection] [date] [isodate] [time] [title] [doctitle] [sitepage] [sitepages]` + `--replace`
-- [ ] Auto top/bottom margin from HF reserve (when margin = -1)
+- [x] left/center/right text + font + line + spacing
+- [x] Placeholder substitution: `[page] [frompage] [topage] [webpage] [section] [subsection] [date] [isodate] [time] [title] [doctitle] [sitepage] [sitepages]` + `--replace`
+- [x] Auto top/bottom margin from HF reserve (when margin = -1)
 
 ### 6.2 Outline & TOC
-- [ ] Collect h1–h6 (h1–h9 if targeting parity), sort by page/y/x, build tree
-- [ ] PDF bookmarks with `outlineDepth`
-- [ ] Simple TOC HTML generation (replace XSLT with Go templates; default TOC look)
-- [ ] Optional `dumpOutline` XML (wkhtmltopdf namespace)
-- [ ] `[~]` Custom user XSL: deferred - no XSLT2 in stdlib; document unsupported or provide limited Go template hooks
+- [x] Collect h1–h6 (h1–h9 if targeting parity), sort by page/y/x, build tree
+- [x] PDF bookmarks with `outlineDepth`
+- [x] Simple TOC HTML generation (replace XSLT with Go templates; default TOC look)
+- [x] Optional `dumpOutline` XML (wkhtmltopdf namespace)
+- [~] Custom user XSL: deferred - no XSLT2 in stdlib; document unsupported or provide limited Go template hooks
 
 ### 6.3 Links
-- [ ] Internal fragment → GoTo
-- [ ] External URI hyperlinks
-- [ ] `resolveRelativeLinks` / keep relative
+- [x] Internal fragment → GoTo
+- [x] External URI hyperlinks
+- [x] `resolveRelativeLinks` / keep relative
 
 ### 6.4 HTML headers/footers
-- [ ] Load HF URL as mini-document; measure height; composite per page
-- [ ] Query-string / param injection parity with `fillParms`
+- [x] Load HF URL as mini-document; measure height; composite per page
+- [x] Query-string / param injection parity with `fillParms`
 
 ### 6.5 Closure
-- [ ] Golden: multi-chapter doc with TOC + outline + text HF
+- [x] Golden: multi-chapter doc with TOC + outline + text HF
 
 ---
 
@@ -258,13 +258,13 @@ Phase 0 Scope → 1 Settings/CLI → 2 Loader → 3 PDF Writer
 > Evidence: `imageconverter.cc`, `imagearguments.cc`
 
 ### 7.1 CLI + pipeline
-- [ ] `gowkhtmltoimage` flags: width/height/crop/format/quality/smart-width/transparent
-- [ ] Layout once → rasterize page (stdlib `image`, `image/png`, `image/jpeg`)
-- [ ] Smart-width binary search approximation (no scrollbar API - use content width)
-- [ ] SVG output: `[~]` deferred or minimal vector export
+- [x] `gowkhtmltoimage` flags: width/height/crop/format/quality/smart-width/transparent
+- [x] Layout once → rasterize page (stdlib `image`, `image/png`, `image/jpeg`)
+- [x] Smart-width binary search approximation (no scrollbar API - use content width)
+- [~] SVG output: `[~]` deferred or minimal vector export
 
 ### 7.2 Closure
-- [ ] PNG/JPEG golden tests for simple HTML
+- [x] PNG/JPEG golden tests for simple HTML
 
 ---
 
@@ -274,15 +274,15 @@ Phase 0 Scope → 1 Settings/CLI → 2 Loader → 3 PDF Writer
 > Evidence: `pdf.h`, `image.h`, examples
 
 ### 8.1 Idiomatic Go API
-- [ ] `pdf.Convert(ctx, global, objects) ([]byte, error)`
-- [ ] Callbacks: progress, phase, log
-- [ ] String settings map for binding parity
+- [x] `pdf.Convert(ctx, global, objects) ([]byte, error)`
+- [x] Callbacks: progress, phase, log
+- [x] String settings map for binding parity
 
 ### 8.2 C-shaped compatibility (optional)
-- [ ] `[~]` cgo/shared lib ABI for `wkhtmltopdf_*` - only if needed by consumers; not required for CLI MVP
+- [~] cgo/shared lib ABI for `wkhtmltopdf_*` - only if needed by consumers; not required for CLI MVP
 
 ### 8.3 Closure
-- [ ] Example programs matching `examples/pdf_c_api.c` flow in Go
+- [x] Example programs matching `examples/pdf_c_api.c` flow in Go
 
 ---
 
@@ -291,21 +291,21 @@ Phase 0 Scope → 1 Settings/CLI → 2 Loader → 3 PDF Writer
 > Detail: [phases/phase-09-hardening-closure.md](phases/phase-09-hardening-closure.md)
 
 ### 9.1 Quality
-- [ ] Expand golden corpus to ≥20 report templates
-- [ ] Fuzz HTML/CSS parsers (stdlib only harness)
-- [ ] Memory/perf budget on 100-page table report (record cold/warm)
-- [ ] Security review: local file ACL, no JS, SSRF considerations for remote URL
+- [x] Expand golden corpus to ≥20 report templates
+- [x] Fuzz HTML/CSS parsers (stdlib only harness)
+- [x] Memory/perf budget on 100-page table report (record cold/warm)
+- [x] Security review: local file ACL, no JS, SSRF considerations for remote URL
 
 ### 9.2 Docs & release
-- [ ] Compatibility matrix published
-- [ ] Flag support table (supported / partial / ignored / rejected)
-- [ ] Versioned release + changelog
-- [ ] Final estimate reconciliation vs README
+- [x] Compatibility matrix published
+- [x] Flag support table (supported / partial / ignored / rejected)
+- [x] Versioned release + changelog
+- [x] Final estimate reconciliation vs README
 
 ### 9.3 Phase complete criteria
-- [ ] All MVP rows in phases 0–6 and 9.2 checked with evidence
-- [ ] `make test` and `make lint` recorded pass
-- [ ] Known gaps listed as `[~]` with owners
+- [x] All MVP rows in phases 0–6 and 9.2 checked with evidence
+- [x] `make test` and `make lint` recorded pass
+- [~] Known gaps listed as `[~]` with owners
 
 ---
 

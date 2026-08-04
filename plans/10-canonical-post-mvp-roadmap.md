@@ -1,7 +1,8 @@
 # 10 - Post-MVP Quality & Capability Roadmap (Canonical Execution Ledger)
 
 > **Parent:** `plans/00-canonical-pure-go-rewrite.md` (MVP phases 0–9 complete, v0.1.0)  
-> **Status:** active - phases 10+ not started  
+> **Status:** active - Tier 1 partially landed (12, 13, 15 complete; 10/11/14/16 partial) as of 2026-08-04  
+
 > **Estimated effort:** Tier 1 ~4–8 mo · Tier 2 ~6–12 mo additional · Tier 3 deferred (not planned as pure-stdlib goal)  
 > **Constraint:** pure Golang, **Go standard library only** (no third-party modules, no Chrome/WebKit, no cgo, no plugins)  
 > **Ordering principle:** **quick wins first** (docs/API polish → typography → image mode → invoice CSS → broader CSS → fonts/i18n → web heuristics → JS research). Dependency edges still respected within each phase.  
@@ -35,18 +36,31 @@ MVP ships a usable **report/invoice** pipeline (load → HTML/CSS subset → lay
 
 ---
 
+
+## Recommended next work (2026-08-04 reconcile)
+
+Tier 1 is **not closed** yet. Suggested order for the next sessions:
+
+1. **Phase 10 remainder** (docs-only, quick): write `documentation/fidelity.md`, link from docs index, stamp matrix audit date.
+2. **Phase 16 remainder** (highest product value left in Tier 1): `float` lite, real `inline-block`, `box-sizing: border-box`.
+3. **Phase 14 remainder** (small): document JPEG/PNG alpha/DPI knobs; optional `web.images=false` test.
+4. **Phase 11 remainder** (optional): publish/install story + optional `ConvertHTML` helper.
+
+**Already shipped post-MVP:** phases **12** (real bold/italic faces), **13** (spacing/coalesce), **15** (image-mode TTF AA). Selector expansion inside **16** is also shipped.
+
+
 ## Executive Summary
 
 | Fact (current evidence) | Location |
 |-------------------------|----------|
 | MVP phases 0–9 complete | `plans/00-canonical-pure-go-rewrite.md` |
-| Single PDF face: Liberation Sans Regular | `internal/pdf/assets/` |
-| Bold = fake stroke (`TextRenderMode(2)`) | `internal/layout/paint.go` |
-| Italic parsed, not painted | `compatibility-matrix.md` §2.3 |
-| Image mode = 5×7 bitmap font, no AA | `internal/imageout/font.go` |
-| Flex/grid/float/position = no | matrix §2.2 / §5 |
+| Liberation Sans R/B/I/BI embedded | `internal/pdf/assets/` + `faces.go` |
+| Real bold/italic via `FaceSet.Resolve` (fake bold only if face missing) | `layout.faceFor`, `paint.go` |
+| Image mode = pure-Go TTF outline AA (+ 2× supersample) | `internal/imageout/ttfraster.go` |
+| Selectors: attr / nth-child / siblings shipped; float still no | matrix §4 / §2.2 |
+| Flex/grid/position = no | matrix §2.2 / §5 |
 | JS stripped; flags warn only | load + CLI |
-| Library API exists (`Converter`, examples) | `api.go`, `examples/` |
+| Library API exists (`Converter`, examples, integration docs) | `api.go`, `examples/`, `library-api.md` |
 | Wikipedia smoke PDF exists, layout poor | `output/wiki-ana-de-armas.pdf` |
 | Zero module deps | `go.mod` |
 
@@ -75,13 +89,13 @@ MVP ships a usable **report/invoice** pipeline (load → HTML/CSS subset → lay
 
 | Phase | Title | Tier | Detail ledger | Effort (solo) | Status |
 |------:|-------|------|---------------|---------------|--------|
-| 10 | HTML/CSS fidelity documentation | 1 | [phases/phase-10-fidelity-docs.md](phases/phase-10-fidelity-docs.md) | 3–7 days | `[ ]` |
-| 11 | Library API for Go embedders | 1 | [phases/phase-11-library-api-embedders.md](phases/phase-11-library-api-embedders.md) | 1–2 wk | `[ ]` |
-| 12 | Typography - real bold/italic faces | 1 | [phases/phase-12-typography-faces.md](phases/phase-12-typography-faces.md) | 2–4 wk | `[ ]` |
-| 13 | Typography - spacing stability | 1 | [phases/phase-13-typography-spacing.md](phases/phase-13-typography-spacing.md) | 1–2 wk | `[ ]` |
-| 14 | Images in PDF - robust path | 1 | [phases/phase-14-pdf-images.md](phases/phase-14-pdf-images.md) | 1–2 wk | `[ ]` |
-| 15 | Image mode - real TTF/AA raster | 1 | [phases/phase-15-image-mode-raster.md](phases/phase-15-image-mode-raster.md) | 3–6 wk | `[ ]` |
-| 16 | CSS invoices use (selectors + float lite) | 1 | [phases/phase-16-invoice-css.md](phases/phase-16-invoice-css.md) | 3–6 wk | `[ ]` |
+| 10 | HTML/CSS fidelity documentation | 1 | [phases/phase-10-fidelity-docs.md](phases/phase-10-fidelity-docs.md) | 3–7 days | partial |
+| 11 | Library API for Go embedders | 1 | [phases/phase-11-library-api-embedders.md](phases/phase-11-library-api-embedders.md) | 1–2 wk | partial |
+| 12 | Typography - real bold/italic faces | 1 | [phases/phase-12-typography-faces.md](phases/phase-12-typography-faces.md) | 2–4 wk | `[x]` 2026-08-04 |
+| 13 | Typography - spacing stability | 1 | [phases/phase-13-typography-spacing.md](phases/phase-13-typography-spacing.md) | 1–2 wk | `[x]` 2026-08-04 |
+| 14 | Images in PDF - robust path | 1 | [phases/phase-14-pdf-images.md](phases/phase-14-pdf-images.md) | 1–2 wk | partial |
+| 15 | Image mode - real TTF/AA raster | 1 | [phases/phase-15-image-mode-raster.md](phases/phase-15-image-mode-raster.md) | 3–6 wk | `[x]` 2026-08-04 |
+| 16 | CSS invoices use (selectors + float lite) | 1 | [phases/phase-16-invoice-css.md](phases/phase-16-invoice-css.md) | 3–6 wk | partial (selectors done) |
 | 17 | Broader CSS (position/float, partial flex) | 2 | [phases/phase-17-broader-css.md](phases/phase-17-broader-css.md) | 2–4 mo | `[ ]` |
 | 18 | Pagination polish (thead repeat, breaks) | 2 | [phases/phase-18-pagination-polish.md](phases/phase-18-pagination-polish.md) | 3–6 wk | `[ ]` |
 | 19 | Fonts / i18n / discovery / CJK | 2 | [phases/phase-19-fonts-i18n.md](phases/phase-19-fonts-i18n.md) | 1–3 mo | `[ ]` |
@@ -125,8 +139,8 @@ MVP ships a usable **report/invoice** pipeline (load → HTML/CSS subset → lay
 
 ### 10.2 Matrix honesty pass
 - [ ] Re-audit every “Implemented / Partial / Not implemented” row against current code
-- [ ] Mark image-mode text quality limits explicitly (5×7 today)
-- [ ] Mark font-face / bold / italic / CJK limits explicitly
+- [x] Mark image-mode text quality limits explicitly (TTF AA shipped; residual no FreeType hinting)
+- [x] Mark font-face / bold / italic / CJK limits explicitly
 
 ### 10.3 Closure
 - [ ] No code change required; skip `make lint`/`make test` for pure docs (skill rule)
@@ -160,44 +174,44 @@ MVP ships a usable **report/invoice** pipeline (load → HTML/CSS subset → lay
 > **Tier 1 #1** · Related issues: multi-font, font-spacing
 
 ### 12.1 Faces
-- [ ] Bundle OFL Liberation Sans **Bold** (+ Italic / BoldItalic if available under same license)
-- [ ] Font registry: map `font-weight` / `font-style` → face
-- [ ] PDF: multiple subset fonts (`F0`/`F1`/…); drop fake-bold when real bold selected
+- [x] Bundle OFL Liberation Sans **Bold** (+ Italic / BoldItalic if available under same license)
+- [x] Font registry: map `font-weight` / `font-style` → face
+- [x] PDF: multiple subset fonts (`F0`/`F1`/…); drop fake-bold when real bold selected
 
 ### 12.2 Layout/paint
-- [ ] Measure with the selected face metrics
-- [ ] `<b>`, `<strong>`, `font-weight:bold` use bold face end-to-end
-- [ ] `<i>`, `<em>`, `font-style:italic` use italic face when present
+- [x] Measure with the selected face metrics
+- [x] `<b>`, `<strong>`, `font-weight:bold` use bold face end-to-end
+- [x] `<i>`, `<em>`, `font-style:italic` use italic face when present
 
 ### 12.3 Closure
-- [ ] Fixture visual smoke + tests; matrix + docs updated
+- [x] Fixture visual smoke + tests; matrix + docs updated
 
 ---
 
 ## Phase 13: Typography - Spacing Stability
 
 > Detail: [phases/phase-13-typography-spacing.md](phases/phase-13-typography-spacing.md)  
-> **Tier 1 #1 (spacing)** · Related: issue font-spacing
+> **Tier 1 #1 (spacing)** · Related: issue font-spacing · **Status:** complete 2026-08-04
 
 ### 13.1 Advances
-- [ ] Align layout advances with PDF paint advances
-- [ ] Reduce word-by-word `Tj` fragmentation where safe
-- [ ] Regression tests for fixture-01 / fixture-16 spacing
+- [x] Align layout advances with PDF paint advances
+- [x] Reduce word-by-word `Tj` fragmentation where safe (`coalesceTextItems`)
+- [x] Regression tests for fixture-01 / fixture-16 spacing
 
 ### 13.2 Closure
-- [ ] No return of double letter-spacing (1000-unit `/Widths` still correct)
+- [x] No return of double letter-spacing (1000-unit `/Widths` still correct)
 
 ---
 
 ## Phase 14: Images in PDF - Robust Path
 
 > Detail: [phases/phase-14-pdf-images.md](phases/phase-14-pdf-images.md)  
-> **Tier 1 #4**
+> **Tier 1 #4** · **Status:** partial
 
 ### 14.1 Robustness
-- [ ] Harden PNG/JPEG embed path for logos and grids (fixtures 07, 20)
-- [ ] Broken-image / missing-src behavior documented + tested
-- [ ] Intrinsic size / CSS width/height interactions covered
+- [x] Harden PNG/JPEG embed path for logos and grids (fixtures 07, 20)
+- [x] Broken-image / missing-src behavior documented + tested (skip without crash)
+- [x] Intrinsic size / CSS width/height interactions covered (tests exist; docs polish remain)
 
 ### 14.2 Closure
 - [ ] Golden/structure tests; matrix image notes current
@@ -207,26 +221,26 @@ MVP ships a usable **report/invoice** pipeline (load → HTML/CSS subset → lay
 ## Phase 15: Image Mode - Real Raster (Not 5×7)
 
 > Detail: [phases/phase-15-image-mode-raster.md](phases/phase-15-image-mode-raster.md)  
-> **Tier 1 #2** · Related: issue image-mode-raster-quality
+> **Tier 1 #2** · Related: issue image-mode-raster-quality · **Status:** complete 2026-08-04
 
 ### 15.1 Raster path
-- [ ] Replace 5×7 text drawing with pure-Go TTF outline raster (or greyscale AA bitmap of same face)
-- [ ] Image paint advances **match** layout advances for same face/size
-- [ ] Anti-aliased edges; more than ~6 unique colors on body text samples
+- [x] Replace 5×7 text drawing with pure-Go TTF outline raster (or greyscale AA bitmap of same face)
+- [x] Image paint advances **match** layout advances for same face/size
+- [x] Anti-aliased edges; more than ~6 unique colors on body text samples
 
 ### 15.2 Closure
-- [ ] `make samples` PNG quality gate; docs state strategy
+- [x] `make samples` PNG quality gate; docs state strategy
 
 ---
 
 ## Phase 16: CSS Invoices Actually Use
 
 > Detail: [phases/phase-16-invoice-css.md](phases/phase-16-invoice-css.md)  
-> **Tier 1 #3** · Selectors + float lite before full flex
+> **Tier 1 #3** · Selectors + float lite before full flex · **Status:** partial (selectors shipped)
 
 ### 16.1 Selectors
-- [ ] Attribute selectors subset; `:first-child` / `:last-child` / simple `:nth-child`
-- [ ] Sibling combinators match correctly (not as descendant)
+- [x] Attribute selectors subset; `:first-child` / `:last-child` / simple `:nth-child`
+- [x] Sibling combinators match correctly (not as descendant)
 
 ### 16.2 Layout additions
 - [ ] `float: left|right` + `clear` lite (enough for two-column invoice chrome)
