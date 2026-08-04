@@ -37,6 +37,11 @@ import (
 // multiplying every point by 96/72.
 const ptToPx = 96.0 / 72.0
 
+// rasterSS is the supersample factor for the paint canvas. Ops are painted
+// at rasterSS times the final resolution, then box-filtered down. This
+// stabilises small-text baselines and edges (stdlib has no FreeType hinting).
+const rasterSS = 2
+
 // screenWidthDefault is the wkhtmltoimage default viewport width in pixels
 // (settings.ImageGlobal.Width default is already 1024; this guards against
 // 0-width RenderOptions).
@@ -187,10 +192,12 @@ func maxHeight(res *layout.Result, opts RenderOptions) float64 {
 
 // rasterize paints the display list into an NRGBA canvas. The canvas is
 // white unless transparent is set, in which case it starts fully transparent
-// and only painted ops become visible.
+// and only painted ops become visible. Painting uses rasterSS supersampling
+// then box-filters down to the final CSS-pixel size.
 func rasterize(res *layout.Result, height float64, transparent bool) *image.NRGBA {
-	w := int(math.Round(res.Width * ptToPx))
-	h := int(math.Round(height * ptToPx))
+	pxPerPt := ptToPx * float64(rasterSS)
+	w := int(math.Round(res.Width * pxPerPt))
+	h := int(math.Round(height * pxPerPt))
 	if w < 1 {
 		w = 1
 	}
@@ -202,20 +209,60 @@ func rasterize(res *layout.Result, height float64, transparent bool) *image.NRGB
 		draw.Draw(img, img.Bounds(), image.NewUniform(color.White), image.Point{}, draw.Src)
 	}
 	for i := range res.Ops {
-		paint(img, &res.Ops[i])
+		paint(img, &res.Ops[i], pxPerPt)
 	}
-	return img
+	if rasterSS <= 1 {
+		return img
+	}
+	return downscaleBox(img, rasterSS)
 }
 
-// paint draws one display-list operation onto the canvas.
-func paint(img *image.NRGBA, op *layout.Op) {
+// downscaleBox averages factor×factor blocks of src into one output pixel.
+func downscaleBox(src *image.NRGBA, factor int) *image.NRGBA {
+	if factor <= 1 {
+		return src
+	}
+	sb := src.Bounds()
+	dw := sb.Dx() / factor
+	dh := sb.Dy() / factor
+	if dw < 1 {
+		dw = 1
+	}
+	if dh < 1 {
+		dh = 1
+	}
+	dst := image.NewNRGBA(image.Rect(0, 0, dw, dh))
+	n := uint32(factor * factor)
+	for y := 0; y < dh; y++ {
+		for x := 0; x < dw; x++ {
+			var r, g, b, a uint32
+			for dy := 0; dy < factor; dy++ {
+				for dx := 0; dx < factor; dx++ {
+					c := src.NRGBAAt(sb.Min.X+x*factor+dx, sb.Min.Y+y*factor+dy)
+					r += uint32(c.R)
+					g += uint32(c.G)
+					b += uint32(c.B)
+					a += uint32(c.A)
+				}
+			}
+			dst.SetNRGBA(x, y, color.NRGBA{
+				R: uint8(r / n), G: uint8(g / n), B: uint8(b / n), A: uint8(a / n),
+			})
+		}
+	}
+	return dst
+}
+
+// paint draws one display-list operation onto the canvas. pxPerPt converts
+// layout points into the (possibly supersampled) canvas pixel space.
+func paint(img *image.NRGBA, op *layout.Op, pxPerPt float64) {
 	switch op.Kind {
 	case layout.OpFillRect:
 		c := color.NRGBA{
 			R: uint8(op.R * 255), G: uint8(op.G * 255), B: uint8(op.B * 255),
 			A: uint8(op.Alpha * 255),
 		}
-		r := ptRect(op.X, op.Y, op.W, op.H).Intersect(img.Bounds())
+		r := ptRectScale(op.X, op.Y, op.W, op.H, pxPerPt).Intersect(img.Bounds())
 		if !r.Empty() {
 			draw.Draw(img, r, image.NewUniform(c), image.Point{}, draw.Over)
 		}
@@ -224,8 +271,8 @@ func paint(img *image.NRGBA, op *layout.Op) {
 		c := color.NRGBA{
 			R: uint8(op.R * 255), G: uint8(op.G * 255), B: uint8(op.B * 255), A: 255,
 		}
-		lw := strokeWidth(op)
-		r := ptRect(op.X, op.Y, op.W, op.H)
+		lw := strokeWidthScale(op, pxPerPt)
+		r := ptRectScale(op.X, op.Y, op.W, op.H, pxPerPt)
 		rects := [4]image.Rectangle{
 			image.Rect(r.Min.X, r.Min.Y, r.Max.X, r.Min.Y+lw),
 			image.Rect(r.Min.X, r.Max.Y-lw, r.Max.X, r.Max.Y),
@@ -242,14 +289,14 @@ func paint(img *image.NRGBA, op *layout.Op) {
 		c := color.NRGBA{
 			R: uint8(op.R * 255), G: uint8(op.G * 255), B: uint8(op.B * 255), A: 255,
 		}
-		lw := strokeWidth(op)
+		lw := strokeWidthScale(op, pxPerPt)
 		// centre the stroke on the line: half its width, in points
-		half := float64(lw) / 2 / ptToPx
+		half := float64(lw) / 2 / pxPerPt
 		var r image.Rectangle
 		if op.H <= 0 { // horizontal line
-			r = ptRect(op.X, op.Y-half, op.W, 2*half)
+			r = ptRectScale(op.X, op.Y-half, op.W, 2*half, pxPerPt)
 		} else { // vertical line
-			r = ptRect(op.X-half, op.Y, 2*half, op.H)
+			r = ptRectScale(op.X-half, op.Y, 2*half, op.H, pxPerPt)
 		}
 		if r = r.Intersect(img.Bounds()); !r.Empty() {
 			draw.Draw(img, r, image.NewUniform(c), image.Point{}, draw.Over)
@@ -259,17 +306,17 @@ func paint(img *image.NRGBA, op *layout.Op) {
 		c := color.NRGBA{
 			R: uint8(op.R * 255), G: uint8(op.G * 255), B: uint8(op.B * 255), A: 255,
 		}
-		bx := int(math.Round(op.X * ptToPx))
-		by := int(math.Round(op.Y * ptToPx))
+		// Keep fractional baselines so glyphs share one stable baseline
+		// instead of independently rounded Y positions (bobbing text).
+		bx := op.X * pxPerPt
+		by := op.Y * pxPerPt
 		if op.Font != nil {
-			// Real TTF raster: advances match layout/PDF face metrics.
-			ttfDrawString(img, bx, by, op.Text, op.Size, op.Font, c)
-			// Fake bold only if the face is not already bold.
+			ttfDrawString(img, bx, by, op.Text, op.Size, op.Font, c, pxPerPt)
 			if op.Bold && !op.Font.Bold() {
-				ttfDrawString(img, bx+1, by, op.Text, op.Size, op.Font, c)
+				ttfDrawString(img, bx+float64(rasterSS), by, op.Text, op.Size, op.Font, c, pxPerPt)
 			}
 		} else {
-			drawString(img, bx, by, op.Text, op.Size, op.Bold, c)
+			drawString(img, int(math.Round(bx)), int(math.Round(by)), op.Text, op.Size*float64(rasterSS), op.Bold, c)
 		}
 
 	case layout.OpImage:
@@ -283,7 +330,7 @@ func paint(img *image.NRGBA, op *layout.Op) {
 		if err != nil || op.W <= 0 || op.H <= 0 {
 			return // layout already validated the bytes; skip on failure
 		}
-		r := ptRect(op.X, op.Y, op.W, op.H).Intersect(img.Bounds())
+		r := ptRectScale(op.X, op.Y, op.W, op.H, pxPerPt).Intersect(img.Bounds())
 		if !r.Empty() {
 			sb := src.Bounds()
 			if r.Dx() == sb.Dx() && r.Dy() == sb.Dy() {
@@ -300,24 +347,23 @@ func paint(img *image.NRGBA, op *layout.Op) {
 	}
 }
 
-// strokeWidth returns the stroke thickness in pixels: op.Width points (for
-// OpLine) or 1 point for rect outlines.
-func strokeWidth(op *layout.Op) int {
+// strokeWidthScale returns the stroke thickness in canvas pixels.
+func strokeWidthScale(op *layout.Op, pxPerPt float64) int {
 	w := op.Width
 	if w <= 0 {
 		w = 1
 	}
-	if lw := int(math.Round(w * ptToPx)); lw >= 1 {
+	if lw := int(math.Round(w * pxPerPt)); lw >= 1 {
 		return lw
 	}
 	return 1
 }
 
-// ptRect converts a point-space rectangle into pixel-space image.Rectangle.
-func ptRect(x, y, w, h float64) image.Rectangle {
+// ptRectScale converts a point-space rectangle into canvas pixels.
+func ptRectScale(x, y, w, h, pxPerPt float64) image.Rectangle {
 	return image.Rect(
-		int(math.Round(x*ptToPx)), int(math.Round(y*ptToPx)),
-		int(math.Round((x+w)*ptToPx)), int(math.Round((y+h)*ptToPx)),
+		int(math.Round(x*pxPerPt)), int(math.Round(y*pxPerPt)),
+		int(math.Round((x+w)*pxPerPt)), int(math.Round((y+h)*pxPerPt)),
 	)
 }
 
