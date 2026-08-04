@@ -23,7 +23,7 @@ fixture. Do **not** implement CSS Fragmentation `orphans`/`widows` properties
 | Matrix §2.6 orphans/widows | **Must** | Partial (heuristics); CSS props absent |
 | Fidelity + matrix pagination blurbs | **Must** | Shared Pass 0 — thead/zoom/orphan prose |
 | CLI docs thead repeat | Should | `cli.md` + `library-api.md` notes |
-| Optional orphans fixture | Nice-to-have | Golden or unit test |
+| Optional orphans fixture | Nice-to-have → **included** | New `fixture-30-orphans-heuristic.html` |
 
 ---
 
@@ -80,23 +80,31 @@ Owned by [00-shared-doc-honesty.md](00-shared-doc-honesty.md) §2.3 / §3.1:
 
 ---
 
-## Phase 3: Optional orphans fixture / unit tests
+## Phase 3: Orphans fixture (new file only; do not edit fixture-11/23)
 
 ### 3.1 Design constraints
 
 Heuristics depend on content height vs `contentH` and font metrics — brittle as
 pixel goldens. Prefer:
 
-1. Unit test on layout ops (`orphansWidows` / `keepHeadingWithNext`), **or**
-2. Golden with loose page-count envelope only
+1. New golden with **loose** page-count envelope (`minPages: 2`, no tight max), **or**
+2. Unit test on layout ops (`orphansWidows` / `keepHeadingWithNext`)
 
-### 3.2 Optional checklist
+Do **not** modify existing fixtures (especially fixture-11 / fixture-23).
 
-- [ ] Add `TestOrphansWidowsHeuristic` and/or `TestKeepHeadingWithNext` under `internal/layout/`
-- [ ] Optional golden `fixture-NN-orphans-heuristic.html` (short paras near page bottom)
-- [ ] Envelope in `golden_test.go` if golden added
-- [ ] Proof: `go test ./internal/layout -run 'Thead|Orphan|Heading' -count=1`
-- [~] Skip if not product-prioritized — parent Pending “optional orphans fixture” stays `[~]`
+### 3.2 New fixture checklist
+
+- [x] Add `testdata/golden/fixture-30-orphans-heuristic.html` with:
+  - enough filler / page-break to guarantee ≥2 pages
+  - short straddler sentinel `ORPHAN-SHORT-STRADDLE`
+  - heading + body sentinels for keep-with-next
+  - explicit honesty: CSS `orphans`/`widows` **not** parsed
+- [x] Envelope in `fixturePageBounds`
+- [x] Document in `testdata/golden/README.md`
+- [x] Proof: `go test ./internal/convert -run 'TestGoldenCorpusAllFixtures/fixture-30' -count=1` → pass
+- [ ] Optional follow-up: `TestOrphansWidowsHeuristic` unit test under `internal/layout/`
+
+**Shipped on `feature/tier-2-pending-2`:** fixture-30 added (existing fixtures untouched).
 
 ### 3.3 Explicit non-goal
 

@@ -58,7 +58,7 @@ smart-shrinking re-layout.
 ### 18.4 Fixtures
 
 - [x] Multi-page table with thead (`fixture-23-thead-repeat.html`)
-- [ ] Long paragraph orphans fixture (optional quality)
+- [x] Long paragraph orphans fixture (`fixture-30-orphans-heuristic.html` — heuristics only)
 - [x] Golden page-count envelopes updated
 
 ### 18.5 Docs
@@ -87,7 +87,7 @@ smart-shrinking re-layout.
 | Matrix §2.6 orphans/widows | Heuristics exist; CSS `orphans`/`widows` properties still absent |
 | Fidelity + matrix pagination blurbs | Still claim no thead repeat / old zoom story |
 | CLI docs thead repeat | README mentions; dedicated CLI/library note optional |
-| Optional orphans fixture | Nice-to-have, not blocking |
+| Optional orphans fixture | **New** `fixture-30-orphans-heuristic.html` (do not edit 11/23) |
 
 ---
 

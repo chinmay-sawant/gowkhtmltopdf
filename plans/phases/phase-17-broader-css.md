@@ -36,7 +36,7 @@ report and simple marketing layouts - not Wikipedia chrome parity.
 - [x] Consecutive left/right floats packing (right packing improvement)
 - [x] Clearfixes correctly across block boundaries (phase 16 + tests)
 - [~] Interaction with tables and lists documented + tested (best-effort; edge cases remain)
-- [~] Fixtures for multi-float header/footer chrome (invoice float fixture exists; richer chrome optional)
+- [x] Fixtures for float beside table (`fixture-29-float-beside-table.html`; richer chrome still optional beyond 22/29)
 
 ### 17.2 Position
 
@@ -111,7 +111,7 @@ report and simple marketing layouts - not Wikipedia chrome parity.
 | Compatibility-matrix / fidelity MVP-gap rows | Still say flex/grid ignored or thead absent in places |
 | Sticky positioning | Explicitly deferred |
 | Full Grid / full Flex | Deferred (stdlib report subset only) |
-| Richer float+table interaction fixtures | Optional quality |
+| Richer float+table interaction fixtures | **New** `fixture-29-float-beside-table.html` (do not edit 22) |
 
 ---
 

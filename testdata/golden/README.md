@@ -57,6 +57,8 @@ proves. Page envelopes are pinned in `internal/convert/golden_test.go`
 | 26 | Position lite: relative offsets + absolute overlay (phase 17) | 1 |
 | 27 | CJK/Unicode sample (pair with `--font-path` for real glyphs; phase 19) | 1 |
 | 28 | flex-wrap, CSS grid lite, position:fixed stamp | 2 |
+| 29 | Float beside table: float:right infobox + wrapping prose + clear (phase 17 quality) | 1 |
+| 30 | Orphans/keep-with-next heuristic sample (phase 18; CSS orphans/widows props not parsed) | ≥2 |
 
 ## Pass criteria (MVP)
 

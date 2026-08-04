@@ -190,10 +190,10 @@ Checklist:
 
 ### 5.2 Explicitly not this subplan
 
-- [~] Phase 19 `@font-face` E2E test / image-mode wiring → `phase-19-pending.md`
-- [~] Phase 20 HF fragment GoTo → `phase-20-pending.md`
-- [~] Phase 18 optional orphans fixture → `phase-18-pending.md`
-- [~] Phase 17 optional float+table fixture → `phase-17-pending.md`
+- [~] Explicitly not this subplan:
+  - Phase 19 `@font-face` E2E / image-mode → phase-19-pending
+  - Phase 20 HF fragment GoTo → phase-20-pending
+  - (fixtures 29/30 already added on branch)
 
 ---
 

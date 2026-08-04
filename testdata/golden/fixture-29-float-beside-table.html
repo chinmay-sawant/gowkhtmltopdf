@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<!--
+  fixture-29-float-beside-table
+  Proves: float lite interaction with a floated table (infobox) beside
+  wrapping body paragraphs — not sequential chrome-then-table (fixture-22).
+  Phase 17 pending quality: float:right table + clear + flowing prose.
+  Expected: 1 page.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Float beside table</title>
+  <style>
+    body { font-family: sans-serif; font-size: 10pt; color: #222; margin: 0; }
+    h1 { font-size: 14pt; color: #1a3d6d; margin: 0 0 8px 0; }
+    p { margin: 0 0 8px 0; line-height: 1.35; }
+    table.infobox {
+      float: right;
+      width: 160pt;
+      margin: 0 0 8pt 10pt;
+      border-collapse: collapse;
+      border: 1pt solid #1a3d6d;
+      font-size: 8pt;
+    }
+    table.infobox th {
+      background-color: #1a3d6d;
+      color: #fff;
+      padding: 4px 6px;
+      text-align: left;
+    }
+    table.infobox td {
+      border: 1px solid #aab7c4;
+      padding: 3px 6px;
+    }
+    .clear { clear: both; }
+    .marker { color: #1a3d6d; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>Float-beside-table quality sample</h1>
+
+  <table class="infobox">
+    <tr><th colspan="2">FLOAT-TABLE-INFOBOX</th></tr>
+    <tr><td>SKU</td><td>FT-29-0042</td></tr>
+    <tr><td>Region</td><td>EMEA</td></tr>
+    <tr><td>Status</td><td>OPEN</td></tr>
+    <tr><td>Owner</td><td>Ops desk</td></tr>
+  </table>
+
+  <p>This paragraph should flow beside the floated infobox table on the
+  right. Marker <span class="marker">FLOAT-BESIDE-PROSE-A</span> must remain
+  readable while the table occupies the right margin of the content box.</p>
+
+  <p>A second wrapping paragraph continues the flow under and around the
+  float where the engine packs consecutive content. Marker
+  <span class="marker">FLOAT-BESIDE-PROSE-B</span> anchors regression text
+  extraction for the golden corpus.</p>
+
+  <p>Third paragraph adds enough copy for wrap-around coverage without
+  forcing a second page: packing density, clearfix, and table borders
+  stay in the report-friendly float lite subset.</p>
+
+  <div class="clear"></div>
+
+  <p>After <span class="marker">FLOAT-CLEAR-BOTH</span>, content resumes
+  full width below the float and table. A normal in-flow summary table
+  follows without competing for float space.</p>
+
+  <table style="width:100%; border-collapse:collapse; font-size:9pt;">
+    <tr>
+      <th style="border:1px solid #aab7c4; background:#eef3f8; padding:4px;">Line</th>
+      <th style="border:1px solid #aab7c4; background:#eef3f8; padding:4px;">Note</th>
+    </tr>
+    <tr>
+      <td style="border:1px solid #aab7c4; padding:4px;">1</td>
+      <td style="border:1px solid #aab7c4; padding:4px;">Post-clear full-width row FLOAT-AFTER-CLEAR-ROW</td>
+    </tr>
+  </table>
+</body>
+</html>

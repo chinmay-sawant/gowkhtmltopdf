@@ -25,6 +25,11 @@ Evidence gathered 2026-08-05 via parallel code scans of layout/convert/pdf + doc
 | 3 | [phase-19-pending.md](phase-19-pending.md) | `@font-face` audit + docs | Partial label needs audit |
 | 4 | [phase-20-pending.md](phase-20-pending.md) | **Code:** HF `#id` GoTo + docs | Real leftover |
 
+**Quality fixtures already added** on this branch (new files only):
+
+- `testdata/golden/fixture-29-float-beside-table.html` (phase 17)
+- `testdata/golden/fixture-30-orphans-heuristic.html` (phase 18)
+
 **Conflict rule:** do **not** let phases 17–20 each rewrite
 `documentation/compatibility-matrix.md` independently. Land shared Pass 0 first
 (or as one coordinated PR), then per-phase code leftovers.

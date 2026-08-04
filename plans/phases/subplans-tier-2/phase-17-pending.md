@@ -22,7 +22,7 @@ stay deferred.
 | Compatibility-matrix / fidelity MVP-gap rows | **Must** | Shared doc-honesty Pass 0 |
 | Sticky positioning | `[~]` deferred | Honesty only: sticky ≡ relative-offset |
 | Full Grid / full Flex | `[~]` deferred | Document supported subset; no algorithm expansion |
-| Richer float+table fixtures | Optional | New golden if product wants |
+| Richer float+table interaction fixtures | **New** `fixture-29-float-beside-table.html` (do not edit fixture-22) |
 
 ---
 
@@ -106,13 +106,15 @@ stay deferred.
 - [x] Unit: `TestFloatLeftRightClear`, `TestFloatWidthPercent`
 - [~] Wiki-like smoke has floated infobox — not a golden Phase 17 fixture
 
-### 4.2 Optional fixture (nice-to-have)
+### 4.2 New fixtures (required for this subplan; do not edit fixture-22)
 
-- [ ] Design golden: floated table beside wrapping paragraphs **or** float wrapping around table edge
-- [ ] Add `testdata/golden/fixture-NN-float-table-*.html` + envelope in `internal/convert/golden_test.go`
-- [ ] Document remaining gaps: float inside table cell / table-inside-float packing
-- [ ] Proof: `go test ./internal/convert -run TestGoldenCorpus -count=1`
-- [~] Skip if product prioritizes Phase 21 — mark parent Pending row `[~]` with reason
+- [x] Add `testdata/golden/fixture-29-float-beside-table.html` — floated table beside wrapping prose + `clear`
+- [x] Envelope in `internal/convert/golden_test.go` `fixturePageBounds`
+- [x] Document in `testdata/golden/README.md`
+- [x] Proof: `go test ./internal/convert -run 'TestGoldenCorpusAllFixtures/fixture-29' -count=1` → pass
+- [~] Leave remaining gaps documented: float inside table cell / table-inside-float packing (still `[~]`)
+
+**Shipped on `feature/tier-2-pending-2`:** fixture-29 added (existing fixtures untouched).
 
 ---
 
