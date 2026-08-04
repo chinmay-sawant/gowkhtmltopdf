@@ -258,10 +258,12 @@ parity remains **not planned**.
 |---|---|---|
 | JavaScript / WebKit features (`--enable-javascript`, `--run-script`, `--window-status`, plugins) | No JS engine in stdlib; flags accepted with warnings; `<script>` stripped at load | Phase 22 staged (see post-MVP roadmap) |
 | Floats / positioned layout (`float`, `clear`, `position: relative/absolute/fixed`) | **Float lite + relative/absolute/fixed**; sticky ≈ relative offsets | Sticky pagination stickiness still lite |
-| Flexbox / Grid (`display: flex|grid`) | **Partial flex** (incl. wrap) + **grid lite** (`grid-template-columns` / gap) | Nested grid / spans deferred |
 | Richer selectors (attribute `[attr=…]`, `:first-child`, `:nth-child`, sibling `+`/`~`) | **Shipped** for presence/exact attr, first/last/nth-child, siblings | Hover/link pseudos still ignored |
 | Multi-font bold/italic (Liberation Sans family) | **Shipped** - Regular/Bold/Italic/BoldItalic embedded | Further families: `--font-path` (phase 19) |
-| CJK fonts / complex-script shaping | **Type0/CID + font-path**; RTL run reverse best-effort | Arabic joining / Indic **not claimed** |
+| Flexbox / Grid (`display: flex|grid`) | **Partial flex** (grow/shrink/basis/order/wrap) + **grid lite** | Nested grid / spans / full flex algorithm deferred |
+| CJK fonts / complex-script shaping | **Type0/CID + font-path**; RTL reverse; vertical-rl lite | **No HarfBuzz**; Arabic joining / Indic **not claimed** |
+| HTML character entities (`&amp;` …) | **Shipped** (stdlib unescape in text + attrs) | — |
+| `z-index` | **Lite** on positioned boxes (paint sort) | Stacking contexts / opacity still lite |
 | AcroForm forms (`--enable-forms`) | No form model in the PDF writer | Intermediate roadmap (forms) |
 | XSLT TOC stylesheets (`--xsl-style-sheet`) | No XSLT in stdlib; flag warns + ignores; default Go-template TOC used | Not planned |
 | SVG image output (`--format svg`) | No stdlib SVG encoder | Not planned |

@@ -1,6 +1,8 @@
 package layout
 
 import (
+	"sort"
+
 	"gowkhtmltopdf/internal/pdf"
 )
 
@@ -130,15 +132,34 @@ func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 				drawLink(p, op, pg, contentH, opts)
 			}
 		}
+		sortPaintIndices(res.Ops, idxs)
 		for _, idx := range idxs {
 			paintOp(&res.Ops[idx], pageIdx)
 		}
 		// Fixed layer: page-local coords (pageIdx 0 math on every page).
+		sortPaintIndices(res.Ops, fixedIdx)
 		for _, idx := range fixedIdx {
 			paintOp(&res.Ops[idx], 0)
 		}
 	}
 	return nil
+}
+
+func sortPaintIndices(ops []Op, idxs []int) {
+	sort.SliceStable(idxs, func(i, j int) bool {
+		a, b := ops[idxs[i]], ops[idxs[j]]
+		az, bz := 0, 0
+		if a.ZIndexSet {
+			az = a.ZIndex
+		}
+		if b.ZIndexSet {
+			bz = b.ZIndex
+		}
+		if az != bz {
+			return az < bz
+		}
+		return idxs[i] < idxs[j]
+	})
 }
 
 func isSplittable(op *Op) bool {

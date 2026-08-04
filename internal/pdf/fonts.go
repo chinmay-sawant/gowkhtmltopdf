@@ -45,6 +45,9 @@ func ParseTTF(data []byte) (*Font, error) {
 	}
 	if !bytes.Equal(data[0:4], []byte{0, 1, 0, 0}) &&
 		!bytes.Equal(data[0:4], []byte("true")) {
+		if bytes.Equal(data[0:4], []byte("OTTO")) {
+			return nil, errors.New("font: CFF/OTTO OpenType not supported (TrueType outlines only)")
+		}
 		return nil, errors.New("font: not a TrueType font")
 	}
 	numTables := int(binary.BigEndian.Uint16(data[4:6]))

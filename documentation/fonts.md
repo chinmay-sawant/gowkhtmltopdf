@@ -12,18 +12,20 @@ WinAnsi-style single-byte codes.
 
 | Flag | Effect |
 |------|--------|
-| `--font-path DIR` | Scan `DIR` (and shallow children) for `.ttf` faces; repeatable |
+| `--font-path DIR` | Scan `DIR` (and shallow children) for `.ttf` / TrueType-flavored `.otf`; repeatable |
 | `--use-system-fonts` | Also scan common OS font directories (e.g. `/usr/share/fonts`) |
 
 Discovery is **opt-in** (privacy + startup). CSS `font-family` lists are
 matched against discovered family names (name table) before falling back
-to Liberation.
+to Liberation. **CFF / `OTTO` OpenType is rejected** (TrueType outlines only).
 
-Example (CJK):
+Example (CJK / Hangul when installed):
 
 ```sh
 gowkhtmltopdf --font-path /usr/share/fonts/truetype/droid \
   fixture-27-cjk-fontpath.html out.pdf
+# Hangul needs a Hangul-capable face, e.g. fonts-noto-cjk:
+#   --font-path /usr/share/fonts/opentype/noto
 ```
 
 ## Type0 / CID path
@@ -36,20 +38,16 @@ for CJK.
 
 ## Honest shaping limits
 
-- **No HarfBuzz / no OpenType shaping.** Glyphs are placed with advance
-  widths only.
-- **CJK (Han / kana / hangul)** works when a capable TTF is on the font
-  path: characters render, but vertical writing modes, ruby, and complex
-  line-breaking are not claimed.
-- **Mixed Latin + CJK:** Latin glyphs missing from a CJK face (common with
-  Droid Sans Fallback) are drawn with the embedded Liberation face; CJK
-  continues on the Type0 sibling of the original face. Hangul needs a
-  Hangul-capable face — many “Fallback” fonts ship without it.
-- **Arabic / Hebrew:** a best-effort **RTL run reverse** is applied at
-  emit time so character order is closer to visual RTL. **Joining,
-  ligation, and mark positioning are NOT implemented** — production
-  Arabic/Indic output is **not claimed**.
+- **No HarfBuzz / no OpenType shaping** (stdlib-only product constraint).
+  Glyphs are placed with advance widths only. Adding HarfBuzz would require
+  a plan amendment and a non-stdlib dependency.
+- **Arabic / Hebrew:** best-effort **RTL run reverse** at emit time. **Joining,
+  ligation, and mark positioning are NOT implemented.**
 - **Indic and other complex scripts** are **not claimed**.
-- **`@font-face`:** local `url(...ttf)` sources are loaded under the same
-  ACL as other subresources; `.woff`/network downloads are skipped with a
-  warning.
+- **CJK (Han / kana / hangul)** works when a capable TTF is on the font
+  path: characters render, but vertical writing modes are a lite stacked
+  glyph path (`writing-mode: vertical-rl|lr`), not full CSS vertical
+  typesetting. Hangul requires a Hangul-capable face.
+- **Mixed Latin + CJK:** Latin glyphs missing from a CJK face are drawn with
+  embedded Liberation; CJK continues on the Type0 sibling of the original face.
+- **`@font-face`:** local `url(...ttf|otf)` under ACL; `.woff`/network skipped.

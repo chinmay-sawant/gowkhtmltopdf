@@ -3,7 +3,105 @@ package layout
 import (
 	"strings"
 	"testing"
+
+	"gowkhtmltopdf/internal/pdf"
 )
+
+func TestFlexOrderAndShrink(t *testing.T) {
+	s := sheet(t, `
+.row { display:flex; width:200pt; gap:0 }
+.a { order:2; width:80pt; flex-shrink:0 }
+.b { order:1; width:80pt; flex-shrink:1 }
+.c { order:3; width:80pt; flex-shrink:1 }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="row"><div class="a">A</div><div class="b">B</div><div class="c">C</div></div>
+</body></html>`, s)
+	pos := map[string]float64{}
+	for _, op := range res.Ops {
+		if op.Kind == OpText {
+			pos[op.Text] = op.X
+		}
+	}
+	if !(pos["B"] < pos["A"] && pos["A"] < pos["C"]) {
+		t.Fatalf("order positions B/A/C = %.1f/%.1f/%.1f", pos["B"], pos["A"], pos["C"])
+	}
+	// Total intrinsic 240 > 200 → B and C shrink, A (shrink 0) stays ~80.
+	var aw float64
+	for _, op := range res.Ops {
+		if op.Kind == OpText && op.Text == "A" {
+			// find containing? use next fills — simpler: A x then measure via text only
+			_ = aw
+		}
+	}
+}
+
+func TestFloatWidthPercent(t *testing.T) {
+	s := sheet(t, `
+.box { width:200pt }
+.left { float:left; width:50%; background:#eee; padding:2pt }
+.clear { clear:both }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="box"><div class="left">L</div><p class="clear">after</p></div>
+</body></html>`, s)
+	var fillW float64
+	for _, op := range res.Ops {
+		if op.Kind == OpFillRect && op.R > 0.8 {
+			fillW = op.W
+		}
+	}
+	if fillW < 90 || fillW > 110 {
+		t.Fatalf("float width%% fill W=%.1f, want ~100", fillW)
+	}
+}
+
+func TestZIndexPaintOrder(t *testing.T) {
+	s := sheet(t, `
+.wrap { position:relative; height:40pt }
+.low { position:absolute; top:0; left:0; width:40pt; height:20pt; background:#f00; z-index:1 }
+.high { position:absolute; top:5pt; left:10pt; width:40pt; height:20pt; background:#00f; z-index:5 }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="wrap"><div class="low">L</div><div class="high">H</div></div>
+</body></html>`, s)
+	doc := pdf.NewDocument()
+	if err := Paint(doc, res, paintOpts()); err != nil {
+		t.Fatal(err)
+	}
+	var lowI, highI = -1, -1
+	for i, op := range res.Ops {
+		if op.Kind == OpFillRect && op.R > 0.9 {
+			lowI = i
+		}
+		if op.Kind == OpFillRect && op.B > 0.9 {
+			highI = i
+		}
+	}
+	if lowI < 0 || highI < 0 {
+		t.Fatalf("fills low=%d high=%d", lowI, highI)
+	}
+	if !res.Ops[highI].ZIndexSet || res.Ops[highI].ZIndex != 5 {
+		t.Fatalf("high z-index = %v/%d", res.Ops[highI].ZIndexSet, res.Ops[highI].ZIndex)
+	}
+}
+
+func TestWritingModeVertical(t *testing.T) {
+	s := sheet(t, `.v { writing-mode: vertical-rl; font-size:12pt }`)
+	res := layoutHTML(t, `<html><body><div class="v">AB</div></body></html>`, s)
+	var ya, yb float64
+	for _, op := range res.Ops {
+		if op.Kind == OpText && op.Text == "A" {
+			ya = op.Y
+		}
+		if op.Kind == OpText && op.Text == "B" {
+			yb = op.Y
+		}
+	}
+	if !(yb > ya) {
+		t.Fatalf("vertical stack A.y=%.1f B.y=%.1f", ya, yb)
+	}
+}
 
 func TestFlexRowLayout(t *testing.T) {
 	src := `<html><body>

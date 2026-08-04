@@ -283,6 +283,22 @@ func TestTokenizeUnterminated(t *testing.T) {
 
 // --- tree-level tests ---
 
+func TestUnescapeEntitiesInText(t *testing.T) {
+	root := mustParse(t, `<html><body><h2>Docs &amp; forms</h2><p>a &lt; b &#38; c</p></body></html>`)
+	body := root.FirstChild("body")
+	if body == nil {
+		body = root.FirstChild("html").FirstChild("body")
+	}
+	h2 := body.FirstChild("h2")
+	if h2 == nil || h2.TextContent() != "Docs & forms" {
+		t.Fatalf("h2 text = %q, want Docs & forms", h2.TextContent())
+	}
+	p := body.FirstChild("p")
+	if p == nil || p.TextContent() != "a < b & c" {
+		t.Fatalf("p text = %q", p.TextContent())
+	}
+}
+
 func TestParseNesting(t *testing.T) {
 	root := mustParse(t, `<html><head><title>t</title></head><body><div><p>hi</p></div></body></html>`)
 	html := root.FirstChild("html")

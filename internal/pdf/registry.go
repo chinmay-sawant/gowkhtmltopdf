@@ -101,7 +101,7 @@ func ScanFontDir(dir string) (*Registry, error) {
 		}
 		name := e.Name()
 		low := strings.ToLower(name)
-		if !strings.HasSuffix(low, ".ttf") {
+		if !strings.HasSuffix(low, ".ttf") && !strings.HasSuffix(low, ".otf") {
 			continue
 		}
 		path := filepath.Join(dir, name)
@@ -171,7 +171,7 @@ func ScanFontDirs(dirs []string) *Registry {
 				continue
 			}
 			low := strings.ToLower(e.Name())
-			if !strings.HasSuffix(low, ".ttf") {
+			if !strings.HasSuffix(low, ".ttf") && !strings.HasSuffix(low, ".otf") {
 				continue
 			}
 			data, err := os.ReadFile(path)
