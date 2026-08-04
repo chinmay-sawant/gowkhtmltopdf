@@ -644,6 +644,12 @@ func mergeFontFaces(ctx context.Context, loader *load.Loader, reg *pdf.Registry,
 					fmt.Fprintf(log, "warning: object %d: @font-face src %q skipped (TTF/OTF only)\n", idx, u)
 					continue
 				}
+				// data: would bypass the network:// gate; reject so we never
+				// ParseTTF untrusted inline payloads from CSS.
+				if strings.HasPrefix(low, "data:") {
+					fmt.Fprintf(log, "warning: object %d: @font-face data: src skipped\n", idx)
+					continue
+				}
 				if strings.Contains(low, "://") && !strings.HasPrefix(low, "file:") {
 					fmt.Fprintf(log, "warning: object %d: @font-face network src %q skipped\n", idx, u)
 					continue

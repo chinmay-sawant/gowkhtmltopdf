@@ -36,8 +36,8 @@ clones of arbitrary websites.
 | Invoices / tables / page breaks in pure Go | Yes |
 | Headers, footers, TOC, PDF bookmarks | Yes |
 | Zero native deps / offline static binary | Yes |
-| Full CSS (flex, grid, absolute/fixed) or JavaScript | No (float lite shipped; see deferred) |
-| CJK / complex Unicode fonts | Not yet (Latin Liberation family; CID later) |
+| Full CSS (flex, grid, absolute/fixed) or JavaScript | **Partial** flex/grid lite + position lite; **No** JS (see deferred) |
+| CJK / complex Unicode fonts | **Partial** — Type0/CID + `--font-path`; Arabic joining; no HarfBuzz |
 
 ```text
 HTML (file | URL | stdin)
@@ -273,7 +273,7 @@ parity remains **not planned**.
 | Inline `<a href="#x">` source-rect links | **Shipped** for inline text runs with paint boxes; GoTo via `applyInternalLinks` | Cases without geometry still skipped |
 | Cross-object URL map (`urlToPageObj`) | Same-document anchors within multi-object jobs via body offsets | Full cross-object URL map still lite |
 | `resolveRelativeLinks` | **Shipped** (`--resolve-relative-links` / `--keep-relative-links`) | — |
-| HTML header/footer links on body pages | **HTML HF external URI links carried** onto body pages | Fragment GoTo from HF still limited |
+| HTML header/footer links on body pages | **Shipped** — external URI + `#id` fragment GoTo to body (copies-aware) | Full nested HTML HF documents still out of scope |
 | `[topage]` with copies | **Corrected** when HF drawn after copies | — |
 | `[subject]` placeholder | Expands empty (no setting field upstream either) | Not planned |
 | `dump-outline` TOC page offset | **TOC offset included** via `DumpOutlineXMLOffset` | — |

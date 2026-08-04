@@ -1,7 +1,7 @@
 # Phase 20 - Headers/Footers & Links Edge Cases
 
 > **Parent:** `plans/10-canonical-post-mvp-roadmap.md`  
-> **Status:** done (core) on `master` via #16; **one HF HTML-link leftover**  
+> **Status:** done (core + HF fragment GoTo + doc honesty)  
 > **Estimated effort:** 2–4 weeks  
 > **Depends on:** Phase 6 HF/TOC/links MVP  
 > **Unblocks:** Tier 2 #9 polish  
@@ -21,7 +21,7 @@ model.
 |--------------|--------|---------------------|
 | Inline `#anchor` source rects | Best-effort boxes for inlines | **Shipped** (`fixture-24`) |
 | `resolveRelativeLinks` | Implement flag behavior | **Shipped** |
-| HTML HF links on body pages | Carry URI annotations if feasible | **Partial** (external URI carried; HF fragment GoTo limited) |
+| HTML HF links on body pages | Carry URI + fragment GoTo | **Shipped** (external URI + `#id` → body GoTo; copies-aware) |
 | `[topage]` with copies | Correct when copies > 1 | **Shipped** |
 | `dump-outline` TOC offset | Include TOC pages | **Shipped** |
 | Cross-object URL map | Same-document multi-object anchors | **Shipped** (lite) |
@@ -47,9 +47,9 @@ model.
 ### 20.3 Header/footer edges
 
 - [x] `[topage]` correct under `--copies` > 1 (HF after copies bake order)
-- [~] HTML header/footer: **external URI** link annotations carried onto body pages; **fragment GoTo from HF** still limited
+- [x] HTML header/footer: **external URI** link annotations carried onto body pages; **fragment GoTo from HF** → body `AddLinkDest` (copies-aware)
 - [x] HF bold uses real face when phase 12 faces available
-- [x] Path: `internal/convert/hf.go`
+- [x] Path: `internal/convert/hf.go`, `links.go` (`buildBodyIDIndex`)
 
 ### 20.4 Outline / dump
 
@@ -66,7 +66,7 @@ model.
 - [x] `make lint` / `make test`
 - [x] Golden multi-chapter + HF / fixture-24 regression
 - [x] Parent Phase 20 core checked
-- [ ] Remaining: HTML-HF fragment GoTo (see Pending)
+- [x] HTML-HF fragment GoTo shipped (`hf_links_test.go`)
 - [x] Next: **Phase 21** arbitrary websites
 
 ---
@@ -78,7 +78,7 @@ model.
 
 | Item | Notes |
 |------|--------|
-| HTML HF → body **fragment** (`#id`) GoTo | External URI from HTML HF shipped; same-doc GoTo from HF still limited |
+| HTML HF → body **fragment** (`#id`) GoTo | **Shipped** — `drawHTMLHF` + `buildBodyIDIndex` + `remapPageForCopies` |
 | Shared matrix/fidelity refresh | Cross-cutting with phases 17–19 honesty pass |
 | Full HTML HF as nested documents | Out of scope (Phase 6 model stands) |
 

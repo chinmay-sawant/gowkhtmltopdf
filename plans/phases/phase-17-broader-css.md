@@ -46,7 +46,7 @@ report and simple marketing layouts - not Wikipedia chrome parity.
 - [x] `position: absolute`: containing block subset; out of flow; `left`/`top`/`right`/`bottom`/`width`/`height` subset
 - [x] `position: fixed` lite (stamped on every page in paint)
 - [~] `position: sticky` - deferred
-- [ ] Matrix §2.2 / fidelity “MVP gap” rows still stale in places — refresh honesty tables
+- [x] Matrix §2.2 / fidelity “MVP gap” rows — refreshed via shared doc-honesty pass
 
 ### 17.3 Partial flexbox (report-friendly)
 
@@ -62,7 +62,7 @@ report and simple marketing layouts - not Wikipedia chrome parity.
 - [x] `order`
 - [x] Tests: flex fixtures (`fixture-25`, `fixture-28`) + layout unit tests
 - [x] Path: `internal/layout/flex.go`
-- [ ] Matrix: flex still listed as “No” in places — update to Partial with property list
+- [x] Matrix: flex → Partial with property list (shared doc-honesty pass)
 
 ### 17.4 Grid lite (amended into Tier 2)
 
@@ -89,14 +89,14 @@ report and simple marketing layouts - not Wikipedia chrome parity.
 ### 17.7 Docs & honesty
 
 - [x] README / PR notes for flex, grid lite, z-index
-- [ ] Fidelity guide + compatibility-matrix still claim “no flex/grid” in older rows — **pending doc sync**
+- [x] Fidelity guide + compatibility-matrix Partial flex/grid wording (shared doc-honesty pass)
 - [x] Do **not** claim “full CSS3” or framework support (Bootstrap/Tailwind)
 
 ### 17.8 Closure gates
 
 - [x] `make lint` / `make test` (CI on #16 / #17)
 - [x] Parent Phase 17 core checked
-- [ ] Remaining: matrix/fidelity honesty pass (see Pending)
+- [x] Matrix/fidelity honesty pass (shared doc-honesty)
 - [x] Next: Phase 18/19/20 polish; then **Phase 21** when product prioritizes
 
 ---
@@ -104,12 +104,12 @@ report and simple marketing layouts - not Wikipedia chrome parity.
 ## Pending (after #17)
 
 > **Execution subplan:** [`subplans-tier-2/phase-17-pending.md`](subplans-tier-2/phase-17-pending.md)  
-> **Shared doc honesty:** [`subplans-tier-2/00-shared-doc-honesty.md`](subplans-tier-2/00-shared-doc-honesty.md)
+> **Shared doc honesty:** [`subplans-tier-2/00-shared-doc-honesty.md`](subplans-tier-2/00-shared-doc-honesty.md) — **done** for matrix/fidelity
 
 | Item | Notes |
 |------|--------|
-| Compatibility-matrix / fidelity MVP-gap rows | Still say flex/grid ignored or thead absent in places |
-| Sticky positioning | Explicitly deferred |
+| Compatibility-matrix / fidelity MVP-gap rows | **[x]** Shared doc-honesty pass |
+| Sticky positioning | Explicitly deferred (`[~]`) |
 | Full Grid / full Flex | Deferred (stdlib report subset only) |
 | Richer float+table interaction fixtures | **New** `fixture-29-float-beside-table.html` (do not edit 22) |
 

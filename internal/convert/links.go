@@ -137,18 +137,17 @@ func locationOf(st *objectState, node *html.Node) layout.ElementLocation {
 	return layout.ElementLocation{}
 }
 
-// applyInternalLinks turns OpLinkURI ops whose URI is a same-document
-// fragment (#id) into GoTo annotations. Destinations are element boxes with
-// a matching id attribute. When LocalLinks is false, fragment ops are skipped.
-func applyInternalLinks(doc *pdf.Document, bodies []*objectState, tocTotal int, cmd *cli.Command) {
-	if doc == nil {
-		return
-	}
-	_ = cmd
-	idLoc := map[string]struct {
-		st  *objectState
-		loc layout.ElementLocation
-	}{}
+// bodyIDDest is one body element destination keyed by id attribute.
+type bodyIDDest struct {
+	st  *objectState
+	loc layout.ElementLocation
+}
+
+// buildBodyIDIndex maps element id attributes across body objects to their
+// layout locations. Later occurrences of the same id overwrite earlier ones
+// (matches the prior applyInternalLinks loop).
+func buildBodyIDIndex(bodies []*objectState) map[string]bodyIDDest {
+	idLoc := map[string]bodyIDDest{}
 	for _, st := range bodies {
 		if st == nil || st.res == nil {
 			continue
@@ -158,13 +157,42 @@ func applyInternalLinks(doc *pdf.Document, bodies []*objectState, tocTotal int, 
 				continue
 			}
 			if id := loc.Node.Attribute("id"); id != "" {
-				idLoc[id] = struct {
-					st  *objectState
-					loc layout.ElementLocation
-				}{st, loc}
+				idLoc[id] = bodyIDDest{st, loc}
 			}
 		}
 	}
+	return idLoc
+}
+
+// logicalDestPage is the pre-copy document page index of a body id dest.
+func logicalDestPage(dest bodyIDDest, tocTotal int) int {
+	return tocTotal + dest.st.offset + dest.loc.Page
+}
+
+// remapPageForCopies maps a pre-copy (logical) page index onto the final
+// document page index in the same copy group as srcPage. Matches the
+// ownership rules used by drawHeadersFooters after materializeCopies.
+func remapPageForCopies(logicalDest, srcPage, logicalN, copies int, collate bool) int {
+	if copies <= 1 || logicalN <= 0 {
+		return logicalDest
+	}
+	if collate {
+		copyIdx := srcPage / logicalN
+		return copyIdx*logicalN + logicalDest
+	}
+	copyIdx := srcPage % copies
+	return logicalDest*copies + copyIdx
+}
+
+// applyInternalLinks turns OpLinkURI ops whose URI is a same-document
+// fragment (#id) into GoTo annotations. Destinations are element boxes with
+// a matching id attribute. When LocalLinks is false, fragment ops are skipped.
+func applyInternalLinks(doc *pdf.Document, bodies []*objectState, tocTotal int, cmd *cli.Command) {
+	if doc == nil {
+		return
+	}
+	_ = cmd
+	idLoc := buildBodyIDIndex(bodies)
 	for _, st := range bodies {
 		if st == nil || st.res == nil || st.geom.contentH <= 0 {
 			continue
@@ -200,7 +228,7 @@ func applyInternalLinks(doc *pdf.Document, bodies []*objectState, tocTotal int, 
 			if srcLoc.W <= 0 {
 				srcLoc.W = 10
 			}
-			destPage := tocTotal + dest.st.offset + dest.loc.Page
+			destPage := logicalDestPage(dest, tocTotal)
 			dx, dy := destPoint(dest.loc, dest.st.geom)
 			srcPage.AddLinkDest(pageRect(srcLoc, st.geom), destPage, dx, dy)
 		}

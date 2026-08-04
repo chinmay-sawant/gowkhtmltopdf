@@ -64,29 +64,29 @@ smart-shrinking re-layout.
 ### 18.5 Docs
 
 - [x] README deferred “table header repeat” → shipped
-- [ ] CLI / library docs mention thead repeat behavior explicitly
-- [ ] Compatibility-matrix pagination paragraph still describes pre-phase-18 state — **pending refresh**
+- [x] CLI / library docs mention thead repeat behavior explicitly (shared doc-honesty)
+- [x] Compatibility-matrix pagination paragraph refreshed (shared doc-honesty)
 
 ### 18.6 Closure gates
 
 - [x] `make lint` →
 - [x] `make test` →
 - [x] Parent Phase 18 core checked
-- [ ] Remaining: matrix/fidelity/CLI honesty (see Pending)
-- [x] Next: Phase 20 / 17 / 19 were parallel Tier 2; product next is **Phase 21** or doc sync
+- [x] Matrix/fidelity/CLI honesty (shared doc-honesty pass)
+- [x] Next: Phase 20 / 17 / 19 were parallel Tier 2; product next is **Phase 21**
 
 ---
 
 ## Pending (after #17)
 
 > **Execution subplan:** [`subplans-tier-2/phase-18-pending.md`](subplans-tier-2/phase-18-pending.md)  
-> **Shared doc honesty:** [`subplans-tier-2/00-shared-doc-honesty.md`](subplans-tier-2/00-shared-doc-honesty.md)
+> **Shared doc honesty:** [`subplans-tier-2/00-shared-doc-honesty.md`](subplans-tier-2/00-shared-doc-honesty.md) — **done** for matrix/fidelity/CLI
 
 | Item | Notes |
 |------|--------|
-| Matrix §2.6 orphans/widows | Heuristics exist; CSS `orphans`/`widows` properties still absent |
-| Fidelity + matrix pagination blurbs | Still claim no thead repeat / old zoom story |
-| CLI docs thead repeat | README mentions; dedicated CLI/library note optional |
+| Matrix §2.6 orphans/widows | **[x]** Partial (heuristics); CSS props still absent |
+| Fidelity + matrix pagination blurbs | **[x]** Shared doc-honesty pass |
+| CLI docs thead repeat | **[x]** `cli.md` / `library-api.md` notes |
 | Optional orphans fixture | **New** `fixture-30-orphans-heuristic.html` (do not edit 11/23) |
 
 ---

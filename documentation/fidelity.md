@@ -36,7 +36,7 @@ pipeline instead of claiming this engine matches it.
 | **Tier 2** | Leave wkhtmltopdf for most jobs | 17–20 | Broader CSS, pagination polish, multi-font/Unicode, HF/link edges |
 | **Tier 3** | Compete on the open web | 23 deferred | Not planned as pure-stdlib product; Chrome/Playwright territory |
 
-**As of 2026-08-04:** Tier 1 remainder (float lite, PDF image docs/`web.images`, library install + `ConvertHTML`) is closed. See the post-MVP roadmap status index.
+**As of 2026-08-05:** Tier 1 closed; **Tier 2 phases 17–20 core shipped** (#16/#17). See the post-MVP roadmap status index and shared doc-honesty pass.
 
 ### CSS invoices use (phase 16)
 
@@ -83,18 +83,18 @@ are **not** a pass criterion.
 
 ## Feature fidelity map (goals → status → phase)
 
-| User-facing goal | Status (2026-08-04) | Primary phase(s) |
+| User-facing goal | Status (2026-08-05) | Primary phase(s) |
 |------------------|---------------------|------------------|
 | Typography bold/italic | **Shipped** (Liberation R/B/I/BI) | 12 |
 | Typography spacing | **Shipped** (coalesce + shared advances) | 13 |
 | Image mode text quality | **Shipped** (TTF outline AA, 2× supersample) | 15 |
 | Invoice CSS (boxes/tables) | Implemented subset | 4, 16 expands |
 | Selectors (`:nth-child`, attr, siblings) | **Shipped** | 16.1 |
-| Floats / flex / position / grid | No floats; no flex/grid layout | 16–17 (grid deferred) |
+| Floats / flex / position / grid | **Partial** — float lite; flex subset; grid lite; relative/absolute/fixed lite; sticky ≈ relative offsets | 16–17 |
 | PDF images (logos/grids) | PNG/JPEG path + golden fixtures solid | 14 (docs polish remain) |
-| Pagination / thead repeat | Partial (breaks yes; thead repeat no) | 5, 18 |
-| Fonts / CJK / discovery | Latin family only | 12 done; 19 next for CJK |
-| HF / links edges | Mostly done; known gaps | 6, 20 |
+| Pagination / thead repeat | **Shipped** breaks + thead repeat; orphan/widow **heuristics** (not CSS props) | 5, 18 |
+| Fonts / CJK / discovery | **Partial** — Type0/CID + `--font-path` / registry; Arabic joining best-effort; local `@font-face` PDF | 12, 19 |
+| HF / links edges | Body GoTo + HF URI + HF fragment GoTo (copies-aware) | 6, 20 |
 | Arbitrary URL print | Smoke only | 21 |
 | JavaScript | Stripped | 22 staged |
 | Open-web competition | Not planned | 23 |
@@ -108,7 +108,7 @@ The engine should **not crash** on unsupported input:
 | Input | Behavior |
 |-------|----------|
 | Unknown CSS property / value | Declaration ignored |
-| Unsupported display (flex/grid) | Element keeps initial/default display |
+| Unsupported display (full Grid / unknown values) | Unknown/`display` values ignored; report-subset flex/grid are Partial (see matrix) |
 | `<script>` | Stripped at load; JS flags warn only |
 | Missing font family name | Falls back to embedded Liberation Sans |
 | Missing bold face | Fake stroke bold only if face missing |

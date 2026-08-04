@@ -1,7 +1,7 @@
 # Tier 2 Subplan - Phase 18 Pending (Pagination docs + optional orphans)
 
 > **Parent:** [`plans/phases/phase-18-pagination-polish.md`](../phase-18-pagination-polish.md) — Pending (after #17)  
-> **Status:** not started  
+> **Status:** docs honesty done (shared pass); orphans fixture shipped  
 > **Estimated effort:** 0.5 day docs + 0–1 day optional fixture/tests  
 > **Depends on:** [00-shared-doc-honesty.md](00-shared-doc-honesty.md) for matrix/fidelity  
 > **Constraint:** stdlib-only; CSS `orphans`/`widows` property parsing remains out of scope unless amended
@@ -54,24 +54,24 @@ fixture. Do **not** implement CSS Fragmentation `orphans`/`widows` properties
 
 Owned by [00-shared-doc-honesty.md](00-shared-doc-honesty.md) §2.3 / §3.1:
 
-- [ ] Matrix Pagination prose: remove “zoom not forwarded / smart-shrink warn-only / thead not implemented / orphan none”
-- [ ] Matrix §2.6: `orphans`/`widows` → **Partial (heuristics)**; note CSS properties not parsed
-- [ ] `fidelity.md` feature map: thead repeat shipped (not “thead repeat no”)
-- [ ] Re-cite current code lines (`convert.go` ~355–400; `paint.go` `repeatTableHeaders` / `orphansWidows`) — old `convert.go:218-229` cites are obsolete
-- [ ] Proof: `rg -n 'thead repeat no|does not forward|orphan/widow control not implemented' documentation/` → empty for false claims
+- [x] Matrix Pagination prose: remove “zoom not forwarded / smart-shrink warn-only / thead not implemented / orphan none”
+- [x] Matrix §2.6: `orphans`/`widows` → **Partial (heuristics)**; note CSS properties not parsed
+- [x] `fidelity.md` feature map: thead repeat shipped (not “thead repeat no”)
+- [x] Re-cite current code lines (`convert.go` Zoom + smart-shrink; `paint.go` `repeatTableHeaders` / `orphansWidows`) — old `convert.go:218-229` cites are obsolete
+- [x] Proof: `rg -n 'thead repeat no|does not forward|orphan/widow control not implemented' documentation/` → empty for false claims
 
 ### 2.2 CLI / library notes (should)
 
-- [ ] `documentation/cli.md`: subsection **Pagination & tables**
+- [x] `documentation/cli.md`: subsection **Pagination & tables**
   - thead / `table-header-group` repeats on continuation pages
   - `--zoom` scales layout; `--smart-shrinking` may re-layout to fit width
   - orphans/widows: automatic heuristics only; CSS properties ignored
-- [ ] `documentation/library-api.md`: same behavioral note or pointer to matrix §2.6
-- [ ] Proof: `rg -n 'thead|smart-shrink|orphan' documentation/cli.md documentation/library-api.md`
+- [x] `documentation/library-api.md`: same behavioral note or pointer to matrix §2.6
+- [x] Proof: `rg -n 'thead|smart-shrink|orphan' documentation/cli.md documentation/library-api.md`
 
 ### 2.3 Samples inventory (optional hygiene)
 
-- [ ] `documentation/samples.md`: fixture range includes 23+ (not “fixture-01 … fixture-21” only)
+- [x] `documentation/samples.md`: fixture range includes 23+ (not “fixture-01 … fixture-21” only)
 
 ### 2.4 Already honest (do not regress)
 
@@ -116,13 +116,13 @@ Do **not** modify existing fixtures (especially fixture-11 / fixture-23).
 
 ### 4.1 Required
 
-- [ ] Shared doc-honesty pagination + §2.6 + fidelity thead row done
-- [ ] Parent Phase 18 Pending matrix/fidelity/CLI items updated
-- [ ] If code/fixtures: `make lint` → ; `make test` → ; record outcomes
+- [x] Shared doc-honesty pagination + §2.6 + fidelity thead row done
+- [x] Parent Phase 18 Pending matrix/fidelity/CLI items updated
+- [x] If code/fixtures: `make lint` → ; `make test` → ; record outcomes
 
 ### 4.2 Docs-only path
 
-- [ ] Documentation-only changes: skill says skip lint/test; still visually review matrix
+- [x] Documentation-only changes: skill says skip lint/test; still visually review matrix
 
 ### 4.3 Next
 

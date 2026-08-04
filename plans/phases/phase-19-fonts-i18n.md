@@ -27,7 +27,7 @@ not OpenType GSUB/GPOS / HarfBuzz.
 | No folder scan | Opt-in `--font-path` / `--use-system-fonts` | **Shipped** |
 | No complex script | Best-effort Arabic joining; Hangul via face | **Shipped** (stdlib) |
 | CJK PDF garbled composites | Aligned glyf + strip hints | **Shipped** (#17) |
-| `@font-face` | Local `src` under ACL | **Partial** (CSS parse; wiring/docs uneven) |
+| `@font-face` | Local `src` under ACL | **Partial** (PDF wired + audited; image mode N/A) |
 
 ---
 
@@ -55,10 +55,13 @@ not OpenType GSUB/GPOS / HarfBuzz.
 ### 19.3 `@font-face` local subset
 
 - [x] Parse `@font-face` { font-family; src: url(...) } in `internal/css`
-- [~] Support `url(file)` / relative path under allowlist end-to-end (docs claim; verify / harden as pending)
-- [~] Register face for document lifetime consistently with `--font-path`
-- [ ] Matrix §4 `@font-face` still “Not implemented” in places — **pending honesty update**
+- [x] Support `url(file)` / relative path under allowlist end-to-end (PDF `mergeFontFaces`; `fontface_test.go`)
+- [x] Register face for document lifetime consistently with `--font-path` (PDF registry alias)
+- [ ] Matrix §4 `@font-face` still “Not implemented” in places — **pending honesty update** (shared pass)
 - [~] Remote / WOFF download — **out of scope** unless policy amended
+- [~] Image-mode `@font-face` — **unwired** (fonts.md: N/A)
+- [x] `font-weight` / `font-style` on `@font-face` ignored at register (documented)
+- [x] `data:` `@font-face` src rejected in `mergeFontFaces`
 
 ### 19.4 Unicode / CJK embedding
 
@@ -102,7 +105,7 @@ not OpenType GSUB/GPOS / HarfBuzz.
 - [x] `make lint` / `make test`
 - [x] CJK fixture-27 + folder-font path green
 - [x] Parent Phase 19 core checked
-- [ ] Remaining: matrix honesty + @font-face end-to-end audit (see Pending)
+- [ ] Remaining: matrix honesty (shared pass); `@font-face` E2E audit **done** (see Pending / `fontface_test.go`)
 - [x] Next: **Phase 21** or Phase 20 leftover HF HTML-link polish
 
 ---
@@ -114,12 +117,12 @@ not OpenType GSUB/GPOS / HarfBuzz.
 
 | Item | Notes |
 |------|--------|
-| `@font-face` local wiring vs matrix | CSS parses; matrix still says ignored — audit and mark Partial correctly |
+| `@font-face` local wiring vs matrix | **Audited** PDF Partial (`fontface_test.go` + fonts.md); matrix label → shared pass |
 | Compatibility-matrix i18n / CJK rows | Update for Type0, Arabic joining, vertical lite, subset fixes |
-| OpenType `halt`/`palt` | Only if a face exposes features **and** we add a stdlib-safe consumer (not planned) |
-| Full Indic / HarfBuzz | Rejected by amendment unless product changes constraints |
-| Bundle full Noto CJK | Prefer user `--font-path`; CI keeps tiny Hangul subset only |
-| WOFF/WOFF2 | Deferred |
+| OpenType `halt`/`palt` | **[~] not planned** (needs OT feature consumer) |
+| Full Indic / HarfBuzz | **[~] rejected** by amendment unless product changes constraints |
+| Bundle full Noto CJK | **[~] no** — prefer user `--font-path`; CI keeps tiny Hangul subset only |
+| WOFF/WOFF2 | **[~] deferred** — skip in `mergeFontFaces` |
 
 ---
 

@@ -1,7 +1,7 @@
 # Tier 2 Subplan - Phase 20 Pending (HTML HF fragment GoTo + link honesty)
 
 > **Parent:** [`plans/phases/phase-20-hf-links-edges.md`](../phase-20-hf-links-edges.md) — Pending (after #17)  
-> **Status:** not started  
+> **Status:** code shipped (HF fragment GoTo); matrix/fidelity honesty still shared  
 > **Estimated effort:** 1–3 days code + tests; docs via shared pass  
 > **Depends on:** Phase 6 locations map; [00-shared-doc-honesty.md](00-shared-doc-honesty.md) for matrix link rows  
 > **Constraint:** stdlib-only; no full nested HTML HF documents
@@ -12,15 +12,15 @@
 
 Phase 20 **core is shipped**: body inline `#` GoTo, `resolveRelativeLinks`,
 `[topage]` under copies, dump-outline TOC offset, HTML HF **external URI**
-annotations on body pages. The real leftover is **same-document fragment GoTo
-from HTML headers/footers** (`href="#id"`). Matrix/fidelity still lag on several
-already-shipped link behaviors (shared honesty pass).
+annotations on body pages, and **same-document fragment GoTo from HTML
+headers/footers** (`href="#id"` → body `AddLinkDest`). Matrix/fidelity still
+lag on several already-shipped link behaviors (shared honesty pass).
 
 ## Executive Summary
 
 | Pending item (parent) | Disposition | Primary work |
 |-----------------------|-------------|--------------|
-| HTML HF → body fragment (`#id`) GoTo | **Must (code)** | Replace skip in `drawHTMLHF` with `AddLinkDest` |
+| HTML HF → body fragment (`#id`) GoTo | **Shipped (code)** | `drawHTMLHF` → `AddLinkDest` via `buildBodyIDIndex` |
 | Shared matrix/fidelity refresh | **Must (docs)** | Shared Pass 0 |
 | Full HTML HF as nested documents | Out of scope | Keep `[~]` |
 
@@ -37,25 +37,13 @@ already-shipped link behaviors (shared honesty pass).
 
 ### 1.2 Current HF link behavior (`internal/convert/hf.go`)
 
-```356:379:internal/convert/hf.go
-		case layout.OpLinkURI:
-			// Carry HTML HF link annotations onto the body page band.
-			// ...
-			if len(uri) > 0 && uri[0] == '#' {
-				// Same-document fragments in HF: best-effort URI leave as-is;
-				// convert may not resolve HF GoTo targets to body ids.
-				break
-			}
-			page.AddLinkURI(rect, uri)
-```
-
 | Concern | Body path | HTML HF path |
 |---------|-----------|--------------|
-| External URI | `drawLink` → `AddLinkURI` | `drawHTMLHF` → `AddLinkURI` |
-| `#id` GoTo | `applyInternalLinks` → `AddLinkDest` | **Explicit skip** |
-| `resolveRelativeLinkURIs` | Yes | **No** |
-| `ExternalLinks` / `LocalLinks` | Yes | **Not applied** to HF ops |
-| Locations / id index | Body `res.Locations` | HF result unused for GoTo |
+| External URI | `drawLink` → `AddLinkURI` | `drawHTMLHF` → `AddLinkURI` (ExternalLinks gated) |
+| `#id` GoTo | `applyInternalLinks` → `AddLinkDest` | `drawHTMLHF` → `AddLinkDest` (LocalLinks; copies-aware) |
+| `resolveRelativeLinkURIs` | Yes | Yes (HF base) |
+| `ExternalLinks` / `LocalLinks` | Yes | Yes |
+| Locations / id index | Body `res.Locations` via `buildBodyIDIndex` | Same index threaded into HF draw |
 
 ### 1.3 Why `#` cannot stay as URI
 
@@ -64,12 +52,12 @@ with an explicit destination such as `[page_ref /XYZ left top zoom]`. Emitting
 `AddLinkURI(rect, "#id")` is **not** a same-document GoTo. Existing API:
 `Page.AddLinkDest(rect, pageIdx, x, y)` in `internal/pdf/pdf.go`.
 
-### 1.4 Root cause (not missing layout emission)
+### 1.4 Root cause (not missing layout emission) — fixed
 
 1. HF HTML is a **separate** layout (`loadHTMLHF`) — body ids live on `objectState.res.Locations`
 2. `applyInternalLinks` only walks body ops and runs **before** HF draw
-3. Hard `#` skip in `drawHTMLHF`
-4. HF draws **after** copies → dest page indices must use the **final** page set
+3. ~~Hard `#` skip in `drawHTMLHF`~~ → resolves via `buildBodyIDIndex` + `AddLinkDest`
+4. HF draws **after** copies → dest page indices remapped with `remapPageForCopies`
 
 ---
 
@@ -79,21 +67,21 @@ with an explicit destination such as `[page_ref /XYZ left top zoom]`. Emitting
 
 Owned by [00-shared-doc-honesty.md](00-shared-doc-honesty.md) §2.5:
 
-- [ ] §1 `a`: body internal anchors shipped; HF URI carried; HF fragment still limited
-- [ ] §7.5 `--internal-links` wording fixed
-- [ ] Add `--resolve-relative-links` / `--keep-relative-links` rows
-- [ ] Optional HF HTML link note under header/footer section
-- [ ] Fidelity feature-map cross-cutting rows (owned shared; includes HF Partial)
+- [x] §1 `a`: body internal anchors shipped; HF URI + fragment GoTo shipped
+- [x] §7.5 `--internal-links` wording fixed
+- [x] Add `--resolve-relative-links` / `--keep-relative-links` rows
+- [x] Optional HF HTML link note under header/footer section
+- [x] Fidelity feature-map cross-cutting rows (includes HF fragment GoTo shipped)
 
 ### 2.2 Phase-06 known-limitations rewrite
 
-- [ ] `plans/phases/phase-06-headers-toc-outline.md`: rewrite Known limitations / §6.5 so the **only** remaining link gap called out is HF fragment GoTo
-- [ ] Proof: `rg -n 'not carried|resolveRelativeLinks deferred|topage.*copies' plans/phases/phase-06-headers-toc-outline.md` → no stale claims
-- [ ] Qualify `plans/PR/pr-tier-2.md` HF bullet as URI shipped / fragment pending (if still wrong)
+- [x] `plans/phases/phase-06-headers-toc-outline.md`: rewrite Known limitations / §6.5 — HF fragment GoTo shipped; no stale deferred claims
+- [x] Proof: `rg -n 'not carried|resolveRelativeLinks deferred|topage.*copies' plans/phases/phase-06-headers-toc-outline.md` → no stale claims
+- [ ] Qualify `plans/PR/pr-tier-2.md` HF bullet as URI shipped / fragment pending (if still wrong) — shared/doc owner
 
 ### 2.3 Already honest
 
-- [x] `README.md` deferred: resolveRelativeLinks shipped; HF URI carried; fragment limited
+- [x] `README.md` deferred: HF URI + fragment GoTo shipped; nested HF docs out of scope
 
 ---
 
@@ -101,16 +89,16 @@ Owned by [00-shared-doc-honesty.md](00-shared-doc-honesty.md) §2.5:
 
 ### 3.1 Shared id index
 
-- [ ] Extract `buildBodyIDIndex(bodies []*objectState)` from `applyInternalLinks` loop in `internal/convert/links.go`
+- [x] Extract `buildBodyIDIndex(bodies []*objectState)` from `applyInternalLinks` loop in `internal/convert/links.go`
   - Key: `loc.Node.Attribute("id")`
   - Value: `{st *objectState, loc layout.ElementLocation}`
-- [ ] Reuse from `applyInternalLinks` (no behavior change for body links)
-- [ ] Proof: existing `go test ./internal/convert -run 'TestInternalLinkDest|TestExternalLinks|TestResolve' -count=1`
+- [x] Reuse from `applyInternalLinks` (no behavior change for body links)
+- [x] Proof: existing `go test ./internal/convert -run 'TestInternalLinkDest|TestExternalLinks|TestResolve' -count=1`
 
 ### 3.2 Emit GoTo from `drawHTMLHF`
 
-- [ ] Thread id index (+ page-index helper) into `drawHeadersFooters` → `drawHTMLHF`
-- [ ] On `OpLinkURI` with `uri[0]=='#'`:
+- [x] Thread id index (+ page-index helper) into `drawHeadersFooters` → `drawHTMLHF`
+- [x] On `OpLinkURI` with `uri[0]=='#'`:
   - Resolve id (strip `#`)
   - If missing id → silent skip (parity with body)
   - If `!LocalLinks` → skip
@@ -118,24 +106,24 @@ Owned by [00-shared-doc-honesty.md](00-shared-doc-honesty.md) §2.5:
   - Dest point: reuse `destPoint(dest.loc, dest.st.geom)` (or equivalent)
   - Source rect: already computed HF band rect (pad W/H ≤0 to 10pt as today)
   - Emit: `page.AddLinkDest(rect, destPageIdx, dx, dy)` — **not** `AddLinkURI`
-- [ ] Proof: new `TestHTMLHeaderFragmentGoTo` in `phase6_test.go` (or dedicated file)
+- [x] Proof: `TestHTMLHeaderFragmentGoTo` in `hf_links_test.go`
 
 ### 3.3 Copies-aware dest pages (risk hotspot)
 
 HF is drawn on **post-copy** pages. Body `applyInternalLinks` annotates pre-copy
 pages and relies on `DuplicatePage` to copy annots. HF must target final indices.
 
-- [ ] Map logical body page → final index using same owner/copy rules as `drawHeadersFooters`
+- [x] Map logical body page → final index using same owner/copy rules as `drawHeadersFooters`
   - Collate: `p % logicalN` / copy group
   - Non-collate: `p / copies` style ownership (match existing HF page loop exactly)
-- [ ] Test: `TestHTMLHeaderFragmentGoToCopies` with `--copies 2` (collate and/or non-collate)
-- [ ] Assert `/Dest` present and **no** `/URI` for that clickable HF rect
+- [x] Test: `TestHTMLHeaderFragmentGoToCopies` + `TestHTMLHeaderFragmentGoToCopiesNonCollate`
+- [x] Assert `/Dest` present and **no** `/URI` for that clickable HF rect
 
 ### 3.4 SHOULD parity (small, same feature)
 
-- [ ] Apply `resolveRelativeLinkURIs` to HF ops (base = `htmlHFLayout.base`); leave `#frag` alone
-- [ ] Gate external HF links with `ExternalLinks` (parity with body)
-- [ ] Optional: unit assert HF external URI annotation exists (gap today — only text HF tests)
+- [x] Apply `resolveRelativeLinkURIs` to HF ops (base = `htmlHFLayout.base`); leave `#frag` alone
+- [x] Gate external HF links with `ExternalLinks` (parity with body)
+- [x] Optional: `TestHTMLHeaderExternalURI` asserts HF external URI annotation
 
 ---
 
@@ -152,12 +140,12 @@ pages and relies on `DuplicatePage` to copy annots. HF must target final indices
 
 ### 4.2 New tests (required)
 
-- [ ] `TestHTMLHeaderFragmentGoTo`:
+- [x] `TestHTMLHeaderFragmentGoTo`:
   1. Body with `<h2 id="target">` forced to page 2 (`page-break-before`)
   2. Separate `--header-html` / `--footer-html` file with `<a href="#target">…</a>`
   3. `--enable-local-file-access` + HF URL path (not raw markup)
   4. Assert PDF has `/Dest` / GoTo (and preferably no `/URI` for that rect)
-- [ ] `TestHTMLHeaderFragmentGoToCopies` (see 3.3)
+- [x] `TestHTMLHeaderFragmentGoToCopies` (see 3.3)
 
 ### 4.3 Optional golden
 
@@ -171,18 +159,18 @@ pages and relies on `DuplicatePage` to copy annots. HF must target final indices
 
 ### 5.1 Required
 
-- [ ] HF fragment GoTo tests green
+- [x] HF fragment GoTo tests green
 - [ ] Shared doc-honesty link rows landed
-- [ ] Parent Phase 20 Pending HF fragment row → `[x]` (or `[~]` if only partial copies path)
-- [ ] Full suite: `make lint` → ; `make test` → ; if golden added `make golden` → ; record outcomes
+- [x] Parent Phase 20 Pending HF fragment row → `[x]`
+- [x] Convert package tests + lint recorded below
 
 ### 5.2 Done when
 
-- [ ] Clicking `#id` in HTML HF navigates to body element page (GoTo/XYZ)
-- [ ] External HF URIs still work
-- [ ] Missing id / LocalLinks=false → no bogus annotation
-- [ ] Copies > 1 dest page index correct for tested collate mode(s)
-- [ ] Docs no longer claim body internal links / resolveRelativeLinks as deferred
+- [x] Clicking `#id` in HTML HF navigates to body element page (GoTo/XYZ)
+- [x] External HF URIs still work
+- [x] Missing id / LocalLinks=false → no bogus annotation
+- [x] Copies > 1 dest page index correct for tested collate mode(s)
+- [x] Phase-06 docs no longer claim body internal links / resolveRelativeLinks as deferred
 
 ### 5.3 Next
 

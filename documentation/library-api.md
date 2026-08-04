@@ -85,7 +85,16 @@ Worked examples:
 - Unknown names: `Set` returns an error  
 - Defaults mirror upstream wkhtmltopdf where implemented  
 
+**Pagination / tables:** `<thead>` repeats on continuation pages; `zoom` /
+smart-shrinking settings re-layout when wired (same behavior as CLI `--zoom` /
+`--smart-shrinking`). Orphan/widow control is heuristics only — see matrix §2.6.
+
+**Fonts / links:** `font-path` / `use-system-fonts` feed the font registry;
+`resolve-relative-links` / internal-links behave as in matrix §7.5. Body `#`
+GoTo is shipped; HTML HF `#id` fragment GoTo resolves to body destinations (copies-aware).
+
 Authoritative support matrix: [compatibility-matrix.md](compatibility-matrix.md).
+Fonts details: [fonts.md](fonts.md).
 
 ## Local file access (library)
 

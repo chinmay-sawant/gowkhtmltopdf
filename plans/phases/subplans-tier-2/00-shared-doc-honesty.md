@@ -1,7 +1,7 @@
 # Tier 2 Subplan 00 - Shared Documentation Honesty (phases 17–20)
 
 > **Parent:** `plans/10-canonical-post-mvp-roadmap.md` + phases 17–20 Pending tables  
-> **Status:** not started  
+> **Status:** done (2026-08-05)  
 > **Estimated effort:** 0.5–1 day (docs only)  
 > **Constraint:** documentation-only; no `make lint`/`make test` required per skill  
 > **Normative file:** `documentation/compatibility-matrix.md`
@@ -33,16 +33,16 @@ phases 17–20 do not fight over the same matrix rows.
 
 ### 1.1 Conflict rule
 
-- [ ] Treat this file as the only matrix rewrite owner for Tier 2 pending
-- [ ] Per-phase subplans mark matrix rows `[x]` only after this pass lands
-- [ ] Do not open four separate matrix PRs
+- [x] Treat this file as the only matrix rewrite owner for Tier 2 pending
+- [x] Per-phase subplans mark matrix rows `[x]` only after this pass lands
+- [x] Do not open four separate matrix PRs
 
 ### 1.2 Normative target list
 
-- [ ] Normative: `documentation/compatibility-matrix.md`
-- [ ] Mirrors: `documentation/fidelity.md`, `documentation/overview.md`, `README.md` overview table
-- [ ] Operator additives: `documentation/cli.md`, `documentation/library-api.md`
-- [ ] Fonts refine only if Partial wording differs: `documentation/fonts.md`
+- [x] Normative: `documentation/compatibility-matrix.md`
+- [x] Mirrors: `documentation/fidelity.md`, `documentation/overview.md`, `README.md` overview table
+- [x] Operator additives: `documentation/cli.md`, `documentation/library-api.md`
+- [x] Fonts refine only if Partial wording differs: `documentation/fonts.md` (owned by fontface agent — left alone)
 
 ---
 
@@ -52,8 +52,8 @@ Stamp header, then edit in this order (avoids internal contradictions).
 
 ### 2.1 Header stamp
 
-- [ ] Update **Last honesty audit** date + note “Tier 2 phases 17–20 core on master (#16/#17)”
-- [ ] Record base commit at edit time
+- [x] Update **Last honesty audit** date + note “Tier 2 phases 17–20 core on master (#16/#17)”
+- [x] Record base commit at edit time (`f5bb754`)
 
 ### 2.2 Phase 17 rows — display / position / flex / grid
 
@@ -68,11 +68,11 @@ Stamp header, then edit in this order (avoids internal contradictions).
 
 Checklist:
 
-- [ ] §2.2: `position` → **Partial** — static/relative/absolute/fixed lite; sticky = relative-offset only (`applyRelativeOffset`); cite fixture-26/28
-- [ ] §2.2: extend `display` Implemented/Partial list with flex/grid values
-- [ ] Feature checklist: Flexbox/Grid → **Partial** + property bullets (see phase-17-pending supported subset)
-- [ ] Feature checklist: Floats/absolute → float lite + absolute/fixed lite; sticky deferred
-- [ ] §5: remove “flex/grid ignored” and “absolute/fixed → static”; rephrase as deferred-full / Partial
+- [x] §2.2: `position` → **Partial** — static/relative/absolute/fixed lite; sticky = relative-offset only (`applyRelativeOffset`); cite fixture-26/28
+- [x] §2.2: extend `display` Implemented/Partial list with flex/grid values
+- [x] Feature checklist: Flexbox/Grid → **Partial** + property bullets (see phase-17-pending supported subset)
+- [x] Feature checklist: Floats/absolute → float lite + absolute/fixed lite; sticky deferred
+- [x] §5: remove “flex/grid ignored” and “absolute/fixed → static”; rephrase as deferred-full / Partial
 
 ### 2.3 Phase 18 rows — pagination
 
@@ -85,9 +85,9 @@ Checklist:
 
 Checklist:
 
-- [ ] Rewrite Pagination paragraph: zoom forwarded; smart-shrinking re-layouts; thead repeat shipped (`fixture-23`); orphan/widow **heuristics** (not CSS props)
-- [ ] §2.6: Status → **Partial (heuristics)**; note CSS `orphans`/`widows` still absent from `applyRestProps` / `internal/css`
-- [ ] Ensure §7.3 / `--zoom` rows stay consistent with new prose (they already say Supported)
+- [x] Rewrite Pagination paragraph: zoom forwarded; smart-shrinking re-layouts; thead repeat shipped (`fixture-23`); orphan/widow **heuristics** (not CSS props)
+- [x] §2.6: Status → **Partial (heuristics)**; note CSS `orphans`/`widows` still absent from `applyRestProps` / `internal/css`
+- [x] Ensure §7.3 / `--zoom` rows stay consistent with new prose (they already say Supported)
 
 ### 2.4 Phase 19 rows — fonts / i18n / @font-face
 
@@ -102,12 +102,12 @@ Checklist:
 
 Checklist:
 
-- [ ] §4: **split** `@page` (Not implemented) vs `@font-face` (**Partial**); fix stale `css.go` line cites
-- [ ] §5: replace `@font-face` Ignored with Partial wording (local TTF/OTF via `FetchSub`; WOFF/network skipped; image mode unwired)
-- [ ] §2.3: mention registry, `--font-path`, local `@font-face` (PDF)
-- [ ] §5 RTL/CJK: Type0/CID Identity-H; Arabic presentation-form joining; Hangul needs face; vertical-rl lite; Indic/HarfBuzz not claimed
-- [ ] Add `writing-mode: vertical-rl\|lr` Partial row (or note under text/fonts)
-- [ ] Add §7 flag rows: `--font-path`, `--use-system-fonts`
+- [x] §4: **split** `@page` (Not implemented) vs `@font-face` (**Partial**); fix stale `css.go` line cites
+- [x] §5: replace `@font-face` Ignored with Partial wording (local TTF/OTF via `FetchSub`; WOFF/network skipped; image mode unwired)
+- [x] §2.3: mention registry, `--font-path`, local `@font-face` (PDF)
+- [x] §5 RTL/CJK: Type0/CID Identity-H; Arabic presentation-form joining; Hangul needs face; vertical-rl lite; Indic/HarfBuzz not claimed
+- [x] Add `writing-mode: vertical-rl\|lr` Partial row (or note under text/fonts)
+- [x] Add §7 flag rows: `--font-path`, `--use-system-fonts`
 
 ### 2.5 Phase 20 rows — links / HF
 
@@ -121,15 +121,15 @@ Checklist:
 
 Checklist:
 
-- [ ] §1 `a`: body `#id` GoTo shipped; HTML HF **external URI** carried; HF **fragment GoTo** still limited (point to phase-20-pending)
-- [ ] §7.5 `--internal-links`: update to Supported/Partial with geometry caveats
-- [ ] Add `--resolve-relative-links` / `--keep-relative-links` Supported rows
-- [ ] Optional §7.7 HF note: HTML HF URI annotations on body pages; fragment GoTo pending
+- [x] §1 `a`: body `#id` GoTo shipped; HTML HF **external URI** carried; HF **fragment GoTo** still limited (point to phase-20-pending)
+- [x] §7.5 `--internal-links`: update to Supported/Partial with geometry caveats
+- [x] Add `--resolve-relative-links` / `--keep-relative-links` Supported rows
+- [x] Optional §7.7 HF note: HTML HF URI annotations on body pages; fragment GoTo pending
 
 ### 2.6 Matrix self-consistency gate
 
-- [ ] `rg -n 'flex/grid.*[Nn]o|thead repeat.*not implemented|Latin-only|@font-face.*[Ii]gnored|does not forward' documentation/compatibility-matrix.md` → no false negatives vs shipped Tier 2
-- [ ] Pagination prose does not contradict §7.3 / `--zoom`
+- [x] `rg -n 'flex/grid.*[Nn]o|thead repeat.*not implemented|Latin-only|@font-face.*[Ii]gnored|does not forward' documentation/compatibility-matrix.md` → no false negatives vs shipped Tier 2
+- [x] Pagination prose does not contradict §7.3 / `--zoom`
 
 ---
 
@@ -137,26 +137,26 @@ Checklist:
 
 ### 3.1 `documentation/fidelity.md`
 
-- [ ] Feature map: floats/flex/position/grid → Partial / shipped lite (not “No”)
-- [ ] Feature map: Pagination / thead → shipped (breaks + thead; orphans heuristics)
-- [ ] Feature map: Fonts / CJK → Partial (Type0 + discovery; not “Latin only / 19 next”)
-- [ ] Failure modes: narrow “Unsupported display (flex/grid)” to full-Grid / unknown values only
-- [ ] Soft: Tier “as of” blurb → Tier 2 core shipped
+- [x] Feature map: floats/flex/position/grid → Partial / shipped lite (not “No”)
+- [x] Feature map: Pagination / thead → shipped (breaks + thead; orphans heuristics)
+- [x] Feature map: Fonts / CJK → Partial (Type0 + discovery; not “Latin only / 19 next”)
+- [x] Failure modes: narrow “Unsupported display (flex/grid)” to full-Grid / unknown values only
+- [x] Soft: Tier “as of” blurb → Tier 2 core shipped
 
 ### 3.2 `documentation/overview.md`
 
-- [ ] `#what-it-is-not`: remove “no flex/grid/floats/position” and “no CJK/CID yet”
-- [ ] Replace with honest report-subset / Partial language + matrix link
+- [x] `#what-it-is-not`: remove “no flex/grid/floats/position” and “no CJK/CID yet”
+- [x] Replace with honest report-subset / Partial language + matrix link
 
 ### 3.3 `README.md` overview table
 
-- [ ] Align “Full CSS” / “CJK” overview rows with deferred table (Partial / shipped lite)
-- [ ] Do **not** invent claims beyond deferred table + matrix
+- [x] Align “Full CSS” / “CJK” overview rows with deferred table (Partial / shipped lite)
+- [x] Do **not** invent claims beyond deferred table + matrix
 
 ### 3.4 Plans hygiene (same honesty PR or follow-up)
 
-- [ ] `plans/10-canonical-post-mvp-roadmap.md` “Current product facts” flex/grid/position bullets
-- [ ] Point phase 17–20 Pending “matrix/fidelity” rows at this subplan as `[~]` covered / or `[x]` when done
+- [x] `plans/10-canonical-post-mvp-roadmap.md` “Current product facts” flex/grid/position bullets
+- [x] Point phase 17–20 Pending “matrix/fidelity” rows at this subplan as `[~]` covered / or `[x]` when done
 
 ---
 
@@ -164,18 +164,18 @@ Checklist:
 
 ### 4.1 `documentation/cli.md`
 
-- [ ] Add short **Pagination & tables**: thead repeat; `--zoom` / smart-shrinking; orphans/widows = heuristics not CSS
-- [ ] Add **Fonts & links**: `--font-path`, `--use-system-fonts`, `--resolve-relative-links`
-- [ ] Fix adjacent stale “bitmap font” image-mode line if still present (Phase 15 honesty)
+- [x] Add short **Pagination & tables**: thead repeat; `--zoom` / smart-shrinking; orphans/widows = heuristics not CSS
+- [x] Add **Fonts & links**: `--font-path`, `--use-system-fonts`, `--resolve-relative-links`
+- [x] Fix adjacent stale “bitmap font” image-mode line if still present (Phase 15 honesty)
 
 ### 4.2 `documentation/library-api.md`
 
-- [ ] Under settings: one paragraph or bullets pointing at matrix §2.6 / fonts / links
-- [ ] Mention thead repeat + Zoom / smart-shrinking settings keys
+- [x] Under settings: one paragraph or bullets pointing at matrix §2.6 / fonts / links
+- [x] Mention thead repeat + Zoom / smart-shrinking settings keys
 
 ### 4.3 Optional inventory
 
-- [ ] `documentation/samples.md`: fixture range includes 23+ (not stuck at fixture-21)
+- [x] `documentation/samples.md`: fixture range includes 23+ (not stuck at fixture-21)
 
 ---
 
@@ -183,10 +183,10 @@ Checklist:
 
 ### 5.1 Done when
 
-- [ ] Matrix no longer denies flex/grid, thead, Type0/CJK, local `@font-face`, or body internal links
-- [ ] Fidelity feature-map matches product positioning
-- [ ] Overview + README overview match deferred table
-- [ ] Parent phase Pending “matrix/fidelity” items can flip to `[x]` (or `[~]` pointer here)
+- [x] Matrix no longer denies flex/grid, thead, Type0/CJK, local `@font-face`, or body internal links
+- [x] Fidelity feature-map matches product positioning
+- [x] Overview + README overview match deferred table
+- [x] Parent phase Pending “matrix/fidelity” items can flip to `[x]` (or `[~]` pointer here)
 
 ### 5.2 Explicitly not this subplan
 

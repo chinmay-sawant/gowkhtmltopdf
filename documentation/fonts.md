@@ -57,4 +57,10 @@ for CJK.
   typesetting.
 - **Mixed Latin + CJK:** Latin glyphs missing from a CJK face are drawn with
   embedded Liberation; CJK continues on the Type0 sibling of the original face.
-- **`@font-face`:** local `url(...ttf|otf)` under ACL; `.woff`/network skipped.
+- **`@font-face` (PDF Partial):** local `url(...ttf|otf)` under loader ACL
+  (`--enable-local-file-access` / `--allow`) is fetched via `FetchSub`,
+  parsed, and registered for the document. **Image mode does not call
+  `mergeFontFaces` (N/A).** `.woff` / `.woff2` / `https://` / `data:` src are
+  skipped with a warning. `font-weight` / `font-style` on `@font-face` are
+  parsed but **ignored** at register time (alias is family name only).
+  Remote webfonts and WOFF decode remain deferred.

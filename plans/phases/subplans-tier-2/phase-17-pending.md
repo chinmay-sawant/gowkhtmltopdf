@@ -1,7 +1,7 @@
 # Tier 2 Subplan - Phase 17 Pending (Broader CSS honesty + optional float/table)
 
 > **Parent:** [`plans/phases/phase-17-broader-css.md`](../phase-17-broader-css.md) — Pending (after #17)  
-> **Status:** not started  
+> **Status:** docs honesty done (shared pass); optional float fixture shipped  
 > **Estimated effort:** 0.5 day docs (via shared pass) + 0–2 days optional fixtures  
 > **Depends on:** [00-shared-doc-honesty.md](00-shared-doc-honesty.md) for matrix/fidelity  
 > **Constraint:** stdlib-only; no full browser CSS
@@ -71,19 +71,19 @@ stay deferred.
 
 ### 2.1 Defer to shared matrix rewrite
 
-- [ ] Land [00-shared-doc-honesty.md](00-shared-doc-honesty.md) Phase 2.2 items (position/flex/grid/§5)
-- [ ] Land shared fidelity map + overview/README overview updates for float/flex/position/grid
-- [ ] Flip parent checklist rows:
-  - [ ] “Matrix §2.2 / fidelity MVP-gap”
-  - [ ] “Matrix: flex still listed as No”
-  - [ ] “Fidelity guide + compatibility-matrix still claim no flex/grid”
-- [ ] Proof: `rg -n 'Flexbox / Grid|position: fixed / absolute|No floats; no flex' documentation/` shows Partial/shipped wording only
+- [x] Land [00-shared-doc-honesty.md](00-shared-doc-honesty.md) Phase 2.2 items (position/flex/grid/§5)
+- [x] Land shared fidelity map + overview/README overview updates for float/flex/position/grid
+- [x] Flip parent checklist rows:
+  - [x] “Matrix §2.2 / fidelity MVP-gap”
+  - [x] “Matrix: flex still listed as No”
+  - [x] “Fidelity guide + compatibility-matrix still claim no flex/grid”
+- [x] Proof: `rg -n 'Flexbox / Grid|position: fixed / absolute|No floats; no flex' documentation/` shows Partial/shipped wording only
 
 ### 2.2 Sticky honesty sentence
 
-- [ ] Matrix/README: explicit “sticky ≈ relative offsets; no page-edge stickiness”
-- [ ] Cite `applyRelativeOffset` + lack of `TestSticky`
-- [ ] Keep parent `[~] position: sticky - deferred`
+- [x] Matrix/README: explicit “sticky ≈ relative offsets; no page-edge stickiness”
+- [x] Cite `applyRelativeOffset` + lack of `TestSticky`
+- [x] Keep parent `[~] position: sticky - deferred`
 
 ---
 
@@ -91,10 +91,10 @@ stay deferred.
 
 ### 3.1 Record non-goals in checklist
 
-- [ ] Confirm full CSS Grid (areas, dense, row spans, complex `fr`) remains **out of scope**
-- [ ] Confirm full flex algorithm (cyclic %-sizing, content-based min-size) remains **out of scope**
-- [ ] Confirm multi-column `column-count`, transforms, container queries remain deferred
-- [ ] No code change required — honesty + parent `[~]` rows sufficient
+- [x] Confirm full CSS Grid (areas, dense, row spans, complex `fr`) remains **out of scope**
+- [x] Confirm full flex algorithm (cyclic %-sizing, content-based min-size) remains **out of scope**
+- [x] Confirm multi-column `column-count`, transforms, container queries remain deferred
+- [x] No code change required — honesty + parent `[~]` rows sufficient
 
 ---
 
@@ -122,9 +122,9 @@ stay deferred.
 
 ### 5.1 Required
 
-- [ ] Shared doc-honesty Pass 0 complete for Phase 17 claims
-- [ ] Parent Phase 17 Pending table updated (matrix rows `[x]`; sticky/full grid/flex remain `[~]`)
-- [ ] Docs-only: no lint/test required; if fixtures added → `make lint` + `make test`
+- [x] Shared doc-honesty Pass 0 complete for Phase 17 claims
+- [x] Parent Phase 17 Pending table updated (matrix rows `[x]`; sticky/full grid/flex remain `[~]`)
+- [x] Docs-only: no lint/test required; if fixtures added → `make lint` + `make test`
 
 ### 5.2 Next
 

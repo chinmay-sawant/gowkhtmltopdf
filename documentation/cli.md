@@ -45,6 +45,25 @@ gowkhtmltopdf page --enable-local-file-access in.html out.pdf
 `[doctitle]`, `[webpage]`, `[section]`, `[subsection]`  
 Custom: `--replace name value`.
 
+### Pagination & tables
+
+- Multi-page tables with `<thead>` / `table-header-group` **repeat** the header
+  row(s) on continuation pages (fixture-23).
+- `--zoom` scales layout (forwarded to the layout engine).
+- `--smart-shrinking` may **re-layout** with an effective zoom when content is
+  wider than the page.
+- Orphan/widow control is automatic **heuristics** only; CSS `orphans` /
+  `widows` properties are not parsed.
+
+### Fonts & links
+
+- `--font-path <dir>` adds font search directories; `--use-system-fonts` opts
+  into system font dirs (off by default for determinism).
+- `--resolve-relative-links` / `--keep-relative-links` control whether relative
+  `href` values are resolved against the page URL.
+- Body `#id` internal links emit GoTo annotations when geometry is available;
+  HTML header/footer `#id` links resolve to body GoTo destinations.
+
 ### Page-scoped flags and `toc`
 
 Flags such as `--enable-local-file-access` may appear **before** any object
@@ -62,7 +81,8 @@ Useful options: `--width`, `--height`, `--format`, `--quality`,
 `--transparent`, `--crop-x/y/w/h`, `--enable-local-file-access`.
 
 Default viewport width is approximately **1024** CSS pixels (smart-width).
-Text uses a bitmap font (no anti-aliasing).
+Text uses the same TTF outline raster path as PDF (coverage AA); a 5×7 bitmap
+fallback applies only when an op has no font face.
 
 ## Exit codes
 

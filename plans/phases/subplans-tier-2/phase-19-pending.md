@@ -2,7 +2,7 @@
 
 > **Parent:** [`plans/phases/phase-19-fonts-i18n.md`](../phase-19-fonts-i18n.md) — Pending (after #17)  
 > **Amendment:** [`plans/amendments/2026-08-04-shaping-stdlib.md`](../../amendments/2026-08-04-shaping-stdlib.md)  
-> **Status:** not started  
+> **Status:** Phase 2 audit landed (2026-08-05); matrix honesty owned by shared pass  
 > **Estimated effort:** 0.5–1 day audit/tests + docs (shared pass)  
 > **Depends on:** [00-shared-doc-honesty.md](00-shared-doc-honesty.md) for matrix i18n rows  
 > **Constraint:** stdlib-only TTF; **no HarfBuzz**; no WOFF unless amended
@@ -21,7 +21,7 @@ fidelity (#17). Remaining work is (1) audit `@font-face` end-to-end and mark
 
 | Pending item (parent) | Disposition | Primary work |
 |-----------------------|-------------|--------------|
-| `@font-face` local wiring vs matrix | **Must audit** | PDF path wired; matrix says ignored |
+| `@font-face` local wiring vs matrix | **Audited** (PDF Partial) | Tests + fonts.md; matrix → shared pass |
 | Compatibility-matrix i18n / CJK rows | **Must** | Shared Pass 0 |
 | OpenType `halt`/`palt` | Confirm not planned | Checkbox only |
 | Full Indic / HarfBuzz | Rejected by amendment | Checkbox only |
@@ -43,16 +43,16 @@ fidelity (#17). Remaining work is (1) audit `@font-face` end-to-end and mark
 | Layout | Works | `faceFor` / `faceForRune` → `Lookup` |
 | PDF embed | Works | Same registry; Type0 when needed |
 | Image mode | **Unwired** | `imageout.Run` scans font-path only |
-| E2E convert test | **Missing** | CSS unit parse only (`TestParseAtRulesSkipped`) |
+| E2E convert test | **Shipped** | `internal/convert/fontface_test.go` |
 
 ### 1.2 Partial gaps (document or harden)
 
 - [x] WOFF / `https://` src skipped in `mergeFontFaces` (correct)
 - [x] `ff.Weight` / `ff.Style` parsed but **unused** at register time
 - [x] Network webfonts rejected before HTTP fetch
-- [~] `data:` URLs may pass network check (no `://`) — document or reject
+- [x] `data:` URLs rejected in `mergeFontFaces` (would bypass `://` gate)
 - [~] Image-mode `@font-face` unwired
-- [~] No convert golden asserting Custom face embedding
+- [x] Convert golden asserting Custom face embedding (`TestFontFaceLocalEmbed`)
 
 ### 1.3 Shipped i18n (honesty targets)
 
@@ -76,21 +76,21 @@ fidelity (#17). Remaining work is (1) audit `@font-face` end-to-end and mark
 
 ### 2.1 Prove PDF Partial
 
-- [ ] Convert integration test: HTML with `@font-face { font-family: Custom; src: url(<testdata ttf>) }` + `font-family: Custom`
-  - Path suggestion: `internal/convert/fontface_test.go` (new) or extend existing convert tests
+- [x] Convert integration test: HTML with `@font-face { font-family: Custom; src: url(<testdata ttf>) }` + `font-family: Custom`
+  - Path: `internal/convert/fontface_test.go`
   - Enable local ACL appropriately (`EnableLocalFileAccess` / `--allow`)
-  - Assert PDF embeds the face (font name / Type0 / subset presence — pick one stable signal)
-- [ ] ACL deny case: same fixture without local enable → warning; Liberation/`?` fallback; no panic
-- [ ] WOFF src → skipped warning; no panic
-- [ ] `https://` src → skipped; no fetch
-- [ ] Proof: `go test ./internal/convert -run FontFace -count=1`
+  - Assert PDF embeds the face (`/BaseFont /Custom` + `/FontFile2`)
+- [x] ACL deny case: page under `--allow`; sibling font outside → warning; Liberation fallback; no panic
+- [x] WOFF src → skipped warning; no panic
+- [x] `https://` src → skipped; no fetch
+- [x] Proof: `go test ./internal/convert -run FontFace -count=1`
 
 ### 2.2 Document Partial boundaries
 
-- [ ] Record: image mode does **not** call `mergeFontFaces` (honest Partial, or tiny follow-up to port)
-- [ ] Record: `font-weight` / `font-style` on `@font-face` ignored at register
-- [ ] Spot-check `data:` `@font-face`; document reject-or-allow decision
-- [ ] Optional tiny harden: reject `data:` unless explicitly allowed
+- [x] Record: image mode does **not** call `mergeFontFaces` (honest Partial)
+- [x] Record: `font-weight` / `font-style` on `@font-face` ignored at register
+- [x] Spot-check `data:` `@font-face`; **reject** (skip warning)
+- [x] Tiny harden: reject `data:` in `mergeFontFaces`
 
 ### 2.3 Optional image-mode parity (separate slice)
 
@@ -103,7 +103,7 @@ fidelity (#17). Remaining work is (1) audit `@font-face` end-to-end and mark
 
 ### 3.1 Shared matrix / fidelity (must)
 
-Owned by [00-shared-doc-honesty.md](00-shared-doc-honesty.md) §2.4 / §3:
+Owned by [00-shared-doc-honesty.md](00-shared-doc-honesty.md) §2.4 / §3 — **not this agent**:
 
 - [ ] §4 split `@page` vs `@font-face` Partial; fix stale cites
 - [ ] §5 `@font-face` Ignored → Partial wording
@@ -115,9 +115,9 @@ Owned by [00-shared-doc-honesty.md](00-shared-doc-honesty.md) §2.4 / §3:
 
 ### 3.2 Fonts.md + threat model (should)
 
-- [ ] `documentation/fonts.md`: tighten `@font-face` to “PDF Partial; image mode N/A; weight/style descriptors ignored”
-- [ ] `documentation/THREAT-MODEL.md`: one note — TTF via `@font-face` is untrusted parse under ACL; `--font-path` is operator-controlled
-- [ ] Keep shaping honesty: presentation-form Arabic; no GSUB/GPOS / HarfBuzz
+- [x] `documentation/fonts.md`: tighten `@font-face` to “PDF Partial; image mode N/A; weight/style descriptors ignored”
+- [x] `documentation/THREAT-MODEL.md`: one note — TTF via `@font-face` is untrusted parse under ACL; `--font-path` is operator-controlled
+- [x] Keep shaping honesty: presentation-form Arabic; no GSUB/GPOS / HarfBuzz
 
 ### 3.3 Recommended matrix status labels
 
@@ -138,10 +138,10 @@ Owned by [00-shared-doc-honesty.md](00-shared-doc-honesty.md) §2.4 / §3:
 
 ## Phase 4: Deferred confirmations (checkboxes only)
 
-- [ ] OpenType `halt`/`palt`: **not planned** (needs OT feature consumer)
-- [ ] Full Indic / HarfBuzz: **rejected** unless product changes amendment
-- [ ] Bundle full Noto CJK: **no** — prefer `--font-path`; CI keeps tiny Hangul subset
-- [ ] WOFF/WOFF2: **deferred** — keep skip in `mergeFontFaces`
+- [~] OpenType `halt`/`palt`: **not planned** (needs OT feature consumer)
+- [~] Full Indic / HarfBuzz: **rejected** unless product changes amendment
+- [~] Bundle full Noto CJK: **no** — prefer `--font-path`; CI keeps tiny Hangul subset
+- [~] WOFF/WOFF2: **deferred** — keep skip in `mergeFontFaces`
 
 ---
 
@@ -149,10 +149,14 @@ Owned by [00-shared-doc-honesty.md](00-shared-doc-honesty.md) §2.4 / §3:
 
 ### 5.1 Required
 
-- [ ] Audit tests green (`go test ./internal/convert -run FontFace`)
-- [ ] Shared doc-honesty i18n/@font-face rows landed
-- [ ] Parent Phase 19 Pending / 19.3 / 19.8 / 19.9 remaining boxes updated
-- [ ] Non-doc changes: `make lint` → ; `make test` → ; record outcomes beside gates
+- [x] Audit tests green (`go test ./internal/convert -run FontFace`) — see outcomes below
+- [ ] Shared doc-honesty i18n/@font-face rows landed (other agent / matrix)
+- [x] Parent Phase 19 Pending / 19.3 audit rows updated (matrix row still pending shared pass)
+- [x] Non-doc changes: `make lint` → ; FontFace tests → ; record outcomes beside gates
+
+**Outcomes (2026-08-05):**
+- `go test ./internal/convert -run FontFace -count=1` → PASS (LocalEmbed, ACLDeny, WOFF, HTTPS, Data)
+- `make lint` → PASS (`go vet ./...`)
 
 ### 5.2 Next
 

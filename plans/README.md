@@ -30,16 +30,16 @@ Ordered for **quick wins first**, still stdlib-only (no third-party libraries or
 | 14 | [PDF images robust path](phases/phase-14-pdf-images.md) | 1 | **done** |
 | 15 | [Image mode TTF/AA raster](phases/phase-15-image-mode-raster.md) | 1 | **done** |
 | 16 | [Invoice CSS (selectors + float lite)](phases/phase-16-invoice-css.md) | 1 | **done** |
-| 17 | [Broader CSS (flex / grid lite / position)](phases/phase-17-broader-css.md) | 2 | **core done** (#16/#17); [pending subplan](phases/subplans-tier-2/phase-17-pending.md) |
-| 18 | [Pagination polish (thead repeat)](phases/phase-18-pagination-polish.md) | 2 | **core done** (#16); [pending subplan](phases/subplans-tier-2/phase-18-pending.md) |
-| 19 | [Fonts / i18n / discovery / CJK](phases/phase-19-fonts-i18n.md) | 2 | **core done** (#16/#17); [pending subplan](phases/subplans-tier-2/phase-19-pending.md) |
-| 20 | [HF / links edge cases](phases/phase-20-hf-links-edges.md) | 2 | **core done** (#16); [pending subplan](phases/subplans-tier-2/phase-20-pending.md) |
+| 17 | [Broader CSS (flex / grid lite / position)](phases/phase-17-broader-css.md) | 2 | **done** (#16/#17 + doc honesty); [subplan](phases/subplans-tier-2/phase-17-pending.md) |
+| 18 | [Pagination polish (thead repeat)](phases/phase-18-pagination-polish.md) | 2 | **done** (#16 + doc honesty); [subplan](phases/subplans-tier-2/phase-18-pending.md) |
+| 19 | [Fonts / i18n / discovery / CJK](phases/phase-19-fonts-i18n.md) | 2 | **done** (#16/#17 + `@font-face` audit); [subplan](phases/subplans-tier-2/phase-19-pending.md) |
+| 20 | [HF / links edge cases](phases/phase-20-hf-links-edges.md) | 2 | **done** (#16/#17 + HF fragment GoTo); [subplan](phases/subplans-tier-2/phase-20-pending.md) |
 | 21 | [Arbitrary websites / paste-any-URL](phases/phase-21-arbitrary-websites.md) | 2→3 | next product work |
 | 22 | [JavaScript (staged)](phases/phase-22-javascript.md) | 2→3 |
 | 23 | [Tier 3 open-web (deferred)](phases/phase-23-tier3-deferred.md) | 3 `[~]` |
 
 **Tier 1** (solid report engine): phases 10–16 — **closed** 2026-08-04.  
-**Tier 2** (leave wkhtmltopdf for most jobs): phases 17–20 — **core shipped** 2026-08-05 (#16/#17); leftover doc honesty + `[~]` edges in each phase file.  
+**Tier 2** (leave wkhtmltopdf for most jobs): phases 17–20 — **closed** on `feature/tier-2-pending-2` (doc honesty + `@font-face` audit + HF fragment GoTo; intentional `[~]` deferrals remain).  
 **Tier 3** (compete on open web): phase 23 deferred - use Chrome/Playwright for that class of problem.
 
 ---

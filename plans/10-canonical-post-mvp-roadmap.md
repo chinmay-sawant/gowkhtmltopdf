@@ -45,7 +45,7 @@ Tier 1 is **not closed** yet. Suggested order for the next sessions:
 2. **Phase 14** (complete): document JPEG/PNG alpha/DPI knobs; `web.images=false` test.
 3. **Phase 11** (complete): publish/install story + `ConvertHTML` helper.
 
-**Tier 1 is closed** (report engine solid). **Tier 2 phases 17–20 core shipped** on `master` (#16 / #17); remaining items are tracked under [`phases/subplans-tier-2/`](phases/subplans-tier-2/) (shared matrix honesty + per-phase leftovers). Next product work is **Phase 21** (or the shared matrix/fidelity sync).
+**Tier 1 is closed** (report engine solid). **Tier 2 phases 17–20 core shipped** on `master` (#16 / #17); shared matrix/fidelity honesty pass is under [`phases/subplans-tier-2/00-shared-doc-honesty.md`](phases/subplans-tier-2/00-shared-doc-honesty.md). Remaining code leftovers are tracked under [`phases/subplans-tier-2/`](phases/subplans-tier-2/). Next product work is **Phase 21**.
 
 **Already shipped post-MVP:** phases **10** (fidelity docs), **12** (real bold/italic faces), **13** (spacing/coalesce), **15** (image-mode TTF AA), **16** (selectors + float lite), **17–20** core (flex/grid lite, thead repeat, fonts/CJK/Arabic joining, HF/links edges).
 
@@ -58,8 +58,10 @@ Tier 1 is **not closed** yet. Suggested order for the next sessions:
 | Liberation Sans R/B/I/BI embedded | `internal/pdf/assets/` + `faces.go` |
 | Real bold/italic via `FaceSet.Resolve` (fake bold only if face missing) | `layout.faceFor`, `paint.go` |
 | Image mode = pure-Go TTF outline AA (+ 2× supersample) | `internal/imageout/ttfraster.go` |
-| Selectors: attr / nth-child / siblings shipped; float still no | matrix §4 / §2.2 |
-| Flex/grid/position = no | matrix §2.2 / §5 |
+| Selectors: attr / nth-child / siblings shipped; float lite shipped | matrix §4 / §2.2 |
+| Flex/grid/position = **Partial** (flex subset, grid lite, relative/absolute/fixed; sticky ≈ relative) | matrix §2.2 / feature checklist |
+| thead repeat + zoom/smart-shrink re-layout shipped; orphans = heuristics | matrix Pagination / §2.6 |
+| Type0/CJK + font-path; Arabic joining; local `@font-face` PDF Partial | matrix §4 / §5; fonts.md |
 | JS stripped; flags warn only | load + CLI |
 | Library API exists (`Converter`, examples, integration docs) | `api.go`, `examples/`, `library-api.md` |
 | Wikipedia smoke PDF exists, layout poor | `output/wiki-ana-de-armas.pdf` |
@@ -97,10 +99,10 @@ Tier 1 is **not closed** yet. Suggested order for the next sessions:
 | 14 | Images in PDF - robust path | 1 | [phases/phase-14-pdf-images.md](phases/phase-14-pdf-images.md) | 1–2 wk | `[x]` 2026-08-04 |
 | 15 | Image mode - real TTF/AA raster | 1 | [phases/phase-15-image-mode-raster.md](phases/phase-15-image-mode-raster.md) | 3–6 wk | `[x]` 2026-08-04 |
 | 16 | CSS invoices use (selectors + float lite) | 1 | [phases/phase-16-invoice-css.md](phases/phase-16-invoice-css.md) | 3–6 wk | `[x]` 2026-08-04 |
-| 17 | Broader CSS (position/float, partial flex, grid lite) | 2 | [phases/phase-17-broader-css.md](phases/phase-17-broader-css.md) · [subplan](phases/subplans-tier-2/phase-17-pending.md) | 2–4 mo | `[x]` #16/#17; matrix honesty pending |
-| 18 | Pagination polish (thead repeat, breaks) | 2 | [phases/phase-18-pagination-polish.md](phases/phase-18-pagination-polish.md) · [subplan](phases/subplans-tier-2/phase-18-pending.md) | 3–6 wk | `[x]` #16; matrix/CLI docs pending |
+| 17 | Broader CSS (position/float, partial flex, grid lite) | 2 | [phases/phase-17-broader-css.md](phases/phase-17-broader-css.md) · [subplan](phases/subplans-tier-2/phase-17-pending.md) | 2–4 mo | `[x]` #16/#17; matrix honesty via shared pass |
+| 18 | Pagination polish (thead repeat, breaks) | 2 | [phases/phase-18-pagination-polish.md](phases/phase-18-pagination-polish.md) · [subplan](phases/subplans-tier-2/phase-18-pending.md) | 3–6 wk | `[x]` #16; matrix/CLI docs via shared pass |
 | 19 | Fonts / i18n (discovery, CJK/Type0, stdlib shaping) | 2 | [phases/phase-19-fonts-i18n.md](phases/phase-19-fonts-i18n.md) · [subplan](phases/subplans-tier-2/phase-19-pending.md) | 1–3 mo | `[x]` #16/#17; @font-face audit pending |
-| 20 | HF / links edge cases | 2 | [phases/phase-20-hf-links-edges.md](phases/phase-20-hf-links-edges.md) · [subplan](phases/subplans-tier-2/phase-20-pending.md) | 2–4 wk | `[x]` #16; HF fragment GoTo `[~]` |
+| 20 | HF / links edge cases | 2 | [phases/phase-20-hf-links-edges.md](phases/phase-20-hf-links-edges.md) · [subplan](phases/subplans-tier-2/phase-20-pending.md) | 2–4 wk | `[x]` #16/#17 + HF fragment GoTo |
 | 21 | Arbitrary websites / paste-any-URL | 2→3 | [phases/phase-21-arbitrary-websites.md](phases/phase-21-arbitrary-websites.md) | 2–4 mo | `[ ]` |
 | 22 | JavaScript support (staged) | 2→3 | [phases/phase-22-javascript.md](phases/phase-22-javascript.md) | research + years for full | `[ ]` |
 | 23 | Tier 3 open-web competition | 3 | [phases/phase-23-tier3-deferred.md](phases/phase-23-tier3-deferred.md) | n/a | `[~]` deferred |
@@ -270,7 +272,7 @@ Tier 1 is **not closed** yet. Suggested order for the next sessions:
 ### 17.2 Partial flex + grid lite
 - [x] `display: flex` row/column + justify/align/gap/grow/shrink/basis/order/wrap
 - [x] Grid lite: column tracks, `grid-column` spans, nested grids (`fixture-28`)
-- [ ] Matrix/fidelity honesty rows still stale in places
+- [x] Matrix/fidelity honesty (shared doc-honesty pass)
 
 ### 17.3 Closure
 - [x] Fixtures 25–26–28 + layout tests; Wikipedia still not claimed
@@ -289,7 +291,7 @@ Tier 1 is **not closed** yet. Suggested order for the next sessions:
 
 ### 18.2 Closure
 - [x] Multi-page table fixture-23 proves header repeat
-- [ ] Matrix/fidelity still claim “no thead repeat” / orphans Not implemented in places — pending doc sync
+- [x] Matrix/fidelity/CLI honesty for thead/zoom/orphans (shared doc-honesty pass)
 
 ---
 
@@ -322,7 +324,7 @@ Tier 1 is **not closed** yet. Suggested order for the next sessions:
 ### 20.1 Gaps from README deferred list
 - [x] Inline `#anchor` link source rects where paint boxes exist
 - [x] `resolveRelativeLinks` (`--resolve-relative-links` / `--keep-relative-links`)
-- [~] HTML HF links on body pages (external URI carried; HF fragment GoTo limited)
+- [x] HTML HF links on body pages (external URI + fragment GoTo shipped)
 - [x] `[topage]` with copies; dump-outline TOC offset
 
 ### 20.2 Closure
