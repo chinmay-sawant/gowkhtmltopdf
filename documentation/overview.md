@@ -30,11 +30,12 @@ and footers, table of contents, and PDF bookmarks - not full browser parity.
 
 - A full CSS engine (no flex/grid/floats/position as layout)
 - A JavaScript runtime (`<script>` is stripped; flags are no-ops)
-- A Unicode/CJK typesetting stack (single embedded Latin font today)
+- A Unicode/CJK typesetting stack (Latin Liberation family today; no CJK/CID yet)
 - Pixel-identical WebKit/wkhtmltopdf output
 
-See [compatibility-matrix.md](compatibility-matrix.md) and the deferred list
-in the root [README](../README.md#deferred--not-planned).
+See the [fidelity guide](fidelity.md) for tiers and claims language, the
+[compatibility matrix](compatibility-matrix.md) for the normative contract,
+and the deferred list in the root [README](../README.md#deferred--not-planned).
 
 ## Pipeline (at a glance)
 

@@ -20,15 +20,15 @@ Canonical ledger: **[10-canonical-post-mvp-roadmap.md](10-canonical-post-mvp-roa
 
 Ordered for **quick wins first**, still stdlib-only (no third-party libraries or plugins):
 
-| Phase | Title | Tier |
-|------:|-------|------|
-| 10 | [HTML/CSS fidelity documentation](phases/phase-10-fidelity-docs.md) | 1 |
-| 11 | [Library API for Go embedders](phases/phase-11-library-api-embedders.md) | 1 |
-| 12 | [Typography - real bold/italic](phases/phase-12-typography-faces.md) | 1 |
-| 13 | [Typography - spacing](phases/phase-13-typography-spacing.md) | 1 |
-| 14 | [PDF images robust path](phases/phase-14-pdf-images.md) | 1 |
-| 15 | [Image mode TTF/AA raster](phases/phase-15-image-mode-raster.md) | 1 |
-| 16 | [Invoice CSS (selectors + float lite)](phases/phase-16-invoice-css.md) | 1 |
+| Phase | Title | Tier | Status (2026-08-04) |
+|------:|-------|------|---------------------|
+| 10 | [HTML/CSS fidelity documentation](phases/phase-10-fidelity-docs.md) | 1 | **done** (`documentation/fidelity.md`) |
+| 11 | [Library API for Go embedders](phases/phase-11-library-api-embedders.md) | 1 | partial (core DX shipped) |
+| 12 | [Typography - real bold/italic](phases/phase-12-typography-faces.md) | 1 | **done** |
+| 13 | [Typography - spacing](phases/phase-13-typography-spacing.md) | 1 | **done** |
+| 14 | [PDF images robust path](phases/phase-14-pdf-images.md) | 1 | partial |
+| 15 | [Image mode TTF/AA raster](phases/phase-15-image-mode-raster.md) | 1 | **done** |
+| 16 | [Invoice CSS (selectors + float lite)](phases/phase-16-invoice-css.md) | 1 | partial (selectors done; float lite open) |
 | 17 | [Broader CSS (position / partial flex)](phases/phase-17-broader-css.md) | 2 |
 | 18 | [Pagination polish (thead repeat)](phases/phase-18-pagination-polish.md) | 2 |
 | 19 | [Fonts / i18n / discovery / CJK](phases/phase-19-fonts-i18n.md) | 2 |

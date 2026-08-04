@@ -49,7 +49,7 @@ Full browser layout is multi-decade org work. MVP success = invoice/report templ
 - [x] Tables: rows/cols, border-collapse separate (collapse optional later), colspan (rowspan later)
 - [x] Images: intrinsic size, max-width, object sizing subset
 - [x] Overflow: visible default; clip optional
-- [ ] Floats / absolute: `[~]` after MVP if corpus needs - deferred: matrix marks Not implemented
+- [~] Floats / absolute: `[~]` after MVP if corpus needs - deferred: matrix marks Not implemented
 - [x] Flex/grid: out of MVP allowlist
 
 ### 4.5 Display list & paint

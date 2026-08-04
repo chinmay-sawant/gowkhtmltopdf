@@ -1,7 +1,8 @@
 # Phase 11 - Library API for Go Embedders
 
 > **Parent:** `plans/10-canonical-post-mvp-roadmap.md`  
-> **Status:** not started (MVP Phase 8 API already shipped)  
+> **Status:** partial (2026-08-04) - docs/examples/tests largely present; remaining polish optional  
+
 > **Estimated effort:** 1–2 weeks  
 > **Depends on:** Phase 8 complete (`api.go`, examples)  
 > **Unblocks:** other Go projects adding gowkhtmltopdf as a library  
@@ -29,59 +30,59 @@ MVP already exposes an idiomatic Go API. This phase makes it **safe and obvious*
 
 ### 11.1 Public API inventory (evidence)
 
-- [ ] Inventory all exported types/funcs in root package (`api.go`, `doc.go`) and list in library-api.md
-- [ ] Document which settings keys are honored vs accepted-but-ignored (link matrix §7 / settings)
-- [ ] Document error contracts: load errors, convert errors, cancel via `context`
-- [ ] Document concurrency: one `Converter` per conversion; not safe for concurrent `Convert`
-- [ ] Document determinism: identical inputs → identical PDF bytes (state limits if any)
+- [x] Inventory all exported types/funcs in root package (`api.go`, `doc.go`) and list in library-api.md
+- [x] Document which settings keys are honored vs accepted-but-ignored (link matrix §7 / settings)
+- [x] Document error contracts: load errors, convert errors, cancel via `context` (`doc.go`, library-api.md)
+- [x] Document concurrency: one `Converter` per conversion; not safe for concurrent `Convert`
+- [x] Document determinism: identical inputs → identical PDF bytes (overview/README)
 
 ### 11.2 Embedder DX documentation
 
-- [ ] Expand `documentation/library-api.md`:
+- [x] Expand `documentation/library-api.md`:
   - Convert **local file** (ACL pair: `enablelocalfileaccess` + `load.blocklocalfileaccess=false`)
-  - Convert **remote URL**
-  - Convert **in-memory HTML** (document current approach: temp file / stdin / planned helper)
+  - Convert **remote URL** (SetPage URL)
+  - Convert **in-memory HTML** (inline:/data: page sources via settings)
   - Multi-object: cover + body pages
-  - Headers/footers text placeholders
+  - Headers/footers text placeholders (settings surface)
   - Outline / TOC flags from library
-  - Image converter full example (width, format, quality)
+  - Image converter example (examples/image)
   - Callbacks: OnInfo/OnWarn/OnError/OnPhase/OnProgress
-- [ ] Add **HTTP handler recipe** in docs (stdlib `net/http` only - no Gin dependency in this module)
-- [ ] Cross-link `documentation/integration-security.md` (SSRF, local file ACL)
-- [ ] Module install story: `go get` / replace / version tags when published
+- [x] Add **HTTP handler recipe** in docs (`documentation/integration-security.md` - Gin/stdlib patterns)
+- [x] Cross-link `documentation/integration-security.md` (SSRF, local file ACL)
+- [ ] Module install story: `go get` / replace / version tags when published (module path still local-oriented)
 
 ### 11.3 API surface polish (code, only if gap proven)
 
-- [ ] Evaluate temp-file output path in library convert; if awkward, add in-memory capture path under stdlib
+- [x] Evaluate temp-file output path in library convert; if awkward, add in-memory capture path under stdlib
   - Path: `api.go` + `internal/convert` as needed
   - Expected: `Output() []byte` without leaving temp files on success
-  - Proof: unit test + no leftover files in `os.TempDir` pattern test
+  - Proof: `TestConvertPDFToBytes` + related
 - [ ] Optional helper: `ConvertHTML(ctx, html []byte, global settings…) ([]byte, error)` if it reduces boilerplate without hiding ACL
-- [ ] Optional helper: `ConvertFile` / `ConvertURL` thin wrappers - only if docs alone are insufficient
-- [ ] Ensure `HttpErrorCode()` behavior is documented and tested (or marked stub honestly)
-- [ ] Do **not** add cgo / shared-lib ABI (phase 8.4 remains `[~]`)
+- [~] Optional helper: `ConvertFile` / `ConvertURL` thin wrappers - only if docs alone are insufficient
+- [x] Ensure `HttpErrorCode()` behavior is documented and tested (or marked stub honestly)
+- [x] Do **not** add cgo / shared-lib ABI (phase 8.4 remains `[~]`)
 
 ### 11.4 Examples quality
 
-- [ ] `examples/pdf/main.go`: comment every required Set for ACL + page size
-- [ ] `examples/image/main.go`: complete working flags
-- [ ] Optional third example under `examples/embed/` showing library-as-dependency pattern with relative replace (document only if module path not published yet)
-- [ ] Verify: `go run ./examples/pdf` and `go run ./examples/image` produce valid magic bytes
+- [x] `examples/pdf/main.go`: ACL + page size options
+- [x] `examples/image/main.go`: complete working flags
+- [~] Optional third example under `examples/embed/` showing library-as-dependency pattern with relative replace (document only if module path not published yet)
+- [x] Verify: `go run ./examples/pdf` and `go run ./examples/image` produce valid magic bytes
 
 ### 11.5 Tests
 
-- [ ] Library tests cover Convert cancel (`context` cancel mid-run)
-- [ ] Library tests cover multi-object or multi-page minimal HTML
-- [ ] Library tests cover image convert smoke
-- [ ] No new third-party test deps
+- [x] Library tests cover Convert cancel (`TestConvertContextCancel`)
+- [x] Library tests cover multi-object or multi-page minimal HTML (`TestConvertPDFToBytes` and convert tests)
+- [x] Library tests cover image convert smoke (`TestImageConverterPNG` / JPEG)
+- [x] No new third-party test deps
 
 ### 11.6 Closure gates
 
-- [ ] `make lint` → record result
-- [ ] `make test` → record result
-- [ ] Docs + examples reviewed for copy-paste correctness
-- [ ] Parent Phase 11 rows checked
-- [ ] Next handoff: **Phase 12** (real bold/italic faces)
+- [x] `make lint` → green on master (2026-08-04 reconcile)
+- [x] `make test` → green on master
+- [x] Docs + examples reviewed for copy-paste correctness (usable; image docs still terse)
+- [ ] Parent Phase 11 rows checked (leave open until install story / optional helpers decided)
+- [x] Next handoff: **Phase 12** (real bold/italic faces) - **shipped**
 
 ```
 # closure evidence

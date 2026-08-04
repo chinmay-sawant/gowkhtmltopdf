@@ -57,6 +57,7 @@ make build
 | Path | What |
 |------|------|
 | [documentation/getting-started.md](documentation/getting-started.md) | Install and first conversion |
+| [documentation/fidelity.md](documentation/fidelity.md) | Fidelity guide (tiers, claims, degrade rules) |
 | [documentation/cli.md](documentation/cli.md) | CLI flags and multi-object grammar |
 | [documentation/library-api.md](documentation/library-api.md) | Go API |
 | [documentation/architecture.md](documentation/architecture.md) | Package map and pipeline |
@@ -247,11 +248,11 @@ Release history: [CHANGELOG.md](CHANGELOG.md).
 ## Deferred / not planned
 
 Every deliberate deferral from the phase ledgers (`[~]` items), with its
-next gate. The **Intermediate roadmap** (post-MVP, from
-[plans/phases/phase-09-hardening-closure.md](plans/phases/phase-09-hardening-closure.md)):
-floats/position +2–4 mo, partial flex +2–3 mo, better CJK fonts +1–2 mo,
-AcroForm forms +1–2 mo, richer selectors +1–2 mo. Full WebKit parity
-remains **not planned**.
+next gate. Active post-MVP execution ledger:
+**[plans/10-canonical-post-mvp-roadmap.md](plans/10-canonical-post-mvp-roadmap.md)**
+(phases 10–23). Product fidelity framing:
+**[documentation/fidelity.md](documentation/fidelity.md)**. Full WebKit
+parity remains **not planned**.
 
 | Deferred | Status / reason | Next gate |
 |---|---|---|
@@ -288,6 +289,7 @@ remains **not planned**.
 |---|---|
 | **[documentation/README.md](documentation/README.md)** | **Documentation index** |
 | [documentation/overview.md](documentation/overview.md) | Product overview and design principles |
+| [documentation/fidelity.md](documentation/fidelity.md) | Fidelity guide (tiers, claims, degrade rules) |
 | [documentation/getting-started.md](documentation/getting-started.md) | Install, first PDF, library snippet |
 | [documentation/architecture.md](documentation/architecture.md) | Pipeline and packages |
 | [documentation/cli.md](documentation/cli.md) | CLI usage |

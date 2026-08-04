@@ -41,7 +41,7 @@ wkhtmltopdf multi-doc “merge” is one continuous print session, not PDF conca
 ### 5.4 Multi-object print (`internal/convert`)
 - [x] Phase machine mirroring: load → count pages → (TOC later) → links → HF → print - `RunPDFContext` reports Loading pages / Counting pages / Resolving links / Printing pages / Done (`convert.go:62-73`); `TestRunPDFProgress` (`convert_test.go:349`)
 - [x] Ordered objects: each contributes pages to one Document - per-object `renderObject` loop appends pages, ranges recorded (`convert.go:58-68`); `TestRunPDFThreeObjects` (`convert_test.go:333`), `TestRunPDFMultiPage` (`convert_test.go:86`)
-- [ ] `includeInOutline` / `pagesCount` flags - deferred; not referenced in `renderObject` (`convert.go:166-242`); `pageOffset` likewise not implemented
+- [~] `includeInOutline` / `pagesCount` flags - deferred; not referenced in `renderObject` (`convert.go:166-242`); `pageOffset` likewise not implemented
 - [x] Cover: no HF (enforced in settings already) - `IsCover` set by CLI (`cli/cli.go:148`); no HF drawing exists in `renderObject`
 - [x] Copies loop + collate vs non-collate (`printDocument` / `spoolTo` logic) - `materializeCopies` (`convert.go:131`) via `Document.DuplicatePage` (`pdf.go:170`); non-collate = `ReorderPages` permutation (`convert.go:149-163`, `pdf.go:140`); tests `TestRunPDFCopiesCollate` / `TestRunPDFCopiesNonCollate` (`convert_test.go:289,311`)
 - [x] Grayscale paint mode - `doc.SetGrayscale(cmd.Global.Grayscale)` (`convert.go:80`; `pdf.go:58`)

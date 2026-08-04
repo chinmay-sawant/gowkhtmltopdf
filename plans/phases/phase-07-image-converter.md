@@ -30,8 +30,8 @@ Port `wkhtmltoimage`: load one page, choose viewport, render to PNG/JPEG (SVG de
 - [x] Output path / stdout / memory - path or `-`→stdout dispatch (`imageout.go:419-433`); end-to-end via `Run` (`imageout.go:343`); test `TestRunEndToEnd` (`imageout_test.go:289`)
 
 ### 7.3 Deferred
-- [ ] `[ ]` SVG output - no QSvgGenerator and no stdlib SVG encoder; deferred as optional minimal vector export
-- [ ] `[ ]` BMP if needed - deferred
+- [~] SVG output - no QSvgGenerator and no stdlib SVG encoder; deferred as optional minimal vector export
+- [~] BMP if needed - deferred
 
 ### 7.4 Tests
 - [x] Solid color HTML → PNG dimensions - `TestRenderSolidColor` (`imageout_test.go:97`; 200 px wide, exact pixel colors)

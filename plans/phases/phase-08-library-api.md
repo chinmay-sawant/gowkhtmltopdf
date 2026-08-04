@@ -30,7 +30,7 @@ Expose an idiomatic Go API mirroring the lifecycle of `pdf.h` / `image.h` withou
 - [x] No process-global QApplication; document thread-safety (prefer one convert per call) - documented "one Converter per conversion; not safe for concurrent Convert"
 
 ### 8.4 Optional C ABI
-- [ ] `[~]` cgo exports matching `wkhtmltopdf_*` - only if consumer demand; not MVP - deferred as planned
+- [~] cgo exports matching `wkhtmltopdf_*` - only if consumer demand; not MVP - deferred as planned
 
 ### 8.5 Closure
 - [x] Examples build with `go run` - `examples/pdf`, `examples/image` verified end-to-end

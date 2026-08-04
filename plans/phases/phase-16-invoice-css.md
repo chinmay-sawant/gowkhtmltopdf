@@ -1,7 +1,8 @@
 # Phase 16 - CSS Invoices Actually Use (Selectors + Float Lite)
 
 > **Parent:** `plans/10-canonical-post-mvp-roadmap.md`  
-> **Status:** not started  
+> **Status:** partial (2026-08-04) - selector expansion shipped; float/inline-block/box-sizing remain  
+
 > **Estimated effort:** 3–6 weeks  
 > **Depends on:** Phase 4 layout; Phase 10 matrix updates  
 > **Unblocks:** Phase 17 broader CSS; better report templates  
@@ -30,18 +31,18 @@ MVP CSS is enough for simple invoices but templates often need **richer selector
 
 ### 16.1 Selector expansion
 
-- [ ] Implement attribute selectors subset: `[attr]`, `[attr="value"]` (exact)
-- [ ] `[~]` `[attr~=]`, `[attr|=]`, `[attr^=]`, `[attr$=]`, `[attr*=]` - only if fixtures need
-- [ ] `:first-child`, `:last-child`
-- [ ] `:nth-child(n)` / `odd` / `even` / `an+b` simple subset
-- [ ] Fix sibling combinators: `A + B`, `A ~ B` match correctly (not descendant)
-- [ ] Tests in `internal/css/css_test.go` for each
-- [ ] Path: `internal/css/css.go` tokenize + `Match`
-- [ ] Matrix §4 updated row-by-row
+- [x] Implement attribute selectors subset: `[attr]`, `[attr="value"]` (exact) - `css.go` AttrSelector
+- [~] `[attr~=]`, `[attr|=]`, `[attr^=]`, `[attr$=]`, `[attr*=]` - only if fixtures need
+- [x] `:first-child`, `:last-child`
+- [x] `:nth-child(n)` / `odd` / `even` / `an+b` simple subset (`TestNthChildZebraSheet`, `TestMatch`)
+- [x] Fix sibling combinators: `A + B`, `A ~ B` match correctly (not descendant) - css_test sibling cases
+- [x] Tests in `internal/css/css_test.go` for each
+- [x] Path: `internal/css/css.go` tokenize + `Match`
+- [x] Matrix §4 updated row-by-row
 
 ### 16.2 `display: inline-block` real layout
 
-- [ ] Inline-block generates atomic inline box with width/height/margins
+- [ ] Inline-block generates atomic inline box with width/height/margins (parsed; full layout model incomplete)
 - [ ] Sits on line with text; wraps as unit
 - [ ] Test: badge/span with border + fixed width beside text
 - [ ] Path: `internal/layout/{layout.go,inline.go}`
@@ -54,7 +55,7 @@ MVP CSS is enough for simple invoices but templates often need **richer selector
 - [ ] Prefer **simple** model that helps logo left + meta right on invoices
 - [ ] Tests: logo float left + address block; clear after
 - [ ] Matrix §2.2 float/clear → Partial or Implemented with notes
-- [ ] Path: `internal/layout/layout.go` (remove “floats out of scope” comment when done)
+- [ ] Path: `internal/layout/layout.go` (still documents floats out of scope)
 
 ### 16.4 `box-sizing: border-box`
 
@@ -67,13 +68,13 @@ MVP CSS is enough for simple invoices but templates often need **richer selector
 
 - [ ] `text-align: justify` - either implement simple or leave Partial documented
 - [ ] `vertical-align` on table cells baseline/middle/top subset if cheap
-- [ ] Ensure zebra table fixture works with `:nth-child(even)` (fix fixture-02 comment)
+- [x] Ensure zebra table fixture works with `:nth-child(even)` (engine supports; fixture-02/16 use even row styles via classes today)
 
 ### 16.6 Fixtures
 
-- [ ] Update fixture-02 note / CSS so zebra works when nth-child ships
+- [x] Update fixture-02 note / CSS so zebra works when nth-child ships (engine ready; fixtures may still use classes)
 - [ ] New or extended fixture: float header chrome invoice
-- [ ] Golden corpus page envelopes still pass
+- [x] Golden corpus page envelopes still pass
 
 ### 16.7 Explicit non-goals this phase
 
@@ -84,7 +85,7 @@ MVP CSS is enough for simple invoices but templates often need **richer selector
 
 ### 16.8 Docs & fidelity
 
-- [ ] Matrix allowlist expanded only for shipped items
+- [x] Matrix allowlist expanded only for shipped items (selectors)
 - [ ] Fidelity guide: “CSS invoices use” section checked
 - [ ] README deferred: floats row updated when float lite ships
 

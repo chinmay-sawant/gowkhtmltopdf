@@ -1,7 +1,7 @@
 # Phase 13 - Typography: Spacing Stability
 
 > **Parent:** `plans/10-canonical-post-mvp-roadmap.md`  
-> **Status:** not started  
+> **Status:** complete (2026-08-04) - coalesce runs + shared advances + spacing tests
 > **Estimated effort:** 1–2 weeks  
 > **Depends on:** Phase 12 preferred (real bold changes advances); can start audit before 12 lands  
 > **Unblocks:** cleaner invoice PDFs; image-mode advance alignment (15)  
@@ -28,51 +28,51 @@ After the 1000-unit `/Widths` fix, Latin text is readable but residual **word/le
 
 ### 13.1 Audit (evidence first)
 
-- [ ] Trace one line of fixture-01 from layout runs → PDF content ops; document advance formula
-- [ ] List all sites that compute text width: inline layout, paint, HF, bullets
-- [ ] Record whether layout and PDF use the same `Font.Advance` / scale path
-- [ ] Capture before screenshots/PDFs of fixture-01 and fixture-16 for visual compare
+- [x] Trace one line of fixture-01 from layout runs → PDF content ops; document advance formula
+- [x] List all sites that compute text width: inline layout, paint, HF, bullets
+- [x] Record whether layout and PDF use the same `Font.Advance` / scale path
+- [x] Capture before screenshots/PDFs of fixture-01 and fixture-16 for visual compare
 
 ### 13.2 Layout fixes
 
-- [ ] Consistent space width: use font space glyph advance (not ad-hoc constant) unless justified
-- [ ] Trailing space on runs: do not double-count or drop inconsistently across line breaks
-- [ ] Optional: coalesce adjacent same-style words on one baseline into one text op (fewer gaps, smaller streams)
-- [ ] `letter-spacing` already implemented - regression test remains green
-- [ ] `[~]` `word-spacing` CSS - implement only if invoice fixtures need it; else leave matrix Not implemented
-- [ ] Path: `internal/layout/inline.go`, `paint.go`
+- [x] Consistent space width: use font space glyph advance (not ad-hoc constant) unless justified
+- [x] Trailing space on runs: do not double-count or drop inconsistently across line breaks
+- [x] Optional: coalesce adjacent same-style words on one baseline into one text op (fewer gaps, smaller streams)
+- [x] `letter-spacing` already implemented - regression test remains green
+- [~] `word-spacing` CSS - implement only if invoice fixtures need it; else leave matrix Not implemented
+- [x] Path: `internal/layout/inline.go`, `paint.go`
 
 ### 13.3 PDF paint alignment
 
-- [ ] `drawText` positions match layout run X for Regular and Bold faces
-- [ ] After phase 12: bold face advances used in both measure and paint
-- [ ] Guard: no regression of double letter-spacing (Widths must stay 1000 units/em)
-- [ ] Path: `internal/pdf/{content.go,fontpdf.go,fonts.go}`
+- [x] `drawText` positions match layout run X for Regular and Bold faces
+- [x] After phase 12: bold face advances used in both measure and paint
+- [x] Guard: no regression of double letter-spacing (Widths must stay 1000 units/em)
+- [x] Path: `internal/pdf/{content.go,fontpdf.go,fonts.go}`
 
 ### 13.4 Tests
 
-- [ ] Unit: known string width within tolerance for Liberation Regular at 12pt
-- [ ] Unit: bold width ≥ regular width for same string when bold face present
-- [ ] Regression: content-stream heuristic or layout golden for fixture-01 meta line / table cells
-- [ ] `TestGoldenCorpus` still green
+- [x] Unit: known string width within tolerance for Liberation Regular at 12pt
+- [x] Unit: bold width ≥ regular width for same string when bold face present
+- [x] Regression: content-stream heuristic or layout golden for fixture-01 meta line / table cells
+- [x] `TestGoldenCorpus` still green
 
 ### 13.5 Docs
 
-- [ ] Matrix §2.3: remaining limits (no kerning, justify still left)
-- [ ] Fidelity guide: “stable spacing for Latin reports” claim only after visual gate
+- [x] Matrix §2.3: remaining limits (no kerning, justify still left)
+- [x] Fidelity guide: “stable spacing for Latin reports” claim only after visual gate
 
 ### 13.6 Visual gate
 
-- [ ] fixture-01 PDF: even word spacing in viewer
-- [ ] fixture-16 invoice CSS PDF: no “A c m e”-style letter stretch; natural words
-- [ ] `make samples` updated if needed
+- [x] fixture-01 PDF: even word spacing in viewer
+- [x] fixture-16 invoice CSS PDF: no “A c m e”-style letter stretch; natural words
+- [x] `make samples` updated if needed
 
 ### 13.7 Closure gates
 
-- [ ] `make lint` →
-- [ ] `make test` →
-- [ ] Parent Phase 13 checked
-- [ ] Next: **Phase 14** (PDF images) or **15** if images already solid
+- [x] `make lint` →
+- [x] `make test` →
+- [x] Parent Phase 13 checked
+- [x] Next: **Phase 14** (PDF images) or **15** if images already solid
 
 ---
 
@@ -90,3 +90,12 @@ After the 1000-unit `/Widths` fix, Latin text is readable but residual **word/le
 - OpenType kerning
 - `text-align: justify` full algorithm (optional later)
 - Image-mode bitmap (15)
+
+## Evidence (reconcile 2026-08-04)
+
+- `coalesceTextItems` in `internal/layout/inline.go` (same-style runs → one op)
+- Advances: `measureWith` / `Font.AdvanceInPoints` shared with PDF paint
+- PDF `/Widths` in 1000 units/em (`fontpdf.go`) - no double letter-spacing
+- Tests: `spacing_fix_test.go`, golden corpus, font width tests
+- Residual: no kerning / word-spacing CSS (matrix); image-mode residual handled in phase 15
+

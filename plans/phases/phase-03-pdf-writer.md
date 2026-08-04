@@ -58,9 +58,9 @@ Minimal PDF 1.4 with text, images, compression, links, and outlines is ~2–4 PM
 - [x] Grayscale: convert colors at paint time
 
 ### 3.7 Explicit defer
-- [x] `[~]` Encryption - not in upstream
-- [x] `[~]` AcroForm - Phase 9+ optional
-- [x] `[~]` ICC / PDF/A
+- [~] Encryption - not in upstream
+- [~] AcroForm - Phase 9+ optional
+- [~] ICC / PDF/A
 
 ### 3.8 Tests & proof
 - [x] Golden: minimal 1-page "Hello" PDF parses (custom structural tests)
