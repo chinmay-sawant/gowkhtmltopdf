@@ -1,6 +1,6 @@
 ## Summary
 
-Delivers Tier 2 phases **18 → 20 → 17 → 19** plus deferred layout/font follow-ups, then hardens visual fidelity for fixtures 25–28 and the TOC/HF showcase (CJK Type0, flex/grid backgrounds, absolute paint order, text HF baselines, grid gap sizing).
+Delivers Tier 2 phases **18 → 20 → 17 → 19** plus deferred layout/font follow-ups, then hardens visual fidelity for fixtures 25–28, the TOC/HF showcase (CJK Type0, flex/grid backgrounds, absolute paint order, text HF baselines, grid gap sizing), and fixture-08 `page-break-after: avoid` spacing.
 
 ---
 
@@ -48,11 +48,14 @@ Delivers Tier 2 phases **18 → 20 → 17 → 19** plus deferred layout/font fol
 - Defer absolute/fixed paint after in-flow; keep containing-block origin at content top
 - Text HF ascent/descent baseline signs (showcase footer no longer clipped)
 - Grid `1fr` tracks subtract `(n−1)×gap` so cells fit inside the border
+- `page-break-after: avoid` only acts across page boundaries (no longer collapses
+  on-page margins — fixture-08 Forms index overlap)
 - `make samples` passes `--font-path` when Droid is installed
 
 ### Samples
 
 - Regenerated `output/fixture-23` … `28` + `output/showcase-toc-hf-outline.pdf`
+- Regenerated `output/fixture-08-forced-page-breaks.pdf` after avoid-spacing fix
 
 ---
 
@@ -87,6 +90,7 @@ Delivers Tier 2 phases **18 → 20 → 17 → 19** plus deferred layout/font fol
 - [x] Spot-check CJK with Droid: `output/fixture-27-cjk-fontpath.pdf`
 - [x] Spot-check grid gap + FIXED badge: `output/fixture-28-flex-wrap-grid-fixed.pdf`
 - [x] Spot-check HF not clipped: `output/showcase-toc-hf-outline.pdf`
+- [x] Spot-check Forms index spacing: `output/fixture-08-forced-page-breaks.pdf`
 
 ### Commands
 
@@ -101,6 +105,7 @@ make samples
 ## Screenshots / sample output
 
 ```
+output/fixture-08-forced-page-breaks.pdf
 output/fixture-23-thead-repeat.pdf
 output/fixture-24-internal-anchors.pdf
 output/fixture-25-flex-row.pdf
@@ -130,6 +135,7 @@ output/showcase-toc-hf-outline.pdf   # toc + header/footer + outline on fixture-
 
 ## Follow-ups (out of scope)
 
+- HTML character entity decoding (fixture-08 heading still shows literal `&amp;`)
 - Full CSS Grid (span, areas, dense pack)
 - HarfBuzz / true complex-script shaping (Arabic joining, Indic)
 - Hangul-capable default face bundling

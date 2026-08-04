@@ -330,13 +330,18 @@ func afterBreaks(res *Result, contentH float64) bool {
 				changed = true
 			}
 		case b.style.PageBreakAfter == "avoid":
-			remaining := float64(lastPage+1)*contentH - lastY
-			if next.h <= remaining {
-				dy := lastY - next.y
-				if dy < -0.001 {
-					shiftFlowY(res, next.opStart, next.opEnd, next.y, dy)
-					changed = true
-				}
+			// Keep this box with the following box across page boundaries.
+			// Do NOT collapse natural flow spacing when they already share a
+			// page (that pulled .keep boxes up onto paragraph baselines —
+			// fixture-08 Forms index overlap).
+			nextPage := int(next.y / contentH)
+			if nextPage <= lastPage {
+				break
+			}
+			dy := float64(lastPage+1)*contentH - b.y
+			if dy > 0.001 {
+				shiftFlowY(res, b.opStart, b.opEnd, b.y, dy)
+				changed = true
 			}
 		}
 	}
