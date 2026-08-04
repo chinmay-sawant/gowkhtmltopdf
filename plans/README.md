@@ -22,7 +22,7 @@ Ordered for **quick wins first**, still stdlib-only (no third-party libraries or
 
 | Phase | Title | Tier | Status (2026-08-04) |
 |------:|-------|------|---------------------|
-| 10 | [HTML/CSS fidelity documentation](phases/phase-10-fidelity-docs.md) | 1 | partial (`fidelity.md` still open) |
+| 10 | [HTML/CSS fidelity documentation](phases/phase-10-fidelity-docs.md) | 1 | **done** (`documentation/fidelity.md`) |
 | 11 | [Library API for Go embedders](phases/phase-11-library-api-embedders.md) | 1 | partial (core DX shipped) |
 | 12 | [Typography - real bold/italic](phases/phase-12-typography-faces.md) | 1 | **done** |
 | 13 | [Typography - spacing](phases/phase-13-typography-spacing.md) | 1 | **done** |

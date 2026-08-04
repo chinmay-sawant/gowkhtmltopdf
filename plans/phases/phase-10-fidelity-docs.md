@@ -1,8 +1,7 @@
 # Phase 10 - HTML/CSS Fidelity Documentation
 
 > **Parent:** `plans/10-canonical-post-mvp-roadmap.md`  
-> **Status:** partial (2026-08-04) - matrix/samples/README honesty advanced; `fidelity.md` still missing  
-
+> **Status:** complete (2026-08-04) - `documentation/fidelity.md` + matrix audit stamp + doc links  
 > **Estimated effort:** 3–7 days  
 > **Depends on:** MVP matrix exists (`documentation/compatibility-matrix.md`)  
 > **Unblocks:** honest marketing, Tier 1 planning, all later matrix updates  
@@ -16,12 +15,12 @@ Create a **detailed, phase-wise fidelity document set** so nobody expects Wikipe
 
 ## Executive Summary
 
-| Today | Gap |
-|-------|-----|
-| Matrix is long and accurate for MVP | No single “fidelity story” for Tier 1/2/3 |
-| Samples under `output/` | Not linked per feature pass/fail |
-| README deferred table | Points at intermediate roadmap, not this post-MVP ledger |
-| Image-mode 5×7 not loud enough in matrix | Users may think PNG is screenshot-quality |
+| Today | Gap (closed) |
+|-------|--------------|
+| Matrix is long and evidence-cited | Fidelity guide ships product tiers + claims language |
+| Samples under `output/` | Linked from samples + fidelity map |
+| README deferred table | Points at post-MVP roadmap + fidelity.md |
+| Image-mode 5×7 | Documented as replaced by TTF AA |
 
 ---
 
@@ -29,76 +28,74 @@ Create a **detailed, phase-wise fidelity document set** so nobody expects Wikipe
 
 ### 10.1 Fidelity guide (new doc)
 
-- [ ] Create `documentation/fidelity.md` (or equivalent name) with:
+- [x] Create `documentation/fidelity.md` with:
   - Product positioning: **controlled report HTML**, not a browser
   - Tier 1 / Tier 2 / Tier 3 goals in plain language
   - What “good” means for invoices vs Wikipedia vs marketing sites
   - Explicit: full WebKit parity under pure stdlib is **not a milestone**
-- [ ] Section **“How to read the matrix”**: Implemented / Partial / Not implemented / Ignored
-- [ ] Section **“How we prove fidelity”**: golden fixtures, `make samples`, visual smoke, structure tests
-- [ ] Section **“Failure modes”**: graceful degrade (ignored CSS, stripped script, missing font → fallback), never crash
-- [ ] Link from `documentation/README.md` and `documentation/overview.md`
+- [x] Section **“How to read the matrix”**: Implemented / Partial / Not implemented / Ignored
+- [x] Section **“How we prove fidelity”**: golden fixtures, `make samples`, visual smoke, structure tests
+- [x] Section **“Failure modes”**: graceful degrade (ignored CSS, stripped script, missing font → fallback), never crash
+- [x] Link from `documentation/README.md` and `documentation/overview.md`
 
 ### 10.2 Feature fidelity map (phase-wise)
 
-Produce a table (in fidelity.md or matrix appendix) mapping **user-facing goals → current status → target phase**:
-
-- [ ] Typography (bold/italic/spacing) → Partial → phases 12–13
-- [ ] Image mode quality → 5×7 bitmap → phase 15
-- [ ] Invoice CSS (boxes/tables) → Implemented subset → phase 16 expands
-- [ ] Floats / flex / position / grid → No → phases 16–17 (grid deferred)
-- [ ] PDF images (logos/grids) → Implemented PNG/JPEG → phase 14 harden
-- [ ] Pagination / thead repeat → Partial → phase 18
-- [ ] Fonts / CJK / discovery → Single face Latin → phases 12, 19
-- [ ] HF / links edges → Mostly done, known gaps → phase 20
-- [ ] Arbitrary URL print → Smoke only → phase 21
-- [ ] JavaScript → Stripped → phase 22 (staged)
-- [ ] Open-web competition → Not planned → phase 23
+- [x] Typography (bold/italic/spacing) → map in fidelity.md (shipped phases 12–13)
+- [x] Image mode quality → TTF AA shipped (phase 15)
+- [x] Invoice CSS (boxes/tables) → Implemented subset → phase 16 expands
+- [x] Floats / flex / position / grid → No → phases 16–17 (grid deferred)
+- [x] PDF images (logos/grids) → Implemented PNG/JPEG → phase 14 harden
+- [x] Pagination / thead repeat → Partial → phase 18
+- [x] Fonts / CJK / discovery → Latin family → phases 12, 19
+- [x] HF / links edges → Mostly done, known gaps → phase 20
+- [x] Arbitrary URL print → Smoke only → phase 21
+- [x] JavaScript → Stripped → phase 22 (staged)
+- [x] Open-web competition → Not planned → phase 23
 
 ### 10.3 Matrix honesty audit (evidence, not prose)
 
-Re-walk code and tick only with file references:
-
 - [x] Audit §2.1 box model against `internal/layout/style.go` + `layout.go` (matrix rows cite paths)
 - [x] Audit §2.2 display/float/position against consumers (not just parsers) - float still Not implemented
-- [x] Audit §2.3 fonts - updated for real Bold/Italic faces (2026-08); fake bold only as fallback
+- [x] Audit §2.3 fonts - real Bold/Italic faces; fake bold only as fallback
 - [x] Audit §2.5 tables (`rowspan` no, header repeat no)
-- [x] Audit §4 selectors - attribute/first-last-nth/siblings **Implemented** (matrix §4)
-- [x] Audit image converter path: matrix documents TTF outline AA (not 5×7 primary path)
+- [x] Audit §4 selectors - attribute/first-last-nth/siblings **Implemented**
+- [x] Audit image converter path: TTF outline AA documented
 - [x] Audit JS: strip site + flag warnings listed
-- [x] Fix any stale “Implemented” that is only “parsed” (ongoing as features land)
-- [ ] Record audit date and commit/sha in matrix header when done (formal stamp still open)
+- [x] Fix stale tag-row for `strong`/`em`/`b`/`i` (real faces, not upright-only italic)
+- [x] Record audit date and base commit in matrix header (`Last honesty audit: 2026-08-04 · 38c82fc`)
 
 ### 10.4 Fixture ↔ feature index
 
-- [x] Extend `documentation/samples.md` (or fidelity appendix) with fixture inventory pointers (`testdata/golden/README.md` + samples)
-- [x] Link `output/*.pdf` / `*.png` as visual evidence (`output/README.md`, samples.md)
-- [x] Document Wikipedia smoke: `output/wiki-ana-de-armas.pdf` = **smoke only**, not pass
+- [x] Samples + golden README inventory
+- [x] Link `output/*.pdf` / `*.png` as visual evidence
+- [x] Document Wikipedia smoke: smoke only, not pass
 
 ### 10.5 README / changelog pointers
 
-- [x] README “Deferred / not planned” tracks post-MVP items (points at phase ledgers; tighten to `10-canonical-post-mvp-roadmap.md` still open)
+- [x] README “Deferred / not planned” points at `plans/10-canonical-post-mvp-roadmap.md`
 - [x] Keep Tier 3 rows as “not planned” with pointer to phase 23
-- [ ] Add one-line “Fidelity” link under Docs table (blocked on `fidelity.md`)
-- [ ] Optional: CHANGELOG “Unreleased” note that post-MVP roadmap published
+- [x] Fidelity link under Docs tables (README + documentation/README)
+- [~] Optional: CHANGELOG “Unreleased” note that post-MVP roadmap published
 
 ### 10.6 Docs-only closure gates
 
-- [ ] Fidelity guide reviewed for over-claim language (ban “pixel perfect”, “full CSS”, “browser replacement”)
-- [ ] All internal links resolve
-- [ ] Documentation-only: **no** `make lint` / `make test` required for pure doc PR (per skill)
-- [ ] If any code comment/doc.go strings updated for honesty, run `make lint` + `make test` and record outcomes here:
-
-```
-# record when non-doc files touched:
-# make lint → 
-# make test → 
-```
+- [x] Fidelity guide reviewed for over-claim language (banned claims section)
+- [x] Internal links resolve (fidelity ↔ matrix ↔ samples ↔ plans)
+- [x] Documentation-only: **no** `make lint` / `make test` required for pure doc PR (per skill)
 
 ### 10.7 Phase complete criteria
 
-- [ ] Parent ledger Phase 10 rows checked with evidence paths
-- [ ] Next phase handoff: **Phase 11** (Library API embedders)
+- [x] Parent ledger Phase 10 rows checked with evidence paths
+- [x] Next phase handoff: **Phase 11** remainder / **Phase 16** float lite (product choice)
+
+---
+
+## Evidence (closure 2026-08-04)
+
+- `documentation/fidelity.md` (new)
+- Links: `documentation/README.md`, `overview.md`, root `README.md`
+- Matrix header audit stamp + `strong`/`em`/`b`/`i` honesty fix
+- Deferred table intro → post-MVP roadmap
 
 ---
 

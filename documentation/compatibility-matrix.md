@@ -1,13 +1,14 @@
 # gowkhtmltopdf - HTML/CSS Compatibility Matrix (MVP Allowlist)
 
-> **Parent:** `plans/00-canonical-pure-go-rewrite.md` (Phase 0.1)
-> **Status:** frozen for MVP; amendments go through plan review
-> **Target:** controlled report/invoice HTML → PDF. **Not** a browser.
+> **Parent:** `plans/00-canonical-pure-go-rewrite.md` (Phase 0.1); post-MVP updates under `plans/10-canonical-post-mvp-roadmap.md`  
+> **Status:** living contract - amendments go through plan review  
+> **Target:** controlled report/invoice HTML → PDF. **Not** a browser.  
+> **Last honesty audit:** 2026-08-04 · base commit `cd9100f` (plans reconcile) · fidelity guide: [fidelity.md](fidelity.md)
 
-This document is the **contract** the layout engine (Phase 4) is allowed to
-implement. Anything not listed here is *unsupported*; unsupported input must
-degrade gracefully (ignored declaration / skipped node / documented error),
-never crash.
+This document is the **contract** the layout engine is allowed to implement.
+Anything not listed here is *unsupported*; unsupported input must degrade
+gracefully (ignored declaration / skipped node / documented error), never
+crash. Product framing: [fidelity.md](fidelity.md).
 
 ---
 
@@ -29,7 +30,7 @@ as its inline text (per the note column).
 | `table`, `thead`, `tbody`, `tfoot`, `tr`, `th`, `td` | Table subset; see §4/§2.5 (colspan yes, rowspan no) |
 | `img` | Replaced element; **PNG/JPEG only** (intrinsic dims `layout.go:352`; GIF not detected → skipped) |
 | `a` | Hyperlink (`href`) for `http/https/mailto` targets (`inline.go:226,305`); internal anchors deferred to Phase 6 |
-| `strong`, `em`, `b`, `i`, `u`, `small` | `b`/`strong` bold (fake bold), `u` underline, `small` smaller; `em`/`i` parse italic but render upright (no italic font yet, §2.3) |
+| `strong`, `em`, `b`, `i`, `u`, `small` | `b`/`strong` → bold face; `em`/`i` → italic face (Liberation family, §2.3); `u` underline; `small` smaller; fake stroke bold only if a bold face is missing |
 | `pre`, `code` | `pre` honors `white-space: pre`; `code` has no monospace rule - single embedded font for all families (§2.3) |
 | `blockquote` | Block-level only - no indent margins (UA rule `style.go:714-717`) |
 | `header`, `footer`, `main`, `section`, `article`, `aside`, `nav` | Treated as `div` (semantic aliases) |

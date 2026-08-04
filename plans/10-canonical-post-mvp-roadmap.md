@@ -41,12 +41,11 @@ MVP ships a usable **report/invoice** pipeline (load → HTML/CSS subset → lay
 
 Tier 1 is **not closed** yet. Suggested order for the next sessions:
 
-1. **Phase 10 remainder** (docs-only, quick): write `documentation/fidelity.md`, link from docs index, stamp matrix audit date.
-2. **Phase 16 remainder** (highest product value left in Tier 1): `float` lite, real `inline-block`, `box-sizing: border-box`.
-3. **Phase 14 remainder** (small): document JPEG/PNG alpha/DPI knobs; optional `web.images=false` test.
-4. **Phase 11 remainder** (optional): publish/install story + optional `ConvertHTML` helper.
+1. **Phase 16 remainder** (highest product value left in Tier 1): `float` lite, real `inline-block`, `box-sizing: border-box`.
+2. **Phase 14 remainder** (small): document JPEG/PNG alpha/DPI knobs; optional `web.images=false` test.
+3. **Phase 11 remainder** (optional): publish/install story + optional `ConvertHTML` helper.
 
-**Already shipped post-MVP:** phases **12** (real bold/italic faces), **13** (spacing/coalesce), **15** (image-mode TTF AA). Selector expansion inside **16** is also shipped.
+**Already shipped post-MVP:** phases **10** (fidelity docs), **12** (real bold/italic faces), **13** (spacing/coalesce), **15** (image-mode TTF AA). Selector expansion inside **16** is also shipped.
 
 
 ## Executive Summary
@@ -89,7 +88,7 @@ Tier 1 is **not closed** yet. Suggested order for the next sessions:
 
 | Phase | Title | Tier | Detail ledger | Effort (solo) | Status |
 |------:|-------|------|---------------|---------------|--------|
-| 10 | HTML/CSS fidelity documentation | 1 | [phases/phase-10-fidelity-docs.md](phases/phase-10-fidelity-docs.md) | 3–7 days | partial |
+| 10 | HTML/CSS fidelity documentation | 1 | [phases/phase-10-fidelity-docs.md](phases/phase-10-fidelity-docs.md) | 3–7 days | `[x]` 2026-08-04 |
 | 11 | Library API for Go embedders | 1 | [phases/phase-11-library-api-embedders.md](phases/phase-11-library-api-embedders.md) | 1–2 wk | partial |
 | 12 | Typography - real bold/italic faces | 1 | [phases/phase-12-typography-faces.md](phases/phase-12-typography-faces.md) | 2–4 wk | `[x]` 2026-08-04 |
 | 13 | Typography - spacing stability | 1 | [phases/phase-13-typography-spacing.md](phases/phase-13-typography-spacing.md) | 1–2 wk | `[x]` 2026-08-04 |
