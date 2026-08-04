@@ -2,13 +2,14 @@ package layout
 
 import (
 	"strings"
+	"unicode"
 
 	"gowkhtmltopdf/internal/html"
 )
 
-// buildVerticalBlock lays out writing-mode: vertical-rl|vertical-lr as a
-// stacked column of glyphs (one character per line). Glyphs are not rotated;
-// this is a report-friendly vertical stack, not full CSS vertical typesetting.
+// buildVerticalBlock lays out writing-mode: vertical-rl|vertical-lr.
+// Ideographic / Hangul / kana glyphs are rotated 90° (sideways); Latin and
+// other scripts stay upright in a stacked column.
 func (e *engine) buildVerticalBlock(n *html.Node, st ResolvedStyle, availW, x, y float64) *box {
 	ml := e.scalePt(st.MarginLeft)
 	b := &box{node: n, style: st, kind: "block", x: x + ml, y: y}
@@ -33,9 +34,6 @@ func (e *engine) buildVerticalBlock(n *html.Node, st ResolvedStyle, availW, x, y
 	}
 	text := strings.TrimSpace(n.TextContent())
 	runes := []rune(text)
-	if st.WritingMode == "vertical-rl" {
-		// Keep source order top→bottom for rl lite (readers still scan down).
-	}
 	cy := padT
 	face := e.faceFor(st)
 	for _, r := range runes {
@@ -46,11 +44,15 @@ func (e *engine) buildVerticalBlock(n *html.Node, st ResolvedStyle, availW, x, y
 			cy += lh * 0.4
 			continue
 		}
-		s := string(r)
+		rot := 0.0
+		if isVerticalSidewaysRune(r) {
+			rot = 90
+		}
 		e.add(Op{
 			Kind: OpText, X: contentX, Y: y + cy + e.fontAscent(fs)*0.85,
-			Text: s, Font: face, Size: fs, Bold: st.FontWeight >= 700,
+			Text: string(r), Font: face, Size: fs, Bold: st.FontWeight >= 700,
 			R: st.Color[0], G: st.Color[1], B: st.Color[2],
+			RotateDeg: rot,
 		})
 		cy += lh
 	}
@@ -61,4 +63,20 @@ func (e *engine) buildVerticalBlock(n *html.Node, st ResolvedStyle, availW, x, y
 	b.h = cy
 	e.prependChrome(contentStart, st, b.x, y, b.w, b.h)
 	return b
+}
+
+func isVerticalSidewaysRune(r rune) bool {
+	switch {
+	case r >= 0x2E80 && r <= 0x9FFF: // CJK radicals + ideographs
+		return true
+	case r >= 0xF900 && r <= 0xFAFF:
+		return true
+	case r >= 0x3040 && r <= 0x30FF: // hiragana/katakana
+		return true
+	case r >= 0xAC00 && r <= 0xD7AF: // Hangul syllables
+		return true
+	case unicode.Is(unicode.Han, r) || unicode.Is(unicode.Hangul, r):
+		return true
+	}
+	return false
 }

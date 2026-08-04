@@ -7,7 +7,7 @@
 // siblings, tables (separate borders, colspan), images, lists, text wrapping
 // with the embedded Liberation Sans font, float lite (left/right + clear),
 // real inline-block, box-sizing, position relative/absolute lite, and a
-// partial flex (row/column) subset. Grid remains deferred.
+// partial flex (row/column) subset and CSS grid lite (tracks, gap, column span).
 package layout
 
 import (
@@ -107,6 +107,10 @@ type Op struct {
 	// ZIndex paints later (higher) above earlier ops when non-zero or set.
 	ZIndex    int
 	ZIndexSet bool
+
+	// RotateDeg rotates the glyph around its baseline origin (PDF text matrix).
+	// Used for writing-mode:vertical-* upright→sideways CJK (90°).
+	RotateDeg float64
 }
 
 type engine struct {

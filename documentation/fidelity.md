@@ -20,7 +20,7 @@ is tracked in
 | Pixel-perfect clone of an arbitrary website | **Out of scope** |
 | Full CSS (flex/grid as layout, absolute/fixed positioning) | **Partial** — flex (grow/shrink/basis/order/wrap), grid lite, relative/absolute/fixed; not full CSS3 |
 | JavaScript-driven pages | **Out of scope** (`<script>` stripped; flags warn only) |
-| Full Unicode / CJK typesetting | **Partial** — Type0/CID + `--font-path`; no HarfBuzz (stdlib) |
+| Full Unicode / CJK typesetting | **Partial** — Type0/CID + `--font-path`; Arabic joining best-effort; no HarfBuzz (stdlib) |
 
 **Explicit non-milestone:** full WebKit parity under pure Go stdlib only is
 **not** a dated goal. For open-web screenshot quality, use a headless browser

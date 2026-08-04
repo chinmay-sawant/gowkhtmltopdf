@@ -220,6 +220,22 @@ func (e *engine) placeFlexLineMeasured(parent *box, st ResolvedStyle, items []fl
 			}
 		}
 	}
+	// Clamp to min/max-width after grow/shrink (simplified flex algorithm).
+	for i, it := range items {
+		cs := e.styles[it.n]
+		if cs.MinWidth > 0 {
+			mn := e.scalePt(cs.MinWidth)
+			if widths[i] < mn {
+				widths[i] = mn
+			}
+		}
+		if cs.MaxWidth >= 0 {
+			mx := e.scalePt(cs.MaxWidth)
+			if widths[i] > mx {
+				widths[i] = mx
+			}
+		}
+	}
 	totalW := 0.0
 	for _, w := range widths {
 		totalW += w

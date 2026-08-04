@@ -38,7 +38,8 @@ samples:
 	rm -f output/fixture-*.pdf output/fixture-*.png output/showcase-*.pdf
 	# Opt-in CJK/system faces when present (fixture-27 and font-family lists).
 	FONT_FLAGS=""; \
-	if [ -d /usr/share/fonts/truetype/droid ]; then FONT_FLAGS="--font-path /usr/share/fonts/truetype/droid"; fi; \
+	if [ -d /usr/share/fonts/truetype/droid ]; then FONT_FLAGS="$$FONT_FLAGS --font-path /usr/share/fonts/truetype/droid"; fi; \
+	if [ -d testdata/fonts ]; then FONT_FLAGS="$$FONT_FLAGS --font-path testdata/fonts"; fi; \
 	for f in testdata/golden/fixture-*.html; do \
 		name=$$(basename "$$f" .html); \
 		go run ./cmd/gowkhtmltopdf --enable-local-file-access $$FONT_FLAGS "$$f" "output/$$name.pdf"; \

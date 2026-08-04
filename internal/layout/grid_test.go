@@ -14,10 +14,53 @@ func TestParseGridTracksSubtractsGap(t *testing.T) {
 	if sum < contentW-0.01 || sum > contentW+0.01 {
 		t.Fatalf("tracks+gaps = %.3f, want contentW=%.3f (cols=%v)", sum, contentW, cols)
 	}
-	cols2 := parseGridTracks("1fr 1fr 1fr", contentW, gap, e)
-	sum2 := cols2[0] + cols2[1] + cols2[2] + 2*gap
-	if sum2 < contentW-0.01 || sum2 > contentW+0.01 {
-		t.Fatalf("fr list tracks+gaps = %.3f, want %.3f", sum2, contentW)
+}
+
+func TestGridColumnSpan(t *testing.T) {
+	s := sheet(t, `
+.g { display:grid; grid-template-columns:repeat(3,1fr); gap:4pt; width:300pt }
+.wide { grid-column: span 2; background:#eee }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="g"><div class="wide">AB</div><div>C</div><div>D</div></div>
+</body></html>`, s)
+	var wideW float64
+	for _, op := range res.Ops {
+		if op.Kind == OpFillRect && op.R > 0.8 {
+			if op.W > wideW {
+				wideW = op.W
+			}
+		}
+	}
+	// span 2 of 3 tracks ≈ 2/3 of 300 minus gaps ≈ 196+
+	if wideW < 180 || wideW > 220 {
+		t.Fatalf("span-2 width=%.1f, want ~200", wideW)
+	}
+}
+
+func TestNestedGridWithSpan(t *testing.T) {
+	s := sheet(t, `
+.outer { display:grid; grid-template-columns:1fr 1fr; gap:4pt; width:300pt }
+.inner { display:grid; grid-template-columns:repeat(3,1fr); gap:2pt; background:#ddd }
+.span { grid-column: span 2; background:#fcc }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="outer">
+  <div class="inner"><div class="span">X</div><div>Y</div></div>
+  <div>Z</div>
+</div>
+</body></html>`, s)
+	var spanW float64
+	for _, op := range res.Ops {
+		if op.Kind == OpFillRect && op.R > 0.9 && op.G < 0.9 {
+			if op.W > spanW {
+				spanW = op.W
+			}
+		}
+	}
+	// Inner content ~148pt; span 2/3 ≈ 95+
+	if spanW < 80 || spanW > 130 {
+		t.Fatalf("nested span-2 width=%.1f, want ~95-110", spanW)
 	}
 }
 

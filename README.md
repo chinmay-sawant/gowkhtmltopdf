@@ -260,8 +260,8 @@ parity remains **not planned**.
 | Floats / positioned layout (`float`, `clear`, `position: relative/absolute/fixed`) | **Float lite + relative/absolute/fixed**; sticky ≈ relative offsets | Sticky pagination stickiness still lite |
 | Richer selectors (attribute `[attr=…]`, `:first-child`, `:nth-child`, sibling `+`/`~`) | **Shipped** for presence/exact attr, first/last/nth-child, siblings | Hover/link pseudos still ignored |
 | Multi-font bold/italic (Liberation Sans family) | **Shipped** - Regular/Bold/Italic/BoldItalic embedded | Further families: `--font-path` (phase 19) |
-| Flexbox / Grid (`display: flex|grid`) | **Partial flex** (grow/shrink/basis/order/wrap) + **grid lite** | Nested grid / spans / full flex algorithm deferred |
-| CJK fonts / complex-script shaping | **Type0/CID + font-path**; RTL reverse; vertical-rl lite | **No HarfBuzz**; Arabic joining / Indic **not claimed** |
+| Flexbox / Grid (`display: flex|grid`) | **Partial flex** (grow/shrink/basis/order/wrap + min/max clamp) + **grid lite** (`span`, nested grids) | Full CSS Grid / iterative flex content sizing still lite |
+| CJK fonts / complex-script shaping | **Type0/CID + font-path**; RTL reverse; **Arabic presentation-form joining** (best-effort); vertical-rl **rotated CJK** | **No HarfBuzz**; Indic production **not claimed**; Hangul needs a Hangul face |
 | HTML character entities (`&amp;` …) | **Shipped** (stdlib unescape in text + attrs) | — |
 | `z-index` | **Lite** on positioned boxes (paint sort) | Stacking contexts / opacity still lite |
 | AcroForm forms (`--enable-forms`) | No form model in the PDF writer | Intermediate roadmap (forms) |

@@ -770,7 +770,11 @@ func drawText(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintO
 	}
 	c.SetFont(fontName, op.Size)
 	c.BeginText()
-	c.TextAt(x, y)
+	if op.RotateDeg == 90 || op.RotateDeg == -90 {
+		c.TextMatrix(0, 1, -1, 0, x, y)
+	} else {
+		c.TextAt(x, y)
+	}
 	// Fake bold only when CSS wants bold but the face is not a real bold TTF.
 	// Skip for Type0/CJK runs: stroking composite outlines looks like tofu clumps.
 	fakeBold := op.Bold && (op.Font == nil || !op.Font.Bold())

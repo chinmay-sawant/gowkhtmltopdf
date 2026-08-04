@@ -41,6 +41,8 @@ type ResolvedStyle struct {
 	WritingMode         string // "" | "horizontal-tb" | "vertical-rl" | "vertical-lr"
 	GridTemplateColumns string // raw grid-template-columns value
 	GridTemplateRows    string
+	GridColumnSpan      int     // from grid-column: span N (default 1)
+	GridColumnStart     int     // 1-based; 0 = auto
 	Width               float64 // -1 = auto; absolute length in pt when WidthPercent < 0
 	WidthPercent        float64 // >=0 means width is that % of the containing block at layout time
 	Height              float64
@@ -127,6 +129,8 @@ func initialStyle() ResolvedStyle {
 		BorderCollapse:   "separate",
 		BorderSpacing:    0,
 		TableLayout:      "auto",
+		GridColumnSpan:   1,
+		WritingMode:      "horizontal-tb",
 	}
 }
 
@@ -443,6 +447,12 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext)
 			st.GridTemplateColumns = value
 		case "grid-template-rows":
 			st.GridTemplateRows = value
+		case "grid-column", "grid-column-end":
+			parseGridColumn(st, value)
+		case "grid-column-start":
+			if v, err := strconv.Atoi(strings.TrimSpace(value)); err == nil && v > 0 {
+				st.GridColumnStart = v
+			}
 		case "float":
 			switch value {
 			case "left", "right", "none":
@@ -912,6 +922,44 @@ func marginLen(value string, fs, ctxW float64) float64 {
 }
 
 func pxToPt(px float64) float64 { return px * 0.75 }
+
+func parseGridColumn(st *ResolvedStyle, value string) {
+	value = strings.TrimSpace(value)
+	if strings.HasPrefix(value, "span ") {
+		n, err := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(value, "span ")))
+		if err == nil && n > 0 {
+			st.GridColumnSpan = n
+		}
+		return
+	}
+	// "1 / 3" or "1 / span 2"
+	parts := strings.Split(value, "/")
+	if len(parts) == 1 {
+		if v, err := strconv.Atoi(strings.TrimSpace(parts[0])); err == nil && v > 0 {
+			st.GridColumnStart = v
+			st.GridColumnSpan = 1
+		}
+		return
+	}
+	if v, err := strconv.Atoi(strings.TrimSpace(parts[0])); err == nil && v > 0 {
+		st.GridColumnStart = v
+	}
+	end := strings.TrimSpace(parts[1])
+	if strings.HasPrefix(end, "span ") {
+		n, err := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(end, "span ")))
+		if err == nil && n > 0 {
+			st.GridColumnSpan = n
+		}
+		return
+	}
+	if v, err := strconv.Atoi(end); err == nil && st.GridColumnStart > 0 {
+		sp := v - st.GridColumnStart
+		if sp < 1 {
+			sp = 1
+		}
+		st.GridColumnSpan = sp
+	}
+}
 
 // uaRules returns the user-agent declarations for an element name.
 func uaRules(name string) []css.Declaration {
