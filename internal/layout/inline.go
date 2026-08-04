@@ -196,20 +196,23 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 			continue
 		}
 		c := it.style.Color
-		face := e.faceFor(it.style)
-		e.add(Op{Kind: OpText, X: lx, Y: baseline, W: it.w, H: it.h,
-			Text: it.text, Font: face, Size: it.style.FontSize * e.scale, Bold: it.style.FontWeight >= 700,
-			R: c[0], G: c[1], B: c[2]})
-		if it.style.TextDecoration == "underline" {
-			e.add(Op{Kind: OpLine, X: lx, Y: baseline + it.descent*0.25, W: it.w, H: 0, R: c[0], G: c[1], B: c[2]})
+		size := it.style.FontSize * e.scale
+		for _, run := range e.splitTextByFace(it.text, it.style) {
+			e.add(Op{Kind: OpText, X: lx, Y: baseline, W: run.w, H: it.h,
+				Text: run.text, Font: run.face, Size: size, Bold: it.style.FontWeight >= 700,
+				R: c[0], G: c[1], B: c[2]})
+			if it.style.TextDecoration == "underline" {
+				e.add(Op{Kind: OpLine, X: lx, Y: baseline + it.descent*0.25, W: run.w, H: 0, R: c[0], G: c[1], B: c[2]})
+			}
+			if it.style.TextDecoration == "line-through" {
+				e.add(Op{Kind: OpLine, X: lx, Y: baseline - it.ascent*0.3, W: run.w, H: 0, R: c[0], G: c[1], B: c[2]})
+			}
+			if it.href != "" {
+				e.add(Op{Kind: OpLinkURI, X: lx, Y: baseline - it.ascent, W: run.w, H: it.ascent + it.descent, URI: it.href})
+			}
+			lx += run.w
 		}
-		if it.style.TextDecoration == "line-through" {
-			e.add(Op{Kind: OpLine, X: lx, Y: baseline - it.ascent*0.3, W: it.w, H: 0, R: c[0], G: c[1], B: c[2]})
-		}
-		if it.href != "" {
-			e.add(Op{Kind: OpLinkURI, X: lx, Y: baseline - it.ascent, W: it.w, H: it.ascent + it.descent, URI: it.href})
-		}
-		lx += it.w + it.marginR
+		lx += it.marginR
 		if i < len(line)-1 {
 			lx += justifyGap
 		}
@@ -428,20 +431,75 @@ func (e *engine) measureText(s string, size float64) float64 {
 	return e.measureWith(e.font, s, size, 0)
 }
 
-// measureTextFace measures s with the face selected for st.
+// measureTextFace measures s using per-rune CSS font-family fallback
+// (same face selection as paint).
 func (e *engine) measureTextFace(s string, st ResolvedStyle) float64 {
 	size := st.FontSize * e.scale
-	return e.measureWith(e.faceFor(st), s, size, st.LetterSpacing*e.scale)
+	ls := st.LetterSpacing * e.scale
+	var total float64
+	n := 0
+	for _, r := range s {
+		face := e.faceForRune(st, r)
+		if face == nil {
+			face = e.font
+		}
+		total += face.AdvanceInPoints(r, size)
+		n++
+	}
+	if ls != 0 && n > 0 {
+		total += ls * float64(n)
+	}
+	return total
+}
+
+type faceRun struct {
+	text string
+	face *pdf.Font
+	w    float64
+}
+
+// splitTextByFace splits s into contiguous runs that share the same face
+// under CSS font-family fallback.
+func (e *engine) splitTextByFace(s string, st ResolvedStyle) []faceRun {
+	if s == "" {
+		return nil
+	}
+	size := st.FontSize * e.scale
+	var runs []faceRun
+	var cur faceRun
+	for _, r := range s {
+		face := e.faceForRune(st, r)
+		if face == nil {
+			face = e.font
+		}
+		if cur.face == nil {
+			cur = faceRun{face: face}
+		} else if face != cur.face {
+			runs = append(runs, cur)
+			cur = faceRun{face: face}
+		}
+		cur.text += string(r)
+		cur.w += face.AdvanceInPoints(r, size)
+	}
+	if cur.face != nil {
+		runs = append(runs, cur)
+	}
+	return runs
 }
 
 func (e *engine) measureWith(face *pdf.Font, s string, size, letterSpacing float64) float64 {
 	if face == nil {
 		face = e.font
 	}
+	fallback := e.font // Liberation (or engine default) for glyphs the face lacks
 	var total float64
 	n := 0
 	for _, r := range s {
-		total += face.AdvanceInPoints(r, size)
+		advFace := face
+		if face.GlyphID(r) == 0 && fallback != nil && fallback.GlyphID(r) != 0 {
+			advFace = fallback
+		}
+		total += advFace.AdvanceInPoints(r, size)
 		n++
 	}
 	if letterSpacing != 0 && n > 0 {

@@ -56,6 +56,7 @@ type RenderOptions struct {
 	Width       int // viewport width in pixels; <= 0 means 1024
 	Height      int // minimum canvas height in pixels; 0 = content height
 	Font        *pdf.Font
+	Registry    *pdf.Registry // optional --font-path / system faces (CJK)
 	Sheets      []*css.Stylesheet
 	Media       string // "screen" (default), "print" or ""
 	Images      func(src string) ([]byte, error)
@@ -129,6 +130,7 @@ func layoutOptions(opts RenderOptions, font *pdf.Font, viewportPx float64) layou
 		Width:      viewportPx * 0.75,
 		Height:     heightPt,
 		Font:       font,
+		Registry:   opts.Registry,
 		Sheets:     opts.Sheets,
 		Media:      opts.Media,
 		Images:     opts.Images,
@@ -415,6 +417,17 @@ func Run(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("default font: %w", err)
 	}
+	var registry *pdf.Registry
+	if dirs := cmd.Global.FontPaths; len(dirs) > 0 || cmd.Global.UseSystemFonts {
+		scan := append([]string{}, dirs...)
+		if cmd.Global.UseSystemFonts {
+			scan = append(scan, pdf.DefaultSystemFontDirs()...)
+		}
+		registry = pdf.ScanFontDirs(scan)
+		if log != nil && log != io.Discard && !cmd.Global.Quiet && len(scan) > 0 {
+			fmt.Fprintf(log, "info: scanned %d font path(s)\n", len(scan))
+		}
+	}
 
 	res, err := loader.Load(ctx, obj.Page, obj.Load)
 	if err != nil {
@@ -451,6 +464,7 @@ func Run(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 		Width:       cmd.Image.Width,
 		Height:      cmd.Image.Height,
 		Font:        font,
+		Registry:    registry,
 		Sheets:      sheets,
 		Media:       mediaFor(cmd, obj),
 		Images:      imagesFn,

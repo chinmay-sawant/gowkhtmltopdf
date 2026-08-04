@@ -144,6 +144,32 @@ func (e *engine) faceFor(st ResolvedStyle) *pdf.Font {
 	return e.font
 }
 
+// faceForRune picks the first CSS font-family face (then defaults) that has a
+// glyph for r — browser-like fallback so Hangul/Latin/CJK can come from
+// different faces in one run.
+func (e *engine) faceForRune(st ResolvedStyle, r rune) *pdf.Font {
+	if r == ' ' || r == '\t' || r == '\n' || r == '\r' {
+		return e.faceFor(st)
+	}
+	if e.registry != nil {
+		for _, fam := range st.FontFamily {
+			f := e.registry.Lookup([]string{fam}, st.FontWeight, st.FontItalic)
+			if f != nil && f.GlyphID(r) != 0 {
+				return f
+			}
+		}
+	}
+	if e.faces != nil {
+		if f := e.faces.Resolve(st.FontWeight, st.FontItalic); f != nil && f.GlyphID(r) != 0 {
+			return f
+		}
+	}
+	if e.font != nil && e.font.GlyphID(r) != 0 {
+		return e.font
+	}
+	return e.faceFor(st)
+}
+
 // scalePt applies the engine zoom factor to a style length in points.
 func (e *engine) scalePt(v float64) float64 { return v * e.scale }
 
