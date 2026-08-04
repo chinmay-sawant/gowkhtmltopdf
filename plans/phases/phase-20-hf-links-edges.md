@@ -1,7 +1,7 @@
 # Phase 20 - Headers/Footers & Links Edge Cases
 
 > **Parent:** `plans/10-canonical-post-mvp-roadmap.md`  
-> **Status:** done (core) on `feature/tier-2`  
+> **Status:** done (core) on `master` via #16; **one HF HTML-link leftover**  
 > **Estimated effort:** 2–4 weeks  
 > **Depends on:** Phase 6 HF/TOC/links MVP  
 > **Unblocks:** Tier 2 #9 polish  
@@ -11,18 +11,20 @@
 
 ## Overview
 
-Close known **edge gaps** listed in README deferred table for headers/footers, anchors, and relative links - without redesigning the Phase 6 model.
+Close known **edge gaps** listed in the README deferred table for
+headers/footers, anchors, and relative links - without redesigning the Phase 6
+model.
 
 ## Executive Summary
 
-| Gap (README) | Target |
-|--------------|--------|
-| Inline `#anchor` source rects | Best-effort boxes for inlines |
-| `resolveRelativeLinks` | Implement flag behavior |
-| HTML HF links on body pages | Carry link annotations if feasible |
-| `[topage]` with copies | Correct when copies > 1 |
-| `dump-outline` TOC offset | Include TOC pages if applicable |
-| Cross-object URL map | Same-document multi-object anchors |
+| Gap (README) | Target | Status (2026-08-05) |
+|--------------|--------|---------------------|
+| Inline `#anchor` source rects | Best-effort boxes for inlines | **Shipped** (`fixture-24`) |
+| `resolveRelativeLinks` | Implement flag behavior | **Shipped** |
+| HTML HF links on body pages | Carry URI annotations if feasible | **Partial** (external URI carried; HF fragment GoTo limited) |
+| `[topage]` with copies | Correct when copies > 1 | **Shipped** |
+| `dump-outline` TOC offset | Include TOC pages | **Shipped** |
+| Cross-object URL map | Same-document multi-object anchors | **Shipped** (lite) |
 
 ---
 
@@ -30,42 +32,52 @@ Close known **edge gaps** listed in README deferred table for headers/footers, a
 
 ### 20.1 Internal links
 
-- [ ] Inline `<a href="#id">` produces clickable target and source rect when geometry available
-- [ ] Document remaining cases where inline has no box
-- [ ] Cross-object destinations when multi-object PDF used
-- [ ] Tests: fixture-06 + multi-section fixture
-- [ ] Path: `internal/convert/links.go`, layout locations
+- [x] Inline `<a href="#id">` produces clickable target and source rect when geometry available
+- [x] Document remaining cases where inline has no box (README / matrix honesty)
+- [x] Cross-object destinations when multi-object PDF used (best-effort)
+- [x] Tests: fixture-06 + `fixture-24-internal-anchors`
+- [x] Path: `internal/convert/links.go`, layout locations
 
 ### 20.2 Relative / resolve flags
 
-- [ ] Implement `resolveRelativeLinks` (or document permanent ignore with matrix row)
-- [ ] External http(s)/mailto still work
-- [ ] Tests for relative href against page base URL
+- [x] Implement `resolveRelativeLinks` (`--resolve-relative-links` / `--keep-relative-links`)
+- [x] External http(s)/mailto still work
+- [x] Tests for relative href against page base URL (`links_resolve_test.go`)
 
 ### 20.3 Header/footer edges
 
-- [ ] `[topage]` correct under `--copies` > 1 (bake order fix)
-- [ ] HTML header/footer: if links present, either paint annotations on body pages or document “text only”
-- [ ] HF bold uses real face if phase 12 done
-- [ ] Path: `internal/convert/hf.go`
+- [x] `[topage]` correct under `--copies` > 1 (HF after copies bake order)
+- [~] HTML header/footer: **external URI** link annotations carried onto body pages; **fragment GoTo from HF** still limited
+- [x] HF bold uses real face when phase 12 faces available
+- [x] Path: `internal/convert/hf.go`
 
 ### 20.4 Outline / dump
 
-- [ ] `dump-outline` page numbers account for TOC pages when TOC object present
-- [ ] Outline depth / heading collection regression tests
+- [x] `dump-outline` page numbers account for TOC pages (`DumpOutlineXMLOffset`)
+- [x] Outline depth / heading collection regression coverage via golden / convert tests
 
 ### 20.5 Docs
 
-- [ ] Matrix / CLI flag rows for resolveRelativeLinks, copies+HF
-- [ ] README deferred rows cleared or narrowed
+- [x] README deferred rows for resolveRelativeLinks, copies+HF, dump-outline, thead (adjacent Tier 2)
+- [ ] Matrix / older fidelity blurbs may still lag — shared Tier 2 doc-sync pending
 
 ### 20.6 Closure gates
 
-- [ ] `make lint` →
-- [ ] `make test` →
-- [ ] Golden multi-chapter + HF regression
-- [ ] Parent Phase 20 checked
-- [ ] Next: **Phase 21**
+- [x] `make lint` / `make test`
+- [x] Golden multi-chapter + HF / fixture-24 regression
+- [x] Parent Phase 20 core checked
+- [ ] Remaining: HTML-HF fragment GoTo (see Pending)
+- [x] Next: **Phase 21** arbitrary websites
+
+---
+
+## Pending (after #17)
+
+| Item | Notes |
+|------|--------|
+| HTML HF → body **fragment** (`#id`) GoTo | External URI from HTML HF shipped; same-doc GoTo from HF still limited |
+| Shared matrix/fidelity refresh | Cross-cutting with phases 17–19 honesty pass |
+| Full HTML HF as nested documents | Out of scope (Phase 6 model stands) |
 
 ---
 
@@ -74,7 +86,7 @@ Close known **edge gaps** listed in README deferred table for headers/footers, a
 | Depends on | Provides to |
 |------------|-------------|
 | Phase 6 locations map | Better navigation PDFs |
-| Phase 18 page numbers | Consistent HF |
+| Phase 18 page numbers | Consistent HF `[page]` / `[topage]` |
 
 ---
 
