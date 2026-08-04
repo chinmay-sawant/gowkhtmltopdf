@@ -73,6 +73,9 @@ model.
 
 ## Pending (after #17)
 
+> **Execution subplan:** [`subplans-tier-2/phase-20-pending.md`](subplans-tier-2/phase-20-pending.md)  
+> **Shared doc honesty:** [`subplans-tier-2/00-shared-doc-honesty.md`](subplans-tier-2/00-shared-doc-honesty.md)
+
 | Item | Notes |
 |------|--------|
 | HTML HF → body **fragment** (`#id`) GoTo | External URI from HTML HF shipped; same-doc GoTo from HF still limited |

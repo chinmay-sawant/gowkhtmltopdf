@@ -103,6 +103,9 @@ report and simple marketing layouts - not Wikipedia chrome parity.
 
 ## Pending (after #17)
 
+> **Execution subplan:** [`subplans-tier-2/phase-17-pending.md`](subplans-tier-2/phase-17-pending.md)  
+> **Shared doc honesty:** [`subplans-tier-2/00-shared-doc-honesty.md`](subplans-tier-2/00-shared-doc-honesty.md)
+
 | Item | Notes |
 |------|--------|
 | Compatibility-matrix / fidelity MVP-gap rows | Still say flex/grid ignored or thead absent in places |

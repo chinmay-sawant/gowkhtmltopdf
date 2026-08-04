@@ -5,6 +5,7 @@
 | [00-canonical-pure-go-rewrite.md](00-canonical-pure-go-rewrite.md) | **MVP ledger** (phases 0–9) - complete for v0.1.0 |
 | [10-canonical-post-mvp-roadmap.md](10-canonical-post-mvp-roadmap.md) | **Active post-MVP execution ledger** - update status here |
 | [phases/](phases/) | Per-phase atomic checklists (MVP 00–09 + post-MVP 10–23) |
+| [phases/subplans-tier-2/](phases/subplans-tier-2/) | Post-#17 leftovers for phases 17–20 (shared doc honesty + per-phase) |
 | [exploration/](exploration/) | Multi-agent analysis snapshots (read-only evidence) |
 | [PR/](PR/) | PR/issue body archives |
 
@@ -29,10 +30,10 @@ Ordered for **quick wins first**, still stdlib-only (no third-party libraries or
 | 14 | [PDF images robust path](phases/phase-14-pdf-images.md) | 1 | **done** |
 | 15 | [Image mode TTF/AA raster](phases/phase-15-image-mode-raster.md) | 1 | **done** |
 | 16 | [Invoice CSS (selectors + float lite)](phases/phase-16-invoice-css.md) | 1 | **done** |
-| 17 | [Broader CSS (flex / grid lite / position)](phases/phase-17-broader-css.md) | 2 | **core done** (#16/#17); matrix honesty pending |
-| 18 | [Pagination polish (thead repeat)](phases/phase-18-pagination-polish.md) | 2 | **core done** (#16); matrix/CLI docs pending |
-| 19 | [Fonts / i18n / discovery / CJK](phases/phase-19-fonts-i18n.md) | 2 | **core done** (#16/#17); @font-face audit pending |
-| 20 | [HF / links edge cases](phases/phase-20-hf-links-edges.md) | 2 | **core done** (#16); HF fragment GoTo `[~]` |
+| 17 | [Broader CSS (flex / grid lite / position)](phases/phase-17-broader-css.md) | 2 | **core done** (#16/#17); [pending subplan](phases/subplans-tier-2/phase-17-pending.md) |
+| 18 | [Pagination polish (thead repeat)](phases/phase-18-pagination-polish.md) | 2 | **core done** (#16); [pending subplan](phases/subplans-tier-2/phase-18-pending.md) |
+| 19 | [Fonts / i18n / discovery / CJK](phases/phase-19-fonts-i18n.md) | 2 | **core done** (#16/#17); [pending subplan](phases/subplans-tier-2/phase-19-pending.md) |
+| 20 | [HF / links edge cases](phases/phase-20-hf-links-edges.md) | 2 | **core done** (#16); [pending subplan](phases/subplans-tier-2/phase-20-pending.md) |
 | 21 | [Arbitrary websites / paste-any-URL](phases/phase-21-arbitrary-websites.md) | 2→3 | next product work |
 | 22 | [JavaScript (staged)](phases/phase-22-javascript.md) | 2→3 |
 | 23 | [Tier 3 open-web (deferred)](phases/phase-23-tier3-deferred.md) | 3 `[~]` |

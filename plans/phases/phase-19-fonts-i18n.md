@@ -109,6 +109,9 @@ not OpenType GSUB/GPOS / HarfBuzz.
 
 ## Pending (after #17)
 
+> **Execution subplan:** [`subplans-tier-2/phase-19-pending.md`](subplans-tier-2/phase-19-pending.md)  
+> **Shared doc honesty:** [`subplans-tier-2/00-shared-doc-honesty.md`](subplans-tier-2/00-shared-doc-honesty.md)
+
 | Item | Notes |
 |------|--------|
 | `@font-face` local wiring vs matrix | CSS parses; matrix still says ignored — audit and mark Partial correctly |

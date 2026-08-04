@@ -45,7 +45,7 @@ Tier 1 is **not closed** yet. Suggested order for the next sessions:
 2. **Phase 14** (complete): document JPEG/PNG alpha/DPI knobs; `web.images=false` test.
 3. **Phase 11** (complete): publish/install story + `ConvertHTML` helper.
 
-**Tier 1 is closed** (report engine solid). **Tier 2 phases 17–20 core shipped** on `master` (#16 / #17); remaining items are doc honesty + a few `[~]` edges (see each phase “Pending” section). Next product work is **Phase 21** (or the shared matrix/fidelity sync).
+**Tier 1 is closed** (report engine solid). **Tier 2 phases 17–20 core shipped** on `master` (#16 / #17); remaining items are tracked under [`phases/subplans-tier-2/`](phases/subplans-tier-2/) (shared matrix honesty + per-phase leftovers). Next product work is **Phase 21** (or the shared matrix/fidelity sync).
 
 **Already shipped post-MVP:** phases **10** (fidelity docs), **12** (real bold/italic faces), **13** (spacing/coalesce), **15** (image-mode TTF AA), **16** (selectors + float lite), **17–20** core (flex/grid lite, thead repeat, fonts/CJK/Arabic joining, HF/links edges).
 
@@ -97,10 +97,10 @@ Tier 1 is **not closed** yet. Suggested order for the next sessions:
 | 14 | Images in PDF - robust path | 1 | [phases/phase-14-pdf-images.md](phases/phase-14-pdf-images.md) | 1–2 wk | `[x]` 2026-08-04 |
 | 15 | Image mode - real TTF/AA raster | 1 | [phases/phase-15-image-mode-raster.md](phases/phase-15-image-mode-raster.md) | 3–6 wk | `[x]` 2026-08-04 |
 | 16 | CSS invoices use (selectors + float lite) | 1 | [phases/phase-16-invoice-css.md](phases/phase-16-invoice-css.md) | 3–6 wk | `[x]` 2026-08-04 |
-| 17 | Broader CSS (position/float, partial flex, grid lite) | 2 | [phases/phase-17-broader-css.md](phases/phase-17-broader-css.md) | 2–4 mo | `[x]` #16/#17; matrix honesty pending |
-| 18 | Pagination polish (thead repeat, breaks) | 2 | [phases/phase-18-pagination-polish.md](phases/phase-18-pagination-polish.md) | 3–6 wk | `[x]` #16; matrix/CLI docs pending |
-| 19 | Fonts / i18n (discovery, CJK/Type0, stdlib shaping) | 2 | [phases/phase-19-fonts-i18n.md](phases/phase-19-fonts-i18n.md) | 1–3 mo | `[x]` #16/#17; @font-face audit pending |
-| 20 | HF / links edge cases | 2 | [phases/phase-20-hf-links-edges.md](phases/phase-20-hf-links-edges.md) | 2–4 wk | `[x]` #16; HF fragment GoTo `[~]` |
+| 17 | Broader CSS (position/float, partial flex, grid lite) | 2 | [phases/phase-17-broader-css.md](phases/phase-17-broader-css.md) · [subplan](phases/subplans-tier-2/phase-17-pending.md) | 2–4 mo | `[x]` #16/#17; matrix honesty pending |
+| 18 | Pagination polish (thead repeat, breaks) | 2 | [phases/phase-18-pagination-polish.md](phases/phase-18-pagination-polish.md) · [subplan](phases/subplans-tier-2/phase-18-pending.md) | 3–6 wk | `[x]` #16; matrix/CLI docs pending |
+| 19 | Fonts / i18n (discovery, CJK/Type0, stdlib shaping) | 2 | [phases/phase-19-fonts-i18n.md](phases/phase-19-fonts-i18n.md) · [subplan](phases/subplans-tier-2/phase-19-pending.md) | 1–3 mo | `[x]` #16/#17; @font-face audit pending |
+| 20 | HF / links edge cases | 2 | [phases/phase-20-hf-links-edges.md](phases/phase-20-hf-links-edges.md) · [subplan](phases/subplans-tier-2/phase-20-pending.md) | 2–4 wk | `[x]` #16; HF fragment GoTo `[~]` |
 | 21 | Arbitrary websites / paste-any-URL | 2→3 | [phases/phase-21-arbitrary-websites.md](phases/phase-21-arbitrary-websites.md) | 2–4 mo | `[ ]` |
 | 22 | JavaScript support (staged) | 2→3 | [phases/phase-22-javascript.md](phases/phase-22-javascript.md) | research + years for full | `[ ]` |
 | 23 | Tier 3 open-web competition | 3 | [phases/phase-23-tier3-deferred.md](phases/phase-23-tier3-deferred.md) | n/a | `[~]` deferred |
