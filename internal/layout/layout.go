@@ -7,7 +7,7 @@
 // siblings, tables (separate borders, colspan), images, lists, text wrapping
 // with the embedded Liberation Sans font, float lite (left/right + clear),
 // real inline-block, box-sizing, position relative/absolute lite, and a
-// partial flex (row/column) subset. Grid remains deferred.
+// partial flex (row/column) subset and CSS grid lite (tracks, gap, column span).
 package layout
 
 import (
@@ -103,18 +103,28 @@ type Op struct {
 	// Fixed marks ops from position:fixed boxes; Paint stamps them on every
 	// page at viewport-relative coordinates.
 	Fixed bool
+
+	// ZIndex paints later (higher) above earlier ops when non-zero or set.
+	ZIndex    int
+	ZIndexSet bool
+
+	// RotateDeg rotates the glyph around its baseline origin (PDF text matrix).
+	// Used for writing-mode:vertical-* upright→sideways CJK (90°).
+	RotateDeg float64
 }
 
 type engine struct {
-	opts     Options
-	font     *pdf.Font // default/regular face (metrics fallback)
-	faces    *pdf.FaceSet
-	registry *pdf.Registry
-	styles   map[*html.Node]ResolvedStyle
-	ops      []Op
-	noEmit   bool // measurement mode: compute geometry without emitting ops
-	height   float64
-	scale    float64 // zoom factor applied to style lengths (>= 1)
+	opts      Options
+	font      *pdf.Font // default/regular face (metrics fallback)
+	faces     *pdf.FaceSet
+	registry  *pdf.Registry
+	styles    map[*html.Node]ResolvedStyle
+	ops       []Op
+	noEmit    bool // measurement mode: compute geometry without emitting ops
+	height    float64
+	scale     float64 // zoom factor applied to style lengths (>= 1)
+	zIndex    int
+	zIndexSet bool
 }
 
 // faceFor selects the TrueType face for a resolved style (bold/italic),
@@ -134,6 +144,32 @@ func (e *engine) faceFor(st ResolvedStyle) *pdf.Font {
 	return e.font
 }
 
+// faceForRune picks the first CSS font-family face (then defaults) that has a
+// glyph for r — browser-like fallback so Hangul/Latin/CJK can come from
+// different faces in one run.
+func (e *engine) faceForRune(st ResolvedStyle, r rune) *pdf.Font {
+	if r == ' ' || r == '\t' || r == '\n' || r == '\r' {
+		return e.faceFor(st)
+	}
+	if e.registry != nil {
+		for _, fam := range st.FontFamily {
+			f := e.registry.Lookup([]string{fam}, st.FontWeight, st.FontItalic)
+			if f != nil && f.GlyphID(r) != 0 {
+				return f
+			}
+		}
+	}
+	if e.faces != nil {
+		if f := e.faces.Resolve(st.FontWeight, st.FontItalic); f != nil && f.GlyphID(r) != 0 {
+			return f
+		}
+	}
+	if e.font != nil && e.font.GlyphID(r) != 0 {
+		return e.font
+	}
+	return e.faceFor(st)
+}
+
 // scalePt applies the engine zoom factor to a style length in points.
 func (e *engine) scalePt(v float64) float64 { return v * e.scale }
 
@@ -148,8 +184,23 @@ func zoomScale(z float64) float64 {
 
 func (e *engine) add(op Op) {
 	if !e.noEmit {
+		op.ZIndex = e.zIndex
+		op.ZIndexSet = e.zIndexSet
 		e.ops = append(e.ops, op)
 	}
+}
+
+func (e *engine) pushZ(st ResolvedStyle) (prevZ int, prevSet bool) {
+	prevZ, prevSet = e.zIndex, e.zIndexSet
+	if st.ZIndexSet {
+		e.zIndex = st.ZIndex
+		e.zIndexSet = true
+	}
+	return prevZ, prevSet
+}
+
+func (e *engine) popZ(prevZ int, prevSet bool) {
+	e.zIndex, e.zIndexSet = prevZ, prevSet
 }
 
 // Layout renders the document into a display list.
@@ -227,6 +278,8 @@ func (e *engine) build(n *html.Node, availW, x, y float64) *box {
 	if st.Display == "none" {
 		return nil
 	}
+	prevZ, prevSet := e.pushZ(st)
+	defer e.popZ(prevZ, prevSet)
 	start := len(e.ops)
 	var b *box
 	switch n.Name {
@@ -242,6 +295,9 @@ func (e *engine) build(n *html.Node, availW, x, y float64) *box {
 	}
 	if b == nil && st.Position == "absolute" {
 		b = e.buildAbsolute(n, st, availW, x, y)
+	}
+	if b == nil && (st.WritingMode == "vertical-rl" || st.WritingMode == "vertical-lr") {
+		b = e.buildVerticalBlock(n, st, availW, x, y)
 	}
 	if b == nil && (st.Display == "flex" || st.Display == "inline-flex") {
 		b = e.buildFlex(n, st, availW, x, y)
@@ -483,6 +539,10 @@ func (e *engine) prependChrome(insertAt int, st ResolvedStyle, x, y, w, h float6
 	if len(chrome) == 0 {
 		return
 	}
+	for i := range chrome {
+		chrome[i].ZIndex = e.zIndex
+		chrome[i].ZIndexSet = e.zIndexSet
+	}
 	// insert chrome before content ops
 	tail := append([]Op(nil), e.ops[insertAt:]...)
 	e.ops = e.ops[:insertAt]
@@ -703,8 +763,22 @@ func (e *engine) placeFloat(n *html.Node, cs ResolvedStyle, floats *floatState, 
 			}
 		}
 	case "right":
-		if floats.hasRight && floats.rightBottom > fy {
-			fy = floats.rightBottom
+		if floats.hasRight {
+			room := floats.rightEdge - contentX
+			if floats.hasLeft && floats.rightEdge-floats.leftEdge < room {
+				room = floats.rightEdge - floats.leftEdge
+			}
+			if room >= avail*0.5 {
+				fy = floats.rightTop
+				if fy < flowY {
+					fy = flowY
+				}
+				if avail > room {
+					avail = room
+				}
+			} else if floats.rightBottom > fy {
+				fy = floats.rightBottom
+			}
 		}
 	}
 

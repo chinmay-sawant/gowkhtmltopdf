@@ -1,6 +1,8 @@
 package layout
 
 import (
+	"sort"
+
 	"gowkhtmltopdf/internal/pdf"
 )
 
@@ -130,15 +132,34 @@ func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 				drawLink(p, op, pg, contentH, opts)
 			}
 		}
+		sortPaintIndices(res.Ops, idxs)
 		for _, idx := range idxs {
 			paintOp(&res.Ops[idx], pageIdx)
 		}
 		// Fixed layer: page-local coords (pageIdx 0 math on every page).
+		sortPaintIndices(res.Ops, fixedIdx)
 		for _, idx := range fixedIdx {
 			paintOp(&res.Ops[idx], 0)
 		}
 	}
 	return nil
+}
+
+func sortPaintIndices(ops []Op, idxs []int) {
+	sort.SliceStable(idxs, func(i, j int) bool {
+		a, b := ops[idxs[i]], ops[idxs[j]]
+		az, bz := 0, 0
+		if a.ZIndexSet {
+			az = a.ZIndex
+		}
+		if b.ZIndexSet {
+			bz = b.ZIndex
+		}
+		if az != bz {
+			return az < bz
+		}
+		return idxs[i] < idxs[j]
+	})
 }
 
 func isSplittable(op *Op) bool {
@@ -749,9 +770,13 @@ func drawText(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintO
 	}
 	c.SetFont(fontName, op.Size)
 	c.BeginText()
-	c.TextAt(x, y)
-	// Fake bold only when CSS wants bold but the face is not a real bold TTF.
-	// Skip for Type0/CJK runs: stroking composite outlines looks like tofu clumps.
+	if op.RotateDeg == 90 || op.RotateDeg == -90 {
+		c.TextMatrix(0, 1, -1, 0, x, y)
+	} else {
+		c.TextAt(x, y)
+	}
+	// Fake bold only for Latin when CSS wants bold but the face is not bold.
+	// Stroking CJK/Type0 outlines creates horizontal streak artifacts.
 	fakeBold := op.Bold && (op.Font == nil || !op.Font.Bold())
 	if fakeBold {
 		for _, r := range op.Text {

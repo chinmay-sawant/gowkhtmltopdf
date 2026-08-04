@@ -1,17 +1,22 @@
 package layout
 
 import (
+	"sort"
+
 	"gowkhtmltopdf/internal/html"
 )
 
 type flexMeas struct {
-	n     *html.Node
-	baseW float64
-	grow  float64
+	n      *html.Node
+	baseW  float64
+	grow   float64
+	shrink float64
+	order  int
 }
 
 // buildFlex lays out a flex container (row or column) with a report-friendly
-// subset: justify-content, align-items, gap, flex-grow 0/1, and flex-wrap.
+// subset: justify-content, align-items, gap, flex-grow/shrink/basis, order,
+// and flex-wrap.
 func (e *engine) buildFlex(n *html.Node, st ResolvedStyle, availW, x, y float64) *box {
 	ml, mr := e.scalePt(st.MarginLeft), e.scalePt(st.MarginRight)
 	b := &box{node: n, style: st, kind: "block", x: x + ml, y: y}
@@ -88,8 +93,16 @@ func (e *engine) flowFlexRow(parent *box, kids []*html.Node, st ResolvedStyle, c
 		if g < 0 {
 			g = 0
 		}
-		items = append(items, flexMeas{n: kid, baseW: e.flexItemBaseWidth(kid, cs, contentW), grow: g})
+		sh := cs.FlexShrink
+		if sh < 0 {
+			sh = 1
+		}
+		items = append(items, flexMeas{
+			n: kid, baseW: e.flexItemBaseWidth(kid, cs, contentW),
+			grow: g, shrink: sh, order: cs.FlexOrder,
+		})
 	}
+	sort.SliceStable(items, func(i, j int) bool { return items[i].order < items[j].order })
 
 	var lines [][]flexMeas
 	if !wrap {
@@ -133,6 +146,20 @@ func (e *engine) flowFlexRow(parent *box, kids []*html.Node, st ResolvedStyle, c
 func (e *engine) flexItemBaseWidth(n *html.Node, cs ResolvedStyle, contentW float64) float64 {
 	pad := e.scalePt(cs.PaddingLeft) + e.scalePt(cs.PaddingRight) +
 		e.scalePt(cs.BorderLeft.Width) + e.scalePt(cs.BorderRight.Width)
+	if cs.FlexBasisPercent >= 0 {
+		w := contentW * cs.FlexBasisPercent / 100
+		if cs.BoxSizing != "border-box" {
+			w += pad
+		}
+		return w
+	}
+	if cs.FlexBasis >= 0 {
+		w := e.scalePt(cs.FlexBasis)
+		if cs.BoxSizing != "border-box" {
+			w += pad
+		}
+		return w
+	}
 	if cs.WidthPercent >= 0 {
 		w := contentW * cs.WidthPercent / 100
 		if cs.BoxSizing != "border-box" {
@@ -159,24 +186,54 @@ func (e *engine) flexItemBaseWidth(n *html.Node, cs ResolvedStyle, contentW floa
 }
 
 func (e *engine) placeFlexLineMeasured(parent *box, st ResolvedStyle, items []flexMeas, contentW, contentX, y, cy, gap float64) float64 {
-	var fixed, growSum float64
+	var fixed, growSum, shrinkSum float64
 	for _, it := range items {
 		fixed += it.baseW
 		growSum += it.grow
+		shrinkSum += it.shrink * it.baseW
 	}
 	gaps := gap * float64(len(items)-1)
 	if gaps < 0 {
 		gaps = 0
 	}
 	free := contentW - fixed - gaps
-	if free < 0 {
-		free = 0
-	}
 	widths := make([]float64, len(items))
 	for i, it := range items {
 		widths[i] = it.baseW
-		if growSum > 0 && free > 0 && it.grow > 0 {
-			widths[i] += free * (it.grow / growSum)
+	}
+	if free > 0 && growSum > 0 {
+		for i, it := range items {
+			if it.grow > 0 {
+				widths[i] += free * (it.grow / growSum)
+			}
+		}
+	} else if free < 0 && shrinkSum > 0 {
+		deficit := -free
+		for i, it := range items {
+			if it.shrink <= 0 || it.baseW <= 0 {
+				continue
+			}
+			share := (it.shrink * it.baseW) / shrinkSum
+			widths[i] -= deficit * share
+			if widths[i] < 0 {
+				widths[i] = 0
+			}
+		}
+	}
+	// Clamp to min/max-width after grow/shrink (simplified flex algorithm).
+	for i, it := range items {
+		cs := e.styles[it.n]
+		if cs.MinWidth > 0 {
+			mn := e.scalePt(cs.MinWidth)
+			if widths[i] < mn {
+				widths[i] = mn
+			}
+		}
+		if cs.MaxWidth >= 0 {
+			mx := e.scalePt(cs.MaxWidth)
+			if widths[i] > mx {
+				widths[i] = mx
+			}
 		}
 	}
 	totalW := 0.0
@@ -201,7 +258,6 @@ func (e *engine) placeFlexLineMeasured(parent *box, st ResolvedStyle, items []fl
 		}
 	}
 
-	// Build each item into its final width so backgrounds match the flex slot.
 	type placed struct {
 		box *box
 		h   float64
@@ -218,14 +274,6 @@ func (e *engine) placeFlexLineMeasured(parent *box, st ResolvedStyle, items []fl
 				lx += justifyGap
 			}
 			continue
-		}
-		// Force border-box to the flex slot when build undersized/oversized.
-		if absFloat(cb.w-widths[i]) > 0.5 {
-			dx := 0.0
-			if cb.w > widths[i] {
-				// leave as-is but clamp visual slot
-			}
-			_ = dx
 		}
 		dx := lx - cb.x
 		dy := (y + cy) - cb.y
@@ -244,7 +292,6 @@ func (e *engine) placeFlexLineMeasured(parent *box, st ResolvedStyle, items []fl
 			lx += justifyGap
 		}
 	}
-	// align-items vertical adjustment
 	for _, p := range built {
 		if p.box == nil {
 			continue
@@ -266,16 +313,18 @@ func (e *engine) placeFlexLineMeasured(parent *box, st ResolvedStyle, items []fl
 	return cy + rowH
 }
 
-func absFloat(v float64) float64 {
-	if v < 0 {
-		return -v
-	}
-	return v
-}
-
 func (e *engine) flowFlexColumn(parent *box, kids []*html.Node, contentW, contentX, y, cy, gap float64) float64 {
-	for i, kid := range kids {
-		cb := e.build(kid, contentW, contentX, y+cy)
+	type ord struct {
+		n     *html.Node
+		order int
+	}
+	items := make([]ord, 0, len(kids))
+	for _, kid := range kids {
+		items = append(items, ord{n: kid, order: e.styles[kid].FlexOrder})
+	}
+	sort.SliceStable(items, func(i, j int) bool { return items[i].order < items[j].order })
+	for i, it := range items {
+		cb := e.build(it.n, contentW, contentX, y+cy)
 		if cb == nil {
 			continue
 		}
@@ -283,7 +332,7 @@ func (e *engine) flowFlexColumn(parent *box, kids []*html.Node, contentW, conten
 			parent.children = append(parent.children, cb)
 		}
 		cy += cb.h
-		if i < len(kids)-1 {
+		if i < len(items)-1 {
 			cy += gap
 		}
 	}

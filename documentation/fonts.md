@@ -1,6 +1,7 @@
 # Fonts, discovery, and Unicode shaping limits
 
 > Phase 19 notes for operators and integrators.
+> Plan amendment: [`plans/amendments/2026-08-04-shaping-stdlib.md`](../plans/amendments/2026-08-04-shaping-stdlib.md).
 
 ## Bundled faces
 
@@ -12,19 +13,25 @@ WinAnsi-style single-byte codes.
 
 | Flag | Effect |
 |------|--------|
-| `--font-path DIR` | Scan `DIR` (and shallow children) for `.ttf` faces; repeatable |
+| `--font-path DIR` | Scan `DIR` (and shallow children) for `.ttf` / TrueType-flavored `.otf`; repeatable |
 | `--use-system-fonts` | Also scan common OS font directories (e.g. `/usr/share/fonts`) |
 
 Discovery is **opt-in** (privacy + startup). CSS `font-family` lists are
 matched against discovered family names (name table) before falling back
-to Liberation.
+to Liberation. **CFF / `OTTO` OpenType is rejected** (TrueType outlines only).
 
-Example (CJK):
+Example (CJK / Hangul):
 
 ```sh
 gowkhtmltopdf --font-path /usr/share/fonts/truetype/droid \
+  --font-path testdata/fonts \
   fixture-27-cjk-fontpath.html out.pdf
+# Production Hangul: fonts-noto-cjk / any Hangul-capable TTF on --font-path
+#   --font-path /usr/share/fonts/opentype/noto
 ```
+
+`testdata/fonts/NotoSansKR-HangulSubset.ttf` is a tiny OFL subset for CI /
+fixture-27 smoke only — not a full CJK face.
 
 ## Type0 / CID path
 
@@ -36,20 +43,18 @@ for CJK.
 
 ## Honest shaping limits
 
-- **No HarfBuzz / no OpenType shaping.** Glyphs are placed with advance
-  widths only.
-- **CJK (Han / kana / hangul)** works when a capable TTF is on the font
-  path: characters render, but vertical writing modes, ruby, and complex
-  line-breaking are not claimed.
-- **Mixed Latin + CJK:** Latin glyphs missing from a CJK face (common with
-  Droid Sans Fallback) are drawn with the embedded Liberation face; CJK
-  continues on the Type0 sibling of the original face. Hangul needs a
-  Hangul-capable face — many “Fallback” fonts ship without it.
-- **Arabic / Hebrew:** a best-effort **RTL run reverse** is applied at
-  emit time so character order is closer to visual RTL. **Joining,
-  ligation, and mark positioning are NOT implemented** — production
-  Arabic/Indic output is **not claimed**.
-- **Indic and other complex scripts** are **not claimed**.
-- **`@font-face`:** local `url(...ttf)` sources are loaded under the same
-  ACL as other subresources; `.woff`/network downloads are skipped with a
-  warning.
+- **No HarfBuzz / no OpenType GSUB/GPOS** (stdlib-only + `CGO_ENABLED=0`).
+  Real HarfBuzz remains out of scope; see the plan amendment above.
+- **Arabic / Hebrew:** RTL run reverse **plus** best-effort **Arabic
+  presentation-form joining** (initial/medial/final/isolated) and Lam-Alef
+  ligatures in `ShapeText`. This is **not** OpenType shaping — faces without
+  Presentation Forms glyphs will still look disconnected.
+- **Indic and other complex scripts** are **not claimed** (combining marks
+  kept after base; no matra reordering).
+- **CJK (Han / kana / Hangul)** works when a capable TTF is on the font
+  path. `writing-mode: vertical-rl|lr` rotates ideographic / Hangul / kana
+  glyphs 90° (sideways) and stacks Latin upright — not full CSS vertical
+  typesetting.
+- **Mixed Latin + CJK:** Latin glyphs missing from a CJK face are drawn with
+  embedded Liberation; CJK continues on the Type0 sibling of the original face.
+- **`@font-face`:** local `url(...ttf|otf)` under ACL; `.woff`/network skipped.

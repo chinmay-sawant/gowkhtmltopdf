@@ -7,9 +7,8 @@ import (
 	"gowkhtmltopdf/internal/html"
 )
 
-// buildGrid lays out a simple CSS grid: equal or fixed tracks from
-// grid-template-columns, with gap. Auto-flow is row. Nested grid and
-// spanning are out of scope.
+// buildGrid lays out a CSS grid lite: tracks from grid-template-columns,
+// gap, auto-flow row, and column spanning (grid-column: span N / start / end).
 func (e *engine) buildGrid(n *html.Node, st ResolvedStyle, availW, x, y float64) *box {
 	ml, mr := e.scalePt(st.MarginLeft), e.scalePt(st.MarginRight)
 	b := &box{node: n, style: st, kind: "block", x: x + ml, y: y}
@@ -51,17 +50,105 @@ func (e *engine) buildGrid(n *html.Node, st ResolvedStyle, availW, x, y float64)
 		kids = append(kids, c)
 	}
 
-	col := 0
-	rowY := cy
-	rowH := 0.0
-	for i, kid := range kids {
-		cw := cols[col]
-		cx := contentX
-		for j := 0; j < col; j++ {
-			cx += cols[j] + gap
+	// Occupancy map: row → set of used column indices.
+	type cell struct {
+		n         *html.Node
+		col, span int
+		row       int
+	}
+	var placed []cell
+	occ := map[int]map[int]bool{}
+	ensure := func(row int) {
+		if occ[row] == nil {
+			occ[row] = map[int]bool{}
 		}
-		cb := e.build(kid, cw, cx, y+rowY)
-		if cb != nil {
+	}
+	freeAt := func(row, col, span int) bool {
+		ensure(row)
+		for i := 0; i < span; i++ {
+			c := col + i
+			if c >= len(cols) || occ[row][c] {
+				return false
+			}
+		}
+		return true
+	}
+	mark := func(row, col, span int) {
+		ensure(row)
+		for i := 0; i < span; i++ {
+			occ[row][col+i] = true
+		}
+	}
+
+	cursorRow, cursorCol := 0, 0
+	for _, kid := range kids {
+		cs := e.styles[kid]
+		span := cs.GridColumnSpan
+		if span < 1 {
+			span = 1
+		}
+		if span > len(cols) {
+			span = len(cols)
+		}
+		start := cs.GridColumnStart - 1 // 0-based
+		row, col := cursorRow, cursorCol
+		if start >= 0 {
+			col = start
+			// find first row where this start+span fits
+			for !freeAt(row, col, span) {
+				row++
+			}
+		} else {
+			for {
+				if col+span > len(cols) {
+					col = 0
+					row++
+					continue
+				}
+				if freeAt(row, col, span) {
+					break
+				}
+				col++
+			}
+		}
+		mark(row, col, span)
+		placed = append(placed, cell{n: kid, col: col, span: span, row: row})
+		cursorRow, cursorCol = row, col+span
+		if cursorCol >= len(cols) {
+			cursorCol = 0
+			cursorRow++
+		}
+	}
+
+	// Lay out by rows.
+	maxRow := 0
+	for _, p := range placed {
+		if p.row > maxRow {
+			maxRow = p.row
+		}
+	}
+	rowY := cy
+	for r := 0; r <= maxRow; r++ {
+		rowH := 0.0
+		for _, p := range placed {
+			if p.row != r {
+				continue
+			}
+			cw := 0.0
+			cx := contentX
+			for j := 0; j < p.col; j++ {
+				cx += cols[j] + gap
+			}
+			for j := 0; j < p.span; j++ {
+				cw += cols[p.col+j]
+				if j > 0 {
+					cw += gap
+				}
+			}
+			cb := e.build(p.n, cw, cx, y+rowY)
+			if cb == nil {
+				continue
+			}
 			dx := cx - cb.x
 			dy := (y + rowY) - cb.y
 			e.shiftBoxOps(cb, dx, dy)
@@ -72,16 +159,11 @@ func (e *engine) buildGrid(n *html.Node, st ResolvedStyle, availW, x, y float64)
 			}
 			b.children = append(b.children, cb)
 		}
-		col++
-		if col >= len(cols) || i == len(kids)-1 {
-			cy = rowY + rowH
-			if i < len(kids)-1 {
-				cy += gap
-			}
-			rowY = cy
-			rowH = 0
-			col = 0
+		cy = rowY + rowH
+		if r < maxRow {
+			cy += gap
 		}
+		rowY = cy
 	}
 	cy += e.scalePt(st.PaddingBottom)
 	if st.Height >= 0 {
@@ -122,8 +204,8 @@ func parseGridTracks(raw string, contentW, columnGap float64, e *engine) []float
 	}
 	toks := strings.Fields(raw)
 	type track struct {
-		fr    float64 // >0 means fr weight
-		fixed float64 // >=0 means definite pt width; -1 unset
+		fr    float64
+		fixed float64
 	}
 	var tracks []track
 	frSum := 0.0

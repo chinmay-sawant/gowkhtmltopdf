@@ -177,6 +177,11 @@ func (c *Content) TextAt(x, y float64) {
 	c.buf.WriteString(fmt.Sprintf("%s %s Td\n", num(x), num(y)))
 }
 
+// TextMatrix sets the text matrix via Tm (a b c d e f).
+func (c *Content) TextMatrix(a, b, cc, d, e, f float64) {
+	c.buf.WriteString(fmt.Sprintf("%s %s %s %s %s %s Tm\n", num(a), num(b), num(cc), num(d), num(e), num(f)))
+}
+
 // TextLeading sets the leading for TL/T*.
 func (c *Content) TextLeading(leading float64) {
 	c.buf.WriteString(num(leading) + " TL\n")

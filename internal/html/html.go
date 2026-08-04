@@ -124,14 +124,15 @@ func Parse(source string) (*Node, error) {
 			if len(t.data) == 0 {
 				continue
 			}
+			data := UnescapeEntities(t.data)
 			if len(top.Children) > 0 {
 				last := top.Children[len(top.Children)-1]
 				if last.Type == TextNode {
-					last.Text += t.data
+					last.Text += data
 					continue
 				}
 			}
-			node := &Node{Type: TextNode, Text: t.data}
+			node := &Node{Type: TextNode, Text: data}
 			node.Parent = top
 			top.Children = append(top.Children, node)
 		case tokStart:
@@ -170,7 +171,7 @@ func Parse(source string) (*Node, error) {
 			node := &Node{Type: ElementNode, Name: name, Attrs: map[string]string{}}
 			for i := 0; i+1 < len(t.attrs); i += 2 {
 				key := strings.ToLower(t.attrs[i])
-				val := t.attrs[i+1]
+				val := UnescapeEntities(t.attrs[i+1])
 				if _, dup := node.Attrs[key]; !dup {
 					node.AttrOrder = append(node.AttrOrder, key)
 					node.Attrs[key] = val

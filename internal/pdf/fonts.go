@@ -35,6 +35,7 @@ type Font struct {
 	tables  map[string][]byte // name -> raw table bytes (for rebuilding subset)
 	cmap    map[uint32]uint16 // rune -> glyph id
 	advance []int32           // advance width in font units per glyph
+	lsb     []int16           // left side bearing per glyph
 }
 
 // ParseTTF parses a TrueType (or OpenType with TrueType outlines) font file.
@@ -45,6 +46,9 @@ func ParseTTF(data []byte) (*Font, error) {
 	}
 	if !bytes.Equal(data[0:4], []byte{0, 1, 0, 0}) &&
 		!bytes.Equal(data[0:4], []byte("true")) {
+		if bytes.Equal(data[0:4], []byte("OTTO")) {
+			return nil, errors.New("font: CFF/OTTO OpenType not supported (TrueType outlines only)")
+		}
 		return nil, errors.New("font: not a TrueType font")
 	}
 	numTables := int(binary.BigEndian.Uint16(data[4:6]))
@@ -135,11 +139,18 @@ func (f *Font) parseHmtx() error {
 	}
 	lastAdv := int32(binary.BigEndian.Uint16(t[need-4 : need-2]))
 	f.advance = make([]int32, f.numGlyphs)
+	f.lsb = make([]int16, f.numGlyphs)
 	for i := 0; i < f.numHMetrics; i++ {
 		f.advance[i] = int32(binary.BigEndian.Uint16(t[i*4 : i*4+2]))
+		f.lsb[i] = int16(binary.BigEndian.Uint16(t[i*4+2 : i*4+4]))
 	}
+	sideBearings := t[need:]
 	for i := f.numHMetrics; i < f.numGlyphs; i++ {
 		f.advance[i] = lastAdv
+		off := (i - f.numHMetrics) * 2
+		if off+2 <= len(sideBearings) {
+			f.lsb[i] = int16(binary.BigEndian.Uint16(sideBearings[off : off+2]))
+		}
 	}
 	return nil
 }

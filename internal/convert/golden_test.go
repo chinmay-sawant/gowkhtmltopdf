@@ -80,6 +80,16 @@ func commandForFixture(t *testing.T, file string) *cli.Command {
 	cmd.Global.PageSize = "A4"
 	cmd.Global.Margin = settings.DefaultMargins()
 	cmd.Global.Background = true
+	// Opt-in CJK/Hangul faces for fixture-27 (and any CSS that names them).
+	fontDirs := []string{}
+	if _, err := os.Stat("/usr/share/fonts/truetype/droid"); err == nil {
+		fontDirs = append(fontDirs, "/usr/share/fonts/truetype/droid")
+	}
+	testFonts := filepath.Join("..", "..", "testdata", "fonts")
+	if _, err := os.Stat(testFonts); err == nil {
+		fontDirs = append(fontDirs, testFonts)
+	}
+	cmd.Global.FontPaths = fontDirs
 	return cmd
 }
 
@@ -237,6 +247,12 @@ func TestGoldenCorpusAllFixtures(t *testing.T) {
 			}
 			if b.uris && !bytes.Contains(data, []byte("/S /URI")) {
 				t.Error("expected a URI link annotation (/S /URI)")
+			}
+			if file == "fixture-27-cjk-fontpath.html" && bytes.Contains(data, []byte("NotoSansKR")) {
+				// Hangul subset on testdata/fonts — prove Type0 path for KR glyphs.
+				if !bytes.Contains(data, []byte("/Subtype /Type0")) {
+					t.Error("fixture-27: expected Type0 font when NotoSansKR is embedded")
+				}
 			}
 			assertPDFStructure(t, data)
 		})

@@ -1,23 +1,28 @@
 <!DOCTYPE html>
 <!--
   fixture-27-cjk-fontpath
-  Proves: CJK (Chinese/Japanese) renders when a Unicode face is available via
-  --font-path (phase 19). Hangul requires a Hangul-capable face (Droid Sans
-  Fallback on many distros lacks it). Samples pass --font-path when present.
-  Expected: 1 page.
+  Proves: CJK (Chinese/Japanese) and Hangul render when Unicode faces are
+  available via --font-path. Samples pass Droid + testdata/fonts (Noto Sans KR
+  fixture subset: Latin + Han/kana + Hangul) when present. Expected: 1 page.
 -->
 <html>
 <head>
   <meta charset="utf-8">
   <title>CJK Sample</title>
   <style>
-    body { font-family: "Droid Sans Fallback", "Noto Sans CJK SC", sans-serif; font-size: 14pt; }
-    h1 { font-size: 18pt; }
+    body {
+      /* Droid first for Han/kana; Noto KR supplies Hangul (and Latin) via fallback. */
+      font-family: "Droid Sans Fallback", "Noto Sans KR", sans-serif;
+      font-size: 14pt;
+      color: #111;
+    }
+    h1 { font-size: 18pt; font-weight: bold; }
   </style>
 </head>
 <body>
   <h1>国际化报告</h1>
   <p>こんにちは、世界。Hello mixed Latin + 中文 + 日本語.</p>
   <p>汉字与假名：東京都、上海、深圳。</p>
+  <p>안녕하세요. 한글 테스트.</p>
 </body>
 </html>

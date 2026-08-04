@@ -32,8 +32,17 @@ type ResolvedStyle struct {
 	AlignItems          string  // stretch | flex-start | center | flex-end
 	Gap                 float64 // flex/grid gap (pt)
 	FlexGrow            float64
+	FlexShrink          float64 // default 1; 0 disables shrink
+	FlexBasis           float64 // -1 = auto
+	FlexBasisPercent    float64 // >=0 means % of flex container content width
+	FlexOrder           int
+	ZIndex              int
+	ZIndexSet           bool
+	WritingMode         string // "" | "horizontal-tb" | "vertical-rl" | "vertical-lr"
 	GridTemplateColumns string // raw grid-template-columns value
 	GridTemplateRows    string
+	GridColumnSpan      int     // from grid-column: span N (default 1)
+	GridColumnStart     int     // 1-based; 0 = auto
 	Width               float64 // -1 = auto; absolute length in pt when WidthPercent < 0
 	WidthPercent        float64 // >=0 means width is that % of the containing block at layout time
 	Height              float64
@@ -86,36 +95,42 @@ type border struct {
 // initialStyle returns the CSS initial values.
 func initialStyle() ResolvedStyle {
 	return ResolvedStyle{
-		Display:        "inline",
-		Position:       "static",
-		Float:          "none",
-		Clear:          "none",
-		BoxSizing:      "content-box",
-		TopAuto:        true,
-		RightAuto:      true,
-		BottomAuto:     true,
-		LeftAuto:       true,
-		FlexDirection:  "row",
-		FlexWrap:       "nowrap",
-		JustifyContent: "flex-start",
-		AlignItems:     "stretch",
-		Width:          -1,
-		WidthPercent:   -1,
-		Height:         -1,
-		MinWidth:       0,
-		MaxWidth:       -1,
-		MinHeight:      0,
-		MaxHeight:      -1,
-		Color:          [3]float64{0, 0, 0},
-		BGColor:        [4]float64{0, 0, 0, 0},
-		FontSize:       12, // 16px at 96dpi
-		FontWeight:     400,
-		VerticalAlign:  "baseline",
-		WhiteSpace:     "normal",
-		TextDecoration: "none",
-		BorderCollapse: "separate",
-		BorderSpacing:  0,
-		TableLayout:    "auto",
+		Display:          "inline",
+		Position:         "static",
+		Float:            "none",
+		FlexGrow:         0,
+		FlexShrink:       1,
+		FlexBasis:        -1,
+		FlexBasisPercent: -1,
+		Clear:            "none",
+		BoxSizing:        "content-box",
+		TopAuto:          true,
+		RightAuto:        true,
+		BottomAuto:       true,
+		LeftAuto:         true,
+		FlexDirection:    "row",
+		FlexWrap:         "nowrap",
+		JustifyContent:   "flex-start",
+		AlignItems:       "stretch",
+		Width:            -1,
+		WidthPercent:     -1,
+		Height:           -1,
+		MinWidth:         0,
+		MaxWidth:         -1,
+		MinHeight:        0,
+		MaxHeight:        -1,
+		Color:            [3]float64{0, 0, 0},
+		BGColor:          [4]float64{0, 0, 0, 0},
+		FontSize:         12, // 16px at 96dpi
+		FontWeight:       400,
+		VerticalAlign:    "baseline",
+		WhiteSpace:       "normal",
+		TextDecoration:   "none",
+		BorderCollapse:   "separate",
+		BorderSpacing:    0,
+		TableLayout:      "auto",
+		GridColumnSpan:   1,
+		WritingMode:      "horizontal-tb",
 	}
 }
 
@@ -396,10 +411,48 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext)
 			if v, err := strconv.ParseFloat(strings.TrimSpace(value), 64); err == nil && v >= 0 {
 				st.FlexGrow = v
 			}
+		case "flex-shrink":
+			if v, err := strconv.ParseFloat(strings.TrimSpace(value), 64); err == nil && v >= 0 {
+				st.FlexShrink = v
+			}
+		case "flex-basis":
+			if value == "auto" {
+				st.FlexBasis = -1
+				st.FlexBasisPercent = -1
+			} else if v, unit, ok := css.ParseLength(value); ok && unit == "%" {
+				st.FlexBasisPercent = v
+				st.FlexBasis = -1
+			} else if v, ok := lengthBox(value, fs, ctx.viewportW, "auto"); ok {
+				st.FlexBasis = v
+				st.FlexBasisPercent = -1
+			}
+		case "order":
+			if v, err := strconv.Atoi(strings.TrimSpace(value)); err == nil {
+				st.FlexOrder = v
+			}
+		case "z-index":
+			if value == "auto" {
+				st.ZIndexSet = false
+				st.ZIndex = 0
+			} else if v, err := strconv.Atoi(strings.TrimSpace(value)); err == nil {
+				st.ZIndex = v
+				st.ZIndexSet = true
+			}
+		case "writing-mode":
+			switch value {
+			case "horizontal-tb", "vertical-rl", "vertical-lr":
+				st.WritingMode = value
+			}
 		case "grid-template-columns":
 			st.GridTemplateColumns = value
 		case "grid-template-rows":
 			st.GridTemplateRows = value
+		case "grid-column", "grid-column-end":
+			parseGridColumn(st, value)
+		case "grid-column-start":
+			if v, err := strconv.Atoi(strings.TrimSpace(value)); err == nil && v > 0 {
+				st.GridColumnStart = v
+			}
 		case "float":
 			switch value {
 			case "left", "right", "none":
@@ -869,6 +922,44 @@ func marginLen(value string, fs, ctxW float64) float64 {
 }
 
 func pxToPt(px float64) float64 { return px * 0.75 }
+
+func parseGridColumn(st *ResolvedStyle, value string) {
+	value = strings.TrimSpace(value)
+	if strings.HasPrefix(value, "span ") {
+		n, err := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(value, "span ")))
+		if err == nil && n > 0 {
+			st.GridColumnSpan = n
+		}
+		return
+	}
+	// "1 / 3" or "1 / span 2"
+	parts := strings.Split(value, "/")
+	if len(parts) == 1 {
+		if v, err := strconv.Atoi(strings.TrimSpace(parts[0])); err == nil && v > 0 {
+			st.GridColumnStart = v
+			st.GridColumnSpan = 1
+		}
+		return
+	}
+	if v, err := strconv.Atoi(strings.TrimSpace(parts[0])); err == nil && v > 0 {
+		st.GridColumnStart = v
+	}
+	end := strings.TrimSpace(parts[1])
+	if strings.HasPrefix(end, "span ") {
+		n, err := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(end, "span ")))
+		if err == nil && n > 0 {
+			st.GridColumnSpan = n
+		}
+		return
+	}
+	if v, err := strconv.Atoi(end); err == nil && st.GridColumnStart > 0 {
+		sp := v - st.GridColumnStart
+		if sp < 1 {
+			sp = 1
+		}
+		st.GridColumnSpan = sp
+	}
+}
 
 // uaRules returns the user-agent declarations for an element name.
 func uaRules(name string) []css.Declaration {
