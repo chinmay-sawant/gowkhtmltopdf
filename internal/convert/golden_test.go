@@ -169,6 +169,7 @@ var fixturePageBounds = map[string]fixtureBounds{
 	"fixture-19-margin-and-sizing.html":     {minPages: 1, maxPages: 1},
 	"fixture-20-image-grid.html":            {minPages: 1, maxPages: 1, images: true},
 	"fixture-21-detailed-report.html":       {minPages: 3, maxPages: 0},
+	"fixture-22-float-invoice-chrome.html":  {minPages: 1, maxPages: 1},
 }
 
 // fixtureHeaderOK enforces the corpus hygiene rule: every fixture starts

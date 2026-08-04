@@ -18,7 +18,7 @@ is tracked in
 | Invoices, statements, multi-page tables, headers/footers, TOC, outlines | **In scope** (report engine) |
 | Deterministic PDF bytes, static binary, zero third-party modules | **In scope** |
 | Pixel-perfect clone of an arbitrary website | **Out of scope** |
-| Full CSS (flex/grid as layout, floats, absolute/fixed positioning) | **Out of scope** until later phases; floats still not laid out |
+| Full CSS (flex/grid as layout, absolute/fixed positioning) | **Out of scope** until later phases; float lite + clear shipped (phase 16) |
 | JavaScript-driven pages | **Out of scope** (`<script>` stripped; flags warn only) |
 | Full Unicode / CJK typesetting | **Partial / later** (Latin Liberation family today; phase 19) |
 
@@ -36,9 +36,15 @@ pipeline instead of claiming this engine matches it.
 | **Tier 2** | Leave wkhtmltopdf for most jobs | 17–20 | Broader CSS, pagination polish, multi-font/Unicode, HF/link edges |
 | **Tier 3** | Compete on the open web | 23 deferred | Not planned as pure-stdlib product; Chrome/Playwright territory |
 
-**As of 2026-08-04 (reconcile):** Tier 1 is **partially landed**
-(typography faces + spacing + image-mode TTF AA shipped; selectors expanded;
-float lite and some docs still open). See the post-MVP roadmap status index.
+**As of 2026-08-04:** Tier 1 remainder (float lite, PDF image docs/`web.images`, library install + `ConvertHTML`) is closed. See the post-MVP roadmap status index.
+
+### CSS invoices use (phase 16)
+
+Report templates can rely on: richer selectors (`:nth-child`, attribute, siblings), **float lite** (`float`/`clear` for logo+meta chrome), real **`inline-block`**, **`box-sizing: border-box`**, simple **`text-align: justify`**, and table-cell **`vertical-align`** top/middle/bottom. Not a full CSS2 float engine — prefer clear after chrome; complex float wrap is best-effort.
+
+### Images in PDF (phase 14)
+
+PNG/JPEG logos and grids are a solid path (fixtures 07/20). JPEG bytes pass through as DCTDecode; PNG alpha → soft-mask. DPI/quality CLI knobs for PDF remain ignored (honest matrix). `GlobalSettings` / `web.images=false` disables painting.
 
 ---
 

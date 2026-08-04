@@ -313,6 +313,9 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, doc 
 	}
 
 	imagesFn := func(src string) ([]byte, error) {
+		if !cmd.Global.Web.Images {
+			return nil, fmt.Errorf("images disabled")
+		}
 		r, err := loader.FetchSub(ctx, res.Base, src, obj.Load)
 		if err != nil {
 			return nil, err

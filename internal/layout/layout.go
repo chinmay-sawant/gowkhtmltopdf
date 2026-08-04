@@ -3,10 +3,11 @@
 // canvas (y grows downward from the top of the page content area). Painting
 // into a pdf.Document is done by Paint (paint.go).
 //
-// Phase-04 scope: block and inline flow, margin collapsing between siblings,
-// tables (separate borders, colspan), images, lists, text wrapping with the
-// embedded Liberation Sans font. Floats, absolute positioning, flex and grid
-// are out of scope; their properties degrade to in-flow block layout.
+// Report-engine scope: block and inline flow, margin collapsing between
+// siblings, tables (separate borders, colspan), images, lists, text wrapping
+// with the embedded Liberation Sans font, float lite (left/right + clear),
+// real inline-block, and box-sizing. Absolute/fixed positioning, flex and
+// grid remain out of scope; those properties degrade to in-flow layout.
 package layout
 
 import (
@@ -241,10 +242,18 @@ func (e *engine) buildBlock(n *html.Node, st ResolvedStyle, availW, x, y float64
 	if b.w < 0 {
 		b.w = 0
 	}
+	definiteW := st.Width >= 0 || st.WidthPercent >= 0
 	if st.WidthPercent >= 0 {
 		b.w = availW * st.WidthPercent / 100
 	} else if st.Width >= 0 {
 		b.w = e.scalePt(st.Width)
+	}
+	// content-box (default): specified width is the content width, so the
+	// border box grows by horizontal padding + border. border-box: specified
+	// width already is the border-box size.
+	if definiteW && st.BoxSizing != "border-box" {
+		b.w += e.scalePt(st.PaddingLeft) + e.scalePt(st.PaddingRight) +
+			e.scalePt(st.BorderLeft.Width) + e.scalePt(st.BorderRight.Width)
 	}
 	if st.MinWidth > 0 && b.w < e.scalePt(st.MinWidth) {
 		b.w = e.scalePt(st.MinWidth)
@@ -253,7 +262,6 @@ func (e *engine) buildBlock(n *html.Node, st ResolvedStyle, availW, x, y float64
 		b.w = e.scalePt(st.MaxWidth)
 	}
 	// Horizontal margin: auto centers (or pushes) a definite-width box.
-	definiteW := st.Width >= 0 || st.WidthPercent >= 0
 	if definiteW && (st.MarginLeftAuto || st.MarginRightAuto) {
 		free := availW - b.w
 		if free < 0 {
@@ -298,8 +306,15 @@ func (e *engine) buildBlock(n *html.Node, st ResolvedStyle, availW, x, y float64
 		e.add(Op{Kind: OpBullet, X: contentX + 4, Y: b.firstBaseline, Text: "\u2022", Font: e.font, Size: e.scalePt(st.FontSize), R: st.Color[0], G: st.Color[1], B: st.Color[2]})
 	}
 
-	if st.Height >= 0 && cy < e.scalePt(st.Height) {
-		cy = e.scalePt(st.Height)
+	if st.Height >= 0 {
+		h := e.scalePt(st.Height)
+		if st.BoxSizing != "border-box" {
+			h += e.scalePt(st.PaddingTop) + e.scalePt(st.PaddingBottom) +
+				e.scalePt(st.BorderTop.Width) + e.scalePt(st.BorderBottom.Width)
+		}
+		if cy < h {
+			cy = h
+		}
 	}
 	if st.MinHeight > 0 && cy < e.scalePt(st.MinHeight) {
 		cy = e.scalePt(st.MinHeight)
@@ -361,7 +376,11 @@ func (e *engine) partition(children []*html.Node, blocks, inlines *[]*html.Node)
 		if cs.Display == "none" {
 			continue
 		}
-		if cs.Display == "inline" || c.Name == "img" || cs.Float != "none" {
+		if cs.Float != "none" {
+			*blocks = append(*blocks, c)
+			continue
+		}
+		if cs.Display == "inline" || cs.Display == "inline-block" || c.Name == "img" {
 			*inlines = append(*inlines, c)
 			continue
 		}
@@ -378,10 +397,10 @@ func (e *engine) isInlineChild(n *html.Node) bool {
 		return false
 	}
 	cs := e.styles[n]
-	if cs.Display == "none" {
+	if cs.Display == "none" || cs.Float != "none" {
 		return false
 	}
-	return cs.Display == "inline" || n.Name == "img" || cs.Float != "none"
+	return cs.Display == "inline" || cs.Display == "inline-block" || n.Name == "img"
 }
 
 // onlyCollapsibleWS reports whether every node is a text node of only
@@ -399,12 +418,13 @@ func onlyCollapsibleWS(nodes []*html.Node) bool {
 }
 
 // flowChildren lays out children in document order: runs of inlines, then
-// block boxes, alternating as they appear. Using blocks-then-inlines put
-// nested tables above their preceding text (fixture-10 "Gateway… including").
+// block boxes, alternating as they appear. Floated children are positioned
+// out of flow with a lite exclusion model; clear advances past them.
 // Returns the advanced content height (cy end − cy start contribution is
 // encoded as the final cy relative to start; callers pass starting cy).
 func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedStyle, contentW, contentX, y, cy float64) float64 {
 	prevBottom := 0.0
+	floats := newFloatState(contentX, contentW)
 	i := 0
 	for i < len(children) {
 		n := children[i]
@@ -418,6 +438,20 @@ func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedSty
 			i++
 			continue
 		}
+		if n.Type == html.ElementNode && e.styles[n].Float != "none" {
+			cs := e.styles[n]
+			cy = floats.clear(cs.Clear, y, cy)
+			fb := e.placeFloat(n, cs, &floats, contentW, contentX, y, cy)
+			if fb != nil && parent != nil {
+				parent.children = append(parent.children, fb)
+				if e.opts.DebugBoxes {
+					e.add(Op{Kind: OpStrokeRect, X: fb.x, Y: fb.y, W: fb.w, H: fb.h, R: 1, G: 0, B: 0})
+				}
+			}
+			prevBottom = 0
+			i++
+			continue
+		}
 		if e.isInlineChild(n) {
 			var run []*html.Node
 			for i < len(children) {
@@ -425,6 +459,9 @@ func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedSty
 				if c.Type == html.ElementNode && e.styles[c].Display == "none" {
 					i++
 					continue
+				}
+				if c.Type == html.ElementNode && e.styles[c].Float != "none" {
+					break
 				}
 				if c.Type == html.TextNode && strings.TrimSpace(c.Text) == "" {
 					// keep interior whitespace inside an inline run, but a
@@ -447,7 +484,8 @@ func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedSty
 				if pb == nil {
 					pb = &box{style: st}
 				}
-				h := e.layoutInline(pb, run, contentW, contentX, y+cy)
+				ix, iw := floats.exclusion(y, cy)
+				h := e.layoutInline(pb, run, iw, ix, y+cy)
 				cy += h
 				if h > 0 {
 					prevBottom = 0
@@ -461,8 +499,10 @@ func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedSty
 			continue
 		}
 		cs := e.styles[n]
+		cy = floats.clear(cs.Clear, y, cy)
 		cy += collapseMargins(prevBottom, e.scalePt(cs.MarginTop))
-		cb := e.build(n, contentW, contentX, y+cy)
+		bx, bw := floats.exclusion(y, cy)
+		cb := e.build(n, bw, bx, y+cy)
 		if cb == nil {
 			prevBottom = 0
 			i++
@@ -478,7 +518,62 @@ func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedSty
 		}
 		i++
 	}
-	return cy
+	return floats.extentCy(y, cy)
+}
+
+// placeFloat lays out n as a float:left|right box and records it in floats.
+func (e *engine) placeFloat(n *html.Node, cs ResolvedStyle, floats *floatState, contentW, contentX, y, cy float64) *box {
+	avail := contentW
+	// Shrink-to-fit when width is auto: prefer intrinsic content width,
+	// capped by the containing block.
+	if cs.Width < 0 && cs.WidthPercent < 0 {
+		intr := e.measureCellContent(n, cs)
+		intr += e.scalePt(cs.PaddingLeft) + e.scalePt(cs.PaddingRight) +
+			e.scalePt(cs.BorderLeft.Width) + e.scalePt(cs.BorderRight.Width) +
+			e.scalePt(cs.MarginLeft) + e.scalePt(cs.MarginRight)
+		if intr > 0 && intr < avail {
+			avail = intr
+		}
+	}
+	// Stack below existing floats on the same side.
+	fy := y + cy
+	switch cs.Float {
+	case "left":
+		if floats.hasLeft && floats.leftBottom > fy {
+			fy = floats.leftBottom
+		}
+	case "right":
+		if floats.hasRight && floats.rightBottom > fy {
+			fy = floats.rightBottom
+		}
+	}
+	fb := e.build(n, avail, contentX, fy)
+	if fb == nil {
+		return nil
+	}
+	if cs.Float == "right" {
+		mr := e.scalePt(cs.MarginRight)
+		wantX := contentX + contentW - fb.w - mr
+		dx := wantX - fb.x
+		fb.x = wantX
+		e.shiftBoxOps(fb, dx, 0)
+	}
+	floats.place(cs.Float, fb)
+	return fb
+}
+
+// shiftBoxOps translates every op in b's op range by (dx, dy).
+func (e *engine) shiftBoxOps(b *box, dx, dy float64) {
+	if dx == 0 && dy == 0 {
+		return
+	}
+	if b.opEnd < b.opStart {
+		return
+	}
+	for k := b.opStart; k <= b.opEnd && k < len(e.ops); k++ {
+		e.ops[k].X += dx
+		e.ops[k].Y += dy
+	}
 }
 
 func collapseMargins(a, b float64) float64 {
@@ -547,6 +642,12 @@ func (e *engine) buildImage(n *html.Node, st ResolvedStyle, x, y float64) *box {
 	if st.MaxHeight >= 0 && b.h > e.scalePt(st.MaxHeight) {
 		b.w = b.w * e.scalePt(st.MaxHeight) / b.h
 		b.h = e.scalePt(st.MaxHeight)
+	}
+	// Float (and other out-of-line) images paint here; in-flow <img> is
+	// collected into the inline formatting context and painted on the line.
+	if st.Float != "none" && b.imgData != nil {
+		e.add(Op{Kind: OpImage, X: x, Y: y, W: b.w, H: b.h,
+			Image: b.imgData, ImgW: b.imgW, ImgH: b.imgH, IsJPEG: b.imgJPEG})
 	}
 	return b
 }
@@ -841,6 +942,15 @@ func (e *engine) emitCell(b *box) {
 	}
 	cx := b.x + e.scalePt(st.PaddingLeft) + e.scalePt(st.BorderLeft.Width)
 	cy := b.y + e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)
+	// vertical-align on table cells: shift content within the row box.
+	if extra := b.h - b.contentH; extra > 0 {
+		switch st.VerticalAlign {
+		case "middle":
+			cy += extra / 2
+		case "bottom":
+			cy += extra
+		}
+	}
 	// flowChildren advances cy; cell content is rooted at absolute y=b.y so
 	// pass y=0 and absolute positions via contentX / cy as canvas coords.
 	_ = e.flowChildren(&box{style: st}, b.node.Children, st, contentW, cx, 0, cy)

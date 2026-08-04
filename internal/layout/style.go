@@ -16,6 +16,7 @@ type ResolvedStyle struct {
 	Position        string  // "static" | "relative"
 	Float           string  // "none" | "left" | "right"
 	Clear           string  // "none" | "left" | "right" | "both"
+	BoxSizing       string  // "content-box" | "border-box"
 	Width           float64 // -1 = auto; absolute length in pt when WidthPercent < 0
 	WidthPercent    float64 // >=0 means width is that % of the containing block at layout time
 	Height          float64
@@ -72,6 +73,7 @@ func initialStyle() ResolvedStyle {
 		Position:       "static",
 		Float:          "none",
 		Clear:          "none",
+		BoxSizing:      "content-box",
 		Width:          -1,
 		WidthPercent:   -1,
 		Height:         -1,
@@ -342,6 +344,11 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext)
 			switch value {
 			case "left", "right", "both", "none":
 				st.Clear = value
+			}
+		case "box-sizing":
+			switch value {
+			case "content-box", "border-box":
+				st.BoxSizing = value
 			}
 		case "width":
 			if value == "auto" {

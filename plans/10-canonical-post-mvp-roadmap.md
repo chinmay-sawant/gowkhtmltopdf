@@ -41,9 +41,11 @@ MVP ships a usable **report/invoice** pipeline (load → HTML/CSS subset → lay
 
 Tier 1 is **not closed** yet. Suggested order for the next sessions:
 
-1. **Phase 16 remainder** (highest product value left in Tier 1): `float` lite, real `inline-block`, `box-sizing: border-box`.
-2. **Phase 14 remainder** (small): document JPEG/PNG alpha/DPI knobs; optional `web.images=false` test.
-3. **Phase 11 remainder** (optional): publish/install story + optional `ConvertHTML` helper.
+1. **Phase 16** (complete): `float` lite, real `inline-block`, `box-sizing: border-box`.
+2. **Phase 14** (complete): document JPEG/PNG alpha/DPI knobs; `web.images=false` test.
+3. **Phase 11** (complete): publish/install story + `ConvertHTML` helper.
+
+**Tier 1 is closed** (report engine solid). Next product work is Tier 2 (phases 17–20).
 
 **Already shipped post-MVP:** phases **10** (fidelity docs), **12** (real bold/italic faces), **13** (spacing/coalesce), **15** (image-mode TTF AA). Selector expansion inside **16** is also shipped.
 
@@ -89,12 +91,12 @@ Tier 1 is **not closed** yet. Suggested order for the next sessions:
 | Phase | Title | Tier | Detail ledger | Effort (solo) | Status |
 |------:|-------|------|---------------|---------------|--------|
 | 10 | HTML/CSS fidelity documentation | 1 | [phases/phase-10-fidelity-docs.md](phases/phase-10-fidelity-docs.md) | 3–7 days | `[x]` 2026-08-04 |
-| 11 | Library API for Go embedders | 1 | [phases/phase-11-library-api-embedders.md](phases/phase-11-library-api-embedders.md) | 1–2 wk | partial |
+| 11 | Library API for Go embedders | 1 | [phases/phase-11-library-api-embedders.md](phases/phase-11-library-api-embedders.md) | 1–2 wk | `[x]` 2026-08-04 |
 | 12 | Typography - real bold/italic faces | 1 | [phases/phase-12-typography-faces.md](phases/phase-12-typography-faces.md) | 2–4 wk | `[x]` 2026-08-04 |
 | 13 | Typography - spacing stability | 1 | [phases/phase-13-typography-spacing.md](phases/phase-13-typography-spacing.md) | 1–2 wk | `[x]` 2026-08-04 |
-| 14 | Images in PDF - robust path | 1 | [phases/phase-14-pdf-images.md](phases/phase-14-pdf-images.md) | 1–2 wk | partial |
+| 14 | Images in PDF - robust path | 1 | [phases/phase-14-pdf-images.md](phases/phase-14-pdf-images.md) | 1–2 wk | `[x]` 2026-08-04 |
 | 15 | Image mode - real TTF/AA raster | 1 | [phases/phase-15-image-mode-raster.md](phases/phase-15-image-mode-raster.md) | 3–6 wk | `[x]` 2026-08-04 |
-| 16 | CSS invoices use (selectors + float lite) | 1 | [phases/phase-16-invoice-css.md](phases/phase-16-invoice-css.md) | 3–6 wk | partial (selectors done) |
+| 16 | CSS invoices use (selectors + float lite) | 1 | [phases/phase-16-invoice-css.md](phases/phase-16-invoice-css.md) | 3–6 wk | `[x]` 2026-08-04 |
 | 17 | Broader CSS (position/float, partial flex) | 2 | [phases/phase-17-broader-css.md](phases/phase-17-broader-css.md) | 2–4 mo | `[ ]` |
 | 18 | Pagination polish (thead repeat, breaks) | 2 | [phases/phase-18-pagination-polish.md](phases/phase-18-pagination-polish.md) | 3–6 wk | `[ ]` |
 | 19 | Fonts / i18n / discovery / CJK | 2 | [phases/phase-19-fonts-i18n.md](phases/phase-19-fonts-i18n.md) | 1–3 mo | `[ ]` |
@@ -151,20 +153,22 @@ Tier 1 is **not closed** yet. Suggested order for the next sessions:
 ## Phase 11: Library API for Go Embedders
 
 > Detail: [phases/phase-11-library-api-embedders.md](phases/phase-11-library-api-embedders.md)  
-> **Baseline:** Phase 8 complete (`api.go`, `examples/pdf`, `examples/image`, `documentation/library-api.md`)
+> **Baseline:** Phase 8 complete (`api.go`, `examples/pdf`, `examples/image`, `documentation/library-api.md`)  
+> **Status:** complete 2026-08-04
 
 ### 11.1 Embedder DX
-- [ ] Expand library docs: invoice-from-bytes, multi-object, image convert, ACL pair
-- [ ] Add copy-paste integration examples (HTTP handler pattern, no Gin dep in module)
-- [ ] Document thread-safety, deterministic output, error types
+- [x] Expand library docs: invoice-from-bytes, multi-object, image convert, ACL pair
+- [x] Add copy-paste integration examples (HTTP handler pattern, no Gin dep in module)
+- [x] Document thread-safety, deterministic output, error types
 
 ### 11.2 API surface polish
-- [ ] Review public API for missing helpers (e.g. convert HTML string → PDF bytes without temp dance if still awkward)
-- [ ] Ensure examples build in CI / documented `go run`
-- [ ] Optional: `go doc` completeness on exported types
+- [x] Review public API for missing helpers (`ConvertHTML` shipped)
+- [x] Ensure examples build in CI / documented `go run`
+- [x] Optional: `go doc` completeness on exported types
+- [x] Module install / replace story in library-api.md
 
 ### 11.3 Closure
-- [ ] `make test` + `make lint` green; examples verified
+- [x] `make test` + `make lint` green; examples verified
 
 ---
 
@@ -206,7 +210,7 @@ Tier 1 is **not closed** yet. Suggested order for the next sessions:
 ## Phase 14: Images in PDF - Robust Path
 
 > Detail: [phases/phase-14-pdf-images.md](phases/phase-14-pdf-images.md)  
-> **Tier 1 #4** · **Status:** partial
+> **Tier 1 #4** · **Status:** complete 2026-08-04
 
 ### 14.1 Robustness
 - [x] Harden PNG/JPEG embed path for logos and grids (fixtures 07, 20)
@@ -214,7 +218,7 @@ Tier 1 is **not closed** yet. Suggested order for the next sessions:
 - [x] Intrinsic size / CSS width/height interactions covered (tests exist; docs polish remain)
 
 ### 14.2 Closure
-- [ ] Golden/structure tests; matrix image notes current
+- [x] Golden/structure tests; matrix image notes current (`web.images`, JPEG/PNG alpha/DPI knobs)
 
 ---
 
@@ -236,19 +240,19 @@ Tier 1 is **not closed** yet. Suggested order for the next sessions:
 ## Phase 16: CSS Invoices Actually Use
 
 > Detail: [phases/phase-16-invoice-css.md](phases/phase-16-invoice-css.md)  
-> **Tier 1 #3** · Selectors + float lite before full flex · **Status:** partial (selectors shipped)
+> **Tier 1 #3** · Selectors + float lite before full flex · **Status:** complete 2026-08-04
 
 ### 16.1 Selectors
 - [x] Attribute selectors subset; `:first-child` / `:last-child` / simple `:nth-child`
 - [x] Sibling combinators match correctly (not as descendant)
 
 ### 16.2 Layout additions
-- [ ] `float: left|right` + `clear` lite (enough for two-column invoice chrome)
-- [ ] `display: inline-block` real layout (not degrade-to-block only)
-- [ ] Optional: simple `box-sizing: border-box`
+- [x] `float: left|right` + `clear` lite (enough for two-column invoice chrome)
+- [x] `display: inline-block` real layout (not degrade-to-block only)
+- [x] Optional: simple `box-sizing: border-box`
 
 ### 16.3 Closure
-- [ ] New fixtures; matrix updated; still stdlib-only
+- [x] New fixtures; matrix updated; still stdlib-only
 
 ---
 

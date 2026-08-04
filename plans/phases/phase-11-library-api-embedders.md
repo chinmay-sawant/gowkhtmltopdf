@@ -1,7 +1,7 @@
 # Phase 11 - Library API for Go Embedders
 
 > **Parent:** `plans/10-canonical-post-mvp-roadmap.md`  
-> **Status:** partial (2026-08-04) - docs/examples/tests largely present; remaining polish optional  
+> **Status:** complete (2026-08-04) - docs/examples + install story + `ConvertHTML`  
 
 > **Estimated effort:** 1–2 weeks  
 > **Depends on:** Phase 8 complete (`api.go`, examples)  
@@ -16,12 +16,12 @@ MVP already exposes an idiomatic Go API. This phase makes it **safe and obvious*
 
 ## Executive Summary
 
-| Exists today | Gap for embedders |
-|--------------|-------------------|
-| `NewConverter` / `Convert` / `Output` | HTML-bytes → PDF path may force temp files / page paths |
-| Dotted `Set`/`Get` | Discoverability of keys is CLI-heavy |
-| `examples/pdf`, `examples/image` | Thin; no “service embed” recipe |
-| `documentation/library-api.md` | Incomplete image surface; ACL pair easy to miss |
+| Exists today | Status |
+|--------------|--------|
+| `NewConverter` / `Convert` / `Output` | Shipped; `ConvertHTML` helper for in-memory HTML |
+| Dotted `Set`/`Get` | Documented; matrix §7 for honored vs ignored |
+| `examples/pdf`, `examples/image` | Working |
+| `documentation/library-api.md` | Install + ACL + ConvertHTML |
 | Phase 8.4 C ABI | Deferred forever under no-cgo |
 
 ---
@@ -41,7 +41,7 @@ MVP already exposes an idiomatic Go API. This phase makes it **safe and obvious*
 - [x] Expand `documentation/library-api.md`:
   - Convert **local file** (ACL pair: `enablelocalfileaccess` + `load.blocklocalfileaccess=false`)
   - Convert **remote URL** (SetPage URL)
-  - Convert **in-memory HTML** (inline:/data: page sources via settings)
+  - Convert **in-memory HTML** (inline:/data: page sources via settings + `ConvertHTML`)
   - Multi-object: cover + body pages
   - Headers/footers text placeholders (settings surface)
   - Outline / TOC flags from library
@@ -49,7 +49,7 @@ MVP already exposes an idiomatic Go API. This phase makes it **safe and obvious*
   - Callbacks: OnInfo/OnWarn/OnError/OnPhase/OnProgress
 - [x] Add **HTTP handler recipe** in docs (`documentation/integration-security.md` - Gin/stdlib patterns)
 - [x] Cross-link `documentation/integration-security.md` (SSRF, local file ACL)
-- [ ] Module install story: `go get` / replace / version tags when published (module path still local-oriented)
+- [x] Module install story: `go get` / replace / version tags (`library-api.md` Install)
 
 ### 11.3 API surface polish (code, only if gap proven)
 
@@ -57,8 +57,8 @@ MVP already exposes an idiomatic Go API. This phase makes it **safe and obvious*
   - Path: `api.go` + `internal/convert` as needed
   - Expected: `Output() []byte` without leaving temp files on success
   - Proof: `TestConvertPDFToBytes` + related
-- [ ] Optional helper: `ConvertHTML(ctx, html []byte, global settings…) ([]byte, error)` if it reduces boilerplate without hiding ACL
-- [~] Optional helper: `ConvertFile` / `ConvertURL` thin wrappers - only if docs alone are insufficient
+- [x] Optional helper: `ConvertHTML(ctx, html []byte, global *GlobalSettings) ([]byte, error)` - `TestConvertHTMLHelper`
+- [~] Optional helper: `ConvertFile` / `ConvertURL` thin wrappers - docs alone are sufficient
 - [x] Ensure `HttpErrorCode()` behavior is documented and tested (or marked stub honestly)
 - [x] Do **not** add cgo / shared-lib ABI (phase 8.4 remains `[~]`)
 
@@ -78,10 +78,10 @@ MVP already exposes an idiomatic Go API. This phase makes it **safe and obvious*
 
 ### 11.6 Closure gates
 
-- [x] `make lint` → green on master (2026-08-04 reconcile)
-- [x] `make test` → green on master
-- [x] Docs + examples reviewed for copy-paste correctness (usable; image docs still terse)
-- [ ] Parent Phase 11 rows checked (leave open until install story / optional helpers decided)
+- [x] `make lint` → green
+- [x] `make test` → green
+- [x] Docs + examples reviewed for copy-paste correctness
+- [x] Parent Phase 11 rows checked
 - [x] Next handoff: **Phase 12** (real bold/italic faces) - **shipped**
 
 ```

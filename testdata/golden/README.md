@@ -32,7 +32,7 @@ proves. Page envelopes are pinned in `internal/convert/golden_test.go`
 | 01 | Simple invoice: `div`, `h1`, `p`, `table`, `span`, bold total | 1 |
 | 02 | Table-heavy: 15-row table, thead/tbody/tfoot, colspan subtotal, borders | 2 |
 | 03 | Multi-page statement: `page-break-before/after/inside`, outline headings | ≥2 |
-| 04 | Two-column layout via fixed table cells (floats unsupported) | 1 |
+| 04 | Two-column layout via fixed table cells (float lite also available; see fixture-22) | 1 |
 | 05 | Linked relative stylesheet (`style-05.css`) driving all styling | 1 |
 | 06 | External `<a href>` → PDF URI annotations + linked stylesheet | 1 |
 | 07 | Relative `logo.png` + data: URI PNG, intrinsic sizes | 1 |
@@ -50,6 +50,7 @@ proves. Page envelopes are pinned in `internal/convert/golden_test.go`
 | 19 | Box model: fixed/min/max widths, margins, padding, borders | 1 |
 | 20 | Image grid: four data: URI PNGs at intrinsic sizes | 1 |
 | 21 | Detailed multi-section ops report (KPIs, WPs, invoice extract, REQs) | ≥3 |
+| 22 | Float lite invoice chrome: float left/right + clear, inline-block badge, border-box | 1 |
 
 ## Pass criteria (MVP)
 

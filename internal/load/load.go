@@ -112,6 +112,9 @@ func GuessURL(input string) (Kind, string, error) {
 		return KindInline, "inline:" + input, nil
 	}
 	lower := strings.ToLower(input)
+	if strings.HasPrefix(lower, "inline:") {
+		return KindInline, input, nil
+	}
 	if strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://") {
 		return KindHTTP, input, nil
 	}

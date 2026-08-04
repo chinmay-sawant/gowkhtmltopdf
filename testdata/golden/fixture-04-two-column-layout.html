@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <!--
   fixture-04-two-column-layout
-  Proves: side-by-side column layout without floats (engine has no float
-  positioning). Columns are a width-fixed table with two cells, each holding
-  an independent block stack. Also exercises per-cell backgrounds, table
-  borders and block spacing inside cells.
+  Proves: side-by-side column layout (table-based; float lite is also
+  available — see fixture-22). Columns are a width-fixed table with two
+  cells, each holding an independent block stack. Also exercises per-cell
+  backgrounds, table borders and block spacing inside cells.
   Expected: 1 page.
 -->
 <html>
@@ -50,7 +50,7 @@
   </table>
 
   <p style="margin-top: 10px">The two-column body above is a table with two
-  fixed-width cells; the engine renders floats as in-flow blocks, so tables
-  are the supported way to build multi-column documents.</p>
+  fixed-width cells. Float lite (`float`/`clear`) is also supported for
+  invoice chrome — see fixture-22.</p>
 </body>
 </html>

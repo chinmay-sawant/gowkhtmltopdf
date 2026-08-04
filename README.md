@@ -36,7 +36,7 @@ clones of arbitrary websites.
 | Invoices / tables / page breaks in pure Go | Yes |
 | Headers, footers, TOC, PDF bookmarks | Yes |
 | Zero native deps / offline static binary | Yes |
-| Full CSS (flex, grid, floats) or JavaScript | No (see deferred) |
+| Full CSS (flex, grid, absolute/fixed) or JavaScript | No (float lite shipped; see deferred) |
 | CJK / complex Unicode fonts | Not yet (Latin Liberation family; CID later) |
 
 ```text
@@ -257,7 +257,7 @@ parity remains **not planned**.
 | Deferred | Status / reason | Next gate |
 |---|---|---|
 | JavaScript / WebKit features (`--enable-javascript`, `--run-script`, `--window-status`, plugins) | No JS engine in stdlib; flags accepted with warnings; `<script>` stripped at load | Phase 22 staged (see post-MVP roadmap) |
-| Floats / positioned layout (`float`, `clear`, `position: relative/absolute/fixed`) | Parsed but treated as in-flow | Phase 16–17 |
+| Floats / positioned layout (`float`, `clear`, `position: relative/absolute/fixed`) | **Float lite + clear shipped** (invoice chrome); `position` still in-flow | Phase 17 for position/float refinements |
 | Flexbox / Grid (`display: flex|grid`) | Not in the CSS allowlist; elements degrade to initial `inline` | Phase 17 (partial flex); grid deferred |
 | Richer selectors (attribute `[attr=…]`, `:first-child`, `:nth-child`, sibling `+`/`~`) | **Shipped** for presence/exact attr, first/last/nth-child, siblings | Hover/link pseudos still ignored |
 | Multi-font bold/italic (Liberation Sans family) | **Shipped** - Regular/Bold/Italic/BoldItalic embedded | Further families: phase 19 |

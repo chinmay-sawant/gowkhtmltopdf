@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<!--
+  fixture-22-float-invoice-chrome
+  Proves: float lite invoice letterhead — logo float:left, meta float:right,
+  clear:both, then body content. Also exercises inline-block badge and
+  box-sizing:border-box on a fixed-width note.
+  Expected: 1 page.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Float chrome invoice</title>
+  <style>
+    body { font-family: sans-serif; font-size: 10pt; color: #222; margin: 0; }
+    .letterhead { margin-bottom: 12px; border-bottom: 2pt solid #1a3d6d; padding-bottom: 8px; }
+    .logo {
+      float: left; width: 90pt; height: 36pt;
+      background-color: #1a3d6d; color: #fff;
+      text-align: center; line-height: 36pt;
+      box-sizing: border-box;
+    }
+    .meta {
+      float: right; width: 140pt;
+      text-align: right; font-size: 9pt; color: #444;
+    }
+    .meta strong { color: #1a3d6d; font-size: 11pt; }
+    .clear { clear: both; }
+    .badge {
+      display: inline-block; width: 48pt; padding: 2pt 4pt;
+      border: 1pt solid #1a3d6d; box-sizing: border-box;
+      text-align: center; font-size: 8pt; color: #1a3d6d;
+    }
+    table.items { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    table.items th, table.items td {
+      border: 1px solid #aab7c4; padding: 4px 6px; text-align: left;
+    }
+    table.items th { background-color: #1a3d6d; color: #fff; }
+    .note {
+      width: 100%; box-sizing: border-box; padding: 8pt;
+      background-color: #f2f6fa; border: 1pt solid #c5d5e8; margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="letterhead">
+    <div class="logo">ACME</div>
+    <div class="meta">
+      <strong>INV-22-0042</strong><br>
+      Issue: 2026-08-04<br>
+      Due: 2026-09-03
+    </div>
+    <div class="clear"></div>
+  </div>
+
+  <p>Bill to: Meridian Systems AG · Status: <span class="badge">OPEN</span></p>
+
+  <table class="items">
+    <tr><th>#</th><th>Description</th><th>Qty</th><th>Net</th></tr>
+    <tr><td>1</td><td>Gateway base unit</td><td>2</td><td>2,480.00</td></tr>
+    <tr><td>2</td><td>Installation</td><td>1</td><td>350.00</td></tr>
+  </table>
+
+  <div class="note">Payment terms: Net 30. Float chrome + inline-block badge + border-box note.</div>
+</body>
+</html>

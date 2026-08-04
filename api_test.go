@@ -58,6 +58,25 @@ func TestConvertPDFToBytes(t *testing.T) {
 	}
 }
 
+func TestConvertHTMLHelper(t *testing.T) {
+	pdf, err := ConvertHTML(context.Background(), []byte("<html><body><p>inline html</p></body></html>"), nil)
+	if err != nil {
+		t.Fatalf("ConvertHTML: %v", err)
+	}
+	if !bytes.HasPrefix(pdf, []byte("%PDF-")) {
+		t.Fatalf("ConvertHTML output is not a PDF")
+	}
+	g := NewGlobalSettings()
+	_ = g.Set("size.pagesize", "Letter")
+	pdf2, err := ConvertHTML(context.Background(), []byte("<html><body><p>letter</p></body></html>"), g)
+	if err != nil {
+		t.Fatalf("ConvertHTML with global: %v", err)
+	}
+	if !bytes.HasPrefix(pdf2, []byte("%PDF-")) {
+		t.Fatal("ConvertHTML+global output is not a PDF")
+	}
+}
+
 func TestGlobalSettingsGetSetRoundTrip(t *testing.T) {
 	cases := []struct{ name, value string }{
 		{"size.pagesize", "Letter"},
