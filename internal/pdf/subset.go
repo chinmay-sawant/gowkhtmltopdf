@@ -38,6 +38,7 @@ func subsetFont(f *Font, used []rune) (*subsetResult, error) {
 
 	oldToNew := map[uint16]uint16{}
 	advances := make([]int32, 0, len(glyphs))
+	lsbs := make([]int16, 0, len(glyphs))
 	outlines := make([][]byte, len(glyphs))
 	for newID, old := range glyphs {
 		oldToNew[old] = uint16(newID)
@@ -46,12 +47,17 @@ func subsetFont(f *Font, used []rune) (*subsetResult, error) {
 		} else {
 			advances = append(advances, 0)
 		}
+		if int(old) < len(f.lsb) {
+			lsbs = append(lsbs, f.lsb[old])
+		} else {
+			lsbs = append(lsbs, 0)
+		}
 		outlines[newID] = f.glyphOutline(old)
 	}
 	// remap composite components (on clones - never mutate source tables)
 	cloned := make([][]byte, len(outlines))
 	for i, o := range outlines {
-		cloned[i] = bytes.Clone(o)
+		cloned[i] = stripGlyphHints(bytes.Clone(o))
 		remapComposite(cloned[i], oldToNew)
 	}
 	outlines = cloned
@@ -74,7 +80,7 @@ func subsetFont(f *Font, used []rune) (*subsetResult, error) {
 	}
 	sort.Slice(res.runes, func(i, j int) bool { return res.runes[i] < res.runes[j] })
 
-	sub := &subsetter{f: f, glyphs: glyphs, outlines: outlines, advances: advances}
+	sub := &subsetter{f: f, glyphs: glyphs, outlines: outlines, advances: advances, lsbs: lsbs}
 	sub.mappings = make([]codeGlyph, 0, len(res.glyphIDs))
 	for r, g := range res.glyphIDs {
 		sub.mappings = append(sub.mappings, codeGlyph{code: uint16(r), glyph: g})
@@ -114,6 +120,7 @@ func subsetFontUnicode(f *Font, used []rune) (*subsetResult, error) {
 
 	oldToNew := map[uint16]uint16{}
 	advances := make([]int32, 0, len(glyphs))
+	lsbs := make([]int16, 0, len(glyphs))
 	outlines := make([][]byte, len(glyphs))
 	for newID, old := range glyphs {
 		oldToNew[old] = uint16(newID)
@@ -122,11 +129,16 @@ func subsetFontUnicode(f *Font, used []rune) (*subsetResult, error) {
 		} else {
 			advances = append(advances, 0)
 		}
+		if int(old) < len(f.lsb) {
+			lsbs = append(lsbs, f.lsb[old])
+		} else {
+			lsbs = append(lsbs, 0)
+		}
 		outlines[newID] = f.glyphOutline(old)
 	}
 	cloned := make([][]byte, len(outlines))
 	for i, o := range outlines {
-		cloned[i] = bytes.Clone(o)
+		cloned[i] = stripGlyphHints(bytes.Clone(o))
 		remapComposite(cloned[i], oldToNew)
 	}
 	outlines = cloned
@@ -147,7 +159,7 @@ func subsetFontUnicode(f *Font, used []rune) (*subsetResult, error) {
 	}
 	sort.Slice(res.runes, func(i, j int) bool { return res.runes[i] < res.runes[j] })
 
-	sub := &subsetter{f: f, glyphs: glyphs, outlines: outlines, advances: advances}
+	sub := &subsetter{f: f, glyphs: glyphs, outlines: outlines, advances: advances, lsbs: lsbs}
 	sub.mappings = make([]codeGlyph, 0, len(res.glyphIDs))
 	for r, g := range res.glyphIDs {
 		sub.mappings = append(sub.mappings, codeGlyph{code: uint16(r), glyph: g})
@@ -174,6 +186,80 @@ func collectGlyph(f *Font, g uint16, set map[uint16]bool) {
 	for _, c := range f.compositeGlyphIDs(g) {
 		collectGlyph(f, c, set)
 	}
+}
+
+// stripGlyphHints removes TrueType hinting bytecode from a glyf outline.
+// Subsets omit fpgm/prep/cvt, so leftover instructions can garble CJK
+// composites in PDF viewers (broken 東京都 etc.).
+func stripGlyphHints(b []byte) []byte {
+	if len(b) < 10 {
+		return b
+	}
+	numContours := int16(binary.BigEndian.Uint16(b[0:2]))
+	if numContours < 0 {
+		return stripCompositeHints(b)
+	}
+	if numContours == 0 {
+		return b
+	}
+	n := int(numContours)
+	if len(b) < 10+2*n+2 {
+		return b
+	}
+	insPos := 10 + 2*n
+	insLen := int(binary.BigEndian.Uint16(b[insPos:]))
+	after := insPos + 2 + insLen
+	if after > len(b) {
+		return b
+	}
+	if insLen == 0 {
+		return b
+	}
+	out := make([]byte, 0, len(b)-insLen)
+	out = append(out, b[:insPos]...)
+	out = append(out, 0, 0) // instructionLength = 0
+	out = append(out, b[after:]...)
+	return out
+}
+
+func stripCompositeHints(b []byte) []byte {
+	pos := 10
+	lastFlagsAt := -1
+	for {
+		if pos+4 > len(b) {
+			return b
+		}
+		lastFlagsAt = pos
+		flags := binary.BigEndian.Uint16(b[pos : pos+2])
+		pos += 4
+		if flags&0x0001 != 0 {
+			pos += 4
+		} else {
+			pos += 2
+		}
+		switch {
+		case flags&0x0008 != 0:
+			pos += 2
+		case flags&0x0040 != 0:
+			pos += 4
+		case flags&0x0080 != 0:
+			pos += 8
+		}
+		if flags&0x0020 == 0 {
+			break
+		}
+	}
+	if lastFlagsAt < 0 || pos > len(b) {
+		return b
+	}
+	flags := binary.BigEndian.Uint16(b[lastFlagsAt : lastFlagsAt+2])
+	if flags&0x0100 == 0 { // WE_HAVE_INSTRUCTIONS
+		// Drop any accidental trailing bytes past the component list.
+		return bytes.Clone(b[:pos])
+	}
+	out := bytes.Clone(b[:pos])
+	binary.BigEndian.PutUint16(out[lastFlagsAt:lastFlagsAt+2], flags&^0x0100)
+	return out
 }
 
 // remapComposite rewrites composite component glyph ids in a glyf outline.
@@ -226,25 +312,38 @@ type subsetter struct {
 	glyphs   []uint16
 	outlines [][]byte
 	advances []int32
+	lsbs     []int16
 	mappings []codeGlyph // sorted by code
 }
 
 func (s *subsetter) build() ([]byte, error) {
 	numGlyphs := len(s.glyphs)
-	// long loca always (format 1)
+	// long loca always (format 1). TrueType requires each glyph to start on a
+	// 4-byte boundary; odd/unaligned glyf offsets corrupt CJK composites in
+	// PDFium and other viewers (garbled 東京都 etc.).
 	loca := make([]uint32, numGlyphs+1)
 	cur := 0
+	padded := make([][]byte, numGlyphs)
 	for i, o := range s.outlines {
 		loca[i] = uint32(cur)
-		cur += len(o)
+		p := bytes.Clone(o)
+		for len(p)%4 != 0 {
+			p = append(p, 0)
+		}
+		padded[i] = p
+		cur += len(p)
 	}
 	loca[numGlyphs] = uint32(cur)
 
 	// hmtx: advance (2) + lsb (2) per glyph
 	hmtx := new(bytes.Buffer)
-	for _, a := range s.advances {
+	for i, a := range s.advances {
 		binary.Write(hmtx, binary.BigEndian, uint16(a))
-		binary.Write(hmtx, binary.BigEndian, uint16(0))
+		lsb := int16(0)
+		if i < len(s.lsbs) {
+			lsb = s.lsbs[i]
+		}
+		binary.Write(hmtx, binary.BigEndian, uint16(lsb))
 	}
 
 	// cmap: rune codes → renumbered glyph ids
@@ -275,7 +374,7 @@ func (s *subsetter) build() ([]byte, error) {
 	binary.BigEndian.PutUint16(hhea[34:36], uint16(numGlyphs))
 
 	glyf := new(bytes.Buffer)
-	for _, o := range s.outlines {
+	for _, o := range padded {
 		glyf.Write(o)
 	}
 
