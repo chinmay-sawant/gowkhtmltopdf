@@ -6,8 +6,8 @@
 // Report-engine scope: block and inline flow, margin collapsing between
 // siblings, tables (separate borders, colspan), images, lists, text wrapping
 // with the embedded Liberation Sans font, float lite (left/right + clear),
-// real inline-block, and box-sizing. Absolute/fixed positioning, flex and
-// grid remain out of scope; those properties degrade to in-flow layout.
+// real inline-block, box-sizing, position relative/absolute lite, and a
+// partial flex (row/column) subset. Grid remains deferred.
 package layout
 
 import (
@@ -26,6 +26,8 @@ type Options struct {
 	Width      float64 // viewport/content width in points
 	Height     float64 // viewport height in points (for % heights)
 	Font       *pdf.Font
+	Faces      *pdf.FaceSet  // optional Liberation family; defaults loaded when nil
+	Registry   *pdf.Registry // optional discovered fonts (--font-path)
 	Sheets     []*css.Stylesheet
 	Media      string // "print" or "screen"; "" = apply "all" rules only
 	Images     func(src string) ([]byte, error)
@@ -97,21 +99,33 @@ type Op struct {
 	ImgW   int
 	ImgH   int
 	IsJPEG bool
+
+	// Fixed marks ops from position:fixed boxes; Paint stamps them on every
+	// page at viewport-relative coordinates.
+	Fixed bool
 }
 
 type engine struct {
-	opts   Options
-	font   *pdf.Font // default/regular face (metrics fallback)
-	faces  *pdf.FaceSet
-	styles map[*html.Node]ResolvedStyle
-	ops    []Op
-	noEmit bool // measurement mode: compute geometry without emitting ops
-	height float64
-	scale  float64 // zoom factor applied to style lengths (>= 1)
+	opts     Options
+	font     *pdf.Font // default/regular face (metrics fallback)
+	faces    *pdf.FaceSet
+	registry *pdf.Registry
+	styles   map[*html.Node]ResolvedStyle
+	ops      []Op
+	noEmit   bool // measurement mode: compute geometry without emitting ops
+	height   float64
+	scale    float64 // zoom factor applied to style lengths (>= 1)
 }
 
-// faceFor selects the TrueType face for a resolved style (bold/italic).
+// faceFor selects the TrueType face for a resolved style (bold/italic),
+// preferring CSS font-family matches from the opt-in registry, then the
+// bundled Liberation FaceSet.
 func (e *engine) faceFor(st ResolvedStyle) *pdf.Font {
+	if e.registry != nil {
+		if f := e.registry.Lookup(st.FontFamily, st.FontWeight, st.FontItalic); f != nil {
+			return f
+		}
+	}
 	if e.faces != nil {
 		if f := e.faces.Resolve(st.FontWeight, st.FontItalic); f != nil {
 			return f
@@ -147,16 +161,20 @@ func Layout(root *html.Node, opts Options) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
+	if opts.Faces != nil {
+		faces = opts.Faces
+	}
 	font := opts.Font
 	if font == nil {
 		font = faces.Regular
 	}
 	e := &engine{
-		opts:   opts,
-		font:   font,
-		faces:  faces,
-		styles: resolveStyles(root, opts.Sheets, opts.Media, opts.Width, opts.Height),
-		scale:  zoomScale(opts.Zoom),
+		opts:     opts,
+		font:     font,
+		faces:    faces,
+		registry: opts.Registry,
+		styles:   resolveStyles(root, opts.Sheets, opts.Media, opts.Width, opts.Height),
+		scale:    zoomScale(opts.Zoom),
 	}
 
 	b := e.build(root, opts.Width, 0, 0)
@@ -190,6 +208,9 @@ type box struct {
 	// rows[i] holds the cell boxes of table row i, in document order. The
 	// row's op range is from rows[i][0].opStart to rows[i][len-1].opEnd.
 	rows [][]*box
+	// headerRows is the number of leading rows that came from <thead> /
+	// table-header-group (for repeating headers across pages).
+	headerRows int
 	// replaced
 	imgSrc  string
 	imgData []byte
@@ -214,13 +235,33 @@ func (e *engine) build(n *html.Node, availW, x, y float64) *box {
 	case "hr":
 		b = e.buildHR(n, st, availW, x, y)
 	}
+	// Out-of-flow positioning wraps the display type so fixed/absolute flex
+	// and grid containers still get the right formatting context.
+	if b == nil && st.Position == "fixed" {
+		b = e.buildFixed(n, st, availW, x, y)
+	}
+	if b == nil && st.Position == "absolute" {
+		b = e.buildAbsolute(n, st, availW, x, y)
+	}
+	if b == nil && (st.Display == "flex" || st.Display == "inline-flex") {
+		b = e.buildFlex(n, st, availW, x, y)
+	}
+	if b == nil && (st.Display == "grid" || st.Display == "inline-grid") {
+		b = e.buildGrid(n, st, availW, x, y)
+	}
 	if b == nil && isTableDisplay(st.Display) {
 		b = e.buildTable(n, st, availW, x, y)
 	}
 	if b == nil {
 		b = e.buildBlock(n, st, availW, x, y)
 	}
+	if b != nil && (st.Position == "relative" || st.Position == "sticky") {
+		e.applyRelativeOffset(b)
+	}
 	b.opStart, b.opEnd = start, len(e.ops)-1
+	if b != nil && st.Position == "fixed" {
+		e.markOpsFixed(b.opStart, b.opEnd)
+	}
 	return b
 }
 
@@ -328,6 +369,92 @@ func (e *engine) buildBlock(n *html.Node, st ResolvedStyle, availW, x, y float64
 	return b
 }
 
+// buildAbsolute places an out-of-flow box using left/top (and optional width/
+// height). Containing block is the parent's content edge approximation
+// (availW/x/y passed from the caller).
+func (e *engine) buildAbsolute(n *html.Node, st ResolvedStyle, availW, x, y float64) *box {
+	start := len(e.ops)
+	b := e.buildInFlowDisplay(n, st, availW, x, y)
+	if b == nil {
+		return nil
+	}
+	b.opStart, b.opEnd = start, len(e.ops)-1
+	ax, ay := x, y
+	if !st.LeftAuto {
+		ax = x + e.scalePt(st.Left)
+	} else if !st.RightAuto {
+		ax = x + availW - b.w - e.scalePt(st.Right)
+	}
+	if !st.TopAuto {
+		ay = y + e.scalePt(st.Top)
+	} else if !st.BottomAuto {
+		ay = y + e.scalePt(st.Bottom)
+	}
+	dx, dy := ax-b.x, ay-b.y
+	b.x, b.y = ax, ay
+	e.shiftBoxOps(b, dx, dy)
+	return b
+}
+
+// buildFixed places an out-of-flow box against the initial containing block
+// (viewport origin). Ops are marked Fixed so Paint stamps them on every page.
+func (e *engine) buildFixed(n *html.Node, st ResolvedStyle, availW, x, y float64) *box {
+	_ = availW
+	_ = x
+	_ = y
+	cbW := e.opts.Width
+	if cbW <= 0 {
+		cbW = availW
+	}
+	start := len(e.ops)
+	b := e.buildInFlowDisplay(n, st, cbW, 0, 0)
+	if b == nil {
+		return nil
+	}
+	b.opStart, b.opEnd = start, len(e.ops)-1
+	ax, ay := 0.0, 0.0
+	if !st.LeftAuto {
+		ax = e.scalePt(st.Left)
+	} else if !st.RightAuto {
+		ax = cbW - b.w - e.scalePt(st.Right)
+	}
+	if !st.TopAuto {
+		ay = e.scalePt(st.Top)
+	} else if !st.BottomAuto {
+		ay = e.opts.Height - b.h - e.scalePt(st.Bottom)
+		if ay < 0 {
+			ay = e.scalePt(st.Bottom)
+		}
+	}
+	dx, dy := ax-b.x, ay-b.y
+	b.x, b.y = ax, ay
+	e.shiftBoxOps(b, dx, dy)
+	return b
+}
+
+// buildInFlowDisplay builds flex/grid/table/block ignoring position.
+func (e *engine) buildInFlowDisplay(n *html.Node, st ResolvedStyle, availW, x, y float64) *box {
+	if st.Display == "flex" || st.Display == "inline-flex" {
+		return e.buildFlex(n, st, availW, x, y)
+	}
+	if st.Display == "grid" || st.Display == "inline-grid" {
+		return e.buildGrid(n, st, availW, x, y)
+	}
+	if isTableDisplay(st.Display) {
+		return e.buildTable(n, st, availW, x, y)
+	}
+	return e.buildBlock(n, st, availW, x, y)
+}
+
+func (e *engine) markOpsFixed(start, end int) {
+	if end < start {
+		return
+	}
+	for i := start; i <= end && i < len(e.ops); i++ {
+		e.ops[i].Fixed = true
+	}
+}
+
 // prependChrome inserts background + border ops at insertAt so they paint
 // under any content ops already appended for this box.
 func (e *engine) prependChrome(insertAt int, st ResolvedStyle, x, y, w, h float64) {
@@ -376,11 +503,11 @@ func (e *engine) partition(children []*html.Node, blocks, inlines *[]*html.Node)
 		if cs.Display == "none" {
 			continue
 		}
-		if cs.Float != "none" {
+		if cs.Float != "none" || cs.Position == "absolute" || cs.Position == "fixed" {
 			*blocks = append(*blocks, c)
 			continue
 		}
-		if cs.Display == "inline" || cs.Display == "inline-block" || c.Name == "img" {
+		if cs.Display == "inline" || cs.Display == "inline-block" || cs.Display == "inline-flex" || c.Name == "img" {
 			*inlines = append(*inlines, c)
 			continue
 		}
@@ -397,10 +524,10 @@ func (e *engine) isInlineChild(n *html.Node) bool {
 		return false
 	}
 	cs := e.styles[n]
-	if cs.Display == "none" || cs.Float != "none" {
+	if cs.Display == "none" || cs.Float != "none" || cs.Position == "absolute" || cs.Position == "fixed" {
 		return false
 	}
-	return cs.Display == "inline" || cs.Display == "inline-block" || n.Name == "img"
+	return cs.Display == "inline" || cs.Display == "inline-block" || cs.Display == "inline-flex" || n.Name == "img"
 }
 
 // onlyCollapsibleWS reports whether every node is a text node of only
@@ -425,6 +552,10 @@ func onlyCollapsibleWS(nodes []*html.Node) bool {
 func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedStyle, contentW, contentX, y, cy float64) float64 {
 	prevBottom := 0.0
 	floats := newFloatState(contentX, contentW)
+	var deferred []*html.Node
+	// Absolute/fixed containing-block origin is the content edge at entry.
+	// Do not use the post-flow cy or deferred boxes sit below in-flow siblings.
+	absOriginY := y + cy
 	i := 0
 	for i < len(children) {
 		n := children[i]
@@ -435,6 +566,13 @@ func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedSty
 		// Skip pure whitespace text so it does not interrupt margin collapse
 		// between block siblings (fixture-19 margin-bottom between divs).
 		if n.Type == html.TextNode && strings.TrimSpace(n.Text) == "" {
+			i++
+			continue
+		}
+		if n.Type == html.ElementNode && (e.styles[n].Position == "absolute" || e.styles[n].Position == "fixed") {
+			// Defer out-of-flow boxes so they paint above in-flow content
+			// (absolute overlays sit on top of later siblings' text).
+			deferred = append(deferred, n)
 			i++
 			continue
 		}
@@ -518,14 +656,20 @@ func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedSty
 		}
 		i++
 	}
+	for _, n := range deferred {
+		ab := e.build(n, contentW, contentX, absOriginY)
+		if ab != nil && parent != nil {
+			parent.children = append(parent.children, ab)
+		}
+	}
 	return floats.extentCy(y, cy)
 }
 
 // placeFloat lays out n as a float:left|right box and records it in floats.
+// Consecutive same-side floats pack horizontally when width remains;
+// otherwise they stack below the previous float bottom.
 func (e *engine) placeFloat(n *html.Node, cs ResolvedStyle, floats *floatState, contentW, contentX, y, cy float64) *box {
 	avail := contentW
-	// Shrink-to-fit when width is auto: prefer intrinsic content width,
-	// capped by the containing block.
 	if cs.Width < 0 && cs.WidthPercent < 0 {
 		intr := e.measureCellContent(n, cs)
 		intr += e.scalePt(cs.PaddingLeft) + e.scalePt(cs.PaddingRight) +
@@ -535,21 +679,48 @@ func (e *engine) placeFloat(n *html.Node, cs ResolvedStyle, floats *floatState, 
 			avail = intr
 		}
 	}
-	// Stack below existing floats on the same side.
-	fy := y + cy
+	flowY := y + cy
+	fx, fy := contentX, flowY
+
 	switch cs.Float {
 	case "left":
-		if floats.hasLeft && floats.leftBottom > fy {
-			fy = floats.leftBottom
+		if floats.hasLeft {
+			room := contentX + contentW - floats.leftEdge
+			if floats.hasRight && floats.rightEdge-floats.leftEdge < room {
+				room = floats.rightEdge - floats.leftEdge
+			}
+			if room >= avail*0.5 { // enough room to attempt side-by-side
+				fx = floats.leftEdge
+				fy = floats.leftTop
+				if fy < flowY {
+					fy = flowY
+				}
+				if avail > room {
+					avail = room
+				}
+			} else if floats.leftBottom > fy {
+				fy = floats.leftBottom
+			}
 		}
 	case "right":
 		if floats.hasRight && floats.rightBottom > fy {
 			fy = floats.rightBottom
 		}
 	}
-	fb := e.build(n, avail, contentX, fy)
+
+	fb := e.build(n, avail, fx, fy)
 	if fb == nil {
 		return nil
+	}
+	if cs.Float == "left" && floats.hasLeft && fb.x+fb.w > contentX+contentW {
+		// Overflowed the pack attempt — stack below.
+		fy = floats.leftBottom
+		if fy < flowY {
+			fy = flowY
+		}
+		dx, dy := contentX-fb.x, fy-fb.y
+		fb.x, fb.y = contentX, fy
+		e.shiftBoxOps(fb, dx, dy)
 	}
 	if cs.Float == "right" {
 		mr := e.scalePt(cs.MarginRight)
@@ -703,10 +874,11 @@ func imageDims(data []byte) (w, h int, isJPEG bool, ok bool) {
 // --- tables ---
 
 func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64) *box {
-	// flatten row groups into rows
+	// flatten row groups into rows; count leading header-group rows
 	var rows [][]*html.Node
-	var collect func(n *html.Node)
-	collect = func(n *html.Node) {
+	headerRows := 0
+	var collect func(n *html.Node, inHeader bool)
+	collect = func(n *html.Node, inHeader bool) {
 		for _, c := range n.Children {
 			if c.Type != html.ElementNode {
 				continue
@@ -724,14 +896,19 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 					}
 				}
 				rows = append(rows, cells)
+				if inHeader {
+					headerRows++
+				}
+			case cs.Display == "table-header-group":
+				collect(c, true)
 			case strings.HasSuffix(cs.Display, "row-group"):
-				collect(c)
+				collect(c, false)
 			}
 		}
 	}
-	collect(n)
+	collect(n, false)
 
-	tb := &box{node: n, style: st, kind: "table", x: x, y: y}
+	tb := &box{node: n, style: st, kind: "table", x: x, y: y, headerRows: headerRows}
 	if len(rows) == 0 {
 		return tb
 	}

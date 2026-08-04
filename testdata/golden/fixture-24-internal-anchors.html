@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<!--
+  fixture-24-internal-anchors
+  Proves: same-document <a href="#id"> links produce PDF GoTo annotations
+  to element destinations with matching id attributes (phase 20).
+  Expected: 2 pages (destination section forced onto page 2).
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Internal Anchors</title>
+  <style>
+    body { font-family: sans-serif; font-size: 11pt; color: #222; }
+    h1 { font-size: 18pt; }
+    .spacer { page-break-before: always; }
+  </style>
+</head>
+<body>
+  <h1>Internal link report</h1>
+  <p>Jump to the <a href="#appendix">appendix</a> for the full table.
+  Also see <a href="#notes">notes</a>.</p>
+
+  <div class="spacer"></div>
+  <h2 id="appendix">Appendix</h2>
+  <p>Appendix body content for destination geometry.</p>
+  <h2 id="notes">Notes</h2>
+  <p>Secondary destination used by the second fragment link.</p>
+</body>
+</html>

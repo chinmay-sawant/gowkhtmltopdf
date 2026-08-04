@@ -16,6 +16,7 @@ type Content struct {
 	fontFiles map[string]*Font  // resource name -> parsed font (embedded)
 	used      map[string][]rune // resource name -> runes seen
 	curFont   string            // active font from last SetFont
+	curSize   float64           // active font size from last SetFont
 	imageUses map[string]string // resource name -> image object ref
 	imageRefs map[string]*imageResource
 	opacity   float64 // 0 disables
@@ -56,6 +57,7 @@ func cloneContent(c *Content) *Content {
 		fontFiles: c.fontFiles,
 		used:      c.used,
 		curFont:   c.curFont,
+		curSize:   c.curSize,
 		imageUses: c.imageUses,
 		imageRefs: c.imageRefs,
 		opacity:   c.opacity,
@@ -143,6 +145,7 @@ func (c *Content) Transform(a, b, c2, d, e, f float64) {
 // SetFont selects a registered font resource by name and size.
 func (c *Content) SetFont(name string, size float64) {
 	c.curFont = name
+	c.curSize = size
 	c.buf.WriteString(fmt.Sprintf("/%s %s Tf\n", name, num(size)))
 }
 
@@ -189,9 +192,92 @@ func (c *Content) TextRenderMode(mode int) {
 }
 
 // TextShow draws a string in the current font, recording its runes for the
-// subsetter. Non-Latin-1 code points are folded (see winAnsiFold) so the
-// recorded runes match the single-byte codes written by pdfString.
+// subsetter. Mixed CJK+Latin is split: Unicode glyphs the face provides go
+// through Type0; Latin that the face lacks (typical for CJK fallback fonts)
+// is drawn with an embedded Liberation fallback so ASCII does not become tofu.
 func (c *Content) TextShow(s string) {
+	s = ShapeText(s)
+	f := c.fontFiles[c.curFont]
+	if f == nil || !c.textNeedsType0(s) {
+		c.textShowSimple(s)
+		return
+	}
+	type run struct {
+		s     string
+		type0 bool
+	}
+	var runs []run
+	var buf strings.Builder
+	mode := -1 // -1 unset, 0 simple, 1 type0
+	flush := func() {
+		if buf.Len() == 0 {
+			return
+		}
+		runs = append(runs, run{s: buf.String(), type0: mode == 1})
+		buf.Reset()
+	}
+	for _, r := range s {
+		has := f.GlyphID(r) != 0
+		next := 0
+		if r > 0xFF {
+			next = 1
+		} else if !has {
+			next = 0 // missing Latin on CJK face → Liberation
+		}
+		if mode < 0 {
+			mode = next
+		} else if next != mode {
+			flush()
+			mode = next
+		}
+		buf.WriteRune(r)
+	}
+	flush()
+	// Keep the caller's face as the Type0 source. Latin fallback may switch
+	// curFont to FL; Type0 must still subset the original Unicode face, not FL_u.
+	base := strings.TrimSuffix(c.curFont, "_u")
+	size := c.curSize
+	for _, rn := range runs {
+		if rn.type0 {
+			if c.curFont != base && c.curFont != base+"_u" {
+				c.SetFont(base, size)
+			}
+			c.textShowType0(rn.s)
+			continue
+		}
+		name := base
+		if face := c.fontFiles[base]; face != nil {
+			for _, r := range rn.s {
+				if face.GlyphID(r) == 0 {
+					name = c.ensureLatinFallback()
+					break
+				}
+			}
+		}
+		if c.curFont != name {
+			c.SetFont(name, size)
+		}
+		c.textShowSimple(rn.s)
+	}
+	if c.curFont != base {
+		c.SetFont(base, size)
+	}
+}
+
+func (c *Content) ensureLatinFallback() string {
+	const name = "FL"
+	if c.fontFiles[name] != nil {
+		return name
+	}
+	lf, err := DefaultFont()
+	if err != nil || lf == nil {
+		return c.curFont
+	}
+	c.UseEmbeddedFont(name, lf)
+	return name
+}
+
+func (c *Content) textShowSimple(s string) {
 	for _, r := range s {
 		if r > 0xFF {
 			r = winAnsiFold(r)
@@ -204,10 +290,50 @@ func (c *Content) TextShow(s string) {
 	c.buf.WriteString(pdfString(s) + " Tj\n")
 }
 
+func (c *Content) textNeedsType0(s string) bool {
+	if _, ok := c.fontFiles[c.curFont]; !ok {
+		return false
+	}
+	for _, r := range s {
+		if r > 0xFF {
+			r = winAnsiFold(r)
+		}
+		if r > 0xFF {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *Content) textShowType0(s string) {
+	base := strings.TrimSuffix(c.curFont, "_u")
+	uname := base + "_u"
+	if f := c.fontFiles[base]; f != nil {
+		c.UseEmbeddedFont(uname, f)
+	} else if f := c.fontFiles[c.curFont]; f != nil && c.curFont == uname {
+		c.UseEmbeddedFont(uname, f)
+	}
+	if c.curFont != uname {
+		c.SetFont(uname, c.curSize)
+	}
+	for _, r := range s {
+		if r > 0xFFFF {
+			r = '?'
+		}
+		c.used[uname] = append(c.used[uname], r)
+	}
+	c.buf.WriteString(pdfHexCIDs(s) + " Tj\n")
+}
+
 // TextShowAdj draws text with per-char adjustments (kerning offsets in 1/1000 em).
 func (c *Content) TextShowAdj(s string, kern []int) {
 	if len(kern) == 0 {
 		c.TextShow(s)
+		return
+	}
+	if c.textNeedsType0(s) {
+		// Kerning with Type0 is best-effort: draw without adjustments.
+		c.textShowType0(s)
 		return
 	}
 	for _, r := range s {

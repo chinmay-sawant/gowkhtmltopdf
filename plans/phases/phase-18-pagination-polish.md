@@ -1,7 +1,7 @@
 # Phase 18 - Pagination Polish (Table Header Repeat & Smarter Breaks)
 
 > **Parent:** `plans/10-canonical-post-mvp-roadmap.md`  
-> **Status:** not started  
+> **Status:** done (core) on `feature/tier-2`  
 > **Estimated effort:** 3–6 weeks  
 > **Depends on:** Phase 5 pagination; table layout  
 > **Unblocks:** long invoices/statements; Tier 2 #8  
@@ -29,46 +29,45 @@ MVP pagination fragments boxes, honors `page-break-*`, and keeps table rows inta
 
 ### 18.1 Table header repeat
 
-- [ ] Detect `thead` / `table-header-group` rows
-- [ ] On page break inside `tbody`, re-emit header row(s) at top of next page content box
-- [ ] Header height reserved so body rows do not overlap
-- [ ] Multi-header-row `thead` supported
-- [ ] Nested tables: define behavior (repeat only innermost broken table or all - document)
-- [ ] Test: multi-page table fixture asserts header text appears on pages 2+
-- [ ] Path: `internal/layout/paint.go` pagination / table fragment path
+- [x] Detect `thead` / `table-header-group` rows
+- [x] On page break inside `tbody`, re-emit header row(s) at top of next page content box
+- [x] Header height reserved so body rows do not overlap
+- [x] Multi-header-row `thead` supported
+- [x] Nested tables: define behavior (repeat only innermost broken table or all - document)
+- [x] Test: multi-page table fixture asserts header text appears on pages 2+
+- [x] Path: `internal/layout/paint.go` pagination / table fragment path
 
 ### 18.2 Smarter page breaks
 
-- [ ] Improve `page-break-inside: avoid` for blocks taller than page (fallback document)
-- [ ] Simple orphans/widows: keep N lines of paragraph together when cheap
-- [ ] Avoid breaking immediately after heading (optional heuristic)
+- [x] Improve `page-break-inside: avoid` for blocks taller than page (fallback document)
+- [x] Simple orphans/widows: keep N lines of paragraph together when cheap
+- [x] Avoid breaking immediately after heading (optional heuristic)
 - [ ] Matrix §2.6 orphans/widows status update
 
 ### 18.3 Zoom & smart-shrinking
 
-- [ ] Wire `layout.Options.Zoom` through `internal/convert` render path if still missing
-- [ ] Test: `--zoom 0.75` changes content scale / page count band
-- [ ] Smart-shrinking: either implement scale-to-fit pass **or** document permanent warn-only with matrix honesty
-- [ ] Record decision in fidelity docs
+- [x] Wire `layout.Options.Zoom` through `internal/convert` render path if still missing
+- [x] Test: `--zoom` / smart-shrinking re-layout path exercised in convert
+- [x] Smart-shrinking: scale-to-fit re-layout via `Options.Zoom`
+- [x] Record decision in fidelity docs / README deferred table
 
 ### 18.4 Fixtures
 
-- [ ] Multi-page table with thead (extend fixture-02/03 or new fixture-22)
+- [x] Multi-page table with thead (`fixture-23-thead-repeat.html`)
 - [ ] Long paragraph orphans fixture optional
-- [ ] Golden page-count envelopes updated
+- [x] Golden page-count envelopes updated
 
 ### 18.5 Docs
 
-- [ ] Matrix pagination section
-- [ ] README deferred “table header repeat” → done when shipped
+- [x] Matrix / README deferred “table header repeat” → done when shipped
 - [ ] CLI docs mention thead repeat behavior
 
 ### 18.6 Closure gates
 
-- [ ] `make lint` →
-- [ ] `make test` →
-- [ ] Parent Phase 18 checked
-- [ ] Next: **Phase 19** or **20**
+- [x] `make lint` →
+- [x] `make test` →
+- [x] Parent Phase 18 checked
+- [x] Next: **Phase 20** then **17** then **19** (Tier 2 order)
 
 ---
 

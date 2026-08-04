@@ -109,6 +109,13 @@ func TestParseAtRulesSkipped(t *testing.T) {
 	if len(s.Rules) != 1 || s.Rules[0].Selectors[0].Parts[0].Tag != "p" {
 		t.Fatalf("rules = %+v", s.Rules)
 	}
+	if len(s.FontFaces) != 1 || s.FontFaces[0].Family != "X" {
+		t.Fatalf("font-faces = %+v", s.FontFaces)
+	}
+	urls := FontFaceURLs(s.FontFaces[0].Src)
+	if len(urls) != 1 || urls[0] != "x.woff" {
+		t.Fatalf("font-face urls = %v", urls)
+	}
 }
 
 func TestParseOrderAndNestedMediaOrder(t *testing.T) {

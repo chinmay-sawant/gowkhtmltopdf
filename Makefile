@@ -36,9 +36,12 @@ golden-update:
 samples:
 	# Wipe regenerable fixture samples only (keep optional URL smokes like wiki-*.pdf)
 	rm -f output/fixture-*.pdf output/fixture-*.png output/showcase-*.pdf
+	# Opt-in CJK/system faces when present (fixture-27 and font-family lists).
+	FONT_FLAGS=""; \
+	if [ -d /usr/share/fonts/truetype/droid ]; then FONT_FLAGS="--font-path /usr/share/fonts/truetype/droid"; fi; \
 	for f in testdata/golden/fixture-*.html; do \
 		name=$$(basename "$$f" .html); \
-		go run ./cmd/gowkhtmltopdf --enable-local-file-access "$$f" "output/$$name.pdf"; \
+		go run ./cmd/gowkhtmltopdf --enable-local-file-access $$FONT_FLAGS "$$f" "output/$$name.pdf"; \
 	done
 	go run ./cmd/gowkhtmltopdf --enable-local-file-access --outline --outline-depth 2 --header-left "gowkhtmltopdf demo - [title]" --header-right "page [page]/[topage]" --footer-center "[section]" toc testdata/golden/fixture-16-invoice-with-css.html output/showcase-toc-hf-outline.pdf
 	go run ./cmd/gowkhtmltoimage --enable-local-file-access testdata/golden/fixture-01-simple-invoice.html output/fixture-01-simple-invoice.png

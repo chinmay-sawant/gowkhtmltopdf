@@ -1,7 +1,7 @@
 # Phase 20 - Headers/Footers & Links Edge Cases
 
 > **Parent:** `plans/10-canonical-post-mvp-roadmap.md`  
-> **Status:** not started  
+> **Status:** done (core) on `feature/tier-2`  
 > **Estimated effort:** 2–4 weeks  
 > **Depends on:** Phase 6 HF/TOC/links MVP  
 > **Unblocks:** Tier 2 #9 polish  

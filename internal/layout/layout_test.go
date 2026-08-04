@@ -960,3 +960,48 @@ func TestPageBreakBeforeStacked(t *testing.T) {
 		prev = p
 	}
 }
+
+func TestPageBreakAfterAvoidKeepsSpacing(t *testing.T) {
+	// page-break-after:avoid must not pull the following box up onto the
+	// preceding paragraph's baseline when both already fit on the same page
+	// (fixture-08 Forms index overlapped the summary paragraph).
+	s := sheet(t, `
+body { margin: 0; font-size: 10pt }
+p { margin: 0 0 8px 0 }
+.after-avoid { page-break-after: avoid }
+.keep { page-break-inside: avoid; border: 1px solid #000; padding: 8px; background-color: #eeeeee }
+`)
+	res := layoutHTML(t, `<html><body>
+<p class="after-avoid">All forms are available from the document server under /operations/forms. Paper copies are stored in the archive room, shelf D, binders 14 to 21.</p>
+<div class="keep"><p><strong>Forms index</strong> - FM-101 shift book.</p></div>
+</body></html>`, s)
+	doc := pdf.NewDocument()
+	if err := Paint(doc, res, paintOpts()); err != nil {
+		t.Fatal(err)
+	}
+	var lastParaBaseline, keepTop float64
+	var foundPara, foundKeep bool
+	for _, op := range res.Ops {
+		if op.Kind == OpText && (strings.Contains(op.Text, "All forms") ||
+			strings.Contains(op.Text, "shelf D") ||
+			strings.Contains(op.Text, "document server") ||
+			strings.Contains(op.Text, "binders")) {
+			if !foundPara || op.Y > lastParaBaseline {
+				lastParaBaseline = op.Y
+			}
+			foundPara = true
+		}
+		if op.Kind == OpFillRect && op.R > 0.85 && op.G > 0.85 && op.B > 0.85 {
+			keepTop = op.Y
+			foundKeep = true
+		}
+	}
+	if !foundPara || !foundKeep {
+		t.Fatalf("para=%v keep=%v", foundPara, foundKeep)
+	}
+	// Keep box top must sit below the last paragraph baseline (plus a little
+	// ink), preserving margin — not snapped up to the baseline.
+	if keepTop < lastParaBaseline+4 {
+		t.Fatalf("Forms index box top %.1f overlaps paragraph baseline %.1f", keepTop, lastParaBaseline)
+	}
+}

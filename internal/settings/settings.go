@@ -307,6 +307,9 @@ type PdfGlobal struct {
 	Web                   Web
 	Load                  LoadGlobal
 	DefaultEncoding       string
+	FontPaths             []string // --font-path directories (opt-in TTF discovery)
+	UseSystemFonts        bool     // --use-system-fonts
+	ResolveRelativeLinks  bool     // resolve relative <a href> against page URL
 }
 
 // DefaultPdfGlobal returns the pdfsettings.cc-compatible defaults.
@@ -338,6 +341,7 @@ func DefaultPdfGlobal() PdfGlobal {
 			Plugins:         false,
 			DefaultEncoding: "utf-8",
 		},
+		ResolveRelativeLinks: true,
 	}
 }
 

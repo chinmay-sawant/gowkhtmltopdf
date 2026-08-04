@@ -11,6 +11,8 @@ package layout
 type floatState struct {
 	leftBottom  float64 // canvas y of lowest left-float bottom; 0 = none
 	rightBottom float64
+	leftTop     float64 // canvas y of the top of the current left pack row
+	rightTop    float64
 	leftEdge    float64 // absolute x of right edge of active left float
 	rightEdge   float64 // absolute x of left edge of active right float
 	contentX    float64
@@ -39,6 +41,7 @@ func (f *floatState) clear(clear string, y, cy float64) float64 {
 		}
 		f.hasLeft = false
 		f.leftBottom = 0
+		f.leftTop = 0
 		f.leftEdge = f.contentX
 	case "right":
 		if f.hasRight && f.rightBottom > need {
@@ -46,6 +49,7 @@ func (f *floatState) clear(clear string, y, cy float64) float64 {
 		}
 		f.hasRight = false
 		f.rightBottom = 0
+		f.rightTop = 0
 		f.rightEdge = f.contentX + f.contentW
 	case "both":
 		if f.hasLeft && f.leftBottom > need {
@@ -56,6 +60,7 @@ func (f *floatState) clear(clear string, y, cy float64) float64 {
 		}
 		f.hasLeft, f.hasRight = false, false
 		f.leftBottom, f.rightBottom = 0, 0
+		f.leftTop, f.rightTop = 0, 0
 		f.leftEdge = f.contentX
 		f.rightEdge = f.contentX + f.contentW
 	}
@@ -73,6 +78,9 @@ func (f *floatState) place(side string, b *box) {
 		if !f.hasLeft || bottom > f.leftBottom {
 			f.leftBottom = bottom
 		}
+		if !f.hasLeft || b.y < f.leftTop {
+			f.leftTop = b.y
+		}
 		edge := b.x + b.w
 		if !f.hasLeft || edge > f.leftEdge {
 			f.leftEdge = edge
@@ -81,6 +89,9 @@ func (f *floatState) place(side string, b *box) {
 	case "right":
 		if !f.hasRight || bottom > f.rightBottom {
 			f.rightBottom = bottom
+		}
+		if !f.hasRight || b.y < f.rightTop {
+			f.rightTop = b.y
 		}
 		if !f.hasRight || b.x < f.rightEdge {
 			f.rightEdge = b.x

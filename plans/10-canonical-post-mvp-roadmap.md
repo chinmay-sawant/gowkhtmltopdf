@@ -97,10 +97,10 @@ Tier 1 is **not closed** yet. Suggested order for the next sessions:
 | 14 | Images in PDF - robust path | 1 | [phases/phase-14-pdf-images.md](phases/phase-14-pdf-images.md) | 1–2 wk | `[x]` 2026-08-04 |
 | 15 | Image mode - real TTF/AA raster | 1 | [phases/phase-15-image-mode-raster.md](phases/phase-15-image-mode-raster.md) | 3–6 wk | `[x]` 2026-08-04 |
 | 16 | CSS invoices use (selectors + float lite) | 1 | [phases/phase-16-invoice-css.md](phases/phase-16-invoice-css.md) | 3–6 wk | `[x]` 2026-08-04 |
-| 17 | Broader CSS (position/float, partial flex) | 2 | [phases/phase-17-broader-css.md](phases/phase-17-broader-css.md) | 2–4 mo | `[ ]` |
-| 18 | Pagination polish (thead repeat, breaks) | 2 | [phases/phase-18-pagination-polish.md](phases/phase-18-pagination-polish.md) | 3–6 wk | `[ ]` |
-| 19 | Fonts / i18n / discovery / CJK | 2 | [phases/phase-19-fonts-i18n.md](phases/phase-19-fonts-i18n.md) | 1–3 mo | `[ ]` |
-| 20 | HF / links edge cases | 2 | [phases/phase-20-hf-links-edges.md](phases/phase-20-hf-links-edges.md) | 2–4 wk | `[ ]` |
+| 17 | Broader CSS (position/float, partial flex) | 2 | [phases/phase-17-broader-css.md](phases/phase-17-broader-css.md) | 2–4 mo | `[x]` tier-2 |
+| 18 | Pagination polish (thead repeat, breaks) | 2 | [phases/phase-18-pagination-polish.md](phases/phase-18-pagination-polish.md) | 3–6 wk | `[x]` tier-2 |
+| 19 | Fonts / i18n (discovery, CJK/Type0) | 2 | [phases/phase-19-fonts-i18n.md](phases/phase-19-fonts-i18n.md) | 1–3 mo | `[x]` core |
+| 20 | HF / links edge cases | 2 | [phases/phase-20-hf-links-edges.md](phases/phase-20-hf-links-edges.md) | 2–4 wk | `[x]` tier-2 |
 | 21 | Arbitrary websites / paste-any-URL | 2→3 | [phases/phase-21-arbitrary-websites.md](phases/phase-21-arbitrary-websites.md) | 2–4 mo | `[ ]` |
 | 22 | JavaScript support (staged) | 2→3 | [phases/phase-22-javascript.md](phases/phase-22-javascript.md) | research + years for full | `[ ]` |
 | 23 | Tier 3 open-web competition | 3 | [phases/phase-23-tier3-deferred.md](phases/phase-23-tier3-deferred.md) | n/a | `[~]` deferred |
@@ -259,68 +259,70 @@ Tier 1 is **not closed** yet. Suggested order for the next sessions:
 ## Phase 17: Broader CSS (Position / Float Full / Partial Flex)
 
 > Detail: [phases/phase-17-broader-css.md](phases/phase-17-broader-css.md)  
-> **Tier 2 #6**
+> **Tier 2 #6** · **Status:** largely done on `feature/tier-2`
 
 ### 17.1 Position & float
-- [ ] `position: relative` offsets; float stacking refinements
-- [ ] `[~]` `absolute` / `fixed` only if report need proven
+- [x] `position: relative` offsets; float packing refinements
+- [x] `position: absolute` lite (left/top/right/bottom subset)
+- [ ] `[~]` `fixed` / sticky still deferred
 
 ### 17.2 Partial flex
-- [ ] `display: flex` row + basic `justify-content` / `align-items` / `gap` subset
-- [ ] `[~]` flex-wrap, flex-grow complexity - staged
-- [ ] Grid remains out of allowlist unless amended
+- [x] `display: flex` row/column + `justify-content` / `align-items` / `gap` / `flex-grow`
+- [ ] `[~]` flex-wrap complexity - staged
+- [x] Grid remains out of allowlist unless amended
 
 ### 17.3 Closure
-- [ ] Fixtures + matrix; Wikipedia still not claimed
+- [x] Fixtures 25–26 + layout tests; Wikipedia still not claimed
 
 ---
 
 ## Phase 18: Pagination Polish
 
 > Detail: [phases/phase-18-pagination-polish.md](phases/phase-18-pagination-polish.md)  
-> **Tier 2 #8**
+> **Tier 2 #8** · **Status:** largely done on `feature/tier-2`
 
 ### 18.1 Tables & breaks
-- [ ] Repeat table header (`thead`) on continued pages
-- [ ] Smarter `page-break-inside` / orphan-widow heuristics
-- [ ] Wire `--zoom` through convert if still missing
+- [x] Repeat table header (`thead`) on continued pages
+- [x] Smarter orphan/widow + keep-heading-with-next heuristics
+- [x] Wire `--zoom` through convert (+ smart-shrinking re-layout)
 
 ### 18.2 Closure
-- [ ] Multi-page table fixture proves header repeat
+- [x] Multi-page table fixture-23 proves header repeat
 
 ---
 
 ## Phase 19: Fonts / i18n / Discovery / CJK
 
 > Detail: [phases/phase-19-fonts-i18n.md](phases/phase-19-fonts-i18n.md)  
-> **Tier 2 #7** · Localization + installed/folder fonts
+> **Tier 2 #7** · Localization + installed/folder fonts · **Status:** core path on `feature/tier-2`
 
 ### 19.1 Discovery
-- [ ] Font search paths: bundled → user folder flag → optional system dirs (documented ACL)
-- [ ] Map CSS `font-family` lists to discovered faces
+- [x] Font search paths: bundled → `--font-path` → optional `--use-system-fonts`
+- [x] Map CSS `font-family` lists to discovered faces
 - [ ] `@font-face` local `src` subset (no network webfont download without policy)
 
 ### 19.2 Unicode
-- [ ] Type0/CID or multi-face path for common CJK / beyond Latin-1
-- [ ] Document shaping limits (no HarfBuzz): CJK OK-ish; Arabic/Indic not claimed
+- [x] Type0/CID path for BMP Unicode (CJK with a capable face)
+- [x] Document shaping limits (no HarfBuzz): CJK OK-ish; Arabic/Indic not claimed
 
 ### 19.3 Closure
-- [ ] CJK fixture; matrix Unicode section honest
+- [x] CJK fixture-27; Type0 tests skip if system font absent
 
 ---
 
 ## Phase 20: HF / Links Edge Cases
 
 > Detail: [phases/phase-20-hf-links-edges.md](phases/phase-20-hf-links-edges.md)  
-> **Tier 2 #9**
+> **Tier 2 #9** · **Status:** largely done on `feature/tier-2`
 
 ### 20.1 Gaps from README deferred list
-- [ ] Inline `#anchor` link source rects where possible
-- [ ] `resolveRelativeLinks`; HTML HF links on body pages
-- [ ] `[topage]` with copies; dump-outline TOC offset
+- [x] Inline `#anchor` link source rects where paint boxes exist
+- [x] `resolveRelativeLinks` (`--resolve-relative-links` / `--keep-relative-links`)
+- [ ] `[~]` HTML HF links on body pages (text HF OK; HTML-HF link carry limited)
+- [x] `[topage]` with copies; dump-outline TOC offset
 
 ### 20.2 Closure
-- [ ] Golden multi-chapter + HF regression
+- [x] Fixture-24 internal anchors + HF/link regression tests
 
 ---
 

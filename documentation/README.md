@@ -13,6 +13,7 @@ User and design docs for the pure-Go, stdlib-only HTML→PDF / HTML→image engi
 | [integration-security.md](integration-security.md) | **Gin/web apps:** SSRF, local files, preferred patterns (also vs wkhtmltopdf) |
 | [samples.md](samples.md) | Golden fixtures and committed `output/` samples |
 | [compatibility-matrix.md](compatibility-matrix.md) | Per-element / per-property support (normative contract) |
+| [fonts.md](fonts.md) | Font discovery, Type0/CJK path, honest shaping limits |
 | [THREAT-MODEL.md](THREAT-MODEL.md) | Security model and local-file ACL |
 | [comparison-with-others/sebastiaanklippert-go-wkhtmltopdf.md](comparison-with-others/sebastiaanklippert-go-wkhtmltopdf.md) | vs SebastiaanKlippert/go-wkhtmltopdf (wrapper vs pure-Go engine) |
 
