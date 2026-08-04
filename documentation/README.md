@@ -13,6 +13,7 @@ User and design docs for the pure-Go, stdlib-only HTML→PDF / HTML→image engi
 | [samples.md](samples.md) | Golden fixtures and committed `output/` samples |
 | [compatibility-matrix.md](compatibility-matrix.md) | Per-element / per-property support |
 | [THREAT-MODEL.md](THREAT-MODEL.md) | Security model and local-file ACL |
+| [comparison-with-others/sebastiaanklippert-go-wkhtmltopdf.md](comparison-with-others/sebastiaanklippert-go-wkhtmltopdf.md) | vs SebastiaanKlippert/go-wkhtmltopdf (wrapper vs pure-Go engine) |
 
 ## Plans (implementation ledgers)
 
