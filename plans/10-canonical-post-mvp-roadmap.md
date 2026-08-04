@@ -129,21 +129,22 @@ Tier 1 is **not closed** yet. Suggested order for the next sessions:
 ## Phase 10: HTML/CSS Fidelity Documentation
 
 > Detail: [phases/phase-10-fidelity-docs.md](phases/phase-10-fidelity-docs.md)  
-> **Why first:** pure documentation; unblocks honest product messaging and every later matrix update.
+> **Why first:** pure documentation; unblocks honest product messaging and every later matrix update.  
+> **Status:** complete 2026-08-04 (`documentation/fidelity.md`)
 
 ### 10.1 Fidelity contract
-- [ ] Publish a **fidelity guide** that states: report HTML first; not a browser
-- [ ] Cross-link matrix ↔ fixtures ↔ sample PDFs with pass/fail/partial
-- [ ] Document Tier 1 / 2 / 3 expectations and this roadmap
+- [x] Publish a **fidelity guide** that states: report HTML first; not a browser
+- [x] Cross-link matrix ↔ fixtures ↔ sample PDFs with pass/fail/partial
+- [x] Document Tier 1 / 2 / 3 expectations and this roadmap
 
 ### 10.2 Matrix honesty pass
-- [ ] Re-audit every “Implemented / Partial / Not implemented” row against current code
+- [x] Re-audit every “Implemented / Partial / Not implemented” row against current code
 - [x] Mark image-mode text quality limits explicitly (TTF AA shipped; residual no FreeType hinting)
 - [x] Mark font-face / bold / italic / CJK limits explicitly
 
 ### 10.3 Closure
-- [ ] No code change required; skip `make lint`/`make test` for pure docs (skill rule)
-- [ ] Point README “Deferred” table at this ledger
+- [x] No code change required; skip `make lint`/`make test` for pure docs (skill rule)
+- [x] Point README “Deferred” table at this ledger
 
 ---
 
