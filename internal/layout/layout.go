@@ -750,6 +750,8 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 			}
 			cellW += spacing * float64(cell.span-1)
 			cell.w = cellW
+			// Height against final column width so wrap matches paint.
+			e.measureCellHeight(cell, cellW)
 			if cell.contentH > rowH {
 				rowH = cell.contentH
 			}
@@ -782,19 +784,27 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 	return tb
 }
 
-// buildCell measures a table cell (no ops emitted).
+// buildCell measures a table cell's max-content width (no ops emitted).
+// Height is not final here: layoutCell must run again with the real column
+// width after column sizing, or narrow max-content widths force false wraps
+// and inflate row heights (empty bands under single-line cell text).
 func (e *engine) buildCell(n *html.Node, col, span int) *box {
 	st := e.styles[n]
 	b := &box{node: n, style: st, kind: "cell", col: col, span: span}
 	b.contentW = e.measureCellContent(n, st)
-	// Preserve the caller's noEmit flag. Nested tables call buildCell during
-	// an outer measure pass; restoring false mid-measure leaked ops at
-	// wrong positions (fixture-10 nested table borders/text).
+	return b
+}
+
+// measureCellHeight lays out the cell at width (border-box) without emitting
+// paint ops, and stores the result on b.contentH.
+func (e *engine) measureCellHeight(b *box, width float64) {
 	was := e.noEmit
 	e.noEmit = true
-	b.contentH = e.layoutCell(n, st, b.contentW)
+	// Preserve the caller's noEmit flag. Nested tables call this during an
+	// outer measure pass; restoring false mid-measure leaked ops at wrong
+	// positions (fixture-10 nested table borders/text).
+	b.contentH = e.layoutCell(b.node, b.style, width)
 	e.noEmit = was
-	return b
 }
 
 // cellBG returns the background to paint for a cell: the cell's own color,

@@ -2,9 +2,10 @@
 
 ## Golden HTML (`testdata/golden/`)
 
-Twenty report-style HTML fixtures (`fixture-01` … `fixture-20`) exercise
+Twenty-one report-style HTML fixtures (`fixture-01` … `fixture-21`) exercise
 invoices, tables, page breaks, CSS, links, images, lists, typography, and
-more. See [`testdata/golden/README.md`](../testdata/golden/README.md).
+a multi-section detailed operations report. See
+[`testdata/golden/README.md`](../testdata/golden/README.md).
 
 CI / local structure tests:
 
@@ -19,6 +20,7 @@ make golden
 |----------|--------|
 | `output/fixture-*.pdf` | Each golden HTML via `gowkhtmltopdf` |
 | `output/fixture-01-simple-invoice.png` | Image converter smoke |
+| `output/fixture-21-detailed-report.png` | Detailed report via library image API |
 | `output/showcase-toc-hf-outline.pdf` | TOC + HF + outline on fixture-16 |
 | `output/wiki-ana-de-armas.pdf` | Optional complex URL smoke (Wikipedia) |
 

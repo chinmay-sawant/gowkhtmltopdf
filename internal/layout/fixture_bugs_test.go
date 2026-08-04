@@ -167,6 +167,52 @@ func TestBackgroundPaintsUnderText(t *testing.T) {
 	}
 }
 
+// TestTableCellRowHeightUsesFinalWidth guards against measuring cell height at
+// max-content width (too narrow → false wraps → inflated empty row bands).
+func TestTableCellRowHeightUsesFinalWidth(t *testing.T) {
+	s, err := css.Parse(`
+		table { width: 100%; border-collapse: collapse; }
+		td { border: 1px solid #000; padding: 4px; font-size: 10pt; }
+	`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := html.Parse(`<html><body>
+		<table>
+			<tr><td>On-time delivery</td><td>96.4 %</td><td>above target</td></tr>
+			<tr><td>First-pass yield</td><td>98.1 %</td><td>above target</td></tr>
+		</table>
+	</body></html>`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := Layout(root, Options{Width: 500, Height: 400, Sheets: []*css.Stylesheet{s}, Background: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ys []float64
+	for _, op := range res.Ops {
+		if op.Kind == OpText && strings.Contains(op.Text, "On-time") {
+			ys = append(ys, op.Y)
+		}
+		if op.Kind == OpText && strings.Contains(op.Text, "First-pass") {
+			ys = append(ys, op.Y)
+		}
+	}
+	if len(ys) < 2 {
+		t.Fatalf("need both row labels, got ys=%v", ys)
+	}
+	dy := ys[1] - ys[0]
+	// Single-line 10pt rows with padding should be well under 30pt apart.
+	// The max-content-height bug produced ~35-50pt empty bands between rows.
+	if dy > 28 {
+		t.Errorf("row baseline gap = %.1f pt, want <= 28 (inflated cell height from max-content measure)", dy)
+	}
+	if dy < 8 {
+		t.Errorf("row baseline gap = %.1f pt, want >= 8 (rows collapsed?)", dy)
+	}
+}
+
 func TestTableCellBackgroundHeight(t *testing.T) {
 	s, err := css.Parse(`th { background-color: #1a3d6d; color: #fff } td { background-color: #f2f6fa }`)
 	if err != nil {
