@@ -21,8 +21,6 @@ make golden
 | `output/fixture-*.pdf` | Each golden HTML via `gowkhtmltopdf` |
 | `output/fixture-01-simple-invoice.png` | Image converter smoke |
 | `output/fixture-21-detailed-report.png` | Detailed report via library image API |
-| `output/example-google.pdf` | `http://google.com` via library PDF API |
-| `output/example-google.png` | `http://google.com` via library image API |
 | `output/showcase-toc-hf-outline.pdf` | TOC + HF + outline on fixture-16 |
 | `output/wiki-ana-de-armas.pdf` | Optional complex URL smoke (Wikipedia) |
 
