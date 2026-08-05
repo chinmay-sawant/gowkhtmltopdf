@@ -1460,16 +1460,22 @@ func ParseColor(v string) (r, g, b int, alpha float64, ok bool) {
 // cssVarFallback extracts the fallback from var(--name, fallback). Nested
 // var() in the fallback is not expanded further here.
 func cssVarFallback(v string) (string, bool) {
+	_, fb, ok := parseVarFn(v)
+	return fb, ok && fb != ""
+}
+
+// parseVarFn parses a top-level var(--name) or var(--name, fallback).
+// ok is false when v is not a var() function.
+func parseVarFn(v string) (name, fallback string, ok bool) {
 	v = strings.TrimSpace(v)
 	if len(v) < 6 || !strings.EqualFold(v[:4], "var(") {
-		return "", false
+		return "", "", false
 	}
 	inner := v[4:]
 	if !strings.HasSuffix(inner, ")") {
-		return "", false
+		return "", "", false
 	}
 	inner = strings.TrimSpace(inner[:len(inner)-1])
-	// Split on top-level comma.
 	depth := 0
 	for i := 0; i < len(inner); i++ {
 		switch inner[i] {
@@ -1481,10 +1487,62 @@ func cssVarFallback(v string) (string, bool) {
 			}
 		case ',':
 			if depth == 0 {
-				fb := strings.TrimSpace(inner[i+1:])
-				return fb, fb != ""
+				name = strings.ToLower(strings.TrimSpace(inner[:i]))
+				fallback = strings.TrimSpace(inner[i+1:])
+				return name, fallback, name != ""
 			}
 		}
+	}
+	name = strings.ToLower(strings.TrimSpace(inner))
+	return name, "", name != ""
+}
+
+// ResolveVar expands CSS var() references in v using lookup(--name).
+// Unresolved var() uses the CSS fallback, then knownCSSVarDefault (Codex/
+// Vector print-density tokens → 8pt body). Nested var() expands up to a
+// small depth.
+func ResolveVar(v string, lookup func(name string) (string, bool)) string {
+	v = strings.TrimSpace(v)
+	for depth := 0; depth < 16; depth++ {
+		if !strings.HasPrefix(strings.ToLower(v), "var(") {
+			return v
+		}
+		name, fallback, ok := parseVarFn(v)
+		if !ok {
+			return v
+		}
+		if lookup != nil {
+			if val, found := lookup(name); found && strings.TrimSpace(val) != "" {
+				v = strings.TrimSpace(val)
+				continue
+			}
+		}
+		if fallback != "" {
+			v = fallback
+			continue
+		}
+		if def, ok := knownCSSVarDefault(name); ok {
+			v = def
+			continue
+		}
+		return ""
+	}
+	return v
+}
+
+// knownCSSVarDefault supplies print-oriented fallbacks for Codex/Vector
+// tokens when --name is referenced without a stylesheet definition or
+// CSS fallback. 8pt is the body density target when skins omit the tokens.
+func knownCSSVarDefault(name string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "--font-size-medium", "--font-size-small":
+		return "8pt", true
+	case "--font-size-x-small":
+		return "7pt", true
+	case "--font-size-large":
+		return "10pt", true
+	case "--line-height-content", "--line-height-medium", "--line-height-small":
+		return "1.6", true
 	}
 	return "", false
 }

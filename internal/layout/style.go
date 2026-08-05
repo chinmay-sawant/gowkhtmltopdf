@@ -114,6 +114,9 @@ type ResolvedStyle struct {
 	HasTransform    bool
 	TransformOrigin transformOriginSpec
 	Opacity         float64 // 0..1; initial 1; also from filter:opacity()
+	// CustomProps holds resolved CSS custom properties (--*) for this element
+	// (inherited). Shared with the parent map when the element declares none.
+	CustomProps map[string]string
 }
 
 type border struct {
@@ -189,6 +192,9 @@ type styleContext struct {
 	media     string
 	viewportW float64 // containing-block width for % of margins/padding/width
 	viewportH float64 // for % of height
+	// remBase is the used font-size of the root element for rem units (pt).
+	// 0 means the CSS initial medium size (16px → 12pt).
+	remBase float64
 	// containers maps size-query containers (inline-size|size) to their used
 	// content-box inline size. nil means first pass: skip @container rules.
 	containers map[*html.Node]sizeContainer
@@ -236,7 +242,12 @@ func resolveStylesCtx(root *html.Node, ctx *styleContext) map[*html.Node]Resolve
 			if parent != nil {
 				inheritProps(&st, *parent, raw)
 			}
-			applyFontProps(&st, raw, parent)
+			st.CustomProps = mergeCustomProps(parent, raw)
+			raw = resolveRawVars(raw, st.CustomProps)
+			applyFontProps(&st, raw, parent, ctx)
+			if n.Name == "html" && st.FontSize > 0 {
+				ctx.remBase = st.FontSize
+			}
 			applyRestProps(&st, raw, ctx, parent)
 			// Wiki print CSS sets text-decoration:inherit (!important) → none,
 			// which hides links. Keep underlines for discoverability (Chrome
@@ -257,6 +268,7 @@ func resolveStylesCtx(root *html.Node, ctx *styleContext) map[*html.Node]Resolve
 			st = initialStyle()
 			if parent != nil {
 				inheritProps(&st, *parent, nil)
+				st.CustomProps = parent.CustomProps
 			}
 		}
 		out[n] = st
@@ -265,6 +277,96 @@ func resolveStylesCtx(root *html.Node, ctx *styleContext) map[*html.Node]Resolve
 		}
 	}
 	walk(root, nil)
+	return out
+}
+
+// mergeCustomProps inherits parent custom properties and overlays any --*
+// declarations from raw, resolving var() chains (MediaWiki/Codex tokens).
+func mergeCustomProps(parent *ResolvedStyle, raw map[string]string) map[string]string {
+	var parentProps map[string]string
+	if parent != nil {
+		parentProps = parent.CustomProps
+	}
+	declared := false
+	for prop := range raw {
+		if strings.HasPrefix(prop, "--") {
+			declared = true
+			break
+		}
+	}
+	if !declared {
+		return parentProps
+	}
+	work := map[string]string{}
+	for k, v := range parentProps {
+		work[k] = v
+	}
+	for prop, v := range raw {
+		if strings.HasPrefix(prop, "--") {
+			work[prop] = v
+		}
+	}
+	memo := map[string]string{}
+	var eval func(name string, stack map[string]bool) string
+	eval = func(name string, stack map[string]bool) string {
+		if v, ok := memo[name]; ok {
+			return v
+		}
+		rawV, ok := work[name]
+		if !ok {
+			return ""
+		}
+		if !strings.Contains(strings.ToLower(rawV), "var(") {
+			memo[name] = rawV
+			return rawV
+		}
+		if stack[name] {
+			return ""
+		}
+		stack[name] = true
+		val := css.ResolveVar(rawV, func(n string) (string, bool) {
+			s := eval(n, stack)
+			if strings.TrimSpace(s) == "" {
+				_, exists := work[n]
+				return s, exists
+			}
+			return s, true
+		})
+		delete(stack, name)
+		memo[name] = val
+		return val
+	}
+	for name := range work {
+		eval(name, map[string]bool{})
+	}
+	return memo
+}
+
+// resolveRawVars expands var() in cascaded property values using customProps.
+// Custom property keys (--*) are left unchanged (already resolved in the map).
+func resolveRawVars(raw map[string]string, customProps map[string]string) map[string]string {
+	if len(raw) == 0 {
+		return raw
+	}
+	lookup := func(name string) (string, bool) {
+		if customProps == nil {
+			return "", false
+		}
+		v, ok := customProps[name]
+		return v, ok && strings.TrimSpace(v) != ""
+	}
+	out := make(map[string]string, len(raw))
+	for prop, v := range raw {
+		if strings.HasPrefix(prop, "--") {
+			out[prop] = v
+			continue
+		}
+		if strings.Contains(strings.ToLower(v), "var(") {
+			out[prop] = css.ResolveVar(v, lookup)
+		} else {
+			out[prop] = v
+		}
+	}
 	return out
 }
 
@@ -422,14 +524,18 @@ func cascadeRaw(ctx *styleContext, n *html.Node) map[string]string {
 }
 
 // applyFontProps resolves font-size/family/weight/style/font first, using the
-// parent's size for percentages and em.
-func applyFontProps(st *ResolvedStyle, raw map[string]string, parent *ResolvedStyle) {
+// parent's size for percentages and em, and ctx.remBase for rem.
+func applyFontProps(st *ResolvedStyle, raw map[string]string, parent *ResolvedStyle, ctx *styleContext) {
 	parentSize := st.FontSize
 	if parent != nil {
 		parentSize = parent.FontSize
 	}
+	remBase := pxToPt(16)
+	if ctx != nil && ctx.remBase > 0 {
+		remBase = ctx.remBase
+	}
 	if v, ok := raw["font-size"]; ok {
-		st.FontSize = fontSize(v, parentSize)
+		st.FontSize = fontSize(v, parentSize, remBase)
 	}
 	if v, ok := raw["font-family"]; ok {
 		if fam := css.ParseFontFamily(v); len(fam) > 0 {
@@ -456,7 +562,7 @@ func applyFontProps(st *ResolvedStyle, raw map[string]string, parent *ResolvedSt
 		st.FontItalic = v == "italic" || v == "oblique"
 	}
 	if v, ok := raw["font"]; ok {
-		parseFontShorthand(st, v)
+		parseFontShorthand(st, v, remBase)
 	}
 }
 
@@ -991,7 +1097,7 @@ func isMulticol(st ResolvedStyle) bool {
 }
 
 // parseFontShorthand handles "font: italic bold 12px/1.4 Arial, sans-serif".
-func parseFontShorthand(st *ResolvedStyle, value string) {
+func parseFontShorthand(st *ResolvedStyle, value string, remBase float64) {
 	parts := strings.Fields(value)
 	for i, p := range parts {
 		if p == "italic" || p == "oblique" {
@@ -1012,7 +1118,7 @@ func parseFontShorthand(st *ResolvedStyle, value string) {
 			st.LineHeight = lineHeight(rest[j+1:], st.FontSize)
 			rest = rest[:j]
 		}
-		st.FontSize = fontSize(rest, st.FontSize)
+		st.FontSize = fontSize(rest, st.FontSize, remBase)
 		if i+1 < len(parts) {
 			if fam := css.ParseFontFamily(strings.Join(parts[i+1:], " ")); len(fam) > 0 {
 				st.FontFamily = fam
@@ -1204,7 +1310,10 @@ func borderWidth(value string, fs float64) float64 {
 	return 0
 }
 
-func fontSize(value string, parent float64) float64 {
+func fontSize(value string, parent, remBase float64) float64 {
+	if remBase <= 0 {
+		remBase = pxToPt(16)
+	}
 	switch value {
 	case "xx-small":
 		return pxToPt(9)
@@ -1236,7 +1345,7 @@ func fontSize(value string, parent float64) float64 {
 		case "px":
 			return pxToPt(v)
 		case "rem":
-			return pxToPt(16) * v
+			return remBase * v
 		case "in":
 			return v * 72
 		case "cm":

@@ -51,12 +51,14 @@ Always re-open a regenerated PDF in a real viewer when changing the PDF writer.
 ### Optional live smoke (also via `make samples` — not `make test`)
 
 `make samples` refreshes `output/wiki-ana-de-armas.pdf` from the live Wikipedia
-URL **without** `--simplify-dom` (raw page chrome included) and **with**
+URL **without** `--simplify-dom` (raw page chrome included), **with**
 `--use-system-fonts` so IPA/Unicode glyphs can fall back to DejaVu/Noto when
-present. Requires network; soft-fails if unreachable. Manual equivalent:
+present, and **`--zoom 0.666667`** so wiki print CSS `p { font-size: 12pt }`
+paints at ~8pt using Liberation (Georgia/Arial CSS names alias to Liberation —
+no proprietary TTFs). Requires network; soft-fails if unreachable. Manual equivalent:
 
 ```sh
-./bin/gowkhtmltopdf --use-system-fonts \
+./bin/gowkhtmltopdf --use-system-fonts --zoom 0.666667 \
   'https://en.wikipedia.org/wiki/Ana_de_Armas' output/wiki-ana-de-armas.pdf
 ```
 

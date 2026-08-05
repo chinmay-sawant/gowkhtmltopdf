@@ -962,14 +962,15 @@ func (e *engine) placeFloat(n *html.Node, cs ResolvedStyle, floats *floatState, 
 		fb.x, fb.y = contentX, fy
 		e.shiftBoxOps(fb, dx, dy)
 	}
+	ml := e.scalePt(cs.MarginLeft)
+	mr := e.scalePt(cs.MarginRight)
 	if cs.Float == "right" {
-		mr := e.scalePt(cs.MarginRight)
 		wantX := contentX + contentW - fb.w - mr
 		dx := wantX - fb.x
 		fb.x = wantX
 		e.shiftBoxOps(fb, dx, 0)
 	}
-	floats.place(cs.Float, fb)
+	floats.place(cs.Float, fb, ml, mr)
 	return fb
 }
 

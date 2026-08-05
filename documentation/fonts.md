@@ -16,7 +16,7 @@ WinAnsi-style single-byte codes.
 | Flag | Effect |
 |------|--------|
 | `--font-path DIR` | Scan `DIR` (and shallow children) for `.ttf` / TrueType-flavored `.otf`; repeatable |
-| `--use-system-fonts` | Also scan common OS font directories (e.g. `/usr/share/fonts`) |
+| `--use-system-fonts` | Also scan common OS font directories (e.g. `/usr/share/fonts`). Skips proprietary Windows/corefont trees; CSS names like Georgia/Arial alias to Liberation at lookup. |
 
 Discovery is **opt-in** (privacy + startup). CSS `font-family` lists are
 matched against discovered family names (name table) before falling back

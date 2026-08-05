@@ -116,7 +116,7 @@ Use one of two recipes depending on the goal:
 the Ana `make samples` artifact; **no** `--simplify-dom`):
 
 ```sh
-gowkhtmltopdf --use-system-fonts --timeout 60 \
+gowkhtmltopdf --use-system-fonts --zoom 0.666667 --timeout 60 \
   --load-error-handling ignore \
   'https://en.wikipedia.org/wiki/Ana_de_Armas' output/wiki-ana-de-armas.pdf
 ```

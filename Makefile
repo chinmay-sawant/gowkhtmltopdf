@@ -59,8 +59,10 @@ samples:
 	go run ./cmd/gowkhtmltoimage --enable-local-file-access testdata/golden/fixture-01-simple-invoice.html output/fixture-01-simple-invoice.png
 	go run ./examples/image --enable-local-file-access --width 1024 testdata/golden/fixture-21-detailed-report.html output/fixture-21-detailed-report.png
 	# Live Wikipedia smoke (network, raw — no --simplify-dom). Soft-fail so offline/CI hosts still get fixture samples.
-	# --use-system-fonts enables Unicode/IPA glyph fallback (DejaVu/Noto when present).
-	go run ./cmd/gowkhtmltopdf --use-system-fonts \
+	# --use-system-fonts: IPA/Unicode fallback (DejaVu/Noto). Proprietary fonts (Georgia/Arial) are
+	# never required — CSS names alias to Liberation. --zoom 2/3: wiki print CSS sets p{font-size:12pt};
+	# zoom yields ~8pt body density (Chrome-print target) with our faces.
+	go run ./cmd/gowkhtmltopdf --use-system-fonts --zoom 0.666667 \
 		'https://en.wikipedia.org/wiki/Ana_de_Armas' \
 		output/wiki-ana-de-armas.pdf \
 		|| echo "warning: wiki-ana-de-armas.pdf live smoke skipped (network/fetch failed)"
