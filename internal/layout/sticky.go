@@ -190,27 +190,16 @@ func applyOneSticky(res *Result, b *box, contentH float64) {
 }
 
 // shiftStickyPageFlow moves non-sticky flow on [pageTop, pageBottom) down so
-// continuation rows clear the sticky band without leaving a full empty row.
-//
-// dy is the max of (1) putting the first row fill just under the bar and
-// (2) putting the first text baseline a few points under the bar so Row 28
-// remains readable. Section border/background lines stay at the page top.
+// the first row fill sits just under the sticky band (thead-repeat style).
+// Section border/background lines stay at the page top so side borders remain
+// attached to the sticky clone (no grey "missing border" strip under the bar).
 func shiftStickyPageFlow(res *Result, sticky *box, pageTop, pageBottom, stickyY, reserve float64) {
 	if res == nil || sticky == nil || reserve <= 0 {
 		return
 	}
-	const flowGap = 2.0
-	paintedH := reserve - flowGap
-	if paintedH < 1 {
-		paintedH = reserve
-	}
-	stickyBot := stickyY + paintedH
 	neededFillTop := stickyY + reserve
-
 	bodyFillTop := 0.0
 	foundFill := false
-	bodyTextTop := 0.0
-	foundText := false
 	for i := range res.Ops {
 		op := &res.Ops[i]
 		if op.Fixed || op.StickyID == sticky.stickyID {
@@ -222,34 +211,36 @@ func shiftStickyPageFlow(res *Result, sticky *box, pageTop, pageBottom, stickyY,
 		if isPageLeadingBackground(op, pageTop, reserve) {
 			continue
 		}
-		switch op.Kind {
-		case OpFillRect, OpStrokeRect:
+		if op.Kind != OpFillRect && op.Kind != OpStrokeRect {
+			continue
+		}
+		if !foundFill || op.Y < bodyFillTop {
+			bodyFillTop = op.Y
+			foundFill = true
+		}
+	}
+	if !foundFill {
+		for i := range res.Ops {
+			op := &res.Ops[i]
+			if op.Fixed || op.StickyID == sticky.stickyID {
+				continue
+			}
+			if op.Y < pageTop-1e-9 || op.Y >= pageBottom-1e-9 {
+				continue
+			}
+			if isPageLeadingBackground(op, pageTop, reserve) {
+				continue
+			}
 			if !foundFill || op.Y < bodyFillTop {
 				bodyFillTop = op.Y
 				foundFill = true
 			}
-		case OpText, OpBullet:
-			if !foundText || op.Y < bodyTextTop {
-				bodyTextTop = op.Y
-				foundText = true
-			}
 		}
 	}
-	dy := 0.0
-	if foundFill && bodyFillTop < neededFillTop-0.5 {
-		dy = neededFillTop - bodyFillTop
+	if !foundFill || bodyFillTop >= neededFillTop-0.5 {
+		return
 	}
-	// Keep the first line's baseline under the bar so it is not lost inside
-	// the sticky clone (fixture-31 Row 28).
-	const textClear = 8.0
-	if foundText {
-		need := stickyBot + textClear
-		if bodyTextTop+dy < need-0.5 {
-			if d := need - bodyTextTop; d > dy {
-				dy = d
-			}
-		}
-	}
+	dy := neededFillTop - bodyFillTop
 	if dy <= 0 {
 		return
 	}

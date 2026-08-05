@@ -308,9 +308,10 @@ func TestStickyFixture31ContinuationClearsFlow(t *testing.T) {
 	if gap := row29Y - row28Y; gap < 20 || gap > 35 {
 		t.Errorf("Row 28→29 spacing = %.2f, want ~25pt (got Row28=%.2f Row29=%.2f)", gap, row28Y, row29Y)
 	}
-	// First continuation baseline sits a few points under the sticky bottom.
-	if gap := row28Y - stickyBot; gap < 4 || gap > 20 {
-		t.Errorf("gap sticky→Row28 = %.2f (stickyBot=%.2f row28=%.2f), want ~8pt under bar", gap, stickyBot, row28Y)
+	// First row fill is flush under the sticky band; text sits slightly above
+	// the fill (same geometry as page 1 under the natural sticky).
+	if gap := row28Y - stickyBot; gap < -14 || gap > 12 {
+		t.Errorf("gap sticky→Row28 = %.2f (stickyBot=%.2f row28=%.2f), want near page-1 sticky overlap", gap, stickyBot, row28Y)
 	}
 
 	// Split row fills must not sit in the sticky band. Tall page-leading
