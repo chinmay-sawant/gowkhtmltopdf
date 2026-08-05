@@ -226,7 +226,8 @@ Status legend as in §2; evidence in `internal/css/css.go`.
 | Sibling (`a + b`, `a ~ b`) | Implemented | next-sibling `+` and subsequent-sibling `~` (`css.Match`); test `TestSiblingCombinators` |
 | Attribute (`[href]`, `[href="…"]`) | Implemented | presence `[attr]` and exact `[attr=value]` (quoted or bare); other ops not yet |
 | `:first-child`, `:last-child`, `:nth-child(n)` | Implemented | `odd`/`even`/`an+b`/integer; tests `TestMatch`, `TestNthChildZebraSheet` |
-| `:link`, `:visited`, `:hover`, `:active`, `:focus` | Not implemented (accepted, ignored) | ignored for print; compound still matches without them |
+| `:link`, `:visited` | Partial | Print semantics: match any `a` with non-empty `href` (no visit history; `:visited` ≡ `:link`). Specificity counts as a class-level pseudo. Proof: `TestLinkVisitedPseudos`, `TestLinkPseudoColor` |
+| `:hover`, `:active`, `:focus` | Not implemented (accepted, never match) | Parsed onto the compound but `matchPseudo` returns false so `a:hover` does not degrade to bare `a` |
 | `::before` / `::after` | Not implemented | dropped with the other pseudo-classes |
 | `!important` | Implemented | `css.go:664-688`; separate cascade layer `style.go:221-247`; test `css_test.go::TestParseImportant` |
 | Specificity (ID > class > element), inline `style` wins, `!important` overrides | Implemented | `Specificity` `css.go:578`; inline style priority `style.go:233-239`; test `css_test.go::TestSpecificity` |

@@ -2,7 +2,7 @@
 
 > **Parent:** [`plans/phases/phase-21-arbitrary-websites.md`](../phase-21-arbitrary-websites.md) · [`plans/10-canonical-post-mvp-roadmap.md`](../../10-canonical-post-mvp-roadmap.md)  
 > **Branch:** `feature/pending-phase-items`  
-> **Status:** executing (sequential; no parallel subagents)  
+> **Status:** executing (Phase 1 done; Phase 2 next)  
 > **Estimated effort:** multi-week (quick wins first → hard/policy last)  
 > **Skill:** [`skills/phase-wise-checklist/SKILLS.md`](../../../skills/phase-wise-checklist/SKILLS.md)  
 > **Constraint:** stdlib layout + allowlisted `go-text/typesetting`; no CGO HarfBuzz; no browser embed  
@@ -33,7 +33,7 @@ above when relevant). Do not mark `[x]` without evidence.
 
 | Order | Phase | Impact | Effort | In prior plans? | Disposition |
 |------:|-------|--------|--------|-----------------|-------------|
-| 1 | [`01-link-pseudos.md`](01-link-pseudos.md) — `:link` / `:visited` print | Blue links (wiki Vector) | Quick | Matrix “ignored”; **no implement row** | **Must** |
+| 1 | [`01-link-pseudos.md`](01-link-pseudos.md) — `:link` / `:visited` print | Blue links (wiki Vector) | Quick | Matrix “ignored”; **no implement row** | **done** (2026-08-05) |
 | 2 | [`02-openweb-css-residuals.md`](02-openweb-css-residuals.md) — Phase 17/21 CSS leftovers | Page count, infobox, density | Medium | Phase 21 §21.3; pending-3 shipped core | **Must** |
 | 3 | [`03-unicode-glyph-fallback.md`](03-unicode-glyph-fallback.md) — IPA / missing glyphs | Pronunciation, symbols | Quick–medium | Phase 19 fonts; WOFF2 out | **Must** |
 | 4 | [`04-print-media-stylesheets.md`](04-print-media-stylesheets.md) — `@media print` + sheet volume | Chrome ~10pp vs our ~32pp | Medium | Phase 21 §21.3; matrix `@media` weak | **Should** |

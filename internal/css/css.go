@@ -756,8 +756,14 @@ func parseCompoundCtx(s string, insideHas bool) (SelectorPart, bool) {
 					return SelectorPart{}, false
 				}
 				part.Pseudos = append(part.Pseudos, PseudoClass{Name: "not", Not: sels})
-			case "link", "visited", "hover", "active", "focus":
-				// accepted and ignored for print
+			case "link", "visited":
+				// Print semantics: both mean "a[href]" (no browsing history).
+				part.Pseudos = append(part.Pseudos, PseudoClass{Name: name})
+			case "hover", "active", "focus":
+				// Accepted for parse/cascade structure but never match in print
+				// (static PDF has no pointer/focus state). Keeping them on the
+				// compound prevents a:hover from degrading to bare `a`.
+				part.Pseudos = append(part.Pseudos, PseudoClass{Name: name})
 			default:
 				// unknown: ignore
 			}
@@ -938,9 +944,24 @@ func matchPseudo(ps PseudoClass, n *html.Node) bool {
 			}
 		}
 		return true
+	case "link", "visited":
+		// Print: no link history — both match any anchor with an href.
+		return isLinkAnchor(n)
+	case "hover", "active", "focus":
+		return false
 	default:
 		return true
 	}
+}
+
+// isLinkAnchor reports whether n is an <a> element with a non-empty href
+// (any scheme, including "#" fragments and relative paths).
+func isLinkAnchor(n *html.Node) bool {
+	if n == nil || n.Type != html.ElementNode || !strings.EqualFold(n.Name, "a") {
+		return false
+	}
+	href := strings.TrimSpace(n.Attribute("href"))
+	return href != ""
 }
 
 func previousElementSibling(n *html.Node) *html.Node {

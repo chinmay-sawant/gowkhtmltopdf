@@ -463,6 +463,40 @@ func TestCascadeAndInline(t *testing.T) {
 	}
 }
 
+func TestLinkPseudoColor(t *testing.T) {
+	// Author a { black } loses to a:link { blue } on specificity (print = has href).
+	s := sheet(t, `
+		a { color: #111111; }
+		a:link { color: #0066cc; }
+		a:visited { color: #0066cc; }
+		a:hover { color: #ff0000; }
+	`)
+	res := layoutHTML(t, `<html><body>
+		<p><a href="https://example.com/">with</a> <a>bare</a></p>
+	</body></html>`, s)
+	texts := opsOfKind(res, OpText)
+	var with, bare *Op
+	for i := range texts {
+		t := strings.TrimSpace(texts[i].Text)
+		switch t {
+		case "with":
+			with = &texts[i]
+		case "bare":
+			bare = &texts[i]
+		}
+	}
+	if with == nil || bare == nil {
+		t.Fatalf("texts = %+v, want with+bare", texts)
+	}
+	if with.R > 0.05 || with.G < 0.35 || with.G > 0.45 || with.B < 0.75 {
+		t.Errorf("a:link color = (%v,%v,%v), want blue-ish #0066cc", with.R, with.G, with.B)
+	}
+	// bare <a> has no href → :link does not match; a { #111 } applies (not hover red).
+	if bare.R > 0.2 || bare.G > 0.2 || bare.B > 0.2 {
+		t.Errorf("bare <a> color = (%v,%v,%v), want near #111 (not :link/:hover)", bare.R, bare.G, bare.B)
+	}
+}
+
 func TestBackgroundFill(t *testing.T) {
 	s := sheet(t, `div { background-color: #f00; width: 100pt; height: 50pt }`)
 	res := layoutHTML(t, `<html><body><div>x</div></body></html>`, s)

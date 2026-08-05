@@ -279,7 +279,7 @@ func TestMatch(t *testing.T) {
 		{"body div p", plain, true},
 		{"html body > div p.note", note, true},
 		{"b", div, false},
-		{"a:hover", note, false}, // interactive pseudo ignored → match as p
+		{"a:hover", note, false}, // type a does not match <p>
 		{"[x]", note, false},     // attribute required; note has no x
 		{"[id]", second, true},
 		{"[id=second]", second, true},
@@ -300,6 +300,68 @@ func TestMatch(t *testing.T) {
 		if got := Match(sel, tc.node); got != tc.want {
 			t.Errorf("Match(%q) = %v, want %v", tc.sel, got, tc.want)
 		}
+	}
+}
+
+func TestLinkVisitedPseudos(t *testing.T) {
+	root := treeFor(t, `<html><body>
+		<p><a id="ext" href="https://example.com/">ext</a>
+		<a id="frag" href="#x">frag</a>
+		<a id="empty" href="">empty</a>
+		<a id="bare">bare</a></p>
+	</body></html>`)
+	p := root.FirstChild("html").FirstChild("body").FirstChild("p")
+	byID := map[string]*html.Node{}
+	for _, c := range p.Children {
+		if c.Type == html.ElementNode && c.Name == "a" {
+			byID[c.Attribute("id")] = c
+		}
+	}
+	for _, id := range []string{"ext", "frag", "empty", "bare"} {
+		if byID[id] == nil {
+			t.Fatalf("missing #%s", id)
+		}
+	}
+	cases := []struct {
+		sel  string
+		id   string
+		want bool
+	}{
+		{"a:link", "ext", true},
+		{"a:visited", "ext", true},
+		{":link", "ext", true},
+		{"a:link", "frag", true},
+		{"a:link", "empty", false},
+		{"a:link", "bare", false},
+		{"a:hover", "ext", false},
+		{"a:focus", "ext", false},
+		{"a:active", "ext", false},
+	}
+	for _, tc := range cases {
+		sel, ok := parseSelector(tc.sel)
+		if !ok {
+			t.Fatalf("parseSelector(%q) failed", tc.sel)
+		}
+		if got := Match(sel, byID[tc.id]); got != tc.want {
+			t.Errorf("Match(%q, #%s) = %v, want %v", tc.sel, tc.id, got, tc.want)
+		}
+	}
+	// Specificity: a:link beats bare a (pseudo counts as class-level).
+	sa, ok := parseSelector("a")
+	if !ok {
+		t.Fatal("parse a")
+	}
+	sl, ok := parseSelector("a:link")
+	if !ok {
+		t.Fatal("parse a:link")
+	}
+	_, ba, ca := Specificity(sa)
+	_, bl, cl := Specificity(sl)
+	if !(bl > ba || (bl == ba && cl >= ca)) {
+		t.Fatalf("a:link specificity (%d,%d) should outrank a (%d,%d) on b-axis", bl, cl, ba, ca)
+	}
+	if bl < 1 {
+		t.Fatalf("a:link b-specificity = %d, want >= 1", bl)
 	}
 }
 
