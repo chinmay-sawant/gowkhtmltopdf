@@ -118,7 +118,6 @@ go build -o bin/gowkhtmltopdf ./cmd/gowkhtmltopdf
 
 ## Follow-ups (out of scope for this PR)
 
-- Flex cross-axis `align-items: stretch` still packs as start (matrix `[~]`)
 - True shared-track subgrid / full CSS Grid L3 masonry / Chrome layout-test parity
 - Multi-pass flex intrinsic sizing beyond cyclic `%` → auto subset
 - **Next:** Phase 21 site corpus stress against Stage A/B/C-lite layout

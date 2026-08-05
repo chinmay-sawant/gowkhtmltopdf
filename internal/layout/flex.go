@@ -448,8 +448,57 @@ func (e *engine) placeFlexLineMeasured(parent *box, st ResolvedStyle, items []fl
 	built := make([]placed, 0, len(items))
 	rowH := 0.0
 	lx := startX
+
+	// Cross-size target for align-items:stretch. Definite container height
+	// (lineCross) is the flex line cross size; otherwise measure content max.
+	targetCross := lineCross
+	if targetCross < 0 {
+		was := e.noEmit
+		e.noEmit = true
+		maxH := 0.0
+		mx := startX
+		for i, it := range items {
+			cb := e.build(it.n, widths[i], mx, y+cy)
+			if cb != nil && cb.h > maxH {
+				maxH = cb.h
+			}
+			mx += widths[i]
+			if i < len(items)-1 {
+				mx += justifyGap
+			}
+		}
+		e.noEmit = was
+		targetCross = maxH
+	}
+
 	for i, it := range items {
+		cs := e.styles[it.n]
+		origH := cs.Height
+		forceStretch := flexItemCrossStretch(st, cs) && targetCross > 0
+		if forceStretch {
+			// Used cross size = line cross size (border box), matching column
+			// main-size forcing so backgrounds fill the flex line (fixture-33).
+			padV := e.scalePt(cs.PaddingTop) + e.scalePt(cs.PaddingBottom) +
+				e.scalePt(cs.BorderTop.Width) + e.scalePt(cs.BorderBottom.Width)
+			forceH := targetCross
+			if e.scale > 0 {
+				if cs.BoxSizing == "border-box" {
+					cs.Height = forceH / e.scale
+				} else {
+					inner := forceH - padV
+					if inner < 0 {
+						inner = 0
+					}
+					cs.Height = inner / e.scale
+				}
+				e.styles[it.n] = cs
+			}
+		}
 		cb := e.build(it.n, widths[i], lx, y+cy)
+		if forceStretch {
+			cs.Height = origH
+			e.styles[it.n] = cs
+		}
 		if cb == nil {
 			built = append(built, placed{n: it.n})
 			lx += widths[i]
@@ -479,6 +528,9 @@ func (e *engine) placeFlexLineMeasured(parent *box, st ResolvedStyle, items []fl
 	if lineCross >= 0 && lineCross > alignH {
 		alignH = lineCross
 	}
+	if targetCross > alignH {
+		alignH = targetCross
+	}
 	for _, p := range built {
 		if p.box == nil {
 			continue
@@ -494,7 +546,7 @@ func (e *engine) placeFlexLineMeasured(parent *box, st ResolvedStyle, items []fl
 		case "center":
 			dy = (y + cy + (alignH-p.box.h)/2) - p.box.y
 		default:
-			// stretch / flex-start / start / auto: pack at cross-start
+			// stretch / flex-start / start: pack at cross-start (stretch already sized)
 			dy = 0
 		}
 		if dy != 0 {
@@ -505,7 +557,31 @@ func (e *engine) placeFlexLineMeasured(parent *box, st ResolvedStyle, items []fl
 	if lineCross >= 0 && lineCross > rowH {
 		return cy + lineCross
 	}
+	if targetCross > rowH {
+		return cy + targetCross
+	}
 	return cy + rowH
+}
+
+// flexItemCrossStretch reports whether a flex item should stretch on the cross
+// axis (align-items/self stretch, and no definite cross size).
+func flexItemCrossStretch(st, cs ResolvedStyle) bool {
+	align := st.AlignItems
+	if align == "" {
+		align = "stretch"
+	}
+	if cs.AlignSelf != "" && cs.AlignSelf != "auto" {
+		align = cs.AlignSelf
+	}
+	switch align {
+	case "flex-start", "start", "flex-end", "end", "center":
+		return false
+	}
+	// Definite height/% means the used cross size is already specified.
+	if cs.Height >= 0 || cs.HeightPercent >= 0 {
+		return false
+	}
+	return true
 }
 
 // flexItemBaseHeight resolves the flex base size on the column main axis.

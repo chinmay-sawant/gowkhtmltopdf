@@ -143,8 +143,8 @@ Evidence: `internal/layout/flex.go`, `style.go` (`applyRestProps` + `parseFlexSh
 | `flex-direction` (`row` \| `column` \| `row-reverse` \| `column-reverse`) | [x] Implemented | `style.go`; row/column + reverse paths in `flex.go`; `TestFlexRowReverse` |
 | `flex-wrap` (`nowrap` \| `wrap` \| `wrap-reverse`) | [x] Implemented | Multi-line wrap; wrap-reverse reverses line order |
 | `justify-content` (`flex-start` \| `flex-end` \| `center` \| `space-between` \| `space-around` \| `space-evenly`) | [x] Implemented | Row + column (definite height); `TestFlexSpaceEvenly` |
-| `align-items` (`stretch` \| `flex-start` \| `center` \| `flex-end`) | [~] Partial | start/center/end honored; **`stretch` packs as flex-start** on the row cross axis (no cross-size stretch). Column path uses content width for items |
-| `align-self` | [~] Partial | Overrides container; same stretch→start lite as `align-items`; `TestFlexAlignSelf` |
+| `align-items` (`stretch` \| `flex-start` \| `center` \| `flex-end`) | [x] Implemented | Row cross-axis stretch sizes auto-height items to the flex line (fixture-33); start/center/end honored; `TestFlexAlignItemsStretchRow` |
+| `align-self` | [x] Implemented | Overrides container; stretch follows same rules; `TestFlexAlignSelf` |
 | `align-content` (multi-line) | [~] Partial | Distributes free cross space when container height is definite and wrap produced ≥2 lines; `stretch` = pack at start |
 | `gap` / `row-gap` / `column-gap` | [x] Implemented | Independent longhands; shorthand fills both when longhands unset (`flexGaps`) |
 | `flex` shorthand (`none` \| `auto` \| grow/shrink/basis) | [x] Implemented | `parseFlexShorthand` |

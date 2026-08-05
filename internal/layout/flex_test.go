@@ -266,6 +266,36 @@ func TestFlexAlignSelf(t *testing.T) {
 	}
 }
 
+// TestFlexAlignItemsStretchRow matches fixture-33 definite row: container
+// height 36pt, items flex-basis 50% with auto height → stretch to line cross size.
+func TestFlexAlignItemsStretchRow(t *testing.T) {
+	s := sheet(t, `
+.row { display:flex; width:240pt; height:36pt; gap:0; border:1px solid #1565c0; background:#e3f2fd }
+.half { flex:0 0 50%; box-sizing:border-box; padding:6pt; background:#90caf9 }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="row"><div class="half">Left 50%</div><div class="half">Right 50%</div></div>
+</body></html>`, s)
+	var itemH []float64
+	for _, op := range res.Ops {
+		if op.Kind != OpFillRect {
+			continue
+		}
+		// Item blue (#90caf9 ≈ 0.565, 0.792, 0.976), not container wash.
+		if op.R > 0.5 && op.R < 0.7 && op.B > 0.9 && op.W > 80 {
+			itemH = append(itemH, op.H)
+		}
+	}
+	if len(itemH) < 2 {
+		t.Fatalf("expected ≥2 item fills, got %d (ops=%d)", len(itemH), len(res.Ops))
+	}
+	for i, h := range itemH {
+		if h < 34 || h > 38 {
+			t.Errorf("item[%d] fill h=%.2f, want ~36pt (stretched to row height)", i, h)
+		}
+	}
+}
+
 func TestFlexShorthandParsing(t *testing.T) {
 	cases := []struct {
 		name     string
