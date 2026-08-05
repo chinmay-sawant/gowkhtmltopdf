@@ -153,6 +153,10 @@ type engine struct {
 	// imgMaxW > 0 clamps replaced <img> boxes to this containing-block width
 	// (table cell / float / inline formatting context).
 	imgMaxW float64
+	// bfcFloats is the floatState of the nearest enclosing BFC. Ordinary
+	// blocks reuse it so floats affect later siblings; BFC roots push a
+	// fresh state (see pushBFCFloats).
+	bfcFloats *floatState
 }
 
 // faceFor selects the TrueType face for a resolved style (bold/italic),
@@ -508,14 +512,19 @@ func (e *engine) buildBlock(n *html.Node, st ResolvedStyle, availW, x, y float64
 	contentStart := len(e.ops)
 
 	cy := e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)
+	pop, enclose := e.pushBFCFloats(st, contentX, contentW)
 	cy = e.flowChildren(b, n.Children, st, contentW, contentX, y, cy)
+	if enclose && e.bfcFloats != nil {
+		cy = e.bfcFloats.extentCy(y, cy)
+	}
+	pop()
 	// padding-bottom is inside the border box (space above border-bottom /
 	// letterhead rules — fixture-07/16).
 	cy += e.scalePt(st.PaddingBottom)
 
-	// list marker
+	// list marker (outside the principal box content — in the marker area)
 	if n.Name == "li" && b.firstBaseline > 0 {
-		e.add(Op{Kind: OpBullet, X: contentX + 4, Y: b.firstBaseline, Text: "\u2022", Font: e.font, Size: e.scalePt(st.FontSize), R: st.Color[0], G: st.Color[1], B: st.Color[2]})
+		e.emitListMarker(n, st, contentX, b.firstBaseline)
 	}
 
 	if h, ok := resolveUsedHeight(st, -1, e); ok {
@@ -748,9 +757,17 @@ func onlyCollapsibleWS(nodes []*html.Node) bool {
 // out of flow with a lite exclusion model; clear advances past them.
 // Returns the advanced content height (cy end − cy start contribution is
 // encoded as the final cy relative to start; callers pass starting cy).
+// Float enclosure (extentCy) is the caller's job when it owns a BFC.
 func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedStyle, contentW, contentX, y, cy float64) float64 {
 	prevBottom := 0.0
-	floats := newFloatState(contentX, contentW)
+	var local floatState
+	floats := e.bfcFloats
+	if floats == nil {
+		// Defensive: callers should pushBFCFloats first. Keep a local state
+		// so isolated measure passes (layoutCell) still work.
+		local = newFloatState(contentX, contentW)
+		floats = &local
+	}
 	var deferred []*html.Node
 	// Absolute/fixed containing-block origin is the content edge at entry.
 	// Do not use the post-flow cy or deferred boxes sit below in-flow siblings.
@@ -785,7 +802,7 @@ func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedSty
 		if n.Type == html.ElementNode && e.styles[n].Float != "none" {
 			cs := e.styles[n]
 			cy = floats.clear(cs.Clear, y, cy)
-			fb := e.placeFloat(n, cs, &floats, contentW, contentX, y, cy)
+			fb := e.placeFloat(n, cs, floats, contentW, contentX, y, cy)
 			if fb != nil && parent != nil {
 				parent.children = append(parent.children, fb)
 				if e.opts.DebugBoxes {
@@ -828,8 +845,7 @@ func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedSty
 				if pb == nil {
 					pb = &box{style: st}
 				}
-				ix, iw := floats.exclusion(y, cy)
-				h := e.layoutInlineFloats(pb, run, iw, ix, y+cy, &floats)
+				h := e.layoutInlineFloats(pb, run, contentW, contentX, y+cy, floats)
 				cy += h
 				if h > 0 {
 					prevBottom = 0
@@ -851,7 +867,7 @@ func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedSty
 		}
 		cy = floats.clear(clear, y, cy)
 		cy += collapseMargins(prevBottom, e.scalePt(cs.MarginTop))
-		bx, bw := floats.exclusion(y, cy)
+		bx, bw := floats.exclusion(contentX, contentW, y, cy)
 		cb := e.build(n, bw, bx, y+cy)
 		if cb == nil {
 			prevBottom = 0
@@ -874,7 +890,136 @@ func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedSty
 			parent.children = append(parent.children, ab)
 		}
 	}
-	return floats.extentCy(y, cy)
+	return cy
+}
+
+// pushBFCFloats installs a floatState for the current box. When the box
+// establishes a BFC (or is the root), a fresh state is used and enclose is
+// true so the caller should extend height with extentCy. Otherwise the
+// parent BFC's state is reused and floats may protrude.
+func (e *engine) pushBFCFloats(st ResolvedStyle, contentX, contentW float64) (pop func(), enclose bool) {
+	prev := e.bfcFloats
+	if prev == nil || establishesBFC(st) {
+		fs := newFloatState(contentX, contentW)
+		e.bfcFloats = &fs
+		return func() { e.bfcFloats = prev }, true
+	}
+	return func() { e.bfcFloats = prev }, false
+}
+
+// emitListMarker paints the list marker in the marker area to the left of
+// the content edge so it does not overlap the principal text.
+func (e *engine) emitListMarker(n *html.Node, st ResolvedStyle, contentX, baseline float64) {
+	typ := st.ListStyleType
+	if typ == "" {
+		typ = "disc"
+	}
+	if typ == "none" {
+		return
+	}
+	size := e.scalePt(st.FontSize)
+	face := e.faceFor(st)
+	var text string
+	switch typ {
+	case "disc":
+		text = "\u2022"
+	case "circle":
+		text = "\u25E6"
+	case "square":
+		text = "\u25AA"
+	case "decimal", "decimal-leading-zero":
+		text = strconv.Itoa(listItemIndex(n)) + "."
+	case "lower-alpha", "lower-latin":
+		text = alphaMarker(listItemIndex(n), false) + "."
+	case "upper-alpha", "upper-latin":
+		text = alphaMarker(listItemIndex(n), true) + "."
+	case "lower-roman":
+		text = romanMarker(listItemIndex(n), false) + "."
+	case "upper-roman":
+		text = romanMarker(listItemIndex(n), true) + "."
+	default:
+		text = "\u2022"
+	}
+	mw := 0.0
+	if face != nil {
+		for _, r := range text {
+			mw += face.AdvanceInPoints(r, size)
+		}
+	}
+	if mw <= 0 {
+		mw = size * float64(len([]rune(text))) * 0.5
+	}
+	// Outside marker: sit in the padding/margin gutter left of contentX.
+	gap := size * 0.35
+	x := contentX - gap - mw
+	if x < 0 {
+		x = 0
+	}
+	e.add(Op{
+		Kind: OpBullet, X: x, Y: baseline, Text: text, Font: face, Size: size,
+		R: st.Color[0], G: st.Color[1], B: st.Color[2],
+	})
+}
+
+// listItemIndex is the 1-based index among element siblings that are list items.
+func listItemIndex(n *html.Node) int {
+	if n == nil || n.Parent == nil {
+		return 1
+	}
+	i := 0
+	for _, c := range n.Parent.Children {
+		if c.Type != html.ElementNode {
+			continue
+		}
+		if !strings.EqualFold(c.Name, "li") {
+			continue
+		}
+		i++
+		if c == n {
+			return i
+		}
+	}
+	return 1
+}
+
+func alphaMarker(n int, upper bool) string {
+	if n < 1 {
+		n = 1
+	}
+	var chars []byte
+	for n > 0 {
+		n--
+		ch := byte('a' + (n % 26))
+		if upper {
+			ch = byte('A' + (n % 26))
+		}
+		chars = append(chars, ch)
+		n /= 26
+	}
+	for i, j := 0, len(chars)-1; i < j; i, j = i+1, j-1 {
+		chars[i], chars[j] = chars[j], chars[i]
+	}
+	return string(chars)
+}
+
+func romanMarker(n int, upper bool) string {
+	if n < 1 {
+		n = 1
+	}
+	vals := []int{1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1}
+	syms := []string{"m", "cm", "d", "cd", "c", "xc", "l", "xl", "x", "ix", "v", "iv", "i"}
+	var b strings.Builder
+	for i, v := range vals {
+		for n >= v {
+			b.WriteString(syms[i])
+			n -= v
+		}
+	}
+	s := b.String()
+	if upper {
+		return strings.ToUpper(s)
+	}
+	return s
 }
 
 // placeFloat lays out n as a float:left|right box and records it in floats.
@@ -1778,7 +1923,13 @@ func (e *engine) emitCell(b *box, skipBorders bool) {
 	if contentW > 0 {
 		e.imgMaxW = contentW
 	}
+	pop, enclose := e.pushBFCFloats(st, cx, contentW)
 	_ = e.flowChildren(b, b.node.Children, st, contentW, cx, 0, cy)
+	if enclose && e.bfcFloats != nil {
+		// Cell border box already sized; floats are clipped to the cell BFC.
+		_ = e.bfcFloats.extentCy(0, cy)
+	}
+	pop()
 	e.imgMaxW = oldMax
 	b.opStart, b.opEnd = start, len(e.ops)-1
 }
@@ -1885,7 +2036,12 @@ func (e *engine) layoutCell(n *html.Node, st ResolvedStyle, width float64) float
 		contentW = 0
 	}
 	cy := e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)
+	pop, enclose := e.pushBFCFloats(st, 0, contentW)
 	cy = e.flowChildren(nil, n.Children, st, contentW, 0, 0, cy)
+	if enclose && e.bfcFloats != nil {
+		cy = e.bfcFloats.extentCy(0, cy)
+	}
+	pop()
 	return cy + e.scalePt(st.PaddingBottom) + e.scalePt(st.BorderBottom.Width)
 }
 

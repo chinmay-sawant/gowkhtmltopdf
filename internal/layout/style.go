@@ -98,6 +98,7 @@ type ResolvedStyle struct {
 	TextDecoration      string  // "none" | "underline" | "line-through"
 	LetterSpacing       float64
 	TextIndent          float64
+	ListStyleType       string // "disc" | "circle" | "square" | "decimal" | "none" | …
 	BorderCollapse      string // "separate" | "collapse"
 	BorderSpacing       float64
 	TableLayout         string // "auto" | "fixed"
@@ -172,6 +173,7 @@ func initialStyle() ResolvedStyle {
 		VerticalAlign:    "baseline",
 		WhiteSpace:       "normal",
 		TextDecoration:   "none",
+		ListStyleType:    "disc",
 		BorderCollapse:   "separate",
 		BorderSpacing:    0,
 		TableLayout:      "auto",
@@ -454,6 +456,9 @@ func inheritProps(st *ResolvedStyle, parent ResolvedStyle, raw map[string]string
 	if !set("letter-spacing") {
 		st.LetterSpacing = parent.LetterSpacing
 	}
+	if !set("list-style-type") && !set("list-style") {
+		st.ListStyleType = parent.ListStyleType
+	}
 	if !set("border-collapse") {
 		st.BorderCollapse = parent.BorderCollapse
 	}
@@ -626,7 +631,7 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext,
 			case "block", "inline", "none", "list-item", "table", "table-row", "table-cell",
 				"table-row-group", "table-header-group", "table-footer-group",
 				"inline-block", "table-caption", "table-column", "table-column-group",
-				"flex", "inline-flex", "grid", "inline-grid", "subgrid":
+				"flex", "inline-flex", "grid", "inline-grid", "subgrid", "flow-root":
 				st.Display = value
 			}
 		case "position":
@@ -999,6 +1004,17 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext,
 			st.LetterSpacing = marginLen(value, fs, ctx.viewportW)
 		case "text-indent":
 			st.TextIndent = marginLen(value, fs, ctx.viewportW)
+		case "list-style-type":
+			if t := parseListStyleType(value); t != "" {
+				st.ListStyleType = t
+			}
+		case "list-style":
+			// Shorthand: accept type keywords; ignore position/image for now.
+			for _, tok := range strings.Fields(value) {
+				if t := parseListStyleType(tok); t != "" {
+					st.ListStyleType = t
+				}
+			}
 		case "border-collapse":
 			if value == "collapse" || value == "separate" {
 				st.BorderCollapse = value
@@ -1419,6 +1435,17 @@ func parseOverflowKeyword(value string) (string, bool) {
 	return "", false
 }
 
+// parseListStyleType returns a known list-style-type keyword, or "" if unknown.
+func parseListStyleType(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "disc", "circle", "square", "decimal", "decimal-leading-zero",
+		"lower-roman", "upper-roman", "lower-alpha", "lower-latin",
+		"upper-alpha", "upper-latin", "none":
+		return strings.ToLower(strings.TrimSpace(value))
+	}
+	return ""
+}
+
 // overflowCreatesStickyScrollport reports whether overflow establishes a sticky
 // scrollport (CSS Position 3 / Overflow 3). PDF has no user scroll, so sticky
 // inside these boxes clamps at scroll offset 0 against the box edges.
@@ -1713,7 +1740,7 @@ func uaRules(name string) []css.Declaration {
 		}
 	case "div", "section", "article", "header", "footer", "main", "aside",
 		"nav", "form", "fieldset", "figure", "figcaption", "blockquote",
-		"address", "dl", "dd", "menu", "details", "summary":
+		"address", "dl", "dd", "details", "summary":
 		return []css.Declaration{{Prop: "display", Value: "block"}}
 	case "p":
 		return []css.Declaration{
@@ -1739,8 +1766,10 @@ func uaRules(name string) []css.Declaration {
 		return []css.Declaration{{Prop: "display", Value: "block"}, {Prop: "font-size", Value: "1.17em"}, {Prop: "margin", Value: "1em 0"}, {Prop: "font-weight", Value: "bold"}}
 	case "h4", "h5", "h6":
 		return []css.Declaration{{Prop: "display", Value: "block"}, {Prop: "font-weight", Value: "bold"}, {Prop: "font-size", Value: "1em"}, {Prop: "margin", Value: "1.33em 0"}}
-	case "ul", "ol":
-		return []css.Declaration{{Prop: "display", Value: "block"}, {Prop: "margin", Value: "1em 0"}, {Prop: "padding-left", Value: "40px"}}
+	case "ul", "menu":
+		return []css.Declaration{{Prop: "display", Value: "block"}, {Prop: "margin", Value: "1em 0"}, {Prop: "padding-left", Value: "40px"}, {Prop: "list-style-type", Value: "disc"}}
+	case "ol":
+		return []css.Declaration{{Prop: "display", Value: "block"}, {Prop: "margin", Value: "1em 0"}, {Prop: "padding-left", Value: "40px"}, {Prop: "list-style-type", Value: "decimal"}}
 	case "li":
 		return []css.Declaration{{Prop: "display", Value: "list-item"}}
 	case "table":

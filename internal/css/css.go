@@ -757,10 +757,11 @@ func parseCompoundCtx(s string, insideHas bool) (SelectorPart, bool) {
 			case "link", "visited":
 				// Print semantics: both mean "a[href]" (no browsing history).
 				part.Pseudos = append(part.Pseudos, PseudoClass{Name: name})
-			case "hover", "active", "focus":
+			case "hover", "active", "focus", "target":
 				// Accepted for parse/cascade structure but never match in print
-				// (static PDF has no pointer/focus state). Keeping them on the
-				// compound prevents a:hover from degrading to bare `a`.
+				// (static PDF has no pointer/focus/:target fragment state).
+				// Keeping them on the compound prevents li:target from
+				// degrading to bare `li` (wiki reflist highlight blue).
 				part.Pseudos = append(part.Pseudos, PseudoClass{Name: name})
 			case "before", "after", "first-line", "first-letter":
 				// CSS2 single-colon pseudo-elements — unsupported; rejecting
@@ -768,7 +769,9 @@ func parseCompoundCtx(s string, insideHas bool) (SelectorPart, bool) {
 				// (same class of bug as stripping ::before).
 				return SelectorPart{}, false
 			default:
-				// unknown: ignore
+				// Keep unknown pseudos so they do not degrade to the host
+				// selector (same class of bug as stripping :target / ::before).
+				part.Pseudos = append(part.Pseudos, PseudoClass{Name: name, Arg: arg})
 			}
 			i = j
 		default:
@@ -1020,10 +1023,12 @@ func matchPseudo(ps PseudoClass, n *html.Node) bool {
 	case "link", "visited":
 		// Print: no link history — both match any anchor with an href.
 		return isLinkAnchor(n)
-	case "hover", "active", "focus":
+	case "hover", "active", "focus", "target":
 		return false
 	default:
-		return true
+		// Unknown pseudo-classes never match in print (kept on the compound
+		// so selectors do not degrade to the host).
+		return false
 	}
 }
 

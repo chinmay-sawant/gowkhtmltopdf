@@ -1,14 +1,18 @@
 package layout
 
-// floatState tracks left/right floats inside one block formatting context
-// (one flowChildren call — including table-cell BFCs via emitCell/layoutCell).
+// floatState tracks left/right floats inside one block formatting context.
 // Coordinates are canvas-absolute for bottoms and edges; contentX/contentW
-// define the containing block.
+// define the BFC's content box (exclusion starts from those edges).
 //
-// Lite model (invoice chrome): floats leave normal flow, pack to a side at
-// the current flow y (stacking vertically when multiple floats share a side),
-// and in-flow content uses a simple side exclusion until clear or past the
-// float bottoms. Not a full CSS2 float engine.
+// Lite model: floats leave normal flow, pack to a side at the current flow y
+// (stacking vertically when multiple floats share a side), and in-flow
+// content uses a simple side exclusion until clear or past the float bottoms.
+// Not a full CSS2 float engine.
+//
+// BFC policy: only formatting-context roots enclose floats in their height
+// (extentCy). Ordinary blocks share the parent BFC's floatState so a float
+// inside <section> still affects following sibling sections — matching CSS
+// (overflow:visible parents do not grow around floats).
 //
 // Table policy (tier-2-pending-3): in-flow display:table boxes always clear
 // below floats in flowChildren — no shrink-beside. Floated tables keep
@@ -110,9 +114,10 @@ func (f *floatState) place(side string, b *box, ml, mr float64) {
 }
 
 // exclusion returns the in-flow content origin and width at canvas y = y+cy
-// after subtracting active float intrusion.
-func (f *floatState) exclusion(y, cy float64) (x, w float64) {
-	x, w = f.contentX, f.contentW
+// after subtracting active float intrusion from the caller's content box
+// (contentX/contentW). Float edges are canvas-absolute.
+func (f *floatState) exclusion(contentX, contentW, y, cy float64) (x, w float64) {
+	x, w = contentX, contentW
 	top := y + cy
 	if f.hasLeft && f.leftBottom > top {
 		if f.leftEdge > x {
@@ -146,7 +151,8 @@ func (f *floatState) clearY(top float64) float64 {
 }
 
 // extentCy returns cy raised to cover any float that still protrudes below
-// the in-flow content end (so the parent border box encloses floats).
+// the in-flow content end. Only BFC roots should apply this (CSS2.1 §10.6.7);
+// ordinary blocks leave floats protruding so later siblings can wrap.
 func (f *floatState) extentCy(y, cy float64) float64 {
 	end := y + cy
 	if f.hasLeft && f.leftBottom > end {
@@ -156,4 +162,23 @@ func (f *floatState) extentCy(y, cy float64) float64 {
 		end = f.rightBottom
 	}
 	return end - y
+}
+
+// establishesBFC reports whether st creates a new block formatting context
+// that traps floats (CSS2.1 / Display 3). Descendants' floats do not affect
+// the parent BFC; the box's used height encloses its floats.
+func establishesBFC(st ResolvedStyle) bool {
+	if st.Float != "none" {
+		return true
+	}
+	switch st.Display {
+	case "flow-root", "inline-block", "table-cell", "table-caption",
+		"flex", "inline-flex", "grid", "inline-grid":
+		return true
+	}
+	switch st.Overflow {
+	case "hidden", "scroll", "auto", "clip":
+		return true
+	}
+	return false
 }

@@ -563,6 +563,18 @@ func shiftFlowY(res *Result, from, to int, fromY, dy float64) {
 	walk(res.root)
 }
 
+// shiftOpsOnly moves ops in [from,to] by dy without dragging later flow.
+// Used when rejoining a page-break-after:avoid box to a following box that
+// already sits on the next page.
+func shiftOpsOnly(res *Result, from, to int, dy float64) {
+	for i := from; i <= to; i++ {
+		if i >= 0 && i < len(res.Ops) && res.Ops[i].Fixed {
+			continue
+		}
+		res.Ops[i].Y += dy
+	}
+}
+
 // avoidInside walks post-order and moves page-break-inside: avoid boxes wholly
 // to the next page when they span multiple pages but fit one content height.
 func avoidInside(res *Result, contentH float64) bool {
@@ -575,24 +587,49 @@ func avoidInside(res *Result, contentH float64) bool {
 			}
 		}
 		if b.style.PageBreakInside == "avoid" && b.h > 0 {
+			h := b.h
+			// Prefer ink extent when taller than the border box (rowspan /
+			// deferred paint can make ops protrude past b.h — wiki awards).
+			if b.opStart <= b.opEnd && b.opStart >= 0 && b.opEnd < len(res.Ops) {
+				bot := b.y
+				for k := b.opStart; k <= b.opEnd; k++ {
+					op := res.Ops[k]
+					ob := op.Y
+					switch op.Kind {
+					case OpText, OpBullet:
+						ob += op.Size * 1.2
+					default:
+						if op.H > 0 {
+							ob += op.H
+						}
+					}
+					if ob > bot {
+						bot = ob
+					}
+				}
+				if ink := bot - b.y; ink > h {
+					h = ink
+				}
+			}
 			lo := int(b.y / contentH)
-			hi := int((b.y + b.h) / contentH)
-			if hi > lo && b.h <= contentH+0.01 {
+			hi := int((b.y + h) / contentH)
+			if hi > lo && h <= contentH+0.01 {
 				remaining := float64(lo+1)*contentH - b.y
-				// If keeping the box intact would blank out most of the current
-				// page (common for dense auto-width tables / reference blocks
-				// that now fit one page after tighter sizing), allow splitting
-				// instead — browsers do the same for large avoid boxes.
-				if remaining < b.h*0.5 && b.h > contentH*0.35 {
+				// Prefer splitting over blanking more than half the current
+				// page. Mid-page wiki tables (filmography → awards) would
+				// otherwise leave a huge empty band; small overflows near
+				// the page end still move (TestPageBreakInsideAvoid).
+				if remaining > contentH*0.5 {
 					return changed
 				}
-				// Also skip when the blank remainder would exceed ~1/3 page
-				// (reference sections pushed after a heading left huge gaps).
-				if remaining < contentH*0.35 && b.h > contentH*0.25 {
+				if remaining < h*0.5 && h > contentH*0.35 {
 					return changed
 				}
-				shiftFlowY(res, b.opStart, b.opEnd, b.y, float64(hi)*contentH-b.y)
-				changed = true
+				dy := float64(lo+1)*contentH - b.y
+				if dy > 0.01 {
+					shiftFlowY(res, b.opStart, b.opEnd, b.y, dy)
+					changed = true
+				}
 			}
 		}
 		return changed
@@ -682,9 +719,19 @@ func afterBreaks(res *Result, contentH float64) bool {
 			if nextPage <= lastPage {
 				break
 			}
-			dy := float64(lastPage+1)*contentH - b.y
+			// Move only this box onto next's page. shiftFlowY would also
+			// push next (and everything below) further down — leaving a
+			// blank page between a short filmography tail and awards when
+			// h2[page-break-after:avoid] follows a moved avoid-inside table.
+			target := next.y - b.h
+			pageStart := float64(nextPage) * contentH
+			if target < pageStart {
+				target = pageStart
+			}
+			dy := target - b.y
 			if dy > 0.001 {
-				shiftFlowY(res, b.opStart, b.opEnd, b.y, dy)
+				shiftOpsOnly(res, b.opStart, b.opEnd, dy)
+				b.y += dy
 				changed = true
 			}
 		}
@@ -745,8 +792,15 @@ func rowsIntact(res *Result, contentH float64) bool {
 			}
 			lo, hi := int(rowTop/contentH), int(rowBottom/contentH)
 			if hi > lo {
-				shiftFlowY(res, first, last, rowTop, float64(hi)*contentH-rowTop)
-				changed = true
+				// Move only to the next page start. Using hi*contentH when the
+				// row's measured bottom spans multiple pages (e.g. rowspan
+				// paint height leaking into rowBoxH) skipped blank pages
+				// between filmography and awards on long wiki tables.
+				dy := float64(lo+1)*contentH - rowTop
+				if dy > 0.01 {
+					shiftFlowY(res, first, last, rowTop, dy)
+					changed = true
+				}
 			}
 		}
 		return changed
@@ -1318,3 +1372,4 @@ func drawLinkXform(p *pdf.Page, op *Op, pageIdx int, contentH float64, opts Pain
 	}
 	p.AddLinkURI([4]float64{llx, lly, urx, ury}, op.URI)
 }
+

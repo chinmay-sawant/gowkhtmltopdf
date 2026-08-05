@@ -58,7 +58,12 @@ func (e *engine) buildMulticol(n *html.Node, st ResolvedStyle, availW, x, y floa
 	// otherwise reserves a tall empty band before a single wide child
 	// (wiki reflist with column-width:30em on a narrow page).
 	if nCols <= 1 {
+		pop, enclose := e.pushBFCFloats(st, contentX, contentW)
 		cy = e.flowChildren(b, n.Children, st, contentW, contentX, y, cy)
+		if enclose && e.bfcFloats != nil {
+			cy = e.bfcFloats.extentCy(y, cy)
+		}
+		pop()
 		cy += e.scalePt(st.PaddingBottom)
 		if h, ok := resolveUsedHeight(st, -1, e); ok && cy < h {
 			cy = h

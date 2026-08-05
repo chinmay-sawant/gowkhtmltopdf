@@ -38,11 +38,11 @@ func (e *engine) layoutInline(b *box, nodes []*html.Node, availW, x, y float64) 
 	return e.layoutInlineFloats(b, nodes, availW, x, y, nil)
 }
 
-func (e *engine) layoutInlineFloats(b *box, nodes []*html.Node, availW, x, y float64, floats *floatState) float64 {
+func (e *engine) layoutInlineFloats(b *box, nodes []*html.Node, contentW, contentX, y float64, floats *floatState) float64 {
 	var items []inlineItem
 	oldMax := e.imgMaxW
-	if availW > 0 {
-		e.imgMaxW = availW
+	if contentW > 0 {
+		e.imgMaxW = contentW
 	}
 	e.collectInline(nodes, &items)
 	e.imgMaxW = oldMax
@@ -53,9 +53,9 @@ func (e *engine) layoutInlineFloats(b *box, nodes []*html.Node, availW, x, y flo
 	ly := y
 	i := 0
 	for i < len(items) {
-		lineX, lineW := x, availW
+		lineX, lineW := contentX, contentW
 		if floats != nil {
-			lineX, lineW = floats.exclusion(0, ly)
+			lineX, lineW = floats.exclusion(contentX, contentW, 0, ly)
 		}
 		if lineW < 0 {
 			lineW = 0
@@ -77,15 +77,15 @@ func (e *engine) layoutInlineFloats(b *box, nodes []*html.Node, availW, x, y flo
 			}
 			// Empty line beside a float too narrow for this item: CSS2.1 §9.5
 			// pushes the line box below the float and recomputes width.
-			if lineAdv == 0 && adv > lineW && floats != nil && lineW < availW-0.5 {
+			if lineAdv == 0 && adv > lineW && floats != nil && lineW < contentW-0.5 {
 				if next := floats.clearY(ly); next > ly+0.5 {
 					ly = next
-					lineX, lineW = floats.exclusion(0, ly)
+					lineX, lineW = floats.exclusion(contentX, contentW, 0, ly)
 					if lineW < 0 {
 						lineW = 0
 					}
 					// Retry this item at the new Y (do not advance i).
-					if adv > lineW && lineW < availW-0.5 {
+					if adv > lineW && lineW < contentW-0.5 {
 						// Still too narrow (e.g. both sides floated) — emit anyway.
 					} else {
 						continue
@@ -324,8 +324,30 @@ func (e *engine) collectInlineNode(n *html.Node, out *[]inlineItem) {
 			if text == "" {
 				return
 			}
-			for _, word := range strings.Fields(text) {
-				*out = append(*out, e.textItem(word+" ", st))
+			// white-space:nowrap — keep the run unbreakable (wiki .reference
+			// cite markers in narrow table columns).
+			if st.WhiteSpace == "nowrap" {
+				*out = append(*out, e.textItem(text, st))
+				return
+			}
+			words := strings.Fields(text)
+			for i, word := range words {
+				// Space only between words of this text node — not after the
+				// last token. Appending " " to every field made cite brackets
+				// render as "[ 111 ]" and wrap/overlap in narrow Ref columns.
+				if i < len(words)-1 {
+					word += " "
+				}
+				*out = append(*out, e.textItem(word, st))
+			}
+			// Preserve a trailing word-separator when the source text node
+			// ended with whitespace (so "foo <b>bar</b>" keeps the gap).
+			if len(words) > 0 && len(n.Text) > 0 {
+				last := n.Text[len(n.Text)-1]
+				if last == ' ' || last == '\t' || last == '\n' || last == '\r' || last == '\f' {
+					(*out)[len(*out)-1].text += " "
+					(*out)[len(*out)-1].w = e.measureTextFace((*out)[len(*out)-1].text, st)
+				}
 			}
 		}
 	case html.ElementNode:
