@@ -578,6 +578,14 @@ func avoidInside(res *Result, contentH float64) bool {
 			lo := int(b.y / contentH)
 			hi := int((b.y + b.h) / contentH)
 			if hi > lo && b.h <= contentH+0.01 {
+				remaining := float64(lo+1)*contentH - b.y
+				// If keeping the box intact would blank out most of the current
+				// page (common for dense auto-width tables that now fit one
+				// page after max-content column sizing), allow splitting
+				// instead — browsers do the same for large wikitables.
+				if remaining < b.h*0.5 && b.h > contentH*0.45 {
+					return changed
+				}
 				shiftFlowY(res, b.opStart, b.opEnd, b.y, float64(hi)*contentH-b.y)
 				changed = true
 			}
@@ -682,7 +690,6 @@ func afterBreaks(res *Result, contentH float64) bool {
 // rowsIntact keeps each table row on a single page: a row spanning multiple
 // pages moves wholly to the next.
 func rowsIntact(res *Result, contentH float64) bool {
-	ops := res.Ops
 	var walk func(b *box) bool
 	walk = func(b *box) bool {
 		changed := false
@@ -696,6 +703,8 @@ func rowsIntact(res *Result, contentH float64) bool {
 				continue
 			}
 			first, last := -1, -1
+			rowTop, rowBottom := 0.0, 0.0
+			haveGeom := false
 			for _, cell := range row {
 				if cell.opStart <= cell.opEnd {
 					if first < 0 {
@@ -705,18 +714,29 @@ func rowsIntact(res *Result, contentH float64) bool {
 						last = cell.opEnd
 					}
 				}
+				// Use starting-row geometry, not full rowspan paint extent.
+				// Rowspan cells emit bottom borders at y+h (full span); scanning
+				// those ops made the first row look multi-page and cascaded
+				// blank pages (wiki awards tables with rowspan=10+).
+				top := cell.y
+				h := cell.h
+				if cell.rowSpan > 1 && cell.rowBoxH > 0 {
+					h = cell.rowBoxH
+				}
+				bot := top + h
+				if !haveGeom {
+					rowTop, rowBottom, haveGeom = top, bot, true
+				} else {
+					if top < rowTop {
+						rowTop = top
+					}
+					if bot > rowBottom {
+						rowBottom = bot
+					}
+				}
 			}
-			if first < 0 {
+			if first < 0 || !haveGeom {
 				continue
-			}
-			rowTop, rowBottom := ops[first].Y, ops[first].Y
-			for k := first + 1; k <= last; k++ {
-				if ops[k].Y < rowTop {
-					rowTop = ops[k].Y
-				}
-				if ops[k].Y > rowBottom {
-					rowBottom = ops[k].Y
-				}
 			}
 			lo, hi := int(rowTop/contentH), int(rowBottom/contentH)
 			if hi > lo {

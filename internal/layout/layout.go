@@ -317,8 +317,15 @@ type box struct {
 	firstBaseline  float64
 	// table cells
 	col, span int
-	contentW  float64
-	contentH  float64
+	rowSpan   int // vertical span (default 1) for <td rowspan>
+	// rowBoxH is the height of the cell's starting row only. For rowspan>1,
+	// h covers the full span (background/borders) while rowBoxH is what
+	// rowsIntact uses so bottom-edge paint ops do not make the first row
+	// look multi-page.
+	rowBoxH    float64
+	contentW   float64 // max-content border-box (preferred column contribution)
+	contentMin float64 // min-content border-box (shrink floor)
+	contentH   float64
 	// rows[i] holds the cell boxes of table row i, in document order. The
 	// row's op range is from rows[i][0].opStart to rows[i][len-1].opEnd.
 	rows [][]*box
@@ -1167,63 +1174,120 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 		return tb
 	}
 
-	// determine columns, honoring colspan
+	// Occupancy grid for rowspan: occupied[r][c] counts remaining rows that
+	// column c is covered by a prior rowspan (including the current row).
+	nRows := len(rows)
+	// Pass 1: assign each cell a column index honoring rowspan holes, and
+	// discover nCols.
+	type tcell struct {
+		node         *html.Node
+		row, col     int
+		cSpan, rSpan int
+	}
+	var placed []tcell
+	occupied := make([][]int, nRows) // per-row remaining coverage counts
 	nCols := 0
-	for _, r := range rows {
-		col := 0
-		for _, cell := range r {
-			col += colSpan(cell)
+	for ri, r := range rows {
+		if occupied[ri] == nil {
+			occupied[ri] = make([]int, nCols)
 		}
-		if col > nCols {
-			nCols = col
+		ci := 0
+		for _, cellNode := range r {
+			cs, rs := colSpan(cellNode), cellRowSpan(cellNode)
+			if cs < 1 {
+				cs = 1
+			}
+			if rs < 1 {
+				rs = 1
+			}
+			for ci < len(occupied[ri]) && occupied[ri][ci] > 0 {
+				ci++
+			}
+			for len(occupied[ri]) < ci+cs {
+				occupied[ri] = append(occupied[ri], 0)
+			}
+			for k := 0; k < cs; k++ {
+				occupied[ri][ci+k] = rs // covered for rs rows including this one
+			}
+			// Mark subsequent rows.
+			for rr := 1; rr < rs && ri+rr < nRows; rr++ {
+				for len(occupied[ri+rr]) < ci+cs {
+					occupied[ri+rr] = append(occupied[ri+rr], 0)
+				}
+				for k := 0; k < cs; k++ {
+					if occupied[ri+rr][ci+k] < rs-rr {
+						occupied[ri+rr][ci+k] = rs - rr
+					}
+				}
+			}
+			placed = append(placed, tcell{node: cellNode, row: ri, col: ci, cSpan: cs, rSpan: rs})
+			if end := ci + cs; end > nCols {
+				nCols = end
+			}
+			ci += cs
+		}
+		if len(occupied[ri]) > nCols {
+			nCols = len(occupied[ri])
 		}
 	}
 	if nCols == 0 {
 		return tb
 	}
-
-	// measure each cell's max-content width; colspan cells contribute their
-	// content width evenly across the spanned columns (min floor per col).
-	colW := make([]float64, nCols)
-	var cellData [][]*box
-	for _, r := range rows {
-		col := 0
-		var cells []*box
-		for _, cellNode := range r {
-			span := colSpan(cellNode)
-			if span < 1 {
-				span = 1
-			}
-			if col+span > nCols {
-				span = nCols - col
-				if span < 1 {
-					span = 1
-				}
-			}
-			cell := e.buildCell(cellNode, col, span)
-			cells = append(cells, cell)
-			if span == 1 {
-				if cell.contentW > colW[col] {
-					colW[col] = cell.contentW
-				}
-			} else if span > 1 {
-				// Prefer existing single-col measurements; only grow if the
-				// spanned content needs more total space than current sum.
-				var sum float64
-				for k := 0; k < span && col+k < nCols; k++ {
-					sum += colW[col+k]
-				}
-				need := cell.contentW
-				if need > sum {
-					extra := (need - sum) / float64(span)
-					for k := 0; k < span && col+k < nCols; k++ {
-						colW[col+k] += extra
-					}
-				}
-			}
-			col += span
+	// Normalize occupied rows to nCols.
+	for ri := range occupied {
+		for len(occupied[ri]) < nCols {
+			occupied[ri] = append(occupied[ri], 0)
 		}
-		cellData = append(cellData, cells)
+	}
+
+	// measure each cell's min/max-content width; colspan cells contribute their
+	// content width evenly across the spanned columns (min floor per col).
+	colW := make([]float64, nCols)   // preferred = max-content
+	colMin := make([]float64, nCols) // shrink floor = min-content
+	colPct := make([]float64, nCols) // >=0 means width:% of table; -1 = auto
+	colAbs := make([]float64, nCols) // >=0 means absolute width pt; -1 = auto
+	for i := range colPct {
+		colPct[i] = -1
+		colAbs[i] = -1
+	}
+	cellData := make([][]*box, nRows)
+	for _, p := range placed {
+		cell := e.buildCell(p.node, p.col, p.cSpan)
+		cell.rowSpan = p.rSpan
+		cellData[p.row] = append(cellData[p.row], cell)
+		cs := e.styles[p.node]
+		if p.cSpan == 1 {
+			if cell.contentW > colW[p.col] {
+				colW[p.col] = cell.contentW
+			}
+			if cell.contentMin > colMin[p.col] {
+				colMin[p.col] = cell.contentMin
+			}
+			if cs.WidthPercent >= 0 && colPct[p.col] < 0 {
+				colPct[p.col] = cs.WidthPercent
+			}
+			if cs.Width >= 0 && colAbs[p.col] < 0 {
+				colAbs[p.col] = e.scalePt(cs.Width)
+			}
+		} else if p.cSpan > 1 {
+			var sumMax, sumMin float64
+			for k := 0; k < p.cSpan && p.col+k < nCols; k++ {
+				sumMax += colW[p.col+k]
+				sumMin += colMin[p.col+k]
+			}
+			if cell.contentW > sumMax {
+				extra := (cell.contentW - sumMax) / float64(p.cSpan)
+				for k := 0; k < p.cSpan && p.col+k < nCols; k++ {
+					colW[p.col+k] += extra
+				}
+			}
+			if cell.contentMin > sumMin {
+				extra := (cell.contentMin - sumMin) / float64(p.cSpan)
+				for k := 0; k < p.cSpan && p.col+k < nCols; k++ {
+					colMin[p.col+k] += extra
+				}
+			}
+		}
 	}
 
 	// table width
@@ -1233,72 +1297,244 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 	if st.BorderCollapse == "collapse" {
 		spacing = 0
 	}
-	sum := 0.0
-	for _, w := range colW {
-		sum += w
+	sumMax := 0.0
+	sumMin := 0.0
+	for i := range colW {
+		sumMax += colW[i]
+		sumMin += colMin[i]
 	}
-	sum += spacing * float64(nCols+1)
-	sum += e.scalePt(st.BorderLeft.Width) + e.scalePt(st.BorderRight.Width) + e.scalePt(st.PaddingLeft) + e.scalePt(st.PaddingRight)
+	chrome := spacing*float64(nCols+1) +
+		e.scalePt(st.BorderLeft.Width) + e.scalePt(st.BorderRight.Width) +
+		e.scalePt(st.PaddingLeft) + e.scalePt(st.PaddingRight)
+	sumMax += chrome
+	sumMin += chrome
 	tableW := availW
+	definiteTable := false
 	if st.WidthPercent >= 0 {
 		// width:% of the containing block (parent cell / block), not viewport
 		tableW = availW * st.WidthPercent / 100
+		definiteTable = true
 	} else if st.Width >= 0 {
 		tableW = e.scalePt(st.Width)
 		if tableW > availW && availW > 0 {
 			tableW = availW
 		}
-	} else if sum < availW {
-		tableW = sum
+		definiteTable = true
+	} else if sumMax < availW {
+		// width:auto — shrink-wrap to max-content (not min-content).
+		tableW = sumMax
 	}
-	if tableW > sum {
-		extra := (tableW - sum) / float64(nCols)
+
+	// Apply column width:% / absolute widths when the table size is definite.
+	hasColHint := false
+	for i := range colPct {
+		if colPct[i] >= 0 || colAbs[i] >= 0 {
+			hasColHint = true
+			break
+		}
+	}
+	if definiteTable && hasColHint {
+		inner := tableW - chrome
+		if inner < 0 {
+			inner = 0
+		}
+		used := 0.0
+		autoMax := 0.0
+		for i := range colW {
+			switch {
+			case colPct[i] >= 0:
+				colW[i] = inner * colPct[i] / 100
+				if colW[i] < colMin[i] {
+					colW[i] = colMin[i]
+				}
+				used += colW[i]
+			case colAbs[i] >= 0:
+				colW[i] = colAbs[i]
+				if colW[i] < colMin[i] {
+					colW[i] = colMin[i]
+				}
+				used += colW[i]
+			default:
+				autoMax += colW[i]
+			}
+		}
+		remain := inner - used
+		if remain < 0 {
+			remain = 0
+		}
+		if autoMax > 0 && remain > 0 {
+			for i := range colW {
+				if colPct[i] < 0 && colAbs[i] < 0 {
+					colW[i] = remain * (colW[i] / autoMax)
+					if colW[i] < colMin[i] {
+						colW[i] = colMin[i]
+					}
+				}
+			}
+		} else if autoMax == 0 && remain > 0 {
+			// All columns hinted — distribute leftover by % share, else evenly.
+			pctTotal := 0.0
+			for i := range colPct {
+				if colPct[i] > 0 {
+					pctTotal += colPct[i]
+				}
+			}
+			for i := range colW {
+				if pctTotal > 0 && colPct[i] > 0 {
+					colW[i] += remain * (colPct[i] / pctTotal)
+				} else {
+					colW[i] += remain / float64(nCols)
+				}
+			}
+		}
+	} else if tableW > sumMax {
+		extra := (tableW - sumMax) / float64(nCols)
 		for i := range colW {
 			colW[i] += extra
 		}
-	} else if tableW < sum {
-		// shrink proportionally
-		inner := sum - spacing*float64(nCols+1)
-		if inner > 0 {
-			scale := (tableW - spacing*float64(nCols+1)) / inner
-			if scale > 0 {
-				for i := range colW {
-					colW[i] *= scale
+	} else if tableW < sumMax {
+		innerAvail := tableW - chrome
+		if innerAvail < 0 {
+			innerAvail = 0
+		}
+		innerMax := sumMax - chrome
+		innerMin := sumMin - chrome
+		if innerAvail >= innerMin && innerMax > innerMin {
+			// Grow each column from min toward max proportional to free space.
+			free := innerAvail - innerMin
+			span := innerMax - innerMin
+			for i := range colW {
+				grow := colW[i] - colMin[i]
+				if grow < 0 {
+					grow = 0
 				}
+				colW[i] = colMin[i] + free*(grow/span)
+			}
+		} else if innerMax > 0 {
+			scale := innerAvail / innerMax
+			if scale < 0 {
+				scale = 0
+			}
+			for i := range colW {
+				colW[i] *= scale
 			}
 		}
 	}
 	tb.w = tableW
 	cy := e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)
-	for _, cells := range cellData {
+	rowHeights := make([]float64, nRows)
+	rowTops := make([]float64, nRows)
+	padL := e.scalePt(st.PaddingLeft) + e.scalePt(st.BorderLeft.Width)
+	// Measure each cell at its final column width; row height from single-row
+	// cells first. Rowspan cells enlarge the spanned rows afterward.
+	for ri, cells := range cellData {
+		rowTops[ri] = y + cy
 		rowH := 0.0
-		rowX := e.scalePt(st.PaddingLeft) + e.scalePt(st.BorderLeft.Width)
 		for _, cell := range cells {
-			cell.x = x + rowX
-			cell.y = y + cy
+			if cell.rowSpan < 1 {
+				cell.rowSpan = 1
+			}
 			cellW := 0.0
-			for k := 0; k < cell.span; k++ {
+			for k := 0; k < cell.span && cell.col+k < nCols; k++ {
 				cellW += colW[cell.col+k]
 			}
 			cellW += spacing * float64(cell.span-1)
 			cell.w = cellW
-			// Height against final column width so wrap matches paint.
+			cell.x = x + padL
+			for c := 0; c < cell.col && c < nCols; c++ {
+				cell.x += colW[c] + spacing
+			}
+			cell.y = rowTops[ri]
 			e.measureCellHeight(cell, cellW)
-			if cell.contentH > rowH {
+			if cell.rowSpan == 1 && cell.contentH > rowH {
 				rowH = cell.contentH
 			}
-			rowX += cellW + spacing
 			tb.children = append(tb.children, cell)
 		}
-		// Row height must land on every cell so backgrounds/borders paint
-		// with non-zero height (emitCell uses b.h, not contentH).
 		if rowH <= 0 {
 			rowH = 1
 		}
-		for _, cell := range cells {
-			cell.h = rowH
-		}
+		rowHeights[ri] = rowH
 		cy += rowH + spacing
+	}
+	// Grow rows so rowspan cells fit their content across the spanned band.
+	for _, cell := range tb.children {
+		if cell.rowSpan <= 1 {
+			continue
+		}
+		start := -1
+		for ri, cells := range cellData {
+			for _, c := range cells {
+				if c == cell {
+					start = ri
+					break
+				}
+			}
+			if start >= 0 {
+				break
+			}
+		}
+		if start < 0 {
+			continue
+		}
+		end := start + cell.rowSpan
+		if end > nRows {
+			end = nRows
+		}
+		sum := 0.0
+		for ri := start; ri < end; ri++ {
+			sum += rowHeights[ri]
+			if ri+1 < end {
+				sum += spacing
+			}
+		}
+		if cell.contentH > sum {
+			extra := (cell.contentH - sum) / float64(end-start)
+			for ri := start; ri < end; ri++ {
+				rowHeights[ri] += extra
+			}
+		}
+	}
+	// Recompute tops and assign final cell heights after rowspan growth.
+	cy = e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)
+	for ri := range rowHeights {
+		rowTops[ri] = y + cy
+		cy += rowHeights[ri] + spacing
+	}
+	for _, cell := range tb.children {
+		start := -1
+		for ri, cells := range cellData {
+			for _, c := range cells {
+				if c == cell {
+					start = ri
+					break
+				}
+			}
+			if start >= 0 {
+				break
+			}
+		}
+		if start < 0 {
+			continue
+		}
+		cell.y = rowTops[start]
+		rs := cell.rowSpan
+		if rs < 1 {
+			rs = 1
+		}
+		end := start + rs
+		if end > nRows {
+			end = nRows
+		}
+		h := 0.0
+		for ri := start; ri < end; ri++ {
+			h += rowHeights[ri]
+			if ri+1 < end {
+				h += spacing
+			}
+		}
+		cell.h = h
+		cell.rowBoxH = rowHeights[start]
 	}
 	tb.rows = cellData
 	tb.h = cy + e.scalePt(st.PaddingBottom) + e.scalePt(st.BorderBottom.Width)
@@ -1316,14 +1552,14 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 	return tb
 }
 
-// buildCell measures a table cell's max-content width (no ops emitted).
+// buildCell measures a table cell's min/max-content width (no ops emitted).
 // Height is not final here: layoutCell must run again with the real column
 // width after column sizing, or narrow max-content widths force false wraps
 // and inflate row heights (empty bands under single-line cell text).
 func (e *engine) buildCell(n *html.Node, col, span int) *box {
 	st := e.styles[n]
 	b := &box{node: n, style: st, kind: "cell", col: col, span: span}
-	b.contentW = e.measureCellContent(n, st)
+	b.contentMin, b.contentW = e.measureCellMinMax(n, st)
 	return b
 }
 
@@ -1394,32 +1630,99 @@ func (e *engine) emitCell(b *box) {
 	b.opStart, b.opEnd = start, len(e.ops)-1
 }
 
-// measureCellContent returns the max-content width of the cell.
+// measureCellContent returns the max-content border-box width of the cell
+// (longest unwrapped line, not longest word). Using min-content here made
+// auto tables shrink-wrap to a rivulet of columns and inflate row heights
+// via forced wraps (wiki filmography / any dense multi-column table).
 func (e *engine) measureCellContent(n *html.Node, st ResolvedStyle) float64 {
-	maxW := 0.0
-	var measure func(n *html.Node, fs float64)
-	measure = func(n *html.Node, fs float64) {
+	minW, maxW := e.measureCellMinMax(n, st)
+	_ = minW
+	return maxW
+}
+
+// measureCellMinMax returns min-content and max-content border-box widths.
+// min-content ≈ longest unbreakable word; max-content ≈ widest line if soft
+// wraps are not taken (hard breaks from <br>/blocks still split lines).
+func (e *engine) measureCellMinMax(n *html.Node, st ResolvedStyle) (minW, maxW float64) {
+	var lineW, longestWord float64
+	flushLine := func() {
+		if lineW > maxW {
+			maxW = lineW
+		}
+		lineW = 0
+	}
+	var walk func(n *html.Node, fs float64, nowrap bool)
+	walk = func(n *html.Node, fs float64, nowrap bool) {
 		switch n.Type {
 		case html.TextNode:
-			for _, word := range strings.Fields(n.Text) {
-				w := e.measureText(word, fs*e.scale)
-				if w > maxW {
-					maxW = w
+			text := n.Text
+			if !nowrap {
+				// Collapse runs of whitespace to a single space for measure,
+				// matching normal white-space:normal inline layout.
+				fields := strings.Fields(text)
+				if len(fields) == 0 {
+					return
 				}
-			}
-		case html.ElementNode:
-			if e.styles[n].Display == "none" {
+				// Leading space if original had leading WS and line already started.
+				if lineW > 0 && len(text) > 0 && isHTMLSpace(text[0]) {
+					lineW += e.measureText(" ", fs*e.scale)
+				}
+				for i, word := range fields {
+					if i > 0 {
+						lineW += e.measureText(" ", fs*e.scale)
+					}
+					w := e.measureText(word, fs*e.scale)
+					if w > longestWord {
+						longestWord = w
+					}
+					lineW += w
+				}
 				return
 			}
-			fs = e.styles[n].FontSize
+			w := e.measureText(text, fs*e.scale)
+			if w > longestWord {
+				longestWord = w
+			}
+			lineW += w
+		case html.ElementNode:
+			cs := e.styles[n]
+			if cs.Display == "none" {
+				return
+			}
+			fs = cs.FontSize
+			if n.Name == "br" {
+				flushLine()
+				return
+			}
+			// Block-level in-cell boxes start a new line (simplified).
+			blockish := cs.Display == "block" || cs.Display == "table" ||
+				cs.Display == "list-item" || cs.Display == "flex" || cs.Display == "grid"
+			if blockish {
+				flushLine()
+			}
+			childNowrap := nowrap || cs.WhiteSpace == "nowrap" || cs.WhiteSpace == "pre"
 			for _, c := range n.Children {
-				measure(c, fs)
+				walk(c, fs, childNowrap)
+			}
+			if blockish {
+				flushLine()
 			}
 		}
 	}
-	measure(n, st.FontSize)
-	maxW += e.scalePt(st.PaddingLeft) + e.scalePt(st.PaddingRight) + e.scalePt(st.BorderLeft.Width) + e.scalePt(st.BorderRight.Width)
-	return maxW
+	walk(n, st.FontSize, st.WhiteSpace == "nowrap" || st.WhiteSpace == "pre")
+	flushLine()
+	chrome := e.scalePt(st.PaddingLeft) + e.scalePt(st.PaddingRight) +
+		e.scalePt(st.BorderLeft.Width) + e.scalePt(st.BorderRight.Width)
+	minW = longestWord + chrome
+	maxW += chrome
+	if maxW < minW {
+		maxW = minW
+	}
+	return minW, maxW
+}
+
+func isHTMLSpace(b byte) bool {
+	return b == ' ' || b == '\t' || b == '\n' || b == '\r' || b == '\f'
 }
 
 // layoutCell measures the height of a cell's content (no ops emitted).
@@ -1435,6 +1738,13 @@ func (e *engine) layoutCell(n *html.Node, st ResolvedStyle, width float64) float
 
 func colSpan(n *html.Node) int {
 	if v, err := strconv.Atoi(strings.TrimSpace(n.Attribute("colspan"))); err == nil && v > 1 {
+		return v
+	}
+	return 1
+}
+
+func cellRowSpan(n *html.Node) int {
+	if v, err := strconv.Atoi(strings.TrimSpace(n.Attribute("rowspan"))); err == nil && v > 1 {
 		return v
 	}
 	return 1
