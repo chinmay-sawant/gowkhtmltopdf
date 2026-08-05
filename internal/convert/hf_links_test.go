@@ -295,11 +295,12 @@ func TestHTMLHeaderPlaceholdersCopies(t *testing.T) {
 	if pageCount(data) != 2 {
 		t.Fatalf("pages = %d, want 2", pageCount(data))
 	}
-	if !bytes.Contains(data, []byte("P1/2")) && !bytes.Contains(data, []byte("P1")) {
-		// Text may be encoded; at least ensure PDF produced without error.
-		t.Log("placeholder text may be compressed/encoded; PDF generated OK")
+	if bytes.Contains(data, []byte("P0/0")) || bytes.Contains(data, []byte("P0/")) {
+		t.Error("HTML HF placeholders expanded to page 0 (load-time substitute bug)")
 	}
-	_ = data
+	if !bytes.Contains(data, []byte("P1/2")) && !bytes.Contains(data, []byte("P2/2")) {
+		t.Error("expected per-page HTML HF placeholder expansion P1/2 or P2/2")
+	}
 }
 
 func TestRemapPageForCopies(t *testing.T) {

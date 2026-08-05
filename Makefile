@@ -45,7 +45,15 @@ samples:
 	for f in testdata/golden/fixture-*.html; do \
 		case "$$f" in *-header.html|*-footer.html) continue;; esac; \
 		name=$$(basename "$$f" .html); \
-		go run ./cmd/gowkhtmltopdf --enable-local-file-access $$FONT_FLAGS "$$f" "output/$$name.pdf"; \
+		id=$$(printf '%s\n' "$$name" | sed -n 's/^\(fixture-[0-9][0-9]*\).*/\1/p'); \
+		HF_FLAGS=""; \
+		if [ -n "$$id" ] && [ -f "testdata/golden/$$id-header.html" ]; then \
+			HF_FLAGS="$$HF_FLAGS --header-html testdata/golden/$$id-header.html --margin-top -1"; \
+		fi; \
+		if [ -n "$$id" ] && [ -f "testdata/golden/$$id-footer.html" ]; then \
+			HF_FLAGS="$$HF_FLAGS --footer-html testdata/golden/$$id-footer.html --margin-bottom -1"; \
+		fi; \
+		go run ./cmd/gowkhtmltopdf --enable-local-file-access $$FONT_FLAGS $$HF_FLAGS "$$f" "output/$$name.pdf"; \
 	done
 	go run ./cmd/gowkhtmltopdf --enable-local-file-access --outline --outline-depth 2 --header-left "gowkhtmltopdf demo - [title]" --header-right "page [page]/[topage]" --footer-center "[section]" toc testdata/golden/fixture-16-invoice-with-css.html output/showcase-toc-hf-outline.pdf
 	go run ./cmd/gowkhtmltoimage --enable-local-file-access testdata/golden/fixture-01-simple-invoice.html output/fixture-01-simple-invoice.png

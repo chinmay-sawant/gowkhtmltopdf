@@ -218,6 +218,64 @@ func TestHTMLHeaderRawMarkupRejected(t *testing.T) {
 	}
 }
 
+// TestHTMLHeaderRelativePathCWD ensures --header-html paths resolve like a
+// top-level page (CWD-relative), not as a subresource of the body document.
+// Path doubling ("…/golden/testdata/golden/header.html") previously skipped HF.
+func TestHTMLHeaderRelativePathCWD(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "testdata", "golden")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	headerRel := filepath.Join("testdata", "golden", "header.html")
+	pageRel := filepath.Join("testdata", "golden", "page.html")
+	if err := os.WriteFile(filepath.Join(root, headerRel), []byte(`<html><body><b>RELHFMARK</b></body></html>`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, pageRel), []byte(`<html><body><p>BODYREL</p></body></html>`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	old, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(old) })
+
+	cmd := &cli.Command{
+		Global: settings.DefaultPdfGlobal(),
+		Objects: []settings.PdfObject{
+			{Page: pageRel, Load: settings.DefaultLoadPage()},
+		},
+		Output: filepath.Join(t.TempDir(), "out.pdf"),
+	}
+	cmd.Global.EnableLocalFileAccess = true
+	cmd.Objects[0].Load.BlockLocalFileAccess = false
+	cmd.Global.Header.HTMLURL = headerRel
+	cmd.Global.Margin.Top = -1
+	cmd.Global.UseCompression = false
+	cmd.Global.Outline = false
+	var log bytes.Buffer
+	if err := RunPDF(cmd, &log); err != nil {
+		t.Fatalf("RunPDF: %v\nlog: %s", err, log.String())
+	}
+	data, err := os.ReadFile(cmd.Output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(log.Bytes(), []byte("no such file")) {
+		t.Fatalf("HF path failed to resolve (path doubling?): %s", log.String())
+	}
+	if !bytes.Contains(data, []byte("RELHFMARK")) {
+		t.Error("relative --header-html text missing from PDF")
+	}
+	if !bytes.Contains(data, []byte("BODYREL")) {
+		t.Error("body text missing")
+	}
+}
+
 func TestAutoMargin(t *testing.T) {
 	cmd, _ := newCommand(t, `<html><body><p>BODYTEXT</p></body></html>`, filepath.Join(t.TempDir(), "out.pdf"))
 	cmd.Global.Margin.Top = -1
