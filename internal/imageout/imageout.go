@@ -669,7 +669,9 @@ func styleText(n *html.Node) string {
 }
 
 // linkStylesheet reports whether n is a stylesheet <link> whose media
-// attribute allows screen output: empty, or containing "screen" or "all".
+// attribute matches the screen/image pipeline (empty, all, screen, or
+// feature queries MediaMatches accepts for "screen"). Viewport uses a
+// generous default so min-width feature links still load for typical widths.
 func linkStylesheet(n *html.Node) bool {
 	if n.Name != "link" || !strings.Contains(strings.ToLower(n.Attribute("rel")), "stylesheet") {
 		return false
@@ -677,6 +679,11 @@ func linkStylesheet(n *html.Node) bool {
 	if n.Attribute("href") == "" {
 		return false
 	}
-	media := strings.ToLower(n.Attribute("media"))
-	return media == "" || strings.Contains(media, "screen") || strings.Contains(media, "all")
+	media := n.Attribute("media")
+	if media == "" {
+		return true
+	}
+	// Default ~1024 CSS px wide viewport for image mode link filtering.
+	const vw, vh = 768.0, 576.0 // 1024px×768px in pt
+	return css.MediaMatches(media, "screen", vw, vh)
 }

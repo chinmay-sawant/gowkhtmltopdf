@@ -231,8 +231,8 @@ Status legend as in §2; evidence in `internal/css/css.go`.
 | `::before` / `::after` | Not implemented | dropped with the other pseudo-classes |
 | `!important` | Implemented | `css.go:664-688`; separate cascade layer `style.go:221-247`; test `css_test.go::TestParseImportant` |
 | Specificity (ID > class > element), inline `style` wins, `!important` overrides | Implemented | `Specificity` `css.go:578`; inline style priority `style.go:233-239`; test `css_test.go::TestSpecificity` |
-| `@media print` / `screen` filtering | Implemented | `mediaType` `css.go:186`; applied per rule `style.go:212-214`; convert passes `Media: "print"` (`convert.go:115`); test `css_test.go::TestParseMedia` |
-| `@media` feature queries (`(min-width: …)`) | Not implemented | only the media type substring is considered |
+| `@media print` / `screen` filtering | Implemented | `MediaMatches` (`css/media.go`); cascade `style.go`; convert `Media: "print"`; tests `TestParseMedia`, `TestMediaMatches*` |
+| `@media` feature queries (`(min-width: …)`) | Partial | size features + orientation vs viewport; unknown features → false; `TestMediaMatchesSizeFeatures` |
 | `:has()` | Partial | Relative selectors inside `:has(...)`; descendant/child/sibling + simple compounds; no forgiving-selector list / complex chrome edge cases. `has.go`; fixture-41 |
 | `@container` / `container-type` | Partial | Size queries only (`inline-size`/`width` + `and`/`or`/`not`); named containers; two-pass style after used inline size. No style/scroll-state queries; no `cq*` units. `container.go`; fixture-42 |
 | `@page` | Not implemented | `@page` blocks skipped gracefully at parse |

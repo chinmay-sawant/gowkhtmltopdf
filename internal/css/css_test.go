@@ -90,7 +90,7 @@ func TestParseMedia(t *testing.T) {
 	if len(s.Rules) != 5 {
 		t.Fatalf("got %d rules: %+v", len(s.Rules), s.Rules)
 	}
-	want := []string{"print", "screen", "screen", "all", "all"}
+	want := []string{"print", "screen", "screen and (max-width: 600px)", "all", "all"}
 	for i, w := range want {
 		if s.Rules[i].Media != w {
 			t.Errorf("rule %d media = %q, want %q", i, s.Rules[i].Media, w)

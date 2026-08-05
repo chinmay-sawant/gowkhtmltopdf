@@ -65,26 +65,7 @@ func (c ContainerCond) Matches(inlineSizePt, fontSizePt float64) bool {
 func (f SizeFeature) matches(inlineSizePt, fontSizePt float64) bool {
 	switch f.Name {
 	case "width", "inline-size":
-		// ok
-	default:
-		return false
-	}
-	thresh, ok := lengthToPt(f.Value, f.Unit, fontSizePt)
-	if !ok {
-		return false
-	}
-	switch f.Op {
-	case "<":
-		return inlineSizePt < thresh
-	case ">":
-		return inlineSizePt > thresh
-	case "<=":
-		return inlineSizePt <= thresh
-	case ">=":
-		return inlineSizePt >= thresh
-	case "=":
-		const eps = 0.01
-		return inlineSizePt > thresh-eps && inlineSizePt < thresh+eps
+		return f.matchesAxis(inlineSizePt, fontSizePt)
 	default:
 		return false
 	}

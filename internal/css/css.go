@@ -4,9 +4,9 @@
 //
 // Scope: `*`, type, `.class`, `#id`, attribute selectors ([attr]/[attr=val]),
 // :first-child/:last-child/:nth-child/:has()/:not(), descendant/child/sibling
-// combinators, `@media print|screen` filtering, `@container` size queries
-// (inline-size/width + and/or/not), `!important`, inline style attributes.
-// Unsupported constructs degrade without panicking.
+// combinators, `@media` type + size-feature matching (see MediaMatches),
+// `@container` size queries (inline-size/width + and/or/not), `!important`,
+// inline style attributes. Unsupported constructs degrade without panicking.
 package css
 
 import (
@@ -34,7 +34,7 @@ type FontFace struct {
 type Rule struct {
 	Selectors []Selector
 	Decls     []Declaration
-	Media     string // "all", "print" or "screen"
+	Media     string // raw @media prelude ("all", "print", "screen and (…)", …)
 	Order     int    // source order within the sheet; callers rebase across sheets
 	// Container is non-nil for rules nested under @container. The rule applies
 	// only when the query matches the nearest eligible ancestor container.
@@ -91,8 +91,8 @@ type Declaration struct {
 }
 
 // Parse parses a stylesheet. Broken input never returns an error for recoverable
-// garbage; only unbalanced blocks do. Media queries resolve to "print",
-// "screen" or "all".
+// garbage; only unbalanced blocks do. @media preambles are stored raw on
+// Rule.Media and evaluated later via MediaMatches.
 func Parse(src string) (*Stylesheet, error) {
 	s := &Stylesheet{}
 	src = stripComments(src)
@@ -110,7 +110,10 @@ func Parse(src string) (*Stylesheet, error) {
 				if open < 0 {
 					return nil, errUnbalanced
 				}
-				media := mediaType(src[:open])
+				media := strings.TrimSpace(src[len("@media"):open])
+				if media == "" {
+					media = "all"
+				}
 				block, rest, err := takeBlock(src, open)
 				if err != nil {
 					return nil, err
@@ -358,19 +361,6 @@ func parseRuleList(media string, cq *ContainerQuery, block string, orderPtr *int
 		*orderPtr++
 	}
 	return rules, nil
-}
-
-// mediaType reduces a @media query to "print", "screen" or "all".
-func mediaType(s string) string {
-	low := strings.ToLower(s)
-	switch {
-	case strings.Contains(low, "print"):
-		return "print"
-	case strings.Contains(low, "screen"):
-		return "screen"
-	default:
-		return "all"
-	}
 }
 
 var errUnbalanced = &parseError{"unbalanced braces in stylesheet"}

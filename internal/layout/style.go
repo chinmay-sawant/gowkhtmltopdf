@@ -362,7 +362,7 @@ func cascadeRaw(ctx *styleContext, n *html.Node) map[string]string {
 	// author sheets in source order
 	for _, sheet := range ctx.sheets {
 		for _, r := range sheet.Rules {
-			if ctx.media != "" && r.Media != "all" && r.Media != ctx.media {
+			if !css.MediaMatches(r.Media, ctx.media, ctx.viewportW, ctx.viewportH) {
 				continue
 			}
 			if r.Container != nil {

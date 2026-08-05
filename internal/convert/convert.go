@@ -310,14 +310,15 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 		return nil, fmt.Errorf("object %d (%s): parse html: %w", idx+1, obj.Page, err)
 	}
 
-	sheets := collectSheets(ctx, loader, root, res.Base, obj.Load, idx+1, log)
-	sheets = AppendSimplifySheet(sheets, SimplifyDOMEnabled(cmd.Global.Web, obj.Web))
-	registry = MergeFontFaces(ctx, loader, registry, sheets, res.Base, obj.Load, idx+1, log)
-
 	pageW, pageH, err := pageGeometry(cmd.Global)
 	if err != nil {
 		return nil, fmt.Errorf("object %d (%s): %w", idx+1, obj.Page, err)
 	}
+	contentW := pageW - cmd.Global.Margin.Left*mmToPt - cmd.Global.Margin.Right*mmToPt
+	contentH := pageH - cmd.Global.Margin.Top*mmToPt - cmd.Global.Margin.Bottom*mmToPt
+	sheets := collectSheets(ctx, loader, root, res.Base, obj.Load, idx+1, log, contentW, contentH)
+	sheets = AppendSimplifySheet(sheets, SimplifyDOMEnabled(cmd.Global.Web, obj.Web))
+	registry = MergeFontFaces(ctx, loader, registry, sheets, res.Base, obj.Load, idx+1, log)
 
 	imagesFn := func(src string) ([]byte, error) {
 		if !cmd.Global.Web.Images {
@@ -506,8 +507,8 @@ func pageGeometry(g settings.PdfGlobal) (w, h float64, err error) {
 
 // collectSheets gathers <style> blocks and <link rel="stylesheet"> resources
 // from the DOM. A failed stylesheet only logs a warning; the layout proceeds
-// without it.
-func collectSheets(ctx context.Context, loader *load.Loader, root *html.Node, base string, lp settings.LoadPage, idx int, log io.Writer) []*css.Stylesheet {
+// without it. viewportW/H (pt) evaluate link media attributes for print.
+func collectSheets(ctx context.Context, loader *load.Loader, root *html.Node, base string, lp settings.LoadPage, idx int, log io.Writer, viewportW, viewportH float64) []*css.Stylesheet {
 	var sheets []*css.Stylesheet
 	var walk func(n *html.Node)
 	walk = func(n *html.Node) {
@@ -524,7 +525,7 @@ func collectSheets(ctx context.Context, loader *load.Loader, root *html.Node, ba
 			}
 			return // raw-text element; no element children
 		case "link":
-			if linkStylesheet(n) {
+			if linkStylesheet(n, viewportW, viewportH) {
 				href := n.Attribute("href")
 				r, err := loader.FetchSub(ctx, base, href, lp)
 				if err != nil {
@@ -545,6 +546,14 @@ func collectSheets(ctx context.Context, loader *load.Loader, root *html.Node, ba
 		}
 	}
 	walk(root)
+	nRules := 0
+	for _, s := range sheets {
+		nRules += len(s.Rules)
+	}
+	const softRuleWarn = 25000
+	if nRules >= softRuleWarn {
+		fmt.Fprintf(log, "warning: object %d: large stylesheet volume (%d rules); print may be slow\n", idx, nRules)
+	}
 	return sheets
 }
 
@@ -560,16 +569,20 @@ func styleText(n *html.Node) string {
 }
 
 // linkStylesheet reports whether n is a stylesheet <link> whose media
-// attribute allows print output: empty, or containing "print" or "all".
-func linkStylesheet(n *html.Node) bool {
+// attribute matches the print pipeline (empty, all, print, or feature
+// queries that MediaMatches accepts for media type "print").
+func linkStylesheet(n *html.Node, viewportW, viewportH float64) bool {
 	if n.Name != "link" || !strings.Contains(strings.ToLower(n.Attribute("rel")), "stylesheet") {
 		return false
 	}
 	if n.Attribute("href") == "" {
 		return false
 	}
-	media := strings.ToLower(n.Attribute("media"))
-	return media == "" || strings.Contains(media, "print") || strings.Contains(media, "all")
+	media := n.Attribute("media")
+	if media == "" {
+		return true
+	}
+	return css.MediaMatches(media, "print", viewportW, viewportH)
 }
 
 // DefaultTOCXSL returns the default TOC stylesheet. In pure Go the default
