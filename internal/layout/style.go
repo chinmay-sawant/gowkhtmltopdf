@@ -238,16 +238,13 @@ func resolveStylesCtx(root *html.Node, ctx *styleContext) map[*html.Node]Resolve
 			}
 			applyFontProps(&st, raw, parent)
 			applyRestProps(&st, raw, ctx, parent)
-			// Chrome print keeps body links underlined even when wiki print CSS
-			// sets text-decoration:inherit (!important) → none. Explicit none
-			// (e.g. .IPA a) stays none. color:inherit → body black makes links
-			// invisible as links; use Vector progressive blue for discoverability.
+			// Wiki print CSS sets text-decoration:inherit (!important) → none,
+			// which hides links. Keep underlines for discoverability (Chrome
+			// print is black + underlined). Do NOT force a link color — inherit
+			// black/body color is correct for print.
 			if n.Name == "a" && strings.TrimSpace(n.Attribute("href")) != "" {
 				if v, ok := raw["text-decoration"]; ok && strings.EqualFold(strings.TrimSpace(v), "inherit") {
 					st.TextDecoration = "underline"
-				}
-				if v, ok := raw["color"]; ok && strings.EqualFold(strings.TrimSpace(v), "inherit") {
-					st.Color = [3]float64{0x06 / 255.0, 0x45 / 255.0, 0xad / 255.0}
 				}
 			}
 			// CSS2.1 §9.7: float ≠ none blockifies table-internal / inline
