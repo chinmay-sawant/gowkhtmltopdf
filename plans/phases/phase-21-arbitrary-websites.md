@@ -1,7 +1,7 @@
 # Phase 21 - Arbitrary Websites & “Paste Any URL → Decent Print”
 
 > **Parent:** `plans/10-canonical-post-mvp-roadmap.md`  
-> **Status:** in progress (§21.1–21.7 shipped; §21.8 gates recording)  
+> **Status:** in progress (§21.1–21.7 shipped; open-web Chrome-gap work → [`pending-phase-items/`](pending-phase-items/README.md))  
 > **Estimated effort:** 2–4 months (iterative)  
 > **Depends on:** Phases 16–17 CSS; Phase 19 fonts strongly help  
 > **Unblocks:** marketing sites / Wikipedia-class **readable** prints (not parity)  

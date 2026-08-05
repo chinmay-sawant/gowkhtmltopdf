@@ -33,10 +33,10 @@ golden-update:
 	@echo "golden-update: implemented in Phase 3 (PDF writer)"; true
 
 # Regenerate the sample outputs in output/: one PDF per golden fixture, a
-# showcase PDF (TOC + headers/footers + outline) and a PNG from the image
-# converter. Sample files under output/ are committed as viewer smoke artifacts.
+# showcase PDF (TOC + headers/footers + outline), image PNGs, and the optional
+# live Wikipedia smoke (needs network; failure does not fail the target).
 samples:
-	# Wipe regenerable fixture samples only (keep optional URL smokes like wiki-*.pdf)
+	# Wipe regenerable fixture samples only (wiki-*.pdf is rewritten below).
 	rm -f output/fixture-*.pdf output/fixture-*.png output/showcase-*.pdf
 	# Opt-in CJK/system faces when present (fixture-27 and font-family lists).
 	FONT_FLAGS=""; \
@@ -58,6 +58,11 @@ samples:
 	go run ./cmd/gowkhtmltopdf --enable-local-file-access --outline --outline-depth 2 --header-left "gowkhtmltopdf demo - [title]" --header-right "page [page]/[topage]" --footer-center "[section]" toc testdata/golden/fixture-16-invoice-with-css.html output/showcase-toc-hf-outline.pdf
 	go run ./cmd/gowkhtmltoimage --enable-local-file-access testdata/golden/fixture-01-simple-invoice.html output/fixture-01-simple-invoice.png
 	go run ./examples/image --enable-local-file-access --width 1024 testdata/golden/fixture-21-detailed-report.html output/fixture-21-detailed-report.png
+	# Live Wikipedia smoke (network, raw — no --simplify-dom). Soft-fail so offline/CI hosts still get fixture samples.
+	go run ./cmd/gowkhtmltopdf \
+		'https://en.wikipedia.org/wiki/Ana_de_Armas' \
+		output/wiki-ana-de-armas.pdf \
+		|| echo "warning: wiki-ana-de-armas.pdf live smoke skipped (network/fetch failed)"
 	ls -la output/ | awk '{print $$5, $$9}' | tail -30
 
 clean:
