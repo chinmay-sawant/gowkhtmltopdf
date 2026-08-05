@@ -553,3 +553,78 @@ func paintFixture31(t *testing.T) (*Result, float64, *pdf.Document) {
 	}
 	return res, contentH, doc
 }
+
+func TestStickyFixture31Row28HasWhiteBackground(t *testing.T) {
+	res, contentH, _ := paintFixture31(t)
+	var row28Y float64
+	found := false
+	for _, op := range res.Ops {
+		if op.Kind == OpText && strings.Contains(op.Text, "Row 28") {
+			row28Y, found = op.Y, true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("Row 28 text missing")
+	}
+	if int(row28Y/contentH) < 1 {
+		t.Fatalf("Row 28 still on page 0 (y=%.2f)", row28Y)
+	}
+	covered := false
+	for _, op := range res.Ops {
+		if op.Kind != OpFillRect || op.H < 5 || op.H > 40 {
+			continue
+		}
+		if op.R < 0.99 || op.G < 0.99 || op.B < 0.99 {
+			continue
+		}
+		if op.Y <= row28Y+1 && op.Y+op.H >= row28Y+4 {
+			covered = true
+			break
+		}
+	}
+	if !covered {
+		t.Errorf("Row 28 at y=%.2f has no white row background", row28Y)
+	}
+}
+
+func TestStickyFixture31NoOrphanRowsOnPage1(t *testing.T) {
+	res, contentH, _ := paintFixture31(t)
+	var last0 float64
+	for _, op := range res.Ops {
+		if op.Kind != OpText || op.Fixed || int(op.Y/contentH) != 0 {
+			continue
+		}
+		if op.Y > last0 {
+			last0 = op.Y
+		}
+	}
+	if last0 == 0 {
+		t.Fatal("no page-0 text")
+	}
+	lastBot := last0 + 14
+	for i, op := range res.Ops {
+		if op.Fixed || op.StickyID != 0 || int(op.Y/contentH) != 0 {
+			continue
+		}
+		if op.Kind == OpFillRect && op.H > 0.5 && op.H <= 40 && op.Y+op.H/2 > lastBot+1 {
+			t.Errorf("op[%d] orphan row fill y=%.2f h=%.2f below last text bot %.2f",
+				i, op.Y, op.H, lastBot)
+		}
+	}
+	// Section chrome should end near last content, not the page boundary.
+	boundary := contentH
+	for i, op := range res.Ops {
+		if op.Kind != OpFillRect || op.H < 50 || int(op.Y/contentH) != 0 {
+			continue
+		}
+		if op.Y+op.H > boundary-5 {
+			t.Errorf("op[%d] section fill still reaches page bottom (bot=%.2f boundary=%.2f)",
+				i, op.Y+op.H, boundary)
+		}
+		if op.Y+op.H > lastBot+40 {
+			t.Errorf("op[%d] section fill bot=%.2f too far past last text %.2f",
+				i, op.Y+op.H, lastBot)
+		}
+	}
+}

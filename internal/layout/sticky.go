@@ -375,10 +375,17 @@ func nearSectionBorderRGB(r, g, b float64) bool {
 }
 
 // isPageLeadingBackground reports tall fill/stroke/line chrome that begins at
-// the page top — typically split remnants of a section/containing-block
-// background or border. These stay put under the sticky clone.
+// the current page top — typically split remnants of a section/containing-
+// block background or border. These stay put under the sticky clone.
+//
+// Y must be at this page's top (not merely above it): otherwise page-0 section
+// fills match when processing continuation pages and get their H grown into
+// empty page-1 bands (fixture-31 after Row 27).
 func isPageLeadingBackground(op *Op, pageTop, reserve float64) bool {
-	if op == nil || op.Y > pageTop+1 {
+	if op == nil {
+		return false
+	}
+	if op.Y < pageTop-1 || op.Y > pageTop+1 {
 		return false
 	}
 	switch op.Kind {
