@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gowkhtmltopdf vs the HTML-to-PDF landscape (2026)</title>
+<style>
+  :root {
+    --bg: #faf9f7;
+    --fg: #1a1a1a;
+    --muted: #666;
+    --border: #ddd6cc;
+    --head-bg: #2b2b2b;
+    --head-fg: #fff;
+    --us: #e8f0e6;
+    --us-border: #7ba06d;
+    --good: #1d7a3e;
+    --bad: #b42318;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.55;
+  }
+  main { max-width: 1100px; margin: 0 auto; padding: 32px 20px 64px; }
+  h1 { font-size: 1.7rem; margin-bottom: 4px; }
+  h2 { font-size: 1.25rem; margin-top: 40px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+  .sub { color: var(--muted); margin-top: 0; font-size: .95rem; }
+  .score {
+    background: #fff; border: 1px solid var(--border); border-left: 5px solid var(--us-border);
+    padding: 14px 18px; border-radius: 6px; font-size: .98rem;
+  }
+  .score strong { font-size: 1.15rem; }
+  .tablescroll { overflow-x: auto; }
+  table {
+    width: 100%; border-collapse: collapse; background: #fff;
+    border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
+    font-size: .92rem; margin: 12px 0;
+  }
+  th, td { padding: 9px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+  thead th { background: var(--head-bg); color: var(--head-fg); font-weight: 600; white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody td:first-child { font-weight: 600; white-space: nowrap; }
+  tr.us td { background: var(--us); }
+  tr.us td:first-child, tr.us th:first-child { box-shadow: inset 3px 0 0 var(--us-border); }
+  .ok { color: var(--good); }
+  .no { color: var(--bad); }
+  .foot { color: var(--muted); font-size: .85rem; margin-top: 6px; }
+  ul { padding-left: 22px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>gowkhtmltopdf vs the HTML-to-PDF landscape (2026)</h1>
+  <p class="sub">Research-backed comparison, Aug 2026. Sources: official docs, GitHub issues, published benchmarks (pdf4.dev Q3-2026, KYOTU 2023; vendor blogs flagged where self-interested). Highlighted column = gowkhtmltopdf.</p>
+
+  <h2>Score card</h2>
+  <p class="score">
+    <strong>gowkhtmltopdf: 8.0/10</strong> — perfect for its niche (deterministic reports), held back
+    by partial CSS, no JS, no PDF/A. 9/10 for controlled reports; 6/10 as a general converter.
+  </p>
+
+  <h2>Core comparison</h2>
+  <div class="tablescroll">
+  <table>
+    <thead>
+      <tr><th></th><th>gowkhtmltopdf</th><th>Puppeteer / Chromium</th><th>wkhtmltopdf</th><th>WeasyPrint</th><th>Prince XML</th></tr>
+    </thead>
+    <tbody>
+      <tr class="us">
+        <td>Architecture</td>
+        <td>Pure-Go, stdlib-only, no browser</td>
+        <td>Blink engine, full browser process</td>
+        <td>Qt WebKit, frozen ~2012</td>
+        <td>Own Python engine (Pango/HarfBuzz)</td>
+        <td>Proprietary C++ engine</td>
+      </tr>
+      <tr class="us">
+        <td>JavaScript</td>
+        <td><span class="ok"><b>None</b></span> (safe by design)</td>
+        <td>Full V8 — SPAs, charts</td>
+        <td>Old WebKit JS, unreliable</td>
+        <td><span class="ok"><b>None</b></span></td>
+        <td>Sandboxed ES6, no network</td>
+      </tr>
+      <tr class="us">
+        <td>CSS fidelity</td>
+        <td>Flex/grid <b>lite</b>, no modern CSS</td>
+        <td>Full modern CSS, broken flex/grid pagination</td>
+        <td>No grid, broken flex</td>
+        <td>Full flex, mostly grid, best free Paged Media</td>
+        <td>Deepest Paged Media + grid</td>
+      </tr>
+      <tr class="us">
+        <td>TOC / outlines</td>
+        <td><span class="ok"><b>Native both</b></span></td>
+        <td>Outlines ✓ (buggy); <b>TOC not native</b> (#1778)</td>
+        <td>Both ✓ (XSLT)</td>
+        <td>Bookmarks</td>
+        <td>Both ✓✓</td>
+      </tr>
+      <tr class="us">
+        <td>Determinism</td>
+        <td><span class="ok"><b>Byte-identical guaranteed</b></span></td>
+        <td><span class="no">✗</span> timestamps + OS fonts vary</td>
+        <td>Mostly</td>
+        <td>✓ near (<code>SOURCE_DATE_EPOCH</code>)</td>
+        <td>✓</td>
+      </tr>
+      <tr class="us">
+        <td>Security</td>
+        <td><span class="ok"><b>~zero surface</b></span> — no JS, no fetch</td>
+        <td><span class="no">--no-sandbox + JS = RCE</span>; SSRF via IMDS</td>
+        <td><span class="no"><b>CVE-2022-35583 (9.8)</b></span>, dead</td>
+        <td><span class="no">&lt;link&gt;/image fetch</span> (Lyft exploit)</td>
+        <td>XXE history</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>Operations</h2>
+  <div class="tablescroll">
+  <table>
+    <thead>
+      <tr><th></th><th>gowkhtmltopdf</th><th>Puppeteer / Chromium</th><th>wkhtmltopdf</th><th>WeasyPrint</th><th>Prince XML</th></tr>
+    </thead>
+    <tbody>
+      <tr class="us">
+        <td>Latency / PDF</td>
+        <td>ms–low s, no startup</td>
+        <td>1.8–2.5 s cold; 3–55 ms warm pooled</td>
+        <td>~0.36 s</td>
+        <td>227–629 ms cold-only</td>
+        <td>&lt;1 s</td>
+      </tr>
+      <tr class="us">
+        <td>Memory</td>
+        <td>flat, tiny process</td>
+        <td><span class="no"><b>600 MB–1.3 GB peak</b></span> at concurrency</td>
+        <td>~35 MiB</td>
+        <td>~240 MB flat</td>
+        <td>tiny</td>
+      </tr>
+      <tr class="us">
+        <td>Footprint</td>
+        <td><span class="ok"><b>14 MB static binary, zero deps</b></span></td>
+        <td>100–450 MB + ~20 libs; Docker 0.4–2.5 GB</td>
+        <td>~15 MB, rotting Qt libs</td>
+        <td>~30–50 MB + system libs</td>
+        <td>~16 MB</td>
+      </tr>
+      <tr class="us">
+        <td>PDF standards</td>
+        <td>No PDF/A</td>
+        <td>No PDF/A, forms, encryption</td>
+        <td>No</td>
+        <td><span class="ok"><b>PDF/A-1/2/3, PDF/UA, forms</b></span></td>
+        <td>Everything + signatures</td>
+      </tr>
+      <tr class="us">
+        <td>Fonts / CJK</td>
+        <td>Partial (Type0/CID, Arabic, no HarfBuzz)</td>
+        <td>Full + web fonts, OS-dependent</td>
+        <td>Poor</td>
+        <td>Good, fontconfig quirks</td>
+        <td>Best</td>
+      </tr>
+      <tr class="us">
+        <td>License</td>
+        <td><span class="ok"><b>MIT, free, active</b></span></td>
+        <td>Apache-2.0, free</td>
+        <td><span class="no">LGPL, archived 2023</span></td>
+        <td>BSD, free, active</td>
+        <td><span class="no"><b>$3,800 + $950/yr</b></span></td>
+      </tr>
+      <tr class="us">
+        <td>Score /10</td>
+        <td><span class="ok"><b>8.0</b></span></td>
+        <td>7.5</td>
+        <td><span class="no">3.0</span></td>
+        <td>7.5</td>
+        <td>9.0 (at price)</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>When to choose</h2>
+  <div class="tablescroll">
+  <table>
+    <thead>
+      <tr><th>Tool</th><th>Choose when…</th></tr>
+    </thead>
+    <tbody>
+      <tr class="us">
+        <td><b>gowkhtmltopdf</b></td>
+        <td>Server-generated reports (invoices, tables, statements) needing <b>deterministic bytes, tiny offline binary, zero security surface</b> — or migrating off wkhtmltopdf</td>
+      </tr>
+      <tr>
+        <td><b>Puppeteer / Chromium</b></td>
+        <td>Templates need <b>modern CSS/JS</b> (charts, SPAs, arbitrary sites) and you can afford browser ops + 100–500× resources</td>
+      </tr>
+      <tr>
+        <td><b>wkhtmltopdf</b></td>
+        <td><span class="no"><b>Never</b></span> — archived, unpatched 9.8 CVE</td>
+      </tr>
+      <tr>
+        <td><b>WeasyPrint</b></td>
+        <td><b>PDF/A, PDF/UA, e-invoice (Factur-X)</b> compliance on a free budget</td>
+      </tr>
+      <tr>
+        <td><b>Prince XML</b></td>
+        <td>Enterprise compliance (PDF/A+X, forms, signatures) with budget, keeping HTML/CSS input</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>Related docs</h2>
+  <ul>
+    <li><a href="../overview.md">Overview</a></li>
+    <li><a href="../compatibility-matrix.md">Compatibility matrix</a></li>
+    <li><a href="sebastiaanklippert-go-wkhtmltopdf.md">Comparison: gowkhtmltopdf vs SebastiaanKlippert/go-wkhtmltopdf</a></li>
+    <li><a href="../integration-security.md">Integration and security</a></li>
+    <li><a href="../THREAT-MODEL.md">Threat model</a></li>
+  </ul>
+
+  <p class="foot">This HTML page is a styled mirror of <code>landscape-2026.md</code> in the same directory.</p>
+</main>
+</body>
+</html>
