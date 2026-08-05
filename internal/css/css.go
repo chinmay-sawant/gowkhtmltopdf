@@ -58,10 +58,12 @@ type SelectorPart struct {
 	Combinator string
 }
 
-// AttrSelector is [name] or [name=value] (exact match).
+// AttrSelector is [name], [name=value] (exact), [name~=word] (space-separated
+// word), or [name*=substr] (substring). Other CSS attribute operators are not
+// implemented yet.
 type AttrSelector struct {
 	Name  string
-	Op    string // "" presence, "=" exact
+	Op    string // "", "=", "~=", "*="
 	Value string
 }
 
@@ -776,7 +778,7 @@ func parseCompoundCtx(s string, insideHas bool) (SelectorPart, bool) {
 }
 
 func parseAttrSelector(s string) (AttrSelector, bool) {
-	// s includes brackets: [href] or [href="x"] or [href=x]
+	// s includes brackets: [href], [href="x"], [typeof~='mw:File/Thumb'], [class*="noprint"]
 	if len(s) < 3 || s[0] != '[' || s[len(s)-1] != ']' {
 		return AttrSelector{}, false
 	}
@@ -784,15 +786,30 @@ func parseAttrSelector(s string) (AttrSelector, bool) {
 	if inner == "" {
 		return AttrSelector{}, false
 	}
-	eq := strings.IndexByte(inner, '=')
-	if eq < 0 {
+	// Operator forms: ~= *= ^= $= |= =  (check multi-char before bare =)
+	op := ""
+	nameEnd := -1
+	for _, cand := range []string{"~=", "*=", "^=", "$=", "|="} {
+		if i := strings.Index(inner, cand); i > 0 {
+			nameEnd = i
+			op = cand
+			break
+		}
+	}
+	if nameEnd < 0 {
+		if i := strings.IndexByte(inner, '='); i >= 0 {
+			nameEnd = i
+			op = "="
+		}
+	}
+	if nameEnd < 0 {
 		if !validIdent(inner) {
 			return AttrSelector{}, false
 		}
 		return AttrSelector{Name: strings.ToLower(inner)}, true
 	}
-	name := strings.TrimSpace(inner[:eq])
-	val := strings.TrimSpace(inner[eq+1:])
+	name := strings.TrimSpace(inner[:nameEnd])
+	val := strings.TrimSpace(inner[nameEnd+len(op):])
 	if !validIdent(name) {
 		return AttrSelector{}, false
 	}
@@ -801,7 +818,14 @@ func parseAttrSelector(s string) (AttrSelector, bool) {
 			val = val[1 : len(val)-1]
 		}
 	}
-	return AttrSelector{Name: strings.ToLower(name), Op: "=", Value: val}, true
+	switch op {
+	case "=", "~=", "*=":
+		return AttrSelector{Name: strings.ToLower(name), Op: op, Value: val}, true
+	default:
+		// ^= $= |= recognized so the selector is skipped cleanly by the caller
+		// when we return false — avoid treating "typeof^" as an ident.
+		return AttrSelector{}, false
+	}
 }
 
 // validIdent reports whether s is a valid CSS identifier (letters, digits,
@@ -909,7 +933,33 @@ func matchPart(p SelectorPart, n *html.Node) bool {
 			}
 			continue
 		}
-		if !ok || val != a.Value {
+		if !ok {
+			return false
+		}
+		switch a.Op {
+		case "=":
+			if val != a.Value {
+				return false
+			}
+		case "~=":
+			if a.Value == "" || strings.Contains(a.Value, " ") {
+				return false
+			}
+			found := false
+			for _, w := range strings.Fields(val) {
+				if w == a.Value {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return false
+			}
+		case "*=":
+			if a.Value == "" || !strings.Contains(val, a.Value) {
+				return false
+			}
+		default:
 			return false
 		}
 	}

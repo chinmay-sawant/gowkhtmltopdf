@@ -284,6 +284,8 @@ func TestMatch(t *testing.T) {
 		{"[id]", second, true},
 		{"[id=second]", second, true},
 		{"[id=nope]", second, false},
+		{"[id*=eco]", second, true},
+		{"[id*=zzz]", second, false},
 		{"p:first-child", note, true},
 		{"p:first-child", plain, false},
 		{"p:last-child", plain, false}, // last element child of div is span
@@ -362,6 +364,38 @@ func TestLinkVisitedPseudos(t *testing.T) {
 	}
 	if bl < 1 {
 		t.Fatalf("a:link b-specificity = %d, want >= 1", bl)
+	}
+}
+
+func TestAttrWordAndSubstring(t *testing.T) {
+	root := treeFor(t, `<html><body>
+		<figure typeof="mw:File/Thumb mw:Image" id="f1"></figure>
+		<figure typeof="mw:File/Frame" id="f2"></figure>
+	</body></html>`)
+	body := root.FirstChild("html").FirstChild("body")
+	f1 := body.FirstChild("figure")
+	f2 := f1
+	for _, c := range body.Children {
+		if c.Type == html.ElementNode && c.Attribute("id") == "f2" {
+			f2 = c
+		}
+	}
+	sel, ok := parseSelector(`figure[typeof~="mw:File/Thumb"]`)
+	if !ok {
+		t.Fatal("parse ~=")
+	}
+	if !Match(sel, f1) {
+		t.Error("f1 should match typeof~=mw:File/Thumb")
+	}
+	if Match(sel, f2) {
+		t.Error("f2 Frame should not match Thumb word")
+	}
+	sel2, ok := parseSelector(`figure[typeof*="File/Fr"]`)
+	if !ok {
+		t.Fatal("parse *=")
+	}
+	if !Match(sel2, f2) {
+		t.Error("f2 should match typeof*=File/Fr")
 	}
 }
 
