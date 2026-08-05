@@ -1064,7 +1064,10 @@ func (e *engine) buildImage(n *html.Node, st ResolvedStyle, x, y float64) *box {
 			}
 		}
 	}
-	if e.imgMaxW > 0 && (maxW < 0 || e.imgMaxW < maxW) {
+	// imgMaxW caps auto-sized images inside floats/narrow BFCs. A definite
+	// CSS width (wiki wordmark 8.75em) must win — otherwise header logos
+	// collapse to a few points beside the globe icon.
+	if st.Width < 0 && e.imgMaxW > 0 && (maxW < 0 || e.imgMaxW < maxW) {
 		maxW = e.imgMaxW
 	}
 	if maxW >= 0 && b.w > maxW && b.w > 0 {
@@ -1545,11 +1548,152 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 	}
 	e.emitBorders(st, x, y, tb.w, tb.h)
 
+	collapse := st.BorderCollapse == "collapse"
 	// emit cell content and boxes now that positions are final
 	for _, cell := range tb.children {
-		e.emitCell(cell)
+		e.emitCell(cell, collapse)
+	}
+	if collapse {
+		e.emitCollapsedGrid(tb, x, y, padL, spacing, colW, rowTops, rowHeights)
 	}
 	return tb
+}
+
+// emitCollapsedGrid strokes a single shared border grid for border-collapse
+// tables. Per-cell borders leave gaps at rowspan holes and double strokes on
+// shared edges; one grid from final geometry stays continuous.
+func (e *engine) emitCollapsedGrid(tb *box, x, y, padL, spacing float64, colW, rowTops, rowHeights []float64) {
+	if len(rowTops) == 0 || len(colW) == 0 {
+		return
+	}
+	bw := 0.5
+	var r, g, b float64
+	for _, cell := range tb.children {
+		st := cell.style
+		sides := []struct {
+			w     float64
+			style string
+			c     [3]float64
+		}{
+			{e.scalePt(st.BorderTop.Width), st.BorderTop.Style, st.BorderTop.Color},
+			{e.scalePt(st.BorderLeft.Width), st.BorderLeft.Style, st.BorderLeft.Color},
+		}
+		for _, side := range sides {
+			if side.w > 0 && side.style != "none" {
+				bw = side.w
+				r, g, b = side.c[0], side.c[1], side.c[2]
+				break
+			}
+		}
+		if bw != 0.5 || r+g+b > 0 {
+			break
+		}
+	}
+	nCols := len(colW)
+	nRows := len(rowHeights)
+	left := x + padL
+	xs := make([]float64, nCols+1)
+	xs[0] = left
+	for i := 0; i < nCols; i++ {
+		xs[i+1] = xs[i] + colW[i]
+		if i+1 < nCols {
+			xs[i+1] += spacing
+		}
+	}
+	right := xs[nCols]
+	ys := make([]float64, nRows+1)
+	for i := 0; i < nRows; i++ {
+		ys[i] = rowTops[i]
+	}
+	ys[nRows] = rowTops[nRows-1] + rowHeights[nRows-1]
+
+	hline := func(x0, x1, yy float64) {
+		e.add(Op{Kind: OpLine, X: x0, Y: yy, W: x1 - x0, H: 0, Width: bw, R: r, G: g, B: b})
+	}
+	vline := func(xx, y0, y1 float64) {
+		e.add(Op{Kind: OpLine, X: xx, Y: y0, W: 0, H: y1 - y0, Width: bw, R: r, G: g, B: b})
+	}
+
+	// Horizontal rules — skip segments covered by a rowspan continuing through
+	// this boundary.
+	for ri := 0; ri <= nRows; ri++ {
+		yy := ys[ri]
+		for ci := 0; ci < nCols; ci++ {
+			if ri > 0 && ri < nRows && rowspanCovers(tb, ri-1, ri, ci) {
+				continue
+			}
+			hline(xs[ci], xs[ci+1], yy)
+		}
+	}
+	// Vertical rules — skip segments covered by a colspan.
+	for ci := 0; ci <= nCols; ci++ {
+		xx := xs[ci]
+		for ri := 0; ri < nRows; ri++ {
+			if ci > 0 && ci < nCols && colspanCovers(tb, ri, ci-1, ci) {
+				continue
+			}
+			vline(xx, ys[ri], ys[ri+1])
+		}
+	}
+	_ = right
+	_ = y
+}
+
+// rowspanCovers reports whether some cell occupies column ci across the
+// boundary between row above and row below (so the horizontal rule is omitted).
+func rowspanCovers(tb *box, above, below, ci int) bool {
+	for _, cell := range tb.children {
+		if cell.rowSpan <= 1 {
+			continue
+		}
+		start := cellStartRow(tb, cell)
+		if start < 0 {
+			continue
+		}
+		if start <= above && start+cell.rowSpan > below &&
+			cell.col <= ci && cell.col+cell.span > ci {
+			return true
+		}
+	}
+	return false
+}
+
+func colspanCovers(tb *box, ri, leftCol, rightCol int) bool {
+	if ri < 0 || ri >= len(tb.rows) {
+		return false
+	}
+	for _, cell := range tb.rows[ri] {
+		if cell.span > 1 && cell.col <= leftCol && cell.col+cell.span > rightCol {
+			return true
+		}
+	}
+	// Rowspan continuation rows have no local cell — find covering cell.
+	for _, cell := range tb.children {
+		start := cellStartRow(tb, cell)
+		if start < 0 {
+			continue
+		}
+		rs := cell.rowSpan
+		if rs < 1 {
+			rs = 1
+		}
+		if start <= ri && start+rs > ri &&
+			cell.span > 1 && cell.col <= leftCol && cell.col+cell.span > rightCol {
+			return true
+		}
+	}
+	return false
+}
+
+func cellStartRow(tb *box, cell *box) int {
+	for ri, cells := range tb.rows {
+		for _, c := range cells {
+			if c == cell {
+				return ri
+			}
+		}
+	}
+	return -1
 }
 
 // buildCell measures a table cell's min/max-content width (no ops emitted).
@@ -1593,7 +1737,9 @@ func (e *engine) cellBG(b *box) (r, g, bl, a float64, ok bool) {
 }
 
 // emitCell paints a placed cell's background, borders and content.
-func (e *engine) emitCell(b *box) {
+// skipBorders is set for border-collapse tables whose grid is stroked once
+// by the parent table (avoids doubled/gapped per-cell edges).
+func (e *engine) emitCell(b *box, skipBorders bool) {
 	st := b.style
 	start := len(e.ops)
 	if e.opts.Background {
@@ -1602,7 +1748,9 @@ func (e *engine) emitCell(b *box) {
 				R: r, G: g, B: bl, Alpha: a})
 		}
 	}
-	e.emitBorders(st, b.x, b.y, b.w, b.h)
+	if !skipBorders {
+		e.emitBorders(st, b.x, b.y, b.w, b.h)
+	}
 	contentW := b.w - e.scalePt(st.PaddingLeft) - e.scalePt(st.PaddingRight) - e.scalePt(st.BorderLeft.Width) - e.scalePt(st.BorderRight.Width)
 	if contentW < 0 {
 		contentW = 0

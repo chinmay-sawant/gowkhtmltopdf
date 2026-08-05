@@ -54,6 +54,25 @@ func (e *engine) buildMulticol(n *html.Node, st ResolvedStyle, availW, x, y floa
 	cy := e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)
 	gap := e.multicolGap(st)
 	nCols, colW := usedColumnCountWidth(contentW, gap, st.ColumnWidth, st.ColumnCount)
+	// One column: use ordinary block flow. The multicol line/page snap path
+	// otherwise reserves a tall empty band before a single wide child
+	// (wiki reflist with column-width:30em on a narrow page).
+	if nCols <= 1 {
+		cy = e.flowChildren(b, n.Children, st, contentW, contentX, y, cy)
+		cy += e.scalePt(st.PaddingBottom)
+		if h, ok := resolveUsedHeight(st, -1, e); ok && cy < h {
+			cy = h
+		}
+		if st.MinHeight > 0 && cy < e.scalePt(st.MinHeight) {
+			cy = e.scalePt(st.MinHeight)
+		}
+		if st.MaxHeight >= 0 && cy > e.scalePt(st.MaxHeight) {
+			cy = e.scalePt(st.MaxHeight)
+		}
+		b.h = cy
+		e.prependChrome(contentStart, st, b.x, y, b.w, b.h)
+		return b
+	}
 
 	var kids []*html.Node
 	for _, c := range n.Children {

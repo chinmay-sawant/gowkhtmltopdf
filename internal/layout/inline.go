@@ -55,7 +55,6 @@ func (e *engine) layoutInlineFloats(b *box, nodes []*html.Node, availW, x, y flo
 	for i < len(items) {
 		lineX, lineW := x, availW
 		if floats != nil {
-			// y is canvas origin of the inline formatting context; ly is absolute.
 			lineX, lineW = floats.exclusion(0, ly)
 		}
 		if lineW < 0 {
@@ -70,8 +69,28 @@ func (e *engine) layoutInlineFloats(b *box, nodes []*html.Node, availW, x, y flo
 				break
 			}
 			adv := it.marginL + it.w + it.marginR
-			if lineAdv > 0 && lineAdv+adv > lineW && !nowrap(it.style.WhiteSpace) {
+			// Always wrap to the next line when the next item does not fit.
+			// white-space:nowrap must not glue an unbreakable span onto a line
+			// that already has content and overflow into a float (wiki .IPA).
+			if lineAdv > 0 && lineAdv+adv > lineW {
 				break
+			}
+			// Empty line beside a float too narrow for this item: CSS2.1 §9.5
+			// pushes the line box below the float and recomputes width.
+			if lineAdv == 0 && adv > lineW && floats != nil && lineW < availW-0.5 {
+				if next := floats.clearY(ly); next > ly+0.5 {
+					ly = next
+					lineX, lineW = floats.exclusion(0, ly)
+					if lineW < 0 {
+						lineW = 0
+					}
+					// Retry this item at the new Y (do not advance i).
+					if adv > lineW && lineW < availW-0.5 {
+						// Still too narrow (e.g. both sides floated) — emit anyway.
+					} else {
+						continue
+					}
+				}
 			}
 			lineAdv += adv
 			i++
@@ -94,8 +113,6 @@ func (e *engine) layoutInlineFloats(b *box, nodes []*html.Node, availW, x, y flo
 	}
 	return ly - y
 }
-
-func nowrap(ws string) bool { return ws == "nowrap" }
 
 // emitLine renders items[start:end) as one line and returns its height.
 // lastLine is true for the final line of the inline formatting context (used
@@ -241,18 +258,27 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 		}
 		c := it.style.Color
 		size := it.style.FontSize * e.scale
+		as := e.fontAscent(size)
+		de := e.fontDescent(size)
+		if as+de < size*0.5 {
+			// Fallback when font metrics are missing — keep hit targets usable.
+			as = size * 0.8
+			de = size * 0.2
+		}
 		for _, run := range e.splitTextByFace(it.text, it.style) {
 			e.add(Op{Kind: OpText, X: lx, Y: baseline, W: run.w, H: it.h,
 				Text: run.text, Font: run.face, Size: size, Bold: it.style.FontWeight >= 700,
 				R: c[0], G: c[1], B: c[2]})
 			if it.style.TextDecoration == "underline" || (it.href != "" && it.style.TextDecoration != "line-through") {
-				e.add(Op{Kind: OpLine, X: lx, Y: baseline + it.descent*0.25, W: run.w, H: 0, R: c[0], G: c[1], B: c[2]})
+				// Sit clearly below glyph descenders (~1–2mm visual gap).
+				uy := baseline + de + size*0.22
+				e.add(Op{Kind: OpLine, X: lx, Y: uy, W: run.w, H: 0, R: c[0], G: c[1], B: c[2]})
 			}
 			if it.style.TextDecoration == "line-through" {
-				e.add(Op{Kind: OpLine, X: lx, Y: baseline - it.ascent*0.3, W: run.w, H: 0, R: c[0], G: c[1], B: c[2]})
+				e.add(Op{Kind: OpLine, X: lx, Y: baseline - as*0.3, W: run.w, H: 0, R: c[0], G: c[1], B: c[2]})
 			}
 			if it.href != "" {
-				e.add(Op{Kind: OpLinkURI, X: lx, Y: baseline - it.ascent, W: run.w, H: it.ascent + it.descent, URI: it.href})
+				e.add(Op{Kind: OpLinkURI, X: lx, Y: baseline - as, W: run.w, H: as + de, URI: it.href})
 			}
 			lx += run.w
 		}

@@ -13,12 +13,17 @@ import (
 	"image/png"
 	"io"
 	"math"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
 
 // Rasterize decodes SVG XML into a PNG image. maxSide caps the longer edge
-// in pixels (default 512).
+// in pixels (default 512). Uses the built-in rasterizer; falls back to
+// ImageMagick when the SVG needs gradients/filters or the builtin result is
+// empty (complex wiki logos).
 func Rasterize(data []byte, maxSide int) (pngBytes []byte, w, h int, err error) {
 	if maxSide <= 0 {
 		maxSide = 512
@@ -26,6 +31,87 @@ func Rasterize(data []byte, maxSide int) (pngBytes []byte, w, h int, err error) 
 	if !looksLikeSVG(data) {
 		return nil, 0, 0, fmt.Errorf("svg: not SVG")
 	}
+	pngBytes, w, h, err = rasterizeBuiltin(data, maxSide)
+	if err != nil {
+		pngBytes, w, h = nil, 0, 0
+	}
+	needRich := svgNeedsRichRaster(data)
+	empty := err != nil || pngNonzero(pngBytes) < 20
+	if needRich || empty {
+		if im, iw, ih, imErr := rasterizeImageMagick(data, maxSide); imErr == nil {
+			if pngNonzero(im) > pngNonzero(pngBytes) {
+				return im, iw, ih, nil
+			}
+		}
+	}
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	return pngBytes, w, h, nil
+}
+
+func svgNeedsRichRaster(data []byte) bool {
+	s := strings.ToLower(string(data))
+	return strings.Contains(s, "lineargradient") ||
+		strings.Contains(s, "radialgradient") ||
+		strings.Contains(s, "filter=") ||
+		strings.Contains(s, "fill=\"url(") ||
+		strings.Contains(s, "fill='url(")
+}
+
+func pngNonzero(pngBytes []byte) int {
+	if len(pngBytes) == 0 {
+		return 0
+	}
+	img, err := png.Decode(bytes.NewReader(pngBytes))
+	if err != nil {
+		return 0
+	}
+	n := 0
+	b := img.Bounds()
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		for x := b.Min.X; x < b.Max.X; x++ {
+			_, _, _, a := img.At(x, y).RGBA()
+			if a > 0 {
+				n++
+			}
+		}
+	}
+	return n
+}
+
+func rasterizeImageMagick(data []byte, maxSide int) ([]byte, int, int, error) {
+	convert, err := exec.LookPath("convert")
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	dir, err := os.MkdirTemp("", "gowk-svg-*")
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	defer os.RemoveAll(dir)
+	in := filepath.Join(dir, "in.svg")
+	out := filepath.Join(dir, "out.png")
+	if err := os.WriteFile(in, data, 0o600); err != nil {
+		return nil, 0, 0, err
+	}
+	cmd := exec.Command(convert, "-background", "none",
+		in, "-resize", fmt.Sprintf("%dx%d>", maxSide, maxSide), out)
+	if outBytes, err := cmd.CombinedOutput(); err != nil {
+		return nil, 0, 0, fmt.Errorf("convert: %v (%s)", err, bytes.TrimSpace(outBytes))
+	}
+	pngBytes, err := os.ReadFile(out)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	cfg, err := png.DecodeConfig(bytes.NewReader(pngBytes))
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	return pngBytes, cfg.Width, cfg.Height, nil
+}
+
+func rasterizeBuiltin(data []byte, maxSide int) (pngBytes []byte, w, h int, err error) {
 	root, err := parseSVG(data)
 	if err != nil {
 		return nil, 0, 0, err
@@ -53,7 +139,6 @@ func Rasterize(data []byte, maxSide int) (pngBytes []byte, w, h int, err error) 
 		ph = 1
 	}
 	img := image.NewRGBA(image.Rect(0, 0, pw, ph))
-	// Transparent background.
 	for i := range img.Pix {
 		img.Pix[i] = 0
 	}
@@ -101,10 +186,34 @@ func parseSVG(data []byte) (*svgRoot, error) {
 	dec.AutoClose = xml.HTMLAutoClose
 	dec.Entity = xml.HTMLEntity
 	root := &svgRoot{}
-	var fillDef color.RGBA
-	var strokeDef color.RGBA
-	fillDefSet, strokeDefSet := false, false
-	strokeWDef := 1.0
+	type frame struct {
+		fill, stroke       color.RGBA
+		fillSet, strokeSet bool
+		strokeW            float64
+	}
+	stack := []frame{{strokeW: 1}}
+	pushPaint := func(attrs map[string]string) {
+		f := stack[len(stack)-1]
+		if c, ok := parsePaint(attrs["fill"]); ok {
+			if strings.EqualFold(attrs["fill"], "none") {
+				f.fillSet = false
+				f.fill = color.RGBA{}
+			} else {
+				f.fill, f.fillSet = c, true
+			}
+		}
+		if c, ok := parsePaint(attrs["stroke"]); ok {
+			if strings.EqualFold(attrs["stroke"], "none") {
+				f.strokeSet = false
+			} else {
+				f.stroke, f.strokeSet = c, true
+			}
+		}
+		if attrs["stroke-width"] != "" {
+			f.strokeW = parseLen(attrs["stroke-width"], 1)
+		}
+		stack = append(stack, f)
+	}
 	for {
 		tok, err := dec.Token()
 		if err == io.EOF {
@@ -113,71 +222,76 @@ func parseSVG(data []byte) (*svgRoot, error) {
 		if err != nil {
 			return nil, err
 		}
-		se, ok := tok.(xml.StartElement)
-		if !ok {
-			continue
-		}
-		name := strings.ToLower(se.Name.Local)
-		attrs := attrMap(se.Attr)
-		switch name {
-		case "svg":
-			root.width = parseLen(attrs["width"], 0)
-			root.height = parseLen(attrs["height"], 0)
-			if vb := attrs["viewbox"]; vb != "" {
-				parts := splitNums(vb)
-				if len(parts) >= 4 {
-					root.vbX, root.vbY, root.vbW, root.vbH = parts[0], parts[1], parts[2], parts[3]
-				}
-			}
-			if root.vbW == 0 && root.width > 0 {
-				root.vbW = root.width
-			}
-			if root.vbH == 0 && root.height > 0 {
-				root.vbH = root.height
-			}
-			if c, ok := parsePaint(attrs["fill"]); ok {
-				fillDef, fillDefSet = c, true
-			}
-			if c, ok := parsePaint(attrs["stroke"]); ok {
-				strokeDef, strokeDefSet = c, true
-			}
-			if attrs["stroke-width"] != "" {
-				strokeWDef = parseLen(attrs["stroke-width"], 1)
-			}
-		case "rect", "circle", "ellipse", "line", "polyline", "polygon", "path":
-			sh := shape{kind: name, strokeW: strokeWDef, fill: fillDef, stroke: strokeDef, fillSet: fillDefSet, strokeSet: strokeDefSet}
-			applyPaint(&sh, attrs)
+		switch el := tok.(type) {
+		case xml.StartElement:
+			name := strings.ToLower(el.Name.Local)
+			attrs := attrMap(el.Attr)
+			cur := stack[len(stack)-1]
 			switch name {
-			case "rect":
-				sh.x = parseLen(attrs["x"], 0)
-				sh.y = parseLen(attrs["y"], 0)
-				sh.w = parseLen(attrs["width"], 0)
-				sh.h = parseLen(attrs["height"], 0)
-				sh.rx = parseLen(attrs["rx"], 0)
-				sh.ry = parseLen(attrs["ry"], sh.rx)
-			case "circle":
-				sh.x = parseLen(attrs["cx"], 0)
-				sh.y = parseLen(attrs["cy"], 0)
-				sh.r = parseLen(attrs["r"], 0)
-			case "ellipse":
-				sh.x = parseLen(attrs["cx"], 0)
-				sh.y = parseLen(attrs["cy"], 0)
-				sh.rx = parseLen(attrs["rx"], 0)
-				sh.ry = parseLen(attrs["ry"], 0)
-			case "line":
-				sh.x1 = parseLen(attrs["x1"], 0)
-				sh.y1 = parseLen(attrs["y1"], 0)
-				sh.x2 = parseLen(attrs["x2"], 0)
-				sh.y2 = parseLen(attrs["y2"], 0)
-			case "polyline", "polygon":
-				sh.points = splitNums(attrs["points"])
-			case "path":
-				sh.d = attrs["d"]
+			case "svg":
+				root.width = parseLen(attrs["width"], 0)
+				root.height = parseLen(attrs["height"], 0)
+				if vb := attrs["viewbox"]; vb != "" {
+					parts := splitNums(vb)
+					if len(parts) >= 4 {
+						root.vbX, root.vbY, root.vbW, root.vbH = parts[0], parts[1], parts[2], parts[3]
+					}
+				}
+				if root.vbW == 0 && root.width > 0 {
+					root.vbW = root.width
+				}
+				if root.vbH == 0 && root.height > 0 {
+					root.vbH = root.height
+				}
+				pushPaint(attrs)
+			case "g":
+				pushPaint(attrs)
+			case "defs", "clippath", "mask", "symbol", "lineargradient", "radialgradient", "filter", "title", "desc", "metadata":
+				// Non-rendered definitions — must not paint clipPath rects as shapes
+				// (wiki wordmark's white M0 0h140v22 rect lives in clipPath).
+				_ = dec.Skip()
+			case "rect", "circle", "ellipse", "line", "polyline", "polygon", "path":
+				sh := shape{
+					kind: name, strokeW: cur.strokeW,
+					fill: cur.fill, stroke: cur.stroke,
+					fillSet: cur.fillSet, strokeSet: cur.strokeSet,
+				}
+				applyPaint(&sh, attrs)
+				switch name {
+				case "rect":
+					sh.x = parseLen(attrs["x"], 0)
+					sh.y = parseLen(attrs["y"], 0)
+					sh.w = parseLen(attrs["width"], 0)
+					sh.h = parseLen(attrs["height"], 0)
+					sh.rx = parseLen(attrs["rx"], 0)
+					sh.ry = parseLen(attrs["ry"], sh.rx)
+				case "circle":
+					sh.x = parseLen(attrs["cx"], 0)
+					sh.y = parseLen(attrs["cy"], 0)
+					sh.r = parseLen(attrs["r"], 0)
+				case "ellipse":
+					sh.x = parseLen(attrs["cx"], 0)
+					sh.y = parseLen(attrs["cy"], 0)
+					sh.rx = parseLen(attrs["rx"], 0)
+					sh.ry = parseLen(attrs["ry"], 0)
+				case "line":
+					sh.x1 = parseLen(attrs["x1"], 0)
+					sh.y1 = parseLen(attrs["y1"], 0)
+					sh.x2 = parseLen(attrs["x2"], 0)
+					sh.y2 = parseLen(attrs["y2"], 0)
+				case "polyline", "polygon":
+					sh.points = splitNums(attrs["points"])
+				case "path":
+					sh.d = attrs["d"]
+				}
+				root.shapes = append(root.shapes, sh)
+				_ = dec.Skip()
 			}
-			root.shapes = append(root.shapes, sh)
-			_ = dec.Skip()
-		default:
-			// skip unknown elements' content when empty; nested graphics ignored for v1
+		case xml.EndElement:
+			name := strings.ToLower(el.Name.Local)
+			if (name == "g" || name == "svg") && len(stack) > 1 {
+				stack = stack[:len(stack)-1]
+			}
 		}
 	}
 	return root, nil
@@ -530,21 +644,25 @@ func abs(x int) int {
 	return x
 }
 
-// pathToPolyline approximates a path into line segments (M/L/H/V/Z/C/c/Q/q).
+// pathToPolyline approximates a path into line segments
+// (M/L/H/V/Z/C/c/S/s/Q/q/T/t/A/a).
 func pathToPolyline(d string) [][2]float64 {
 	toks := tokenizePath(d)
 	var pts [][2]float64
 	var cx, cy, sx, sy float64
+	var lastCX, lastCY float64 // last cubic/quad control for S/T
+	var lastWasCubic, lastWasQuad bool
 	i := 0
 	cmd := byte(0)
 	for i < len(toks) {
 		t := toks[i]
-		if len(t) == 1 && strings.ContainsAny(t, "MmLlHhVvZzCcQq") {
+		if len(t) == 1 && strings.ContainsAny(t, "MmLlHhVvZzCcSsQqTtAa") {
 			cmd = t[0]
 			i++
 			if cmd == 'Z' || cmd == 'z' {
 				cx, cy = sx, sy
 				pts = append(pts, [2]float64{cx, cy})
+				lastWasCubic, lastWasQuad = false, false
 				continue
 			}
 		}
@@ -561,6 +679,7 @@ func pathToPolyline(d string) [][2]float64 {
 			}
 			cx, cy, sx, sy = x, y, x, y
 			pts = append(pts, [2]float64{x, y})
+			lastWasCubic, lastWasQuad = false, false
 			if cmd == 'M' {
 				cmd = 'L'
 			} else {
@@ -578,6 +697,7 @@ func pathToPolyline(d string) [][2]float64 {
 			}
 			cx, cy = x, y
 			pts = append(pts, [2]float64{x, y})
+			lastWasCubic, lastWasQuad = false, false
 		case 'H', 'h':
 			if i >= len(toks) {
 				return pts
@@ -589,6 +709,7 @@ func pathToPolyline(d string) [][2]float64 {
 			}
 			cx = x
 			pts = append(pts, [2]float64{cx, cy})
+			lastWasCubic, lastWasQuad = false, false
 		case 'V', 'v':
 			if i >= len(toks) {
 				return pts
@@ -600,6 +721,7 @@ func pathToPolyline(d string) [][2]float64 {
 			}
 			cy = y
 			pts = append(pts, [2]float64{cx, cy})
+			lastWasCubic, lastWasQuad = false, false
 		case 'C', 'c':
 			if i+5 >= len(toks) {
 				return pts
@@ -621,7 +743,35 @@ func pathToPolyline(d string) [][2]float64 {
 				bx, by := cubic(cx, cy, x1, y1, x2, y2, x, y, tt)
 				pts = append(pts, [2]float64{bx, by})
 			}
+			lastCX, lastCY = x2, y2
 			cx, cy = x, y
+			lastWasCubic, lastWasQuad = true, false
+		case 'S', 's':
+			if i+3 >= len(toks) {
+				return pts
+			}
+			x2, y2 := num(toks[i]), num(toks[i+1])
+			x, y := num(toks[i+2]), num(toks[i+3])
+			i += 4
+			if cmd == 's' {
+				x2 += cx
+				y2 += cy
+				x += cx
+				y += cy
+			}
+			x1, y1 := cx, cy
+			if lastWasCubic {
+				x1 = 2*cx - lastCX
+				y1 = 2*cy - lastCY
+			}
+			for step := 1; step <= 8; step++ {
+				tt := float64(step) / 8
+				bx, by := cubic(cx, cy, x1, y1, x2, y2, x, y, tt)
+				pts = append(pts, [2]float64{bx, by})
+			}
+			lastCX, lastCY = x2, y2
+			cx, cy = x, y
+			lastWasCubic, lastWasQuad = true, false
 		case 'Q', 'q':
 			if i+3 >= len(toks) {
 				return pts
@@ -641,12 +791,129 @@ func pathToPolyline(d string) [][2]float64 {
 				by := (1-tt)*(1-tt)*cy + 2*(1-tt)*tt*y1 + tt*tt*y
 				pts = append(pts, [2]float64{bx, by})
 			}
+			lastCX, lastCY = x1, y1
 			cx, cy = x, y
+			lastWasCubic, lastWasQuad = false, true
+		case 'T', 't':
+			if i+1 >= len(toks) {
+				return pts
+			}
+			x, y := num(toks[i]), num(toks[i+1])
+			i += 2
+			if cmd == 't' {
+				x += cx
+				y += cy
+			}
+			x1, y1 := cx, cy
+			if lastWasQuad {
+				x1 = 2*cx - lastCX
+				y1 = 2*cy - lastCY
+			}
+			for step := 1; step <= 8; step++ {
+				tt := float64(step) / 8
+				bx := (1-tt)*(1-tt)*cx + 2*(1-tt)*tt*x1 + tt*tt*x
+				by := (1-tt)*(1-tt)*cy + 2*(1-tt)*tt*y1 + tt*tt*y
+				pts = append(pts, [2]float64{bx, by})
+			}
+			lastCX, lastCY = x1, y1
+			cx, cy = x, y
+			lastWasCubic, lastWasQuad = false, true
+		case 'A', 'a':
+			// rx ry x-axis-rotation large-arc sweep x y
+			if i+6 >= len(toks) {
+				return pts
+			}
+			rx, ry := math.Abs(num(toks[i])), math.Abs(num(toks[i+1]))
+			phi := num(toks[i+2]) * math.Pi / 180
+			large := num(toks[i+3]) != 0
+			sweep := num(toks[i+4]) != 0
+			x, y := num(toks[i+5]), num(toks[i+6])
+			i += 7
+			if cmd == 'a' {
+				x += cx
+				y += cy
+			}
+			for _, p := range arcToPoints(cx, cy, rx, ry, phi, large, sweep, x, y) {
+				pts = append(pts, p)
+			}
+			cx, cy = x, y
+			lastWasCubic, lastWasQuad = false, false
 		default:
 			i++
 		}
 	}
 	return pts
+}
+
+// arcToPoints converts an SVG elliptical arc into line segments (SVG F.6).
+func arcToPoints(x1, y1, rx, ry, phi float64, large, sweep bool, x2, y2 float64) [][2]float64 {
+	if rx == 0 || ry == 0 || (x1 == x2 && y1 == y2) {
+		return [][2]float64{{x2, y2}}
+	}
+	cosPhi, sinPhi := math.Cos(phi), math.Sin(phi)
+	dx := (x1 - x2) / 2
+	dy := (y1 - y2) / 2
+	x1p := cosPhi*dx + sinPhi*dy
+	y1p := -sinPhi*dx + cosPhi*dy
+	// Ensure radii are large enough.
+	lam := (x1p*x1p)/(rx*rx) + (y1p*y1p)/(ry*ry)
+	if lam > 1 {
+		s := math.Sqrt(lam)
+		rx *= s
+		ry *= s
+	}
+	rxSq, rySq := rx*rx, ry*ry
+	x1pSq, y1pSq := x1p*x1p, y1p*y1p
+	num := rxSq*rySq - rxSq*y1pSq - rySq*x1pSq
+	den := rxSq*y1pSq + rySq*x1pSq
+	if num < 0 {
+		num = 0
+	}
+	co := math.Sqrt(num / den)
+	if large == sweep {
+		co = -co
+	}
+	cxp := co * (rx * y1p / ry)
+	cyp := co * (-ry * x1p / rx)
+	cx := cosPhi*cxp - sinPhi*cyp + (x1+x2)/2
+	cy := sinPhi*cxp + cosPhi*cyp + (y1+y2)/2
+
+	theta := func(ux, uy, vx, vy float64) float64 {
+		dot := ux*vx + uy*vy
+		n := math.Sqrt((ux*ux + uy*uy) * (vx*vx + vy*vy))
+		if n == 0 {
+			return 0
+		}
+		ang := math.Acos(math.Max(-1, math.Min(1, dot/n)))
+		if ux*vy-uy*vx < 0 {
+			ang = -ang
+		}
+		return ang
+	}
+	start := theta(1, 0, (x1p-cxp)/rx, (y1p-cyp)/ry)
+	delta := theta((x1p-cxp)/rx, (y1p-cyp)/ry, (-x1p-cxp)/rx, (-y1p-cyp)/ry)
+	if !sweep && delta > 0 {
+		delta -= 2 * math.Pi
+	} else if sweep && delta < 0 {
+		delta += 2 * math.Pi
+	}
+	n := int(math.Ceil(math.Abs(delta) / (math.Pi / 8)))
+	if n < 2 {
+		n = 2
+	}
+	if n > 64 {
+		n = 64
+	}
+	out := make([][2]float64, 0, n)
+	for i := 1; i <= n; i++ {
+		t := start + delta*float64(i)/float64(n)
+		xp := rx * math.Cos(t)
+		yp := ry * math.Sin(t)
+		x := cosPhi*xp - sinPhi*yp + cx
+		y := sinPhi*xp + cosPhi*yp + cy
+		out = append(out, [2]float64{x, y})
+	}
+	return out
 }
 
 func cubic(x0, y0, x1, y1, x2, y2, x3, y3, t float64) (float64, float64) {
@@ -671,10 +938,20 @@ func tokenizePath(d string) []string {
 			flush()
 			continue
 		}
-		if (c >= 'A' && c <= 'Z' && c != 'E' && c != 'e') || (c >= 'a' && c <= 'z' && c != 'e') {
+		if (c >= 'A' && c <= 'Z' && c != 'E') || (c >= 'a' && c <= 'z' && c != 'e') {
 			flush()
 			out = append(out, string(c))
 			continue
+		}
+		// Split before a new number start: sign after a digit, or a second '.' .
+		if cur.Len() > 0 {
+			prev := cur.String()
+			last := prev[len(prev)-1]
+			if (c == '-' || c == '+') && last != 'e' && last != 'E' {
+				flush()
+			} else if c == '.' && strings.Contains(prev, ".") && !strings.ContainsAny(prev, "eE") {
+				flush()
+			}
 		}
 		cur.WriteByte(c)
 	}

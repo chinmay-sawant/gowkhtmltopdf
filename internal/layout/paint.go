@@ -580,10 +580,15 @@ func avoidInside(res *Result, contentH float64) bool {
 			if hi > lo && b.h <= contentH+0.01 {
 				remaining := float64(lo+1)*contentH - b.y
 				// If keeping the box intact would blank out most of the current
-				// page (common for dense auto-width tables that now fit one
-				// page after max-content column sizing), allow splitting
-				// instead — browsers do the same for large wikitables.
-				if remaining < b.h*0.5 && b.h > contentH*0.45 {
+				// page (common for dense auto-width tables / reference blocks
+				// that now fit one page after tighter sizing), allow splitting
+				// instead — browsers do the same for large avoid boxes.
+				if remaining < b.h*0.5 && b.h > contentH*0.35 {
+					return changed
+				}
+				// Also skip when the blank remainder would exceed ~1/3 page
+				// (reference sections pushed after a heading left huge gaps).
+				if remaining < contentH*0.35 && b.h > contentH*0.25 {
 					return changed
 				}
 				shiftFlowY(res, b.opStart, b.opEnd, b.y, float64(hi)*contentH-b.y)

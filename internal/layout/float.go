@@ -128,6 +128,19 @@ func (f *floatState) exclusion(y, cy float64) (x, w float64) {
 	return x, w
 }
 
+// clearY returns the canvas Y just past any float that still shortens the
+// line at top (so a line box that cannot fit can restart at full width).
+func (f *floatState) clearY(top float64) float64 {
+	next := top
+	if f.hasLeft && f.leftBottom > next {
+		next = f.leftBottom
+	}
+	if f.hasRight && f.rightBottom > next {
+		next = f.rightBottom
+	}
+	return next
+}
+
 // extentCy returns cy raised to cover any float that still protrudes below
 // the in-flow content end (so the parent border box encloses floats).
 func (f *floatState) extentCy(y, cy float64) float64 {
