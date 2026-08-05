@@ -308,10 +308,9 @@ func TestStickyFixture31ContinuationClearsFlow(t *testing.T) {
 	if gap := row29Y - row28Y; gap < 20 || gap > 35 {
 		t.Errorf("Row 28→29 spacing = %.2f, want ~25pt (got Row28=%.2f Row29=%.2f)", gap, row28Y, row29Y)
 	}
-	// First row fill is flush under the sticky band; text sits slightly above
-	// the fill (same geometry as page 1 under the natural sticky).
-	if gap := row28Y - stickyBot; gap < -14 || gap > 12 {
-		t.Errorf("gap sticky→Row28 = %.2f (stickyBot=%.2f row28=%.2f), want near page-1 sticky overlap", gap, stickyBot, row28Y)
+	// First continuation baseline sits under the sticky bottom (not through it).
+	if gap := row28Y - stickyBot; gap < 6 || gap > 24 {
+		t.Errorf("gap sticky→Row28 = %.2f (stickyBot=%.2f row28=%.2f), want ~10pt under bar", gap, stickyBot, row28Y)
 	}
 
 	// Split row fills must not sit in the sticky band. Tall page-leading
@@ -335,6 +334,35 @@ func TestStickyFixture31ContinuationClearsFlow(t *testing.T) {
 		}
 		t.Errorf("op[%d] fill y=%.2f h=%.2f sits under sticky band [%.2f,%.2f)",
 			i, op.Y, op.H, pt, stickyBot)
+	}
+
+	// Section side borders must extend past Row 35 after the sticky shift.
+	var row35Y float64
+	var found35 bool
+	for _, op := range res.Ops {
+		if op.Kind == OpText && strings.Contains(op.Text, "Row 35") {
+			row35Y, found35 = op.Y, true
+			break
+		}
+	}
+	if !found35 {
+		t.Fatal("Row 35 text missing")
+	}
+	borderCovers35 := false
+	for _, op := range res.Ops {
+		if op.Kind != OpLine || int(op.Y/contentH) != 1 {
+			continue
+		}
+		if op.Y > pt+1 || op.H < 40 {
+			continue
+		}
+		if op.Y+op.H >= row35Y-0.5 {
+			borderCovers35 = true
+			break
+		}
+	}
+	if !borderCovers35 {
+		t.Errorf("section border does not extend to Row 35 (y=%.2f)", row35Y)
 	}
 }
 

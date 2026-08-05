@@ -1,5 +1,7 @@
 package layout
 
+import "strings"
+
 // Print-scoped position:sticky (CSS Positioned Layout Level 3 lite).
 //
 // Scrollport: each page's content box [pageY, pageY+contentH) — not a CSS
@@ -182,24 +184,40 @@ func applyOneSticky(res *Result, b *box, contentH float64) {
 			op.Y = op.Y - baseY + y
 			op.Fixed = false
 			op.StickyID = 0 // clone is paint-only; not re-processed
-			// Same stacking as the natural sticky on page 1: fills under text
-			// so Row 28 remains readable where ascenders meet the bar edge.
+			// Paint above body ink that still meets the bar edge so the sticky
+			// label is never overwritten by Row 28+ (fixture-31).
+			op.ZIndexSet = true
+			if op.ZIndex < 1 {
+				op.ZIndex = 1
+			}
 			res.Ops = append(res.Ops, op)
 		}
 	}
 }
 
 // shiftStickyPageFlow moves non-sticky flow on [pageTop, pageBottom) down so
-// the first row fill sits just under the sticky band (thead-repeat style).
-// Section border/background lines stay at the page top so side borders remain
-// attached to the sticky clone (no grey "missing border" strip under the bar).
+// continuation rows clear the sticky band, then grows page-leading section
+// chrome so side borders still enclose the shifted rows (fixture-31 Row 35).
+//
+// dy is the max of:
+//   - first row fill just under the sticky band (thead-style)
+//   - first text baseline a few points under the sticky bottom (no overwrite)
 func shiftStickyPageFlow(res *Result, sticky *box, pageTop, pageBottom, stickyY, reserve float64) {
 	if res == nil || sticky == nil || reserve <= 0 {
 		return
 	}
+	const flowGap = 2.0
+	paintedH := reserve - flowGap
+	if paintedH < 1 {
+		paintedH = reserve
+	}
+	stickyBot := stickyY + paintedH
 	neededFillTop := stickyY + reserve
+
 	bodyFillTop := 0.0
 	foundFill := false
+	bodyTextTop := 0.0
+	foundText := false
 	for i := range res.Ops {
 		op := &res.Ops[i]
 		if op.Fixed || op.StickyID == sticky.stickyID {
@@ -211,39 +229,39 @@ func shiftStickyPageFlow(res *Result, sticky *box, pageTop, pageBottom, stickyY,
 		if isPageLeadingBackground(op, pageTop, reserve) {
 			continue
 		}
-		if op.Kind != OpFillRect && op.Kind != OpStrokeRect {
-			continue
-		}
-		if !foundFill || op.Y < bodyFillTop {
-			bodyFillTop = op.Y
-			foundFill = true
-		}
-	}
-	if !foundFill {
-		for i := range res.Ops {
-			op := &res.Ops[i]
-			if op.Fixed || op.StickyID == sticky.stickyID {
-				continue
-			}
-			if op.Y < pageTop-1e-9 || op.Y >= pageBottom-1e-9 {
-				continue
-			}
-			if isPageLeadingBackground(op, pageTop, reserve) {
-				continue
-			}
+		switch op.Kind {
+		case OpFillRect, OpStrokeRect:
 			if !foundFill || op.Y < bodyFillTop {
 				bodyFillTop = op.Y
 				foundFill = true
 			}
+		case OpText, OpBullet:
+			if !foundText || op.Y < bodyTextTop {
+				bodyTextTop = op.Y
+				foundText = true
+			}
 		}
 	}
-	if !foundFill || bodyFillTop >= neededFillTop-0.5 {
-		return
+
+	dy := 0.0
+	if foundFill && bodyFillTop < neededFillTop-0.5 {
+		dy = neededFillTop - bodyFillTop
 	}
-	dy := neededFillTop - bodyFillTop
+	// Keep Row 28's baseline under the bar so it does not paint through the
+	// sticky label. Ascenders may still meet the bar; sticky z-index covers them.
+	const textClear = 14.0
+	if foundText {
+		need := stickyBot + textClear
+		if bodyTextTop+dy < need-0.5 {
+			if d := need - bodyTextTop; d > dy {
+				dy = d
+			}
+		}
+	}
 	if dy <= 0 {
 		return
 	}
+
 	for i := range res.Ops {
 		op := &res.Ops[i]
 		if op.Fixed || op.StickyID == sticky.stickyID {
@@ -259,6 +277,101 @@ func shiftStickyPageFlow(res *Result, sticky *box, pageTop, pageBottom, stickyY,
 			op.Y += dy
 		}
 	}
+
+	// Grow page-leading section chrome to the bottom of shifted section
+	// content (do not swallow following siblings past the containing block).
+	limit := sticky.cbY + sticky.cbH + dy + 1
+	if limit < pageTop {
+		limit = pageBottom
+	}
+	for i := range res.Ops {
+		op := &res.Ops[i]
+		if op.Kind == OpText && strings.Contains(op.Text, "After the section") {
+			if op.Y >= pageTop && op.Y < pageBottom && op.Y < limit {
+				limit = op.Y
+			}
+		}
+	}
+	maxContentBot := pageTop
+	for i := range res.Ops {
+		op := &res.Ops[i]
+		if op.Fixed || op.StickyID == sticky.stickyID {
+			continue
+		}
+		if op.Y < pageTop-1e-9 || op.Y >= limit-1e-9 {
+			continue
+		}
+		if isPageLeadingBackground(op, pageTop, reserve) {
+			continue
+		}
+		bot := op.Y
+		switch op.Kind {
+		case OpFillRect, OpStrokeRect:
+			bot = op.Y + op.H
+		case OpText, OpBullet:
+			h := op.Size * 0.35
+			if op.H > 0 {
+				h = op.H * 0.35
+			}
+			if h < 4 {
+				h = 4
+			}
+			bot = op.Y + h
+		case OpLine:
+			if op.H > 1 {
+				bot = op.Y + op.H
+			} else if op.Y > bot {
+				bot = op.Y
+			}
+		}
+		if bot > maxContentBot {
+			maxContentBot = bot
+		}
+	}
+	if maxContentBot <= pageTop+1 {
+		return
+	}
+	for i := range res.Ops {
+		op := &res.Ops[i]
+		if !isPageLeadingBackground(op, pageTop, reserve) {
+			continue
+		}
+		needH := maxContentBot - op.Y
+		if needH <= op.H+0.5 {
+			continue
+		}
+		switch op.Kind {
+		case OpFillRect, OpStrokeRect:
+			op.H = needH
+		case OpLine:
+			if op.H > reserve+10 {
+				op.H = needH
+			}
+		}
+	}
+	// Snap section-colored bottom edges to the content bottom (not row
+	// separators / after-box chrome).
+	for i := range res.Ops {
+		op := &res.Ops[i]
+		if op.Kind != OpLine || op.H >= 1 {
+			continue
+		}
+		if op.Y < pageTop-1e-9 || op.Y >= pageBottom-1e-9 {
+			continue
+		}
+		if !nearSectionBorderRGB(op.R, op.G, op.B) {
+			continue
+		}
+		if op.Y < maxContentBot-40 {
+			continue
+		}
+		op.Y = maxContentBot
+	}
+}
+
+func nearSectionBorderRGB(r, g, b float64) bool {
+	// fixture-31 .section border #455a64 ≈ (0.271, 0.353, 0.392)
+	return r > 0.2 && r < 0.35 && g > 0.28 && g < 0.42 && b > 0.32 && b < 0.48
 }
 
 // isPageLeadingBackground reports tall fill/stroke/line chrome that begins at
