@@ -1,8 +1,8 @@
 # Pending — Phase 8: SVG-as-`img` (wiki logo / icons)
 
 > **Parent:** [`README.md`](README.md)  
-> **Status:** done (out of scope by design — 2026-08-05)  
-> **Estimated effort:** n/a unless product amends  
+> **Status:** in progress (reopened — must ship, not defer)  
+> **Estimated effort:** days–weeks  
 > **Prior plan coverage:** **Yes** — matrix / fidelity: SVG-as-`img` not decodable by stdlib  
 
 ---
@@ -10,25 +10,29 @@
 ## Overview
 
 Chrome prints Wikipedia logo (SVG). We skip SVG images. Restoring logos needs
-an SVG subset renderer or rasterization dependency — **product amendment**.
+an SVG subset renderer (stdlib XML + path raster) — **implementing**, not deferring.
 
 ---
 
 ## Phase 8 checklist
 
-### 8.1 Honesty (no implement)
+### 8.1 Honesty → implement
 
-- [x] Document: SVG-as-`img` unsupported — matrix / fidelity already state this
-- [x] Ana “missing header logo” attributed to SVG (and skin CSS), not a Phase 1–7 regression
-- [x] Next gate if amended: new phase under pending-phase-items or Phase 23 tooling
+- [x] Document gap previously stated in matrix
+- [ ] Decode `image/svg+xml` / `.svg` `<img src>` into PNG via subset rasterizer
+- [ ] Support rect/circle/path/fill basics sufficient for wiki wordmark smoke
+- [ ] Tests: tiny SVG fixture paints non-empty image op
+- [ ] Status → done when wiki logo or fixture SVG appears in PDF
 
 ### 8.2 Gates
 
-- [x] No code change required for this ledger pass
-- [x] Status → **out of scope by design**
+- [ ] `make lint` →
+- [ ] `make test` →
+- [ ] Smoke note for Ana logo presence
 
 ---
 
-## Out of scope
+## Out of scope (narrow)
 
-- Implementing SVG here without explicit product amendment
+- Full SVG 2 / CSS-in-SVG / SMIL animation
+- External `<use href>` network fan-out beyond existing loader ACL

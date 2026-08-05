@@ -32,8 +32,13 @@ type inlineItem struct {
 
 // layoutInline lays out inline content into line boxes and emits text/image
 // ops. It returns the consumed height and records the first line's baseline
-// on the box.
+// on the box. When floats is non-nil, each line re-queries exclusion at its
+// canvas Y so text widens again after a float ends mid-paragraph.
 func (e *engine) layoutInline(b *box, nodes []*html.Node, availW, x, y float64) float64 {
+	return e.layoutInlineFloats(b, nodes, availW, x, y, nil)
+}
+
+func (e *engine) layoutInlineFloats(b *box, nodes []*html.Node, availW, x, y float64, floats *floatState) float64 {
 	var items []inlineItem
 	e.collectInline(nodes, &items)
 	if len(items) == 0 {
@@ -41,32 +46,46 @@ func (e *engine) layoutInline(b *box, nodes []*html.Node, availW, x, y float64) 
 	}
 
 	ly := y
-	lastBreak := 0
-	lineW := 0.0
-	itemAdvance := func(it *inlineItem) float64 {
-		return it.marginL + it.w + it.marginR
-	}
-	type lineSpan struct{ start, end int }
-	var spans []lineSpan
-	for i := 0; i < len(items); i++ {
-		it := &items[i]
-		if it.forceBreak {
-			spans = append(spans, lineSpan{lastBreak, i})
-			lastBreak = i + 1
-			lineW = 0
-			continue
+	i := 0
+	for i < len(items) {
+		lineX, lineW := x, availW
+		if floats != nil {
+			// y is canvas origin of the inline formatting context; ly is absolute.
+			lineX, lineW = floats.exclusion(0, ly)
 		}
-		adv := itemAdvance(it)
-		if lineW > 0 && lineW+adv > availW && !nowrap(it.style.WhiteSpace) {
-			spans = append(spans, lineSpan{lastBreak, i})
-			lastBreak = i
+		if lineW < 0 {
 			lineW = 0
 		}
-		lineW += adv
-	}
-	spans = append(spans, lineSpan{lastBreak, len(items)})
-	for i, sp := range spans {
-		ly += e.emitLine(b, items, sp.start, sp.end, availW, x, ly, i == len(spans)-1)
+		// Pack one line under current exclusion width.
+		start := i
+		lineAdv := 0.0
+		for i < len(items) {
+			it := &items[i]
+			if it.forceBreak {
+				break
+			}
+			adv := it.marginL + it.w + it.marginR
+			if lineAdv > 0 && lineAdv+adv > lineW && !nowrap(it.style.WhiteSpace) {
+				break
+			}
+			lineAdv += adv
+			i++
+		}
+		end := i
+		if i < len(items) && items[i].forceBreak {
+			i++ // consume br
+		}
+		if end == start {
+			// Single unbreakable item wider than line — still emit it.
+			if i < len(items) && !items[i].forceBreak {
+				i++
+				end = i
+			} else {
+				continue
+			}
+		}
+		lastLine := i >= len(items)
+		ly += e.emitLine(b, items, start, end, lineW, lineX, ly, lastLine)
 	}
 	return ly - y
 }
@@ -146,10 +165,24 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 		lx = x + (availW-totalW)/2
 	case "justify":
 		lx = x
-		// Simple justify: distribute leftover space between items on
-		// non-final lines that have more than one advance unit.
+		// Distribute leftover between word slots on non-final lines.
+		// Cap expansion so short lines beside floats do not blow out to
+		// huge rivers (Chrome-like readability; wiki print uses justify).
 		if !lastLine && availW > totalW && len(line) > 1 {
-			justifyGap = (availW - totalW) / float64(len(line)-1)
+			gaps := float64(len(line) - 1)
+			raw := (availW - totalW) / gaps
+			maxGap := 6.0 // pt
+			for i := range line {
+				if fs := line[i].style.FontSize * e.scale; fs > maxGap {
+					maxGap = fs // up to 1em extra between words
+				}
+			}
+			if raw <= maxGap*2 {
+				if raw > maxGap {
+					raw = maxGap // soft-cap rivers without abandoning justify
+				}
+				justifyGap = raw
+			}
 		}
 	default:
 		lx = x
@@ -207,7 +240,7 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 			e.add(Op{Kind: OpText, X: lx, Y: baseline, W: run.w, H: it.h,
 				Text: run.text, Font: run.face, Size: size, Bold: it.style.FontWeight >= 700,
 				R: c[0], G: c[1], B: c[2]})
-			if it.style.TextDecoration == "underline" {
+			if it.style.TextDecoration == "underline" || (it.href != "" && it.style.TextDecoration != "line-through") {
 				e.add(Op{Kind: OpLine, X: lx, Y: baseline + it.descent*0.25, W: run.w, H: 0, R: c[0], G: c[1], B: c[2]})
 			}
 			if it.style.TextDecoration == "line-through" {

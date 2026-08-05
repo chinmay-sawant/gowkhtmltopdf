@@ -1,25 +1,30 @@
 # Pending — Phase 10: JavaScript / hydration
 
 > **Parent:** [`README.md`](README.md)  
-> **Status:** deferred → [`../phase-22-javascript.md`](../phase-22-javascript.md)  
-> **Estimated effort:** see Phase 22  
+> **Status:** in progress (reopened — execute here, do not only point at Phase 22)  
+> **Estimated effort:** see also [`../phase-22-javascript.md`](../phase-22-javascript.md)  
 > **Prior plan coverage:** **Yes** — Phase 22 staged JS  
 
 ---
 
 ## Overview
 
-SPAs and JS-driven skins are out of this ledger’s sequential Chrome-gap work.
+Ship a **minimal** print-oriented JS subset so skins that gate content on
+`document.documentElement.classList` / simple DOM prep can render. Full SPA
+hydration remains Phase 22 depth, but this ledger owns a first working slice.
 
 ---
 
 ## Phase 10 checklist
 
-- [~] All JS work → [`phase-22-javascript.md`](../phase-22-javascript.md) (do not execute here)
-- [x] README order-10 points here
+- [ ] Parse and run a tiny JS subset (or embed a pure-Go interpreter under allowlist amendment)
+- [ ] Apply `classList` / `getElementById` / `querySelector` lite mutations before layout
+- [ ] Strip remaining scripts safely when unsupported
+- [ ] Tests: fixture HTML that requires one class toggle to reveal content
+- [ ] Cross-link Phase 22 for deeper work; do **not** leave this row `[~]` only
 
----
+### Gates
 
-## Gates
-
-- [x] Pointer only; no implement on `feature/pending-phase-items` for JS
+- [ ] `make lint` →
+- [ ] `make test` →
+- [ ] Status → done / Partial with shipped subset named

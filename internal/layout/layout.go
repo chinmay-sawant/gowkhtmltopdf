@@ -814,7 +814,7 @@ func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedSty
 					pb = &box{style: st}
 				}
 				ix, iw := floats.exclusion(y, cy)
-				h := e.layoutInline(pb, run, iw, ix, y+cy)
+				h := e.layoutInlineFloats(pb, run, iw, ix, y+cy, &floats)
 				cy += h
 				if h > 0 {
 					prevBottom = 0

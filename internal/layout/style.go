@@ -235,7 +235,19 @@ func resolveStylesCtx(root *html.Node, ctx *styleContext) map[*html.Node]Resolve
 				inheritProps(&st, *parent, raw)
 			}
 			applyFontProps(&st, raw, parent)
-			applyRestProps(&st, raw, ctx)
+			applyRestProps(&st, raw, ctx, parent)
+			// Chrome print keeps body links underlined even when wiki print CSS
+			// sets text-decoration:inherit (!important) → none. Explicit none
+			// (e.g. .IPA a) stays none. color:inherit → body black makes links
+			// invisible as links; use Vector progressive blue for discoverability.
+			if n.Name == "a" && strings.TrimSpace(n.Attribute("href")) != "" {
+				if v, ok := raw["text-decoration"]; ok && strings.EqualFold(strings.TrimSpace(v), "inherit") {
+					st.TextDecoration = "underline"
+				}
+				if v, ok := raw["color"]; ok && strings.EqualFold(strings.TrimSpace(v), "inherit") {
+					st.Color = [3]float64{0x06 / 255.0, 0x45 / 255.0, 0xad / 255.0}
+				}
+			}
 			// CSS2.1 §9.7: float ≠ none blockifies table-internal / inline
 			// displays before layout (table/flex/grid stay). Floated <table>
 			// keeps display:table so fixture-29 wrapper packing still works.
@@ -455,7 +467,7 @@ func applyFontProps(st *ResolvedStyle, raw map[string]string, parent *ResolvedSt
 // would be nondeterministic and could let a shorthand (e.g. UA "margin")
 // clobber a winning longhand (e.g. author "margin-bottom") depending on map
 // iteration order.
-func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext) {
+func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext, parent *ResolvedStyle) {
 	fs := st.FontSize
 	// gap/flex/container applied before longhands so row-gap/column-gap,
 	// flex-*, and container-type/name win over shorthands.
@@ -790,7 +802,11 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext)
 				st.BorderTop.Color, st.BorderRight.Color, st.BorderBottom.Color, st.BorderLeft.Color = c, c, c, c
 			}
 		case "color":
-			if r, g, b, _, ok := css.ParseColor(value); ok {
+			if value == "inherit" {
+				if parent != nil {
+					st.Color = parent.Color
+				}
+			} else if r, g, b, _, ok := css.ParseColor(value); ok {
 				st.Color = [3]float64{float64(r) / 255, float64(g) / 255, float64(b) / 255}
 			}
 		case "background-color":
@@ -836,6 +852,10 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext)
 				st.TextDecoration = "line-through"
 			case "none":
 				st.TextDecoration = "none"
+			case "inherit":
+				if parent != nil {
+					st.TextDecoration = parent.TextDecoration
+				}
 			}
 		case "letter-spacing":
 			st.LetterSpacing = marginLen(value, fs, ctx.viewportW)

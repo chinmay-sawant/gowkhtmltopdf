@@ -82,6 +82,11 @@ type PseudoClass struct {
 	Arg  string // nth-child argument, lower-case, trimmed
 	Has  []RelativeSelector
 	Not  []Selector
+	// Where is the argument to :where() / :is() (selector list). Matching
+	// uses OR semantics; :where contributes 0 specificity, :is uses the
+	// most specific argument (Selectors 4).
+	Where   []Selector
+	WhereIs bool // true when parsed from :is() (specificity from args)
 }
 
 // Declaration is one property: value pair.
@@ -749,6 +754,17 @@ func parseCompoundCtx(s string, insideHas bool) (SelectorPart, bool) {
 					return SelectorPart{}, false
 				}
 				part.Pseudos = append(part.Pseudos, PseudoClass{Name: "not", Not: sels})
+			case "where", "is":
+				if !hasParen || strings.TrimSpace(argRaw) == "" {
+					return SelectorPart{}, false
+				}
+				sels, ok := parseSelectorListStrict(argRaw, insideHas)
+				if !ok {
+					return SelectorPart{}, false
+				}
+				part.Pseudos = append(part.Pseudos, PseudoClass{
+					Name: "where", Where: sels, WhereIs: name == "is",
+				})
 			case "link", "visited":
 				// Print semantics: both mean "a[href]" (no browsing history).
 				part.Pseudos = append(part.Pseudos, PseudoClass{Name: name})
@@ -999,6 +1015,14 @@ func matchPseudo(ps PseudoClass, n *html.Node) bool {
 			}
 		}
 		return true
+	case "where":
+		// :where() / :is() — match if any argument selector matches.
+		for _, sel := range ps.Where {
+			if Match(sel, n) {
+				return true
+			}
+		}
+		return false
 	case "link", "visited":
 		// Print: no link history — both match any anchor with an href.
 		return isLinkAnchor(n)
@@ -1161,6 +1185,15 @@ func Specificity(s Selector) (a, b, c int) {
 				a += a2
 				b += b2
 				c += c2
+			case "where":
+				if ps.WhereIs {
+					// :is() — most specific argument
+					a2, b2, c2 := maxSelectorSpecificity(ps.Where)
+					a += a2
+					b += b2
+					c += c2
+				}
+				// :where() — zero specificity
 			default:
 				b++
 			}
@@ -1337,6 +1370,13 @@ func ParseColor(v string) (r, g, b int, alpha float64, ok bool) {
 	if v == "" {
 		return 0, 0, 0, 0, false
 	}
+	// CSS variables: var(--name, fallback) — resolve fallback only (no custom props).
+	if strings.HasPrefix(strings.ToLower(v), "var(") {
+		if fb, okFB := cssVarFallback(v); okFB {
+			return ParseColor(fb)
+		}
+		return 0, 0, 0, 0, false
+	}
 	alpha = 1
 	if v[0] == '#' {
 		hex := v[1:]
@@ -1421,6 +1461,38 @@ func ParseColor(v string) (r, g, b int, alpha float64, ok bool) {
 		return r, g, b, alpha, true
 	}
 	return 0, 0, 0, 0, false
+}
+
+// cssVarFallback extracts the fallback from var(--name, fallback). Nested
+// var() in the fallback is not expanded further here.
+func cssVarFallback(v string) (string, bool) {
+	v = strings.TrimSpace(v)
+	if len(v) < 6 || !strings.EqualFold(v[:4], "var(") {
+		return "", false
+	}
+	inner := v[4:]
+	if !strings.HasSuffix(inner, ")") {
+		return "", false
+	}
+	inner = strings.TrimSpace(inner[:len(inner)-1])
+	// Split on top-level comma.
+	depth := 0
+	for i := 0; i < len(inner); i++ {
+		switch inner[i] {
+		case '(':
+			depth++
+		case ')':
+			if depth > 0 {
+				depth--
+			}
+		case ',':
+			if depth == 0 {
+				fb := strings.TrimSpace(inner[i+1:])
+				return fb, fb != ""
+			}
+		}
+	}
+	return "", false
 }
 
 func isHex(s string) bool {
