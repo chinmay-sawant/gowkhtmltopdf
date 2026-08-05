@@ -22,8 +22,8 @@ report and simple marketing layouts - not Wikipedia chrome parity.
 | Float refinement | Nested floats, `%` widths, better wrapping | **Shipped** (lite) |
 | `position: relative` / `absolute` | Offsets + containing-block subset | **Shipped** (lite) |
 | `z-index` | Paint sort on positioned / chrome ops | **Shipped** (lite) |
-| `display: flex` | Row/column + align/gap/grow/shrink/basis/order/wrap + Stage A deepen | **Shipped** (Stage A partial; see flex-grid-full) |
-| `display: grid` | Columns/rows, spans, nested, `fr`, alignment stretch | **Shipped** (Stage B lite; not full Grid) |
+| `display: flex` | Row/column + align/gap/grow/shrink/basis/order/wrap + Stage A deepen | **Shipped** (Stage A; see flex-grid-full) |
+| `display: grid` | Columns/rows, spans, nested, `fr`, alignment, Stage C lite | **Shipped** (Stage B + Stage C lite; not full Grid L1/L3) |
 | `position: fixed` / sticky | Print-safe fixed stamps + sticky | fixed lite shipped; sticky **print-scoped** (page scrollport) |
 
 ---
@@ -35,7 +35,8 @@ report and simple marketing layouts - not Wikipedia chrome parity.
 - [x] Float with percentage widths (`feature/tier-2-pending` / #17)
 - [x] Consecutive left/right floats packing (right packing improvement)
 - [x] Clearfixes correctly across block boundaries (phase 16 + tests)
-- [~] Interaction with tables and lists documented + tested (best-effort; edge cases remain)
+- [x] Interaction with tables documented + tested (fixture-29 float-beside-table; best-effort)
+- [x] Float-inside-table-cell / table-inside-float packing edge cases → [`tier-2-pending-3/float-table-packing.md`](tier-2-pending-3/float-table-packing.md) (**done**: clear-below tables, float-in-td, blockify table-cell; fixture-38)
 - [x] Fixtures for float beside table (`fixture-29-float-beside-table.html`; richer chrome still optional beyond 22/29)
 
 ### 17.2 Position
@@ -72,15 +73,19 @@ report and simple marketing layouts - not Wikipedia chrome parity.
 - [x] Nested grids
 - [x] Tests: `grid_test.go`, `fixture-28-flex-wrap-grid-fixed`
 - [x] Stage B (template-rows, row span, `fr`/`minmax`, areas, dense, justify/align stretch) — **2026-08-05**; see [`subplans-tier-2/flex-grid-full.md`](subplans-tier-2/flex-grid-full.md)
-- [~] Full CSS Grid L1/L3 + Chrome parity — remaining honesty in [`subplans-tier-2/flex-grid-full.md`](subplans-tier-2/flex-grid-full.md) Stage C (`[~]` subgrid shared tracks / masonry L3 / no pixel parity)
+- [x] Stage C lite (cyclic `%` subset; subgrid copy-inherit; masonry pack) — [`subplans-tier-2/flex-grid-full.md`](subplans-tier-2/flex-grid-full.md); fixture-35
+- [x] Flex min-size + `%` re-resolve polish + Partial subgrid/masonry expand — [`tier-2-pending-3/flex-grid-remaining.md`](tier-2-pending-3/flex-grid-remaining.md) (joint intrinsic / full L3 / Chrome parity remain out)
 
-### 17.5 Explicitly not this phase (still deferred)
+### 17.5 Explicitly not this phase (moved to pending-3)
 
-- [~] Multi-column `column-count`
+- [x] Multi-column `column-count` lite — [`tier-2-pending-3/multicol.md`](tier-2-pending-3/multicol.md) (2026-08-05)
 - [x] Sticky positioning — print-scoped ([`subplans-tier-2/sticky-print.md`](subplans-tier-2/sticky-print.md))
-- [~] Transforms, filters, animations, transitions
-- [~] Container queries, `:has()`
-- [~] Full flex algorithm (multi-pass intrinsic iterations beyond cyclic `%` subset) — see [`subplans-tier-2/flex-grid-full.md`](subplans-tier-2/flex-grid-full.md) Stage C
+- [x] Static 2D transforms (paint CTM; opacity ExtGState; animations/3D/blur permanent non-goals) → [`tier-2-pending-3/static-transforms.md`](tier-2-pending-3/static-transforms.md)
+- [x] `:has()` + `@container` size lite — [`tier-2-pending-3/selectors-has-container.md`](tier-2-pending-3/selectors-has-container.md) (2026-08-05; style/scroll-state/`cq*` units = permanent Partial non-goals)
+- [x] Flex min-size polish + Partial subgrid/masonry — [`tier-2-pending-3/flex-grid-remaining.md`](tier-2-pending-3/flex-grid-remaining.md) (deep multi-pass / joint intrinsic / Chrome parity out)
+- [x] Overflow sticky scrollport @ offset 0 — [`tier-2-pending-3/sticky-overflow-honesty.md`](tier-2-pending-3/sticky-overflow-honesty.md)
+
+> Float↔table cell packing and full Grid L1/L3 parity are listed under §17.1 / §17.4 with the same pending-3 pointers.
 
 ### 17.6 Fixtures & corpus
 
@@ -111,9 +116,10 @@ report and simple marketing layouts - not Wikipedia chrome parity.
 | Item | Notes |
 |------|--------|
 | Compatibility-matrix / fidelity MVP-gap rows | **[x]** Shared doc-honesty pass |
-| Sticky positioning | **[x]** print-scoped ([`sticky-print.md`](subplans-tier-2/sticky-print.md); fixture-31) |
-| Full Grid / full Flex | Stage A + Stage B **done** 2026-08-05; Stage C lite with `[~]` gaps → [`subplans-tier-2/flex-grid-full.md`](subplans-tier-2/flex-grid-full.md); next **Phase 21** corpus |
-| Richer float+table interaction fixtures | **New** `fixture-29-float-beside-table.html` (do not edit 22) |
+| Sticky positioning | **[x]** print-scoped ([`sticky-print.md`](subplans-tier-2/sticky-print.md); fixture-31) + overflow@0 ([`sticky-overflow-honesty.md`](tier-2-pending-3/sticky-overflow-honesty.md)) |
+| Full Grid / full Flex | Stage A–C lite + flex polish / Partial subgrid·masonry **done** → [`tier-2-pending-3/flex-grid-remaining.md`](tier-2-pending-3/flex-grid-remaining.md); joint intrinsic / Chrome parity out |
+| Richer float+table interaction fixtures | **[x]** fixture-29 + fixture-38 (cell packing) — [`tier-2-pending-3/float-table-packing.md`](tier-2-pending-3/float-table-packing.md) |
+| Remaining phase-17 leftovers | Canonical ledger → [`tier-2-pending-3/README.md`](tier-2-pending-3/README.md) |
 
 ---
 

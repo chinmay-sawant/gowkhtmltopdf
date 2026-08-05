@@ -7,8 +7,10 @@
 // siblings, tables (separate borders, colspan), images, lists, text wrapping
 // with the embedded Liberation Sans font, float lite (left/right + clear),
 // real inline-block, box-sizing, position relative/absolute/fixed lite,
-// print-scoped sticky (page content box = scrollport; see sticky.go), and a
-// partial flex (row/column) subset and CSS grid lite (tracks, gap, column span).
+// print-scoped sticky (page content box = scrollport; overflow boxes at
+// scroll offset 0 — see sticky.go), and a
+// partial flex (row/column) subset, CSS grid lite (tracks, gap, column span),
+// and CSS multi-column lite (column-count/width/gap/span/fill).
 package layout
 
 import (
@@ -114,8 +116,18 @@ type Op struct {
 	ZIndexSet bool
 
 	// RotateDeg rotates the glyph around its baseline origin (PDF text matrix).
-	// Used for writing-mode:vertical-* upright→sideways CJK (90°).
+	// Used for writing-mode:vertical-* upright→sideways CJK (90°). Independent
+	// of CSS transform CTM (which wraps the whole op via Xform).
 	RotateDeg float64
+
+	// Xform is a baked canvas-space CSS 2D transform (identity if unset).
+	// Applied at paint via PDF cm (see pdfCTMFromCSS). Sibling flow unaffected.
+	Xform    Matrix2D
+	XformSet bool
+
+	// PaintOpacity is element opacity (CSS opacity / filter:opacity), 0..1.
+	// 0 or unset (≥1) means fully opaque. Nested opacities are multiplied.
+	PaintOpacity float64
 }
 
 type engine struct {
@@ -131,6 +143,8 @@ type engine struct {
 	zIndex    int
 	zIndexSet bool
 	stickySeq int // monotonically increasing sticky box IDs (for Op.StickyID)
+	// transformCBDepth counts ancestors with transform≠none; fixed→absolute CB.
+	transformCBDepth int
 }
 
 // faceFor selects the TrueType face for a resolved style (bold/italic),
@@ -201,6 +215,10 @@ func (e *engine) pushZ(st ResolvedStyle) (prevZ int, prevSet bool) {
 	if st.ZIndexSet {
 		e.zIndex = st.ZIndex
 		e.zIndexSet = true
+	} else if st.HasTransform || st.Opacity < 1 {
+		// CSS: transform/opacity create a stacking context (like z-index:0).
+		e.zIndex = 0
+		e.zIndexSet = true
 	}
 	return prevZ, prevSet
 }
@@ -225,12 +243,37 @@ func Layout(root *html.Node, opts Options) (*Result, error) {
 	if font == nil {
 		font = faces.Regular
 	}
+
+	// Pass 1: cascade without @container (used sizes unknown).
+	styles := resolveStyles(root, opts.Sheets, opts.Media, opts.Width, opts.Height)
+	// After definite inline sizes of size containers are known, re-cascade so
+	// matching @container rules apply, then lay out once with final styles.
+	if css.HasContainerRules(opts.Sheets) {
+		cinfo := measureSizeContainers(root, styles, opts.Width)
+		if len(cinfo) > 0 {
+			styles = resolveStylesWithContainers(root, opts.Sheets, opts.Media, opts.Width, opts.Height, cinfo)
+			// One nested remount: @container may change nested container-type.
+			cinfo2 := measureSizeContainers(root, styles, opts.Width)
+			if len(cinfo2) != len(cinfo) {
+				styles = resolveStylesWithContainers(root, opts.Sheets, opts.Media, opts.Width, opts.Height, cinfo2)
+			} else {
+				for n, a := range cinfo {
+					b, ok := cinfo2[n]
+					if !ok || a.inlineSize != b.inlineSize || a.names != b.names {
+						styles = resolveStylesWithContainers(root, opts.Sheets, opts.Media, opts.Width, opts.Height, cinfo2)
+						break
+					}
+				}
+			}
+		}
+	}
+
 	e := &engine{
 		opts:     opts,
 		font:     font,
 		faces:    faces,
 		registry: opts.Registry,
-		styles:   resolveStyles(root, opts.Sheets, opts.Media, opts.Width, opts.Height),
+		styles:   styles,
 		scale:    zoomScale(opts.Zoom),
 	}
 
@@ -242,6 +285,9 @@ func Layout(root *html.Node, opts Options) (*Result, error) {
 	if res.Height < e.height {
 		res.Height = e.height
 	}
+	// Paint-time CSS transforms/opacity: stamp composed CTMs after geometry
+	// is final so transform-origin % resolves against the border box.
+	stampBoxTransforms(b, IdentityMatrix(), res.Ops)
 	return res, nil
 }
 
@@ -270,12 +316,15 @@ type box struct {
 	headerRows int
 	// sticky: print-scoped position:sticky (see sticky.go). Insets are scaled
 	// points; cb* is filled at pagination time from the parent box.
+	// stickyPort is the nearest overflow:auto|scroll|hidden|clip ancestor
+	// (scrollport at offset 0); nil means page content box is the scrollport.
 	sticky                         bool
 	stickyID                       int
 	stickyTop, stickyRight         float64
 	stickyBottom, stickyLeft       float64
 	stickyTopSet, stickyRightSet   bool
 	stickyBottomSet, stickyLeftSet bool
+	stickyPort                     *box
 	cbX, cbY, cbW, cbH             float64
 	// replaced
 	imgSrc  string
@@ -295,6 +344,8 @@ func (e *engine) build(n *html.Node, availW, x, y float64) *box {
 	}
 	prevZ, prevSet := e.pushZ(st)
 	defer e.popZ(prevZ, prevSet)
+	// Ancestor transforms only (own transform does not change this box's CB).
+	underXformCB := e.transformCBDepth > 0
 	start := len(e.ops)
 	var b *box
 	switch n.Name {
@@ -305,11 +356,21 @@ func (e *engine) build(n *html.Node, availW, x, y float64) *box {
 	}
 	// Out-of-flow positioning wraps the display type so fixed/absolute flex
 	// and grid containers still get the right formatting context.
+	// Transformed ancestors establish a CB for fixed (treated as absolute).
 	if b == nil && st.Position == "fixed" {
-		b = e.buildFixed(n, st, availW, x, y)
+		if underXformCB {
+			b = e.buildAbsolute(n, st, availW, x, y)
+		} else {
+			b = e.buildFixed(n, st, availW, x, y)
+		}
 	}
 	if b == nil && st.Position == "absolute" {
 		b = e.buildAbsolute(n, st, availW, x, y)
+	}
+	// Descendants of a transformed box see this as a containing block.
+	if st.HasTransform {
+		e.transformCBDepth++
+		defer func() { e.transformCBDepth-- }()
 	}
 	if b == nil && (st.WritingMode == "vertical-rl" || st.WritingMode == "vertical-lr") {
 		b = e.buildVerticalBlock(n, st, availW, x, y)
@@ -319,6 +380,9 @@ func (e *engine) build(n *html.Node, availW, x, y float64) *box {
 	}
 	if b == nil && (st.Display == "grid" || st.Display == "inline-grid" || st.Display == "subgrid") {
 		b = e.buildGrid(n, st, availW, x, y)
+	}
+	if b == nil && isMulticol(st) {
+		b = e.buildMulticol(n, st, availW, x, y)
 	}
 	if b == nil && isTableDisplay(st.Display) {
 		b = e.buildTable(n, st, availW, x, y)
@@ -333,7 +397,8 @@ func (e *engine) build(n *html.Node, availW, x, y float64) *box {
 	if b != nil && st.Position == "sticky" {
 		e.tagSticky(b)
 	}
-	if b != nil && st.Position == "fixed" {
+	if b != nil && st.Position == "fixed" && !underXformCB {
+		// Only viewport-fixed when not under a transformed ancestor CB.
 		e.markOpsFixed(b.opStart, b.opEnd)
 	}
 	return b
@@ -375,7 +440,12 @@ func (e *engine) buildBlock(n *html.Node, st ResolvedStyle, availW, x, y float64
 		b.w += e.scalePt(st.PaddingLeft) + e.scalePt(st.PaddingRight) +
 			e.scalePt(st.BorderLeft.Width) + e.scalePt(st.BorderRight.Width)
 	}
-	if st.MinWidth > 0 && b.w < e.scalePt(st.MinWidth) {
+	if st.MinWidthPercent >= 0 && availW > 0 && availW < 1e12 {
+		mn := availW * st.MinWidthPercent / 100
+		if b.w < mn {
+			b.w = mn
+		}
+	} else if st.MinWidth > 0 && b.w < e.scalePt(st.MinWidth) {
 		b.w = e.scalePt(st.MinWidth)
 	}
 	if st.MaxWidth >= 0 && b.w > e.scalePt(st.MaxWidth) {
@@ -532,13 +602,16 @@ func (e *engine) buildFixed(n *html.Node, st ResolvedStyle, availW, x, y float64
 	return b
 }
 
-// buildInFlowDisplay builds flex/grid/table/block ignoring position.
+// buildInFlowDisplay builds flex/grid/multicol/table/block ignoring position.
 func (e *engine) buildInFlowDisplay(n *html.Node, st ResolvedStyle, availW, x, y float64) *box {
 	if st.Display == "flex" || st.Display == "inline-flex" {
 		return e.buildFlex(n, st, availW, x, y)
 	}
 	if st.Display == "grid" || st.Display == "inline-grid" || st.Display == "subgrid" {
 		return e.buildGrid(n, st, availW, x, y)
+	}
+	if isMulticol(st) {
+		return e.buildMulticol(n, st, availW, x, y)
 	}
 	if isTableDisplay(st.Display) {
 		return e.buildTable(n, st, availW, x, y)
@@ -660,6 +733,13 @@ func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedSty
 	// Absolute/fixed containing-block origin is the content edge at entry.
 	// Do not use the post-flow cy or deferred boxes sit below in-flow siblings.
 	absOriginY := y + cy
+	absCBX, absCBW := contentX, contentW
+	if st.HasTransform {
+		// Transformed element: padding box is the CB for abs/fixed descendants.
+		absCBX = contentX - e.scalePt(st.PaddingLeft)
+		absOriginY = absOriginY - e.scalePt(st.PaddingTop)
+		absCBW = contentW + e.scalePt(st.PaddingLeft) + e.scalePt(st.PaddingRight)
+	}
 	i := 0
 	for i < len(children) {
 		n := children[i]
@@ -741,7 +821,13 @@ func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedSty
 			continue
 		}
 		cs := e.styles[n]
-		cy = floats.clear(cs.Clear, y, cy)
+		// In-flow tables always clear below preceding floats (deterministic
+		// report policy). Shrink-to-fit / squeeze-beside is unsupported.
+		clear := cs.Clear
+		if cs.Display == "table" {
+			clear = "both"
+		}
+		cy = floats.clear(clear, y, cy)
 		cy += collapseMargins(prevBottom, e.scalePt(cs.MarginTop))
 		bx, bw := floats.exclusion(y, cy)
 		cb := e.build(n, bw, bx, y+cy)
@@ -761,7 +847,7 @@ func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedSty
 		i++
 	}
 	for _, n := range deferred {
-		ab := e.build(n, contentW, contentX, absOriginY)
+		ab := e.build(n, absCBW, absCBX, absOriginY)
 		if ab != nil && parent != nil {
 			parent.children = append(parent.children, ab)
 		}
@@ -775,10 +861,19 @@ func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedSty
 func (e *engine) placeFloat(n *html.Node, cs ResolvedStyle, floats *floatState, contentW, contentX, y, cy float64) *box {
 	avail := contentW
 	if cs.Width < 0 && cs.WidthPercent < 0 {
-		intr := e.measureCellContent(n, cs)
-		intr += e.scalePt(cs.PaddingLeft) + e.scalePt(cs.PaddingRight) +
-			e.scalePt(cs.BorderLeft.Width) + e.scalePt(cs.BorderRight.Width) +
-			e.scalePt(cs.MarginLeft) + e.scalePt(cs.MarginRight)
+		var intr float64
+		if isSizeContainer(cs) {
+			// Size containment: intrinsic inline size as-if-empty (padding+border
+			// only) so used size does not depend on descendants.
+			intr = e.scalePt(cs.PaddingLeft) + e.scalePt(cs.PaddingRight) +
+				e.scalePt(cs.BorderLeft.Width) + e.scalePt(cs.BorderRight.Width) +
+				e.scalePt(cs.MarginLeft) + e.scalePt(cs.MarginRight)
+		} else {
+			intr = e.measureCellContent(n, cs)
+			intr += e.scalePt(cs.PaddingLeft) + e.scalePt(cs.PaddingRight) +
+				e.scalePt(cs.BorderLeft.Width) + e.scalePt(cs.BorderRight.Width) +
+				e.scalePt(cs.MarginLeft) + e.scalePt(cs.MarginRight)
+		}
 		if intr > 0 && intr < avail {
 			avail = intr
 		}
@@ -1246,10 +1341,10 @@ func (e *engine) emitCell(b *box) {
 			cy += extra
 		}
 	}
-	// flowChildren advances cy; cell content is rooted at absolute y=b.y so
-	// pass y=0 and absolute positions via contentX / cy as canvas coords.
-	_ = e.flowChildren(&box{style: st}, b.node.Children, st, contentW, cx, 0, cy)
-	// Note: flowChildren uses y+cy for block placement; with y=0 that is cy.
+	// flowChildren advances cy; cell content is rooted at absolute canvas y
+	// (pass y=0, contentX=cx, cy=content top) so floats pack inside the cell
+	// BFC. Pass the cell as parent so float/block children attach for tests.
+	_ = e.flowChildren(b, b.node.Children, st, contentW, cx, 0, cy)
 	b.opStart, b.opEnd = start, len(e.ops)-1
 }
 

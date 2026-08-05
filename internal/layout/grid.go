@@ -427,9 +427,10 @@ func (e *engine) buildGrid(n *html.Node, st ResolvedStyle, availW, x, y float64)
 // non-masonry axis tracks by shortest-stack packing.
 //
 // Honesty: this is not the full CSS Grid Level 3 masonry algorithm (no
-// spanning across masonry tracks, no alignment into shared tracks, no
-// reverse packing). Items are placed in source order into the currently
-// shortest column (or row when packing along columns).
+// reverse packing / alignment into shared masonry tracks). Items pack in
+// source order into the currently shortest column (or row). grid-column
+// span N across the fixed (non-masonry) axis is honored as consecutive
+// tracks from the chosen stack — Partial spanning, not full L3.
 func (e *engine) buildMasonryPack(n *html.Node, st ResolvedStyle, availW, x, y float64, packIntoColumns bool) *box {
 	ml := e.scalePt(st.MarginLeft)
 	b := &box{node: n, style: st, kind: "block", x: x + ml, y: y}
@@ -472,15 +473,35 @@ func (e *engine) buildMasonryPack(n *html.Node, st ResolvedStyle, availW, x, y f
 
 		for _, kid := range kids {
 			ci := shortestStackIndex(stacks)
+			span := e.styles[kid].GridColumnSpan
+			if span < 1 {
+				span = 1
+			}
+			if ci+span > len(cols) {
+				span = len(cols) - ci
+				if span < 1 {
+					span = 1
+					ci = len(cols) - 1
+				}
+			}
+			// Honesty Partial: spanning takes consecutive tracks from the
+			// chosen shortest column; not full L3 masonry spanning search.
+			trackW := 0.0
+			for s := 0; s < span; s++ {
+				trackW += cols[ci+s]
+				if s > 0 {
+					trackW += columnGap
+				}
+			}
 			was := e.noEmit
 			e.noEmit = true
-			mb := e.build(kid, cols[ci], colX[ci], y+cy+stacks[ci])
+			mb := e.build(kid, trackW, colX[ci], y+cy+stacks[ci])
 			e.noEmit = was
 			prefH := 0.0
 			if mb != nil {
 				prefH = mb.h
 			}
-			cb := e.build(kid, cols[ci], colX[ci], y+cy+stacks[ci])
+			cb := e.build(kid, trackW, colX[ci], y+cy+stacks[ci])
 			if cb == nil {
 				continue
 			}
@@ -494,7 +515,9 @@ func (e *engine) buildMasonryPack(n *html.Node, st ResolvedStyle, availW, x, y f
 			if cb.h > h {
 				h = cb.h
 			}
-			stacks[ci] += h + rowGap
+			for s := 0; s < span; s++ {
+				stacks[ci+s] += h + rowGap
+			}
 		}
 		maxStack := 0.0
 		for _, s := range stacks {
@@ -604,9 +627,12 @@ func shortestStackIndex(stacks []float64) int {
 // parent grid-template-columns/rows/areas when the child's templates are empty,
 // "none", or the "subgrid" keyword.
 //
-// Honesty: no true shared track sizing across subtrees. Parent track sizes are
-// not re-resolved jointly; only the template string is copied, then sized in
-// the child's own containing block.
+// Partial (report-engine): when the subgrid is a direct child of a grid and
+// inherits columns, and the child's used width matches the parent's content
+// width, track sizes are re-resolved from the same template against that
+// shared width — approximate shared tracks without joint intrinsic sizing.
+// True CSS Grid 2 shared-track participation across subtrees remains out of
+// scope (no parent Resolve Intrinsic Track Sizes joint pass).
 func applySubgridInherit(n *html.Node, st ResolvedStyle, e *engine) ResolvedStyle {
 	if st.Display != "subgrid" {
 		return st

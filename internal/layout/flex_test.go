@@ -440,6 +440,112 @@ func TestFlexBasisPercentDefiniteColumn(t *testing.T) {
 	}
 }
 
+func TestFlexContentMinSizeDefiniteRow(t *testing.T) {
+	// Content-based min-width:auto must stop shrink from crushing long
+	// unbreakable text below its intrinsic width inside a definite row.
+	s := sheet(t, `
+.row { display:flex; width:120pt; gap:0 }
+.a { flex: 1 1 80pt; background:#fcc; white-space:nowrap }
+.b { flex: 1 1 80pt; background:#ccf }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="row">
+  <div class="a">LONGWORDWITHOUTSPACES</div>
+  <div class="b">B</div>
+</div>
+</body></html>`, s)
+	var aw float64
+	for _, op := range res.Ops {
+		if op.Kind == OpFillRect && op.R > 0.9 && op.G < 0.9 && op.W > 5 {
+			if op.W > aw {
+				aw = op.W
+			}
+		}
+	}
+	if aw < 50 {
+		t.Fatalf("content min floor crushed A to W=%.1f (want substantial intrinsic)", aw)
+	}
+	// A should keep more than equal half when content min exceeds shrink share.
+	if aw <= 60 {
+		t.Fatalf("A width=%.1f; content min should prefer A over equal 60pt split", aw)
+	}
+}
+
+func TestFlexPercentChildDefiniteRow(t *testing.T) {
+	// % width child inside a definite flex item re-resolves against the item's
+	// used main size (not the viewport).
+	s := sheet(t, `
+.row { display:flex; width:200pt; gap:0 }
+.item { flex: 0 0 100pt; background:#eee }
+.inner { width:50%; background:#f99; height:12pt }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="row"><div class="item"><div class="inner">X</div></div></div>
+</body></html>`, s)
+	var innerW float64
+	for _, op := range res.Ops {
+		if op.Kind == OpFillRect && op.R > 0.9 && op.G < 0.7 {
+			innerW = op.W
+		}
+	}
+	if innerW < 45 || innerW > 55 {
+		t.Fatalf("inner width%% = %.1f, want ~50 (50%% of 100pt flex item)", innerW)
+	}
+}
+
+func TestFlexMinWidthPercentDefinite(t *testing.T) {
+	// min-width:% against definite flex container: A cannot shrink below 60%.
+	s := sheet(t, `
+.row { display:flex; width:200pt; gap:0 }
+.a { flex: 0 1 150pt; min-width: 60%; background:#cfc }
+.b { flex: 0 1 150pt; background:#ffc }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="row"><div class="a">A</div><div class="b">B</div></div>
+</body></html>`, s)
+	var aw, bw float64
+	for _, op := range res.Ops {
+		if op.Kind != OpFillRect || op.W < 5 {
+			continue
+		}
+		if op.G > 0.7 && op.R < 0.9 {
+			aw = op.W
+		}
+		if op.R > 0.9 && op.G > 0.9 && op.B < 0.9 {
+			bw = op.W
+		}
+	}
+	if aw < 115 || aw > 130 {
+		t.Fatalf("min-width:60%% floor A=%.1f, want ~120", aw)
+	}
+	if bw < 65 || bw > 90 {
+		t.Fatalf("B after rebalance=%.1f, want ~80", bw)
+	}
+}
+
+func TestFlexNestedSmoke(t *testing.T) {
+	s := sheet(t, `
+.outer { display:flex; width:220pt; gap:4pt }
+.inner { display:flex; flex:1; gap:2pt; background:#eee }
+.cell { flex:1; background:#ddd; min-width:20pt }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="outer">
+  <div class="inner"><div class="cell">1</div><div class="cell">2</div></div>
+  <div class="inner"><div class="cell">3</div><div class="cell">4</div></div>
+</div>
+</body></html>`, s)
+	texts := 0
+	for _, op := range res.Ops {
+		if op.Kind == OpText {
+			texts++
+		}
+	}
+	if texts < 4 {
+		t.Fatalf("nested flex smoke: got %d text ops, want ≥4", texts)
+	}
+}
+
 func TestPositionRelativeAbsolute(t *testing.T) {
 	src := `<html><body>
 <div style="position:relative;top:10pt;left:20pt">rel</div>

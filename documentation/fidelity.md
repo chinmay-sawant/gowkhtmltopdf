@@ -18,13 +18,19 @@ is tracked in
 | Invoices, statements, multi-page tables, headers/footers, TOC, outlines | **In scope** (report engine) |
 | Deterministic PDF bytes, static binary, zero third-party modules | **In scope** |
 | Pixel-perfect clone of an arbitrary website | **Out of scope** |
-| Full CSS (flex/grid as layout, absolute/fixed/sticky positioning) | **Partial** — flex (grow/shrink/basis/order/wrap), grid lite, relative/absolute/fixed; sticky print-scoped (page = scrollport); not full CSS3 |
+| Wikipedia / marketing “decent print” (readable title + body) | **Progressive goal** (Phase 21) — not MVP acceptance yet |
+| Full CSS (flex/grid as layout, absolute/fixed/sticky positioning) | **Partial** — flex (grow/shrink/basis/order/wrap), grid lite, relative/absolute/fixed; sticky print-scoped (page = scrollport); static 2D transforms (paint CTM); not full CSS3 |
 | JavaScript-driven pages | **Out of scope** (`<script>` stripped; flags warn only) |
 | Full Unicode / CJK typesetting | **Partial** — Type0/CID + `--font-path`; Arabic OT via `go-text/typesetting` (GSUB) + presentation-form fallback; Indic Partial; no CGO HarfBuzz |
 
 **Explicit non-milestone:** full WebKit parity under pure Go stdlib only is
 **not** a dated goal. For open-web screenshot quality, use a headless browser
 pipeline instead of claiming this engine matches it.
+
+**Explicit non-claims (Phase 21):** this engine does **not** claim Wikipedia
+visual parity (Vector/Minerva skins, pixel layout) and does **not** claim
+marketing-site pixel match. The bar is **“decent print”** below — readable
+primary content, not a browser clone.
 
 ---
 
@@ -76,8 +82,50 @@ or golden fixture. Prefer the matrix over marketing prose.
 Details: [samples.md](samples.md), [testdata/golden/README.md](../testdata/golden/README.md).
 
 **Wikipedia / arbitrary URL** smoke (e.g. `output/wiki-ana-de-armas.pdf`) is
-**smoke only**: the file may open and paginate, but layout and non-Latin fonts
-are **not** a pass criterion.
+**smoke only** until Phase 21 acceptance against **vendored** fixtures: the
+file may open and paginate, but layout quality and non-Latin fonts are **not**
+yet a product pass criterion. See [Arbitrary websites](#arbitrary-websites-phase-21).
+
+---
+
+## Arbitrary websites (Phase 21)
+
+Product goal: paste a URL (or feed static HTML from a public page) and get a
+**decent print** PDF — not Chrome/WebKit parity. Work is tracked in
+[`plans/phases/phase-21-arbitrary-websites.md`](../plans/phases/phase-21-arbitrary-websites.md).
+Until vendored-fixture acceptance lands, treat live URL output as exploratory.
+Vendored HTML and optional live smoke notes: [samples.md](samples.md).
+
+### “Decent print” criteria (acceptance bar)
+
+A page meets the bar when **all** of the following hold (vendored fixtures in
+CI; live Wikipedia remains optional manual smoke):
+
+1. **Primary title** is visible early — not buried under many pages of nav /
+   chrome before the article heading.
+2. **Main body text** is readable across pages (multi-page OK).
+3. **Reduced useless chrome** (search, appearance menus, site chrome) when
+   print/simplify heuristics are enabled — heuristics are **opt-in** and
+   default **off** for controlled report HTML (not shipped as of this docs
+   contract).
+4. **Non-Latin text:** tofu/boxes only when the configured font set is missing
+   glyphs (Phase 19 fonts); missing fonts are not a layout failure by themselves.
+5. **Allowed gaps:** JS widgets, sticky headers, complex grids, SPA hydration,
+   and full skin CSS may still be wrong or absent.
+
+### Explicit non-claims
+
+| Claim | Status |
+|-------|--------|
+| Wikipedia visual / skin parity | **Not claimed** |
+| Marketing landing pixel match | **Not claimed** |
+| Full CSS / browser replacement | **Not claimed** (matrix remains Partial / Not implemented for many properties) |
+| “Paste any URL → Chrome-quality print” | **Banned** until Tier 3 is explicitly reopened |
+
+CLI URL fetch is a supported **input path** (`http`/`https`); it is **not** the
+same as meeting the decent-print acceptance bar. Security when fetching URLs
+or converting untrusted HTML: [cli.md](cli.md#remote-url-security),
+[THREAT-MODEL.md](THREAT-MODEL.md), [integration-security.md](integration-security.md).
 
 ---
 
@@ -92,10 +140,10 @@ are **not** a pass criterion.
 | Selectors (`:nth-child`, attr, siblings) | **Shipped** | 16.1 |
 | Floats / flex / position / grid | **Partial** — float lite; flex subset; grid lite; relative/absolute/fixed lite; sticky print scrollport (page content box) | 16–17 |
 | PDF images (logos/grids) | PNG/JPEG path + golden fixtures solid | 14 (docs polish remain) |
-| Pagination / thead repeat | **Shipped** breaks + thead repeat; orphan/widow **heuristics** (not CSS props) | 5, 18 |
+| Pagination / thead repeat | **Shipped** breaks + thead repeat; CSS `orphans`/`widows` parsed + Rule 3 (heuristic fallback) | 5, 18 |
 | Fonts / CJK / discovery | **Partial** — Type0/CID + `--font-path` / registry; Arabic OT (`go-text/typesetting`); local `@font-face` PDF+image | 12, 19 |
 | HF / links edges | Body GoTo + HF URI + HF fragment GoTo (copies-aware) | 6, 20 |
-| Arbitrary URL print | Smoke only | 21 |
+| Arbitrary URL / “decent print” | **In progress** — product contract + docs; acceptance not met | 21 |
 | JavaScript | Stripped | 22 staged |
 | Open-web competition | Not planned | 23 |
 
@@ -127,8 +175,10 @@ Security defaults: [THREAT-MODEL.md](THREAT-MODEL.md),
 surface, pure Go, deterministic PDF, print-quality raster (relative to 5×7).
 
 **Banned / over-claim:** pixel perfect, full CSS, browser replacement, WebKit
-parity, “paste any URL and get Chrome-quality print” (until tier 3 is
-explicitly reopened with different constraints).
+parity, Wikipedia visual parity, marketing pixel match, “paste any URL and get
+Chrome-quality print” (until tier 3 is explicitly reopened with different
+constraints). “Decent print” is allowed only with the criteria above and only
+after Phase 21 acceptance against vendored fixtures.
 
 ---
 

@@ -21,7 +21,9 @@ standard library **plus** a narrow exception for OpenType shaping via
 
 **Status:** MVP (v0.1.0). Phases 0–9 of the [canonical plan](plans/00-canonical-pure-go-rewrite.md)
 are implemented; remaining gaps are listed under
-[Deferred / not planned](#deferred--not-planned).
+[Deferred / not planned](#deferred--not-planned). Progressive post-MVP goals
+(including URL → decent print) are under
+[Progressive goals](#progressive-goals-post-mvp) — not MVP feature claims.
 
 **Docs:** start at **[documentation/overview.md](documentation/overview.md)** (full index:
 [documentation/README.md](documentation/README.md)).
@@ -152,6 +154,8 @@ Basic conversion (note: `--enable-local-file-access` belongs *after* a
 gowkhtmltopdf page --enable-local-file-access invoice.html invoice.pdf
 gowkhtmltopdf --page-size A4 --orientation Landscape report.html report.pdf
 gowkhtmltopdf --enable-local-file-access --quiet report.html report.pdf -   # to stdout
+# Remote URL (SSRF / untrusted HTML — see documentation/cli.md#remote-url-security)
+gowkhtmltopdf 'https://example.com/report.html' out.pdf
 ```
 
 Multi-object document with header/footer, TOC, and outline:
@@ -249,6 +253,24 @@ Release history: [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
+## Progressive goals (post-MVP)
+
+Active ledger: **[plans/10-canonical-post-mvp-roadmap.md](plans/10-canonical-post-mvp-roadmap.md)**.
+These are **goals**, not MVP feature claims, until their phase acceptance gates pass.
+
+| Goal | Phase | Status |
+|------|-------|--------|
+| Broader CSS / pagination / fonts / HF edges (Tier 2 core) | 17–20 | Shipped core; see fidelity + matrix |
+| **URL → decent print** (readable title + body on wiki/marketing-class HTML; not pixel parity) | **21** | Product contract + docs in progress; acceptance **not** met — do not list as a shipped feature |
+| Staged JavaScript | 22 | Not started |
+| Open-web / browser competition | 23 | Deferred (not planned under pure-stdlib) |
+
+“Decent print” criteria and explicit non-claims (no Wikipedia visual parity, no
+marketing pixel match): **[documentation/fidelity.md](documentation/fidelity.md#arbitrary-websites-phase-21)**.
+CLI URL security (SSRF, untrusted HTML): **[documentation/cli.md](documentation/cli.md#remote-url-security)**.
+
+---
+
 ## Deferred / not planned
 
 Every deliberate deferral from the phase ledgers (`[~]` items), with its
@@ -261,10 +283,10 @@ parity remains **not planned**.
 | Deferred | Status / reason | Next gate |
 |---|---|---|
 | JavaScript / WebKit features (`--enable-javascript`, `--run-script`, `--window-status`, plugins) | No JS engine in stdlib; flags accepted with warnings; `<script>` stripped at load | Phase 22 staged (see post-MVP roadmap) |
-| Floats / positioned layout (`float`, `clear`, `position: relative/absolute/fixed`) | **Float lite + relative/absolute/fixed**; sticky ≈ relative offsets | Sticky pagination stickiness still lite |
+| Floats / positioned layout (`float`, `clear`, `position: relative/absolute/fixed`) | **Float lite + relative/absolute/fixed**; sticky = print page scrollport + overflow@0 | Chrome scroll sticky pixel parity non-goal |
 | Richer selectors (attribute `[attr=…]`, `:first-child`, `:nth-child`, sibling `+`/`~`) | **Shipped** for presence/exact attr, first/last/nth-child, siblings | Hover/link pseudos still ignored |
 | Multi-font bold/italic (Liberation Sans family) | **Shipped** - Regular/Bold/Italic/BoldItalic embedded | Further families: `--font-path` (phase 19) |
-| Flexbox / Grid (`display: flex|grid`) | **Partial flex** (grow/shrink/basis/order/wrap + min/max clamp) + **grid lite** (`span`, nested grids) | Full CSS Grid / iterative flex content sizing still lite |
+| Flexbox / Grid (`display: flex|grid`) | **Partial** flex min-size polish + grid lite + Partial subgrid/masonry | Joint subgrid intrinsic / full L3 masonry / Chrome parity out |
 | CJK fonts / complex-script shaping | **Type0/CID + font-path**; **OT Arabic** via `go-text/typesetting` (GSUB) + presentation-form fallback; vertical-rl **rotated CJK** | **No CGO HarfBuzz**; Indic **Partial**; Hangul needs a Hangul face |
 | HTML character entities (`&amp;` …) | **Shipped** (stdlib unescape in text + attrs) | — |
 | `z-index` | **Lite** on positioned boxes (paint sort) | Stacking contexts / opacity still lite |
@@ -277,7 +299,7 @@ parity remains **not planned**.
 | Inline `<a href="#x">` source-rect links | **Shipped** for inline text runs with paint boxes; GoTo via `applyInternalLinks` | Cases without geometry still skipped |
 | Cross-object URL map (`urlToPageObj`) | Same-document anchors within multi-object jobs via body offsets | Full cross-object URL map still lite |
 | `resolveRelativeLinks` | **Shipped** (`--resolve-relative-links` / `--keep-relative-links`) | — |
-| HTML header/footer links on body pages | **Shipped** — external URI + `#id` fragment GoTo to body (copies-aware) | Full nested HTML HF documents still out of scope |
+| HTML header/footer nested documents | **Partial** — child layout + registry/`@font-face` + clipped band; `#id` → body only | Browser HF / running elements out |
 | `[topage]` with copies | **Corrected** when HF drawn after copies | — |
 | `[subject]` placeholder | Expands empty (no setting field upstream either) | Not planned |
 | `dump-outline` TOC page offset | **TOC offset included** via `DumpOutlineXMLOffset` | — |

@@ -13,12 +13,17 @@ testdata/golden/
   fixture-01-simple-invoice.html       # single page, minimal CSS
   fixture-02-table-heavy-invoice.html  # wide table, borders, many rows
   fixture-03-multi-page-invoice.html   # >1 page, page-break usage
-  fixture-04-*.html .. fixture-21-*.html   # phase-9.1 corpus + detailed report
+  fixture-04-*.html .. fixture-42-*.html   # phase-9.1+ corpus (skip *-header/footer companions)
+  fixture-36-header.html / fixture-36-footer.html  # nested HF companions for fixture-36
   out/                  # generated PDFs (gitignored)
 ```
 
 Golden comparison is **structural + content**, not pixel-diff (Phase 0.3
 decision; revisit image diffing in Phase 4 closure if cheap).
+
+When `fixture-NN-header.html` and/or `fixture-NN-footer.html` exist beside a
+body fixture, `commandForFixture` sets `Header.HTMLURL` / `Footer.HTMLURL`
+(auto margins). Companion files are not converted as body fixtures.
 
 ## Fixture inventory
 
@@ -58,15 +63,22 @@ proves. Page envelopes are pinned in `internal/convert/golden_test.go`
 | 27 | CJK/Unicode sample (pair with `--font-path` for real glyphs; phase 19) | 1 |
 | 28 | flex-wrap, CSS grid lite, position:fixed stamp | 2 |
 | 29 | Float beside table: float:right infobox + wrapping prose + clear (phase 17 quality) | 1 |
-| 30 | Orphans/keep-with-next heuristic sample (phase 18; CSS orphans/widows props not parsed) | ≥2 |
+| 30 | Orphans/keep-with-next heuristic sample (phase 18; geometric fallback) | ≥2 |
 | 31 | Print-scoped `position: sticky` (page content box = scrollport; phase 17 sticky-print) | ≥2 |
 | 32 | Flex Stage A + Grid Stage B lite (`flex-grid-full.md`): reverse, space-evenly, gaps, column flex, template-rows, row span | 1 |
 | 33 | Flex `%` basis cyclic honesty: definite vs indefinite main size (cyclic → auto) | 1 |
 | 34 | Grid `template-areas` / `grid-area` names + `grid-auto-flow: dense` | 1 |
 | 35 | Grid `minmax` / intrinsic measure lite + subgrid copy-inherit + masonry pack | 1 |
+| 36 | Nested HTML HF: flex header + image + `#target` GoTo; placeholder footer (companions `fixture-36-header.html` / `fixture-36-footer.html`) | 1 |
 | 33 | Flex % basis: definite resolve + indefinite/cyclic → auto (`flex-grid-full.md` §2.2) | 1 |
 | 34 | Grid Stage B areas + dense (`flex-grid-full.md`): `grid-template-areas` / `grid-area`, implied tracks, `grid-auto-flow: dense` | 1 |
 | 35 | Grid Stage B/C: `minmax()`+`fr` floors, cyclic height %, `display:subgrid` inherit, `grid-template-rows:masonry` packing | 1 |
+| 37 | CSS `orphans`/`widows` parse + Rule 3 keep-together (tier-2-pending-3) | ≥2 |
+| 38 | Float inside `td`: icon float + wrap + clear; table after float clears below (tier-2-pending-3) | 1 |
+| 39 | CSS multicol lite: `column-count`/`gap`/`span`/`fill`; column boxes stay on one page (tier-2-pending-3) | ≥2 |
+| 40 | Static 2D CSS `transform` badge (rotate) + abspos CB under transform (tier-2-pending-3) | 1 |
+| 41 | `:has()` relational selector: article footnote border, `tr:has(td.neg)` row highlight (tier-2-pending-3) | 1 |
+| 42 | `@container` size lite: named `inline-size` + unnamed `width` queries (tier-2-pending-3) | 1 |
 
 ## Pass criteria (MVP)
 

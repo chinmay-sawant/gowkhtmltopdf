@@ -112,17 +112,18 @@ not Chrome layout-test pixel parity.
       grid/flex children with `width`/`height: %` against indefinite ancestors
       resolve as auto/content-based (not 0/NaN); measure-pass lite for
       `min-content`/`max-content` track mins via text measure APIs
-- [~] Subgrid — **report-engine lite**: `display:subgrid` → nested `grid` that
-      copy-inherits parent `grid-template-columns`/`rows`/`areas` when present.
-      Honesty: no true shared track sizing across subtrees beyond copy-inherit
-- [~] Masonry — **report-engine lite**: `grid-template-rows: masonry` OR
+- [x] Subgrid report-engine lite: `display:subgrid` → nested `grid` that
+      copy-inherits parent `grid-template-columns`/`rows`/`areas` when present
+      (fixture-35). Honesty: no true shared track sizing across subtrees
+- [x] Masonry report-engine lite: `grid-template-rows: masonry` OR
       `grid-template-columns: masonry` packs into the non-masonry axis by
-      shortest-stack packing. Both axes masonry → fall back to dense grid.
+      shortest-stack packing; both axes → dense fallback (fixture-35).
       Honesty: not full CSS Grid L3 masonry (no masonry spanning / shared tracks)
 
 ### 4.2 Explicit deferrals
 
-- [~] Subgrid (true shared tracks) — lite copy-inherit only (above)
+- [~] Subgrid (true shared tracks) — beyond copy-inherit lite above
+- [~] Full CSS Grid L3 masonry (spanning / shared tracks)
 - [~] Chrome layout-test parity
 - [~] Container queries / `:has()` (separate CSS epic)
 
@@ -140,8 +141,9 @@ not Chrome layout-test pixel parity.
 
 - [x] Stage A complete → **2026-08-05**
 - [x] Stage B complete → **2026-08-05**
-- [x] Stage C `[~]` with listed gaps (subgrid copy-inherit only; masonry pack lite;
-      no Chrome layout-test parity; no multi-pass flex intrinsic beyond cyclic `%`)
+- [x] Stage C lite complete with honesty gaps recorded (subgrid copy-inherit + masonry pack
+      shipped as `[x]`; true shared-track subgrid / full L3 masonry / Chrome parity remain `[~]`;
+      no multi-pass flex intrinsic beyond cyclic `%`)
 - [x] Next: Phase 21 site corpus stress against new layout
 
 ---

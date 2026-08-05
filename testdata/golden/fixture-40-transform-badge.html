@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<!--
+  fixture-40-transform-badge
+  Proves: static 2D CSS transform (rotate) on an inline-block badge; sibling
+  flow unchanged; transform-origin center. Animations ignored (static value).
+  Expected: 1 page.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Transform badge</title>
+  <style>
+    body { font-family: sans-serif; font-size: 11pt; margin: 24pt; }
+    h1 { font-size: 16pt; margin: 0 0 12pt; }
+    .row { margin: 8pt 0; }
+    .badge {
+      display: inline-block;
+      transform: rotate(-12deg);
+      transform-origin: center center;
+      background: #c62828;
+      color: #fff;
+      padding: 3pt 8pt;
+      font-weight: 700;
+      font-size: 9pt;
+    }
+    .plain {
+      display: inline-block;
+      background: #eceff1;
+      padding: 3pt 8pt;
+    }
+    .abs-host {
+      position: relative;
+      transform: scale(1); /* establishes CB; identity scale for layout proof */
+      width: 200pt;
+      height: 48pt;
+      border: 1px dashed #666;
+      margin-top: 16pt;
+      padding: 8pt;
+    }
+    .abs-host .dot {
+      position: absolute;
+      top: 0; left: 0;
+      width: 12pt; height: 12pt;
+      background: #1565c0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Static transform badge</h1>
+  <div class="row">
+    <span class="badge">NEW</span>
+    <span class="plain">Sibling stays in flow</span>
+  </div>
+  <div class="abs-host">
+    <div class="dot"></div>
+    Abs child uses transformed padding box as CB.
+  </div>
+</body>
+</html>

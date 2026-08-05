@@ -126,7 +126,7 @@ Do **not** modify existing fixtures (especially fixture-11 / fixture-23).
 
 ### 4.3 Next
 
-- [ ] Phase 19 `@font-face` audit or Phase 20 HF fragment GoTo
+- [x] Phase 19 `@font-face` audit and Phase 20 HF fragment GoTo closed
 
 ---
 

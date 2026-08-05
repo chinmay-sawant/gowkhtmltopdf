@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<!--
+  fixture-37-orphans-css
+  Proves: CSS orphans/widows property parsing + Fragmentation Rule 3
+  (line-aware keep-together when counts exist). A multi-line paragraph with
+  orphans:4; widows:2 near a page boundary must not leave fewer than 4 lines
+  before the break when the block fits the next page. Forced break-before:
+  always still overrides orphan limits. Heuristic fixture-30 remains separate.
+  Expected: ≥2 pages.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>CSS orphans/widows sample</title>
+  <style>
+    body { font-family: sans-serif; font-size: 11pt; color: #1c1c1c; margin: 0; }
+    h1 { font-size: 16pt; color: #1a3d6d; margin: 0 0 10px 0; }
+    h2 { font-size: 13pt; color: #1a3d6d; margin: 12px 0 6px 0; }
+    p { margin: 0 0 10px 0; line-height: 1.4; }
+    .filler { font-size: 10pt; line-height: 1.45; margin: 0 0 8px 0; }
+    .css-orphan {
+      orphans: 4;
+      widows: 2;
+      font-size: 11pt;
+      line-height: 1.35;
+      width: 220pt;
+      margin: 0 0 10px 0;
+    }
+    .sentinel { font-weight: bold; color: #1a3d6d; }
+    .page2 { page-break-before: always; }
+  </style>
+</head>
+<body>
+  <h1>CSS orphans and widows</h1>
+
+  <p class="filler">Filler block 01 for vertical space. Marker OW-CSS-FILL-01.</p>
+  <p class="filler">Filler block 02 for vertical space. Marker OW-CSS-FILL-02.</p>
+  <p class="filler">Filler block 03 for vertical space. Marker OW-CSS-FILL-03.</p>
+  <p class="filler">Filler block 04 for vertical space. Marker OW-CSS-FILL-04.</p>
+  <p class="filler">Filler block 05 for vertical space. Marker OW-CSS-FILL-05.</p>
+  <p class="filler">Filler block 06 for vertical space. Marker OW-CSS-FILL-06.</p>
+  <p class="filler">Filler block 07 for vertical space. Marker OW-CSS-FILL-07.</p>
+  <p class="filler">Filler block 08 for vertical space. Marker OW-CSS-FILL-08.</p>
+  <p class="filler">Filler block 09 for vertical space. Marker OW-CSS-FILL-09.</p>
+  <p class="filler">Filler block 10 for vertical space. Marker OW-CSS-FILL-10.</p>
+  <p class="filler">Filler block 11 for vertical space. Marker OW-CSS-FILL-11.</p>
+  <p class="filler">Filler block 12 for vertical space. Marker OW-CSS-FILL-12.</p>
+  <p class="filler">Filler block 13 for vertical space. Marker OW-CSS-FILL-13.</p>
+  <p class="filler">Filler block 14 for vertical space. Marker OW-CSS-FILL-14.</p>
+  <p class="filler">Filler block 15 for vertical space. Marker OW-CSS-FILL-15.</p>
+  <p class="filler">Filler block 16 for vertical space. Marker OW-CSS-FILL-16.</p>
+  <p class="filler">Filler block 17 for vertical space. Marker OW-CSS-FILL-17.</p>
+  <p class="filler">Filler block 18 for vertical space. Marker OW-CSS-FILL-18.</p>
+  <p class="filler">Filler block 19 for vertical space. Marker OW-CSS-FILL-19.</p>
+  <p class="filler">Filler block 20 for vertical space. Marker OW-CSS-FILL-20.</p>
+  <p class="filler">Filler block 21 for vertical space. Marker OW-CSS-FILL-21.</p>
+  <p class="filler">Filler block 22 for vertical space. Marker OW-CSS-FILL-22.</p>
+  <p class="filler">Filler block 23 for vertical space. Marker OW-CSS-FILL-23.</p>
+  <p class="filler">Filler block 24 for vertical space. Marker OW-CSS-FILL-24.</p>
+  <p class="filler">Filler block 25 for vertical space. Marker OW-CSS-FILL-25.</p>
+  <p class="filler">Filler block 26 for vertical space. Marker OW-CSS-FILL-26.</p>
+  <p class="filler">Filler block 27 for vertical space. Marker OW-CSS-FILL-27.</p>
+  <p class="filler">Filler block 28 for vertical space. Marker OW-CSS-FILL-28.</p>
+  <p class="filler">Filler block 29 approaching the page-break zone. Marker OW-CSS-FILL-29.</p>
+  <p class="filler">Filler block 30 approaching the page-break zone. Marker OW-CSS-FILL-30.</p>
+  <p class="filler">Filler block 31 approaching the page-break zone. Marker OW-CSS-FILL-31.</p>
+  <p class="filler">Filler block 32 near first page bottom. Marker OW-CSS-FILL-32.</p>
+
+  <p class="css-orphan">
+    Author-valued CSS orphans four and widows two apply to this narrow
+    paragraph so line boxes are counted under Fragmentation Rule 3.
+    Extra words force several lines: alpha bravo charlie delta echo foxtrot
+    golf hotel india juliet kilo lima mike november oscar papa quebec
+    romeo sierra tango uniform victor whiskey xray yankee zulu.
+    <span class="sentinel">OW-CSS-KEEP-BLOCK</span>
+  </p>
+
+  <div class="page2">
+    <h2>Forced continuation</h2>
+    <p>page-break-before: always overrides orphan restrictions.
+    <span class="sentinel">OW-CSS-FORCED-PAGE</span></p>
+    <p class="filler">Trailing page-two prose. Marker OW-CSS-TRAIL-01.</p>
+    <p class="filler">Trailing page-two prose. Marker OW-CSS-TRAIL-02.</p>
+    <p class="filler">Trailing page-two prose. Marker OW-CSS-TRAIL-03.</p>
+  </div>
+</body>
+</html>

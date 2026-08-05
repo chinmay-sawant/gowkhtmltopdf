@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<!--
+  fixture-38-float-inside-td
+  Proves: float lite inside a table cell — icon float:left with wrapping
+  text, clear:both, neighbor cell vertical-align:top. Also documents
+  in-flow table after float clearing below (no shrink-beside).
+  Expected: 1 page.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Float inside table cell</title>
+  <style>
+    body { font-family: sans-serif; font-size: 10pt; color: #222; margin: 0; }
+    h1 { font-size: 14pt; color: #1a3d6d; margin: 0 0 8px 0; }
+    p { margin: 0 0 8px 0; line-height: 1.35; }
+    .chrome {
+      float: left; width: 70pt; height: 28pt;
+      background-color: #1a3d6d; color: #fff;
+      text-align: center; line-height: 28pt; font-size: 9pt;
+    }
+    table.pack {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+    }
+    table.pack td {
+      vertical-align: top;
+      border: 1px solid #aab7c4;
+      padding: 6px 8px;
+    }
+    .icon {
+      float: left;
+      width: 36pt;
+      height: 36pt;
+      background-color: #c5d5e8;
+      color: #1a3d6d;
+      text-align: center;
+      line-height: 36pt;
+      font-weight: bold;
+      margin: 0 6pt 4pt 0;
+    }
+    .clear { clear: both; }
+    .marker { color: #1a3d6d; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>Float-inside-td quality sample</h1>
+
+  <div class="chrome">FLOAT-38</div>
+  <p>Letterhead float precedes an in-flow summary table. Policy: the table
+  <span class="marker">FLOAT-TABLE-CLEARS-BELOW</span> clears below the float
+  (no shrink-beside).</p>
+
+  <table class="pack">
+    <tr>
+      <td>
+        <div class="icon">ID</div>
+        Cell text wraps beside the floated icon. Marker
+        <span class="marker">FLOAT-INSIDE-TD-WRAP</span> anchors regression
+        extraction for the golden corpus.
+        <div class="clear"></div>
+        After clear, content resumes full cell width —
+        <span class="marker">FLOAT-INSIDE-TD-CLEAR</span>.
+      </td>
+      <td>
+        Neighbor cell uses <span class="marker">FLOAT-TD-NEIGHBOR-TOP</span>
+        with vertical-align:top so row packing stays report-friendly.
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

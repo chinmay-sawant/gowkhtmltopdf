@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<!--
+  fixture-41-has-selector
+  Proves: Selectors 4 :has() relational matching — article:has(.footnote)
+  border-left, section:has(> h2), tr:has(td.neg) / tr:has(td.warning) row
+  styles. Nested :has and pseudo-elements inside :has are invalid (unit-tested).
+  Expected: 1 page.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<title>fixture-41 :has() selector</title>
+<style>
+body { font-family: sans-serif; font-size: 12pt; margin: 24pt; }
+article:has(.footnote) {
+  border-left: 4pt solid #246;
+  padding-left: 8pt;
+  margin-bottom: 12pt;
+}
+table { border-collapse: collapse; width: 100%; margin-top: 16pt; }
+td, th { border: 1pt solid #999; padding: 4pt 8pt; }
+tr:has(td.neg) td { color: #c00; background: #fee; }
+tr:has(td.warning) { background: #ffc; }
+section:has(> h2) { margin-top: 18pt; }
+</style>
+</head>
+<body>
+<article>
+  <p>Article with a footnote should show a left border.</p>
+  <p class="footnote">* Footnote text.</p>
+</article>
+<article>
+  <p>Article without a footnote has no special border.</p>
+</article>
+<section>
+  <h2>Section with direct h2 child</h2>
+  <p>Matched by section:has(&gt; h2).</p>
+</section>
+<table>
+  <tr><th>Qty</th><th>Note</th></tr>
+  <tr><td class="neg">-12</td><td>loss row via :has(td.neg)</td></tr>
+  <tr><td>4</td><td>normal row</td></tr>
+  <tr><td class="warning">0</td><td>warning cell highlights row</td></tr>
+</table>
+</body>
+</html>

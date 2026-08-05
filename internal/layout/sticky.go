@@ -4,13 +4,14 @@ import "strings"
 
 // Print-scoped position:sticky (CSS Positioned Layout Level 3 lite).
 //
-// Scrollport: each page's content box [pageY, pageY+contentH) — not a CSS
-// overflow:auto scroller (PDF has no scroll). Sticky is not position:fixed:
-// it does not stamp on every page; it only clamps (and clones onto
-// continuation pages) where the containing block intersects the page.
-//
-// Overflow-scroll sticky inside overflow:auto/scroll boxes is unsupported
-// and degrades to in-flow layout without page-edge sticking.
+// Scrollport selection:
+//   - Default: each page's content box [pageY, pageY+contentH) — PDF print
+//     scrollport (fixture-31). Sticky is not position:fixed: it does not stamp
+//     on every page; it only clamps (and clones onto continuation pages) where
+//     the containing block intersects the page.
+//   - Inside overflow:auto|scroll|hidden|clip: that box is the sticky
+//     scrollport. PDF has no user scroll, so clamp at scroll offset 0 against
+//     the overflow box edges (no page-edge sticking / continuation clones).
 //
 // Insets: non-auto top/right/bottom/left define sticky-view edges; auto means
 // no constraint on that side. Containing-block limit: the sticky margin box
@@ -55,15 +56,20 @@ func (b *box) hasStickyInset() bool {
 }
 
 // applyStickyPrint clamps sticky boxes to each page's content box (scrollport)
-// and clones stuck paint ops onto continuation pages where the containing
-// block still intersects. Called after flow pagination has settled.
+// or to a nearest overflow scrollport at scroll offset 0, and clones stuck
+// paint ops onto continuation pages where the containing block still
+// intersects (print scrollport only). Called after flow pagination has settled.
 func applyStickyPrint(res *Result, contentH float64) {
 	if res == nil || res.root == nil || contentH <= 0 {
 		return
 	}
 	var stickies []*box
-	var walk func(b, parent *box)
-	walk = func(b, parent *box) {
+	var walk func(b, parent, overflowPort *box)
+	walk = func(b, parent, overflowPort *box) {
+		port := overflowPort
+		if overflowCreatesStickyScrollport(b.style.Overflow) {
+			port = b
+		}
 		if b.sticky {
 			if parent != nil {
 				b.cbX, b.cbY, b.cbW, b.cbH = parent.x, parent.y, parent.w, parent.h
@@ -74,13 +80,14 @@ func applyStickyPrint(res *Result, contentH float64) {
 				}
 				b.cbX, b.cbY, b.cbW, b.cbH = 0, 0, res.Width, h
 			}
+			b.stickyPort = port
 			stickies = append(stickies, b)
 		}
 		for _, c := range b.children {
-			walk(c, b)
+			walk(c, b, port)
 		}
 	}
-	walk(res.root, nil)
+	walk(res.root, nil, nil)
 	for _, b := range stickies {
 		applyOneSticky(res, b, contentH)
 	}
@@ -88,6 +95,13 @@ func applyStickyPrint(res *Result, contentH float64) {
 
 func applyOneSticky(res *Result, b *box, contentH float64) {
 	if !b.hasStickyInset() || b.stickyID == 0 {
+		return
+	}
+
+	// Overflow scrollport at scroll offset 0: clamp within the overflow box
+	// only — no print page continuation clones (PDF has no scroll).
+	if b.stickyPort != nil {
+		applyStickyOverflowClamp(res, b)
 		return
 	}
 
@@ -192,6 +206,25 @@ func applyOneSticky(res *Result, b *box, contentH float64) {
 			}
 			res.Ops = append(res.Ops, op)
 		}
+	}
+}
+
+// applyStickyOverflowClamp clamps sticky to its overflow ancestor at scroll
+// offset 0 (PDF has no scroll). No continuation-page clones.
+func applyStickyOverflowClamp(res *Result, b *box) {
+	port := b.stickyPort
+	if port == nil {
+		return
+	}
+	origX, origY := b.x, b.y
+	portLeft, portTop := port.x, port.y
+	portRight, portBottom := port.x+port.w, port.y+port.h
+	x1 := clampStickyX(origX, b.w, b.cbX, b.cbW, portLeft, portRight, b)
+	y1 := clampStickyY(origY, b.h, b.cbY, b.cbH, portTop, portBottom, b)
+	dx, dy := x1-origX, y1-origY
+	if dx != 0 || dy != 0 {
+		shiftStickyOps(res, b.stickyID, dx, dy)
+		b.x, b.y = x1, y1
 	}
 }
 

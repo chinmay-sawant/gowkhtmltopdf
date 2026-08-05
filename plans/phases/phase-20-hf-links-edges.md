@@ -59,7 +59,7 @@ model.
 ### 20.5 Docs
 
 - [x] README deferred rows for resolveRelativeLinks, copies+HF, dump-outline, thead (adjacent Tier 2)
-- [ ] Matrix / older fidelity blurbs may still lag — shared Tier 2 doc-sync pending
+- [x] Matrix / fidelity link + HF blurbs refreshed (shared Tier 2 doc-honesty)
 
 ### 20.6 Closure gates
 
@@ -78,9 +78,9 @@ model.
 
 | Item | Notes |
 |------|--------|
-| HTML HF → body **fragment** (`#id`) GoTo | **Shipped** — `drawHTMLHF` + `buildBodyIDIndex` + `remapPageForCopies` |
-| Shared matrix/fidelity refresh | Cross-cutting with phases 17–19 honesty pass |
-| Full HTML HF as nested documents | **[~]** deferred to **v0.3.0** — [`subplans-tier-2/nested-hf-v0.3.0.md`](subplans-tier-2/nested-hf-v0.3.0.md) |
+| HTML HF → body **fragment** (`#id`) GoTo | **[x] Shipped** — `drawHTMLHF` + `buildBodyIDIndex` + `remapPageForCopies` |
+| Shared matrix/fidelity refresh | **[x]** Shared doc-honesty pass |
+| Full HTML HF as nested documents | **[x] Partial shipped** [`tier-2-pending-3/nested-html-hf.md`](tier-2-pending-3/nested-html-hf.md) (child layout + registry; clipped band; `#id` → body) |
 
 ---
 
@@ -95,6 +95,7 @@ model.
 
 ## Out of scope
 
-- Full HTML HF as nested full browser documents
-- Nested HF **document** model — deferred to v0.3.0 ([`nested-hf-v0.3.0.md`](subplans-tier-2/nested-hf-v0.3.0.md))
+- Full browser HTML HF as nested browsing contexts
+- Nested HF **document** model — **now planned in** [`tier-2-pending-3/nested-html-hf.md`](tier-2-pending-3/nested-html-hf.md) (former v0.3.0 deferral rescinded; see superseded [`subplans-tier-2/nested-hf-v0.3.0.md`](subplans-tier-2/nested-hf-v0.3.0.md))
 - PDF named actions beyond GoTo/URI
+- CSS running elements / named pages (still out; nested HTML HF ≠ GCPM)

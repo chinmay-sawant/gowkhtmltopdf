@@ -182,6 +182,9 @@ type Web struct {
 	LoadImages      bool
 	PrintMediaType  bool
 	MediaType       MediaType
+	// SimplifyDOM opts into chrome-strip heuristics for URL/print mode
+	// (--simplify-dom). Default false so invoice/report HTML is unchanged.
+	SimplifyDOM bool
 }
 
 // LoadGlobal holds settings shared by all loads.

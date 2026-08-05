@@ -178,9 +178,10 @@ func drawTextHF(page *pdf.Page, hf settings.HeaderFooter, geom hfGeom, parms hfP
 	}
 }
 
-// htmlHFLayout is a cached, laid-out HTML header/footer document. When the
-// source contains placeholders (perPage) the layout is redone per page; the
-// placeholder-free case lays out once and reuses the display list.
+// htmlHFLayout is a cached, laid-out HTML header/footer child document. When
+// the source contains placeholders (perPage) the layout is redone per page;
+// the placeholder-free case lays out once and reuses the display list.
+// Fonts use the same Registry + MergeFontFaces path as the body.
 type htmlHFLayout struct {
 	raw      string
 	skip     bool // value looked like raw markup, not a URL
@@ -191,39 +192,64 @@ type htmlHFLayout struct {
 	res      *layout.Result
 	imagesFn func(src string) ([]byte, error)
 	font     *pdf.Font
+	registry *pdf.Registry
 	width    float64
 	height   float64
 }
 
-// loadHTMLHF loads an HTML header/footer document, applies the --replace map
-// to its source, parses it and lays it out at the object's content width.
-// Placeholder substitution happens per page at draw time.
+// loadHTMLHF loads an HTML header/footer as a nested child document: fetch
+// under ACL, collect stylesheets, MergeFontFaces, layout at content width.
+// Placeholder substitution happens per page at draw time. Output is always
+// clipped to the margin band (no independent multi-page HF).
+//
+// The HF URL is resolved like a top-level page (CWD-relative / absolute /
+// http(s)), not as a subresource of the body document. Resolving against
+// st.base would break CLI paths such as
+// `--header-html testdata/golden/fixture-36-header.html` when the page is
+// already under that directory (path doubling).
 func loadHTMLHF(ctx context.Context, loader *load.Loader, font *pdf.Font, st *objectState, rawOrURL string, log io.Writer) (*htmlHFLayout, error) {
 	if load.IsHTML(rawOrURL) {
 		// upstream looksLikeHtmlAndNotAUrl: raw markup is not a URL
 		fmt.Fprintf(log, "warning: object %d: header/footer html value looks like markup, not a URL; ignoring\n", st.idx)
 		return &htmlHFLayout{skip: true}, nil
 	}
-	res, err := loader.FetchSub(ctx, st.base, rawOrURL, st.lp)
+	res, err := loader.Load(ctx, rawOrURL, st.lp)
 	if err != nil {
 		return nil, fmt.Errorf("header/footer html: %w", err)
 	}
 	raw := string(res.Body)
-	parms := hfParms{replaces: st.repl}
-	raw = parms.substitute(raw) // --replace applies to HTML HFs too
-	root, err := html.Parse(raw)
+	// Detect placeholders on the pristine document. Applying full substitute
+	// here with zero page counters used to rewrite [page]/[topage] to "0"
+	// and clear perPage, so draw never re-expanded them.
+	perPage := knownIn(raw)
+	for k, v := range st.repl {
+		if k == "" {
+			continue
+		}
+		raw = strings.ReplaceAll(raw, k, v)
+	}
+	measureRaw := raw
+	if perPage {
+		measureRaw = (hfParms{page: 1, topage: 1}).substitute(raw)
+	}
+	root, err := html.Parse(measureRaw)
 	if err != nil {
 		return nil, fmt.Errorf("header/footer html: parse: %w", err)
 	}
 	sheets := collectSheets(ctx, loader, root, res.Base, st.lp, st.idx, log)
+	reg := MergeFontFaces(ctx, loader, st.registry, sheets, res.Base, st.lp, st.idx+1, log)
+	if reg != nil {
+		st.registry = reg
+	}
 	l := &htmlHFLayout{
 		raw:      raw,
-		perPage:  knownIn(raw),
+		perPage:  perPage,
 		base:     res.Base,
 		lp:       st.lp,
 		sheets:   sheets,
 		imagesFn: st.imagesFn,
 		font:     font,
+		registry: st.registry,
 		width:    st.geom.pageW - st.geom.marginLeft - st.geom.marginRight,
 		height:   st.geom.contentH,
 	}
@@ -231,7 +257,7 @@ func loadHTMLHF(ctx context.Context, loader *load.Loader, font *pdf.Font, st *ob
 	// for every page; placeholder docs use it only for the natural height
 	// (auto margins) and re-layout per page at draw time.
 	l.res, err = layout.Layout(root, layout.Options{
-		Width: l.width, Height: l.height, Font: font,
+		Width: l.width, Height: l.height, Font: font, Registry: l.registry,
 		Sheets: sheets, Media: "print", Images: st.imagesFn,
 	})
 	if err != nil {
@@ -270,7 +296,7 @@ func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hf setti
 			return err
 		}
 		res, err = layout.Layout(root, layout.Options{
-			Width: hfL.width, Height: hfL.height, Font: hfL.font,
+			Width: hfL.width, Height: hfL.height, Font: hfL.font, Registry: hfL.registry,
 			Sheets: hfL.sheets, Media: "print", Images: hfL.imagesFn,
 		})
 		if err != nil {
@@ -282,14 +308,18 @@ func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hf setti
 	}
 	spacing := hf.Spacing * mmToPt
 	pageH := page.Height()
-	bandTop := geom.marginBottom
-	if isHeader {
-		bandTop = pageH - geom.marginTop
-	}
+	// Clip to the reserved margin band. Footer band is the bottom strip
+	// [0, marginBottom]; header band is the top strip
+	// [pageH-marginTop, pageH]. (Using marginBottom as the footer's bandTop
+	// incorrectly clipped footer ink out of the page.)
+	bandTop := 0.0
 	bandH := geom.marginBottom
 	if isHeader {
+		bandTop = pageH - geom.marginTop
 		bandH = geom.marginTop
 	}
+	// Nested HF is a single-page clamp: taller content is clipped to the band
+	// (height was reserved via hfHeightFor / effectiveMargins).
 	// Canvas y=0 (top of the HF document) maps to:
 	//   header: spacing below the page top; footer: spacing + doc height
 	yTop := pageH - spacing

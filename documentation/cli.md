@@ -20,6 +20,9 @@ gowkhtmltopdf [GLOBAL OPTIONS] [OBJECT]... <output>
 # Local file (ACL opt-in)
 gowkhtmltopdf --enable-local-file-access report.html report.pdf
 
+# Remote URL (HTTPS) — see Remote URL security below
+gowkhtmltopdf 'https://example.com/report.html' out.pdf
+
 # Page size and margins
 gowkhtmltopdf --page-size A4 --margin-top 15mm report.html out.pdf
 
@@ -37,7 +40,37 @@ gowkhtmltopdf --enable-local-file-access \
 
 # Explicit page keyword (page-scoped flags after page)
 gowkhtmltopdf page --enable-local-file-access in.html out.pdf
+
+# URL → decent print (opt-in chrome strip; see URL mode below)
+gowkhtmltopdf --simplify-dom 'https://example.com/article' article.pdf
 ```
+
+### Remote URL security
+
+HTTP(S) inputs are a first-class CLI path:
+
+```sh
+gowkhtmltopdf 'https://example.com/report.html' out.pdf
+```
+
+That makes the **process running the CLI** an HTTP client for the primary URL
+and for every linked stylesheet/image the document references. Treat this as
+the same threat class documented for embedding:
+
+| Risk | What happens | Mitigation |
+|------|----------------|------------|
+| **SSRF** | Server/CLI host fetches attacker-chosen hosts (localhost, metadata, RFC1918) when the URL or HTML is untrusted | Do not pass arbitrary user `?url=` / CLI args without host allowlists and network isolation |
+| **Untrusted HTML** | Hostile markup can trigger second-hop fetches (`img`/`link`) and CPU/RAM DoS up to loader caps | Convert only HTML you author, or isolate the job; keep local-file ACL off |
+| **Local files** | `file://` and path reads are denied by default | Keep `--enable-local-file-access` / `--allow` off for untrusted input |
+
+Defaults that help: connect/response timeouts, redirect limits, body size caps,
+TLS verify on (unless `--insecure`), no JavaScript execution. There is **no**
+network egress allowlist inside the converter — input trust is the control.
+
+Fidelity for public sites is a separate question: URL fetch ≠ “decent print”
+acceptance. See [fidelity.md — Arbitrary websites](fidelity.md#arbitrary-websites-phase-21),
+[THREAT-MODEL.md](THREAT-MODEL.md) (§5–§7.1), and
+[integration-security.md](integration-security.md).
 
 ### Placeholders (text headers/footers)
 
@@ -50,12 +83,15 @@ Custom: `--replace name value`.
 - Multi-page tables with `<thead>` / `table-header-group` **repeat** the header
   row(s) on continuation pages (fixture-23).
 - `position: sticky` clamps to the page content box (print scrollport) within
-  the containing block (fixture-31); not overflow-scroll sticky.
+  the containing block (fixture-31). Inside `overflow: auto|scroll|hidden|clip`,
+  that box is the sticky scrollport at scroll offset 0 (PDF has no user scroll;
+  no page-edge clones for overflow-contained sticky).
 - `--zoom` scales layout (forwarded to the layout engine).
 - `--smart-shrinking` may **re-layout** with an effective zoom when content is
   wider than the page.
-- Orphan/widow control is automatic **heuristics** only; CSS `orphans` /
-  `widows` properties are not parsed.
+- Orphan/widow control: CSS `orphans` / `widows` are parsed (integer ≥1,
+  inherit, initial 2) and enforced when line boxes are countable; a geometric
+  short-block heuristic remains when line counts are unavailable.
 
 ### Fonts & links
 
@@ -65,7 +101,42 @@ Custom: `--replace name value`.
 - `--resolve-relative-links` / `--keep-relative-links` control whether relative
   `href` values are resolved against the page URL.
 - Body `#id` internal links emit GoTo annotations when geometry is available;
-  HTML header/footer `#id` links resolve to body GoTo destinations.
+  HTML header/footer `#id` links resolve to **body** GoTo destinations (ids
+  inside the HF document tree are not destinations).
+- `--header-html` / `--footer-html` run a nested child layout (body CSS subset,
+  flex/grid/images, local `@font-face` under the same ACL), clipped to the
+  reserved margin band — not a browser nested browsing context.
+
+### URL mode & chrome strip (`--simplify-dom`)
+
+Paste-any-URL prints are best-effort (“decent print”, not visual parity).
+Recommended flags:
+
+```sh
+gowkhtmltopdf --simplify-dom --timeout 60 \
+  --load-error-handling ignore \
+  'https://en.wikipedia.org/wiki/Example' out.pdf
+```
+
+| Flag / setting | Role |
+|----------------|------|
+| `--simplify-dom` | Opt-in chrome-strip (default **off**). Injects a synthetic `display:none` stylesheet for `nav`/`footer`/`aside`, ARIA landmark roles, and wiki selectors (`#mw-navigation`, `.mw-jump-link`, `nav.site-nav`). Nodes stay in the tree; no extra origins are fetched. |
+| `--no-simplify-dom` | Explicit off (also the default). Keep for invoices/reports. |
+| `--print-media-type` | Accepted for wkhtmltopdf compatibility; layout already runs with `Media: "print"` (site `@media print` rules apply when present). Prefer `--simplify-dom` for chrome reduction. |
+| `--timeout <sec>` | HTTP response timeout (default 60s). Connect timeout is 30s. |
+| `--load-error-handling ignore\|skip\|abort` | Main document load policy. |
+| Images | On by default. Library/embedders: `web.images=false` skips fetch/paint (no dedicated `--images` CLI flag yet). |
+| JS flags | No JS engine; scripts are stripped at load. |
+
+Loader limits (verified existing behavior in `internal/load/load.go`): body
+cap **100 MiB** (`DefaultMaxBodySize`), connect **30s**, response **60s**
+(or `--timeout`), redirect cap **10**. Failed CSS `<link>` and image
+subresources are isolated (warning + continue; body text still emits) —
+see `TestSubresourceFailureIsolation`. Progress phases print to stderr
+unless `--quiet`.
+
+Security notes for remote URLs: see [Remote URL security](#remote-url-security)
+above.
 
 ### Page-scoped flags and `toc`
 

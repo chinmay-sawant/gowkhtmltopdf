@@ -111,9 +111,13 @@ processes. The trust envelope of any local reader applies.
 - Local file reads are the only sensitive channel and are gated by the ACL
   (section 3). With default flags, no document-reachable path reads any
   local file.
-- **Fonts:** TTF bytes loaded via `@font-face` `url(...)` are untrusted parse
-  input under the same ACL as other subresources; `--font-path` /
+- **Fonts:** TTF/OTF/WOFF1 bytes loaded via `@font-face` `url(...)` are
+  untrusted parse input under the same ACL as other subresources; WOFF1
+  decompress uses size caps (table count, per-table / reconstructed SFNT
+  limits, overlap rejection) before `ParseTTF`. `--font-path` /
   `--use-system-fonts` are operator-controlled discovery (not HTML ACL).
+  Remote `https://` `@font-face` is not fetched (product policy). WOFF2 is
+  rejected (Brotli not allowlisted).
 - Operator credentials (custom headers, basic auth, cookies) are attached
   to the requests the operator configured them for. Cross-host auth and
   cookie headers are stripped by `net/http` on redirects, but custom

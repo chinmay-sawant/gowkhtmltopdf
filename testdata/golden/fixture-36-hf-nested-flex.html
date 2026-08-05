@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<!--
+  fixture-36-hf-nested-flex
+  Proves: nested HTML header/footer as child layout documents (flex row +
+  image in header, placeholders in footer) via --header-html / --footer-html
+  companions fixture-36-header.html and fixture-36-footer.html (tier-2-pending-3
+  nested-html-hf). Body #target is the fragment destination for the HF link.
+  Expected: 1 page; embedded image from header; GoTo from header #target link.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Nested HTML HF</title>
+  <style>
+    body { font-family: sans-serif; font-size: 11pt; color: #222; margin: 0; }
+    h1 { font-size: 16pt; color: #1a3d6d; }
+    h2 { font-size: 13pt; margin-top: 18pt; }
+    p { margin: 8pt 0; line-height: 1.35; }
+    .note { font-size: 9pt; color: #555; border-top: 1px solid #ccc; padding-top: 8pt; margin-top: 20pt; }
+  </style>
+</head>
+<body>
+  <h1>Nested HTML header/footer</h1>
+  <p>Body content under a flex HTML header (logo + link) and a placeholder
+  HTML footer. The header is a separate child document laid out into the
+  reserved margin band.</p>
+
+  <h2 id="target">Target section</h2>
+  <p>Fragment destination for the header <code>#target</code> link. Enough
+  prose follows so the page is clearly non-empty under the HF bands.</p>
+  <p>Line items stay on one page: widget A, widget B, and a closing note for
+  the convert golden runner.</p>
+
+  <p class="note">Companion files: fixture-36-header.html, fixture-36-footer.html
+  (wired by the golden runner when present beside this body fixture).</p>
+</body>
+</html>

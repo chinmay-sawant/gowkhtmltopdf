@@ -74,7 +74,7 @@ func RunPDFContext(ctx context.Context, cmd *cli.Command, log io.Writer, progres
 		obj := &cmd.Objects[i]
 		applyObjectDefaults(obj)
 		if obj.IsTableOfContent {
-			st, err := initTOCState(ctx, loader, font, cmd, obj, i, log)
+			st, err := initTOCState(ctx, loader, font, registry, cmd, obj, i, log)
 			if err != nil {
 				return err
 			}
@@ -261,19 +261,20 @@ func nonCollateOrder(ranges []pageRange, copies int) []int {
 
 // initTOCState builds the per-object state of a table-of-contents object:
 // geometry (with auto margins resolved) and the effective TOC settings.
-func initTOCState(ctx context.Context, loader *load.Loader, font *pdf.Font, cmd *cli.Command, obj *settings.PdfObject, idx int, log io.Writer) (*objectState, error) {
+func initTOCState(ctx context.Context, loader *load.Loader, font *pdf.Font, registry *pdf.Registry, cmd *cli.Command, obj *settings.PdfObject, idx int, log io.Writer) (*objectState, error) {
 	pageW, pageH, err := pageGeometry(cmd.Global)
 	if err != nil {
 		return nil, fmt.Errorf("object %d: %w", idx+1, err)
 	}
 	st := &objectState{
-		obj:    obj,
-		idx:    idx,
-		isTOC:  true,
-		header: obj.HeaderFor(cmd.Global),
-		footer: obj.FooterFor(cmd.Global),
-		repl:   mergedReplaces(obj, cmd.Global),
-		toc:    effectiveTOC(*obj, cmd.Global),
+		obj:      obj,
+		idx:      idx,
+		isTOC:    true,
+		header:   obj.HeaderFor(cmd.Global),
+		footer:   obj.FooterFor(cmd.Global),
+		repl:     mergedReplaces(obj, cmd.Global),
+		toc:      effectiveTOC(*obj, cmd.Global),
+		registry: registry,
 		geom: hfGeom{
 			pageW:        pageW,
 			pageH:        pageH,
@@ -310,6 +311,7 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 	}
 
 	sheets := collectSheets(ctx, loader, root, res.Base, obj.Load, idx+1, log)
+	sheets = AppendSimplifySheet(sheets, SimplifyDOMEnabled(cmd.Global.Web, obj.Web))
 	registry = MergeFontFaces(ctx, loader, registry, sheets, res.Base, obj.Load, idx+1, log)
 
 	pageW, pageH, err := pageGeometry(cmd.Global)
@@ -329,13 +331,14 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 	}
 
 	st := &objectState{
-		obj:    obj,
-		idx:    idx,
-		header: obj.HeaderFor(cmd.Global),
-		footer: obj.FooterFor(cmd.Global),
-		repl:   mergedReplaces(obj, cmd.Global),
-		base:   res.Base,
-		lp:     obj.Load,
+		obj:      obj,
+		idx:      idx,
+		header:   obj.HeaderFor(cmd.Global),
+		footer:   obj.FooterFor(cmd.Global),
+		repl:     mergedReplaces(obj, cmd.Global),
+		base:     res.Base,
+		lp:       obj.Load,
+		registry: registry,
 		geom: hfGeom{
 			pageW:        pageW,
 			pageH:        pageH,
@@ -351,6 +354,8 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 	if err := effectiveMargins(ctx, loader, font, cmd, st, log); err != nil {
 		return nil, fmt.Errorf("object %d (%s): %w", idx+1, obj.Page, err)
 	}
+	// HF MergeFontFaces may have extended the registry; keep body layout in sync.
+	registry = st.registry
 
 	lres, err := layout.Layout(root, layout.Options{
 		Width:      st.geom.pageW - st.geom.marginLeft - st.geom.marginRight,
@@ -630,8 +635,9 @@ func loadFontRegistry(cmd *cli.Command, log io.Writer) *pdf.Registry {
 	return reg
 }
 
-// MergeFontFaces loads local @font-face url(...) TTF/OTF sources into the
-// registry (network/woff/data skipped). ACL follows FetchSub. Shared by PDF
+// MergeFontFaces loads local @font-face url(...) TTF/OTF/WOFF1 sources into
+// the registry. WOFF2 (.woff2), EOT, data:, and remote https:// (non-file)
+// src are skipped by product policy. ACL follows FetchSub. Shared by PDF
 // convert and image mode so both honor the same local @font-face subset.
 func MergeFontFaces(ctx context.Context, loader *load.Loader, reg *pdf.Registry, sheets []*css.Stylesheet, base string, lp settings.LoadPage, idx int, log io.Writer) *pdf.Registry {
 	for _, sheet := range sheets {
@@ -641,8 +647,8 @@ func MergeFontFaces(ctx context.Context, loader *load.Loader, reg *pdf.Registry,
 		for _, ff := range sheet.FontFaces {
 			for _, u := range css.FontFaceURLs(ff.Src) {
 				low := strings.ToLower(u)
-				if strings.HasSuffix(low, ".woff") || strings.HasSuffix(low, ".woff2") || strings.HasSuffix(low, ".eot") {
-					fmt.Fprintf(log, "warning: object %d: @font-face src %q skipped (TTF/OTF only)\n", idx, u)
+				if strings.HasSuffix(low, ".woff2") || strings.HasSuffix(low, ".eot") {
+					fmt.Fprintf(log, "warning: object %d: @font-face src %q skipped (WOFF2/EOT unsupported; WOFF1/TTF/OTF only)\n", idx, u)
 					continue
 				}
 				// data: would bypass the network:// gate; reject so we never
@@ -651,6 +657,8 @@ func MergeFontFaces(ctx context.Context, loader *load.Loader, reg *pdf.Registry,
 					fmt.Fprintf(log, "warning: object %d: @font-face data: src skipped\n", idx)
 					continue
 				}
+				// Remote network fonts are unsupported by design (ACL/network
+				// policy): no auto-fetch of https:// webfont CDNs.
 				if strings.Contains(low, "://") && !strings.HasPrefix(low, "file:") {
 					fmt.Fprintf(log, "warning: object %d: @font-face network src %q skipped\n", idx, u)
 					continue
@@ -660,7 +668,7 @@ func MergeFontFaces(ctx context.Context, loader *load.Loader, reg *pdf.Registry,
 					fmt.Fprintf(log, "warning: object %d: @font-face src %q: %v\n", idx, u, err)
 					continue
 				}
-				f, err := pdf.ParseTTF(r.Body)
+				f, err := pdf.ParseFontBytes(r.Body)
 				if err != nil {
 					fmt.Fprintf(log, "warning: object %d: @font-face src %q: %v\n", idx, u, err)
 					continue

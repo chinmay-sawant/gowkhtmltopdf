@@ -85,17 +85,20 @@ Worked examples:
 - Unknown names: `Set` returns an error  
 - Defaults mirror upstream wkhtmltopdf where implemented  
 
-**Pagination / tables:** `<thead>` repeats on continuation pages; `position: sticky` clamps to the page content box (print scrollport) within its containing block (not overflow-scroll sticky); `zoom` /
+**Pagination / tables:** `<thead>` repeats on continuation pages; `position: sticky` clamps to the page content box (print scrollport) within its containing block, or to a nearest `overflow:auto|scroll|hidden|clip` ancestor at scroll offset 0; `zoom` /
 smart-shrinking settings re-layout when wired (same behavior as CLI `--zoom` /
-`--smart-shrinking`). Orphan/widow control is heuristics only — see matrix §2.6.
+`--smart-shrinking`). CSS `orphans`/`widows` are parsed with Rule 3 when line
+boxes exist; geometric heuristic fallback — see matrix §2.6.
 
 **Fonts / links:** `font-path` / `use-system-fonts` feed the font registry;
-the image converter honors local `@font-face` TTF/OTF under the same ACL as
+the image converter honors local `@font-face` TTF/OTF/WOFF1 under the same ACL as
 PDF. Text runs use OpenType shaping via `go-text/typesetting` when the face
 has GSUB (`ShapeTextFont` / `TextShow`), with presentation-form Arabic as
-fallback — see [fonts.md](fonts.md). `resolve-relative-links` / internal-links
+fallback; CJK punctuation may request OT `halt`/`palt` — see [fonts.md](fonts.md). `resolve-relative-links` / internal-links
 behave as in matrix §7.5. Body `#` GoTo is shipped; HTML HF `#id` fragment
-GoTo resolves to body destinations (copies-aware).
+GoTo resolves to **body** destinations only (copies-aware). Nested HTML HF is a
+child layout (body CSS subset + local `@font-face` under ACL), clipped to the
+margin band — see matrix §7.7.
 
 Authoritative support matrix: [compatibility-matrix.md](compatibility-matrix.md).
 Fonts details: [fonts.md](fonts.md).

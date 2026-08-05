@@ -444,6 +444,8 @@ func Run(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 	}
 
 	sheets := collectSheets(ctx, loader, root, res.Base, obj.Load, log)
+	enabled := convert.SimplifyDOMEnabled(cmd.Image.Web, obj.Web) || cmd.Global.Web.SimplifyDOM
+	sheets = convert.AppendSimplifySheet(sheets, enabled)
 	registry = convert.MergeFontFaces(ctx, loader, registry, sheets, res.Base, obj.Load, 1, log)
 
 	cache := map[string][]byte{}

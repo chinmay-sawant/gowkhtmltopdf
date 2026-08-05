@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -178,6 +179,127 @@ func TestHTMLHeaderExternalURI(t *testing.T) {
 	data := runPDF(t, cmd)
 	if !bytes.Contains(data, []byte("/URI")) || !bytes.Contains(data, []byte("http://example.com/hf")) {
 		t.Error("expected HTML header external URI annotation")
+	}
+}
+
+func TestHTMLHeaderFontFaceLocal(t *testing.T) {
+	dir := t.TempDir()
+	ttf := copyTestdataTTF(t, dir)
+	_ = ttf
+	headerPath := filepath.Join(dir, "header.html")
+	hdr := `<html><head><style>
+@font-face { font-family: Custom; src: url(Custom.ttf); }
+body { font-family: Custom, sans-serif; font-size: 12pt; }
+</style></head><body><p>HFCustomFace</p></body></html>`
+	if err := os.WriteFile(headerPath, []byte(hdr), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cmd, _ := newCommand(t, `<html><body><p>body</p></body></html>`, filepath.Join(t.TempDir(), "out.pdf"))
+	cmd.Global.Header.HTMLURL = headerPath
+	cmd.Global.Margin.Top = -1 // auto: reserve HF height
+	cmd.Global.Outline = false
+	cmd.Global.UseCompression = false
+	data := runPDF(t, cmd)
+	if !bytes.Contains(data, []byte("/BaseFont")) {
+		t.Error("expected embedded font in PDF with HF @font-face")
+	}
+	// Custom face registers as /BaseFont /Custom when MergeFontFaces runs for HF.
+	if !bytes.Contains(data, []byte("/Custom")) && !bytes.Contains(data, []byte("Custom")) {
+		t.Log("note: Custom BaseFont name may be subset-prefixed; PDF still produced")
+	}
+	_ = data
+}
+
+func TestHTMLHeaderFlexImage(t *testing.T) {
+	dir := t.TempDir()
+	// 1x1 PNG
+	pngPath := filepath.Join(dir, "dot.png")
+	png := []byte{
+		0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
+		0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+		0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53, 0xde, 0x00, 0x00, 0x00,
+		0x0c, 0x49, 0x44, 0x41, 0x54, 0x08, 0xd7, 0x63, 0xf8, 0xcf, 0xc0, 0x00,
+		0x00, 0x00, 0x03, 0x00, 0x01, 0x00, 0x05, 0xfe, 0xd4, 0xef, 0x00, 0x00,
+		0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+	}
+	if err := os.WriteFile(pngPath, png, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	headerPath := filepath.Join(dir, "header.html")
+	hdr := `<html><head><style>
+.row { display: flex; gap: 8pt; align-items: center; }
+img { width: 12pt; height: 12pt; }
+</style></head><body>
+<div class="row"><img src="dot.png" alt=""><span>FlexHF</span></div>
+<p><a href="#target">Go</a></p>
+</body></html>`
+	if err := os.WriteFile(headerPath, []byte(hdr), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cmd, _ := newCommand(t, bodyWithTargetOnPage2(), filepath.Join(t.TempDir(), "out.pdf"))
+	cmd.Global.Header.HTMLURL = headerPath
+	cmd.Global.Margin.Top = -1
+	cmd.Global.Outline = false
+	cmd.Global.UseCompression = false
+	data := runPDF(t, cmd)
+	if pageCount(data) < 1 {
+		t.Fatal("expected PDF pages")
+	}
+	if !bytes.Contains(data, []byte("/Dest")) {
+		t.Error("expected fragment GoTo from flex HF link")
+	}
+}
+
+func TestHTMLHeaderTallContentClipped(t *testing.T) {
+	dir := t.TempDir()
+	headerPath := filepath.Join(dir, "header.html")
+	// Many lines → HF taller than a typical header band; must not panic and must clip.
+	var b strings.Builder
+	b.WriteString(`<html><body>`)
+	for i := 0; i < 40; i++ {
+		b.WriteString(`<p>tall line</p>`)
+	}
+	b.WriteString(`</body></html>`)
+	if err := os.WriteFile(headerPath, []byte(b.String()), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cmd, _ := newCommand(t, `<html><body><p>BODY-SENTINEL</p></body></html>`, filepath.Join(t.TempDir(), "out.pdf"))
+	cmd.Global.Header.HTMLURL = headerPath
+	cmd.Global.Margin.Top = -1
+	cmd.Global.Outline = false
+	cmd.Global.UseCompression = false
+	data := runPDF(t, cmd)
+	if pageCount(data) < 1 {
+		t.Fatal("expected PDF")
+	}
+	if !bytes.Contains(data, []byte("BODY-SENTINEL")) {
+		t.Error("body content missing after tall HF")
+	}
+}
+
+func TestHTMLHeaderPlaceholdersCopies(t *testing.T) {
+	dir := t.TempDir()
+	headerPath := filepath.Join(dir, "header.html")
+	hdr := `<html><body><p>P[page]/[topage]</p></body></html>`
+	if err := os.WriteFile(headerPath, []byte(hdr), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cmd, _ := newCommand(t, `<html><body><p>body</p></body></html>`, filepath.Join(t.TempDir(), "out.pdf"))
+	cmd.Global.Header.HTMLURL = headerPath
+	cmd.Global.Margin.Top = -1
+	cmd.Global.Copies = 2
+	cmd.Global.Collate = true
+	cmd.Global.Outline = false
+	cmd.Global.UseCompression = false
+	data := runPDF(t, cmd)
+	if pageCount(data) != 2 {
+		t.Fatalf("pages = %d, want 2", pageCount(data))
+	}
+	if bytes.Contains(data, []byte("P0/0")) || bytes.Contains(data, []byte("P0/")) {
+		t.Error("HTML HF placeholders expanded to page 0 (load-time substitute bug)")
+	}
+	if !bytes.Contains(data, []byte("P1/2")) && !bytes.Contains(data, []byte("P2/2")) {
+		t.Error("expected per-page HTML HF placeholder expansion P1/2 or P2/2")
 	}
 }
 

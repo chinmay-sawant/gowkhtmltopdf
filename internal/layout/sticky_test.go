@@ -10,6 +10,122 @@ import (
 	"gowkhtmltopdf/internal/pdf"
 )
 
+func TestStickyOverflowScrollportNoPageClone(t *testing.T) {
+	// Sticky inside overflow:auto must use that box as scrollport at offset 0
+	// (no page-edge continuation clones). Without overflow, the same sticky
+	// would stick across pages (print scrollport).
+	var body strings.Builder
+	body.WriteString(`<html><body>
+<div class="scroller">
+  <div class="stick">STICKY</div>
+`)
+	for i := 0; i < 40; i++ {
+		body.WriteString(`<p>row ` + itoa(i) + ` filler text for pagination</p>`)
+	}
+	body.WriteString(`</div></body></html>`)
+
+	s := sheet(t, `
+.scroller { overflow: auto; background: #f5f5f5; }
+.stick {
+  position: sticky;
+  top: 0;
+  background: #c62828;
+  color: #fff;
+  padding: 6pt;
+  height: 24pt;
+}
+p { margin: 4pt 0; font-size: 12pt; }
+`)
+	root, err := html.Parse(body.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := Layout(root, Options{
+		Width: 400, Height: 200, Background: true,
+		Sheets: []*css.Stylesheet{s}, Media: "print",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc := pdf.NewDocument()
+	opts := PaintOptions{
+		PageWidth: 500, PageHeight: 280,
+		MarginTop: 20, MarginBottom: 20, MarginLeft: 20, MarginRight: 20,
+	}
+	if err := Paint(doc, res, opts); err != nil {
+		t.Fatal(err)
+	}
+	contentH := 240.0
+	if doc.PageCount() < 2 {
+		t.Fatalf("expected multi-page scroller content, got %d pages", doc.PageCount())
+	}
+	pagesWithSticky := map[int]bool{}
+	var stick *box
+	var walk func(b *box)
+	walk = func(b *box) {
+		if b.sticky {
+			stick = b
+			return
+		}
+		for _, c := range b.children {
+			walk(c)
+		}
+	}
+	walk(res.root)
+	if stick == nil {
+		t.Fatal("no sticky box")
+	}
+	if stick.stickyPort == nil {
+		t.Fatal("expected overflow stickyPort on sticky box")
+	}
+	if !overflowCreatesStickyScrollport(stick.stickyPort.style.Overflow) {
+		t.Fatalf("stickyPort overflow=%q, want auto/scroll/hidden", stick.stickyPort.style.Overflow)
+	}
+	for _, op := range res.Ops {
+		if op.Kind != OpText {
+			continue
+		}
+		if strings.Contains(op.Text, "STICKY") {
+			pagesWithSticky[int(op.Y/contentH)] = true
+		}
+	}
+	if len(pagesWithSticky) != 1 {
+		t.Fatalf("overflow sticky on %d page band(s) %v, want exactly 1 (no page clones)",
+			len(pagesWithSticky), pagesWithSticky)
+	}
+}
+
+func TestStickyOverflowClampAtOffsetZero(t *testing.T) {
+	// At scroll offset 0, sticky top:0 inside overflow stays at natural Y when
+	// already below the scrollport top (no spurious jump to page top).
+	s := sheet(t, `
+.scroller { overflow: hidden; width: 200pt; padding-top: 20pt; background:#eee }
+.stick { position: sticky; top: 0; height: 16pt; background:#333; color:#fff }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="scroller"><div class="stick">S</div><p>below</p></div>
+</body></html>`, s)
+	doc := pdf.NewDocument()
+	if err := Paint(doc, res, paintOpts()); err != nil {
+		t.Fatal(err)
+	}
+	var sy float64
+	var found bool
+	for _, op := range res.Ops {
+		if op.Kind == OpText && strings.Contains(op.Text, "S") {
+			sy, found = op.Y, true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("sticky text missing")
+	}
+	// Natural position is below scroller padding — must not jump to y≈0 page top.
+	if sy < 10 {
+		t.Fatalf("sticky y=%.1f jumped toward page top; overflow scrollport at offset 0 should keep natural Y", sy)
+	}
+}
+
 func TestStickyClampYTop(t *testing.T) {
 	b := &box{
 		sticky:       true,

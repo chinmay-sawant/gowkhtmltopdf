@@ -1,7 +1,7 @@
 # Tier 2 Subplans (`plans/phases/subplans-tier-2/`)
 
 > **Parent:** [`plans/10-canonical-post-mvp-roadmap.md`](../../10-canonical-post-mvp-roadmap.md)  
-> **Branch:** `feature/tier-2-pending-2`  
+> **Branch:** `feature/tier-2-pending-2` (deepen work closed); leftovers → `feature/tier-2-pending-3`  
 > **Skill:** [`skills/phase-wise-checklist/SKILLS.md`](../../../skills/phase-wise-checklist/SKILLS.md)
 
 ---
@@ -25,7 +25,7 @@
 | 1 | [image-mode-fontface.md](image-mode-fontface.md) | Image pipeline `@font-face` parity | **done** |
 | 2 | [sticky-print.md](sticky-print.md) | Full print-scoped CSS sticky | **done** (fixture-31) |
 | 3 | [shaping-gotext-typesetting.md](shaping-gotext-typesetting.md) | OT shaping via `go-text/typesetting` | **done** (`go.mod` + `ShapeTextFont`) |
-| 4 | [flex-grid-full.md](flex-grid-full.md) | **Separate** full Flex + Grid ledger | not started |
+| 4 | [flex-grid-full.md](flex-grid-full.md) | **Separate** full Flex + Grid ledger | **done** (Stage A/B + Stage C lite; true L1/L3 + Chrome parity remain `[~]`) |
 
 ### WOFF note
 
@@ -38,11 +38,16 @@ No subplan — **`--font-path` policy stands**; do not bundle full Noto CJK.
 
 ---
 
-## C. Deferred to v0.3.0
+## C. Remaining phases 17–20 leftovers → pending-3
 
-| Subplan | Status |
-|---------|--------|
-| [nested-hf-v0.3.0.md](nested-hf-v0.3.0.md) | `[~]` deferred to **version 0.3.0** |
+| Ledger | Status |
+|--------|--------|
+| [`../tier-2-pending-3/README.md`](../tier-2-pending-3/README.md) | **canonical** execution plan on `feature/tier-2-pending-3` |
+| [nested-hf-v0.3.0.md](nested-hf-v0.3.0.md) | `[~]` superseded → [`../tier-2-pending-3/nested-html-hf.md`](../tier-2-pending-3/nested-html-hf.md) |
+
+Includes: nested HTML HF (pulled forward from v0.3.0), CSS orphans/widows parse,
+float↔table edges, multicol, static transforms, `:has`/`@container`, flex/grid
+hard-edge honesty, sticky overflow honesty, fonts policy.
 
 ---
 

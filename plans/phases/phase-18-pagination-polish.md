@@ -1,7 +1,7 @@
 # Phase 18 - Pagination Polish (Table Header Repeat & Smarter Breaks)
 
 > **Parent:** `plans/10-canonical-post-mvp-roadmap.md`  
-> **Status:** done (core) on `master` via #16; **docs polish pending**  
+> **Status:** done (core + docs honesty) on `master` via #16; pending polish closed  
 > **Estimated effort:** 3–6 weeks  
 > **Depends on:** Phase 5 pagination; table layout  
 > **Unblocks:** long invoices/statements; Tier 2 #8  
@@ -22,7 +22,7 @@ smart-shrinking re-layout.
 |---------|-----|--------|---------------------|
 | Table rows unsplit | Yes | Keep | **Shipped** |
 | `thead` repeat | No | Yes | **Shipped** (`fixture-23`) |
-| orphans/widows | No | Simple heuristics | **Shipped** (heuristics; CSS props not parsed) |
+| orphans/widows | No | Simple heuristics | **Shipped** (CSS props parsed + Rule 3; heuristic fallback) |
 | `--zoom` in convert | Partial | Wired | **Shipped** |
 | Smart-shrinking re-layout | Warn only | Subset | **Shipped** via `Options.Zoom` |
 
@@ -45,8 +45,8 @@ smart-shrinking re-layout.
 - [x] Improve `page-break-inside: avoid` for blocks taller than page (fallback documented)
 - [x] Simple orphans/widows: keep N lines of paragraph together when cheap
 - [x] Avoid breaking immediately after heading (optional heuristic)
-- [ ] Matrix §2.6: still says `orphans`/`widows` “Not implemented” — update to Partial / heuristic note
-- [ ] Fidelity MVP-gap row still says “thead repeat no” — **stale; fix**
+- [x] Matrix §2.6: `orphans`/`widows` → Partial (CSS parsed + Rule 3; heuristic fallback)
+- [x] Fidelity MVP-gap thead-repeat row refreshed (shared doc-honesty)
 
 ### 18.3 Zoom & smart-shrinking
 
@@ -84,10 +84,11 @@ smart-shrinking re-layout.
 
 | Item | Notes |
 |------|--------|
-| Matrix §2.6 orphans/widows | **[x]** Partial (heuristics); CSS props still absent |
+| Matrix §2.6 orphans/widows | **[x]** Partial (CSS props parsed + Rule 3; heuristic fallback) |
 | Fidelity + matrix pagination blurbs | **[x]** Shared doc-honesty pass |
 | CLI docs thead repeat | **[x]** `cli.md` / `library-api.md` notes |
 | Optional orphans fixture | **New** `fixture-30-orphans-heuristic.html` (do not edit 11/23) |
+| CSS `orphans`/`widows` parse | **[x]** → [`tier-2-pending-3/orphans-widows-css.md`](tier-2-pending-3/orphans-widows-css.md) |
 
 ---
 
@@ -102,7 +103,6 @@ smart-shrinking re-layout.
 
 ## Out of scope
 
-- Full CSS Paged Media Level 3
+- Full CSS Paged Media Level 3 / remaining css-break-3 edges beyond orphans/widows Rule 3
 - Named pages / running elements (beyond existing HF)
 - Footnote regions
-- CSS `orphans` / `widows` property parsing (heuristics only unless amended)
