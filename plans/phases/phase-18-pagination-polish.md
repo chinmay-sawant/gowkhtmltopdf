@@ -1,7 +1,7 @@
 # Phase 18 - Pagination Polish (Table Header Repeat & Smarter Breaks)
 
 > **Parent:** `plans/10-canonical-post-mvp-roadmap.md`  
-> **Status:** done (core) on `master` via #16; **docs polish pending**  
+> **Status:** done (core + docs honesty) on `master` via #16; pending polish closed  
 > **Estimated effort:** 3–6 weeks  
 > **Depends on:** Phase 5 pagination; table layout  
 > **Unblocks:** long invoices/statements; Tier 2 #8  
@@ -45,8 +45,8 @@ smart-shrinking re-layout.
 - [x] Improve `page-break-inside: avoid` for blocks taller than page (fallback documented)
 - [x] Simple orphans/widows: keep N lines of paragraph together when cheap
 - [x] Avoid breaking immediately after heading (optional heuristic)
-- [ ] Matrix §2.6: still says `orphans`/`widows` “Not implemented” — update to Partial / heuristic note
-- [ ] Fidelity MVP-gap row still says “thead repeat no” — **stale; fix**
+- [x] Matrix §2.6: `orphans`/`widows` → Partial (heuristics); CSS props not parsed
+- [x] Fidelity MVP-gap thead-repeat row refreshed (shared doc-honesty)
 
 ### 18.3 Zoom & smart-shrinking
 

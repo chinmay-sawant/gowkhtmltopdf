@@ -5,8 +5,8 @@
 > **Estimated effort:** 1–3 months  
 > **Depends on:** Phase 12 font registry  
 > **Unblocks:** localization, CJK reports, better Wikipedia language lists  
-> **Tier:** 2 #7 · **Constraint:** stdlib-only TTF parse/embed; **no HarfBuzz**  
-> **Amendment:** [`plans/amendments/2026-08-04-shaping-stdlib.md`](../amendments/2026-08-04-shaping-stdlib.md)
+> **Tier:** 2 #7 · **Constraint:** stdlib-only TTF parse/embed + allowlisted `go-text/typesetting`; **no CGO HarfBuzz**  
+> **Amendment:** [`plans/amendments/2026-08-04-shaping-stdlib.md`](../amendments/2026-08-04-shaping-stdlib.md) (interim; partly superseded by [`2026-08-05-gotext-typesetting.md`](../amendments/2026-08-05-gotext-typesetting.md))
 
 ---
 
@@ -57,7 +57,7 @@ not OpenType GSUB/GPOS / HarfBuzz.
 - [x] Parse `@font-face` { font-family; src: url(...) } in `internal/css`
 - [x] Support `url(file)` / relative path under allowlist end-to-end (PDF `mergeFontFaces`; `fontface_test.go`)
 - [x] Register face for document lifetime consistently with `--font-path` (PDF registry alias)
-- [ ] Matrix §4 `@font-face` still “Not implemented” in places — **pending honesty update** (shared pass)
+- [x] Matrix §4 `@font-face` → Partial (local TTF/OTF PDF + image; shared doc-honesty)
 - [~] Remote / WOFF download — **out of scope** unless policy amended
 - [x] Image-mode `@font-face` — wired via `convert.MergeFontFaces` (`imageout` + `fontface_test.go`)
 - [x] `font-weight` / `font-style` on `@font-face` ignored at register (documented)
@@ -80,14 +80,16 @@ not OpenType GSUB/GPOS / HarfBuzz.
 - [x] Indic: NFC + honesty “not claimed” (no matra reordering)
 - [x] Hangul: capable face via font-path; CI subset vendored
 - [x] Docs: `documentation/fonts.md` shaping honesty language
-- [~] OpenType `halt`/`palt` / GSUB/GPOS — **deferred** (would need HarfBuzz or a large pure-Go OT stack)
+- [x] OpenType GSUB via `go-text/typesetting` (`ShapeTextFont`; presentation-form fallback)
+- [~] OpenType `halt`/`palt` feature tags — **not wired** / not planned
+- [~] CGO HarfBuzz — **rejected** (allowlist is `go-text/typesetting` only)
 
 ### 19.6 Localization product notes
 
 - [x] Document regional fonts via `--font-path` (fonts.md + fixture README)
 - [x] CLI help: font-path / use-system-fonts flags
 - [x] Library API: settings keys for font paths
-- [x] Explicit non-claim: full Arabic/Indic OpenType shaping not supported
+- [x] Explicit non-claim: full Indic production / CGO HarfBuzz not supported; Arabic is OT Partial + fallback
 
 ### 19.7 Image mode
 
@@ -98,7 +100,7 @@ not OpenType GSUB/GPOS / HarfBuzz.
 ### 19.8 Docs
 
 - [x] fonts.md / README CJK + Hangul rows updated for #17 era
-- [ ] Compatibility-matrix Unicode / flex / @font-face sections still stale in places
+- [x] Compatibility-matrix Unicode / @font-face / shaping rows refreshed (shared doc-honesty)
 - [x] Threat model note: font parse is untrusted input (size/ACL)
 
 ### 19.9 Closure gates
@@ -106,8 +108,8 @@ not OpenType GSUB/GPOS / HarfBuzz.
 - [x] `make lint` / `make test`
 - [x] CJK fixture-27 + folder-font path green
 - [x] Parent Phase 19 core checked
-- [ ] Remaining: matrix honesty (shared pass); `@font-face` E2E audit **done** (see Pending / `fontface_test.go`)
-- [x] Next: **Phase 21** or Phase 20 leftover HF HTML-link polish
+- [x] Matrix honesty (shared pass) + `@font-face` E2E audit done (`fontface_test.go` + imageout)
+- [x] Next: **Phase 21**
 
 ---
 
@@ -118,12 +120,13 @@ not OpenType GSUB/GPOS / HarfBuzz.
 
 | Item | Notes |
 |------|--------|
-| `@font-face` local wiring vs matrix | **Audited** PDF Partial (`fontface_test.go` + fonts.md); matrix label → shared pass |
-| Compatibility-matrix i18n / CJK rows | Update for Type0, Arabic joining, vertical lite, subset fixes |
-| OpenType `halt`/`palt` / full Indic | → [`subplans-tier-2/shaping-gotext-typesetting.md`](subplans-tier-2/shaping-gotext-typesetting.md) + [`amendments/2026-08-05-gotext-typesetting.md`](../amendments/2026-08-05-gotext-typesetting.md) (**plan only**) |
+| `@font-face` local wiring vs matrix | **[x]** PDF + image Partial (`fontface_test.go` + imageout + matrix) |
+| Compatibility-matrix i18n / CJK rows | **[x]** Shared doc-honesty pass |
+| OpenType GSUB via `go-text/typesetting` | **[x]** [`shaping-gotext-typesetting.md`](subplans-tier-2/shaping-gotext-typesetting.md) |
+| OpenType `halt`/`palt` / full Indic / CGO HarfBuzz | **[~]** halt/palt not wired; Indic not production-claimed; CGO HarfBuzz rejected |
 | Bundle full Noto CJK | **[~] no** — `--font-path` is enough |
 | WOFF/WOFF2 | **[~] not required** for typesetting; see shaping subplan WOFF clarification |
-| Image-mode `@font-face` | **Done** — [`subplans-tier-2/image-mode-fontface.md`](subplans-tier-2/image-mode-fontface.md) |
+| Image-mode `@font-face` | **[x]** [`subplans-tier-2/image-mode-fontface.md`](subplans-tier-2/image-mode-fontface.md) |
 
 ---
 

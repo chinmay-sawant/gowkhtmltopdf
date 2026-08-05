@@ -25,7 +25,7 @@
 | 1 | [image-mode-fontface.md](image-mode-fontface.md) | Image pipeline `@font-face` parity | **done** |
 | 2 | [sticky-print.md](sticky-print.md) | Full print-scoped CSS sticky | **done** (fixture-31) |
 | 3 | [shaping-gotext-typesetting.md](shaping-gotext-typesetting.md) | OT shaping via `go-text/typesetting` | **done** (`go.mod` + `ShapeTextFont`) |
-| 4 | [flex-grid-full.md](flex-grid-full.md) | **Separate** full Flex + Grid ledger | not started |
+| 4 | [flex-grid-full.md](flex-grid-full.md) | **Separate** full Flex + Grid ledger | **done** (Stage A/B + Stage C lite; true L1/L3 + Chrome parity remain `[~]`) |
 
 ### WOFF note
 

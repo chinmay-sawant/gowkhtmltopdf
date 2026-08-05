@@ -1,7 +1,7 @@
 # Tier 2 Subplan - Phase 17 Pending (Broader CSS honesty + optional float/table)
 
 > **Parent:** [`plans/phases/phase-17-broader-css.md`](../phase-17-broader-css.md) — Pending (after #17)  
-> **Status:** docs honesty done (shared pass); optional float fixture shipped  
+> **Status:** **done** — docs honesty, fixture-29, print sticky, flex/grid Stage A–C lite  
 > **Estimated effort:** 0.5 day docs (via shared pass) + 0–2 days optional fixtures  
 > **Depends on:** [00-shared-doc-honesty.md](00-shared-doc-honesty.md) for matrix/fidelity  
 > **Constraint:** stdlib-only; no full browser CSS
@@ -10,19 +10,19 @@
 
 ## Overview
 
-Phase 17 **core is shipped** (partial flex, grid lite, position/float/z-index). Remaining
-work is (1) documentation honesty so matrix/fidelity stop claiming “no flex/grid”,
-and (2) optional quality fixtures for float↔table edges. Sticky and full Grid/Flex
-stay deferred.
+Phase 17 **core is shipped** (partial flex, grid lite, position/float/z-index), plus
+follow-ons: print-scoped sticky, flex/grid deepen (Stage A–C lite), and float↔table
+fixture-29. Remaining work is intentional non-goals (full browser CSS / Chrome parity)
+and a few float packing edge cases.
 
 ## Executive Summary
 
 | Pending item (parent) | Disposition | Primary work |
 |-----------------------|-------------|--------------|
-| Compatibility-matrix / fidelity MVP-gap rows | **Must** | Shared doc-honesty Pass 0 |
-| Sticky positioning | `[~]` deferred | Honesty only: sticky ≡ relative-offset |
-| Full Grid / full Flex | `[~]` deferred | Document supported subset; no algorithm expansion |
-| Richer float+table interaction fixtures | **New** `fixture-29-float-beside-table.html` (do not edit fixture-22) |
+| Compatibility-matrix / fidelity MVP-gap rows | **[x] done** | Shared doc-honesty Pass 0 |
+| Sticky positioning | **[x] done** | Print-scoped ([`sticky-print.md`](sticky-print.md); fixture-31) |
+| Full Grid / full Flex | Stage A/B/C lite **[x]**; true L1/L3 + Chrome parity **[~]** | [`flex-grid-full.md`](flex-grid-full.md) |
+| Richer float+table interaction fixtures | **[x] done** | `fixture-29-float-beside-table.html` |
 
 ---
 
@@ -30,40 +30,22 @@ stay deferred.
 
 ### 1.1 Shipped paths (do not re-implement)
 
-- [x] Flex: `internal/layout/flex.go` + `flex_test.go`; fixtures 25, 28
-- [x] Grid lite: `internal/layout/grid.go` + `grid_test.go`; fixture 28
+- [x] Flex: `internal/layout/flex.go` + `flex_test.go`; fixtures 25, 28 (+ Stage A deepen)
+- [x] Grid: `internal/layout/grid.go` + `grid_test.go`; fixtures 28, 32–35 (Stage B/C lite)
 - [x] Position: `layout.go` `buildAbsolute`/`buildFixed`/`applyRelativeOffset`; fixture 26/28
+- [x] Print sticky: `sticky.go` / `applyStickyPrint`; fixture-31; `TestSticky*`
 - [x] z-index lite: `paint.go` `sortPaintIndices`; `TestZIndexPaintOrder`
-- [x] Float lite: `float.go` + `TestFloatWidthPercent`; fixture 22
+- [x] Float lite: `float.go` + `TestFloatWidthPercent`; fixtures 22, 29
 
 ### 1.2 Supported property subset (honesty bullets for matrix)
 
-**Flex (Partial)** — parsed + used:
-- `display: flex | inline-flex`
-- `flex-direction: row | column` (no `*-reverse`)
-- `flex-wrap: nowrap | wrap | wrap-reverse`
-- `justify-content: flex-start | flex-end | center | space-between | start | end`
-- `align-items: stretch | flex-start | flex-end | center | start | end` (stretch does not grow height)
-- `gap` / `row-gap` / `column-gap` → single shared `Gap`
-- `flex-grow`, `flex-shrink`, `flex-basis` (length / `%` / `auto`); min/max-width clamp
-- `order`
-- Column path: order + gap only (no grow/shrink/justify on column)
-
-**Not flex:** shorthand `flex:`; `align-self`; `align-content`; content-based min-size iterations
-
-**Grid lite (Partial):**
-- `display: grid | inline-grid`
-- `grid-template-columns` (lengths, `Nfr`, `repeat(n, …)`)
-- shared `gap`
-- `grid-column` / start / end (`span N`, `start / end`)
-- nested grids; auto-flow row occupancy
-- `grid-template-rows` stored but **unused** in layout
-
-**Not grid:** areas, dense auto-flow, row spans, `grid-row*`, justify/align on grid, named lines
+See matrix §2.7 / §2.8 and [`flex-grid-full.md`](flex-grid-full.md) for the current
+Partial property tables (Stage A flex + Stage B/C grid lite including subgrid
+copy-inherit and one-axis masonry pack).
 
 **Position:**
 - relative / absolute / fixed lite consumed
-- sticky parsed but **aliased to relative offsets** (`layout.go` treats `sticky` like relative) — not true sticky pagination
+- sticky = print-scoped clamp (page content box = scrollport) — not overflow-scroll sticky
 
 ---
 
@@ -81,20 +63,21 @@ stay deferred.
 
 ### 2.2 Sticky honesty sentence
 
-- [x] Matrix/README: explicit “sticky ≈ relative offsets; no page-edge stickiness”
-- [x] Cite `applyRelativeOffset` + lack of `TestSticky`
-- [x] Keep parent `[~] position: sticky - deferred`
+- [x] Matrix/README: sticky = print page-content-box scrollport (not relative-only alias)
+- [x] Cite `sticky.go` / `applyStickyPrint` + `TestSticky*` / fixture-31
+- [x] Parent sticky rows flipped to `[x]` (print-scoped); overflow-scroll sticky remains `[~]`
 
 ---
 
-## Phase 3: Deferred full Flex / Grid (confirmation only)
+## Phase 3: Flex / Grid deepen (executed via flex-grid-full)
 
-### 3.1 Record non-goals in checklist
+### 3.1 Record scope
 
-- [x] Confirm full CSS Grid (areas, dense, row spans, complex `fr`) remains **out of scope**
-- [x] Confirm full flex algorithm (cyclic %-sizing, content-based min-size) remains **out of scope**
-- [x] Confirm multi-column `column-count`, transforms, container queries remain deferred
-- [x] No code change required — honesty + parent `[~]` rows sufficient
+- [x] Stage A flex deepen shipped — [`flex-grid-full.md`](flex-grid-full.md)
+- [x] Stage B grid deepen shipped
+- [x] Stage C lite shipped (cyclic `%` subset; subgrid copy-inherit; masonry pack lite)
+- [~] True shared-track subgrid / full CSS Grid L3 masonry / Chrome layout-test parity — still deferred
+- [~] Multi-column `column-count`, transforms, container queries / `:has()` — still deferred
 
 ---
 
@@ -123,12 +106,12 @@ stay deferred.
 ### 5.1 Required
 
 - [x] Shared doc-honesty Pass 0 complete for Phase 17 claims
-- [x] Parent Phase 17 Pending table updated (matrix rows `[x]`; sticky/full grid/flex remain `[~]`)
+- [x] Parent Phase 17 Pending table updated (matrix/sticky/fixture rows `[x]`; browser-parity flex/grid remain `[~]`)
 - [x] Docs-only: no lint/test required; if fixtures added → `make lint` + `make test`
 
 ### 5.2 Next
 
-- [ ] Phase 18 pending (pagination honesty) or Phase 21 product work
+- [x] Phase 18–20 pending closed; product next is **Phase 21**
 
 ---
 
@@ -137,14 +120,14 @@ stay deferred.
 | Depends on | Provides to |
 |------------|-------------|
 | Shared doc-honesty | Closable matrix/fidelity pending |
-| Shipped flex/grid/position | Accurate Partial property lists |
-| Optional float fixture | Stronger float↔table evidence for Phase 21 |
+| Shipped flex/grid/position/sticky | Accurate Partial property lists |
+| Float fixture-29 | Stronger float↔table evidence for Phase 21 |
 
 ---
 
 ## Out of scope
 
 - Pixel parity with Chrome layout tests
-- Implementing real `position: sticky`
-- Expanding to full Flex/Grid algorithms
+- Continuous-media sticky inside `overflow: auto` scrollers
+- True shared-track subgrid / full CSS Grid L3 masonry
 - Bootstrap/Tailwind framework support claims

@@ -1,7 +1,7 @@
 # Tier 2 Subplan - Phase 20 Pending (HTML HF fragment GoTo + link honesty)
 
 > **Parent:** [`plans/phases/phase-20-hf-links-edges.md`](../phase-20-hf-links-edges.md) — Pending (after #17)  
-> **Status:** code shipped (HF fragment GoTo); matrix/fidelity honesty still shared  
+> **Status:** **done** (HF fragment GoTo + matrix/fidelity honesty)  
 > **Estimated effort:** 1–3 days code + tests; docs via shared pass  
 > **Depends on:** Phase 6 locations map; [00-shared-doc-honesty.md](00-shared-doc-honesty.md) for matrix link rows  
 > **Constraint:** stdlib-only; no full nested HTML HF documents
@@ -21,8 +21,8 @@ lag on several already-shipped link behaviors (shared honesty pass).
 | Pending item (parent) | Disposition | Primary work |
 |-----------------------|-------------|--------------|
 | HTML HF → body fragment (`#id`) GoTo | **Shipped (code)** | `drawHTMLHF` → `AddLinkDest` via `buildBodyIDIndex` |
-| Shared matrix/fidelity refresh | **Must (docs)** | Shared Pass 0 |
-| Full HTML HF as nested documents | Out of scope | Keep `[~]` |
+| Shared matrix/fidelity refresh | **[x] done** | Shared Pass 0 |
+| Full HTML HF as nested documents | Out of scope | Keep `[~]` → v0.3.0 |
 
 ---
 
@@ -77,7 +77,7 @@ Owned by [00-shared-doc-honesty.md](00-shared-doc-honesty.md) §2.5:
 
 - [x] `plans/phases/phase-06-headers-toc-outline.md`: rewrite Known limitations / §6.5 — HF fragment GoTo shipped; no stale deferred claims
 - [x] Proof: `rg -n 'not carried|resolveRelativeLinks deferred|topage.*copies' plans/phases/phase-06-headers-toc-outline.md` → no stale claims
-- [ ] Qualify `plans/PR/pr-tier-2.md` HF bullet as URI shipped / fragment pending (if still wrong) — shared/doc owner
+- [x] Qualify `plans/PR/pr-tier-2.md` HF bullet — URI + fragment GoTo both shipped (matrix/README are source of truth)
 
 ### 2.3 Already honest
 
@@ -160,7 +160,7 @@ pages and relies on `DuplicatePage` to copy annots. HF must target final indices
 ### 5.1 Required
 
 - [x] HF fragment GoTo tests green
-- [ ] Shared doc-honesty link rows landed
+- [x] Shared doc-honesty link rows landed
 - [x] Parent Phase 20 Pending HF fragment row → `[x]`
 - [x] Convert package tests + lint recorded below
 
@@ -174,7 +174,7 @@ pages and relies on `DuplicatePage` to copy annots. HF must target final indices
 
 ### 5.3 Next
 
-- [ ] Phase 21 arbitrary websites (product), or close Tier 2 pending entirely
+- [ ] Phase 21 arbitrary websites (product next)
 
 ---
 

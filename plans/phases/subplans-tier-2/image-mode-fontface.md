@@ -58,7 +58,8 @@ the image pipeline so CSS-declared local faces work for PNG/JPEG output.
 
 - [x] `go test ./internal/imageout -count=1` → PASS
 - [x] `go test ./internal/convert -run FontFace -count=1` → PASS
-- [~] `make lint` → blocked by parallel sticky WIP (`internal/layout/sticky_test.go` undefined `css`; out of scope). Owned packages: `go vet ./internal/imageout ./internal/convert` → PASS
+- [x] `make lint` / owned packages: sticky WIP resolved; `go vet ./internal/imageout ./internal/convert` → PASS
+- [x] Matrix `@font-face` Partial note: PDF + image local TTF (`compatibility-matrix.md`)
 
 ---
 
@@ -67,7 +68,7 @@ the image pipeline so CSS-declared local faces work for PNG/JPEG output.
 ### 3.1 Honesty
 
 - [x] `documentation/fonts.md`: remove “image mode N/A” for local `@font-face`
-- [ ] Matrix `@font-face` Partial note: PDF + image local TTF — **other agent** (`compatibility-matrix.md`)
+- [x] Matrix `@font-face` Partial note: PDF + image local TTF (`compatibility-matrix.md`)
 - [x] Phase 19 Pending / 19.7 rows updated
 
 ---
