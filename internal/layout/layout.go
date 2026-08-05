@@ -187,6 +187,13 @@ func (e *engine) faceForRune(st ResolvedStyle, r rune) *pdf.Font {
 	if e.font != nil && e.font.GlyphID(r) != 0 {
 		return e.font
 	}
+	// Last resort: any opt-in registry face that covers this codepoint
+	// (DejaVu/Noto when --font-path / --use-system-fonts scanned them).
+	if e.registry != nil {
+		if f := e.registry.FindWithGlyph(r, st.FontWeight, st.FontItalic); f != nil {
+			return f
+		}
+	}
 	return e.faceFor(st)
 }
 

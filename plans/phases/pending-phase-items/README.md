@@ -2,12 +2,12 @@
 
 > **Parent:** [`plans/phases/phase-21-arbitrary-websites.md`](../phase-21-arbitrary-websites.md) · [`plans/10-canonical-post-mvp-roadmap.md`](../../10-canonical-post-mvp-roadmap.md)  
 > **Branch:** `feature/pending-phase-items`  
-> **Status:** executing (Phase 1 done; Phase 2 partial; Phase 3 next)  
+> **Status:** executing (Phases 1–3 done; Phase 2 partial; Phase 4 next)  
 > **Estimated effort:** multi-week (quick wins first → hard/policy last)  
 > **Skill:** [`skills/phase-wise-checklist/SKILLS.md`](../../../skills/phase-wise-checklist/SKILLS.md)  
 > **Constraint:** stdlib layout + allowlisted `go-text/typesetting`; no CGO HarfBuzz; no browser embed  
 > **Smoke (raw, no `--simplify-dom`):**  
-> `./bin/gowkhtmltopdf 'https://en.wikipedia.org/wiki/Ana_de_Armas' output/wiki-ana-de-armas.pdf`  
+> `./bin/gowkhtmltopdf --use-system-fonts 'https://en.wikipedia.org/wiki/Ana_de_Armas' output/wiki-ana-de-armas.pdf`  
 > **Reference:** `output/chrome_ana.pdf` (Chrome print of same URL — not an acceptance golden)
 
 ---
@@ -35,7 +35,7 @@ above when relevant). Do not mark `[x]` without evidence.
 |------:|-------|--------|--------|-----------------|-------------|
 | 1 | [`01-link-pseudos.md`](01-link-pseudos.md) — `:link` / `:visited` print | Blue links (wiki Vector) | Quick | Matrix “ignored”; **no implement row** | **done** (2026-08-05) |
 | 2 | [`02-openweb-css-residuals.md`](02-openweb-css-residuals.md) — Phase 17/21 CSS leftovers | Page count, infobox, density | Medium | Phase 21 §21.3; pending-3 shipped core | **partial** (attr `~=`/`*=` + wiki-like print chrome; live density open) |
-| 3 | [`03-unicode-glyph-fallback.md`](03-unicode-glyph-fallback.md) — IPA / missing glyphs | Pronunciation, symbols | Quick–medium | Phase 19 fonts; WOFF2 out | **Must** |
+| 3 | [`03-unicode-glyph-fallback.md`](03-unicode-glyph-fallback.md) — IPA / missing glyphs | Pronunciation, symbols | Quick–medium | Phase 19 fonts; WOFF2 out | **done** (2026-08-05) |
 | 4 | [`04-print-media-stylesheets.md`](04-print-media-stylesheets.md) — `@media print` + sheet volume | Chrome ~10pp vs our ~32pp | Medium | Phase 21 §21.3; matrix `@media` weak | **Should** |
 | 5 | [`05-url-mode-flags.md`](05-url-mode-flags.md) — URL-mode flag recipe | Usable paste-URL UX | Quick (docs) | Phase 21 §21.5 / cli.md | **Must** |
 | 6 | [`06-selector-cascade-gaps.md`](06-selector-cascade-gaps.md) — skin selectors | Rules never match | Medium–hard | Selectors Partial; `:has` shipped | **Should** |

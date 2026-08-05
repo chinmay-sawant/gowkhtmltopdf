@@ -59,7 +59,8 @@ samples:
 	go run ./cmd/gowkhtmltoimage --enable-local-file-access testdata/golden/fixture-01-simple-invoice.html output/fixture-01-simple-invoice.png
 	go run ./examples/image --enable-local-file-access --width 1024 testdata/golden/fixture-21-detailed-report.html output/fixture-21-detailed-report.png
 	# Live Wikipedia smoke (network, raw — no --simplify-dom). Soft-fail so offline/CI hosts still get fixture samples.
-	go run ./cmd/gowkhtmltopdf \
+	# --use-system-fonts enables Unicode/IPA glyph fallback (DejaVu/Noto when present).
+	go run ./cmd/gowkhtmltopdf --use-system-fonts \
 		'https://en.wikipedia.org/wiki/Ana_de_Armas' \
 		output/wiki-ana-de-armas.pdf \
 		|| echo "warning: wiki-ana-de-armas.pdf live smoke skipped (network/fetch failed)"

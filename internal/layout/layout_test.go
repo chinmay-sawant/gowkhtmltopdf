@@ -6,6 +6,7 @@ import (
 	"image/color"
 	"image/png"
 	"math"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -494,6 +495,49 @@ func TestLinkPseudoColor(t *testing.T) {
 	// bare <a> has no href → :link does not match; a { #111 } applies (not hover red).
 	if bare.R > 0.2 || bare.G > 0.2 || bare.B > 0.2 {
 		t.Errorf("bare <a> color = (%v,%v,%v), want near #111 (not :link/:hover)", bare.R, bare.G, bare.B)
+	}
+}
+
+func TestIPAGlyphRegistryFallback(t *testing.T) {
+	dejavu := "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+	if _, err := os.Stat(dejavu); err != nil {
+		t.Skip("DejaVu Sans not installed")
+	}
+	reg, err := pdf.ScanFontDir("/usr/share/fonts/truetype/dejavu")
+	if err != nil || reg == nil {
+		t.Fatalf("ScanFontDir: %v", err)
+	}
+	ipa := "ˈaɾ"
+	root := mustParse(t, `<html><body><p style="font-family: Liberation Sans, sans-serif">`+ipa+`</p></body></html>`)
+	res, err := Layout(root, Options{Width: testViewport, Height: 400, Registry: reg, Media: "print"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	texts := opsOfKind(res, OpText)
+	if len(texts) == 0 {
+		t.Fatal("no text ops")
+	}
+	// At least one run should use a non-Liberation face that has IPA glyphs.
+	var usedDejaVu bool
+	for _, op := range texts {
+		if op.Font == nil {
+			continue
+		}
+		for _, n := range op.Font.FamilyNames() {
+			if strings.Contains(strings.ToLower(n), "dejavu") {
+				usedDejaVu = true
+			}
+		}
+		// Missing-glyph junk often has tiny/wrong advances; ensure ˈ is present as shaped text.
+		if strings.Contains(op.Text, "ˈ") || strings.Contains(op.Text, "ɾ") {
+			if op.Font.GlyphID('ˈ') == 0 && op.Font.GlyphID('ɾ') == 0 {
+				t.Errorf("IPA run still on face without IPA glyphs: families=%v text=%q", op.Font.FamilyNames(), op.Text)
+			}
+		}
+	}
+	if !usedDejaVu {
+		t.Logf("ops=%+v", texts)
+		t.Error("expected DejaVu fallback for IPA codepoints missing from Liberation")
 	}
 }
 

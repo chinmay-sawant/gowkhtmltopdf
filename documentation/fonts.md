@@ -67,6 +67,11 @@ for CJK.
   typesetting.
 - **Mixed Latin + CJK:** Latin glyphs missing from a CJK face are drawn with
   embedded Liberation; CJK continues on the Type0 sibling of the original face.
+- **IPA / uncommon Unicode:** when the CSS `font-family` face (and Liberation)
+  lack a glyph, the layout engine falls back to **any** face on the opt-in
+  registry that covers the codepoint (prefers DejaVu/Noto family names). Use
+  `--use-system-fonts` or `--font-path` (e.g. DejaVu) for Wikipedia phonetic
+  lines. Remote WOFF2 webfonts remain skipped by policy.
 - **`@font-face` (Partial):** local `url(...ttf|otf|woff)` under loader ACL
   (`--enable-local-file-access` / `--allow`) is fetched via `FetchSub`,
   parsed (WOFF1 → SFNT via stdlib zlib), and registered for the document on

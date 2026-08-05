@@ -67,6 +67,47 @@ func (r *Registry) Lookup(families []string, weight int, italic bool) *Font {
 	return nil
 }
 
+// FindWithGlyph returns any registered face that has a glyph for ch, preferring
+// weight/italic match. Used as a last-resort Unicode fallback when CSS
+// font-family faces (and Liberation) lack the codepoint (e.g. IPA ˈ/ɾ).
+func (reg *Registry) FindWithGlyph(ch rune, weight int, italic bool) *Font {
+	if reg == nil {
+		return nil
+	}
+	bold := weight >= 700
+	var best *Font
+	bestScore := -1
+	seen := map[*Font]bool{}
+	for _, faces := range reg.byFamily {
+		for _, f := range faces {
+			if f == nil || seen[f] || f.GlyphID(ch) == 0 {
+				continue
+			}
+			seen[f] = true
+			score := 1
+			if f.Bold() == bold {
+				score += 2
+			}
+			if f.Italic() == italic {
+				score += 2
+			}
+			// Prefer known Unicode-capable families when several match.
+			for _, n := range f.FamilyNames() {
+				low := strings.ToLower(n)
+				if strings.Contains(low, "dejavu") || strings.Contains(low, "noto") || strings.Contains(low, "freesans") {
+					score += 3
+					break
+				}
+			}
+			if score > bestScore {
+				bestScore = score
+				best = f
+			}
+		}
+	}
+	return best
+}
+
 func pickFace(faces []*Font, weight int, italic bool) *Font {
 	bold := weight >= 700
 	var best *Font

@@ -51,11 +51,12 @@ Always re-open a regenerated PDF in a real viewer when changing the PDF writer.
 ### Optional live smoke (also via `make samples` — not `make test`)
 
 `make samples` refreshes `output/wiki-ana-de-armas.pdf` from the live Wikipedia
-URL **without** `--simplify-dom` (raw page chrome included). Requires network;
-soft-fails if unreachable. Manual equivalent:
+URL **without** `--simplify-dom` (raw page chrome included) and **with**
+`--use-system-fonts` so IPA/Unicode glyphs can fall back to DejaVu/Noto when
+present. Requires network; soft-fails if unreachable. Manual equivalent:
 
 ```sh
-./bin/gowkhtmltopdf \
+./bin/gowkhtmltopdf --use-system-fonts \
   'https://en.wikipedia.org/wiki/Ana_de_Armas' output/wiki-ana-de-armas.pdf
 ```
 
