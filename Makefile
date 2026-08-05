@@ -43,6 +43,7 @@ samples:
 	if [ -d /usr/share/fonts/truetype/droid ]; then FONT_FLAGS="$$FONT_FLAGS --font-path /usr/share/fonts/truetype/droid"; fi; \
 	if [ -d testdata/fonts ]; then FONT_FLAGS="$$FONT_FLAGS --font-path testdata/fonts"; fi; \
 	for f in testdata/golden/fixture-*.html; do \
+		case "$$f" in *-header.html|*-footer.html) continue;; esac; \
 		name=$$(basename "$$f" .html); \
 		go run ./cmd/gowkhtmltopdf --enable-local-file-access $$FONT_FLAGS "$$f" "output/$$name.pdf"; \
 	done

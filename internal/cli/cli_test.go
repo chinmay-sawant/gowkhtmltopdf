@@ -258,6 +258,20 @@ func TestLoadFlags(t *testing.T) {
 	}
 }
 
+func TestSimplifyDOMFlag(t *testing.T) {
+	cmd := parse(t, "--simplify-dom", "in.html", "out.pdf")
+	if !cmd.Global.Web.SimplifyDOM {
+		t.Error("global web.simplifydom")
+	}
+	if !cmd.Objects[0].Web.SimplifyDOM {
+		t.Error("object web.simplifydom")
+	}
+	cmd = parse(t, "--simplify-dom", "--no-simplify-dom", "in.html", "out.pdf")
+	if cmd.Global.Web.SimplifyDOM || cmd.Objects[0].Web.SimplifyDOM {
+		t.Error("--no-simplify-dom should clear the flag")
+	}
+}
+
 func TestUnknownFlagErrors(t *testing.T) {
 	if _, err := Parse([]string{"--bogus-flag", "x", "out.pdf"}, nil); err == nil {
 		t.Error("unknown flag must error")

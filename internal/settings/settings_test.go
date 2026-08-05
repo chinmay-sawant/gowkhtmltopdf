@@ -198,6 +198,12 @@ func TestObjectSetDottedKeys(t *testing.T) {
 	if o.Web.Images {
 		t.Error("web.images should be false")
 	}
+	if err := o.Set("web.simplifydom", "true"); err != nil {
+		t.Fatal(err)
+	}
+	if !o.Web.SimplifyDOM {
+		t.Error("web.simplifydom should be true")
+	}
 }
 
 func TestParseUnitReal(t *testing.T) {

@@ -1,0 +1,164 @@
+package convert
+
+import (
+	"bytes"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"gowkhtmltopdf/internal/css"
+	"gowkhtmltopdf/internal/html"
+	"gowkhtmltopdf/internal/layout"
+	"gowkhtmltopdf/internal/pdf"
+	"gowkhtmltopdf/internal/settings"
+)
+
+// chromeHTML is a wiki-like page with chrome left visible (no author
+// display:none). Used to prove --simplify-dom is opt-in.
+const chromeHTML = `<!DOCTYPE html>
+<html><body>
+  <a class="mw-jump-link" href="#content">Jump to content UNIQUEJUMP</a>
+  <nav class="site-nav"><ul><li>Random article UNIQUENAV</li></ul></nav>
+  <div id="mw-navigation">Wiki tools UNIQUEMWNAV</div>
+  <aside role="complementary">Appearance UNIQUEASIDE</aside>
+  <footer>Site footer UNIQUEFOOTER</footer>
+  <main id="content">
+    <h1>Article Title UNIQUE TITLE</h1>
+    <p>Body paragraph UNIQUEBODY for the print path.</p>
+  </main>
+</body></html>`
+
+func TestSimplifyDOMOffKeepsChrome(t *testing.T) {
+	cmd, _ := newCommand(t, chromeHTML, filepath.Join(t.TempDir(), "off.pdf"))
+	cmd.Global.UseCompression = false
+	data := runPDF(t, cmd)
+	for _, needle := range []string{"UNIQUENAV", "UNIQUEJUMP", "UNIQUEMWNAV", "UNIQUEASIDE", "UNIQUEFOOTER", "UNIQUEBODY"} {
+		if !bytes.Contains(data, []byte(needle)) {
+			t.Errorf("flag off: PDF missing %q (chrome/body should remain)", needle)
+		}
+	}
+}
+
+func TestSimplifyDOMOnHidesChrome(t *testing.T) {
+	cmd, _ := newCommand(t, chromeHTML, filepath.Join(t.TempDir(), "on.pdf"))
+	cmd.Global.UseCompression = false
+	cmd.Global.Web.SimplifyDOM = true
+	cmd.Objects[0].Web.SimplifyDOM = true
+	data := runPDF(t, cmd)
+	if !bytes.Contains(data, []byte("UNIQUEBODY")) {
+		t.Error("flag on: body text missing from PDF")
+	}
+	if !bytes.Contains(data, []byte("UNIQUE TITLE")) && !bytes.Contains(data, []byte("Article Title")) {
+		t.Error("flag on: title missing from PDF")
+	}
+	for _, needle := range []string{"UNIQUENAV", "UNIQUEJUMP", "UNIQUEMWNAV", "UNIQUEASIDE", "UNIQUEFOOTER"} {
+		if bytes.Contains(data, []byte(needle)) {
+			t.Errorf("flag on: chrome text %q should be display:none and absent from PDF", needle)
+		}
+	}
+}
+
+func TestSimplifyChromeCSSParsesAndMatches(t *testing.T) {
+	sheet, err := css.Parse(SimplifyChromeCSS)
+	if err != nil || sheet == nil {
+		t.Fatalf("parse SimplifyChromeCSS: %v", err)
+	}
+	root, err := html.Parse(chromeHTML)
+	if err != nil {
+		t.Fatal(err)
+	}
+	font, err := pdf.DefaultFont()
+	if err != nil {
+		t.Fatal(err)
+	}
+	off := layoutMust(t, root, nil, font)
+	on := layoutMust(t, root, []*css.Stylesheet{sheet}, font)
+	offText := layoutText(off)
+	onText := layoutText(on)
+	if !strings.Contains(offText, "UNIQUENAV") {
+		t.Fatal("layout without simplify should include nav text")
+	}
+	if strings.Contains(onText, "UNIQUENAV") || strings.Contains(onText, "UNIQUEFOOTER") {
+		t.Fatalf("layout with simplify should hide chrome; got %q", onText)
+	}
+	if !strings.Contains(onText, "UNIQUEBODY") {
+		t.Fatalf("layout with simplify should keep body; got %q", onText)
+	}
+}
+
+func TestAppendSimplifySheetNoopWhenOff(t *testing.T) {
+	got := AppendSimplifySheet(nil, false)
+	if got != nil {
+		t.Fatalf("want nil, got %d sheets", len(got))
+	}
+	got = AppendSimplifySheet(nil, true)
+	if len(got) != 1 {
+		t.Fatalf("want 1 sheet, got %d", len(got))
+	}
+}
+
+func TestSimplifyDOMEnabled(t *testing.T) {
+	if SimplifyDOMEnabled(settings.Web{}, settings.Web{}) {
+		t.Fatal("default must be off")
+	}
+	if !SimplifyDOMEnabled(settings.Web{SimplifyDOM: true}, settings.Web{}) {
+		t.Fatal("global on")
+	}
+	if !SimplifyDOMEnabled(settings.Web{}, settings.Web{SimplifyDOM: true}) {
+		t.Fatal("object on")
+	}
+}
+
+func layoutMust(t *testing.T, root *html.Node, sheets []*css.Stylesheet, font *pdf.Font) *layout.Result {
+	t.Helper()
+	res, err := layout.Layout(root, layout.Options{
+		Width:  500,
+		Height: 700,
+		Font:   font,
+		Sheets: sheets,
+		Media:  "print",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return res
+}
+
+func layoutText(res *layout.Result) string {
+	var b strings.Builder
+	for _, op := range res.Ops {
+		if op.Kind == layout.OpText {
+			b.WriteString(op.Text)
+			b.WriteByte(' ')
+		}
+	}
+	return b.String()
+}
+
+// TestSubresourceFailureIsolation: missing CSS + broken image must not
+// abort conversion; body text still appears (phase 21.5).
+func TestSubresourceFailureIsolation(t *testing.T) {
+	htmlSrc := `<html><head>
+<link rel="stylesheet" href="missing-no-such.css">
+</head><body>
+<p>ISOLATIONBODY</p>
+<img src="missing-no-such.png" width="40" height="40">
+</body></html>`
+	cmd, _ := newCommand(t, htmlSrc, filepath.Join(t.TempDir(), "iso.pdf"))
+	cmd.Global.UseCompression = false
+	var log bytes.Buffer
+	if err := RunPDF(cmd, &log); err != nil {
+		t.Fatalf("RunPDF should succeed with missing subresources: %v", err)
+	}
+	data, err := os.ReadFile(cmd.Output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(data, []byte("ISOLATIONBODY")) {
+		t.Error("body text missing after CSS/image failures")
+	}
+	if !strings.Contains(log.String(), "skipping <link") {
+		t.Errorf("expected warning about missing stylesheet; log=%q", log.String())
+	}
+}

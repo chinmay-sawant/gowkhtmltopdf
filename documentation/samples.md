@@ -15,6 +15,19 @@ make golden
 # equivalent: go test ./internal/convert/ -run 'TestGoldenCorpus' -v
 ```
 
+## Vendored web fixtures (`testdata/web/`)
+
+Static HTML used by Phase 21 acceptance tests (no live network in `make test`):
+
+| File | Role |
+|------|------|
+| `testdata/web/wiki-like-article.html` | Wiki-like article (title **Ana de Armas**); nav chrome present but `display:none` |
+| `testdata/web/marketing-landing.html` | Marketing landing with hero + primary CTA |
+
+```sh
+go test ./internal/convert -run 'TestWeb(Wiki|Marketing)FixtureAcceptance' -count=1
+```
+
 ## Committed PDF/PNG samples (`output/`)
 
 | Artifact | Source |
@@ -23,7 +36,7 @@ make golden
 | `output/fixture-01-simple-invoice.png` | Image converter smoke |
 | `output/fixture-21-detailed-report.png` | Detailed report via library image API |
 | `output/showcase-toc-hf-outline.pdf` | TOC + HF + outline on fixture-16 |
-| `output/wiki-ana-de-armas.pdf` | Optional complex URL smoke (Wikipedia) |
+| `output/wiki-ana-de-armas.pdf` | Optional live Wikipedia smoke (manual; not CI) |
 
 Regenerate:
 
@@ -34,6 +47,18 @@ make samples
 These files are **illustrative**. They are not byte-for-byte golden masters;
 font subsets and timestamps may differ across rebuilds depending on settings.
 Always re-open a regenerated PDF in a real viewer when changing the PDF writer.
+
+### Optional live smoke (manual / nightly — not `make test`)
+
+To refresh the Wikipedia-class sample against a live URL (requires network):
+
+```sh
+./bin/gowkhtmltopdf 'https://en.wikipedia.org/wiki/Ana_de_Armas' output/wiki-ana-de-armas.pdf
+```
+
+Open the PDF and check the Phase 21 “decent print” bar (title early, body readable,
+chrome not dominating). Do **not** gate CI on this; update `output/wiki-*.pdf` only
+when intentionally regenerating samples.
 
 ## Makefile targets
 

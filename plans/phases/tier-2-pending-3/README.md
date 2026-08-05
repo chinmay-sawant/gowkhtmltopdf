@@ -2,7 +2,7 @@
 
 > **Parent:** [`plans/10-canonical-post-mvp-roadmap.md`](../../10-canonical-post-mvp-roadmap.md)  
 > **Branch:** `feature/tier-2-pending-3`  
-> **Status:** done (waves 1–2 shipped 2026-08-05; optional nested HF golden fixture-36 still open)  
+> **Status:** done (waves 1–2 shipped 2026-08-05; nested HF golden fixture-36 closed)  
 > **Estimated effort:** 6–12 weeks  
 > **Skill:** [`skills/phase-wise-checklist/SKILLS.md`](../../../skills/phase-wise-checklist/SKILLS.md)  
 > **Constraint:** stdlib layout + allowlisted `go-text/typesetting`; no CGO HarfBuzz; no browser engine
@@ -27,7 +27,7 @@ sticky overflow behavior.
 
 | Order | Subplan | Phase | Kind | Default disposition |
 |------:|---------|-------|------|---------------------|
-| 1 | [nested-html-hf.md](nested-html-hf.md) | 20 | **Must** | **done** — child HF layout + registry/`MergeFontFaces`; optional fixture-36 open |
+| 1 | [nested-html-hf.md](nested-html-hf.md) | 20 | **Must** | **done** — child HF layout + registry/`MergeFontFaces`; golden fixture-36 |
 | 2 | [orphans-widows-css.md](orphans-widows-css.md) | 18 | **Must** | **done** — CSS orphans/widows + fragmentation; fixture-37 |
 | 3 | [float-table-packing.md](float-table-packing.md) | 17 | **Must** | **done** — clear-below tables, float-in-td, blockify; fixture-38 |
 | 4 | [multicol.md](multicol.md) | 17 | **Must** | **done** — `column-count` / width / gap / span lite; fixture-39 |

@@ -47,14 +47,18 @@ Open `/tmp/invoice.pdf` in any PDF viewer. Committed samples live in
 
 HTTP(S) fetch uses timeouts, redirect limits, and size caps. Complex public
 sites (heavy CSS/JS) will not look like a browser; the product target is
-server-generated HTML.
+server-generated HTML. Phase 21 “decent print” for arbitrary sites is a
+**progressive goal**, not MVP acceptance — see
+[fidelity.md](fidelity.md#arbitrary-websites-phase-21).
 
 **If you embed this in Gin (or any API):** do **not** pass arbitrary user
 `?url=` values into the converter without host allowlists and network
 isolation - that is classic **SSRF** (your server fetches internal hosts).
 The **preferred** pattern is to generate HTML yourself, then convert that.
 The same class of issue exists for **upstream wkhtmltopdf**. See
-[integration-security.md](integration-security.md).
+[cli.md — Remote URL security](cli.md#remote-url-security),
+[integration-security.md](integration-security.md), and
+[THREAT-MODEL.md](THREAT-MODEL.md).
 
 ## Image output
 

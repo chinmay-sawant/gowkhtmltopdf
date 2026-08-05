@@ -3,12 +3,13 @@
 > **Parent:** `plans/00-canonical-pure-go-rewrite.md` (Phase 0.1); post-MVP updates under `plans/10-canonical-post-mvp-roadmap.md`  
 > **Status:** living contract - amendments go through plan review  
 > **Target:** controlled report/invoice HTML → PDF. **Not** a browser.  
-> **Last honesty audit:** 2026-08-05 · base commit `f5bb754` · Tier 2 phases 17–20 core on master (#16/#17) · fidelity guide: [fidelity.md](fidelity.md)
+> **Last honesty audit:** 2026-08-05 · base commit `f5bb754` · Tier 2 phases 17–20 core on master (#16/#17) · fidelity guide: [fidelity.md](fidelity.md)  
+> **Phase 21 note:** arbitrary-website / “decent print” work does **not** expand this matrix. CSS remains a **report subset** (Partial flex/grid/position; many properties Not implemented). No new Implemented rows until code + tests ship — see [fidelity.md § Arbitrary websites](fidelity.md#arbitrary-websites-phase-21).
 
 This document is the **contract** the layout engine is allowed to implement.
 Anything not listed here is *unsupported*; unsupported input must degrade
 gracefully (ignored declaration / skipped node / documented error), never
-crash. Product framing: [fidelity.md](fidelity.md).
+crash. Product framing: [fidelity.md](fidelity.md). **Still not full CSS.**
 
 ---
 
@@ -263,7 +264,7 @@ Status legend as in §2; evidence in `internal/css/css.go`.
 
 ## 7. CLI flag support matrix (Phase 9.1)
 
-Extracted from every `add(...)` call in `internal/cli/flags.go` (109 flags;
+Extracted from every `add(...)` call in `internal/cli/flags.go` (98 flags;
 each bool flag also accepts `--no-<flag>`). Status is **ground truth, not
 intent**: each flag's dotted setting was traced from the `Set` surface
 (`internal/settings/reflect.go`) to its consumers in `internal/convert`,
@@ -343,6 +344,7 @@ wkhtmltopdf honors them.
 | `--minimum-font-size` | Both | Ignored (stored, no consumer) |
 | `--user-style-sheet` | Both | Ignored (stored, no consumer) |
 | `--print-media-type`, `--no-print-media-type` | Both | Ignored (layout always runs with `Media: "print"`; the flag cannot change that) |
+| `--simplify-dom`, `--no-simplify-dom` | Both | Supported (opt-in chrome-strip; injects synthetic `display:none` sheet — `convert.SimplifyChromeCSS`; default off; `TestSimplifyDOMOnHidesChrome`, `TestSimplifyDOMOffKeepsChrome`) |
 | `--media-type` | Both | Ignored (same) |
 | `--javascript-delay` | Both | Ignored (`WaitJSDelay` is never invoked) |
 | `--window-status`, `--run-script` | Both | Ignored (stored; warning stub not wired) |

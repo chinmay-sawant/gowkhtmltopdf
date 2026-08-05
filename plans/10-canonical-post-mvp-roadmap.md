@@ -46,7 +46,7 @@ Tier 1 is **not closed** yet. Suggested order for the next sessions:
 2. **Phase 14** (complete): document JPEG/PNG alpha/DPI knobs; `web.images=false` test.
 3. **Phase 11** (complete): publish/install story + `ConvertHTML` helper.
 
-**Tier 1 is closed** (report engine solid). **Tier 2 phases 17–20 core shipped** on `master` (#16 / #17); shared matrix/fidelity honesty pass is under [`phases/subplans-tier-2/00-shared-doc-honesty.md`](phases/subplans-tier-2/00-shared-doc-honesty.md). Remaining code leftovers are tracked under [`phases/subplans-tier-2/`](phases/subplans-tier-2/). Next product work is **Phase 21**.
+**Tier 1 is closed** (report engine solid). **Tier 2 phases 17–20 core shipped** on `master` (#16 / #17); shared matrix/fidelity honesty pass is under [`phases/subplans-tier-2/00-shared-doc-honesty.md`](phases/subplans-tier-2/00-shared-doc-honesty.md). Remaining code leftovers are tracked under [`phases/subplans-tier-2/`](phases/subplans-tier-2/). **Phase 21** is **in progress (docs contract)** — §21.1 product bar + §21.7 docs honesty landed; vendored fixtures / heuristics / acceptance owned in parallel ([detail](phases/phase-21-arbitrary-websites.md)).
 
 **Already shipped post-MVP:** phases **10** (fidelity docs), **12** (real bold/italic faces), **13** (spacing/coalesce), **15** (image-mode TTF AA), **16** (selectors + float lite), **17–20** core (flex/grid lite, thead repeat, fonts/CJK/Arabic joining, HF/links edges).
 
@@ -104,7 +104,7 @@ Tier 1 is **not closed** yet. Suggested order for the next sessions:
 | 18 | Pagination polish (thead repeat, breaks) | 2 | [phases/phase-18-pagination-polish.md](phases/phase-18-pagination-polish.md) · [subplan](phases/subplans-tier-2/phase-18-pending.md) | 3–6 wk | `[x]` #16; matrix/CLI docs via shared pass |
 | 19 | Fonts / i18n (discovery, CJK/Type0, stdlib shaping) | 2 | [phases/phase-19-fonts-i18n.md](phases/phase-19-fonts-i18n.md) · [subplan](phases/subplans-tier-2/phase-19-pending.md) | 1–3 mo | `[x]` #16/#17; @font-face audit pending |
 | 20 | HF / links edge cases | 2 | [phases/phase-20-hf-links-edges.md](phases/phase-20-hf-links-edges.md) · [subplan](phases/subplans-tier-2/phase-20-pending.md) | 2–4 wk | `[x]` #16/#17 + HF fragment GoTo |
-| 21 | Arbitrary websites / paste-any-URL | 2→3 | [phases/phase-21-arbitrary-websites.md](phases/phase-21-arbitrary-websites.md) | 2–4 mo | `[ ]` |
+| 21 | Arbitrary websites / paste-any-URL | 2→3 | [phases/phase-21-arbitrary-websites.md](phases/phase-21-arbitrary-websites.md) | 2–4 mo | `[~]` in progress (docs contract: §21.1 + §21.7) |
 | 22 | JavaScript support (staged) | 2→3 | [phases/phase-22-javascript.md](phases/phase-22-javascript.md) | research + years for full | `[ ]` |
 | 23 | Tier 3 open-web competition | 3 | [phases/phase-23-tier3-deferred.md](phases/phase-23-tier3-deferred.md) | n/a | `[~]` deferred |
 
@@ -336,10 +336,11 @@ Tier 1 is **not closed** yet. Suggested order for the next sessions:
 ## Phase 21: Arbitrary Websites / “Paste Any URL”
 
 > Detail: [phases/phase-21-arbitrary-websites.md](phases/phase-21-arbitrary-websites.md)  
-> **Not full parity** - “decent print” bar
+> **Status:** in progress (docs contract) — **Not full parity**; “decent print” bar  
+> Normative criteria: [documentation/fidelity.md](../documentation/fidelity.md#arbitrary-websites-phase-21)
 
 ### 21.1 Product bar
-- [ ] Define “decent print”: title + main article body readable; chrome reduced
+- [x] Define “decent print”: title + main article body readable; chrome reduced when heuristics on — shipped in `documentation/fidelity.md` (Phase 21 section); explicit non-claims (no Wikipedia visual parity / marketing pixel match)
 - [ ] Vendored Wikipedia-class HTML fixture for CI (no live net required)
 - [ ] Optional reader-mode / chrome-strip heuristics (documented, opt-in)
 
@@ -349,6 +350,7 @@ Tier 1 is **not closed** yet. Suggested order for the next sessions:
 
 ### 21.3 Closure
 - [ ] Smoke command + acceptance notes; **no** “Wikipedia parity” claim
+- [x] Docs honesty: matrix still not full CSS; README progressive goal only — detail plan §21.7
 
 ---
 

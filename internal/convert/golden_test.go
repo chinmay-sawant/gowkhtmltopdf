@@ -41,11 +41,58 @@ func goldenDir() string {
 	return filepath.Join("..", "..", "testdata", "golden")
 }
 
+// isHFCompanionHTML reports whether name is a nested HTML header/footer
+// companion (fixture-NN-header.html / fixture-NN-footer.html), not a body
+// golden fixture. Companions are copied into the temp dir but skipped by
+// TestGoldenCorpusAllFixtures.
+func isHFCompanionHTML(name string) bool {
+	return strings.HasSuffix(name, "-header.html") || strings.HasSuffix(name, "-footer.html")
+}
+
+// fixtureIDPrefix returns "fixture-NN" from a body fixture file name
+// (e.g. fixture-36-hf-nested-flex.html → fixture-36), or "" if the name
+// does not match the corpus convention.
+func fixtureIDPrefix(file string) string {
+	base := strings.TrimSuffix(filepath.Base(file), ".html")
+	parts := strings.SplitN(base, "-", 3)
+	if len(parts) < 2 || parts[0] != "fixture" {
+		return ""
+	}
+	for _, c := range parts[1] {
+		if c < '0' || c > '9' {
+			return ""
+		}
+	}
+	return parts[0] + "-" + parts[1]
+}
+
+// attachHFCompanions sets Header.HTMLURL / Footer.HTMLURL when
+// fixture-NN-header.html and/or fixture-NN-footer.html exist beside the
+// body fixture in dir. Auto (-1) margins reserve the measured HF bands.
+func attachHFCompanions(cmd *cli.Command, dir, file string) {
+	prefix := fixtureIDPrefix(file)
+	if prefix == "" || isHFCompanionHTML(file) {
+		return
+	}
+	header := filepath.Join(dir, prefix+"-header.html")
+	if _, err := os.Stat(header); err == nil {
+		cmd.Global.Header.HTMLURL = header
+		cmd.Global.Margin.Top = -1
+	}
+	footer := filepath.Join(dir, prefix+"-footer.html")
+	if _, err := os.Stat(footer); err == nil {
+		cmd.Global.Footer.HTMLURL = footer
+		cmd.Global.Margin.Bottom = -1
+	}
+}
+
 // commandForFixture builds a cli.Command that converts a golden fixture:
 // A4 page, 10 mm margins, backgrounds on, local file access enabled so the
 // fixture's relative links and images resolve (same ACL shape as newCommand).
 // The whole corpus directory is copied next to the fixture (html, css, png),
 // so relative references in the fixture keep working after the copy.
+// If fixture-NN-header.html / fixture-NN-footer.html exist beside the body
+// fixture, they are wired as nested HTML HF URLs (auto top/bottom margins).
 func commandForFixture(t *testing.T, file string) *cli.Command {
 	t.Helper()
 	dir := t.TempDir()
@@ -80,6 +127,7 @@ func commandForFixture(t *testing.T, file string) *cli.Command {
 	cmd.Global.PageSize = "A4"
 	cmd.Global.Margin = settings.DefaultMargins()
 	cmd.Global.Background = true
+	attachHFCompanions(cmd, dir, file)
 	// Opt-in CJK/Hangul faces for fixture-27 (and any CSS that names them).
 	fontDirs := []string{}
 	if _, err := os.Stat("/usr/share/fonts/truetype/droid"); err == nil {
@@ -193,6 +241,7 @@ var fixturePageBounds = map[string]fixtureBounds{
 	"fixture-33-flex-cyclic-basis.html":     {minPages: 1, maxPages: 1},
 	"fixture-34-grid-areas-dense.html":      {minPages: 1, maxPages: 1},
 	"fixture-35-grid-minmax-intrinsic.html": {minPages: 1, maxPages: 1},
+	"fixture-36-hf-nested-flex.html":        {minPages: 1, maxPages: 1, images: true},
 	"fixture-37-orphans-css.html":           {minPages: 2, maxPages: 0},
 	"fixture-38-float-inside-td.html":       {minPages: 1, maxPages: 1},
 	"fixture-39-multicol-article.html":      {minPages: 2, maxPages: 0},
@@ -233,7 +282,7 @@ func TestGoldenCorpusAllFixtures(t *testing.T) {
 	fixtureCount := 0
 	for _, e := range entries {
 		file := e.Name()
-		if e.IsDir() || !strings.HasSuffix(file, ".html") {
+		if e.IsDir() || !strings.HasSuffix(file, ".html") || isHFCompanionHTML(file) {
 			continue
 		}
 		fixtureCount++

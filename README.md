@@ -21,7 +21,9 @@ standard library **plus** a narrow exception for OpenType shaping via
 
 **Status:** MVP (v0.1.0). Phases 0–9 of the [canonical plan](plans/00-canonical-pure-go-rewrite.md)
 are implemented; remaining gaps are listed under
-[Deferred / not planned](#deferred--not-planned).
+[Deferred / not planned](#deferred--not-planned). Progressive post-MVP goals
+(including URL → decent print) are under
+[Progressive goals](#progressive-goals-post-mvp) — not MVP feature claims.
 
 **Docs:** start at **[documentation/overview.md](documentation/overview.md)** (full index:
 [documentation/README.md](documentation/README.md)).
@@ -152,6 +154,8 @@ Basic conversion (note: `--enable-local-file-access` belongs *after* a
 gowkhtmltopdf page --enable-local-file-access invoice.html invoice.pdf
 gowkhtmltopdf --page-size A4 --orientation Landscape report.html report.pdf
 gowkhtmltopdf --enable-local-file-access --quiet report.html report.pdf -   # to stdout
+# Remote URL (SSRF / untrusted HTML — see documentation/cli.md#remote-url-security)
+gowkhtmltopdf 'https://example.com/report.html' out.pdf
 ```
 
 Multi-object document with header/footer, TOC, and outline:
@@ -246,6 +250,24 @@ go build -ldflags "-X gowkhtmltopdf/internal/cli.Version=$(cat VERSION)" ./cmd/g
 ```
 
 Release history: [CHANGELOG.md](CHANGELOG.md).
+
+---
+
+## Progressive goals (post-MVP)
+
+Active ledger: **[plans/10-canonical-post-mvp-roadmap.md](plans/10-canonical-post-mvp-roadmap.md)**.
+These are **goals**, not MVP feature claims, until their phase acceptance gates pass.
+
+| Goal | Phase | Status |
+|------|-------|--------|
+| Broader CSS / pagination / fonts / HF edges (Tier 2 core) | 17–20 | Shipped core; see fidelity + matrix |
+| **URL → decent print** (readable title + body on wiki/marketing-class HTML; not pixel parity) | **21** | Product contract + docs in progress; acceptance **not** met — do not list as a shipped feature |
+| Staged JavaScript | 22 | Not started |
+| Open-web / browser competition | 23 | Deferred (not planned under pure-stdlib) |
+
+“Decent print” criteria and explicit non-claims (no Wikipedia visual parity, no
+marketing pixel match): **[documentation/fidelity.md](documentation/fidelity.md#arbitrary-websites-phase-21)**.
+CLI URL security (SSRF, untrusted HTML): **[documentation/cli.md](documentation/cli.md#remote-url-security)**.
 
 ---
 

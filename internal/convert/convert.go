@@ -311,6 +311,7 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 	}
 
 	sheets := collectSheets(ctx, loader, root, res.Base, obj.Load, idx+1, log)
+	sheets = AppendSimplifySheet(sheets, SimplifyDOMEnabled(cmd.Global.Web, obj.Web))
 	registry = MergeFontFaces(ctx, loader, registry, sheets, res.Base, obj.Load, idx+1, log)
 
 	pageW, pageH, err := pageGeometry(cmd.Global)

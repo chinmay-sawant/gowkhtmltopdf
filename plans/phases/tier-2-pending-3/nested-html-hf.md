@@ -128,7 +128,8 @@ axis — not WeasyPrint/Prince running elements.
 
 ### 4.2 Optional golden
 
-- [ ] New golden `fixture-36-hf-nested-flex.html` (+ header/footer HTML files) when convert golden runner can load HF URLs cleanly
+- [x] New golden `fixture-36-hf-nested-flex.html` (+ `fixture-36-header.html` / `fixture-36-footer.html`); golden runner wires companions via `attachHFCompanions` when `fixture-NN-{header,footer}.html` exist
+- [x] Proof: `go test ./internal/convert -run 'TestGoldenCorpusAllFixtures/fixture-36|HTMLHeader' -count=1` → PASS (2026-08-05); `make lint` → PASS; `go test ./internal/convert -count=1` → PASS (1.089s)
 
 ### 4.3 Gates
 

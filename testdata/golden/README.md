@@ -13,12 +13,17 @@ testdata/golden/
   fixture-01-simple-invoice.html       # single page, minimal CSS
   fixture-02-table-heavy-invoice.html  # wide table, borders, many rows
   fixture-03-multi-page-invoice.html   # >1 page, page-break usage
-  fixture-04-*.html .. fixture-21-*.html   # phase-9.1 corpus + detailed report
+  fixture-04-*.html .. fixture-42-*.html   # phase-9.1+ corpus (skip *-header/footer companions)
+  fixture-36-header.html / fixture-36-footer.html  # nested HF companions for fixture-36
   out/                  # generated PDFs (gitignored)
 ```
 
 Golden comparison is **structural + content**, not pixel-diff (Phase 0.3
 decision; revisit image diffing in Phase 4 closure if cheap).
+
+When `fixture-NN-header.html` and/or `fixture-NN-footer.html` exist beside a
+body fixture, `commandForFixture` sets `Header.HTMLURL` / `Footer.HTMLURL`
+(auto margins). Companion files are not converted as body fixtures.
 
 ## Fixture inventory
 
@@ -64,6 +69,7 @@ proves. Page envelopes are pinned in `internal/convert/golden_test.go`
 | 33 | Flex `%` basis cyclic honesty: definite vs indefinite main size (cyclic → auto) | 1 |
 | 34 | Grid `template-areas` / `grid-area` names + `grid-auto-flow: dense` | 1 |
 | 35 | Grid `minmax` / intrinsic measure lite + subgrid copy-inherit + masonry pack | 1 |
+| 36 | Nested HTML HF: flex header + image + `#target` GoTo; placeholder footer (companions `fixture-36-header.html` / `fixture-36-footer.html`) | 1 |
 | 33 | Flex % basis: definite resolve + indefinite/cyclic → auto (`flex-grid-full.md` §2.2) | 1 |
 | 34 | Grid Stage B areas + dense (`flex-grid-full.md`): `grid-template-areas` / `grid-area`, implied tracks, `grid-auto-flow: dense` | 1 |
 | 35 | Grid Stage B/C: `minmax()`+`fr` floors, cyclic height %, `display:subgrid` inherit, `grid-template-rows:masonry` packing | 1 |
@@ -72,6 +78,7 @@ proves. Page envelopes are pinned in `internal/convert/golden_test.go`
 | 39 | CSS multicol lite: `column-count`/`gap`/`span`/`fill`; column boxes stay on one page (tier-2-pending-3) | ≥2 |
 | 40 | Static 2D CSS `transform` badge (rotate) + abspos CB under transform (tier-2-pending-3) | 1 |
 | 41 | `:has()` relational selector: article footnote border, `tr:has(td.neg)` row highlight (tier-2-pending-3) | 1 |
+| 42 | `@container` size lite: named `inline-size` + unnamed `width` queries (tier-2-pending-3) | 1 |
 
 ## Pass criteria (MVP)
 

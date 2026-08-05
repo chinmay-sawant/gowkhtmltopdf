@@ -206,6 +206,12 @@ func init() {
 		func(g *settings.PdfGlobal, val string) error { return g.Set("web.printmediatype", "false") },
 		func(o *settings.PdfObject, val string) error { return o.Set("load.printmediatype", "false") },
 	))
+	// Opt-in chrome-strip for arbitrary websites (phase 21.4). Default off.
+	// Distinct from --print-media-type (layout always uses Media:"print").
+	add("simplify-dom", ModeBoth, "bool", pageScoped(
+		func(g *settings.PdfGlobal, val string) error { return g.Set("web.simplifydom", val) },
+		func(o *settings.PdfObject, val string) error { return o.Set("web.simplifydom", val) },
+	))
 	add("media-type", ModeBoth, "value", pageScoped(
 		func(g *settings.PdfGlobal, val string) error { return nil },
 		func(o *settings.PdfObject, val string) error { return o.Set("load.mediatype", val) },
