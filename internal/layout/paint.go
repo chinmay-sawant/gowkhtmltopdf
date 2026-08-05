@@ -476,10 +476,21 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 	}
 }
 
-// isSectionWashRGB reports the soft grey used by fixture-31 .section
-// background (#eceff1) and similar report section washes.
+// isSectionWashRGB reports near-neutral cool greys like fixture-31 .section
+// (#eceff1). Chromatic washes (e.g. fixture-32 grid #f3e5f5) must not match
+// or page-trailing clip steals their height.
 func isSectionWashRGB(r, g, b float64) bool {
-	return r > 0.85 && g > 0.85 && b > 0.85 && r < 0.98 && g < 0.98 && b < 0.98
+	if abs3(r-g) > 0.035 || abs3(g-b) > 0.035 || abs3(r-b) > 0.035 {
+		return false
+	}
+	return r > 0.88 && g > 0.88 && b > 0.88 && r < 0.97 && g < 0.97 && b < 0.97
+}
+
+func abs3(v float64) float64 {
+	if v < 0 {
+		return -v
+	}
+	return v
 }
 
 // shiftFlowY moves the ops of the target range [from,to] - plus every op

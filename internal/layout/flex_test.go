@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	"gowkhtmltopdf/internal/css"
+	"gowkhtmltopdf/internal/html"
 	"gowkhtmltopdf/internal/pdf"
 )
 
@@ -151,6 +153,168 @@ func TestFlexRowLayout(t *testing.T) {
 	}
 	if texts < 3 {
 		t.Fatalf("text ops = %d, want >= 3", texts)
+	}
+}
+
+func TestFlexRowReverse(t *testing.T) {
+	s := sheet(t, `
+.row { display:flex; flex-direction:row-reverse; width:200pt; gap:0 }
+.a { width:40pt }
+.b { width:40pt }
+.c { width:40pt }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="row"><div class="a">A</div><div class="b">B</div><div class="c">C</div></div>
+</body></html>`, s)
+	pos := map[string]float64{}
+	for _, op := range res.Ops {
+		if op.Kind == OpText {
+			pos[op.Text] = op.X
+		}
+	}
+	if !(pos["C"] < pos["B"] && pos["B"] < pos["A"]) {
+		t.Fatalf("row-reverse positions C/B/A = %.1f/%.1f/%.1f", pos["C"], pos["B"], pos["A"])
+	}
+}
+
+func TestFlexSpaceEvenly(t *testing.T) {
+	s := sheet(t, `
+.row { display:flex; justify-content:space-evenly; width:300pt; gap:0 }
+.item { width:40pt }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="row"><div class="item">A</div><div class="item">B</div><div class="item">C</div></div>
+</body></html>`, s)
+	pos := map[string]float64{}
+	for _, op := range res.Ops {
+		if op.Kind == OpText {
+			pos[op.Text] = op.X
+		}
+	}
+	if len(pos) < 3 {
+		t.Fatalf("missing texts: %v", pos)
+	}
+	// space-evenly: equal gaps at edges and between; A should not be at x≈0.
+	d1 := pos["B"] - pos["A"]
+	d2 := pos["C"] - pos["B"]
+	if d1 < 50 || d2 < 50 {
+		t.Fatalf("space-evenly gaps too small: A=%.1f B=%.1f C=%.1f", pos["A"], pos["B"], pos["C"])
+	}
+	if diff := d1 - d2; diff > 5 || diff < -5 {
+		t.Fatalf("space-evenly gaps unequal: AB=%.1f BC=%.1f", d1, d2)
+	}
+	if pos["A"] < 20 {
+		t.Fatalf("space-evenly leading gap missing: A.x=%.1f", pos["A"])
+	}
+}
+
+func TestFlexColumnGapVsRowGap(t *testing.T) {
+	s := sheet(t, `
+.row {
+  display:flex; flex-wrap:wrap; width:100pt;
+  column-gap:20pt; row-gap:40pt;
+}
+.item { width:40pt; height:10pt }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="row">
+  <div class="item">A</div><div class="item">B</div>
+  <div class="item">C</div><div class="item">D</div>
+</div>
+</body></html>`, s)
+	posX, posY := map[string]float64{}, map[string]float64{}
+	for _, op := range res.Ops {
+		if op.Kind == OpText {
+			posX[op.Text] = op.X
+			posY[op.Text] = op.Y
+		}
+	}
+	for _, k := range []string{"A", "B", "C", "D"} {
+		if _, ok := posX[k]; !ok {
+			t.Fatalf("missing text %s", k)
+		}
+	}
+	// A,B on first line with ~20pt column-gap; C,D on second with ~40pt row-gap.
+	if col := posX["B"] - posX["A"]; col < 50 || col > 70 {
+		t.Fatalf("column-gap AB dx=%.1f, want ~60 (40+20)", col)
+	}
+	if row := posY["C"] - posY["A"]; row < 40 || row > 70 {
+		t.Fatalf("row-gap AC dy=%.1f, want ~50 (10+40)", row)
+	}
+	if posY["B"]-posY["A"] > 5 {
+		t.Fatalf("B should share A's line: Ay=%.1f By=%.1f", posY["A"], posY["B"])
+	}
+}
+
+func TestFlexAlignSelf(t *testing.T) {
+	s := sheet(t, `
+.row { display:flex; align-items:flex-start; width:200pt; height:60pt; gap:0 }
+.a { width:40pt; height:10pt }
+.b { width:40pt; height:10pt; align-self:flex-end }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="row"><div class="a">A</div><div class="b">B</div></div>
+</body></html>`, s)
+	posY := map[string]float64{}
+	for _, op := range res.Ops {
+		if op.Kind == OpText {
+			posY[op.Text] = op.Y
+		}
+	}
+	if posY["B"] <= posY["A"]+10 {
+		t.Fatalf("align-self flex-end: A.y=%.1f B.y=%.1f, want B lower", posY["A"], posY["B"])
+	}
+}
+
+func TestFlexShorthandParsing(t *testing.T) {
+	cases := []struct {
+		name     string
+		css      string
+		grow     float64
+		sh       float64
+		basis    float64
+		basisPct float64
+	}{
+		{"none", "flex:none", 0, 0, -1, -1},
+		{"auto", "flex:auto", 1, 1, -1, -1},
+		{"one", "flex:1", 1, 1, -1, 0},
+		{"three", "flex:0 0 80pt", 0, 0, 80, -1},
+		{"grow-shrink-auto", "flex:1 1 auto", 1, 1, -1, -1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			s := sheet(t, ".x { display:flex } .i { "+tc.css+" }")
+			doc := `<html><body><div class="x"><div class="i">Z</div></div></body></html>`
+			res := layoutHTML(t, doc, s)
+			if res == nil {
+				t.Fatal("nil result")
+			}
+			// Re-resolve styles the same way layout does.
+			root := mustParse(t, doc)
+			styles := resolveStyles(root, []*css.Stylesheet{s}, "screen", 612, 792)
+			var item *html.Node
+			var find func(*html.Node)
+			find = func(n *html.Node) {
+				if n.Type == html.ElementNode && n.Attribute("class") == "i" {
+					item = n
+					return
+				}
+				for _, c := range n.Children {
+					find(c)
+				}
+			}
+			find(root)
+			if item == nil {
+				t.Fatal("item not found")
+			}
+			st := styles[item]
+			if st.FlexGrow != tc.grow || st.FlexShrink != tc.sh {
+				t.Fatalf("grow/shrink = %v/%v, want %v/%v", st.FlexGrow, st.FlexShrink, tc.grow, tc.sh)
+			}
+			if st.FlexBasis != tc.basis || st.FlexBasisPercent != tc.basisPct {
+				t.Fatalf("basis/pct = %v/%v, want %v/%v", st.FlexBasis, st.FlexBasisPercent, tc.basis, tc.basisPct)
+			}
+		})
 	}
 }
 

@@ -7,8 +7,8 @@ import (
 	"gowkhtmltopdf/internal/html"
 )
 
-// buildGrid lays out a CSS grid lite: tracks from grid-template-columns,
-// gap, auto-flow row, and column spanning (grid-column: span N / start / end).
+// buildGrid lays out a CSS grid Stage B lite: column/row tracks, independent
+// gaps, auto-flow row, column/row spanning, and justify/align-items/self.
 func (e *engine) buildGrid(n *html.Node, st ResolvedStyle, availW, x, y float64) *box {
 	ml, mr := e.scalePt(st.MarginLeft), e.scalePt(st.MarginRight)
 	b := &box{node: n, style: st, kind: "block", x: x + ml, y: y}
@@ -33,12 +33,27 @@ func (e *engine) buildGrid(n *html.Node, st ResolvedStyle, availW, x, y float64)
 	contentX := b.x + e.scalePt(st.BorderLeft.Width) + e.scalePt(st.PaddingLeft)
 	contentStart := len(e.ops)
 	cy := e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)
-	gap := e.scalePt(st.Gap)
 
-	cols := parseGridTracks(st.GridTemplateColumns, contentW, gap, e)
+	rowGap, columnGap := e.gridGaps(st)
+
+	cols := parseGridTracks(st.GridTemplateColumns, contentW, columnGap, e)
 	if len(cols) == 0 {
 		cols = []float64{contentW}
 	}
+
+	contentH := -1.0
+	if st.Height >= 0 {
+		h := e.scalePt(st.Height)
+		if st.BoxSizing == "border-box" {
+			h -= e.scalePt(st.PaddingTop) + e.scalePt(st.PaddingBottom) +
+				e.scalePt(st.BorderTop.Width) + e.scalePt(st.BorderBottom.Width)
+		}
+		if h < 0 {
+			h = 0
+		}
+		contentH = h
+	}
+
 	var kids []*html.Node
 	for _, c := range n.Children {
 		if c.Type != html.ElementNode {
@@ -50,11 +65,10 @@ func (e *engine) buildGrid(n *html.Node, st ResolvedStyle, availW, x, y float64)
 		kids = append(kids, c)
 	}
 
-	// Occupancy map: row → set of used column indices.
 	type cell struct {
-		n         *html.Node
-		col, span int
-		row       int
+		n            *html.Node
+		col, colSpan int
+		row, rowSpan int
 	}
 	var placed []cell
 	occ := map[int]map[int]bool{}
@@ -63,125 +77,363 @@ func (e *engine) buildGrid(n *html.Node, st ResolvedStyle, availW, x, y float64)
 			occ[row] = map[int]bool{}
 		}
 	}
-	freeAt := func(row, col, span int) bool {
-		ensure(row)
-		for i := 0; i < span; i++ {
-			c := col + i
-			if c >= len(cols) || occ[row][c] {
-				return false
+	freeAt := func(row, col, rowSpan, colSpan int) bool {
+		for r := 0; r < rowSpan; r++ {
+			ensure(row + r)
+			for i := 0; i < colSpan; i++ {
+				c := col + i
+				if c >= len(cols) || occ[row+r][c] {
+					return false
+				}
 			}
 		}
 		return true
 	}
-	mark := func(row, col, span int) {
-		ensure(row)
-		for i := 0; i < span; i++ {
-			occ[row][col+i] = true
+	mark := func(row, col, rowSpan, colSpan int) {
+		for r := 0; r < rowSpan; r++ {
+			ensure(row + r)
+			for i := 0; i < colSpan; i++ {
+				occ[row+r][col+i] = true
+			}
 		}
 	}
 
 	cursorRow, cursorCol := 0, 0
 	for _, kid := range kids {
 		cs := e.styles[kid]
-		span := cs.GridColumnSpan
-		if span < 1 {
-			span = 1
+		colSpan := cs.GridColumnSpan
+		if colSpan < 1 {
+			colSpan = 1
 		}
-		if span > len(cols) {
-			span = len(cols)
+		if colSpan > len(cols) {
+			colSpan = len(cols)
 		}
-		start := cs.GridColumnStart - 1 // 0-based
+		rowSpan := cs.GridRowSpan
+		if rowSpan < 1 {
+			rowSpan = 1
+		}
+		colStart := cs.GridColumnStart - 1 // 0-based; -1 = auto
+		rowStart := cs.GridRowStart - 1
+
 		row, col := cursorRow, cursorCol
-		if start >= 0 {
-			col = start
-			// find first row where this start+span fits
-			for !freeAt(row, col, span) {
+		switch {
+		case rowStart >= 0 && colStart >= 0:
+			row, col = rowStart, colStart
+			for !freeAt(row, col, rowSpan, colSpan) {
 				row++
 			}
-		} else {
+		case colStart >= 0:
+			col = colStart
+			for !freeAt(row, col, rowSpan, colSpan) {
+				row++
+			}
+		case rowStart >= 0:
+			row = rowStart
+			col = 0
 			for {
-				if col+span > len(cols) {
+				if col+colSpan > len(cols) {
 					col = 0
 					row++
 					continue
 				}
-				if freeAt(row, col, span) {
+				if freeAt(row, col, rowSpan, colSpan) {
+					break
+				}
+				col++
+			}
+		default:
+			for {
+				if col+colSpan > len(cols) {
+					col = 0
+					row++
+					continue
+				}
+				if freeAt(row, col, rowSpan, colSpan) {
 					break
 				}
 				col++
 			}
 		}
-		mark(row, col, span)
-		placed = append(placed, cell{n: kid, col: col, span: span, row: row})
-		cursorRow, cursorCol = row, col+span
+		mark(row, col, rowSpan, colSpan)
+		placed = append(placed, cell{n: kid, col: col, colSpan: colSpan, row: row, rowSpan: rowSpan})
+		cursorRow, cursorCol = row, col+colSpan
 		if cursorCol >= len(cols) {
 			cursorCol = 0
 			cursorRow++
 		}
 	}
 
-	// Lay out by rows.
 	maxRow := 0
 	for _, p := range placed {
-		if p.row > maxRow {
-			maxRow = p.row
+		end := p.row + p.rowSpan - 1
+		if end > maxRow {
+			maxRow = end
 		}
 	}
-	rowY := cy
-	for r := 0; r <= maxRow; r++ {
-		rowH := 0.0
-		for _, p := range placed {
-			if p.row != r {
-				continue
-			}
-			cw := 0.0
-			cx := contentX
-			for j := 0; j < p.col; j++ {
-				cx += cols[j] + gap
-			}
-			for j := 0; j < p.span; j++ {
-				cw += cols[p.col+j]
-				if j > 0 {
-					cw += gap
+	numRows := maxRow + 1
+	if numRows < 1 {
+		numRows = 1
+	}
+
+	definiteRows := contentH >= 0 && strings.TrimSpace(st.GridTemplateRows) != "" &&
+		strings.ToLower(strings.TrimSpace(st.GridTemplateRows)) != "none"
+	var rows []float64
+	if definiteRows {
+		rows = parseGridTracks(st.GridTemplateRows, contentH, rowGap, e)
+	}
+	if len(rows) == 0 {
+		rows = make([]float64, numRows)
+		// Honor explicit fixed track minimums when height is auto.
+		if mins := parseGridTrackFixedMins(st.GridTemplateRows, e); len(mins) > 0 {
+			for i := 0; i < numRows && i < len(mins); i++ {
+				if mins[i] > 0 {
+					rows[i] = mins[i]
 				}
 			}
-			cb := e.build(p.n, cw, cx, y+rowY)
-			if cb == nil {
+		}
+	} else if len(rows) < numRows {
+		for len(rows) < numRows {
+			rows = append(rows, 0)
+		}
+	} else if len(rows) > numRows {
+		numRows = len(rows)
+	}
+
+	type placedBox struct {
+		cell
+		b         *box
+		cellW, cx float64
+		prefH     float64
+	}
+	var pboxes []placedBox
+
+	// Measure preferred heights without emitting (needed for auto row tracks).
+	for _, p := range placed {
+		cw := 0.0
+		cx := contentX
+		for j := 0; j < p.col; j++ {
+			cx += cols[j] + columnGap
+		}
+		for j := 0; j < p.colSpan; j++ {
+			cw += cols[p.col+j]
+			if j > 0 {
+				cw += columnGap
+			}
+		}
+		was := e.noEmit
+		e.noEmit = true
+		mb := e.build(p.n, cw, cx, y+cy)
+		e.noEmit = was
+		prefH := 0.0
+		if mb != nil {
+			prefH = mb.h
+		}
+		pboxes = append(pboxes, placedBox{cell: p, cellW: cw, cx: cx, prefH: prefH})
+		if !definiteRows && p.rowSpan == 1 && prefH > rows[p.row] {
+			rows[p.row] = prefH
+		}
+	}
+
+	if !definiteRows {
+		for _, pb := range pboxes {
+			if pb.rowSpan <= 1 {
 				continue
 			}
-			dx := cx - cb.x
-			dy := (y + rowY) - cb.y
-			e.shiftBoxOps(cb, dx, dy)
-			cb.x += dx
-			cb.y += dy
-			if cb.h > rowH {
-				rowH = cb.h
+			sum := 0.0
+			for r := 0; r < pb.rowSpan; r++ {
+				sum += rows[pb.row+r]
+				if r > 0 {
+					sum += rowGap
+				}
 			}
-			b.children = append(b.children, cb)
+			if pb.prefH > sum {
+				extra := (pb.prefH - sum) / float64(pb.rowSpan)
+				for r := 0; r < pb.rowSpan; r++ {
+					rows[pb.row+r] += extra
+				}
+			}
 		}
-		cy = rowY + rowH
-		if r < maxRow {
-			cy += gap
-		}
-		rowY = cy
 	}
-	cy += e.scalePt(st.PaddingBottom)
+
+	rowYs := make([]float64, numRows)
+	rowYs[0] = cy
+	for r := 1; r < numRows; r++ {
+		rowYs[r] = rowYs[r-1] + rows[r-1] + rowGap
+	}
+
+	containerJustify := st.JustifyItems
+	if containerJustify == "" {
+		containerJustify = "stretch"
+	}
+	containerAlign := st.AlignItems
+	if containerAlign == "" {
+		containerAlign = "stretch"
+	}
+
+	for i := range pboxes {
+		pb := &pboxes[i]
+		cellH := 0.0
+		for r := 0; r < pb.rowSpan; r++ {
+			cellH += rows[pb.row+r]
+			if r > 0 {
+				cellH += rowGap
+			}
+		}
+		targetX := pb.cx
+		targetY := y + rowYs[pb.row]
+
+		cs := e.styles[pb.n]
+		justify := cs.JustifySelf
+		if justify == "" || justify == "auto" {
+			justify = containerJustify
+		}
+		align := cs.AlignSelf
+		if align == "" || align == "auto" {
+			align = containerAlign
+		}
+
+		// Default stretch: border box fills the grid area (CSS Grid §10.2).
+		// Without this, span-2 cells stay content-sized (fixture-32 Tall span-2).
+		buildH := -1.0
+		if (align == "stretch" || align == "") && cellH > 0 && cs.Height < 0 {
+			buildH = cellH
+		}
+
+		var cb *box
+		if buildH > 0 {
+			prev := e.styles[pb.n]
+			mod := prev
+			mod.Height = buildH
+			mod.BoxSizing = "border-box"
+			e.styles[pb.n] = mod
+			cb = e.build(pb.n, pb.cellW, pb.cx, targetY)
+			e.styles[pb.n] = prev
+		} else {
+			cb = e.build(pb.n, pb.cellW, pb.cx, targetY)
+		}
+		if cb == nil {
+			continue
+		}
+		pb.b = cb
+
+		dx := targetX - pb.b.x
+		dy := targetY - pb.b.y
+		dx += gridAlignOffset(justify, pb.cellW, pb.b.w)
+		dy += gridAlignOffset(align, cellH, pb.b.h)
+
+		e.shiftBoxOps(pb.b, dx, dy)
+		pb.b.x += dx
+		pb.b.y += dy
+		b.children = append(b.children, pb.b)
+	}
+
+	usedH := cy
+	if numRows > 0 {
+		usedH = rowYs[numRows-1] + rows[numRows-1]
+	}
+	usedH += e.scalePt(st.PaddingBottom)
 	if st.Height >= 0 {
 		h := e.scalePt(st.Height)
 		if st.BoxSizing != "border-box" {
 			h += e.scalePt(st.PaddingTop) + e.scalePt(st.PaddingBottom) +
 				e.scalePt(st.BorderTop.Width) + e.scalePt(st.BorderBottom.Width)
 		}
-		if cy < h {
-			cy = h
+		if usedH < h {
+			usedH = h
 		}
 	}
-	b.h = cy
+	// Content-box height is the content area only; cy already includes
+	// padding-top + border-top, usedH includes padding-bottom. Ensure the
+	// border box covers padding-top/border-top that sit above content tracks.
+	minBorderH := e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width) +
+		e.scalePt(st.PaddingBottom) + e.scalePt(st.BorderBottom.Width)
+	if contentH >= 0 {
+		minBorderH += contentH
+	}
+	if usedH < minBorderH {
+		usedH = minBorderH
+	}
+	b.h = usedH
 	e.prependChrome(contentStart, st, b.x, y, b.w, b.h)
 	return b
 }
 
-// parseGridTracks parses a lite subset of grid-template-columns.
+// gridGaps returns scaled row/column gaps. When both longhands are unset (0),
+// fall back to the Gap shorthand for both axes.
+func (e *engine) gridGaps(st ResolvedStyle) (rowGap, columnGap float64) {
+	if st.RowGap == 0 && st.ColumnGap == 0 {
+		g := e.scalePt(st.Gap)
+		return g, g
+	}
+	return e.scalePt(st.RowGap), e.scalePt(st.ColumnGap)
+}
+
+// gridAlignOffset returns the inline/block offset for start/end/center/stretch.
+// stretch is treated as start (lite).
+func gridAlignOffset(value string, cell, item float64) float64 {
+	switch value {
+	case "end", "flex-end", "right", "bottom":
+		if cell > item {
+			return cell - item
+		}
+	case "center":
+		if cell > item {
+			return (cell - item) / 2
+		}
+	}
+	return 0
+}
+
+// parseGridTrackFixedMins returns fixed (non-fr) track sizes as minimums for
+// auto-height grids. fr / unknown tracks yield 0.
+func parseGridTrackFixedMins(raw string, e *engine) []float64 {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || raw == "none" {
+		return nil
+	}
+	if strings.HasPrefix(strings.ToLower(raw), "repeat(") {
+		inner := raw[len("repeat("):]
+		if i := strings.LastIndex(inner, ")"); i >= 0 {
+			inner = inner[:i]
+		}
+		parts := strings.SplitN(inner, ",", 2)
+		if len(parts) == 2 {
+			n, err := strconv.Atoi(strings.TrimSpace(parts[0]))
+			if err == nil && n > 0 && n < 64 {
+				track := strings.TrimSpace(parts[1])
+				if strings.HasSuffix(track, "fr") || track == "" {
+					return nil
+				}
+				if v, ok := lengthBox(track, 12, 0, "auto"); ok && v >= 0 {
+					sv := e.scalePt(v)
+					out := make([]float64, n)
+					for i := range out {
+						out[i] = sv
+					}
+					return out
+				}
+			}
+		}
+		return nil
+	}
+	toks := strings.Fields(raw)
+	out := make([]float64, 0, len(toks))
+	for _, t := range toks {
+		t = strings.TrimSpace(t)
+		if strings.HasSuffix(t, "fr") {
+			out = append(out, 0)
+			continue
+		}
+		if v, ok := lengthBox(t, 12, 0, "auto"); ok && v >= 0 {
+			out = append(out, e.scalePt(v))
+			continue
+		}
+		out = append(out, 0)
+	}
+	return out
+}
+
+// parseGridTracks parses a lite subset of grid-template-columns/rows.
 // columnGap is subtracted from contentW before distributing fr/equal tracks
 // so (n tracks + n-1 gaps) fit the content box.
 func parseGridTracks(raw string, contentW, columnGap float64, e *engine) []float64 {
