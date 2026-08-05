@@ -25,8 +25,12 @@ func (e *engine) flexGaps(st ResolvedStyle) (rowGap, colGap float64) {
 }
 
 // flexContentHeight returns the definite content-box height of a flex
-// container, or -1 when height is auto.
+// container, or -1 when height is auto. HeightPercent against an indefinite
+// containing block is treated as auto (cyclic % honesty).
 func (e *engine) flexContentHeight(st ResolvedStyle) float64 {
+	if st.HeightPercent >= 0 && st.Height < 0 {
+		return -1
+	}
 	if st.Height < 0 {
 		return -1
 	}
@@ -52,7 +56,10 @@ func (e *engine) buildFlex(n *html.Node, st ResolvedStyle, availW, x, y float64)
 		b.w = 0
 	}
 	if st.WidthPercent >= 0 {
-		b.w = availW * st.WidthPercent / 100
+		// Cyclic % honesty: indefinite availW → keep fill-remaining (auto).
+		if availW > 0 && availW < 1e12 {
+			b.w = availW * st.WidthPercent / 100
+		}
 	} else if st.Width >= 0 {
 		b.w = e.scalePt(st.Width)
 		if st.BoxSizing != "border-box" {
@@ -267,15 +274,27 @@ func reverseFlexMeas(line []flexMeas) {
 	}
 }
 
-func (e *engine) flexItemBaseWidth(n *html.Node, cs ResolvedStyle, contentW float64) float64 {
+// flexItemBaseWidth resolves the flex base size on the row main axis.
+// mainSize is the flex container content-box width, or <0 when indefinite
+// (shrink-to-fit). Percentage flex-basis against an indefinite main size is
+// treated as auto (content-based) — CSS Flexbox L1 §9.2 cyclic %-sizing subset.
+func (e *engine) flexItemBaseWidth(n *html.Node, cs ResolvedStyle, mainSize float64) float64 {
 	pad := e.scalePt(cs.PaddingLeft) + e.scalePt(cs.PaddingRight) +
 		e.scalePt(cs.BorderLeft.Width) + e.scalePt(cs.BorderRight.Width)
+	capW := mainSize
+	if capW < 0 {
+		capW = 1e9
+	}
 	if cs.FlexBasisPercent >= 0 {
-		w := contentW * cs.FlexBasisPercent / 100
-		if cs.BoxSizing != "border-box" {
-			w += pad
+		if mainSize < 0 {
+			// Cyclic % basis → auto; fall through to width / content.
+		} else {
+			w := mainSize * cs.FlexBasisPercent / 100
+			if cs.BoxSizing != "border-box" {
+				w += pad
+			}
+			return w
 		}
-		return w
 	}
 	if cs.FlexBasis >= 0 {
 		w := e.scalePt(cs.FlexBasis)
@@ -284,8 +303,8 @@ func (e *engine) flexItemBaseWidth(n *html.Node, cs ResolvedStyle, contentW floa
 		}
 		return w
 	}
-	if cs.WidthPercent >= 0 {
-		w := contentW * cs.WidthPercent / 100
+	if cs.WidthPercent >= 0 && mainSize >= 0 {
+		w := mainSize * cs.WidthPercent / 100
 		if cs.BoxSizing != "border-box" {
 			w += pad
 		}
@@ -303,8 +322,8 @@ func (e *engine) flexItemBaseWidth(n *html.Node, cs ResolvedStyle, contentW floa
 	if intr <= 0 {
 		intr = pad + e.scalePt(cs.FontSize)*2
 	}
-	if intr > contentW {
-		intr = contentW
+	if intr > capW {
+		intr = capW
 	}
 	return intr
 }
@@ -489,9 +508,32 @@ func (e *engine) placeFlexLineMeasured(parent *box, st ResolvedStyle, items []fl
 	return cy + rowH
 }
 
-func (e *engine) flexItemBaseHeight(n *html.Node, cs ResolvedStyle, contentW float64) float64 {
+// flexItemBaseHeight resolves the flex base size on the column main axis.
+// mainSize is the flex container content-box height from flexContentHeight
+// (−1 when height is auto / indefinite). Percentage flex-basis against an
+// indefinite main size is treated as auto (content-based) — CSS Flexbox L1
+// §9.2 cyclic %-sizing subset; do not resolve % as 0 silently.
+func (e *engine) flexItemBaseHeight(n *html.Node, cs ResolvedStyle, contentW, mainSize float64) float64 {
 	padV := e.scalePt(cs.PaddingTop) + e.scalePt(cs.PaddingBottom) +
 		e.scalePt(cs.BorderTop.Width) + e.scalePt(cs.BorderBottom.Width)
+	if cs.FlexBasisPercent >= 0 {
+		if mainSize < 0 {
+			// Cyclic % basis → auto; fall through to height / content.
+		} else {
+			h := mainSize * cs.FlexBasisPercent / 100
+			if cs.BoxSizing != "border-box" {
+				h += padV
+			}
+			return h
+		}
+	}
+	if cs.FlexBasis >= 0 {
+		h := e.scalePt(cs.FlexBasis)
+		if cs.BoxSizing != "border-box" {
+			h += padV
+		}
+		return h
+	}
 	if cs.Height >= 0 {
 		h := e.scalePt(cs.Height)
 		if cs.BoxSizing != "border-box" {
@@ -515,6 +557,7 @@ func (e *engine) flowFlexColumn(parent *box, kids []*html.Node, st ResolvedStyle
 		grow   float64
 		shrink float64
 	}
+	contentH := e.flexContentHeight(st)
 	items := make([]colMeas, 0, len(kids))
 	for _, kid := range kids {
 		cs := e.styles[kid]
@@ -527,7 +570,7 @@ func (e *engine) flowFlexColumn(parent *box, kids []*html.Node, st ResolvedStyle
 			sh = 1
 		}
 		items = append(items, colMeas{
-			n: kid, baseH: e.flexItemBaseHeight(kid, cs, contentW),
+			n: kid, baseH: e.flexItemBaseHeight(kid, cs, contentW, contentH),
 			grow: g, shrink: sh,
 		})
 	}
@@ -555,7 +598,6 @@ func (e *engine) flowFlexColumn(parent *box, kids []*html.Node, st ResolvedStyle
 	if gaps < 0 {
 		gaps = 0
 	}
-	contentH := e.flexContentHeight(st)
 	if contentH >= 0 {
 		free := contentH - fixed - gaps
 		if free > 0 && growSum > 0 {

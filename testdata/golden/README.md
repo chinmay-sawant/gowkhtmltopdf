@@ -61,6 +61,12 @@ proves. Page envelopes are pinned in `internal/convert/golden_test.go`
 | 30 | Orphans/keep-with-next heuristic sample (phase 18; CSS orphans/widows props not parsed) | ≥2 |
 | 31 | Print-scoped `position: sticky` (page content box = scrollport; phase 17 sticky-print) | ≥2 |
 | 32 | Flex Stage A + Grid Stage B lite (`flex-grid-full.md`): reverse, space-evenly, gaps, column flex, template-rows, row span | 1 |
+| 33 | Flex `%` basis cyclic honesty: definite vs indefinite main size (cyclic → auto) | 1 |
+| 34 | Grid `template-areas` / `grid-area` names + `grid-auto-flow: dense` | 1 |
+| 35 | Grid `minmax` / intrinsic measure lite + subgrid copy-inherit + masonry pack | 1 |
+| 33 | Flex % basis: definite resolve + indefinite/cyclic → auto (`flex-grid-full.md` §2.2) | 1 |
+| 34 | Grid Stage B areas + dense (`flex-grid-full.md`): `grid-template-areas` / `grid-area`, implied tracks, `grid-auto-flow: dense` | 1 |
+| 35 | Grid Stage B/C: `minmax()`+`fr` floors, cyclic height %, `display:subgrid` inherit, `grid-template-rows:masonry` packing | 1 |
 
 ## Pass criteria (MVP)
 

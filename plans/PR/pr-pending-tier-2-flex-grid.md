@@ -116,17 +116,13 @@ go build -o bin/gowkhtmltopdf ./cmd/gowkhtmltopdf
 
 ---
 
-## Follow-ups (out of scope)
+## Follow-ups (out of scope for this PR)
 
-- Percentage flex basis cyclic sizing (Stage A remainder)
-- `grid-template-areas` / `grid-area` name placement
-- `grid-auto-flow: dense` (optional Stage B2)
-- Full `minmax()` / intrinsic sizing / nested % cycles (Stage C)
-- Subgrid / masonry (explicitly deferred)
-- Matrix property tables + Phase 17 closure dates (Phase 5 docs)
-- Full `make lint` / `make test` gate recording on the subplan checklist
-
----
+- Flex cross-axis `align-items: stretch` still packs as start (matrix `[~]`)
+- True shared-track subgrid / full CSS Grid L3 masonry / Chrome layout-test parity
+- Multi-pass flex intrinsic sizing beyond cyclic `%` → auto subset
+- **Next:** Phase 21 site corpus stress against Stage A/B/C-lite layout
+- CI `make test` on PR merge (layout + convert proof recorded on subplan 2026-08-05)
 
 ## Reviewer checklist
 

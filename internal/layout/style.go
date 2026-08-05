@@ -40,20 +40,24 @@ type ResolvedStyle struct {
 	FlexGrow            float64
 	FlexShrink          float64 // default 1; 0 disables shrink
 	FlexBasis           float64 // -1 = auto
-	FlexBasisPercent    float64 // >=0 means % of flex container content width
+	FlexBasisPercent    float64 // >=0 means % of flex container content main size (width/height)
 	FlexOrder           int
 	ZIndex              int
 	ZIndexSet           bool
 	WritingMode         string // "" | "horizontal-tb" | "vertical-rl" | "vertical-lr"
 	GridTemplateColumns string // raw grid-template-columns value
 	GridTemplateRows    string
+	GridTemplateAreas   string  // raw grid-template-areas value
+	GridArea            string  // named area (custom-ident); empty = line-based placement
+	GridAutoFlow        string  // "row" | "column" | "dense" | "row dense" | "column dense"
 	GridColumnSpan      int     // from grid-column: span N (default 1)
 	GridColumnStart     int     // 1-based; 0 = auto
 	GridRowSpan         int     // from grid-row: span N (default 1)
 	GridRowStart        int     // 1-based; 0 = auto
 	Width               float64 // -1 = auto; absolute length in pt when WidthPercent < 0
 	WidthPercent        float64 // >=0 means width is that % of the containing block at layout time
-	Height              float64
+	Height              float64 // -1 = auto; absolute length in pt when HeightPercent < 0
+	HeightPercent       float64 // >=0 means height is that % of the CB; indefinite CB → auto (cyclic honesty)
 	MinWidth            float64
 	MaxWidth            float64
 	MinHeight           float64
@@ -127,6 +131,7 @@ func initialStyle() ResolvedStyle {
 		Width:            -1,
 		WidthPercent:     -1,
 		Height:           -1,
+		HeightPercent:    -1,
 		MinWidth:         0,
 		MaxWidth:         -1,
 		MinHeight:        0,
@@ -383,7 +388,7 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext)
 			case "block", "inline", "none", "list-item", "table", "table-row", "table-cell",
 				"table-row-group", "table-header-group", "table-footer-group",
 				"inline-block", "table-caption", "table-column", "table-column-group",
-				"flex", "inline-flex", "grid", "inline-grid":
+				"flex", "inline-flex", "grid", "inline-grid", "subgrid":
 				st.Display = value
 			}
 		case "position":
@@ -495,6 +500,12 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext)
 			st.GridTemplateColumns = value
 		case "grid-template-rows":
 			st.GridTemplateRows = value
+		case "grid-template-areas":
+			st.GridTemplateAreas = value
+		case "grid-area":
+			parseGridArea(st, value)
+		case "grid-auto-flow":
+			st.GridAutoFlow = parseGridAutoFlowValue(value)
 		case "grid-column", "grid-column-end":
 			parseGridColumn(st, value)
 		case "grid-column-start":
@@ -536,8 +547,17 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext)
 				st.WidthPercent = -1
 			}
 		case "height":
-			if v, ok := lengthBox(value, fs, ctx.viewportH, "auto"); ok {
+			if value == "auto" {
+				st.Height = -1
+				st.HeightPercent = -1
+			} else if v, unit, ok := css.ParseLength(value); ok && unit == "%" {
+				// Defer % height to layout; indefinite containing block → auto
+				// (cyclic percentage honesty for flex/grid children).
+				st.HeightPercent = v
+				st.Height = -1
+			} else if v, ok := lengthBox(value, fs, ctx.viewportH, "auto"); ok {
 				st.Height = v
+				st.HeightPercent = -1
 			}
 		case "min-width":
 			if v, ok := lengthBox(value, fs, ctx.viewportW, "none"); ok {
@@ -1059,6 +1079,120 @@ func marginLen(value string, fs, ctxW float64) float64 {
 }
 
 func pxToPt(px float64) float64 { return px * 0.75 }
+
+// parseGridAutoFlowValue normalizes grid-auto-flow to one of:
+// "row", "column", "dense", "row dense", "column dense".
+func parseGridAutoFlowValue(value string) string {
+	toks := strings.Fields(strings.ToLower(strings.TrimSpace(value)))
+	row, col, dense := false, false, false
+	for _, t := range toks {
+		switch t {
+		case "row":
+			row = true
+		case "column":
+			col = true
+		case "dense":
+			dense = true
+		}
+	}
+	switch {
+	case col && dense:
+		return "column dense"
+	case row && dense:
+		return "row dense"
+	case dense:
+		return "dense"
+	case col:
+		return "column"
+	default:
+		return "row"
+	}
+}
+
+// parseGridArea handles grid-area: <custom-ident> or the lite line form
+// row-start / column-start / row-end / column-end (and 1–2 slash forms).
+func parseGridArea(st *ResolvedStyle, value string) {
+	value = strings.TrimSpace(value)
+	if value == "" || strings.EqualFold(value, "auto") {
+		st.GridArea = ""
+		return
+	}
+	parts := strings.Split(value, "/")
+	for i := range parts {
+		parts[i] = strings.TrimSpace(parts[i])
+	}
+	if len(parts) == 1 {
+		tok := parts[0]
+		if _, err := strconv.Atoi(tok); err == nil {
+			// Single line index → row-start (CSS shorthand lite).
+			parseGridRow(st, tok)
+			st.GridArea = ""
+			return
+		}
+		if strings.HasPrefix(tok, "span ") {
+			parseGridRow(st, tok)
+			st.GridArea = ""
+			return
+		}
+		// Named area.
+		st.GridArea = tok
+		return
+	}
+	st.GridArea = ""
+	switch len(parts) {
+	case 2:
+		// CSS: row-start / column-start (omitted ends copy starts → span 1).
+		parseGridRow(st, parts[0])
+		parseGridColumn(st, parts[1])
+	case 3:
+		// row-start / column-start / row-end
+		parseGridRow(st, parts[0])
+		parseGridColumn(st, parts[1])
+		applyGridLineEnd(st, true, parts[2])
+	default:
+		// row-start / column-start / row-end / column-end
+		parseGridRow(st, parts[0])
+		parseGridColumn(st, parts[1])
+		applyGridLineEnd(st, true, parts[2])
+		applyGridLineEnd(st, false, parts[3])
+	}
+}
+
+// applyGridLineEnd sets span from an end line or "span N" on row (isRow) or column.
+func applyGridLineEnd(st *ResolvedStyle, isRow bool, end string) {
+	end = strings.TrimSpace(end)
+	if strings.HasPrefix(end, "span ") {
+		n, err := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(end, "span ")))
+		if err != nil || n < 1 {
+			return
+		}
+		if isRow {
+			st.GridRowSpan = n
+		} else {
+			st.GridColumnSpan = n
+		}
+		return
+	}
+	v, err := strconv.Atoi(end)
+	if err != nil {
+		return
+	}
+	if isRow {
+		if st.GridRowStart > 0 {
+			sp := v - st.GridRowStart
+			if sp < 1 {
+				sp = 1
+			}
+			st.GridRowSpan = sp
+		}
+	} else if st.GridColumnStart > 0 {
+		sp := v - st.GridColumnStart
+		if sp < 1 {
+			sp = 1
+		}
+		st.GridColumnSpan = sp
+	}
+}
 
 func parseGridColumn(st *ResolvedStyle, value string) {
 	value = strings.TrimSpace(value)

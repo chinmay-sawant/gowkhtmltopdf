@@ -318,6 +318,98 @@ func TestFlexShorthandParsing(t *testing.T) {
 	}
 }
 
+func TestFlexBasisPercentDefinite(t *testing.T) {
+	s := sheet(t, `
+.row { display:flex; width:200pt; gap:0; height:30pt }
+.a { flex: 0 0 50%; background:#fcc }
+.b { flex: 0 0 50%; background:#ccf }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="row"><div class="a">A</div><div class="b">B</div></div>
+</body></html>`, s)
+	var fills []float64
+	for _, op := range res.Ops {
+		if op.Kind == OpFillRect && op.W > 10 && op.H > 5 {
+			fills = append(fills, op.W)
+		}
+	}
+	if len(fills) < 2 {
+		t.Fatalf("expected item fills, got %d", len(fills))
+	}
+	for i, w := range fills[:2] {
+		if w < 90 || w > 110 {
+			t.Fatalf("item %d width=%.1f, want ~100 (50%% of 200pt)", i, w)
+		}
+	}
+}
+
+func TestFlexBasisPercentCyclicColumn(t *testing.T) {
+	// height:auto column → main size indefinite; % flex-basis must act as auto
+	// (content-based), not resolve as 0.
+	s := sheet(t, `
+.col { display:flex; flex-direction:column; width:120pt; gap:0 }
+.pct { flex: 0 0 50%; background:#cfc; padding:4pt }
+.auto { flex: 0 0 auto; background:#ffc; padding:4pt }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="col">
+  <div class="pct">PERCENT BASIS</div>
+  <div class="auto">AUTO BASIS</div>
+</div>
+</body></html>`, s)
+	var pctH, autoH float64
+	for _, op := range res.Ops {
+		if op.Kind != OpFillRect || op.H < 2 {
+			continue
+		}
+		switch {
+		case op.G > 0.7 && op.R < 0.9: // #cfc
+			pctH = op.H
+		case op.R > 0.9 && op.G > 0.9 && op.B < 0.9: // #ffc
+			autoH = op.H
+		}
+	}
+	if pctH < 8 {
+		t.Fatalf("cyclic %% basis height=%.1f, want content-sized (>0), not silent 0", pctH)
+	}
+	if autoH < 8 {
+		t.Fatalf("auto basis height=%.1f, want content-sized", autoH)
+	}
+	// Same padding/font → cyclic-% (as auto) should be near the auto sibling.
+	if diff := pctH - autoH; diff > 4 || diff < -4 {
+		t.Fatalf("cyclic %% height=%.1f vs auto=%.1f, want near-equal content sizes", pctH, autoH)
+	}
+}
+
+func TestFlexBasisPercentDefiniteColumn(t *testing.T) {
+	s := sheet(t, `
+.col { display:flex; flex-direction:column; width:100pt; height:100pt; gap:0 }
+.a { flex: 0 0 40%; background:#f99 }
+.b { flex: 0 0 60%; background:#99f }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="col"><div class="a">A</div><div class="b">B</div></div>
+</body></html>`, s)
+	var h40, h60 float64
+	for _, op := range res.Ops {
+		if op.Kind != OpFillRect || op.H < 5 {
+			continue
+		}
+		if op.R > 0.9 && op.G < 0.7 {
+			h40 = op.H
+		}
+		if op.B > 0.9 && op.R < 0.7 {
+			h60 = op.H
+		}
+	}
+	if h40 < 35 || h40 > 45 {
+		t.Fatalf("40%% basis height=%.1f, want ~40", h40)
+	}
+	if h60 < 55 || h60 > 65 {
+		t.Fatalf("60%% basis height=%.1f, want ~60", h60)
+	}
+}
+
 func TestPositionRelativeAbsolute(t *testing.T) {
 	src := `<html><body>
 <div style="position:relative;top:10pt;left:20pt">rel</div>

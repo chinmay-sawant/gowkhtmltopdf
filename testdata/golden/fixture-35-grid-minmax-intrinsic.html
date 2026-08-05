@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<!--
+  fixture-35-grid-minmax-intrinsic
+  Proves Stage B full minmax() + Stage C subset from
+  plans/phases/subplans-tier-2/flex-grid-full.md:
+  - grid-template-columns: minmax(min, max) with length / fr floors
+  - cyclic height:% on grid child against auto-height parent → content-based
+  - display:subgrid copy-inherits parent template columns (no shared sizing)
+  - grid-template-rows: masonry shortest-column packing
+  Do not edit fixtures 25/28/32–34 — this is the Stage B/C proof fixture.
+  Expected: 1 page.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Grid minmax intrinsic subgrid masonry</title>
+  <style>
+    body { font-family: sans-serif; font-size: 9pt; margin: 10pt; color: #222; }
+    h1 { font-size: 13pt; margin: 0 0 6pt; }
+    h2 { font-size: 10pt; margin: 8pt 0 3pt; color: #333; }
+    .label { font-size: 8pt; color: #555; margin: 0 0 2pt; }
+
+    .minmax {
+      display: grid;
+      grid-template-columns: minmax(80pt, 1fr) minmax(40pt, 1fr) minmax(20pt, 1fr);
+      width: 300pt;
+      gap: 6pt;
+      padding: 4pt;
+      border: 1px solid #1565c0;
+      background: #e3f2fd;
+    }
+    .minmax > div {
+      background: #fff;
+      border: 1px solid #90caf9;
+      padding: 4pt;
+      box-sizing: border-box;
+    }
+
+    .cyclic {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      width: 280pt;
+      gap: 4pt;
+      border: 1px solid #2e7d32;
+      padding: 4pt;
+      background: #e8f5e9;
+    }
+    .cyclic .pct {
+      height: 50%;
+      background: #c8e6c9;
+      padding: 4pt;
+      box-sizing: border-box;
+    }
+    .cyclic .auto {
+      background: #a5d6a7;
+      padding: 8pt;
+      box-sizing: border-box;
+    }
+
+    .parent {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      width: 280pt;
+      gap: 4pt;
+      border: 1px solid #6a1b9a;
+      padding: 4pt;
+      background: #f3e5f5;
+    }
+    .sub {
+      display: subgrid;
+      grid-column: span 3;
+      background: #e1bee7;
+      padding: 2pt;
+    }
+    .sub > div {
+      background: #fff;
+      border: 1px solid #ce93d8;
+      padding: 3pt;
+      box-sizing: border-box;
+    }
+
+    .masonry {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-rows: masonry;
+      width: 280pt;
+      column-gap: 6pt;
+      row-gap: 4pt;
+      border: 1px solid #e65100;
+      padding: 4pt;
+      background: #fff3e0;
+    }
+    .masonry > div {
+      background: #ffe0b2;
+      border: 1px solid #ffb74d;
+      padding: 4pt;
+      box-sizing: border-box;
+    }
+    .masonry .tall { min-height: 36pt; }
+    .masonry .mid { min-height: 22pt; }
+  </style>
+</head>
+<body>
+  <h1>Grid minmax / intrinsic / subgrid / masonry</h1>
+
+  <h2>minmax() + fr floors</h2>
+  <p class="label">Three tracks: minmax(80pt,1fr) minmax(40pt,1fr) minmax(20pt,1fr).</p>
+  <div class="minmax">
+    <div>Min 80</div>
+    <div>Min 40</div>
+    <div>Min 20</div>
+  </div>
+
+  <h2>Cyclic height percent</h2>
+  <p class="label">Child height:50% against auto-height grid → content-based (not 0).</p>
+  <div class="cyclic">
+    <div class="pct">Percent height</div>
+    <div class="auto">Auto sized sibling with more text content here.</div>
+  </div>
+
+  <h2>Subgrid lite</h2>
+  <p class="label">Inner display:subgrid inherits parent three columns (copy-inherit).</p>
+  <div class="parent">
+    <div class="sub">
+      <div>S1</div><div>S2</div><div>S3</div>
+    </div>
+  </div>
+
+  <h2>Masonry packing</h2>
+  <p class="label">grid-template-rows:masonry — shortest-column pack.</p>
+  <div class="masonry">
+    <div class="tall">Tall A</div>
+    <div class="mid">Mid B</div>
+    <div>Short C</div>
+    <div>D</div>
+    <div class="mid">E</div>
+  </div>
+</body>
+</html>

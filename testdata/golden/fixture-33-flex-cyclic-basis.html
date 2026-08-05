@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<!--
+  fixture-33-flex-cyclic-basis
+  Proves Stage A remainder from plans/phases/subplans-tier-2/flex-grid-full.md §2.2:
+  - definite flex container main size: % flex-basis resolves against content box
+  - indefinite main size (column height:auto): % flex-basis treated as auto (content),
+    not silent 0 — CSS Flexbox L1 §9.2 cyclic %-sizing subset
+  Do not edit fixtures 25/28/32 — this is the cyclic-basis proof fixture.
+  Expected: 1 page.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Flex Cyclic Percentage Basis</title>
+  <style>
+    body { font-family: sans-serif; font-size: 9pt; margin: 10pt; color: #222; }
+    h1 { font-size: 14pt; margin: 0 0 8pt; }
+    h2 { font-size: 11pt; margin: 10pt 0 4pt; color: #333; }
+    .label { font-size: 8pt; color: #555; margin: 0 0 2pt; }
+
+    .row {
+      display: flex;
+      width: 240pt;
+      height: 36pt;
+      gap: 0;
+      border: 1px solid #1565c0;
+      background: #e3f2fd;
+    }
+    .row .half {
+      flex: 0 0 50%;
+      box-sizing: border-box;
+      padding: 6pt;
+      background: #90caf9;
+      border-right: 1px solid #1565c0;
+    }
+    .row .half:last-child { border-right: none; background: #64b5f6; }
+
+    .col-definite {
+      display: flex;
+      flex-direction: column;
+      width: 200pt;
+      height: 100pt;
+      gap: 0;
+      border: 1px solid #2e7d32;
+      background: #e8f5e9;
+    }
+    .col-definite .top {
+      flex: 0 0 40%;
+      box-sizing: border-box;
+      padding: 4pt;
+      background: #a5d6a7;
+    }
+    .col-definite .bot {
+      flex: 0 0 60%;
+      box-sizing: border-box;
+      padding: 4pt;
+      background: #66bb6a;
+    }
+
+    .col-auto {
+      display: flex;
+      flex-direction: column;
+      width: 200pt;
+      gap: 4pt;
+      border: 1px solid #ef6c00;
+      padding: 4pt;
+      background: #fff3e0;
+    }
+    .col-auto .pct {
+      flex: 0 0 50%;
+      padding: 6pt;
+      background: #ffcc80;
+      box-sizing: border-box;
+    }
+    .col-auto .content {
+      flex: 0 0 auto;
+      padding: 6pt;
+      background: #ffb74d;
+      box-sizing: border-box;
+    }
+  </style>
+</head>
+<body>
+  <h1>Flex cyclic percentage basis</h1>
+
+  <h2>Definite row — 50% / 50% basis</h2>
+  <p class="label">Container width 240pt (definite); each item flex-basis 50%.</p>
+  <div class="row">
+    <div class="half">Left 50%</div>
+    <div class="half">Right 50%</div>
+  </div>
+
+  <h2>Definite column — 40% / 60% basis</h2>
+  <p class="label">Container height 100pt (definite); % basis against content height.</p>
+  <div class="col-definite">
+    <div class="top">Top 40%</div>
+    <div class="bot">Bottom 60%</div>
+  </div>
+
+  <h2>Indefinite column — cyclic % → auto</h2>
+  <p class="label">height:auto; flex-basis:50% acts as content-sized (not zero).</p>
+  <div class="col-auto">
+    <div class="pct">Percent basis (cyclic → auto)</div>
+    <div class="content">Auto basis sibling</div>
+  </div>
+</body>
+</html>
