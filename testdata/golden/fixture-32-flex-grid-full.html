@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<!--
+  fixture-32-flex-grid-full
+  Proves Stage A flex deepen + Stage B grid lite from
+  plans/phases/subplans-tier-2/flex-grid-full.md:
+  - flex: wrap + row-reverse + space-evenly + independent row/column-gap
+  - flex: column + flex shorthand grow + align-self
+  - grid: template-rows 1fr, grid-row span, independent gaps
+  Do not edit fixtures 25/28 — this is the Stage A/B proof fixture.
+  Expected: 1 page.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Flex Grid Full Stage A/B</title>
+  <style>
+    body { font-family: sans-serif; font-size: 9pt; margin: 10pt; color: #222; }
+    h1 { font-size: 14pt; margin: 0 0 8pt; }
+    h2 { font-size: 11pt; margin: 10pt 0 4pt; color: #333; }
+    .label { font-size: 8pt; color: #555; margin: 0 0 2pt; }
+
+    /* Stage A: wrap + reverse + space-evenly + independent gaps */
+    .wrap-reverse {
+      display: flex;
+      flex-direction: row-reverse;
+      flex-wrap: wrap;
+      justify-content: space-evenly;
+      column-gap: 12pt;
+      row-gap: 4pt;
+      width: 240pt;
+      border: 1px solid #1565c0;
+      padding: 4pt;
+      background: #e3f2fd;
+    }
+    .wrap-reverse > div {
+      width: 70pt;
+      padding: 4pt;
+      background: #fff;
+      border: 1px solid #90caf9;
+      box-sizing: border-box;
+    }
+
+    /* Stage A: column + flex shorthand + align-self */
+    .col {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-around;
+      align-items: flex-start;
+      gap: 6pt;
+      height: 120pt;
+      width: 200pt;
+      border: 1px solid #2e7d32;
+      padding: 4pt;
+      background: #e8f5e9;
+    }
+    .col .grow {
+      flex: 1 1 auto;
+      width: 100%;
+      background: #c8e6c9;
+      padding: 3pt;
+      box-sizing: border-box;
+    }
+    .col .self-end {
+      align-self: flex-end;
+      width: 80pt;
+      background: #a5d6a7;
+      padding: 3pt;
+      box-sizing: border-box;
+    }
+    .col .fixed {
+      flex: 0 0 auto;
+      width: 60pt;
+      background: #81c784;
+      padding: 3pt;
+      box-sizing: border-box;
+    }
+
+    /* Stage B: rows + row span + independent gaps */
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      column-gap: 10pt;
+      row-gap: 6pt;
+      height: 100pt;
+      width: 280pt;
+      border: 1px solid #6a1b9a;
+      padding: 4pt;
+      background: #f3e5f5;
+    }
+    .grid > div {
+      background: #fff;
+      border: 1px solid #ce93d8;
+      padding: 4pt;
+      box-sizing: border-box;
+    }
+    .grid .tall {
+      grid-row: span 2;
+      background: #e1bee7;
+    }
+  </style>
+</head>
+<body>
+  <h1>Flex &amp; grid Stage A/B</h1>
+
+  <h2>Flex wrap + row-reverse + space-evenly</h2>
+  <p class="label">Items A–D; row-reverse; column-gap 12pt, row-gap 4pt.</p>
+  <div class="wrap-reverse">
+    <div>A</div><div>B</div><div>C</div><div>D</div>
+  </div>
+
+  <h2>Flex column + flex shorthand + align-self</h2>
+  <p class="label">Growing middle; trailing item align-self:flex-end.</p>
+  <div class="col">
+    <div class="fixed">Top</div>
+    <div class="grow">Grow (flex: 1 1 auto)</div>
+    <div class="self-end">Self end</div>
+  </div>
+
+  <h2>Grid rows + row span</h2>
+  <p class="label">3×2 tracks; first cell grid-row:span 2; column-gap 10pt, row-gap 6pt.</p>
+  <div class="grid">
+    <div class="tall">Tall span-2</div>
+    <div>B</div>
+    <div>C</div>
+    <div>D</div>
+    <div>E</div>
+  </div>
+</body>
+</html>

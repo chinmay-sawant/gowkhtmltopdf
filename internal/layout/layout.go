@@ -317,7 +317,7 @@ func (e *engine) build(n *html.Node, availW, x, y float64) *box {
 	if b == nil && (st.Display == "flex" || st.Display == "inline-flex") {
 		b = e.buildFlex(n, st, availW, x, y)
 	}
-	if b == nil && (st.Display == "grid" || st.Display == "inline-grid") {
+	if b == nil && (st.Display == "grid" || st.Display == "inline-grid" || st.Display == "subgrid") {
 		b = e.buildGrid(n, st, availW, x, y)
 	}
 	if b == nil && isTableDisplay(st.Display) {
@@ -359,7 +359,12 @@ func (e *engine) buildBlock(n *html.Node, st ResolvedStyle, availW, x, y float64
 	}
 	definiteW := st.Width >= 0 || st.WidthPercent >= 0
 	if st.WidthPercent >= 0 {
-		b.w = availW * st.WidthPercent / 100
+		// Cyclic % honesty: indefinite containing block → treat as auto.
+		if availW > 0 && availW < 1e12 {
+			b.w = availW * st.WidthPercent / 100
+		} else {
+			definiteW = false
+		}
 	} else if st.Width >= 0 {
 		b.w = e.scalePt(st.Width)
 	}
@@ -421,12 +426,7 @@ func (e *engine) buildBlock(n *html.Node, st ResolvedStyle, availW, x, y float64
 		e.add(Op{Kind: OpBullet, X: contentX + 4, Y: b.firstBaseline, Text: "\u2022", Font: e.font, Size: e.scalePt(st.FontSize), R: st.Color[0], G: st.Color[1], B: st.Color[2]})
 	}
 
-	if st.Height >= 0 {
-		h := e.scalePt(st.Height)
-		if st.BoxSizing != "border-box" {
-			h += e.scalePt(st.PaddingTop) + e.scalePt(st.PaddingBottom) +
-				e.scalePt(st.BorderTop.Width) + e.scalePt(st.BorderBottom.Width)
-		}
+	if h, ok := resolveUsedHeight(st, -1, e); ok {
 		if cy < h {
 			cy = h
 		}
@@ -441,6 +441,32 @@ func (e *engine) buildBlock(n *html.Node, st ResolvedStyle, availW, x, y float64
 
 	e.prependChrome(contentStart, st, b.x, y, b.w, b.h)
 	return b
+}
+
+// resolveUsedHeight returns a definite border-box height when the style has a
+// usable height. HeightPercent requires a definite containing-block height
+// (cbH >= 0); otherwise the percentage is treated as auto (cyclic honesty).
+func resolveUsedHeight(st ResolvedStyle, cbH float64, e *engine) (float64, bool) {
+	if st.HeightPercent >= 0 {
+		if cbH < 0 {
+			return 0, false
+		}
+		h := cbH * st.HeightPercent / 100
+		if st.BoxSizing != "border-box" {
+			h += e.scalePt(st.PaddingTop) + e.scalePt(st.PaddingBottom) +
+				e.scalePt(st.BorderTop.Width) + e.scalePt(st.BorderBottom.Width)
+		}
+		return h, true
+	}
+	if st.Height < 0 {
+		return 0, false
+	}
+	h := e.scalePt(st.Height)
+	if st.BoxSizing != "border-box" {
+		h += e.scalePt(st.PaddingTop) + e.scalePt(st.PaddingBottom) +
+			e.scalePt(st.BorderTop.Width) + e.scalePt(st.BorderBottom.Width)
+	}
+	return h, true
 }
 
 // buildAbsolute places an out-of-flow box using left/top (and optional width/
@@ -511,7 +537,7 @@ func (e *engine) buildInFlowDisplay(n *html.Node, st ResolvedStyle, availW, x, y
 	if st.Display == "flex" || st.Display == "inline-flex" {
 		return e.buildFlex(n, st, availW, x, y)
 	}
-	if st.Display == "grid" || st.Display == "inline-grid" {
+	if st.Display == "grid" || st.Display == "inline-grid" || st.Display == "subgrid" {
 		return e.buildGrid(n, st, availW, x, y)
 	}
 	if isTableDisplay(st.Display) {

@@ -880,6 +880,31 @@ func TestBoundaryFillSplit(t *testing.T) {
 	}
 }
 
+// TestSplitCrossingFloatBoundaryNoHang guards the CI hang where an OpLine/fill
+// with Y numerically on a page boundary made int(Y/contentH) report the
+// previous page, so splitCrossingRects inserted forever (mid-slice copy).
+func TestSplitCrossingFloatBoundaryNoHang(t *testing.T) {
+	contentH := 785.1970866141731
+	// Y just below a page top so truncating division sticks on the prior page.
+	y := contentH*52 - 1e-10
+	res := &Result{Ops: []Op{{
+		Kind: OpLine, X: 10, Y: y, W: 0, H: 15.8, Width: 1,
+	}}}
+	done := make(chan struct{})
+	go func() {
+		splitCrossingRects(res, contentH, nil)
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("splitCrossingRects hung on float page-boundary edge")
+	}
+	if len(res.Ops) == 0 || len(res.Ops) > 4 {
+		t.Fatalf("ops=%d after split, want a small finite split", len(res.Ops))
+	}
+}
+
 // pageOfIdx returns the page of the op at index i.
 func pageOfIdx(t *testing.T, res *Result, i int) int {
 	t.Helper()

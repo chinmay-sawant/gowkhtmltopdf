@@ -22,8 +22,8 @@ report and simple marketing layouts - not Wikipedia chrome parity.
 | Float refinement | Nested floats, `%` widths, better wrapping | **Shipped** (lite) |
 | `position: relative` / `absolute` | Offsets + containing-block subset | **Shipped** (lite) |
 | `z-index` | Paint sort on positioned / chrome ops | **Shipped** (lite) |
-| `display: flex` | Row/column + align/gap/grow/shrink/basis/order/wrap | **Shipped** (partial) |
-| `display: grid` | Columns, spans, nested grids | **Shipped** (lite; not full Grid) |
+| `display: flex` | Row/column + align/gap/grow/shrink/basis/order/wrap + Stage A deepen | **Shipped** (Stage A partial; see flex-grid-full) |
+| `display: grid` | Columns/rows, spans, nested, `fr`, alignment stretch | **Shipped** (Stage B lite; not full Grid) |
 | `position: fixed` / sticky | Print-safe fixed stamps + sticky | fixed lite shipped; sticky **print-scoped** (page scrollport) |
 
 ---
@@ -63,6 +63,7 @@ report and simple marketing layouts - not Wikipedia chrome parity.
 - [x] Tests: flex fixtures (`fixture-25`, `fixture-28`) + layout unit tests
 - [x] Path: `internal/layout/flex.go`
 - [x] Matrix: flex → Partial with property list (shared doc-honesty pass)
+- [x] Stage A deepen (reverse, space-around/evenly, align-content/self, flex shorthand, independent gaps, `%` basis cyclic subset) — **2026-08-05**; see [`subplans-tier-2/flex-grid-full.md`](subplans-tier-2/flex-grid-full.md)
 
 ### 17.4 Grid lite (amended into Tier 2)
 
@@ -70,7 +71,8 @@ report and simple marketing layouts - not Wikipedia chrome parity.
 - [x] Occupancy placement; `grid-column: span N` / start–end
 - [x] Nested grids
 - [x] Tests: `grid_test.go`, `fixture-28-flex-wrap-grid-fixed`
-- [~] Full CSS Grid (areas, dense auto-flow, row spans, `fr` complexity) — see [`subplans-tier-2/flex-grid-full.md`](subplans-tier-2/flex-grid-full.md)
+- [x] Stage B (template-rows, row span, `fr`/`minmax`, areas, dense, justify/align stretch) — **2026-08-05**; see [`subplans-tier-2/flex-grid-full.md`](subplans-tier-2/flex-grid-full.md)
+- [~] Full CSS Grid L1/L3 + Chrome parity — remaining honesty in [`subplans-tier-2/flex-grid-full.md`](subplans-tier-2/flex-grid-full.md) Stage C (`[~]` subgrid shared tracks / masonry L3 / no pixel parity)
 
 ### 17.5 Explicitly not this phase (still deferred)
 
@@ -78,7 +80,7 @@ report and simple marketing layouts - not Wikipedia chrome parity.
 - [x] Sticky positioning — print-scoped ([`subplans-tier-2/sticky-print.md`](subplans-tier-2/sticky-print.md))
 - [~] Transforms, filters, animations, transitions
 - [~] Container queries, `:has()`
-- [~] Full flex algorithm (content-based min-size iterations, percentage cyclic sizing) — see [`subplans-tier-2/flex-grid-full.md`](subplans-tier-2/flex-grid-full.md)
+- [~] Full flex algorithm (multi-pass intrinsic iterations beyond cyclic `%` subset) — see [`subplans-tier-2/flex-grid-full.md`](subplans-tier-2/flex-grid-full.md) Stage C
 
 ### 17.6 Fixtures & corpus
 
@@ -110,7 +112,7 @@ report and simple marketing layouts - not Wikipedia chrome parity.
 |------|--------|
 | Compatibility-matrix / fidelity MVP-gap rows | **[x]** Shared doc-honesty pass |
 | Sticky positioning | **[x]** print-scoped ([`sticky-print.md`](subplans-tier-2/sticky-print.md); fixture-31) |
-| Full Grid / full Flex | → [`subplans-tier-2/flex-grid-full.md`](subplans-tier-2/flex-grid-full.md) |
+| Full Grid / full Flex | Stage A + Stage B **done** 2026-08-05; Stage C lite with `[~]` gaps → [`subplans-tier-2/flex-grid-full.md`](subplans-tier-2/flex-grid-full.md); next **Phase 21** corpus |
 | Richer float+table interaction fixtures | **New** `fixture-29-float-beside-table.html` (do not edit 22) |
 
 ---

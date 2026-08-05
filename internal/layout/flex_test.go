@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	"gowkhtmltopdf/internal/css"
+	"gowkhtmltopdf/internal/html"
 	"gowkhtmltopdf/internal/pdf"
 )
 
@@ -151,6 +153,290 @@ func TestFlexRowLayout(t *testing.T) {
 	}
 	if texts < 3 {
 		t.Fatalf("text ops = %d, want >= 3", texts)
+	}
+}
+
+func TestFlexRowReverse(t *testing.T) {
+	s := sheet(t, `
+.row { display:flex; flex-direction:row-reverse; width:200pt; gap:0 }
+.a { width:40pt }
+.b { width:40pt }
+.c { width:40pt }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="row"><div class="a">A</div><div class="b">B</div><div class="c">C</div></div>
+</body></html>`, s)
+	pos := map[string]float64{}
+	for _, op := range res.Ops {
+		if op.Kind == OpText {
+			pos[op.Text] = op.X
+		}
+	}
+	if !(pos["C"] < pos["B"] && pos["B"] < pos["A"]) {
+		t.Fatalf("row-reverse positions C/B/A = %.1f/%.1f/%.1f", pos["C"], pos["B"], pos["A"])
+	}
+}
+
+func TestFlexSpaceEvenly(t *testing.T) {
+	s := sheet(t, `
+.row { display:flex; justify-content:space-evenly; width:300pt; gap:0 }
+.item { width:40pt }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="row"><div class="item">A</div><div class="item">B</div><div class="item">C</div></div>
+</body></html>`, s)
+	pos := map[string]float64{}
+	for _, op := range res.Ops {
+		if op.Kind == OpText {
+			pos[op.Text] = op.X
+		}
+	}
+	if len(pos) < 3 {
+		t.Fatalf("missing texts: %v", pos)
+	}
+	// space-evenly: equal gaps at edges and between; A should not be at x≈0.
+	d1 := pos["B"] - pos["A"]
+	d2 := pos["C"] - pos["B"]
+	if d1 < 50 || d2 < 50 {
+		t.Fatalf("space-evenly gaps too small: A=%.1f B=%.1f C=%.1f", pos["A"], pos["B"], pos["C"])
+	}
+	if diff := d1 - d2; diff > 5 || diff < -5 {
+		t.Fatalf("space-evenly gaps unequal: AB=%.1f BC=%.1f", d1, d2)
+	}
+	if pos["A"] < 20 {
+		t.Fatalf("space-evenly leading gap missing: A.x=%.1f", pos["A"])
+	}
+}
+
+func TestFlexColumnGapVsRowGap(t *testing.T) {
+	s := sheet(t, `
+.row {
+  display:flex; flex-wrap:wrap; width:100pt;
+  column-gap:20pt; row-gap:40pt;
+}
+.item { width:40pt; height:10pt }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="row">
+  <div class="item">A</div><div class="item">B</div>
+  <div class="item">C</div><div class="item">D</div>
+</div>
+</body></html>`, s)
+	posX, posY := map[string]float64{}, map[string]float64{}
+	for _, op := range res.Ops {
+		if op.Kind == OpText {
+			posX[op.Text] = op.X
+			posY[op.Text] = op.Y
+		}
+	}
+	for _, k := range []string{"A", "B", "C", "D"} {
+		if _, ok := posX[k]; !ok {
+			t.Fatalf("missing text %s", k)
+		}
+	}
+	// A,B on first line with ~20pt column-gap; C,D on second with ~40pt row-gap.
+	if col := posX["B"] - posX["A"]; col < 50 || col > 70 {
+		t.Fatalf("column-gap AB dx=%.1f, want ~60 (40+20)", col)
+	}
+	if row := posY["C"] - posY["A"]; row < 40 || row > 70 {
+		t.Fatalf("row-gap AC dy=%.1f, want ~50 (10+40)", row)
+	}
+	if posY["B"]-posY["A"] > 5 {
+		t.Fatalf("B should share A's line: Ay=%.1f By=%.1f", posY["A"], posY["B"])
+	}
+}
+
+func TestFlexAlignSelf(t *testing.T) {
+	s := sheet(t, `
+.row { display:flex; align-items:flex-start; width:200pt; height:60pt; gap:0 }
+.a { width:40pt; height:10pt }
+.b { width:40pt; height:10pt; align-self:flex-end }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="row"><div class="a">A</div><div class="b">B</div></div>
+</body></html>`, s)
+	posY := map[string]float64{}
+	for _, op := range res.Ops {
+		if op.Kind == OpText {
+			posY[op.Text] = op.Y
+		}
+	}
+	if posY["B"] <= posY["A"]+10 {
+		t.Fatalf("align-self flex-end: A.y=%.1f B.y=%.1f, want B lower", posY["A"], posY["B"])
+	}
+}
+
+// TestFlexAlignItemsStretchRow matches fixture-33 definite row: container
+// height 36pt, items flex-basis 50% with auto height → stretch to line cross size.
+func TestFlexAlignItemsStretchRow(t *testing.T) {
+	s := sheet(t, `
+.row { display:flex; width:240pt; height:36pt; gap:0; border:1px solid #1565c0; background:#e3f2fd }
+.half { flex:0 0 50%; box-sizing:border-box; padding:6pt; background:#90caf9 }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="row"><div class="half">Left 50%</div><div class="half">Right 50%</div></div>
+</body></html>`, s)
+	var itemH []float64
+	for _, op := range res.Ops {
+		if op.Kind != OpFillRect {
+			continue
+		}
+		// Item blue (#90caf9 ≈ 0.565, 0.792, 0.976), not container wash.
+		if op.R > 0.5 && op.R < 0.7 && op.B > 0.9 && op.W > 80 {
+			itemH = append(itemH, op.H)
+		}
+	}
+	if len(itemH) < 2 {
+		t.Fatalf("expected ≥2 item fills, got %d (ops=%d)", len(itemH), len(res.Ops))
+	}
+	for i, h := range itemH {
+		if h < 34 || h > 38 {
+			t.Errorf("item[%d] fill h=%.2f, want ~36pt (stretched to row height)", i, h)
+		}
+	}
+}
+
+func TestFlexShorthandParsing(t *testing.T) {
+	cases := []struct {
+		name     string
+		css      string
+		grow     float64
+		sh       float64
+		basis    float64
+		basisPct float64
+	}{
+		{"none", "flex:none", 0, 0, -1, -1},
+		{"auto", "flex:auto", 1, 1, -1, -1},
+		{"one", "flex:1", 1, 1, -1, 0},
+		{"three", "flex:0 0 80pt", 0, 0, 80, -1},
+		{"grow-shrink-auto", "flex:1 1 auto", 1, 1, -1, -1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			s := sheet(t, ".x { display:flex } .i { "+tc.css+" }")
+			doc := `<html><body><div class="x"><div class="i">Z</div></div></body></html>`
+			res := layoutHTML(t, doc, s)
+			if res == nil {
+				t.Fatal("nil result")
+			}
+			// Re-resolve styles the same way layout does.
+			root := mustParse(t, doc)
+			styles := resolveStyles(root, []*css.Stylesheet{s}, "screen", 612, 792)
+			var item *html.Node
+			var find func(*html.Node)
+			find = func(n *html.Node) {
+				if n.Type == html.ElementNode && n.Attribute("class") == "i" {
+					item = n
+					return
+				}
+				for _, c := range n.Children {
+					find(c)
+				}
+			}
+			find(root)
+			if item == nil {
+				t.Fatal("item not found")
+			}
+			st := styles[item]
+			if st.FlexGrow != tc.grow || st.FlexShrink != tc.sh {
+				t.Fatalf("grow/shrink = %v/%v, want %v/%v", st.FlexGrow, st.FlexShrink, tc.grow, tc.sh)
+			}
+			if st.FlexBasis != tc.basis || st.FlexBasisPercent != tc.basisPct {
+				t.Fatalf("basis/pct = %v/%v, want %v/%v", st.FlexBasis, st.FlexBasisPercent, tc.basis, tc.basisPct)
+			}
+		})
+	}
+}
+
+func TestFlexBasisPercentDefinite(t *testing.T) {
+	s := sheet(t, `
+.row { display:flex; width:200pt; gap:0; height:30pt }
+.a { flex: 0 0 50%; background:#fcc }
+.b { flex: 0 0 50%; background:#ccf }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="row"><div class="a">A</div><div class="b">B</div></div>
+</body></html>`, s)
+	var fills []float64
+	for _, op := range res.Ops {
+		if op.Kind == OpFillRect && op.W > 10 && op.H > 5 {
+			fills = append(fills, op.W)
+		}
+	}
+	if len(fills) < 2 {
+		t.Fatalf("expected item fills, got %d", len(fills))
+	}
+	for i, w := range fills[:2] {
+		if w < 90 || w > 110 {
+			t.Fatalf("item %d width=%.1f, want ~100 (50%% of 200pt)", i, w)
+		}
+	}
+}
+
+func TestFlexBasisPercentCyclicColumn(t *testing.T) {
+	// height:auto column → main size indefinite; % flex-basis must act as auto
+	// (content-based), not resolve as 0.
+	s := sheet(t, `
+.col { display:flex; flex-direction:column; width:120pt; gap:0 }
+.pct { flex: 0 0 50%; background:#cfc; padding:4pt }
+.auto { flex: 0 0 auto; background:#ffc; padding:4pt }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="col">
+  <div class="pct">PERCENT BASIS</div>
+  <div class="auto">AUTO BASIS</div>
+</div>
+</body></html>`, s)
+	var pctH, autoH float64
+	for _, op := range res.Ops {
+		if op.Kind != OpFillRect || op.H < 2 {
+			continue
+		}
+		switch {
+		case op.G > 0.7 && op.R < 0.9: // #cfc
+			pctH = op.H
+		case op.R > 0.9 && op.G > 0.9 && op.B < 0.9: // #ffc
+			autoH = op.H
+		}
+	}
+	if pctH < 8 {
+		t.Fatalf("cyclic %% basis height=%.1f, want content-sized (>0), not silent 0", pctH)
+	}
+	if autoH < 8 {
+		t.Fatalf("auto basis height=%.1f, want content-sized", autoH)
+	}
+	// Same padding/font → cyclic-% (as auto) should be near the auto sibling.
+	if diff := pctH - autoH; diff > 4 || diff < -4 {
+		t.Fatalf("cyclic %% height=%.1f vs auto=%.1f, want near-equal content sizes", pctH, autoH)
+	}
+}
+
+func TestFlexBasisPercentDefiniteColumn(t *testing.T) {
+	s := sheet(t, `
+.col { display:flex; flex-direction:column; width:100pt; height:100pt; gap:0 }
+.a { flex: 0 0 40%; background:#f99 }
+.b { flex: 0 0 60%; background:#99f }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="col"><div class="a">A</div><div class="b">B</div></div>
+</body></html>`, s)
+	var h40, h60 float64
+	for _, op := range res.Ops {
+		if op.Kind != OpFillRect || op.H < 5 {
+			continue
+		}
+		if op.R > 0.9 && op.G < 0.7 {
+			h40 = op.H
+		}
+		if op.B > 0.9 && op.R < 0.7 {
+			h60 = op.H
+		}
+	}
+	if h40 < 35 || h40 > 45 {
+		t.Fatalf("40%% basis height=%.1f, want ~40", h40)
+	}
+	if h60 < 55 || h60 > 65 {
+		t.Fatalf("60%% basis height=%.1f, want ~60", h60)
 	}
 }
 

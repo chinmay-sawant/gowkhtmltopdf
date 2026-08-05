@@ -26,26 +26,38 @@ type ResolvedStyle struct {
 	RightAuto           bool
 	BottomAuto          bool
 	LeftAuto            bool
-	FlexDirection       string  // "row" | "column"
+	FlexDirection       string  // "row" | "column" | "row-reverse" | "column-reverse"
 	FlexWrap            string  // "nowrap" | "wrap" | "wrap-reverse"
-	JustifyContent      string  // flex-start | flex-end | center | space-between
+	JustifyContent      string  // flex-start | flex-end | center | space-between | space-around | space-evenly
 	AlignItems          string  // stretch | flex-start | center | flex-end
-	Gap                 float64 // flex/grid gap (pt)
+	AlignContent        string  // flex-start | flex-end | center | space-between | space-around | space-evenly | stretch
+	AlignSelf           string  // auto | stretch | flex-start | flex-end | center | start | end
+	JustifyItems        string  // grid: stretch | start | end | center
+	JustifySelf         string  // grid item: auto | stretch | start | end | center
+	Gap                 float64 // flex/grid gap shorthand (pt); kept for backward compat
+	RowGap              float64 // pt; 0 with ColumnGap 0 → layout falls back to Gap
+	ColumnGap           float64
 	FlexGrow            float64
 	FlexShrink          float64 // default 1; 0 disables shrink
 	FlexBasis           float64 // -1 = auto
-	FlexBasisPercent    float64 // >=0 means % of flex container content width
+	FlexBasisPercent    float64 // >=0 means % of flex container content main size (width/height)
 	FlexOrder           int
 	ZIndex              int
 	ZIndexSet           bool
 	WritingMode         string // "" | "horizontal-tb" | "vertical-rl" | "vertical-lr"
 	GridTemplateColumns string // raw grid-template-columns value
 	GridTemplateRows    string
+	GridTemplateAreas   string  // raw grid-template-areas value
+	GridArea            string  // named area (custom-ident); empty = line-based placement
+	GridAutoFlow        string  // "row" | "column" | "dense" | "row dense" | "column dense"
 	GridColumnSpan      int     // from grid-column: span N (default 1)
 	GridColumnStart     int     // 1-based; 0 = auto
+	GridRowSpan         int     // from grid-row: span N (default 1)
+	GridRowStart        int     // 1-based; 0 = auto
 	Width               float64 // -1 = auto; absolute length in pt when WidthPercent < 0
 	WidthPercent        float64 // >=0 means width is that % of the containing block at layout time
-	Height              float64
+	Height              float64 // -1 = auto; absolute length in pt when HeightPercent < 0
+	HeightPercent       float64 // >=0 means height is that % of the CB; indefinite CB → auto (cyclic honesty)
 	MinWidth            float64
 	MaxWidth            float64
 	MinHeight           float64
@@ -112,9 +124,14 @@ func initialStyle() ResolvedStyle {
 		FlexWrap:         "nowrap",
 		JustifyContent:   "flex-start",
 		AlignItems:       "stretch",
+		AlignContent:     "stretch",
+		AlignSelf:        "auto",
+		JustifyItems:     "stretch",
+		JustifySelf:      "auto",
 		Width:            -1,
 		WidthPercent:     -1,
 		Height:           -1,
+		HeightPercent:    -1,
 		MinWidth:         0,
 		MaxWidth:         -1,
 		MinHeight:        0,
@@ -130,6 +147,7 @@ func initialStyle() ResolvedStyle {
 		BorderSpacing:    0,
 		TableLayout:      "auto",
 		GridColumnSpan:   1,
+		GridRowSpan:      1,
 		WritingMode:      "horizontal-tb",
 	}
 }
@@ -345,7 +363,8 @@ func applyFontProps(st *ResolvedStyle, raw map[string]string, parent *ResolvedSt
 // iteration order.
 func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext) {
 	fs := st.FontSize
-	shorthands := []string{"margin", "padding", "border", "border-width", "border-style", "border-color"}
+	// gap/flex applied before longhands so row-gap/column-gap and flex-* win.
+	shorthands := []string{"margin", "padding", "border", "border-width", "border-style", "border-color", "gap", "flex"}
 	isShorthand := map[string]bool{}
 	for _, p := range shorthands {
 		isShorthand[p] = true
@@ -369,7 +388,7 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext)
 			case "block", "inline", "none", "list-item", "table", "table-row", "table-cell",
 				"table-row-group", "table-header-group", "table-footer-group",
 				"inline-block", "table-caption", "table-column", "table-column-group",
-				"flex", "inline-flex", "grid", "inline-grid":
+				"flex", "inline-flex", "grid", "inline-grid", "subgrid":
 				st.Display = value
 			}
 		case "position":
@@ -386,7 +405,8 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext)
 		case "left":
 			st.Left, st.LeftAuto = marginLenAuto(value, fs, ctx.viewportW)
 		case "flex-direction":
-			if value == "row" || value == "column" {
+			switch value {
+			case "row", "column", "row-reverse", "column-reverse":
 				st.FlexDirection = value
 			}
 		case "flex-wrap":
@@ -395,7 +415,7 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext)
 			}
 		case "justify-content":
 			switch value {
-			case "flex-start", "flex-end", "center", "space-between", "start", "end":
+			case "flex-start", "flex-end", "center", "space-between", "space-around", "space-evenly", "start", "end":
 				st.JustifyContent = value
 			}
 		case "align-items":
@@ -403,10 +423,43 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext)
 			case "stretch", "flex-start", "flex-end", "center", "start", "end":
 				st.AlignItems = value
 			}
-		case "gap", "column-gap", "row-gap":
+		case "align-content":
+			switch value {
+			case "flex-start", "flex-end", "center", "space-between", "space-around", "space-evenly", "stretch", "start", "end":
+				st.AlignContent = value
+			}
+		case "align-self":
+			switch value {
+			case "auto", "stretch", "flex-start", "flex-end", "center", "start", "end":
+				st.AlignSelf = value
+			}
+		case "justify-items":
+			switch value {
+			case "stretch", "start", "end", "center", "flex-start", "flex-end":
+				st.JustifyItems = value
+			}
+		case "justify-self":
+			switch value {
+			case "auto", "stretch", "start", "end", "center", "flex-start", "flex-end":
+				st.JustifySelf = value
+			}
+		case "gap":
 			if v, ok := lengthBox(value, fs, ctx.viewportW, "none"); ok && v >= 0 {
 				st.Gap = v
+				st.RowGap = v
+				st.ColumnGap = v
 			}
+		case "row-gap":
+			if v, ok := lengthBox(value, fs, ctx.viewportW, "none"); ok && v >= 0 {
+				st.RowGap = v
+				st.Gap = v
+			}
+		case "column-gap":
+			if v, ok := lengthBox(value, fs, ctx.viewportW, "none"); ok && v >= 0 {
+				st.ColumnGap = v
+			}
+		case "flex":
+			parseFlexShorthand(st, value, fs, ctx.viewportW)
 		case "flex-grow":
 			if v, err := strconv.ParseFloat(strings.TrimSpace(value), 64); err == nil && v >= 0 {
 				st.FlexGrow = v
@@ -447,11 +500,23 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext)
 			st.GridTemplateColumns = value
 		case "grid-template-rows":
 			st.GridTemplateRows = value
+		case "grid-template-areas":
+			st.GridTemplateAreas = value
+		case "grid-area":
+			parseGridArea(st, value)
+		case "grid-auto-flow":
+			st.GridAutoFlow = parseGridAutoFlowValue(value)
 		case "grid-column", "grid-column-end":
 			parseGridColumn(st, value)
 		case "grid-column-start":
 			if v, err := strconv.Atoi(strings.TrimSpace(value)); err == nil && v > 0 {
 				st.GridColumnStart = v
+			}
+		case "grid-row", "grid-row-end":
+			parseGridRow(st, value)
+		case "grid-row-start":
+			if v, err := strconv.Atoi(strings.TrimSpace(value)); err == nil && v > 0 {
+				st.GridRowStart = v
 			}
 		case "float":
 			switch value {
@@ -482,8 +547,17 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext)
 				st.WidthPercent = -1
 			}
 		case "height":
-			if v, ok := lengthBox(value, fs, ctx.viewportH, "auto"); ok {
+			if value == "auto" {
+				st.Height = -1
+				st.HeightPercent = -1
+			} else if v, unit, ok := css.ParseLength(value); ok && unit == "%" {
+				// Defer % height to layout; indefinite containing block → auto
+				// (cyclic percentage honesty for flex/grid children).
+				st.HeightPercent = v
+				st.Height = -1
+			} else if v, ok := lengthBox(value, fs, ctx.viewportH, "auto"); ok {
 				st.Height = v
+				st.HeightPercent = -1
 			}
 		case "min-width":
 			if v, ok := lengthBox(value, fs, ctx.viewportW, "none"); ok {
@@ -670,6 +744,89 @@ func parseFontShorthand(st *ResolvedStyle, value string) {
 			}
 		}
 		return
+	}
+}
+
+// parseFlexShorthand handles flex: none | auto | <grow> | <grow> <shrink> | <grow> <shrink> <basis>.
+func parseFlexShorthand(st *ResolvedStyle, value string, fs, pctBase float64) {
+	value = strings.TrimSpace(value)
+	switch value {
+	case "none":
+		st.FlexGrow, st.FlexShrink = 0, 0
+		st.FlexBasis, st.FlexBasisPercent = -1, -1
+		return
+	case "auto":
+		st.FlexGrow, st.FlexShrink = 1, 1
+		st.FlexBasis, st.FlexBasisPercent = -1, -1
+		return
+	}
+	parts := strings.Fields(value)
+	if len(parts) == 0 {
+		return
+	}
+	isBasis := func(tok string) bool {
+		if tok == "auto" || tok == "content" {
+			return true
+		}
+		if _, _, ok := css.ParseLength(tok); ok {
+			return true
+		}
+		return false
+	}
+	setBasis := func(tok string) {
+		if tok == "auto" || tok == "content" {
+			st.FlexBasis = -1
+			st.FlexBasisPercent = -1
+			return
+		}
+		if v, unit, ok := css.ParseLength(tok); ok && unit == "%" {
+			st.FlexBasisPercent = v
+			st.FlexBasis = -1
+			return
+		}
+		if v, ok := lengthBox(tok, fs, pctBase, "auto"); ok {
+			st.FlexBasis = v
+			st.FlexBasisPercent = -1
+		}
+	}
+	switch len(parts) {
+	case 1:
+		if g, err := strconv.ParseFloat(parts[0], 64); err == nil {
+			// flex: <number> → grow <number>, shrink 1, basis 0%
+			st.FlexGrow = g
+			st.FlexShrink = 1
+			st.FlexBasis = -1
+			st.FlexBasisPercent = 0
+			return
+		}
+		if isBasis(parts[0]) {
+			st.FlexGrow, st.FlexShrink = 1, 1
+			setBasis(parts[0])
+		}
+	case 2:
+		g, errG := strconv.ParseFloat(parts[0], 64)
+		if errG != nil {
+			return
+		}
+		st.FlexGrow = g
+		if sh, err := strconv.ParseFloat(parts[1], 64); err == nil {
+			st.FlexShrink = sh
+			st.FlexBasis = -1
+			st.FlexBasisPercent = 0
+			return
+		}
+		st.FlexShrink = 1
+		if isBasis(parts[1]) {
+			setBasis(parts[1])
+		}
+	default:
+		g, errG := strconv.ParseFloat(parts[0], 64)
+		sh, errS := strconv.ParseFloat(parts[1], 64)
+		if errG != nil || errS != nil {
+			return
+		}
+		st.FlexGrow, st.FlexShrink = g, sh
+		setBasis(parts[2])
 	}
 }
 
@@ -923,6 +1080,120 @@ func marginLen(value string, fs, ctxW float64) float64 {
 
 func pxToPt(px float64) float64 { return px * 0.75 }
 
+// parseGridAutoFlowValue normalizes grid-auto-flow to one of:
+// "row", "column", "dense", "row dense", "column dense".
+func parseGridAutoFlowValue(value string) string {
+	toks := strings.Fields(strings.ToLower(strings.TrimSpace(value)))
+	row, col, dense := false, false, false
+	for _, t := range toks {
+		switch t {
+		case "row":
+			row = true
+		case "column":
+			col = true
+		case "dense":
+			dense = true
+		}
+	}
+	switch {
+	case col && dense:
+		return "column dense"
+	case row && dense:
+		return "row dense"
+	case dense:
+		return "dense"
+	case col:
+		return "column"
+	default:
+		return "row"
+	}
+}
+
+// parseGridArea handles grid-area: <custom-ident> or the lite line form
+// row-start / column-start / row-end / column-end (and 1–2 slash forms).
+func parseGridArea(st *ResolvedStyle, value string) {
+	value = strings.TrimSpace(value)
+	if value == "" || strings.EqualFold(value, "auto") {
+		st.GridArea = ""
+		return
+	}
+	parts := strings.Split(value, "/")
+	for i := range parts {
+		parts[i] = strings.TrimSpace(parts[i])
+	}
+	if len(parts) == 1 {
+		tok := parts[0]
+		if _, err := strconv.Atoi(tok); err == nil {
+			// Single line index → row-start (CSS shorthand lite).
+			parseGridRow(st, tok)
+			st.GridArea = ""
+			return
+		}
+		if strings.HasPrefix(tok, "span ") {
+			parseGridRow(st, tok)
+			st.GridArea = ""
+			return
+		}
+		// Named area.
+		st.GridArea = tok
+		return
+	}
+	st.GridArea = ""
+	switch len(parts) {
+	case 2:
+		// CSS: row-start / column-start (omitted ends copy starts → span 1).
+		parseGridRow(st, parts[0])
+		parseGridColumn(st, parts[1])
+	case 3:
+		// row-start / column-start / row-end
+		parseGridRow(st, parts[0])
+		parseGridColumn(st, parts[1])
+		applyGridLineEnd(st, true, parts[2])
+	default:
+		// row-start / column-start / row-end / column-end
+		parseGridRow(st, parts[0])
+		parseGridColumn(st, parts[1])
+		applyGridLineEnd(st, true, parts[2])
+		applyGridLineEnd(st, false, parts[3])
+	}
+}
+
+// applyGridLineEnd sets span from an end line or "span N" on row (isRow) or column.
+func applyGridLineEnd(st *ResolvedStyle, isRow bool, end string) {
+	end = strings.TrimSpace(end)
+	if strings.HasPrefix(end, "span ") {
+		n, err := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(end, "span ")))
+		if err != nil || n < 1 {
+			return
+		}
+		if isRow {
+			st.GridRowSpan = n
+		} else {
+			st.GridColumnSpan = n
+		}
+		return
+	}
+	v, err := strconv.Atoi(end)
+	if err != nil {
+		return
+	}
+	if isRow {
+		if st.GridRowStart > 0 {
+			sp := v - st.GridRowStart
+			if sp < 1 {
+				sp = 1
+			}
+			st.GridRowSpan = sp
+		}
+	} else if st.GridColumnStart > 0 {
+		sp := v - st.GridColumnStart
+		if sp < 1 {
+			sp = 1
+		}
+		st.GridColumnSpan = sp
+	}
+}
+
 func parseGridColumn(st *ResolvedStyle, value string) {
 	value = strings.TrimSpace(value)
 	if strings.HasPrefix(value, "span ") {
@@ -958,6 +1229,44 @@ func parseGridColumn(st *ResolvedStyle, value string) {
 			sp = 1
 		}
 		st.GridColumnSpan = sp
+	}
+}
+
+func parseGridRow(st *ResolvedStyle, value string) {
+	value = strings.TrimSpace(value)
+	if strings.HasPrefix(value, "span ") {
+		n, err := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(value, "span ")))
+		if err == nil && n > 0 {
+			st.GridRowSpan = n
+		}
+		return
+	}
+	// "1 / 3" or "1 / span 2"
+	parts := strings.Split(value, "/")
+	if len(parts) == 1 {
+		if v, err := strconv.Atoi(strings.TrimSpace(parts[0])); err == nil && v > 0 {
+			st.GridRowStart = v
+			st.GridRowSpan = 1
+		}
+		return
+	}
+	if v, err := strconv.Atoi(strings.TrimSpace(parts[0])); err == nil && v > 0 {
+		st.GridRowStart = v
+	}
+	end := strings.TrimSpace(parts[1])
+	if strings.HasPrefix(end, "span ") {
+		n, err := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(end, "span ")))
+		if err == nil && n > 0 {
+			st.GridRowSpan = n
+		}
+		return
+	}
+	if v, err := strconv.Atoi(end); err == nil && st.GridRowStart > 0 {
+		sp := v - st.GridRowStart
+		if sp < 1 {
+			sp = 1
+		}
+		st.GridRowSpan = sp
 	}
 }
 

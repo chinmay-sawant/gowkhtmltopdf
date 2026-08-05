@@ -65,7 +65,7 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 
 | Property | Status | Notes / verified by |
 |----------|--------|---------------------|
-| `display` (`block\|inline\|none\|list-item\|table\|table-row\|table-cell\|table-row-group\|table-header-group\|table-footer-group\|flex\|inline-flex\|grid\|inline-grid`) | Implemented / Partial | Core display values Implemented; `flex`/`inline-flex`/`grid`/`inline-grid` accepted in `style.go` and routed to Partial flex/grid layout (see feature checklist). `none` test `TestDisplayNone`; tables `TestTableLayout`; flex/grid fixtures 25/28 |
+| `display` (`block\|inline\|none\|list-item\|table\|table-row\|table-cell\|table-row-group\|table-header-group\|table-footer-group\|flex\|inline-flex\|grid\|inline-grid`) | Implemented / Partial | Core display values Implemented; `flex`/`inline-flex`/`grid`/`inline-grid` accepted in `style.go` and routed to Stage A flex / Stage B grid lite (§2.7 / §2.8). `none` test `TestDisplayNone`; tables `TestTableLayout`; flex/grid fixtures 25/28/32 |
 | `display: inline-block` | Implemented (lite) | atomic inline box with width/height/margins; shrink-to-fit when width auto; test `TestInlineBlockBesideText` |
 | `display: table-caption`, `table-column(-group)` | Not implemented | parsed; no caption/column model in `buildTable` - `<caption>` does not render |
 | `float` (`left\|right`) | Implemented (lite) | out-of-flow pack to side; stacks on same side; simple exclusion for following in-flow content; test `TestFloatLeftRightClear`, fixture-22 / fixture-29 |
@@ -127,11 +127,54 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 | `border-collapse` | Separate only | see §2.5 |
 | Pagination | Fragment + whole-op + phase-18 polish | rect-type ops (fill/stroke/line) split at page boundaries; text/images/links move wholly (line-level) (`paint.go`); `page-break-before/after: always`, `page-break-inside: avoid`, table rows never split; **`<thead>` / `table-header-group` repeat** on continuation pages (`repeatTableHeaders`, fixture-23); orphan/widow **heuristics** (not CSS props); `--zoom` forwarded; smart-shrinking re-layouts. `Result.Locations` for outlines/links. See "Pagination" note below. |
 | Floats / absolute positioning | Float lite + absolute/fixed/sticky lite | float/`clear` lite (§2.2); relative/absolute/fixed lite; sticky = print page-content-box scrollport (§2.2; fixture-31) |
-| Flexbox / Grid | Partial | **Flex:** `display: flex\|inline-flex`; `flex-direction: row\|column` (no `*-reverse`); `flex-wrap: nowrap\|wrap\|wrap-reverse`; `justify-content` flex-start/end/center/space-between/start/end; `align-items` stretch/flex-start/end/center/start/end (stretch does not grow height); `gap`/`row-gap`/`column-gap` → shared Gap; `flex-grow`/`flex-shrink`/`flex-basis` + min/max-width clamp; `order`; column path: order+gap only. **Not flex:** shorthand `flex:`; `align-self`; `align-content`; content-based min-size iterations. **Grid lite:** `display: grid\|inline-grid`; `grid-template-columns` (lengths, `Nfr`, `repeat(n,…)`); shared `gap`; `grid-column` / start / end (`span N`); nested grids; auto-flow row occupancy; `grid-template-rows` stored but unused. **Not grid:** areas, dense auto-flow, row spans, `grid-row*`, justify/align on grid, named lines. Paths: `flex.go`, `grid.go`; fixtures 25/28 |
+| Flexbox / Grid | Partial | Stage A flex + Stage B grid (areas/dense/`minmax`) + Stage C lite — §2.7 / §2.8. Paths: `flex.go`, `grid.go`, `style.go`; fixtures 25/28/32–35; plan `plans/phases/subplans-tier-2/flex-grid-full.md`. **Not** Bootstrap/Tailwind / Chrome layout-test parity |
 | JavaScript | No | stripped at load; `--enable-javascript` accepted + warning (Phase 1) |
 | Image-mode text | TTF outline raster | same Liberation faces as PDF; pure-Go coverage AA (`internal/imageout/ttfraster.go`); 5×7 bitmap only if an op has no font |
 
 **Pagination (phases 5 + 18).** Box-aware fragmentation: rect-type ops crossing a page boundary are split; text, images and links move wholly (line-level). `page-break-before/after: always` and `page-break-inside: avoid` via canvas-Y flow shifts; table rows never split. **Table headers repeat** across pages (`repeatTableHeaders` in `paint.go`; fixture-23). **`--zoom`** is forwarded to `layout.Options.Zoom` (`convert.go`; `TestZoom`). **Smart-shrinking** detects over-wide content and **re-layouts** with an effective zoom (`TestRunPDFSmartShrinking`). Orphan/widow control is **heuristic** (`orphansWidows`, fixture-30) — CSS `orphans`/`widows` properties are not parsed. `Result.Locations` carries element boxes for outlines/links.
+
+### 2.7 Flexbox (Stage A — report subset)
+
+Evidence: `internal/layout/flex.go`, `style.go` (`applyRestProps` + `parseFlexShorthand`); fixtures 25/28/32/33; `flex_test.go`. Status uses the §2 legend (Implemented / Partial / Not implemented). Checklist form: **[x]** Implemented · **[~]** Partial · **[ ]** Missing.
+
+| Property | Status | Notes / verified by |
+|----------|--------|---------------------|
+| `display: flex` / `inline-flex` | [x] Implemented | Routed to `buildFlex`; fixtures 25/28/32 |
+| `flex-direction` (`row` \| `column` \| `row-reverse` \| `column-reverse`) | [x] Implemented | `style.go`; row/column + reverse paths in `flex.go`; `TestFlexRowReverse` |
+| `flex-wrap` (`nowrap` \| `wrap` \| `wrap-reverse`) | [x] Implemented | Multi-line wrap; wrap-reverse reverses line order |
+| `justify-content` (`flex-start` \| `flex-end` \| `center` \| `space-between` \| `space-around` \| `space-evenly`) | [x] Implemented | Row + column (definite height); `TestFlexSpaceEvenly` |
+| `align-items` (`stretch` \| `flex-start` \| `center` \| `flex-end`) | [x] Implemented | Row cross-axis stretch sizes auto-height items to the flex line (fixture-33); start/center/end honored; `TestFlexAlignItemsStretchRow` |
+| `align-self` | [x] Implemented | Overrides container; stretch follows same rules; `TestFlexAlignSelf` |
+| `align-content` (multi-line) | [~] Partial | Distributes free cross space when container height is definite and wrap produced ≥2 lines; `stretch` = pack at start |
+| `gap` / `row-gap` / `column-gap` | [x] Implemented | Independent longhands; shorthand fills both when longhands unset (`flexGaps`) |
+| `flex` shorthand (`none` \| `auto` \| grow/shrink/basis) | [x] Implemented | `parseFlexShorthand` |
+| `flex-grow` / `flex-shrink` / `flex-basis` | [x] Implemented | Length/%/auto basis; post grow/shrink min/max-width clamp; column grow/shrink when height definite |
+| Content-based min-size floor | [~] Partial | `flexMinMainSize` — non-zero intrinsic floor so text does not crush to 0 on shrink (Flexbox §4.5 lite) |
+| `order` | [x] Implemented | Stable sort before place |
+| Percentage basis cyclic sizing | [~] Partial | Definite CB: `%` vs content main size; indefinite/cyclic → treat as `auto` (content) — fixture-33 / `TestFlexBasisPercent*` |
+| Nested percentage / intrinsic flex iterations | [~] Partial | Stage C subset: indefinite CB `%` width/height → auto/content (not 0/NaN); not full Flexbox intrinsic passes |
+
+### 2.8 CSS Grid (Stage B + Stage C lite — report subset)
+
+Evidence: `internal/layout/grid.go`, `style.go`; fixtures 28/32/34/35; `grid_test.go`. **Not** full Grid L1 / L3 / Chrome parity.
+
+| Property | Status | Notes / verified by |
+|----------|--------|---------------------|
+| `display: grid` / `inline-grid` | [x] Implemented | Routed to `buildGrid`; nested grids OK |
+| `display: subgrid` | [~] Partial | Copy-inherits parent templates/areas; **no** shared track sizing across subtrees — fixture-35 |
+| `grid-template-columns` | [x] Implemented | Lengths, `fr`, `repeat(N, …)`, `minmax(...)`; gap subtracted before `fr` distribute |
+| `grid-template-rows` | [x] Implemented | Consumed when height definite; fixed mins on auto-height; fixture-32 |
+| `minmax()` track sizing | [x] Implemented | Lengths / `%` (definite) / `fr` / `auto` / `min-content` / `max-content` subset; `fr` keeps min floors — fixture-35 |
+| `gap` / `row-gap` / `column-gap` | [x] Implemented | Independent (`gridGaps`); `TestGridIndependentGaps` |
+| `grid-column` / `grid-column-start` / `grid-column-end` / `span N` | [x] Implemented | Line numbers + span; 2D occupancy |
+| `grid-row` / `grid-row-start` / `grid-row-end` / `span N` | [x] Implemented | Row span + stretch into spanned tracks; `TestGridRowSpan*` |
+| Auto-flow placement (row / column) | [x] Implemented | Sparse row default; column major via `grid-auto-flow: column` |
+| `grid-auto-flow: dense` | [x] Implemented | `dense` / `row dense` / `column dense` hole-fill — fixture-34 |
+| `grid-template-areas` / `grid-area` names | [x] Implemented | Named areas + lite line form; areas can extend auto tracks — fixture-34 |
+| `justify-items` / `align-items` | [x] Implemented | Default stretch; start/center/end; stretch sizes item to grid area |
+| `justify-self` / `align-self` | [x] Implemented | Overrides container; stretch fills area |
+| Masonry | [~] Partial | One-axis `grid-template-*: masonry` → shortest-stack pack; both axes → dense fallback — fixture-35. Not full CSS Grid L3 |
+| Intrinsic / nested % track cycles | [~] Partial | Measure-pass lite for min/max-content track mins; cyclic `%` → auto when CB indefinite |
 
 ## 3. Supported units
 
@@ -178,7 +221,7 @@ Status legend as in §2; evidence in `internal/css/css.go`.
 | Feature | Handling |
 |---------|----------|
 | JavaScript / `<script>` / DOM APIs | **Stripped at load.** `--enable-javascript` accepted but ignored with warning (Phase 1) |
-| Full CSS Grid / full Flexbox | **Out of scope** beyond the Partial report subset in the feature checklist (areas, dense auto-flow, cyclic flex min-size, etc.) |
+| Full CSS Grid / full Flexbox | Stage A/B report subset **shipped** (§2.7 / §2.8); Stage C lite (subgrid copy-inherit, masonry pack) with honesty gaps. **Not** Bootstrap/Tailwind / Chrome layout-test parity. See `plans/phases/subplans-tier-2/flex-grid-full.md` |
 | True `position: sticky` inside `overflow: auto` scrollers | Print sticky uses the **page content box** as scrollport (`sticky.go`); continuous-media overflow-scroll sticky is unsupported |
 | `transform`, `filter`, `animation`, `transition` | Ignored |
 | `background-image` / gradients | Ignored (Phase 3+ candidate) |

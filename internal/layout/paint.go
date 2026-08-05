@@ -205,10 +205,15 @@ func paginateOps(res *Result, contentH float64) []int {
 			boundary := float64(page+1) * contentH
 			if op.Y+opH > boundary+1e-9 {
 				if dy := boundary - op.Y; dy > 1e-6 {
-					// Row backgrounds often sit above the text baseline. Find
-					// those fills so we can bring them onto the next page with
-					// the text (fixture-31 Row 28 white bg).
-					minY := op.Y
+					// Snap text (+ following flow). Same-row fills sit above the
+					// baseline; include them in dy via minY so their tops clear
+					// onto this page with the text (fixture-31 Row 28 white bg).
+					// Keep chrome matching tight (one row) so table reports do
+					// not inflate dy. Never clamp fill tops to `boundary` alone
+					// — that collapses them onto the text Y and leaves section
+					// gray showing through the ascent/padding band.
+					oldY := op.Y
+					minY := oldY
 					var chrome []int
 					for j := range res.Ops {
 						o := &res.Ops[j]
@@ -221,8 +226,10 @@ func paginateOps(res *Result, contentH float64) []int {
 						if o.H <= 0.5 || o.H > 40 {
 							continue
 						}
-						// Fill starts above the text and overlaps its band.
-						if o.Y >= op.Y-0.5 || o.Y+o.H < op.Y-0.5 {
+						if o.Y > oldY+0.5 || o.Y+o.H < oldY-0.5 {
+							continue
+						}
+						if oldY-o.Y > o.H+2 {
 							continue
 						}
 						chrome = append(chrome, j)
@@ -230,15 +237,12 @@ func paginateOps(res *Result, contentH float64) []int {
 							minY = o.Y
 						}
 					}
-					// One shared dy keeps row spacing; large enough that the
-					// above-text fill clears the page boundary.
 					dy = boundary - minY
-					// Move text + everything below the text first. Chrome at
-					// minY (< text Y) is left behind by shiftFlowY on purpose.
-					shiftFlowY(res, i, i, op.Y-0.01, dy)
+					shiftFlowY(res, i, i, oldY-0.01, dy)
 					for _, j := range chrome {
-						if res.Ops[j].Y < boundary {
-							res.Ops[j].Y += dy
+						o := &res.Ops[j]
+						if o.Y < oldY-0.01 {
+							o.Y += dy
 						}
 					}
 				} else {
@@ -278,40 +282,55 @@ func paginateOps(res *Result, contentH float64) []int {
 	return opPage
 }
 
-// splitCrossingRects truncates splittable ops at the end of their current page
-// and inserts the remainder immediately after the original op (preserving
-// document paint order). Appending remainders at the end of res.Ops would
-// paint section/row backgrounds on top of later text (fixture-31 page 2).
-// Fragments that still span further pages are split on subsequent iterations.
-// opPage is advisory; page is derived from Y after insertions shift indices.
+// splitCrossingRects truncates splittable ops at each page boundary and keeps
+// remainders immediately after (document paint order). Built into a new slice
+// rather than mid-slice insert+copy (O(n²) and float-edge infinite loops when
+// Y sits on a page boundary — TestTenPageTableReportPerformance hang).
 func splitCrossingRects(res *Result, contentH float64, opPage []int) {
 	_ = opPage
-	for i := 0; i < len(res.Ops); i++ {
-		if res.Ops[i].Fixed {
+	if res == nil || contentH <= 0 {
+		return
+	}
+	out := make([]Op, 0, len(res.Ops)+8)
+	for i := range res.Ops {
+		op := res.Ops[i]
+		if op.Fixed || !isSplittable(&op) || op.H <= 0 {
+			out = append(out, op)
 			continue
 		}
-		op := &res.Ops[i]
-		if !isSplittable(op) {
-			continue
-		}
-		p := int(op.Y / contentH)
-		if p < 0 {
-			p = 0
-		}
-		boundary := float64(p+1) * contentH
-		if op.Y+op.H > boundary+1e-9 {
-			op2 := *op
-			op2.Y = boundary
-			op2.H = op.Y + op.H - boundary
-			op.H = boundary - op.Y
-			// Insert remainder right after the truncated op so backgrounds
-			// stay under in-flow text/chrome on continuation pages.
-			res.Ops = append(res.Ops, Op{})
-			copy(res.Ops[i+2:], res.Ops[i+1:])
-			res.Ops[i+1] = op2
-			// Next i++ visits the fragment (may split again if multi-page).
+		guard := 0
+		for op.H > 1e-9 {
+			guard++
+			if guard > 10000 {
+				// Defensive: never hang the paint pipeline.
+				out = append(out, op)
+				break
+			}
+			// Epsilon bump so Y exactly on a page top maps to that page, not
+			// the previous one (int truncates 52.0-ε down to 51).
+			p := int((op.Y + 1e-6) / contentH)
+			if p < 0 {
+				p = 0
+			}
+			boundary := float64(p+1) * contentH
+			if op.Y+op.H <= boundary+1e-9 {
+				out = append(out, op)
+				break
+			}
+			firstH := boundary - op.Y
+			if firstH <= 1e-6 {
+				// Start is at/past boundary; advance to next page top via p++.
+				op.Y = float64(p+1) * contentH
+				continue
+			}
+			frag := op
+			frag.H = firstH
+			out = append(out, frag)
+			op.Y = boundary
+			op.H -= firstH
 		}
 	}
+	res.Ops = out
 }
 
 // stripOrphanRowChrome removes row-sized fills and horizontal rules that sit
@@ -476,10 +495,21 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 	}
 }
 
-// isSectionWashRGB reports the soft grey used by fixture-31 .section
-// background (#eceff1) and similar report section washes.
+// isSectionWashRGB reports near-neutral cool greys like fixture-31 .section
+// (#eceff1). Chromatic washes (e.g. fixture-32 grid #f3e5f5) must not match
+// or page-trailing clip steals their height.
 func isSectionWashRGB(r, g, b float64) bool {
-	return r > 0.85 && g > 0.85 && b > 0.85 && r < 0.98 && g < 0.98 && b < 0.98
+	if abs3(r-g) > 0.035 || abs3(g-b) > 0.035 || abs3(r-b) > 0.035 {
+		return false
+	}
+	return r > 0.88 && g > 0.88 && b > 0.88 && r < 0.97 && g < 0.97 && b < 0.97
+}
+
+func abs3(v float64) float64 {
+	if v < 0 {
+		return -v
+	}
+	return v
 }
 
 // shiftFlowY moves the ops of the target range [from,to] - plus every op

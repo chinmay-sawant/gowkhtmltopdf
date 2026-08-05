@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gowkhtmltopdf vs the HTML-to-PDF landscape (2026)</title>
+<style>
+  :root {
+    --bg: #faf9f7;
+    --fg: #1a1a1a;
+    --muted: #666;
+    --border: #ddd6cc;
+    --head-bg: #2b2b2b;
+    --head-fg: #fff;
+    --us: #e8f0e6;
+    --us-border: #7ba06d;
+    --good: #1d7a3e;
+    --bad: #b42318;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.55;
+  }
+  main { max-width: 1100px; margin: 0 auto; padding: 32px 20px 64px; }
+  h1 { font-size: 1.7rem; margin-bottom: 4px; }
+  h2 { font-size: 1.25rem; margin-top: 40px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+  .sub { color: var(--muted); margin-top: 0; font-size: .95rem; }
+  .score {
+    background: #fff; border: 1px solid var(--border); border-left: 5px solid var(--us-border);
+    padding: 14px 18px; border-radius: 6px; font-size: .98rem;
+  }
+  .score strong { font-size: 1.15rem; }
+  .tablescroll { overflow-x: auto; }
+  table {
+    width: 100%; border-collapse: collapse; background: #fff;
+    border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
+    font-size: .92rem; margin: 12px 0;
+  }
+  th, td { padding: 9px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+  thead th { background: var(--head-bg); color: var(--head-fg); font-weight: 600; white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody td:first-child { font-weight: 600; white-space: nowrap; }
+  tr.us td { background: var(--us); }
+  tr.us td:first-child, tr.us th:first-child { box-shadow: inset 3px 0 0 var(--us-border); }
+  .ok { color: var(--good); }
+  .no { color: var(--bad); }
+  .foot { color: var(--muted); font-size: .85rem; margin-top: 6px; }
+  .note { background: #fff8e6; border: 1px solid #e6c875; padding: 12px 16px; border-radius: 6px; }
+  ul { padding-left: 22px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>gowkhtmltopdf vs the HTML-to-PDF landscape (2026)</h1>
+  <p class="sub">Research-backed comparison, Aug 2026. Sources include official docs, GitHub issues, and published benchmarks. Vendor benchmarks are identified as self-interested, and performance figures are directional rather than like-for-like measurements. Highlighted column = gowkhtmltopdf.</p>
+
+  <h2>Score card</h2>
+  <p class="score">
+    <strong>gowkhtmltopdf: 7.5/10 overall</strong> — a strong fit for trusted, controlled reports,
+    held back by partial CSS, no JavaScript, no PDF/A, and the current default creation-time metadata.
+    <b>8.5/10 for controlled reports</b> and <b>5.5–6/10 as a general converter</b> are more useful
+    role-specific scores. A 9/10 niche score depends on making normal CLI output byte-stable.
+  </p>
+
+  <h2>Core comparison</h2>
+  <div class="tablescroll">
+  <table>
+    <thead>
+      <tr><th></th><th>gowkhtmltopdf</th><th>Puppeteer / Chromium</th><th>wkhtmltopdf</th><th>WeasyPrint</th><th>Prince XML</th></tr>
+    </thead>
+    <tbody>
+      <tr class="us">
+        <td>Architecture</td>
+        <td>Pure Go, no CGO/browser; one allowlisted shaping module</td>
+        <td>Blink engine, full browser process</td>
+        <td>Qt WebKit, frozen ~2012</td>
+        <td>Own Python engine (Pango/HarfBuzz)</td>
+        <td>Proprietary C++ engine</td>
+      </tr>
+      <tr class="us">
+        <td>JavaScript</td>
+        <td><span class="ok"><b>None</b></span>; no JS or process execution</td>
+        <td>Full V8 — SPAs, charts</td>
+        <td>Old WebKit JS, unreliable</td>
+        <td><span class="ok"><b>None</b></span></td>
+        <td>Sandboxed ES6, no network</td>
+      </tr>
+      <tr class="us">
+        <td>CSS fidelity</td>
+        <td>Flex/grid/position <b>lite</b>; many modern properties missing</td>
+        <td>Full modern CSS; print pagination still needs testing</td>
+        <td>No grid, broken flex</td>
+        <td>Full flex, mostly grid, best free Paged Media</td>
+        <td>Deepest Paged Media + grid</td>
+      </tr>
+      <tr class="us">
+        <td>TOC / outlines</td>
+        <td><span class="ok"><b>Generated TOC + native PDF outlines</b></span></td>
+        <td>Outline support is experimental; <b>TOC not a native PDF option</b></td>
+        <td>Both ✓ (XSLT)</td>
+        <td>Bookmarks</td>
+        <td>Both ✓✓</td>
+      </tr>
+      <tr class="us">
+        <td>Determinism</td>
+        <td><span class="no"><b>Not guaranteed by default</b></span>; CLI creation time varies</td>
+        <td><span class="no">✗</span> timestamps, OS fonts, browser versions, and environment vary</td>
+        <td>Mostly</td>
+        <td>✓ near (<code>SOURCE_DATE_EPOCH</code>)</td>
+        <td>Depends on inputs and runtime</td>
+      </tr>
+      <tr class="us">
+        <td>Security</td>
+        <td>No JS/exec, but HTTP(S)/data fetches, optional file reads, and in-process DoS remain</td>
+        <td>Sandbox and deployment configuration matter; <code>--no-sandbox</code> materially increases impact</td>
+        <td><span class="no"><b>CVE-2022-35583 (9.8 SSRF)</b></span>, archived</td>
+        <td><span class="no">&lt;link&gt;/image fetch</span> (Lyft exploit)</td>
+        <td>XXE history</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>Operations</h2>
+  <div class="tablescroll">
+  <table>
+    <thead>
+      <tr><th></th><th>gowkhtmltopdf</th><th>Puppeteer / Chromium</th><th>wkhtmltopdf</th><th>WeasyPrint</th><th>Prince XML</th></tr>
+    </thead>
+    <tbody>
+      <tr class="us">
+        <td>Latency / PDF</td>
+        <td>Repository fixtures: ms–low s; validate on target workload</td>
+        <td>Published figures vary: cold startup versus warm pooled rendering</td>
+        <td>Published figures vary by fixture and platform</td>
+        <td>Published figures vary by fixture and platform</td>
+        <td>Measure with the vendor's supported deployment</td>
+      </tr>
+      <tr class="us">
+        <td>Memory</td>
+        <td>Small process on repository fixtures; measure at target concurrency</td>
+        <td>Browser-plus-page memory varies substantially with browser version, pages, and concurrency</td>
+        <td>Published single-process figures are workload-dependent</td>
+        <td>Published figures are workload-dependent</td>
+        <td>Measure with the vendor's supported deployment</td>
+      </tr>
+      <tr class="us">
+        <td>Footprint</td>
+        <td><span class="ok"><b>~14 MB with a stripped CGO_ENABLED=0 build; no runtime shared libraries</b></span></td>
+        <td>100–450 MB + browser/system libs; Docker image size varies</td>
+        <td>~15 MB, rotting Qt libs</td>
+        <td>~30–50 MB + system libs</td>
+        <td>~16 MB</td>
+      </tr>
+      <tr class="us">
+        <td>PDF standards</td>
+        <td>No PDF/A, forms, or encryption</td>
+        <td>No PDF/A/forms/encryption in the basic PDF API; tagged PDF and outlines are experimental</td>
+        <td>No</td>
+        <td><span class="ok"><b>PDF/A-1/2/3, PDF/UA, forms</b></span>; validity still needs validation</td>
+        <td>Strong standards/commercial extras; verify the required profile</td>
+      </tr>
+      <tr class="us">
+        <td>Fonts / CJK</td>
+        <td>Partial Type0/CID; pure-Go OpenType shaping where supported; Indic/CJK/vertical limits remain</td>
+        <td>Full + web fonts, OS-dependent</td>
+        <td>Poor</td>
+        <td>Good, fontconfig quirks</td>
+        <td>Best</td>
+      </tr>
+      <tr class="us">
+        <td>License</td>
+        <td><span class="ok"><b>MIT, free, active</b></span></td>
+        <td>Apache-2.0, free</td>
+        <td><span class="no">LGPL, archived 2023</span></td>
+        <td>BSD, free, active</td>
+        <td><span class="no">Commercial pricing is quoted; official FAQ says from ~$2,000/year, while $3,800 is a separate per-server non-commercial tier</span></td>
+      </tr>
+      <tr class="us">
+        <td>Score /10</td>
+        <td><span class="ok"><b>7.5 overall</b></span></td>
+        <td>7.5</td>
+        <td><span class="no">3.0</span></td>
+        <td>7.5</td>
+        <td>9.0 (at price)</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>When to choose</h2>
+  <div class="tablescroll">
+  <table>
+    <thead>
+      <tr><th>Tool</th><th>Choose when…</th></tr>
+    </thead>
+    <tbody>
+      <tr class="us">
+        <td><b>gowkhtmltopdf</b></td>
+        <td>Trusted server-generated reports (invoices, tables, statements) needing a small offline Go binary, predictable layout, no JavaScript, and controlled resource access — or migrating off wkhtmltopdf</td>
+      </tr>
+      <tr>
+        <td><b>Puppeteer / Chromium</b></td>
+        <td>Templates need <b>modern CSS/JS</b> (charts, SPAs, arbitrary sites) and you can afford browser operations plus a materially larger resource budget</td>
+      </tr>
+      <tr>
+        <td><b>wkhtmltopdf</b></td>
+        <td>Avoid for new deployments; archived with a documented unpatched 9.8 SSRF vulnerability. Migrate legacy uses when practical</td>
+      </tr>
+      <tr>
+        <td><b>WeasyPrint</b></td>
+        <td><b>PDF/A, PDF/UA, e-invoice (Factur-X)</b> compliance on a free budget</td>
+      </tr>
+      <tr>
+        <td><b>Prince XML</b></td>
+        <td>Enterprise compliance (PDF/A+X, forms, signatures) with budget, keeping HTML/CSS input</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>Evidence and interpretation</h2>
+  <div class="note">
+    <ul>
+      <li>The normal conversion path currently calls <code>SetCreationTime(time.Now())</code>, so byte-identical output is not guaranteed by default. The deterministic PDF-writer fallback is useful for tests, but it is not the same as a stable CLI contract.</li>
+      <li>“No JavaScript” is a meaningful security reduction, not a zero-attack-surface claim. The loader can fetch HTTP(S) and data subresources, and local-file access is an explicit but real capability. Treat untrusted HTML as able to drive network egress and resource consumption.</li>
+      <li>The score is a judgment call, not a universal benchmark. Capability, deployment footprint, security posture, standards support, and maintenance should be scored separately when the target workload is not controlled reports.</li>
+      <li>Performance values must be reproduced with the same fixture, tool version, OS, cold/warm mode, and concurrency. The cited PDF4 benchmark, for example, separates cold and warm browser runs and reports five-run medians on macOS arm64; those values should not be merged with unrelated concurrency figures.</li>
+    </ul>
+  </div>
+
+  <h2>Sources</h2>
+  <ul>
+    <li><a href="https://pptr.dev/api/puppeteer.pdfoptions">Puppeteer PDF options</a></li>
+    <li><a href="https://chromium.googlesource.com/chromium/src/sandbox/">Chromium sandbox overview</a></li>
+    <li><a href="https://github.com/wkhtmltopdf/wkhtmltopdf">wkhtmltopdf archived repository</a></li>
+    <li><a href="https://nvd.nist.gov/vuln/detail/CVE-2022-35583">NVD record for CVE-2022-35583</a></li>
+    <li><a href="https://doc.courtbouillon.org/weasyprint/stable/common_use_cases.html">WeasyPrint specialized PDFs and forms</a></li>
+    <li><a href="https://www.princexml.com/purchase/license_faq/">Prince license FAQ</a></li>
+    <li><a href="https://pdf4.dev/blog/html-to-pdf-benchmark-2026">PDF4.dev 2026 benchmark</a></li>
+    <li><a href="https://www.kyotutechnology.com/de/pdf-generation-libraries-performance-wkhtmltopdf-vs-puppeteer/">KYOTU wkhtmltopdf/Puppeteer benchmark</a></li>
+  </ul>
+
+  <h2>Related docs</h2>
+  <ul>
+    <li><a href="../overview.md">Overview</a></li>
+    <li><a href="../compatibility-matrix.md">Compatibility matrix</a></li>
+    <li><a href="sebastiaanklippert-go-wkhtmltopdf.md">Comparison: gowkhtmltopdf vs SebastiaanKlippert/go-wkhtmltopdf</a></li>
+    <li><a href="../integration-security.md">Integration and security</a></li>
+    <li><a href="../THREAT-MODEL.md">Threat model</a></li>
+  </ul>
+
+  <p class="foot">This HTML page is a styled mirror of <code>landscape-2026.md</code> in the same directory.</p>
+</main>
+</body>
+</html>
