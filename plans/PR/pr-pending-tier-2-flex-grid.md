@@ -1,10 +1,9 @@
 ## Summary
 
-Deepens report-engine Flexbox (Stage A) and CSS Grid (Stage B lite) toward the
-Tier 2 flex-grid-full subplan: independent gaps, reverse directions, space-*
-justify, align-content/self, flex shorthand, grid rows/`fr`/row-span, and
-default `align-items: stretch` so spanning cells match HTML height. Adds
-fixture-32 as proof without editing fixtures 25/28.
+Closes the Tier 2 flex-grid-full workstream on a stdlib-only report engine:
+Stage A flex deepen, Stage B grid (rows/`fr`/areas/dense/`minmax`), Stage C
+lite (cyclic `%`, subgrid copy-inherit, masonry pack), plus pagination fixes
+so CI no longer hangs and fixture-31/33 match HTML.
 
 ---
 
@@ -22,34 +21,46 @@ fixture-32 as proof without editing fixtures 25/28.
 
 ### Flex Stage A (`internal/layout/flex.go`, `style.go`)
 
-- Independent `row-gap` / `column-gap` (no longer collapse to a single gap)
+- Independent `row-gap` / `column-gap`
 - `flex-direction: row-reverse` / `column-reverse`
 - `justify-content: space-around` / `space-evenly`
 - `align-content` for wrapped multi-line flex
 - Column path grow/shrink/justify/align parity with row
 - Shorthand `flex: grow shrink basis`, `align-self`, content-based min-size floor
+- Percentage flex-basis: definite CB resolves `%`; indefinite/cyclic → auto
+  (content) — fixture-33
+- Row `align-items: stretch` sizes auto-height items to the flex line cross
+  size (fixture-33 50%/50% boxes fill 36pt)
 
-### Grid Stage B lite (`internal/layout/grid.go`, `style.go`)
+### Grid Stage B + Stage C lite (`internal/layout/grid.go`, `style.go`, `layout.go`)
 
-- Consume `grid-template-rows` when container height is definite
-- `grid-row` / start / end / `span` with 2D occupancy
-- `fr` track distribution (+ lite minmax); independent row/column gaps
-- `justify-items` / `align-items` / self variants
-- **Stretch fix:** default `align-items: stretch` sizes items (including
-  `grid-row: span 2`) to the grid area so fixture-32 “Tall span-2” matches HTML
+- `grid-template-rows` / `fr` / row span + default stretch into grid areas
+  (fixture-32 Tall span-2)
+- `grid-template-areas` + `grid-area` name placement; `grid-auto-flow: dense`
+  — fixture-34
+- Full `minmax()` subset (lengths / `%` / `fr` / `auto` / min-/max-content)
+- Intrinsic measure lite + cyclic `%` width/height honesty
+- `display: subgrid` copy-inherit parent templates (no shared track sizing)
+- One-axis masonry shortest-stack pack (both axes → dense fallback) —
+  fixture-35
 
-### Paint honesty (`internal/layout/paint.go`)
+### Pagination / paint fixes (`internal/layout/paint.go`)
 
-- Tighten `isSectionWashRGB` so chromatic grid washes (e.g. `#f3e5f5`) are not
-  clipped as neutral section greys
+- **splitCrossingRects:** rebuild fragments in a new slice + epsilon page math
+  (fixes `TestTenPageTableReportPerformance` 10m hang from float-edge infinite
+  mid-slice inserts)
+- Page-break same-row chrome: tight `minY` snap so fixture-31 Row 28 white
+  fill stays above the baseline (not section gray)
+- Tighten `isSectionWashRGB` so chromatic grid washes are not clipped as
+  section greys
 
 ### Fixtures & docs
 
-- New golden: `testdata/golden/fixture-32-flex-grid-full.html`
-- Wire into `internal/convert/golden_test.go`, `testdata/golden/README.md`,
-  compatibility matrix, and flex-grid-full checklist progress
-- Regenerated sample PDFs under `output/` (including fixture-32)
-- Unit coverage expansions in `flex_test.go` / `grid_test.go`
+- New goldens only (25/28 untouched): fixtures **32–35**
+- Compatibility matrix §2.7 / §2.8; Phase 17 markers; flex-grid-full Stage
+  A/B complete **2026-08-05**, Stage C `[~]` with listed gaps
+- Landscape 2026 comparison notes under `documentation/comparison-with-others/`
+- Regenerated sample PDFs under `output/`
 
 ---
 
@@ -57,12 +68,12 @@ fixture-32 as proof without editing fixtures 25/28.
 
 | Area | Impact |
 |------|--------|
-| **Behavior / correctness** | Deeper flex/grid layouts; span-2 cells stretch to row tracks |
-| **Performance** | Extra measure pass for stretch grid items (local to grid containers) |
+| **Behavior / correctness** | Deeper flex/grid; cyclic `%`; areas/dense/`minmax`; Row 28 white; fixture-33 stretch |
+| **Performance** | Fixes pathological paint hang; local measure passes for stretch/grid |
 | **Memory** | Negligible |
 | **API / CLI** | Unchanged |
 | **Dependencies** | None |
-| **Binary size / build time** | Sample PDF refresh only |
+| **Binary size / build time** | Sample PDF refresh |
 
 ---
 
@@ -76,27 +87,30 @@ fixture-32 as proof without editing fixtures 25/28.
 
 ## Test plan
 
-- [x] `go test ./internal/layout -run 'Flex|Grid' -count=1`
-- [x] `TestGridRowSpan` / `TestGridRowSpanStretchMatchesFixture32`
-- [x] Regenerated `output/fixture-32-flex-grid-full.pdf` (Tall span-2 height matches HTML)
-- [ ] CI `go test ./...` + lint + `CGO_ENABLED=0` static build
+- [x] `make lint`
+- [x] `go test ./internal/layout ./internal/convert -count=1`
+- [x] `go test ./internal/convert -run TestTenPageTableReportPerformance` (~0.2s)
+- [x] Sticky Row 28 white + Flex stretch + Grid areas/dense/minmax unit tests
+- [x] CI `test + lint` + `CGO_ENABLED=0` static build green on #19
+- [x] `make samples` regenerated output fixtures 32–35 (+ suite)
 
 ### Commands
 
 ```sh
-go test ./internal/layout -run 'Flex|Grid' -count=1
-go build -o bin/gowkhtmltopdf ./cmd/gowkhtmltopdf
-./bin/gowkhtmltopdf --enable-local-file-access \
-  testdata/golden/fixture-32-flex-grid-full.html \
-  output/fixture-32-flex-grid-full.pdf
+make lint
+go test ./internal/layout ./internal/convert -count=1 -timeout 120s
+make samples
 ```
 
 ---
 
 ## Screenshots / sample output
 
-- `output/fixture-32-flex-grid-full.pdf` — Grid rows + row span: Tall span-2
-  fills both `1fr` rows (+ gap); B/C and D/E flush with tall cell edges
+- `output/fixture-32-flex-grid-full.pdf` — Tall span-2 fills both `1fr` rows
+- `output/fixture-33-flex-cyclic-basis.pdf` — 50%/50% row boxes stretch to 36pt
+- `output/fixture-34-grid-areas-dense.pdf` — named areas + dense packing
+- `output/fixture-35-grid-minmax-intrinsic.pdf` — minmax / subgrid / masonry lite
+- `output/fixture-31-sticky-top.pdf` — page-2 Row 28 white (not section gray)
 
 ---
 
@@ -116,12 +130,13 @@ go build -o bin/gowkhtmltopdf ./cmd/gowkhtmltopdf
 
 ---
 
-## Follow-ups (out of scope for this PR)
+## Follow-ups (out of scope)
 
 - True shared-track subgrid / full CSS Grid L3 masonry / Chrome layout-test parity
 - Multi-pass flex intrinsic sizing beyond cyclic `%` → auto subset
 - **Next:** Phase 21 site corpus stress against Stage A/B/C-lite layout
-- CI `make test` on PR merge (layout + convert proof recorded on subplan 2026-08-05)
+
+---
 
 ## Reviewer checklist
 
