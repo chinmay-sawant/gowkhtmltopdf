@@ -114,6 +114,36 @@ func applyOneSticky(res *Result, b *box, contentH float64) {
 		return
 	}
 	baseX, baseY := origX, origY
+	// Painted sticky height (box + ink). Continuation flow starts just below
+	// the bar (thead-style). Add a modest ascent clearance so the first row's
+	// text (baseline Y, ascenders above) is not drawn through the bar —
+	// without the old ~20pt pad that left a large white band under the clone.
+	reserve := b.h
+	maxBot := baseY + b.h
+	for _, op := range baseOps {
+		bot := op.Y + op.H
+		if op.Kind == OpText || op.Kind == OpBullet {
+			h := op.H
+			if h <= 0 {
+				h = 12
+			}
+			bot = op.Y + h*0.35
+		}
+		if bot > maxBot {
+			maxBot = bot
+		}
+	}
+	if d := maxBot - baseY; d > reserve {
+		reserve = d
+	}
+	// Clear body-line ascenders under the bar so Row 28 is not clipped by the
+	// sticky clone (measured ~16–20pt for the fixture font bbox).
+	const ascentClearance = 16.0
+	const stickyFlowGap = 2.0
+	reserve += ascentClearance + stickyFlowGap
+	if reserve < 1 {
+		reserve = 1
+	}
 
 	natPage := int(origY / contentH)
 	if natPage < 0 {
@@ -145,14 +175,74 @@ func applyOneSticky(res *Result, b *box, contentH float64) {
 		if y+b.h <= pt+1e-9 || y >= pb-1e-9 {
 			continue
 		}
+		// Reserve vertical space under the sticky clone so flow rows are not
+		// painted underneath (thead-repeat style). Without this, continuation
+		// pages overlap Row N+1 with the sticky bar (fixture-31 / row 28+).
+		if b.stickyTopSet {
+			// Push all in-CB flow on this page down from the page top so the
+			// sticky band (box top → painted bottom) is clear of row chrome.
+			shiftStickyPageFlow(res, b, pt, pb, pt, reserve)
+			y = clampStickyY(origY, b.h, b.cbY, b.cbH, pt, pb, b)
+		}
 		for _, op := range baseOps {
 			op.X = op.X - baseX + x
 			op.Y = op.Y - baseY + y
 			op.Fixed = false
 			op.StickyID = 0 // clone is paint-only; not re-processed
+			// Keep default z-index so continuation row text can paint over the
+			// bar's bottom edge the same way as the natural sticky on page 1
+			// (sortPaintIndices already draws fills under text).
 			res.Ops = append(res.Ops, op)
 		}
 	}
+}
+
+// shiftStickyPageFlow moves non-sticky ops on [pageTop, pageBottom) down by
+// reserve so a sticky clone at stickyY does not cover body content.
+//
+// Everything on the page below the sticky band is shifted — including
+// following siblings outside the containing block (fixture-31 ".after") —
+// except tall page-leading background/border rects. Those stay anchored at
+// the page top so section chrome continues under the sticky clone the way
+// CSS paints a scrolling containing block (avoids a white gap + border
+// slicing through the first continuation row).
+func shiftStickyPageFlow(res *Result, sticky *box, pageTop, pageBottom, stickyY, reserve float64) {
+	if res == nil || sticky == nil || reserve <= 0 {
+		return
+	}
+	for i := range res.Ops {
+		op := &res.Ops[i]
+		if op.Fixed || op.StickyID == sticky.stickyID {
+			continue
+		}
+		if op.Y < pageTop-1e-9 || op.Y >= pageBottom-1e-9 {
+			continue
+		}
+		if op.Y >= stickyY-0.5 {
+			if isPageLeadingBackground(op, pageTop, reserve) {
+				continue
+			}
+			op.Y += reserve
+		}
+	}
+}
+
+// isPageLeadingBackground reports tall fill/stroke rects that begin at the
+// page top — typically split remnants of a section/containing-block background.
+func isPageLeadingBackground(op *Op, pageTop, reserve float64) bool {
+	if op == nil {
+		return false
+	}
+	switch op.Kind {
+	case OpFillRect, OpStrokeRect:
+	default:
+		return false
+	}
+	if op.Y > pageTop+1 {
+		return false
+	}
+	// Row-sized fragments must still move; only large chrome stays put.
+	return op.H > reserve+10
 }
 
 func shiftStickyOps(res *Result, stickyID int, dx, dy float64) {

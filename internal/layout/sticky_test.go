@@ -1,6 +1,7 @@
 package layout
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -248,4 +249,278 @@ func TestStickyNotRelativeOffsetAtLayout(t *testing.T) {
 	if sy >= ry-1 {
 		t.Fatalf("sticky y=%.1f should be above relative y=%.1f (relative applies top at layout)", sy, ry)
 	}
+}
+
+// TestStickyFixture31ContinuationClearsFlow ensures continuation-page sticky
+// clones reserve space so flow starts just under the sticky bar (thead-style),
+// row fills clear the sticky band, and Row 28/29 keep natural spacing.
+func TestStickyFixture31ContinuationClearsFlow(t *testing.T) {
+	res, contentH, doc := paintFixture31(t)
+	if doc.PageCount() < 2 {
+		t.Fatalf("fixture-31 expected ≥2 pages, got %d", doc.PageCount())
+	}
+
+	pt := contentH
+	stickyBot := pt
+	foundFill := false
+	for _, op := range res.Ops {
+		if op.Kind != OpFillRect || op.StickyID != 0 {
+			continue
+		}
+		// Sticky clone fill: near page-1 top, bar-sized height.
+		if op.Y < pt-1 || op.Y > pt+5 || op.H < 20 || op.H > 40 {
+			continue
+		}
+		bot := op.Y + op.H
+		if bot > stickyBot {
+			stickyBot = bot
+			foundFill = true
+		}
+	}
+	if !foundFill {
+		t.Fatal("no sticky clone fill on continuation page")
+	}
+
+	var row28Y, row29Y float64
+	var found28, found29 bool
+	for _, op := range res.Ops {
+		if op.Kind != OpText {
+			continue
+		}
+		switch {
+		case strings.Contains(op.Text, "Row 28"):
+			found28, row28Y = true, op.Y
+			if int(op.Y/contentH) < 1 {
+				t.Errorf("Row 28 still on page %d (y=%.2f), want continuation", int(op.Y/contentH), op.Y)
+			}
+		case strings.Contains(op.Text, "Row 29"):
+			found29, row29Y = true, op.Y
+		}
+	}
+	if !found28 {
+		t.Fatal("Row 28 text op missing")
+	}
+	if !found29 {
+		t.Fatal("Row 29 text op missing")
+	}
+	// Natural row pitch is ~25pt; snapping Row 28 alone used to collapse this
+	// to ~14pt so both lines looked like one cell.
+	if gap := row29Y - row28Y; gap < 20 || gap > 35 {
+		t.Errorf("Row 28→29 spacing = %.2f, want ~25pt (got Row28=%.2f Row29=%.2f)", gap, row28Y, row29Y)
+	}
+	// First continuation row clears the sticky bar (ascent ~16pt + 2pt gap).
+	if gap := row28Y - stickyBot; gap < 10 || gap > 24 {
+		t.Errorf("gap sticky→Row28 = %.2f (stickyBot=%.2f row28=%.2f), want ~14–20pt", gap, stickyBot, row28Y)
+	}
+
+	// Split row fills must not sit in the sticky band. Tall page-leading
+	// section chrome may remain under the sticky clone by design.
+	for i, op := range res.Ops {
+		if op.Kind != OpFillRect || op.StickyID != 0 {
+			continue
+		}
+		if op.Y < pt-1 || op.Y >= stickyBot-0.5 {
+			continue
+		}
+		if int(op.Y/contentH) != 1 {
+			continue
+		}
+		// Ignore the sticky clone itself.
+		if op.H >= 20 && op.H <= 40 && op.Y <= pt+5 {
+			continue
+		}
+		if isPageLeadingBackground(&op, pt, stickyBot-pt) {
+			continue
+		}
+		t.Errorf("op[%d] fill y=%.2f h=%.2f sits under sticky band [%.2f,%.2f)",
+			i, op.Y, op.H, pt, stickyBot)
+	}
+}
+
+// TestStickyFixture31SplitFillsPreservePaintOrder ensures page-split section/row
+// fills are not appended after continuation text (which would wash out rows).
+func TestStickyFixture31SplitFillsPreservePaintOrder(t *testing.T) {
+	res, contentH, doc := paintFixture31(t)
+	if doc.PageCount() < 2 {
+		t.Fatalf("fixture-31 expected ≥2 pages, got %d", doc.PageCount())
+	}
+
+	var row28Idx int = -1
+	var row28Y float64
+	for i, op := range res.Ops {
+		if op.Kind == OpText && strings.Contains(op.Text, "Row 28") {
+			row28Idx = i
+			row28Y = op.Y
+			break
+		}
+	}
+	if row28Idx < 0 {
+		t.Fatal("Row 28 text missing")
+	}
+	if int(row28Y/contentH) < 1 {
+		t.Fatalf("Row 28 not on continuation page (y=%.2f)", row28Y)
+	}
+
+	// Section gray continuation must appear before Row 28 text in the display
+	// list (insert-after-original), so document order alone keeps it under ink.
+	sectionBefore := false
+	for i := 0; i < row28Idx; i++ {
+		op := res.Ops[i]
+		if op.Kind != OpFillRect || op.StickyID != 0 {
+			continue
+		}
+		if int(op.Y/contentH) != 1 {
+			continue
+		}
+		// Gray section background (#eceff1).
+		if op.R > 0.9 && op.G > 0.9 && op.B > 0.9 && op.H > 50 &&
+			op.Y <= row28Y && op.Y+op.H >= row28Y {
+			sectionBefore = true
+			break
+		}
+	}
+	if !sectionBefore {
+		t.Error("section continuation fill must precede Row 28 text in Ops")
+	}
+
+	// At paint time, equal-z fills under Row 28's baseline must paint before
+	// the text (sortPaintIndices chrome-under-content).
+	pageIdxs := make([]int, 0, 32)
+	for i, op := range res.Ops {
+		if op.Fixed {
+			continue
+		}
+		if int(op.Y/contentH) != 1 {
+			continue
+		}
+		pageIdxs = append(pageIdxs, i)
+	}
+	sortPaintIndices(res.Ops, pageIdxs)
+	row28Paint := -1
+	for pi, idx := range pageIdxs {
+		if idx == row28Idx {
+			row28Paint = pi
+			break
+		}
+	}
+	if row28Paint < 0 {
+		t.Fatal("Row 28 not in continuation page paint list")
+	}
+	for pi := row28Paint + 1; pi < len(pageIdxs); pi++ {
+		op := res.Ops[pageIdxs[pi]]
+		if op.Kind != OpFillRect {
+			continue
+		}
+		if op.Y >= row28Y || op.Y+op.H <= row28Y {
+			continue
+		}
+		oz := 0
+		if op.ZIndexSet {
+			oz = op.ZIndex
+		}
+		if oz >= 1 {
+			continue
+		}
+		t.Errorf("paint-order: fill op[%d] after Row 28 covers baseline with z=%d",
+			pageIdxs[pi], oz)
+	}
+}
+
+// TestStickyFixture31AfterSectionNotCovered ensures the After-section note is
+// present after Row 35 (not overlapping it) and not buried under section fill.
+func TestStickyFixture31AfterSectionNotCovered(t *testing.T) {
+	res, contentH, doc := paintFixture31(t)
+	if doc.PageCount() < 2 {
+		t.Fatalf("fixture-31 expected ≥2 pages, got %d", doc.PageCount())
+	}
+
+	var afterIdx int = -1
+	var afterY, row35Y float64
+	var afterText string
+	var found35 bool
+	for i, op := range res.Ops {
+		if op.Kind == OpText && strings.Contains(op.Text, "After the section") {
+			afterIdx = i
+			afterY = op.Y
+			afterText = op.Text
+		}
+		if op.Kind == OpText && strings.Contains(op.Text, "Row 35") {
+			row35Y = op.Y
+			found35 = true
+		}
+	}
+	if afterIdx < 0 {
+		t.Fatal("After-section text missing from display list")
+	}
+	if !found35 {
+		t.Fatal("Row 35 text missing")
+	}
+	if int(afterY/contentH) < 1 {
+		t.Fatalf("After-section expected on continuation page, y=%.2f", afterY)
+	}
+	if !strings.Contains(afterText, "sticky must not replicate") {
+		t.Errorf("After text incomplete: %q", afterText)
+	}
+	// After must sit below Row 35 (sticky reserve shifts both equally).
+	if afterY < row35Y+8 {
+		t.Errorf("After overlaps Row 35: afterY=%.2f row35Y=%.2f", afterY, row35Y)
+	}
+
+	// Late section gray must not follow After text while covering its Y
+	// (would hide the cream box / note the way position:fixed would not).
+	for i := afterIdx + 1; i < len(res.Ops); i++ {
+		op := res.Ops[i]
+		if op.Kind != OpFillRect {
+			continue
+		}
+		if op.Y >= afterY || op.Y+op.H <= afterY {
+			continue
+		}
+		// Gray section (#eceff1), not sticky blue / cream after-box.
+		if op.R > 0.9 && op.G > 0.9 && op.B > 0.92 && op.B < 0.97 && op.H > 50 {
+			t.Errorf("op[%d] section fill after After-text covers it (y=%.2f h=%.2f)",
+				i, op.Y, op.H)
+		}
+	}
+}
+
+func paintFixture31(t *testing.T) (*Result, float64, *pdf.Document) {
+	t.Helper()
+	src, err := os.ReadFile("../../testdata/golden/fixture-31-sticky-top.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	htmlSrc := string(src)
+	si := strings.Index(htmlSrc, "<style>")
+	sj := strings.Index(htmlSrc, "</style>")
+	if si < 0 || sj < 0 {
+		t.Fatal("fixture missing <style>")
+	}
+	sheet, err := css.Parse(htmlSrc[si+7 : sj])
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := html.Parse(htmlSrc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pageW, pageH := 595.28, 841.89
+	m := 28.35
+	contentW := pageW - 2*m
+	contentH := pageH - 2*m
+	res, err := Layout(root, Options{
+		Width: contentW, Height: contentH, Background: true,
+		Sheets: []*css.Stylesheet{sheet}, Media: "print",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc := pdf.NewDocument()
+	if err := Paint(doc, res, PaintOptions{
+		PageWidth: pageW, PageHeight: pageH,
+		MarginTop: m, MarginBottom: m, MarginLeft: m, MarginRight: m,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return res, contentH, doc
 }
