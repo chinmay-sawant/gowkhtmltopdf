@@ -272,6 +272,26 @@ func TestSimplifyDOMFlag(t *testing.T) {
 	}
 }
 
+func TestSimplifyDOMProfileFlag(t *testing.T) {
+	cmd := parse(t, "--simplify-dom", "--simplify-dom-profile", "mediawiki", "in.html", "out.pdf")
+	if cmd.Global.Web.SimplifyDOMProfile != "mediawiki" {
+		t.Errorf("profile=%q", cmd.Global.Web.SimplifyDOMProfile)
+	}
+	if cmd.Objects[0].Web.SimplifyDOMProfile != "mediawiki" {
+		t.Errorf("object profile=%q", cmd.Objects[0].Web.SimplifyDOMProfile)
+	}
+}
+
+func TestPrintLinkUnderlineFlag(t *testing.T) {
+	cmd := parse(t, "--print-link-underline", "in.html", "out.pdf")
+	if !cmd.Global.Web.PrintLinkUnderline {
+		t.Error("global printlinkunderline")
+	}
+	if !cmd.Objects[0].Web.PrintLinkUnderline {
+		t.Error("object printlinkunderline")
+	}
+}
+
 func TestUnknownFlagErrors(t *testing.T) {
 	if _, err := Parse([]string{"--bogus-flag", "x", "out.pdf"}, nil); err == nil {
 		t.Error("unknown flag must error")

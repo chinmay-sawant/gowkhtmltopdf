@@ -7,7 +7,8 @@
 > **Skill:** [`skills/phase-wise-checklist/SKILLS.md`](../../../skills/phase-wise-checklist/SKILLS.md)  
 > **Constraint:** stdlib layout + allowlisted `go-text/typesetting`; no CGO HarfBuzz; no browser embed  
 > **Smoke (raw, no `--simplify-dom`):**  
-> `./bin/gowkhtmltopdf --use-system-fonts 'https://en.wikipedia.org/wiki/Ana_de_Armas' output/wiki-ana-de-armas.pdf`  
+> `./bin/gowkhtmltopdf --use-system-fonts --zoom 0.666667 'https://en.wikipedia.org/wiki/Ana_de_Armas' output/wiki-ana-de-armas.pdf`  
+> (`--zoom` is an **operator recipe** for density vs Chrome — not CSS fidelity; see [`12-css-faithful-engine.md`](12-css-faithful-engine.md))  
 > **Reference:** `output/chrome_ana.pdf` (Chrome print of same URL — not an acceptance golden)
 
 ---
@@ -19,6 +20,12 @@ Chrome’s print PDF **without claiming Chrome parity**. Work is ordered from
 **high-impact quick wins** to **hard / policy / deferred** items. Ana de Armas
 Wikipedia is the **canary**, not the only target — each phase must improve
 general pages (wiki + marketing) where applicable.
+
+**Engine policy (2026-08-05):** default path must stay **CSS-faithful /
+site-agnostic**. Skin-shaped overrides (forced link underlines, Codex `8pt`
+var defaults, rewriting named font families, MW selectors in default simplify)
+are tracked for removal in [`12-css-faithful-engine.md`](12-css-faithful-engine.md).
+Operator flags remain the only intentional policy knobs.
 
 Product bar remains Phase 21 **decent print** (title early, body readable,
 optional chrome-strip). Full browser competition stays Phase 23.
@@ -44,6 +51,7 @@ above when relevant). Do not mark `[x]` without evidence.
 | 9 | [`09-remote-webfonts.md`](09-remote-webfonts.md) — WOFF2 / HTTPS `@font-face` | Chrome font faces | Hard + security | Phase 19 non-goal superseded | **in progress** (must ship) |
 | 10 | [`10-javascript.md`](10-javascript.md) — JS / hydration | SPAs / class gates | Very hard | Phase 22 | **in progress** (subset here) |
 | 11 | [`11-chrome-parity.md`](11-chrome-parity.md) — Chrome compare harness | Print match metrics | Epic | Phase 23 | **in progress** (harness here) |
+| 12 | [`12-css-faithful-engine.md`](12-css-faithful-engine.md) — site-agnostic / CSS-faithful cleanup | Remove skin-shaped overrides | Medium | Phase 21 contract | **done** (2026-08-05) |
 
 ---
 
@@ -59,6 +67,7 @@ above when relevant). Do not mark `[x]` without evidence.
 7. Layout hard edges (flex/grid/float) — Partial stop OK
 8–9. SVG / remote webfonts — document out of scope (no implement unless product amends)
 10–11. Point to Phase 22 / 23; do not execute here
+12. CSS-faithful / site-agnostic cleanup (remove cascade lies; operator flags only)
 ```
 
 ---

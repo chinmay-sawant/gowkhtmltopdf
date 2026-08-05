@@ -49,9 +49,9 @@ func (r *Registry) AddFamilyAlias(family string, f *Font) {
 }
 
 // Lookup returns a face matching family list + weight/italic, or nil.
-// CSS generic families and common proprietary names (Georgia, Arial, …)
-// map to metrically compatible Liberation faces so we never require
-// licensed system fonts — only Liberation (bundled) or opt-in free fonts.
+// Each CSS family token is tried as its exact registry key first. Only the
+// CSS generics serif / sans-serif / monospace expand to Liberation (and
+// similar libre) faces — named families like Georgia are never rewritten.
 func (r *Registry) Lookup(families []string, weight int, italic bool) *Font {
 	if r == nil {
 		return nil
@@ -71,9 +71,7 @@ func (r *Registry) Lookup(families []string, weight int, italic bool) *Font {
 }
 
 // fontFamilyKeys returns lowercase registry keys to try for one CSS family
-// token. Generics and proprietary names resolve to Liberation only — never
-// Georgia/Arial/Times TTFs. Bundled FaceSet covers Liberation Sans when the
-// registry has no Liberation Serif/Mono from --use-system-fonts.
+// token. Named families stay as-is; only CSS generics expand to Liberation.
 func fontFamilyKeys(fam string) []string {
 	key := strings.ToLower(strings.TrimSpace(fam))
 	key = strings.Trim(key, `"'`)
@@ -81,15 +79,12 @@ func fontFamilyKeys(fam string) []string {
 		return nil
 	}
 	switch key {
-	case "serif", "georgia", "times", "times new roman", "times new roman ps",
-		"linux libertine", "source serif 4", "source serif pro", "cambria":
-		return []string{"liberation serif"}
-	case "sans-serif", "arial", "helvetica", "helvetica neue", "verdana",
-		"tahoma", "segoe ui", "system-ui", "ui-sans-serif":
-		return []string{"liberation sans"}
-	case "monospace", "courier", "courier new", "consolas", "menlo", "monaco",
-		"ui-monospace":
-		return []string{"liberation mono"}
+	case "serif":
+		return []string{"liberation serif", "dejavu serif", "noto serif"}
+	case "sans-serif":
+		return []string{"liberation sans", "dejavu sans", "noto sans"}
+	case "monospace":
+		return []string{"liberation mono", "dejavu sans mono", "noto sans mono"}
 	default:
 		return []string{key}
 	}

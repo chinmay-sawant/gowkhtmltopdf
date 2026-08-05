@@ -38,6 +38,10 @@ type Options struct {
 	Background bool    // paint background colors
 	DebugBoxes bool    // outline every box for test/golden output
 	Zoom       float64 // zoom factor; style lengths are scaled by it (any positive value, < 1 shrinks)
+	// PrintLinkUnderline is an opt-in operator policy (--print-link-underline):
+	// after cascade, force text-decoration:underline on a[href]. Default off
+	// so author CSS (including inherit → none) is honored.
+	PrintLinkUnderline bool
 }
 
 // Result is a display list plus the canvas bounds.
@@ -256,22 +260,22 @@ func Layout(root *html.Node, opts Options) (*Result, error) {
 	}
 
 	// Pass 1: cascade without @container (used sizes unknown).
-	styles := resolveStyles(root, opts.Sheets, opts.Media, opts.Width, opts.Height)
+	styles := resolveStylesOpts(root, opts)
 	// After definite inline sizes of size containers are known, re-cascade so
 	// matching @container rules apply, then lay out once with final styles.
 	if css.HasContainerRules(opts.Sheets) {
 		cinfo := measureSizeContainers(root, styles, opts.Width)
 		if len(cinfo) > 0 {
-			styles = resolveStylesWithContainers(root, opts.Sheets, opts.Media, opts.Width, opts.Height, cinfo)
+			styles = resolveStylesWithContainersOpts(root, opts, cinfo)
 			// One nested remount: @container may change nested container-type.
 			cinfo2 := measureSizeContainers(root, styles, opts.Width)
 			if len(cinfo2) != len(cinfo) {
-				styles = resolveStylesWithContainers(root, opts.Sheets, opts.Media, opts.Width, opts.Height, cinfo2)
+				styles = resolveStylesWithContainersOpts(root, opts, cinfo2)
 			} else {
 				for n, a := range cinfo {
 					b, ok := cinfo2[n]
 					if !ok || a.inlineSize != b.inlineSize || a.names != b.names {
-						styles = resolveStylesWithContainers(root, opts.Sheets, opts.Media, opts.Width, opts.Height, cinfo2)
+						styles = resolveStylesWithContainersOpts(root, opts, cinfo2)
 						break
 					}
 				}

@@ -195,6 +195,8 @@ type styleContext struct {
 	// remBase is the used font-size of the root element for rem units (pt).
 	// 0 means the CSS initial medium size (16px → 12pt).
 	remBase float64
+	// printLinkUnderline is the opt-in --print-link-underline operator policy.
+	printLinkUnderline bool
 	// containers maps size-query containers (inline-size|size) to their used
 	// content-box inline size. nil means first pass: skip @container rules.
 	containers map[*html.Node]sizeContainer
@@ -216,6 +218,18 @@ func resolveStyles(root *html.Node, sheets []*css.Stylesheet, media string, view
 	})
 }
 
+// resolveStylesOpts is like resolveStyles but honors layout operator policies
+// (e.g. PrintLinkUnderline) carried on Options.
+func resolveStylesOpts(root *html.Node, opts Options) map[*html.Node]ResolvedStyle {
+	return resolveStylesCtx(root, &styleContext{
+		sheets:             opts.Sheets,
+		media:              opts.Media,
+		viewportW:          opts.Width,
+		viewportH:          opts.Height,
+		printLinkUnderline: opts.PrintLinkUnderline,
+	})
+}
+
 // resolveStylesWithContainers is the second style pass: @container rules are
 // applied when their query matches the nearest eligible ancestor in containers.
 func resolveStylesWithContainers(
@@ -228,6 +242,21 @@ func resolveStylesWithContainers(
 	return resolveStylesCtx(root, &styleContext{
 		sheets: sheets, media: media, viewportW: viewportW, viewportH: viewportH,
 		containers: containers,
+	})
+}
+
+func resolveStylesWithContainersOpts(
+	root *html.Node,
+	opts Options,
+	containers map[*html.Node]sizeContainer,
+) map[*html.Node]ResolvedStyle {
+	return resolveStylesCtx(root, &styleContext{
+		sheets:             opts.Sheets,
+		media:              opts.Media,
+		viewportW:          opts.Width,
+		viewportH:          opts.Height,
+		printLinkUnderline: opts.PrintLinkUnderline,
+		containers:         containers,
 	})
 }
 
@@ -249,14 +278,11 @@ func resolveStylesCtx(root *html.Node, ctx *styleContext) map[*html.Node]Resolve
 				ctx.remBase = st.FontSize
 			}
 			applyRestProps(&st, raw, ctx, parent)
-			// Wiki print CSS sets text-decoration:inherit (!important) → none,
-			// which hides links. Keep underlines for discoverability (Chrome
-			// print is black + underlined). Do NOT force a link color — inherit
-			// black/body color is correct for print.
-			if n.Name == "a" && strings.TrimSpace(n.Attribute("href")) != "" {
-				if v, ok := raw["text-decoration"]; ok && strings.EqualFold(strings.TrimSpace(v), "inherit") {
-					st.TextDecoration = "underline"
-				}
+			// Opt-in operator policy (--print-link-underline): underline
+			// anchors with href after the cascade. Default off — author CSS
+			// (including text-decoration: inherit → parent) wins otherwise.
+			if ctx != nil && ctx.printLinkUnderline && n.Name == "a" && strings.TrimSpace(n.Attribute("href")) != "" {
+				st.TextDecoration = "underline"
 			}
 			// CSS2.1 §9.7: float ≠ none blockifies table-internal / inline
 			// displays before layout (table/flex/grid stay). Floated <table>

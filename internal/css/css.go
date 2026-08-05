@@ -1498,9 +1498,9 @@ func parseVarFn(v string) (name, fallback string, ok bool) {
 }
 
 // ResolveVar expands CSS var() references in v using lookup(--name).
-// Unresolved var() uses the CSS fallback, then knownCSSVarDefault (Codex/
-// Vector print-density tokens → 8pt body). Nested var() expands up to a
-// small depth.
+// Unresolved var() uses the CSS fallback when present; otherwise the empty
+// string (caller treats as invalid / keeps the prior cascaded value).
+// Nested var() expands up to a small depth.
 func ResolveVar(v string, lookup func(name string) (string, bool)) string {
 	v = strings.TrimSpace(v)
 	for depth := 0; depth < 16; depth++ {
@@ -1521,30 +1521,9 @@ func ResolveVar(v string, lookup func(name string) (string, bool)) string {
 			v = fallback
 			continue
 		}
-		if def, ok := knownCSSVarDefault(name); ok {
-			v = def
-			continue
-		}
 		return ""
 	}
 	return v
-}
-
-// knownCSSVarDefault supplies print-oriented fallbacks for Codex/Vector
-// tokens when --name is referenced without a stylesheet definition or
-// CSS fallback. 8pt is the body density target when skins omit the tokens.
-func knownCSSVarDefault(name string) (string, bool) {
-	switch strings.ToLower(strings.TrimSpace(name)) {
-	case "--font-size-medium", "--font-size-small":
-		return "8pt", true
-	case "--font-size-x-small":
-		return "7pt", true
-	case "--font-size-large":
-		return "10pt", true
-	case "--line-height-content", "--line-height-medium", "--line-height-small":
-		return "1.6", true
-	}
-	return "", false
 }
 
 func isHex(s string) bool {

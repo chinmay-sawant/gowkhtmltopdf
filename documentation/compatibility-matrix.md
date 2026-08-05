@@ -78,7 +78,7 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 
 | Property | Status | Notes / verified by |
 |----------|--------|---------------------|
-| `font-family` (named + generic) | Partial | parsed + inherited; embedded Liberation Sans family (R/B/I/BI) plus **font registry** (`--font-path`, optional `--use-system-fonts`) and local `@font-face` TTF/OTF/WOFF1 on **PDF and image** paths (see §4 / §5). Named families resolve via discovery; missing faces fall back to Liberation |
+| `font-family` (named + generic) | Partial | parsed + inherited; embedded Liberation Sans family (R/B/I/BI) plus **font registry** (`--font-path`, optional `--use-system-fonts`) and local `@font-face` TTF/OTF/WOFF1 on **PDF and image** paths (see §4 / §5). Named families resolve as named; missing faces fall through the author’s comma stack, then Liberation; only CSS generics (`serif`/`sans-serif`/`monospace`) expand to Liberation |
 | `writing-mode` (`horizontal-tb\|vertical-rl\|vertical-lr`) | Partial | `vertical-rl` / `vertical-lr` lite (rotated CJK paint); default horizontal. Not a full vertical typesetting engine |
 | `font-size` | Implemented | `style.go` `fontSize` (px/pt/em/%/rem/in/cm/mm/pc + keywords); `%`/`em` resolve against parent; test `TestFontSizeEmInherit` |
 | `font-weight` (`normal\|bold\|100-900`) | Implemented | ≥700 selects Liberation Sans **Bold** (or BoldItalic); fake stroke bold only if a bold face is missing; tests `TestRealBoldFaceOps`, `TestBoldFaceInInvoicePDF` |
@@ -345,11 +345,13 @@ wkhtmltopdf honors them.
 | `--minimum-font-size` | Both | Ignored (stored, no consumer) |
 | `--user-style-sheet` | Both | Ignored (stored, no consumer) |
 | `--print-media-type`, `--no-print-media-type` | Both | Ignored (layout always runs with `Media: "print"`; the flag cannot change that) |
-| `--simplify-dom`, `--no-simplify-dom` | Both | Supported (opt-in chrome-strip; injects synthetic `display:none` sheet — `convert.SimplifyChromeCSS`; default off; `TestSimplifyDOMOnHidesChrome`, `TestSimplifyDOMOffKeepsChrome`) |
+| `--simplify-dom`, `--no-simplify-dom` | Both | Supported (opt-in chrome-strip; landmarks-only `SimplifyChromeCSS`; default off; `TestSimplifyDOMOnHidesChrome`) |
+| `--simplify-dom-profile` | Both | Supported (`mediawiki` adds MW selectors; empty = landmarks only; `TestSimplifyDOMMediaWikiProfile`) |
+| `--print-link-underline` | Both | Supported (opt-in underline `a[href]` after cascade; default off; `TestPrintLinkUnderlineOptIn`) |
 | `--media-type` | Both | Ignored (same) |
 | `--javascript-delay` | Both | Ignored (`WaitJSDelay` is never invoked) |
 | `--window-status`, `--run-script` | Both | Ignored (stored; warning stub not wired) |
-| `--zoom` | Both | Supported (forwarded to `layout.Options.Zoom` in `convert.go`) |
+| `--zoom` | Both | Supported (operator layout scale → `layout.Options.Zoom`; not stylesheet emulation) |
 | `--stop-slow-scripts`, `--no-stop-slow-scripts` | Both | Ignored (no JS) |
 | `--debug-javascript`, `--no-debug-javascript` | Both | Ignored (no JS) |
 | `--load-error-handling` | Both | Supported (abort/skip/ignore in the loader) |

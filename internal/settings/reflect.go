@@ -252,7 +252,9 @@ func webSetters(w *Web) map[string]setter {
 		"loadimages":      setBool(&w.LoadImages),
 		"printmediatype":  setBool(&w.PrintMediaType),
 		"mediatype":       setMediaType(&w.MediaType),
-		"simplifydom":     setBool(&w.SimplifyDOM),
+		"simplifydom":        setBool(&w.SimplifyDOM),
+		"simplifydomprofile": setString(&w.SimplifyDOMProfile),
+		"printlinkunderline": setBool(&w.PrintLinkUnderline),
 	}
 }
 

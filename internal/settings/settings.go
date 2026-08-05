@@ -185,6 +185,12 @@ type Web struct {
 	// SimplifyDOM opts into chrome-strip heuristics for URL/print mode
 	// (--simplify-dom). Default false so invoice/report HTML is unchanged.
 	SimplifyDOM bool
+	// SimplifyDOMProfile selects extra chrome-strip selectors when SimplifyDOM
+	// is on. Empty = landmarks only; "mediawiki" adds #mw-navigation / .mw-jump-link.
+	SimplifyDOMProfile string
+	// PrintLinkUnderline opts into underlining a[href] after cascade
+	// (--print-link-underline). Default false — author text-decoration wins.
+	PrintLinkUnderline bool
 }
 
 // LoadGlobal holds settings shared by all loads.

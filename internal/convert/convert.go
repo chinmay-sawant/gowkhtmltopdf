@@ -317,7 +317,7 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 	contentW := pageW - cmd.Global.Margin.Left*mmToPt - cmd.Global.Margin.Right*mmToPt
 	contentH := pageH - cmd.Global.Margin.Top*mmToPt - cmd.Global.Margin.Bottom*mmToPt
 	sheets := collectSheets(ctx, loader, root, res.Base, obj.Load, idx+1, log, contentW, contentH)
-	sheets = AppendSimplifySheet(sheets, SimplifyDOMEnabled(cmd.Global.Web, obj.Web))
+	sheets = AppendSimplifySheet(sheets, SimplifyDOMEnabled(cmd.Global.Web, obj.Web), SimplifyDOMProfile(cmd.Global.Web, obj.Web))
 	registry = MergeFontFaces(ctx, loader, registry, sheets, res.Base, obj.Load, idx+1, log)
 
 	imagesFn := func(src string) ([]byte, error) {
@@ -359,15 +359,16 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 	registry = st.registry
 
 	lres, err := layout.Layout(root, layout.Options{
-		Width:      st.geom.pageW - st.geom.marginLeft - st.geom.marginRight,
-		Height:     st.geom.contentH,
-		Font:       font,
-		Registry:   registry,
-		Sheets:     sheets,
-		Media:      "print",
-		Zoom:       obj.Load.ZoomFactor,
-		Images:     imagesFn,
-		Background: cmd.Global.Background,
+		Width:              st.geom.pageW - st.geom.marginLeft - st.geom.marginRight,
+		Height:             st.geom.contentH,
+		Font:               font,
+		Registry:           registry,
+		Sheets:             sheets,
+		Media:              "print",
+		Zoom:               obj.Load.ZoomFactor,
+		Images:             imagesFn,
+		Background:         cmd.Global.Background,
+		PrintLinkUnderline: cmd.Global.Web.PrintLinkUnderline || obj.Web.PrintLinkUnderline,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("object %d (%s): layout: %w", idx+1, obj.Page, err)
@@ -389,15 +390,16 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 					effZoom = zoom * zf
 				}
 				lres, err = layout.Layout(root, layout.Options{
-					Width:      contentW,
-					Height:     st.geom.pageH - st.geom.marginTop - st.geom.marginBottom,
-					Font:       font,
-					Registry:   registry,
-					Sheets:     sheets,
-					Media:      "print",
-					Zoom:       effZoom,
-					Images:     imagesFn,
-					Background: cmd.Global.Background,
+					Width:              contentW,
+					Height:             st.geom.pageH - st.geom.marginTop - st.geom.marginBottom,
+					Font:               font,
+					Registry:           registry,
+					Sheets:             sheets,
+					Media:              "print",
+					Zoom:               effZoom,
+					Images:             imagesFn,
+					Background:         cmd.Global.Background,
+					PrintLinkUnderline: cmd.Global.Web.PrintLinkUnderline || obj.Web.PrintLinkUnderline,
 				})
 				if err != nil {
 					return nil, fmt.Errorf("object %d (%s): smart-shrink layout: %w", idx+1, obj.Page, err)

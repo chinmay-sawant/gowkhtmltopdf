@@ -77,8 +77,8 @@ func (f *floatState) clear(clear string, y, cy float64) float64 {
 
 // place records a laid-out float box on the left or right side.
 // ml/mr are the floated box's horizontal margins (scaled pt); exclusion uses
-// the margin box so in-flow text clears the gap before the border (wiki
-// infobox margin-left:1em), instead of painting flush against the frame.
+// the margin box so in-flow text clears the gap before the border (e.g.
+// float:right; margin-left:1em), instead of painting flush against the frame.
 func (f *floatState) place(side string, b *box, ml, mr float64) {
 	bottom := b.y + b.h
 	switch side {

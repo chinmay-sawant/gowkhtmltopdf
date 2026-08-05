@@ -7,8 +7,7 @@ import (
 	"gowkhtmltopdf/internal/html"
 )
 
-// TestVectorBodyPrintSize: clientpref-1 circular token falls back to 1rem
-// (12pt); paint still aliases Georgia → Liberation.
+// TestVectorBodyPrintSize: clientpref-1 circular token falls back to 1rem (12pt).
 func TestVectorBodyPrintSize(t *testing.T) {
 	s := sheet(t, `
 html.vector-feature-custom-font-size-clientpref-1 {
@@ -38,8 +37,8 @@ p { margin: 0; }
 	}
 }
 
-// TestPrintZoomDensifies12ptTo8: wiki print CSS sets p{font-size:12pt};
-// --zoom 2/3 yields the ~8pt body density target with Liberation faces.
+// TestPrintZoomDensifies12ptTo8: author CSS p{font-size:12pt} + operator
+// --zoom 2/3 yields ~8pt paint size (recipe policy, not cascade invention).
 func TestPrintZoomDensifies12ptTo8(t *testing.T) {
 	s := sheet(t, `
 p { font-size: 12pt; margin: 0; font-family: Georgia, serif; font-weight: normal; }
@@ -52,7 +51,6 @@ p { font-size: 12pt; margin: 0; font-family: Georgia, serif; font-weight: normal
 	res, err := Layout(root, Options{
 		Width: 400, Height: 200, Sheets: []*css.Stylesheet{s},
 		Media: "print", Zoom: zoom,
-		Registry: nil, // FaceSet Liberation via default faces
 	})
 	if err != nil {
 		t.Fatal(err)
