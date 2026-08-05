@@ -51,12 +51,13 @@ type Selector struct {
 // the following part: "" for the first part, ">" child, "+" next-sibling,
 // "~" subsequent-sibling, " " descendant.
 type SelectorPart struct {
-	Tag        string
-	Classes    []string
-	ID         string
-	Attrs      []AttrSelector
-	Pseudos    []PseudoClass
-	Combinator string
+	Tag           string
+	Classes       []string
+	ID            string
+	Attrs         []AttrSelector
+	Pseudos       []PseudoClass
+	PseudoElement string // "before" | "after" | "" — never matches the host element
+	Combinator    string
 }
 
 // AttrSelector is [name], [name=value] (exact), [name~=word] (space-separated
@@ -693,7 +694,23 @@ func parseCompoundCtx(s string, insideHas bool) (SelectorPart, bool) {
 			i += j + 1
 		case ':':
 			if i+1 < len(s) && s[i+1] == ':' {
-				return SelectorPart{}, false // pseudo-elements not supported
+				// ::pseudo-element (Selectors 3+). Only ::before/::after are
+				// supported; others reject the selector so declarations do
+				// not apply to the host.
+				j := i + 2
+				for j < len(s) && s[j] != '(' && !isCompoundBreak(s[j]) {
+					j++
+				}
+				pe := strings.ToLower(s[i+2 : j])
+				if pe != "before" && pe != "after" {
+					return SelectorPart{}, false
+				}
+				if hasParen := j < len(s) && s[j] == '('; hasParen {
+					return SelectorPart{}, false
+				}
+				part.PseudoElement = pe
+				i = j
+				continue
 			}
 			j := i + 1
 			for j < len(s) && s[j] != '(' && !isCompoundBreak(s[j]) {
@@ -763,10 +780,10 @@ func parseCompoundCtx(s string, insideHas bool) (SelectorPart, bool) {
 				// Keeping them on the compound prevents li:target from
 				// degrading to bare `li` (wiki reflist highlight blue).
 				part.Pseudos = append(part.Pseudos, PseudoClass{Name: name})
-			case "before", "after", "first-line", "first-letter":
-				// CSS2 single-colon pseudo-elements — unsupported; rejecting
-				// the selector avoids applying their declarations to the host
-				// (same class of bug as stripping ::before).
+			case "before", "after":
+				// CSS2 single-colon pseudo-elements.
+				part.PseudoElement = name
+			case "first-line", "first-letter":
 				return SelectorPart{}, false
 			default:
 				// Keep unknown pseudos so they do not degrade to the host
@@ -905,9 +922,30 @@ func Match(s Selector, n *html.Node) bool {
 	return true
 }
 
+// MatchPseudo reports whether s selects the ::before or ::after pseudo-element
+// of n (pe is "before" or "after").
+func MatchPseudo(s Selector, n *html.Node, pe string) bool {
+	if n == nil || pe == "" || len(s.Parts) == 0 {
+		return false
+	}
+	last := s.Parts[len(s.Parts)-1]
+	if last.PseudoElement != pe {
+		return false
+	}
+	parts := make([]SelectorPart, len(s.Parts))
+	copy(parts, s.Parts)
+	parts[len(parts)-1].PseudoElement = ""
+	return Match(Selector{Parts: parts}, n)
+}
+
 // matchPart matches one compound against an element.
 func matchPart(p SelectorPart, n *html.Node) bool {
 	if n.Type != html.ElementNode {
+		return false
+	}
+	// ::before/::after never match the host element (declarations apply to
+	// generated pseudo boxes via MatchPseudo).
+	if p.PseudoElement != "" {
 		return false
 	}
 	if p.Tag != "*" && !strings.EqualFold(p.Tag, n.Name) {
@@ -1023,6 +1061,19 @@ func matchPseudo(ps PseudoClass, n *html.Node) bool {
 	case "link", "visited":
 		// Print: no link history — both match any anchor with an href.
 		return isLinkAnchor(n)
+	case "root":
+		// Document element (html in HTML). html.Parse wraps the tree in a
+		// synthetic ElementNode named "#document" — that must not match, and
+		// must not block <html> from matching.
+		if n.Type != html.ElementNode || n.Name == "#document" || strings.HasPrefix(n.Name, "#") {
+			return false
+		}
+		for p := n.Parent; p != nil; p = p.Parent {
+			if p.Type == html.ElementNode && p.Name != "#document" && !strings.HasPrefix(p.Name, "#") {
+				return false
+			}
+		}
+		return true
 	case "hover", "active", "focus", "target":
 		return false
 	default:
@@ -1171,6 +1222,9 @@ func Specificity(s Selector) (a, b, c int) {
 		b += len(p.Classes) + len(p.Attrs)
 		if p.Tag != "*" {
 			c++
+		}
+		if p.PseudoElement != "" {
+			c++ // pseudo-elements count like type selectors
 		}
 		for _, ps := range p.Pseudos {
 			switch ps.Name {

@@ -6,9 +6,9 @@ import (
 	"gowkhtmltopdf/internal/html"
 )
 
-// TestPseudoElementSelectorDoesNotApplyToHost: stripping ::before from
-// selectors used to leave the host (`p`) matching Vector print's
-// `p::before { width: 120pt }`, crushing wiki body columns to 120pt.
+// TestPseudoElementSelectorDoesNotApplyToHost: p::before { width:120pt } must
+// not match the host <p> (that crushed wiki body columns to 120pt when
+// ::before was stripped). Pseudo rules are kept for generated content.
 func TestPseudoElementSelectorDoesNotApplyToHost(t *testing.T) {
 	s, err := Parse(`p::before { width: 120pt; content: ''; display: block }
 p:before { width: 99pt }
@@ -31,20 +31,30 @@ p { color: #000 }`)
 		}
 	}
 	walk(root)
-	nRules := 0
+	if p == nil {
+		t.Fatal("no p")
+	}
+	hostMatches := 0
+	pseudoMatches := 0
 	for _, r := range s.Rules {
 		for _, sel := range r.Selectors {
-			nRules++
-			t.Logf("selector=%v decls=%v", sel, r.Decls)
-			for _, d := range r.Decls {
-				if d.Prop == "width" {
-					t.Fatalf("pseudo-element width rule leaked as host selector %v", sel)
+			if Match(sel, p) {
+				hostMatches++
+				for _, d := range r.Decls {
+					if d.Prop == "width" {
+						t.Fatalf("pseudo width matched host via Match: %v", sel)
+					}
 				}
+			}
+			if MatchPseudo(sel, p, "before") {
+				pseudoMatches++
 			}
 		}
 	}
-	if nRules != 1 {
-		t.Fatalf("expected only p{color} rule to survive, got %d selectors", nRules)
+	if hostMatches != 1 {
+		t.Fatalf("host matches=%d, want 1 (p{color})", hostMatches)
 	}
-	_ = p
+	if pseudoMatches < 1 {
+		t.Fatalf("pseudo matches=%d, want ≥1 for ::before/ :before", pseudoMatches)
+	}
 }

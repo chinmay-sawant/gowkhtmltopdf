@@ -320,6 +320,14 @@ func (e *engine) collectInlineNode(n *html.Node, out *[]inlineItem) {
 				}
 			}
 		default:
+			// Whitespace-only text nodes still separate adjacent inlines
+			// (wiki "Cuba"+" "+"Spain"); collapseWS would drop them.
+			if strings.TrimSpace(n.Text) == "" {
+				if n.Text != "" {
+					*out = append(*out, e.textItem(" ", st))
+				}
+				return
+			}
 			text := collapseWS(n.Text)
 			if text == "" {
 				return
@@ -331,6 +339,19 @@ func (e *engine) collectInlineNode(n *html.Node, out *[]inlineItem) {
 				return
 			}
 			words := strings.Fields(text)
+			// collapseWS / Fields strip a leading space that still separates
+			// this node from the previous inline ("</a> in" → "Reeves"+"in").
+			// Re-introduce one when the source began with whitespace and the
+			// prior item does not already end with a space.
+			if len(words) > 0 && len(n.Text) > 0 && len(*out) > 0 {
+				first := n.Text[0]
+				if first == ' ' || first == '\t' || first == '\n' || first == '\r' || first == '\f' {
+					prev := &(*out)[len(*out)-1]
+					if !prev.forceBreak && !strings.HasSuffix(prev.text, " ") {
+						words[0] = " " + words[0]
+					}
+				}
+			}
 			for i, word := range words {
 				// Space only between words of this text node — not after the
 				// last token. Appending " " to every field made cite brackets
@@ -390,8 +411,14 @@ func (e *engine) collectInlineNode(n *html.Node, out *[]inlineItem) {
 				}
 			}
 			before := len(*out)
+			if txt := e.pseudoContent(n, "before"); txt != "" {
+				*out = append(*out, e.textItem(txt, st))
+			}
 			for _, c := range n.Children {
 				e.collectInlineNode(c, out)
+			}
+			if txt := e.pseudoContent(n, "after"); txt != "" {
+				*out = append(*out, e.textItem(txt, st))
 			}
 			// Horizontal margins on inline elements (e.g. .co { margin-left: 10px }
 			// after a logo) apply to the first/last generated items.

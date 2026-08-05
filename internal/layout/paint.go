@@ -254,7 +254,16 @@ func paginateOps(res *Result, contentH float64) []int {
 							minY = o.Y
 						}
 					}
-					dy = boundary - minY
+					// Leave room for ascenders above the baseline so snapped
+					// lines do not paint into the top margin (page-4/5 bleed).
+					lead := 0.0
+					if op.Kind == OpText || op.Kind == OpBullet {
+						lead = op.Size * 0.75
+						if lead < 8 {
+							lead = 8
+						}
+					}
+					dy = boundary + lead - minY
 					shiftFlowY(res, i, i, oldY-0.01, dy)
 					for _, j := range chrome {
 						o := &res.Ops[j]
@@ -719,12 +728,81 @@ func afterBreaks(res *Result, contentH float64) bool {
 			if nextPage <= lastPage {
 				break
 			}
-			// Move only this box onto next's page. shiftFlowY would also
-			// push next (and everything below) further down — leaving a
-			// blank page between a short filmography tail and awards when
-			// h2[page-break-after:avoid] follows a moved avoid-inside table.
-			target := next.y - b.h
+			// Place the heading on next's page without a full-page shiftFlowY
+			// (that blanked pages after avoid-inside tables). Clear the
+			// page-top band first: paginateOps may already have snapped a
+			// prior paragraph's continuation to pageStart — that text is
+			// NOT `next` (next is the following sibling), so we must push
+			// every op in the landing band, not only next.
 			pageStart := float64(nextPage) * contentH
+			need := b.h
+			if need < 1 {
+				need = 12
+			}
+			if b.opStart <= b.opEnd && b.opStart >= 0 && b.opEnd < len(res.Ops) {
+				top, bot := b.y, b.y
+				for k := b.opStart; k <= b.opEnd; k++ {
+					op := res.Ops[k]
+					y0, y1 := op.Y, op.Y
+					switch op.Kind {
+					case OpText, OpBullet:
+						y0 = op.Y - op.Size*0.8
+						y1 = op.Y + op.Size*0.35
+					case OpLine:
+						if op.H == 0 {
+							y1 = op.Y + math.Max(op.Width, 1)
+						} else {
+							y1 = op.Y + op.H
+						}
+					default:
+						if op.H > 0 {
+							y1 = op.Y + op.H
+						}
+					}
+					if y0 < top {
+						top = y0
+					}
+					if y1 > bot {
+						bot = y1
+					}
+				}
+				if ink := bot - top; ink > need {
+					need = ink
+				}
+				if ink := bot - b.y; ink > need {
+					need = ink
+				}
+			}
+			const gap = 10.0
+			need += gap
+			bandTop := pageStart + need
+			minY := bandTop
+			minIdx := -1
+			for i := range res.Ops {
+				op := &res.Ops[i]
+				if op.Fixed {
+					continue
+				}
+				if int(op.Y/contentH) != nextPage {
+					continue
+				}
+				if op.Y < minY {
+					minY = op.Y
+					minIdx = i
+				}
+			}
+			if minIdx >= 0 && minY < bandTop-0.01 {
+				push := bandTop - minY
+				shiftFlowY(res, minIdx, minIdx, minY-0.01, push)
+			}
+			target := bandTop - need // == pageStart when band was cleared
+			if target < pageStart {
+				target = pageStart
+			}
+			// Prefer sitting just above the (possibly pushed) next sibling.
+			if next.y-need > target {
+				target = next.y - need
+			}
 			if target < pageStart {
 				target = pageStart
 			}
@@ -798,7 +876,12 @@ func rowsIntact(res *Result, contentH float64) bool {
 				// between filmography and awards on long wiki tables.
 				dy := float64(lo+1)*contentH - rowTop
 				if dy > 0.01 {
-					shiftFlowY(res, first, last, rowTop, dy)
+					// fromY slightly above rowTop so border-collapse grid
+					// lines that sit exactly on the row edge (and later
+					// rows / chrome below) shift with the cells — otherwise
+					// content moves and the grid stays behind (gapped /
+					// misaligned music-video tables across page breaks).
+					shiftFlowY(res, first, last, rowTop-0.01, dy)
 					changed = true
 				}
 			}
@@ -848,6 +931,8 @@ func keepHeadingWithNext(res *Result, contentH float64) bool {
 		if nextPage > page {
 			continue // already separated by a break
 		}
+		// Move heading + following content together so the heading does not
+		// land on top of a line that already snapped to the next page.
 		dy := float64(page+1)*contentH - b.y
 		if dy > 0 {
 			shiftFlowY(res, b.opStart, b.opEnd, b.y, dy)
@@ -1372,4 +1457,3 @@ func drawLinkXform(p *pdf.Page, op *Op, pageIdx int, contentH float64, opts Pain
 	}
 	p.AddLinkURI([4]float64{llx, lly, urx, ury}, op.URI)
 }
-

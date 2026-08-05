@@ -367,6 +367,36 @@ func TestLinkVisitedPseudos(t *testing.T) {
 	}
 }
 
+// TestRootPseudo: :root matches the document element (<html>), not body/descendants.
+// Without this, Vector :root { --font-size-medium: … } never applies (1013e0f).
+func TestRootPseudo(t *testing.T) {
+	doc := treeFor(t, `<html><body><p>x</p></body></html>`)
+	htmlEl := doc.FirstChild("html")
+	body := htmlEl.FirstChild("body")
+	p := body.FirstChild("p")
+	sel, ok := parseSelector(":root")
+	if !ok {
+		t.Fatal("parseSelector(:root) failed")
+	}
+	if Match(sel, doc) {
+		t.Fatal(":root must not match synthetic #document")
+	}
+	if !Match(sel, htmlEl) {
+		t.Fatal(":root must match <html>")
+	}
+	if Match(sel, body) || Match(sel, p) {
+		t.Fatal(":root must not match body or p")
+	}
+	// Also accept html:root
+	sel2, ok := parseSelector("html:root")
+	if !ok {
+		t.Fatal("parseSelector(html:root) failed")
+	}
+	if !Match(sel2, htmlEl) {
+		t.Fatal("html:root must match <html>")
+	}
+}
+
 func TestAttrWordAndSubstring(t *testing.T) {
 	root := treeFor(t, `<html><body>
 		<figure typeof="mw:File/Thumb mw:Image" id="f1"></figure>

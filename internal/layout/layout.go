@@ -1696,9 +1696,14 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 		e.add(Op{Kind: OpFillRect, X: x, Y: y, W: tb.w, H: tb.h,
 			R: st.BGColor[0], G: st.BGColor[1], B: st.BGColor[2], Alpha: st.BGColor[3]})
 	}
-	e.emitBorders(st, x, y, tb.w, tb.h)
-
 	collapse := st.BorderCollapse == "collapse"
+	// Separate borders: stroke the table box. Collapsed grids include the
+	// outer perimeter — stroking both doubles the outer edge and leaves the
+	// table chrome behind when only cell ops shift across pages.
+	if !collapse {
+		e.emitBorders(st, x, y, tb.w, tb.h)
+	}
+
 	// emit cell content and boxes now that positions are final
 	for _, cell := range tb.children {
 		e.emitCell(cell, collapse)
