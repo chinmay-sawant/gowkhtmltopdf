@@ -317,6 +317,42 @@ func shiftStickyPageFlow(res *Result, sticky *box, pageTop, pageBottom, stickyY,
 	if limit < pageTop {
 		limit = pageBottom
 	}
+	// Pagination snaps (e.g. ascender lead) can push rows past layout-time
+	// cbH without updating the box — extend the fence to on-page body flow
+	// so side borders still reach the last row (fixture-31 Row 35).
+	for i := range res.Ops {
+		op := &res.Ops[i]
+		if op.Fixed || op.StickyID == sticky.stickyID {
+			continue
+		}
+		if op.Y < pageTop-1e-9 || op.Y >= pageBottom-1e-9 {
+			continue
+		}
+		if isPageLeadingBackground(op, pageTop, reserve) {
+			continue
+		}
+		bot := op.Y
+		switch op.Kind {
+		case OpFillRect, OpStrokeRect:
+			bot = op.Y + op.H
+		case OpText, OpBullet:
+			h := op.Size * 0.35
+			if op.H > 0 {
+				h = op.H * 0.35
+			}
+			if h < 4 {
+				h = 4
+			}
+			bot = op.Y + h
+		case OpLine:
+			if op.H > 1 {
+				bot = op.Y + op.H
+			}
+		}
+		if bot+1 > limit {
+			limit = bot + 1
+		}
+	}
 	for i := range res.Ops {
 		op := &res.Ops[i]
 		if op.Kind == OpText && strings.Contains(op.Text, "After the section") {

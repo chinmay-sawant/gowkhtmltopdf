@@ -271,11 +271,20 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 				R: c[0], G: c[1], B: c[2]})
 			if it.style.TextDecoration == "underline" || (it.href != "" && it.style.TextDecoration != "line-through") {
 				// Sit clearly below glyph descenders (~1–2mm visual gap).
+				// Thin stroke (~5% of em, floor 0.4pt) — default 1pt looked heavy.
 				uy := baseline + de + size*0.22
-				e.add(Op{Kind: OpLine, X: lx, Y: uy, W: run.w, H: 0, R: c[0], G: c[1], B: c[2]})
+				uw := size * 0.05
+				if uw < 0.4 {
+					uw = 0.4
+				}
+				e.add(Op{Kind: OpLine, X: lx, Y: uy, W: run.w, H: 0, Width: uw, R: c[0], G: c[1], B: c[2]})
 			}
 			if it.style.TextDecoration == "line-through" {
-				e.add(Op{Kind: OpLine, X: lx, Y: baseline - as*0.3, W: run.w, H: 0, R: c[0], G: c[1], B: c[2]})
+				uw := size * 0.05
+				if uw < 0.4 {
+					uw = 0.4
+				}
+				e.add(Op{Kind: OpLine, X: lx, Y: baseline - as*0.3, W: run.w, H: 0, Width: uw, R: c[0], G: c[1], B: c[2]})
 			}
 			if it.href != "" {
 				e.add(Op{Kind: OpLinkURI, X: lx, Y: baseline - as, W: run.w, H: as + de, URI: it.href})
@@ -321,10 +330,15 @@ func (e *engine) collectInlineNode(n *html.Node, out *[]inlineItem) {
 			}
 		default:
 			// Whitespace-only text nodes still separate adjacent inlines
-			// (wiki "Cuba"+" "+"Spain"); collapseWS would drop them.
+			// (wiki "Cuba"+" "+"Spain" / pretty-printed newlines between
+			// anchors). collapseWS would drop them. Skip only after a
+			// replaced element so `<img>\n<span margin-left>` does not add
+			// a space on top of the margin (TestLogoTitleGap).
 			if strings.TrimSpace(n.Text) == "" {
 				if n.Text != "" {
-					*out = append(*out, e.textItem(" ", st))
+					if len(*out) == 0 || !(*out)[len(*out)-1].img {
+						*out = append(*out, e.textItem(" ", st))
+					}
 				}
 				return
 			}
