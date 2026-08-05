@@ -22,6 +22,7 @@ import (
 	"gowkhtmltopdf/internal/css"
 	"gowkhtmltopdf/internal/html"
 	"gowkhtmltopdf/internal/pdf"
+	"gowkhtmltopdf/internal/svg"
 )
 
 // Options controls a Layout run.
@@ -1000,7 +1001,9 @@ func (e *engine) buildImage(n *html.Node, st ResolvedStyle, x, y float64) *box {
 	src := n.Attribute("src")
 	if src != "" && e.opts.Images != nil {
 		if data, err := e.opts.Images(src); err == nil {
-			if w, h, jpeg, ok := imageDims(data); ok {
+			if png, pw, ph, err := svg.Rasterize(data, 1024); err == nil {
+				b.imgSrc, b.imgData, b.imgJPEG, b.imgW, b.imgH = src, png, false, pw, ph
+			} else if w, h, jpeg, ok := imageDims(data); ok {
 				b.imgSrc, b.imgData, b.imgJPEG, b.imgW, b.imgH = src, data, jpeg, w, h
 			}
 		}

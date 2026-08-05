@@ -19,15 +19,15 @@ an SVG subset renderer (stdlib XML + path raster) — **implementing**, not defe
 ### 8.1 Honesty → implement
 
 - [x] Document gap previously stated in matrix
-- [ ] Decode `image/svg+xml` / `.svg` `<img src>` into PNG via subset rasterizer
-- [ ] Support rect/circle/path/fill basics sufficient for wiki wordmark smoke
-- [ ] Tests: tiny SVG fixture paints non-empty image op
-- [ ] Status → done when wiki logo or fixture SVG appears in PDF
+- [x] Decode `image/svg+xml` / `.svg` `<img src>` into PNG via subset rasterizer (`internal/svg`)
+- [x] Support rect/circle/ellipse/line/polyline/polygon/path (M/L/H/V/Z/C/Q) basics
+- [x] Tests: `TestRasterizeRect`, `TestRasterizePath`
+- [ ] Status → done when wiki logo or fixture SVG appears in PDF (complex Wikimedia SVG may need more path/CSS-in-SVG)
 
 ### 8.2 Gates
 
-- [ ] `make lint` →
-- [ ] `make test` →
+- [x] `make lint` → (with suite)
+- [x] `make test` → pass including `./internal/svg`
 - [ ] Smoke note for Ana logo presence
 
 ---

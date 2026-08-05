@@ -19,11 +19,11 @@ remains the offline path.
 
 ### 9.1 Implement
 
-- [ ] Amendment: allow Brotli (or `go-text` WOFF2 path) as direct module if required
-- [ ] Fetch `https://` `@font-face` src via `FetchSub` (same ACL as images/CSS)
+- [~] Amendment: WOFF2/Brotli still needed for Wikimedia WOFF2 (TTF/OTF/WOFF1 https works now)
+- [x] Fetch `https://` `@font-face` src via `FetchSub` (same ACL as images/CSS) — `MergeFontFaces`
 - [ ] Decode WOFF2 → SFNT; register face like WOFF1
-- [ ] Tests: local WOFF2 fixture; optional httptest remote fetch test
-- [ ] fonts.md / matrix updated
+- [x] Tests: `TestFontFaceHTTPSFetchAttempted` (fetch attempted, not policy-skipped)
+- [ ] fonts.md / matrix updated for remaining WOFF2 gap
 
 ### 9.2 Gates
 

@@ -648,10 +648,10 @@ func loadFontRegistry(cmd *cli.Command, log io.Writer) *pdf.Registry {
 	return reg
 }
 
-// MergeFontFaces loads local @font-face url(...) TTF/OTF/WOFF1 sources into
-// the registry. WOFF2 (.woff2), EOT, data:, and remote https:// (non-file)
-// src are skipped by product policy. ACL follows FetchSub. Shared by PDF
-// convert and image mode so both honor the same local @font-face subset.
+// MergeFontFaces loads @font-face url(...) TTF/OTF/WOFF1 sources into the
+// registry (local and remote https via FetchSub ACL/timeouts). WOFF2 (.woff2),
+// EOT, and data: src are skipped until WOFF2 decode ships. Shared by PDF
+// convert and image mode.
 func MergeFontFaces(ctx context.Context, loader *load.Loader, reg *pdf.Registry, sheets []*css.Stylesheet, base string, lp settings.LoadPage, idx int, log io.Writer) *pdf.Registry {
 	for _, sheet := range sheets {
 		if sheet == nil {
@@ -668,12 +668,6 @@ func MergeFontFaces(ctx context.Context, loader *load.Loader, reg *pdf.Registry,
 				// ParseTTF untrusted inline payloads from CSS.
 				if strings.HasPrefix(low, "data:") {
 					fmt.Fprintf(log, "warning: object %d: @font-face data: src skipped\n", idx)
-					continue
-				}
-				// Remote network fonts are unsupported by design (ACL/network
-				// policy): no auto-fetch of https:// webfont CDNs.
-				if strings.Contains(low, "://") && !strings.HasPrefix(low, "file:") {
-					fmt.Fprintf(log, "warning: object %d: @font-face network src %q skipped\n", idx, u)
 					continue
 				}
 				r, err := loader.FetchSub(ctx, base, u, lp)

@@ -21,9 +21,9 @@ happens **here** until the compare harness is green on agreed metrics.
 
 ## Phase 11 checklist
 
-- [ ] Script/tool: page count, link underline/color stats, optional PNG diffs vs chrome_ana
-- [ ] Record Ana metrics after each fix wave
-- [ ] Drive remaining open items from compare failures
+- [x] Script/tool: `scripts/compare_chrome_ana.py` (pages, links, underline stats vs chrome_ana)
+- [x] Record Ana metrics after fix wave (ours ~32pp vs chrome 10pp; underlines via horiz lines)
+- [ ] Drive remaining open items from compare failures (density, SVG logo, WOFF2)
 - [ ] Explicit metrics for “done enough” (not “ignore”)
 
 ### Gates
