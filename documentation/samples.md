@@ -61,9 +61,11 @@ present. Requires network; soft-fails if unreachable. Manual equivalent:
 ```
 
 Use `--simplify-dom` separately when you want chrome-strip for comparison; do not
-bake it into this smoke artifact. Open the PDF and judge layout honestly against
-the Phase 21 “decent print” bar. Do **not** gate CI on this; commit
-`output/wiki-*.pdf` only when intentionally updating the smoke artifact.
+bake it into this smoke artifact. Full URL-mode recipes (raw vs decent-print):
+[cli.md — URL mode](cli.md#url-mode--chrome-strip---simplify-dom). Open the PDF
+and judge layout honestly against the Phase 21 “decent print” bar. Do **not**
+gate CI on this; commit `output/wiki-*.pdf` only when intentionally updating the
+smoke artifact.
 
 ## Makefile targets
 

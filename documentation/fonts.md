@@ -71,7 +71,8 @@ for CJK.
   lack a glyph, the layout engine falls back to **any** face on the opt-in
   registry that covers the codepoint (prefers DejaVu/Noto family names). Use
   `--use-system-fonts` or `--font-path` (e.g. DejaVu) for Wikipedia phonetic
-  lines. Remote WOFF2 webfonts remain skipped by policy.
+  lines — see URL-mode recipes in [cli.md](cli.md#url-mode--chrome-strip---simplify-dom).
+  Remote WOFF2 webfonts remain skipped by policy.
 - **`@font-face` (Partial):** local `url(...ttf|otf|woff)` under loader ACL
   (`--enable-local-file-access` / `--allow`) is fetched via `FetchSub`,
   parsed (WOFF1 → SFNT via stdlib zlib), and registered for the document on
