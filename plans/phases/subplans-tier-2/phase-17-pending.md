@@ -77,7 +77,8 @@ copy-inherit and one-axis masonry pack).
 - [x] Stage B grid deepen shipped
 - [x] Stage C lite shipped (cyclic `%` subset; subgrid copy-inherit; masonry pack lite)
 - [~] True shared-track subgrid / full CSS Grid L3 masonry / Chrome layout-test parity — still deferred
-- [~] Multi-column `column-count`, transforms, container queries / `:has()` — still deferred
+- [x] Multi-column `column-count` lite — [`../tier-2-pending-3/multicol.md`](../tier-2-pending-3/multicol.md)
+- [~] Static transforms, container queries / `:has()` — still deferred (pending-3)
 
 ---
 

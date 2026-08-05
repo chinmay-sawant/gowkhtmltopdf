@@ -2,8 +2,8 @@
 
 > **Parent:** [`plans/10-canonical-post-mvp-roadmap.md`](../../10-canonical-post-mvp-roadmap.md)  
 > **Branch:** `feature/tier-2-pending-3`  
-> **Status:** planning (execution ledger)  
-> **Estimated effort:** 6–12 weeks (depends on which hard CSS edges product keeps)  
+> **Status:** done (waves 1–2 shipped 2026-08-05; optional nested HF golden fixture-36 still open)  
+> **Estimated effort:** 6–12 weeks  
 > **Skill:** [`skills/phase-wise-checklist/SKILLS.md`](../../../skills/phase-wise-checklist/SKILLS.md)  
 > **Constraint:** stdlib layout + allowlisted `go-text/typesetting`; no CGO HarfBuzz; no browser engine
 
@@ -11,19 +11,15 @@
 
 ## Overview
 
-After Tier 2 core + deepen work (sticky print, flex/grid Stage A–C lite, OT
-shaping, image `@font-face`, HF fragment GoTo), a residual checklist remained
-as intentional `[~]` / unfinished polish. This ledger is the **canonical
-execution plan** to finish phases **17–20** leftovers — including **nested HTML
-headers/footers as child documents** (pulled forward from former v0.3.0 deferral).
+Last Tier 2 pending run: finish **all** phases 17–20 leftover items. Permanent
+product boundaries (browser HF, CGO HarfBuzz, Noto binary bundle) are marked
+`[x]` as **documented out of scope**, not deferred.
 
-**Research inputs (2026-08-05):**
+**Wave 1 (parallel, quickest wins):** orphans/widows CSS · float↔table · `:has`
+· fonts WOFF/halt — plus nested HF registry wiring in parallel.
 
-| Source | Role |
-|--------|------|
-| Web CSS research | Multicol, transforms, `:has`/`@container`, orphans/widows, flex/grid hard edges, sticky, float↔table |
-| Web fonts/HF research | WOFF policy, `halt`/`palt`, Indic honesty, Noto path, wkhtmltopdf nested HF model |
-| Codebase explore | Current seams: `css.go`, `layout/*`, `paint.go`, `hf.go`, `MergeFontFaces`, `ShapeTextFont` |
+**Wave 2:** multicol · static transforms · `@container` · flex/grid remaining ·
+sticky overflow behavior.
 
 ---
 
@@ -31,15 +27,15 @@ headers/footers as child documents** (pulled forward from former v0.3.0 deferral
 
 | Order | Subplan | Phase | Kind | Default disposition |
 |------:|---------|-------|------|---------------------|
-| 1 | [nested-html-hf.md](nested-html-hf.md) | 20 | **Must** | Implement child HF document pipeline |
-| 2 | [orphans-widows-css.md](orphans-widows-css.md) | 18 | **Must** | Parse CSS props; wire into fragmentation |
-| 3 | [float-table-packing.md](float-table-packing.md) | 17 | **Must** | Deterministic float↔table edge cases |
-| 4 | [multicol.md](multicol.md) | 17 | **Must** | `column-count` / width / gap / span lite |
-| 5 | [static-transforms.md](static-transforms.md) | 17 | **Should** | Static 2D `transform` paint + CB/stacking |
-| 6 | [selectors-has-container.md](selectors-has-container.md) | 17 | **Should** | `:has()` then `@container` size lite |
-| 7 | [flex-grid-remaining.md](flex-grid-remaining.md) | 17 | **Should / `[~]`** | Flex min-size polish; true subgrid/masonry L3 stay `[~]` unless amended |
-| 8 | [sticky-overflow-honesty.md](sticky-overflow-honesty.md) | 17 | **Honesty + optional** | Document print sticky; overflow sticky remains non-goal |
-| 9 | [fonts-remaining.md](fonts-remaining.md) | 19 | **Honesty / optional** | Confirm WOFF/Noto/halt policy; optional WOFF1 only if amended |
+| 1 | [nested-html-hf.md](nested-html-hf.md) | 20 | **Must** | **done** — child HF layout + registry/`MergeFontFaces`; optional fixture-36 open |
+| 2 | [orphans-widows-css.md](orphans-widows-css.md) | 18 | **Must** | **done** — CSS orphans/widows + fragmentation; fixture-37 |
+| 3 | [float-table-packing.md](float-table-packing.md) | 17 | **Must** | **done** — clear-below tables, float-in-td, blockify; fixture-38 |
+| 4 | [multicol.md](multicol.md) | 17 | **Must** | **done** — `column-count` / width / gap / span lite; fixture-39 |
+| 5 | [static-transforms.md](static-transforms.md) | 17 | **Should** | **done** — static 2D transform paint + CB/stacking; fixture-40 |
+| 6 | [selectors-has-container.md](selectors-has-container.md) | 17 | **Should** | **done** — `:has()` + `@container` size lite; fixtures 41–42 |
+| 7 | [flex-grid-remaining.md](flex-grid-remaining.md) | 17 | **Should** | **done** — flex min-size polish; Partial subgrid/masonry expand |
+| 8 | [sticky-overflow-honesty.md](sticky-overflow-honesty.md) | 17 | **Must (amended)** | **done** — overflow sticky scrollport @ offset 0 |
+| 9 | [fonts-remaining.md](fonts-remaining.md) | 19 | **Honesty / optional** | **done** — WOFF1 + halt/palt; WOFF2/Noto-bundle out by design |
 
 ---
 
@@ -52,8 +48,8 @@ headers/footers as child documents** (pulled forward from former v0.3.0 deferral
 4. multicol                (needs fragmentation)
 5. static-transforms       (paint + CB side effects)
 6. selectors-has-container (:has first; @container after widths)
-7. flex-grid-remaining     (optional flex polish; keep L3 [~])
-8. sticky-overflow-honesty (docs; no scrollport sticky unless amended)
+7. flex-grid-remaining     (flex polish + Partial subgrid/masonry — done)
+8. sticky-overflow-honesty (overflow sticky @ offset 0 — done)
 9. fonts-remaining         (docs + optional WOFF1; no Brotli without amendment)
 ```
 

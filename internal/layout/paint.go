@@ -1,6 +1,7 @@
 package layout
 
 import (
+	"math"
 	"sort"
 
 	"gowkhtmltopdf/internal/pdf"
@@ -113,6 +114,21 @@ func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 		}
 		nextImg := 0
 		paintOp := func(op *Op, pg int) {
+			if op.Kind == OpLinkURI {
+				drawLinkXform(p, op, pg, contentH, opts)
+				return
+			}
+			needGS := op.XformSet || (op.PaintOpacity > 0 && op.PaintOpacity < 1)
+			if needGS {
+				c.Save()
+			}
+			if op.XformSet {
+				a, b, cc, d, e, f := pdfCTMFromCSS(op.Xform, pg, contentH, opts, p.Height())
+				c.Transform(a, b, cc, d, e, f)
+			}
+			if op.PaintOpacity > 0 && op.PaintOpacity < 1 {
+				c.SetOpacity(op.PaintOpacity)
+			}
 			switch op.Kind {
 			case OpFillRect:
 				drawFill(c, op, pg, contentH, opts, p.Height())
@@ -126,8 +142,9 @@ func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 				name := "I" + itoa(nextImg)
 				nextImg++
 				drawImage(p, c, op, pg, contentH, opts, name)
-			case OpLinkURI:
-				drawLink(p, op, pg, contentH, opts)
+			}
+			if needGS {
+				c.Restore()
 			}
 		}
 		sortPaintIndices(res.Ops, idxs)
@@ -769,10 +786,18 @@ func isHeadingName(name string) bool {
 	return false
 }
 
-// orphansWidows keeps a short block from leaving a single line stranded at the
-// bottom of a page when the whole block fits on the next page.
+// orphansWidows enforces CSS Fragmentation Level 3 Rule 3 (widows/orphans)
+// when a leaf block has countable line boxes, and falls back to a geometric
+// short-block heuristic when line counts are unavailable.
+//
+// Class B breaks are rejected when lines-before < orphans or lines-after <
+// widows (or the block has fewer lines than orphans+widows can satisfy). If
+// the whole block fits on the next page it is shifted; otherwise progress
+// escape leaves the break (content taller than one page). Forced breaks
+// (page-break-before/after: always) run earlier and are not undone here.
+// break-inside: avoid remains higher priority via avoidInside.
 func orphansWidows(res *Result, contentH float64) bool {
-	if res.root == nil {
+	if res.root == nil || contentH <= 0 {
 		return false
 	}
 	changed := false
@@ -784,19 +809,61 @@ func orphansWidows(res *Result, contentH float64) bool {
 		if b.kind != "block" || b.h <= 0 || b.opStart > b.opEnd {
 			return
 		}
-		// Only short paragraphs (roughly 2–4 line boxes).
-		if b.h < 14 || b.h > 60 {
+		// Nested block containers: children apply Rule 3; only heuristic on
+		// short straddlers here.
+		if hasNestedFlowChild(b) {
+			if orphansWidowsHeuristic(res, b, contentH) {
+				changed = true
+			}
 			return
+		}
+		lines := countBlockLineYs(res, b)
+		if len(lines) == 0 {
+			if orphansWidowsHeuristic(res, b, contentH) {
+				changed = true
+			}
+			return
+		}
+		orphans := b.style.Orphans
+		if orphans < 1 {
+			orphans = 2
+		}
+		widows := b.style.Widows
+		if widows < 1 {
+			widows = 2
 		}
 		lo := int(b.y / contentH)
 		hi := int((b.y + b.h) / contentH)
 		if hi <= lo {
 			return
 		}
-		// Straddles a boundary; if it fits entirely on the next page, move it.
-		if b.h <= contentH {
+		boundary := float64(lo+1) * contentH
+		before, after := 0, 0
+		for _, y := range lines {
+			if y < boundary-1e-6 {
+				before++
+			} else {
+				after++
+			}
+		}
+		// Rule 3 applies to Class B breaks *between line boxes*. If all text
+		// lines sit on one side of the boundary (only padding/bg straddles),
+		// do not keep-together tall boxes — fall back to the short heuristic.
+		if before == 0 || after == 0 {
+			if orphansWidowsHeuristic(res, b, contentH) {
+				changed = true
+			}
+			return
+		}
+		// Rule 3: legal Class B break only if both sides meet the minima.
+		legal := before >= orphans && after >= widows
+		if legal {
+			return
+		}
+		// Keep the block together when it fits one page; else progress escape.
+		if b.h <= contentH+0.01 {
 			dy := float64(hi)*contentH - b.y
-			if dy > 0 {
+			if dy > 1e-6 {
 				shiftFlowY(res, b.opStart, b.opEnd, b.y, dy)
 				changed = true
 			}
@@ -804,6 +871,66 @@ func orphansWidows(res *Result, contentH float64) bool {
 	}
 	walk(res.root)
 	return changed
+}
+
+// orphansWidowsHeuristic is the phase-18 geometric fallback: short blocks
+// (~2–4 lines) that straddle a page boundary move wholly when they fit.
+func orphansWidowsHeuristic(res *Result, b *box, contentH float64) bool {
+	if b.h < 14 || b.h > 60 {
+		return false
+	}
+	lo := int(b.y / contentH)
+	hi := int((b.y + b.h) / contentH)
+	if hi <= lo || b.h > contentH {
+		return false
+	}
+	dy := float64(hi)*contentH - b.y
+	if dy <= 1e-6 {
+		return false
+	}
+	shiftFlowY(res, b.opStart, b.opEnd, b.y, dy)
+	return true
+}
+
+func hasNestedFlowChild(b *box) bool {
+	for _, c := range b.children {
+		if c.kind == "block" || c.kind == "table" {
+			return true
+		}
+	}
+	return false
+}
+
+// countBlockLineYs returns distinct text/bullet baseline Y positions in b's
+// op range (approximate line boxes for an IFC leaf block).
+func countBlockLineYs(res *Result, b *box) []float64 {
+	if res == nil || b.opStart > b.opEnd || b.opStart < 0 {
+		return nil
+	}
+	const eps = 0.5
+	ys := make([]float64, 0, 8)
+	end := b.opEnd
+	if end >= len(res.Ops) {
+		end = len(res.Ops) - 1
+	}
+	for i := b.opStart; i <= end; i++ {
+		op := &res.Ops[i]
+		if op.Kind != OpText && op.Kind != OpBullet {
+			continue
+		}
+		y := op.Y
+		found := false
+		for _, ey := range ys {
+			if abs3(ey-y) <= eps {
+				found = true
+				break
+			}
+		}
+		if !found {
+			ys = append(ys, y)
+		}
+	}
+	return ys
 }
 
 // repeatTableHeaders clones thead row ops onto every page that continues a
@@ -1124,4 +1251,45 @@ func drawLink(p *pdf.Page, op *Op, pageIdx int, contentH float64, opts PaintOpti
 	}
 	x, y := canvasToPDF(op.X, op.Y+op.H, pageIdx, contentH, opts, p.Height())
 	p.AddLinkURI([4]float64{x, y, x + op.W, y + op.H}, op.URI)
+}
+
+// drawLinkXform places a URI annotation. Annotations are page-space (not under
+// content-stream CTM), so CSS transforms are applied to the canvas rect first.
+func drawLinkXform(p *pdf.Page, op *Op, pageIdx int, contentH float64, opts PaintOptions) {
+	if len(op.URI) > 0 && op.URI[0] == '#' {
+		return
+	}
+	x0, y0, x1, y1 := op.X, op.Y, op.X+op.W, op.Y+op.H
+	if op.XformSet {
+		corners := [4][2]float64{
+			{x0, y0}, {x1, y0}, {x0, y1}, {x1, y1},
+		}
+		minX, minY := math.MaxFloat64, math.MaxFloat64
+		maxX, maxY := -math.MaxFloat64, -math.MaxFloat64
+		for _, pt := range corners {
+			tx, ty := op.Xform.Apply(pt[0], pt[1])
+			if tx < minX {
+				minX = tx
+			}
+			if ty < minY {
+				minY = ty
+			}
+			if tx > maxX {
+				maxX = tx
+			}
+			if ty > maxY {
+				maxY = ty
+			}
+		}
+		x0, y0, x1, y1 = minX, minY, maxX, maxY
+	}
+	llx, lly := canvasToPDF(x0, y1, pageIdx, contentH, opts, p.Height())
+	urx, ury := canvasToPDF(x1, y0, pageIdx, contentH, opts, p.Height())
+	if llx > urx {
+		llx, urx = urx, llx
+	}
+	if lly > ury {
+		lly, ury = ury, lly
+	}
+	p.AddLinkURI([4]float64{llx, lly, urx, ury}, op.URI)
 }

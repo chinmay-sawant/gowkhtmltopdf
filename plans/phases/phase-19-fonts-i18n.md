@@ -27,7 +27,7 @@ not OpenType GSUB/GPOS / HarfBuzz.
 | No folder scan | Opt-in `--font-path` / `--use-system-fonts` | **Shipped** |
 | No complex script | Best-effort Arabic joining; Hangul via face | **Shipped** (stdlib) |
 | CJK PDF garbled composites | Aligned glyf + strip hints | **Shipped** (#17) |
-| `@font-face` | Local `src` under ACL | **Partial** (PDF + image local TTF/OTF; WOFF/remote deferred) |
+| `@font-face` | Local `src` under ACL | **Partial** (PDF + image local TTF/OTF/WOFF1; WOFF2/remote HTTPS policy skip) |
 
 ---
 
@@ -58,7 +58,7 @@ not OpenType GSUB/GPOS / HarfBuzz.
 - [x] Support `url(file)` / relative path under allowlist end-to-end (PDF `mergeFontFaces`; `fontface_test.go`)
 - [x] Register face for document lifetime consistently with `--font-path` (PDF registry alias)
 - [x] Matrix §4 `@font-face` → Partial (local TTF/OTF PDF + image; shared doc-honesty)
-- [~] Remote / WOFF download — **[~]** → [`tier-2-pending-3/fonts-remaining.md`](tier-2-pending-3/fonts-remaining.md)
+- [x] Remote / WOFF2 download — **policy** → [`tier-2-pending-3/fonts-remaining.md`](tier-2-pending-3/fonts-remaining.md) (WOFF1 shipped; remote HTTPS not supported by design)
 - [x] Image-mode `@font-face` — wired via `convert.MergeFontFaces` (`imageout` + `fontface_test.go`)
 - [x] `font-weight` / `font-style` on `@font-face` ignored at register (documented)
 - [x] `data:` `@font-face` src rejected in `mergeFontFaces`
@@ -71,7 +71,7 @@ not OpenType GSUB/GPOS / HarfBuzz.
 - [x] `writing-mode: vertical-rl|lr` lite: stacked Latin upright + **90° rotated** ideographic/Hangul/kana
 - [x] Test: Japanese/Chinese/Hangul sample renders (fixture-27) when faces on path
 - [x] Subset fidelity (#17): **4-byte glyf/loca align**, preserve LSB, **strip hint bytecode** (no `fpgm`/`prep`/`cvt` in subset)
-- [x] Keep full-em CJK punctuation metrics (match HTML+Droid; no fake `halt`)
+- [x] Keep full-em CJK punctuation metrics by default; OT `halt`/`palt` when face supports (fonts-remaining)
 
 ### 19.5 Shaping (stdlib amendment)
 
@@ -81,8 +81,8 @@ not OpenType GSUB/GPOS / HarfBuzz.
 - [x] Hangul: capable face via font-path; CI subset vendored
 - [x] Docs: `documentation/fonts.md` shaping honesty language
 - [x] OpenType GSUB via `go-text/typesetting` (`ShapeTextFont`; presentation-form fallback)
-- [~] OpenType `halt`/`palt` feature tags — **[~]** → [`tier-2-pending-3/fonts-remaining.md`](tier-2-pending-3/fonts-remaining.md)
-- [~] CGO HarfBuzz — **rejected** (allowlist is `go-text/typesetting` only); see fonts-remaining
+- [x] OpenType `halt`/`palt` feature tags — [`tier-2-pending-3/fonts-remaining.md`](tier-2-pending-3/fonts-remaining.md)
+- [x] CGO HarfBuzz — **rejected** (allowlist is `go-text/typesetting` only); see fonts-remaining
 
 ### 19.6 Localization product notes
 
@@ -123,9 +123,9 @@ not OpenType GSUB/GPOS / HarfBuzz.
 | `@font-face` local wiring vs matrix | **[x]** PDF + image Partial (`fontface_test.go` + imageout + matrix) |
 | Compatibility-matrix i18n / CJK rows | **[x]** Shared doc-honesty pass |
 | OpenType GSUB via `go-text/typesetting` | **[x]** [`shaping-gotext-typesetting.md`](subplans-tier-2/shaping-gotext-typesetting.md) |
-| OpenType `halt`/`palt` / full Indic / CGO HarfBuzz | **[~]** → [`tier-2-pending-3/fonts-remaining.md`](tier-2-pending-3/fonts-remaining.md) |
-| Bundle full Noto CJK | **[~] no** — `--font-path` is enough ([fonts-remaining](tier-2-pending-3/fonts-remaining.md)) |
-| WOFF/WOFF2 | **[~]** → [fonts-remaining](tier-2-pending-3/fonts-remaining.md) |
+| OpenType `halt`/`palt` / full Indic / CGO HarfBuzz | **[x]** halt/palt shipped; Indic Partial honesty; CGO rejected — [fonts-remaining](tier-2-pending-3/fonts-remaining.md) |
+| Bundle full Noto CJK | **[x] no** — `--font-path` is enough ([fonts-remaining](tier-2-pending-3/fonts-remaining.md)) |
+| WOFF/WOFF2 | **[x]** WOFF1 shipped; WOFF2 unsupported without Brotli amendment — [fonts-remaining](tier-2-pending-3/fonts-remaining.md) |
 | Image-mode `@font-face` | **[x]** [`subplans-tier-2/image-mode-fontface.md`](subplans-tier-2/image-mode-fontface.md) |
 
 ---
@@ -141,7 +141,7 @@ not OpenType GSUB/GPOS / HarfBuzz.
 
 ## Out of scope
 
-- WOFF/WOFF2 (optional later; not required for `go-text/typesetting`)
+- WOFF2 without a Brotli-module amendment (WOFF1 is supported)
 - CGO HarfBuzz / any third-party module **except** allowlisted `go-text/typesetting`
-- Auto-download Google Fonts
+- Auto-download Google Fonts / remote `https://` `@font-face` (product policy)
 - Shipping multi-megabyte CJK faces in the default binary

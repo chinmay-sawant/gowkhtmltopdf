@@ -31,6 +31,10 @@ type objectState struct {
 	headerHTML *htmlHFLayout
 	footerHTML *htmlHFLayout
 
+	// registry is the opt-in font registry (--font-path / body @font-face)
+	// shared with nested HTML HF layout so HF can resolve the same faces.
+	registry *pdf.Registry
+
 	base     string
 	lp       settings.LoadPage
 	imagesFn func(src string) ([]byte, error)

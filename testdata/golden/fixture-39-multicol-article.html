@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<!--
+  fixture-39-multicol-article
+  Proves: CSS multi-column lite — column-count, column-gap, column-span:all,
+  column-fill:balance. Column boxes do not straddle pages (new multicol line
+  on the next page). Multi-page 2-column article with a mid-flow spanner.
+  Expected: ≥2 pages.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Multicol article sample</title>
+  <style>
+    body { font-family: sans-serif; font-size: 11pt; color: #1c1c1c; margin: 0; }
+    h1 { font-size: 16pt; color: #1a3d6d; margin: 0 0 10px 0; column-span: all; }
+    h2 { font-size: 13pt; color: #1a3d6d; margin: 12px 0 8px 0; column-span: all; }
+    p { margin: 0 0 10px 0; line-height: 1.45; }
+    .article {
+      column-count: 2;
+      column-gap: 16pt;
+      column-fill: balance;
+      width: 100%;
+    }
+    .marker { font-weight: bold; color: #1a3d6d; }
+  </style>
+</head>
+<body>
+  <div class="article">
+    <h1>Multicol report article</h1>
+    <p>Opening column prose for the multicol lite fixture. Marker <span class="marker">MC-OPEN</span>.
+      The layout engine flows this content across two equal columns with a
+      sixteen-point gap and balances column heights on each multicol line.</p>
+    <p>Filler block 01. Multicol article mass for pagination. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu marker MC-F01.</p>
+    <p>Filler block 02. Multicol article mass for pagination. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu marker MC-F02.</p>
+    <p>Filler block 03. Multicol article mass for pagination. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu marker MC-F03.</p>
+    <p>Filler block 04. Multicol article mass for pagination. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu marker MC-F04.</p>
+    <p>Filler block 05. Multicol article mass for pagination. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu marker MC-F05.</p>
+    <p>Filler block 06. Multicol article mass for pagination. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu marker MC-F06.</p>
+    <p>Filler block 07. Multicol article mass for pagination. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu marker MC-F07.</p>
+    <p>Filler block 08. Multicol article mass for pagination. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu marker MC-F08.</p>
+    <p>Filler block 09. Multicol article mass for pagination. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu marker MC-F09.</p>
+    <p>Filler block 10. Multicol article mass for pagination. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu marker MC-F10.</p>
+    <p>Filler block 11. Multicol article mass for pagination. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu marker MC-F11.</p>
+    <p>Filler block 12. Multicol article mass for pagination. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu marker MC-F12.</p>
+    <p>Filler block 13. Multicol article mass for pagination. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu marker MC-F13.</p>
+    <p>Filler block 14. Multicol article mass for pagination. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu marker MC-F14.</p>
+    <p>Filler block 15. Multicol article mass for pagination. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu marker MC-F15.</p>
+    <p>Filler block 16. Multicol article mass for pagination. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu marker MC-F16.</p>
+    <p>Filler block 17. Multicol article mass for pagination. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu marker MC-F17.</p>
+    <p>Filler block 18. Multicol article mass for pagination. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu marker MC-F18.</p>
+    <p>Filler block 19. Multicol article mass for pagination. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu marker MC-F19.</p>
+    <p>Filler block 20. Multicol article mass for pagination. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu marker MC-F20.</p>
+    <p>Filler block 21. Multicol article mass for pagination. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu marker MC-F21.</p>
+    <p>Last block before spanner. Marker <span class="marker">MC-PRE-SPAN</span>.</p>
+    <h2>Spanner section</h2>
+    <p>Content after <span class="marker">MC-SPANNER</span> resumes in fresh columns below
+      the full-width heading. Following paragraphs pack into a new balanced multicol line.</p>
+    <p>Continuation block 22. After spanner multicol mass. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu MC-C22.</p>
+    <p>Continuation block 23. After spanner multicol mass. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu MC-C23.</p>
+    <p>Continuation block 24. After spanner multicol mass. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu MC-C24.</p>
+    <p>Continuation block 25. After spanner multicol mass. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu MC-C25.</p>
+    <p>Continuation block 26. After spanner multicol mass. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu MC-C26.</p>
+    <p>Continuation block 27. After spanner multicol mass. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu MC-C27.</p>
+    <p>Continuation block 28. After spanner multicol mass. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu MC-C28.</p>
+    <p>Continuation block 29. After spanner multicol mass. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu MC-C29.</p>
+    <p>Continuation block 30. After spanner multicol mass. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu MC-C30.</p>
+    <p>Continuation block 31. After spanner multicol mass. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu MC-C31.</p>
+    <p>Continuation block 32. After spanner multicol mass. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu MC-C32.</p>
+    <p>Continuation block 33. After spanner multicol mass. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu MC-C33.</p>
+    <p>Continuation block 34. After spanner multicol mass. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu MC-C34.</p>
+    <p>Continuation block 35. After spanner multicol mass. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu MC-C35.</p>
+    <p>Continuation block 36. After spanner multicol mass. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu MC-C36.</p>
+    <p>Continuation block 37. After spanner multicol mass. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu MC-C37.</p>
+    <p>Continuation block 38. After spanner multicol mass. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu MC-C38.</p>
+    <p>Continuation block 39. After spanner multicol mass. Alpha bravo charlie
+      delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa
+      quebec romeo sierra tango uniform victor whiskey xray yankee zulu MC-C39.</p>
+    <p>Closing paragraph. Marker <span class="marker">MC-END</span>.</p>
+  </div>
+</body>
+</html>

@@ -261,10 +261,10 @@ parity remains **not planned**.
 | Deferred | Status / reason | Next gate |
 |---|---|---|
 | JavaScript / WebKit features (`--enable-javascript`, `--run-script`, `--window-status`, plugins) | No JS engine in stdlib; flags accepted with warnings; `<script>` stripped at load | Phase 22 staged (see post-MVP roadmap) |
-| Floats / positioned layout (`float`, `clear`, `position: relative/absolute/fixed`) | **Float lite + relative/absolute/fixed**; sticky ≈ relative offsets | Sticky pagination stickiness still lite |
+| Floats / positioned layout (`float`, `clear`, `position: relative/absolute/fixed`) | **Float lite + relative/absolute/fixed**; sticky = print page scrollport + overflow@0 | Chrome scroll sticky pixel parity non-goal |
 | Richer selectors (attribute `[attr=…]`, `:first-child`, `:nth-child`, sibling `+`/`~`) | **Shipped** for presence/exact attr, first/last/nth-child, siblings | Hover/link pseudos still ignored |
 | Multi-font bold/italic (Liberation Sans family) | **Shipped** - Regular/Bold/Italic/BoldItalic embedded | Further families: `--font-path` (phase 19) |
-| Flexbox / Grid (`display: flex|grid`) | **Partial flex** (grow/shrink/basis/order/wrap + min/max clamp) + **grid lite** (`span`, nested grids) | Full CSS Grid / iterative flex content sizing still lite |
+| Flexbox / Grid (`display: flex|grid`) | **Partial** flex min-size polish + grid lite + Partial subgrid/masonry | Joint subgrid intrinsic / full L3 masonry / Chrome parity out |
 | CJK fonts / complex-script shaping | **Type0/CID + font-path**; **OT Arabic** via `go-text/typesetting` (GSUB) + presentation-form fallback; vertical-rl **rotated CJK** | **No CGO HarfBuzz**; Indic **Partial**; Hangul needs a Hangul face |
 | HTML character entities (`&amp;` …) | **Shipped** (stdlib unescape in text + attrs) | — |
 | `z-index` | **Lite** on positioned boxes (paint sort) | Stacking contexts / opacity still lite |
@@ -277,7 +277,7 @@ parity remains **not planned**.
 | Inline `<a href="#x">` source-rect links | **Shipped** for inline text runs with paint boxes; GoTo via `applyInternalLinks` | Cases without geometry still skipped |
 | Cross-object URL map (`urlToPageObj`) | Same-document anchors within multi-object jobs via body offsets | Full cross-object URL map still lite |
 | `resolveRelativeLinks` | **Shipped** (`--resolve-relative-links` / `--keep-relative-links`) | — |
-| HTML header/footer links on body pages | **Shipped** — external URI + `#id` fragment GoTo to body (copies-aware) | Full nested HTML HF documents still out of scope |
+| HTML header/footer nested documents | **Partial** — child layout + registry/`@font-face` + clipped band; `#id` → body only | Browser HF / running elements out |
 | `[topage]` with copies | **Corrected** when HF drawn after copies | — |
 | `[subject]` placeholder | Expands empty (no setting field upstream either) | Not planned |
 | `dump-outline` TOC page offset | **TOC offset included** via `DumpOutlineXMLOffset` | — |

@@ -80,7 +80,7 @@ model.
 |------|--------|
 | HTML HF → body **fragment** (`#id`) GoTo | **[x] Shipped** — `drawHTMLHF` + `buildBodyIDIndex` + `remapPageForCopies` |
 | Shared matrix/fidelity refresh | **[x]** Shared doc-honesty pass |
-| Full HTML HF as nested documents | **[~] → in progress plan** [`tier-2-pending-3/nested-html-hf.md`](tier-2-pending-3/nested-html-hf.md) (pulled from v0.3.0) |
+| Full HTML HF as nested documents | **[x] Partial shipped** [`tier-2-pending-3/nested-html-hf.md`](tier-2-pending-3/nested-html-hf.md) (child layout + registry; clipped band; `#id` → body) |
 
 ---
 

@@ -18,7 +18,7 @@ is tracked in
 | Invoices, statements, multi-page tables, headers/footers, TOC, outlines | **In scope** (report engine) |
 | Deterministic PDF bytes, static binary, zero third-party modules | **In scope** |
 | Pixel-perfect clone of an arbitrary website | **Out of scope** |
-| Full CSS (flex/grid as layout, absolute/fixed/sticky positioning) | **Partial** — flex (grow/shrink/basis/order/wrap), grid lite, relative/absolute/fixed; sticky print-scoped (page = scrollport); not full CSS3 |
+| Full CSS (flex/grid as layout, absolute/fixed/sticky positioning) | **Partial** — flex (grow/shrink/basis/order/wrap), grid lite, relative/absolute/fixed; sticky print-scoped (page = scrollport); static 2D transforms (paint CTM); not full CSS3 |
 | JavaScript-driven pages | **Out of scope** (`<script>` stripped; flags warn only) |
 | Full Unicode / CJK typesetting | **Partial** — Type0/CID + `--font-path`; Arabic OT via `go-text/typesetting` (GSUB) + presentation-form fallback; Indic Partial; no CGO HarfBuzz |
 
@@ -92,7 +92,7 @@ are **not** a pass criterion.
 | Selectors (`:nth-child`, attr, siblings) | **Shipped** | 16.1 |
 | Floats / flex / position / grid | **Partial** — float lite; flex subset; grid lite; relative/absolute/fixed lite; sticky print scrollport (page content box) | 16–17 |
 | PDF images (logos/grids) | PNG/JPEG path + golden fixtures solid | 14 (docs polish remain) |
-| Pagination / thead repeat | **Shipped** breaks + thead repeat; orphan/widow **heuristics** (not CSS props) | 5, 18 |
+| Pagination / thead repeat | **Shipped** breaks + thead repeat; CSS `orphans`/`widows` parsed + Rule 3 (heuristic fallback) | 5, 18 |
 | Fonts / CJK / discovery | **Partial** — Type0/CID + `--font-path` / registry; Arabic OT (`go-text/typesetting`); local `@font-face` PDF+image | 12, 19 |
 | HF / links edges | Body GoTo + HF URI + HF fragment GoTo (copies-aware) | 6, 20 |
 | Arbitrary URL print | Smoke only | 21 |

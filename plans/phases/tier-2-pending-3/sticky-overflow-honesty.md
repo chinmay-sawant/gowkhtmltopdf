@@ -1,9 +1,9 @@
-# Tier 2 Pending-3 — Sticky overflow honesty (+ optional non-goal lock)
+# Tier 2 Pending-3 — Sticky overflow honesty (+ overflow scrollport at offset 0)
 
 > **Parent:** [`plans/phases/phase-17-broader-css.md`](../phase-17-broader-css.md)  
 > **Related:** [`../subplans-tier-2/sticky-print.md`](../subplans-tier-2/sticky-print.md)  
-> **Status:** not started (docs-first)  
-> **Estimated effort:** 0.5 day docs; **implementation of overflow sticky = out of scope**  
+> **Status:** done  
+> **Estimated effort:** 0.5–1 day  
 > **Constraint:** PDF has no user scroll  
 > **Spec:** [CSS Position 3 — sticky](https://www.w3.org/TR/css-position-3/#stickypos-insets) · [CSS Overflow 3](https://www.w3.org/TR/css-overflow-3/)
 
@@ -11,10 +11,11 @@
 
 ## Overview
 
-Print-scoped sticky (page content box = scrollport) is **shipped** (`sticky.go`,
-fixture-31). Continuous-media sticky inside `overflow: auto|scroll` remains a
-non-goal for PDF. This subplan locks honesty and optional fixture notes; it does
-**not** implement nested scrollports unless product amends.
+Print-scoped sticky (page content box = scrollport) remains **shipped**
+(`sticky.go`, fixture-31). Amendment: sticky inside
+`overflow: auto|scroll|hidden|clip` uses that box as the sticky scrollport and
+clamps at **scroll offset 0** (PDF has no scroll) — no page-edge continuation
+clones for overflow-contained sticky.
 
 ---
 
@@ -22,48 +23,53 @@ non-goal for PDF. This subplan locks honesty and optional fixture notes; it does
 
 | Topic | Stance |
 |-------|--------|
-| Print sticky | **Done** — keep |
-| Overflow-scroll sticky | **`[~]` non-goal** — degrade to in-flow / relative |
+| Print sticky | **Done** — keep (fixture-31) |
+| Overflow sticky | **Done (Partial)** — scrollport = overflow box @ offset 0 |
 | Nested sticky axis conflicts | Best-effort clamp only |
 | Chrome scroll sticky pixel parity | Non-goal |
+| Continuous-media scroll animation | Non-goal (no user scroll) |
 
 ---
 
-## Phase 1: Honesty pass
+## Phase 1: Honesty pass + real overflow scrollport
 
 ### 1.1 Docs
 
-- [ ] Matrix §2.2 sticky row: reaffirm print scrollport; overflow sticky unsupported
-- [ ] `cli.md` / `library-api.md` already mention print sticky — add one overflow-unsupported sentence if missing
-- [ ] Parent phase-17 / sticky-print `[~]` overflow rows — keep with pointer here
-- [ ] README deferred table alignment
+- [x] Matrix §2.2 sticky / overflow rows: print scrollport + overflow @ offset 0
+- [x] `cli.md` / `library-api.md`: overflow sticky sentence
+- [x] Parent phase-17 overflow row → `[x]` with pointer here
+- [x] README deferred table alignment
 
-### 1.2 Code comment
+### 1.2 Code
 
-- [ ] Ensure `sticky.go` / `applyStickyPrint` comment states overflow boxes are not scrollports in PDF
-- [ ] If `overflow` is parsed later for clipping, do **not** silently enable sticky-as-scroll without amendment
+- [x] Parse `overflow` / `overflow-x` / `overflow-y` into `ResolvedStyle.Overflow`
+- [x] `applyStickyPrint` selects nearest overflow scrollport ancestor
+- [x] Overflow path: clamp at offset 0; **no** page continuation clones
+- [x] Path: `sticky.go`, `style.go`; comments state PDF has no scroll
+- [x] Proof: `TestStickyOverflowScrollportNoPageClone`, `TestStickyOverflowClampAtOffsetZero`
 
 ---
 
-## Phase 2: Optional tests (no new feature)
+## Phase 2: Tests
 
-### 2.1 Regression only
+### 2.1 Regression
 
-- [ ] Keep `TestSticky*` + fixture-31 green
-- [~] Optional: document-only HTML sample showing `overflow:auto` + sticky → treated as relative/in-flow (no golden required)
+- [x] Keep `TestSticky*` + fixture-31 green
+- [x] Overflow sticky does not page-clone (`TestStickyOverflowScrollportNoPageClone`)
 
-### 2.2 Explicit non-implement
+### 2.2 Explicit non-implement (product boundaries, documented)
 
-- [~] Parse `overflow` + nested scrollport sticky clamp — **out of scope** for pending-3
-- [~] Sticky thead-like div fixture (optional nice-to-have from sticky-print) — only if free
+- [x] Continuous-media scroll offset > 0 — N/A in PDF (documented)
+- [x] Equating sticky with `position: fixed` page stamps — out of scope
 
 ---
 
 ## Phase 3: Closure
 
-- [ ] Docs-only path: skill says skip lint/test
-- [ ] Mark this subplan **done** when honesty sentences land
-- [ ] Next: fonts-remaining
+- [x] `make lint` → PASS (`go vet ./...`, 2026-08-05)
+- [x] `go test ./internal/layout ./internal/convert -count=1` → PASS (2026-08-05)
+- [x] Mark this subplan **done**
+- [x] Next: fonts-remaining / Phase 21 corpus
 
 ---
 
@@ -78,5 +84,6 @@ non-goal for PDF. This subplan locks honesty and optional fixture notes; it does
 
 ## Out of scope
 
-- Implementing continuous-media sticky
+- User-scroll offset > 0 sticky animation
 - Equating sticky with `position: fixed` page stamps
+- Full overflow clipping paint (overflow parsed for sticky scrollport only)

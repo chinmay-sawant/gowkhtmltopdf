@@ -1,6 +1,7 @@
 package layout
 
 import (
+	"sort"
 	"testing"
 
 	"gowkhtmltopdf/internal/css"
@@ -762,5 +763,77 @@ func TestDetectMasonryBothFallsBack(t *testing.T) {
 	}
 	if detectMasonryAxis("1fr 1fr", "masonry") != masonryRows {
 		t.Fatal("expected masonryRows")
+	}
+}
+
+func TestSubgridTrackWidthMatchesParent(t *testing.T) {
+	// Partial shared-track: copy-inherited 100pt columns against the same
+	// content width should place cells on the same column starts as a
+	// non-subgrid sibling row would.
+	s := sheet(t, `
+.outer { display:grid; grid-template-columns:100pt 100pt 100pt; width:300pt; gap:0 }
+.inner { display:subgrid; grid-column: 1 / -1; background:#eee }
+.a { background:#fcc }
+.b { background:#cfc }
+.c { background:#ccf }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="outer">
+  <div class="inner">
+    <div class="a">A</div><div class="b">B</div><div class="c">C</div>
+  </div>
+</div>
+</body></html>`, s)
+	var xs []float64
+	for _, op := range res.Ops {
+		if op.Kind != OpFillRect || op.W < 40 || op.W > 120 {
+			continue
+		}
+		if (op.R > 0.9 && op.G < 0.9) || (op.G > 0.7 && op.R < 0.9) || (op.B > 0.9 && op.R < 0.9) {
+			xs = append(xs, op.X)
+		}
+	}
+	if len(xs) < 3 {
+		t.Fatalf("expected 3 cell fills, got xs=%v", xs)
+	}
+	sort.Float64s(xs)
+	// Column starts ~100pt apart.
+	if xs[1]-xs[0] < 80 || xs[1]-xs[0] > 120 {
+		t.Fatalf("col gap A→B = %.1f, want ~100; xs=%v", xs[1]-xs[0], xs)
+	}
+	if xs[2]-xs[1] < 80 || xs[2]-xs[1] > 120 {
+		t.Fatalf("col gap B→C = %.1f, want ~100; xs=%v", xs[2]-xs[1], xs)
+	}
+}
+
+func TestMasonryColumnSpanPartial(t *testing.T) {
+	// Partial L3: grid-column:span 2 on the fixed axis spans two column tracks.
+	s := sheet(t, `
+.m {
+  display: grid;
+  grid-template-columns: 60pt 60pt 60pt;
+  grid-template-rows: masonry;
+  width: 180pt;
+  gap: 0;
+}
+.wide { grid-column: span 2; background:#f99; height:20pt }
+.s { background:#9f9; height:20pt }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="m">
+  <div class="wide">W</div>
+  <div class="s">S</div>
+</div>
+</body></html>`, s)
+	var wideW float64
+	for _, op := range res.Ops {
+		if op.Kind == OpFillRect && op.R > 0.9 && op.G < 0.7 {
+			if op.W > wideW {
+				wideW = op.W
+			}
+		}
+	}
+	if wideW < 110 || wideW > 130 {
+		t.Fatalf("masonry span 2 width=%.1f, want ~120 (2×60pt)", wideW)
 	}
 }

@@ -328,22 +328,123 @@ func (e *engine) flexItemBaseWidth(n *html.Node, cs ResolvedStyle, mainSize floa
 	return intr
 }
 
-// flexMinMainSize is the Stage A lite min-size contribution: max(MinWidth,
-// min(intrinsic content width, baseW)) so text does not crush to 0 on shrink.
-func (e *engine) flexMinMainSize(it flexMeas) float64 {
+// flexMinMainSize is the content-based minimum main size (Flexbox §4.5 lite /
+// css-sizing-3): max(specified min-width, min(content suggestion, specified
+// size suggestion when definite)). Used as the shrink floor so text does not
+// crush to 0. mainSize is the definite flex container content main size, or
+// <0 when indefinite (then % min-width is ignored — cyclic honesty).
+func (e *engine) flexMinMainSize(it flexMeas, mainSize float64) float64 {
 	cs := e.styles[it.n]
 	floor := 0.0
-	if cs.MinWidth > 0 {
+	if cs.MinWidthPercent >= 0 && mainSize >= 0 {
+		floor = mainSize * cs.MinWidthPercent / 100
+	} else if cs.MinWidth > 0 {
 		floor = e.scalePt(cs.MinWidth)
 	}
+	// Automatic minimum (min-width:auto): content size suggestion.
 	intr := e.measureCellContent(it.n, cs)
-	if intr > it.baseW {
-		intr = it.baseW
+	pad := e.scalePt(cs.PaddingLeft) + e.scalePt(cs.PaddingRight) +
+		e.scalePt(cs.BorderLeft.Width) + e.scalePt(cs.BorderRight.Width)
+	contentSug := intr + pad
+	// Specified size suggestion when width/% is definite against mainSize.
+	specSug := -1.0
+	if cs.WidthPercent >= 0 && mainSize >= 0 {
+		specSug = mainSize * cs.WidthPercent / 100
+		if cs.BoxSizing != "border-box" {
+			specSug += pad
+		}
+	} else if cs.Width >= 0 {
+		specSug = e.scalePt(cs.Width)
+		if cs.BoxSizing != "border-box" {
+			specSug += pad
+		}
+	} else if it.baseW > 0 {
+		specSug = it.baseW
 	}
-	if intr > floor {
-		floor = intr
+	autoMin := contentSug
+	if specSug >= 0 && specSug < autoMin {
+		autoMin = specSug
+	}
+	// Overflow non-visible → automatic min size is 0 (CSS Flexbox §4.5).
+	if overflowCreatesStickyScrollport(cs.Overflow) {
+		autoMin = 0
+	}
+	if autoMin > floor {
+		floor = autoMin
 	}
 	return floor
+}
+
+// flexClampMainWidths applies min/max after grow/shrink, then re-resolves so
+// that percentage-driven floors and content mins that raised used sizes are
+// honored without leaving the line sum inconsistent when space remains.
+func (e *engine) flexClampMainWidths(items []flexMeas, widths []float64, contentW, mainSize float64) {
+	for i, it := range items {
+		cs := e.styles[it.n]
+		floor := e.flexMinMainSize(it, mainSize)
+		if widths[i] < floor {
+			widths[i] = floor
+		}
+		if cs.MaxWidth >= 0 {
+			mx := e.scalePt(cs.MaxWidth)
+			if widths[i] > mx {
+				widths[i] = mx
+			}
+		}
+	}
+	// If mins pushed the sum over contentW, freeze at floors and re-shrink
+	// remaining flexible items (css-sizing / flex redistribution lite).
+	sum := 0.0
+	for _, w := range widths {
+		sum += w
+	}
+	gapExtra := 0.0 // gaps already excluded from contentW by caller
+	_ = gapExtra
+	if sum <= contentW+1e-6 || contentW < 0 {
+		return
+	}
+	deficit := sum - contentW
+	for deficit > 1e-6 {
+		var shrinkable float64
+		for i, it := range items {
+			floor := e.flexMinMainSize(it, mainSize)
+			room := widths[i] - floor
+			if room > 1e-6 && it.shrink > 0 {
+				shrinkable += room
+			}
+		}
+		if shrinkable <= 1e-6 {
+			break
+		}
+		step := deficit
+		if step > shrinkable {
+			step = shrinkable
+		}
+		for i, it := range items {
+			floor := e.flexMinMainSize(it, mainSize)
+			room := widths[i] - floor
+			if room <= 1e-6 || it.shrink <= 0 {
+				continue
+			}
+			cut := step * (room / shrinkable)
+			widths[i] -= cut
+			if widths[i] < floor {
+				widths[i] = floor
+			}
+		}
+		sum = 0
+		for _, w := range widths {
+			sum += w
+		}
+		if sum >= contentW-1e-6 && sum <= contentW+1e-6 {
+			break
+		}
+		next := sum - contentW
+		if next >= deficit-1e-9 {
+			break
+		}
+		deficit = next
+	}
 }
 
 func (e *engine) placeFlexLineMeasured(parent *box, st ResolvedStyle, items []flexMeas, contentW, contentX, y, cy, gap, lineCross float64) float64 {
@@ -376,28 +477,14 @@ func (e *engine) placeFlexLineMeasured(parent *box, st ResolvedStyle, items []fl
 			}
 			share := (it.shrink * it.baseW) / shrinkSum
 			widths[i] -= deficit * share
-			floor := e.flexMinMainSize(it)
+			floor := e.flexMinMainSize(it, contentW)
 			if widths[i] < floor {
 				widths[i] = floor
 			}
 		}
 	}
-	// Clamp to min/max-width after grow/shrink (simplified flex algorithm).
-	for i, it := range items {
-		cs := e.styles[it.n]
-		if cs.MinWidth > 0 {
-			mn := e.scalePt(cs.MinWidth)
-			if widths[i] < mn {
-				widths[i] = mn
-			}
-		}
-		if cs.MaxWidth >= 0 {
-			mx := e.scalePt(cs.MaxWidth)
-			if widths[i] > mx {
-				widths[i] = mx
-			}
-		}
-	}
+	// Clamp to min/max-width after grow/shrink; re-resolve when mins overflow.
+	e.flexClampMainWidths(items, widths, contentW, contentW)
 	sumW := 0.0
 	for _, w := range widths {
 		sumW += w
@@ -610,6 +697,13 @@ func (e *engine) flexItemBaseHeight(n *html.Node, cs ResolvedStyle, contentW, ma
 		}
 		return h
 	}
+	if cs.HeightPercent >= 0 && mainSize >= 0 {
+		h := mainSize * cs.HeightPercent / 100
+		if cs.BoxSizing != "border-box" {
+			h += padV
+		}
+		return h
+	}
 	if cs.Height >= 0 {
 		h := e.scalePt(cs.Height)
 		if cs.BoxSizing != "border-box" {
@@ -624,6 +718,51 @@ func (e *engine) flexItemBaseHeight(n *html.Node, cs ResolvedStyle, contentW, ma
 		h = padV + e.scalePt(cs.FontSize)*1.2
 	}
 	return h
+}
+
+// flexMinCrossMainSize is the column-axis content-based min-height floor
+// (Flexbox §4.5 lite). mainSize is the definite flex container content height.
+func (e *engine) flexMinCrossMainSize(n *html.Node, baseH, mainSize float64) float64 {
+	cs := e.styles[n]
+	floor := 0.0
+	if cs.MinHeightPercent >= 0 && mainSize >= 0 {
+		floor = mainSize * cs.MinHeightPercent / 100
+	} else if cs.MinHeight > 0 {
+		floor = e.scalePt(cs.MinHeight)
+	}
+	if overflowCreatesStickyScrollport(cs.Overflow) {
+		return floor
+	}
+	padV := e.scalePt(cs.PaddingTop) + e.scalePt(cs.PaddingBottom) +
+		e.scalePt(cs.BorderTop.Width) + e.scalePt(cs.BorderBottom.Width)
+	start := len(e.ops)
+	contentSug := e.layoutCell(n, cs, 1e9)
+	e.ops = e.ops[:start]
+	if contentSug < padV {
+		contentSug = padV + e.scalePt(cs.FontSize)*1.2
+	}
+	specSug := -1.0
+	if cs.HeightPercent >= 0 && mainSize >= 0 {
+		specSug = mainSize * cs.HeightPercent / 100
+		if cs.BoxSizing != "border-box" {
+			specSug += padV
+		}
+	} else if cs.Height >= 0 {
+		specSug = e.scalePt(cs.Height)
+		if cs.BoxSizing != "border-box" {
+			specSug += padV
+		}
+	} else if baseH > 0 {
+		specSug = baseH
+	}
+	autoMin := contentSug
+	if specSug >= 0 && specSug < autoMin {
+		autoMin = specSug
+	}
+	if autoMin > floor {
+		floor = autoMin
+	}
+	return floor
 }
 
 func (e *engine) flowFlexColumn(parent *box, kids []*html.Node, st ResolvedStyle, contentW, contentX, y, cy, gap float64) float64 {
@@ -690,8 +829,23 @@ func (e *engine) flowFlexColumn(parent *box, kids []*html.Node, st ResolvedStyle
 				}
 				share := (it.shrink * it.baseH) / shrinkSum
 				heights[i] -= deficit * share
-				if heights[i] < 0 {
-					heights[i] = 0
+				floor := e.flexMinCrossMainSize(it.n, it.baseH, contentH)
+				if heights[i] < floor {
+					heights[i] = floor
+				}
+			}
+		}
+		// Re-apply min/max-height after grow/shrink (percentage re-resolve).
+		for i, it := range items {
+			cs := e.styles[it.n]
+			floor := e.flexMinCrossMainSize(it.n, it.baseH, contentH)
+			if heights[i] < floor {
+				heights[i] = floor
+			}
+			if cs.MaxHeight >= 0 {
+				mx := e.scalePt(cs.MaxHeight)
+				if heights[i] > mx {
+					heights[i] = mx
 				}
 			}
 		}

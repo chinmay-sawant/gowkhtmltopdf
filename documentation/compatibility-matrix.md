@@ -59,7 +59,7 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 | `width`, `height` | Implemented | `style.go:316-323`; consumed in `layout.go:176-191` (block) and `layout.go:315-320` (images) |
 | `min-width`, `min-height`, `max-width`, `max-height` | Implemented | `style.go:324-339`; enforced `layout.go:181-186, 321-328`; `%` resolves against viewport approximation |
 | `box-sizing` (`content-box\|border-box`) | Implemented | parsed `style.go`; default `content-box` (specified width is content width); `border-box` makes width include padding+border (`layout.go` `buildBlock`); test `TestBoxSizingBorderBox` |
-| `overflow` (`visible\|hidden`) | Not implemented | absent from `applyRestProps`; no clipping anywhere |
+| `overflow` (`visible\|hidden\|auto\|scroll\|clip`) | Partial | Parsed for sticky scrollport selection (`style.go`). **Not** general paint clipping. Sticky inside `auto\|scroll\|hidden\|clip` clamps to that box at scroll offset 0 (`sticky.go`) |
 
 ### 2.2 Display & flow
 
@@ -68,16 +68,16 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 | `display` (`block\|inline\|none\|list-item\|table\|table-row\|table-cell\|table-row-group\|table-header-group\|table-footer-group\|flex\|inline-flex\|grid\|inline-grid`) | Implemented / Partial | Core display values Implemented; `flex`/`inline-flex`/`grid`/`inline-grid` accepted in `style.go` and routed to Stage A flex / Stage B grid lite (§2.7 / §2.8). `none` test `TestDisplayNone`; tables `TestTableLayout`; flex/grid fixtures 25/28/32 |
 | `display: inline-block` | Implemented (lite) | atomic inline box with width/height/margins; shrink-to-fit when width auto; test `TestInlineBlockBesideText` |
 | `display: table-caption`, `table-column(-group)` | Not implemented | parsed; no caption/column model in `buildTable` - `<caption>` does not render |
-| `float` (`left\|right`) | Implemented (lite) | out-of-flow pack to side; stacks on same side; simple exclusion for following in-flow content; test `TestFloatLeftRightClear`, fixture-22 / fixture-29 |
+| `float` (`left\|right`) | Implemented (lite) | out-of-flow pack to side; stacks on same side; simple exclusion for following in-flow content; float inside `td` packs in cell BFC; in-flow `table` always clears below floats (no shrink-beside); `float` on `table-cell`/`table-row` blockifies (CSS2.1 §9.7); tests `TestFloatLeftRightClear`, `TestFloatInsideTableCell`, `TestTableClearsFloat`, fixture-22 / 29 / 38 |
 | `clear` (`left\|right\|both`) | Implemented (lite) | advances past named float bottoms (`float.go`); test `TestFloatLeftRightClear` |
-| `position` (`static\|relative\|absolute\|fixed\|sticky`) | Partial | static in-flow; `relative`/`absolute`/`fixed` lite via `buildAbsolute` / `buildFixed` / `applyRelativeOffset` (fixtures 26/28). `sticky` = print-scoped clamp (page content box = scrollport; `sticky.go`, fixture-31, `TestSticky*`) — not overflow-scroll sticky |
-| `position: sticky` | Partial (print scrollport) | Page content box (`contentH`) is the sticky view; clamps `top`/`bottom`/`left`/`right` within containing block; continuation-page clones where CB intersects. **Not** `position:fixed` (no stamp outside CB). Overflow:`auto`/`scroll` sticky unsupported (degrades to in-flow). Path: `sticky.go` / `applyStickyPrint`; fixture-31; `TestSticky*` |
+| `position` (`static\|relative\|absolute\|fixed\|sticky`) | Partial | static in-flow; `relative`/`absolute`/`fixed` lite via `buildAbsolute` / `buildFixed` / `applyRelativeOffset` (fixtures 26/28). `sticky` = print-scoped clamp (page content box = scrollport; `sticky.go`, fixture-31, `TestSticky*`) plus overflow-box scrollport at offset 0 |
+| `position: sticky` | Partial (print + overflow@0) | Default scrollport = page content box (`contentH`); clamps `top`/`bottom`/`left`/`right` within containing block; continuation-page clones where CB intersects. Inside `overflow:auto\|scroll\|hidden\|clip`, that box is the scrollport at **scroll offset 0** (PDF has no scroll; no page clones). **Not** `position:fixed`. Path: `sticky.go` / `applyStickyPrint`; fixture-31; `TestSticky*` / `TestStickyOverflow*` |
 
 ### 2.3 Text & fonts
 
 | Property | Status | Notes / verified by |
 |----------|--------|---------------------|
-| `font-family` (named + generic) | Partial | parsed + inherited; embedded Liberation Sans family (R/B/I/BI) plus **font registry** (`--font-path`, optional `--use-system-fonts`) and local `@font-face` TTF/OTF on **PDF and image** paths (see §4 / §5). Named families resolve via discovery; missing faces fall back to Liberation |
+| `font-family` (named + generic) | Partial | parsed + inherited; embedded Liberation Sans family (R/B/I/BI) plus **font registry** (`--font-path`, optional `--use-system-fonts`) and local `@font-face` TTF/OTF/WOFF1 on **PDF and image** paths (see §4 / §5). Named families resolve via discovery; missing faces fall back to Liberation |
 | `writing-mode` (`horizontal-tb\|vertical-rl\|vertical-lr`) | Partial | `vertical-rl` / `vertical-lr` lite (rotated CJK paint); default horizontal. Not a full vertical typesetting engine |
 | `font-size` | Implemented | `style.go` `fontSize` (px/pt/em/%/rem/in/cm/mm/pc + keywords); `%`/`em` resolve against parent; test `TestFontSizeEmInherit` |
 | `font-weight` (`normal\|bold\|100-900`) | Implemented | ≥700 selects Liberation Sans **Bold** (or BoldItalic); fake stroke bold only if a bold face is missing; tests `TestRealBoldFaceOps`, `TestBoldFaceInInvoicePDF` |
@@ -99,7 +99,7 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 | `color` | Implemented | `style.go:402-405`; consumed `inline.go:152-155`; test `TestCascadeAndInline` |
 | `background-color` | Implemented | `style.go:406-409`; painted `layout.go:234-237, 504-507, 531-534` (gated by `Background`); tests `TestBackgroundFill`, `TestRunPDFStyleTableImage` |
 | `background` (shorthand) | Not implemented | absent from `applyRestProps` (only `background-color`) |
-| `opacity` | Not implemented | absent from `applyRestProps`; the alpha channel only carries `rgba()`/`#rrggbbaa` background alpha |
+| `opacity` | Partial | Parsed in `applyRestProps`; paint via PDF ExtGState (`SetOpacity`). Nested opacities multiply. Also accepts `filter: opacity()`; other filter functions ignored (permanent print non-goal for blur/shadow). |
 
 ### 2.5 Table subset
 
@@ -115,7 +115,7 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 | Property | Status | Notes / verified by |
 |----------|--------|---------------------|
 | `page-break-before/after/inside` (`auto\|always\|avoid`) | Implemented (print pipeline) | parsed into `style.PageBreak*`; honored as canvas-Y flow shifts by the phase-5 paginator - `beforeAlways` `paint.go:203`, `afterBreaks` `paint.go:236`, `avoidInside` `paint.go:179`; tests `TestPageBreakParsing`, `TestPageBreakBeforeAlways`, `TestPageBreakInsideAvoid` |
-| `orphans`, `widows` | Partial (heuristics) | Automatic orphan/widow **heuristics** in `paint.go` `orphansWidows` (+ keep-heading-with-next). CSS `orphans` / `widows` properties are **not** parsed (`applyRestProps` / `internal/css` have no handlers) — author values ignored |
+| `orphans`, `widows` | Partial | CSS `orphans` / `widows` **parsed** (integer ≥1, inherit, initial 2) in `applyRestProps`; Fragmentation Rule 3 enforced when line boxes are countable (`paint.go` `orphansWidows`). Geometric short-block **heuristic** remains as fallback when line counts are unavailable (fixture-30). See fixture-37. |
 
 ### Feature checklist (page geometry, tables, pagination)
 
@@ -125,13 +125,15 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 | `colspan` | Yes | `colSpan` `layout.go:618-622`; test `TestTableColspan` |
 | `rowspan` | No | attribute ignored - only `colspan` is read |
 | `border-collapse` | Separate only | see §2.5 |
-| Pagination | Fragment + whole-op + phase-18 polish | rect-type ops (fill/stroke/line) split at page boundaries; text/images/links move wholly (line-level) (`paint.go`); `page-break-before/after: always`, `page-break-inside: avoid`, table rows never split; **`<thead>` / `table-header-group` repeat** on continuation pages (`repeatTableHeaders`, fixture-23); orphan/widow **heuristics** (not CSS props); `--zoom` forwarded; smart-shrinking re-layouts. `Result.Locations` for outlines/links. See "Pagination" note below. |
-| Floats / absolute positioning | Float lite + absolute/fixed/sticky lite | float/`clear` lite (§2.2); relative/absolute/fixed lite; sticky = print page-content-box scrollport (§2.2; fixture-31) |
+| Pagination | Fragment + whole-op + phase-18 polish | rect-type ops (fill/stroke/line) split at page boundaries; text/images/links move wholly (line-level) (`paint.go`); `page-break-before/after: always`, `page-break-inside: avoid`, table rows never split; **`<thead>` / `table-header-group` repeat** on continuation pages (`repeatTableHeaders`, fixture-23); CSS `orphans`/`widows` parsed + Rule 3 when line boxes exist (heuristic fallback; fixtures 30/37); `--zoom` forwarded; smart-shrinking re-layouts. `Result.Locations` for outlines/links. See "Pagination" note below. |
+| Floats / absolute positioning | Float lite + absolute/fixed/sticky lite | float/`clear` lite (§2.2); relative/absolute/fixed lite; sticky = print page scrollport + overflow@0 (§2.2; fixture-31) |
 | Flexbox / Grid | Partial | Stage A flex + Stage B grid (areas/dense/`minmax`) + Stage C lite — §2.7 / §2.8. Paths: `flex.go`, `grid.go`, `style.go`; fixtures 25/28/32–35; plan `plans/phases/subplans-tier-2/flex-grid-full.md`. **Not** Bootstrap/Tailwind / Chrome layout-test parity |
+| Multicol | Partial | Report lite: `column-count`/`column-width`/`columns`, `column-gap` (normal→1em), `column-span:none\|all`, `column-fill:balance\|auto`; column boxes do not straddle pages — §2.9; `multicol.go`; fixture-39 |
+| Transforms (static 2D) | Partial | `transform` + `transform-origin` paint CTM; stacking + abs/fixed CB; sibling flow unchanged. No animation timelines; no 3D; `filter` only `opacity()`. Fixture-40; `transform.go` |
 | JavaScript | No | stripped at load; `--enable-javascript` accepted + warning (Phase 1) |
 | Image-mode text | TTF outline raster | same Liberation faces as PDF; pure-Go coverage AA (`internal/imageout/ttfraster.go`); 5×7 bitmap only if an op has no font |
 
-**Pagination (phases 5 + 18).** Box-aware fragmentation: rect-type ops crossing a page boundary are split; text, images and links move wholly (line-level). `page-break-before/after: always` and `page-break-inside: avoid` via canvas-Y flow shifts; table rows never split. **Table headers repeat** across pages (`repeatTableHeaders` in `paint.go`; fixture-23). **`--zoom`** is forwarded to `layout.Options.Zoom` (`convert.go`; `TestZoom`). **Smart-shrinking** detects over-wide content and **re-layouts** with an effective zoom (`TestRunPDFSmartShrinking`). Orphan/widow control is **heuristic** (`orphansWidows`, fixture-30) — CSS `orphans`/`widows` properties are not parsed. `Result.Locations` carries element boxes for outlines/links.
+**Pagination (phases 5 + 18).** Box-aware fragmentation: rect-type ops crossing a page boundary are split; text, images and links move wholly (line-level). `page-break-before/after: always` and `page-break-inside: avoid` via canvas-Y flow shifts; table rows never split. **Table headers repeat** across pages (`repeatTableHeaders` in `paint.go`; fixture-23). **`--zoom`** is forwarded to `layout.Options.Zoom` (`convert.go`; `TestZoom`). **Smart-shrinking** detects over-wide content and **re-layouts** with an effective zoom (`TestRunPDFSmartShrinking`). CSS `orphans`/`widows` are parsed (initial 2) and Fragmentation Rule 3 is applied when line boxes are available; the geometric short-block heuristic remains for edge cases (fixtures 30/37). `Result.Locations` carries element boxes for outlines/links.
 
 ### 2.7 Flexbox (Stage A — report subset)
 
@@ -149,10 +151,10 @@ Evidence: `internal/layout/flex.go`, `style.go` (`applyRestProps` + `parseFlexSh
 | `gap` / `row-gap` / `column-gap` | [x] Implemented | Independent longhands; shorthand fills both when longhands unset (`flexGaps`) |
 | `flex` shorthand (`none` \| `auto` \| grow/shrink/basis) | [x] Implemented | `parseFlexShorthand` |
 | `flex-grow` / `flex-shrink` / `flex-basis` | [x] Implemented | Length/%/auto basis; post grow/shrink min/max-width clamp; column grow/shrink when height definite |
-| Content-based min-size floor | [~] Partial | `flexMinMainSize` — non-zero intrinsic floor so text does not crush to 0 on shrink (Flexbox §4.5 lite) |
+| Content-based min-size floor | [x] Partial polish | `flexMinMainSize` / `flexClampMainWidths` — content-based `min-width:auto` + `%` min re-resolve on definite containers; overflow non-visible → auto min 0 (Flexbox §4.5 lite). Deep multi-pass intrinsic still out |
 | `order` | [x] Implemented | Stable sort before place |
-| Percentage basis cyclic sizing | [~] Partial | Definite CB: `%` vs content main size; indefinite/cyclic → treat as `auto` (content) — fixture-33 / `TestFlexBasisPercent*` |
-| Nested percentage / intrinsic flex iterations | [~] Partial | Stage C subset: indefinite CB `%` width/height → auto/content (not 0/NaN); not full Flexbox intrinsic passes |
+| Percentage basis cyclic sizing | [x] Partial | Definite CB: `%` vs content main size; indefinite/cyclic → treat as `auto` (content) — fixture-33 / `TestFlexBasisPercent*` |
+| Nested percentage / intrinsic flex iterations | [x] Partial polish | Definite-item `%` children re-resolve against used main size; indefinite CB `%` → auto/content; not full Flexbox intrinsic passes |
 
 ### 2.8 CSS Grid (Stage B + Stage C lite — report subset)
 
@@ -161,7 +163,7 @@ Evidence: `internal/layout/grid.go`, `style.go`; fixtures 28/32/34/35; `grid_tes
 | Property | Status | Notes / verified by |
 |----------|--------|---------------------|
 | `display: grid` / `inline-grid` | [x] Implemented | Routed to `buildGrid`; nested grids OK |
-| `display: subgrid` | [~] Partial | Copy-inherits parent templates/areas; **no** shared track sizing across subtrees — fixture-35 |
+| `display: subgrid` | [x] Partial | Copy-inherits parent templates/areas; same content-width re-resolves inherited tracks — **no** joint Resolve Intrinsic across subtrees — fixture-35 / `TestSubgrid*` |
 | `grid-template-columns` | [x] Implemented | Lengths, `fr`, `repeat(N, …)`, `minmax(...)`; gap subtracted before `fr` distribute |
 | `grid-template-rows` | [x] Implemented | Consumed when height definite; fixed mins on auto-height; fixture-32 |
 | `minmax()` track sizing | [x] Implemented | Lengths / `%` (definite) / `fr` / `auto` / `min-content` / `max-content` subset; `fr` keeps min floors — fixture-35 |
@@ -173,8 +175,24 @@ Evidence: `internal/layout/grid.go`, `style.go`; fixtures 28/32/34/35; `grid_tes
 | `grid-template-areas` / `grid-area` names | [x] Implemented | Named areas + lite line form; areas can extend auto tracks — fixture-34 |
 | `justify-items` / `align-items` | [x] Implemented | Default stretch; start/center/end; stretch sizes item to grid area |
 | `justify-self` / `align-self` | [x] Implemented | Overrides container; stretch fills area |
-| Masonry | [~] Partial | One-axis `grid-template-*: masonry` → shortest-stack pack; both axes → dense fallback — fixture-35. Not full CSS Grid L3 |
-| Intrinsic / nested % track cycles | [~] Partial | Measure-pass lite for min/max-content track mins; cyclic `%` → auto when CB indefinite |
+| Masonry | [x] Partial | One-axis `grid-template-*: masonry` → shortest-stack pack; `grid-column: span N` on fixed axis; both axes → dense fallback — fixture-35 / `TestMasonry*`. Not full CSS Grid L3 |
+| Intrinsic / nested % track cycles | [x] Partial | Measure-pass lite for min/max-content track mins; cyclic `%` → auto when CB indefinite |
+
+### 2.9 CSS Multi-column (report lite)
+
+Evidence: `internal/layout/multicol.go`, `style.go` (`applyRestProps`); fixture-39; `multicol_test.go`. **Not** full Multicol L1 / L2 / Chrome balancing with floats.
+
+| Property | Status | Notes / verified by |
+|----------|--------|---------------------|
+| `column-count` (`auto` \| integer ≥1) | [x] Implemented | Establishes multicol when ≠ auto; `TestMulticolParseProps` |
+| `column-width` (`auto` \| `<length>`) | [x] Implemented | Used count/width per Multicol §3.3; `TestUsedColumnCountWidth` |
+| `columns` shorthand | [x] Implemented | `parseColumnsShorthand` |
+| `column-gap` (`normal` \| `<length>`) | [x] Implemented | Multicol: `normal` → 1em; flex/grid still treat unset/normal as 0 gap |
+| `column-span` (`none` \| `all`) | [x] Implemented | Mid-flow spanner; preceding columns balance — fixture-39 / `TestMulticolColumnSpanAll` |
+| `column-fill` (`balance` \| `auto`) | [x] Implemented | Balance packs to equal stacks; auto fills to page/definite height |
+| Column box pagination | [x] Implemented | Column boxes do not cross page boundaries; new multicol line on next page — `TestMulticolLinesDoNotStraddlePages` |
+| `break-*: column \| avoid-column` | [~] Partial | Aliased to page `always`/`avoid` (starts new multicol line via page break) |
+| `column-rule*`, L2 integer spans, overflow columns | [ ] Missing | Deferred (see `plans/phases/tier-2-pending-3/multicol.md` out of scope) |
 
 ## 3. Supported units
 
@@ -213,23 +231,25 @@ Status legend as in §2; evidence in `internal/css/css.go`.
 | Specificity (ID > class > element), inline `style` wins, `!important` overrides | Implemented | `Specificity` `css.go:578`; inline style priority `style.go:233-239`; test `css_test.go::TestSpecificity` |
 | `@media print` / `screen` filtering | Implemented | `mediaType` `css.go:186`; applied per rule `style.go:212-214`; convert passes `Media: "print"` (`convert.go:115`); test `css_test.go::TestParseMedia` |
 | `@media` feature queries (`(min-width: …)`) | Not implemented | only the media type substring is considered |
+| `:has()` | Partial | Relative selectors inside `:has(...)`; descendant/child/sibling + simple compounds; no forgiving-selector list / complex chrome edge cases. `has.go`; fixture-41 |
+| `@container` / `container-type` | Partial | Size queries only (`inline-size`/`width` + `and`/`or`/`not`); named containers; two-pass style after used inline size. No style/scroll-state queries; no `cq*` units. `container.go`; fixture-42 |
 | `@page` | Not implemented | `@page` blocks skipped gracefully at parse |
-| `@font-face` | Partial | Parsed; `MergeFontFaces` loads **local TTF/OTF** via `FetchSub` ACL for **PDF and image** paths. WOFF / remote network `src` skipped. See §5 |
+| `@font-face` | Partial | Parsed; `MergeFontFaces` loads **local TTF/OTF/WOFF1** via `FetchSub` ACL for **PDF and image** paths. WOFF2 / remote network `src` skipped by policy. See §5 |
 
 ## 5. Explicitly unsupported (MVP)
 
 | Feature | Handling |
 |---------|----------|
 | JavaScript / `<script>` / DOM APIs | **Stripped at load.** `--enable-javascript` accepted but ignored with warning (Phase 1) |
-| Full CSS Grid / full Flexbox | Stage A/B report subset **shipped** (§2.7 / §2.8); Stage C lite (subgrid copy-inherit, masonry pack) with honesty gaps. **Not** Bootstrap/Tailwind / Chrome layout-test parity. See `plans/phases/subplans-tier-2/flex-grid-full.md` |
-| True `position: sticky` inside `overflow: auto` scrollers | Print sticky uses the **page content box** as scrollport (`sticky.go`); continuous-media overflow-scroll sticky is unsupported |
-| `transform`, `filter`, `animation`, `transition` | Ignored |
+| Full CSS Grid / full Flexbox | Stage A/B report subset **shipped** (§2.7 / §2.8); Stage C lite + flex min-size polish + Partial subgrid/masonry span (`tier-2-pending-3/flex-grid-remaining.md`). **Not** Bootstrap/Tailwind / Chrome layout-test parity |
+| `position: sticky` continuous scroll | Overflow boxes are sticky scrollports at **offset 0** only (PDF has no scroll). Page content box remains the print scrollport when no overflow ancestor. No scroll-offset > 0 animation |
+| `transform`, `filter`, `animation`, `transition` | Partial / out of scope | **Static 2D** `transform` + `transform-origin` Implemented (translate/scale/rotate/matrix/skew*; paint CTM; stacking + abs/fixed CB). Sibling flow unchanged. Overflow: no clip — ink may paint outside page box. **`filter`:** only `opacity()` (see `opacity` row); blur/drop-shadow/SVG filters = permanent print-engine non-goal. **`animation`/`transition`/`@keyframes`:** parse-ignored (static cascaded value only; no timelines). **3D / perspective:** permanent non-goal. Fixture-40; `transform.go` / `transform_test.go` |
 | `background-image` / gradients | Ignored (Phase 3+ candidate) |
-| `@font-face` (remote / WOFF) | **Partial:** local TTF/OTF via `FetchSub` ACL on **PDF and image** paths. WOFF and network `src` skipped; missing faces fall back to registry / Liberation |
+| `@font-face` (remote / WOFF2) | **Partial:** local TTF/OTF/WOFF1 via `FetchSub` ACL on **PDF and image** paths. **WOFF2** skipped (Brotli not allowlisted). **Remote `https://`** skipped — not supported by design (ACL/network policy). Missing faces fall back to registry / Liberation |
 | Custom XSLT TOC (`--xsl-style-sheet`) | Not implemented (no XSLT in stdlib); Go templates instead (Phase 6) |
 | WebP, SVG-as-`img`, AVIF | Not decodable by stdlib; broken-image placeholder or skip |
 | Fixed CSS headers/footers via `position: fixed` alone | Prefer CLI `--header-*` / `--footer-*` for repeating chrome; CSS `fixed` lite paints on every page but is not a full running-element model |
-| Complex-script shaping (Indic, Arabic, CJK) | **Type0/CID Identity-H** for BMP Unicode (CJK with a capable face); **Arabic OT** via `go-text/typesetting` when the face has GSUB (+ presentation-form `ShapeText` fallback); Hangul needs a Hangul face; **vertical-rl** lite (rotated CJK). **Indic Partial** (OT when face/cmap allow; not production-claimed). No CGO HarfBuzz |
+| Complex-script shaping (Indic, Arabic, CJK) | **Type0/CID Identity-H** for BMP Unicode (CJK with a capable face); **Arabic OT** via `go-text/typesetting` when the face has GSUB (+ presentation-form `ShapeText` fallback); Hangul needs a Hangul face; **vertical-rl** lite (rotated CJK). **Indic Partial** (OT when face/cmap allow; not production-claimed). Optional OT **`halt`/`palt`** for CJK punctuation via `ShapeTextFont` FontFeatures. No CGO HarfBuzz (pure-Go port inside typesetting only) |
 | PDF encryption, PDF/A, duplex, AcroForm | Out of scope (not in original wkhtmltopdf either) |
 
 ## 6. Security policy (frozen defaults)
@@ -360,7 +380,7 @@ wkhtmltopdf honors them.
 | `--header-spacing`, `--footer-spacing` | PDF | Supported (band measurement) |
 | `--header-line`, `--footer-line` | PDF | Supported (separator line) |
 | `--header-font-name`, `--footer-font-name` | PDF | Partial (stored; every font renders as the embedded Liberation Sans) |
-| `--header-html`, `--footer-html` | PDF | Supported (URL values; raw-markup values rejected with a warning - upstream-compatible; `TestHTMLHeader`, `TestHTMLHeaderRawMarkupRejected`). HTML HF **external URI** and **fragment GoTo** annotations are carried onto body pages (`TestHTMLHeaderFragmentGoTo`) |
+| `--header-html`, `--footer-html` | PDF | **Partial** nested HTML HF: child layout (body CSS subset, flex/grid/images, local `@font-face` via shared registry/ACL); clipped to margin band; URI + `#id` GoTo to **body** destinations only (HF-tree ids are not destinations). URL values; raw markup rejected. Tests: `TestHTMLHeader*`, `hf_links_test.go` |
 
 ### 7.8 TOC objects
 

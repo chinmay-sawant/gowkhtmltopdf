@@ -1,13 +1,18 @@
 package layout
 
 // floatState tracks left/right floats inside one block formatting context
-// (one flowChildren call). Coordinates are canvas-absolute for bottoms and
-// edges; contentX/contentW define the containing block.
+// (one flowChildren call — including table-cell BFCs via emitCell/layoutCell).
+// Coordinates are canvas-absolute for bottoms and edges; contentX/contentW
+// define the containing block.
 //
 // Lite model (invoice chrome): floats leave normal flow, pack to a side at
 // the current flow y (stacking vertically when multiple floats share a side),
 // and in-flow content uses a simple side exclusion until clear or past the
 // float bottoms. Not a full CSS2 float engine.
+//
+// Table policy (tier-2-pending-3): in-flow display:table boxes always clear
+// below floats in flowChildren — no shrink-beside. Floated tables keep
+// display:table (CSS2.1 §9.7) and participate via placeFloat (fixture-29).
 type floatState struct {
 	leftBottom  float64 // canvas y of lowest left-float bottom; 0 = none
 	rightBottom float64

@@ -3,8 +3,9 @@
 // specificity ordering, and value helpers (lengths, colors, font families).
 //
 // Scope: `*`, type, `.class`, `#id`, attribute selectors ([attr]/[attr=val]),
-// :first-child/:last-child/:nth-child, descendant/child/sibling combinators,
-// `@media print|screen` filtering, `!important`, inline style attributes.
+// :first-child/:last-child/:nth-child/:has()/:not(), descendant/child/sibling
+// combinators, `@media print|screen` filtering, `@container` size queries
+// (inline-size/width + and/or/not), `!important`, inline style attributes.
 // Unsupported constructs degrade without panicking.
 package css
 
@@ -35,6 +36,9 @@ type Rule struct {
 	Decls     []Declaration
 	Media     string // "all", "print" or "screen"
 	Order     int    // source order within the sheet; callers rebase across sheets
+	// Container is non-nil for rules nested under @container. The rule applies
+	// only when the query matches the nearest eligible ancestor container.
+	Container *ContainerQuery
 }
 
 // Selector is a chain of compound parts linked by combinators.
@@ -61,10 +65,20 @@ type AttrSelector struct {
 	Value string
 }
 
-// PseudoClass is :first-child, :last-child, or :nth-child(...).
+// RelativeSelector is a complex selector interpreted relative to a subject
+// element (Selectors 4). Leading is " " (descendant), ">", "+", or "~".
+type RelativeSelector struct {
+	Leading string
+	Parts   []SelectorPart
+}
+
+// PseudoClass is :first-child, :last-child, :nth-child(...), :has(...), or
+// :not(...).
 type PseudoClass struct {
 	Name string // lower-case, without leading ':'
 	Arg  string // nth-child argument, lower-case, trimmed
+	Has  []RelativeSelector
+	Not  []Selector
 }
 
 // Declaration is one property: value pair.
@@ -100,12 +114,44 @@ func Parse(src string) (*Stylesheet, error) {
 					return nil, err
 				}
 				src = rest
-				rules, err := parseRuleList(media, block, &order)
+				rules, err := parseRuleList(media, nil, block, &order)
+				if err != nil {
+					return nil, err
+				}
+				s.Rules = append(s.Rules, rules...)
+			case strings.HasPrefix(low, "@container"):
+				open := strings.IndexByte(src, '{')
+				if open < 0 {
+					return nil, errUnbalanced
+				}
+				prelude := strings.TrimSpace(src[len("@container"):open])
+				cq, ok := parseContainerPrelude(prelude)
+				block, rest, err := takeBlock(src, open)
+				if err != nil {
+					return nil, err
+				}
+				src = rest
+				if !ok {
+					continue
+				}
+				rules, err := parseRuleList("all", &cq, block, &order)
 				if err != nil {
 					return nil, err
 				}
 				s.Rules = append(s.Rules, rules...)
 			case strings.HasPrefix(low, "@page"):
+				open := strings.IndexByte(src, '{')
+				if open < 0 {
+					src = ""
+					continue
+				}
+				_, rest, err := takeBlock(src, open)
+				if err != nil {
+					return nil, err
+				}
+				src = rest
+			case strings.HasPrefix(low, "@keyframes"), strings.HasPrefix(low, "@-webkit-keyframes"):
+				// Animations are parse-ignored (static cascaded values only).
 				open := strings.IndexByte(src, '{')
 				if open < 0 {
 					src = ""
@@ -223,13 +269,55 @@ func FontFaceURLs(src string) []string {
 	return out
 }
 
-// parseRuleList parses the rules inside a @media block body.
-func parseRuleList(media, block string, orderPtr *int) ([]Rule, error) {
+// parseRuleList parses the rules inside a @media or @container block body.
+// When cq is non-nil, every produced rule inherits that container query.
+func parseRuleList(media string, cq *ContainerQuery, block string, orderPtr *int) ([]Rule, error) {
 	var rules []Rule
 	for block != "" {
 		block = strings.TrimLeft(block, " \t\r\n")
 		if block == "" {
 			break
+		}
+		// Nested @container inside @media (or another @container): flatten.
+		if strings.HasPrefix(block, "@") {
+			low := strings.ToLower(block)
+			if strings.HasPrefix(low, "@container") {
+				open := strings.IndexByte(block, '{')
+				if open < 0 {
+					return nil, errUnbalanced
+				}
+				prelude := strings.TrimSpace(block[len("@container"):open])
+				innerCQ, ok := parseContainerPrelude(prelude)
+				innerBlock, rem, err := takeBlock(block, open)
+				if err != nil {
+					return nil, err
+				}
+				block = rem
+				if !ok {
+					continue
+				}
+				// Nested @container replaces (does not combine) the query.
+				use := &innerCQ
+				nested, err := parseRuleList(media, use, innerBlock, orderPtr)
+				if err != nil {
+					return nil, err
+				}
+				rules = append(rules, nested...)
+				continue
+			}
+			// Other at-rules inside: skip their block or statement.
+			if open := strings.IndexByte(block, '{'); open >= 0 {
+				_, rem, err := takeBlock(block, open)
+				if err != nil {
+					return nil, err
+				}
+				block = rem
+			} else if end := strings.IndexByte(block, ';'); end >= 0 {
+				block = block[end+1:]
+			} else {
+				block = ""
+			}
+			continue
 		}
 		selEnd, err := findBlock(block)
 		if err == errNoBlock {
@@ -254,12 +342,17 @@ func parseRuleList(media, block string, orderPtr *int) ([]Rule, error) {
 		if !ok || len(sel) == 0 {
 			continue
 		}
-		rules = append(rules, Rule{
+		r := Rule{
 			Selectors: sel,
 			Decls:     parseDeclarations(declBlock),
 			Media:     media,
 			Order:     *orderPtr,
-		})
+		}
+		if cq != nil {
+			cp := *cq
+			r.Container = &cp
+		}
+		rules = append(rules, r)
 		*orderPtr++
 	}
 	return rules, nil
@@ -490,18 +583,19 @@ func splitSelectorChain(s string) []string {
 				i += j
 			}
 		case c == ':':
-			// keep :pseudo / :nth-child(n) inside the compound; drop ::pseudo-elements
+			// keep :pseudo / :nth-child(n) / :has(...) inside the compound;
+			// drop ::pseudo-elements
 			if i+1 < len(s) && s[i+1] == ':' {
 				// ::before etc. - skip
 				i += 2
 				for i < len(s) && !isSelBreak(s[i]) {
 					if s[i] == '(' {
-						j := strings.IndexByte(s[i:], ')')
-						if j < 0 {
+						_, end, ok := takeParenArg(s, i)
+						if !ok {
 							i = len(s)
 							break
 						}
-						i += j
+						i = end
 						break
 					}
 					i++
@@ -517,12 +611,12 @@ func splitSelectorChain(s string) []string {
 			i++
 			for i < len(s) && !isSelBreak(s[i]) {
 				if s[i] == '(' {
-					j := strings.IndexByte(s[i:], ')')
-					if j < 0 {
+					_, end, ok := takeParenArg(s, i)
+					if !ok {
 						i = len(s)
 						break
 					}
-					i += j + 1
+					i = end
 					break
 				}
 				i++
@@ -551,6 +645,12 @@ func isSelBreak(b byte) bool {
 // parseCompound parses "tag#id.class1.class2[attr]:nth-child(even)" into a
 // SelectorPart. A tag of "*" or "" means universal.
 func parseCompound(s string) (SelectorPart, bool) {
+	return parseCompoundCtx(s, false)
+}
+
+// parseCompoundCtx parses a compound. When insideHas is true, nested :has()
+// and pseudo-elements are rejected as invalid.
+func parseCompoundCtx(s string, insideHas bool) (SelectorPart, bool) {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return SelectorPart{Tag: "*"}, true
@@ -614,19 +714,49 @@ func parseCompound(s string) (SelectorPart, bool) {
 			}
 			name := strings.ToLower(s[i+1 : j])
 			arg := ""
-			if j < len(s) && s[j] == '(' {
-				k := strings.IndexByte(s[j:], ')')
-				if k < 0 {
+			var argRaw string
+			hasParen := j < len(s) && s[j] == '('
+			if hasParen {
+				raw, end, ok := takeParenArg(s, j)
+				if !ok {
 					return SelectorPart{}, false
 				}
-				arg = strings.ToLower(strings.TrimSpace(s[j+1 : j+k]))
-				j = j + k + 1
+				argRaw = raw
+				arg = strings.ToLower(strings.TrimSpace(raw))
+				j = end
 			}
-			// unsupported interactive/link pseudos: ignore (match without them)
+			if insideHas {
+				switch name {
+				case "has", "before", "after", "first-line", "first-letter":
+					return SelectorPart{}, false
+				}
+			}
 			switch name {
 			case "first-child", "last-child", "nth-child":
 				part.Pseudos = append(part.Pseudos, PseudoClass{Name: name, Arg: arg})
-			case "link", "visited", "hover", "active", "focus", "not":
+			case "has":
+				if !hasParen || strings.TrimSpace(argRaw) == "" {
+					return SelectorPart{}, false
+				}
+				lowArg := strings.ToLower(argRaw)
+				if strings.Contains(lowArg, ":has(") || strings.Contains(argRaw, "::") {
+					return SelectorPart{}, false
+				}
+				rels, ok := parseRelativeSelectorList(argRaw)
+				if !ok {
+					return SelectorPart{}, false
+				}
+				part.Pseudos = append(part.Pseudos, PseudoClass{Name: "has", Has: rels})
+			case "not":
+				if !hasParen || strings.TrimSpace(argRaw) == "" {
+					return SelectorPart{}, false
+				}
+				sels, ok := parseSelectorListStrict(argRaw, insideHas)
+				if !ok {
+					return SelectorPart{}, false
+				}
+				part.Pseudos = append(part.Pseudos, PseudoClass{Name: "not", Not: sels})
+			case "link", "visited", "hover", "active", "focus":
 				// accepted and ignored for print
 			default:
 				// unknown: ignore
@@ -794,6 +924,20 @@ func matchPseudo(ps PseudoClass, n *html.Node) bool {
 	case "nth-child":
 		idx := elementIndex(n)
 		return matchNth(ps.Arg, idx)
+	case "has":
+		for _, rs := range ps.Has {
+			if matchRelative(rs, n) {
+				return true
+			}
+		}
+		return false
+	case "not":
+		for _, sel := range ps.Not {
+			if Match(sel, n) {
+				return false
+			}
+		}
+		return true
 	default:
 		return true
 	}
@@ -918,14 +1062,32 @@ func classSet(n *html.Node) map[string]bool {
 }
 
 // Specificity returns (a, b, c): ID count, class/attribute/pseudo count, type count.
+// :has() / :not() contribute the specificity of their most specific argument
+// (Selectors 4), not a flat class-level count for the pseudo itself.
 func Specificity(s Selector) (a, b, c int) {
 	for _, p := range s.Parts {
 		if p.ID != "" {
 			a++
 		}
-		b += len(p.Classes) + len(p.Attrs) + len(p.Pseudos)
+		b += len(p.Classes) + len(p.Attrs)
 		if p.Tag != "*" {
 			c++
+		}
+		for _, ps := range p.Pseudos {
+			switch ps.Name {
+			case "has":
+				a2, b2, c2 := maxRelativeSpecificity(ps.Has)
+				a += a2
+				b += b2
+				c += c2
+			case "not":
+				a2, b2, c2 := maxSelectorSpecificity(ps.Not)
+				a += a2
+				b += b2
+				c += c2
+			default:
+				b++
+			}
 		}
 	}
 	return a, b, c

@@ -141,6 +141,7 @@ func TestShapeTextFontLatinUnchanged(t *testing.T) {
 func TestDirectModuleAllowlist(t *testing.T) {
 	// Product constraint: only github.com/go-text/typesetting may appear as a
 	// direct third-party require (transitive graph is allowed).
+	// Also documents CGO HarfBuzz rejection: no harfbuzz CGO module allowed.
 	cmd := exec.Command("go", "list", "-m", "-f", "{{if and (not .Main) (not .Indirect)}}{{.Path}}{{end}}", "all")
 	cmd.Dir = "../.."
 	out, err := cmd.CombinedOutput()
@@ -156,7 +157,53 @@ func TestDirectModuleAllowlist(t *testing.T) {
 			continue
 		}
 		if !allowed[line] {
-			t.Errorf("unexpected direct module %q (allowlist: typesetting only)", line)
+			t.Errorf("unexpected direct module %q (allowlist: typesetting only; CGO HarfBuzz rejected)", line)
 		}
+		if strings.Contains(strings.ToLower(line), "harfbuzz") {
+			t.Errorf("CGO HarfBuzz module forbidden: %q", line)
+		}
+	}
+}
+
+func TestCJKPunctFontFeatures(t *testing.T) {
+	feats := cjkPunctFontFeatures("。")
+	if len(feats) != 2 {
+		t.Fatalf("CJK punct features = %d, want halt+palt", len(feats))
+	}
+	if got := feats[0].Tag.String(); got != "halt" {
+		t.Errorf("feat0 = %q, want halt", got)
+	}
+	if got := feats[1].Tag.String(); got != "palt" {
+		t.Errorf("feat1 = %q, want palt", got)
+	}
+	if cjkPunctFontFeatures("hello") != nil {
+		t.Error("Latin must not auto-enable halt/palt")
+	}
+}
+
+func TestParseFontFeatureSettings(t *testing.T) {
+	feats := ParseFontFeatureSettings(`"halt" 1, "palt" on`)
+	if len(feats) != 2 {
+		t.Fatalf("got %d features, want 2", len(feats))
+	}
+	if feats[0].Tag.String() != "halt" || feats[0].Value != 1 {
+		t.Errorf("halt = %+v", feats[0])
+	}
+	if feats[1].Tag.String() != "palt" || feats[1].Value != 1 {
+		t.Errorf("palt = %+v", feats[1])
+	}
+	off := ParseFontFeatureSettings(`"halt" off`)
+	if len(off) != 1 || off[0].Value != 0 {
+		t.Errorf("halt off = %+v", off)
+	}
+}
+
+func TestShapeTextFontWithFeaturesCJKStillSafe(t *testing.T) {
+	// Face may lack halt/palt tables; requesting features must not panic
+	// or break the ShapeTextFont path for CJK punctuation.
+	f := loadDejaVu(t)
+	got := ShapeTextFontWithFeatures("你好。", f, ParseFontFeatureSettings(`"halt" 1, "palt" 1`))
+	if got == "" {
+		t.Fatal("empty shaped text")
 	}
 }

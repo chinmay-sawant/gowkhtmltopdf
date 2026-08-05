@@ -193,6 +193,12 @@ var fixturePageBounds = map[string]fixtureBounds{
 	"fixture-33-flex-cyclic-basis.html":     {minPages: 1, maxPages: 1},
 	"fixture-34-grid-areas-dense.html":      {minPages: 1, maxPages: 1},
 	"fixture-35-grid-minmax-intrinsic.html": {minPages: 1, maxPages: 1},
+	"fixture-37-orphans-css.html":           {minPages: 2, maxPages: 0},
+	"fixture-38-float-inside-td.html":       {minPages: 1, maxPages: 1},
+	"fixture-39-multicol-article.html":      {minPages: 2, maxPages: 0},
+	"fixture-40-transform-badge.html":       {minPages: 1, maxPages: 1},
+	"fixture-41-has-selector.html":          {minPages: 1, maxPages: 1},
+	"fixture-42-container-inline-size.html": {minPages: 1, maxPages: 1},
 }
 
 // fixtureHeaderOK enforces the corpus hygiene rule: every fixture starts

@@ -37,6 +37,11 @@ type ResolvedStyle struct {
 	Gap                 float64 // flex/grid gap shorthand (pt); kept for backward compat
 	RowGap              float64 // pt; 0 with ColumnGap 0 → layout falls back to Gap
 	ColumnGap           float64
+	ColumnGapNormal     bool    // true when column-gap is normal/initial (multicol → 1em; flex/grid → 0)
+	ColumnCount         int     // 0 = auto; ≥1 = used count hint
+	ColumnWidth         float64 // -1 = auto; else length in pt
+	ColumnSpan          string  // "none" | "all" (multicol spanner)
+	ColumnFill          string  // "balance" | "auto"
 	FlexGrow            float64
 	FlexShrink          float64 // default 1; 0 disables shrink
 	FlexBasis           float64 // -1 = auto
@@ -58,10 +63,13 @@ type ResolvedStyle struct {
 	WidthPercent        float64 // >=0 means width is that % of the containing block at layout time
 	Height              float64 // -1 = auto; absolute length in pt when HeightPercent < 0
 	HeightPercent       float64 // >=0 means height is that % of the CB; indefinite CB → auto (cyclic honesty)
-	MinWidth            float64
+	MinWidth            float64 // absolute pt when MinWidthPercent < 0; 0 = auto (content min for flex)
+	MinWidthPercent     float64 // >=0 means % of containing block (deferred like WidthPercent)
 	MaxWidth            float64
 	MinHeight           float64
+	MinHeightPercent    float64 // >=0 means % of CB height; indefinite → ignore
 	MaxHeight           float64
+	Overflow            string // "visible" | "hidden" | "scroll" | "auto" | "clip" — sticky scrollport when non-visible
 	MarginTop           float64
 	MarginRight         float64
 	MarginBottom        float64
@@ -96,6 +104,15 @@ type ResolvedStyle struct {
 	PageBreakBefore     string // "" | "always" | "avoid"
 	PageBreakAfter      string // "" | "always" | "avoid"
 	PageBreakInside     string // "" | "always" | "avoid"
+	Orphans             int    // CSS orphans; inherited; initial 2; integer ≥ 1
+	Widows              int    // CSS widows; inherited; initial 2; integer ≥ 1
+	ContainerType       string // "" | "normal" | "inline-size" | "size"
+	ContainerName       string // space-separated lower-case names; empty = none
+	// Static 2D CSS transforms (paint-time CTM; sibling flow unchanged).
+	Transform       Matrix2D
+	HasTransform    bool
+	TransformOrigin transformOriginSpec
+	Opacity         float64 // 0..1; initial 1; also from filter:opacity()
 }
 
 type border struct {
@@ -128,14 +145,21 @@ func initialStyle() ResolvedStyle {
 		AlignSelf:        "auto",
 		JustifyItems:     "stretch",
 		JustifySelf:      "auto",
+		ColumnGapNormal:  true,
+		ColumnWidth:      -1,
+		ColumnSpan:       "none",
+		ColumnFill:       "balance",
 		Width:            -1,
 		WidthPercent:     -1,
 		Height:           -1,
 		HeightPercent:    -1,
 		MinWidth:         0,
+		MinWidthPercent:  -1,
 		MaxWidth:         -1,
 		MinHeight:        0,
+		MinHeightPercent: -1,
 		MaxHeight:        -1,
+		Overflow:         "visible",
 		Color:            [3]float64{0, 0, 0},
 		BGColor:          [4]float64{0, 0, 0, 0},
 		FontSize:         12, // 16px at 96dpi
@@ -149,6 +173,11 @@ func initialStyle() ResolvedStyle {
 		GridColumnSpan:   1,
 		GridRowSpan:      1,
 		WritingMode:      "horizontal-tb",
+		Orphans:          2,
+		Widows:           2,
+		Transform:        IdentityMatrix(),
+		TransformOrigin:  defaultTransformOrigin(),
+		Opacity:          1,
 	}
 }
 
@@ -158,26 +187,61 @@ type styleContext struct {
 	media     string
 	viewportW float64 // containing-block width for % of margins/padding/width
 	viewportH float64 // for % of height
+	// containers maps size-query containers (inline-size|size) to their used
+	// content-box inline size. nil means first pass: skip @container rules.
+	containers map[*html.Node]sizeContainer
+}
+
+// sizeContainer is one element that establishes a size query container.
+type sizeContainer struct {
+	inlineSize float64 // content-box inline size in pt
+	fontSize   float64 // used font-size (em base for query lengths)
+	names      string  // space-separated container-name values
 }
 
 // resolveStyles walks the tree top-down, computing the used style of every
 // element from the cascade (UA → sheets in order → inline) plus inheritance.
+// @container rules are ignored on this first pass (no used sizes yet).
 func resolveStyles(root *html.Node, sheets []*css.Stylesheet, media string, viewportW, viewportH float64) map[*html.Node]ResolvedStyle {
-	ctx := &styleContext{sheets: sheets, media: media, viewportW: viewportW, viewportH: viewportH}
+	return resolveStylesCtx(root, &styleContext{
+		sheets: sheets, media: media, viewportW: viewportW, viewportH: viewportH,
+	})
+}
+
+// resolveStylesWithContainers is the second style pass: @container rules are
+// applied when their query matches the nearest eligible ancestor in containers.
+func resolveStylesWithContainers(
+	root *html.Node,
+	sheets []*css.Stylesheet,
+	media string,
+	viewportW, viewportH float64,
+	containers map[*html.Node]sizeContainer,
+) map[*html.Node]ResolvedStyle {
+	return resolveStylesCtx(root, &styleContext{
+		sheets: sheets, media: media, viewportW: viewportW, viewportH: viewportH,
+		containers: containers,
+	})
+}
+
+func resolveStylesCtx(root *html.Node, ctx *styleContext) map[*html.Node]ResolvedStyle {
 	out := map[*html.Node]ResolvedStyle{}
-	raws := map[*html.Node]map[string]string{}
 	var walk func(n *html.Node, parent *ResolvedStyle)
 	walk = func(n *html.Node, parent *ResolvedStyle) {
 		var st ResolvedStyle
 		if n.Type == html.ElementNode {
 			raw := cascadeRaw(ctx, n)
-			raws[n] = raw
 			st = initialStyle()
 			if parent != nil {
 				inheritProps(&st, *parent, raw)
 			}
 			applyFontProps(&st, raw, parent)
 			applyRestProps(&st, raw, ctx)
+			// CSS2.1 §9.7: float ≠ none blockifies table-internal / inline
+			// displays before layout (table/flex/grid stay). Floated <table>
+			// keeps display:table so fixture-29 wrapper packing still works.
+			if st.Float != "none" {
+				st.Display = blockifyDisplayForFloat(st.Display)
+			}
 		} else if n.Type == html.TextNode {
 			st = initialStyle()
 			if parent != nil {
@@ -191,6 +255,21 @@ func resolveStyles(root *html.Node, sheets []*css.Stylesheet, media string, view
 	}
 	walk(root, nil)
 	return out
+}
+
+// blockifyDisplayForFloat maps specified display to the used value when
+// float is left|right (CSS2.1 §9.7). table stays table (floated table
+// wrapper); table-cell/row/… and inlines become block.
+func blockifyDisplayForFloat(d string) string {
+	switch d {
+	case "inline", "inline-block", "inline-table", "inline-flex", "inline-grid",
+		"run-in", "table-row-group", "table-header-group", "table-footer-group",
+		"table-row", "table-cell", "table-caption", "table-column",
+		"table-column-group", "list-item":
+		return "block"
+	default:
+		return d
+	}
 }
 
 // inheritProps copies inheritable properties from the parent, unless the
@@ -242,6 +321,12 @@ func inheritProps(st *ResolvedStyle, parent ResolvedStyle, raw map[string]string
 	if !set("border-spacing") {
 		st.BorderSpacing = parent.BorderSpacing
 	}
+	if !set("orphans") {
+		st.Orphans = parent.Orphans
+	}
+	if !set("widows") {
+		st.Widows = parent.Widows
+	}
 }
 
 // cascadeRaw returns the winning declaration per property for the element
@@ -279,6 +364,15 @@ func cascadeRaw(ctx *styleContext, n *html.Node) map[string]string {
 		for _, r := range sheet.Rules {
 			if ctx.media != "" && r.Media != "all" && r.Media != ctx.media {
 				continue
+			}
+			if r.Container != nil {
+				if ctx.containers == nil {
+					continue // first pass: used sizes unknown
+				}
+				info, ok := findSizeContainer(n, r.Container.Name, ctx.containers)
+				if !ok || !r.Container.Cond.Matches(info.inlineSize, info.fontSize) {
+					continue
+				}
 			}
 			for _, sel := range r.Selectors {
 				if !css.Match(sel, n) {
@@ -363,8 +457,9 @@ func applyFontProps(st *ResolvedStyle, raw map[string]string, parent *ResolvedSt
 // iteration order.
 func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext) {
 	fs := st.FontSize
-	// gap/flex applied before longhands so row-gap/column-gap and flex-* win.
-	shorthands := []string{"margin", "padding", "border", "border-width", "border-style", "border-color", "gap", "flex"}
+	// gap/flex/container applied before longhands so row-gap/column-gap,
+	// flex-*, and container-type/name win over shorthands.
+	shorthands := []string{"margin", "padding", "border", "border-width", "border-style", "border-color", "gap", "flex", "container"}
 	isShorthand := map[string]bool{}
 	for _, p := range shorthands {
 		isShorthand[p] = true
@@ -444,10 +539,16 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext)
 				st.JustifySelf = value
 			}
 		case "gap":
-			if v, ok := lengthBox(value, fs, ctx.viewportW, "none"); ok && v >= 0 {
+			if value == "normal" {
+				st.Gap = 0
+				st.RowGap = 0
+				st.ColumnGap = 0
+				st.ColumnGapNormal = true
+			} else if v, ok := lengthBox(value, fs, ctx.viewportW, "none"); ok && v >= 0 {
 				st.Gap = v
 				st.RowGap = v
 				st.ColumnGap = v
+				st.ColumnGapNormal = false
 			}
 		case "row-gap":
 			if v, ok := lengthBox(value, fs, ctx.viewportW, "none"); ok && v >= 0 {
@@ -455,8 +556,36 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext)
 				st.Gap = v
 			}
 		case "column-gap":
-			if v, ok := lengthBox(value, fs, ctx.viewportW, "none"); ok && v >= 0 {
+			if value == "normal" {
+				st.ColumnGap = 0
+				st.ColumnGapNormal = true
+			} else if v, ok := lengthBox(value, fs, ctx.viewportW, "none"); ok && v >= 0 {
 				st.ColumnGap = v
+				st.ColumnGapNormal = false
+			}
+		case "column-count":
+			if value == "auto" {
+				st.ColumnCount = 0
+			} else if n, err := strconv.Atoi(strings.TrimSpace(value)); err == nil && n >= 1 {
+				st.ColumnCount = n
+			}
+		case "column-width":
+			if value == "auto" {
+				st.ColumnWidth = -1
+			} else if v, ok := lengthBox(value, fs, ctx.viewportW, "auto"); ok && v >= 0 {
+				st.ColumnWidth = v
+			}
+		case "columns":
+			parseColumnsShorthand(st, value, fs, ctx.viewportW)
+		case "column-span":
+			switch value {
+			case "none", "all":
+				st.ColumnSpan = value
+			}
+		case "column-fill":
+			switch value {
+			case "balance", "auto":
+				st.ColumnFill = value
 			}
 		case "flex":
 			parseFlexShorthand(st, value, fs, ctx.viewportW)
@@ -560,20 +689,43 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext)
 				st.HeightPercent = -1
 			}
 		case "min-width":
-			if v, ok := lengthBox(value, fs, ctx.viewportW, "none"); ok {
+			if value == "auto" || value == "none" {
+				st.MinWidth = 0
+				st.MinWidthPercent = -1
+			} else if v, unit, ok := css.ParseLength(value); ok && unit == "%" {
+				st.MinWidthPercent = v
+				st.MinWidth = 0
+			} else if v, ok := lengthBox(value, fs, ctx.viewportW, "none"); ok {
 				st.MinWidth = v
+				st.MinWidthPercent = -1
 			}
 		case "max-width":
 			if v, ok := lengthBox(value, fs, ctx.viewportW, "none"); ok {
 				st.MaxWidth = v
 			}
 		case "min-height":
-			if v, ok := lengthBox(value, fs, ctx.viewportH, "none"); ok {
+			if value == "auto" || value == "none" {
+				st.MinHeight = 0
+				st.MinHeightPercent = -1
+			} else if v, unit, ok := css.ParseLength(value); ok && unit == "%" {
+				st.MinHeightPercent = v
+				st.MinHeight = 0
+			} else if v, ok := lengthBox(value, fs, ctx.viewportH, "none"); ok {
 				st.MinHeight = v
+				st.MinHeightPercent = -1
 			}
 		case "max-height":
 			if v, ok := lengthBox(value, fs, ctx.viewportH, "none"); ok {
 				st.MaxHeight = v
+			}
+		case "overflow":
+			if ov, ok := parseOverflowKeyword(value); ok {
+				st.Overflow = ov
+			}
+		case "overflow-x", "overflow-y":
+			// Either axis non-visible creates a sticky scrollport (CSS Position 3).
+			if ov, ok := parseOverflowKeyword(value); ok && ov != "visible" {
+				st.Overflow = ov
 			}
 		case "margin":
 			setFourMargin(st, value, fs, ctx.viewportW)
@@ -700,19 +852,116 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext)
 				st.TableLayout = value
 			}
 		case "page-break-before", "break-before":
-			if value == "always" || value == "avoid" {
-				st.PageBreakBefore = value
+			// Lite: column | avoid-column alias to always | avoid (new multicol
+			// line via page break). Spec column breaks beyond that are deferred.
+			switch value {
+			case "always", "column":
+				st.PageBreakBefore = "always"
+			case "avoid", "avoid-column":
+				st.PageBreakBefore = "avoid"
 			}
 		case "page-break-after", "break-after":
-			if value == "always" || value == "avoid" {
-				st.PageBreakAfter = value
+			switch value {
+			case "always", "column":
+				st.PageBreakAfter = "always"
+			case "avoid", "avoid-column":
+				st.PageBreakAfter = "avoid"
 			}
 		case "page-break-inside", "break-inside":
-			if value == "always" || value == "avoid" {
-				st.PageBreakInside = value
+			switch value {
+			case "always", "column":
+				st.PageBreakInside = "always"
+			case "avoid", "avoid-column":
+				st.PageBreakInside = "avoid"
 			}
+		case "orphans":
+			if n, ok := parseOrphansWidowsInt(value); ok {
+				st.Orphans = n
+			}
+		case "widows":
+			if n, ok := parseOrphansWidowsInt(value); ok {
+				st.Widows = n
+			}
+		case "container-type":
+			switch strings.ToLower(value) {
+			case "normal", "size", "inline-size":
+				st.ContainerType = strings.ToLower(value)
+			}
+		case "container-name":
+			st.ContainerName = css.ParseContainerNameValue(value)
+		case "container":
+			name, ctype := css.ParseContainerShorthand(value)
+			st.ContainerName = name
+			if ctype != "" {
+				st.ContainerType = ctype
+			}
+		case "transform":
+			// Animations/transitions ignored: cascaded static value only.
+			if m, has, ok := parseTransformList(value, fs); ok {
+				st.Transform = m
+				st.HasTransform = has
+			}
+		case "transform-origin":
+			if spec, ok := parseTransformOrigin(value, fs); ok {
+				st.TransformOrigin = spec
+			}
+		case "opacity":
+			if v, ok := parseOpacityValue(value); ok {
+				st.Opacity = v
+			}
+		case "filter":
+			// opacity() via ExtGState; blur/drop-shadow permanent non-goals.
+			if v, ok := parseFilterOpacity(value); ok {
+				st.Opacity *= v
+			}
+		case "animation", "animation-name", "animation-duration",
+			"animation-timing-function", "animation-delay", "animation-iteration-count",
+			"animation-direction", "animation-fill-mode", "animation-play-state",
+			"transition", "transition-property", "transition-duration",
+			"transition-timing-function", "transition-delay":
+			// Parse-ignore: no timeline; static cascaded transform/opacity only.
 		}
 	}
+}
+
+// parseOrphansWidowsInt accepts a CSS <integer ≥ 1>. Invalid values are
+// ignored by the caller (declaration dropped).
+func parseOrphansWidowsInt(value string) (int, bool) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0, false
+	}
+	n, err := strconv.Atoi(value)
+	if err != nil || n < 1 {
+		return 0, false
+	}
+	return n, true
+}
+
+// parseColumnsShorthand parses CSS columns: [ <column-width> || <column-count> ].
+// Both longhands reset to auto before applying tokens (CSS Cascading).
+func parseColumnsShorthand(st *ResolvedStyle, value string, fs, viewportW float64) {
+	st.ColumnCount = 0
+	st.ColumnWidth = -1
+	for _, tok := range strings.Fields(value) {
+		tok = strings.TrimSpace(tok)
+		if tok == "" || tok == "auto" {
+			continue
+		}
+		if n, err := strconv.Atoi(tok); err == nil && n >= 1 {
+			st.ColumnCount = n
+			continue
+		}
+		if v, ok := lengthBox(tok, fs, viewportW, "auto"); ok && v >= 0 {
+			st.ColumnWidth = v
+		}
+	}
+}
+
+// isMulticol reports whether st establishes a multi-column container
+// (column-count or column-width is not auto).
+func isMulticol(st ResolvedStyle) bool {
+	return st.ColumnCount > 0 || st.ColumnWidth >= 0
 }
 
 // parseFontShorthand handles "font: italic bold 12px/1.4 Arial, sans-serif".
@@ -997,6 +1246,27 @@ func lineHeight(value string, fs float64) float64 {
 		}
 	}
 	return 0
+}
+
+// parseOverflowKeyword accepts CSS overflow keywords used for sticky scrollport
+// detection. clip is treated like hidden (scroll container, no user scroll).
+func parseOverflowKeyword(value string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "visible", "hidden", "scroll", "auto", "clip":
+		return strings.ToLower(strings.TrimSpace(value)), true
+	}
+	return "", false
+}
+
+// overflowCreatesStickyScrollport reports whether overflow establishes a sticky
+// scrollport (CSS Position 3 / Overflow 3). PDF has no user scroll, so sticky
+// inside these boxes clamps at scroll offset 0 against the box edges.
+func overflowCreatesStickyScrollport(overflow string) bool {
+	switch overflow {
+	case "auto", "scroll", "hidden", "clip":
+		return true
+	}
+	return false
 }
 
 // lengthBox parses a length for box-sizing properties. "auto" maps to -1,

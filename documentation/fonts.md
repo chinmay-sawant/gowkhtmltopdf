@@ -67,10 +67,23 @@ for CJK.
   typesetting.
 - **Mixed Latin + CJK:** Latin glyphs missing from a CJK face are drawn with
   embedded Liberation; CJK continues on the Type0 sibling of the original face.
-- **`@font-face` (Partial):** local `url(...ttf|otf)` under loader ACL
+- **`@font-face` (Partial):** local `url(...ttf|otf|woff)` under loader ACL
   (`--enable-local-file-access` / `--allow`) is fetched via `FetchSub`,
-  parsed, and registered for the document on **both PDF and image** paths
-  (`convert.MergeFontFaces`). `.woff` / `.woff2` / `https://` / `data:` src
-  are skipped with a warning. `font-weight` / `font-style` on `@font-face`
-  are parsed but **ignored** at register time (alias is family name only).
-  Remote webfonts and WOFF decode remain deferred.
+  parsed (WOFF1 → SFNT via stdlib zlib), and registered for the document on
+  **both PDF and image** paths (`convert.MergeFontFaces`). `.woff2` / `.eot` /
+  `https://` / `data:` src are skipped with a warning. `font-weight` /
+  `font-style` on `@font-face` are parsed but **ignored** at register time
+  (alias is family name only).
+  - **WOFF1:** supported (decompress → `ParseTTF`; TrueType outlines only).
+  - **WOFF2:** not supported — needs Brotli; `go-text/typesetting` has WOFF1
+    only; no new direct modules. Documented gap (`DecodeWOFF2` /
+    `TestDecodeWOFF2Gap`).
+  - **Remote `https://` `@font-face`:** not supported by design (ACL/network
+    product policy — no webfont CDN auto-fetch).
+  - **Full Noto CJK bundle:** not shipped; use `--font-path` (policy).
+  - **CGO HarfBuzz:** rejected; allowlisted module is pure-Go
+    `go-text/typesetting` only (`TestDirectModuleAllowlist`).
+- **OpenType `halt` / `palt`:** requested via typesetting `FontFeatures` for
+  CJK / East-Asian punctuation runs in `ShapeTextFont`, and via
+  `ParseFontFeatureSettings` / `ShapeTextFontWithFeatures` when CSS
+  `font-feature-settings` is supplied by a caller.

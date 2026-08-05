@@ -50,12 +50,15 @@ Custom: `--replace name value`.
 - Multi-page tables with `<thead>` / `table-header-group` **repeat** the header
   row(s) on continuation pages (fixture-23).
 - `position: sticky` clamps to the page content box (print scrollport) within
-  the containing block (fixture-31); not overflow-scroll sticky.
+  the containing block (fixture-31). Inside `overflow: auto|scroll|hidden|clip`,
+  that box is the sticky scrollport at scroll offset 0 (PDF has no user scroll;
+  no page-edge clones for overflow-contained sticky).
 - `--zoom` scales layout (forwarded to the layout engine).
 - `--smart-shrinking` may **re-layout** with an effective zoom when content is
   wider than the page.
-- Orphan/widow control is automatic **heuristics** only; CSS `orphans` /
-  `widows` properties are not parsed.
+- Orphan/widow control: CSS `orphans` / `widows` are parsed (integer ≥1,
+  inherit, initial 2) and enforced when line boxes are countable; a geometric
+  short-block heuristic remains when line counts are unavailable.
 
 ### Fonts & links
 
@@ -65,7 +68,11 @@ Custom: `--replace name value`.
 - `--resolve-relative-links` / `--keep-relative-links` control whether relative
   `href` values are resolved against the page URL.
 - Body `#id` internal links emit GoTo annotations when geometry is available;
-  HTML header/footer `#id` links resolve to body GoTo destinations.
+  HTML header/footer `#id` links resolve to **body** GoTo destinations (ids
+  inside the HF document tree are not destinations).
+- `--header-html` / `--footer-html` run a nested child layout (body CSS subset,
+  flex/grid/images, local `@font-face` under the same ACL), clipped to the
+  reserved margin band — not a browser nested browsing context.
 
 ### Page-scoped flags and `toc`
 

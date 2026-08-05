@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<!--
+  fixture-42-container-inline-size
+  Proves: CSS Containment 3 / Conditional 5 lite — container: name / inline-size
+  establishes a size query container; @container name (inline-size > 20em)
+  applies descendant rules when the used content-box inline size matches.
+  Narrow containers (no match) keep default styles. Unnamed @container (width)
+  also works. Style/scroll-state queries and cqw units are out of scope.
+  Expected: 1 page.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<title>fixture-42 @container inline-size</title>
+<style>
+body { font-family: sans-serif; font-size: 12pt; margin: 24pt; }
+.card {
+  container: card / inline-size;
+  border: 1pt solid #246;
+  padding: 8pt;
+  margin-bottom: 12pt;
+  box-sizing: border-box;
+}
+.wide { width: 400px; }
+.narrow { width: 100px; }
+@container card (inline-size > 20em) {
+  .title { color: #c00; font-size: 18pt; font-weight: bold; }
+  .meta { display: block; color: #246; }
+}
+.meta { display: none; }
+.panel {
+  container-type: inline-size;
+  width: 350px;
+  padding: 8pt;
+  background: #eef;
+  margin-top: 16pt;
+}
+@container (width > 200px) {
+  .panel-note { color: #060; font-weight: bold; }
+}
+</style>
+</head>
+<body>
+<div class="card wide">
+  <p class="title">Wide card (matches @container card)</p>
+  <p class="meta">Shown only when inline-size &gt; 20em</p>
+</div>
+<div class="card narrow">
+  <p class="title">Narrow card (no container match)</p>
+  <p class="meta">Hidden meta</p>
+</div>
+<div class="panel">
+  <p class="panel-note">Unnamed @container (width &gt; 200px) matched.</p>
+</div>
+</body>
+</html>

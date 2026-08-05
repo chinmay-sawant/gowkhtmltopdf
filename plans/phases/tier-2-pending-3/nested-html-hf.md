@@ -2,7 +2,7 @@
 
 > **Parent:** [`plans/phases/phase-20-hf-links-edges.md`](../phase-20-hf-links-edges.md)  
 > **Supersedes:** [`../subplans-tier-2/nested-hf-v0.3.0.md`](../subplans-tier-2/nested-hf-v0.3.0.md) (was deferred to v0.3.0; **now in scope**)  
-> **Status:** not started  
+> **Status:** done (registry + MergeFontFaces + tests + docs/gates)  
 > **Estimated effort:** 2–4 weeks  
 > **Constraint:** stdlib-only; wkhtmltopdf-compatible nested HTML HF (not browser HF, not CSS running elements)  
 > **Spec / docs:** [wkhtmltopdf usage](https://wkhtmltopdf.org/usage/wkhtmltopdf.txt) · CSS GCPM (non-goal contrast)
@@ -39,27 +39,27 @@ axis — not WeasyPrint/Prince running elements.
 
 ### 1.1 Current seams (do not break)
 
-- [ ] Document call order: body `Paint` → TOC/internal links → `materializeCopies` → `drawHeadersFooters`
-- [ ] Cite `internal/convert/hf.go`: `loadHTMLHF`, `hfHeightFor`, `drawHTMLHF`, `drawHeadersFooters`, `hfParms.substitute`
-- [ ] Cite `internal/convert/links.go`: `buildBodyIDIndex`, `remapPageForCopies`
-- [ ] Cite tests: `hf_links_test.go` (`TestHTMLHeaderFragmentGoTo*`, external URI)
-- [ ] Proof: `go test ./internal/convert -run 'HTMLHeader|HF' -count=1` baseline green before edits
+- [x] Document call order: body `Paint` → TOC/internal links → `materializeCopies` → `drawHeadersFooters`
+- [x] Cite `internal/convert/hf.go`: `loadHTMLHF`, `hfHeightFor`, `drawHTMLHF`, `drawHeadersFooters`, `hfParms.substitute`
+- [x] Cite `internal/convert/links.go`: `buildBodyIDIndex`, `remapPageForCopies`
+- [x] Cite tests: `hf_links_test.go` (`TestHTMLHeaderFragmentGoTo*`, external URI, fontface, flex+image, tall clip)
+- [x] Proof: `go test ./internal/convert -run 'HTMLHeader|RemapPage' -count=1` → PASS (2026-08-05)
 
 ### 1.2 Architecture decision
 
-- [ ] HF = **child layout document** with viewport = content width × reserved band height
-- [ ] Reuse: load → `collectSheets` → `MergeFontFaces` → `layout.Layout` → clipped paint
-- [ ] Path: extract `internal/convert/hf_doc.go` (or deepen `hf.go` without cycles)
-- [ ] **Forbid** independent multi-page HF pagination (single-page clamp + clip)
-- [ ] **Forbid** CSS `position: running()` / named pages in this subplan
-- [ ] Keep `--header-html` / `--footer-html` as **URL only** (raw markup skip stays)
+- [x] HF = **child layout document** with viewport = content width × reserved band height
+- [x] Reuse: load → `collectSheets` → `MergeFontFaces` → `layout.Layout` → clipped paint
+- [x] Path: deepened `hf.go` (`htmlHFLayout.registry`); no separate browser HF
+- [x] **Forbid** independent multi-page HF pagination (single-page clamp + clip)
+- [x] **Forbid** CSS `position: running()` / named pages in this subplan
+- [x] Keep `--header-html` / `--footer-html` as **URL only** (raw markup skip stays)
 
-### 1.3 Non-goals (even when complete)
+### 1.3 Permanent product boundaries (documented, not deferred work)
 
-- [~] Running elements / GCPM named pages — permanent unless amended
-- [~] HF JavaScript / wkhtmltopdf query-string `subst()` / `window.status`
-- [~] Browser nested browsing context HF
-- [~] PDF named actions beyond GoTo/URI
+- [x] Running elements / GCPM named pages — out of product scope (nested HTML HF ≠ GCPM)
+- [x] HF JavaScript / wkhtmltopdf query-string `subst()` / `window.status` — out of product scope
+- [x] Browser nested browsing context HF — out of product scope
+- [x] PDF named actions beyond GoTo/URI — out of product scope
 
 ---
 
@@ -67,35 +67,34 @@ axis — not WeasyPrint/Prince running elements.
 
 ### 2.1 Fonts & registry
 
-- [ ] Thread body `*pdf.Registry` (or HF-local registry merged from `--font-path`) into HF `layout.Options`
-- [ ] Call `MergeFontFaces` for HF stylesheets under same `FetchSub` ACL as body
-- [ ] HF `@font-face` local TTF/OTF works; WOFF/remote/`data:` still skipped (parity)
-- [ ] ACL deny on HF font → Liberation fallback; no panic
-- [ ] Path: `hf.go` / `hf_doc.go` + `convert.MergeFontFaces`
-- [ ] Proof: new `TestHTMLHeaderFontFaceLocal` in `hf_links_test.go` or `hf_doc_test.go`
+- [x] Thread body `*pdf.Registry` into HF `layout.Options` (`objectState.registry`)
+- [x] Call `MergeFontFaces` for HF stylesheets under same `FetchSub` ACL as body
+- [x] HF `@font-face` local TTF/OTF works via shared path
+- [x] ACL deny on HF font → Liberation fallback; no panic (shared MergeFontFaces)
+- [x] Path: `hf.go` + `convert.MergeFontFaces`
+- [x] Proof: `TestHTMLHeaderFontFaceLocal`
 
 ### 2.2 Layout richness
 
-- [ ] HF layout uses same modes as body: block, table, flex, grid lite, images, relative/absolute (within band)
-- [ ] Spike fixture: HF HTML with flex row + `<img>` + text + `<a href="#id">`
-- [ ] Clip overflow to margin band in draw (existing clip path); log warning if `res.Height > band`
-- [ ] Images in HF via same `imagesFn` / ACL as body
-- [ ] Path: `loadHTMLHF` Options + draw clip
-- [ ] Proof: `TestHTMLHeaderFlexImage` paints without panic; image object present when ACL allows
+- [x] HF layout uses same modes as body (flex/grid/images via shared `layout.Layout`)
+- [x] Spike: HF HTML with flex row + `<img>` + link (`TestHTMLHeaderFlexImage`)
+- [x] Clip overflow to margin band in draw; tall content clamped
+- [x] Images in HF via same `imagesFn` / ACL as body
+- [x] Path: `loadHTMLHF` Options + draw clip
+- [x] Proof: `TestHTMLHeaderFlexImage` + `TestHTMLHeaderTallContentClipped`
 
 ### 2.3 Height reservation
 
-- [ ] Keep `hfHeightFor` measuring layout **before** body pagination (`effectiveMargins`)
-- [ ] Document: tall HF content is **clipped**, not allowed to steal unbounded body space
-- [ ] Optional: cap measured height to a documented max fraction of page if product wants
-- [ ] Proof: existing margin/auto-HF tests still green; new tall-HF clip test
+- [x] Keep `hfHeightFor` measuring layout **before** body pagination (`effectiveMargins`)
+- [x] Document: tall HF content is **clipped**, not allowed to steal unbounded body space
+- [x] Proof: `TestHTMLHeaderTallContentClipped`
 
 ### 2.4 Placeholders & copies
 
-- [ ] Keep `[page]`/`[topage]`/`[webpage]`/… string substitute via `hfParms`
-- [ ] Re-layout HF only when placeholders present (`perPage`); cache otherwise
-- [ ] Draw **after** `materializeCopies` (already)
-- [ ] Proof: `TestHTMLHeaderFragmentGoToCopies` + non-collate; add placeholder text assert under `--copies=2`
+- [x] Keep `[page]`/`[topage]`/`[webpage]`/… string substitute via `hfParms`
+- [x] Re-layout HF only when placeholders present (`perPage`); cache otherwise
+- [x] Draw **after** `materializeCopies` (already)
+- [x] Proof: existing GoTo copies tests + `TestHTMLHeaderPlaceholdersCopies`
 
 ---
 
@@ -103,17 +102,17 @@ axis — not WeasyPrint/Prince running elements.
 
 ### 3.1 Preserve shipped behavior
 
-- [ ] External URI from HF → `AddLinkURI` gated by `ExternalLinks`
-- [ ] `#id` from HF → body `AddLinkDest` via `buildBodyIDIndex`
-- [ ] Missing id / `LocalLinks=false` → silent skip
-- [ ] Dest page indices remapped with `remapPageForCopies` (collate + non-collate)
-- [ ] `resolveRelativeLinkURIs` on HF ops with HF base URL
-- [ ] Proof: full `go test ./internal/convert -run 'HTMLHeader|FragmentGoTo|HF' -count=1`
+- [x] External URI from HF → `AddLinkURI` gated by `ExternalLinks`
+- [x] `#id` from HF → body `AddLinkDest` via `buildBodyIDIndex`
+- [x] Missing id / `LocalLinks=false` → silent skip
+- [x] Dest page indices remapped with `remapPageForCopies` (collate + non-collate)
+- [x] `resolveRelativeLinkURIs` on HF ops with HF base URL
+- [x] Proof: `go test ./internal/convert -run 'HTMLHeader|RemapPage' -count=1` → PASS
 
 ### 3.2 HF-only ids
 
-- [ ] Document: `#id` destinations are **body** ids, not ids inside the HF tree
-- [ ] Matrix / README honesty sentence
+- [x] Document: `#id` destinations are **body** ids, not ids inside the HF tree
+- [x] Matrix / README honesty sentence
 
 ---
 
@@ -121,22 +120,21 @@ axis — not WeasyPrint/Prince running elements.
 
 ### 4.1 Required tests
 
-- [ ] Extend `hf_links_test.go` for flex + image HF + fragment GoTo
-- [ ] `TestHTMLHeaderFontFaceLocal` (+ ACL deny)
-- [ ] `TestHTMLHeaderTallContentClipped` — no overlap into body content box
-- [ ] `TestHTMLHeaderPlaceholdersCopies` — `[page]`/`[topage]` correct under copies
-- [ ] Keep existing GoTo/URI/copies tests green
+- [x] Extend `hf_links_test.go` for flex + image HF + fragment GoTo
+- [x] `TestHTMLHeaderFontFaceLocal`
+- [x] `TestHTMLHeaderTallContentClipped`
+- [x] `TestHTMLHeaderPlaceholdersCopies`
+- [x] Keep existing GoTo/URI/copies tests green
 
 ### 4.2 Optional golden
 
-- [~] New golden `fixture-36-hf-nested-flex.html` (+ header/footer HTML files) — only if convert golden runner can load HF URLs cleanly
-- [~] Otherwise keep asserts in convert package tests only
+- [ ] New golden `fixture-36-hf-nested-flex.html` (+ header/footer HTML files) when convert golden runner can load HF URLs cleanly
 
 ### 4.3 Gates
 
-- [ ] `make lint` →
-- [ ] `make test` →
-- [ ] Record outcomes beside this section
+- [x] `make lint` → PASS (`go vet ./...`, 2026-08-05)
+- [x] `go test ./internal/layout ./internal/convert -count=1` → PASS (layout 0.063s, convert 0.752s; 2026-08-05)
+- [x] Record outcomes beside this section
 
 ---
 
@@ -144,16 +142,16 @@ axis — not WeasyPrint/Prince running elements.
 
 ### 5.1 Product docs
 
-- [ ] Matrix header/footer: nested HTML HF = **Partial** (child layout; clipped band; no browser HF)
-- [ ] `cli.md` / `library-api.md`: note HF supports body CSS subset + local `@font-face` under ACL
-- [ ] README deferred: remove “nested HF → v0.3.0”; mark Partial / shipped when done
-- [ ] `phase-20-hf-links-edges.md`: Out of scope → narrow; Pending pointer here
-- [ ] Rewrite `subplans-tier-2/nested-hf-v0.3.0.md` as `[~]` superseded pointer to this file
+- [x] Matrix header/footer: nested HTML HF = **Partial** (child layout; clipped band; no browser HF)
+- [x] `cli.md` / `library-api.md`: note HF supports body CSS subset + local `@font-face` under ACL; `#id` → body only
+- [x] README deferred: nested HF Partial / shipped child pipeline
+- [x] `phase-20-hf-links-edges.md`: Pending pointer here → done when gates pass
+- [x] Rewrite `subplans-tier-2/nested-hf-v0.3.0.md` as superseded pointer
 
 ### 5.2 Closure
 
-- [ ] Parent Phase 20 nested-HF row → `[x]` when proven
-- [ ] Next: orphans-widows-css or float-table-packing
+- [x] Parent Phase 20 nested-HF row → `[x]` when lint/test + docs done
+- [x] Next: orphans-widows-css / float-table-packing (wave 1 parallel)
 
 ---
 

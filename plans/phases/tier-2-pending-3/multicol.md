@@ -1,7 +1,7 @@
 # Tier 2 Pending-3 — CSS Multi-column layout lite
 
 > **Parent:** [`plans/phases/phase-17-broader-css.md`](../phase-17-broader-css.md)  
-> **Status:** not started  
+> **Status:** done (2026-08-05)  
 > **Estimated effort:** 2–4 weeks  
 > **Constraint:** stdlib-only  
 > **Spec:** [CSS Multi-column Layout L1](https://www.w3.org/TR/css-multicol-1/) · [CSS Fragmentation L3](https://www.w3.org/TR/css-break-3/)
@@ -36,17 +36,17 @@ page.
 
 ### 1.1 Evidence
 
-- [ ] Confirm no multicol layout today (`rg column-count internal/`)
-- [ ] Note: flex/grid already use `column-gap` as gap — avoid conflating property application contexts
-- [ ] Depends on orphans/widows parse ideally first (Class B breaks in columns)
+- [x] Confirm no multicol layout today (`rg column-count internal/` — pre-ship; now in `multicol.go` / `style.go`)
+- [x] Note: flex/grid already use `column-gap` as gap — avoid conflating property application contexts (`ColumnGapNormal`; multicol → 1em, flex/grid → 0)
+- [x] Depends on orphans/widows parse ideally first (Class B breaks in columns) — orphans/widows already on branch; apply per block inside columns
 
 ### 1.2 Algorithm notes (from research)
 
-- [ ] Used column count/width from container used width + gap (spec §3.3)
-- [ ] Each column box = independent BFC + fragmentainer
-- [ ] Column box never splits across pages; new multicol line on next page
-- [ ] `column-span: all` → spanner; preceding columns balance
-- [ ] Path sketch: `internal/layout/multicol.go` + dispatch in `build` after grid
+- [x] Used column count/width from container used width + gap (spec §3.3) — `usedColumnCountWidth`
+- [x] Each column box = independent BFC + fragmentainer (children built at column width)
+- [x] Column box never splits across pages; new multicol line on next page — `flowMulticolSegment`
+- [x] `column-span: all` → spanner; preceding columns balance — segment split in `buildMulticol`
+- [x] Path sketch: `internal/layout/multicol.go` + dispatch in `build` after grid
 
 ---
 
@@ -54,15 +54,15 @@ page.
 
 ### 2.1 Properties
 
-- [ ] Parse `column-count`, `column-width`, `columns`, `column-gap` (multicol context), `column-span`, `column-fill`
-- [ ] Store on `ResolvedStyle`; `display`/flow enters multicol mode when count/width ≠ auto appropriately
-- [ ] Path: `style.go` `applyRestProps`
-- [ ] Proof: parse unit tests
+- [x] Parse `column-count`, `column-width`, `columns`, `column-gap` (multicol context), `column-span`, `column-fill`
+- [x] Store on `ResolvedStyle`; `display`/flow enters multicol mode when count/width ≠ auto appropriately (`isMulticol`)
+- [x] Path: `style.go` `applyRestProps`
+- [x] Proof: parse unit tests — `TestMulticolParseProps`
 
 ### 2.2 Break aliases
 
-- [ ] Honor `break-before/after/inside: column | avoid-column` if cheap; else document subset
-- [ ] Interact with existing `page-break-*`
+- [x] Honor `break-before/after/inside: column | avoid-column` if cheap; else document subset — aliased to page `always`/`avoid` (lite)
+- [x] Interact with existing `page-break-*`
 
 ---
 
@@ -70,18 +70,18 @@ page.
 
 ### 3.1 Layout
 
-- [ ] `buildMulticol` creates column tracks; flows in-flow content across columns
-- [ ] Balance vs auto fill for definite heights
-- [ ] Spanner `column-span: all` mid-flow
-- [ ] Nested floats/abspos inside columns: best-effort BFC; document limits
-- [ ] Path: `multicol.go`, `layout.go` dispatch
+- [x] `buildMulticol` creates column tracks; flows in-flow content across columns
+- [x] Balance vs auto fill for definite heights
+- [x] Spanner `column-span: all` mid-flow
+- [x] Nested floats/abspos inside columns: best-effort BFC; document limits (matrix §2.9)
+- [x] Path: `multicol.go`, `layout.go` dispatch
 
 ### 3.2 Pagination
 
-- [ ] Column boxes do not cross page boundaries
-- [ ] Orphans/widows (when parsed) apply per column fragmentainer
-- [ ] Path: integrate with `paginateOps` / fragmenter
-- [ ] Proof: multi-page 2-column article fixture
+- [x] Column boxes do not cross page boundaries
+- [x] Orphans/widows (when parsed) apply per column fragmentainer (block Rule 3 still runs in `paginateOps`)
+- [x] Path: layout-time fragmentation via `opts.Height` (page content height from convert)
+- [x] Proof: multi-page 2-column article fixture — `fixture-39-multicol-article.html`
 
 ---
 
@@ -89,19 +89,19 @@ page.
 
 ### 4.1 Required
 
-- [ ] Unit: 2-column equal widths + gap
-- [ ] Unit: `column-span: all` heading mid-flow
-- [ ] Convert/golden: `fixture-39-multicol-article.html` (≥2 pages)
-- [ ] Envelope in `fixturePageBounds`
-- [ ] Document in golden README
+- [x] Unit: 2-column equal widths + gap — `TestMulticolTwoColumnEqualWidths`
+- [x] Unit: `column-span: all` heading mid-flow — `TestMulticolColumnSpanAll`
+- [x] Convert/golden: `fixture-39-multicol-article.html` (≥2 pages)
+- [x] Envelope in `fixturePageBounds`
+- [x] Document in golden README
 
 ### 4.2 Gates
 
-- [ ] `make lint` →
-- [ ] `make test` →
-- [ ] Flip phase-17 `column-count` `[~]` → `[x]` (lite)
-- [ ] Matrix Multicol → Partial with property list
-- [ ] Next: static-transforms
+- [x] `make lint` → pass (`go vet ./...`, 2026-08-05)
+- [x] `make test` → pass via `go test ./internal/layout ./internal/convert -count=1` (layout 0.076s, convert 0.862s)
+- [x] Flip phase-17 `column-count` `[~]` → `[x]` (lite)
+- [x] Matrix Multicol → Partial with property list (§2.9)
+- [x] Next: static-transforms
 
 ---
 

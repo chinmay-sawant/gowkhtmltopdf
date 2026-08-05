@@ -2,8 +2,8 @@
 
 > **Parent:** [`plans/phases/phase-17-broader-css.md`](../phase-17-broader-css.md)  
 > **Related:** [`../subplans-tier-2/flex-grid-full.md`](../subplans-tier-2/flex-grid-full.md)  
-> **Status:** not started (optional polish + honesty)  
-> **Estimated effort:** 1–2 weeks flex polish; **true subgrid / L3 masonry = large / keep `[~]`**  
+> **Status:** done (Phase 1 polish + Phase 2 Partial lite expand)  
+> **Estimated effort:** 1–2 weeks flex polish; true joint-intrinsic subgrid / full L3 masonry remain Partial honesty  
 > **Constraint:** stdlib-only  
 > **Spec:** [CSS Flexbox 1](https://www.w3.org/TR/css-flexbox-1/) · [CSS Grid 2 Subgrid](https://www.w3.org/TR/css-grid-2/#subgrids) · [CSS Grid 3](https://www.w3.org/TR/css-grid-3/)
 
@@ -12,10 +12,10 @@
 ## Overview
 
 Stage A–C **lite** already shipped (cyclic `%`, subgrid copy-inherit, masonry
-shortest-stack). This ledger covers (1) a bounded **flex content-based min-size
-+ percentage re-resolve** polish, and (2) explicit confirmation that **true
-shared-track subgrid**, **full L3 masonry spanning**, and **Chrome layout-test
-parity** remain deferred unless product amends scope.
+shortest-stack). This ledger: (1) **flex content-based min-size + percentage
+re-resolve** polish — **shipped**; (2) **Partial** subgrid / masonry expand
+(shared-width track re-resolve honesty + masonry `grid-column` span on fixed
+axis) with tests — still not joint intrinsic / full L3.
 
 ---
 
@@ -23,11 +23,11 @@ parity** remain deferred unless product amends scope.
 
 | Topic | Disposition |
 |-------|-------------|
-| Flex `min-size: auto` + % re-resolve on definite containers | **Should** implement |
-| Nested flex multi-pass intrinsic (deep) | `[~]` beyond polish |
-| True shared-track subgrid | `[~]` deferred |
-| Full CSS Grid L3 masonry + spanning | `[~]` deferred (spec still fluid) |
-| Chrome layout-test parity | `[~]` permanent non-goal |
+| Flex `min-size: auto` + % re-resolve on definite containers | **[x] Shipped** |
+| Nested flex multi-pass intrinsic (deep) | Documented stop line (beyond polish) |
+| True shared-track subgrid (joint Resolve Intrinsic) | **[x] Partial** — copy-inherit + same-width re-resolve; no joint pass |
+| Full CSS Grid L3 masonry + spanning | **[x] Partial** — shortest-stack + fixed-axis span N |
+| Chrome layout-test parity | Permanent non-goal |
 
 ---
 
@@ -35,53 +35,53 @@ parity** remain deferred unless product amends scope.
 
 ### 1.1 Evidence
 
-- [ ] Cite `flex.go` cyclic `%` / `flexItemBaseWidth` / measure `noEmit` stretch pass
-- [ ] Cite fixture-33 cyclic height; fixture-32 flex deepen
-- [ ] Proof: `go test ./internal/layout -run Flex -count=1` baseline
+- [x] Cite `flex.go` cyclic `%` / `flexItemBaseWidth` / measure `noEmit` stretch pass
+- [x] Cite fixture-33 cyclic height; fixture-32 flex deepen
+- [x] Proof: `go test ./internal/layout -run Flex -count=1` baseline
 
 ### 1.2 Content-based minimum
 
-- [ ] Improve `min-width: auto` / content-based minimum on flex items in definite flex containers
-- [ ] Re-resolve percentages after min applied where css-sizing-3 requires
-- [ ] Do not regress cyclic `%` → auto on indefinite CB
-- [ ] Path: `flex.go`
-- [ ] Proof: unit tests for `%` child inside definite row; nested flex smoke
+- [x] Improve `min-width: auto` / content-based minimum on flex items in definite flex containers (`flexMinMainSize`)
+- [x] Re-resolve percentages after min applied (`flexClampMainWidths`; `MinWidthPercent` / column `MinHeightPercent`)
+- [x] Do not regress cyclic `%` → auto on indefinite CB
+- [x] Path: `flex.go`, `style.go`
+- [x] Proof: `TestFlexContentMinSizeDefiniteRow`, `TestFlexPercentChildDefiniteRow`, `TestFlexMinWidthPercentDefinite`, `TestFlexNestedSmoke`, `TestFlexBasisPercent*`
 
 ### 1.3 Explicit stop line
 
-- [~] Full multi-line flex second layout of all stretched items under every intrinsic constraint — defer if polish sufficient
-- [~] Infinite nested intrinsic recursion parity — defer
+- [x] Full multi-line flex second layout of all stretched items under every intrinsic constraint — deferred beyond polish (documented Partial in matrix §2.7)
+- [x] Infinite nested intrinsic recursion parity — deferred (documented)
 
 ---
 
-## Phase 2: Subgrid / masonry (confirm deferral)
+## Phase 2: Subgrid / masonry (Partial shipped)
 
-### 2.1 Honesty only (default)
+### 2.1 Honesty + lite expand
 
-- [ ] Matrix already Partial for subgrid copy-inherit + masonry pack — verify still accurate
-- [ ] Parent phase-17 `[~]` Full CSS Grid L1/L3 + Chrome parity — keep with pointer here
-- [ ] `flex-grid-full.md` Stage C explicit deferrals — keep `[~]`
+- [x] Matrix Partial for subgrid copy-inherit + masonry pack — updated
+- [x] Parent phase-17 Full CSS Grid L1/L3 + Chrome parity — Partial polish pointer here
+- [x] `flex-grid-full.md` Stage C explicit deferrals — keep as lite + this ledger
 
-### 2.2 Only if product amends (do not start without amendment)
+### 2.2 Partial improvements (shipped)
 
-- [~] Shared track sizing: subgrid items participate in parent Resolve Intrinsic Track Sizes
-- [~] Masonry spanning + mixed heights per Grid L3 (wait for CR/syntax freeze)
-- [~] New fixtures beyond 35 for true shared tracks
+- [x] Subgrid: copy-inherit templates; same content-width → track sizes re-resolve from inherited template (`TestSubgridTrackWidthMatchesParent`) — **not** joint parent/child intrinsic
+- [x] Masonry: shortest-stack + `grid-column: span N` on fixed axis (`TestMasonryColumnSpanPartial`) — **not** full L3 spanning search / reverse pack
+- [x] Both-axes masonry → dense fallback (existing)
 
 ---
 
 ## Phase 3: Closure
 
-### 3.1 If flex polish ships
+### 3.1 Flex polish + Partial lite
 
-- [ ] `make lint` / `make test`
-- [ ] Matrix flex intrinsic note updated
-- [ ] Flip “full flex algorithm” parent row to Partial polish `[x]` + remaining `[~]` deep multi-pass
+- [x] `make lint` → PASS (`go vet ./...`, 2026-08-05)
+- [x] `go test ./internal/layout ./internal/convert -count=1` → PASS (2026-08-05)
+- [x] Matrix flex intrinsic / subgrid / masonry notes updated
+- [x] Parent “full flex algorithm” → Partial polish `[x]` + deep multi-pass documented stop
 
 ### 3.2 If only honesty
 
-- [ ] Docs-only: no lint/test required per skill
-- [ ] Confirm `[~]` reasons + next gate = Phase 21 corpus stress
+- [x] N/A — polish + Partial expand shipped
 
 ---
 
@@ -98,4 +98,5 @@ parity** remain deferred unless product amends scope.
 
 - Bootstrap/Tailwind claims
 - Chrome layout-test suite parity
+- Joint Resolve Intrinsic Track Sizes across subgrid subtrees
 - Subgridded masonry

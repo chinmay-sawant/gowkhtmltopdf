@@ -165,6 +165,12 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 				e.ops[k].X += dx
 				e.ops[k].Y += dy
 			}
+			it.blockBox.x += dx
+			it.blockBox.y += dy
+			// Attach to parent so paint-time transforms/opacity stamp the subtree.
+			if b != nil {
+				b.children = append(b.children, it.blockBox)
+			}
 			lx += it.blockBox.w + it.marginR
 			if i < len(line)-1 {
 				lx += justifyGap
@@ -348,6 +354,16 @@ func (e *engine) inlineBlockAvail(n *html.Node, st ResolvedStyle) float64 {
 				e.scalePt(st.BorderLeft.Width) + e.scalePt(st.BorderRight.Width)
 		}
 		return w + e.scalePt(st.MarginLeft) + e.scalePt(st.MarginRight)
+	}
+	if isSizeContainer(st) {
+		// Size containment: shrink-to-fit as-if-empty.
+		intr := e.scalePt(st.PaddingLeft) + e.scalePt(st.PaddingRight) +
+			e.scalePt(st.BorderLeft.Width) + e.scalePt(st.BorderRight.Width) +
+			e.scalePt(st.MarginLeft) + e.scalePt(st.MarginRight)
+		if intr < 1 {
+			intr = 1
+		}
+		return intr
 	}
 	intr := e.measureCellContent(n, st)
 	intr += e.scalePt(st.PaddingLeft) + e.scalePt(st.PaddingRight) +

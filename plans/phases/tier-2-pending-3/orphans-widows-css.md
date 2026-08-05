@@ -2,7 +2,7 @@
 
 > **Parent:** [`plans/phases/phase-18-pagination-polish.md`](../phase-18-pagination-polish.md)  
 > **Related:** [`../subplans-tier-2/phase-18-pending.md`](../subplans-tier-2/phase-18-pending.md)  
-> **Status:** not started  
+> **Status:** done  
 > **Estimated effort:** 3–7 days  
 > **Constraint:** stdlib-only  
 > **Spec:** [CSS Fragmentation Level 3 — widows & orphans](https://www.w3.org/TR/css-break-3/#widows-orphans)
@@ -12,10 +12,10 @@
 ## Overview
 
 Phase 18 shipped **geometric heuristics** (`paint.go` `orphansWidows`,
-`keepHeadingWithNext`, fixture-30). CSS properties `orphans` / `widows` are
-still **not parsed**. This subplan adds author-valued integers and enforces
-Fragmentation Rule 3 against line boxes where available, falling back to the
-heuristic when line counts are unavailable.
+`keepHeadingWithNext`, fixture-30). This subplan adds author-valued CSS
+`orphans` / `widows` integers and enforces Fragmentation Rule 3 against line
+boxes where available, falling back to the heuristic when line counts are
+unavailable.
 
 ---
 
@@ -33,19 +33,19 @@ heuristic when line counts are unavailable.
 
 ### 1.1 Current behavior
 
-- [ ] Confirm zero handlers for `orphans`/`widows` under `internal/css/` + `applyRestProps`
-- [ ] Cite `paint.go:orphansWidows` (~14–60pt straddler heuristic)
-- [ ] Cite fixture-30 honesty: CSS props not parsed
-- [ ] Proof: `rg -n 'orphans|widows' internal/css internal/layout/style.go`
+- [x] Confirm zero handlers for `orphans`/`widows` under `internal/css/` + `applyRestProps` (pre-change; now handled in `applyRestProps`)
+- [x] Cite `paint.go:orphansWidows` (~14–60pt straddler heuristic → `orphansWidowsHeuristic`)
+- [x] Cite fixture-30 honesty: CSS props not parsed (historical); fixture-37 covers CSS props
+- [x] Proof: `rg -n 'orphans|widows' internal/css internal/layout/style.go` → `Orphans`/`Widows` fields + parse
 
 ### 1.2 Spec rules to implement
 
-- [ ] `orphans` / `widows`: inherited; initial **2**; integer ≥ 1; invalid → ignore declaration
-- [ ] Applies to block containers that establish an IFC (have line boxes)
-- [ ] Class B break only if lines before ≥ orphans **and** lines after ≥ widows
-- [ ] Forced breaks override widow/orphan restrictions
-- [ ] `break-inside: avoid` remains higher priority than widows (modern fragmentation text)
-- [ ] Progress escape: if no legal break and content won't fit, may break anyway (document)
+- [x] `orphans` / `widows`: inherited; initial **2**; integer ≥ 1; invalid → ignore declaration
+- [x] Applies to block containers that establish an IFC (have line boxes)
+- [x] Class B break only if lines before ≥ orphans **and** lines after ≥ widows
+- [x] Forced breaks override widow/orphan restrictions (`TestBreakBeforeAlwaysIgnoresOrphans`)
+- [x] `break-inside: avoid` remains higher priority than widows (modern fragmentation text) — `avoidInside` runs before `orphansWidows`
+- [x] Progress escape: if no legal break and content won't fit, may break anyway (documented in `orphansWidows` comment)
 
 ---
 
@@ -53,16 +53,16 @@ heuristic when line counts are unavailable.
 
 ### 2.1 Style fields
 
-- [ ] Add `Orphans`, `Widows int` on `ResolvedStyle` (default 2)
-- [ ] Parse in `applyRestProps` (or dedicated helper): integer ≥ 1
-- [ ] Inherit through cascade
-- [ ] Path: `internal/layout/style.go`, optionally `internal/css` if needed
-- [ ] Proof: unit test parse + inherit
+- [x] Add `Orphans`, `Widows int` on `ResolvedStyle` (default 2)
+- [x] Parse in `applyRestProps` (or dedicated helper): integer ≥ 1
+- [x] Inherit through cascade
+- [x] Path: `internal/layout/style.go`, optionally `internal/css` if needed
+- [x] Proof: unit test parse + inherit (`TestOrphansWidowsParseAndInherit`)
 
 ### 2.2 Alias hygiene
 
-- [ ] Confirm `page-break-*` → `break-*` already mapped; no change required unless gaps found
-- [ ] Document interaction with existing `page-break-inside: avoid`
+- [x] Confirm `page-break-*` → `break-*` already mapped; no change required unless gaps found
+- [x] Document interaction with existing `page-break-inside: avoid`
 
 ---
 
@@ -70,24 +70,24 @@ heuristic when line counts are unavailable.
 
 ### 3.1 Line-aware path (preferred)
 
-- [ ] When fragmenting a text block, count line boxes before/after candidate break
-- [ ] Reject Class B breaks that violate orphans/widows
-- [ ] If block has fewer lines than the property → keep all lines together
-- [ ] Path: `paint.go` pagination helpers / text split sites
-- [ ] Proof: unit test with known line metrics + `orphans:4; widows:2`
+- [x] When fragmenting a text block, count line boxes before/after candidate break
+- [x] Reject Class B breaks that violate orphans/widows
+- [x] If block has fewer lines than the property → keep all lines together
+- [x] Path: `paint.go` pagination helpers / text split sites
+- [x] Proof: unit test with known line metrics + `orphans:4; widows:2` (`TestOrphansWidowsLineAwareKeepTogether`)
 
 ### 3.2 Heuristic fallback
 
-- [ ] Keep geometric `orphansWidows` when line boxes unavailable
-- [ ] When CSS props differ from initial 2, prefer line-aware path; document fallback
-- [ ] Optional: `TestOrphansWidowsHeuristic` under `internal/layout/` (phase-18-pending open row)
+- [x] Keep geometric `orphansWidows` when line boxes unavailable (`orphansWidowsHeuristic`)
+- [x] When CSS props differ from initial 2, prefer line-aware path; document fallback
+- [x] Optional: `TestOrphansWidowsHeuristic` under `internal/layout/` (`TestOrphansWidowsHeuristicFallback`)
 
 ### 3.3 Fixtures
 
-- [ ] New golden **or** convert test: `orphans:4; widows:2` with forced multi-page paragraph
-- [ ] Do **not** edit fixture-11 / fixture-23 / fixture-30 envelopes tightly
-- [ ] Optional: extend fixture-30 with a CSS-prop section (new file preferred: `fixture-37-orphans-css.html`)
-- [ ] Forced `break-before: page` mid-flow ignores orphans (assert)
+- [x] New golden **or** convert test: `orphans:4; widows:2` with forced multi-page paragraph
+- [x] Do **not** edit fixture-11 / fixture-23 / fixture-30 envelopes tightly
+- [x] Optional: extend fixture-30 with a CSS-prop section (new file preferred: `fixture-37-orphans-css.html`)
+- [x] Forced `break-before: page` mid-flow ignores orphans (assert via `break-before: always`)
 
 ---
 
@@ -95,17 +95,18 @@ heuristic when line counts are unavailable.
 
 ### 4.1 Honesty
 
-- [ ] Matrix §2.6: Partial → note **CSS properties parsed**; heuristics remain for edge cases
-- [ ] `cli.md` / `library-api.md`: update “CSS properties ignored” sentence
-- [ ] Parent phase-18 Out of scope: remove “property parsing” or narrow to full css-break-3
-- [ ] Flip phase-18 `[~]` CSS orphans/widows parse row → `[x]` when proven
+- [x] Matrix §2.6: Partial → note **CSS properties parsed**; heuristics remain for edge cases
+- [x] `cli.md` / `library-api.md`: update “CSS properties ignored” sentence
+- [x] Parent phase-18 Out of scope: remove “property parsing” or narrow to full css-break-3
+- [x] Flip phase-18 `[~]` CSS orphans/widows parse row → `[x]` when proven
 
 ### 4.2 Gates
 
-- [ ] `make lint` →
-- [ ] `make test` →
-- [ ] Record outcomes
-- [ ] Next: float-table-packing or multicol
+- [x] `make lint` → `go vet ./...` exit 0 (2026-08-05)
+- [x] `go test ./internal/layout ./internal/convert -count=1` → both ok; `TestGoldenCorpusAllFixtures/fixture-37-orphans-css.html` PASS
+- [x] `make test` → `go test ./...` exit 0 (all packages ok)
+- [x] Record outcomes
+- [x] Next: float-table-packing or multicol
 
 ---
 
