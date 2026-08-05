@@ -205,13 +205,15 @@ func paginateOps(res *Result, contentH float64) []int {
 			boundary := float64(page+1) * contentH
 			if op.Y+opH > boundary+1e-9 {
 				if dy := boundary - op.Y; dy > 1e-6 {
-					// Snap text (+ following flow) by dy. Same-row fills above
-					// the baseline are left behind by shiftFlowY; push them by
-					// the same dy and snap any remnant above the boundary
-					// (fixture-31 Row 28 white bg). Do not inflate dy via
-					// minY — that over-shifted multi-cell table rows into
-					// 100+ pages and hung splitCrossingRects.
+					// Snap text (+ following flow). Same-row fills sit above the
+					// baseline; include them in dy via minY so their tops clear
+					// onto this page with the text (fixture-31 Row 28 white bg).
+					// Keep chrome matching tight (one row) so table reports do
+					// not inflate dy. Never clamp fill tops to `boundary` alone
+					// — that collapses them onto the text Y and leaves section
+					// gray showing through the ascent/padding band.
 					oldY := op.Y
+					minY := oldY
 					var chrome []int
 					for j := range res.Ops {
 						o := &res.Ops[j]
@@ -231,16 +233,16 @@ func paginateOps(res *Result, contentH float64) []int {
 							continue
 						}
 						chrome = append(chrome, j)
+						if o.Y < minY {
+							minY = o.Y
+						}
 					}
+					dy = boundary - minY
 					shiftFlowY(res, i, i, oldY-0.01, dy)
 					for _, j := range chrome {
 						o := &res.Ops[j]
-						// Left behind (above oldY): apply the same snap dy.
 						if o.Y < oldY-0.01 {
 							o.Y += dy
-						}
-						if o.Y < boundary {
-							o.Y = boundary
 						}
 					}
 				} else {

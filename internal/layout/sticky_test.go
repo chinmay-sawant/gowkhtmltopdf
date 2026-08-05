@@ -571,6 +571,7 @@ func TestStickyFixture31Row28HasWhiteBackground(t *testing.T) {
 		t.Fatalf("Row 28 still on page 0 (y=%.2f)", row28Y)
 	}
 	covered := false
+	var white Op
 	for _, op := range res.Ops {
 		if op.Kind != OpFillRect || op.H < 5 || op.H > 40 {
 			continue
@@ -578,13 +579,18 @@ func TestStickyFixture31Row28HasWhiteBackground(t *testing.T) {
 		if op.R < 0.99 || op.G < 0.99 || op.B < 0.99 {
 			continue
 		}
-		if op.Y <= row28Y+1 && op.Y+op.H >= row28Y+4 {
+		// Must cover the text band AND start above the baseline so section
+		// gray cannot show through ascenders/padding (was clamped to text Y).
+		if op.Y <= row28Y-2 && op.Y+op.H >= row28Y+4 {
 			covered = true
+			white = op
 			break
 		}
 	}
 	if !covered {
-		t.Errorf("Row 28 at y=%.2f has no white row background", row28Y)
+		t.Errorf("Row 28 at y=%.2f has no white row background starting above baseline", row28Y)
+	} else if white.Y >= row28Y-0.5 {
+		t.Errorf("Row 28 white fill y=%.2f ≈ text y=%.2f; gray will show through", white.Y, row28Y)
 	}
 }
 
