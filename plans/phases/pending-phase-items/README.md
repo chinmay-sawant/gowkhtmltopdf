@@ -2,7 +2,7 @@
 
 > **Parent:** [`plans/phases/phase-21-arbitrary-websites.md`](../phase-21-arbitrary-websites.md) · [`plans/10-canonical-post-mvp-roadmap.md`](../../10-canonical-post-mvp-roadmap.md)  
 > **Branch:** `feature/pending-phase-items`  
-> **Status:** executing (Phases 1,3,5 done; 2+4 Partial; Phase 6 next)  
+> **Status:** closed for sequential pass (2026-08-05) — 1,3,5 done; 2,4,6,7 Partial; 8–9 out of scope; 10–11 deferred  
 > **Estimated effort:** multi-week (quick wins first → hard/policy last)  
 > **Skill:** [`skills/phase-wise-checklist/SKILLS.md`](../../../skills/phase-wise-checklist/SKILLS.md)  
 > **Constraint:** stdlib layout + allowlisted `go-text/typesetting`; no CGO HarfBuzz; no browser embed  
@@ -38,8 +38,8 @@ above when relevant). Do not mark `[x]` without evidence.
 | 3 | [`03-unicode-glyph-fallback.md`](03-unicode-glyph-fallback.md) — IPA / missing glyphs | Pronunciation, symbols | Quick–medium | Phase 19 fonts; WOFF2 out | **done** (2026-08-05) |
 | 4 | [`04-print-media-stylesheets.md`](04-print-media-stylesheets.md) — `@media print` + sheet volume | Chrome ~10pp vs our ~93pp | Medium | Phase 21 §21.3; matrix `@media` weak | **Partial** (matching done; density open) |
 | 5 | [`05-url-mode-flags.md`](05-url-mode-flags.md) — URL-mode flag recipe | Usable paste-URL UX | Quick (docs) | Phase 21 §21.5 / cli.md | **done** (2026-08-05) |
-| 6 | [`06-selector-cascade-gaps.md`](06-selector-cascade-gaps.md) — skin selectors | Rules never match | Medium–hard | Selectors Partial; `:has` shipped | **Should** |
-| 7 | [`07-layout-hard-edges.md`](07-layout-hard-edges.md) — flex/grid/float depth | Marketing + gadgets | Hard | flex-grid-remaining Partial | **Should / Partial** |
+| 6 | [`06-selector-cascade-gaps.md`](06-selector-cascade-gaps.md) — skin selectors | Rules never match | Medium–hard | Selectors Partial; `:has` shipped | **Partial** (`^=`/`$=`/`|=` 2026-08-05) |
+| 7 | [`07-layout-hard-edges.md`](07-layout-hard-edges.md) — flex/grid/float depth | Marketing + gadgets | Hard | flex-grid-remaining Partial | **Partial stop** (2026-08-05) |
 | 8 | [`08-svg-images.md`](08-svg-images.md) — SVG-as-`img` | Wiki logo / icons | Hard / policy | Matrix unsupported | **[x] out of scope** unless amended |
 | 9 | [`09-remote-webfonts.md`](09-remote-webfonts.md) — WOFF2 / HTTPS `@font-face` | Chrome font faces | Hard + security | Phase 19 permanent non-goal | **[x] out of scope** unless amended |
 | 10 | [`10-javascript.md`](10-javascript.md) — JS / hydration | SPAs | Very hard | Phase 22 | **[~] → Phase 22** |

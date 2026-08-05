@@ -2,7 +2,8 @@
 // declarations-and-rules parser, selector matching against the html tree,
 // specificity ordering, and value helpers (lengths, colors, font families).
 //
-// Scope: `*`, type, `.class`, `#id`, attribute selectors ([attr]/[attr=val]),
+// Scope: `*`, type, `.class`, `#id`, attribute selectors (`[attr]`, `=`, `~=`,
+// `*=`, `^=`, `$=`, `|=`),
 // :first-child/:last-child/:nth-child/:has()/:not(), descendant/child/sibling
 // combinators, `@media` type + size-feature matching (see MediaMatches),
 // `@container` size queries (inline-size/width + and/or/not), `!important`,
@@ -59,11 +60,11 @@ type SelectorPart struct {
 }
 
 // AttrSelector is [name], [name=value] (exact), [name~=word] (space-separated
-// word), or [name*=substr] (substring). Other CSS attribute operators are not
-// implemented yet.
+// word), [name*=substr] (substring), [name^=prefix], [name$=suffix], or
+// [name|=ident] (exact or prefix-plus-hyphen).
 type AttrSelector struct {
 	Name  string
-	Op    string // "", "=", "~=", "*="
+	Op    string // "", "=", "~=", "*=", "^=", "$=", "|="
 	Value string
 }
 
@@ -809,11 +810,9 @@ func parseAttrSelector(s string) (AttrSelector, bool) {
 		}
 	}
 	switch op {
-	case "=", "~=", "*=":
+	case "=", "~=", "*=", "^=", "$=", "|=":
 		return AttrSelector{Name: strings.ToLower(name), Op: op, Value: val}, true
 	default:
-		// ^= $= |= recognized so the selector is skipped cleanly by the caller
-		// when we return false — avoid treating "typeof^" as an ident.
 		return AttrSelector{}, false
 	}
 }
@@ -947,6 +946,22 @@ func matchPart(p SelectorPart, n *html.Node) bool {
 			}
 		case "*=":
 			if a.Value == "" || !strings.Contains(val, a.Value) {
+				return false
+			}
+		case "^=":
+			if a.Value == "" || !strings.HasPrefix(val, a.Value) {
+				return false
+			}
+		case "$=":
+			if a.Value == "" || !strings.HasSuffix(val, a.Value) {
+				return false
+			}
+		case "|=":
+			// Exact match or value is followed by a hyphen (HTML lang / BCP47-style).
+			if a.Value == "" {
+				return false
+			}
+			if val != a.Value && !strings.HasPrefix(val, a.Value+"-") {
 				return false
 			}
 		default:

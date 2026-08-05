@@ -224,7 +224,7 @@ Status legend as in §2; evidence in `internal/css/css.go`.
 | Universal (`*`) | Implemented | `css.go:456-459` |
 | Descendant (`div p`), child (`ul > li`) | Implemented | combinators `css.go:356-362`; matching `css.go:528-543` |
 | Sibling (`a + b`, `a ~ b`) | Implemented | next-sibling `+` and subsequent-sibling `~` (`css.Match`); test `TestSiblingCombinators` |
-| Attribute (`[href]`, `[href="…"]`) | Partial | presence `[attr]`, exact `[attr=value]`, word `[attr~=word]`, substring `[attr*=substr]`; `^=`/`$=`/`|=` not yet |
+| Attribute (`[href]`, `[href="…"]`) | Partial | presence, exact `=`, word `~=`, substring `*=`, prefix `^=`, suffix `$=`, dash `|=`; `TestAttrWordAndSubstring`, `TestAttrPrefixSuffixDash` |
 | `:first-child`, `:last-child`, `:nth-child(n)` | Implemented | `odd`/`even`/`an+b`/integer; tests `TestMatch`, `TestNthChildZebraSheet` |
 | `:link`, `:visited` | Partial | Print semantics: match any `a` with non-empty `href` (no visit history; `:visited` ≡ `:link`). Specificity counts as a class-level pseudo. Proof: `TestLinkVisitedPseudos`, `TestLinkPseudoColor` |
 | `:hover`, `:active`, `:focus` | Not implemented (accepted, never match) | Parsed onto the compound but `matchPseudo` returns false so `a:hover` does not degrade to bare `a` |

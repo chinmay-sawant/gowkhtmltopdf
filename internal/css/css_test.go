@@ -399,6 +399,51 @@ func TestAttrWordAndSubstring(t *testing.T) {
 	}
 }
 
+func TestAttrPrefixSuffixDash(t *testing.T) {
+	root := treeFor(t, `<html><body>
+		<a id="pdf" href="/files/report.pdf">PDF</a>
+		<a id="png" href="/files/report.png">PNG</a>
+		<a id="PDF" href="/files/report.PDF">PDF2</a>
+		<span id="en" lang="en"></span>
+		<span id="enus" lang="en-US"></span>
+		<span id="fr" lang="fr"></span>
+	</body></html>`)
+	body := root.FirstChild("html").FirstChild("body")
+	byID := map[string]*html.Node{}
+	for _, c := range body.Children {
+		if c.Type == html.ElementNode {
+			byID[c.Attribute("id")] = c
+		}
+	}
+	sel, ok := parseSelector(`a[href$=".pdf"]`)
+	if !ok {
+		t.Fatal("parse $=")
+	}
+	if !Match(sel, byID["pdf"]) {
+		t.Error("pdf should match href$=.pdf")
+	}
+	if Match(sel, byID["png"]) || Match(sel, byID["PDF"]) {
+		t.Error("$= is case-sensitive; png/PDF must not match .pdf")
+	}
+	sel2, ok := parseSelector(`a[href^="/files/"]`)
+	if !ok {
+		t.Fatal("parse ^=")
+	}
+	if !Match(sel2, byID["pdf"]) || Match(sel2, byID["en"]) {
+		t.Error("^= /files/ should match pdf links only")
+	}
+	sel3, ok := parseSelector(`[lang|="en"]`)
+	if !ok {
+		t.Fatal("parse |=")
+	}
+	if !Match(sel3, byID["en"]) || !Match(sel3, byID["enus"]) {
+		t.Error("|=en should match en and en-US")
+	}
+	if Match(sel3, byID["fr"]) {
+		t.Error("fr should not match lang|=en")
+	}
+}
+
 func TestSiblingCombinators(t *testing.T) {
 	root := treeFor(t, `<html><body><div><p id="a">A</p><span>x</span><p id="b">B</p><p id="c">C</p></div></body></html>`)
 	div := root.FirstChild("html").FirstChild("body").FirstChild("div")
