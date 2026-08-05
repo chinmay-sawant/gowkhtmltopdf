@@ -80,7 +80,7 @@ model.
 |------|--------|
 | HTML HF → body **fragment** (`#id`) GoTo | **[x] Shipped** — `drawHTMLHF` + `buildBodyIDIndex` + `remapPageForCopies` |
 | Shared matrix/fidelity refresh | **[x]** Shared doc-honesty pass |
-| Full HTML HF as nested documents | **[~]** deferred to **v0.3.0** — [`subplans-tier-2/nested-hf-v0.3.0.md`](subplans-tier-2/nested-hf-v0.3.0.md) |
+| Full HTML HF as nested documents | **[~] → in progress plan** [`tier-2-pending-3/nested-html-hf.md`](tier-2-pending-3/nested-html-hf.md) (pulled from v0.3.0) |
 
 ---
 
@@ -95,6 +95,7 @@ model.
 
 ## Out of scope
 
-- Full HTML HF as nested full browser documents
-- Nested HF **document** model — deferred to v0.3.0 ([`nested-hf-v0.3.0.md`](subplans-tier-2/nested-hf-v0.3.0.md))
+- Full browser HTML HF as nested browsing contexts
+- Nested HF **document** model — **now planned in** [`tier-2-pending-3/nested-html-hf.md`](tier-2-pending-3/nested-html-hf.md) (former v0.3.0 deferral rescinded; see superseded [`subplans-tier-2/nested-hf-v0.3.0.md`](subplans-tier-2/nested-hf-v0.3.0.md))
 - PDF named actions beyond GoTo/URI
+- CSS running elements / named pages (still out; nested HTML HF ≠ GCPM)

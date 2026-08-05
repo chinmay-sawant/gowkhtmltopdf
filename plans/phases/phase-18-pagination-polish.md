@@ -88,6 +88,7 @@ smart-shrinking re-layout.
 | Fidelity + matrix pagination blurbs | **[x]** Shared doc-honesty pass |
 | CLI docs thead repeat | **[x]** `cli.md` / `library-api.md` notes |
 | Optional orphans fixture | **New** `fixture-30-orphans-heuristic.html` (do not edit 11/23) |
+| CSS `orphans`/`widows` parse | **[~]** → [`tier-2-pending-3/orphans-widows-css.md`](tier-2-pending-3/orphans-widows-css.md) |
 
 ---
 
@@ -105,4 +106,4 @@ smart-shrinking re-layout.
 - Full CSS Paged Media Level 3
 - Named pages / running elements (beyond existing HF)
 - Footnote regions
-- CSS `orphans` / `widows` property parsing (heuristics only unless amended)
+- CSS `orphans` / `widows` property parsing — **moved to** [`tier-2-pending-3/orphans-widows-css.md`](tier-2-pending-3/orphans-widows-css.md) (heuristics already shipped)

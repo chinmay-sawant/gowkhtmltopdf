@@ -58,7 +58,7 @@ not OpenType GSUB/GPOS / HarfBuzz.
 - [x] Support `url(file)` / relative path under allowlist end-to-end (PDF `mergeFontFaces`; `fontface_test.go`)
 - [x] Register face for document lifetime consistently with `--font-path` (PDF registry alias)
 - [x] Matrix §4 `@font-face` → Partial (local TTF/OTF PDF + image; shared doc-honesty)
-- [~] Remote / WOFF download — **out of scope** unless policy amended
+- [~] Remote / WOFF download — **[~]** → [`tier-2-pending-3/fonts-remaining.md`](tier-2-pending-3/fonts-remaining.md)
 - [x] Image-mode `@font-face` — wired via `convert.MergeFontFaces` (`imageout` + `fontface_test.go`)
 - [x] `font-weight` / `font-style` on `@font-face` ignored at register (documented)
 - [x] `data:` `@font-face` src rejected in `mergeFontFaces`
@@ -81,8 +81,8 @@ not OpenType GSUB/GPOS / HarfBuzz.
 - [x] Hangul: capable face via font-path; CI subset vendored
 - [x] Docs: `documentation/fonts.md` shaping honesty language
 - [x] OpenType GSUB via `go-text/typesetting` (`ShapeTextFont`; presentation-form fallback)
-- [~] OpenType `halt`/`palt` feature tags — **not wired** / not planned
-- [~] CGO HarfBuzz — **rejected** (allowlist is `go-text/typesetting` only)
+- [~] OpenType `halt`/`palt` feature tags — **[~]** → [`tier-2-pending-3/fonts-remaining.md`](tier-2-pending-3/fonts-remaining.md)
+- [~] CGO HarfBuzz — **rejected** (allowlist is `go-text/typesetting` only); see fonts-remaining
 
 ### 19.6 Localization product notes
 
@@ -123,9 +123,9 @@ not OpenType GSUB/GPOS / HarfBuzz.
 | `@font-face` local wiring vs matrix | **[x]** PDF + image Partial (`fontface_test.go` + imageout + matrix) |
 | Compatibility-matrix i18n / CJK rows | **[x]** Shared doc-honesty pass |
 | OpenType GSUB via `go-text/typesetting` | **[x]** [`shaping-gotext-typesetting.md`](subplans-tier-2/shaping-gotext-typesetting.md) |
-| OpenType `halt`/`palt` / full Indic / CGO HarfBuzz | **[~]** halt/palt not wired; Indic not production-claimed; CGO HarfBuzz rejected |
-| Bundle full Noto CJK | **[~] no** — `--font-path` is enough |
-| WOFF/WOFF2 | **[~] not required** for typesetting; see shaping subplan WOFF clarification |
+| OpenType `halt`/`palt` / full Indic / CGO HarfBuzz | **[~]** → [`tier-2-pending-3/fonts-remaining.md`](tier-2-pending-3/fonts-remaining.md) |
+| Bundle full Noto CJK | **[~] no** — `--font-path` is enough ([fonts-remaining](tier-2-pending-3/fonts-remaining.md)) |
+| WOFF/WOFF2 | **[~]** → [fonts-remaining](tier-2-pending-3/fonts-remaining.md) |
 | Image-mode `@font-face` | **[x]** [`subplans-tier-2/image-mode-fontface.md`](subplans-tier-2/image-mode-fontface.md) |
 
 ---
