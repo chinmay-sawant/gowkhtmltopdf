@@ -6,7 +6,8 @@
 // Report-engine scope: block and inline flow, margin collapsing between
 // siblings, tables (separate borders, colspan), images, lists, text wrapping
 // with the embedded Liberation Sans font, float lite (left/right + clear),
-// real inline-block, box-sizing, position relative/absolute lite, and a
+// real inline-block, box-sizing, position relative/absolute/fixed lite,
+// print-scoped sticky (page content box = scrollport; see sticky.go), and a
 // partial flex (row/column) subset and CSS grid lite (tracks, gap, column span).
 package layout
 
@@ -104,6 +105,10 @@ type Op struct {
 	// page at viewport-relative coordinates.
 	Fixed bool
 
+	// StickyID links display-list ops to a position:sticky box after parent
+	// prependChrome shifts op indices (0 = not sticky).
+	StickyID int
+
 	// ZIndex paints later (higher) above earlier ops when non-zero or set.
 	ZIndex    int
 	ZIndexSet bool
@@ -125,6 +130,7 @@ type engine struct {
 	scale     float64 // zoom factor applied to style lengths (>= 1)
 	zIndex    int
 	zIndexSet bool
+	stickySeq int // monotonically increasing sticky box IDs (for Op.StickyID)
 }
 
 // faceFor selects the TrueType face for a resolved style (bold/italic),
@@ -262,6 +268,15 @@ type box struct {
 	// headerRows is the number of leading rows that came from <thead> /
 	// table-header-group (for repeating headers across pages).
 	headerRows int
+	// sticky: print-scoped position:sticky (see sticky.go). Insets are scaled
+	// points; cb* is filled at pagination time from the parent box.
+	sticky                         bool
+	stickyID                       int
+	stickyTop, stickyRight         float64
+	stickyBottom, stickyLeft       float64
+	stickyTopSet, stickyRightSet   bool
+	stickyBottomSet, stickyLeftSet bool
+	cbX, cbY, cbW, cbH             float64
 	// replaced
 	imgSrc  string
 	imgData []byte
@@ -311,10 +326,13 @@ func (e *engine) build(n *html.Node, availW, x, y float64) *box {
 	if b == nil {
 		b = e.buildBlock(n, st, availW, x, y)
 	}
-	if b != nil && (st.Position == "relative" || st.Position == "sticky") {
+	if b != nil && st.Position == "relative" {
 		e.applyRelativeOffset(b)
 	}
 	b.opStart, b.opEnd = start, len(e.ops)-1
+	if b != nil && st.Position == "sticky" {
+		e.tagSticky(b)
+	}
 	if b != nil && st.Position == "fixed" {
 		e.markOpsFixed(b.opStart, b.opEnd)
 	}

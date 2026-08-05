@@ -339,10 +339,11 @@ func (e *engine) flowFlexColumn(parent *box, kids []*html.Node, contentW, conten
 	return cy
 }
 
-// applyRelativeOffset shifts a positioned:relative (or sticky-lite) box and
-// its ops by top/left (right/bottom when the corresponding auto flags are set).
+// applyRelativeOffset shifts a position:relative box and its ops by top/left
+// (right/bottom when the corresponding auto flags are set). position:sticky
+// uses tagSticky + applyStickyPrint instead (print scrollport clamp).
 func (e *engine) applyRelativeOffset(b *box) {
-	if b == nil || (b.style.Position != "relative" && b.style.Position != "sticky") {
+	if b == nil || b.style.Position != "relative" {
 		return
 	}
 	st := b.style

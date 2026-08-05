@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"gowkhtmltopdf/internal/cli"
+	"gowkhtmltopdf/internal/convert"
 	"gowkhtmltopdf/internal/css"
 	"gowkhtmltopdf/internal/html"
 	"gowkhtmltopdf/internal/layout"
@@ -443,6 +444,7 @@ func Run(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 	}
 
 	sheets := collectSheets(ctx, loader, root, res.Base, obj.Load, log)
+	registry = convert.MergeFontFaces(ctx, loader, registry, sheets, res.Base, obj.Load, 1, log)
 
 	cache := map[string][]byte{}
 	imagesFn := func(src string) ([]byte, error) {

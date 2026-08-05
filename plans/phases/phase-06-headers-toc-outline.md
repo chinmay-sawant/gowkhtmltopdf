@@ -48,9 +48,9 @@ Port outline extraction, PDF bookmarks, text/HTML headers & footers, TOC generat
 - [~] Custom `--xsl-style-sheet`: unsupported - error or ignore with warning - warns + ignores
 
 ### 6.5 Links
-- [x] Internal: same-document anchors + cross-object URL map (`urlToPageObj`) - MVP: TOC forward/back links (block entries + heading boxes → AddLinkDest); arbitrary inline `<a href="#x">` source rects skipped (inline elements produce no boxes; documented TODO); cross-object map deferred
-- [x] External: URI annotations - layout OpLinkURI → AddLinkURI (verified end-to-end)
-- [x] Flags: useLocalLinks, useExternalLinks, resolveRelativeLinks - ExternalLinks gate neutralizes OpLinkURI ops (OpKind sentinel); LocalLinks read; resolveRelativeLinks deferred
+- [x] Internal: same-document anchors + cross-object URL map (`urlToPageObj`) - body `#id` GoTo via `applyInternalLinks` + `buildBodyIDIndex`; TOC forward/back; HTML HF `#id` → body GoTo via `drawHTMLHF` + `AddLinkDest` (copies-aware)
+- [x] External: URI annotations - layout OpLinkURI → AddLinkURI (body + HTML HF); gated by ExternalLinks
+- [x] Flags: useLocalLinks, useExternalLinks, resolveRelativeLinks - LocalLinks/ExternalLinks honored on body and HTML HF; `resolveRelativeLinkURIs` applied to body and HTML HF ops when `--resolve-relative-links` is on
 
 ### 6.6 Forms
 - [~] `produceForms` deferred - optional post-MVP AcroForm text/checkbox only - deferred as planned
@@ -74,7 +74,7 @@ Port outline extraction, PDF bookmarks, text/HTML headers & footers, TOC generat
 - **Body pages painted once, then `ReorderPages` moves TOC pages to the front** - no scratch docs, no re-paint; annotations/outline/HF passes all use final indices afterwards.
 - **External-link gating neutralizes ops in place** (sentinel OpKind Paint ignores) instead of filtering - removing ops would corrupt box-tree op indices and crash pagination.
 - **Auto margin measures text via font line box, HTML HF via its layout height**, pre-loading/caching HTML HFs in the loading loop (upstream loads headers before rendering).
-- **Known limitations**: dump-outline XML pages are body-relative (no TOC offset); TOC fixed-point may drift if re-layout changes the count; HTML HF links not carried to body pages; `[topage]` ignores copies (HF baked before duplication); `[subject]` expands empty (no setting field); inline `<a href="#x">` source-rect links not emitted.
+- **Known limitations**: TOC fixed-point may drift if re-layout changes the count; `[subject]` expands empty (no setting field); inline `<a href="#x">` source rects are emitted when layout produces a paint box (text runs) and skipped when the inline has no box; full nested HTML HF documents (as separate browser documents) remain out of scope. HTML HF external URI annotations and same-document `#id` → body GoTo are shipped (including copies-aware dest indices).
 
 ---
 

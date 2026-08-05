@@ -2,9 +2,10 @@
 
 ## Golden HTML (`testdata/golden/`)
 
-Twenty-one report-style HTML fixtures (`fixture-01` … `fixture-21`) exercise
-invoices, tables, page breaks, CSS, links, images, lists, typography, and
-a multi-section detailed operations report. See
+Thirty report-style HTML fixtures (`fixture-01` … `fixture-30`) exercise
+invoices, tables (incl. thead repeat), page breaks, CSS (float/flex/grid/
+position lite), links, images, lists, typography, CJK/`--font-path`, and
+orphan/widow heuristics. See
 [`testdata/golden/README.md`](../testdata/golden/README.md).
 
 CI / local structure tests:
@@ -45,9 +46,11 @@ Always re-open a regenerated PDF in a real viewer when changing the PDF writer.
 | `make samples` | Refresh `output/` |
 | `make clean` | Remove `testdata/golden/out` |
 
-## Expected quality bar (MVP)
+## Expected quality bar (MVP+)
 
 - Latin report HTML: readable text, sane letter-spacing, multi-page tables  
 - TOC/outline showcase: navigable bookmarks, page headers/footers  
-- Wikipedia-class pages: may open as multi-page PDFs but **layout and
-  non-Latin fonts are incomplete** - tracked as follow-up (CID fonts, CSS)
+- Tier 2 report subset: float/flex/grid lite, thead repeat, Type0/CJK with a
+  capable face via `--font-path`  
+- Wikipedia-class pages: may open as multi-page PDFs but **open-web layout
+  parity is not a pass criterion** — Phase 21 / fidelity smoke only

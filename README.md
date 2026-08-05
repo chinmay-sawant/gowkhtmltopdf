@@ -5,12 +5,15 @@ Pure-Go, stdlib-only HTML→PDF (and HTML→image) converter - a work-alike for
 invoices, statements, tables, multi-page documents with headers/footers,
 TOCs and PDF outlines.
 
-**Built from scratch.** No third-party Go modules, no third-party PDF/HTML/CSS
-APIs or services, no Chrome/WebKit embedding, no cgo. Every stage of the
-pipeline (load → parse → style → layout → paint → PDF write) is implemented
-in this repository against the Go standard library only.
+**Built from scratch.** No third-party PDF/HTML/CSS APIs or services, no
+Chrome/WebKit embedding, no cgo. The pipeline (load → parse → style → layout →
+paint → PDF write) is implemented in this repository. Runtime deps are the Go
+standard library **plus** a narrow exception for OpenType shaping via
+[`go-text/typesetting`](plans/amendments/2026-08-05-gotext-typesetting.md)
+(landed in `go.mod`).
 
-- **Go standard library only** - `go.mod` has zero dependencies
+- **Go standard library by default** - the only direct third-party require is
+  `github.com/go-text/typesetting` (OpenType shaping; `CGO_ENABLED=0`)
 - Two static binaries: `gowkhtmltopdf` (PDF) and `gowkhtmltoimage` (PNG/JPEG)
 - Idiomatic Go library API (`gowkhtmltopdf` root package)
 - Deterministic output: identical input bytes → identical PDF bytes
@@ -36,8 +39,8 @@ clones of arbitrary websites.
 | Invoices / tables / page breaks in pure Go | Yes |
 | Headers, footers, TOC, PDF bookmarks | Yes |
 | Zero native deps / offline static binary | Yes |
-| Full CSS (flex, grid, absolute/fixed) or JavaScript | No (float lite shipped; see deferred) |
-| CJK / complex Unicode fonts | Not yet (Latin Liberation family; CID later) |
+| Full CSS (flex, grid, absolute/fixed) or JavaScript | **Partial** flex/grid lite + position lite; **No** JS (see deferred) |
+| CJK / complex Unicode fonts | **Partial** — Type0/CID + `--font-path`; Arabic joining; no HarfBuzz |
 
 ```text
 HTML (file | URL | stdin)
@@ -88,9 +91,10 @@ fix whatever fails, and open generated PDFs - closed that last gap. Font
 letter-spacing is fixed for Latin text; complex pages (e.g. full Wikipedia
 articles) still need follow-up for Unicode/CID fonts and richer CSS.
 
-None of that changes the product rule: **no third-party APIs or modules in
-the runtime** - only the Go stdlib and the embedded Liberation Sans font
-asset shipped in-tree.
+None of that changes the product rule: **no third-party PDF/HTML/CSS APIs** and
+**no cgo** — only the Go stdlib, in-tree assets (Liberation Sans), and the
+documented shaping exception ([`go-text/typesetting`](plans/amendments/2026-08-05-gotext-typesetting.md))
+already in `go.mod`.
 
 ---
 
@@ -261,7 +265,7 @@ parity remains **not planned**.
 | Richer selectors (attribute `[attr=…]`, `:first-child`, `:nth-child`, sibling `+`/`~`) | **Shipped** for presence/exact attr, first/last/nth-child, siblings | Hover/link pseudos still ignored |
 | Multi-font bold/italic (Liberation Sans family) | **Shipped** - Regular/Bold/Italic/BoldItalic embedded | Further families: `--font-path` (phase 19) |
 | Flexbox / Grid (`display: flex|grid`) | **Partial flex** (grow/shrink/basis/order/wrap + min/max clamp) + **grid lite** (`span`, nested grids) | Full CSS Grid / iterative flex content sizing still lite |
-| CJK fonts / complex-script shaping | **Type0/CID + font-path**; RTL reverse; **Arabic presentation-form joining** (best-effort); vertical-rl **rotated CJK** | **No HarfBuzz**; Indic production **not claimed**; Hangul needs a Hangul face |
+| CJK fonts / complex-script shaping | **Type0/CID + font-path**; **OT Arabic** via `go-text/typesetting` (GSUB) + presentation-form fallback; vertical-rl **rotated CJK** | **No CGO HarfBuzz**; Indic **Partial**; Hangul needs a Hangul face |
 | HTML character entities (`&amp;` …) | **Shipped** (stdlib unescape in text + attrs) | — |
 | `z-index` | **Lite** on positioned boxes (paint sort) | Stacking contexts / opacity still lite |
 | AcroForm forms (`--enable-forms`) | No form model in the PDF writer | Intermediate roadmap (forms) |
@@ -273,7 +277,7 @@ parity remains **not planned**.
 | Inline `<a href="#x">` source-rect links | **Shipped** for inline text runs with paint boxes; GoTo via `applyInternalLinks` | Cases without geometry still skipped |
 | Cross-object URL map (`urlToPageObj`) | Same-document anchors within multi-object jobs via body offsets | Full cross-object URL map still lite |
 | `resolveRelativeLinks` | **Shipped** (`--resolve-relative-links` / `--keep-relative-links`) | — |
-| HTML header/footer links on body pages | **HTML HF external URI links carried** onto body pages | Fragment GoTo from HF still limited |
+| HTML header/footer links on body pages | **Shipped** — external URI + `#id` fragment GoTo to body (copies-aware) | Full nested HTML HF documents still out of scope |
 | `[topage]` with copies | **Corrected** when HF drawn after copies | — |
 | `[subject]` placeholder | Expands empty (no setting field upstream either) | Not planned |
 | `dump-outline` TOC page offset | **TOC offset included** via `DumpOutlineXMLOffset` | — |

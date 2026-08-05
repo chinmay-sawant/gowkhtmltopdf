@@ -1,7 +1,7 @@
-# Phase 17 - Broader CSS: Position / Float Refinement / Partial Flex
+# Phase 17 - Broader CSS: Position / Float Refinement / Partial Flex / Grid Lite
 
 > **Parent:** `plans/10-canonical-post-mvp-roadmap.md`  
-> **Status:** done (core) on `feature/tier-2`  
+> **Status:** done (core + pending polish) on `master` via #16 / #17  
 > **Estimated effort:** 2–4 months  
 > **Depends on:** Phase 16 float lite + selectors  
 > **Unblocks:** Phase 21 arbitrary websites; Tier 2 “leave wkhtmltopdf for most jobs”  
@@ -11,17 +11,20 @@
 
 ## Overview
 
-Expand layout beyond invoice float-lite toward **partial flex**, refined **position**, and remaining float edge cases. Grid remains out of scope unless product amends. Goal: enough CSS for many report and simple marketing layouts - not Wikipedia chrome parity.
+Expand layout beyond invoice float-lite toward **partial flex**, **grid lite**,
+refined **position**, and remaining float edge cases. Goal: enough CSS for many
+report and simple marketing layouts - not Wikipedia chrome parity.
 
 ## Executive Summary
 
-| Feature | Target |
-|---------|--------|
-| Float refinement | Nested floats, percentage widths, better wrapping |
-| `position: relative` | Offset without leaving flow |
-| `position: absolute` | Containing block subset if reports need overlays |
-| `display: flex` | Row direction + basic alignment/gap |
-| `display: grid` | **Deferred** (allowlist stays out) |
+| Feature | Target | Status (2026-08-05) |
+|---------|--------|---------------------|
+| Float refinement | Nested floats, `%` widths, better wrapping | **Shipped** (lite) |
+| `position: relative` / `absolute` | Offsets + containing-block subset | **Shipped** (lite) |
+| `z-index` | Paint sort on positioned / chrome ops | **Shipped** (lite) |
+| `display: flex` | Row/column + align/gap/grow/shrink/basis/order/wrap | **Shipped** (partial) |
+| `display: grid` | Columns, spans, nested grids | **Shipped** (lite; not full Grid) |
+| `position: fixed` / sticky | Print-safe fixed stamps + sticky | fixed lite shipped; sticky **print-scoped** (page scrollport) |
 
 ---
 
@@ -29,63 +32,86 @@ Expand layout beyond invoice float-lite toward **partial flex**, refined **posit
 
 ### 17.1 Float refinement
 
-- [ ] Float with percentage widths
-- [ ] Consecutive left/right floats packing
-- [ ] Clearfixes correctly across block boundaries
-- [ ] Interaction with tables and lists documented + tested
-- [ ] Fixtures for multi-float header/footer chrome
+- [x] Float with percentage widths (`feature/tier-2-pending` / #17)
+- [x] Consecutive left/right floats packing (right packing improvement)
+- [x] Clearfixes correctly across block boundaries (phase 16 + tests)
+- [~] Interaction with tables and lists documented + tested (best-effort; edge cases remain)
+- [x] Fixtures for float beside table (`fixture-29-float-beside-table.html`; richer chrome still optional beyond 22/29)
 
 ### 17.2 Position
 
-- [ ] `position: relative` + `top`/`right`/`bottom`/`left` offsets applied at paint or layout
-- [ ] Stacking: document z-order rules (simple tree order if no z-index)
-- [ ] `[~]` `z-index` - only if needed
-- [ ] `position: absolute`: containing block = nearest positioned ancestor or initial; out of flow
-- [ ] Absolute with `left`/`top`/`width`/`height` subset for badges/watermarks
-- [ ] `[~]` `position: fixed` - page-fixed in print is hard; prefer CLI HF; implement only with clear print semantics
-- [ ] Matrix §2.2 updates
+- [x] `position: relative` + `top`/`right`/`bottom`/`left` offsets
+- [x] Stacking: tree order by default; lite `z-index` when set (ops + chrome paint sort)
+- [x] Lite `z-index` on positioned boxes
+- [x] `position: absolute`: containing block subset; out of flow; `left`/`top`/`right`/`bottom`/`width`/`height` subset
+- [x] `position: fixed` lite (stamped on every page in paint)
+- [x] `position: sticky` — print-scoped full sticky ([`subplans-tier-2/sticky-print.md`](subplans-tier-2/sticky-print.md); page content box = scrollport; fixture-31)
+- [x] Matrix §2.2 / fidelity “MVP gap” rows — refreshed via shared doc-honesty pass
 
 ### 17.3 Partial flexbox (report-friendly)
 
-- [ ] Parse `display: flex` / `inline-flex` into layout mode (not ignore → inline)
-- [ ] Default `flex-direction: row`
-- [ ] `flex-direction: column` basic
-- [ ] `justify-content`: flex-start | flex-end | center | space-between (subset)
-- [ ] `align-items`: stretch | flex-start | center | flex-end (subset)
-- [ ] `gap` / `row-gap` / `column-gap` simple lengths
-- [ ] Children: honor `flex-grow` 0/1 basic; `[~]` full flex algorithm deferred
-- [ ] `[~]` `flex-wrap: wrap` - stage 2 if needed
-- [ ] `[~]` `order` - optional
-- [ ] Tests: 3-column metric row; header bar with space-between
-- [ ] Path: new flex layout path in `internal/layout/`
-- [ ] Matrix: flex Partial with listed properties only
+- [x] Parse `display: flex` / `inline-flex` into layout mode
+- [x] Default `flex-direction: row`
+- [x] `flex-direction: column` basic
+- [x] `justify-content`: flex-start | flex-end | center | space-between (subset)
+- [x] `align-items`: stretch | flex-start | center | flex-end (subset)
+- [x] `gap` / `row-gap` / `column-gap` simple lengths
+- [x] Children: `flex-grow`, `flex-shrink`, `flex-basis` (%/length)
+- [x] Post grow/shrink **min/max-width clamp**
+- [x] `flex-wrap: wrap` / `wrap-reverse` (basic)
+- [x] `order`
+- [x] Tests: flex fixtures (`fixture-25`, `fixture-28`) + layout unit tests
+- [x] Path: `internal/layout/flex.go`
+- [x] Matrix: flex → Partial with property list (shared doc-honesty pass)
 
-### 17.4 Explicitly not this phase
+### 17.4 Grid lite (amended into Tier 2)
 
-- [~] CSS Grid / subgrid  
-- [~] Multi-column `column-count`  
-- [~] Sticky positioning  
-- [~] Transforms, filters, animations, transitions  
-- [~] Container queries, `:has()`  
+- [x] `display: grid` / basic column tracks
+- [x] Occupancy placement; `grid-column: span N` / start–end
+- [x] Nested grids
+- [x] Tests: `grid_test.go`, `fixture-28-flex-wrap-grid-fixed`
+- [~] Full CSS Grid (areas, dense auto-flow, row spans, `fr` complexity) — see [`subplans-tier-2/flex-grid-full.md`](subplans-tier-2/flex-grid-full.md)
 
-### 17.5 Fixtures & corpus
+### 17.5 Explicitly not this phase (still deferred)
 
-- [ ] Add flex-based report fixture (no external CSS frameworks)
-- [ ] Add relative/absolute badge fixture
-- [ ] Ensure existing golden invoices do not regress
+- [~] Multi-column `column-count`
+- [x] Sticky positioning — print-scoped ([`subplans-tier-2/sticky-print.md`](subplans-tier-2/sticky-print.md))
+- [~] Transforms, filters, animations, transitions
+- [~] Container queries, `:has()`
+- [~] Full flex algorithm (content-based min-size iterations, percentage cyclic sizing) — see [`subplans-tier-2/flex-grid-full.md`](subplans-tier-2/flex-grid-full.md)
 
-### 17.6 Docs & honesty
+### 17.6 Fixtures & corpus
 
-- [ ] Fidelity guide: “partial flex” definition table
-- [ ] README deferred floats/flex rows updated
-- [ ] Do **not** claim “full CSS3” or framework support (Bootstrap/Tailwind)
+- [x] Flex-based report fixtures (`fixture-25`, `fixture-28`)
+- [x] Relative/absolute / fixed lite (`fixture-26`)
+- [x] Existing golden invoices do not regress (`make test` / samples)
 
-### 17.7 Closure gates
+### 17.7 Docs & honesty
 
-- [ ] `make lint` →
-- [ ] `make test` →
-- [ ] Parent Phase 17 checked
-- [ ] Next: **Phase 18** pagination and/or **19** fonts by need
+- [x] README / PR notes for flex, grid lite, z-index
+- [x] Fidelity guide + compatibility-matrix Partial flex/grid wording (shared doc-honesty pass)
+- [x] Do **not** claim “full CSS3” or framework support (Bootstrap/Tailwind)
+
+### 17.8 Closure gates
+
+- [x] `make lint` / `make test` (CI on #16 / #17)
+- [x] Parent Phase 17 core checked
+- [x] Matrix/fidelity honesty pass (shared doc-honesty)
+- [x] Next: Phase 18/19/20 polish; then **Phase 21** when product prioritizes
+
+---
+
+## Pending (after #17)
+
+> **Execution subplan:** [`subplans-tier-2/phase-17-pending.md`](subplans-tier-2/phase-17-pending.md)  
+> **Shared doc honesty:** [`subplans-tier-2/00-shared-doc-honesty.md`](subplans-tier-2/00-shared-doc-honesty.md) — **done** for matrix/fidelity
+
+| Item | Notes |
+|------|--------|
+| Compatibility-matrix / fidelity MVP-gap rows | **[x]** Shared doc-honesty pass |
+| Sticky positioning | **[x]** print-scoped ([`sticky-print.md`](subplans-tier-2/sticky-print.md); fixture-31) |
+| Full Grid / full Flex | → [`subplans-tier-2/flex-grid-full.md`](subplans-tier-2/flex-grid-full.md) |
+| Richer float+table interaction fixtures | **New** `fixture-29-float-beside-table.html` (do not edit 22) |
 
 ---
 
@@ -94,11 +120,11 @@ Expand layout beyond invoice float-lite toward **partial flex**, refined **posit
 | Depends on | Provides to |
 |------------|-------------|
 | Phase 16 | Phase 21 website layouts |
-| Paint display list | Absolute positioned paint order |
+| Paint display list | Absolute / fixed / z-index paint order |
 
 ---
 
 ## Out of scope
 
-- Years of browser float/flex edge cases
+- Years of browser float/flex/grid edge cases
 - Pixel parity with Chrome layout tests

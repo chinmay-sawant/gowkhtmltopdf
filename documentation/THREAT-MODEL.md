@@ -111,6 +111,9 @@ processes. The trust envelope of any local reader applies.
 - Local file reads are the only sensitive channel and are gated by the ACL
   (section 3). With default flags, no document-reachable path reads any
   local file.
+- **Fonts:** TTF bytes loaded via `@font-face` `url(...)` are untrusted parse
+  input under the same ACL as other subresources; `--font-path` /
+  `--use-system-fonts` are operator-controlled discovery (not HTML ACL).
 - Operator credentials (custom headers, basic auth, cookies) are attached
   to the requests the operator configured them for. Cross-host auth and
   cookie headers are stripped by `net/http` on redirects, but custom

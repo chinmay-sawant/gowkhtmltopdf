@@ -3,7 +3,7 @@
 > **Parent:** `plans/00-canonical-pure-go-rewrite.md` (Phase 0.1); post-MVP updates under `plans/10-canonical-post-mvp-roadmap.md`  
 > **Status:** living contract - amendments go through plan review  
 > **Target:** controlled report/invoice HTML → PDF. **Not** a browser.  
-> **Last honesty audit:** 2026-08-04 · base commit `cd9100f` (plans reconcile) · fidelity guide: [fidelity.md](fidelity.md)
+> **Last honesty audit:** 2026-08-05 · base commit `f5bb754` · Tier 2 phases 17–20 core on master (#16/#17) · fidelity guide: [fidelity.md](fidelity.md)
 
 This document is the **contract** the layout engine is allowed to implement.
 Anything not listed here is *unsupported*; unsupported input must degrade
@@ -29,7 +29,7 @@ as its inline text (per the note column).
 | `ul`, `ol`, `li` | Simple lists: bullet markers. `ol` renders bullets too (decimal markers not implemented; always `•`, `layout.go:220`) |
 | `table`, `thead`, `tbody`, `tfoot`, `tr`, `th`, `td` | Table subset; see §4/§2.5 (colspan yes, rowspan no) |
 | `img` | Replaced element; **PNG/JPEG only**. JPEG is DCTDecode pass-through (no re-encode). PNG is decoded to DeviceRGB; alpha becomes a soft-mask (`/SMask`) when present (`internal/pdf/images.go`). Layout uses a fixed 96 dpi CSS px→pt map; `--dpi` / `--image-dpi` / `--image-quality` are stored but ignored for PDF embedding. `web.images=false` (global) skips fetch/paint (`TestRunPDFWebImagesFalse`). Subresource size capped by loader `MaxBodySize` (default 100 MiB) |
-| `a` | Hyperlink (`href`) for `http/https/mailto` targets (`inline.go:226,305`); internal anchors deferred to Phase 6 |
+| `a` | Hyperlink (`href`) for `http/https/mailto` external URI annotations; body `#id` / `#name` **GoTo** via `applyInternalLinks` (fixture-24). HTML header/footer **external URI** and **fragment GoTo** (`#id` → body destinations via `AddLinkDest`, copies-aware) are carried onto body pages |
 | `strong`, `em`, `b`, `i`, `u`, `small` | `b`/`strong` → bold face; `em`/`i` → italic face (Liberation family, §2.3); `u` underline; `small` smaller; fake stroke bold only if a bold face is missing |
 | `pre`, `code` | `pre` honors `white-space: pre`; `code` has no monospace rule - single embedded font for all families (§2.3) |
 | `blockquote` | Block-level only - no indent margins (UA rule `style.go:714-717`) |
@@ -65,19 +65,20 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 
 | Property | Status | Notes / verified by |
 |----------|--------|---------------------|
-| `display` (`block\|inline\|none\|list-item\|table\|table-row\|table-cell\|table-row-group\|table-header-group\|table-footer-group`) | Implemented | `style.go`; consumed in layout; `none` test `TestDisplayNone`; tables test `TestTableLayout` |
+| `display` (`block\|inline\|none\|list-item\|table\|table-row\|table-cell\|table-row-group\|table-header-group\|table-footer-group\|flex\|inline-flex\|grid\|inline-grid`) | Implemented / Partial | Core display values Implemented; `flex`/`inline-flex`/`grid`/`inline-grid` accepted in `style.go` and routed to Partial flex/grid layout (see feature checklist). `none` test `TestDisplayNone`; tables `TestTableLayout`; flex/grid fixtures 25/28 |
 | `display: inline-block` | Implemented (lite) | atomic inline box with width/height/margins; shrink-to-fit when width auto; test `TestInlineBlockBesideText` |
 | `display: table-caption`, `table-column(-group)` | Not implemented | parsed; no caption/column model in `buildTable` - `<caption>` does not render |
-| `float` (`left\|right`) | Implemented (lite) | out-of-flow pack to side; stacks on same side; simple exclusion for following in-flow content; test `TestFloatLeftRightClear`, fixture-22 |
+| `float` (`left\|right`) | Implemented (lite) | out-of-flow pack to side; stacks on same side; simple exclusion for following in-flow content; test `TestFloatLeftRightClear`, fixture-22 / fixture-29 |
 | `clear` (`left\|right\|both`) | Implemented (lite) | advances past named float bottoms (`float.go`); test `TestFloatLeftRightClear` |
-| `position` (`static\|relative`) | Not implemented | parsed, never consumed - everything is `static`; `relative` produces no shift |
-| `position: fixed` / `absolute` | Not implemented | ignored → `static` (consistent with §5) |
+| `position` (`static\|relative\|absolute\|fixed\|sticky`) | Partial | static in-flow; `relative`/`absolute`/`fixed` lite via `buildAbsolute` / `buildFixed` / `applyRelativeOffset` (fixtures 26/28). `sticky` = print-scoped clamp (page content box = scrollport; `sticky.go`, fixture-31, `TestSticky*`) — not overflow-scroll sticky |
+| `position: sticky` | Partial (print scrollport) | Page content box (`contentH`) is the sticky view; clamps `top`/`bottom`/`left`/`right` within containing block; continuation-page clones where CB intersects. **Not** `position:fixed` (no stamp outside CB). Overflow:`auto`/`scroll` sticky unsupported (degrades to in-flow). Path: `sticky.go` / `applyStickyPrint`; fixture-31; `TestSticky*` |
 
 ### 2.3 Text & fonts
 
 | Property | Status | Notes / verified by |
 |----------|--------|---------------------|
-| `font-family` (named + generic) | Partial | parsed + inherited; embedded Liberation Sans family (regular/bold/italic/bold-italic). Named remote families fall back until font discovery (phase 19) |
+| `font-family` (named + generic) | Partial | parsed + inherited; embedded Liberation Sans family (R/B/I/BI) plus **font registry** (`--font-path`, optional `--use-system-fonts`) and local `@font-face` TTF/OTF on **PDF and image** paths (see §4 / §5). Named families resolve via discovery; missing faces fall back to Liberation |
+| `writing-mode` (`horizontal-tb\|vertical-rl\|vertical-lr`) | Partial | `vertical-rl` / `vertical-lr` lite (rotated CJK paint); default horizontal. Not a full vertical typesetting engine |
 | `font-size` | Implemented | `style.go` `fontSize` (px/pt/em/%/rem/in/cm/mm/pc + keywords); `%`/`em` resolve against parent; test `TestFontSizeEmInherit` |
 | `font-weight` (`normal\|bold\|100-900`) | Implemented | ≥700 selects Liberation Sans **Bold** (or BoldItalic); fake stroke bold only if a bold face is missing; tests `TestRealBoldFaceOps`, `TestBoldFaceInInvoicePDF` |
 | `font-style` (`italic\|oblique`) | Implemented | selects Liberation Sans Italic / BoldItalic (`pdf.FaceSet.Resolve`); test `TestRealBoldFaceOps` |
@@ -114,7 +115,7 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 | Property | Status | Notes / verified by |
 |----------|--------|---------------------|
 | `page-break-before/after/inside` (`auto\|always\|avoid`) | Implemented (print pipeline) | parsed into `style.PageBreak*`; honored as canvas-Y flow shifts by the phase-5 paginator - `beforeAlways` `paint.go:203`, `afterBreaks` `paint.go:236`, `avoidInside` `paint.go:179`; tests `TestPageBreakParsing`, `TestPageBreakBeforeAlways`, `TestPageBreakInsideAvoid` |
-| `orphans`, `widows` | Not implemented | absent from `applyRestProps` |
+| `orphans`, `widows` | Partial (heuristics) | Automatic orphan/widow **heuristics** in `paint.go` `orphansWidows` (+ keep-heading-with-next). CSS `orphans` / `widows` properties are **not** parsed (`applyRestProps` / `internal/css` have no handlers) — author values ignored |
 
 ### Feature checklist (page geometry, tables, pagination)
 
@@ -124,13 +125,13 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 | `colspan` | Yes | `colSpan` `layout.go:618-622`; test `TestTableColspan` |
 | `rowspan` | No | attribute ignored - only `colspan` is read |
 | `border-collapse` | Separate only | see §2.5 |
-| Pagination | Fragment + whole-op (phase 5) | rect-type ops (fill/stroke/line) split at page boundaries; text/images/links move wholly (line-level) (`paint.go:107-150`); `page-break-before/after: always`, `page-break-inside: avoid`, table rows never split (`paint.go:179-336`); element → (page, rect) map in `Result.Locations` for Phase 6. See "Pagination (phase 5)" note below. |
-| Floats / absolute positioning | Float lite yes; absolute/fixed no | see §2.2; absolute/fixed degrade to in-flow |
-| Flexbox / Grid | No | `display:flex|grid` not in the allowlist → ignored, element keeps the initial `inline` display (see §5) |
+| Pagination | Fragment + whole-op + phase-18 polish | rect-type ops (fill/stroke/line) split at page boundaries; text/images/links move wholly (line-level) (`paint.go`); `page-break-before/after: always`, `page-break-inside: avoid`, table rows never split; **`<thead>` / `table-header-group` repeat** on continuation pages (`repeatTableHeaders`, fixture-23); orphan/widow **heuristics** (not CSS props); `--zoom` forwarded; smart-shrinking re-layouts. `Result.Locations` for outlines/links. See "Pagination" note below. |
+| Floats / absolute positioning | Float lite + absolute/fixed/sticky lite | float/`clear` lite (§2.2); relative/absolute/fixed lite; sticky = print page-content-box scrollport (§2.2; fixture-31) |
+| Flexbox / Grid | Partial | **Flex:** `display: flex\|inline-flex`; `flex-direction: row\|column` (no `*-reverse`); `flex-wrap: nowrap\|wrap\|wrap-reverse`; `justify-content` flex-start/end/center/space-between/start/end; `align-items` stretch/flex-start/end/center/start/end (stretch does not grow height); `gap`/`row-gap`/`column-gap` → shared Gap; `flex-grow`/`flex-shrink`/`flex-basis` + min/max-width clamp; `order`; column path: order+gap only. **Not flex:** shorthand `flex:`; `align-self`; `align-content`; content-based min-size iterations. **Grid lite:** `display: grid\|inline-grid`; `grid-template-columns` (lengths, `Nfr`, `repeat(n,…)`); shared `gap`; `grid-column` / start / end (`span N`); nested grids; auto-flow row occupancy; `grid-template-rows` stored but unused. **Not grid:** areas, dense auto-flow, row spans, `grid-row*`, justify/align on grid, named lines. Paths: `flex.go`, `grid.go`; fixtures 25/28 |
 | JavaScript | No | stripped at load; `--enable-javascript` accepted + warning (Phase 1) |
 | Image-mode text | TTF outline raster | same Liberation faces as PDF; pure-Go coverage AA (`internal/imageout/ttfraster.go`); 5×7 bitmap only if an op has no font |
 
-**Pagination (phase 5).** Implemented 2026-08-03 (`internal/layout/paint.go`): fragmentation is box-aware - rect-type ops crossing a page boundary are split at the boundary, while text, images and links move wholly to the next page (text is already line-level, so glyphs never split). `page-break-before/after: always` and `page-break-inside: avoid` are honored via canvas-Y flow shifts (`shiftFlowY` `paint.go:156`), and table rows never split (`rowsIntact` `paint.go:290`). `Result.Locations` (`paint.go:341`) carries element boxes (page + rect) for Phase 6 outline/TOC/links. Remaining partials: `--zoom` is accepted and `layout.Options.Zoom` works (`TestZoom` `layout_test.go:726`), but the convert pipeline does not forward it yet; smart-shrinking detects over-wide content and warns without re-layout (`convert.go:218-229`); table-header repeat across pages not implemented; orphan/widow control not implemented.
+**Pagination (phases 5 + 18).** Box-aware fragmentation: rect-type ops crossing a page boundary are split; text, images and links move wholly (line-level). `page-break-before/after: always` and `page-break-inside: avoid` via canvas-Y flow shifts; table rows never split. **Table headers repeat** across pages (`repeatTableHeaders` in `paint.go`; fixture-23). **`--zoom`** is forwarded to `layout.Options.Zoom` (`convert.go`; `TestZoom`). **Smart-shrinking** detects over-wide content and **re-layouts** with an effective zoom (`TestRunPDFSmartShrinking`). Orphan/widow control is **heuristic** (`orphansWidows`, fixture-30) — CSS `orphans`/`widows` properties are not parsed. `Result.Locations` carries element boxes for outlines/links.
 
 ## 3. Supported units
 
@@ -169,22 +170,23 @@ Status legend as in §2; evidence in `internal/css/css.go`.
 | Specificity (ID > class > element), inline `style` wins, `!important` overrides | Implemented | `Specificity` `css.go:578`; inline style priority `style.go:233-239`; test `css_test.go::TestSpecificity` |
 | `@media print` / `screen` filtering | Implemented | `mediaType` `css.go:186`; applied per rule `style.go:212-214`; convert passes `Media: "print"` (`convert.go:115`); test `css_test.go::TestParseMedia` |
 | `@media` feature queries (`(min-width: …)`) | Not implemented | only the media type substring is considered |
-| `@page`, `@font-face` | Not implemented | block skipped gracefully (`css.go:85-95`) |
+| `@page` | Not implemented | `@page` blocks skipped gracefully at parse |
+| `@font-face` | Partial | Parsed; `MergeFontFaces` loads **local TTF/OTF** via `FetchSub` ACL for **PDF and image** paths. WOFF / remote network `src` skipped. See §5 |
 
 ## 5. Explicitly unsupported (MVP)
 
 | Feature | Handling |
 |---------|----------|
 | JavaScript / `<script>` / DOM APIs | **Stripped at load.** `--enable-javascript` accepted but ignored with warning (Phase 1) |
-| CSS Grid, Flexbox (`display:flex/grid`) | Declaration ignored → element keeps the initial `inline` display (`style.go:295-301` accepts only the listed values) |
-| `position: fixed` / `absolute` | Ignored → `static` |
+| Full CSS Grid / full Flexbox | **Out of scope** beyond the Partial report subset in the feature checklist (areas, dense auto-flow, cyclic flex min-size, etc.) |
+| True `position: sticky` inside `overflow: auto` scrollers | Print sticky uses the **page content box** as scrollport (`sticky.go`); continuous-media overflow-scroll sticky is unsupported |
 | `transform`, `filter`, `animation`, `transition` | Ignored |
 | `background-image` / gradients | Ignored (Phase 3+ candidate) |
-| `@font-face` (remote or local) | Ignored; font-family falls back to defaults |
+| `@font-face` (remote / WOFF) | **Partial:** local TTF/OTF via `FetchSub` ACL on **PDF and image** paths. WOFF and network `src` skipped; missing faces fall back to registry / Liberation |
 | Custom XSLT TOC (`--xsl-style-sheet`) | Not implemented (no XSLT in stdlib); Go templates instead (Phase 6) |
 | WebP, SVG-as-`img`, AVIF | Not decodable by stdlib; broken-image placeholder or skip |
-| `position: fixed` headers/footers | Use CLI `--header-*` / `--footer-*` flags instead (Phase 6) |
-| RTL / complex-script shaping (Arabic, Devanagari, CJK) | Latin-first; non-Latin best-effort via embedded fonts (Phase 3); documented limit |
+| Fixed CSS headers/footers via `position: fixed` alone | Prefer CLI `--header-*` / `--footer-*` for repeating chrome; CSS `fixed` lite paints on every page but is not a full running-element model |
+| Complex-script shaping (Indic, Arabic, CJK) | **Type0/CID Identity-H** for BMP Unicode (CJK with a capable face); **Arabic OT** via `go-text/typesetting` when the face has GSUB (+ presentation-form `ShapeText` fallback); Hangul needs a Hangul face; **vertical-rl** lite (rotated CJK). **Indic Partial** (OT when face/cmap allow; not production-claimed). No CGO HarfBuzz |
 | PDF encryption, PDF/A, duplex, AcroForm | Out of scope (not in original wkhtmltopdf either) |
 
 ## 6. Security policy (frozen defaults)
@@ -291,7 +293,10 @@ wkhtmltopdf honors them.
 | `--custom-header-propagation`, `--no-custom-header-propagation` | Both | Ignored (`RepeatCustomHeaders` stored, never read) |
 | `--timeout` | Both | Supported (HTTP response timeout) |
 | `--external-links`, `--no-external-links` | PDF | Partial (the `stripLinkURIs` path exists, but `applyObjectDefaults` ORs the default on, so the off state is unreachable from the CLI - documented quirk in `convert.go`) |
-| `--internal-links`, `--no-internal-links` | PDF | Ignored (layout never emits internal link ops) |
+| `--internal-links`, `--no-internal-links` | PDF | Partial (body `#` fragment GoTo via layout `OpLinkURI` + `applyInternalLinks`; HTML HF `#id` → body `AddLinkDest`. Geometry caveats — runs without paint boxes still skipped) |
+| `--resolve-relative-links`, `--keep-relative-links` | PDF | Supported (`resolveRelativeLinkURIs`; relative `href` resolution vs keep-as-written) |
+| `--font-path` | Both | Supported (extra font search directories for registry discovery) |
+| `--use-system-fonts` | Both | Supported (opt-in system font dirs; default off for determinism) |
 | `--produce-forms` | PDF | Ignored (no AcroForm support in the PDF writer) |
 
 ### 7.6 Pair flags (two values)
@@ -312,7 +317,7 @@ wkhtmltopdf honors them.
 | `--header-spacing`, `--footer-spacing` | PDF | Supported (band measurement) |
 | `--header-line`, `--footer-line` | PDF | Supported (separator line) |
 | `--header-font-name`, `--footer-font-name` | PDF | Partial (stored; every font renders as the embedded Liberation Sans) |
-| `--header-html`, `--footer-html` | PDF | Supported (URL values; raw-markup values rejected with a warning - upstream-compatible; `TestHTMLHeader`, `TestHTMLHeaderRawMarkupRejected`) |
+| `--header-html`, `--footer-html` | PDF | Supported (URL values; raw-markup values rejected with a warning - upstream-compatible; `TestHTMLHeader`, `TestHTMLHeaderRawMarkupRejected`). HTML HF **external URI** and **fragment GoTo** annotations are carried onto body pages (`TestHTMLHeaderFragmentGoTo`) |
 
 ### 7.8 TOC objects
 

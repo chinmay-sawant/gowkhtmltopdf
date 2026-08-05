@@ -5,15 +5,19 @@ import (
 	"unicode/utf8"
 )
 
-// ShapeText applies best-effort text shaping before PDF emission.
+// ShapeText applies best-effort text shaping before PDF emission when no
+// font face is available for OpenType. Prefer ShapeTextFont when a *Font is
+// known (TextShow does).
 //
-// Pipeline (stdlib-only; not HarfBuzz / OpenType GSUB/GPOS):
+// Fallback pipeline (no GSUB / face unavailable):
 //  1. Unicode NFC normalize (helps some Indic sequences)
 //  2. Arabic presentation-form joining (initial/medial/final/isolated)
 //  3. RTL run reverse for Arabic/Hebrew ranges
 //
-// Indic matra reordering, mark positioning, and Arabic ligation beyond
-// Lam-Alef are NOT implemented — production Indic/complex Arabic is not claimed.
+// When the active face has OpenType GSUB, ShapeTextFont uses
+// go-text/typesetting and reverse-cmaps glyphs to Unicode CIDs for Type0.
+// Indic remains Partial — matra reordering is only as good as the OT face
+// and reverse-cmap coverage.
 func ShapeText(s string) string {
 	if s == "" {
 		return s

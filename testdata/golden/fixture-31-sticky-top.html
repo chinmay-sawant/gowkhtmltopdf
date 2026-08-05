@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<!--
+  fixture-31-sticky-top
+  Proves: position:sticky with top inset clamps to the page content box
+  (print scrollport) within the containing block; continuation pages show
+  the sticky bar near the page top while the section CB continues.
+  Not position:fixed (no stamp outside the section). Expected: ≥2 pages.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Sticky Top Print</title>
+  <style>
+    body { font-family: sans-serif; font-size: 11pt; margin: 16pt; }
+    h1 { font-size: 16pt; margin: 0 0 12pt; }
+    .section {
+      border: 1px solid #455a64;
+      background: #eceff1;
+      padding-bottom: 8pt;
+    }
+    .sticky-bar {
+      position: sticky;
+      top: 0;
+      background: #1565c0;
+      color: #fff;
+      padding: 8pt 10pt;
+      font-weight: bold;
+      border-bottom: 2px solid #0d47a1;
+    }
+    .row {
+      padding: 6pt 10pt;
+      border-bottom: 1px solid #cfd8dc;
+      background: #fff;
+      margin: 0 4pt;
+    }
+    .after {
+      margin-top: 16pt;
+      padding: 8pt;
+      background: #fff8e1;
+      border: 1px dashed #f9a825;
+    }
+  </style>
+</head>
+<body>
+  <h1>Sticky print scrollport</h1>
+  <div class="section">
+    <div class="sticky-bar">Section header (sticky top:0)</div>
+    <div class="row">Row 01 — long section body so pagination crosses pages.</div>
+    <div class="row">Row 02 — sticky bar should reappear near page tops.</div>
+    <div class="row">Row 03 — while this containing block continues.</div>
+    <div class="row">Row 04 — filler content for multi-page layout.</div>
+    <div class="row">Row 05 — filler content for multi-page layout.</div>
+    <div class="row">Row 06 — filler content for multi-page layout.</div>
+    <div class="row">Row 07 — filler content for multi-page layout.</div>
+    <div class="row">Row 08 — filler content for multi-page layout.</div>
+    <div class="row">Row 09 — filler content for multi-page layout.</div>
+    <div class="row">Row 10 — filler content for multi-page layout.</div>
+    <div class="row">Row 11 — filler content for multi-page layout.</div>
+    <div class="row">Row 12 — filler content for multi-page layout.</div>
+    <div class="row">Row 13 — filler content for multi-page layout.</div>
+    <div class="row">Row 14 — filler content for multi-page layout.</div>
+    <div class="row">Row 15 — filler content for multi-page layout.</div>
+    <div class="row">Row 16 — filler content for multi-page layout.</div>
+    <div class="row">Row 17 — filler content for multi-page layout.</div>
+    <div class="row">Row 18 — filler content for multi-page layout.</div>
+    <div class="row">Row 19 — filler content for multi-page layout.</div>
+    <div class="row">Row 20 — filler content for multi-page layout.</div>
+    <div class="row">Row 21 — filler content for multi-page layout.</div>
+    <div class="row">Row 22 — filler content for multi-page layout.</div>
+    <div class="row">Row 23 — filler content for multi-page layout.</div>
+    <div class="row">Row 24 — filler content for multi-page layout.</div>
+    <div class="row">Row 25 — filler content for multi-page layout.</div>
+    <div class="row">Row 26 — filler content for multi-page layout.</div>
+    <div class="row">Row 27 — filler content for multi-page layout.</div>
+    <div class="row">Row 28 — filler content for multi-page layout.</div>
+    <div class="row">Row 29 — filler content for multi-page layout.</div>
+    <div class="row">Row 30 — filler content for multi-page layout.</div>
+    <div class="row">Row 31 — filler content for multi-page layout.</div>
+    <div class="row">Row 32 — filler content for multi-page layout.</div>
+    <div class="row">Row 33 — filler content for multi-page layout.</div>
+    <div class="row">Row 34 — filler content for multi-page layout.</div>
+    <div class="row">Row 35 — end of sticky containing block.</div>
+  </div>
+  <div class="after">
+    After the section: sticky must not replicate here like position:fixed.
+  </div>
+</body>
+</html>

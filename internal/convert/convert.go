@@ -310,7 +310,7 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 	}
 
 	sheets := collectSheets(ctx, loader, root, res.Base, obj.Load, idx+1, log)
-	registry = mergeFontFaces(ctx, loader, registry, sheets, res.Base, obj.Load, idx+1, log)
+	registry = MergeFontFaces(ctx, loader, registry, sheets, res.Base, obj.Load, idx+1, log)
 
 	pageW, pageH, err := pageGeometry(cmd.Global)
 	if err != nil {
@@ -630,9 +630,10 @@ func loadFontRegistry(cmd *cli.Command, log io.Writer) *pdf.Registry {
 	return reg
 }
 
-// mergeFontFaces loads local @font-face url(...) TTF sources into the
-// registry (network/woff skipped). ACL follows FetchSub.
-func mergeFontFaces(ctx context.Context, loader *load.Loader, reg *pdf.Registry, sheets []*css.Stylesheet, base string, lp settings.LoadPage, idx int, log io.Writer) *pdf.Registry {
+// MergeFontFaces loads local @font-face url(...) TTF/OTF sources into the
+// registry (network/woff/data skipped). ACL follows FetchSub. Shared by PDF
+// convert and image mode so both honor the same local @font-face subset.
+func MergeFontFaces(ctx context.Context, loader *load.Loader, reg *pdf.Registry, sheets []*css.Stylesheet, base string, lp settings.LoadPage, idx int, log io.Writer) *pdf.Registry {
 	for _, sheet := range sheets {
 		if sheet == nil {
 			continue
@@ -642,6 +643,12 @@ func mergeFontFaces(ctx context.Context, loader *load.Loader, reg *pdf.Registry,
 				low := strings.ToLower(u)
 				if strings.HasSuffix(low, ".woff") || strings.HasSuffix(low, ".woff2") || strings.HasSuffix(low, ".eot") {
 					fmt.Fprintf(log, "warning: object %d: @font-face src %q skipped (TTF/OTF only)\n", idx, u)
+					continue
+				}
+				// data: would bypass the network:// gate; reject so we never
+				// ParseTTF untrusted inline payloads from CSS.
+				if strings.HasPrefix(low, "data:") {
+					fmt.Fprintf(log, "warning: object %d: @font-face data: src skipped\n", idx)
 					continue
 				}
 				if strings.Contains(low, "://") && !strings.HasPrefix(low, "file:") {

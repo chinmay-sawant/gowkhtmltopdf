@@ -28,9 +28,13 @@ and footers, table of contents, and PDF bookmarks - not full browser parity.
 
 ## What it is not
 
-- A full CSS engine (no flex/grid/floats/position as layout)
+- A full CSS / browser layout engine (report-subset **Partial** flex, grid lite,
+  float lite, and relative/absolute/fixed — not full CSS3; see the
+  [compatibility matrix](compatibility-matrix.md))
 - A JavaScript runtime (`<script>` is stripped; flags are no-ops)
-- A Unicode/CJK typesetting stack (Latin Liberation family today; no CJK/CID yet)
+- A full Unicode / complex-script stack (Type0/CID + Arabic OT via
+  `go-text/typesetting` with presentation-form fallback; Indic Partial —
+  see [fonts.md](fonts.md))
 - Pixel-identical WebKit/wkhtmltopdf output
 
 See the [fidelity guide](fidelity.md) for tiers and claims language, the

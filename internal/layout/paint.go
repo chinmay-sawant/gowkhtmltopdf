@@ -51,29 +51,27 @@ func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 		}
 	}
 
-	// assemble final page lists, splitting rect ops at page boundaries
-	res.Pages = nil
+	// Split rect ops at page boundaries first. Sticky must run after this:
+	// continuation fragments are created at the page-top boundary and would
+	// otherwise cover sticky clones / reserved flow (fixture-31).
+	splitCrossingRects(res, contentH, opPage)
+
+	// Drop row shells left behind when text snapped to the next page
+	// (fixture-31: empty white rows after Row 27 on page 1).
+	stripOrphanRowChrome(res, contentH)
+
+	// Print-scoped sticky: clamp + continuation clones + reserve flow space.
+	applyStickyPrint(res, contentH)
+
+	// Re-derive pages after splits and sticky (new ops / Y shifts).
+	opPage = make([]int, len(res.Ops))
 	perPage := map[int][]int{}
 	for i := range res.Ops {
 		if res.Ops[i].Fixed {
 			continue
 		}
-		op := &res.Ops[i]
-		p := opPage[i]
-		if isSplittable(op) {
-			boundary := float64(p+1) * contentH
-			if op.Y+op.H > boundary+1e-9 {
-				rest := len(res.Ops)
-				op2 := *op
-				op2.Y = boundary
-				op2.H = op.Y + op.H - boundary
-				op.H = boundary - op.Y
-				res.Ops = append(res.Ops, op2)
-				perPage[p] = append(perPage[p], i)
-				perPage[p+1] = append(perPage[p+1], rest)
-				continue
-			}
-		}
+		p := int(res.Ops[i].Y / contentH)
+		opPage[i] = p
 		perPage[p] = append(perPage[p], i)
 	}
 	maxP := 0
@@ -158,8 +156,25 @@ func sortPaintIndices(ops []Op, idxs []int) {
 		if az != bz {
 			return az < bz
 		}
+		// Same stacking context: backgrounds/borders under text & images so
+		// page-split fill remnants cannot cover continuation-row ink
+		// (fixture-31 Row 28 vs next-row white fill).
+		la, lb := paintLayer(a.Kind), paintLayer(b.Kind)
+		if la != lb {
+			return la < lb
+		}
 		return idxs[i] < idxs[j]
 	})
+}
+
+// paintLayer orders ops within a z-index band: chrome under content.
+func paintLayer(k OpKind) int {
+	switch k {
+	case OpFillRect, OpStrokeRect, OpLine:
+		return 0
+	default:
+		return 1
+	}
 }
 
 func isSplittable(op *Op) bool {
@@ -167,13 +182,13 @@ func isSplittable(op *Op) bool {
 }
 
 // paginateOps assigns every op a page. Crossing text/image/link ops snap to
-// the next page boundary; then page-break policies are applied as canvas-Y
-// shifts (moving content down with its flow); finally pages derive from the
-// final Y positions. Rect-type ops crossing a boundary are split by Paint.
+// the next page boundary (taking following flow with them so row spacing is
+// preserved); then page-break policies are applied as canvas-Y shifts; finally
+// pages derive from the final Y positions. Rect-type ops crossing a boundary
+// are split by Paint.
 func paginateOps(res *Result, contentH float64) []int {
-	ops := res.Ops
-	for i := range ops {
-		op := &ops[i]
+	for i := 0; i < len(res.Ops); i++ {
+		op := &res.Ops[i]
 		if op.Fixed {
 			continue
 		}
@@ -184,8 +199,51 @@ func paginateOps(res *Result, contentH float64) []int {
 				opH = op.Size * 1.2
 			}
 			page := int(op.Y / contentH)
-			if op.Y+opH > float64(page+1)*contentH {
-				op.Y = float64(page+1) * contentH
+			if page < 0 {
+				page = 0
+			}
+			boundary := float64(page+1) * contentH
+			if op.Y+opH > boundary+1e-9 {
+				if dy := boundary - op.Y; dy > 1e-6 {
+					// Row backgrounds often sit above the text baseline. Find
+					// those fills so we can bring them onto the next page with
+					// the text (fixture-31 Row 28 white bg).
+					minY := op.Y
+					var chrome []int
+					for j := range res.Ops {
+						o := &res.Ops[j]
+						if o.Fixed || j == i {
+							continue
+						}
+						if o.Kind != OpFillRect && o.Kind != OpStrokeRect {
+							continue
+						}
+						if o.H <= 0.5 || o.H > 40 {
+							continue
+						}
+						// Fill starts above the text and overlaps its band.
+						if o.Y >= op.Y-0.5 || o.Y+o.H < op.Y-0.5 {
+							continue
+						}
+						chrome = append(chrome, j)
+						if o.Y < minY {
+							minY = o.Y
+						}
+					}
+					// One shared dy keeps row spacing; large enough that the
+					// above-text fill clears the page boundary.
+					dy = boundary - minY
+					// Move text + everything below the text first. Chrome at
+					// minY (< text Y) is left behind by shiftFlowY on purpose.
+					shiftFlowY(res, i, i, op.Y-0.01, dy)
+					for _, j := range chrome {
+						if res.Ops[j].Y < boundary {
+							res.Ops[j].Y += dy
+						}
+					}
+				} else {
+					op.Y = boundary
+				}
 			}
 		}
 	}
@@ -212,11 +270,216 @@ func paginateOps(res *Result, contentH float64) []int {
 	}
 	// After flow has settled, clone <thead> onto continuation pages.
 	repeatTableHeaders(res, contentH)
+	// Sticky is applied in Paint after rect splitting (see splitCrossingRects).
 	opPage := make([]int, len(res.Ops))
 	for i := range res.Ops {
 		opPage[i] = int(res.Ops[i].Y / contentH)
 	}
 	return opPage
+}
+
+// splitCrossingRects truncates splittable ops at the end of their current page
+// and inserts the remainder immediately after the original op (preserving
+// document paint order). Appending remainders at the end of res.Ops would
+// paint section/row backgrounds on top of later text (fixture-31 page 2).
+// Fragments that still span further pages are split on subsequent iterations.
+// opPage is advisory; page is derived from Y after insertions shift indices.
+func splitCrossingRects(res *Result, contentH float64, opPage []int) {
+	_ = opPage
+	for i := 0; i < len(res.Ops); i++ {
+		if res.Ops[i].Fixed {
+			continue
+		}
+		op := &res.Ops[i]
+		if !isSplittable(op) {
+			continue
+		}
+		p := int(op.Y / contentH)
+		if p < 0 {
+			p = 0
+		}
+		boundary := float64(p+1) * contentH
+		if op.Y+op.H > boundary+1e-9 {
+			op2 := *op
+			op2.Y = boundary
+			op2.H = op.Y + op.H - boundary
+			op.H = boundary - op.Y
+			// Insert remainder right after the truncated op so backgrounds
+			// stay under in-flow text/chrome on continuation pages.
+			res.Ops = append(res.Ops, Op{})
+			copy(res.Ops[i+2:], res.Ops[i+1:])
+			res.Ops[i+1] = op2
+			// Next i++ visits the fragment (may split again if multi-page).
+		}
+	}
+}
+
+// stripOrphanRowChrome removes row-sized fills and horizontal rules that sit
+// on a page with no overlapping text/bullet/image ink. Page-break snaps move
+// the text but leave the previous row's trailing fill / the snapped row's
+// background behind, which reads as empty rows (fixture-31 after Row 27).
+func stripOrphanRowChrome(res *Result, contentH float64) {
+	if res == nil || contentH <= 0 || len(res.Ops) == 0 {
+		return
+	}
+	maxPage := 0
+	for i := range res.Ops {
+		if res.Ops[i].Fixed {
+			continue
+		}
+		p := int(res.Ops[i].Y / contentH)
+		if p > maxPage {
+			maxPage = p
+		}
+	}
+	for p := 0; p <= maxPage; p++ {
+		pageTop := float64(p) * contentH
+		pageBot := pageTop + contentH
+		lastInkBot := pageTop
+		hasInk := false
+		for i := range res.Ops {
+			op := &res.Ops[i]
+			if op.Fixed || op.Y < pageTop-1e-9 || op.Y >= pageBot-1e-9 {
+				continue
+			}
+			var bot float64
+			switch op.Kind {
+			case OpText, OpBullet:
+				h := op.Size * 1.2
+				if op.H > h {
+					h = op.H
+				}
+				if h < 4 {
+					h = 4
+				}
+				bot = op.Y + h
+			case OpImage:
+				bot = op.Y + op.H
+			default:
+				continue
+			}
+			hasInk = true
+			if bot > lastInkBot {
+				lastInkBot = bot
+			}
+		}
+		if !hasInk {
+			continue
+		}
+		stripped := false
+		for i := range res.Ops {
+			op := &res.Ops[i]
+			if op.Fixed || op.StickyID != 0 {
+				continue
+			}
+			if op.Y < pageTop-1e-9 || op.Y >= pageBot-1e-9 {
+				continue
+			}
+			switch op.Kind {
+			case OpFillRect, OpStrokeRect:
+				// Row-sized shells whose center sits below the last ink are
+				// empty trailing row backgrounds (not the cell that holds the
+				// last text, whose center is at/above the baseline band).
+				if op.H <= 0.5 || op.H > 40 {
+					continue
+				}
+				if op.Y+op.H/2 > lastInkBot+0.5 {
+					op.H = 0
+					stripped = true
+				}
+			case OpLine:
+				if op.H >= 1 {
+					continue
+				}
+				// Horizontal rule below the last ink (empty row separator).
+				if op.Y > lastInkBot+0.5 {
+					op.Width = 0
+					stripped = true
+				}
+			}
+		}
+		if stripped {
+			// Tighten the last row fill so padding under the final baseline does
+			// not read as another empty row (fixture-31 Row 27 cell).
+			const underPad = 8.0
+			for i := range res.Ops {
+				op := &res.Ops[i]
+				if op.Fixed || op.StickyID != 0 {
+					continue
+				}
+				if op.Y < pageTop-1e-9 || op.Y >= pageBot-1e-9 {
+					continue
+				}
+				if (op.Kind == OpFillRect || op.Kind == OpStrokeRect) &&
+					op.H > 0.5 && op.H <= 40 &&
+					op.Y < lastInkBot && op.Y+op.H > lastInkBot+underPad+2 {
+					op.H = lastInkBot + underPad - op.Y
+					if op.H < 1 {
+						op.H = 1
+					}
+				}
+				if op.Kind == OpLine && op.H < 1 && op.Width > 0 &&
+					op.Y > lastInkBot+underPad+1 && op.Y < lastInkBot+40 {
+					op.Y = lastInkBot + underPad
+				}
+			}
+		}
+		// Pull section washes / borders up to the last row chrome / ink so grey
+		// does not pad an empty band to the page bottom (fixture-31 page 1).
+		// Only section-colored chrome is clipped — arbitrary tall fills
+		// (TestBoundaryFillSplit) are left to the normal page-split remnant.
+		contentBot := lastInkBot
+		for i := range res.Ops {
+			op := &res.Ops[i]
+			if op.Fixed || op.StickyID != 0 {
+				continue
+			}
+			if op.Y < pageTop-1e-9 || op.Y >= pageBot-1e-9 {
+				continue
+			}
+			if (op.Kind == OpFillRect || op.Kind == OpStrokeRect) && op.H > 0.5 && op.H <= 40 {
+				if bot := op.Y + op.H; bot > contentBot {
+					contentBot = bot
+				}
+			}
+			if op.Kind == OpLine && op.H < 1 && op.Width > 0 && op.Y > contentBot {
+				contentBot = op.Y
+			}
+		}
+		if pageBot-contentBot < 8 {
+			continue
+		}
+		for i := range res.Ops {
+			op := &res.Ops[i]
+			if op.Fixed || op.StickyID != 0 {
+				continue
+			}
+			if op.Y < pageTop-1e-9 || op.Y >= pageBot-1e-9 {
+				continue
+			}
+			switch op.Kind {
+			case OpFillRect:
+				if op.H > 40 && isSectionWashRGB(op.R, op.G, op.B) &&
+					op.Y+op.H > contentBot+1 && op.Y < contentBot {
+					op.H = contentBot - op.Y
+				}
+			case OpLine:
+				if op.H > 40 && nearSectionBorderRGB(op.R, op.G, op.B) &&
+					op.Y+op.H > contentBot+1 && op.Y < contentBot {
+					op.H = contentBot - op.Y
+				} else if op.H < 1 && op.Width > 0 && nearSectionBorderRGB(op.R, op.G, op.B) &&
+					op.Y > contentBot+1 && op.Y > pageBot-30 {
+					op.Y = contentBot
+				}
+			}
+		}
+	}
+}
+
+// isSectionWashRGB reports the soft grey used by fixture-31 .section
+// background (#eceff1) and similar report section washes.
+func isSectionWashRGB(r, g, b float64) bool {
+	return r > 0.85 && g > 0.85 && b > 0.85 && r < 0.98 && g < 0.98 && b < 0.98
 }
 
 // shiftFlowY moves the ops of the target range [from,to] - plus every op

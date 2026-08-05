@@ -240,11 +240,25 @@ func loadHTMLHF(ctx context.Context, loader *load.Loader, font *pdf.Font, st *ob
 	return l, nil
 }
 
+// hfLinkContext carries body id destinations and link flags into HTML HF
+// drawing so fragment hrefs become GoTo annotations on the final page set.
+type hfLinkContext struct {
+	idIndex  map[string]bodyIDDest
+	tocTotal int
+	logicalN int
+	copies   int
+	collate  bool
+	srcPage  int // final (post-copy) page index being drawn
+	useLocal bool
+	useExt   bool
+	resolve  bool
+}
+
 // drawHTMLHF paints a cached HTML header/footer onto page, clipped to the
 // margin band. The HF document's canvas origin maps to `spacing` points from
 // the page top (header) or from the page bottom (footer); x is aligned with
 // the content area's left margin. Images are embedded per page.
-func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hf settings.HeaderFooter, geom hfGeom, parms hfParms, isHeader bool) error {
+func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hf settings.HeaderFooter, geom hfGeom, parms hfParms, isHeader bool, links hfLinkContext) error {
 	if hfL == nil || hfL.skip {
 		return nil
 	}
@@ -262,6 +276,9 @@ func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hf setti
 		if err != nil {
 			return err
 		}
+	}
+	if links.resolve {
+		resolveRelativeLinkURIs(res.Ops, hfL.base)
 	}
 	spacing := hf.Spacing * mmToPt
 	pageH := page.Height()
@@ -372,8 +389,21 @@ func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hf setti
 				break
 			}
 			if len(uri) > 0 && uri[0] == '#' {
-				// Same-document fragments in HF: best-effort URI leave as-is;
-				// convert may not resolve HF GoTo targets to body ids.
+				frag := uri[1:]
+				if !links.useLocal || frag == "" || links.idIndex == nil {
+					break
+				}
+				dest, ok := links.idIndex[frag]
+				if !ok {
+					break
+				}
+				logical := logicalDestPage(dest, links.tocTotal)
+				destPage := remapPageForCopies(logical, links.srcPage, links.logicalN, links.copies, links.collate)
+				dx, dy := destPoint(dest.loc, dest.st.geom)
+				page.AddLinkDest(rect, destPage, dx, dy)
+				break
+			}
+			if !links.useExt {
 				break
 			}
 			page.AddLinkURI(rect, uri)
@@ -494,6 +524,7 @@ func drawHeadersFooters(ctx context.Context, loader *load.Loader, font *pdf.Font
 	if copies < 1 {
 		copies = 1
 	}
+	idIndex := buildBodyIDIndex(bodies)
 	for p := 0; p < total; p++ {
 		var own owner
 		switch {
@@ -531,6 +562,17 @@ func drawHeadersFooters(ctx context.Context, loader *load.Loader, font *pdf.Font
 		if page == nil {
 			continue
 		}
+		links := hfLinkContext{
+			idIndex:  idIndex,
+			tocTotal: tocTotal,
+			logicalN: logicalN,
+			copies:   copies,
+			collate:  cmd.Global.Collate,
+			srcPage:  p,
+			useLocal: own.st.obj.LocalLinks,
+			useExt:   own.st.obj.ExternalLinks,
+			resolve:  cmd.Global.ResolveRelativeLinks,
+		}
 		draw := func(hf settings.HeaderFooter, isHeader bool) {
 			if !headerHasContent(hf) {
 				return
@@ -553,7 +595,7 @@ func drawHeadersFooters(ctx context.Context, loader *load.Loader, font *pdf.Font
 						own.st.footerHTML = l
 					}
 				}
-				if err := drawHTMLHF(ctx, page, l, hf, own.st.geom, parms, isHeader); err != nil {
+				if err := drawHTMLHF(ctx, page, l, hf, own.st.geom, parms, isHeader, links); err != nil {
 					fmt.Fprintf(log, "warning: object %d: header/footer html draw: %v\n", own.st.idx, err)
 				}
 				return
