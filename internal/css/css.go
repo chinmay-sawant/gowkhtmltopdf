@@ -581,32 +581,21 @@ func splitSelectorChain(s string) []string {
 				i += j
 			}
 		case c == ':':
-			// keep :pseudo / :nth-child(n) / :has(...) inside the compound;
-			// drop ::pseudo-elements
-			if i+1 < len(s) && s[i+1] == ':' {
-				// ::before etc. - skip
-				i += 2
-				for i < len(s) && !isSelBreak(s[i]) {
-					if s[i] == '(' {
-						_, end, ok := takeParenArg(s, i)
-						if !ok {
-							i = len(s)
-							break
-						}
-						i = end
-						break
-					}
-					i++
-				}
-				i--
-				break
-			}
+			// keep :pseudo / :nth-child(n) / :has(...) and ::pseudo-elements
+			// inside the compound so parseCompound can reject unsupported
+			// pseudo-elements. Never strip ::before/::after — that used to
+			// leave a bare host selector (Vector print `p::before{width:120pt}`
+			// became `p{width:120pt}` and crushed wiki body columns).
 			if cur.Len() == 0 && (len(out) == 0 || out[len(out)-1] == " " ||
 				out[len(out)-1] == ">" || out[len(out)-1] == "+" || out[len(out)-1] == "~") {
 				cur.WriteByte('*')
 			}
 			start := i
-			i++
+			if i+1 < len(s) && s[i+1] == ':' {
+				i += 2 // ::pseudo-element
+			} else {
+				i++ // :pseudo-class or CSS2 :before/:after
+			}
 			for i < len(s) && !isSelBreak(s[i]) {
 				if s[i] == '(' {
 					_, end, ok := takeParenArg(s, i)
@@ -773,6 +762,11 @@ func parseCompoundCtx(s string, insideHas bool) (SelectorPart, bool) {
 				// (static PDF has no pointer/focus state). Keeping them on the
 				// compound prevents a:hover from degrading to bare `a`.
 				part.Pseudos = append(part.Pseudos, PseudoClass{Name: name})
+			case "before", "after", "first-line", "first-letter":
+				// CSS2 single-colon pseudo-elements — unsupported; rejecting
+				// the selector avoids applying their declarations to the host
+				// (same class of bug as stripping ::before).
+				return SelectorPart{}, false
 			default:
 				// unknown: ignore
 			}

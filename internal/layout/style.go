@@ -66,6 +66,7 @@ type ResolvedStyle struct {
 	MinWidth            float64 // absolute pt when MinWidthPercent < 0; 0 = auto (content min for flex)
 	MinWidthPercent     float64 // >=0 means % of containing block (deferred like WidthPercent)
 	MaxWidth            float64
+	MaxWidthPercent     float64 // >=0 means % of containing block / img clamp context
 	MinHeight           float64
 	MinHeightPercent    float64 // >=0 means % of CB height; indefinite → ignore
 	MaxHeight           float64
@@ -156,6 +157,7 @@ func initialStyle() ResolvedStyle {
 		MinWidth:         0,
 		MinWidthPercent:  -1,
 		MaxWidth:         -1,
+		MaxWidthPercent:  -1,
 		MinHeight:        0,
 		MinHeightPercent: -1,
 		MaxHeight:        -1,
@@ -712,8 +714,15 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext,
 				st.MinWidthPercent = -1
 			}
 		case "max-width":
-			if v, ok := lengthBox(value, fs, ctx.viewportW, "none"); ok {
+			if value == "none" {
+				st.MaxWidth = -1
+				st.MaxWidthPercent = -1
+			} else if v, unit, ok := css.ParseLength(value); ok && unit == "%" {
+				st.MaxWidthPercent = v
+				st.MaxWidth = -1
+			} else if v, ok := lengthBox(value, fs, ctx.viewportW, "none"); ok {
 				st.MaxWidth = v
+				st.MaxWidthPercent = -1
 			}
 		case "min-height":
 			if value == "auto" || value == "none" {

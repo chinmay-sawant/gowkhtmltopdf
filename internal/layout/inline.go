@@ -40,7 +40,12 @@ func (e *engine) layoutInline(b *box, nodes []*html.Node, availW, x, y float64) 
 
 func (e *engine) layoutInlineFloats(b *box, nodes []*html.Node, availW, x, y float64, floats *floatState) float64 {
 	var items []inlineItem
+	oldMax := e.imgMaxW
+	if availW > 0 {
+		e.imgMaxW = availW
+	}
 	e.collectInline(nodes, &items)
+	e.imgMaxW = oldMax
 	if len(items) == 0 {
 		return 0
 	}

@@ -146,6 +146,9 @@ type engine struct {
 	stickySeq int // monotonically increasing sticky box IDs (for Op.StickyID)
 	// transformCBDepth counts ancestors with transform≠none; fixed→absolute CB.
 	transformCBDepth int
+	// imgMaxW > 0 clamps replaced <img> boxes to this containing-block width
+	// (table cell / float / inline formatting context).
+	imgMaxW float64
 }
 
 // faceFor selects the TrueType face for a resolved style (bold/italic),
@@ -929,7 +932,16 @@ func (e *engine) placeFloat(n *html.Node, cs ResolvedStyle, floats *floatState, 
 		}
 	}
 
+	oldMax := e.imgMaxW
+	if cs.Width >= 0 {
+		e.imgMaxW = e.scalePt(cs.Width)
+	} else if cs.WidthPercent >= 0 && contentW > 0 {
+		e.imgMaxW = contentW * cs.WidthPercent / 100
+	} else if avail > 0 && avail < contentW {
+		e.imgMaxW = avail
+	}
 	fb := e.build(n, avail, fx, fy)
+	e.imgMaxW = oldMax
 	if fb == nil {
 		return nil
 	}
@@ -1029,9 +1041,28 @@ func (e *engine) buildImage(n *html.Node, st ResolvedStyle, x, y float64) *box {
 	if st.Height >= 0 {
 		b.h = e.scalePt(st.Height)
 	}
-	if st.MaxWidth >= 0 && b.w > e.scalePt(st.MaxWidth) {
-		b.h = b.h * e.scalePt(st.MaxWidth) / b.w
-		b.w = e.scalePt(st.MaxWidth)
+	maxW := -1.0
+	if st.MaxWidth >= 0 {
+		maxW = e.scalePt(st.MaxWidth)
+	}
+	if st.MaxWidthPercent >= 0 {
+		cb := e.imgMaxW
+		if cb <= 0 {
+			cb = e.opts.Width
+		}
+		if cb > 0 {
+			pct := cb * st.MaxWidthPercent / 100
+			if maxW < 0 || pct < maxW {
+				maxW = pct
+			}
+		}
+	}
+	if e.imgMaxW > 0 && (maxW < 0 || e.imgMaxW < maxW) {
+		maxW = e.imgMaxW
+	}
+	if maxW >= 0 && b.w > maxW && b.w > 0 {
+		b.h = b.h * maxW / b.w
+		b.w = maxW
 	}
 	if st.MaxHeight >= 0 && b.h > e.scalePt(st.MaxHeight) {
 		b.w = b.w * e.scalePt(st.MaxHeight) / b.h
@@ -1354,7 +1385,12 @@ func (e *engine) emitCell(b *box) {
 	// flowChildren advances cy; cell content is rooted at absolute canvas y
 	// (pass y=0, contentX=cx, cy=content top) so floats pack inside the cell
 	// BFC. Pass the cell as parent so float/block children attach for tests.
+	oldMax := e.imgMaxW
+	if contentW > 0 {
+		e.imgMaxW = contentW
+	}
 	_ = e.flowChildren(b, b.node.Children, st, contentW, cx, 0, cy)
+	e.imgMaxW = oldMax
 	b.opStart, b.opEnd = start, len(e.ops)-1
 }
 
