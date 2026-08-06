@@ -7,6 +7,8 @@
 | [phases/](phases/) | Per-phase atomic checklists (MVP 00–09 + post-MVP 10–23) |
 | [phases/subplans-tier-2/](phases/subplans-tier-2/) | Tier 2 subplans: closed pending + sticky/flex-grid/shaping/image-fontface; nested HF → v0.3.0 |
 | [exploration/](exploration/) | Multi-agent analysis snapshots (read-only evidence) |
+| [reviews/ponytail/](reviews/ponytail/) | Ponytail leanness audits + phase-wise remediation (baseline **5.7/10**) |
+| [reviews/improve-codebase/](reviews/improve-codebase/) | Architecture deepening reviews (reserved) |
 | [PR/](PR/) | PR/issue body archives |
 
 Workflow: [../skills/phase-wise-checklist/SKILLS.md](../skills/phase-wise-checklist/SKILLS.md)
