@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"gowkhtmltopdf/internal/settings"
@@ -36,6 +37,23 @@ type Command struct {
 
 	DumpDefaultTOCXSL bool
 	DumpOutline       bool
+}
+
+// OpenOutput returns the writer for this command: OutputWriter (library bytes
+// sink) takes precedence over Output path; empty/"-" use stdout.
+// The closer must be called when done (no-op for writer/stdout).
+func (cmd *Command) OpenOutput() (io.Writer, func() error, error) {
+	if cmd.OutputWriter != nil {
+		return cmd.OutputWriter, func() error { return nil }, nil
+	}
+	if cmd.Output != "" && cmd.Output != "-" {
+		f, err := os.Create(cmd.Output)
+		if err != nil {
+			return nil, nil, fmt.Errorf("output %q: %w", cmd.Output, err)
+		}
+		return f, f.Close, nil
+	}
+	return os.Stdout, func() error { return nil }, nil
 }
 
 // flagSpec describes one accepted flag.

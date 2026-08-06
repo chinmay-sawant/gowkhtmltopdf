@@ -9,7 +9,7 @@
 > **Skills source:** `skills/ponytail*` (4.8.4)  
 > **Plan shape:** `skills/phase-wise-checklist/SKILLS.md`  
 > **Scope:** whole Go tree  
-> **Overall rating:** **5.7 / 10** baseline → **9.4 / 10** post-partials (2026-08-07) — Get tables + single background + library bytes sink closed
+> **Overall rating:** **5.7 / 10** baseline → **9.5 / 10** post-remediation (fresh weighted re-audit 2026-08-07 after key-table unify + OpenOutput + no Web.Background mirror)
 
 ---
 
@@ -37,33 +37,37 @@ What it questions is **~2.5–3.5k lines of removable slop** plus a large **wkht
 |---|---|
 | **Ponytail leanness (overall)** | **5.7 / 10** |
 
-### Post-remediation (2026-08-07 re-audit)
+### Post-remediation (fresh weighted re-audit 2026-08-07)
+
+Evidence pass after closing residual partials (unified Set/Get via `gReg`/`oReg`/`iReg`, removed `Web.Background` mirror, single `cli.Command.OpenOutput`, parity + OutputWriter precedence tests).
 
 | Metric | Score | Notes |
 |---|---|---|
-| **Ponytail leanness (overall)** | **9.1 / 10** | Only documented `// ponytail:` ceilings remain as intentional debt |
-| Dead API surface | 9.0 / 10 | Stub flags/settings removed (Policy A); dead operators/packing gone |
-| Duplication | 8.8 / 10 | HF shared op paint, subset merge, selector/Match unify, layout helpers |
-| Over-abstraction | 9.0 / 10 | Still few interfaces; Partial CSS cut where unused |
-| Intentional shortcuts | 9.5 / 10 | 18 `// ponytail:` markers with ceiling+trigger ([PONYTAIL-DEBT.md](./PONYTAIL-DEBT.md)) |
-| Dependency bloat | 8.5 / 10 | Still 2 direct deps; canvas sole SVG path (heavy indirect tree accepted) |
+| **Ponytail leanness (overall)** | **9.5 / 10** | Matches weighted area sum below (not a freehand headline) |
+| Dead API surface | 9.4 / 10 | Policy A stubs gone; Get/Set one key surface; Ignored ledger only |
+| Duplication | 9.3 / 10 | OpenOutput shared; no dual openCommandOutput; no dual Get tables |
+| Over-abstraction | 9.2 / 10 | Still few interfaces; Partial CSS/layout ceilings documented |
+| Intentional shortcuts | 9.6 / 10 | `// ponytail:` markers with ceiling+trigger only |
+| Dependency bloat | 8.5 / 10 | 2 direct deps; canvas sole SVG (heavy indirect tree accepted) |
 
-### Rating by area (post)
+### Rating by area (post — fresh)
 
-| # | Area | Before | After | Notes |
-|---|---|---:|---:|---|
-| 1 | Surface API + CLI + settings | 5.2 | **9.2** | Policy A; grayscale single field; setter tables once |
-| 2 | Convert + load + HTML + outline | 5.4 | **9.0** | Media wire, defaults honesty, outline Exclude, CollapseWS |
-| 3 | CSS engine | 6.7 | **9.0** | Selector unify; drop :is/:where; container keep with ponytail |
-| 4 | Layout engine | 5.4 | **9.0** | Dead packer gone; helper merge; masonry/subgrid/vertical cut |
-| 5 | PDF + imageout + SVG | 6.3 | **9.2** | Canvas-only SVG (−842); bitmap font gone; subset merge |
-| | **Weighted overall** | **5.7** | **9.1** | weights unchanged |
+| # | Area | Baseline | After P0–5 | After partials+unify | Notes |
+|---|---|---:|---:|---:|---|
+| 1 | Surface API + CLI + settings | 5.2 | 9.2 | **9.7** | Unified keys; single Background; OutputWriter sink; parity tests |
+| 2 | Convert + load + HTML + outline | 5.4 | 9.0 | **9.5** | Shared OpenOutput; Exclude/CollapseWS; media/defaults honesty |
+| 3 | CSS engine | 6.7 | 9.0 | **9.3** | Selector unify; :is/:where cut; Cond keep with ponytail |
+| 4 | Layout engine | 5.4 | 9.0 | **9.5** | Dead packer cut; masonry/subgrid/vertical cut; helper merge |
+| 5 | PDF + imageout + SVG | 6.3 | 9.2 | **9.6** | Canvas-only; bitmap gone; OT-first; single BG; OpenOutput |
+| | **Weighted overall** | **5.7** | **9.1** | **9.5** | weights: 14% / 12% / 9% / 42% / 23% |
 
 ```
-9.2×0.14 + 9.0×0.12 + 9.0×0.09 + 9.0×0.42 + 9.2×0.23
-= 1.288 + 1.080 + 0.810 + 3.780 + 2.116
-= 9.074 → 9.1
+9.7×0.14 + 9.5×0.12 + 9.3×0.09 + 9.5×0.42 + 9.6×0.23
+= 1.358 + 1.140 + 0.837 + 3.990 + 2.208
+= 9.533 → 9.5
 ```
+
+Prior "9.4" headline without matching area rows was **unsupported** and is superseded by this table.
 
 ### Net remediation (master…HEAD, code-ish)
 
@@ -517,15 +521,15 @@ Optional stretch toward a pure 10/10 (not blocking):
 2. Revisit canvas indirect dependency weight if SVG usage stays narrow.
 3. Architecture deepening under `plans/reviews/improve-codebase/` (separate skill).
 
-**Baseline: 5.7 / 10 · Post-remediation: 9.1 / 10 · Goal band: ~10 / 10**
+**Baseline: 5.7 / 10 · Post-remediation: 9.5 / 10 (weighted, 2026-08-07) · Residual to 10: third-order layout/CSS ceilings + canvas indirect deps**
 
 
-## Partials closed (2026-08-07 follow-up)
+## Partials closed + de-duplication (2026-08-07)
 
-Evidence-backed close of the three residual gaps after phases 0–5:
-
-- [x] **Get tables** — `PdfGlobal`/`PdfObject`/`ImageGlobal.Get` use the same key surface as `Set` (`internal/settings/getters.go`); reflection `getDotted` removed from `api.go`. Ignored keys round-trip via `Get`.
-- [x] **Image background single field** — paint uses `Global.Background` only (imageout + convert); `web.background` / bare `background` Set both write it; ImageConverter.Set(`web.background`) syncs Global.
-- [x] **Library bytes sink** — `cli.Command.OutputWriter`; convert + imageout prefer it; `Converter`/`ImageConverter` capture to `bytes.Buffer` (no temp file).
+- [x] **Unified Set/Get keys** — each key registered once via `gReg`/`oReg`/`iReg` in `reflect.go` (no separate getters key list). `TestKeyTableSetGetParity` enforces set/get key equality.
+- [x] **No `Web.Background` field** — removed from `Web`; sole paint switch is `PdfGlobal.Background`. Object `web.background` is Policy A ignored; ImageConverter routes `web.background`/`background` to Global.
+- [x] **Shared `cli.Command.OpenOutput`** — convert and imageout both call it (no duplicated openCommandOutput). `TestOpenOutputWriterPrecedence` proves writer > path.
+- [x] **Library bytes sink** — `OutputWriter` + in-memory capture in `Converter`/`ImageConverter`.
+- [x] **Fresh weighted re-audit** — area scores updated; overall **9.5** = weighted sum (see table above).
 
 `make lint` + `make test` green after these changes.

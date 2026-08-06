@@ -12,7 +12,6 @@ import (
 	"image/png"
 	"io"
 	"math"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -510,7 +509,7 @@ func Run(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 		return fmt.Errorf("encode %s: %w", format, err)
 	}
 
-	out, closeOut, err := openCommandOutput(cmd)
+	out, closeOut, err := cmd.OpenOutput()
 	if err != nil {
 		return err
 	}
@@ -522,21 +521,6 @@ func Run(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 		return fmt.Errorf("write %q: %w", cmd.Output, err)
 	}
 	return closeOut()
-}
-
-// openCommandOutput prefers OutputWriter (library bytes sink), else path/"-"/stdout.
-func openCommandOutput(cmd *cli.Command) (io.Writer, func() error, error) {
-	if cmd.OutputWriter != nil {
-		return cmd.OutputWriter, func() error { return nil }, nil
-	}
-	if cmd.Output != "" && cmd.Output != "-" {
-		f, err := os.Create(cmd.Output)
-		if err != nil {
-			return nil, nil, fmt.Errorf("output %q: %w", cmd.Output, err)
-		}
-		return f, f.Close, nil
-	}
-	return os.Stdout, func() error { return nil }, nil
 }
 
 // firstObject returns the first page-like object. Image mode renders a

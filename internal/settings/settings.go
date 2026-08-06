@@ -134,13 +134,13 @@ type Size struct {
 }
 
 // Web holds web-behaviour settings that the engine actually consults.
+// Body paint background is PdfGlobal.Background only (not a Web field).
 // Inert wkhtml keys (javascript, plugins, user-style-sheet, …) are accepted
 // via Set into Ignored maps — not typed fields (Policy A).
 type Web struct {
-	Background bool
-	Images     bool
+	Images bool
 	// PrintMediaType / MediaType: image mode media selection (imageout.mediaFor).
-	// PDF convert currently hardcodes print media — see convert package.
+	// PDF convert uses mediaFor with object/global load+web fields.
 	PrintMediaType bool
 	MediaType      MediaType
 	// SimplifyDOM opts into chrome-strip heuristics for URL/print mode
@@ -289,8 +289,7 @@ func DefaultPdfGlobal() PdfGlobal {
 		TOC:            DefaultTableOfContent(),
 		Background:     true,
 		Web: Web{
-			Background: true,
-			Images:     true,
+			Images: true,
 		},
 		ResolveRelativeLinks: true,
 	}
@@ -386,8 +385,7 @@ func DefaultImageGlobal() ImageGlobal {
 		SmartWidth: true,
 		Crop:       CropSettings{Left: -1, Top: -1, Width: -1, Height: -1},
 		Web: Web{
-			Background: true,
-			Images:     true,
+			Images: true,
 		},
 	}
 }

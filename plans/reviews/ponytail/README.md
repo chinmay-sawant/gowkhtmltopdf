@@ -6,7 +6,7 @@ Ponytail **ultra** leanness audits for gowkhtmltopdf.
 
 | File | Date | Rating | Notes |
 |---|---|---:|---|
-| [ponytail-ultra-2026-08-06.md](./ponytail-ultra-2026-08-06.md) | 2026-08-06 | **5.7 → 9.1 / 10** | All phases 0–5 closed 2026-08-07 on `chore/ponytail-review-1` |
+| [ponytail-ultra-2026-08-06.md](./ponytail-ultra-2026-08-06.md) | 2026-08-06 | **5.7 → 9.5 / 10** | All phases 0–5 closed 2026-08-07 on `chore/ponytail-review-1` |
 | [PONYTAIL-DEBT.md](./PONYTAIL-DEBT.md) | 2026-08-07 | — | 18 intentional `// ponytail:` ceilings |
 
 ## Skills used

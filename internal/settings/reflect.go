@@ -26,18 +26,46 @@ type setter func(raw string) error
 // globalApply applies a dotted key to a PdfGlobal.
 type globalApply func(g *PdfGlobal, raw string) error
 
+// globalGet reads a dotted key from a PdfGlobal.
+type globalGet func(g *PdfGlobal) (string, bool)
+
 // objectApply applies a dotted key to a PdfObject.
 type objectApply func(o *PdfObject, raw string) error
+
+// objectGet reads a dotted key from a PdfObject.
+type objectGet func(o *PdfObject) (string, bool)
 
 // imageApply applies a dotted key to an ImageGlobal.
 type imageApply func(g *ImageGlobal, raw string) error
 
+// imageGet reads a dotted key from an ImageGlobal.
+type imageGet func(g *ImageGlobal) (string, bool)
+
 var (
 	globalKeyTable map[string]globalApply
+	globalGetTable map[string]globalGet
 	objectKeyTable map[string]objectApply
+	objectGetTable map[string]objectGet
 	imageKeyTable  map[string]imageApply
+	imageGetTable  map[string]imageGet
 	keysOnce       sync.Once
 )
+
+// gReg / oReg / iReg register one key once for both Set and Get.
+func gReg(set map[string]globalApply, get map[string]globalGet, key string, s globalApply, g globalGet) {
+	set[key] = s
+	get[key] = g
+}
+
+func oReg(set map[string]objectApply, get map[string]objectGet, key string, s objectApply, g objectGet) {
+	set[key] = s
+	get[key] = g
+}
+
+func iReg(set map[string]imageApply, get map[string]imageGet, key string, s imageApply, g imageGet) {
+	set[key] = s
+	get[key] = g
+}
 
 // ignoredGlobalKeys are wkhtml global keys with no engine consumer. Set accepts
 // them into PdfGlobal.Ignored (Policy A) so scripts do not fail on known stubs.
@@ -66,6 +94,8 @@ var ignoredGlobalKeys = map[string]struct{}{
 	"web.loadimages":      {},
 }
 
+// Note: global web.background is a real key (→ PdfGlobal.Background), not ignored.
+
 // ignoredObjectKeys are wkhtml object/load/web keys with no engine consumer.
 var ignoredObjectKeys = map[string]struct{}{
 	"pagescount":   {},
@@ -83,7 +113,8 @@ var ignoredObjectKeys = map[string]struct{}{
 	"load.locallinks":            {},
 	"load.repeatexternalheaders": {},
 	"load.repeatexternalcookies": {},
-	// web.* stubs
+	// web.* stubs — paint background is Global only
+	"web.background":      {},
 	"web.javascript":      {},
 	"web.java":            {},
 	"web.plugins":         {},
@@ -288,274 +319,351 @@ func appendString(dst *[]string) setter {
 }
 
 func buildKeyTables() {
-	globalKeyTable = buildGlobalKeyTable()
-	objectKeyTable = buildObjectKeyTable()
-	imageKeyTable = buildImageKeyTable()
-	buildGetTables()
+	globalKeyTable, globalGetTable = buildGlobalKeys()
+	objectKeyTable, objectGetTable = buildObjectKeys()
+	imageKeyTable, imageGetTable = buildImageKeys()
 }
 
-func buildGlobalKeyTable() map[string]globalApply {
-	s := map[string]globalApply{
-		"orientation": func(g *PdfGlobal, raw string) error {
-			return setOrientation(&g.Orientation)(raw)
+func buildGlobalKeys() (map[string]globalApply, map[string]globalGet) {
+	set := make(map[string]globalApply)
+	get := make(map[string]globalGet)
+
+	gReg(set, get, "orientation",
+		func(g *PdfGlobal, raw string) error { return setOrientation(&g.Orientation)(raw) },
+		func(g *PdfGlobal) (string, bool) { return g.Orientation.String(), true },
+	)
+	// colormode and grayscale both share Grayscale.
+	gReg(set, get, "colormode",
+		func(g *PdfGlobal, raw string) error { return setGrayscaleFromColorMode(&g.Grayscale)(raw) },
+		func(g *PdfGlobal) (string, bool) {
+			if g.Grayscale {
+				return "grayscale", true
+			}
+			return "color", true
 		},
-		// colormode and grayscale both write Grayscale (convert's only reader).
-		"colormode": func(g *PdfGlobal, raw string) error {
-			return setGrayscaleFromColorMode(&g.Grayscale)(raw)
-		},
-		"grayscale": func(g *PdfGlobal, raw string) error {
-			return setBool(&g.Grayscale)(raw)
-		},
-		"pageoffset": func(g *PdfGlobal, raw string) error {
-			return setInt(&g.PageOffset)(raw)
-		},
-		"copies": func(g *PdfGlobal, raw string) error {
-			return setInt(&g.Copies)(raw)
-		},
-		"collate": func(g *PdfGlobal, raw string) error {
-			return setBool(&g.Collate)(raw)
-		},
-		"outline": func(g *PdfGlobal, raw string) error {
-			return setBool(&g.Outline)(raw)
-		},
-		"outlinedepth": func(g *PdfGlobal, raw string) error {
-			return setInt(&g.OutlineDepth)(raw)
-		},
-		"dumpoutline": func(g *PdfGlobal, raw string) error {
-			return setBool(&g.DumpOutline)(raw)
-		},
-		"dumpoutlinewithdefaulttocxsl": func(g *PdfGlobal, raw string) error {
-			return setBool(&g.DumpDefaultTOCXSL)(raw)
-		},
-		"usecompression": func(g *PdfGlobal, raw string) error {
-			return setBool(&g.UseCompression)(raw)
-		},
-		"title": func(g *PdfGlobal, raw string) error {
-			return setString(&g.Title)(raw)
-		},
-		"smartshrinking": func(g *PdfGlobal, raw string) error {
-			return setBool(&g.SmartShrinking)(raw)
-		},
-		// "background" registered below with web.background (single paint field).
-		"enablelocalfileaccess": func(g *PdfGlobal, raw string) error {
-			return setBool(&g.EnableLocalFileAccess)(raw)
-		},
-		"excludefromoutline": func(g *PdfGlobal, raw string) error {
-			return appendString(&g.ExcludeFromOutline)(raw)
-		},
-		"quiet": func(g *PdfGlobal, raw string) error {
-			return setBool(&g.Quiet)(raw)
-		},
-		"proxy": func(g *PdfGlobal, raw string) error {
-			return setString(&g.Load.Proxy)(raw)
-		},
-		"usesystemfonts": func(g *PdfGlobal, raw string) error {
-			return setBool(&g.UseSystemFonts)(raw)
-		},
-		"resolverelativelinks": func(g *PdfGlobal, raw string) error {
-			return setBool(&g.ResolveRelativeLinks)(raw)
-		},
-		"fontpath": func(g *PdfGlobal, raw string) error {
-			return appendString(&g.FontPaths)(raw)
-		},
-		"allow": func(g *PdfGlobal, raw string) error {
-			return appendString(&g.Allow)(raw)
-		},
-	}
+	)
+	gReg(set, get, "grayscale",
+		func(g *PdfGlobal, raw string) error { return setBool(&g.Grayscale)(raw) },
+		func(g *PdfGlobal) (string, bool) { return fmtBool(g.Grayscale), true },
+	)
+	gReg(set, get, "pageoffset",
+		func(g *PdfGlobal, raw string) error { return setInt(&g.PageOffset)(raw) },
+		func(g *PdfGlobal) (string, bool) { return fmtInt(g.PageOffset), true },
+	)
+	gReg(set, get, "copies",
+		func(g *PdfGlobal, raw string) error { return setInt(&g.Copies)(raw) },
+		func(g *PdfGlobal) (string, bool) { return fmtInt(g.Copies), true },
+	)
+	gReg(set, get, "collate",
+		func(g *PdfGlobal, raw string) error { return setBool(&g.Collate)(raw) },
+		func(g *PdfGlobal) (string, bool) { return fmtBool(g.Collate), true },
+	)
+	gReg(set, get, "outline",
+		func(g *PdfGlobal, raw string) error { return setBool(&g.Outline)(raw) },
+		func(g *PdfGlobal) (string, bool) { return fmtBool(g.Outline), true },
+	)
+	gReg(set, get, "outlinedepth",
+		func(g *PdfGlobal, raw string) error { return setInt(&g.OutlineDepth)(raw) },
+		func(g *PdfGlobal) (string, bool) { return fmtInt(g.OutlineDepth), true },
+	)
+	gReg(set, get, "dumpoutline",
+		func(g *PdfGlobal, raw string) error { return setBool(&g.DumpOutline)(raw) },
+		func(g *PdfGlobal) (string, bool) { return fmtBool(g.DumpOutline), true },
+	)
+	gReg(set, get, "dumpoutlinewithdefaulttocxsl",
+		func(g *PdfGlobal, raw string) error { return setBool(&g.DumpDefaultTOCXSL)(raw) },
+		func(g *PdfGlobal) (string, bool) { return fmtBool(g.DumpDefaultTOCXSL), true },
+	)
+	gReg(set, get, "usecompression",
+		func(g *PdfGlobal, raw string) error { return setBool(&g.UseCompression)(raw) },
+		func(g *PdfGlobal) (string, bool) { return fmtBool(g.UseCompression), true },
+	)
+	gReg(set, get, "title",
+		func(g *PdfGlobal, raw string) error { return setString(&g.Title)(raw) },
+		func(g *PdfGlobal) (string, bool) { return g.Title, true },
+	)
+	gReg(set, get, "smartshrinking",
+		func(g *PdfGlobal, raw string) error { return setBool(&g.SmartShrinking)(raw) },
+		func(g *PdfGlobal) (string, bool) { return fmtBool(g.SmartShrinking), true },
+	)
+	// Sole paint switch for PDF + image (no Web.Background mirror).
+	paintBG := func(g *PdfGlobal, raw string) error { return setBool(&g.Background)(raw) }
+	paintBGGet := func(g *PdfGlobal) (string, bool) { return fmtBool(g.Background), true }
+	gReg(set, get, "background", paintBG, paintBGGet)
+	gReg(set, get, "web.background", paintBG, paintBGGet)
+
+	gReg(set, get, "enablelocalfileaccess",
+		func(g *PdfGlobal, raw string) error { return setBool(&g.EnableLocalFileAccess)(raw) },
+		func(g *PdfGlobal) (string, bool) { return fmtBool(g.EnableLocalFileAccess), true },
+	)
+	gReg(set, get, "excludefromoutline",
+		func(g *PdfGlobal, raw string) error { return appendString(&g.ExcludeFromOutline)(raw) },
+		func(g *PdfGlobal) (string, bool) { return fmtStrings(g.ExcludeFromOutline), true },
+	)
+	gReg(set, get, "quiet",
+		func(g *PdfGlobal, raw string) error { return setBool(&g.Quiet)(raw) },
+		func(g *PdfGlobal) (string, bool) { return fmtBool(g.Quiet), true },
+	)
+	gReg(set, get, "proxy",
+		func(g *PdfGlobal, raw string) error { return setString(&g.Load.Proxy)(raw) },
+		func(g *PdfGlobal) (string, bool) { return g.Load.Proxy, true },
+	)
+	gReg(set, get, "usesystemfonts",
+		func(g *PdfGlobal, raw string) error { return setBool(&g.UseSystemFonts)(raw) },
+		func(g *PdfGlobal) (string, bool) { return fmtBool(g.UseSystemFonts), true },
+	)
+	gReg(set, get, "resolverelativelinks",
+		func(g *PdfGlobal, raw string) error { return setBool(&g.ResolveRelativeLinks)(raw) },
+		func(g *PdfGlobal) (string, bool) { return fmtBool(g.ResolveRelativeLinks), true },
+	)
+	gReg(set, get, "fontpath",
+		func(g *PdfGlobal, raw string) error { return appendString(&g.FontPaths)(raw) },
+		func(g *PdfGlobal) (string, bool) { return fmtStrings(g.FontPaths), true },
+	)
+	gReg(set, get, "allow",
+		func(g *PdfGlobal, raw string) error { return appendString(&g.Allow)(raw) },
+		func(g *PdfGlobal) (string, bool) { return fmtStrings(g.Allow), true },
+	)
 
 	for _, e := range []string{"top", "bottom", "left", "right"} {
 		edge := e
-		s["margin."+edge] = func(g *PdfGlobal, raw string) error {
-			return marginSetter(&g.Margin, edge)(raw)
-		}
+		gReg(set, get, "margin."+edge,
+			func(g *PdfGlobal, raw string) error { return marginSetter(&g.Margin, edge)(raw) },
+			func(g *PdfGlobal) (string, bool) {
+				var v float64
+				switch edge {
+				case "top":
+					v = g.Margin.Top
+				case "bottom":
+					v = g.Margin.Bottom
+				case "left":
+					v = g.Margin.Left
+				case "right":
+					v = g.Margin.Right
+				}
+				return fmtFloat(v), true
+			},
+		)
 	}
 
-	// Page size: dual-write PageSize name for convert.pageGeometry; dimensions
-	// live only on Size (PageWidth/PageHeight top-level fields removed).
-	s["size.pagesize"] = func(g *PdfGlobal, raw string) error {
-		v := strings.TrimSpace(raw)
-		g.PageSize = v
-		g.Size.PageSize = v
-		return nil
-	}
-	s["size.width"] = func(g *PdfGlobal, raw string) error {
-		u, err := ParseUnitReal(raw, "mm")
-		if err != nil {
-			return err
-		}
-		mm, ok := u.Mm()
-		if !ok {
-			return fmt.Errorf("size.width: unit %q not convertible", u.Unit)
-		}
-		g.Size.Width = mm
-		return nil
-	}
-	s["size.height"] = func(g *PdfGlobal, raw string) error {
-		u, err := ParseUnitReal(raw, "mm")
-		if err != nil {
-			return err
-		}
-		mm, ok := u.Mm()
-		if !ok {
-			return fmt.Errorf("size.height: unit %q not convertible", u.Unit)
-		}
-		g.Size.Height = mm
-		return nil
-	}
+	gReg(set, get, "size.pagesize",
+		func(g *PdfGlobal, raw string) error {
+			v := strings.TrimSpace(raw)
+			g.PageSize = v
+			g.Size.PageSize = v
+			return nil
+		},
+		func(g *PdfGlobal) (string, bool) {
+			if g.PageSize != "" {
+				return g.PageSize, true
+			}
+			return g.Size.PageSize, true
+		},
+	)
+	gReg(set, get, "size.width",
+		func(g *PdfGlobal, raw string) error {
+			u, err := ParseUnitReal(raw, "mm")
+			if err != nil {
+				return err
+			}
+			mm, ok := u.Mm()
+			if !ok {
+				return fmt.Errorf("size.width: unit %q not convertible", u.Unit)
+			}
+			g.Size.Width = mm
+			return nil
+		},
+		func(g *PdfGlobal) (string, bool) { return fmtFloat(g.Size.Width), true },
+	)
+	gReg(set, get, "size.height",
+		func(g *PdfGlobal, raw string) error {
+			u, err := ParseUnitReal(raw, "mm")
+			if err != nil {
+				return err
+			}
+			mm, ok := u.Mm()
+			if !ok {
+				return fmt.Errorf("size.height: unit %q not convertible", u.Unit)
+			}
+			g.Size.Height = mm
+			return nil
+		},
+		func(g *PdfGlobal) (string, bool) { return fmtFloat(g.Size.Height), true },
+	)
 
 	for _, k := range []string{"fontsize", "fontname", "left", "right", "center", "line", "spacing", "htmlurl"} {
 		key := k
-		s["header."+key] = func(g *PdfGlobal, raw string) error {
-			return hfApply(&g.Header, key, raw)
-		}
-		s["footer."+key] = func(g *PdfGlobal, raw string) error {
-			return hfApply(&g.Footer, key, raw)
-		}
+		gReg(set, get, "header."+key,
+			func(g *PdfGlobal, raw string) error { return hfApply(&g.Header, key, raw) },
+			func(g *PdfGlobal) (string, bool) { return hfGet(&g.Header, key) },
+		)
+		gReg(set, get, "footer."+key,
+			func(g *PdfGlobal, raw string) error { return hfApply(&g.Footer, key, raw) },
+			func(g *PdfGlobal) (string, bool) { return hfGet(&g.Footer, key) },
+		)
 	}
 	for _, k := range []string{"fontscale", "indentation", "dottedlines", "captiontext", "forwardlinks", "backlinks", "xslstylesheet"} {
 		key := k
-		s["toc."+key] = func(g *PdfGlobal, raw string) error {
-			return tocApply(&g.TOC, key, raw)
-		}
+		gReg(set, get, "toc."+key,
+			func(g *PdfGlobal, raw string) error { return tocApply(&g.TOC, key, raw) },
+			func(g *PdfGlobal) (string, bool) { return tocGet(&g.TOC, key) },
+		)
 	}
-	// web.background maps onto PdfGlobal.Background — the single paint field
-	// convert and imageout both read (not Web.Background alone).
-	s["web.background"] = func(g *PdfGlobal, raw string) error {
-		if err := setBool(&g.Background)(raw); err != nil {
-			return err
-		}
-		g.Web.Background = g.Background // keep nested field in sync for snapshots
-		return nil
-	}
+	// web.* except background (mapped to Global.Background above)
 	for _, k := range []string{
 		"images", "printmediatype", "mediatype",
 		"simplifydom", "simplifydomprofile", "printlinkunderline",
 	} {
 		key := k
-		s["web."+key] = func(g *PdfGlobal, raw string) error {
-			return webApply(&g.Web, key, raw)
-		}
+		gReg(set, get, "web."+key,
+			func(g *PdfGlobal, raw string) error { return webApply(&g.Web, key, raw) },
+			func(g *PdfGlobal) (string, bool) { return webGet(&g.Web, key) },
+		)
 	}
-	// bare "background" is the same paint switch as web.background
-	s["background"] = func(g *PdfGlobal, raw string) error {
-		if err := setBool(&g.Background)(raw); err != nil {
-			return err
-		}
-		g.Web.Background = g.Background
-		return nil
-	}
-	return s
+	return set, get
 }
 
-func buildObjectKeyTable() map[string]objectApply {
-	s := map[string]objectApply{
-		"page": func(o *PdfObject, raw string) error {
-			return setString(&o.Page)(raw)
-		},
-		"externallinks": func(o *PdfObject, raw string) error {
-			return setBool(&o.ExternalLinks)(raw)
-		},
-		"locallinks": func(o *PdfObject, raw string) error {
-			return setBool(&o.LocalLinks)(raw)
-		},
-		"includeinoutline": func(o *PdfObject, raw string) error {
-			return setBool(&o.IncludeInOutline)(raw)
-		},
-		"useoutline": func(o *PdfObject, raw string) error {
-			return setBool(&o.UseOutline)(raw)
-		},
-		"istableofcontent": func(o *PdfObject, raw string) error {
-			return setBool(&o.IsTableOfContent)(raw)
-		},
-		"iscover": func(o *PdfObject, raw string) error {
-			return setBool(&o.IsCover)(raw)
-		},
-	}
+func buildObjectKeys() (map[string]objectApply, map[string]objectGet) {
+	set := make(map[string]objectApply)
+	get := make(map[string]objectGet)
+
+	oReg(set, get, "page",
+		func(o *PdfObject, raw string) error { return setString(&o.Page)(raw) },
+		func(o *PdfObject) (string, bool) { return o.Page, true },
+	)
+	oReg(set, get, "externallinks",
+		func(o *PdfObject, raw string) error { return setBool(&o.ExternalLinks)(raw) },
+		func(o *PdfObject) (string, bool) { return fmtBool(o.ExternalLinks), true },
+	)
+	oReg(set, get, "locallinks",
+		func(o *PdfObject, raw string) error { return setBool(&o.LocalLinks)(raw) },
+		func(o *PdfObject) (string, bool) { return fmtBool(o.LocalLinks), true },
+	)
+	oReg(set, get, "includeinoutline",
+		func(o *PdfObject, raw string) error { return setBool(&o.IncludeInOutline)(raw) },
+		func(o *PdfObject) (string, bool) { return fmtBool(o.IncludeInOutline), true },
+	)
+	oReg(set, get, "useoutline",
+		func(o *PdfObject, raw string) error { return setBool(&o.UseOutline)(raw) },
+		func(o *PdfObject) (string, bool) { return fmtBool(o.UseOutline), true },
+	)
+	oReg(set, get, "istableofcontent",
+		func(o *PdfObject, raw string) error { return setBool(&o.IsTableOfContent)(raw) },
+		func(o *PdfObject) (string, bool) { return fmtBool(o.IsTableOfContent), true },
+	)
+	oReg(set, get, "iscover",
+		func(o *PdfObject, raw string) error { return setBool(&o.IsCover)(raw) },
+		func(o *PdfObject) (string, bool) { return fmtBool(o.IsCover), true },
+	)
 
 	for _, k := range []string{
 		"zoomfactor", "blocklocalfileaccess", "loaderrorhandling",
 		"username", "password", "mediatype", "printmediatype", "timeout",
 	} {
 		key := k
-		s["load."+key] = func(o *PdfObject, raw string) error {
-			return loadApply(&o.Load, key, raw)
-		}
+		oReg(set, get, "load."+key,
+			func(o *PdfObject, raw string) error { return loadApply(&o.Load, key, raw) },
+			func(o *PdfObject) (string, bool) { return loadGet(&o.Load, key) },
+		)
 	}
+	// object web.background is inert (paint uses Global.Background only) — Policy A ignored
 	for _, k := range []string{
-		"background", "images", "printmediatype", "mediatype",
+		"images", "printmediatype", "mediatype",
 		"simplifydom", "simplifydomprofile", "printlinkunderline",
 	} {
 		key := k
-		s["web."+key] = func(o *PdfObject, raw string) error {
-			return webApply(&o.Web, key, raw)
-		}
+		oReg(set, get, "web."+key,
+			func(o *PdfObject, raw string) error { return webApply(&o.Web, key, raw) },
+			func(o *PdfObject) (string, bool) { return webGet(&o.Web, key) },
+		)
 	}
 	for _, k := range []string{"fontsize", "fontname", "left", "right", "center", "line", "spacing", "htmlurl"} {
 		key := k
-		s["header."+key] = func(o *PdfObject, raw string) error {
-			o.HeaderSet = true
-			return hfApply(&o.Header, key, raw)
-		}
-		s["footer."+key] = func(o *PdfObject, raw string) error {
-			o.FooterSet = true
-			return hfApply(&o.Footer, key, raw)
-		}
+		oReg(set, get, "header."+key,
+			func(o *PdfObject, raw string) error {
+				o.HeaderSet = true
+				return hfApply(&o.Header, key, raw)
+			},
+			func(o *PdfObject) (string, bool) { return hfGet(&o.Header, key) },
+		)
+		oReg(set, get, "footer."+key,
+			func(o *PdfObject, raw string) error {
+				o.FooterSet = true
+				return hfApply(&o.Footer, key, raw)
+			},
+			func(o *PdfObject) (string, bool) { return hfGet(&o.Footer, key) },
+		)
 	}
 	for _, k := range []string{"fontscale", "indentation", "dottedlines", "captiontext", "forwardlinks", "backlinks", "xslstylesheet"} {
 		key := k
-		s["toc."+key] = func(o *PdfObject, raw string) error {
-			return tocApply(&o.TOC, key, raw)
-		}
+		oReg(set, get, "toc."+key,
+			func(o *PdfObject, raw string) error { return tocApply(&o.TOC, key, raw) },
+			func(o *PdfObject) (string, bool) { return tocGet(&o.TOC, key) },
+		)
 	}
-	return s
+	return set, get
 }
 
-func buildImageKeyTable() map[string]imageApply {
-	s := map[string]imageApply{
-		"width": func(g *ImageGlobal, raw string) error {
-			return setInt(&g.Width)(raw)
-		},
-		"height": func(g *ImageGlobal, raw string) error {
-			return setInt(&g.Height)(raw)
-		},
-		"quality": func(g *ImageGlobal, raw string) error {
-			return setInt(&g.Quality)(raw)
-		},
-		"smartwidth": func(g *ImageGlobal, raw string) error {
-			return setBool(&g.SmartWidth)(raw)
-		},
-		"transparent": func(g *ImageGlobal, raw string) error {
-			return setBool(&g.Transparent)(raw)
-		},
-		"format": func(g *ImageGlobal, raw string) error {
-			return setString(&g.Format)(raw)
-		},
-		"crop.left": func(g *ImageGlobal, raw string) error {
-			return setInt(&g.Crop.Left)(raw)
-		},
-		"crop.top": func(g *ImageGlobal, raw string) error {
-			return setInt(&g.Crop.Top)(raw)
-		},
-		"crop.width": func(g *ImageGlobal, raw string) error {
-			return setInt(&g.Crop.Width)(raw)
-		},
-		"crop.height": func(g *ImageGlobal, raw string) error {
-			return setInt(&g.Crop.Height)(raw)
-		},
-		"proxy": func(g *ImageGlobal, raw string) error {
-			return setString(&g.Load.Proxy)(raw)
-		},
-	}
+func buildImageKeys() (map[string]imageApply, map[string]imageGet) {
+	set := make(map[string]imageApply)
+	get := make(map[string]imageGet)
+
+	iReg(set, get, "width",
+		func(g *ImageGlobal, raw string) error { return setInt(&g.Width)(raw) },
+		func(g *ImageGlobal) (string, bool) { return fmtInt(g.Width), true },
+	)
+	iReg(set, get, "height",
+		func(g *ImageGlobal, raw string) error { return setInt(&g.Height)(raw) },
+		func(g *ImageGlobal) (string, bool) { return fmtInt(g.Height), true },
+	)
+	iReg(set, get, "quality",
+		func(g *ImageGlobal, raw string) error { return setInt(&g.Quality)(raw) },
+		func(g *ImageGlobal) (string, bool) { return fmtInt(g.Quality), true },
+	)
+	iReg(set, get, "smartwidth",
+		func(g *ImageGlobal, raw string) error { return setBool(&g.SmartWidth)(raw) },
+		func(g *ImageGlobal) (string, bool) { return fmtBool(g.SmartWidth), true },
+	)
+	iReg(set, get, "transparent",
+		func(g *ImageGlobal, raw string) error { return setBool(&g.Transparent)(raw) },
+		func(g *ImageGlobal) (string, bool) { return fmtBool(g.Transparent), true },
+	)
+	iReg(set, get, "format",
+		func(g *ImageGlobal, raw string) error { return setString(&g.Format)(raw) },
+		func(g *ImageGlobal) (string, bool) { return g.Format, true },
+	)
+	iReg(set, get, "crop.left",
+		func(g *ImageGlobal, raw string) error { return setInt(&g.Crop.Left)(raw) },
+		func(g *ImageGlobal) (string, bool) { return fmtInt(g.Crop.Left), true },
+	)
+	iReg(set, get, "crop.top",
+		func(g *ImageGlobal, raw string) error { return setInt(&g.Crop.Top)(raw) },
+		func(g *ImageGlobal) (string, bool) { return fmtInt(g.Crop.Top), true },
+	)
+	iReg(set, get, "crop.width",
+		func(g *ImageGlobal, raw string) error { return setInt(&g.Crop.Width)(raw) },
+		func(g *ImageGlobal) (string, bool) { return fmtInt(g.Crop.Width), true },
+	)
+	iReg(set, get, "crop.height",
+		func(g *ImageGlobal, raw string) error { return setInt(&g.Crop.Height)(raw) },
+		func(g *ImageGlobal) (string, bool) { return fmtInt(g.Crop.Height), true },
+	)
+	iReg(set, get, "proxy",
+		func(g *ImageGlobal, raw string) error { return setString(&g.Load.Proxy)(raw) },
+		func(g *ImageGlobal) (string, bool) { return g.Load.Proxy, true },
+	)
+	// image web.background is not typed here — ImageConverter.Set routes it to Global.Background
 	for _, k := range []string{
-		"background", "images", "printmediatype", "mediatype",
+		"images", "printmediatype", "mediatype",
 		"simplifydom", "simplifydomprofile", "printlinkunderline",
 	} {
 		key := k
-		s["web."+key] = func(g *ImageGlobal, raw string) error {
-			return webApply(&g.Web, key, raw)
-		}
+		iReg(set, get, "web."+key,
+			func(g *ImageGlobal, raw string) error { return webApply(&g.Web, key, raw) },
+			func(g *ImageGlobal) (string, bool) { return webGet(&g.Web, key) },
+		)
 	}
-	return s
+	return set, get
 }
 
 func hfApply(hf *HeaderFooter, key, raw string) error {
@@ -580,6 +688,28 @@ func hfApply(hf *HeaderFooter, key, raw string) error {
 	return fmt.Errorf("unknown header/footer key %q", key)
 }
 
+func hfGet(hf *HeaderFooter, key string) (string, bool) {
+	switch key {
+	case "fontsize":
+		return fmtFloat(hf.FontSize), true
+	case "fontname":
+		return hf.FontName, true
+	case "left":
+		return hf.Left, true
+	case "right":
+		return hf.Right, true
+	case "center":
+		return hf.Center, true
+	case "line":
+		return fmtBool(hf.Line), true
+	case "spacing":
+		return fmtFloat(hf.Spacing), true
+	case "htmlurl":
+		return hf.HTMLURL, true
+	}
+	return "", false
+}
+
 func tocApply(t *TableOfContent, key, raw string) error {
 	switch key {
 	case "fontscale":
@@ -600,10 +730,28 @@ func tocApply(t *TableOfContent, key, raw string) error {
 	return fmt.Errorf("unknown toc key %q", key)
 }
 
+func tocGet(t *TableOfContent, key string) (string, bool) {
+	switch key {
+	case "fontscale":
+		return fmtFloat(t.FontScale), true
+	case "indentation":
+		return t.Indentation, true
+	case "dottedlines":
+		return fmtBool(t.DottedLines), true
+	case "captiontext":
+		return t.CaptionText, true
+	case "forwardlinks":
+		return fmtBool(t.ForwardLinks), true
+	case "backlinks":
+		return fmtBool(t.BackLinks), true
+	case "xslstylesheet":
+		return t.XSLStyleSheet, true
+	}
+	return "", false
+}
+
 func webApply(w *Web, key, raw string) error {
 	switch key {
-	case "background":
-		return setBool(&w.Background)(raw)
 	case "images":
 		return setBool(&w.Images)(raw)
 	case "printmediatype":
@@ -618,6 +766,24 @@ func webApply(w *Web, key, raw string) error {
 		return setBool(&w.PrintLinkUnderline)(raw)
 	}
 	return fmt.Errorf("unknown web key %q", key)
+}
+
+func webGet(w *Web, key string) (string, bool) {
+	switch key {
+	case "images":
+		return fmtBool(w.Images), true
+	case "printmediatype":
+		return fmtBool(w.PrintMediaType), true
+	case "mediatype":
+		return w.MediaType.String(), true
+	case "simplifydom":
+		return fmtBool(w.SimplifyDOM), true
+	case "simplifydomprofile":
+		return w.SimplifyDOMProfile, true
+	case "printlinkunderline":
+		return fmtBool(w.PrintLinkUnderline), true
+	}
+	return "", false
 }
 
 func loadApply(l *LoadPage, key, raw string) error {
@@ -640,6 +806,28 @@ func loadApply(l *LoadPage, key, raw string) error {
 		return setInt(&l.Timeout)(raw)
 	}
 	return fmt.Errorf("unknown load key %q", key)
+}
+
+func loadGet(l *LoadPage, key string) (string, bool) {
+	switch key {
+	case "zoomfactor":
+		return fmtFloat(l.ZoomFactor), true
+	case "blocklocalfileaccess":
+		return fmtBool(l.BlockLocalFileAccess), true
+	case "loaderrorhandling":
+		return l.LoadErrorHandling.String(), true
+	case "username":
+		return l.Username, true
+	case "password":
+		return l.Password, true
+	case "mediatype":
+		return l.MediaType.String(), true
+	case "printmediatype":
+		return fmtBool(l.PrintMediaType), true
+	case "timeout":
+		return fmtInt(l.Timeout), true
+	}
+	return "", false
 }
 
 // HttpErrorCode maps an HTTP status to the wkhtmltopdf exit-code convention

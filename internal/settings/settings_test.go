@@ -24,7 +24,6 @@ func TestDefaultPdfGlobalSnapshot(t *testing.T) {
 		{"SmartShrinking", g.SmartShrinking, true},
 		{"Background", g.Background, true},
 		{"Web.Images", g.Web.Images, true},
-		{"Web.Background", g.Web.Background, true},
 	}
 	for _, c := range checks {
 		if c.got != c.want {
@@ -146,8 +145,7 @@ func TestGlobalSetDottedKeys(t *testing.T) {
 			}
 		}},
 		{"web.background", "false", func(t *testing.T) {
-			// Single paint field: Global.Background (Web.Background kept in sync).
-			if g.Background || g.Web.Background {
+			if g.Background {
 				t.Error("web.background should clear Global.Background")
 			}
 		}},
@@ -416,5 +414,59 @@ func TestGlobalGetSetRoundTripAndIgnored(t *testing.T) {
 	}
 	if got, ok := g.Get("web.background"); !ok || got != "false" {
 		t.Fatalf("Get(web.background)=%q,%v after Set(background)", got, ok)
+	}
+}
+
+func TestKeyTableSetGetParity(t *testing.T) {
+	// Every Set key must have a Get, and every Get key must have a Set.
+	ensureKeyTables()
+	for k := range globalKeyTable {
+		if _, ok := globalGetTable[k]; !ok {
+			t.Errorf("global Set key %q missing Get", k)
+		}
+	}
+	for k := range globalGetTable {
+		if _, ok := globalKeyTable[k]; !ok {
+			t.Errorf("global Get key %q missing Set", k)
+		}
+	}
+	for k := range objectKeyTable {
+		if _, ok := objectGetTable[k]; !ok {
+			t.Errorf("object Set key %q missing Get", k)
+		}
+	}
+	for k := range objectGetTable {
+		if _, ok := objectKeyTable[k]; !ok {
+			t.Errorf("object Get key %q missing Set", k)
+		}
+	}
+	for k := range imageKeyTable {
+		if _, ok := imageGetTable[k]; !ok {
+			t.Errorf("image Set key %q missing Get", k)
+		}
+	}
+	for k := range imageGetTable {
+		if _, ok := imageKeyTable[k]; !ok {
+			t.Errorf("image Get key %q missing Set", k)
+		}
+	}
+}
+
+func TestBackgroundSingleFieldNoWebMirror(t *testing.T) {
+	g := DefaultPdfGlobal()
+	if err := g.Set("web.background", "false"); err != nil {
+		t.Fatal(err)
+	}
+	if g.Background {
+		t.Fatal("Global.Background should be false")
+	}
+	// Web has no Background field — compile-time guarantee; runtime Get uses Global.
+	got, ok := g.Get("web.background")
+	if !ok || got != "false" {
+		t.Fatalf("Get(web.background)=%q,%v", got, ok)
+	}
+	got2, ok := g.Get("background")
+	if !ok || got2 != "false" {
+		t.Fatalf("Get(background)=%q,%v", got2, ok)
 	}
 }

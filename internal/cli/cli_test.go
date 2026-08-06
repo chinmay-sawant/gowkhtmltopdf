@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"math"
 	"testing"
 
@@ -487,5 +488,27 @@ func TestPageScopedBeforePageKeyword(t *testing.T) {
 	}
 	if cmd.Objects[0].Page != "in.html" || cmd.Objects[0].Load.BlockLocalFileAccess {
 		t.Errorf("page = %+v", cmd.Objects[0])
+	}
+}
+
+func TestOpenOutputWriterPrecedence(t *testing.T) {
+	var buf bytes.Buffer
+	cmd := &Command{
+		Output:       "/tmp/should-not-be-created-by-openoutput-test.pdf",
+		OutputWriter: &buf,
+	}
+	w, closeW, err := cmd.OpenOutput()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeW()
+	if w != &buf {
+		t.Fatal("OutputWriter must win over Output path")
+	}
+	if _, err := w.Write([]byte("x")); err != nil {
+		t.Fatal(err)
+	}
+	if buf.String() != "x" {
+		t.Fatalf("buf=%q", buf.String())
 	}
 }

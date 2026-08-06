@@ -248,14 +248,12 @@ func NewImageConverter() *ImageConverter {
 // an error. "web.background" also updates the shared Global.Background paint
 // switch so image and PDF share one background field.
 func (c *ImageConverter) Set(name, value string) error {
-	if err := c.image.Set(name, value); err != nil {
-		return err
-	}
 	key := strings.ToLower(strings.TrimSpace(name))
-	if key == "web.background" {
+	// Sole paint field is Global.Background (image has no Web.Background).
+	if key == "web.background" || key == "background" {
 		return c.global.g.Set("background", value)
 	}
-	return nil
+	return c.image.Set(name, value)
 }
 
 // Global returns the shared global settings (only "enablelocalfileaccess"
