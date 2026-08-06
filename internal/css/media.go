@@ -118,36 +118,20 @@ func extractMediaFeatures(q string) (features []string, rest string) {
 	var b strings.Builder
 	for i := 0; i < len(q); {
 		if q[i] == '(' {
-			end, ok := matchingParen(q, i)
+			inner, end, ok := takeParenArg(q, i)
 			if !ok {
 				b.WriteByte(q[i])
 				i++
 				continue
 			}
-			features = append(features, strings.TrimSpace(q[i+1:end]))
-			i = end + 1
+			features = append(features, strings.TrimSpace(inner))
+			i = end
 			continue
 		}
 		b.WriteByte(q[i])
 		i++
 	}
 	return features, b.String()
-}
-
-func matchingParen(s string, open int) (int, bool) {
-	depth := 0
-	for i := open; i < len(s); i++ {
-		switch s[i] {
-		case '(':
-			depth++
-		case ')':
-			depth--
-			if depth == 0 {
-				return i, true
-			}
-		}
-	}
-	return -1, false
 }
 
 func mediaFeatureMatches(inner string, widthPt, heightPt float64) bool {

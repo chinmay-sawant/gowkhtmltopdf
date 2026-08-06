@@ -150,6 +150,65 @@ func TestOutlineExclude(t *testing.T) {
 	}
 }
 
+func TestOutlineExcludeNestedAndEmpty(t *testing.T) {
+	// Descendant/element selectors drop via css.Match; empty Exclude is a no-op.
+	root := treeHTML(t, `<div class="nav"><h2>Nav</h2></div><h1>Body</h1><h2>Sec</h2>`)
+	nodes := headNodes(t, root)
+	hs := Lookup(CollectHeadings(root), fakeLocations(nodes, 0, 10, 0))
+
+	// Document order Nav(h2), Body(h1), Sec(h2): Nav clamps to a root child,
+	// Body is a sibling root child, Sec nests under Body.
+	tree := BuildTree(hs, Options{})
+	if len(tree.Children) != 2 || tree.Children[0].Heading.Title != "Nav" || tree.Children[1].Heading.Title != "Body" {
+		t.Fatalf("empty Exclude: root = %+v, want [Nav, Body]", titles(tree.Children))
+	}
+	if len(tree.Children[1].Children) != 1 || tree.Children[1].Children[0].Heading.Title != "Sec" {
+		t.Fatalf("empty Exclude: Body children = %+v, want [Sec]", titles(tree.Children[1].Children))
+	}
+
+	tree = BuildTree(hs, Options{Exclude: []css.Selector{parseSel(t, ".nav h2")}})
+	if len(tree.Children) != 1 || tree.Children[0].Heading.Title != "Body" {
+		t.Fatalf("after .nav h2: root = %+v, want [Body]", titles(tree.Children))
+	}
+	if len(tree.Children[0].Children) != 1 || tree.Children[0].Children[0].Heading.Title != "Sec" {
+		t.Fatalf("after .nav h2: Body children = %+v, want [Sec]", titles(tree.Children[0].Children))
+	}
+
+	// Element selector drops every h2, leaving only the h1.
+	tree = BuildTree(hs, Options{Exclude: []css.Selector{parseSel(t, "h2")}})
+	if len(tree.Children) != 1 || tree.Children[0].Heading.Title != "Body" || len(tree.Children[0].Children) != 0 {
+		t.Fatalf("after h2: tree = %+v, want [Body] with no children", titles(tree.Children))
+	}
+}
+
+// titles returns heading titles for a slice of outline nodes (test helper).
+func titles(ns []*Node) []string {
+	out := make([]string, len(ns))
+	for i, n := range ns {
+		if n.Heading != nil {
+			out[i] = n.Heading.Title
+		}
+	}
+	return out
+}
+
+func TestCollapseWS(t *testing.T) {
+	cases := []struct {
+		in, want string
+	}{
+		{"", ""},
+		{"  Two   Words ", "Two Words"},
+		{"a\t\nb\rc\fd", "a b c d"},
+		{" already ", "already"},
+		{"no-space", "no-space"},
+	}
+	for _, tc := range cases {
+		if got := CollapseWS(tc.in); got != tc.want {
+			t.Errorf("CollapseWS(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
 func TestOutlineCollectTitlesAndAnchors(t *testing.T) {
 	root := treeHTML(t, "<h1>  Two   Words </h1><p>text</p><h2>Deep</h2>")
 	hs := CollectHeadings(root)

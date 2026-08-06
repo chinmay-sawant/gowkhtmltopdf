@@ -15,7 +15,7 @@ func TestSubsetGlyfFourByteAligned(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sub, err := subsetFontUnicode(f, []rune("汉字与假名：東京都、上海、深圳。"))
+	sub, err := subsetFont(f, []rune("汉字与假名：東京都、上海、深圳。"), subsetUnicode)
 	if err != nil {
 		t.Fatal(err)
 	}

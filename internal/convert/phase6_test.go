@@ -129,7 +129,9 @@ func tocCommand(t *testing.T, out string) *cli.Command {
 			`<html><body><h1>Chapter Two</h1><p>text of the second chapter</p></body></html>`,
 		},
 		out)
-	toc := settings.PdfObject{IsTableOfContent: true, Load: settings.DefaultLoadPage()}
+	toc := settings.DefaultPdfObject()
+	toc.IsTableOfContent = true
+	toc.UseOutline = false
 	cmd.Objects = append([]settings.PdfObject{toc}, cmd.Objects...)
 	cmd.Global.TOC.ForwardLinks = true
 	cmd.Global.UseCompression = false
@@ -244,15 +246,15 @@ func TestHTMLHeaderRelativePathCWD(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.Chdir(old) })
 
+	obj := settings.DefaultPdfObject()
+	obj.Page = pageRel
+	obj.Load.BlockLocalFileAccess = false
 	cmd := &cli.Command{
-		Global: settings.DefaultPdfGlobal(),
-		Objects: []settings.PdfObject{
-			{Page: pageRel, Load: settings.DefaultLoadPage()},
-		},
-		Output: filepath.Join(t.TempDir(), "out.pdf"),
+		Global:  settings.DefaultPdfGlobal(),
+		Objects: []settings.PdfObject{obj},
+		Output:  filepath.Join(t.TempDir(), "out.pdf"),
 	}
 	cmd.Global.EnableLocalFileAccess = true
-	cmd.Objects[0].Load.BlockLocalFileAccess = false
 	cmd.Global.Header.HTMLURL = headerRel
 	cmd.Global.Margin.Top = -1
 	cmd.Global.UseCompression = false
@@ -292,9 +294,8 @@ func TestAutoMargin(t *testing.T) {
 }
 
 func TestExternalLinksDefaultOn(t *testing.T) {
-	// External links are ON by default (DefaultPdfObject; the CLI's zero-value
-	// objects read as on - see applyObjectDefaults). The annotation is
-	// painted by the layout engine and serialized as /URI.
+	// External links are ON by DefaultPdfObject (callers/CLI must apply defaults;
+	// convert no longer OR-hacks zero-value bools permanently ON).
 	body := `<html><body><p>see <a href="http://example.com/x">link</a></p></body></html>`
 	cmd, _ := newCommand(t, body, filepath.Join(t.TempDir(), "out.pdf"))
 	cmd.Global.UseCompression = false
@@ -304,6 +305,17 @@ func TestExternalLinksDefaultOn(t *testing.T) {
 	}
 	if !bytes.Contains(data, []byte("/URI")) || !bytes.Contains(data, []byte("http://example.com/x")) {
 		t.Error("expected an external URI annotation")
+	}
+}
+
+func TestExternalLinksDisableHonored(t *testing.T) {
+	body := `<html><body><p>see <a href="http://example.com/x">link</a></p></body></html>`
+	cmd, _ := newCommand(t, body, filepath.Join(t.TempDir(), "out.pdf"))
+	cmd.Objects[0].ExternalLinks = false
+	cmd.Global.UseCompression = false
+	data := runPDF(t, cmd)
+	if bytes.Contains(data, []byte("http://example.com/x")) {
+		t.Error("ExternalLinks=false must strip external URI annotations")
 	}
 }
 

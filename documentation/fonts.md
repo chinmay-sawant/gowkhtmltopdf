@@ -62,9 +62,8 @@ for CJK.
   that (fallback keeps combining marks after the base; no in-tree matra
   reordering).
 - **CJK (Han / kana / Hangul)** works when a capable TTF is on the font
-  path. `writing-mode: vertical-rl|lr` rotates ideographic / Hangul / kana
-  glyphs 90° (sideways) and stacks Latin upright — not full CSS vertical
-  typesetting.
+  path. `writing-mode: vertical-rl|lr` is parsed but lays out as horizontal
+  block (vertical lite paint removed); not full CSS vertical typesetting.
 - **Mixed Latin + CJK:** Latin glyphs missing from a CJK face are drawn with
   embedded Liberation; CJK continues on the Type0 sibling of the original face.
 - **IPA / uncommon Unicode:** when the CSS `font-family` face (and Liberation)

@@ -46,12 +46,9 @@ func init() {
 	add("license", ModeBoth, "bool", nopFlag)
 	add("extended-help", ModeBoth, "bool", nopFlag)
 
-	// --- global PDF flags ---
+	// --- global PDF flags (engine-consumed only; Policy A) ---
 	add("quiet", ModeBoth, "bool", func(c *Command, cur *objectCtx, val string) error {
 		return c.Global.Set("quiet", val)
-	})
-	add("log-level", ModeBoth, "value", func(c *Command, cur *objectCtx, val string) error {
-		return c.Global.Set("log-level", val)
 	})
 	add("collate", ModePDF, "bool", func(c *Command, cur *objectCtx, val string) error {
 		return c.Global.Set("collate", val)
@@ -65,11 +62,10 @@ func init() {
 	add("page-size", ModePDF, "value", func(c *Command, cur *objectCtx, val string) error {
 		return c.Global.Set("size.pagesize", val)
 	})
+	// convert reads Global.Grayscale only (ColorMode is not a stored field).
 	add("grayscale", ModePDF, "bool", func(c *Command, cur *objectCtx, val string) error {
-		return c.Global.Set("colormode", boolVal(val, "grayscale", "color"))
-	})
-	add("lowquality", ModePDF, "bool", func(c *Command, cur *objectCtx, val string) error {
-		return c.Global.Set("lowquality", val)
+		c.Global.Grayscale = boolVal(val, "true", "false") == "true"
+		return nil
 	})
 	add("title", ModePDF, "value", func(c *Command, cur *objectCtx, val string) error {
 		return c.Global.Set("title", val)
@@ -86,39 +82,19 @@ func init() {
 	add("margin-right", ModePDF, "value", func(c *Command, cur *objectCtx, val string) error {
 		return c.Global.Set("margin.right", val)
 	})
-	add("dpi", ModePDF, "value", func(c *Command, cur *objectCtx, val string) error {
-		return c.Global.Set("dpi", val)
-	})
 	add("page-width", ModePDF, "value", func(c *Command, cur *objectCtx, val string) error {
 		return c.Global.Set("size.width", val)
 	})
 	add("page-height", ModePDF, "value", func(c *Command, cur *objectCtx, val string) error {
 		return c.Global.Set("size.height", val)
 	})
-	add("image-quality", ModeBoth, "value", func(c *Command, cur *objectCtx, val string) error {
-		return c.Global.Set("imagequality", val)
-	})
-	add("image-dpi", ModePDF, "value", func(c *Command, cur *objectCtx, val string) error {
-		return c.Global.Set("imagedpi", val)
-	})
 	add("no-pdf-compression", ModePDF, "bool", func(c *Command, cur *objectCtx, val string) error {
 		return c.Global.Set("usecompression", negBool(val))
-	})
-	add("use-xserver", ModeBoth, "bool", func(c *Command, cur *objectCtx, val string) error {
-		return c.Global.Set("usexserver", val)
-	})
-	add("cookie-jar", ModeBoth, "value", func(c *Command, cur *objectCtx, val string) error {
-		return c.Global.Set("cookiejar", val)
-	})
-	add("read-args-from-stdin", ModeBoth, "bool", func(c *Command, cur *objectCtx, val string) error {
-		return c.Global.Set("readargsfromstdin", val)
 	})
 	add("page-offset", ModePDF, "value", func(c *Command, cur *objectCtx, val string) error {
 		return c.Global.Set("pageoffset", val)
 	})
-	add("smart-shrinking", ModePDF, "bool", func(c *Command, cur *objectCtx, val string) error {
-		return c.Global.Set("smartshrinking", val)
-	})
+	// Smart-shrinking: enable/disable pair only (no bare --smart-shrinking).
 	add("enable-smart-shrinking", ModePDF, "bool", func(c *Command, cur *objectCtx, val string) error {
 		return c.Global.Set("smartshrinking", "true")
 	})
@@ -133,6 +109,8 @@ func init() {
 	add("outline-depth", ModePDF, "value", func(c *Command, cur *objectCtx, val string) error {
 		return c.Global.Set("outlinedepth", val)
 	})
+	// Single home: Command fields only. convert ORs cmd.DumpOutline with
+	// Global.DumpOutline (library/reflect path); main uses DumpDefaultTOCXSL.
 	add("dump-outline", ModePDF, "bool", func(c *Command, cur *objectCtx, val string) error {
 		c.DumpOutline = true
 		return nil
@@ -142,15 +120,7 @@ func init() {
 		return nil
 	})
 
-	// --- shared web/load flags (page-scoped: current object else global) ---
-	add("enable-javascript", ModeBoth, "bool", pageScoped(
-		func(g *settings.PdfGlobal, val string) error { return g.Set("web.javascript", val) },
-		func(o *settings.PdfObject, val string) error { return o.Set("web.javascript", val) },
-	))
-	add("disable-javascript", ModeBoth, "bool", pageScoped(
-		func(g *settings.PdfGlobal, val string) error { return g.Set("web.javascript", "false") },
-		func(o *settings.PdfObject, val string) error { return o.Set("web.javascript", "false") },
-	))
+	// --- shared load / web flags (page-scoped: current object else global) ---
 	add("enable-local-file-access", ModeBoth, "bool", pageScoped(
 		func(g *settings.PdfGlobal, val string) error { return g.Set("enablelocalfileaccess", val) },
 		func(o *settings.PdfObject, val string) error { return o.Set("load.blocklocalfileaccess", negBool(val)) },
@@ -162,44 +132,17 @@ func init() {
 	add("allow", ModePDF, "value", func(c *Command, cur *objectCtx, val string) error {
 		return c.Global.Set("allow", val)
 	})
-	add("background", ModeBoth, "bool", pageScoped(
-		func(g *settings.PdfGlobal, val string) error { return g.Set("background", val) },
-		func(o *settings.PdfObject, val string) error { return o.Set("web.background", val) },
-	))
-	add("no-background", ModeBoth, "bool", pageScoped(
-		func(g *settings.PdfGlobal, val string) error { return g.Set("background", "false") },
-		func(o *settings.PdfObject, val string) error { return o.Set("web.background", "false") },
-	))
-	add("enable-plugins", ModeBoth, "bool", pageScoped(
-		func(g *settings.PdfGlobal, val string) error { return g.Set("web.plugins", val) },
-		func(o *settings.PdfObject, val string) error { return o.Set("web.plugins", val) },
-	))
-	add("disable-plugins", ModeBoth, "bool", pageScoped(
-		func(g *settings.PdfGlobal, val string) error { return g.Set("web.plugins", "false") },
-		func(o *settings.PdfObject, val string) error { return o.Set("web.plugins", "false") },
-	))
-	add("default-encoding", ModeBoth, "value", pageScoped(
-		func(g *settings.PdfGlobal, val string) error { return g.Set("web.defaultencoding", val) },
-		func(o *settings.PdfObject, val string) error { return o.Set("web.defaultencoding", val) },
-	))
-	add("minimum-font-size", ModeBoth, "value", pageScoped(
-		func(g *settings.PdfGlobal, val string) error { return g.Set("web.minimumfontsize", val) },
-		func(o *settings.PdfObject, val string) error { return o.Set("web.minimumfontsize", val) },
-	))
-	add("user-style-sheet", ModeBoth, "value", pageScoped(
-		func(g *settings.PdfGlobal, val string) error { return g.Set("web.userstylesheet", val) },
-		func(o *settings.PdfObject, val string) error { return o.Set("web.userstylesheet", val) },
-	))
-	add("print-media-type", ModeBoth, "bool", pageScoped(
-		func(g *settings.PdfGlobal, val string) error { return g.Set("web.printmediatype", val) },
-		func(o *settings.PdfObject, val string) error { return o.Set("load.printmediatype", val) },
-	))
-	add("no-print-media-type", ModeBoth, "bool", pageScoped(
-		func(g *settings.PdfGlobal, val string) error { return g.Set("web.printmediatype", "false") },
-		func(o *settings.PdfObject, val string) error { return o.Set("load.printmediatype", "false") },
-	))
+	// PDF convert and imageout both read Global.Background (Policy A single field).
+	add("background", ModeBoth, "bool", func(c *Command, cur *objectCtx, val string) error {
+		c.Global.Background = boolVal(val, "true", "false") == "true"
+		return nil
+	})
+	add("no-background", ModeBoth, "bool", func(c *Command, cur *objectCtx, val string) error {
+		c.Global.Background = false
+		return nil
+	})
 	// Opt-in chrome-strip for arbitrary websites (phase 21.4). Default off.
-	// Distinct from --print-media-type (layout always uses Media:"print").
+	// Distinct from --print-media-type (PDF layout always uses Media:"print").
 	add("simplify-dom", ModeBoth, "bool", pageScoped(
 		func(g *settings.PdfGlobal, val string) error { return g.Set("web.simplifydom", val) },
 		func(o *settings.PdfObject, val string) error { return o.Set("web.simplifydom", val) },
@@ -214,41 +157,17 @@ func init() {
 		func(g *settings.PdfGlobal, val string) error { return g.Set("web.printlinkunderline", val) },
 		func(o *settings.PdfObject, val string) error { return o.Set("web.printlinkunderline", val) },
 	))
+	// Media flags: convert.mediaFor reads Global.Web + obj.Load; imageout.mediaFor
+	// reads Image.Web.PrintMediaType || obj.Load.PrintMediaType and obj.Load.MediaType.
+	add("print-media-type", ModeBoth, "bool", printMediaFlag(true))
+	add("no-print-media-type", ModeBoth, "bool", printMediaFlag(false))
 	add("media-type", ModeBoth, "value", pageScoped(
-		func(g *settings.PdfGlobal, val string) error { return nil },
+		func(g *settings.PdfGlobal, val string) error { return g.Set("web.mediatype", val) },
 		func(o *settings.PdfObject, val string) error { return o.Set("load.mediatype", val) },
-	))
-	add("javascript-delay", ModeBoth, "value", pageScoped(
-		func(g *settings.PdfGlobal, val string) error { return nil },
-		func(o *settings.PdfObject, val string) error { return o.Set("load.jsdelay", val) },
-	))
-	add("window-status", ModeBoth, "value", pageScoped(
-		func(g *settings.PdfGlobal, val string) error { return nil },
-		func(o *settings.PdfObject, val string) error { return o.Set("load.windowstatus", val) },
-	))
-	add("run-script", ModeBoth, "value", pageScoped(
-		func(g *settings.PdfGlobal, val string) error { return nil },
-		func(o *settings.PdfObject, val string) error { return o.Set("load.runscript", val) },
 	))
 	add("zoom", ModeBoth, "value", pageScoped(
 		func(g *settings.PdfGlobal, val string) error { return nil },
 		func(o *settings.PdfObject, val string) error { return o.Set("load.zoomfactor", val) },
-	))
-	add("stop-slow-scripts", ModeBoth, "bool", pageScoped(
-		func(g *settings.PdfGlobal, val string) error { return nil },
-		func(o *settings.PdfObject, val string) error { return o.Set("load.stopslowscripts", val) },
-	))
-	add("no-stop-slow-scripts", ModeBoth, "bool", pageScoped(
-		func(g *settings.PdfGlobal, val string) error { return nil },
-		func(o *settings.PdfObject, val string) error { return o.Set("load.stopslowscripts", "false") },
-	))
-	add("debug-javascript", ModeBoth, "bool", pageScoped(
-		func(g *settings.PdfGlobal, val string) error { return nil },
-		func(o *settings.PdfObject, val string) error { return o.Set("load.debugjavascript", val) },
-	))
-	add("no-debug-javascript", ModeBoth, "bool", pageScoped(
-		func(g *settings.PdfGlobal, val string) error { return nil },
-		func(o *settings.PdfObject, val string) error { return o.Set("load.debugjavascript", "false") },
 	))
 	add("load-error-handling", ModeBoth, "value", pageScoped(
 		func(g *settings.PdfGlobal, val string) error { return g.Set("loaderrorhandling", val) },
@@ -265,14 +184,6 @@ func init() {
 	add("password", ModeBoth, "value", pageScoped(
 		func(g *settings.PdfGlobal, val string) error { return nil },
 		func(o *settings.PdfObject, val string) error { return o.Set("load.password", val) },
-	))
-	add("custom-header-propagation", ModeBoth, "bool", pageScoped(
-		func(g *settings.PdfGlobal, val string) error { return nil },
-		func(o *settings.PdfObject, val string) error { return o.Set("load.repeatexternalheaders", val) },
-	))
-	add("no-custom-header-propagation", ModeBoth, "bool", pageScoped(
-		func(g *settings.PdfGlobal, val string) error { return nil },
-		func(o *settings.PdfObject, val string) error { return o.Set("load.repeatexternalheaders", "false") },
 	))
 	add("timeout", ModeBoth, "value", pageScoped(
 		func(g *settings.PdfGlobal, val string) error { return nil },
@@ -298,10 +209,6 @@ func init() {
 	add("use-system-fonts", ModeBoth, "bool", func(c *Command, cur *objectCtx, val string) error {
 		return c.Global.Set("usesystemfonts", val)
 	})
-	add("produce-forms", ModePDF, "bool", pageScoped(
-		func(g *settings.PdfGlobal, val string) error { return g.Set("produceforms", val) },
-		func(o *settings.PdfObject, val string) error { return o.Set("produceforms", val) },
-	))
 
 	// --- pair flags (two values: name value) ---
 	add("cookie", ModeBoth, "value", func(c *Command, cur *objectCtx, val string) error {
@@ -395,6 +302,30 @@ func init() {
 
 func nopFlag(*Command, *objectCtx, string) error { return nil }
 
+// printMediaFlag sets the fields imageout (and a future PDF media wire) read:
+// Image.Web.PrintMediaType, Global.Web.PrintMediaType, and object Load.PrintMediaType.
+func printMediaFlag(enable bool) flagApplier {
+	return func(c *Command, cur *objectCtx, val string) error {
+		on := enable
+		if enable {
+			// Honour --print-media-type=false / --no-print-media-type via negate.
+			on = boolVal(val, "true", "false") == "true"
+		}
+		c.Image.Web.PrintMediaType = on
+		c.Global.Web.PrintMediaType = on
+		if cur.obj != nil {
+			cur.obj.Load.PrintMediaType = on
+			return nil
+		}
+		if cur.pending == nil {
+			o := settings.DefaultPdfObject()
+			cur.pending = &o
+		}
+		cur.pending.Load.PrintMediaType = on
+		return nil
+	}
+}
+
 func init() {
 	shortFlags = map[string]flagSpec{
 		"q": flagTable["quiet"],
@@ -425,7 +356,8 @@ func pageScoped(glob func(g *settings.PdfGlobal, val string) error, obj func(o *
 			return obj(cur.obj, val)
 		}
 		if cur.pending == nil {
-			cur.pending = &settings.PdfObject{}
+			o := settings.DefaultPdfObject()
+			cur.pending = &o
 		}
 		return obj(cur.pending, val)
 	}

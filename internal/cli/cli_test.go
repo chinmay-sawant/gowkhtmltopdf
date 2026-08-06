@@ -25,7 +25,6 @@ func TestGlobalFlagsToSettings(t *testing.T) {
 		"--copies", "3",
 		"--no-outline",
 		"--outline-depth", "2",
-		"--dpi", "150",
 		"--grayscale",
 		"-q",
 		"page.html",
@@ -53,11 +52,9 @@ func TestGlobalFlagsToSettings(t *testing.T) {
 	if g.OutlineDepth != 2 {
 		t.Errorf("outline-depth = %d", g.OutlineDepth)
 	}
-	if g.DPI != 150 {
-		t.Errorf("dpi = %d", g.DPI)
-	}
-	if g.ColorMode != settings.ColorModeGrayscale {
-		t.Error("grayscale")
+	// convert reads Global.Grayscale only.
+	if !g.Grayscale {
+		t.Error("grayscale must set Global.Grayscale")
 	}
 	if !g.Quiet {
 		t.Error("quiet")
@@ -108,14 +105,17 @@ func TestBoolFlagValues(t *testing.T) {
 	if cmd.Global.Outline {
 		t.Error("--no-outline must set false")
 	}
-	// page-scoped web flags bind to the first object (address remapping)
-	cmd = parse(t, "--enable-javascript", "in.html", "out.pdf")
-	if !cmd.Objects[0].Web.JavaScript {
-		t.Error("enable-javascript must land on first object")
+	// page-scoped flags bind to the first object (address remapping)
+	cmd = parse(t, "--enable-local-file-access", "in.html", "out.pdf")
+	if cmd.Objects[0].Load.BlockLocalFileAccess {
+		t.Error("enable-local-file-access must land on first object")
 	}
-	cmd = parse(t, "--disable-javascript", "in.html", "out.pdf")
-	if cmd.Objects[0].Web.JavaScript {
-		t.Error("disable-javascript")
+	if !cmd.Global.EnableLocalFileAccess {
+		t.Error("enable-local-file-access must set global")
+	}
+	cmd = parse(t, "--disable-local-file-access", "in.html", "out.pdf")
+	if !cmd.Objects[0].Load.BlockLocalFileAccess {
+		t.Error("disable-local-file-access")
 	}
 }
 
@@ -233,7 +233,6 @@ func TestTOCFlags(t *testing.T) {
 
 func TestLoadFlags(t *testing.T) {
 	cmd := parse(t,
-		"--javascript-delay", "1500",
 		"--zoom", "1.5",
 		"--load-error-handling", "ignore",
 		"--print-media-type",
@@ -241,9 +240,6 @@ func TestLoadFlags(t *testing.T) {
 		"in.html", "out.pdf",
 	)
 	o := cmd.Objects[0]
-	if o.Load.JSDelay != 1500 {
-		t.Errorf("jsdelay = %d", o.Load.JSDelay)
-	}
 	if o.Load.ZoomFactor != 1.5 {
 		t.Errorf("zoom = %v", o.Load.ZoomFactor)
 	}
@@ -251,10 +247,102 @@ func TestLoadFlags(t *testing.T) {
 		t.Error("load-error-handling")
 	}
 	if !o.Load.PrintMediaType {
-		t.Error("print-media-type")
+		t.Error("print-media-type on object Load")
+	}
+	if !cmd.Image.Web.PrintMediaType {
+		t.Error("print-media-type must set Image.Web (imageout mediaFor)")
+	}
+	if !cmd.Global.Web.PrintMediaType {
+		t.Error("print-media-type must set Global.Web (convert mediaFor)")
 	}
 	if o.Load.Username != "u" || o.Load.Password != "p" {
 		t.Errorf("auth = %q/%q", o.Load.Username, o.Load.Password)
+	}
+}
+
+func TestGrayscaleSetsConvertField(t *testing.T) {
+	cmd := parse(t, "--grayscale", "in.html", "out.pdf")
+	if !cmd.Global.Grayscale {
+		t.Error("--grayscale must set Global.Grayscale (convert.SetGrayscale)")
+	}
+	cmd = parse(t, "--no-grayscale", "in.html", "out.pdf")
+	if cmd.Global.Grayscale {
+		t.Error("--no-grayscale must clear Global.Grayscale")
+	}
+}
+
+func TestSmartShrinkingEnableDisable(t *testing.T) {
+	// Default is on; disable pair only (no bare --smart-shrinking).
+	cmd := parse(t, "--disable-smart-shrinking", "in.html", "out.pdf")
+	if cmd.Global.SmartShrinking {
+		t.Error("disable-smart-shrinking")
+	}
+	cmd = parse(t, "--disable-smart-shrinking", "--enable-smart-shrinking", "in.html", "out.pdf")
+	if !cmd.Global.SmartShrinking {
+		t.Error("enable-smart-shrinking must re-enable")
+	}
+	if _, err := Parse([]string{"--smart-shrinking", "in.html", "out.pdf"}); err == nil {
+		t.Error("bare --smart-shrinking must be unknown (pair only)")
+	}
+}
+
+func TestBackgroundPDFAndImage(t *testing.T) {
+	// Both convert and imageout read Global.Background.
+	cmd := parse(t, "--no-background", "in.html", "out.pdf")
+	if cmd.Global.Background {
+		t.Error("no-background must clear Global.Background")
+	}
+	cmd = parse(t, "--no-background", "--background", "in.html", "out.pdf")
+	if !cmd.Global.Background {
+		t.Error("--background must set Global.Background")
+	}
+}
+
+func TestDumpOutlineCommandFieldOnly(t *testing.T) {
+	cmd := parse(t, "--dump-outline", "in.html", "out.pdf")
+	if !cmd.DumpOutline {
+		t.Error("--dump-outline must set Command.DumpOutline")
+	}
+	if cmd.Global.DumpOutline {
+		t.Error("--dump-outline must not dual-write Global.DumpOutline")
+	}
+	cmd = parse(t, "--dump-default-toc-xsl", "in.html", "out.pdf")
+	if !cmd.DumpDefaultTOCXSL {
+		t.Error("--dump-default-toc-xsl must set Command.DumpDefaultTOCXSL")
+	}
+	if cmd.Global.DumpDefaultTOCXSL {
+		t.Error("--dump-default-toc-xsl must not dual-write Global")
+	}
+}
+
+func TestStubFlagsRemoved(t *testing.T) {
+	// Policy A: inert engine-less flags are rejected, not accepted no-ops.
+	cases := [][]string{
+		{"--dpi", "150", "in.html", "out.pdf"},
+		{"--image-dpi", "300", "in.html", "out.pdf"},
+		{"--image-quality", "80", "in.html", "out.pdf"},
+		{"--lowquality", "in.html", "out.pdf"},
+		{"--use-xserver", "in.html", "out.pdf"},
+		{"--cookie-jar", "jar.txt", "in.html", "out.pdf"},
+		{"--read-args-from-stdin", "in.html", "out.pdf"},
+		{"--log-level", "info", "in.html", "out.pdf"},
+		{"--javascript-delay", "1000", "in.html", "out.pdf"},
+		{"--window-status", "ready", "in.html", "out.pdf"},
+		{"--run-script", "x.js", "in.html", "out.pdf"},
+		{"--debug-javascript", "in.html", "out.pdf"},
+		{"--user-style-sheet", "s.css", "in.html", "out.pdf"},
+		{"--minimum-font-size", "8", "in.html", "out.pdf"},
+		{"--enable-plugins", "in.html", "out.pdf"},
+		{"--produce-forms", "in.html", "out.pdf"},
+		{"--enable-javascript", "in.html", "out.pdf"},
+		{"--stop-slow-scripts", "in.html", "out.pdf"},
+		{"--default-encoding", "utf-8", "in.html", "out.pdf"},
+		{"--custom-header-propagation", "in.html", "out.pdf"},
+	}
+	for _, args := range cases {
+		if _, err := Parse(args); err == nil {
+			t.Errorf("stub flag %v must be unknown", args[0])
+		}
 	}
 }
 
@@ -393,11 +481,11 @@ func TestPageScopedBeforeTOCNoGhost(t *testing.T) {
 }
 
 func TestPageScopedBeforePageKeyword(t *testing.T) {
-	cmd := parse(t, "--enable-javascript", "page", "in.html", "out.pdf")
+	cmd := parse(t, "--enable-local-file-access", "page", "in.html", "out.pdf")
 	if len(cmd.Objects) != 1 {
 		t.Fatalf("objects = %d, want 1; got %+v", len(cmd.Objects), cmd.Objects)
 	}
-	if cmd.Objects[0].Page != "in.html" || !cmd.Objects[0].Web.JavaScript {
+	if cmd.Objects[0].Page != "in.html" || cmd.Objects[0].Load.BlockLocalFileAccess {
 		t.Errorf("page = %+v", cmd.Objects[0])
 	}
 }

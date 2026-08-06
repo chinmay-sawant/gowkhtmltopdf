@@ -64,7 +64,7 @@ func CollectHeadings(root *html.Node) []*Heading {
 		if lvl := headingLevel(n.Name); lvl > 0 {
 			out = append(out, &Heading{
 				Node:  n,
-				Title: collapseWS(n.TextContent()),
+				Title: CollapseWS(n.TextContent()),
 				Level: lvl,
 			})
 		}
@@ -118,11 +118,10 @@ type Options struct {
 	// MaxDepth is the deepest heading level kept; headings (after clamping)
 	// deeper than MaxDepth are dropped from the tree. 0 keeps everything.
 	MaxDepth int
-	// Exclude drops headings whose node matches any selector.
+	// Exclude drops headings whose node matches any selector (css.Match).
+	// Callers pass --exclude-from-outline selectors here; object-level
+	// gates (UseOutline / IncludeInOutline) filter before CollectHeadings.
 	Exclude []css.Selector
-	// Include is an extra per-node gate (e.g. object-level outline flags);
-	// nil includes every heading that survives Exclude.
-	Include func(n *html.Node) bool
 }
 
 // BuildTree sorts headings by (page, y, x) - within a page, y-down order so a
@@ -138,9 +137,6 @@ type Options struct {
 func BuildTree(headings []*Heading, opts Options) *Node {
 	sel := make([]*Heading, 0, len(headings))
 	for _, h := range headings {
-		if opts.Include != nil && !opts.Include(h.Node) {
-			continue
-		}
 		if matchAny(opts.Exclude, h.Node) {
 			continue
 		}
@@ -250,9 +246,10 @@ func matchAny(sels []css.Selector, n *html.Node) bool {
 	return false
 }
 
-// collapseWS collapses whitespace runs to a single space and trims the ends,
-// mirroring the layout engine's inline text handling.
-func collapseWS(s string) string {
+// CollapseWS collapses whitespace runs (space, tab, newline, CR, form feed)
+// to a single space and trims leading/trailing spaces. Shared by outline
+// title collection; convert may reuse for document titles and similar.
+func CollapseWS(s string) string {
 	var b strings.Builder
 	prevSpace := true
 	for _, r := range s {

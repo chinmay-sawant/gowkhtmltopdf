@@ -13,6 +13,10 @@ type ContainerQuery struct {
 }
 
 // ContainerCond is a boolean tree of size features (and / or / not).
+//
+// ponytail: full Cond tree, simplify if no nested and/or in real sheets
+// (fixture-42 only needs single feat comparisons; layout tests still cover
+// and/or/not).
 type ContainerCond struct {
 	Kind string // "feat", "and", "or", "not"
 	Feat *SizeFeature
@@ -269,35 +273,6 @@ func parseParenOrFeat(s string) (ContainerCond, bool) {
 		return ContainerCond{}, false
 	}
 	return ContainerCond{Kind: "feat", Feat: &feat}, true
-}
-
-func takeParen(s string) (inner, rest string, ok bool) {
-	s = strings.TrimSpace(s)
-	if !strings.HasPrefix(s, "(") {
-		return "", s, false
-	}
-	depth := 0
-	for i := 0; i < len(s); i++ {
-		switch s[i] {
-		case '"', '\'':
-			q := s[i]
-			i++
-			for i < len(s) && s[i] != q {
-				if s[i] == '\\' && i+1 < len(s) {
-					i++
-				}
-				i++
-			}
-		case '(':
-			depth++
-		case ')':
-			depth--
-			if depth == 0 {
-				return s[1:i], s[i+1:], true
-			}
-		}
-	}
-	return "", s, false
 }
 
 // splitCondKeyword splits on top-level `and`/`or` keywords (not inside parens).

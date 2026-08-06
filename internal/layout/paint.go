@@ -3,6 +3,7 @@ package layout
 import (
 	"math"
 	"sort"
+	"strconv"
 
 	"gowkhtmltopdf/internal/pdf"
 )
@@ -109,7 +110,7 @@ func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 			if n, ok := fontNames[f]; ok {
 				return n
 			}
-			n := "F" + itoa(nextFont)
+			n := "F" + strconv.Itoa(nextFont)
 			nextFont++
 			fontNames[f] = n
 			c.UseEmbeddedFont(n, f)
@@ -142,7 +143,7 @@ func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 			case OpText, OpBullet:
 				drawText(c, op, pg, contentH, opts, p.Height(), resName(op.Font))
 			case OpImage:
-				name := "I" + itoa(nextImg)
+				name := "I" + strconv.Itoa(nextImg)
 				nextImg++
 				drawImage(p, c, op, pg, contentH, opts, name)
 			}
@@ -722,17 +723,10 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 // (#eceff1). Chromatic washes (e.g. fixture-32 grid #f3e5f5) must not match
 // or page-trailing clip steals their height.
 func isSectionWashRGB(r, g, b float64) bool {
-	if abs3(r-g) > 0.035 || abs3(g-b) > 0.035 || abs3(r-b) > 0.035 {
+	if math.Abs(r-g) > 0.035 || math.Abs(g-b) > 0.035 || math.Abs(r-b) > 0.035 {
 		return false
 	}
 	return r > 0.88 && g > 0.88 && b > 0.88 && r < 0.97 && g < 0.97 && b < 0.97
-}
-
-func abs3(v float64) float64 {
-	if v < 0 {
-		return -v
-	}
-	return v
 }
 
 // shiftFlowY moves the ops of the target range [from,to] - plus every op
@@ -1331,7 +1325,7 @@ func countBlockLineYs(res *Result, b *box) []float64 {
 		y := op.Y
 		found := false
 		for _, ey := range ys {
-			if abs3(ey-y) <= eps {
+			if math.Abs(ey-y) <= eps {
 				found = true
 				break
 			}
@@ -1625,20 +1619,6 @@ func drawText(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintO
 		c.TextRenderMode(0)
 	}
 	c.EndText()
-}
-
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	var b [12]byte
-	i := len(b)
-	for n > 0 {
-		i--
-		b[i] = byte('0' + n%10)
-		n /= 10
-	}
-	return string(b[i:])
 }
 
 func drawImage(p *pdf.Page, c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintOptions, name string) {

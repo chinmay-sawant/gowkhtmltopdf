@@ -191,23 +191,6 @@ func TestRenderImageDataURI(t *testing.T) {
 	}
 }
 
-// TestFontTable checks the embedded font covers ASCII 32..126 and that a
-// known glyph (A has a crossbar at row 4) survived embedding.
-func TestFontTable(t *testing.T) {
-	if want := (126 - 32 + 1) * glyphCols; len(fontData) != want {
-		t.Fatalf("fontData length = %d, want %d", len(fontData), want)
-	}
-	cols := glyphAt('A')
-	for col := 0; col < glyphCols; col++ {
-		if cols[col]&(1<<4) == 0 {
-			t.Errorf("glyph A column %d misses the crossbar row 4", col)
-		}
-	}
-	if got := measureString("Hi", 12); got != 12 {
-		t.Errorf("measureString(\"Hi\", 12) = %v, want 12", got)
-	}
-}
-
 // TestScaleNearest checks the stdlib-free scaler preserves content.
 func TestScaleNearest(t *testing.T) {
 	src := image.NewNRGBA(image.Rect(0, 0, 2, 2))

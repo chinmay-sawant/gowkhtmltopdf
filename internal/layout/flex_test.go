@@ -88,50 +88,6 @@ func TestZIndexPaintOrder(t *testing.T) {
 	}
 }
 
-func TestWritingModeVertical(t *testing.T) {
-	s := sheet(t, `.v { writing-mode: vertical-rl; font-size:12pt }`)
-	res := layoutHTML(t, `<html><body><div class="v">AB</div></body></html>`, s)
-	var ya, yb float64
-	for _, op := range res.Ops {
-		if op.Kind == OpText && op.Text == "A" {
-			ya = op.Y
-		}
-		if op.Kind == OpText && op.Text == "B" {
-			yb = op.Y
-		}
-	}
-	if !(yb > ya) {
-		t.Fatalf("vertical stack A.y=%.1f B.y=%.1f", ya, yb)
-	}
-}
-
-func TestWritingModeVerticalCJKRotated(t *testing.T) {
-	s := sheet(t, `.v { writing-mode: vertical-rl; font-size:12pt }`)
-	res := layoutHTML(t, `<html><body><div class="v">中A</div></body></html>`, s)
-	var rotCJK, rotLat float64
-	var sawCJK, sawLat bool
-	for _, op := range res.Ops {
-		if op.Kind != OpText {
-			continue
-		}
-		switch op.Text {
-		case "中":
-			rotCJK, sawCJK = op.RotateDeg, true
-		case "A":
-			rotLat, sawLat = op.RotateDeg, true
-		}
-	}
-	if !sawCJK || !sawLat {
-		t.Fatal("missing CJK or Latin glyph ops")
-	}
-	if rotCJK != 90 {
-		t.Fatalf("CJK RotateDeg=%v, want 90", rotCJK)
-	}
-	if rotLat != 0 {
-		t.Fatalf("Latin RotateDeg=%v, want 0 (upright)", rotLat)
-	}
-}
-
 func TestFlexRowLayout(t *testing.T) {
 	src := `<html><body>
 <div style="display:flex;justify-content:space-between;gap:8pt;width:300pt">

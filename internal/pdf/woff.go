@@ -35,6 +35,8 @@ var (
 
 // ParseFontBytes parses TTF/OTF (TrueType outlines) or WOFF1-wrapped SFNT.
 // WOFF2 is rejected with a clear error (Brotli not allowlisted).
+//
+// ponytail: WOFF1 in-tree only; no Brotli / WOFF2 direct dep.
 func ParseFontBytes(data []byte) (*Font, error) {
 	if len(data) >= 4 {
 		sig := string(data[0:4])

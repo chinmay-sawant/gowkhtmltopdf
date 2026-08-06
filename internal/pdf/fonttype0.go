@@ -20,6 +20,8 @@ func needsType0(used []rune) bool {
 // ensureFont subsets f for runes and emits the font objects once per subset.
 // Latin-1-only subsets use a simple TrueType font; any higher Unicode uses
 // Type0 / CIDFontType2 with Identity-H and Unicode CIDs.
+//
+// ponytail: Type0+simple dual embed — both product-real (Latin-1 vs CJK/BMP).
 func (d *Document) ensureFont(f *Font, used []rune) (string, error) {
 	if len(used) == 0 {
 		used = []rune{' '}
@@ -39,7 +41,7 @@ func (d *Document) ensureFontSimple(f *Font, used []rune) (string, error) {
 	if ref, ok := d.fontCache[key]; ok {
 		return ref, nil
 	}
-	sub, err := subsetFont(f, used)
+	sub, err := subsetFont(f, used, subsetSimple)
 	if err != nil {
 		return "", err
 	}
@@ -76,7 +78,7 @@ func (d *Document) ensureFontSimple(f *Font, used []rune) (string, error) {
 	}
 	d.setDict(ef.fontRef, fmt.Sprintf(
 		"<< /Type /Font /Subtype /TrueType /BaseFont /%s /FirstChar %d /LastChar %d /Widths [%s] /FontDescriptor %s /Encoding /WinAnsiEncoding /ToUnicode %s >>",
-		pdfName, first, last, strings.Join(ws, " "), ef.descRef, d.ensureToUnicode(sub)))
+		pdfName, first, last, strings.Join(ws, " "), ef.descRef, d.ensureToUnicode(sub, 1)))
 
 	d.fontCache[key] = ef.fontRef
 	return ef.fontRef, nil
@@ -93,7 +95,7 @@ func (d *Document) ensureFontType0(f *Font, used []rune) (string, error) {
 	if ref, ok := d.fontCache[key]; ok {
 		return ref, nil
 	}
-	sub, err := subsetFontUnicode(f, used)
+	sub, err := subsetFont(f, used, subsetUnicode)
 	if err != nil {
 		return "", err
 	}
@@ -166,48 +168,10 @@ func (d *Document) ensureFontType0(f *Font, used []rune) (string, error) {
 
 	d.setDict(type0Ref, fmt.Sprintf(
 		"<< /Type /Font /Subtype /Type0 /BaseFont /%s /Encoding /Identity-H /DescendantFonts [%s] /ToUnicode %s >>",
-		pdfName, cidRef, d.ensureToUnicodeIdentity(sub)))
+		pdfName, cidRef, d.ensureToUnicode(sub, 2)))
 
 	d.fontCache[key] = type0Ref
 	return type0Ref, nil
-}
-
-// ensureToUnicodeIdentity maps Identity-H CIDs (Unicode code points) to Unicode.
-func (d *Document) ensureToUnicodeIdentity(sub *subsetResult) string {
-	ref := d.newObject()
-	var b strings.Builder
-	b.WriteString("/CIDInit /ProcSet findresource begin\n")
-	b.WriteString("12 dict begin\n")
-	b.WriteString("begincmap\n")
-	b.WriteString("/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def\n")
-	b.WriteString("/CMapName /Adobe-Identity-UCS def\n")
-	b.WriteString("/CMapType 2 def\n")
-	b.WriteString("1 begincodespacerange\n")
-	b.WriteString("<0000> <FFFF>\n")
-	b.WriteString("endcodespacerange\n")
-	type m struct{ code, r rune }
-	var maps []m
-	for r := range sub.glyphIDs {
-		maps = append(maps, m{code: r, r: r})
-	}
-	sort.Slice(maps, func(a, b int) bool { return maps[a].code < maps[b].code })
-	for start := 0; start < len(maps); start += 100 {
-		end := start + 100
-		if end > len(maps) {
-			end = len(maps)
-		}
-		fmt.Fprintf(&b, "%d beginbfchar\n", end-start)
-		for _, mm := range maps[start:end] {
-			fmt.Fprintf(&b, "<%04X> <%04X>\n", mm.code, mm.r)
-		}
-		b.WriteString("endbfchar\n")
-	}
-	b.WriteString("endcmap\n")
-	b.WriteString("/CMapName currentdict /CMap defineresource pop\n")
-	b.WriteString("end\nend\n")
-	d.setDict(ref, fmt.Sprintf("<< /Length %d >>", b.Len()))
-	d.setStream(ref, []byte(b.String()))
-	return ref
 }
 
 // pdfHexCIDs encodes s as an Identity-H hex string of Unicode CIDs.

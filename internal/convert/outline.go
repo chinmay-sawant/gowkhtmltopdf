@@ -37,6 +37,7 @@ type objectState struct {
 
 	base     string
 	lp       settings.LoadPage
+	media    string // layout CSS media ("print", "screen", …)
 	imagesFn func(src string) ([]byte, error)
 	doctitle string // <title> of the object document
 
@@ -63,7 +64,7 @@ func docTitle(root *html.Node) string {
 			return ""
 		}
 		if n.Name == "title" {
-			return collapseText(n.TextContent())
+			return outline.CollapseWS(n.TextContent())
 		}
 		for _, c := range n.Children {
 			if t := walk(c); t != "" {
@@ -75,29 +76,11 @@ func docTitle(root *html.Node) string {
 	return walk(root)
 }
 
-func collapseText(s string) string {
-	out := make([]byte, 0, len(s))
-	prevSpace := true
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		if c == ' ' || c == '\t' || c == '\n' || c == '\r' {
-			if !prevSpace {
-				out = append(out, ' ')
-				prevSpace = true
-			}
-			continue
-		}
-		out = append(out, c)
-		prevSpace = false
-	}
-	return string(out)
-}
-
 // collectObjectHeadings gathers the h1..h6 elements of one painted object,
 // matches them against the layout locations, and rebases their page numbers
 // to the document page index given by offset. Objects opted out of the
-// outline (UseOutline/IncludeInOutline false) and headings matching
-// --exclude-from-outline selectors are dropped.
+// outline (UseOutline/IncludeInOutline false) are dropped here;
+// --exclude-from-outline is applied later via outline.BuildTree Options.Exclude.
 func collectObjectHeadings(root *html.Node, res *layout.Result, offset int, g settings.PdfGlobal, obj settings.PdfObject, log io.Writer) []*outline.Heading {
 	if !obj.UseOutline || !obj.IncludeInOutline {
 		return nil
@@ -107,19 +90,14 @@ func collectObjectHeadings(root *html.Node, res *layout.Result, offset int, g se
 	if len(hs) == 0 {
 		return nil
 	}
-	sels := parseExcludeSelectors(g.ExcludeFromOutline, log)
-	kept := hs[:0]
 	for _, h := range hs {
-		if matchAnySelector(sels, h.Node) {
-			continue
-		}
 		h.Page += offset
-		kept = append(kept, h)
 	}
-	return kept
+	return hs
 }
 
-// parseExcludeSelectors parses the --exclude-from-outline selector strings.
+// parseExcludeSelectors parses --exclude-from-outline selector strings into
+// css.Selector values for outline.Options.Exclude (matching lives in outline).
 func parseExcludeSelectors(specs []string, log io.Writer) []css.Selector {
 	var out []css.Selector
 	for _, s := range specs {
@@ -131,15 +109,6 @@ func parseExcludeSelectors(specs []string, log io.Writer) []css.Selector {
 		out = append(out, sheet.Rules[0].Selectors[0])
 	}
 	return out
-}
-
-func matchAnySelector(sels []css.Selector, n *html.Node) bool {
-	for _, s := range sels {
-		if css.Match(s, n) {
-			return true
-		}
-	}
-	return false
 }
 
 // flatHeadings concatenates the per-object heading lists in object order,

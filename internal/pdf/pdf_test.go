@@ -268,7 +268,7 @@ func TestSubsetWidthsArePDFUnits(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sub, err := subsetFont(f, []rune("A "))
+	sub, err := subsetFont(f, []rune("A "), subsetSimple)
 	if err != nil {
 		t.Fatal(err)
 	}

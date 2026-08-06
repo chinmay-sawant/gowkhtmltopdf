@@ -60,7 +60,8 @@ func subsetWidths(sub *subsetResult, unitsPerEm int16) (int, int, []float64) {
 }
 
 // ensureToUnicode emits the ToUnicode CMap for a subset and returns its ref.
-func (d *Document) ensureToUnicode(sub *subsetResult) string {
+// codeBytes is 1 for simple (WinAnsi single-byte) or 2 for Identity-H CIDs.
+func (d *Document) ensureToUnicode(sub *subsetResult, codeBytes int) string {
 	ref := d.newObject()
 	var b strings.Builder
 	b.WriteString("/CIDInit /ProcSet findresource begin\n")
@@ -70,9 +71,13 @@ func (d *Document) ensureToUnicode(sub *subsetResult) string {
 	b.WriteString("/CMapName /Adobe-Identity-UCS def\n")
 	b.WriteString("/CMapType 2 def\n")
 	b.WriteString("1 begincodespacerange\n")
-	fmt.Fprintf(&b, "<%02X> <%02X>\n", byte(0), byte(0xFF))
+	if codeBytes >= 2 {
+		b.WriteString("<0000> <FFFF>\n")
+	} else {
+		fmt.Fprintf(&b, "<%02X> <%02X>\n", byte(0), byte(0xFF))
+	}
 	b.WriteString("endcodespacerange\n")
-	// group mappings: code → unicode (code == rune value for Latin-1)
+	// code → unicode (code == rune for both simple Latin-1 and Identity-H CIDs)
 	type m struct{ code, r rune }
 	var maps []m
 	for r := range sub.glyphIDs {
@@ -86,7 +91,11 @@ func (d *Document) ensureToUnicode(sub *subsetResult) string {
 		}
 		fmt.Fprintf(&b, "%d beginbfchar\n", end-start)
 		for _, mm := range maps[start:end] {
-			fmt.Fprintf(&b, "<%02X> <%04X>\n", mm.code, mm.r)
+			if codeBytes >= 2 {
+				fmt.Fprintf(&b, "<%04X> <%04X>\n", mm.code, mm.r)
+			} else {
+				fmt.Fprintf(&b, "<%02X> <%04X>\n", mm.code, mm.r)
+			}
 		}
 		b.WriteString("endbfchar\n")
 	}

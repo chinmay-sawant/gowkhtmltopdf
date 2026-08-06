@@ -45,10 +45,7 @@ func TestRegistryScanDroid(t *testing.T) {
 	if _, err := os.Stat(dir); err != nil {
 		t.Skip(err)
 	}
-	reg, err := ScanFontDir(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	reg := ScanFontDirs([]string{dir})
 	f := reg.Lookup([]string{"Droid Sans Fallback"}, 400, false)
 	if f == nil {
 		// try any family from the file

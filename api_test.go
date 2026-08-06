@@ -83,7 +83,7 @@ func TestGlobalSettingsGetSetRoundTrip(t *testing.T) {
 		{"orientation", "Landscape"},
 		{"margin.top", "12.5"},
 		{"web.background", "false"},
-		{"dpi", "150"},
+		{"grayscale", "true"},
 		{"title", "Round Trip"},
 		{"enablelocalfileaccess", "true"},
 		{"header.center", "[title]"},

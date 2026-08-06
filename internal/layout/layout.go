@@ -16,6 +16,7 @@ package layout
 import (
 	"encoding/binary"
 	"errors"
+	"math"
 	"strconv"
 	"strings"
 
@@ -121,8 +122,7 @@ type Op struct {
 	ZIndexSet bool
 
 	// RotateDeg rotates the glyph around its baseline origin (PDF text matrix).
-	// Used for writing-mode:vertical-* upright→sideways CJK (90°). Independent
-	// of CSS transform CTM (which wraps the whole op via Xform).
+	// Independent of CSS transform CTM (which wraps the whole op via Xform).
 	RotateDeg float64
 
 	// Xform is a baked canvas-space CSS 2D transform (identity if unset).
@@ -384,51 +384,25 @@ func (e *engine) build(n *html.Node, availW, x, y float64) *box {
 	// and grid containers still get the right formatting context.
 	// Transformed ancestors establish a CB for fixed (treated as absolute).
 	if b == nil && st.Position == "fixed" {
-		if underXformCB {
-			b = e.buildAbsolute(n, st, availW, x, y)
-		} else {
-			b = e.buildFixed(n, st, availW, x, y)
-		}
+		b = e.buildOutOfFlow(n, st, availW, x, y, !underXformCB)
 	}
 	if b == nil && st.Position == "absolute" {
-		b = e.buildAbsolute(n, st, availW, x, y)
+		b = e.buildOutOfFlow(n, st, availW, x, y, false)
 	}
 	// Descendants of a transformed box see this as a containing block.
 	if st.HasTransform {
 		e.transformCBDepth++
 		defer func() { e.transformCBDepth-- }()
 	}
-	if b == nil && (st.WritingMode == "vertical-rl" || st.WritingMode == "vertical-lr") {
-		b = e.buildVerticalBlock(n, st, availW, x, y)
-	}
-	if b == nil && (st.Display == "flex" || st.Display == "inline-flex") {
-		b = e.buildFlex(n, st, availW, x, y)
-	}
-	if b == nil && (st.Display == "grid" || st.Display == "inline-grid" || st.Display == "subgrid") {
-		b = e.buildGrid(n, st, availW, x, y)
-	}
-	if b == nil && isMulticol(st) {
-		b = e.buildMulticol(n, st, availW, x, y)
-	}
-	if b == nil && isTableDisplay(st.Display) {
-		// MediaWiki thumbs use figure{display:table;float:right} purely for
-		// shrink-to-fit. Routing those through buildTable drops nested <img>
-		// (no table-row/cell structure) and leaves empty floated boxes that
-		// clear following paragraphs with huge gaps. Treat non-table hosts
-		// without table-structure children as ordinary blocks.
-		if useBlockForTableDisplay(n) {
-			b = e.buildBlock(n, st, availW, x, y)
-		} else {
-			b = e.buildTable(n, st, availW, x, y)
-		}
-	}
 	if b == nil {
-		b = e.buildBlock(n, st, availW, x, y)
+		b = e.buildInFlowDisplay(n, st, availW, x, y)
 	}
 	if b != nil && st.Position == "relative" {
 		e.applyRelativeOffset(b)
 	}
-	b.opStart, b.opEnd = start, len(e.ops)-1
+	if b != nil {
+		b.opStart, b.opEnd = start, len(e.ops)-1
+	}
 	if b != nil && st.Position == "sticky" {
 		e.tagSticky(b)
 	}
@@ -601,61 +575,41 @@ func resolveUsedHeight(st ResolvedStyle, cbH float64, e *engine) (float64, bool)
 	return h, true
 }
 
-// buildAbsolute places an out-of-flow box using left/top (and optional width/
-// height). Containing block is the parent's content edge approximation
-// (availW/x/y passed from the caller).
-func (e *engine) buildAbsolute(n *html.Node, st ResolvedStyle, availW, x, y float64) *box {
+// buildOutOfFlow places absolute (viewportFixed=false) or fixed
+// (viewportFixed=true) boxes. Fixed under a transformed ancestor is absolute
+// (caller passes viewportFixed=false). Fixed ops are marked by build().
+func (e *engine) buildOutOfFlow(n *html.Node, st ResolvedStyle, availW, x, y float64, viewportFixed bool) *box {
+	cbX, cbY, cbW := x, y, availW
+	if viewportFixed {
+		cbX, cbY = 0, 0
+		cbW = e.opts.Width
+		if cbW <= 0 {
+			cbW = availW
+		}
+	}
 	start := len(e.ops)
-	b := e.buildInFlowDisplay(n, st, availW, x, y)
+	b := e.buildInFlowDisplay(n, st, cbW, cbX, cbY)
 	if b == nil {
 		return nil
 	}
 	b.opStart, b.opEnd = start, len(e.ops)-1
-	ax, ay := x, y
+	ax, ay := cbX, cbY
 	if !st.LeftAuto {
-		ax = x + e.scalePt(st.Left)
+		ax = cbX + e.scalePt(st.Left)
 	} else if !st.RightAuto {
-		ax = x + availW - b.w - e.scalePt(st.Right)
+		ax = cbX + cbW - b.w - e.scalePt(st.Right)
 	}
 	if !st.TopAuto {
-		ay = y + e.scalePt(st.Top)
+		ay = cbY + e.scalePt(st.Top)
 	} else if !st.BottomAuto {
-		ay = y + e.scalePt(st.Bottom)
-	}
-	dx, dy := ax-b.x, ay-b.y
-	b.x, b.y = ax, ay
-	e.shiftBoxOps(b, dx, dy)
-	return b
-}
-
-// buildFixed places an out-of-flow box against the initial containing block
-// (viewport origin). Ops are marked Fixed so Paint stamps them on every page.
-func (e *engine) buildFixed(n *html.Node, st ResolvedStyle, availW, x, y float64) *box {
-	_ = availW
-	_ = x
-	_ = y
-	cbW := e.opts.Width
-	if cbW <= 0 {
-		cbW = availW
-	}
-	start := len(e.ops)
-	b := e.buildInFlowDisplay(n, st, cbW, 0, 0)
-	if b == nil {
-		return nil
-	}
-	b.opStart, b.opEnd = start, len(e.ops)-1
-	ax, ay := 0.0, 0.0
-	if !st.LeftAuto {
-		ax = e.scalePt(st.Left)
-	} else if !st.RightAuto {
-		ax = cbW - b.w - e.scalePt(st.Right)
-	}
-	if !st.TopAuto {
-		ay = e.scalePt(st.Top)
-	} else if !st.BottomAuto {
-		ay = e.opts.Height - b.h - e.scalePt(st.Bottom)
-		if ay < 0 {
-			ay = e.scalePt(st.Bottom)
+		if viewportFixed {
+			ay = e.opts.Height - b.h - e.scalePt(st.Bottom)
+			if ay < 0 {
+				ay = e.scalePt(st.Bottom)
+			}
+		} else {
+			// Absolute bottom: offset from CB top (lite; not height−bottom).
+			ay = cbY + e.scalePt(st.Bottom)
 		}
 	}
 	dx, dy := ax-b.x, ay-b.y
@@ -665,6 +619,8 @@ func (e *engine) buildFixed(n *html.Node, st ResolvedStyle, availW, x, y float64
 }
 
 // buildInFlowDisplay builds flex/grid/multicol/table/block ignoring position.
+// Single display dispatch shared with build() so abspos/fixed get the same
+// formatting context (including table display:table-as-block heuristic).
 func (e *engine) buildInFlowDisplay(n *html.Node, st ResolvedStyle, availW, x, y float64) *box {
 	if st.Display == "flex" || st.Display == "inline-flex" {
 		return e.buildFlex(n, st, availW, x, y)
@@ -676,6 +632,14 @@ func (e *engine) buildInFlowDisplay(n *html.Node, st ResolvedStyle, availW, x, y
 		return e.buildMulticol(n, st, availW, x, y)
 	}
 	if isTableDisplay(st.Display) {
+		// MediaWiki thumbs use figure{display:table;float:right} purely for
+		// shrink-to-fit. Routing those through buildTable drops nested <img>
+		// (no table-row/cell structure) and leaves empty floated boxes that
+		// clear following paragraphs with huge gaps. Treat non-table hosts
+		// without table-structure children as ordinary blocks.
+		if useBlockForTableDisplay(n) {
+			return e.buildBlock(n, st, availW, x, y)
+		}
 		return e.buildTable(n, st, availW, x, y)
 	}
 	return e.buildBlock(n, st, availW, x, y)
@@ -690,6 +654,25 @@ func (e *engine) markOpsFixed(start, end int) {
 	}
 }
 
+// borderOps returns the four border line ops for the given border box.
+func (e *engine) borderOps(st ResolvedStyle, x, y, w, h float64) []Op {
+	var ops []Op
+	wt, wr, wb, wl := e.scalePt(st.BorderTop.Width), e.scalePt(st.BorderRight.Width), e.scalePt(st.BorderBottom.Width), e.scalePt(st.BorderLeft.Width)
+	if wt > 0 && st.BorderTop.Style != "none" {
+		ops = append(ops, Op{Kind: OpLine, X: x, Y: y, W: w, H: 0, Width: wt, R: st.BorderTop.Color[0], G: st.BorderTop.Color[1], B: st.BorderTop.Color[2]})
+	}
+	if wr > 0 && st.BorderRight.Style != "none" {
+		ops = append(ops, Op{Kind: OpLine, X: x + w, Y: y, W: 0, H: h, Width: wr, R: st.BorderRight.Color[0], G: st.BorderRight.Color[1], B: st.BorderRight.Color[2]})
+	}
+	if wb > 0 && st.BorderBottom.Style != "none" {
+		ops = append(ops, Op{Kind: OpLine, X: x, Y: y + h, W: w, H: 0, Width: wb, R: st.BorderBottom.Color[0], G: st.BorderBottom.Color[1], B: st.BorderBottom.Color[2]})
+	}
+	if wl > 0 && st.BorderLeft.Style != "none" {
+		ops = append(ops, Op{Kind: OpLine, X: x, Y: y, W: 0, H: h, Width: wl, R: st.BorderLeft.Color[0], G: st.BorderLeft.Color[1], B: st.BorderLeft.Color[2]})
+	}
+	return ops
+}
+
 // prependChrome inserts background + border ops at insertAt so they paint
 // under any content ops already appended for this box.
 func (e *engine) prependChrome(insertAt int, st ResolvedStyle, x, y, w, h float64) {
@@ -701,20 +684,7 @@ func (e *engine) prependChrome(insertAt int, st ResolvedStyle, x, y, w, h float6
 		chrome = append(chrome, Op{Kind: OpFillRect, X: x, Y: y, W: w, H: h,
 			R: st.BGColor[0], G: st.BGColor[1], B: st.BGColor[2], Alpha: st.BGColor[3]})
 	}
-	// borders (same geometry as emitBorders)
-	wt, wr, wb, wl := e.scalePt(st.BorderTop.Width), e.scalePt(st.BorderRight.Width), e.scalePt(st.BorderBottom.Width), e.scalePt(st.BorderLeft.Width)
-	if wt > 0 && st.BorderTop.Style != "none" {
-		chrome = append(chrome, Op{Kind: OpLine, X: x, Y: y, W: w, H: 0, Width: wt, R: st.BorderTop.Color[0], G: st.BorderTop.Color[1], B: st.BorderTop.Color[2]})
-	}
-	if wr > 0 && st.BorderRight.Style != "none" {
-		chrome = append(chrome, Op{Kind: OpLine, X: x + w, Y: y, W: 0, H: h, Width: wr, R: st.BorderRight.Color[0], G: st.BorderRight.Color[1], B: st.BorderRight.Color[2]})
-	}
-	if wb > 0 && st.BorderBottom.Style != "none" {
-		chrome = append(chrome, Op{Kind: OpLine, X: x, Y: y + h, W: w, H: 0, Width: wb, R: st.BorderBottom.Color[0], G: st.BorderBottom.Color[1], B: st.BorderBottom.Color[2]})
-	}
-	if wl > 0 && st.BorderLeft.Style != "none" {
-		chrome = append(chrome, Op{Kind: OpLine, X: x, Y: y, W: 0, H: h, Width: wl, R: st.BorderLeft.Color[0], G: st.BorderLeft.Color[1], B: st.BorderLeft.Color[2]})
-	}
+	chrome = append(chrome, e.borderOps(st, x, y, w, h)...)
 	if len(chrome) == 0 {
 		return
 	}
@@ -1180,18 +1150,8 @@ func collapseMargins(a, b float64) float64 {
 }
 
 func (e *engine) emitBorders(st ResolvedStyle, x, y, w, h float64) {
-	wt, wr, wb, wl := e.scalePt(st.BorderTop.Width), e.scalePt(st.BorderRight.Width), e.scalePt(st.BorderBottom.Width), e.scalePt(st.BorderLeft.Width)
-	if wt > 0 && st.BorderTop.Style != "none" {
-		e.add(Op{Kind: OpLine, X: x, Y: y, W: w, H: 0, Width: wt, R: st.BorderTop.Color[0], G: st.BorderTop.Color[1], B: st.BorderTop.Color[2]})
-	}
-	if wr > 0 && st.BorderRight.Style != "none" {
-		e.add(Op{Kind: OpLine, X: x + w, Y: y, W: 0, H: h, Width: wr, R: st.BorderRight.Color[0], G: st.BorderRight.Color[1], B: st.BorderRight.Color[2]})
-	}
-	if wb > 0 && st.BorderBottom.Style != "none" {
-		e.add(Op{Kind: OpLine, X: x, Y: y + h, W: w, H: 0, Width: wb, R: st.BorderBottom.Color[0], G: st.BorderBottom.Color[1], B: st.BorderBottom.Color[2]})
-	}
-	if wl > 0 && st.BorderLeft.Style != "none" {
-		e.add(Op{Kind: OpLine, X: x, Y: y, W: 0, H: h, Width: wl, R: st.BorderLeft.Color[0], G: st.BorderLeft.Color[1], B: st.BorderLeft.Color[2]})
+	for _, op := range e.borderOps(st, x, y, w, h) {
+		e.add(op)
 	}
 }
 
@@ -2122,7 +2082,7 @@ func distributeRowspanLines(ops []Op, start, end int, cellY, cellH, padTop, padB
 		}
 		placed := false
 		for bi := range bands {
-			if absFloat(bands[bi].y-op.Y) <= yEps {
+			if math.Abs(bands[bi].y-op.Y) <= yEps {
 				bands[bi].idx = append(bands[bi].idx, i)
 				// Keep average Y so multi-glyph lines stay coherent.
 				n := float64(len(bands[bi].idx))
@@ -2193,9 +2153,9 @@ func distributeRowspanLines(ops []Op, start, end int, cellY, cellH, padTop, padB
 		y := ops[i].Y
 		// Nearest band baseline.
 		best := 0
-		bestD := absFloat(y - shifts[0].y0)
+		bestD := math.Abs(y - shifts[0].y0)
 		for si := 1; si < len(shifts); si++ {
-			d := absFloat(y - shifts[si].y0)
+			d := math.Abs(y - shifts[si].y0)
 			if d < bestD {
 				bestD, best = d, si
 			}
@@ -2204,13 +2164,6 @@ func distributeRowspanLines(ops []Op, start, end int, cellY, cellH, padTop, padB
 			ops[i].Y += shifts[best].dy
 		}
 	}
-}
-
-func absFloat(v float64) float64 {
-	if v < 0 {
-		return -v
-	}
-	return v
 }
 
 // measureCellContent returns the max-content border-box width of the cell

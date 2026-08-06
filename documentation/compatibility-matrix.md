@@ -79,7 +79,7 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 | Property | Status | Notes / verified by |
 |----------|--------|---------------------|
 | `font-family` (named + generic) | Partial | parsed + inherited; embedded Liberation Sans family (R/B/I/BI) plus **font registry** (`--font-path`, optional `--use-system-fonts`) and local `@font-face` TTF/OTF/WOFF1 on **PDF and image** paths (see §4 / §5). Named families resolve as named; missing faces fall through the author’s comma stack, then Liberation; only CSS generics (`serif`/`sans-serif`/`monospace`) expand to Liberation |
-| `writing-mode` (`horizontal-tb\|vertical-rl\|vertical-lr`) | Partial | `vertical-rl` / `vertical-lr` lite (rotated CJK paint); default horizontal. Not a full vertical typesetting engine |
+| `writing-mode` (`horizontal-tb\|vertical-rl\|vertical-lr`) | Partial (horizontal only) | Parsed; `vertical-rl`/`vertical-lr` lay out as normal horizontal block (vertical lite paint removed for leanness — ponytail Phase 4). Full CSS vertical typesetting is out of scope |
 | `font-size` | Implemented | `style.go` `fontSize` (px/pt/em/%/rem/in/cm/mm/pc + keywords); `%`/`em` resolve against parent; test `TestFontSizeEmInherit` |
 | `font-weight` (`normal\|bold\|100-900`) | Implemented | ≥700 selects Liberation Sans **Bold** (or BoldItalic); fake stroke bold only if a bold face is missing; tests `TestRealBoldFaceOps`, `TestBoldFaceInInvoicePDF` |
 | `font-style` (`italic\|oblique`) | Implemented | selects Liberation Sans Italic / BoldItalic (`pdf.FaceSet.Resolve`); test `TestRealBoldFaceOps` |
@@ -164,7 +164,7 @@ Evidence: `internal/layout/grid.go`, `style.go`; fixtures 28/32/34/35; `grid_tes
 | Property | Status | Notes / verified by |
 |----------|--------|---------------------|
 | `display: grid` / `inline-grid` | [x] Implemented | Routed to `buildGrid`; nested grids OK |
-| `display: subgrid` | [x] Partial | Copy-inherits parent templates/areas; same content-width re-resolves inherited tracks — **no** joint Resolve Intrinsic across subtrees — fixture-35 / `TestSubgrid*` |
+| `display: subgrid` | [~] Not implemented | Treated as ordinary `display: grid` (no parent template inherit). Joint Resolve Intrinsic / subgrid L1 out of scope — ponytail Phase 4 cut |
 | `grid-template-columns` | [x] Implemented | Lengths, `fr`, `repeat(N, …)`, `minmax(...)`; gap subtracted before `fr` distribute |
 | `grid-template-rows` | [x] Implemented | Consumed when height definite; fixed mins on auto-height; fixture-32 |
 | `minmax()` track sizing | [x] Implemented | Lengths / `%` (definite) / `fr` / `auto` / `min-content` / `max-content` subset; `fr` keeps min floors — fixture-35 |
@@ -176,7 +176,7 @@ Evidence: `internal/layout/grid.go`, `style.go`; fixtures 28/32/34/35; `grid_tes
 | `grid-template-areas` / `grid-area` names | [x] Implemented | Named areas + lite line form; areas can extend auto tracks — fixture-34 |
 | `justify-items` / `align-items` | [x] Implemented | Default stretch; start/center/end; stretch sizes item to grid area |
 | `justify-self` / `align-self` | [x] Implemented | Overrides container; stretch fills area |
-| Masonry | [x] Partial | One-axis `grid-template-*: masonry` → shortest-stack pack; `grid-column: span N` on fixed axis; both axes → dense fallback — fixture-35 / `TestMasonry*`. Not full CSS Grid L3 |
+| Masonry | [~] Not implemented | Lone `masonry` keyword stripped → dense auto-flow only (no shortest-stack pack). CSS Grid L3 masonry out of scope — ponytail Phase 4 cut |
 | Intrinsic / nested % track cycles | [x] Partial | Measure-pass lite for min/max-content track mins; cyclic `%` → auto when CB indefinite |
 
 ### 2.9 CSS Multi-column (report lite)

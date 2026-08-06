@@ -195,6 +195,7 @@ type htmlHFLayout struct {
 	registry *pdf.Registry
 	width    float64
 	height   float64
+	media    string
 }
 
 // loadHTMLHF loads an HTML header/footer as a nested child document: fetch
@@ -236,9 +237,13 @@ func loadHTMLHF(ctx context.Context, loader *load.Loader, font *pdf.Font, st *ob
 	if err != nil {
 		return nil, fmt.Errorf("header/footer html: parse: %w", err)
 	}
+	media := st.media
+	if media == "" {
+		media = "print"
+	}
 	sheets := collectSheets(ctx, loader, root, res.Base, st.lp, st.idx, log,
 		st.geom.pageW-st.geom.marginLeft-st.geom.marginRight,
-		st.geom.contentH)
+		st.geom.contentH, media)
 	reg := MergeFontFaces(ctx, loader, st.registry, sheets, res.Base, st.lp, st.idx+1, log)
 	if reg != nil {
 		st.registry = reg
@@ -254,13 +259,14 @@ func loadHTMLHF(ctx context.Context, loader *load.Loader, font *pdf.Font, st *ob
 		registry: st.registry,
 		width:    st.geom.pageW - st.geom.marginLeft - st.geom.marginRight,
 		height:   st.geom.contentH,
+		media:    media,
 	}
 	// Lay out once regardless: placeholder-free docs reuse this display list
 	// for every page; placeholder docs use it only for the natural height
 	// (auto margins) and re-layout per page at draw time.
 	l.res, err = layout.Layout(root, layout.Options{
 		Width: l.width, Height: l.height, Font: font, Registry: l.registry,
-		Sheets: sheets, Media: "print", Images: st.imagesFn,
+		Sheets: sheets, Media: media, Images: st.imagesFn,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("header/footer html: layout: %w", err)
@@ -286,11 +292,18 @@ type hfLinkContext struct {
 // margin band. The HF document's canvas origin maps to `spacing` points from
 // the page top (header) or from the page bottom (footer); x is aligned with
 // the content area's left margin. Images are embedded per page.
+//
+// Body pages use layout.Paint (pagination + sticky); HF is a single-band
+// clamp that shares the same canvas→PDF op dispatch via paintLayoutOps.
 func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hf settings.HeaderFooter, geom hfGeom, parms hfParms, isHeader bool, links hfLinkContext) error {
 	if hfL == nil || hfL.skip {
 		return nil
 	}
 	res := hfL.res
+	media := hfL.media
+	if media == "" {
+		media = "print"
+	}
 	if hfL.perPage {
 		raw := parms.substitute(hfL.raw)
 		root, err := html.Parse(raw)
@@ -299,7 +312,7 @@ func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hf setti
 		}
 		res, err = layout.Layout(root, layout.Options{
 			Width: hfL.width, Height: hfL.height, Font: hfL.font, Registry: hfL.registry,
-			Sheets: hfL.sheets, Media: "print", Images: hfL.imagesFn,
+			Sheets: hfL.sheets, Media: media, Images: hfL.imagesFn,
 		})
 		if err != nil {
 			return err
@@ -333,6 +346,17 @@ func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hf setti
 	c.Save()
 	c.Rect(0, bandTop, page.Width(), bandH)
 	c.Clip()
+	paintLayoutOps(page, c, res.Ops, geom.marginLeft, yTop, links)
+	c.Restore()
+	return nil
+}
+
+// paintLayoutOps dispatches layout ops onto an existing page content stream
+// with canvas origin at (originX, yTop) — PDF x = originX+op.X, y = yTop-op.Y
+// (y-down canvas). Used by HTML headers/footers; body painting stays in
+// layout.Paint (pagination). Link fragments become GoTo annotations when
+// links provides destinations.
+func paintLayoutOps(page *pdf.Page, c *pdf.Content, ops []layout.Op, originX, yTop float64, links hfLinkContext) {
 	fontNames := map[*pdf.Font]string{}
 	nextFont := 0
 	resName := func(f *pdf.Font) string {
@@ -349,9 +373,9 @@ func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hf setti
 		return n
 	}
 	nextImg := 0
-	for i := range res.Ops {
-		op := &res.Ops[i]
-		x := geom.marginLeft + op.X
+	for i := range ops {
+		op := &ops[i]
+		x := originX + op.X
 		switch op.Kind {
 		case layout.OpFillRect:
 			y := yTop - (op.Y + op.H)
@@ -403,7 +427,6 @@ func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hf setti
 				_ = c.AddPNGImage(imgName, x, y, op.W, op.H, op.Image)
 			}
 		case layout.OpLinkURI:
-			// Carry HTML HF link annotations onto the body page band.
 			y1 := yTop - (op.Y + op.H)
 			y2 := yTop - op.Y
 			if y2 < y1 {
@@ -441,8 +464,6 @@ func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hf setti
 			page.AddLinkURI(rect, uri)
 		}
 	}
-	c.Restore()
-	return nil
 }
 
 // hfHeightFor returns the drawn height of a text or HTML header/footer in

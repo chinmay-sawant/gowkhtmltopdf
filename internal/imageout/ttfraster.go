@@ -14,8 +14,15 @@ import (
 // basex/basey are the baseline-left position in output pixels (may be
 // fractional). pxPerPt converts layout points to pixels (ptToPx, or a
 // supersampled multiple of it).
+//
+// Text is run through pdf.ShapeTextFont first so Arabic/RTL/OT forms match
+// PDF emission (Phase 2.4 image shaping parity).
 func ttfDrawString(img *image.NRGBA, basex, basey float64, s string, sizePt float64, face *pdf.Font, col color.NRGBA, pxPerPt float64) {
 	if face == nil || s == "" || sizePt <= 0 || pxPerPt <= 0 {
+		return
+	}
+	s = pdf.ShapeTextFont(s, face)
+	if s == "" {
 		return
 	}
 	pxSize := sizePt * pxPerPt

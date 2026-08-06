@@ -3,6 +3,8 @@
 // self-closing and void elements. Script/style contents are kept as raw text
 // and stripped at the layout stage. No browser-grade error recovery: common
 // malformed nesting degrades to a usable tree, not a crash.
+//
+// ponytail: custom Node tree (Parent/Attrs/void); migrate to x/net/html only if layout/css rewritten, not free delete.
 package html
 
 import (

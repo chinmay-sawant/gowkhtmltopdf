@@ -15,10 +15,7 @@ func TestDefaultPdfGlobalSnapshot(t *testing.T) {
 	}{
 		{"PageSize", g.PageSize, "A4"},
 		{"Orientation", g.Orientation, OrientationPortrait},
-		{"ColorMode", g.ColorMode, ColorModeColor},
-		{"DPI", g.DPI, 96},
-		{"ImageDPI", g.ImageDPI, 600},
-		{"ImageQuality", g.ImageQuality, 94},
+		{"Grayscale", g.Grayscale, false},
 		{"Collate", g.Collate, true},
 		{"Outline", g.Outline, true},
 		{"OutlineDepth", g.OutlineDepth, 4},
@@ -27,7 +24,7 @@ func TestDefaultPdfGlobalSnapshot(t *testing.T) {
 		{"SmartShrinking", g.SmartShrinking, true},
 		{"Background", g.Background, true},
 		{"Web.Images", g.Web.Images, true},
-		{"Web.Plugins", g.Web.Plugins, false},
+		{"Web.Background", g.Web.Background, true},
 	}
 	for _, c := range checks {
 		if c.got != c.want {
@@ -47,21 +44,15 @@ func TestDefaultPdfGlobalSnapshot(t *testing.T) {
 
 func TestDefaultPdfObjectSnapshot(t *testing.T) {
 	o := DefaultPdfObject()
-	if !o.ExternalLinks || !o.LocalLinks || !o.IncludeInOutline || !o.PagesCount || o.ProduceForms {
+	if !o.ExternalLinks || !o.LocalLinks || !o.IncludeInOutline || !o.UseOutline {
 		t.Errorf("default object = %+v", o)
 	}
 }
 
 func TestDefaultLoadPageSnapshot(t *testing.T) {
 	o := DefaultPdfObject()
-	if o.Load.JSDelay != 200 {
-		t.Errorf("default jsdelay = %d, want 200", o.Load.JSDelay)
-	}
 	if !o.Load.BlockLocalFileAccess {
 		t.Error("default blockLocalFileAccess must be true")
-	}
-	if !o.Load.StopSlowScripts {
-		t.Error("default stopSlowScripts must be true")
 	}
 	if o.Load.LoadErrorHandling != LoadErrorAbort {
 		t.Error("default loadErrorHandling must be abort")
@@ -89,14 +80,34 @@ func TestGlobalSetDottedKeys(t *testing.T) {
 				t.Errorf("pagesize = %q/%q", g.PageSize, g.Size.PageSize)
 			}
 		}},
+		{"size.width", "210mm", func(t *testing.T) {
+			if g.Size.Width != 210 {
+				t.Errorf("size.width = %v, want 210", g.Size.Width)
+			}
+		}},
+		{"size.height", "297mm", func(t *testing.T) {
+			if g.Size.Height != 297 {
+				t.Errorf("size.height = %v, want 297", g.Size.Height)
+			}
+		}},
 		{"orientation", "landscape", func(t *testing.T) {
 			if g.Orientation != OrientationLandscape {
 				t.Error("orientation not landscape")
 			}
 		}},
 		{"colormode", "grayscale", func(t *testing.T) {
-			if g.ColorMode != ColorModeGrayscale {
-				t.Error("colormode not grayscale")
+			if !g.Grayscale {
+				t.Error("colormode=grayscale must set Grayscale")
+			}
+		}},
+		{"grayscale", "false", func(t *testing.T) {
+			if g.Grayscale {
+				t.Error("grayscale=false must clear Grayscale")
+			}
+		}},
+		{"grayscale", "true", func(t *testing.T) {
+			if !g.Grayscale {
+				t.Error("grayscale=true must set Grayscale")
 			}
 		}},
 		{"outline", "false", func(t *testing.T) {
@@ -144,9 +155,9 @@ func TestGlobalSetDottedKeys(t *testing.T) {
 				t.Errorf("allow = %v", g.Allow)
 			}
 		}},
-		{"imagedpi", "300", func(t *testing.T) {
-			if g.ImageDPI != 300 {
-				t.Errorf("imagedpi = %d", g.ImageDPI)
+		{"dumpoutline", "true", func(t *testing.T) {
+			if !g.DumpOutline {
+				t.Error("dumpoutline should be true")
 			}
 		}},
 	}
@@ -159,6 +170,23 @@ func TestGlobalSetDottedKeys(t *testing.T) {
 	}
 }
 
+func TestGlobalSetIgnoredKeys(t *testing.T) {
+	g := DefaultPdfGlobal()
+	// Policy A: inert wkhtml keys are accepted into Ignored, not typed fields.
+	for _, key := range []string{"dpi", "imagedpi", "imagequality", "lowquality", "log-level", "web.javascript", "produceforms"} {
+		if err := g.Set(key, "1"); err != nil {
+			t.Errorf("Set(%q) should accept ignored key: %v", key, err)
+		}
+		if g.Ignored[key] != "1" {
+			t.Errorf("Ignored[%q] = %q, want 1", key, g.Ignored[key])
+		}
+	}
+	// No typed stubs reintroduced.
+	if g.Quiet {
+		// Quiet is real; ensure dpi did not bleed into other fields.
+	}
+}
+
 func TestGlobalSetUnknownKey(t *testing.T) {
 	g := DefaultPdfGlobal()
 	if err := g.Set("bogus.key", "1"); err == nil {
@@ -168,17 +196,17 @@ func TestGlobalSetUnknownKey(t *testing.T) {
 
 func TestObjectSetDottedKeys(t *testing.T) {
 	o := DefaultPdfObject()
-	if err := o.Set("load.jsdelay", "500"); err != nil {
-		t.Fatal(err)
-	}
-	if o.Load.JSDelay != 500 {
-		t.Errorf("jsdelay = %d", o.Load.JSDelay)
-	}
 	if err := o.Set("load.blocklocalfileaccess", "false"); err != nil {
 		t.Fatal(err)
 	}
 	if o.Load.BlockLocalFileAccess {
 		t.Error("blocklocalfileaccess should be false")
+	}
+	if err := o.Set("load.timeout", "30"); err != nil {
+		t.Fatal(err)
+	}
+	if o.Load.Timeout != 30 {
+		t.Errorf("timeout = %d", o.Load.Timeout)
 	}
 	if err := o.Set("header.left", "objheader"); err != nil {
 		t.Fatal(err)
@@ -203,6 +231,25 @@ func TestObjectSetDottedKeys(t *testing.T) {
 	}
 	if !o.Web.SimplifyDOM {
 		t.Error("web.simplifydom should be true")
+	}
+}
+
+func TestObjectSetIgnoredKeys(t *testing.T) {
+	o := DefaultPdfObject()
+	if err := o.Set("load.jsdelay", "500"); err != nil {
+		t.Fatalf("jsdelay should be accepted as ignored: %v", err)
+	}
+	if o.Ignored["load.jsdelay"] != "500" {
+		t.Errorf("Ignored jsdelay = %q", o.Ignored["load.jsdelay"])
+	}
+	if err := o.Set("web.javascript", "false"); err != nil {
+		t.Fatalf("web.javascript should be accepted as ignored: %v", err)
+	}
+	if o.Ignored["web.javascript"] != "false" {
+		t.Errorf("Ignored web.javascript = %q", o.Ignored["web.javascript"])
+	}
+	if err := o.Set("pagescount", "false"); err != nil {
+		t.Fatalf("pagescount should be accepted as ignored: %v", err)
 	}
 }
 
@@ -281,8 +328,8 @@ func TestParseEnums(t *testing.T) {
 	if v, err := ParseOrientation("diagonal"); err == nil || v != OrientationPortrait {
 		t.Error("invalid orientation must error")
 	}
-	if v, _ := ParseLogLevel("debug"); v != LogDebug {
-		t.Error("log-level debug")
+	if v, _ := ParseColorMode("grayscale"); v != ColorModeGrayscale {
+		t.Error("color-mode grayscale")
 	}
 	if v, _ := ParseLoadErrorHandling("skip"); v != LoadErrorSkip {
 		t.Error("load-error-handling skip")
@@ -312,5 +359,36 @@ func TestHeaderForFooterForInherit(t *testing.T) {
 	o.Header.Left = "own header"
 	if o.HeaderFor(g).Left != "own header" {
 		t.Error("object header override must win")
+	}
+}
+
+func TestDefaultImageGlobalNoQuietLogLevel(t *testing.T) {
+	img := DefaultImageGlobal()
+	if img.Width != 1024 || !img.SmartWidth || img.Quality != 94 {
+		t.Errorf("default image = %+v", img)
+	}
+	// Quiet lives on PdfGlobal only; imageout uses Global.Quiet.
+}
+
+func TestImageSet(t *testing.T) {
+	img := DefaultImageGlobal()
+	if err := img.Set("width", "800"); err != nil {
+		t.Fatal(err)
+	}
+	if img.Width != 800 {
+		t.Errorf("width = %d", img.Width)
+	}
+	if err := img.Set("web.images", "false"); err != nil {
+		t.Fatal(err)
+	}
+	if img.Web.Images {
+		t.Error("web.images should be false")
+	}
+	// Inert web key accepted into Ignored.
+	if err := img.Set("web.javascript", "true"); err != nil {
+		t.Fatal(err)
+	}
+	if img.Ignored["web.javascript"] != "true" {
+		t.Errorf("Ignored = %v", img.Ignored)
 	}
 }

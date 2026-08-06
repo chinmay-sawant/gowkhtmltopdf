@@ -206,6 +206,8 @@ func (c *Converter) AddObject(s *ObjectSettings) *Converter {
 // Convert runs the conversion. The produced bytes replace the previous
 // Output. ctx is threaded into every load; cancel it to abort. Errors are
 // also reported to OnError when set.
+//
+// ponytail: path-based Command DTO, bytes sink when embedders need zero temp files
 func (c *Converter) Convert(ctx context.Context) error {
 	if ctx == nil {
 		ctx = context.Background()
@@ -213,6 +215,8 @@ func (c *Converter) Convert(ctx context.Context) error {
 	if len(c.objects) == 0 {
 		return errors.New("gowkhtmltopdf: no page objects added")
 	}
+	// convert.RunPDFContext writes only to cmd.Output path or os.Stdout ("-"/"");
+	// there is no io.Writer sink yet, so capture via a short-lived temp file.
 	path, err := tempOutput("gowkhtmltopdf-*.pdf")
 	if err != nil {
 		return err
@@ -347,6 +351,8 @@ func (c *ImageConverter) Object() *ObjectSettings {
 
 // Convert runs the conversion, replacing the previous Output. ctx is threaded
 // into the load; cancel it to abort. Errors are also reported to OnError.
+//
+// ponytail: path-based Command DTO, bytes sink when embedders need zero temp files
 func (c *ImageConverter) Convert(ctx context.Context) error {
 	if ctx == nil {
 		ctx = context.Background()
@@ -354,6 +360,8 @@ func (c *ImageConverter) Convert(ctx context.Context) error {
 	if c.object == nil || strings.TrimSpace(c.object.o.Page) == "" {
 		return errors.New("gowkhtmltopdf: no input page added")
 	}
+	// imageout.Run writes only to cmd.Output path or os.Stdout ("-"/"");
+	// no io.Writer sink yet — capture via a short-lived temp file.
 	path, err := tempOutput("gowkhtmltopdf-image-*")
 	if err != nil {
 		return err

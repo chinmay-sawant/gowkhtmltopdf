@@ -151,40 +151,6 @@ func pickFace(faces []*Font, weight int, italic bool) *Font {
 	return best
 }
 
-// ScanFontDir loads .ttf files from dir (non-recursive). Errors on individual
-// files are skipped; the directory itself must be readable.
-func ScanFontDir(dir string) (*Registry, error) {
-	r := NewRegistry()
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, err
-	}
-	for _, e := range entries {
-		if e.IsDir() {
-			continue
-		}
-		name := e.Name()
-		low := strings.ToLower(name)
-		if !strings.HasSuffix(low, ".ttf") && !strings.HasSuffix(low, ".otf") {
-			continue
-		}
-		path := filepath.Join(dir, name)
-		data, err := os.ReadFile(path)
-		if err != nil {
-			continue
-		}
-		f, err := ParseTTF(data)
-		if err != nil {
-			continue
-		}
-		if f.PostScriptName == "" {
-			f.PostScriptName = strings.TrimSuffix(name, filepath.Ext(name))
-		}
-		r.AddFont(f)
-	}
-	return r, nil
-}
-
 // DefaultSystemFontDirs returns common system font directories for the current OS.
 // Callers must opt in via --use-system-fonts; nothing is scanned by default.
 // Proprietary Windows/corefont trees are omitted — use Liberation (bundled)

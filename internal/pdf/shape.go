@@ -5,19 +5,16 @@ import (
 	"unicode/utf8"
 )
 
-// ShapeText applies best-effort text shaping before PDF emission when no
-// font face is available for OpenType. Prefer ShapeTextFont when a *Font is
-// known (TextShow does).
+// ShapeText is the no-face fallback pipeline used when ShapeTextFont cannot
+// run OpenType (no *Font, no GSUB, reverse-cmap miss). Prefer ShapeTextFont
+// whenever a face is known (TextShow does).
 //
-// Fallback pipeline (no GSUB / face unavailable):
-//  1. Unicode NFC normalize (helps some Indic sequences)
-//  2. Arabic presentation-form joining (initial/medial/final/isolated)
+// Fallback only:
+//  1. light combining-mark pass (stdlib; full NFC needs x/text)
+//  2. Arabic presentation-form joining (tables below)
 //  3. RTL run reverse for Arabic/Hebrew ranges
 //
-// When the active face has OpenType GSUB, ShapeTextFont uses
-// go-text/typesetting and reverse-cmaps glyphs to Unicode CIDs for Type0.
-// Indic remains Partial — matra reordering is only as good as the OT face
-// and reverse-cmap coverage.
+// Indic remains Partial without OT.
 func ShapeText(s string) string {
 	if s == "" {
 		return s
@@ -118,7 +115,9 @@ func isRTLNeutral(r rune) bool {
 	return false
 }
 
-// join types for Arabic letters in the U+0621..U+064A block.
+// --- manual Arabic joining (fallback when no GSUB) ---
+// ponytail: manual Arabic joining when no GSUB, OT via go-text when available
+
 const (
 	joinNone  = iota
 	joinRight // right-joining only (final/isolated)
@@ -126,45 +125,46 @@ const (
 	joinTrans // transparent (harakat) — ignore for joining adjacency
 )
 
-// arabicForms maps base letter → [isolated, final, initial, medial].
-// 0 means that form is unavailable (use isolated).
+// arabicForms: base → [isolated, final, initial, medial]; 0 = use isolated.
+// Covers U+0621..U+064A presentation forms only — enough for common Arabic
+// without OT; expand only if a no-GSUB face is a product requirement.
 var arabicForms = map[rune][4]rune{
-	0x0621: {0xFE80, 0, 0, 0},                // hamza
-	0x0622: {0xFE81, 0xFE82, 0, 0},           // alef madda
-	0x0623: {0xFE83, 0xFE84, 0, 0},           // alef hamza above
-	0x0624: {0xFE85, 0xFE86, 0, 0},           // waw hamza
-	0x0625: {0xFE87, 0xFE88, 0, 0},           // alef hamza below
-	0x0626: {0xFE89, 0xFE8A, 0xFE8B, 0xFE8C}, // yeh hamza
-	0x0627: {0xFE8D, 0xFE8E, 0, 0},           // alef
-	0x0628: {0xFE8F, 0xFE90, 0xFE91, 0xFE92}, // beh
-	0x0629: {0xFE93, 0xFE94, 0, 0},           // teh marbuta
-	0x062A: {0xFE95, 0xFE96, 0xFE97, 0xFE98}, // teh
-	0x062B: {0xFE99, 0xFE9A, 0xFE9B, 0xFE9C}, // theh
-	0x062C: {0xFE9D, 0xFE9E, 0xFE9F, 0xFEA0}, // jeem
-	0x062D: {0xFEA1, 0xFEA2, 0xFEA3, 0xFEA4}, // hah
-	0x062E: {0xFEA5, 0xFEA6, 0xFEA7, 0xFEA8}, // khah
-	0x062F: {0xFEA9, 0xFEAA, 0, 0},           // dal
-	0x0630: {0xFEAB, 0xFEAC, 0, 0},           // thal
-	0x0631: {0xFEAD, 0xFEAE, 0, 0},           // reh
-	0x0632: {0xFEAF, 0xFEB0, 0, 0},           // zain
-	0x0633: {0xFEB1, 0xFEB2, 0xFEB3, 0xFEB4}, // seen
-	0x0634: {0xFEB5, 0xFEB6, 0xFEB7, 0xFEB8}, // sheen
-	0x0635: {0xFEB9, 0xFEBA, 0xFEBB, 0xFEBC}, // sad
-	0x0636: {0xFEBD, 0xFEBE, 0xFEBF, 0xFEC0}, // dad
-	0x0637: {0xFEC1, 0xFEC2, 0xFEC3, 0xFEC4}, // tah
-	0x0638: {0xFEC5, 0xFEC6, 0xFEC7, 0xFEC8}, // zah
-	0x0639: {0xFEC9, 0xFECA, 0xFECB, 0xFECC}, // ain
-	0x063A: {0xFECD, 0xFECE, 0xFECF, 0xFED0}, // ghain
-	0x0641: {0xFED1, 0xFED2, 0xFED3, 0xFED4}, // feh
-	0x0642: {0xFED5, 0xFED6, 0xFED7, 0xFED8}, // qaf
-	0x0643: {0xFED9, 0xFEDA, 0xFEDB, 0xFEDC}, // kaf
-	0x0644: {0xFEDD, 0xFEDE, 0xFEDF, 0xFEE0}, // lam
-	0x0645: {0xFEE1, 0xFEE2, 0xFEE3, 0xFEE4}, // meem
-	0x0646: {0xFEE5, 0xFEE6, 0xFEE7, 0xFEE8}, // noon
-	0x0647: {0xFEE9, 0xFEEA, 0xFEEB, 0xFEEC}, // heh
-	0x0648: {0xFEED, 0xFEEE, 0, 0},           // waw
-	0x0649: {0xFEEF, 0xFEF0, 0, 0},           // alef maksura
-	0x064A: {0xFEF1, 0xFEF2, 0xFEF3, 0xFEF4}, // yeh
+	0x0621: {0xFE80, 0, 0, 0},
+	0x0622: {0xFE81, 0xFE82, 0, 0},
+	0x0623: {0xFE83, 0xFE84, 0, 0},
+	0x0624: {0xFE85, 0xFE86, 0, 0},
+	0x0625: {0xFE87, 0xFE88, 0, 0},
+	0x0626: {0xFE89, 0xFE8A, 0xFE8B, 0xFE8C},
+	0x0627: {0xFE8D, 0xFE8E, 0, 0},
+	0x0628: {0xFE8F, 0xFE90, 0xFE91, 0xFE92},
+	0x0629: {0xFE93, 0xFE94, 0, 0},
+	0x062A: {0xFE95, 0xFE96, 0xFE97, 0xFE98},
+	0x062B: {0xFE99, 0xFE9A, 0xFE9B, 0xFE9C},
+	0x062C: {0xFE9D, 0xFE9E, 0xFE9F, 0xFEA0},
+	0x062D: {0xFEA1, 0xFEA2, 0xFEA3, 0xFEA4},
+	0x062E: {0xFEA5, 0xFEA6, 0xFEA7, 0xFEA8},
+	0x062F: {0xFEA9, 0xFEAA, 0, 0},
+	0x0630: {0xFEAB, 0xFEAC, 0, 0},
+	0x0631: {0xFEAD, 0xFEAE, 0, 0},
+	0x0632: {0xFEAF, 0xFEB0, 0, 0},
+	0x0633: {0xFEB1, 0xFEB2, 0xFEB3, 0xFEB4},
+	0x0634: {0xFEB5, 0xFEB6, 0xFEB7, 0xFEB8},
+	0x0635: {0xFEB9, 0xFEBA, 0xFEBB, 0xFEBC},
+	0x0636: {0xFEBD, 0xFEBE, 0xFEBF, 0xFEC0},
+	0x0637: {0xFEC1, 0xFEC2, 0xFEC3, 0xFEC4},
+	0x0638: {0xFEC5, 0xFEC6, 0xFEC7, 0xFEC8},
+	0x0639: {0xFEC9, 0xFECA, 0xFECB, 0xFECC},
+	0x063A: {0xFECD, 0xFECE, 0xFECF, 0xFED0},
+	0x0641: {0xFED1, 0xFED2, 0xFED3, 0xFED4},
+	0x0642: {0xFED5, 0xFED6, 0xFED7, 0xFED8},
+	0x0643: {0xFED9, 0xFEDA, 0xFEDB, 0xFEDC},
+	0x0644: {0xFEDD, 0xFEDE, 0xFEDF, 0xFEE0},
+	0x0645: {0xFEE1, 0xFEE2, 0xFEE3, 0xFEE4},
+	0x0646: {0xFEE5, 0xFEE6, 0xFEE7, 0xFEE8},
+	0x0647: {0xFEE9, 0xFEEA, 0xFEEB, 0xFEEC},
+	0x0648: {0xFEED, 0xFEEE, 0, 0},
+	0x0649: {0xFEEF, 0xFEF0, 0, 0},
+	0x064A: {0xFEF1, 0xFEF2, 0xFEF3, 0xFEF4},
 }
 
 // Lam-Alef ligatures: lam + alef variants → presentation ligature.
@@ -176,10 +176,10 @@ var lamAlef = map[rune][2]rune{ // [isolated, final]
 }
 
 func arabicJoinType(r rune) int {
-	if r >= 0x064B && r <= 0x065F { // harakat / superscript alef etc.
+	if r >= 0x064B && r <= 0x065F {
 		return joinTrans
 	}
-	if r == 0x0670 || r == 0x0640 { // superscript alef / tatweel
+	if r == 0x0670 || r == 0x0640 {
 		if r == 0x0640 {
 			return joinDual
 		}
@@ -189,7 +189,7 @@ func arabicJoinType(r rune) int {
 	if !ok {
 		return joinNone
 	}
-	if forms[2] != 0 { // has initial → dual
+	if forms[2] != 0 {
 		return joinDual
 	}
 	if forms[0] != 0 {
@@ -203,13 +203,11 @@ func shapeArabicJoining(s string) string {
 	if len(runes) == 0 {
 		return s
 	}
-	// First pass: Lam-Alef ligatures (logical order).
+	// Lam-Alef ligatures (logical order).
 	tmp := make([]rune, 0, len(runes))
 	for i := 0; i < len(runes); i++ {
 		if runes[i] == 0x0644 && i+1 < len(runes) {
 			if lig, ok := lamAlef[runes[i+1]]; ok {
-				// Decide isol vs fina from left neighbor later — store as isol for now
-				// and tag via private use: use isol; joining pass upgrades.
 				tmp = append(tmp, lig[0])
 				i++
 				continue
@@ -226,11 +224,9 @@ func shapeArabicJoining(s string) string {
 		if jt == joinNone || jt == joinTrans {
 			continue
 		}
-		// Lam-Alef ligature codepoints already presentation forms.
 		if r >= 0xFEF5 && r <= 0xFEFC {
-			prev := prevJoinCause(runes, i)
-			if prev {
-				out[i] = r + 1 // final form is isol+1 in this block
+			if prevJoinCause(runes, i) {
+				out[i] = r + 1 // final = isol+1 in this block
 			}
 			continue
 		}
@@ -275,7 +271,7 @@ func prevJoinCause(runes []rune, i int) bool {
 		if jt == joinTrans {
 			continue
 		}
-		return jt == joinDual // only dual-joining letters cause a join to the right
+		return jt == joinDual
 	}
 	return false
 }
@@ -291,7 +287,7 @@ func nextJoinCause(runes []rune, i int) bool {
 	return false
 }
 
-// ShapeNeeded reports whether s contains scripts that benefit from ShapeText.
+// ShapeNeeded reports whether s contains scripts that benefit from shaping.
 func ShapeNeeded(s string) bool {
 	for i := 0; i < len(s); {
 		r, size := utf8.DecodeRuneInString(s[i:])

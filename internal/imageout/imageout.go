@@ -1,9 +1,3 @@
-// Package imageout converts HTML to a raster image (PNG or JPEG) for the
-// gowkhtmltoimage command: it loads one document, lays it out with the shared
-// layout engine, rasterizes the display list with stdlib image/draw, and
-// encodes the result. Text is drawn from the same embedded TrueType faces
-// as PDF mode (pure-Go outline raster with simple anti-aliasing); a 5x7
-// bitmap remains as a last-resort fallback when no font is attached to an op.
 package imageout
 
 import (
@@ -316,13 +310,21 @@ func paint(img *image.NRGBA, op *layout.Op, pxPerPt float64) {
 		// instead of independently rounded Y positions (bobbing text).
 		bx := op.X * pxPerPt
 		by := op.Y * pxPerPt
-		if op.Font != nil {
-			ttfDrawString(img, bx, by, op.Text, op.Size, op.Font, c, pxPerPt)
-			if op.Bold && !op.Font.Bold() {
-				ttfDrawString(img, bx+float64(rasterSS), by, op.Text, op.Size, op.Font, c, pxPerPt)
+		face := op.Font
+		if face == nil {
+			// Layout always attaches a face when DefaultFont is available;
+			// this is defensive only (no 5×7 bitmap dual path).
+			var err error
+			face, err = pdf.DefaultFont()
+			if err != nil || face == nil {
+				return
 			}
-		} else {
-			drawString(img, int(math.Round(bx)), int(math.Round(by)), op.Text, op.Size*float64(rasterSS), op.Bold, c)
+		}
+		ttfDrawString(img, bx, by, op.Text, op.Size, face, c, pxPerPt)
+		// ponytail: fake-bold double-draw when CSS weight wants bold but the
+		// face is regular; upgrade when synthetic bold outlines land in pdf.
+		if op.Bold && !face.Bold() {
+			ttfDrawString(img, bx+float64(rasterSS), by, op.Text, op.Size, face, c, pxPerPt)
 		}
 
 	case layout.OpImage:
@@ -407,6 +409,10 @@ func Run(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 	if log == nil {
 		log = io.Discard
 	}
+	// Policy A: one quiet bit — CLI --quiet sets Global.Quiet (not Image.Quiet).
+	if cmd.Global.Quiet {
+		log = io.Discard
+	}
 	obj, err := firstObject(cmd, log)
 	if err != nil {
 		return err
@@ -428,7 +434,7 @@ func Run(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 			scan = append(scan, pdf.DefaultSystemFontDirs()...)
 		}
 		registry = pdf.ScanFontDirs(scan)
-		if log != nil && log != io.Discard && !cmd.Global.Quiet && len(scan) > 0 {
+		if log != io.Discard && len(scan) > 0 {
 			fmt.Fprintf(log, "info: scanned %d font path(s)\n", len(scan))
 		}
 	}
@@ -471,6 +477,10 @@ func Run(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 		return r.Body, nil
 	}
 
+	// Policy A quiet bit is Global.Quiet only (Image.Quiet removed).
+	// Background: typed image home is Image.Web.Background; CLI --background
+	// ModeBoth still writes Global.Background — require both so either path
+	// can disable paints until CLI collapses onto one field.
 	img, err := Render(root, RenderOptions{
 		Width:              cmd.Image.Width,
 		Height:             cmd.Image.Height,
@@ -479,7 +489,7 @@ func Run(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 		Sheets:             sheets,
 		Media:              mediaFor(cmd, obj),
 		Images:             imagesFn,
-		Background:         cmd.Image.Web.Background,
+		Background:         cmd.Global.Background && cmd.Image.Web.Background,
 		Transparent:        cmd.Image.Transparent,
 		Crop:               cropRect(cmd.Image.Crop),
 		SmartWidth:         cmd.Image.SmartWidth,

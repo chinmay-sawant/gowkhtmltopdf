@@ -2,6 +2,7 @@ package convert
 
 import (
 	"fmt"
+	stdlibhtml "html"
 	"io"
 	"strconv"
 	"strings"
@@ -36,28 +37,6 @@ func effectiveTOC(o settings.PdfObject, g settings.PdfGlobal) settings.TableOfCo
 	t.ForwardLinks = o.TOC.ForwardLinks || t.ForwardLinks
 	t.BackLinks = o.TOC.BackLinks || t.BackLinks
 	return t
-}
-
-// escHTML escapes the HTML special characters of a text run.
-func escHTML(s string) string {
-	var b strings.Builder
-	for _, r := range s {
-		switch r {
-		case '&':
-			b.WriteString("&amp;")
-		case '<':
-			b.WriteString("&lt;")
-		case '>':
-			b.WriteString("&gt;")
-		case '"':
-			b.WriteString("&quot;")
-		case '\'':
-			b.WriteString("&#39;")
-		default:
-			b.WriteRune(r)
-		}
-	}
-	return b.String()
 }
 
 // lengthToPt converts a CSS length to points. em/rem resolve against the
@@ -108,7 +87,7 @@ func genTOCHTML(toc settings.TableOfContent, entries []*outline.Node, pageOf fun
 
 	var b strings.Builder
 	b.WriteString("<html><body>")
-	b.WriteString("<h1>" + escHTML(toc.CaptionText) + "</h1>")
+	b.WriteString("<h1>" + stdlibhtml.EscapeString(toc.CaptionText) + "</h1>")
 	for _, n := range entries {
 		h := n.Heading
 		if h == nil || h.Title == "" {
@@ -186,11 +165,15 @@ func layoutTOC(font *pdf.Font, st *objectState, entries []*outline.Node, tocGues
 	if err != nil {
 		return nil, nil, fmt.Errorf("object %d: toc: parse: %w", st.idx+1, err)
 	}
+	media := st.media
+	if media == "" {
+		media = "print"
+	}
 	res, err := layout.Layout(root, layout.Options{
 		Width:  contentW,
 		Height: st.geom.contentH,
 		Font:   font,
-		Media:  "print",
+		Media:  media,
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("object %d: toc: layout: %w", st.idx+1, err)

@@ -66,7 +66,7 @@ func (ctx *objectCtx) newObject(c *Command) *settings.PdfObject {
 		c.Objects = append(c.Objects, *ctx.pending)
 		ctx.pending = nil
 	} else {
-		c.Objects = append(c.Objects, settings.PdfObject{})
+		c.Objects = append(c.Objects, settings.DefaultPdfObject())
 	}
 	ctx.obj = &c.Objects[len(c.Objects)-1]
 	return ctx.obj
@@ -76,7 +76,7 @@ func (ctx *objectCtx) newObject(c *Command) *settings.PdfObject {
 // settings. Used for toc so pre-object page flags apply to the first real
 // page that follows, not to the TOC entry itself.
 func (ctx *objectCtx) newFreshObject(c *Command) *settings.PdfObject {
-	c.Objects = append(c.Objects, settings.PdfObject{})
+	c.Objects = append(c.Objects, settings.DefaultPdfObject())
 	ctx.obj = &c.Objects[len(c.Objects)-1]
 	return ctx.obj
 }

@@ -37,6 +37,8 @@ type shapedRun struct {
 // GSUB table and reverse-cmap can map every shaped glyph to Unicode. Otherwise
 // it falls back to presentation-form ShapeText.
 //
+// ponytail: go-text OT shaping when GSUB available; manual Arabic/RTL fallback otherwise.
+//
 // For CJK / East-Asian punctuation runs, optional OpenType features halt and
 // palt are requested via typesetting FontFeatures when the face provides them.
 // CSS font-feature-settings can also be passed via ShapeTextFontWithFeatures.

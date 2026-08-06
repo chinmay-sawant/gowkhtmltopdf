@@ -104,7 +104,7 @@ func TestSubsetFont(t *testing.T) {
 	for _, r := range used {
 		distinct[r] = true
 	}
-	sub, err := subsetFont(f, used)
+	sub, err := subsetFont(f, used, subsetSimple)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +141,7 @@ func TestSubsetFont(t *testing.T) {
 
 func TestSubsetChecksum(t *testing.T) {
 	f := testFont(t)
-	sub, err := subsetFont(f, []rune("abc"))
+	sub, err := subsetFont(f, []rune("abc"), subsetSimple)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -166,7 +166,7 @@ func TestCompositeSubset(t *testing.T) {
 	if allSimple {
 		t.Skip("font has no composite glyphs in test set")
 	}
-	sub, err := subsetFont(f, []rune{comp})
+	sub, err := subsetFont(f, []rune{comp}, subsetSimple)
 	if err != nil {
 		t.Fatal(err)
 	}

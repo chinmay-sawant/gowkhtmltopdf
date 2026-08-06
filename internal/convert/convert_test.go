@@ -26,6 +26,16 @@ import (
 	"gowkhtmltopdf/internal/settings"
 )
 
+// defaultObject returns a PdfObject with documented defaults (ExternalLinks,
+// LocalLinks, UseOutline, IncludeInOutline ON). Callers / CLI must supply
+// these; convert no longer OR-hacks zero values permanently on.
+func defaultObject(page string) settings.PdfObject {
+	o := settings.DefaultPdfObject()
+	o.Page = page
+	o.Load.BlockLocalFileAccess = false
+	return o
+}
+
 // newCommand writes html into a temp dir and returns a cli.Command pointing
 // at it, with local file access enabled (the frozen ACL default blocks local
 // reads unless the user opts in).
@@ -37,15 +47,12 @@ func newCommand(t *testing.T, html string, output string) (*cli.Command, string)
 		t.Fatalf("write input: %v", err)
 	}
 	cmd := &cli.Command{
-		Global: settings.DefaultPdfGlobal(),
-		Objects: []settings.PdfObject{
-			{Page: path, Load: settings.DefaultLoadPage()},
-		},
-		Output: output,
+		Global:  settings.DefaultPdfGlobal(),
+		Objects: []settings.PdfObject{defaultObject(path)},
+		Output:  output,
 	}
 	// --enable-local-file-access: global flag on, object-level block off.
 	cmd.Global.EnableLocalFileAccess = true
-	cmd.Objects[0].Load.BlockLocalFileAccess = false
 	cmd.Global.Size = settings.Size{PageSize: cmd.Global.PageSize}
 	return cmd, dir
 }
@@ -175,23 +182,47 @@ func TestLinkStylesheetMediaMatches(t *testing.T) {
 		}}
 	}
 	const vw, vh = 538.0, 785.0
-	if !linkStylesheet(mk(""), vw, vh) {
+	if !linkStylesheet(mk(""), vw, vh, "print") {
 		t.Error("empty media should load")
 	}
-	if !linkStylesheet(mk("print"), vw, vh) {
+	if !linkStylesheet(mk("print"), vw, vh, "print") {
 		t.Error("print should load")
 	}
-	if !linkStylesheet(mk("all"), vw, vh) {
+	if !linkStylesheet(mk("all"), vw, vh, "print") {
 		t.Error("all should load")
 	}
-	if linkStylesheet(mk("screen"), vw, vh) {
+	if linkStylesheet(mk("screen"), vw, vh, "print") {
 		t.Error("screen-only must be excluded for print")
 	}
-	if !linkStylesheet(mk("(min-width: 500px)"), vw, vh) {
+	if !linkStylesheet(mk("(min-width: 500px)"), vw, vh, "print") {
 		t.Error("min-width feature matching A4 content should load")
 	}
-	if linkStylesheet(mk("(min-width: 2000px)"), vw, vh) {
+	if linkStylesheet(mk("(min-width: 2000px)"), vw, vh, "print") {
 		t.Error("unmatched min-width must not load")
+	}
+	if !linkStylesheet(mk("screen"), vw, vh, "screen") {
+		t.Error("screen media type should accept screen stylesheets")
+	}
+}
+
+func TestMediaForPDF(t *testing.T) {
+	g := settings.DefaultPdfGlobal()
+	o := settings.DefaultPdfObject()
+	if got := mediaFor(g, &o); got != "print" {
+		t.Errorf("PDF default media = %q, want print", got)
+	}
+	o.Load.MediaType = settings.MediaScreen
+	if got := mediaFor(g, &o); got != "screen" {
+		t.Errorf("object media-type screen = %q, want screen", got)
+	}
+	o.Load.MediaType = settings.MediaPrint
+	if got := mediaFor(g, &o); got != "print" {
+		t.Errorf("object media-type print = %q, want print", got)
+	}
+	// MediaIgnore is zero/unset — keeps PDF print default.
+	o.Load.MediaType = settings.MediaIgnore
+	if got := mediaFor(g, &o); got != "print" {
+		t.Errorf("object media-type ignore/unset = %q, want print", got)
 	}
 }
 
@@ -263,9 +294,7 @@ func newCommandMulti(t *testing.T, htmls []string, output string) *cli.Command {
 		if err := os.WriteFile(path, []byte(h), 0o644); err != nil {
 			t.Fatalf("write input: %v", err)
 		}
-		obj := settings.PdfObject{Page: path, Load: settings.DefaultLoadPage()}
-		obj.Load.BlockLocalFileAccess = false
-		cmd.Objects = append(cmd.Objects, obj)
+		cmd.Objects = append(cmd.Objects, defaultObject(path))
 	}
 	return cmd
 }
@@ -414,11 +443,9 @@ func TestRunPDFProgress(t *testing.T) {
 	if err := RunPDFContext(context.Background(), cmd, &log, collect); err != nil {
 		t.Fatalf("RunPDFContext: %v", err)
 	}
+	// Real phases only: load progress + Done (no theater 100% placeholders).
 	want := []string{
 		"Loading pages (1/1)",
-		"Counting pages (1/1)",
-		"Resolving links (1/1)",
-		"Printing pages (1/1)",
 		"Done",
 	}
 	if !slices.Equal(phases, want) {
@@ -427,10 +454,8 @@ func TestRunPDFProgress(t *testing.T) {
 	if p := percents["Done"]; p != 100 {
 		t.Errorf("Done percent = %d, want 100", p)
 	}
-	for _, phase := range want {
-		if p := percents[phase]; p < 0 || p > 100 {
-			t.Errorf("phase %q percent %d out of range", phase, p)
-		}
+	if p := percents["Loading pages (1/1)"]; p != 100 {
+		t.Errorf("Loading pages percent = %d, want 100", p)
 	}
 	if !strings.Contains(log.String(), "Loading pages (1/1)") {
 		t.Error("progress phase not written to log")

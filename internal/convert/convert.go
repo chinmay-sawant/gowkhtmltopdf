@@ -72,7 +72,6 @@ func RunPDFContext(ctx context.Context, cmd *cli.Command, log io.Writer, progres
 		}
 		report(fmt.Sprintf("Loading pages (%d/%d)", i+1, n), percent(i+1, n))
 		obj := &cmd.Objects[i]
-		applyObjectDefaults(obj)
 		if obj.IsTableOfContent {
 			st, err := initTOCState(ctx, loader, font, registry, cmd, obj, i, log)
 			if err != nil {
@@ -92,12 +91,17 @@ func RunPDFContext(ctx context.Context, cmd *cli.Command, log io.Writer, progres
 
 	headings := flatHeadings(bodies)
 
+	// Exclude selectors are applied in outline.BuildTree (not at collect time)
+	// so TOC and PDF outline share one filter path.
+	exclude := parseExcludeSelectors(cmd.Global.ExcludeFromOutline, log)
+
 	tocTotal := 0
 	if len(tocs) > 0 {
-		report("Building table of contents (1/1)", 100)
+		// Real phase: TOC layout + paint (page count unknown until finished).
+		report("Building table of contents", percent(n, n+1))
 		// The TOC lists the full outline (all levels); the PDF outline
 		// applies outline-depth separately below.
-		tocTree := outline.BuildTree(headings, outline.Options{})
+		tocTree := outline.BuildTree(headings, outline.Options{Exclude: exclude})
 		tocTotal, err = renderTOCObjects(font, doc, cmd, tocs, tocTree.Flatten(), log)
 		if err != nil {
 			return err
@@ -116,13 +120,11 @@ func RunPDFContext(ctx context.Context, cmd *cli.Command, log io.Writer, progres
 		}
 	}
 
-	report("Counting pages (1/1)", 100)
-	report("Resolving links (1/1)", 100)
-	report("Printing pages (1/1)", 100)
-	report("Done", 100)
-
 	if cmd.Global.Outline {
-		outTree := outline.BuildTree(headings, outline.Options{MaxDepth: cmd.Global.OutlineDepth})
+		outTree := outline.BuildTree(headings, outline.Options{
+			MaxDepth: cmd.Global.OutlineDepth,
+			Exclude:  exclude,
+		})
 		// --dump-outline writes the wkhtmltopdf XML to stdout; the CLI sets
 		// the Command field, the reflect surface sets Global.DumpOutline.
 		if cmd.DumpOutline || cmd.Global.DumpOutline {
@@ -154,6 +156,7 @@ func RunPDFContext(ctx context.Context, cmd *cli.Command, log io.Writer, progres
 	}
 	doc.SetInfo("Producer", "gowkhtmltopdf")
 	doc.SetCompression(cmd.Global.UseCompression)
+	// Grayscale is the sole color bit (settings maps colormode → Grayscale).
 	doc.SetGrayscale(cmd.Global.Grayscale)
 	doc.SetCreationTime(time.Now())
 
@@ -171,6 +174,8 @@ func RunPDFContext(ctx context.Context, cmd *cli.Command, log io.Writer, progres
 
 	// Headers/footers after copies so [page]/[topage] reflect the final page set.
 	drawHeadersFooters(ctx, loader, font, doc, cmd, tocs, bodies, tocTotal, headings, log)
+
+	report("Done", 100)
 
 	var out io.Writer = os.Stdout
 	closeOut := func() error { return nil }
@@ -275,6 +280,7 @@ func initTOCState(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 		repl:     mergedReplaces(obj, cmd.Global),
 		toc:      effectiveTOC(*obj, cmd.Global),
 		registry: registry,
+		media:    mediaFor(cmd.Global, obj),
 		geom: hfGeom{
 			pageW:        pageW,
 			pageH:        pageH,
@@ -316,7 +322,8 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 	}
 	contentW := pageW - cmd.Global.Margin.Left*mmToPt - cmd.Global.Margin.Right*mmToPt
 	contentH := pageH - cmd.Global.Margin.Top*mmToPt - cmd.Global.Margin.Bottom*mmToPt
-	sheets := collectSheets(ctx, loader, root, res.Base, obj.Load, idx+1, log, contentW, contentH)
+	media := mediaFor(cmd.Global, obj)
+	sheets := collectSheets(ctx, loader, root, res.Base, obj.Load, idx+1, log, contentW, contentH, media)
 	sheets = AppendSimplifySheet(sheets, SimplifyDOMEnabled(cmd.Global.Web, obj.Web), SimplifyDOMProfile(cmd.Global.Web, obj.Web))
 	registry = MergeFontFaces(ctx, loader, registry, sheets, res.Base, obj.Load, idx+1, log)
 
@@ -340,6 +347,7 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 		base:     res.Base,
 		lp:       obj.Load,
 		registry: registry,
+		media:    media,
 		geom: hfGeom{
 			pageW:        pageW,
 			pageH:        pageH,
@@ -364,7 +372,7 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 		Font:               font,
 		Registry:           registry,
 		Sheets:             sheets,
-		Media:              "print",
+		Media:              media,
 		Zoom:               obj.Load.ZoomFactor,
 		Images:             imagesFn,
 		Background:         cmd.Global.Background,
@@ -395,7 +403,7 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 					Font:               font,
 					Registry:           registry,
 					Sheets:             sheets,
-					Media:              "print",
+					Media:              media,
 					Zoom:               effZoom,
 					Images:             imagesFn,
 					Background:         cmd.Global.Background,
@@ -427,24 +435,6 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 	st.res = lres
 	st.headings = collectObjectHeadings(root, lres, before, cmd.Global, *obj, log)
 	return st, nil
-}
-
-// applyObjectDefaults resolves the per-object defaults for the flags Phase 6
-// consults (external-links, local-links, use-outline, include-in-outline).
-// settings.DefaultPdfObject defines all four as ON, but internal/cli builds
-// objects as zero values and never applies those defaults, so a false
-// boolean is ambiguous between "unset" and an explicit --no-* flag. This
-// build resolves the ambiguity in favour of the documented default: the
-// gates always read as on and an explicit --no-external-links on an object
-// is accepted but not honored (pre-existing CLI default quirk; fixing it
-// belongs in internal/cli, which is out of scope here). Library callers
-// wanting the gates off must be handled there as well.
-func applyObjectDefaults(o *settings.PdfObject) {
-	def := settings.DefaultPdfObject()
-	o.ExternalLinks = o.ExternalLinks || def.ExternalLinks
-	o.LocalLinks = o.LocalLinks || def.LocalLinks
-	o.UseOutline = o.UseOutline || def.UseOutline
-	o.IncludeInOutline = o.IncludeInOutline || def.IncludeInOutline
 }
 
 // mergedReplaces merges the --replace maps of the global and object header
@@ -486,16 +476,17 @@ func measuredWidth(res *layout.Result) float64 {
 	return w
 }
 
-// pageGeometry resolves the page size in points. Explicit size.width/height
-// (mm) win over a named size; landscape swaps the pair.
+// pageGeometry resolves the page size in points from the single size model:
+// Size.Width/Height (mm) override a named PageSize / Size.PageSize.
+// Landscape swaps the pair. Legacy PageWidth/PageHeight fields are gone.
 func pageGeometry(g settings.PdfGlobal) (w, h float64, err error) {
-	name := g.PageSize
-	if name == "" {
-		name = g.Size.PageSize
-	}
 	if g.Size.Width > 0 && g.Size.Height > 0 {
 		w, h = g.Size.Width*mmToPt, g.Size.Height*mmToPt
 	} else {
+		name := g.PageSize
+		if name == "" {
+			name = g.Size.PageSize
+		}
 		w, h, err = settings.ParsePageSize(name)
 		if err != nil {
 			return 0, 0, err
@@ -507,10 +498,40 @@ func pageGeometry(g settings.PdfGlobal) (w, h float64, err error) {
 	return w, h, nil
 }
 
+// mediaFor resolves layout CSS media for PDF mode, matching imageout's
+// object/global flags. PDF defaults to "print" (paged output). --media-type
+// screen|print overrides; MediaIgnore is the zero/unset value and does not
+// clear the PDF default (unlike image mode, which starts at "screen").
+func mediaFor(g settings.PdfGlobal, obj *settings.PdfObject) string {
+	media := "print"
+	if g.Web.PrintMediaType {
+		media = "print"
+	}
+	switch g.Web.MediaType {
+	case settings.MediaPrint:
+		media = "print"
+	case settings.MediaScreen:
+		media = "screen"
+	}
+	if obj == nil {
+		return media
+	}
+	if obj.Load.PrintMediaType {
+		media = "print"
+	}
+	switch obj.Load.MediaType {
+	case settings.MediaPrint:
+		media = "print"
+	case settings.MediaScreen:
+		media = "screen"
+	}
+	return media
+}
+
 // collectSheets gathers <style> blocks and <link rel="stylesheet"> resources
 // from the DOM. A failed stylesheet only logs a warning; the layout proceeds
-// without it. viewportW/H (pt) evaluate link media attributes for print.
-func collectSheets(ctx context.Context, loader *load.Loader, root *html.Node, base string, lp settings.LoadPage, idx int, log io.Writer, viewportW, viewportH float64) []*css.Stylesheet {
+// without it. viewportW/H (pt) and mediaType evaluate link media attributes.
+func collectSheets(ctx context.Context, loader *load.Loader, root *html.Node, base string, lp settings.LoadPage, idx int, log io.Writer, viewportW, viewportH float64, mediaType string) []*css.Stylesheet {
 	var sheets []*css.Stylesheet
 	var walk func(n *html.Node)
 	walk = func(n *html.Node) {
@@ -527,7 +548,7 @@ func collectSheets(ctx context.Context, loader *load.Loader, root *html.Node, ba
 			}
 			return // raw-text element; no element children
 		case "link":
-			if linkStylesheet(n, viewportW, viewportH) {
+			if linkStylesheet(n, viewportW, viewportH, mediaType) {
 				href := n.Attribute("href")
 				r, err := loader.FetchSub(ctx, base, href, lp)
 				if err != nil {
@@ -571,9 +592,9 @@ func styleText(n *html.Node) string {
 }
 
 // linkStylesheet reports whether n is a stylesheet <link> whose media
-// attribute matches the print pipeline (empty, all, print, or feature
-// queries that MediaMatches accepts for media type "print").
-func linkStylesheet(n *html.Node, viewportW, viewportH float64) bool {
+// attribute matches the conversion mediaType (empty, all, print/screen, or
+// feature queries that MediaMatches accepts for that type).
+func linkStylesheet(n *html.Node, viewportW, viewportH float64, mediaType string) bool {
 	if n.Name != "link" || !strings.Contains(strings.ToLower(n.Attribute("rel")), "stylesheet") {
 		return false
 	}
@@ -584,7 +605,7 @@ func linkStylesheet(n *html.Node, viewportW, viewportH float64) bool {
 	if media == "" {
 		return true
 	}
-	return css.MediaMatches(media, "print", viewportW, viewportH)
+	return css.MediaMatches(media, mediaType, viewportW, viewportH)
 }
 
 // DefaultTOCXSL returns the default TOC stylesheet. In pure Go the default

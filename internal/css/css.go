@@ -76,17 +76,12 @@ type RelativeSelector struct {
 }
 
 // PseudoClass is :first-child, :last-child, :nth-child(...), :has(...), or
-// :not(...).
+// :not(...). :is()/:where() are not implemented (unknown, never match).
 type PseudoClass struct {
 	Name string // lower-case, without leading ':'
 	Arg  string // nth-child argument, lower-case, trimmed
 	Has  []RelativeSelector
 	Not  []Selector
-	// Where is the argument to :where() / :is() (selector list). Matching
-	// uses OR semantics; :where contributes 0 specificity, :is uses the
-	// most specific argument (Selectors 4).
-	Where   []Selector
-	WhereIs bool // true when parsed from :is() (specificity from args)
 }
 
 // Declaration is one property: value pair.
@@ -508,31 +503,7 @@ func splitTopLevel(s string, sep byte) []string {
 // parseSelector parses one compound chain, e.g. "div.a#b > p.c" or
 // "tr:nth-child(even)".
 func parseSelector(s string) (Selector, bool) {
-	var sel Selector
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return sel, false
-	}
-	parts := splitSelectorChain(s)
-	for i, ch := range parts {
-		if ch == ">" || ch == "+" || ch == "~" || ch == " " {
-			continue // combinator marker, applied to the next compound
-		}
-		part, ok := parseCompound(ch)
-		if !ok {
-			return sel, false
-		}
-		if len(sel.Parts) > 0 {
-			switch parts[i-1] {
-			case ">", "+", "~":
-				part.Combinator = parts[i-1]
-			default:
-				part.Combinator = " "
-			}
-		}
-		sel.Parts = append(sel.Parts, part)
-	}
-	return sel, len(sel.Parts) > 0
+	return parseSelectorCtx(s, false)
 }
 
 // splitSelectorChain splits a selector into compounds and combinators, e.g.
@@ -625,13 +596,8 @@ func isSelBreak(b byte) bool {
 		b == '~' || b == ' ' || b == '\t' || b == '\n' || b == '\r'
 }
 
-// parseCompound parses "tag#id.class1.class2[attr]:nth-child(even)" into a
-// SelectorPart. A tag of "*" or "" means universal.
-func parseCompound(s string) (SelectorPart, bool) {
-	return parseCompoundCtx(s, false)
-}
-
-// parseCompoundCtx parses a compound. When insideHas is true, nested :has()
+// parseCompoundCtx parses a compound ("tag#id.class[attr]:nth-child(even)").
+// A tag of "*" or "" means universal. When insideHas is true, nested :has()
 // and pseudo-elements are rejected as invalid.
 func parseCompoundCtx(s string, insideHas bool) (SelectorPart, bool) {
 	s = strings.TrimSpace(s)
@@ -755,17 +721,6 @@ func parseCompoundCtx(s string, insideHas bool) (SelectorPart, bool) {
 					return SelectorPart{}, false
 				}
 				part.Pseudos = append(part.Pseudos, PseudoClass{Name: "not", Not: sels})
-			case "where", "is":
-				if !hasParen || strings.TrimSpace(argRaw) == "" {
-					return SelectorPart{}, false
-				}
-				sels, ok := parseSelectorListStrict(argRaw, insideHas)
-				if !ok {
-					return SelectorPart{}, false
-				}
-				part.Pseudos = append(part.Pseudos, PseudoClass{
-					Name: "where", Where: sels, WhereIs: name == "is",
-				})
 			case "link", "visited":
 				// Print semantics: both mean "a[href]" (no browsing history).
 				part.Pseudos = append(part.Pseudos, PseudoClass{Name: name})
@@ -867,54 +822,10 @@ func isCompoundBreak(b byte) bool {
 
 // Match reports whether the selector matches the element node. Matching runs
 // right to left: the last part must match n, earlier parts must match
-// ancestors/siblings per their combinators.
+// ancestors/siblings per their combinators. Implemented via leftmostMatch
+// (same combinator walk; Match only needs success/failure).
 func Match(s Selector, n *html.Node) bool {
-	if n == nil || n.Type != html.ElementNode || len(s.Parts) == 0 {
-		return false
-	}
-	if !matchPart(s.Parts[len(s.Parts)-1], n) {
-		return false
-	}
-	cur := n
-	// Combinator is stored on the right-hand part of each pair (how that
-	// part attaches to the previous). Walk left using Parts[i+1].Combinator.
-	for i := len(s.Parts) - 2; i >= 0; i-- {
-		part := s.Parts[i]
-		switch s.Parts[i+1].Combinator {
-		case ">":
-			cur = cur.Parent
-			if cur == nil || cur.Type != html.ElementNode || !matchPart(part, cur) {
-				return false
-			}
-		case "+":
-			prev := previousElementSibling(cur)
-			if prev == nil || !matchPart(part, prev) {
-				return false
-			}
-			cur = prev
-		case "~":
-			found := false
-			for sib := previousElementSibling(cur); sib != nil; sib = previousElementSibling(sib) {
-				if matchPart(part, sib) {
-					cur = sib
-					found = true
-					break
-				}
-			}
-			if !found {
-				return false
-			}
-		default: // descendant
-			cur = cur.Parent
-			for cur != nil && (cur.Type != html.ElementNode || !matchPart(part, cur)) {
-				cur = cur.Parent
-			}
-			if cur == nil {
-				return false
-			}
-		}
-	}
-	return true
+	return leftmostMatch(s, n) != nil
 }
 
 // MatchPseudo reports whether s selects the ::before or ::after pseudo-element
@@ -1045,14 +956,6 @@ func matchPseudo(ps PseudoClass, n *html.Node) bool {
 			}
 		}
 		return true
-	case "where":
-		// :where() / :is() — match if any argument selector matches.
-		for _, sel := range ps.Where {
-			if Match(sel, n) {
-				return true
-			}
-		}
-		return false
 	case "link", "visited":
 		// Print: no link history — both match any anchor with an href.
 		return isLinkAnchor(n)
@@ -1233,15 +1136,6 @@ func Specificity(s Selector) (a, b, c int) {
 				a += a2
 				b += b2
 				c += c2
-			case "where":
-				if ps.WhereIs {
-					// :is() — most specific argument
-					a2, b2, c2 := maxSelectorSpecificity(ps.Where)
-					a += a2
-					b += b2
-					c += c2
-				}
-				// :where() — zero specificity
 			default:
 				b++
 			}
@@ -1609,45 +1503,28 @@ func ParseFontFamily(v string) []string {
 	return out
 }
 
-// namedColors is the named-color subset: the CSS2 set plus common extras.
+// namedColors is CSS2 system colors plus greys/orange and common web names
+// used by fixtures and layout tests (ponytail: not the full CSS Color 4 list).
 var namedColors = map[string][3]int{
+	// CSS2 core
 	"black": {0, 0, 0}, "silver": {192, 192, 192}, "gray": {128, 128, 128},
 	"grey": {128, 128, 128}, "white": {255, 255, 255}, "maroon": {128, 0, 0},
 	"red": {255, 0, 0}, "purple": {128, 0, 128}, "fuchsia": {255, 0, 255},
-	"magenta": {255, 0, 255}, "green": {0, 128, 0}, "lime": {0, 255, 0},
-	"olive": {128, 128, 0}, "yellow": {255, 255, 0}, "navy": {0, 0, 128},
-	"blue": {0, 0, 255}, "teal": {0, 128, 128}, "aqua": {0, 255, 255},
-	"cyan": {0, 255, 255}, "orange": {255, 165, 0}, "brown": {165, 42, 42},
-	"pink": {255, 192, 203}, "gold": {255, 215, 0}, "darkgray": {169, 169, 169},
-	"darkgrey": {169, 169, 169}, "lightgray": {211, 211, 211}, "lightgrey": {211, 211, 211},
+	"green": {0, 128, 0}, "lime": {0, 255, 0}, "olive": {128, 128, 0},
+	"yellow": {255, 255, 0}, "navy": {0, 0, 128}, "blue": {0, 0, 255},
+	"teal": {0, 128, 128}, "aqua": {0, 255, 255},
+	// Common aliases / CSS3 extras used in sheets
+	"cyan": {0, 255, 255}, "magenta": {255, 0, 255}, "orange": {255, 165, 0},
+	"brown": {165, 42, 42}, "pink": {255, 192, 203}, "gold": {255, 215, 0},
+	"darkgray": {169, 169, 169}, "darkgrey": {169, 169, 169},
+	"lightgray": {211, 211, 211}, "lightgrey": {211, 211, 211},
 	"darkgreen": {0, 100, 0}, "darkblue": {0, 0, 139}, "darkred": {139, 0, 0},
-	"darkorange": {255, 140, 0}, "lightblue": {173, 216, 230}, "lightgreen": {144, 238, 144},
-	"lightyellow": {255, 255, 224}, "coral": {255, 127, 80}, "crimson": {220, 20, 60},
-	"khaki": {240, 230, 140}, "indigo": {75, 0, 130}, "ivory": {255, 255, 240},
-	"lavender": {230, 230, 250}, "violet": {238, 130, 238}, "tan": {210, 180, 140},
-	"salmon": {250, 128, 114}, "seagreen": {46, 139, 87}, "steelblue": {70, 130, 180},
-	"turquoise": {64, 224, 208}, "wheat": {245, 222, 179}, "aliceblue": {240, 248, 255},
-	"antiquewhite": {250, 235, 215}, "azure": {240, 255, 255}, "beige": {245, 245, 220},
-	"bisque": {255, 228, 196}, "blanchedalmond": {255, 235, 205}, "burlywood": {222, 184, 135},
-	"cadetblue": {95, 158, 160}, "chocolate": {210, 105, 30}, "darkslategray": {47, 79, 79},
-	"deepskyblue": {0, 191, 255}, "dodgerblue": {30, 144, 255}, "firebrick": {178, 34, 34},
-	"forestgreen": {34, 139, 34}, "gainsboro": {220, 220, 220}, "ghostwhite": {248, 248, 255},
-	"goldenrod": {218, 165, 32}, "honeydew": {240, 255, 240}, "hotpink": {255, 105, 180},
-	"indianred": {205, 92, 92}, "lightcoral": {240, 128, 128}, "lightcyan": {224, 255, 255},
-	"lightpink": {255, 182, 193}, "lightsalmon": {255, 160, 122}, "lightseagreen": {32, 178, 170},
-	"lightskyblue": {135, 206, 250}, "lightslategray": {119, 136, 153}, "lightsteelblue": {176, 196, 222},
-	"mediumblue": {0, 0, 205}, "mediumpurple": {147, 112, 219}, "mediumseagreen": {60, 179, 113},
-	"mediumslateblue": {123, 104, 238}, "mediumturquoise": {72, 209, 204}, "mediumvioletred": {199, 21, 133},
-	"midnightblue": {25, 25, 112}, "mintcream": {245, 255, 250}, "mistyrose": {255, 228, 225},
-	"moccasin": {255, 228, 181}, "navajowhite": {255, 222, 173}, "oldlace": {253, 245, 230},
-	"olivedrab": {107, 142, 35}, "orangered": {255, 69, 0}, "orchid": {218, 112, 214},
-	"palegoldenrod": {238, 232, 170}, "palegreen": {152, 251, 152}, "paleturquoise": {175, 238, 238},
-	"palevioletred": {219, 112, 147}, "papayawhip": {255, 239, 213}, "peachpuff": {255, 218, 185},
-	"peru": {205, 133, 63}, "plum": {221, 160, 221}, "powderblue": {176, 224, 230},
-	"rebeccapurple": {102, 51, 153}, "rosybrown": {188, 143, 143}, "royalblue": {65, 105, 225},
-	"saddlebrown": {139, 69, 19}, "sandybrown": {244, 164, 96}, "sienna": {160, 82, 45},
-	"skyblue": {135, 206, 235}, "slateblue": {106, 90, 205}, "slategray": {112, 128, 144},
-	"snow": {255, 250, 250}, "springgreen": {0, 255, 127}, "thistle": {216, 191, 216},
-	"tomato": {255, 99, 71}, "violetred": {208, 32, 144}, "whitesmoke": {245, 245, 245},
-	"yellowgreen": {154, 205, 50},
+	"darkorange": {255, 140, 0}, "lightblue": {173, 216, 230},
+	"lightgreen": {144, 238, 144}, "lightyellow": {255, 255, 224},
+	"coral": {255, 127, 80}, "crimson": {220, 20, 60}, "indigo": {75, 0, 130},
+	"khaki": {240, 230, 140}, "lavender": {230, 230, 250}, "violet": {238, 130, 238},
+	"tan": {210, 180, 140}, "salmon": {250, 128, 114}, "seagreen": {46, 139, 87},
+	"steelblue": {70, 130, 180}, "turquoise": {64, 224, 208}, "wheat": {245, 222, 179},
+	"orangered": {255, 69, 0}, "tomato": {255, 99, 71}, "whitesmoke": {245, 245, 245},
+	"gainsboro": {220, 220, 220}, "rebeccapurple": {102, 51, 153},
 }

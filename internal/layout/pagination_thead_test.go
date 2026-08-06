@@ -1,6 +1,7 @@
 package layout
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 
@@ -14,7 +15,7 @@ func TestTheadRepeatOnContinuationPages(t *testing.T) {
 <thead><tr><th>ColA</th><th>ColB</th></tr></thead>
 <tbody>`
 	for i := 0; i < 40; i++ {
-		src += `<tr><td>r` + itoa(i) + `</td><td>body row ` + itoa(i) + `</td></tr>`
+		src += `<tr><td>r` + strconv.Itoa(i) + `</td><td>body row ` + strconv.Itoa(i) + `</td></tr>`
 	}
 	src += `</tbody></table></body></html>`
 

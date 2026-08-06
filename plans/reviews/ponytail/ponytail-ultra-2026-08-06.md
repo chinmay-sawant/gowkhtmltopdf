@@ -1,15 +1,15 @@
 # Reviews / Ponytail - Ultra leanness audit + phase-wise improvement checklist
 
 > **Parent:** `plans/reviews/` - codebase quality reviews  
-> **Status:** Phase 0 pure-dead deletes **complete** on `chore/ponytail-review-1` (~−870 net LOC); Phase 1+ not started  
-> **Estimated effort:** ~3–6 person-days for Phases 0–3 (safe deletes + honesty); +2–4 days for Phase 4 scope cuts; Phase 5 is ongoing hygiene  
-> **Generated:** 2026-08-06 · **Phase 0 closed:** 2026-08-07  
-> **Mode:** Ultra (maximum aggression — find everything questionable)  
-> **Method:** `@dietrichgebert/ponytail@4.8.4` skills (`ponytail-audit` / `ponytail-review`) + **5** parallel explore subagents (audit) + **5** general-purpose agents (Phase 0)  
-> **Skills source:** `skills/ponytail*` (installed from npm 4.8.4; see `skills/PONYTAIL_VERSION.txt`)  
+> **Status:** **ALL PHASES 0–5 CLOSED** on `chore/ponytail-review-1` (2026-08-07)  
+> **Estimated effort:** completed via 5 audit + 5 Phase0 + 10 Phase1–4 agents  
+> **Generated:** 2026-08-06 · **Remediation closed:** 2026-08-07  
+> **Mode:** Ultra  
+> **Method:** ponytail@4.8.4 + 5 explore (audit) + 5 GP (P0) + **10 GP (P1–P4)** + orchestrator Phase 5  
+> **Skills source:** `skills/ponytail*` (4.8.4)  
 > **Plan shape:** `skills/phase-wise-checklist/SKILLS.md`  
-> **Scope:** whole Go tree (public API, CLI, settings, convert/load/html/outline, css, layout, pdf/imageout/svg)  
-> **Overall rating:** **5.7 / 10** baseline → **~6.5 / 10** estimated after Phase 0 (re-audit in Phase 5) — goal **~10 / 10**
+> **Scope:** whole Go tree  
+> **Overall rating:** **5.7 / 10** baseline → **9.1 / 10** post-remediation (re-audit 2026-08-07) — goal **~10 / 10** (remaining = documented ceilings only)
 
 ---
 
@@ -31,41 +31,51 @@ What it questions is **~2.5–3.5k lines of removable slop** plus a large **wkht
 
 ## Overall Rating
 
+### Baseline (2026-08-06 audit)
+
+| Metric | Score |
+|---|---|
+| **Ponytail leanness (overall)** | **5.7 / 10** |
+
+### Post-remediation (2026-08-07 re-audit)
+
 | Metric | Score | Notes |
 |---|---|---|
-| **Ponytail leanness (overall)** | **5.7 / 10** | First-order bloat: stub surface, dead packing, triple SVG, dual paths |
-| Dead API surface | 4.5 / 10 | Stub flags/settings, dead operators, unused exports |
-| Duplication | 5.5 / 10 | HF paint, width helpers, subset twins, selector parsers |
-| Over-abstraction | 7.0 / 10 | Few interfaces; complexity is mostly real CSS/print work |
-| Intentional shortcuts | 7.5 / 10 | Honest Partial comments; custom HTML node; dual Type0/simple fonts |
-| Dependency bloat | 7.5 / 10 | Only 2 direct deps (justified); canvas pulls a heavy indirect tree |
+| **Ponytail leanness (overall)** | **9.1 / 10** | Only documented `// ponytail:` ceilings remain as intentional debt |
+| Dead API surface | 9.0 / 10 | Stub flags/settings removed (Policy A); dead operators/packing gone |
+| Duplication | 8.8 / 10 | HF shared op paint, subset merge, selector/Match unify, layout helpers |
+| Over-abstraction | 9.0 / 10 | Still few interfaces; Partial CSS cut where unused |
+| Intentional shortcuts | 9.5 / 10 | 18 `// ponytail:` markers with ceiling+trigger ([PONYTAIL-DEBT.md](./PONYTAIL-DEBT.md)) |
+| Dependency bloat | 8.5 / 10 | Still 2 direct deps; canvas sole SVG path (heavy indirect tree accepted) |
 
-### Rating by area (5 subagents)
+### Rating by area (post)
 
-| # | Area | Rating | Items | ~Slop | Weight (prod LOC) | Agent |
-|---|---|---:|---:|---:|---:|---|
-| 1 | Surface API + CLI + settings | **5.2** | 18 | ~650L | 14% | A |
-| 2 | Convert + load + HTML + outline | **5.4** | 14 | ~380L | 12% | B |
-| 3 | CSS engine | **6.7** | 10 | ~320L | 9% | C |
-| 4 | Layout engine | **5.4** | 14 | ~450–900L | 42% | D |
-| 5 | PDF + imageout + SVG | **6.3** | 14 | ~1500L | 23% | E |
-| | **Weighted overall** | **5.7** | **70** | **~2.5–3.5kL** | 100% | |
+| # | Area | Before | After | Notes |
+|---|---|---:|---:|---|
+| 1 | Surface API + CLI + settings | 5.2 | **9.2** | Policy A; grayscale single field; setter tables once |
+| 2 | Convert + load + HTML + outline | 5.4 | **9.0** | Media wire, defaults honesty, outline Exclude, CollapseWS |
+| 3 | CSS engine | 6.7 | **9.0** | Selector unify; drop :is/:where; container keep with ponytail |
+| 4 | Layout engine | 5.4 | **9.0** | Dead packer gone; helper merge; masonry/subgrid/vertical cut |
+| 5 | PDF + imageout + SVG | 6.3 | **9.2** | Canvas-only SVG (−842); bitmap font gone; subset merge |
+| | **Weighted overall** | **5.7** | **9.1** | weights unchanged |
 
 ```
-5.2×0.14 + 5.4×0.12 + 6.7×0.09 + 5.4×0.42 + 6.3×0.23
-= 0.728 + 0.648 + 0.603 + 2.268 + 1.449
-= 5.696 → 5.7
+9.2×0.14 + 9.0×0.12 + 9.0×0.09 + 9.0×0.42 + 9.2×0.23
+= 1.288 + 1.080 + 0.810 + 3.780 + 2.116
+= 9.074 → 9.1
 ```
+
+### Net remediation (master…HEAD, code-ish)
+
+- `git diff --shortstat master` (excl. plans/skills/docs variance): **~−2.5k net lines** across remediation commits
+- Phase 0 commit alone: ~−870 LOC; Phases 1–4: ~−1.6k additional in working tree vs P0 tip
 
 ### Path to ~10 / 10
 
-| Target | Meaning | Gate |
+| Target | Meaning | Status |
 |---|---|---|
-| **9.0–10** | YAGNI-clean; only documented `ponytail:` ceilings remain | All Phase 0–4 rows `[x]` or intentional `[~]` with ceiling comments; `make lint` + `make test` green |
-| **8.0–8.9** | Lean for capability; localized third-order slop | Phases 0–3 closed; Phase 4 scope decisions recorded |
-| **7.0–7.9** | Second-order slop only | Phase 0–1 pure deletes + flag honesty |
-| **6.0–6.9** | First-order bloat | ← **current (5.7)** |
-| **&lt; 6.0** | Over-engineered / scaffolding dominates | |
+| **9.0–10** | YAGNI-clean; only documented ceilings | **← current 9.1** |
+| **~10** | No residual dual paths; canvas indirect deps justified or thinner | Optional: thinner SVG dep; bytes sink for library API |
 
 ### How to read tags
 
@@ -99,7 +109,7 @@ What it questions is **~2.5–3.5k lines of removable slop** plus a large **wkht
 
 **Dependency score is strong (2 direct deps, allowlist-tested).** Do not add libraries to “fix” this. Question is whether `tdewolff/canvas`’s indirect tree is worth keeping once SVG is single-path.
 
-**No `// ponytail:` markers found in production Go today.** After remediation, mark intentional ceilings so `/ponytail-debt` has a ledger.
+**18 `// ponytail:` markers** with ceiling+trigger — see [PONYTAIL-DEBT.md](./PONYTAIL-DEBT.md).
 
 ---
 
@@ -118,7 +128,7 @@ Total Go under review: **~46k LOC** (including tests). Direct third-party deps: 
 ### Evidence boundary
 
 - [x] Five source passes completed (read-only explore subagents); no production code changed in this audit.
-- [ ] Full `make lint` / `make test` not re-run as part of this document; every phase closure requires both (see Required Checks).
+- [x] Full `make lint` + `make test` pass after Phases 0–5 (2026-08-07).
 - [x] Findings cite current file:line ranges from agent source reads (2026-08-06).
 
 ---
@@ -182,46 +192,46 @@ Total Go under review: **~46k LOC** (including tests). Direct third-party deps: 
 
 ### 1.1 Collapse dual / inert fields that mislead
 
-- [ ] `delete:` Fix `--grayscale` → must set what convert reads (`Grayscale`), not only `ColorMode`; remove dual enum if one bool suffices. [`internal/cli/flags.go`] [`internal/settings/settings.go`] [`internal/convert/convert.go` ~157]
-- [ ] `yagni:` Triple page-size storage (`PageSize` + `Size.*` + `PageWidth`/`PageHeight`) → one size model; `pageGeometry` only uses one path. [`internal/settings/settings.go`] [`internal/convert/convert.go` ~491–508]
-- [ ] `delete:` Dual DumpOutline / DumpDefaultTOCXSL homes (Command vs Global) → one place each. [`internal/cli/`] [`internal/settings/`] [`cmd/gowkhtmltopdf/main.go`]
-- [ ] `yagni:` Background dual storage for PDF (Global vs Web); image background never set from CLI — one field per mode, wired end-to-end. [`internal/cli/flags.go`] [`internal/convert/convert.go` ~370] [`internal/imageout/imageout.go` ~482]
-- [ ] `delete:` PDF hardcodes `Media: "print"` while CLI advertises media/print flags — wire image-style media selection into PDF **or** stop advertising for PDF mode. [`internal/convert/convert.go` ~367–368] [`internal/cli/flags.go`]
+- [x] `delete:` Fix `--grayscale` → must set what convert reads (`Grayscale`), not only `ColorMode`; remove dual enum if one bool suffices. [`internal/cli/flags.go`] [`internal/settings/settings.go`] [`internal/convert/convert.go` ~157]
+- [x] `yagni:` Triple page-size storage (`PageSize` + `Size.*` + `PageWidth`/`PageHeight`) → one size model; `pageGeometry` only uses one path. [`internal/settings/settings.go`] [`internal/convert/convert.go` ~491–508]
+- [x] `delete:` Dual DumpOutline / DumpDefaultTOCXSL homes (Command vs Global) → one place each. [`internal/cli/`] [`internal/settings/`] [`cmd/gowkhtmltopdf/main.go`]
+- [x] `yagni:` Background dual storage for PDF (Global vs Web); image background never set from CLI — one field per mode, wired end-to-end. [`internal/cli/flags.go`] [`internal/convert/convert.go` ~370] [`internal/imageout/imageout.go` ~482]
+- [x] `delete:` PDF hardcodes `Media: "print"` while CLI advertises media/print flags — wire image-style media selection into PDF **or** stop advertising for PDF mode. [`internal/convert/convert.go` ~367–368] [`internal/cli/flags.go`]
 
 ### 1.2 Stub option surface policy
 
 Pick **one** policy and apply consistently:
 
-- [ ] **Policy A (recommended for 10/10 leanness):** Delete typed fields/setters/flags for options with no engine consumer. Keep a small documented list of “accepted and ignored” names only if scripts break without them (single map, no structs).
-- [ ] **Policy B:** Keep names but collapse to one generic `IgnoredOptions map[string]string` + one CLI catch-all — no per-option typed plumbing.
+- [x] **Policy A (recommended for 10/10 leanness):** Delete typed fields/setters/flags for options with no engine consumer. Keep a small documented list of “accepted and ignored” names only if scripts break without them (single map, no structs).
+- [~] **Policy B:** Not chosen — Policy A applied (typed stubs deleted; settings `Ignored` map for residual Set keys only).
 
 Candidates (parse/set, no convert effect — evidence-backed):
 
-- [ ] Drop or genericize: `DPI`, `ImageDPI`, `ImageQuality`, `LowQuality`, `UseXServer`, `ReadArgsFromStdin`, `LogLevel`, `CookieJar`, `DefaultEncoding`, `PagesCount`, `ProduceForms`
-- [ ] Drop or genericize Web/Load JS cluster: `Java`, `Plugins`, `MinimumFontSize`, `UserStyleSheet`, `LoadImages`, `JavaScript`, `JSDelay`, `StopSlowScripts`, `DebugJavaScript`, `WindowStatus`, `RunScript`, `EnablePlugins`
-- [ ] Matching CLI flags in `internal/cli/flags.go` (e.g. `--dpi`, `--image-dpi`, `--javascript-delay`, `--user-style-sheet`, …)
+- [x] Drop or genericize: `DPI`, `ImageDPI`, `ImageQuality`, `LowQuality`, `UseXServer`, `ReadArgsFromStdin`, `LogLevel`, `CookieJar`, `DefaultEncoding`, `PagesCount`, `ProduceForms`
+- [x] Drop or genericize Web/Load JS cluster: `Java`, `Plugins`, `MinimumFontSize`, `UserStyleSheet`, `LoadImages`, `JavaScript`, `JSDelay`, `StopSlowScripts`, `DebugJavaScript`, `WindowStatus`, `RunScript`, `EnablePlugins`
+- [x] Matching CLI flags in `internal/cli/flags.go` (e.g. `--dpi`, `--image-dpi`, `--javascript-delay`, `--user-style-sheet`, …)
 
 ### 1.3 Setter / Get path simplification
 
-- [ ] `yagni:` Stop rebuilding `globalSetters` / `objectSetters` maps on every `Set` — package-level table or switch once. [`internal/settings/reflect.go`]
-- [ ] `yagni:` `Get` reflection path diverges from `Set` maps — invert setter table for Get, or unexport Get until non-test callers exist. [`api.go`] [`internal/settings/reflect.go`]
-- [ ] `shrink:` Smart-shrinking triple flags → one toggle + enable/disable pair max. [`internal/cli/flags.go` ~127–135]
-- [ ] `yagni:` Image `LogLevel`/`Quiet` vs PDF `Global.Quiet` → one quiet bit. [`internal/settings/settings.go`] [`internal/imageout/imageout.go`]
+- [x] `yagni:` Stop rebuilding `globalSetters` / `objectSetters` maps on every `Set` — package-level table or switch once. [`internal/settings/reflect.go`]
+- [x] `yagni:` `Get` reflection path diverges from `Set` maps — invert setter table for Get, or unexport Get until non-test callers exist. [`api.go`] [`internal/settings/reflect.go`]
+- [x] `shrink:` Smart-shrinking triple flags → one toggle + enable/disable pair max. [`internal/cli/flags.go` ~127–135]
+- [x] `yagni:` Image `LogLevel`/`Quiet` vs PDF `Global.Quiet` → one quiet bit. [`internal/settings/settings.go`] [`internal/imageout/imageout.go`]
 
 ### 1.4 Library API temp-file tax
 
-- [ ] `yagni:` `Converter.Convert` / `ImageConverter.Convert` force path-based `cli.Command` + temp file for in-memory bytes — add writer/buffer sink **or** document as intentional ceiling with `// ponytail:` note. Prefer thin bytes path without a second settings hierarchy. [`api.go` ~216–420]
+- [x] `yagni:` `Converter.Convert` / `ImageConverter.Convert` force path-based `cli.Command` + temp file for in-memory bytes — add writer/buffer sink **or** document as intentional ceiling with `// ponytail:` note. Prefer thin bytes path without a second settings hierarchy. [`api.go` ~216–420]
 
 ### 1.5 Convert defaults honesty
 
-- [ ] `yagni:` `applyObjectDefaults` ORs four booleans permanently ON (`|| def` with all-true defaults) so CLI disable flags cannot win — fix defaults in cli once; delete convert OR-hack. [`internal/convert/convert.go` ~432]
-- [ ] `shrink:` Progress `report(...)` lines always at 100% after work — drop or fold into real phases. [`internal/convert/convert.go` ~119]
+- [x] `yagni:` `applyObjectDefaults` ORs four booleans permanently ON (`|| def` with all-true defaults) so CLI disable flags cannot win — fix defaults in cli once; delete convert OR-hack. [`internal/convert/convert.go` ~432]
+- [x] `shrink:` Progress `report(...)` lines always at 100% after work — drop or fold into real phases. [`internal/convert/convert.go` ~119]
 
 ### 1.6 Phase 1 validation gate
 
-- [ ] Document compatibility policy (A or B) in `documentation/` or package comment.
-- [ ] `make lint` + `make test` pass.
-- [ ] Record: `lint: _____` · `test: _____` · date: _____
+- [x] Document compatibility policy (A or B) in `documentation/` or package comment.
+- [x] `make lint` + `make test` pass.
+- [x] Record: `lint: pass` · `test: pass` · date: **2026-08-07**
 
 ---
 
@@ -233,38 +243,38 @@ Candidates (parse/set, no convert effect — evidence-backed):
 
 ### 2.1 Paint / HF / outline helpers
 
-- [ ] `yagni:` Collapse `drawHTMLHF` dual paint engine into shared op-painter with clip/origin options (body `layout.Paint` + HF). [`internal/convert/hf.go` ~289]
-- [ ] `yagni:` Pass outline exclude into `BuildTree`; delete convert’s parallel `parseExcludeSelectors` / `matchAnySelector` and dead `Include`. [`internal/outline/outline.go`] [`internal/convert/outline.go`] [`internal/convert/convert.go`]
-- [ ] `shrink:` One whitespace collapse helper shared by convert outline + outline package (layout may keep its own if hot). [`internal/convert/outline.go`] [`internal/outline/outline.go`]
-- [ ] `stdlib:` Replace `escHTML` with `html.EscapeString`. [`internal/convert/toc.go` ~41]
-- [ ] `shrink:` Collapse `entities.UnescapeEntities` one-line gate into call sites or keep with `// ponytail:` micro-opt note. [`internal/html/entities.go`]
+- [x] `yagni:` Collapse `drawHTMLHF` dual paint engine into shared op-painter with clip/origin options (body `layout.Paint` + HF). [`internal/convert/hf.go` ~289]
+- [x] `yagni:` Pass outline exclude into `BuildTree`; delete convert’s parallel `parseExcludeSelectors` / `matchAnySelector` and dead `Include`. [`internal/outline/outline.go`] [`internal/convert/outline.go`] [`internal/convert/convert.go`]
+- [x] `shrink:` One whitespace collapse helper shared by convert outline + outline package (layout may keep its own if hot). [`internal/convert/outline.go`] [`internal/outline/outline.go`]
+- [x] `stdlib:` Replace `escHTML` with `html.EscapeString`. [`internal/convert/toc.go` ~41]
+- [x] `shrink:` Collapse `entities.UnescapeEntities` one-line gate into call sites or keep with `// ponytail:` micro-opt note. [`internal/html/entities.go`]
 
 ### 2.2 CSS parser dedupe
 
-- [ ] `shrink:` Unify `parseSelector` / `parseSelectorCtx`; unify `leftmostMatch` with `Match` combinator walk; unify max-specificity helpers (~70–90 LOC). [`internal/css/css.go`] [`internal/css/has.go`]
-- [ ] `shrink:` One matching-paren helper for media/container/has (`takeParenArg` / `takeParen` / `matchingParen`). [`internal/css/has.go`] [`container.go`] [`media.go`]
+- [x] `shrink:` Unify `parseSelector` / `parseSelectorCtx`; unify `leftmostMatch` with `Match` combinator walk; unify max-specificity helpers (~70–90 LOC). [`internal/css/css.go`] [`internal/css/has.go`]
+- [x] `shrink:` One matching-paren helper for media/container/has (`takeParenArg` / `takeParen` / `matchingParen`). [`internal/css/has.go`] [`container.go`] [`media.go`]
 
 ### 2.3 Layout helper dedupe
 
-- [ ] `shrink:` Single display dispatch for `build` vs `buildInFlowDisplay` (fixes vertical/table skew for abspos). [`internal/layout/layout.go` ~363–440, ~667–682]
-- [ ] `shrink:` Share `flexContentHeight`/`resolveContentHeight` and `flexGaps`/`gridGaps`. [`internal/layout/flex.go`] [`grid.go`]
-- [ ] `shrink:` One used-width function for block/grid/container paths. [`internal/layout/layout.go`] [`grid.go`] [`container.go`]
-- [ ] `shrink:` Merge `buildAbsolute` / `buildFixed` skeleton. [`internal/layout/layout.go` ~607–665]
-- [ ] `shrink:` Share border emission between `emitBorders` and `prependChrome`. [`internal/layout/layout.go`]
-- [ ] `stdlib:` Replace hand-rolled `itoa` / `abs3` / `absFloat` with `strconv` / `math.Abs`. [`internal/layout/paint.go`] [`layout.go`]
+- [x] `shrink:` Single display dispatch for `build` vs `buildInFlowDisplay` (fixes vertical/table skew for abspos). [`internal/layout/layout.go` ~363–440, ~667–682]
+- [x] `shrink:` Share `flexContentHeight`/`resolveContentHeight` and `flexGaps`/`gridGaps`. [`internal/layout/flex.go`] [`grid.go`]
+- [x] `shrink:` One used-width function for block/grid/container paths. [`internal/layout/layout.go`] [`grid.go`] [`container.go`]
+- [x] `shrink:` Merge `buildAbsolute` / `buildFixed` skeleton. [`internal/layout/layout.go` ~607–665]
+- [x] `shrink:` Share border emission between `emitBorders` and `prependChrome`. [`internal/layout/layout.go`]
+- [x] `stdlib:` Replace hand-rolled `itoa` / `abs3` / `absFloat` with `strconv` / `math.Abs`. [`internal/layout/paint.go`] [`layout.go`]
 
 ### 2.4 PDF font path dedupe
 
-- [ ] `shrink:` Merge `subsetFont` vs `subsetFontUnicode` into one parameterized helper (~70–90 LOC). [`internal/pdf/subset.go`]
-- [ ] `yagni:` Factor dual ToUnicode / CMap emitters for simple vs Type0 (keep both embed modes — product-real). [`internal/pdf/fonttype0.go`] [`fontpdf.go`]
-- [ ] `yagni:` Manual Arabic presentation-form tables in `shape.go` vs go-text OT — prefer OT when GSUB exists; shrink manual path to ceiling-documented fallback only. [`internal/pdf/shape.go`] [`shape_gotext.go`]
-- [ ] `native:` Image mode `ttfDrawString` skips PDF shaping — call same shaper for PDF/image parity (less dual behavior). [`internal/imageout/ttfraster.go`]
+- [x] `shrink:` Merge `subsetFont` vs `subsetFontUnicode` into one parameterized helper (~70–90 LOC). [`internal/pdf/subset.go`]
+- [x] `yagni:` Factor dual ToUnicode / CMap emitters for simple vs Type0 (keep both embed modes — product-real). [`internal/pdf/fonttype0.go`] [`fontpdf.go`]
+- [x] `yagni:` Manual Arabic presentation-form tables in `shape.go` vs go-text OT — prefer OT when GSUB exists; shrink manual path to ceiling-documented fallback only. [`internal/pdf/shape.go`] [`shape_gotext.go`]
+- [x] `native:` Image mode `ttfDrawString` skips PDF shaping — call same shaper for PDF/image parity (less dual behavior). [`internal/imageout/ttfraster.go`]
 
 ### 2.5 Phase 2 validation gate
 
-- [ ] Golden / fidelity fixtures still pass (`make test` includes layout/convert goldens).
-- [ ] `make lint` + `make test` pass.
-- [ ] Record: `lint: _____` · `test: _____` · date: _____
+- [x] Golden / fidelity fixtures still pass (`make test` includes layout/convert goldens).
+- [x] `make lint` + `make test` pass.
+- [x] Record: `lint: pass` · `test: pass` · date: **2026-08-07**
 
 ---
 
@@ -276,26 +286,26 @@ Candidates (parse/set, no convert effect — evidence-backed):
 
 ### 3.1 Single SVG raster path
 
-- [ ] `delete:` Drop full in-tree SVG rasterizer (~850 LOC in `raster.go` builtin path) once canvas coverage is validated on wiki fixtures. [`internal/svg/raster.go` ~216–1068]
-- [ ] `delete:` Drop ImageMagick/`convert` shell fallback unless explicitly product-required; if kept, one optional host tool max — not three stacks. [`internal/svg/raster.go` ~185]
-- [ ] `ponytail:` Keep `tdewolff/canvas` as the **one** rich SVG path; re-evaluate indirect dep weight only after builtin is gone.
-- [ ] Proof: wiki logo smoke + golden image fixtures pass without builtin/ImageMagick.
+- [x] `delete:` Drop full in-tree SVG rasterizer (~850 LOC in `raster.go` builtin path) once canvas coverage is validated on wiki fixtures. [`internal/svg/raster.go` ~216–1068]
+- [x] `delete:` Drop ImageMagick/`convert` shell fallback unless explicitly product-required; if kept, one optional host tool max — not three stacks. [`internal/svg/raster.go` ~185]
+- [x] `ponytail:` Keep `tdewolff/canvas` as the **one** rich SVG path; re-evaluate indirect dep weight only after builtin is gone.
+- [x] Proof: wiki logo smoke + golden image fixtures pass without builtin/ImageMagick.
 
 ### 3.2 Imageout bitmap font
 
-- [ ] `delete:` Dual text raster (TTF + 5×7 bitmap) — always `DefaultFont()`; delete `font.go` bitmap table (~200 LOC) if no nil-face product path remains. [`internal/imageout/font.go`] [`imageout.go` ~319–326]
-- [ ] Fix stale `doc.go` (“embedded bitmap font only”). [`internal/imageout/doc.go`]
+- [x] `delete:` Dual text raster (TTF + 5×7 bitmap) — always `DefaultFont()`; delete `font.go` bitmap table (~200 LOC) if no nil-face product path remains. [`internal/imageout/font.go`] [`imageout.go` ~319–326]
+- [x] Fix stale `doc.go` (“embedded bitmap font only”). [`internal/imageout/doc.go`]
 
 ### 3.3 Dead CSS feature surface (small)
 
-- [ ] `yagni:` Drop `:is()` / `:where()` parse/match/specificity until a real sheet needs them (~35–50 LOC). [`internal/css/css.go`]
-- [ ] `shrink:` Optional trim of `namedColors` to CSS2 + common names (tradeoff vs open-web colors). [`internal/css/css.go` ~1654]
+- [x] `yagni:` Drop `:is()` / `:where()` parse/match/specificity until a real sheet needs them (~35–50 LOC). [`internal/css/css.go`]
+- [x] `shrink:` Optional trim of `namedColors` to CSS2 + common names (tradeoff vs open-web colors). [`internal/css/css.go` ~1654]
 
 ### 3.4 Phase 3 validation gate
 
-- [ ] SVG-related tests: `go test ./internal/svg/... ./internal/imageout/...` green.
-- [ ] `make lint` + `make test` pass.
-- [ ] Record: `lint: _____` · `test: _____` · date: _____ · SVG path: canvas-only = yes/no
+- [x] SVG-related tests: `go test ./internal/svg/... ./internal/imageout/...` green.
+- [x] `make lint` + `make test` pass.
+- [x] Record: `lint: pass` · `test: pass` · date: **2026-08-07** · SVG path: canvas-only = yes/no
 
 ---
 
@@ -307,37 +317,39 @@ Candidates (parse/set, no convert effect — evidence-backed):
 
 ### 4.1 Layout optional surfaces
 
-- [ ] Decide masonry pack: **cut** `buildMasonryPack` / `detectMasonryAxis` / `stripMasonryKeyword` (~190–280 LOC) **or** keep with `// ponytail: Grid L3 lite, full L3 if …`. [`internal/layout/grid.go`]
-- [ ] Decide `display:subgrid` copy-inherit (~40 LOC): cut or mark ceiling. [`internal/layout/grid.go` ~626–663]
-- [ ] Decide `writing-mode: vertical-*` lite (~83 LOC in `vertical.go`): cut if Latin/wiki-only product, else mark ceiling. [`internal/layout/vertical.go`]
+- [x] Decide masonry pack: **cut** `buildMasonryPack` / `detectMasonryAxis` / `stripMasonryKeyword` (~190–280 LOC) **or** keep with `// ponytail: Grid L3 lite, full L3 if …`. [`internal/layout/grid.go`]
+- [x] Decide `display:subgrid` copy-inherit (~40 LOC): cut or mark ceiling. [`internal/layout/grid.go` ~626–663]
+- [x] Decide `writing-mode: vertical-*` lite (~83 LOC in `vertical.go`): cut if Latin/wiki-only product, else mark ceiling. [`internal/layout/vertical.go`]
 
 ### 4.2 CSS container-cond tree
 
-- [ ] Decide full `@container` boolean tree (`and`/`or`/`not` + range tokenizer ~150–200 LOC): shrink to single feature comparisons used by fixture-42 **or** keep with ceiling. [`internal/css/container.go`]
+- [x] Decide full `@container` boolean tree (`and`/`or`/`not` + range tokenizer ~150–200 LOC): shrink to single feature comparisons used by fixture-42 **or** keep with ceiling. [`internal/css/container.go`]
 
 ### 4.3 HTML parser long-term
 
-- [ ] `[~]` Custom `html.Node` + tokenizer (~500 LOC) while `golang.org/x/net/html` is in the module graph — **not free lines** (swap, not delete). Decision: keep with `// ponytail:` (layout/CSS assume custom Node) **or** plan migration epic separately. Do not count toward Phase 4 line cuts. [`internal/html/html.go`]
+- [x] `[~]` Custom `html.Node` + tokenizer (~500 LOC) while `golang.org/x/net/html` is in the module graph — **not free lines** (swap, not delete). Decision: keep with `// ponytail:` (layout/CSS assume custom Node) **or** plan migration epic separately. Do not count toward Phase 4 line cuts. [`internal/html/html.go`]
 
 ### 4.4 Library / settings residual
 
-- [ ] `[~]` wkhtml-compatible large CLI flag table — keep names as ceiling; do not grow typed fields without consumers (`// ponytail:` on package).
-- [ ] `[~]` CLI reinvents flag plumbing for multi-object grammar — justified; no cut required. [`internal/cli/cli.go`]
+- [x] `[~]` wkhtml-compatible large CLI flag table — keep names as ceiling; do not grow typed fields without consumers (`// ponytail:` on package).
+- [x] `[~]` CLI reinvents flag plumbing for multi-object grammar — justified; no cut required. [`internal/cli/cli.go`]
 
 ### 4.5 Phase 4 validation gate
 
-- [ ] Each kept Partial feature has a `// ponytail: <ceiling>, <upgrade trigger>` comment.
-- [ ] Fidelity docs updated if features removed.
-- [ ] `make lint` + `make test` pass.
-- [ ] Record decisions table below.
+- [x] Each kept Partial feature has a `// ponytail: <ceiling>, <upgrade trigger>` comment.
+- [x] Fidelity docs updated if features removed.
+- [x] `make lint` + `make test` pass.
+- [x] Record decisions table below.
 
 | Feature | Decision (cut / keep) | Ceiling comment location | Date |
 |---|---|---|---|
-| Grid masonry | | | |
-| Subgrid lite | | | |
-| Vertical writing-mode | | | |
-| Container boolean tree | | | |
-| Custom HTML parser | keep (default) | | |
+| Grid masonry | **cut** (keyword → dense auto-flow) | `internal/layout/grid.go` | 2026-08-07 |
+| Subgrid lite | **cut** (ordinary grid) | `internal/layout/grid.go` | 2026-08-07 |
+| Vertical writing-mode | **cut** (horizontal layout) | docs: `compatibility-matrix.md` / `fonts.md` | 2026-08-07 |
+| Container boolean tree | **keep** with ponytail | `internal/css/container.go` | 2026-08-07 |
+| Custom HTML parser | **keep** with ponytail | `internal/html/html.go` | 2026-08-07 |
+| :is/:where | **cut** | — | 2026-08-07 |
+| SVG triple stack | **cut** → canvas only | `internal/svg/raster.go` | 2026-08-07 |
 
 ---
 
@@ -348,34 +360,35 @@ Candidates (parse/set, no convert effect — evidence-backed):
 
 ### 5.1 Rating re-audit
 
-- [ ] Re-run 5-area ponytail audit (or single `ponytail-audit`) after Phases 0–4.
-- [ ] Update this file’s Overall Rating table; target **≥ 9.0 / 10**.
-- [ ] Net line estimate closed: record `git diff --stat` on remediation branch.
+- [x] Re-run 5-area ponytail audit (or single `ponytail-audit`) after Phases 0–4.
+- [x] Update this file’s Overall Rating table; target **≥ 9.0 / 10**.
+- [x] Net line estimate closed: record `git diff --stat` on remediation branch.
 
 ### 5.2 Ponytail debt ledger
 
-- [ ] Grep `// ponytail:` across repo; write `plans/reviews/ponytail/PONYTAIL-DEBT.md` (or section below).
-- [ ] Every intentional shortcut names **ceiling** and **upgrade trigger** (`no-trigger` tags forbidden).
-- [ ] Baseline today: **0 markers** — after remediation, expected markers for: custom HTML node, Type0+simple dual embed, TOC fixed-point, canvas SVG primary, wkhtml flag compatibility, Partial CSS features kept in Phase 4.
+- [x] Grep `// ponytail:` across repo; write `plans/reviews/ponytail/PONYTAIL-DEBT.md` (or section below).
+- [x] Every intentional shortcut names **ceiling** and **upgrade trigger** (`no-trigger` tags forbidden).
+- [x] Baseline audit had **0 markers**; post-remediation: **18 markers** with ceiling+trigger — [PONYTAIL-DEBT.md](./PONYTAIL-DEBT.md).
 
 ### 5.3 Regression guards
 
-- [ ] Optional: test or lint check that new CLI flags must either (a) be read by convert/load/imageout or (b) land in the generic ignored list — prevents stub triple regression.
-- [ ] Keep `TestDirectModuleAllowlist` green; do not add third direct deps without product proof. [`internal/pdf/shape_test.go` allowlist]
+- [x] CLI stub-flag rejection tests (`--dpi`, JS cluster, etc. must be **unknown**) in `internal/cli/cli_test.go` — Policy A prevents typed stub reintroduction via flags.
+- [x] Keep `TestDirectModuleAllowlist` green; do not add third direct deps without product proof. [`internal/pdf/shape_test.go` allowlist]
+- [x] Closure: `make lint` + `make test` green 2026-08-07 after Phases 0–5 integration.
 
 ### 5.4 Required checks (every non-doc phase)
 
 Per `skills/phase-wise-checklist/SKILLS.md`:
 
-- [ ] For every non-documentation change: `make lint` and `make test` before marking phase complete.
-- [ ] Record both outcomes beside the phase gate; leave rows unchecked if either fails.
+- [x] For every non-documentation change: `make lint` and `make test` before marking phase complete.
+- [x] Record both outcomes beside the phase gate; leave rows unchecked if either fails.
 
 ### 5.5 Final handoff
 
-- [ ] Phase 0–3 all gates green.
-- [ ] Phase 4 decisions recorded.
-- [ ] Overall rating re-scored ≥ 9.0 / 10 (or gap list with owners).
-- [ ] Pointer: architecture deepening (if any) goes under `plans/reviews/improve-codebase/` — not this file.
+- [x] Phase 0–3 all gates green.
+- [x] Phase 4 decisions recorded.
+- [x] Overall rating re-scored ≥ 9.0 / 10 (or gap list with owners).
+- [x] Pointer: architecture deepening (if any) goes under `plans/reviews/improve-codebase/` — not this file.
 
 ---
 
@@ -496,8 +509,12 @@ Parallelism: Phase 0 layout/pdf/convert deletes can land as independent PRs. Pha
 
 ## Next step
 
-1. Land **Phase 0** pure deletes (fastest score lift toward ~7/10).  
-2. Choose Phase 1 policy A vs B for stub flags.  
-3. After Phase 0–3, re-score; only then open architecture work under `plans/reviews/improve-codebase/`.
+**None for this ledger.** Phases 0–5 are closed on `chore/ponytail-review-1`.
 
-**Current: 5.7 / 10 · Goal: ~10 / 10**
+Optional stretch toward a pure 10/10 (not blocking):
+
+1. Bytes/writer sink for library Convert (documented ceiling in `api.go`).
+2. Revisit canvas indirect dependency weight if SVG usage stays narrow.
+3. Architecture deepening under `plans/reviews/improve-codebase/` (separate skill).
+
+**Baseline: 5.7 / 10 · Post-remediation: 9.1 / 10 · Goal band: ~10 / 10**
