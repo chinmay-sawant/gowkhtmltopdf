@@ -17,6 +17,14 @@ User and design docs for the pure-Go, stdlib-only HTML→PDF / HTML→image engi
 | [THREAT-MODEL.md](THREAT-MODEL.md) | Security model and local-file ACL |
 | [comparison-with-others/sebastiaanklippert-go-wkhtmltopdf.md](comparison-with-others/sebastiaanklippert-go-wkhtmltopdf.md) | vs SebastiaanKlippert/go-wkhtmltopdf (wrapper vs pure-Go engine) |
 
+## Contributing
+
+| Document | Purpose |
+|----------|---------|
+| [../CONTRIBUTIONS.md](../CONTRIBUTIONS.md) | Setup, tests, PR workflow, layout visual QA, doc update map |
+| [../CHANGELOG.md](../CHANGELOG.md) | User-facing release notes |
+| [../skills/PR/PR_TEMPLATE.md](../skills/PR/PR_TEMPLATE.md) | Pull request body template |
+
 ## Plans (implementation ledgers)
 
 Phase-by-phase execution notes live under [`../plans/`](../plans/), not here:

@@ -70,6 +70,21 @@ and judge layout honestly against the Phase 21 “decent print” bar. Do **not*
 gate CI on this; commit `output/wiki-*.pdf` only when intentionally updating the
 smoke artifact.
 
+### Visual QA checklist (layout / pagination changes)
+
+Structure tests (`make golden`) do not catch overlapping text, broken table
+chrome, or underline noise. After changing `internal/layout` (or pagination
+paint), open the smoke PDF (or a focused fixture) and verify:
+
+- [ ] Body paragraphs are sequential — no interleaved or overpainted lines
+- [ ] No huge empty bands between short `page-break-inside: avoid` list items
+- [ ] Multi-page tables: continuous outer borders on continuation strips; Ref
+      cites in rowspan cells readable (not crushed together)
+- [ ] Reference lists: bare URLs not a dense underline forest; titles still linked
+- [ ] Floats: text clears beside/below without orphan fragments mid-column
+
+Contributor setup and PR expectations: [CONTRIBUTIONS.md](../CONTRIBUTIONS.md).
+
 ## Makefile targets
 
 | Target | Action |

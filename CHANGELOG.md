@@ -4,6 +4,34 @@ All notable changes to gowkhtmltopdf are recorded here. This project follows
 semantic versioning; `VERSION` holds the current release and is stamped into
 binaries at build time (see README "Versioning").
 
+## Unreleased
+
+### Fixed (print / layout)
+
+- **Long tokens / URLs:** honor `overflow-wrap` / `word-break` (with inheritance);
+  emergency wrap when a token exceeds the line so text does not paint past the
+  page edge; soft breaks at URL punctuation.
+- **Float tails:** short remaining text that fits one full-width line clears
+  below the float instead of orphaning beside it.
+- **Captions:** `overflow-wrap: break-word` no longer mid-breaks words that fit
+  the next full line.
+- **Tables:** per-row border-collapse grid bound to row op ranges (no phantom
+  empty bands across page breaks); empty/padding-only rows collapsed; leading
+  all-`<th>` rows repeat as headers; multi-cite nowrap min-content; rowspan
+  cells with `<br>` cites spread vertically across the cell height.
+- **Pagination:** `preferSplitOverBlank` for short `page-break-inside: avoid`
+  boxes (dense reference lists); **disabled** document-global gap packing that
+  crushed line spacing and interleaved body text.
+- **Links:** coalesce same-href underlines on a line; clamp stroke weight; skip
+  underlines on bare URL strings in reference lists.
+- **Sample:** regenerate `output/wiki-ana-de-armas.pdf` (live Wikipedia smoke).
+
+### Tests
+
+- Layout regressions for overflow wrap, thead-from-th, ref gaps, table empty
+  rows / multi-cite / rowspan cites / continuation borders, underline coalesce,
+  and body-line packing (no overlap).
+
 ## 0.1.0 (2026-08-03)
 
 First MVP release: a pure-Go, stdlib-only HTML-to-PDF engine with a

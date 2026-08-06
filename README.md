@@ -27,6 +27,7 @@ are implemented; remaining gaps are listed under
 
 **Docs:** start at **[documentation/overview.md](documentation/overview.md)** (full index:
 [documentation/README.md](documentation/README.md)).
+**Contributing:** [CONTRIBUTIONS.md](CONTRIBUTIONS.md).
 
 ---
 
