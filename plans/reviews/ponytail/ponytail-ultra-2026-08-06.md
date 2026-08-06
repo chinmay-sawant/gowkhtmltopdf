@@ -9,7 +9,7 @@
 > **Skills source:** `skills/ponytail*` (4.8.4)  
 > **Plan shape:** `skills/phase-wise-checklist/SKILLS.md`  
 > **Scope:** whole Go tree  
-> **Overall rating:** **5.7 / 10** baseline → **9.1 / 10** post-remediation (re-audit 2026-08-07) — goal **~10 / 10** (remaining = documented ceilings only)
+> **Overall rating:** **5.7 / 10** baseline → **9.4 / 10** post-partials (2026-08-07) — Get tables + single background + library bytes sink closed
 
 ---
 
@@ -518,3 +518,14 @@ Optional stretch toward a pure 10/10 (not blocking):
 3. Architecture deepening under `plans/reviews/improve-codebase/` (separate skill).
 
 **Baseline: 5.7 / 10 · Post-remediation: 9.1 / 10 · Goal band: ~10 / 10**
+
+
+## Partials closed (2026-08-07 follow-up)
+
+Evidence-backed close of the three residual gaps after phases 0–5:
+
+- [x] **Get tables** — `PdfGlobal`/`PdfObject`/`ImageGlobal.Get` use the same key surface as `Set` (`internal/settings/getters.go`); reflection `getDotted` removed from `api.go`. Ignored keys round-trip via `Get`.
+- [x] **Image background single field** — paint uses `Global.Background` only (imageout + convert); `web.background` / bare `background` Set both write it; ImageConverter.Set(`web.background`) syncs Global.
+- [x] **Library bytes sink** — `cli.Command.OutputWriter`; convert + imageout prefer it; `Converter`/`ImageConverter` capture to `bytes.Buffer` (no temp file).
+
+`make lint` + `make test` green after these changes.

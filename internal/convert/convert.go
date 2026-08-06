@@ -177,21 +177,34 @@ func RunPDFContext(ctx context.Context, cmd *cli.Command, log io.Writer, progres
 
 	report("Done", 100)
 
-	var out io.Writer = os.Stdout
-	closeOut := func() error { return nil }
-	if cmd.Output != "" && cmd.Output != "-" {
-		f, err := os.Create(cmd.Output)
-		if err != nil {
-			return fmt.Errorf("output %q: %w", cmd.Output, err)
-		}
-		out = f
-		closeOut = f.Close
+	out, closeOut, err := openCommandOutput(cmd)
+	if err != nil {
+		return err
 	}
 	if err := doc.Write(out); err != nil {
 		closeOut()
+		if cmd.OutputWriter != nil {
+			return fmt.Errorf("write output: %w", err)
+		}
 		return fmt.Errorf("write %q: %w", cmd.Output, err)
 	}
 	return closeOut()
+}
+
+// openCommandOutput returns the writer for cmd: OutputWriter (library bytes
+// sink) wins, else Output path / "-" / stdout.
+func openCommandOutput(cmd *cli.Command) (io.Writer, func() error, error) {
+	if cmd.OutputWriter != nil {
+		return cmd.OutputWriter, func() error { return nil }, nil
+	}
+	if cmd.Output != "" && cmd.Output != "-" {
+		f, err := os.Create(cmd.Output)
+		if err != nil {
+			return nil, nil, fmt.Errorf("output %q: %w", cmd.Output, err)
+		}
+		return f, f.Close, nil
+	}
+	return os.Stdout, func() error { return nil }, nil
 }
 
 // percent rounds i/n to a 0-100 percentage.

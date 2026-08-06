@@ -9,7 +9,7 @@
 
 | File | Ceiling | Upgrade trigger |
 |------|---------|-----------------|
-| `api.go` (Convert / ImageConvert) | Path-based `cli.Command` DTO + temp file for library bytes | Embedders need zero temp files → add writer/bytes sink in convert/imageout |
+| `api.go` / `cli.Command` | Path still used by CLI; library uses `OutputWriter` bytes sink | None — sink shipped 2026-08-07 |
 | `internal/cli/doc.go` | Multi-object wkhtml CLI grammar; Policy A flag surface only | New flag only when convert/load/imageout reads it |
 | `internal/settings/settings.go` | ColorMode not stored (Grayscale only); PageSize dual name mirror; `Ignored` sink for inert keys | Second real consumer of a key → promote to typed field |
 | `internal/html/html.go` | Custom `Node` tree (Parent/Attrs/void) | Layout/CSS rewritten to `x/net/html` — not a free delete |
@@ -25,7 +25,7 @@
 
 ## Summary
 
-**18 markers** across production Go. **0 `no-trigger`** tags — every row names a ceiling and upgrade path.
+Markers across production Go (see `rg '// ponytail:'`). **0 `no-trigger`** tags — every row names a ceiling and upgrade path. Library temp-file debt **closed** (OutputWriter bytes sink, 2026-08-07).
 
 ```
 rg -n '// ponytail:' --glob '*.go' | wc -l   # expect ≥ 15

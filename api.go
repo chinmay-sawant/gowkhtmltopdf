@@ -7,10 +7,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
-	"os"
-	"reflect"
-	"strconv"
 	"strings"
 
 	"gowkhtmltopdf/internal/cli"
@@ -52,13 +48,13 @@ func (s *GlobalSettings) Set(name, value string) error {
 	return s.g.Set(name, value)
 }
 
-// Get reads a dotted settings key back as its canonical string form. ok is
-// false when the name does not resolve to a field or has no scalar
-// representation (maps, nested structs). Booleans read as "true"/"false",
-// enums as their canonical name ("portrait", "print", "abort", …), floats
-// with the shortest round-trip representation.
+// Get reads a dotted settings key back as its canonical string form via the
+// same key table as Set (plus Policy A Ignored values). ok is false when the
+// name is unknown. Booleans read as "true"/"false", enums as their canonical
+// name ("Portrait", "print", "abort", …), floats with the shortest round-trip
+// representation.
 func (s *GlobalSettings) Get(name string) (string, bool) {
-	return getDotted(&s.g, name)
+	return s.g.Get(name)
 }
 
 // ObjectSettings wraps the per-page wkhtmltopdf settings: the input page
@@ -83,10 +79,9 @@ func (s *ObjectSettings) Set(name, value string) error {
 	return s.o.Set(name, value)
 }
 
-// Get reads a dotted object settings key back as its canonical string form;
-// ok is false when the name does not resolve to a scalar field.
+// Get reads a dotted object settings key via the same key table as Set.
 func (s *ObjectSettings) Get(name string) (string, bool) {
-	return getDotted(&s.o, name)
+	return s.o.Get(name)
 }
 
 // SetPage sets the input page (a path, URL or "inline:…" / "data:…" source)
@@ -95,65 +90,6 @@ func (s *ObjectSettings) SetPage(page string) *ObjectSettings {
 	s.o.Page = page
 	return s
 }
-
-// getDotted resolves a dotted name through the exported fields of the struct
-// dst points at, case-insensitively, and formats the terminal value.
-func getDotted(dst any, name string) (string, bool) {
-	v := reflect.ValueOf(dst)
-	if v.Kind() != reflect.Pointer || v.Elem().Kind() != reflect.Struct {
-		return "", false
-	}
-	cur := v.Elem()
-	for _, part := range strings.Split(strings.ToLower(strings.TrimSpace(name)), ".") {
-		if part == "" || cur.Kind() != reflect.Struct {
-			return "", false
-		}
-		f := cur.FieldByNameFunc(func(n string) bool { return strings.EqualFold(n, part) })
-		if !f.IsValid() {
-			return "", false
-		}
-		cur = f
-	}
-	return formatSettingValue(cur)
-}
-
-// formatSettingValue renders a reflect.Value as its settings string form.
-func formatSettingValue(v reflect.Value) (string, bool) {
-	if !v.CanInterface() {
-		return "", false
-	}
-	switch v.Kind() {
-	case reflect.String:
-		return v.String(), true
-	case reflect.Bool:
-		return strconv.FormatBool(v.Bool()), true
-	case reflect.Int:
-		// Enums (Orientation, ColorMode, MediaType, LogLevel,
-		// LoadErrorHandling) implement fmt.Stringer; plain ints don't.
-		if v.Type().Implements(stringerType) {
-			return v.Interface().(fmt.Stringer).String(), true
-		}
-		return strconv.FormatInt(v.Int(), 10), true
-	case reflect.Float64:
-		return strconv.FormatFloat(v.Float(), 'g', -1, 64), true
-	case reflect.Slice:
-		// List settings ("allow", "exclude-from-outline") join with newlines.
-		if v.Type().Elem().Kind() != reflect.String {
-			return "", false
-		}
-		var b strings.Builder
-		for i := 0; i < v.Len(); i++ {
-			if i > 0 {
-				b.WriteByte('\n')
-			}
-			b.WriteString(v.Index(i).String())
-		}
-		return b.String(), true
-	}
-	return "", false
-}
-
-var stringerType = reflect.TypeOf((*fmt.Stringer)(nil)).Elem()
 
 // ---------------------------------------------------------------------------
 // PDF conversion
@@ -205,9 +141,8 @@ func (c *Converter) AddObject(s *ObjectSettings) *Converter {
 
 // Convert runs the conversion. The produced bytes replace the previous
 // Output. ctx is threaded into every load; cancel it to abort. Errors are
-// also reported to OnError when set.
-//
-// ponytail: path-based Command DTO, bytes sink when embedders need zero temp files
+// also reported to OnError when set. Output is captured via an in-memory
+// writer (no temp file).
 func (c *Converter) Convert(ctx context.Context) error {
 	if ctx == nil {
 		ctx = context.Background()
@@ -215,15 +150,8 @@ func (c *Converter) Convert(ctx context.Context) error {
 	if len(c.objects) == 0 {
 		return errors.New("gowkhtmltopdf: no page objects added")
 	}
-	// convert.RunPDFContext writes only to cmd.Output path or os.Stdout ("-"/"");
-	// there is no io.Writer sink yet, so capture via a short-lived temp file.
-	path, err := tempOutput("gowkhtmltopdf-*.pdf")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(path)
-
-	cmd := &cli.Command{Global: c.global.g, Output: path}
+	var buf bytes.Buffer
+	cmd := &cli.Command{Global: c.global.g, OutputWriter: &buf}
 	for _, o := range c.objects {
 		cmd.Objects = append(cmd.Objects, o.o)
 	}
@@ -250,11 +178,7 @@ func (c *Converter) Convert(ctx context.Context) error {
 		}
 		return err
 	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Errorf("gowkhtmltopdf: read output: %w", err)
-	}
-	c.output = data
+	c.output = buf.Bytes()
 	return nil
 }
 
@@ -321,9 +245,17 @@ func NewImageConverter() *ImageConverter {
 // Set applies an image-mode settings key: "width", "height", "quality",
 // "smartwidth", "transparent", "format" ("png"|"jpg") and the crop keys
 // "crop.left", "crop.top", "crop.width", "crop.height". Unknown names return
-// an error.
+// an error. "web.background" also updates the shared Global.Background paint
+// switch so image and PDF share one background field.
 func (c *ImageConverter) Set(name, value string) error {
-	return c.image.Set(name, value)
+	if err := c.image.Set(name, value); err != nil {
+		return err
+	}
+	key := strings.ToLower(strings.TrimSpace(name))
+	if key == "web.background" {
+		return c.global.g.Set("background", value)
+	}
+	return nil
 }
 
 // Global returns the shared global settings (only "enablelocalfileaccess"
@@ -351,8 +283,7 @@ func (c *ImageConverter) Object() *ObjectSettings {
 
 // Convert runs the conversion, replacing the previous Output. ctx is threaded
 // into the load; cancel it to abort. Errors are also reported to OnError.
-//
-// ponytail: path-based Command DTO, bytes sink when embedders need zero temp files
+// Output is captured via an in-memory writer (no temp file).
 func (c *ImageConverter) Convert(ctx context.Context) error {
 	if ctx == nil {
 		ctx = context.Background()
@@ -360,19 +291,12 @@ func (c *ImageConverter) Convert(ctx context.Context) error {
 	if c.object == nil || strings.TrimSpace(c.object.o.Page) == "" {
 		return errors.New("gowkhtmltopdf: no input page added")
 	}
-	// imageout.Run writes only to cmd.Output path or os.Stdout ("-"/"");
-	// no io.Writer sink yet — capture via a short-lived temp file.
-	path, err := tempOutput("gowkhtmltopdf-image-*")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(path)
-
+	var buf bytes.Buffer
 	cmd := &cli.Command{
-		Global:  c.global.g,
-		Image:   c.image,
-		Objects: []settings.PdfObject{c.object.o},
-		Output:  path,
+		Global:       c.global.g,
+		Image:        c.image,
+		Objects:      []settings.PdfObject{c.object.o},
+		OutputWriter: &buf,
 	}
 	flush := &lineLog{
 		onInfo:  c.OnInfo,
@@ -385,11 +309,7 @@ func (c *ImageConverter) Convert(ctx context.Context) error {
 		}
 		return err
 	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Errorf("gowkhtmltopdf: read output: %w", err)
-	}
-	c.output = data
+	c.output = buf.Bytes()
 	return nil
 }
 
@@ -403,21 +323,6 @@ func (c *ImageConverter) Output() []byte {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-// tempOutput creates an empty temp file and returns its path; the conversion
-// pipelines write their output there by path.
-func tempOutput(pattern string) (string, error) {
-	f, err := os.CreateTemp("", pattern)
-	if err != nil {
-		return "", fmt.Errorf("gowkhtmltopdf: temp output: %w", err)
-	}
-	path := f.Name()
-	if err := f.Close(); err != nil {
-		os.Remove(path)
-		return "", fmt.Errorf("gowkhtmltopdf: temp output: %w", err)
-	}
-	return path, nil
-}
 
 // lineLog is an io.Writer that classifies newline-terminated log lines and
 // forwards them to the converter callbacks: "warning:" lines to onWarn,

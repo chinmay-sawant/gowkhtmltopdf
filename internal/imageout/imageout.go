@@ -477,10 +477,8 @@ func Run(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 		return r.Body, nil
 	}
 
-	// Policy A quiet bit is Global.Quiet only (Image.Quiet removed).
-	// Background: typed image home is Image.Web.Background; CLI --background
-	// ModeBoth still writes Global.Background — require both so either path
-	// can disable paints until CLI collapses onto one field.
+	// Policy A: Quiet is Global.Quiet; body paint background is Global.Background
+	// only (single field for PDF + image; CLI --background / library Set).
 	img, err := Render(root, RenderOptions{
 		Width:              cmd.Image.Width,
 		Height:             cmd.Image.Height,
@@ -489,7 +487,7 @@ func Run(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 		Sheets:             sheets,
 		Media:              mediaFor(cmd, obj),
 		Images:             imagesFn,
-		Background:         cmd.Global.Background && cmd.Image.Web.Background,
+		Background:         cmd.Global.Background,
 		Transparent:        cmd.Image.Transparent,
 		Crop:               cropRect(cmd.Image.Crop),
 		SmartWidth:         cmd.Image.SmartWidth,
@@ -512,21 +510,33 @@ func Run(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 		return fmt.Errorf("encode %s: %w", format, err)
 	}
 
-	out := io.Writer(os.Stdout)
-	closeOut := func() error { return nil }
-	if cmd.Output != "" && cmd.Output != "-" {
-		f, err := os.Create(cmd.Output)
-		if err != nil {
-			return fmt.Errorf("output %q: %w", cmd.Output, err)
-		}
-		out = f
-		closeOut = f.Close
+	out, closeOut, err := openCommandOutput(cmd)
+	if err != nil {
+		return err
 	}
 	if _, err := out.Write(data); err != nil {
 		closeOut()
+		if cmd.OutputWriter != nil {
+			return fmt.Errorf("write output: %w", err)
+		}
 		return fmt.Errorf("write %q: %w", cmd.Output, err)
 	}
 	return closeOut()
+}
+
+// openCommandOutput prefers OutputWriter (library bytes sink), else path/"-"/stdout.
+func openCommandOutput(cmd *cli.Command) (io.Writer, func() error, error) {
+	if cmd.OutputWriter != nil {
+		return cmd.OutputWriter, func() error { return nil }, nil
+	}
+	if cmd.Output != "" && cmd.Output != "-" {
+		f, err := os.Create(cmd.Output)
+		if err != nil {
+			return nil, nil, fmt.Errorf("output %q: %w", cmd.Output, err)
+		}
+		return f, f.Close, nil
+	}
+	return os.Stdout, func() error { return nil }, nil
 }
 
 // firstObject returns the first page-like object. Image mode renders a

@@ -146,8 +146,9 @@ func TestGlobalSetDottedKeys(t *testing.T) {
 			}
 		}},
 		{"web.background", "false", func(t *testing.T) {
-			if g.Web.Background {
-				t.Error("web.background should be false")
+			// Single paint field: Global.Background (Web.Background kept in sync).
+			if g.Background || g.Web.Background {
+				t.Error("web.background should clear Global.Background")
 			}
 		}},
 		{"allow", "/srv/html", func(t *testing.T) {
@@ -390,5 +391,30 @@ func TestImageSet(t *testing.T) {
 	}
 	if img.Ignored["web.javascript"] != "true" {
 		t.Errorf("Ignored = %v", img.Ignored)
+	}
+}
+
+func TestGlobalGetSetRoundTripAndIgnored(t *testing.T) {
+	g := DefaultPdfGlobal()
+	if err := g.Set("title", "Hi"); err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := g.Get("title"); !ok || got != "Hi" {
+		t.Fatalf("Get(title)=%q,%v", got, ok)
+	}
+	if err := g.Set("dpi", "150"); err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := g.Get("dpi"); !ok || got != "150" {
+		t.Fatalf("Get(dpi ignored)=%q,%v want 150,true", got, ok)
+	}
+	if _, ok := g.Get("totally.unknown"); ok {
+		t.Fatal("unknown key should not Get")
+	}
+	if err := g.Set("background", "false"); err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := g.Get("web.background"); !ok || got != "false" {
+		t.Fatalf("Get(web.background)=%q,%v after Set(background)", got, ok)
 	}
 }

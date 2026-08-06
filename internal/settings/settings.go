@@ -255,7 +255,7 @@ type PdfGlobal struct {
 	Footer                HeaderFooter
 	Header                HeaderFooter
 	TOC                   TableOfContent
-	Background            bool // PDF body background (convert); image uses Image.Web.Background
+	Background            bool // sole paint switch for PDF + image body backgrounds
 	EnableLocalFileAccess bool
 	Allow                 []string
 	ExcludeFromOutline    []string

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"strings"
 
 	"gowkhtmltopdf/internal/settings"
@@ -27,7 +28,11 @@ type Command struct {
 	Global  settings.PdfGlobal
 	Image   settings.ImageGlobal
 	Objects []settings.PdfObject
-	Output  string // output path or "-" (stdout)
+	// Output is a path or "-" (stdout). Ignored when OutputWriter is set.
+	Output string
+	// OutputWriter, when non-nil, receives PDF/image bytes directly (library
+	// path). Takes precedence over Output so embedders need no temp files.
+	OutputWriter io.Writer
 
 	DumpDefaultTOCXSL bool
 	DumpOutline       bool

@@ -291,6 +291,7 @@ func buildKeyTables() {
 	globalKeyTable = buildGlobalKeyTable()
 	objectKeyTable = buildObjectKeyTable()
 	imageKeyTable = buildImageKeyTable()
+	buildGetTables()
 }
 
 func buildGlobalKeyTable() map[string]globalApply {
@@ -335,9 +336,7 @@ func buildGlobalKeyTable() map[string]globalApply {
 		"smartshrinking": func(g *PdfGlobal, raw string) error {
 			return setBool(&g.SmartShrinking)(raw)
 		},
-		"background": func(g *PdfGlobal, raw string) error {
-			return setBool(&g.Background)(raw)
-		},
+		// "background" registered below with web.background (single paint field).
 		"enablelocalfileaccess": func(g *PdfGlobal, raw string) error {
 			return setBool(&g.EnableLocalFileAccess)(raw)
 		},
@@ -419,14 +418,31 @@ func buildGlobalKeyTable() map[string]globalApply {
 			return tocApply(&g.TOC, key, raw)
 		}
 	}
+	// web.background maps onto PdfGlobal.Background — the single paint field
+	// convert and imageout both read (not Web.Background alone).
+	s["web.background"] = func(g *PdfGlobal, raw string) error {
+		if err := setBool(&g.Background)(raw); err != nil {
+			return err
+		}
+		g.Web.Background = g.Background // keep nested field in sync for snapshots
+		return nil
+	}
 	for _, k := range []string{
-		"background", "images", "printmediatype", "mediatype",
+		"images", "printmediatype", "mediatype",
 		"simplifydom", "simplifydomprofile", "printlinkunderline",
 	} {
 		key := k
 		s["web."+key] = func(g *PdfGlobal, raw string) error {
 			return webApply(&g.Web, key, raw)
 		}
+	}
+	// bare "background" is the same paint switch as web.background
+	s["background"] = func(g *PdfGlobal, raw string) error {
+		if err := setBool(&g.Background)(raw); err != nil {
+			return err
+		}
+		g.Web.Background = g.Background
+		return nil
 	}
 	return s
 }
