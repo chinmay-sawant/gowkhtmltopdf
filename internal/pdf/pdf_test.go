@@ -57,11 +57,15 @@ func TestWriteHeaderAndTrailer(t *testing.T) {
 }
 
 func TestDeterministicOutput(t *testing.T) {
+	f, err := DefaultFont()
+	if err != nil {
+		t.Fatal(err)
+	}
 	build := func() []byte {
 		d := fixedDoc(t)
 		p := d.AddPage(200, 200)
 		c := p.Content()
-		c.UseFont("F1", "Helvetica")
+		c.UseEmbeddedFont("F1", f)
 		c.BeginText()
 		c.SetFont("F1", 12)
 		c.TextAt(10, 20)
@@ -77,9 +81,13 @@ func TestDeterministicOutput(t *testing.T) {
 }
 
 func TestXrefOffsets(t *testing.T) {
+	f, err := DefaultFont()
+	if err != nil {
+		t.Fatal(err)
+	}
 	d := fixedDoc(t)
 	p := d.AddPage(100, 100)
-	p.Content().UseFont("F1", "Times-Roman")
+	p.Content().UseEmbeddedFont("F1", f)
 	out := writePDF(t, d)
 
 	// every n entry must point at the start of "N 0 obj"
@@ -162,11 +170,15 @@ func TestContentOperators(t *testing.T) {
 }
 
 func TestTextStream(t *testing.T) {
+	f, err := DefaultFont()
+	if err != nil {
+		t.Fatal(err)
+	}
 	d := fixedDoc(t)
 	d.SetCompression(false)
 	p := d.AddPage(300, 300)
 	c := p.Content()
-	c.UseFont("F1", "Courier")
+	c.UseEmbeddedFont("F1", f)
 	c.BeginText()
 	c.SetFont("F1", 14)
 	c.TextLeading(18)
@@ -182,7 +194,8 @@ func TestTextStream(t *testing.T) {
 		"(line one) Tj",
 		"T*",
 		"(line two) Tj",
-		"/Type /Font /Subtype /Type1 /BaseFont /Courier",
+		"/Type /Font /Subtype /TrueType",
+		"/BaseFont /",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q", want)
@@ -194,14 +207,14 @@ func TestImageXObject(t *testing.T) {
 	d := fixedDoc(t)
 	d.SetCompression(false)
 	p := d.AddPage(200, 200)
-	// 2x1 gradient
-	rgba := []byte{255, 0, 0, 255, 0, 0, 255, 255}
-	p.Content().DrawImage("Im1", 10, 10, 100, 50, rgba, 2, 1)
+	if err := p.Content().AddPNGImage("Im1", 10, 10, 100, 50, makePNG(t, false)); err != nil {
+		t.Fatal(err)
+	}
 	out := string(writePDF(t, d))
 	for _, want := range []string{
 		"/Im1 Do",
 		"/Subtype /Image",
-		"/Width 2 /Height 1",
+		"/Width 4 /Height 2",
 		"/ColorSpace /DeviceRGB",
 		"/XObject << /Im1",
 	} {

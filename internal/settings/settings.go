@@ -1,7 +1,6 @@
-// Package settings implements the wkhtmltopdf-compatible settings model:
-// defaults, parsers, and the dotted-name Set surface used by the CLI and
-// the future library API. Pure Go, no external dependencies.
 package settings
+
+import "strings"
 
 // ColorMode mirrors wkhtmltopdf --color-mode.
 type ColorMode int
@@ -455,14 +454,4 @@ func DefaultImageGlobal() ImageGlobal {
 	}
 }
 
-func normalize(s string) string {
-	out := make([]byte, 0, len(s))
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		if c >= 'A' && c <= 'Z' {
-			c += 'a' - 'A'
-		}
-		out = append(out, c)
-	}
-	return string(out)
-}
+func normalize(s string) string { return strings.ToLower(s) }

@@ -1,15 +1,15 @@
 # Reviews / Ponytail - Ultra leanness audit + phase-wise improvement checklist
 
 > **Parent:** `plans/reviews/` - codebase quality reviews  
-> **Status:** baseline audit complete; remediation not started  
+> **Status:** Phase 0 pure-dead deletes **complete** on `chore/ponytail-review-1` (~−870 net LOC); Phase 1+ not started  
 > **Estimated effort:** ~3–6 person-days for Phases 0–3 (safe deletes + honesty); +2–4 days for Phase 4 scope cuts; Phase 5 is ongoing hygiene  
-> **Generated:** 2026-08-06  
+> **Generated:** 2026-08-06 · **Phase 0 closed:** 2026-08-07  
 > **Mode:** Ultra (maximum aggression — find everything questionable)  
-> **Method:** `@dietrichgebert/ponytail@4.8.4` skills (`ponytail-audit` / `ponytail-review`) + **5** parallel explore subagents  
+> **Method:** `@dietrichgebert/ponytail@4.8.4` skills (`ponytail-audit` / `ponytail-review`) + **5** parallel explore subagents (audit) + **5** general-purpose agents (Phase 0)  
 > **Skills source:** `skills/ponytail*` (installed from npm 4.8.4; see `skills/PONYTAIL_VERSION.txt`)  
 > **Plan shape:** `skills/phase-wise-checklist/SKILLS.md`  
 > **Scope:** whole Go tree (public API, CLI, settings, convert/load/html/outline, css, layout, pdf/imageout/svg)  
-> **Overall rating:** **5.7 / 10** (ponytail leanness) — goal **~10 / 10**
+> **Overall rating:** **5.7 / 10** baseline → **~6.5 / 10** estimated after Phase 0 (re-audit in Phase 5) — goal **~10 / 10**
 
 ---
 
@@ -131,44 +131,46 @@ Total Go under review: **~46k LOC** (including tests). Direct third-party deps: 
 
 ### 0.1 Layout dead packing cluster
 
-- [ ] `delete:` Remove no-op `packAvoidGaps` call sites and the entire dead packer: `packAvoidSiblingGaps`, `boxInkBottom`, `boxInkTop`, `boxTextSize` (~200 LOC). Real control remains `preferSplitOverBlank`. [`internal/layout/paint.go`] (calls ~72, ~503; packer ~1311–1496)
-- [ ] Retire or rewrite `TestPackAvoidSiblingsCollapsesResidualGap` so it no longer claims packing “must” happen. [`internal/layout/ref_gap_test.go`]
-- [ ] `delete:` `partition` (zero callers; `flowChildren` inlines classification). [`internal/layout/layout.go` ~732–755]
-- [ ] `delete:` `layoutInline` dead wrapper (`layoutInlineFloats` is the real entry). [`internal/layout/inline.go` ~37–38]
-- [ ] `delete:` `autoTrack` zero-caller grid helper. [`internal/layout/grid.go` ~986–991]
+- [x] `delete:` Removed no-op `packAvoidGaps` call sites and dead packer cluster (`packAvoidSiblingGaps`, `boxInkBottom`, `boxInkTop`, `boxTextSize`). Real control remains `preferSplitOverBlank`. [`internal/layout/paint.go`]
+- [x] Deleted `TestPackAvoidSiblingsCollapsesResidualGap` (only asserted dead packing). [`internal/layout/ref_gap_test.go`]
+- [x] `delete:` `partition` (zero callers). [`internal/layout/layout.go`]
+- [x] `delete:` `layoutInline` dead wrapper. [`internal/layout/inline.go`]
+- [x] `delete:` `autoTrack` zero-caller grid helper. [`internal/layout/grid.go`]
 
 ### 0.2 PDF / imageout dead surface
 
-- [ ] `delete:` Unused content operators: `TextShowAdj`, `TextRise`, `TextHorizScale`, `TextWordSpacing`, `TextCharSpacing`, `FillStroke`, `ClosePath`. [`internal/pdf/content.go`]
-- [ ] `delete:` Product-dead `DrawImage` raw-RGBA path (paint uses JPEG/PNG only) — unexport or remove; retarget tests. [`internal/pdf/content.go`]
-- [ ] `delete:` `ShapeRun` / glyph-run API until a real glyph-run emitter exists (tests-only). [`internal/pdf/shape_gotext.go`]
-- [ ] `delete:` Dead helpers: `Finite`, `coalesceSegments`, `MergeRegistries`, public `ScanFontDir` (prod uses `ScanFontDirs`), exported `DecodeWOFF2` stub. [`internal/pdf/glyph.go`] [`subset.go`] [`registry.go`] [`woff.go`]
-- [ ] `yagni:` Base-14 `UseFont` + Type1 branch unused by product (always embedded faces) — drop or keep behind test-only build; retarget pdf tests to embedded faces. [`internal/pdf/content.go`]
+- [x] `delete:` Unused content operators: `TextShowAdj`, `TextRise`, `TextHorizScale`, `TextWordSpacing`, `TextCharSpacing`, `FillStroke`, `ClosePath`. [`internal/pdf/content.go`]
+- [x] `delete:` Product-dead `DrawImage` raw-RGBA path; tests retargeted to `AddPNGImage`. [`internal/pdf/content.go`]
+- [x] `delete:` `ShapeRun` / `ShapedGlyph` / `ShapedRun` public API (kept internal OT path + `ShapeTextFont`). [`internal/pdf/shape_gotext.go`]
+- [x] `delete:` Dead helpers: `Finite`, `coalesceSegments`, `MergeRegistries`, exported `DecodeWOFF2` stub. [`internal/pdf/glyph.go`] [`subset.go`] [`registry.go`] [`woff.go`]
+- [~] Public `ScanFontDir` **kept** — still used by `fonttype0_test.go` and `layout/layout_test.go`; prod uses `ScanFontDirs`. Unexport later with test retarget (Phase 2 hygiene).
+- [x] `yagni:` Base-14 `UseFont` + Type1 branch removed; tests use `UseEmbeddedFont`. [`internal/pdf/content.go`]
 
 ### 0.3 Convert / load / html dead stubs
 
-- [ ] `delete:` Production-dead `CharsetFromMeta` (parse always uses `html.Parse(string(res.Body))` without re-decode). [`internal/html/html.go`]
-- [ ] `delete:` Loader knobs with zero wiring: `ApplyCert`, `InsecureTLS` (never set from CLI/API), `OnProgress` / `active` dead fields — or wire once from real flags. Prefer delete until consumers exist. [`internal/load/load.go`]
-- [ ] `delete:` `WaitJSDelay` / `WarnJSStubs` unused by convert (settings accept JS flags; pipeline ignores). [`internal/load/load.go`]
-- [ ] `delete:` Doc-only `convert.HttpError` twin of `settings.HttpStatusError` (nothing constructs it). [`internal/convert/doc.go`]
-- [ ] `delete:` Write-only / test-only DOM surface if no serializer needs it: `AttrOrder`, `ElementChildren` (tests only). [`internal/html/html.go`]
+- [x] `delete:` Production-dead `CharsetFromMeta` + tests. [`internal/html/html.go`]
+- [x] `delete:` Loader knobs with zero wiring: `ApplyCert`, `InsecureTLS`, `OnProgress` field, `active`. ACL/caps/TLS-verify kept. [`internal/load/load.go`]
+- [x] `delete:` `WaitJSDelay` / `WarnJSStubs` (+ `TestWaitJSDelay`). [`internal/load/load.go`]
+- [x] `delete:` Doc-only `convert.HttpError` twin; doc points at `settings.HttpStatusError`. [`internal/convert/doc.go`]
+- [x] `delete:` Write-only / test-only DOM surface: `AttrOrder`, `ElementChildren`. [`internal/html/html.go`]
 
 ### 0.4 CSS / surface small dead exports
 
-- [ ] `delete:` `IsInherited` and `CompareSpecificity` (css package + tests only; cascade lives in layout). [`internal/css/css.go`]
-- [ ] `delete:` Unexport `IsImportant` (test-only export). [`internal/css/css.go`]
-- [ ] `delete:` `FontFace.Weight` / `FontFace.Style` written, never read by `MergeFontFaces`. [`internal/css/css.go`]
-- [ ] `delete:` `Converter.HttpErrorCode` always returns 0. [`api.go`]
-- [ ] `delete:` Unused settings helpers: `PageSizeNames`, unused unit helpers if only self-tested. [`internal/settings/pagesize.go`] [`unitreal.go`]
-- [ ] `delete:` CLI `Man` / `HTMLHelp` / unused `Show*` plumbing never checked by mains; collapse `PrintExtendedHelp` alias; drop unused `Parse` `out` writer. [`internal/cli/cli.go`] [`help.go`] [`flags.go`]
-- [ ] `delete:` Nop applier `--load-media-error-handling`. [`internal/cli/flags.go` ~265–268]
-- [ ] `delete:` Stale “Phase 00 scaffold only” package docs in cli/settings/load/html/css. [`internal/*/doc.go`]
+- [x] `delete:` `IsInherited` and `CompareSpecificity`. [`internal/css/css.go`]
+- [x] Unexported `IsImportant` → `isImportant`. [`internal/css/css.go`]
+- [x] `delete:` `FontFace.Weight` / `FontFace.Style` fields + parse cases. [`internal/css/css.go`]
+- [x] `delete:` `Converter.HttpErrorCode` always-0 method. [`api.go`]
+- [x] `delete:` Unused settings helpers: `PageSizeNames`, `Unit`, `FormatUnitReal`, `MmToPoints`. [`internal/settings/pagesize.go`] [`unitreal.go`]
+- [x] `delete:` CLI `Man` / `HTMLHelp` / unused `Show*`; collapsed `PrintExtendedHelp`; `Parse(argv)` without unused `out`. [`internal/cli/cli.go`] [`help.go`] [`flags.go`] [`cmd/*`]
+- [x] `delete:` Nop applier `--load-media-error-handling`. [`internal/cli/flags.go`]
+- [x] `delete:` Stale “Phase 00 scaffold only” docs: cli, settings, convert; css `doc.go` removed (package comment lives on `css.go`).
+- [x] Hygiene: pre-existing gofmt on `layout/style.go` + `table_continuation_border_test.go`; golden header for `complex-css.html` (was failing header check on master).
 
 ### 0.5 Phase 0 validation gate
 
-- [ ] `make lint` passes after Phase 0 deletes.
-- [ ] `make test` passes after Phase 0 deletes.
-- [ ] Record outcomes here: `lint: _____` · `test: _____` · date: _____
+- [x] `make lint` passes after Phase 0 deletes.
+- [x] `make test` passes after Phase 0 deletes.
+- [x] Record outcomes: `lint: pass (go vet + gofmt clean)` · `test: pass (go test ./...)` · date: **2026-08-07** · net: **~−870 LOC** (42 files in Phase 0 commit)
 
 ---
 

@@ -729,31 +729,6 @@ func (e *engine) prependChrome(insertAt int, st ResolvedStyle, x, y, w, h float6
 	e.ops = append(e.ops, tail...)
 }
 
-// partition splits children into block-level and inline nodes.
-func (e *engine) partition(children []*html.Node, blocks, inlines *[]*html.Node) {
-	for _, c := range children {
-		if c.Type != html.ElementNode {
-			if c.Type == html.TextNode {
-				*inlines = append(*inlines, c)
-			}
-			continue
-		}
-		cs := e.styles[c]
-		if cs.Display == "none" {
-			continue
-		}
-		if cs.Float != "none" || cs.Position == "absolute" || cs.Position == "fixed" {
-			*blocks = append(*blocks, c)
-			continue
-		}
-		if e.isInlineChild(c) {
-			*inlines = append(*inlines, c)
-			continue
-		}
-		*blocks = append(*blocks, c)
-	}
-}
-
 // isInlineChild reports whether n participates in an inline formatting context.
 func (e *engine) isInlineChild(n *html.Node) bool {
 	if n.Type == html.TextNode {

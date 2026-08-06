@@ -1,11 +1,7 @@
-// Package cli implements the wkhtmltopdf-compatible command-line parser:
-// global options, multi-object grammar (page/cover/toc), help/version, and
-// exit-code mapping.
 package cli
 
 import (
 	"fmt"
-	"io"
 	"strings"
 
 	"gowkhtmltopdf/internal/settings"
@@ -33,14 +29,8 @@ type Command struct {
 	Objects []settings.PdfObject
 	Output  string // output path or "-" (stdout)
 
-	ShowHelp          bool
-	ShowVersion       bool
-	ShowLicense       bool
-	ShowExtHelp       bool
 	DumpDefaultTOCXSL bool
 	DumpOutline       bool
-	Man               bool
-	HTMLHelp          bool
 }
 
 // flagSpec describes one accepted flag.
@@ -92,7 +82,7 @@ func (ctx *objectCtx) newFreshObject(c *Command) *settings.PdfObject {
 }
 
 // Parse parses wkhtmltopdf-style arguments.
-func Parse(argv []string, out io.Writer) (*Command, error) {
+func Parse(argv []string) (*Command, error) {
 	cmd := &Command{Global: settings.DefaultPdfGlobal(), Image: settings.DefaultImageGlobal()}
 	cur := &objectCtx{}
 	var free []string
@@ -103,23 +93,13 @@ func Parse(argv []string, out io.Writer) (*Command, error) {
 		i++
 		switch {
 		case arg == "-h" || arg == "--help":
-			cmd.ShowHelp = true
 			return cmd, ErrHelp
 		case arg == "-V" || arg == "--version":
-			cmd.ShowVersion = true
 			return cmd, ErrVersion
 		case arg == "-L" || arg == "--license":
-			cmd.ShowLicense = true
 			return cmd, ErrLicense
 		case arg == "-E" || arg == "--extended-help":
-			cmd.ShowExtHelp = true
 			return cmd, ErrExtHelp
-		case arg == "--man":
-			cmd.Man = true
-			continue
-		case arg == "--html":
-			cmd.HTMLHelp = true
-			continue
 		case arg == "--":
 			// end of options; remaining args are positional
 			for ; i < len(argv); i++ {

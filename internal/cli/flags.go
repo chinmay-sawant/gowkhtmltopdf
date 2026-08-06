@@ -45,14 +45,6 @@ func init() {
 	add("version", ModeBoth, "bool", nopFlag)
 	add("license", ModeBoth, "bool", nopFlag)
 	add("extended-help", ModeBoth, "bool", nopFlag)
-	add("man", ModeBoth, "bool", func(c *Command, cur *objectCtx, val string) error {
-		c.Man = true
-		return nil
-	})
-	add("html", ModeBoth, "bool", func(c *Command, cur *objectCtx, val string) error {
-		c.HTMLHelp = true
-		return nil
-	})
 
 	// --- global PDF flags ---
 	add("quiet", ModeBoth, "bool", func(c *Command, cur *objectCtx, val string) error {
@@ -261,10 +253,6 @@ func init() {
 	add("load-error-handling", ModeBoth, "value", pageScoped(
 		func(g *settings.PdfGlobal, val string) error { return g.Set("loaderrorhandling", val) },
 		func(o *settings.PdfObject, val string) error { return o.Set("load.loaderrorhandling", val) },
-	))
-	add("load-media-error-handling", ModeBoth, "value", pageScoped(
-		func(g *settings.PdfGlobal, val string) error { return nil },
-		func(o *settings.PdfObject, val string) error { return nil },
 	))
 	add("proxy", ModeBoth, "value", pageScoped(
 		func(g *settings.PdfGlobal, val string) error { return g.Set("proxy", val) },

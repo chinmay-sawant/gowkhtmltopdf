@@ -98,22 +98,22 @@ type ResolvedStyle struct {
 	// OverflowWrap is CSS overflow-wrap / word-wrap: "normal" | "break-word" | "anywhere".
 	OverflowWrap string
 	// WordBreak is CSS word-break: "normal" | "break-all" | "keep-all".
-	WordBreak      string
-	TextDecoration string // "none" | "underline" | "line-through"
-	LetterSpacing  float64
-	TextIndent     float64
-	ListStyleType       string // "disc" | "circle" | "square" | "decimal" | "none" | …
-	BorderCollapse      string // "separate" | "collapse"
-	BorderSpacing       float64
-	TableLayout         string // "auto" | "fixed"
-	IsReplaced          bool   // img, hr
-	PageBreakBefore     string // "" | "always" | "avoid"
-	PageBreakAfter      string // "" | "always" | "avoid"
-	PageBreakInside     string // "" | "always" | "avoid"
-	Orphans             int    // CSS orphans; inherited; initial 2; integer ≥ 1
-	Widows              int    // CSS widows; inherited; initial 2; integer ≥ 1
-	ContainerType       string // "" | "normal" | "inline-size" | "size"
-	ContainerName       string // space-separated lower-case names; empty = none
+	WordBreak       string
+	TextDecoration  string // "none" | "underline" | "line-through"
+	LetterSpacing   float64
+	TextIndent      float64
+	ListStyleType   string // "disc" | "circle" | "square" | "decimal" | "none" | …
+	BorderCollapse  string // "separate" | "collapse"
+	BorderSpacing   float64
+	TableLayout     string // "auto" | "fixed"
+	IsReplaced      bool   // img, hr
+	PageBreakBefore string // "" | "always" | "avoid"
+	PageBreakAfter  string // "" | "always" | "avoid"
+	PageBreakInside string // "" | "always" | "avoid"
+	Orphans         int    // CSS orphans; inherited; initial 2; integer ≥ 1
+	Widows          int    // CSS widows; inherited; initial 2; integer ≥ 1
+	ContainerType   string // "" | "normal" | "inline-size" | "size"
+	ContainerName   string // space-separated lower-case names; empty = none
 	// Static 2D CSS transforms (paint-time CTM; sibling flow unchanged).
 	Transform       Matrix2D
 	HasTransform    bool

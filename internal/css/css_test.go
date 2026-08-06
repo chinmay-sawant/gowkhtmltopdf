@@ -74,8 +74,8 @@ func TestParseImportant(t *testing.T) {
 	if d[0].Value != "red" || d[1].Value != "0" {
 		t.Errorf("values not stripped: %+v", d)
 	}
-	if !IsImportant("red !important") || IsImportant("red") {
-		t.Errorf("IsImportant broken")
+	if !isImportant("red !important") || isImportant("red") {
+		t.Errorf("isImportant broken")
 	}
 }
 
@@ -539,40 +539,6 @@ func TestSpecificity(t *testing.T) {
 		a, b, c := Specificity(sel)
 		if a != tc.a || b != tc.b || c != tc.c {
 			t.Errorf("Specificity(%q) = (%d,%d,%d), want (%d,%d,%d)", tc.sel, a, b, c, tc.a, tc.b, tc.c)
-		}
-	}
-}
-
-func TestCompareSpecificity(t *testing.T) {
-	idSel, _ := parseSelector("#x")
-	clsSel, _ := parseSelector(".y")
-	typSel, _ := parseSelector("p")
-	if CompareSpecificity(idSel, clsSel, 0, 0) != 1 {
-		t.Error("id should beat class")
-	}
-	if CompareSpecificity(clsSel, typSel, 0, 0) != 1 {
-		t.Error("class should beat type")
-	}
-	if CompareSpecificity(typSel, idSel, 0, 0) != -1 {
-		t.Error("type should lose to id")
-	}
-	if CompareSpecificity(typSel, typSel, 5, 3) != 1 {
-		t.Error("later source order should lose")
-	}
-	if CompareSpecificity(typSel, typSel, 2, 2) != 0 {
-		t.Error("equal should be equal")
-	}
-}
-
-func TestIsInherited(t *testing.T) {
-	for _, p := range []string{"color", "font-size", "line-height", "text-align", "white-space", "visibility"} {
-		if !IsInherited(p) {
-			t.Errorf("IsInherited(%q) = false, want true", p)
-		}
-	}
-	for _, p := range []string{"margin", "padding", "border", "width", "height", "display", "position"} {
-		if IsInherited(p) {
-			t.Errorf("IsInherited(%q) = true, want false", p)
 		}
 	}
 }

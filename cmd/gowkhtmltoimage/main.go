@@ -16,10 +16,10 @@ func main() {
 }
 
 func run(argv []string) int {
-	cmd, err := cli.Parse(argv, os.Stderr)
+	cmd, err := cli.Parse(argv)
 	if err != nil {
 		switch {
-		case errors.Is(err, cli.ErrHelp):
+		case errors.Is(err, cli.ErrHelp), errors.Is(err, cli.ErrExtHelp):
 			cli.PrintHelp(os.Stdout, cli.ModeImage)
 			return cli.ExitOK
 		case errors.Is(err, cli.ErrVersion):
@@ -27,9 +27,6 @@ func run(argv []string) int {
 			return cli.ExitOK
 		case errors.Is(err, cli.ErrLicense):
 			cli.PrintLicense(os.Stdout)
-			return cli.ExitOK
-		case errors.Is(err, cli.ErrExtHelp):
-			cli.PrintExtendedHelp(os.Stdout, cli.ModeImage)
 			return cli.ExitOK
 		}
 		fmt.Fprintf(os.Stderr, "gowkhtmltoimage: %v\n", err)

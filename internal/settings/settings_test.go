@@ -260,17 +260,6 @@ func TestUnitRealPoints(t *testing.T) {
 	}
 }
 
-func TestUnitRealFormat(t *testing.T) {
-	u, _ := ParseUnitReal("10mm", "mm")
-	if got := u.FormatUnitReal(); got != "10mm" {
-		t.Errorf("FormatUnitReal = %q", got)
-	}
-	u, _ = ParseUnitReal("7.5", "mm")
-	if got := u.FormatUnitReal(); got != "7.5" {
-		t.Errorf("FormatUnitReal implied = %q", got)
-	}
-}
-
 func TestParsePageSize(t *testing.T) {
 	w, h, err := ParsePageSize("A4")
 	if err != nil || math.Abs(w-595.28) > 0.1 || math.Abs(h-841.89) > 0.1 {

@@ -348,17 +348,6 @@ func TestConcurrentLoads(t *testing.T) {
 	}
 }
 
-func TestWaitJSDelay(t *testing.T) {
-	start := time.Now()
-	WaitJSDelay(context.Background(), 30)
-	if d := time.Since(start); d < 25*time.Millisecond {
-		t.Errorf("jsdelay slept %v", d)
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	WaitJSDelay(ctx, 500)
-}
-
 func TestRedirectLimit(t *testing.T) {
 	var n int
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

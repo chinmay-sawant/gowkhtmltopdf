@@ -465,19 +465,6 @@ func unicodeCmap4(mappings []codeGlyph) ([]byte, error) {
 	return out, nil
 }
 
-func coalesceSegments(n int) []struct{ start, end uint16 } {
-	var segs []struct{ start, end uint16 }
-	for i := 0; i < n; {
-		j := i
-		for j+1 < n {
-			j++
-		}
-		segs = append(segs, struct{ start, end uint16 }{uint16(i), uint16(j)})
-		i = j + 1
-	}
-	return segs
-}
-
 // simpleFontRune reports whether r can be encoded as a single-byte char code
 // in a simple PDF font (Latin-1 range; Type0/CID is deferred).
 func simpleFontRune(r rune) bool { return r >= 0 && r <= 0xFF }

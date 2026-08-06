@@ -28,19 +28,9 @@ var (
 	}
 )
 
-// ShapedGlyph is one output glyph from ShapeRun (OpenType or fallback).
-type ShapedGlyph struct {
-	GID     uint16
-	Rune    rune    // Unicode CID for PDF Identity-H when reverse-cmap succeeds
-	Advance float64 // font units
-	Cluster int
-}
-
-// ShapedRun is the result of ShapeRun.
-type ShapedRun struct {
-	Glyphs []ShapedGlyph
-	Text   string // reverse-cmap Unicode string when fully mapped; else ""
-	OT     bool   // true when OpenType shaping produced Glyphs
+// shapedRun is the internal result of OpenType shaping for reverse-cmap text.
+type shapedRun struct {
+	text string // reverse-cmap Unicode when fully mapped; else ""
 }
 
 // ShapeTextFont shapes s for PDF/image emission using OpenType when f has a
@@ -65,8 +55,8 @@ func ShapeTextFontWithFeatures(s string, f *Font, features []shaping.FontFeature
 	if !needShape {
 		return s
 	}
-	if run, ok := tryShapeOpenType(s, f, feats); ok && run.Text != "" {
-		return run.Text
+	if run, ok := tryShapeOpenType(s, f, feats); ok && run.text != "" {
+		return run.text
 	}
 	if ShapeNeeded(s) {
 		return ShapeText(s)
@@ -74,35 +64,18 @@ func ShapeTextFontWithFeatures(s string, f *Font, features []shaping.FontFeature
 	return s
 }
 
-// ShapeRun returns glyph-level shaping. When OpenType succeeds, OT is true and
-// Text holds reverse-cmap Unicode (visual order) suitable for Type0 Identity-H.
-// On failure Glyphs is empty and callers should use ShapeText.
-func ShapeRun(s string, f *Font) ShapedRun {
-	if s == "" {
-		return ShapedRun{}
-	}
-	feats := mergeFontFeatures(s, nil)
-	if !ShapeNeeded(s) && len(feats) == 0 {
-		return ShapedRun{}
-	}
-	if run, ok := tryShapeOpenType(s, f, feats); ok {
-		return run
-	}
-	return ShapedRun{}
-}
-
-func tryShapeOpenType(s string, f *Font, features []shaping.FontFeature) (ShapedRun, bool) {
+func tryShapeOpenType(s string, f *Font, features []shaping.FontFeature) (shapedRun, bool) {
 	if f == nil {
-		return ShapedRun{}, false
+		return shapedRun{}, false
 	}
 	// GSUB covers Arabic ligation; halt/palt live in GPOS and are requested via
 	// FontFeatures — allow the OT path when either applies.
 	if !f.hasGSUB() && len(features) == 0 {
-		return ShapedRun{}, false
+		return shapedRun{}, false
 	}
 	face, ok := gotextFace(f)
 	if !ok {
-		return ShapedRun{}, false
+		return shapedRun{}, false
 	}
 	rev := f.reverseCmap()
 	text := []rune(s)
@@ -124,7 +97,6 @@ func tryShapeOpenType(s string, f *Font, features []shaping.FontFeature) (Shaped
 		FontFeatures: features,
 	}, singleFaceMap{face})
 
-	outGlyphs := make([]ShapedGlyph, 0, len(text))
 	outRunes := make([]rune, 0, len(text))
 	for _, in := range inputs {
 		if in.Face == nil {
@@ -139,26 +111,12 @@ func tryShapeOpenType(s string, f *Font, features []shaping.FontFeature) (Shaped
 			gid := uint16(g.GlyphID)
 			r, ok := rev[gid]
 			if !ok {
-				return ShapedRun{}, false
+				return shapedRun{}, false
 			}
-			adv := 0.0
-			if int(gid) < len(f.advance) {
-				adv = float64(f.advance[gid])
-			}
-			outGlyphs = append(outGlyphs, ShapedGlyph{
-				GID:     gid,
-				Rune:    r,
-				Advance: adv,
-				Cluster: g.ClusterIndex,
-			})
 			outRunes = append(outRunes, r)
 		}
 	}
-	return ShapedRun{
-		Glyphs: outGlyphs,
-		Text:   string(outRunes),
-		OT:     true,
-	}, true
+	return shapedRun{text: string(outRunes)}, true
 }
 
 // ParseFontFeatureSettings parses a CSS font-feature-settings value into

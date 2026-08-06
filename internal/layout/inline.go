@@ -30,14 +30,10 @@ type inlineItem struct {
 	opEnd    int
 }
 
-// layoutInline lays out inline content into line boxes and emits text/image
-// ops. It returns the consumed height and records the first line's baseline
-// on the box. When floats is non-nil, each line re-queries exclusion at its
-// canvas Y so text widens again after a float ends mid-paragraph.
-func (e *engine) layoutInline(b *box, nodes []*html.Node, availW, x, y float64) float64 {
-	return e.layoutInlineFloats(b, nodes, availW, x, y, nil)
-}
-
+// layoutInlineFloats lays out inline content into line boxes and emits
+// text/image ops. It returns the consumed height and records the first line's
+// baseline on the box. When floats is non-nil, each line re-queries exclusion
+// at its canvas Y so text widens again after a float ends mid-paragraph.
 func (e *engine) layoutInlineFloats(b *box, nodes []*html.Node, contentW, contentX, y float64, floats *floatState) float64 {
 	var items []inlineItem
 	oldMax := e.imgMaxW

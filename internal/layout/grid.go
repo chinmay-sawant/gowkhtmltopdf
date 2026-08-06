@@ -983,13 +983,6 @@ func flexibleTrack(fr float64) gridTrackDef {
 	}
 }
 
-func autoTrack() gridTrackDef {
-	return gridTrackDef{
-		min: gridTrackSize{kind: trackAuto},
-		max: gridTrackSize{kind: trackAuto},
-	}
-}
-
 // parseGridTrackFixedMins returns fixed (non-fr) track sizes as minimums for
 // auto-height grids. fr / unknown / intrinsic tracks yield 0.
 func parseGridTrackFixedMins(raw string, e *engine) []float64 {

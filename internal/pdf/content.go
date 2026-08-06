@@ -12,7 +12,6 @@ import (
 type Content struct {
 	buf       bytes.Buffer
 	fontUses  map[string]string // resource name -> font object ref (allocated at finalize)
-	fontDefs  map[string]string // resource name -> base font name (base-14)
 	fontFiles map[string]*Font  // resource name -> parsed font (embedded)
 	used      map[string][]rune // resource name -> runes seen
 	curFont   string            // active font from last SetFont
@@ -24,17 +23,15 @@ type Content struct {
 }
 
 type imageResource struct {
-	ref    string // indirect object ref (allocated lazily)
+	ref    string // indirect object ref (allocated in AddJPEGImage/AddPNGImage)
 	width  int
 	height int
-	data   []byte // raw RGBA
 }
 
 // NewContent creates an empty content stream builder.
 func NewContent() *Content {
 	return &Content{
 		fontUses:  map[string]string{},
-		fontDefs:  map[string]string{},
 		fontFiles: map[string]*Font{},
 		used:      map[string][]rune{},
 		imageUses: map[string]string{},
@@ -53,7 +50,6 @@ func (c *Content) Bytes() []byte { return c.buf.Bytes() }
 func cloneContent(c *Content) *Content {
 	nc := &Content{
 		fontUses:  c.fontUses,
-		fontDefs:  c.fontDefs,
 		fontFiles: c.fontFiles,
 		used:      c.used,
 		curFont:   c.curFont,
@@ -120,14 +116,8 @@ func (c *Content) Rect(x, y, w, h float64) {
 // Fill paints the current path with the fill color.
 func (c *Content) Fill() { c.buf.WriteString("f\n") }
 
-// FillStroke fills and strokes the current path.
-func (c *Content) FillStroke() { c.buf.WriteString("B\n") }
-
 // Stroke strokes the current path.
 func (c *Content) Stroke() { c.buf.WriteString("S\n") }
-
-// ClosePath closes the current subpath.
-func (c *Content) ClosePath() { c.buf.WriteString("h\n") }
 
 // Clip sets the current path as the clipping region (non-zero winding).
 func (c *Content) Clip() { c.buf.WriteString("W n\n") }
@@ -147,14 +137,6 @@ func (c *Content) SetFont(name string, size float64) {
 	c.curFont = name
 	c.curSize = size
 	c.buf.WriteString(fmt.Sprintf("/%s %s Tf\n", name, num(size)))
-}
-
-// UseFont registers a base-14 font under a resource name for later SetFont.
-func (c *Content) UseFont(name, baseFont string) {
-	c.fontDefs[name] = baseFont
-	if c.fontUses[name] == "" {
-		c.fontUses[name] = ""
-	}
 }
 
 // UseEmbeddedFont registers a parsed TTF under a resource name. Runes drawn
@@ -330,69 +312,6 @@ func (c *Content) textShowType0(s string) {
 	c.buf.WriteString(pdfHexCIDs(s) + " Tj\n")
 }
 
-// TextShowAdj draws text with per-char adjustments (kerning offsets in 1/1000 em).
-func (c *Content) TextShowAdj(s string, kern []int) {
-	if len(kern) == 0 {
-		c.TextShow(s)
-		return
-	}
-	if c.textNeedsType0(s) {
-		// Kerning with Type0 is best-effort: draw without adjustments.
-		c.textShowType0(s)
-		return
-	}
-	for _, r := range s {
-		if r > 0xFF {
-			r = winAnsiFold(r)
-		}
-		if r > 0xFF {
-			r = '?'
-		}
-		c.used[c.curFont] = append(c.used[c.curFont], r)
-	}
-	var b strings.Builder
-	b.WriteByte('[')
-	b.WriteString(pdfString(s))
-	for _, k := range kern {
-		b.WriteString(" " + strconv.Itoa(-k))
-	}
-	b.WriteString("] TJ\n")
-	c.buf.WriteString(b.String())
-}
-
-// TextRise sets the text rise.
-func (c *Content) TextRise(rise float64) {
-	c.buf.WriteString(num(rise) + " Ts\n")
-}
-
-// TextHorizScale sets the horizontal text scaling (percent).
-func (c *Content) TextHorizScale(scale float64) {
-	c.buf.WriteString(num(scale) + " Tz\n")
-}
-
-// TextWordSpacing sets word spacing.
-func (c *Content) TextWordSpacing(s float64) {
-	c.buf.WriteString(num(s) + " Tw\n")
-}
-
-// TextCharSpacing sets character spacing.
-func (c *Content) TextCharSpacing(s float64) {
-	c.buf.WriteString(num(s) + " Tc\n")
-}
-
-// images
-
-// DrawImage embeds raw RGBA pixels as a Flate-compressed image XObject and
-// paints it into the rect (x, y, w, h) in PDF coords.
-func (c *Content) DrawImage(name string, x, y, w, h float64, rgba []byte, width, height int) {
-	c.imageRefs[name] = &imageResource{width: width, height: height, data: rgba}
-	c.imageUses[name] = "" // resolved at finalize
-	c.Save()
-	c.Transform(w, 0, 0, h, x, y)
-	c.buf.WriteString("/" + name + " Do\n")
-	c.Restore()
-}
-
 // resources
 
 // fonts returns the map of font resource name to object ref, allocating the
@@ -401,40 +320,28 @@ func (c *Content) DrawImage(name string, x, y, w, h float64, rgba []byte, width,
 func (c *Content) fonts() map[string]string {
 	out := map[string]string{}
 	for name := range c.fontUses {
-		if f, ok := c.fontFiles[name]; ok {
-			ref, err := c.doc.ensureFont(f, c.used[name])
-			if err != nil {
-				continue // skip broken font, layout should have caught it
-			}
-			c.fontUses[name] = ref
-		} else if c.fontUses[name] == "" {
-			c.fontUses[name] = c.doc.newObject()
-			c.doc.setDict(c.fontUses[name], "<< /Type /Font /Subtype /Type1 /BaseFont /"+c.fontDefs[name]+" >>")
+		f, ok := c.fontFiles[name]
+		if !ok {
+			continue
 		}
-		out[name] = c.fontUses[name]
+		ref, err := c.doc.ensureFont(f, c.used[name])
+		if err != nil {
+			continue // skip broken font, layout should have caught it
+		}
+		c.fontUses[name] = ref
+		out[name] = ref
 	}
 	return out
 }
 
-// imageResources returns the map of image resource name to object ref,
-// allocating refs and emitting the image XObject lazily.
+// imageResources returns the map of image resource name to object ref.
+// JPEG/PNG paths allocate the XObject eagerly in AddJPEGImage/AddPNGImage.
 func (c *Content) imageResources() map[string]string {
 	out := map[string]string{}
 	for name, img := range c.imageRefs {
-		if img.ref == "" {
-			raw := img.data
-			dict := fmt.Sprintf("<< /Type /XObject /Subtype /Image /Width %d /Height %d /ColorSpace /DeviceRGB /BitsPerComponent 8",
-				img.width, img.height)
-			if c.doc.useCompression {
-				raw = flateBytes(raw)
-				dict += " /Filter /FlateDecode"
-			}
-			dict += fmt.Sprintf(" /Length %d >>", len(raw))
-			img.ref = c.doc.newObject()
-			c.doc.setDict(img.ref, dict)
-			c.doc.setStream(img.ref, raw)
+		if img.ref != "" {
+			out[name] = img.ref
 		}
-		out[name] = img.ref
 	}
 	return out
 }

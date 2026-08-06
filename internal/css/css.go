@@ -24,11 +24,10 @@ type Stylesheet struct {
 }
 
 // FontFace is one @font-face rule (local src subset).
+// Family and Src are consumed by convert.MergeFontFaces; weight/style are ignored.
 type FontFace struct {
 	Family string
 	Src    string // raw src value (may contain url(...) or local(...))
-	Weight string
-	Style  string
 }
 
 // Rule is one rule set: selectors plus a declaration block.
@@ -248,10 +247,6 @@ func parseFontFace(block string) FontFace {
 			}
 		case "src":
 			ff.Src = d.Value
-		case "font-weight":
-			ff.Weight = d.Value
-		case "font-style":
-			ff.Style = d.Value
 		}
 	}
 	return ff
@@ -1255,29 +1250,6 @@ func Specificity(s Selector) (a, b, c int) {
 	return a, b, c
 }
 
-// CompareSpecificity returns -1/0/1: lower specificity first; ties break on
-// the given orders.
-func CompareSpecificity(a, b Selector, orderA, orderB int) int {
-	ia, ib, ic := Specificity(a)
-	ja, jb, jc := Specificity(b)
-	for _, t := range [][2]int{{ia, ja}, {ib, jb}, {ic, jc}} {
-		if t[0] != t[1] {
-			if t[0] < t[1] {
-				return -1
-			}
-			return 1
-		}
-	}
-	switch {
-	case orderA < orderB:
-		return -1
-	case orderA > orderB:
-		return 1
-	default:
-		return 0
-	}
-}
-
 // ParseInline parses a style="" attribute value into declarations.
 func ParseInline(style string) []Declaration {
 	return parseDeclarations(style)
@@ -1301,7 +1273,7 @@ func parseDeclarations(block string) []Declaration {
 		if prop == "" || value == "" {
 			continue
 		}
-		important := IsImportant(value)
+		important := isImportant(value)
 		if important {
 			value = stripImportant(value)
 		}
@@ -1326,9 +1298,9 @@ func validPropName(p string) bool {
 	return true
 }
 
-// IsImportant reports whether a declaration value carries !important
+// isImportant reports whether a declaration value carries !important
 // (whitespace between ! and important is allowed).
-func IsImportant(v string) bool {
+func isImportant(v string) bool {
 	v = strings.TrimSpace(v)
 	const word = "important"
 	if len(v) < len(word)+1 {
@@ -1344,7 +1316,7 @@ func IsImportant(v string) bool {
 // stripImportant removes a trailing !important (any case, optional space)
 // from a declaration value.
 func stripImportant(v string) string {
-	if !IsImportant(v) {
+	if !isImportant(v) {
 		return v
 	}
 	v = strings.TrimRight(v, " \t")
@@ -1352,20 +1324,6 @@ func stripImportant(v string) string {
 	v = strings.TrimRight(v, " \t")
 	v = strings.TrimSuffix(v, "!")
 	return strings.TrimSpace(v)
-}
-
-// IsInherited reports whether the property inherits from its parent.
-func IsInherited(prop string) bool {
-	switch prop {
-	case "color", "font", "font-family", "font-size", "font-style", "font-variant",
-		"font-weight", "letter-spacing", "line-height", "text-align", "text-indent",
-		"text-transform", "visibility", "white-space", "word-spacing",
-		"border-collapse", "border-spacing", "caption-side", "empty-cells",
-		"list-style", "list-style-image", "list-style-position", "list-style-type",
-		"quotes", "cursor", "direction", "unicode-bidi":
-		return true
-	}
-	return false
 }
 
 // ParseLength parses a CSS length: number + unit, where bare numbers are

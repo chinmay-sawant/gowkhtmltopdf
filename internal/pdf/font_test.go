@@ -237,20 +237,27 @@ func TestFontCacheSharedAcrossPages(t *testing.T) {
 	}
 }
 
-func TestBase14FallbackStillWorks(t *testing.T) {
+func TestEmbeddedFontStillWorks(t *testing.T) {
+	f, err := DefaultFont()
+	if err != nil {
+		t.Fatal(err)
+	}
 	d := fixedDoc(t)
 	d.SetCompression(false)
 	p := d.AddPage(100, 100)
 	c := p.Content()
-	c.UseFont("F1", "Helvetica")
+	c.UseEmbeddedFont("F1", f)
 	c.BeginText()
 	c.SetFont("F1", 12)
 	c.TextAt(5, 5)
 	c.TextShow("x")
 	c.EndText()
 	out := string(writePDF(t, d))
-	if !strings.Contains(out, "/Subtype /Type1 /BaseFont /Helvetica") {
-		t.Error("base-14 font dict missing")
+	if !strings.Contains(out, "/Subtype /TrueType") {
+		t.Error("embedded TrueType font dict missing")
+	}
+	if !strings.Contains(out, "/FontFile2") {
+		t.Error("embedded font file stream missing")
 	}
 }
 

@@ -1,12 +1,12 @@
 // Package load reimplements the MultiPageLoader orchestration layer:
 // URL guessing, HTTP(S)/file fetching, cookies, proxy, auth, local ACL,
-// POST bodies, and the jsdelay/windowStatus/runScript stubs. Not a browser:
-// it hands raw bytes to the HTML/CSS/layout pipeline.
+// and POST bodies. Not a browser: it hands raw bytes to the HTML/CSS/layout
+// pipeline. JS-related settings flags are accepted by the settings/CLI layer
+// but not consumed here (no JS engine).
 package load
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -157,22 +157,18 @@ func isLocalPath(s string) bool {
 		len(s) == 2 && s[1] == ':' // windows drive
 }
 
-// Loader fetches resources concurrently with aggregate progress.
+// Loader fetches resources with the configured network and local-file policy.
 type Loader struct {
 	Client       *http.Client
 	Global       settings.LoadGlobal
 	Log          io.Writer
-	OnProgress   func(percent int)
 	MaxBodySize  int64
 	MaxRedirects int
-	InsecureTLS  bool
 
 	// Allow prefixes and the effective local-access flag, injected by the
 	// caller from settings (convert wires PdfGlobal.Allow + EnableLocalFileAccess).
 	Allow                 []string
 	EnableLocalFileAccess bool
-
-	active int
 }
 
 // NewLoader builds a Loader from global load settings.
@@ -188,13 +184,9 @@ func NewLoader(g settings.LoadGlobal) *Loader {
 }
 
 func (l *Loader) initClient() {
-	tlsCfg := &tls.Config{}
-	if l.InsecureTLS {
-		tlsCfg.InsecureSkipVerify = true // #nosec G402 -- explicit --insecure opt-in
-	}
 	jar, _ := cookiejar.New(nil)
+	// Default TLS verification stays on (http.Transport system roots).
 	transport := &http.Transport{
-		TLSClientConfig:   tlsCfg,
 		ForceAttemptHTTP2: true,
 		DialContext: (&net.Dialer{
 			Timeout:   DefaultConnectTimeout,
@@ -219,19 +211,6 @@ func (l *Loader) initClient() {
 			return nil
 		},
 	}
-}
-
-// ApplyCert loads a client certificate (PEM key+crt) onto the transport.
-func (l *Loader) ApplyCert(certPEM, keyPEM []byte) error {
-	cert, err := tls.X509KeyPair(certPEM, keyPEM)
-	if err != nil {
-		return fmt.Errorf("client cert: %w", err)
-	}
-	if tr, ok := l.Client.Transport.(*http.Transport); ok {
-		tr.TLSClientConfig.Certificates = []tls.Certificate{cert}
-		return nil
-	}
-	return errors.New("client cert: unexpected transport")
 }
 
 // Load fetches the primary resource for an object.
@@ -473,31 +452,4 @@ func decodeDataURL(s string) ([]byte, string, error) {
 func decodeBase64(s string) ([]byte, error) {
 	r := strings.NewReplacer("\n", "", "\r", "", " ", "")
 	return base64.StdEncoding.DecodeString(r.Replace(s))
-}
-
-// WaitJSDelay sleeps ms (or ctx cancel), the MVP stand-in for JS execution.
-func WaitJSDelay(ctx context.Context, ms int) {
-	if ms <= 0 {
-		return
-	}
-	t := time.NewTimer(time.Duration(ms) * time.Millisecond)
-	defer t.Stop()
-	select {
-	case <-ctx.Done():
-	case <-t.C:
-	}
-}
-
-// WarnJSStubs logs once that windowStatus/runScript are accepted but ignored
-// (no JS engine in MVP).
-func WarnJSStubs(log io.Writer, lp settings.LoadPage) {
-	if lp.WindowStatus != "" {
-		fmt.Fprintf(log, "warning: --window-status ignored (no JavaScript engine in MVP)\n")
-	}
-	if lp.RunScript != "" {
-		fmt.Fprintf(log, "warning: --run-script ignored (no JavaScript engine in MVP)\n")
-	}
-	if lp.DebugJavaScript {
-		fmt.Fprintf(log, "warning: --debug-javascript ignored (no JavaScript engine in MVP)\n")
-	}
 }

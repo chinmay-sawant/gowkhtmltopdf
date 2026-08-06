@@ -67,10 +67,6 @@ func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 	// Print-scoped sticky: clamp + continuation clones + reserve flow space.
 	applyStickyPrint(res, contentH)
 
-	// Sticky / chrome cleanup can leave residual empty bands in short avoid
-	// sequences; re-pack once after the paint-time passes settle.
-	packAvoidGaps(res, contentH)
-
 	// Re-derive pages after splits and sticky (new ops / Y shifts).
 	opPage = make([]int, len(res.Ops))
 	perPage := map[int][]int{}
@@ -246,10 +242,10 @@ func capTablePageBreaks(res *Result, contentH float64) {
 	// Group verticals that share a start Y (row top) or end Y (row bottom).
 	roundY := func(y float64) int { return int(math.Round(y * 2)) } // 0.5pt bins
 	type cluster struct {
-		y              float64
-		minX, maxX     float64
-		bw, r, g, b    float64
-		n              int
+		y           float64
+		minX, maxX  float64
+		bw, r, g, b float64
+		n           int
 	}
 	clusterAt := func(byStart bool) map[int]*cluster {
 		out := map[int]*cluster{}
@@ -497,11 +493,9 @@ func paginateOps(res *Result, contentH float64) []int {
 			break
 		}
 	}
-	// Collapse residual empty bands left by keep-together shifts between
-	// consecutive page-break-inside:avoid siblings (wiki reference lists)
-	// and heal mid-item holes from partial line-snaps inside short avoid boxes.
-	packAvoidGaps(res, contentH)
 	// After flow has settled, clone <thead> onto continuation pages.
+	// Blank avoid-list bands are controlled by preferSplitOverBlank during
+	// the fixpoint above (former packAvoidGaps sibling packing was a no-op).
 	repeatTableHeaders(res, contentH)
 	// Sticky is applied in Paint after rect splitting (see splitCrossingRects).
 	opPage := make([]int, len(res.Ops))
@@ -1306,193 +1300,6 @@ func preferSplitOverBlank(remaining, h, contentH float64) bool {
 		}
 	}
 	return false
-}
-
-// packAvoidGaps runs once after the page-break fixpoint. It only applies
-// conservative sibling packing between short page-break-inside:avoid list-like
-// boxes when residual keep-together air is large. Internal line-gap compaction
-// (compactAvoidInternalGaps / shiftOpsBelowY) was removed: a global Y-shift of
-// every op below a hole over-pulled subsequent body paragraphs into each other.
-func packAvoidGaps(res *Result, contentH float64) {
-	// Intentionally no-op. Prior sibling packing + internal compaction used
-	// global Y shifts that interleaved/crushed body and reference text.
-	// preferSplitOverBlank remains the safe fix for blank avoid-list bands.
-	_ = res
-	_ = contentH
-}
-
-// packAvoidSiblingGaps pulls consecutive short avoid siblings together only
-// when the residual gap is large (keep-together residue), never so tightly
-// that the next item collides with the previous ink or natural line pitch.
-// Restricted to short boxes (h < 0.25·contentH) that look like list items —
-// aggressive packing of tall avoid boxes crushed body paragraph spacing.
-func packAvoidSiblingGaps(res *Result, contentH float64) bool {
-	changed := false
-	var walk func(b *box)
-	walk = func(b *box) {
-		// Pack among this parent's children first (document order).
-		var avoidKids []*box
-		for _, c := range b.children {
-			if c.style.PageBreakInside != "avoid" || c.h <= 0 || c.opStart > c.opEnd {
-				continue
-			}
-			// Prefer only short avoid boxes (list items, short citations).
-			if c.h >= contentH*0.25 {
-				continue
-			}
-			avoidKids = append(avoidKids, c)
-		}
-		for i := 1; i < len(avoidKids); i++ {
-			prev, next := avoidKids[i-1], avoidKids[i]
-			if int(prev.y/contentH) != int(next.y/contentH) {
-				continue
-			}
-			prevBot := boxInkBottom(res, prev)
-			nextTop := boxInkTop(res, next)
-			if nextTop < next.y {
-				nextTop = next.y
-			}
-			size := boxTextSize(res, next)
-			if size <= 0 {
-				size = boxTextSize(res, prev)
-			}
-			if size <= 0 {
-				size = 10
-			}
-			// Floor gap after packing: natural line pitch, never below 1.15·size.
-			minGap := size * 1.15
-			if minGap < 8 {
-				minGap = 8
-			}
-			gap := nextTop - prevBot
-			if gap <= minGap+0.5 {
-				continue
-			}
-			excess := gap - minGap
-			// Only pack large residual bands (not normal CSS margins / leading).
-			// Requires excess > 20pt AND > 2·lineSize so modest air is left alone.
-			if excess <= 20 || excess <= 2*size {
-				continue
-			}
-			// Never pull next above the page content top or into prev ink+pitch.
-			pageTop := float64(int(next.y/contentH)) * contentH
-			minY := pageTop + 2
-			if prevBot+minGap > minY {
-				minY = prevBot + minGap
-			}
-			// Pull relative to the box top we will shift.
-			maxPull := next.y - minY
-			// Also limited by how much ink top sits above the natural slot.
-			if pull := nextTop - (prevBot + minGap); pull < maxPull {
-				maxPull = pull
-			}
-			if maxPull < excess {
-				excess = maxPull
-			}
-			if excess <= 0.5 {
-				continue
-			}
-			// Range-shift the next box + everything below its ink top.
-			// Prefer nextTop (ink) as fromY so stale box.y below the text
-			// does not leave the first line behind. Index band covers markers
-			// that sit at high indices.
-			fromY := nextTop - 0.01
-			if next.y-0.01 < fromY {
-				// Also catch any ops/chrome at the border-box top.
-				fromY = next.y - 0.01
-			}
-			shiftFlowY(res, next.opStart, next.opEnd, fromY, -excess)
-			changed = true
-		}
-		for _, c := range b.children {
-			walk(c)
-		}
-	}
-	walk(res.root)
-	return changed
-}
-
-// boxInkBottom returns the lowest painted extent of b's ops (text descent
-// approximated as size*1.2), falling back to b.y+b.h.
-func boxInkBottom(res *Result, b *box) float64 {
-	bot := b.y + b.h
-	if res == nil || b.opStart > b.opEnd || b.opStart < 0 {
-		return bot
-	}
-	end := b.opEnd
-	if end >= len(res.Ops) {
-		end = len(res.Ops) - 1
-	}
-	ink := b.y
-	found := false
-	for k := b.opStart; k <= end; k++ {
-		op := res.Ops[k]
-		ob := op.Y
-		switch op.Kind {
-		case OpText, OpBullet:
-			ob += op.Size * 1.2
-			found = true
-		default:
-			if op.H > 0 {
-				ob += op.H
-				found = true
-			}
-		}
-		if ob > ink {
-			ink = ob
-		}
-	}
-	if found && ink > bot {
-		return ink
-	}
-	if found {
-		return ink
-	}
-	return bot
-}
-
-// boxInkTop returns the topmost text/bullet baseline of b, or b.y.
-func boxInkTop(res *Result, b *box) float64 {
-	if res == nil || b.opStart > b.opEnd || b.opStart < 0 {
-		return b.y
-	}
-	top := b.y
-	found := false
-	end := b.opEnd
-	if end >= len(res.Ops) {
-		end = len(res.Ops) - 1
-	}
-	for k := b.opStart; k <= end; k++ {
-		op := res.Ops[k]
-		if op.Kind != OpText && op.Kind != OpBullet {
-			continue
-		}
-		if !found || op.Y < top {
-			top = op.Y
-			found = true
-		}
-	}
-	if !found {
-		return b.y
-	}
-	return top
-}
-
-func boxTextSize(res *Result, b *box) float64 {
-	if res == nil || b.opStart > b.opEnd || b.opStart < 0 {
-		return 0
-	}
-	end := b.opEnd
-	if end >= len(res.Ops) {
-		end = len(res.Ops) - 1
-	}
-	for k := b.opStart; k <= end; k++ {
-		op := res.Ops[k]
-		if (op.Kind == OpText || op.Kind == OpBullet) && op.Size > 0 {
-			return op.Size
-		}
-	}
-	return 0
 }
 
 func hasNestedFlowChild(b *box) bool {

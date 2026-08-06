@@ -183,12 +183,3 @@ func DecodeWOFF(data []byte) ([]byte, error) {
 	}
 	return out, nil
 }
-
-// DecodeWOFF2 documents the WOFF2 gap: Brotli is not in stdlib and not an
-// allowlisted direct module; go-text/typesetting only reads WOFF1.
-func DecodeWOFF2(data []byte) ([]byte, error) {
-	if len(data) < 4 || string(data[0:4]) != woff2Signature {
-		return nil, errWOFFBadSignature
-	}
-	return nil, errWOFF2Unsupported
-}

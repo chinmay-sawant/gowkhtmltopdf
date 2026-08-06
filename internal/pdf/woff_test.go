@@ -148,13 +148,9 @@ func TestDecodeWOFFRejectsOverlap(t *testing.T) {
 
 func TestDecodeWOFF2Gap(t *testing.T) {
 	// Concrete gap: WOFF2 needs Brotli; typesetting has no WOFF2 reader and we
-	// do not add direct modules. Decode must fail with the documented error.
+	// do not add direct modules. ParseFontBytes rejects wOF2 with a clear error.
 	buf := []byte("wOF2....fake...")
-	_, err := DecodeWOFF2(buf)
-	if !errors.Is(err, errWOFF2Unsupported) {
-		t.Fatalf("DecodeWOFF2: got %v, want errWOFF2Unsupported", err)
-	}
-	_, err = ParseFontBytes(buf)
+	_, err := ParseFontBytes(buf)
 	if !errors.Is(err, errWOFF2Unsupported) {
 		t.Fatalf("ParseFontBytes WOFF2: got %v, want errWOFF2Unsupported", err)
 	}

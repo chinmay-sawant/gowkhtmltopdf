@@ -1,3 +1,2 @@
-// Package cli is reserved by the cli phase of the gowkhtmltopdf rewrite.
-// Phase 00 scaffold only; implementation lands in later phases.
+// Package cli implements the wkhtmltopdf-compatible CLI parser, multi-object grammar, and help output.
 package cli

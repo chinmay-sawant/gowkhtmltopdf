@@ -284,15 +284,6 @@ func ConvertHTML(ctx context.Context, html []byte, global *GlobalSettings) ([]by
 	return c.Output(), nil
 }
 
-// HttpErrorCode returns the wkhtmltopdf-style HTTP error exit code for the
-// last conversion (2 for a 404, 3 for a 401). The pure-Go pipeline does not
-// yet classify load failures into those codes, so this always returns 0;
-// it exists for upstream API parity. Errors from a failed load surface
-// through Convert's error return instead.
-func (c *Converter) HttpErrorCode() int {
-	return 0
-}
-
 // ---------------------------------------------------------------------------
 // Image conversion
 // ---------------------------------------------------------------------------

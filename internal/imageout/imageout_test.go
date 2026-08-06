@@ -273,7 +273,7 @@ func TestEncodeFormats(t *testing.T) {
 // runCommand builds a parsed cli.Command pointing at input with output file.
 func runCommand(t *testing.T, args ...string) *cli.Command {
 	t.Helper()
-	cmd, err := cli.Parse(args, io.Discard)
+	cmd, err := cli.Parse(args)
 	if err != nil {
 		t.Fatalf("cli.Parse(%v): %v", args, err)
 	}

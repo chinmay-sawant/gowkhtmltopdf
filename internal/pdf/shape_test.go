@@ -99,16 +99,6 @@ func TestShapeTextFontArabicOTJoining(t *testing.T) {
 	if rs[1] != 0xFE91 {
 		t.Errorf("second U+%04X want FE91 (initial)", rs[1])
 	}
-	run := ShapeRun("بب", f)
-	if !run.OT {
-		t.Fatal("expected OT shaping")
-	}
-	if len(run.Glyphs) != 2 {
-		t.Fatalf("glyphs=%d", len(run.Glyphs))
-	}
-	if run.Glyphs[0].Advance <= 0 || run.Glyphs[1].Advance <= 0 {
-		t.Fatalf("expected positive advances: %+v", run.Glyphs)
-	}
 }
 
 func TestShapeTextFontArabicOTLamAlef(t *testing.T) {

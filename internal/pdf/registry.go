@@ -185,20 +185,6 @@ func ScanFontDir(dir string) (*Registry, error) {
 	return r, nil
 }
 
-// MergeRegistries combines multiple registries (later faces append).
-func MergeRegistries(regs ...*Registry) *Registry {
-	out := NewRegistry()
-	for _, r := range regs {
-		if r == nil {
-			continue
-		}
-		for fam, faces := range r.byFamily {
-			out.byFamily[fam] = append(out.byFamily[fam], faces...)
-		}
-	}
-	return out
-}
-
 // DefaultSystemFontDirs returns common system font directories for the current OS.
 // Callers must opt in via --use-system-fonts; nothing is scanned by default.
 // Proprietary Windows/corefont trees are omitted — use Liberation (bundled)

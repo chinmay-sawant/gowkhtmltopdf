@@ -6,7 +6,7 @@ Ponytail **ultra** leanness audits for gowkhtmltopdf.
 
 | File | Date | Rating | Notes |
 |---|---|---:|---|
-| [ponytail-ultra-2026-08-06.md](./ponytail-ultra-2026-08-06.md) | 2026-08-06 | **5.7 / 10** | Baseline; 5 subagents; phase-wise checklist to ~10/10 |
+| [ponytail-ultra-2026-08-06.md](./ponytail-ultra-2026-08-06.md) | 2026-08-06 | **5.7 / 10** baseline · **~6.5** est. post-P0 | Phase 0 closed 2026-08-07 on `chore/ponytail-review-1` |
 
 ## Skills used
 

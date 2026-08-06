@@ -9,7 +9,7 @@ import (
 
 func parse(t *testing.T, args ...string) *Command {
 	t.Helper()
-	cmd, err := Parse(args, nil)
+	cmd, err := Parse(args)
 	if err != nil {
 		t.Fatalf("Parse(%v): %v", args, err)
 	}
@@ -293,28 +293,28 @@ func TestPrintLinkUnderlineFlag(t *testing.T) {
 }
 
 func TestUnknownFlagErrors(t *testing.T) {
-	if _, err := Parse([]string{"--bogus-flag", "x", "out.pdf"}, nil); err == nil {
+	if _, err := Parse([]string{"--bogus-flag", "x", "out.pdf"}); err == nil {
 		t.Error("unknown flag must error")
 	}
-	if _, err := Parse([]string{"-Z", "x", "out.pdf"}, nil); err == nil {
+	if _, err := Parse([]string{"-Z", "x", "out.pdf"}); err == nil {
 		t.Error("unknown short flag must error")
 	}
 }
 
 func TestDocFlags(t *testing.T) {
 	for _, args := range [][]string{{"--help"}, {"-h"}} {
-		_, err := Parse(args, nil)
+		_, err := Parse(args)
 		if err != ErrHelp {
 			t.Errorf("Parse(%v) = %v, want ErrHelp", args, err)
 		}
 	}
 	for _, args := range [][]string{{"--version"}, {"-V"}} {
-		_, err := Parse(args, nil)
+		_, err := Parse(args)
 		if err != ErrVersion {
 			t.Errorf("Parse(%v) = %v, want ErrVersion", args, err)
 		}
 	}
-	_, err := Parse([]string{"--license"}, nil)
+	_, err := Parse([]string{"--license"})
 	if err != ErrLicense {
 		t.Errorf("license = %v", err)
 	}
@@ -350,7 +350,7 @@ func TestImageFlags(t *testing.T) {
 }
 
 func TestValidateNoInput(t *testing.T) {
-	if _, err := Parse([]string{"toc", "out.pdf"}, nil); err == nil {
+	if _, err := Parse([]string{"toc", "out.pdf"}); err == nil {
 		t.Error("toc-only must error (no input page)")
 	}
 }

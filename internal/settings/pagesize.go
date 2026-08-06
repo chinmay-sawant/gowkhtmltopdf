@@ -78,15 +78,3 @@ func canonical(key string) string {
 	}
 	return key
 }
-
-// PageSizeNames returns all supported named sizes (sorted, lowercased keys
-// not needed for display).
-func PageSizeNames() []string {
-	names := []string{
-		"A0", "A1", "A2", "A3", "A4", "A5", "A6",
-		"B0", "B1", "B2", "B3", "B4", "B5", "B6",
-		"C5E", "Comm10E", "DLE", "Executive", "Folio",
-		"Ledger", "Legal", "Letter", "Tabloid",
-	}
-	return names
-}

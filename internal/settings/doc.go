@@ -1,3 +1,2 @@
-// Package settings is reserved by the settings phase of the gowkhtmltopdf rewrite.
-// Phase 00 scaffold only; implementation lands in later phases.
+// Package settings implements the wkhtmltopdf-compatible settings model and dotted-name Set surface.
 package settings
