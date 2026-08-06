@@ -107,9 +107,9 @@ func LengthToPt(val float64, unit string, basePt float64) (float64, bool) {
 
 // ParseContainerNameValue parses container-name: none | <custom-ident>+.
 // Returns the space-joined names (empty for none / invalid).
-// FIX-REVIEW: P3-03 A typed `ContainerNames []string` with Matches(name) is
-// deferred to avoid wave-1 churn: layout re-splits this string in two places
-// (style.go:1098, container.go:19-24) — change together in a later wave.
+// ponytail: space-joined string is the wire form layout re-splits in two
+// places; upgrade to typed ContainerNames with Matches(name) when those
+// call sites change together.
 func ParseContainerNameValue(value string) string {
 	value = strings.TrimSpace(value)
 	if value == "" || strings.EqualFold(value, "none") {

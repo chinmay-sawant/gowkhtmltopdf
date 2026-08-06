@@ -70,7 +70,7 @@ func (e *engine) buildMulticol(n *html.Node, st ResolvedStyle, availW, x, y floa
 			cy = e.scalePt(st.MaxHeight)
 		}
 		b.h = cy
-		e.prependChrome(contentStart, st, b.x, y, b.w, b.h)
+		e.prependChrome(contentStart, b, st, b.x, y, b.w, b.h)
 		return b
 	}
 
@@ -134,7 +134,7 @@ func (e *engine) buildMulticol(n *html.Node, st ResolvedStyle, availW, x, y floa
 		cy = e.scalePt(st.MaxHeight)
 	}
 	b.h = cy
-	e.prependChrome(contentStart, st, b.x, y, b.w, b.h)
+	e.prependChrome(contentStart, b, st, b.x, y, b.w, b.h)
 	return b
 }
 

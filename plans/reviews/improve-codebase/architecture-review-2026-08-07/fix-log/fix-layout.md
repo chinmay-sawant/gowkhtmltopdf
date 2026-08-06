@@ -1,6 +1,6 @@
 # fix-log/fix-layout.md — wave-1 remediation of `internal/layout`
 
-Agent: fix-layout (owns `internal/layout/*`). Date: 2026-08-07.
+Agent: fix-layout / fix-layout-finish (owns `internal/layout/*`). Date: 2026-08-07.
 Source of truth: `phases/phase-04-layout-engine.md`, phase-03 layout rows, phase-05 layout paint, phase-02 P2-13 layout side.
 
 ## Per-CID status
@@ -26,21 +26,26 @@ Source of truth: `phases/phase-04-layout-engine.md`, phase-03 layout rows, phase
 - `box.row` set at placement: `cell.row, cell.rowSpan = p.row, p.rSpan`.
 - Removed `cellStartRow` scans; rowspan growth, final height assign, `rowspanCovers`, and `colspanCovers` use `cell.row`.
 
-### P4-05 — one text-wrap policy — PARTIAL
-- Added `wordBreakPolicy` + `wordBreakOf(st)` (normal / break-all / break-word / never).
-- Wired into `unbreakableMinWidth` and `breakOverflowItem`.
-- Full `breakToken` / `minContentWidth` unification and `measureCellMinMax` rewrite deferred (higher risk; fixtures green with policy enum only).
-- `// FIX-REVIEW: P4-05` residual: complete token chunker shared by measure + line pack.
+### P4-05 — one text-wrap policy — DONE
+- `wordBreakPolicy` + `wordBreakOf(st)` (normal / break-all / break-word / never).
+- `softModeOf(pol)` maps policy → soft-break rune table (shared by pack + measure).
+- `breakToken(s, st, firstMax, restMax) []string` — single chunker used by `breakOverflowItem`.
+- `minContentWidth(s, st)` replaces `unbreakableMinWidth`; `measureCellMinMax` calls it.
+- `breakOverflowItem` no longer re-derives break-all/break-word flags for soft-mode selection; gate logic uses `wordBreakOf` enum only, then `breakToken`.
+- lineOnlyNowrap / em*10 cite-cluster cap kept in measure (layout-specific heuristic; not part of token policy).
 
 ### P4-06 — inline CB width into inline-block measure — DONE
 - `engine.inlineCBW` set in `layoutInlineFloats` from `contentW`.
 - `inlineBlockAvail(n, st, cbW)` resolves `width:%` against `cbW` when > 0, else viewport fallback.
 - `collectInlineNode` passes `e.inlineCBW`.
 
-### P4-07 — defer chrome / stop splice — PARTIAL / DEFERRED
-- Attempted deferred `chromeEntry` + `finalizeChrome`: broke chrome-only boxes (empty `opStart>opEnd` before merge), sticky clone StickyID stamping, and transform stamping on abspos fills.
-- Restored immediate splice in `prependChrome` for correctness.
-- Marker in `prependChrome`: `// FIX-REVIEW: P4-07 full deferred-chrome needs re-stamping StickyID/Fixed and chrome-only ranges after merge`.
+### P4-07 — defer chrome / stop splice — DONE (safer partial)
+- Option A: defer background/border chrome for the common path; keep immediate splice for sticky / fixed / transform boxes (`chromeMustSpliceImmediately`).
+- `chromeEntry{at, ops, b}` + `engine.deferredChrome`; `prependChrome` records or splices.
+- Immediate splices bump deferred `at` indices so mixed mode stays consistent.
+- `finalizeChrome` (called from `Layout` before `stampBoxTransforms`): one linear merge, reverse-registration order at same `at` (parent chrome under child), `oldToNew` remap, owner chrome expansion, bottom-up parent∪children range union, `restampStickyFixed`.
+- `shiftBoxOps` also shifts deferred chrome owned by the moved subtree (float/relative geometry).
+- Full append-only build for sticky/fixed/transform left as future; common chromed blocks no longer O(B·N) splice.
 
 ### P3-01 — one cascade rule-walk for pseudo-content — DONE
 - Added `styleContext.matchedRules(n, pe)` with media + `@container` + specificity gates.
@@ -76,18 +81,14 @@ Source of truth: `phases/phase-04-layout-engine.md`, phase-03 layout rows, phase
 - `Paint` / `PaintBand` skip `opKindNoop`.
 - convert `stripLinkURIs` consumer = fix-convert.
 
-## Files changed
-- `internal/layout/layout.go` — imageRef/cache, contentBox, sizeTableColumns, cell.row, wordBreakPolicy, DeactivateOp, Layout containers, buildImage/measure paths
-- `internal/layout/inline.go` — imgRef, inlineCBW, inlineBlockAvail(cbW), wordBreakOf in breakOverflow
-- `internal/layout/flex.go`, `grid.go`, `multicol.go` — contentBox
-- `internal/layout/style.go` — resolveStylesWith, matchedRules, mergeCustomProps → ResolveCustomProps, LengthToPt callers
-- `internal/layout/pseudo_content.go` — matchedRules + containers
-- `internal/layout/transform.go` — LengthToPt in parseTransformLength
-- `internal/layout/paint.go` — PaintStyle/StyleOf/FakeBoldFor/PaintBand, image embed error prop, noop skip
+## Files changed (this close-out)
+- `internal/layout/layout.go` — minContentWidth, softModeOf, chromeEntry/deferredChrome, prependChrome defer path, finalizeChrome, restampStickyFixed, shiftBoxOps deferred shift
+- `internal/layout/inline.go` — breakToken; breakOverflowItem uses wordBreakOf + breakToken only
+- `internal/layout/flex.go`, `grid.go`, `multicol.go` — prependChrome(box, …) signature
 
 ## Validation
 ```
-gofmt -w $(find internal/layout -name '*.go')
+gofmt -w internal/layout/layout.go internal/layout/inline.go internal/layout/flex.go internal/layout/grid.go internal/layout/multicol.go
 go build ./internal/layout/...
 go vet ./internal/layout/...
 go test ./internal/layout/... -count=1
@@ -97,14 +98,14 @@ All green (`ok gowkhtmltopdf/internal/layout`).
 ## Remaining markers / handoffs
 | Marker | Owner |
 |---|---|
-| `// FIX-REVIEW: P4-07` deferred chrome | fix-layout later wave |
-| `// FIX-REVIEW: P4-05` full breakToken/minContentWidth | fix-layout later wave |
 | PaintBand/StyleOf consumers | fix-convert, fix-imageout-wave2 |
 | `layout.DeactivateOp` consumers | fix-convert |
 | container.go zoom in contentInlineSize | optional follow-up |
+| P4-07 full append-only for sticky/fixed/transform | optional later (common path deferred now) |
 
 ## Summary for parent
-- **done:** P4-01, P4-02, P4-03, P4-04, P4-06, P3-01, P3-03 layout, P3-04 layout, P3-05, P5-01 layout, P5-07 layout, P2-13 layout
-- **partial:** P4-05 (policy enum wired), P4-07 (deferred chrome rolled back; marker left)
+- **done:** P4-01..P4-07, P3-01, P3-03 layout, P3-04 layout, P3-05, P5-01 layout, P5-07 layout, P2-13 layout
+- **partial:** none for layout CIDs in this wave
 - **blocked:** none
 - **CI:** `go build/vet/test ./internal/layout/...` all pass
+- **FIX-REVIEW removed:** P4-05, P4-07

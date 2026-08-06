@@ -1,7 +1,7 @@
 # Reviews / Improve codebase architecture — gowkhtmltopdf (2026-08-07)
 
 > **Parent:** `plans/reviews/improve-codebase/README.md` - architecture deepening reviews
-> **Status:** **findings complete** (2026-08-07) — 7 explore agents, 49 findings → 45 checklist rows; remediation not started
+> **Status:** **remediation complete** (2026-08-07) — 46 checklist rows closed; see `phases/` and `fix-log/`
 > **Scope:** whole Go tree (~714k non-test bytes), 7 non-overlapping areas
 > **Method:** 7 explore subagents (surface/API, settings+CLI, HTML+load+outline, CSS, layout, convert, PDF/fonts/raster) — `improve-codebase-architecture` deepening, `codebase-design` vocabulary (module depth, seams, locality, leverage); ran after ponytail leanness closed (9.5/10)
 > **Plan shape:** phase-wise checklist; report split into per-phase files

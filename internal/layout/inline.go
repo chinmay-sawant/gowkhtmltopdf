@@ -211,17 +211,15 @@ func (e *engine) breakOverflowItem(it inlineItem, remainW, fullLineW, restLineW 
 	if adv <= remainW+0.01 {
 		return nil
 	}
-	breakAll := pol == breakAll
-	breakWord := pol == breakWord
 	tokenExceedsLine := adv > fullLineW+0.01
 	// Mid-line: a normal / break-word token that fits a full next line must
 	// wrap whole — not mid-break into a tight remainW (captions: "International").
-	if !breakAll && !tokenExceedsLine {
+	if pol != breakAll && !tokenExceedsLine {
 		return nil
 	}
 	// Emergency path (overflow-wrap:normal): only when alone on the line and
 	// the token is wider than that line.
-	if !breakAll && !breakWord {
+	if pol == breakNormal {
 		if !(aloneOnLine && tokenExceedsLine) {
 			// Defer to next line where aloneOnLine emergency can apply.
 			return nil
@@ -253,16 +251,7 @@ func (e *engine) breakOverflowItem(it inlineItem, remainW, fullLineW, restLineW 
 	if restRoom < 1 {
 		return nil
 	}
-	// Soft opportunities: full set for overflow-wrap:break-word; URL-ish only
-	// for pure emergency (avoid splitting ordinary hyphenated words).
-	softMode := softBreakURL
-	if breakWord && !breakAll {
-		softMode = softBreakWord
-	}
-	if breakAll {
-		softMode = softBreakNone // grapheme-only
-	}
-	chunks := e.splitTextToWidth(it.text, it.style, firstRoom, restRoom, softMode)
+	chunks := e.breakToken(it.text, it.style, firstRoom, restRoom)
 	if len(chunks) <= 1 {
 		return nil
 	}
@@ -280,6 +269,20 @@ func (e *engine) breakOverflowItem(it inlineItem, remainW, fullLineW, restLineW 
 		out = append(out, part)
 	}
 	return out
+}
+
+// breakToken splits s into chunks that each fit firstMax (first piece) then
+// restMax under wordBreakOf(st). Shared by inline overflow packing; soft-mode
+// selection lives only here (and softModeOf) so measure and pack cannot drift.
+func (e *engine) breakToken(s string, st ResolvedStyle, firstMax, restMax float64) []string {
+	if s == "" {
+		return nil
+	}
+	pol := wordBreakOf(st)
+	if pol == breakNever {
+		return []string{s}
+	}
+	return e.splitTextToWidth(s, st, firstMax, restMax, softModeOf(pol))
 }
 
 // preferFloatClearForTail reports whether remaining inline content from i

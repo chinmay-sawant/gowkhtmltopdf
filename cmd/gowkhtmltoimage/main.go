@@ -33,12 +33,11 @@ func run(argv []string) int {
 		return cli.ExitError
 	}
 
+	// imageout.Run opens the output sink, resolves --format from the path,
+	// builds convert.Request, and calls RunRequest (P1-1 adapter).
 	if err := imageout.Run(context.Background(), cmd, os.Stderr); err != nil {
 		fmt.Fprintf(os.Stderr, "gowkhtmltoimage: %v\n", err)
-		if hc, ok := err.(interface{ HttpErrorCode() int }); ok {
-			return hc.HttpErrorCode()
-		}
-		return cli.ExitError
+		return cli.ExitCode(err)
 	}
 	return cli.ExitOK
 }

@@ -13,10 +13,32 @@ import (
 	"gowkhtmltopdf/internal/settings"
 )
 
+// objectPlacement holds document page indices filled after paint / TOC
+// assembly. Load-time fields stay on objectState; these mutate as the
+// pipeline places the object into the final page set.
+//
+// Lifecycle:
+//   - pages, offset: set in renderObject after body paint (pre-TOC reorder)
+//   - start: set after TOC reorder (tocs: assembly positions; bodies: tocTotal+offset)
+//   - TOC objects use tocPages for count; start is set at paint then rewritten
+//     when TOC pages move to the front.
+type objectPlacement struct {
+	pages  int // body: number of painted pages
+	offset int // body: body-global index of the first page (pre-TOC reorder)
+	start  int // final document page index of the first page (post-reorder)
+}
+
 // objectState is the per-object state gathered during the loading loop and
 // consumed by the TOC, outline, link and header/footer passes. Body objects
 // carry headings/layout; TOC objects carry their effective TOC settings and
 // the generated page layout.
+//
+// Fields are grouped by lifecycle:
+//   - identity / settings: obj, idx, isTOC, header, footer, repl, toc, media, …
+//   - load-time resources: registry, base, lp, imagesFn, geom, headerHTML/footerHTML
+//   - body content: res, headings
+//   - TOC content: tocPages, tocRoot, tocRes
+//   - placement (post-paint): embedded objectPlacement (pages, offset, start)
 type objectState struct {
 	obj   *settings.PdfObject
 	idx   int // 0-based object index (messages use idx+1)
@@ -33,6 +55,8 @@ type objectState struct {
 
 	// registry is the opt-in font registry (--font-path / body @font-face)
 	// shared with nested HTML HF layout so HF can resolve the same faces.
+	// effectiveMargins returns the HF-extended registry; callers assign it
+	// explicitly (see renderObject handshake).
 	registry *pdf.Registry
 
 	base     string
@@ -43,8 +67,6 @@ type objectState struct {
 
 	// body objects:
 	res      *layout.Result
-	pages    int
-	offset   int // body-global page index of the first page
 	headings []*outline.Heading
 
 	// TOC objects:
@@ -52,8 +74,8 @@ type objectState struct {
 	tocRoot  *html.Node
 	tocRes   *layout.Result
 
-	// final document placement (filled after the page reorder):
-	start int // document page index of the first page
+	// Document placement (pages/offset/start); see objectPlacement.
+	objectPlacement
 }
 
 // docTitle extracts the <title> element text of a document, or "".

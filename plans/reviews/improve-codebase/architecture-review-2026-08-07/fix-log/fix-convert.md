@@ -20,9 +20,9 @@ Agent: **fix-convert** (owns `internal/convert/*` only)
 | **P2-01 / P2-14** | **done** | Exported `CollectSheets(..., SheetOptions, log)` + `SheetOptions`. Call sites in convert/HF use it. |
 | **P2-03** | **done** | `pagePlan` with `OwnerOf`/`Remap`/`Ranges`/`LogicalN`; HF + link remap consume it. |
 | **P2-11** | **done** | `newHFGeom` + `objectState.bodyLayoutOpts` share geometry/layout option construction. |
-| **P2-12** | **partial** | Unused `cmd` dropped from `applyInternalLinks`. `paintCount` still swallows paint errors (returns 1). Marker left. |
+| **P2-12** | **done** | `paintCount` returns `(int, error)`; `renderTOCObjects` wraps with `object %d: toc: paintCount`. FIX-REVIEW removed. |
 | **P2-13** | **done** | Uses `layout.DeactivateOp` for link neutralization (sentinel deleted). |
-| **P2-10** | **deferred** | `objectState` not slimmed (risk); no marker at a single call site — logged here. |
+| **P2-10** | **done** | `objectPlacement` (pages/offset/start) embedded; lifecycle comments. HF registry returned from `loadHTMLHF`/`effectiveMargins`; explicit assign in `renderObject`/`initTOCState`. |
 | **P5-01** | **done** | HF `paintLayoutOps` → `layout.PaintBand` for visual ops; link annotations remain convert-side. |
 | **P5-02** | **deferred** | Full page-assembly pipe extract not landed (wave-2/imageout shared); logged. |
 | **P3-03** | **done** | TOC `lengthToPt` delegates to `css.LengthToPt` after `css.ParseLength`. |
@@ -47,11 +47,42 @@ go test ./internal/convert/... -count=1   # GREEN (ok, ~1.5–2s)
 
 ## Remaining markers
 
-- `internal/convert/toc.go` — `// FIX-REVIEW: P2-12 paintCount swallows paint errors (returns 1); …`
-- P2-10 objectState slim / P5-02 shared pipe: deferred in this log (no silent drop of required MUST rows).
+- None in `internal/convert/*`.
+- P5-02 shared page-assembly pipe: still deferred (wave-2/imageout shared).
 
 ## Cross-package notes for orchestrator
 
 - `outline.SortHeadings` / `SectionOf` still key on `Heading.Page`. Convert uses `headingsDocPageView` so document-global consumers see DocPage projected into Page without mutating shared object-local Page.
 - `settings.ResolveMedia` takes `*Web`; object PDF media lives on `LoadPage` — convert projects Load→Web at the mediaFor boundary.
 - `layout.PaintBand` + `layout.DeactivateOp` consumed (were available by wave-1 layout).
+
+## Finish pass
+
+Agent: **fix-convert-finish** (2026-08-07)
+
+### Closed
+
+| CID | Work |
+|---|---|
+| **P2-12** | `paintCount` → `(int, error)`; both measure loops in `renderTOCObjects` propagate via `fmt.Errorf("object %d: toc: paintCount: %w", …)`. FIX-REVIEW marker removed. |
+| **P2-10** | Extracted `objectPlacement{pages,offset,start}` embedded on `objectState` with lifecycle comments (load-time vs placement). `loadHTMLHF` / `hfHeightFor` / `effectiveMargins` return `*pdf.Registry`; no silent `st.registry` mutation inside `loadHTMLHF`. Callers assign: `initTOCState`, `renderObject` (explicit body handshake), late HF load in `drawHeadersFooters`. |
+
+### FIX-REVIEW sweep
+
+- Zero remaining `FIX-REVIEW` markers under `internal/convert/`.
+
+### Validation
+
+```
+gofmt -w internal/convert/*.go
+go build ./internal/convert/...   # GREEN
+go vet ./internal/convert/...     # GREEN
+go test ./internal/convert/... -count=1   # GREEN (~1.8s)
+```
+
+### Files touched (finish)
+
+- `internal/convert/toc.go` — paintCount error surface
+- `internal/convert/outline.go` — objectPlacement + objectState docs
+- `internal/convert/hf.go` — registry return path for HF load/margins
+- `internal/convert/convert.go` — effectiveMargins registry handshake

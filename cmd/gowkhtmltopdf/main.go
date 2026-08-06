@@ -52,12 +52,29 @@ func run(argv []string) int {
 	if cmd.Global.Quiet {
 		logw = io.Discard
 	}
-	if err := convert.RunPDFContext(context.Background(), cmd, logw, nil); err != nil {
+
+	out, closeOut, err := cmd.OpenOutput()
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "gowkhtmltopdf: %v\n", err)
-		if hc, ok := err.(interface{ HttpErrorCode() int }); ok {
-			return hc.HttpErrorCode()
-		}
-		return cli.ExitError
+		return cli.ExitCode(err)
+	}
+	req := &convert.Request{
+		Global:  cmd.Global,
+		Objects: cmd.Objects,
+		Output:  out,
+	}
+	// CLI may still set the legacy Command.DumpOutline bit; OR into Global
+	// (same as convert.RunPDFContext adapter).
+	if cmd.DumpOutline {
+		req.Global.DumpOutline = true
+	}
+	runErr := convert.Run(context.Background(), req, logw, nil)
+	if closeErr := closeOut(); closeErr != nil && runErr == nil {
+		runErr = closeErr
+	}
+	if runErr != nil {
+		fmt.Fprintf(os.Stderr, "gowkhtmltopdf: %v\n", runErr)
+		return cli.ExitCode(runErr)
 	}
 	return cli.ExitOK
 }

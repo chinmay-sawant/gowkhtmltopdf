@@ -59,7 +59,7 @@ func (e *engine) buildFlex(n *html.Node, st ResolvedStyle, availW, x, y float64)
 		}
 	}
 	b.h = cy
-	e.prependChrome(contentStart, st, b.x, y, b.w, b.h)
+	e.prependChrome(contentStart, b, st, b.x, y, b.w, b.h)
 	return b
 }
 

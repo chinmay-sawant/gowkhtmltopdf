@@ -450,9 +450,11 @@ func initTOCState(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 		geom:     geom,
 		lp:       obj.Load,
 	}
-	if err := effectiveMargins(ctx, loader, font, req.Global, st, log); err != nil {
+	reg, err := effectiveMargins(ctx, loader, font, req.Global, st, log)
+	if err != nil {
 		return nil, fmt.Errorf("object %d: %w", idx+1, err)
 	}
+	st.registry = reg
 	return st, nil
 }
 
@@ -514,11 +516,13 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 		imagesFn: imagesFn,
 		doctitle: docTitle(root),
 	}
-	if err := effectiveMargins(ctx, loader, font, req.Global, st, log); err != nil {
+	reg, err := effectiveMargins(ctx, loader, font, req.Global, st, log)
+	if err != nil {
 		return nil, fmt.Errorf("object %d (%s): %w", idx+1, obj.Page, err)
 	}
-	// HF MergeFontFaces may have extended the registry; keep body layout in sync.
-	registry = st.registry
+	// Explicit handshake: body layout uses the HF-extended registry.
+	st.registry = reg
+	registry = reg
 
 	lres, err := layout.Layout(root, st.bodyLayoutOpts(font, registry, sheets, obj.Load.ZoomFactor, imagesFn, req.Global.Background, printUL))
 	if err != nil {

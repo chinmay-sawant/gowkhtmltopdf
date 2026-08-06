@@ -1286,8 +1286,9 @@ func ParseColor(v string) (r, g, b int, alpha float64, ok bool) {
 		return 0, 0, 0, 0, false
 	}
 	// CSS variables: var(--name, fallback) — resolve fallback only (no custom props).
-	// FIX-REVIEW: P3-04 ParseColor still resolves var() fallbacks itself; kept
-	// until layout's var handling via ResolveCustomProps genuinely replaces it.
+	// ponytail: ParseColor accepts bare var() without a prop map (API is color-
+	// string only). Layout resolves custom props via ResolveCustomProps before
+	// color parse; upgrade if ParseColor gains a props argument.
 	if strings.HasPrefix(strings.ToLower(v), "var(") {
 		if fb, okFB := cssVarFallback(v); okFB {
 			return ParseColor(fb)

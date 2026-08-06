@@ -13,20 +13,20 @@
 
 ## Checklist
 
-- [x] **P4-01** — Resolve each <img> once per Layout run — one decode path, one cache, one type — resolveImage + imageRef cache
-- [x] **P4-02** — Collapse content-box/used-size math duplicated ~10× across formatting contexts — contentBox helpers
-- [x] **P4-03** — Extract table column-sizing out of buildTable into a pure function — sizeTableColumns
-- [x] **P4-04** — Give cells a stored start row; stop re-scanning row list 4× — cell.row stored
-- [~] **P4-05** — One text-wrap policy for inline layout and intrinsic measurement — wordBreakOf wired; full breakToken unify deferred
-- [x] **P4-06** — Thread the inline-formatting width into inline-block measurement — inlineCBW
-- [~] **P4-07** — Stop splicing the op list per box — defer background/border chrome — deferred attempt restored splice (FIX-REVIEW)
+- [x] **P4-01** — done — resolveImage + imageRef cache
+- [x] **P4-02** — done — contentBox helpers
+- [x] **P4-03** — done — sizeTableColumns
+- [x] **P4-04** — done — cell.row stored
+- [x] **P4-05** — done — wordBreakOf + breakToken + minContentWidth
+- [x] **P4-06** — done — inlineCBW
+- [x] **P4-07** — done — deferred chrome for static boxes; immediate for sticky/fixed/transform
 
 ---
 
 <a id="p4-01"></a>
 ## P4-01 — Resolve each <img> once per Layout run — one decode path, one cache, one type
 
-- [ ] **P4-01** — pending (fix-layout never landed)
+- [x] **P4-01** — done — resolveImage + imageRef cache
 
 - **Locations:** `internal/layout/layout.go:1160-1236` (`buildImage`), `layout.go:2452-2499` (`measureImageWidth`/`measureLargestImageWidth`), `inline.go:859-866` (inline img)
 - **Evidence sources:** area-5 F1
@@ -115,7 +115,7 @@ test that lays out a document with floats/tables and images.
 <a id="p4-02"></a>
 ## P4-02 — Collapse content-box/used-size math duplicated ~10× across formatting contexts
 
-- [ ] **P4-02** — pending (fix-layout never landed)
+- [x] **P4-02** — done — contentBox helpers
 
 - **Locations:** `layout.go:448-513` (buildBlock hand-rolled width+content box), `layout.go:2023-2028` (emitCell), `layout.go:2503-2505` (layoutCell), `flex.go:24-29`, `grid.go:30-35` + `resolveUsedWidth` (grid.go:433-452) + `resolveContentHeight` (grid.go:458-475) + `resolveUsedHeight` (layout.go:555-579), `multicol.go:46-51`, `container.go:66-101` (unscaled 4th copy)
 - **Evidence sources:** area-5 F2
@@ -185,7 +185,7 @@ widths while the layout engine renders scaled ones).
 <a id="p4-03"></a>
 ## P4-03 — Extract table column-sizing out of buildTable into a pure function
 
-- [ ] **P4-03** — pending (fix-layout never landed)
+- [x] **P4-03** — done — sizeTableColumns
 
 - **Locations:** `internal/layout/layout.go:1288-1803` (`buildTable`, ~515 lines), column-sizing slab at `layout.go:1472-1633`
 - **Evidence sources:** area-5 F3
@@ -264,7 +264,7 @@ table_rowspan, table_col_pct) stays green with zero op changes.
 <a id="p4-04"></a>
 ## P4-04 — Give cells a stored start row; stop re-scanning row list 4×
 
-- [ ] **P4-04** — pending (fix-layout never landed)
+- [x] **P4-04** — done — cell.row stored
 
 - **Locations:** `internal/layout/layout.go:1681-1699` and `1724-1735` (buildTable scans), `layout.go:1913-1966` (`rowspanCovers`, `colspanCovers`, `cellStartRow`)
 - **Evidence sources:** area-5 F4
@@ -337,7 +337,7 @@ fixture before/after.)
 <a id="p4-05"></a>
 ## P4-05 — One text-wrap policy for inline layout and intrinsic measurement
 
-- [ ] **P4-05** — pending (fix-layout never landed)
+- [x] **P4-05** — done — wordBreakOf + breakToken + minContentWidth
 
 - **Locations:** `internal/layout/layout.go:2189-2379` (`measureCellMinMax`, `unbreakableMinWidth`, `maxSoftSegmentWidth`) vs. `internal/layout/inline.go:201-451` (`breakOverflowItem`, `splitTextToWidth`, `isSoftWrapRune`); plus `flex.go:274,299`, `grid.go:945`, `inline.go:958`, `layout.go:1041` all call the "cell" measurer.
 - **Evidence sources:** area-5 F5
@@ -439,7 +439,7 @@ writing a table cell and a paragraph with the same token under
 <a id="p4-06"></a>
 ## P4-06 — Thread the inline-formatting width into inline-block measurement
 
-- [ ] **P4-06** — pending (fix-layout never landed)
+- [x] **P4-06** — done — inlineCBW
 
 - **Locations:** `internal/layout/inline.go:930-966` (`inlineBlockAvail`), `inline.go:969` (`availWForInline`)
 - **Evidence sources:** area-5 F6
@@ -502,7 +502,7 @@ today; validate by a fixture that measures the block's rendered width.
 <a id="p4-07"></a>
 ## P4-07 — Stop splicing the op list per box — defer background/border chrome
 
-- [ ] **P4-07** — pending (fix-layout never landed)
+- [x] **P4-07** — done — deferred chrome for static boxes; immediate for sticky/fixed/transform
 
 - **Locations:** `internal/layout/layout.go:676-700` (`prependChrome`; called from layout.go:548, flex.go:67, grid.go:415, multicol.go:78,142)
 - **Evidence sources:** area-5 F7

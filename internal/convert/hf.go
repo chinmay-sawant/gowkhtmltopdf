@@ -237,15 +237,18 @@ type htmlHFLayout struct {
 // st.base would break CLI paths such as
 // `--header-html testdata/golden/fixture-36-header.html` when the page is
 // already under that directory (path doubling).
-func loadHTMLHF(ctx context.Context, loader *load.Loader, font *pdf.Font, st *objectState, rawOrURL string, log io.Writer) (*htmlHFLayout, error) {
+// loadHTMLHF returns the layout and the font registry after any HF @font-face
+// merge. Callers must assign the returned registry onto st (and any outer
+// registry handoff); this function does not mutate st.registry.
+func loadHTMLHF(ctx context.Context, loader *load.Loader, font *pdf.Font, st *objectState, rawOrURL string, log io.Writer) (*htmlHFLayout, *pdf.Registry, error) {
 	if load.IsHTML(rawOrURL) {
 		// upstream looksLikeHtmlAndNotAUrl: raw markup is not a URL
 		line.Emit(log, line.Warn, "object %d: header/footer html value looks like markup, not a URL; ignoring", st.idx)
-		return &htmlHFLayout{skip: true}, nil
+		return &htmlHFLayout{skip: true}, st.registry, nil
 	}
 	res, err := loader.Load(ctx, rawOrURL, st.lp)
 	if err != nil {
-		return nil, fmt.Errorf("header/footer html: %w", err)
+		return nil, nil, fmt.Errorf("header/footer html: %w", err)
 	}
 	raw := string(res.Body)
 	// Detect placeholders on the pristine document. Applying full substitute
@@ -264,7 +267,7 @@ func loadHTMLHF(ctx context.Context, loader *load.Loader, font *pdf.Font, st *ob
 	}
 	root, err := html.Parse(measureRaw)
 	if err != nil {
-		return nil, fmt.Errorf("header/footer html: parse: %w", err)
+		return nil, nil, fmt.Errorf("header/footer html: parse: %w", err)
 	}
 	media := st.media
 	if media == "" {
@@ -277,8 +280,8 @@ func loadHTMLHF(ctx context.Context, loader *load.Loader, font *pdf.Font, st *ob
 		ObjectIndex: st.idx + 1,
 	}, log)
 	reg := MergeFontFaces(ctx, loader, st.registry, sheets, res.Base, st.lp, st.idx+1, log)
-	if reg != nil {
-		st.registry = reg
+	if reg == nil {
+		reg = st.registry
 	}
 	l := &htmlHFLayout{
 		raw:      raw,
@@ -288,7 +291,7 @@ func loadHTMLHF(ctx context.Context, loader *load.Loader, font *pdf.Font, st *ob
 		sheets:   sheets,
 		imagesFn: st.imagesFn,
 		font:     font,
-		registry: st.registry,
+		registry: reg,
 		width:    st.geom.contentW,
 		height:   st.geom.contentH,
 		media:    media,
@@ -301,9 +304,9 @@ func loadHTMLHF(ctx context.Context, loader *load.Loader, font *pdf.Font, st *ob
 		Sheets: sheets, Media: media, Images: st.imagesFn,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("header/footer html: layout: %w", err)
+		return nil, nil, fmt.Errorf("header/footer html: layout: %w", err)
 	}
-	return l, nil
+	return l, reg, nil
 }
 
 // hfLinkContext carries body id destinations and link flags into HTML HF
@@ -437,16 +440,20 @@ func paintLayoutOps(page *pdf.Page, c *pdf.Content, ops []layout.Op, originX, yT
 }
 
 // hfHeightFor returns the drawn height of a text or HTML header/footer in
-// points (0 when nothing is drawn). Text uses the font's line box; HTML uses
-// the laid-out document height.
-func hfHeightFor(ctx context.Context, loader *load.Loader, font *pdf.Font, st *objectState, hf settings.HeaderFooter, isHeader bool, log io.Writer) (float64, error) {
+// points (0 when nothing is drawn) and the font registry after any HTML HF
+// @font-face merge. Text uses the font's line box; HTML uses the laid-out
+// document height.
+func hfHeightFor(ctx context.Context, loader *load.Loader, font *pdf.Font, st *objectState, hf settings.HeaderFooter, isHeader bool, log io.Writer) (float64, *pdf.Registry, error) {
 	if !headerHasContent(hf) {
-		return 0, nil
+		return 0, st.registry, nil
 	}
 	if hf.HTMLURL != "" {
-		l, err := loadHTMLHF(ctx, loader, font, st, hf.HTMLURL, log)
+		l, reg, err := loadHTMLHF(ctx, loader, font, st, hf.HTMLURL, log)
 		if err != nil {
-			return 0, err
+			return 0, nil, err
+		}
+		if reg != nil {
+			st.registry = reg // next HF band (footer) sees header faces
 		}
 		if isHeader {
 			st.headerHTML = l
@@ -454,38 +461,42 @@ func hfHeightFor(ctx context.Context, loader *load.Loader, font *pdf.Font, st *o
 			st.footerHTML = l
 		}
 		if l.skip || l.res == nil {
-			return 0, nil
+			return 0, st.registry, nil
 		}
-		return l.res.Height, nil
+		return l.res.Height, st.registry, nil
 	}
 	size := hf.FontSize
 	if size <= 0 {
 		size = 12
 	}
-	return (float64(font.Ascent()) - float64(font.Descent())) / float64(font.UnitsPerEm()) * size, nil
+	h := (float64(font.Ascent()) - float64(font.Descent())) / float64(font.UnitsPerEm()) * size
+	return h, st.registry, nil
 }
 
 // effectiveMargins resolves the object's top/bottom margins in points,
 // replacing auto (-1) margins with the measured header/footer height plus the
 // header/footer spacing, so the body layout reserves the bands. HTML
 // headers/footers are loaded and laid out here (once, cached on st).
-func effectiveMargins(ctx context.Context, loader *load.Loader, font *pdf.Font, g settings.PdfGlobal, st *objectState, log io.Writer) error {
+//
+// The returned registry is st.registry after any HF MergeFontFaces extensions;
+// callers assign it for the body layout handshake (do not rely on mutation alone).
+func effectiveMargins(ctx context.Context, loader *load.Loader, font *pdf.Font, g settings.PdfGlobal, st *objectState, log io.Writer) (*pdf.Registry, error) {
 	if g.Margin.Top < 0 {
-		h, err := hfHeightFor(ctx, loader, font, st, st.header, true, log)
+		h, _, err := hfHeightFor(ctx, loader, font, st, st.header, true, log)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		st.geom.marginTop = h + st.header.Spacing*mmToPt
 	}
 	if g.Margin.Bottom < 0 {
-		h, err := hfHeightFor(ctx, loader, font, st, st.footer, false, log)
+		h, _, err := hfHeightFor(ctx, loader, font, st, st.footer, false, log)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		st.geom.marginBottom = h + st.footer.Spacing*mmToPt
 	}
 	st.geom.recomputeContent()
-	return nil
+	return st.registry, nil
 }
 
 // drawHeadersFooters is the final pass that paints the effective text/HTML
@@ -550,10 +561,14 @@ func drawHeadersFooters(ctx context.Context, loader *load.Loader, font *pdf.Font
 				}
 				if l == nil {
 					var err error
-					l, err = loadHTMLHF(ctx, loader, font, own.st, hf.HTMLURL, log)
+					var reg *pdf.Registry
+					l, reg, err = loadHTMLHF(ctx, loader, font, own.st, hf.HTMLURL, log)
 					if err != nil {
 						line.Emit(log, line.Warn, "object %d: header/footer html: %v", own.st.idx, err)
 						return
+					}
+					if reg != nil {
+						own.st.registry = reg
 					}
 					if isHeader {
 						own.st.headerHTML = l

@@ -82,7 +82,9 @@ var ignoredGlobalKeys = map[string]struct{}{
 	"log-level":         {},
 	"loglevel":          {},
 	"cookiejar":         {},
-	// FIX-REVIEW: P2-09 default-encoding ignored; engine decodes UTF-8/ASCII only (html/load decode seam is fix-html-load-outline's)
+	// ponytail: --default-encoding accepted then ignored; engine is UTF-8/ASCII
+	// only via html.ParseDocument + load charset seam. Upgrade when multi-
+	// charset decode ships.
 	"defaultencoding": {},
 	"produceforms":    {},
 	// Global load-error-handling never reached LoadPage; only load.loaderrorhandling does.

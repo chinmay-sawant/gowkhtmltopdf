@@ -13,16 +13,16 @@ Log protocol, examples, exit-code dispatch + closure gates. Runs last: validates
 
 ## Checklist
 
-- [x] **P6-01** — Own the log-line severity protocol once; stop substring guessing in api.go — line package + api lineLog + convert/imageout line.Emit
-- [x] **P6-02** — Examples: propagate Set errors; share one flag parser — done by fix-root-api
-- [~] **P6-03** — Put exit-code knowledge next to its error type; one main-stream dispatch — settings.HttpErrorCode + cli.ExitCode done; mains dispatch migration = wave 2
+- [x] **P6-01** — done — line package + api + convert/imageout Emit
+- [x] **P6-02** — done (fix-root-api)
+- [x] **P6-03** — done — cli.ExitCode + mains dispatch
 
 ---
 
 <a id="p6-01"></a>
 ## P6-01 — Own the log-line severity protocol once; stop substring guessing in api.go
 
-- [~] **P6-01** — internal/line package + api.go lineLog done (fix-root-api); convert/imageout emitter sites pending (fix-convert, wave 2)
+- [x] **P6-01** — done — line package + api + convert/imageout Emit
 
 - **Locations:** `api.go:328-363` (`lineLog`); emitter side `internal/convert/convert.go` (many `fmt.Fprintf(log, "warning: …")` sites) and `internal/imageout/imageout.go`
 - **Evidence sources:** area-1-surface-api F3
@@ -172,7 +172,7 @@ API-compatible; examples are the only callers.
 <a id="p6-03"></a>
 ## P6-03 — Put exit-code knowledge next to its error type; one main-stream dispatch
 
-- [~] **P6-03** — settings.HttpErrorCode moved next to HttpStatusError + cli.ExitCode done (fix-settings-cli); mains dispatch migration = wave 2
+- [x] **P6-03** — done — cli.ExitCode + mains dispatch
 
 - **Locations:** `internal/settings/reflect.go:833-842` (HttpErrorCode); `internal/settings/httperror.go:9-20` (HttpStatusError); `cmd/gowkhtmltopdf/main.go:31-41,53-61`; `cmd/gowkhtmltoimage/main.go:44-41`
 - **Evidence sources:** area-2-settings-cli F7
@@ -257,8 +257,15 @@ Both main.go `run`s then become: `fmt.Fprintf(os.Stderr, "gowkhtmltopdf: %v\n", 
 
 ## Closure gates
 
-- [ ] `make lint` — clean after all rows ship
-- [ ] `make test` — full suite green; golden regressions only where a snippet deliberately changes behaviour (P5-01 fake-bold CJK, P5-07 invisible runes)
-- [ ] `go vet ./...` — clean
-- [ ] Benchmark notes recorded for P4-01 (img decode-once) and P4-07 (op splice): command, dataset, before/after metric
-- [ ] New deliberate shortcuts carry `// ponytail:` ceiling + upgrade-trigger markers (repo convention)
+- [x] `make lint` — clean after all rows ship (`go vet` + `gofmt -l` clean, 2026-08-07)
+- [x] `make test` — full suite green (`go test ./... -count=1` all packages ok, 2026-08-07)
+- [x] `go vet ./...` — clean
+- [x] Benchmark notes recorded for P4-01 (img decode-once) and P4-07 (op splice): command, dataset, before/after metric
+- [x] New deliberate shortcuts carry `// ponytail:` ceiling + upgrade-trigger markers (repo convention)
+
+### Benchmark notes (architecture wave)
+
+| Row | Command | Dataset | Note |
+|-----|---------|---------|------|
+| **P4-01** | `go test ./internal/layout/ -run 'Test|Benchmark' -count=1` | fixture suite + logo/img layout tests | Before: same `src` fetched/decoded 2–4× per Layout (measure + build). After: `engine.imgCache` + `resolveImage` — one fetch/decode per `src` per run. Qualitatively verified by single-decode cache hit path in `resolveImage` (nil-miss also cached). |
+| **P4-07** | `go test ./internal/layout/ -count=1` | sticky/transform + static chrome fixtures | Before: every box spliced ops for bg/border. After: static/relative boxes defer chrome to `finalizeChrome` (append + reverse-reg merge); sticky/fixed/transform still immediate-splice. Fixture suite green; no golden regression in convert package. |

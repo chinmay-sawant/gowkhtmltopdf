@@ -111,7 +111,7 @@ func init() {
 	// One home: Global settings (CLI and library both write it); the engine
 	// reads Global only. Negation rides the value.
 	// Dump homes: Global settings only (engine reads Global; main uses
-// Global.DumpDefaultTOCXSL; convert adapter ORs legacy Command.DumpOutline).
+	// Global.DumpDefaultTOCXSL; convert adapter ORs legacy Command.DumpOutline).
 	add("dump-outline", ModePDF, flagBool, func(c *Command, cur *objectCtx, vals []string) error {
 		return c.Global.Set("dumpoutline", vals[0])
 	})

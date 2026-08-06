@@ -286,6 +286,26 @@ func TestImageConverterNeedsPage(t *testing.T) {
 	}
 }
 
+// TestImageConverterSetBody: P2-04 InlineHTML source kind works for image mode
+// via Object().SetBody (no temp file, no URL guessing).
+func TestImageConverterSetBody(t *testing.T) {
+	c := NewImageConverter()
+	c.Object().SetBody([]byte(`<html><body><div style="width:40px;height:30px;background-color:#112233"></div></body></html>`), "")
+	if err := c.Set("width", "100"); err != nil {
+		t.Fatalf("Set(width): %v", err)
+	}
+	if err := c.Convert(context.Background()); err != nil {
+		t.Fatalf("Convert: %v", err)
+	}
+	img, err := png.Decode(bytes.NewReader(c.Output()))
+	if err != nil {
+		t.Fatalf("output is not a decodable PNG: %v", err)
+	}
+	if img.Bounds().Dx() != 100 {
+		t.Errorf("width = %d, want 100", img.Bounds().Dx())
+	}
+}
+
 func TestConverterNeedsObject(t *testing.T) {
 	if err := NewConverter().Convert(context.Background()); err == nil {
 		t.Fatal("Convert without objects succeeded, want error")

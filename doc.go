@@ -49,6 +49,11 @@
 //
 //	c.AddHTML([]byte("<html>…</html>"), "https://example.com/templates/")
 //
+// Image mode uses the same source kind on the page object:
+//
+//	img := gowkhtmltopdf.NewImageConverter()
+//	img.Object().SetBody([]byte("<html>…</html>"), "")
+//
 // An empty base leaves relative subresources unresolvable.
 //
 // # Thread safety

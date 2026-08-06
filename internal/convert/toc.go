@@ -128,14 +128,12 @@ func paintOptions(g hfGeom) layout.PaintOptions {
 
 // paintCount lays the result out into a scratch document and returns its
 // page count, leaving res untouched.
-// FIX-REVIEW: P2-12 paintCount swallows paint errors (returns 1); surface
-// error through renderTOCObjects when callers can handle it.
-func paintCount(res *layout.Result, g hfGeom) int {
+func paintCount(res *layout.Result, g hfGeom) (int, error) {
 	scratch := pdf.NewDocument()
 	if err := layout.Paint(scratch, cloneResult(res), paintOptions(g)); err != nil {
-		return 1
+		return 0, err
 	}
-	return scratch.PageCount()
+	return scratch.PageCount(), nil
 }
 
 // layoutTOC generates and lays out the TOC document for one TOC object.
@@ -197,7 +195,11 @@ func renderTOCObjects(font *pdf.Font, doc *pdf.Document, req *Request, tocs []*o
 			return 0, err
 		}
 		st.tocRoot, st.tocRes = root, res
-		st.tocPages = paintCount(res, st.geom)
+		n, err := paintCount(res, st.geom)
+		if err != nil {
+			return 0, fmt.Errorf("object %d: toc: paintCount: %w", st.idx+1, err)
+		}
+		st.tocPages = n
 		guess += st.tocPages
 	}
 	// Iteration 2: renumber with the measured total, measure again, and keep
@@ -209,7 +211,11 @@ func renderTOCObjects(font *pdf.Font, doc *pdf.Document, req *Request, tocs []*o
 				return 0, err
 			}
 			st.tocRoot, st.tocRes = root, res
-			st.tocPages = paintCount(res, st.geom)
+			n, err := paintCount(res, st.geom)
+			if err != nil {
+				return 0, fmt.Errorf("object %d: toc: paintCount: %w", st.idx+1, err)
+			}
+			st.tocPages = n
 		}
 	}
 	// Paint the final TOC pages into doc, keeping the painted result (its

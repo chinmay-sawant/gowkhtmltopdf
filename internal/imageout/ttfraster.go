@@ -13,13 +13,17 @@ import (
 // image mode advances match layout/PDF (same face + AdvanceInPoints).
 // basex/basey are the baseline-left position in output pixels (may be
 // fractional). pxPerPt converts layout points to pixels (ptToPx, or a
-// supersampled multiple of it).
+// supersampled multiple of it). atlas caches glyph bitmaps for one raster
+// run; nil creates a private atlas (tests / one-shot callers).
 //
 // Text is run through pdf.ShapeTextFont first so Arabic/RTL/OT forms match
 // PDF emission (Phase 2.4 image shaping parity).
-func ttfDrawString(img *image.NRGBA, basex, basey float64, s string, sizePt float64, face *pdf.Font, col color.NRGBA, pxPerPt float64) {
+func ttfDrawString(img *image.NRGBA, basex, basey float64, s string, sizePt float64, face *pdf.Font, col color.NRGBA, pxPerPt float64, atlas *glyphAtlas) {
 	if face == nil || s == "" || sizePt <= 0 || pxPerPt <= 0 {
 		return
+	}
+	if atlas == nil {
+		atlas = newGlyphAtlas()
 	}
 	s = pdf.ShapeTextFont(s, face)
 	if s == "" {
@@ -34,7 +38,7 @@ func ttfDrawString(img *image.NRGBA, basex, basey float64, s string, sizePt floa
 	x := basex
 	for _, r := range s {
 		adv := face.AdvanceInPoints(r, sizePt) * pxPerPt
-		drawGlyphAA(img, x, basey, r, face, scale, col)
+		drawGlyphAA(img, x, basey, r, face, scale, col, atlas)
 		x += adv
 	}
 }
@@ -51,17 +55,49 @@ type glyphCacheEntry struct {
 	originY float64
 }
 
-// maxGlyphCache caps the package-level atlas so a long-lived process re-parsing
-// fonts (new *pdf.Font keys) cannot grow RSS without bound (P5-05). When full,
-// half the entries are dropped. Full per-Render ownership is a future step.
+// maxGlyphCache caps one atlas so a long display list (or tests that reuse an
+// atlas across many sizes) cannot grow RSS without bound (P5-05). When full,
+// half the entries are dropped.
 const maxGlyphCache = 4096
 
-var (
-	glyphMu    sync.Mutex
-	glyphCache = map[glyphKey]*glyphCacheEntry{}
-)
+// glyphAtlas holds rasterized glyph bitmaps for one Render/rasterize run.
+// Per-run ownership avoids concurrent Renders contending on a package map
+// and keeps eviction local to that run's working set.
+type glyphAtlas struct {
+	mu sync.Mutex
+	m  map[glyphKey]*glyphCacheEntry
+}
 
-func drawGlyphAA(dst *image.NRGBA, basex, basey float64, r rune, face *pdf.Font, scale float64, col color.NRGBA) {
+func newGlyphAtlas() *glyphAtlas {
+	return &glyphAtlas{m: make(map[glyphKey]*glyphCacheEntry)}
+}
+
+func (a *glyphAtlas) get(key glyphKey, makeEnt func() *glyphCacheEntry) *glyphCacheEntry {
+	if a == nil {
+		return makeEnt()
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if ent, ok := a.m[key]; ok {
+		return ent
+	}
+	if len(a.m) >= maxGlyphCache {
+		// Drop about half; map iteration order is unspecified (stdlib).
+		n := len(a.m) / 2
+		for k := range a.m {
+			delete(a.m, k)
+			n--
+			if n <= 0 {
+				break
+			}
+		}
+	}
+	ent := makeEnt()
+	a.m[key] = ent
+	return ent
+}
+
+func drawGlyphAA(dst *image.NRGBA, basex, basey float64, r rune, face *pdf.Font, scale float64, col color.NRGBA, atlas *glyphAtlas) {
 	if r == ' ' {
 		return
 	}
@@ -71,24 +107,9 @@ func drawGlyphAA(dst *image.NRGBA, basex, basey float64, r rune, face *pdf.Font,
 	}
 	key := glyphKey{face: face, size: sizeKey, r: r}
 
-	glyphMu.Lock()
-	ent, ok := glyphCache[key]
-	if !ok {
-		if len(glyphCache) >= maxGlyphCache {
-			// Drop about half; map iteration order is unspecified (stdlib).
-			n := len(glyphCache) / 2
-			for k := range glyphCache {
-				delete(glyphCache, k)
-				n--
-				if n <= 0 {
-					break
-				}
-			}
-		}
-		ent = rasterGlyph(face, r, scale)
-		glyphCache[key] = ent
-	}
-	glyphMu.Unlock()
+	ent := atlas.get(key, func() *glyphCacheEntry {
+		return rasterGlyph(face, r, scale)
+	})
 	if ent == nil || ent.img == nil {
 		return
 	}

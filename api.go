@@ -9,7 +9,6 @@ import (
 	"errors"
 	"strings"
 
-	"gowkhtmltopdf/internal/cli"
 	"gowkhtmltopdf/internal/convert"
 	"gowkhtmltopdf/internal/imageout"
 	"gowkhtmltopdf/internal/line"
@@ -165,41 +164,26 @@ func (c *Converter) AddHTML(page []byte, baseURL string) *Converter {
 // also reported to OnError when set. Output is captured via an in-memory
 // writer (no temp file).
 func (c *Converter) Convert(ctx context.Context) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
 	if len(c.objects) == 0 {
 		return errors.New("gowkhtmltopdf: no page objects added")
 	}
-	var buf bytes.Buffer
-	cmd := &cli.Command{Global: c.global.g, OutputWriter: &buf}
-	for _, o := range c.objects {
-		cmd.Objects = append(cmd.Objects, o.o)
+	objects := make([]settings.PdfObject, len(c.objects))
+	for i, o := range c.objects {
+		objects[i] = o.o
 	}
-
-	flush := &lineLog{
-		onInfo:  c.OnInfo,
-		onWarn:  c.OnWarn,
-		onError: c.OnError,
+	req := &convert.Request{
+		Global:  c.global.g,
+		Objects: objects,
 	}
-	var progress func(phase string, percent int)
-	if c.OnPhase != nil || c.OnProgress != nil {
-		progress = func(phase string, percent int) {
-			if c.OnPhase != nil {
-				c.OnPhase(phase)
-			}
-			if c.OnProgress != nil {
-				c.OnProgress(percent)
-			}
-		}
+	h := convertHooks{
+		OnInfo: c.OnInfo, OnWarn: c.OnWarn, OnError: c.OnError,
+		OnPhase: c.OnPhase, OnProgress: c.OnProgress,
 	}
-	if err := convert.RunPDFContext(ctx, cmd, flush, progress); err != nil {
-		if c.OnError != nil {
-			c.OnError(err.Error())
-		}
+	out, err := h.executePDF(ctx, req)
+	if err != nil {
 		return err
 	}
-	c.output = buf.Bytes()
+	c.output = out
 	return nil
 }
 
@@ -300,32 +284,27 @@ func (c *ImageConverter) Object() *ObjectSettings {
 // Convert runs the conversion, replacing the previous Output. ctx is threaded
 // into the load; cancel it to abort. Errors are also reported to OnError.
 // Output is captured via an in-memory writer (no temp file).
+//
+// The page may be a path/URL via AddObject/SetPage, or in-memory HTML via
+// Object().SetBody (P2-04 InlineHTML source kind).
 func (c *ImageConverter) Convert(ctx context.Context) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	if strings.TrimSpace(c.object.o.Page) == "" {
+	if strings.TrimSpace(c.object.o.Page) == "" && len(c.object.o.Load.InlineHTML) == 0 {
 		return errors.New("gowkhtmltopdf: no input page added")
 	}
-	var buf bytes.Buffer
-	cmd := &cli.Command{
-		Global:       c.global.g,
-		Image:        c.image,
-		Objects:      []settings.PdfObject{c.object.o},
-		OutputWriter: &buf,
+	img := c.image
+	req := &convert.Request{
+		Global:  c.global.g,
+		Image:   &img,
+		Objects: []settings.PdfObject{c.object.o},
 	}
-	flush := &lineLog{
-		onInfo:  c.OnInfo,
-		onWarn:  c.OnWarn,
-		onError: c.OnError,
+	h := convertHooks{
+		OnInfo: c.OnInfo, OnWarn: c.OnWarn, OnError: c.OnError,
 	}
-	if err := imageout.Run(ctx, cmd, flush); err != nil {
-		if c.OnError != nil {
-			c.OnError(err.Error())
-		}
+	out, err := h.executeImage(ctx, req)
+	if err != nil {
 		return err
 	}
-	c.output = buf.Bytes()
+	c.output = out
 	return nil
 }
 
@@ -334,6 +313,75 @@ func (c *ImageConverter) Convert(ctx context.Context) error {
 // returned slice is a copy.
 func (c *ImageConverter) Output() []byte {
 	return append([]byte(nil), c.output...)
+}
+
+// ---------------------------------------------------------------------------
+// Shared executor (P1-8)
+// ---------------------------------------------------------------------------
+
+// convertHooks holds the optional log/progress callbacks shared by PDF and
+// image Convert drivers. Both Converter and ImageConverter reduce to building
+// a convert.Request and calling executePDF / executeImage.
+type convertHooks struct {
+	OnInfo, OnWarn, OnError func(string)
+	OnPhase                 func(string)
+	OnProgress              func(int)
+}
+
+func (h convertHooks) lineLog() *lineLog {
+	return &lineLog{
+		onInfo:  h.OnInfo,
+		onWarn:  h.OnWarn,
+		onError: h.OnError,
+	}
+}
+
+func (h convertHooks) progress() func(string, int) {
+	if h.OnPhase == nil && h.OnProgress == nil {
+		return nil
+	}
+	return func(phase string, percent int) {
+		if h.OnPhase != nil {
+			h.OnPhase(phase)
+		}
+		if h.OnProgress != nil {
+			h.OnProgress(percent)
+		}
+	}
+}
+
+// executePDF runs the PDF pipeline into an in-memory buffer and reports
+// failures to OnError.
+func (h convertHooks) executePDF(ctx context.Context, req *convert.Request) ([]byte, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	var buf bytes.Buffer
+	req.Output = &buf
+	if err := convert.Run(ctx, req, h.lineLog(), h.progress()); err != nil {
+		if h.OnError != nil {
+			h.OnError(err.Error())
+		}
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// executeImage runs the image pipeline into an in-memory buffer and reports
+// failures to OnError.
+func (h convertHooks) executeImage(ctx context.Context, req *convert.Request) ([]byte, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	var buf bytes.Buffer
+	req.Output = &buf
+	if err := imageout.RunRequest(ctx, req, h.lineLog()); err != nil {
+		if h.OnError != nil {
+			h.OnError(err.Error())
+		}
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 // ---------------------------------------------------------------------------

@@ -7,7 +7,7 @@ run **after** the ponytail leanness audit (closed 9.5/10 on 2026-08-07).
 
 | File | Date | Status | Findings | Rows |
 |------|------|--------|---------:|-----:|
-| [architecture-review-2026-08-07.md](./architecture-review-2026-08-07.md) | 2026-08-07 | findings complete; remediation pending | 49 | 46 |
+| [architecture-review-2026-08-07.md](./architecture-review-2026-08-07.md) | 2026-08-07 | remediation complete (all rows + closure gates) | 49 | 46 |
 
 ## Phase-wise checklist (smaller files)
 

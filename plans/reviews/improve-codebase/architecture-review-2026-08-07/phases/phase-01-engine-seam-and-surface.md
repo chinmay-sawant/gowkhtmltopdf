@@ -13,22 +13,22 @@
 
 ## Checklist
 
-- [~] **P1-1** — Give the engines a neutral, CLI-independent `Request` type — convert.Request/Run + imageout.RunRequest done; api.go/cmd mains still call *cli.Command adapters (wave 2)
-- [x] **P1-2** — Replace the stringly-typed flag value contract (NUL-joined pairs, 3 bool vocabularies) — done by fix-settings-cli
-- [x] **P1-3** — One flag-routing helper for the pre-object "address remapping" rule (4 implementations) — done by fix-settings-cli
-- [x] **P1-4** — `--print-media-type`: one resolution rule instead of two pasted copies — settings.ResolveMedia + convert/imageout mediaFor consumers done
-- [x] **P1-5** — Collapse dump-flag homes into one typed field; stop swallowing the bool value — Global home + convert adapter OR + main DumpDefaultTOCXSL on Global
-- [x] **P1-6** — Turn the 843-line reflect.go registry into one field-descriptor table — done by fix-settings-cli
-- [x] **P1-7** — Move the image↔global `background` aliasing rule into the settings model — done (settings + api)
-- [ ] **P1-8** — Collapse the two near-identical Convert driver bodies into one shared executor — pending (wave 2, fix-engine-migration-wave2)
-- [x] **P1-9** — Fix `ImageConverter.Object()` nil-receiver panic before `AddObject` — done by fix-root-api
+- [x] **P1-1** — done — convert.Request/Run, imageout.RunRequest, api + cmd mains off cli.Command
+- [x] **P1-2** — done (fix-settings-cli)
+- [x] **P1-3** — done (fix-settings-cli)
+- [x] **P1-4** — done — settings.ResolveMedia + convert/imageout mediaFor
+- [x] **P1-5** — done — Global dump homes + convert/main consumers
+- [x] **P1-6** — done (fix-settings-cli)
+- [x] **P1-7** — done (settings.ApplyImageKey + api)
+- [x] **P1-8** — done — convertHooks shared executor in api.go
+- [x] **P1-9** — done (fix-root-api)
 
 ---
 
 <a id="p1-1"></a>
 ## P1-1 — Give the engines a neutral, CLI-independent `Request` type
 
-- [ ] **P1-1** — Give the engines a neutral, CLI-independent `Request` type — pending: fix-convert side never landed (agent failed twice, no changes in internal/convert); api/mains migration = wave 2
+- [x] **P1-1** — done — convert.Request/Run, imageout.RunRequest, api + cmd mains off cli.Command
 
 - **Locations:** `api.go:146-187` (`Converter.Convert`); `api.go:285-315` (`ImageConverter.Convert`); seam at `internal/convert/convert.go:44` and `internal/imageout/imageout.go:407`, `internal/cli/cli.go:28-63`; `internal/convert/convert.go:44-45`; `internal/imageout/imageout.go:407-408`; `api.go:120-126`; `internal/convert/convert_test.go:44-58`
 - **Evidence sources:** area-1 F1; area-2 F1
@@ -391,7 +391,7 @@ incl. creation inside `printMediaFlag` is deleted.
 <a id="p1-4"></a>
 ## P1-4 — `--print-media-type`: one resolution rule instead of two pasted copies
 
-- [~] **P1-4** — cli side + `settings.ResolveMedia` done (fix-settings-cli); convert.go `mediaFor` → `ResolveMedia("print", …)` and imageout `mediaFor` → `ResolveMedia("screen", …)` pending (fix-convert, wave 2)
+- [x] **P1-4** — done — settings.ResolveMedia + convert/imageout mediaFor
 
 - **Locations:** `internal/cli/flags.go:305-327` (printMediaFlag); `internal/convert/convert.go:498-526` (mediaFor); `internal/imageout/imageout.go:547-562` (mediaFor)
 - **Evidence sources:** area-2 F4
@@ -503,7 +503,7 @@ routes any `Set("web.printmediatype", …)` to the same single home, mirroring t
 <a id="p1-5"></a>
 ## P1-5 — Collapse dump-flag homes into one typed field; stop swallowing the bool value
 
-- [~] **P1-5** — cli/settings/main done (fix-settings-cli, fix-root-api); convert.go:130 `cmd.DumpOutline || cmd.Global.DumpOutline` OR-read collapse pending (fix-convert); stale FIX-REVIEW marker at internal/cli/flags.go:113 to remove (wave 3)
+- [x] **P1-5** — done — Global dump homes + convert/main consumers
 
 - **Locations:** `internal/cli/flags.go:112-121`; `internal/convert/convert.go:130`; `cmd/gowkhtmltopdf/main.go:37-44`; `internal/settings/reflect.go:866-873` & `874-881` (keys `dumpoutline`, `dumpoutlinewithdefaulttocxsl`)
 - **Evidence sources:** area-2 F5
@@ -649,7 +649,7 @@ apply/get switches (hf/toc/web/load × apply/get) become four small descriptor t
 <a id="p1-7"></a>
 ## P1-7 — Move the image↔global `background` aliasing rule into the settings model
 
-- [x] **P1-7** — done (settings.ApplyImageKey by fix-settings-cli; api.go delegate by fix-root-api)
+- [x] **P1-7** — done (settings.ApplyImageKey + api)
 
 - **Locations:** `api.go:249-261` (`ImageConverter.Set`); rule duplicated in `internal/settings/reflect.go:655`, `internal/settings/doc.go`, `internal/imageout/imageout.go`
 - **Evidence sources:** area-1 F5
@@ -703,7 +703,7 @@ API-compatible; no caller moves.
 <a id="p1-8"></a>
 ## P1-8 — Collapse the two near-identical Convert driver bodies into one shared executor
 
-- [ ] **P1-8** — pending (wave 2, fix-engine-migration-wave2 — not started)
+- [x] **P1-8** — done — convertHooks shared executor in api.go
 
 - **Locations:** `api.go:146-187` (`Converter.Convert`) vs `api.go:285-315` (`ImageConverter.Convert`)
 - **Evidence sources:** area-1 F2

@@ -193,7 +193,9 @@ func maxHeight(res *layout.Result, opts RenderOptions) float64 {
 // rasterize paints the display list into an NRGBA canvas. The canvas is
 // white unless transparent is set, in which case it starts fully transparent
 // and only painted ops become visible. Painting uses rasterSS supersampling
-// then box-filters down to the final CSS-pixel size.
+// then box-filters down to the final CSS-pixel size. Glyph bitmaps for this
+// run live on a per-rasterize atlas (P5-05) so concurrent Renders do not share
+// mutable cache state.
 func rasterize(res *layout.Result, height float64, transparent bool) *image.NRGBA {
 	pxPerPt := ptToPx * float64(rasterSS)
 	w := int(math.Round(res.Width * pxPerPt))
@@ -208,8 +210,9 @@ func rasterize(res *layout.Result, height float64, transparent bool) *image.NRGB
 	if !transparent {
 		draw.Draw(img, img.Bounds(), image.NewUniform(color.White), image.Point{}, draw.Src)
 	}
+	atlas := newGlyphAtlas()
 	for i := range res.Ops {
-		paint(img, &res.Ops[i], pxPerPt)
+		paint(img, &res.Ops[i], pxPerPt, atlas)
 	}
 	if rasterSS <= 1 {
 		return img
@@ -256,14 +259,20 @@ func downscaleBox(src *image.NRGBA, factor int) *image.NRGBA {
 // paint draws one display-list operation onto the canvas. pxPerPt converts
 // layout points into the (possibly supersampled) canvas pixel space.
 //
-// FIX-REVIEW: P5-01 — layout exports StyleOf/FakeBoldFor/PaintBand (PDF HF
-// consumes PaintBand); raster paint still uses a local fake-bold/alpha/stroke
-// map — switch this path to StyleOf/FakeBoldFor for one semantics table.
-// FIX-REVIEW: P5-02 — full page-assembly pipeline extract (shared with
-// convert) deferred; prologue now shares CollectSheets + MergeFontFaces only.
-func paint(img *image.NRGBA, op *layout.Op, pxPerPt float64) {
+// Paint semantics (fake-bold gate, stroke min-width) come from layout.StyleOf /
+// layout.FakeBoldFor so PDF and raster stay on one table (P5-01). Fill alpha
+// deliberately diverges: StyleOf pre-composites translucent fills against white
+// (PDF paper); raster keeps raw op.R/G/B/Alpha and draw.Over onto NRGBA so a
+// transparent canvas (Transparent) can show through. FakeBold + stroke width
+// still follow the shared table.
+//
+// Page assembly: prologue already shares convert.CollectSheets +
+// MergeFontFaces; multi-page PDF assembly remains convert-specific (P5-02).
+func paint(img *image.NRGBA, op *layout.Op, pxPerPt float64, atlas *glyphAtlas) {
+	ps := layout.StyleOf(op)
 	switch op.Kind {
 	case layout.OpFillRect:
+		// Raw alpha for Over compositing — see paint comment (PDF vs raster).
 		c := color.NRGBA{
 			R: uint8(op.R * 255), G: uint8(op.G * 255), B: uint8(op.B * 255),
 			A: uint8(op.Alpha * 255),
@@ -277,7 +286,7 @@ func paint(img *image.NRGBA, op *layout.Op, pxPerPt float64) {
 		c := color.NRGBA{
 			R: uint8(op.R * 255), G: uint8(op.G * 255), B: uint8(op.B * 255), A: 255,
 		}
-		lw := strokeWidthScale(op, pxPerPt)
+		lw := strokeWidthScale(ps.StrokeWidth, pxPerPt)
 		r := ptRectScale(op.X, op.Y, op.W, op.H, pxPerPt)
 		rects := [4]image.Rectangle{
 			image.Rect(r.Min.X, r.Min.Y, r.Max.X, r.Min.Y+lw),
@@ -295,7 +304,7 @@ func paint(img *image.NRGBA, op *layout.Op, pxPerPt float64) {
 		c := color.NRGBA{
 			R: uint8(op.R * 255), G: uint8(op.G * 255), B: uint8(op.B * 255), A: 255,
 		}
-		lw := strokeWidthScale(op, pxPerPt)
+		lw := strokeWidthScale(ps.StrokeWidth, pxPerPt)
 		// centre the stroke on the line: half its width, in points
 		half := float64(lw) / 2 / pxPerPt
 		var r image.Rectangle
@@ -326,11 +335,10 @@ func paint(img *image.NRGBA, op *layout.Op, pxPerPt float64) {
 				return
 			}
 		}
-		ttfDrawString(img, bx, by, op.Text, op.Size, face, c, pxPerPt)
-		// ponytail: fake-bold double-draw when CSS weight wants bold but the
-		// face is regular; upgrade when synthetic bold outlines land in pdf.
-		if op.Bold && !face.Bold() {
-			ttfDrawString(img, bx+float64(rasterSS), by, op.Text, op.Size, face, c, pxPerPt)
+		ttfDrawString(img, bx, by, op.Text, op.Size, face, c, pxPerPt, atlas)
+		// Latin-only fake-bold (CJK gate lives in layout.FakeBoldFor).
+		if layout.FakeBoldFor(op) {
+			ttfDrawString(img, bx+float64(rasterSS), by, op.Text, op.Size, face, c, pxPerPt, atlas)
 		}
 
 	case layout.OpImage:
@@ -361,9 +369,10 @@ func paint(img *image.NRGBA, op *layout.Op, pxPerPt float64) {
 	}
 }
 
-// strokeWidthScale returns the stroke thickness in canvas pixels.
-func strokeWidthScale(op *layout.Op, pxPerPt float64) int {
-	w := op.Width
+// strokeWidthScale returns the stroke thickness in canvas pixels from a
+// StyleOf-resolved width (already min-clamped to 1 when non-positive).
+func strokeWidthScale(strokeWidth float64, pxPerPt float64) int {
+	w := strokeWidth
 	if w <= 0 {
 		w = 1
 	}
@@ -598,11 +607,16 @@ func imageLoadGlobalCmd(cmd *cli.Command) settings.LoadGlobal {
 
 // firstObject returns the first page-like object. Image mode renders a
 // single page; extra page objects and TOC objects are ignored with warnings.
+// An empty Page is accepted when Load.InlineHTML is set (P2-04 in-memory
+// source kind via ObjectSettings.SetBody).
 func firstObject(objects []settings.PdfObject, log io.Writer) (*settings.PdfObject, error) {
 	var first *settings.PdfObject
 	for i := range objects {
 		o := &objects[i]
-		if o.IsTableOfContent || o.Page == "" {
+		if o.IsTableOfContent {
+			continue
+		}
+		if o.Page == "" && len(o.Load.InlineHTML) == 0 {
 			continue
 		}
 		if first == nil {
@@ -705,5 +719,3 @@ func onWhite(img image.Image) image.Image {
 	draw.Draw(dst, dst.Bounds(), img, img.Bounds().Min, draw.Over)
 	return dst
 }
-
-

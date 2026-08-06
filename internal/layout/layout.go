@@ -17,6 +17,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"math"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -166,6 +167,19 @@ type engine struct {
 	// blocks reuse it so floats affect later siblings; BFC roots push a
 	// fresh state (see pushBFCFloats).
 	bfcFloats *floatState
+	// deferredChrome holds background/border ops to splice in one linear
+	// pass (finalizeChrome) for the common non-sticky/non-fixed/non-transform
+	// path. Sticky/fixed/transform boxes still splice immediately.
+	deferredChrome []chromeEntry
+}
+
+// chromeEntry records one box's background/border ops for insertion before
+// the content op at index `at`. Owner is the box that requested chrome so
+// chrome-only ranges and geometry shifts can be applied after merge.
+type chromeEntry struct {
+	at  int
+	ops []Op
+	b   *box
 }
 
 // faceFor selects the TrueType face for a resolved style (bold/italic),
@@ -311,6 +325,9 @@ func Layout(root *html.Node, opts Options) (*Result, error) {
 	}
 
 	b := e.build(root, opts.Width, 0, 0)
+	// Merge deferred background/border ops before stamping sticky/fixed flags
+	// and CSS transforms (those passes need final op indices).
+	e.finalizeChrome(b)
 	res := &Result{Ops: e.ops, Width: opts.Width, Height: opts.Height, root: b}
 	if b != nil {
 		res.Height = b.y + b.h
@@ -552,7 +569,7 @@ func (e *engine) buildBlock(n *html.Node, st ResolvedStyle, availW, x, y float64
 	}
 	b.h = cy
 
-	e.prependChrome(contentStart, st, b.x, y, b.w, b.h)
+	e.prependChrome(contentStart, b, st, b.x, y, b.w, b.h)
 	return b
 }
 
@@ -680,14 +697,27 @@ func (e *engine) borderOps(st ResolvedStyle, x, y, w, h float64) []Op {
 	return ops
 }
 
+// chromeMustSpliceImmediately reports boxes whose chrome must land in e.ops
+// during the build: sticky (StickyID stamp), fixed (Fixed stamp), and
+// transform (op-range exclusive CTM stamp). Common static/relative boxes defer.
+func chromeMustSpliceImmediately(st ResolvedStyle) bool {
+	if st.HasTransform {
+		return true
+	}
+	switch st.Position {
+	case "sticky", "fixed":
+		return true
+	}
+	return false
+}
+
 // prependChrome inserts background + border ops at insertAt so they paint
 // under any content ops already appended for this box.
 //
-// FIX-REVIEW: P4-07 full deferred-chrome (append-only build + finalizeChrome)
-// needs re-stamping StickyID/Fixed and chrome-only box op ranges after merge;
-// deferred attempt broke sticky clones and transform stamping. Kept splice
-// for correctness; finalizeChrome helper remains for a later wave.
-func (e *engine) prependChrome(insertAt int, st ResolvedStyle, x, y, w, h float64) {
+// Common path defers the splice until finalizeChrome (one linear merge).
+// Sticky/fixed/transform keep an immediate splice so mid-build StickyID/Fixed
+// stamps and transform exclusive ranges stay correct without re-derivation.
+func (e *engine) prependChrome(insertAt int, b *box, st ResolvedStyle, x, y, w, h float64) {
 	if e.noEmit {
 		return
 	}
@@ -704,11 +734,189 @@ func (e *engine) prependChrome(insertAt int, st ResolvedStyle, x, y, w, h float6
 		chrome[i].ZIndex = e.zIndex
 		chrome[i].ZIndexSet = e.zIndexSet
 	}
-	// insert chrome before content ops
+	if !chromeMustSpliceImmediately(st) {
+		e.deferredChrome = append(e.deferredChrome, chromeEntry{at: insertAt, ops: chrome, b: b})
+		return
+	}
+	// Immediate splice (sticky/fixed/transform).
 	tail := append([]Op(nil), e.ops[insertAt:]...)
 	e.ops = e.ops[:insertAt]
 	e.ops = append(e.ops, chrome...)
 	e.ops = append(e.ops, tail...)
+	// Keep deferred insert indices valid after this mid-build splice.
+	n := len(chrome)
+	for i := range e.deferredChrome {
+		if e.deferredChrome[i].at >= insertAt {
+			e.deferredChrome[i].at += n
+		}
+	}
+}
+
+// finalizeChrome merges deferred background/border ops into e.ops in one
+// linear pass and reindexes box op ranges. Paint order for multiple entries
+// at the same index matches immediate-splice nesting: later (outer) entries
+// paint first.
+func (e *engine) finalizeChrome(root *box) {
+	if len(e.deferredChrome) == 0 {
+		return
+	}
+	entries := e.deferredChrome
+	e.deferredChrome = nil
+
+	// Sort by insert index ascending; same index → reverse registration order
+	// (parent registered after child, paints under content first).
+	type indexed struct {
+		ord int
+		ent chromeEntry
+	}
+	order := make([]indexed, len(entries))
+	for i, ent := range entries {
+		order[i] = indexed{ord: i, ent: ent}
+	}
+	sort.SliceStable(order, func(i, j int) bool {
+		if order[i].ent.at != order[j].ent.at {
+			return order[i].ent.at < order[j].ent.at
+		}
+		// Higher ord (later register) first within the same at.
+		return order[i].ord > order[j].ord
+	})
+
+	totalChrome := 0
+	for _, it := range order {
+		totalChrome += len(it.ent.ops)
+	}
+	oldOps := e.ops
+	out := make([]Op, 0, len(oldOps)+totalChrome)
+	oldToNew := make([]int, len(oldOps))
+	type span struct{ start, end int }
+	ownerChrome := map[*box]span{}
+
+	recordOwner := func(b *box, cs, ce int) {
+		if b == nil || ce < cs {
+			return
+		}
+		if prev, ok := ownerChrome[b]; ok {
+			if cs < prev.start {
+				prev.start = cs
+			}
+			if ce > prev.end {
+				prev.end = ce
+			}
+			ownerChrome[b] = prev
+			return
+		}
+		ownerChrome[b] = span{cs, ce}
+	}
+
+	oi := 0
+	for i, op := range oldOps {
+		for oi < len(order) && order[oi].ent.at == i {
+			ent := order[oi].ent
+			cs := len(out)
+			out = append(out, ent.ops...)
+			recordOwner(ent.b, cs, len(out)-1)
+			oi++
+		}
+		oldToNew[i] = len(out)
+		out = append(out, op)
+	}
+	// Trailing chrome (chrome-only boxes with insertAt == len(ops)).
+	for oi < len(order) {
+		ent := order[oi].ent
+		cs := len(out)
+		out = append(out, ent.ops...)
+		recordOwner(ent.b, cs, len(out)-1)
+		oi++
+	}
+	e.ops = out
+
+	// Remap content op ranges, expand owners with their chrome, then union
+	// parent ranges over children so ancestor ranges still cover nested chrome.
+	var remap func(b *box)
+	remap = func(b *box) {
+		if b == nil {
+			return
+		}
+		if b.opEnd >= b.opStart && b.opStart >= 0 && b.opEnd < len(oldToNew) {
+			b.opStart = oldToNew[b.opStart]
+			b.opEnd = oldToNew[b.opEnd]
+		}
+		if sp, ok := ownerChrome[b]; ok {
+			if b.opEnd < b.opStart {
+				b.opStart, b.opEnd = sp.start, sp.end
+			} else {
+				if sp.start < b.opStart {
+					b.opStart = sp.start
+				}
+				if sp.end > b.opEnd {
+					b.opEnd = sp.end
+				}
+			}
+		}
+		for _, c := range b.children {
+			remap(c)
+		}
+	}
+	remap(root)
+
+	var unionChildren func(b *box)
+	unionChildren = func(b *box) {
+		if b == nil {
+			return
+		}
+		for _, c := range b.children {
+			unionChildren(c)
+			if c.opEnd < c.opStart {
+				continue
+			}
+			if b.opEnd < b.opStart {
+				b.opStart, b.opEnd = c.opStart, c.opEnd
+				continue
+			}
+			if c.opStart < b.opStart {
+				b.opStart = c.opStart
+			}
+			if c.opEnd > b.opEnd {
+				b.opEnd = c.opEnd
+			}
+		}
+	}
+	unionChildren(root)
+
+	// Deferred chrome under sticky ancestors never received StickyID at build
+	// time; re-stamp from the box tree. Fixed content already marked Fixed —
+	// expand Fixed onto chrome in the same range when any op is Fixed.
+	restampStickyFixed(root, e.ops)
+}
+
+// restampStickyFixed re-applies StickyID from sticky boxes and expands Fixed
+// onto the full op range when the box was viewport-fixed (any op already Fixed).
+func restampStickyFixed(b *box, ops []Op) {
+	if b == nil {
+		return
+	}
+	if b.sticky && b.stickyID != 0 && b.opEnd >= b.opStart && b.opStart >= 0 {
+		for i := b.opStart; i <= b.opEnd && i < len(ops); i++ {
+			ops[i].StickyID = b.stickyID
+		}
+	}
+	if b.style.Position == "fixed" && b.opEnd >= b.opStart && b.opStart >= 0 {
+		hasFixed := false
+		for i := b.opStart; i <= b.opEnd && i < len(ops); i++ {
+			if ops[i].Fixed {
+				hasFixed = true
+				break
+			}
+		}
+		if hasFixed {
+			for i := b.opStart; i <= b.opEnd && i < len(ops); i++ {
+				ops[i].Fixed = true
+			}
+		}
+	}
+	for _, c := range b.children {
+		restampStickyFixed(c, ops)
+	}
 }
 
 // contentBox returns the content-box origin and width for a border box.
@@ -1185,16 +1393,41 @@ func (e *engine) placeFloat(n *html.Node, cs ResolvedStyle, floats *floatState, 
 }
 
 // shiftBoxOps translates every op in b's op range by (dx, dy).
+// Deferred chrome owned by b's subtree is shifted too so finalizeChrome
+// places backgrounds/borders at the post-move geometry.
 func (e *engine) shiftBoxOps(b *box, dx, dy float64) {
-	if dx == 0 && dy == 0 {
+	if dx == 0 && dy == 0 || b == nil {
 		return
 	}
-	if b.opEnd < b.opStart {
+	if b.opEnd >= b.opStart {
+		for k := b.opStart; k <= b.opEnd && k < len(e.ops); k++ {
+			e.ops[k].X += dx
+			e.ops[k].Y += dy
+		}
+	}
+	if len(e.deferredChrome) == 0 {
 		return
 	}
-	for k := b.opStart; k <= b.opEnd && k < len(e.ops); k++ {
-		e.ops[k].X += dx
-		e.ops[k].Y += dy
+	inSubtree := map[*box]struct{}{}
+	var mark func(*box)
+	mark = func(x *box) {
+		if x == nil {
+			return
+		}
+		inSubtree[x] = struct{}{}
+		for _, c := range x.children {
+			mark(c)
+		}
+	}
+	mark(b)
+	for i := range e.deferredChrome {
+		if _, ok := inSubtree[e.deferredChrome[i].b]; !ok {
+			continue
+		}
+		for j := range e.deferredChrome[i].ops {
+			e.deferredChrome[i].ops[j].X += dx
+			e.deferredChrome[i].ops[j].Y += dy
+		}
 	}
 }
 
@@ -2116,7 +2349,7 @@ func (e *engine) measureCellMinMax(n *html.Node, st ResolvedStyle) (minW, maxW f
 						lineW += e.measureTextFace(" ", cs)
 					}
 					w := e.measureTextFace(word, cs)
-					uw := e.unbreakableMinWidth(word, cs)
+					uw := e.minContentWidth(word, cs)
 					if uw > longestWord {
 						longestWord = uw
 					}
@@ -2125,7 +2358,7 @@ func (e *engine) measureCellMinMax(n *html.Node, st ResolvedStyle) (minW, maxW f
 				return
 			}
 			w := e.measureTextFace(text, cs)
-			uw := e.unbreakableMinWidth(text, cs)
+			uw := e.minContentWidth(text, cs)
 			if uw > longestWord {
 				longestWord = uw
 			}
@@ -2180,12 +2413,9 @@ func (e *engine) measureCellMinMax(n *html.Node, st ResolvedStyle) (minW, maxW f
 	return minW, maxW
 }
 
-// unbreakableMinWidth is the min-content contribution of a single token under
-// the element's word-break / overflow-wrap policy (CSS min-content).
-// Emergency print wrapping (tokens wider than the used line) is layout-only
-// and must not shrink table column mins to a single rune.
 // wordBreakPolicy is the single table for "how may a token split?" —
 // white-space, word-break and overflow-wrap combine into one enum.
+// Shared by intrinsic min-content measurement and inline overflow packing.
 type wordBreakPolicy int
 
 const (
@@ -2208,19 +2438,37 @@ func wordBreakOf(st ResolvedStyle) wordBreakPolicy {
 	return breakNormal
 }
 
-func (e *engine) unbreakableMinWidth(word string, st ResolvedStyle) float64 {
-	if word == "" {
+// softModeOf maps a break policy to the soft-wrap rune table used by
+// breakToken / splitTextToWidth. Emergency (breakNormal) uses URL-ish
+// opportunities only so ordinary hyphenated words stay intact.
+func softModeOf(pol wordBreakPolicy) softBreakMode {
+	switch pol {
+	case breakAll:
+		return softBreakNone
+	case breakWord:
+		return softBreakWord
+	default:
+		return softBreakURL
+	}
+}
+
+// minContentWidth is the min-content contribution of a single token under
+// the element's word-break / overflow-wrap policy (CSS min-content).
+// Emergency print wrapping (tokens wider than the used line) is layout-only
+// and must not shrink table column mins to a single rune.
+func (e *engine) minContentWidth(s string, st ResolvedStyle) float64 {
+	if s == "" {
 		return 0
 	}
-	full := e.measureTextFace(word, st)
+	full := e.measureTextFace(s, st)
 	switch wordBreakOf(st) {
 	case breakNever:
 		return full
 	case breakAll:
-		return e.maxRuneWidth(word, st)
+		return e.maxRuneWidth(s, st)
 	case breakWord:
 		// Soft opportunities (/, ?, &, …) split the token for min-content.
-		return e.maxSoftSegmentWidth(word, st)
+		return e.maxSoftSegmentWidth(s, st)
 	default:
 		return full
 	}
