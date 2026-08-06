@@ -1,0 +1,135 @@
+package layout
+
+import (
+	"fmt"
+	"strings"
+	"testing"
+
+	"gowkhtmltopdf/internal/css"
+	"gowkhtmltopdf/internal/html"
+	"gowkhtmltopdf/internal/pdf"
+)
+
+// TestAvoidListItemsNoCascadingGaps: dense page-break-inside:avoid list items
+// near page boundaries must not cascade expanding empty bands between
+// consecutive items (wiki .mw-references-columns li{page-break-inside:avoid}).
+// Prefer splitting short avoid boxes over blanking large mid-page remainders.
+func TestAvoidListItemsNoCascadingGaps(t *testing.T) {
+	s := sheet(t, `
+body { margin: 0; font-size: 10pt; }
+ol { margin: 0; padding-left: 24pt; }
+li { page-break-inside: avoid; margin: 0 0 0.4em 0; }
+p { margin: 0.4em 0; }
+`)
+	var b strings.Builder
+	b.WriteString(`<html><body>`)
+	// Push the list so items straddle multiple page boundaries.
+	for i := 0; i < 28; i++ {
+		b.WriteString(fmt.Sprintf(
+			`<p>Filler paragraph %d with enough words to approach the natural page-break zone for list pagination testing.</p>`, i))
+	}
+	b.WriteString(`<ol start="1">`)
+	for i := 0; i < 35; i++ {
+		b.WriteString(fmt.Sprintf(
+			`<li id="r%d">"Citation title number %d with a fairly long path" (https://example.com/article/%d/long-path-name-here). Journal Name. 12 December 2022. Archived from the original. Retrieved 12 December 2022.</li>`,
+			i, i+1, i))
+	}
+	b.WriteString(`</ol></body></html>`)
+
+	root, err := html.Parse(b.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	const pageH = 750.0
+	res, err := Layout(root, Options{
+		Width: 538, Height: pageH, Sheets: []*css.Stylesheet{s},
+		Media: "print", Background: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc := pdf.NewDocument()
+	po := PaintOptions{PageWidth: 595, PageHeight: pageH + 50, MarginTop: 25, MarginBottom: 25}
+	if err := Paint(doc, res, po); err != nil {
+		t.Fatal(err)
+	}
+	contentH := pageH // Paint margins subtract from PageHeight; here content = pageH
+
+	// Collect list-item top Y from bullets (decimal markers).
+	var starts []float64
+	for _, op := range res.Ops {
+		if op.Kind == OpBullet {
+			starts = append(starts, op.Y)
+		}
+	}
+	if len(starts) < 20 {
+		// Fall back to li locations if markers missing.
+		for _, loc := range res.Locations {
+			if loc.Node != nil && loc.Node.Name == "li" {
+				starts = append(starts, loc.Y)
+			}
+		}
+	}
+	if len(starts) < 10 {
+		t.Fatalf("expected many list starts, got %d", len(starts))
+	}
+	// Sort.
+	for i := 0; i < len(starts); i++ {
+		for j := i + 1; j < len(starts); j++ {
+			if starts[j] < starts[i] {
+				starts[i], starts[j] = starts[j], starts[i]
+			}
+		}
+	}
+
+	maxSamePageGap := 0.0
+	bigGaps := 0
+	for i := 1; i < len(starts); i++ {
+		if int(starts[i-1]/contentH) != int(starts[i]/contentH) {
+			continue
+		}
+		g := starts[i] - starts[i-1]
+		if g > maxSamePageGap {
+			maxSamePageGap = g
+		}
+		// Natural multi-line item + margin is ~25–45pt; cascading avoid
+		// left 100–150pt bands on wiki references.
+		if g > 70 {
+			bigGaps++
+			t.Logf("large gap %.1f between items at y=%.1f and y=%.1f (page %d)",
+				g, starts[i-1], starts[i], int(starts[i]/contentH))
+		}
+	}
+	t.Logf("list starts=%d maxSamePageGap=%.1f bigGaps>70=%d", len(starts), maxSamePageGap, bigGaps)
+	if maxSamePageGap > 80 {
+		t.Fatalf("cascading avoid-inside gaps: max same-page inter-item gap %.1f (want ≤80)", maxSamePageGap)
+	}
+	if bigGaps > 2 {
+		t.Fatalf("%d same-page inter-item gaps >70pt (want ≤2)", bigGaps)
+	}
+}
+
+// TestPreferSplitOverBlankUnit checks the shared blank-band heuristic.
+func TestPreferSplitOverBlankUnit(t *testing.T) {
+	contentH := 800.0
+	// Half-page remaining always prefers split.
+	if !preferSplitOverBlank(401, 40, contentH) {
+		t.Fatal("remaining > half page should prefer split")
+	}
+	// Short list item with ~100pt remaining → split (no 100pt blank band).
+	if !preferSplitOverBlank(100, 30, contentH) {
+		t.Fatal("short box with large remaining should prefer split")
+	}
+	// Short box with 40pt remaining still prefers split (maxBlank ~24).
+	if !preferSplitOverBlank(40, 30, contentH) {
+		t.Fatal("short box with mid remaining should prefer split")
+	}
+	// Near page end: small remaining, short box → keep together (move).
+	if preferSplitOverBlank(18, 30, contentH) {
+		t.Fatal("near page end small remaining should allow keep-together move")
+	}
+	// Tall box near mid (remaining < half, box large): short-box rule N/A.
+	if preferSplitOverBlank(300, 400, contentH) {
+		t.Fatal("tall box with remaining < half should not match short-box rule")
+	}
+}

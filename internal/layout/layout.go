@@ -1385,6 +1385,34 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 	}
 	collect(n, false)
 
+	// Drop completely empty rows (no cell elements) before geometry. Empty
+	// <tr></tr> / filter residue would otherwise force a min row band and a
+	// phantom bordered strip above real headers. Rows that only exist as
+	// rowspan continuation slots still appear once cells are placed — those
+	// come from rowspan, not from empty tr nodes.
+	//
+	// headerRows was counted from thead during collect; stripping empty
+	// thead rows invalidates that count — recompute after strip.
+	rows = stripEmptyTableRows(rows)
+	if headerRows > len(rows) {
+		headerRows = len(rows)
+	}
+	// If thead contributed only empty rows, fall through to leading-th.
+	if headerRows > 0 {
+		// Verify leading rows still look like headers (all th); otherwise
+		// the count was empty-thead noise.
+		if countLeadingTHRows(rows[:headerRows]) != headerRows {
+			headerRows = 0
+		}
+	}
+
+	// Tables without <thead> often still use a leading row of <th> cells as
+	// column headers (common HTML pattern). Treat consecutive leading all-th
+	// rows as repeating headers for multi-page tables — generic, not site CSS.
+	if headerRows == 0 {
+		headerRows = countLeadingTHRows(rows)
+	}
+
 	tb := &box{node: n, style: st, kind: "table", x: x, y: y, headerRows: headerRows}
 	if len(rows) == 0 {
 		return tb
@@ -1626,6 +1654,25 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 				}
 				colW[i] = colMin[i] + free*(grow/span)
 			}
+		} else if innerMin > 0 && innerAvail < innerMin {
+			// Narrower than min-content.
+			if definiteTable {
+				// width:N / width:% — scale mins into the definite box so
+				// max-width:100% images in a 22em float still shrink.
+				scale := innerAvail / innerMin
+				if scale < 0 {
+					scale = 0
+				}
+				for i := range colW {
+					colW[i] = colMin[i] * scale
+				}
+			} else {
+				// width:auto — honor mins (table may overflow) rather than
+				// crushing text into emergency mid-word wraps.
+				for i := range colW {
+					colW[i] = colMin[i]
+				}
+			}
 		} else if innerMax > 0 {
 			scale := innerAvail / innerMax
 			if scale < 0 {
@@ -1633,7 +1680,20 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 			}
 			for i := range colW {
 				colW[i] *= scale
+				if !definiteTable && colW[i] < colMin[i] {
+					colW[i] = colMin[i]
+				}
 			}
+		}
+	}
+	// Auto tables: border box covers used columns. Definite width keeps tableW.
+	if !definiteTable {
+		sumCols := chrome
+		for i := range colW {
+			sumCols += colW[i]
+		}
+		if sumCols > tableW {
+			tableW = sumCols
 		}
 	}
 	tb.w = tableW
@@ -1643,6 +1703,8 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 	padL := e.scalePt(st.PaddingLeft) + e.scalePt(st.BorderLeft.Width)
 	// Measure each cell at its final column width; row height from single-row
 	// cells first. Rowspan cells enlarge the spanned rows afterward.
+	// Rows with no local cells (rowspan holes) or only ink-less cells stay at
+	// height 0 until rowspan growth — do not invent a 1pt phantom band.
 	for ri, cells := range cellData {
 		rowTops[ri] = y + cy
 		rowH := 0.0
@@ -1667,11 +1729,18 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 			}
 			tb.children = append(tb.children, cell)
 		}
-		if rowH <= 0 {
-			rowH = 1
+		// Collapse rows whose cells have no ink (only padding/borders of empty
+		// th/td). Keep a hairline only when the row has cells that paint
+		// borders in separate-border mode and measured some chrome — pure
+		// empty content collapses to 0 so border-collapse grids do not draw
+		// a phantom empty band above real headers.
+		if rowH > 0 && rowCellsHaveNoInk(rows[ri]) {
+			rowH = 0
 		}
 		rowHeights[ri] = rowH
-		cy += rowH + spacing
+		if rowH > 0 || spacing > 0 {
+			cy += rowH + spacing
+		}
 	}
 	// Grow rows so rowspan cells fit their content across the spanned band.
 	for _, cell := range tb.children {
@@ -1767,21 +1836,42 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 		e.emitBorders(st, x, y, tb.w, tb.h)
 	}
 
-	// emit cell content and boxes now that positions are final
-	for _, cell := range tb.children {
-		e.emitCell(cell, collapse)
+	// Emit cells row-by-row so collapsed grid segments for a row land in the
+	// same op index span as that row's cells (pagination moves them together).
+	lastNonEmpty := -1
+	for ri := range rowHeights {
+		if rowHeights[ri] > 0.01 {
+			lastNonEmpty = ri
+		}
 	}
 	if collapse {
-		e.emitCollapsedGrid(tb, x, y, padL, spacing, colW, rowTops, rowHeights)
+		for ri, cells := range cellData {
+			for _, cell := range cells {
+				// Skip paint for collapsed empty rows (h≈0); content was
+				// ink-less and would only re-inflate phantom bands.
+				if cell.h > 0.01 {
+					e.emitCell(cell, true)
+				}
+			}
+			if rowHeights[ri] > 0.01 {
+				e.emitCollapsedRowGrid(tb, ri, ri == lastNonEmpty, padL, colW, rowTops, rowHeights)
+			}
+		}
+	} else {
+		for _, cell := range tb.children {
+			if cell.h > 0.01 {
+				e.emitCell(cell, false)
+			}
+		}
 	}
 	return tb
 }
 
-// emitCollapsedGrid strokes a single shared border grid for border-collapse
-// tables. Per-cell borders leave gaps at rowspan holes and double strokes on
-// shared edges; one grid from final geometry stays continuous.
-func (e *engine) emitCollapsedGrid(tb *box, x, y, padL, spacing float64, colW, rowTops, rowHeights []float64) {
-	if len(rowTops) == 0 || len(colW) == 0 {
+// emitCollapsedRowGrid strokes the shared border-collapse grid for one table
+// row (top edge + verticals; bottom edge when lastRow). Ops are appended
+// immediately after that row's cells and folded into the row's op range.
+func (e *engine) emitCollapsedRowGrid(tb *box, ri int, lastRow bool, padL float64, colW, rowTops, rowHeights []float64) {
+	if ri < 0 || ri >= len(rowHeights) || rowHeights[ri] <= 0.01 || len(colW) == 0 {
 		return
 	}
 	bw := 0.5
@@ -1808,53 +1898,74 @@ func (e *engine) emitCollapsedGrid(tb *box, x, y, padL, spacing float64, colW, r
 		}
 	}
 	nCols := len(colW)
-	nRows := len(rowHeights)
-	left := x + padL
+	left := tb.x + padL
 	xs := make([]float64, nCols+1)
 	xs[0] = left
 	for i := 0; i < nCols; i++ {
 		xs[i+1] = xs[i] + colW[i]
-		if i+1 < nCols {
-			xs[i+1] += spacing
-		}
 	}
-	right := xs[nCols]
-	ys := make([]float64, nRows+1)
-	for i := 0; i < nRows; i++ {
-		ys[i] = rowTops[i]
-	}
-	ys[nRows] = rowTops[nRows-1] + rowHeights[nRows-1]
-
+	y0 := rowTops[ri]
+	y1 := y0 + rowHeights[ri]
+	gridStart := len(e.ops)
 	hline := func(x0, x1, yy float64) {
+		if x1-x0 <= 0 {
+			return
+		}
 		e.add(Op{Kind: OpLine, X: x0, Y: yy, W: x1 - x0, H: 0, Width: bw, R: r, G: g, B: b})
 	}
-	vline := func(xx, y0, y1 float64) {
-		e.add(Op{Kind: OpLine, X: xx, Y: y0, W: 0, H: y1 - y0, Width: bw, R: r, G: g, B: b})
-	}
-
-	// Horizontal rules — skip segments covered by a rowspan continuing through
-	// this boundary.
-	for ri := 0; ri <= nRows; ri++ {
-		yy := ys[ri]
-		for ci := 0; ci < nCols; ci++ {
-			if ri > 0 && ri < nRows && rowspanCovers(tb, ri-1, ri, ci) {
-				continue
-			}
-			hline(xs[ci], xs[ci+1], yy)
+	vline := func(xx, ya, yb float64) {
+		if yb-ya <= 0.01 {
+			return
 		}
+		e.add(Op{Kind: OpLine, X: xx, Y: ya, W: 0, H: yb - ya, Width: bw, R: r, G: g, B: b})
 	}
-	// Vertical rules — skip segments covered by a colspan.
+	// Top edge — skip under rowspan continuations.
+	for ci := 0; ci < nCols; ci++ {
+		if ri > 0 && rowspanCovers(tb, ri-1, ri, ci) {
+			continue
+		}
+		hline(xs[ci], xs[ci+1], y0)
+	}
+	// Verticals for this row.
 	for ci := 0; ci <= nCols; ci++ {
-		xx := xs[ci]
-		for ri := 0; ri < nRows; ri++ {
-			if ci > 0 && ci < nCols && colspanCovers(tb, ri, ci-1, ci) {
-				continue
-			}
-			vline(xx, ys[ri], ys[ri+1])
+		if ci > 0 && ci < nCols && colspanCovers(tb, ri, ci-1, ci) {
+			continue
+		}
+		vline(xs[ci], y0, y1)
+	}
+	if lastRow {
+		for ci := 0; ci < nCols; ci++ {
+			hline(xs[ci], xs[ci+1], y1)
 		}
 	}
-	_ = right
-	_ = y
+	gridEnd := len(e.ops) - 1
+	if gridEnd >= gridStart && ri < len(tb.rows) {
+		expandRowOpRange(tb.rows[ri], gridStart, gridEnd)
+	}
+}
+
+// expandRowOpRange includes [start,end] paint ops in every cell of the row so
+// pagination shifts that use the row's op span also move the collapsed grid.
+func expandRowOpRange(row []*box, start, end int) {
+	if start > end || len(row) == 0 {
+		return
+	}
+	for _, cell := range row {
+		if cell == nil {
+			continue
+		}
+		if cell.opStart > cell.opEnd {
+			// Cell emitted nothing (empty); claim the grid ops alone.
+			cell.opStart, cell.opEnd = start, end
+			continue
+		}
+		if start < cell.opStart {
+			cell.opStart = start
+		}
+		if end > cell.opEnd {
+			cell.opEnd = end
+		}
+	}
 }
 
 // rowspanCovers reports whether some cell occupies column ci across the
@@ -2015,6 +2126,9 @@ func (e *engine) measureCellContent(n *html.Node, st ResolvedStyle) float64 {
 // measureCellMinMax returns min-content and max-content border-box widths.
 // min-content ≈ longest unbreakable word; max-content ≈ widest line if soft
 // wraps are not taken (hard breaks from <br>/blocks still split lines).
+// When word-break/overflow-wrap allow breaking long tokens, min-content uses
+// the longest soft segment (or widest single rune) so URL-heavy cells can
+// shrink instead of forcing the table past the page edge.
 func (e *engine) measureCellMinMax(n *html.Node, st ResolvedStyle) (minW, maxW float64) {
 	var lineW, longestWord float64
 	flushLine := func() {
@@ -2023,11 +2137,14 @@ func (e *engine) measureCellMinMax(n *html.Node, st ResolvedStyle) (minW, maxW f
 		}
 		lineW = 0
 	}
-	var walk func(n *html.Node, fs float64, nowrap bool)
-	walk = func(n *html.Node, fs float64, nowrap bool) {
+	var walk func(n *html.Node, cs ResolvedStyle, nowrap bool)
+	walk = func(n *html.Node, cs ResolvedStyle, nowrap bool) {
 		switch n.Type {
 		case html.TextNode:
 			text := n.Text
+			// Measure with the same face selection as paint (measureTextFace),
+			// not the engine default face — mismatched metrics undersize
+			// columns and force emergency wraps on words that should fit.
 			if !nowrap {
 				// Collapse runs of whitespace to a single space for measure,
 				// matching normal white-space:normal inline layout.
@@ -2037,38 +2154,39 @@ func (e *engine) measureCellMinMax(n *html.Node, st ResolvedStyle) (minW, maxW f
 				}
 				// Leading space if original had leading WS and line already started.
 				if lineW > 0 && len(text) > 0 && isHTMLSpace(text[0]) {
-					lineW += e.measureText(" ", fs*e.scale)
+					lineW += e.measureTextFace(" ", cs)
 				}
 				for i, word := range fields {
 					if i > 0 {
-						lineW += e.measureText(" ", fs*e.scale)
+						lineW += e.measureTextFace(" ", cs)
 					}
-					w := e.measureText(word, fs*e.scale)
-					if w > longestWord {
-						longestWord = w
+					w := e.measureTextFace(word, cs)
+					uw := e.unbreakableMinWidth(word, cs)
+					if uw > longestWord {
+						longestWord = uw
 					}
 					lineW += w
 				}
 				return
 			}
-			w := e.measureText(text, fs*e.scale)
-			if w > longestWord {
-				longestWord = w
+			w := e.measureTextFace(text, cs)
+			uw := e.unbreakableMinWidth(text, cs)
+			if uw > longestWord {
+				longestWord = uw
 			}
 			lineW += w
 		case html.ElementNode:
-			cs := e.styles[n]
-			if cs.Display == "none" {
+			childCS := e.styles[n]
+			if childCS.Display == "none" {
 				return
 			}
-			fs = cs.FontSize
 			if n.Name == "br" {
 				flushLine()
 				return
 			}
 			// Replaced images contribute their used CSS-pixel width (wiki thumbs).
 			if n.Name == "img" {
-				iw := e.measureImageWidth(n, cs)
+				iw := e.measureImageWidth(n, childCS)
 				if iw > longestWord {
 					longestWord = iw
 				}
@@ -2076,21 +2194,21 @@ func (e *engine) measureCellMinMax(n *html.Node, st ResolvedStyle) (minW, maxW f
 				return
 			}
 			// Block-level in-cell boxes start a new line (simplified).
-			blockish := cs.Display == "block" || cs.Display == "table" ||
-				cs.Display == "list-item" || cs.Display == "flex" || cs.Display == "grid"
+			blockish := childCS.Display == "block" || childCS.Display == "table" ||
+				childCS.Display == "list-item" || childCS.Display == "flex" || childCS.Display == "grid"
 			if blockish {
 				flushLine()
 			}
-			childNowrap := nowrap || cs.WhiteSpace == "nowrap" || cs.WhiteSpace == "pre"
+			childNowrap := nowrap || childCS.WhiteSpace == "nowrap" || childCS.WhiteSpace == "pre"
 			for _, c := range n.Children {
-				walk(c, fs, childNowrap)
+				walk(c, childCS, childNowrap)
 			}
 			if blockish {
 				flushLine()
 			}
 		}
 	}
-	walk(n, st.FontSize, st.WhiteSpace == "nowrap" || st.WhiteSpace == "pre")
+	walk(n, st, st.WhiteSpace == "nowrap" || st.WhiteSpace == "pre")
 	flushLine()
 	chrome := e.scalePt(st.PaddingLeft) + e.scalePt(st.PaddingRight) +
 		e.scalePt(st.BorderLeft.Width) + e.scalePt(st.BorderRight.Width)
@@ -2100,6 +2218,147 @@ func (e *engine) measureCellMinMax(n *html.Node, st ResolvedStyle) (minW, maxW f
 		maxW = minW
 	}
 	return minW, maxW
+}
+
+// unbreakableMinWidth is the min-content contribution of a single token under
+// the element's word-break / overflow-wrap policy (CSS min-content).
+// Emergency print wrapping (tokens wider than the used line) is layout-only
+// and must not shrink table column mins to a single rune.
+func (e *engine) unbreakableMinWidth(word string, st ResolvedStyle) float64 {
+	if word == "" {
+		return 0
+	}
+	full := e.measureTextFace(word, st)
+	if st.WhiteSpace == "nowrap" || st.WhiteSpace == "pre" {
+		return full
+	}
+	breakAll := st.WordBreak == "break-all" || st.OverflowWrap == "anywhere"
+	if breakAll {
+		return e.maxRuneWidth(word, st)
+	}
+	if st.OverflowWrap == "break-word" {
+		// Soft opportunities (/, ?, &, …) split the token for min-content.
+		return e.maxSoftSegmentWidth(word, st)
+	}
+	return full
+}
+
+func (e *engine) maxRuneWidth(s string, st ResolvedStyle) float64 {
+	var max float64
+	for _, r := range s {
+		w := e.measureTextFace(string(r), st)
+		if w > max {
+			max = w
+		}
+	}
+	return max
+}
+
+func (e *engine) maxSoftSegmentWidth(s string, st ResolvedStyle) float64 {
+	runes := []rune(s)
+	if len(runes) == 0 {
+		return 0
+	}
+	var max, cur float64
+	for i, r := range runes {
+		rw := e.measureTextFace(string(r), st)
+		cur += rw
+		if isSoftWrapRune(r, softBreakWord) || i == len(runes)-1 {
+			if cur > max {
+				max = cur
+			}
+			cur = 0
+		}
+	}
+	if max <= 0 {
+		return e.maxRuneWidth(s, st)
+	}
+	return max
+}
+
+// countLeadingTHRows returns how many consecutive leading rows are composed
+// entirely of <th> cells (column header band without an explicit <thead>).
+// Empty rows (no cells) are skipped so a leading blank tr does not block
+// detection of the real header band.
+func countLeadingTHRows(rows [][]*html.Node) int {
+	n := 0
+	for _, row := range rows {
+		if len(row) == 0 {
+			continue
+		}
+		allTH := true
+		for _, cell := range row {
+			if cell == nil || cell.Name != "th" {
+				allTH = false
+				break
+			}
+		}
+		if !allTH {
+			break
+		}
+		n++
+	}
+	return n
+}
+
+// stripEmptyTableRows removes rows that have no table-cell elements.
+// Safe: rowspan placement only creates geometry for rows that exist in the
+// source list; empty tr nodes never start cells and only produced phantom
+// min-height bands in the border-collapse grid.
+func stripEmptyTableRows(rows [][]*html.Node) [][]*html.Node {
+	if len(rows) == 0 {
+		return rows
+	}
+	out := rows[:0]
+	for _, row := range rows {
+		if len(row) == 0 {
+			continue
+		}
+		out = append(out, row)
+	}
+	// If every row was empty, return a fresh empty slice (not a shared buf).
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// rowCellsHaveNoInk reports whether every cell in the row is free of text,
+// images, and other non-whitespace content (padding-only empty th/td).
+func rowCellsHaveNoInk(cells []*html.Node) bool {
+	if len(cells) == 0 {
+		return true
+	}
+	for _, c := range cells {
+		if c == nil {
+			continue
+		}
+		if nodeHasTableInk(c) {
+			return false
+		}
+	}
+	return true
+}
+
+func nodeHasTableInk(n *html.Node) bool {
+	if n == nil {
+		return false
+	}
+	switch n.Type {
+	case html.TextNode:
+		return strings.TrimSpace(n.Text) != ""
+	case html.ElementNode:
+		switch n.Name {
+		case "img", "svg", "video", "canvas", "br":
+			return true
+		}
+		for _, c := range n.Children {
+			if nodeHasTableInk(c) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func isHTMLSpace(b byte) bool {

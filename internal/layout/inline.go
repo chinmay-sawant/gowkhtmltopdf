@@ -47,6 +47,7 @@ func (e *engine) layoutInlineFloats(b *box, nodes []*html.Node, contentW, conten
 	e.collectInline(nodes, &items)
 	e.imgMaxW = oldMax
 	items = squeezeInlineSpaces(items)
+	items = separateAdjacentCites(items, e)
 	if len(items) == 0 {
 		return 0
 	}
@@ -61,6 +62,18 @@ func (e *engine) layoutInlineFloats(b *box, nodes []*html.Node, contentW, conten
 		if lineW < 0 {
 			lineW = 0
 		}
+		// Short remaining tail beside a float: if it fits as one full-width
+		// line under the float, drop there instead of leaving an orphan in
+		// the narrow column (e.g. wiki "big time."[71] left of a thumb).
+		if floats != nil && lineW < contentW-0.5 {
+			if next, ok := e.preferFloatClearForTail(items, i, contentW, lineW, ly, floats); ok {
+				ly = next
+				lineX, lineW = floats.exclusion(contentX, contentW, 0, ly)
+				if lineW < 0 {
+					lineW = 0
+				}
+			}
+		}
 		// Pack one line under current exclusion width.
 		start := i
 		lineAdv := 0.0
@@ -68,6 +81,26 @@ func (e *engine) layoutInlineFloats(b *box, nodes []*html.Node, contentW, conten
 			it := &items[i]
 			if it.forceBreak {
 				break
+			}
+			// Split long unbreakable runs (URLs, paths, base64) that would
+			// overflow the line. Honors overflow-wrap / word-break; also
+			// emergency-breaks when a token is wider than the line so text
+			// does not paint past the page edge (print PDF).
+			// restMax for subsequent chunks uses contentW (full BFC width) so
+			// pre-split fragments can reflow wider after a float ends.
+			if !it.img && it.blockBox == nil && it.text != "" {
+				room := lineW - lineAdv
+				if room < 0 {
+					room = 0
+				}
+				restW := contentW
+				if restW < lineW {
+					restW = lineW
+				}
+				if parts := e.breakOverflowItem(*it, room, lineW, restW, lineAdv == 0); len(parts) > 1 {
+					items = append(items[:i], append(parts, items[i+1:]...)...)
+					it = &items[i]
+				}
 			}
 			adv := it.marginL + it.w + it.marginR
 			// Always wrap to the next line when the next item does not fit.
@@ -77,13 +110,26 @@ func (e *engine) layoutInlineFloats(b *box, nodes []*html.Node, contentW, conten
 			// (")[37]" → not ")\n[" or "[\n37]" or "saying.[\n7]").
 			if lineAdv > 0 && lineAdv+adv > lineW {
 				if i > start && noBreakBefore(items[i-1], items[i]) {
-					// Keep sticky tail on this line even if it overflows slightly.
-					lineAdv += adv
-					i++
-					for i < len(items) && !items[i].forceBreak &&
-						noBreakBefore(items[i-1], items[i]) {
-						lineAdv += items[i].marginL + items[i].w + items[i].marginR
+					// Keep short sticky tails (cite ")", "[37]", commas) even if
+					// they overflow slightly. Do NOT glue multi-em tokens
+					// (bare URLs after "(") onto the line — that painted past
+					// the page edge on reference lists.
+					em := items[i].style.FontSize * e.scale
+					if em < 1 {
+						em = 10
+					}
+					if adv <= em*2.5 {
+						lineAdv += adv
 						i++
+						for i < len(items) && !items[i].forceBreak &&
+							noBreakBefore(items[i-1], items[i]) {
+							a := items[i].marginL + items[i].w + items[i].marginR
+							if a > em*2.5 {
+								break
+							}
+							lineAdv += a
+							i++
+						}
 					}
 				}
 				break
@@ -125,6 +171,271 @@ func (e *engine) layoutInlineFloats(b *box, nodes []*html.Node, contentW, conten
 		ly += e.emitLine(b, items, start, end, lineW, lineX, ly, lastLine)
 	}
 	return ly - y
+}
+
+// breakOverflowItem splits a text item that cannot fit in remainW on the
+// current line (or in fullLineW alone). Returns nil when no split is needed
+// or allowed; otherwise a sequence of items that replace the original.
+// restLineW is the width used for chunks after the first (typically the BFC
+// content width so fragments reflow full-width after a float ends).
+//
+// Policy (generic, not site-specific):
+//   - word-break:break-all / overflow-wrap:anywhere → fill remainW, any grapheme
+//   - overflow-wrap:break-word → soft then grapheme, but only when the token is
+//     wider than a full line (CSS: do not mid-break a word that fits the next line)
+//   - white-space:nowrap → never split
+//   - otherwise emergency-split when the token alone exceeds fullLineW so
+//     paint cannot run past the content box (print engines commonly do this)
+func (e *engine) breakOverflowItem(it inlineItem, remainW, fullLineW, restLineW float64, aloneOnLine bool) []inlineItem {
+	if it.img || it.blockBox != nil || it.forceBreak || it.text == "" {
+		return nil
+	}
+	if it.style.WhiteSpace == "nowrap" || it.style.WhiteSpace == "pre" {
+		return nil
+	}
+	adv := it.marginL + it.w + it.marginR
+	// Nothing to do when the whole item fits on this line.
+	if adv <= remainW+0.01 {
+		return nil
+	}
+	breakAll := it.style.WordBreak == "break-all" || it.style.OverflowWrap == "anywhere"
+	breakWord := it.style.OverflowWrap == "break-word"
+	tokenExceedsLine := adv > fullLineW+0.01
+	// Mid-line: a normal / break-word token that fits a full next line must
+	// wrap whole — not mid-break into a tight remainW (captions: "International").
+	if !breakAll && !tokenExceedsLine {
+		return nil
+	}
+	// Emergency path (overflow-wrap:normal): only when alone on the line and
+	// the token is wider than that line.
+	if !breakAll && !breakWord {
+		if !(aloneOnLine && tokenExceedsLine) {
+			// Defer to next line where aloneOnLine emergency can apply.
+			return nil
+		}
+	}
+	// Width available for the first chunk of text (exclude leading margin once).
+	firstRoom := remainW - it.marginL
+	if firstRoom < 1 {
+		// No room on this line — let the outer packer wrap to the next line
+		// unless we are already alone (then force a progressive split).
+		if !aloneOnLine {
+			return nil
+		}
+		firstRoom = fullLineW - it.marginL - it.marginR
+	}
+	if firstRoom < 1 {
+		firstRoom = fullLineW
+	}
+	if firstRoom < 1 {
+		return nil
+	}
+	if restLineW < fullLineW {
+		restLineW = fullLineW
+	}
+	restRoom := restLineW - it.marginL - it.marginR
+	if restRoom < 1 {
+		restRoom = restLineW
+	}
+	if restRoom < 1 {
+		return nil
+	}
+	// Soft opportunities: full set for overflow-wrap:break-word; URL-ish only
+	// for pure emergency (avoid splitting ordinary hyphenated words).
+	softMode := softBreakURL
+	if breakWord && !breakAll {
+		softMode = softBreakWord
+	}
+	if breakAll {
+		softMode = softBreakNone // grapheme-only
+	}
+	chunks := e.splitTextToWidth(it.text, it.style, firstRoom, restRoom, softMode)
+	if len(chunks) <= 1 {
+		return nil
+	}
+	out := make([]inlineItem, 0, len(chunks))
+	for i, chunk := range chunks {
+		part := it
+		part.text = chunk
+		part.w = e.measureTextFace(chunk, it.style)
+		if i > 0 {
+			part.marginL = 0
+		}
+		if i < len(chunks)-1 {
+			part.marginR = 0
+		}
+		out = append(out, part)
+	}
+	return out
+}
+
+// preferFloatClearForTail reports whether remaining inline content from i
+// should drop below active floats so the last line(s) use full content width
+// instead of sitting as a short orphan beside the float.
+func (e *engine) preferFloatClearForTail(items []inlineItem, i int, contentW, lineW, ly float64, floats *floatState) (nextY float64, ok bool) {
+	if floats == nil || i >= len(items) {
+		return ly, false
+	}
+	next := floats.clearY(ly)
+	gap := next - ly
+	if gap <= 0.5 {
+		return ly, false
+	}
+	var rem float64
+	estLH := 0.0
+	for j := i; j < len(items); j++ {
+		it := items[j]
+		if it.forceBreak {
+			// Hard break ends the tail we consider for a single-line clear.
+			break
+		}
+		rem += it.marginL + it.w + it.marginR
+		if estLH <= 0 && it.h > 0 {
+			estLH = it.h
+		}
+	}
+	if rem <= 0 {
+		return ly, false
+	}
+	if estLH < 1 {
+		estLH = 12
+	}
+	// Only when the whole remaining tail fits one full-width line (true
+	// short ending), not when a long paragraph still has room to wrap
+	// usefully beside the float.
+	if rem > contentW+1 {
+		return ly, false
+	}
+	// Near the float bottom, pull the last full-width-fitting chunk under the
+	// float so we do not leave "…destined for the" beside + orphan
+	// "big time."[71] under. Allow a slightly larger jump when the tail would
+	// need multiple narrow lines but only one full-width line.
+	maxGap := estLH * 2.5
+	if rem > lineW+0.01 {
+		maxGap = estLH * 3.5
+	}
+	if gap <= maxGap {
+		return next, true
+	}
+	return ly, false
+}
+
+// separateAdjacentCites inserts a thin space between consecutive citation
+// markers ("][") so [90][91][92] are not painted as a cramped cluster. Does
+// not touch spaces inside a single marker ([111]).
+func separateAdjacentCites(items []inlineItem, e *engine) []inlineItem {
+	if len(items) < 2 {
+		return items
+	}
+	out := make([]inlineItem, 0, len(items))
+	out = append(out, items[0])
+	for i := 1; i < len(items); i++ {
+		cur := items[i]
+		prev := &out[len(out)-1]
+		if !prev.img && !cur.img && !prev.forceBreak && !cur.forceBreak &&
+			prev.blockBox == nil && cur.blockBox == nil {
+			pt := strings.TrimRight(prev.text, " ")
+			ct := strings.TrimLeft(cur.text, " ")
+			if strings.HasSuffix(pt, "]") && strings.HasPrefix(ct, "[") &&
+				!strings.HasSuffix(prev.text, " ") && !strings.HasPrefix(cur.text, " ") {
+				// Prefer a hair space so markers stay visually tight but not
+				// colliding; fall back to a normal space if measure fails.
+				gap := "\u200a" // hair space
+				cur.text = gap + cur.text
+				if e != nil {
+					cur.w = e.measureTextFace(cur.text, cur.style)
+				}
+			}
+		}
+		out = append(out, cur)
+	}
+	return out
+}
+
+// softBreakMode selects where splitTextToWidth may insert breaks inside a token.
+type softBreakMode int
+
+const (
+	softBreakNone softBreakMode = iota // grapheme only (word-break:break-all)
+	softBreakURL                       // emergency: / ? & = # % : etc. (not hyphen)
+	softBreakWord                      // overflow-wrap:break-word: URL + hyphen + underscore
+)
+
+// splitTextToWidth breaks s into substrings that each fit max widths.
+// firstMax is for the first chunk (remaining space on the current line);
+// restMax is for subsequent chunks (full line content width).
+func (e *engine) splitTextToWidth(s string, st ResolvedStyle, firstMax, restMax float64, mode softBreakMode) []string {
+	if s == "" {
+		return nil
+	}
+	runes := []rune(s)
+	if len(runes) <= 1 {
+		return []string{s}
+	}
+	var out []string
+	for len(runes) > 0 {
+		limit := restMax
+		if len(out) == 0 {
+			limit = firstMax
+		}
+		if limit < 1 {
+			limit = restMax
+		}
+		// Find the longest prefix that fits limit.
+		n := 0
+		var w float64
+		for n < len(runes) {
+			rw := e.measureTextFace(string(runes[n]), st)
+			if n > 0 && w+rw > limit+0.01 {
+				break
+			}
+			// Always take at least one rune so we make progress.
+			if n == 0 && rw > limit+0.01 {
+				n = 1
+				w = rw
+				break
+			}
+			w += rw
+			n++
+		}
+		if n <= 0 {
+			n = 1
+		}
+		// Prefer a soft wrap opportunity near the end of the fitting prefix
+		// so URLs break after "/" etc. rather than mid-token when possible.
+		if mode != softBreakNone && n < len(runes) && n > 1 {
+			if soft := lastSoftBreak(runes[:n], mode); soft > 0 {
+				n = soft
+			}
+		}
+		out = append(out, string(runes[:n]))
+		runes = runes[n:]
+	}
+	return out
+}
+
+// lastSoftBreak returns a split index after a soft-wrap character near the
+// end of runes, or 0 if none is suitable (keep at least 1 rune on each side).
+func lastSoftBreak(runes []rune, mode softBreakMode) int {
+	for i := len(runes) - 1; i >= 1; i-- {
+		if isSoftWrapRune(runes[i-1], mode) {
+			return i
+		}
+	}
+	return 0
+}
+
+func isSoftWrapRune(r rune, mode softBreakMode) bool {
+	switch r {
+	case '/', '\\', '?', '&', '=', '%', '#', ':', ';', ',', '+', '~', '@',
+		'!', '*', '(', ')', '[', ']', '{', '}':
+		return true
+	case '-', '_', '.':
+		// Hyphen/underscore/dot: only for overflow-wrap soft breaks, not pure
+		// emergency (keeps "inner-a" / file names intact when slightly tight).
+		return mode == softBreakWord
+	}
+	return false
 }
 
 // emitLine renders items[start:end) as one line and returns its height.
@@ -285,35 +596,37 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 			as = size * 0.8
 			de = size * 0.2
 		}
-		for _, run := range e.splitTextByFace(it.text, it.style) {
+		runs := e.splitTextByFace(it.text, it.style)
+		runStart := lx
+		var runSpan float64
+		for _, run := range runs {
 			e.add(Op{Kind: OpText, X: lx, Y: baseline, W: run.w, H: it.h,
 				Text: run.text, Font: run.face, Size: size, Bold: it.style.FontWeight >= 700,
 				R: c[0], G: c[1], B: c[2]})
-			// Underline links for PDF affordance (browser-like). Print skins
-			// often set a{text-decoration:inherit} which resolves to none;
-			// without this, wiki body links vanish. Opt-out: decoration
-			// line-through. --print-link-underline still forces via cascade.
-			if it.style.TextDecoration == "underline" || (it.href != "" && it.style.TextDecoration != "line-through") {
-				// Sit clearly below glyph descenders (~1–2mm visual gap).
-				// Thin stroke (~5% of em, floor 0.4pt) — default 1pt looked heavy.
-				uy := baseline + de + size*0.22
-				uw := size * 0.05
-				if uw < 0.4 {
-					uw = 0.4
-				}
-				e.add(Op{Kind: OpLine, X: lx, Y: uy, W: run.w, H: 0, Width: uw, R: c[0], G: c[1], B: c[2]})
-			}
-			if it.style.TextDecoration == "line-through" {
-				uw := size * 0.05
-				if uw < 0.4 {
-					uw = 0.4
-				}
-				e.add(Op{Kind: OpLine, X: lx, Y: baseline - as*0.3, W: run.w, H: 0, Width: uw, R: c[0], G: c[1], B: c[2]})
-			}
 			if it.href != "" {
 				e.add(Op{Kind: OpLinkURI, X: lx, Y: baseline - as, W: run.w, H: as + de, URI: it.href})
 			}
 			lx += run.w
+			runSpan += run.w
+		}
+		// One decoration stroke per text item (not per face-run) so multi-face
+		// / multi-line link underlines do not stack into a double-thick seam.
+		// Thin stroke (~5% em, floor 0.35pt) — keep light on dense ref URLs.
+		wantUnderline := it.style.TextDecoration == "underline" ||
+			(it.href != "" && it.style.TextDecoration != "line-through")
+		if runSpan > 0.01 && (wantUnderline || it.style.TextDecoration == "line-through") {
+			uw := size * 0.05
+			if uw < 0.35 {
+				uw = 0.35
+			}
+			if wantUnderline {
+				// Sit clearly below glyph descenders (~1–2mm visual gap).
+				uy := baseline + de + size*0.22
+				e.add(Op{Kind: OpLine, X: runStart, Y: uy, W: runSpan, H: 0, Width: uw, R: c[0], G: c[1], B: c[2]})
+			}
+			if it.style.TextDecoration == "line-through" {
+				e.add(Op{Kind: OpLine, X: runStart, Y: baseline - as*0.3, W: runSpan, H: 0, Width: uw, R: c[0], G: c[1], B: c[2]})
+			}
 		}
 		lx += it.marginR
 		if i < len(line)-1 && isJustifyGapAfter(*it) {

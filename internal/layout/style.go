@@ -95,9 +95,13 @@ type ResolvedStyle struct {
 	TextAlign           string  // "left" | "right" | "center" | "justify"
 	VerticalAlign       string  // "baseline" | "top" | "middle" | "bottom"
 	WhiteSpace          string  // "normal" | "nowrap" | "pre"
-	TextDecoration      string  // "none" | "underline" | "line-through"
-	LetterSpacing       float64
-	TextIndent          float64
+	// OverflowWrap is CSS overflow-wrap / word-wrap: "normal" | "break-word" | "anywhere".
+	OverflowWrap string
+	// WordBreak is CSS word-break: "normal" | "break-all" | "keep-all".
+	WordBreak      string
+	TextDecoration string // "none" | "underline" | "line-through"
+	LetterSpacing  float64
+	TextIndent     float64
 	ListStyleType       string // "disc" | "circle" | "square" | "decimal" | "none" | …
 	BorderCollapse      string // "separate" | "collapse"
 	BorderSpacing       float64
@@ -172,6 +176,8 @@ func initialStyle() ResolvedStyle {
 		FontWeight:       400,
 		VerticalAlign:    "baseline",
 		WhiteSpace:       "normal",
+		OverflowWrap:     "normal",
+		WordBreak:        "normal",
 		TextDecoration:   "none",
 		ListStyleType:    "disc",
 		BorderCollapse:   "separate",
@@ -446,6 +452,13 @@ func inheritProps(st *ResolvedStyle, parent ResolvedStyle, raw map[string]string
 	}
 	if !set("white-space") {
 		st.WhiteSpace = parent.WhiteSpace
+	}
+	// overflow-wrap / word-wrap and word-break are inherited (CSS Text).
+	if !set("overflow-wrap") && !set("word-wrap") {
+		st.OverflowWrap = parent.OverflowWrap
+	}
+	if !set("word-break") {
+		st.WordBreak = parent.WordBreak
 	}
 	if !set("vertical-align") {
 		st.VerticalAlign = parent.VerticalAlign
@@ -986,6 +999,23 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext,
 				st.WhiteSpace = value
 			case "pre", "pre-wrap", "pre-line":
 				st.WhiteSpace = "pre"
+			}
+		case "overflow-wrap", "word-wrap":
+			// word-wrap is the legacy alias of overflow-wrap.
+			switch value {
+			case "normal", "break-word", "anywhere":
+				st.OverflowWrap = value
+			case "break-spaces":
+				// Treat like anywhere for line breaking (extra space preservation omitted).
+				st.OverflowWrap = "anywhere"
+			}
+		case "word-break":
+			switch value {
+			case "normal", "break-all", "keep-all":
+				st.WordBreak = value
+			case "break-word":
+				// Legacy alias ≈ overflow-wrap:anywhere + word-break:normal.
+				st.OverflowWrap = "anywhere"
 			}
 		case "text-decoration":
 			switch value {

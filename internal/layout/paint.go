@@ -711,14 +711,17 @@ func avoidInside(res *Result, contentH float64) bool {
 			hi := int((b.y + h) / contentH)
 			if hi > lo && h <= contentH+0.01 {
 				remaining := float64(lo+1)*contentH - b.y
-				// Prefer splitting over blanking more than half the current
-				// page. Mid-page wiki tables (filmography → awards) would
-				// otherwise leave a huge empty band; small overflows near
-				// the page end still move (TestPageBreakInsideAvoid).
-				if remaining > contentH*0.5 {
+				// Prefer splitting over large empty bands. Use border-box
+				// height (b.h), not ink: after line-snap, ink can span a
+				// page gap while the box is still a short list item —
+				// classifying by ink disabled the short-box guard and
+				// cascaded 100–150pt gaps (wiki references).
+				if preferSplitOverBlank(remaining, b.h, contentH) {
 					return changed
 				}
-				if remaining < h*0.5 && h > contentH*0.35 {
+				// Large boxes: also prefer split when less than half the box
+				// fits (rowspan tables / tall avoid blocks).
+				if remaining < b.h*0.5 && b.h > contentH*0.35 {
 					return changed
 				}
 				dy := float64(lo+1)*contentH - b.y
@@ -1112,7 +1115,13 @@ func orphansWidows(res *Result, contentH float64) bool {
 			return
 		}
 		// Keep the block together when it fits one page; else progress escape.
+		// Same blank-band guard as avoidInside: do not open a large empty
+		// region on the current page for a short keep-together.
 		if b.h <= contentH+0.01 {
+			remaining := float64(lo+1)*contentH - b.y
+			if preferSplitOverBlank(remaining, b.h, contentH) {
+				return
+			}
 			dy := float64(hi)*contentH - b.y
 			if dy > 1e-6 {
 				shiftFlowY(res, b.opStart, b.opEnd, b.y, dy)
@@ -1135,12 +1144,49 @@ func orphansWidowsHeuristic(res *Result, b *box, contentH float64) bool {
 	if hi <= lo || b.h > contentH {
 		return false
 	}
+	remaining := float64(lo+1)*contentH - b.y
+	if preferSplitOverBlank(remaining, b.h, contentH) {
+		return false
+	}
 	dy := float64(hi)*contentH - b.y
 	if dy <= 1e-6 {
 		return false
 	}
 	shiftFlowY(res, b.opStart, b.opEnd, b.y, dy)
 	return true
+}
+
+// preferSplitOverBlank reports whether a keep-together shift would leave an
+// unacceptably large empty band on the current page. Shared by avoidInside
+// and orphans/widows so dense page-break-inside:avoid lists do not cascade
+// expanding gaps between consecutive short blocks.
+//
+// h should be the border-box height (not ink): line-snap can inflate ink
+// across a page boundary without making the box "tall".
+func preferSplitOverBlank(remaining, h, contentH float64) bool {
+	if contentH <= 0 {
+		return false
+	}
+	// Never blank more than half a page to keep a box together.
+	if remaining > contentH*0.5 {
+		return true
+	}
+	// Short/medium boxes (list items, citations, cards): only keep-together
+	// when nearly at the page end. Each keep-together does shiftFlowY on
+	// following siblings; sequences of short avoid items otherwise expand
+	// inter-item gaps by remaining on every fixpoint iteration.
+	if h > 0 && h < contentH*0.35 {
+		// Allow at most ~2 line-heights of trailing blank (or 75% of the
+		// box), whichever is larger — enough for true end-of-page overflow.
+		maxBlank := 24.0
+		if h*0.75 > maxBlank {
+			maxBlank = h * 0.75
+		}
+		if remaining > maxBlank {
+			return true
+		}
+	}
+	return false
 }
 
 func hasNestedFlowChild(b *box) bool {
