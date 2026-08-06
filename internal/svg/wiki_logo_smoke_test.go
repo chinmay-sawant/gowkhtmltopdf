@@ -9,10 +9,19 @@ import (
 )
 
 func TestRasterizeWikiWordmark(t *testing.T) {
-	for _, f := range []string{"/tmp/wiki-wordmark.svg", "/tmp/enwiki.svg", "/tmp/wiki-tagline.svg"} {
+	// Optional host cache of live Wikipedia logo SVGs (see samples recipe).
+	// Prefer the 25th-anniversary icon/wordmark/tagline used by enwiki Vector 2022.
+	for _, f := range []string{
+		"/tmp/enwiki-25.svg",
+		"/tmp/wikipedia-wordmark-en-25.svg",
+		"/tmp/wikipedia-tagline-en-25.svg",
+		"/tmp/wiki-wordmark.svg",
+		"/tmp/enwiki.svg",
+		"/tmp/wiki-tagline.svg",
+	} {
 		b, err := os.ReadFile(f)
 		if err != nil {
-			t.Skip(err)
+			continue
 		}
 		pngb, w, h, err := Rasterize(b, 512)
 		if err != nil {

@@ -1,7 +1,7 @@
-// Package svg provides a minimal SVG-as-image rasterizer for <img src="*.svg">.
-// Scope: viewBox/width/height, rect, circle, ellipse, line, polyline, polygon,
-// path (M/L/H/V/Z/C/c/Q/q subset), solid fill/stroke. No CSS-in-SVG, text, or
-// external references.
+// Package svg provides SVG-as-image rasterization for <img src="*.svg">.
+// Primary path: github.com/tdewolff/canvas (ParseSVG + rasterizer), which
+// handles complex wiki logos (gradients, groups, clipPaths). A small
+// in-tree rasterizer and optional ImageMagick remain as fallbacks.
 package svg
 
 import (
@@ -18,12 +18,15 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/tdewolff/canvas"
+	"github.com/tdewolff/canvas/renderers/rasterizer"
 )
 
 // Rasterize decodes SVG XML into a PNG image. maxSide caps the longer edge
-// in pixels (default 512). Uses the built-in rasterizer; falls back to
-// ImageMagick when the SVG needs gradients/filters or the builtin result is
-// empty (complex wiki logos).
+// in pixels (default 512). Prefers tdewolff/canvas; falls back to the
+// in-tree rasterizer and ImageMagick when canvas fails or yields an empty
+// image.
 func Rasterize(data []byte, maxSide int) (pngBytes []byte, w, h int, err error) {
 	if maxSide <= 0 {
 		maxSide = 512
@@ -31,23 +34,122 @@ func Rasterize(data []byte, maxSide int) (pngBytes []byte, w, h int, err error) 
 	if !looksLikeSVG(data) {
 		return nil, 0, 0, fmt.Errorf("svg: not SVG")
 	}
+
+	// Primary: tdewolff/canvas (correct arcs, gradients, groups, clipPaths).
+	if pngBytes, w, h, err = rasterizeCanvas(data, maxSide); err == nil && pngNonzero(pngBytes) >= 20 {
+		return pngBytes, w, h, nil
+	}
+	canvasPNG, canvasW, canvasH, canvasErr := pngBytes, w, h, err
+	canvasNZ := pngNonzero(canvasPNG)
+
+	// Fallback: in-tree minimal rasterizer.
 	pngBytes, w, h, err = rasterizeBuiltin(data, maxSide)
 	if err != nil {
 		pngBytes, w, h = nil, 0, 0
 	}
+	builtinNZ := pngNonzero(pngBytes)
+
+	// Fallback: ImageMagick convert when available (optional host tool).
 	needRich := svgNeedsRichRaster(data)
-	empty := err != nil || pngNonzero(pngBytes) < 20
-	if needRich || empty {
+	empty := err != nil || builtinNZ < 20
+	if needRich || empty || canvasNZ < 20 {
 		if im, iw, ih, imErr := rasterizeImageMagick(data, maxSide); imErr == nil {
-			if pngNonzero(im) > pngNonzero(pngBytes) {
+			imNZ := pngNonzero(im)
+			if imNZ > builtinNZ && imNZ > canvasNZ {
 				return im, iw, ih, nil
 			}
 		}
 	}
+
+	// Prefer the denser successful raster among canvas and builtin.
+	if canvasErr == nil && canvasNZ >= builtinNZ && canvasNZ >= 20 {
+		return canvasPNG, canvasW, canvasH, nil
+	}
 	if err != nil {
+		if canvasErr == nil {
+			return canvasPNG, canvasW, canvasH, nil
+		}
 		return nil, 0, 0, err
 	}
 	return pngBytes, w, h, nil
+}
+
+// rasterizeCanvas uses tdewolff/canvas to parse SVG and rasterize to PNG.
+// Canvas stores sizes in millimeters (unitless root width/height may be
+// treated as mm). We pick resolution so the longer edge is the SVG's
+// viewBox/width/height in CSS pixels (capped by maxSide), matching layout's
+// 96dpi intrinsic-size model.
+func rasterizeCanvas(data []byte, maxSide int) ([]byte, int, int, error) {
+	c, err := canvas.ParseSVG(bytes.NewReader(data))
+	if err != nil {
+		return nil, 0, 0, fmt.Errorf("svg canvas: %w", err)
+	}
+	cw, ch := c.Size()
+	if cw <= 0 || ch <= 0 {
+		return nil, 0, 0, fmt.Errorf("svg canvas: empty size")
+	}
+
+	// Intrinsic CSS-pixel size from viewBox / width / height attributes.
+	targetW, targetH := svgCSSPixelSize(data, maxSide)
+	// Map canvas mm → target pixels.
+	dpmm := float64(targetW) / cw
+	if alt := float64(targetH) / ch; alt > 0 && (dpmm <= 0 || math.Abs(alt-dpmm) > 1e-6) {
+		// Prefer the resolution that keeps the longer edge within target.
+		if float64(targetW) >= float64(targetH) {
+			dpmm = float64(targetW) / cw
+		} else {
+			dpmm = float64(targetH) / ch
+		}
+	}
+	if dpmm <= 0 {
+		dpmm = 96.0 / 25.4
+	}
+
+	img := rasterizer.Draw(c, canvas.DPMM(dpmm), nil)
+	bounds := img.Bounds()
+	pw, ph := bounds.Dx(), bounds.Dy()
+	if pw < 1 || ph < 1 {
+		return nil, 0, 0, fmt.Errorf("svg canvas: zero pixel size")
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		return nil, 0, 0, err
+	}
+	return buf.Bytes(), pw, ph, nil
+}
+
+// svgCSSPixelSize returns the target raster size in CSS pixels (capped by
+// maxSide), derived from viewBox or root width/height.
+func svgCSSPixelSize(data []byte, maxSide int) (int, int) {
+	vw, vh := 0.0, 0.0
+	if root, err := parseSVG(data); err == nil && root != nil {
+		vw, vh = root.vbW, root.vbH
+		if vw <= 0 {
+			vw = root.width
+		}
+		if vh <= 0 {
+			vh = root.height
+		}
+	}
+	if vw <= 0 {
+		vw = 100
+	}
+	if vh <= 0 {
+		vh = 100
+	}
+	scale := 1.0
+	if vw > float64(maxSide) || vh > float64(maxSide) {
+		scale = float64(maxSide) / math.Max(vw, vh)
+	}
+	pw := int(math.Ceil(vw * scale))
+	ph := int(math.Ceil(vh * scale))
+	if pw < 1 {
+		pw = 1
+	}
+	if ph < 1 {
+		ph = 1
+	}
+	return pw, ph
 }
 
 func svgNeedsRichRaster(data []byte) bool {
@@ -142,7 +244,7 @@ func rasterizeBuiltin(data []byte, maxSide int) (pngBytes []byte, w, h int, err 
 	for i := range img.Pix {
 		img.Pix[i] = 0
 	}
-	c := &canvas{img: img, sx: scale, sy: scale, ox: -root.vbX * scale, oy: -root.vbY * scale}
+	c := &drawCanvas{img: img, sx: scale, sy: scale, ox: -root.vbX * scale, oy: -root.vbY * scale}
 	for _, sh := range root.shapes {
 		c.draw(sh)
 	}
@@ -411,17 +513,18 @@ func splitNums(s string) []float64 {
 	return out
 }
 
-type canvas struct {
+// drawCanvas is the in-tree raster target (kept as fallback when tdewolff/canvas fails).
+type drawCanvas struct {
 	img    *image.RGBA
 	sx, sy float64
 	ox, oy float64
 }
 
-func (c *canvas) tx(x, y float64) (int, int) {
+func (c *drawCanvas) tx(x, y float64) (int, int) {
 	return int(math.Round(x*c.sx + c.ox)), int(math.Round(y*c.sy + c.oy))
 }
 
-func (c *canvas) draw(sh shape) {
+func (c *drawCanvas) draw(sh shape) {
 	switch sh.kind {
 	case "rect":
 		x0, y0 := c.tx(sh.x, sh.y)

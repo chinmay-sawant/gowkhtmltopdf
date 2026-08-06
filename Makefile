@@ -1,7 +1,10 @@
 .PHONY: test lint build fmt golden golden-update samples clean
 
-# Phase 00 scaffold: stdlib + allowlisted go-text/typesetting only.
-# Direct third-party requires must stay ⊆ {github.com/go-text/typesetting}
+# Phase 00 scaffold: stdlib + allowlisted direct modules only.
+# Direct third-party requires must stay ⊆ {
+#   github.com/go-text/typesetting,  # OpenType shaping
+#   github.com/tdewolff/canvas,      # SVG-as-image rasterization
+# }
 # (enforced by internal/pdf.TestDirectModuleAllowlist).
 
 test:
