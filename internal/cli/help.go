@@ -69,7 +69,7 @@ func flagList(m Mode) string {
 	var b strings.Builder
 	for _, n := range names {
 		spec := flagTable[n]
-		if spec.kind == "bool" {
+		if spec.kind == flagBool {
 			fmt.Fprintf(&b, "  --%s\n", n)
 		} else {
 			fmt.Fprintf(&b, "  --%s <value>\n", n)

@@ -260,7 +260,7 @@ func runCommand(t *testing.T, args ...string) *cli.Command {
 	if err != nil {
 		t.Fatalf("cli.Parse(%v): %v", args, err)
 	}
-	cmd.Global.EnableLocalFileAccess = true
+	cmd.Global.Load.EnableLocalFileAccess = true
 	for i := range cmd.Objects {
 		cmd.Objects[i].Load.BlockLocalFileAccess = false
 	}

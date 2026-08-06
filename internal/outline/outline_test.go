@@ -45,18 +45,11 @@ func fakeLocations(nodes []*html.Node, page int, y, x float64) []layout.ElementL
 func headNodes(t *testing.T, root *html.Node) []*html.Node {
 	t.Helper()
 	var nodes []*html.Node
-	var walk func(n *html.Node)
-	walk = func(n *html.Node) {
-		if n.Type == html.ElementNode {
-			if n.Name >= "h1" && n.Name <= "h6" {
-				nodes = append(nodes, n)
-			}
+	root.Walk(func(n *html.Node) {
+		if n.Type == html.ElementNode && n.Name >= "h1" && n.Name <= "h6" {
+			nodes = append(nodes, n)
 		}
-		for _, c := range n.Children {
-			walk(c)
-		}
-	}
-	walk(root)
+	})
 	return nodes
 }
 
@@ -190,6 +183,60 @@ func titles(ns []*Node) []string {
 		}
 	}
 	return out
+}
+
+func TestSortHeadings(t *testing.T) {
+	root := treeHTML(t, "<h1>A</h1><h2>B</h2><h1>C</h1>")
+	nodes := headNodes(t, root)
+	hs := CollectHeadings(root)
+	locs := []layout.ElementLocation{
+		{Node: nodes[0], Page: 1, X: 5, Y: 30, W: 100, H: 20},
+		{Node: nodes[1], Page: 0, X: 0, Y: 10, W: 100, H: 20},
+		{Node: nodes[2], Page: 1, X: 5, Y: 10, W: 100, H: 20},
+	}
+	hs = Lookup(hs, locs)
+
+	// Deliberately out of order: page 1 before page 0; C (y=10) before A (y=30).
+	reversed := []*Heading{hs[0], hs[2], hs[1]}
+	SortHeadings(reversed)
+	got := []string{}
+	for _, h := range reversed {
+		got = append(got, h.Title)
+	}
+	want := []string{"B", "C", "A"} // page 0 first; within page 1: y-down, then x
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("SortHeadings order = %v, want %v", got, want)
+		}
+	}
+}
+
+func TestSectionOf(t *testing.T) {
+	root := treeHTML(t, "<h1>Intro</h1><h2>Deep</h2><h1>Body</h1>")
+	nodes := headNodes(t, root)
+	hs := Lookup(CollectHeadings(root), []layout.ElementLocation{
+		{Node: nodes[0], Page: 0, X: 0, Y: 10, W: 100, H: 20},
+		{Node: nodes[1], Page: 0, X: 0, Y: 50, W: 100, H: 20},
+		{Node: nodes[2], Page: 1, X: 0, Y: 10, W: 100, H: 20},
+	})
+	SortHeadings(hs)
+
+	cases := []struct {
+		page       int
+		section    string
+		subsection string
+	}{
+		{0, "Intro", "Deep"},
+		{1, "Intro", "Body"},
+		{2, "Intro", "Body"},
+		{-1, "", ""},
+	}
+	for _, c := range cases {
+		sec, sub := SectionOf(hs, c.page)
+		if sec != c.section || sub != c.subsection {
+			t.Errorf("SectionOf(page %d) = %q, %q; want %q, %q", c.page, sec, sub, c.section, c.subsection)
+		}
+	}
 }
 
 func TestCollapseWS(t *testing.T) {

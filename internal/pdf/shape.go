@@ -20,16 +20,15 @@ func ShapeText(s string) string {
 		return s
 	}
 	s = string([]rune(s)) // ensure valid
-	s = nfcNormalize(s)
+	s = stripOrphanMark(s)
 	s = shapeArabicJoining(s)
 	return reverseRTLRuns(s)
 }
 
-func nfcNormalize(s string) string {
-	// Prefer stdlib when available via unicode iteration; full NFC requires
-	// golang.org/x/text which is forbidden — do a minimal pass for common
-	// Hangul/Arabic compatibility by returning s unchanged when no combining
-	// marks, else strip orphaned combining marks after base (best-effort).
+// stripOrphanMark drops leading combining marks (best-effort stand-in for
+// full NFC, which needs golang.org/x/text and is forbidden here). Marks
+// after a base character are kept as-is, without reordering.
+func stripOrphanMark(s string) string {
 	if !hasCombining(s) {
 		return s
 	}

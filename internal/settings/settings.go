@@ -109,6 +109,31 @@ func (m MediaType) String() string {
 	return "ignore"
 }
 
+// ResolveMedia computes the effective CSS media type: the print-media-type
+// override (either home) wins, then the object media-type, then the global
+// media-type, falling back to base (the mode default: "print" for PDF,
+// "screen" for image). obj may be nil.
+func ResolveMedia(base string, global Web, obj *Web) string {
+	if global.PrintMediaType || obj != nil && obj.PrintMediaType {
+		return "print"
+	}
+	if obj != nil {
+		switch obj.MediaType {
+		case MediaPrint:
+			return "print"
+		case MediaScreen:
+			return "screen"
+		}
+	}
+	switch global.MediaType {
+	case MediaPrint:
+		return "print"
+	case MediaScreen:
+		return "screen"
+	}
+	return base
+}
+
 // Margin holds the four page margins in millimetres.
 type Margin struct {
 	Top    float64
@@ -154,10 +179,12 @@ type Web struct {
 	PrintLinkUnderline bool
 }
 
-// LoadGlobal holds load settings shared by all page loads. Only Proxy is
-// consumed by internal/load today.
+// LoadGlobal holds load settings shared by all page loads. NewLoader applies
+// the full policy (proxy, allow prefixes, local-access flag) in one place.
 type LoadGlobal struct {
-	Proxy string
+	Proxy                 string
+	Allow                 []string // local ACL prefixes (--allow)
+	EnableLocalFileAccess bool
 }
 
 // LoadPage holds per-page load settings with engine consumers in load/convert.
@@ -174,6 +201,11 @@ type LoadPage struct {
 	MediaType            MediaType
 	PrintMediaType       bool
 	Timeout              int // seconds; 0 = default
+	// InlineHTML is an in-memory HTML document source (SetBody); when set it
+	// replaces Page as the input and skips URL guessing entirely. InlineBase
+	// resolves relative subresources (load.Load).
+	InlineHTML []byte
+	InlineBase string
 }
 
 // PostItem is one urlencoded form field for POST loads.
@@ -244,27 +276,27 @@ type PdfGlobal struct {
 	Collate      bool
 	Outline      bool
 	OutlineDepth int
-	// DumpOutline / DumpDefaultTOCXSL: settings home is Global (not Command).
-	// convert still ORs Command.DumpOutline for CLI dual-write until cli collapses.
-	DumpOutline           bool
-	DumpDefaultTOCXSL     bool
-	UseCompression        bool
-	Title                 string
-	Margin                Margin
-	SmartShrinking        bool
-	Footer                HeaderFooter
-	Header                HeaderFooter
-	TOC                   TableOfContent
-	Background            bool // sole paint switch for PDF + image body backgrounds
-	EnableLocalFileAccess bool
-	Allow                 []string
-	ExcludeFromOutline    []string
-	Quiet                 bool
-	Web                   Web
-	Load                  LoadGlobal
-	FontPaths             []string // --font-path directories (opt-in TTF discovery)
-	UseSystemFonts        bool     // --use-system-fonts
-	ResolveRelativeLinks  bool     // resolve relative <a href> against page URL
+	// DumpOutline / DumpDefaultTOCXSL: one home is Global settings (CLI and
+	// library both write it); the engine reads it only.
+	DumpOutline        bool
+	DumpDefaultTOCXSL  bool
+	UseCompression     bool
+	Title              string
+	Margin             Margin
+	SmartShrinking     bool
+	Footer             HeaderFooter
+	Header             HeaderFooter
+	TOC                TableOfContent
+	Background         bool // sole paint switch for PDF + image body backgrounds
+	ExcludeFromOutline []string
+	Quiet              bool
+	Web                Web
+	// Load carries the shared load policy: Proxy, Allow (ACL prefixes) and
+	// EnableLocalFileAccess live on LoadGlobal, applied by load.NewLoader.
+	Load                 LoadGlobal
+	FontPaths            []string // --font-path directories (opt-in TTF discovery)
+	UseSystemFonts       bool     // --use-system-fonts
+	ResolveRelativeLinks bool     // resolve relative <a href> against page URL
 	// Ignored holds accepted-but-inert wkhtml keys (dpi, javascript, …).
 	// ponytail: Policy A sink — do not re-add typed stubs without engine consumers.
 	Ignored map[string]string

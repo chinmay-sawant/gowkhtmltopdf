@@ -17,10 +17,7 @@ type inlineItem struct {
 	marginL    float64 // leading horizontal margin (e.g. span margin-left)
 	marginR    float64 // trailing horizontal margin
 	img        bool
-	imgData    []byte
-	imgJPEG    bool
-	imgW       int
-	imgH       int
+	imgRef     *imageRef
 	href       string
 	forceBreak bool
 	// block-in-inline: a laid-out block box whose ops live in
@@ -37,11 +34,14 @@ type inlineItem struct {
 func (e *engine) layoutInlineFloats(b *box, nodes []*html.Node, contentW, contentX, y float64, floats *floatState) float64 {
 	var items []inlineItem
 	oldMax := e.imgMaxW
+	oldCB := e.inlineCBW
 	if contentW > 0 {
 		e.imgMaxW = contentW
+		e.inlineCBW = contentW
 	}
 	e.collectInline(nodes, &items)
 	e.imgMaxW = oldMax
+	e.inlineCBW = oldCB
 	items = squeezeInlineSpaces(items)
 	items = separateAdjacentCites(items, e)
 	if len(items) == 0 {
@@ -202,7 +202,8 @@ func (e *engine) breakOverflowItem(it inlineItem, remainW, fullLineW, restLineW 
 	if it.img || it.blockBox != nil || it.forceBreak || it.text == "" {
 		return nil
 	}
-	if it.style.WhiteSpace == "nowrap" || it.style.WhiteSpace == "pre" {
+	pol := wordBreakOf(it.style)
+	if pol == breakNever {
 		return nil
 	}
 	adv := it.marginL + it.w + it.marginR
@@ -210,8 +211,8 @@ func (e *engine) breakOverflowItem(it inlineItem, remainW, fullLineW, restLineW 
 	if adv <= remainW+0.01 {
 		return nil
 	}
-	breakAll := it.style.WordBreak == "break-all" || it.style.OverflowWrap == "anywhere"
-	breakWord := it.style.OverflowWrap == "break-word"
+	breakAll := pol == breakAll
+	breakWord := pol == breakWord
 	tokenExceedsLine := adv > fullLineW+0.01
 	// Mid-line: a normal / break-word token that fits a full next line must
 	// wrap whole — not mid-break into a tight remainW (captions: "International").
@@ -610,9 +611,9 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 			case "bottom":
 				top = y + lh - it.h
 			}
-			if it.imgData != nil {
+			if it.imgRef != nil && it.imgRef.data != nil {
 				e.add(Op{Kind: OpImage, X: lx, Y: top, W: it.w, H: it.h,
-					Image: it.imgData, ImgW: it.imgW, ImgH: it.imgH, IsJPEG: it.imgJPEG})
+					Image: it.imgRef.data, ImgW: it.imgRef.w, ImgH: it.imgRef.h, IsJPEG: it.imgRef.isJPEG})
 			}
 			if it.href != "" {
 				e.add(Op{Kind: OpLinkURI, X: lx, Y: top, W: it.w, H: it.h, URI: it.href})
@@ -859,14 +860,13 @@ func (e *engine) collectInlineNode(n *html.Node, out *[]inlineItem) {
 		if n.Name == "img" {
 			ib := e.buildImage(n, st, 0, 0)
 			*out = append(*out, inlineItem{
-				img: true, imgData: ib.imgData, imgJPEG: ib.imgJPEG,
-				imgW: ib.imgW, imgH: ib.imgH, w: ib.w, h: ib.h, style: st,
+				img: true, imgRef: ib.img, w: ib.w, h: ib.h, style: st,
 				marginL: e.scalePt(st.MarginLeft), marginR: e.scalePt(st.MarginRight),
 			})
 			return
 		}
 		if st.Display == "inline-block" {
-			avail := e.inlineBlockAvail(n, st)
+			avail := e.inlineBlockAvail(n, st, e.inlineCBW)
 			opStart := len(e.ops)
 			cb := e.build(n, avail, 0, 0)
 			opEnd := len(e.ops)
@@ -927,10 +927,12 @@ func (e *engine) collectInlineNode(n *html.Node, out *[]inlineItem) {
 // inlineBlockAvail returns the containing-block width used to lay out an
 // inline-block: specified width when present, otherwise shrink-to-fit capped
 // at a generous max so auto-width badges size to their content.
-func (e *engine) inlineBlockAvail(n *html.Node, st ResolvedStyle) float64 {
+func (e *engine) inlineBlockAvail(n *html.Node, st ResolvedStyle, cbW float64) float64 {
 	if st.WidthPercent >= 0 {
-		// Percent of viewport is a best-effort stand-in; real containing
-		// block width is not threaded into collectInline.
+		// Prefer the inline formatting-context width; fall back to viewport.
+		if cbW > 0 {
+			return cbW * st.WidthPercent / 100
+		}
 		if e.opts.Width > 0 {
 			return e.opts.Width * st.WidthPercent / 100
 		}

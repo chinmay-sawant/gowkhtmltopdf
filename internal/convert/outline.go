@@ -1,13 +1,13 @@
 package convert
 
 import (
-	"fmt"
 	"io"
 	"sort"
 
 	"gowkhtmltopdf/internal/css"
 	"gowkhtmltopdf/internal/html"
 	"gowkhtmltopdf/internal/layout"
+	"gowkhtmltopdf/internal/line"
 	"gowkhtmltopdf/internal/outline"
 	"gowkhtmltopdf/internal/pdf"
 	"gowkhtmltopdf/internal/settings"
@@ -58,30 +58,21 @@ type objectState struct {
 
 // docTitle extracts the <title> element text of a document, or "".
 func docTitle(root *html.Node) string {
-	var walk func(n *html.Node) string
-	walk = func(n *html.Node) string {
-		if n.Type != html.ElementNode {
-			return ""
-		}
-		if n.Name == "title" {
-			return outline.CollapseWS(n.TextContent())
-		}
-		for _, c := range n.Children {
-			if t := walk(c); t != "" {
-				return t
-			}
-		}
+	if root == nil {
 		return ""
 	}
-	return walk(root)
+	if t := root.TextContentOf("title"); t != "" {
+		return outline.CollapseWS(t)
+	}
+	return ""
 }
 
-// collectObjectHeadings gathers the h1..h6 elements of one painted object,
-// matches them against the layout locations, and rebases their page numbers
-// to the document page index given by offset. Objects opted out of the
+// collectObjectHeadings gathers the h1..h6 elements of one painted object and
+// matches them against the layout locations. Page stays object-local (from
+// Lookup); DocPage is filled once in flatHeadings. Objects opted out of the
 // outline (UseOutline/IncludeInOutline false) are dropped here;
 // --exclude-from-outline is applied later via outline.BuildTree Options.Exclude.
-func collectObjectHeadings(root *html.Node, res *layout.Result, offset int, g settings.PdfGlobal, obj settings.PdfObject, log io.Writer) []*outline.Heading {
+func collectObjectHeadings(root *html.Node, res *layout.Result, _ int, _ settings.PdfGlobal, obj settings.PdfObject, _ io.Writer) []*outline.Heading {
 	if !obj.UseOutline || !obj.IncludeInOutline {
 		return nil
 	}
@@ -89,9 +80,6 @@ func collectObjectHeadings(root *html.Node, res *layout.Result, offset int, g se
 	hs = outline.Lookup(hs, res.Locations)
 	if len(hs) == 0 {
 		return nil
-	}
-	for _, h := range hs {
-		h.Page += offset
 	}
 	return hs
 }
@@ -101,29 +89,35 @@ func collectObjectHeadings(root *html.Node, res *layout.Result, offset int, g se
 func parseExcludeSelectors(specs []string, log io.Writer) []css.Selector {
 	var out []css.Selector
 	for _, s := range specs {
-		sheet, err := css.Parse(s + "{}")
-		if err != nil || sheet == nil || len(sheet.Rules) == 0 || len(sheet.Rules[0].Selectors) == 0 {
-			fmt.Fprintf(log, "warning: ignoring invalid --exclude-from-outline selector %q\n", s)
+		sels, ok := css.ParseSelectors(s)
+		if !ok || len(sels) == 0 {
+			line.Emit(log, line.Warn, "ignoring invalid --exclude-from-outline selector %q", s)
 			continue
 		}
-		out = append(out, sheet.Rules[0].Selectors[0])
+		out = append(out, sels...)
 	}
 	return out
 }
 
 // flatHeadings concatenates the per-object heading lists in object order,
-// assigns stable synthetic anchors, and sorts by (page, y, x) - the order
-// both the outline tree and the [section]/[subsection] lookup use.
+// sets DocPage once (body-global), assigns stable synthetic anchors, and
+// sorts by document page order.
 func flatHeadings(bodies []*objectState) []*outline.Heading {
 	var all []*outline.Heading
 	for _, st := range bodies {
-		all = append(all, st.headings...)
+		for _, h := range st.headings {
+			h.DocPage = st.offset + h.Page
+			all = append(all, h)
+		}
 	}
 	outline.AssignAnchors(all)
+	// Document order by DocPage. outline.SortHeadings keys on Page (object-local);
+	// multi-object flat lists need DocPage order for TOC/HF/outline.
+	// BuildTree receives headingsDocPageView so its SortHeadings sees DocPage in Page.
 	sort.SliceStable(all, func(i, j int) bool {
 		a, b := all[i], all[j]
-		if a.Page != b.Page {
-			return a.Page < b.Page
+		if a.DocPage != b.DocPage {
+			return a.DocPage < b.DocPage
 		}
 		if a.Y != b.Y {
 			return a.Y < b.Y
@@ -133,8 +127,21 @@ func flatHeadings(bodies []*objectState) []*outline.Heading {
 	return all
 }
 
+// headingsDocPageView returns copies with Page set to DocPage so outline
+// package helpers (SortHeadings, SectionOf, BuildTree) operate in document
+// order without mutating the shared object-local Page field.
+func headingsDocPageView(hs []*outline.Heading) []*outline.Heading {
+	out := make([]*outline.Heading, len(hs))
+	for i, h := range hs {
+		cp := *h
+		cp.Page = h.DocPage
+		out[i] = &cp
+	}
+	return out
+}
+
 // bodyStateFor returns the body object whose page span contains the body
-// page index, or nil.
+// page index (body-global / DocPage), or nil.
 func bodyStateFor(bodies []*objectState, page int) *objectState {
 	for _, st := range bodies {
 		if page >= st.offset && page < st.offset+st.pages {
@@ -147,18 +154,24 @@ func bodyStateFor(bodies []*objectState, page int) *objectState {
 // emitOutline converts the outline tree (canvas coordinates) into pdf.Outline
 // nodes with final page refs and PDF (y-up) coordinates. The root is a
 // container for the top-level headings, as pdf.Document.SetOutline expects.
+// Tree headings typically carry Page=DocPage (via headingsDocPageView).
 func emitOutline(doc *pdf.Document, tree *outline.Node, bodies []*objectState, tocTotal int) *pdf.Outline {
 	root := &pdf.Outline{}
 	var conv func(n *outline.Node) *pdf.Outline
 	conv = func(n *outline.Node) *pdf.Outline {
 		h := n.Heading
 		o := &pdf.Outline{Title: h.Title}
-		if st := bodyStateFor(bodies, h.Page); st != nil {
-			locPage := h.Page - st.offset
-			o.PageRef = doc.PageRef(tocTotal + h.Page)
-			o.X = st.geom.marginLeft + h.X
-			// canvas y-down (page-relative offset included) → PDF y-up
-			o.Y = st.geom.pageH - st.geom.marginTop - (h.Y - float64(locPage)*st.geom.contentH)
+		// View copies used by BuildTree set Page = DocPage; prefer DocPage when
+		// non-zero, else Page (covers page 0 via Page on the view).
+		docPage := h.DocPage
+		if h.DocPage == 0 {
+			docPage = h.Page // view: Page holds DocPage including 0
+		}
+		if st := bodyStateFor(bodies, docPage); st != nil {
+			locPage := docPage - st.offset
+			o.PageRef = doc.PageRef(tocTotal + docPage)
+			loc := layout.ElementLocation{Page: locPage, X: h.X, Y: h.Y, W: h.W, H: h.H}
+			o.X, o.Y = st.geom.pdfXY(loc)
 		}
 		for _, c := range n.Children {
 			o.Children = append(o.Children, conv(c))

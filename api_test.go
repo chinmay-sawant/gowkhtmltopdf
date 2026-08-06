@@ -254,6 +254,31 @@ func TestVersion(t *testing.T) {
 	}
 }
 
+// TestLineLogSeverity pins the marker-prefix severity protocol: the
+// grammar lives in internal/line, the callback mapping stays in api.go,
+// and a line whose *message* mentions "error" is not an error line.
+func TestLineLogSeverity(t *testing.T) {
+	var infos, warns, errs []string
+	w := &lineLog{
+		onInfo:  func(l string) { infos = append(infos, l) },
+		onWarn:  func(l string) { warns = append(warns, l) },
+		onError: func(l string) { errs = append(errs, l) },
+	}
+	w.Write([]byte("Loading pages (1/1)\n"))
+	w.Write([]byte("warning: object 1: large stylesheet volume\n"))
+	w.Write([]byte("error: failed to load http://x\n"))
+	w.Write([]byte("info: load error policy is skip, omitting\n"))
+	if len(infos) != 2 {
+		t.Errorf("infos = %v, want 2 lines", infos)
+	}
+	if len(warns) != 1 || warns[0] != "warning: object 1: large stylesheet volume" {
+		t.Errorf("warns = %v", warns)
+	}
+	if len(errs) != 1 || errs[0] != "error: failed to load http://x" {
+		t.Errorf("errs = %v", errs)
+	}
+}
+
 func TestImageConverterNeedsPage(t *testing.T) {
 	c := NewImageConverter()
 	if err := c.Convert(context.Background()); err == nil {

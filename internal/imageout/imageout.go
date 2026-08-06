@@ -20,6 +20,7 @@ import (
 	"gowkhtmltopdf/internal/css"
 	"gowkhtmltopdf/internal/html"
 	"gowkhtmltopdf/internal/layout"
+	"gowkhtmltopdf/internal/line"
 	"gowkhtmltopdf/internal/load"
 	"gowkhtmltopdf/internal/pdf"
 	"gowkhtmltopdf/internal/settings"
@@ -254,6 +255,12 @@ func downscaleBox(src *image.NRGBA, factor int) *image.NRGBA {
 
 // paint draws one display-list operation onto the canvas. pxPerPt converts
 // layout points into the (possibly supersampled) canvas pixel space.
+//
+// FIX-REVIEW: P5-01 — layout exports StyleOf/FakeBoldFor/PaintBand (PDF HF
+// consumes PaintBand); raster paint still uses a local fake-bold/alpha/stroke
+// map — switch this path to StyleOf/FakeBoldFor for one semantics table.
+// FIX-REVIEW: P5-02 — full page-assembly pipeline extract (shared with
+// convert) deferred; prologue now shares CollectSheets + MergeFontFaces only.
 func paint(img *image.NRGBA, op *layout.Op, pxPerPt float64) {
 	switch op.Kind {
 	case layout.OpFillRect:
@@ -401,40 +408,82 @@ func scaleNearest(src image.Image, w, h int) *image.NRGBA {
 	return dst
 }
 
-// Run drives the gowkhtmltoimage command: load the first page object, render
-// it with Render, encode as PNG or JPEG (--format / output extension, quality
-// from --quality) and write to the output path or stdout ("-" or "").
+// Run is the CLI-facing adapter (P1-1): opens the output sink, builds a
+// convert.Request, and delegates to RunRequest. Existing cmd/tests keep this
+// signature; the engine no longer depends on *cli.Command internals beyond
+// OpenOutput and output-path format sniffing.
 func Run(ctx context.Context, cmd *cli.Command, log io.Writer) error {
+	if cmd == nil {
+		return errors.New("imageout: nil command")
+	}
+	out, closeOut, err := cmd.OpenOutput()
+	if err != nil {
+		return err
+	}
+	img := cmd.Image
+	// Resolve --format / extension before the engine so Request only needs
+	// Image.Format (library callers set Format explicitly or get PNG).
+	format, err := resolveFormat(img.Format, cmd.Output)
+	if err != nil {
+		closeOut()
+		return err
+	}
+	img.Format = format
+	req := &convert.Request{
+		Global:  cmd.Global,
+		Image:   &img,
+		Objects: cmd.Objects,
+		Output:  out,
+	}
+	runErr := RunRequest(ctx, req, log)
+	if closeErr := closeOut(); closeErr != nil && runErr == nil {
+		return closeErr
+	}
+	return runErr
+}
+
+// RunRequest drives image conversion from a CLI-independent convert.Request
+// (P1-1). req.Image must be non-nil; req.Output receives encoded PNG/JPEG
+// bytes (nil → os.Stdout is not auto-selected; callers must supply a writer).
+func RunRequest(ctx context.Context, req *convert.Request, log io.Writer) error {
+	if req == nil {
+		return errors.New("imageout: nil request")
+	}
+	if req.Image == nil {
+		return errors.New("imageout: nil Image settings")
+	}
 	if log == nil {
 		log = io.Discard
 	}
 	// Policy A: one quiet bit — CLI --quiet sets Global.Quiet (not Image.Quiet).
-	if cmd.Global.Quiet {
+	if req.Global.Quiet {
 		log = io.Discard
 	}
-	obj, err := firstObject(cmd, log)
+	obj, err := firstObject(req.Objects, log)
 	if err != nil {
 		return err
 	}
 
-	loader := load.NewLoader(cmd.Image.Load)
+	// P2-07: full load policy at construction. Image.Load holds image-mode
+	// Proxy; CLI/library ACL (--allow / --enable-local-file-access) lives on
+	// Global.Load. Merge so NewLoader applies everything; no post-construction
+	// field pokes on Loader.
+	loader := load.NewLoader(imageLoadGlobal(req.Global, *req.Image))
 	loader.Log = log
-	loader.Allow = cmd.Global.Allow
-	loader.EnableLocalFileAccess = cmd.Global.EnableLocalFileAccess
 
 	font, err := pdf.DefaultFont()
 	if err != nil {
 		return fmt.Errorf("default font: %w", err)
 	}
 	var registry *pdf.Registry
-	if dirs := cmd.Global.FontPaths; len(dirs) > 0 || cmd.Global.UseSystemFonts {
+	if dirs := req.Global.FontPaths; len(dirs) > 0 || req.Global.UseSystemFonts {
 		scan := append([]string{}, dirs...)
-		if cmd.Global.UseSystemFonts {
+		if req.Global.UseSystemFonts {
 			scan = append(scan, pdf.DefaultSystemFontDirs()...)
 		}
 		registry = pdf.ScanFontDirs(scan)
 		if log != io.Discard && len(scan) > 0 {
-			fmt.Fprintf(log, "info: scanned %d font path(s)\n", len(scan))
+			line.Emit(log, line.Info, "scanned %d font path(s)", len(scan))
 		}
 	}
 
@@ -446,23 +495,32 @@ func Run(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 		return fmt.Errorf("load %q: load-error policy is skip; nothing to render", obj.Page)
 	}
 
-	root, err := html.Parse(string(res.Body))
+	root, err := html.ParseDocument(res.Body)
 	if err != nil {
 		return fmt.Errorf("parse html: %w", err)
 	}
 
-	sheets := collectSheets(ctx, loader, root, res.Base, obj.Load, log)
-	enabled := convert.SimplifyDOMEnabled(cmd.Image.Web, obj.Web) || cmd.Global.Web.SimplifyDOM
-	profile := convert.SimplifyDOMProfile(cmd.Image.Web, obj.Web)
+	imgSet := req.Image
+	media := mediaFor(req.Global, *imgSet, obj)
+	// P2-01/P2-14: shared gatherer; default ~1024×768 CSS-px viewport in pt
+	// (768×576) for <link media> feature queries. Media matches layout.
+	sheets := convert.CollectSheets(ctx, loader, root, res.Base, obj.Load, convert.SheetOptions{
+		ViewportW: 768.0,
+		ViewportH: 576.0,
+		MediaType: media,
+		// ObjectIndex 0: image mode has one page; omit "object N:" prefix.
+	}, log)
+	enabled := convert.SimplifyDOMEnabled(imgSet.Web, obj.Web) || req.Global.Web.SimplifyDOM
+	profile := convert.SimplifyDOMProfile(imgSet.Web, obj.Web)
 	if profile == "" {
-		profile = convert.SimplifyDOMProfile(cmd.Global.Web, settings.Web{})
+		profile = convert.SimplifyDOMProfile(req.Global.Web, settings.Web{})
 	}
 	sheets = convert.AppendSimplifySheet(sheets, enabled, profile)
 	registry = convert.MergeFontFaces(ctx, loader, registry, sheets, res.Base, obj.Load, 1, log)
 
 	cache := map[string][]byte{}
 	imagesFn := func(src string) ([]byte, error) {
-		if !cmd.Image.Web.Images {
+		if !imgSet.Web.Images {
 			return nil, fmt.Errorf("images disabled")
 		}
 		if b, ok := cache[src]; ok {
@@ -479,56 +537,71 @@ func Run(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 	// Policy A: Quiet is Global.Quiet; body paint background is Global.Background
 	// only (single field for PDF + image; CLI --background / library Set).
 	img, err := Render(root, RenderOptions{
-		Width:              cmd.Image.Width,
-		Height:             cmd.Image.Height,
+		Width:              imgSet.Width,
+		Height:             imgSet.Height,
 		Font:               font,
 		Registry:           registry,
 		Sheets:             sheets,
-		Media:              mediaFor(cmd, obj),
+		Media:              media,
 		Images:             imagesFn,
-		Background:         cmd.Global.Background,
-		Transparent:        cmd.Image.Transparent,
-		Crop:               cropRect(cmd.Image.Crop),
-		SmartWidth:         cmd.Image.SmartWidth,
-		PrintLinkUnderline: cmd.Image.Web.PrintLinkUnderline || cmd.Global.Web.PrintLinkUnderline || obj.Web.PrintLinkUnderline,
+		Background:         req.Global.Background,
+		Transparent:        imgSet.Transparent,
+		Crop:               cropRect(imgSet.Crop),
+		SmartWidth:         imgSet.SmartWidth,
+		PrintLinkUnderline: imgSet.Web.PrintLinkUnderline || req.Global.Web.PrintLinkUnderline || obj.Web.PrintLinkUnderline,
 	})
 	if err != nil {
 		return err
 	}
 
-	format, err := resolveFormat(cmd.Image.Format, cmd.Output)
+	format, err := resolveFormat(imgSet.Format, "")
 	if err != nil {
 		return err
 	}
-	if format == "jpg" && cmd.Image.Transparent {
-		fmt.Fprintln(log, "warning: --transparent ignored for JPEG output (white background used)")
+	if format == "jpg" && imgSet.Transparent {
+		line.Emit(log, line.Warn, "--transparent ignored for JPEG output (white background used)")
 		img = onWhite(img)
 	}
-	data, err := encode(img, format, cmd.Image.Quality)
+	data, err := encode(img, format, imgSet.Quality)
 	if err != nil {
 		return fmt.Errorf("encode %s: %w", format, err)
 	}
 
-	out, closeOut, err := cmd.OpenOutput()
-	if err != nil {
-		return err
+	out := req.Output
+	if out == nil {
+		return errors.New("imageout: nil Output writer")
 	}
 	if _, err := out.Write(data); err != nil {
-		closeOut()
-		if cmd.OutputWriter != nil {
-			return fmt.Errorf("write output: %w", err)
-		}
-		return fmt.Errorf("write %q: %w", cmd.Output, err)
+		return fmt.Errorf("write output: %w", err)
 	}
-	return closeOut()
+	return nil
+}
+
+// imageLoadGlobal builds the LoadGlobal for image mode: Proxy from Image.Load
+// plus ACL (Allow / EnableLocalFileAccess) from Global.Load, where CLI and
+// ImageConverter.Global set them. NewLoader applies the full policy.
+func imageLoadGlobal(global settings.PdfGlobal, image settings.ImageGlobal) settings.LoadGlobal {
+	lg := image.Load
+	// Global.Load is the ACL home (enablelocalfileaccess / allow keys).
+	// Prefer Global when set; keep any Image.Load ACL already present (OR).
+	if len(global.Load.Allow) > 0 {
+		lg.Allow = append(append([]string(nil), lg.Allow...), global.Load.Allow...)
+	}
+	lg.EnableLocalFileAccess = lg.EnableLocalFileAccess || global.Load.EnableLocalFileAccess
+	return lg
+}
+
+// imageLoadGlobalCmd is a test helper: ACL merge from a parsed Command.
+func imageLoadGlobalCmd(cmd *cli.Command) settings.LoadGlobal {
+	return imageLoadGlobal(cmd.Global, cmd.Image)
 }
 
 // firstObject returns the first page-like object. Image mode renders a
 // single page; extra page objects and TOC objects are ignored with warnings.
-func firstObject(cmd *cli.Command, log io.Writer) (*settings.PdfObject, error) {
+func firstObject(objects []settings.PdfObject, log io.Writer) (*settings.PdfObject, error) {
 	var first *settings.PdfObject
-	for i := range cmd.Objects {
-		o := &cmd.Objects[i]
+	for i := range objects {
+		o := &objects[i]
 		if o.IsTableOfContent || o.Page == "" {
 			continue
 		}
@@ -536,7 +609,7 @@ func firstObject(cmd *cli.Command, log io.Writer) (*settings.PdfObject, error) {
 			first = o
 			continue
 		}
-		fmt.Fprintf(log, "warning: image mode renders the first page only; ignoring object %d\n", i+1)
+		line.Emit(log, line.Warn, "image mode renders the first page only; ignoring object %d", i+1)
 	}
 	if first == nil {
 		return nil, errors.New("no input to convert")
@@ -544,22 +617,30 @@ func firstObject(cmd *cli.Command, log io.Writer) (*settings.PdfObject, error) {
 	return first, nil
 }
 
-// mediaFor resolves the layout media: screen (browser default) unless
-// --print-media-type was given.
-func mediaFor(cmd *cli.Command, obj *settings.PdfObject) string {
-	media := "screen"
-	if cmd.Image.Web.PrintMediaType || obj.Load.PrintMediaType {
-		media = "print"
+// mediaFor resolves the layout media via settings.ResolveMedia (P1-4).
+// Image mode defaults to "screen". CLI --print-media-type lands on
+// Global.Web; object overrides live on LoadPage and are mapped into a
+// temporary Web view. Image.Web is merged so library Set paths still apply.
+func mediaFor(global settings.PdfGlobal, image settings.ImageGlobal, obj *settings.PdfObject) string {
+	web := image.Web
+	if global.Web.PrintMediaType {
+		web.PrintMediaType = true
 	}
-	switch obj.Load.MediaType {
-	case settings.MediaPrint:
-		media = "print"
-	case settings.MediaScreen:
-		media = "screen"
-	case settings.MediaIgnore:
-		media = ""
+	if web.MediaType == settings.MediaIgnore {
+		web.MediaType = global.Web.MediaType
 	}
-	return media
+	var objWeb *settings.Web
+	if obj != nil {
+		w := settings.Web{
+			PrintMediaType: obj.Load.PrintMediaType || obj.Web.PrintMediaType,
+			MediaType:      obj.Load.MediaType,
+		}
+		if obj.Web.MediaType != settings.MediaIgnore {
+			w.MediaType = obj.Web.MediaType
+		}
+		objWeb = &w
+	}
+	return settings.ResolveMedia("screen", web, objWeb)
 }
 
 // cropRect converts image settings into a pixel rectangle; returns the zero
@@ -625,77 +706,4 @@ func onWhite(img image.Image) image.Image {
 	return dst
 }
 
-// collectSheets gathers <style> blocks and <link rel="stylesheet"> resources
-// from the DOM. A failed stylesheet only logs a warning; layout proceeds
-// without it.
-func collectSheets(ctx context.Context, loader *load.Loader, root *html.Node, base string, lp settings.LoadPage, log io.Writer) []*css.Stylesheet {
-	var sheets []*css.Stylesheet
-	var walk func(n *html.Node)
-	walk = func(n *html.Node) {
-		if n.Type != html.ElementNode {
-			return
-		}
-		switch n.Name {
-		case "style":
-			sheet, err := css.Parse(styleText(n))
-			if err != nil {
-				fmt.Fprintf(log, "warning: skipping <style>: %v\n", err)
-			} else if sheet != nil {
-				sheets = append(sheets, sheet)
-			}
-			return // raw-text element; no element children
-		case "link":
-			if linkStylesheet(n) {
-				href := n.Attribute("href")
-				r, err := loader.FetchSub(ctx, base, href, lp)
-				if err != nil {
-					fmt.Fprintf(log, "warning: skipping <link href=%q>: %v\n", href, err)
-					return
-				}
-				sheet, err := css.Parse(string(r.Body))
-				if err != nil {
-					fmt.Fprintf(log, "warning: skipping <link href=%q>: %v\n", href, err)
-					return
-				}
-				sheets = append(sheets, sheet)
-			}
-			return
-		}
-		for _, c := range n.Children {
-			walk(c)
-		}
-	}
-	walk(root)
-	return sheets
-}
 
-// styleText concatenates the raw text of a <style> element.
-func styleText(n *html.Node) string {
-	var sb strings.Builder
-	for _, c := range n.Children {
-		if c.Type == html.TextNode {
-			sb.WriteString(c.Text)
-		}
-	}
-	return sb.String()
-}
-
-// linkStylesheet reports whether n is a stylesheet <link> whose media
-// attribute matches the screen/image pipeline (empty, all, screen, or
-// feature queries MediaMatches accepts for "screen"). Viewport uses a
-// generous default so min-width feature links still load for typical widths.
-func linkStylesheet(n *html.Node) bool {
-	if n.Name != "link" || !strings.Contains(strings.ToLower(n.Attribute("rel")), "stylesheet") {
-		return false
-	}
-	if n.Attribute("href") == "" {
-		return false
-	}
-	media := n.Attribute("media")
-	if media == "" {
-		return true
-	}
-	// Default ~1024 CSS px wide viewport for image mode link filtering.
-	const vw, vh = 768.0, 576.0 // 1024px×768px in pt
-	return css.MediaMatches(media, "screen", vw, vh)
-}

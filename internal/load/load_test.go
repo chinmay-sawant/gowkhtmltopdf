@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -711,5 +712,111 @@ func TestHTTPLocalhostAllowedByDesign(t *testing.T) {
 	}
 	if string(res.Body) != "localhost ok" {
 		t.Errorf("body = %q", res.Body)
+	}
+}
+
+// TestLoadInlineHTML: an explicit in-memory HTML source is returned as-is
+// and skips GuessURL entirely; subresources resolve against InlineBase.
+func TestLoadInlineHTML(t *testing.T) {
+	l := NewLoader(settings.LoadGlobal{})
+	lp := defaultLP()
+	lp.InlineHTML = []byte("<html><body>inline</body></html>")
+	lp.InlineBase = "https://example.com/docs/page.html"
+
+	// The input would be treated as an http:// URL by GuessURL; InlineHTML
+	// must short-circuit it without any guessing or fetching.
+	res, err := l.Load(context.Background(), "this is not a url", lp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Kind != KindInline {
+		t.Errorf("kind = %v, want KindInline", res.Kind)
+	}
+	if string(res.Body) != "<html><body>inline</body></html>" {
+		t.Errorf("body = %q", res.Body)
+	}
+	if res.Base != "https://example.com/docs/page.html" {
+		t.Errorf("base = %q, want InlineBase", res.Base)
+	}
+
+	lp2 := defaultLP()
+	lp2.InlineHTML = []byte("<html></html>")
+	res2, err := l.Load(context.Background(), "ignored", lp2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res2.Base != "" {
+		t.Errorf("empty InlineBase must leave Base empty, got %q", res2.Base)
+	}
+}
+
+func TestLoadCharsetContentType(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", r.URL.Query().Get("ct"))
+		w.Write([]byte("<html><body>ok</body></html>"))
+	}))
+	defer srv.Close()
+
+	l := NewLoader(settings.LoadGlobal{})
+	for _, tc := range []struct {
+		ct   string
+		ok   bool
+		want string
+	}{
+		{"text/html", true, ""},
+		{"text/html; charset=utf-8", true, ""},
+		{"text/html; charset=UTF-8", true, ""},
+		{"text/html; charset=us-ascii", true, ""},
+		{"text/html; charset=ISO-8859-1", false, "unsupported charset: ISO-8859-1 (only UTF-8/ASCII)"},
+		{"text/html; charset=windows-1252", false, "unsupported charset: windows-1252 (only UTF-8/ASCII)"},
+	} {
+		_, err := l.Load(context.Background(), srv.URL+"?ct="+url.QueryEscape(tc.ct), defaultLP())
+		if tc.ok && err != nil {
+			t.Errorf("ct %q: %v", tc.ct, err)
+		}
+		if !tc.ok {
+			if err == nil {
+				t.Errorf("ct %q: expected error", tc.ct)
+			} else if !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("ct %q: err = %v, want contains %q", tc.ct, err, tc.want)
+			}
+		}
+	}
+}
+
+func TestLoadCharsetMetaDecl(t *testing.T) {
+	// Content-Type without a charset parameter: the <meta> declaration is
+	// the only charset signal, and it must be honored at the load seam.
+	var body string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.Write([]byte(body))
+	}))
+	defer srv.Close()
+
+	l := NewLoader(settings.LoadGlobal{})
+	for _, tc := range []struct {
+		name, head string
+		ok         bool
+		want       string
+	}{
+		{"utf8-charset", `<meta charset="utf-8">`, true, ""},
+		{"utf8-content-type", `<meta http-equiv="content-type" content="text/html; charset=UTF-8">`, true, ""},
+		{"no-meta", `<html><body>x</body></html>`, true, ""},
+		{"latin1-charset", `<meta charset="windows-1252">`, false, "unsupported charset: windows-1252 (only UTF-8/ASCII)"},
+		{"latin1-content-type", `<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">`, false, "unsupported charset: ISO-8859-1 (only UTF-8/ASCII)"},
+	} {
+		body = tc.head + "<title>t</title></head><body>x</body></html>"
+		_, err := l.Load(context.Background(), srv.URL+"/"+tc.name, defaultLP())
+		if tc.ok && err != nil {
+			t.Errorf("%s: %v", tc.name, err)
+		}
+		if !tc.ok {
+			if err == nil {
+				t.Errorf("%s: expected error", tc.name)
+			} else if !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("%s: err = %v, want contains %q", tc.name, err, tc.want)
+			}
+		}
 	}
 }

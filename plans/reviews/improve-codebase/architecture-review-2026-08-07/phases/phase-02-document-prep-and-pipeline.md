@@ -13,27 +13,27 @@
 
 ## Checklist
 
-- [ ] **P2-01** — One stylesheet-gatherer module instead of two near-copies
-- [ ] **P2-02** — Settle Heading.Page's contract: flatten once, never mutate, never un-flatten
-- [ ] **P2-03** — Consolidate the page-index/copies model into one type
-- [ ] **P2-04** — Make in-memory HTML an explicit source kind with a base URL
-- [ ] **P2-05** — Move SortHeadings + section lookup into the outline package
-- [ ] **P2-06** — Delete `locationOf`; one y-down→PDF helper next to geometry fields
-- [ ] **P2-07** — Loader policy lives in one construction; stop caller-poked ACL fields
-- [ ] **P2-08** — Give html.Node the traversal primitives callers keep re-implementing
-- [ ] **P2-09** — Own the bytes→runes seam that Parse assumes but nobody implements
-- [ ] **P2-10** — Slim `objectState` god-struct; make the pass-order handshakes explicit
-- [ ] **P2-11** — One page-geometry/`layout.Options` constructor instead of arithmetic at 6 sites
-- [ ] **P2-12** — Drop `applyInternalLinks`' ignored `cmd`; stop `paintCount` swallowing layout errors
-- [ ] **P2-13** — Remove the magic OpKind-sentinel link-neutralization leak into convert
-- [ ] **P2-14** — Unify the document-prep prologue (sheet harvesting + font-face merge) with imageout
+- [x] **P2-01** — One stylesheet-gatherer module instead of two near-copies — convert.CollectSheets exported; imageout consumes + deleted twin
+- [x] **P2-02** — Settle Heading.Page's contract: flatten once, never mutate, never un-flatten — DocPage set once in flatHeadings; consumers use DocPage / DocPage view
+- [x] **P2-03** — Consolidate the page-index/copies model into one type — pagePlan (OwnerOf/Remap/Ranges) in convert
+- [~] **P2-04** — Make in-memory HTML an explicit source kind with a base URL — api/settings/load done; full wiring (wave 2) pending
+- [x] **P2-05** — Move SortHeadings + section lookup into the outline package — outline exports + convert SectionOf/BuildTree via DocPage view
+- [x] **P2-06** — Delete `locationOf`; one y-down→PDF helper next to geometry fields — hfGeom.pdfY/pdfXY/pdfRect
+- [x] **P2-07** — Loader policy lives in one construction; stop caller-poked ACL fields — convert + imageout pokes removed; NewLoader applies LoadGlobal
+- [x] **P2-08** — Give html.Node the traversal primitives callers keep re-implementing — Walk/TextContentOf; convert + imageout call sites done
+- [x] **P2-09** — Own the bytes→runes seam that Parse assumes but nobody implements — ParseDocument at convert/imageout load sites; `--default-encoding` still FIX-REVIEW
+- [ ] **P2-10** — Slim `objectState` god-struct; make the pass-order handshakes explicit — deferred (risk; logged in fix-convert)
+- [x] **P2-11** — One page-geometry/`layout.Options` constructor instead of arithmetic at 6 sites — newHFGeom + bodyLayoutOpts
+- [~] **P2-12** — Drop `applyInternalLinks`' ignored `cmd`; stop `paintCount` swallowing layout errors — cmd dropped; paintCount still swallows (FIX-REVIEW)
+- [x] **P2-13** — Remove the magic OpKind-sentinel link-neutralization leak into convert — layout.DeactivateOp + convert consumer
+- [x] **P2-14** — Unify the document-prep prologue (sheet harvesting + font-face merge) with imageout — CollectSheets + MergeFontFaces shared
 
 ---
 
 <a id="p2-01"></a>
 ## P2-01 — One stylesheet-gatherer module instead of two near-copies
 
-- [ ] **P2-01** — One stylesheet-gatherer module instead of two near-copies
+- [ ] **P2-01** — pending (fix-convert side never landed; imageout consume = wave 2)
 
 - **Locations:** `internal/convert/convert.go:528-615` and `internal/imageout/imageout.go:628-697` (collectSheets + styleText + linkStylesheet), `internal/convert/convert.go:529-611` (collectSheets, styleText, linkStylesheet) and the verbatim siblings in `internal/imageout/imageout.go:631-705`
 - **Evidence sources:** area-3 F5; area-4 F1
@@ -221,7 +221,7 @@ func CollectSheets(ctx context.Context, root *html.Node, load SheetSource, media
 <a id="p2-02"></a>
 ## P2-02 — Settle Heading.Page's contract: flatten once, never mutate, never un-flatten
 
-- [ ] **P2-02** — Settle Heading.Page's contract: flatten once, never mutate, never un-flatten
+- [~] **P2-02** — outline side done (Heading.DocPage, fix-html-load-outline); convert consumers pending (fix-convert)
 
 - **Locations:** `internal/outline/outline.go:23-32` (Heading), `internal/convert/outline.go:84-96` (rebase), `internal/convert/outline.go:150-162` (`emitOutline` un-rebase), consumers `internal/convert/toc.go:172-176`, `internal/convert/links.go:102-113`, `internal/convert/hf.go:525-544`)
 - **Evidence sources:** area-3 F1
@@ -300,7 +300,7 @@ st.offset == element location page` for every outline entry after the change.
 <a id="p2-03"></a>
 ## P2-03 — Consolidate the page-index/copies model into one type
 
-- [ ] **P2-03** — Consolidate the page-index/copies model into one type
+- [ ] **P2-03** — pending (fix-convert)
 
 - **Locations:** `internal/convert/hf.go:556-596`; siblings `internal/convert/convert.go:204-264` (`pageRange`, `tocFirstOrder`, `materializeCopies`, `nonCollateOrder`) and `:146-152` (ranges rebuild); `internal/convert/links.go:175-185` (`remapPageForCopies`); `internal/convert/outline.go:56-57` (`objectState.start`)
 - **Evidence sources:** area-6 F1
@@ -434,7 +434,7 @@ Callers are all internal: `RunPDFContext` (convert.go:146-152, 176-264 — `page
 <a id="p2-04"></a>
 ## P2-04 — Make in-memory HTML an explicit source kind with a base URL
 
-- [ ] **P2-04** — Make in-memory HTML an explicit source kind with a base URL
+- [~] **P2-04** — api (SetBody/AddHTML/ConvertHTML) + settings (InlineHTML/InlineBase) + load (InlineHTML-first) done; full wiring (wave 2) pending
 
 - **Locations:** `api.go:196-208` (`ConvertHTML`); classification rule `internal/load/load.go:88-105` (`IsHTML`/`GuessURL`)
 - **Evidence sources:** area-1 F4
@@ -498,7 +498,7 @@ Exported behaviour change: `ObjectSettings` gains `SetBody`; `ConvertHTML` and `
 <a id="p2-05"></a>
 ## P2-05 — Move SortHeadings + section lookup into the outline package
 
-- [ ] **P2-05** — Move SortHeadings + section lookup into the outline package
+- [~] **P2-05** — outline side done (SortHeadings/SectionOf, fix-html-load-outline); convert consumption pending (fix-convert)
 
 - **Locations:** duplicate comparators `internal/convert/outline.go:117-134` and `internal/outline/outline.go:137-154`; order-dependent section lookup `internal/convert/hf.go:525-544`
 - **Evidence sources:** area-3 F2
@@ -590,7 +590,7 @@ instead of the object that owns the list.
 <a id="p2-06"></a>
 ## P2-06 — Delete `locationOf`; one y-down→PDF helper next to geometry fields
 
-- [ ] **P2-06** — Delete `locationOf`; one y-down→PDF helper next to geometry fields
+- [ ] **P2-06** — pending (fix-convert)
 
 - **Locations:** `internal/convert/links.go:32-47` (pageRect + destPoint), `internal/convert/links.go:130-138` (`locationOf`), `internal/convert/outline.go:156-162` (`emitOutline` y-flip)
 - **Evidence sources:** area-3 F3
@@ -656,7 +656,7 @@ a single trusted location source.
 <a id="p2-07"></a>
 ## P2-07 — Loader policy lives in one construction; stop caller-poked ACL fields
 
-- [ ] **P2-07** — Loader policy lives in one construction; stop caller-poked ACL fields
+- [~] **P2-07** — settings (LoadGlobal.Allow/EnableLocalFileAccess) + load (NewLoader applies) done; convert.go:47-48 + imageout.go:422-423 pokes pending (currently breaks `go build ./...`)
 
 - **Locations:** `internal/load/load.go:161-184` (struct + `NewLoader`), `internal/convert/convert.go:45-48`, `internal/imageout/imageout.go:420-423` (identical pokes), `internal/settings/settings.go` LoadGlobal (Proxy only)
 - **Evidence sources:** area-3 F4
@@ -743,7 +743,7 @@ fetchers) are added.
 <a id="p2-08"></a>
 ## P2-08 — Give html.Node the traversal primitives callers keep re-implementing
 
-- [ ] **P2-08** — Give html.Node the traversal primitives callers keep re-implementing
+- [~] **P2-08** — html.Walk/TextContentOf + outline refactor done (fix-html-load-outline); convert/imageout call sites pending
 
 - **Locations:** `internal/html/html.go:25-64` (interface); re-implementations: `internal/outline/outline.go:57-77` (CollectHeadings walk), `internal/convert/outline.go:59-77` (docTitle walk), `internal/convert/convert.go:531-612` and `internal/imageout/imageout.go:631-673` (collectSheets walks ×2), `internal/convert/convert.go:581-589` and `internal/imageout/imageout.go:673-681` (styleText ×2), `internal/outline/outline_test.go:38-53` (headNodes)
 - **Evidence sources:** area-3 F6
@@ -839,7 +839,7 @@ both converters — leverage against every current and future consumer.
 <a id="p2-09"></a>
 ## P2-09 — Own the bytes→runes seam that Parse assumes but nobody implements
 
-- [ ] **P2-09** — Own the bytes→runes seam that Parse assumes but nobody implements
+- [~] **P2-09** — html.ParseDocument + load charset seam done (fix-html-load-outline); convert.go:169 call site pending; `--default-encoding` FIX-REVIEW marker in settings
 
 - **Locations:** `internal/html/html.go:96-98` (contract), `internal/load/load.go:48-56` (ContentType written at 5 sites, read nowhere: `:225, :232, :269, :379, :409`), `internal/settings/reflect.go:110` + `internal/settings/settings.go:163-165` (`--default-encoding` accepted then Ignored)
 - **Evidence sources:** area-3 F7
@@ -895,7 +895,7 @@ decoding.
 <a id="p2-10"></a>
 ## P2-10 — Slim `objectState` god-struct; make the pass-order handshakes explicit
 
-- [ ] **P2-10** — Slim `objectState` god-struct; make the pass-order handshakes explicit
+- [ ] **P2-10** — pending (fix-convert)
 
 - **Locations:** `internal/convert/outline.go:20-57` (struct); hidden-mutation handshake `internal/convert/convert.go:363-364` and `internal/convert/hf.go:247-260`; placement fields written late in `RunPDFContext`/`renderTOCObjects`
 - **Evidence sources:** area-6 F4
@@ -965,7 +965,7 @@ func loadHTMLHF(ctx context.Context, loader *load.Loader, font *pdf.Font, st *ob
 <a id="p2-11"></a>
 ## P2-11 — One page-geometry/`layout.Options` constructor instead of arithmetic at 6 sites
 
-- [ ] **P2-11** — One page-geometry/`layout.Options` constructor instead of arithmetic at 6 sites
+- [ ] **P2-11** — pending (fix-convert)
 
 - **Locations:** `internal/convert/convert.go:271-296` (initTOCState) and `:338-364` (renderObject, identical geom literal); margin arithmetic re-derived at `convert.go:320-321, 367, 383, 399`, `hf.go:260, 518-520`, `toc.go:159`; `layout.Options` literals at `convert.go:366-377, 397-412`, `hf.go:267-283, 313-326`, `toc.go:172-182`
 - **Evidence sources:** area-6 F5
@@ -1042,7 +1042,7 @@ func (st *objectState) bodyLayoutOpts(zoom float64) layout.Options {
 <a id="p2-12"></a>
 ## P2-12 — Drop `applyInternalLinks`' ignored `cmd`; stop `paintCount` swallowing layout errors
 
-- [ ] **P2-12** — Drop `applyInternalLinks`' ignored `cmd`; stop `paintCount` swallowing layout errors
+- [ ] **P2-12** — pending (fix-convert)
 
 - **Locations:** `internal/convert/links.go:190-211` (`cmd` dead parameter); `internal/convert/convert.go:144` (caller); `internal/convert/toc.go:143-149` (`paintCount`)
 - **Evidence sources:** area-6 F6
@@ -1095,7 +1095,7 @@ func applyInternalLinks(doc *pdf.Document, bodies []*objectState, tocTotal int, 
 <a id="p2-13"></a>
 ## P2-13 — Remove the magic OpKind-sentinel link-neutralization leak into convert
 
-- [ ] **P2-13** — Remove the magic OpKind-sentinel link-neutralization leak into convert
+- [ ] **P2-13** — pending (fix-convert + layout DeactivateOp)
 
 - **Locations:** `internal/convert/links.go:13-30` (`linkOpSkip`, `stripLinkURIs`); uses at `links.go:207-208`; the contract lives in `internal/layout/paint.go:120-136` (switch with no case for 255)
 - **Evidence sources:** area-6 F7
@@ -1163,7 +1163,7 @@ layout.DeactivateOp(&ops[i])
 <a id="p2-14"></a>
 ## P2-14 — Unify the document-prep prologue (sheet harvesting + font-face merge) with imageout
 
-- [ ] **P2-14** — Unify the document-prep prologue (sheet harvesting + font-face merge) with imageout
+- [ ] **P2-14** — pending (fix-convert side never landed; imageout = wave 2)
 
 - **Locations:** `internal/convert/convert.go:531-602` (`collectSheets`/`styleText`/`linkStylesheet`); verbatim twin `internal/imageout/imageout.go:631-701`; prologue duplication `internal/convert/convert.go:316-336` vs `internal/imageout/imageout.go:420-477`
 - **Evidence sources:** area-6 F3

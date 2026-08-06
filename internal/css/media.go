@@ -178,7 +178,7 @@ func matchOrientation(low string, widthPt, heightPt float64) bool {
 
 // matchesAxis compares a size feature against one axis length in points.
 func (f SizeFeature) matchesAxis(sizePt, fontSizePt float64) bool {
-	thresh, ok := lengthToPt(f.Value, f.Unit, fontSizePt)
+	thresh, ok := LengthToPt(f.Value, f.Unit, fontSizePt)
 	if !ok {
 		return false
 	}

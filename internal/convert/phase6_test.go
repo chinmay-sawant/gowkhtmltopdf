@@ -254,7 +254,7 @@ func TestHTMLHeaderRelativePathCWD(t *testing.T) {
 		Objects: []settings.PdfObject{obj},
 		Output:  filepath.Join(t.TempDir(), "out.pdf"),
 	}
-	cmd.Global.EnableLocalFileAccess = true
+	cmd.Global.Load.EnableLocalFileAccess = true
 	cmd.Global.Header.HTMLURL = headerRel
 	cmd.Global.Margin.Top = -1
 	cmd.Global.UseCompression = false

@@ -13,5 +13,17 @@ func (e *HttpStatusError) Error() string {
 	return fmt.Sprintf("failed to load %s: HTTP %d", e.URL, e.Status)
 }
 
-// HttpErrorCode maps an HTTP status to the wkhtmltopdf exit-code convention.
+// HttpErrorCode maps an HTTP status to the wkhtmltopdf exit-code convention
+// (utilities.cc): 404 → 2, 401 → 3, everything else stays 1.
+func HttpErrorCode(status int) int {
+	switch status {
+	case 404:
+		return 2
+	case 401:
+		return 3
+	}
+	return 1
+}
+
+// HttpErrorCode reports the exit code this load failure maps to.
 func (e *HttpStatusError) HttpErrorCode() int { return HttpErrorCode(e.Status) }

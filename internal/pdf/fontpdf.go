@@ -7,14 +7,6 @@ import (
 	"strings"
 )
 
-// embeddedFont is one subset embedded in the document.
-type embeddedFont struct {
-	subset  *subsetResult
-	ref     string // /FontFile2 object ref
-	descRef string // /FontDescriptor object ref
-	fontRef string // font dict object ref
-}
-
 // pdfNameToken keeps only characters safe in a PDF name token.
 func pdfNameToken(s string) string {
 	var b strings.Builder
@@ -29,16 +21,29 @@ func pdfNameToken(s string) string {
 	return b.String()
 }
 
+// widthsInEm is the single home of the font-units→PDF-1000-em conversion,
+// feeding both the simple /Widths array and the Type0 /W array. The result
+// is indexed by subset glyph id.
+func widthsInEm(sub *subsetResult, unitsPerEm int16) []float64 {
+	upm := float64(unitsPerEm)
+	if upm <= 0 {
+		upm = 1000
+	}
+	ws := make([]float64, len(sub.widths))
+	for i, w := range sub.widths {
+		// PDF glyph space: 1000 units = 1 em.
+		ws[i] = w * 1000 / upm
+	}
+	return ws
+}
+
 // subsetWidths returns (firstCode, lastCode, widths) with widths indexed by
 // char code in PDF 1000-unit em space; codes without a glyph get 0.
 func subsetWidths(sub *subsetResult, unitsPerEm int16) (int, int, []float64) {
 	if len(sub.glyphIDs) == 0 {
 		return 0, 0, nil
 	}
-	upm := float64(unitsPerEm)
-	if upm <= 0 {
-		upm = 1000
-	}
+	ws := widthsInEm(sub, unitsPerEm)
 	first, last := 0xFF, 0
 	for r := range sub.glyphIDs {
 		c := int(r)
@@ -51,9 +56,8 @@ func subsetWidths(sub *subsetResult, unitsPerEm int16) (int, int, []float64) {
 	}
 	widths := make([]float64, last-first+1)
 	for r, g := range sub.glyphIDs {
-		if int(g) < len(sub.widths) {
-			// PDF glyph space: 1000 units = 1 em.
-			widths[int(r)-first] = sub.widths[g] * 1000 / upm
+		if int(g) < len(ws) {
+			widths[int(r)-first] = ws[g]
 		}
 	}
 	return first, last, widths
@@ -61,7 +65,7 @@ func subsetWidths(sub *subsetResult, unitsPerEm int16) (int, int, []float64) {
 
 // ensureToUnicode emits the ToUnicode CMap for a subset and returns its ref.
 // codeBytes is 1 for simple (WinAnsi single-byte) or 2 for Identity-H CIDs.
-func (d *Document) ensureToUnicode(sub *subsetResult, codeBytes int) string {
+func (d *Document) ensureToUnicode(sub *subsetResult, codeBytes int) objRef {
 	ref := d.newObject()
 	var b strings.Builder
 	b.WriteString("/CIDInit /ProcSet findresource begin\n")

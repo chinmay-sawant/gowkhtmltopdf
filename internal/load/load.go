@@ -165,19 +165,23 @@ type Loader struct {
 	MaxBodySize  int64
 	MaxRedirects int
 
-	// Allow prefixes and the effective local-access flag, injected by the
-	// caller from settings (convert wires PdfGlobal.Allow + EnableLocalFileAccess).
+	// Allow prefixes and the effective local-access flag, applied by
+	// NewLoader from settings.LoadGlobal (caller-side pokes are being
+	// removed in parallel). Kept exported for tests.
 	Allow                 []string
 	EnableLocalFileAccess bool
 }
 
-// NewLoader builds a Loader from global load settings.
+// NewLoader builds a Loader from global load settings, applying the full
+// load policy (proxy, allow prefixes, local-access flag) in one place.
 func NewLoader(g settings.LoadGlobal) *Loader {
 	l := &Loader{
-		Global:       g,
-		Log:          io.Discard,
-		MaxBodySize:  DefaultMaxBodySize,
-		MaxRedirects: DefaultMaxRedirects,
+		Global:                g,
+		Log:                   io.Discard,
+		MaxBodySize:           DefaultMaxBodySize,
+		MaxRedirects:          DefaultMaxRedirects,
+		Allow:                 g.Allow,
+		EnableLocalFileAccess: g.EnableLocalFileAccess,
 	}
 	l.initClient()
 	return l
@@ -213,30 +217,197 @@ func (l *Loader) initClient() {
 	}
 }
 
-// Load fetches the primary resource for an object.
+// Load fetches the primary resource for an object. In-memory HTML
+// (lp.InlineHTML) is returned as-is and skips GuessURL entirely; subresources
+// resolve against lp.InlineBase when set. Every loaded document is checked
+// for a supported charset at this seam (see checkDocumentCharset).
 func (l *Loader) Load(ctx context.Context, input string, lp settings.LoadPage) (*Resource, error) {
+	if len(lp.InlineHTML) > 0 {
+		res := &Resource{
+			Kind:        KindInline,
+			URL:         "inline:",
+			Base:        lp.InlineBase,
+			Body:        lp.InlineHTML,
+			ContentType: "text/html",
+		}
+		return res, checkDocumentCharset(res)
+	}
 	kind, target, err := GuessURL(input)
 	if err != nil {
 		return nil, err
 	}
+	var res *Resource
 	switch kind {
 	case KindInline:
 		if strings.HasPrefix(target, "inline:") {
-			return &Resource{Kind: KindInline, URL: "inline:", Body: []byte(target[len("inline:"):]), ContentType: "text/html"}, nil
-		}
-		if strings.HasPrefix(target, "data:") {
-			body, ctype, err := decodeDataURL(target)
+			res = &Resource{Kind: KindInline, URL: "inline:", Body: []byte(target[len("inline:"):]), ContentType: "text/html"}
+		} else if strings.HasPrefix(target, "data:") {
+			var body []byte
+			var ctype string
+			body, ctype, err = decodeDataURL(target)
 			if err != nil {
 				return nil, err
 			}
-			return &Resource{Kind: KindInline, URL: target, Body: body, ContentType: ctype}, nil
+			res = &Resource{Kind: KindInline, URL: target, Body: body, ContentType: ctype}
 		}
 	case KindFile:
-		return l.loadFile(ctx, target, lp)
+		res, err = l.loadFile(ctx, target, lp)
 	case KindHTTP:
-		return l.loadHTTP(ctx, target, lp)
+		res, err = l.loadHTTP(ctx, target, lp)
 	}
-	return nil, fmt.Errorf("cannot load %q", input)
+	if err != nil {
+		return nil, err
+	}
+	if res == nil {
+		return nil, fmt.Errorf("cannot load %q", input)
+	}
+	if !res.Skip {
+		return res, checkDocumentCharset(res)
+	}
+	return res, nil
+}
+
+// checkDocumentCharset enforces the bytes-to-runes seam: only UTF-8/ASCII
+// documents are supported. The charset is taken from the resource's
+// Content-Type charset parameter, falling back to a <meta charset> (or
+// <meta http-equiv="content-type">) declaration in the first 1 KiB of the
+// body. Anything else is refused with a clear error instead of silently
+// garbling the page.
+func checkDocumentCharset(res *Resource) error {
+	cs := charsetFromContentType(res.ContentType)
+	if cs == "" {
+		cs = metaCharset(res.Body)
+	}
+	if cs == "" || charsetSupported(cs) {
+		return nil
+	}
+	return fmt.Errorf("unsupported charset: %s (only UTF-8/ASCII)", cs)
+}
+
+// charsetSupported reports whether a charset name is one the pipeline can
+// decode. Only UTF-8 and ASCII are accepted.
+func charsetSupported(cs string) bool {
+	switch strings.ToLower(strings.TrimSpace(cs)) {
+	case "utf-8", "utf8", "us-ascii", "ascii":
+		return true
+	}
+	return false
+}
+
+// charsetFromContentType extracts the charset parameter of a Content-Type
+// value, or "" when absent or unparseable.
+func charsetFromContentType(ct string) string {
+	if ct == "" {
+		return ""
+	}
+	_, params, err := mime.ParseMediaType(ct)
+	if err != nil {
+		return ""
+	}
+	return params["charset"]
+}
+
+// metaCharset scans the first 1 KiB of a document for a <meta charset> or
+// <meta http-equiv="content-type"> declaration and returns the declared
+// charset, or "" when there is none.
+func metaCharset(body []byte) string {
+	s := string(body)
+	if len(s) > 1024 {
+		s = s[:1024]
+	}
+	low := strings.ToLower(s)
+	for {
+		i := strings.Index(low, "<meta")
+		if i < 0 {
+			return ""
+		}
+		j := strings.IndexByte(s[i:], '>')
+		if j < 0 {
+			return ""
+		}
+		if cs := metaTagCharset(s[i : i+j]); cs != "" {
+			return cs
+		}
+		s = s[i+j+1:]
+		low = strings.ToLower(s)
+	}
+}
+
+// metaTagCharset extracts the charset from one <meta ...> tag: the charset
+// attribute directly, or the content attribute when http-equiv is
+// content-type.
+func metaTagCharset(tag string) string {
+	if strings.EqualFold(attrValue(tag, "http-equiv"), "content-type") {
+		if cs := charsetInContent(attrValue(tag, "content")); cs != "" {
+			return cs
+		}
+	}
+	if cs := attrValue(tag, "charset"); cs != "" {
+		return cs
+	}
+	return ""
+}
+
+// charsetInContent extracts the charset=... parameter from a meta content
+// attribute value (e.g. "text/html; charset=windows-1252").
+func charsetInContent(content string) string {
+	low := strings.ToLower(content)
+	i := strings.Index(low, "charset")
+	if i < 0 {
+		return ""
+	}
+	rest := strings.TrimLeft(content[i+len("charset"):], " \t\n\r\f")
+	if !strings.HasPrefix(rest, "=") {
+		return ""
+	}
+	return strings.Trim(strings.TrimLeft(rest[1:], " \t\n\r\f"), "\"' ;")
+}
+
+// attrValue extracts the value of the named attribute (case-insensitive)
+// from a <meta ...> tag body, or "".
+func attrValue(tag, name string) string {
+	low := strings.ToLower(tag)
+	needle := strings.ToLower(name)
+	for {
+		i := strings.Index(low, needle)
+		if i < 0 {
+			return ""
+		}
+		if i > 0 {
+			c := tag[i-1]
+			if c != ' ' && c != '\t' && c != '\n' && c != '\r' && c != '\f' {
+				tag = tag[i+len(needle):]
+				low = low[i+len(needle):]
+				continue
+			}
+		}
+		rest := strings.TrimLeft(tag[i+len(needle):], " \t\n\r\f")
+		if !strings.HasPrefix(rest, "=") {
+			tag = tag[i+len(needle):]
+			low = low[i+len(needle):]
+			continue
+		}
+		rest = strings.TrimLeft(rest[1:], " \t\n\r\f")
+		if rest == "" {
+			return ""
+		}
+		if rest[0] == '"' || rest[0] == '\'' {
+			q := rest[0]
+			if k := strings.IndexByte(rest[1:], q); k >= 0 {
+				return rest[1 : k+1]
+			}
+			return ""
+		}
+		k := 0
+		for k < len(rest) && !isMetaWhitespace(rest[k]) {
+			k++
+		}
+		return rest[:k]
+	}
+}
+
+func isMetaWhitespace(b byte) bool {
+	return b == ' ' || b == '\t' || b == '\n' || b == '\r' || b == '\f' || b == '>'
 }
 
 func (l *Loader) loadFile(ctx context.Context, path string, lp settings.LoadPage) (*Resource, error) {

@@ -11,14 +11,11 @@ import (
 	"github.com/go-text/typesetting/shaping"
 )
 
-// gotextFaceCache maps *Font → *gtfont.Face (or false-sentinel on failure).
-var gotextFaceCache sync.Map
-
-type gotextFaceEntry struct {
-	face *gtfont.Face
-	ok   bool
-}
-
+// gotextFace parses the go-text face once per Font (see Font.gotOnce); the
+// package-level sync.Map is gone so derived data lives on and dies with the
+// Font it derives from.
+//
+// ponytail: go-text OT shaping when GSUB available; manual Arabic/RTL fallback otherwise.
 var (
 	shaperPool = sync.Pool{
 		New: func() any { return &shaping.HarfbuzzShaper{} },
@@ -75,7 +72,7 @@ func tryShapeOpenType(s string, f *Font, features []shaping.FontFeature) (shaped
 	if !f.hasGSUB() && len(features) == 0 {
 		return shapedRun{}, false
 	}
-	face, ok := gotextFace(f)
+	face, ok := f.gotextFace()
 	if !ok {
 		return shapedRun{}, false
 	}
@@ -279,38 +276,42 @@ func (f *Font) hasGSUB() bool {
 	return ok
 }
 
-func gotextFace(f *Font) (*gtfont.Face, bool) {
+// gotextFace parses the go-text face once per Font (see Font.gotOnce); the
+// package-level sync.Map is gone so derived data lives on and dies with the
+// Font it derives from.
+func (f *Font) gotextFace() (*gtfont.Face, bool) {
 	if f == nil || len(f.data) == 0 {
 		return nil, false
 	}
-	if v, ok := gotextFaceCache.Load(f); ok {
-		e := v.(gotextFaceEntry)
-		return e.face, e.ok
-	}
-	face, err := gtfont.ParseTTF(bytes.NewReader(f.data))
-	e := gotextFaceEntry{face: face, ok: err == nil && face != nil}
-	if actual, loaded := gotextFaceCache.LoadOrStore(f, e); loaded {
-		e = actual.(gotextFaceEntry)
-	}
-	return e.face, e.ok
+	f.gotOnce.Do(func() {
+		if face, err := gtfont.ParseTTF(bytes.NewReader(f.data)); err == nil && face != nil {
+			f.gotFace = face
+		}
+	})
+	return f.gotFace, f.gotFace != nil
 }
 
 // reverseCmap maps glyph id → preferred Unicode (presentation forms win).
+// The map is built once from f.cmap (immutable after parse) and cached on
+// the Font.
 func (f *Font) reverseCmap() map[uint16]rune {
-	out := make(map[uint16]rune, len(f.cmap))
-	for cp, gid := range f.cmap {
-		if gid == 0 {
-			continue
-		}
-		r := rune(cp)
-		if prev, ok := out[gid]; ok {
-			if cmapRuneScore(r) <= cmapRuneScore(prev) {
+	f.revOnce.Do(func() {
+		out := make(map[uint16]rune, len(f.cmap))
+		for cp, gid := range f.cmap {
+			if gid == 0 {
 				continue
 			}
+			r := rune(cp)
+			if prev, ok := out[gid]; ok {
+				if cmapRuneScore(r) <= cmapRuneScore(prev) {
+					continue
+				}
+			}
+			out[gid] = r
 		}
-		out[gid] = r
-	}
-	return out
+		f.rev = out
+	})
+	return f.rev
 }
 
 func cmapRuneScore(r rune) int {

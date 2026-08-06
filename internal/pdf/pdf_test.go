@@ -369,6 +369,81 @@ func TestOutlineCountAndSort(t *testing.T) {
 	}
 }
 
+func TestSetFillColorGrayscale(t *testing.T) {
+	// P5-03: Document.SetGrayscale must have its promised paint-time effect.
+	// Fill/stroke colors fold through Rec.601 luma so r=g=b lines are equal.
+	d := fixedDoc(t)
+	d.SetGrayscale(true)
+	d.SetCompression(false)
+	p := d.AddPage(100, 100)
+	c := p.Content()
+	c.SetFillColor(1, 0, 0)   // pure red → luma 0.299
+	c.SetStrokeColor(0, 1, 0) // pure green → luma 0.587
+	out := string(writePDF(t, d))
+	if !strings.Contains(out, "0.299 0.299 0.299 rg") {
+		t.Errorf("grayscale fill not folded to luma: %q", outlineSnippet(out))
+	}
+	if !strings.Contains(out, "0.587 0.587 0.587 RG") {
+		t.Errorf("grayscale stroke not folded to luma: %q", outlineSnippet(out))
+	}
+	if strings.Contains(out, "1 0 0 rg") || strings.Contains(out, "0 1 0 RG") {
+		t.Error("grayscale mode emitted the raw RGB color")
+	}
+
+	// Default (off) keeps colors untouched.
+	d2 := fixedDoc(t)
+	d2.SetCompression(false)
+	c2 := d2.AddPage(100, 100).Content()
+	c2.SetFillColor(1, 0, 0)
+	c2.SetStrokeColor(0, 1, 0)
+	out2 := string(writePDF(t, d2))
+	if !strings.Contains(out2, "1 0 0 rg") || !strings.Contains(out2, "0 1 0 RG") {
+		t.Error("color mode must keep the raw RGB color")
+	}
+}
+
+func TestGrayscaleGetter(t *testing.T) {
+	d := NewDocument()
+	if d.Grayscale() {
+		t.Error("new document must start in color mode")
+	}
+	d.SetGrayscale(true)
+	if !d.Grayscale() {
+		t.Error("SetGrayscale(true) must report Grayscale() == true")
+	}
+}
+
+func TestOutlineBadPageRefFails(t *testing.T) {
+	// P5-04: a bogus PageRef must fail Write instead of emitting a corrupt
+	// /Dest with no diagnostic.
+	for _, ref := range []string{"", "999999 0 R", "garbage", "4 0 X", "0 0 R"} {
+		d := fixedDoc(t)
+		d.AddPage(200, 200)
+		d.SetOutline(&Outline{Title: "root", Children: []*Outline{{Title: "bad", PageRef: ref}}})
+		var buf bytes.Buffer
+		err := d.Write(&buf)
+		if ref == "" {
+			// empty PageRef = no /Dest at all; valid.
+			if err != nil {
+				t.Errorf("empty PageRef: unexpected error %v", err)
+			}
+			continue
+		}
+		if err == nil {
+			t.Errorf("PageRef %q: expected Write error, got nil", ref)
+		}
+	}
+	// A valid ref still writes fine (page object 1).
+	d := fixedDoc(t)
+	d.SetCompression(false)
+	d.AddPage(200, 200)
+	d.SetOutline(&Outline{Title: "root", Children: []*Outline{{Title: "ok", PageRef: "1 0 R", X: 5, Y: 6}}})
+	out := string(writePDF(t, d))
+	if !strings.Contains(out, "/Dest [1 0 R /XYZ 5 6 null]") {
+		t.Error("valid PageRef must emit /Dest")
+	}
+}
+
 func TestWriteToMemoryBuffer(t *testing.T) {
 	d := fixedDoc(t)
 	d.SetCompression(false)
@@ -414,13 +489,13 @@ func TestReorderPagesKidsOrder(t *testing.T) {
 	}
 	out := string(writePDF(t, d))
 	kids := kidsRefs(t, out)
-	want := []string{pC.ref, pA.ref, pB.ref}
+	want := []string{pC.ref.String(), pA.ref.String(), pB.ref.String()}
 	if strings.Join(kids, " ") != strings.Join(want, " ") {
 		t.Errorf("/Kids = %v, want %v", kids, want)
 	}
 	// every page object still owns its original content stream
 	for _, p := range []*Page{pA, pB, pC} {
-		if !strings.Contains(out, "/Contents "+p.contentRef) {
+		if !strings.Contains(out, "/Contents "+p.contentRef.String()) {
 			t.Errorf("page %s lost its content stream %s", p.ref, p.contentRef)
 		}
 	}
@@ -451,12 +526,12 @@ func TestDuplicatePage(t *testing.T) {
 	out := string(writePDF(t, d))
 	// kids must be [A B A'] and every page keeps its own content stream
 	kids := kidsRefs(t, out)
-	wantKids := []string{pA.ref, pB.ref, dup.ref}
+	wantKids := []string{pA.ref.String(), pB.ref.String(), dup.ref.String()}
 	if strings.Join(kids, " ") != strings.Join(wantKids, " ") {
 		t.Errorf("/Kids = %v, want %v", kids, wantKids)
 	}
 	for _, p := range []*Page{pA, pB, dup} {
-		if !strings.Contains(out, "/Contents "+p.contentRef) {
+		if !strings.Contains(out, "/Contents "+p.contentRef.String()) {
 			t.Errorf("page %s lost its content stream %s", p.ref, p.contentRef)
 		}
 	}

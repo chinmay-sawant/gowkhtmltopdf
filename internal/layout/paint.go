@@ -98,6 +98,7 @@ func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 	}
 	populateLocations(res, contentH, opPage)
 
+	var paintErr error
 	for pageIdx, idxs := range res.Pages {
 		p := doc.AddPage(opts.PageWidth, opts.PageHeight)
 		c := p.Content()
@@ -118,6 +119,9 @@ func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 		}
 		nextImg := 0
 		paintOp := func(op *Op, pg int) {
+			if op.Kind == opKindNoop {
+				return
+			}
 			if op.Kind == OpLinkURI {
 				drawLinkXform(p, op, pg, contentH, opts)
 				return
@@ -145,7 +149,9 @@ func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 			case OpImage:
 				name := "I" + strconv.Itoa(nextImg)
 				nextImg++
-				drawImage(p, c, op, pg, contentH, opts, name)
+				if err := drawImage(p, c, op, pg, contentH, opts, name); err != nil && paintErr == nil {
+					paintErr = err
+				}
 			}
 			if needGS {
 				c.Restore()
@@ -161,7 +167,7 @@ func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 			paintOp(&res.Ops[idx], 0)
 		}
 	}
-	return nil
+	return paintErr
 }
 
 func sortPaintIndices(ops []Op, idxs []int) {
@@ -196,6 +202,205 @@ func paintLayer(k OpKind) int {
 	default:
 		return 1
 	}
+}
+
+// PaintStyle is the resolved per-op appearance that PDF and image adapters
+// share: translucent-fill pre-composition, stroke min-width, and the Latin-only
+// fake-bold gate (stroking CJK/Type0 outlines creates horizontal streaks).
+type PaintStyle struct {
+	FillR, FillG, FillB float64 // final RGB; alpha pre-composited against white when translucent
+	FillAlpha           float64 // 1 after pre-composite; raw Op.Alpha when opaque
+	StrokeWidth         float64
+	FakeBold            bool
+}
+
+// StyleOf resolves paint-semantics for op. Layout owns these decisions so
+// convert HF and imageout adapters do not drift.
+func StyleOf(op *Op) PaintStyle {
+	if op == nil {
+		return PaintStyle{FillAlpha: 1, StrokeWidth: 1}
+	}
+	ps := PaintStyle{
+		FillR: op.R, FillG: op.G, FillB: op.B, FillAlpha: 1,
+		StrokeWidth: op.Width,
+	}
+	if ps.StrokeWidth <= 0 {
+		ps.StrokeWidth = 1
+	}
+	// Pre-composite translucent fills against white paper (PDF path).
+	if op.Alpha > 0 && op.Alpha < 1 {
+		a := op.Alpha
+		ps.FillR = op.R*a + (1 - a)
+		ps.FillG = op.G*a + (1 - a)
+		ps.FillB = op.B*a + (1 - a)
+		ps.FillAlpha = 1
+	} else if op.Alpha > 0 {
+		ps.FillAlpha = op.Alpha
+	}
+	ps.FakeBold = FakeBoldFor(op)
+	return ps
+}
+
+// FakeBoldFor reports whether CSS bold should be synthesized for op (Latin
+// only; CJK stroking produces streak artifacts).
+func FakeBoldFor(op *Op) bool {
+	if op == nil || !op.Bold || (op.Font != nil && op.Font.Bold()) {
+		return false
+	}
+	for _, r := range op.Text {
+		if r > 0xFF {
+			return false
+		}
+	}
+	return true
+}
+
+// BandOptions configures PaintBand (shared op→PDF dispatch for body and HF).
+type BandOptions struct {
+	OriginX, OriginY float64 // canvas origin on the page (y-down canvas → PDF via OriginY)
+	// ContentH and Page geometry for canvasToPDF when using pageIdx 0 math.
+	// When ContentH is 0, OriginY is treated as the PDF y of canvas y=0 top
+	// edge and coordinates are mapped as PDF_y = OriginY - canvas_y.
+	ContentH float64
+	PageH    float64
+	Margins  PaintOptions // MarginLeft/Top used when ContentH > 0
+}
+
+// PaintBand paints ops onto an existing page's content stream. Same dispatch
+// as Paint for fill/stroke/line/text/image (colors, opacity, transforms,
+// embedded fonts, fake-bold policy). Pagination, z-sorting and fixed stamps
+// are skipped. Link ops are left to the caller (annotations need document
+// context). Returns the first image-embed error, if any.
+func PaintBand(p *pdf.Page, c *pdf.Content, ops []Op, opts BandOptions) error {
+	if p == nil || c == nil {
+		return nil
+	}
+	fontNames := map[*pdf.Font]string{}
+	nextFont := 0
+	resName := func(f *pdf.Font) string {
+		if f == nil {
+			return "F0"
+		}
+		if n, ok := fontNames[f]; ok {
+			return n
+		}
+		n := "B" + strconv.Itoa(nextFont)
+		nextFont++
+		fontNames[f] = n
+		c.UseEmbeddedFont(n, f)
+		return n
+	}
+	nextImg := 0
+	po := opts.Margins
+	contentH := opts.ContentH
+	pageH := opts.PageH
+	if pageH <= 0 {
+		pageH = p.Height()
+	}
+	// Band mode without full page geometry: map canvas (y down) to PDF using
+	// OriginY as the top edge and OriginX as left origin.
+	useSimple := contentH <= 0
+	var firstErr error
+	for i := range ops {
+		op := &ops[i]
+		if op.Kind == OpLinkURI || op.Kind == opKindNoop {
+			continue
+		}
+		needGS := op.XformSet || (op.PaintOpacity > 0 && op.PaintOpacity < 1)
+		if needGS {
+			c.Save()
+		}
+		if op.XformSet && !useSimple {
+			a, b, cc, d, e, f := pdfCTMFromCSS(op.Xform, 0, contentH, po, pageH)
+			c.Transform(a, b, cc, d, e, f)
+		}
+		if op.PaintOpacity > 0 && op.PaintOpacity < 1 {
+			c.SetOpacity(op.PaintOpacity)
+		}
+		if useSimple {
+			if err := paintOpBandSimple(c, p, op, opts, resName(op.Font), &nextImg); err != nil && firstErr == nil {
+				firstErr = err
+			}
+		} else {
+			switch op.Kind {
+			case OpFillRect:
+				drawFill(c, op, 0, contentH, po, pageH)
+			case OpStrokeRect:
+				drawStroke(c, op, 0, contentH, po, pageH)
+			case OpLine:
+				drawLine(c, op, 0, contentH, po, pageH)
+			case OpText, OpBullet:
+				drawText(c, op, 0, contentH, po, pageH, resName(op.Font))
+			case OpImage:
+				name := "I" + strconv.Itoa(nextImg)
+				nextImg++
+				if err := drawImage(p, c, op, 0, contentH, po, name); err != nil && firstErr == nil {
+					firstErr = err
+				}
+			}
+		}
+		if needGS {
+			c.Restore()
+		}
+	}
+	return firstErr
+}
+
+func paintOpBandSimple(c *pdf.Content, p *pdf.Page, op *Op, opts BandOptions, fontName string, nextImg *int) error {
+	x := opts.OriginX + op.X
+	switch op.Kind {
+	case OpFillRect:
+		ps := StyleOf(op)
+		y := opts.OriginY - (op.Y + op.H)
+		c.SetFillColor(ps.FillR, ps.FillG, ps.FillB)
+		c.Rect(x, y, op.W, op.H)
+		c.Fill()
+	case OpStrokeRect:
+		y := opts.OriginY - (op.Y + op.H)
+		c.SetStrokeColor(op.R, op.G, op.B)
+		c.SetLineWidth(1)
+		c.Rect(x, y, op.W, op.H)
+		c.Stroke()
+	case OpLine:
+		y1 := opts.OriginY - op.Y
+		y2 := opts.OriginY - (op.Y + op.H)
+		w := op.Width
+		if w <= 0 {
+			w = 1
+		}
+		c.SetStrokeColor(op.R, op.G, op.B)
+		c.SetLineWidth(w)
+		c.MoveTo(x, y1)
+		c.LineTo(opts.OriginX+op.X+op.W, y2)
+		c.Stroke()
+	case OpText, OpBullet:
+		y := opts.OriginY - op.Y
+		c.SetFillColor(op.R, op.G, op.B)
+		if fontName == "" {
+			fontName = "F0"
+		}
+		c.SetFont(fontName, op.Size)
+		c.BeginText()
+		c.TextAt(x, y)
+		if FakeBoldFor(op) {
+			c.SetLineWidth(op.Size * 0.06)
+			c.TextRenderMode(2)
+		}
+		c.TextShow(op.Text)
+		if FakeBoldFor(op) {
+			c.TextRenderMode(0)
+		}
+		c.EndText()
+	case OpImage:
+		name := "I" + strconv.Itoa(*nextImg)
+		*nextImg++
+		y := opts.OriginY - (op.Y + op.H)
+		if op.IsJPEG {
+			return c.AddJPEGImage(name, x, y, op.W, op.H, op.Image)
+		}
+		return c.AddPNGImage(name, x, y, op.W, op.H, op.Image)
+	}
+	return nil
 }
 
 func isSplittable(op *Op) bool {
@@ -1549,17 +1754,8 @@ func canvasToPDF(opX, opY float64, pageIdx int, contentH float64, opts PaintOpti
 
 func drawFill(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintOptions, pageH float64) {
 	x, y := canvasToPDF(op.X, op.Y+op.H, pageIdx, contentH, opts, pageH)
-	r, g, b := op.R, op.G, op.B
-	// Pre-composite translucent fills against white paper. Relying on PDF
-	// ExtGState alone left rgba(…) bands looking like solid dark blue when
-	// the graphics state was missing or not reset (fixture-14 .alpha).
-	if op.Alpha > 0 && op.Alpha < 1 {
-		a := op.Alpha
-		r = r*a + (1 - a) // white backdrop
-		g = g*a + (1 - a)
-		b = b*a + (1 - a)
-	}
-	c.SetFillColor(r, g, b)
+	ps := StyleOf(op)
+	c.SetFillColor(ps.FillR, ps.FillG, ps.FillB)
 	c.Rect(x, y, op.W, op.H)
 	c.Fill()
 }
@@ -1601,15 +1797,7 @@ func drawText(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintO
 	}
 	// Fake bold only for Latin when CSS wants bold but the face is not bold.
 	// Stroking CJK/Type0 outlines creates horizontal streak artifacts.
-	fakeBold := op.Bold && (op.Font == nil || !op.Font.Bold())
-	if fakeBold {
-		for _, r := range op.Text {
-			if r > 0xFF {
-				fakeBold = false
-				break
-			}
-		}
-	}
+	fakeBold := FakeBoldFor(op)
 	if fakeBold {
 		c.SetLineWidth(op.Size * 0.06)
 		c.TextRenderMode(2) // fill + stroke
@@ -1621,16 +1809,15 @@ func drawText(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintO
 	c.EndText()
 }
 
-func drawImage(p *pdf.Page, c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintOptions, name string) {
+func drawImage(p *pdf.Page, c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintOptions, name string) error {
 	x, y := canvasToPDF(op.X, op.Y+op.H, pageIdx, contentH, opts, p.Height())
 	if name == "" {
 		name = "I0"
 	}
 	if op.IsJPEG {
-		_ = c.AddJPEGImage(name, x, y, op.W, op.H, op.Image)
-	} else {
-		_ = c.AddPNGImage(name, x, y, op.W, op.H, op.Image)
+		return c.AddJPEGImage(name, x, y, op.W, op.H, op.Image)
 	}
+	return c.AddPNGImage(name, x, y, op.W, op.H, op.Image)
 }
 
 func drawLink(p *pdf.Page, op *Op, pageIdx int, contentH float64, opts PaintOptions) {

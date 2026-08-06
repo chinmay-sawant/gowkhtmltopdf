@@ -146,24 +146,14 @@ func Parse(src string) (*Stylesheet, error) {
 				}
 				s.Rules = append(s.Rules, rules...)
 			case strings.HasPrefix(low, "@page"):
-				open := strings.IndexByte(src, '{')
-				if open < 0 {
-					src = ""
-					continue
-				}
-				_, rest, err := takeBlock(src, open)
+				rest, err := skipAtRule(src)
 				if err != nil {
 					return nil, err
 				}
 				src = rest
 			case strings.HasPrefix(low, "@keyframes"), strings.HasPrefix(low, "@-webkit-keyframes"):
 				// Animations are parse-ignored (static cascaded values only).
-				open := strings.IndexByte(src, '{')
-				if open < 0 {
-					src = ""
-					continue
-				}
-				_, rest, err := takeBlock(src, open)
+				rest, err := skipAtRule(src)
 				if err != nil {
 					return nil, err
 				}
@@ -171,7 +161,11 @@ func Parse(src string) (*Stylesheet, error) {
 			case strings.HasPrefix(low, "@font-face"):
 				open := strings.IndexByte(src, '{')
 				if open < 0 {
-					src = ""
+					rest, err := skipAtRule(src)
+					if err != nil {
+						return nil, err
+					}
+					src = rest
 					continue
 				}
 				block, rest, err := takeBlock(src, open)
@@ -183,11 +177,11 @@ func Parse(src string) (*Stylesheet, error) {
 					s.FontFaces = append(s.FontFaces, ff)
 				}
 			default:
-				if end := strings.IndexByte(src, ';'); end >= 0 {
-					src = src[end+1:]
-				} else {
-					src = ""
+				rest, err := skipAtRule(src)
+				if err != nil {
+					return nil, err
 				}
+				src = rest
 			}
 			continue
 		}
@@ -214,19 +208,49 @@ func Parse(src string) (*Stylesheet, error) {
 		if selText == "" {
 			continue
 		}
-		sel, ok := parseSelectorList(selText)
-		if !ok || len(sel) == 0 {
-			continue
+		if r, ok := parseOneRule(selText, block, "all", nil, &order); ok {
+			s.Rules = append(s.Rules, r)
 		}
-		s.Rules = append(s.Rules, Rule{
-			Selectors: sel,
-			Decls:     parseDeclarations(block),
-			Media:     "all",
-			Order:     order,
-		})
-		order++
 	}
 	return s, nil
+}
+
+// parseOneRule builds a Rule from selector text + declaration block, owning
+// the order counter. Shared by Parse and parseRuleList.
+func parseOneRule(selText, block, media string, cq *ContainerQuery, order *int) (Rule, bool) {
+	sel, ok := parseSelectorList(selText)
+	if !ok || len(sel) == 0 {
+		return Rule{}, false
+	}
+	r := Rule{
+		Selectors: sel,
+		Decls:     parseDeclarations(block),
+		Media:     media,
+		Order:     *order,
+	}
+	if cq != nil {
+		cp := *cq
+		r.Container = &cp
+	}
+	*order++
+	return r, true
+}
+
+// skipAtRule consumes one at-rule from src: its braced block when present,
+// otherwise a ';'-terminated statement (or everything when neither exists).
+// Returns the remaining source.
+func skipAtRule(src string) (rest string, err error) {
+	if open := strings.IndexByte(src, '{'); open >= 0 {
+		_, rest, err := takeBlock(src, open)
+		if err != nil {
+			return "", err
+		}
+		return rest, nil
+	}
+	if end := strings.IndexByte(src, ';'); end >= 0 {
+		return src[end+1:], nil
+	}
+	return "", nil
 }
 
 func parseFontFace(block string) FontFace {
@@ -308,17 +332,11 @@ func parseRuleList(media string, cq *ContainerQuery, block string, orderPtr *int
 				continue
 			}
 			// Other at-rules inside: skip their block or statement.
-			if open := strings.IndexByte(block, '{'); open >= 0 {
-				_, rem, err := takeBlock(block, open)
-				if err != nil {
-					return nil, err
-				}
-				block = rem
-			} else if end := strings.IndexByte(block, ';'); end >= 0 {
-				block = block[end+1:]
-			} else {
-				block = ""
+			rest, err := skipAtRule(block)
+			if err != nil {
+				return nil, err
 			}
+			block = rest
 			continue
 		}
 		selEnd, err := findBlock(block)
@@ -340,22 +358,9 @@ func parseRuleList(media string, cq *ContainerQuery, block string, orderPtr *int
 			return nil, err
 		}
 		block = rem
-		sel, ok := parseSelectorList(selText)
-		if !ok || len(sel) == 0 {
-			continue
+		if r, ok := parseOneRule(selText, declBlock, media, cq, orderPtr); ok {
+			rules = append(rules, r)
 		}
-		r := Rule{
-			Selectors: sel,
-			Decls:     parseDeclarations(declBlock),
-			Media:     media,
-			Order:     *orderPtr,
-		}
-		if cq != nil {
-			cp := *cq
-			r.Container = &cp
-		}
-		rules = append(rules, r)
-		*orderPtr++
 	}
 	return rules, nil
 }
@@ -454,6 +459,11 @@ func takeBlock(src string, open int) (string, string, error) {
 	}
 	return "", "", &parseError{"unbalanced braces in stylesheet"}
 }
+
+// ParseSelectors parses a comma-separated selector list; every part must
+// parse (strict). Callers needing a standalone selector no longer fabricate
+// a whole stylesheet.
+func ParseSelectors(s string) ([]Selector, bool) { return parseSelectorListStrict(s, false) }
 
 // parseSelectorList splits a selector list on top-level commas.
 func parseSelectorList(s string) ([]Selector, bool) {
@@ -1276,6 +1286,8 @@ func ParseColor(v string) (r, g, b int, alpha float64, ok bool) {
 		return 0, 0, 0, 0, false
 	}
 	// CSS variables: var(--name, fallback) — resolve fallback only (no custom props).
+	// FIX-REVIEW: P3-04 ParseColor still resolves var() fallbacks itself; kept
+	// until layout's var handling via ResolveCustomProps genuinely replaces it.
 	if strings.HasPrefix(strings.ToLower(v), "var(") {
 		if fb, okFB := cssVarFallback(v); okFB {
 			return ParseColor(fb)
@@ -1435,6 +1447,48 @@ func ResolveVar(v string, lookup func(name string) (string, bool)) string {
 		return ""
 	}
 	return v
+}
+
+// ResolveCustomProps walks a custom-property graph: the inherited overlay
+// plus declared --* values, with var() chains expanded once using a memo and
+// a cycle stack (cycles resolve to invalid → empty). The single place
+// custom-property policy lives.
+func ResolveCustomProps(declared, inherited map[string]string) map[string]string {
+	work := make(map[string]string, len(inherited)+len(declared))
+	for k, v := range inherited {
+		work[k] = v
+	}
+	for k, v := range declared {
+		work[k] = v
+	}
+	memo := map[string]string{}
+	var eval func(name string, stack map[string]bool) string
+	eval = func(name string, stack map[string]bool) string {
+		if v, ok := memo[name]; ok {
+			return v
+		}
+		raw, ok := work[name]
+		if !ok || !strings.Contains(strings.ToLower(raw), "var(") {
+			memo[name] = raw
+			return raw
+		}
+		if stack[name] {
+			return ""
+		}
+		stack[name] = true
+		val := ResolveVar(raw, func(n string) (string, bool) {
+			s := eval(n, stack)
+			_, exists := work[n]
+			return s, exists && strings.TrimSpace(s) != ""
+		})
+		delete(stack, name)
+		memo[name] = val
+		return val
+	}
+	for name := range work {
+		eval(name, map[string]bool{})
+	}
+	return memo
 }
 
 func isHex(s string) bool {

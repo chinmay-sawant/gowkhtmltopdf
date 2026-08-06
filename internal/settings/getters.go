@@ -5,53 +5,23 @@ import (
 	"strings"
 )
 
-// Get methods use the Get half of the unified key tables built in reflect.go
-// (same key names as Set — registered once via gReg/oReg/iReg).
+// Get methods use the Get half of the field-descriptor tables built in
+// reflect.go (same key names as Set — registered once per type).
 
 // Get reads a dotted global key as its canonical string form. ok is false
 // for unknown keys. Accepted ignored keys return the last Set value.
 func (g *PdfGlobal) Get(name string) (string, bool) {
-	ensureKeyTables()
-	key := normalizeDots(name)
-	if fn, ok := globalGetTable[key]; ok {
-		return fn(g)
-	}
-	if g.Ignored != nil {
-		if v, ok := g.Ignored[key]; ok {
-			return v, true
-		}
-	}
-	return "", false
+	return getForKey(g, globalKeys, &g.Ignored, name)
 }
 
 // Get reads a dotted object key as its canonical string form.
 func (o *PdfObject) Get(name string) (string, bool) {
-	ensureKeyTables()
-	key := normalizeDots(name)
-	if fn, ok := objectGetTable[key]; ok {
-		return fn(o)
-	}
-	if o.Ignored != nil {
-		if v, ok := o.Ignored[key]; ok {
-			return v, true
-		}
-	}
-	return "", false
+	return getForKey(o, objectKeys, &o.Ignored, name)
 }
 
 // Get reads a dotted image-mode key as its canonical string form.
 func (g *ImageGlobal) Get(name string) (string, bool) {
-	ensureKeyTables()
-	key := normalizeDots(name)
-	if fn, ok := imageGetTable[key]; ok {
-		return fn(g)
-	}
-	if g.Ignored != nil {
-		if v, ok := g.Ignored[key]; ok {
-			return v, true
-		}
-	}
-	return "", false
+	return getForKey(g, imageKeys, &g.Ignored, name)
 }
 
 func fmtBool(b bool) string { return strconv.FormatBool(b) }

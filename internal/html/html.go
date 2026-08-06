@@ -52,6 +52,26 @@ func (n *Node) TextContent() string {
 	return b.String()
 }
 
+// Walk visits n and every descendant in pre-order (document order).
+func (n *Node) Walk(f func(*Node)) {
+	f(n)
+	for _, c := range n.Children {
+		c.Walk(f)
+	}
+}
+
+// TextContentOf returns the text content of the first element descendant
+// named name, or "" when there is none.
+func (n *Node) TextContentOf(name string) string {
+	var out string
+	n.Walk(func(c *Node) {
+		if out == "" && c.Type == ElementNode && c.Name == name {
+			out = c.TextContent()
+		}
+	})
+	return out
+}
+
 func (n *Node) appendText(b *strings.Builder) {
 	switch n.Type {
 	case TextNode:
@@ -94,7 +114,8 @@ var autoClose = map[string][]string{
 }
 
 // Parse turns HTML source into a tree with a synthetic root. The source is
-// decoded UTF-8; callers handle charset detection beforehand.
+// decoded UTF-8; charset detection happens at the load seam (internal/load).
+// Use ParseDocument for the bytes-to-tree path (it strips the BOM).
 func Parse(source string) (*Node, error) {
 	tok, err := tokenize(source)
 	if err != nil {
@@ -183,6 +204,17 @@ func Parse(source string) (*Node, error) {
 		}
 	}
 	return root, nil
+}
+
+// ParseDocument turns raw document bytes into a tree with a synthetic root,
+// stripping a leading UTF-8 BOM (mirroring load.IsHTML). Only UTF-8/ASCII
+// sources are supported; the charset rule is enforced at the load seam.
+func ParseDocument(body []byte) (*Node, error) {
+	s := string(body)
+	if strings.HasPrefix(s, "\ufeff") { // BOM, mirroring load.IsHTML
+		s = s[1:]
+	}
+	return Parse(s)
 }
 
 // openInStack reports whether an element with name is currently open.

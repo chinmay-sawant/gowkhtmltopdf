@@ -1,9 +1,11 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 
 	"gowkhtmltopdf/internal/settings"
@@ -56,11 +58,20 @@ func (cmd *Command) OpenOutput() (io.Writer, func() error, error) {
 	return os.Stdout, func() error { return nil }, nil
 }
 
+// flagKind distinguishes how a flag's value is extracted and delivered.
+type flagKind uint8
+
+const (
+	flagBool  flagKind = iota // app receives one canonical "true"/"false"
+	flagValue                 // app receives one value token
+	flagPair                  // app receives exactly two tokens (name value)
+)
+
 // flagSpec describes one accepted flag.
 type flagSpec struct {
-	kind string // "bool" | "value"
-	mod  Mode   // which binaries accept it
-	app  func(c *Command, cur *objectCtx, val string) error
+	kind flagKind
+	mod  Mode // which binaries accept it
+	app  func(c *Command, ctx *objectCtx, vals []string) error
 }
 
 type objectCtx struct {
@@ -233,43 +244,80 @@ func (c *Command) validate() error {
 	return nil
 }
 
-// apply runs a flag with value extraction (next-arg or =value). Pair flags
-// consume two values joined by pairSep.
+// applyPage routes a page-ish flag: the global half first, then the current
+// object, else accumulates it as pending first-page settings (upstream
+// address remapping: page settings before any object keyword apply to the
+// first page).
+func (ctx *objectCtx) applyPage(c *Command, glob func(g *settings.PdfGlobal, val string) error,
+	obj func(o *settings.PdfObject, val string) error, val string) error {
+	if err := glob(&c.Global, val); err != nil {
+		return err
+	}
+	if ctx.obj != nil {
+		return obj(ctx.obj, val)
+	}
+	if ctx.pending == nil {
+		o := settings.DefaultPdfObject()
+		ctx.pending = &o
+	}
+	return obj(ctx.pending, val)
+}
+
+// apply runs a flag with value extraction (next-arg or =value). Bool flags
+// arrive pre-parsed as canonical "true"/"false"; pair flags arrive as two
+// separate tokens.
 func apply(c *Command, cur *objectCtx, name string, spec flagSpec, negated bool, inlineVal string, hasInline bool, argv []string, i *int) error {
-	if spec.kind == "bool" {
-		val := "true"
-		if negated {
-			val = "false"
+	switch spec.kind {
+	case flagBool:
+		b, err := parseBool(inlineVal, negated, hasInline)
+		if err != nil {
+			return err
 		}
-		if hasInline {
-			switch strings.ToLower(inlineVal) {
-			case "true", "1", "yes", "on":
-				val = "true"
-			case "false", "0", "no", "off":
-				val = "false"
-			default:
-				return fmt.Errorf("invalid boolean value %q", inlineVal)
+		return spec.app(c, cur, []string{strconv.FormatBool(b)})
+	case flagValue:
+		vals := []string{inlineVal}
+		if !hasInline {
+			if *i >= len(argv) {
+				return fmt.Errorf("option requires a value")
 			}
+			vals[0] = argv[*i]
+			*i++
 		}
-		return spec.app(c, cur, val)
-	}
-	// value flag
-	if hasInline {
-		return spec.app(c, cur, inlineVal)
-	}
-	if *i >= len(argv) {
-		return fmt.Errorf("option requires a value")
-	}
-	val := argv[*i]
-	*i++
-	if isPairFlag(name) {
+		return spec.app(c, cur, vals)
+	case flagPair:
+		vals := [2]string{}
+		if hasInline {
+			vals[0] = inlineVal
+		} else {
+			if *i >= len(argv) {
+				return fmt.Errorf("option requires two values (name value)")
+			}
+			vals[0] = argv[*i]
+			*i++
+		}
 		if *i >= len(argv) {
 			return fmt.Errorf("option requires two values (name value)")
 		}
-		val += pairSep + argv[*i]
+		vals[1] = argv[*i]
 		*i++
+		return spec.app(c, cur, vals[:])
 	}
-	return spec.app(c, cur, val)
+	return fmt.Errorf("internal: unknown flag kind for --%s", name)
+}
+
+// parseBool turns the bool-flag contract into a real bool: an inline value
+// (--flag=x) wins, otherwise --no-flag negates. Unknown inline values error.
+func parseBool(inlineVal string, negated, hasInline bool) (bool, error) {
+	if hasInline {
+		switch strings.ToLower(inlineVal) {
+		case "true", "1", "yes", "on":
+			return true, nil
+		case "false", "0", "no", "off":
+			return false, nil
+		}
+		return false, fmt.Errorf("invalid boolean value %q", inlineVal)
+	}
+	return !negated, nil
 }
 
 func splitFlag(name string) (string, string, bool) {
@@ -285,9 +333,20 @@ func lookupFlag(name string) (flagSpec, bool, bool) {
 		return spec, false, true
 	}
 	if strings.HasPrefix(name, "no-") {
-		if spec, ok := flagTable[name[3:]]; ok && spec.kind == "bool" {
+		if spec, ok := flagTable[name[3:]]; ok && spec.kind == flagBool {
 			return spec, true, true
 		}
 	}
 	return flagSpec{}, false, false
+}
+
+// ExitCode converts an error into a process exit code: errors carrying an
+// HttpErrorCode() int method (e.g. settings.HttpStatusError) report that
+// code; everything else exits 1.
+func ExitCode(err error) int {
+	var hc interface{ HttpErrorCode() int }
+	if errors.As(err, &hc) {
+		return hc.HttpErrorCode()
+	}
+	return ExitError
 }

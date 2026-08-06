@@ -89,8 +89,8 @@ func TestFontFaceACLDeny(t *testing.T) {
 		Objects: []settings.PdfObject{obj},
 		Output:  filepath.Join(t.TempDir(), "out.pdf"),
 	}
-	cmd.Global.EnableLocalFileAccess = false
-	cmd.Global.Allow = []string{pageDir}
+	cmd.Global.Load.EnableLocalFileAccess = false
+	cmd.Global.Load.Allow = []string{pageDir}
 	cmd.Global.Size = settings.Size{PageSize: cmd.Global.PageSize}
 
 	var log bytes.Buffer

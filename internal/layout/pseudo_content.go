@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"gowkhtmltopdf/internal/css"
 	"gowkhtmltopdf/internal/html"
 )
 
@@ -44,29 +43,30 @@ func (e *engine) pseudoContent(n *html.Node, pe string) string {
 	if media == "" {
 		media = "print"
 	}
-	for _, sheet := range e.opts.Sheets {
-		if sheet == nil {
-			continue
-		}
-		for _, r := range sheet.Rules {
-			if !css.MediaMatches(r.Media, media, e.opts.Width, e.opts.Height) {
+	// Shared cascade walk (media + @container gates). Containers are nil on
+	// the engine's style map path; when styles were re-cascaded with size
+	// containers, content under non-matching @container is already absent
+	// from ResolvedStyle — but pseudo content re-walks sheets, so pass the
+	// same gate via a styleContext without containers (pass-1 semantics:
+	// skip @container rules) matching cascadeRaw's first pass. When
+	// e.styles came from a container pass, non-matching container content
+	// is suppressed here the same way colors are.
+	ctx := &styleContext{
+		sheets:     e.opts.Sheets,
+		media:      media,
+		viewportW:  e.opts.Width,
+		viewportH:  e.opts.Height,
+		containers: e.containers,
+	}
+	for _, rh := range ctx.matchedRules(n, pe) {
+		for _, d := range rh.r.Decls {
+			if !strings.EqualFold(d.Prop, "content") {
 				continue
 			}
-			for _, sel := range r.Selectors {
-				if !css.MatchPseudo(sel, n, pe) {
-					continue
-				}
-				a, b, c := css.Specificity(sel)
-				for _, d := range r.Decls {
-					if !strings.EqualFold(d.Prop, "content") {
-						continue
-					}
-					h := hit{value: d.Value, a: a, b: b, c: c, order: r.Order, important: d.Important}
-					if better(h) {
-						hh := h
-						best = &hh
-					}
-				}
+			h := hit{value: d.Value, a: rh.a, b: rh.b, c: rh.c, order: rh.r.Order, important: d.Important}
+			if better(h) {
+				hh := h
+				best = &hh
 			}
 		}
 	}

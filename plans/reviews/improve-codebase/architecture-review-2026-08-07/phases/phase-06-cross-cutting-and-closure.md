@@ -13,16 +13,16 @@ Log protocol, examples, exit-code dispatch + closure gates. Runs last: validates
 
 ## Checklist
 
-- [ ] **P6-01** — Own the log-line severity protocol once; stop substring guessing in api.go
-- [ ] **P6-02** — Examples: propagate Set errors; share one flag parser
-- [ ] **P6-03** — Put exit-code knowledge next to its error type; one main-stream dispatch
+- [x] **P6-01** — Own the log-line severity protocol once; stop substring guessing in api.go — line package + api lineLog + convert/imageout line.Emit
+- [x] **P6-02** — Examples: propagate Set errors; share one flag parser — done by fix-root-api
+- [~] **P6-03** — Put exit-code knowledge next to its error type; one main-stream dispatch — settings.HttpErrorCode + cli.ExitCode done; mains dispatch migration = wave 2
 
 ---
 
 <a id="p6-01"></a>
 ## P6-01 — Own the log-line severity protocol once; stop substring guessing in api.go
 
-- [ ] **P6-01** — Own the log-line severity protocol once; stop substring guessing in api.go
+- [~] **P6-01** — internal/line package + api.go lineLog done (fix-root-api); convert/imageout emitter sites pending (fix-convert, wave 2)
 
 - **Locations:** `api.go:328-363` (`lineLog`); emitter side `internal/convert/convert.go` (many `fmt.Fprintf(log, "warning: …")` sites) and `internal/imageout/imageout.go`
 - **Evidence sources:** area-1-surface-api F3
@@ -110,7 +110,7 @@ API-compatible. (Alternative with the same locality win: a shared `internal/logl
 <a id="p6-02"></a>
 ## P6-02 — Examples: propagate Set errors; share one flag parser
 
-- [ ] **P6-02** — Examples: propagate Set errors; share one flag parser
+- [x] **P6-02** — done (fix-root-api)
 
 - **Locations:** `examples/pdf/main.go:40-98`; `examples/image/main.go:34-86`
 - **Evidence sources:** area-1-surface-api F6
@@ -172,7 +172,7 @@ API-compatible; examples are the only callers.
 <a id="p6-03"></a>
 ## P6-03 — Put exit-code knowledge next to its error type; one main-stream dispatch
 
-- [ ] **P6-03** — Put exit-code knowledge next to its error type; one main-stream dispatch
+- [~] **P6-03** — settings.HttpErrorCode moved next to HttpStatusError + cli.ExitCode done (fix-settings-cli); mains dispatch migration = wave 2
 
 - **Locations:** `internal/settings/reflect.go:833-842` (HttpErrorCode); `internal/settings/httperror.go:9-20` (HttpStatusError); `cmd/gowkhtmltopdf/main.go:31-41,53-61`; `cmd/gowkhtmltoimage/main.go:44-41`
 - **Evidence sources:** area-2-settings-cli F7

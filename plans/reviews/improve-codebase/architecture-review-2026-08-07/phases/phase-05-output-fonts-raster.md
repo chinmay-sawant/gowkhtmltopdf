@@ -13,20 +13,20 @@
 
 ## Checklist
 
-- [ ] **P5-01** — One paint-semantics table — convert body, HF and image adapters must not drift
-- [ ] **P5-02** — Extract the one page-assembly pipeline; stop maintaining PDF/image forks
-- [ ] **P5-03** — `SetGrayscale`: implement the promised paint-time seam or delete the setter
-- [ ] **P5-04** — Give PDF object references a real type; centralize dict assembly
-- [ ] **P5-05** — Move derived font data (font-face, reverse cmap) onto *Font; bound the atlas
-- [ ] **P5-06** — Collapse the two font-embed pipelines (simple + type0) into one with a mode switch
-- [ ] **P5-07** — Stop swallowing the font-embed error (unembedded runes render invisible)
+- [~] **P5-01** — One paint-semantics table — layout PaintBand/StyleOf/FakeBoldFor + convert HF consume done; imageout raster still local (FIX-REVIEW)
+- [~] **P5-02** — Extract the one page-assembly pipeline; stop maintaining PDF/image forks — CollectSheets/MergeFontFaces shared; full pipe extract deferred
+- [x] **P5-03** — `SetGrayscale`: implement the promised paint-time seam or delete the setter — done (fix-pdf-fonts: implemented Rec.601 luma at paint time + JPEG/PNG desaturate at embed time)
+- [x] **P5-04** — Give PDF object references a real type; centralize dict assembly — done (fix-pdf-fonts)
+- [~] **P5-05** — Move derived font data (font-face, reverse cmap) onto *Font; bound the atlas — pdf side done; imageout glyphCache bounded at 4096 (per-Render ownership deferred)
+- [x] **P5-06** — Collapse the two font-embed pipelines (simple + type0) into one with a mode switch — done (fix-pdf-fonts)
+- [x] **P5-07** — Stop swallowing the font-embed error (unembedded runes render invisible) — pdf + layout paint image-embed paths done
 
 ---
 
 <a id="p5-01"></a>
 ## P5-01 — One paint-semantics table — convert body, HF and image adapters must not drift
 
-- [ ] **P5-01** — One paint-semantics table — convert body, HF and image adapters must not drift
+- [ ] **P5-01** — pending (layout PaintBand/PaintStyle never landed; convert hf.go + imageout consumption follow)
 
 - **Locations:** `internal/convert/hf.go:359-460` (`paintLayoutOps`); the sibling dispatch lives in `internal/layout/paint.go:120-182` (`Paint`'s `paintOp` + `sortPaintIndices`) with draw helpers at 1550-1640, `internal/layout/paint.go:1602-1620` (PDF fake bold) vs `internal/imageout/imageout.go:322-327` (raster fake bold); same split for fill alpha (`layout/paint.go drawFill` pre-composites against white vs `imageout paint` raw `Op.Alpha`) and stroke width (`strokeWidthScale` vs PDF `SetLineWidth`)
 - **Evidence sources:** area-6 F2; area-7 F7
@@ -175,7 +175,7 @@ Not raised as separate findings (adjacent, small): `Font.FamilyNames()` mutates 
 <a id="p5-02"></a>
 ## P5-02 — Extract the one page-assembly pipeline; stop maintaining PDF/image forks
 
-- [ ] **P5-02** — Extract the one page-assembly pipeline; stop maintaining PDF/image forks
+- [ ] **P5-02** — pending (fix-convert never landed; imageout = wave 2)
 
 - **Locations:** `internal/imageout/imageout.go:420-477` vs `internal/convert/convert.go:50-54,301-336`; same-named forked helpers at the bottom of both files (`collectSheets`/`styleText`/`linkStylesheet`/`mediaFor` — `styleText` is byte-for-byte identical)
 - **Evidence sources:** area-7 F1
@@ -325,7 +325,7 @@ func Assemble(ctx context.Context, loader *load.Loader, log io.Writer,
 <a id="p5-03"></a>
 ## P5-03 — `SetGrayscale`: implement the promised paint-time seam or delete the setter
 
-- [ ] **P5-03** — `SetGrayscale`: implement the promised paint-time seam or delete the setter
+- [x] **P5-03** — done (fix-pdf-fonts: implemented — Rec.601 luma at paint time in Content.SetFillColor/SetStrokeColor + JPEG/PNG desaturate at embed time)
 
 - **Locations:** `internal/pdf/pdf.go:34,57-61`; sole writer `internal/convert/convert.go:159-160`
 - **Evidence sources:** area-7 F2
@@ -374,7 +374,7 @@ func (c *Content) SetFillColor(r, g, b float64) {
 <a id="p5-04"></a>
 ## P5-04 — Give PDF object references a real type; centralize dict assembly
 
-- [ ] **P5-04** — Give PDF object references a real type; centralize dict assembly
+- [x] **P5-04** — done (fix-pdf-fonts)
 
 - **Locations:** `internal/pdf/pdf.go:69-96` plus hand-stringed dict builders in `fonttype0.go:53-81,109-190`, `fontpdf.go`, `images.go:50-90`, `pdf.go:300+`
 - **Evidence sources:** area-7 F3
@@ -447,7 +447,7 @@ Exported surface keeps strings where callers already consume them (`PageRef`/`Ou
 <a id="p5-05"></a>
 ## P5-05 — Move derived font data (font-face, reverse cmap) onto *Font; bound the atlas
 
-- [ ] **P5-05** — Move derived font data (font-face, reverse cmap) onto *Font; bound the atlas
+- [~] **P5-05** — pdf side done (fix-pdf-fonts: Font-local gotOnce/revOnce caches, package-level gotextFaceCache deleted); imageout ttfraster glyphCache bound = wave 2
 
 - **Locations:** `internal/pdf/shape_gotext.go:14-29,299-314`; `internal/imageout/ttfraster.go:42-57`
 - **Evidence sources:** area-7 F4
@@ -516,7 +516,7 @@ func (f *Font) reverseCmap() map[uint16]rune {
 <a id="p5-06"></a>
 ## P5-06 — Collapse the two font-embed pipelines (simple + type0) into one with a mode switch
 
-- [ ] **P5-06** — Collapse the two font-embed pipelines (simple + type0) into one with a mode switch
+- [x] **P5-06** — done (fix-pdf-fonts)
 
 - **Locations:** `internal/pdf/fonttype0.go:35-85` and `:89-171`
 - **Evidence sources:** area-7 F5
@@ -611,7 +611,7 @@ func (d *Document) ensureFont(f *Font, used []rune) (string, error) {
 <a id="p5-07"></a>
 ## P5-07 — Stop swallowing the font-embed error (unembedded runes render invisible)
 
-- [ ] **P5-07** — Stop swallowing the font-embed error (unembedded runes render invisible)
+- [~] **P5-07** — pdf side done (fix-pdf-fonts: fonts() → error, propagated into Write); layout paint.go `_ = AddJPEGImage/AddPNGImage` discard sites pending (fix-layout never landed)
 
 - **Locations:** `internal/pdf/content.go:327-332`; discard sites `_ = c.AddJPEGImage(...)` / `_ = c.AddPNGImage(...)` at `internal/layout/paint.go:1636-1639`
 - **Evidence sources:** area-7 F6

@@ -17,18 +17,19 @@ import (
 )
 
 // Heading is one outline entry: an h1..h6 element plus its layout location.
-// Page/X/Y/W/H are filled from an ElementLocation; X/Y/W/H are canvas
-// coordinates (y grows downward from the top of the page content area), Page
-// is the 0-based page index the element landed on (object-local; callers
-// rebase it to document pages).
+// X/Y/W/H are canvas coordinates (y grows downward from the top of the page
+// content area) filled from an ElementLocation. Page stays object-local
+// forever; DocPage is set exactly once during assembly and never mutated
+// afterwards.
 type Heading struct {
-	Node   *html.Node
-	Title  string
-	Level  int // 1..6
-	Page   int
-	X, Y   float64
-	W, H   float64
-	Anchor string // synthetic __WKANCHOR_<base36>, stable across runs
+	Node    *html.Node
+	Title   string
+	Level   int // 1..6
+	Page    int // 0-based page within the calling object's layout
+	DocPage int // document-global page, filled once during assembly, never mutated afterwards
+	X, Y    float64
+	W, H    float64
+	Anchor  string // synthetic __WKANCHOR_<base36>, stable across runs
 }
 
 // headingLevel maps an element name to its outline level, 0 when it is not a
@@ -56,8 +57,7 @@ func headingLevel(name string) int {
 // are zero until Lookup runs.
 func CollectHeadings(root *html.Node) []*Heading {
 	var out []*Heading
-	var walk func(n *html.Node)
-	walk = func(n *html.Node) {
+	root.Walk(func(n *html.Node) {
 		if n.Type != html.ElementNode {
 			return
 		}
@@ -68,11 +68,7 @@ func CollectHeadings(root *html.Node) []*Heading {
 				Level: lvl,
 			})
 		}
-		for _, c := range n.Children {
-			walk(c)
-		}
-	}
-	walk(root)
+	})
 	return out
 }
 
@@ -124,6 +120,43 @@ type Options struct {
 	Exclude []css.Selector
 }
 
+// SortHeadings brings headings into the order used by the tree, the TOC and
+// the section lookup: page, y-down within a page, then x.
+func SortHeadings(hs []*Heading) {
+	sort.SliceStable(hs, func(i, j int) bool {
+		a, b := hs[i], hs[j]
+		if a.Page != b.Page {
+			return a.Page < b.Page
+		}
+		if a.Y != b.Y {
+			return a.Y < b.Y
+		}
+		return a.X < b.X
+	})
+}
+
+// SectionOf mirrors the wkhtmltopdf outline cache: section = first heading at
+// or before page, subsection = last. Headings must be in SortHeadings order.
+func SectionOf(hs []*Heading, page int) (section, subsection string) {
+	var first, last *Heading
+	for _, h := range hs {
+		if h.Page > page {
+			break
+		}
+		if first == nil {
+			first = h
+		}
+		last = h
+	}
+	if first != nil {
+		section = first.Title
+	}
+	if last != nil {
+		subsection = last.Title
+	}
+	return section, subsection
+}
+
 // BuildTree sorts headings by (page, y, x) - within a page, y-down order so a
 // heading higher on the page comes first - and assembles them into a
 // level-stack tree whose root children are the top-level headings.
@@ -142,16 +175,7 @@ func BuildTree(headings []*Heading, opts Options) *Node {
 		}
 		sel = append(sel, h)
 	}
-	sort.SliceStable(sel, func(i, j int) bool {
-		a, b := sel[i], sel[j]
-		if a.Page != b.Page {
-			return a.Page < b.Page
-		}
-		if a.Y != b.Y {
-			return a.Y < b.Y
-		}
-		return a.X < b.X
-	})
+	SortHeadings(sel)
 
 	root := &Node{}
 	stack := []*Node{root}

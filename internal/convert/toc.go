@@ -7,10 +7,10 @@ import (
 	"strconv"
 	"strings"
 
-	"gowkhtmltopdf/internal/cli"
 	"gowkhtmltopdf/internal/css"
 	"gowkhtmltopdf/internal/html"
 	"gowkhtmltopdf/internal/layout"
+	"gowkhtmltopdf/internal/line"
 	"gowkhtmltopdf/internal/outline"
 	"gowkhtmltopdf/internal/pdf"
 	"gowkhtmltopdf/internal/settings"
@@ -40,30 +40,18 @@ func effectiveTOC(o settings.PdfObject, g settings.PdfGlobal) settings.TableOfCo
 }
 
 // lengthToPt converts a CSS length to points. em/rem resolve against the
-// base font size; px at 96 dpi; % is rejected (0). Unparsable lengths return
+// base font size; px at 96 dpi; % is rejected (-1). Unparsable lengths return
 // -1 so callers can fall back.
 func lengthToPt(v string, baseSize float64) float64 {
 	val, unit, ok := css.ParseLength(v)
 	if !ok {
 		return -1
 	}
-	switch unit {
-	case "pt":
-		return val
-	case "mm":
-		return val * mmToPt
-	case "cm":
-		return val * 10 * mmToPt
-	case "in":
-		return val * 72
-	case "pc":
-		return val * 12
-	case "px":
-		return val * 72 / 96
-	case "em", "rem":
-		return val * baseSize
+	pt, ok := css.LengthToPt(val, unit, baseSize)
+	if !ok {
+		return -1
 	}
-	return -1
+	return pt
 }
 
 // genTOCHTML renders the default-look table of contents document: a caption
@@ -140,6 +128,8 @@ func paintOptions(g hfGeom) layout.PaintOptions {
 
 // paintCount lays the result out into a scratch document and returns its
 // page count, leaving res untouched.
+// FIX-REVIEW: P2-12 paintCount swallows paint errors (returns 1); surface
+// error through renderTOCObjects when callers can handle it.
 func paintCount(res *layout.Result, g hfGeom) int {
 	scratch := pdf.NewDocument()
 	if err := layout.Paint(scratch, cloneResult(res), paintOptions(g)); err != nil {
@@ -151,16 +141,22 @@ func paintCount(res *layout.Result, g hfGeom) int {
 // layoutTOC generates and lays out the TOC document for one TOC object.
 // Entry page numbers are offset by tocGuess - the assumed number of pages the
 // TOC objects will occupy at the front of the document.
-func layoutTOC(font *pdf.Font, st *objectState, entries []*outline.Node, tocGuess int, cmd *cli.Command, log io.Writer) (*html.Node, *layout.Result, error) {
+// Headings typically come from BuildTree on a DocPage view, so h.Page is body-global.
+func layoutTOC(font *pdf.Font, st *objectState, entries []*outline.Node, tocGuess int, g settings.PdfGlobal, log io.Writer) (*html.Node, *layout.Result, error) {
 	toc := st.toc
 	if toc.XSLStyleSheet != "" {
-		fmt.Fprintf(log, "warning: object %d: --xsl-style-sheet is not supported; using the built-in TOC template\n", st.idx)
+		line.Emit(log, line.Warn, "object %d: --xsl-style-sheet is not supported; using the built-in TOC template", st.idx)
 	}
-	contentW := st.geom.pageW - st.geom.marginLeft - st.geom.marginRight
+	contentW := st.geom.contentW
 	pageOf := func(h *outline.Heading) int {
-		return tocGuess + h.Page + 1 + cmd.Global.PageOffset
+		p := h.DocPage
+		if h.DocPage == 0 {
+			p = h.Page // view copies put DocPage into Page (including 0)
+		}
+		return tocGuess + p + 1 + g.PageOffset
 	}
 	htmlDoc := genTOCHTML(toc, entries, pageOf, font, contentW)
+	// TOC HTML is a generated string template, not loaded document bytes.
 	root, err := html.Parse(htmlDoc)
 	if err != nil {
 		return nil, nil, fmt.Errorf("object %d: toc: parse: %w", st.idx+1, err)
@@ -187,15 +183,16 @@ func layoutTOC(font *pdf.Font, st *objectState, entries []*outline.Node, tocGues
 // layouts into doc. It returns the total number of TOC pages. The renumbering
 // is done twice at most; if the second measurement changed the count the
 // entry numbers may be off by the delta (documented, rare in practice).
-func renderTOCObjects(font *pdf.Font, doc *pdf.Document, cmd *cli.Command, tocs []*objectState, entries []*outline.Node, log io.Writer) (int, error) {
+func renderTOCObjects(font *pdf.Font, doc *pdf.Document, req *Request, tocs []*objectState, entries []*outline.Node, log io.Writer) (int, error) {
 	if len(tocs) == 0 {
 		return 0, nil
 	}
+	g := req.Global
 
 	// Iteration 1: measure with tocGuess = 0.
 	guess := 0
 	for _, st := range tocs {
-		root, res, err := layoutTOC(font, st, entries, guess, cmd, log)
+		root, res, err := layoutTOC(font, st, entries, guess, g, log)
 		if err != nil {
 			return 0, err
 		}
@@ -207,7 +204,7 @@ func renderTOCObjects(font *pdf.Font, doc *pdf.Document, cmd *cli.Command, tocs 
 	// the final layout for painting.
 	if guess > 0 {
 		for _, st := range tocs {
-			root, res, err := layoutTOC(font, st, entries, guess, cmd, log)
+			root, res, err := layoutTOC(font, st, entries, guess, g, log)
 			if err != nil {
 				return 0, err
 			}

@@ -150,8 +150,8 @@ func TestGlobalSetDottedKeys(t *testing.T) {
 			}
 		}},
 		{"allow", "/srv/html", func(t *testing.T) {
-			if len(g.Allow) != 1 || g.Allow[0] != "/srv/html" {
-				t.Errorf("allow = %v", g.Allow)
+			if len(g.Load.Allow) != 1 || g.Load.Allow[0] != "/srv/html" {
+				t.Errorf("allow = %v", g.Load.Allow)
 			}
 		}},
 		{"dumpoutline", "true", func(t *testing.T) {
@@ -418,36 +418,24 @@ func TestGlobalGetSetRoundTripAndIgnored(t *testing.T) {
 }
 
 func TestKeyTableSetGetParity(t *testing.T) {
-	// Every Set key must have a Get, and every Get key must have a Set.
-	ensureKeyTables()
-	for k := range globalKeyTable {
-		if _, ok := globalGetTable[k]; !ok {
-			t.Errorf("global Set key %q missing Get", k)
+	// Every registered key must have both an apply and a get descriptor, and
+	// every Get must answer ok=true (all descriptors get returns true).
+	g := DefaultPdfGlobal()
+	o := DefaultPdfObject()
+	img := DefaultImageGlobal()
+	for k := range globalKeys {
+		if _, ok := getForKey(&g, globalKeys, &g.Ignored, k); !ok {
+			t.Errorf("global key %q missing Get", k)
 		}
 	}
-	for k := range globalGetTable {
-		if _, ok := globalKeyTable[k]; !ok {
-			t.Errorf("global Get key %q missing Set", k)
+	for k := range objectKeys {
+		if _, ok := getForKey(&o, objectKeys, &o.Ignored, k); !ok {
+			t.Errorf("object key %q missing Get", k)
 		}
 	}
-	for k := range objectKeyTable {
-		if _, ok := objectGetTable[k]; !ok {
-			t.Errorf("object Set key %q missing Get", k)
-		}
-	}
-	for k := range objectGetTable {
-		if _, ok := objectKeyTable[k]; !ok {
-			t.Errorf("object Get key %q missing Set", k)
-		}
-	}
-	for k := range imageKeyTable {
-		if _, ok := imageGetTable[k]; !ok {
-			t.Errorf("image Set key %q missing Get", k)
-		}
-	}
-	for k := range imageGetTable {
-		if _, ok := imageKeyTable[k]; !ok {
-			t.Errorf("image Get key %q missing Set", k)
+	for k := range imageKeys {
+		if _, ok := getForKey(&img, imageKeys, &img.Ignored, k); !ok {
+			t.Errorf("image key %q missing Get", k)
 		}
 	}
 }
@@ -468,5 +456,63 @@ func TestBackgroundSingleFieldNoWebMirror(t *testing.T) {
 	got2, ok := g.Get("background")
 	if !ok || got2 != "false" {
 		t.Fatalf("Get(background)=%q,%v", got2, ok)
+	}
+}
+
+func TestResolveMedia(t *testing.T) {
+	base := "print"
+	none := Web{}
+	pmt := Web{PrintMediaType: true}
+	screen := Web{MediaType: MediaScreen}
+	print := Web{MediaType: MediaPrint}
+
+	if got := ResolveMedia(base, none, nil); got != "print" {
+		t.Errorf("default PDF = %q", got)
+	}
+	if got := ResolveMedia("screen", none, nil); got != "screen" {
+		t.Errorf("default image = %q", got)
+	}
+	if got := ResolveMedia(base, pmt, nil); got != "print" {
+		t.Errorf("global print-media-type = %q", got)
+	}
+	if got := ResolveMedia(base, none, &pmt); got != "print" {
+		t.Errorf("obj print-media-type = %q", got)
+	}
+	if got := ResolveMedia(base, screen, nil); got != "screen" {
+		t.Errorf("global media-type screen = %q", got)
+	}
+	if got := ResolveMedia(base, none, &screen); got != "screen" {
+		t.Errorf("obj media-type screen = %q", got)
+	}
+	// obj wins over global media-type.
+	if got := ResolveMedia(base, screen, &print); got != "print" {
+		t.Errorf("obj media-type print over global screen = %q", got)
+	}
+	// print-media-type override wins over media-type.
+	if got := ResolveMedia(base, screen, &Web{PrintMediaType: true}); got != "print" {
+		t.Errorf("pmt over media-type screen = %q", got)
+	}
+}
+
+func TestApplyImageKeyBackgroundAlias(t *testing.T) {
+	g := DefaultPdfGlobal()
+	img := DefaultImageGlobal()
+	if err := ApplyImageKey(&g, &img, "web.background", "false"); err != nil {
+		t.Fatal(err)
+	}
+	if g.Background {
+		t.Error("web.background must route to PdfGlobal.Background")
+	}
+	if err := ApplyImageKey(&g, &img, "background", "true"); err != nil {
+		t.Fatal(err)
+	}
+	if !g.Background {
+		t.Error("background must route to PdfGlobal.Background")
+	}
+	if err := ApplyImageKey(&g, &img, "width", "800"); err != nil {
+		t.Fatal(err)
+	}
+	if img.Width != 800 {
+		t.Errorf("width must route to ImageGlobal: %d", img.Width)
 	}
 }

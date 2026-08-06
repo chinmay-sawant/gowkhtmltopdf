@@ -52,7 +52,7 @@ func newCommand(t *testing.T, html string, output string) (*cli.Command, string)
 		Output:  output,
 	}
 	// --enable-local-file-access: global flag on, object-level block off.
-	cmd.Global.EnableLocalFileAccess = true
+	cmd.Global.Load.EnableLocalFileAccess = true
 	cmd.Global.Size = settings.Size{PageSize: cmd.Global.PageSize}
 	return cmd, dir
 }
@@ -286,7 +286,7 @@ func newCommandMulti(t *testing.T, htmls []string, output string) *cli.Command {
 		Global: settings.DefaultPdfGlobal(),
 		Output: output,
 	}
-	cmd.Global.EnableLocalFileAccess = true
+	cmd.Global.Load.EnableLocalFileAccess = true
 	cmd.Global.Size = settings.Size{PageSize: cmd.Global.PageSize}
 	for _, h := range htmls {
 		dir := t.TempDir()

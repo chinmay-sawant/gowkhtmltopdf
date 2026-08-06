@@ -27,12 +27,7 @@ func (e *engine) buildGrid(n *html.Node, st ResolvedStyle, availW, x, y float64)
 	ml := e.scalePt(st.MarginLeft)
 	b := &box{node: n, style: st, kind: "block", x: x + ml, y: y}
 	b.w = resolveUsedWidth(st, availW, e)
-	contentW := b.w - e.scalePt(st.PaddingLeft) - e.scalePt(st.PaddingRight) -
-		e.scalePt(st.BorderLeft.Width) - e.scalePt(st.BorderRight.Width)
-	if contentW < 0 {
-		contentW = 0
-	}
-	contentX := b.x + e.scalePt(st.BorderLeft.Width) + e.scalePt(st.PaddingLeft)
+	contentX, contentW := e.contentBox(b.x, b.w, st)
 	contentStart := len(e.ops)
 	cy := e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)
 

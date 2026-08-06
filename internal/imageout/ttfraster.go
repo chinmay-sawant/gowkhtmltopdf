@@ -51,6 +51,11 @@ type glyphCacheEntry struct {
 	originY float64
 }
 
+// maxGlyphCache caps the package-level atlas so a long-lived process re-parsing
+// fonts (new *pdf.Font keys) cannot grow RSS without bound (P5-05). When full,
+// half the entries are dropped. Full per-Render ownership is a future step.
+const maxGlyphCache = 4096
+
 var (
 	glyphMu    sync.Mutex
 	glyphCache = map[glyphKey]*glyphCacheEntry{}
@@ -69,6 +74,17 @@ func drawGlyphAA(dst *image.NRGBA, basex, basey float64, r rune, face *pdf.Font,
 	glyphMu.Lock()
 	ent, ok := glyphCache[key]
 	if !ok {
+		if len(glyphCache) >= maxGlyphCache {
+			// Drop about half; map iteration order is unspecified (stdlib).
+			n := len(glyphCache) / 2
+			for k := range glyphCache {
+				delete(glyphCache, k)
+				n--
+				if n <= 0 {
+					break
+				}
+			}
+		}
 		ent = rasterGlyph(face, r, scale)
 		glyphCache[key] = ent
 	}

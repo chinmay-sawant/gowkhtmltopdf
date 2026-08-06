@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"fmt"
 	"math"
 	"testing"
 
@@ -111,7 +112,7 @@ func TestBoolFlagValues(t *testing.T) {
 	if cmd.Objects[0].Load.BlockLocalFileAccess {
 		t.Error("enable-local-file-access must land on first object")
 	}
-	if !cmd.Global.EnableLocalFileAccess {
+	if !cmd.Global.Load.EnableLocalFileAccess {
 		t.Error("enable-local-file-access must set global")
 	}
 	cmd = parse(t, "--disable-local-file-access", "in.html", "out.pdf")
@@ -233,7 +234,10 @@ func TestTOCFlags(t *testing.T) {
 }
 
 func TestLoadFlags(t *testing.T) {
+	// Page-only flags (zoom, username, password) must follow an object
+	// keyword; the page keyword seeds the object.
 	cmd := parse(t,
+		"page",
 		"--zoom", "1.5",
 		"--load-error-handling", "ignore",
 		"--print-media-type",
@@ -250,14 +254,37 @@ func TestLoadFlags(t *testing.T) {
 	if !o.Load.PrintMediaType {
 		t.Error("print-media-type on object Load")
 	}
-	if !cmd.Image.Web.PrintMediaType {
-		t.Error("print-media-type must set Image.Web (imageout mediaFor)")
+	if cmd.Image.Web.PrintMediaType {
+		t.Error("print-media-type must not set Image.Web (single home is Global + obj.Load)")
 	}
 	if !cmd.Global.Web.PrintMediaType {
 		t.Error("print-media-type must set Global.Web (convert mediaFor)")
 	}
 	if o.Load.Username != "u" || o.Load.Password != "p" {
 		t.Errorf("auth = %q/%q", o.Load.Username, o.Load.Password)
+	}
+}
+
+func TestPageOnlyFlagPreObjectRejected(t *testing.T) {
+	for _, args := range [][]string{
+		{"--zoom", "2", "in.html", "out.pdf"},
+		{"--username", "u", "in.html", "out.pdf"},
+		{"--password", "p", "in.html", "out.pdf"},
+		{"--timeout", "30", "in.html", "out.pdf"},
+		{"--external-links", "in.html", "out.pdf"},
+		{"--internal-links", "in.html", "out.pdf"},
+	} {
+		if _, err := Parse(args); err == nil {
+			t.Errorf("page-only flag %v before any object keyword must error", args[0])
+		}
+	}
+	// After an object keyword they land on the object.
+	cmd := parse(t, "page", "--zoom", "2", "--external-links", "in.html", "out.pdf")
+	if cmd.Objects[0].Load.ZoomFactor != 2 {
+		t.Error("zoom must land on the object after page keyword")
+	}
+	if !cmd.Objects[0].ExternalLinks {
+		t.Error("external-links must land on the object after page keyword")
 	}
 }
 
@@ -299,20 +326,23 @@ func TestBackgroundPDFAndImage(t *testing.T) {
 	}
 }
 
-func TestDumpOutlineCommandFieldOnly(t *testing.T) {
+func TestDumpOutlineGlobalHome(t *testing.T) {
+	// Single home: Global settings; negation rides the value.
 	cmd := parse(t, "--dump-outline", "in.html", "out.pdf")
-	if !cmd.DumpOutline {
-		t.Error("--dump-outline must set Command.DumpOutline")
+	if !cmd.Global.DumpOutline {
+		t.Error("--dump-outline must set Global.DumpOutline")
 	}
+	cmd = parse(t, "--no-dump-outline", "in.html", "out.pdf")
 	if cmd.Global.DumpOutline {
-		t.Error("--dump-outline must not dual-write Global.DumpOutline")
+		t.Error("--no-dump-outline must clear Global.DumpOutline")
 	}
 	cmd = parse(t, "--dump-default-toc-xsl", "in.html", "out.pdf")
-	if !cmd.DumpDefaultTOCXSL {
-		t.Error("--dump-default-toc-xsl must set Command.DumpDefaultTOCXSL")
+	if !cmd.Global.DumpDefaultTOCXSL {
+		t.Error("--dump-default-toc-xsl must set Global.DumpDefaultTOCXSL")
 	}
+	cmd = parse(t, "--dump-default-toc-xsl=false", "in.html", "out.pdf")
 	if cmd.Global.DumpDefaultTOCXSL {
-		t.Error("--dump-default-toc-xsl must not dual-write Global")
+		t.Error("--dump-default-toc-xsl=false must clear Global.DumpDefaultTOCXSL")
 	}
 }
 
@@ -468,7 +498,7 @@ func TestPageScopedBeforeTOCNoGhost(t *testing.T) {
 	if cmd.Objects[1].Load.BlockLocalFileAccess {
 		t.Error("enable-local-file-access must land on the first real page")
 	}
-	if !cmd.Global.EnableLocalFileAccess {
+	if !cmd.Global.Load.EnableLocalFileAccess {
 		t.Error("enable-local-file-access must set the global flag")
 	}
 	// Header/footer before any object keyword remain global so every object
@@ -488,6 +518,25 @@ func TestPageScopedBeforePageKeyword(t *testing.T) {
 	}
 	if cmd.Objects[0].Page != "in.html" || cmd.Objects[0].Load.BlockLocalFileAccess {
 		t.Errorf("page = %+v", cmd.Objects[0])
+	}
+}
+
+func TestExitCode(t *testing.T) {
+	if ExitCode(nil) != ExitError {
+		t.Error("nil must exit 1")
+	}
+	if ExitCode(fmt.Errorf("boom")) != ExitError {
+		t.Error("plain error must exit 1")
+	}
+	if ExitCode(&settings.HttpStatusError{Status: 404}) != 2 {
+		t.Error("404 must exit 2")
+	}
+	if ExitCode(&settings.HttpStatusError{Status: 401}) != 3 {
+		t.Error("401 must exit 3")
+	}
+	// Wrapped errors still resolve through errors.As.
+	if ExitCode(fmt.Errorf("wrap: %w", &settings.HttpStatusError{Status: 404})) != 2 {
+		t.Error("wrapped 404 must exit 2")
 	}
 }
 

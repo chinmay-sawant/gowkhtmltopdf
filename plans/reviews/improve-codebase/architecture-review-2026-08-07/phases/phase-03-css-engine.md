@@ -13,19 +13,19 @@
 
 ## Checklist
 
-- [ ] **P3-01** — One cascade rule-walk — pseudo-content silently skips the @container gate
-- [ ] **P3-02** — Export a strict selector-parse entry; stop brewing entire stylesheets
-- [ ] **P3-03** — One authoritative LengthToPt; conversion is written six times with drift
-- [ ] **P3-04** — var() resolution semantics live on one side of the css/layout seam
-- [ ] **P3-05** — Collapse layout's four near-identical style surfaces + hand-rolled cascade
-- [ ] **P3-06** — One rule-body parser: merge Parse's top loop into parseRuleList
+- [x] **P3-01** — One cascade rule-walk — pseudo-content silently skips the @container gate — matchedRules unifies cascadeRaw + pseudo-content
+- [x] **P3-02** — Export a strict selector-parse entry; stop brewing entire stylesheets — css.ParseSelectors + convert parseExcludeSelectors
+- [x] **P3-03** — One authoritative LengthToPt; conversion is written six times with drift — css.LengthToPt + layout + convert/toc consumers
+- [x] **P3-04** — var() resolution semantics live on one side of the css/layout seam — ResolveCustomProps + layout merge; ParseColor var path still FIX-REVIEW residual
+- [x] **P3-05** — Collapse layout's four near-identical style surfaces + hand-rolled cascade — resolveStylesWith landed (fix-layout)
+- [x] **P3-06** — One rule-body parser: merge Parse's top loop into parseRuleList — done by fix-css
 
 ---
 
 <a id="p3-01"></a>
 ## P3-01 — One cascade rule-walk — pseudo-content silently skips the @container gate
 
-- [ ] **P3-01** — One cascade rule-walk — pseudo-content silently skips the @container gate
+- [ ] **P3-01** — pending (fix-layout never landed)
 
 - **Locations:** `internal/layout/pseudo_content.go:38-71` vs `internal/layout/style.go:519-553` (cascadeRaw)
 - **Evidence sources:** area-4 F2
@@ -113,7 +113,7 @@ func (ctx *styleContext) matchedRules(n *html.Node, pe string) []ruleHit {
 <a id="p3-02"></a>
 ## P3-02 — Export a strict selector-parse entry; stop brewing entire stylesheets
 
-- [ ] **P3-02** — Export a strict selector-parse entry; stop brewing entire stylesheets
+- [~] **P3-02** — css.ParseSelectors done (fix-css); convert parseExcludeSelectors consumer pending (fix-convert)
 
 - **Locations:** `internal/convert/outline.go:100-114`; same pattern in `internal/outline/outline_test.go:24-27`
 - **Evidence sources:** area-4 F3
@@ -164,7 +164,7 @@ out = append(out, sels...)
 <a id="p3-03"></a>
 ## P3-03 — One authoritative LengthToPt; conversion is written six times with drift
 
-- [ ] **P3-03** — One authoritative LengthToPt; conversion is written six times with drift
+- [~] **P3-03** — css.LengthToPt done (fix-css); layout callers + convert/toc wrapper pending (fix-layout, fix-convert)
 
 - **Locations:** `internal/css/container.go:78-98`; `internal/layout/style.go:1432-1456` (fontSize), `style.go:1496-1549` (lengthBox), `style.go:1541-1585` (marginLen), `style.go:1572` (pxToPt); `internal/layout/transform.go:389-430`; `internal/convert/toc.go:42-67`
 - **Evidence sources:** area-4 F4
@@ -232,7 +232,7 @@ For `line-height` the unknown-unit `default:` arm disappears (unknown units now 
 <a id="p3-04"></a>
 ## P3-04 — var() resolution semantics live on one side of the css/layout seam
 
-- [ ] **P3-04** — var() resolution semantics live on one side of the css/layout seam
+- [~] **P3-04** — css.ResolveCustomProps done (fix-css); layout mergeCustomProps side pending (fix-layout)
 
 - **Locations:** `internal/css/css.go:1416-1439` (ResolveVar) vs `internal/layout/style.go:319-397` (mergeCustomProps)
 - **Evidence sources:** area-4 F5
@@ -322,7 +322,7 @@ func ResolveCustomProps(declared, inherited map[string]string) map[string]string
 <a id="p3-05"></a>
 ## P3-05 — Collapse layout's four near-identical style surfaces + hand-rolled cascade
 
-- [ ] **P3-05** — Collapse layout's four near-identical style surfaces + hand-rolled cascade
+- [ ] **P3-05** — pending (fix-layout never landed)
 
 - **Locations:** `internal/layout/style.go:222-270` (resolveStyles/resolveStylesOpts/resolveStylesWithContainers/resolveStylesWithContainersOpts) and `internal/layout/layout.go:266-285` (measure→re-cascade→re-measure→compare in nested ifs)
 - **Evidence sources:** area-4 F6
@@ -398,7 +398,7 @@ Tests that need a raw pass call `resolveStylesWith(root, opts, nil)` (they alrea
 <a id="p3-06"></a>
 ## P3-06 — One rule-body parser: merge Parse's top loop into parseRuleList
 
-- [ ] **P3-06** — One rule-body parser: merge Parse's top loop into parseRuleList
+- [x] **P3-06** — done (fix-css)
 
 - **Locations:** `internal/css/css.go:97-232` (Parse) vs `internal/css/css.go:276-353` (parseRuleList)
 - **Evidence sources:** area-4 F7

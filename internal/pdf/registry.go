@@ -22,7 +22,7 @@ func (r *Registry) AddFont(f *Font) {
 	if r == nil || f == nil {
 		return
 	}
-	names := f.FamilyNames()
+	names := f.LoadNames()
 	if len(names) == 0 && f.PostScriptName != "" {
 		names = []string{f.PostScriptName}
 	}

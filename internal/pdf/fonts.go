@@ -8,7 +8,10 @@ import (
 	"math"
 	"sort"
 	"strings"
+	"sync"
 	"unicode/utf16"
+
+	gtfont "github.com/go-text/typesetting/font"
 )
 
 // Font is a parsed TrueType/OpenType font (table-directory view). It exposes
@@ -37,6 +40,14 @@ type Font struct {
 	cmap    map[uint32]uint16 // rune -> glyph id
 	advance []int32           // advance width in font units per glyph
 	lsb     []int16           // left side bearing per glyph
+
+	// Derived, immutable caches live on the Font next to the data they
+	// derive from (locality) and disappear with it (bounds): the go-text
+	// face and the reverse cmap are built at most once each.
+	gotOnce sync.Once
+	gotFace *gtfont.Face // parsed go-text face (nil on failure)
+	revOnce sync.Once
+	rev     map[uint16]rune
 }
 
 // ParseTTF parses a TrueType (or OpenType with TrueType outlines) font file.
@@ -385,7 +396,17 @@ func (f *Font) GlyphID(r rune) uint16 {
 
 // FamilyNames returns CSS-friendly family names from the font's name table
 // (NameIDs 1 and 16 when present). Empty when the name table is missing.
+// See LoadNames for the deliberate PostScriptName fill that backs this.
 func (f *Font) FamilyNames() []string {
+	return f.LoadNames()
+}
+
+// LoadNames reads the name table and makes the PostScriptName fill explicit:
+// when f.PostScriptName is still empty, the first NameID 6/4 record becomes
+// it (the PDF /BaseFont label). Callers that need the names without the
+// mutation can call this once up front. Returns family names (NameIDs 1 and
+// 16), or nil when the name table is missing.
+func (f *Font) LoadNames() []string {
 	t, ok := f.tables["name"]
 	if !ok || len(t) < 6 {
 		return nil

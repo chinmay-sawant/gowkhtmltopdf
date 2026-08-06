@@ -1,6 +1,7 @@
 package css
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -634,5 +635,152 @@ func TestParseStripCommentsPreservesNewlines(t *testing.T) {
 	}
 	if s.Rules[0].Decls[0].Value != "red" {
 		t.Errorf("decl = %+v", s.Rules[0].Decls[0])
+	}
+}
+
+func TestLengthToPt(t *testing.T) {
+	cases := []struct {
+		val    float64
+		unit   string
+		basePt float64
+		want   float64
+		ok     bool
+	}{
+		{12, "px", 12, 9, true},        // 0.75
+		{10, "pt", 12, 10, true},       // 1:1
+		{1, "in", 12, 72, true},        // 72
+		{1, "cm", 12, 72 / 2.54, true}, // 72/2.54
+		{25.4, "mm", 12, 72, true},     // 72/25.4
+		{2, "pc", 12, 24, true},        // * 12
+		{2, "em", 12, 24, true},        // * basePt
+		{2, "EM", 12, 24, true},        // case-insensitive
+		{2, "rem", 12, 24, true},       // 16px root = 12pt
+		{2, "ex", 12, 12, true},        // * basePt * 0.5
+		{2, "ch", 12, 12, true},        // * basePt * 0.5
+		{5, "px", 12, 3.75, true},      // fractional
+		{0, "em", 12, 0, true},         // zero em
+		{50, "%", 12, 0, false},        // percentages unsupported
+		{2, "vw", 12, 0, false},        // viewport units unsupported
+		{2, "q", 12, 0, false},         // unknown unit
+		{2, "", 12, 0, false},          // empty unit
+	}
+	for _, tc := range cases {
+		got, ok := LengthToPt(tc.val, tc.unit, tc.basePt)
+		if ok != tc.ok || (ok && got != tc.want) {
+			t.Errorf("LengthToPt(%v, %q, %v) = (%v, %v), want (%v, %v)",
+				tc.val, tc.unit, tc.basePt, got, ok, tc.want, tc.ok)
+		}
+	}
+}
+
+func TestResolveCustomProps(t *testing.T) {
+	declared := map[string]string{
+		"--a": "10px",
+		"--b": "var(--a)",
+		"--c": "var(--b)",
+		"--d": "var(--missing, 5px)",
+	}
+	got := ResolveCustomProps(declared, nil)
+	want := map[string]string{
+		"--a": "10px",
+		"--b": "10px",
+		"--c": "10px",
+		"--d": "5px",
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("ResolveCustomProps(%q) = %q, want %q", k, got[k], v)
+		}
+	}
+}
+
+func TestResolveCustomPropsInheritedOverlay(t *testing.T) {
+	inherited := map[string]string{"--size": "12px", "--color": "red"}
+	declared := map[string]string{"--size": "14px", "--double": "var(--size)"}
+	got := ResolveCustomProps(declared, inherited)
+	if got["--size"] != "14px" {
+		t.Errorf("declared must win over inherited: %q", got["--size"])
+	}
+	if got["--color"] != "red" {
+		t.Errorf("inherited-only prop missing: %q", got["--color"])
+	}
+	if got["--double"] != "14px" {
+		t.Errorf("chain into overlaid prop: %q", got["--double"])
+	}
+}
+
+func TestResolveCustomPropsCycle(t *testing.T) {
+	declared := map[string]string{
+		"--x": "var(--y)",
+		"--y": "var(--x)",
+	}
+	got := ResolveCustomProps(declared, nil)
+	// Cycle → invalid → empty, for both members.
+	if got["--x"] != "" {
+		t.Errorf("--x cycle = %q, want empty", got["--x"])
+	}
+	if got["--y"] != "" {
+		t.Errorf("--y cycle = %q, want empty", got["--y"])
+	}
+}
+
+func TestResolveCustomPropsDeepChain(t *testing.T) {
+	// A chain longer than ResolveVar's 16-deep bound must still resolve fully
+	// (the stack-walk is the stricter policy; this is what the memo walk
+	// guarantees at the css seam).
+	declared := map[string]string{"--v0": "final"}
+	// build --v1 = var(--v0) ... --v20 = var(--v19)
+	for i := 1; i <= 20; i++ {
+		declared[fmt.Sprintf("--v%d", i)] = fmt.Sprintf("var(--v%d)", i-1)
+	}
+	got := ResolveCustomProps(declared, nil)
+	if got["--v20"] != "final" {
+		t.Errorf("deep chain --v20 = %q, want final", got["--v20"])
+	}
+}
+
+func TestResolveCustomPropsSelfReferenceWithFallback(t *testing.T) {
+	// Self-reference (cycle) but with a fallback: spec says the fallback is
+	// used only when the variable is invalid at computed-value time; the
+	// cycle makes the reference invalid, so the fallback applies.
+	declared := map[string]string{
+		"--a": "var(--a, 9px)",
+		"--b": "var(--a)",
+	}
+	got := ResolveCustomProps(declared, nil)
+	if got["--b"] != "9px" {
+		t.Errorf("--b through cyclic --a with fallback = %q, want 9px", got["--b"])
+	}
+}
+
+func TestParseSelectors(t *testing.T) {
+	sels, ok := ParseSelectors("h1, h2, .title")
+	if !ok || len(sels) != 3 {
+		t.Fatalf("ParseSelectors(h1, h2, .title) = %d sels, ok=%v", len(sels), ok)
+	}
+	for i, tag := range []string{"h1", "h2", "*"} {
+		if got := sels[i].Parts[0].Tag; got != tag {
+			t.Errorf("selector %d tag = %q, want %q", i, got, tag)
+		}
+	}
+	// Single selector.
+	single, ok := ParseSelectors("div > p.a")
+	if !ok || len(single) != 1 || len(single[0].Parts) != 2 {
+		t.Fatalf("ParseSelectors(div > p.a) = %+v, ok=%v", single, ok)
+	}
+	// Invalid part fails the whole list (strict), even with valid parts.
+	if _, ok := ParseSelectors("p, &^*%"); ok {
+		t.Error("ParseSelectors with invalid part must fail (strict)")
+	}
+	// Empty / whitespace-only.
+	if _, ok := ParseSelectors(""); ok {
+		t.Error("ParseSelectors(\"\") must fail")
+	}
+	if _, ok := ParseSelectors("  , p"); ok {
+		t.Error("ParseSelectors with empty list item must fail")
+	}
+	// Unsupported pseudo-element fails.
+	if _, ok := ParseSelectors("p::first-line"); ok {
+		t.Error("ParseSelectors with ::first-line must fail")
 	}
 }

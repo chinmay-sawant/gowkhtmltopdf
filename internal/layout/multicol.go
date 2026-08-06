@@ -43,12 +43,7 @@ func (e *engine) buildMulticol(n *html.Node, st ResolvedStyle, availW, x, y floa
 	}
 	b.x = x + ml
 
-	contentW := b.w - e.scalePt(st.PaddingLeft) - e.scalePt(st.PaddingRight) -
-		e.scalePt(st.BorderLeft.Width) - e.scalePt(st.BorderRight.Width)
-	if contentW < 0 {
-		contentW = 0
-	}
-	contentX := b.x + e.scalePt(st.BorderLeft.Width) + e.scalePt(st.PaddingLeft)
+	contentX, contentW := e.contentBox(b.x, b.w, st)
 	contentStart := len(e.ops)
 
 	cy := e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)

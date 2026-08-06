@@ -34,9 +34,9 @@ func run(argv []string) int {
 		return cli.ExitError
 	}
 
-	// Sole dump home for --dump-default-toc-xsl: cmd.DumpDefaultTOCXSL (CLI).
-	// Do not also read Global.DumpDefaultTOCXSL. --dump-outline is convert's job.
-	if cmd.DumpDefaultTOCXSL {
+	// Sole dump home for --dump-default-toc-xsl: Global.DumpDefaultTOCXSL
+	// (CLI appliers write Global now). --dump-outline is convert's job.
+	if cmd.Global.DumpDefaultTOCXSL {
 		fmt.Fprint(os.Stdout, convert.DefaultTOCXSL())
 		return cli.ExitOK
 	}

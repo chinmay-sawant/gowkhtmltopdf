@@ -217,25 +217,29 @@ type sizeContainer struct {
 	names      string  // space-separated container-name values
 }
 
-// resolveStyles walks the tree top-down, computing the used style of every
-// element from the cascade (UA → sheets in order → inline) plus inheritance.
-// @container rules are ignored on this first pass (no used sizes yet).
-func resolveStyles(root *html.Node, sheets []*css.Stylesheet, media string, viewportW, viewportH float64) map[*html.Node]ResolvedStyle {
-	return resolveStylesCtx(root, &styleContext{
-		sheets: sheets, media: media, viewportW: viewportW, viewportH: viewportH,
-	})
-}
-
-// resolveStylesOpts is like resolveStyles but honors layout operator policies
-// (e.g. PrintLinkUnderline) carried on Options.
-func resolveStylesOpts(root *html.Node, opts Options) map[*html.Node]ResolvedStyle {
+// resolveStylesWith is the single cascade entry: Options + optional size
+// containers for @container rules (nil = first pass, skip container queries).
+func resolveStylesWith(root *html.Node, opts Options, containers map[*html.Node]sizeContainer) map[*html.Node]ResolvedStyle {
 	return resolveStylesCtx(root, &styleContext{
 		sheets:             opts.Sheets,
 		media:              opts.Media,
 		viewportW:          opts.Width,
 		viewportH:          opts.Height,
 		printLinkUnderline: opts.PrintLinkUnderline,
+		containers:         containers,
 	})
+}
+
+// resolveStyles walks the tree top-down (test helper; no operator policies).
+// @container rules are ignored on this first pass (no used sizes yet).
+func resolveStyles(root *html.Node, sheets []*css.Stylesheet, media string, viewportW, viewportH float64) map[*html.Node]ResolvedStyle {
+	return resolveStylesWith(root, Options{Sheets: sheets, Media: media, Width: viewportW, Height: viewportH}, nil)
+}
+
+// resolveStylesOpts is like resolveStyles but honors layout operator policies
+// (e.g. PrintLinkUnderline) carried on Options.
+func resolveStylesOpts(root *html.Node, opts Options) map[*html.Node]ResolvedStyle {
+	return resolveStylesWith(root, opts, nil)
 }
 
 // resolveStylesWithContainers is the second style pass: @container rules are
@@ -247,10 +251,7 @@ func resolveStylesWithContainers(
 	viewportW, viewportH float64,
 	containers map[*html.Node]sizeContainer,
 ) map[*html.Node]ResolvedStyle {
-	return resolveStylesCtx(root, &styleContext{
-		sheets: sheets, media: media, viewportW: viewportW, viewportH: viewportH,
-		containers: containers,
-	})
+	return resolveStylesWith(root, Options{Sheets: sheets, Media: media, Width: viewportW, Height: viewportH}, containers)
 }
 
 func resolveStylesWithContainersOpts(
@@ -258,14 +259,7 @@ func resolveStylesWithContainersOpts(
 	opts Options,
 	containers map[*html.Node]sizeContainer,
 ) map[*html.Node]ResolvedStyle {
-	return resolveStylesCtx(root, &styleContext{
-		sheets:             opts.Sheets,
-		media:              opts.Media,
-		viewportW:          opts.Width,
-		viewportH:          opts.Height,
-		printLinkUnderline: opts.PrintLinkUnderline,
-		containers:         containers,
-	})
+	return resolveStylesWith(root, opts, containers)
 }
 
 func resolveStylesCtx(root *html.Node, ctx *styleContext) map[*html.Node]ResolvedStyle {
@@ -315,65 +309,22 @@ func resolveStylesCtx(root *html.Node, ctx *styleContext) map[*html.Node]Resolve
 }
 
 // mergeCustomProps inherits parent custom properties and overlays any --*
-// declarations from raw, resolving var() chains (MediaWiki/Codex tokens).
+// declarations from raw, resolving var() chains via css.ResolveCustomProps.
 func mergeCustomProps(parent *ResolvedStyle, raw map[string]string) map[string]string {
 	var parentProps map[string]string
 	if parent != nil {
 		parentProps = parent.CustomProps
 	}
-	declared := false
-	for prop := range raw {
-		if strings.HasPrefix(prop, "--") {
-			declared = true
-			break
-		}
-	}
-	if !declared {
-		return parentProps
-	}
-	work := map[string]string{}
-	for k, v := range parentProps {
-		work[k] = v
-	}
+	declared := map[string]string{}
 	for prop, v := range raw {
 		if strings.HasPrefix(prop, "--") {
-			work[prop] = v
+			declared[prop] = v
 		}
 	}
-	memo := map[string]string{}
-	var eval func(name string, stack map[string]bool) string
-	eval = func(name string, stack map[string]bool) string {
-		if v, ok := memo[name]; ok {
-			return v
-		}
-		rawV, ok := work[name]
-		if !ok {
-			return ""
-		}
-		if !strings.Contains(strings.ToLower(rawV), "var(") {
-			memo[name] = rawV
-			return rawV
-		}
-		if stack[name] {
-			return ""
-		}
-		stack[name] = true
-		val := css.ResolveVar(rawV, func(n string) (string, bool) {
-			s := eval(n, stack)
-			if strings.TrimSpace(s) == "" {
-				_, exists := work[n]
-				return s, exists
-			}
-			return s, true
-		})
-		delete(stack, name)
-		memo[name] = val
-		return val
+	if len(declared) == 0 {
+		return parentProps
 	}
-	for name := range work {
-		eval(name, map[string]bool{})
-	}
-	return memo
+	return css.ResolveCustomProps(declared, parentProps)
 }
 
 // resolveRawVars expands var() in cascaded property values using customProps.
@@ -488,6 +439,53 @@ func inheritProps(st *ResolvedStyle, parent ResolvedStyle, raw map[string]string
 
 // cascadeRaw returns the winning declaration per property for the element
 // across UA sheet, author sheets and the inline style attribute.
+// ruleHit is one selector match from the shared cascade rule walk.
+type ruleHit struct {
+	r       css.Rule
+	a, b, c int
+}
+
+// matchedRules walks sheets with the cascade's gates (media, @container,
+// selector match, specificity). pe != "" matches ::before/::after shapes
+// instead of the element (pseudo-content path).
+func (ctx *styleContext) matchedRules(n *html.Node, pe string) []ruleHit {
+	if ctx == nil {
+		return nil
+	}
+	var hits []ruleHit
+	for _, sheet := range ctx.sheets {
+		if sheet == nil {
+			continue
+		}
+		for _, r := range sheet.Rules {
+			if !css.MediaMatches(r.Media, ctx.media, ctx.viewportW, ctx.viewportH) {
+				continue
+			}
+			if r.Container != nil {
+				if ctx.containers == nil {
+					continue // pass 1 / pseudo pass without sizes: skip
+				}
+				info, ok := findSizeContainer(n, r.Container.Name, ctx.containers)
+				if !ok || !r.Container.Cond.Matches(info.inlineSize, info.fontSize) {
+					continue
+				}
+			}
+			for _, sel := range r.Selectors {
+				if pe != "" {
+					if !css.MatchPseudo(sel, n, pe) {
+						continue
+					}
+				} else if !css.Match(sel, n) {
+					continue
+				}
+				a, b, c := css.Specificity(sel)
+				hits = append(hits, ruleHit{r: r, a: a, b: b, c: c})
+			}
+		}
+	}
+	return hits
+}
+
 func cascadeRaw(ctx *styleContext, n *html.Node) map[string]string {
 	normal := map[string]string{}
 	important := map[string]string{}
@@ -516,33 +514,14 @@ func cascadeRaw(ctx *styleContext, n *html.Node) map[string]string {
 		apply(normal, nSpec, nOrder, d.Prop, d.Value, 0, 0, 0, -1)
 	}
 
-	// author sheets in source order
-	for _, sheet := range ctx.sheets {
-		for _, r := range sheet.Rules {
-			if !css.MediaMatches(r.Media, ctx.media, ctx.viewportW, ctx.viewportH) {
-				continue
-			}
-			if r.Container != nil {
-				if ctx.containers == nil {
-					continue // first pass: used sizes unknown
-				}
-				info, ok := findSizeContainer(n, r.Container.Name, ctx.containers)
-				if !ok || !r.Container.Cond.Matches(info.inlineSize, info.fontSize) {
-					continue
-				}
-			}
-			for _, sel := range r.Selectors {
-				if !css.Match(sel, n) {
-					continue
-				}
-				a, b, c := css.Specificity(sel)
-				for _, d := range r.Decls {
-					if d.Important {
-						apply(important, iSpec, iOrder, d.Prop, d.Value, a, b, c, r.Order)
-					} else {
-						apply(normal, nSpec, nOrder, d.Prop, d.Value, a, b, c, r.Order)
-					}
-				}
+	// author sheets in source order (shared matchedRules walk)
+	for _, hit := range ctx.matchedRules(n, "") {
+		r := hit.r
+		for _, d := range r.Decls {
+			if d.Important {
+				apply(important, iSpec, iOrder, d.Prop, d.Value, hit.a, hit.b, hit.c, r.Order)
+			} else {
+				apply(normal, nSpec, nOrder, d.Prop, d.Value, hit.a, hit.b, hit.c, r.Order)
 			}
 		}
 	}
@@ -1413,22 +1392,12 @@ func fontSize(value string, parent, remBase float64) float64 {
 		switch unit {
 		case "%":
 			return parent * v / 100
-		case "em":
-			return parent * v
-		case "pt":
-			return v
-		case "px":
-			return pxToPt(v)
 		case "rem":
 			return remBase * v
-		case "in":
-			return v * 72
-		case "cm":
-			return v * 72 / 2.54
-		case "mm":
-			return v * 72 / 25.4
-		case "pc":
-			return v * 12
+		default:
+			if pt, ok := css.LengthToPt(v, unit, parent); ok {
+				return pt
+			}
 		}
 	}
 	return parent
@@ -1442,17 +1411,11 @@ func lineHeight(value string, fs float64) float64 {
 		return v * fs
 	}
 	if v, unit, ok := css.ParseLength(value); ok {
-		switch unit {
-		case "%":
+		if unit == "%" {
 			return fs * v / 100
-		case "em":
-			return fs * v
-		case "pt":
-			return v
-		case "px":
-			return pxToPt(v)
-		default:
-			return v * 72 / 25.4
+		}
+		if pt, ok := css.LengthToPt(v, unit, fs); ok {
+			return pt
 		}
 	}
 	return 0
@@ -1502,28 +1465,17 @@ func lengthBox(value string, fs, containing float64, autoValue string) (float64,
 		return 0, false
 	}
 	switch unit {
-	case "px":
-		return pxToPt(v), true
-	case "pt":
-		return v, true
-	case "in":
-		return v * 72, true
-	case "cm":
-		return v * 72 / 2.54, true
-	case "mm":
-		return v * 72 / 25.4, true
-	case "pc":
-		return v * 12, true
-	case "em":
-		return fs * v, true
-	case "rem":
-		return pxToPt(16) * v, true
-	case "%":
+	case "%", "vw", "vh":
 		return containing * v / 100, true
-	case "vw":
-		return containing * v / 100, true
-	case "vh":
-		return containing * v / 100, true
+	default:
+		if pt, ok := css.LengthToPt(v, unit, fs); ok {
+			// rem uses LengthToPt's 16px root; keep remBase-independent path
+			// matching prior lengthBox (rem → 12pt * v via pxToPt(16)).
+			if unit == "rem" {
+				return pxToPt(16) * v, true
+			}
+			return pt, true
+		}
 	}
 	return 0, false
 }
@@ -1546,25 +1498,14 @@ func marginLen(value string, fs, ctxW float64) float64 {
 	if !ok {
 		return 0
 	}
-	switch unit {
-	case "px":
-		return pxToPt(v)
-	case "pt":
-		return v
-	case "in":
-		return v * 72
-	case "cm":
-		return v * 72 / 2.54
-	case "mm":
-		return v * 72 / 25.4
-	case "pc":
-		return v * 12
-	case "em":
-		return fs * v
-	case "rem":
-		return pxToPt(16) * v
-	case "%":
+	if unit == "%" {
 		return ctxW * v / 100
+	}
+	if unit == "rem" {
+		return pxToPt(16) * v
+	}
+	if pt, ok := css.LengthToPt(v, unit, fs); ok {
+		return pt
 	}
 	return 0
 }

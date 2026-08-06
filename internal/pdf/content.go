@@ -23,7 +23,7 @@ type Content struct {
 }
 
 type imageResource struct {
-	ref    string // indirect object ref (allocated in AddJPEGImage/AddPNGImage)
+	ref    objRef // indirect object ref (allocated in AddJPEGImage/AddPNGImage)
 	width  int
 	height int
 }
@@ -71,13 +71,23 @@ func (c *Content) Save() { c.buf.WriteString("q\n") }
 // Restore pops the graphics state stack.
 func (c *Content) Restore() { c.buf.WriteString("Q\n") }
 
-// SetFillColor sets the fill color (RGB, 0..1).
+// SetFillColor sets the fill color (RGB, 0..1); grayscale is applied at this
+// paint-time seam, which is what Document.SetGrayscale promises today.
 func (c *Content) SetFillColor(r, g, b float64) {
+	if c.doc != nil && c.doc.grayscale {
+		v := 0.299*r + 0.587*g + 0.114*b // Rec.601 luma
+		r, g, b = v, v, v
+	}
 	c.buf.WriteString(fmt.Sprintf("%s %s %s rg\n", num(r), num(g), num(b)))
 }
 
-// SetStrokeColor sets the stroke color (RGB, 0..1).
+// SetStrokeColor sets the stroke color (RGB, 0..1); grayscale is applied at
+// this paint-time seam, same fold as SetFillColor.
 func (c *Content) SetStrokeColor(r, g, b float64) {
+	if c.doc != nil && c.doc.grayscale {
+		v := 0.299*r + 0.587*g + 0.114*b // Rec.601 luma
+		r, g, b = v, v, v
+	}
 	c.buf.WriteString(fmt.Sprintf("%s %s %s RG\n", num(r), num(g), num(b)))
 }
 
@@ -316,8 +326,10 @@ func (c *Content) textShowType0(s string) {
 
 // fonts returns the map of font resource name to object ref, allocating the
 // font objects and their dicts lazily. Embedded fonts are subset for the
-// runes used on this content.
-func (c *Content) fonts() map[string]string {
+// runes used on this content. A font whose subset fails fails the page: text
+// that names a missing /Resources entry renders invisible, so the error is
+// propagated instead of dropped.
+func (c *Content) fonts() (map[string]string, error) {
 	out := map[string]string{}
 	for name := range c.fontUses {
 		f, ok := c.fontFiles[name]
@@ -326,12 +338,12 @@ func (c *Content) fonts() map[string]string {
 		}
 		ref, err := c.doc.ensureFont(f, c.used[name])
 		if err != nil {
-			continue // skip broken font, layout should have caught it
+			return nil, fmt.Errorf("embed font %s: %w", name, err)
 		}
-		c.fontUses[name] = ref
-		out[name] = ref
+		c.fontUses[name] = ref.String()
+		out[name] = ref.String()
 	}
-	return out
+	return out, nil
 }
 
 // imageResources returns the map of image resource name to object ref.
@@ -339,8 +351,8 @@ func (c *Content) fonts() map[string]string {
 func (c *Content) imageResources() map[string]string {
 	out := map[string]string{}
 	for name, img := range c.imageRefs {
-		if img.ref != "" {
-			out[name] = img.ref
+		if img.ref != 0 {
+			out[name] = img.ref.String()
 		}
 	}
 	return out

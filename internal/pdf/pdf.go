@@ -26,6 +26,34 @@ type object struct {
 	stream []byte
 }
 
+// objRef is a typed indirect-object handle; the "N 0 R" spelling is a
+// formatting concern, not a data type, and refs cannot be malformed.
+type objRef int
+
+func (r objRef) String() string { return strconv.Itoa(int(r)) + " 0 R" }
+
+// parseRef parses an "N 0 R" reference string (the exported surface still
+// carries refs as strings). ok is false when s is not a valid ref.
+func parseRef(s string) (objRef, bool) {
+	fields := strings.Fields(s)
+	if len(fields) != 3 || fields[1] != "0" || fields[2] != "R" {
+		return 0, false
+	}
+	n, err := strconv.Atoi(fields[0])
+	if err != nil || n <= 0 {
+		return 0, false
+	}
+	return objRef(n), true
+}
+
+// dict is a tiny ordered builder so PDF syntax (escaping, /Name tokens,
+// pdfString folding) lives in one place instead of ~20 fmt.Sprintf sites.
+type dict []string
+
+func (d dict) add(k string, v ...string) dict { return append(d, append([]string{k}, v...)...) }
+
+func (d dict) String() string { return "<< " + strings.Join(d, " ") + " >>" }
+
 // Document is a PDF under construction.
 type Document struct {
 	objects        []*object
@@ -36,9 +64,9 @@ type Document struct {
 	nextID         int
 	pages          []*Page
 	outlineRoot    *Outline
-	fontCache      map[string]string // subset key -> font dict ref
-	catalogRef     string            // set by finalize
-	infoRef        string            // set by finalize
+	fontCache      map[string]objRef // subset key -> font dict ref
+	catalogRef     objRef            // set by finalize
+	infoRef        objRef            // set by finalize
 	finalized      bool
 }
 
@@ -47,7 +75,7 @@ func NewDocument() *Document {
 	return &Document{
 		info:           map[string]string{},
 		useCompression: true,
-		fontCache:      map[string]string{},
+		fontCache:      map[string]objRef{},
 	}
 }
 
@@ -66,43 +94,32 @@ func (d *Document) SetCreationTime(t time.Time) { d.creationTime = t }
 // SetInfo sets an Info-dict entry (Title, Creator, Producer, Subject, …).
 func (d *Document) SetInfo(key, value string) { d.info[key] = value }
 
-// newObject allocates an indirect object and returns its reference string.
-func (d *Document) newObject() string {
+// newObject allocates an indirect object and returns its typed reference.
+func (d *Document) newObject() objRef {
 	d.nextID++
 	id := d.nextID
 	d.objects = append(d.objects, &object{id: id})
-	return strconv.Itoa(id) + " 0 R"
+	return objRef(id)
 }
 
 // setDict replaces the object's dict body.
-func (d *Document) setDict(ref string, dict string) {
-	id := refID(ref)
-	d.objects[id-1].dict = dict
+func (d *Document) setDict(r objRef, dict string) {
+	d.objects[int(r)-1].dict = dict
 }
 
 // setStream attaches a raw stream (compressed later at write time).
-func (d *Document) setStream(ref string, raw []byte) {
-	id := refID(ref)
-	d.objects[id-1].stream = raw
-}
-
-func refID(ref string) int {
-	end := strings.IndexByte(ref, ' ')
-	n, err := strconv.Atoi(ref[:end])
-	if err != nil {
-		panic("bad ref " + ref)
-	}
-	return n
+func (d *Document) setStream(r objRef, raw []byte) {
+	d.objects[int(r)-1].stream = raw
 }
 
 // Page is one page of the document.
 type Page struct {
 	doc        *Document
-	ref        string
+	ref        objRef
 	width      float64
 	height     float64
 	content    *Content
-	contentRef string
+	contentRef objRef
 	annots     []annotation
 }
 
@@ -114,7 +131,7 @@ type annotation struct {
 	destX    float64
 	destY    float64
 	hasDest  bool
-	annotRef string
+	annotRef objRef
 }
 
 // AddPage appends a page with the given size in points.
@@ -140,7 +157,7 @@ func (d *Document) PageRef(idx int) string {
 	if idx < 0 || idx >= len(d.pages) {
 		return ""
 	}
-	return d.pages[idx].ref
+	return d.pages[idx].ref.String()
 }
 
 // PageAt returns the Page at index idx, or nil when out of range. Used to
@@ -227,7 +244,7 @@ type Outline struct {
 	X, Y     float64
 	Children []*Outline
 
-	refStr string // assigned during finalize
+	refStr objRef // assigned during finalize
 }
 
 // SetOutline installs the document outline tree.
@@ -244,18 +261,21 @@ func (d *Document) Write(w io.Writer) error {
 
 	offsets := make([]int64, len(d.objects)+1)
 	for _, o := range d.objects {
-		offsets[o.id] = int64(buf.Len())
-		if o.dict != "" {
-			fmt.Fprintf(&buf, "%d 0 obj\n", o.id)
-			buf.WriteString(o.dict)
-			if len(o.stream) > 0 {
-				buf.WriteString("\nstream\n")
-				buf.Write(o.stream)
-				buf.WriteString("\nendstream")
-			}
-			fmt.Fprintln(&buf)
-			fmt.Fprintln(&buf, "endobj")
+		if o.dict == "" {
+			// Object was allocated but never materialized; leave its offset
+			// unrecorded so the xref cannot point at the *next* object.
+			continue
 		}
+		offsets[o.id] = int64(buf.Len())
+		fmt.Fprintf(&buf, "%d 0 obj\n", o.id)
+		buf.WriteString(o.dict)
+		if len(o.stream) > 0 {
+			buf.WriteString("\nstream\n")
+			buf.Write(o.stream)
+			buf.WriteString("\nendstream")
+		}
+		fmt.Fprintln(&buf)
+		fmt.Fprintln(&buf, "endobj")
 	}
 
 	xrefPos := int64(buf.Len())
@@ -299,7 +319,7 @@ func (d *Document) finalize() error {
 
 	var pageRefs []string
 	for _, p := range d.pages {
-		pageRefs = append(pageRefs, p.ref)
+		pageRefs = append(pageRefs, p.ref.String())
 	}
 
 	// pages tree root
@@ -312,41 +332,39 @@ func (d *Document) finalize() error {
 	// empty value and the Catalog dictionary is malformed (viewers show no
 	// content / fail to open the file).
 	if d.outlineRoot != nil {
-		d.finalizeOutlines(d.outlineRoot)
+		if err := d.finalizeOutlines(d.outlineRoot); err != nil {
+			return err
+		}
 	}
 
-	catalogParts := []string{
-		"<< /Type /Catalog",
-		"/Pages " + pagesRef,
-	}
+	cat := dict{}.add("/Type", "/Catalog").add("/Pages", pagesRef.String())
 	if d.outlineRoot != nil {
-		catalogParts = append(catalogParts, "/Outlines "+d.outlineRoot.refStr, "/PageMode /UseOutlines")
+		cat = cat.add("/Outlines", d.outlineRoot.refStr.String()).add("/PageMode", "/UseOutlines")
 	}
-	catalogParts = append(catalogParts, ">>")
-	d.setDict(catalogRef, strings.Join(catalogParts, " "))
+	d.setDict(catalogRef, cat.String())
 
 	// info dict
 	now := d.creationTime
 	if now.IsZero() {
 		now = time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC) // deterministic default
 	}
-	infoParts := []string{"<<"}
+	info := dict{}
 	for _, k := range []string{"Title", "Subject", "Author", "Keywords"} {
 		if v, ok := d.info[k]; ok && v != "" {
-			infoParts = append(infoParts, "/"+k+" "+pdfString(v))
+			info = info.add("/"+k, pdfString(v))
 		}
 	}
-	infoParts = append(infoParts,
-		"/Creator "+pdfString(d.info["Creator"]),
-		"/Producer "+pdfString("gowkhtmltopdf "+Version),
-		"/CreationDate "+pdfString(pdfDate(now)),
-		"/ModDate "+pdfString(pdfDate(now)),
-		">>")
-	d.setDict(infoRef, strings.Join(infoParts, " "))
+	info = info.add("/Creator", pdfString(d.info["Creator"])).
+		add("/Producer", pdfString("gowkhtmltopdf "+Version)).
+		add("/CreationDate", pdfString(pdfDate(now))).
+		add("/ModDate", pdfString(pdfDate(now)))
+	d.setDict(infoRef, info.String())
 
 	// per-page objects
 	for _, p := range d.pages {
-		d.finalizePage(p, pagesRef)
+		if err := d.finalizePage(p, pagesRef); err != nil {
+			return err
+		}
 	}
 
 	d.catalogRef = catalogRef
@@ -355,7 +373,7 @@ func (d *Document) finalize() error {
 	return nil
 }
 
-func (d *Document) finalizePage(p *Page, pagesRef string) {
+func (d *Document) finalizePage(p *Page, pagesRef objRef) error {
 	raw := p.content.Bytes()
 	if d.useCompression {
 		raw = flateBytes(raw)
@@ -367,7 +385,10 @@ func (d *Document) finalizePage(p *Page, pagesRef string) {
 	}
 
 	// resources: fonts + images used by content
-	fonts := p.content.fonts()
+	fonts, err := p.content.fonts()
+	if err != nil {
+		return err
+	}
 	imgResources := p.content.imageResources()
 	var res strings.Builder
 	res.WriteString("<< /ProcSet [/PDF /Text /ImageB /ImageC /ImageI]")
@@ -392,21 +413,22 @@ func (d *Document) finalizePage(p *Page, pagesRef string) {
 
 	parts := []string{
 		"<< /Type /Page",
-		"/Parent " + pagesRef,
+		"/Parent " + pagesRef.String(),
 		fmt.Sprintf("/MediaBox [0 0 %s %s]", num(p.width), num(p.height)),
 		"/Resources " + res.String(),
-		"/Contents " + p.contentRef,
+		"/Contents " + p.contentRef.String(),
 	}
 	if len(p.annots) > 0 {
 		d.buildAnnots(p)
 		var refs []string
 		for _, a := range p.annots {
-			refs = append(refs, a.annotRef)
+			refs = append(refs, a.annotRef.String())
 		}
 		parts = append(parts, "/Annots ["+strings.Join(refs, " ")+"]")
 	}
 	parts = append(parts, ">>")
 	d.setDict(p.ref, strings.Join(parts, "\n"))
+	return nil
 }
 
 func (d *Document) buildAnnots(p *Page) {
@@ -432,47 +454,59 @@ func (d *Document) buildAnnots(p *Page) {
 
 // finalizeOutlines allocates outline item refs and serializes the tree.
 // The root Outline is the /Outlines dictionary; its children are items.
-func (d *Document) finalizeOutlines(root *Outline) {
+// PageRef strings are validated as object refs; a bogus ref fails the
+// document instead of emitting a corrupt /Dest.
+func (d *Document) finalizeOutlines(root *Outline) error {
 	assignRefs(root, d)
 	if len(root.Children) == 0 {
 		d.setDict(root.refStr, "<< /Type /Outlines /Count 0 >>")
-		return
+		return nil
 	}
 	first := root.Children[0].refStr
 	last := root.Children[len(root.Children)-1].refStr
 	d.setDict(root.refStr, fmt.Sprintf(
 		"<< /Type /Outlines /First %s /Last %s /Count %d >>",
 		first, last, outlineCount(root)))
-	buildOutlineItems(root, root.refStr, d)
+	return buildOutlineItems(root, root.refStr, d)
 }
 
 // buildOutlineItems writes each child item of parent, with /Parent /Prev
 // /Next sibling links, recursing into nested children.
-func buildOutlineItems(parent *Outline, parentRef string, d *Document) {
+func buildOutlineItems(parent *Outline, parentRef objRef, d *Document) error {
 	for i, n := range parent.Children {
 		var parts []string
 		parts = append(parts, "<< /Title "+pdfString(n.Title))
 		if n.PageRef != "" {
-			parts = append(parts, fmt.Sprintf("/Dest [%s /XYZ %s %s null]", n.PageRef, num(n.X), num(n.Y)))
+			ref, ok := parseRef(n.PageRef)
+			if !ok {
+				return fmt.Errorf("pdf: outline %q: bad PageRef %q", n.Title, n.PageRef)
+			}
+			if int(ref) < 1 || int(ref) > len(d.objects) {
+				return fmt.Errorf("pdf: outline %q: PageRef %q out of range", n.Title, n.PageRef)
+			}
+			parts = append(parts, fmt.Sprintf("/Dest [%s /XYZ %s %s null]", ref, num(n.X), num(n.Y)))
 		}
 		if len(n.Children) > 0 {
 			first := n.Children[0].refStr
 			last := n.Children[len(n.Children)-1].refStr
 			parts = append(parts, fmt.Sprintf("/First %s /Last %s /Count %d", first, last, countChildren(n)))
 		}
-		parts = append(parts, "/Parent "+parentRef)
+		parts = append(parts, "/Parent "+parentRef.String())
 		if i > 0 {
-			parts = append(parts, "/Prev "+parent.Children[i-1].refStr)
+			parts = append(parts, "/Prev "+parent.Children[i-1].refStr.String())
 		}
 		if i < len(parent.Children)-1 {
-			parts = append(parts, "/Next "+parent.Children[i+1].refStr)
+			parts = append(parts, "/Next "+parent.Children[i+1].refStr.String())
 		}
 		parts = append(parts, ">>")
 		d.setDict(n.refStr, strings.Join(parts, " "))
 		if len(n.Children) > 0 {
-			buildOutlineItems(n, n.refStr, d)
+			if err := buildOutlineItems(n, n.refStr, d); err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 }
 
 func assignRefs(n *Outline, d *Document) {

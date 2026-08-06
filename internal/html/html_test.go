@@ -674,3 +674,48 @@ func TestParseUsableTreeNoPanic(t *testing.T) {
 		}
 	}
 }
+
+func TestWalkPreOrder(t *testing.T) {
+	root := mustParse(t, `<html><head><title>t</title></head><body><h1>x</h1><p>y</p></body></html>`)
+	var names []string
+	root.Walk(func(n *Node) {
+		if n.Type == ElementNode {
+			names = append(names, n.Name)
+		}
+	})
+	want := []string{"#document", "html", "head", "title", "body", "h1", "p"}
+	if len(names) != len(want) {
+		t.Fatalf("walk order = %v, want %v", names, want)
+	}
+	for i := range want {
+		if names[i] != want[i] {
+			t.Fatalf("walk order = %v, want %v", names, want)
+		}
+	}
+}
+
+func TestTextContentOf(t *testing.T) {
+	root := mustParse(t, `<html><head><title>One</title><title>Two</title></head><body><p>body text</p></body></html>`)
+	if got := root.TextContentOf("title"); got != "One" {
+		t.Errorf("TextContentOf(title) = %q, want %q", got, "One")
+	}
+	if got := root.TextContentOf("section"); got != "" {
+		t.Errorf("TextContentOf(section) = %q, want %q", got, "")
+	}
+	if got := root.TextContentOf("p"); got != "body text" {
+		t.Errorf("TextContentOf(p) = %q, want %q", got, "body text")
+	}
+}
+
+func TestParseDocument(t *testing.T) {
+	src := "<html><body>ok</body></html>"
+	for _, body := range [][]byte{[]byte(src), append([]byte("\ufeff"), src...)} {
+		root, err := ParseDocument(body)
+		if err != nil {
+			t.Fatalf("ParseDocument: %v", err)
+		}
+		if root.FirstChild("html") == nil {
+			t.Errorf("ParseDocument(%q): no html element", body[:4])
+		}
+	}
+}

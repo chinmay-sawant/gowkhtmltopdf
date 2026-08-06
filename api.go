@@ -12,6 +12,7 @@ import (
 	"gowkhtmltopdf/internal/cli"
 	"gowkhtmltopdf/internal/convert"
 	"gowkhtmltopdf/internal/imageout"
+	"gowkhtmltopdf/internal/line"
 	"gowkhtmltopdf/internal/settings"
 )
 
@@ -91,6 +92,17 @@ func (s *ObjectSettings) SetPage(page string) *ObjectSettings {
 	return s
 }
 
+// SetBody sets an in-memory HTML document as the input page and returns s
+// so calls can be chained. base resolves relative subresources (<link>,
+// <img>, <a>); an empty base leaves them unresolvable. No URL guessing is
+// involved: the bytes are always treated as a document.
+func (s *ObjectSettings) SetBody(html []byte, base string) *ObjectSettings {
+	s.o.Page = ""
+	s.o.Load.InlineHTML = html
+	s.o.Load.InlineBase = base
+	return s
+}
+
 // ---------------------------------------------------------------------------
 // PDF conversion
 // ---------------------------------------------------------------------------
@@ -105,9 +117,9 @@ type Converter struct {
 	output  []byte
 
 	// OnInfo, OnWarn and OnError receive the conversion's log lines,
-	// classified by content ("warning:" prefixed lines go to OnWarn,
-	// error lines to OnError, everything else - including phase lines - to
-	// OnInfo). They may be nil.
+	// classified by severity marker ("warning:"/"warn:" lines go to
+	// OnWarn, "error:"/"err:" lines to OnError, everything else -
+	// including phase lines - to OnInfo). They may be nil.
 	OnInfo  func(string)
 	OnWarn  func(string)
 	OnError func(string)
@@ -136,6 +148,15 @@ func (c *Converter) Global() *GlobalSettings {
 func (c *Converter) AddObject(s *ObjectSettings) *Converter {
 	cp := *s
 	c.objects = append(c.objects, &cp)
+	return c
+}
+
+// AddHTML appends an in-memory HTML document as a page object and returns c
+// for chaining. baseURL resolves relative subresources; an empty baseURL
+// leaves them unresolvable. Unlike SetPage, the bytes are always treated as
+// a document - no URL guessing is applied.
+func (c *Converter) AddHTML(page []byte, baseURL string) *Converter {
+	c.AddObject(NewObjectSettings().SetBody(page, baseURL))
 	return c
 }
 
@@ -204,8 +225,7 @@ func ConvertHTML(ctx context.Context, html []byte, global *GlobalSettings) ([]by
 	if global != nil {
 		c.global = global
 	}
-	obj := NewObjectSettings().SetPage(string(html))
-	c.AddObject(obj)
+	c.AddObject(NewObjectSettings().SetBody(html, ""))
 	if err := c.Convert(ctx); err != nil {
 		return nil, err
 	}
@@ -234,11 +254,13 @@ type ImageConverter struct {
 }
 
 // NewImageConverter returns an ImageConverter with the wkhtmltoimage default
-// settings: 1024 px smart-width viewport, PNG output.
+// settings: 1024 px smart-width viewport, PNG output. Object() is valid
+// immediately; its page is empty until AddObject.
 func NewImageConverter() *ImageConverter {
 	return &ImageConverter{
 		global: NewGlobalSettings(),
 		image:  settings.DefaultImageGlobal(),
+		object: NewObjectSettings(),
 	}
 }
 
@@ -248,12 +270,7 @@ func NewImageConverter() *ImageConverter {
 // an error. "web.background" also updates the shared Global.Background paint
 // switch so image and PDF share one background field.
 func (c *ImageConverter) Set(name, value string) error {
-	key := strings.ToLower(strings.TrimSpace(name))
-	// Sole paint field is Global.Background (image has no Web.Background).
-	if key == "web.background" || key == "background" {
-		return c.global.g.Set("background", value)
-	}
-	return c.image.Set(name, value)
+	return settings.ApplyImageKey(&c.global.g, &c.image, name, value)
 }
 
 // Global returns the shared global settings (only "enablelocalfileaccess"
@@ -274,7 +291,8 @@ func (c *ImageConverter) AddObject(page string) *ImageConverter {
 
 // Object returns the settings of the page to convert (the one passed to the
 // most recent AddObject), so per-page load options can be set - for example
-// "load.blocklocalfileaccess" = "false" to allow local inputs.
+// "load.blocklocalfileaccess" = "false" to allow local inputs. Object is
+// always valid; its page is empty until AddObject is called.
 func (c *ImageConverter) Object() *ObjectSettings {
 	return c.object
 }
@@ -286,7 +304,7 @@ func (c *ImageConverter) Convert(ctx context.Context) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if c.object == nil || strings.TrimSpace(c.object.o.Page) == "" {
+	if strings.TrimSpace(c.object.o.Page) == "" {
 		return errors.New("gowkhtmltopdf: no input page added")
 	}
 	var buf bytes.Buffer
@@ -323,8 +341,9 @@ func (c *ImageConverter) Output() []byte {
 // ---------------------------------------------------------------------------
 
 // lineLog is an io.Writer that classifies newline-terminated log lines and
-// forwards them to the converter callbacks: "warning:" lines to onWarn,
-// error lines to onError, everything else to onInfo.
+// forwards them to the converter callbacks. Severity is decided by
+// line.SeverityOf (the marker-prefix grammar owned by internal/line); the
+// callback mapping stays here.
 type lineLog struct {
 	buf     bytes.Buffer
 	onInfo  func(string)
@@ -340,23 +359,23 @@ func (w *lineLog) Write(p []byte) (int, error) {
 		if i < 0 {
 			break
 		}
-		line := strings.TrimSpace(string(raw[:i]))
+		l := strings.TrimSpace(string(raw[:i]))
 		w.buf.Next(i + 1)
-		if line == "" {
+		if l == "" {
 			continue
 		}
-		switch lower := strings.ToLower(line); {
-		case strings.Contains(lower, "warning:"):
+		switch line.SeverityOf(l) {
+		case line.Warn:
 			if w.onWarn != nil {
-				w.onWarn(line)
+				w.onWarn(l)
 			}
-		case strings.Contains(lower, "error"):
+		case line.Error:
 			if w.onError != nil {
-				w.onError(line)
+				w.onError(l)
 			}
 		default:
 			if w.onInfo != nil {
-				w.onInfo(line)
+				w.onInfo(l)
 			}
 		}
 	}
