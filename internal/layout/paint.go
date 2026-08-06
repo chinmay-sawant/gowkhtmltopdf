@@ -61,6 +61,9 @@ func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 	// (fixture-31: empty white rows after Row 27 on page 1).
 	stripOrphanRowChrome(res, contentH)
 
+	// Close open tops on table continuations after rowspan/vertical splits.
+	capTablePageBreaks(res, contentH)
+
 	// Print-scoped sticky: clamp + continuation clones + reserve flow space.
 	applyStickyPrint(res, contentH)
 
@@ -196,6 +199,90 @@ func paintLayer(k OpKind) int {
 
 func isSplittable(op *Op) bool {
 	return op.Kind == OpFillRect || op.Kind == OpStrokeRect || op.Kind == OpLine
+}
+
+// capTablePageBreaks draws a horizontal top edge on pages where a table
+// continuation begins mid-grid (split vertical rules at the page top with no
+// matching full-width horizontal). Without this, border-collapse rowspan
+// tables leave open tops and orphan vertical stubs (wiki awards before
+// "2024 Razzie").
+func capTablePageBreaks(res *Result, contentH float64) {
+	if res == nil || contentH <= 0 || len(res.Ops) == 0 {
+		return
+	}
+	maxPage := 0
+	for i := range res.Ops {
+		if res.Ops[i].Fixed {
+			continue
+		}
+		p := int(res.Ops[i].Y / contentH)
+		if p > maxPage {
+			maxPage = p
+		}
+	}
+	const eps = 2.0
+	for p := 1; p <= maxPage; p++ {
+		pageTop := float64(p) * contentH
+		type vseg struct{ x, h, w, r, g, b float64 }
+		var verts []vseg
+		var hMinX, hMaxX float64
+		hasHRule := false
+		for i := range res.Ops {
+			op := &res.Ops[i]
+			if op.Fixed || op.Kind != OpLine {
+				continue
+			}
+			// Verticals that begin at/near this page top (continuation stubs).
+			if op.H > 2 && (op.W < 1 || op.W < op.H*0.05) {
+				if op.Y >= pageTop-eps && op.Y <= pageTop+eps {
+					verts = append(verts, vseg{op.X, op.H, op.Width, op.R, op.G, op.B})
+				}
+				continue
+			}
+			// Horizontal near page top.
+			if op.W > 2 && op.H < 1 && op.Y >= pageTop-eps && op.Y <= pageTop+eps {
+				left, right := op.X, op.X+op.W
+				if !hasHRule {
+					hMinX, hMaxX = left, right
+					hasHRule = true
+				} else {
+					if left < hMinX {
+						hMinX = left
+					}
+					if right > hMaxX {
+						hMaxX = right
+					}
+				}
+			}
+		}
+		if len(verts) < 2 {
+			continue
+		}
+		minX, maxX := verts[0].x, verts[0].x
+		bw, r, g, b := verts[0].w, verts[0].r, verts[0].g, verts[0].b
+		for _, v := range verts[1:] {
+			if v.x < minX {
+				minX = v.x
+			}
+			if v.x > maxX {
+				maxX = v.x
+			}
+		}
+		if maxX-minX < 20 {
+			continue
+		}
+		// Skip only when an existing horizontal already spans the full band.
+		if hasHRule && hMinX <= minX+eps && hMaxX >= maxX-eps {
+			continue
+		}
+		if bw < 0.3 {
+			bw = 0.5
+		}
+		res.Ops = append(res.Ops, Op{
+			Kind: OpLine, X: minX, Y: pageTop, W: maxX - minX, H: 0,
+			Width: bw, R: r, G: g, B: b,
+		})
+	}
 }
 
 // paginateOps assigns every op a page. Crossing text/image/link ops snap to

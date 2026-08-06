@@ -49,8 +49,13 @@ func TestMulticolParseProps(t *testing.T) {
 		t.Fatalf("c: normal=%v width=%.1f count=%d", c.ColumnGapNormal, c.ColumnWidth, c.ColumnCount)
 	}
 	d := styles[nodes[3]]
-	if d.PageBreakBefore != "always" || d.PageBreakInside != "avoid" {
-		t.Fatalf("d breaks: before=%q inside=%q", d.PageBreakBefore, d.PageBreakInside)
+	// break-before:column ≈ page always; break-inside:avoid-column is
+	// column-only and must not set page-break-inside:avoid.
+	if d.PageBreakBefore != "always" {
+		t.Fatalf("d break-before: got %q, want always", d.PageBreakBefore)
+	}
+	if d.PageBreakInside == "avoid" {
+		t.Fatalf("d break-inside:avoid-column must not map to page avoid (got %q)", d.PageBreakInside)
 	}
 }
 

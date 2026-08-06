@@ -46,6 +46,7 @@ func (e *engine) layoutInlineFloats(b *box, nodes []*html.Node, contentW, conten
 	}
 	e.collectInline(nodes, &items)
 	e.imgMaxW = oldMax
+	items = squeezeInlineSpaces(items)
 	if len(items) == 0 {
 		return 0
 	}
@@ -72,7 +73,19 @@ func (e *engine) layoutInlineFloats(b *box, nodes []*html.Node, contentW, conten
 			// Always wrap to the next line when the next item does not fit.
 			// white-space:nowrap must not glue an unbreakable span onto a line
 			// that already has content and overflow into a float (wiki .IPA).
+			// Exception: never break before attaching punctuation / mid-cite
+			// (")[37]" → not ")\n[" or "[\n37]" or "saying.[\n7]").
 			if lineAdv > 0 && lineAdv+adv > lineW {
+				if i > start && noBreakBefore(items[i-1], items[i]) {
+					// Keep sticky tail on this line even if it overflows slightly.
+					lineAdv += adv
+					i++
+					for i < len(items) && !items[i].forceBreak &&
+						noBreakBefore(items[i-1], items[i]) {
+						lineAdv += items[i].marginL + items[i].w + items[i].marginR
+						i++
+					}
+				}
 				break
 			}
 			// Empty line beside a float too narrow for this item: CSS2.1 §9.5
@@ -180,6 +193,9 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 
 	var lx float64
 	justifyGap := 0.0
+	// CSS justify expands inter-word spaces only — not every inline box
+	// boundary. Expanding after every item put rivers before commas, cites
+	// ("word [1]"), and apostrophes ("Roth 's") on wiki print pages.
 	switch textAlign {
 	case "right":
 		lx = x + availW - totalW
@@ -187,23 +203,27 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 		lx = x + (availW-totalW)/2
 	case "justify":
 		lx = x
-		// Distribute leftover between word slots on non-final lines.
-		// Cap expansion so short lines beside floats do not blow out to
-		// huge rivers (Chrome-like readability; wiki print uses justify).
 		if !lastLine && availW > totalW && len(line) > 1 {
-			gaps := float64(len(line) - 1)
-			raw := (availW - totalW) / gaps
-			maxGap := 6.0 // pt
-			for i := range line {
-				if fs := line[i].style.FontSize * e.scale; fs > maxGap {
-					maxGap = fs // up to 1em extra between words
+			gaps := 0
+			for i := 0; i < len(line)-1; i++ {
+				if isJustifyGapAfter(line[i]) {
+					gaps++
 				}
 			}
-			if raw <= maxGap*2 {
-				if raw > maxGap {
-					raw = maxGap // soft-cap rivers without abandoning justify
+			if gaps > 0 {
+				raw := (availW - totalW) / float64(gaps)
+				maxGap := 6.0 // pt
+				for i := range line {
+					if fs := line[i].style.FontSize * e.scale; fs > maxGap {
+						maxGap = fs // up to 1em extra between words
+					}
 				}
-				justifyGap = raw
+				if raw <= maxGap*2 {
+					if raw > maxGap {
+						raw = maxGap // soft-cap rivers without abandoning justify
+					}
+					justifyGap = raw
+				}
 			}
 		}
 	default:
@@ -227,7 +247,7 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 				b.children = append(b.children, it.blockBox)
 			}
 			lx += it.blockBox.w + it.marginR
-			if i < len(line)-1 {
+			if i < len(line)-1 && isJustifyGapAfter(*it) {
 				lx += justifyGap
 			}
 			continue
@@ -251,7 +271,7 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 				e.add(Op{Kind: OpLinkURI, X: lx, Y: top, W: it.w, H: it.h, URI: it.href})
 			}
 			lx += it.w + it.marginR
-			if i < len(line)-1 {
+			if i < len(line)-1 && isJustifyGapAfter(*it) {
 				lx += justifyGap
 			}
 			continue
@@ -269,6 +289,10 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 			e.add(Op{Kind: OpText, X: lx, Y: baseline, W: run.w, H: it.h,
 				Text: run.text, Font: run.face, Size: size, Bold: it.style.FontWeight >= 700,
 				R: c[0], G: c[1], B: c[2]})
+			// Underline links for PDF affordance (browser-like). Print skins
+			// often set a{text-decoration:inherit} which resolves to none;
+			// without this, wiki body links vanish. Opt-out: decoration
+			// line-through. --print-link-underline still forces via cascade.
 			if it.style.TextDecoration == "underline" || (it.href != "" && it.style.TextDecoration != "line-through") {
 				// Sit clearly below glyph descenders (~1–2mm visual gap).
 				// Thin stroke (~5% of em, floor 0.4pt) — default 1pt looked heavy.
@@ -292,7 +316,7 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 			lx += run.w
 		}
 		lx += it.marginR
-		if i < len(line)-1 {
+		if i < len(line)-1 && isJustifyGapAfter(*it) {
 			lx += justifyGap
 		}
 	}
@@ -357,11 +381,14 @@ func (e *engine) collectInlineNode(n *html.Node, out *[]inlineItem) {
 			// this node from the previous inline ("</a> in" → "Reeves"+"in").
 			// Re-introduce one when the source began with whitespace and the
 			// prior item does not already end with a space.
+			// Do not insert a space before attaching punctuation (", . ) ]") —
+			// pretty-printed "</a>\n," must stay "Award," not "Award ,".
 			if len(words) > 0 && len(n.Text) > 0 && len(*out) > 0 {
 				first := n.Text[0]
 				if first == ' ' || first == '\t' || first == '\n' || first == '\r' || first == '\f' {
 					prev := &(*out)[len(*out)-1]
-					if !prev.forceBreak && !strings.HasSuffix(prev.text, " ") {
+					if !prev.forceBreak && !strings.HasSuffix(prev.text, " ") &&
+						!isAttachPunct(words[0]) {
 						words[0] = " " + words[0]
 					}
 				}
@@ -508,6 +535,112 @@ func availWForInline() float64 { return 1 << 30 }
 func (e *engine) textItem(text string, st ResolvedStyle) inlineItem {
 	w := e.measureTextFace(text, st)
 	return inlineItem{text: text, style: st, w: w, h: lineHeightOf(&st) * e.scale}
+}
+
+// squeezeInlineSpaces drops artificial space items that sit immediately before
+// attaching punctuation (pretty-printed "</a>\n," → "Award ,") or that are
+// redundant after a trailing space already on the previous item.
+func squeezeInlineSpaces(items []inlineItem) []inlineItem {
+	if len(items) < 2 {
+		return items
+	}
+	out := make([]inlineItem, 0, len(items))
+	for i := 0; i < len(items); i++ {
+		it := items[i]
+		if !it.img && !it.forceBreak && it.blockBox == nil && strings.TrimSpace(it.text) == "" {
+			// Pure space item.
+			if i+1 < len(items) {
+				next := items[i+1]
+				if !next.img && !next.forceBreak && isAttachPunct(next.text) {
+					continue // drop space before "," / ")" / "]" …
+				}
+				if strings.HasPrefix(strings.TrimSpace(next.text), "[") {
+					continue // drop space before citation bracket
+				}
+			}
+			if len(out) > 0 && strings.HasSuffix(out[len(out)-1].text, " ") {
+				continue // redundant double space
+			}
+		}
+		out = append(out, it)
+	}
+	return out
+}
+
+// isJustifyGapAfter reports whether CSS text-align:justify may expand after it.
+// Only inter-word spaces stretch — not boundaries before punctuation or cites.
+func isJustifyGapAfter(it inlineItem) bool {
+	if it.img || it.forceBreak || it.blockBox != nil {
+		return false
+	}
+	return strings.HasSuffix(it.text, " ")
+}
+
+// isAttachPunct is true for tokens that glue to the previous word (no leading space).
+func isAttachPunct(s string) bool {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return false
+	}
+	r := []rune(s)[0]
+	switch r {
+	case ',', '.', ';', ':', '!', '?', ')', ']', '}', '\'', '"', '%',
+		'\u201d' /* ” */, '\u2019' /* ’ */, '\u2013' /* – */, '\u2014': /* — */
+		return true
+	}
+	return false
+}
+
+// noBreakBefore reports that a line break between prev and cur would split
+// punctuation or a citation marker unnaturally.
+func noBreakBefore(prev, cur inlineItem) bool {
+	if cur.forceBreak || prev.forceBreak {
+		return false
+	}
+	if cur.img || prev.img || cur.blockBox != nil || prev.blockBox != nil {
+		return false
+	}
+	// Keep nowrap runs together (wiki .reference / .IPA pieces).
+	if prev.style.WhiteSpace == "nowrap" && cur.style.WhiteSpace == "nowrap" {
+		return true
+	}
+	ct := strings.TrimSpace(cur.text)
+	if ct == "" {
+		return false
+	}
+	// Do not start a line with closing/attach punctuation.
+	if isAttachPunct(ct) {
+		return true
+	}
+	// Digits that continue a cite: "[" then "37" then "]".
+	if isAllDigits(ct) {
+		pt := strings.TrimSpace(prev.text)
+		if strings.HasSuffix(pt, "[") || isAllDigits(pt) {
+			return true
+		}
+	}
+	// Do not break after opening brackets / quotes.
+	pt := strings.TrimRight(prev.text, " ")
+	if pt != "" {
+		runes := []rune(pt)
+		switch runes[len(runes)-1] {
+		case '[', '(', '{', '"', '\'', '\u201c' /* “ */, '\u2018': /* ‘ */
+			return true
+		}
+	}
+	return false
+}
+
+func isAllDigits(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 // coalesceTextItems merges consecutive non-image text runs that share style

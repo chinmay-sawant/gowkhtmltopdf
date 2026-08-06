@@ -411,7 +411,16 @@ func (e *engine) build(n *html.Node, availW, x, y float64) *box {
 		b = e.buildMulticol(n, st, availW, x, y)
 	}
 	if b == nil && isTableDisplay(st.Display) {
-		b = e.buildTable(n, st, availW, x, y)
+		// MediaWiki thumbs use figure{display:table;float:right} purely for
+		// shrink-to-fit. Routing those through buildTable drops nested <img>
+		// (no table-row/cell structure) and leaves empty floated boxes that
+		// clear following paragraphs with huge gaps. Treat non-table hosts
+		// without table-structure children as ordinary blocks.
+		if useBlockForTableDisplay(n) {
+			b = e.buildBlock(n, st, availW, x, y)
+		} else {
+			b = e.buildTable(n, st, availW, x, y)
+		}
 	}
 	if b == nil {
 		b = e.buildBlock(n, st, availW, x, y)
@@ -437,6 +446,28 @@ func isTableDisplay(d string) bool {
 		return true
 	}
 	return false
+}
+
+// useBlockForTableDisplay reports elements that set display:table only for
+// shrink-to-fit (wiki figure thumbs) rather than real tabular structure.
+func useBlockForTableDisplay(n *html.Node) bool {
+	if n == nil || n.Type != html.ElementNode {
+		return false
+	}
+	if n.Name == "table" {
+		return false
+	}
+	// Real tables nest tr/tbody/thead/tfoot/colgroup; figures nest a/img/figcaption.
+	for _, c := range n.Children {
+		if c.Type != html.ElementNode {
+			continue
+		}
+		switch c.Name {
+		case "tr", "tbody", "thead", "tfoot", "colgroup", "col", "caption":
+			return false
+		}
+	}
+	return true
 }
 
 // buildBlock lays out a block-level box.
@@ -715,7 +746,7 @@ func (e *engine) partition(children []*html.Node, blocks, inlines *[]*html.Node)
 			*blocks = append(*blocks, c)
 			continue
 		}
-		if cs.Display == "inline" || cs.Display == "inline-block" || cs.Display == "inline-flex" || c.Name == "img" {
+		if e.isInlineChild(c) {
 			*inlines = append(*inlines, c)
 			continue
 		}
@@ -735,7 +766,17 @@ func (e *engine) isInlineChild(n *html.Node) bool {
 	if cs.Display == "none" || cs.Float != "none" || cs.Position == "absolute" || cs.Position == "fixed" {
 		return false
 	}
-	return cs.Display == "inline" || cs.Display == "inline-block" || cs.Display == "inline-flex" || n.Name == "img"
+	// <img> is replaced and UA-default inline-block, but author CSS may set
+	// display:block (wiki .mw-logo-wordmark / .mw-logo-tagline stack).
+	if n.Name == "img" {
+		switch cs.Display {
+		case "block", "flex", "grid", "table", "list-item", "flow-root":
+			return false
+		default:
+			return true
+		}
+	}
+	return cs.Display == "inline" || cs.Display == "inline-block" || cs.Display == "inline-flex"
 }
 
 // onlyCollapsibleWS reports whether every node is a text node of only
@@ -867,7 +908,16 @@ func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedSty
 		}
 		cy = floats.clear(clear, y, cy)
 		cy += collapseMargins(prevBottom, e.scalePt(cs.MarginTop))
-		bx, bw := floats.exclusion(contentX, contentW, y, cy)
+		// CSS2.1 §9.5: line boxes next to floats are shortened, not the
+		// block box — so normal paragraphs get full content width and
+		// re-query exclusion per line (wiki "Leading roles" reclaim).
+		// §9.5 / BFC: flow-root, overflow≠visible, flex, etc. must not
+		// overlap float margin boxes — otherwise heading border-bottom
+		// paints through the infobox (wiki .mw-heading{display:flow-root}).
+		bx, bw := contentX, contentW
+		if establishesBFC(cs) {
+			bx, bw = floats.exclusion(contentX, contentW, y, cy)
+		}
 		cb := e.build(n, bw, bx, y+cy)
 		if cb == nil {
 			prevBottom = 0
@@ -1033,6 +1083,13 @@ func (e *engine) placeFloat(n *html.Node, cs ResolvedStyle, floats *floatState, 
 			// Size containment: intrinsic inline size as-if-empty (padding+border
 			// only) so used size does not depend on descendants.
 			intr = e.scalePt(cs.PaddingLeft) + e.scalePt(cs.PaddingRight) +
+				e.scalePt(cs.BorderLeft.Width) + e.scalePt(cs.BorderRight.Width) +
+				e.scalePt(cs.MarginLeft) + e.scalePt(cs.MarginRight)
+		} else if imgW := e.measureLargestImageWidth(n); imgW > 0 {
+			// Wiki thumbs: size the float to the image, not the unwrapped
+			// figcaption max-content (which letterboxed images in a wide frame).
+			intr = imgW +
+				e.scalePt(cs.PaddingLeft) + e.scalePt(cs.PaddingRight) +
 				e.scalePt(cs.BorderLeft.Width) + e.scalePt(cs.BorderRight.Width) +
 				e.scalePt(cs.MarginLeft) + e.scalePt(cs.MarginRight)
 		} else {
@@ -1228,11 +1285,17 @@ func (e *engine) buildImage(n *html.Node, st ResolvedStyle, x, y float64) *box {
 		b.w = b.w * e.scalePt(st.MaxHeight) / b.h
 		b.h = e.scalePt(st.MaxHeight)
 	}
-	// Float (and other out-of-line) images paint here; in-flow <img> is
-	// collected into the inline formatting context and painted on the line.
-	if st.Float != "none" && b.imgData != nil {
-		e.add(Op{Kind: OpImage, X: x, Y: y, W: b.w, H: b.h,
-			Image: b.imgData, ImgW: b.imgW, ImgH: b.imgH, IsJPEG: b.imgJPEG})
+	// Paint replaced images that are not deferred to the inline line box.
+	// Inline/inline-block <img> is collected by collectInline and painted in
+	// emitLine; block-level and floated images paint here (wiki logo tagline
+	// uses display:block and must stack under the wordmark).
+	if b.imgData != nil {
+		inlineLevel := st.Display == "inline" || st.Display == "inline-block" ||
+			st.Display == "inline-flex" || st.Display == ""
+		if st.Float != "none" || !inlineLevel {
+			e.add(Op{Kind: OpImage, X: x, Y: y, W: b.w, H: b.h,
+				Image: b.imgData, ImgW: b.imgW, ImgH: b.imgH, IsJPEG: b.imgJPEG})
+		}
 	}
 	return b
 }
@@ -2003,6 +2066,15 @@ func (e *engine) measureCellMinMax(n *html.Node, st ResolvedStyle) (minW, maxW f
 				flushLine()
 				return
 			}
+			// Replaced images contribute their used CSS-pixel width (wiki thumbs).
+			if n.Name == "img" {
+				iw := e.measureImageWidth(n, cs)
+				if iw > longestWord {
+					longestWord = iw
+				}
+				lineW += iw
+				return
+			}
 			// Block-level in-cell boxes start a new line (simplified).
 			blockish := cs.Display == "block" || cs.Display == "table" ||
 				cs.Display == "list-item" || cs.Display == "flex" || cs.Display == "grid"
@@ -2032,6 +2104,57 @@ func (e *engine) measureCellMinMax(n *html.Node, st ResolvedStyle) (minW, maxW f
 
 func isHTMLSpace(b byte) bool {
 	return b == ' ' || b == '\t' || b == '\n' || b == '\r' || b == '\f'
+}
+
+// measureImageWidth returns the used content width of an <img> in points
+// (HTML width attribute or decoded intrinsic size), for shrink-to-fit.
+func (e *engine) measureImageWidth(n *html.Node, st ResolvedStyle) float64 {
+	if n == nil {
+		return 0
+	}
+	// Prefer explicit width attribute (wiki thumbs: width="250").
+	if v, err := strconv.Atoi(strings.TrimSpace(n.Attribute("width"))); err == nil && v > 0 {
+		return e.scalePt(pxToPt(float64(v)))
+	}
+	if st.Width >= 0 {
+		return e.scalePt(st.Width)
+	}
+	src := n.Attribute("src")
+	if src != "" && e.opts.Images != nil {
+		if data, err := e.opts.Images(src); err == nil {
+			if _, pw, _, err := svg.Rasterize(data, 1024); err == nil && pw > 0 {
+				return e.scalePt(pxToPt(float64(pw)))
+			}
+			if w, _, _, ok := imageDims(data); ok && w > 0 {
+				return e.scalePt(pxToPt(float64(w)))
+			}
+		}
+	}
+	return 0
+}
+
+// measureLargestImageWidth walks n for the widest descendant <img>.
+func (e *engine) measureLargestImageWidth(n *html.Node) float64 {
+	if n == nil {
+		return 0
+	}
+	var best float64
+	var walk func(*html.Node)
+	walk = func(n *html.Node) {
+		if n.Type == html.ElementNode {
+			if n.Name == "img" {
+				st := e.styles[n]
+				if w := e.measureImageWidth(n, st); w > best {
+					best = w
+				}
+			}
+			for _, c := range n.Children {
+				walk(c)
+			}
+		}
+	}
+	walk(n)
+	return best
 }
 
 // layoutCell measures the height of a cell's content (no ops emitted).

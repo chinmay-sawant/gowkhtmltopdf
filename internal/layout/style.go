@@ -1026,27 +1026,30 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext,
 				st.TableLayout = value
 			}
 		case "page-break-before", "break-before":
-			// Lite: column | avoid-column alias to always | avoid (new multicol
-			// line via page break). Spec column breaks beyond that are deferred.
+			// column → page always is a multicol approximation.
+			// avoid-column is column-only (CSS Break) — do NOT map to page avoid
+			// (wiki .mw-references-columns li{break-inside:avoid-column} was
+			// leaving huge gaps between reference list items).
 			switch value {
-			case "always", "column":
+			case "always", "column", "page", "left", "right":
 				st.PageBreakBefore = "always"
-			case "avoid", "avoid-column":
+			case "avoid", "avoid-page":
 				st.PageBreakBefore = "avoid"
 			}
 		case "page-break-after", "break-after":
 			switch value {
-			case "always", "column":
+			case "always", "column", "page", "left", "right":
 				st.PageBreakAfter = "always"
-			case "avoid", "avoid-column":
+			case "avoid", "avoid-page":
 				st.PageBreakAfter = "avoid"
 			}
 		case "page-break-inside", "break-inside":
 			switch value {
-			case "always", "column":
+			case "always", "page":
 				st.PageBreakInside = "always"
-			case "avoid", "avoid-column":
+			case "avoid", "avoid-page":
 				st.PageBreakInside = "avoid"
+				// avoid-column: ignored for page pagination
 			}
 		case "orphans":
 			if n, ok := parseOrphansWidowsInt(value); ok {
