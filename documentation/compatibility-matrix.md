@@ -29,7 +29,7 @@ as its inline text (per the note column).
 | `h1`–`h6` | Heading levels; outline source (Phase 6) |
 | `ul`, `ol`, `li` | Simple lists: bullet markers. `ol` renders bullets too (decimal markers not implemented; always `•`, `layout.go:220`) |
 | `table`, `thead`, `tbody`, `tfoot`, `tr`, `th`, `td` | Table subset; see §4/§2.5 (colspan yes, rowspan no) |
-| `img` | Replaced element; **PNG/JPEG only**. JPEG is DCTDecode pass-through (no re-encode). PNG is decoded to DeviceRGB; alpha becomes a soft-mask (`/SMask`) when present (`internal/pdf/images.go`). Layout uses a fixed 96 dpi CSS px→pt map; `--dpi` / `--image-dpi` / `--image-quality` are stored but ignored for PDF embedding. `web.images=false` (global) skips fetch/paint (`TestRunPDFWebImagesFalse`). Subresource size capped by loader `MaxBodySize` (default 100 MiB) |
+| `img` | Replaced element; **PNG/JPEG/SVG subset**. JPEG is DCTDecode pass-through. PNG decoded to DeviceRGB; alpha soft-mask when present. **SVG** rasterized via `internal/svg` (rect/circle/path subset → PNG). Layout uses a fixed 96 dpi CSS px→pt map. `web.images=false` skips fetch/paint. |
 | `a` | Hyperlink (`href`) for `http/https/mailto` external URI annotations; body `#id` / `#name` **GoTo** via `applyInternalLinks` (fixture-24). HTML header/footer **external URI** and **fragment GoTo** (`#id` → body destinations via `AddLinkDest`, copies-aware) are carried onto body pages |
 | `strong`, `em`, `b`, `i`, `u`, `small` | `b`/`strong` → bold face; `em`/`i` → italic face (Liberation family, §2.3); `u` underline; `small` smaller; fake stroke bold only if a bold face is missing |
 | `pre`, `code` | `pre` honors `white-space: pre`; `code` has no monospace rule - single embedded font for all families (§2.3) |
@@ -78,7 +78,7 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 
 | Property | Status | Notes / verified by |
 |----------|--------|---------------------|
-| `font-family` (named + generic) | Partial | parsed + inherited; embedded Liberation Sans family (R/B/I/BI) plus **font registry** (`--font-path`, optional `--use-system-fonts`) and local `@font-face` TTF/OTF/WOFF1 on **PDF and image** paths (see §4 / §5). Named families resolve via discovery; missing faces fall back to Liberation |
+| `font-family` (named + generic) | Partial | parsed + inherited; embedded Liberation Sans family (R/B/I/BI) plus **font registry** (`--font-path`, optional `--use-system-fonts`) and local `@font-face` TTF/OTF/WOFF1 on **PDF and image** paths (see §4 / §5). Named families resolve as named; missing faces fall through the author’s comma stack, then Liberation; only CSS generics (`serif`/`sans-serif`/`monospace`) expand to Liberation |
 | `writing-mode` (`horizontal-tb\|vertical-rl\|vertical-lr`) | Partial | `vertical-rl` / `vertical-lr` lite (rotated CJK paint); default horizontal. Not a full vertical typesetting engine |
 | `font-size` | Implemented | `style.go` `fontSize` (px/pt/em/%/rem/in/cm/mm/pc + keywords); `%`/`em` resolve against parent; test `TestFontSizeEmInherit` |
 | `font-weight` (`normal\|bold\|100-900`) | Implemented | ≥700 selects Liberation Sans **Bold** (or BoldItalic); fake stroke bold only if a bold face is missing; tests `TestRealBoldFaceOps`, `TestBoldFaceInInvoicePDF` |
@@ -224,14 +224,15 @@ Status legend as in §2; evidence in `internal/css/css.go`.
 | Universal (`*`) | Implemented | `css.go:456-459` |
 | Descendant (`div p`), child (`ul > li`) | Implemented | combinators `css.go:356-362`; matching `css.go:528-543` |
 | Sibling (`a + b`, `a ~ b`) | Implemented | next-sibling `+` and subsequent-sibling `~` (`css.Match`); test `TestSiblingCombinators` |
-| Attribute (`[href]`, `[href="…"]`) | Implemented | presence `[attr]` and exact `[attr=value]` (quoted or bare); other ops not yet |
+| Attribute (`[href]`, `[href="…"]`) | Partial | presence, exact `=`, word `~=`, substring `*=`, prefix `^=`, suffix `$=`, dash `|=`; `TestAttrWordAndSubstring`, `TestAttrPrefixSuffixDash` |
 | `:first-child`, `:last-child`, `:nth-child(n)` | Implemented | `odd`/`even`/`an+b`/integer; tests `TestMatch`, `TestNthChildZebraSheet` |
-| `:link`, `:visited`, `:hover`, `:active`, `:focus` | Not implemented (accepted, ignored) | ignored for print; compound still matches without them |
+| `:link`, `:visited` | Partial | Print semantics: match any `a` with non-empty `href` (no visit history; `:visited` ≡ `:link`). Specificity counts as a class-level pseudo. Proof: `TestLinkVisitedPseudos`, `TestLinkPseudoColor` |
+| `:hover`, `:active`, `:focus` | Not implemented (accepted, never match) | Parsed onto the compound but `matchPseudo` returns false so `a:hover` does not degrade to bare `a` |
 | `::before` / `::after` | Not implemented | dropped with the other pseudo-classes |
 | `!important` | Implemented | `css.go:664-688`; separate cascade layer `style.go:221-247`; test `css_test.go::TestParseImportant` |
 | Specificity (ID > class > element), inline `style` wins, `!important` overrides | Implemented | `Specificity` `css.go:578`; inline style priority `style.go:233-239`; test `css_test.go::TestSpecificity` |
-| `@media print` / `screen` filtering | Implemented | `mediaType` `css.go:186`; applied per rule `style.go:212-214`; convert passes `Media: "print"` (`convert.go:115`); test `css_test.go::TestParseMedia` |
-| `@media` feature queries (`(min-width: …)`) | Not implemented | only the media type substring is considered |
+| `@media print` / `screen` filtering | Implemented | `MediaMatches` (`css/media.go`); cascade `style.go`; convert `Media: "print"`; tests `TestParseMedia`, `TestMediaMatches*` |
+| `@media` feature queries (`(min-width: …)`) | Partial | size features + orientation vs viewport; unknown features → false; `TestMediaMatchesSizeFeatures` |
 | `:has()` | Partial | Relative selectors inside `:has(...)`; descendant/child/sibling + simple compounds; no forgiving-selector list / complex chrome edge cases. `has.go`; fixture-41 |
 | `@container` / `container-type` | Partial | Size queries only (`inline-size`/`width` + `and`/`or`/`not`); named containers; two-pass style after used inline size. No style/scroll-state queries; no `cq*` units. `container.go`; fixture-42 |
 | `@page` | Not implemented | `@page` blocks skipped gracefully at parse |
@@ -246,7 +247,7 @@ Status legend as in §2; evidence in `internal/css/css.go`.
 | `position: sticky` continuous scroll | Overflow boxes are sticky scrollports at **offset 0** only (PDF has no scroll). Page content box remains the print scrollport when no overflow ancestor. No scroll-offset > 0 animation |
 | `transform`, `filter`, `animation`, `transition` | Partial / out of scope | **Static 2D** `transform` + `transform-origin` Implemented (translate/scale/rotate/matrix/skew*; paint CTM; stacking + abs/fixed CB). Sibling flow unchanged. Overflow: no clip — ink may paint outside page box. **`filter`:** only `opacity()` (see `opacity` row); blur/drop-shadow/SVG filters = permanent print-engine non-goal. **`animation`/`transition`/`@keyframes`:** parse-ignored (static cascaded value only; no timelines). **3D / perspective:** permanent non-goal. Fixture-40; `transform.go` / `transform_test.go` |
 | `background-image` / gradients | Ignored (Phase 3+ candidate) |
-| `@font-face` (remote / WOFF2) | **Partial:** local TTF/OTF/WOFF1 via `FetchSub` ACL on **PDF and image** paths. **WOFF2** skipped (Brotli not allowlisted). **Remote `https://`** skipped — not supported by design (ACL/network policy). Missing faces fall back to registry / Liberation |
+| `@font-face` (remote / WOFF2) | **Partial:** local **and https** TTF/OTF/WOFF1 via `FetchSub` ACL on PDF/image paths. **WOFF2** still skipped (Brotli/WOFF2 decode). **data:** skipped. Missing faces fall back to registry / Liberation |
 | Custom XSLT TOC (`--xsl-style-sheet`) | Not implemented (no XSLT in stdlib); Go templates instead (Phase 6) |
 | WebP, SVG-as-`img`, AVIF | Not decodable by stdlib; broken-image placeholder or skip |
 | Fixed CSS headers/footers via `position: fixed` alone | Prefer CLI `--header-*` / `--footer-*` for repeating chrome; CSS `fixed` lite paints on every page but is not a full running-element model |
@@ -344,11 +345,13 @@ wkhtmltopdf honors them.
 | `--minimum-font-size` | Both | Ignored (stored, no consumer) |
 | `--user-style-sheet` | Both | Ignored (stored, no consumer) |
 | `--print-media-type`, `--no-print-media-type` | Both | Ignored (layout always runs with `Media: "print"`; the flag cannot change that) |
-| `--simplify-dom`, `--no-simplify-dom` | Both | Supported (opt-in chrome-strip; injects synthetic `display:none` sheet — `convert.SimplifyChromeCSS`; default off; `TestSimplifyDOMOnHidesChrome`, `TestSimplifyDOMOffKeepsChrome`) |
+| `--simplify-dom`, `--no-simplify-dom` | Both | Supported (opt-in chrome-strip; landmarks-only `SimplifyChromeCSS`; default off; `TestSimplifyDOMOnHidesChrome`) |
+| `--simplify-dom-profile` | Both | Supported (`mediawiki` adds MW selectors; empty = landmarks only; `TestSimplifyDOMMediaWikiProfile`) |
+| `--print-link-underline` | Both | Supported (opt-in underline `a[href]` after cascade; default off; `TestPrintLinkUnderlineOptIn`) |
 | `--media-type` | Both | Ignored (same) |
 | `--javascript-delay` | Both | Ignored (`WaitJSDelay` is never invoked) |
 | `--window-status`, `--run-script` | Both | Ignored (stored; warning stub not wired) |
-| `--zoom` | Both | Supported (forwarded to `layout.Options.Zoom` in `convert.go`) |
+| `--zoom` | Both | Supported (operator layout scale → `layout.Options.Zoom`; not stylesheet emulation) |
 | `--stop-slow-scripts`, `--no-stop-slow-scripts` | Both | Ignored (no JS) |
 | `--debug-javascript`, `--no-debug-javascript` | Both | Ignored (no JS) |
 | `--load-error-handling` | Both | Supported (abort/skip/ignore in the loader) |

@@ -65,6 +65,8 @@ type RenderOptions struct {
 	Transparent bool // PNG background: alpha 0 instead of white
 	Crop        image.Rectangle
 	SmartWidth  bool // grow the viewport until content fits (default on)
+	// PrintLinkUnderline mirrors --print-link-underline (opt-in).
+	PrintLinkUnderline bool
 }
 
 // Render lays out root and rasterizes the result. The canvas is the viewport
@@ -128,14 +130,15 @@ func layoutOptions(opts RenderOptions, font *pdf.Font, viewportPx float64) layou
 		heightPt = viewportPx * 0.75
 	}
 	return layout.Options{
-		Width:      viewportPx * 0.75,
-		Height:     heightPt,
-		Font:       font,
-		Registry:   opts.Registry,
-		Sheets:     opts.Sheets,
-		Media:      opts.Media,
-		Images:     opts.Images,
-		Background: opts.Background,
+		Width:              viewportPx * 0.75,
+		Height:             heightPt,
+		Font:               font,
+		Registry:           opts.Registry,
+		Sheets:             opts.Sheets,
+		Media:              opts.Media,
+		Images:             opts.Images,
+		Background:         opts.Background,
+		PrintLinkUnderline: opts.PrintLinkUnderline,
 	}
 }
 
@@ -445,7 +448,11 @@ func Run(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 
 	sheets := collectSheets(ctx, loader, root, res.Base, obj.Load, log)
 	enabled := convert.SimplifyDOMEnabled(cmd.Image.Web, obj.Web) || cmd.Global.Web.SimplifyDOM
-	sheets = convert.AppendSimplifySheet(sheets, enabled)
+	profile := convert.SimplifyDOMProfile(cmd.Image.Web, obj.Web)
+	if profile == "" {
+		profile = convert.SimplifyDOMProfile(cmd.Global.Web, settings.Web{})
+	}
+	sheets = convert.AppendSimplifySheet(sheets, enabled, profile)
 	registry = convert.MergeFontFaces(ctx, loader, registry, sheets, res.Base, obj.Load, 1, log)
 
 	cache := map[string][]byte{}
@@ -465,17 +472,18 @@ func Run(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 	}
 
 	img, err := Render(root, RenderOptions{
-		Width:       cmd.Image.Width,
-		Height:      cmd.Image.Height,
-		Font:        font,
-		Registry:    registry,
-		Sheets:      sheets,
-		Media:       mediaFor(cmd, obj),
-		Images:      imagesFn,
-		Background:  cmd.Image.Web.Background,
-		Transparent: cmd.Image.Transparent,
-		Crop:        cropRect(cmd.Image.Crop),
-		SmartWidth:  cmd.Image.SmartWidth,
+		Width:              cmd.Image.Width,
+		Height:             cmd.Image.Height,
+		Font:               font,
+		Registry:           registry,
+		Sheets:             sheets,
+		Media:              mediaFor(cmd, obj),
+		Images:             imagesFn,
+		Background:         cmd.Image.Web.Background,
+		Transparent:        cmd.Image.Transparent,
+		Crop:               cropRect(cmd.Image.Crop),
+		SmartWidth:         cmd.Image.SmartWidth,
+		PrintLinkUnderline: cmd.Image.Web.PrintLinkUnderline || cmd.Global.Web.PrintLinkUnderline || obj.Web.PrintLinkUnderline,
 	})
 	if err != nil {
 		return err
@@ -669,7 +677,9 @@ func styleText(n *html.Node) string {
 }
 
 // linkStylesheet reports whether n is a stylesheet <link> whose media
-// attribute allows screen output: empty, or containing "screen" or "all".
+// attribute matches the screen/image pipeline (empty, all, screen, or
+// feature queries MediaMatches accepts for "screen"). Viewport uses a
+// generous default so min-width feature links still load for typical widths.
 func linkStylesheet(n *html.Node) bool {
 	if n.Name != "link" || !strings.Contains(strings.ToLower(n.Attribute("rel")), "stylesheet") {
 		return false
@@ -677,6 +687,11 @@ func linkStylesheet(n *html.Node) bool {
 	if n.Attribute("href") == "" {
 		return false
 	}
-	media := strings.ToLower(n.Attribute("media"))
-	return media == "" || strings.Contains(media, "screen") || strings.Contains(media, "all")
+	media := n.Attribute("media")
+	if media == "" {
+		return true
+	}
+	// Default ~1024 CSS px wide viewport for image mode link filtering.
+	const vw, vh = 768.0, 576.0 // 1024px×768px in pt
+	return css.MediaMatches(media, "screen", vw, vh)
 }

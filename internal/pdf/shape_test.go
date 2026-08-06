@@ -139,8 +139,10 @@ func TestShapeTextFontLatinUnchanged(t *testing.T) {
 }
 
 func TestDirectModuleAllowlist(t *testing.T) {
-	// Product constraint: only github.com/go-text/typesetting may appear as a
-	// direct third-party require (transitive graph is allowed).
+	// Product constraint: only the listed modules may appear as direct
+	// third-party requires (transitive graph is allowed).
+	//   - go-text/typesetting: OpenType shaping
+	//   - tdewolff/canvas: SVG-as-image rasterization (wiki logos, etc.)
 	// Also documents CGO HarfBuzz rejection: no harfbuzz CGO module allowed.
 	cmd := exec.Command("go", "list", "-m", "-f", "{{if and (not .Main) (not .Indirect)}}{{.Path}}{{end}}", "all")
 	cmd.Dir = "../.."
@@ -150,6 +152,7 @@ func TestDirectModuleAllowlist(t *testing.T) {
 	}
 	allowed := map[string]bool{
 		"github.com/go-text/typesetting": true,
+		"github.com/tdewolff/canvas":     true,
 	}
 	for _, line := range strings.Split(string(out), "\n") {
 		line = strings.TrimSpace(line)
@@ -157,7 +160,7 @@ func TestDirectModuleAllowlist(t *testing.T) {
 			continue
 		}
 		if !allowed[line] {
-			t.Errorf("unexpected direct module %q (allowlist: typesetting only; CGO HarfBuzz rejected)", line)
+			t.Errorf("unexpected direct module %q (allowlist: typesetting + tdewolff/canvas; CGO HarfBuzz rejected)", line)
 		}
 		if strings.Contains(strings.ToLower(line), "harfbuzz") {
 			t.Errorf("CGO HarfBuzz module forbidden: %q", line)

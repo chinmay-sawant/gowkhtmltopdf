@@ -110,19 +110,36 @@ Custom: `--replace name value`.
 ### URL mode & chrome strip (`--simplify-dom`)
 
 Paste-any-URL prints are best-effort (“decent print”, not visual parity).
-Recommended flags:
+Use one of two recipes depending on the goal:
+
+**1. Raw honesty smoke** (what the engine does with the live page as-is — also
+the Ana `make samples` artifact; **no** `--simplify-dom`):
 
 ```sh
-gowkhtmltopdf --simplify-dom --timeout 60 \
+gowkhtmltopdf --use-system-fonts --zoom 0.666667 --timeout 60 \
+  --load-error-handling ignore \
+  'https://en.wikipedia.org/wiki/Ana_de_Armas' output/wiki-ana-de-armas.pdf
+```
+
+**2. Decent-print attempt** (opt-in chrome strip + fonts; still not Chrome
+parity):
+
+```sh
+gowkhtmltopdf --simplify-dom --use-system-fonts --timeout 60 \
   --load-error-handling ignore \
   'https://en.wikipedia.org/wiki/Example' out.pdf
 ```
 
 | Flag / setting | Role |
 |----------------|------|
-| `--simplify-dom` | Opt-in chrome-strip (default **off**). Injects a synthetic `display:none` stylesheet for `nav`/`footer`/`aside`, ARIA landmark roles, and wiki selectors (`#mw-navigation`, `.mw-jump-link`, `nav.site-nav`). Nodes stay in the tree; no extra origins are fetched. |
-| `--no-simplify-dom` | Explicit off (also the default). Keep for invoices/reports. |
-| `--print-media-type` | Accepted for wkhtmltopdf compatibility; layout already runs with `Media: "print"` (site `@media print` rules apply when present). Prefer `--simplify-dom` for chrome reduction. |
+| `--simplify-dom` | Opt-in chrome-strip (default **off**). Injects landmark `display:none` (`nav`/`footer`/`aside` + ARIA roles). Nodes stay in the tree; no extra origins are fetched. |
+| `--simplify-dom-profile mediawiki` | With `--simplify-dom`, also hide MediaWiki `#mw-navigation` / `.mw-jump-link`. Empty profile = landmarks only. |
+| `--no-simplify-dom` | Explicit off (also the default). Keep for invoices/reports and for raw smoke artifacts. |
+| `--print-link-underline` | Opt-in: underline `a[href]` after cascade (default **off**). Author `text-decoration` wins otherwise. |
+| `--use-system-fonts` | Opt-in OS font scan so IPA/Unicode glyphs can fall back (see [fonts.md](fonts.md)). Prefer this for open-web URLs; invoices often need only embedded Liberation. |
+| `--font-path <dir>` | Explicit extra face directories (e.g. DejaVu) when system scan is undesirable. |
+| `--zoom` | Operator layout scale (not stylesheet emulation). Ana smoke may use `0.666667` to densify author `12pt` body. |
+| `--print-media-type` | Accepted for wkhtmltopdf compatibility; layout already runs with `Media: "print"` (site `@media print` + size features via `MediaMatches`). Prefer `--simplify-dom` for chrome reduction beyond print CSS. |
 | `--timeout <sec>` | HTTP response timeout (default 60s). Connect timeout is 30s. |
 | `--load-error-handling ignore\|skip\|abort` | Main document load policy. |
 | Images | On by default. Library/embedders: `web.images=false` skips fetch/paint (no dedicated `--images` CLI flag yet). |
@@ -136,7 +153,7 @@ see `TestSubresourceFailureIsolation`. Progress phases print to stderr
 unless `--quiet`.
 
 Security notes for remote URLs: see [Remote URL security](#remote-url-security)
-above.
+above. Sample regeneration: [samples.md](samples.md).
 
 ### Page-scoped flags and `toc`
 

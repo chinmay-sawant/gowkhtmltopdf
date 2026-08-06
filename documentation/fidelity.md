@@ -96,6 +96,22 @@ Product goal: paste a URL (or feed static HTML from a public page) and get a
 Until vendored-fixture acceptance lands, treat live URL output as exploratory.
 Vendored HTML and optional live smoke notes: [samples.md](samples.md).
 
+### CSS-faithful / site-agnostic default
+
+The engine’s **default** convert path must honor the page’s cascaded CSS
+(UA → author sheets → inline), including print `@media` and `var()` custom
+properties. Wikipedia and other named sites are **canaries and recipes**, not
+hardwired style sources.
+
+| Intentional policy (operator flags) | Not allowed in default cascade |
+|-------------------------------------|--------------------------------|
+| `--zoom`, smart-shrinking | Inventing font sizes for skin tokens (e.g. forced `8pt` for `--font-size-medium`) |
+| `--simplify-dom` (landmarks) + optional `--simplify-dom-profile=mediawiki` | Forcing link underlines when CSS computes `inherit`/`none` (unless `--print-link-underline`) |
+| `--use-system-fonts` / `--font-path` | Rewriting named `font-family` entries before trying the author’s stack |
+| `--print-link-underline` (opt-in, default off) | Encoding `#mw-*` / `.infobox` / `.vector-body` into layout |
+
+Cleanup ledger: [`plans/phases/pending-phase-items/12-css-faithful-engine.md`](../plans/phases/pending-phase-items/12-css-faithful-engine.md).
+
 ### “Decent print” criteria (acceptance bar)
 
 A page meets the bar when **all** of the following hold (vendored fixtures in

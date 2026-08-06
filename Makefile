@@ -1,7 +1,10 @@
 .PHONY: test lint build fmt golden golden-update samples clean
 
-# Phase 00 scaffold: stdlib + allowlisted go-text/typesetting only.
-# Direct third-party requires must stay ⊆ {github.com/go-text/typesetting}
+# Phase 00 scaffold: stdlib + allowlisted direct modules only.
+# Direct third-party requires must stay ⊆ {
+#   github.com/go-text/typesetting,  # OpenType shaping
+#   github.com/tdewolff/canvas,      # SVG-as-image rasterization
+# }
 # (enforced by internal/pdf.TestDirectModuleAllowlist).
 
 test:
@@ -33,10 +36,10 @@ golden-update:
 	@echo "golden-update: implemented in Phase 3 (PDF writer)"; true
 
 # Regenerate the sample outputs in output/: one PDF per golden fixture, a
-# showcase PDF (TOC + headers/footers + outline) and a PNG from the image
-# converter. Sample files under output/ are committed as viewer smoke artifacts.
+# showcase PDF (TOC + headers/footers + outline), image PNGs, and the optional
+# live Wikipedia smoke (needs network; failure does not fail the target).
 samples:
-	# Wipe regenerable fixture samples only (keep optional URL smokes like wiki-*.pdf)
+	# Wipe regenerable fixture samples only (wiki-*.pdf is rewritten below).
 	rm -f output/fixture-*.pdf output/fixture-*.png output/showcase-*.pdf
 	# Opt-in CJK/system faces when present (fixture-27 and font-family lists).
 	FONT_FLAGS=""; \
@@ -58,6 +61,13 @@ samples:
 	go run ./cmd/gowkhtmltopdf --enable-local-file-access --outline --outline-depth 2 --header-left "gowkhtmltopdf demo - [title]" --header-right "page [page]/[topage]" --footer-center "[section]" toc testdata/golden/fixture-16-invoice-with-css.html output/showcase-toc-hf-outline.pdf
 	go run ./cmd/gowkhtmltoimage --enable-local-file-access testdata/golden/fixture-01-simple-invoice.html output/fixture-01-simple-invoice.png
 	go run ./examples/image --enable-local-file-access --width 1024 testdata/golden/fixture-21-detailed-report.html output/fixture-21-detailed-report.png
+	# Live Wikipedia smoke (network, raw — no --simplify-dom). Soft-fail so offline/CI hosts still get fixture samples.
+	# Operator recipe (not CSS fidelity): --use-system-fonts for IPA fallback; optional --zoom 2/3 densifies
+	# author p{font-size:12pt} toward ~8pt; optional --print-link-underline / --simplify-dom-profile=mediawiki.
+	go run ./cmd/gowkhtmltopdf --use-system-fonts --zoom 0.666667 \
+		'https://en.wikipedia.org/wiki/Ana_de_Armas' \
+		output/wiki-ana-de-armas.pdf \
+		|| echo "warning: wiki-ana-de-armas.pdf live smoke skipped (network/fetch failed)"
 	ls -la output/ | awk '{print $$5, $$9}' | tail -30
 
 clean:

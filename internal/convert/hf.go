@@ -236,7 +236,9 @@ func loadHTMLHF(ctx context.Context, loader *load.Loader, font *pdf.Font, st *ob
 	if err != nil {
 		return nil, fmt.Errorf("header/footer html: parse: %w", err)
 	}
-	sheets := collectSheets(ctx, loader, root, res.Base, st.lp, st.idx, log)
+	sheets := collectSheets(ctx, loader, root, res.Base, st.lp, st.idx, log,
+		st.geom.pageW-st.geom.marginLeft-st.geom.marginRight,
+		st.geom.contentH)
 	reg := MergeFontFaces(ctx, loader, st.registry, sheets, res.Base, st.lp, st.idx+1, log)
 	if reg != nil {
 		st.registry = reg

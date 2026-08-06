@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"gowkhtmltopdf/internal/cli"
+	"gowkhtmltopdf/internal/html"
 	"gowkhtmltopdf/internal/layout"
 	"gowkhtmltopdf/internal/settings"
 )
@@ -151,6 +152,46 @@ func TestRunPDFScreenOnlyStylesheetExcluded(t *testing.T) {
 	}
 	if err := RunPDF(cmd, &bytes.Buffer{}); err != nil {
 		t.Fatalf("RunPDF: %v", err)
+	}
+}
+
+func TestRunPDFPrintLinkMediaFeatures(t *testing.T) {
+	htmlDoc := `<html><head><link rel="stylesheet" href="feat.css" media="(min-width: 500px)"></head>
+<body><p class="hi">Hello</p></body></html>`
+	cmd, dir := newCommand(t, htmlDoc, filepath.Join(t.TempDir(), "out.pdf"))
+	if err := os.WriteFile(filepath.Join(dir, "feat.css"), []byte(".hi { color: #0645ad }"), 0o644); err != nil {
+		t.Fatalf("write css: %v", err)
+	}
+	var log bytes.Buffer
+	if err := RunPDF(cmd, &log); err != nil {
+		t.Fatalf("RunPDF: %v\n%s", err, log.String())
+	}
+}
+
+func TestLinkStylesheetMediaMatches(t *testing.T) {
+	mk := func(media string) *html.Node {
+		return &html.Node{Type: html.ElementNode, Name: "link", Attrs: map[string]string{
+			"rel": "stylesheet", "href": "x.css", "media": media,
+		}}
+	}
+	const vw, vh = 538.0, 785.0
+	if !linkStylesheet(mk(""), vw, vh) {
+		t.Error("empty media should load")
+	}
+	if !linkStylesheet(mk("print"), vw, vh) {
+		t.Error("print should load")
+	}
+	if !linkStylesheet(mk("all"), vw, vh) {
+		t.Error("all should load")
+	}
+	if linkStylesheet(mk("screen"), vw, vh) {
+		t.Error("screen-only must be excluded for print")
+	}
+	if !linkStylesheet(mk("(min-width: 500px)"), vw, vh) {
+		t.Error("min-width feature matching A4 content should load")
+	}
+	if linkStylesheet(mk("(min-width: 2000px)"), vw, vh) {
+		t.Error("unmatched min-width must not load")
 	}
 }
 

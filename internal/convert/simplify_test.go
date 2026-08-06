@@ -52,9 +52,33 @@ func TestSimplifyDOMOnHidesChrome(t *testing.T) {
 	if !bytes.Contains(data, []byte("UNIQUE TITLE")) && !bytes.Contains(data, []byte("Article Title")) {
 		t.Error("flag on: title missing from PDF")
 	}
+	// Landmarks-only default: nav/aside/footer gone; MediaWiki IDs stay visible.
+	for _, needle := range []string{"UNIQUENAV", "UNIQUEASIDE", "UNIQUEFOOTER"} {
+		if bytes.Contains(data, []byte(needle)) {
+			t.Errorf("flag on: landmark chrome %q should be display:none", needle)
+		}
+	}
+	for _, needle := range []string{"UNIQUEJUMP", "UNIQUEMWNAV"} {
+		if !bytes.Contains(data, []byte(needle)) {
+			t.Errorf("landmarks-only: MediaWiki chrome %q should remain without profile", needle)
+		}
+	}
+}
+
+func TestSimplifyDOMMediaWikiProfile(t *testing.T) {
+	cmd, _ := newCommand(t, chromeHTML, filepath.Join(t.TempDir(), "mw.pdf"))
+	cmd.Global.UseCompression = false
+	cmd.Global.Web.SimplifyDOM = true
+	cmd.Global.Web.SimplifyDOMProfile = "mediawiki"
+	cmd.Objects[0].Web.SimplifyDOM = true
+	cmd.Objects[0].Web.SimplifyDOMProfile = "mediawiki"
+	data := runPDF(t, cmd)
+	if !bytes.Contains(data, []byte("UNIQUEBODY")) {
+		t.Error("body missing")
+	}
 	for _, needle := range []string{"UNIQUENAV", "UNIQUEJUMP", "UNIQUEMWNAV", "UNIQUEASIDE", "UNIQUEFOOTER"} {
 		if bytes.Contains(data, []byte(needle)) {
-			t.Errorf("flag on: chrome text %q should be display:none and absent from PDF", needle)
+			t.Errorf("mediawiki profile: chrome %q should be hidden", needle)
 		}
 	}
 }
@@ -85,16 +109,24 @@ func TestSimplifyChromeCSSParsesAndMatches(t *testing.T) {
 	if !strings.Contains(onText, "UNIQUEBODY") {
 		t.Fatalf("layout with simplify should keep body; got %q", onText)
 	}
+	// Landmarks-only sheet does not hide MediaWiki IDs.
+	if !strings.Contains(onText, "UNIQUEMWNAV") {
+		t.Fatalf("landmarks-only should keep #mw-navigation; got %q", onText)
+	}
 }
 
 func TestAppendSimplifySheetNoopWhenOff(t *testing.T) {
-	got := AppendSimplifySheet(nil, false)
+	got := AppendSimplifySheet(nil, false, "")
 	if got != nil {
 		t.Fatalf("want nil, got %d sheets", len(got))
 	}
-	got = AppendSimplifySheet(nil, true)
+	got = AppendSimplifySheet(nil, true, "")
 	if len(got) != 1 {
 		t.Fatalf("want 1 sheet, got %d", len(got))
+	}
+	got = AppendSimplifySheet(nil, true, "mediawiki")
+	if len(got) != 2 {
+		t.Fatalf("want 2 sheets (landmarks+mw), got %d", len(got))
 	}
 }
 
@@ -107,6 +139,18 @@ func TestSimplifyDOMEnabled(t *testing.T) {
 	}
 	if !SimplifyDOMEnabled(settings.Web{}, settings.Web{SimplifyDOM: true}) {
 		t.Fatal("object on")
+	}
+}
+
+func TestSimplifyDOMProfile(t *testing.T) {
+	if SimplifyDOMProfile(settings.Web{}, settings.Web{}) != "" {
+		t.Fatal("default profile empty")
+	}
+	if SimplifyDOMProfile(settings.Web{SimplifyDOMProfile: "mediawiki"}, settings.Web{}) != "mediawiki" {
+		t.Fatal("global mediawiki")
+	}
+	if SimplifyDOMProfile(settings.Web{}, settings.Web{SimplifyDOMProfile: "wiki"}) != "mediawiki" {
+		t.Fatal("object wiki alias")
 	}
 }
 

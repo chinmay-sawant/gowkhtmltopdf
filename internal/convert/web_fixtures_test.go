@@ -46,9 +46,15 @@ func TestWebWikiFixtureAcceptance(t *testing.T) {
 		t.Errorf("pages = %d, want %d..%d", n, minPages, maxPages)
 	}
 
-	// Chrome present in HTML but display:none — must not dominate print.
-	if bytes.Contains(data, []byte("Random article")) {
-		t.Error("nav chrome text should be display:none and absent from PDF")
+	// Chrome present in HTML but @media print display:none — must not print.
+	for _, chrome := range []string{"Random article", "Sidebar chrome", "Site footer chrome", "Jump to content"} {
+		if bytes.Contains(data, []byte(chrome)) {
+			t.Errorf("nav/print chrome %q should be display:none and absent from PDF", chrome)
+		}
+	}
+	// a:link color for Cuban (uncompressed streams carry rg before text).
+	if !bytes.Contains(data, []byte("Cuban")) {
+		t.Error("PDF missing linked body word \"Cuban\"")
 	}
 }
 

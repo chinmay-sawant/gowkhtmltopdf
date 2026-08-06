@@ -336,6 +336,8 @@ Tier 1 is **not closed** yet. Suggested order for the next sessions:
 ## Phase 21: Arbitrary Websites / “Paste Any URL”
 
 > Detail: [phases/phase-21-arbitrary-websites.md](phases/phase-21-arbitrary-websites.md)  
+> Open-web gap work: [phases/pending-phase-items/README.md](phases/pending-phase-items/README.md)  
+> **CSS-faithful cleanup:** [phases/pending-phase-items/12-css-faithful-engine.md](phases/pending-phase-items/12-css-faithful-engine.md)  
 > **Status:** in progress (docs contract) — **Not full parity**; “decent print” bar  
 > Normative criteria: [documentation/fidelity.md](../documentation/fidelity.md#arbitrary-websites-phase-21)
 
@@ -343,10 +345,12 @@ Tier 1 is **not closed** yet. Suggested order for the next sessions:
 - [x] Define “decent print”: title + main article body readable; chrome reduced when heuristics on — shipped in `documentation/fidelity.md` (Phase 21 section); explicit non-claims (no Wikipedia visual parity / marketing pixel match)
 - [ ] Vendored Wikipedia-class HTML fixture for CI (no live net required)
 - [ ] Optional reader-mode / chrome-strip heuristics (documented, opt-in)
+- [ ] Site-agnostic default: remove skin-shaped cascade overrides (see pending phase 12)
 
 ### 21.2 Progressive CSS for marketing/wiki
 - [ ] Consume phases 16–17 features against wiki snapshot
 - [ ] Media-query basics that help print (`@media print` already partial)
+- [ ] Honor author CSS/`var()` without inventing Codex/Vector token sizes
 
 ### 21.3 Closure
 - [ ] Smoke command + acceptance notes; **no** “Wikipedia parity” claim

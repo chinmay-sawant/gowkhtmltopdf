@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"unicode/utf16"
@@ -338,6 +339,35 @@ func (f *Font) CapHeight() int16 { return f.capHeight }
 
 // BBox returns the font bounding box in font units.
 func (f *Font) BBox() (int16, int16, int16, int16) { return f.xMin, f.yMin, f.xMax, f.yMax }
+
+// pdfEmScale returns the factor that converts font design units to the PDF
+// FontDescriptor 1000-unit em. Writing raw 2048-upm values made viewers treat
+// Ascent 1825 as 1.825em (Liberation) and inflate text selection boxes.
+func (f *Font) pdfEmScale() float64 {
+	upm := float64(f.unitsPerEm)
+	if upm <= 0 {
+		return 1
+	}
+	return 1000 / upm
+}
+
+func (f *Font) scaleToPDFEm(v int16) int {
+	return int(math.Round(float64(v) * f.pdfEmScale()))
+}
+
+// PDFAscent is Ascent in 1000-em PDF glyph space.
+func (f *Font) PDFAscent() int { return f.scaleToPDFEm(f.ascender) }
+
+// PDFDescent is Descent in 1000-em PDF glyph space.
+func (f *Font) PDFDescent() int { return f.scaleToPDFEm(f.descender) }
+
+// PDFCapHeight is CapHeight in 1000-em PDF glyph space.
+func (f *Font) PDFCapHeight() int { return f.scaleToPDFEm(f.capHeight) }
+
+// PDFBBox is the font bbox in 1000-em PDF glyph space.
+func (f *Font) PDFBBox() (xMin, yMin, xMax, yMax int) {
+	return f.scaleToPDFEm(f.xMin), f.scaleToPDFEm(f.yMin), f.scaleToPDFEm(f.xMax), f.scaleToPDFEm(f.yMax)
+}
 
 // Bold reports whether the font declares a bold macStyle.
 func (f *Font) Bold() bool { return f.macStyle&1 != 0 }

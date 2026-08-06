@@ -195,11 +195,13 @@ body { font-family: Custom, sans-serif; }
 	}
 }
 
-func TestFontFaceHTTPSSkipped(t *testing.T) {
+func TestFontFaceHTTPSFetchAttempted(t *testing.T) {
+	// Remote https @font-face is allowed through FetchSub; a dead host must
+	// warn and not register the face (no silent skip-by-policy).
 	html := `<html><head><style>
-@font-face { font-family: Custom; src: url(https://example.com/fonts/Custom.ttf); }
+@font-face { font-family: Custom; src: url(https://127.0.0.1:1/fonts/Custom.ttf); }
 body { font-family: Custom, sans-serif; }
-</style></head><body><p>HTTPS skip</p></body></html>`
+</style></head><body><p>HTTPS fetch</p></body></html>`
 	cmd, _ := newCommand(t, html, filepath.Join(t.TempDir(), "out.pdf"))
 
 	var log bytes.Buffer
@@ -207,15 +209,18 @@ body { font-family: Custom, sans-serif; }
 		t.Fatalf("RunPDF: %v\nlog: %s", err, log.String())
 	}
 	warn := log.String()
-	if !strings.Contains(warn, "network src") {
-		t.Errorf("expected network skip warning; log=%q", warn)
+	if !strings.Contains(warn, "@font-face src") {
+		t.Errorf("expected @font-face fetch warning; log=%q", warn)
+	}
+	if strings.Contains(warn, "network src") && strings.Contains(warn, "skipped") {
+		t.Errorf("https fonts must no longer be policy-skipped; log=%q", warn)
 	}
 	data, err := os.ReadFile(cmd.Output)
 	if err != nil {
 		t.Fatalf("read output: %v", err)
 	}
 	if bytes.Contains(data, []byte("/BaseFont /Custom")) {
-		t.Error("https @font-face src must not register Custom")
+		t.Error("failed https @font-face must not register Custom")
 	}
 }
 

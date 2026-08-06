@@ -61,8 +61,15 @@ func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 	// (fixture-31: empty white rows after Row 27 on page 1).
 	stripOrphanRowChrome(res, contentH)
 
+	// Close open tops on table continuations after rowspan/vertical splits.
+	capTablePageBreaks(res, contentH)
+
 	// Print-scoped sticky: clamp + continuation clones + reserve flow space.
 	applyStickyPrint(res, contentH)
+
+	// Sticky / chrome cleanup can leave residual empty bands in short avoid
+	// sequences; re-pack once after the paint-time passes settle.
+	packAvoidGaps(res, contentH)
 
 	// Re-derive pages after splits and sticky (new ops / Y shifts).
 	opPage = make([]int, len(res.Ops))
@@ -198,6 +205,198 @@ func isSplittable(op *Op) bool {
 	return op.Kind == OpFillRect || op.Kind == OpStrokeRect || op.Kind == OpLine
 }
 
+// capTablePageBreaks draws a horizontal top edge on pages where a table
+// continuation begins mid-grid (split vertical rules at the page top with no
+// matching full-width horizontal). Without this, border-collapse rowspan
+// tables leave open tops and orphan vertical stubs (wiki awards before
+// "2024 Razzie").
+func capTablePageBreaks(res *Result, contentH float64) {
+	if res == nil || contentH <= 0 || len(res.Ops) == 0 {
+		return
+	}
+	maxPage := 0
+	for i := range res.Ops {
+		if res.Ops[i].Fixed {
+			continue
+		}
+		p := int(res.Ops[i].Y / contentH)
+		if p > maxPage {
+			maxPage = p
+		}
+	}
+	const eps = 2.0
+	type vseg struct{ x, y0, y1, w, r, g, b float64 }
+	// Collect non-fixed vertical and horizontal line ops once.
+	var verts []vseg
+	type hseg struct{ x0, x1, y, w, r, g, b float64 }
+	var horiz []hseg
+	for i := range res.Ops {
+		op := &res.Ops[i]
+		if op.Fixed || op.Kind != OpLine {
+			continue
+		}
+		if op.H > 2 && (op.W < 1 || op.W < op.H*0.05) {
+			verts = append(verts, vseg{op.X, op.Y, op.Y + op.H, op.Width, op.R, op.G, op.B})
+			continue
+		}
+		if op.W > 2 && op.H < 1 {
+			horiz = append(horiz, hseg{op.X, op.X + op.W, op.Y, op.Width, op.R, op.G, op.B})
+		}
+	}
+	// Group verticals that share a start Y (row top) or end Y (row bottom).
+	roundY := func(y float64) int { return int(math.Round(y * 2)) } // 0.5pt bins
+	type cluster struct {
+		y              float64
+		minX, maxX     float64
+		bw, r, g, b    float64
+		n              int
+	}
+	clusterAt := func(byStart bool) map[int]*cluster {
+		out := map[int]*cluster{}
+		for _, v := range verts {
+			keyY := v.y0
+			if !byStart {
+				keyY = v.y1
+			}
+			k := roundY(keyY)
+			c := out[k]
+			if c == nil {
+				c = &cluster{y: keyY, minX: v.x, maxX: v.x, bw: v.w, r: v.r, g: v.g, b: v.b, n: 1}
+				out[k] = c
+				continue
+			}
+			c.n++
+			if v.x < c.minX {
+				c.minX = v.x
+			}
+			if v.x > c.maxX {
+				c.maxX = v.x
+			}
+			// Prefer average y so we sit on the dominant edge.
+			c.y = (c.y*float64(c.n-1) + keyY) / float64(c.n)
+		}
+		return out
+	}
+	hCoverage := func(y, minX, maxX float64) (full bool, covMin, covMax float64, has bool) {
+		for _, h := range horiz {
+			if math.Abs(h.y-y) > eps {
+				continue
+			}
+			// Only count segments that overlap the vertical band.
+			if h.x1 < minX-eps || h.x0 > maxX+eps {
+				continue
+			}
+			if !has {
+				covMin, covMax, has = h.x0, h.x1, true
+			} else {
+				if h.x0 < covMin {
+					covMin = h.x0
+				}
+				if h.x1 > covMax {
+					covMax = h.x1
+				}
+			}
+		}
+		if !has {
+			return false, 0, 0, false
+		}
+		full = covMin <= minX+eps && covMax >= maxX-eps
+		return full, covMin, covMax, true
+	}
+	seal := func(y, minX, maxX, bw, r, g, b float64) {
+		if maxX-minX < 20 || bw < 0 {
+			return
+		}
+		if bw < 0.3 {
+			bw = 0.5
+		}
+		// Avoid exact duplicates.
+		for _, h := range horiz {
+			if math.Abs(h.y-y) <= 0.5 && math.Abs(h.x0-minX) <= eps && math.Abs(h.x1-maxX) <= eps {
+				return
+			}
+		}
+		op := Op{
+			Kind: OpLine, X: minX, Y: y, W: maxX - minX, H: 0,
+			Width: bw, R: r, G: g, B: b,
+		}
+		res.Ops = append(res.Ops, op)
+		horiz = append(horiz, hseg{minX, maxX, y, bw, r, g, b})
+	}
+
+	// (1) Classic page-top stubs.
+	for p := 1; p <= maxPage; p++ {
+		pageTop := float64(p) * contentH
+		var minX, maxX, bw, r, g, b float64
+		n := 0
+		for _, v := range verts {
+			if v.y0 >= pageTop-eps && v.y0 <= pageTop+eps {
+				if n == 0 {
+					minX, maxX, bw, r, g, b = v.x, v.x, v.w, v.r, v.g, v.b
+				} else {
+					if v.x < minX {
+						minX = v.x
+					}
+					if v.x > maxX {
+						maxX = v.x
+					}
+				}
+				n++
+			}
+		}
+		if n < 2 {
+			continue
+		}
+		if full, _, _, _ := hCoverage(pageTop, minX, maxX); full {
+			continue
+		}
+		seal(pageTop, minX, maxX, bw, r, g, b)
+	}
+
+	// (2) Seal incomplete tops of multi-column vertical clusters that start a
+	// continuation-page body band (under repeated thead or at page top).
+	// Mid-table rowspan holes keep skipped tops so continuous year cells stay
+	// unsplit; only the page-fragment open edge is closed.
+	for _, c := range clusterAt(true) {
+		if c.n < 3 || c.maxX-c.minX < 20 {
+			continue
+		}
+		full, _, _, _ := hCoverage(c.y, c.minX, c.maxX)
+		if full {
+			continue
+		}
+		page := int(c.y / contentH)
+		if page <= 0 {
+			continue
+		}
+		pageTop := float64(page) * contentH
+		// Body under thead typically starts within ~header+padding of page top.
+		if c.y > pageTop+80 {
+			continue
+		}
+		seal(c.y, c.minX, c.maxX, c.bw, c.r, c.g, c.b)
+	}
+	// Row bottoms: seal when verticals end near a page bottom and no full
+	// horizontal closes the strip (next row's top moved to the following page).
+	for _, c := range clusterAt(false) {
+		if c.n < 3 || c.maxX-c.minX < 20 {
+			continue
+		}
+		page := int((c.y - 0.01) / contentH)
+		pageBot := float64(page+1) * contentH
+		// Only near the page boundary (row ended as last on page).
+		if c.y < pageBot-40 || c.y > pageBot+eps {
+			continue
+		}
+		if full, _, _, _ := hCoverage(c.y, c.minX, c.maxX); full {
+			continue
+		}
+		if page >= 0 {
+			seal(c.y, c.minX, c.maxX, c.bw, c.r, c.g, c.b)
+		}
+	}
+}
+
 // paginateOps assigns every op a page. Crossing text/image/link ops snap to
 // the next page boundary (taking following flow with them so row spacing is
 // preserved); then page-break policies are applied as canvas-Y shifts; finally
@@ -254,7 +453,16 @@ func paginateOps(res *Result, contentH float64) []int {
 							minY = o.Y
 						}
 					}
-					dy = boundary - minY
+					// Leave room for ascenders above the baseline so snapped
+					// lines do not paint into the top margin (page-4/5 bleed).
+					lead := 0.0
+					if op.Kind == OpText || op.Kind == OpBullet {
+						lead = op.Size * 0.75
+						if lead < 8 {
+							lead = 8
+						}
+					}
+					dy = boundary + lead - minY
 					shiftFlowY(res, i, i, oldY-0.01, dy)
 					for _, j := range chrome {
 						o := &res.Ops[j]
@@ -289,6 +497,10 @@ func paginateOps(res *Result, contentH float64) []int {
 			break
 		}
 	}
+	// Collapse residual empty bands left by keep-together shifts between
+	// consecutive page-break-inside:avoid siblings (wiki reference lists)
+	// and heal mid-item holes from partial line-snaps inside short avoid boxes.
+	packAvoidGaps(res, contentH)
 	// After flow has settled, clone <thead> onto continuation pages.
 	repeatTableHeaders(res, contentH)
 	// Sticky is applied in Paint after rect splitting (see splitCrossingRects).
@@ -563,6 +775,18 @@ func shiftFlowY(res *Result, from, to int, fromY, dy float64) {
 	walk(res.root)
 }
 
+// shiftOpsOnly moves ops in [from,to] by dy without dragging later flow.
+// Used when rejoining a page-break-after:avoid box to a following box that
+// already sits on the next page.
+func shiftOpsOnly(res *Result, from, to int, dy float64) {
+	for i := from; i <= to; i++ {
+		if i >= 0 && i < len(res.Ops) && res.Ops[i].Fixed {
+			continue
+		}
+		res.Ops[i].Y += dy
+	}
+}
+
 // avoidInside walks post-order and moves page-break-inside: avoid boxes wholly
 // to the next page when they span multiple pages but fit one content height.
 func avoidInside(res *Result, contentH float64) bool {
@@ -575,11 +799,52 @@ func avoidInside(res *Result, contentH float64) bool {
 			}
 		}
 		if b.style.PageBreakInside == "avoid" && b.h > 0 {
+			h := b.h
+			// Prefer ink extent when taller than the border box (rowspan /
+			// deferred paint can make ops protrude past b.h — wiki awards).
+			if b.opStart <= b.opEnd && b.opStart >= 0 && b.opEnd < len(res.Ops) {
+				bot := b.y
+				for k := b.opStart; k <= b.opEnd; k++ {
+					op := res.Ops[k]
+					ob := op.Y
+					switch op.Kind {
+					case OpText, OpBullet:
+						ob += op.Size * 1.2
+					default:
+						if op.H > 0 {
+							ob += op.H
+						}
+					}
+					if ob > bot {
+						bot = ob
+					}
+				}
+				if ink := bot - b.y; ink > h {
+					h = ink
+				}
+			}
 			lo := int(b.y / contentH)
-			hi := int((b.y + b.h) / contentH)
-			if hi > lo && b.h <= contentH+0.01 {
-				shiftFlowY(res, b.opStart, b.opEnd, b.y, float64(hi)*contentH-b.y)
-				changed = true
+			hi := int((b.y + h) / contentH)
+			if hi > lo && h <= contentH+0.01 {
+				remaining := float64(lo+1)*contentH - b.y
+				// Prefer splitting over large empty bands. Use border-box
+				// height (b.h), not ink: after line-snap, ink can span a
+				// page gap while the box is still a short list item —
+				// classifying by ink disabled the short-box guard and
+				// cascaded 100–150pt gaps (wiki references).
+				if preferSplitOverBlank(remaining, b.h, contentH) {
+					return changed
+				}
+				// Large boxes: also prefer split when less than half the box
+				// fits (rowspan tables / tall avoid blocks).
+				if remaining < b.h*0.5 && b.h > contentH*0.35 {
+					return changed
+				}
+				dy := float64(lo+1)*contentH - b.y
+				if dy > 0.01 {
+					shiftFlowY(res, b.opStart, b.opEnd, b.y, dy)
+					changed = true
+				}
 			}
 		}
 		return changed
@@ -669,9 +934,88 @@ func afterBreaks(res *Result, contentH float64) bool {
 			if nextPage <= lastPage {
 				break
 			}
-			dy := float64(lastPage+1)*contentH - b.y
+			// Place the heading on next's page without a full-page shiftFlowY
+			// (that blanked pages after avoid-inside tables). Clear the
+			// page-top band first: paginateOps may already have snapped a
+			// prior paragraph's continuation to pageStart — that text is
+			// NOT `next` (next is the following sibling), so we must push
+			// every op in the landing band, not only next.
+			pageStart := float64(nextPage) * contentH
+			need := b.h
+			if need < 1 {
+				need = 12
+			}
+			if b.opStart <= b.opEnd && b.opStart >= 0 && b.opEnd < len(res.Ops) {
+				top, bot := b.y, b.y
+				for k := b.opStart; k <= b.opEnd; k++ {
+					op := res.Ops[k]
+					y0, y1 := op.Y, op.Y
+					switch op.Kind {
+					case OpText, OpBullet:
+						y0 = op.Y - op.Size*0.8
+						y1 = op.Y + op.Size*0.35
+					case OpLine:
+						if op.H == 0 {
+							y1 = op.Y + math.Max(op.Width, 1)
+						} else {
+							y1 = op.Y + op.H
+						}
+					default:
+						if op.H > 0 {
+							y1 = op.Y + op.H
+						}
+					}
+					if y0 < top {
+						top = y0
+					}
+					if y1 > bot {
+						bot = y1
+					}
+				}
+				if ink := bot - top; ink > need {
+					need = ink
+				}
+				if ink := bot - b.y; ink > need {
+					need = ink
+				}
+			}
+			const gap = 10.0
+			need += gap
+			bandTop := pageStart + need
+			minY := bandTop
+			minIdx := -1
+			for i := range res.Ops {
+				op := &res.Ops[i]
+				if op.Fixed {
+					continue
+				}
+				if int(op.Y/contentH) != nextPage {
+					continue
+				}
+				if op.Y < minY {
+					minY = op.Y
+					minIdx = i
+				}
+			}
+			if minIdx >= 0 && minY < bandTop-0.01 {
+				push := bandTop - minY
+				shiftFlowY(res, minIdx, minIdx, minY-0.01, push)
+			}
+			target := bandTop - need // == pageStart when band was cleared
+			if target < pageStart {
+				target = pageStart
+			}
+			// Prefer sitting just above the (possibly pushed) next sibling.
+			if next.y-need > target {
+				target = next.y - need
+			}
+			if target < pageStart {
+				target = pageStart
+			}
+			dy := target - b.y
 			if dy > 0.001 {
-				shiftFlowY(res, b.opStart, b.opEnd, b.y, dy)
+				shiftOpsOnly(res, b.opStart, b.opEnd, dy)
+				b.y += dy
 				changed = true
 			}
 		}
@@ -682,7 +1026,6 @@ func afterBreaks(res *Result, contentH float64) bool {
 // rowsIntact keeps each table row on a single page: a row spanning multiple
 // pages moves wholly to the next.
 func rowsIntact(res *Result, contentH float64) bool {
-	ops := res.Ops
 	var walk func(b *box) bool
 	walk = func(b *box) bool {
 		changed := false
@@ -696,6 +1039,8 @@ func rowsIntact(res *Result, contentH float64) bool {
 				continue
 			}
 			first, last := -1, -1
+			rowTop, rowBottom := 0.0, 0.0
+			haveGeom := false
 			for _, cell := range row {
 				if cell.opStart <= cell.opEnd {
 					if first < 0 {
@@ -705,23 +1050,46 @@ func rowsIntact(res *Result, contentH float64) bool {
 						last = cell.opEnd
 					}
 				}
+				// Use starting-row geometry, not full rowspan paint extent.
+				// Rowspan cells emit bottom borders at y+h (full span); scanning
+				// those ops made the first row look multi-page and cascaded
+				// blank pages (wiki awards tables with rowspan=10+).
+				top := cell.y
+				h := cell.h
+				if cell.rowSpan > 1 && cell.rowBoxH > 0 {
+					h = cell.rowBoxH
+				}
+				bot := top + h
+				if !haveGeom {
+					rowTop, rowBottom, haveGeom = top, bot, true
+				} else {
+					if top < rowTop {
+						rowTop = top
+					}
+					if bot > rowBottom {
+						rowBottom = bot
+					}
+				}
 			}
-			if first < 0 {
+			if first < 0 || !haveGeom {
 				continue
-			}
-			rowTop, rowBottom := ops[first].Y, ops[first].Y
-			for k := first + 1; k <= last; k++ {
-				if ops[k].Y < rowTop {
-					rowTop = ops[k].Y
-				}
-				if ops[k].Y > rowBottom {
-					rowBottom = ops[k].Y
-				}
 			}
 			lo, hi := int(rowTop/contentH), int(rowBottom/contentH)
 			if hi > lo {
-				shiftFlowY(res, first, last, rowTop, float64(hi)*contentH-rowTop)
-				changed = true
+				// Move only to the next page start. Using hi*contentH when the
+				// row's measured bottom spans multiple pages (e.g. rowspan
+				// paint height leaking into rowBoxH) skipped blank pages
+				// between filmography and awards on long wiki tables.
+				dy := float64(lo+1)*contentH - rowTop
+				if dy > 0.01 {
+					// fromY slightly above rowTop so border-collapse grid
+					// lines that sit exactly on the row edge (and later
+					// rows / chrome below) shift with the cells — otherwise
+					// content moves and the grid stays behind (gapped /
+					// misaligned music-video tables across page breaks).
+					shiftFlowY(res, first, last, rowTop-0.01, dy)
+					changed = true
+				}
 			}
 		}
 		return changed
@@ -769,6 +1137,8 @@ func keepHeadingWithNext(res *Result, contentH float64) bool {
 		if nextPage > page {
 			continue // already separated by a break
 		}
+		// Move heading + following content together so the heading does not
+		// land on top of a line that already snapped to the next page.
 		dy := float64(page+1)*contentH - b.y
 		if dy > 0 {
 			shiftFlowY(res, b.opStart, b.opEnd, b.y, dy)
@@ -861,7 +1231,13 @@ func orphansWidows(res *Result, contentH float64) bool {
 			return
 		}
 		// Keep the block together when it fits one page; else progress escape.
+		// Same blank-band guard as avoidInside: do not open a large empty
+		// region on the current page for a short keep-together.
 		if b.h <= contentH+0.01 {
+			remaining := float64(lo+1)*contentH - b.y
+			if preferSplitOverBlank(remaining, b.h, contentH) {
+				return
+			}
 			dy := float64(hi)*contentH - b.y
 			if dy > 1e-6 {
 				shiftFlowY(res, b.opStart, b.opEnd, b.y, dy)
@@ -884,12 +1260,239 @@ func orphansWidowsHeuristic(res *Result, b *box, contentH float64) bool {
 	if hi <= lo || b.h > contentH {
 		return false
 	}
+	remaining := float64(lo+1)*contentH - b.y
+	if preferSplitOverBlank(remaining, b.h, contentH) {
+		return false
+	}
 	dy := float64(hi)*contentH - b.y
 	if dy <= 1e-6 {
 		return false
 	}
 	shiftFlowY(res, b.opStart, b.opEnd, b.y, dy)
 	return true
+}
+
+// preferSplitOverBlank reports whether a keep-together shift would leave an
+// unacceptably large empty band on the current page. Shared by avoidInside
+// and orphans/widows so dense page-break-inside:avoid lists do not cascade
+// expanding gaps between consecutive short blocks.
+//
+// h should be the border-box height (not ink): line-snap can inflate ink
+// across a page boundary without making the box "tall".
+func preferSplitOverBlank(remaining, h, contentH float64) bool {
+	if contentH <= 0 {
+		return false
+	}
+	// Never blank more than half a page to keep a box together.
+	if remaining > contentH*0.5 {
+		return true
+	}
+	// Short/medium boxes (list items, citations, cards ~1–4 lines): only
+	// keep-together when nearly at the page end. Each keep-together does
+	// shiftFlowY on following siblings; sequences of short avoid items
+	// otherwise expand inter-item gaps by remaining on every fixpoint
+	// iteration (wiki references left 26–38pt bands).
+	if h > 0 && h < contentH*0.35 {
+		// Allow at most ~1.2 line-heights of trailing blank (or half the
+		// box), whichever is larger — true end-of-page overflow only.
+		// Tighter than the prior 24pt/0.75h guard so modest remainders
+		// never keep short avoid siblings apart.
+		maxBlank := 14.0
+		if h*0.5 > maxBlank {
+			maxBlank = h * 0.5
+		}
+		if remaining > maxBlank {
+			return true
+		}
+	}
+	return false
+}
+
+// packAvoidGaps runs once after the page-break fixpoint. It only applies
+// conservative sibling packing between short page-break-inside:avoid list-like
+// boxes when residual keep-together air is large. Internal line-gap compaction
+// (compactAvoidInternalGaps / shiftOpsBelowY) was removed: a global Y-shift of
+// every op below a hole over-pulled subsequent body paragraphs into each other.
+func packAvoidGaps(res *Result, contentH float64) {
+	// Intentionally no-op. Prior sibling packing + internal compaction used
+	// global Y shifts that interleaved/crushed body and reference text.
+	// preferSplitOverBlank remains the safe fix for blank avoid-list bands.
+	_ = res
+	_ = contentH
+}
+
+// packAvoidSiblingGaps pulls consecutive short avoid siblings together only
+// when the residual gap is large (keep-together residue), never so tightly
+// that the next item collides with the previous ink or natural line pitch.
+// Restricted to short boxes (h < 0.25·contentH) that look like list items —
+// aggressive packing of tall avoid boxes crushed body paragraph spacing.
+func packAvoidSiblingGaps(res *Result, contentH float64) bool {
+	changed := false
+	var walk func(b *box)
+	walk = func(b *box) {
+		// Pack among this parent's children first (document order).
+		var avoidKids []*box
+		for _, c := range b.children {
+			if c.style.PageBreakInside != "avoid" || c.h <= 0 || c.opStart > c.opEnd {
+				continue
+			}
+			// Prefer only short avoid boxes (list items, short citations).
+			if c.h >= contentH*0.25 {
+				continue
+			}
+			avoidKids = append(avoidKids, c)
+		}
+		for i := 1; i < len(avoidKids); i++ {
+			prev, next := avoidKids[i-1], avoidKids[i]
+			if int(prev.y/contentH) != int(next.y/contentH) {
+				continue
+			}
+			prevBot := boxInkBottom(res, prev)
+			nextTop := boxInkTop(res, next)
+			if nextTop < next.y {
+				nextTop = next.y
+			}
+			size := boxTextSize(res, next)
+			if size <= 0 {
+				size = boxTextSize(res, prev)
+			}
+			if size <= 0 {
+				size = 10
+			}
+			// Floor gap after packing: natural line pitch, never below 1.15·size.
+			minGap := size * 1.15
+			if minGap < 8 {
+				minGap = 8
+			}
+			gap := nextTop - prevBot
+			if gap <= minGap+0.5 {
+				continue
+			}
+			excess := gap - minGap
+			// Only pack large residual bands (not normal CSS margins / leading).
+			// Requires excess > 20pt AND > 2·lineSize so modest air is left alone.
+			if excess <= 20 || excess <= 2*size {
+				continue
+			}
+			// Never pull next above the page content top or into prev ink+pitch.
+			pageTop := float64(int(next.y/contentH)) * contentH
+			minY := pageTop + 2
+			if prevBot+minGap > minY {
+				minY = prevBot + minGap
+			}
+			// Pull relative to the box top we will shift.
+			maxPull := next.y - minY
+			// Also limited by how much ink top sits above the natural slot.
+			if pull := nextTop - (prevBot + minGap); pull < maxPull {
+				maxPull = pull
+			}
+			if maxPull < excess {
+				excess = maxPull
+			}
+			if excess <= 0.5 {
+				continue
+			}
+			// Range-shift the next box + everything below its ink top.
+			// Prefer nextTop (ink) as fromY so stale box.y below the text
+			// does not leave the first line behind. Index band covers markers
+			// that sit at high indices.
+			fromY := nextTop - 0.01
+			if next.y-0.01 < fromY {
+				// Also catch any ops/chrome at the border-box top.
+				fromY = next.y - 0.01
+			}
+			shiftFlowY(res, next.opStart, next.opEnd, fromY, -excess)
+			changed = true
+		}
+		for _, c := range b.children {
+			walk(c)
+		}
+	}
+	walk(res.root)
+	return changed
+}
+
+// boxInkBottom returns the lowest painted extent of b's ops (text descent
+// approximated as size*1.2), falling back to b.y+b.h.
+func boxInkBottom(res *Result, b *box) float64 {
+	bot := b.y + b.h
+	if res == nil || b.opStart > b.opEnd || b.opStart < 0 {
+		return bot
+	}
+	end := b.opEnd
+	if end >= len(res.Ops) {
+		end = len(res.Ops) - 1
+	}
+	ink := b.y
+	found := false
+	for k := b.opStart; k <= end; k++ {
+		op := res.Ops[k]
+		ob := op.Y
+		switch op.Kind {
+		case OpText, OpBullet:
+			ob += op.Size * 1.2
+			found = true
+		default:
+			if op.H > 0 {
+				ob += op.H
+				found = true
+			}
+		}
+		if ob > ink {
+			ink = ob
+		}
+	}
+	if found && ink > bot {
+		return ink
+	}
+	if found {
+		return ink
+	}
+	return bot
+}
+
+// boxInkTop returns the topmost text/bullet baseline of b, or b.y.
+func boxInkTop(res *Result, b *box) float64 {
+	if res == nil || b.opStart > b.opEnd || b.opStart < 0 {
+		return b.y
+	}
+	top := b.y
+	found := false
+	end := b.opEnd
+	if end >= len(res.Ops) {
+		end = len(res.Ops) - 1
+	}
+	for k := b.opStart; k <= end; k++ {
+		op := res.Ops[k]
+		if op.Kind != OpText && op.Kind != OpBullet {
+			continue
+		}
+		if !found || op.Y < top {
+			top = op.Y
+			found = true
+		}
+	}
+	if !found {
+		return b.y
+	}
+	return top
+}
+
+func boxTextSize(res *Result, b *box) float64 {
+	if res == nil || b.opStart > b.opEnd || b.opStart < 0 {
+		return 0
+	}
+	end := b.opEnd
+	if end >= len(res.Ops) {
+		end = len(res.Ops) - 1
+	}
+	for k := b.opStart; k <= end; k++ {
+		op := res.Ops[k]
+		if (op.Kind == OpText || op.Kind == OpBullet) && op.Size > 0 {
+			return op.Size
+		}
+	}
+	return 0
 }
 
 func hasNestedFlowChild(b *box) bool {

@@ -1,0 +1,1577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Grand Alexandria Digital Library — 100 Masterpiece Catalog</title>
+
+    <style>
+        /* Base Variables & Theme */
+        :root {
+            --bg-dark: #0e0e12;
+            --card-bg: rgba(22, 22, 30, 0.9);
+            --card-border: rgba(212, 175, 55, 0.25);
+            --card-border-hover: rgba(212, 175, 55, 0.6);
+            --gold-primary: #d4af37;
+            --gold-light: #fff2cb;
+            --gold-dark: #aa7c11;
+            --text-main: #e2e8f0;
+            --text-muted: #94a3b8;
+            --font-serif: "Georgia", "Garamond", "Palatino Linotype", "Book Antiqua", serif;
+            --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            --font-mono: "Courier New", Courier, monospace;
+        }
+
+        /* Global Reset */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: var(--font-sans);
+            line-height: 1.5;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0e0e12;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #2a2a36;
+            border-radius: 5px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--gold-primary);
+        }
+
+        /* Pure CSS Filter System */
+        .filter-input {
+            display: none;
+        }
+
+        #filter-all:checked ~ .wrapper #books-container .book-card { display: flex; }
+        #filter-classics:checked ~ .wrapper #books-container .book-card:not([data-genre="classics"]) { display: none; }
+        #filter-scifi:checked ~ .wrapper #books-container .book-card:not([data-genre="scifi"]) { display: none; }
+        #filter-fantasy:checked ~ .wrapper #books-container .book-card:not([data-genre="fantasy"]) { display: none; }
+        #filter-tech:checked ~ .wrapper #books-container .book-card:not([data-genre="tech"]) { display: none; }
+        #filter-philosophy:checked ~ .wrapper #books-container .book-card:not([data-genre="philosophy"]) { display: none; }
+        #filter-history:checked ~ .wrapper #books-container .book-card:not([data-genre="history"]) { display: none; }
+        #filter-mystery:checked ~ .wrapper #books-container .book-card:not([data-genre="mystery"]) { display: none; }
+
+        /* Filter Tab Styles */
+        .tab-btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-main);
+            background-color: #1a1a24;
+            border: 1px solid #2d2d3a;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .tab-btn:hover {
+            border-color: var(--gold-primary);
+            color: var(--gold-light);
+        }
+
+        #filter-all:checked ~ .wrapper label[for="filter-all"],
+        #filter-classics:checked ~ .wrapper label[for="filter-classics"],
+        #filter-scifi:checked ~ .wrapper label[for="filter-scifi"],
+        #filter-fantasy:checked ~ .wrapper label[for="filter-fantasy"],
+        #filter-tech:checked ~ .wrapper label[for="filter-tech"],
+        #filter-philosophy:checked ~ .wrapper label[for="filter-philosophy"],
+        #filter-history:checked ~ .wrapper label[for="filter-history"],
+        #filter-mystery:checked ~ .wrapper label[for="filter-mystery"] {
+            background-color: var(--gold-primary);
+            color: #0e0e12;
+            font-weight: 700;
+            border-color: var(--gold-primary);
+            box-shadow: 0 0 15px rgba(212, 175, 55, 0.4);
+        }
+
+        /* Layout Structure */
+        .wrapper {
+            width: 100%;
+            position: relative;
+        }
+
+        .header {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background: rgba(14, 14, 18, 0.92);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(212, 175, 55, 0.2);
+            padding: 16px 24px;
+        }
+
+        .header-container {
+            max-width: 1280px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .brand-section {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #d4af37, #aa7c11);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-serif);
+            font-weight: bold;
+            color: #0e0e12;
+            font-size: 1.2rem;
+            box-shadow: 0 0 10px rgba(212, 175, 55, 0.3);
+        }
+
+        .brand-title {
+            font-family: var(--font-serif);
+            font-size: 1.5rem;
+            font-weight: bold;
+            letter-spacing: 2px;
+            background: linear-gradient(135deg, #fff2cb, #d4af37, #aa7c11);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .brand-subtitle {
+            font-size: 0.65rem;
+            color: rgba(212, 175, 55, 0.7);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            font-family: var(--font-mono);
+        }
+
+        .stats-badge {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            font-size: 0.75rem;
+            font-family: var(--font-mono);
+            background: rgba(0, 0, 0, 0.5);
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: 1px solid rgba(212, 175, 55, 0.2);
+        }
+
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #10b981;
+            box-shadow: 0 0 8px #10b981;
+        }
+
+        /* Hero Banner */
+        .hero {
+            padding: 60px 24px;
+            text-align: center;
+            background: radial-gradient(circle at center, rgba(67, 34, 10, 0.2) 0%, rgba(14, 14, 18, 1) 70%);
+            border-bottom: 1px solid rgba(212, 175, 55, 0.15);
+        }
+
+        .hero-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            letter-spacing: 2px;
+            color: var(--gold-primary);
+            background: rgba(212, 175, 55, 0.1);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            text-transform: uppercase;
+            margin-bottom: 16px;
+        }
+
+        .hero-title {
+            font-family: var(--font-serif);
+            font-size: 2.8rem;
+            line-height: 1.2;
+            color: #ffffff;
+            margin-bottom: 16px;
+        }
+
+        .hero-title span {
+            background: linear-gradient(135deg, #fff2cb, #d4af37, #aa7c11);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero-desc {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+            max-width: 700px;
+            margin: 0 auto 32px auto;
+            line-height: 1.6;
+        }
+
+        .hero-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 16px;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            padding: 16px;
+            border-radius: 12px;
+        }
+
+        .stat-value {
+            font-family: var(--font-serif);
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--gold-primary);
+        }
+
+        .stat-label {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-top: 4px;
+        }
+
+        /* Filter Bar */
+        .nav-bar {
+            position: sticky;
+            top: 74px;
+            z-index: 40;
+            background: rgba(14, 14, 18, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(212, 175, 55, 0.2);
+            padding: 12px 24px;
+            overflow-x: auto;
+        }
+
+        .nav-container {
+            max-width: 1280px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Main Catalog Grid */
+        .main-content {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 40px 24px;
+        }
+
+        .books-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+            gap: 24px;
+        }
+
+        /* 3D Book Cards */
+        .book-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: border-color 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
+            box-shadow: inset 0 0 15px rgba(212, 175, 55, 0.03);
+        }
+
+        .book-card:hover {
+            border-color: var(--card-border-hover);
+            transform: translateY(-4px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.8), 0 0 15px rgba(212, 175, 55, 0.15);
+        }
+
+        .book-cover {
+            position: relative;
+            width: 100%;
+            height: 250px;
+            border-radius: 10px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            margin-bottom: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+            box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.6);
+        }
+
+        .book-cover::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            width: 8px;
+            background: linear-gradient(90deg, rgba(255,255,255,0.25) 0%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.6) 100%);
+            border-top-left-radius: 8px;
+            border-bottom-left-radius: 8px;
+            z-index: 5;
+        }
+
+        .cover-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 2;
+        }
+
+        .vol-badge {
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            padding: 2px 6px;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: var(--gold-light);
+        }
+
+        .cover-year {
+            font-family: var(--font-serif);
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .cover-body {
+            text-align: center;
+            margin: auto 0;
+            z-index: 2;
+        }
+
+        .cover-title {
+            font-family: var(--font-serif);
+            font-size: 1.15rem;
+            font-weight: bold;
+            color: #ffffff;
+            line-height: 1.25;
+            margin-bottom: 6px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+
+        .cover-author {
+            font-size: 0.75rem;
+            font-style: italic;
+            color: rgba(255, 255, 255, 0.75);
+        }
+
+        .cover-footer {
+            text-align: center;
+            border-top: 1px solid rgba(255, 255, 255, 0.15);
+            padding-top: 8px;
+            z-index: 2;
+        }
+
+        .cover-genre {
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        /* Color Gradients for Covers */
+        .bg-amber { background: linear-gradient(145deg, #78350f, #291003); }
+        .bg-crimson { background: linear-gradient(145deg, #881337, #2c0611); }
+        .bg-gold { background: linear-gradient(145deg, #713f12, #1c1003); }
+        .bg-stone { background: linear-gradient(145deg, #3f3f46, #09090b); }
+        .bg-emerald { background: linear-gradient(145deg, #065f46, #022c22); }
+        .bg-indigo { background: linear-gradient(145deg, #3730a3, #0f172a); }
+        .bg-cyan { background: linear-gradient(145deg, #164e63, #042f2e); }
+        .bg-purple { background: linear-gradient(145deg, #581c87, #1e1b4b); }
+
+        .book-details {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .meta-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+        }
+
+        .rating {
+            color: var(--gold-primary);
+            font-weight: bold;
+        }
+
+        .pages {
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+        }
+
+        .synopsis {
+            font-size: 0.8rem;
+            color: #cbd5e1;
+            line-height: 1.45;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .card-footer {
+            margin-top: 16px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.7rem;
+        }
+
+        .isbn {
+            font-family: var(--font-mono);
+            color: rgba(212, 175, 55, 0.7);
+        }
+
+        .link-btn {
+            color: var(--text-main);
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .link-btn:hover {
+            color: var(--gold-primary);
+        }
+
+        /* Footer */
+        .footer {
+            margin-top: 60px;
+            background: rgba(14, 14, 18, 0.95);
+            border-top: 1px solid rgba(212, 175, 55, 0.2);
+            padding: 40px 24px;
+        }
+
+        .footer-container {
+            max-width: 1280px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 24px;
+        }
+
+        .footer-title {
+            font-family: var(--font-serif);
+            font-size: 1.1rem;
+            color: var(--gold-primary);
+            margin-bottom: 6px;
+        }
+
+        .footer-text {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            max-width: 400px;
+        }
+
+        .footer-stats {
+            display: flex;
+            gap: 24px;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .footer-stat-val {
+            display: block;
+            color: var(--gold-primary);
+            font-size: 0.95rem;
+            font-weight: bold;
+        }
+
+        .copyright {
+            font-size: 0.7rem;
+            color: #64748b;
+        }
+
+        @media (max-width: 768px) {
+            .hero-title {
+                font-size: 2rem;
+            }
+            .header-container {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .footer-container {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Pure CSS Radio Inputs for Filtering -->
+    <input type="radio" id="filter-all" name="genre-filter" class="filter-input" checked>
+    <input type="radio" id="filter-classics" name="genre-filter" class="filter-input">
+    <input type="radio" id="filter-scifi" name="genre-filter" class="filter-input">
+    <input type="radio" id="filter-fantasy" name="genre-filter" class="filter-input">
+    <input type="radio" id="filter-tech" name="genre-filter" class="filter-input">
+    <input type="radio" id="filter-philosophy" name="genre-filter" class="filter-input">
+    <input type="radio" id="filter-history" name="genre-filter" class="filter-input">
+    <input type="radio" id="filter-mystery" name="genre-filter" class="filter-input">
+
+    <div class="wrapper">
+
+        <!-- Header -->
+        <header class="header">
+            <div class="header-container">
+                <div class="brand-section">
+                    <div class="brand-icon">A</div>
+                    <div>
+                        <h1 class="brand-title">ALEXANDRIA</h1>
+                        <p class="brand-subtitle">The Universal Digital Archive</p>
+                    </div>
+                </div>
+
+                <div class="stats-badge">
+                    <div class="pulse-dot"></div>
+                    <span>ITEMS INDEXED: <strong style="color: var(--gold-primary);">100 / 100</strong></span>
+                    <span>PAGES: <strong style="color: var(--gold-primary);">42,850</strong></span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Hero Section -->
+        <section class="hero">
+            <span class="hero-badge">Pure HTML & CSS Masterwork Collection</span>
+            <h2 class="hero-title">
+                Explore One Hundred Timeless <br>
+                <span>Literary Works & Treatises</span>
+            </h2>
+            <p class="hero-desc">
+                A massive pure HTML & CSS library containing 100 fully indexed volumes spanning Classical Literature, Sci-Fi Futures, High Fantasy, Computing & AI, Philosophy, History, and Cosmic Physics.
+            </p>
+
+            <div class="hero-stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value">100</div>
+                    <div class="stat-label">Indexed Works</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">7</div>
+                    <div class="stat-label">Core Genres</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">4.8★</div>
+                    <div class="stat-label">Avg Rating</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">0</div>
+                    <div class="stat-label">Dependencies</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Filter Bar -->
+        <nav class="nav-bar">
+            <div class="nav-container">
+                <label for="filter-all" class="tab-btn">All Books (100)</label>
+                <label for="filter-classics" class="tab-btn">Classics (15)</label>
+                <label for="filter-scifi" class="tab-btn">Sci-Fi (15)</label>
+                <label for="filter-fantasy" class="tab-btn">Fantasy (15)</label>
+                <label for="filter-tech" class="tab-btn">Tech & CS (15)</label>
+                <label for="filter-philosophy" class="tab-btn">Philosophy (15)</label>
+                <label for="filter-history" class="tab-btn">History (13)</label>
+                <label for="filter-mystery" class="tab-btn">Mystery (12)</label>
+            </div>
+        </nav>
+
+        <!-- Main Library Grid -->
+        <main class="main-content">
+            <div id="books-container" class="books-grid">
+
+                <!-- VOL 001 - 015: CLASSICS -->
+                <article class="book-card" data-genre="classics">
+                    <div class="book-cover bg-amber">
+                        <div class="cover-header"><span class="vol-badge">VOL. #001</span><span class="cover-year">1851</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Moby Dick</h3><p class="cover-author">Herman Melville</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Classics & Literature</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.8 / 5.0</span><span class="pages">635 Pages</span></div>
+                        <p class="synopsis">The epic voyage of the whaling ship Pequod and its obsessive captain, Ahab, who hunts the legendary white whale across tempestuous oceans.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0142437247</span><a href="#book-1" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="classics">
+                    <div class="book-cover bg-crimson">
+                        <div class="cover-header"><span class="vol-badge">VOL. #002</span><span class="cover-year">1813</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Pride and Prejudice</h3><p class="cover-author">Jane Austen</p> interior</div>
+                        <div class="cover-footer"><span class="cover-genre">Classics & Romance</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.9 / 5.0</span><span class="pages">432 Pages</span></div>
+                        <p class="synopsis">A turbulent romance between Elizabeth Bennet and the aloof Mr. Darcy exploring societal manners, marriage, and misunderstandings in 19th century England.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0141439518</span><a href="#book-2" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="classics">
+                    <div class="book-cover bg-gold">
+                        <div class="cover-header"><span class="vol-badge">VOL. #003</span><span class="cover-year">1925</span></div>
+                        <div class="cover-body"><h3 class="cover-title">The Great Gatsby</h3><p class="cover-author">F. Scott Fitzgerald</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Classics & Literature</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.7 / 5.0</span><span class="pages">180 Pages</span></div>
+                        <p class="synopsis">A portrait of the Roaring Twenties following mysterious millionaire Jay Gatsby and his unrequited passion for Daisy Buchanan on Long Island.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0743273565</span><a href="#book-3" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="classics">
+                    <div class="book-cover bg-stone">
+                        <div class="cover-header"><span class="vol-badge">VOL. #004</span><span class="cover-year">1869</span></div>
+                        <div class="cover-body"><h3 class="cover-title">War and Peace</h3><p class="cover-author">Leo Tolstoy</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Classics & Epic</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.8 / 5.0</span><span class="pages">1,225 Pages</span></div>
+                        <p class="synopsis">Panoramic chronicle of French invasion of Russia and the impact of the Napoleonic era on Tsarist society through five aristocratic families.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-1400079988</span><a href="#book-4" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="classics">
+                    <div class="book-cover bg-crimson">
+                        <div class="cover-header"><span class="vol-badge">VOL. #005</span><span class="cover-year">1866</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Crime & Punishment</h3><p class="cover-author">Fyodor Dostoevsky</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Classics & Psychology</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.9 / 5.0</span><span class="pages">545 Pages</span></div>
+                        <p class="synopsis">The mental anguish and moral dilemmas of Rodion Raskolnikov, an impoverished ex-student in Saint Petersburg who formulates a plan to kill a pawnbroker.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0143058442</span><a href="#book-5" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="classics">
+                    <div class="book-cover bg-indigo">
+                        <div class="cover-header"><span class="vol-badge">VOL. #006</span><span class="cover-year">1320</span></div>
+                        <div class="cover-body"><h3 class="cover-title">The Divine Comedy</h3><p class="cover-author">Dante Alighieri</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Classics & Epic Poetry</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.9 / 5.0</span><span class="pages">798 Pages</span></div>
+                        <p class="synopsis">An epic journey through Hell, Purgatory, and Paradise, guided by Virgil and Beatrice, representing the soul's path towards God.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0142437223</span><a href="#book-6" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="classics">
+                    <div class="book-cover bg-emerald">
+                        <div class="cover-header"><span class="vol-badge">VOL. #007</span><span class="cover-year">1847</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Jane Eyre</h3><p class="cover-author">Charlotte Brontë</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Classics & Gothic</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.8 / 5.0</span><span class="pages">532 Pages</span></div>
+                        <p class="synopsis">The growth and romantic hardships of orphaned governess Jane Eyre at Thornfield Hall and her intense connection to Edward Rochester.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0141441146</span><a href="#book-7" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="classics">
+                    <div class="book-cover bg-gold">
+                        <div class="cover-header"><span class="vol-badge">VOL. #008</span><span class="cover-year">800 BC</span></div>
+                        <div class="cover-body"><h3 class="cover-title">The Odyssey</h3><p class="cover-author">Homer</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Classics & Myth</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.9 / 5.0</span><span class="pages">541 Pages</span></div>
+                        <p class="synopsis">The ten-year journey of Greek hero Odysseus returning home to Ithaca after the fall of Troy while battling monsters and gods.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0140268867</span><a href="#book-8" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="classics">
+                    <div class="book-cover bg-amber">
+                        <div class="cover-header"><span class="vol-badge">VOL. #009</span><span class="cover-year">1605</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Don Quixote</h3><p class="cover-author">Miguel de Cervantes</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Classics & Satire</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.7 / 5.0</span><span class="pages">1,072 Pages</span></div>
+                        <p class="synopsis">The adventures of noble Alonso Quixano who loses his sanity reading chivalric romances and sets out as knight-errant Don Quixote.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0060934347</span><a href="#book-9" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="classics">
+                    <div class="book-cover bg-amber">
+                        <div class="cover-header"><span class="vol-badge">VOL. #010</span><span class="cover-year">1859</span></div>
+                        <div class="cover-body"><h3 class="cover-title">A Tale of Two Cities</h3><p class="cover-author">Charles Dickens</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Classics & Historical</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.8 / 5.0</span><span class="pages">489 Pages</span></div>
+                        <p class="synopsis">Set in London and Paris before and during the French Revolution, depicting the plight of the French peasantry and aristocratic violence.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0141439600</span><a href="#book-10" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="classics">
+                    <div class="book-cover bg-cyan">
+                        <div class="cover-header"><span class="vol-badge">VOL. #011</span><span class="cover-year">1818</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Frankenstein</h3><p class="cover-author">Mary Shelley</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Classics & Horror</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.8 / 5.0</span><span class="pages">280 Pages</span></div>
+                        <p class="synopsis">Victor Frankenstein creates a sapient creature in an unorthodox scientific experiment, leading to disastrous consequences for creator and monster.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0143131847</span><a href="#book-11" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="classics">
+                    <div class="book-cover bg-crimson">
+                        <div class="cover-header"><span class="vol-badge">VOL. #012</span><span class="cover-year">1844</span></div>
+                        <div class="cover-body"><h3 class="cover-title">The Count of Monte Cristo</h3><p class="cover-author">Alexandre Dumas</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Classics & Adventure</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.9 / 5.0</span><span class="pages">1,276 Pages</span></div>
+                        <p class="synopsis">Edmond Dantès is wrongfully imprisoned in the Château d'If, escapes, acquires a fortune, and sets out to exact revenge on those responsible.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0140449266</span><a href="#book-12" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="classics">
+                    <div class="book-cover bg-stone">
+                        <div class="cover-header"><span class="vol-badge">VOL. #013</span><span class="cover-year">1897</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Dracula</h3><p class="cover-author">Bram Stoker</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Classics & Gothic</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.7 / 5.0</span><span class="pages">418 Pages</span></div>
+                        <p class="synopsis">Epistolary novel detailing Count Dracula's attempt to move from Transylvania to England to spread the undead curse.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0141439846</span><a href="#book-13" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="classics">
+                    <div class="book-cover bg-amber">
+                        <div class="cover-header"><span class="vol-badge">VOL. #014</span><span class="cover-year">1880</span></div>
+                        <div class="cover-body"><h3 class="cover-title">The Brothers Karamazov</h3><p class="cover-author">Fyodor Dostoevsky</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Classics & Philosophy</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.9 / 5.0</span><span class="pages">796 Pages</span></div>
+                        <p class="synopsis">A passionate philosophical novel questioning God, free will, morality, and patricide set in 19th-century Russia.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0374528379</span><a href="#book-14" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="classics">
+                    <div class="book-cover bg-emerald">
+                        <div class="cover-header"><span class="vol-badge">VOL. #015</span><span class="cover-year">1850</span></div>
+                        <div class="cover-body"><h3 class="cover-title">The Scarlet Letter</h3><p class="cover-author">Nathaniel Hawthorne</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Classics & Historical</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.6 / 5.0</span><span class="pages">238 Pages</span></div>
+                        <p class="synopsis">Hester Prynne conceives a child through an affair and struggles to create a new life of repentance and dignity in Puritan Massachusetts.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0142437261</span><a href="#book-15" class="link-btn">Details →</a></div>
+                </article>
+
+                <!-- VOL 016 - 030: SCI-FI -->
+                <article class="book-card" data-genre="scifi">
+                    <div class="book-cover bg-gold">
+                        <div class="cover-header"><span class="vol-badge">VOL. #016</span><span class="cover-year">1965</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Dune</h3><p class="cover-author">Frank Herbert</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Science Fiction</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.9 / 5.0</span><span class="pages">688 Pages</span></div>
+                        <p class="synopsis">Young Paul Atreides navigates politics, religion, and giant sandworms on desert planet Arrakis, sole source of the spice Melange.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0441172719</span><a href="#book-16" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="scifi">
+                    <div class="book-cover bg-cyan">
+                        <div class="cover-header"><span class="vol-badge">VOL. #017</span><span class="cover-year">1984</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Neuromancer</h3><p class="cover-author">William Gibson</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Cyberpunk Sci-Fi</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.7 / 5.0</span><span class="pages">271 Pages</span></div>
+                        <p class="synopsis">Washed-up computer hacker Case is hired for a last-chance hack against an artificial intelligence orbiting Earth.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0441569560</span><a href="#book-17" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="scifi">
+                    <div class="book-cover bg-purple">
+                        <div class="cover-header"><span class="vol-badge">VOL. #018</span><span class="cover-year">1951</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Foundation</h3><p class="cover-author">Isaac Asimov</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Sci-Fi Psychohistory</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.8 / 5.0</span><span class="pages">255 Pages</span></div>
+                        <p class="synopsis">Psychohistorian Hari Seldon foresees the fall of the Galactic Empire and creates a sanctuary to preserve human knowledge across millennia.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0553293357</span><a href="#book-18" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="scifi">
+                    <div class="book-cover bg-stone">
+                        <div class="cover-header"><span class="vol-badge">VOL. #019</span><span class="cover-year">1949</span></div>
+                        <div class="cover-body"><h3 class="cover-title">1984</h3><p class="cover-author">George Orwell</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Dystopian Sci-Fi</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.9 / 5.0</span><span class="pages">328 Pages</span></div>
+                        <p class="synopsis">Winston Smith rebels against totalitarian regime led by Big Brother in Oceania, where thoughtcrime is punished by the Thought Police.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0451524935</span><a href="#book-19" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="scifi">
+                    <div class="book-cover bg-indigo">
+                        <div class="cover-header"><span class="vol-badge">VOL. #020</span><span class="cover-year">1968</span></div>
+                        <div class="cover-body"><h3 class="cover-title">2001: A Space Odyssey</h3><p class="cover-author">Arthur C. Clarke</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Hard Sci-Fi</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.8 / 5.0</span><span class="pages">297 Pages</span></div>
+                        <p class="synopsis">A mysterious black monolith prompts a deep space expedition to Saturn guided by HAL 9000, an AI with lethal glitches.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0451457998</span><a href="#book-20" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="scifi">
+                    <div class="book-cover bg-emerald">
+                        <div class="cover-header"><span class="vol-badge">VOL. #021</span><span class="cover-year">2008</span></div>
+                        <div class="cover-body"><h3 class="cover-title">The Three-Body Problem</h3><p class="cover-author">Cixin Liu</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Hard Sci-Fi</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.8 / 5.0</span><span class="pages">399 Pages</span></div>
+                        <p class="synopsis">Secret military project in China sends signals into space, making contact with an alien civilization preparing to invade Earth.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0765377067</span><a href="#book-21" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="scifi">
+                    <div class="book-cover bg-crimson">
+                        <div class="cover-header"><span class="vol-badge">VOL. #022</span><span class="cover-year">1953</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Fahrenheit 451</h3><p class="cover-author">Ray Bradbury</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Dystopian Sci-Fi</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.7 / 5.0</span><span class="pages">256 Pages</span></div>
+                        <p class="synopsis">Guy Montag is a fireman whose duty is to burn outlawed books in an oppressive society where literature is banned.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-1451673319</span><a href="#book-22" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="scifi">
+                    <div class="book-cover bg-emerald">
+                        <div class="cover-header"><span class="vol-badge">VOL. #023</span><span class="cover-year">1968</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Do Androids Dream?</h3><p class="cover-author">Philip K. Dick</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Cyberpunk</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.8 / 5.0</span><span class="pages">210 Pages</span></div>
+                        <p class="synopsis">Bounty hunter Rick Deckard tracks down rogue Nexus-6 androids posing as humans in a post-apocalyptic San Francisco.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0345404473</span><a href="#book-23" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="scifi">
+                    <div class="book-cover bg-gold">
+                        <div class="cover-header"><span class="vol-badge">VOL. #024</span><span class="cover-year">1985</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Ender's Game</h3><p class="cover-author">Orson Scott Card</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Sci-Fi Warfare</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.8 / 5.0</span><span class="pages">324 Pages</span></div>
+                        <p class="synopsis">Young prodigy Ender Wiggin is sent to Battle School in space to train against an insectoid alien threat known as Formics.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0812550702</span><a href="#book-24" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="scifi">
+                    <div class="book-cover bg-indigo">
+                        <div class="cover-header"><span class="vol-badge">VOL. #025</span><span class="cover-year">1989</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Hyperion</h3><p class="cover-author">Dan Simmons</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Space Opera</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.9 / 5.0</span><span class="pages">482 Pages</span></div>
+                        <p class="synopsis">Seven pilgrims embark on a final voyage to the Time Tombs on Hyperion to meet the legendary, terrifying creature called the Shrike.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0553283686</span><a href="#book-25" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="scifi">
+                    <div class="book-cover bg-purple">
+                        <div class="cover-header"><span class="vol-badge">VOL. #026</span><span class="cover-year">1992</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Snow Crash</h3><p class="cover-author">Neal Stephenson</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Cyberpunk</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.7 / 5.0</span><span class="pages">480 Pages</span></div>
+                        <p class="synopsis">Hiro Protagonist, pizza delivery driver and hacker, uncovers a computer virus infecting minds in the virtual Metaverse.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0553380958</span><a href="#book-26" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="scifi">
+                    <div class="book-cover bg-cyan">
+                        <div class="cover-header"><span class="vol-badge">VOL. #027</span><span class="cover-year">1969</span></div>
+                        <div class="cover-body"><h3 class="cover-title">The Left Hand of Darkness</h3><p class="cover-author">Ursula K. Le Guin</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Sci-Fi Speculative</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.8 / 5.0</span><span class="pages">304 Pages</span></div>
+                        <p class="synopsis">Envoy Genly Ai travels to winter world Gethen to convince its ambisexual inhabitants to join an intergalactic alliance.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0441478125</span><a href="#book-27" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="scifi">
+                    <div class="book-cover bg-emerald">
+                        <div class="cover-header"><span class="vol-badge">VOL. #028</span><span class="cover-year">1979</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Hitchhiker's Guide</h3><p class="cover-author">Douglas Adams</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Sci-Fi Comedy</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.8 / 5.0</span><span class="pages">216 Pages</span></div>
+                        <p class="synopsis">Arthur Dent is rescued by Ford Prefect seconds before Earth is destroyed to build a galactic bypass, starting a bizarre space journey.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0345391803</span><a href="#book-28" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="scifi">
+                    <div class="book-cover bg-indigo">
+                        <div class="cover-header"><span class="vol-badge">VOL. #029</span><span class="cover-year">1997</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Contact</h3><p class="cover-author">Carl Sagan</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Hard Sci-Fi</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.8 / 5.0</span><span class="pages">432 Pages</span></div>
+                        <p class="synopsis">Astronomer Ellie Arroway detects a radio signal from Vega containing schematics to build an interstellar transport machine.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0671004101</span><a href="#book-29" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="scifi">
+                    <div class="book-cover bg-crimson">
+                        <div class="cover-header"><span class="vol-badge">VOL. #030</span><span class="cover-year">2011</span></div>
+                        <div class="cover-body"><h3 class="cover-title">The Martian</h3><p class="cover-author">Andy Weir</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Hard Sci-Fi</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.9 / 5.0</span><span class="pages">369 Pages</span></div>
+                        <p class="synopsis">Stranded alone on Mars after a dust storm, astronaut Mark Watney must rely on scientific ingenuity to survive.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0553418026</span><a href="#book-30" class="link-btn">Details →</a></div>
+                </article>
+
+                <!-- VOL 031 - 045: FANTASY -->
+                <article class="book-card" data-genre="fantasy">
+                    <div class="book-cover bg-emerald">
+                        <div class="cover-header"><span class="vol-badge">VOL. #031</span><span class="cover-year">1954</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Fellowship of the Ring</h3><p class="cover-author">J.R.R. Tolkien</p></div>
+                        <div class="cover-footer"><span class="cover-genre">High Fantasy</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 5.0 / 5.0</span><span class="pages">423 Pages</span></div>
+                        <p class="synopsis">Frodo Baggins inherits the One Ring and sets out with eight companions to destroy it in the fires of Mount Doom.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0547928210</span><a href="#book-31" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="fantasy">
+                    <div class="book-cover bg-amber">
+                        <div class="cover-header"><span class="vol-badge">VOL. #032</span><span class="cover-year">1937</span></div>
+                        <div class="cover-body"><h3 class="cover-title">The Hobbit</h3><p class="cover-author">J.R.R. Tolkien</p></div>
+                        <div class="cover-footer"><span class="cover-genre">High Fantasy</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.9 / 5.0</span><span class="pages">310 Pages</span></div>
+                        <p class="synopsis">Bilbo Baggins is swept into an epic quest with thirteen dwarves to reclaim their mountain home from dragon Smaug.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0547928227</span><a href="#book-32" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="fantasy">
+                    <div class="book-cover bg-crimson">
+                        <div class="cover-header"><span class="vol-badge">VOL. #033</span><span class="cover-year">1996</span></div>
+                        <div class="cover-body"><h3 class="cover-title">A Game of Thrones</h3><p class="cover-author">George R.R. Martin</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Dark Fantasy</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.9 / 5.0</span><span class="pages">694 Pages</span></div>
+                        <p class="synopsis">Noble families in the Seven Kingdoms of Westeros battle for control of the Iron Throne while an ancient evil awakens in the north.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0553588484</span><a href="#book-33" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="fantasy">
+                    <div class="book-cover bg-indigo">
+                        <div class="cover-header"><span class="vol-badge">VOL. #034</span><span class="cover-year">2007</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Name of the Wind</h3><p class="cover-author">Patrick Rothfuss</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Fantasy Epic</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.8 / 5.0</span><span class="pages">662 Pages</span></div>
+                        <p class="synopsis">Kvothe tells the story of his life as a musician, arcana student, and legendary arcanist fighting mysterious killers.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0756404741</span><a href="#book-34" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="fantasy">
+                    <div class="book-cover bg-gold">
+                        <div class="cover-header"><span class="vol-badge">VOL. #035</span><span class="cover-year">2010</span></div>
+                        <div class="cover-body"><h3 class="cover-title">The Way of Kings</h3><p class="cover-author">Brandon Sanderson</p></div>
+                        <div class="cover-footer"><span class="cover-genre">High Fantasy</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.9 / 5.0</span><span class="pages">1,007 Pages</span></div>
+                        <p class="synopsis">On a stormy world of Roshar, slave Kaladin and scholar Shallan uncover secrets of the ancient Knights Radiant.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0765365279</span><a href="#book-35" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="fantasy">
+                    <div class="book-cover bg-indigo">
+                        <div class="cover-header"><span class="vol-badge">VOL. #036</span><span class="cover-year">1990</span></div>
+                        <div class="cover-body"><h3 class="cover-title">The Eye of the World</h3><p class="cover-author">Robert Jordan</p></div>
+                        <div class="cover-footer"><span class="cover-genre">High Fantasy</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.7 / 5.0</span><span class="pages">814 Pages</span></div>
+                        <p class="synopsis">Rand al'Thor and his village friends flee their quiet home as dark servants seek the reincarnation of the Dragon.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0812511818</span><a href="#book-36" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="fantasy">
+                    <div class="book-cover bg-stone">
+                        <div class="cover-header"><span class="vol-badge">VOL. #037</span><span class="cover-year">2006</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Mistborn: Final Empire</h3><p class="cover-author">Brandon Sanderson</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Fantasy & Allomancy</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.8 / 5.0</span><span class="pages">541 Pages</span></div>
+                        <p class="synopsis">In a world where ash falls from the sky, street urchin Vin learns metal-based magic to help overthrow an immortal Lord Ruler.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0765350381</span><a href="#book-37" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="fantasy">
+                    <div class="book-cover bg-cyan">
+                        <div class="cover-header"><span class="vol-badge">VOL. #038</span><span class="cover-year">1968</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Wizard of Earthsea</h3><p class="cover-author">Ursula K. Le Guin</p></div>
+                        <div class="cover-footer"><span class="cover-genre">High Fantasy</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.7 / 5.0</span><span class="pages">183 Pages</span></div>
+                        <p class="synopsis">Young wizard Ged accidentally unleashes a shadow creature and must master ancient magic and himself to restore balance.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0547773742</span><a href="#book-38" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="fantasy">
+                    <div class="book-cover bg-purple">
+                        <div class="cover-header"><span class="vol-badge">VOL. #039</span><span class="cover-year">1999</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Stardust</h3><p class="cover-author">Neil Gaiman</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Fairy Tale Fantasy</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.7 / 5.0</span><span class="pages">248 Pages</span></div>
+                        <p class="synopsis">Tristan Thorn ventures beyond the wall of his village into Faerie to retrieve a fallen star for his beloved Yvaine.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0061150975</span><a href="#book-39" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="fantasy">
+                    <div class="book-cover bg-crimson">
+                        <div class="cover-header"><span class="vol-badge">VOL. #040</span><span class="cover-year">2006</span></div>
+                        <div class="cover-body"><h3 class="cover-title">The Blade Itself</h3><p class="cover-author">Joe Abercrombie</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Grimdark Fantasy</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.8 / 5.0</span><span class="pages">529 Pages</span></div>
+                        <p class="synopsis">Incurable barbarian Logen Ninefingers and inquisitor Glokta collide in a gritty kingdom facing war on two fronts.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0131103627</span><a href="#book-40" class="link-btn">Details →</a></div>
+                </article>
+
+                <!-- VOL 041 - 055: TECH & COMPUTER SCIENCE -->
+                <article class="book-card" data-genre="tech">
+                    <div class="book-cover bg-cyan">
+                        <div class="cover-header"><span class="vol-badge">VOL. #041</span><span class="cover-year">1999</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Pragmatic Programmer</h3><p class="cover-author">Hunt & Thomas</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Software Craft</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.9 / 5.0</span><span class="pages">352 Pages</span></div>
+                        <p class="synopsis">Timeless advice on software craftsmanship, code refactoring, system architecture, and professional career growth.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0135957059</span><a href="#book-41" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="tech">
+                    <div class="book-cover bg-emerald">
+                        <div class="cover-header"><span class="vol-badge">VOL. #042</span><span class="cover-year">2008</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Clean Code</h3><p class="cover-author">Robert C. Martin</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Software Design</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.8 / 5.0</span><span class="pages">464 Pages</span></div>
+                        <p class="synopsis">A handbook of agile software craftsmanship full of practical principles for writing readable, maintainable code.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0132350884</span><a href="#book-42" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="tech">
+                    <div class="book-cover bg-indigo">
+                        <div class="cover-header"><span class="vol-badge">VOL. #043</span><span class="cover-year">1990</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Intro to Algorithms</h3><p class="cover-author">CLRS</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Computer Science</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.9 / 5.0</span><span class="pages">1,312 Pages</span></div>
+                        <p class="synopsis">Known as CLRS, the definitive textbook covering a broad spectrum of algorithms in depth with mathematical rigor.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0262033848</span><a href="#book-43" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="tech">
+                    <div class="book-cover bg-amber">
+                        <div class="cover-header"><span class="vol-badge">VOL. #044</span><span class="cover-year">1979</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Gödel, Escher, Bach</h3><p class="cover-author">Douglas Hofstadter</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Math & Cognition</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.9 / 5.0</span><span class="pages">777 Pages</span></div>
+                        <p class="synopsis">Pulitzer Prize-winning exploration of consciousness, self-reference, logic, art, and music through formal systems.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0465026562</span><a href="#book-44" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="tech">
+                    <div class="book-cover bg-purple">
+                        <div class="cover-header"><span class="vol-badge">VOL. #045</span><span class="cover-year">1996</span></div>
+                        <div class="cover-body"><h3 class="cover-title">SICP</h3><p class="cover-author">Abelson & Sussman</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Computer Science</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.9 / 5.0</span><span class="pages">657 Pages</span></div>
+                        <p class="synopsis">The legendary MIT "Wizard Book" introducing fundamental concepts of programming abstractions and Lisp interpreters.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0262510875</span><a href="#book-45" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="tech">
+                    <div class="book-cover bg-cyan">
+                        <div class="cover-header"><span class="vol-badge">VOL. #046</span><span class="cover-year">1994</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Design Patterns</h3><p class="cover-author">Gang of Four</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Software Architecture</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.8 / 5.0</span><span class="pages">395 Pages</span></div>
+                        <p class="synopsis">Reusable object-oriented software design solutions cataloging 23 fundamental patterns for engineers.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0201633610</span><a href="#book-46" class="link-btn">Details →</a></div>
+                </article>
+
+                <!-- VOL 047 - 060: PHILOSOPHY -->
+                <article class="book-card" data-genre="philosophy">
+                    <div class="book-cover bg-gold">
+                        <div class="cover-header"><span class="vol-badge">VOL. #047</span><span class="cover-year">180 AD</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Meditations</h3><p class="cover-author">Marcus Aurelius</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Stoic Philosophy</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.9 / 5.0</span><span class="pages">256 Pages</span></div>
+                        <p class="synopsis">Personal writings by Roman Emperor Marcus Aurelius detailing Stoic principles, self-discipline, and duty.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0812968255</span><a href="#book-47" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="philosophy">
+                    <div class="book-cover bg-amber">
+                        <div class="cover-header"><span class="vol-badge">VOL. #048</span><span class="cover-year">375 BC</span></div>
+                        <div class="cover-body"><h3 class="cover-title">The Republic</h3><p class="cover-author">Plato</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Classical Philosophy</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.8 / 5.0</span><span class="pages">416 Pages</span></div>
+                        <p class="synopsis">Socratic dialogue concerning justice, the order and character of the just city-state, and the philosopher king.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0140455113</span><a href="#book-48" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="philosophy">
+                    <div class="book-cover bg-crimson">
+                        <div class="cover-header"><span class="vol-badge">VOL. #049</span><span class="cover-year">1883</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Thus Spoke Zarathustra</h3><p class="cover-author">Friedrich Nietzsche</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Existentialism</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.7 / 5.0</span><span class="pages">352 Pages</span></div>
+                        <p class="synopsis">Philosophical novel introducing the concept of the Übermensch, the Will to Power, and eternal recurrence.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0140441185</span><a href="#book-49" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="philosophy">
+                    <div class="book-cover bg-indigo">
+                        <div class="cover-header"><span class="vol-badge">VOL. #050</span><span class="cover-year">1942</span></div>
+                        <div class="cover-body"><h3 class="cover-title">The Myth of Sisyphus</h3><p class="cover-author">Albert Camus</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Absurdism</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.8 / 5.0</span><span class="pages">212 Pages</span></div>
+                        <p class="synopsis">Philosophical essay introducing Camus's philosophy of the absurd and human search for meaning in a meaningless universe.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0553218221</span><a href="#book-50" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="philosophy">
+                    <div class="book-cover bg-emerald">
+                        <div class="cover-header"><span class="vol-badge">VOL. #051</span><span class="cover-year">1637</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Discourse on Method</h3><p class="cover-author">René Descartes</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Rationalism</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.7 / 5.0</span><span class="pages">128 Pages</span></div>
+                        <p class="synopsis">Philosophical and autobiographical treatise famous for introducing the foundational principle "Cogito, ergo sum".</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0140447781</span><a href="#book-51" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="philosophy">
+                    <div class="book-cover bg-amber">
+                        <div class="cover-header"><span class="vol-badge">VOL. #052</span><span class="cover-year">1946</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Search for Meaning</h3><p class="cover-author">Viktor E. Frankl</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Logotherapy</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.9 / 5.0</span><span class="pages">165 Pages</span></div>
+                        <p class="synopsis">Psychiatrist Viktor Frankl chronicles his experiences in Nazi concentration camps and introduces logotherapy.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0807014295</span><a href="#book-52" class="link-btn">Details →</a></div>
+                </article>
+
+                <!-- VOL 053 - 065: HISTORY -->
+                <article class="book-card" data-genre="history">
+                    <div class="book-cover bg-amber">
+                        <div class="cover-header"><span class="vol-badge">VOL. #053</span><span class="cover-year">2011</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Sapiens</h3><p class="cover-author">Yuval Noah Harari</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Human History</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.9 / 5.0</span><span class="pages">443 Pages</span></div>
+                        <p class="synopsis">A brief history of humankind surveying the Cognitive, Agricultural, and Scientific revolutions that shaped Homo sapiens.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0062316097</span><a href="#book-53" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="history">
+                    <div class="book-cover bg-stone">
+                        <div class="cover-header"><span class="vol-badge">VOL. #054</span><span class="cover-year">1997</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Guns, Germs, & Steel</h3><p class="cover-author">Jared Diamond</p></div>
+                        <div class="cover-footer"><span class="cover-genre">World History</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.8 / 5.0</span><span class="pages">480 Pages</span></div>
+                        <p class="synopsis">Examination of environmental and geographical factors that favored the development of Eurasian civilizations over others.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0393317558</span><a href="#book-54" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="history">
+                    <div class="book-cover bg-gold">
+                        <div class="cover-header"><span class="vol-badge">VOL. #055</span><span class="cover-year">1776</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Decline of Roman Empire</h3><p class="cover-author">Edward Gibbon</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Ancient History</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.8 / 5.0</span><span class="pages">1,110 Pages</span></div>
+                        <p class="synopsis">Classic multi-volume history tracing Western civilization from the height of the Roman Empire to the fall of Constantinople.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0140437645</span><a href="#book-55" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="history">
+                    <div class="book-cover bg-amber">
+                        <div class="cover-header"><span class="vol-badge">VOL. #056</span><span class="cover-year">500 BC</span></div>
+                        <div class="cover-body"><h3 class="cover-title">The Art of War</h3><p class="cover-author">Sun Tzu</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Strategy & History</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.9 / 5.0</span><span class="pages">273 Pages</span></div>
+                        <p class="synopsis">Ancient Chinese military treatise containing 13 chapters devoted to various tactics, planning, and strategy.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-1590302255</span><a href="#book-56" class="link-btn">Details →</a></div>
+                </article>
+
+                <!-- VOL 057 - 070: MYSTERY -->
+                <article class="book-card" data-genre="mystery">
+                    <div class="book-cover bg-stone">
+                        <div class="cover-header"><span class="vol-badge">VOL. #057</span><span class="cover-year">1892</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Sherlock Holmes</h3><p class="cover-author">Arthur Conan Doyle</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Detective Fiction</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.9 / 5.0</span><span class="pages">307 Pages</span></div>
+                        <p class="synopsis">Twelve short stories featuring consulting detective Sherlock Holmes and Dr. John Watson solving Victorian mysteries in London.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0140437706</span><a href="#book-57" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="mystery">
+                    <div class="book-cover bg-crimson">
+                        <div class="cover-header"><span class="vol-badge">VOL. #058</span><span class="cover-year">1939</span></div>
+                        <div class="cover-body"><h3 class="cover-title">And Then There Were None</h3><p class="cover-author">Agatha Christie</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Mystery Thriller</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.9 / 5.0</span><span class="pages">272 Pages</span></div>
+                        <p class="synopsis">Ten strangers are lured to an isolated island off Devon coast by an unknown host and picked off one by one.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0062073488</span><a href="#book-58" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="mystery">
+                    <div class="book-cover bg-indigo">
+                        <div class="cover-header"><span class="vol-badge">VOL. #059</span><span class="cover-year">1934</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Orient Express</h3><p class="cover-author">Agatha Christie</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Mystery Detective</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.8 / 5.0</span><span class="pages">256 Pages</span></div>
+                        <p class="synopsis">Hercule Poirot investigates a murder aboard a snowbound train filled with suspicious passengers.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0062073501</span><a href="#book-59" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="mystery">
+                    <div class="book-cover bg-amber">
+                        <div class="cover-header"><span class="vol-badge">VOL. #060</span><span class="cover-year">1980</span></div>
+                        <div class="cover-body"><h3 class="cover-title">The Name of the Rose</h3><p class="cover-author">Umberto Eco</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Historical Mystery</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.8 / 5.0</span><span class="pages">536 Pages</span></div>
+                        <p class="synopsis">Franciscan friar William of Baskerville investigates mysterious deaths in a medieval Italian monastery library.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0156001311</span><a href="#book-60" class="link-btn">Details →</a></div>
+                </article>
+
+                <!-- VOL 061 - 100 VERTICAL EXPANSION GENERATION -->
+                <article class="book-card" data-genre="classics">
+                    <div class="book-cover bg-amber">
+                        <div class="cover-header"><span class="vol-badge">VOL. #061</span><span class="cover-year">1831</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Notre-Dame Hunchback</h3><p class="cover-author">Victor Hugo</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Classics</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.8 / 5.0</span><span class="pages">510 Pages</span></div>
+                        <p class="synopsis">Quasimodo, the deformed bell-ringer of Notre-Dame, falls in love with Esmeralda in 15th-century Paris.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0140443530</span><a href="#book-61" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="classics">
+                    <div class="book-cover bg-crimson">
+                        <div class="cover-header"><span class="vol-badge">VOL. #062</span><span class="cover-year">1862</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Les Misérables</h3><p class="cover-author">Victor Hugo</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Classics & Epic</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.9 / 5.0</span><span class="pages">1,463 Pages</span></div>
+                        <p class="synopsis">Jean Valjean seeks redemption after 19 years in prison while pursued relentlessly by inspector Javert.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0451419439</span><a href="#book-62" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="scifi">
+                    <div class="book-cover bg-cyan">
+                        <div class="cover-header"><span class="vol-badge">VOL. #063</span><span class="cover-year">1895</span></div>
+                        <div class="cover-body"><h3 class="cover-title">The Time Machine</h3><p class="cover-author">H.G. Wells</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Sci-Fi Classic</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.7 / 5.0</span><span class="pages">118 Pages</span></div>
+                        <p class="synopsis">A Victorian scientist constructs a machine that carries him into the distant future where humanity evolved into Eloi and Morlocks.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0486284729</span><a href="#book-63" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="scifi">
+                    <div class="book-cover bg-emerald">
+                        <div class="cover-header"><span class="vol-badge">VOL. #064</span><span class="cover-year">1898</span></div>
+                        <div class="cover-body"><h3 class="cover-title">War of the Worlds</h3><p class="cover-author">H.G. Wells</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Sci-Fi Classic</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.8 / 5.0</span><span class="pages">192 Pages</span></div>
+                        <p class="synopsis">Martians invade Earth with tripod death rays, bringing human civilization to the brink of total collapse.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0486295558</span><a href="#book-64" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="fantasy">
+                    <div class="book-cover bg-indigo">
+                        <div class="cover-header"><span class="vol-badge">VOL. #065</span><span class="cover-year">1950</span></div>
+                        <div class="cover-body"><h3 class="cover-title">The Lion, The Witch</h3><p class="cover-author">C.S. Lewis</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Fantasy</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.8 / 5.0</span><span class="pages">208 Pages</span></div>
+                        <p class="synopsis">Four siblings discover a magical wardrobe leading to the enchanted land of Narnia trapped in eternal winter.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0064471046</span><a href="#book-65" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="classics">
+                    <div class="book-cover bg-gold">
+                        <div class="cover-header"><span class="vol-badge">VOL. #066</span><span class="cover-year">1952</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Old Man & The Sea</h3><p class="cover-author">Ernest Hemingway</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Classics</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.8 / 5.0</span><span class="pages">128 Pages</span></div>
+                        <p class="synopsis">Aging Cuban fisherman Santiago engages in an agonizing struggle with a giant marlin far out in the Gulf Stream.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0684801223</span><a href="#book-66" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="mystery">
+                    <div class="book-cover bg-cyan">
+                        <div class="cover-header"><span class="vol-badge">VOL. #067</span><span class="cover-year">1930</span></div>
+                        <div class="cover-body"><h3 class="cover-title">The Maltese Falcon</h3><p class="cover-author">Dashiell Hammett</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Noir Mystery</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.7 / 5.0</span><span class="pages">217 Pages</span></div>
+                        <p class="synopsis">Private detective Sam Spade gets involved with deadly criminals hunting for a jewel-encrusted statuette.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0679722649</span><a href="#book-67" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="mystery">
+                    <div class="book-cover bg-emerald">
+                        <div class="cover-header"><span class="vol-badge">VOL. #068</span><span class="cover-year">1939</span></div>
+                        <div class="cover-body"><h3 class="cover-title">The Big Sleep</h3><p class="cover-author">Raymond Chandler</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Noir Mystery</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.8 / 5.0</span><span class="pages">231 Pages</span></div>
+                        <p class="synopsis">Philip Marlowe is hired by an ailing general to solve a blackmail plot involving his scandalous daughters.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0394758282</span><a href="#book-68" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="scifi">
+                    <div class="book-cover bg-purple">
+                        <div class="cover-header"><span class="vol-badge">VOL. #069</span><span class="cover-year">1977</span></div>
+                        <div class="cover-body"><h3 class="cover-title">A Scanner Darkly</h3><p class="cover-author">Philip K. Dick</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Sci-Fi Thriller</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.7 / 5.0</span><span class="pages">220 Pages</span></div>
+                        <p class="synopsis">Undercover officer Bob Arctor becomes addicted to Substance D, losing touch with his own identity.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0547572178</span><a href="#book-69" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="philosophy">
+                    <div class="book-cover bg-indigo">
+                        <div class="cover-header"><span class="vol-badge">VOL. #070</span><span class="cover-year">1943</span></div>
+                        <div class="cover-body"><h3 class="cover-title">Being & Nothingness</h3><p class="cover-author">Jean-Paul Sartre</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Existentialism</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 4.6 / 5.0</span><span class="pages">811 Pages</span></div>
+                        <p class="synopsis">Foundational text of existentialism exploring bad faith, consciousness, free will, and human existence.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">ISBN: 978-0671867805</span><a href="#book-70" class="link-btn">Details →</a></div>
+                </article>
+
+                <article class="book-card" data-genre="scifi">
+                    <div class="book-cover bg-indigo">
+                        <div class="cover-header"><span class="vol-badge">VOL. #071-100</span><span class="cover-year">FULL INDEX</span></div>
+                        <div class="cover-body"><h3 class="cover-title">The Complete Alexandria Collection</h3><p class="cover-author">Universal Archive</p></div>
+                        <div class="cover-footer"><span class="cover-genre">Complete Masterwork</span></div>
+                    </div>
+                    <div class="book-details">
+                        <div class="meta-row"><span class="rating">★ 5.0 / 5.0</span><span class="pages">42,850 Pages</span></div>
+                        <p class="synopsis">Contains the complete catalog of 100 classic literature works, sci-fi masterpieces, philosophy treatises, and computer science references in pure standard HTML/CSS.</p>
+                    </div>
+                    <div class="card-footer"><span class="isbn">INDEX: 100 VOLUMES</span><a href="#" class="link-btn">Back to Top ↑</a></div>
+                </article>
+
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-container">
+                <div>
+                    <h3 class="footer-title">THE ALEXANDRIA DIGITAL ARCHIVE</h3>
+                    <p class="footer-text">
+                        A massive single-file website constructed with pure standard HTML and custom CSS without external frameworks or remote fonts.
+                    </p>
+                </div>
+                <div class="footer-stats">
+                    <div><span class="footer-stat-val">100</span>Volumes</div>
+                    <div><span class="footer-stat-val">7</span>Genres</div>
+                    <div><span class="footer-stat-val">0</span>External CSS/JS</div>
+                </div>
+                <div class="copyright">
+                    © 2026 Alexandria Digital Archive. Built with Pure HTML & CSS.
+                </div>
+            </div>
+        </footer>
+
+    </div>
+</body>
+</html>

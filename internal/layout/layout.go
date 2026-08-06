@@ -22,6 +22,7 @@ import (
 	"gowkhtmltopdf/internal/css"
 	"gowkhtmltopdf/internal/html"
 	"gowkhtmltopdf/internal/pdf"
+	"gowkhtmltopdf/internal/svg"
 )
 
 // Options controls a Layout run.
@@ -37,6 +38,10 @@ type Options struct {
 	Background bool    // paint background colors
 	DebugBoxes bool    // outline every box for test/golden output
 	Zoom       float64 // zoom factor; style lengths are scaled by it (any positive value, < 1 shrinks)
+	// PrintLinkUnderline is an opt-in operator policy (--print-link-underline):
+	// after cascade, force text-decoration:underline on a[href]. Default off
+	// so author CSS (including inherit → none) is honored.
+	PrintLinkUnderline bool
 }
 
 // Result is a display list plus the canvas bounds.
@@ -145,6 +150,13 @@ type engine struct {
 	stickySeq int // monotonically increasing sticky box IDs (for Op.StickyID)
 	// transformCBDepth counts ancestors with transform≠none; fixed→absolute CB.
 	transformCBDepth int
+	// imgMaxW > 0 clamps replaced <img> boxes to this containing-block width
+	// (table cell / float / inline formatting context).
+	imgMaxW float64
+	// bfcFloats is the floatState of the nearest enclosing BFC. Ordinary
+	// blocks reuse it so floats affect later siblings; BFC roots push a
+	// fresh state (see pushBFCFloats).
+	bfcFloats *floatState
 }
 
 // faceFor selects the TrueType face for a resolved style (bold/italic),
@@ -186,6 +198,13 @@ func (e *engine) faceForRune(st ResolvedStyle, r rune) *pdf.Font {
 	}
 	if e.font != nil && e.font.GlyphID(r) != 0 {
 		return e.font
+	}
+	// Last resort: any opt-in registry face that covers this codepoint
+	// (DejaVu/Noto when --font-path / --use-system-fonts scanned them).
+	if e.registry != nil {
+		if f := e.registry.FindWithGlyph(r, st.FontWeight, st.FontItalic); f != nil {
+			return f
+		}
 	}
 	return e.faceFor(st)
 }
@@ -245,22 +264,22 @@ func Layout(root *html.Node, opts Options) (*Result, error) {
 	}
 
 	// Pass 1: cascade without @container (used sizes unknown).
-	styles := resolveStyles(root, opts.Sheets, opts.Media, opts.Width, opts.Height)
+	styles := resolveStylesOpts(root, opts)
 	// After definite inline sizes of size containers are known, re-cascade so
 	// matching @container rules apply, then lay out once with final styles.
 	if css.HasContainerRules(opts.Sheets) {
 		cinfo := measureSizeContainers(root, styles, opts.Width)
 		if len(cinfo) > 0 {
-			styles = resolveStylesWithContainers(root, opts.Sheets, opts.Media, opts.Width, opts.Height, cinfo)
+			styles = resolveStylesWithContainersOpts(root, opts, cinfo)
 			// One nested remount: @container may change nested container-type.
 			cinfo2 := measureSizeContainers(root, styles, opts.Width)
 			if len(cinfo2) != len(cinfo) {
-				styles = resolveStylesWithContainers(root, opts.Sheets, opts.Media, opts.Width, opts.Height, cinfo2)
+				styles = resolveStylesWithContainersOpts(root, opts, cinfo2)
 			} else {
 				for n, a := range cinfo {
 					b, ok := cinfo2[n]
 					if !ok || a.inlineSize != b.inlineSize || a.names != b.names {
-						styles = resolveStylesWithContainers(root, opts.Sheets, opts.Media, opts.Width, opts.Height, cinfo2)
+						styles = resolveStylesWithContainersOpts(root, opts, cinfo2)
 						break
 					}
 				}
@@ -306,8 +325,15 @@ type box struct {
 	firstBaseline  float64
 	// table cells
 	col, span int
-	contentW  float64
-	contentH  float64
+	rowSpan   int // vertical span (default 1) for <td rowspan>
+	// rowBoxH is the height of the cell's starting row only. For rowspan>1,
+	// h covers the full span (background/borders) while rowBoxH is what
+	// rowsIntact uses so bottom-edge paint ops do not make the first row
+	// look multi-page.
+	rowBoxH    float64
+	contentW   float64 // max-content border-box (preferred column contribution)
+	contentMin float64 // min-content border-box (shrink floor)
+	contentH   float64
 	// rows[i] holds the cell boxes of table row i, in document order. The
 	// row's op range is from rows[i][0].opStart to rows[i][len-1].opEnd.
 	rows [][]*box
@@ -385,7 +411,16 @@ func (e *engine) build(n *html.Node, availW, x, y float64) *box {
 		b = e.buildMulticol(n, st, availW, x, y)
 	}
 	if b == nil && isTableDisplay(st.Display) {
-		b = e.buildTable(n, st, availW, x, y)
+		// MediaWiki thumbs use figure{display:table;float:right} purely for
+		// shrink-to-fit. Routing those through buildTable drops nested <img>
+		// (no table-row/cell structure) and leaves empty floated boxes that
+		// clear following paragraphs with huge gaps. Treat non-table hosts
+		// without table-structure children as ordinary blocks.
+		if useBlockForTableDisplay(n) {
+			b = e.buildBlock(n, st, availW, x, y)
+		} else {
+			b = e.buildTable(n, st, availW, x, y)
+		}
 	}
 	if b == nil {
 		b = e.buildBlock(n, st, availW, x, y)
@@ -411,6 +446,28 @@ func isTableDisplay(d string) bool {
 		return true
 	}
 	return false
+}
+
+// useBlockForTableDisplay reports elements that set display:table only for
+// shrink-to-fit (wiki figure thumbs) rather than real tabular structure.
+func useBlockForTableDisplay(n *html.Node) bool {
+	if n == nil || n.Type != html.ElementNode {
+		return false
+	}
+	if n.Name == "table" {
+		return false
+	}
+	// Real tables nest tr/tbody/thead/tfoot/colgroup; figures nest a/img/figcaption.
+	for _, c := range n.Children {
+		if c.Type != html.ElementNode {
+			continue
+		}
+		switch c.Name {
+		case "tr", "tbody", "thead", "tfoot", "colgroup", "col", "caption":
+			return false
+		}
+	}
+	return true
 }
 
 // buildBlock lays out a block-level box.
@@ -486,14 +543,19 @@ func (e *engine) buildBlock(n *html.Node, st ResolvedStyle, availW, x, y float64
 	contentStart := len(e.ops)
 
 	cy := e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)
+	pop, enclose := e.pushBFCFloats(st, contentX, contentW)
 	cy = e.flowChildren(b, n.Children, st, contentW, contentX, y, cy)
+	if enclose && e.bfcFloats != nil {
+		cy = e.bfcFloats.extentCy(y, cy)
+	}
+	pop()
 	// padding-bottom is inside the border box (space above border-bottom /
 	// letterhead rules — fixture-07/16).
 	cy += e.scalePt(st.PaddingBottom)
 
-	// list marker
+	// list marker (outside the principal box content — in the marker area)
 	if n.Name == "li" && b.firstBaseline > 0 {
-		e.add(Op{Kind: OpBullet, X: contentX + 4, Y: b.firstBaseline, Text: "\u2022", Font: e.font, Size: e.scalePt(st.FontSize), R: st.Color[0], G: st.Color[1], B: st.Color[2]})
+		e.emitListMarker(n, st, contentX, b.firstBaseline)
 	}
 
 	if h, ok := resolveUsedHeight(st, -1, e); ok {
@@ -684,7 +746,7 @@ func (e *engine) partition(children []*html.Node, blocks, inlines *[]*html.Node)
 			*blocks = append(*blocks, c)
 			continue
 		}
-		if cs.Display == "inline" || cs.Display == "inline-block" || cs.Display == "inline-flex" || c.Name == "img" {
+		if e.isInlineChild(c) {
 			*inlines = append(*inlines, c)
 			continue
 		}
@@ -704,7 +766,17 @@ func (e *engine) isInlineChild(n *html.Node) bool {
 	if cs.Display == "none" || cs.Float != "none" || cs.Position == "absolute" || cs.Position == "fixed" {
 		return false
 	}
-	return cs.Display == "inline" || cs.Display == "inline-block" || cs.Display == "inline-flex" || n.Name == "img"
+	// <img> is replaced and UA-default inline-block, but author CSS may set
+	// display:block (wiki .mw-logo-wordmark / .mw-logo-tagline stack).
+	if n.Name == "img" {
+		switch cs.Display {
+		case "block", "flex", "grid", "table", "list-item", "flow-root":
+			return false
+		default:
+			return true
+		}
+	}
+	return cs.Display == "inline" || cs.Display == "inline-block" || cs.Display == "inline-flex"
 }
 
 // onlyCollapsibleWS reports whether every node is a text node of only
@@ -726,9 +798,17 @@ func onlyCollapsibleWS(nodes []*html.Node) bool {
 // out of flow with a lite exclusion model; clear advances past them.
 // Returns the advanced content height (cy end − cy start contribution is
 // encoded as the final cy relative to start; callers pass starting cy).
+// Float enclosure (extentCy) is the caller's job when it owns a BFC.
 func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedStyle, contentW, contentX, y, cy float64) float64 {
 	prevBottom := 0.0
-	floats := newFloatState(contentX, contentW)
+	var local floatState
+	floats := e.bfcFloats
+	if floats == nil {
+		// Defensive: callers should pushBFCFloats first. Keep a local state
+		// so isolated measure passes (layoutCell) still work.
+		local = newFloatState(contentX, contentW)
+		floats = &local
+	}
 	var deferred []*html.Node
 	// Absolute/fixed containing-block origin is the content edge at entry.
 	// Do not use the post-flow cy or deferred boxes sit below in-flow siblings.
@@ -763,7 +843,7 @@ func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedSty
 		if n.Type == html.ElementNode && e.styles[n].Float != "none" {
 			cs := e.styles[n]
 			cy = floats.clear(cs.Clear, y, cy)
-			fb := e.placeFloat(n, cs, &floats, contentW, contentX, y, cy)
+			fb := e.placeFloat(n, cs, floats, contentW, contentX, y, cy)
 			if fb != nil && parent != nil {
 				parent.children = append(parent.children, fb)
 				if e.opts.DebugBoxes {
@@ -806,8 +886,7 @@ func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedSty
 				if pb == nil {
 					pb = &box{style: st}
 				}
-				ix, iw := floats.exclusion(y, cy)
-				h := e.layoutInline(pb, run, iw, ix, y+cy)
+				h := e.layoutInlineFloats(pb, run, contentW, contentX, y+cy, floats)
 				cy += h
 				if h > 0 {
 					prevBottom = 0
@@ -829,7 +908,16 @@ func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedSty
 		}
 		cy = floats.clear(clear, y, cy)
 		cy += collapseMargins(prevBottom, e.scalePt(cs.MarginTop))
-		bx, bw := floats.exclusion(y, cy)
+		// CSS2.1 §9.5: line boxes next to floats are shortened, not the
+		// block box — so normal paragraphs get full content width and
+		// re-query exclusion per line (wiki "Leading roles" reclaim).
+		// §9.5 / BFC: flow-root, overflow≠visible, flex, etc. must not
+		// overlap float margin boxes — otherwise heading border-bottom
+		// paints through the infobox (wiki .mw-heading{display:flow-root}).
+		bx, bw := contentX, contentW
+		if establishesBFC(cs) {
+			bx, bw = floats.exclusion(contentX, contentW, y, cy)
+		}
 		cb := e.build(n, bw, bx, y+cy)
 		if cb == nil {
 			prevBottom = 0
@@ -852,7 +940,136 @@ func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedSty
 			parent.children = append(parent.children, ab)
 		}
 	}
-	return floats.extentCy(y, cy)
+	return cy
+}
+
+// pushBFCFloats installs a floatState for the current box. When the box
+// establishes a BFC (or is the root), a fresh state is used and enclose is
+// true so the caller should extend height with extentCy. Otherwise the
+// parent BFC's state is reused and floats may protrude.
+func (e *engine) pushBFCFloats(st ResolvedStyle, contentX, contentW float64) (pop func(), enclose bool) {
+	prev := e.bfcFloats
+	if prev == nil || establishesBFC(st) {
+		fs := newFloatState(contentX, contentW)
+		e.bfcFloats = &fs
+		return func() { e.bfcFloats = prev }, true
+	}
+	return func() { e.bfcFloats = prev }, false
+}
+
+// emitListMarker paints the list marker in the marker area to the left of
+// the content edge so it does not overlap the principal text.
+func (e *engine) emitListMarker(n *html.Node, st ResolvedStyle, contentX, baseline float64) {
+	typ := st.ListStyleType
+	if typ == "" {
+		typ = "disc"
+	}
+	if typ == "none" {
+		return
+	}
+	size := e.scalePt(st.FontSize)
+	face := e.faceFor(st)
+	var text string
+	switch typ {
+	case "disc":
+		text = "\u2022"
+	case "circle":
+		text = "\u25E6"
+	case "square":
+		text = "\u25AA"
+	case "decimal", "decimal-leading-zero":
+		text = strconv.Itoa(listItemIndex(n)) + "."
+	case "lower-alpha", "lower-latin":
+		text = alphaMarker(listItemIndex(n), false) + "."
+	case "upper-alpha", "upper-latin":
+		text = alphaMarker(listItemIndex(n), true) + "."
+	case "lower-roman":
+		text = romanMarker(listItemIndex(n), false) + "."
+	case "upper-roman":
+		text = romanMarker(listItemIndex(n), true) + "."
+	default:
+		text = "\u2022"
+	}
+	mw := 0.0
+	if face != nil {
+		for _, r := range text {
+			mw += face.AdvanceInPoints(r, size)
+		}
+	}
+	if mw <= 0 {
+		mw = size * float64(len([]rune(text))) * 0.5
+	}
+	// Outside marker: sit in the padding/margin gutter left of contentX.
+	gap := size * 0.35
+	x := contentX - gap - mw
+	if x < 0 {
+		x = 0
+	}
+	e.add(Op{
+		Kind: OpBullet, X: x, Y: baseline, Text: text, Font: face, Size: size,
+		R: st.Color[0], G: st.Color[1], B: st.Color[2],
+	})
+}
+
+// listItemIndex is the 1-based index among element siblings that are list items.
+func listItemIndex(n *html.Node) int {
+	if n == nil || n.Parent == nil {
+		return 1
+	}
+	i := 0
+	for _, c := range n.Parent.Children {
+		if c.Type != html.ElementNode {
+			continue
+		}
+		if !strings.EqualFold(c.Name, "li") {
+			continue
+		}
+		i++
+		if c == n {
+			return i
+		}
+	}
+	return 1
+}
+
+func alphaMarker(n int, upper bool) string {
+	if n < 1 {
+		n = 1
+	}
+	var chars []byte
+	for n > 0 {
+		n--
+		ch := byte('a' + (n % 26))
+		if upper {
+			ch = byte('A' + (n % 26))
+		}
+		chars = append(chars, ch)
+		n /= 26
+	}
+	for i, j := 0, len(chars)-1; i < j; i, j = i+1, j-1 {
+		chars[i], chars[j] = chars[j], chars[i]
+	}
+	return string(chars)
+}
+
+func romanMarker(n int, upper bool) string {
+	if n < 1 {
+		n = 1
+	}
+	vals := []int{1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1}
+	syms := []string{"m", "cm", "d", "cd", "c", "xc", "l", "xl", "x", "ix", "v", "iv", "i"}
+	var b strings.Builder
+	for i, v := range vals {
+		for n >= v {
+			b.WriteString(syms[i])
+			n -= v
+		}
+	}
+	s := b.String()
+	if upper {
+		return strings.ToUpper(s)
+	}
+	return s
 }
 
 // placeFloat lays out n as a float:left|right box and records it in floats.
@@ -866,6 +1083,13 @@ func (e *engine) placeFloat(n *html.Node, cs ResolvedStyle, floats *floatState, 
 			// Size containment: intrinsic inline size as-if-empty (padding+border
 			// only) so used size does not depend on descendants.
 			intr = e.scalePt(cs.PaddingLeft) + e.scalePt(cs.PaddingRight) +
+				e.scalePt(cs.BorderLeft.Width) + e.scalePt(cs.BorderRight.Width) +
+				e.scalePt(cs.MarginLeft) + e.scalePt(cs.MarginRight)
+		} else if imgW := e.measureLargestImageWidth(n); imgW > 0 {
+			// Wiki thumbs: size the float to the image, not the unwrapped
+			// figcaption max-content (which letterboxed images in a wide frame).
+			intr = imgW +
+				e.scalePt(cs.PaddingLeft) + e.scalePt(cs.PaddingRight) +
 				e.scalePt(cs.BorderLeft.Width) + e.scalePt(cs.BorderRight.Width) +
 				e.scalePt(cs.MarginLeft) + e.scalePt(cs.MarginRight)
 		} else {
@@ -921,7 +1145,16 @@ func (e *engine) placeFloat(n *html.Node, cs ResolvedStyle, floats *floatState, 
 		}
 	}
 
+	oldMax := e.imgMaxW
+	if cs.Width >= 0 {
+		e.imgMaxW = e.scalePt(cs.Width)
+	} else if cs.WidthPercent >= 0 && contentW > 0 {
+		e.imgMaxW = contentW * cs.WidthPercent / 100
+	} else if avail > 0 && avail < contentW {
+		e.imgMaxW = avail
+	}
 	fb := e.build(n, avail, fx, fy)
+	e.imgMaxW = oldMax
 	if fb == nil {
 		return nil
 	}
@@ -935,14 +1168,15 @@ func (e *engine) placeFloat(n *html.Node, cs ResolvedStyle, floats *floatState, 
 		fb.x, fb.y = contentX, fy
 		e.shiftBoxOps(fb, dx, dy)
 	}
+	ml := e.scalePt(cs.MarginLeft)
+	mr := e.scalePt(cs.MarginRight)
 	if cs.Float == "right" {
-		mr := e.scalePt(cs.MarginRight)
 		wantX := contentX + contentW - fb.w - mr
 		dx := wantX - fb.x
 		fb.x = wantX
 		e.shiftBoxOps(fb, dx, 0)
 	}
-	floats.place(cs.Float, fb)
+	floats.place(cs.Float, fb, ml, mr)
 	return fb
 }
 
@@ -993,7 +1227,9 @@ func (e *engine) buildImage(n *html.Node, st ResolvedStyle, x, y float64) *box {
 	src := n.Attribute("src")
 	if src != "" && e.opts.Images != nil {
 		if data, err := e.opts.Images(src); err == nil {
-			if w, h, jpeg, ok := imageDims(data); ok {
+			if png, pw, ph, err := svg.Rasterize(data, 1024); err == nil {
+				b.imgSrc, b.imgData, b.imgJPEG, b.imgW, b.imgH = src, png, false, pw, ph
+			} else if w, h, jpeg, ok := imageDims(data); ok {
 				b.imgSrc, b.imgData, b.imgJPEG, b.imgW, b.imgH = src, data, jpeg, w, h
 			}
 		}
@@ -1019,19 +1255,47 @@ func (e *engine) buildImage(n *html.Node, st ResolvedStyle, x, y float64) *box {
 	if st.Height >= 0 {
 		b.h = e.scalePt(st.Height)
 	}
-	if st.MaxWidth >= 0 && b.w > e.scalePt(st.MaxWidth) {
-		b.h = b.h * e.scalePt(st.MaxWidth) / b.w
-		b.w = e.scalePt(st.MaxWidth)
+	maxW := -1.0
+	if st.MaxWidth >= 0 {
+		maxW = e.scalePt(st.MaxWidth)
+	}
+	if st.MaxWidthPercent >= 0 {
+		cb := e.imgMaxW
+		if cb <= 0 {
+			cb = e.opts.Width
+		}
+		if cb > 0 {
+			pct := cb * st.MaxWidthPercent / 100
+			if maxW < 0 || pct < maxW {
+				maxW = pct
+			}
+		}
+	}
+	// imgMaxW caps auto-sized images inside floats/narrow BFCs. A definite
+	// CSS width (wiki wordmark 8.75em) must win — otherwise header logos
+	// collapse to a few points beside the globe icon.
+	if st.Width < 0 && e.imgMaxW > 0 && (maxW < 0 || e.imgMaxW < maxW) {
+		maxW = e.imgMaxW
+	}
+	if maxW >= 0 && b.w > maxW && b.w > 0 {
+		b.h = b.h * maxW / b.w
+		b.w = maxW
 	}
 	if st.MaxHeight >= 0 && b.h > e.scalePt(st.MaxHeight) {
 		b.w = b.w * e.scalePt(st.MaxHeight) / b.h
 		b.h = e.scalePt(st.MaxHeight)
 	}
-	// Float (and other out-of-line) images paint here; in-flow <img> is
-	// collected into the inline formatting context and painted on the line.
-	if st.Float != "none" && b.imgData != nil {
-		e.add(Op{Kind: OpImage, X: x, Y: y, W: b.w, H: b.h,
-			Image: b.imgData, ImgW: b.imgW, ImgH: b.imgH, IsJPEG: b.imgJPEG})
+	// Paint replaced images that are not deferred to the inline line box.
+	// Inline/inline-block <img> is collected by collectInline and painted in
+	// emitLine; block-level and floated images paint here (wiki logo tagline
+	// uses display:block and must stack under the wordmark).
+	if b.imgData != nil {
+		inlineLevel := st.Display == "inline" || st.Display == "inline-block" ||
+			st.Display == "inline-flex" || st.Display == ""
+		if st.Float != "none" || !inlineLevel {
+			e.add(Op{Kind: OpImage, X: x, Y: y, W: b.w, H: b.h,
+				Image: b.imgData, ImgW: b.imgW, ImgH: b.imgH, IsJPEG: b.imgJPEG})
+		}
 	}
 	return b
 }
@@ -1121,68 +1385,153 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 	}
 	collect(n, false)
 
+	// Drop completely empty rows (no cell elements) before geometry. Empty
+	// <tr></tr> / filter residue would otherwise force a min row band and a
+	// phantom bordered strip above real headers. Rows that only exist as
+	// rowspan continuation slots still appear once cells are placed — those
+	// come from rowspan, not from empty tr nodes.
+	//
+	// headerRows was counted from thead during collect; stripping empty
+	// thead rows invalidates that count — recompute after strip.
+	rows = stripEmptyTableRows(rows)
+	if headerRows > len(rows) {
+		headerRows = len(rows)
+	}
+	// If thead contributed only empty rows, fall through to leading-th.
+	if headerRows > 0 {
+		// Verify leading rows still look like headers (all th); otherwise
+		// the count was empty-thead noise.
+		if countLeadingTHRows(rows[:headerRows]) != headerRows {
+			headerRows = 0
+		}
+	}
+
+	// Tables without <thead> often still use a leading row of <th> cells as
+	// column headers (common HTML pattern). Treat consecutive leading all-th
+	// rows as repeating headers for multi-page tables — generic, not site CSS.
+	if headerRows == 0 {
+		headerRows = countLeadingTHRows(rows)
+	}
+
 	tb := &box{node: n, style: st, kind: "table", x: x, y: y, headerRows: headerRows}
 	if len(rows) == 0 {
 		return tb
 	}
 
-	// determine columns, honoring colspan
+	// Occupancy grid for rowspan: occupied[r][c] counts remaining rows that
+	// column c is covered by a prior rowspan (including the current row).
+	nRows := len(rows)
+	// Pass 1: assign each cell a column index honoring rowspan holes, and
+	// discover nCols.
+	type tcell struct {
+		node         *html.Node
+		row, col     int
+		cSpan, rSpan int
+	}
+	var placed []tcell
+	occupied := make([][]int, nRows) // per-row remaining coverage counts
 	nCols := 0
-	for _, r := range rows {
-		col := 0
-		for _, cell := range r {
-			col += colSpan(cell)
+	for ri, r := range rows {
+		if occupied[ri] == nil {
+			occupied[ri] = make([]int, nCols)
 		}
-		if col > nCols {
-			nCols = col
+		ci := 0
+		for _, cellNode := range r {
+			cs, rs := colSpan(cellNode), cellRowSpan(cellNode)
+			if cs < 1 {
+				cs = 1
+			}
+			if rs < 1 {
+				rs = 1
+			}
+			for ci < len(occupied[ri]) && occupied[ri][ci] > 0 {
+				ci++
+			}
+			for len(occupied[ri]) < ci+cs {
+				occupied[ri] = append(occupied[ri], 0)
+			}
+			for k := 0; k < cs; k++ {
+				occupied[ri][ci+k] = rs // covered for rs rows including this one
+			}
+			// Mark subsequent rows.
+			for rr := 1; rr < rs && ri+rr < nRows; rr++ {
+				for len(occupied[ri+rr]) < ci+cs {
+					occupied[ri+rr] = append(occupied[ri+rr], 0)
+				}
+				for k := 0; k < cs; k++ {
+					if occupied[ri+rr][ci+k] < rs-rr {
+						occupied[ri+rr][ci+k] = rs - rr
+					}
+				}
+			}
+			placed = append(placed, tcell{node: cellNode, row: ri, col: ci, cSpan: cs, rSpan: rs})
+			if end := ci + cs; end > nCols {
+				nCols = end
+			}
+			ci += cs
+		}
+		if len(occupied[ri]) > nCols {
+			nCols = len(occupied[ri])
 		}
 	}
 	if nCols == 0 {
 		return tb
 	}
-
-	// measure each cell's max-content width; colspan cells contribute their
-	// content width evenly across the spanned columns (min floor per col).
-	colW := make([]float64, nCols)
-	var cellData [][]*box
-	for _, r := range rows {
-		col := 0
-		var cells []*box
-		for _, cellNode := range r {
-			span := colSpan(cellNode)
-			if span < 1 {
-				span = 1
-			}
-			if col+span > nCols {
-				span = nCols - col
-				if span < 1 {
-					span = 1
-				}
-			}
-			cell := e.buildCell(cellNode, col, span)
-			cells = append(cells, cell)
-			if span == 1 {
-				if cell.contentW > colW[col] {
-					colW[col] = cell.contentW
-				}
-			} else if span > 1 {
-				// Prefer existing single-col measurements; only grow if the
-				// spanned content needs more total space than current sum.
-				var sum float64
-				for k := 0; k < span && col+k < nCols; k++ {
-					sum += colW[col+k]
-				}
-				need := cell.contentW
-				if need > sum {
-					extra := (need - sum) / float64(span)
-					for k := 0; k < span && col+k < nCols; k++ {
-						colW[col+k] += extra
-					}
-				}
-			}
-			col += span
+	// Normalize occupied rows to nCols.
+	for ri := range occupied {
+		for len(occupied[ri]) < nCols {
+			occupied[ri] = append(occupied[ri], 0)
 		}
-		cellData = append(cellData, cells)
+	}
+
+	// measure each cell's min/max-content width; colspan cells contribute their
+	// content width evenly across the spanned columns (min floor per col).
+	colW := make([]float64, nCols)   // preferred = max-content
+	colMin := make([]float64, nCols) // shrink floor = min-content
+	colPct := make([]float64, nCols) // >=0 means width:% of table; -1 = auto
+	colAbs := make([]float64, nCols) // >=0 means absolute width pt; -1 = auto
+	for i := range colPct {
+		colPct[i] = -1
+		colAbs[i] = -1
+	}
+	cellData := make([][]*box, nRows)
+	for _, p := range placed {
+		cell := e.buildCell(p.node, p.col, p.cSpan)
+		cell.rowSpan = p.rSpan
+		cellData[p.row] = append(cellData[p.row], cell)
+		cs := e.styles[p.node]
+		if p.cSpan == 1 {
+			if cell.contentW > colW[p.col] {
+				colW[p.col] = cell.contentW
+			}
+			if cell.contentMin > colMin[p.col] {
+				colMin[p.col] = cell.contentMin
+			}
+			if cs.WidthPercent >= 0 && colPct[p.col] < 0 {
+				colPct[p.col] = cs.WidthPercent
+			}
+			if cs.Width >= 0 && colAbs[p.col] < 0 {
+				colAbs[p.col] = e.scalePt(cs.Width)
+			}
+		} else if p.cSpan > 1 {
+			var sumMax, sumMin float64
+			for k := 0; k < p.cSpan && p.col+k < nCols; k++ {
+				sumMax += colW[p.col+k]
+				sumMin += colMin[p.col+k]
+			}
+			if cell.contentW > sumMax {
+				extra := (cell.contentW - sumMax) / float64(p.cSpan)
+				for k := 0; k < p.cSpan && p.col+k < nCols; k++ {
+					colW[p.col+k] += extra
+				}
+			}
+			if cell.contentMin > sumMin {
+				extra := (cell.contentMin - sumMin) / float64(p.cSpan)
+				for k := 0; k < p.cSpan && p.col+k < nCols; k++ {
+					colMin[p.col+k] += extra
+				}
+			}
+		}
 	}
 
 	// table width
@@ -1192,72 +1541,285 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 	if st.BorderCollapse == "collapse" {
 		spacing = 0
 	}
-	sum := 0.0
-	for _, w := range colW {
-		sum += w
+	sumMax := 0.0
+	sumMin := 0.0
+	for i := range colW {
+		sumMax += colW[i]
+		sumMin += colMin[i]
 	}
-	sum += spacing * float64(nCols+1)
-	sum += e.scalePt(st.BorderLeft.Width) + e.scalePt(st.BorderRight.Width) + e.scalePt(st.PaddingLeft) + e.scalePt(st.PaddingRight)
+	chrome := spacing*float64(nCols+1) +
+		e.scalePt(st.BorderLeft.Width) + e.scalePt(st.BorderRight.Width) +
+		e.scalePt(st.PaddingLeft) + e.scalePt(st.PaddingRight)
+	sumMax += chrome
+	sumMin += chrome
 	tableW := availW
+	definiteTable := false
 	if st.WidthPercent >= 0 {
 		// width:% of the containing block (parent cell / block), not viewport
 		tableW = availW * st.WidthPercent / 100
+		definiteTable = true
 	} else if st.Width >= 0 {
 		tableW = e.scalePt(st.Width)
 		if tableW > availW && availW > 0 {
 			tableW = availW
 		}
-	} else if sum < availW {
-		tableW = sum
+		definiteTable = true
+	} else if sumMax < availW {
+		// width:auto — shrink-wrap to max-content (not min-content).
+		tableW = sumMax
 	}
-	if tableW > sum {
-		extra := (tableW - sum) / float64(nCols)
+
+	// Apply column width:% / absolute widths when the table size is definite.
+	hasColHint := false
+	for i := range colPct {
+		if colPct[i] >= 0 || colAbs[i] >= 0 {
+			hasColHint = true
+			break
+		}
+	}
+	if definiteTable && hasColHint {
+		inner := tableW - chrome
+		if inner < 0 {
+			inner = 0
+		}
+		used := 0.0
+		autoMax := 0.0
+		for i := range colW {
+			switch {
+			case colPct[i] >= 0:
+				colW[i] = inner * colPct[i] / 100
+				if colW[i] < colMin[i] {
+					colW[i] = colMin[i]
+				}
+				used += colW[i]
+			case colAbs[i] >= 0:
+				colW[i] = colAbs[i]
+				if colW[i] < colMin[i] {
+					colW[i] = colMin[i]
+				}
+				used += colW[i]
+			default:
+				autoMax += colW[i]
+			}
+		}
+		remain := inner - used
+		if remain < 0 {
+			remain = 0
+		}
+		if autoMax > 0 && remain > 0 {
+			for i := range colW {
+				if colPct[i] < 0 && colAbs[i] < 0 {
+					colW[i] = remain * (colW[i] / autoMax)
+					if colW[i] < colMin[i] {
+						colW[i] = colMin[i]
+					}
+				}
+			}
+		} else if autoMax == 0 && remain > 0 {
+			// All columns hinted — distribute leftover by % share, else evenly.
+			pctTotal := 0.0
+			for i := range colPct {
+				if colPct[i] > 0 {
+					pctTotal += colPct[i]
+				}
+			}
+			for i := range colW {
+				if pctTotal > 0 && colPct[i] > 0 {
+					colW[i] += remain * (colPct[i] / pctTotal)
+				} else {
+					colW[i] += remain / float64(nCols)
+				}
+			}
+		}
+	} else if tableW > sumMax {
+		extra := (tableW - sumMax) / float64(nCols)
 		for i := range colW {
 			colW[i] += extra
 		}
-	} else if tableW < sum {
-		// shrink proportionally
-		inner := sum - spacing*float64(nCols+1)
-		if inner > 0 {
-			scale := (tableW - spacing*float64(nCols+1)) / inner
-			if scale > 0 {
+	} else if tableW < sumMax {
+		innerAvail := tableW - chrome
+		if innerAvail < 0 {
+			innerAvail = 0
+		}
+		innerMax := sumMax - chrome
+		innerMin := sumMin - chrome
+		if innerAvail >= innerMin && innerMax > innerMin {
+			// Grow each column from min toward max proportional to free space.
+			free := innerAvail - innerMin
+			span := innerMax - innerMin
+			for i := range colW {
+				grow := colW[i] - colMin[i]
+				if grow < 0 {
+					grow = 0
+				}
+				colW[i] = colMin[i] + free*(grow/span)
+			}
+		} else if innerMin > 0 && innerAvail < innerMin {
+			// Narrower than min-content.
+			if definiteTable {
+				// width:N / width:% — scale mins into the definite box so
+				// max-width:100% images in a 22em float still shrink.
+				scale := innerAvail / innerMin
+				if scale < 0 {
+					scale = 0
+				}
 				for i := range colW {
-					colW[i] *= scale
+					colW[i] = colMin[i] * scale
+				}
+			} else {
+				// width:auto — honor mins (table may overflow) rather than
+				// crushing text into emergency mid-word wraps.
+				for i := range colW {
+					colW[i] = colMin[i]
+				}
+			}
+		} else if innerMax > 0 {
+			scale := innerAvail / innerMax
+			if scale < 0 {
+				scale = 0
+			}
+			for i := range colW {
+				colW[i] *= scale
+				if !definiteTable && colW[i] < colMin[i] {
+					colW[i] = colMin[i]
 				}
 			}
 		}
 	}
+	// Auto tables: border box covers used columns. Definite width keeps tableW.
+	if !definiteTable {
+		sumCols := chrome
+		for i := range colW {
+			sumCols += colW[i]
+		}
+		if sumCols > tableW {
+			tableW = sumCols
+		}
+	}
 	tb.w = tableW
 	cy := e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)
-	for _, cells := range cellData {
+	rowHeights := make([]float64, nRows)
+	rowTops := make([]float64, nRows)
+	padL := e.scalePt(st.PaddingLeft) + e.scalePt(st.BorderLeft.Width)
+	// Measure each cell at its final column width; row height from single-row
+	// cells first. Rowspan cells enlarge the spanned rows afterward.
+	// Rows with no local cells (rowspan holes) or only ink-less cells stay at
+	// height 0 until rowspan growth — do not invent a 1pt phantom band.
+	for ri, cells := range cellData {
+		rowTops[ri] = y + cy
 		rowH := 0.0
-		rowX := e.scalePt(st.PaddingLeft) + e.scalePt(st.BorderLeft.Width)
 		for _, cell := range cells {
-			cell.x = x + rowX
-			cell.y = y + cy
+			if cell.rowSpan < 1 {
+				cell.rowSpan = 1
+			}
 			cellW := 0.0
-			for k := 0; k < cell.span; k++ {
+			for k := 0; k < cell.span && cell.col+k < nCols; k++ {
 				cellW += colW[cell.col+k]
 			}
 			cellW += spacing * float64(cell.span-1)
 			cell.w = cellW
-			// Height against final column width so wrap matches paint.
+			cell.x = x + padL
+			for c := 0; c < cell.col && c < nCols; c++ {
+				cell.x += colW[c] + spacing
+			}
+			cell.y = rowTops[ri]
 			e.measureCellHeight(cell, cellW)
-			if cell.contentH > rowH {
+			if cell.rowSpan == 1 && cell.contentH > rowH {
 				rowH = cell.contentH
 			}
-			rowX += cellW + spacing
 			tb.children = append(tb.children, cell)
 		}
-		// Row height must land on every cell so backgrounds/borders paint
-		// with non-zero height (emitCell uses b.h, not contentH).
-		if rowH <= 0 {
-			rowH = 1
+		// Collapse rows whose cells have no ink (only padding/borders of empty
+		// th/td). Keep a hairline only when the row has cells that paint
+		// borders in separate-border mode and measured some chrome — pure
+		// empty content collapses to 0 so border-collapse grids do not draw
+		// a phantom empty band above real headers.
+		if rowH > 0 && rowCellsHaveNoInk(rows[ri]) {
+			rowH = 0
 		}
-		for _, cell := range cells {
-			cell.h = rowH
+		rowHeights[ri] = rowH
+		if rowH > 0 || spacing > 0 {
+			cy += rowH + spacing
 		}
-		cy += rowH + spacing
+	}
+	// Grow rows so rowspan cells fit their content across the spanned band.
+	for _, cell := range tb.children {
+		if cell.rowSpan <= 1 {
+			continue
+		}
+		start := -1
+		for ri, cells := range cellData {
+			for _, c := range cells {
+				if c == cell {
+					start = ri
+					break
+				}
+			}
+			if start >= 0 {
+				break
+			}
+		}
+		if start < 0 {
+			continue
+		}
+		end := start + cell.rowSpan
+		if end > nRows {
+			end = nRows
+		}
+		sum := 0.0
+		for ri := start; ri < end; ri++ {
+			sum += rowHeights[ri]
+			if ri+1 < end {
+				sum += spacing
+			}
+		}
+		if cell.contentH > sum {
+			extra := (cell.contentH - sum) / float64(end-start)
+			for ri := start; ri < end; ri++ {
+				rowHeights[ri] += extra
+			}
+		}
+	}
+	// Recompute tops and assign final cell heights after rowspan growth.
+	cy = e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)
+	for ri := range rowHeights {
+		rowTops[ri] = y + cy
+		cy += rowHeights[ri] + spacing
+	}
+	for _, cell := range tb.children {
+		start := -1
+		for ri, cells := range cellData {
+			for _, c := range cells {
+				if c == cell {
+					start = ri
+					break
+				}
+			}
+			if start >= 0 {
+				break
+			}
+		}
+		if start < 0 {
+			continue
+		}
+		cell.y = rowTops[start]
+		rs := cell.rowSpan
+		if rs < 1 {
+			rs = 1
+		}
+		end := start + rs
+		if end > nRows {
+			end = nRows
+		}
+		h := 0.0
+		for ri := start; ri < end; ri++ {
+			h += rowHeights[ri]
+			if ri+1 < end {
+				h += spacing
+			}
+		}
+		cell.h = h
+		cell.rowBoxH = rowHeights[start]
 	}
 	tb.rows = cellData
 	tb.h = cy + e.scalePt(st.PaddingBottom) + e.scalePt(st.BorderBottom.Width)
@@ -1266,23 +1828,216 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 		e.add(Op{Kind: OpFillRect, X: x, Y: y, W: tb.w, H: tb.h,
 			R: st.BGColor[0], G: st.BGColor[1], B: st.BGColor[2], Alpha: st.BGColor[3]})
 	}
-	e.emitBorders(st, x, y, tb.w, tb.h)
+	collapse := st.BorderCollapse == "collapse"
+	// Separate borders: stroke the table box. Collapsed grids include the
+	// outer perimeter — stroking both doubles the outer edge and leaves the
+	// table chrome behind when only cell ops shift across pages.
+	if !collapse {
+		e.emitBorders(st, x, y, tb.w, tb.h)
+	}
 
-	// emit cell content and boxes now that positions are final
-	for _, cell := range tb.children {
-		e.emitCell(cell)
+	// Emit cells row-by-row so collapsed grid segments for a row land in the
+	// same op index span as that row's cells (pagination moves them together).
+	lastNonEmpty := -1
+	for ri := range rowHeights {
+		if rowHeights[ri] > 0.01 {
+			lastNonEmpty = ri
+		}
+	}
+	if collapse {
+		for ri, cells := range cellData {
+			for _, cell := range cells {
+				// Skip paint for collapsed empty rows (h≈0); content was
+				// ink-less and would only re-inflate phantom bands.
+				if cell.h > 0.01 {
+					e.emitCell(cell, true)
+				}
+			}
+			if rowHeights[ri] > 0.01 {
+				e.emitCollapsedRowGrid(tb, ri, ri == lastNonEmpty, padL, colW, rowTops, rowHeights)
+			}
+		}
+	} else {
+		for _, cell := range tb.children {
+			if cell.h > 0.01 {
+				e.emitCell(cell, false)
+			}
+		}
 	}
 	return tb
 }
 
-// buildCell measures a table cell's max-content width (no ops emitted).
+// emitCollapsedRowGrid strokes the shared border-collapse grid for one table
+// row (top edge + verticals; bottom edge when lastRow). Ops are appended
+// immediately after that row's cells and folded into the row's op range.
+func (e *engine) emitCollapsedRowGrid(tb *box, ri int, lastRow bool, padL float64, colW, rowTops, rowHeights []float64) {
+	if ri < 0 || ri >= len(rowHeights) || rowHeights[ri] <= 0.01 || len(colW) == 0 {
+		return
+	}
+	bw := 0.5
+	var r, g, b float64
+	for _, cell := range tb.children {
+		st := cell.style
+		sides := []struct {
+			w     float64
+			style string
+			c     [3]float64
+		}{
+			{e.scalePt(st.BorderTop.Width), st.BorderTop.Style, st.BorderTop.Color},
+			{e.scalePt(st.BorderLeft.Width), st.BorderLeft.Style, st.BorderLeft.Color},
+		}
+		for _, side := range sides {
+			if side.w > 0 && side.style != "none" {
+				bw = side.w
+				r, g, b = side.c[0], side.c[1], side.c[2]
+				break
+			}
+		}
+		if bw != 0.5 || r+g+b > 0 {
+			break
+		}
+	}
+	nCols := len(colW)
+	left := tb.x + padL
+	xs := make([]float64, nCols+1)
+	xs[0] = left
+	for i := 0; i < nCols; i++ {
+		xs[i+1] = xs[i] + colW[i]
+	}
+	y0 := rowTops[ri]
+	y1 := y0 + rowHeights[ri]
+	gridStart := len(e.ops)
+	hline := func(x0, x1, yy float64) {
+		if x1-x0 <= 0 {
+			return
+		}
+		e.add(Op{Kind: OpLine, X: x0, Y: yy, W: x1 - x0, H: 0, Width: bw, R: r, G: g, B: b})
+	}
+	vline := func(xx, ya, yb float64) {
+		if yb-ya <= 0.01 {
+			return
+		}
+		e.add(Op{Kind: OpLine, X: xx, Y: ya, W: 0, H: yb - ya, Width: bw, R: r, G: g, B: b})
+	}
+	// Top edge. Skip under rowspan continuations so a multi-row Year cell is
+	// not bisected mid-table; paint.capTablePageBreaks re-seals full tops for
+	// page fragments under repeated thead where those holes look open.
+	// Always emit a segment for every column that has a local cell or is not
+	// rowspan-covered — empty (ink-less) local cells still close their band.
+	for ci := 0; ci < nCols; ci++ {
+		if ri > 0 && rowspanCovers(tb, ri-1, ri, ci) {
+			continue
+		}
+		hline(xs[ci], xs[ci+1], y0)
+	}
+	// Verticals for this row — include outer edges and rowspan-hole columns so
+	// the strip is a complete grid even when the row has fewer local cells.
+	for ci := 0; ci <= nCols; ci++ {
+		if ci > 0 && ci < nCols && colspanCovers(tb, ri, ci-1, ci) {
+			continue
+		}
+		vline(xs[ci], y0, y1)
+	}
+	if lastRow {
+		for ci := 0; ci < nCols; ci++ {
+			hline(xs[ci], xs[ci+1], y1)
+		}
+	}
+	gridEnd := len(e.ops) - 1
+	if gridEnd >= gridStart && ri < len(tb.rows) {
+		expandRowOpRange(tb.rows[ri], gridStart, gridEnd)
+	}
+}
+
+// expandRowOpRange includes [start,end] paint ops in every cell of the row so
+// pagination shifts that use the row's op span also move the collapsed grid.
+func expandRowOpRange(row []*box, start, end int) {
+	if start > end || len(row) == 0 {
+		return
+	}
+	for _, cell := range row {
+		if cell == nil {
+			continue
+		}
+		if cell.opStart > cell.opEnd {
+			// Cell emitted nothing (empty); claim the grid ops alone.
+			cell.opStart, cell.opEnd = start, end
+			continue
+		}
+		if start < cell.opStart {
+			cell.opStart = start
+		}
+		if end > cell.opEnd {
+			cell.opEnd = end
+		}
+	}
+}
+
+// rowspanCovers reports whether some cell occupies column ci across the
+// boundary between row above and row below (so the horizontal rule is omitted).
+func rowspanCovers(tb *box, above, below, ci int) bool {
+	for _, cell := range tb.children {
+		if cell.rowSpan <= 1 {
+			continue
+		}
+		start := cellStartRow(tb, cell)
+		if start < 0 {
+			continue
+		}
+		if start <= above && start+cell.rowSpan > below &&
+			cell.col <= ci && cell.col+cell.span > ci {
+			return true
+		}
+	}
+	return false
+}
+
+func colspanCovers(tb *box, ri, leftCol, rightCol int) bool {
+	if ri < 0 || ri >= len(tb.rows) {
+		return false
+	}
+	for _, cell := range tb.rows[ri] {
+		if cell.span > 1 && cell.col <= leftCol && cell.col+cell.span > rightCol {
+			return true
+		}
+	}
+	// Rowspan continuation rows have no local cell — find covering cell.
+	for _, cell := range tb.children {
+		start := cellStartRow(tb, cell)
+		if start < 0 {
+			continue
+		}
+		rs := cell.rowSpan
+		if rs < 1 {
+			rs = 1
+		}
+		if start <= ri && start+rs > ri &&
+			cell.span > 1 && cell.col <= leftCol && cell.col+cell.span > rightCol {
+			return true
+		}
+	}
+	return false
+}
+
+func cellStartRow(tb *box, cell *box) int {
+	for ri, cells := range tb.rows {
+		for _, c := range cells {
+			if c == cell {
+				return ri
+			}
+		}
+	}
+	return -1
+}
+
+// buildCell measures a table cell's min/max-content width (no ops emitted).
 // Height is not final here: layoutCell must run again with the real column
 // width after column sizing, or narrow max-content widths force false wraps
 // and inflate row heights (empty bands under single-line cell text).
 func (e *engine) buildCell(n *html.Node, col, span int) *box {
 	st := e.styles[n]
 	b := &box{node: n, style: st, kind: "cell", col: col, span: span}
-	b.contentW = e.measureCellContent(n, st)
+	b.contentMin, b.contentW = e.measureCellMinMax(n, st)
 	return b
 }
 
@@ -1316,7 +2071,9 @@ func (e *engine) cellBG(b *box) (r, g, bl, a float64, ok bool) {
 }
 
 // emitCell paints a placed cell's background, borders and content.
-func (e *engine) emitCell(b *box) {
+// skipBorders is set for border-collapse tables whose grid is stroked once
+// by the parent table (avoids doubled/gapped per-cell edges).
+func (e *engine) emitCell(b *box, skipBorders bool) {
 	st := b.style
 	start := len(e.ops)
 	if e.opts.Background {
@@ -1325,7 +2082,9 @@ func (e *engine) emitCell(b *box) {
 				R: r, G: g, B: bl, Alpha: a})
 		}
 	}
-	e.emitBorders(st, b.x, b.y, b.w, b.h)
+	if !skipBorders {
+		e.emitBorders(st, b.x, b.y, b.w, b.h)
+	}
 	contentW := b.w - e.scalePt(st.PaddingLeft) - e.scalePt(st.PaddingRight) - e.scalePt(st.BorderLeft.Width) - e.scalePt(st.BorderRight.Width)
 	if contentW < 0 {
 		contentW = 0
@@ -1344,36 +2103,471 @@ func (e *engine) emitCell(b *box) {
 	// flowChildren advances cy; cell content is rooted at absolute canvas y
 	// (pass y=0, contentX=cx, cy=content top) so floats pack inside the cell
 	// BFC. Pass the cell as parent so float/block children attach for tests.
+	oldMax := e.imgMaxW
+	if contentW > 0 {
+		e.imgMaxW = contentW
+	}
+	pop, enclose := e.pushBFCFloats(st, cx, contentW)
 	_ = e.flowChildren(b, b.node.Children, st, contentW, cx, 0, cy)
+	if enclose && e.bfcFloats != nil {
+		// Cell border box already sized; floats are clipped to the cell BFC.
+		_ = e.bfcFloats.extentCy(0, cy)
+	}
+	pop()
+	e.imgMaxW = oldMax
+	// Rowspan cells with forced multi-line content (wiki Ref: [127]<br>[128]
+	// in rowspan=2) pack lines at the top with normal line-height, so both
+	// markers sit in the first row band and look overlapped. Spread line
+	// boxes evenly across the full cell height when we have room.
+	if b.rowSpan > 1 {
+		distributeRowspanLines(e.ops, start, len(e.ops), b.y, b.h,
+			e.scalePt(st.PaddingTop)+e.scalePt(st.BorderTop.Width),
+			e.scalePt(st.PaddingBottom)+e.scalePt(st.BorderBottom.Width))
+	}
 	b.opStart, b.opEnd = start, len(e.ops)-1
 }
 
-// measureCellContent returns the max-content width of the cell.
-func (e *engine) measureCellContent(n *html.Node, st ResolvedStyle) float64 {
-	maxW := 0.0
-	var measure func(n *html.Node, fs float64)
-	measure = func(n *html.Node, fs float64) {
-		switch n.Type {
-		case html.TextNode:
-			for _, word := range strings.Fields(n.Text) {
-				w := e.measureText(word, fs*e.scale)
-				if w > maxW {
-					maxW = w
-				}
+// distributeRowspanLines remaps distinct text/bullet baselines in ops[start:end)
+// so they span the cell's content box evenly (top line near top, bottom near
+// bottom). Non-text ops (underlines, links) ride with the nearest baseline.
+func distributeRowspanLines(ops []Op, start, end int, cellY, cellH, padTop, padBot float64) {
+	if end <= start || cellH <= 0 || ops == nil {
+		return
+	}
+	type band struct {
+		y   float64
+		idx []int
+	}
+	const yEps = 0.75
+	var bands []band
+	for i := start; i < end && i < len(ops); i++ {
+		op := ops[i]
+		if op.Kind != OpText && op.Kind != OpBullet {
+			continue
+		}
+		placed := false
+		for bi := range bands {
+			if absFloat(bands[bi].y-op.Y) <= yEps {
+				bands[bi].idx = append(bands[bi].idx, i)
+				// Keep average Y so multi-glyph lines stay coherent.
+				n := float64(len(bands[bi].idx))
+				bands[bi].y = (bands[bi].y*(n-1) + op.Y) / n
+				placed = true
+				break
 			}
-		case html.ElementNode:
-			if e.styles[n].Display == "none" {
-				return
-			}
-			fs = e.styles[n].FontSize
-			for _, c := range n.Children {
-				measure(c, fs)
+		}
+		if !placed {
+			bands = append(bands, band{y: op.Y, idx: []int{i}})
+		}
+	}
+	if len(bands) < 2 {
+		return
+	}
+	// Sort bands top→bottom.
+	for i := 0; i < len(bands); i++ {
+		for j := i + 1; j < len(bands); j++ {
+			if bands[j].y < bands[i].y {
+				bands[i], bands[j] = bands[j], bands[i]
 			}
 		}
 	}
-	measure(n, st.FontSize)
-	maxW += e.scalePt(st.PaddingLeft) + e.scalePt(st.PaddingRight) + e.scalePt(st.BorderLeft.Width) + e.scalePt(st.BorderRight.Width)
+	innerTop := cellY + padTop
+	innerBot := cellY + cellH - padBot
+	if innerBot-innerTop < 4 {
+		return
+	}
+	// Only redistribute when natural packing is much shorter than the cell
+	// (typical rowspan>1 with few <br> lines).
+	natural := bands[len(bands)-1].y - bands[0].y
+	if natural >= (innerBot-innerTop)*0.55 {
+		return
+	}
+	n := len(bands)
+	targets := make([]float64, n)
+	if n == 1 {
+		return
+	}
+	// Place first baseline ~0.7em into the cell, last near bottom; interpolate.
+	// Use first text size as em estimate.
+	em := 8.0
+	for _, i := range bands[0].idx {
+		if ops[i].Size > 0 {
+			em = ops[i].Size
+			break
+		}
+	}
+	first := innerTop + em*0.85
+	last := innerBot - em*0.25
+	if last <= first {
+		return
+	}
+	for i := 0; i < n; i++ {
+		if n == 1 {
+			targets[i] = first
+		} else {
+			targets[i] = first + (last-first)*float64(i)/float64(n-1)
+		}
+	}
+	// Map old baseline → dy, apply to all ops near that baseline.
+	type shift struct{ y0, dy float64 }
+	var shifts []shift
+	for i, b := range bands {
+		shifts = append(shifts, shift{y0: b.y, dy: targets[i] - b.y})
+	}
+	for i := start; i < end && i < len(ops); i++ {
+		y := ops[i].Y
+		// Nearest band baseline.
+		best := 0
+		bestD := absFloat(y - shifts[0].y0)
+		for si := 1; si < len(shifts); si++ {
+			d := absFloat(y - shifts[si].y0)
+			if d < bestD {
+				bestD, best = d, si
+			}
+		}
+		if bestD <= em*1.5 {
+			ops[i].Y += shifts[best].dy
+		}
+	}
+}
+
+func absFloat(v float64) float64 {
+	if v < 0 {
+		return -v
+	}
+	return v
+}
+
+// measureCellContent returns the max-content border-box width of the cell
+// (longest unwrapped line, not longest word). Using min-content here made
+// auto tables shrink-wrap to a rivulet of columns and inflate row heights
+// via forced wraps (wiki filmography / any dense multi-column table).
+func (e *engine) measureCellContent(n *html.Node, st ResolvedStyle) float64 {
+	minW, maxW := e.measureCellMinMax(n, st)
+	_ = minW
 	return maxW
+}
+
+// measureCellMinMax returns min-content and max-content border-box widths.
+// min-content ≈ longest unbreakable word; max-content ≈ widest line if soft
+// wraps are not taken (hard breaks from <br>/blocks still split lines).
+// When word-break/overflow-wrap allow breaking long tokens, min-content uses
+// the longest soft segment (or widest single rune) so URL-heavy cells can
+// shrink instead of forcing the table past the page edge.
+//
+// Short nowrap-only lines (wiki Ref cells with [127][128]) use the full line
+// as min-content so adjacent cite markers stay on one horizontal line instead
+// of wrapping into a stacked, overlapping pair in a one-marker-wide column.
+func (e *engine) measureCellMinMax(n *html.Node, st ResolvedStyle) (minW, maxW float64) {
+	var lineW, longestWord float64
+	// lineOnlyNowrap is true when every contribution on the current line came
+	// from white-space:nowrap/pre runs (no soft-wrap opportunities between
+	// adjacent nowrap boxes either — we treat the line as a cite/IPA cluster).
+	lineOnlyNowrap := true
+	lineHasInk := false
+	flushLine := func() {
+		if lineW > maxW {
+			maxW = lineW
+		}
+		if lineHasInk && lineOnlyNowrap && lineW > longestWord {
+			// Cap so a pathological nowrap paragraph does not freeze the table
+			// at max-content; multi-cite clusters are well under ~10em.
+			em := st.FontSize
+			if em < 1 {
+				em = 10
+			}
+			if lineW <= em*10*e.scale {
+				longestWord = lineW
+			}
+		}
+		lineW = 0
+		lineOnlyNowrap = true
+		lineHasInk = false
+	}
+	var walk func(n *html.Node, cs ResolvedStyle, nowrap bool)
+	walk = func(n *html.Node, cs ResolvedStyle, nowrap bool) {
+		switch n.Type {
+		case html.TextNode:
+			text := n.Text
+			// Measure with the same face selection as paint (measureTextFace),
+			// not the engine default face — mismatched metrics undersize
+			// columns and force emergency wraps on words that should fit.
+			if !nowrap {
+				// Collapse runs of whitespace to a single space for measure,
+				// matching normal white-space:normal inline layout.
+				fields := strings.Fields(text)
+				if len(fields) == 0 {
+					return
+				}
+				lineOnlyNowrap = false
+				lineHasInk = true
+				// Leading space if original had leading WS and line already started.
+				if lineW > 0 && len(text) > 0 && isHTMLSpace(text[0]) {
+					lineW += e.measureTextFace(" ", cs)
+				}
+				for i, word := range fields {
+					if i > 0 {
+						lineW += e.measureTextFace(" ", cs)
+					}
+					w := e.measureTextFace(word, cs)
+					uw := e.unbreakableMinWidth(word, cs)
+					if uw > longestWord {
+						longestWord = uw
+					}
+					lineW += w
+				}
+				return
+			}
+			w := e.measureTextFace(text, cs)
+			uw := e.unbreakableMinWidth(text, cs)
+			if uw > longestWord {
+				longestWord = uw
+			}
+			if strings.TrimSpace(text) != "" {
+				lineHasInk = true
+			}
+			lineW += w
+		case html.ElementNode:
+			childCS := e.styles[n]
+			if childCS.Display == "none" {
+				return
+			}
+			if n.Name == "br" {
+				flushLine()
+				return
+			}
+			// Replaced images contribute their used CSS-pixel width (wiki thumbs).
+			if n.Name == "img" {
+				iw := e.measureImageWidth(n, childCS)
+				if iw > longestWord {
+					longestWord = iw
+				}
+				lineOnlyNowrap = false
+				lineHasInk = true
+				lineW += iw
+				return
+			}
+			// Block-level in-cell boxes start a new line (simplified).
+			blockish := childCS.Display == "block" || childCS.Display == "table" ||
+				childCS.Display == "list-item" || childCS.Display == "flex" || childCS.Display == "grid"
+			if blockish {
+				flushLine()
+			}
+			childNowrap := nowrap || childCS.WhiteSpace == "nowrap" || childCS.WhiteSpace == "pre"
+			for _, c := range n.Children {
+				walk(c, childCS, childNowrap)
+			}
+			if blockish {
+				flushLine()
+			}
+		}
+	}
+	walk(n, st, st.WhiteSpace == "nowrap" || st.WhiteSpace == "pre")
+	flushLine()
+	chrome := e.scalePt(st.PaddingLeft) + e.scalePt(st.PaddingRight) +
+		e.scalePt(st.BorderLeft.Width) + e.scalePt(st.BorderRight.Width)
+	minW = longestWord + chrome
+	maxW += chrome
+	if maxW < minW {
+		maxW = minW
+	}
+	return minW, maxW
+}
+
+// unbreakableMinWidth is the min-content contribution of a single token under
+// the element's word-break / overflow-wrap policy (CSS min-content).
+// Emergency print wrapping (tokens wider than the used line) is layout-only
+// and must not shrink table column mins to a single rune.
+func (e *engine) unbreakableMinWidth(word string, st ResolvedStyle) float64 {
+	if word == "" {
+		return 0
+	}
+	full := e.measureTextFace(word, st)
+	if st.WhiteSpace == "nowrap" || st.WhiteSpace == "pre" {
+		return full
+	}
+	breakAll := st.WordBreak == "break-all" || st.OverflowWrap == "anywhere"
+	if breakAll {
+		return e.maxRuneWidth(word, st)
+	}
+	if st.OverflowWrap == "break-word" {
+		// Soft opportunities (/, ?, &, …) split the token for min-content.
+		return e.maxSoftSegmentWidth(word, st)
+	}
+	return full
+}
+
+func (e *engine) maxRuneWidth(s string, st ResolvedStyle) float64 {
+	var max float64
+	for _, r := range s {
+		w := e.measureTextFace(string(r), st)
+		if w > max {
+			max = w
+		}
+	}
+	return max
+}
+
+func (e *engine) maxSoftSegmentWidth(s string, st ResolvedStyle) float64 {
+	runes := []rune(s)
+	if len(runes) == 0 {
+		return 0
+	}
+	var max, cur float64
+	for i, r := range runes {
+		rw := e.measureTextFace(string(r), st)
+		cur += rw
+		if isSoftWrapRune(r, softBreakWord) || i == len(runes)-1 {
+			if cur > max {
+				max = cur
+			}
+			cur = 0
+		}
+	}
+	if max <= 0 {
+		return e.maxRuneWidth(s, st)
+	}
+	return max
+}
+
+// countLeadingTHRows returns how many consecutive leading rows are composed
+// entirely of <th> cells (column header band without an explicit <thead>).
+// Empty rows (no cells) are skipped so a leading blank tr does not block
+// detection of the real header band.
+func countLeadingTHRows(rows [][]*html.Node) int {
+	n := 0
+	for _, row := range rows {
+		if len(row) == 0 {
+			continue
+		}
+		allTH := true
+		for _, cell := range row {
+			if cell == nil || cell.Name != "th" {
+				allTH = false
+				break
+			}
+		}
+		if !allTH {
+			break
+		}
+		n++
+	}
+	return n
+}
+
+// stripEmptyTableRows removes rows that have no table-cell elements.
+// Safe: rowspan placement only creates geometry for rows that exist in the
+// source list; empty tr nodes never start cells and only produced phantom
+// min-height bands in the border-collapse grid.
+func stripEmptyTableRows(rows [][]*html.Node) [][]*html.Node {
+	if len(rows) == 0 {
+		return rows
+	}
+	out := rows[:0]
+	for _, row := range rows {
+		if len(row) == 0 {
+			continue
+		}
+		out = append(out, row)
+	}
+	// If every row was empty, return a fresh empty slice (not a shared buf).
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// rowCellsHaveNoInk reports whether every cell in the row is free of text,
+// images, and other non-whitespace content (padding-only empty th/td).
+func rowCellsHaveNoInk(cells []*html.Node) bool {
+	if len(cells) == 0 {
+		return true
+	}
+	for _, c := range cells {
+		if c == nil {
+			continue
+		}
+		if nodeHasTableInk(c) {
+			return false
+		}
+	}
+	return true
+}
+
+func nodeHasTableInk(n *html.Node) bool {
+	if n == nil {
+		return false
+	}
+	switch n.Type {
+	case html.TextNode:
+		return strings.TrimSpace(n.Text) != ""
+	case html.ElementNode:
+		switch n.Name {
+		case "img", "svg", "video", "canvas", "br":
+			return true
+		}
+		for _, c := range n.Children {
+			if nodeHasTableInk(c) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func isHTMLSpace(b byte) bool {
+	return b == ' ' || b == '\t' || b == '\n' || b == '\r' || b == '\f'
+}
+
+// measureImageWidth returns the used content width of an <img> in points
+// (HTML width attribute or decoded intrinsic size), for shrink-to-fit.
+func (e *engine) measureImageWidth(n *html.Node, st ResolvedStyle) float64 {
+	if n == nil {
+		return 0
+	}
+	// Prefer explicit width attribute (wiki thumbs: width="250").
+	if v, err := strconv.Atoi(strings.TrimSpace(n.Attribute("width"))); err == nil && v > 0 {
+		return e.scalePt(pxToPt(float64(v)))
+	}
+	if st.Width >= 0 {
+		return e.scalePt(st.Width)
+	}
+	src := n.Attribute("src")
+	if src != "" && e.opts.Images != nil {
+		if data, err := e.opts.Images(src); err == nil {
+			if _, pw, _, err := svg.Rasterize(data, 1024); err == nil && pw > 0 {
+				return e.scalePt(pxToPt(float64(pw)))
+			}
+			if w, _, _, ok := imageDims(data); ok && w > 0 {
+				return e.scalePt(pxToPt(float64(w)))
+			}
+		}
+	}
+	return 0
+}
+
+// measureLargestImageWidth walks n for the widest descendant <img>.
+func (e *engine) measureLargestImageWidth(n *html.Node) float64 {
+	if n == nil {
+		return 0
+	}
+	var best float64
+	var walk func(*html.Node)
+	walk = func(n *html.Node) {
+		if n.Type == html.ElementNode {
+			if n.Name == "img" {
+				st := e.styles[n]
+				if w := e.measureImageWidth(n, st); w > best {
+					best = w
+				}
+			}
+			for _, c := range n.Children {
+				walk(c)
+			}
+		}
+	}
+	walk(n)
+	return best
 }
 
 // layoutCell measures the height of a cell's content (no ops emitted).
@@ -1383,12 +2577,24 @@ func (e *engine) layoutCell(n *html.Node, st ResolvedStyle, width float64) float
 		contentW = 0
 	}
 	cy := e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)
+	pop, enclose := e.pushBFCFloats(st, 0, contentW)
 	cy = e.flowChildren(nil, n.Children, st, contentW, 0, 0, cy)
+	if enclose && e.bfcFloats != nil {
+		cy = e.bfcFloats.extentCy(0, cy)
+	}
+	pop()
 	return cy + e.scalePt(st.PaddingBottom) + e.scalePt(st.BorderBottom.Width)
 }
 
 func colSpan(n *html.Node) int {
 	if v, err := strconv.Atoi(strings.TrimSpace(n.Attribute("colspan"))); err == nil && v > 1 {
+		return v
+	}
+	return 1
+}
+
+func cellRowSpan(n *html.Node) int {
+	if v, err := strconv.Atoi(strings.TrimSpace(n.Attribute("rowspan"))); err == nil && v > 1 {
 		return v
 	}
 	return 1

@@ -2,11 +2,12 @@
 // declarations-and-rules parser, selector matching against the html tree,
 // specificity ordering, and value helpers (lengths, colors, font families).
 //
-// Scope: `*`, type, `.class`, `#id`, attribute selectors ([attr]/[attr=val]),
+// Scope: `*`, type, `.class`, `#id`, attribute selectors (`[attr]`, `=`, `~=`,
+// `*=`, `^=`, `$=`, `|=`),
 // :first-child/:last-child/:nth-child/:has()/:not(), descendant/child/sibling
-// combinators, `@media print|screen` filtering, `@container` size queries
-// (inline-size/width + and/or/not), `!important`, inline style attributes.
-// Unsupported constructs degrade without panicking.
+// combinators, `@media` type + size-feature matching (see MediaMatches),
+// `@container` size queries (inline-size/width + and/or/not), `!important`,
+// inline style attributes. Unsupported constructs degrade without panicking.
 package css
 
 import (
@@ -34,7 +35,7 @@ type FontFace struct {
 type Rule struct {
 	Selectors []Selector
 	Decls     []Declaration
-	Media     string // "all", "print" or "screen"
+	Media     string // raw @media prelude ("all", "print", "screen and (…)", …)
 	Order     int    // source order within the sheet; callers rebase across sheets
 	// Container is non-nil for rules nested under @container. The rule applies
 	// only when the query matches the nearest eligible ancestor container.
@@ -50,18 +51,21 @@ type Selector struct {
 // the following part: "" for the first part, ">" child, "+" next-sibling,
 // "~" subsequent-sibling, " " descendant.
 type SelectorPart struct {
-	Tag        string
-	Classes    []string
-	ID         string
-	Attrs      []AttrSelector
-	Pseudos    []PseudoClass
-	Combinator string
+	Tag           string
+	Classes       []string
+	ID            string
+	Attrs         []AttrSelector
+	Pseudos       []PseudoClass
+	PseudoElement string // "before" | "after" | "" — never matches the host element
+	Combinator    string
 }
 
-// AttrSelector is [name] or [name=value] (exact match).
+// AttrSelector is [name], [name=value] (exact), [name~=word] (space-separated
+// word), [name*=substr] (substring), [name^=prefix], [name$=suffix], or
+// [name|=ident] (exact or prefix-plus-hyphen).
 type AttrSelector struct {
 	Name  string
-	Op    string // "" presence, "=" exact
+	Op    string // "", "=", "~=", "*=", "^=", "$=", "|="
 	Value string
 }
 
@@ -79,6 +83,11 @@ type PseudoClass struct {
 	Arg  string // nth-child argument, lower-case, trimmed
 	Has  []RelativeSelector
 	Not  []Selector
+	// Where is the argument to :where() / :is() (selector list). Matching
+	// uses OR semantics; :where contributes 0 specificity, :is uses the
+	// most specific argument (Selectors 4).
+	Where   []Selector
+	WhereIs bool // true when parsed from :is() (specificity from args)
 }
 
 // Declaration is one property: value pair.
@@ -89,8 +98,8 @@ type Declaration struct {
 }
 
 // Parse parses a stylesheet. Broken input never returns an error for recoverable
-// garbage; only unbalanced blocks do. Media queries resolve to "print",
-// "screen" or "all".
+// garbage; only unbalanced blocks do. @media preambles are stored raw on
+// Rule.Media and evaluated later via MediaMatches.
 func Parse(src string) (*Stylesheet, error) {
 	s := &Stylesheet{}
 	src = stripComments(src)
@@ -108,7 +117,10 @@ func Parse(src string) (*Stylesheet, error) {
 				if open < 0 {
 					return nil, errUnbalanced
 				}
-				media := mediaType(src[:open])
+				media := strings.TrimSpace(src[len("@media"):open])
+				if media == "" {
+					media = "all"
+				}
 				block, rest, err := takeBlock(src, open)
 				if err != nil {
 					return nil, err
@@ -358,19 +370,6 @@ func parseRuleList(media string, cq *ContainerQuery, block string, orderPtr *int
 	return rules, nil
 }
 
-// mediaType reduces a @media query to "print", "screen" or "all".
-func mediaType(s string) string {
-	low := strings.ToLower(s)
-	switch {
-	case strings.Contains(low, "print"):
-		return "print"
-	case strings.Contains(low, "screen"):
-		return "screen"
-	default:
-		return "all"
-	}
-}
-
 var errUnbalanced = &parseError{"unbalanced braces in stylesheet"}
 var errNoBlock = &parseError{"missing '{' before ';'"}
 
@@ -583,32 +582,21 @@ func splitSelectorChain(s string) []string {
 				i += j
 			}
 		case c == ':':
-			// keep :pseudo / :nth-child(n) / :has(...) inside the compound;
-			// drop ::pseudo-elements
-			if i+1 < len(s) && s[i+1] == ':' {
-				// ::before etc. - skip
-				i += 2
-				for i < len(s) && !isSelBreak(s[i]) {
-					if s[i] == '(' {
-						_, end, ok := takeParenArg(s, i)
-						if !ok {
-							i = len(s)
-							break
-						}
-						i = end
-						break
-					}
-					i++
-				}
-				i--
-				break
-			}
+			// keep :pseudo / :nth-child(n) / :has(...) and ::pseudo-elements
+			// inside the compound so parseCompound can reject unsupported
+			// pseudo-elements. Never strip ::before/::after — that used to
+			// leave a bare host selector (Vector print `p::before{width:120pt}`
+			// became `p{width:120pt}` and crushed wiki body columns).
 			if cur.Len() == 0 && (len(out) == 0 || out[len(out)-1] == " " ||
 				out[len(out)-1] == ">" || out[len(out)-1] == "+" || out[len(out)-1] == "~") {
 				cur.WriteByte('*')
 			}
 			start := i
-			i++
+			if i+1 < len(s) && s[i+1] == ':' {
+				i += 2 // ::pseudo-element
+			} else {
+				i++ // :pseudo-class or CSS2 :before/:after
+			}
 			for i < len(s) && !isSelBreak(s[i]) {
 				if s[i] == '(' {
 					_, end, ok := takeParenArg(s, i)
@@ -706,7 +694,23 @@ func parseCompoundCtx(s string, insideHas bool) (SelectorPart, bool) {
 			i += j + 1
 		case ':':
 			if i+1 < len(s) && s[i+1] == ':' {
-				return SelectorPart{}, false // pseudo-elements not supported
+				// ::pseudo-element (Selectors 3+). Only ::before/::after are
+				// supported; others reject the selector so declarations do
+				// not apply to the host.
+				j := i + 2
+				for j < len(s) && s[j] != '(' && !isCompoundBreak(s[j]) {
+					j++
+				}
+				pe := strings.ToLower(s[i+2 : j])
+				if pe != "before" && pe != "after" {
+					return SelectorPart{}, false
+				}
+				if hasParen := j < len(s) && s[j] == '('; hasParen {
+					return SelectorPart{}, false
+				}
+				part.PseudoElement = pe
+				i = j
+				continue
 			}
 			j := i + 1
 			for j < len(s) && s[j] != '(' && !isCompoundBreak(s[j]) {
@@ -756,10 +760,35 @@ func parseCompoundCtx(s string, insideHas bool) (SelectorPart, bool) {
 					return SelectorPart{}, false
 				}
 				part.Pseudos = append(part.Pseudos, PseudoClass{Name: "not", Not: sels})
-			case "link", "visited", "hover", "active", "focus":
-				// accepted and ignored for print
+			case "where", "is":
+				if !hasParen || strings.TrimSpace(argRaw) == "" {
+					return SelectorPart{}, false
+				}
+				sels, ok := parseSelectorListStrict(argRaw, insideHas)
+				if !ok {
+					return SelectorPart{}, false
+				}
+				part.Pseudos = append(part.Pseudos, PseudoClass{
+					Name: "where", Where: sels, WhereIs: name == "is",
+				})
+			case "link", "visited":
+				// Print semantics: both mean "a[href]" (no browsing history).
+				part.Pseudos = append(part.Pseudos, PseudoClass{Name: name})
+			case "hover", "active", "focus", "target":
+				// Accepted for parse/cascade structure but never match in print
+				// (static PDF has no pointer/focus/:target fragment state).
+				// Keeping them on the compound prevents li:target from
+				// degrading to bare `li` (wiki reflist highlight blue).
+				part.Pseudos = append(part.Pseudos, PseudoClass{Name: name})
+			case "before", "after":
+				// CSS2 single-colon pseudo-elements.
+				part.PseudoElement = name
+			case "first-line", "first-letter":
+				return SelectorPart{}, false
 			default:
-				// unknown: ignore
+				// Keep unknown pseudos so they do not degrade to the host
+				// selector (same class of bug as stripping :target / ::before).
+				part.Pseudos = append(part.Pseudos, PseudoClass{Name: name, Arg: arg})
 			}
 			i = j
 		default:
@@ -770,7 +799,7 @@ func parseCompoundCtx(s string, insideHas bool) (SelectorPart, bool) {
 }
 
 func parseAttrSelector(s string) (AttrSelector, bool) {
-	// s includes brackets: [href] or [href="x"] or [href=x]
+	// s includes brackets: [href], [href="x"], [typeof~='mw:File/Thumb'], [class*="noprint"]
 	if len(s) < 3 || s[0] != '[' || s[len(s)-1] != ']' {
 		return AttrSelector{}, false
 	}
@@ -778,15 +807,30 @@ func parseAttrSelector(s string) (AttrSelector, bool) {
 	if inner == "" {
 		return AttrSelector{}, false
 	}
-	eq := strings.IndexByte(inner, '=')
-	if eq < 0 {
+	// Operator forms: ~= *= ^= $= |= =  (check multi-char before bare =)
+	op := ""
+	nameEnd := -1
+	for _, cand := range []string{"~=", "*=", "^=", "$=", "|="} {
+		if i := strings.Index(inner, cand); i > 0 {
+			nameEnd = i
+			op = cand
+			break
+		}
+	}
+	if nameEnd < 0 {
+		if i := strings.IndexByte(inner, '='); i >= 0 {
+			nameEnd = i
+			op = "="
+		}
+	}
+	if nameEnd < 0 {
 		if !validIdent(inner) {
 			return AttrSelector{}, false
 		}
 		return AttrSelector{Name: strings.ToLower(inner)}, true
 	}
-	name := strings.TrimSpace(inner[:eq])
-	val := strings.TrimSpace(inner[eq+1:])
+	name := strings.TrimSpace(inner[:nameEnd])
+	val := strings.TrimSpace(inner[nameEnd+len(op):])
 	if !validIdent(name) {
 		return AttrSelector{}, false
 	}
@@ -795,7 +839,12 @@ func parseAttrSelector(s string) (AttrSelector, bool) {
 			val = val[1 : len(val)-1]
 		}
 	}
-	return AttrSelector{Name: strings.ToLower(name), Op: "=", Value: val}, true
+	switch op {
+	case "=", "~=", "*=", "^=", "$=", "|=":
+		return AttrSelector{Name: strings.ToLower(name), Op: op, Value: val}, true
+	default:
+		return AttrSelector{}, false
+	}
 }
 
 // validIdent reports whether s is a valid CSS identifier (letters, digits,
@@ -873,9 +922,30 @@ func Match(s Selector, n *html.Node) bool {
 	return true
 }
 
+// MatchPseudo reports whether s selects the ::before or ::after pseudo-element
+// of n (pe is "before" or "after").
+func MatchPseudo(s Selector, n *html.Node, pe string) bool {
+	if n == nil || pe == "" || len(s.Parts) == 0 {
+		return false
+	}
+	last := s.Parts[len(s.Parts)-1]
+	if last.PseudoElement != pe {
+		return false
+	}
+	parts := make([]SelectorPart, len(s.Parts))
+	copy(parts, s.Parts)
+	parts[len(parts)-1].PseudoElement = ""
+	return Match(Selector{Parts: parts}, n)
+}
+
 // matchPart matches one compound against an element.
 func matchPart(p SelectorPart, n *html.Node) bool {
 	if n.Type != html.ElementNode {
+		return false
+	}
+	// ::before/::after never match the host element (declarations apply to
+	// generated pseudo boxes via MatchPseudo).
+	if p.PseudoElement != "" {
 		return false
 	}
 	if p.Tag != "*" && !strings.EqualFold(p.Tag, n.Name) {
@@ -903,7 +973,49 @@ func matchPart(p SelectorPart, n *html.Node) bool {
 			}
 			continue
 		}
-		if !ok || val != a.Value {
+		if !ok {
+			return false
+		}
+		switch a.Op {
+		case "=":
+			if val != a.Value {
+				return false
+			}
+		case "~=":
+			if a.Value == "" || strings.Contains(a.Value, " ") {
+				return false
+			}
+			found := false
+			for _, w := range strings.Fields(val) {
+				if w == a.Value {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return false
+			}
+		case "*=":
+			if a.Value == "" || !strings.Contains(val, a.Value) {
+				return false
+			}
+		case "^=":
+			if a.Value == "" || !strings.HasPrefix(val, a.Value) {
+				return false
+			}
+		case "$=":
+			if a.Value == "" || !strings.HasSuffix(val, a.Value) {
+				return false
+			}
+		case "|=":
+			// Exact match or value is followed by a hyphen (HTML lang / BCP47-style).
+			if a.Value == "" {
+				return false
+			}
+			if val != a.Value && !strings.HasPrefix(val, a.Value+"-") {
+				return false
+			}
+		default:
 			return false
 		}
 	}
@@ -938,9 +1050,47 @@ func matchPseudo(ps PseudoClass, n *html.Node) bool {
 			}
 		}
 		return true
-	default:
+	case "where":
+		// :where() / :is() — match if any argument selector matches.
+		for _, sel := range ps.Where {
+			if Match(sel, n) {
+				return true
+			}
+		}
+		return false
+	case "link", "visited":
+		// Print: no link history — both match any anchor with an href.
+		return isLinkAnchor(n)
+	case "root":
+		// Document element (html in HTML). html.Parse wraps the tree in a
+		// synthetic ElementNode named "#document" — that must not match, and
+		// must not block <html> from matching.
+		if n.Type != html.ElementNode || n.Name == "#document" || strings.HasPrefix(n.Name, "#") {
+			return false
+		}
+		for p := n.Parent; p != nil; p = p.Parent {
+			if p.Type == html.ElementNode && p.Name != "#document" && !strings.HasPrefix(p.Name, "#") {
+				return false
+			}
+		}
 		return true
+	case "hover", "active", "focus", "target":
+		return false
+	default:
+		// Unknown pseudo-classes never match in print (kept on the compound
+		// so selectors do not degrade to the host).
+		return false
 	}
+}
+
+// isLinkAnchor reports whether n is an <a> element with a non-empty href
+// (any scheme, including "#" fragments and relative paths).
+func isLinkAnchor(n *html.Node) bool {
+	if n == nil || n.Type != html.ElementNode || !strings.EqualFold(n.Name, "a") {
+		return false
+	}
+	href := strings.TrimSpace(n.Attribute("href"))
+	return href != ""
 }
 
 func previousElementSibling(n *html.Node) *html.Node {
@@ -1073,6 +1223,9 @@ func Specificity(s Selector) (a, b, c int) {
 		if p.Tag != "*" {
 			c++
 		}
+		if p.PseudoElement != "" {
+			c++ // pseudo-elements count like type selectors
+		}
 		for _, ps := range p.Pseudos {
 			switch ps.Name {
 			case "has":
@@ -1085,6 +1238,15 @@ func Specificity(s Selector) (a, b, c int) {
 				a += a2
 				b += b2
 				c += c2
+			case "where":
+				if ps.WhereIs {
+					// :is() — most specific argument
+					a2, b2, c2 := maxSelectorSpecificity(ps.Where)
+					a += a2
+					b += b2
+					c += c2
+				}
+				// :where() — zero specificity
 			default:
 				b++
 			}
@@ -1261,6 +1423,13 @@ func ParseColor(v string) (r, g, b int, alpha float64, ok bool) {
 	if v == "" {
 		return 0, 0, 0, 0, false
 	}
+	// CSS variables: var(--name, fallback) — resolve fallback only (no custom props).
+	if strings.HasPrefix(strings.ToLower(v), "var(") {
+		if fb, okFB := cssVarFallback(v); okFB {
+			return ParseColor(fb)
+		}
+		return 0, 0, 0, 0, false
+	}
 	alpha = 1
 	if v[0] == '#' {
 		hex := v[1:]
@@ -1345,6 +1514,75 @@ func ParseColor(v string) (r, g, b int, alpha float64, ok bool) {
 		return r, g, b, alpha, true
 	}
 	return 0, 0, 0, 0, false
+}
+
+// cssVarFallback extracts the fallback from var(--name, fallback). Nested
+// var() in the fallback is not expanded further here.
+func cssVarFallback(v string) (string, bool) {
+	_, fb, ok := parseVarFn(v)
+	return fb, ok && fb != ""
+}
+
+// parseVarFn parses a top-level var(--name) or var(--name, fallback).
+// ok is false when v is not a var() function.
+func parseVarFn(v string) (name, fallback string, ok bool) {
+	v = strings.TrimSpace(v)
+	if len(v) < 6 || !strings.EqualFold(v[:4], "var(") {
+		return "", "", false
+	}
+	inner := v[4:]
+	if !strings.HasSuffix(inner, ")") {
+		return "", "", false
+	}
+	inner = strings.TrimSpace(inner[:len(inner)-1])
+	depth := 0
+	for i := 0; i < len(inner); i++ {
+		switch inner[i] {
+		case '(':
+			depth++
+		case ')':
+			if depth > 0 {
+				depth--
+			}
+		case ',':
+			if depth == 0 {
+				name = strings.ToLower(strings.TrimSpace(inner[:i]))
+				fallback = strings.TrimSpace(inner[i+1:])
+				return name, fallback, name != ""
+			}
+		}
+	}
+	name = strings.ToLower(strings.TrimSpace(inner))
+	return name, "", name != ""
+}
+
+// ResolveVar expands CSS var() references in v using lookup(--name).
+// Unresolved var() uses the CSS fallback when present; otherwise the empty
+// string (caller treats as invalid / keeps the prior cascaded value).
+// Nested var() expands up to a small depth.
+func ResolveVar(v string, lookup func(name string) (string, bool)) string {
+	v = strings.TrimSpace(v)
+	for depth := 0; depth < 16; depth++ {
+		if !strings.HasPrefix(strings.ToLower(v), "var(") {
+			return v
+		}
+		name, fallback, ok := parseVarFn(v)
+		if !ok {
+			return v
+		}
+		if lookup != nil {
+			if val, found := lookup(name); found && strings.TrimSpace(val) != "" {
+				v = strings.TrimSpace(val)
+				continue
+			}
+		}
+		if fallback != "" {
+			v = fallback
+			continue
+		}
+		return ""
+	}
+	return v
 }
 
 func isHex(s string) bool {

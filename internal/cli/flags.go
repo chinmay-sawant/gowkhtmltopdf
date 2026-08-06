@@ -212,6 +212,16 @@ func init() {
 		func(g *settings.PdfGlobal, val string) error { return g.Set("web.simplifydom", val) },
 		func(o *settings.PdfObject, val string) error { return o.Set("web.simplifydom", val) },
 	))
+	// Extra chrome selectors when --simplify-dom is on (empty|mediawiki).
+	add("simplify-dom-profile", ModeBoth, "value", pageScoped(
+		func(g *settings.PdfGlobal, val string) error { return g.Set("web.simplifydomprofile", val) },
+		func(o *settings.PdfObject, val string) error { return o.Set("web.simplifydomprofile", val) },
+	))
+	// Opt-in: underline a[href] after cascade (CSS-faithful default is off).
+	add("print-link-underline", ModeBoth, "bool", pageScoped(
+		func(g *settings.PdfGlobal, val string) error { return g.Set("web.printlinkunderline", val) },
+		func(o *settings.PdfObject, val string) error { return o.Set("web.printlinkunderline", val) },
+	))
 	add("media-type", ModeBoth, "value", pageScoped(
 		func(g *settings.PdfGlobal, val string) error { return nil },
 		func(o *settings.PdfObject, val string) error { return o.Set("load.mediatype", val) },

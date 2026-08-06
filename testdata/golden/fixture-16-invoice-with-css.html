@@ -2,11 +2,11 @@
 <!--
   fixture-16-invoice-with-css
   Proves: a full production invoice - letterhead header block, bill-to /
-  ship-to blocks (table-based columns), a long line-items table (24 rows,
-  forcing multiple pages with the row-uncut pagination rule), a tfoot
+  ship-to blocks (table-based columns),   a long line-items table (24 rows) that stays dense under correct
+  max-content column sizing, a tfoot
   totals section with colspan, and a footer block. Combines most of the
   matrix: tables, backgrounds, borders, hr, colored text.
-  Expected: exactly 3 pages.
+  Expected: 1–2 pages (was 3 when columns wrongly used min-content).
 -->
 <html>
 <head>

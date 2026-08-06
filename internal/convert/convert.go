@@ -310,14 +310,15 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 		return nil, fmt.Errorf("object %d (%s): parse html: %w", idx+1, obj.Page, err)
 	}
 
-	sheets := collectSheets(ctx, loader, root, res.Base, obj.Load, idx+1, log)
-	sheets = AppendSimplifySheet(sheets, SimplifyDOMEnabled(cmd.Global.Web, obj.Web))
-	registry = MergeFontFaces(ctx, loader, registry, sheets, res.Base, obj.Load, idx+1, log)
-
 	pageW, pageH, err := pageGeometry(cmd.Global)
 	if err != nil {
 		return nil, fmt.Errorf("object %d (%s): %w", idx+1, obj.Page, err)
 	}
+	contentW := pageW - cmd.Global.Margin.Left*mmToPt - cmd.Global.Margin.Right*mmToPt
+	contentH := pageH - cmd.Global.Margin.Top*mmToPt - cmd.Global.Margin.Bottom*mmToPt
+	sheets := collectSheets(ctx, loader, root, res.Base, obj.Load, idx+1, log, contentW, contentH)
+	sheets = AppendSimplifySheet(sheets, SimplifyDOMEnabled(cmd.Global.Web, obj.Web), SimplifyDOMProfile(cmd.Global.Web, obj.Web))
+	registry = MergeFontFaces(ctx, loader, registry, sheets, res.Base, obj.Load, idx+1, log)
 
 	imagesFn := func(src string) ([]byte, error) {
 		if !cmd.Global.Web.Images {
@@ -358,15 +359,16 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 	registry = st.registry
 
 	lres, err := layout.Layout(root, layout.Options{
-		Width:      st.geom.pageW - st.geom.marginLeft - st.geom.marginRight,
-		Height:     st.geom.contentH,
-		Font:       font,
-		Registry:   registry,
-		Sheets:     sheets,
-		Media:      "print",
-		Zoom:       obj.Load.ZoomFactor,
-		Images:     imagesFn,
-		Background: cmd.Global.Background,
+		Width:              st.geom.pageW - st.geom.marginLeft - st.geom.marginRight,
+		Height:             st.geom.contentH,
+		Font:               font,
+		Registry:           registry,
+		Sheets:             sheets,
+		Media:              "print",
+		Zoom:               obj.Load.ZoomFactor,
+		Images:             imagesFn,
+		Background:         cmd.Global.Background,
+		PrintLinkUnderline: cmd.Global.Web.PrintLinkUnderline || obj.Web.PrintLinkUnderline,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("object %d (%s): layout: %w", idx+1, obj.Page, err)
@@ -388,15 +390,16 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 					effZoom = zoom * zf
 				}
 				lres, err = layout.Layout(root, layout.Options{
-					Width:      contentW,
-					Height:     st.geom.pageH - st.geom.marginTop - st.geom.marginBottom,
-					Font:       font,
-					Registry:   registry,
-					Sheets:     sheets,
-					Media:      "print",
-					Zoom:       effZoom,
-					Images:     imagesFn,
-					Background: cmd.Global.Background,
+					Width:              contentW,
+					Height:             st.geom.pageH - st.geom.marginTop - st.geom.marginBottom,
+					Font:               font,
+					Registry:           registry,
+					Sheets:             sheets,
+					Media:              "print",
+					Zoom:               effZoom,
+					Images:             imagesFn,
+					Background:         cmd.Global.Background,
+					PrintLinkUnderline: cmd.Global.Web.PrintLinkUnderline || obj.Web.PrintLinkUnderline,
 				})
 				if err != nil {
 					return nil, fmt.Errorf("object %d (%s): smart-shrink layout: %w", idx+1, obj.Page, err)
@@ -506,8 +509,8 @@ func pageGeometry(g settings.PdfGlobal) (w, h float64, err error) {
 
 // collectSheets gathers <style> blocks and <link rel="stylesheet"> resources
 // from the DOM. A failed stylesheet only logs a warning; the layout proceeds
-// without it.
-func collectSheets(ctx context.Context, loader *load.Loader, root *html.Node, base string, lp settings.LoadPage, idx int, log io.Writer) []*css.Stylesheet {
+// without it. viewportW/H (pt) evaluate link media attributes for print.
+func collectSheets(ctx context.Context, loader *load.Loader, root *html.Node, base string, lp settings.LoadPage, idx int, log io.Writer, viewportW, viewportH float64) []*css.Stylesheet {
 	var sheets []*css.Stylesheet
 	var walk func(n *html.Node)
 	walk = func(n *html.Node) {
@@ -524,7 +527,7 @@ func collectSheets(ctx context.Context, loader *load.Loader, root *html.Node, ba
 			}
 			return // raw-text element; no element children
 		case "link":
-			if linkStylesheet(n) {
+			if linkStylesheet(n, viewportW, viewportH) {
 				href := n.Attribute("href")
 				r, err := loader.FetchSub(ctx, base, href, lp)
 				if err != nil {
@@ -545,6 +548,14 @@ func collectSheets(ctx context.Context, loader *load.Loader, root *html.Node, ba
 		}
 	}
 	walk(root)
+	nRules := 0
+	for _, s := range sheets {
+		nRules += len(s.Rules)
+	}
+	const softRuleWarn = 25000
+	if nRules >= softRuleWarn {
+		fmt.Fprintf(log, "warning: object %d: large stylesheet volume (%d rules); print may be slow\n", idx, nRules)
+	}
 	return sheets
 }
 
@@ -560,16 +571,20 @@ func styleText(n *html.Node) string {
 }
 
 // linkStylesheet reports whether n is a stylesheet <link> whose media
-// attribute allows print output: empty, or containing "print" or "all".
-func linkStylesheet(n *html.Node) bool {
+// attribute matches the print pipeline (empty, all, print, or feature
+// queries that MediaMatches accepts for media type "print").
+func linkStylesheet(n *html.Node, viewportW, viewportH float64) bool {
 	if n.Name != "link" || !strings.Contains(strings.ToLower(n.Attribute("rel")), "stylesheet") {
 		return false
 	}
 	if n.Attribute("href") == "" {
 		return false
 	}
-	media := strings.ToLower(n.Attribute("media"))
-	return media == "" || strings.Contains(media, "print") || strings.Contains(media, "all")
+	media := n.Attribute("media")
+	if media == "" {
+		return true
+	}
+	return css.MediaMatches(media, "print", viewportW, viewportH)
 }
 
 // DefaultTOCXSL returns the default TOC stylesheet. In pure Go the default
@@ -635,10 +650,10 @@ func loadFontRegistry(cmd *cli.Command, log io.Writer) *pdf.Registry {
 	return reg
 }
 
-// MergeFontFaces loads local @font-face url(...) TTF/OTF/WOFF1 sources into
-// the registry. WOFF2 (.woff2), EOT, data:, and remote https:// (non-file)
-// src are skipped by product policy. ACL follows FetchSub. Shared by PDF
-// convert and image mode so both honor the same local @font-face subset.
+// MergeFontFaces loads @font-face url(...) TTF/OTF/WOFF1 sources into the
+// registry (local and remote https via FetchSub ACL/timeouts). WOFF2 (.woff2),
+// EOT, and data: src are skipped until WOFF2 decode ships. Shared by PDF
+// convert and image mode.
 func MergeFontFaces(ctx context.Context, loader *load.Loader, reg *pdf.Registry, sheets []*css.Stylesheet, base string, lp settings.LoadPage, idx int, log io.Writer) *pdf.Registry {
 	for _, sheet := range sheets {
 		if sheet == nil {
@@ -655,12 +670,6 @@ func MergeFontFaces(ctx context.Context, loader *load.Loader, reg *pdf.Registry,
 				// ParseTTF untrusted inline payloads from CSS.
 				if strings.HasPrefix(low, "data:") {
 					fmt.Fprintf(log, "warning: object %d: @font-face data: src skipped\n", idx)
-					continue
-				}
-				// Remote network fonts are unsupported by design (ACL/network
-				// policy): no auto-fetch of https:// webfont CDNs.
-				if strings.Contains(low, "://") && !strings.HasPrefix(low, "file:") {
-					fmt.Fprintf(log, "warning: object %d: @font-face network src %q skipped\n", idx, u)
 					continue
 				}
 				r, err := loader.FetchSub(ctx, base, u, lp)

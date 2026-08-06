@@ -90,7 +90,7 @@ func TestParseMedia(t *testing.T) {
 	if len(s.Rules) != 5 {
 		t.Fatalf("got %d rules: %+v", len(s.Rules), s.Rules)
 	}
-	want := []string{"print", "screen", "screen", "all", "all"}
+	want := []string{"print", "screen", "screen and (max-width: 600px)", "all", "all"}
 	for i, w := range want {
 		if s.Rules[i].Media != w {
 			t.Errorf("rule %d media = %q, want %q", i, s.Rules[i].Media, w)
@@ -279,11 +279,13 @@ func TestMatch(t *testing.T) {
 		{"body div p", plain, true},
 		{"html body > div p.note", note, true},
 		{"b", div, false},
-		{"a:hover", note, false}, // interactive pseudo ignored → match as p
+		{"a:hover", note, false}, // type a does not match <p>
 		{"[x]", note, false},     // attribute required; note has no x
 		{"[id]", second, true},
 		{"[id=second]", second, true},
 		{"[id=nope]", second, false},
+		{"[id*=eco]", second, true},
+		{"[id*=zzz]", second, false},
 		{"p:first-child", note, true},
 		{"p:first-child", plain, false},
 		{"p:last-child", plain, false}, // last element child of div is span
@@ -300,6 +302,175 @@ func TestMatch(t *testing.T) {
 		if got := Match(sel, tc.node); got != tc.want {
 			t.Errorf("Match(%q) = %v, want %v", tc.sel, got, tc.want)
 		}
+	}
+}
+
+func TestLinkVisitedPseudos(t *testing.T) {
+	root := treeFor(t, `<html><body>
+		<p><a id="ext" href="https://example.com/">ext</a>
+		<a id="frag" href="#x">frag</a>
+		<a id="empty" href="">empty</a>
+		<a id="bare">bare</a></p>
+	</body></html>`)
+	p := root.FirstChild("html").FirstChild("body").FirstChild("p")
+	byID := map[string]*html.Node{}
+	for _, c := range p.Children {
+		if c.Type == html.ElementNode && c.Name == "a" {
+			byID[c.Attribute("id")] = c
+		}
+	}
+	for _, id := range []string{"ext", "frag", "empty", "bare"} {
+		if byID[id] == nil {
+			t.Fatalf("missing #%s", id)
+		}
+	}
+	cases := []struct {
+		sel  string
+		id   string
+		want bool
+	}{
+		{"a:link", "ext", true},
+		{"a:visited", "ext", true},
+		{":link", "ext", true},
+		{"a:link", "frag", true},
+		{"a:link", "empty", false},
+		{"a:link", "bare", false},
+		{"a:hover", "ext", false},
+		{"a:focus", "ext", false},
+		{"a:active", "ext", false},
+	}
+	for _, tc := range cases {
+		sel, ok := parseSelector(tc.sel)
+		if !ok {
+			t.Fatalf("parseSelector(%q) failed", tc.sel)
+		}
+		if got := Match(sel, byID[tc.id]); got != tc.want {
+			t.Errorf("Match(%q, #%s) = %v, want %v", tc.sel, tc.id, got, tc.want)
+		}
+	}
+	// Specificity: a:link beats bare a (pseudo counts as class-level).
+	sa, ok := parseSelector("a")
+	if !ok {
+		t.Fatal("parse a")
+	}
+	sl, ok := parseSelector("a:link")
+	if !ok {
+		t.Fatal("parse a:link")
+	}
+	_, ba, ca := Specificity(sa)
+	_, bl, cl := Specificity(sl)
+	if !(bl > ba || (bl == ba && cl >= ca)) {
+		t.Fatalf("a:link specificity (%d,%d) should outrank a (%d,%d) on b-axis", bl, cl, ba, ca)
+	}
+	if bl < 1 {
+		t.Fatalf("a:link b-specificity = %d, want >= 1", bl)
+	}
+}
+
+// TestRootPseudo: :root matches the document element (<html>), not body/descendants.
+// Without this, Vector :root { --font-size-medium: … } never applies (1013e0f).
+func TestRootPseudo(t *testing.T) {
+	doc := treeFor(t, `<html><body><p>x</p></body></html>`)
+	htmlEl := doc.FirstChild("html")
+	body := htmlEl.FirstChild("body")
+	p := body.FirstChild("p")
+	sel, ok := parseSelector(":root")
+	if !ok {
+		t.Fatal("parseSelector(:root) failed")
+	}
+	if Match(sel, doc) {
+		t.Fatal(":root must not match synthetic #document")
+	}
+	if !Match(sel, htmlEl) {
+		t.Fatal(":root must match <html>")
+	}
+	if Match(sel, body) || Match(sel, p) {
+		t.Fatal(":root must not match body or p")
+	}
+	// Also accept html:root
+	sel2, ok := parseSelector("html:root")
+	if !ok {
+		t.Fatal("parseSelector(html:root) failed")
+	}
+	if !Match(sel2, htmlEl) {
+		t.Fatal("html:root must match <html>")
+	}
+}
+
+func TestAttrWordAndSubstring(t *testing.T) {
+	root := treeFor(t, `<html><body>
+		<figure typeof="mw:File/Thumb mw:Image" id="f1"></figure>
+		<figure typeof="mw:File/Frame" id="f2"></figure>
+	</body></html>`)
+	body := root.FirstChild("html").FirstChild("body")
+	f1 := body.FirstChild("figure")
+	f2 := f1
+	for _, c := range body.Children {
+		if c.Type == html.ElementNode && c.Attribute("id") == "f2" {
+			f2 = c
+		}
+	}
+	sel, ok := parseSelector(`figure[typeof~="mw:File/Thumb"]`)
+	if !ok {
+		t.Fatal("parse ~=")
+	}
+	if !Match(sel, f1) {
+		t.Error("f1 should match typeof~=mw:File/Thumb")
+	}
+	if Match(sel, f2) {
+		t.Error("f2 Frame should not match Thumb word")
+	}
+	sel2, ok := parseSelector(`figure[typeof*="File/Fr"]`)
+	if !ok {
+		t.Fatal("parse *=")
+	}
+	if !Match(sel2, f2) {
+		t.Error("f2 should match typeof*=File/Fr")
+	}
+}
+
+func TestAttrPrefixSuffixDash(t *testing.T) {
+	root := treeFor(t, `<html><body>
+		<a id="pdf" href="/files/report.pdf">PDF</a>
+		<a id="png" href="/files/report.png">PNG</a>
+		<a id="PDF" href="/files/report.PDF">PDF2</a>
+		<span id="en" lang="en"></span>
+		<span id="enus" lang="en-US"></span>
+		<span id="fr" lang="fr"></span>
+	</body></html>`)
+	body := root.FirstChild("html").FirstChild("body")
+	byID := map[string]*html.Node{}
+	for _, c := range body.Children {
+		if c.Type == html.ElementNode {
+			byID[c.Attribute("id")] = c
+		}
+	}
+	sel, ok := parseSelector(`a[href$=".pdf"]`)
+	if !ok {
+		t.Fatal("parse $=")
+	}
+	if !Match(sel, byID["pdf"]) {
+		t.Error("pdf should match href$=.pdf")
+	}
+	if Match(sel, byID["png"]) || Match(sel, byID["PDF"]) {
+		t.Error("$= is case-sensitive; png/PDF must not match .pdf")
+	}
+	sel2, ok := parseSelector(`a[href^="/files/"]`)
+	if !ok {
+		t.Fatal("parse ^=")
+	}
+	if !Match(sel2, byID["pdf"]) || Match(sel2, byID["en"]) {
+		t.Error("^= /files/ should match pdf links only")
+	}
+	sel3, ok := parseSelector(`[lang|="en"]`)
+	if !ok {
+		t.Fatal("parse |=")
+	}
+	if !Match(sel3, byID["en"]) || !Match(sel3, byID["enus"]) {
+		t.Error("|=en should match en and en-US")
+	}
+	if Match(sel3, byID["fr"]) {
+		t.Error("fr should not match lang|=en")
 	}
 }
 

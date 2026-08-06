@@ -66,6 +66,7 @@ type ResolvedStyle struct {
 	MinWidth            float64 // absolute pt when MinWidthPercent < 0; 0 = auto (content min for flex)
 	MinWidthPercent     float64 // >=0 means % of containing block (deferred like WidthPercent)
 	MaxWidth            float64
+	MaxWidthPercent     float64 // >=0 means % of containing block / img clamp context
 	MinHeight           float64
 	MinHeightPercent    float64 // >=0 means % of CB height; indefinite → ignore
 	MaxHeight           float64
@@ -94,9 +95,14 @@ type ResolvedStyle struct {
 	TextAlign           string  // "left" | "right" | "center" | "justify"
 	VerticalAlign       string  // "baseline" | "top" | "middle" | "bottom"
 	WhiteSpace          string  // "normal" | "nowrap" | "pre"
-	TextDecoration      string  // "none" | "underline" | "line-through"
-	LetterSpacing       float64
-	TextIndent          float64
+	// OverflowWrap is CSS overflow-wrap / word-wrap: "normal" | "break-word" | "anywhere".
+	OverflowWrap string
+	// WordBreak is CSS word-break: "normal" | "break-all" | "keep-all".
+	WordBreak      string
+	TextDecoration string // "none" | "underline" | "line-through"
+	LetterSpacing  float64
+	TextIndent     float64
+	ListStyleType       string // "disc" | "circle" | "square" | "decimal" | "none" | …
 	BorderCollapse      string // "separate" | "collapse"
 	BorderSpacing       float64
 	TableLayout         string // "auto" | "fixed"
@@ -113,6 +119,9 @@ type ResolvedStyle struct {
 	HasTransform    bool
 	TransformOrigin transformOriginSpec
 	Opacity         float64 // 0..1; initial 1; also from filter:opacity()
+	// CustomProps holds resolved CSS custom properties (--*) for this element
+	// (inherited). Shared with the parent map when the element declares none.
+	CustomProps map[string]string
 }
 
 type border struct {
@@ -156,6 +165,7 @@ func initialStyle() ResolvedStyle {
 		MinWidth:         0,
 		MinWidthPercent:  -1,
 		MaxWidth:         -1,
+		MaxWidthPercent:  -1,
 		MinHeight:        0,
 		MinHeightPercent: -1,
 		MaxHeight:        -1,
@@ -166,7 +176,10 @@ func initialStyle() ResolvedStyle {
 		FontWeight:       400,
 		VerticalAlign:    "baseline",
 		WhiteSpace:       "normal",
+		OverflowWrap:     "normal",
+		WordBreak:        "normal",
 		TextDecoration:   "none",
+		ListStyleType:    "disc",
 		BorderCollapse:   "separate",
 		BorderSpacing:    0,
 		TableLayout:      "auto",
@@ -187,6 +200,11 @@ type styleContext struct {
 	media     string
 	viewportW float64 // containing-block width for % of margins/padding/width
 	viewportH float64 // for % of height
+	// remBase is the used font-size of the root element for rem units (pt).
+	// 0 means the CSS initial medium size (16px → 12pt).
+	remBase float64
+	// printLinkUnderline is the opt-in --print-link-underline operator policy.
+	printLinkUnderline bool
 	// containers maps size-query containers (inline-size|size) to their used
 	// content-box inline size. nil means first pass: skip @container rules.
 	containers map[*html.Node]sizeContainer
@@ -208,6 +226,18 @@ func resolveStyles(root *html.Node, sheets []*css.Stylesheet, media string, view
 	})
 }
 
+// resolveStylesOpts is like resolveStyles but honors layout operator policies
+// (e.g. PrintLinkUnderline) carried on Options.
+func resolveStylesOpts(root *html.Node, opts Options) map[*html.Node]ResolvedStyle {
+	return resolveStylesCtx(root, &styleContext{
+		sheets:             opts.Sheets,
+		media:              opts.Media,
+		viewportW:          opts.Width,
+		viewportH:          opts.Height,
+		printLinkUnderline: opts.PrintLinkUnderline,
+	})
+}
+
 // resolveStylesWithContainers is the second style pass: @container rules are
 // applied when their query matches the nearest eligible ancestor in containers.
 func resolveStylesWithContainers(
@@ -223,6 +253,21 @@ func resolveStylesWithContainers(
 	})
 }
 
+func resolveStylesWithContainersOpts(
+	root *html.Node,
+	opts Options,
+	containers map[*html.Node]sizeContainer,
+) map[*html.Node]ResolvedStyle {
+	return resolveStylesCtx(root, &styleContext{
+		sheets:             opts.Sheets,
+		media:              opts.Media,
+		viewportW:          opts.Width,
+		viewportH:          opts.Height,
+		printLinkUnderline: opts.PrintLinkUnderline,
+		containers:         containers,
+	})
+}
+
 func resolveStylesCtx(root *html.Node, ctx *styleContext) map[*html.Node]ResolvedStyle {
 	out := map[*html.Node]ResolvedStyle{}
 	var walk func(n *html.Node, parent *ResolvedStyle)
@@ -234,8 +279,19 @@ func resolveStylesCtx(root *html.Node, ctx *styleContext) map[*html.Node]Resolve
 			if parent != nil {
 				inheritProps(&st, *parent, raw)
 			}
-			applyFontProps(&st, raw, parent)
-			applyRestProps(&st, raw, ctx)
+			st.CustomProps = mergeCustomProps(parent, raw)
+			raw = resolveRawVars(raw, st.CustomProps)
+			applyFontProps(&st, raw, parent, ctx)
+			if n.Name == "html" && st.FontSize > 0 {
+				ctx.remBase = st.FontSize
+			}
+			applyRestProps(&st, raw, ctx, parent)
+			// Opt-in operator policy (--print-link-underline): underline
+			// anchors with href after the cascade. Default off — author CSS
+			// (including text-decoration: inherit → parent) wins otherwise.
+			if ctx != nil && ctx.printLinkUnderline && n.Name == "a" && strings.TrimSpace(n.Attribute("href")) != "" {
+				st.TextDecoration = "underline"
+			}
 			// CSS2.1 §9.7: float ≠ none blockifies table-internal / inline
 			// displays before layout (table/flex/grid stay). Floated <table>
 			// keeps display:table so fixture-29 wrapper packing still works.
@@ -246,6 +302,7 @@ func resolveStylesCtx(root *html.Node, ctx *styleContext) map[*html.Node]Resolve
 			st = initialStyle()
 			if parent != nil {
 				inheritProps(&st, *parent, nil)
+				st.CustomProps = parent.CustomProps
 			}
 		}
 		out[n] = st
@@ -254,6 +311,96 @@ func resolveStylesCtx(root *html.Node, ctx *styleContext) map[*html.Node]Resolve
 		}
 	}
 	walk(root, nil)
+	return out
+}
+
+// mergeCustomProps inherits parent custom properties and overlays any --*
+// declarations from raw, resolving var() chains (MediaWiki/Codex tokens).
+func mergeCustomProps(parent *ResolvedStyle, raw map[string]string) map[string]string {
+	var parentProps map[string]string
+	if parent != nil {
+		parentProps = parent.CustomProps
+	}
+	declared := false
+	for prop := range raw {
+		if strings.HasPrefix(prop, "--") {
+			declared = true
+			break
+		}
+	}
+	if !declared {
+		return parentProps
+	}
+	work := map[string]string{}
+	for k, v := range parentProps {
+		work[k] = v
+	}
+	for prop, v := range raw {
+		if strings.HasPrefix(prop, "--") {
+			work[prop] = v
+		}
+	}
+	memo := map[string]string{}
+	var eval func(name string, stack map[string]bool) string
+	eval = func(name string, stack map[string]bool) string {
+		if v, ok := memo[name]; ok {
+			return v
+		}
+		rawV, ok := work[name]
+		if !ok {
+			return ""
+		}
+		if !strings.Contains(strings.ToLower(rawV), "var(") {
+			memo[name] = rawV
+			return rawV
+		}
+		if stack[name] {
+			return ""
+		}
+		stack[name] = true
+		val := css.ResolveVar(rawV, func(n string) (string, bool) {
+			s := eval(n, stack)
+			if strings.TrimSpace(s) == "" {
+				_, exists := work[n]
+				return s, exists
+			}
+			return s, true
+		})
+		delete(stack, name)
+		memo[name] = val
+		return val
+	}
+	for name := range work {
+		eval(name, map[string]bool{})
+	}
+	return memo
+}
+
+// resolveRawVars expands var() in cascaded property values using customProps.
+// Custom property keys (--*) are left unchanged (already resolved in the map).
+func resolveRawVars(raw map[string]string, customProps map[string]string) map[string]string {
+	if len(raw) == 0 {
+		return raw
+	}
+	lookup := func(name string) (string, bool) {
+		if customProps == nil {
+			return "", false
+		}
+		v, ok := customProps[name]
+		return v, ok && strings.TrimSpace(v) != ""
+	}
+	out := make(map[string]string, len(raw))
+	for prop, v := range raw {
+		if strings.HasPrefix(prop, "--") {
+			out[prop] = v
+			continue
+		}
+		if strings.Contains(strings.ToLower(v), "var(") {
+			out[prop] = css.ResolveVar(v, lookup)
+		} else {
+			out[prop] = v
+		}
+	}
 	return out
 }
 
@@ -306,6 +453,13 @@ func inheritProps(st *ResolvedStyle, parent ResolvedStyle, raw map[string]string
 	if !set("white-space") {
 		st.WhiteSpace = parent.WhiteSpace
 	}
+	// overflow-wrap / word-wrap and word-break are inherited (CSS Text).
+	if !set("overflow-wrap") && !set("word-wrap") {
+		st.OverflowWrap = parent.OverflowWrap
+	}
+	if !set("word-break") {
+		st.WordBreak = parent.WordBreak
+	}
 	if !set("vertical-align") {
 		st.VerticalAlign = parent.VerticalAlign
 	}
@@ -314,6 +468,9 @@ func inheritProps(st *ResolvedStyle, parent ResolvedStyle, raw map[string]string
 	}
 	if !set("letter-spacing") {
 		st.LetterSpacing = parent.LetterSpacing
+	}
+	if !set("list-style-type") && !set("list-style") {
+		st.ListStyleType = parent.ListStyleType
 	}
 	if !set("border-collapse") {
 		st.BorderCollapse = parent.BorderCollapse
@@ -362,7 +519,7 @@ func cascadeRaw(ctx *styleContext, n *html.Node) map[string]string {
 	// author sheets in source order
 	for _, sheet := range ctx.sheets {
 		for _, r := range sheet.Rules {
-			if ctx.media != "" && r.Media != "all" && r.Media != ctx.media {
+			if !css.MediaMatches(r.Media, ctx.media, ctx.viewportW, ctx.viewportH) {
 				continue
 			}
 			if r.Container != nil {
@@ -411,14 +568,18 @@ func cascadeRaw(ctx *styleContext, n *html.Node) map[string]string {
 }
 
 // applyFontProps resolves font-size/family/weight/style/font first, using the
-// parent's size for percentages and em.
-func applyFontProps(st *ResolvedStyle, raw map[string]string, parent *ResolvedStyle) {
+// parent's size for percentages and em, and ctx.remBase for rem.
+func applyFontProps(st *ResolvedStyle, raw map[string]string, parent *ResolvedStyle, ctx *styleContext) {
 	parentSize := st.FontSize
 	if parent != nil {
 		parentSize = parent.FontSize
 	}
+	remBase := pxToPt(16)
+	if ctx != nil && ctx.remBase > 0 {
+		remBase = ctx.remBase
+	}
 	if v, ok := raw["font-size"]; ok {
-		st.FontSize = fontSize(v, parentSize)
+		st.FontSize = fontSize(v, parentSize, remBase)
 	}
 	if v, ok := raw["font-family"]; ok {
 		if fam := css.ParseFontFamily(v); len(fam) > 0 {
@@ -445,7 +606,7 @@ func applyFontProps(st *ResolvedStyle, raw map[string]string, parent *ResolvedSt
 		st.FontItalic = v == "italic" || v == "oblique"
 	}
 	if v, ok := raw["font"]; ok {
-		parseFontShorthand(st, v)
+		parseFontShorthand(st, v, remBase)
 	}
 }
 
@@ -455,7 +616,7 @@ func applyFontProps(st *ResolvedStyle, raw map[string]string, parent *ResolvedSt
 // would be nondeterministic and could let a shorthand (e.g. UA "margin")
 // clobber a winning longhand (e.g. author "margin-bottom") depending on map
 // iteration order.
-func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext) {
+func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext, parent *ResolvedStyle) {
 	fs := st.FontSize
 	// gap/flex/container applied before longhands so row-gap/column-gap,
 	// flex-*, and container-type/name win over shorthands.
@@ -483,7 +644,7 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext)
 			case "block", "inline", "none", "list-item", "table", "table-row", "table-cell",
 				"table-row-group", "table-header-group", "table-footer-group",
 				"inline-block", "table-caption", "table-column", "table-column-group",
-				"flex", "inline-flex", "grid", "inline-grid", "subgrid":
+				"flex", "inline-flex", "grid", "inline-grid", "subgrid", "flow-root":
 				st.Display = value
 			}
 		case "position":
@@ -700,8 +861,15 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext)
 				st.MinWidthPercent = -1
 			}
 		case "max-width":
-			if v, ok := lengthBox(value, fs, ctx.viewportW, "none"); ok {
+			if value == "none" {
+				st.MaxWidth = -1
+				st.MaxWidthPercent = -1
+			} else if v, unit, ok := css.ParseLength(value); ok && unit == "%" {
+				st.MaxWidthPercent = v
+				st.MaxWidth = -1
+			} else if v, ok := lengthBox(value, fs, ctx.viewportW, "none"); ok {
 				st.MaxWidth = v
+				st.MaxWidthPercent = -1
 			}
 		case "min-height":
 			if value == "auto" || value == "none" {
@@ -790,7 +958,11 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext)
 				st.BorderTop.Color, st.BorderRight.Color, st.BorderBottom.Color, st.BorderLeft.Color = c, c, c, c
 			}
 		case "color":
-			if r, g, b, _, ok := css.ParseColor(value); ok {
+			if value == "inherit" {
+				if parent != nil {
+					st.Color = parent.Color
+				}
+			} else if r, g, b, _, ok := css.ParseColor(value); ok {
 				st.Color = [3]float64{float64(r) / 255, float64(g) / 255, float64(b) / 255}
 			}
 		case "background-color":
@@ -828,6 +1000,23 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext)
 			case "pre", "pre-wrap", "pre-line":
 				st.WhiteSpace = "pre"
 			}
+		case "overflow-wrap", "word-wrap":
+			// word-wrap is the legacy alias of overflow-wrap.
+			switch value {
+			case "normal", "break-word", "anywhere":
+				st.OverflowWrap = value
+			case "break-spaces":
+				// Treat like anywhere for line breaking (extra space preservation omitted).
+				st.OverflowWrap = "anywhere"
+			}
+		case "word-break":
+			switch value {
+			case "normal", "break-all", "keep-all":
+				st.WordBreak = value
+			case "break-word":
+				// Legacy alias ≈ overflow-wrap:anywhere + word-break:normal.
+				st.OverflowWrap = "anywhere"
+			}
 		case "text-decoration":
 			switch value {
 			case "underline":
@@ -836,11 +1025,26 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext)
 				st.TextDecoration = "line-through"
 			case "none":
 				st.TextDecoration = "none"
+			case "inherit":
+				if parent != nil {
+					st.TextDecoration = parent.TextDecoration
+				}
 			}
 		case "letter-spacing":
 			st.LetterSpacing = marginLen(value, fs, ctx.viewportW)
 		case "text-indent":
 			st.TextIndent = marginLen(value, fs, ctx.viewportW)
+		case "list-style-type":
+			if t := parseListStyleType(value); t != "" {
+				st.ListStyleType = t
+			}
+		case "list-style":
+			// Shorthand: accept type keywords; ignore position/image for now.
+			for _, tok := range strings.Fields(value) {
+				if t := parseListStyleType(tok); t != "" {
+					st.ListStyleType = t
+				}
+			}
 		case "border-collapse":
 			if value == "collapse" || value == "separate" {
 				st.BorderCollapse = value
@@ -852,27 +1056,30 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext)
 				st.TableLayout = value
 			}
 		case "page-break-before", "break-before":
-			// Lite: column | avoid-column alias to always | avoid (new multicol
-			// line via page break). Spec column breaks beyond that are deferred.
+			// column → page always is a multicol approximation.
+			// avoid-column is column-only (CSS Break) — do NOT map to page avoid
+			// (wiki .mw-references-columns li{break-inside:avoid-column} was
+			// leaving huge gaps between reference list items).
 			switch value {
-			case "always", "column":
+			case "always", "column", "page", "left", "right":
 				st.PageBreakBefore = "always"
-			case "avoid", "avoid-column":
+			case "avoid", "avoid-page":
 				st.PageBreakBefore = "avoid"
 			}
 		case "page-break-after", "break-after":
 			switch value {
-			case "always", "column":
+			case "always", "column", "page", "left", "right":
 				st.PageBreakAfter = "always"
-			case "avoid", "avoid-column":
+			case "avoid", "avoid-page":
 				st.PageBreakAfter = "avoid"
 			}
 		case "page-break-inside", "break-inside":
 			switch value {
-			case "always", "column":
+			case "always", "page":
 				st.PageBreakInside = "always"
-			case "avoid", "avoid-column":
+			case "avoid", "avoid-page":
 				st.PageBreakInside = "avoid"
+				// avoid-column: ignored for page pagination
 			}
 		case "orphans":
 			if n, ok := parseOrphansWidowsInt(value); ok {
@@ -965,7 +1172,7 @@ func isMulticol(st ResolvedStyle) bool {
 }
 
 // parseFontShorthand handles "font: italic bold 12px/1.4 Arial, sans-serif".
-func parseFontShorthand(st *ResolvedStyle, value string) {
+func parseFontShorthand(st *ResolvedStyle, value string, remBase float64) {
 	parts := strings.Fields(value)
 	for i, p := range parts {
 		if p == "italic" || p == "oblique" {
@@ -986,7 +1193,7 @@ func parseFontShorthand(st *ResolvedStyle, value string) {
 			st.LineHeight = lineHeight(rest[j+1:], st.FontSize)
 			rest = rest[:j]
 		}
-		st.FontSize = fontSize(rest, st.FontSize)
+		st.FontSize = fontSize(rest, st.FontSize, remBase)
 		if i+1 < len(parts) {
 			if fam := css.ParseFontFamily(strings.Join(parts[i+1:], " ")); len(fam) > 0 {
 				st.FontFamily = fam
@@ -1178,7 +1385,10 @@ func borderWidth(value string, fs float64) float64 {
 	return 0
 }
 
-func fontSize(value string, parent float64) float64 {
+func fontSize(value string, parent, remBase float64) float64 {
+	if remBase <= 0 {
+		remBase = pxToPt(16)
+	}
 	switch value {
 	case "xx-small":
 		return pxToPt(9)
@@ -1210,7 +1420,7 @@ func fontSize(value string, parent float64) float64 {
 		case "px":
 			return pxToPt(v)
 		case "rem":
-			return pxToPt(16) * v
+			return remBase * v
 		case "in":
 			return v * 72
 		case "cm":
@@ -1256,6 +1466,17 @@ func parseOverflowKeyword(value string) (string, bool) {
 		return strings.ToLower(strings.TrimSpace(value)), true
 	}
 	return "", false
+}
+
+// parseListStyleType returns a known list-style-type keyword, or "" if unknown.
+func parseListStyleType(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "disc", "circle", "square", "decimal", "decimal-leading-zero",
+		"lower-roman", "upper-roman", "lower-alpha", "lower-latin",
+		"upper-alpha", "upper-latin", "none":
+		return strings.ToLower(strings.TrimSpace(value))
+	}
+	return ""
 }
 
 // overflowCreatesStickyScrollport reports whether overflow establishes a sticky
@@ -1552,7 +1773,7 @@ func uaRules(name string) []css.Declaration {
 		}
 	case "div", "section", "article", "header", "footer", "main", "aside",
 		"nav", "form", "fieldset", "figure", "figcaption", "blockquote",
-		"address", "dl", "dd", "menu", "details", "summary":
+		"address", "dl", "dd", "details", "summary":
 		return []css.Declaration{{Prop: "display", Value: "block"}}
 	case "p":
 		return []css.Declaration{
@@ -1578,8 +1799,10 @@ func uaRules(name string) []css.Declaration {
 		return []css.Declaration{{Prop: "display", Value: "block"}, {Prop: "font-size", Value: "1.17em"}, {Prop: "margin", Value: "1em 0"}, {Prop: "font-weight", Value: "bold"}}
 	case "h4", "h5", "h6":
 		return []css.Declaration{{Prop: "display", Value: "block"}, {Prop: "font-weight", Value: "bold"}, {Prop: "font-size", Value: "1em"}, {Prop: "margin", Value: "1.33em 0"}}
-	case "ul", "ol":
-		return []css.Declaration{{Prop: "display", Value: "block"}, {Prop: "margin", Value: "1em 0"}, {Prop: "padding-left", Value: "40px"}}
+	case "ul", "menu":
+		return []css.Declaration{{Prop: "display", Value: "block"}, {Prop: "margin", Value: "1em 0"}, {Prop: "padding-left", Value: "40px"}, {Prop: "list-style-type", Value: "disc"}}
+	case "ol":
+		return []css.Declaration{{Prop: "display", Value: "block"}, {Prop: "margin", Value: "1em 0"}, {Prop: "padding-left", Value: "40px"}, {Prop: "list-style-type", Value: "decimal"}}
 	case "li":
 		return []css.Declaration{{Prop: "display", Value: "list-item"}}
 	case "table":

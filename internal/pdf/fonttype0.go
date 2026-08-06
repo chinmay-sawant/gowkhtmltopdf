@@ -53,7 +53,7 @@ func (d *Document) ensureFontSimple(f *Font, used []rune) (string, error) {
 		len(raw), len(sub.data)))
 	d.setStream(ef.ref, raw)
 
-	xMin, yMin, xMax, yMax := f.BBox()
+	xMin, yMin, xMax, yMax := f.PDFBBox()
 	flags := 32
 	italicAngle := 0
 	if f.Italic() {
@@ -67,7 +67,7 @@ func (d *Document) ensureFontSimple(f *Font, used []rune) (string, error) {
 	d.setDict(ef.descRef, fmt.Sprintf(
 		"<< /Type /FontDescriptor /FontName /%s /Flags %d /FontBBox [%d %d %d %d] /ItalicAngle %d /Ascent %d /Descent %d /CapHeight %d /StemV 80 /FontFile2 %s >>",
 		pdfName, flags, xMin, yMin, xMax, yMax, italicAngle,
-		f.Ascent(), f.Descent(), f.CapHeight(), ef.ref))
+		f.PDFAscent(), f.PDFDescent(), f.PDFCapHeight(), ef.ref))
 
 	first, last, widths := subsetWidths(sub, f.UnitsPerEm())
 	ws := make([]string, len(widths))
@@ -109,7 +109,7 @@ func (d *Document) ensureFontType0(f *Font, used []rune) (string, error) {
 		len(raw), len(sub.data)))
 	d.setStream(fileRef, raw)
 
-	xMin, yMin, xMax, yMax := f.BBox()
+	xMin, yMin, xMax, yMax := f.PDFBBox()
 	flags := 32
 	italicAngle := 0
 	if f.Italic() {
@@ -123,7 +123,7 @@ func (d *Document) ensureFontType0(f *Font, used []rune) (string, error) {
 	d.setDict(descRef, fmt.Sprintf(
 		"<< /Type /FontDescriptor /FontName /%s /Flags %d /FontBBox [%d %d %d %d] /ItalicAngle %d /Ascent %d /Descent %d /CapHeight %d /StemV 80 /FontFile2 %s >>",
 		pdfName, flags, xMin, yMin, xMax, yMax, italicAngle,
-		f.Ascent(), f.Descent(), f.CapHeight(), fileRef))
+		f.PDFAscent(), f.PDFDescent(), f.PDFCapHeight(), fileRef))
 
 	// CIDToGIDMap: 2 bytes per CID from 0..maxCID.
 	maxCID := 0

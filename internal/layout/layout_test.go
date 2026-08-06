@@ -6,6 +6,7 @@ import (
 	"image/color"
 	"image/png"
 	"math"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -460,6 +461,83 @@ func TestCascadeAndInline(t *testing.T) {
 	}
 	if !near(texts[1].X, 11) {
 		t.Errorf("special margin x = %v, want 11 (body 6 + margin 5)", texts[1].X)
+	}
+}
+
+func TestLinkPseudoColor(t *testing.T) {
+	// Author a { black } loses to a:link { blue } on specificity (print = has href).
+	s := sheet(t, `
+		a { color: #111111; }
+		a:link { color: #0066cc; }
+		a:visited { color: #0066cc; }
+		a:hover { color: #ff0000; }
+	`)
+	res := layoutHTML(t, `<html><body>
+		<p><a href="https://example.com/">with</a> <a>bare</a></p>
+	</body></html>`, s)
+	texts := opsOfKind(res, OpText)
+	var with, bare *Op
+	for i := range texts {
+		t := strings.TrimSpace(texts[i].Text)
+		switch t {
+		case "with":
+			with = &texts[i]
+		case "bare":
+			bare = &texts[i]
+		}
+	}
+	if with == nil || bare == nil {
+		t.Fatalf("texts = %+v, want with+bare", texts)
+	}
+	if with.R > 0.05 || with.G < 0.35 || with.G > 0.45 || with.B < 0.75 {
+		t.Errorf("a:link color = (%v,%v,%v), want blue-ish #0066cc", with.R, with.G, with.B)
+	}
+	// bare <a> has no href → :link does not match; a { #111 } applies (not hover red).
+	if bare.R > 0.2 || bare.G > 0.2 || bare.B > 0.2 {
+		t.Errorf("bare <a> color = (%v,%v,%v), want near #111 (not :link/:hover)", bare.R, bare.G, bare.B)
+	}
+}
+
+func TestIPAGlyphRegistryFallback(t *testing.T) {
+	dejavu := "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+	if _, err := os.Stat(dejavu); err != nil {
+		t.Skip("DejaVu Sans not installed")
+	}
+	reg, err := pdf.ScanFontDir("/usr/share/fonts/truetype/dejavu")
+	if err != nil || reg == nil {
+		t.Fatalf("ScanFontDir: %v", err)
+	}
+	ipa := "ˈaɾ"
+	root := mustParse(t, `<html><body><p style="font-family: Liberation Sans, sans-serif">`+ipa+`</p></body></html>`)
+	res, err := Layout(root, Options{Width: testViewport, Height: 400, Registry: reg, Media: "print"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	texts := opsOfKind(res, OpText)
+	if len(texts) == 0 {
+		t.Fatal("no text ops")
+	}
+	// At least one run should use a non-Liberation face that has IPA glyphs.
+	var usedDejaVu bool
+	for _, op := range texts {
+		if op.Font == nil {
+			continue
+		}
+		for _, n := range op.Font.FamilyNames() {
+			if strings.Contains(strings.ToLower(n), "dejavu") {
+				usedDejaVu = true
+			}
+		}
+		// Missing-glyph junk often has tiny/wrong advances; ensure ˈ is present as shaped text.
+		if strings.Contains(op.Text, "ˈ") || strings.Contains(op.Text, "ɾ") {
+			if op.Font.GlyphID('ˈ') == 0 && op.Font.GlyphID('ɾ') == 0 {
+				t.Errorf("IPA run still on face without IPA glyphs: families=%v text=%q", op.Font.FamilyNames(), op.Text)
+			}
+		}
+	}
+	if !usedDejaVu {
+		t.Logf("ops=%+v", texts)
+		t.Error("expected DejaVu fallback for IPA codepoints missing from Liberation")
 	}
 }
 

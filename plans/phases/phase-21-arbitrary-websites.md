@@ -1,7 +1,7 @@
 # Phase 21 - Arbitrary Websites & “Paste Any URL → Decent Print”
 
 > **Parent:** `plans/10-canonical-post-mvp-roadmap.md`  
-> **Status:** in progress (§21.1–21.7 shipped; §21.8 gates recording)  
+> **Status:** in progress (§21.1–21.7 shipped; open-web Chrome-gap work → [`pending-phase-items/`](pending-phase-items/README.md))  
 > **Estimated effort:** 2–4 months (iterative)  
 > **Depends on:** Phases 16–17 CSS; Phase 19 fonts strongly help  
 > **Unblocks:** marketing sites / Wikipedia-class **readable** prints (not parity)  
@@ -59,9 +59,10 @@ Target **Wikipedia and marketing sites** with a product bar of **“decent print
 ### 21.4 Chrome-strip / reader heuristics (opt-in)
 
 - [x] Design opt-in flag: `--simplify-dom` / `web.simplifydom` (default off); `--print-media-type` already exists and remains layout-print (no duplicate)
-- [x] Heuristics: inject synthetic `display:none !important` sheet (`convert.SimplifyChromeCSS`) — rules: `nav`/`footer`/`aside`; `[role=navigation|contentinfo|complementary]`; `#mw-navigation`; `.mw-jump-link`; `nav.site-nav`. Nodes kept in tree (not removed). Proof: `TestSimplifyDOMOnHidesChrome`, `TestSimplifyChromeCSSParsesAndMatches`
+- [x] Heuristics: inject synthetic `display:none !important` sheet (`convert.SimplifyChromeCSS`) — **landmarks only** (`nav`/`footer`/`aside` + ARIA roles + `nav.site-nav`). MediaWiki IDs via `--simplify-dom-profile=mediawiki`. Proof: `TestSimplifyDOMOnHidesChrome`, `TestSimplifyDOMMediaWikiProfile`
 - [x] Default **off** for controlled report HTML — `TestSimplifyDOMOffKeepsChrome`, `TestSimplifyDOMEnabled`
 - [x] Security: heuristics must not fetch extra origins — synthetic CSS only; no FetchSub (`simplify.go`)
+- [x] **CSS-faithful / site-agnostic cleanup** — remove skin-shaped cascade overrides; honor author CSS; operator flags only → [`pending-phase-items/12-css-faithful-engine.md`](pending-phase-items/12-css-faithful-engine.md) **done** 2026-08-05
 
 ### 21.5 “Paste any URL” path
 
