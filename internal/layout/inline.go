@@ -114,17 +114,33 @@ func (e *engine) layoutInlineFloats(b *box, nodes []*html.Node, contentW, conten
 					// they overflow slightly. Do NOT glue multi-em tokens
 					// (bare URLs after "(") onto the line — that painted past
 					// the page edge on reference lists.
+					//
+					// Nowrap-to-nowrap chains (wiki Ref cells "[127][128]") must
+					// stay on one line even when the cell is a hair narrower
+					// than the cluster; stacking at the same X was worse.
 					em := items[i].style.FontSize * e.scale
 					if em < 1 {
 						em = 10
 					}
-					if adv <= em*2.5 {
+					nowrapCluster := items[i-1].style.WhiteSpace == "nowrap" &&
+						items[i].style.WhiteSpace == "nowrap"
+					limit := em * 2.5
+					if nowrapCluster {
+						limit = em * 8 // multi-cite / IPA fragments
+					}
+					if adv <= limit {
 						lineAdv += adv
 						i++
 						for i < len(items) && !items[i].forceBreak &&
 							noBreakBefore(items[i-1], items[i]) {
 							a := items[i].marginL + items[i].w + items[i].marginR
-							if a > em*2.5 {
+							nc := items[i-1].style.WhiteSpace == "nowrap" &&
+								items[i].style.WhiteSpace == "nowrap"
+							lim := em * 2.5
+							if nc {
+								lim = em * 8
+							}
+							if a > lim {
 								break
 							}
 							lineAdv += a
@@ -541,10 +557,33 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 		lx = x
 	}
 
+	// Coalesce adjacent same-href (or same-decoration) underline segments on
+	// this line into ONE OpLine. Multi-face items already share one span; this
+	// also merges bold/italic/nested chunks and skips whitespace-only runs so
+	// dense reference lists (wrapped archive.org URLs) do not paint a forest
+	// of short double-rules.
+	type undRun struct {
+		active  bool
+		x, y, w float64
+		uw      float64
+		r, g, b float64
+		href    string
+		hasHref bool
+	}
+	var und undRun
+	flushUnd := func() {
+		if und.active && und.w > 0.01 {
+			e.add(Op{Kind: OpLine, X: und.x, Y: und.y, W: und.w, H: 0,
+				Width: und.uw, R: und.r, G: und.g, B: und.b})
+		}
+		und = undRun{}
+	}
+
 	for i := range line {
 		it := &line[i]
 		lx += it.marginL
 		if it.blockBox != nil {
+			flushUnd()
 			dx := lx - it.blockBox.x
 			dy := baseline - it.h - it.blockBox.y
 			for k := it.opStart; k < it.opEnd; k++ {
@@ -564,6 +603,7 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 			continue
 		}
 		if it.img {
+			flushUnd()
 			top := baseline - it.h
 			va := it.style.VerticalAlign
 			switch va {
@@ -609,35 +649,122 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 			lx += run.w
 			runSpan += run.w
 		}
-		// One decoration stroke per text item (not per face-run) so multi-face
-		// / multi-line link underlines do not stack into a double-thick seam.
-		// Thin stroke (~5% em, floor 0.35pt) — keep light on dense ref URLs.
-		wantUnderline := it.style.TextDecoration == "underline" ||
-			(it.href != "" && it.style.TextDecoration != "line-through")
+		// Decoration: one stroke per logical link run on this line (not per
+		// face-run / nested style chunk). Thin stroke ~5% em, clamped for
+		// dense reference print (min 0.25pt, max 0.45pt).
+		// Force-underline a[href] for PDF affordance. Bare URL strings
+		// (https://…, archive fragments) never get underlines — multi-line
+		// ref lists were a forest of rules; titles/prose links still underline.
+		bareURL := isBareURLText(it.text)
+		wantUnderline := !bareURL && (it.style.TextDecoration == "underline" ||
+			(it.href != "" && it.style.TextDecoration != "line-through"))
+		wsOnly := strings.TrimSpace(it.text) == ""
 		if runSpan > 0.01 && (wantUnderline || it.style.TextDecoration == "line-through") {
-			uw := size * 0.05
-			if uw < 0.35 {
-				uw = 0.35
-			}
+			uw := underlineStrokeWidth(size)
 			if wantUnderline {
 				// Sit clearly below glyph descenders (~1–2mm visual gap).
 				uy := baseline + de + size*0.22
-				e.add(Op{Kind: OpLine, X: runStart, Y: uy, W: runSpan, H: 0, Width: uw, R: c[0], G: c[1], B: c[2]})
+				if wsOnly {
+					// Do not start an underline on whitespace-only, but extend
+					// an active same-href run across inter-word spaces.
+					if und.active && it.href != "" && und.hasHref && it.href == und.href {
+						end := runStart + runSpan
+						if end > und.x+und.w {
+							und.w = end - und.x
+						}
+						if uw < und.uw {
+							und.uw = uw
+						}
+					}
+				} else if und.active && nearUndY(und.y, uy) &&
+					((it.href != "" && und.hasHref && it.href == und.href) ||
+						(it.href == "" && !und.hasHref)) &&
+					// Allow justify rivers / margins between nested chunks
+					// (up to ~2em) without splitting the underline.
+					runStart <= und.x+und.w+size*2+0.5 {
+					// Extend continuous underline over adjacent same-href text.
+					end := runStart + runSpan
+					if end > und.x+und.w {
+						und.w = end - und.x
+					}
+					if uw < und.uw {
+						und.uw = uw
+					}
+					// Prefer first chunk's color (title) when styles mix.
+				} else {
+					flushUnd()
+					und = undRun{
+						active: true, x: runStart, y: uy, w: runSpan, uw: uw,
+						r: c[0], g: c[1], b: c[2],
+						href: it.href, hasHref: it.href != "",
+					}
+				}
+			} else {
+				flushUnd()
 			}
-			if it.style.TextDecoration == "line-through" {
-				e.add(Op{Kind: OpLine, X: runStart, Y: baseline - as*0.3, W: runSpan, H: 0, Width: uw, R: c[0], G: c[1], B: c[2]})
+			if it.style.TextDecoration == "line-through" && !wsOnly {
+				e.add(Op{Kind: OpLine, X: runStart, Y: baseline - as*0.3, W: runSpan, H: 0,
+					Width: uw, R: c[0], G: c[1], B: c[2]})
 			}
+		} else if !wantUnderline {
+			flushUnd()
 		}
 		lx += it.marginR
 		if i < len(line)-1 && isJustifyGapAfter(*it) {
 			lx += justifyGap
 		}
 	}
+	flushUnd()
 
 	if b != nil && b.firstBaseline == 0 {
 		b.firstBaseline = baseline
 	}
 	return lh
+}
+
+// underlineStrokeWidth returns a light print-friendly underline thickness.
+// ~5% em, clamped so small ref text stays visible without dense double-rules.
+func underlineStrokeWidth(em float64) float64 {
+	uw := em * 0.05
+	if uw < 0.25 {
+		uw = 0.25
+	}
+	if uw > 0.45 {
+		uw = 0.45
+	}
+	return uw
+}
+
+// isBareURLText reports that s is essentially a URL (optional leading
+// punctuation from "(https://…)" wrappers). Used to skip force-underlines on
+// raw link text in reference lists.
+func isBareURLText(s string) bool {
+	t := strings.TrimSpace(s)
+	t = strings.TrimLeft(t, "([\"' \t")
+	if t == "" {
+		return false
+	}
+	low := strings.ToLower(t)
+	if strings.HasPrefix(low, "https://") || strings.HasPrefix(low, "http://") ||
+		strings.HasPrefix(low, "www.") {
+		return true
+	}
+	// Continuation fragment of a wrapped URL (no scheme on later lines).
+	if strings.Contains(t, "/") && !strings.ContainsAny(t, " \t") &&
+		(strings.Contains(t, ".com") || strings.Contains(t, ".org") ||
+			strings.Contains(t, "archive.") || strings.Contains(t, ".html") ||
+			strings.Contains(t, ".php") || strings.Count(t, "/") >= 2) {
+		return true
+	}
+	return false
+}
+
+func nearUndY(a, b float64) bool {
+	d := a - b
+	if d < 0 {
+		d = -d
+	}
+	return d < 0.5
 }
 
 // collectInline flattens inline child nodes into items.

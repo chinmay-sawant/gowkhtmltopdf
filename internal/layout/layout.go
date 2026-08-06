@@ -1919,14 +1919,19 @@ func (e *engine) emitCollapsedRowGrid(tb *box, ri int, lastRow bool, padL float6
 		}
 		e.add(Op{Kind: OpLine, X: xx, Y: ya, W: 0, H: yb - ya, Width: bw, R: r, G: g, B: b})
 	}
-	// Top edge — skip under rowspan continuations.
+	// Top edge. Skip under rowspan continuations so a multi-row Year cell is
+	// not bisected mid-table; paint.capTablePageBreaks re-seals full tops for
+	// page fragments under repeated thead where those holes look open.
+	// Always emit a segment for every column that has a local cell or is not
+	// rowspan-covered — empty (ink-less) local cells still close their band.
 	for ci := 0; ci < nCols; ci++ {
 		if ri > 0 && rowspanCovers(tb, ri-1, ri, ci) {
 			continue
 		}
 		hline(xs[ci], xs[ci+1], y0)
 	}
-	// Verticals for this row.
+	// Verticals for this row — include outer edges and rowspan-hole columns so
+	// the strip is a complete grid even when the row has fewer local cells.
 	for ci := 0; ci <= nCols; ci++ {
 		if ci > 0 && ci < nCols && colspanCovers(tb, ri, ci-1, ci) {
 			continue
@@ -2110,7 +2115,127 @@ func (e *engine) emitCell(b *box, skipBorders bool) {
 	}
 	pop()
 	e.imgMaxW = oldMax
+	// Rowspan cells with forced multi-line content (wiki Ref: [127]<br>[128]
+	// in rowspan=2) pack lines at the top with normal line-height, so both
+	// markers sit in the first row band and look overlapped. Spread line
+	// boxes evenly across the full cell height when we have room.
+	if b.rowSpan > 1 {
+		distributeRowspanLines(e.ops, start, len(e.ops), b.y, b.h,
+			e.scalePt(st.PaddingTop)+e.scalePt(st.BorderTop.Width),
+			e.scalePt(st.PaddingBottom)+e.scalePt(st.BorderBottom.Width))
+	}
 	b.opStart, b.opEnd = start, len(e.ops)-1
+}
+
+// distributeRowspanLines remaps distinct text/bullet baselines in ops[start:end)
+// so they span the cell's content box evenly (top line near top, bottom near
+// bottom). Non-text ops (underlines, links) ride with the nearest baseline.
+func distributeRowspanLines(ops []Op, start, end int, cellY, cellH, padTop, padBot float64) {
+	if end <= start || cellH <= 0 || ops == nil {
+		return
+	}
+	type band struct {
+		y   float64
+		idx []int
+	}
+	const yEps = 0.75
+	var bands []band
+	for i := start; i < end && i < len(ops); i++ {
+		op := ops[i]
+		if op.Kind != OpText && op.Kind != OpBullet {
+			continue
+		}
+		placed := false
+		for bi := range bands {
+			if absFloat(bands[bi].y-op.Y) <= yEps {
+				bands[bi].idx = append(bands[bi].idx, i)
+				// Keep average Y so multi-glyph lines stay coherent.
+				n := float64(len(bands[bi].idx))
+				bands[bi].y = (bands[bi].y*(n-1) + op.Y) / n
+				placed = true
+				break
+			}
+		}
+		if !placed {
+			bands = append(bands, band{y: op.Y, idx: []int{i}})
+		}
+	}
+	if len(bands) < 2 {
+		return
+	}
+	// Sort bands top→bottom.
+	for i := 0; i < len(bands); i++ {
+		for j := i + 1; j < len(bands); j++ {
+			if bands[j].y < bands[i].y {
+				bands[i], bands[j] = bands[j], bands[i]
+			}
+		}
+	}
+	innerTop := cellY + padTop
+	innerBot := cellY + cellH - padBot
+	if innerBot-innerTop < 4 {
+		return
+	}
+	// Only redistribute when natural packing is much shorter than the cell
+	// (typical rowspan>1 with few <br> lines).
+	natural := bands[len(bands)-1].y - bands[0].y
+	if natural >= (innerBot-innerTop)*0.55 {
+		return
+	}
+	n := len(bands)
+	targets := make([]float64, n)
+	if n == 1 {
+		return
+	}
+	// Place first baseline ~0.7em into the cell, last near bottom; interpolate.
+	// Use first text size as em estimate.
+	em := 8.0
+	for _, i := range bands[0].idx {
+		if ops[i].Size > 0 {
+			em = ops[i].Size
+			break
+		}
+	}
+	first := innerTop + em*0.85
+	last := innerBot - em*0.25
+	if last <= first {
+		return
+	}
+	for i := 0; i < n; i++ {
+		if n == 1 {
+			targets[i] = first
+		} else {
+			targets[i] = first + (last-first)*float64(i)/float64(n-1)
+		}
+	}
+	// Map old baseline → dy, apply to all ops near that baseline.
+	type shift struct{ y0, dy float64 }
+	var shifts []shift
+	for i, b := range bands {
+		shifts = append(shifts, shift{y0: b.y, dy: targets[i] - b.y})
+	}
+	for i := start; i < end && i < len(ops); i++ {
+		y := ops[i].Y
+		// Nearest band baseline.
+		best := 0
+		bestD := absFloat(y - shifts[0].y0)
+		for si := 1; si < len(shifts); si++ {
+			d := absFloat(y - shifts[si].y0)
+			if d < bestD {
+				bestD, best = d, si
+			}
+		}
+		if bestD <= em*1.5 {
+			ops[i].Y += shifts[best].dy
+		}
+	}
+}
+
+func absFloat(v float64) float64 {
+	if v < 0 {
+		return -v
+	}
+	return v
 }
 
 // measureCellContent returns the max-content border-box width of the cell
@@ -2129,13 +2254,35 @@ func (e *engine) measureCellContent(n *html.Node, st ResolvedStyle) float64 {
 // When word-break/overflow-wrap allow breaking long tokens, min-content uses
 // the longest soft segment (or widest single rune) so URL-heavy cells can
 // shrink instead of forcing the table past the page edge.
+//
+// Short nowrap-only lines (wiki Ref cells with [127][128]) use the full line
+// as min-content so adjacent cite markers stay on one horizontal line instead
+// of wrapping into a stacked, overlapping pair in a one-marker-wide column.
 func (e *engine) measureCellMinMax(n *html.Node, st ResolvedStyle) (minW, maxW float64) {
 	var lineW, longestWord float64
+	// lineOnlyNowrap is true when every contribution on the current line came
+	// from white-space:nowrap/pre runs (no soft-wrap opportunities between
+	// adjacent nowrap boxes either — we treat the line as a cite/IPA cluster).
+	lineOnlyNowrap := true
+	lineHasInk := false
 	flushLine := func() {
 		if lineW > maxW {
 			maxW = lineW
 		}
+		if lineHasInk && lineOnlyNowrap && lineW > longestWord {
+			// Cap so a pathological nowrap paragraph does not freeze the table
+			// at max-content; multi-cite clusters are well under ~10em.
+			em := st.FontSize
+			if em < 1 {
+				em = 10
+			}
+			if lineW <= em*10*e.scale {
+				longestWord = lineW
+			}
+		}
 		lineW = 0
+		lineOnlyNowrap = true
+		lineHasInk = false
 	}
 	var walk func(n *html.Node, cs ResolvedStyle, nowrap bool)
 	walk = func(n *html.Node, cs ResolvedStyle, nowrap bool) {
@@ -2152,6 +2299,8 @@ func (e *engine) measureCellMinMax(n *html.Node, st ResolvedStyle) (minW, maxW f
 				if len(fields) == 0 {
 					return
 				}
+				lineOnlyNowrap = false
+				lineHasInk = true
 				// Leading space if original had leading WS and line already started.
 				if lineW > 0 && len(text) > 0 && isHTMLSpace(text[0]) {
 					lineW += e.measureTextFace(" ", cs)
@@ -2174,6 +2323,9 @@ func (e *engine) measureCellMinMax(n *html.Node, st ResolvedStyle) (minW, maxW f
 			if uw > longestWord {
 				longestWord = uw
 			}
+			if strings.TrimSpace(text) != "" {
+				lineHasInk = true
+			}
 			lineW += w
 		case html.ElementNode:
 			childCS := e.styles[n]
@@ -2190,6 +2342,8 @@ func (e *engine) measureCellMinMax(n *html.Node, st ResolvedStyle) (minW, maxW f
 				if iw > longestWord {
 					longestWord = iw
 				}
+				lineOnlyNowrap = false
+				lineHasInk = true
 				lineW += iw
 				return
 			}

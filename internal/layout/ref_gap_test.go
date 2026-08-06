@@ -13,7 +13,9 @@ import (
 // TestAvoidListItemsNoCascadingGaps: dense page-break-inside:avoid list items
 // near page boundaries must not cascade expanding empty bands between
 // consecutive items (wiki .mw-references-columns li{page-break-inside:avoid}).
-// Prefer splitting short avoid boxes over blanking large mid-page remainders.
+// Prefer splitting short avoid boxes over blanking large mid-page remainders,
+// and pack residual keep-together gaps so same-page inter-item start pitch
+// stays near natural multi-line height (≤ ~2.5 line heights beyond content).
 func TestAvoidListItemsNoCascadingGaps(t *testing.T) {
 	s := sheet(t, `
 body { margin: 0; font-size: 10pt; }
@@ -82,6 +84,22 @@ p { margin: 0.4em 0; }
 		}
 	}
 
+	// Inter-item empty air (next start − prev location bottom) via Locations.
+	type liY struct{ y, h float64 }
+	var lis []liY
+	for _, loc := range res.Locations {
+		if loc.Node != nil && loc.Node.Name == "li" {
+			lis = append(lis, liY{loc.Y, loc.H})
+		}
+	}
+	for i := 0; i < len(lis); i++ {
+		for j := i + 1; j < len(lis); j++ {
+			if lis[j].y < lis[i].y {
+				lis[i], lis[j] = lis[j], lis[i]
+			}
+		}
+	}
+
 	maxSamePageGap := 0.0
 	bigGaps := 0
 	for i := 1; i < len(starts); i++ {
@@ -93,19 +111,47 @@ p { margin: 0.4em 0; }
 			maxSamePageGap = g
 		}
 		// Natural multi-line item + margin is ~25–45pt; cascading avoid
-		// left 100–150pt bands on wiki references.
-		if g > 70 {
+		// left 100–150pt bands on wiki references. Residual 26–38pt bands
+		// are still too airy vs Chrome.
+		if g > 55 {
 			bigGaps++
 			t.Logf("large gap %.1f between items at y=%.1f and y=%.1f (page %d)",
 				g, starts[i-1], starts[i], int(starts[i]/contentH))
 		}
 	}
-	t.Logf("list starts=%d maxSamePageGap=%.1f bigGaps>70=%d", len(starts), maxSamePageGap, bigGaps)
-	if maxSamePageGap > 80 {
-		t.Fatalf("cascading avoid-inside gaps: max same-page inter-item gap %.1f (want ≤80)", maxSamePageGap)
+
+	maxEmpty := 0.0
+	emptyBig := 0
+	for i := 1; i < len(lis); i++ {
+		if int(lis[i].y/contentH) != int(lis[i-1].y/contentH) {
+			continue
+		}
+		empty := lis[i].y - (lis[i-1].y + lis[i-1].h)
+		if empty > maxEmpty {
+			maxEmpty = empty
+		}
+		// Pure empty between items should stay near margin (0.4em ≈ 4pt) +
+		// a line of slack; 2.5 line-heights at 10pt/1.2 ≈ 30pt is the cap.
+		if empty > 30 {
+			emptyBig++
+			t.Logf("empty air %.1f between li y=%.1f h=%.1f and y=%.1f",
+				empty, lis[i-1].y, lis[i-1].h, lis[i].y)
+		}
 	}
-	if bigGaps > 2 {
-		t.Fatalf("%d same-page inter-item gaps >70pt (want ≤2)", bigGaps)
+
+	t.Logf("list starts=%d maxSamePageGap=%.1f bigGaps>55=%d maxEmpty=%.1f empty>30=%d",
+		len(starts), maxSamePageGap, bigGaps, maxEmpty, emptyBig)
+	if maxSamePageGap > 55 {
+		t.Fatalf("cascading avoid-inside gaps: max same-page inter-item start gap %.1f (want ≤55)", maxSamePageGap)
+	}
+	if bigGaps > 1 {
+		t.Fatalf("%d same-page inter-item start gaps >55pt (want ≤1)", bigGaps)
+	}
+	if maxEmpty > 30 {
+		t.Fatalf("avoid-item empty air: max same-page empty %.1f (want ≤30 ≈ 2.5 line heights)", maxEmpty)
+	}
+	if emptyBig > 1 {
+		t.Fatalf("%d same-page empty gaps >30pt (want ≤1)", emptyBig)
 	}
 }
 
@@ -120,16 +166,95 @@ func TestPreferSplitOverBlankUnit(t *testing.T) {
 	if !preferSplitOverBlank(100, 30, contentH) {
 		t.Fatal("short box with large remaining should prefer split")
 	}
-	// Short box with 40pt remaining still prefers split (maxBlank ~24).
+	// Short box with 40pt remaining still prefers split (maxBlank ~15).
 	if !preferSplitOverBlank(40, 30, contentH) {
 		t.Fatal("short box with mid remaining should prefer split")
 	}
+	// 20pt remaining on a 30pt box: maxBlank = max(14, 15) = 15 → split.
+	if !preferSplitOverBlank(20, 30, contentH) {
+		t.Fatal("short box with 20pt remaining should prefer split")
+	}
 	// Near page end: small remaining, short box → keep together (move).
-	if preferSplitOverBlank(18, 30, contentH) {
+	if preferSplitOverBlank(12, 30, contentH) {
 		t.Fatal("near page end small remaining should allow keep-together move")
 	}
 	// Tall box near mid (remaining < half, box large): short-box rule N/A.
 	if preferSplitOverBlank(300, 400, contentH) {
 		t.Fatal("tall box with remaining < half should not match short-box rule")
+	}
+}
+
+// TestPackAvoidSiblingsCollapsesResidualGap: after a keep-together residue
+// would leave > natural margin between two short avoid list items on the
+// same page, packAvoidGaps must pull them together.
+func TestPackAvoidSiblingsCollapsesResidualGap(t *testing.T) {
+	s := sheet(t, `
+body { margin: 0; font-size: 10pt; line-height: 1.2; }
+ol { margin: 0; padding-left: 20pt; }
+li { page-break-inside: avoid; margin: 0 0 0.4em 0; }
+`)
+	// Place the list so the first avoid item barely overflows the page,
+	// historically leaving a keep-together blank before the next sibling.
+	var b strings.Builder
+	b.WriteString(`<html><body>`)
+	for i := 0; i < 22; i++ {
+		b.WriteString(fmt.Sprintf(
+			`<p style="margin:0.35em 0">Filler block %d with words so the ordered list begins near a page boundary for avoid packing.</p>`, i))
+	}
+	b.WriteString(`<ol>`)
+	for i := 0; i < 12; i++ {
+		b.WriteString(fmt.Sprintf(
+			`<li>Short citation %d with a URL https://example.com/path/%d/article-title-here and a bit more text.</li>`, i+1, i))
+	}
+	b.WriteString(`</ol></body></html>`)
+	root, err := html.Parse(b.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	const pageH = 400.0
+	res, err := Layout(root, Options{
+		Width: 400, Height: pageH, Sheets: []*css.Stylesheet{s},
+		Media: "print", Background: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc := pdf.NewDocument()
+	if err := Paint(doc, res, PaintOptions{
+		PageWidth: 450, PageHeight: pageH + 40, MarginTop: 20, MarginBottom: 20,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	contentH := pageH
+	var lis []ElementLocation
+	for _, loc := range res.Locations {
+		if loc.Node != nil && loc.Node.Name == "li" {
+			lis = append(lis, loc)
+		}
+	}
+	if len(lis) < 6 {
+		t.Fatalf("expected list items, got %d", len(lis))
+	}
+	for i := 0; i < len(lis); i++ {
+		for j := i + 1; j < len(lis); j++ {
+			if lis[j].Y < lis[i].Y {
+				lis[i], lis[j] = lis[j], lis[i]
+			}
+		}
+	}
+	maxEmpty := 0.0
+	for i := 1; i < len(lis); i++ {
+		if int(lis[i].Y/contentH) != int(lis[i-1].Y/contentH) {
+			continue
+		}
+		empty := lis[i].Y - (lis[i-1].Y + lis[i-1].H)
+		if empty > maxEmpty {
+			maxEmpty = empty
+		}
+	}
+	t.Logf("lis=%d maxEmpty=%.1f", len(lis), maxEmpty)
+	// 2.5 line heights at 10pt × 1.2 ≈ 30pt; packed avoid items must be denser.
+	if maxEmpty > 28 {
+		t.Fatalf("packed avoid siblings: max empty %.1f (want ≤28)", maxEmpty)
 	}
 }
