@@ -234,8 +234,7 @@ func TestTOCFlags(t *testing.T) {
 }
 
 func TestLoadFlags(t *testing.T) {
-	// Page-only flags (zoom, username, password) must follow an object
-	// keyword; the page keyword seeds the object.
+	// Page-only flags after an object keyword land on that object.
 	cmd := parse(t,
 		"page",
 		"--zoom", "1.5",
@@ -265,26 +264,47 @@ func TestLoadFlags(t *testing.T) {
 	}
 }
 
-func TestPageOnlyFlagPreObjectRejected(t *testing.T) {
-	for _, args := range [][]string{
-		{"--zoom", "2", "in.html", "out.pdf"},
-		{"--username", "u", "in.html", "out.pdf"},
-		{"--password", "p", "in.html", "out.pdf"},
-		{"--timeout", "30", "in.html", "out.pdf"},
-		{"--external-links", "in.html", "out.pdf"},
-		{"--internal-links", "in.html", "out.pdf"},
-	} {
-		if _, err := Parse(args); err == nil {
-			t.Errorf("page-only flag %v before any object keyword must error", args[0])
-		}
+func TestPageOnlyFlagPreObjectPending(t *testing.T) {
+	// Pre-object page-only flags remap onto the first page (pending), matching
+	// documented smoke recipes: `--zoom 0.67 url out.pdf`.
+	cmd := parse(t, "--zoom", "2", "--username", "u", "--password", "p",
+		"--timeout", "30", "--external-links", "--internal-links",
+		"in.html", "out.pdf")
+	o := cmd.Objects[0]
+	if o.Load.ZoomFactor != 2 {
+		t.Errorf("pre-object zoom pending: got %v", o.Load.ZoomFactor)
+	}
+	if o.Load.Username != "u" || o.Load.Password != "p" {
+		t.Errorf("pre-object auth pending: %q/%q", o.Load.Username, o.Load.Password)
+	}
+	if o.Load.Timeout != 30 {
+		t.Errorf("pre-object timeout pending: got %v", o.Load.Timeout)
+	}
+	if !o.ExternalLinks {
+		t.Error("pre-object external-links pending")
+	}
+	if !o.LocalLinks {
+		t.Error("pre-object internal-links (locallinks) pending")
 	}
 	// After an object keyword they land on the object.
-	cmd := parse(t, "page", "--zoom", "2", "--external-links", "in.html", "out.pdf")
+	cmd = parse(t, "page", "--zoom", "2", "--external-links", "in.html", "out.pdf")
 	if cmd.Objects[0].Load.ZoomFactor != 2 {
 		t.Error("zoom must land on the object after page keyword")
 	}
 	if !cmd.Objects[0].ExternalLinks {
 		t.Error("external-links must land on the object after page keyword")
+	}
+	// Leading toc does not consume pending; zoom applies to the page after.
+	cmd = parse(t, "--zoom", "1.5", "toc", "page", "in.html", "out.pdf")
+	var body *settings.PdfObject
+	for i := range cmd.Objects {
+		if !cmd.Objects[i].IsTableOfContent {
+			body = &cmd.Objects[i]
+			break
+		}
+	}
+	if body == nil || body.Load.ZoomFactor != 1.5 {
+		t.Errorf("pre-object zoom after toc must land on body page; body=%v", body)
 	}
 }
 

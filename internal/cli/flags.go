@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"fmt"
 	"strconv"
 
 	"gowkhtmltopdf/internal/settings"
@@ -341,15 +340,22 @@ func printMediaFlag(enable bool) flagApplier {
 }
 
 // pageOnlyFlag routes a page-only flag (zoom, username, password, timeout,
-// external-links, internal-links). These have no global consumer, so the
-// pre-object position is rejected loudly instead of silently dropping the
-// value (upstream address remapping would stamp only the first page).
+// external-links, internal-links). There is no Global consumer; flags apply
+// to the current object, or accumulate as pending first-page settings when
+// they appear before any page/cover/toc keyword (upstream address remapping:
+// `--zoom 0.67 url out.pdf` stamps zoom on the first page). TOC objects do
+// not consume pending (see newFreshObject), so pre-object zoom still lands
+// on the first real page after a leading toc.
 func pageOnlyFlag(obj func(o *settings.PdfObject, val string) error) flagApplier {
 	return func(c *Command, cur *objectCtx, vals []string) error {
-		if cur.obj == nil {
-			return fmt.Errorf("option must follow a page/cover/toc object")
+		if cur.obj != nil {
+			return obj(cur.obj, vals[0])
 		}
-		return obj(cur.obj, vals[0])
+		if cur.pending == nil {
+			o := settings.DefaultPdfObject()
+			cur.pending = &o
+		}
+		return obj(cur.pending, vals[0])
 	}
 }
 
