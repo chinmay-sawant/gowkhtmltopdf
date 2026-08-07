@@ -10,7 +10,7 @@ import (
 // inlineItem is one atomic piece of inline content.
 type inlineItem struct {
 	text       string
-	style      ResolvedStyle
+	style      *ResolvedStyle
 	w, h       float64 // text: run width + line height; image: placed size
 	ascent     float64
 	descent    float64
@@ -202,7 +202,7 @@ func (e *engine) breakOverflowItem(it inlineItem, remainW, fullLineW, restLineW 
 	if it.img || it.blockBox != nil || it.forceBreak || it.text == "" {
 		return nil
 	}
-	pol := wordBreakOf(it.style)
+	pol := wordBreakOf(*it.style)
 	if pol == breakNever {
 		return nil
 	}
@@ -251,7 +251,7 @@ func (e *engine) breakOverflowItem(it inlineItem, remainW, fullLineW, restLineW 
 	if restRoom < 1 {
 		return nil
 	}
-	chunks := e.breakToken(it.text, it.style, firstRoom, restRoom)
+	chunks := e.breakToken(it.text, *it.style, firstRoom, restRoom)
 	if len(chunks) <= 1 {
 		return nil
 	}
@@ -259,7 +259,7 @@ func (e *engine) breakOverflowItem(it inlineItem, remainW, fullLineW, restLineW 
 	for i, chunk := range chunks {
 		part := it
 		part.text = chunk
-		part.w = e.measureTextFace(chunk, it.style)
+		part.w = e.measureTextFace(chunk, *it.style)
 		if i > 0 {
 			part.marginL = 0
 		}
@@ -359,7 +359,7 @@ func separateAdjacentCites(items []inlineItem, e *engine) []inlineItem {
 				gap := "\u200a" // hair space
 				cur.text = gap + cur.text
 				if e != nil {
-					cur.w = e.measureTextFace(cur.text, cur.style)
+					cur.w = e.measureTextFace(cur.text, *cur.style)
 				}
 			}
 		}
@@ -458,8 +458,7 @@ func isSoftWrapRune(r rune, mode softBreakMode) bool {
 // lastLine is true for the final line of the inline formatting context (used
 // so text-align:justify leaves the last line start-aligned).
 func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x, y float64, lastLine bool) float64 {
-	line := make([]inlineItem, end-start)
-	copy(line, items[start:end])
+	line := items[start:end]
 	if len(line) == 0 {
 		return 0
 	}
@@ -470,7 +469,7 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 		trimmed := strings.TrimRight(last.text, " ")
 		if trimmed != last.text {
 			last.text = trimmed
-			last.w = e.measureTextFace(trimmed, last.style)
+			last.w = e.measureTextFace(trimmed, *last.style)
 		}
 	}
 
@@ -490,7 +489,7 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 	maxAscent, maxDescent := 0.0, 0.0
 	for i := range line {
 		it := &line[i]
-		if it.img || it.blockBox != nil {
+		if it.forceBreak || it.style == nil || it.img || it.blockBox != nil {
 			if it.h > maxAscent {
 				maxAscent = it.h
 			}
@@ -498,7 +497,7 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 		}
 		as := e.fontAscent(it.style.FontSize * e.scale)
 		de := e.fontDescent(it.style.FontSize * e.scale)
-		lh := lineHeightOf(&it.style) * e.scale
+		lh := lineHeightOf(it.style) * e.scale
 		extra := (lh - as - de) / 2
 		if as+extra > maxAscent {
 			maxAscent = as + extra
@@ -581,6 +580,9 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 
 	for i := range line {
 		it := &line[i]
+		if it.forceBreak || it.style == nil {
+			continue
+		}
 		lx += it.marginL
 		if it.blockBox != nil {
 			flushUnd()
@@ -633,7 +635,7 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 			as = size * 0.8
 			de = size * 0.2
 		}
-		runs := e.splitTextByFace(it.text, it.style)
+		runs := e.splitTextByFace(it.text, *it.style)
 		runStart := lx
 		var runSpan float64
 		for _, run := range runs {
@@ -783,7 +785,7 @@ func (e *engine) collectInlineNode(n *html.Node, out *[]inlineItem) {
 			parts := strings.Split(n.Text, "\n")
 			for i, p := range parts {
 				if p != "" {
-					*out = append(*out, e.textItem(p, st))
+					*out = append(*out, e.textItem(p, e.stylePtr(n)))
 				}
 				if i < len(parts)-1 {
 					*out = append(*out, inlineItem{forceBreak: true})
@@ -798,7 +800,7 @@ func (e *engine) collectInlineNode(n *html.Node, out *[]inlineItem) {
 			if strings.TrimSpace(n.Text) == "" {
 				if n.Text != "" {
 					if len(*out) == 0 || !(*out)[len(*out)-1].img {
-						*out = append(*out, e.textItem(" ", st))
+						*out = append(*out, e.textItem(" ", e.stylePtr(n)))
 					}
 				}
 				return
@@ -810,7 +812,7 @@ func (e *engine) collectInlineNode(n *html.Node, out *[]inlineItem) {
 			// white-space:nowrap — keep the run unbreakable (wiki .reference
 			// cite markers in narrow table columns).
 			if st.WhiteSpace == "nowrap" {
-				*out = append(*out, e.textItem(text, st))
+				*out = append(*out, e.textItem(text, e.stylePtr(n)))
 				return
 			}
 			words := strings.Fields(text)
@@ -837,7 +839,7 @@ func (e *engine) collectInlineNode(n *html.Node, out *[]inlineItem) {
 				if i < len(words)-1 {
 					word += " "
 				}
-				*out = append(*out, e.textItem(word, st))
+				*out = append(*out, e.textItem(word, e.stylePtr(n)))
 			}
 			// Preserve a trailing word-separator when the source text node
 			// ended with whitespace (so "foo <b>bar</b>" keeps the gap).
@@ -860,7 +862,7 @@ func (e *engine) collectInlineNode(n *html.Node, out *[]inlineItem) {
 		if n.Name == "img" {
 			ib := e.buildImage(n, st, 0, 0)
 			*out = append(*out, inlineItem{
-				img: true, imgRef: ib.img, w: ib.w, h: ib.h, style: st,
+				img: true, imgRef: ib.img, w: ib.w, h: ib.h, style: e.stylePtr(n),
 				marginL: e.scalePt(st.MarginLeft), marginR: e.scalePt(st.MarginRight),
 			})
 			return
@@ -872,7 +874,7 @@ func (e *engine) collectInlineNode(n *html.Node, out *[]inlineItem) {
 			opEnd := len(e.ops)
 			if cb != nil {
 				*out = append(*out, inlineItem{
-					img: true, w: cb.w, h: cb.h, style: st,
+					img: true, w: cb.w, h: cb.h, style: e.stylePtr(n),
 					blockBox: cb, opStart: opStart, opEnd: opEnd,
 					marginL: e.scalePt(st.MarginLeft), marginR: e.scalePt(st.MarginRight),
 				})
@@ -889,13 +891,13 @@ func (e *engine) collectInlineNode(n *html.Node, out *[]inlineItem) {
 			}
 			before := len(*out)
 			if txt := e.pseudoContent(n, "before"); txt != "" {
-				*out = append(*out, e.textItem(txt, st))
+				*out = append(*out, e.textItem(txt, e.stylePtr(n)))
 			}
 			for _, c := range n.Children {
 				e.collectInlineNode(c, out)
 			}
 			if txt := e.pseudoContent(n, "after"); txt != "" {
-				*out = append(*out, e.textItem(txt, st))
+				*out = append(*out, e.textItem(txt, e.stylePtr(n)))
 			}
 			// Horizontal margins on inline elements (e.g. .co { margin-left: 10px }
 			// after a logo) apply to the first/last generated items.
@@ -917,7 +919,7 @@ func (e *engine) collectInlineNode(n *html.Node, out *[]inlineItem) {
 		opEnd := len(e.ops)
 		if cb != nil {
 			*out = append(*out, inlineItem{
-				img: true, w: cb.w, h: cb.h, style: st,
+				img: true, w: cb.w, h: cb.h, style: e.stylePtr(n),
 				blockBox: cb, opStart: opStart, opEnd: opEnd,
 			})
 		}
@@ -970,9 +972,9 @@ func (e *engine) inlineBlockAvail(n *html.Node, st ResolvedStyle, cbW float64) f
 // availWForInline is a generous width for block-in-inline measurement.
 func availWForInline() float64 { return 1 << 30 }
 
-func (e *engine) textItem(text string, st ResolvedStyle) inlineItem {
-	w := e.measureTextFace(text, st)
-	return inlineItem{text: text, style: st, w: w, h: lineHeightOf(&st) * e.scale}
+func (e *engine) textItem(text string, st *ResolvedStyle) inlineItem {
+	w := e.measureTextFace(text, *st)
+	return inlineItem{text: text, style: st, w: w, h: lineHeightOf(st) * e.scale}
 }
 
 // squeezeInlineSpaces drops artificial space items that sit immediately before
@@ -1105,7 +1107,10 @@ func coalesceTextItems(line []inlineItem) []inlineItem {
 	return out
 }
 
-func sameInlineStyle(a, b ResolvedStyle) bool {
+func sameInlineStyle(a, b *ResolvedStyle) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
 	return a.FontSize == b.FontSize &&
 		a.FontWeight == b.FontWeight &&
 		a.FontItalic == b.FontItalic &&
@@ -1179,24 +1184,36 @@ func (e *engine) splitTextByFace(s string, st ResolvedStyle) []faceRun {
 		return nil
 	}
 	size := st.FontSize * e.scale
-	var runs []faceRun
-	var cur faceRun
-	for _, r := range s {
+	runs := make([]faceRun, 0, 1)
+	start := 0
+	var current *pdf.Font
+	var width float64
+	for i, r := range s {
 		face := e.faceForRune(st, r)
 		if face == nil {
 			face = e.font
 		}
-		if cur.face == nil {
-			cur = faceRun{face: face}
-		} else if face != cur.face {
-			runs = append(runs, cur)
-			cur = faceRun{face: face}
+		if current != nil && face != current {
+			runs = append(runs, faceRun{
+				text: s[start:i],
+				face: current,
+				w:    width,
+			})
+			start = i
+			width = 0
 		}
-		cur.text += string(r)
-		cur.w += face.AdvanceInPoints(r, size)
+		if current == nil {
+			start = i
+		}
+		current = face
+		width += face.AdvanceInPoints(r, size)
 	}
-	if cur.face != nil {
-		runs = append(runs, cur)
+	if current != nil {
+		runs = append(runs, faceRun{
+			text: s[start:],
+			face: current,
+			w:    width,
+		})
 	}
 	return runs
 }

@@ -232,14 +232,15 @@ func rasterizeContext(ctx context.Context, res *layout.Result, height float64, t
 	}
 	img := image.NewNRGBA(image.Rect(0, 0, w, h))
 	if !transparent {
-		draw.Draw(img, img.Bounds(), image.NewUniform(color.White), image.Point{}, draw.Src)
+		fillNRGBAOpaque(img, img.Bounds(), color.NRGBA{R: 255, G: 255, B: 255, A: 255})
 	}
 	atlas := newGlyphAtlas()
+	imageCache := newRasterImageCache()
 	for _, i := range rasterPaintOrder(res.Ops) {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		paint(img, &res.Ops[i], pxPerPt, atlas)
+		paint(img, &res.Ops[i], pxPerPt, atlas, imageCache)
 	}
 	if rasterSS <= 1 {
 		return img, nil
@@ -293,10 +294,98 @@ func rasterPaintLayer(k layout.OpKind) int {
 	}
 }
 
+type decodedRasterImage struct {
+	raw   []byte
+	jpeg  bool
+	image image.Image
+}
+
+type scaledRasterImageKey struct {
+	decoded *decodedRasterImage
+	w, h    int
+}
+
+type rasterImageCache struct {
+	decoded map[uint64][]*decodedRasterImage
+	scaled  map[scaledRasterImageKey]*image.NRGBA
+}
+
+func newRasterImageCache() *rasterImageCache {
+	return &rasterImageCache{
+		decoded: make(map[uint64][]*decodedRasterImage),
+		scaled:  make(map[scaledRasterImageKey]*image.NRGBA),
+	}
+}
+
+func rasterImageHash(data []byte, isJPEG bool) uint64 {
+	// FNV-1a is sufficient as a lookup accelerator; bytes.Equal below keeps
+	// collisions correct. Include the source kind because PNG and JPEG have
+	// different decoders even if their payloads happen to match.
+	hash := uint64(14695981039346656037)
+	if isJPEG {
+		hash ^= 1
+		hash *= 1099511628211
+	}
+	for _, b := range data {
+		hash ^= uint64(b)
+		hash *= 1099511628211
+	}
+	return hash
+}
+
+func (c *rasterImageCache) decode(op *layout.Op) (*decodedRasterImage, error) {
+	key := rasterImageHash(op.Image, op.IsJPEG)
+	for _, entry := range c.decoded[key] {
+		if entry.jpeg == op.IsJPEG && bytes.Equal(entry.raw, op.Image) {
+			return entry, nil
+		}
+	}
+	var (
+		src image.Image
+		err error
+	)
+	if op.IsJPEG {
+		src, err = jpeg.Decode(bytes.NewReader(op.Image))
+	} else {
+		src, err = png.Decode(bytes.NewReader(op.Image))
+	}
+	if err != nil {
+		return nil, err
+	}
+	// PNG decoders may return RGBA for some color types. Normalize once per
+	// source so repeated tiles can use the direct NRGBA scaling path without
+	// changing the generic decoder semantics.
+	if !op.IsJPEG {
+		if nrgba, ok := src.(*image.NRGBA); !ok {
+			normalized := image.NewNRGBA(src.Bounds())
+			draw.Draw(normalized, normalized.Bounds(), src, src.Bounds().Min, draw.Src)
+			src = normalized
+		} else {
+			src = nrgba
+		}
+	}
+	entry := &decodedRasterImage{raw: op.Image, jpeg: op.IsJPEG, image: src}
+	c.decoded[key] = append(c.decoded[key], entry)
+	return entry, nil
+}
+
+func (c *rasterImageCache) scaledImage(src *decodedRasterImage, w, h int) *image.NRGBA {
+	key := scaledRasterImageKey{decoded: src, w: w, h: h}
+	if scaled, ok := c.scaled[key]; ok {
+		return scaled
+	}
+	scaled := scaleNearest(src.image, w, h)
+	c.scaled[key] = scaled
+	return scaled
+}
+
 // downscaleBox averages factor×factor blocks of src into one output pixel.
 func downscaleBox(src *image.NRGBA, factor int) *image.NRGBA {
 	if factor <= 1 {
 		return src
+	}
+	if factor == 2 {
+		return downscaleBox2(src)
 	}
 	sb := src.Bounds()
 	dw := sb.Dx() / factor
@@ -314,16 +403,54 @@ func downscaleBox(src *image.NRGBA, factor int) *image.NRGBA {
 			var r, g, b, a uint32
 			for dy := 0; dy < factor; dy++ {
 				for dx := 0; dx < factor; dx++ {
-					c := src.NRGBAAt(sb.Min.X+x*factor+dx, sb.Min.Y+y*factor+dy)
-					r += uint32(c.R)
-					g += uint32(c.G)
-					b += uint32(c.B)
-					a += uint32(c.A)
+					srcOffset := src.PixOffset(
+						sb.Min.X+x*factor+dx,
+						sb.Min.Y+y*factor+dy,
+					)
+					r += uint32(src.Pix[srcOffset])
+					g += uint32(src.Pix[srcOffset+1])
+					b += uint32(src.Pix[srcOffset+2])
+					a += uint32(src.Pix[srcOffset+3])
 				}
 			}
-			dst.SetNRGBA(x, y, color.NRGBA{
-				R: uint8(r / n), G: uint8(g / n), B: uint8(b / n), A: uint8(a / n),
-			})
+			dstOffset := dst.PixOffset(x, y)
+			dst.Pix[dstOffset] = uint8(r / n)
+			dst.Pix[dstOffset+1] = uint8(g / n)
+			dst.Pix[dstOffset+2] = uint8(b / n)
+			dst.Pix[dstOffset+3] = uint8(a / n)
+		}
+	}
+	return dst
+}
+
+func downscaleBox2(src *image.NRGBA) *image.NRGBA {
+	sb := src.Bounds()
+	dw := sb.Dx() / 2
+	dh := sb.Dy() / 2
+	if dw < 1 {
+		dw = 1
+	}
+	if dh < 1 {
+		dh = 1
+	}
+	dst := image.NewNRGBA(image.Rect(0, 0, dw, dh))
+	for y := 0; y < dh; y++ {
+		srcTop := src.PixOffset(sb.Min.X, sb.Min.Y+y*2)
+		srcBottom := src.PixOffset(sb.Min.X, sb.Min.Y+y*2+1)
+		dstOffset := dst.PixOffset(0, y)
+		for x := 0; x < dw; x++ {
+			left := x * 8
+			right := left + 4
+			r, g, b, a := uint32(src.Pix[srcTop+left]), uint32(src.Pix[srcTop+left+1]), uint32(src.Pix[srcTop+left+2]), uint32(src.Pix[srcTop+left+3])
+			r += uint32(src.Pix[srcTop+right]) + uint32(src.Pix[srcBottom+left]) + uint32(src.Pix[srcBottom+right])
+			g += uint32(src.Pix[srcTop+right+1]) + uint32(src.Pix[srcBottom+left+1]) + uint32(src.Pix[srcBottom+right+1])
+			b += uint32(src.Pix[srcTop+right+2]) + uint32(src.Pix[srcBottom+left+2]) + uint32(src.Pix[srcBottom+right+2])
+			a += uint32(src.Pix[srcTop+right+3]) + uint32(src.Pix[srcBottom+left+3]) + uint32(src.Pix[srcBottom+right+3])
+			dst.Pix[dstOffset] = uint8(r / 4)
+			dst.Pix[dstOffset+1] = uint8(g / 4)
+			dst.Pix[dstOffset+2] = uint8(b / 4)
+			dst.Pix[dstOffset+3] = uint8(a / 4)
+			dstOffset += 4
 		}
 	}
 	return dst
@@ -341,7 +468,7 @@ func downscaleBox(src *image.NRGBA, factor int) *image.NRGBA {
 //
 // Page assembly: prologue already shares convert.CollectSheets +
 // MergeFontFaces; multi-page PDF assembly remains convert-specific (P5-02).
-func paint(img *image.NRGBA, op *layout.Op, pxPerPt float64, atlas *glyphAtlas) {
+func paint(img *image.NRGBA, op *layout.Op, pxPerPt float64, atlas *glyphAtlas, imageCache *rasterImageCache) {
 	ps := layout.StyleOf(op)
 	switch op.Kind {
 	case layout.OpFillRect:
@@ -352,7 +479,11 @@ func paint(img *image.NRGBA, op *layout.Op, pxPerPt float64, atlas *glyphAtlas) 
 		}
 		r := ptRectScale(op.X, op.Y, op.W, op.H, pxPerPt).Intersect(img.Bounds())
 		if !r.Empty() {
-			draw.Draw(img, r, image.NewUniform(c), image.Point{}, draw.Over)
+			if c.A == 255 {
+				fillNRGBAOpaque(img, r, c)
+			} else {
+				draw.Draw(img, r, image.NewUniform(c), image.Point{}, draw.Over)
+			}
 		}
 
 	case layout.OpStrokeRect:
@@ -369,7 +500,7 @@ func paint(img *image.NRGBA, op *layout.Op, pxPerPt float64, atlas *glyphAtlas) 
 		}
 		for _, rr := range rects {
 			if rr = rr.Intersect(img.Bounds()); !rr.Empty() {
-				draw.Draw(img, rr, image.NewUniform(c), image.Point{}, draw.Over)
+				fillNRGBAOpaque(img, rr, c)
 			}
 		}
 
@@ -387,7 +518,7 @@ func paint(img *image.NRGBA, op *layout.Op, pxPerPt float64, atlas *glyphAtlas) 
 			r = ptRectScale(op.X-half, op.Y, 2*half, op.H, pxPerPt)
 		}
 		if r = r.Intersect(img.Bounds()); !r.Empty() {
-			draw.Draw(img, r, image.NewUniform(c), image.Point{}, draw.Over)
+			fillNRGBAOpaque(img, r, c)
 		}
 
 	case layout.OpText, layout.OpBullet:
@@ -415,25 +546,29 @@ func paint(img *image.NRGBA, op *layout.Op, pxPerPt float64, atlas *glyphAtlas) 
 		}
 
 	case layout.OpImage:
-		var src image.Image
-		var err error
-		if op.IsJPEG {
-			src, err = jpeg.Decode(bytes.NewReader(op.Image))
-		} else {
-			src, err = png.Decode(bytes.NewReader(op.Image))
-		}
+		decoded, err := imageCache.decode(op)
 		if err != nil || op.W <= 0 || op.H <= 0 {
 			return // layout already validated the bytes; skip on failure
 		}
+		src := decoded.image
 		r := ptRectScale(op.X, op.Y, op.W, op.H, pxPerPt).Intersect(img.Bounds())
 		if !r.Empty() {
 			sb := src.Bounds()
 			if r.Dx() == sb.Dx() && r.Dy() == sb.Dy() {
-				draw.Draw(img, r, src, sb.Min, draw.Over)
+				if nrgba, ok := src.(*image.NRGBA); ok && nrgba.Opaque() {
+					drawNRGBAOpaque(img, r, nrgba, sb.Min)
+				} else {
+					draw.Draw(img, r, src, sb.Min, draw.Over)
+				}
 			} else {
 				// Go 1.26 removed image/draw's scalers; nearest
 				// neighbour keeps it stdlib-only.
-				draw.Draw(img, r, scaleNearest(src, r.Dx(), r.Dy()), image.Point{}, draw.Over)
+				scaled := imageCache.scaledImage(decoded, r.Dx(), r.Dy())
+				if scaled.Opaque() {
+					drawNRGBAOpaque(img, r, scaled, image.Point{})
+				} else {
+					draw.Draw(img, r, scaled, image.Point{}, draw.Over)
+				}
 			}
 		}
 
@@ -463,10 +598,41 @@ func ptRectScale(x, y, w, h, pxPerPt float64) image.Rectangle {
 	)
 }
 
+func fillNRGBAOpaque(dst *image.NRGBA, r image.Rectangle, c color.NRGBA) {
+	if r.Empty() {
+		return
+	}
+	for y := r.Min.Y; y < r.Max.Y; y++ {
+		offset := dst.PixOffset(r.Min.X, y)
+		for x := r.Min.X; x < r.Max.X; x++ {
+			dst.Pix[offset] = c.R
+			dst.Pix[offset+1] = c.G
+			dst.Pix[offset+2] = c.B
+			dst.Pix[offset+3] = 255
+			offset += 4
+		}
+	}
+}
+
+func drawNRGBAOpaque(dst *image.NRGBA, r image.Rectangle, src *image.NRGBA, sp image.Point) {
+	for y := 0; y < r.Dy(); y++ {
+		dstOffset := dst.PixOffset(r.Min.X, r.Min.Y+y)
+		srcOffset := src.PixOffset(sp.X, sp.Y+y)
+		copy(dst.Pix[dstOffset:dstOffset+4*r.Dx()], src.Pix[srcOffset:srcOffset+4*r.Dx()])
+	}
+}
+
 // scaleNearest resizes src to w×h with nearest-neighbour sampling. Go 1.26
 // removed image/draw's BiLinear/NearestNeighbor scalers, so a tiny scaler
 // lives here; natural-size images take the draw.Draw fast path in paint.
 func scaleNearest(src image.Image, w, h int) *image.NRGBA {
+	if nrgba, ok := src.(*image.NRGBA); ok {
+		return scaleNearestNRGBA(nrgba, w, h)
+	}
+	return scaleNearestGeneric(src, w, h)
+}
+
+func scaleNearestNRGBA(src *image.NRGBA, w, h int) *image.NRGBA {
 	dst := image.NewNRGBA(image.Rect(0, 0, w, h))
 	sb := src.Bounds()
 	if sb.Dx() == 0 || sb.Dy() == 0 {
@@ -484,7 +650,37 @@ func scaleNearest(src image.Image, w, h int) *image.NRGBA {
 			if sx > sb.Max.X-1 {
 				sx = sb.Max.X - 1
 			}
-			dst.SetNRGBA(x, y, color.NRGBAModel.Convert(src.At(sx, sy)).(color.NRGBA))
+			srcOffset := src.PixOffset(sx, sy)
+			dstOffset := dst.PixOffset(x, y)
+			copy(dst.Pix[dstOffset:dstOffset+4], src.Pix[srcOffset:srcOffset+4])
+		}
+	}
+	return dst
+}
+
+func scaleNearestGeneric(src image.Image, w, h int) *image.NRGBA {
+	dst := image.NewNRGBA(image.Rect(0, 0, w, h))
+	sb := src.Bounds()
+	if sb.Dx() == 0 || sb.Dy() == 0 {
+		return dst
+	}
+	fx := float64(sb.Dx()) / float64(w)
+	fy := float64(sb.Dy()) / float64(h)
+	for y := 0; y < h; y++ {
+		sy := sb.Min.Y + int((float64(y)+0.5)*fy)
+		if sy > sb.Max.Y-1 {
+			sy = sb.Max.Y - 1
+		}
+		for x := 0; x < w; x++ {
+			sx := sb.Min.X + int((float64(x)+0.5)*fx)
+			if sx > sb.Max.X-1 {
+				sx = sb.Max.X - 1
+			}
+			dst.SetNRGBA(
+				x,
+				y,
+				color.NRGBAModel.Convert(src.At(sx, sy)).(color.NRGBA),
+			)
 		}
 	}
 	return dst

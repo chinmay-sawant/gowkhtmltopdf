@@ -53,7 +53,20 @@ type Result struct {
 	Width  float64
 	Height float64
 
-	root *box // element box tree, kept for Paint (Locations)
+	root  *box   // element box tree, kept for Paint (Locations)
+	boxes []*box // flattened box list for repeated pagination updates
+
+	// flowPages indexes non-fixed operations by their current canvas page while
+	// pagination is settling. It is rebuilt when the display list is rewritten
+	// and updated in place by shiftFlowY so flow shifts do not rescan operations
+	// that are before the affected page.
+	flowPages    [][]int
+	flowPageOf   []int
+	flowPos      []int
+	flowPageSize float64
+	flowBoxes    [][]int
+	flowBoxPage  []int
+	flowBoxPos   []int
 
 	// Pages maps page index → indices into Ops of the ops painted on that
 	// page. Filled by Paint using its pagination semantics (an op goes to
@@ -156,6 +169,7 @@ type engine struct {
 	faces      *pdf.FaceSet
 	registry   *pdf.Registry
 	styles     map[*html.Node]ResolvedStyle
+	stylePtrs  map[*html.Node]*ResolvedStyle
 	ops        []Op
 	noEmit     bool // measurement mode: compute geometry without emitting ops
 	height     float64
@@ -382,8 +396,10 @@ func LayoutContext(ctx context.Context, root *html.Node, opts Options) (*Result,
 		faces:      faces,
 		registry:   opts.Registry,
 		styles:     styles,
+		stylePtrs:  make(map[*html.Node]*ResolvedStyle),
 		scale:      zoomScale(opts.Zoom),
 		containers: containers,
+		ops:        make([]Op, 0, estimateOpCapacity(root)),
 	}
 
 	b := e.build(root, opts.Width, 0, 0)
@@ -393,7 +409,15 @@ func LayoutContext(ctx context.Context, root *html.Node, opts Options) (*Result,
 	// Merge deferred background/border ops before stamping sticky/fixed flags
 	// and CSS transforms (those passes need final op indices).
 	e.finalizeChrome(b)
-	res := &Result{Ops: e.ops, Width: opts.Width, Height: opts.Height, root: b}
+	boxes := make([]*box, 0)
+	flattenBoxes(b, &boxes)
+	res := &Result{
+		Ops:    e.ops,
+		Width:  opts.Width,
+		Height: opts.Height,
+		root:   b,
+		boxes:  boxes,
+	}
 	if b != nil {
 		res.Height = b.y + b.h
 	}
@@ -404,6 +428,44 @@ func LayoutContext(ctx context.Context, root *html.Node, opts Options) (*Result,
 	// is final so transform-origin % resolves against the border box.
 	stampBoxTransforms(b, IdentityMatrix(), res.Ops)
 	return res, nil
+}
+
+func (e *engine) stylePtr(n *html.Node) *ResolvedStyle {
+	if p, ok := e.stylePtrs[n]; ok {
+		return p
+	}
+	st := e.styles[n]
+	p := new(ResolvedStyle)
+	*p = st
+	e.stylePtrs[n] = p
+	return p
+}
+
+func flattenBoxes(b *box, out *[]*box) {
+	if b == nil {
+		return
+	}
+	*out = append(*out, b)
+	for _, child := range b.children {
+		flattenBoxes(child, out)
+	}
+}
+
+func estimateOpCapacity(root *html.Node) int {
+	if root == nil {
+		return 0
+	}
+	nodes := 0
+	root.Walk(func(*html.Node) { nodes++ })
+	capacity := nodes * 4
+	if capacity < 64 {
+		capacity = 64
+	}
+	const maxCapacity = 1 << 20
+	if capacity > maxCapacity {
+		capacity = maxCapacity
+	}
+	return capacity
 }
 
 // box is one laid-out box.
@@ -418,6 +480,7 @@ type box struct {
 	// (e.g. boxes built during a noEmit measure pass).
 	opStart, opEnd int
 	children       []*box
+	flowIndex      int // transient index in Result.boxes during pagination
 	firstBaseline  float64
 	// table cells
 	col, span int

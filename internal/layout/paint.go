@@ -488,6 +488,16 @@ func capTablePageBreaks(res *Result, contentH float64) {
 	}
 	// Group verticals that share a start Y (row top) or end Y (row bottom).
 	roundY := func(y float64) int { return int(math.Round(y * 2)) } // 0.5pt bins
+	vertStarts := map[int][]vseg{}
+	vertEnds := map[int][]vseg{}
+	horizByY := map[int][]hseg{}
+	for _, v := range verts {
+		vertStarts[roundY(v.y0)] = append(vertStarts[roundY(v.y0)], v)
+		vertEnds[roundY(v.y1)] = append(vertEnds[roundY(v.y1)], v)
+	}
+	for _, h := range horiz {
+		horizByY[roundY(h.y)] = append(horizByY[roundY(h.y)], h)
+	}
 	type cluster struct {
 		y           float64
 		minX, maxX  float64
@@ -496,47 +506,56 @@ func capTablePageBreaks(res *Result, contentH float64) {
 	}
 	clusterAt := func(byStart bool) map[int]*cluster {
 		out := map[int]*cluster{}
-		for _, v := range verts {
-			keyY := v.y0
-			if !byStart {
-				keyY = v.y1
+		groups := vertStarts
+		if !byStart {
+			groups = vertEnds
+		}
+		for _, group := range groups {
+			for _, v := range group {
+				keyY := v.y0
+				if !byStart {
+					keyY = v.y1
+				}
+				k := roundY(keyY)
+				c := out[k]
+				if c == nil {
+					c = &cluster{y: keyY, minX: v.x, maxX: v.x, bw: v.w, r: v.r, g: v.g, b: v.b, n: 1}
+					out[k] = c
+					continue
+				}
+				c.n++
+				if v.x < c.minX {
+					c.minX = v.x
+				}
+				if v.x > c.maxX {
+					c.maxX = v.x
+				}
+				// Prefer average y so we sit on the dominant edge.
+				c.y = (c.y*float64(c.n-1) + keyY) / float64(c.n)
 			}
-			k := roundY(keyY)
-			c := out[k]
-			if c == nil {
-				c = &cluster{y: keyY, minX: v.x, maxX: v.x, bw: v.w, r: v.r, g: v.g, b: v.b, n: 1}
-				out[k] = c
-				continue
-			}
-			c.n++
-			if v.x < c.minX {
-				c.minX = v.x
-			}
-			if v.x > c.maxX {
-				c.maxX = v.x
-			}
-			// Prefer average y so we sit on the dominant edge.
-			c.y = (c.y*float64(c.n-1) + keyY) / float64(c.n)
 		}
 		return out
 	}
 	hCoverage := func(y, minX, maxX float64) (full bool, covMin, covMax float64, has bool) {
-		for _, h := range horiz {
-			if math.Abs(h.y-y) > eps {
-				continue
-			}
-			// Only count segments that overlap the vertical band.
-			if h.x1 < minX-eps || h.x0 > maxX+eps {
-				continue
-			}
-			if !has {
-				covMin, covMax, has = h.x0, h.x1, true
-			} else {
-				if h.x0 < covMin {
-					covMin = h.x0
+		key := roundY(y)
+		for k := key - int(eps*2) - 1; k <= key+int(eps*2)+1; k++ {
+			for _, h := range horizByY[k] {
+				if math.Abs(h.y-y) > eps {
+					continue
 				}
-				if h.x1 > covMax {
-					covMax = h.x1
+				// Only count segments that overlap the vertical band.
+				if h.x1 < minX-eps || h.x0 > maxX+eps {
+					continue
+				}
+				if !has {
+					covMin, covMax, has = h.x0, h.x1, true
+				} else {
+					if h.x0 < covMin {
+						covMin = h.x0
+					}
+					if h.x1 > covMax {
+						covMax = h.x1
+					}
 				}
 			}
 		}
@@ -564,7 +583,9 @@ func capTablePageBreaks(res *Result, contentH float64) {
 			Width: bw, R: r, G: g, B: b,
 		}
 		res.Ops = append(res.Ops, op)
-		horiz = append(horiz, hseg{minX, maxX, y, bw, r, g, b})
+		sealed := hseg{minX, maxX, y, bw, r, g, b}
+		horiz = append(horiz, sealed)
+		horizByY[roundY(y)] = append(horizByY[roundY(y)], sealed)
 	}
 
 	// (1) Classic page-top stubs.
@@ -572,8 +593,12 @@ func capTablePageBreaks(res *Result, contentH float64) {
 		pageTop := float64(p) * contentH
 		var minX, maxX, bw, r, g, b float64
 		n := 0
-		for _, v := range verts {
-			if v.y0 >= pageTop-eps && v.y0 <= pageTop+eps {
+		key := roundY(pageTop)
+		for k := key - int(eps*2) - 1; k <= key+int(eps*2)+1; k++ {
+			for _, v := range vertStarts[k] {
+				if v.y0 < pageTop-eps || v.y0 > pageTop+eps {
+					continue
+				}
 				if n == 0 {
 					minX, maxX, bw, r, g, b = v.x, v.x, v.w, v.r, v.g, v.b
 				} else {
@@ -646,6 +671,7 @@ func capTablePageBreaks(res *Result, contentH float64) {
 // pages derive from the final Y positions. Rect-type ops crossing a boundary
 // are split by Paint.
 func paginateOps(res *Result, contentH float64) []int {
+	ensureFlowIndex(res, contentH)
 	// Resolve forced section starts before snapping text to provisional page
 	// boundaries. Otherwise a row near the boundary of the unbroken flow can
 	// move its text alone; a later page-break-before shift then leaves the
@@ -867,14 +893,25 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 			maxPage = p
 		}
 	}
+	pageOps := make([][]int, maxPage+1)
+	for i := range res.Ops {
+		if res.Ops[i].Fixed {
+			continue
+		}
+		page := int(res.Ops[i].Y / contentH)
+		if page < 0 || page > maxPage {
+			continue
+		}
+		pageOps[page] = append(pageOps[page], i)
+	}
 	for p := 0; p <= maxPage; p++ {
 		pageTop := float64(p) * contentH
 		pageBot := pageTop + contentH
 		lastInkBot := pageTop
 		hasInk := false
-		for i := range res.Ops {
+		for _, i := range pageOps[p] {
 			op := &res.Ops[i]
-			if op.Fixed || op.Y < pageTop-1e-9 || op.Y >= pageBot-1e-9 {
+			if op.Y < pageTop-1e-9 || op.Y >= pageBot-1e-9 {
 				continue
 			}
 			var bot float64
@@ -902,9 +939,9 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 			continue
 		}
 		stripped := false
-		for i := range res.Ops {
+		for _, i := range pageOps[p] {
 			op := &res.Ops[i]
-			if op.Fixed || op.StickyID != 0 {
+			if op.StickyID != 0 {
 				continue
 			}
 			if op.Y < pageTop-1e-9 || op.Y >= pageBot-1e-9 {
@@ -937,9 +974,9 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 			// Tighten the last row fill so padding under the final baseline does
 			// not read as another empty row (fixture-31 Row 27 cell).
 			const underPad = 8.0
-			for i := range res.Ops {
+			for _, i := range pageOps[p] {
 				op := &res.Ops[i]
-				if op.Fixed || op.StickyID != 0 {
+				if op.StickyID != 0 {
 					continue
 				}
 				if op.Y < pageTop-1e-9 || op.Y >= pageBot-1e-9 {
@@ -964,9 +1001,9 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 		// Only section-colored chrome is clipped — arbitrary tall fills
 		// (TestBoundaryFillSplit) are left to the normal page-split remnant.
 		contentBot := lastInkBot
-		for i := range res.Ops {
+		for _, i := range pageOps[p] {
 			op := &res.Ops[i]
-			if op.Fixed || op.StickyID != 0 {
+			if op.StickyID != 0 {
 				continue
 			}
 			if op.Y < pageTop-1e-9 || op.Y >= pageBot-1e-9 {
@@ -984,9 +1021,9 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 		if pageBot-contentBot < 8 {
 			continue
 		}
-		for i := range res.Ops {
+		for _, i := range pageOps[p] {
 			op := &res.Ops[i]
-			if op.Fixed || op.StickyID != 0 {
+			if op.StickyID != 0 {
 				continue
 			}
 			if op.Y < pageTop-1e-9 || op.Y >= pageBot-1e-9 {
@@ -1027,14 +1064,48 @@ func isSectionWashRGB(r, g, b float64) bool {
 // fixpoint converges instead of dragging boundary ops along each iteration.
 // Box.y is kept in sync for boxes whose top moved.
 func shiftFlowY(res *Result, from, to int, fromY, dy float64) {
+	if res == nil || len(res.Ops) == 0 || dy == 0 {
+		return
+	}
+	ensureFlowIndex(res, flowIndexPageSize(res))
 	for i := from; i <= to; i++ {
-		if i >= 0 && i < len(res.Ops) && res.Ops[i].Fixed {
+		if i < 0 || i >= len(res.Ops) || res.Ops[i].Fixed {
 			continue
 		}
-		res.Ops[i].Y += dy
+		shiftIndexedOp(res, i, dy)
 	}
-	for i := range res.Ops {
-		if i < from || i > to {
+	startPage := int(fromY / res.flowPageSize)
+	if startPage < 0 {
+		startPage = 0
+	}
+	if dy > 0 {
+		// Positive flow shifts move an operation to the same or a later page.
+		// Process buckets from the end so an operation moved to another bucket
+		// is never visited twice. Removing the current item in shiftIndexedOp
+		// swaps the bucket's last item into its place; keep the cursor in place
+		// when that happens.
+		for p := len(res.flowPages) - 1; p >= startPage; p-- {
+			for j := 0; j < len(res.flowPages[p]); {
+				i := res.flowPages[p][j]
+				if (i >= from && i <= to) || res.Ops[i].Y <= fromY {
+					j++
+					continue
+				}
+				oldPage := res.flowPageOf[i]
+				shiftIndexedOp(res, i, dy)
+				if res.flowPageOf[i] == oldPage {
+					j++
+				}
+			}
+		}
+	} else {
+		// Negative shifts are uncommon in the pagination fixpoint. Keep the
+		// exact legacy semantics for that direction; no allocation index is
+		// needed on the normal positive path.
+		for i := range res.Ops {
+			if i >= from && i <= to {
+				continue
+			}
 			if res.Ops[i].Y > fromY {
 				res.Ops[i].Y += dy
 			}
@@ -1043,16 +1114,175 @@ func shiftFlowY(res *Result, from, to int, fromY, dy float64) {
 	if res.root == nil {
 		return
 	}
-	var walk func(b *box)
-	walk = func(b *box) {
-		if b.y > fromY || (b.y == fromY && b.opStart >= from && b.opEnd <= to) {
-			b.y += dy
+	if len(res.flowBoxes) == 0 {
+		boxes := res.boxes
+		if len(boxes) == 0 {
+			boxes = make([]*box, 0)
+			flattenBoxes(res.root, &boxes)
+			res.boxes = boxes
 		}
-		for _, c := range b.children {
-			walk(c)
+		ensureFlowBoxIndex(res, boxes)
+	}
+	for p := len(res.flowBoxes) - 1; p >= startPage; p-- {
+		for j := 0; j < len(res.flowBoxes[p]); {
+			boxIndex := res.flowBoxes[p][j]
+			b := res.boxes[boxIndex]
+			if p == startPage && !(b.y > fromY ||
+				(b.y == fromY && b.opStart >= from && b.opEnd <= to)) {
+				j++
+				continue
+			}
+			oldPage := res.flowBoxPage[boxIndex]
+			shiftIndexedBox(res, boxIndex, dy)
+			if res.flowBoxPage[boxIndex] == oldPage {
+				j++
+			}
 		}
 	}
-	walk(res.root)
+}
+
+func flowIndexPageSize(res *Result) float64 {
+	if res.flowPageSize > 0 {
+		return res.flowPageSize
+	}
+	return 1
+}
+
+func ensureFlowIndex(res *Result, pageSize float64) {
+	if res == nil || len(res.Ops) == 0 || pageSize <= 0 {
+		return
+	}
+	if res.flowPageSize == pageSize && len(res.flowPageOf) == len(res.Ops) {
+		return
+	}
+	res.flowPageSize = pageSize
+	maxPage := 0
+	for i := range res.Ops {
+		if res.Ops[i].Fixed {
+			continue
+		}
+		page := int(res.Ops[i].Y / pageSize)
+		if page < 0 {
+			page = 0
+		}
+		if page > maxPage {
+			maxPage = page
+		}
+	}
+	res.flowPages = make([][]int, maxPage+1)
+	res.flowPageOf = make([]int, len(res.Ops))
+	res.flowPos = make([]int, len(res.Ops))
+	for i := range res.flowPageOf {
+		res.flowPageOf[i] = -1
+		res.flowPos[i] = -1
+	}
+	for i := range res.Ops {
+		if res.Ops[i].Fixed {
+			continue
+		}
+		page := int(res.Ops[i].Y / pageSize)
+		if page < 0 {
+			page = 0
+		}
+		res.flowPageOf[i] = page
+		res.flowPos[i] = len(res.flowPages[page])
+		res.flowPages[page] = append(res.flowPages[page], i)
+	}
+	boxes := res.boxes
+	if len(boxes) == 0 && res.root != nil {
+		boxes = make([]*box, 0)
+		flattenBoxes(res.root, &boxes)
+		res.boxes = boxes
+	}
+	ensureFlowBoxIndex(res, boxes)
+}
+
+func ensureFlowBoxIndex(res *Result, boxes []*box) {
+	if res == nil {
+		return
+	}
+	if len(res.flowBoxPage) == len(boxes) && len(res.flowBoxes) > 0 {
+		return
+	}
+	res.flowBoxes = make([][]int, len(res.flowPages))
+	res.flowBoxPage = make([]int, len(boxes))
+	res.flowBoxPos = make([]int, len(boxes))
+	for i, b := range boxes {
+		b.flowIndex = i
+		page := int(b.y / res.flowPageSize)
+		if page < 0 {
+			page = 0
+		}
+		for len(res.flowBoxes) <= page {
+			res.flowBoxes = append(res.flowBoxes, nil)
+		}
+		res.flowBoxPage[i] = page
+		res.flowBoxPos[i] = len(res.flowBoxes[page])
+		res.flowBoxes[page] = append(res.flowBoxes[page], i)
+	}
+}
+
+func shiftIndexedOp(res *Result, index int, dy float64) {
+	if index < 0 || index >= len(res.Ops) || res.Ops[index].Fixed {
+		return
+	}
+	oldPage := res.flowPageOf[index]
+	res.Ops[index].Y += dy
+	newPage := int(res.Ops[index].Y / res.flowPageSize)
+	if newPage < 0 {
+		newPage = 0
+	}
+	if oldPage == newPage {
+		return
+	}
+	if oldPage >= 0 && oldPage < len(res.flowPages) {
+		bucket := res.flowPages[oldPage]
+		pos := res.flowPos[index]
+		if pos >= 0 && pos < len(bucket) {
+			last := bucket[len(bucket)-1]
+			bucket[pos] = last
+			res.flowPos[last] = pos
+			res.flowPages[oldPage] = bucket[:len(bucket)-1]
+		}
+	}
+	for len(res.flowPages) <= newPage {
+		res.flowPages = append(res.flowPages, nil)
+	}
+	res.flowPageOf[index] = newPage
+	res.flowPos[index] = len(res.flowPages[newPage])
+	res.flowPages[newPage] = append(res.flowPages[newPage], index)
+}
+
+func shiftIndexedBox(res *Result, index int, dy float64) {
+	if index < 0 || index >= len(res.boxes) {
+		return
+	}
+	b := res.boxes[index]
+	oldPage := res.flowBoxPage[index]
+	b.y += dy
+	newPage := int(b.y / res.flowPageSize)
+	if newPage < 0 {
+		newPage = 0
+	}
+	if oldPage == newPage {
+		return
+	}
+	if oldPage >= 0 && oldPage < len(res.flowBoxes) {
+		bucket := res.flowBoxes[oldPage]
+		pos := res.flowBoxPos[index]
+		if pos >= 0 && pos < len(bucket) {
+			last := bucket[len(bucket)-1]
+			bucket[pos] = last
+			res.flowBoxPos[last] = pos
+			res.flowBoxes[oldPage] = bucket[:len(bucket)-1]
+		}
+	}
+	for len(res.flowBoxes) <= newPage {
+		res.flowBoxes = append(res.flowBoxes, nil)
+	}
+	res.flowBoxPage[index] = newPage
+	res.flowBoxPos[index] = len(res.flowBoxes[newPage])
+	res.flowBoxes[newPage] = append(res.flowBoxes[newPage], index)
 }
 
 // shiftOpsOnly moves ops in [from,to] by dy without dragging later flow.
@@ -1135,14 +1365,26 @@ func avoidInside(res *Result, contentH float64) bool {
 // beforeAlways walks pre-order and moves page-break-before: always boxes to a
 // fresh page after everything preceding them.
 func beforeAlways(res *Result, contentH float64) bool {
+	if res == nil || res.root == nil || contentH <= 0 {
+		return false
+	}
+	// The previous implementation recomputed the maximum Y of every prefix
+	// once per forced-break box. Build the same mutation-safe metadata once per
+	// pass instead; a successful shift returns immediately and the next pass
+	// rebuilds the prefix from the updated operation coordinates.
+	prefixMaxY := make([]float64, len(res.Ops)+1)
+	for i, op := range res.Ops {
+		prefixMaxY[i+1] = prefixMaxY[i]
+		if op.Y > prefixMaxY[i+1] {
+			prefixMaxY[i+1] = op.Y
+		}
+	}
 	var walk func(b *box) bool
 	walk = func(b *box) bool {
 		if b.style.PageBreakBefore == "always" {
 			lastBefore := 0.0
-			for i := 0; i < b.opStart; i++ {
-				if res.Ops[i].Y > lastBefore {
-					lastBefore = res.Ops[i].Y
-				}
+			if b.opStart > 0 && b.opStart < len(prefixMaxY) {
+				lastBefore = prefixMaxY[b.opStart]
 			}
 			loPage := int(b.y / contentH)
 			lastPage := int(lastBefore / contentH)
@@ -1157,7 +1399,7 @@ func beforeAlways(res *Result, contentH float64) bool {
 		changed := false
 		for _, c := range b.children {
 			if walk(c) {
-				changed = true
+				return true
 			}
 		}
 		return changed
