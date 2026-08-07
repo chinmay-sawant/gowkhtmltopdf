@@ -212,5 +212,3 @@ td, th { border: 1px solid #333; padding: 3pt; }
 		t.Fatalf("page %d missing outer verticals left=%v right=%v (topY=%.1f)", contPage, hasLeft, hasRight, topY)
 	}
 }
-
-

@@ -1,22 +1,44 @@
 package convert
 
 import (
-	"fmt"
 	"io"
 	"sort"
 
 	"gowkhtmltopdf/internal/css"
 	"gowkhtmltopdf/internal/html"
 	"gowkhtmltopdf/internal/layout"
+	"gowkhtmltopdf/internal/line"
 	"gowkhtmltopdf/internal/outline"
 	"gowkhtmltopdf/internal/pdf"
 	"gowkhtmltopdf/internal/settings"
 )
 
+// objectPlacement holds document page indices filled after paint / TOC
+// assembly. Load-time fields stay on objectState; these mutate as the
+// pipeline places the object into the final page set.
+//
+// Lifecycle:
+//   - pages, offset: set in renderObject after body paint (pre-TOC reorder)
+//   - start: set after TOC reorder (tocs: assembly positions; bodies: tocTotal+offset)
+//   - TOC objects use tocPages for count; start is set at paint then rewritten
+//     when TOC pages move to the front.
+type objectPlacement struct {
+	pages  int // body: number of painted pages
+	offset int // body: body-global index of the first page (pre-TOC reorder)
+	start  int // final document page index of the first page (post-reorder)
+}
+
 // objectState is the per-object state gathered during the loading loop and
 // consumed by the TOC, outline, link and header/footer passes. Body objects
 // carry headings/layout; TOC objects carry their effective TOC settings and
 // the generated page layout.
+//
+// Fields are grouped by lifecycle:
+//   - identity / settings: obj, idx, isTOC, header, footer, repl, toc, media, …
+//   - load-time resources: registry, base, lp, imagesFn, geom, headerHTML/footerHTML
+//   - body content: res, headings
+//   - TOC content: tocPages, tocRoot, tocRes
+//   - placement (post-paint): embedded objectPlacement (pages, offset, start)
 type objectState struct {
 	obj   *settings.PdfObject
 	idx   int // 0-based object index (messages use idx+1)
@@ -33,17 +55,20 @@ type objectState struct {
 
 	// registry is the opt-in font registry (--font-path / body @font-face)
 	// shared with nested HTML HF layout so HF can resolve the same faces.
-	registry *pdf.Registry
+	// effectiveMargins returns the HF-extended registry; callers assign it
+	// explicitly (see renderObject handshake).
+	registry      *pdf.Registry
+	resources     ResourceContext
+	imagesEnabled bool
 
 	base     string
 	lp       settings.LoadPage
+	media    string // layout CSS media ("print", "screen", …)
 	imagesFn func(src string) ([]byte, error)
 	doctitle string // <title> of the object document
 
 	// body objects:
 	res      *layout.Result
-	pages    int
-	offset   int // body-global page index of the first page
 	headings []*outline.Heading
 
 	// TOC objects:
@@ -51,54 +76,27 @@ type objectState struct {
 	tocRoot  *html.Node
 	tocRes   *layout.Result
 
-	// final document placement (filled after the page reorder):
-	start int // document page index of the first page
+	// Document placement (pages/offset/start); see objectPlacement.
+	objectPlacement
 }
 
 // docTitle extracts the <title> element text of a document, or "".
 func docTitle(root *html.Node) string {
-	var walk func(n *html.Node) string
-	walk = func(n *html.Node) string {
-		if n.Type != html.ElementNode {
-			return ""
-		}
-		if n.Name == "title" {
-			return collapseText(n.TextContent())
-		}
-		for _, c := range n.Children {
-			if t := walk(c); t != "" {
-				return t
-			}
-		}
+	if root == nil {
 		return ""
 	}
-	return walk(root)
-}
-
-func collapseText(s string) string {
-	out := make([]byte, 0, len(s))
-	prevSpace := true
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		if c == ' ' || c == '\t' || c == '\n' || c == '\r' {
-			if !prevSpace {
-				out = append(out, ' ')
-				prevSpace = true
-			}
-			continue
-		}
-		out = append(out, c)
-		prevSpace = false
+	if t := root.TextContentOf("title"); t != "" {
+		return outline.CollapseWS(t)
 	}
-	return string(out)
+	return ""
 }
 
-// collectObjectHeadings gathers the h1..h6 elements of one painted object,
-// matches them against the layout locations, and rebases their page numbers
-// to the document page index given by offset. Objects opted out of the
-// outline (UseOutline/IncludeInOutline false) and headings matching
-// --exclude-from-outline selectors are dropped.
-func collectObjectHeadings(root *html.Node, res *layout.Result, offset int, g settings.PdfGlobal, obj settings.PdfObject, log io.Writer) []*outline.Heading {
+// collectObjectHeadings gathers the h1..h6 elements of one painted object and
+// matches them against the layout locations. Page stays object-local (from
+// Lookup); DocPage is filled once in flatHeadings. Objects opted out of the
+// outline (UseOutline/IncludeInOutline false) are dropped here;
+// --exclude-from-outline is applied later via outline.BuildTree Options.Exclude.
+func collectObjectHeadings(root *html.Node, res *layout.Result, _ int, _ settings.PdfGlobal, obj settings.PdfObject, _ io.Writer) []*outline.Heading {
 	if !obj.UseOutline || !obj.IncludeInOutline {
 		return nil
 	}
@@ -107,54 +105,42 @@ func collectObjectHeadings(root *html.Node, res *layout.Result, offset int, g se
 	if len(hs) == 0 {
 		return nil
 	}
-	sels := parseExcludeSelectors(g.ExcludeFromOutline, log)
-	kept := hs[:0]
-	for _, h := range hs {
-		if matchAnySelector(sels, h.Node) {
-			continue
-		}
-		h.Page += offset
-		kept = append(kept, h)
-	}
-	return kept
+	return hs
 }
 
-// parseExcludeSelectors parses the --exclude-from-outline selector strings.
+// parseExcludeSelectors parses --exclude-from-outline selector strings into
+// css.Selector values for outline.Options.Exclude (matching lives in outline).
 func parseExcludeSelectors(specs []string, log io.Writer) []css.Selector {
 	var out []css.Selector
 	for _, s := range specs {
-		sheet, err := css.Parse(s + "{}")
-		if err != nil || sheet == nil || len(sheet.Rules) == 0 || len(sheet.Rules[0].Selectors) == 0 {
-			fmt.Fprintf(log, "warning: ignoring invalid --exclude-from-outline selector %q\n", s)
+		sels, ok := css.ParseSelectors(s)
+		if !ok || len(sels) == 0 {
+			line.Emit(log, line.Warn, "ignoring invalid --exclude-from-outline selector %q", s)
 			continue
 		}
-		out = append(out, sheet.Rules[0].Selectors[0])
+		out = append(out, sels...)
 	}
 	return out
 }
 
-func matchAnySelector(sels []css.Selector, n *html.Node) bool {
-	for _, s := range sels {
-		if css.Match(s, n) {
-			return true
-		}
-	}
-	return false
-}
-
 // flatHeadings concatenates the per-object heading lists in object order,
-// assigns stable synthetic anchors, and sorts by (page, y, x) - the order
-// both the outline tree and the [section]/[subsection] lookup use.
+// sets DocPage once (body-global), assigns stable synthetic anchors, and
+// sorts by document page order.
 func flatHeadings(bodies []*objectState) []*outline.Heading {
 	var all []*outline.Heading
 	for _, st := range bodies {
-		all = append(all, st.headings...)
+		for _, h := range st.headings {
+			h.DocPage = st.offset + h.Page
+			all = append(all, h)
+		}
 	}
 	outline.AssignAnchors(all)
+	// Document order by the explicit DocPage field. The object-local Page field
+	// remains unchanged for page-local layout and header/footer semantics.
 	sort.SliceStable(all, func(i, j int) bool {
 		a, b := all[i], all[j]
-		if a.Page != b.Page {
-			return a.Page < b.Page
+		if a.DocPage != b.DocPage {
+			return a.DocPage < b.DocPage
 		}
 		if a.Y != b.Y {
 			return a.Y < b.Y
@@ -165,7 +151,7 @@ func flatHeadings(bodies []*objectState) []*outline.Heading {
 }
 
 // bodyStateFor returns the body object whose page span contains the body
-// page index, or nil.
+// page index (body-global / DocPage), or nil.
 func bodyStateFor(bodies []*objectState, page int) *objectState {
 	for _, st := range bodies {
 		if page >= st.offset && page < st.offset+st.pages {
@@ -178,18 +164,19 @@ func bodyStateFor(bodies []*objectState, page int) *objectState {
 // emitOutline converts the outline tree (canvas coordinates) into pdf.Outline
 // nodes with final page refs and PDF (y-up) coordinates. The root is a
 // container for the top-level headings, as pdf.Document.SetOutline expects.
+// Tree headings retain object-local Page and carry document-global DocPage.
 func emitOutline(doc *pdf.Document, tree *outline.Node, bodies []*objectState, tocTotal int) *pdf.Outline {
 	root := &pdf.Outline{}
 	var conv func(n *outline.Node) *pdf.Outline
 	conv = func(n *outline.Node) *pdf.Outline {
 		h := n.Heading
 		o := &pdf.Outline{Title: h.Title}
-		if st := bodyStateFor(bodies, h.Page); st != nil {
-			locPage := h.Page - st.offset
-			o.PageRef = doc.PageRef(tocTotal + h.Page)
-			o.X = st.geom.marginLeft + h.X
-			// canvas y-down (page-relative offset included) → PDF y-up
-			o.Y = st.geom.pageH - st.geom.marginTop - (h.Y - float64(locPage)*st.geom.contentH)
+		docPage := h.DocPage
+		if st := bodyStateFor(bodies, docPage); st != nil {
+			locPage := docPage - st.offset
+			o.PageRef = doc.PageRef(tocTotal + docPage)
+			loc := layout.ElementLocation{Page: locPage, X: h.X, Y: h.Y, W: h.W, H: h.H}
+			o.X, o.Y = st.geom.pdfXY(loc)
 		}
 		for _, c := range n.Children {
 			o.Children = append(o.Children, conv(c))

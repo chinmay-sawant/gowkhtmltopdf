@@ -42,7 +42,12 @@ func treeString(n *Node) string {
 
 func assertChildren(t *testing.T, n *Node, names ...string) {
 	t.Helper()
-	got := n.ElementChildren()
+	var got []*Node
+	for _, c := range n.Children {
+		if c.Type == ElementNode {
+			got = append(got, c)
+		}
+	}
 	if len(got) != len(names) {
 		t.Errorf("children of <%s>: got %d elements, want %d\n%s", n.Name, len(got), len(names), treeString(n))
 		return
@@ -344,7 +349,7 @@ func TestParseVoidElements(t *testing.T) {
 	}
 	img := p.FirstChild("img")
 	if img.Attribute("src") != "y.png" || img.Attribute("alt") != "y" {
-		t.Errorf("img attrs = %v, %v", img.Attrs, img.AttrOrder)
+		t.Errorf("img attrs = %v", img.Attrs)
 	}
 	if len(img.Children) != 0 {
 		t.Errorf("void <img> has children:\n%s", treeString(img))
@@ -494,18 +499,9 @@ func TestParseTextMerging(t *testing.T) {
 	}
 }
 
-func TestParseAttrOrderAndDuplicates(t *testing.T) {
+func TestParseAttrDuplicates(t *testing.T) {
 	root := mustParse(t, `<div ID="a" class="b" data-x="1" hidden id="dup">x</div>`)
 	div := root.FirstChild("div")
-	wantOrder := []string{"id", "class", "data-x", "hidden"}
-	if len(div.AttrOrder) != len(wantOrder) {
-		t.Fatalf("AttrOrder = %v, want %v", div.AttrOrder, wantOrder)
-	}
-	for i, k := range wantOrder {
-		if div.AttrOrder[i] != k {
-			t.Errorf("AttrOrder[%d] = %q, want %q", i, div.AttrOrder[i], k)
-		}
-	}
 	if len(div.Attrs) != 4 {
 		t.Errorf("Attrs = %v, want 4 entries", div.Attrs)
 	}
@@ -519,6 +515,9 @@ func TestParseAttrOrderAndDuplicates(t *testing.T) {
 	}
 	if div.Attribute("hidden") != "" {
 		t.Errorf("boolean attr hidden = %q, want \"\"", div.Attribute("hidden"))
+	}
+	if div.Attribute("data-x") != "1" {
+		t.Errorf("data-x = %q, want %q", div.Attribute("data-x"), "1")
 	}
 }
 
@@ -591,7 +590,13 @@ func TestParseMalformed(t *testing.T) {
 		{
 			src: `</div>text`,
 			check: func(t *testing.T, root *Node) {
-				if len(root.ElementChildren()) != 0 || root.TextContent() != "text" {
+				for _, c := range root.Children {
+					if c.Type == ElementNode {
+						t.Errorf("stray end tag produced element:\n%s", treeString(root))
+						return
+					}
+				}
+				if root.TextContent() != "text" {
 					t.Errorf("stray end tag:\n%s", treeString(root))
 				}
 			},
@@ -670,73 +675,47 @@ func TestParseUsableTreeNoPanic(t *testing.T) {
 	}
 }
 
-// --- CharsetFromMeta tests ---
-
-func TestCharsetFromMetaCharsetAttr(t *testing.T) {
-	cases := []struct {
-		src, want string
-	}{
-		{`<meta charset="utf-8">`, "utf-8"},
-		{`<html><head><meta charset="UTF-8"></head></html>`, "utf-8"},
-		{`<meta name="foo" charset="ISO-8859-1">`, "iso-8859-1"},
-		{`<meta charset="">`, ""},
+func TestWalkPreOrder(t *testing.T) {
+	root := mustParse(t, `<html><head><title>t</title></head><body><h1>x</h1><p>y</p></body></html>`)
+	var names []string
+	root.Walk(func(n *Node) {
+		if n.Type == ElementNode {
+			names = append(names, n.Name)
+		}
+	})
+	want := []string{"#document", "html", "head", "title", "body", "h1", "p"}
+	if len(names) != len(want) {
+		t.Fatalf("walk order = %v, want %v", names, want)
 	}
-	for _, tc := range cases {
-		root := mustParse(t, tc.src)
-		if got := CharsetFromMeta(root); got != tc.want {
-			t.Errorf("CharsetFromMeta(%q) = %q, want %q", tc.src, got, tc.want)
+	for i := range want {
+		if names[i] != want[i] {
+			t.Fatalf("walk order = %v, want %v", names, want)
 		}
 	}
 }
 
-func TestCharsetFromMetaHttpEquiv(t *testing.T) {
-	cases := []struct {
-		src, want string
-	}{
-		{`<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">`, "iso-8859-1"},
-		{`<meta http-equiv="Content-Type" content="text/html; charset=utf-8">`, "utf-8"},
-		{`<meta http-equiv="content-type" content="text/html;charset=utf-8">`, "utf-8"},
-		{`<meta http-equiv="content-type" content='text/html; charset="utf-8"'>`, "utf-8"},
-		{`<meta http-equiv="content-type" content="text/html; charset='utf-8';">`, "utf-8"},
-		{`<meta http-equiv="refresh" content="0; url=/">`, ""},
-		{`<meta http-equiv="content-type" content="text/plain">`, ""},
-		{`<html><head><meta http-equiv="content-type" content="text/html; charset=windows-1252"></head></html>`, "windows-1252"},
+func TestTextContentOf(t *testing.T) {
+	root := mustParse(t, `<html><head><title>One</title><title>Two</title></head><body><p>body text</p></body></html>`)
+	if got := root.TextContentOf("title"); got != "One" {
+		t.Errorf("TextContentOf(title) = %q, want %q", got, "One")
 	}
-	for _, tc := range cases {
-		root := mustParse(t, tc.src)
-		if got := CharsetFromMeta(root); got != tc.want {
-			t.Errorf("CharsetFromMeta(%q) = %q, want %q", tc.src, got, tc.want)
+	if got := root.TextContentOf("section"); got != "" {
+		t.Errorf("TextContentOf(section) = %q, want %q", got, "")
+	}
+	if got := root.TextContentOf("p"); got != "body text" {
+		t.Errorf("TextContentOf(p) = %q, want %q", got, "body text")
+	}
+}
+
+func TestParseDocument(t *testing.T) {
+	src := "<html><body>ok</body></html>"
+	for _, body := range [][]byte{[]byte(src), append([]byte("\ufeff"), src...)} {
+		root, err := ParseDocument(body)
+		if err != nil {
+			t.Fatalf("ParseDocument: %v", err)
 		}
-	}
-}
-
-func TestCharsetFromMetaCaseInsensitive(t *testing.T) {
-	root := mustParse(t, `<HTML><HEAD><META HTTP-EQUIV="CONTENT-TYPE" CONTENT="TEXT/HTML; CHARSET=SHIFT_JIS"></HEAD></HTML>`)
-	if got := CharsetFromMeta(root); got != "shift_jis" {
-		t.Errorf("CharsetFromMeta = %q, want %q", got, "shift_jis")
-	}
-}
-
-func TestCharsetFromMetaNone(t *testing.T) {
-	cases := []string{
-		"",
-		"<html><body>no meta</body></html>",
-		`<meta name="description" content="x">`,
-		"plain text",
-		`<p>hello</p>`,
-	}
-	for _, src := range cases {
-		root := mustParse(t, src)
-		if got := CharsetFromMeta(root); got != "" {
-			t.Errorf("CharsetFromMeta(%q) = %q, want \"\"", src, got)
+		if root.FirstChild("html") == nil {
+			t.Errorf("ParseDocument(%q): no html element", body[:4])
 		}
-	}
-}
-
-func TestCharsetFromMetaDeepScan(t *testing.T) {
-	// first declaration in document order wins
-	root := mustParse(t, `<meta name="x"><meta charset="utf-8"><meta http-equiv="content-type" content="text/html; charset=iso-8859-1">`)
-	if got := CharsetFromMeta(root); got != "utf-8" {
-		t.Errorf("CharsetFromMeta = %q, want %q", got, "utf-8")
 	}
 }

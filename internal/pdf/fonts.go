@@ -2,13 +2,17 @@ package pdf
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
 	"sort"
 	"strings"
+	"sync"
 	"unicode/utf16"
+
+	gtfont "github.com/go-text/typesetting/font"
 )
 
 // Font is a parsed TrueType/OpenType font (table-directory view). It exposes
@@ -16,6 +20,10 @@ import (
 // subset the font into the PDF.
 type Font struct {
 	data []byte
+	// fingerprint identifies the loaded face independently of its display
+	// name. Registries may assign the same PostScriptName to different files;
+	// subset caching must not merge those faces.
+	fingerprint [32]byte
 
 	// PostScriptName is the PDF /BaseFont label (e.g. LiberationSans-Bold).
 	// Empty when the font was loaded without a registry name.
@@ -37,6 +45,14 @@ type Font struct {
 	cmap    map[uint32]uint16 // rune -> glyph id
 	advance []int32           // advance width in font units per glyph
 	lsb     []int16           // left side bearing per glyph
+
+	// Derived, immutable caches live on the Font next to the data they
+	// derive from (locality) and disappear with it (bounds): the go-text
+	// face and the reverse cmap are built at most once each.
+	gotOnce sync.Once
+	gotFace *gtfont.Face // parsed go-text face (nil on failure)
+	revOnce sync.Once
+	rev     map[uint16]rune
 }
 
 // ParseTTF parses a TrueType (or OpenType with TrueType outlines) font file.
@@ -56,7 +72,7 @@ func ParseTTF(data []byte) (*Font, error) {
 	if 12+16*numTables > len(data) {
 		return nil, errors.New("font: truncated table directory")
 	}
-	f := &Font{data: data, tables: map[string][]byte{}}
+	f := &Font{data: data, fingerprint: sha256.Sum256(data), tables: map[string][]byte{}}
 	for i := 0; i < numTables; i++ {
 		rec := data[12+16*i:]
 		tag := string(rec[0:4])
@@ -385,7 +401,17 @@ func (f *Font) GlyphID(r rune) uint16 {
 
 // FamilyNames returns CSS-friendly family names from the font's name table
 // (NameIDs 1 and 16 when present). Empty when the name table is missing.
+// See LoadNames for the deliberate PostScriptName fill that backs this.
 func (f *Font) FamilyNames() []string {
+	return f.LoadNames()
+}
+
+// LoadNames reads the name table and makes the PostScriptName fill explicit:
+// when f.PostScriptName is still empty, the first NameID 6/4 record becomes
+// it (the PDF /BaseFont label). Callers that need the names without the
+// mutation can call this once up front. Returns family names (NameIDs 1 and
+// 16), or nil when the name table is missing.
+func (f *Font) LoadNames() []string {
 	t, ok := f.tables["name"]
 	if !ok || len(t) < 6 {
 		return nil

@@ -1,12 +1,12 @@
 // Package load reimplements the MultiPageLoader orchestration layer:
 // URL guessing, HTTP(S)/file fetching, cookies, proxy, auth, local ACL,
-// POST bodies, and the jsdelay/windowStatus/runScript stubs. Not a browser:
-// it hands raw bytes to the HTML/CSS/layout pipeline.
+// and POST bodies. Not a browser: it hands raw bytes to the HTML/CSS/layout
+// pipeline. JS-related settings flags are accepted by the settings/CLI layer
+// but not consumed here (no JS engine).
 package load
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -53,6 +53,36 @@ type Resource struct {
 	ContentType string
 	StatusCode  int
 	Skip        bool // set when load-error policy = skip
+}
+
+// ResourceContext binds a loaded document's base URL and load policy. It is
+// the narrow seam consumers should use when fetching CSS, images, fonts, or
+// other document-relative resources. The loader remains the owner of URL
+// resolution, ACL checks, body limits, and error handling.
+type ResourceContext struct {
+	loader *Loader
+	base   string
+	lp     settings.LoadPage
+}
+
+// ForResource returns a context for resources relative to res. A nil
+// resource is allowed for callers that only need absolute references; those
+// references still go through the same loader policy.
+func (l *Loader) ForResource(res *Resource, lp settings.LoadPage) ResourceContext {
+	var base string
+	if res != nil {
+		base = res.Base
+	}
+	return ResourceContext{loader: l, base: base, lp: lp}
+}
+
+// Fetch resolves ref against the document base and fetches it using the
+// document's load policy.
+func (c ResourceContext) Fetch(ctx context.Context, ref string) (*Resource, error) {
+	if c.loader == nil {
+		return nil, errors.New("nil resource loader")
+	}
+	return c.loader.FetchSub(ctx, c.base, ref, c.lp)
 }
 
 // AccessController implements the local-file ACL: default deny; an explicit
@@ -157,44 +187,40 @@ func isLocalPath(s string) bool {
 		len(s) == 2 && s[1] == ':' // windows drive
 }
 
-// Loader fetches resources concurrently with aggregate progress.
+// Loader fetches resources with the configured network and local-file policy.
 type Loader struct {
 	Client       *http.Client
 	Global       settings.LoadGlobal
 	Log          io.Writer
-	OnProgress   func(percent int)
 	MaxBodySize  int64
 	MaxRedirects int
-	InsecureTLS  bool
 
-	// Allow prefixes and the effective local-access flag, injected by the
-	// caller from settings (convert wires PdfGlobal.Allow + EnableLocalFileAccess).
+	// Allow prefixes and the effective local-access flag, applied by
+	// NewLoader from settings.LoadGlobal (caller-side pokes are being
+	// removed in parallel). Kept exported for tests.
 	Allow                 []string
 	EnableLocalFileAccess bool
-
-	active int
 }
 
-// NewLoader builds a Loader from global load settings.
+// NewLoader builds a Loader from global load settings, applying the full
+// load policy (proxy, allow prefixes, local-access flag) in one place.
 func NewLoader(g settings.LoadGlobal) *Loader {
 	l := &Loader{
-		Global:       g,
-		Log:          io.Discard,
-		MaxBodySize:  DefaultMaxBodySize,
-		MaxRedirects: DefaultMaxRedirects,
+		Global:                g,
+		Log:                   io.Discard,
+		MaxBodySize:           DefaultMaxBodySize,
+		MaxRedirects:          DefaultMaxRedirects,
+		Allow:                 g.Allow,
+		EnableLocalFileAccess: g.EnableLocalFileAccess,
 	}
 	l.initClient()
 	return l
 }
 
 func (l *Loader) initClient() {
-	tlsCfg := &tls.Config{}
-	if l.InsecureTLS {
-		tlsCfg.InsecureSkipVerify = true // #nosec G402 -- explicit --insecure opt-in
-	}
 	jar, _ := cookiejar.New(nil)
+	// Default TLS verification stays on (http.Transport system roots).
 	transport := &http.Transport{
-		TLSClientConfig:   tlsCfg,
 		ForceAttemptHTTP2: true,
 		DialContext: (&net.Dialer{
 			Timeout:   DefaultConnectTimeout,
@@ -221,43 +247,200 @@ func (l *Loader) initClient() {
 	}
 }
 
-// ApplyCert loads a client certificate (PEM key+crt) onto the transport.
-func (l *Loader) ApplyCert(certPEM, keyPEM []byte) error {
-	cert, err := tls.X509KeyPair(certPEM, keyPEM)
-	if err != nil {
-		return fmt.Errorf("client cert: %w", err)
-	}
-	if tr, ok := l.Client.Transport.(*http.Transport); ok {
-		tr.TLSClientConfig.Certificates = []tls.Certificate{cert}
-		return nil
-	}
-	return errors.New("client cert: unexpected transport")
-}
-
-// Load fetches the primary resource for an object.
+// Load fetches the primary resource for an object. In-memory HTML
+// (lp.InlineHTML) is returned as-is and skips GuessURL entirely; subresources
+// resolve against lp.InlineBase when set. Every loaded document is checked
+// for a supported charset at this seam (see checkDocumentCharset).
 func (l *Loader) Load(ctx context.Context, input string, lp settings.LoadPage) (*Resource, error) {
+	if len(lp.InlineHTML) > 0 {
+		if err := checkBodyLimit("inline HTML", len(lp.InlineHTML), l.MaxBodySize); err != nil {
+			return nil, err
+		}
+		res := &Resource{
+			Kind:        KindInline,
+			URL:         "inline:",
+			Base:        lp.InlineBase,
+			Body:        lp.InlineHTML,
+			ContentType: "text/html",
+		}
+		return res, checkDocumentCharset(res)
+	}
 	kind, target, err := GuessURL(input)
 	if err != nil {
 		return nil, err
 	}
+	var res *Resource
 	switch kind {
 	case KindInline:
 		if strings.HasPrefix(target, "inline:") {
-			return &Resource{Kind: KindInline, URL: "inline:", Body: []byte(target[len("inline:"):]), ContentType: "text/html"}, nil
-		}
-		if strings.HasPrefix(target, "data:") {
-			body, ctype, err := decodeDataURL(target)
+			res = &Resource{Kind: KindInline, URL: "inline:", Body: []byte(target[len("inline:"):]), ContentType: "text/html"}
+		} else if strings.HasPrefix(target, "data:") {
+			var body []byte
+			var ctype string
+			body, ctype, err = decodeDataURLLimited(target, l.MaxBodySize)
 			if err != nil {
 				return nil, err
 			}
-			return &Resource{Kind: KindInline, URL: target, Body: body, ContentType: ctype}, nil
+			res = &Resource{Kind: KindInline, URL: target, Body: body, ContentType: ctype}
 		}
 	case KindFile:
-		return l.loadFile(ctx, target, lp)
+		res, err = l.loadFile(ctx, target, lp)
 	case KindHTTP:
-		return l.loadHTTP(ctx, target, lp)
+		res, err = l.loadHTTP(ctx, target, lp)
 	}
-	return nil, fmt.Errorf("cannot load %q", input)
+	if err != nil {
+		return nil, err
+	}
+	if res == nil {
+		return nil, fmt.Errorf("cannot load %q", input)
+	}
+	if !res.Skip {
+		return res, checkDocumentCharset(res)
+	}
+	return res, nil
+}
+
+// checkDocumentCharset enforces the bytes-to-runes seam: only UTF-8/ASCII
+// documents are supported. The charset is taken from the resource's
+// Content-Type charset parameter, falling back to a <meta charset> (or
+// <meta http-equiv="content-type">) declaration in the first 1 KiB of the
+// body. Anything else is refused with a clear error instead of silently
+// garbling the page.
+func checkDocumentCharset(res *Resource) error {
+	cs := charsetFromContentType(res.ContentType)
+	if cs == "" {
+		cs = metaCharset(res.Body)
+	}
+	if cs == "" || charsetSupported(cs) {
+		return nil
+	}
+	return fmt.Errorf("unsupported charset: %s (only UTF-8/ASCII)", cs)
+}
+
+// charsetSupported reports whether a charset name is one the pipeline can
+// decode. Only UTF-8 and ASCII are accepted.
+func charsetSupported(cs string) bool {
+	switch strings.ToLower(strings.TrimSpace(cs)) {
+	case "utf-8", "utf8", "us-ascii", "ascii":
+		return true
+	}
+	return false
+}
+
+// charsetFromContentType extracts the charset parameter of a Content-Type
+// value, or "" when absent or unparseable.
+func charsetFromContentType(ct string) string {
+	if ct == "" {
+		return ""
+	}
+	_, params, err := mime.ParseMediaType(ct)
+	if err != nil {
+		return ""
+	}
+	return params["charset"]
+}
+
+// metaCharset scans the first 1 KiB of a document for a <meta charset> or
+// <meta http-equiv="content-type"> declaration and returns the declared
+// charset, or "" when there is none.
+func metaCharset(body []byte) string {
+	s := string(body)
+	if len(s) > 1024 {
+		s = s[:1024]
+	}
+	low := strings.ToLower(s)
+	for {
+		i := strings.Index(low, "<meta")
+		if i < 0 {
+			return ""
+		}
+		j := strings.IndexByte(s[i:], '>')
+		if j < 0 {
+			return ""
+		}
+		if cs := metaTagCharset(s[i : i+j]); cs != "" {
+			return cs
+		}
+		s = s[i+j+1:]
+		low = strings.ToLower(s)
+	}
+}
+
+// metaTagCharset extracts the charset from one <meta ...> tag: the charset
+// attribute directly, or the content attribute when http-equiv is
+// content-type.
+func metaTagCharset(tag string) string {
+	if strings.EqualFold(attrValue(tag, "http-equiv"), "content-type") {
+		if cs := charsetInContent(attrValue(tag, "content")); cs != "" {
+			return cs
+		}
+	}
+	if cs := attrValue(tag, "charset"); cs != "" {
+		return cs
+	}
+	return ""
+}
+
+// charsetInContent extracts the charset=... parameter from a meta content
+// attribute value (e.g. "text/html; charset=windows-1252").
+func charsetInContent(content string) string {
+	low := strings.ToLower(content)
+	i := strings.Index(low, "charset")
+	if i < 0 {
+		return ""
+	}
+	rest := strings.TrimLeft(content[i+len("charset"):], " \t\n\r\f")
+	if !strings.HasPrefix(rest, "=") {
+		return ""
+	}
+	return strings.Trim(strings.TrimLeft(rest[1:], " \t\n\r\f"), "\"' ;")
+}
+
+// attrValue extracts the value of the named attribute (case-insensitive)
+// from a <meta ...> tag body, or "".
+func attrValue(tag, name string) string {
+	low := strings.ToLower(tag)
+	needle := strings.ToLower(name)
+	for {
+		i := strings.Index(low, needle)
+		if i < 0 {
+			return ""
+		}
+		if i > 0 {
+			c := tag[i-1]
+			if c != ' ' && c != '\t' && c != '\n' && c != '\r' && c != '\f' {
+				tag = tag[i+len(needle):]
+				low = low[i+len(needle):]
+				continue
+			}
+		}
+		rest := strings.TrimLeft(tag[i+len(needle):], " \t\n\r\f")
+		if !strings.HasPrefix(rest, "=") {
+			tag = tag[i+len(needle):]
+			low = low[i+len(needle):]
+			continue
+		}
+		rest = strings.TrimLeft(rest[1:], " \t\n\r\f")
+		if rest == "" {
+			return ""
+		}
+		if rest[0] == '"' || rest[0] == '\'' {
+			q := rest[0]
+			if k := strings.IndexByte(rest[1:], q); k >= 0 {
+				return rest[1 : k+1]
+			}
+			return ""
+		}
+		k := 0
+		for k < len(rest) && !isMetaWhitespace(rest[k]) {
+			k++
+		}
+		return rest[:k]
+	}
+}
+
+func isMetaWhitespace(b byte) bool {
+	return b == ' ' || b == '\t' || b == '\n' || b == '\r' || b == '\f' || b == '>'
 }
 
 func (l *Loader) loadFile(ctx context.Context, path string, lp settings.LoadPage) (*Resource, error) {
@@ -404,15 +587,23 @@ func (l *Loader) loadHTTP(ctx context.Context, target string, lp settings.LoadPa
 
 // FetchSub fetches a subresource (css/img) resolved against base.
 func (l *Loader) FetchSub(ctx context.Context, base, ref string, lp settings.LoadPage) (*Resource, error) {
-	baseURL, err := url.Parse(base)
-	if err != nil {
-		return nil, err
-	}
 	refURL, err := url.Parse(strings.TrimSpace(ref))
 	if err != nil {
 		return nil, err
 	}
-	abs := baseURL.ResolveReference(refURL)
+	if !refURL.IsAbs() && base == "" {
+		return nil, fmt.Errorf("cannot resolve relative subresource %q without a document base URL", ref)
+	}
+	var abs *url.URL
+	if refURL.IsAbs() {
+		abs = refURL
+	} else {
+		baseURL, err := url.Parse(base)
+		if err != nil {
+			return nil, err
+		}
+		abs = baseURL.ResolveReference(refURL)
+	}
 	switch abs.Scheme {
 	case "file", "":
 		p := abs.Path
@@ -423,7 +614,7 @@ func (l *Loader) FetchSub(ctx context.Context, base, ref string, lp settings.Loa
 	case "http", "https":
 		return l.loadHTTP(ctx, abs.String(), lp)
 	case "data":
-		body, ctype, err := decodeDataURL(abs.String())
+		body, ctype, err := decodeDataURLLimited(abs.String(), l.MaxBodySize)
 		if err != nil {
 			return nil, err
 		}
@@ -441,6 +632,13 @@ func urlEncodePost(items []settings.PostItem) string {
 }
 
 func decodeDataURL(s string) ([]byte, string, error) {
+	return decodeDataURLLimited(s, -1)
+}
+
+// decodeDataURLLimited decodes a data URL while enforcing the same body cap
+// used by file and HTTP resources. A negative max means unlimited and exists
+// only for the package-local compatibility helper above.
+func decodeDataURLLimited(s string, max int64) ([]byte, string, error) {
 	rest := strings.TrimPrefix(s, "data:")
 	comma := strings.IndexByte(rest, ',')
 	if comma < 0 {
@@ -452,7 +650,7 @@ func decodeDataURL(s string) ([]byte, string, error) {
 		parts := strings.Split(meta, ";")
 		for _, p := range parts {
 			if strings.HasPrefix(p, "base64") {
-				dec, err := decodeBase64(data)
+				dec, err := decodeBase64Limited(data, max)
 				if err != nil {
 					return nil, "", err
 				}
@@ -463,41 +661,119 @@ func decodeDataURL(s string) ([]byte, string, error) {
 			}
 		}
 	}
-	dec, err := url.QueryUnescape(data)
+	dec, err := unescapeDataLimited(data, max)
 	if err != nil {
 		return nil, "", err
 	}
-	return []byte(dec), ctype, nil
+	return dec, ctype, nil
 }
 
 func decodeBase64(s string) ([]byte, error) {
-	r := strings.NewReplacer("\n", "", "\r", "", " ", "")
-	return base64.StdEncoding.DecodeString(r.Replace(s))
+	return decodeBase64Limited(s, -1)
 }
 
-// WaitJSDelay sleeps ms (or ctx cancel), the MVP stand-in for JS execution.
-func WaitJSDelay(ctx context.Context, ms int) {
-	if ms <= 0 {
-		return
+func decodeBase64Limited(s string, max int64) ([]byte, error) {
+	// Count first so a large amount of whitespace cannot force an equally
+	// large compacted allocation before the body limit is checked.
+	compactLen := 0
+	for i := 0; i < len(s); i++ {
+		if s[i] != '\n' && s[i] != '\r' && s[i] != ' ' && s[i] != '\t' {
+			compactLen++
+		}
 	}
-	t := time.NewTimer(time.Duration(ms) * time.Millisecond)
-	defer t.Stop()
-	select {
-	case <-ctx.Done():
-	case <-t.C:
+	if max >= 0 {
+		decodedLen := base64.StdEncoding.DecodedLen(compactLen)
+		if compactLen > 0 && s != "" {
+			// DecodedLen includes the bytes represented by padding. Account for
+			// it so a one-byte data URL is not rejected with a one-byte limit.
+			seen := 0
+			for i := len(s) - 1; i >= 0 && seen < 2; i-- {
+				switch s[i] {
+				case ' ', '\t', '\n', '\r':
+					continue
+				case '=':
+					decodedLen--
+					seen++
+				default:
+					seen = 2
+				}
+			}
+		}
+		if int64(decodedLen) > max {
+			return nil, fmt.Errorf("data URL exceeds max body size %d", max)
+		}
+	}
+	var b strings.Builder
+	b.Grow(compactLen)
+	for i := 0; i < len(s); i++ {
+		if s[i] != '\n' && s[i] != '\r' && s[i] != ' ' && s[i] != '\t' {
+			b.WriteByte(s[i])
+		}
+	}
+	dec, err := base64.StdEncoding.DecodeString(b.String())
+	if err != nil {
+		return nil, err
+	}
+	if err := checkBodyLimit("data URL", len(dec), max); err != nil {
+		return nil, err
+	}
+	return dec, nil
+}
+
+func unescapeDataLimited(s string, max int64) ([]byte, error) {
+	if max >= 0 && int64(len(s)) < max {
+		// This is only a capacity hint. Percent escapes and '+' can make the
+		// decoded body shorter, never longer, than the source string.
+		max = int64(len(s))
+	}
+	capacity := len(s)
+	if max >= 0 && int64(capacity) > max {
+		capacity = int(max)
+	}
+	out := make([]byte, 0, capacity)
+	for i := 0; i < len(s); i++ {
+		var b byte
+		switch s[i] {
+		case '%':
+			if i+2 >= len(s) {
+				return nil, fmt.Errorf("invalid URL escape in data URL")
+			}
+			hi, okHi := fromHex(s[i+1])
+			lo, okLo := fromHex(s[i+2])
+			if !okHi || !okLo {
+				return nil, fmt.Errorf("invalid URL escape in data URL")
+			}
+			b = hi<<4 | lo
+			i += 2
+		case '+':
+			b = ' '
+		default:
+			b = s[i]
+		}
+		if max >= 0 && int64(len(out)) >= max {
+			return nil, fmt.Errorf("data URL exceeds max body size %d", max)
+		}
+		out = append(out, b)
+	}
+	return out, nil
+}
+
+func fromHex(b byte) (byte, bool) {
+	switch {
+	case b >= '0' && b <= '9':
+		return b - '0', true
+	case b >= 'a' && b <= 'f':
+		return b - 'a' + 10, true
+	case b >= 'A' && b <= 'F':
+		return b - 'A' + 10, true
+	default:
+		return 0, false
 	}
 }
 
-// WarnJSStubs logs once that windowStatus/runScript are accepted but ignored
-// (no JS engine in MVP).
-func WarnJSStubs(log io.Writer, lp settings.LoadPage) {
-	if lp.WindowStatus != "" {
-		fmt.Fprintf(log, "warning: --window-status ignored (no JavaScript engine in MVP)\n")
+func checkBodyLimit(source string, length int, max int64) error {
+	if max >= 0 && int64(length) > max {
+		return fmt.Errorf("%s exceeds max body size %d", source, max)
 	}
-	if lp.RunScript != "" {
-		fmt.Fprintf(log, "warning: --run-script ignored (no JavaScript engine in MVP)\n")
-	}
-	if lp.DebugJavaScript {
-		fmt.Fprintf(log, "warning: --debug-javascript ignored (no JavaScript engine in MVP)\n")
-	}
+	return nil
 }

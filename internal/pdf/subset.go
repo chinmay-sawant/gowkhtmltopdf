@@ -8,10 +8,7 @@ import (
 	"sort"
 )
 
-// subsetFont builds a minimal TrueType font containing only the glyphs used
-// by runes. The rebuilt cmap maps each rune (char code = its Latin-1 byte
-// value) to the renumbered glyph id, so the PDF can emit raw character codes
-// in content streams and the viewer resolves them through the cmap.
+// subsetResult is a minimal TrueType subset for PDF embedding.
 type subsetResult struct {
 	data     []byte
 	runes    []rune          // sorted runes that got glyphs
@@ -19,10 +16,33 @@ type subsetResult struct {
 	widths   []float64       // advance widths in font units, index = new glyph id
 }
 
-func subsetFont(f *Font, used []rune) (*subsetResult, error) {
+// subsetScope selects which runes enter the subset cmap / glyph map.
+// Simple fonts map Latin-1 only; Type0 needs the full BMP for Identity-H CIDs.
+type subsetScope int
+
+const (
+	subsetSimple  subsetScope = iota // Latin-1 single-byte PDF fonts
+	subsetUnicode                    // Unicode BMP (Type0 / CIDToGIDMap)
+)
+
+// subsetFont builds a minimal TrueType font containing only the glyphs used
+// by runes. The rebuilt cmap maps accepted runes to renumbered glyph ids.
+// scope=subsetSimple keeps Latin-1 only; scope=subsetUnicode keeps BMP
+// (codes above U+FFFF are skipped).
+func subsetFont(f *Font, used []rune, scope subsetScope) (*subsetResult, error) {
+	accept := func(r rune) bool {
+		if scope == subsetSimple {
+			return simpleFontRune(r)
+		}
+		return r <= 0xFFFF
+	}
+
 	// .notdef always included
 	glyphSet := map[uint16]bool{0: true}
 	for _, r := range used {
+		if !accept(r) {
+			continue
+		}
 		g := f.GlyphID(r)
 		if g == 0 {
 			continue
@@ -62,90 +82,9 @@ func subsetFont(f *Font, used []rune) (*subsetResult, error) {
 	}
 	outlines = cloned
 
-	// rune -> new glyph id, deduped and sorted (Latin-1 codes only for
-	// simple-font embedding; use subsetFontUnicode for Type0)
 	res := &subsetResult{glyphIDs: map[rune]uint16{}}
 	for _, r := range used {
-		if !simpleFontRune(r) {
-			continue
-		}
-		old := f.GlyphID(r)
-		if old == 0 {
-			continue
-		}
-		res.glyphIDs[r] = oldToNew[old]
-	}
-	for r := range res.glyphIDs {
-		res.runes = append(res.runes, r)
-	}
-	sort.Slice(res.runes, func(i, j int) bool { return res.runes[i] < res.runes[j] })
-
-	sub := &subsetter{f: f, glyphs: glyphs, outlines: outlines, advances: advances, lsbs: lsbs}
-	sub.mappings = make([]codeGlyph, 0, len(res.glyphIDs))
-	for r, g := range res.glyphIDs {
-		sub.mappings = append(sub.mappings, codeGlyph{code: uint16(r), glyph: g})
-	}
-	sort.Slice(sub.mappings, func(i, j int) bool { return sub.mappings[i].code < sub.mappings[j].code })
-	data, err := sub.build()
-	if err != nil {
-		return nil, err
-	}
-	res.data = data
-	res.widths = make([]float64, len(advances))
-	for i, a := range advances {
-		res.widths[i] = float64(a)
-	}
-	return res, nil
-}
-
-// subsetFontUnicode is like subsetFont but keeps glyph mappings for the full
-// Unicode BMP (needed for Type0 CIDToGIDMap). Codes above U+FFFF are skipped.
-func subsetFontUnicode(f *Font, used []rune) (*subsetResult, error) {
-	glyphSet := map[uint16]bool{0: true}
-	for _, r := range used {
-		if r > 0xFFFF {
-			continue
-		}
-		g := f.GlyphID(r)
-		if g == 0 {
-			continue
-		}
-		collectGlyph(f, g, glyphSet)
-	}
-	glyphs := make([]uint16, 0, len(glyphSet))
-	for g := range glyphSet {
-		glyphs = append(glyphs, g)
-	}
-	sort.Slice(glyphs, func(i, j int) bool { return glyphs[i] < glyphs[j] })
-
-	oldToNew := map[uint16]uint16{}
-	advances := make([]int32, 0, len(glyphs))
-	lsbs := make([]int16, 0, len(glyphs))
-	outlines := make([][]byte, len(glyphs))
-	for newID, old := range glyphs {
-		oldToNew[old] = uint16(newID)
-		if int(old) < len(f.advance) {
-			advances = append(advances, f.advance[old])
-		} else {
-			advances = append(advances, 0)
-		}
-		if int(old) < len(f.lsb) {
-			lsbs = append(lsbs, f.lsb[old])
-		} else {
-			lsbs = append(lsbs, 0)
-		}
-		outlines[newID] = f.glyphOutline(old)
-	}
-	cloned := make([][]byte, len(outlines))
-	for i, o := range outlines {
-		cloned[i] = stripGlyphHints(bytes.Clone(o))
-		remapComposite(cloned[i], oldToNew)
-	}
-	outlines = cloned
-
-	res := &subsetResult{glyphIDs: map[rune]uint16{}}
-	for _, r := range used {
-		if r > 0xFFFF {
+		if !accept(r) {
 			continue
 		}
 		old := f.GlyphID(r)
@@ -463,19 +402,6 @@ func unicodeCmap4(mappings []codeGlyph) ([]byte, error) {
 	out = append(out, rec[:]...)
 	out = append(out, b...)
 	return out, nil
-}
-
-func coalesceSegments(n int) []struct{ start, end uint16 } {
-	var segs []struct{ start, end uint16 }
-	for i := 0; i < n; {
-		j := i
-		for j+1 < n {
-			j++
-		}
-		segs = append(segs, struct{ start, end uint16 }{uint16(i), uint16(j)})
-		i = j + 1
-	}
-	return segs
 }
 
 // simpleFontRune reports whether r can be encoded as a single-byte char code

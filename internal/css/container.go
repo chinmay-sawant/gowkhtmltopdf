@@ -13,6 +13,10 @@ type ContainerQuery struct {
 }
 
 // ContainerCond is a boolean tree of size features (and / or / not).
+//
+// ponytail: full Cond tree, simplify if no nested and/or in real sheets
+// (fixture-42 only needs single feat comparisons; layout tests still cover
+// and/or/not).
 type ContainerCond struct {
 	Kind string // "feat", "and", "or", "not"
 	Feat *SizeFeature
@@ -71,9 +75,11 @@ func (f SizeFeature) matches(inlineSizePt, fontSizePt float64) bool {
 	}
 }
 
-// lengthToPt converts a parsed length to points. em uses fontSizePt; % and
-// viewport units are unsupported in container queries (return false).
-func lengthToPt(val float64, unit string, fontSizePt float64) (float64, bool) {
+// LengthToPt converts a parsed length to points. basePt is the em/rem base
+// (the element's font size). Same conversions as the former internal helper;
+// % and viewport units are unsupported (return false). Unknown units return
+// false so callers can apply their own policy (e.g. line-height inherits).
+func LengthToPt(val float64, unit string, basePt float64) (float64, bool) {
 	switch strings.ToLower(unit) {
 	case "px":
 		return val * 0.75, true
@@ -91,9 +97,9 @@ func lengthToPt(val float64, unit string, fontSizePt float64) (float64, bool) {
 		if unit == "rem" {
 			return val * 16 * 0.75, true // 16px root
 		}
-		return val * fontSizePt, true
+		return val * basePt, true
 	case "ex", "ch":
-		return val * fontSizePt * 0.5, true
+		return val * basePt * 0.5, true
 	default:
 		return 0, false
 	}
@@ -101,6 +107,9 @@ func lengthToPt(val float64, unit string, fontSizePt float64) (float64, bool) {
 
 // ParseContainerNameValue parses container-name: none | <custom-ident>+.
 // Returns the space-joined names (empty for none / invalid).
+// ponytail: space-joined string is the wire form layout re-splits in two
+// places; upgrade to typed ContainerNames with Matches(name) when those
+// call sites change together.
 func ParseContainerNameValue(value string) string {
 	value = strings.TrimSpace(value)
 	if value == "" || strings.EqualFold(value, "none") {
@@ -269,35 +278,6 @@ func parseParenOrFeat(s string) (ContainerCond, bool) {
 		return ContainerCond{}, false
 	}
 	return ContainerCond{Kind: "feat", Feat: &feat}, true
-}
-
-func takeParen(s string) (inner, rest string, ok bool) {
-	s = strings.TrimSpace(s)
-	if !strings.HasPrefix(s, "(") {
-		return "", s, false
-	}
-	depth := 0
-	for i := 0; i < len(s); i++ {
-		switch s[i] {
-		case '"', '\'':
-			q := s[i]
-			i++
-			for i < len(s) && s[i] != q {
-				if s[i] == '\\' && i+1 < len(s) {
-					i++
-				}
-				i++
-			}
-		case '(':
-			depth++
-		case ')':
-			depth--
-			if depth == 0 {
-				return s[1:i], s[i+1:], true
-			}
-		}
-	}
-	return "", s, false
 }
 
 // splitCondKeyword splits on top-level `and`/`or` keywords (not inside parens).

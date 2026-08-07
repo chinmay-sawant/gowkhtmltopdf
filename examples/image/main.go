@@ -14,9 +14,10 @@ package main
 
 import (
 	"context"
+	"errors"
+	"flag"
 	"fmt"
 	"os"
-	"strings"
 
 	gowkhtmltopdf "gowkhtmltopdf"
 )
@@ -39,56 +40,51 @@ func main() {
 }
 
 func run(argv []string) error {
-	var (
-		width      = ""
-		format     = "png"
-		localFiles = false
-	)
-	var inputs []string
-	for i := 0; i < len(argv); i++ {
-		arg := argv[i]
-		switch {
-		case arg == "--help" || arg == "-h":
-			usage()
+	fs := flag.NewFlagSet("image", flag.ContinueOnError)
+	fs.Usage = usage
+	width := fs.String("width", "", "viewport width in pixels (default 1024)")
+	format := fs.String("format", "png", "output format (png or jpg)")
+	localFiles := fs.Bool("enable-local-file-access", false, "allow local files (needed for file inputs)")
+	if err := fs.Parse(argv); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
 			return nil
-		case arg == "--enable-local-file-access":
-			localFiles = true
-		case strings.HasPrefix(arg, "--width="):
-			width = strings.TrimPrefix(arg, "--width=")
-		case arg == "--width" && i+1 < len(argv):
-			i++
-			width = argv[i]
-		case strings.HasPrefix(arg, "--format="):
-			format = strings.TrimPrefix(arg, "--format=")
-		case arg == "--format" && i+1 < len(argv):
-			i++
-			format = argv[i]
-		case strings.HasPrefix(arg, "-"):
-			return fmt.Errorf("unknown option %q", arg)
-		default:
-			inputs = append(inputs, arg)
 		}
+		return err
 	}
-	if len(inputs) != 2 {
+	if fs.NArg() != 2 {
 		usage()
 		return fmt.Errorf("need exactly one input and one output file")
 	}
-	input, output := inputs[0], inputs[1]
-	if format != "png" && format != "jpg" {
-		return fmt.Errorf("unsupported format %q (png or jpg)", format)
+	input, output := fs.Arg(0), fs.Arg(1)
+	if *format != "png" && *format != "jpg" {
+		return fmt.Errorf("unsupported format %q (png or jpg)", *format)
 	}
 
 	c := gowkhtmltopdf.NewImageConverter()
-	if width != "" {
-		c.Set("width", width)
+	mustSet := func(name, value string) error {
+		if err := c.Set(name, value); err != nil {
+			return fmt.Errorf("%s: %w", name, err)
+		}
+		return nil
 	}
-	c.Set("format", format)
-	if localFiles {
-		c.Global().Set("enablelocalfileaccess", "true")
+	if *width != "" {
+		if err := mustSet("width", *width); err != nil {
+			return err
+		}
+	}
+	if err := mustSet("format", *format); err != nil {
+		return err
+	}
+	if *localFiles {
+		if err := c.Global().Set("enablelocalfileaccess", "true"); err != nil {
+			return err
+		}
 	}
 	c.AddObject(input)
-	if localFiles {
-		c.Object().Set("load.blocklocalfileaccess", "false")
+	if *localFiles {
+		if err := c.Object().Set("load.blocklocalfileaccess", "false"); err != nil {
+			return err
+		}
 	}
 
 	if err := c.Convert(context.Background()); err != nil {

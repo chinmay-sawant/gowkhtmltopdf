@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -346,17 +347,6 @@ func TestConcurrentLoads(t *testing.T) {
 			t.Errorf("concurrent load: %v", err)
 		}
 	}
-}
-
-func TestWaitJSDelay(t *testing.T) {
-	start := time.Now()
-	WaitJSDelay(context.Background(), 30)
-	if d := time.Since(start); d < 25*time.Millisecond {
-		t.Errorf("jsdelay slept %v", d)
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	WaitJSDelay(ctx, 500)
 }
 
 func TestRedirectLimit(t *testing.T) {
@@ -722,5 +712,205 @@ func TestHTTPLocalhostAllowedByDesign(t *testing.T) {
 	}
 	if string(res.Body) != "localhost ok" {
 		t.Errorf("body = %q", res.Body)
+	}
+}
+
+// TestLoadInlineHTML: an explicit in-memory HTML source is returned as-is
+// and skips GuessURL entirely; subresources resolve against InlineBase.
+func TestLoadInlineHTML(t *testing.T) {
+	l := NewLoader(settings.LoadGlobal{})
+	lp := defaultLP()
+	lp.InlineHTML = []byte("<html><body>inline</body></html>")
+	lp.InlineBase = "https://example.com/docs/page.html"
+
+	// The input would be treated as an http:// URL by GuessURL; InlineHTML
+	// must short-circuit it without any guessing or fetching.
+	res, err := l.Load(context.Background(), "this is not a url", lp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Kind != KindInline {
+		t.Errorf("kind = %v, want KindInline", res.Kind)
+	}
+	if string(res.Body) != "<html><body>inline</body></html>" {
+		t.Errorf("body = %q", res.Body)
+	}
+	if res.Base != "https://example.com/docs/page.html" {
+		t.Errorf("base = %q, want InlineBase", res.Base)
+	}
+
+	lp2 := defaultLP()
+	lp2.InlineHTML = []byte("<html></html>")
+	res2, err := l.Load(context.Background(), "ignored", lp2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res2.Base != "" {
+		t.Errorf("empty InlineBase must leave Base empty, got %q", res2.Base)
+	}
+}
+
+func TestDataURLHonorsBodyLimitForPrimaryAndSubresource(t *testing.T) {
+	l := NewLoader(settings.LoadGlobal{})
+	l.MaxBodySize = 4
+	lp := defaultLP()
+
+	if _, err := l.Load(context.Background(), "data:text/plain,12345", lp); err == nil {
+		t.Fatal("oversized primary data URL must be rejected")
+	} else if !strings.Contains(err.Error(), "data URL exceeds max body size 4") {
+		t.Fatalf("primary error = %v", err)
+	}
+	if _, err := l.FetchSub(context.Background(), "", "data:text/plain,12345", lp); err == nil {
+		t.Fatal("oversized data subresource must be rejected")
+	} else if !strings.Contains(err.Error(), "data URL exceeds max body size 4") {
+		t.Fatalf("subresource error = %v", err)
+	}
+	if _, err := l.Load(context.Background(), "data:text/plain;base64,MTIzNDU=", lp); err == nil {
+		t.Fatal("oversized base64 data URL must be rejected")
+	} else if !strings.Contains(err.Error(), "data URL exceeds max body size 4") {
+		t.Fatalf("base64 error = %v", err)
+	}
+
+	res, err := l.FetchSub(context.Background(), "", "data:text/plain,1234", lp)
+	if err != nil {
+		t.Fatalf("data URL at the body limit: %v", err)
+	}
+	if string(res.Body) != "1234" {
+		t.Errorf("body = %q, want 1234", res.Body)
+	}
+}
+
+func TestInlineHTMLHonorsBodyLimit(t *testing.T) {
+	l := NewLoader(settings.LoadGlobal{})
+	l.MaxBodySize = 4
+	lp := defaultLP()
+	lp.InlineHTML = []byte("12345")
+	if _, err := l.Load(context.Background(), "ignored", lp); err == nil {
+		t.Fatal("oversized inline HTML must be rejected")
+	} else if !strings.Contains(err.Error(), "inline HTML exceeds max body size 4") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestEmptyInlineBaseRejectsRelativeSubresources(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "local.css")
+	if err := os.WriteFile(path, []byte("body{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	l := NewLoader(settings.LoadGlobal{})
+	// Even with local access enabled, an inline document without a base must
+	// not reinterpret a relative reference as a process-working-directory
+	// file. The reference is unresolved, not an implicit local path.
+	l.EnableLocalFileAccess = true
+	if _, err := l.FetchSub(context.Background(), "", path, defaultLP()); err == nil {
+		t.Fatal("relative reference without a base must be rejected")
+	} else if !strings.Contains(err.Error(), "without a document base URL") {
+		t.Fatalf("error = %v", err)
+	}
+
+	res, err := l.FetchSub(context.Background(), "", "data:text/plain,ok", defaultLP())
+	if err != nil {
+		t.Fatalf("absolute data reference without a base: %v", err)
+	}
+	if string(res.Body) != "ok" {
+		t.Errorf("body = %q, want ok", res.Body)
+	}
+}
+
+func TestResourceContextBindsBaseAndPolicy(t *testing.T) {
+	dir := t.TempDir()
+	styleDir := filepath.Join(dir, "styles")
+	if err := os.Mkdir(styleDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	stylePath := filepath.Join(styleDir, "site.css")
+	if err := os.WriteFile(stylePath, []byte("body{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	l := NewLoader(settings.LoadGlobal{})
+	l.EnableLocalFileAccess = true
+	base := &Resource{Base: "file://" + filepath.ToSlash(filepath.Join(dir, "page.html"))}
+	lp := defaultLP()
+	lp.BlockLocalFileAccess = false
+	ctx := l.ForResource(base, lp)
+	res, err := ctx.Fetch(context.Background(), "styles/site.css")
+	if err != nil {
+		t.Fatalf("relative fetch = %v", err)
+	}
+	if string(res.Body) != "body{}" {
+		t.Errorf("body = %q, want body{}", res.Body)
+	}
+}
+
+func TestLoadCharsetContentType(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", r.URL.Query().Get("ct"))
+		w.Write([]byte("<html><body>ok</body></html>"))
+	}))
+	defer srv.Close()
+
+	l := NewLoader(settings.LoadGlobal{})
+	for _, tc := range []struct {
+		ct   string
+		ok   bool
+		want string
+	}{
+		{"text/html", true, ""},
+		{"text/html; charset=utf-8", true, ""},
+		{"text/html; charset=UTF-8", true, ""},
+		{"text/html; charset=us-ascii", true, ""},
+		{"text/html; charset=ISO-8859-1", false, "unsupported charset: ISO-8859-1 (only UTF-8/ASCII)"},
+		{"text/html; charset=windows-1252", false, "unsupported charset: windows-1252 (only UTF-8/ASCII)"},
+	} {
+		_, err := l.Load(context.Background(), srv.URL+"?ct="+url.QueryEscape(tc.ct), defaultLP())
+		if tc.ok && err != nil {
+			t.Errorf("ct %q: %v", tc.ct, err)
+		}
+		if !tc.ok {
+			if err == nil {
+				t.Errorf("ct %q: expected error", tc.ct)
+			} else if !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("ct %q: err = %v, want contains %q", tc.ct, err, tc.want)
+			}
+		}
+	}
+}
+
+func TestLoadCharsetMetaDecl(t *testing.T) {
+	// Content-Type without a charset parameter: the <meta> declaration is
+	// the only charset signal, and it must be honored at the load seam.
+	var body string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.Write([]byte(body))
+	}))
+	defer srv.Close()
+
+	l := NewLoader(settings.LoadGlobal{})
+	for _, tc := range []struct {
+		name, head string
+		ok         bool
+		want       string
+	}{
+		{"utf8-charset", `<meta charset="utf-8">`, true, ""},
+		{"utf8-content-type", `<meta http-equiv="content-type" content="text/html; charset=UTF-8">`, true, ""},
+		{"no-meta", `<html><body>x</body></html>`, true, ""},
+		{"latin1-charset", `<meta charset="windows-1252">`, false, "unsupported charset: windows-1252 (only UTF-8/ASCII)"},
+		{"latin1-content-type", `<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">`, false, "unsupported charset: ISO-8859-1 (only UTF-8/ASCII)"},
+	} {
+		body = tc.head + "<title>t</title></head><body>x</body></html>"
+		_, err := l.Load(context.Background(), srv.URL+"/"+tc.name, defaultLP())
+		if tc.ok && err != nil {
+			t.Errorf("%s: %v", tc.name, err)
+		}
+		if !tc.ok {
+			if err == nil {
+				t.Errorf("%s: expected error", tc.name)
+			} else if !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("%s: err = %v, want contains %q", tc.name, err, tc.want)
+			}
+		}
 	}
 }

@@ -17,18 +17,44 @@ import (
 )
 
 // Heading is one outline entry: an h1..h6 element plus its layout location.
-// Page/X/Y/W/H are filled from an ElementLocation; X/Y/W/H are canvas
-// coordinates (y grows downward from the top of the page content area), Page
-// is the 0-based page index the element landed on (object-local; callers
-// rebase it to document pages).
+// X/Y/W/H are canvas coordinates (y grows downward from the top of the page
+// content area) filled from an ElementLocation. Page stays object-local
+// forever; DocPage is set exactly once during assembly and never mutated
+// afterwards.
 type Heading struct {
-	Node   *html.Node
-	Title  string
-	Level  int // 1..6
-	Page   int
-	X, Y   float64
-	W, H   float64
-	Anchor string // synthetic __WKANCHOR_<base36>, stable across runs
+	Node    *html.Node
+	Title   string
+	Level   int // 1..6
+	Page    int // 0-based page within the calling object's layout
+	DocPage int // document-global page, filled once during assembly, never mutated afterwards
+	X, Y    float64
+	W, H    float64
+	Anchor  string // synthetic __WKANCHOR_<base36>, stable across runs
+}
+
+// PageOf is the explicit ordering contract used when headings from more than
+// one page-producing scope are combined. It returns the page number used for
+// ordering, section lookup, and outline serialization; it does not mutate the
+// heading. Use LocalPage for an object's local layout or DocumentPage for a
+// flattened document view.
+type PageOf func(*Heading) int
+
+// LocalPage orders a heading by the page in its object's layout.
+func LocalPage(h *Heading) int {
+	if h == nil {
+		return 0
+	}
+	return h.Page
+}
+
+// DocumentPage orders a heading by the page assigned during document
+// assembly. Unlike the old Page/DocPage view convention, this accessor keeps
+// the object-local Page field unchanged.
+func DocumentPage(h *Heading) int {
+	if h == nil {
+		return 0
+	}
+	return h.DocPage
 }
 
 // headingLevel maps an element name to its outline level, 0 when it is not a
@@ -56,23 +82,18 @@ func headingLevel(name string) int {
 // are zero until Lookup runs.
 func CollectHeadings(root *html.Node) []*Heading {
 	var out []*Heading
-	var walk func(n *html.Node)
-	walk = func(n *html.Node) {
+	root.Walk(func(n *html.Node) {
 		if n.Type != html.ElementNode {
 			return
 		}
 		if lvl := headingLevel(n.Name); lvl > 0 {
 			out = append(out, &Heading{
 				Node:  n,
-				Title: collapseWS(n.TextContent()),
+				Title: CollapseWS(n.TextContent()),
 				Level: lvl,
 			})
 		}
-		for _, c := range n.Children {
-			walk(c)
-		}
-	}
-	walk(root)
+	})
 	return out
 }
 
@@ -118,11 +139,62 @@ type Options struct {
 	// MaxDepth is the deepest heading level kept; headings (after clamping)
 	// deeper than MaxDepth are dropped from the tree. 0 keeps everything.
 	MaxDepth int
-	// Exclude drops headings whose node matches any selector.
+	// Exclude drops headings whose node matches any selector (css.Match).
+	// Callers pass --exclude-from-outline selectors here; object-level
+	// gates (UseOutline / IncludeInOutline) filter before CollectHeadings.
 	Exclude []css.Selector
-	// Include is an extra per-node gate (e.g. object-level outline flags);
-	// nil includes every heading that survives Exclude.
-	Include func(n *html.Node) bool
+}
+
+// SortHeadings brings headings into the order used by the tree, the TOC and
+// the section lookup: page, y-down within a page, then x.
+func SortHeadings(hs []*Heading) {
+	SortHeadingsBy(hs, LocalPage)
+}
+
+// SortHeadingsBy sorts headings using pageOf without changing any Heading
+// fields. This is the preferred API for flattened multi-object outlines.
+func SortHeadingsBy(hs []*Heading, pageOf PageOf) {
+	pageOf = normalizePageOf(pageOf)
+	sort.SliceStable(hs, func(i, j int) bool {
+		a, b := hs[i], hs[j]
+		if pageOf(a) != pageOf(b) {
+			return pageOf(a) < pageOf(b)
+		}
+		if a.Y != b.Y {
+			return a.Y < b.Y
+		}
+		return a.X < b.X
+	})
+}
+
+// SectionOf mirrors the wkhtmltopdf outline cache: section = first heading at
+// or before page, subsection = last. Headings must be in SortHeadings order.
+func SectionOf(hs []*Heading, page int) (section, subsection string) {
+	return SectionOfBy(hs, page, LocalPage)
+}
+
+// SectionOfBy returns the section/subsection for page using the supplied
+// explicit ordering accessor. The input must already be sorted with the same
+// accessor.
+func SectionOfBy(hs []*Heading, page int, pageOf PageOf) (section, subsection string) {
+	pageOf = normalizePageOf(pageOf)
+	var first, last *Heading
+	for _, h := range hs {
+		if pageOf(h) > page {
+			break
+		}
+		if first == nil {
+			first = h
+		}
+		last = h
+	}
+	if first != nil {
+		section = first.Title
+	}
+	if last != nil {
+		subsection = last.Title
+	}
+	return section, subsection
 }
 
 // BuildTree sorts headings by (page, y, x) - within a page, y-down order so a
@@ -136,26 +208,22 @@ type Options struct {
 // never skips levels. Titles, anchors and sort order are unaffected by the
 // clamp.
 func BuildTree(headings []*Heading, opts Options) *Node {
+	return BuildTreeBy(headings, opts, LocalPage)
+}
+
+// BuildTreeBy builds an outline tree using pageOf for ordering. The accessor
+// is carried explicitly instead of requiring callers to copy document-global
+// pages into Heading.Page.
+func BuildTreeBy(headings []*Heading, opts Options, pageOf PageOf) *Node {
+	pageOf = normalizePageOf(pageOf)
 	sel := make([]*Heading, 0, len(headings))
 	for _, h := range headings {
-		if opts.Include != nil && !opts.Include(h.Node) {
-			continue
-		}
 		if matchAny(opts.Exclude, h.Node) {
 			continue
 		}
 		sel = append(sel, h)
 	}
-	sort.SliceStable(sel, func(i, j int) bool {
-		a, b := sel[i], sel[j]
-		if a.Page != b.Page {
-			return a.Page < b.Page
-		}
-		if a.Y != b.Y {
-			return a.Y < b.Y
-		}
-		return a.X < b.X
-	})
+	SortHeadingsBy(sel, pageOf)
 
 	root := &Node{}
 	stack := []*Node{root}
@@ -200,21 +268,28 @@ func (n *Node) Flatten() []*Node {
 // and backLink attributes carry the heading's synthetic anchor. Valid XML,
 // no CDATA.
 func DumpOutlineXML(root *Node) []byte {
-	return DumpOutlineXMLOffset(root, 0)
+	return DumpOutlineXMLBy(root, 0, LocalPage)
 }
 
 // DumpOutlineXMLOffset is DumpOutlineXML with a page offset (e.g. TOC page
 // count) added to every item's page number so dump matches final PDF pages.
 func DumpOutlineXMLOffset(root *Node, pageOffset int) []byte {
+	return DumpOutlineXMLBy(root, pageOffset, LocalPage)
+}
+
+// DumpOutlineXMLBy serializes an outline using pageOf for the 1-based page
+// attribute. It is the explicit counterpart to the legacy local-page helper.
+func DumpOutlineXMLBy(root *Node, pageOffset int, pageOf PageOf) []byte {
+	pageOf = normalizePageOf(pageOf)
 	var b strings.Builder
 	b.WriteString("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
 	b.WriteString("<outline xmlns=\"http://wkhtmltopdf.org/outline\">\n")
-	dumpNode(root, &b, 1, pageOffset)
+	dumpNode(root, &b, 1, pageOffset, pageOf)
 	b.WriteString("</outline>\n")
 	return []byte(b.String())
 }
 
-func dumpNode(n *Node, b *strings.Builder, depth, pageOffset int) {
+func dumpNode(n *Node, b *strings.Builder, depth, pageOffset int, pageOf PageOf) {
 	pad := strings.Repeat("  ", depth)
 	for _, c := range n.Children {
 		h := c.Heading
@@ -225,7 +300,7 @@ func dumpNode(n *Node, b *strings.Builder, depth, pageOffset int) {
 		b.WriteString("<item title=\"")
 		b.WriteString(xmlEscape(h.Title))
 		b.WriteString("\" page=\"")
-		b.WriteString(strconv.Itoa(h.Page + 1 + pageOffset))
+		b.WriteString(strconv.Itoa(pageOf(h) + 1 + pageOffset))
 		b.WriteString("\" link=\"")
 		b.WriteString(h.Anchor)
 		b.WriteString("\" backLink=\"")
@@ -235,10 +310,17 @@ func dumpNode(n *Node, b *strings.Builder, depth, pageOffset int) {
 			continue
 		}
 		b.WriteString("\">\n")
-		dumpNode(c, b, depth+1, pageOffset)
+		dumpNode(c, b, depth+1, pageOffset, pageOf)
 		b.WriteString(pad)
 		b.WriteString("</item>\n")
 	}
+}
+
+func normalizePageOf(pageOf PageOf) PageOf {
+	if pageOf == nil {
+		return LocalPage
+	}
+	return pageOf
 }
 
 func matchAny(sels []css.Selector, n *html.Node) bool {
@@ -250,9 +332,10 @@ func matchAny(sels []css.Selector, n *html.Node) bool {
 	return false
 }
 
-// collapseWS collapses whitespace runs to a single space and trims the ends,
-// mirroring the layout engine's inline text handling.
-func collapseWS(s string) string {
+// CollapseWS collapses whitespace runs (space, tab, newline, CR, form feed)
+// to a single space and trims leading/trailing spaces. Shared by outline
+// title collection; convert may reuse for document titles and similar.
+func CollapseWS(s string) string {
 	var b strings.Builder
 	prevSpace := true
 	for _, r := range s {

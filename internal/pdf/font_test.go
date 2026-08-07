@@ -1,6 +1,7 @@
 package pdf
 
 import (
+	"bytes"
 	"encoding/binary"
 	"strings"
 	"testing"
@@ -104,7 +105,7 @@ func TestSubsetFont(t *testing.T) {
 	for _, r := range used {
 		distinct[r] = true
 	}
-	sub, err := subsetFont(f, used)
+	sub, err := subsetFont(f, used, subsetSimple)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +142,7 @@ func TestSubsetFont(t *testing.T) {
 
 func TestSubsetChecksum(t *testing.T) {
 	f := testFont(t)
-	sub, err := subsetFont(f, []rune("abc"))
+	sub, err := subsetFont(f, []rune("abc"), subsetSimple)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -166,7 +167,7 @@ func TestCompositeSubset(t *testing.T) {
 	if allSimple {
 		t.Skip("font has no composite glyphs in test set")
 	}
-	sub, err := subsetFont(f, []rune{comp})
+	sub, err := subsetFont(f, []rune{comp}, subsetSimple)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -237,20 +238,62 @@ func TestFontCacheSharedAcrossPages(t *testing.T) {
 	}
 }
 
-func TestBase14FallbackStillWorks(t *testing.T) {
+func TestFontCacheSeparatesLoadedFacesWithSameDisplayName(t *testing.T) {
+	faces, err := LoadDefaultFaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A registry/display label is not a face identity. Deliberately give
+	// regular and bold the same label and ensure their embedded subsets remain
+	// separate.
+	regular, err := ParseTTF(bytes.Clone(faces.Regular.data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	regular.PostScriptName = "SameFace"
+	bold, err := ParseTTF(bytes.Clone(faces.Bold.data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	bold.PostScriptName = "SameFace"
+	d := fixedDoc(t)
+	d.SetCompression(false)
+	for _, face := range []*Font{regular, bold} {
+		p := d.AddPage(100, 100)
+		c := p.Content()
+		c.UseEmbeddedFont("F1", face)
+		c.BeginText()
+		c.SetFont("F1", 10)
+		c.TextAt(5, 5)
+		c.TextShow("H")
+		c.EndText()
+	}
+	if got := strings.Count(string(writePDF(t, d)), "/FontFile2"); got != 2 {
+		t.Fatalf("FontFile2 count = %d, want 2 for distinct loaded faces", got)
+	}
+}
+
+func TestEmbeddedFontStillWorks(t *testing.T) {
+	f, err := DefaultFont()
+	if err != nil {
+		t.Fatal(err)
+	}
 	d := fixedDoc(t)
 	d.SetCompression(false)
 	p := d.AddPage(100, 100)
 	c := p.Content()
-	c.UseFont("F1", "Helvetica")
+	c.UseEmbeddedFont("F1", f)
 	c.BeginText()
 	c.SetFont("F1", 12)
 	c.TextAt(5, 5)
 	c.TextShow("x")
 	c.EndText()
 	out := string(writePDF(t, d))
-	if !strings.Contains(out, "/Subtype /Type1 /BaseFont /Helvetica") {
-		t.Error("base-14 font dict missing")
+	if !strings.Contains(out, "/Subtype /TrueType") {
+		t.Error("embedded TrueType font dict missing")
+	}
+	if !strings.Contains(out, "/FontFile2") {
+		t.Error("embedded font file stream missing")
 	}
 }
 

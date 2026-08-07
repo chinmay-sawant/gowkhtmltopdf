@@ -32,3 +32,56 @@ td, th { border: 1px solid #999; padding: 2pt; }
 		t.Fatalf("horizontal grid lines=%d, want ≥5 (got Y=%v)", len(hlines), hlines)
 	}
 }
+
+// border-collapse alone must not create visible borders. A collapsed table
+// with no table or cell border declarations has no grid to paint.
+func TestCollapsedTableWithoutBordersDoesNotPaintGrid(t *testing.T) {
+	s := sheet(t, `
+body { margin: 0; font-size: 10pt; }
+table { border-collapse: collapse; width: 200pt; }
+`)
+	res := layoutHTML(t, `<html><body>
+<table><tr><th>Item</th><th>Qty</th></tr>
+<tr><td>Widget A</td><td>2</td></tr></table>
+</body></html>`, s)
+
+	for _, op := range res.Ops {
+		if op.Kind == OpLine {
+			t.Fatalf("collapsed table without borders painted line: %#v", op)
+		}
+	}
+}
+
+// Collapsed grids must honor the sides actually declared by the cells. A
+// bottom-only dotted border must not become a full solid-looking grid.
+func TestCollapsedTableUsesDeclaredBorderSides(t *testing.T) {
+	s := sheet(t, `
+body { margin: 0; font-size: 10pt; }
+table { border-collapse: collapse; width: 240pt; }
+td { border: none; border-bottom: 1px dotted #bbb; padding: 2pt; }
+`)
+	res := layoutHTML(t, `<html><body>
+<table><tr><td>A</td><td>1</td></tr>
+<tr><td>B</td><td>2</td></tr>
+<tr><td>C</td><td>3</td></tr></table>
+</body></html>`, s)
+
+	horizontal, vertical := 0, 0
+	for _, op := range res.Ops {
+		if op.Kind != OpLine {
+			continue
+		}
+		if op.H == 0 && op.W > 0 {
+			horizontal++
+		}
+		if op.W == 0 && op.H > 0 {
+			vertical++
+		}
+	}
+	if horizontal == 0 {
+		t.Fatal("bottom border did not produce horizontal lines")
+	}
+	if vertical != 0 {
+		t.Fatalf("bottom-only border produced %d vertical lines", vertical)
+	}
+}

@@ -3,47 +3,23 @@ package convert
 import (
 	"strings"
 
-	"gowkhtmltopdf/internal/cli"
 	"gowkhtmltopdf/internal/html"
 	"gowkhtmltopdf/internal/layout"
 	"gowkhtmltopdf/internal/outline"
 	"gowkhtmltopdf/internal/pdf"
 )
 
-// linkOpSkip is a sentinel OpKind for neutralized link ops. Paint's switch
-// has no case for it, so a skipped op paints nothing; paginateOps and
-// isSplittable likewise ignore it. The op keeps its slot in the Ops slice
-// because the layout engine's box tree stores op indices (opStart/opEnd)
-// that Paint relies on - removing entries would corrupt pagination.
-const linkOpSkip = layout.OpKind(255)
-
 // stripLinkURIs neutralizes external (http/https/mailto) link ops in place.
 // Same-document fragment links (#id) are left for applyInternalLinks.
+// Neutralization uses layout.DeactivateOp so every painter skips the op
+// while keeping its slot (box tree op indices stay valid).
 func stripLinkURIs(ops []layout.Op) []layout.Op {
 	for i := range ops {
 		if ops[i].Kind == layout.OpLinkURI && !strings.HasPrefix(ops[i].URI, "#") {
-			ops[i].Kind = linkOpSkip
-			ops[i].URI = ""
+			layout.DeactivateOp(&ops[i])
 		}
 	}
 	return ops
-}
-
-// pageRect converts an element location (canvas coordinates, y-down) into a
-// PDF annotation rect [x1 y1 x2 y2] with y-up coordinates.
-func pageRect(loc layout.ElementLocation, g hfGeom) [4]float64 {
-	x1 := g.marginLeft + loc.X
-	yTop := g.pageH - g.marginTop - (loc.Y - float64(loc.Page)*g.contentH)
-	yBot := g.pageH - g.marginTop - (loc.Y + loc.H - float64(loc.Page)*g.contentH)
-	return [4]float64{x1, yBot, x1 + loc.W, yTop}
-}
-
-// destPoint converts a location's top-left corner into a PDF /XYZ
-// destination (x, y-up).
-func destPoint(loc layout.ElementLocation, g hfGeom) (float64, float64) {
-	x := g.marginLeft + loc.X
-	y := g.pageH - g.marginTop - (loc.Y - float64(loc.Page)*g.contentH)
-	return x, y
 }
 
 // tocAnchorLocations indexes the element boxes of one laid-out TOC document
@@ -98,18 +74,21 @@ func applyTOCLinks(doc *pdf.Document, tocs []*objectState, bodies []*objectState
 			if srcPage == nil {
 				continue
 			}
+			docPage := h.DocPage
 			if tr.toc.ForwardLinks {
 				// TOC entry → heading
 				destX, destY := headingDest(h, bodies)
-				srcPage.AddLinkDest(pageRect(eloc, tr.geom), tocTotal+h.Page, destX, destY)
+				srcPage.AddLinkDest(tr.geom.pdfRect(eloc), tocTotal+docPage, destX, destY)
 			}
 			if tr.toc.BackLinks {
 				// heading → TOC entry
 				destPage := tr.start + eloc.Page
-				destX, destY := destPoint(eloc, tr.geom)
-				if st := bodyStateFor(bodies, h.Page); st != nil {
-					if page := doc.PageAt(tocTotal + h.Page); page != nil {
-						page.AddLinkDest(pageRect(locationOf(st, h.Node), st.geom), destPage, destX, destY)
+				destX, destY := tr.geom.pdfXY(eloc)
+				if st := bodyStateFor(bodies, docPage); st != nil {
+					if page := doc.PageAt(tocTotal + docPage); page != nil {
+						locPage := docPage - st.offset
+						hLoc := layout.ElementLocation{Page: locPage, X: h.X, Y: h.Y, W: h.W, H: h.H}
+						page.AddLinkDest(st.geom.pdfRect(hLoc), destPage, destX, destY)
 					}
 				}
 			}
@@ -118,23 +97,15 @@ func applyTOCLinks(doc *pdf.Document, tocs []*objectState, bodies []*objectState
 }
 
 // headingDest returns the PDF destination (x, y-up) of a heading's top-left
-// corner.
+// corner using the heading's own geometry (no location scan).
 func headingDest(h *outline.Heading, bodies []*objectState) (float64, float64) {
-	st := bodyStateFor(bodies, h.Page)
+	docPage := h.DocPage
+	st := bodyStateFor(bodies, docPage)
 	if st == nil {
 		return 0, 0
 	}
-	return destPoint(locationOf(st, h.Node), st.geom)
-}
-
-// locationOf finds an element's location in the object's layout result.
-func locationOf(st *objectState, node *html.Node) layout.ElementLocation {
-	for _, loc := range st.res.Locations {
-		if loc.Node == node {
-			return loc
-		}
-	}
-	return layout.ElementLocation{}
+	locPage := docPage - st.offset
+	return st.geom.pdfXY(layout.ElementLocation{Page: locPage, X: h.X, Y: h.Y, W: h.W, H: h.H})
 }
 
 // bodyIDDest is one body element destination keyed by id attribute.
@@ -170,28 +141,20 @@ func logicalDestPage(dest bodyIDDest, tocTotal int) int {
 }
 
 // remapPageForCopies maps a pre-copy (logical) page index onto the final
-// document page index in the same copy group as srcPage. Matches the
-// ownership rules used by drawHeadersFooters after materializeCopies.
+// document page index in the same copy group as srcPage. Thin wrapper over
+// pagePlan.Remap kept for unit tests.
 func remapPageForCopies(logicalDest, srcPage, logicalN, copies int, collate bool) int {
-	if copies <= 1 || logicalN <= 0 {
-		return logicalDest
-	}
-	if collate {
-		copyIdx := srcPage / logicalN
-		return copyIdx*logicalN + logicalDest
-	}
-	copyIdx := srcPage % copies
-	return logicalDest*copies + copyIdx
+	pp := &pagePlan{copies: copies, collate: collate, owners: make([]pageOwner, logicalN)}
+	return pp.Remap(logicalDest, srcPage)
 }
 
 // applyInternalLinks turns OpLinkURI ops whose URI is a same-document
 // fragment (#id) into GoTo annotations. Destinations are element boxes with
 // a matching id attribute. When LocalLinks is false, fragment ops are skipped.
-func applyInternalLinks(doc *pdf.Document, bodies []*objectState, tocTotal int, cmd *cli.Command) {
+func applyInternalLinks(doc *pdf.Document, bodies []*objectState, tocTotal int) {
 	if doc == nil {
 		return
 	}
-	_ = cmd
 	idLoc := buildBodyIDIndex(bodies)
 	for _, st := range bodies {
 		if st == nil || st.res == nil || st.geom.contentH <= 0 {
@@ -204,8 +167,7 @@ func applyInternalLinks(doc *pdf.Document, bodies []*objectState, tocTotal int, 
 				continue
 			}
 			frag := strings.TrimPrefix(op.URI, "#")
-			op.Kind = linkOpSkip
-			op.URI = ""
+			layout.DeactivateOp(op)
 			if !useLocal || frag == "" {
 				continue
 			}
@@ -229,8 +191,8 @@ func applyInternalLinks(doc *pdf.Document, bodies []*objectState, tocTotal int, 
 				srcLoc.W = 10
 			}
 			destPage := logicalDestPage(dest, tocTotal)
-			dx, dy := destPoint(dest.loc, dest.st.geom)
-			srcPage.AddLinkDest(pageRect(srcLoc, st.geom), destPage, dx, dy)
+			dx, dy := dest.st.geom.pdfXY(dest.loc)
+			srcPage.AddLinkDest(st.geom.pdfRect(srcLoc), destPage, dx, dy)
 		}
 	}
 }

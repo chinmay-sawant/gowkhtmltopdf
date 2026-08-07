@@ -11,39 +11,27 @@ import (
 // buildGrid lays out a CSS grid Stage B/C subset: column/row tracks (incl.
 // minmax/fr/auto/min-content/max-content lite), independent gaps, template
 // areas + named grid-area, auto-flow row/column (sparse or dense), column/row
-// spanning, justify/align-items/self, subgrid inherit, and masonry packing
-// (shortest-column) when one template axis is masonry.
+// spanning, and justify/align-items/self.
+//
+// ponytail: display:subgrid → ordinary grid (no parent template inherit).
+// ponytail: grid-template-*: masonry keyword stripped → dense auto-flow
+// (no L3 shortest-stack pack). Upgrade if report templates need either.
 func (e *engine) buildGrid(n *html.Node, st ResolvedStyle, availW, x, y float64) *box {
-	st = applySubgridInherit(n, st, e)
-
-	masonry := detectMasonryAxis(st.GridTemplateColumns, st.GridTemplateRows)
-	switch masonry {
-	case masonryBoth:
-		// Honesty: both-axes masonry is not defined for packing; fall back to
-		// ordinary dense auto-flow after stripping the masonry keywords.
-		st.GridTemplateColumns = stripMasonryKeyword(st.GridTemplateColumns)
-		st.GridTemplateRows = stripMasonryKeyword(st.GridTemplateRows)
-	case masonryRows:
-		// grid-template-rows: masonry — pack into column tracks.
-		return e.buildMasonryPack(n, st, availW, x, y, true)
-	case masonryCols:
-		// grid-template-columns: masonry — pack into row tracks.
-		return e.buildMasonryPack(n, st, availW, x, y, false)
+	if st.Display == "subgrid" {
+		st.Display = "grid"
 	}
+	// Masonry keyword → empty track list → auto-flow dense grid.
+	st.GridTemplateColumns = stripMasonryKeyword(st.GridTemplateColumns)
+	st.GridTemplateRows = stripMasonryKeyword(st.GridTemplateRows)
 
 	ml := e.scalePt(st.MarginLeft)
 	b := &box{node: n, style: st, kind: "block", x: x + ml, y: y}
 	b.w = resolveUsedWidth(st, availW, e)
-	contentW := b.w - e.scalePt(st.PaddingLeft) - e.scalePt(st.PaddingRight) -
-		e.scalePt(st.BorderLeft.Width) - e.scalePt(st.BorderRight.Width)
-	if contentW < 0 {
-		contentW = 0
-	}
-	contentX := b.x + e.scalePt(st.BorderLeft.Width) + e.scalePt(st.PaddingLeft)
+	contentX, contentW := e.contentBox(b.x, b.w, st)
 	contentStart := len(e.ops)
 	cy := e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)
 
-	rowGap, columnGap := e.gridGaps(st)
+	rowGap, columnGap := e.styleGaps(st)
 
 	colDefs := parseGridTrackDefs(st.GridTemplateColumns)
 	areas := parseGridTemplateAreas(st.GridTemplateAreas)
@@ -419,281 +407,14 @@ func (e *engine) buildGrid(n *html.Node, st ResolvedStyle, availW, x, y float64)
 		usedH = minBorderH
 	}
 	b.h = usedH
-	e.prependChrome(contentStart, st, b.x, y, b.w, b.h)
+	e.prependChrome(contentStart, b, st, b.x, y, b.w, b.h)
 	return b
 }
 
-// buildMasonryPack implements report-engine masonry lite: items pack into the
-// non-masonry axis tracks by shortest-stack packing.
-//
-// Honesty: this is not the full CSS Grid Level 3 masonry algorithm (no
-// reverse packing / alignment into shared masonry tracks). Items pack in
-// source order into the currently shortest column (or row). grid-column
-// span N across the fixed (non-masonry) axis is honored as consecutive
-// tracks from the chosen stack — Partial spanning, not full L3.
-func (e *engine) buildMasonryPack(n *html.Node, st ResolvedStyle, availW, x, y float64, packIntoColumns bool) *box {
-	ml := e.scalePt(st.MarginLeft)
-	b := &box{node: n, style: st, kind: "block", x: x + ml, y: y}
-	b.w = resolveUsedWidth(st, availW, e)
-	contentW := b.w - e.scalePt(st.PaddingLeft) - e.scalePt(st.PaddingRight) -
-		e.scalePt(st.BorderLeft.Width) - e.scalePt(st.BorderRight.Width)
-	if contentW < 0 {
-		contentW = 0
-	}
-	contentX := b.x + e.scalePt(st.BorderLeft.Width) + e.scalePt(st.PaddingLeft)
-	contentStart := len(e.ops)
-	cy := e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)
-	rowGap, columnGap := e.gridGaps(st)
-
-	var kids []*html.Node
-	for _, c := range n.Children {
-		if c.Type != html.ElementNode {
-			continue
-		}
-		if e.styles[c].Display == "none" {
-			continue
-		}
-		kids = append(kids, c)
-	}
-
-	if packIntoColumns {
-		colRaw := stripMasonryKeyword(st.GridTemplateColumns)
-		colDefs := parseGridTrackDefs(colRaw)
-		if len(colDefs) == 0 {
-			colDefs = []gridTrackDef{flexibleTrack(1), flexibleTrack(1), flexibleTrack(1)}
-		}
-		intrinsics := measureTrackIntrinsics(e, kids, len(colDefs), true)
-		cols := resolveGridTrackSizes(colDefs, contentW, columnGap, e, intrinsics)
-		stacks := make([]float64, len(cols))
-		colX := make([]float64, len(cols))
-		colX[0] = contentX
-		for i := 1; i < len(cols); i++ {
-			colX[i] = colX[i-1] + cols[i-1] + columnGap
-		}
-
-		for _, kid := range kids {
-			ci := shortestStackIndex(stacks)
-			span := e.styles[kid].GridColumnSpan
-			if span < 1 {
-				span = 1
-			}
-			if ci+span > len(cols) {
-				span = len(cols) - ci
-				if span < 1 {
-					span = 1
-					ci = len(cols) - 1
-				}
-			}
-			// Honesty Partial: spanning takes consecutive tracks from the
-			// chosen shortest column; not full L3 masonry spanning search.
-			trackW := 0.0
-			for s := 0; s < span; s++ {
-				trackW += cols[ci+s]
-				if s > 0 {
-					trackW += columnGap
-				}
-			}
-			was := e.noEmit
-			e.noEmit = true
-			mb := e.build(kid, trackW, colX[ci], y+cy+stacks[ci])
-			e.noEmit = was
-			prefH := 0.0
-			if mb != nil {
-				prefH = mb.h
-			}
-			cb := e.build(kid, trackW, colX[ci], y+cy+stacks[ci])
-			if cb == nil {
-				continue
-			}
-			dx := colX[ci] - cb.x
-			dy := (y + cy + stacks[ci]) - cb.y
-			e.shiftBoxOps(cb, dx, dy)
-			cb.x += dx
-			cb.y += dy
-			b.children = append(b.children, cb)
-			h := prefH
-			if cb.h > h {
-				h = cb.h
-			}
-			for s := 0; s < span; s++ {
-				stacks[ci+s] += h + rowGap
-			}
-		}
-		maxStack := 0.0
-		for _, s := range stacks {
-			if s > maxStack {
-				maxStack = s
-			}
-		}
-		if maxStack > 0 {
-			maxStack -= rowGap // last gap unused
-		}
-		usedH := cy + maxStack + e.scalePt(st.PaddingBottom)
-		if st.Height >= 0 {
-			h := e.scalePt(st.Height)
-			if st.BoxSizing != "border-box" {
-				h += e.scalePt(st.PaddingTop) + e.scalePt(st.PaddingBottom) +
-					e.scalePt(st.BorderTop.Width) + e.scalePt(st.BorderBottom.Width)
-			}
-			if usedH < h {
-				usedH = h
-			}
-		}
-		b.h = usedH
-		e.prependChrome(contentStart, st, b.x, y, b.w, b.h)
-		return b
-	}
-
-	// Pack into row tracks (grid-template-columns: masonry).
-	contentH := resolveContentHeight(st, e)
-	rowRaw := stripMasonryKeyword(st.GridTemplateRows)
-	rowDefs := parseGridTrackDefs(rowRaw)
-	if len(rowDefs) == 0 {
-		rowDefs = []gridTrackDef{flexibleTrack(1), flexibleTrack(1)}
-	}
-	rowSizeBase := contentH
-	if rowSizeBase < 0 {
-		rowSizeBase = contentW // honesty: auto-height masonry rows share contentW
-	}
-	intrinsics := measureTrackIntrinsics(e, kids, len(rowDefs), false)
-	rows := resolveGridTrackSizes(rowDefs, rowSizeBase, rowGap, e, intrinsics)
-	stacks := make([]float64, len(rows)) // used width per row
-	rowY := make([]float64, len(rows))
-	rowY[0] = cy
-	for i := 1; i < len(rows); i++ {
-		rowY[i] = rowY[i-1] + rows[i-1] + rowGap
-	}
-
-	for _, kid := range kids {
-		ri := shortestStackIndex(stacks)
-		remain := contentW - stacks[ri]
-		if remain < 0 {
-			remain = contentW
-			stacks[ri] = 0
-		}
-		was := e.noEmit
-		e.noEmit = true
-		mb := e.build(kid, remain, contentX+stacks[ri], y+rowY[ri])
-		e.noEmit = was
-		itemW := remain
-		if mb != nil && mb.w > 0 && mb.w < remain {
-			itemW = mb.w
-		}
-		cb := e.build(kid, itemW, contentX+stacks[ri], y+rowY[ri])
-		if cb == nil {
-			continue
-		}
-		dx := contentX + stacks[ri] - cb.x
-		dy := y + rowY[ri] - cb.y
-		e.shiftBoxOps(cb, dx, dy)
-		cb.x += dx
-		cb.y += dy
-		b.children = append(b.children, cb)
-		stacks[ri] += cb.w + columnGap
-	}
-	usedH := cy
-	if len(rows) > 0 {
-		usedH = rowY[len(rows)-1] + rows[len(rows)-1]
-	}
-	usedH += e.scalePt(st.PaddingBottom)
-	if st.Height >= 0 {
-		h := e.scalePt(st.Height)
-		if st.BoxSizing != "border-box" {
-			h += e.scalePt(st.PaddingTop) + e.scalePt(st.PaddingBottom) +
-				e.scalePt(st.BorderTop.Width) + e.scalePt(st.BorderBottom.Width)
-		}
-		if usedH < h {
-			usedH = h
-		}
-	}
-	b.h = usedH
-	e.prependChrome(contentStart, st, b.x, y, b.w, b.h)
-	return b
-}
-
-func shortestStackIndex(stacks []float64) int {
-	best := 0
-	for i := 1; i < len(stacks); i++ {
-		if stacks[i] < stacks[best] {
-			best = i
-		}
-	}
-	return best
-}
-
-// --- Subgrid lite -----------------------------------------------------------
-
-// applySubgridInherit treats display:subgrid as a nested grid that copy-inherits
-// parent grid-template-columns/rows/areas when the child's templates are empty,
-// "none", or the "subgrid" keyword.
-//
-// Partial (report-engine): when the subgrid is a direct child of a grid and
-// inherits columns, and the child's used width matches the parent's content
-// width, track sizes are re-resolved from the same template against that
-// shared width — approximate shared tracks without joint intrinsic sizing.
-// True CSS Grid 2 shared-track participation across subtrees remains out of
-// scope (no parent Resolve Intrinsic Track Sizes joint pass).
-func applySubgridInherit(n *html.Node, st ResolvedStyle, e *engine) ResolvedStyle {
-	if st.Display != "subgrid" {
-		return st
-	}
-	st.Display = "grid"
-	if n == nil || n.Parent == nil || e == nil || e.styles == nil {
-		return st
-	}
-	ps, ok := e.styles[n.Parent]
-	if !ok {
-		return st
-	}
-	if isSubgridTemplateValue(st.GridTemplateColumns) {
-		st.GridTemplateColumns = ps.GridTemplateColumns
-	}
-	if isSubgridTemplateValue(st.GridTemplateRows) {
-		st.GridTemplateRows = ps.GridTemplateRows
-	}
-	if isSubgridTemplateValue(st.GridTemplateAreas) {
-		st.GridTemplateAreas = ps.GridTemplateAreas
-	}
-	return st
-}
-
-func isSubgridTemplateValue(s string) bool {
-	s = strings.ToLower(strings.TrimSpace(s))
-	return s == "" || s == "none" || s == "subgrid"
-}
-
-// --- Masonry detection ------------------------------------------------------
-
-type masonryAxis int
-
-const (
-	masonryNone masonryAxis = iota
-	masonryRows             // grid-template-rows: masonry
-	masonryCols             // grid-template-columns: masonry
-	masonryBoth
-)
-
-func detectMasonryAxis(cols, rows string) masonryAxis {
-	c := isMasonryKeyword(cols)
-	r := isMasonryKeyword(rows)
-	switch {
-	case c && r:
-		return masonryBoth
-	case r:
-		return masonryRows
-	case c:
-		return masonryCols
-	default:
-		return masonryNone
-	}
-}
-
-func isMasonryKeyword(raw string) bool {
-	return strings.ToLower(strings.TrimSpace(raw)) == "masonry"
-}
-
+// stripMasonryKeyword clears a lone "masonry" track list so layout falls
+// through to ordinary dense auto-flow (no L3 pack).
 func stripMasonryKeyword(raw string) string {
-	if isMasonryKeyword(raw) {
+	if strings.ToLower(strings.TrimSpace(raw)) == "masonry" {
 		return ""
 	}
 	return raw
@@ -703,6 +424,7 @@ func stripMasonryKeyword(raw string) string {
 
 // resolveUsedWidth computes border-box width. WidthPercent against a
 // non-positive (indefinite) availW is treated as auto (fill remaining).
+// Shared by flex/grid/multicol (block keeps its own min/max/margin-auto path).
 func resolveUsedWidth(st ResolvedStyle, availW float64, e *engine) float64 {
 	ml, mr := e.scalePt(st.MarginLeft), e.scalePt(st.MarginRight)
 	w := availW - ml - mr
@@ -727,6 +449,7 @@ func resolveUsedWidth(st ResolvedStyle, availW float64, e *engine) float64 {
 // resolveContentHeight returns definite content-box height, or -1 when auto.
 // HeightPercent only resolves when Height was already made definite by a parent
 // stretch; unresolved HeightPercent (indefinite CB) is treated as auto.
+// Shared by flex/grid/multicol.
 func resolveContentHeight(st ResolvedStyle, e *engine) float64 {
 	if st.HeightPercent >= 0 && st.Height < 0 {
 		// Cyclic % honesty: indefinite containing block → auto.
@@ -748,9 +471,9 @@ func resolveContentHeight(st ResolvedStyle, e *engine) float64 {
 
 // --- Gaps / alignment -------------------------------------------------------
 
-// gridGaps returns scaled row/column gaps. When both longhands are unset (0),
-// fall back to the Gap shorthand for both axes.
-func (e *engine) gridGaps(st ResolvedStyle) (rowGap, columnGap float64) {
+// styleGaps returns scaled row/column gaps. When both longhands are unset (0),
+// fall back to the Gap shorthand for both axes. Shared by flex and grid.
+func (e *engine) styleGaps(st ResolvedStyle) (rowGap, columnGap float64) {
 	if st.RowGap == 0 && st.ColumnGap == 0 {
 		g := e.scalePt(st.Gap)
 		return g, g
@@ -980,13 +703,6 @@ func flexibleTrack(fr float64) gridTrackDef {
 	return gridTrackDef{
 		min: gridTrackSize{kind: trackAuto},
 		max: gridTrackSize{kind: trackFr, val: fr},
-	}
-}
-
-func autoTrack() gridTrackDef {
-	return gridTrackDef{
-		min: gridTrackSize{kind: trackAuto},
-		max: gridTrackSize{kind: trackAuto},
 	}
 }
 

@@ -13,9 +13,9 @@ import (
 // TestAvoidListItemsNoCascadingGaps: dense page-break-inside:avoid list items
 // near page boundaries must not cascade expanding empty bands between
 // consecutive items (wiki .mw-references-columns li{page-break-inside:avoid}).
-// Prefer splitting short avoid boxes over blanking large mid-page remainders,
-// and pack residual keep-together gaps so same-page inter-item start pitch
-// stays near natural multi-line height (≤ ~2.5 line heights beyond content).
+// Prefer splitting short avoid boxes over blanking large mid-page remainders
+// (preferSplitOverBlank) so same-page inter-item start pitch stays near
+// natural multi-line height (≤ ~2.5 line heights beyond content).
 func TestAvoidListItemsNoCascadingGaps(t *testing.T) {
 	s := sheet(t, `
 body { margin: 0; font-size: 10pt; }
@@ -181,80 +181,5 @@ func TestPreferSplitOverBlankUnit(t *testing.T) {
 	// Tall box near mid (remaining < half, box large): short-box rule N/A.
 	if preferSplitOverBlank(300, 400, contentH) {
 		t.Fatal("tall box with remaining < half should not match short-box rule")
-	}
-}
-
-// TestPackAvoidSiblingsCollapsesResidualGap: after a keep-together residue
-// would leave > natural margin between two short avoid list items on the
-// same page, packAvoidGaps must pull them together.
-func TestPackAvoidSiblingsCollapsesResidualGap(t *testing.T) {
-	s := sheet(t, `
-body { margin: 0; font-size: 10pt; line-height: 1.2; }
-ol { margin: 0; padding-left: 20pt; }
-li { page-break-inside: avoid; margin: 0 0 0.4em 0; }
-`)
-	// Place the list so the first avoid item barely overflows the page,
-	// historically leaving a keep-together blank before the next sibling.
-	var b strings.Builder
-	b.WriteString(`<html><body>`)
-	for i := 0; i < 22; i++ {
-		b.WriteString(fmt.Sprintf(
-			`<p style="margin:0.35em 0">Filler block %d with words so the ordered list begins near a page boundary for avoid packing.</p>`, i))
-	}
-	b.WriteString(`<ol>`)
-	for i := 0; i < 12; i++ {
-		b.WriteString(fmt.Sprintf(
-			`<li>Short citation %d with a URL https://example.com/path/%d/article-title-here and a bit more text.</li>`, i+1, i))
-	}
-	b.WriteString(`</ol></body></html>`)
-	root, err := html.Parse(b.String())
-	if err != nil {
-		t.Fatal(err)
-	}
-	const pageH = 400.0
-	res, err := Layout(root, Options{
-		Width: 400, Height: pageH, Sheets: []*css.Stylesheet{s},
-		Media: "print", Background: true,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	doc := pdf.NewDocument()
-	if err := Paint(doc, res, PaintOptions{
-		PageWidth: 450, PageHeight: pageH + 40, MarginTop: 20, MarginBottom: 20,
-	}); err != nil {
-		t.Fatal(err)
-	}
-	contentH := pageH
-	var lis []ElementLocation
-	for _, loc := range res.Locations {
-		if loc.Node != nil && loc.Node.Name == "li" {
-			lis = append(lis, loc)
-		}
-	}
-	if len(lis) < 6 {
-		t.Fatalf("expected list items, got %d", len(lis))
-	}
-	for i := 0; i < len(lis); i++ {
-		for j := i + 1; j < len(lis); j++ {
-			if lis[j].Y < lis[i].Y {
-				lis[i], lis[j] = lis[j], lis[i]
-			}
-		}
-	}
-	maxEmpty := 0.0
-	for i := 1; i < len(lis); i++ {
-		if int(lis[i].Y/contentH) != int(lis[i-1].Y/contentH) {
-			continue
-		}
-		empty := lis[i].Y - (lis[i-1].Y + lis[i-1].H)
-		if empty > maxEmpty {
-			maxEmpty = empty
-		}
-	}
-	t.Logf("lis=%d maxEmpty=%.1f", len(lis), maxEmpty)
-	// 2.5 line heights at 10pt × 1.2 ≈ 30pt; packed avoid items must be denser.
-	if maxEmpty > 28 {
-		t.Fatalf("packed avoid siblings: max empty %.1f (want ≤28)", maxEmpty)
 	}
 }

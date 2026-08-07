@@ -1,8 +1,10 @@
 package layout
 
 import (
+	"context"
 	"math"
 	"sort"
+	"strconv"
 
 	"gowkhtmltopdf/internal/pdf"
 )
@@ -29,8 +31,21 @@ type PaintOptions struct {
 // After pagination Paint fills res.Pages (page → op indices) and res.Locations
 // (element boxes in document order with their page and canvas rect).
 func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
+	return PaintContext(context.Background(), doc, res, opts)
+}
+
+// PaintContext is the cancellation-aware form of Paint. The legacy Paint
+// entrypoint remains a background-context adapter for package callers that do
+// not have a request context.
+func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts PaintOptions) error {
 	if doc == nil || res == nil {
 		return nil
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 	contentH := opts.PageHeight - opts.MarginTop - opts.MarginBottom
 	if contentH <= 0 {
@@ -67,10 +82,6 @@ func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 	// Print-scoped sticky: clamp + continuation clones + reserve flow space.
 	applyStickyPrint(res, contentH)
 
-	// Sticky / chrome cleanup can leave residual empty bands in short avoid
-	// sequences; re-pack once after the paint-time passes settle.
-	packAvoidGaps(res, contentH)
-
 	// Re-derive pages after splits and sticky (new ops / Y shifts).
 	opPage = make([]int, len(res.Ops))
 	perPage := map[int][]int{}
@@ -101,7 +112,11 @@ func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 	}
 	populateLocations(res, contentH, opPage)
 
+	var paintErr error
 	for pageIdx, idxs := range res.Pages {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		p := doc.AddPage(opts.PageWidth, opts.PageHeight)
 		c := p.Content()
 		fontNames := map[*pdf.Font]string{}
@@ -113,7 +128,7 @@ func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 			if n, ok := fontNames[f]; ok {
 				return n
 			}
-			n := "F" + itoa(nextFont)
+			n := "F" + strconv.Itoa(nextFont)
 			nextFont++
 			fontNames[f] = n
 			c.UseEmbeddedFont(n, f)
@@ -121,6 +136,9 @@ func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 		}
 		nextImg := 0
 		paintOp := func(op *Op, pg int) {
+			if op.Kind == opKindNoop {
+				return
+			}
 			if op.Kind == OpLinkURI {
 				drawLinkXform(p, op, pg, contentH, opts)
 				return
@@ -146,9 +164,11 @@ func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 			case OpText, OpBullet:
 				drawText(c, op, pg, contentH, opts, p.Height(), resName(op.Font))
 			case OpImage:
-				name := "I" + itoa(nextImg)
+				name := "I" + strconv.Itoa(nextImg)
 				nextImg++
-				drawImage(p, c, op, pg, contentH, opts, name)
+				if err := drawImage(p, c, op, pg, contentH, opts, name); err != nil && paintErr == nil {
+					paintErr = err
+				}
 			}
 			if needGS {
 				c.Restore()
@@ -156,15 +176,21 @@ func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 		}
 		sortPaintIndices(res.Ops, idxs)
 		for _, idx := range idxs {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
 			paintOp(&res.Ops[idx], pageIdx)
 		}
 		// Fixed layer: page-local coords (pageIdx 0 math on every page).
 		sortPaintIndices(res.Ops, fixedIdx)
 		for _, idx := range fixedIdx {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
 			paintOp(&res.Ops[idx], 0)
 		}
 	}
-	return nil
+	return paintErr
 }
 
 func sortPaintIndices(ops []Op, idxs []int) {
@@ -179,6 +205,9 @@ func sortPaintIndices(ops []Op, idxs []int) {
 		}
 		if az != bz {
 			return az < bz
+		}
+		if a.Positioned != b.Positioned {
+			return !a.Positioned
 		}
 		// Same stacking context: backgrounds/borders under text & images so
 		// page-split fill remnants cannot cover continuation-row ink
@@ -199,6 +228,220 @@ func paintLayer(k OpKind) int {
 	default:
 		return 1
 	}
+}
+
+// PaintStyle is the resolved per-op appearance that PDF and image adapters
+// share: translucent-fill pre-composition, stroke min-width, and the Latin-only
+// fake-bold gate (stroking CJK/Type0 outlines creates horizontal streaks).
+type PaintStyle struct {
+	FillR, FillG, FillB float64 // final RGB; alpha pre-composited against white when translucent
+	FillAlpha           float64 // 1 after pre-composite; raw Op.Alpha when opaque
+	StrokeWidth         float64
+	FakeBold            bool
+}
+
+// StyleOf resolves paint-semantics for op. Layout owns these decisions so
+// convert HF and imageout adapters do not drift.
+func StyleOf(op *Op) PaintStyle {
+	if op == nil {
+		return PaintStyle{FillAlpha: 1, StrokeWidth: 1}
+	}
+	ps := PaintStyle{
+		FillR: op.R, FillG: op.G, FillB: op.B, FillAlpha: 1,
+		StrokeWidth: op.Width,
+	}
+	if ps.StrokeWidth <= 0 {
+		ps.StrokeWidth = 1
+	}
+	// Pre-composite translucent fills against white paper (PDF path).
+	if op.Alpha > 0 && op.Alpha < 1 {
+		a := op.Alpha
+		ps.FillR = op.R*a + (1 - a)
+		ps.FillG = op.G*a + (1 - a)
+		ps.FillB = op.B*a + (1 - a)
+		ps.FillAlpha = 1
+	} else if op.Alpha > 0 {
+		ps.FillAlpha = op.Alpha
+	}
+	ps.FakeBold = FakeBoldFor(op)
+	return ps
+}
+
+// FakeBoldFor reports whether CSS bold should be synthesized for op (Latin
+// only; CJK stroking produces streak artifacts).
+func FakeBoldFor(op *Op) bool {
+	if op == nil || !op.Bold || (op.Font != nil && op.Font.Bold()) {
+		return false
+	}
+	for _, r := range op.Text {
+		if r > 0xFF {
+			return false
+		}
+	}
+	return true
+}
+
+// BandOptions configures PaintBand (shared op→PDF dispatch for body and HF).
+type BandOptions struct {
+	OriginX, OriginY float64 // canvas origin on the page (y-down canvas → PDF via OriginY)
+	// ContentH and Page geometry for canvasToPDF when using pageIdx 0 math.
+	// When ContentH is 0, OriginY is treated as the PDF y of canvas y=0 top
+	// edge and coordinates are mapped as PDF_y = OriginY - canvas_y.
+	ContentH float64
+	PageH    float64
+	Margins  PaintOptions // MarginLeft/Top used when ContentH > 0
+}
+
+// PaintBand paints ops onto an existing page's content stream. Same dispatch
+// as Paint for fill/stroke/line/text/image (colors, opacity, transforms,
+// embedded fonts, fake-bold policy). Pagination, z-sorting and fixed stamps
+// are skipped. Link ops are left to the caller (annotations need document
+// context). Returns the first image-embed error, if any.
+func PaintBand(p *pdf.Page, c *pdf.Content, ops []Op, opts BandOptions) error {
+	return PaintBandContext(context.Background(), p, c, ops, opts)
+}
+
+// PaintBandContext is the cancellation-aware form of PaintBand used for
+// HTML headers and footers.
+func PaintBandContext(ctx context.Context, p *pdf.Page, c *pdf.Content, ops []Op, opts BandOptions) error {
+	if p == nil || c == nil {
+		return nil
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	fontNames := map[*pdf.Font]string{}
+	nextFont := 0
+	resName := func(f *pdf.Font) string {
+		if f == nil {
+			return "F0"
+		}
+		if n, ok := fontNames[f]; ok {
+			return n
+		}
+		n := "B" + strconv.Itoa(nextFont)
+		nextFont++
+		fontNames[f] = n
+		c.UseEmbeddedFont(n, f)
+		return n
+	}
+	nextImg := 0
+	po := opts.Margins
+	contentH := opts.ContentH
+	pageH := opts.PageH
+	if pageH <= 0 {
+		pageH = p.Height()
+	}
+	// Band mode without full page geometry: map canvas (y down) to PDF using
+	// OriginY as the top edge and OriginX as left origin.
+	useSimple := contentH <= 0
+	var firstErr error
+	for i := range ops {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		op := &ops[i]
+		if op.Kind == OpLinkURI || op.Kind == opKindNoop {
+			continue
+		}
+		needGS := op.XformSet || (op.PaintOpacity > 0 && op.PaintOpacity < 1)
+		if needGS {
+			c.Save()
+		}
+		if op.XformSet && !useSimple {
+			a, b, cc, d, e, f := pdfCTMFromCSS(op.Xform, 0, contentH, po, pageH)
+			c.Transform(a, b, cc, d, e, f)
+		}
+		if op.PaintOpacity > 0 && op.PaintOpacity < 1 {
+			c.SetOpacity(op.PaintOpacity)
+		}
+		if useSimple {
+			if err := paintOpBandSimple(c, p, op, opts, resName(op.Font), &nextImg); err != nil && firstErr == nil {
+				firstErr = err
+			}
+		} else {
+			switch op.Kind {
+			case OpFillRect:
+				drawFill(c, op, 0, contentH, po, pageH)
+			case OpStrokeRect:
+				drawStroke(c, op, 0, contentH, po, pageH)
+			case OpLine:
+				drawLine(c, op, 0, contentH, po, pageH)
+			case OpText, OpBullet:
+				drawText(c, op, 0, contentH, po, pageH, resName(op.Font))
+			case OpImage:
+				name := "I" + strconv.Itoa(nextImg)
+				nextImg++
+				if err := drawImage(p, c, op, 0, contentH, po, name); err != nil && firstErr == nil {
+					firstErr = err
+				}
+			}
+		}
+		if needGS {
+			c.Restore()
+		}
+	}
+	return firstErr
+}
+
+func paintOpBandSimple(c *pdf.Content, p *pdf.Page, op *Op, opts BandOptions, fontName string, nextImg *int) error {
+	x := opts.OriginX + op.X
+	switch op.Kind {
+	case OpFillRect:
+		ps := StyleOf(op)
+		y := opts.OriginY - (op.Y + op.H)
+		c.SetFillColor(ps.FillR, ps.FillG, ps.FillB)
+		c.Rect(x, y, op.W, op.H)
+		c.Fill()
+	case OpStrokeRect:
+		y := opts.OriginY - (op.Y + op.H)
+		c.SetStrokeColor(op.R, op.G, op.B)
+		c.SetLineWidth(1)
+		c.Rect(x, y, op.W, op.H)
+		c.Stroke()
+	case OpLine:
+		y1 := opts.OriginY - op.Y
+		y2 := opts.OriginY - (op.Y + op.H)
+		w := op.Width
+		if w <= 0 {
+			w = 1
+		}
+		c.SetStrokeColor(op.R, op.G, op.B)
+		c.SetLineWidth(w)
+		c.MoveTo(x, y1)
+		c.LineTo(opts.OriginX+op.X+op.W, y2)
+		c.Stroke()
+	case OpText, OpBullet:
+		y := opts.OriginY - op.Y
+		c.SetFillColor(op.R, op.G, op.B)
+		if fontName == "" {
+			fontName = "F0"
+		}
+		c.SetFont(fontName, op.Size)
+		c.BeginText()
+		c.TextAt(x, y)
+		if FakeBoldFor(op) {
+			c.SetLineWidth(op.Size * 0.06)
+			c.TextRenderMode(2)
+		}
+		c.TextShow(op.Text)
+		if FakeBoldFor(op) {
+			c.TextRenderMode(0)
+		}
+		c.EndText()
+	case OpImage:
+		name := "I" + strconv.Itoa(*nextImg)
+		*nextImg++
+		y := opts.OriginY - (op.Y + op.H)
+		if op.IsJPEG {
+			return c.AddJPEGImage(name, x, y, op.W, op.H, op.Image)
+		}
+		return c.AddPNGImage(name, x, y, op.W, op.H, op.Image)
+	}
+	return nil
 }
 
 func isSplittable(op *Op) bool {
@@ -246,10 +489,10 @@ func capTablePageBreaks(res *Result, contentH float64) {
 	// Group verticals that share a start Y (row top) or end Y (row bottom).
 	roundY := func(y float64) int { return int(math.Round(y * 2)) } // 0.5pt bins
 	type cluster struct {
-		y              float64
-		minX, maxX     float64
-		bw, r, g, b    float64
-		n              int
+		y           float64
+		minX, maxX  float64
+		bw, r, g, b float64
+		n           int
 	}
 	clusterAt := func(byStart bool) map[int]*cluster {
 		out := map[int]*cluster{}
@@ -497,11 +740,9 @@ func paginateOps(res *Result, contentH float64) []int {
 			break
 		}
 	}
-	// Collapse residual empty bands left by keep-together shifts between
-	// consecutive page-break-inside:avoid siblings (wiki reference lists)
-	// and heal mid-item holes from partial line-snaps inside short avoid boxes.
-	packAvoidGaps(res, contentH)
 	// After flow has settled, clone <thead> onto continuation pages.
+	// Blank avoid-list bands are controlled by preferSplitOverBlank during
+	// the fixpoint above (former packAvoidGaps sibling packing was a no-op).
 	repeatTableHeaders(res, contentH)
 	// Sticky is applied in Paint after rect splitting (see splitCrossingRects).
 	opPage := make([]int, len(res.Ops))
@@ -515,16 +756,37 @@ func paginateOps(res *Result, contentH float64) []int {
 // remainders immediately after (document paint order). Built into a new slice
 // rather than mid-slice insert+copy (O(n²) and float-edge infinite loops when
 // Y sits on a page boundary — TestTenPageTableReportPerformance hang).
+type opSpan struct{ start, end int }
+
 func splitCrossingRects(res *Result, contentH float64, opPage []int) {
 	_ = opPage
 	if res == nil || contentH <= 0 {
 		return
 	}
+	// Give legacy/test-constructed operations an identity before any rewrite.
+	// Layout-generated operations already receive IDs from engine.add. A split
+	// fragment keeps its source ID; the box-range remap below is what makes all
+	// fragments remain owned by the same element.
+	var nextID uint64
+	for i := range res.Ops {
+		if res.Ops[i].ID > nextID {
+			nextID = res.Ops[i].ID
+		}
+	}
+	for i := range res.Ops {
+		if res.Ops[i].ID == 0 {
+			nextID++
+			res.Ops[i].ID = nextID
+		}
+	}
+	spans := make([]opSpan, len(res.Ops))
 	out := make([]Op, 0, len(res.Ops)+8)
 	for i := range res.Ops {
 		op := res.Ops[i]
+		start := len(out)
 		if op.Fixed || !isSplittable(&op) || op.H <= 0 {
 			out = append(out, op)
+			spans[i] = opSpan{start: start, end: len(out) - 1}
 			continue
 		}
 		guard := 0
@@ -558,8 +820,27 @@ func splitCrossingRects(res *Result, contentH float64, opPage []int) {
 			op.Y = boundary
 			op.H -= firstH
 		}
+		spans[i] = opSpan{start: start, end: len(out) - 1}
 	}
 	res.Ops = out
+	remapBoxOpRanges(res.root, spans)
+}
+
+// remapBoxOpRanges updates the layout-owned operation ranges after a display
+// list rewrite. In particular, a source rectangle can become two or more
+// page fragments; mapping the box end to the final fragment keeps pagination,
+// sticky/fixed stamping, and ElementLocation ownership aligned.
+func remapBoxOpRanges(b *box, spans []opSpan) {
+	if b == nil {
+		return
+	}
+	if b.opStart >= 0 && b.opEnd >= b.opStart && b.opStart < len(spans) && b.opEnd < len(spans) {
+		b.opStart = spans[b.opStart].start
+		b.opEnd = spans[b.opEnd].end
+	}
+	for _, child := range b.children {
+		remapBoxOpRanges(child, spans)
+	}
 }
 
 // stripOrphanRowChrome removes row-sized fills and horizontal rules that sit
@@ -728,17 +1009,10 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 // (#eceff1). Chromatic washes (e.g. fixture-32 grid #f3e5f5) must not match
 // or page-trailing clip steals their height.
 func isSectionWashRGB(r, g, b float64) bool {
-	if abs3(r-g) > 0.035 || abs3(g-b) > 0.035 || abs3(r-b) > 0.035 {
+	if math.Abs(r-g) > 0.035 || math.Abs(g-b) > 0.035 || math.Abs(r-b) > 0.035 {
 		return false
 	}
 	return r > 0.88 && g > 0.88 && b > 0.88 && r < 0.97 && g < 0.97 && b < 0.97
-}
-
-func abs3(v float64) float64 {
-	if v < 0 {
-		return -v
-	}
-	return v
 }
 
 // shiftFlowY moves the ops of the target range [from,to] - plus every op
@@ -1308,193 +1582,6 @@ func preferSplitOverBlank(remaining, h, contentH float64) bool {
 	return false
 }
 
-// packAvoidGaps runs once after the page-break fixpoint. It only applies
-// conservative sibling packing between short page-break-inside:avoid list-like
-// boxes when residual keep-together air is large. Internal line-gap compaction
-// (compactAvoidInternalGaps / shiftOpsBelowY) was removed: a global Y-shift of
-// every op below a hole over-pulled subsequent body paragraphs into each other.
-func packAvoidGaps(res *Result, contentH float64) {
-	// Intentionally no-op. Prior sibling packing + internal compaction used
-	// global Y shifts that interleaved/crushed body and reference text.
-	// preferSplitOverBlank remains the safe fix for blank avoid-list bands.
-	_ = res
-	_ = contentH
-}
-
-// packAvoidSiblingGaps pulls consecutive short avoid siblings together only
-// when the residual gap is large (keep-together residue), never so tightly
-// that the next item collides with the previous ink or natural line pitch.
-// Restricted to short boxes (h < 0.25·contentH) that look like list items —
-// aggressive packing of tall avoid boxes crushed body paragraph spacing.
-func packAvoidSiblingGaps(res *Result, contentH float64) bool {
-	changed := false
-	var walk func(b *box)
-	walk = func(b *box) {
-		// Pack among this parent's children first (document order).
-		var avoidKids []*box
-		for _, c := range b.children {
-			if c.style.PageBreakInside != "avoid" || c.h <= 0 || c.opStart > c.opEnd {
-				continue
-			}
-			// Prefer only short avoid boxes (list items, short citations).
-			if c.h >= contentH*0.25 {
-				continue
-			}
-			avoidKids = append(avoidKids, c)
-		}
-		for i := 1; i < len(avoidKids); i++ {
-			prev, next := avoidKids[i-1], avoidKids[i]
-			if int(prev.y/contentH) != int(next.y/contentH) {
-				continue
-			}
-			prevBot := boxInkBottom(res, prev)
-			nextTop := boxInkTop(res, next)
-			if nextTop < next.y {
-				nextTop = next.y
-			}
-			size := boxTextSize(res, next)
-			if size <= 0 {
-				size = boxTextSize(res, prev)
-			}
-			if size <= 0 {
-				size = 10
-			}
-			// Floor gap after packing: natural line pitch, never below 1.15·size.
-			minGap := size * 1.15
-			if minGap < 8 {
-				minGap = 8
-			}
-			gap := nextTop - prevBot
-			if gap <= minGap+0.5 {
-				continue
-			}
-			excess := gap - minGap
-			// Only pack large residual bands (not normal CSS margins / leading).
-			// Requires excess > 20pt AND > 2·lineSize so modest air is left alone.
-			if excess <= 20 || excess <= 2*size {
-				continue
-			}
-			// Never pull next above the page content top or into prev ink+pitch.
-			pageTop := float64(int(next.y/contentH)) * contentH
-			minY := pageTop + 2
-			if prevBot+minGap > minY {
-				minY = prevBot + minGap
-			}
-			// Pull relative to the box top we will shift.
-			maxPull := next.y - minY
-			// Also limited by how much ink top sits above the natural slot.
-			if pull := nextTop - (prevBot + minGap); pull < maxPull {
-				maxPull = pull
-			}
-			if maxPull < excess {
-				excess = maxPull
-			}
-			if excess <= 0.5 {
-				continue
-			}
-			// Range-shift the next box + everything below its ink top.
-			// Prefer nextTop (ink) as fromY so stale box.y below the text
-			// does not leave the first line behind. Index band covers markers
-			// that sit at high indices.
-			fromY := nextTop - 0.01
-			if next.y-0.01 < fromY {
-				// Also catch any ops/chrome at the border-box top.
-				fromY = next.y - 0.01
-			}
-			shiftFlowY(res, next.opStart, next.opEnd, fromY, -excess)
-			changed = true
-		}
-		for _, c := range b.children {
-			walk(c)
-		}
-	}
-	walk(res.root)
-	return changed
-}
-
-// boxInkBottom returns the lowest painted extent of b's ops (text descent
-// approximated as size*1.2), falling back to b.y+b.h.
-func boxInkBottom(res *Result, b *box) float64 {
-	bot := b.y + b.h
-	if res == nil || b.opStart > b.opEnd || b.opStart < 0 {
-		return bot
-	}
-	end := b.opEnd
-	if end >= len(res.Ops) {
-		end = len(res.Ops) - 1
-	}
-	ink := b.y
-	found := false
-	for k := b.opStart; k <= end; k++ {
-		op := res.Ops[k]
-		ob := op.Y
-		switch op.Kind {
-		case OpText, OpBullet:
-			ob += op.Size * 1.2
-			found = true
-		default:
-			if op.H > 0 {
-				ob += op.H
-				found = true
-			}
-		}
-		if ob > ink {
-			ink = ob
-		}
-	}
-	if found && ink > bot {
-		return ink
-	}
-	if found {
-		return ink
-	}
-	return bot
-}
-
-// boxInkTop returns the topmost text/bullet baseline of b, or b.y.
-func boxInkTop(res *Result, b *box) float64 {
-	if res == nil || b.opStart > b.opEnd || b.opStart < 0 {
-		return b.y
-	}
-	top := b.y
-	found := false
-	end := b.opEnd
-	if end >= len(res.Ops) {
-		end = len(res.Ops) - 1
-	}
-	for k := b.opStart; k <= end; k++ {
-		op := res.Ops[k]
-		if op.Kind != OpText && op.Kind != OpBullet {
-			continue
-		}
-		if !found || op.Y < top {
-			top = op.Y
-			found = true
-		}
-	}
-	if !found {
-		return b.y
-	}
-	return top
-}
-
-func boxTextSize(res *Result, b *box) float64 {
-	if res == nil || b.opStart > b.opEnd || b.opStart < 0 {
-		return 0
-	}
-	end := b.opEnd
-	if end >= len(res.Ops) {
-		end = len(res.Ops) - 1
-	}
-	for k := b.opStart; k <= end; k++ {
-		op := res.Ops[k]
-		if (op.Kind == OpText || op.Kind == OpBullet) && op.Size > 0 {
-			return op.Size
-		}
-	}
-	return 0
-}
-
 func hasNestedFlowChild(b *box) bool {
 	for _, c := range b.children {
 		if c.kind == "block" || c.kind == "table" {
@@ -1524,7 +1611,7 @@ func countBlockLineYs(res *Result, b *box) []float64 {
 		y := op.Y
 		found := false
 		for _, ey := range ys {
-			if abs3(ey-y) <= eps {
+			if math.Abs(ey-y) <= eps {
 				found = true
 				break
 			}
@@ -1748,17 +1835,8 @@ func canvasToPDF(opX, opY float64, pageIdx int, contentH float64, opts PaintOpti
 
 func drawFill(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintOptions, pageH float64) {
 	x, y := canvasToPDF(op.X, op.Y+op.H, pageIdx, contentH, opts, pageH)
-	r, g, b := op.R, op.G, op.B
-	// Pre-composite translucent fills against white paper. Relying on PDF
-	// ExtGState alone left rgba(…) bands looking like solid dark blue when
-	// the graphics state was missing or not reset (fixture-14 .alpha).
-	if op.Alpha > 0 && op.Alpha < 1 {
-		a := op.Alpha
-		r = r*a + (1 - a) // white backdrop
-		g = g*a + (1 - a)
-		b = b*a + (1 - a)
-	}
-	c.SetFillColor(r, g, b)
+	ps := StyleOf(op)
+	c.SetFillColor(ps.FillR, ps.FillG, ps.FillB)
 	c.Rect(x, y, op.W, op.H)
 	c.Fill()
 }
@@ -1800,15 +1878,7 @@ func drawText(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintO
 	}
 	// Fake bold only for Latin when CSS wants bold but the face is not bold.
 	// Stroking CJK/Type0 outlines creates horizontal streak artifacts.
-	fakeBold := op.Bold && (op.Font == nil || !op.Font.Bold())
-	if fakeBold {
-		for _, r := range op.Text {
-			if r > 0xFF {
-				fakeBold = false
-				break
-			}
-		}
-	}
+	fakeBold := FakeBoldFor(op)
 	if fakeBold {
 		c.SetLineWidth(op.Size * 0.06)
 		c.TextRenderMode(2) // fill + stroke
@@ -1820,30 +1890,15 @@ func drawText(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintO
 	c.EndText()
 }
 
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	var b [12]byte
-	i := len(b)
-	for n > 0 {
-		i--
-		b[i] = byte('0' + n%10)
-		n /= 10
-	}
-	return string(b[i:])
-}
-
-func drawImage(p *pdf.Page, c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintOptions, name string) {
+func drawImage(p *pdf.Page, c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintOptions, name string) error {
 	x, y := canvasToPDF(op.X, op.Y+op.H, pageIdx, contentH, opts, p.Height())
 	if name == "" {
 		name = "I0"
 	}
 	if op.IsJPEG {
-		_ = c.AddJPEGImage(name, x, y, op.W, op.H, op.Image)
-	} else {
-		_ = c.AddPNGImage(name, x, y, op.W, op.H, op.Image)
+		return c.AddJPEGImage(name, x, y, op.W, op.H, op.Image)
 	}
+	return c.AddPNGImage(name, x, y, op.W, op.H, op.Image)
 }
 
 func drawLink(p *pdf.Page, op *Op, pageIdx int, contentH float64, opts PaintOptions) {

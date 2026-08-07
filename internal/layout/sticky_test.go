@@ -2,6 +2,7 @@ package layout
 
 import (
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -20,7 +21,7 @@ func TestStickyOverflowScrollportNoPageClone(t *testing.T) {
   <div class="stick">STICKY</div>
 `)
 	for i := 0; i < 40; i++ {
-		body.WriteString(`<p>row ` + itoa(i) + ` filler text for pagination</p>`)
+		body.WriteString(`<p>row ` + strconv.Itoa(i) + ` filler text for pagination</p>`)
 	}
 	body.WriteString(`</div></body></html>`)
 
@@ -168,7 +169,7 @@ func TestStickyTopContinuationPages(t *testing.T) {
   <div class="stick">STICKY</div>
 `)
 	for i := 0; i < 30; i++ {
-		body.WriteString(`<p>row ` + itoa(i) + ` filler text for pagination</p>`)
+		body.WriteString(`<p>row ` + strconv.Itoa(i) + ` filler text for pagination</p>`)
 	}
 	body.WriteString(`</div></body></html>`)
 

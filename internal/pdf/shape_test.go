@@ -20,6 +20,22 @@ func TestShapeTextRTLReverse(t *testing.T) {
 	}
 }
 
+func TestShapeRunKeepsTextAndAdvancesAligned(t *testing.T) {
+	f := testFont(t)
+	run := ShapeRun("A\u0301B", f, 12)
+	if len(run.Runes) != len(run.Advances) {
+		t.Fatalf("runes=%d advances=%d", len(run.Runes), len(run.Advances))
+	}
+	if run.Text == "" || len(run.Runes) == 0 {
+		t.Fatal("empty shaped run")
+	}
+	for i, advance := range run.Advances {
+		if advance <= 0 {
+			t.Errorf("advance[%d] = %v, want positive", i, advance)
+		}
+	}
+}
+
 func TestArabicJoiningBehProducesConnectedForms(t *testing.T) {
 	got := shapeArabicJoining("ب")
 	if got == "ب" {
@@ -98,16 +114,6 @@ func TestShapeTextFontArabicOTJoining(t *testing.T) {
 	}
 	if rs[1] != 0xFE91 {
 		t.Errorf("second U+%04X want FE91 (initial)", rs[1])
-	}
-	run := ShapeRun("بب", f)
-	if !run.OT {
-		t.Fatal("expected OT shaping")
-	}
-	if len(run.Glyphs) != 2 {
-		t.Fatalf("glyphs=%d", len(run.Glyphs))
-	}
-	if run.Glyphs[0].Advance <= 0 || run.Glyphs[1].Advance <= 0 {
-		t.Fatalf("expected positive advances: %+v", run.Glyphs)
 	}
 }
 

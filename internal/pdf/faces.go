@@ -9,6 +9,8 @@ import (
 
 // FaceSet holds the four Liberation Sans faces used for CSS
 // font-weight / font-style selection.
+//
+// ponytail: Liberation faces bundled in-tree (assets/); system fonts opt-in only.
 type FaceSet struct {
 	Regular    *Font
 	Bold       *Font

@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 
+	"gowkhtmltopdf/internal/app"
 	"gowkhtmltopdf/internal/cli"
 	"gowkhtmltopdf/internal/convert"
 )
@@ -17,10 +18,10 @@ func main() {
 }
 
 func run(argv []string) int {
-	cmd, err := cli.Parse(argv, os.Stderr)
+	cmd, err := cli.Parse(argv, cli.ModePDF)
 	if err != nil {
 		switch {
-		case errors.Is(err, cli.ErrHelp):
+		case errors.Is(err, cli.ErrHelp), errors.Is(err, cli.ErrExtHelp):
 			cli.PrintHelp(os.Stdout, cli.ModePDF)
 			return cli.ExitOK
 		case errors.Is(err, cli.ErrVersion):
@@ -29,15 +30,14 @@ func run(argv []string) int {
 		case errors.Is(err, cli.ErrLicense):
 			cli.PrintLicense(os.Stdout)
 			return cli.ExitOK
-		case errors.Is(err, cli.ErrExtHelp):
-			cli.PrintExtendedHelp(os.Stdout, cli.ModePDF)
-			return cli.ExitOK
 		}
 		fmt.Fprintf(os.Stderr, "gowkhtmltopdf: %v\n", err)
 		return cli.ExitError
 	}
 
-	if cmd.DumpDefaultTOCXSL {
+	// Sole dump home for --dump-default-toc-xsl: Global.DumpDefaultTOCXSL
+	// (CLI appliers write Global now). --dump-outline is convert's job.
+	if cmd.Global.DumpDefaultTOCXSL {
 		fmt.Fprint(os.Stdout, convert.DefaultTOCXSL())
 		return cli.ExitOK
 	}
@@ -53,12 +53,11 @@ func run(argv []string) int {
 	if cmd.Global.Quiet {
 		logw = io.Discard
 	}
-	if err := convert.RunPDFContext(context.Background(), cmd, logw, nil); err != nil {
-		fmt.Fprintf(os.Stderr, "gowkhtmltopdf: %v\n", err)
-		if hc, ok := err.(interface{ HttpErrorCode() int }); ok {
-			return hc.HttpErrorCode()
-		}
-		return cli.ExitError
+
+	runErr := app.RunPDF(context.Background(), cmd, logw, nil)
+	if runErr != nil {
+		fmt.Fprintf(os.Stderr, "gowkhtmltopdf: %v\n", runErr)
+		return cli.ExitCode(runErr)
 	}
 	return cli.ExitOK
 }

@@ -10,7 +10,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+
+	"gowkhtmltopdf/internal/settings"
 )
 
 // writeHTML writes a temp HTML file and returns its path.
@@ -83,7 +86,7 @@ func TestGlobalSettingsGetSetRoundTrip(t *testing.T) {
 		{"orientation", "Landscape"},
 		{"margin.top", "12.5"},
 		{"web.background", "false"},
-		{"dpi", "150"},
+		{"grayscale", "true"},
 		{"title", "Round Trip"},
 		{"enablelocalfileaccess", "true"},
 		{"header.center", "[title]"},
@@ -149,6 +152,92 @@ func TestObjectSettingsGetSet(t *testing.T) {
 	}
 	if err := o.Set("unknown.key", "x"); err == nil {
 		t.Error("Set(unknown.key) succeeded, want error")
+	}
+}
+
+func TestObjectSettingsSetBodyCopiesInput(t *testing.T) {
+	html := []byte("<p>original</p>")
+	o := NewObjectSettings().SetBody(html, "https://example.test/")
+	html[4] = 'X'
+	if got := string(o.o.Load.InlineHTML); got != "<p>original</p>" {
+		t.Fatalf("SetBody retained caller buffer: %q", got)
+	}
+}
+
+func TestConverterAddObjectDeepCopiesNestedData(t *testing.T) {
+	source := NewObjectSettings().SetBody([]byte("<p>original</p>"), "https://example.test/")
+	source.o.Load.CustomHeaders = map[string]string{"X-Request": "before"}
+	source.o.Load.Cookies = map[string]string{"session": "before"}
+	source.o.Load.Post = []settings.PostItem{{Name: "q", Value: "before"}}
+	source.o.Header.Replace = map[string]string{"[name]": "before"}
+	source.o.Footer.Replace = map[string]string{"[page]": "before"}
+	source.o.Ignored = map[string]string{"stub": "before"}
+
+	c := NewConverter().AddObject(source)
+
+	source.o.Load.InlineHTML[3] = 'X'
+	source.o.Load.CustomHeaders["X-Request"] = "after"
+	source.o.Load.CustomHeaders["X-New"] = "after"
+	source.o.Load.Cookies["session"] = "after"
+	source.o.Load.Post[0].Value = "after"
+	source.o.Header.Replace["[name]"] = "after"
+	source.o.Footer.Replace["[page]"] = "after"
+	source.o.Ignored["stub"] = "after"
+	source.o.Page = "after.html"
+
+	got := c.objects[0].o
+	if string(got.Load.InlineHTML) != "<p>original</p>" {
+		t.Errorf("inline HTML changed through source mutation: %q", got.Load.InlineHTML)
+	}
+	if got.Load.CustomHeaders["X-Request"] != "before" || got.Load.CustomHeaders["X-New"] != "" {
+		t.Errorf("custom headers were not copied: %v", got.Load.CustomHeaders)
+	}
+	if got.Load.Cookies["session"] != "before" {
+		t.Errorf("cookies were not copied: %v", got.Load.Cookies)
+	}
+	if len(got.Load.Post) != 1 || got.Load.Post[0].Value != "before" {
+		t.Errorf("post data was not copied: %v", got.Load.Post)
+	}
+	if got.Header.Replace["[name]"] != "before" || got.Footer.Replace["[page]"] != "before" {
+		t.Errorf("header/footer replacements were not copied: header=%v footer=%v", got.Header.Replace, got.Footer.Replace)
+	}
+	if got.Ignored["stub"] != "before" || got.Page != "" {
+		t.Errorf("object snapshot changed through source mutation: %+v", got)
+	}
+}
+
+func TestConverterAddObjectSnapshotIsIndependentUnderMutation(t *testing.T) {
+	source := NewObjectSettings().SetBody([]byte("<p>original</p>"), "")
+	source.o.Load.CustomHeaders = map[string]string{"X-Request": "before"}
+	source.o.Load.Post = []settings.PostItem{{Name: "q", Value: "before"}}
+	source.o.Header.Replace = map[string]string{"[name]": "before"}
+	c := NewConverter().AddObject(source)
+	snapshot := c.objects[0].o
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 1000; i++ {
+			source.o.Load.InlineHTML[0] = byte('a' + i%26)
+			source.o.Load.CustomHeaders["X-Request"] = "mutated"
+			source.o.Load.Post[0].Value = "mutated"
+			source.o.Header.Replace["[name]"] = "mutated"
+		}
+	}()
+	for i := 0; i < 1000; i++ {
+		_ = snapshot.Load.InlineHTML[0]
+		_ = snapshot.Load.CustomHeaders["X-Request"]
+		_ = snapshot.Load.Post[0].Value
+		_ = snapshot.Header.Replace["[name]"]
+	}
+	wg.Wait()
+
+	if got := string(snapshot.Load.InlineHTML); got != "<p>original</p>" {
+		t.Errorf("snapshot changed during source mutation: %q", got)
+	}
+	if snapshot.Load.CustomHeaders["X-Request"] != "before" || snapshot.Load.Post[0].Value != "before" || snapshot.Header.Replace["[name]"] != "before" {
+		t.Errorf("snapshot nested data changed during source mutation: %+v", snapshot)
 	}
 }
 
@@ -254,10 +343,55 @@ func TestVersion(t *testing.T) {
 	}
 }
 
+// TestLineLogSeverity pins the marker-prefix severity protocol: the
+// grammar lives in internal/line, the callback mapping stays in api.go,
+// and a line whose *message* mentions "error" is not an error line.
+func TestLineLogSeverity(t *testing.T) {
+	var infos, warns, errs []string
+	w := &lineLog{
+		onInfo:  func(l string) { infos = append(infos, l) },
+		onWarn:  func(l string) { warns = append(warns, l) },
+		onError: func(l string) { errs = append(errs, l) },
+	}
+	w.Write([]byte("Loading pages (1/1)\n"))
+	w.Write([]byte("warning: object 1: large stylesheet volume\n"))
+	w.Write([]byte("error: failed to load http://x\n"))
+	w.Write([]byte("info: load error policy is skip, omitting\n"))
+	if len(infos) != 2 {
+		t.Errorf("infos = %v, want 2 lines", infos)
+	}
+	if len(warns) != 1 || warns[0] != "warning: object 1: large stylesheet volume" {
+		t.Errorf("warns = %v", warns)
+	}
+	if len(errs) != 1 || errs[0] != "error: failed to load http://x" {
+		t.Errorf("errs = %v", errs)
+	}
+}
+
 func TestImageConverterNeedsPage(t *testing.T) {
 	c := NewImageConverter()
 	if err := c.Convert(context.Background()); err == nil {
 		t.Fatal("Convert without a page succeeded, want error")
+	}
+}
+
+// TestImageConverterSetBody: P2-04 InlineHTML source kind works for image mode
+// via Object().SetBody (no temp file, no URL guessing).
+func TestImageConverterSetBody(t *testing.T) {
+	c := NewImageConverter()
+	c.Object().SetBody([]byte(`<html><body><div style="width:40px;height:30px;background-color:#112233"></div></body></html>`), "")
+	if err := c.Set("width", "100"); err != nil {
+		t.Fatalf("Set(width): %v", err)
+	}
+	if err := c.Convert(context.Background()); err != nil {
+		t.Fatalf("Convert: %v", err)
+	}
+	img, err := png.Decode(bytes.NewReader(c.Output()))
+	if err != nil {
+		t.Fatalf("output is not a decodable PNG: %v", err)
+	}
+	if img.Bounds().Dx() != 100 {
+		t.Errorf("width = %d, want 100", img.Bounds().Dx())
 	}
 }
 

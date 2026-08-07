@@ -1,7 +1,6 @@
 package layout
 
 import (
-	"sort"
 	"testing"
 
 	"gowkhtmltopdf/internal/css"
@@ -645,96 +644,6 @@ func TestGridMinmaxFrLayout(t *testing.T) {
 	}
 }
 
-func TestMasonryShortestColumn(t *testing.T) {
-	s := sheet(t, `
-.g {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  grid-template-rows: masonry;
-  width: 300pt;
-  column-gap: 0;
-  row-gap: 0;
-}
-.t { background:#fcc; height:60pt }
-.m { background:#cfc; height:30pt }
-.s { background:#ccf; height:20pt }
-`)
-	res := layoutHTML(t, `<html><body>
-<div class="g">
-  <div class="t">T</div>
-  <div class="m">M</div>
-  <div class="s">S</div>
-  <div class="s">S2</div>
-</div>
-</body></html>`, s)
-	type fill struct{ x, y, h float64 }
-	var fills []fill
-	for _, op := range res.Ops {
-		if op.Kind != OpFillRect || op.W > 250 {
-			continue
-		}
-		if op.H >= 15 {
-			fills = append(fills, fill{op.X, op.Y, op.H})
-		}
-	}
-	if len(fills) < 4 {
-		t.Fatalf("fills=%d, want >=4", len(fills))
-	}
-	// After T(60)/M(30)/S(20) in cols 0/1/2, S2 packs into shortest (col2 at y~20).
-	var s2y float64
-	var foundS2 bool
-	for _, f := range fills {
-		if f.h >= 18 && f.h <= 25 && f.x > 180 {
-			s2y = f.y
-			foundS2 = true
-		}
-	}
-	if !foundS2 {
-		t.Fatalf("S2 fill in third column missing; fills=%v", fills)
-	}
-	// S2 should sit atop col2 stack (~ below first S), not below tall T.
-	if s2y > 50 {
-		t.Fatalf("S2 y=%.1f too low — masonry should pack into shortest column", s2y)
-	}
-}
-
-func TestSubgridInheritColumns(t *testing.T) {
-	s := sheet(t, `
-.outer { display:grid; grid-template-columns:100pt 100pt 100pt; width:300pt; gap:0 }
-.inner { display:subgrid; background:#eee }
-.a { background:#fcc }
-.b { background:#cfc }
-.c { background:#ccf }
-`)
-	res := layoutHTML(t, `<html><body>
-<div class="outer">
-  <div class="inner">
-    <div class="a">A</div><div class="b">B</div><div class="c">C</div>
-  </div>
-</div>
-</body></html>`, s)
-	var xs []float64
-	for _, op := range res.Ops {
-		if op.Kind != OpFillRect || op.W > 200 {
-			continue
-		}
-		if op.R > 0.9 && op.G < 0.9 || op.G > 0.7 && op.R < 0.9 || op.B > 0.9 && op.G > 0.7 {
-			xs = append(xs, op.X)
-		}
-	}
-	if len(xs) < 3 {
-		t.Fatalf("expected 3 cell fills, got xs=%v", xs)
-	}
-	// Distinct column starts ~100pt apart under inherited 100pt tracks.
-	seen := map[int]bool{}
-	for _, x := range xs {
-		seen[int(x/50)] = true
-	}
-	if len(seen) < 2 {
-		t.Fatalf("subgrid cells not in distinct columns: xs=%v", xs)
-	}
-}
-
 func TestIntrinsicHeightPercentCyclic(t *testing.T) {
 	// height:% against auto-height ancestor must not resolve as 0/NaN — treat as auto.
 	s := sheet(t, `
@@ -757,83 +666,11 @@ func TestIntrinsicHeightPercentCyclic(t *testing.T) {
 	}
 }
 
-func TestDetectMasonryBothFallsBack(t *testing.T) {
-	if detectMasonryAxis("masonry", "masonry") != masonryBoth {
-		t.Fatal("expected masonryBoth")
+func TestStripMasonryKeyword(t *testing.T) {
+	if stripMasonryKeyword("masonry") != "" {
+		t.Fatal("want empty after strip")
 	}
-	if detectMasonryAxis("1fr 1fr", "masonry") != masonryRows {
-		t.Fatal("expected masonryRows")
-	}
-}
-
-func TestSubgridTrackWidthMatchesParent(t *testing.T) {
-	// Partial shared-track: copy-inherited 100pt columns against the same
-	// content width should place cells on the same column starts as a
-	// non-subgrid sibling row would.
-	s := sheet(t, `
-.outer { display:grid; grid-template-columns:100pt 100pt 100pt; width:300pt; gap:0 }
-.inner { display:subgrid; grid-column: 1 / -1; background:#eee }
-.a { background:#fcc }
-.b { background:#cfc }
-.c { background:#ccf }
-`)
-	res := layoutHTML(t, `<html><body>
-<div class="outer">
-  <div class="inner">
-    <div class="a">A</div><div class="b">B</div><div class="c">C</div>
-  </div>
-</div>
-</body></html>`, s)
-	var xs []float64
-	for _, op := range res.Ops {
-		if op.Kind != OpFillRect || op.W < 40 || op.W > 120 {
-			continue
-		}
-		if (op.R > 0.9 && op.G < 0.9) || (op.G > 0.7 && op.R < 0.9) || (op.B > 0.9 && op.R < 0.9) {
-			xs = append(xs, op.X)
-		}
-	}
-	if len(xs) < 3 {
-		t.Fatalf("expected 3 cell fills, got xs=%v", xs)
-	}
-	sort.Float64s(xs)
-	// Column starts ~100pt apart.
-	if xs[1]-xs[0] < 80 || xs[1]-xs[0] > 120 {
-		t.Fatalf("col gap A→B = %.1f, want ~100; xs=%v", xs[1]-xs[0], xs)
-	}
-	if xs[2]-xs[1] < 80 || xs[2]-xs[1] > 120 {
-		t.Fatalf("col gap B→C = %.1f, want ~100; xs=%v", xs[2]-xs[1], xs)
-	}
-}
-
-func TestMasonryColumnSpanPartial(t *testing.T) {
-	// Partial L3: grid-column:span 2 on the fixed axis spans two column tracks.
-	s := sheet(t, `
-.m {
-  display: grid;
-  grid-template-columns: 60pt 60pt 60pt;
-  grid-template-rows: masonry;
-  width: 180pt;
-  gap: 0;
-}
-.wide { grid-column: span 2; background:#f99; height:20pt }
-.s { background:#9f9; height:20pt }
-`)
-	res := layoutHTML(t, `<html><body>
-<div class="m">
-  <div class="wide">W</div>
-  <div class="s">S</div>
-</div>
-</body></html>`, s)
-	var wideW float64
-	for _, op := range res.Ops {
-		if op.Kind == OpFillRect && op.R > 0.9 && op.G < 0.7 {
-			if op.W > wideW {
-				wideW = op.W
-			}
-		}
-	}
-	if wideW < 110 || wideW > 130 {
-		t.Fatalf("masonry span 2 width=%.1f, want ~120 (2×60pt)", wideW)
+	if stripMasonryKeyword("1fr 1fr") != "1fr 1fr" {
+		t.Fatal("non-masonry tracks must stay")
 	}
 }

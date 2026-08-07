@@ -22,7 +22,7 @@ func (r *Registry) AddFont(f *Font) {
 	if r == nil || f == nil {
 		return
 	}
-	names := f.FamilyNames()
+	names := f.LoadNames()
 	if len(names) == 0 && f.PostScriptName != "" {
 		names = []string{f.PostScriptName}
 	}
@@ -149,54 +149,6 @@ func pickFace(faces []*Font, weight int, italic bool) *Font {
 		}
 	}
 	return best
-}
-
-// ScanFontDir loads .ttf files from dir (non-recursive). Errors on individual
-// files are skipped; the directory itself must be readable.
-func ScanFontDir(dir string) (*Registry, error) {
-	r := NewRegistry()
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, err
-	}
-	for _, e := range entries {
-		if e.IsDir() {
-			continue
-		}
-		name := e.Name()
-		low := strings.ToLower(name)
-		if !strings.HasSuffix(low, ".ttf") && !strings.HasSuffix(low, ".otf") {
-			continue
-		}
-		path := filepath.Join(dir, name)
-		data, err := os.ReadFile(path)
-		if err != nil {
-			continue
-		}
-		f, err := ParseTTF(data)
-		if err != nil {
-			continue
-		}
-		if f.PostScriptName == "" {
-			f.PostScriptName = strings.TrimSuffix(name, filepath.Ext(name))
-		}
-		r.AddFont(f)
-	}
-	return r, nil
-}
-
-// MergeRegistries combines multiple registries (later faces append).
-func MergeRegistries(regs ...*Registry) *Registry {
-	out := NewRegistry()
-	for _, r := range regs {
-		if r == nil {
-			continue
-		}
-		for fam, faces := range r.byFamily {
-			out.byFamily[fam] = append(out.byFamily[fam], faces...)
-		}
-	}
-	return out
 }
 
 // DefaultSystemFontDirs returns common system font directories for the current OS.

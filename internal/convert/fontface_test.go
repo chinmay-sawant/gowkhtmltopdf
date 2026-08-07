@@ -81,15 +81,16 @@ func TestFontFaceACLDeny(t *testing.T) {
 	if err := os.WriteFile(htmlPath, []byte(fontFaceHTML("../fonts/Custom.ttf")), 0o644); err != nil {
 		t.Fatalf("write html: %v", err)
 	}
+	obj := settings.DefaultPdfObject()
+	obj.Page = htmlPath
+	// ACL test: do not open local file access; only Allow pageDir for the HTML.
 	cmd := &cli.Command{
-		Global: settings.DefaultPdfGlobal(),
-		Objects: []settings.PdfObject{
-			{Page: htmlPath, Load: settings.DefaultLoadPage()},
-		},
-		Output: filepath.Join(t.TempDir(), "out.pdf"),
+		Global:  settings.DefaultPdfGlobal(),
+		Objects: []settings.PdfObject{obj},
+		Output:  filepath.Join(t.TempDir(), "out.pdf"),
 	}
-	cmd.Global.EnableLocalFileAccess = false
-	cmd.Global.Allow = []string{pageDir}
+	cmd.Global.Load.EnableLocalFileAccess = false
+	cmd.Global.Load.Allow = []string{pageDir}
 	cmd.Global.Size = settings.Size{PageSize: cmd.Global.PageSize}
 
 	var log bytes.Buffer

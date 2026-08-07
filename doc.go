@@ -40,6 +40,22 @@
 //	c.Global().Set("enablelocalfileaccess", "true")
 //	obj.Set("load.blocklocalfileaccess", "false")
 //
+// # In-memory HTML
+//
+// In-memory documents are an explicit source kind: SetBody (and the
+// ConvertHTML / AddHTML helpers) mark the object as inline HTML, so no URL
+// guessing is applied and an optional base URL resolves relative
+// subresources:
+//
+//	c.AddHTML([]byte("<html>…</html>"), "https://example.com/templates/")
+//
+// Image mode uses the same source kind on the page object:
+//
+//	img := gowkhtmltopdf.NewImageConverter()
+//	img.Object().SetBody([]byte("<html>…</html>"), "")
+//
+// An empty base leaves relative subresources unresolvable.
+//
 // # Thread safety
 //
 // A Converter (and ImageConverter) is not safe for concurrent Convert calls:

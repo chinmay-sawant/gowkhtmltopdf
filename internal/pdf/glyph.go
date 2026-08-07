@@ -2,7 +2,6 @@ package pdf
 
 import (
 	"encoding/binary"
-	"math"
 )
 
 // GlyphPoint is one TrueType contour point in font units.
@@ -297,12 +296,4 @@ func ContourBounds(pts []GlyphPoint) (minX, minY, maxX, maxY float64) {
 		}
 	}
 	return
-}
-
-// Ensure finite numbers for raster safety.
-func Finite(v float64) float64 {
-	if math.IsNaN(v) || math.IsInf(v, 0) {
-		return 0
-	}
-	return v
 }

@@ -41,3 +41,20 @@ func BenchmarkWrite50Pages(b *testing.B) {
 		b.SetBytes(int64(buf.Len()))
 	}
 }
+
+// BenchmarkShapeRun measures the shared shaping + advance path consumed by
+// both PDF text emission and image rasterization.
+func BenchmarkShapeRun(b *testing.B) {
+	f, err := DefaultFont()
+	if err != nil {
+		b.Fatal(err)
+	}
+	const text = "The quick brown fox jumps over the lazy dog"
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		run := ShapeRun(text, f, 11)
+		if len(run.Runes) != len(run.Advances) {
+			b.Fatal("shaped run has unpaired advances")
+		}
+	}
+}

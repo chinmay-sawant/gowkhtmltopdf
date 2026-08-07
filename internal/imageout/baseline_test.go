@@ -23,7 +23,7 @@ func TestGlyphBaselineStable(t *testing.T) {
 		img.Pix[i] = 255
 	}
 	const baseY = 55.0
-	ttfDrawString(img, 10, baseY, s, sizePt, face, color.NRGBA{0, 0, 0, 255}, ptToPx)
+	ttfDrawString(img, 10, baseY, s, sizePt, face, color.NRGBA{0, 0, 0, 255}, ptToPx, nil)
 
 	x := 10.0
 	var bottoms []int

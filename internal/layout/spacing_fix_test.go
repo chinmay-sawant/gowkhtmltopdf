@@ -119,6 +119,47 @@ func TestNestedTableStaysInCell(t *testing.T) {
 	}
 }
 
+func TestPositionLiteFixtureReservesOverlaySpace(t *testing.T) {
+	root, sheets := loadFixture(t, "fixture-26-position-lite.html")
+	res, err := Layout(root, Options{Width: 595 - 56.7, Height: 842, Sheets: sheets, Background: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	absBottom := 0.0
+	flowY := 0.0
+	flowBold := false
+	relLeft := 0.0
+	relTextX := 0.0
+	for _, op := range res.Ops {
+		if op.Kind == OpFillRect && op.W > 400 && op.H > 20 && op.R > 0.9 && op.G > 0.9 && op.B > 0.9 {
+			relLeft = op.X
+		}
+		if op.Kind == OpText && strings.Contains(op.Text, "Relatively offset block") {
+			relTextX = op.X
+		}
+		if op.Kind == OpFillRect && op.W > 100 && op.H > 10 && op.R > 0.9 && op.G > 0.85 && op.G < 0.99 && op.B > 0.8 && op.B < 0.95 {
+			absBottom = op.Y + op.H
+		}
+		if op.Kind == OpText && strings.Contains(op.Text, "In-flow text under") {
+			flowY = op.Y
+			flowBold = op.Bold
+		}
+	}
+	if relLeft == 0 || relTextX == 0 || absBottom == 0 || flowY == 0 {
+		t.Fatalf("relative left=%.1f text x=%.1f overlay bottom=%.1f flow y=%.1f", relLeft, relTextX, absBottom, flowY)
+	}
+	if relTextX < relLeft {
+		t.Fatalf("relative text x=%.1f is outside green box left=%.1f", relTextX, relLeft)
+	}
+	if flowY <= absBottom {
+		t.Fatalf("fixture flow text y=%.1f overlaps absolute overlay bottom=%.1f", flowY, absBottom)
+	}
+	if flowBold {
+		t.Fatal("fixture flow text unexpectedly uses bold font weight")
+	}
+}
+
 func TestLetterheadPaddingBeforeBorder(t *testing.T) {
 	root, sheets := loadFixture(t, "fixture-16-invoice-with-css.html")
 	res, err := Layout(root, Options{Width: 595 - 56.7, Height: 842, Sheets: sheets, Background: true})

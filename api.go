@@ -7,15 +7,11 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
-	"os"
-	"reflect"
-	"strconv"
 	"strings"
 
-	"gowkhtmltopdf/internal/cli"
 	"gowkhtmltopdf/internal/convert"
 	"gowkhtmltopdf/internal/imageout"
+	"gowkhtmltopdf/internal/line"
 	"gowkhtmltopdf/internal/settings"
 )
 
@@ -52,13 +48,13 @@ func (s *GlobalSettings) Set(name, value string) error {
 	return s.g.Set(name, value)
 }
 
-// Get reads a dotted settings key back as its canonical string form. ok is
-// false when the name does not resolve to a field or has no scalar
-// representation (maps, nested structs). Booleans read as "true"/"false",
-// enums as their canonical name ("portrait", "print", "abort", …), floats
-// with the shortest round-trip representation.
+// Get reads a dotted settings key back as its canonical string form via the
+// same key table as Set (plus Policy A Ignored values). ok is false when the
+// name is unknown. Booleans read as "true"/"false", enums as their canonical
+// name ("Portrait", "print", "abort", …), floats with the shortest round-trip
+// representation.
 func (s *GlobalSettings) Get(name string) (string, bool) {
-	return getDotted(&s.g, name)
+	return s.g.Get(name)
 }
 
 // ObjectSettings wraps the per-page wkhtmltopdf settings: the input page
@@ -83,10 +79,9 @@ func (s *ObjectSettings) Set(name, value string) error {
 	return s.o.Set(name, value)
 }
 
-// Get reads a dotted object settings key back as its canonical string form;
-// ok is false when the name does not resolve to a scalar field.
+// Get reads a dotted object settings key via the same key table as Set.
 func (s *ObjectSettings) Get(name string) (string, bool) {
-	return getDotted(&s.o, name)
+	return s.o.Get(name)
 }
 
 // SetPage sets the input page (a path, URL or "inline:…" / "data:…" source)
@@ -96,64 +91,16 @@ func (s *ObjectSettings) SetPage(page string) *ObjectSettings {
 	return s
 }
 
-// getDotted resolves a dotted name through the exported fields of the struct
-// dst points at, case-insensitively, and formats the terminal value.
-func getDotted(dst any, name string) (string, bool) {
-	v := reflect.ValueOf(dst)
-	if v.Kind() != reflect.Pointer || v.Elem().Kind() != reflect.Struct {
-		return "", false
-	}
-	cur := v.Elem()
-	for _, part := range strings.Split(strings.ToLower(strings.TrimSpace(name)), ".") {
-		if part == "" || cur.Kind() != reflect.Struct {
-			return "", false
-		}
-		f := cur.FieldByNameFunc(func(n string) bool { return strings.EqualFold(n, part) })
-		if !f.IsValid() {
-			return "", false
-		}
-		cur = f
-	}
-	return formatSettingValue(cur)
+// SetBody sets an in-memory HTML document as the input page and returns s
+// so calls can be chained. base resolves relative subresources (<link>,
+// <img>, <a>); an empty base leaves them unresolvable. No URL guessing is
+// involved: the bytes are always treated as a document.
+func (s *ObjectSettings) SetBody(html []byte, base string) *ObjectSettings {
+	s.o.Page = ""
+	s.o.Load.InlineHTML = cloneBytes(html)
+	s.o.Load.InlineBase = base
+	return s
 }
-
-// formatSettingValue renders a reflect.Value as its settings string form.
-func formatSettingValue(v reflect.Value) (string, bool) {
-	if !v.CanInterface() {
-		return "", false
-	}
-	switch v.Kind() {
-	case reflect.String:
-		return v.String(), true
-	case reflect.Bool:
-		return strconv.FormatBool(v.Bool()), true
-	case reflect.Int:
-		// Enums (Orientation, ColorMode, MediaType, LogLevel,
-		// LoadErrorHandling) implement fmt.Stringer; plain ints don't.
-		if v.Type().Implements(stringerType) {
-			return v.Interface().(fmt.Stringer).String(), true
-		}
-		return strconv.FormatInt(v.Int(), 10), true
-	case reflect.Float64:
-		return strconv.FormatFloat(v.Float(), 'g', -1, 64), true
-	case reflect.Slice:
-		// List settings ("allow", "exclude-from-outline") join with newlines.
-		if v.Type().Elem().Kind() != reflect.String {
-			return "", false
-		}
-		var b strings.Builder
-		for i := 0; i < v.Len(); i++ {
-			if i > 0 {
-				b.WriteByte('\n')
-			}
-			b.WriteString(v.Index(i).String())
-		}
-		return b.String(), true
-	}
-	return "", false
-}
-
-var stringerType = reflect.TypeOf((*fmt.Stringer)(nil)).Elem()
 
 // ---------------------------------------------------------------------------
 // PDF conversion
@@ -169,9 +116,9 @@ type Converter struct {
 	output  []byte
 
 	// OnInfo, OnWarn and OnError receive the conversion's log lines,
-	// classified by content ("warning:" prefixed lines go to OnWarn,
-	// error lines to OnError, everything else - including phase lines - to
-	// OnInfo). They may be nil.
+	// classified by severity marker ("warning:"/"warn:" lines go to
+	// OnWarn, "error:"/"err:" lines to OnError, everything else -
+	// including phase lines - to OnInfo). They may be nil.
 	OnInfo  func(string)
 	OnWarn  func(string)
 	OnError func(string)
@@ -198,59 +145,93 @@ func (c *Converter) Global() *GlobalSettings {
 // settings are copied, so later mutations of s do not affect the converter.
 // A converter needs at least one object to convert.
 func (c *Converter) AddObject(s *ObjectSettings) *Converter {
-	cp := *s
-	c.objects = append(c.objects, &cp)
+	cp := &ObjectSettings{o: clonePdfObject(s.o)}
+	c.objects = append(c.objects, cp)
+	return c
+}
+
+// clonePdfObject creates an ownership boundary at the public API. PdfObject
+// contains maps and slices in load, header/footer, ignored-setting, and
+// inline-document fields; a struct assignment alone would let callers mutate
+// a converter after AddObject returned.
+func clonePdfObject(src settings.PdfObject) settings.PdfObject {
+	dst := src
+	dst.Header = cloneHeaderFooter(src.Header)
+	dst.Footer = cloneHeaderFooter(src.Footer)
+	dst.Load.CustomHeaders = cloneStringMap(src.Load.CustomHeaders)
+	dst.Load.Cookies = cloneStringMap(src.Load.Cookies)
+	dst.Load.Post = clonePostItems(src.Load.Post)
+	dst.Load.InlineHTML = cloneBytes(src.Load.InlineHTML)
+	dst.Ignored = cloneStringMap(src.Ignored)
+	return dst
+}
+
+func cloneHeaderFooter(src settings.HeaderFooter) settings.HeaderFooter {
+	dst := src
+	dst.Replace = cloneStringMap(src.Replace)
+	return dst
+}
+
+func clonePostItems(src []settings.PostItem) []settings.PostItem {
+	if src == nil {
+		return nil
+	}
+	dst := make([]settings.PostItem, len(src))
+	copy(dst, src)
+	return dst
+}
+
+func cloneStringMap(src map[string]string) map[string]string {
+	if src == nil {
+		return nil
+	}
+	dst := make(map[string]string, len(src))
+	for key, value := range src {
+		dst[key] = value
+	}
+	return dst
+}
+
+func cloneBytes(src []byte) []byte {
+	if src == nil {
+		return nil
+	}
+	dst := make([]byte, len(src))
+	copy(dst, src)
+	return dst
+}
+
+// AddHTML appends an in-memory HTML document as a page object and returns c
+// for chaining. baseURL resolves relative subresources; an empty baseURL
+// leaves them unresolvable. Unlike SetPage, the bytes are always treated as
+// a document - no URL guessing is applied.
+func (c *Converter) AddHTML(page []byte, baseURL string) *Converter {
+	c.AddObject(NewObjectSettings().SetBody(page, baseURL))
 	return c
 }
 
 // Convert runs the conversion. The produced bytes replace the previous
 // Output. ctx is threaded into every load; cancel it to abort. Errors are
-// also reported to OnError when set.
+// also reported to OnError when set. Output is captured via an in-memory
+// writer (no temp file).
 func (c *Converter) Convert(ctx context.Context) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
 	if len(c.objects) == 0 {
 		return errors.New("gowkhtmltopdf: no page objects added")
 	}
-	path, err := tempOutput("gowkhtmltopdf-*.pdf")
+	objects := make([]settings.PdfObject, len(c.objects))
+	for i, o := range c.objects {
+		objects[i] = o.o
+	}
+	req := convert.NewPDFRequest(c.global.g, objects, nil, nil)
+	h := convertHooks{
+		OnInfo: c.OnInfo, OnWarn: c.OnWarn, OnError: c.OnError,
+		OnPhase: c.OnPhase, OnProgress: c.OnProgress,
+	}
+	out, err := h.executePDF(ctx, req)
 	if err != nil {
 		return err
 	}
-	defer os.Remove(path)
-
-	cmd := &cli.Command{Global: c.global.g, Output: path}
-	for _, o := range c.objects {
-		cmd.Objects = append(cmd.Objects, o.o)
-	}
-
-	flush := &lineLog{
-		onInfo:  c.OnInfo,
-		onWarn:  c.OnWarn,
-		onError: c.OnError,
-	}
-	var progress func(phase string, percent int)
-	if c.OnPhase != nil || c.OnProgress != nil {
-		progress = func(phase string, percent int) {
-			if c.OnPhase != nil {
-				c.OnPhase(phase)
-			}
-			if c.OnProgress != nil {
-				c.OnProgress(percent)
-			}
-		}
-	}
-	if err := convert.RunPDFContext(ctx, cmd, flush, progress); err != nil {
-		if c.OnError != nil {
-			c.OnError(err.Error())
-		}
-		return err
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Errorf("gowkhtmltopdf: read output: %w", err)
-	}
-	c.output = data
+	c.output = out
 	return nil
 }
 
@@ -276,21 +257,11 @@ func ConvertHTML(ctx context.Context, html []byte, global *GlobalSettings) ([]by
 	if global != nil {
 		c.global = global
 	}
-	obj := NewObjectSettings().SetPage(string(html))
-	c.AddObject(obj)
+	c.AddObject(NewObjectSettings().SetBody(html, ""))
 	if err := c.Convert(ctx); err != nil {
 		return nil, err
 	}
 	return c.Output(), nil
-}
-
-// HttpErrorCode returns the wkhtmltopdf-style HTTP error exit code for the
-// last conversion (2 for a 404, 3 for a 401). The pure-Go pipeline does not
-// yet classify load failures into those codes, so this always returns 0;
-// it exists for upstream API parity. Errors from a failed load surface
-// through Convert's error return instead.
-func (c *Converter) HttpErrorCode() int {
-	return 0
 }
 
 // ---------------------------------------------------------------------------
@@ -315,20 +286,23 @@ type ImageConverter struct {
 }
 
 // NewImageConverter returns an ImageConverter with the wkhtmltoimage default
-// settings: 1024 px smart-width viewport, PNG output.
+// settings: 1024 px smart-width viewport, PNG output. Object() is valid
+// immediately; its page is empty until AddObject.
 func NewImageConverter() *ImageConverter {
 	return &ImageConverter{
 		global: NewGlobalSettings(),
 		image:  settings.DefaultImageGlobal(),
+		object: NewObjectSettings(),
 	}
 }
 
 // Set applies an image-mode settings key: "width", "height", "quality",
 // "smartwidth", "transparent", "format" ("png"|"jpg") and the crop keys
 // "crop.left", "crop.top", "crop.width", "crop.height". Unknown names return
-// an error.
+// an error. "web.background" also updates the shared Global.Background paint
+// switch so image and PDF share one background field.
 func (c *ImageConverter) Set(name, value string) error {
-	return c.image.Set(name, value)
+	return settings.ApplyImageKey(&c.global.g, &c.image, name, value)
 }
 
 // Global returns the shared global settings (only "enablelocalfileaccess"
@@ -349,48 +323,32 @@ func (c *ImageConverter) AddObject(page string) *ImageConverter {
 
 // Object returns the settings of the page to convert (the one passed to the
 // most recent AddObject), so per-page load options can be set - for example
-// "load.blocklocalfileaccess" = "false" to allow local inputs.
+// "load.blocklocalfileaccess" = "false" to allow local inputs. Object is
+// always valid; its page is empty until AddObject is called.
 func (c *ImageConverter) Object() *ObjectSettings {
 	return c.object
 }
 
 // Convert runs the conversion, replacing the previous Output. ctx is threaded
 // into the load; cancel it to abort. Errors are also reported to OnError.
+// Output is captured via an in-memory writer (no temp file).
+//
+// The page may be a path/URL via AddObject/SetPage, or in-memory HTML via
+// Object().SetBody (P2-04 InlineHTML source kind).
 func (c *ImageConverter) Convert(ctx context.Context) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	if c.object == nil || strings.TrimSpace(c.object.o.Page) == "" {
+	if strings.TrimSpace(c.object.o.Page) == "" && len(c.object.o.Load.InlineHTML) == 0 {
 		return errors.New("gowkhtmltopdf: no input page added")
 	}
-	path, err := tempOutput("gowkhtmltopdf-image-*")
+	img := c.image
+	req := convert.NewImageRequest(c.global.g, img, []settings.PdfObject{c.object.o}, nil)
+	h := convertHooks{
+		OnInfo: c.OnInfo, OnWarn: c.OnWarn, OnError: c.OnError,
+	}
+	out, err := h.executeImage(ctx, req)
 	if err != nil {
 		return err
 	}
-	defer os.Remove(path)
-
-	cmd := &cli.Command{
-		Global:  c.global.g,
-		Image:   c.image,
-		Objects: []settings.PdfObject{c.object.o},
-		Output:  path,
-	}
-	flush := &lineLog{
-		onInfo:  c.OnInfo,
-		onWarn:  c.OnWarn,
-		onError: c.OnError,
-	}
-	if err := imageout.Run(ctx, cmd, flush); err != nil {
-		if c.OnError != nil {
-			c.OnError(err.Error())
-		}
-		return err
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Errorf("gowkhtmltopdf: read output: %w", err)
-	}
-	c.output = data
+	c.output = out
 	return nil
 }
 
@@ -402,27 +360,82 @@ func (c *ImageConverter) Output() []byte {
 }
 
 // ---------------------------------------------------------------------------
+// Shared executor (P1-8)
+// ---------------------------------------------------------------------------
+
+// convertHooks holds the optional log/progress callbacks shared by PDF and
+// image Convert drivers. Both Converter and ImageConverter reduce to building
+// a convert.Request and calling executePDF / executeImage.
+type convertHooks struct {
+	OnInfo, OnWarn, OnError func(string)
+	OnPhase                 func(string)
+	OnProgress              func(int)
+}
+
+func (h convertHooks) lineLog() *lineLog {
+	return &lineLog{
+		onInfo:  h.OnInfo,
+		onWarn:  h.OnWarn,
+		onError: h.OnError,
+	}
+}
+
+func (h convertHooks) progress() func(string, int) {
+	if h.OnPhase == nil && h.OnProgress == nil {
+		return nil
+	}
+	return func(phase string, percent int) {
+		if h.OnPhase != nil {
+			h.OnPhase(phase)
+		}
+		if h.OnProgress != nil {
+			h.OnProgress(percent)
+		}
+	}
+}
+
+// executePDF runs the PDF pipeline into an in-memory buffer and reports
+// failures to OnError.
+func (h convertHooks) executePDF(ctx context.Context, req *convert.Request) ([]byte, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	var buf bytes.Buffer
+	req.Output = &buf
+	if err := convert.Run(ctx, req, h.lineLog(), h.progress()); err != nil {
+		if h.OnError != nil {
+			h.OnError(err.Error())
+		}
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// executeImage runs the image pipeline into an in-memory buffer and reports
+// failures to OnError.
+func (h convertHooks) executeImage(ctx context.Context, req *convert.Request) ([]byte, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	var buf bytes.Buffer
+	req.Output = &buf
+	if err := imageout.RunRequest(ctx, req, h.lineLog()); err != nil {
+		if h.OnError != nil {
+			h.OnError(err.Error())
+		}
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-// tempOutput creates an empty temp file and returns its path; the conversion
-// pipelines write their output there by path.
-func tempOutput(pattern string) (string, error) {
-	f, err := os.CreateTemp("", pattern)
-	if err != nil {
-		return "", fmt.Errorf("gowkhtmltopdf: temp output: %w", err)
-	}
-	path := f.Name()
-	if err := f.Close(); err != nil {
-		os.Remove(path)
-		return "", fmt.Errorf("gowkhtmltopdf: temp output: %w", err)
-	}
-	return path, nil
-}
-
 // lineLog is an io.Writer that classifies newline-terminated log lines and
-// forwards them to the converter callbacks: "warning:" lines to onWarn,
-// error lines to onError, everything else to onInfo.
+// forwards them to the converter callbacks. Severity is decided by
+// line.SeverityOf (the marker-prefix grammar owned by internal/line); the
+// callback mapping stays here.
 type lineLog struct {
 	buf     bytes.Buffer
 	onInfo  func(string)
@@ -438,23 +451,23 @@ func (w *lineLog) Write(p []byte) (int, error) {
 		if i < 0 {
 			break
 		}
-		line := strings.TrimSpace(string(raw[:i]))
+		l := strings.TrimSpace(string(raw[:i]))
 		w.buf.Next(i + 1)
-		if line == "" {
+		if l == "" {
 			continue
 		}
-		switch lower := strings.ToLower(line); {
-		case strings.Contains(lower, "warning:"):
+		switch line.SeverityOf(l) {
+		case line.Warn:
 			if w.onWarn != nil {
-				w.onWarn(line)
+				w.onWarn(l)
 			}
-		case strings.Contains(lower, "error"):
+		case line.Error:
 			if w.onError != nil {
-				w.onError(line)
+				w.onError(l)
 			}
 		default:
 			if w.onInfo != nil {
-				w.onInfo(line)
+				w.onInfo(l)
 			}
 		}
 	}

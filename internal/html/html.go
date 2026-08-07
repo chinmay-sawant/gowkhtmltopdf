@@ -3,6 +3,8 @@
 // self-closing and void elements. Script/style contents are kept as raw text
 // and stripped at the layout stage. No browser-grade error recovery: common
 // malformed nesting degrades to a usable tree, not a crash.
+//
+// ponytail: custom Node tree (Parent/Attrs/void); migrate to x/net/html only if layout/css rewritten, not free delete.
 package html
 
 import (
@@ -22,13 +24,12 @@ const (
 
 // Node is one DOM node.
 type Node struct {
-	Type      NodeType
-	Name      string // element name (lowercased) for elements
-	Attrs     map[string]string
-	AttrOrder []string // preserves source order for deterministic output
-	Text      string   // text/comment/doctype content
-	Children  []*Node
-	Parent    *Node
+	Type     NodeType
+	Name     string // element name (lowercased) for elements
+	Attrs    map[string]string
+	Text     string // text/comment/doctype content
+	Children []*Node
+	Parent   *Node
 }
 
 // Attribute returns an attribute value, or "".
@@ -44,22 +45,31 @@ func (n *Node) FirstChild(name string) *Node {
 	return nil
 }
 
-// ElementChildren returns element children.
-func (n *Node) ElementChildren() []*Node {
-	out := make([]*Node, 0, len(n.Children))
-	for _, c := range n.Children {
-		if c.Type == ElementNode {
-			out = append(out, c)
-		}
-	}
-	return out
-}
-
 // TextContent concatenates all descendant text.
 func (n *Node) TextContent() string {
 	var b strings.Builder
 	n.appendText(&b)
 	return b.String()
+}
+
+// Walk visits n and every descendant in pre-order (document order).
+func (n *Node) Walk(f func(*Node)) {
+	f(n)
+	for _, c := range n.Children {
+		c.Walk(f)
+	}
+}
+
+// TextContentOf returns the text content of the first element descendant
+// named name, or "" when there is none.
+func (n *Node) TextContentOf(name string) string {
+	var out string
+	n.Walk(func(c *Node) {
+		if out == "" && c.Type == ElementNode && c.Name == name {
+			out = c.TextContent()
+		}
+	})
+	return out
 }
 
 func (n *Node) appendText(b *strings.Builder) {
@@ -104,7 +114,8 @@ var autoClose = map[string][]string{
 }
 
 // Parse turns HTML source into a tree with a synthetic root. The source is
-// decoded UTF-8; callers handle charset detection beforehand.
+// decoded UTF-8; charset detection happens at the load seam (internal/load).
+// Use ParseDocument for the bytes-to-tree path (it strips the BOM).
 func Parse(source string) (*Node, error) {
 	tok, err := tokenize(source)
 	if err != nil {
@@ -173,7 +184,6 @@ func Parse(source string) (*Node, error) {
 				key := strings.ToLower(t.attrs[i])
 				val := UnescapeEntities(t.attrs[i+1])
 				if _, dup := node.Attrs[key]; !dup {
-					node.AttrOrder = append(node.AttrOrder, key)
 					node.Attrs[key] = val
 				}
 			}
@@ -196,44 +206,15 @@ func Parse(source string) (*Node, error) {
 	return root, nil
 }
 
-// CharsetFromMeta scans the document for a meta element declaring a charset,
-// either as <meta charset="..."> or as <meta http-equiv="content-type"
-// content="...; charset=...">, and returns the charset name lowercased, or ""
-// if none is declared.
-func CharsetFromMeta(root *Node) string {
-	for _, c := range root.Children {
-		if cs := charsetFromNode(c); cs != "" {
-			return cs
-		}
-		if c.Type == ElementNode {
-			if cs := CharsetFromMeta(c); cs != "" {
-				return cs
-			}
-		}
+// ParseDocument turns raw document bytes into a tree with a synthetic root,
+// stripping a leading UTF-8 BOM (mirroring load.IsHTML). Only UTF-8/ASCII
+// sources are supported; the charset rule is enforced at the load seam.
+func ParseDocument(body []byte) (*Node, error) {
+	s := string(body)
+	if strings.HasPrefix(s, "\ufeff") { // BOM, mirroring load.IsHTML
+		s = s[1:]
 	}
-	return ""
-}
-
-func charsetFromNode(n *Node) string {
-	if n.Type != ElementNode || n.Name != "meta" {
-		return ""
-	}
-	if cs := n.Attribute("charset"); cs != "" {
-		return strings.ToLower(cs)
-	}
-	if !strings.EqualFold(strings.TrimSpace(n.Attribute("http-equiv")), "content-type") {
-		return ""
-	}
-	content := strings.ToLower(n.Attribute("content"))
-	i := strings.Index(content, "charset=")
-	if i < 0 {
-		return ""
-	}
-	cs := content[i+len("charset="):]
-	if j := strings.IndexAny(cs, " \t;"); j >= 0 {
-		cs = cs[:j]
-	}
-	return strings.Trim(cs, "\"'")
+	return Parse(s)
 }
 
 // openInStack reports whether an element with name is currently open.

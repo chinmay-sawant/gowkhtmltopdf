@@ -503,9 +503,9 @@ func TestIPAGlyphRegistryFallback(t *testing.T) {
 	if _, err := os.Stat(dejavu); err != nil {
 		t.Skip("DejaVu Sans not installed")
 	}
-	reg, err := pdf.ScanFontDir("/usr/share/fonts/truetype/dejavu")
-	if err != nil || reg == nil {
-		t.Fatalf("ScanFontDir: %v", err)
+	reg := pdf.ScanFontDirs([]string{"/usr/share/fonts/truetype/dejavu"})
+	if reg == nil {
+		t.Fatal("ScanFontDirs returned nil")
 	}
 	ipa := "ˈaɾ"
 	root := mustParse(t, `<html><body><p style="font-family: Liberation Sans, sans-serif">`+ipa+`</p></body></html>`)

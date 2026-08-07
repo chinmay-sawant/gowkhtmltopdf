@@ -14,65 +14,14 @@ type flexMeas struct {
 	order  int
 }
 
-// flexGaps returns scaled row/column gaps. When both longhands are unset (0),
-// fall back to the Gap shorthand for both axes.
-func (e *engine) flexGaps(st ResolvedStyle) (rowGap, colGap float64) {
-	if st.RowGap == 0 && st.ColumnGap == 0 {
-		g := e.scalePt(st.Gap)
-		return g, g
-	}
-	return e.scalePt(st.RowGap), e.scalePt(st.ColumnGap)
-}
-
-// flexContentHeight returns the definite content-box height of a flex
-// container, or -1 when height is auto. HeightPercent against an indefinite
-// containing block is treated as auto (cyclic % honesty).
-func (e *engine) flexContentHeight(st ResolvedStyle) float64 {
-	if st.HeightPercent >= 0 && st.Height < 0 {
-		return -1
-	}
-	if st.Height < 0 {
-		return -1
-	}
-	h := e.scalePt(st.Height)
-	if st.BoxSizing == "border-box" {
-		h -= e.scalePt(st.PaddingTop) + e.scalePt(st.PaddingBottom) +
-			e.scalePt(st.BorderTop.Width) + e.scalePt(st.BorderBottom.Width)
-	}
-	if h < 0 {
-		h = 0
-	}
-	return h
-}
-
 // buildFlex lays out a flex container (row or column) with a report-friendly
 // subset: justify-content, align-items/self, align-content, gap/row-gap/
 // column-gap, flex-grow/shrink/basis, order, wrap, and reverse directions.
 func (e *engine) buildFlex(n *html.Node, st ResolvedStyle, availW, x, y float64) *box {
-	ml, mr := e.scalePt(st.MarginLeft), e.scalePt(st.MarginRight)
+	ml := e.scalePt(st.MarginLeft)
 	b := &box{node: n, style: st, kind: "block", x: x + ml, y: y}
-	b.w = availW - ml - mr
-	if b.w < 0 {
-		b.w = 0
-	}
-	if st.WidthPercent >= 0 {
-		// Cyclic % honesty: indefinite availW → keep fill-remaining (auto).
-		if availW > 0 && availW < 1e12 {
-			b.w = availW * st.WidthPercent / 100
-		}
-	} else if st.Width >= 0 {
-		b.w = e.scalePt(st.Width)
-		if st.BoxSizing != "border-box" {
-			b.w += e.scalePt(st.PaddingLeft) + e.scalePt(st.PaddingRight) +
-				e.scalePt(st.BorderLeft.Width) + e.scalePt(st.BorderRight.Width)
-		}
-	}
-	contentW := b.w - e.scalePt(st.PaddingLeft) - e.scalePt(st.PaddingRight) -
-		e.scalePt(st.BorderLeft.Width) - e.scalePt(st.BorderRight.Width)
-	if contentW < 0 {
-		contentW = 0
-	}
-	contentX := b.x + e.scalePt(st.BorderLeft.Width) + e.scalePt(st.PaddingLeft)
+	b.w = resolveUsedWidth(st, availW, e)
+	contentX, contentW := e.contentBox(b.x, b.w, st)
 	contentStart := len(e.ops)
 	cy := e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)
 
@@ -87,7 +36,7 @@ func (e *engine) buildFlex(n *html.Node, st ResolvedStyle, availW, x, y float64)
 		}
 		kids = append(kids, c)
 	}
-	rowGap, colGap := e.flexGaps(st)
+	rowGap, colGap := e.styleGaps(st)
 	dir := st.FlexDirection
 	if dir == "" {
 		dir = "row"
@@ -110,7 +59,7 @@ func (e *engine) buildFlex(n *html.Node, st ResolvedStyle, availW, x, y float64)
 		}
 	}
 	b.h = cy
-	e.prependChrome(contentStart, st, b.x, y, b.w, b.h)
+	e.prependChrome(contentStart, b, st, b.x, y, b.w, b.h)
 	return b
 }
 
@@ -189,7 +138,7 @@ func (e *engine) flowFlexRow(parent *box, kids []*html.Node, st ResolvedStyle, c
 	// content height (CSS flexbox §9.6), so align-items/self have room.
 	lineCross := -1.0
 	if !wrap {
-		lineCross = e.flexContentHeight(st)
+		lineCross = resolveContentHeight(st, e)
 	}
 	placed := make([]linePlace, 0, len(lines))
 	for li, line := range lines {
@@ -211,7 +160,7 @@ func (e *engine) flowFlexRow(parent *box, kids []*html.Node, st ResolvedStyle, c
 
 	// align-content: distribute free cross space when height is definite and
 	// wrapping produced multiple lines. Height:auto → pack at start (no-op).
-	contentH := e.flexContentHeight(st)
+	contentH := resolveContentHeight(st, e)
 	if contentH >= 0 && len(placed) > 1 {
 		linesH := 0.0
 		for _, lp := range placed {
@@ -672,7 +621,7 @@ func flexItemCrossStretch(st, cs ResolvedStyle) bool {
 }
 
 // flexItemBaseHeight resolves the flex base size on the column main axis.
-// mainSize is the flex container content-box height from flexContentHeight
+// mainSize is the flex container content-box height from resolveContentHeight.
 // (−1 when height is auto / indefinite). Percentage flex-basis against an
 // indefinite main size is treated as auto (content-based) — CSS Flexbox L1
 // §9.2 cyclic %-sizing subset; do not resolve % as 0 silently.
@@ -772,7 +721,7 @@ func (e *engine) flowFlexColumn(parent *box, kids []*html.Node, st ResolvedStyle
 		grow   float64
 		shrink float64
 	}
-	contentH := e.flexContentHeight(st)
+	contentH := resolveContentHeight(st, e)
 	items := make([]colMeas, 0, len(kids))
 	for _, kid := range kids {
 		cs := e.styles[kid]

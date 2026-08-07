@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"os"
 
+	"gowkhtmltopdf/internal/app"
 	"gowkhtmltopdf/internal/cli"
-	"gowkhtmltopdf/internal/imageout"
 )
 
 func main() {
@@ -16,10 +16,10 @@ func main() {
 }
 
 func run(argv []string) int {
-	cmd, err := cli.Parse(argv, os.Stderr)
+	cmd, err := cli.Parse(argv, cli.ModeImage)
 	if err != nil {
 		switch {
-		case errors.Is(err, cli.ErrHelp):
+		case errors.Is(err, cli.ErrHelp), errors.Is(err, cli.ErrExtHelp):
 			cli.PrintHelp(os.Stdout, cli.ModeImage)
 			return cli.ExitOK
 		case errors.Is(err, cli.ErrVersion):
@@ -28,20 +28,14 @@ func run(argv []string) int {
 		case errors.Is(err, cli.ErrLicense):
 			cli.PrintLicense(os.Stdout)
 			return cli.ExitOK
-		case errors.Is(err, cli.ErrExtHelp):
-			cli.PrintExtendedHelp(os.Stdout, cli.ModeImage)
-			return cli.ExitOK
 		}
 		fmt.Fprintf(os.Stderr, "gowkhtmltoimage: %v\n", err)
 		return cli.ExitError
 	}
 
-	if err := imageout.Run(context.Background(), cmd, os.Stderr); err != nil {
+	if err := app.RunImage(context.Background(), cmd, os.Stderr); err != nil {
 		fmt.Fprintf(os.Stderr, "gowkhtmltoimage: %v\n", err)
-		if hc, ok := err.(interface{ HttpErrorCode() int }); ok {
-			return hc.HttpErrorCode()
-		}
-		return cli.ExitError
+		return cli.ExitCode(err)
 	}
 	return cli.ExitOK
 }

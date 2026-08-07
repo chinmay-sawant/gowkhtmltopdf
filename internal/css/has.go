@@ -6,32 +6,59 @@ import (
 	"gowkhtmltopdf/internal/html"
 )
 
-// takeParenArg parses a (...) argument whose '(' sits at open. Returns the
-// inner text, the index just past the matching ')', and ok.
-func takeParenArg(s string, open int) (inner string, end int, ok bool) {
+// matchingParen returns the index of the ')' that matches s[open]=='('.
+// Quoted spans are skipped. ok is false if unbalanced or open is not '('.
+// Shared by media features, container conditions, and :has()/:not() args.
+func matchingParen(s string, open int) (close int, ok bool) {
 	if open >= len(s) || s[open] != '(' {
-		return "", open, false
+		return -1, false
 	}
 	depth := 0
 	for i := open; i < len(s); i++ {
 		switch s[i] {
 		case '"', '\'':
 			q := s[i]
-			j := strings.IndexByte(s[i+1:], q)
-			if j < 0 {
-				return "", open, false
+			i++
+			for i < len(s) && s[i] != q {
+				if s[i] == '\\' && i+1 < len(s) {
+					i++
+				}
+				i++
 			}
-			i += j + 1
 		case '(':
 			depth++
 		case ')':
 			depth--
 			if depth == 0 {
-				return s[open+1 : i], i + 1, true
+				return i, true
 			}
 		}
 	}
-	return "", open, false
+	return -1, false
+}
+
+// takeParenArg parses a (...) argument whose '(' sits at open. Returns the
+// inner text, the index just past the matching ')', and ok.
+func takeParenArg(s string, open int) (inner string, end int, ok bool) {
+	close, ok := matchingParen(s, open)
+	if !ok {
+		return "", open, false
+	}
+	return s[open+1 : close], close + 1, true
+}
+
+// takeParen parses a leading (...) from s (after trim). Returns inner text and
+// the remainder after the matching ')'.
+func takeParen(s string) (inner, rest string, ok bool) {
+	s = strings.TrimSpace(s)
+	if !strings.HasPrefix(s, "(") {
+		return "", s, false
+	}
+	inner, end, ok := takeParenArg(s, 0)
+	if !ok {
+		return "", s, false
+	}
+	return inner, s[end:], true
 }
 
 func parseSelectorListStrict(s string, insideHas bool) ([]Selector, bool) {
@@ -184,11 +211,19 @@ func matchRelativeFrom(sel Selector, anchor *html.Node) bool {
 	return false
 }
 
+// leftmostMatch walks the selector combinator chain right-to-left (same walk
+// as Match) and returns the element that matched the leftmost compound, or nil
+// if the selector does not match n.
 func leftmostMatch(sel Selector, n *html.Node) *html.Node {
-	if n == nil || len(sel.Parts) == 0 || !matchPart(sel.Parts[len(sel.Parts)-1], n) {
+	if n == nil || n.Type != html.ElementNode || len(sel.Parts) == 0 {
+		return nil
+	}
+	if !matchPart(sel.Parts[len(sel.Parts)-1], n) {
 		return nil
 	}
 	cur := n
+	// Combinator is stored on the right-hand part of each pair (how that
+	// part attaches to the previous). Walk left using Parts[i+1].Combinator.
 	for i := len(sel.Parts) - 2; i >= 0; i-- {
 		part := sel.Parts[i]
 		switch sel.Parts[i+1].Combinator {
@@ -215,7 +250,7 @@ func leftmostMatch(sel Selector, n *html.Node) *html.Node {
 			if !found {
 				return nil
 			}
-		default:
+		default: // descendant
 			cur = cur.Parent
 			for cur != nil && (cur.Type != html.ElementNode || !matchPart(part, cur)) {
 				cur = cur.Parent
@@ -259,25 +294,26 @@ func isElementDescendant(n, ancestor *html.Node) bool {
 }
 
 func maxRelativeSpecificity(rels []RelativeSelector) (a, b, c int) {
-	first := true
-	for _, rs := range rels {
+	for i, rs := range rels {
 		sa, sb, sc := Specificity(Selector{Parts: rs.Parts})
-		if first || sa > a || (sa == a && sb > b) || (sa == a && sb == b && sc > c) {
+		if i == 0 || betterSpec(sa, sb, sc, a, b, c) {
 			a, b, c = sa, sb, sc
-			first = false
 		}
 	}
 	return a, b, c
 }
 
 func maxSelectorSpecificity(sels []Selector) (a, b, c int) {
-	first := true
-	for _, sel := range sels {
+	for i, sel := range sels {
 		sa, sb, sc := Specificity(sel)
-		if first || sa > a || (sa == a && sb > b) || (sa == a && sb == b && sc > c) {
+		if i == 0 || betterSpec(sa, sb, sc, a, b, c) {
 			a, b, c = sa, sb, sc
-			first = false
 		}
 	}
 	return a, b, c
+}
+
+// betterSpec reports whether (a1,b1,c1) is more specific than (a2,b2,c2).
+func betterSpec(a1, b1, c1, a2, b2, c2 int) bool {
+	return a1 > a2 || (a1 == a2 && b1 > b2) || (a1 == a2 && b1 == b2 && c1 > c2)
 }

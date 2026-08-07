@@ -43,11 +43,9 @@ func buildRichDoc(t *testing.T) []byte {
 		c.TextAt(20, 280)
 		c.TextShow(fmt.Sprintf("page %d", i+1))
 		c.EndText()
-		rgba := make([]byte, 4*4*4)
-		for j := range rgba {
-			rgba[j] = byte(j * 13)
+		if err := c.AddPNGImage("Im1", 200, 200, 80, 80, makePNG(t, false)); err != nil {
+			t.Fatalf("AddPNGImage: %v", err)
 		}
-		c.DrawImage("Im1", 200, 200, 80, 80, rgba, 4, 4)
 		c.Restore()
 		if i == 0 {
 			p.AddLinkURI([4]float64{10, 10, 110, 30}, "https://example.com")

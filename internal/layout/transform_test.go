@@ -82,9 +82,12 @@ func TestTransformRotateBadgeSiblingsUnmoved(t *testing.T) {
 .plain { display: inline-block; background: #eee; padding: 4pt 8pt; }
 `)
 	res := layoutHTML(t, `<div class="row"><span class="badge">NEW</span> <span class="plain">Sibling</span></div>`, s)
-	var badge, plain *Op
+	var badge, plain, plainFill *Op
 	for i := range res.Ops {
 		op := &res.Ops[i]
+		if op.Kind == OpFillRect && op.R > 0.8 && op.G > 0.8 && op.B > 0.8 {
+			plainFill = op
+		}
 		if op.Kind != OpText {
 			continue
 		}
@@ -103,6 +106,12 @@ func TestTransformRotateBadgeSiblingsUnmoved(t *testing.T) {
 	}
 	if plain.XformSet {
 		t.Fatal("sibling must not inherit paint transform on its own ops incorrectly — wait, sibling is not under badge")
+	}
+	if plainFill == nil {
+		t.Fatal("plain sibling background missing")
+	}
+	if math.Abs(plainFill.X-(plain.X-8)) > 1 {
+		t.Fatalf("plain sibling background x=%.1f, text x=%.1f; chrome was not moved with inline-block", plainFill.X, plain.X)
 	}
 	// Layout Y of sibling text should be on the same line band as badge
 	// (transform does not change sibling flow).

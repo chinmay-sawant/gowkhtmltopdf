@@ -11,14 +11,11 @@ import (
 	"github.com/go-text/typesetting/shaping"
 )
 
-// gotextFaceCache maps *Font → *gtfont.Face (or false-sentinel on failure).
-var gotextFaceCache sync.Map
-
-type gotextFaceEntry struct {
-	face *gtfont.Face
-	ok   bool
-}
-
+// gotextFace parses the go-text face once per Font (see Font.gotOnce); the
+// package-level sync.Map is gone so derived data lives on and dies with the
+// Font it derives from.
+//
+// ponytail: go-text OT shaping when GSUB available; manual Arabic/RTL fallback otherwise.
 var (
 	shaperPool = sync.Pool{
 		New: func() any { return &shaping.HarfbuzzShaper{} },
@@ -28,24 +25,41 @@ var (
 	}
 )
 
-// ShapedGlyph is one output glyph from ShapeRun (OpenType or fallback).
-type ShapedGlyph struct {
-	GID     uint16
-	Rune    rune    // Unicode CID for PDF Identity-H when reverse-cmap succeeds
-	Advance float64 // font units
-	Cluster int
+// shapedRun is the internal result of OpenType shaping for reverse-cmap text.
+type shapedRun struct {
+	text string // reverse-cmap Unicode when fully mapped; else ""
 }
 
-// ShapedRun is the result of ShapeRun.
+// ShapedRun is the canonical text result consumed by layout-independent
+// emitters. Text is shaped once, then Runes and Advances describe that exact
+// shaped sequence. Keeping the advance calculation next to shaping prevents
+// PDF and raster output from independently walking the pre-shaped source
+// string and drifting on ligatures or presentation forms.
 type ShapedRun struct {
-	Glyphs []ShapedGlyph
-	Text   string // reverse-cmap Unicode string when fully mapped; else ""
-	OT     bool   // true when OpenType shaping produced Glyphs
+	Text     string
+	Runes    []rune
+	Advances []float64 // points at the requested font size, one per Rune
+}
+
+// ShapeRun shapes s and computes advances for the resulting run. The returned
+// slices are owned by the result and may be retained by the caller.
+func ShapeRun(s string, f *Font, size float64) ShapedRun {
+	text := ShapeTextFont(s, f)
+	runes := []rune(text)
+	advances := make([]float64, len(runes))
+	if f != nil {
+		for i, r := range runes {
+			advances[i] = f.AdvanceInPoints(r, size)
+		}
+	}
+	return ShapedRun{Text: text, Runes: runes, Advances: advances}
 }
 
 // ShapeTextFont shapes s for PDF/image emission using OpenType when f has a
 // GSUB table and reverse-cmap can map every shaped glyph to Unicode. Otherwise
 // it falls back to presentation-form ShapeText.
+//
+// ponytail: go-text OT shaping when GSUB available; manual Arabic/RTL fallback otherwise.
 //
 // For CJK / East-Asian punctuation runs, optional OpenType features halt and
 // palt are requested via typesetting FontFeatures when the face provides them.
@@ -65,8 +79,8 @@ func ShapeTextFontWithFeatures(s string, f *Font, features []shaping.FontFeature
 	if !needShape {
 		return s
 	}
-	if run, ok := tryShapeOpenType(s, f, feats); ok && run.Text != "" {
-		return run.Text
+	if run, ok := tryShapeOpenType(s, f, feats); ok && run.text != "" {
+		return run.text
 	}
 	if ShapeNeeded(s) {
 		return ShapeText(s)
@@ -74,35 +88,18 @@ func ShapeTextFontWithFeatures(s string, f *Font, features []shaping.FontFeature
 	return s
 }
 
-// ShapeRun returns glyph-level shaping. When OpenType succeeds, OT is true and
-// Text holds reverse-cmap Unicode (visual order) suitable for Type0 Identity-H.
-// On failure Glyphs is empty and callers should use ShapeText.
-func ShapeRun(s string, f *Font) ShapedRun {
-	if s == "" {
-		return ShapedRun{}
-	}
-	feats := mergeFontFeatures(s, nil)
-	if !ShapeNeeded(s) && len(feats) == 0 {
-		return ShapedRun{}
-	}
-	if run, ok := tryShapeOpenType(s, f, feats); ok {
-		return run
-	}
-	return ShapedRun{}
-}
-
-func tryShapeOpenType(s string, f *Font, features []shaping.FontFeature) (ShapedRun, bool) {
+func tryShapeOpenType(s string, f *Font, features []shaping.FontFeature) (shapedRun, bool) {
 	if f == nil {
-		return ShapedRun{}, false
+		return shapedRun{}, false
 	}
 	// GSUB covers Arabic ligation; halt/palt live in GPOS and are requested via
 	// FontFeatures — allow the OT path when either applies.
 	if !f.hasGSUB() && len(features) == 0 {
-		return ShapedRun{}, false
+		return shapedRun{}, false
 	}
-	face, ok := gotextFace(f)
+	face, ok := f.gotextFace()
 	if !ok {
-		return ShapedRun{}, false
+		return shapedRun{}, false
 	}
 	rev := f.reverseCmap()
 	text := []rune(s)
@@ -124,7 +121,6 @@ func tryShapeOpenType(s string, f *Font, features []shaping.FontFeature) (Shaped
 		FontFeatures: features,
 	}, singleFaceMap{face})
 
-	outGlyphs := make([]ShapedGlyph, 0, len(text))
 	outRunes := make([]rune, 0, len(text))
 	for _, in := range inputs {
 		if in.Face == nil {
@@ -139,26 +135,12 @@ func tryShapeOpenType(s string, f *Font, features []shaping.FontFeature) (Shaped
 			gid := uint16(g.GlyphID)
 			r, ok := rev[gid]
 			if !ok {
-				return ShapedRun{}, false
+				return shapedRun{}, false
 			}
-			adv := 0.0
-			if int(gid) < len(f.advance) {
-				adv = float64(f.advance[gid])
-			}
-			outGlyphs = append(outGlyphs, ShapedGlyph{
-				GID:     gid,
-				Rune:    r,
-				Advance: adv,
-				Cluster: g.ClusterIndex,
-			})
 			outRunes = append(outRunes, r)
 		}
 	}
-	return ShapedRun{
-		Glyphs: outGlyphs,
-		Text:   string(outRunes),
-		OT:     true,
-	}, true
+	return shapedRun{text: string(outRunes)}, true
 }
 
 // ParseFontFeatureSettings parses a CSS font-feature-settings value into
@@ -319,38 +301,42 @@ func (f *Font) hasGSUB() bool {
 	return ok
 }
 
-func gotextFace(f *Font) (*gtfont.Face, bool) {
+// gotextFace parses the go-text face once per Font (see Font.gotOnce); the
+// package-level sync.Map is gone so derived data lives on and dies with the
+// Font it derives from.
+func (f *Font) gotextFace() (*gtfont.Face, bool) {
 	if f == nil || len(f.data) == 0 {
 		return nil, false
 	}
-	if v, ok := gotextFaceCache.Load(f); ok {
-		e := v.(gotextFaceEntry)
-		return e.face, e.ok
-	}
-	face, err := gtfont.ParseTTF(bytes.NewReader(f.data))
-	e := gotextFaceEntry{face: face, ok: err == nil && face != nil}
-	if actual, loaded := gotextFaceCache.LoadOrStore(f, e); loaded {
-		e = actual.(gotextFaceEntry)
-	}
-	return e.face, e.ok
+	f.gotOnce.Do(func() {
+		if face, err := gtfont.ParseTTF(bytes.NewReader(f.data)); err == nil && face != nil {
+			f.gotFace = face
+		}
+	})
+	return f.gotFace, f.gotFace != nil
 }
 
 // reverseCmap maps glyph id → preferred Unicode (presentation forms win).
+// The map is built once from f.cmap (immutable after parse) and cached on
+// the Font.
 func (f *Font) reverseCmap() map[uint16]rune {
-	out := make(map[uint16]rune, len(f.cmap))
-	for cp, gid := range f.cmap {
-		if gid == 0 {
-			continue
-		}
-		r := rune(cp)
-		if prev, ok := out[gid]; ok {
-			if cmapRuneScore(r) <= cmapRuneScore(prev) {
+	f.revOnce.Do(func() {
+		out := make(map[uint16]rune, len(f.cmap))
+		for cp, gid := range f.cmap {
+			if gid == 0 {
 				continue
 			}
+			r := rune(cp)
+			if prev, ok := out[gid]; ok {
+				if cmapRuneScore(r) <= cmapRuneScore(prev) {
+					continue
+				}
+			}
+			out[gid] = r
 		}
-		out[gid] = r
-	}
-	return out
+		f.rev = out
+	})
+	return f.rev
 }
 
 func cmapRuneScore(r rune) int {

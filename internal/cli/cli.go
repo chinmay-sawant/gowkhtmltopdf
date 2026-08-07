@@ -1,11 +1,11 @@
-// Package cli implements the wkhtmltopdf-compatible command-line parser:
-// global options, multi-object grammar (page/cover/toc), help/version, and
-// exit-code mapping.
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"os"
+	"strconv"
 	"strings"
 
 	"gowkhtmltopdf/internal/settings"
@@ -31,23 +31,47 @@ type Command struct {
 	Global  settings.PdfGlobal
 	Image   settings.ImageGlobal
 	Objects []settings.PdfObject
-	Output  string // output path or "-" (stdout)
+	// Output is a path or "-" (stdout). Ignored when OutputWriter is set.
+	Output string
+	// OutputWriter, when non-nil, receives PDF/image bytes directly (library
+	// path). Takes precedence over Output so embedders need no temp files.
+	OutputWriter io.Writer
 
-	ShowHelp          bool
-	ShowVersion       bool
-	ShowLicense       bool
-	ShowExtHelp       bool
 	DumpDefaultTOCXSL bool
 	DumpOutline       bool
-	Man               bool
-	HTMLHelp          bool
 }
+
+// OpenOutput returns the writer for this command: OutputWriter (library bytes
+// sink) takes precedence over Output path; empty/"-" use stdout.
+// The closer must be called when done (no-op for writer/stdout).
+func (cmd *Command) OpenOutput() (io.Writer, func() error, error) {
+	if cmd.OutputWriter != nil {
+		return cmd.OutputWriter, func() error { return nil }, nil
+	}
+	if cmd.Output != "" && cmd.Output != "-" {
+		f, err := os.Create(cmd.Output)
+		if err != nil {
+			return nil, nil, fmt.Errorf("output %q: %w", cmd.Output, err)
+		}
+		return f, f.Close, nil
+	}
+	return os.Stdout, func() error { return nil }, nil
+}
+
+// flagKind distinguishes how a flag's value is extracted and delivered.
+type flagKind uint8
+
+const (
+	flagBool  flagKind = iota // app receives one canonical "true"/"false"
+	flagValue                 // app receives one value token
+	flagPair                  // app receives exactly two tokens (name value)
+)
 
 // flagSpec describes one accepted flag.
 type flagSpec struct {
-	kind string // "bool" | "value"
-	mod  Mode   // which binaries accept it
-	app  func(c *Command, cur *objectCtx, val string) error
+	kind flagKind
+	mod  Mode // which binaries accept it
+	app  func(c *Command, ctx *objectCtx, vals []string) error
 }
 
 type objectCtx struct {
@@ -76,7 +100,7 @@ func (ctx *objectCtx) newObject(c *Command) *settings.PdfObject {
 		c.Objects = append(c.Objects, *ctx.pending)
 		ctx.pending = nil
 	} else {
-		c.Objects = append(c.Objects, settings.PdfObject{})
+		c.Objects = append(c.Objects, settings.DefaultPdfObject())
 	}
 	ctx.obj = &c.Objects[len(c.Objects)-1]
 	return ctx.obj
@@ -86,13 +110,23 @@ func (ctx *objectCtx) newObject(c *Command) *settings.PdfObject {
 // settings. Used for toc so pre-object page flags apply to the first real
 // page that follows, not to the TOC entry itself.
 func (ctx *objectCtx) newFreshObject(c *Command) *settings.PdfObject {
-	c.Objects = append(c.Objects, settings.PdfObject{})
+	c.Objects = append(c.Objects, settings.DefaultPdfObject())
 	ctx.obj = &c.Objects[len(c.Objects)-1]
 	return ctx.obj
 }
 
 // Parse parses wkhtmltopdf-style arguments.
-func Parse(argv []string, out io.Writer) (*Command, error) {
+//
+// The optional mode restricts the flags accepted by the parser. Omitting it
+// preserves the historical library behaviour and accepts the union of PDF
+// and image flags; command binaries should pass their concrete mode. A
+// variadic parameter keeps existing callers source-compatible while making
+// the mode contract explicit for new callers.
+func Parse(argv []string, modes ...Mode) (*Command, error) {
+	mode, err := parseMode(modes)
+	if err != nil {
+		return nil, err
+	}
 	cmd := &Command{Global: settings.DefaultPdfGlobal(), Image: settings.DefaultImageGlobal()}
 	cur := &objectCtx{}
 	var free []string
@@ -103,23 +137,13 @@ func Parse(argv []string, out io.Writer) (*Command, error) {
 		i++
 		switch {
 		case arg == "-h" || arg == "--help":
-			cmd.ShowHelp = true
 			return cmd, ErrHelp
 		case arg == "-V" || arg == "--version":
-			cmd.ShowVersion = true
 			return cmd, ErrVersion
 		case arg == "-L" || arg == "--license":
-			cmd.ShowLicense = true
 			return cmd, ErrLicense
 		case arg == "-E" || arg == "--extended-help":
-			cmd.ShowExtHelp = true
 			return cmd, ErrExtHelp
-		case arg == "--man":
-			cmd.Man = true
-			continue
-		case arg == "--html":
-			cmd.HTMLHelp = true
-			continue
 		case arg == "--":
 			// end of options; remaining args are positional
 			for ; i < len(argv); i++ {
@@ -134,6 +158,9 @@ func Parse(argv []string, out io.Writer) (*Command, error) {
 			if !ok {
 				return nil, fmt.Errorf("unknown option --%s", name)
 			}
+			if err := checkMode(name, spec, mode); err != nil {
+				return nil, err
+			}
 			if err := apply(cmd, cur, name, spec, negated, val, hasVal, argv, &i); err != nil {
 				return nil, err
 			}
@@ -143,6 +170,9 @@ func Parse(argv []string, out io.Writer) (*Command, error) {
 			spec, ok := shortFlags[name]
 			if !ok {
 				return nil, fmt.Errorf("unknown option -%s", name)
+			}
+			if err := checkMode(name, spec, mode); err != nil {
+				return nil, err
 			}
 			if err := apply(cmd, cur, name, spec, false, "", false, argv, &i); err != nil {
 				return nil, err
@@ -157,6 +187,39 @@ func Parse(argv []string, out io.Writer) (*Command, error) {
 		return nil, err
 	}
 	return cmd, nil
+}
+
+// ParseMode is the explicit form of Parse for callers that know which
+// executable mode they are implementing.
+func ParseMode(argv []string, mode Mode) (*Command, error) {
+	return Parse(argv, mode)
+}
+
+func parseMode(modes []Mode) (Mode, error) {
+	if len(modes) > 1 {
+		return 0, fmt.Errorf("cli: Parse accepts at most one mode")
+	}
+	if len(modes) == 0 {
+		return ModeBoth, nil
+	}
+	mode := modes[0]
+	if mode == 0 || mode&^ModeBoth != 0 {
+		return 0, fmt.Errorf("cli: invalid mode %d", mode)
+	}
+	return mode, nil
+}
+
+func checkMode(name string, spec flagSpec, mode Mode) error {
+	if spec.mod&mode != 0 {
+		return nil
+	}
+	modeName := "requested mode"
+	if mode == ModePDF {
+		modeName = "pdf mode"
+	} else if mode == ModeImage {
+		modeName = "image mode"
+	}
+	return fmt.Errorf("option --%s is not supported in %s", name, modeName)
 }
 
 // positional handles object keywords and queues bare positionals.
@@ -230,43 +293,80 @@ func (c *Command) validate() error {
 	return nil
 }
 
-// apply runs a flag with value extraction (next-arg or =value). Pair flags
-// consume two values joined by pairSep.
+// applyPage routes a page-ish flag: the global half first, then the current
+// object, else accumulates it as pending first-page settings (upstream
+// address remapping: page settings before any object keyword apply to the
+// first page).
+func (ctx *objectCtx) applyPage(c *Command, glob func(g *settings.PdfGlobal, val string) error,
+	obj func(o *settings.PdfObject, val string) error, val string) error {
+	if err := glob(&c.Global, val); err != nil {
+		return err
+	}
+	if ctx.obj != nil {
+		return obj(ctx.obj, val)
+	}
+	if ctx.pending == nil {
+		o := settings.DefaultPdfObject()
+		ctx.pending = &o
+	}
+	return obj(ctx.pending, val)
+}
+
+// apply runs a flag with value extraction (next-arg or =value). Bool flags
+// arrive pre-parsed as canonical "true"/"false"; pair flags arrive as two
+// separate tokens.
 func apply(c *Command, cur *objectCtx, name string, spec flagSpec, negated bool, inlineVal string, hasInline bool, argv []string, i *int) error {
-	if spec.kind == "bool" {
-		val := "true"
-		if negated {
-			val = "false"
+	switch spec.kind {
+	case flagBool:
+		b, err := parseBool(inlineVal, negated, hasInline)
+		if err != nil {
+			return err
 		}
-		if hasInline {
-			switch strings.ToLower(inlineVal) {
-			case "true", "1", "yes", "on":
-				val = "true"
-			case "false", "0", "no", "off":
-				val = "false"
-			default:
-				return fmt.Errorf("invalid boolean value %q", inlineVal)
+		return spec.app(c, cur, []string{strconv.FormatBool(b)})
+	case flagValue:
+		vals := []string{inlineVal}
+		if !hasInline {
+			if *i >= len(argv) {
+				return fmt.Errorf("option requires a value")
 			}
+			vals[0] = argv[*i]
+			*i++
 		}
-		return spec.app(c, cur, val)
-	}
-	// value flag
-	if hasInline {
-		return spec.app(c, cur, inlineVal)
-	}
-	if *i >= len(argv) {
-		return fmt.Errorf("option requires a value")
-	}
-	val := argv[*i]
-	*i++
-	if isPairFlag(name) {
+		return spec.app(c, cur, vals)
+	case flagPair:
+		vals := [2]string{}
+		if hasInline {
+			vals[0] = inlineVal
+		} else {
+			if *i >= len(argv) {
+				return fmt.Errorf("option requires two values (name value)")
+			}
+			vals[0] = argv[*i]
+			*i++
+		}
 		if *i >= len(argv) {
 			return fmt.Errorf("option requires two values (name value)")
 		}
-		val += pairSep + argv[*i]
+		vals[1] = argv[*i]
 		*i++
+		return spec.app(c, cur, vals[:])
 	}
-	return spec.app(c, cur, val)
+	return fmt.Errorf("internal: unknown flag kind for --%s", name)
+}
+
+// parseBool turns the bool-flag contract into a real bool: an inline value
+// (--flag=x) wins, otherwise --no-flag negates. Unknown inline values error.
+func parseBool(inlineVal string, negated, hasInline bool) (bool, error) {
+	if hasInline {
+		switch strings.ToLower(inlineVal) {
+		case "true", "1", "yes", "on":
+			return true, nil
+		case "false", "0", "no", "off":
+			return false, nil
+		}
+		return false, fmt.Errorf("invalid boolean value %q", inlineVal)
+	}
+	return !negated, nil
 }
 
 func splitFlag(name string) (string, string, bool) {
@@ -282,9 +382,20 @@ func lookupFlag(name string) (flagSpec, bool, bool) {
 		return spec, false, true
 	}
 	if strings.HasPrefix(name, "no-") {
-		if spec, ok := flagTable[name[3:]]; ok && spec.kind == "bool" {
+		if spec, ok := flagTable[name[3:]]; ok && spec.kind == flagBool {
 			return spec, true, true
 		}
 	}
 	return flagSpec{}, false, false
+}
+
+// ExitCode converts an error into a process exit code: errors carrying an
+// HttpErrorCode() int method (e.g. settings.HttpStatusError) report that
+// code; everything else exits 1.
+func ExitCode(err error) int {
+	var hc interface{ HttpErrorCode() int }
+	if errors.As(err, &hc) {
+		return hc.HttpErrorCode()
+	}
+	return ExitError
 }

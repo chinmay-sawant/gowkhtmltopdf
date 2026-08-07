@@ -35,6 +35,8 @@ var (
 
 // ParseFontBytes parses TTF/OTF (TrueType outlines) or WOFF1-wrapped SFNT.
 // WOFF2 is rejected with a clear error (Brotli not allowlisted).
+//
+// ponytail: WOFF1 in-tree only; no Brotli / WOFF2 direct dep.
 func ParseFontBytes(data []byte) (*Font, error) {
 	if len(data) >= 4 {
 		sig := string(data[0:4])
@@ -182,13 +184,4 @@ func DecodeWOFF(data []byte) ([]byte, error) {
 		tableOffset += padded
 	}
 	return out, nil
-}
-
-// DecodeWOFF2 documents the WOFF2 gap: Brotli is not in stdlib and not an
-// allowlisted direct module; go-text/typesetting only reads WOFF1.
-func DecodeWOFF2(data []byte) ([]byte, error) {
-	if len(data) < 4 || string(data[0:4]) != woff2Signature {
-		return nil, errWOFFBadSignature
-	}
-	return nil, errWOFF2Unsupported
 }

@@ -15,9 +15,10 @@ package main
 
 import (
 	"context"
+	"errors"
+	"flag"
 	"fmt"
 	"os"
-	"strings"
 
 	gowkhtmltopdf "gowkhtmltopdf"
 )
@@ -41,59 +42,51 @@ func main() {
 }
 
 func run(argv []string) error {
-	var (
-		pageSize    = "A4"
-		orientation = "portrait"
-		marginTop   = ""
-		localFiles  = false
-	)
-	var inputs []string
-	for i := 0; i < len(argv); i++ {
-		arg := argv[i]
-		switch {
-		case arg == "--help" || arg == "-h":
-			usage()
+	fs := flag.NewFlagSet("pdf", flag.ContinueOnError)
+	fs.Usage = usage
+	pageSize := fs.String("page-size", "A4", "e.g. A4, Letter")
+	orientation := fs.String("orientation", "portrait", "portrait or landscape")
+	marginTop := fs.String("margin-top", "", "top margin in mm")
+	localFiles := fs.Bool("enable-local-file-access", false, "allow local files (needed for file inputs)")
+	if err := fs.Parse(argv); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
 			return nil
-		case arg == "--enable-local-file-access":
-			localFiles = true
-		case strings.HasPrefix(arg, "--page-size="):
-			pageSize = strings.TrimPrefix(arg, "--page-size=")
-		case arg == "--page-size" && i+1 < len(argv):
-			i++
-			pageSize = argv[i]
-		case strings.HasPrefix(arg, "--orientation="):
-			orientation = strings.TrimPrefix(arg, "--orientation=")
-		case arg == "--orientation" && i+1 < len(argv):
-			i++
-			orientation = argv[i]
-		case strings.HasPrefix(arg, "--margin-top="):
-			marginTop = strings.TrimPrefix(arg, "--margin-top=")
-		case arg == "--margin-top" && i+1 < len(argv):
-			i++
-			marginTop = argv[i]
-		case strings.HasPrefix(arg, "-"):
-			return fmt.Errorf("unknown option %q", arg)
-		default:
-			inputs = append(inputs, arg)
 		}
+		return err
 	}
-	if len(inputs) != 2 {
+	if fs.NArg() != 2 {
 		usage()
 		return fmt.Errorf("need exactly one input and one output file")
 	}
-	input, output := inputs[0], inputs[1]
+	input, output := fs.Arg(0), fs.Arg(1)
 
 	c := gowkhtmltopdf.NewConverter()
-	c.Global().Set("size.pagesize", pageSize)
-	c.Global().Set("orientation", orientation)
-	if marginTop != "" {
-		c.Global().Set("margin.top", marginTop)
+	mustSet := func(name, value string) error {
+		if err := c.Global().Set(name, value); err != nil {
+			return fmt.Errorf("%s: %w", name, err)
+		}
+		return nil
+	}
+	if err := mustSet("size.pagesize", *pageSize); err != nil {
+		return err
+	}
+	if err := mustSet("orientation", *orientation); err != nil {
+		return err
+	}
+	if *marginTop != "" {
+		if err := mustSet("margin.top", *marginTop); err != nil {
+			return err
+		}
 	}
 
 	obj := gowkhtmltopdf.NewObjectSettings().SetPage(input)
-	if localFiles {
-		c.Global().Set("enablelocalfileaccess", "true")
-		obj.Set("load.blocklocalfileaccess", "false")
+	if *localFiles {
+		if err := mustSet("enablelocalfileaccess", "true"); err != nil {
+			return err
+		}
+		if err := obj.Set("load.blocklocalfileaccess", "false"); err != nil {
+			return err
+		}
 	}
 	c.AddObject(obj)
 

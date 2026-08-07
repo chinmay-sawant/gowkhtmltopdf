@@ -2,6 +2,7 @@ package layout
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"testing"
 
@@ -104,7 +105,7 @@ li { page-break-inside: avoid; margin: 0 0 0.35em 0; }
 		}
 		merged := false
 		for i := range bodyLines {
-			if abs3(bodyLines[i].y-op.Y) <= 0.5 {
+			if math.Abs(bodyLines[i].y-op.Y) <= 0.5 {
 				merged = true
 				if op.Size > bodyLines[i].size {
 					bodyLines[i].size = op.Size

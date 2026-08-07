@@ -7,14 +7,6 @@ import (
 	"strings"
 )
 
-// embeddedFont is one subset embedded in the document.
-type embeddedFont struct {
-	subset  *subsetResult
-	ref     string // /FontFile2 object ref
-	descRef string // /FontDescriptor object ref
-	fontRef string // font dict object ref
-}
-
 // pdfNameToken keeps only characters safe in a PDF name token.
 func pdfNameToken(s string) string {
 	var b strings.Builder
@@ -29,16 +21,29 @@ func pdfNameToken(s string) string {
 	return b.String()
 }
 
+// widthsInEm is the single home of the font-units→PDF-1000-em conversion,
+// feeding both the simple /Widths array and the Type0 /W array. The result
+// is indexed by subset glyph id.
+func widthsInEm(sub *subsetResult, unitsPerEm int16) []float64 {
+	upm := float64(unitsPerEm)
+	if upm <= 0 {
+		upm = 1000
+	}
+	ws := make([]float64, len(sub.widths))
+	for i, w := range sub.widths {
+		// PDF glyph space: 1000 units = 1 em.
+		ws[i] = w * 1000 / upm
+	}
+	return ws
+}
+
 // subsetWidths returns (firstCode, lastCode, widths) with widths indexed by
 // char code in PDF 1000-unit em space; codes without a glyph get 0.
 func subsetWidths(sub *subsetResult, unitsPerEm int16) (int, int, []float64) {
 	if len(sub.glyphIDs) == 0 {
 		return 0, 0, nil
 	}
-	upm := float64(unitsPerEm)
-	if upm <= 0 {
-		upm = 1000
-	}
+	ws := widthsInEm(sub, unitsPerEm)
 	first, last := 0xFF, 0
 	for r := range sub.glyphIDs {
 		c := int(r)
@@ -51,16 +56,16 @@ func subsetWidths(sub *subsetResult, unitsPerEm int16) (int, int, []float64) {
 	}
 	widths := make([]float64, last-first+1)
 	for r, g := range sub.glyphIDs {
-		if int(g) < len(sub.widths) {
-			// PDF glyph space: 1000 units = 1 em.
-			widths[int(r)-first] = sub.widths[g] * 1000 / upm
+		if int(g) < len(ws) {
+			widths[int(r)-first] = ws[g]
 		}
 	}
 	return first, last, widths
 }
 
 // ensureToUnicode emits the ToUnicode CMap for a subset and returns its ref.
-func (d *Document) ensureToUnicode(sub *subsetResult) string {
+// codeBytes is 1 for simple (WinAnsi single-byte) or 2 for Identity-H CIDs.
+func (d *Document) ensureToUnicode(sub *subsetResult, codeBytes int) objRef {
 	ref := d.newObject()
 	var b strings.Builder
 	b.WriteString("/CIDInit /ProcSet findresource begin\n")
@@ -70,9 +75,13 @@ func (d *Document) ensureToUnicode(sub *subsetResult) string {
 	b.WriteString("/CMapName /Adobe-Identity-UCS def\n")
 	b.WriteString("/CMapType 2 def\n")
 	b.WriteString("1 begincodespacerange\n")
-	fmt.Fprintf(&b, "<%02X> <%02X>\n", byte(0), byte(0xFF))
+	if codeBytes >= 2 {
+		b.WriteString("<0000> <FFFF>\n")
+	} else {
+		fmt.Fprintf(&b, "<%02X> <%02X>\n", byte(0), byte(0xFF))
+	}
 	b.WriteString("endcodespacerange\n")
-	// group mappings: code → unicode (code == rune value for Latin-1)
+	// code → unicode (code == rune for both simple Latin-1 and Identity-H CIDs)
 	type m struct{ code, r rune }
 	var maps []m
 	for r := range sub.glyphIDs {
@@ -86,7 +95,11 @@ func (d *Document) ensureToUnicode(sub *subsetResult) string {
 		}
 		fmt.Fprintf(&b, "%d beginbfchar\n", end-start)
 		for _, mm := range maps[start:end] {
-			fmt.Fprintf(&b, "<%02X> <%04X>\n", mm.code, mm.r)
+			if codeBytes >= 2 {
+				fmt.Fprintf(&b, "<%04X> <%04X>\n", mm.code, mm.r)
+			} else {
+				fmt.Fprintf(&b, "<%02X> <%04X>\n", mm.code, mm.r)
+			}
 		}
 		b.WriteString("endbfchar\n")
 	}

@@ -12,7 +12,6 @@ import (
 type Content struct {
 	buf       bytes.Buffer
 	fontUses  map[string]string // resource name -> font object ref (allocated at finalize)
-	fontDefs  map[string]string // resource name -> base font name (base-14)
 	fontFiles map[string]*Font  // resource name -> parsed font (embedded)
 	used      map[string][]rune // resource name -> runes seen
 	curFont   string            // active font from last SetFont
@@ -24,17 +23,15 @@ type Content struct {
 }
 
 type imageResource struct {
-	ref    string // indirect object ref (allocated lazily)
+	ref    objRef // indirect object ref (allocated in AddJPEGImage/AddPNGImage)
 	width  int
 	height int
-	data   []byte // raw RGBA
 }
 
 // NewContent creates an empty content stream builder.
 func NewContent() *Content {
 	return &Content{
 		fontUses:  map[string]string{},
-		fontDefs:  map[string]string{},
 		fontFiles: map[string]*Font{},
 		used:      map[string][]rune{},
 		imageUses: map[string]string{},
@@ -45,26 +42,63 @@ func NewContent() *Content {
 // Bytes returns the raw (uncompressed) content stream.
 func (c *Content) Bytes() []byte { return c.buf.Bytes() }
 
-// cloneContent returns a copy of c that paints the same operators. Font,
-// image and rune maps are shared with the source: they are only written
-// during painting (before clone time) and at finalize, where writes are
-// idempotent, so both pages resolve to the same resource objects. A fresh
-// bytes.Buffer is used because Buffer values must not be copied after use.
+// cloneContent returns a copy of c that paints the same operators. Resource
+// maps are copied rather than aliased: a duplicated page may add a resource
+// after cloning and must not mutate the source page's resource dictionary.
+// The parsed fonts themselves are immutable, so their pointers remain shared.
+// A fresh bytes.Buffer is used because Buffer values must not be copied after
+// use.
 func cloneContent(c *Content) *Content {
 	nc := &Content{
-		fontUses:  c.fontUses,
-		fontDefs:  c.fontDefs,
-		fontFiles: c.fontFiles,
-		used:      c.used,
+		fontUses:  cloneStringMap(c.fontUses),
+		fontFiles: cloneFontMap(c.fontFiles),
+		used:      cloneRuneMap(c.used),
 		curFont:   c.curFont,
 		curSize:   c.curSize,
-		imageUses: c.imageUses,
-		imageRefs: c.imageRefs,
+		imageUses: cloneStringMap(c.imageUses),
+		imageRefs: cloneImageMap(c.imageRefs),
 		opacity:   c.opacity,
 		doc:       c.doc,
 	}
 	nc.buf.Write(c.buf.Bytes())
 	return nc
+}
+
+func cloneStringMap(src map[string]string) map[string]string {
+	dst := make(map[string]string, len(src))
+	for k, v := range src {
+		dst[k] = v
+	}
+	return dst
+}
+
+func cloneFontMap(src map[string]*Font) map[string]*Font {
+	dst := make(map[string]*Font, len(src))
+	for k, v := range src {
+		dst[k] = v
+	}
+	return dst
+}
+
+func cloneRuneMap(src map[string][]rune) map[string][]rune {
+	dst := make(map[string][]rune, len(src))
+	for k, v := range src {
+		dst[k] = append([]rune(nil), v...)
+	}
+	return dst
+}
+
+func cloneImageMap(src map[string]*imageResource) map[string]*imageResource {
+	dst := make(map[string]*imageResource, len(src))
+	for k, v := range src {
+		if v == nil {
+			dst[k] = nil
+			continue
+		}
+		copy := *v
+		dst[k] = &copy
+	}
+	return dst
 }
 
 // graphics state
@@ -75,13 +109,23 @@ func (c *Content) Save() { c.buf.WriteString("q\n") }
 // Restore pops the graphics state stack.
 func (c *Content) Restore() { c.buf.WriteString("Q\n") }
 
-// SetFillColor sets the fill color (RGB, 0..1).
+// SetFillColor sets the fill color (RGB, 0..1); grayscale is applied at this
+// paint-time seam, which is what Document.SetGrayscale promises today.
 func (c *Content) SetFillColor(r, g, b float64) {
+	if c.doc != nil && c.doc.grayscale {
+		v := 0.299*r + 0.587*g + 0.114*b // Rec.601 luma
+		r, g, b = v, v, v
+	}
 	c.buf.WriteString(fmt.Sprintf("%s %s %s rg\n", num(r), num(g), num(b)))
 }
 
-// SetStrokeColor sets the stroke color (RGB, 0..1).
+// SetStrokeColor sets the stroke color (RGB, 0..1); grayscale is applied at
+// this paint-time seam, same fold as SetFillColor.
 func (c *Content) SetStrokeColor(r, g, b float64) {
+	if c.doc != nil && c.doc.grayscale {
+		v := 0.299*r + 0.587*g + 0.114*b // Rec.601 luma
+		r, g, b = v, v, v
+	}
 	c.buf.WriteString(fmt.Sprintf("%s %s %s RG\n", num(r), num(g), num(b)))
 }
 
@@ -120,14 +164,8 @@ func (c *Content) Rect(x, y, w, h float64) {
 // Fill paints the current path with the fill color.
 func (c *Content) Fill() { c.buf.WriteString("f\n") }
 
-// FillStroke fills and strokes the current path.
-func (c *Content) FillStroke() { c.buf.WriteString("B\n") }
-
 // Stroke strokes the current path.
 func (c *Content) Stroke() { c.buf.WriteString("S\n") }
-
-// ClosePath closes the current subpath.
-func (c *Content) ClosePath() { c.buf.WriteString("h\n") }
 
 // Clip sets the current path as the clipping region (non-zero winding).
 func (c *Content) Clip() { c.buf.WriteString("W n\n") }
@@ -147,14 +185,6 @@ func (c *Content) SetFont(name string, size float64) {
 	c.curFont = name
 	c.curSize = size
 	c.buf.WriteString(fmt.Sprintf("/%s %s Tf\n", name, num(size)))
-}
-
-// UseFont registers a base-14 font under a resource name for later SetFont.
-func (c *Content) UseFont(name, baseFont string) {
-	c.fontDefs[name] = baseFont
-	if c.fontUses[name] == "" {
-		c.fontUses[name] = ""
-	}
 }
 
 // UseEmbeddedFont registers a parsed TTF under a resource name. Runes drawn
@@ -202,7 +232,7 @@ func (c *Content) TextRenderMode(mode int) {
 // is drawn with an embedded Liberation fallback so ASCII does not become tofu.
 func (c *Content) TextShow(s string) {
 	f := c.fontFiles[c.curFont]
-	s = ShapeTextFont(s, f)
+	s = ShapeRun(s, f, c.curSize).Text
 	if f == nil || !c.textNeedsType0(s) {
 		c.textShowSimple(s)
 		return
@@ -330,111 +360,38 @@ func (c *Content) textShowType0(s string) {
 	c.buf.WriteString(pdfHexCIDs(s) + " Tj\n")
 }
 
-// TextShowAdj draws text with per-char adjustments (kerning offsets in 1/1000 em).
-func (c *Content) TextShowAdj(s string, kern []int) {
-	if len(kern) == 0 {
-		c.TextShow(s)
-		return
-	}
-	if c.textNeedsType0(s) {
-		// Kerning with Type0 is best-effort: draw without adjustments.
-		c.textShowType0(s)
-		return
-	}
-	for _, r := range s {
-		if r > 0xFF {
-			r = winAnsiFold(r)
-		}
-		if r > 0xFF {
-			r = '?'
-		}
-		c.used[c.curFont] = append(c.used[c.curFont], r)
-	}
-	var b strings.Builder
-	b.WriteByte('[')
-	b.WriteString(pdfString(s))
-	for _, k := range kern {
-		b.WriteString(" " + strconv.Itoa(-k))
-	}
-	b.WriteString("] TJ\n")
-	c.buf.WriteString(b.String())
-}
-
-// TextRise sets the text rise.
-func (c *Content) TextRise(rise float64) {
-	c.buf.WriteString(num(rise) + " Ts\n")
-}
-
-// TextHorizScale sets the horizontal text scaling (percent).
-func (c *Content) TextHorizScale(scale float64) {
-	c.buf.WriteString(num(scale) + " Tz\n")
-}
-
-// TextWordSpacing sets word spacing.
-func (c *Content) TextWordSpacing(s float64) {
-	c.buf.WriteString(num(s) + " Tw\n")
-}
-
-// TextCharSpacing sets character spacing.
-func (c *Content) TextCharSpacing(s float64) {
-	c.buf.WriteString(num(s) + " Tc\n")
-}
-
-// images
-
-// DrawImage embeds raw RGBA pixels as a Flate-compressed image XObject and
-// paints it into the rect (x, y, w, h) in PDF coords.
-func (c *Content) DrawImage(name string, x, y, w, h float64, rgba []byte, width, height int) {
-	c.imageRefs[name] = &imageResource{width: width, height: height, data: rgba}
-	c.imageUses[name] = "" // resolved at finalize
-	c.Save()
-	c.Transform(w, 0, 0, h, x, y)
-	c.buf.WriteString("/" + name + " Do\n")
-	c.Restore()
-}
-
 // resources
 
 // fonts returns the map of font resource name to object ref, allocating the
 // font objects and their dicts lazily. Embedded fonts are subset for the
-// runes used on this content.
-func (c *Content) fonts() map[string]string {
+// runes used on this content. A font whose subset fails fails the page: text
+// that names a missing /Resources entry renders invisible, so the error is
+// propagated instead of dropped.
+func (c *Content) fonts() (map[string]string, error) {
 	out := map[string]string{}
 	for name := range c.fontUses {
-		if f, ok := c.fontFiles[name]; ok {
-			ref, err := c.doc.ensureFont(f, c.used[name])
-			if err != nil {
-				continue // skip broken font, layout should have caught it
-			}
-			c.fontUses[name] = ref
-		} else if c.fontUses[name] == "" {
-			c.fontUses[name] = c.doc.newObject()
-			c.doc.setDict(c.fontUses[name], "<< /Type /Font /Subtype /Type1 /BaseFont /"+c.fontDefs[name]+" >>")
+		f, ok := c.fontFiles[name]
+		if !ok {
+			continue
 		}
-		out[name] = c.fontUses[name]
+		ref, err := c.doc.ensureFont(f, c.used[name])
+		if err != nil {
+			return nil, fmt.Errorf("embed font %s: %w", name, err)
+		}
+		c.fontUses[name] = ref.String()
+		out[name] = ref.String()
 	}
-	return out
+	return out, nil
 }
 
-// imageResources returns the map of image resource name to object ref,
-// allocating refs and emitting the image XObject lazily.
+// imageResources returns the map of image resource name to object ref.
+// JPEG/PNG paths allocate the XObject eagerly in AddJPEGImage/AddPNGImage.
 func (c *Content) imageResources() map[string]string {
 	out := map[string]string{}
 	for name, img := range c.imageRefs {
-		if img.ref == "" {
-			raw := img.data
-			dict := fmt.Sprintf("<< /Type /XObject /Subtype /Image /Width %d /Height %d /ColorSpace /DeviceRGB /BitsPerComponent 8",
-				img.width, img.height)
-			if c.doc.useCompression {
-				raw = flateBytes(raw)
-				dict += " /Filter /FlateDecode"
-			}
-			dict += fmt.Sprintf(" /Length %d >>", len(raw))
-			img.ref = c.doc.newObject()
-			c.doc.setDict(img.ref, dict)
-			c.doc.setStream(img.ref, raw)
+		if img.ref != 0 {
+			out[name] = img.ref.String()
 		}
-		out[name] = img.ref
 	}
 	return out
 }

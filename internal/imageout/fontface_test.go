@@ -71,18 +71,18 @@ func TestFontFaceLocalUsesCustom(t *testing.T) {
 	}
 
 	// Open-box: same merge + layout as Run must attach Custom (not Liberation fallback).
-	loader := load.NewLoader(cmd.Image.Load)
-	loader.Allow = cmd.Global.Allow
-	loader.EnableLocalFileAccess = cmd.Global.EnableLocalFileAccess
+	loader := load.NewLoader(imageLoadGlobalCmd(cmd))
 	res, err := loader.Load(context.Background(), htmlPath, cmd.Objects[0].Load)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	root, err := html.Parse(string(res.Body))
+	root, err := html.ParseDocument(res.Body)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
-	sheets := collectSheets(context.Background(), loader, root, res.Base, cmd.Objects[0].Load, io.Discard)
+	sheets := convert.CollectSheets(context.Background(), loader, root, res.Base, cmd.Objects[0].Load, convert.SheetOptions{
+		ViewportW: 768, ViewportH: 576, MediaType: "screen",
+	}, io.Discard)
 	reg := convert.MergeFontFaces(context.Background(), loader, nil, sheets, res.Base, cmd.Objects[0].Load, 1, io.Discard)
 	if reg == nil || reg.Lookup([]string{"Custom"}, 400, false) == nil {
 		t.Fatal("expected Custom face in registry after MergeFontFaces")
@@ -140,8 +140,8 @@ func TestFontFaceACLDeny(t *testing.T) {
 		},
 		Output: pngOut,
 	}
-	cmd.Global.EnableLocalFileAccess = false
-	cmd.Global.Allow = []string{pageDir}
+	cmd.Global.Load.EnableLocalFileAccess = false
+	cmd.Global.Load.Allow = []string{pageDir}
 	cmd.Image.Width = 200
 	cmd.Image.Format = "png"
 
@@ -163,18 +163,18 @@ func TestFontFaceACLDeny(t *testing.T) {
 	}
 
 	// Face must not register under Custom when FetchSub is denied.
-	loader := load.NewLoader(cmd.Image.Load)
-	loader.Allow = cmd.Global.Allow
-	loader.EnableLocalFileAccess = cmd.Global.EnableLocalFileAccess
+	loader := load.NewLoader(imageLoadGlobalCmd(cmd))
 	res, err := loader.Load(context.Background(), htmlPath, cmd.Objects[0].Load)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	rootHTML, err := html.Parse(string(res.Body))
+	rootHTML, err := html.ParseDocument(res.Body)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
-	sheets := collectSheets(context.Background(), loader, rootHTML, res.Base, cmd.Objects[0].Load, io.Discard)
+	sheets := convert.CollectSheets(context.Background(), loader, rootHTML, res.Base, cmd.Objects[0].Load, convert.SheetOptions{
+		ViewportW: 768, ViewportH: 576, MediaType: "screen",
+	}, io.Discard)
 	var denyLog bytes.Buffer
 	reg := convert.MergeFontFaces(context.Background(), loader, nil, sheets, res.Base, cmd.Objects[0].Load, 1, &denyLog)
 	if reg != nil && reg.Lookup([]string{"Custom"}, 400, false) != nil {

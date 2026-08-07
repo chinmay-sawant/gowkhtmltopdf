@@ -402,30 +402,18 @@ func parseTransformLength(s string, fs float64) (float64, bool) {
 		}
 		return 0, false
 	}
-	switch unit {
-	case "px":
-		return pxToPt(v), true
-	case "pt":
-		return v, true
-	case "in":
-		return v * 72, true
-	case "cm":
-		return v * 72 / 2.54, true
-	case "mm":
-		return v * 72 / 25.4, true
-	case "pc":
-		return v * 12, true
-	case "em":
-		return fs * v, true
-	case "rem":
-		return pxToPt(16) * v, true
-	case "%":
+	if unit == "%" {
 		// Without the border box at parse time, % translate is 0 (used value
 		// would need layout). Authors should use absolute lengths for print.
 		return 0, true
-	default:
-		return 0, false
 	}
+	if unit == "rem" {
+		return pxToPt(16) * v, true
+	}
+	if pt, ok := css.LengthToPt(v, unit, fs); ok {
+		return pt, true
+	}
+	return 0, false
 }
 
 // parseTransformOrigin parses CSS transform-origin (1–3 values; z ignored).

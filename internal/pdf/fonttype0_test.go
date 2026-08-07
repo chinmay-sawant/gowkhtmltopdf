@@ -1,6 +1,7 @@
 package pdf
 
 import (
+	"bytes"
 	"os"
 	"strings"
 	"testing"
@@ -45,10 +46,7 @@ func TestRegistryScanDroid(t *testing.T) {
 	if _, err := os.Stat(dir); err != nil {
 		t.Skip(err)
 	}
-	reg, err := ScanFontDir(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	reg := ScanFontDirs([]string{dir})
 	f := reg.Lookup([]string{"Droid Sans Fallback"}, 400, false)
 	if f == nil {
 		// try any family from the file
@@ -83,6 +81,22 @@ func TestFamilyNamesLiberation(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("family names = %v, want Liberation*", names)
+	}
+}
+
+func TestFontEmbedErrorPropagates(t *testing.T) {
+	// P5-07: a failing subset must fail Write with a wrapped "embed font"
+	// error, not silently drop the resource (which renders text invisible).
+	d := fixedDoc(t)
+	p := d.AddPage(100, 100)
+	p.Content().UseEmbeddedFont("F1", &Font{}) // empty font: subsetting fails
+	var buf bytes.Buffer
+	err := d.Write(&buf)
+	if err == nil {
+		t.Fatal("expected Write error for unembeddable font")
+	}
+	if !strings.Contains(err.Error(), "embed font F1") {
+		t.Errorf("Write error = %q, want it to wrap %q", err, "embed font F1")
 	}
 }
 

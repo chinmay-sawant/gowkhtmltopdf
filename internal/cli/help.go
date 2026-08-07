@@ -37,11 +37,6 @@ Description:
 `, flagList(m))
 }
 
-// PrintExtendedHelp writes the full flag list.
-func PrintExtendedHelp(w io.Writer, m Mode) {
-	PrintHelp(w, m)
-}
-
 // PrintVersion writes the version banner.
 func PrintVersion(w io.Writer) {
 	fmt.Fprintf(w, "Name: gowkhtmltopdf\nVersion: %s\n", Version)
@@ -74,7 +69,7 @@ func flagList(m Mode) string {
 	var b strings.Builder
 	for _, n := range names {
 		spec := flagTable[n]
-		if spec.kind == "bool" {
+		if spec.kind == flagBool {
 			fmt.Fprintf(&b, "  --%s\n", n)
 		} else {
 			fmt.Fprintf(&b, "  --%s <value>\n", n)

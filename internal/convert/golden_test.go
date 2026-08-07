@@ -112,16 +112,16 @@ func commandForFixture(t *testing.T, file string) *cli.Command {
 			t.Fatalf("write %s: %v", e.Name(), err)
 		}
 	}
+	obj := settings.DefaultPdfObject()
+	obj.Page = filepath.Join(dir, file)
+	obj.Load.BlockLocalFileAccess = false
 	cmd := &cli.Command{
-		Global: settings.DefaultPdfGlobal(),
-		Objects: []settings.PdfObject{
-			{Page: filepath.Join(dir, file), Load: settings.DefaultLoadPage()},
-		},
-		Output: filepath.Join(t.TempDir(), "out.pdf"),
+		Global:  settings.DefaultPdfGlobal(),
+		Objects: []settings.PdfObject{obj},
+		Output:  filepath.Join(t.TempDir(), "out.pdf"),
 	}
 	// --enable-local-file-access: global flag on, object-level block off.
-	cmd.Global.EnableLocalFileAccess = true
-	cmd.Objects[0].Load.BlockLocalFileAccess = false
+	cmd.Global.Load.EnableLocalFileAccess = true
 	cmd.Global.Size = settings.Size{PageSize: cmd.Global.PageSize}
 	// A4, 10 mm margins, backgrounds on (already the defaults; set explicitly).
 	cmd.Global.PageSize = "A4"
@@ -335,12 +335,11 @@ func TestGoldenFixture03Performance(t *testing.T) {
 
 	ctx := context.Background()
 	loader := load.NewLoader(cmd.Global.Load)
-	loader.EnableLocalFileAccess = cmd.Global.EnableLocalFileAccess
 	res, err := loader.Load(ctx, cmd.Objects[0].Page, cmd.Objects[0].Load)
 	if err != nil {
 		t.Fatalf("load fixture: %v", err)
 	}
-	root, err := html.Parse(string(res.Body))
+	root, err := html.ParseDocument(res.Body)
 	if err != nil {
 		t.Fatalf("parse fixture: %v", err)
 	}
