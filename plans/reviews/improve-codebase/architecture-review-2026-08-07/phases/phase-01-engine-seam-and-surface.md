@@ -1,7 +1,7 @@
 # Phase 1 — Engine seam & surface
 
 > **Parent:** [`architecture-review-2026-08-07.md`](../architecture-review-2026-08-07.md) — canonical architecture-review ledger
-> **Status:** pending (findings gathered 2026-08-07 by 7 explore agents; remediation not started)
+> **Status:** complete (2026-08-07) — all 9 rows closed and validated; see `fix-log/` and the closure gates in Phase 6
 > **Depends on:** see phase map in ledger
 > **Evidence archive:** raw agent findings were archived off-repo on 2026-08-07; every row below carries its Before/After snippets inline
 
@@ -15,7 +15,7 @@
 
 - [x] **P1-1** — done — convert.Request/Run, imageout.RunRequest, api + cmd mains off cli.Command
 - [x] **P1-2** — done (fix-settings-cli)
-- [x] **P1-3** — done (fix-settings-cli)
+- [x] **P1-3** — done — shared `applyPage` routing; `pageOnlyFlag` preserves pre-object pending remapping (`37f5ee2`, `TestPageOnlyFlagPreObjectPending`)
 - [x] **P1-4** — done — settings.ResolveMedia + convert/imageout mediaFor
 - [x] **P1-5** — done — Global dump homes + convert/main consumers
 - [x] **P1-6** — done (fix-settings-cli)
@@ -364,10 +364,13 @@ func (ctx *objectCtx) applyPage(c *Command, glob func(g *settings.PdfGlobal, val
 }
 
 // page-only flags (zoom, username, password, timeout, external/internal-links)
-// use pageOnlyFlag, which rejects the pre-object position loudly when there
-// is no global consumer, instead of silently dropping the value:
+// use pageOnlyFlag, which routes to the current object or accumulates pending
+// first-page settings when no object keyword has appeared:
 func pageOnlyFlag(obj func(o *settings.PdfObject, val string) error) flagApplier { ... }
 ```
+Post-remediation (`37f5ee2`), `pageOnlyFlag` preserves the upstream address-remapping
+behavior for pre-object flags; `TestPageOnlyFlagPreObjectPending` covers direct first-page
+binding and the leading-TOC case.
 ` hfFlag`/`tocFlag`/`printMediaFlag` become thin wrappers over the same router (e.g. hf/toc
 explicitly set *global-only* routing instead of silently diverging); the hand-rolled `pending`
 incl. creation inside `printMediaFlag` is deleted.

@@ -1,7 +1,7 @@
 # Phase 6 — Cross-cutting & closure
 
 > **Parent:** [`architecture-review-2026-08-07.md`](../architecture-review-2026-08-07.md) — canonical architecture-review ledger
-> **Status:** pending (findings gathered 2026-08-07 by 7 explore agents; remediation not started)
+> **Status:** complete (2026-08-07) — all 3 rows and closure gates closed and validated
 > **Depends on:** see phase map in ledger
 > **Evidence archive:** raw agent findings were archived off-repo on 2026-08-07; every row below carries its Before/After snippets inline
 
