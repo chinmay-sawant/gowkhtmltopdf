@@ -204,6 +204,44 @@ func TestScaleNearest(t *testing.T) {
 	}
 }
 
+type imageWrapper struct {
+	image.Image
+}
+
+func TestScaleNearestNRGBAMatchesGeneric(t *testing.T) {
+	src := image.NewNRGBA(image.Rect(0, 0, 3, 2))
+	for y := 0; y < 2; y++ {
+		for x := 0; x < 3; x++ {
+			src.SetNRGBA(x, y, color.NRGBA{
+				R: uint8(20 + x*30),
+				G: uint8(40 + y*50),
+				B: uint8(60 + x*10 + y*5),
+				A: uint8(100 + x*40 + y*20),
+			})
+		}
+	}
+
+	got := scaleNearest(src, 7, 5)
+	want := scaleNearestGeneric(imageWrapper{Image: src}, 7, 5)
+	if string(got.Pix) != string(want.Pix) {
+		t.Fatalf("NRGBA fast path differs from generic path")
+	}
+}
+
+func TestDownscaleBoxUsesExactNRGBAAverages(t *testing.T) {
+	src := image.NewNRGBA(image.Rect(0, 0, 2, 2))
+	src.SetNRGBA(0, 0, color.NRGBA{R: 10, G: 20, B: 30, A: 40})
+	src.SetNRGBA(1, 0, color.NRGBA{R: 20, G: 30, B: 40, A: 50})
+	src.SetNRGBA(0, 1, color.NRGBA{R: 30, G: 40, B: 50, A: 60})
+	src.SetNRGBA(1, 1, color.NRGBA{R: 40, G: 50, B: 60, A: 70})
+
+	got := downscaleBox(src, 2)
+	want := color.NRGBA{R: 25, G: 35, B: 45, A: 55}
+	if pixel := got.NRGBAAt(0, 0); pixel != want {
+		t.Fatalf("downscaled pixel = %v, want %v", pixel, want)
+	}
+}
+
 // TestEncodeFormats checks PNG and JPEG encode and that JPEG quality moves
 // the output size (plumbing of --format/--quality).
 func TestEncodeFormats(t *testing.T) {

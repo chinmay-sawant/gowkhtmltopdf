@@ -185,6 +185,10 @@ func rasterGlyph(face *pdf.Font, r rune, scale float64) *glyphCacheEntry {
 	if first {
 		return &glyphCacheEntry{}
 	}
+	edges := make([][]glyphEdge, 0, len(flat))
+	for _, contour := range flat {
+		edges = append(edges, makeGlyphEdges(contour))
+	}
 	// scale font units -> pixels; y flips (font y-up, image y-down)
 	pad := 1.5
 	x0 := minX * scale
@@ -211,15 +215,43 @@ func rasterGlyph(face *pdf.Font, r rune, scale float64) *glyphCacheEntry {
 		ss = 8
 	}
 	ss2 := ss * ss
+	flatEdges := make([]glyphEdge, 0)
+	for _, contour := range edges {
+		flatEdges = append(flatEdges, contour...)
+	}
 	for py := 0; py < h; py++ {
+		var activeStorage [8][64]glyphEdge
+		var activeRows [8][]glyphEdge
+		for sy := 0; sy < ss; sy++ {
+			iy := -((float64(py) + (float64(sy)+0.5)/float64(ss) + oy) / scale)
+			active := activeStorage[sy][:0]
+			var overflow []glyphEdge
+			for _, edge := range flatEdges {
+				if iy >= edge.yMin && iy < edge.yMax {
+					if overflow != nil {
+						overflow = append(overflow, edge)
+					} else if len(active) < len(activeStorage[sy]) {
+						active = append(active, edge)
+					} else {
+						overflow = append(append([]glyphEdge(nil), active...), edge)
+					}
+				}
+			}
+			if overflow != nil {
+				activeRows[sy] = overflow
+			} else {
+				activeRows[sy] = active
+			}
+		}
 		for px := 0; px < w; px++ {
 			var cover int
 			for sy := 0; sy < ss; sy++ {
+				iy := -((float64(py) + (float64(sy)+0.5)/float64(ss) + oy) / scale)
+				active := activeRows[sy]
 				for sx := 0; sx < ss; sx++ {
 					// sample in font units
 					ix := (float64(px) + (float64(sx)+0.5)/float64(ss) + ox) / scale
-					iy := -((float64(py) + (float64(sy)+0.5)/float64(ss) + oy) / scale)
-					if pointInGlyph(ix, iy, flat) {
+					if pointInActiveEdges(ix, iy, active) {
 						cover++
 					}
 				}
@@ -234,6 +266,70 @@ func rasterGlyph(face *pdf.Font, r rune, scale float64) *glyphCacheEntry {
 		originX: ox,
 		originY: oy,
 	}
+}
+
+type glyphEdge struct {
+	yMin, yMax float64
+	xAtMin     float64
+	dxdy       float64
+}
+
+func makeGlyphEdges(poly []pdf.GlyphPoint) []glyphEdge {
+	if len(poly) < 3 {
+		return nil
+	}
+	edges := make([]glyphEdge, 0, len(poly))
+	for i := range poly {
+		j := i - 1
+		if j < 0 {
+			j = len(poly) - 1
+		}
+		a, b := poly[i], poly[j]
+		if a.Y == b.Y {
+			continue
+		}
+		low, high := a, b
+		if low.Y > high.Y {
+			low, high = high, low
+		}
+		edges = append(edges, glyphEdge{
+			yMin:   low.Y,
+			yMax:   high.Y,
+			xAtMin: low.X,
+			dxdy:   (high.X - low.X) / (high.Y - low.Y),
+		})
+	}
+	return edges
+}
+
+func pointInGlyphEdges(x, y float64, contours [][]glyphEdge) bool {
+	inside := false
+	for _, edges := range contours {
+		if pointInEdges(x, y, edges) {
+			inside = !inside
+		}
+	}
+	return inside
+}
+
+func pointInEdges(x, y float64, edges []glyphEdge) bool {
+	inside := false
+	for _, edge := range edges {
+		if y >= edge.yMin && y < edge.yMax && x < edge.xAtMin+(y-edge.yMin)*edge.dxdy {
+			inside = !inside
+		}
+	}
+	return inside
+}
+
+func pointInActiveEdges(x, y float64, edges []glyphEdge) bool {
+	inside := false
+	for _, edge := range edges {
+		if x < edge.xAtMin+(y-edge.yMin)*edge.dxdy {
+			inside = !inside
+		}
+	}
+	return inside
 }
 
 // pointInGlyph uses even-odd fill over all contours.

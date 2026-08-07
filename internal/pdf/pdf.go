@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -612,15 +613,37 @@ func num(v float64) string {
 	return s
 }
 
+type flateState struct {
+	buf bytes.Buffer
+	zw  *zlib.Writer
+}
+
+var flatePool sync.Pool
+
 // flateBytes compresses raw with zlib (RFC 1950). PDF /FlateDecode streams
 // require the zlib wrapper, not raw DEFLATE (RFC 1951); viewers reject the
-// latter and the page appears empty.
+// latter and the page appears empty. The compressor is reused across page
+// streams; the returned copy owns its bytes before the state goes back to the
+// pool.
 func flateBytes(raw []byte) []byte {
-	var buf bytes.Buffer
-	zw, _ := zlib.NewWriterLevel(&buf, zlib.DefaultCompression)
-	_, _ = zw.Write(raw)
-	_ = zw.Close()
-	return buf.Bytes()
+	state, _ := flatePool.Get().(*flateState)
+	if state == nil {
+		state = &flateState{}
+		state.zw, _ = zlib.NewWriterLevel(&state.buf, zlib.DefaultCompression)
+	} else {
+		state.buf.Reset()
+		state.zw.Reset(&state.buf)
+	}
+	_, _ = state.zw.Write(raw)
+	_ = state.zw.Close()
+	out := state.buf.Bytes()
+	// Transfer the completed buffer to the caller and give the pooled writer a
+	// fresh destination before it is reused. This keeps compressor state pooled
+	// without copying every compressed page stream.
+	state.buf = bytes.Buffer{}
+	state.zw.Reset(&state.buf)
+	flatePool.Put(state)
+	return out
 }
 
 // SortOutlines sorts children by (pageIndex, y, x) - used by layout/outline.

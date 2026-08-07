@@ -280,22 +280,29 @@ func resolveStylesWithContainersOpts(
 
 func resolveStylesCtx(root *html.Node, ctx *styleContext) map[*html.Node]ResolvedStyle {
 	out := map[*html.Node]ResolvedStyle{}
-	var walk func(n *html.Node, parent *ResolvedStyle)
-	walk = func(n *html.Node, parent *ResolvedStyle) {
+	var walk func(n *html.Node, parent ResolvedStyle, hasParent bool)
+	walk = func(n *html.Node, parent ResolvedStyle, hasParent bool) {
 		var st ResolvedStyle
-		if n.Type == html.ElementNode {
+		switch n.Type {
+		case html.ElementNode:
 			raw := cascadeRaw(ctx, n)
 			st = initialStyle()
-			if parent != nil {
-				inheritProps(&st, *parent, raw)
+			var parentProps map[string]string
+			if hasParent {
+				inheritProps(&st, parent, raw)
+				parentProps = parent.CustomProps
 			}
-			st.CustomProps = mergeCustomProps(parent, raw)
+			st.CustomProps = mergeCustomProps(parentProps, raw)
 			raw = resolveRawVars(raw, st.CustomProps)
-			applyFontProps(&st, raw, parent, ctx)
+			parentSize := st.FontSize
+			if hasParent {
+				parentSize = parent.FontSize
+			}
+			applyFontProps(&st, raw, parentSize, ctx)
 			if n.Name == "html" && st.FontSize > 0 {
 				ctx.remBase = st.FontSize
 			}
-			applyRestProps(&st, raw, ctx, parent)
+			applyRestProps(&st, raw, ctx, parent, hasParent)
 			// Opt-in operator policy (--print-link-underline): underline
 			// anchors with href after the cascade. Default off — author CSS
 			// (including text-decoration: inherit → parent) wins otherwise.
@@ -308,29 +315,25 @@ func resolveStylesCtx(root *html.Node, ctx *styleContext) map[*html.Node]Resolve
 			if st.Float != "none" {
 				st.Display = blockifyDisplayForFloat(st.Display)
 			}
-		} else if n.Type == html.TextNode {
+		case html.TextNode:
 			st = initialStyle()
-			if parent != nil {
-				inheritProps(&st, *parent, nil)
+			if hasParent {
+				inheritProps(&st, parent, nil)
 				st.CustomProps = parent.CustomProps
 			}
 		}
 		out[n] = st
 		for _, c := range n.Children {
-			walk(c, &st)
+			walk(c, st, true)
 		}
 	}
-	walk(root, nil)
+	walk(root, ResolvedStyle{}, false)
 	return out
 }
 
 // mergeCustomProps inherits parent custom properties and overlays any --*
 // declarations from raw, resolving var() chains via css.ResolveCustomProps.
-func mergeCustomProps(parent *ResolvedStyle, raw map[string]string) map[string]string {
-	var parentProps map[string]string
-	if parent != nil {
-		parentProps = parent.CustomProps
-	}
+func mergeCustomProps(parentProps map[string]string, raw map[string]string) map[string]string {
 	declared := map[string]string{}
 	for prop, v := range raw {
 		if strings.HasPrefix(prop, "--") {
@@ -564,11 +567,7 @@ func cascadeRaw(ctx *styleContext, n *html.Node) map[string]string {
 
 // applyFontProps resolves font-size/family/weight/style/font first, using the
 // parent's size for percentages and em, and ctx.remBase for rem.
-func applyFontProps(st *ResolvedStyle, raw map[string]string, parent *ResolvedStyle, ctx *styleContext) {
-	parentSize := st.FontSize
-	if parent != nil {
-		parentSize = parent.FontSize
-	}
+func applyFontProps(st *ResolvedStyle, raw map[string]string, parentSize float64, ctx *styleContext) {
 	remBase := pxToPt(16)
 	if ctx != nil && ctx.remBase > 0 {
 		remBase = ctx.remBase
@@ -611,23 +610,27 @@ func applyFontProps(st *ResolvedStyle, raw map[string]string, parent *ResolvedSt
 // would be nondeterministic and could let a shorthand (e.g. UA "margin")
 // clobber a winning longhand (e.g. author "margin-bottom") depending on map
 // iteration order.
-func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext, parent *ResolvedStyle) {
+func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext, parent ResolvedStyle, hasParent bool) {
 	fs := st.FontSize
 	// gap/flex/container applied before longhands so row-gap/column-gap,
 	// flex-*, and container-type/name win over shorthands.
-	shorthands := []string{"margin", "padding", "border", "border-width", "border-style", "border-color", "gap", "flex", "container"}
-	isShorthand := map[string]bool{}
-	for _, p := range shorthands {
-		isShorthand[p] = true
+	shorthands := [...]string{
+		"margin", "padding", "border", "border-width", "border-style",
+		"border-color", "gap", "flex", "container",
 	}
-	var rest []string
+	rest := make([]string, 0, len(raw))
 	for prop := range raw {
-		if !isShorthand[prop] {
-			rest = append(rest, prop)
+		switch prop {
+		case "margin", "padding", "border", "border-width", "border-style",
+			"border-color", "gap", "flex", "container":
+			continue
 		}
+		rest = append(rest, prop)
 	}
 	sort.Strings(rest)
-	props := append(append([]string{}, shorthands...), rest...)
+	props := make([]string, 0, len(shorthands)+len(rest))
+	props = append(props, shorthands[:]...)
+	props = append(props, rest...)
 	for _, prop := range props {
 		value, ok := raw[prop]
 		if !ok {
@@ -954,7 +957,7 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext,
 			}
 		case "color":
 			if value == "inherit" {
-				if parent != nil {
+				if hasParent {
 					st.Color = parent.Color
 				}
 			} else if r, g, b, _, ok := css.ParseColor(value); ok {
@@ -1021,7 +1024,7 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext,
 			case "none":
 				st.TextDecoration = "none"
 			case "inherit":
-				if parent != nil {
+				if hasParent {
 					st.TextDecoration = parent.TextDecoration
 				}
 			}

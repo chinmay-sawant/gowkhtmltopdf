@@ -104,6 +104,47 @@ func TestPaintContextHonorsCancellation(t *testing.T) {
 	}
 }
 
+func TestShiftOpsOnlyMaintainsFlowIndex(t *testing.T) {
+	res := &Result{
+		Ops:          []Op{{Y: 10}, {Y: 20}},
+		flowPageSize: 100,
+	}
+
+	shiftOpsOnly(res, 0, 0, 100)
+
+	if got := res.Ops[0].Y; got != 110 {
+		t.Fatalf("shifted operation Y = %.1f, want 110", got)
+	}
+	if got := res.flowPageOf[0]; got != 1 {
+		t.Fatalf("shifted operation page = %d, want 1", got)
+	}
+	if got := res.flowPageOf[1]; got != 0 {
+		t.Fatalf("unchanged operation page = %d, want 0", got)
+	}
+}
+
+func TestShiftFlowYNegativeMaintainsFlowIndex(t *testing.T) {
+	res := &Result{
+		Ops:          []Op{{Y: 110}, {Y: 210}},
+		flowPageSize: 100,
+	}
+
+	shiftFlowY(res, 2, 1, 100, -100)
+
+	if got := res.Ops[0].Y; got != 10 {
+		t.Fatalf("first operation Y = %.1f, want 10", got)
+	}
+	if got := res.Ops[1].Y; got != 110 {
+		t.Fatalf("second operation Y = %.1f, want 110", got)
+	}
+	if got := res.flowPageOf[0]; got != 0 {
+		t.Fatalf("first operation page = %d, want 0", got)
+	}
+	if got := res.flowPageOf[1]; got != 1 {
+		t.Fatalf("second operation page = %d, want 1", got)
+	}
+}
+
 func BenchmarkUsedImageSize(b *testing.B) {
 	e := &engine{opts: Options{Width: 640}, scale: 1, imgMaxW: 320}
 	root, err := html.Parse(`<img width="400" src="x">`)

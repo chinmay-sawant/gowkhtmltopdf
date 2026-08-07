@@ -42,6 +42,50 @@ func NewContent() *Content {
 // Bytes returns the raw (uncompressed) content stream.
 func (c *Content) Bytes() []byte { return c.buf.Bytes() }
 
+func appendPDFNum(dst []byte, v float64) []byte {
+	if v == float64(int(v)) {
+		return strconv.AppendInt(dst, int64(int(v)), 10)
+	}
+	dst = strconv.AppendFloat(dst, v, 'f', 3, 64)
+	for len(dst) > 0 && dst[len(dst)-1] == '0' {
+		dst = dst[:len(dst)-1]
+	}
+	if len(dst) > 0 && dst[len(dst)-1] == '.' {
+		dst = dst[:len(dst)-1]
+	}
+	return dst
+}
+
+// writePDFNums appends a short numeric operator directly into the content
+// buffer. Keeping formatting on the stack avoids the temporary strings that
+// fmt.Sprintf and num used to create for every path and text coordinate.
+func (c *Content) writePDFNums(suffix string, n int, a, b, cc, d, e, f float64) {
+	out := c.buf.AvailableBuffer()
+	out = appendPDFNum(out, a)
+	if n > 1 {
+		out = append(out, ' ')
+		out = appendPDFNum(out, b)
+	}
+	if n > 2 {
+		out = append(out, ' ')
+		out = appendPDFNum(out, cc)
+	}
+	if n > 3 {
+		out = append(out, ' ')
+		out = appendPDFNum(out, d)
+	}
+	if n > 4 {
+		out = append(out, ' ')
+		out = appendPDFNum(out, e)
+	}
+	if n > 5 {
+		out = append(out, ' ')
+		out = appendPDFNum(out, f)
+	}
+	out = append(out, suffix...)
+	_, _ = c.buf.Write(out)
+}
+
 // cloneContent returns a copy of c that paints the same operators. Resource
 // maps are copied rather than aliased: a duplicated page may add a resource
 // after cloning and must not mutate the source page's resource dictionary.
@@ -116,7 +160,7 @@ func (c *Content) SetFillColor(r, g, b float64) {
 		v := 0.299*r + 0.587*g + 0.114*b // Rec.601 luma
 		r, g, b = v, v, v
 	}
-	c.buf.WriteString(fmt.Sprintf("%s %s %s rg\n", num(r), num(g), num(b)))
+	c.writePDFNums(" rg\n", 3, r, g, b, 0, 0, 0)
 }
 
 // SetStrokeColor sets the stroke color (RGB, 0..1); grayscale is applied at
@@ -126,12 +170,12 @@ func (c *Content) SetStrokeColor(r, g, b float64) {
 		v := 0.299*r + 0.587*g + 0.114*b // Rec.601 luma
 		r, g, b = v, v, v
 	}
-	c.buf.WriteString(fmt.Sprintf("%s %s %s RG\n", num(r), num(g), num(b)))
+	c.writePDFNums(" RG\n", 3, r, g, b, 0, 0, 0)
 }
 
 // SetLineWidth sets the stroked line width in points.
 func (c *Content) SetLineWidth(w float64) {
-	c.buf.WriteString(num(w) + " w\n")
+	c.writePDFNums(" w\n", 1, w, 0, 0, 0, 0, 0)
 }
 
 // SetOpacity sets the fill/stroke opacity (0..1); 0 resets to opaque.
@@ -148,17 +192,17 @@ func (c *Content) SetOpacity(a float64) {
 
 // MoveTo begins a new subpath at (x, y).
 func (c *Content) MoveTo(x, y float64) {
-	c.buf.WriteString(fmt.Sprintf("%s %s m\n", num(x), num(y)))
+	c.writePDFNums(" m\n", 2, x, y, 0, 0, 0, 0)
 }
 
 // LineTo appends a line segment to (x, y).
 func (c *Content) LineTo(x, y float64) {
-	c.buf.WriteString(fmt.Sprintf("%s %s l\n", num(x), num(y)))
+	c.writePDFNums(" l\n", 2, x, y, 0, 0, 0, 0)
 }
 
 // Rect appends a rectangle to the current path.
 func (c *Content) Rect(x, y, w, h float64) {
-	c.buf.WriteString(fmt.Sprintf("%s %s %s %s re\n", num(x), num(y), num(w), num(h)))
+	c.writePDFNums(" re\n", 4, x, y, w, h, 0, 0)
 }
 
 // Fill paints the current path with the fill color.
@@ -174,8 +218,7 @@ func (c *Content) Clip() { c.buf.WriteString("W n\n") }
 
 // Transform appends a 6-element matrix to the CTM.
 func (c *Content) Transform(a, b, c2, d, e, f float64) {
-	c.buf.WriteString(fmt.Sprintf("%s %s %s %s %s %s cm\n",
-		num(a), num(b), num(c2), num(d), num(e), num(f)))
+	c.writePDFNums(" cm\n", 6, a, b, c2, d, e, f)
 }
 
 // text
@@ -184,7 +227,10 @@ func (c *Content) Transform(a, b, c2, d, e, f float64) {
 func (c *Content) SetFont(name string, size float64) {
 	c.curFont = name
 	c.curSize = size
-	c.buf.WriteString(fmt.Sprintf("/%s %s Tf\n", name, num(size)))
+	_ = c.buf.WriteByte('/')
+	c.buf.WriteString(name)
+	_ = c.buf.WriteByte(' ')
+	c.writePDFNums(" Tf\n", 1, size, 0, 0, 0, 0, 0)
 }
 
 // UseEmbeddedFont registers a parsed TTF under a resource name. Runes drawn
@@ -204,17 +250,17 @@ func (c *Content) EndText() { c.buf.WriteString("ET\n") }
 
 // TextAt sets the text position.
 func (c *Content) TextAt(x, y float64) {
-	c.buf.WriteString(fmt.Sprintf("%s %s Td\n", num(x), num(y)))
+	c.writePDFNums(" Td\n", 2, x, y, 0, 0, 0, 0)
 }
 
 // TextMatrix sets the text matrix via Tm (a b c d e f).
 func (c *Content) TextMatrix(a, b, cc, d, e, f float64) {
-	c.buf.WriteString(fmt.Sprintf("%s %s %s %s %s %s Tm\n", num(a), num(b), num(cc), num(d), num(e), num(f)))
+	c.writePDFNums(" Tm\n", 6, a, b, cc, d, e, f)
 }
 
 // TextLeading sets the leading for TL/T*.
 func (c *Content) TextLeading(leading float64) {
-	c.buf.WriteString(num(leading) + " TL\n")
+	c.writePDFNums(" TL\n", 1, leading, 0, 0, 0, 0, 0)
 }
 
 // TextNextLine moves to the next line (TL).
