@@ -1070,6 +1070,14 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 					}
 				}
 			}
+			if target.hasBottom && stickySectionContinuesAfterPage(res, target, pageBot) &&
+				!hasStickySectionBottomBorder(res, target, contentBot) {
+				res.Ops = append(res.Ops, Op{
+					Kind: OpLine, X: target.x, Y: contentBot, W: target.w,
+					Width: target.borderBottomWidth,
+					R:     target.borderBottom[0], G: target.borderBottom[1], B: target.borderBottom[2],
+				})
+			}
 		}
 	}
 	closePageLeadingSectionChrome(res, contentH)
@@ -1144,6 +1152,7 @@ type stickySectionChromeTarget struct {
 	borderLeft        [3]float64
 	borderRight       [3]float64
 	borderBottom      [3]float64
+	borderBottomWidth float64
 	hasBottom         bool
 	hasLeft, hasRight bool
 }
@@ -1158,15 +1167,16 @@ func stickySectionChromeTargets(root *box) []stickySectionChromeTarget {
 		if b.sticky && parent != nil {
 			st := parent.style
 			target := stickySectionChromeTarget{
-				x:            parent.x,
-				y:            parent.y,
-				w:            parent.w,
-				borderLeft:   st.BorderLeft.Color,
-				borderRight:  st.BorderRight.Color,
-				borderBottom: st.BorderBottom.Color,
-				hasBottom:    st.BorderBottom.Width > 0 && st.BorderBottom.Style != "none",
-				hasLeft:      st.BorderLeft.Width > 0 && st.BorderLeft.Style != "none",
-				hasRight:     st.BorderRight.Width > 0 && st.BorderRight.Style != "none",
+				x:                 parent.x,
+				y:                 parent.y,
+				w:                 parent.w,
+				borderLeft:        st.BorderLeft.Color,
+				borderRight:       st.BorderRight.Color,
+				borderBottom:      st.BorderBottom.Color,
+				borderBottomWidth: st.BorderBottom.Width,
+				hasBottom:         st.BorderBottom.Width > 0 && st.BorderBottom.Style != "none",
+				hasLeft:           st.BorderLeft.Width > 0 && st.BorderLeft.Style != "none",
+				hasRight:          st.BorderRight.Width > 0 && st.BorderRight.Style != "none",
 			}
 			if st.BGColor[3] > 0 {
 				target.background = [3]float64{st.BGColor[0], st.BGColor[1], st.BGColor[2]}
@@ -1193,6 +1203,36 @@ func stickySectionChromeTargets(root *box) []stickySectionChromeTarget {
 
 func sameHorizontalFrame(op *Op, target stickySectionChromeTarget) bool {
 	return target.hasBottom && math.Abs(op.X-target.x) < 1 && math.Abs(op.W-target.w) < 1
+}
+
+func stickySectionContinuesAfterPage(res *Result, target stickySectionChromeTarget, pageBottom float64) bool {
+	if res == nil {
+		return false
+	}
+	for _, op := range res.Ops {
+		if op.Fixed || (op.Kind != OpText && op.Kind != OpBullet) || op.Y < pageBottom {
+			continue
+		}
+		if op.X >= target.x-1 && op.X <= target.x+target.w+1 {
+			return true
+		}
+	}
+	return false
+}
+
+func hasStickySectionBottomBorder(res *Result, target stickySectionChromeTarget, y float64) bool {
+	if res == nil {
+		return false
+	}
+	for _, op := range res.Ops {
+		if op.Fixed || op.Kind != OpLine || op.H >= 1 || math.Abs(op.Y-y) >= 1 {
+			continue
+		}
+		if sameHorizontalFrame(&op, target) && sameRGB(&op, target.borderBottom) {
+			return true
+		}
+	}
+	return false
 }
 
 func sameRectFrame(op *Op, target stickySectionChromeTarget) bool {
