@@ -206,6 +206,9 @@ func sortPaintIndices(ops []Op, idxs []int) {
 		if az != bz {
 			return az < bz
 		}
+		if a.Positioned != b.Positioned {
+			return !a.Positioned
+		}
 		// Same stacking context: backgrounds/borders under text & images so
 		// page-split fill remnants cannot cover continuation-row ink
 		// (fixture-31 Row 28 vs next-row white fill).

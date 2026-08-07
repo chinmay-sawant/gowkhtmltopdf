@@ -547,4 +547,23 @@ func TestPositionRelativeAbsolute(t *testing.T) {
 	if flowTextIdx >= 0 && absTextIdx >= 0 && absTextIdx < flowTextIdx {
 		t.Errorf("absolute text op %d before in-flow text %d", absTextIdx, flowTextIdx)
 	}
+	if flowTextIdx >= 0 && absFillIdx >= 0 {
+		ordered := make([]int, len(res.Ops))
+		for i := range ordered {
+			ordered[i] = i
+		}
+		sortPaintIndices(res.Ops, ordered)
+		flowOrder, absFillOrder := -1, -1
+		for order, idx := range ordered {
+			switch idx {
+			case flowTextIdx:
+				flowOrder = order
+			case absFillIdx:
+				absFillOrder = order
+			}
+		}
+		if absFillOrder < flowOrder {
+			t.Errorf("absolute overlay fill paints before in-flow text: fill order=%d flow order=%d", absFillOrder, flowOrder)
+		}
+	}
 }

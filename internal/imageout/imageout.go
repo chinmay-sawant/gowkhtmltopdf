@@ -275,6 +275,9 @@ func rasterPaintOrder(ops []layout.Op) []int {
 		if az != bz {
 			return az < bz
 		}
+		if a.Positioned != b.Positioned {
+			return !a.Positioned
+		}
 		la, lb := rasterPaintLayer(a.Kind), rasterPaintLayer(b.Kind)
 		return la < lb
 	})

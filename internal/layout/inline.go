@@ -586,10 +586,7 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 			flushUnd()
 			dx := lx - it.blockBox.x
 			dy := baseline - it.h - it.blockBox.y
-			for k := it.opStart; k < it.opEnd; k++ {
-				e.ops[k].X += dx
-				e.ops[k].Y += dy
-			}
+			e.shiftBoxOps(it.blockBox, dx, dy)
 			it.blockBox.x += dx
 			it.blockBox.y += dy
 			// Attach to parent so paint-time transforms/opacity stamp the subtree.

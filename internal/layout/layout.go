@@ -129,6 +129,11 @@ type Op struct {
 	ZIndex    int
 	ZIndexSet bool
 
+	// Positioned marks operations emitted by an absolute/fixed subtree. Within
+	// the same z-index band, positioned descendants paint above in-flow text,
+	// while their own backgrounds remain below their own content.
+	Positioned bool
+
 	// RotateDeg rotates the glyph around its baseline origin (PDF text matrix).
 	// Independent of CSS transform CTM (which wraps the whole op via Xform).
 	RotateDeg float64
@@ -144,20 +149,21 @@ type Op struct {
 }
 
 type engine struct {
-	opts      Options
-	ctx       context.Context
-	err       error
-	font      *pdf.Font // default/regular face (metrics fallback)
-	faces     *pdf.FaceSet
-	registry  *pdf.Registry
-	styles    map[*html.Node]ResolvedStyle
-	ops       []Op
-	noEmit    bool // measurement mode: compute geometry without emitting ops
-	height    float64
-	scale     float64 // zoom factor applied to style lengths (>= 1)
-	zIndex    int
-	zIndexSet bool
-	stickySeq int // monotonically increasing sticky box IDs (for Op.StickyID)
+	opts       Options
+	ctx        context.Context
+	err        error
+	font       *pdf.Font // default/regular face (metrics fallback)
+	faces      *pdf.FaceSet
+	registry   *pdf.Registry
+	styles     map[*html.Node]ResolvedStyle
+	ops        []Op
+	noEmit     bool // measurement mode: compute geometry without emitting ops
+	height     float64
+	scale      float64 // zoom factor applied to style lengths (>= 1)
+	zIndex     int
+	zIndexSet  bool
+	positioned bool
+	stickySeq  int // monotonically increasing sticky box IDs (for Op.StickyID)
 	// transformCBDepth counts ancestors with transform≠none; fixed→absolute CB.
 	transformCBDepth int
 	// imgMaxW > 0 clamps replaced <img> boxes to this containing-block width
@@ -265,6 +271,7 @@ func (e *engine) add(op Op) {
 	if !e.noEmit {
 		op.ZIndex = e.zIndex
 		op.ZIndexSet = e.zIndexSet
+		op.Positioned = e.positioned
 		e.ops = append(e.ops, op)
 	}
 }
@@ -287,8 +294,11 @@ func (e *engine) checkContext() bool {
 	return false
 }
 
-func (e *engine) pushZ(st ResolvedStyle) (prevZ int, prevSet bool) {
-	prevZ, prevSet = e.zIndex, e.zIndexSet
+func (e *engine) pushZ(st ResolvedStyle) (prevZ int, prevSet bool, prevPositioned bool) {
+	prevZ, prevSet, prevPositioned = e.zIndex, e.zIndexSet, e.positioned
+	if st.Position == "absolute" || st.Position == "fixed" {
+		e.positioned = true
+	}
 	if st.ZIndexSet {
 		e.zIndex = st.ZIndex
 		e.zIndexSet = true
@@ -297,11 +307,11 @@ func (e *engine) pushZ(st ResolvedStyle) (prevZ int, prevSet bool) {
 		e.zIndex = 0
 		e.zIndexSet = true
 	}
-	return prevZ, prevSet
+	return prevZ, prevSet, prevPositioned
 }
 
-func (e *engine) popZ(prevZ int, prevSet bool) {
-	e.zIndex, e.zIndexSet = prevZ, prevSet
+func (e *engine) popZ(prevZ int, prevSet bool, prevPositioned bool) {
+	e.zIndex, e.zIndexSet, e.positioned = prevZ, prevSet, prevPositioned
 }
 
 // Layout renders the document into a display list.
@@ -454,8 +464,8 @@ func (e *engine) build(n *html.Node, availW, x, y float64) *box {
 	if st.Display == "none" {
 		return nil
 	}
-	prevZ, prevSet := e.pushZ(st)
-	defer e.popZ(prevZ, prevSet)
+	prevZ, prevSet, prevPositioned := e.pushZ(st)
+	defer e.popZ(prevZ, prevSet, prevPositioned)
 	// Ancestor transforms only (own transform does not change this box's CB).
 	underXformCB := e.transformCBDepth > 0
 	start := len(e.ops)
@@ -483,11 +493,11 @@ func (e *engine) build(n *html.Node, availW, x, y float64) *box {
 	if b == nil {
 		b = e.buildInFlowDisplay(n, st, availW, x, y)
 	}
-	if b != nil && st.Position == "relative" {
-		e.applyRelativeOffset(b)
-	}
 	if b != nil {
 		b.opStart, b.opEnd = start, len(e.ops)-1
+		if st.Position == "relative" {
+			e.applyRelativeOffset(b)
+		}
 	}
 	if b != nil && st.Position == "sticky" {
 		e.tagSticky(b)
@@ -736,22 +746,59 @@ func (e *engine) markOpsFixed(start, end int) {
 	}
 }
 
+// borderLineOps expands solid/dashed/dotted borders into the line operations
+// consumed by both PDF and raster painting. Keeping the pattern as segments
+// avoids adding a second stroke-style protocol to Op.
+func borderLineOps(x, y, w, h, width float64, style string, r, g, b float64) []Op {
+	if width <= 0 || style == "none" || (w <= 0 && h <= 0) {
+		return nil
+	}
+	if style != "dashed" && style != "dotted" {
+		return []Op{{Kind: OpLine, X: x, Y: y, W: w, H: h, Width: width, R: r, G: g, B: b}}
+	}
+
+	horizontal := w > 0
+	length := w
+	if !horizontal {
+		length = h
+	}
+	drawLen, gap := width*3, width*2
+	if style == "dotted" {
+		drawLen, gap = width, width*1.5
+	}
+	if drawLen < 0.5 {
+		drawLen = 0.5
+	}
+	if gap < 0.5 {
+		gap = 0.5
+	}
+	ops := make([]Op, 0, int(length/(drawLen+gap))+1)
+	for pos := 0.0; pos < length-0.001; pos += drawLen + gap {
+		seg := math.Min(drawLen, length-pos)
+		if seg <= 0 {
+			break
+		}
+		if horizontal {
+			ops = append(ops, Op{Kind: OpLine, X: x + pos, Y: y, W: seg, H: 0, Width: width, R: r, G: g, B: b})
+		} else {
+			ops = append(ops, Op{Kind: OpLine, X: x, Y: y + pos, W: 0, H: seg, Width: width, R: r, G: g, B: b})
+		}
+	}
+	return ops
+}
+
 // borderOps returns the four border line ops for the given border box.
 func (e *engine) borderOps(st ResolvedStyle, x, y, w, h float64) []Op {
 	var ops []Op
-	wt, wr, wb, wl := e.scalePt(st.BorderTop.Width), e.scalePt(st.BorderRight.Width), e.scalePt(st.BorderBottom.Width), e.scalePt(st.BorderLeft.Width)
-	if wt > 0 && st.BorderTop.Style != "none" {
-		ops = append(ops, Op{Kind: OpLine, X: x, Y: y, W: w, H: 0, Width: wt, R: st.BorderTop.Color[0], G: st.BorderTop.Color[1], B: st.BorderTop.Color[2]})
+	appendSide := func(side border, sx, sy, sw, sh float64) {
+		width := e.scalePt(side.Width)
+		ops = append(ops, borderLineOps(sx, sy, sw, sh, width, side.Style,
+			side.Color[0], side.Color[1], side.Color[2])...)
 	}
-	if wr > 0 && st.BorderRight.Style != "none" {
-		ops = append(ops, Op{Kind: OpLine, X: x + w, Y: y, W: 0, H: h, Width: wr, R: st.BorderRight.Color[0], G: st.BorderRight.Color[1], B: st.BorderRight.Color[2]})
-	}
-	if wb > 0 && st.BorderBottom.Style != "none" {
-		ops = append(ops, Op{Kind: OpLine, X: x, Y: y + h, W: w, H: 0, Width: wb, R: st.BorderBottom.Color[0], G: st.BorderBottom.Color[1], B: st.BorderBottom.Color[2]})
-	}
-	if wl > 0 && st.BorderLeft.Style != "none" {
-		ops = append(ops, Op{Kind: OpLine, X: x, Y: y, W: 0, H: h, Width: wl, R: st.BorderLeft.Color[0], G: st.BorderLeft.Color[1], B: st.BorderLeft.Color[2]})
-	}
+	appendSide(st.BorderTop, x, y, w, 0)
+	appendSide(st.BorderRight, x+w, y, 0, h)
+	appendSide(st.BorderBottom, x, y+h, w, 0)
+	appendSide(st.BorderLeft, x, y, 0, h)
 	return ops
 }
 
@@ -791,6 +838,7 @@ func (e *engine) prependChrome(insertAt int, b *box, st ResolvedStyle, x, y, w, 
 	for i := range chrome {
 		chrome[i].ZIndex = e.zIndex
 		chrome[i].ZIndexSet = e.zIndexSet
+		chrome[i].Positioned = e.positioned
 	}
 	if !chromeMustSpliceImmediately(st) {
 		e.deferredChrome = append(e.deferredChrome, chromeEntry{at: insertAt, ops: chrome, b: b})
@@ -2044,36 +2092,6 @@ func (e *engine) emitCollapsedRowGrid(tb *box, ri int, lastRow bool, padL float6
 	if ri < 0 || ri >= len(rowHeights) || rowHeights[ri] <= 0.01 || len(colW) == 0 {
 		return
 	}
-	bw := 0.0
-	var r, g, b float64
-	for _, cell := range tb.children {
-		st := cell.style
-		sides := []struct {
-			w     float64
-			style string
-			c     [3]float64
-		}{
-			{e.scalePt(st.BorderTop.Width), st.BorderTop.Style, st.BorderTop.Color},
-			{e.scalePt(st.BorderRight.Width), st.BorderRight.Style, st.BorderRight.Color},
-			{e.scalePt(st.BorderBottom.Width), st.BorderBottom.Style, st.BorderBottom.Color},
-			{e.scalePt(st.BorderLeft.Width), st.BorderLeft.Style, st.BorderLeft.Color},
-		}
-		for _, side := range sides {
-			if side.w > 0 && side.style != "none" {
-				bw = side.w
-				r, g, b = side.c[0], side.c[1], side.c[2]
-				break
-			}
-		}
-		if bw > 0 {
-			break
-		}
-	}
-	// border-collapse changes how declared borders meet; it does not invent
-	// borders when the table and cells all use the initial border style.
-	if bw <= 0 {
-		return
-	}
 	nCols := len(colW)
 	left := tb.x + padL
 	xs := make([]float64, nCols+1)
@@ -2084,46 +2102,89 @@ func (e *engine) emitCollapsedRowGrid(tb *box, ri int, lastRow bool, padL float6
 	y0 := rowTops[ri]
 	y1 := y0 + rowHeights[ri]
 	gridStart := len(e.ops)
-	hline := func(x0, x1, yy float64) {
-		if x1-x0 <= 0 {
+	hline := func(x0, x1, yy float64, side border) {
+		if x1-x0 <= 0 || !borderVisible(side) {
 			return
 		}
-		e.add(Op{Kind: OpLine, X: x0, Y: yy, W: x1 - x0, H: 0, Width: bw, R: r, G: g, B: b})
+		for _, op := range borderLineOps(x0, yy, x1-x0, 0,
+			e.scalePt(side.Width), side.Style, side.Color[0], side.Color[1], side.Color[2]) {
+			e.add(op)
+		}
 	}
-	vline := func(xx, ya, yb float64) {
-		if yb-ya <= 0.01 {
+	vline := func(xx, ya, yb float64, side border) {
+		if yb-ya <= 0.01 || !borderVisible(side) {
 			return
 		}
-		e.add(Op{Kind: OpLine, X: xx, Y: ya, W: 0, H: yb - ya, Width: bw, R: r, G: g, B: b})
+		for _, op := range borderLineOps(xx, ya, 0, yb-ya,
+			e.scalePt(side.Width), side.Style, side.Color[0], side.Color[1], side.Color[2]) {
+			e.add(op)
+		}
 	}
 	// Top edge. Skip under rowspan continuations so a multi-row Year cell is
 	// not bisected mid-table; paint.capTablePageBreaks re-seals full tops for
-	// page fragments under repeated thead where those holes look open.
-	// Always emit a segment for every column that has a local cell or is not
-	// rowspan-covered — empty (ink-less) local cells still close their band.
+	// page fragments where those holes look open.
 	for ci := 0; ci < nCols; ci++ {
 		if ri > 0 && rowspanCovers(tb, ri-1, ri, ci) {
 			continue
 		}
-		hline(xs[ci], xs[ci+1], y0)
+		if side, ok := horizontalTableBorder(tb, ri, ci); ok {
+			hline(xs[ci], xs[ci+1], y0, side)
+		}
 	}
-	// Verticals for this row — include outer edges and rowspan-hole columns so
-	// the strip is a complete grid even when the row has fewer local cells.
+	// Verticals only exist where an adjacent cell declares a left/right side.
 	for ci := 0; ci <= nCols; ci++ {
 		if ci > 0 && ci < nCols && colspanCovers(tb, ri, ci-1, ci) {
 			continue
 		}
-		vline(xs[ci], y0, y1)
+		if side, ok := verticalTableBorder(tb, ri, ci); ok {
+			vline(xs[ci], y0, y1, side)
+		}
 	}
 	if lastRow {
 		for ci := 0; ci < nCols; ci++ {
-			hline(xs[ci], xs[ci+1], y1)
+			if side, ok := horizontalTableBorder(tb, ri+1, ci); ok {
+				hline(xs[ci], xs[ci+1], y1, side)
+			}
 		}
 	}
 	gridEnd := len(e.ops) - 1
 	if gridEnd >= gridStart && ri < len(tb.rows) {
 		expandRowOpRange(tb.rows[ri], gridStart, gridEnd)
 	}
+}
+
+func borderVisible(side border) bool {
+	return side.Width > 0 && side.Style != "none"
+}
+
+func horizontalTableBorder(tb *box, boundary, col int) (border, bool) {
+	for _, cell := range tb.children {
+		if cell.col > col || cell.col+cell.span <= col {
+			continue
+		}
+		if cell.row == boundary && borderVisible(cell.style.BorderTop) {
+			return cell.style.BorderTop, true
+		}
+		if cell.row+cell.rowSpan == boundary && borderVisible(cell.style.BorderBottom) {
+			return cell.style.BorderBottom, true
+		}
+	}
+	return border{}, false
+}
+
+func verticalTableBorder(tb *box, row, boundary int) (border, bool) {
+	for _, cell := range tb.children {
+		if cell.row > row || cell.row+cell.rowSpan <= row {
+			continue
+		}
+		if cell.col == boundary && borderVisible(cell.style.BorderLeft) {
+			return cell.style.BorderLeft, true
+		}
+		if cell.col+cell.span == boundary && borderVisible(cell.style.BorderRight) {
+			return cell.style.BorderRight, true
+		}
+	}
+	return border{}, false
 }
 
 // expandRowOpRange includes [start,end] paint ops in every cell of the row so
