@@ -2044,7 +2044,7 @@ func (e *engine) emitCollapsedRowGrid(tb *box, ri int, lastRow bool, padL float6
 	if ri < 0 || ri >= len(rowHeights) || rowHeights[ri] <= 0.01 || len(colW) == 0 {
 		return
 	}
-	bw := 0.5
+	bw := 0.0
 	var r, g, b float64
 	for _, cell := range tb.children {
 		st := cell.style
@@ -2054,6 +2054,8 @@ func (e *engine) emitCollapsedRowGrid(tb *box, ri int, lastRow bool, padL float6
 			c     [3]float64
 		}{
 			{e.scalePt(st.BorderTop.Width), st.BorderTop.Style, st.BorderTop.Color},
+			{e.scalePt(st.BorderRight.Width), st.BorderRight.Style, st.BorderRight.Color},
+			{e.scalePt(st.BorderBottom.Width), st.BorderBottom.Style, st.BorderBottom.Color},
 			{e.scalePt(st.BorderLeft.Width), st.BorderLeft.Style, st.BorderLeft.Color},
 		}
 		for _, side := range sides {
@@ -2063,9 +2065,14 @@ func (e *engine) emitCollapsedRowGrid(tb *box, ri int, lastRow bool, padL float6
 				break
 			}
 		}
-		if bw != 0.5 || r+g+b > 0 {
+		if bw > 0 {
 			break
 		}
+	}
+	// border-collapse changes how declared borders meet; it does not invent
+	// borders when the table and cells all use the initial border style.
+	if bw <= 0 {
+		return
 	}
 	nCols := len(colW)
 	left := tb.x + padL

@@ -32,3 +32,22 @@ td, th { border: 1px solid #999; padding: 2pt; }
 		t.Fatalf("horizontal grid lines=%d, want ≥5 (got Y=%v)", len(hlines), hlines)
 	}
 }
+
+// border-collapse alone must not create visible borders. A collapsed table
+// with no table or cell border declarations has no grid to paint.
+func TestCollapsedTableWithoutBordersDoesNotPaintGrid(t *testing.T) {
+	s := sheet(t, `
+body { margin: 0; font-size: 10pt; }
+table { border-collapse: collapse; width: 200pt; }
+`)
+	res := layoutHTML(t, `<html><body>
+<table><tr><th>Item</th><th>Qty</th></tr>
+<tr><td>Widget A</td><td>2</td></tr></table>
+</body></html>`, s)
+
+	for _, op := range res.Ops {
+		if op.Kind == OpLine {
+			t.Fatalf("collapsed table without borders painted line: %#v", op)
+		}
+	}
+}
