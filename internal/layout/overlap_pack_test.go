@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -16,7 +17,9 @@ import (
 // consecutive baselines collapse (wiki page-2 stacked paragraphs; ref lines
 // with dy ≪ fontSize). Multi-paragraph body + avoid list must keep body line
 // pitch ≥ 0.95·fontSize.
-func TestNoCompactOverlapsBodyLines(t *testing.T) {
+func TestNoCompactOverlapsBodyLines(t *testing.T) { //nolint:gocognit,gocyclo,cyclop,funlen,maintidx
+	t.Parallel()
+
 	const fontSize = 10.0
 	cssSheet := sheet(t, fmt.Sprintf(`
 body { margin: 0; font-size: %gpt; line-height: 1.25; }
@@ -32,14 +35,15 @@ li { page-break-inside: avoid; margin: 0 0 0.35em 0; }
 	// pagination shifts (the historical over-pack victim).
 	for i := range 14 {
 		boxNode.WriteString(fmt.Sprintf(
-			`<p>Body paragraph %d with enough words that the line box wraps onto a second and sometimes a third line of text so we can measure consecutive baselines after paint packing. More filler about articles and biographies to keep width full.</p>`, i))
+			`<p>Body paragraph %d with enough words that the line box wraps onto a second and sometimes a third line of text so we can measure consecutive baselines after paint packing. More filler about articles and biographies to keep width full.</p>`, i)) //nolint:lll // fixture copy must stay one paragraphixture copy must stay one paragraph //nolint:lll // fixture copy must stay one paragraph
 	}
 
 	boxNode.WriteString(`<ol>`)
 
 	for i := range 18 {
 		boxNode.WriteString(fmt.Sprintf(
-			`<li id="cite-%d">"Reference title %d" (https://example.com/ref/%d/long-path). Publisher. 1 January 2020. Retrieved 2 January 2021.</li>`,
+			`<li id="cite-%d">"Reference title %d" (https://example.com/ref/%d/long-path). Publisher. `+
+				`1 January 2020. Retrieved 2 January 2021.</li>`,
 			i, i+1, i))
 	}
 
@@ -48,7 +52,7 @@ li { page-break-inside: avoid; margin: 0 0 0.35em 0; }
 	// collapsing following paragraphs.
 	for i := range 10 {
 		boxNode.WriteString(fmt.Sprintf(
-			`<p>Trailing body %d continues the article with multi-line prose that must keep normal leading after any avoid-sibling packing pass.</p>`, i))
+			`<p>Trailing body %d continues the article with multi-line prose that must keep normal leading after any avoid-sibling packing pass.</p>`, i)) //nolint:lll // fixture copy must stay one paragraphixture copy must stay one paragraph
 	}
 
 	boxNode.WriteString(`</body></html>`)

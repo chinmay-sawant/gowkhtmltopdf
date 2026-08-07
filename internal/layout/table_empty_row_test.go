@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -5,7 +6,9 @@ import (
 )
 
 // Empty <tr></tr> must not invent a bordered band above real headers.
-func TestEmptyTableRowCollapsed(t *testing.T) {
+func TestEmptyTableRowCollapsed(t *testing.T) { //nolint:cyclop,funlen
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 table { border-collapse: collapse; width: 200pt; }
@@ -84,6 +87,7 @@ td, th { border: 1px solid #999; padding: 2pt; }
 // Padding-only empty cells collapse to zero row height (no ink).
 func TestPaddingOnlyEmptyRowCollapsed(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 table { border-collapse: collapse; }
@@ -136,6 +140,7 @@ td, th { border: 1px solid #999; padding: 4pt; }
 // Leading all-th detection still works when a blank tr precedes the header.
 func TestLeadingTHAfterEmptyRow(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 table { border-collapse: collapse; }
 th, td { border: 1px solid #ccc; padding: 2pt; }
@@ -176,6 +181,7 @@ th, td { border: 1px solid #ccc; padding: 2pt; }
 // Normal data tables keep non-empty row heights and internal grid lines.
 func TestNonEmptyRowsNotCollapsed(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 table { border-collapse: collapse; width: 200pt; }
 td, th { border: 1px solid #999; padding: 2pt; }

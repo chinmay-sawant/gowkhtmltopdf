@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -9,6 +10,7 @@ import (
 
 func TestLogoImgHonorsCSSWidth(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `body{margin:0;font-size:16px}`)
 	// Tiny containing float must NOT crush a definite-width logo.
 	htmlSrc := `<html><body>
@@ -23,7 +25,9 @@ func TestLogoImgHonorsCSSWidth(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	svg := []byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 22"><rect width="140" height="22" fill="#0e65c0"/></svg>`)
+	svg := []byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 22">` +
+		`<rect width="140" height="22" fill="#0e65c0"/></svg>`)
+
 	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
 		Width: 500, Height: 400, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true,

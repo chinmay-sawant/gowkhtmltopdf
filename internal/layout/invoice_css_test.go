@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -19,7 +20,7 @@ func TestBoxSizingBorderBox(t *testing.T) {
 
 	var walk func(b *box)
 	walk = func(boxNode *box) {
-		if boxNode.node != nil && boxNode.node.Name == "div" {
+		if boxNode.node != nil && boxNode.node.Name == divElementName {
 			if cls := boxNode.node.Attribute("class"); cls == "a" || cls == "b" {
 				boxes = append(boxes, boxNode)
 			}
@@ -44,7 +45,9 @@ func TestBoxSizingBorderBox(t *testing.T) {
 	}
 }
 
-func TestInlineBlockBesideText(t *testing.T) {
+func TestInlineBlockBesideText(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 .badge { display: inline-block; width: 40pt; padding: 2pt; border: 1pt solid black;
   box-sizing: border-box; text-align: center }
@@ -90,7 +93,9 @@ p { width: 300pt }`)
 	}
 }
 
-func TestFloatLeftRightClear(t *testing.T) {
+func TestFloatLeftRightClear(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 .logo { float: left; width: 60pt; height: 40pt; background-color: #ccc }
 .meta { float: right; width: 80pt; height: 30pt; background-color: #eee }
@@ -102,18 +107,18 @@ body { width: 400pt }`)
 <div class="clear">Below</div>
 </body></html>`, cssSheet)
 
-	var logo, meta, clear *box
+	var logo, meta, clearBox *box
 
 	var walk func(b *box)
 	walk = func(boxNode *box) {
-		if boxNode.node != nil && boxNode.node.Name == "div" {
+		if boxNode.node != nil && boxNode.node.Name == divElementName {
 			switch boxNode.node.Attribute("class") {
 			case "logo":
 				logo = boxNode
 			case "meta":
 				meta = boxNode
 			case "clear":
-				clear = boxNode
+				clearBox = boxNode
 			}
 		}
 
@@ -123,8 +128,8 @@ body { width: 400pt }`)
 	}
 	walk(res.root)
 
-	if logo == nil || meta == nil || clear == nil {
-		t.Fatalf("missing boxes logo=%v meta=%v clear=%v", logo != nil, meta != nil, clear != nil)
+	if logo == nil || meta == nil || clearBox == nil {
+		t.Fatalf("missing boxes logo=%v meta=%v clear=%v", logo != nil, meta != nil, clearBox != nil)
 	}
 	// Same band: logo left, meta right.
 	if logo.x >= meta.x {
@@ -140,13 +145,14 @@ body { width: 400pt }`)
 		below = meta.y + meta.height
 	}
 
-	if clear.y+0.01 < below {
-		t.Errorf("clear y=%v should be >= float bottoms %v", clear.y, below)
+	if clearBox.y+0.01 < below {
+		t.Errorf("clear y=%v should be >= float bottoms %v", clearBox.y, below)
 	}
 }
 
 func TestTextAlignJustify(t *testing.T) {
 	t.Parallel()
+
 	s := sheet(t, `div { width: 200pt; text-align: justify }`)
 	// Long enough to wrap into multiple lines.
 	res := layoutHTML(t, `<html><body><div>alpha bravo charlie delta echo foxtrot golf hotel india</div></body></html>`, s)
@@ -180,6 +186,7 @@ func TestTextAlignJustify(t *testing.T) {
 
 func TestTableCellVerticalAlignMiddle(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 td { border: 1pt solid black; padding: 0 }
 .tall { height: 60pt }

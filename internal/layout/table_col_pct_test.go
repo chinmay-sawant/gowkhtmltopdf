@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -8,7 +9,9 @@ import (
 	"gowkhtmltopdf/internal/html"
 )
 
-func TestTableColumnWidthPercent(t *testing.T) {
+func TestTableColumnWidthPercent(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 table { width: 400pt; border-collapse: collapse; }
 td, th { border: 1px solid #000; padding: 2pt; font-size: 10pt; text-align: left; }

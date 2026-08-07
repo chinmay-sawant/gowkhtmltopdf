@@ -1,4 +1,4 @@
-package css
+package css //nolint:testpackage // exercises unexported parseSelector/isImportant
 
 import (
 	"fmt"
@@ -7,6 +7,8 @@ import (
 
 	"gowkhtmltopdf/internal/html"
 )
+
+const colorRed = "red"
 
 func mustSheet(t *testing.T, src string) *Stylesheet {
 	t.Helper()
@@ -36,7 +38,7 @@ func TestParseBasic(t *testing.T) {
 		t.Fatalf("decls = %+v", rVal.Decls)
 	}
 
-	if rVal.Decls[0].Prop != "color" || rVal.Decls[0].Value != "red" {
+	if rVal.Decls[0].Prop != "color" || rVal.Decls[0].Value != colorRed {
 		t.Errorf("decl 0 = %+v", rVal.Decls[0])
 	}
 
@@ -89,11 +91,11 @@ func TestParseImportant(t *testing.T) {
 		t.Fatalf("decls = %+v", data)
 	}
 
-	if data[0].Value != "red" || data[1].Value != "0" {
+	if data[0].Value != colorRed || data[1].Value != "0" {
 		t.Errorf("values not stripped: %+v", data)
 	}
 
-	if !isImportant("red !important") || isImportant("red") {
+	if !isImportant("red !important") || isImportant(colorRed) {
 		t.Errorf("isImportant broken")
 	}
 }
@@ -219,18 +221,46 @@ func TestParseSelectorCompounds(t *testing.T) {
 		src  string
 		want []SelectorPart
 	}{
-		{"*", []SelectorPart{{Tag: "*"}}},                                                                   //nolint:exhaustruct // intentional zero-value fields
-		{"div", []SelectorPart{{Tag: "div"}}},                                                               //nolint:exhaustruct // intentional zero-value fields
-		{".cls", []SelectorPart{{Tag: "*", Classes: []string{"cls"}}}},                                      //nolint:exhaustruct // intentional zero-value fields
-		{"#id", []SelectorPart{{Tag: "*", ID: "id"}}},                                                       //nolint:exhaustruct // intentional zero-value fields
-		{"div.a.b", []SelectorPart{{Tag: "div", Classes: []string{"a", "b"}}}},                              //nolint:exhaustruct // intentional zero-value fields
-		{"div#x.y", []SelectorPart{{Tag: "div", ID: "x", Classes: []string{"y"}}}},                          //nolint:exhaustruct // intentional zero-value fields
-		{"a:hover", []SelectorPart{{Tag: "a"}}},                                                             //nolint:exhaustruct // intentional zero-value fields
-		{"a[href]", []SelectorPart{{Tag: "a"}}},                                                             //nolint:exhaustruct // intentional zero-value fields
-		{"[disabled]", []SelectorPart{{Tag: "*"}}},                                                          //nolint:exhaustruct // intentional zero-value fields
-		{"div > p", []SelectorPart{{Tag: "div"}, {Tag: "p", Combinator: ">"}}},                              //nolint:exhaustruct // intentional zero-value fields
-		{"div p", []SelectorPart{{Tag: "div"}, {Tag: "p", Combinator: " "}}},                                //nolint:exhaustruct // intentional zero-value fields
-		{"ul li a", []SelectorPart{{Tag: "ul"}, {Tag: "li", Combinator: " "}, {Tag: "a", Combinator: " "}}}, //nolint:exhaustruct // intentional zero-value fields
+		{"*", []SelectorPart{
+			{Tag: "*"}, //nolint:exhaustruct // intentional zero-value fields
+		}},
+		{"div", []SelectorPart{
+			{Tag: "div"}, //nolint:exhaustruct // intentional zero-value fields
+		}},
+		{".cls", []SelectorPart{
+			{Tag: "*", Classes: []string{"cls"}}, //nolint:exhaustruct // intentional zero-value fields
+		}},
+		{"#id", []SelectorPart{
+			{Tag: "*", ID: "id"}, //nolint:exhaustruct // intentional zero-value fields
+		}},
+		{"div.a.b", []SelectorPart{
+			{Tag: "div", Classes: []string{"a", "b"}}, //nolint:exhaustruct // intentional zero-value fields
+		}},
+		{"div#x.y", []SelectorPart{
+			{Tag: "div", ID: "x", Classes: []string{"y"}}, //nolint:exhaustruct // intentional zero-value fields
+		}},
+		{"a:hover", []SelectorPart{
+			{Tag: "a"}, //nolint:exhaustruct // intentional zero-value fields
+		}},
+		{"a[href]", []SelectorPart{
+			{Tag: "a"}, //nolint:exhaustruct // intentional zero-value fields
+		}},
+		{"[disabled]", []SelectorPart{
+			{Tag: "*"}, //nolint:exhaustruct // intentional zero-value fields
+		}},
+		{"div > p", []SelectorPart{
+			{Tag: "div"},                //nolint:exhaustruct // intentional zero-value fields
+			{Tag: "p", Combinator: ">"}, //nolint:exhaustruct // intentional zero-value fields
+		}},
+		{"div p", []SelectorPart{
+			{Tag: "div"},                //nolint:exhaustruct // intentional zero-value fields
+			{Tag: "p", Combinator: " "}, //nolint:exhaustruct // intentional zero-value fields
+		}},
+		{"ul li a", []SelectorPart{
+			{Tag: "ul"},                  //nolint:exhaustruct // intentional zero-value fields
+			{Tag: "li", Combinator: " "}, //nolint:exhaustruct // intentional zero-value fields
+			{Tag: "a", Combinator: " "},  //nolint:exhaustruct // intentional zero-value fields
+		}},
 		{"div.a > p.b i", []SelectorPart{
 			{Tag: "div", Classes: []string{"a"}},                //nolint:exhaustruct // intentional zero-value fields
 			{Tag: "p", Classes: []string{"b"}, Combinator: ">"}, //nolint:exhaustruct // intentional zero-value fields
@@ -284,21 +314,27 @@ func TestMatch(t *testing.T) {
 	</body></html>`)
 	body := root.FirstChild("html").FirstChild("body")
 	div := body.FirstChild("div")
-	pageSize := []*html.Node{}
+
+	var pNodes []*html.Node
 
 	for _, c := range div.Children {
 		if c.Type == html.ElementNode && c.Name == "p" {
-			pageSize = append(pageSize, c)
+			pNodes = append(pNodes, c)
 		}
 	}
 
-	if len(pageSize) != 2 {
-		t.Fatalf("want 2 <p> in div, got %d", len(pageSize))
+	if len(pNodes) != 2 {
+		t.Fatalf("want 2 <p> in div, got %d", len(pNodes))
 	}
 
-	note, plain := pageSize[0], pageSize[1]
+	note, plain := pNodes[0], pNodes[1]
 	bold := div.FirstChild("span").FirstChild("b")
 	second := body.FirstChild("p")
+	checkMatchTable(t, div, note, plain, bold, second)
+}
+
+func checkMatchTable(t *testing.T, div, note, plain, bold, second *html.Node) {
+	t.Helper()
 
 	cases := []struct {
 		sel  string
@@ -403,7 +439,15 @@ func TestLinkVisitedPseudos(t *testing.T) {
 			t.Errorf("Match(%q, #%s) = %v, want %v", testCase.sel, testCase.id, got, testCase.want)
 		}
 	}
-	// Specificity: a:link beats bare a (pseudo counts as class-level).
+
+	checkLinkVisitedSpecificity(t)
+}
+
+// checkLinkVisitedSpecificity: a:link must outrank bare a (pseudo counts as
+// class-level specificity).
+func checkLinkVisitedSpecificity(t *testing.T) {
+	t.Helper()
+
 	selA, found := parseSelector("a")
 	if !found {
 		t.Fatal("parse a")
@@ -501,7 +545,7 @@ func TestAttrWordAndSubstring(t *testing.T) {
 	}
 }
 
-func TestAttrPrefixSuffixDash(t *testing.T) {
+func TestAttrPrefixSuffixDash(t *testing.T) { //nolint:cyclop // attribute-operator matching has many independent checks
 	t.Parallel()
 	root := treeFor(t, `<html><body>
 		<a id="pdf" href="/files/report.pdf">PDF</a>
@@ -556,7 +600,7 @@ func TestAttrPrefixSuffixDash(t *testing.T) {
 	}
 }
 
-func TestSiblingCombinators(t *testing.T) {
+func TestSiblingCombinators(t *testing.T) { //nolint:cyclop // combinator checks across several sibling layouts
 	t.Parallel()
 	root := treeFor(t, `<html><body><div><p id="a">A</p><span>x</span><p id="b">B</p><p id="c">C</p></div></body></html>`)
 	div := root.FirstChild("html").FirstChild("body").FirstChild("div")
@@ -741,7 +785,7 @@ func TestParseStripCommentsPreservesNewlines(t *testing.T) {
 		t.Fatalf("rules = %+v", str.Rules)
 	}
 
-	if str.Rules[0].Decls[0].Value != "red" {
+	if str.Rules[0].Decls[0].Value != colorRed {
 		t.Errorf("decl = %+v", str.Rules[0].Decls[0])
 	}
 }
@@ -878,7 +922,7 @@ func TestResolveCustomPropsSelfReferenceWithFallback(t *testing.T) {
 	}
 }
 
-func TestParseSelectors(t *testing.T) {
+func TestParseSelectors(t *testing.T) { //nolint:cyclop // many independent strict-parsing checks
 	t.Parallel()
 
 	sels, found := ParseSelectors("h1, h2, .title")

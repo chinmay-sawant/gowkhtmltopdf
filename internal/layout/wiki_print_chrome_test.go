@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -5,7 +6,9 @@ import (
 	"testing"
 )
 
-func TestWikiPrintChromeHidden(t *testing.T) {
+func TestWikiPrintChromeHidden(t *testing.T) { //nolint:cyclop,funlen
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 @media print {
   #mw-navigation, .noprint, .mw-jump-link, nav, #footer { display: none }

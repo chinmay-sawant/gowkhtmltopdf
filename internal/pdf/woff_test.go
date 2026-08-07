@@ -1,3 +1,4 @@
+//nolint:testpackage // tests reach into unexported state
 package pdf
 
 import (
@@ -21,24 +22,18 @@ func readLiberationTTF(t *testing.T) []byte {
 	return data
 }
 
-// encodeWOFF1ForTest builds a minimal valid WOFF1 from SFNT tables (zlib).
-func encodeWOFF1ForTest(t *testing.T, sfnt []byte) []byte {
+// woffTestTable mirrors one SFNT table directory record.
+type woffTestTable struct {
+	tag            [4]byte
+	offset, length uint32
+	checksum       uint32
+}
+
+// readSFNTDirectory extracts the SFNT table directory.
+func readSFNTDirectory(t *testing.T, sfnt []byte, numTables int) []woffTestTable {
 	t.Helper()
 
-	if len(sfnt) < 12 {
-		t.Fatal("sfnt too short")
-	}
-
-	flavor := binary.BigEndian.Uint32(sfnt[0:4])
-	numTables := int(binary.BigEndian.Uint16(sfnt[4:6]))
-
-	type tab struct {
-		tag            [4]byte
-		offset, length uint32
-		checksum       uint32
-	}
-
-	tabs := make([]tab, numTables)
+	tabs := make([]woffTestTable, numTables)
 
 	for i := range numTables {
 		rec := sfnt[12+16*i:]
@@ -48,11 +43,17 @@ func encodeWOFF1ForTest(t *testing.T, sfnt []byte) []byte {
 		tabs[i].length = binary.BigEndian.Uint32(rec[12:16])
 	}
 
-	var compressed [][]byte
+	return tabs
+}
 
-	var origLens []uint32
+// compressSFNTTables zlib-compresses each table, keeping incompressible
+// tables verbatim.
+func compressSFNTTables(t *testing.T, tabs []woffTestTable, sfnt []byte) ([][]byte, []uint32, []uint32) {
+	t.Helper()
 
-	var compLens []uint32
+	compressed := make([][]byte, 0, len(tabs))
+	origLens := make([]uint32, 0, len(tabs))
+	compLens := make([]uint32, 0, len(tabs))
 
 	for _, table := range tabs {
 		raw := sfnt[table.offset : table.offset+table.length]
@@ -75,17 +76,23 @@ func encodeWOFF1ForTest(t *testing.T, sfnt []byte) []byte {
 
 		compressed = append(compressed, comp)
 		origLens = append(origLens, table.length)
-		compLens = append(compLens, uint32(len(comp)))
+		compLens = append(compLens, uint32(len(comp))) //nolint:gosec // test fixture sizes are small
 	}
 
-	header := make([]byte, woffHeaderSize)
-	copy(header[0:4], []byte(woffSignature))
-	binary.BigEndian.PutUint32(header[4:8], flavor)
-	binary.BigEndian.PutUint16(header[12:14], uint16(numTables))
-	binary.BigEndian.PutUint32(header[16:20], uint32(len(sfnt)))
+	return compressed, origLens, compLens
+}
 
-	dir := make([]byte, numTables*woffEntrySize)
-	payloadOff := uint32(woffHeaderSize + numTables*woffEntrySize)
+// buildWOFFPayload lays out the aligned table directory and body.
+func buildWOFFPayload(
+	t *testing.T,
+	tabs []woffTestTable,
+	compressed [][]byte,
+	compLens, origLens []uint32,
+) ([]byte, []byte) {
+	t.Helper()
+
+	dir := make([]byte, len(tabs)*woffEntrySize)
+	payloadOff := uint32(woffHeaderSize + len(tabs)*woffEntrySize) //nolint:gosec // test fixture
 
 	var body bytes.Buffer
 
@@ -107,8 +114,32 @@ func encodeWOFF1ForTest(t *testing.T, sfnt []byte) []byte {
 		payloadOff += compLens[idx]
 	}
 
-	out := append(append(header, dir...), body.Bytes()...)
-	binary.BigEndian.PutUint32(out[8:12], uint32(len(out)))
+	return dir, body.Bytes()
+}
+
+// encodeWOFF1ForTest builds a minimal valid WOFF1 from SFNT tables (zlib).
+func encodeWOFF1ForTest(t *testing.T, sfnt []byte) []byte {
+	t.Helper()
+
+	if len(sfnt) < 12 {
+		t.Fatal("sfnt too short")
+	}
+
+	flavor := binary.BigEndian.Uint32(sfnt[0:4])
+	numTables := int(binary.BigEndian.Uint16(sfnt[4:6]))
+	tabs := readSFNTDirectory(t, sfnt, numTables)
+	compressed, origLens, compLens := compressSFNTTables(t, tabs, sfnt)
+
+	header := make([]byte, woffHeaderSize)
+	copy(header[0:4], []byte(woffSignature))
+	binary.BigEndian.PutUint32(header[4:8], flavor)
+	binary.BigEndian.PutUint16(header[12:14], uint16(numTables)) //nolint:gosec // test fixture
+	binary.BigEndian.PutUint32(header[16:20], uint32(len(sfnt))) //nolint:gosec // test fixture
+
+	dir, body := buildWOFFPayload(t, tabs, compressed, compLens, origLens)
+
+	out := bytes.Join([][]byte{header, dir, body}, nil)
+	binary.BigEndian.PutUint32(out[8:12], uint32(len(out))) //nolint:gosec // test fixture
 
 	return out
 }

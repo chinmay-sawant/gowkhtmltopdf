@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -49,7 +50,9 @@ func loadFixture(t *testing.T, name string) (*html.Node, []*css.Stylesheet) {
 	return root, sheets
 }
 
-func TestLogoTitleGap(t *testing.T) {
+func TestLogoTitleGap(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	root, sheets := loadFixture(t, "fixture-07-image-logo.html")
 
 	logo, err := os.ReadFile("../../testdata/golden/logo.png")
@@ -99,8 +102,12 @@ func TestLogoTitleGap(t *testing.T) {
 
 func TestBlockMarginBottomGap(t *testing.T) {
 	t.Parallel()
+
 	root, sheets := loadFixture(t, "fixture-19-margin-and-sizing.html")
-	res, err := Layout(root, Options{Width: 595, Height: 842, Sheets: sheets, Background: true}) //nolint:exhaustruct // intentional zero fields
+
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 595, Height: 842, Sheets: sheets, Background: true,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,10 +132,13 @@ func TestBlockMarginBottomGap(t *testing.T) {
 
 func TestNestedTableStaysInCell(t *testing.T) {
 	t.Parallel()
+
 	root, sheets := loadFixture(t, "fixture-10-table-colspan.html")
 	contW := 595.0 - 2*28.346
 
-	res, err := Layout(root, Options{Width: contW, Height: 842, Sheets: sheets, Background: true}) //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: contW, Height: 842, Sheets: sheets, Background: true,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,15 +150,20 @@ func TestNestedTableStaysInCell(t *testing.T) {
 		}
 
 		if right > contW+1 {
-			t.Errorf("op exceeds content: kind=%v X=%.1f W=%.1f right=%.1f cw=%.1f", paintOp.Kind, paintOp.X, paintOp.W, right, contW)
+			t.Errorf("op exceeds content: kind=%v X=%.1f W=%.1f right=%.1f cw=%.1f",
+				paintOp.Kind, paintOp.X, paintOp.W, right, contW)
 		}
 	}
 }
 
-func TestPositionLiteFixtureReservesOverlaySpace(t *testing.T) {
+func TestPositionLiteFixtureReservesOverlaySpace(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	root, sheets := loadFixture(t, "fixture-26-position-lite.html")
 
-	res, err := Layout(root, Options{Width: 595 - 56.7, Height: 842, Sheets: sheets, Background: true}) //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 595 - 56.7, Height: 842, Sheets: sheets, Background: true,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +175,8 @@ func TestPositionLiteFixtureReservesOverlaySpace(t *testing.T) {
 	relTextX := 0.0
 
 	for _, paintOp := range res.Ops {
-		if paintOp.Kind == OpFillRect && paintOp.W > 400 && paintOp.H > 20 && paintOp.R > 0.9 && paintOp.G > 0.9 && paintOp.B > 0.9 {
+		if paintOp.Kind == OpFillRect && paintOp.W > 400 && paintOp.H > 20 &&
+			paintOp.R > 0.9 && paintOp.G > 0.9 && paintOp.B > 0.9 {
 			relLeft = paintOp.X
 		}
 
@@ -168,7 +184,8 @@ func TestPositionLiteFixtureReservesOverlaySpace(t *testing.T) {
 			relTextX = paintOp.X
 		}
 
-		if paintOp.Kind == OpFillRect && paintOp.W > 100 && paintOp.H > 10 && paintOp.R > 0.9 && paintOp.G > 0.85 && paintOp.G < 0.99 && paintOp.B > 0.8 && paintOp.B < 0.95 {
+		if paintOp.Kind == OpFillRect && paintOp.W > 100 && paintOp.H > 10 &&
+			paintOp.R > 0.9 && paintOp.G > 0.85 && paintOp.G < 0.99 && paintOp.B > 0.8 && paintOp.B < 0.95 {
 			absBottom = paintOp.Y + paintOp.H
 		}
 
@@ -195,10 +212,14 @@ func TestPositionLiteFixtureReservesOverlaySpace(t *testing.T) {
 	}
 }
 
-func TestLetterheadPaddingBeforeBorder(t *testing.T) {
+func TestLetterheadPaddingBeforeBorder(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	root, sheets := loadFixture(t, "fixture-16-invoice-with-css.html")
 
-	res, err := Layout(root, Options{Width: 595 - 56.7, Height: 842, Sheets: sheets, Background: true}) //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 595 - 56.7, Height: 842, Sheets: sheets, Background: true,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,12 +1,14 @@
-package css
+package css //nolint:testpackage // exercises unexported parseContainerPrelude
 
 import "testing"
+
+const cardName = "card"
 
 func TestParseContainerShorthand(t *testing.T) {
 	t.Parallel()
 
 	name, ctype := ParseContainerShorthand("card / inline-size")
-	if name != "card" || ctype != "inline-size" {
+	if name != cardName || ctype != "inline-size" {
 		t.Fatalf("got name=%q type=%q", name, ctype)
 	}
 
@@ -33,12 +35,12 @@ func TestParseContainerNameValue(t *testing.T) {
 		t.Fatal("none should clear")
 	}
 
-	if ParseContainerNameValue("Card") != "card" {
+	if ParseContainerNameValue("Card") != cardName {
 		t.Fatalf("got %q", ParseContainerNameValue("Card"))
 	}
 }
 
-func TestParseContainerRules(t *testing.T) {
+func TestParseContainerRules(t *testing.T) { //nolint:cyclop,funlen // per-variant structural checks
 	t.Parallel()
 	sty := mustSheet(t, `
 		.card { container: card / inline-size; width: 400px }
@@ -68,7 +70,7 @@ func TestParseContainerRules(t *testing.T) {
 	}
 
 	r1Val := sty.Rules[1]
-	if r1Val.Container == nil || r1Val.Container.Name != "card" {
+	if r1Val.Container == nil || r1Val.Container.Name != cardName {
 		t.Fatalf("rule1 container = %+v", r1Val.Container)
 	}
 
@@ -108,65 +110,30 @@ func TestParseContainerRules(t *testing.T) {
 func TestContainerCondMatches(t *testing.T) {
 	t.Parallel()
 
-	contQ, found := parseContainerPrelude("card (inline-size > 20em)")
-	if !found {
-		t.Fatal("parse prelude")
+	cases := []struct {
+		prelude string
+		size    float64
+		want    bool
+	}{
+		{"card (inline-size > 20em)", 241, true},                // 20em at 12pt = 240pt
+		{"card (inline-size > 20em)", 239, false},               // 20em at 12pt = 240pt
+		{"(min-width: 100px)", 75, true},                        // 100px = 75pt
+		{"(min-width: 100px)", 74, false},                       // 100px = 75pt
+		{"(width > 50pt) and (inline-size < 200pt)", 100, true}, // mid-range matches both
+		{"(width > 50pt) and (inline-size < 200pt)", 40, false}, // low fails the > 50pt arm
+		{"not (inline-size < 10pt)", 10, true},                  // == 10 is not < 10
+		{"not (inline-size < 10pt)", 9, false},                  // 9 is < 10
+		{"(width < 1pt) or (inline-size > 5pt)", 6, true},       // second arm matches
 	}
-	// 20em at 12pt = 240pt
-	if !contQ.Cond.Matches(241, 12) {
-		t.Error("241pt should match > 20em@12pt")
-	}
+	for _, testCase := range cases {
+		cq, found := parseContainerPrelude(testCase.prelude)
+		if !found {
+			t.Fatalf("parse prelude %q", testCase.prelude)
+		}
 
-	if contQ.Cond.Matches(239, 12) {
-		t.Error("239pt should not match > 20em@12pt")
-	}
-
-	cq2, found := parseContainerPrelude("(min-width: 100px)")
-	if !found {
-		t.Fatal("parse min-width")
-	}
-	// 100px = 75pt
-	if !cq2.Cond.Matches(75, 12) {
-		t.Error("75pt should match min-width:100px")
-	}
-
-	if cq2.Cond.Matches(74, 12) {
-		t.Error("74pt should not match min-width:100px")
-	}
-
-	cq3, found := parseContainerPrelude("(width > 50pt) and (inline-size < 200pt)")
-	if !found {
-		t.Fatal("parse and")
-	}
-
-	if !cq3.Cond.Matches(100, 12) {
-		t.Error("and should match mid")
-	}
-
-	if cq3.Cond.Matches(40, 12) {
-		t.Error("and should fail low")
-	}
-
-	cq4, found := parseContainerPrelude("not (inline-size < 10pt)")
-	if !found {
-		t.Fatal("parse not")
-	}
-
-	if !cq4.Cond.Matches(10, 12) {
-		t.Error("not (< 10) should match == 10")
-	}
-
-	if cq4.Cond.Matches(9, 12) {
-		t.Error("not (< 10) should fail 9")
-	}
-
-	cq5, found := parseContainerPrelude("(width < 1pt) or (inline-size > 5pt)")
-	if !found {
-		t.Fatal("parse or")
-	}
-
-	if !cq5.Cond.Matches(6, 12) {
-		t.Error("or should match via second")
+		if got := cq.Cond.Matches(testCase.size, 12); got != testCase.want {
+			t.Errorf("Matches(%q, %g) = %v, want %v", testCase.prelude, testCase.size, got, testCase.want)
+		}
 	}
 }
 

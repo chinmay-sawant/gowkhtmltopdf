@@ -1,4 +1,4 @@
-package settings
+package settings //nolint:testpackage // exercises unexported key tables via getForKey
 
 import (
 	"errors"
@@ -34,16 +34,32 @@ func TestDefaultPdfGlobalSnapshot(t *testing.T) {
 		}
 	}
 
-	if global.Margin.Top != 10 || global.Margin.Bottom != 10 || global.Margin.Left != 10 || global.Margin.Right != 10 {
-		t.Errorf("default margins = %+v, want 10mm all sides", global.Margin)
-	}
+	assertDefaultMargins(t, global.Margin)
+	assertDefaultHeader(t, global.Header)
+	assertDefaultTOC(t, global.TOC)
+}
 
-	if global.Header.FontSize != 12 || global.Header.FontName != "Arial" || global.Header.Spacing != 0 {
-		t.Errorf("default header = %+v, want Arial 12 spacing 0", global.Header)
-	}
+func assertDefaultMargins(t *testing.T, m Margin) {
+	t.Helper()
 
-	if global.TOC.CaptionText != "Table of Contents" || global.TOC.FontScale != 0.8 || !global.TOC.DottedLines {
-		t.Errorf("default toc = %+v", global.TOC)
+	if m.Top != 10 || m.Bottom != 10 || m.Left != 10 || m.Right != 10 {
+		t.Errorf("default margins = %+v, want 10mm all sides", m)
+	}
+}
+
+func assertDefaultHeader(t *testing.T, h HeaderFooter) {
+	t.Helper()
+
+	if h.FontSize != 12 || h.FontName != "Arial" || h.Spacing != 0 {
+		t.Errorf("default header = %+v, want Arial 12 spacing 0", h)
+	}
+}
+
+func assertDefaultTOC(t *testing.T, toc TableOfContent) {
+	t.Helper()
+
+	if toc.CaptionText != "Table of Contents" || toc.FontScale != 0.8 || !toc.DottedLines {
+		t.Errorf("default toc = %+v", toc)
 	}
 }
 
@@ -73,115 +89,118 @@ func TestGlobalSetDottedKeys(t *testing.T) {
 	t.Parallel()
 
 	global := DefaultPdfGlobal()
-	tests := []struct {
-		key, val string
-		check    func(t *testing.T)
-	}{
-		{"margin.top", "25mm", func(t *testing.T) {
-			if global.Margin.Top != 25 {
-				t.Errorf("margin.top = %v, want 25", global.Margin.Top)
-			}
-		}},
-		{"margin.left", "1in", func(t *testing.T) {
-			if math.Abs(global.Margin.Left-25.4) > 1e-6 {
-				t.Errorf("margin.left = %v, want 25.4mm", global.Margin.Left)
-			}
-		}},
-		{"size.pagesize", "Letter", func(t *testing.T) {
-			if global.PageSize != "Letter" || global.Size.PageSize != "Letter" {
-				t.Errorf("pagesize = %q/%q", global.PageSize, global.Size.PageSize)
-			}
-		}},
-		{"size.width", "210mm", func(t *testing.T) {
-			if global.Size.Width != 210 {
-				t.Errorf("size.width = %v, want 210", global.Size.Width)
-			}
-		}},
-		{"size.height", "297mm", func(t *testing.T) {
-			if global.Size.Height != 297 {
-				t.Errorf("size.height = %v, want 297", global.Size.Height)
-			}
-		}},
-		{"orientation", "landscape", func(t *testing.T) {
-			if global.Orientation != OrientationLandscape {
-				t.Error("orientation not landscape")
-			}
-		}},
-		{"colormode", "grayscale", func(t *testing.T) {
-			if !global.Grayscale {
-				t.Error("colormode=grayscale must set Grayscale")
-			}
-		}},
-		{"grayscale", "false", func(t *testing.T) {
-			if global.Grayscale {
-				t.Error("grayscale=false must clear Grayscale")
-			}
-		}},
-		{"grayscale", "true", func(t *testing.T) {
-			if !global.Grayscale {
-				t.Error("grayscale=true must set Grayscale")
-			}
-		}},
-		{"outline", "false", func(t *testing.T) {
-			if global.Outline {
-				t.Error("outline should be false")
-			}
-		}},
-		{"outlinedepth", "6", func(t *testing.T) {
-			if global.OutlineDepth != 6 {
-				t.Errorf("outlinedepth = %d", global.OutlineDepth)
-			}
-		}},
-		{"copies", "3", func(t *testing.T) {
-			if global.Copies != 3 {
-				t.Errorf("copies = %d", global.Copies)
-			}
-		}},
-		{"title", "Invoice", func(t *testing.T) {
-			if global.Title != "Invoice" {
-				t.Errorf("title = %q", global.Title)
-			}
-		}},
-		{"header.fontsize", "14", func(t *testing.T) {
-			if global.Header.FontSize != 14 {
-				t.Errorf("header.fontsize = %v", global.Header.FontSize)
-			}
-		}},
-		{"footer.center", "[page] of [topage]", func(t *testing.T) {
-			if global.Footer.Center != "[page] of [topage]" {
-				t.Errorf("footer.center = %q", global.Footer.Center)
-			}
-		}},
-		{"toc.captiontext", "Contents", func(t *testing.T) {
-			if global.TOC.CaptionText != "Contents" {
-				t.Error("toc.captiontext not set")
-			}
-		}},
-		{"web.background", "false", func(t *testing.T) {
-			if global.Background {
-				t.Error("web.background should clear Global.Background")
-			}
-		}},
-		{"allow", "/srv/html", func(t *testing.T) {
-			if len(global.Load.Allow) != 1 || global.Load.Allow[0] != "/srv/html" {
-				t.Errorf("allow = %v", global.Load.Allow)
-			}
-		}},
-		{"dumpoutline", "true", func(t *testing.T) {
-			if !global.DumpOutline {
-				t.Error("dumpoutline should be true")
-			}
-		}},
+	for _, tc := range globalDottedGeometryChecks(&global) {
+		runDottedCheck(t, &global, tc)
 	}
 
-	for _, testCase := range tests {
-		if err := global.Set(testCase.key, testCase.val); err != nil {
-			t.Errorf("Set(%q, %q) error: %v", testCase.key, testCase.val, err)
+	for _, tc := range globalDottedTextChecks(&global) {
+		runDottedCheck(t, &global, tc)
+	}
+}
 
-			continue
-		}
+type dottedCheck struct {
+	key, val string
+	desc     string
+	check    func() bool
+}
 
-		testCase.check(t)
+func runDottedCheck(t *testing.T, global *PdfGlobal, dotted dottedCheck) {
+	t.Helper()
+
+	if err := global.Set(dotted.key, dotted.val); err != nil {
+		t.Errorf("Set(%q, %q) error: %v", dotted.key, dotted.val, err)
+
+		return
+	}
+
+	if !dotted.check() {
+		t.Errorf("%s: Set(%q, %q) check failed", dotted.desc, dotted.key, dotted.val)
+	}
+}
+
+func globalDottedGeometryChecks(global *PdfGlobal) []dottedCheck {
+	return []dottedCheck{
+		{
+			key: "margin.top", val: "25mm", desc: "margin.top must be 25mm",
+			check: func() bool { return global.Margin.Top == 25 },
+		},
+		{
+			key: "margin.left", val: "1in", desc: "margin.left must be 25.4mm",
+			check: func() bool { return math.Abs(global.Margin.Left-25.4) < 1e-6 },
+		},
+		{
+			key: "size.pagesize", val: "Letter", desc: "pagesize must be Letter on both homes",
+			check: func() bool { return global.PageSize == "Letter" && global.Size.PageSize == "Letter" },
+		},
+		{
+			key: "size.width", val: "210mm", desc: "size.width must be 210mm",
+			check: func() bool { return global.Size.Width == 210 },
+		},
+		{
+			key: "size.height", val: "297mm", desc: "size.height must be 297mm",
+			check: func() bool { return global.Size.Height == 297 },
+		},
+		{
+			key: "orientation", val: "landscape", desc: "orientation must be landscape",
+			check: func() bool { return global.Orientation == OrientationLandscape },
+		},
+		{
+			key: "colormode", val: "grayscale", desc: "colormode=grayscale must set Grayscale",
+			check: func() bool { return global.Grayscale },
+		},
+		{
+			key: "grayscale", val: "false", desc: "grayscale=false must clear Grayscale",
+			check: func() bool { return !global.Grayscale },
+		},
+		{
+			key: "grayscale", val: "true", desc: "grayscale=true must set Grayscale",
+			check: func() bool { return global.Grayscale },
+		},
+		{
+			key: "outline", val: "false", desc: "outline must be false",
+			check: func() bool { return !global.Outline },
+		},
+	}
+}
+
+func globalDottedTextChecks(global *PdfGlobal) []dottedCheck {
+	return []dottedCheck{
+		{
+			key: "outlinedepth", val: "6", desc: "outlinedepth must be 6",
+			check: func() bool { return global.OutlineDepth == 6 },
+		},
+		{
+			key: "copies", val: "3", desc: "copies must be 3",
+			check: func() bool { return global.Copies == 3 },
+		},
+		{
+			key: "title", val: "Invoice", desc: "title must be Invoice",
+			check: func() bool { return global.Title == "Invoice" },
+		},
+		{
+			key: "header.fontsize", val: "14", desc: "header.fontsize must be 14",
+			check: func() bool { return global.Header.FontSize == 14 },
+		},
+		{
+			key: "footer.center", val: "[page] of [topage]", desc: "footer.center must be set",
+			check: func() bool { return global.Footer.Center == "[page] of [topage]" },
+		},
+		{
+			key: "toc.captiontext", val: "Contents", desc: "toc.captiontext must be set",
+			check: func() bool { return global.TOC.CaptionText == "Contents" },
+		},
+		{
+			key: "web.background", val: "false", desc: "web.background must clear Global.Background",
+			check: func() bool { return !global.Background },
+		},
+		{
+			key: "allow", val: "/srv/html", desc: "allow must be in Load.Allow",
+			check: func() bool { return len(global.Load.Allow) == 1 && global.Load.Allow[0] == "/srv/html" },
+		},
+		{
+			key: "dumpoutline", val: "true", desc: "dumpoutline must be true",
+			check: func() bool { return global.DumpOutline },
+		},
 	}
 }
 
@@ -190,7 +209,9 @@ func TestGlobalSetIgnoredKeys(t *testing.T) {
 
 	global := DefaultPdfGlobal()
 	// Policy A: inert wkhtml keys are accepted into Ignored, not typed fields.
-	for _, key := range []string{"dpi", "imagedpi", "imagequality", "lowquality", "log-level", "web.javascript", "produceforms"} {
+	for _, key := range []string{
+		"dpi", "imagedpi", "imagequality", "lowquality", "log-level", "web.javascript", "produceforms",
+	} {
 		if err := global.Set(key, "1"); err != nil {
 			t.Errorf("Set(%q) should accept ignored key: %v", key, err)
 		}
@@ -198,10 +219,6 @@ func TestGlobalSetIgnoredKeys(t *testing.T) {
 		if global.Ignored[key] != "1" {
 			t.Errorf("Ignored[%q] = %q, want 1", key, global.Ignored[key])
 		}
-	}
-	// No typed stubs reintroduced.
-	if global.Quiet {
-		// Quiet is real; ensure dpi did not bleed into other fields.
 	}
 }
 
@@ -218,52 +235,48 @@ func TestObjectSetDottedKeys(t *testing.T) {
 	t.Parallel()
 
 	obj := DefaultPdfObject()
-	if err := obj.Set("load.blocklocalfileaccess", "false"); err != nil {
-		t.Fatal(err)
-	}
+	setKey(t, &obj, "load.blocklocalfileaccess", "false")
 
 	if obj.Load.BlockLocalFileAccess {
 		t.Error("blocklocalfileaccess should be false")
 	}
 
-	if err := obj.Set("load.timeout", "30"); err != nil {
-		t.Fatal(err)
-	}
+	setKey(t, &obj, "load.timeout", "30")
 
 	if obj.Load.Timeout != 30 {
 		t.Errorf("timeout = %d", obj.Load.Timeout)
 	}
 
-	if err := obj.Set("header.left", "objheader"); err != nil {
-		t.Fatal(err)
-	}
+	setKey(t, &obj, "header.left", "objheader")
 
 	if !obj.HeaderSet || obj.Header.Left != "objheader" {
 		t.Errorf("object header = %+v (set=%v)", obj.Header, obj.HeaderSet)
 	}
 
-	if err := obj.Set("footer.right", "objfooter"); err != nil {
-		t.Fatal(err)
-	}
+	setKey(t, &obj, "footer.right", "objfooter")
 
 	if !obj.FooterSet || obj.Footer.Right != "objfooter" {
 		t.Errorf("object footer = %+v (set=%v)", obj.Footer, obj.FooterSet)
 	}
 
-	if err := obj.Set("web.images", "false"); err != nil {
-		t.Fatal(err)
-	}
+	setKey(t, &obj, "web.images", "false")
 
 	if obj.Web.Images {
 		t.Error("web.images should be false")
 	}
 
-	if err := obj.Set("web.simplifydom", "true"); err != nil {
-		t.Fatal(err)
-	}
+	setKey(t, &obj, "web.simplifydom", "true")
 
 	if !obj.Web.SimplifyDOM {
 		t.Error("web.simplifydom should be true")
+	}
+}
+
+func setKey(t *testing.T, obj *PdfObject, key, val string) {
+	t.Helper()
+
+	if err := obj.Set(key, val); err != nil {
+		t.Fatalf("Set(%q, %q): %v", key, val, err)
 	}
 }
 
@@ -435,10 +448,10 @@ func TestDefaultImageGlobalNoQuietLogLevel(t *testing.T) {
 	t.Parallel()
 
 	img := DefaultImageGlobal()
+	// Quiet lives on PdfGlobal only; imageout uses Global.Quiet.
 	if img.Width != 1024 || !img.SmartWidth || img.Quality != 94 {
 		t.Errorf("default image = %+v", img)
 	}
-	// Quiet lives on PdfGlobal only; imageout uses Global.Quiet.
 }
 
 func TestImageSet(t *testing.T) {
@@ -478,28 +491,36 @@ func TestGlobalGetSetRoundTripAndIgnored(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got, found := global.Get("title"); !found || got != "Hi" {
-		t.Fatalf("Get(title)=%q,%v", got, found)
-	}
+	getMust(t, &global, "title", "Hi")
 
 	if err := global.Set("dpi", "150"); err != nil {
 		t.Fatal(err)
 	}
 
-	if got, found := global.Get("dpi"); !found || got != "150" {
-		t.Fatalf("Get(dpi ignored)=%q,%v want 150,true", got, found)
-	}
-
-	if _, found := global.Get("totally.unknown"); found {
-		t.Fatal("unknown key should not Get")
-	}
+	getMust(t, &global, "dpi", "150")
+	getMissing(t, &global, "totally.unknown")
 
 	if err := global.Set("background", "false"); err != nil {
 		t.Fatal(err)
 	}
 
-	if got, found := global.Get("web.background"); !found || got != "false" {
-		t.Fatalf("Get(web.background)=%q,%v after Set(background)", got, found)
+	getMust(t, &global, "web.background", "false")
+}
+
+func getMust(t *testing.T, g *PdfGlobal, key, want string) {
+	t.Helper()
+
+	got, found := g.Get(key)
+	if !found || got != want {
+		t.Fatalf("Get(%q) = %q,%v want %q,true", key, got, found, want)
+	}
+}
+
+func getMissing(t *testing.T, g *PdfGlobal, key string) {
+	t.Helper()
+
+	if _, found := g.Get(key); found {
+		t.Fatalf("Get(%q) must not be found", key)
 	}
 }
 
@@ -557,10 +578,10 @@ func TestResolveMedia(t *testing.T) {
 	t.Parallel()
 
 	base := "print"
-	none := Web{}                         //nolint:exhaustruct // intentional zero/partial fields
-	pmt := Web{PrintMediaType: true}      //nolint:exhaustruct // intentional zero/partial fields
-	screen := Web{MediaType: MediaScreen} //nolint:exhaustruct // intentional zero/partial fields
-	print := Web{MediaType: MediaPrint}   //nolint:exhaustruct // intentional zero/partial fields
+	none := Web{}                            //nolint:exhaustruct // intentional zero/partial fields
+	pmt := Web{PrintMediaType: true}         //nolint:exhaustruct // intentional zero/partial fields
+	screen := Web{MediaType: MediaScreen}    //nolint:exhaustruct // intentional zero/partial fields
+	printMedia := Web{MediaType: MediaPrint} //nolint:exhaustruct // intentional zero/partial fields
 
 	if got := ResolveMedia(base, none, nil); got != "print" {
 		t.Errorf("default PDF = %q", got)
@@ -586,11 +607,11 @@ func TestResolveMedia(t *testing.T) {
 		t.Errorf("obj media-type screen = %q", got)
 	}
 	// obj wins over global media-type.
-	if got := ResolveMedia(base, screen, &print); got != "print" {
+	if got := ResolveMedia(base, screen, &printMedia); got != "print" {
 		t.Errorf("obj media-type print over global screen = %q", got)
 	}
 	// print-media-type override wins over media-type.
-	if got := ResolveMedia(base, screen, &Web{PrintMediaType: true}); got != "print" { //nolint:exhaustruct // intentional zero/partial fields
+	if got := ResolveMedia(base, screen, &pmt); got != "print" {
 		t.Errorf("pmt over media-type screen = %q", got)
 	}
 }

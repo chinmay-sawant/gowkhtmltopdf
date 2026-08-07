@@ -25,8 +25,17 @@ const (
 //
 // Text is run through pdf.ShapeTextFont first so Arabic/RTL/OT forms match
 // PDF emission (Phase 2.4 image shaping parity).
-func ttfDrawString(img *image.NRGBA, basex, basey float64, s string, sizePt float64, face *pdf.Font, col color.NRGBA, pxPerPt float64, atlas *glyphAtlas) {
-	if face == nil || s == "" || sizePt <= 0 || pxPerPt <= 0 {
+func ttfDrawString(
+	img *image.NRGBA,
+	basex, basey float64,
+	text string,
+	sizePt float64,
+	face *pdf.Font,
+	col color.NRGBA,
+	pxPerPt float64,
+	atlas *glyphAtlas,
+) {
+	if face == nil || text == "" || sizePt <= 0 || pxPerPt <= 0 {
 		return
 	}
 
@@ -34,7 +43,7 @@ func ttfDrawString(img *image.NRGBA, basex, basey float64, s string, sizePt floa
 		atlas = newGlyphAtlas()
 	}
 
-	run := pdf.ShapeRun(s, face, sizePt)
+	run := pdf.ShapeRun(text, face, sizePt)
 	if run.Text == "" {
 		return
 	}
@@ -118,8 +127,16 @@ func (a *glyphAtlas) get(key glyphKey, makeEnt func() *glyphCacheEntry) *glyphCa
 	return ent
 }
 
-func drawGlyphAA(dst *image.NRGBA, basex, basey float64, r rune, face *pdf.Font, scale float64, col color.NRGBA, atlas *glyphAtlas) {
-	if r == ' ' {
+func drawGlyphAA(
+	dst *image.NRGBA,
+	basex, basey float64,
+	runeVal rune,
+	face *pdf.Font,
+	scale float64,
+	col color.NRGBA,
+	atlas *glyphAtlas,
+) {
+	if runeVal == ' ' {
 		return
 	}
 
@@ -128,10 +145,10 @@ func drawGlyphAA(dst *image.NRGBA, basex, basey float64, r rune, face *pdf.Font,
 		sizeKey = 1
 	}
 
-	key := glyphKey{face: face, size: sizeKey, r: r}
+	key := glyphKey{face: face, size: sizeKey, r: runeVal}
 
 	ent := atlas.get(key, func() *glyphCacheEntry {
-		return rasterGlyph(face, r, scale)
+		return rasterGlyph(face, runeVal, scale)
 	})
 	if ent == nil || ent.img == nil {
 		return
@@ -161,72 +178,41 @@ func drawGlyphAA(dst *image.NRGBA, basex, basey float64, r rune, face *pdf.Font,
 			}
 
 			pixOff := dst.PixOffset(dstX, dstY)
-			dr, dg, db, da := uint32(dst.Pix[pixOff+0]), uint32(dst.Pix[pixOff+1]), uint32(dst.Pix[pixOff+2]), uint32(dst.Pix[pixOff+3])
-			ia := channelMax - srcA
-			dst.Pix[pixOff+0] = uint8((uint32(col.R)*srcA + dr*ia) / channelMax)
-			dst.Pix[pixOff+1] = uint8((uint32(col.G)*srcA + dg*ia) / channelMax)
-			dst.Pix[pixOff+2] = uint8((uint32(col.B)*srcA + db*ia) / channelMax)
-			dst.Pix[pixOff+3] = uint8(srcA + da*ia/channelMax)
+			dstR := uint32(dst.Pix[pixOff+0])
+			dstG := uint32(dst.Pix[pixOff+1])
+			dstB := uint32(dst.Pix[pixOff+2])
+			dstA := uint32(dst.Pix[pixOff+3])
+			invA := channelMax - srcA
+			//nolint:gosec // Over blend of byte channels stays in uint8 range
+			dst.Pix[pixOff+0] = uint8((uint32(col.R)*srcA + dstR*invA) / channelMax)
+			//nolint:gosec // Over blend of byte channels stays in uint8 range
+			dst.Pix[pixOff+1] = uint8((uint32(col.G)*srcA + dstG*invA) / channelMax)
+			//nolint:gosec // Over blend of byte channels stays in uint8 range
+			dst.Pix[pixOff+2] = uint8((uint32(col.B)*srcA + dstB*invA) / channelMax)
+			//nolint:gosec // Over blend of byte channels stays in uint8 range
+			dst.Pix[pixOff+3] = uint8(srcA + dstA*invA/channelMax)
 		}
 	}
 }
 
-func rasterGlyph(face *pdf.Font, r rune, scale float64) *glyphCacheEntry {
-	contours := face.GlyphContours(r)
+func rasterGlyph(face *pdf.Font, runeVal rune, scale float64) *glyphCacheEntry {
+	contours := face.GlyphContours(runeVal)
 	if len(contours) == 0 {
 		return &glyphCacheEntry{} //nolint:exhaustruct // intentional zero/partial fields
 	}
 
-	var flat [][]pdf.GlyphPoint
-
-	var minX, minY, maxX, maxY float64
-
-	first := true
 	// More flatten steps at small sizes → smoother curves (less "wobbly" stems).
 	steps := 8
 	if scale*float64(face.UnitsPerEm()) < minHintScale {
 		steps = 12
 	}
 
-	for _, c := range contours {
-		pts := pdf.FlattenContour(c, steps)
-		if len(pts) < boxFilterFactor2 {
-			continue
-		}
-
-		flat = append(flat, pts)
-
-		bx0, by0, bx1, by1 := pdf.ContourBounds(pts)
-		if first {
-			minX, minY, maxX, maxY = bx0, by0, bx1, by1
-			first = false
-		} else {
-			if bx0 < minX {
-				minX = bx0
-			}
-
-			if by0 < minY {
-				minY = by0
-			}
-
-			if bx1 > maxX {
-				maxX = bx1
-			}
-
-			if by1 > maxY {
-				maxY = by1
-			}
-		}
-	}
-
-	if first {
+	flat, minX, minY, maxX, maxY := flattenGlyphContours(contours, steps)
+	if len(flat) == 0 {
 		return &glyphCacheEntry{} //nolint:exhaustruct // intentional zero/partial fields
 	}
 
-	edges := make([][]glyphEdge, 0, len(flat))
-	for _, contour := range flat {
-		edges = append(edges, makeGlyphEdges(contour))
-	}
+	edges := makeGlyphEdgeList(flat)
 	// scale font units -> pixels; y flips (font y-up, image y-down)
 	pad := 1.5
 	minXPx := minX * scale
@@ -248,7 +234,6 @@ func rasterGlyph(face *pdf.Font, r rune, scale float64) *glyphCacheEntry {
 		return &glyphCacheEntry{} //nolint:exhaustruct // intentional zero/partial fields
 	}
 
-	alpha := image.NewAlpha(image.Rect(0, 0, width, height))
 	originX := minXPx - pad
 	originY := minYPx - pad
 	// Supersample for greyscale AA. Higher factor for body-size text.
@@ -259,39 +244,42 @@ func rasterGlyph(face *pdf.Font, r rune, scale float64) *glyphCacheEntry {
 
 	ss2 := subsample * subsample
 
-	flatEdges := make([]glyphEdge, 0)
-	for _, contour := range edges {
-		flatEdges = append(flatEdges, contour...)
+	alpha := rasterGlyphAlpha(edges, width, height, subsample, ss2, originX, originY, scale)
+
+	return &glyphCacheEntry{
+		img:     alpha,
+		originX: originX,
+		originY: originY,
+	}
+}
+
+// makeGlyphEdgeList converts flattened contours into one flat edge list.
+func makeGlyphEdgeList(flat [][]pdf.GlyphPoint) []glyphEdge {
+	edges := make([]glyphEdge, 0, len(flat)*boxFilterFactor2)
+
+	for _, contour := range flat {
+		edges = append(edges, makeGlyphEdges(contour)...)
 	}
 
-	for pixelY := range height {
-		var activeStorage [8][64]glyphEdge
+	return edges
+}
 
+// rasterGlyphAlpha supersamples every pixel and writes the coverage into an
+// alpha mask (the pixel loop of rasterGlyph, kept separate for scanline
+// locality between the active-edge and sampling passes).
+func rasterGlyphAlpha(
+	flatEdges []glyphEdge,
+	width, height, subsample, ss2 int,
+	originX, originY, scale float64,
+) *image.Alpha {
+	alpha := image.NewAlpha(image.Rect(0, 0, width, height))
+
+	for pixelY := range height {
 		var activeRows [8][]glyphEdge
 
 		for sampleY := range subsample {
 			fontY := -((float64(pixelY) + (float64(sampleY)+pixelCenter)/float64(subsample) + originY) / scale)
-			active := activeStorage[sampleY][:0]
-
-			var overflow []glyphEdge
-
-			for _, edge := range flatEdges {
-				if fontY >= edge.yMin && fontY < edge.yMax {
-					if overflow != nil {
-						overflow = append(overflow, edge)
-					} else if len(active) < len(activeStorage[sampleY]) {
-						active = append(active, edge)
-					} else {
-						overflow = append(append([]glyphEdge(nil), active...), edge)
-					}
-				}
-			}
-
-			if overflow != nil {
-				activeRows[sampleY] = overflow
-			} else {
-				activeRows[sampleY] = active
-			}
+			activeRows[sampleY] = activeEdges(flatEdges, fontY)
 		}
 
 		for pixelX := range width {
@@ -311,16 +299,62 @@ func rasterGlyph(face *pdf.Font, r rune, scale float64) *glyphCacheEntry {
 			}
 
 			if cover > 0 {
-				alpha.SetAlpha(pixelX, pixelY, color.Alpha{A: uint8(255 * cover / ss2)})
+				alpha.SetAlpha(pixelX, pixelY, color.Alpha{
+					//nolint:gosec // cover <= subsample^2, so 255*cover/ss2 <= 255
+					A: uint8(255 * cover / ss2),
+				})
 			}
 		}
 	}
 
-	return &glyphCacheEntry{
-		img:     alpha,
-		originX: originX,
-		originY: originY,
+	return alpha
+}
+
+// flattenGlyphContours flattens each contour and returns the union bounds of
+// the flattened polygons (min/max in font units).
+func flattenGlyphContours(
+	contours [][]pdf.GlyphPoint,
+	steps int,
+) ([][]pdf.GlyphPoint, float64, float64, float64, float64) {
+	flat := make([][]pdf.GlyphPoint, 0, len(contours))
+
+	var minX, minY, maxX, maxY float64
+
+	for _, c := range contours {
+		pts := pdf.FlattenContour(c, steps)
+		if len(pts) < boxFilterFactor2 {
+			continue
+		}
+
+		flat = append(flat, pts)
+
+		bx0, by0, bx1, by1 := pdf.ContourBounds(pts)
+		if len(flat) == 1 {
+			minX, minY, maxX, maxY = bx0, by0, bx1, by1
+		} else {
+			minX = min(minX, bx0)
+			minY = min(minY, by0)
+			maxX = max(maxX, bx1)
+			maxY = max(maxY, by1)
+		}
 	}
+
+	return flat, minX, minY, maxX, maxY
+}
+
+// activeEdges returns the edges crossing fontY. The previous stack-buffered
+// variant spilled to a heap slice when a sample row exceeded its capacity;
+// a single heap-backed active list keeps the coverage semantics identical.
+func activeEdges(flatEdges []glyphEdge, fontY float64) []glyphEdge {
+	active := make([]glyphEdge, 0, len(flatEdges))
+
+	for _, edge := range flatEdges {
+		if fontY >= edge.yMin && fontY < edge.yMax {
+			active = append(active, edge)
+		}
+	}
+
+	return active
 }
 
 type glyphEdge struct {
@@ -363,30 +397,6 @@ func makeGlyphEdges(poly []pdf.GlyphPoint) []glyphEdge {
 	return edges
 }
 
-func pointInGlyphEdges(x, y float64, contours [][]glyphEdge) bool {
-	inside := false
-
-	for _, edges := range contours {
-		if pointInEdges(x, y, edges) {
-			inside = !inside
-		}
-	}
-
-	return inside
-}
-
-func pointInEdges(x, y float64, edges []glyphEdge) bool {
-	inside := false
-
-	for _, edge := range edges {
-		if y >= edge.yMin && y < edge.yMax && x < edge.xAtMin+(y-edge.yMin)*edge.dxdy {
-			inside = !inside
-		}
-	}
-
-	return inside
-}
-
 func pointInActiveEdges(x, y float64, edges []glyphEdge) bool {
 	inside := false
 
@@ -394,45 +404,6 @@ func pointInActiveEdges(x, y float64, edges []glyphEdge) bool {
 		if x < edge.xAtMin+(y-edge.yMin)*edge.dxdy {
 			inside = !inside
 		}
-	}
-
-	return inside
-}
-
-// pointInGlyph uses even-odd fill over all contours.
-func pointInGlyph(x, y float64, contours [][]pdf.GlyphPoint) bool {
-	inside := false
-
-	for _, c := range contours {
-		if pointInPoly(x, y, c) {
-			inside = !inside
-		}
-	}
-
-	return inside
-}
-
-func pointInPoly(x, y float64, poly []pdf.GlyphPoint) bool {
-	nVerts := len(poly)
-	if nVerts < minPolygonVerts {
-		return false
-	}
-
-	inside := false
-
-	prev := nVerts - 1
-	for idx := range nVerts {
-		yi, yj := poly[idx].Y, poly[prev].Y
-		xi, xj := poly[idx].X, poly[prev].X
-
-		if (yi > y) != (yj > y) {
-			xint := (xj-xi)*(y-yi)/(yj-yi) + xi
-			if x < xint {
-				inside = !inside
-			}
-		}
-
-		prev = idx
 	}
 
 	return inside

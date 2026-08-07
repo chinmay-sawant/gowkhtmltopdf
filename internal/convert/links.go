@@ -25,7 +25,7 @@ func stripLinkURIs(ops []layout.Op) []layout.Op {
 
 // tocAnchorLocations indexes the element boxes of one laid-out TOC document
 // by their data-wk-target attribute (the heading anchor of the entry).
-func tocAnchorLocations(root *html.Node, res *layout.Result) map[string]layout.ElementLocation {
+func tocAnchorLocations(_ *html.Node, res *layout.Result) map[string]layout.ElementLocation {
 	out := map[string]layout.ElementLocation{}
 
 	for _, loc := range res.Locations {
@@ -53,7 +53,7 @@ func tocAnchorLocations(root *html.Node, res *layout.Result) map[string]layout.E
 // applyInternalLinks: layout emits OpLinkURI with a "#frag" URI for inline
 // anchors that have a paint box (text runs), and convert resolves them to
 // GoTo destinations via element id / heading locations.
-func applyTOCLinks(doc *pdf.Document, tocs []*objectState, bodies []*objectState, tocTotal int, headings []*outline.Heading) {
+func applyTOCLinks(doc *pdf.Document, tocs []*objectState, bodies []*objectState, tocTotal int, headings []*outline.Heading) { //nolint:gocognit,cyclop,lll // forward/back link passes over entry locations
 	if len(tocs) == 0 {
 		return
 	}
@@ -96,11 +96,13 @@ func applyTOCLinks(doc *pdf.Document, tocs []*objectState, bodies []*objectState
 				destPage := trVal.start + eloc.Page
 				destX, destY := trVal.geom.pdfXY(eloc)
 
-				if st := bodyStateFor(bodies, docPage); st != nil {
+				if stVal := bodyStateFor(bodies, docPage); stVal != nil {
 					if page := doc.PageAt(tocTotal + docPage); page != nil {
-						locPage := docPage - st.offset
-						hLoc := layout.ElementLocation{Page: locPage, X: hVal.X, Y: hVal.Y, W: hVal.W, H: hVal.H} //nolint:exhaustruct // intentional zero-value fields
-						page.AddLinkDest(st.geom.pdfRect(hLoc), destPage, destX, destY)
+						locPage := docPage - stVal.offset
+						hLoc := layout.ElementLocation{ //nolint:exhaustruct // intentional zero-value fields
+							Page: locPage, X: hVal.X, Y: hVal.Y, W: hVal.W, H: hVal.H,
+						}
+						page.AddLinkDest(stVal.geom.pdfRect(hLoc), destPage, destX, destY)
 					}
 				}
 			}
@@ -120,7 +122,11 @@ func headingDest(hVal *outline.Heading, bodies []*objectState) (float64, float64
 
 	locPage := docPage - state.offset
 
-	return state.geom.pdfXY(layout.ElementLocation{Page: locPage, X: hVal.X, Y: hVal.Y, W: hVal.W, H: hVal.H}) //nolint:exhaustruct // intentional zero-value fields
+	loc := layout.ElementLocation{ //nolint:exhaustruct // intentional zero-value fields
+		Page: locPage, X: hVal.X, Y: hVal.Y, W: hVal.W, H: hVal.H,
+	}
+
+	return state.geom.pdfXY(loc)
 }
 
 // bodyIDDest is one body element destination keyed by id attribute.
@@ -159,19 +165,26 @@ func logicalDestPage(dest bodyIDDest, tocTotal int) int {
 	return tocTotal + dest.st.offset + dest.loc.Page
 }
 
-// remapPageForCopies maps a pre-copy (logical) page index onto the final
-// document page index in the same copy group as srcPage. Thin wrapper over
-// pagePlan.Remap kept for unit tests.
-func remapPageForCopies(logicalDest, srcPage, logicalN, copies int, collate bool) int {
-	pp := &pagePlan{copies: copies, collate: collate, owners: make([]pageOwner, logicalN)} //nolint:exhaustruct // intentional zero-value fields
+// remapPageForCopies maps the pre-copy (logical) destination page 1 onto the
+// final document page index in the same copy group as srcPage, in a two-page
+// document. Thin wrapper over pagePlan.Remap kept for unit tests.
+func remapPageForCopies(srcPage, copies int, collate bool) int {
+	// The wrapper models a two-page logical document.
+	const logicalPages = 2
 
-	return pp.Remap(logicalDest, srcPage)
+	plan := &pagePlan{ //nolint:exhaustruct // intentional zero-value fields
+		copies:  copies,
+		collate: collate,
+		owners:  make([]pageOwner, logicalPages),
+	}
+
+	return plan.Remap(1, srcPage)
 }
 
 // applyInternalLinks turns OpLinkURI ops whose URI is a same-document
 // fragment (#id) into GoTo annotations. Destinations are element boxes with
 // a matching id attribute. When LocalLinks is false, fragment ops are skipped.
-func applyInternalLinks(doc *pdf.Document, bodies []*objectState, tocTotal int) {
+func applyInternalLinks(doc *pdf.Document, bodies []*objectState, tocTotal int) { //nolint:cyclop,lll // per-state/per-op fragment resolution
 	if doc == nil {
 		return
 	}

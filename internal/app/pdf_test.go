@@ -1,10 +1,11 @@
-package app
+package app_test
 
 import (
 	"bytes"
 	"errors"
 	"testing"
 
+	"gowkhtmltopdf/internal/app"
 	"gowkhtmltopdf/internal/cli"
 	"gowkhtmltopdf/internal/convert"
 	"gowkhtmltopdf/internal/settings"
@@ -22,7 +23,7 @@ func TestBuildPDFRequestPreservesEngineContract(t *testing.T) {
 
 	cmd.DumpOutline = true
 
-	req, err := BuildPDFRequest(cmd, &out, &outline)
+	req, err := app.BuildPDFRequest(cmd, &out, &outline)
 	if err != nil {
 		t.Fatalf("BuildPDFRequest: %v", err)
 	}
@@ -41,7 +42,7 @@ func TestBuildPDFRequestRejectsMissingOutput(t *testing.T) {
 
 	cmd := &cli.Command{Global: settings.DefaultPdfGlobal()} //nolint:exhaustruct // intentional zero/partial fields
 
-	_, err := BuildPDFRequest(cmd, nil, nil)
+	_, err := app.BuildPDFRequest(cmd, nil, nil)
 	if err == nil {
 		t.Fatal("expected missing output error")
 	}

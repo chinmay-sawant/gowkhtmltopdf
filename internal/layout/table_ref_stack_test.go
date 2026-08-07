@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 // Rowspan Ref cells with <br> between cites (wiki awards pattern) must
@@ -14,7 +15,9 @@ import (
 
 // Multi-cite nowrap markers in a narrow Ref td must not stack at the same X
 // (wiki awards: [127][128] for one win). Prefer one horizontal line.
-func TestMultiCiteInNarrowTDNotStacked(t *testing.T) {
+func TestMultiCiteInNarrowTDNotStacked(t *testing.T) { //nolint:cyclop,funlen
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 table { border-collapse: collapse; width: 480pt; }
@@ -38,7 +41,10 @@ td.ref, th.ref { width: 44pt; }
 <td class="c">She Deserves a New Agent Award</td>
 <td class="w"></td>
 <td class="r">Won</td>
-<td class="ref"><sup class="reference"><a href="#c127"><span class="cite-bracket">[</span>127<span class="cite-bracket">]</span></a></sup><sup class="reference"><a href="#c128"><span class="cite-bracket">[</span>128<span class="cite-bracket">]</span></a></sup></td>
+<td class="ref"><sup class="reference"><a href="#c127">` +
+		`<span class="cite-bracket">[</span>127<span class="cite-bracket">]</span></a></sup>` +
+		`<sup class="reference"><a href="#c128">` +
+		`<span class="cite-bracket">[</span>128<span class="cite-bracket">]</span></a></sup></td>
 </tr>
 </table></body></html>`
 
@@ -128,14 +134,18 @@ td.ref, th.ref { width: 44pt; }
 // so the column is not forced to one-marker width.
 func TestMultiCiteRefMinContentWiderThanOneMarker(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 table { border-collapse: collapse; }
 td { border: 1px solid #999; padding: 2pt; font-size: 9pt; }
 .reference { white-space: nowrap; font-size: 8pt; }
 `)
-	one := `<html><body><table><tr><td><sup class="reference"><a href="#a"><span>[</span>127<span>]</span></a></sup></td></tr></table></body></html>`
-	two := `<html><body><table><tr><td><sup class="reference"><a href="#a"><span>[</span>127<span>]</span></a></sup><sup class="reference"><a href="#b"><span>[</span>128<span>]</span></a></sup></td></tr></table></body></html>`
+	one := `<html><body><table><tr><td>` +
+		`<sup class="reference"><a href="#a"><span>[</span>127<span>]</span></a></sup></td></tr></table></body></html>`
+	two := `<html><body><table><tr><td>` +
+		`<sup class="reference"><a href="#a"><span>[</span>127<span>]</span></a></sup>` +
+		`<sup class="reference"><a href="#b"><span>[</span>128<span>]</span></a></sup></td></tr></table></body></html>`
 	wOne := refCellWidth(t, one, cssSheet)
 	wTwo := refCellWidth(t, two, cssSheet)
 	t.Logf("one=%.1f two=%.1f", wOne, wTwo)
@@ -152,6 +162,7 @@ func refCellWidth(t *testing.T, src string, cssSheet *css.Stylesheet) float64 {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
 		Width: 400, Height: 200, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true,
@@ -168,7 +179,9 @@ func refCellWidth(t *testing.T, src string, cssSheet *css.Stylesheet) float64 {
 	return tb.rows[0][0].w
 }
 
-func TestRowspanBrCitesSpreadVertically(t *testing.T) {
+func TestRowspanBrCitesSpreadVertically(t *testing.T) { //nolint:cyclop,funlen
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 table { border-collapse: collapse; width: 480pt; }
@@ -177,12 +190,18 @@ td { border: 1px solid #aaa; padding: 2pt; font-size: 9pt; }
 `)
 	src := `<html><body><table>
 <tr><td rowspan="2">2023</td><td>EDA Awards</td><td>She Deserves a New Agent Award</td><td>Won</td>
-<td rowspan="2" style="text-align:center"><sup class="reference"><a href="#a"><span class="cite-bracket">[</span>127<span class="cite-bracket">]</span></a></sup><br/><sup class="reference"><a href="#b"><span class="cite-bracket">[</span>128<span class="cite-bracket">]</span></a></sup></td>
+<td rowspan="2" style="text-align:center"><sup class="reference"><a href="#a">` +
+		`<span class="cite-bracket">[</span>127<span class="cite-bracket">]</span></a></sup>` +
+		`<br/><sup class="reference"><a href="#b">` +
+		`<span class="cite-bracket">[</span>128<span class="cite-bracket">]</span></a></sup></td>
 </tr>
 <tr><td></td><td>Most Egregious Lovers Age Difference Award</td><td>Nominated</td></tr>
 </table></body></html>`
 	root := mustParse(t, src)
-	res, err := Layout(root, Options{Width: 500, Height: 400, Sheets: []*css.Stylesheet{cssSheet}, Background: true, Zoom: 0.666667}) //nolint:exhaustruct // intentional zero fields
+
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 500, Height: 400, Sheets: []*css.Stylesheet{cssSheet}, Background: true, Zoom: 0.666667,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,10 +213,6 @@ td { border: 1px solid #aaa; padding: 2pt; font-size: 9pt; }
 	for _, paintOp := range res.Ops {
 		if paintOp.Kind != OpText {
 			continue
-		}
-
-		if paintOp.Text == "127" || paintOp.Text == "[127]" || (len(paintOp.Text) >= 3 && paintOp.Text == "127") {
-			// collect digit ops
 		}
 
 		if containsCite(paintOp.Text, "127") {

@@ -27,7 +27,7 @@ func (f *Font) glyphContoursID(glyphID uint16, deltaX, deltaY, scaleX, scaleY fl
 		return nil
 	}
 
-	numContours := int16(binary.BigEndian.Uint16(raw[0:2]))
+	numContours := int16(binary.BigEndian.Uint16(raw[0:2])) //nolint:gosec // numContours is int16 per glyf spec
 	if numContours < 0 {
 		return f.compositeContours(raw, deltaX, deltaY, scaleX, scaleY)
 	}
@@ -35,35 +35,77 @@ func (f *Font) glyphContoursID(glyphID uint16, deltaX, deltaY, scaleX, scaleY fl
 	return f.simpleContours(raw, int(numContours), deltaX, deltaY, scaleX, scaleY)
 }
 
-func (f *Font) simpleContours(raw []byte, numContours int, dx, dy, sx, sy float64) [][]GlyphPoint {
-	if numContours == 0 || len(raw) < 10+2*numContours {
-		return nil
+// decodeAxis reads the delta-encoded coordinates for one axis of a simple
+// glyph. shortFlag/signFlag select the X or Y encoding bits; the shared byte
+// position advances as the format requires (X deltas precede Y deltas).
+func decodeAxis(raw, flags []byte, pos, nPts int, shortFlag, signFlag byte) ([]float64, int, bool) {
+	vals := make([]float64, nPts)
+
+	var posVal int16
+
+	for idx := range nPts {
+		flag := flags[idx]
+		if flag&shortFlag != 0 { // *_SHORT_VECTOR
+			if pos >= len(raw) {
+				return nil, pos, false
+			}
+
+			val := int16(raw[pos])
+			pos++
+
+			if flag&signFlag == 0 {
+				val = -val
+			}
+
+			posVal += val
+		} else if flag&signFlag == 0 { // signed 16-bit delta
+			if pos+2 > len(raw) {
+				return nil, pos, false
+			}
+
+			posVal += int16(binary.BigEndian.Uint16(raw[pos:])) //nolint:gosec // delta is int16 per glyf spec
+			pos += 2
+		}
+
+		vals[idx] = float64(posVal)
+	}
+
+	return vals, pos, true
+}
+
+// readEndPts reads the end-point indices of a simple glyph's contours.
+func readEndPts(raw []byte, numContours int) ([]int, bool) {
+	if numContours == 0 || len(raw) < glyfHeaderSize+uint16Bytes*numContours {
+		return nil, false
 	}
 
 	endPts := make([]int, numContours)
 	for i := range numContours {
-		endPts[i] = int(binary.BigEndian.Uint16(raw[10+2*i:]))
+		endPts[i] = int(binary.BigEndian.Uint16(raw[glyfHeaderSize+uint16Bytes*i:]))
 	}
 
-	nPts := endPts[numContours-1] + 1
+	return endPts, true
+}
 
-	pos := glyfHeaderSize + uint16Bytes*numContours
+// decodeGlyphFlags expands the (possibly repeated) point-flag bytes,
+// skipping the instruction block that follows them.
+func decodeGlyphFlags(raw []byte, pos, nPts int) ([]byte, int, bool) {
 	if pos+2 > len(raw) {
-		return nil
+		return nil, pos, false
 	}
 
 	insLen := int(binary.BigEndian.Uint16(raw[pos:]))
 
 	pos += uint16Bytes + insLen
 	if pos > len(raw) {
-		return nil
+		return nil, pos, false
 	}
 
 	flags := make([]byte, nPts)
 
 	for idx := 0; idx < nPts; {
 		if pos >= len(raw) {
-			return nil
+			return nil, pos, false
 		}
 
 		flag := raw[pos]
@@ -71,9 +113,9 @@ func (f *Font) simpleContours(raw []byte, numContours int, dx, dy, sx, sy float6
 		flags[idx] = flag
 		idx++
 
-		if flag&8 != 0 { // REPEAT
+		if flag&glyfRepeatFlag != 0 { // REPEAT
 			if pos >= len(raw) {
-				return nil
+				return nil, pos, false
 			}
 
 			rep := int(raw[pos])
@@ -86,78 +128,27 @@ func (f *Font) simpleContours(raw []byte, numContours int, dx, dy, sx, sy float6
 		}
 	}
 
-	xsVal := make([]float64, nPts)
-	ysVal := make([]float64, nPts)
+	return flags, pos, true
+}
 
-	var posX int16
-
-	for idx := range nPts {
-		flag := flags[idx]
-		if flag&2 != 0 { // X_SHORT_VECTOR
-			if pos >= len(raw) {
-				return nil
-			}
-
-			val := int16(raw[pos])
-			pos++
-
-			if flag&16 != 0 {
-				posX += val
-			} else {
-				posX -= val
-			}
-		} else if flag&16 == 0 { // X is signed 16-bit delta
-			if pos+2 > len(raw) {
-				return nil
-			}
-
-			posX += int16(binary.BigEndian.Uint16(raw[pos:]))
-			pos += 2
-		}
-
-		xsVal[idx] = float64(posX)*sx + dx
-	}
-
-	var posY int16
-
-	for idx := range nPts {
-		flag := flags[idx]
-		if flag&4 != 0 { // Y_SHORT_VECTOR
-			if pos >= len(raw) {
-				return nil
-			}
-
-			val := int16(raw[pos])
-			pos++
-
-			if flag&32 != 0 {
-				posY += val
-			} else {
-				posY -= val
-			}
-		} else if flag&32 == 0 {
-			if pos+2 > len(raw) {
-				return nil
-			}
-
-			posY += int16(binary.BigEndian.Uint16(raw[pos:]))
-			pos += 2
-		}
-
-		ysVal[idx] = float64(posY)*sy + dy
-	}
-
-	out := make([][]GlyphPoint, 0, numContours)
+// assembleContours groups the decoded point coordinates into contours.
+func assembleContours(
+	endPts []int,
+	xsVal, ysVal []float64,
+	flags []byte,
+	scaleX, scaleY, deltaX, deltaY float64,
+) [][]GlyphPoint {
+	out := make([][]GlyphPoint, 0, len(endPts))
 
 	start := 0
 	for _, end := range endPts {
-		if end < start || end >= nPts {
+		if end < start || end >= len(xsVal) {
 			break
 		}
 
 		c := make([]GlyphPoint, 0, end-start+1)
 		for i := start; i <= end; i++ {
-			c = append(c, GlyphPoint{X: xsVal[i], Y: ysVal[i], On: flags[i]&1 != 0})
+			c = append(c, GlyphPoint{X: xsVal[i]*scaleX + deltaX, Y: ysVal[i]*scaleY + deltaY, On: flags[i]&glyfOnCurve != 0})
 		}
 
 		out = append(out, c)
@@ -167,73 +158,127 @@ func (f *Font) simpleContours(raw []byte, numContours int, dx, dy, sx, sy float6
 	return out
 }
 
-func (f *Font) compositeContours(raw []byte, dx, dy, sx, sy float64) [][]GlyphPoint {
+func (f *Font) simpleContours(raw []byte, numContours int, deltaX, deltaY, scaleX, scaleY float64) [][]GlyphPoint {
+	endPts, valid := readEndPts(raw, numContours)
+	if !valid {
+		return nil
+	}
+
+	nPts := endPts[numContours-1] + 1
+
+	flags, pos, valid := decodeGlyphFlags(raw, glyfHeaderSize+uint16Bytes*numContours, nPts)
+	if !valid {
+		return nil
+	}
+
+	xsVal, pos, valid := decodeAxis(raw, flags, pos, nPts, glyfXShortVector, glyfXSameOrPos)
+	if !valid {
+		return nil
+	}
+
+	ysVal, _, valid := decodeAxis(raw, flags, pos, nPts, glyfYShortVector, glyfYSameOrPos)
+	if !valid {
+		return nil
+	}
+
+	return assembleContours(endPts, xsVal, ysVal, flags, scaleX, scaleY, deltaX, deltaY)
+}
+
+// readComponentArgs decodes a composite component's argument words.
+func readComponentArgs(raw []byte, pos int, flags uint16) (float64, float64, int, bool) {
+	if flags&glyfArgWords != 0 { // ARG_1_AND_2_ARE_WORDS
+		if pos+uint32Bytes > len(raw) {
+			return 0, 0, pos, false
+		}
+
+		axVal, ayVal := 0.0, 0.0
+		if flags&glyfArgsXYValues != 0 { // ARGS_ARE_XY_VALUES
+			axVal = float64(int16(binary.BigEndian.Uint16(raw[pos:])))   //nolint:gosec // args are int16 per glyf spec
+			ayVal = float64(int16(binary.BigEndian.Uint16(raw[pos+2:]))) //nolint:gosec // args are int16 per glyf spec
+		}
+
+		return axVal, ayVal, pos + uint32Bytes, true
+	}
+
+	if pos+int16Bytes > len(raw) {
+		return 0, 0, pos, false
+	}
+
+	axVal, ayVal := 0.0, 0.0
+	if flags&glyfArgsXYValues != 0 {
+		axVal = float64(int8(raw[pos]))
+		ayVal = float64(int8(raw[pos+1]))
+	}
+
+	return axVal, ayVal, pos + int16Bytes, true
+}
+
+// decodeCompositeComponent reads a composite glyph component's offset and
+// scale values from raw at pos, returning them plus the next position.
+func decodeCompositeComponent(raw []byte, pos int, flags uint16) (float64, float64, float64, float64, int, bool) {
+	axVal, ayVal, next, ok := readComponentArgs(raw, pos, flags)
+	if !ok {
+		return 0, 0, 1, 1, next, false
+	}
+
+	csxVal, csyVal := 1.0, 1.0
+	pos = next
+
+	switch {
+	case flags&glyfHaveScale != 0: // WE_HAVE_A_SCALE
+		if pos+scaleBytes > len(raw) {
+			return 0, 0, 1, 1, pos, false
+		}
+
+		s := f2dot14(raw, pos)
+		csxVal, csyVal = s, s
+		pos += scaleBytes
+	case flags&glyfHaveXYScale != 0: // WE_HAVE_AN_X_AND_Y_SCALE
+		if pos+xyScaleBytes > len(raw) {
+			return 0, 0, 1, 1, pos, false
+		}
+
+		csxVal = f2dot14(raw, pos)
+		csyVal = f2dot14(raw, pos+scaleBytes)
+		pos += xyScaleBytes
+	case flags&glyfHaveTwoByTwo != 0: // WE_HAVE_A_TWO_BY_TWO
+		if pos+twoByTwoBytes > len(raw) {
+			return 0, 0, 1, 1, pos, false
+		}
+		// approximate with x/y scales only
+		csxVal = f2dot14(raw, pos)
+		csyVal = f2dot14(raw, pos+twoByTwoSecondOff)
+		pos += twoByTwoBytes
+	}
+
+	return axVal, ayVal, csxVal, csyVal, pos, true
+}
+
+// f2dot14 decodes a TrueType F2DOT14 scale value.
+func f2dot14(raw []byte, pos int) float64 {
+	//nolint:gosec // scale is F2DOT14 per glyf spec
+	return float64(int16(binary.BigEndian.Uint16(raw[pos:]))) / f2dot14Scale
+}
+
+func (f *Font) compositeContours(raw []byte, deltaX, deltaY, scaleX, scaleY float64) [][]GlyphPoint {
 	var out [][]GlyphPoint
 
-	pos := 10
-	for pos+4 <= len(raw) {
+	pos := glyfHeaderSize
+	for pos+uint32Bytes <= len(raw) {
 		flags := binary.BigEndian.Uint16(raw[pos:])
 		child := binary.BigEndian.Uint16(raw[pos+2:])
-		pos += 4
 
-		var axVal, ayVal float64
-
-		if flags&1 != 0 { // ARG_1_AND_2_ARE_WORDS
-			if pos+4 > len(raw) {
-				break
-			}
-
-			if flags&2 != 0 { // ARGS_ARE_XY_VALUES
-				axVal = float64(int16(binary.BigEndian.Uint16(raw[pos:])))
-				ayVal = float64(int16(binary.BigEndian.Uint16(raw[pos+2:])))
-			}
-
-			pos += 4
-		} else {
-			if pos+2 > len(raw) {
-				break
-			}
-
-			if flags&2 != 0 {
-				axVal = float64(int8(raw[pos]))
-				ayVal = float64(int8(raw[pos+1]))
-			}
-
-			pos += 2
+		axVal, ayVal, csxVal, csyVal, next, ok := decodeCompositeComponent(raw, pos+uint32Bytes, flags)
+		if !ok {
+			break
 		}
 
-		csx, csy := 1.0, 1.0
+		pos = next
 
-		if flags&8 != 0 { // WE_HAVE_A_SCALE
-			if pos+2 > len(raw) {
-				break
-			}
-
-			s := float64(int16(binary.BigEndian.Uint16(raw[pos:]))) / f2dot14Scale
-			csx, csy = s, s
-			pos += 2
-		} else if flags&64 != 0 { // WE_HAVE_AN_X_AND_Y_SCALE
-			if pos+4 > len(raw) {
-				break
-			}
-
-			csx = float64(int16(binary.BigEndian.Uint16(raw[pos:]))) / f2dot14Scale
-			csy = float64(int16(binary.BigEndian.Uint16(raw[pos+2:]))) / f2dot14Scale
-			pos += 4
-		} else if flags&128 != 0 { // WE_HAVE_A_TWO_BY_TWO
-			if pos+8 > len(raw) {
-				break
-			}
-			// approximate with x/y scales only
-			csx = float64(int16(binary.BigEndian.Uint16(raw[pos:]))) / f2dot14Scale
-			csy = float64(int16(binary.BigEndian.Uint16(raw[pos+6:]))) / f2dot14Scale
-			pos += 8
-		}
-
-		sub := f.glyphContoursID(child, dx+axVal*sx, dy+ayVal*sy, sx*csx, sy*csy)
+		sub := f.glyphContoursID(child, deltaX+axVal*scaleX, deltaY+ayVal*scaleY, scaleX*csxVal, scaleY*csyVal)
 		out = append(out, sub...)
 
-		if flags&32 == 0 { // MORE_COMPONENTS
+		if flags&glyfMoreComponents == 0 { // MORE_COMPONENTS
 			break
 		}
 	}
@@ -243,8 +288,8 @@ func (f *Font) compositeContours(raw []byte, dx, dy, sx, sy float64) [][]GlyphPo
 
 // FlattenContour expands TrueType quadratic on/off-curve points into a
 // polyline of on-curve points (font units).
-func FlattenContour(c []GlyphPoint, steps int) []GlyphPoint {
-	if len(c) == 0 {
+func FlattenContour(contour []GlyphPoint, steps int) []GlyphPoint {
+	if len(contour) == 0 {
 		return nil
 	}
 
@@ -252,8 +297,8 @@ func FlattenContour(c []GlyphPoint, steps int) []GlyphPoint {
 		steps = 4
 	}
 	// ensure contour is closed logically
-	pts := make([]GlyphPoint, len(c))
-	copy(pts, c)
+	pts := make([]GlyphPoint, len(contour))
+	copy(pts, contour)
 
 	var out []GlyphPoint
 
@@ -276,22 +321,10 @@ func FlattenContour(c []GlyphPoint, steps int) []GlyphPoint {
 			end := pts[(idx+midpointDiv)%count]
 
 			if !end.On {
-				end = GlyphPoint{
-					X:  (ctrl.X + end.X) / midpointDiv,
-					Y:  (ctrl.Y + end.Y) / midpointDiv,
-					On: true,
-				}
+				end = midpointOf(ctrl, end)
 			}
 
-			for s := 1; s <= steps; s++ {
-				t := float64(s) / float64(steps)
-				out = append(out, GlyphPoint{
-					X:  quad(cur.X, ctrl.X, end.X, t),
-					Y:  quad(cur.Y, ctrl.Y, end.Y, t),
-					On: true,
-				})
-			}
-
+			out = appendFlattened(out, cur, ctrl, end, steps)
 			idx += 2
 
 			continue
@@ -301,7 +334,7 @@ func FlattenContour(c []GlyphPoint, steps int) []GlyphPoint {
 		start := prev
 
 		if !prev.On {
-			start = GlyphPoint{X: (prev.X + cur.X) / midpointDiv, Y: (prev.Y + cur.Y) / midpointDiv, On: true}
+			start = midpointOf(prev, cur)
 			out = append(out, start)
 		}
 
@@ -309,19 +342,31 @@ func FlattenContour(c []GlyphPoint, steps int) []GlyphPoint {
 		end := pts[(idx+1)%count]
 
 		if !end.On {
-			end = GlyphPoint{X: (ctrl.X + end.X) / midpointDiv, Y: (ctrl.Y + end.Y) / midpointDiv, On: true}
+			end = midpointOf(ctrl, end)
 		}
 
-		for s := 1; s <= steps; s++ {
-			t := float64(s) / float64(steps)
-			out = append(out, GlyphPoint{
-				X:  quad(start.X, ctrl.X, end.X, t),
-				Y:  quad(start.Y, ctrl.Y, end.Y, t),
-				On: true,
-			})
-		}
-
+		out = appendFlattened(out, start, ctrl, end, steps)
 		idx++
+	}
+
+	return out
+}
+
+// midpointOf returns the on-curve point midway between two points.
+func midpointOf(a, b GlyphPoint) GlyphPoint {
+	return GlyphPoint{X: (a.X + b.X) / midpointDiv, Y: (a.Y + b.Y) / midpointDiv, On: true}
+}
+
+// appendFlattened appends the flattened quadratic samples between start and
+// end with ctrl as the off-curve control point.
+func appendFlattened(out []GlyphPoint, start, ctrl, end GlyphPoint, steps int) []GlyphPoint {
+	for s := 1; s <= steps; s++ {
+		t := float64(s) / float64(steps)
+		out = append(out, GlyphPoint{
+			X:  quad(start.X, ctrl.X, end.X, t),
+			Y:  quad(start.Y, ctrl.Y, end.Y, t),
+			On: true,
+		})
 	}
 
 	return out
@@ -334,13 +379,13 @@ func quad(p0, p1, p2, t float64) float64 {
 }
 
 // ContourBounds returns min/max of flattened points.
-func ContourBounds(pts []GlyphPoint) (minX, minY, maxX, maxY float64) {
+func ContourBounds(pts []GlyphPoint) (float64, float64, float64, float64) {
 	if len(pts) == 0 {
-		return
+		return 0, 0, 0, 0
 	}
 
-	minX, minY = pts[0].X, pts[0].Y
-	maxX, maxY = minX, minY
+	minX, minY := pts[0].X, pts[0].Y
+	maxX, maxY := minX, minY
 
 	for _, page := range pts[1:] {
 		if page.X < minX {
@@ -360,5 +405,5 @@ func ContourBounds(pts []GlyphPoint) (minX, minY, maxX, maxY float64) {
 		}
 	}
 
-	return
+	return minX, minY, maxX, maxY
 }

@@ -1,13 +1,51 @@
+//nolint:testpackage // white-box test drives ttfDrawString and ptToPx directly
 package imageout
 
 import (
 	"image"
 	"image/color"
 	"math"
+	"strings"
 	"testing"
 
 	"gowkhtmltopdf/internal/pdf"
 )
+
+// glyphInkBottom scans the columns in [x0, x1) for the lowest dark pixel row
+// (-1 when the glyph paints no dark pixel in that band).
+func glyphInkBottom(img *image.NRGBA, x0, x1 int) int {
+	bot := -1
+
+	for yy := range 90 {
+		for xx := x0; xx < x1 && xx < 900; xx++ {
+			c := img.NRGBAAt(xx, yy)
+			if c.R < 40 && c.G < 40 && c.B < 40 {
+				if yy > bot {
+					bot = yy
+				}
+			}
+		}
+	}
+
+	return bot
+}
+
+// bottomExtremes returns the min and max of bottoms.
+func bottomExtremes(bottoms []int) (int, int) {
+	minB, maxB := bottoms[0], bottoms[0]
+
+	for _, bottom := range bottoms[1:] {
+		if bottom < minB {
+			minB = bottom
+		}
+
+		if bottom > maxB {
+			maxB = bottom
+		}
+	}
+
+	return minB, maxB
+}
 
 // TestGlyphBaselineStable checks that non-descender letters share a common
 // baseline within 1px (the pre-fix Floor/Round mix made letters bob).
@@ -39,20 +77,9 @@ func TestGlyphBaselineStable(t *testing.T) {
 		adv := face.AdvanceInPoints(runeVal, sizePt) * ptToPx
 		x0 := int(math.Floor(penX))
 		x1 := int(math.Ceil(penX + adv))
-		bot := -1
+		bot := glyphInkBottom(img, x0, x1)
 
-		for yy := range 90 {
-			for xx := x0; xx < x1 && xx < 900; xx++ {
-				c := img.NRGBAAt(xx, yy)
-				if c.R < 40 && c.G < 40 && c.B < 40 {
-					if yy > bot {
-						bot = yy
-					}
-				}
-			}
-		}
-
-		if runeVal != 'g' && runeVal != 'y' && runeVal != 'p' && runeVal != 'q' && runeVal != 'j' && bot >= 0 {
+		if bot >= 0 && !strings.ContainsRune("gypqj", runeVal) {
 			bottoms = append(bottoms, bot)
 			t.Logf("%q bottom=%d (baseline %.0f, off=%d)", runeVal, bot, baseY, bot-int(baseY))
 		}
@@ -64,17 +91,7 @@ func TestGlyphBaselineStable(t *testing.T) {
 		t.Fatalf("need non-descender samples, got %d", len(bottoms))
 	}
 
-	minB, maxB := bottoms[0], bottoms[0]
-	for _, bottom := range bottoms[1:] {
-		if bottom < minB {
-			minB = bottom
-		}
-
-		if bottom > maxB {
-			maxB = bottom
-		}
-	}
-
+	minB, maxB := bottomExtremes(bottoms)
 	if maxB-minB > 1 {
 		t.Errorf("baseline jitter: non-descender bottoms span %d px (want <=1)", maxB-minB)
 	}

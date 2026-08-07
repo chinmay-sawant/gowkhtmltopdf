@@ -1,7 +1,7 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 
@@ -11,18 +11,23 @@ import (
 
 func TestEmdashLinkNoGap(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 body { margin: 0; font-size: 12pt; }
 p { text-align: justify; margin: 0; }
 a { color: #0645ad; text-decoration: underline; }
 `)
-	src := `<html><body><p>Hollywood release—<a href="/Eli_Roth">Eli Roth</a>'s erotic thriller <i><a href="/kk">Knock Knock</a></i> (2015)—and learned her lines.</p></body></html>`
+	src := `<html><body><p>Hollywood release—<a href="/Eli_Roth">Eli Roth</a>'s erotic thriller ` +
+		`<i><a href="/kk">Knock Knock</a></i> (2015)—and learned her lines.</p></body></html>`
 
 	root, err := html.Parse(src)
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := Layout(root, Options{Width: 500, Height: 400, Sheets: []*css.Stylesheet{cssSheet}}) //nolint:exhaustruct // intentional zero fields
+
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 500, Height: 400, Sheets: []*css.Stylesheet{cssSheet},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +63,7 @@ a { color: #0645ad; text-decoration: underline; }
 		got += r.text
 	}
 
-	fmt.Println(got)
+	t.Log(got)
 
 	if strings.Contains(got, "Roth 's") {
 		t.Error("space before possessive")

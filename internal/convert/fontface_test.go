@@ -1,4 +1,4 @@
-package convert
+package convert //nolint:testpackage // white-box tests need unexported access
 
 import (
 	"bytes"
@@ -31,7 +31,7 @@ func copyTestdataTTF(t *testing.T, dir string) string {
 	}
 
 	dst := filepath.Join(dir, "Custom.ttf")
-	if err := os.WriteFile(dst, data, 0o644); err != nil {
+	if err := os.WriteFile(dst, data, 0o600); err != nil {
 		t.Fatalf("write Custom.ttf: %v", err)
 	}
 
@@ -92,7 +92,7 @@ func TestFontFaceACLDeny(t *testing.T) {
 	copyTestdataTTF(t, fontDir)
 
 	htmlPath := filepath.Join(pageDir, "input.html")
-	if err := os.WriteFile(htmlPath, []byte(fontFaceHTML("../fonts/Custom.ttf")), 0o644); err != nil {
+	if err := os.WriteFile(htmlPath, []byte(fontFaceHTML("../fonts/Custom.ttf")), 0o600); err != nil {
 		t.Fatalf("write html: %v", err)
 	}
 
@@ -147,7 +147,7 @@ func TestFontFaceWOFFEmbed(t *testing.T) {
 	}
 
 	woff := encodeWOFF1Test(t, ttf)
-	if err := os.WriteFile(filepath.Join(dir, "Custom.woff"), woff, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "Custom.woff"), woff, 0o600); err != nil {
 		t.Fatalf("write woff: %v", err)
 	}
 
@@ -166,7 +166,7 @@ func TestFontFaceWOFFEmbed(t *testing.T) {
 	}
 }
 
-func TestFontFaceWOFF2Skipped(t *testing.T) {
+func TestFontFaceWOFF2Skipped(t *testing.T) { //nolint:dupl // deliberate parallel of TestFontFaceBadWOFFSkipped
 	t.Parallel()
 
 	html := `<html><head><style>
@@ -175,7 +175,7 @@ body { font-family: Custom, sans-serif; }
 </style></head><body><p>WOFF2 skip</p></body></html>`
 
 	cmd, dir := newCommand(t, html, filepath.Join(t.TempDir(), "out.pdf"))
-	if err := os.WriteFile(filepath.Join(dir, "Custom.woff2"), []byte("wOF2not-real"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "Custom.woff2"), []byte("wOF2not-real"), 0o600); err != nil {
 		t.Fatalf("write woff2: %v", err)
 	}
 
@@ -199,7 +199,7 @@ body { font-family: Custom, sans-serif; }
 	}
 }
 
-func TestFontFaceBadWOFFSkipped(t *testing.T) {
+func TestFontFaceBadWOFFSkipped(t *testing.T) { //nolint:dupl // deliberate parallel of TestFontFaceWOFF2Skipped
 	t.Parallel()
 
 	html := `<html><head><style>
@@ -208,7 +208,7 @@ body { font-family: Custom, sans-serif; }
 </style></head><body><p>bad WOFF</p></body></html>`
 
 	cmd, dir := newCommand(t, html, filepath.Join(t.TempDir(), "out.pdf"))
-	if err := os.WriteFile(filepath.Join(dir, "Custom.woff"), []byte("not-a-real-woff"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "Custom.woff"), []byte("not-a-real-woff"), 0o600); err != nil {
 		t.Fatalf("write woff: %v", err)
 	}
 
@@ -296,7 +296,7 @@ body { font-family: Custom, sans-serif; }
 }
 
 // encodeWOFF1Test builds a minimal WOFF1 from SFNT for @font-face fixtures.
-func encodeWOFF1Test(t *testing.T, sfnt []byte) []byte {
+func encodeWOFF1Test(t *testing.T, sfnt []byte) []byte { //nolint:funlen // WOFF1 container has many fixed header fields
 	t.Helper()
 
 	if len(sfnt) < 12 {
@@ -352,17 +352,17 @@ func encodeWOFF1Test(t *testing.T, sfnt []byte) []byte {
 
 		compressed[idx] = comp
 		origLens[idx] = table.length
-		compLens[idx] = uint32(len(comp))
+		compLens[idx] = uint32(len(comp)) //nolint:gosec // bounded test fixture size
 	}
 
 	header := make([]byte, woffHeaderSize)
 	copy(header[0:4], []byte("wOFF"))
 	binary.BigEndian.PutUint32(header[4:8], flavor)
-	binary.BigEndian.PutUint16(header[12:14], uint16(numTables))
-	binary.BigEndian.PutUint32(header[16:20], uint32(len(sfnt)))
+	binary.BigEndian.PutUint16(header[12:14], uint16(numTables)) //nolint:gosec // real font table counts
+	binary.BigEndian.PutUint32(header[16:20], uint32(len(sfnt))) //nolint:gosec // bounded test fixture size
 
 	dir := make([]byte, numTables*woffEntrySize)
-	payloadOff := uint32(woffHeaderSize + numTables*woffEntrySize)
+	payloadOff := uint32(woffHeaderSize + numTables*woffEntrySize) //nolint:gosec // bounded test fixture size
 
 	var body bytes.Buffer
 
@@ -383,8 +383,11 @@ func encodeWOFF1Test(t *testing.T, sfnt []byte) []byte {
 		payloadOff += compLens[table]
 	}
 
-	out := append(append(header, dir...), body.Bytes()...)
-	binary.BigEndian.PutUint32(out[8:12], uint32(len(out)))
+	out := make([]byte, 0, len(header)+len(dir)+body.Len())
+	out = append(out, header...)
+	out = append(out, dir...)
+	out = append(out, body.Bytes()...)
+	binary.BigEndian.PutUint32(out[8:12], uint32(len(out))) //nolint:gosec // bounded test fixture size
 
 	return out
 }

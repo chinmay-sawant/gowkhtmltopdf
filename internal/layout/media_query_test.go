@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -8,7 +9,9 @@ import (
 	"gowkhtmltopdf/internal/html"
 )
 
-func TestMediaFeatureQueryPrint(t *testing.T) {
+func TestMediaFeatureQueryPrint(t *testing.T) { //nolint:cyclop,funlen
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 @media screen { .screen-only { display: none } }
 @media (min-width: 400px) { .wide { color: #00ff00 } }

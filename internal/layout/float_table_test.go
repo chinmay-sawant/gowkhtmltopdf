@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -11,7 +12,9 @@ import (
 
 // TestFloatInsideTableCell: float packs inside a td BFC; neighbor cell uses
 // vertical-align:top; clear:both on a block advances past the float.
-func TestFloatInsideTableCell(t *testing.T) {
+func TestFloatInsideTableCell(t *testing.T) { //nolint:cyclop,funlen
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 table { width: 320pt; border-collapse: collapse }
 td { vertical-align: top; border: 1px solid #000; padding: 4pt }
@@ -26,7 +29,7 @@ body { width: 400pt }
 </tr></table>
 </body></html>`, cssSheet)
 
-	var icon, clear, cell *box
+	var icon, clearBox, cell *box
 
 	var walk func(b *box)
 	walk = func(boxNode *box) {
@@ -35,7 +38,7 @@ body { width: 400pt }
 			case "icon":
 				icon = boxNode
 			case "clear":
-				clear = boxNode
+				clearBox = boxNode
 			case "cell":
 				cell = boxNode
 			}
@@ -47,8 +50,8 @@ body { width: 400pt }
 	}
 	walk(res.root)
 
-	if icon == nil || clear == nil || cell == nil {
-		t.Fatalf("missing boxes icon=%v clear=%v cell=%v", icon != nil, clear != nil, cell != nil)
+	if icon == nil || clearBox == nil || cell == nil {
+		t.Fatalf("missing boxes icon=%v clear=%v cell=%v", icon != nil, clearBox != nil, cell != nil)
 	}
 	// Icon is a left float inside the cell content edge.
 	if icon.x+0.01 < cell.x {
@@ -73,8 +76,8 @@ body { width: 400pt }
 		t.Errorf("wrap text x=%.1f should be >= icon right edge %.1f", wrapX, icon.x+icon.w)
 	}
 	// clear:both block sits below the float margin box.
-	if clear.y+0.01 < icon.y+icon.height {
-		t.Errorf("clear y=%.1f should be >= icon bottom %.1f", clear.y, icon.y+icon.height)
+	if clearBox.y+0.01 < icon.y+icon.height {
+		t.Errorf("clear y=%.1f should be >= icon bottom %.1f", clearBox.y, icon.y+icon.height)
 	}
 	// Neighbor cell shares the row top (vertical-align:top).
 	var neighborY float64
@@ -94,6 +97,7 @@ body { width: 400pt }
 // (no shrink-beside). Unsupported: Chrome-style squeeze beside the float.
 func TestTableClearsFloat(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 body { width: 400pt }
 .f { float: left; width: 100pt; height: 60pt; background-color: #ddd }
@@ -141,7 +145,9 @@ td { border: 1px solid #000; padding: 4pt }
 
 // TestFloatOnTableCellBlockifies: float ≠ none on table-cell becomes block
 // (CSS2.1 §9.7) and lays out without panic; anonymous table grid is best-effort.
-func TestFloatOnTableCellBlockifies(t *testing.T) {
+func TestFloatOnTableCellBlockifies(t *testing.T) { //nolint:cyclop,funlen
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 .cell { float: left; display: table-cell; width: 80pt; height: 30pt; background-color: #eee }
 .row { float: left; display: table-row; width: 50pt; height: 20pt; background-color: #ddd }
@@ -167,6 +173,7 @@ func TestFloatOnTableCellBlockifies(t *testing.T) {
 
 		return nil
 	}
+
 	cell := find(root, "cell")
 	row := find(root, "row")
 
@@ -183,7 +190,9 @@ func TestFloatOnTableCellBlockifies(t *testing.T) {
 	}
 
 	// Layout must not panic; floats participate as blocks.
-	res, err := Layout(root, Options{Width: testViewport, Height: 800, Sheets: []*css.Stylesheet{cssSheet}, Background: true}) //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: testViewport, Height: 800, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
+	})
 	if err != nil {
 		t.Fatalf("Layout: %v", err)
 	}
@@ -218,6 +227,7 @@ func TestFloatOnTableCellBlockifies(t *testing.T) {
 // TestFloatedTableKeepsDisplay: float on <table> keeps display:table (wrapper).
 func TestFloatedTableKeepsDisplay(t *testing.T) {
 	t.Parallel()
+
 	s := sheet(t, `table.infobox { float: right; width: 100pt }`)
 	root := mustParse(t, `<html><body><table class="infobox"><tr><td>X</td></tr></table></body></html>`)
 	styles := resolveStyles(root, []*css.Stylesheet{s}, "", testViewport, 800)

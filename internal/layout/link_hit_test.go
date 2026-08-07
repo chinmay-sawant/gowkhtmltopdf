@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -11,15 +12,18 @@ import (
 // PDF viewers give a usable hover/click target (not a zero-height line).
 func TestLinkAnnotationHasHitHeight(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 body { margin: 0; font-size: 12pt; }
 a { color: inherit; text-decoration: underline; }
 `)
 
-	root, err := html.Parse(`<html><body><p>See <a href="https://example.com/academy">Academy Award</a> here.</p></body></html>`)
+	root, err := html.Parse(`<html><body><p>See ` +
+		`<a href="https://example.com/academy">Academy Award</a> here.</p></body></html>`)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
 		Width: 400, Height: 200, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true,
@@ -52,6 +56,7 @@ a { color: inherit; text-decoration: underline; }
 // TestUnderlineSitsBelowDescenders: underline Y must be below the text baseline.
 func TestUnderlineSitsBelowDescenders(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `a { text-decoration: underline; font-size: 14pt; }`)
 
 	root, err := html.Parse(`<html><body><a href="https://example.com">gyp</a></body></html>`)

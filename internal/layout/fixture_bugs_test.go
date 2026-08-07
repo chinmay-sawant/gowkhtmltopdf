@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -10,7 +11,8 @@ import (
 	"gowkhtmltopdf/internal/html"
 )
 
-func TestRowBackgroundShowsThroughCells(t *testing.T) {
+func TestRowBackgroundShowsThroughCells(t *testing.T) { //nolint:cyclop
+	t.Parallel()
 	// tr.good { background } must paint on cells that have no own bg.
 	cssSheet, err := css.Parse(`
 		td { border: 1px solid #000; }
@@ -29,7 +31,9 @@ func TestRowBackgroundShowsThroughCells(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{Width: 400, Height: 300, Sheets: []*css.Stylesheet{cssSheet}, Background: true}) //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 400, Height: 300, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +63,9 @@ func TestRowBackgroundShowsThroughCells(t *testing.T) {
 	}
 }
 
-func TestRGBABackgroundCompositesLight(t *testing.T) {
+func TestRGBABackgroundCompositesLight(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	cssSheet, err := css.Parse(`.alpha { background-color: rgba(15, 58, 95, 0.15); padding: 8px }`)
 	if err != nil {
 		t.Fatal(err)
@@ -70,7 +76,9 @@ func TestRGBABackgroundCompositesLight(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{Width: 400, Height: 200, Sheets: []*css.Stylesheet{cssSheet}, Background: true}) //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 400, Height: 200, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +100,8 @@ func TestRGBABackgroundCompositesLight(t *testing.T) {
 	}
 }
 
-func TestNestedTableNoMeasureLeak(t *testing.T) {
+func TestNestedTableNoMeasureLeak(t *testing.T) { //nolint:cyclop,funlen
+	t.Parallel()
 	// Nested tables must not emit ops during the outer measure pass, and
 	// must keep document order (text before nested table in the same cell).
 	root, err := html.Parse(`<html><body><table>
@@ -105,7 +114,9 @@ func TestNestedTableNoMeasureLeak(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{Width: 500, Height: 400, Background: true}) //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 500, Height: 400, Background: true,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -157,7 +168,8 @@ func TestNestedTableNoMeasureLeak(t *testing.T) {
 	}
 }
 
-func TestBackgroundPaintsUnderText(t *testing.T) {
+func TestBackgroundPaintsUnderText(t *testing.T) { //nolint:cyclop
+	t.Parallel()
 	// Regression: block backgrounds must be emitted before text ops so
 	// yellow/blue notice boxes do not cover their labels.
 	cssSheet, err := css.Parse(`.notice { background-color: #fff3d6; color: #233043; padding: 8px }`)
@@ -170,7 +182,9 @@ func TestBackgroundPaintsUnderText(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{Width: 400, Height: 200, Sheets: []*css.Stylesheet{cssSheet}, Background: true}) //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 400, Height: 200, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -199,7 +213,9 @@ func TestBackgroundPaintsUnderText(t *testing.T) {
 
 // TestTableCellRowHeightUsesFinalWidth guards against measuring cell height at
 // max-content width (too narrow → false wraps → inflated empty row bands).
-func TestTableCellRowHeightUsesFinalWidth(t *testing.T) {
+func TestTableCellRowHeightUsesFinalWidth(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	cssSheet, err := css.Parse(`
 		table { width: 100%; border-collapse: collapse; }
 		td { border: 1px solid #000; padding: 4px; font-size: 10pt; }
@@ -218,7 +234,9 @@ func TestTableCellRowHeightUsesFinalWidth(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{Width: 500, Height: 400, Sheets: []*css.Stylesheet{cssSheet}, Background: true}) //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 500, Height: 400, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -251,7 +269,9 @@ func TestTableCellRowHeightUsesFinalWidth(t *testing.T) {
 	}
 }
 
-func TestTableCellBackgroundHeight(t *testing.T) {
+func TestTableCellBackgroundHeight(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	cssSheet, err := css.Parse(`th { background-color: #1a3d6d; color: #fff } td { background-color: #f2f6fa }`)
 	if err != nil {
 		t.Fatal(err)
@@ -265,7 +285,9 @@ func TestTableCellBackgroundHeight(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{Width: 400, Height: 400, Sheets: []*css.Stylesheet{cssSheet}, Background: true}) //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 400, Height: 400, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -295,13 +317,17 @@ func TestTableCellBackgroundHeight(t *testing.T) {
 	}
 }
 
-func TestPrePreservesNewlines(t *testing.T) {
+func TestPrePreservesNewlines(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	root, err := html.Parse("<html><body><pre>alpha\n  beta\ngamma</pre></body></html>")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{Width: 400, Height: 400, Background: true}) //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 400, Height: 400, Background: true,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -330,7 +356,9 @@ func TestPrePreservesNewlines(t *testing.T) {
 	}
 }
 
-func TestMarginAutoCenters(t *testing.T) {
+func TestMarginAutoCenters(t *testing.T) { //nolint:cyclop,funlen
+	t.Parallel()
+
 	cssSheet, err := css.Parse(`.rule { width: 100pt; margin: 10pt auto; border-top: 4px solid #000 }`)
 	if err != nil {
 		t.Fatal(err)
@@ -343,7 +371,9 @@ func TestMarginAutoCenters(t *testing.T) {
 
 	const viewPortW = 300.0
 
-	res, err := Layout(root, Options{Width: viewPortW, Height: 400, Sheets: []*css.Stylesheet{cssSheet}, Background: true}) //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: viewPortW, Height: 400, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -399,11 +429,14 @@ func TestMarginAutoCenters(t *testing.T) {
 	// expect roughly centered in viewport
 	mid := paintOp.X + paintOp.W/2
 	if mid < viewPortW*0.35 || mid > viewPortW*0.65 {
-		t.Errorf("rule center x=%.1f (op x=%.1f w=%.1f), want near viewport center %.1f", mid, paintOp.X, paintOp.W, viewPortW/2)
+		t.Errorf("rule center x=%.1f (op x=%.1f w=%.1f), want near viewport center %.1f",
+			mid, paintOp.X, paintOp.W, viewPortW/2)
 	}
 }
 
-func TestFixture16HeaderBG(t *testing.T) {
+func TestFixture16HeaderBG(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	b, err := os.ReadFile("../../testdata/golden/fixture-16-invoice-with-css.html")
 	if err != nil {
 		t.Skip(err)
@@ -438,7 +471,9 @@ func TestFixture16HeaderBG(t *testing.T) {
 	}
 	walk(root)
 
-	res, err := Layout(root, Options{Width: 595, Height: 842, Sheets: sheets, Background: true}) //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 595, Height: 842, Sheets: sheets, Background: true,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -460,8 +495,9 @@ func TestFixture16HeaderBG(t *testing.T) {
 
 func TestMultiImageUniqueOps(t *testing.T) {
 	t.Parallel()
-	pngA := mustDecodeB64(t, "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAIAAAACUFjqAAAAEklEQVR4nGP8z8AARIDajAoAAgwAAf8C/tH9n9kAAAAASUVORK5CYII=")
-	pngB := mustDecodeB64(t, "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAIAAAACUFjqAAAAEklEQVR4nGN4z8AAQTDqMSoAAgwAAZ0B/vG0cU0AAAAASUVORK5CYII=")
+
+	pngA := mustDecodeB64(t, "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAIAAAACUFjqAAAAEklEQVR4nGP8z8AARIDajAoAAgwAAf8C/tH9n9kAAAAASUVORK5CYII=") //nolint:lll // opaque base64 fixture
+	pngB := mustDecodeB64(t, "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAIAAAACUFjqAAAAEklEQVR4nGN4z8AAQTDqMSoAAgwAAZ0B/vG0cU0AAAAASUVORK5CYII=") //nolint:lll // opaque base64 fixture
 
 	root, err := html.Parse(`<html><body>
 <p><img src="a.png"></p><p><img src="b.png"></p>
@@ -469,6 +505,7 @@ func TestMultiImageUniqueOps(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
 		Width: 200, Height: 200, Background: true,
 		Images: func(src string) ([]byte, error) {

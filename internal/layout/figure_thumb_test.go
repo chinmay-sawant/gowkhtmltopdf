@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -10,7 +11,8 @@ import (
 
 // Wiki thumbs use figure[typeof~='mw:File/Thumb']{display:table;float:right}.
 // Routing those through the table layout path drops nested <img> content.
-func TestFigureThumbDisplayTableKeepsImage(t *testing.T) {
+func TestFigureThumbDisplayTableKeepsImage(t *testing.T) { //nolint:cyclop,funlen
+	t.Parallel()
 	// 1x1 PNG
 	png := []byte{
 		0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
@@ -20,6 +22,7 @@ func TestFigureThumbDisplayTableKeepsImage(t *testing.T) {
 		0x00, 0x00, 0x03, 0x00, 0x01, 0x00, 0x05, 0xfe, 0xd4, 0xef, 0x00, 0x00,
 		0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
 	}
+
 	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 figure[typeof~="mw:File/Thumb"] {

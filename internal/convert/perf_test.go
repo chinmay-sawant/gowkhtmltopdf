@@ -1,4 +1,4 @@
-package convert
+package convert //nolint:testpackage // white-box tests need unexported access
 
 import (
 	"fmt"
@@ -37,13 +37,18 @@ thead th { background-color: #e8eef5; }
 		}
 
 		fmt.Fprintf(&buf, `<div class="%s"><h2>Invoice %d - line items</h2>`, cls, str)
-		buf.WriteString(`<table><thead><tr><th>#</th><th>Item</th><th>SKU</th><th class="num">Qty</th><th class="num">Unit</th><th class="num">Total</th></tr></thead><tbody>`)
+		buf.WriteString(
+			`<table><thead><tr><th>#</th><th>Item</th><th>SKU</th><th class="num">Qty</th><th class="num">Unit</th><th class="num">Total</th></tr></thead><tbody>`, //nolint:lll // generated HTML row
+		)
 
-		for i := 1; i <= items; i++ {
-			qty := (i*3)%7 + 1
-			unit := 12.5*float64(i%9+1) + float64(i%100)/100.0
-			fmt.Fprintf(&buf, `<tr><td>%d</td><td>Line item %d - consulting service %s</td><td>SKU-%04d</td><td class="num">%d</td><td class="num">%.2f</td><td class="num">%.2f</td></tr>`,
-				i, i, descriptionWord(i), i, qty, unit, unit*float64(qty))
+		for itemIdx := 1; itemIdx <= items; itemIdx++ {
+			qty := (itemIdx*3)%7 + 1
+			unit := 12.5*float64(itemIdx%9+1) + float64(itemIdx%100)/100.0
+			fmt.Fprintf(
+				&buf,
+				`<tr><td>%d</td><td>Line item %d - consulting service %s</td><td>SKU-%04d</td><td class="num">%d</td><td class="num">%.2f</td><td class="num">%.2f</td></tr>`, //nolint:lll // generated HTML row
+				itemIdx, itemIdx, descriptionWord(itemIdx), itemIdx, qty, unit, unit*float64(qty),
+			)
 		}
 
 		buf.WriteString(`</tbody></table></div>`)
@@ -55,10 +60,13 @@ thead th { background-color: #e8eef5; }
 }
 
 // descriptionWord yields a short realistic descriptor for line-item text.
-func descriptionWord(i int) string {
-	words := []string{"setup", "deployment", "maintenance", "migration", "support", "training", "review", "integration", "consulting"}
+func descriptionWord(itemIdx int) string {
+	words := []string{
+		"setup", "deployment", "maintenance", "migration", "support",
+		"training", "review", "integration", "consulting",
+	}
 
-	return words[i%len(words)]
+	return words[itemIdx%len(words)]
 }
 
 // TestTenPageTableReportPerformance is the Phase 9.3 perf gate: a ~10-page

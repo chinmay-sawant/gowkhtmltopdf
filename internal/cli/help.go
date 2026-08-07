@@ -8,7 +8,7 @@ import (
 )
 
 // Version is stamped by the build (ldflags -X) and defaults to 0.1.0-dev.
-var Version = "0.1.0-dev"
+var Version = "0.1.0-dev" //nolint:gochecknoglobals // ldflags-stamped build variable
 
 // PrintHelp writes usage text for the given Mode.
 func PrintHelp(w io.Writer, mode Mode) {
@@ -58,7 +58,7 @@ See LICENSE for the full text of the MIT License.
 
 // flagList renders a "--name" list filtered by Mode.
 func flagList(mode Mode) string {
-	var names []string
+	names := make([]string, 0, len(flagTable))
 
 	for name, spec := range flagTable {
 		if spec.mod&mode == 0 {

@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -9,7 +10,9 @@ import (
 
 // TestTableRowspanColumnAlignment: cells after a rowspan must stay in their
 // logical columns (wiki filmography Year rowspan is the motivating case).
-func TestTableRowspanColumnAlignment(t *testing.T) {
+func TestTableRowspanColumnAlignment(t *testing.T) { //nolint:cyclop,funlen
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 table { border-collapse: collapse; width: 400pt; }
@@ -78,7 +81,9 @@ td, th { border: 1px solid #aaa; padding: 2pt; text-align: left; }
 // TestTableTallRowspanNoBlankPages: a Year-like cell with rowspan covering
 // many short rows must not make rowsIntact treat the first row as multi-page
 // (bottom border at full span height) and cascade blank pages.
-func TestTableTallRowspanNoBlankPages(t *testing.T) {
+func TestTableTallRowspanNoBlankPages(t *testing.T) { //nolint:cyclop,funlen
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 table { border-collapse: collapse; width: 100%; }

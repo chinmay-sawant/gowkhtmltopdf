@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -11,7 +12,9 @@ import (
 // Blocks after a tall float must pack beside it (Chrome), not clear below
 // unless clear is set. Non-BFC parents must not grow around floats — that
 // used to push the next <section> below the entire floated infobox.
-func TestBlockHeadingPacksBesideTallFloat(t *testing.T) {
+func TestBlockHeadingPacksBesideTallFloat(t *testing.T) { //nolint:cyclop,funlen
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 body { margin: 0; font-size: 12pt; }
 .box { float: right; width: 100pt; display: table; border: 1px solid #000; }
@@ -22,7 +25,8 @@ p { margin: 0 0 6pt 0; }
 `)
 	res := layoutHTML(t, `<html><body>
 <section class="lead">
-<table class="box"><tr><td>PHOTO<br/>2<br/>3<br/>4<br/>5<br/>6<br/>7<br/>8<br/>9<br/>10<br/>11<br/>12<br/>Born<br/>Occ<br/>Spouse</td></tr></table>
+<table class="box"><tr><td>PHOTO<br/>2<br/>3<br/>4<br/>5<br/>6<br/>7<br/>8<br/>9<br/>10<br/>11<br/>12<br/>`+
+		`Born<br/>Occ<br/>Spouse</td></tr></table>
 <p>Lead one wraps beside the float with enough words to fill a couple of lines here.</p>
 <p>Lead two ends with Ballerina.</p>
 </section>
@@ -98,7 +102,9 @@ p { margin: 0 0 6pt 0; }
 	}
 }
 
-func TestHeadingBFCShortensBesideFloat(t *testing.T) {
+func TestHeadingBFCShortensBesideFloat(t *testing.T) { //nolint:cyclop,funlen
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 body { margin: 0; font-size: 12pt; }
 .box { float: right; width: 100pt; height: 200pt; background: #ccc; }
@@ -141,7 +147,9 @@ body { margin: 0; font-size: 12pt; }
 		t.Fatal("flow-root must establish BFC")
 	}
 
-	res, err := Layout(root, Options{Width: 500, Height: 800, Sheets: []*css.Stylesheet{cssSheet}, Background: true}) //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 500, Height: 800, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

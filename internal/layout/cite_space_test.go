@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -10,6 +11,7 @@ import (
 // stacks glyphs on top of each other.
 func TestCiteBracketNoArtificialSpaces(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 .reference { white-space: nowrap; }

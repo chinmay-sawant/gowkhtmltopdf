@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -9,7 +10,9 @@ import (
 	"gowkhtmltopdf/internal/pdf"
 )
 
-func TestTheadRepeatOnContinuationPages(t *testing.T) {
+func TestTheadRepeatOnContinuationPages(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	src := `<html><body>
 <table>
 <thead><tr><th>ColA</th><th>ColB</th></tr></thead>
@@ -25,7 +28,9 @@ func TestTheadRepeatOnContinuationPages(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{Width: 400, Height: 200, Background: true}) //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 400, Height: 200, Background: true,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,8 +67,13 @@ func TestTheadRepeatOnContinuationPages(t *testing.T) {
 
 func TestTheadUADisplay(t *testing.T) {
 	t.Parallel()
-	root := mustParse(t, `<html><body><table><thead><tr><th>H</th></tr></thead><tbody><tr><td>B</td></tr></tbody></table></body></html>`)
-	res := layoutHTML(t, `<html><body><table><thead><tr><th>H</th></tr></thead><tbody><tr><td>B</td></tr></tbody></table></body></html>`)
+
+	root := mustParse(t, `<html><body>`+
+		`<table><thead><tr><th>H</th></tr></thead><tbody><tr><td>B</td></tr></tbody></table>`+
+		`</body></html>`)
+	res := layoutHTML(t, `<html><body>`+
+		`<table><thead><tr><th>H</th></tr></thead><tbody><tr><td>B</td></tr></tbody></table>`+
+		`</body></html>`)
 	_ = root
 
 	var tblBox *box

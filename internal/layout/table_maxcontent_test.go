@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -10,7 +11,9 @@ import (
 // Filmography-like auto table: columns sized from longest-word (min-content)
 // leave a narrow table and tall wrapped rows. Max-content sizing should give
 // a wide table filling most of the containing block with short rows.
-func TestAutoTableUsesMaxContentColumnWidths(t *testing.T) {
+func TestAutoTableUsesMaxContentColumnWidths(t *testing.T) { //nolint:gocognit,cyclop,funlen
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 table { border-collapse: collapse; }

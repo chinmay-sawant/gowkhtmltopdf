@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -16,7 +17,9 @@ import (
 // Prefer splitting short avoid boxes over blanking large mid-page remainders
 // (preferSplitOverBlank) so same-page inter-item start pitch stays near
 // natural multi-line height (≤ ~2.5 line heights beyond content).
-func TestAvoidListItemsNoCascadingGaps(t *testing.T) {
+func TestAvoidListItemsNoCascadingGaps(t *testing.T) { //nolint:gocognit,gocyclo,cyclop,funlen
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 ol { margin: 0; padding-left: 24pt; }
@@ -30,14 +33,16 @@ p { margin: 0.4em 0; }
 	// Push the list so items straddle multiple page boundaries.
 	for i := range 28 {
 		boxNode.WriteString(fmt.Sprintf(
-			`<p>Filler paragraph %d with enough words to approach the natural page-break zone for list pagination testing.</p>`, i))
+			`<p>Filler paragraph %d with enough words to approach the natural page-break zone for list pagination testing.</p>`, i)) //nolint:lll // fixture copy must stay one paragraphixture copy must stay one paragraph
 	}
 
 	boxNode.WriteString(`<ol start="1">`)
 
 	for i := range 35 {
 		boxNode.WriteString(fmt.Sprintf(
-			`<li id="r%d">"Citation title number %d with a fairly long path" (https://example.com/article/%d/long-path-name-here). Journal Name. 12 December 2022. Archived from the original. Retrieved 12 December 2022.</li>`,
+			`<li id="r%d">"Citation title number %d with a fairly long path" `+
+				`(https://example.com/article/%d/long-path-name-here). Journal Name. 12 December 2022. `+
+				`Archived from the original. Retrieved 12 December 2022.</li>`,
 			i, i+1, i))
 	}
 
@@ -59,7 +64,9 @@ p { margin: 0.4em 0; }
 	}
 
 	doc := pdf.NewDocument()
-	po := PaintOptions{PageWidth: 595, PageHeight: pageH + 50, MarginTop: 25, MarginBottom: 25} //nolint:exhaustruct // intentional zero fields
+	po := PaintOptions{ //nolint:exhaustruct // intentional zero fields
+		PageWidth: 595, PageHeight: pageH + 50, MarginTop: 25, MarginBottom: 25,
+	}
 
 	if err := Paint(doc, res, po); err != nil {
 		t.Fatal(err)
@@ -184,6 +191,7 @@ p { margin: 0.4em 0; }
 // TestPreferSplitOverBlankUnit checks the shared blank-band heuristic.
 func TestPreferSplitOverBlankUnit(t *testing.T) {
 	t.Parallel()
+
 	contentH := 800.0
 	// Half-page remaining always prefers split.
 	if !preferSplitOverBlank(401, 40, contentH) {

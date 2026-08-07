@@ -18,10 +18,11 @@ type FaceSet struct {
 	BoldItalic *Font
 }
 
+//nolint:gochecknoglobals // lazy init of the embedded-family cache
 var (
 	defaultFacesOnce sync.Once
 	defaultFaces     *FaceSet
-	defaultFacesErr  error
+	errDefaultFaces  error
 )
 
 // LoadDefaultFaces returns the embedded Liberation Sans family
@@ -32,25 +33,25 @@ func LoadDefaultFaces() (*FaceSet, error) {
 
 		var err error
 		if faces.Regular, err = parseNamed("LiberationSans", assets.LiberationSansRegularTTF); err != nil {
-			defaultFacesErr = err
+			errDefaultFaces = err
 
 			return
 		}
 
 		if faces.Bold, err = parseNamed("LiberationSans-Bold", assets.LiberationSansBoldTTF); err != nil {
-			defaultFacesErr = err
+			errDefaultFaces = err
 
 			return
 		}
 
 		if faces.Italic, err = parseNamed("LiberationSans-Italic", assets.LiberationSansItalicTTF); err != nil {
-			defaultFacesErr = err
+			errDefaultFaces = err
 
 			return
 		}
 
 		if faces.BoldItalic, err = parseNamed("LiberationSans-BoldItalic", assets.LiberationSansBoldItalicTTF); err != nil {
-			defaultFacesErr = err
+			errDefaultFaces = err
 
 			return
 		}
@@ -58,7 +59,7 @@ func LoadDefaultFaces() (*FaceSet, error) {
 		defaultFaces = faces
 	})
 
-	return defaultFaces, defaultFacesErr
+	return defaultFaces, errDefaultFaces
 }
 
 func parseNamed(name string, data []byte) (*Font, error) {
@@ -81,20 +82,29 @@ func (fs *FaceSet) Resolve(weight int, italic bool) *Font {
 
 	bold := weight >= fontWeightBoldMin
 
-	switch {
-	case bold && italic && fs.BoldItalic != nil:
-		return fs.BoldItalic
-	case bold && fs.Bold != nil:
-		return fs.Bold
-	case italic && fs.Italic != nil:
-		return fs.Italic
-	case fs.Regular != nil:
-		return fs.Regular
-	case fs.Bold != nil:
-		return fs.Bold
-	default:
+	if bold {
+		if italic && fs.BoldItalic != nil {
+			return fs.BoldItalic
+		}
+
+		if fs.Bold != nil {
+			return fs.Bold
+		}
+	}
+
+	if italic && fs.Italic != nil {
 		return fs.Italic
 	}
+
+	if fs.Regular != nil {
+		return fs.Regular
+	}
+
+	if fs.Bold != nil {
+		return fs.Bold
+	}
+
+	return fs.Italic
 }
 
 // DefaultFont returns the embedded Liberation Sans regular face.

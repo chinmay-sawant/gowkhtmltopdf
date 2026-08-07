@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -11,6 +12,7 @@ import (
 
 func TestFlexOrderAndShrink(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 .row { display:flex; width:200pt; gap:0 }
 .a { order:2; width:80pt; flex-shrink:0 }
@@ -44,6 +46,7 @@ func TestFlexOrderAndShrink(t *testing.T) {
 
 func TestFloatWidthPercent(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 .box { width:200pt }
 .left { float:left; width:50%; background:#eee; padding:2pt }
@@ -66,7 +69,9 @@ func TestFloatWidthPercent(t *testing.T) {
 	}
 }
 
-func TestZIndexPaintOrder(t *testing.T) {
+func TestZIndexPaintOrder(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 .wrap { position:relative; height:40pt }
 .low { position:absolute; top:0; left:0; width:40pt; height:20pt; background:#f00; z-index:1 }
@@ -104,6 +109,7 @@ func TestZIndexPaintOrder(t *testing.T) {
 
 func TestFlexRowLayout(t *testing.T) {
 	t.Parallel()
+
 	src := `<html><body>
 <div style="display:flex;justify-content:space-between;gap:8pt;width:300pt">
   <div style="width:60pt">A</div>
@@ -132,6 +138,7 @@ func TestFlexRowLayout(t *testing.T) {
 
 func TestFlexRowReverse(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 .row { display:flex; flex-direction:row-reverse; width:200pt; gap:0 }
 .a { width:40pt }
@@ -156,6 +163,7 @@ func TestFlexRowReverse(t *testing.T) {
 
 func TestFlexSpaceEvenly(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 .row { display:flex; justify-content:space-evenly; width:300pt; gap:0 }
 .item { width:40pt }
@@ -193,6 +201,7 @@ func TestFlexSpaceEvenly(t *testing.T) {
 
 func TestFlexColumnGapVsRowGap(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 .row {
   display:flex; flex-wrap:wrap; width:100pt;
@@ -236,6 +245,7 @@ func TestFlexColumnGapVsRowGap(t *testing.T) {
 
 func TestFlexAlignSelf(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 .row { display:flex; align-items:flex-start; width:200pt; height:60pt; gap:0 }
 .a { width:40pt; height:10pt }
@@ -259,7 +269,9 @@ func TestFlexAlignSelf(t *testing.T) {
 
 // TestFlexAlignItemsStretchRow matches fixture-33 definite row: container
 // height 36pt, items flex-basis 50% with auto height → stretch to line cross size.
-func TestFlexAlignItemsStretchRow(t *testing.T) {
+func TestFlexAlignItemsStretchRow(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 .row { display:flex; width:240pt; height:36pt; gap:0; border:1px solid #1565c0; background:#e3f2fd }
 .half { flex:0 0 50%; box-sizing:border-box; padding:6pt; background:#90caf9 }
@@ -291,7 +303,9 @@ func TestFlexAlignItemsStretchRow(t *testing.T) {
 	}
 }
 
-func TestFlexShorthandParsing(t *testing.T) {
+func TestFlexShorthandParsing(t *testing.T) { //nolint:cyclop,funlen
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		css      string
@@ -306,9 +320,11 @@ func TestFlexShorthandParsing(t *testing.T) {
 		{"three", "flex:0 0 80pt", 0, 0, 80, -1},
 		{"grow-shrink-auto", "flex:1 1 auto", 1, 1, -1, -1},
 	}
+
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
+
 			cssSheet := sheet(t, ".x { display:flex } .i { "+testCase.css+" }")
 			doc := `<html><body><div class="x"><div class="i">Z</div></div></body></html>`
 
@@ -354,6 +370,7 @@ func TestFlexShorthandParsing(t *testing.T) {
 
 func TestFlexBasisPercentDefinite(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 .row { display:flex; width:200pt; gap:0; height:30pt }
 .a { flex: 0 0 50%; background:#fcc }
@@ -382,7 +399,8 @@ func TestFlexBasisPercentDefinite(t *testing.T) {
 	}
 }
 
-func TestFlexBasisPercentCyclicColumn(t *testing.T) {
+func TestFlexBasisPercentCyclicColumn(t *testing.T) { //nolint:cyclop
+	t.Parallel()
 	// height:auto column → main size indefinite; % flex-basis must act as auto
 	// (content-based), not resolve as 0.
 	cssSheet := sheet(t, `
@@ -425,7 +443,9 @@ func TestFlexBasisPercentCyclicColumn(t *testing.T) {
 	}
 }
 
-func TestFlexBasisPercentDefiniteColumn(t *testing.T) {
+func TestFlexBasisPercentDefiniteColumn(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 .col { display:flex; flex-direction:column; width:100pt; height:100pt; gap:0 }
 .a { flex: 0 0 40%; background:#f99 }
@@ -521,7 +541,8 @@ func TestFlexPercentChildDefiniteRow(t *testing.T) {
 	}
 }
 
-func TestFlexMinWidthPercentDefinite(t *testing.T) {
+func TestFlexMinWidthPercentDefinite(t *testing.T) { //nolint:cyclop
+	t.Parallel()
 	// min-width:% against definite flex container: A cannot shrink below 60%.
 	cssSheet := sheet(t, `
 .row { display:flex; width:200pt; gap:0 }
@@ -559,6 +580,7 @@ func TestFlexMinWidthPercentDefinite(t *testing.T) {
 
 func TestFlexNestedSmoke(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 .outer { display:flex; width:220pt; gap:4pt }
 .inner { display:flex; flex:1; gap:2pt; background:#eee }
@@ -583,7 +605,9 @@ func TestFlexNestedSmoke(t *testing.T) {
 	}
 }
 
-func TestPositionRelativeAbsolute(t *testing.T) {
+func TestPositionRelativeAbsolute(t *testing.T) { //nolint:gocognit,cyclop,funlen
+	t.Parallel()
+
 	src := `<html><body>
 <div style="position:relative;top:10pt;left:20pt">rel</div>
 <div style="position:relative;height:40pt">

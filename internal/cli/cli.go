@@ -20,6 +20,20 @@ var (
 	ErrExtHelp = errors.New("extended help requested")
 )
 
+// Static parse-stage errors, wrapped with the offending token so callers can
+// match with errors.Is.
+var (
+	errUnknownOption       = errors.New("unknown option")
+	errTooManyModes        = errors.New("cli: Parse accepts at most one mode")
+	errInvalidMode         = errors.New("cli: invalid mode")
+	errOptionNotSupported  = errors.New("not supported in")
+	errNeedInputFile       = errors.New("you need to specify at least one input file")
+	errOptionRequiresValue = errors.New("option requires a value")
+	errOptionRequiresPair  = errors.New("option requires two values (name value)")
+	errUnknownFlagKind     = errors.New("internal: unknown flag kind for")
+	errInvalidBoolValue    = errors.New("invalid boolean value")
+)
+
 // Exit codes (utilities.cc): 0 ok, 1 error, 2 HTTP 404, 3 HTTP 401.
 const (
 	ExitOK    = 0
@@ -44,15 +58,15 @@ type Command struct {
 // OpenOutput returns the writer for this command: OutputWriter (library bytes
 // sink) takes precedence over Output path; empty/"-" use stdout.
 // The closer must be called when done (no-op for writer/stdout).
-func (cmd *Command) OpenOutput() (io.Writer, func() error, error) {
-	if cmd.OutputWriter != nil {
-		return cmd.OutputWriter, func() error { return nil }, nil
+func (c *Command) OpenOutput() (io.Writer, func() error, error) {
+	if c.OutputWriter != nil {
+		return c.OutputWriter, func() error { return nil }, nil
 	}
 
-	if cmd.Output != "" && cmd.Output != "-" {
-		f, err := os.Create(cmd.Output)
+	if c.Output != "" && c.Output != "-" {
+		f, err := os.Create(c.Output)
 		if err != nil {
-			return nil, nil, fmt.Errorf("output %q: %w", cmd.Output, err)
+			return nil, nil, fmt.Errorf("output %q: %w", c.Output, err)
 		}
 
 		return f, f.Close, nil
@@ -135,8 +149,11 @@ func Parse(argv []string, modes ...Mode) (*Command, error) {
 		return nil, err
 	}
 
-	cmd := &Command{Global: settings.DefaultPdfGlobal(), Image: settings.DefaultImageGlobal()} //nolint:exhaustruct // intentional zero/partial fields
-	cur := &objectCtx{}                                                                        //nolint:exhaustruct // intentional zero/partial fields
+	cmd := &Command{ //nolint:exhaustruct // intentional zero/partial fields
+		Global: settings.DefaultPdfGlobal(),
+		Image:  settings.DefaultImageGlobal(),
+	}
+	cur := &objectCtx{} //nolint:exhaustruct // intentional zero/partial fields
 
 	var free []string
 
@@ -145,63 +162,8 @@ func Parse(argv []string, modes ...Mode) (*Command, error) {
 		arg := argv[idx]
 		idx++
 
-		switch {
-		case arg == "-h" || arg == "--help":
-			return cmd, ErrHelp
-		case arg == "-V" || arg == "--version":
-			return cmd, ErrVersion
-		case arg == "-L" || arg == "--license":
-			return cmd, ErrLicense
-		case arg == "-E" || arg == "--extended-help":
-			return cmd, ErrExtHelp
-		case arg == "--":
-			// end of options; remaining args are positional
-			for ; idx < len(argv); idx++ {
-				free = append(free, argv[idx])
-			}
-
-			idx = len(argv)
-
-			continue
-		case strings.HasPrefix(arg, "--"):
-			name, val, hasVal := splitFlag(arg[2:])
-			name = strings.ToLower(name)
-			spec, negated, ok := lookupFlag(name)
-
-			if !ok {
-				return nil, fmt.Errorf("unknown option --%s", name)
-			}
-
-			if err := checkMode(name, spec, mode); err != nil {
-				return nil, err
-			}
-
-			if err := apply(cmd, cur, name, spec, negated, val, hasVal, argv, &idx); err != nil {
-				return nil, err
-			}
-
-			continue
-		case strings.HasPrefix(arg, "-") && len(arg) == 2:
-			name := arg[1:]
-			spec, ok := shortFlags[name]
-
-			if !ok {
-				return nil, fmt.Errorf("unknown option -%s", name)
-			}
-
-			if err := checkMode(name, spec, mode); err != nil {
-				return nil, err
-			}
-
-			if err := apply(cmd, cur, name, spec, false, "", false, argv, &idx); err != nil {
-				return nil, err
-			}
-
-			continue
-		}
-
-		if err := cmd.positional(arg, cur, &free); err != nil {
-			return nil, err
+		if err := step(cmd, cur, arg, argv, &idx, mode, &free); err != nil {
+			return cmd, err
 		}
 	}
 
@@ -212,6 +174,87 @@ func Parse(argv []string, modes ...Mode) (*Command, error) {
 	return cmd, nil
 }
 
+// step processes one argv token. Doc flags return their sentinel error; the
+// caller returns cmd alongside so --help/-h etc. exit with a parsed command.
+func step(cmd *Command, cur *objectCtx, arg string, argv []string, idx *int, mode Mode, free *[]string) error {
+	if ok, err := docFlagErr(arg); ok {
+		return err
+	}
+
+	switch {
+	case arg == "--":
+		// end of options; remaining args are positional
+		*free = append(*free, argv[*idx:]...)
+		*idx = len(argv)
+	case strings.HasPrefix(arg, "--"):
+		return parseLongFlag(cmd, cur, arg, argv, idx, mode)
+	case isShortFlag(arg):
+		return parseShortFlag(cmd, cur, arg, argv, idx, mode)
+	default:
+		cmd.positional(arg, cur, free)
+
+		return nil
+	}
+
+	return nil
+}
+
+// docFlagErr maps the doc flags to their sentinel errors.
+func docFlagErr(arg string) (bool, error) {
+	switch arg {
+	case "-h", "--help":
+		return true, ErrHelp
+	case "-V", "--version":
+		return true, ErrVersion
+	case "-L", "--license":
+		return true, ErrLicense
+	case "-E", "--extended-help":
+		return true, ErrExtHelp
+	}
+
+	return false, nil
+}
+
+// isShortFlag reports whether arg is a single-char flag token ("-x").
+func isShortFlag(arg string) bool {
+	return strings.HasPrefix(arg, "-") && len(arg) == 2
+}
+
+// parseLongFlag handles one "--name" token: lookup, mode check and value
+// application. negated is true for --no-<bool> forms.
+func parseLongFlag(cmd *Command, cur *objectCtx, arg string, argv []string, idx *int, mode Mode) error {
+	name, val, hasVal := splitFlag(arg[2:])
+	name = strings.ToLower(name)
+	spec, negated, ok := lookupFlag(name)
+
+	if !ok {
+		return fmt.Errorf("%w --%s", errUnknownOption, name)
+	}
+
+	if err := checkMode(name, spec, mode); err != nil {
+		return err
+	}
+
+	return apply(cmd, cur, name, spec, negated, val, hasVal, argv, idx)
+}
+
+// parseShortFlag handles one "-x" token: lookup, mode check and value
+// application. Short flags never carry inline values or negation.
+func parseShortFlag(cmd *Command, cur *objectCtx, arg string, argv []string, idx *int, mode Mode) error {
+	name := arg[1:]
+	spec, ok := shortFlags[name]
+
+	if !ok {
+		return fmt.Errorf("%w -%s", errUnknownOption, name)
+	}
+
+	if err := checkMode(name, spec, mode); err != nil {
+		return err
+	}
+
+	return apply(cmd, cur, name, spec, false, "", false, argv, idx)
+}
+
 // ParseMode is the explicit form of Parse for callers that know which
 // executable mode they are implementing.
 func ParseMode(argv []string, mode Mode) (*Command, error) {
@@ -220,7 +263,7 @@ func ParseMode(argv []string, mode Mode) (*Command, error) {
 
 func parseMode(modes []Mode) (Mode, error) {
 	if len(modes) > 1 {
-		return 0, errors.New("cli: Parse accepts at most one mode")
+		return 0, errTooManyModes
 	}
 
 	if len(modes) == 0 {
@@ -229,7 +272,7 @@ func parseMode(modes []Mode) (Mode, error) {
 
 	mode := modes[0]
 	if mode == 0 || mode&^ModeBoth != 0 {
-		return 0, fmt.Errorf("cli: invalid mode %d", mode)
+		return 0, fmt.Errorf("%w %d", errInvalidMode, mode)
 	}
 
 	return mode, nil
@@ -247,42 +290,41 @@ func checkMode(name string, spec flagSpec, mode Mode) error {
 		modeName = "image mode"
 	}
 
-	return fmt.Errorf("option --%s is not supported in %s", name, modeName)
+	return fmt.Errorf("option --%s is %w %s", name, errOptionNotSupported, modeName)
 }
 
 // positional handles object keywords and queues bare positionals.
-func (c *Command) positional(arg string, cur *objectCtx, free *[]string) error {
+func (c *Command) positional(arg string, cur *objectCtx, free *[]string) {
 	switch arg {
 	case "page":
 		cur.newObject(c)
 
-		return nil
+		return
 	case "cover":
 		obj := cur.newObject(c)
 		obj.IsCover = true
 		obj.IncludeInOutline = false
 		obj.HeaderSet, obj.FooterSet = true, true
-		obj.Header, obj.Footer = settings.HeaderFooter{}, settings.HeaderFooter{} //nolint:exhaustruct // intentional zero/partial fields
+		//nolint:exhaustruct // intentional zero/partial fields
+		obj.Header, obj.Footer = settings.HeaderFooter{}, settings.HeaderFooter{}
 
-		return nil
+		return
 	case "toc":
 		obj := cur.newFreshObject(c)
 		obj.IsTableOfContent = true
 		obj.UseOutline = false
 
-		return nil
+		return
 	}
 	// Fill an explicit empty page object first; else queue for resolution
 	// (last free arg is the output, the rest become implicit pages).
 	if cur.obj != nil && cur.obj.Page == "" && !cur.obj.IsTableOfContent {
 		cur.obj.Page = arg
 
-		return nil
+		return
 	}
 
 	*free = append(*free, arg)
-
-	return nil
 }
 
 // resolveFree assigns queued positionals: last → output, others → implicit
@@ -330,7 +372,7 @@ func (c *Command) validate() error {
 	}
 
 	if !hasInput {
-		return errors.New("you need to specify at least one input file")
+		return errNeedInputFile
 	}
 
 	return nil
@@ -362,7 +404,10 @@ func (ctx *objectCtx) applyPage(c *Command, glob func(g *settings.PdfGlobal, val
 // apply runs a flag with value extraction (next-arg or =value). Bool flags
 // arrive pre-parsed as canonical "true"/"false"; pair flags arrive as two
 // separate tokens.
-func apply(cmd *Command, cur *objectCtx, name string, spec flagSpec, negated bool, inlineVal string, hasInline bool, argv []string, i *int) error {
+func apply(
+	cmd *Command, cur *objectCtx, name string, spec flagSpec,
+	negated bool, inlineVal string, hasInline bool, argv []string, idx *int,
+) error {
 	switch spec.kind {
 	case flagBool:
 		b, err := parseBool(inlineVal, negated, hasInline)
@@ -375,12 +420,12 @@ func apply(cmd *Command, cur *objectCtx, name string, spec flagSpec, negated boo
 		vals := []string{inlineVal}
 
 		if !hasInline {
-			if *i >= len(argv) {
-				return errors.New("option requires a value")
+			if *idx >= len(argv) {
+				return errOptionRequiresValue
 			}
 
-			vals[0] = argv[*i]
-			*i++
+			vals[0] = argv[*idx]
+			*idx++
 		}
 
 		return spec.app(cmd, cur, vals)
@@ -389,25 +434,25 @@ func apply(cmd *Command, cur *objectCtx, name string, spec flagSpec, negated boo
 		if hasInline {
 			vals[0] = inlineVal
 		} else {
-			if *i >= len(argv) {
-				return errors.New("option requires two values (name value)")
+			if *idx >= len(argv) {
+				return errOptionRequiresPair
 			}
 
-			vals[0] = argv[*i]
-			*i++
+			vals[0] = argv[*idx]
+			*idx++
 		}
 
-		if *i >= len(argv) {
-			return errors.New("option requires two values (name value)")
+		if *idx >= len(argv) {
+			return errOptionRequiresPair
 		}
 
-		vals[1] = argv[*i]
-		*i++
+		vals[1] = argv[*idx]
+		*idx++
 
 		return spec.app(cmd, cur, vals[:])
 	}
 
-	return fmt.Errorf("internal: unknown flag kind for --%s", name)
+	return fmt.Errorf("%w --%s", errUnknownFlagKind, name)
 }
 
 // parseBool turns the bool-flag contract into a real bool: an inline value
@@ -421,7 +466,7 @@ func parseBool(inlineVal string, negated, hasInline bool) (bool, error) {
 			return false, nil
 		}
 
-		return false, fmt.Errorf("invalid boolean value %q", inlineVal)
+		return false, fmt.Errorf("%w %q", errInvalidBoolValue, inlineVal)
 	}
 
 	return !negated, nil

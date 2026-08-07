@@ -1,3 +1,4 @@
+//nolint:testpackage // white-box tests need the ACL merge helper and Run internals
 package imageout
 
 import (
@@ -19,26 +20,33 @@ import (
 )
 
 // copyTestdataTTF copies a known TTF into dir as Custom.ttf for @font-face fixtures.
-func copyTestdataTTF(t *testing.T, dir string) string {
+func copyTestdataTTF(t *testing.T, dir string) {
 	t.Helper()
 
-	src := filepath.Join("..", "pdf", "assets", "LiberationSans-Regular.ttf")
-	data, err := os.ReadFile(src)
-	if err != nil {
-		src = filepath.Join("..", "..", "testdata", "fonts", "NotoSansKR-HangulSubset.ttf")
+	candidates := []string{
+		filepath.Join("..", "pdf", "assets", "LiberationSans-Regular.ttf"),
+		filepath.Join("..", "..", "testdata", "fonts", "NotoSansKR-HangulSubset.ttf"),
+	}
 
-		data, err = os.ReadFile(src)
-		if err != nil {
-			t.Fatalf("read testdata ttf: %v", err)
+	var data []byte
+
+	var readErr error
+
+	for _, src := range candidates {
+		data, readErr = os.ReadFile(src)
+		if readErr == nil {
+			break
 		}
 	}
 
-	dst := filepath.Join(dir, "Custom.ttf")
-	if err := os.WriteFile(dst, data, 0o644); err != nil {
-		t.Fatalf("write Custom.ttf: %v", err)
+	if readErr != nil {
+		t.Fatalf("read testdata ttf: %v", readErr)
 	}
 
-	return dst
+	dst := filepath.Join(dir, "Custom.ttf")
+	if err := os.WriteFile(dst, data, 0o600); err != nil {
+		t.Fatalf("write Custom.ttf: %v", err)
+	}
 }
 
 func fontFaceHTML(srcURL string) string {
@@ -48,39 +56,16 @@ body { font-family: Custom, sans-serif; font-size: 14pt; }
 </style></head><body><p>Hello CustomFace</p></body></html>`
 }
 
-// TestFontFaceLocalUsesCustom proves ACL-allowed local @font-face registers
-// Custom and layout attaches that face (same MergeFontFaces path as Run).
-func TestFontFaceLocalUsesCustom(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	copyTestdataTTF(t, dir)
+// collectFontLayout runs the same load + sheet collection + font-face merge
+// path as Run, then lays out the document (same MergeFontFaces path as Run).
+func collectFontLayout(
+	t *testing.T,
+	cmd *cli.Command,
+	htmlPath string,
+	fontLog io.Writer,
+) (*layout.Result, *pdf.Registry) {
+	t.Helper()
 
-	htmlPath := filepath.Join(dir, "input.html")
-	if err := os.WriteFile(htmlPath, []byte(fontFaceHTML("Custom.ttf")), 0o644); err != nil {
-		t.Fatalf("write html: %v", err)
-	}
-
-	pngOut := filepath.Join(dir, "out.png")
-	cmd := runCommand(t, "--width", "200", "--format", "png", htmlPath, pngOut)
-
-	var log bytes.Buffer
-
-	if err := Run(t.Context(), cmd, &log); err != nil {
-		t.Fatalf("Run: %v\nlog: %s", err, log.String())
-	}
-
-	file, err := os.Open(pngOut)
-	if err != nil {
-		t.Fatalf("open png: %v", err)
-	}
-
-	defer file.Close()
-
-	if _, err := png.Decode(file); err != nil {
-		t.Fatalf("decode png: %v", err)
-	}
-
-	// Open-box: same merge + layout as Run must attach Custom (not Liberation fallback).
 	loader := load.NewLoader(imageLoadGlobalCmd(cmd))
 
 	res, err := loader.Load(t.Context(), htmlPath, cmd.Objects[0].Load)
@@ -93,14 +78,19 @@ func TestFontFaceLocalUsesCustom(t *testing.T) {
 		t.Fatalf("parse: %v", err)
 	}
 
-	sheets := convert.CollectSheets(t.Context(), loader, root, res.Base, cmd.Objects[0].Load, convert.SheetOptions{ //nolint:exhaustruct // intentional zero/partial fields
-		ViewportW: 768, ViewportH: 576, MediaType: "screen",
-	}, io.Discard)
+	sheets := convert.CollectSheets(
+		t.Context(),
+		loader,
+		root,
+		res.Base,
+		cmd.Objects[0].Load,
+		convert.SheetOptions{ //nolint:exhaustruct // intentional zero/partial fields
+			ViewportW: 768, ViewportH: 576, MediaType: "screen",
+		},
+		io.Discard,
+	)
 
-	reg := convert.MergeFontFaces(t.Context(), loader, nil, sheets, res.Base, cmd.Objects[0].Load, 1, io.Discard)
-	if reg == nil || reg.Lookup([]string{"Custom"}, 400, false) == nil {
-		t.Fatal("expected Custom face in registry after MergeFontFaces")
-	}
+	reg := convert.MergeFontFaces(t.Context(), loader, nil, sheets, res.Base, cmd.Objects[0].Load, 1, fontLog)
 
 	def, err := pdf.DefaultFont()
 	if err != nil {
@@ -113,6 +103,54 @@ func TestFontFaceLocalUsesCustom(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("layout: %v", err)
+	}
+
+	return lay, reg
+}
+
+// decodeTestPNG opens path and decodes it as PNG, failing the test otherwise.
+func decodeTestPNG(t *testing.T, path string) {
+	t.Helper()
+
+	file, err := os.Open(path)
+	if err != nil {
+		t.Fatalf("open png: %v", err)
+	}
+
+	defer file.Close()
+
+	if _, err := png.Decode(file); err != nil {
+		t.Fatalf("decode png: %v", err)
+	}
+}
+
+// TestFontFaceLocalUsesCustom proves ACL-allowed local @font-face registers
+// Custom and layout attaches that face (same MergeFontFaces path as Run).
+func TestFontFaceLocalUsesCustom(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	copyTestdataTTF(t, dir)
+
+	htmlPath := filepath.Join(dir, "input.html")
+	if err := os.WriteFile(htmlPath, []byte(fontFaceHTML("Custom.ttf")), 0o600); err != nil {
+		t.Fatalf("write html: %v", err)
+	}
+
+	pngOut := filepath.Join(dir, "out.png")
+	cmd := runCommand(t, "--width", "200", "--format", "png", htmlPath, pngOut)
+
+	var log bytes.Buffer
+
+	if err := Run(t.Context(), cmd, &log); err != nil {
+		t.Fatalf("Run: %v\nlog: %s", err, log.String())
+	}
+
+	decodeTestPNG(t, pngOut)
+
+	// Open-box: same merge + layout as Run must attach Custom (not Liberation fallback).
+	lay, reg := collectFontLayout(t, cmd, htmlPath, io.Discard)
+	if reg == nil || reg.Lookup([]string{"Custom"}, 400, false) == nil {
+		t.Fatal("expected Custom face in registry after MergeFontFaces")
 	}
 
 	sawCustom := false
@@ -153,7 +191,7 @@ func TestFontFaceACLDeny(t *testing.T) {
 	copyTestdataTTF(t, fontDir)
 
 	htmlPath := filepath.Join(pageDir, "input.html")
-	if err := os.WriteFile(htmlPath, []byte(fontFaceHTML("../fonts/Custom.ttf")), 0o644); err != nil {
+	if err := os.WriteFile(htmlPath, []byte(fontFaceHTML("../fonts/Custom.ttf")), 0o600); err != nil {
 		t.Fatalf("write html: %v", err)
 	}
 
@@ -181,37 +219,12 @@ func TestFontFaceACLDeny(t *testing.T) {
 		t.Errorf("expected @font-face ACL warning; log=%q", warn)
 	}
 
-	file, err := os.Open(pngOut)
-	if err != nil {
-		t.Fatalf("open png: %v", err)
-	}
-
-	defer file.Close()
-
-	if _, err := png.Decode(file); err != nil {
-		t.Fatalf("decode png: %v", err)
-	}
+	decodeTestPNG(t, pngOut)
 
 	// Face must not register under Custom when FetchSub is denied.
-	loader := load.NewLoader(imageLoadGlobalCmd(cmd))
-
-	res, err := loader.Load(t.Context(), htmlPath, cmd.Objects[0].Load)
-	if err != nil {
-		t.Fatalf("load: %v", err)
-	}
-
-	rootHTML, err := html.ParseDocument(res.Body)
-	if err != nil {
-		t.Fatalf("parse: %v", err)
-	}
-
-	sheets := convert.CollectSheets(t.Context(), loader, rootHTML, res.Base, cmd.Objects[0].Load, convert.SheetOptions{ //nolint:exhaustruct // intentional zero/partial fields
-		ViewportW: 768, ViewportH: 576, MediaType: "screen",
-	}, io.Discard)
-
 	var denyLog bytes.Buffer
 
-	reg := convert.MergeFontFaces(t.Context(), loader, nil, sheets, res.Base, cmd.Objects[0].Load, 1, &denyLog)
+	_, reg := collectFontLayout(t, cmd, htmlPath, &denyLog)
 	if reg != nil && reg.Lookup([]string{"Custom"}, 400, false) != nil {
 		t.Error("ACL deny must not register Custom")
 	}

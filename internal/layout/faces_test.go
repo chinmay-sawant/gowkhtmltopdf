@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -7,13 +8,17 @@ import (
 	"gowkhtmltopdf/internal/html"
 )
 
-func TestRealBoldFaceOps(t *testing.T) {
+func TestRealBoldFaceOps(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	root, err := html.Parse(`<html><body><p>plain <b>bold</b> <i>italic</i></p></body></html>`)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{Width: 400, Height: 400, Background: true}) //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 400, Height: 400, Background: true,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,10 +59,12 @@ func TestRealBoldFaceOps(t *testing.T) {
 
 func TestCoalesceSameStyleWords(t *testing.T) {
 	t.Parallel()
+
 	root, err := html.Parse(`<html><body><p>one two three</p></body></html>`)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	res, err := Layout(root, Options{Width: 500, Height: 200}) //nolint:exhaustruct // intentional zero fields
 	if err != nil {
 		t.Fatal(err)
@@ -75,6 +82,7 @@ func TestCoalesceSameStyleWords(t *testing.T) {
 
 func TestNthChildZebraSheet(t *testing.T) {
 	t.Parallel()
+
 	sheet, err := css.Parse(`tr:nth-child(even) td { background-color: #eee }`)
 	if err != nil {
 		t.Fatal(err)

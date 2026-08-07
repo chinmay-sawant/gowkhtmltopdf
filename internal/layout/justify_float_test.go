@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -7,6 +8,7 @@ import (
 
 func TestJustifyCapsRiversBesideFloat(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 .wrap { width: 300pt }
 .box { float: right; width: 180pt; height: 80pt; background: #ccc }

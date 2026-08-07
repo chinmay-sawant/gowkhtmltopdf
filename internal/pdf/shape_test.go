@@ -1,3 +1,4 @@
+//nolint:testpackage // tests reach into unexported state
 package pdf
 
 import (

@@ -1,4 +1,4 @@
-package gowkhtmltopdf
+package gowkhtmltopdf //nolint:testpackage // tests inspect unexported Converter/ObjectSettings state
 
 import (
 	"bytes"
@@ -16,12 +16,20 @@ import (
 	"gowkhtmltopdf/internal/settings"
 )
 
+// Shared literal values asserted across several tests.
+const (
+	htmlOriginal = "<p>original</p>"
+	valueBefore  = "before"
+	valueAfter   = "after"
+	valueMutated = "mutated"
+)
+
 // writeHTML writes a temp HTML file and returns its path.
 func writeHTML(t *testing.T, body string) string {
 	t.Helper()
 
 	path := filepath.Join(t.TempDir(), "input.html")
-	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 		t.Fatalf("write input: %v", err)
 	}
 
@@ -113,23 +121,37 @@ func TestGlobalSettingsGetSetRoundTrip(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			global := NewGlobalSettings()
-			if err := global.Set(testCase.name, testCase.value); err != nil {
-				t.Fatalf("Set(%q): %v", testCase.name, err)
-			}
-
-			got, ok := global.Get(testCase.name)
-			if !ok {
-				t.Fatalf("Get(%q) not found after Set", testCase.name)
-			}
-
-			if got != testCase.value {
-				t.Errorf("Get(%q) = %q, want %q", testCase.name, got, testCase.value)
-			}
+			assertGlobalSetGetRoundTrip(t, testCase.name, testCase.value)
 		})
 	}
 
-	// Defaults are readable without any Set call.
+	assertGlobalDefaults(t)
+}
+
+// assertGlobalSetGetRoundTrip pins one Set/Get round trip for a global key.
+func assertGlobalSetGetRoundTrip(t *testing.T, name, value string) {
+	t.Helper()
+
+	global := NewGlobalSettings()
+	if err := global.Set(name, value); err != nil {
+		t.Fatalf("Set(%q): %v", name, err)
+	}
+
+	got, ok := global.Get(name)
+	if !ok {
+		t.Fatalf("Get(%q) not found after Set", name)
+	}
+
+	if got != value {
+		t.Errorf("Get(%q) = %q, want %q", name, got, value)
+	}
+}
+
+// assertGlobalDefaults pins that defaults are readable without any Set call
+// and that bogus keys fail.
+func assertGlobalDefaults(t *testing.T) {
+	t.Helper()
+
 	global := NewGlobalSettings()
 	for name, want := range map[string]string{
 		"size.pagesize":  "A4",
@@ -189,11 +211,11 @@ func TestObjectSettingsGetSet(t *testing.T) {
 func TestObjectSettingsSetBodyCopiesInput(t *testing.T) {
 	t.Parallel()
 
-	html := []byte("<p>original</p>")
+	html := []byte(htmlOriginal)
 	obj := NewObjectSettings().SetBody(html, "https://example.test/")
 	html[4] = 'X'
 
-	if got := string(obj.o.Load.InlineHTML); got != "<p>original</p>" {
+	if got := string(obj.o.Load.InlineHTML); got != htmlOriginal {
 		t.Fatalf("SetBody retained caller buffer: %q", got)
 	}
 }
@@ -201,59 +223,76 @@ func TestObjectSettingsSetBodyCopiesInput(t *testing.T) {
 func TestConverterAddObjectDeepCopiesNestedData(t *testing.T) {
 	t.Parallel()
 
-	source := NewObjectSettings().SetBody([]byte("<p>original</p>"), "https://example.test/")
-	source.o.Load.CustomHeaders = map[string]string{"X-Request": "before"}
-	source.o.Load.Cookies = map[string]string{"session": "before"}
-	source.o.Load.Post = []settings.PostItem{{Name: "q", Value: "before"}}
-	source.o.Header.Replace = map[string]string{"[name]": "before"}
-	source.o.Footer.Replace = map[string]string{"[page]": "before"}
-	source.o.Ignored = map[string]string{"stub": "before"}
+	source := NewObjectSettings().SetBody([]byte(htmlOriginal), "https://example.test/")
+	source.o.Load.CustomHeaders = map[string]string{"X-Request": valueBefore}
+	source.o.Load.Cookies = map[string]string{"session": valueBefore}
+	source.o.Load.Post = []settings.PostItem{{Name: "q", Value: valueBefore}}
+	source.o.Header.Replace = map[string]string{"[name]": valueBefore}
+	source.o.Footer.Replace = map[string]string{"[page]": valueBefore}
+	source.o.Ignored = map[string]string{"stub": valueBefore}
 
 	conv := NewConverter().AddObject(source)
 
 	source.o.Load.InlineHTML[3] = 'X'
-	source.o.Load.CustomHeaders["X-Request"] = "after"
-	source.o.Load.CustomHeaders["X-New"] = "after"
-	source.o.Load.Cookies["session"] = "after"
-	source.o.Load.Post[0].Value = "after"
-	source.o.Header.Replace["[name]"] = "after"
-	source.o.Footer.Replace["[page]"] = "after"
-	source.o.Ignored["stub"] = "after"
+	source.o.Load.CustomHeaders["X-Request"] = valueAfter
+	source.o.Load.CustomHeaders["X-New"] = valueAfter
+	source.o.Load.Cookies["session"] = valueAfter
+	source.o.Load.Post[0].Value = valueAfter
+	source.o.Header.Replace["[name]"] = valueAfter
+	source.o.Footer.Replace["[page]"] = valueAfter
+	source.o.Ignored["stub"] = valueAfter
 	source.o.Page = "after.html"
 
-	got := conv.objects[0].o
-	if string(got.Load.InlineHTML) != "<p>original</p>" {
+	assertSnapshotUntouched(t, conv.objects[0].o)
+}
+
+// assertSnapshotUntouched pins that the AddObject copy was not affected by
+// mutating the source object afterwards.
+func assertSnapshotUntouched(t *testing.T, got settings.PdfObject) {
+	t.Helper()
+
+	if string(got.Load.InlineHTML) != htmlOriginal {
 		t.Errorf("inline HTML changed through source mutation: %q", got.Load.InlineHTML)
 	}
 
-	if got.Load.CustomHeaders["X-Request"] != "before" || got.Load.CustomHeaders["X-New"] != "" {
+	if got.Load.CustomHeaders["X-Request"] != valueBefore || got.Load.CustomHeaders["X-New"] != "" {
 		t.Errorf("custom headers were not copied: %v", got.Load.CustomHeaders)
 	}
 
-	if got.Load.Cookies["session"] != "before" {
+	if got.Load.Cookies["session"] != valueBefore {
 		t.Errorf("cookies were not copied: %v", got.Load.Cookies)
 	}
 
-	if len(got.Load.Post) != 1 || got.Load.Post[0].Value != "before" {
+	if len(got.Load.Post) != 1 || got.Load.Post[0].Value != valueBefore {
 		t.Errorf("post data was not copied: %v", got.Load.Post)
 	}
 
-	if got.Header.Replace["[name]"] != "before" || got.Footer.Replace["[page]"] != "before" {
-		t.Errorf("header/footer replacements were not copied: header=%v footer=%v", got.Header.Replace, got.Footer.Replace)
-	}
+	assertSnapshotHeaderFooterUntouched(t, got)
 
-	if got.Ignored["stub"] != "before" || got.Page != "" {
+	if got.Ignored["stub"] != valueBefore || got.Page != "" {
 		t.Errorf("object snapshot changed through source mutation: %+v", got)
+	}
+}
+
+// assertSnapshotHeaderFooterUntouched pins the header/footer replace copies.
+func assertSnapshotHeaderFooterUntouched(t *testing.T, got settings.PdfObject) {
+	t.Helper()
+
+	if got.Header.Replace["[name]"] != valueBefore || got.Footer.Replace["[page]"] != valueBefore {
+		t.Errorf(
+			"header/footer replacements were not copied: header=%v footer=%v",
+			got.Header.Replace, got.Footer.Replace,
+		)
 	}
 }
 
 func TestConverterAddObjectSnapshotIsIndependentUnderMutation(t *testing.T) {
 	t.Parallel()
 
-	source := NewObjectSettings().SetBody([]byte("<p>original</p>"), "")
-	source.o.Load.CustomHeaders = map[string]string{"X-Request": "before"}
-	source.o.Load.Post = []settings.PostItem{{Name: "q", Value: "before"}}
-	source.o.Header.Replace = map[string]string{"[name]": "before"}
+	source := NewObjectSettings().SetBody([]byte(htmlOriginal), "")
+	source.o.Load.CustomHeaders = map[string]string{"X-Request": valueBefore}
+	source.o.Load.Post = []settings.PostItem{{Name: "q", Value: valueBefore}}
+	source.o.Header.Replace = map[string]string{"[name]": valueBefore}
 	conv := NewConverter().AddObject(source)
 	snapshot := conv.objects[0].o
 
@@ -266,9 +305,9 @@ func TestConverterAddObjectSnapshotIsIndependentUnderMutation(t *testing.T) {
 
 		for i := range 1000 {
 			source.o.Load.InlineHTML[0] = byte('a' + i%26)
-			source.o.Load.CustomHeaders["X-Request"] = "mutated"
-			source.o.Load.Post[0].Value = "mutated"
-			source.o.Header.Replace["[name]"] = "mutated"
+			source.o.Load.CustomHeaders["X-Request"] = valueMutated
+			source.o.Load.Post[0].Value = valueMutated
+			source.o.Header.Replace["[name]"] = valueMutated
 		}
 	}()
 
@@ -281,11 +320,12 @@ func TestConverterAddObjectSnapshotIsIndependentUnderMutation(t *testing.T) {
 
 	waitGroup.Wait()
 
-	if got := string(snapshot.Load.InlineHTML); got != "<p>original</p>" {
+	if got := string(snapshot.Load.InlineHTML); got != htmlOriginal {
 		t.Errorf("snapshot changed during source mutation: %q", got)
 	}
 
-	if snapshot.Load.CustomHeaders["X-Request"] != "before" || snapshot.Load.Post[0].Value != "before" || snapshot.Header.Replace["[name]"] != "before" {
+	if snapshot.Load.CustomHeaders["X-Request"] != valueBefore ||
+		snapshot.Load.Post[0].Value != valueBefore || snapshot.Header.Replace["[name]"] != valueBefore {
 		t.Errorf("snapshot nested data changed during source mutation: %+v", snapshot)
 	}
 }
@@ -432,10 +472,10 @@ func TestLineLogSeverity(t *testing.T) {
 		onWarn:  func(l string) { warns = append(warns, l) },
 		onError: func(l string) { errs = append(errs, l) },
 	}
-	logWriter.Write([]byte("Loading pages (1/1)\n"))
-	logWriter.Write([]byte("warning: object 1: large stylesheet volume\n"))
-	logWriter.Write([]byte("error: failed to load http://x\n"))
-	logWriter.Write([]byte("info: load error policy is skip, omitting\n"))
+	_, _ = logWriter.Write([]byte("Loading pages (1/1)\n"))
+	_, _ = logWriter.Write([]byte("warning: object 1: large stylesheet volume\n"))
+	_, _ = logWriter.Write([]byte("error: failed to load http://x\n"))
+	_, _ = logWriter.Write([]byte("info: load error policy is skip, omitting\n"))
 
 	if len(infos) != 2 {
 		t.Errorf("infos = %v, want 2 lines", infos)
@@ -465,7 +505,10 @@ func TestImageConverterSetBody(t *testing.T) {
 	t.Parallel()
 
 	conv := NewImageConverter()
-	conv.Object().SetBody([]byte(`<html><body><div style="width:40px;height:30px;background-color:#112233"></div></body></html>`), "")
+	conv.Object().SetBody(
+		[]byte(`<html><body><div style="width:40px;height:30px;background-color:#112233"></div></body></html>`),
+		"",
+	)
 
 	if err := conv.Set("width", "100"); err != nil {
 		t.Fatalf("Set(width): %v", err)
@@ -495,5 +538,10 @@ func TestConverterNeedsObject(t *testing.T) {
 
 // pixelAt returns the NRGBA colour at (x, y).
 func pixelAt(img image.Image, x, y int) color.NRGBA {
-	return color.NRGBAModel.Convert(img.At(x, y)).(color.NRGBA)
+	c, ok := color.NRGBAModel.Convert(img.At(x, y)).(color.NRGBA)
+	if !ok {
+		return color.NRGBA{} //nolint:exhaustruct // impossible for NRGBAModel; zero colour fallback
+	}
+
+	return c
 }

@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -9,6 +10,7 @@ import (
 
 func TestParseGridTracksSubtractsGap(t *testing.T) {
 	t.Parallel()
+
 	eng := &engine{scale: 1} //nolint:exhaustruct // intentional zero fields
 
 	const contentW = 300.0
@@ -28,6 +30,7 @@ func TestParseGridTracksSubtractsGap(t *testing.T) {
 
 func TestGridColumnSpan(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 .g { display:grid; grid-template-columns:repeat(3,1fr); gap:4pt; width:300pt }
 .wide { grid-column: span 2; background:#eee }
@@ -53,6 +56,7 @@ func TestGridColumnSpan(t *testing.T) {
 
 func TestNestedGridWithSpan(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 .outer { display:grid; grid-template-columns:1fr 1fr; gap:4pt; width:300pt }
 .inner { display:grid; grid-template-columns:repeat(3,1fr); gap:2pt; background:#ddd }
@@ -80,7 +84,9 @@ func TestNestedGridWithSpan(t *testing.T) {
 	}
 }
 
-func TestGridCellsStayInsideBorder(t *testing.T) {
+func TestGridCellsStayInsideBorder(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	src := `<html><body>
 <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6pt;width:300pt;padding:4pt;border:1px solid #000">
   <div style="background:#f3e5f5">G1</div>
@@ -121,7 +127,9 @@ func TestGridCellsStayInsideBorder(t *testing.T) {
 	}
 }
 
-func TestGridTemplateRowsEqualFr(t *testing.T) {
+func TestGridTemplateRowsEqualFr(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 .g { display:grid; grid-template-columns:1fr; grid-template-rows:1fr 1fr; height:200pt; width:100pt; gap:0 }
 .a { background:#fcc }
@@ -161,7 +169,9 @@ func TestGridTemplateRowsEqualFr(t *testing.T) {
 	}
 }
 
-func TestGridRowSpan(t *testing.T) {
+func TestGridRowSpan(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 .g { display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; height:200pt; width:200pt; gap:0 }
 .tall { grid-row: span 2; background:#fcc }
@@ -224,7 +234,8 @@ func TestGridRowSpan(t *testing.T) {
 	}
 }
 
-func TestGridRowSpanStretchMatchesFixture32(t *testing.T) {
+func TestGridRowSpanStretchMatchesFixture32(t *testing.T) { //nolint:cyclop
+	t.Parallel()
 	// Mirrors fixture-32 .grid: 100pt content height, 6pt row-gap, span 2.
 	cssSheet := sheet(t, `
 .grid {
@@ -292,7 +303,9 @@ func TestGridRowSpanStretchMatchesFixture32(t *testing.T) {
 	}
 }
 
-func TestGridRowGapVsColumnGap(t *testing.T) {
+func TestGridRowGapVsColumnGap(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 .g { display:grid; grid-template-columns:1fr 1fr; width:200pt; column-gap:20pt; row-gap:8pt }
 .a { background:#fcc }
@@ -363,6 +376,7 @@ func TestGridRowGapVsColumnGap(t *testing.T) {
 
 func TestParseGridRowSpan(t *testing.T) {
 	t.Parallel()
+
 	s := sheet(t, `.x { grid-row: span 2 } .y { grid-row: 2 / span 3 } .z { grid-row-start: 3 }`)
 	root := mustParse(t, `<html><body><div class="x"></div><div class="y"></div><div class="z"></div></body></html>`)
 	styles := resolveStyles(root, []*css.Stylesheet{s}, "print", 800, 600)
@@ -371,7 +385,7 @@ func TestParseGridRowSpan(t *testing.T) {
 
 	var collect func(*html.Node)
 	collect = func(n *html.Node) {
-		if n.Type == html.ElementNode && n.Name == "div" {
+		if n.Type == html.ElementNode && n.Name == divElementName {
 			nodes = append(nodes, n)
 		}
 
@@ -399,7 +413,9 @@ func TestParseGridRowSpan(t *testing.T) {
 	}
 }
 
-func TestParseGridTemplateAreas(t *testing.T) {
+func TestParseGridTemplateAreas(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	areas := parseGridTemplateAreas(`"header header" "nav main" "footer footer"`)
 	if areas.rows != 3 || areas.cols != 2 {
 		t.Fatalf("dims %dx%d, want 3x2", areas.rows, areas.cols)
@@ -430,7 +446,9 @@ func TestParseGridTemplateAreas(t *testing.T) {
 	}
 }
 
-func TestParseGridAreaAndAutoFlow(t *testing.T) {
+func TestParseGridAreaAndAutoFlow(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 .n { grid-area: sidebar }
 .l { grid-area: 1 / 2 / 3 / 4 }
@@ -447,7 +465,7 @@ func TestParseGridAreaAndAutoFlow(t *testing.T) {
 
 	var collect func(*html.Node)
 	collect = func(n *html.Node) {
-		if n.Type == html.ElementNode && n.Name == "div" {
+		if n.Type == html.ElementNode && n.Name == divElementName {
 			nodes = append(nodes, n)
 		}
 
@@ -481,7 +499,9 @@ func TestParseGridAreaAndAutoFlow(t *testing.T) {
 	}
 }
 
-func TestGridTemplateAreasPlacement(t *testing.T) {
+func TestGridTemplateAreasPlacement(t *testing.T) { //nolint:cyclop,funlen
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 .g {
   display: grid;
@@ -550,7 +570,8 @@ func TestGridTemplateAreasPlacement(t *testing.T) {
 	_ = headX
 }
 
-func TestGridAreasImplyTrackCounts(t *testing.T) {
+func TestGridAreasImplyTrackCounts(t *testing.T) { //nolint:cyclop
+	t.Parallel()
 	// No grid-template-columns — areas alone imply 3 columns.
 	cssSheet := sheet(t, `
 .g {
@@ -602,7 +623,8 @@ func TestGridAreasImplyTrackCounts(t *testing.T) {
 	}
 }
 
-func TestGridAutoFlowDenseFillsHole(t *testing.T) {
+func TestGridAutoFlowDenseFillsHole(t *testing.T) { //nolint:cyclop
+	t.Parallel()
 	// Item A spans 2 cols in row 0 → hole at (0, missing) then B takes col0?
 	// Layout: 2 cols. First item grid-column: 2 (leaves (0,0) empty).
 	// Sparse: second item starts after cursor → row1.
@@ -646,6 +668,7 @@ func TestGridAutoFlowDenseFillsHole(t *testing.T) {
 
 		return 0
 	}
+
 	sparseBY := yOf(sparse, false)
 	denseBY := yOf(dense, false)
 	sparseAY := yOf(sparse, true)
@@ -663,6 +686,7 @@ func TestGridAutoFlowDenseFillsHole(t *testing.T) {
 
 func TestParseGridTracksMinmax(t *testing.T) {
 	t.Parallel()
+
 	e := &engine{scale: 1} //nolint:exhaustruct // intentional zero fields
 
 	const contentW = 300.0
@@ -688,6 +712,7 @@ func TestParseGridTracksMinmax(t *testing.T) {
 
 func TestParseGridTracksMinmaxPercent(t *testing.T) {
 	t.Parallel()
+
 	e := &engine{scale: 1} //nolint:exhaustruct // intentional zero fields
 
 	cols := parseGridTracks("minmax(10%, 1fr) 1fr", 200, 0, e)
@@ -706,6 +731,7 @@ func TestParseGridTracksMinmaxPercent(t *testing.T) {
 
 func TestParseGridTracksRepeatMinmax(t *testing.T) {
 	t.Parallel()
+
 	e := &engine{scale: 1} //nolint:exhaustruct // intentional zero fields
 
 	cols := parseGridTracks("repeat(3, minmax(40pt, 1fr))", 300, 0, e)
@@ -720,7 +746,9 @@ func TestParseGridTracksRepeatMinmax(t *testing.T) {
 	}
 }
 
-func TestGridMinmaxFrLayout(t *testing.T) {
+func TestGridMinmaxFrLayout(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 .g { display:grid; grid-template-columns:minmax(80pt,1fr) minmax(40pt,1fr); width:300pt; gap:0 }
 .a { background:#fcc }
@@ -783,6 +811,7 @@ func TestIntrinsicHeightPercentCyclic(t *testing.T) {
 
 func TestStripMasonryKeyword(t *testing.T) {
 	t.Parallel()
+
 	if stripMasonryKeyword("masonry") != "" {
 		t.Fatal("want empty after strip")
 	}

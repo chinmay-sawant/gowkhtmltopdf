@@ -2,7 +2,7 @@ package app
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"io"
 
 	"gowkhtmltopdf/internal/cli"
@@ -14,8 +14,12 @@ import (
 // through its compatibility adapter and library request seam.
 func RunImage(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 	if cmd == nil {
-		return errors.New("app: nil command")
+		return errNilCommand
 	}
 
-	return imageout.Run(ctx, cmd, log)
+	if err := imageout.Run(ctx, cmd, log); err != nil {
+		return fmt.Errorf("app: image: %w", err)
+	}
+
+	return nil
 }

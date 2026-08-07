@@ -29,8 +29,9 @@ var (
 	errWOFFSFNTTooLarge  = errors.New("woff: reconstructed SFNT too large")
 	errWOFFBadOffset     = errors.New("woff: bad table offset or length")
 	errWOFFOverlap       = errors.New("woff: overlapping compressed tables")
-	errWOFF2Unsupported  = errors.New("woff2: decode requires Brotli (not available; typesetting has WOFF1 only; no new direct modules)")
-	errWOFFFlavorCFF     = errors.New("woff: CFF/OTTO OpenType not supported (TrueType outlines only)")
+	errWOFF2Unsupported  = errors.New("woff2: decode requires Brotli (not available; " +
+		"typesetting has WOFF1 only; no new direct modules)")
+	errWOFFFlavorCFF = errors.New("woff: CFF/OTTO OpenType not supported (TrueType outlines only)")
 )
 
 // ParseFontBytes parses TTF/OTF (TrueType outlines) or WOFF1-wrapped SFNT.
@@ -56,48 +57,22 @@ func ParseFontBytes(data []byte) (*Font, error) {
 	return ParseTTF(data)
 }
 
-// DecodeWOFF decompresses a WOFF1 file into SFNT (TrueType/OpenType) bytes
-// using stdlib compress/zlib. CFF/OTTO flavor is rejected.
-func DecodeWOFF(data []byte) ([]byte, error) {
-	if len(data) < woffHeaderSize {
-		return nil, errWOFFTooShort
-	}
+// woffEntry is one WOFF table directory record.
+type woffEntry struct {
+	tag      [4]byte
+	offset   uint32
+	comp     uint32
+	orig     uint32
+	checksum uint32
+}
 
-	if string(data[0:4]) != woffSignature {
-		return nil, errWOFFBadSignature
-	}
+// byteSpan is a half-open byte range used for overlap detection.
+type byteSpan struct{ start, end uint32 }
 
-	flavor := binary.BigEndian.Uint32(data[4:8])
-	if flavor == ottoFlavor { // 'OTTO'
-		return nil, errWOFFFlavorCFF
-	}
-
-	numTables := int(binary.BigEndian.Uint16(data[12:14]))
-	if numTables <= 0 || numTables > woffMaxTables {
-		return nil, errWOFFTooManyTables
-	}
-
-	totalSfntSize := binary.BigEndian.Uint32(data[16:20])
-	if totalSfntSize == 0 || totalSfntSize > woffMaxSFNTSize {
-		return nil, errWOFFSFNTTooLarge
-	}
-
-	dirEnd := woffHeaderSize + numTables*woffEntrySize
-	if dirEnd > len(data) {
-		return nil, errWOFFTooShort
-	}
-
-	type entry struct {
-		tag                [4]byte
-		offset, comp, orig uint32
-		checksum           uint32
-	}
-
-	entries := make([]entry, numTables)
-
-	type span struct{ start, end uint32 }
-
-	spans := make([]span, 0, numTables)
+// parseWOFFEntries reads and validates the table directory.
+func parseWOFFEntries(data []byte, numTables int) ([]woffEntry, error) {
+	entries := make([]woffEntry, numTables)
+	spans := make([]byteSpan, 0, numTables)
 
 	for idx := range numTables {
 		off := woffHeaderSize + idx*woffEntrySize
@@ -128,10 +103,16 @@ func DecodeWOFF(data []byte) ([]byte, error) {
 			}
 		}
 
-		spans = append(spans, span{start: entry.offset, end: end})
+		spans = append(spans, byteSpan{start: entry.offset, end: end})
 	}
 
-	tables := make([][]byte, numTables)
+	return entries, nil
+}
+
+// decompressWOFFTables inflates the compressed tables, enforcing the
+// decompress-bomb caps declared in the directory.
+func decompressWOFFTables(data []byte, entries []woffEntry) ([][]byte, error) {
+	tables := make([][]byte, len(entries))
 
 	var sumOrig uint64
 
@@ -155,7 +136,8 @@ func DecodeWOFF(data []byte) ([]byte, error) {
 				return nil, fmt.Errorf("woff: decompress: %w", err)
 			}
 
-			if uint32(len(plain)) != entry.orig {
+			if int64(len(plain)) != int64(entry.orig) {
+				//nolint:err113 // dynamic values in message
 				return nil, fmt.Errorf("woff: table %q decompressed length %d != %d", entry.tag, len(plain), entry.orig)
 			}
 		} else {
@@ -170,47 +152,109 @@ func DecodeWOFF(data []byte) ([]byte, error) {
 		}
 	}
 
+	return tables, nil
+}
+
+// assembleSFNT lays the decompressed tables into an OpenType SFNT file.
+func assembleSFNT(flavor uint32, entries []woffEntry, tables [][]byte) ([]byte, error) {
+	numTables := len(entries)
 	// SFNT header + directory + 4-byte-padded tables.
 	headerSize := sfntOffsetTableSize + sfntTableRecordSize*numTables
 
 	var dataSize uint64
 	for _, t := range tables {
-		dataSize += uint64((len(t) + padMask3) &^ padMask3)
+		dataSize += uint64((len(t) + padMask3) &^ padMask3) //nolint:gosec // table sizes bounded by woffMaxTableLen
 	}
 
-	total := uint64(headerSize) + dataSize
+	total := uint64(headerSize) + dataSize //nolint:gosec // headerSize is small
 	if total > woffMaxSFNTSize || total > math.MaxInt32 {
 		return nil, errWOFFSFNTTooLarge
 	}
 
 	out := make([]byte, total)
 	binary.BigEndian.PutUint32(out[0:4], flavor)
-	binary.BigEndian.PutUint16(out[4:6], uint16(numTables))
+	binary.BigEndian.PutUint16(out[4:6], uint16(numTables)) //nolint:gosec // numTables bounded by woffMaxTables
 	// searchRange / entrySelector / rangeShift (OpenType)
 	searchR := uint16(1)
 	entrySel := uint16(0)
 
-	for searchR*2 <= uint16(numTables) {
+	for searchR*2 <= uint16(numTables) { //nolint:gosec // numTables bounded by woffMaxTables
 		searchR *= 2
 		entrySel++
 	}
 
 	binary.BigEndian.PutUint16(out[6:8], searchR*sfntSearchRangeMul)
 	binary.BigEndian.PutUint16(out[8:10], entrySel)
+	//nolint:gosec // numTables bounded by woffMaxTables
 	binary.BigEndian.PutUint16(out[10:12], uint16(numTables)*16-searchR*16)
 
-	tableOffset := uint32(headerSize)
+	tableOffset := uint32(headerSize) //nolint:gosec // headerSize is small
 
 	for idx, e := range entries {
 		rec := out[12+16*idx:]
 		copy(rec[0:4], e.tag[:])
 		binary.BigEndian.PutUint32(rec[4:8], e.checksum)
 		binary.BigEndian.PutUint32(rec[8:12], tableOffset)
+		//nolint:gosec // table sizes bounded by woffMaxTableLen
 		binary.BigEndian.PutUint32(rec[12:16], uint32(len(tables[idx])))
 		copy(out[tableOffset:], tables[idx])
-		padded := uint32((len(tables[idx]) + padMask3) &^ padMask3)
+		padded := uint32((len(tables[idx]) + padMask3) &^ padMask3) //nolint:gosec // table sizes bounded by woffMaxTableLen
 		tableOffset += padded
 	}
 
 	return out, nil
+}
+
+// validateWOFFHeader checks the WOFF header and returns the flavor and
+// declared table count.
+func validateWOFFHeader(data []byte) (uint32, int, error) {
+	if len(data) < woffHeaderSize {
+		return 0, 0, errWOFFTooShort
+	}
+
+	if string(data[0:4]) != woffSignature {
+		return 0, 0, errWOFFBadSignature
+	}
+
+	flavor := binary.BigEndian.Uint32(data[4:8])
+	if flavor == ottoFlavor { // 'OTTO'
+		return 0, 0, errWOFFFlavorCFF
+	}
+
+	numTables := int(binary.BigEndian.Uint16(data[12:14]))
+	if numTables <= 0 || numTables > woffMaxTables {
+		return 0, 0, errWOFFTooManyTables
+	}
+
+	totalSfntSize := binary.BigEndian.Uint32(data[16:20])
+	if totalSfntSize == 0 || totalSfntSize > woffMaxSFNTSize {
+		return 0, 0, errWOFFSFNTTooLarge
+	}
+
+	if woffHeaderSize+numTables*woffEntrySize > len(data) {
+		return 0, 0, errWOFFTooShort
+	}
+
+	return flavor, numTables, nil
+}
+
+// DecodeWOFF decompresses a WOFF1 file into SFNT (TrueType/OpenType) bytes
+// using stdlib compress/zlib. CFF/OTTO flavor is rejected.
+func DecodeWOFF(data []byte) ([]byte, error) {
+	flavor, numTables, err := validateWOFFHeader(data)
+	if err != nil {
+		return nil, err
+	}
+
+	entries, err := parseWOFFEntries(data, numTables)
+	if err != nil {
+		return nil, err
+	}
+
+	tables, err := decompressWOFFTables(data, entries)
+	if err != nil {
+		return nil, err
+	}
+
+	return assembleSFNT(flavor, entries, tables)
 }

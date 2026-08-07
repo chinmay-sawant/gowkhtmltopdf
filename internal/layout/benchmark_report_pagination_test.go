@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -13,7 +14,9 @@ import (
 // TestBenchmarkReportRowsStayAligned exercises the same five forced sections
 // as the benchmark report. The fifth section used to snap row 12's text during
 // provisional pagination while leaving its collapsed-table chrome behind.
-func TestBenchmarkReportRowsStayAligned(t *testing.T) {
+func TestBenchmarkReportRowsStayAligned(t *testing.T) { //nolint:cyclop,funlen
+	t.Parallel()
+
 	const style = `
 body { color: #172033; font-family: sans-serif; font-size: 9pt; margin: 0; }
 .benchmark-page { page-break-before: always; page-break-inside: avoid; padding: 2mm 0; }
@@ -37,10 +40,15 @@ td.amount { text-align: right; }
 			className += " first"
 		}
 
-		fmt.Fprintf(&src, `<section class="%s"><h1>Benchmark report — page %d</h1><p>Representative invoice and operations data for the full HTML-to-PDF pipeline.</p><table><thead><tr><th>Line</th><th>SKU</th><th>Description</th><th>Quantity</th><th>Amount</th></tr></thead><tbody>`, className, page)
+		fmt.Fprintf(&src, `<section class="%s"><h1>Benchmark report — page %d</h1>`+
+			`<p>Representative invoice and operations data for the full HTML-to-PDF pipeline.</p>`+
+			`<table><thead><tr><th>Line</th><th>SKU</th><th>Description</th>`+
+			`<th>Quantity</th><th>Amount</th></tr></thead><tbody>`, className, page)
 
 		for row := 1; row <= 20; row++ {
-			fmt.Fprintf(&src, `<tr><td>%d</td><td>SKU-%03d-%03d</td><td>Platform operations and support service %d</td><td>%d</td><td class="amount">%d.%02d</td></tr>`, row, page, row, row, (row+page-1)%7+1, page*row, (page+row-1)%100)
+			fmt.Fprintf(&src, `<tr><td>%d</td><td>SKU-%03d-%03d</td>`+
+				`<td>Platform operations and support service %d</td><td>%d</td><td class="amount">%d.%02d</td></tr>`,
+				row, page, row, row, (row+page-1)%7+1, page*row, (page+row-1)%100)
 		}
 
 		src.WriteString(`</tbody></table></section>`)

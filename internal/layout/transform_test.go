@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -11,6 +12,7 @@ import (
 
 func TestParseTransformTranslateRotateScale(t *testing.T) {
 	t.Parallel()
+
 	m, has, ok := parseTransformList("translate(10pt, 20pt) rotate(90deg) scale(2)", 12)
 	if !ok || !has {
 		t.Fatalf("parse ok=%v has=%v", ok, has)
@@ -25,6 +27,7 @@ func TestParseTransformTranslateRotateScale(t *testing.T) {
 
 func TestParseTransformMatrixAndSkew(t *testing.T) {
 	t.Parallel()
+
 	m, has, isOK := parseTransformList("matrix(1, 0, 0, 1, 30, 0)", 12)
 	if !isOK || !has {
 		t.Fatal("matrix parse failed")
@@ -50,6 +53,7 @@ func TestParseTransformMatrixAndSkew(t *testing.T) {
 
 func TestParseTransformNoneAnd3DRejected(t *testing.T) {
 	t.Parallel()
+
 	_, has, isOK := parseTransformList("none", 12)
 	if !isOK || has {
 		t.Fatalf("none: ok=%v has=%v", isOK, has)
@@ -63,6 +67,7 @@ func TestParseTransformNoneAnd3DRejected(t *testing.T) {
 
 func TestParseTransformOriginKeywords(t *testing.T) {
 	t.Parallel()
+
 	spec, isOK := parseTransformOrigin("top left", 12)
 	if !isOK {
 		t.Fatal("origin parse failed")
@@ -78,7 +83,9 @@ func TestParseTransformOriginKeywords(t *testing.T) {
 	}
 }
 
-func TestTransformRotateBadgeSiblingsUnmoved(t *testing.T) {
+func TestTransformRotateBadgeSiblingsUnmoved(t *testing.T) { //nolint:cyclop,funlen
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 .row { font-size: 12pt; }
 .badge {
@@ -91,7 +98,8 @@ func TestTransformRotateBadgeSiblingsUnmoved(t *testing.T) {
 }
 .plain { display: inline-block; background: #eee; padding: 4pt 8pt; }
 `)
-	res := layoutHTML(t, `<div class="row"><span class="badge">NEW</span> <span class="plain">Sibling</span></div>`, cssSheet)
+	res := layoutHTML(t, `<div class="row">`+
+		`<span class="badge">NEW</span> <span class="plain">Sibling</span></div>`, cssSheet)
 
 	var badge, plain, plainFill *Op
 
@@ -140,7 +148,9 @@ func TestTransformRotateBadgeSiblingsUnmoved(t *testing.T) {
 	}
 	// Paint into PDF and ensure content stream contains cm (vector CTM).
 	doc := pdf.NewDocument()
-	if err := Paint(doc, res, PaintOptions{PageWidth: 612, PageHeight: 792, MarginTop: 36, MarginBottom: 36, MarginLeft: 36, MarginRight: 36}); err != nil {
+	if err := Paint(doc, res, PaintOptions{
+		PageWidth: 612, PageHeight: 792, MarginTop: 36, MarginBottom: 36, MarginLeft: 36, MarginRight: 36,
+	}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -159,6 +169,7 @@ func TestTransformRotateBadgeSiblingsUnmoved(t *testing.T) {
 
 func TestTransformAbsposContainingBlockScale(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 .host {
   position: relative;
@@ -207,6 +218,7 @@ func TestTransformAbsposContainingBlockScale(t *testing.T) {
 
 func TestTransformNestedScaleTranslate(t *testing.T) {
 	t.Parallel()
+
 	s := sheet(t, `
 .outer { transform: translate(10pt, 0); }
 .inner { transform: scale(2); transform-origin: top left; width: 40pt; height: 20pt; background: #090; }
@@ -235,6 +247,7 @@ func TestTransformNestedScaleTranslate(t *testing.T) {
 
 func TestTransformKeyframesStaticCascaded(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .badge {
@@ -267,6 +280,7 @@ func TestTransformKeyframesStaticCascaded(t *testing.T) {
 
 func TestOpacityExtGState(t *testing.T) {
 	t.Parallel()
+
 	s := sheet(t, `.faded { opacity: 0.5; background: #00f; width: 40pt; height: 20pt; }`)
 	res := layoutHTML(t, `<div class="faded">Hi</div>`, s)
 
@@ -287,7 +301,9 @@ func TestOpacityExtGState(t *testing.T) {
 	}
 
 	doc := pdf.NewDocument()
-	_ = Paint(doc, res, PaintOptions{PageWidth: 612, PageHeight: 792, MarginTop: 36, MarginBottom: 36, MarginLeft: 36, MarginRight: 36})
+	_ = Paint(doc, res, PaintOptions{
+		PageWidth: 612, PageHeight: 792, MarginTop: 36, MarginBottom: 36, MarginLeft: 36, MarginRight: 36,
+	})
 
 	var buf bytes.Buffer
 	if err := doc.Write(&buf); err != nil {

@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -9,7 +10,9 @@ import (
 	"gowkhtmltopdf/internal/pdf"
 )
 
-func TestOrphansWidowsParseAndInherit(t *testing.T) {
+func TestOrphansWidowsParseAndInherit(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 		.o4 { orphans: 4; widows: 2 }
 		.bad { orphans: 0; widows: -1; orphans: 1.5; widows: auto }
@@ -93,10 +96,12 @@ func TestOrphansWidowsLineAwareKeepTogether(t *testing.T) {
 		{Kind: OpText, Y: 120, Text: "4", Size: 10}, //nolint:exhaustruct // intentional zero fields
 		{Kind: OpText, Y: 135, Text: "5", Size: 10}, //nolint:exhaustruct // intentional zero fields
 	}
+
 	root := &box{ //nolint:exhaustruct // intentional zero fields
 		kind: "block", y: 60, height: 90, opStart: 0, opEnd: 4,
 		style: ResolvedStyle{Orphans: 4, Widows: 2}, //nolint:exhaustruct // intentional zero fields
 	}
+
 	res := &Result{Ops: ops, root: root} //nolint:exhaustruct // intentional zero fields
 	if !orphansWidows(res, contentH) {
 		t.Fatal("expected Rule 3 keep-together shift for orphans:4 with 2|3 split")
@@ -120,17 +125,20 @@ func TestOrphansWidowsLineAwareKeepTogether(t *testing.T) {
 		{Kind: OpText, Y: 120, Text: "4", Size: 10}, //nolint:exhaustruct // intentional zero fields
 		{Kind: OpText, Y: 135, Text: "5", Size: 10}, //nolint:exhaustruct // intentional zero fields
 	}
+
 	root2 := &box{ //nolint:exhaustruct // intentional zero fields
 		kind: "block", y: 60, height: 90, opStart: 0, opEnd: 4,
 		style: ResolvedStyle{Orphans: 2, Widows: 2}, //nolint:exhaustruct // intentional zero fields
 	}
+
 	res2 := &Result{Ops: ops2, root: root2} //nolint:exhaustruct // intentional zero fields
 	if orphansWidows(res2, contentH) {
 		t.Fatal("legal 2|3 split with orphans:2 widows:2 must not shift")
 	}
 }
 
-func TestOrphansWidowsCSSIntegration(t *testing.T) {
+func TestOrphansWidowsCSSIntegration(t *testing.T) { //nolint:cyclop,funlen
+	t.Parallel()
 	// End-to-end: parsed orphans:4 survives layout+paint; forced multi-line
 	// paragraph text ends on a single page near the boundary.
 	cssSheet := sheet(t, `
@@ -202,6 +210,7 @@ func TestOrphansWidowsHeuristicFallback(t *testing.T) {
 	res := &Result{ //nolint:exhaustruct // intentional zero fields
 		Ops: []Op{{Kind: OpFillRect, Y: 830, H: 30}}, //nolint:exhaustruct // intentional zero fields
 	}
+
 	b := &box{ //nolint:exhaustruct // intentional zero fields
 		kind: "block", y: 830, height: 30, opStart: 0, opEnd: 0,
 		style: ResolvedStyle{Orphans: 2, Widows: 2}, //nolint:exhaustruct // intentional zero fields

@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -11,7 +12,9 @@ import (
 // TestFloatMarginBoxExclusion: in-flow text must clear a float's horizontal
 // margin (margin box), not sit flush against the border box — wiki infobox
 // uses margin-left:1em on float:right.
-func TestFloatMarginBoxExclusion(t *testing.T) {
+func TestFloatMarginBoxExclusion(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 body { margin: 0; font-size: 12pt; }
 .box {
@@ -43,7 +46,7 @@ p { margin: 0; }
 		t.Fatal(err)
 	}
 
-	var frameX float64 = pageW
+	var frameX = pageW
 
 	for _, op := range res.Ops {
 		if op.Kind == OpText && strings.Contains(op.Text, "FRAME") {

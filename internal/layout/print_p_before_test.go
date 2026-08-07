@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -14,7 +15,9 @@ import (
 // Pseudo-element rules must not apply to the host. A prior tokenizer bug
 // stripped ::before and left `p { width:120pt }`, squeezing every wiki
 // paragraph to a 120pt column beside the infobox.
-func TestVectorPrintPBeforeDoesNotSqueezeLines(t *testing.T) {
+func TestVectorPrintPBeforeDoesNotSqueezeLines(t *testing.T) { //nolint:cyclop,funlen
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 body { margin: 0; font-size: 12pt; }
 .infobox { float: right; width: 22em; font-size: 88%; }
@@ -27,7 +30,8 @@ p::before { content: ''; display: block; width: 120pt; overflow: hidden; page-br
 	htmlSrc := `<html><body>
 <table class="infobox"><tr><td>Portrait photo here</td></tr>
 <tr><th>Born</th><td>30 April 1988</td></tr></table>
-<p>Ana Celia de Armas Caso is a Cuban-born actress holding Cuban Spanish and American citizenship in Hollywood films today and tomorrow.</p>
+<p>Ana Celia de Armas Caso is a Cuban-born actress holding Cuban Spanish and American citizenship in ` +
+		`Hollywood films today and tomorrow.</p>
 <p>She began her career in Cuba with a leading role in the romantic drama and later moved to Spain.</p>
 </body></html>`
 

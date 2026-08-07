@@ -1,3 +1,4 @@
+//nolint:testpackage // tests reach into unexported state
 package pdf
 
 import (
@@ -17,12 +18,17 @@ func makePNG(t *testing.T, withAlpha bool) []byte {
 
 	for posY := range 2 {
 		for posX := range 4 {
-			a := uint8(255)
+			alpha := uint8(255)
 			if withAlpha && posX%2 == 1 {
-				a = 100
+				alpha = 100
 			}
 
-			img.Set(posX, posY, color.RGBA{R: uint8(posX * 40), G: uint8(posY * 90), B: 128, A: a})
+			img.Set(posX, posY, color.RGBA{
+				R: uint8(posX * 40), //nolint:gosec // test fixture, 4px bounds
+				G: uint8(posY * 90), //nolint:gosec // test fixture, 4px bounds
+				B: 128,
+				A: alpha,
+			})
 		}
 	}
 

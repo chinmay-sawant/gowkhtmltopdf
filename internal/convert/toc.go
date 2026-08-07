@@ -67,7 +67,7 @@ func lengthToPt(v string, baseSize float64) float64 {
 // dotted leader and the page number inline. Each entry div carries its target
 // anchor in a data-wk-target attribute so the link pass can locate it after
 // layout (the <a> wrappers are inline and produce no boxes).
-func genTOCHTML(toc settings.TableOfContent, entries []*outline.Node, pageOf func(*outline.Heading) int, font *pdf.Font, contentW float64) string {
+func genTOCHTML(toc settings.TableOfContent, entries []*outline.Node, pageOf func(*outline.Heading) int, font *pdf.Font, contentW float64) string { //nolint:funlen,lll // template rendering with leader dots and anchors
 	if toc.CaptionText == "" {
 		toc.CaptionText = "Table of Contents"
 	}
@@ -163,7 +163,7 @@ func paintOptions(geom hfGeom) layout.PaintOptions {
 func paintCount(ctx context.Context, res *layout.Result, g hfGeom) (int, error) {
 	scratch := pdf.NewDocument()
 	if err := layout.PaintContext(ctx, scratch, cloneResult(res), paintOptions(g)); err != nil {
-		return 0, err
+		return 0, fmt.Errorf("toc: paintCount: %w", err)
 	}
 
 	return scratch.PageCount(), nil
@@ -173,41 +173,41 @@ func paintCount(ctx context.Context, res *layout.Result, g hfGeom) (int, error) 
 // Entry page numbers are offset by tocGuess - the assumed number of pages the
 // TOC objects will occupy at the front of the document.
 // Headings typically come from BuildTree on a DocPage view, so h.Page is body-global.
-func layoutTOC(ctx context.Context, font *pdf.Font, st *objectState, entries []*outline.Node, tocGuess int, g settings.PdfGlobal, log io.Writer) (*html.Node, *layout.Result, error) {
-	toc := st.toc
+func layoutTOC(ctx context.Context, font *pdf.Font, state *objectState, entries []*outline.Node, tocGuess int, glob settings.PdfGlobal, log io.Writer) (*html.Node, *layout.Result, error) { //nolint:lll // toc pipeline signature
+	toc := state.toc
 	if toc.XSLStyleSheet != "" {
-		line.Emit(log, line.Warn, "object %d: --xsl-style-sheet is not supported; using the built-in TOC template", st.idx)
+		line.Emit(log, line.Warn, "object %d: --xsl-style-sheet is not supported; using the built-in TOC template", state.idx)
 	}
 
-	contentW := st.geom.contentW
+	contentW := state.geom.contentW
 	pageOf := func(h *outline.Heading) int {
 		p := h.DocPage
 		if h.DocPage == 0 {
 			p = h.Page // view copies put DocPage into Page (including 0)
 		}
 
-		return tocGuess + p + 1 + g.PageOffset
+		return tocGuess + p + 1 + glob.PageOffset
 	}
 	htmlDoc := genTOCHTML(toc, entries, pageOf, font, contentW)
 	// TOC HTML is a generated string template, not loaded document bytes.
 	root, err := html.Parse(htmlDoc)
 	if err != nil {
-		return nil, nil, fmt.Errorf("object %d: toc: parse: %w", st.idx+1, err)
+		return nil, nil, fmt.Errorf("object %d: toc: parse: %w", state.idx+1, err)
 	}
 
-	media := st.media
+	media := state.media
 	if media == "" {
 		media = mediaPrint
 	}
 
 	res, err := layout.LayoutContext(ctx, root, layout.Options{ //nolint:exhaustruct // intentional zero-value fields
 		Width:  contentW,
-		Height: st.geom.contentH,
+		Height: state.geom.contentH,
 		Font:   font,
 		Media:  media,
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("object %d: toc: layout: %w", st.idx+1, err)
+		return nil, nil, fmt.Errorf("object %d: toc: layout: %w", state.idx+1, err)
 	}
 
 	return root, res, nil
@@ -219,7 +219,7 @@ func layoutTOC(ctx context.Context, font *pdf.Font, st *objectState, entries []*
 // layouts into doc. It returns the total number of TOC pages. The renumbering
 // is done twice at most; if the second measurement changed the count the
 // entry numbers may be off by the delta (documented, rare in practice).
-func renderTOCObjects(ctx context.Context, font *pdf.Font, doc *pdf.Document, req *Request, tocs []*objectState, entries []*outline.Node, log io.Writer) (int, error) {
+func renderTOCObjects(ctx context.Context, font *pdf.Font, doc *pdf.Document, req *Request, tocs []*objectState, entries []*outline.Node, log io.Writer) (int, error) { //nolint:cyclop,lll // fixed-point iterations over TOC objects
 	if len(tocs) == 0 {
 		return 0, nil
 	}

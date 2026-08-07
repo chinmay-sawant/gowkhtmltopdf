@@ -29,6 +29,8 @@ func Emit(writer io.Writer, sev Severity, format string, args ...any) {
 	prefix := "info: "
 
 	switch sev {
+	case Info:
+		prefix = "info: "
 	case Warn:
 		prefix = "warning: "
 	case Error:

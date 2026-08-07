@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -39,7 +40,9 @@ func layoutHTMLZoom(t *testing.T, src string, zoom float64, sheets ...*css.Style
 	t.Helper()
 	root := mustParse(t, src)
 
-	res, err := Layout(root, Options{Width: testViewport, Height: 800, Sheets: sheets, Background: true, Zoom: zoom}) //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: testViewport, Height: 800, Sheets: sheets, Background: true, Zoom: zoom,
+	})
 	if err != nil {
 		t.Fatalf("Layout: %v", err)
 	}
@@ -114,7 +117,9 @@ func findBox(t *testing.T, res *Result, name string) *box {
 	return found
 }
 
-func TestBoxRanges(t *testing.T) {
+func TestBoxRanges(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	s := sheet(t, `div { padding: 5pt; border: 2pt solid black }`)
 	res := layoutHTML(t, `<html><body><div><p>hello world</p></div></body></html>`, s)
 
@@ -144,7 +149,9 @@ func TestBoxRanges(t *testing.T) {
 
 	// noEmit interplay: table/cell ranges (built via the measure pass) must
 	// map to ops that actually exist
-	tres := layoutHTML(t, `<html><body><table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table></body></html>`)
+	tres := layoutHTML(t, `<html><body>`+
+		`<table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table>`+
+		`</body></html>`)
 
 	tblBox := findBox(t, tres, "table")
 	if tblBox.opStart > tblBox.opEnd {
@@ -174,7 +181,10 @@ func TestBoxRanges(t *testing.T) {
 
 func TestTableRowRanges(t *testing.T) {
 	t.Parallel()
-	res := layoutHTML(t, `<html><body><table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table></body></html>`)
+
+	res := layoutHTML(t, `<html><body>`+
+		`<table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table>`+
+		`</body></html>`)
 
 	tblBox := findBox(t, res, "table")
 	if len(tblBox.rows) != 2 {
@@ -188,6 +198,7 @@ func TestTableRowRanges(t *testing.T) {
 
 		return row[0].opStart, row[len(row)-1].opEnd
 	}
+
 	r0s, r0e := rowRange(tblBox.rows[0])
 	r1s, r1e := rowRange(tblBox.rows[1])
 	// each row's op range covers (overlaps) its cells' ranges
@@ -208,12 +219,19 @@ func TestTableRowRanges(t *testing.T) {
 	}
 }
 
-func TestElementLocations(t *testing.T) {
-	res := layoutHTML(t, `<html><body><h1>title</h1><p>body text</p><table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table></body></html>`)
-	doc := pdf.NewDocument()
-	doc.SetCreationTime(epoch)
+func TestElementLocations(t *testing.T) { //nolint:gocognit,gocyclo,cyclop,funlen
+	t.Parallel()
 
-	err := Paint(doc, res, PaintOptions{PageWidth: 595, PageHeight: 842, MarginTop: 28.35, MarginBottom: 28.35, MarginLeft: 28.35, MarginRight: 28.35})
+	res := layoutHTML(t, `<html><body>`+
+		`<h1>title</h1><p>body text</p>`+
+		`<table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table>`+
+		`</body></html>`)
+	doc := pdf.NewDocument()
+	doc.SetCreationTime(time.Unix(0, 0).UTC())
+
+	err := Paint(doc, res, PaintOptions{
+		PageWidth: 595, PageHeight: 842, MarginTop: 28.35, MarginBottom: 28.35, MarginLeft: 28.35, MarginRight: 28.35,
+	})
 	if err != nil {
 		t.Fatalf("Paint: %v", err)
 	}
@@ -290,9 +308,11 @@ func TestElementLocations(t *testing.T) {
 	sbox.WriteString("</body></html>")
 	res2 := layoutHTML(t, sbox.String())
 	doc2 := pdf.NewDocument()
-	doc2.SetCreationTime(epoch)
+	doc2.SetCreationTime(time.Unix(0, 0).UTC())
 
-	if err := Paint(doc2, res2, PaintOptions{PageWidth: 595, PageHeight: 842, MarginTop: 28.35, MarginBottom: 28.35, MarginLeft: 28.35, MarginRight: 28.35}); err != nil {
+	if err := Paint(doc2, res2, PaintOptions{
+		PageWidth: 595, PageHeight: 842, MarginTop: 28.35, MarginBottom: 28.35, MarginLeft: 28.35, MarginRight: 28.35,
+	}); err != nil {
 		t.Fatalf("Paint long doc: %v", err)
 	}
 
@@ -338,6 +358,7 @@ func indexOf(seq []string, s string) int {
 
 func TestBlockStacking(t *testing.T) {
 	t.Parallel()
+
 	res := layoutHTML(t, `<html><body><div>A</div><div>B</div><div>C</div></body></html>`)
 
 	texts := opsOfKind(res, OpText)
@@ -358,6 +379,7 @@ func TestBlockStacking(t *testing.T) {
 
 func TestBlockWidthsAndMargins(t *testing.T) {
 	t.Parallel()
+
 	s := sheet(t, `div.a { margin: 10pt; width: 200pt } div.b { margin-left: 30pt }`)
 	res := layoutHTML(t, `<html><body><div class="a">x</div><div class="b">y</div></body></html>`, s)
 
@@ -377,6 +399,7 @@ func TestBlockWidthsAndMargins(t *testing.T) {
 
 func TestMarginCollapse(t *testing.T) {
 	t.Parallel()
+
 	s := sheet(t, `p.a { margin-bottom: 20pt } p.b { margin-top: 30pt }`)
 	res := layoutHTML(t, `<html><body><p class="a">A</p><p class="b">B</p></body></html>`, s)
 
@@ -395,6 +418,7 @@ func TestMarginCollapse(t *testing.T) {
 
 func TestPaddingBorderBox(t *testing.T) {
 	t.Parallel()
+
 	s := sheet(t, `div { padding: 10pt; border: 2pt solid black; width: 200pt }`)
 	res := layoutHTML(t, `<html><body><div>text</div></body></html>`, s)
 
@@ -419,8 +443,11 @@ func TestPaddingBorderBox(t *testing.T) {
 
 func TestTextAlign(t *testing.T) {
 	t.Parallel()
+
 	s := sheet(t, `div { width: 300pt } .r { text-align: right } .c { text-align: center }`)
-	res := layoutHTML(t, `<html><body><div>left</div><div class="r">right</div><div class="c">center</div></body></html>`, s)
+	res := layoutHTML(t, `<html><body>`+
+		`<div>left</div><div class="r">right</div><div class="c">center</div>`+
+		`</body></html>`, s)
 
 	texts := opsOfKind(res, OpText)
 	if len(texts) != 3 {
@@ -448,6 +475,7 @@ func TestTextAlign(t *testing.T) {
 
 func TestTextWrapping(t *testing.T) {
 	t.Parallel()
+
 	s := sheet(t, `div { width: 60pt }`)
 	// a long sentence in a 60pt box must wrap into multiple lines
 	res := layoutHTML(t, `<html><body><div>the quick brown fox jumps over the lazy dog</div></body></html>`, s)
@@ -484,6 +512,7 @@ func TestTextWrapping(t *testing.T) {
 
 func TestWhiteSpacePre(t *testing.T) {
 	t.Parallel()
+
 	s := sheet(t, `pre { white-space: pre; width: 60pt }`)
 	res := layoutHTML(t, "<html><body><pre>a b\nc</pre></body></html>", s)
 	texts := opsOfKind(res, OpText)
@@ -499,6 +528,7 @@ func TestWhiteSpacePre(t *testing.T) {
 
 func TestFontSizeEmInherit(t *testing.T) {
 	t.Parallel()
+
 	s := sheet(t, `div { font-size: 20pt } p { font-size: 0.5em } .big { font-size: 2em }`)
 	res := layoutHTML(t, `<html><body><div>parent <p>child</p><p class="big">big</p></div></body></html>`, s)
 
@@ -528,6 +558,7 @@ func TestFontSizeEmInherit(t *testing.T) {
 
 func TestCascadeAndInline(t *testing.T) {
 	t.Parallel()
+
 	s := sheet(t, `p { color: red; margin: 5pt } p.special { color: blue }`)
 	res := layoutHTML(t, `<html><body><p>one</p><p class="special" style="color: #0f0">two</p></body></html>`, s)
 
@@ -549,7 +580,8 @@ func TestCascadeAndInline(t *testing.T) {
 	}
 }
 
-func TestLinkPseudoColor(t *testing.T) {
+func TestLinkPseudoColor(t *testing.T) { //nolint:cyclop
+	t.Parallel()
 	// Author a { black } loses to a:link { blue } on specificity (print = has href).
 	cssSheet := sheet(t, `
 		a { color: #111111; }
@@ -587,7 +619,9 @@ func TestLinkPseudoColor(t *testing.T) {
 	}
 }
 
-func TestIPAGlyphRegistryFallback(t *testing.T) {
+func TestIPAGlyphRegistryFallback(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	dejavu := "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 	if _, err := os.Stat(dejavu); err != nil {
 		t.Skip("DejaVu Sans not installed")
@@ -601,7 +635,9 @@ func TestIPAGlyphRegistryFallback(t *testing.T) {
 	ipa := "ˈaɾ"
 	root := mustParse(t, `<html><body><p style="font-family: Liberation Sans, sans-serif">`+ipa+`</p></body></html>`)
 
-	res, err := Layout(root, Options{Width: testViewport, Height: 400, Registry: reg, Media: "print"}) //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: testViewport, Height: 400, Registry: reg, Media: "print",
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -639,6 +675,7 @@ func TestIPAGlyphRegistryFallback(t *testing.T) {
 
 func TestBackgroundFill(t *testing.T) {
 	t.Parallel()
+
 	s := sheet(t, `div { background-color: #f00; width: 100pt; height: 50pt }`)
 	res := layoutHTML(t, `<html><body><div>x</div></body></html>`, s)
 
@@ -662,6 +699,7 @@ func TestBackgroundFill(t *testing.T) {
 
 func TestDisplayNone(t *testing.T) {
 	t.Parallel()
+
 	s := sheet(t, `.hidden { display: none }`)
 	res := layoutHTML(t, `<html><body><div>visible</div><div class="hidden">secret</div></body></html>`, s)
 
@@ -673,6 +711,7 @@ func TestDisplayNone(t *testing.T) {
 
 func TestListBullet(t *testing.T) {
 	t.Parallel()
+
 	res := layoutHTML(t, `<html><body><ul><li>item</li></ul></body></html>`)
 
 	bullets := opsOfKind(res, OpBullet)
@@ -685,7 +724,9 @@ func TestListBullet(t *testing.T) {
 	}
 }
 
-func TestBoldUnderline(t *testing.T) {
+func TestBoldUnderline(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	res := layoutHTML(t, `<html><body><p><b>bold</b> and <a href="http://x.example/">link</a></p></body></html>`)
 	texts := opsOfKind(res, OpText)
 
@@ -726,6 +767,7 @@ func TestBoldUnderline(t *testing.T) {
 
 func TestTableLayout(t *testing.T) {
 	t.Parallel()
+
 	res := layoutHTML(t, `<html><body><table>
 		<tr><th>Name</th><th>Qty</th><th>Total</th></tr>
 		<tr><td>Widget</td><td>2</td><td>$10.00</td></tr>
@@ -759,6 +801,7 @@ func TestTableLayout(t *testing.T) {
 
 func TestTableColspan(t *testing.T) {
 	t.Parallel()
+
 	res := layoutHTML(t, `<html><body><table>
 		<tr><td colspan="2">wide</td><td>c</td></tr>
 		<tr><td>a</td><td>b</td><td>c</td></tr>
@@ -831,7 +874,9 @@ func layoutHTMLWithImages(t *testing.T, src string, img []byte, imgSrc string) *
 		return img, nil
 	}
 
-	res, err := Layout(root, Options{Width: testViewport, Height: 800, Images: provider, Background: true}) //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: testViewport, Height: 800, Images: provider, Background: true,
+	})
 	if err != nil {
 		t.Fatalf("Layout: %v", err)
 	}
@@ -857,8 +902,6 @@ func tinyPNG(w, h int) []byte {
 	return out.Bytes()
 }
 
-var epoch = time.Unix(0, 0).UTC()
-
 func TestPaginateAndPaint(t *testing.T) {
 	t.Parallel()
 	// long content: many paragraphs → multiple pages
@@ -876,7 +919,7 @@ func TestPaginateAndPaint(t *testing.T) {
 	res := layoutHTML(t, sbox.String())
 
 	doc := pdf.NewDocument()
-	doc.SetCreationTime(epoch)
+	doc.SetCreationTime(time.Unix(0, 0).UTC())
 
 	err := Paint(doc, res, PaintOptions{
 		PageWidth: 595, PageHeight: 842, // A4 portrait
@@ -907,11 +950,14 @@ func TestPaginateAndPaint(t *testing.T) {
 
 func TestPaintSinglePage(t *testing.T) {
 	t.Parallel()
+
 	res := layoutHTML(t, `<html><body><p>hello</p></body></html>`)
 	doc := pdf.NewDocument()
-	doc.SetCreationTime(epoch)
+	doc.SetCreationTime(time.Unix(0, 0).UTC())
 
-	err := Paint(doc, res, PaintOptions{PageWidth: 595, PageHeight: 842, MarginTop: 10, MarginBottom: 10, MarginLeft: 10, MarginRight: 10})
+	err := Paint(doc, res, PaintOptions{
+		PageWidth: 595, PageHeight: 842, MarginTop: 10, MarginBottom: 10, MarginLeft: 10, MarginRight: 10,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -929,9 +975,12 @@ func TestPaintSinglePage(t *testing.T) {
 
 func TestDebugBoxes(t *testing.T) {
 	t.Parallel()
+
 	root := mustParse(t, `<html><body><div>x</div></body></html>`)
 
-	res, err := Layout(root, Options{Width: testViewport, Height: 800, DebugBoxes: true}) //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: testViewport, Height: 800, DebugBoxes: true,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -943,6 +992,7 @@ func TestDebugBoxes(t *testing.T) {
 
 func TestHRElement(t *testing.T) {
 	t.Parallel()
+
 	res := layoutHTML(t, `<html><body><p>a</p><hr><p>b</p></body></html>`)
 
 	fills := opsOfKind(res, OpFillRect)
@@ -957,6 +1007,7 @@ func TestHRElement(t *testing.T) {
 
 func TestZoom(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `div { width: 100pt; margin: 10pt; background-color: #000 }`)
 	src := `<html><body><div>abc</div></body></html>`
 
@@ -989,7 +1040,9 @@ func TestZoom(t *testing.T) {
 
 func TestPageBreakParsing(t *testing.T) {
 	t.Parallel()
-	cssSheet := sheet(t, `div.brk { page-break-before: always } div.avoid { break-inside: avoid } p.aft { break-after: always }`)
+
+	cssSheet := sheet(t, `div.brk { page-break-before: always } `+
+		`div.avoid { break-inside: avoid } p.aft { break-after: always }`)
 	src := `<html><body><div class="brk">x</div><div class="avoid">y</div><p class="aft">z</p></body></html>`
 
 	// parsing must not panic or stall layout
@@ -1097,7 +1150,8 @@ func TestPageBreakInsideAvoid(t *testing.T) {
 	}
 }
 
-func TestBoundaryFillSplit(t *testing.T) {
+func TestBoundaryFillSplit(t *testing.T) { //nolint:cyclop
+	t.Parallel()
 	// colored div starts at y=700 (after 694pt spacer), h=400 → its fill
 	// crosses the boundary at 842 and must split into two clipped rects.
 	s := sheet(t, `div.a { height: 694pt } div.b { height: 400pt; background-color: #000 }`)
@@ -1139,6 +1193,7 @@ func TestBoundaryFillSplit(t *testing.T) {
 // previous page, so splitCrossingRects inserted forever (mid-slice copy).
 func TestSplitCrossingFloatBoundaryNoHang(t *testing.T) {
 	t.Parallel()
+
 	contentH := 785.1970866141731
 	// Y just below a page top so truncating division sticks on the prior page.
 	y := contentH*52 - 1e-10
@@ -1184,7 +1239,9 @@ func TestTableRowNoSplit(t *testing.T) {
 	// three tall rows (padding forces ~750pt rows); each must land on its own
 	// page without splitting.
 	s := sheet(t, `td { padding: 500pt; font-size: 12pt }`)
-	res := layoutHTML(t, `<html><body><table><tr><td>r1</td></tr><tr><td>r2</td></tr><tr><td>r3</td></tr></table></body></html>`, s)
+	res := layoutHTML(t, `<html><body>`+
+		`<table><tr><td>r1</td></tr><tr><td>r2</td></tr><tr><td>r3</td></tr></table>`+
+		`</body></html>`, s)
 	doc := pdf.NewDocument()
 
 	if err := Paint(doc, res, paintOpts()); err != nil {
@@ -1262,7 +1319,8 @@ func TestPageBreakBeforeStacked(t *testing.T) {
 	}
 }
 
-func TestPageBreakAfterAvoidKeepsSpacing(t *testing.T) {
+func TestPageBreakAfterAvoidKeepsSpacing(t *testing.T) { //nolint:cyclop
+	t.Parallel()
 	// page-break-after:avoid must not pull the following box up onto the
 	// preceding paragraph's baseline when both already fit on the same page
 	// (fixture-08 Forms index overlapped the summary paragraph).
@@ -1273,9 +1331,10 @@ p { margin: 0 0 8px 0 }
 .keep { page-break-inside: avoid; border: 1px solid #000; padding: 8px; background-color: #eeeeee }
 `)
 	res := layoutHTML(t, `<html><body>
-<p class="after-avoid">All forms are available from the document server under /operations/forms. Paper copies are stored in the archive room, shelf D, binders 14 to 21.</p>
-<div class="keep"><p><strong>Forms index</strong> - FM-101 shift book.</p></div>
-</body></html>`, cssSheet)
+<p class="after-avoid">All forms are available from the document server under /operations/forms. `+
+		`Paper copies are stored in the archive room, shelf D, binders 14 to 21.</p>`+
+		`<div class="keep"><p><strong>Forms index</strong> - FM-101 shift book.</p></div>`+
+		`</body></html>`, cssSheet)
 	doc := pdf.NewDocument()
 
 	if err := Paint(doc, res, paintOpts()); err != nil {

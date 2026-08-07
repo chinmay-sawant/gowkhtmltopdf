@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -13,6 +14,7 @@ import (
 // list (paint tries the author's stack order).
 func TestCSSVarFontSizeMedium(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 :root {
   --font-size-small: 0.875rem;
@@ -54,6 +56,7 @@ func TestCSSVarFontSizeMedium(t *testing.T) {
 // definition or CSS fallback does not invent 8pt — font-size stays UA/inherited.
 func TestCSSVarFontSizeMediumUnresolved(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 .vector-body { font-size: var(--font-size-medium); }
 `)

@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -10,7 +11,9 @@ import (
 
 // TestNowrapSpanWrapsBesideFloat: white-space:nowrap must not glue a long span
 // onto a shortened line and paint over a right float (wiki .IPA beside infobox).
-func TestNowrapSpanWrapsBesideFloat(t *testing.T) {
+func TestNowrapSpanWrapsBesideFloat(t *testing.T) { //nolint:cyclop,funlen
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 body { margin: 0; font-size: 11pt; }
 .infobox { float: right; clear: right; width: 160pt; background: #eee; }
@@ -41,7 +44,7 @@ is a Cuban-born actress holding citizenship.</p>
 		t.Fatal(err)
 	}
 
-	var floatLeft float64 = pageW
+	var floatLeft = pageW
 
 	for _, op := range res.Ops {
 		if op.Kind == OpText && strings.HasPrefix(strings.TrimSpace(op.Text), "Portrait") {

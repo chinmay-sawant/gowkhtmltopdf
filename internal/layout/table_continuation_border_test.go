@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -14,7 +15,8 @@ import (
 // Multi-page border-collapse table with rowspan: the first body row on a
 // continuation page (under repeated thead) must form a closed outer strip —
 // full-width top edge across all columns, including Year/Org rowspan holes.
-func TestRowspanContinuationPageClosedOuterBorders(t *testing.T) {
+func TestRowspanContinuationPageClosedOuterBorders(t *testing.T) { //nolint:gocognit,gocyclo,cyclop,funlen,maintidx
+	t.Parallel()
 	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 table { border-collapse: collapse; width: 400pt; }
@@ -83,8 +85,6 @@ td, th { border: 1px solid #333; padding: 3pt; }
 
 	type pageInfo struct {
 		hasCombo, has2024 bool
-		bodyTop           float64
-		hasBodyTop        bool
 	}
 
 	pages := map[int]*pageInfo{}

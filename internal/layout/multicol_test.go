@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -8,7 +9,9 @@ import (
 	"gowkhtmltopdf/internal/html"
 )
 
-func TestMulticolParseProps(t *testing.T) {
+func TestMulticolParseProps(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 .a { column-count: 3; column-gap: 12pt; column-fill: auto }
 .b { columns: 100pt 2; column-span: all; column-fill: balance }
@@ -47,7 +50,8 @@ func TestMulticolParseProps(t *testing.T) {
 	}
 
 	b := styles[nodes[1]]
-	if b.ColumnCount != 2 || b.ColumnWidth < 99 || b.ColumnWidth > 101 || b.ColumnSpan != "all" || b.ColumnFill != "balance" {
+	if b.ColumnCount != 2 || b.ColumnWidth < 99 || b.ColumnWidth > 101 ||
+		b.ColumnSpan != "all" || b.ColumnFill != "balance" {
 		t.Fatalf("b: count=%d width=%.1f span=%q fill=%q", b.ColumnCount, b.ColumnWidth, b.ColumnSpan, b.ColumnFill)
 	}
 
@@ -70,6 +74,7 @@ func TestMulticolParseProps(t *testing.T) {
 
 func TestUsedColumnCountWidth(t *testing.T) {
 	t.Parallel()
+
 	nodeN, width := usedColumnCountWidth(200, 10, -1, 2)
 	if nodeN != 2 || math.Abs(width-95) > 0.01 {
 		t.Fatalf("count-only: n=%d w=%.2f want 2 / 95", nodeN, width)
@@ -88,6 +93,7 @@ func TestUsedColumnCountWidth(t *testing.T) {
 
 func TestMulticolTwoColumnEqualWidths(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 .mc {
   column-count: 2;
@@ -132,13 +138,18 @@ func TestMulticolTwoColumnEqualWidths(t *testing.T) {
 	}
 }
 
-func TestMulticolColumnSpanAll(t *testing.T) {
-	s := sheet(t, `
+func TestMulticolColumnSpanAll(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
+	cssSheet := sheet(t, `
 .mc { column-count: 2; column-gap: 10pt; width: 210pt; column-fill: balance }
 .mc p { margin: 0 0 2pt 0; font-size: 9pt }
 .mc h2 { column-span: all; font-size: 12pt; margin: 4pt 0 }
 `)
-	res := layoutHTML(t, "<html><body>\n<div class=\"mc\">\n  <p>Before span AAA AAA.</p>\n  <p>Before span BBB BBB.</p>\n  <h2>Spanner Heading</h2>\n  <p>After span CCC CCC.</p>\n  <p>After span DDD DDD.</p>\n</div>\n</body></html>", s)
+	res := layoutHTML(t,
+		"<html><body>\n<div class=\"mc\">\n  <p>Before span AAA AAA.</p>\n  <p>Before span BBB BBB.</p>\n"+
+			"  <h2>Spanner Heading</h2>\n  <p>After span CCC CCC.</p>"+
+			"  <p>After span DDD DDD.</p>\n</div>\n</body></html>", cssSheet)
 
 	var spanX, beforeX, afterX float64
 
@@ -176,6 +187,7 @@ func TestMulticolColumnSpanAll(t *testing.T) {
 
 func TestMulticolLinesDoNotStraddlePages(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 body { margin: 0 }
 .mc { column-count: 2; column-gap: 8pt; width: 200pt; column-fill: balance; font-size: 10pt }
@@ -199,7 +211,9 @@ body { margin: 0 }
 </body></html>`)
 	pageH := 120.0
 
-	res, err := Layout(root, Options{Width: 220, Height: pageH, Sheets: []*css.Stylesheet{cssSheet}, Background: true}) //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 220, Height: pageH, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

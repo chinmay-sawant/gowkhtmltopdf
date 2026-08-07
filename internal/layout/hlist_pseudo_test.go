@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -8,6 +9,7 @@ import (
 // Wiki .hlist uses li::after{content:"\a0 · "} between citizenship entries.
 func TestHListAfterSeparator(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 .hlist li { display: inline; margin: 0; }

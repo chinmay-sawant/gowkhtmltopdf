@@ -157,8 +157,8 @@ func cloneImageMap(src map[string]*imageResource) map[string]*imageResource {
 			continue
 		}
 
-		copy := *res
-		dst[name] = &copy
+		cloned := *res
+		dst[name] = &cloned
 	}
 
 	return dst
@@ -295,26 +295,39 @@ func (c *Content) TextRenderMode(mode int) {
 	c.buf.WriteString(strconv.Itoa(mode) + " Tr\n")
 }
 
+// textRun is one contiguous simple-or-Type0 segment of a shown string.
+type textRun struct {
+	s     string
+	type0 bool
+}
+
 // TextShow draws a string in the current font, recording its runes for the
 // subsetter. Mixed CJK+Latin is split: Unicode glyphs the face provides go
 // through Type0; Latin that the face lacks (typical for CJK fallback fonts)
 // is drawn with an embedded Liberation fallback so ASCII does not become tofu.
-func (c *Content) TextShow(s string) {
+func (c *Content) TextShow(text string) {
 	fnt := c.fontFiles[c.curFont]
-	s = ShapeRun(s, fnt, c.curSize).Text
+	text = ShapeRun(text, fnt, c.curSize).Text
 
-	if fnt == nil || !c.textNeedsType0(s) {
-		c.textShowSimple(s)
+	if fnt == nil || !c.textNeedsType0(text) {
+		c.textShowSimple(text)
 
 		return
 	}
 
-	type run struct {
-		s     string
-		type0 bool
-	}
+	c.emitTextRuns(splitType0Runs(text, fnt))
 
-	var runs []run
+	base := strings.TrimSuffix(c.curFont, "_u")
+	if c.curFont != base {
+		c.SetFont(base, c.curSize)
+	}
+}
+
+// splitType0Runs breaks s into simple vs Type0 segments: codes above
+// Latin-1 take the Type0 path, missing Latin glyphs on a CJK face fall back
+// to the Liberation face.
+func splitType0Runs(text string, fnt *Font) []textRun {
+	var runs []textRun
 
 	var buf strings.Builder
 
@@ -324,11 +337,11 @@ func (c *Content) TextShow(s string) {
 			return
 		}
 
-		runs = append(runs, run{s: buf.String(), type0: mode == 1})
+		runs = append(runs, textRun{s: buf.String(), type0: mode == 1})
 		buf.Reset()
 	}
 
-	for _, rVal := range s {
+	for _, rVal := range text {
 		has := fnt.GlyphID(rVal) != 0
 
 		next := 0
@@ -350,8 +363,14 @@ func (c *Content) TextShow(s string) {
 	}
 
 	flush()
-	// Keep the caller's face as the Type0 source. Latin fallback may switch
-	// curFont to FL; Type0 must still subset the original Unicode face, not FL_u.
+
+	return runs
+}
+
+// emitTextRuns paints each run, keeping the caller's face as the Type0
+// source. Latin fallback may switch curFont to FL; Type0 must still subset
+// the original Unicode face, not FL_u.
+func (c *Content) emitTextRuns(runs []textRun) {
 	base := strings.TrimSuffix(c.curFont, "_u")
 	size := c.curSize
 
@@ -366,17 +385,7 @@ func (c *Content) TextShow(s string) {
 			continue
 		}
 
-		name := base
-
-		if face := c.fontFiles[base]; face != nil {
-			for _, r := range runVal.s {
-				if face.GlyphID(r) == 0 {
-					name = c.ensureLatinFallback()
-
-					break
-				}
-			}
-		}
+		name := c.runFallbackFont(base, runVal.s)
 
 		if c.curFont != name {
 			c.SetFont(name, size)
@@ -384,10 +393,20 @@ func (c *Content) TextShow(s string) {
 
 		c.textShowSimple(runVal.s)
 	}
+}
 
-	if c.curFont != base {
-		c.SetFont(base, size)
+// runFallbackFont picks the Liberation fallback when the base face lacks a
+// glyph in the run.
+func (c *Content) runFallbackFont(base, s string) string {
+	if face := c.fontFiles[base]; face != nil {
+		for _, r := range s {
+			if face.GlyphID(r) == 0 {
+				return c.ensureLatinFallback()
+			}
+		}
 	}
+
+	return base
 }
 
 func (c *Content) ensureLatinFallback() string {

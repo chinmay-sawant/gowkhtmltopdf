@@ -26,6 +26,12 @@ type ResourceContext struct {
 	Load   settings.LoadPage
 }
 
+// errNoResourceLoader reports a ResourceContext without a bound loader.
+var errNoResourceLoader = errors.New("convert: resource context has no loader")
+
+// errNilLoader reports a nil loader at the document-prep boundary.
+var errNilLoader = errors.New("convert: nil loader")
+
 // NewResourceContext creates the resource seam shared by PDF and image
 // preparation. The loader owns global ACL/network policy; Load carries the
 // per-document credentials, headers, cookies and error policy.
@@ -35,22 +41,27 @@ func NewResourceContext(loader *load.Loader, base string, lp settings.LoadPage) 
 
 // Fetch resolves and loads a document-relative subresource using the bound
 // base URL and load policy.
-func (r ResourceContext) Fetch(ctx context.Context, ref string) (*load.Resource, error) {
+func (r ResourceContext) Fetch(ctx context.Context, ref string) (*load.Resource, error) { //nolint:contextcheck,lll // nil-ctx guard falls back to a fresh context
 	if r.Loader == nil {
-		return nil, errors.New("convert: resource context has no loader")
+		return nil, errNoResourceLoader
 	}
 
 	if ctx == nil {
 		ctx = context.Background()
 	}
 
-	return r.Loader.FetchSub(ctx, r.Base, ref, r.Load)
+	res, err := r.Loader.FetchSub(ctx, r.Base, ref, r.Load)
+	if err != nil {
+		return nil, fmt.Errorf("fetch %q: %w", ref, err)
+	}
+
+	return res, nil
 }
 
 // CollectSheets gathers stylesheets through this document's resource policy.
 // The implementation remains CollectSheets so existing callers and the
 // fix-contract's shared gatherer stay compatible.
-func (r ResourceContext) CollectSheets(ctx context.Context, root *html.Node, opts SheetOptions, log io.Writer) []*css.Stylesheet {
+func (r ResourceContext) CollectSheets(ctx context.Context, root *html.Node, opts SheetOptions, log io.Writer) []*css.Stylesheet { //nolint:lll // resource seam signature
 	if r.Loader == nil {
 		return nil
 	}
@@ -59,7 +70,7 @@ func (r ResourceContext) CollectSheets(ctx context.Context, root *html.Node, opt
 }
 
 // MergeFontFaces loads @font-face resources through this document's policy.
-func (r ResourceContext) MergeFontFaces(ctx context.Context, registry *pdf.Registry, sheets []*css.Stylesheet, idx int, log io.Writer) *pdf.Registry {
+func (r ResourceContext) MergeFontFaces(ctx context.Context, registry *pdf.Registry, sheets []*css.Stylesheet, idx int, log io.Writer) *pdf.Registry { //nolint:lll // resource seam signature
 	if r.Loader == nil {
 		return registry
 	}
@@ -95,23 +106,23 @@ type PreparedDocument struct {
 // Root and no error so the caller can apply its mode-specific skip policy.
 // All subresources are bound to one ResourceContext before any CSS or font
 // work begins.
-func PrepareDocument(ctx context.Context, loader *load.Loader, page string, lp settings.LoadPage, registry *pdf.Registry, opts PrepareOptions, log io.Writer) (*PreparedDocument, error) {
+func PrepareDocument(ctx context.Context, loader *load.Loader, page string, loadPage settings.LoadPage, registry *pdf.Registry, opts PrepareOptions, log io.Writer) (*PreparedDocument, error) { //nolint:contextcheck,lll // nil-ctx guard falls back to a fresh context
 	if loader == nil {
-		return nil, errors.New("convert: nil loader")
+		return nil, errNilLoader
 	}
 
 	if ctx == nil {
 		ctx = context.Background()
 	}
 
-	res, err := loader.Load(ctx, page, lp)
+	res, err := loader.Load(ctx, page, loadPage)
 	if err != nil {
 		return nil, fmt.Errorf("load %q: %w", page, err)
 	}
 
 	prep := &PreparedDocument{ //nolint:exhaustruct // intentional zero-value fields
 		Resource:  res,
-		Resources: NewResourceContext(loader, res.Base, lp),
+		Resources: NewResourceContext(loader, res.Base, loadPage),
 		Registry:  registry,
 	}
 	if res.Skip {

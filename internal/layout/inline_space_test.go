@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -12,6 +13,7 @@ import (
 // keep that space after collapseWS/Fields (wiki "Reeves in", "Cuba Spain").
 func TestLeadingSpaceBetweenInlines(t *testing.T) {
 	t.Parallel()
+
 	s := sheet(t, `body { margin: 0; font-size: 10pt; } a { color: blue; }`)
 	res := layoutHTML(t, `<html><body>
 <p><a href="/w">Reeves</a> in her first film. <a href="/c">Cuba</a> <a href="/s">Spain</a></p>
@@ -42,7 +44,9 @@ func TestLeadingSpaceBetweenInlines(t *testing.T) {
 // already snapped to the next page (wiki Career subsection page-2 overlap).
 // The overlapping text is often a PRIOR paragraph's continuation, not the
 // heading's following sibling — so clearance must clear the whole page-top band.
-func TestPageBreakAfterAvoidNoOverwrite(t *testing.T) {
+func TestPageBreakAfterAvoidNoOverwrite(t *testing.T) { //nolint:cyclop,funlen
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 h3 { font-size: 12pt; margin: 8pt 0 4pt; page-break-after: avoid; }
@@ -51,7 +55,8 @@ p { margin: 0 0 6pt 0; }
 
 	var paras strings.Builder
 	for range 40 {
-		paras.WriteString(`<p>Line of career body text that fills the page so the next heading is forced across a boundary with following copy.</p>`)
+		paras.WriteString(`<p>Line of career body text that fills the page so the next heading is forced ` +
+			`across a boundary with following copy.</p>`)
 	}
 
 	src := `<html><body>` + paras.String() + `
@@ -65,6 +70,7 @@ p { margin: 0 0 6pt 0; }
 	}
 
 	const pageH = 400.0
+
 	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
 		Width: 400, Height: pageH, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
 	})

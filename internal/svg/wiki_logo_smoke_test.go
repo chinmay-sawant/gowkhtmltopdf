@@ -1,4 +1,4 @@
-package svg
+package svg_test
 
 import (
 	"bytes"
@@ -6,6 +6,8 @@ import (
 	"image/png"
 	"os"
 	"testing"
+
+	"gowkhtmltopdf/internal/svg"
 )
 
 func TestRasterizeWikiWordmark(t *testing.T) {
@@ -25,7 +27,7 @@ func TestRasterizeWikiWordmark(t *testing.T) {
 			continue
 		}
 
-		pngBytes, width, height, err := Rasterize(data, 512)
+		pngBytes, width, height, err := svg.Rasterize(data, 512)
 		if err != nil {
 			t.Errorf("%s: %v", path, err)
 
@@ -66,7 +68,7 @@ func TestRasterizeArcPath(t *testing.T) {
 <path fill="#0e65c0" d="M10 50 a40 40 0 1 1 80 0 a40 40 0 1 1 -80 0"/>
 </svg>`)
 
-	pngBytes, width, height, err := Rasterize(src, 128)
+	pngBytes, width, height, err := svg.Rasterize(src, 128)
 	if err != nil {
 		t.Fatal(err)
 	}

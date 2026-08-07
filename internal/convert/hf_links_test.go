@@ -1,4 +1,4 @@
-package convert
+package convert //nolint:testpackage // white-box tests need unexported access
 
 import (
 	"bytes"
@@ -28,7 +28,7 @@ func writeHFLinkHeader(t *testing.T, dir, href string) string {
 	path := filepath.Join(dir, "header.html")
 	html := `<html><body><a href="` + href + `">Jump</a></body></html>`
 
-	if err := os.WriteFile(path, []byte(html), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(html), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -49,9 +49,10 @@ func pageKidsRefs(data []byte) []int {
 		return nil
 	}
 
-	var out []int
+	matches := pageObjRefRe.FindAllSubmatch(mVal[1], -1)
+	out := make([]int, 0, len(matches))
 
-	for _, ref := range pageObjRefRe.FindAllSubmatch(mVal[1], -1) {
+	for _, ref := range matches {
 		n, _ := strconv.Atoi(string(ref[1]))
 		out = append(out, n)
 	}
@@ -60,9 +61,10 @@ func pageKidsRefs(data []byte) []int {
 }
 
 func destPageRefs(data []byte) []int {
-	var out []int
+	matches := destPageRefRe.FindAllSubmatch(data, -1)
+	out := make([]int, 0, len(matches))
 
-	for _, m := range destPageRefRe.FindAllSubmatch(data, -1) {
+	for _, m := range matches {
 		n, _ := strconv.Atoi(string(m[1]))
 		out = append(out, n)
 	}
@@ -222,7 +224,7 @@ func TestHTMLHeaderFontFaceLocal(t *testing.T) {
 body { font-family: Custom, sans-serif; font-size: 12pt; }
 </style></head><body><p>HFCustomFace</p></body></html>`
 
-	if err := os.WriteFile(headerPath, []byte(hdr), 0o644); err != nil {
+	if err := os.WriteFile(headerPath, []byte(hdr), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -258,7 +260,7 @@ func TestHTMLHeaderFlexImage(t *testing.T) {
 		0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
 	}
 
-	if err := os.WriteFile(pngPath, png, 0o644); err != nil {
+	if err := os.WriteFile(pngPath, png, 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -271,7 +273,7 @@ img { width: 12pt; height: 12pt; }
 <p><a href="#target">Go</a></p>
 </body></html>`
 
-	if err := os.WriteFile(headerPath, []byte(hdr), 0o644); err != nil {
+	if err := os.WriteFile(headerPath, []byte(hdr), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -306,7 +308,7 @@ func TestHTMLHeaderTallContentClipped(t *testing.T) {
 
 	buf.WriteString(`</body></html>`)
 
-	if err := os.WriteFile(headerPath, []byte(buf.String()), 0o644); err != nil {
+	if err := os.WriteFile(headerPath, []byte(buf.String()), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -332,7 +334,7 @@ func TestHTMLHeaderPlaceholdersCopies(t *testing.T) {
 	headerPath := filepath.Join(dir, "header.html")
 	hdr := `<html><body><p>P[page]/[topage]</p></body></html>`
 
-	if err := os.WriteFile(headerPath, []byte(hdr), 0o644); err != nil {
+	if err := os.WriteFile(headerPath, []byte(hdr), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -361,23 +363,23 @@ func TestHTMLHeaderPlaceholdersCopies(t *testing.T) {
 func TestRemapPageForCopies(t *testing.T) {
 	t.Parallel()
 	// collate: [0,1, 0',1'] with logicalN=2, copies=2
-	if got := remapPageForCopies(1, 0, 2, 2, true); got != 1 {
+	if got := remapPageForCopies(0, 2, true); got != 1 {
 		t.Errorf("collate src0→dest1 = %d, want 1", got)
 	}
 
-	if got := remapPageForCopies(1, 2, 2, 2, true); got != 3 {
+	if got := remapPageForCopies(2, 2, true); got != 3 {
 		t.Errorf("collate src2→dest1' = %d, want 3", got)
 	}
 	// non-collate: [0,0', 1,1']
-	if got := remapPageForCopies(1, 0, 2, 2, false); got != 2 {
+	if got := remapPageForCopies(0, 2, false); got != 2 {
 		t.Errorf("non-collate src0→dest1 = %d, want 2", got)
 	}
 
-	if got := remapPageForCopies(1, 1, 2, 2, false); got != 3 {
+	if got := remapPageForCopies(1, 2, false); got != 3 {
 		t.Errorf("non-collate src1→dest1' = %d, want 3", got)
 	}
 
-	if got := remapPageForCopies(1, 0, 2, 1, true); got != 1 {
+	if got := remapPageForCopies(0, 1, true); got != 1 {
 		t.Errorf("copies=1 passthrough = %d, want 1", got)
 	}
 }

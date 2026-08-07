@@ -1,4 +1,4 @@
-package convert
+package convert //nolint:testpackage // white-box tests need unexported access
 
 import (
 	"bytes"
@@ -40,16 +40,23 @@ func TestRunRequiresDedicatedOutlineSink(t *testing.T) {
 
 type failingWriter struct{}
 
+var errSinkFailed = errors.New("sink failed")
+
 func (failingWriter) Write([]byte) (int, error) {
-	return 0, errors.New("sink failed")
+	return 0, errSinkFailed
 }
 
 func TestRunPropagatesDocumentWriterError(t *testing.T) {
 	t.Parallel()
 
-	req := NewPDFRequest(settings.DefaultPdfGlobal(), []settings.PdfObject{{ //nolint:exhaustruct // intentional zero-value fields
-		Page: "inline:<html><body><p>writer failure</p></body></html>",
-	}}, failingWriter{}, &bytes.Buffer{})
+	req := NewPDFRequest(
+		settings.DefaultPdfGlobal(),
+		[]settings.PdfObject{{ //nolint:exhaustruct // intentional zero-value fields
+			Page: "inline:<html><body><p>writer failure</p></body></html>",
+		}},
+		failingWriter{},
+		&bytes.Buffer{},
+	)
 
 	err := Run(t.Context(), req, io.Discard, nil)
 	if err == nil || !strings.Contains(err.Error(), "write output") {
@@ -82,7 +89,7 @@ func TestModeSpecificRequestConstructors(t *testing.T) {
 	}
 }
 
-func TestPrepareDocumentBindsSharedResourceContext(t *testing.T) {
+func TestPrepareDocumentBindsSharedResourceContext(t *testing.T) { //nolint:cyclop // seam binding checks many fields
 	t.Parallel()
 
 	lineP := settings.DefaultLoadPage()
@@ -90,7 +97,7 @@ func TestPrepareDocumentBindsSharedResourceContext(t *testing.T) {
 	lineP.InlineBase = "https://example.test/reports/"
 	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero-value fields
 
-	prep, err := PrepareDocument(t.Context(), loader, "ignored", lineP, nil, PrepareOptions{ //nolint:exhaustruct // intentional zero-value fields
+	prep, err := PrepareDocument(t.Context(), loader, "ignored", lineP, nil, PrepareOptions{ //nolint:exhaustruct,lll // intentional zero-value fields
 		ViewportW:   500,
 		ViewportH:   700,
 		MediaType:   mediaPrint,
@@ -104,7 +111,9 @@ func TestPrepareDocumentBindsSharedResourceContext(t *testing.T) {
 		t.Fatal("preparation did not return the document")
 	}
 
-	if prep.Resources.Loader != loader || prep.Resources.Base != lineP.InlineBase || !reflect.DeepEqual(prep.Resources.Load, lineP) {
+	if prep.Resources.Loader != loader ||
+		prep.Resources.Base != lineP.InlineBase ||
+		!reflect.DeepEqual(prep.Resources.Load, lineP) {
 		t.Fatalf("resource context = %+v, want loader/base/load binding", prep.Resources)
 	}
 
@@ -135,7 +144,10 @@ func TestPrepareDocumentPreservesSkipForCallerPolicy(t *testing.T) {
 	lp := settings.DefaultLoadPage()
 	lp.LoadErrorHandling = settings.LoadErrorSkip
 
-	prep, err := PrepareDocument(t.Context(), loader, srv.URL, lp, nil, PrepareOptions{}, io.Discard) //nolint:exhaustruct // intentional zero-value fields
+	prep, err := PrepareDocument(
+		t.Context(), loader, srv.URL, lp, nil, PrepareOptions{}, //nolint:exhaustruct // intentional zero-value fields
+		io.Discard,
+	)
 	if err != nil {
 		t.Fatalf("PrepareDocument: %v", err)
 	}

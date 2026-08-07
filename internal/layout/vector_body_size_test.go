@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -10,6 +11,7 @@ import (
 // TestVectorBodyPrintSize: clientpref-1 circular token falls back to 1rem (12pt).
 func TestVectorBodyPrintSize(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 html.vector-feature-custom-font-size-clientpref-1 {
   --font-size-medium: var(--font-size-medium, 1rem);
@@ -21,7 +23,8 @@ html.vector-feature-custom-font-size-clientpref-1 {
 p { margin: 0; }
 `)
 
-	root, err := html.Parse(`<html class="vector-feature-custom-font-size-clientpref-1"><body><div class="vector-body"><p>Hello world article text</p></div></body></html>`)
+	root, err := html.Parse(`<html class="vector-feature-custom-font-size-clientpref-1">` +
+		`<body><div class="vector-body"><p>Hello world article text</p></div></body></html>`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,6 +50,7 @@ p { margin: 0; }
 // --zoom 2/3 yields ~8pt paint size (recipe policy, not cascade invention).
 func TestPrintZoomDensifies12ptTo8(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 p { font-size: 12pt; margin: 0; font-family: Georgia, serif; font-weight: normal; }
 `)

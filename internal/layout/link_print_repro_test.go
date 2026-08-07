@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -10,7 +11,9 @@ import (
 
 // TestPrintLinkInheritHonorsCascade: text-decoration:inherit on links must
 // not invent underlines (CSS-faithful default).
-func TestPrintLinkInheritHonorsCascade(t *testing.T) {
+func TestPrintLinkInheritHonorsCascade(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 body { color: #000000; }
 @media print {
@@ -70,6 +73,7 @@ a { text-decoration: none; color: #36c }
 // TestPrintLinkUnderlineOptIn: --print-link-underline forces underlines after cascade.
 func TestPrintLinkUnderlineOptIn(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 body { color: #000000; }
 @media print {
@@ -82,6 +86,7 @@ a { text-decoration: none; color: #36c }
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
 		Width: 500, Height: 800, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true, PrintLinkUnderline: true,

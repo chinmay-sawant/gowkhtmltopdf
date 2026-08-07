@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -9,7 +10,9 @@ import (
 )
 
 // Wordmark and tagline must stack vertically (display:block), not sit on one row.
-func TestWikiLogoWordmarkAboveTagline(t *testing.T) {
+func TestWikiLogoWordmarkAboveTagline(t *testing.T) { //nolint:cyclop,funlen
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 @media all {
 .mw-logo { display: flex; height: 100%; align-items: center; }
@@ -38,7 +41,8 @@ func TestWikiLogoWordmarkAboveTagline(t *testing.T) {
 <a class="mw-logo" href="/">
 <img class="mw-logo-icon" width="50" height="50" src="icon.png">
 <span class="mw-logo-container">
-<img class="mw-logo-wordmark" alt="Wikipedia" src="word.png" width="140" height="22" style="width: 8.75em; height: 1.375em;">
+<img class="mw-logo-wordmark" alt="Wikipedia" src="word.png" width="140" height="22" ` +
+		`style="width: 8.75em; height: 1.375em;">
 <img class="mw-logo-tagline" alt="tag" src="tag.png" width="140" height="11" style="width: 8.75em; height: 0.6875em;">
 </span>
 </a>

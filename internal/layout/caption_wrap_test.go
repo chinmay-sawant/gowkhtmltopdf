@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -9,7 +10,9 @@ import (
 
 // Narrow figcaptions must wrap at spaces, not mid-word, when each word fits
 // the caption box (emergency mid-word only if a single token exceeds width).
-func TestCaptionPrefersWordBoundaries(t *testing.T) {
+func TestCaptionPrefersWordBoundaries(t *testing.T) { //nolint:cyclop,funlen
+	t.Parallel()
+
 	png := []byte{
 		0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
 		0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
@@ -18,6 +21,7 @@ func TestCaptionPrefersWordBoundaries(t *testing.T) {
 		0x00, 0x00, 0x03, 0x00, 0x01, 0x00, 0x05, 0xfe, 0xd4, 0xef, 0x00, 0x00,
 		0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
 	}
+
 	cssSheet := sheet(t, `
 body { margin: 0; font-size: 9pt; }
 figure { float: right; width: 120pt; margin: 0; }
@@ -25,11 +29,11 @@ img { display: block; width: 120pt; height: 80pt; }
 figcaption { font-size: 8pt; width: 120pt; }
 `)
 	// Words that each fit ~120pt at 8–9pt but together need multiple lines.
-	cap := "De Armas at the San Sebastian International Film Festival in 2022"
+	caption := "De Armas at the San Sebastian International Film Festival in 2022"
 	root := mustParse(t, `<html><body>
 <figure>
 <img width="120" height="80" src="t.png">
-<figcaption>`+cap+`</figcaption>
+<figcaption>`+caption+`</figcaption>
 </figure>
 <p>Body text beside the float.</p>
 </body></html>`)
@@ -63,7 +67,7 @@ figcaption { font-size: 8pt; width: 120pt; }
 	}
 
 	joined := strings.Join(texts, "")
-	if !strings.Contains(joined, "International") && !strings.Contains(joined, "International") {
+	if !strings.Contains(joined, "International") {
 		// Allow soft line break that keeps the word intact across ops only if
 		// whole "International" appears concatenated.
 		t.Fatalf("caption missing International: %v", texts)
@@ -99,14 +103,17 @@ figcaption { font-size: 8pt; width: 120pt; }
 
 // overflow-wrap:break-word must not mid-break a word that fits the full line
 // width just because remaining space on the current line is tight.
-func TestBreakWordDoesNotMidBreakFittingWord(t *testing.T) {
+func TestBreakWordDoesNotMidBreakFittingWord(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 body { margin: 0; font-size: 12pt; }
 p { margin: 0; width: 140pt; overflow-wrap: break-word; }
 `)
 	// "International" fits 140pt; after "The " remainW is tight enough that a
 	// greedy mid-break would split it — we must wrap the whole word.
-	res := layoutHTML(t, `<html><body><p style="overflow-wrap:break-word">The International festival</p></body></html>`, cssSheet)
+	res := layoutHTML(t,
+		`<html><body><p style="overflow-wrap:break-word">The International festival</p></body></html>`, cssSheet)
 
 	var texts []string
 

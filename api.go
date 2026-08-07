@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	"gowkhtmltopdf/internal/convert"
@@ -18,6 +19,13 @@ import (
 // LibraryVersion is the wkhtmltopdf release this library tracks; upstream
 // 0.12.x compatibility surface.
 const LibraryVersion = "0.12.7-dev"
+
+// Static conversion errors; callers can match with errors.Is.
+var (
+	errNoPageObjectsAdded = errors.New("gowkhtmltopdf: no page objects added")
+	errEmptyHTML          = errors.New("gowkhtmltopdf: empty HTML")
+	errNoInputPageAdded   = errors.New("gowkhtmltopdf: no input page added")
+)
 
 // Version returns the library version banner.
 func Version() string {
@@ -45,7 +53,11 @@ func NewGlobalSettings() *GlobalSettings {
 // "orientation", "web.background", "load.timeout", …). Unknown names return
 // an error.
 func (s *GlobalSettings) Set(name, value string) error {
-	return s.g.Set(name, value)
+	if err := s.g.Set(name, value); err != nil {
+		return fmt.Errorf("global set %q: %w", name, err)
+	}
+
+	return nil
 }
 
 // Get reads a dotted settings key back as its canonical string form via the
@@ -76,7 +88,11 @@ func NewObjectSettings() *ObjectSettings {
 // "web.images", "header.left", "footer.right", …). Unknown names return an
 // error.
 func (s *ObjectSettings) Set(name, value string) error {
-	return s.o.Set(name, value)
+	if err := s.o.Set(name, value); err != nil {
+		return fmt.Errorf("object set %q: %w", name, err)
+	}
+
+	return nil
 }
 
 // Get reads a dotted object settings key via the same key table as Set.
@@ -228,7 +244,7 @@ func (c *Converter) AddHTML(page []byte, baseURL string) *Converter {
 // writer (no temp file).
 func (c *Converter) Convert(ctx context.Context) error {
 	if len(c.objects) == 0 {
-		return errors.New("gowkhtmltopdf: no page objects added")
+		return errNoPageObjectsAdded
 	}
 
 	objects := make([]settings.PdfObject, len(c.objects))
@@ -263,13 +279,15 @@ func (c *Converter) Output() []byte {
 // PDF bytes without creating a temp input file. global may be nil (defaults
 // apply). Local file / subresource ACL is unchanged — linked local assets
 // still need enablelocalfileaccess + load.blocklocalfileaccess=false.
+//
+//nolint:contextcheck // defensive nil-context contract
 func ConvertHTML(ctx context.Context, html []byte, global *GlobalSettings) ([]byte, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 
 	if len(html) == 0 {
-		return nil, errors.New("gowkhtmltopdf: empty HTML")
+		return nil, errEmptyHTML
 	}
 
 	conv := NewConverter()
@@ -324,7 +342,11 @@ func NewImageConverter() *ImageConverter {
 // an error. "web.background" also updates the shared Global.Background paint
 // switch so image and PDF share one background field.
 func (c *ImageConverter) Set(name, value string) error {
-	return settings.ApplyImageKey(&c.global.g, &c.image, name, value)
+	if err := settings.ApplyImageKey(&c.global.g, &c.image, name, value); err != nil {
+		return fmt.Errorf("image set %q: %w", name, err)
+	}
+
+	return nil
 }
 
 // Global returns the shared global settings (only "enablelocalfileaccess"
@@ -360,7 +382,7 @@ func (c *ImageConverter) Object() *ObjectSettings {
 // Object().SetBody (P2-04 InlineHTML source kind).
 func (c *ImageConverter) Convert(ctx context.Context) error {
 	if strings.TrimSpace(c.object.o.Page) == "" && len(c.object.o.Load.InlineHTML) == 0 {
-		return errors.New("gowkhtmltopdf: no input page added")
+		return errNoInputPageAdded
 	}
 
 	img := c.image
@@ -425,6 +447,8 @@ func (h convertHooks) progress() func(string, int) {
 
 // executePDF runs the PDF pipeline into an in-memory buffer and reports
 // failures to OnError.
+//
+//nolint:contextcheck // defensive nil-context contract
 func (h convertHooks) executePDF(ctx context.Context, req *convert.Request) ([]byte, error) {
 	if ctx == nil {
 		ctx = context.Background()
@@ -438,7 +462,7 @@ func (h convertHooks) executePDF(ctx context.Context, req *convert.Request) ([]b
 			h.OnError(err.Error())
 		}
 
-		return nil, err
+		return nil, fmt.Errorf("convert: %w", err)
 	}
 
 	return buf.Bytes(), nil
@@ -446,6 +470,8 @@ func (h convertHooks) executePDF(ctx context.Context, req *convert.Request) ([]b
 
 // executeImage runs the image pipeline into an in-memory buffer and reports
 // failures to OnError.
+//
+//nolint:contextcheck // defensive nil-context contract
 func (h convertHooks) executeImage(ctx context.Context, req *convert.Request) ([]byte, error) {
 	if ctx == nil {
 		ctx = context.Background()
@@ -459,7 +485,7 @@ func (h convertHooks) executeImage(ctx context.Context, req *convert.Request) ([
 			h.OnError(err.Error())
 		}
 
-		return nil, err
+		return nil, fmt.Errorf("image convert: %w", err)
 	}
 
 	return buf.Bytes(), nil
@@ -507,7 +533,7 @@ func (w *lineLog) Write(payload []byte) (int, error) {
 			if w.onError != nil {
 				w.onError(logLine)
 			}
-		default:
+		case line.Info:
 			if w.onInfo != nil {
 				w.onInfo(logLine)
 			}

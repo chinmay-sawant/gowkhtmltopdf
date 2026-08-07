@@ -25,33 +25,26 @@ func (e *engine) tagSticky(b *box) {
 	b.sticky = true
 	e.stickySeq++
 	b.stickyID = e.stickySeq
-	sty := b.style
 
-	if !sty.TopAuto {
-		b.stickyTopSet = true
-		b.stickyTop = e.scalePt(sty.Top)
-	}
-
-	if !sty.RightAuto {
-		b.stickyRightSet = true
-		b.stickyRight = e.scalePt(sty.Right)
-	}
-
-	if !sty.BottomAuto {
-		b.stickyBottomSet = true
-		b.stickyBottom = e.scalePt(sty.Bottom)
-	}
-
-	if !sty.LeftAuto {
-		b.stickyLeftSet = true
-		b.stickyLeft = e.scalePt(sty.Left)
-	}
+	b.stickyTopSet, b.stickyTop = stickyInset(e, b.style.TopAuto, b.style.Top)
+	b.stickyRightSet, b.stickyRight = stickyInset(e, b.style.RightAuto, b.style.Right)
+	b.stickyBottomSet, b.stickyBottom = stickyInset(e, b.style.BottomAuto, b.style.Bottom)
+	b.stickyLeftSet, b.stickyLeft = stickyInset(e, b.style.LeftAuto, b.style.Left)
 
 	if b.opEnd >= b.opStart && b.opStart >= 0 {
 		for i := b.opStart; i <= b.opEnd && i < len(e.ops); i++ {
 			e.ops[i].StickyID = b.stickyID
 		}
 	}
+}
+
+// stickyInset resolves a non-auto sticky inset; auto insets stay unset (0).
+func stickyInset(e *engine, auto bool, v float64) (set bool, inset float64) {
+	if auto {
+		return false, 0
+	}
+
+	return true, e.scalePt(v)
 }
 
 func (b *box) hasStickyInset() bool {

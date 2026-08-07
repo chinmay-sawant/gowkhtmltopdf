@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -8,7 +9,9 @@ import (
 	"gowkhtmltopdf/internal/html"
 )
 
-func TestJustifyDoesNotGapBeforePunctuation(t *testing.T) {
+func TestJustifyDoesNotGapBeforePunctuation(t *testing.T) { //nolint:gocognit,gocyclo,cyclop,funlen
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 p { text-align: justify; margin: 0; }
@@ -16,10 +19,19 @@ a { color: blue; text-decoration: underline; }
 sup.reference { font-size: 8pt; }
 `)
 	src := `<html><body><p style="width:420pt">` +
-		`born 30 April 1988)<sup class="reference"><a href="#c1"><span class="cite-bracket">[</span>1<span class="cite-bracket">]</span></a></sup> is a Cuban-born actress<sup class="reference"><a href="#c2"><span class="cite-bracket">[</span>2<span class="cite-bracket">]</span></a></sup> holding Cuban,<sup class="reference"><a href="#c2b"><span class="cite-bracket">[</span>2<span class="cite-bracket">]</span></a></sup> Spanish, and American citizenship.` +
-		` including an <a href="/Academy_Award">Academy Award</a>, an <a href="/Actor">Actor Award</a>, a <a href="/BAFTA">BAFTA</a>, and two <a href="/Golden_Globe">Golden Globes</a>.` +
+		`born 30 April 1988)<sup class="reference"><a href="#c1">` +
+		`<span class="cite-bracket">[</span>1<span class="cite-bracket">]</span></a></sup> ` +
+		`is a Cuban-born actress<sup class="reference"><a href="#c2">` +
+		`<span class="cite-bracket">[</span>2<span class="cite-bracket">]</span></a></sup> ` +
+		`holding Cuban,<sup class="reference"><a href="#c2b">` +
+		`<span class="cite-bracket">[</span>2<span class="cite-bracket">]</span></a></sup> ` +
+		`Spanish, and American citizenship.` +
+		` including an <a href="/Academy_Award">Academy Award</a>, ` +
+		`an <a href="/Actor">Actor Award</a>, ` +
+		`a <a href="/BAFTA">BAFTA</a>, and two <a href="/Golden_Globe">Golden Globes</a>.` +
 		` After moving to <a href="/LA">Los Angeles</a>, de Armas had English-speaking roles.` +
-		` She starred opposite <a href="/r">Keanu Reeves</a> in her first Hollywood release—<a href="/er">Eli Roth</a>'s erotic thriller.` +
+		` She starred opposite <a href="/r">Keanu Reeves</a> in her first Hollywood release—` +
+		`<a href="/er">Eli Roth</a>'s erotic thriller.` +
 		`</p></body></html>`
 
 	root, err := html.Parse(src)
@@ -27,7 +39,9 @@ sup.reference { font-size: 8pt; }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{Width: 420, Height: 800, Sheets: []*css.Stylesheet{cssSheet}, Background: true}) //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 420, Height: 800, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +87,8 @@ sup.reference { font-size: 8pt; }
 			t.Errorf("justify gap %.2fpt between %q and %q", gap, prev.text, cur.text)
 		}
 
-		if strings.HasSuffix(prev.text, "\u2014") || strings.HasSuffix(prev.text, "\u2013") || strings.HasSuffix(prev.text, "—") {
+		if strings.HasSuffix(prev.text, "\u2014") || strings.HasSuffix(prev.text, "\u2013") ||
+			strings.HasSuffix(prev.text, "—") {
 			// emdash may be end of prev; next shouldn't have large gap if glued in source
 			if gap > 0.5 && !strings.HasPrefix(cur.text, " ") {
 				t.Logf("note gap %.2f after dash %q before %q", gap, prev.text, cur.text)
@@ -85,24 +100,25 @@ sup.reference { font-size: 8pt; }
 		t.Errorf("space before possessive: %q", got)
 	}
 
-	if !strings.Contains(got, "Roth's") && !strings.Contains(got, "Roth\u2019s") {
-		// may be split across ops; check geometrically
-		isOK := false
+	if strings.Contains(got, "Roth's") || strings.Contains(got, "Roth\u2019s") {
+		return
+	}
+	// may be split across ops; check geometrically
+	isOK := false
 
-		for i := 1; i < len(runs); i++ {
-			if strings.HasSuffix(runs[i-1].text, "Roth") && strings.HasPrefix(runs[i].text, "'") {
-				gap := runs[i].x - (runs[i-1].x + runs[i-1].w)
-				if gap <= 0.5 {
-					isOK = true
-				} else {
-					t.Errorf("geometric space before possessive: gap=%.2f", gap)
-				}
+	for i := 1; i < len(runs); i++ {
+		if strings.HasSuffix(runs[i-1].text, "Roth") && strings.HasPrefix(runs[i].text, "'") {
+			gap := runs[i].x - (runs[i-1].x + runs[i-1].w)
+			if gap <= 0.5 {
+				isOK = true
+			} else {
+				t.Errorf("geometric space before possessive: gap=%.2f", gap)
 			}
 		}
+	}
 
-		if !isOK {
-			t.Logf("Roth's ops not found as expected; text=%q", got)
-		}
+	if !isOK {
+		t.Logf("Roth's ops not found as expected; text=%q", got)
 	}
 }
 
@@ -114,14 +130,19 @@ func absF(v float64) float64 {
 	return v
 }
 
-func TestCiteDoesNotSplitAcrossLines(t *testing.T) {
+func TestCiteDoesNotSplitAcrossLines(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 p { text-align: justify; margin: 0; }
 sup.reference { font-size: 8pt; white-space: nowrap; }
 `)
 	src := `<html><body><p>` +
-		`She often did not know what she was saying.<sup class="reference"><a href="#c"><span class="cite-bracket">[</span>37<span class="cite-bracket">]</span></a></sup> She spent four months learning English afterward with more words here to continue.` +
+		`She often did not know what she was saying.` +
+		`<sup class="reference"><a href="#c">` +
+		`<span class="cite-bracket">[</span>37<span class="cite-bracket">]</span></a></sup> ` +
+		`She spent four months learning English afterward with more words here to continue.` +
 		`</p></body></html>`
 
 	root, err := html.Parse(src)
@@ -129,7 +150,9 @@ sup.reference { font-size: 8pt; white-space: nowrap; }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{Width: 200, Height: 800, Sheets: []*css.Stylesheet{cssSheet}, Background: true}) //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 200, Height: 800, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

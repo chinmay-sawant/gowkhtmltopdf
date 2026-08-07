@@ -1,4 +1,4 @@
-package cli
+package cli //nolint:testpackage // tests exercise unexported flagTable/shortFlags
 
 import (
 	"bytes"
@@ -10,6 +10,11 @@ import (
 
 	"gowkhtmltopdf/internal/settings"
 )
+
+// errBoom is a plain non-http error used by ExitCode tests.
+var errBoom = errors.New("boom")
+
+const outPDF = "out.pdf"
 
 func parse(t *testing.T, args ...string) *Command {
 	t.Helper()
@@ -36,10 +41,20 @@ func TestGlobalFlagsToSettings(t *testing.T) {
 		"--grayscale",
 		"-q",
 		"page.html",
-		"out.pdf",
+		outPDF,
 	)
 
-	globalCfg := cmd.Global
+	assertGlobalFlagSettings(t, cmd.Global)
+
+	if cmd.Output != outPDF || len(cmd.Objects) != 1 || cmd.Objects[0].Page != "page.html" {
+		t.Errorf("grammar: output=%q objects=%+v", cmd.Output, cmd.Objects)
+	}
+}
+
+// assertGlobalFlagSettings pins the settings written by global flags.
+func assertGlobalFlagSettings(t *testing.T, globalCfg settings.PdfGlobal) {
+	t.Helper()
+
 	if globalCfg.PageSize != "Letter" {
 		t.Errorf("page-size = %q", globalCfg.PageSize)
 	}
@@ -75,16 +90,12 @@ func TestGlobalFlagsToSettings(t *testing.T) {
 	if !globalCfg.Quiet {
 		t.Error("quiet")
 	}
-
-	if cmd.Output != "out.pdf" || len(cmd.Objects) != 1 || cmd.Objects[0].Page != "page.html" {
-		t.Errorf("grammar: output=%q objects=%+v", cmd.Output, cmd.Objects)
-	}
 }
 
 func TestShortFlags(t *testing.T) {
 	t.Parallel()
 
-	cmd := parse(t, "-s", "A5", "-O", "Landscape", "-q", "-T", "15mm", "-c", "2", "-t", "T", "in.html", "out.pdf")
+	cmd := parse(t, "-s", "A5", "-O", "Landscape", "-q", "-T", "15mm", "-c", "2", "-t", "T", "in.html", outPDF)
 	if cmd.Global.PageSize != "A5" {
 		t.Errorf("page-size = %q", cmd.Global.PageSize)
 	}
@@ -113,7 +124,7 @@ func TestShortFlags(t *testing.T) {
 func TestFlagEqualsSyntax(t *testing.T) {
 	t.Parallel()
 
-	cmd := parse(t, "--page-size=A4", "--orientation=portrait", "in.html", "out.pdf")
+	cmd := parse(t, "--page-size=A4", "--orientation=portrait", "in.html", outPDF)
 	if cmd.Global.PageSize != "A4" {
 		t.Error("= syntax page-size")
 	}
@@ -126,17 +137,17 @@ func TestFlagEqualsSyntax(t *testing.T) {
 func TestBoolFlagValues(t *testing.T) {
 	t.Parallel()
 
-	cmd := parse(t, "--outline=false", "--outline", "in.html", "out.pdf")
+	cmd := parse(t, "--outline=false", "--outline", "in.html", outPDF)
 	if !cmd.Global.Outline {
 		t.Error("--outline=false then --outline must end true")
 	}
 
-	cmd = parse(t, "--no-outline", "in.html", "out.pdf")
+	cmd = parse(t, "--no-outline", "in.html", outPDF)
 	if cmd.Global.Outline {
 		t.Error("--no-outline must set false")
 	}
 	// page-scoped flags bind to the first object (address remapping)
-	cmd = parse(t, "--enable-local-file-access", "in.html", "out.pdf")
+	cmd = parse(t, "--enable-local-file-access", "in.html", outPDF)
 	if cmd.Objects[0].Load.BlockLocalFileAccess {
 		t.Error("enable-local-file-access must land on first object")
 	}
@@ -145,7 +156,7 @@ func TestBoolFlagValues(t *testing.T) {
 		t.Error("enable-local-file-access must set global")
 	}
 
-	cmd = parse(t, "--disable-local-file-access", "in.html", "out.pdf")
+	cmd = parse(t, "--disable-local-file-access", "in.html", outPDF)
 	if !cmd.Objects[0].Load.BlockLocalFileAccess {
 		t.Error("disable-local-file-access")
 	}
@@ -165,25 +176,14 @@ func TestMultiObjectGrammar(t *testing.T) {
 		t.Fatalf("objects = %d, want 4", len(cmd.Objects))
 	}
 
-	cover, toc, ch1, ch2 := cmd.Objects[0], cmd.Objects[1], cmd.Objects[2], cmd.Objects[3]
-	if !cover.IsCover || cover.Page != "cover.html" {
-		t.Errorf("cover = %+v", cover)
+	assertCoverAndTOC(t, cmd.Objects[0], cmd.Objects[1])
+
+	if got := cmd.Objects[2]; got.Page != "ch1.html" || !got.HeaderSet || got.Header.Left != "Chapter" {
+		t.Errorf("ch1 = %+v (header %+v)", got, got.Header)
 	}
 
-	if cover.IncludeInOutline {
-		t.Error("cover includeInOutline must be false")
-	}
-
-	if !toc.IsTableOfContent {
-		t.Error("toc object")
-	}
-
-	if ch1.Page != "ch1.html" || !ch1.HeaderSet || ch1.Header.Left != "Chapter" {
-		t.Errorf("ch1 = %+v (header %+v)", ch1, ch1.Header)
-	}
-
-	if ch2.Page != "ch2.html" || ch2.HeaderSet {
-		t.Errorf("ch2 = %+v", ch2)
+	if got := cmd.Objects[3]; got.Page != "ch2.html" || got.HeaderSet {
+		t.Errorf("ch2 = %+v", got)
 	}
 
 	if cmd.Output != "book.pdf" {
@@ -191,10 +191,23 @@ func TestMultiObjectGrammar(t *testing.T) {
 	}
 }
 
+// assertCoverAndTOC pins the cover and toc object shapes.
+func assertCoverAndTOC(t *testing.T, cover, toc settings.PdfObject) {
+	t.Helper()
+
+	if !cover.IsCover || cover.Page != "cover.html" || cover.IncludeInOutline {
+		t.Errorf("cover = %+v", cover)
+	}
+
+	if !toc.IsTableOfContent {
+		t.Error("toc object")
+	}
+}
+
 func TestImplicitFirstPageObject(t *testing.T) {
 	t.Parallel()
 
-	cmd := parse(t, "--margin-top", "5mm", "a.html", "b.html", "out.pdf")
+	cmd := parse(t, "--margin-top", "5mm", "a.html", "b.html", outPDF)
 	if len(cmd.Objects) != 2 {
 		t.Fatalf("objects = %d", len(cmd.Objects))
 	}
@@ -203,7 +216,7 @@ func TestImplicitFirstPageObject(t *testing.T) {
 		t.Errorf("objects = %+v", cmd.Objects)
 	}
 
-	if cmd.Output != "out.pdf" {
+	if cmd.Output != outPDF {
 		t.Errorf("output = %q", cmd.Output)
 	}
 }
@@ -228,7 +241,7 @@ func TestPairFlags(t *testing.T) {
 		"--cookie", "session", "abc123",
 		"--custom-header", "X-Token", "secret",
 		"--post", "q", "hello",
-		"in.html", "out.pdf",
+		"in.html", outPDF,
 	)
 
 	obj := cmd.Objects[0]
@@ -252,7 +265,7 @@ func TestHeaderFooterFlags(t *testing.T) {
 		"--header-left", "L", "--header-right", "R", "--header-font-size", "14",
 		"--header-line", "--footer-center", "[page]/[topage]",
 		"--footer-spacing", "5",
-		"in.html", "out.pdf",
+		"in.html", outPDF,
 	)
 
 	globalCfg := cmd.Global
@@ -277,7 +290,7 @@ func TestTOCFlags(t *testing.T) {
 		"--toc-text-size-shrink", "0.5",
 		"--disable-dotted-lines",
 		"toc",
-		"in.html", "out.pdf",
+		"in.html", outPDF,
 	)
 	if cmd.Global.TOC.CaptionText != "Contents" {
 		t.Errorf("caption = %q", cmd.Global.TOC.CaptionText)
@@ -302,7 +315,7 @@ func TestLoadFlags(t *testing.T) {
 		"--load-error-handling", "ignore",
 		"--print-media-type",
 		"--username", "u", "--password", "p",
-		"in.html", "out.pdf",
+		"in.html", outPDF,
 	)
 
 	obj := cmd.Objects[0]
@@ -338,9 +351,36 @@ func TestPageOnlyFlagPreObjectPending(t *testing.T) {
 	// documented smoke recipes: `--zoom 0.67 url out.pdf`.
 	cmd := parse(t, "--zoom", "2", "--username", "u", "--password", "p",
 		"--timeout", "30", "--external-links", "--internal-links",
-		"in.html", "out.pdf")
+		"in.html", outPDF)
 
-	obj := cmd.Objects[0]
+	assertPreObjectPending(t, cmd.Objects[0])
+
+	// After an object keyword they land on the object.
+	cmd = parse(t, "page", "--zoom", "2", "--external-links", "in.html", outPDF)
+	assertPostKeywordPending(t, cmd.Objects[0])
+
+	// Leading toc does not consume pending; zoom applies to the page after.
+	cmd = parse(t, "--zoom", "1.5", "toc", "page", "in.html", outPDF)
+
+	var body *settings.PdfObject
+
+	for i := range cmd.Objects {
+		if !cmd.Objects[i].IsTableOfContent {
+			body = &cmd.Objects[i]
+
+			break
+		}
+	}
+
+	if body == nil || body.Load.ZoomFactor != 1.5 {
+		t.Errorf("pre-object zoom after toc must land on body page; body=%v", body)
+	}
+}
+
+// assertPreObjectPending pins pending page-only flags before any keyword.
+func assertPreObjectPending(t *testing.T, obj settings.PdfObject) {
+	t.Helper()
+
 	if obj.Load.ZoomFactor != 2 {
 		t.Errorf("pre-object zoom pending: got %v", obj.Load.ZoomFactor)
 	}
@@ -360,42 +400,30 @@ func TestPageOnlyFlagPreObjectPending(t *testing.T) {
 	if !obj.LocalLinks {
 		t.Error("pre-object internal-links (locallinks) pending")
 	}
-	// After an object keyword they land on the object.
-	cmd = parse(t, "page", "--zoom", "2", "--external-links", "in.html", "out.pdf")
-	if cmd.Objects[0].Load.ZoomFactor != 2 {
+}
+
+// assertPostKeywordPending pins page-only flags after a page keyword.
+func assertPostKeywordPending(t *testing.T, obj settings.PdfObject) {
+	t.Helper()
+
+	if obj.Load.ZoomFactor != 2 {
 		t.Error("zoom must land on the object after page keyword")
 	}
 
-	if !cmd.Objects[0].ExternalLinks {
+	if !obj.ExternalLinks {
 		t.Error("external-links must land on the object after page keyword")
-	}
-	// Leading toc does not consume pending; zoom applies to the page after.
-	cmd = parse(t, "--zoom", "1.5", "toc", "page", "in.html", "out.pdf")
-
-	var body *settings.PdfObject
-
-	for i := range cmd.Objects {
-		if !cmd.Objects[i].IsTableOfContent {
-			body = &cmd.Objects[i]
-
-			break
-		}
-	}
-
-	if body == nil || body.Load.ZoomFactor != 1.5 {
-		t.Errorf("pre-object zoom after toc must land on body page; body=%v", body)
 	}
 }
 
 func TestGrayscaleSetsConvertField(t *testing.T) {
 	t.Parallel()
 
-	cmd := parse(t, "--grayscale", "in.html", "out.pdf")
+	cmd := parse(t, "--grayscale", "in.html", outPDF)
 	if !cmd.Global.Grayscale {
 		t.Error("--grayscale must set Global.Grayscale (convert.SetGrayscale)")
 	}
 
-	cmd = parse(t, "--no-grayscale", "in.html", "out.pdf")
+	cmd = parse(t, "--no-grayscale", "in.html", outPDF)
 	if cmd.Global.Grayscale {
 		t.Error("--no-grayscale must clear Global.Grayscale")
 	}
@@ -405,17 +433,17 @@ func TestSmartShrinkingEnableDisable(t *testing.T) {
 	t.Parallel()
 
 	// Default is on; disable pair only (no bare --smart-shrinking).
-	cmd := parse(t, "--disable-smart-shrinking", "in.html", "out.pdf")
+	cmd := parse(t, "--disable-smart-shrinking", "in.html", outPDF)
 	if cmd.Global.SmartShrinking {
 		t.Error("disable-smart-shrinking")
 	}
 
-	cmd = parse(t, "--disable-smart-shrinking", "--enable-smart-shrinking", "in.html", "out.pdf")
+	cmd = parse(t, "--disable-smart-shrinking", "--enable-smart-shrinking", "in.html", outPDF)
 	if !cmd.Global.SmartShrinking {
 		t.Error("enable-smart-shrinking must re-enable")
 	}
 
-	if _, err := Parse([]string{"--smart-shrinking", "in.html", "out.pdf"}); err == nil {
+	if _, err := Parse([]string{"--smart-shrinking", "in.html", outPDF}); err == nil {
 		t.Error("bare --smart-shrinking must be unknown (pair only)")
 	}
 }
@@ -424,12 +452,12 @@ func TestBackgroundPDFAndImage(t *testing.T) {
 	t.Parallel()
 
 	// Both convert and imageout read Global.Background.
-	cmd := parse(t, "--no-background", "in.html", "out.pdf")
+	cmd := parse(t, "--no-background", "in.html", outPDF)
 	if cmd.Global.Background {
 		t.Error("no-background must clear Global.Background")
 	}
 
-	cmd = parse(t, "--no-background", "--background", "in.html", "out.pdf")
+	cmd = parse(t, "--no-background", "--background", "in.html", outPDF)
 	if !cmd.Global.Background {
 		t.Error("--background must set Global.Background")
 	}
@@ -439,22 +467,22 @@ func TestDumpOutlineGlobalHome(t *testing.T) {
 	t.Parallel()
 
 	// Single home: Global settings; negation rides the value.
-	cmd := parse(t, "--dump-outline", "in.html", "out.pdf")
+	cmd := parse(t, "--dump-outline", "in.html", outPDF)
 	if !cmd.Global.DumpOutline {
 		t.Error("--dump-outline must set Global.DumpOutline")
 	}
 
-	cmd = parse(t, "--no-dump-outline", "in.html", "out.pdf")
+	cmd = parse(t, "--no-dump-outline", "in.html", outPDF)
 	if cmd.Global.DumpOutline {
 		t.Error("--no-dump-outline must clear Global.DumpOutline")
 	}
 
-	cmd = parse(t, "--dump-default-toc-xsl", "in.html", "out.pdf")
+	cmd = parse(t, "--dump-default-toc-xsl", "in.html", outPDF)
 	if !cmd.Global.DumpDefaultTOCXSL {
 		t.Error("--dump-default-toc-xsl must set Global.DumpDefaultTOCXSL")
 	}
 
-	cmd = parse(t, "--dump-default-toc-xsl=false", "in.html", "out.pdf")
+	cmd = parse(t, "--dump-default-toc-xsl=false", "in.html", outPDF)
 	if cmd.Global.DumpDefaultTOCXSL {
 		t.Error("--dump-default-toc-xsl=false must clear Global.DumpDefaultTOCXSL")
 	}
@@ -465,26 +493,26 @@ func TestStubFlagsRemoved(t *testing.T) {
 
 	// Policy A: inert engine-less flags are rejected, not accepted no-ops.
 	cases := [][]string{
-		{"--dpi", "150", "in.html", "out.pdf"},
-		{"--image-dpi", "300", "in.html", "out.pdf"},
-		{"--image-quality", "80", "in.html", "out.pdf"},
-		{"--lowquality", "in.html", "out.pdf"},
-		{"--use-xserver", "in.html", "out.pdf"},
-		{"--cookie-jar", "jar.txt", "in.html", "out.pdf"},
-		{"--read-args-from-stdin", "in.html", "out.pdf"},
-		{"--log-level", "info", "in.html", "out.pdf"},
-		{"--javascript-delay", "1000", "in.html", "out.pdf"},
-		{"--window-status", "ready", "in.html", "out.pdf"},
-		{"--run-script", "x.js", "in.html", "out.pdf"},
-		{"--debug-javascript", "in.html", "out.pdf"},
-		{"--user-style-sheet", "s.css", "in.html", "out.pdf"},
-		{"--minimum-font-size", "8", "in.html", "out.pdf"},
-		{"--enable-plugins", "in.html", "out.pdf"},
-		{"--produce-forms", "in.html", "out.pdf"},
-		{"--enable-javascript", "in.html", "out.pdf"},
-		{"--stop-slow-scripts", "in.html", "out.pdf"},
-		{"--default-encoding", "utf-8", "in.html", "out.pdf"},
-		{"--custom-header-propagation", "in.html", "out.pdf"},
+		{"--dpi", "150", "in.html", outPDF},
+		{"--image-dpi", "300", "in.html", outPDF},
+		{"--image-quality", "80", "in.html", outPDF},
+		{"--lowquality", "in.html", outPDF},
+		{"--use-xserver", "in.html", outPDF},
+		{"--cookie-jar", "jar.txt", "in.html", outPDF},
+		{"--read-args-from-stdin", "in.html", outPDF},
+		{"--log-level", "info", "in.html", outPDF},
+		{"--javascript-delay", "1000", "in.html", outPDF},
+		{"--window-status", "ready", "in.html", outPDF},
+		{"--run-script", "x.js", "in.html", outPDF},
+		{"--debug-javascript", "in.html", outPDF},
+		{"--user-style-sheet", "s.css", "in.html", outPDF},
+		{"--minimum-font-size", "8", "in.html", outPDF},
+		{"--enable-plugins", "in.html", outPDF},
+		{"--produce-forms", "in.html", outPDF},
+		{"--enable-javascript", "in.html", outPDF},
+		{"--stop-slow-scripts", "in.html", outPDF},
+		{"--default-encoding", "utf-8", "in.html", outPDF},
+		{"--custom-header-propagation", "in.html", outPDF},
 	}
 	for _, args := range cases {
 		if _, err := Parse(args); err == nil {
@@ -496,7 +524,7 @@ func TestStubFlagsRemoved(t *testing.T) {
 func TestSimplifyDOMFlag(t *testing.T) {
 	t.Parallel()
 
-	cmd := parse(t, "--simplify-dom", "in.html", "out.pdf")
+	cmd := parse(t, "--simplify-dom", "in.html", outPDF)
 	if !cmd.Global.Web.SimplifyDOM {
 		t.Error("global web.simplifydom")
 	}
@@ -505,7 +533,7 @@ func TestSimplifyDOMFlag(t *testing.T) {
 		t.Error("object web.simplifydom")
 	}
 
-	cmd = parse(t, "--simplify-dom", "--no-simplify-dom", "in.html", "out.pdf")
+	cmd = parse(t, "--simplify-dom", "--no-simplify-dom", "in.html", outPDF)
 	if cmd.Global.Web.SimplifyDOM || cmd.Objects[0].Web.SimplifyDOM {
 		t.Error("--no-simplify-dom should clear the flag")
 	}
@@ -514,7 +542,7 @@ func TestSimplifyDOMFlag(t *testing.T) {
 func TestSimplifyDOMProfileFlag(t *testing.T) {
 	t.Parallel()
 
-	cmd := parse(t, "--simplify-dom", "--simplify-dom-profile", "mediawiki", "in.html", "out.pdf")
+	cmd := parse(t, "--simplify-dom", "--simplify-dom-profile", "mediawiki", "in.html", outPDF)
 	if cmd.Global.Web.SimplifyDOMProfile != "mediawiki" {
 		t.Errorf("profile=%q", cmd.Global.Web.SimplifyDOMProfile)
 	}
@@ -527,7 +555,7 @@ func TestSimplifyDOMProfileFlag(t *testing.T) {
 func TestPrintLinkUnderlineFlag(t *testing.T) {
 	t.Parallel()
 
-	cmd := parse(t, "--print-link-underline", "in.html", "out.pdf")
+	cmd := parse(t, "--print-link-underline", "in.html", outPDF)
 	if !cmd.Global.Web.PrintLinkUnderline {
 		t.Error("global printlinkunderline")
 	}
@@ -540,11 +568,11 @@ func TestPrintLinkUnderlineFlag(t *testing.T) {
 func TestUnknownFlagErrors(t *testing.T) {
 	t.Parallel()
 
-	if _, err := Parse([]string{"--bogus-flag", "x", "out.pdf"}); err == nil {
+	if _, err := Parse([]string{"--bogus-flag", "x", outPDF}); err == nil {
 		t.Error("unknown flag must error")
 	}
 
-	if _, err := Parse([]string{"-Z", "x", "out.pdf"}); err == nil {
+	if _, err := Parse([]string{"-Z", "x", outPDF}); err == nil {
 		t.Error("unknown short flag must error")
 	}
 }
@@ -575,8 +603,8 @@ func TestDocFlags(t *testing.T) {
 func TestEndOfOptions(t *testing.T) {
 	t.Parallel()
 
-	cmd := parse(t, "--", "page.html", "out.pdf")
-	if cmd.Objects[0].Page != "page.html" || cmd.Output != "out.pdf" {
+	cmd := parse(t, "--", "page.html", outPDF)
+	if cmd.Objects[0].Page != "page.html" || cmd.Output != outPDF {
 		t.Errorf("-- handling: %+v", cmd.Objects)
 	}
 }
@@ -591,21 +619,27 @@ func TestImageFlags(t *testing.T) {
 		"in.html", "out.png",
 	)
 
-	img := cmd.Image
+	assertImageDimensions(t, cmd.Image)
+
+	if img := cmd.Image; img.Quality != 80 || img.Format != "png" || !img.Transparent || img.SmartWidth {
+		t.Errorf("image settings = %+v", img)
+	}
+
+	if cmd.Output != "out.png" {
+		t.Errorf("output = %q", cmd.Output)
+	}
+}
+
+// assertImageDimensions pins width/height and the crop rect.
+func assertImageDimensions(t *testing.T, img settings.ImageGlobal) {
+	t.Helper()
+
 	if img.Width != 800 || img.Height != 600 {
 		t.Errorf("width/height = %d/%d", img.Width, img.Height)
 	}
 
 	if img.Crop.Left != 10 || img.Crop.Top != 20 || img.Crop.Width != 100 || img.Crop.Height != 50 {
 		t.Errorf("crop = %+v", img.Crop)
-	}
-
-	if img.Quality != 80 || img.Format != "png" || !img.Transparent || img.SmartWidth {
-		t.Errorf("image settings = %+v", img)
-	}
-
-	if cmd.Output != "out.png" {
-		t.Errorf("output = %q", cmd.Output)
 	}
 }
 
@@ -688,7 +722,7 @@ func TestParseModeValidation(t *testing.T) {
 func TestValidateNoInput(t *testing.T) {
 	t.Parallel()
 
-	if _, err := Parse([]string{"toc", "out.pdf"}); err == nil {
+	if _, err := Parse([]string{"toc", outPDF}); err == nil {
 		t.Error("toc-only must error (no input page)")
 	}
 }
@@ -705,7 +739,7 @@ func TestPageScopedBeforeTOCNoGhost(t *testing.T) {
 		"--footer-center", "[page]",
 		"toc",
 		"in.html",
-		"out.pdf",
+		outPDF,
 	)
 	if len(cmd.Objects) != 2 {
 		t.Fatalf("objects = %d, want 2 (toc + page); got %+v", len(cmd.Objects), cmd.Objects)
@@ -740,7 +774,7 @@ func TestPageScopedBeforeTOCNoGhost(t *testing.T) {
 func TestPageScopedBeforePageKeyword(t *testing.T) {
 	t.Parallel()
 
-	cmd := parse(t, "--enable-local-file-access", "page", "in.html", "out.pdf")
+	cmd := parse(t, "--enable-local-file-access", "page", "in.html", outPDF)
 	if len(cmd.Objects) != 1 {
 		t.Fatalf("objects = %d, want 1; got %+v", len(cmd.Objects), cmd.Objects)
 	}
@@ -757,7 +791,7 @@ func TestExitCode(t *testing.T) {
 		t.Error("nil must exit 1")
 	}
 
-	if ExitCode(errors.New("boom")) != ExitError {
+	if ExitCode(errBoom) != ExitError {
 		t.Error("plain error must exit 1")
 	}
 
@@ -788,7 +822,7 @@ func TestOpenOutputWriterPrecedence(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	defer closeW()
+	defer func() { _ = closeW() }()
 
 	if writer != &buf {
 		t.Fatal("OutputWriter must win over Output path")

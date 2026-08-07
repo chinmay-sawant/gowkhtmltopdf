@@ -6,6 +6,13 @@ import (
 	"gowkhtmltopdf/internal/html"
 )
 
+const (
+	displayNone         = "none"
+	borderBox           = "border-box"
+	containerSize       = "size"
+	containerInlineSize = "inline-size"
+)
+
 // findSizeContainer walks ancestors of n for the nearest size query container
 // matching name (empty name = any size container). Elements without
 // container-type size|inline-size are never registered, so size queries
@@ -35,7 +42,9 @@ func findSizeContainer(n *html.Node, name string, containers map[*html.Node]size
 // inline sizes for elements with container-type: inline-size|size. Widths are
 // computed without children (size containment / as-if-empty for intrinsic
 // contribution), matching buildBlock's definite-width rules.
-func measureSizeContainers(root *html.Node, styles map[*html.Node]ResolvedStyle, viewportW float64) map[*html.Node]sizeContainer {
+func measureSizeContainers(
+	root *html.Node, styles map[*html.Node]ResolvedStyle, viewportW float64,
+) map[*html.Node]sizeContainer {
 	out := map[*html.Node]sizeContainer{}
 
 	var walk func(n *html.Node, availW float64)
@@ -45,12 +54,12 @@ func measureSizeContainers(root *html.Node, styles map[*html.Node]ResolvedStyle,
 		}
 
 		sty := styles[node]
-		if sty.Display == "none" {
+		if sty.Display == displayNone {
 			return
 		}
 
 		borderW := contentInlineSize(sty, availW)
-		if sty.ContainerType == "inline-size" || sty.ContainerType == "size" {
+		if sty.ContainerType == containerInlineSize || sty.ContainerType == containerSize {
 			out[node] = sizeContainer{
 				inlineSize: borderW,
 				fontSize:   sty.FontSize,
@@ -72,33 +81,8 @@ func measureSizeContainers(root *html.Node, styles map[*html.Node]ResolvedStyle,
 // given containing-block availW, mirroring buildBlock without laying out
 // children. Size-contained boxes use this definite width for @container.
 func contentInlineSize(st ResolvedStyle, availW float64) float64 {
-	margR, margR2 := st.MarginLeft, st.MarginRight
-	if st.MarginLeftAuto {
-		margR = 0
-	}
-
-	if st.MarginRightAuto {
-		margR2 = 0
-	}
-
-	width := availW - margR - margR2
-	if width < 0 {
-		width = 0
-	}
-
-	definiteW := st.Width >= 0 || st.WidthPercent >= 0
-
-	if st.WidthPercent >= 0 {
-		if availW > 0 && availW < 1e12 {
-			width = availW * st.WidthPercent / cssPercent
-		} else {
-			definiteW = false
-		}
-	} else if st.Width >= 0 {
-		width = st.Width
-	}
-
-	if definiteW && st.BoxSizing != "border-box" {
+	width, definite := contentBaseInlineSize(st, availW)
+	if definite && st.BoxSizing != borderBox {
 		width += st.PaddingLeft + st.PaddingRight + st.BorderLeft.Width + st.BorderRight.Width
 	}
 
@@ -118,7 +102,36 @@ func contentInlineSize(st ResolvedStyle, availW float64) float64 {
 	return contentW
 }
 
+// contentBaseInlineSize resolves the specified width (auto → containing-block
+// width minus margins) and whether the width is definite.
+func contentBaseInlineSize(st ResolvedStyle, availW float64) (width float64, definite bool) {
+	margL, margR := st.MarginLeft, st.MarginRight
+	if st.MarginLeftAuto {
+		margL = 0
+	}
+
+	if st.MarginRightAuto {
+		margR = 0
+	}
+
+	width = availW - margL - margR
+	if width < 0 {
+		width = 0
+	}
+
+	switch {
+	case st.WidthPercent >= 0:
+		if availW > 0 && availW < 1e12 {
+			return availW * st.WidthPercent / cssPercent, true
+		}
+	case st.Width >= 0:
+		return st.Width, true
+	}
+
+	return width, false
+}
+
 // isSizeContainer reports whether the style establishes a size query container.
 func isSizeContainer(st ResolvedStyle) bool {
-	return st.ContainerType == "inline-size" || st.ContainerType == "size"
+	return st.ContainerType == containerInlineSize || st.ContainerType == containerSize
 }

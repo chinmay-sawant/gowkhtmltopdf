@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -7,7 +8,9 @@ import (
 	"gowkhtmltopdf/internal/html"
 )
 
-func TestHasSelectorArticleBorder(t *testing.T) {
+func TestHasSelectorArticleBorder(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	s := sheet(t, `article:has(.footnote) { border-left: 3pt solid #00f }`)
 	root := mustParse(t, `<html><body>
 		<article id="with"><p>body</p><span class="footnote">fn</span></article>
@@ -54,7 +57,9 @@ func TestHasSelectorArticleBorder(t *testing.T) {
 	}
 }
 
-func TestHasSelectorTableRowHighlight(t *testing.T) {
+func TestHasSelectorTableRowHighlight(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	s := sheet(t, `tr:has(td.neg) td { color: red }`)
 	res := layoutHTML(t, `<html><body><table>
 		<tr><td class="neg">-1</td><td>loss</td></tr>

@@ -1,3 +1,4 @@
+//nolint:testpackage // tests reach into unexported state
 package pdf
 
 import (
@@ -80,7 +81,10 @@ func TestDeterministicOutput(t *testing.T) {
 		cur.TextAt(10, 20)
 		cur.TextShow("hello")
 		cur.EndText()
-		data.SetOutline(&Outline{Title: "root", Children: []*Outline{{Title: "child"}}}) //nolint:exhaustruct // intentional zero-value fields
+		data.SetOutline(&Outline{ //nolint:exhaustruct // intentional zero-value fields
+			Title:    "root",
+			Children: []*Outline{{Title: "child"}},
+		})
 
 		return writePDF(t, data)
 	}
@@ -107,15 +111,7 @@ func TestXrefOffsets(t *testing.T) {
 
 	// every n entry must point at the start of "N 0 obj"
 	lines := strings.Split(string(out), "\n")
-	xrefIdx := -1
-
-	for i, l := range lines {
-		if l == "xref" {
-			xrefIdx = i
-
-			break
-		}
-	}
+	xrefIdx := findLine(lines, "xref")
 
 	if xrefIdx < 0 {
 		t.Fatal("no xref")
@@ -135,6 +131,31 @@ func TestXrefOffsets(t *testing.T) {
 		t.Fatal("no startxref")
 	}
 
+	offsets := parseXrefEntries(t, lines, xrefIdx, startxref)
+
+	for obj, off := range offsets {
+		want := strconv.Itoa(obj) + " 0 obj"
+		if !bytes.HasPrefix(out[off:], []byte(want)) {
+			t.Errorf("object %d offset %d does not start with %q", obj, off, want)
+		}
+	}
+}
+
+// findLine returns the index of the first exact line match, or -1.
+func findLine(lines []string, want string) int {
+	for i, l := range lines {
+		if l == want {
+			return i
+		}
+	}
+
+	return -1
+}
+
+// parseXrefEntries extracts the object→offset table from the xref section.
+func parseXrefEntries(t *testing.T, lines []string, xrefIdx, startxref int) map[int]int {
+	t.Helper()
+
 	offsets := map[int]int{}
 
 	for idx := xrefIdx + 3; idx < startxref-2; idx++ {
@@ -153,12 +174,7 @@ func TestXrefOffsets(t *testing.T) {
 		offsets[obj] = off
 	}
 
-	for obj, off := range offsets {
-		want := strconv.Itoa(obj) + " 0 obj"
-		if !bytes.HasPrefix(out[off:], []byte(want)) {
-			t.Errorf("object %d offset %d does not start with %q", obj, off, want)
-		}
-	}
+	return offsets
 }
 
 func TestEmptyDocFails(t *testing.T) {
@@ -353,13 +369,19 @@ func TestOutlines(t *testing.T) {
 	data.SetCompression(false)
 	data.AddPage(200, 200)
 
-	child := &Outline{Title: "child", PageRef: "4 0 R", X: 10, Y: 100} //nolint:exhaustruct // intentional zero-value fields
-	data.SetOutline(&Outline{                                          //nolint:exhaustruct // intentional zero-value fields
+	child := &Outline{ //nolint:exhaustruct // intentional zero-value fields
+		Title:   "child",
+		PageRef: "4 0 R",
+		X:       10,
+		Y:       100,
+	}
+	data.SetOutline(&Outline{ //nolint:exhaustruct // intentional zero-value fields
 		Title:    "root",
 		Children: []*Outline{{Title: "first", Children: []*Outline{child}}, {Title: "second"}},
 	})
 
 	out := string(writePDF(t, data))
+
 	for _, want := range []string{
 		"/Type /Outlines",
 		"/PageMode /UseOutlines",
@@ -431,7 +453,9 @@ func TestOutlineCountAndSort(t *testing.T) {
 		t.Errorf("sort order wrong: %q %q %q", nodes[0].Title, nodes[1].Title, nodes[2].Title)
 	}
 
-	if got := outlineCount(&Outline{Children: []*Outline{{}, {Children: []*Outline{{}}}}}); got != 3 { //nolint:exhaustruct // intentional zero-value fields
+	if got := outlineCount(&Outline{ //nolint:exhaustruct // intentional zero-value fields
+		Children: []*Outline{{}, {Children: []*Outline{{}}}},
+	}); got != 3 {
 		t.Errorf("outlineCount = %d, want 3", got)
 	}
 }
@@ -496,7 +520,10 @@ func TestOutlineBadPageRefFails(t *testing.T) {
 	for _, ref := range []string{"", "999999 0 R", "garbage", "4 0 X", "0 0 R"} {
 		data := fixedDoc(t)
 		data.AddPage(200, 200)
-		data.SetOutline(&Outline{Title: "root", Children: []*Outline{{Title: "bad", PageRef: ref}}}) //nolint:exhaustruct // intentional zero-value fields
+		data.SetOutline(&Outline{ //nolint:exhaustruct // intentional zero-value fields
+			Title:    "root",
+			Children: []*Outline{{Title: "bad", PageRef: ref}},
+		})
 
 		var buf bytes.Buffer
 
@@ -514,12 +541,15 @@ func TestOutlineBadPageRefFails(t *testing.T) {
 		}
 	}
 	// A valid ref still writes fine (page object 1).
-	d := fixedDoc(t)
-	d.SetCompression(false)
-	d.AddPage(200, 200)
-	d.SetOutline(&Outline{Title: "root", Children: []*Outline{{Title: "ok", PageRef: "1 0 R", X: 5, Y: 6}}}) //nolint:exhaustruct // intentional zero-value fields
+	doc := fixedDoc(t)
+	doc.SetCompression(false)
+	doc.AddPage(200, 200)
+	doc.SetOutline(&Outline{ //nolint:exhaustruct // intentional zero-value fields
+		Title:    "root",
+		Children: []*Outline{{Title: "ok", PageRef: "1 0 R", X: 5, Y: 6}},
+	})
 
-	out := string(writePDF(t, d))
+	out := string(writePDF(t, doc))
 	if !strings.Contains(out, "/Dest [1 0 R /XYZ 5 6 null]") {
 		t.Error("valid PageRef must emit /Dest")
 	}
@@ -624,21 +654,11 @@ func TestDuplicatePage(t *testing.T) {
 	}
 
 	out := string(writePDF(t, data))
-	// kids must be [A B A'] and every page keeps its own content stream
-	kids := kidsRefs(t, out)
-	wantKids := []string{pageA.ref.String(), pBVal.ref.String(), dup.ref.String()}
-
-	if strings.Join(kids, " ") != strings.Join(wantKids, " ") {
-		t.Errorf("/Kids = %v, want %v", kids, wantKids)
-	}
-
-	for _, p := range []*Page{pageA, pBVal, dup} {
-		if !strings.Contains(out, "/Contents "+p.contentRef.String()) {
-			t.Errorf("page %s lost its content stream %s", p.ref, p.contentRef)
-		}
-	}
+	verifyKidsAndContents(t, out, []*Page{pageA, pBVal, dup}, []string{
+		pageA.ref.String(), pBVal.ref.String(), dup.ref.String(),
+	})
 	// both copies of A paint the same text
-	if c := bytes.Count([]byte(out), []byte("(AAA)")); c != 2 {
+	if c := strings.Count(out, "(AAA)"); c != 2 {
 		t.Errorf("(AAA) appears %d times, want 2", c)
 	}
 
@@ -648,6 +668,24 @@ func TestDuplicatePage(t *testing.T) {
 
 	if _, err := data.DuplicatePage(-1); err == nil {
 		t.Error("DuplicatePage(-1): expected error for negative index")
+	}
+}
+
+// verifyKidsAndContents checks the pages tree /Kids order and that every
+// page object still owns its content stream.
+func verifyKidsAndContents(t *testing.T, out string, pages []*Page, wantKids []string) {
+	t.Helper()
+
+	kids := kidsRefs(t, out)
+
+	if strings.Join(kids, " ") != strings.Join(wantKids, " ") {
+		t.Errorf("/Kids = %v, want %v", kids, wantKids)
+	}
+
+	for _, p := range pages {
+		if !strings.Contains(out, "/Contents "+p.contentRef.String()) {
+			t.Errorf("page %s lost its content stream %s", p.ref, p.contentRef)
+		}
 	}
 }
 

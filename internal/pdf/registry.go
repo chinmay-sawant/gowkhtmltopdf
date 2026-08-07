@@ -39,8 +39,8 @@ func (r *Registry) AddFont(fnt *Font) {
 }
 
 // AddFamilyAlias registers f under an explicit CSS family name.
-func (r *Registry) AddFamilyAlias(family string, f *Font) {
-	if r == nil || f == nil {
+func (r *Registry) AddFamilyAlias(family string, font *Font) {
+	if r == nil || font == nil {
 		return
 	}
 
@@ -51,7 +51,7 @@ func (r *Registry) AddFamilyAlias(family string, f *Font) {
 		return
 	}
 
-	r.byFamily[key] = append(r.byFamily[key], f)
+	r.byFamily[key] = append(r.byFamily[key], font)
 }
 
 // Lookup returns a face matching family list + weight/italic, or nil.
@@ -104,8 +104,8 @@ func fontFamilyKeys(fam string) []string {
 // FindWithGlyph returns any registered face that has a glyph for ch, preferring
 // weight/italic match. Used as a last-resort Unicode fallback when CSS
 // font-family faces (and Liberation) lack the codepoint (e.g. IPA ˈ/ɾ).
-func (reg *Registry) FindWithGlyph(ch rune, weight int, italic bool) *Font {
-	if reg == nil {
+func (r *Registry) FindWithGlyph(codePoint rune, weight int, italic bool) *Font {
+	if r == nil {
 		return nil
 	}
 
@@ -116,31 +116,14 @@ func (reg *Registry) FindWithGlyph(ch rune, weight int, italic bool) *Font {
 	bestScore := -1
 	seen := map[*Font]bool{}
 
-	for _, faces := range reg.byFamily {
+	for _, faces := range r.byFamily {
 		for _, fnt := range faces {
-			if fnt == nil || seen[fnt] || fnt.GlyphID(ch) == 0 {
+			score := glyphFaceScore(fnt, codePoint, bold, italic)
+			if score < 0 || seen[fnt] {
 				continue
 			}
 
 			seen[fnt] = true
-
-			score := 1
-			if fnt.Bold() == bold {
-				score += 2
-			}
-
-			if fnt.Italic() == italic {
-				score += 2
-			}
-			// Prefer known Unicode-capable families when several match.
-			for _, n := range fnt.FamilyNames() {
-				low := strings.ToLower(n)
-				if strings.Contains(low, "dejavu") || strings.Contains(low, "noto") || strings.Contains(low, "freesans") {
-					score += 3
-
-					break
-				}
-			}
 
 			if score > bestScore {
 				bestScore = score
@@ -150,6 +133,35 @@ func (reg *Registry) FindWithGlyph(ch rune, weight int, italic bool) *Font {
 	}
 
 	return best
+}
+
+// glyphFaceScore scores a face for ch: -1 when it lacks the glyph, plus
+// weight/italic match bonuses and a premium for known Unicode-capable
+// families (DejaVu/Noto/FreeSans).
+func glyphFaceScore(fnt *Font, codePoint rune, bold, italic bool) int {
+	if fnt == nil || fnt.GlyphID(codePoint) == 0 {
+		return -1
+	}
+
+	score := 1
+	if fnt.Bold() == bold {
+		score += 2
+	}
+
+	if fnt.Italic() == italic {
+		score += 2
+	}
+
+	for _, n := range fnt.FamilyNames() {
+		low := strings.ToLower(n)
+		if strings.Contains(low, "dejavu") || strings.Contains(low, "noto") || strings.Contains(low, "freesans") {
+			score += 3
+
+			break
+		}
+	}
+
+	return score
 }
 
 func pickFace(faces []*Font, weight int, italic bool) *Font {
@@ -234,26 +246,7 @@ func ScanFontDirs(dirs []string) *Registry {
 				continue
 			}
 
-			low := strings.ToLower(entry.Name())
-			if !strings.HasSuffix(low, ".ttf") && !strings.HasSuffix(low, ".otf") {
-				continue
-			}
-
-			data, err := os.ReadFile(path)
-			if err != nil {
-				continue
-			}
-
-			fnt, err := ParseTTF(data)
-			if err != nil {
-				continue
-			}
-
-			if fnt.PostScriptName == "" {
-				fnt.PostScriptName = strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
-			}
-
-			out.AddFont(fnt)
+			scanFontFile(out, path, entry)
 		}
 	}
 	for _, d := range dirs {
@@ -261,4 +254,29 @@ func ScanFontDirs(dirs []string) *Registry {
 	}
 
 	return out
+}
+
+// scanFontFile parses a font file into the registry, skipping anything that
+// is not a TTF/OTF or fails to parse.
+func scanFontFile(out *Registry, path string, entry os.DirEntry) {
+	low := strings.ToLower(entry.Name())
+	if !strings.HasSuffix(low, ".ttf") && !strings.HasSuffix(low, ".otf") {
+		return
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+
+	fnt, err := ParseTTF(data)
+	if err != nil {
+		return
+	}
+
+	if fnt.PostScriptName == "" {
+		fnt.PostScriptName = strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
+	}
+
+	out.AddFont(fnt)
 }

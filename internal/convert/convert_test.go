@@ -1,4 +1,4 @@
-package convert
+package convert //nolint:testpackage // white-box tests need unexported access
 
 import (
 	"bytes"
@@ -45,7 +45,7 @@ func newCommand(t *testing.T, html string, output string) (*cli.Command, string)
 	dir := t.TempDir()
 
 	path := filepath.Join(dir, "input.html")
-	if err := os.WriteFile(path, []byte(html), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(html), 0o600); err != nil {
 		t.Fatalf("write input: %v", err)
 	}
 
@@ -167,8 +167,11 @@ func TestRunPDFWebImagesFalse(t *testing.T) {
 func TestRunPDFLinkedStylesheet(t *testing.T) {
 	t.Parallel()
 
-	cmd, dir := newCommand(t, `<html><head><link rel="stylesheet" href="style.css"></head><body><div class="box">styled</div></body></html>`, filepath.Join(t.TempDir(), "out.pdf"))
-	if err := os.WriteFile(filepath.Join(dir, "style.css"), []byte(".box { background-color: #000000; }"), 0o644); err != nil {
+	cmd, dir := newCommand(
+		t,
+		`<html><head><link rel="stylesheet" href="style.css"></head><body><div class="box">styled</div></body></html>`,
+		filepath.Join(t.TempDir(), "out.pdf"))
+	if err := os.WriteFile(filepath.Join(dir, "style.css"), []byte(".box { background-color: #000000; }"), 0o600); err != nil { //nolint:lll // fixture write
 		t.Fatalf("write css: %v", err)
 	}
 
@@ -181,8 +184,11 @@ func TestRunPDFLinkedStylesheet(t *testing.T) {
 func TestRunPDFScreenOnlyStylesheetExcluded(t *testing.T) {
 	t.Parallel()
 
-	cmd, dir := newCommand(t, `<html><head><link rel="stylesheet" href="screen.css" media="screen"></head><body><div class="box">styled</div></body></html>`, filepath.Join(t.TempDir(), "out.pdf"))
-	if err := os.WriteFile(filepath.Join(dir, "screen.css"), []byte(".box { background-color: #000000; }"), 0o644); err != nil {
+	cmd, dir := newCommand(
+		t,
+		`<html><head><link rel="stylesheet" href="screen.css" media="screen"></head><body><div class="box">styled</div></body></html>`, //nolint:lll // long HTML fixture
+		filepath.Join(t.TempDir(), "out.pdf"))
+	if err := os.WriteFile(filepath.Join(dir, "screen.css"), []byte(".box { background-color: #000000; }"), 0o600); err != nil { //nolint:lll // fixture write
 		t.Fatalf("write css: %v", err)
 	}
 
@@ -198,7 +204,7 @@ func TestRunPDFPrintLinkMediaFeatures(t *testing.T) {
 <body><p class="hi">Hello</p></body></html>`
 
 	cmd, dir := newCommand(t, htmlDoc, filepath.Join(t.TempDir(), "out.pdf"))
-	if err := os.WriteFile(filepath.Join(dir, "feat.css"), []byte(".hi { color: #0645ad }"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "feat.css"), []byte(".hi { color: #0645ad }"), 0o600); err != nil {
 		t.Fatalf("write css: %v", err)
 	}
 
@@ -212,9 +218,11 @@ func TestLinkStylesheetMediaMatches(t *testing.T) {
 	t.Parallel()
 
 	mark := func(media string) *html.Node {
-		return &html.Node{Type: html.ElementNode, Name: "link", Attrs: map[string]string{ //nolint:exhaustruct // intentional zero-value fields
-			"rel": "stylesheet", "href": "x.css", "media": media,
-		}}
+		return &html.Node{ //nolint:exhaustruct // intentional zero-value fields
+			Type:  html.ElementNode,
+			Name:  "link",
+			Attrs: map[string]string{"rel": "stylesheet", "href": "x.css", "media": media},
+		}
 	}
 
 	const viewW, viewH = 538.0, 785.0
@@ -356,7 +364,7 @@ func newCommandMulti(t *testing.T, htmls []string, output string) *cli.Command {
 		dir := t.TempDir()
 
 		path := filepath.Join(dir, "input.html")
-		if err := os.WriteFile(path, []byte(h), 0o644); err != nil {
+		if err := os.WriteFile(path, []byte(h), 0o600); err != nil {
 			t.Fatalf("write input: %v", err)
 		}
 
@@ -447,8 +455,11 @@ func pageLabel(t *testing.T, data []byte, pageRef int) string {
 func labelsOf(t *testing.T, data []byte) []string {
 	t.Helper()
 
-	var labels []string
-	for _, ref := range kidsRefs(t, data) {
+	refs := kidsRefs(t, data)
+
+	labels := make([]string, 0, len(refs))
+
+	for _, ref := range refs {
 		labels = append(labels, pageLabel(t, data, ref))
 	}
 
@@ -605,11 +616,13 @@ func layoutZoomAvailable() bool {
 	return ok
 }
 
-func TestRunPDFSmartShrinking(t *testing.T) {
+func TestRunPDFSmartShrinking(t *testing.T) { //nolint:cyclop // zoom verification has many check steps
 	t.Parallel()
 
 	if !layoutZoomAvailable() {
-		t.Skip("smart shrinking re-layout needs internal/layout.Options.Zoom (TODO); only the over-width warning is emitted today")
+		t.Skip(
+			"smart shrinking re-layout needs internal/layout.Options.Zoom (TODO); only the over-width warning is emitted today",
+		)
 	}
 	// 2000px fixed-width div is ~1500pt wide, far beyond the A4 content area.
 	cmd, _ := newCommand(t,

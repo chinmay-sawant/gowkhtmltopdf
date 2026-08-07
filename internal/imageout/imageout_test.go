@@ -1,8 +1,10 @@
+//nolint:testpackage // white-box tests need raster internals (glyph atlas, downscale, format helpers)
 package imageout
 
 import (
 	"bytes"
 	"encoding/base64"
+	"fmt"
 	"image"
 	"image/color"
 	"image/jpeg"
@@ -23,7 +25,9 @@ import (
 func renderHTML(t *testing.T, src string) image.Image {
 	t.Helper()
 
-	img, err := renderHTMLOpts(src, RenderOptions{Width: 200, Background: true}) //nolint:exhaustruct // intentional zero/partial fields
+	img, err := renderHTMLOpts(src, RenderOptions{ //nolint:exhaustruct // intentional zero/partial fields
+		Width: 200, Background: true,
+	})
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}
@@ -34,7 +38,7 @@ func renderHTML(t *testing.T, src string) image.Image {
 func renderHTMLOpts(src string, opts RenderOptions) (image.Image, error) {
 	root, err := html.Parse(src)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("imageout: parse: %w", err)
 	}
 
 	if opts.Width <= 0 {
@@ -46,14 +50,24 @@ func renderHTMLOpts(src string, opts RenderOptions) (image.Image, error) {
 	return Render(root, opts)
 }
 
+// asNRGBA converts any color to color.NRGBA. The NRGBA model always yields
+// NRGBA, so the checked assertion cannot fail in practice.
+func asNRGBA(c color.Color) color.NRGBA {
+	n, ok := color.NRGBAModel.Convert(c).(color.NRGBA)
+	if !ok {
+		return color.NRGBA{} //nolint:exhaustruct // intentional zero/partial fields
+	}
+
+	return n
+}
+
 // countPixels returns the number of pixels in b whose color matches want.
 func countPixels(img image.Image, b image.Rectangle, want color.NRGBA) int {
 	count := 0
 
 	for row := b.Min.Y; row < b.Max.Y; row++ {
 		for col := b.Min.X; col < b.Max.X; col++ {
-			got := color.NRGBAModel.Convert(img.At(col, row)).(color.NRGBA)
-			if got == want {
+			if asNRGBA(img.At(col, row)) == want {
 				count++
 			}
 		}
@@ -102,7 +116,12 @@ func dataURIImages(src string) ([]byte, error) {
 		return nil, os.ErrNotExist
 	}
 
-	return base64.StdEncoding.DecodeString(data)
+	decoded, err := base64.StdEncoding.DecodeString(data)
+	if err != nil {
+		return nil, fmt.Errorf("decode data URL: %w", err)
+	}
+
+	return decoded, nil
 }
 
 // TestRenderSolidColor checks canvas size and exact pixel colors (PNG path:
@@ -119,11 +138,12 @@ func TestRenderSolidColor(t *testing.T) {
 		t.Errorf("canvas height = %d, want >= 50", got)
 	}
 
-	if count := countPixels(img, image.Rect(0, 0, 200, img.Bounds().Dy()), color.NRGBA{R: 255, A: 255}); count == 0 { //nolint:exhaustruct // intentional zero/partial fields
+	want := color.NRGBA{R: 255, A: 255} //nolint:exhaustruct // intentional zero/partial fields
+	if count := countPixels(img, image.Rect(0, 0, 200, img.Bounds().Dy()), want); count == 0 {
 		t.Error("no solid red pixels found")
 	}
 
-	if got := color.NRGBAModel.Convert(img.At(0, 0)).(color.NRGBA); got != (color.NRGBA{R: 255, G: 255, B: 255, A: 255}) {
+	if got := asNRGBA(img.At(0, 0)); got != (color.NRGBA{R: 255, G: 255, B: 255, A: 255}) {
 		t.Errorf("corner pixel = %v, want white", got)
 	}
 }
@@ -133,17 +153,20 @@ func TestRenderSolidColor(t *testing.T) {
 func TestRenderTransparent(t *testing.T) {
 	t.Parallel()
 
-	img, err := renderHTMLOpts(`<html><body><div style="background-color:#ff0000;width:100px;height:50px"></div></body></html>`,
+	src := `<html><body><div style="background-color:#ff0000;width:100px;height:50px"></div></body></html>`
+
+	img, err := renderHTMLOpts(src,
 		RenderOptions{Width: 200, Transparent: true}) //nolint:exhaustruct // intentional zero/partial fields
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}
 
-	if got := color.NRGBAModel.Convert(img.At(0, 0)).(color.NRGBA); got.A != 0 {
+	if got := asNRGBA(img.At(0, 0)); got.A != 0 {
 		t.Errorf("background alpha = %d, want 0 (transparent)", got.A)
 	}
 
-	if count := countPixels(img, image.Rect(0, 0, 200, img.Bounds().Dy()), color.NRGBA{R: 255, A: 255}); count == 0 { //nolint:exhaustruct // intentional zero/partial fields
+	want := color.NRGBA{R: 255, A: 255} //nolint:exhaustruct // intentional zero/partial fields
+	if count := countPixels(img, image.Rect(0, 0, 200, img.Bounds().Dy()), want); count == 0 {
 		t.Error("no opaque red pixels found")
 	}
 }
@@ -155,7 +178,9 @@ func TestRenderCrop(t *testing.T) {
 
 	src := `<html><body><div style="background-color:#0000ff;width:120px;height:60px"></div></body></html>`
 
-	full, err := renderHTMLOpts(src, RenderOptions{Width: 200, Height: 100}) //nolint:exhaustruct // intentional zero/partial fields
+	full, err := renderHTMLOpts(src, RenderOptions{ //nolint:exhaustruct // intentional zero/partial fields
+		Width: 200, Height: 100,
+	})
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}
@@ -166,7 +191,9 @@ func TestRenderCrop(t *testing.T) {
 
 	crop := image.Rect(50, 50, 150, 100)
 
-	img, err := renderHTMLOpts(src, RenderOptions{Width: 200, Height: 100, Crop: crop}) //nolint:exhaustruct // intentional zero/partial fields
+	img, err := renderHTMLOpts(src, RenderOptions{ //nolint:exhaustruct // intentional zero/partial fields
+		Width: 200, Height: 100, Crop: crop,
+	})
 	if err != nil {
 		t.Fatalf("Render crop: %v", err)
 	}
@@ -176,8 +203,8 @@ func TestRenderCrop(t *testing.T) {
 	}
 
 	for _, p := range []image.Point{{0, 0}, {99, 49}, {50, 25}} {
-		want := color.NRGBAModel.Convert(full.At(p.X+50, p.Y+50)).(color.NRGBA)
-		got := color.NRGBAModel.Convert(img.At(p.X, p.Y)).(color.NRGBA)
+		want := asNRGBA(full.At(p.X+50, p.Y+50))
+		got := asNRGBA(img.At(p.X, p.Y))
 
 		if got != want {
 			t.Errorf("pixel %v = %v, want %v (matches uncropped)", p, got, want)
@@ -190,7 +217,9 @@ func TestRenderText(t *testing.T) {
 	t.Parallel()
 
 	img := renderHTML(t, `<html><body><b>Hi</b></body></html>`)
-	if count := countPixels(img, img.Bounds(), color.NRGBA{A: 255}); count == 0 { //nolint:exhaustruct // intentional zero/partial fields
+
+	want := color.NRGBA{A: 255} //nolint:exhaustruct // intentional zero/partial fields
+	if count := countPixels(img, img.Bounds(), want); count == 0 {
 		t.Fatal("canvas is entirely background")
 	}
 
@@ -198,7 +227,7 @@ func TestRenderText(t *testing.T) {
 
 	for row := img.Bounds().Min.Y; row < img.Bounds().Max.Y; row++ {
 		for col := img.Bounds().Min.X; col < img.Bounds().Max.X; col++ {
-			c := color.NRGBAModel.Convert(img.At(col, row)).(color.NRGBA)
+			c := asNRGBA(img.At(col, row))
 			if c.R < 100 && c.G < 100 && c.B < 100 {
 				dark++
 			}
@@ -217,12 +246,15 @@ func TestRenderImageDataURI(t *testing.T) {
 	src := `<html><body><img src="data:image/png;base64,` +
 		base64.StdEncoding.EncodeToString(raw) + `"></body></html>`
 
-	img, err := renderHTMLOpts(src, RenderOptions{Images: dataURIImages}) //nolint:exhaustruct // intentional zero/partial fields
+	img, err := renderHTMLOpts(src, RenderOptions{ //nolint:exhaustruct // intentional zero/partial fields
+		Images: dataURIImages,
+	})
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}
 	// the image sits at the body margin (8 px) with natural size 16x16
-	if count := countPixels(img, image.Rect(8, 8, 8+16, 8+16), color.NRGBA{R: 255, A: 255}); count == 0 { //nolint:exhaustruct // intentional zero/partial fields
+	want := color.NRGBA{R: 255, A: 255} //nolint:exhaustruct // intentional zero/partial fields
+	if count := countPixels(img, image.Rect(8, 8, 8+16, 8+16), want); count == 0 {
 		t.Error("no red pixels in the <img> region")
 	}
 }
@@ -235,11 +267,14 @@ func TestScaleNearest(t *testing.T) {
 	src.SetNRGBA(0, 0, color.NRGBA{R: 255, A: 255}) //nolint:exhaustruct // intentional zero/partial fields
 
 	dst := scaleNearest(src, 4, 4)
-	if got := dst.At(0, 0); color.NRGBAModel.Convert(got) != (color.NRGBA{R: 255, A: 255}) { //nolint:exhaustruct // intentional zero/partial fields
+
+	wantRed := color.NRGBA{R: 255, A: 255} //nolint:exhaustruct // intentional zero/partial fields
+	if got := dst.At(0, 0); color.NRGBAModel.Convert(got) != wantRed {
 		t.Errorf("scaled (0,0) = %v, want red", got)
 	}
 
-	if got := dst.At(3, 3); color.NRGBAModel.Convert(got) != (color.NRGBA{}) { //nolint:exhaustruct // intentional zero/partial fields
+	wantEmpty := color.NRGBA{} //nolint:exhaustruct // intentional zero/partial fields
+	if got := dst.At(3, 3); color.NRGBAModel.Convert(got) != wantEmpty {
 		t.Errorf("scaled (3,3) = %v, want transparent", got)
 	}
 }
@@ -256,10 +291,10 @@ func TestScaleNearestNRGBAMatchesGeneric(t *testing.T) {
 	for row := range 2 {
 		for col := range 3 {
 			src.SetNRGBA(col, row, color.NRGBA{
-				R: uint8(20 + col*30),
-				G: uint8(40 + row*50),
-				B: uint8(60 + col*10 + row*5),
-				A: uint8(100 + col*40 + row*20),
+				R: uint8(20 + col*30),           //nolint:gosec // test pattern values stay in uint8 range
+				G: uint8(40 + row*50),           //nolint:gosec // test pattern values stay in uint8 range
+				B: uint8(60 + col*10 + row*5),   //nolint:gosec // test pattern values stay in uint8 range
+				A: uint8(100 + col*40 + row*20), //nolint:gosec // test pattern values stay in uint8 range
 			})
 		}
 	}
@@ -289,8 +324,7 @@ func TestDownscaleBoxUsesExactNRGBAAverages(t *testing.T) {
 	}
 }
 
-// TestEncodeFormats checks PNG and JPEG encode and that JPEG quality moves
-// the output size (plumbing of --format/--quality).
+// TestEncodeFormats checks PNG and JPEG encode with the expected dimensions.
 func TestEncodeFormats(t *testing.T) {
 	t.Parallel()
 
@@ -319,16 +353,22 @@ func TestEncodeFormats(t *testing.T) {
 	if dec.Bounds().Dx() != 64 || dec.Bounds().Dy() != 64 {
 		t.Errorf("jpeg size = %v, want 64x64", dec.Bounds())
 	}
+}
 
-	// quality must change the compressed size on noisy content
+// TestEncodeJPEGQualityChangesSize checks that --quality moves the compressed
+// size (plumbing of --format/--quality) on noisy content.
+func TestEncodeJPEGQualityChangesSize(t *testing.T) {
+	t.Parallel()
+
 	noise := image.NewNRGBA(image.Rect(0, 0, 100, 80))
-	rng := rand.New(rand.NewSource(7))
+	rng := rand.New(rand.NewSource(7)) //nolint:gosec // deterministic test input, not security
 
 	for row := range 80 {
 		for col := range 100 {
 			noise.SetNRGBA(col, row, color.NRGBA{
-				R: uint8(rng.Intn(256)), G: uint8(rng.Intn(256)),
-				B: uint8(rng.Intn(256)), A: 255,
+				R: uint8(rng.Intn(256)), G: uint8(rng.Intn(256)), //nolint:gosec // rng.Intn(256) fits uint8
+				B: uint8(rng.Intn(256)), //nolint:gosec // rng.Intn(256) fits uint8
+				A: 255,
 			})
 		}
 	}
@@ -372,7 +412,9 @@ func TestRunEndToEnd(t *testing.T) {
 	dir := t.TempDir()
 
 	input := filepath.Join(dir, "in.html")
-	if err := os.WriteFile(input, []byte(`<html><body><div style="background-color:#ff0000;width:100px;height:50px"></div></body></html>`), 0o644); err != nil {
+	inputHTML := `<html><body><div style="background-color:#ff0000;width:100px;height:50px"></div></body></html>`
+
+	if err := os.WriteFile(input, []byte(inputHTML), 0o600); err != nil {
 		t.Fatalf("write input: %v", err)
 	}
 
@@ -430,7 +472,9 @@ func TestSmartWidth(t *testing.T) {
 
 	src := `<html><body><div style="width:1500px;height:10px;background-color:#0000ff"></div></body></html>`
 
-	smart, err := renderHTMLOpts(src, RenderOptions{Width: 1024, SmartWidth: true}) //nolint:exhaustruct // intentional zero/partial fields
+	smart, err := renderHTMLOpts(src, RenderOptions{ //nolint:exhaustruct // intentional zero/partial fields
+		Width: 1024, SmartWidth: true,
+	})
 	if err != nil {
 		t.Fatalf("Render smart: %v", err)
 	}
@@ -439,7 +483,9 @@ func TestSmartWidth(t *testing.T) {
 		t.Errorf("smart width canvas = %d, want 1536 (1024*1.5)", got)
 	}
 
-	fixed, err := renderHTMLOpts(src, RenderOptions{Width: 1024, SmartWidth: false}) //nolint:exhaustruct // intentional zero/partial fields
+	fixed, err := renderHTMLOpts(src, RenderOptions{ //nolint:exhaustruct // intentional zero/partial fields
+		Width: 1024, SmartWidth: false,
+	})
 	if err != nil {
 		t.Fatalf("Render fixed: %v", err)
 	}
@@ -453,7 +499,9 @@ func TestSmartWidth(t *testing.T) {
 		t.Fatalf("parse: %v", err)
 	}
 
-	def, err := Render(defRoot, RenderOptions{Width: 0, SmartWidth: false, Background: true}) //nolint:exhaustruct // intentional zero/partial fields
+	def, err := Render(defRoot, RenderOptions{ //nolint:exhaustruct // intentional zero/partial fields
+		Width: 0, SmartWidth: false, Background: true,
+	})
 	if err != nil {
 		t.Fatalf("Render default: %v", err)
 	}

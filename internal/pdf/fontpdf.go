@@ -7,12 +7,17 @@ import (
 	"strings"
 )
 
+// pdfNameSafe reports whether r is allowed inside a PDF name token.
+func pdfNameSafe(r rune) bool {
+	return (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' || r == '_'
+}
+
 // pdfNameToken keeps only characters safe in a PDF name token.
 func pdfNameToken(s string) string {
 	var buf strings.Builder
 
 	for _, r := range s {
-		if (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+		if pdfNameSafe(r) {
 			buf.WriteRune(r)
 		}
 	}
@@ -99,7 +104,7 @@ func (d *Document) ensureToUnicode(sub *subsetResult, codeBytes int) objRef {
 	// code → unicode (code == rune for both simple Latin-1 and Identity-H CIDs)
 	type m struct{ code, r rune }
 
-	var maps []m
+	maps := make([]m, 0, len(sub.glyphIDs))
 	for r := range sub.glyphIDs {
 		maps = append(maps, m{code: r, r: r})
 	}

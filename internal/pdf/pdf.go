@@ -17,6 +17,11 @@ import (
 	"time"
 )
 
+var (
+	errPDFFinalized = errors.New("pdf: document already finalized")
+	errPDFNoPages   = errors.New("pdf: no pages")
+)
+
 // Version is the PDF header version emitted.
 const Version = "1.4"
 
@@ -183,10 +188,11 @@ func (d *Document) PageAt(idx int) *Page {
 // permutation of the current page indices; anything else is an error.
 func (d *Document) ReorderPages(order []int) error {
 	if d.finalized {
-		return errors.New("pdf: reorder: document already finalized")
+		return errPDFFinalized
 	}
 
 	if len(order) != len(d.pages) {
+		//nolint:err113 // dynamic counts in message
 		return fmt.Errorf("pdf: reorder: order has %d entries, document has %d pages",
 			len(order), len(d.pages))
 	}
@@ -196,10 +202,12 @@ func (d *Document) ReorderPages(order []int) error {
 
 	for index, idx := range order {
 		if idx < 0 || idx >= len(d.pages) {
+			//nolint:err113 // dynamic index in message
 			return fmt.Errorf("pdf: reorder: index %d out of range (0..%d)", idx, len(d.pages)-1)
 		}
 
 		if seen[idx] {
+			//nolint:err113 // dynamic index in message
 			return fmt.Errorf("pdf: reorder: index %d appears more than once", idx)
 		}
 
@@ -220,10 +228,11 @@ func (d *Document) ReorderPages(order []int) error {
 // copies/collate page runs before ReorderPages.
 func (d *Document) DuplicatePage(idx int) (*Page, error) {
 	if d.finalized {
-		return nil, errors.New("pdf: duplicate: document already finalized")
+		return nil, errPDFFinalized
 	}
 
 	if idx < 0 || idx >= len(d.pages) {
+		//nolint:err113 // dynamic index in message
 		return nil, fmt.Errorf("pdf: duplicate: page index %d out of range (0..%d)", idx, len(d.pages)-1)
 	}
 
@@ -251,7 +260,13 @@ func (p *Page) AddLinkURI(rect [4]float64, uri string) {
 
 // AddLinkDest adds an internal GoTo annotation to a page (0-based index).
 func (p *Page) AddLinkDest(rect [4]float64, page int, x, y float64) {
-	p.annots = append(p.annots, annotation{rect: rect, destPage: page, destX: x, destY: y, hasDest: true}) //nolint:exhaustruct // intentional zero-value fields
+	p.annots = append(p.annots, annotation{ //nolint:exhaustruct // intentional zero-value fields
+		rect:     rect,
+		destPage: page,
+		destX:    x,
+		destY:    y,
+		hasDest:  true,
+	})
 }
 
 // Outline is a PDF outline (bookmark) node.
@@ -312,9 +327,12 @@ func (d *Document) Write(width io.Writer) error {
 	fmt.Fprintln(&buf, "trailer")
 	fmt.Fprintf(&buf, "<< /Size %d /Root %s /Info %s >>\n", len(d.objects)+1, d.catalogRef, d.infoRef)
 	fmt.Fprintf(&buf, "startxref\n%d\n%%%%EOF\n", xrefPos)
-	_, err := width.Write(buf.Bytes())
 
-	return err
+	if _, err := width.Write(buf.Bytes()); err != nil {
+		return fmt.Errorf("pdf: write: %w", err)
+	}
+
+	return nil
 }
 
 // WriteTo implements io.WriterTo.
@@ -325,7 +343,7 @@ func (d *Document) WriteTo(width io.Writer) (int64, error) {
 	}
 
 	if _, err := width.Write(buf.Bytes()); err != nil {
-		return 0, err
+		return 0, fmt.Errorf("pdf: write: %w", err)
 	}
 
 	return int64(buf.Len()), nil
@@ -339,14 +357,14 @@ func (d *Document) finalize() error {
 	}
 
 	if len(d.pages) == 0 {
-		return errors.New("pdf: no pages")
+		return errPDFNoPages
 	}
 
 	catalogRef := d.newObject()
 	infoRef := d.newObject()
 	pagesRef := d.newObject()
 
-	var pageRefs []string
+	pageRefs := make([]string, 0, len(d.pages))
 	for _, p := range d.pages {
 		pageRefs = append(pageRefs, p.ref.String())
 	}
@@ -366,31 +384,8 @@ func (d *Document) finalize() error {
 		}
 	}
 
-	cat := dict{}.add("/Type", "/Catalog").add("/Pages", pagesRef.String())
-	if d.outlineRoot != nil {
-		cat = cat.add("/Outlines", d.outlineRoot.refStr.String()).add("/PageMode", "/UseOutlines")
-	}
-
-	d.setDict(catalogRef, cat.String())
-
-	// info dict
-	now := d.creationTime
-	if now.IsZero() {
-		now = time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC) // deterministic default
-	}
-
-	info := dict{}
-	for _, k := range []string{"Title", "Subject", "Author", "Keywords"} {
-		if v, ok := d.info[k]; ok && v != "" {
-			info = info.add("/"+k, pdfString(v))
-		}
-	}
-
-	info = info.add("/Creator", pdfString(d.info["Creator"])).
-		add("/Producer", pdfString("gowkhtmltopdf "+Version)).
-		add("/CreationDate", pdfString(pdfDate(now))).
-		add("/ModDate", pdfString(pdfDate(now)))
-	d.setDict(infoRef, info.String())
+	d.setDict(catalogRef, catalogDict(d.outlineRoot, pagesRef))
+	d.setDict(infoRef, d.infoDict())
 
 	// per-page objects
 	for _, p := range d.pages {
@@ -406,24 +401,87 @@ func (d *Document) finalize() error {
 	return nil
 }
 
-func (d *Document) finalizePage(p *Page, pagesRef objRef) error {
-	raw := p.content.Bytes()
-	if d.useCompression {
-		raw = flateBytes(raw)
-		d.setStream(p.contentRef, raw)
-		d.setDict(p.contentRef, "<< /Length "+strconv.Itoa(len(raw))+" /Filter /FlateDecode >>")
-	} else {
-		d.setStream(p.contentRef, raw)
-		d.setDict(p.contentRef, "<< /Length "+strconv.Itoa(len(raw))+" >>")
+// catalogDict builds the /Catalog dictionary, wiring /Outlines when set.
+func catalogDict(outlineRoot *Outline, pagesRef objRef) string {
+	cat := dict{}.add("/Type", "/Catalog").add("/Pages", pagesRef.String())
+	if outlineRoot != nil {
+		cat = cat.add("/Outlines", outlineRoot.refStr.String()).add("/PageMode", "/UseOutlines")
 	}
 
-	// resources: fonts + images used by content
-	fonts, err := p.content.fonts()
+	return cat.String()
+}
+
+// infoDict builds the /Info dictionary with the (injectable) timestamps.
+func (d *Document) infoDict() string {
+	now := d.creationTime
+	if now.IsZero() {
+		now = time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC) // deterministic default
+	}
+
+	info := dict{}
+	for _, k := range []string{"Title", "Subject", "Author", "Keywords"} {
+		if v, ok := d.info[k]; ok && v != "" {
+			info = info.add("/"+k, pdfString(v))
+		}
+	}
+
+	return info.add("/Creator", pdfString(d.info["Creator"])).
+		add("/Producer", pdfString("gowkhtmltopdf "+Version)).
+		add("/CreationDate", pdfString(pdfDate(now))).
+		add("/ModDate", pdfString(pdfDate(now))).
+		String()
+}
+
+func (d *Document) finalizePage(page *Page, pagesRef objRef) error {
+	raw := page.content.Bytes()
+	if d.useCompression {
+		raw = flateBytes(raw)
+		d.setDict(page.contentRef, "<< /Length "+strconv.Itoa(len(raw))+" /Filter /FlateDecode >>")
+	} else {
+		d.setDict(page.contentRef, "<< /Length "+strconv.Itoa(len(raw))+" >>")
+	}
+
+	d.setStream(page.contentRef, raw)
+
+	res, err := buildPageResources(page.content)
 	if err != nil {
 		return err
 	}
 
-	imgResources := p.content.imageResources()
+	parts := []string{
+		"<< /Type /Page",
+		"/Parent " + pagesRef.String(),
+		fmt.Sprintf("/MediaBox [0 0 %s %s]", num(page.width), num(page.height)),
+		"/Resources " + res,
+		"/Contents " + page.contentRef.String(),
+	}
+
+	if len(page.annots) > 0 {
+		d.buildAnnots(page)
+
+		var refs []string
+		for _, a := range page.annots {
+			refs = append(refs, a.annotRef.String())
+		}
+
+		parts = append(parts, "/Annots ["+strings.Join(refs, " ")+"]")
+	}
+
+	parts = append(parts, ">>")
+	d.setDict(page.ref, strings.Join(parts, "\n"))
+
+	return nil
+}
+
+// buildPageResources assembles the /Resources dict from the content's fonts
+// and images.
+func buildPageResources(content *Content) (string, error) {
+	fonts, err := content.fonts()
+	if err != nil {
+		return "", err
+	}
+
+	imgResources := content.imageResources()
 
 	var res strings.Builder
 
@@ -449,35 +507,13 @@ func (d *Document) finalizePage(p *Page, pagesRef objRef) error {
 		res.WriteString(" >>")
 	}
 
-	if gs := p.content.extGState(); gs != "" {
+	if gs := content.extGState(); gs != "" {
 		res.WriteString(" " + gs)
 	}
 
 	res.WriteString(" >>")
 
-	parts := []string{
-		"<< /Type /Page",
-		"/Parent " + pagesRef.String(),
-		fmt.Sprintf("/MediaBox [0 0 %s %s]", num(p.width), num(p.height)),
-		"/Resources " + res.String(),
-		"/Contents " + p.contentRef.String(),
-	}
-
-	if len(p.annots) > 0 {
-		d.buildAnnots(p)
-
-		var refs []string
-		for _, a := range p.annots {
-			refs = append(refs, a.annotRef.String())
-		}
-
-		parts = append(parts, "/Annots ["+strings.Join(refs, " ")+"]")
-	}
-
-	parts = append(parts, ">>")
-	d.setDict(p.ref, strings.Join(parts, "\n"))
-
-	return nil
+	return res.String(), nil
 }
 
 func (d *Document) buildAnnots(p *Page) {
@@ -529,22 +565,18 @@ func (d *Document) finalizeOutlines(root *Outline) error {
 
 // buildOutlineItems writes each child item of parent, with /Parent /Prev
 // /Next sibling links, recursing into nested children.
-func buildOutlineItems(parent *Outline, parentRef objRef, d *Document) error {
+func buildOutlineItems(parent *Outline, parentRef objRef, doc *Document) error {
 	for idx, child := range parent.Children {
 		var parts []string
 		parts = append(parts, "<< /Title "+pdfString(child.Title))
 
-		if child.PageRef != "" {
-			ref, ok := parseRef(child.PageRef)
-			if !ok {
-				return fmt.Errorf("pdf: outline %q: bad PageRef %q", child.Title, child.PageRef)
-			}
+		dest, err := outlineDest(child, doc)
+		if err != nil {
+			return err
+		}
 
-			if int(ref) < 1 || int(ref) > len(d.objects) {
-				return fmt.Errorf("pdf: outline %q: PageRef %q out of range", child.Title, child.PageRef)
-			}
-
-			parts = append(parts, fmt.Sprintf("/Dest [%s /XYZ %s %s null]", ref, num(child.X), num(child.Y)))
+		if dest != "" {
+			parts = append(parts, dest)
 		}
 
 		if len(child.Children) > 0 {
@@ -563,16 +595,38 @@ func buildOutlineItems(parent *Outline, parentRef objRef, d *Document) error {
 		}
 
 		parts = append(parts, ">>")
-		d.setDict(child.refStr, strings.Join(parts, " "))
+		doc.setDict(child.refStr, strings.Join(parts, " "))
 
 		if len(child.Children) > 0 {
-			if err := buildOutlineItems(child, child.refStr, d); err != nil {
+			if err := buildOutlineItems(child, child.refStr, doc); err != nil {
 				return err
 			}
 		}
 	}
 
 	return nil
+}
+
+// outlineDest renders the /Dest entry for an outline item, or "" when the
+// item has no destination. A malformed or out-of-range PageRef fails the
+// document instead of emitting a corrupt /Dest.
+func outlineDest(child *Outline, doc *Document) (string, error) {
+	if child.PageRef == "" {
+		return "", nil
+	}
+
+	ref, ok := parseRef(child.PageRef)
+	if !ok {
+		//nolint:err113 // dynamic values in message
+		return "", fmt.Errorf("pdf: outline %q: bad PageRef %q", child.Title, child.PageRef)
+	}
+
+	if int(ref) < 1 || int(ref) > len(doc.objects) {
+		//nolint:err113 // dynamic values in message
+		return "", fmt.Errorf("pdf: outline %q: PageRef %q out of range", child.Title, child.PageRef)
+	}
+
+	return fmt.Sprintf("/Dest [%s /XYZ %s %s null]", ref, num(child.X), num(child.Y)), nil
 }
 
 func assignRefs(n *Outline, d *Document) {
@@ -697,6 +751,7 @@ type flateState struct {
 	zw  *zlib.Writer
 }
 
+//nolint:gochecknoglobals // compressor reuse across page streams; not a mutable global
 var flatePool sync.Pool
 
 // flateBytes compresses raw with zlib (RFC 1950). PDF /FlateDecode streams

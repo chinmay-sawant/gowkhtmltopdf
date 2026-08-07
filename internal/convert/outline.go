@@ -98,7 +98,7 @@ func docTitle(root *html.Node) string {
 // Lookup); DocPage is filled once in flatHeadings. Objects opted out of the
 // outline (UseOutline/IncludeInOutline false) are dropped here;
 // --exclude-from-outline is applied later via outline.BuildTree Options.Exclude.
-func collectObjectHeadings(root *html.Node, res *layout.Result, _ int, _ settings.PdfGlobal, obj settings.PdfObject, _ io.Writer) []*outline.Heading {
+func collectObjectHeadings(root *html.Node, res *layout.Result, _ int, _ settings.PdfGlobal, obj settings.PdfObject, _ io.Writer) []*outline.Heading { //nolint:lll // shared heading collection signature
 	if !obj.UseOutline || !obj.IncludeInOutline {
 		return nil
 	}
@@ -190,11 +190,13 @@ func emitOutline(doc *pdf.Document, tree *outline.Node, bodies []*objectState, t
 		obj := &pdf.Outline{Title: hVal.Title} //nolint:exhaustruct // intentional zero-value fields
 
 		docPage := hVal.DocPage
-		if st := bodyStateFor(bodies, docPage); st != nil {
-			locPage := docPage - st.offset
+		if stVal := bodyStateFor(bodies, docPage); stVal != nil {
+			locPage := docPage - stVal.offset
 			obj.PageRef = doc.PageRef(tocTotal + docPage)
-			loc := layout.ElementLocation{Page: locPage, X: hVal.X, Y: hVal.Y, W: hVal.W, H: hVal.H} //nolint:exhaustruct // intentional zero-value fields
-			obj.X, obj.Y = st.geom.pdfXY(loc)
+			loc := layout.ElementLocation{ //nolint:exhaustruct // intentional zero-value fields
+				Page: locPage, X: hVal.X, Y: hVal.Y, W: hVal.W, H: hVal.H,
+			}
+			obj.X, obj.Y = stVal.geom.pdfXY(loc)
 		}
 
 		for _, c := range num.Children {

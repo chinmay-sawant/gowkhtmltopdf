@@ -6,6 +6,20 @@ import (
 	"gowkhtmltopdf/internal/html"
 )
 
+const (
+	fxAround  = "space-around"
+	fxAuto    = "auto"
+	fxBetween = "space-between"
+	fxCenter  = "center"
+	fxColRev  = "column-reverse"
+	fxEnd     = "end"
+	fxEvenly  = "space-evenly"
+	fxRow     = "row"
+	fxStart   = "start"
+	fxStretch = "stretch"
+	fxWrapRev = "wrap-reverse"
+)
+
 type flexMeas struct {
 	n      *html.Node
 	baseW  float64
@@ -14,18 +28,40 @@ type flexMeas struct {
 	order  int
 }
 
+type flexColMeas struct {
+	n      *html.Node
+	baseH  float64
+	grow   float64
+	shrink float64
+}
+
+type flexLinePlace struct {
+	startChild int
+	endChild   int
+	y0         float64
+	h          float64
+}
+
+type flexPlacedItem struct {
+	box *box
+	h   float64
+	n   *html.Node
+}
+
 // buildFlex lays out a flex container (row or column) with a report-friendly
 // subset: justify-content, align-items/self, align-content, gap/row-gap/
 // column-gap, flex-grow/shrink/basis, order, wrap, and reverse directions.
 func (e *engine) buildFlex(node *html.Node, sty ResolvedStyle, availW, x, posY float64) *box {
 	ml := e.scalePt(sty.MarginLeft)
-	boxNode := &box{node: node, style: sty, kind: "block", x: x + ml, y: posY} //nolint:exhaustruct // intentional zero fields
+	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
+		node: node, style: sty, kind: "block", x: x + ml, y: posY,
+	}
 	boxNode.w = resolveUsedWidth(sty, availW, e)
 	contentX, contentW := e.contentBox(boxNode.x, boxNode.w, sty)
 	contentStart := len(e.ops)
 	curY := e.scalePt(sty.PaddingTop) + e.scalePt(sty.BorderTop.Width)
 
-	var kids []*html.Node
+	kids := make([]*html.Node, 0, len(node.Children))
 
 	for _, child := range node.Children {
 		if child.Type != html.ElementNode {
@@ -44,10 +80,10 @@ func (e *engine) buildFlex(node *html.Node, sty ResolvedStyle, availW, x, posY f
 
 	dir := sty.FlexDirection
 	if dir == "" {
-		dir = "row"
+		dir = fxRow
 	}
 
-	if dir == "column" || dir == "column-reverse" {
+	if dir == "column" || dir == fxColRev {
 		curY = e.flowFlexColumn(boxNode, kids, sty, contentW, contentX, posY, curY, rowGap)
 	} else {
 		curY = e.flowFlexRow(boxNode, kids, sty, contentW, contentX, posY, curY, colGap, rowGap)
@@ -78,96 +114,17 @@ func (e *engine) flowFlexRow(parent *box, kids []*html.Node, st ResolvedStyle, c
 		return cy
 	}
 
-	wrap := st.FlexWrap == "wrap" || st.FlexWrap == "wrap-reverse"
+	wrap := st.FlexWrap == "wrap" || st.FlexWrap == fxWrapRev
 	reverse := st.FlexDirection == "row-reverse"
+	items := e.flexRowItems(kids, contentW)
+	lines := flexWrapLines(items, wrap, reverse, st.FlexWrap == fxWrapRev, colGap, contentW)
 
-	items := make([]flexMeas, 0, len(kids))
-
-	for _, kid := range kids {
-		cstate := e.styles[kid]
-
-		gap := cstate.FlexGrow
-		if gap < 0 {
-			gap = 0
-		}
-
-		shval := cstate.FlexShrink
-		if shval < 0 {
-			shval = 1
-		}
-
-		items = append(items, flexMeas{
-			n: kid, baseW: e.flexItemBaseWidth(kid, cstate, contentW),
-			grow: gap, shrink: shval, order: cstate.FlexOrder,
-		})
-	}
-
-	sort.SliceStable(items, func(i, j int) bool { return items[i].order < items[j].order })
-
-	var lines [][]flexMeas
-
-	if !wrap {
-		line := items
-		if reverse {
-			reverseFlexMeas(line)
-		}
-
-		lines = [][]flexMeas{line}
-	} else {
-		var line []flexMeas
-
-		used := 0.0
-
-		for _, item := range items {
-			need := item.baseW
-			if len(line) > 0 {
-				need += colGap
-			}
-
-			if len(line) > 0 && used+need > contentW+1e-6 {
-				if reverse {
-					reverseFlexMeas(line)
-				}
-
-				lines = append(lines, line)
-				line = nil
-				used = 0
-				need = item.baseW
-			}
-
-			line = append(line, item)
-			used += need
-		}
-
-		if len(line) > 0 {
-			if reverse {
-				reverseFlexMeas(line)
-			}
-
-			lines = append(lines, line)
-		}
-
-		if st.FlexWrap == "wrap-reverse" {
-			for i, j := 0, len(lines)-1; i < j; i, j = i+1, j-1 {
-				lines[i], lines[j] = lines[j], lines[i]
-			}
-		}
-	}
-
-	type linePlace struct {
-		startChild int
-		endChild   int
-		y0         float64
-		h          float64
-	}
-	// Single-line flex with definite height: line cross size is the container
-	// content height (CSS flexbox §9.6), so align-items/self have room.
 	lineCross := -1.0
 	if !wrap {
 		lineCross = resolveContentHeight(st, e)
 	}
 
-	placed := make([]linePlace, 0, len(lines))
+	placed := make([]flexLinePlace, 0, len(lines))
 
 	for lidx, line := range lines {
 		startChild := 0
@@ -183,83 +140,171 @@ func (e *engine) flowFlexRow(parent *box, kids []*html.Node, st ResolvedStyle, c
 			endChild = len(parent.children)
 		}
 
-		placed = append(placed, linePlace{startChild: startChild, endChild: endChild, y0: yStart, h: cy - yStart})
+		placed = append(placed, flexLinePlace{startChild: startChild, endChild: endChild, y0: yStart, h: cy - yStart})
 
 		if lidx < len(lines)-1 {
 			cy += rowGap
 		}
 	}
 
-	// align-content: distribute free cross space when height is definite and
-	// wrapping produced multiple lines. Height:auto → pack at start (no-op).
-	contentH := resolveContentHeight(st, e)
-	if contentH >= 0 && len(placed) > 1 {
-		linesH := 0.0
-		for _, lp := range placed {
-			linesH += lp.h
+	return e.applyAlignContentRow(parent, st.AlignContent, placed, rowGap, resolveContentHeight(st, e), cy)
+}
+
+func (e *engine) flexRowItems(kids []*html.Node, contentW float64) []flexMeas {
+	items := make([]flexMeas, 0, len(kids))
+
+	for _, kid := range kids {
+		cstate := e.styles[kid]
+
+		grow := cstate.FlexGrow
+		if grow < 0 {
+			grow = 0
 		}
 
-		gapsH := rowGap * float64(len(placed)-1)
+		shrink := cstate.FlexShrink
+		if shrink < 0 {
+			shrink = 1
+		}
 
-		free := contentH - linesH - gapsH
-		if free > layoutEpsilon {
-			offsets := make([]float64, len(placed))
+		items = append(items, flexMeas{
+			n: kid, baseW: e.flexItemBaseWidth(kid, cstate, contentW),
+			grow: grow, shrink: shrink, order: cstate.FlexOrder,
+		})
+	}
 
-			switch st.AlignContent {
-			case "flex-end", "end":
-				for i := range offsets {
-					offsets[i] = free
-				}
-			case "center":
-				for i := range offsets {
-					offsets[i] = free / two
-				}
-			case "space-between":
-				step := free / float64(len(placed)-1)
-				for i := range offsets {
-					offsets[i] = step * float64(i)
-				}
-			case "space-around":
-				unit := free / float64(two*len(placed))
-				for i := range offsets {
-					offsets[i] = unit + 2*unit*float64(i)
-				}
-			case "space-evenly":
-				unit := free / float64(len(placed)+1)
-				for i := range offsets {
-					offsets[i] = unit * float64(i+1)
-				}
-			default:
-				// stretch / flex-start: pack at start
-			}
+	sort.SliceStable(items, func(i, j int) bool { return items[i].order < items[j].order })
 
-			if parent != nil {
-				for lpad, lpad2 := range placed {
-					deltaY := offsets[lpad]
-					if deltaY == 0 {
-						continue
-					}
+	return items
+}
 
-					for ci := lpad2.startChild; ci < lpad2.endChild && ci < len(parent.children); ci++ {
-						cb := parent.children[ci]
-						e.shiftBoxOps(cb, 0, deltaY)
-						cb.y += deltaY
-					}
-				}
-			}
+// flexWrapLines packs measured items into flex lines, honoring wrap mode and
+// reverse direction (item order within each line, then line order).
+func flexWrapLines(items []flexMeas, wrap, reverse, wrapReverse bool, colGap, contentW float64) [][]flexMeas {
+	if !wrap {
+		if reverse {
+			reverseFlexMeas(items)
+		}
 
-			last := placed[len(placed)-1]
-			cy = last.y0 + offsets[len(offsets)-1] + last.h
+		return [][]flexMeas{items}
+	}
+
+	var lines [][]flexMeas
+	var line []flexMeas
+	used := 0.0
+
+	for _, item := range items {
+		need := item.baseW
+		if len(line) > 0 {
+			need += colGap
+		}
+
+		if len(line) > 0 && used+need > contentW+1e-6 {
+			lines = append(lines, finalizeFlexLine(line, reverse))
+			line = nil
+			used = 0
+			need = item.baseW
+		}
+
+		line = append(line, item)
+		used += need
+	}
+
+	if len(line) > 0 {
+		lines = append(lines, finalizeFlexLine(line, reverse))
+	}
+
+	if wrapReverse {
+		for i, j := 0, len(lines)-1; i < j; i, j = i+1, j-1 {
+			lines[i], lines[j] = lines[j], lines[i]
 		}
 	}
 
-	return cy
+	return lines
+}
+
+func finalizeFlexLine(line []flexMeas, reverse bool) []flexMeas {
+	if reverse {
+		reverseFlexMeas(line)
+	}
+
+	return line
 }
 
 func reverseFlexMeas(line []flexMeas) {
 	for i, j := 0, len(line)-1; i < j; i, j = i+1, j-1 {
 		line[i], line[j] = line[j], line[i]
 	}
+}
+
+// applyAlignContentRow distributes free cross space between wrapped flex
+// lines when the container height is definite and wrapping produced multiple
+// lines. Height:auto → pack at start (no-op).
+func (e *engine) applyAlignContentRow(parent *box, alignContent string, placed []flexLinePlace, rowGap, contentH, cy float64) float64 {
+	if contentH < 0 || len(placed) <= 1 {
+		return cy
+	}
+
+	linesH := 0.0
+	for _, lp := range placed {
+		linesH += lp.h
+	}
+
+	free := contentH - linesH - rowGap*float64(len(placed)-1)
+	if free <= layoutEpsilon {
+		return cy
+	}
+
+	offsets := alignContentOffsets(alignContent, free, len(placed))
+
+	if parent != nil {
+		for i, lp := range placed {
+			deltaY := offsets[i]
+			if deltaY == 0 {
+				continue
+			}
+
+			e.shiftPlacedChildren(parent, lp.startChild, lp.endChild, deltaY)
+		}
+	}
+
+	last := placed[len(placed)-1]
+
+	return last.y0 + offsets[len(offsets)-1] + last.h
+}
+
+func (e *engine) shiftPlacedChildren(parent *box, startChild, endChild int, deltaY float64) {
+	for ci := startChild; ci < endChild && ci < len(parent.children); ci++ {
+		cb := parent.children[ci]
+		e.shiftBoxOps(cb, 0, deltaY)
+		cb.y += deltaY
+	}
+}
+
+// alignContentOffsets maps align-content to per-line cross-axis offsets.
+func alignContentOffsets(alignContent string, free float64, n int) []float64 {
+	base, step := 0.0, 0.0
+
+	switch alignContent {
+	case "flex-end", fxEnd:
+		base = free
+	case fxCenter:
+		base = free / two
+	case fxBetween:
+		step = free / float64(n-1)
+	case fxAround:
+		unit := free / float64(two*n)
+		base, step = unit, two*unit
+	case fxEvenly:
+		unit := free / float64(n+1)
+		base, step = unit, unit
+	}
+
+	offsets := make([]float64, n)
+	for i := range offsets {
+		offsets[i] = base + step*float64(i)
+	}
+
+	return offsets
 }
 
 // flexItemBaseWidth resolves the flex base size on the row main axis.
@@ -270,49 +315,13 @@ func (e *engine) flexItemBaseWidth(n *html.Node, cs ResolvedStyle, mainSize floa
 	pad := e.scalePt(cs.PaddingLeft) + e.scalePt(cs.PaddingRight) +
 		e.scalePt(cs.BorderLeft.Width) + e.scalePt(cs.BorderRight.Width)
 
+	if w, ok := e.flexSpecifiedBaseWidth(cs, mainSize, pad); ok {
+		return w
+	}
+
 	capW := mainSize
 	if capW < 0 {
 		capW = 1e9
-	}
-
-	if cs.FlexBasisPercent >= 0 {
-		if mainSize < 0 {
-			// Cyclic % basis → auto; fall through to width / content.
-		} else {
-			w := mainSize * cs.FlexBasisPercent / cssPercent
-			if cs.BoxSizing != "border-box" {
-				w += pad
-			}
-
-			return w
-		}
-	}
-
-	if cs.FlexBasis >= 0 {
-		w := e.scalePt(cs.FlexBasis)
-		if cs.BoxSizing != "border-box" {
-			w += pad
-		}
-
-		return w
-	}
-
-	if cs.WidthPercent >= 0 && mainSize >= 0 {
-		w := mainSize * cs.WidthPercent / cssPercent
-		if cs.BoxSizing != "border-box" {
-			w += pad
-		}
-
-		return w
-	}
-
-	if cs.Width >= 0 {
-		w := e.scalePt(cs.Width)
-		if cs.BoxSizing != "border-box" {
-			w += pad
-		}
-
-		return w
 	}
 
 	intr := e.measureCellContent(n, cs) + pad +
@@ -326,6 +335,33 @@ func (e *engine) flexItemBaseWidth(n *html.Node, cs ResolvedStyle, mainSize floa
 	}
 
 	return intr
+}
+
+// flexSpecifiedBaseWidth resolves a definite flex base size (flex-basis then
+// width). Cyclic percentage basis against an indefinite main size falls
+// through to the next specified size, then content.
+func (e *engine) flexSpecifiedBaseWidth(cs ResolvedStyle, mainSize, pad float64) (float64, bool) {
+	switch {
+	case cs.FlexBasisPercent >= 0 && mainSize >= 0:
+		return e.flexBoxSized(cs, mainSize*cs.FlexBasisPercent/cssPercent, pad), true
+	case cs.FlexBasis >= 0:
+		return e.flexBoxSized(cs, e.scalePt(cs.FlexBasis), pad), true
+	case cs.WidthPercent >= 0 && mainSize >= 0:
+		return e.flexBoxSized(cs, mainSize*cs.WidthPercent/cssPercent, pad), true
+	case cs.Width >= 0:
+		return e.flexBoxSized(cs, e.scalePt(cs.Width), pad), true
+	}
+
+	return 0, false
+}
+
+// flexBoxSized converts a content-box size to border-box when BoxSizing says so.
+func (e *engine) flexBoxSized(cs ResolvedStyle, size, pad float64) float64 {
+	if cs.BoxSizing != "border-box" {
+		return size + pad
+	}
+
+	return size
 }
 
 // flexMinMainSize is the content-based minimum main size (Flexbox §4.5 lite /
@@ -348,20 +384,7 @@ func (e *engine) flexMinMainSize(it flexMeas, mainSize float64) float64 {
 		e.scalePt(cstate.BorderLeft.Width) + e.scalePt(cstate.BorderRight.Width)
 	contentSug := intr + pad
 	// Specified size suggestion when width/% is definite against mainSize.
-	specSug := -1.0
-	if cstate.WidthPercent >= 0 && mainSize >= 0 {
-		specSug = mainSize * cstate.WidthPercent / cssPercent
-		if cstate.BoxSizing != "border-box" {
-			specSug += pad
-		}
-	} else if cstate.Width >= 0 {
-		specSug = e.scalePt(cstate.Width)
-		if cstate.BoxSizing != "border-box" {
-			specSug += pad
-		}
-	} else if it.baseW > 0 {
-		specSug = it.baseW
-	}
+	specSug := e.flexSpecifiedWidthSuggestion(cstate, it.baseW, mainSize, pad)
 
 	autoMin := contentSug
 	if specSug >= 0 && specSug < autoMin {
@@ -377,6 +400,19 @@ func (e *engine) flexMinMainSize(it flexMeas, mainSize float64) float64 {
 	}
 
 	return floor
+}
+
+func (e *engine) flexSpecifiedWidthSuggestion(cs ResolvedStyle, baseW, mainSize, pad float64) float64 {
+	switch {
+	case cs.WidthPercent >= 0 && mainSize >= 0:
+		return e.flexBoxSized(cs, mainSize*cs.WidthPercent/cssPercent, pad)
+	case cs.Width >= 0:
+		return e.flexBoxSized(cs, e.scalePt(cs.Width), pad)
+	case baseW > 0:
+		return baseW
+	}
+
+	return -1
 }
 
 // flexClampMainWidths applies min/max after grow/shrink, then re-resolves so
@@ -405,26 +441,20 @@ func (e *engine) flexClampMainWidths(items []flexMeas, widths []float64, content
 		sum += w
 	}
 
-	gapExtra := 0.0 // gaps already excluded from contentW by caller
-	_ = gapExtra
-
 	if sum <= contentW+1e-6 || contentW < 0 {
 		return
 	}
 
+	e.reshrinkFlexWidths(items, widths, contentW, mainSize, sum)
+}
+
+// reshrinkFlexWidths iteratively cuts flexible items back toward contentW,
+// freezing items at their min floors until the deficit is exhausted.
+func (e *engine) reshrinkFlexWidths(items []flexMeas, widths []float64, contentW, mainSize, sum float64) {
 	deficit := sum - contentW
+
 	for deficit > 1e-6 {
-		var shrinkable float64
-
-		for i, it := range items {
-			floor := e.flexMinMainSize(it, mainSize)
-
-			room := widths[i] - floor
-			if room > 1e-6 && it.shrink > 0 {
-				shrinkable += room
-			}
-		}
-
+		shrinkable := e.flexShrinkableRoom(items, widths, mainSize)
 		if shrinkable <= layoutEpsilon {
 			break
 		}
@@ -434,21 +464,7 @@ func (e *engine) flexClampMainWidths(items []flexMeas, widths []float64, content
 			step = shrinkable
 		}
 
-		for idx, it := range items {
-			floor := e.flexMinMainSize(it, mainSize)
-
-			room := widths[idx] - floor
-			if room <= 1e-6 || it.shrink <= 0 {
-				continue
-			}
-
-			cut := step * (room / shrinkable)
-
-			widths[idx] -= cut
-			if widths[idx] < floor {
-				widths[idx] = floor
-			}
-		}
+		e.cutFlexWidths(items, widths, mainSize, step, shrinkable)
 
 		sum = 0
 		for _, w := range widths {
@@ -468,8 +484,100 @@ func (e *engine) flexClampMainWidths(items []flexMeas, widths []float64, content
 	}
 }
 
+func (e *engine) flexShrinkableRoom(items []flexMeas, widths []float64, mainSize float64) float64 {
+	var roomSum float64
+
+	for i, it := range items {
+		floor := e.flexMinMainSize(it, mainSize)
+
+		room := widths[i] - floor
+		if room > 1e-6 && it.shrink > 0 {
+			roomSum += room
+		}
+	}
+
+	return roomSum
+}
+
+func (e *engine) cutFlexWidths(items []flexMeas, widths []float64, mainSize, step, shrinkable float64) {
+	for idx, it := range items {
+		floor := e.flexMinMainSize(it, mainSize)
+
+		room := widths[idx] - floor
+		if room <= 1e-6 || it.shrink <= 0 {
+			continue
+		}
+
+		cut := step * (room / shrinkable)
+
+		widths[idx] -= cut
+		if widths[idx] < floor {
+			widths[idx] = floor
+		}
+	}
+}
+
 func (e *engine) placeFlexLineMeasured(parent *box, st ResolvedStyle, items []flexMeas, contentW, contentX, y, cy, gap, lineCross float64) float64 {
+	widths := e.flexLineWidths(items, contentW, gap)
+
+	gaps := gap * float64(len(items)-1)
+	if gaps < 0 {
+		gaps = 0
+	}
+
+	sumW := 0.0
+	for _, w := range widths {
+		sumW += w
+	}
+
+	startX, justifyGap := justifyRowStart(st.JustifyContent, contentX, contentW, sumW, gaps, gap, len(items))
+
+	targetCross := lineCross
+	if targetCross < 0 {
+		targetCross = e.measureFlexCrossMax(items, widths, startX, y, cy, justifyGap)
+	}
+
+	built, rowH := e.buildRowItems(parent, st, items, widths, y, cy, startX, justifyGap, targetCross)
+
+	alignH := rowH
+	if lineCross > alignH {
+		alignH = lineCross
+	}
+
+	if targetCross > alignH {
+		alignH = targetCross
+	}
+
+	e.alignRowItems(st, built, y, cy, alignH)
+
+	if lineCross > rowH {
+		return cy + lineCross
+	}
+
+	if targetCross > rowH {
+		return cy + targetCross
+	}
+
+	return cy + rowH
+}
+
+// flexLineWidths resolves used main sizes: grow/shrink redistribution over
+// the line, then min/max clamping with floor-frozen re-shrink.
+func (e *engine) flexLineWidths(items []flexMeas, contentW, gap float64) []float64 {
+	widths := make([]float64, len(items))
+	for i, it := range items {
+		widths[i] = it.baseW
+	}
+
+	e.flexDistributeWidths(items, widths, contentW, gap)
+	e.flexClampMainWidths(items, widths, contentW, contentW)
+
+	return widths
+}
+
+func (e *engine) flexDistributeWidths(items []flexMeas, widths []float64, contentW, gap float64) {
 	var fixed, growSum, shrinkSum float64
+
 	for _, it := range items {
 		fixed += it.baseW
 		growSum += it.grow
@@ -482,160 +590,155 @@ func (e *engine) placeFlexLineMeasured(parent *box, st ResolvedStyle, items []fl
 	}
 
 	free := contentW - fixed - gaps
+	if free <= 0 || growSum <= 0 {
+		if free < 0 && shrinkSum > 0 {
+			e.flexShrinkWidths(items, widths, -free, shrinkSum, contentW)
+		}
 
-	widths := make([]float64, len(items))
+		return
+	}
+
 	for i, it := range items {
-		widths[i] = it.baseW
-	}
-
-	if free > 0 && growSum > 0 {
-		for i, it := range items {
-			if it.grow > 0 {
-				widths[i] += free * (it.grow / growSum)
-			}
-		}
-	} else if free < 0 && shrinkSum > 0 {
-		deficit := -free
-
-		for item, item2 := range items {
-			if item2.shrink <= 0 || item2.baseW <= 0 {
-				continue
-			}
-
-			share := (item2.shrink * item2.baseW) / shrinkSum
-			widths[item] -= deficit * share
-			floor := e.flexMinMainSize(item2, contentW)
-
-			if widths[item] < floor {
-				widths[item] = floor
-			}
+		if it.grow > 0 {
+			widths[i] += free * (it.grow / growSum)
 		}
 	}
-	// Clamp to min/max-width after grow/shrink; re-resolve when mins overflow.
-	e.flexClampMainWidths(items, widths, contentW, contentW)
+}
 
-	sumW := 0.0
-	for _, w := range widths {
-		sumW += w
-	}
-
-	totalW := sumW + gaps
-	startX := contentX
-	justifyGap := gap
-
-	switch st.JustifyContent {
-	case "flex-end", "end":
-		startX = contentX + (contentW - totalW)
-	case "center":
-		startX = contentX + (contentW-totalW)/two
-	case "space-between":
-		if len(items) > 1 {
-			rem := contentW - sumW
-			if rem > 0 {
-				justifyGap = rem / float64(len(items)-1)
-			}
-
-			startX = contentX
+func (e *engine) flexShrinkWidths(items []flexMeas, widths []float64, deficit, shrinkSum, contentW float64) {
+	for idx, it := range items {
+		if it.shrink <= 0 || it.baseW <= 0 {
+			continue
 		}
-	case "space-around":
-		if len(items) > 0 {
-			rem := contentW - sumW
-			if rem < 0 {
-				rem = 0
-			}
 
-			unit := rem / float64(two*len(items))
-			startX = contentX + unit
-			justifyGap = two * unit
-		}
-	case "space-evenly":
-		if len(items) > 0 {
-			rem := contentW - sumW
-			if rem < 0 {
-				rem = 0
-			}
+		share := (it.shrink * it.baseW) / shrinkSum
+		widths[idx] -= deficit * share
+		floor := e.flexMinMainSize(it, contentW)
 
-			unit := rem / float64(len(items)+1)
-			startX = contentX + unit
-			justifyGap = unit
+		if widths[idx] < floor {
+			widths[idx] = floor
 		}
 	}
+}
 
-	type placed struct {
-		box *box
-		h   float64
-		n   *html.Node
+// justifyRowStart resolves the main-axis start offset and gap for a row line
+// from justify-content, returning (startX, justifyGap).
+func justifyRowStart(justify string, contentX, contentW, sumW, gaps, gap float64, n int) (float64, float64) {
+	switch justify {
+	case "flex-end", fxEnd:
+		return contentX + contentW - sumW - gaps, gap
+	case fxCenter:
+		return contentX + (contentW-sumW-gaps)/two, gap
+	case fxBetween, fxAround, fxEvenly:
+		return justifyDistributed(justify, contentX, contentW, sumW, gap, n)
 	}
 
-	built := make([]placed, 0, len(items))
+	return contentX, gap
+}
+
+func justifyDistributed(justify string, contentX, contentW, sumW, gap float64, n int) (float64, float64) {
+	rem := contentW - sumW
+	if rem < 0 {
+		rem = 0
+	}
+
+	switch justify {
+	case fxBetween:
+		if n > 1 && rem > 0 {
+			return contentX, rem / float64(n-1)
+		}
+
+		return contentX, gap
+	case fxAround:
+		unit := rem / float64(two*n)
+
+		return contentX + unit, two * unit
+	case fxEvenly:
+		unit := rem / float64(n+1)
+
+		return contentX + unit, unit
+	}
+
+	return contentX, gap
+}
+
+// measureFlexCrossMax measures the tallest item to get the cross size for a
+// line when the container cross size is indefinite (noEmit measure pass).
+func (e *engine) measureFlexCrossMax(items []flexMeas, widths []float64, startX, y, cy, justifyGap float64) float64 {
+	was := e.noEmit
+	e.noEmit = true
+	maxH := 0.0
+	maxX := startX
+
+	for idx, it := range items {
+		cb := e.build(it.n, widths[idx], maxX, y+cy)
+		if cb != nil && cb.height > maxH {
+			maxH = cb.height
+		}
+
+		maxX += widths[idx]
+		if idx < len(items)-1 {
+			maxX += justifyGap
+		}
+	}
+
+	e.noEmit = was
+
+	return maxH
+}
+
+// forceFlexItemCrossSize sets a temporary border-box cross size on the item's
+// resolved style so build() honors flex-computed grow/shrink cross sizes.
+func (e *engine) forceFlexItemCrossSize(n *html.Node, forceH float64) {
+	if e.scale <= 0 {
+		return
+	}
+
+	cstate := e.styles[n]
+
+	if cstate.BoxSizing == "border-box" {
+		cstate.Height = forceH / e.scale
+	} else {
+		inner := forceH - e.scalePt(cstate.PaddingTop) - e.scalePt(cstate.PaddingBottom) -
+			e.scalePt(cstate.BorderTop.Width) - e.scalePt(cstate.BorderBottom.Width)
+		if inner < 0 {
+			inner = 0
+		}
+
+		cstate.Height = inner / e.scale
+	}
+
+	e.styles[n] = cstate
+}
+
+func (e *engine) buildRowItems(parent *box, st ResolvedStyle, items []flexMeas, widths []float64, y, cy, startX, justifyGap, targetCross float64) ([]flexPlacedItem, float64) {
+	built := make([]flexPlacedItem, 0, len(items))
 	rowH := 0.0
 	leftX := startX
 
-	// Cross-size target for align-items:stretch. Definite container height
-	// (lineCross) is the flex line cross size; otherwise measure content max.
-	targetCross := lineCross
-	if targetCross < 0 {
-		was := e.noEmit
-		e.noEmit = true
-		maxH := 0.0
-
-		maxX := startX
-		for idx, it := range items {
-			cb := e.build(it.n, widths[idx], maxX, y+cy)
-			if cb != nil && cb.height > maxH {
-				maxH = cb.height
-			}
-
-			maxX += widths[idx]
-			if idx < len(items)-1 {
-				maxX += justifyGap
-			}
-		}
-
-		e.noEmit = was
-		targetCross = maxH
-	}
-
-	for item, item2 := range items {
-		cstate := e.styles[item2.n]
+	for idx, it := range items {
+		cstate := e.styles[it.n]
 		origH := cstate.Height
 
 		forceStretch := flexItemCrossStretch(st, cstate) && targetCross > 0
 		if forceStretch {
 			// Used cross size = line cross size (border box), matching column
 			// main-size forcing so backgrounds fill the flex line (fixture-33).
-			padV := e.scalePt(cstate.PaddingTop) + e.scalePt(cstate.PaddingBottom) +
-				e.scalePt(cstate.BorderTop.Width) + e.scalePt(cstate.BorderBottom.Width)
-			forceH := targetCross
-
-			if e.scale > 0 {
-				if cstate.BoxSizing == "border-box" {
-					cstate.Height = forceH / e.scale
-				} else {
-					inner := forceH - padV
-					if inner < 0 {
-						inner = 0
-					}
-
-					cstate.Height = inner / e.scale
-				}
-
-				e.styles[item2.n] = cstate
-			}
+			e.forceFlexItemCrossSize(it.n, targetCross)
 		}
 
-		cblock := e.build(item2.n, widths[item], leftX, y+cy)
+		cblock := e.build(it.n, widths[idx], leftX, y+cy)
 
 		if forceStretch {
 			cstate.Height = origH
-			e.styles[item2.n] = cstate
+			e.styles[it.n] = cstate
 		}
 
 		if cblock == nil {
-			built = append(built, placed{n: item2.n}) //nolint:exhaustruct // intentional zero fields
+			built = append(built, flexPlacedItem{n: it.n}) //nolint:exhaustruct // intentional zero fields
 
-			leftX += widths[item]
-			if item < len(items)-1 {
+			leftX += widths[idx]
+			if idx < len(items)-1 {
 				leftX += justifyGap
 			}
 
@@ -652,47 +755,41 @@ func (e *engine) placeFlexLineMeasured(parent *box, st ResolvedStyle, items []fl
 			rowH = cblock.height
 		}
 
-		built = append(built, placed{box: cblock, h: cblock.height, n: item2.n})
+		built = append(built, flexPlacedItem{box: cblock, h: cblock.height, n: it.n})
 
 		if parent != nil {
 			parent.children = append(parent.children, cblock)
 		}
 
-		leftX += widths[item]
-		if item < len(items)-1 {
+		leftX += widths[idx]
+		if idx < len(items)-1 {
 			leftX += justifyGap
 		}
 	}
 
-	alignH := rowH
-	if lineCross >= 0 && lineCross > alignH {
-		alignH = lineCross
-	}
+	return built, rowH
+}
 
-	if targetCross > alignH {
-		alignH = targetCross
-	}
-
+// alignRowItems applies align-items/align-self offsets on the cross axis
+// within a line (stretch sizing happened during build).
+func (e *engine) alignRowItems(st ResolvedStyle, built []flexPlacedItem, y, cy, alignH float64) {
 	for _, page := range built {
 		if page.box == nil {
 			continue
 		}
 
 		align := st.AlignItems
-		if cs, ok := e.styles[page.n]; ok && cs.AlignSelf != "" && cs.AlignSelf != "auto" {
+		if cs, ok := e.styles[page.n]; ok && cs.AlignSelf != "" && cs.AlignSelf != fxAuto {
 			align = cs.AlignSelf
 		}
 
-		deltaY := 0.0
+		var deltaY float64
 
 		switch align {
-		case "flex-end", "end":
+		case "flex-end", fxEnd:
 			deltaY = (y + cy + alignH) - (page.box.y + page.box.height)
-		case "center":
-			deltaY = (y + cy + (alignH-page.box.height)/2) - page.box.y
-		default:
-			// stretch / flex-start / start: pack at cross-start (stretch already sized)
-			deltaY = 0
+		case fxCenter:
+			deltaY = (y + cy + (alignH-page.box.height)/two) - page.box.y
 		}
 
 		if deltaY != 0 {
@@ -700,16 +797,6 @@ func (e *engine) placeFlexLineMeasured(parent *box, st ResolvedStyle, items []fl
 			page.box.y += deltaY
 		}
 	}
-
-	if lineCross >= 0 && lineCross > rowH {
-		return cy + lineCross
-	}
-
-	if targetCross > rowH {
-		return cy + targetCross
-	}
-
-	return cy + rowH
 }
 
 // flexItemCrossStretch reports whether a flex item should stretch on the cross
@@ -717,15 +804,15 @@ func (e *engine) placeFlexLineMeasured(parent *box, st ResolvedStyle, items []fl
 func flexItemCrossStretch(cstate, cstate2 ResolvedStyle) bool {
 	align := cstate.AlignItems
 	if align == "" {
-		align = "stretch"
+		align = fxStretch
 	}
 
-	if cstate2.AlignSelf != "" && cstate2.AlignSelf != "auto" {
+	if cstate2.AlignSelf != "" && cstate2.AlignSelf != fxAuto {
 		align = cstate2.AlignSelf
 	}
 
 	switch align {
-	case "flex-start", "start", "flex-end", "end", "center":
+	case "flex-start", fxStart, "flex-end", fxEnd, fxCenter:
 		return false
 	}
 	// Definite height/% means the used cross size is already specified.
@@ -745,43 +832,7 @@ func (e *engine) flexItemBaseHeight(n *html.Node, cs ResolvedStyle, contentW, ma
 	padV := e.scalePt(cs.PaddingTop) + e.scalePt(cs.PaddingBottom) +
 		e.scalePt(cs.BorderTop.Width) + e.scalePt(cs.BorderBottom.Width)
 
-	if cs.FlexBasisPercent >= 0 {
-		if mainSize < 0 {
-			// Cyclic % basis → auto; fall through to height / content.
-		} else {
-			h := mainSize * cs.FlexBasisPercent / cssPercent
-			if cs.BoxSizing != "border-box" {
-				h += padV
-			}
-
-			return h
-		}
-	}
-
-	if cs.FlexBasis >= 0 {
-		h := e.scalePt(cs.FlexBasis)
-		if cs.BoxSizing != "border-box" {
-			h += padV
-		}
-
-		return h
-	}
-
-	if cs.HeightPercent >= 0 && mainSize >= 0 {
-		h := mainSize * cs.HeightPercent / cssPercent
-		if cs.BoxSizing != "border-box" {
-			h += padV
-		}
-
-		return h
-	}
-
-	if cs.Height >= 0 {
-		h := e.scalePt(cs.Height)
-		if cs.BoxSizing != "border-box" {
-			h += padV
-		}
-
+	if h, ok := e.flexSpecifiedBaseHeight(cs, mainSize, padV); ok {
 		return h
 	}
 
@@ -794,6 +845,21 @@ func (e *engine) flexItemBaseHeight(n *html.Node, cs ResolvedStyle, contentW, ma
 	}
 
 	return height
+}
+
+func (e *engine) flexSpecifiedBaseHeight(cs ResolvedStyle, mainSize, padV float64) (float64, bool) {
+	switch {
+	case cs.FlexBasisPercent >= 0 && mainSize >= 0:
+		return e.flexBoxSized(cs, mainSize*cs.FlexBasisPercent/cssPercent, padV), true
+	case cs.FlexBasis >= 0:
+		return e.flexBoxSized(cs, e.scalePt(cs.FlexBasis), padV), true
+	case cs.HeightPercent >= 0 && mainSize >= 0:
+		return e.flexBoxSized(cs, mainSize*cs.HeightPercent/cssPercent, padV), true
+	case cs.Height >= 0:
+		return e.flexBoxSized(cs, e.scalePt(cs.Height), padV), true
+	}
+
+	return 0, false
 }
 
 // flexMinCrossMainSize is the column-axis content-based min-height floor
@@ -822,20 +888,7 @@ func (e *engine) flexMinCrossMainSize(n *html.Node, baseH, mainSize float64) flo
 		contentSug = padV + e.scalePt(cstate.FontSize)*defaultLineHeightRatio
 	}
 
-	specSug := -1.0
-	if cstate.HeightPercent >= 0 && mainSize >= 0 {
-		specSug = mainSize * cstate.HeightPercent / cssPercent
-		if cstate.BoxSizing != "border-box" {
-			specSug += padV
-		}
-	} else if cstate.Height >= 0 {
-		specSug = e.scalePt(cstate.Height)
-		if cstate.BoxSizing != "border-box" {
-			specSug += padV
-		}
-	} else if baseH > 0 {
-		specSug = baseH
-	}
+	specSug := e.flexSpecifiedHeightSuggestion(cstate, baseH, mainSize, padV)
 
 	autoMin := contentSug
 	if specSug >= 0 && specSug < autoMin {
@@ -849,33 +902,75 @@ func (e *engine) flexMinCrossMainSize(n *html.Node, baseH, mainSize float64) flo
 	return floor
 }
 
-func (e *engine) flowFlexColumn(parent *box, kids []*html.Node, st ResolvedStyle, contentW, contentX, y, cy, gap float64) float64 {
-	type colMeas struct {
-		n      *html.Node
-		baseH  float64
-		grow   float64
-		shrink float64
+func (e *engine) flexSpecifiedHeightSuggestion(cs ResolvedStyle, baseH, mainSize, padV float64) float64 {
+	switch {
+	case cs.HeightPercent >= 0 && mainSize >= 0:
+		return e.flexBoxSized(cs, mainSize*cs.HeightPercent/cssPercent, padV)
+	case cs.Height >= 0:
+		return e.flexBoxSized(cs, e.scalePt(cs.Height), padV)
+	case baseH > 0:
+		return baseH
 	}
 
+	return -1
+}
+
+func (e *engine) flowFlexColumn(parent *box, kids []*html.Node, st ResolvedStyle, contentW, contentX, y, cy, gap float64) float64 {
 	contentH := resolveContentHeight(st, e)
-	items := make([]colMeas, 0, len(kids))
+	items := e.flexColumnItems(kids, contentW, contentH)
+
+	if len(items) == 0 {
+		return cy
+	}
+
+	if st.FlexDirection == fxColRev {
+		for i, j := 0, len(items)-1; i < j; i, j = i+1, j-1 {
+			items[i], items[j] = items[j], items[i]
+		}
+	}
+
+	heights := e.flexColumnHeights(items, contentH, gap)
+
+	gaps := gap * float64(len(items)-1)
+	if gaps < 0 {
+		gaps = 0
+	}
+
+	sumH := 0.0
+	for _, h := range heights {
+		sumH += h
+	}
+
+	startY, justifyGap := justifyColumnStart(st.JustifyContent, contentH, cy, sumH+gaps, sumH, gap, len(items))
+
+	endY := e.buildColumnItems(parent, st, items, heights, contentW, contentX, y, cy, startY, justifyGap)
+
+	if contentH >= 0 && endY < cy+contentH {
+		return cy + contentH
+	}
+
+	return endY
+}
+
+func (e *engine) flexColumnItems(kids []*html.Node, contentW, contentH float64) []flexColMeas {
+	items := make([]flexColMeas, 0, len(kids))
 
 	for _, kid := range kids {
 		cstate := e.styles[kid]
 
-		gap := cstate.FlexGrow
-		if gap < 0 {
-			gap = 0
+		grow := cstate.FlexGrow
+		if grow < 0 {
+			grow = 0
 		}
 
-		shval := cstate.FlexShrink
-		if shval < 0 {
-			shval = 1
+		shrink := cstate.FlexShrink
+		if shrink < 0 {
+			shrink = 1
 		}
 
-		items = append(items, colMeas{
+		items = append(items, flexColMeas{
 			n: kid, baseH: e.flexItemBaseHeight(kid, cstate, contentW, contentH),
-			grow: gap, shrink: shval,
+			grow: grow, shrink: shrink,
 		})
 	}
 
@@ -883,16 +978,12 @@ func (e *engine) flowFlexColumn(parent *box, kids []*html.Node, st ResolvedStyle
 		return e.styles[items[i].n].FlexOrder < e.styles[items[j].n].FlexOrder
 	})
 
-	if st.FlexDirection == "column-reverse" {
-		for i, j := 0, len(items)-1; i < j; i, j = i+1, j-1 {
-			items[i], items[j] = items[j], items[i]
-		}
-	}
+	return items
+}
 
-	if len(items) == 0 {
-		return cy
-	}
-
+// flexColumnHeights resolves used main sizes: grow/shrink redistribution over
+// the definite container height, then min/max-height clamping.
+func (e *engine) flexColumnHeights(items []flexColMeas, contentH, gap float64) []float64 {
 	heights := make([]float64, len(items))
 
 	var fixed, growSum, shrinkSum float64
@@ -904,105 +995,113 @@ func (e *engine) flowFlexColumn(parent *box, kids []*html.Node, st ResolvedStyle
 		shrinkSum += it.shrink * it.baseH
 	}
 
+	if contentH < 0 {
+		return heights
+	}
+
 	gaps := gap * float64(len(items)-1)
 	if gaps < 0 {
 		gaps = 0
 	}
 
+	free := contentH - fixed - gaps
+	if free > 0 && growSum > 0 {
+		e.flexGrowHeights(items, heights, free, growSum)
+	} else if free < 0 && shrinkSum > 0 {
+		e.flexShrinkHeights(items, heights, -free, shrinkSum, contentH)
+	}
+	// Re-apply min/max-height after grow/shrink (percentage re-resolve).
+	e.flexClampColumnHeights(items, heights, contentH)
+
+	return heights
+}
+
+func (e *engine) flexGrowHeights(items []flexColMeas, heights []float64, free, growSum float64) {
+	for i, it := range items {
+		if it.grow > 0 {
+			heights[i] += free * (it.grow / growSum)
+		}
+	}
+}
+
+func (e *engine) flexShrinkHeights(items []flexColMeas, heights []float64, deficit, shrinkSum, contentH float64) {
+	for idx, item := range items {
+		if item.shrink <= 0 || item.baseH <= 0 {
+			continue
+		}
+
+		share := (item.shrink * item.baseH) / shrinkSum
+		heights[idx] -= deficit * share
+		floor := e.flexMinCrossMainSize(item.n, item.baseH, contentH)
+
+		if heights[idx] < floor {
+			heights[idx] = floor
+		}
+	}
+}
+
+func (e *engine) flexClampColumnHeights(items []flexColMeas, heights []float64, contentH float64) {
+	for idx, it := range items {
+		cstate := e.styles[it.n]
+
+		floor := e.flexMinCrossMainSize(it.n, it.baseH, contentH)
+		if heights[idx] < floor {
+			heights[idx] = floor
+		}
+
+		if cstate.MaxHeight >= 0 {
+			mx := e.scalePt(cstate.MaxHeight)
+			if heights[idx] > mx {
+				heights[idx] = mx
+			}
+		}
+	}
+}
+
+// justifyColumnStart resolves the main-axis start offset and gap for a column
+// from justify-content, returning (startY, justifyGap).
+func justifyColumnStart(justify string, contentH, cy, totalH, sumH, gap float64, n int) (float64, float64) {
 	if contentH >= 0 {
-		free := contentH - fixed - gaps
-		if free > 0 && growSum > 0 {
-			for i, it := range items {
-				if it.grow > 0 {
-					heights[i] += free * (it.grow / growSum)
-				}
-			}
-		} else if free < 0 && shrinkSum > 0 {
-			deficit := -free
-
-			for idx, item := range items {
-				if item.shrink <= 0 || item.baseH <= 0 {
-					continue
-				}
-
-				share := (item.shrink * item.baseH) / shrinkSum
-				heights[idx] -= deficit * share
-				floor := e.flexMinCrossMainSize(item.n, item.baseH, contentH)
-
-				if heights[idx] < floor {
-					heights[idx] = floor
-				}
-			}
-		}
-		// Re-apply min/max-height after grow/shrink (percentage re-resolve).
-		for idx, it := range items {
-			cstate := e.styles[it.n]
-
-			floor := e.flexMinCrossMainSize(it.n, it.baseH, contentH)
-			if heights[idx] < floor {
-				heights[idx] = floor
-			}
-
-			if cstate.MaxHeight >= 0 {
-				mx := e.scalePt(cstate.MaxHeight)
-				if heights[idx] > mx {
-					heights[idx] = mx
-				}
-			}
+		switch justify {
+		case "flex-end", fxEnd:
+			return cy + contentH - totalH, gap
+		case fxCenter:
+			return cy + (contentH-totalH)/two, gap
+		case fxBetween, fxAround, fxEvenly:
+			return justifyColumnDistributed(justify, cy, contentH, sumH, gap, n)
 		}
 	}
 
-	sumH := 0.0
-	for _, h := range heights {
-		sumH += h
+	return cy, gap
+}
+
+func justifyColumnDistributed(justify string, cy, contentH, sumH, gap float64, n int) (float64, float64) {
+	rem := contentH - sumH
+	if rem < 0 {
+		rem = 0
 	}
 
-	totalH := sumH + gaps
-	startY := cy
-	justifyGap := gap
+	switch justify {
+	case fxBetween:
+		if n > 1 && rem > 0 {
+			return cy, rem / float64(n-1)
+		}
 
-	switch st.JustifyContent {
-	case "flex-end", "end":
-		if contentH >= 0 {
-			startY = cy + (contentH - totalH)
-		}
-	case "center":
-		if contentH >= 0 {
-			startY = cy + (contentH-totalH)/two
-		}
-	case "space-between":
-		if len(items) > 1 && contentH >= 0 {
-			rem := contentH - sumH
-			if rem > 0 {
-				justifyGap = rem / float64(len(items)-1)
-			}
+		return cy, gap
+	case fxAround:
+		unit := rem / float64(two*n)
 
-			startY = cy
-		}
-	case "space-around":
-		if len(items) > 0 && contentH >= 0 {
-			rem := contentH - sumH
-			if rem < 0 {
-				rem = 0
-			}
+		return cy + unit, two * unit
+	case fxEvenly:
+		unit := rem / float64(n+1)
 
-			unit := rem / float64(two*len(items))
-			startY = cy + unit
-			justifyGap = two * unit
-		}
-	case "space-evenly":
-		if len(items) > 0 && contentH >= 0 {
-			rem := contentH - sumH
-			if rem < 0 {
-				rem = 0
-			}
-
-			unit := rem / float64(len(items)+1)
-			startY = cy + unit
-			justifyGap = unit
-		}
+		return cy + unit, unit
 	}
 
+	return cy, gap
+}
+
+func (e *engine) buildColumnItems(parent *box, st ResolvedStyle, items []flexColMeas, heights []float64, contentW, contentX, y, cy, startY, justifyGap float64) float64 {
 	leftY := startY
 	endY := cy
 
@@ -1010,24 +1109,7 @@ func (e *engine) flowFlexColumn(parent *box, kids []*html.Node, st ResolvedStyle
 		cstate := e.styles[item.n]
 		origH := cstate.Height
 		// Force border-box height so grow/shrink targets stick through build.
-		padV := e.scalePt(cstate.PaddingTop) + e.scalePt(cstate.PaddingBottom) +
-			e.scalePt(cstate.BorderTop.Width) + e.scalePt(cstate.BorderBottom.Width)
-		forceH := heights[idx]
-
-		if e.scale > 0 {
-			if cstate.BoxSizing == "border-box" {
-				cstate.Height = forceH / e.scale
-			} else {
-				inner := forceH - padV
-				if inner < 0 {
-					inner = 0
-				}
-
-				cstate.Height = inner / e.scale
-			}
-
-			e.styles[item.n] = cstate
-		}
+		e.forceFlexItemCrossSize(item.n, heights[idx])
 
 		cblock := e.build(item.n, contentW, contentX, y+leftY)
 		cstate.Height = origH
@@ -1048,25 +1130,7 @@ func (e *engine) flowFlexColumn(parent *box, kids []*html.Node, st ResolvedStyle
 		cblock.x += dx
 		cblock.y += dy
 
-		align := st.AlignItems
-		if cstate.AlignSelf != "" && cstate.AlignSelf != "auto" {
-			align = cstate.AlignSelf
-		}
-
-		switch align {
-		case "center":
-			adx := contentX + (contentW-cblock.w)/2 - cblock.x
-			if adx != 0 {
-				e.shiftBoxOps(cblock, adx, 0)
-				cblock.x += adx
-			}
-		case "flex-end", "end":
-			adx := contentX + contentW - cblock.w - cblock.x
-			if adx != 0 {
-				e.shiftBoxOps(cblock, adx, 0)
-				cblock.x += adx
-			}
-		}
+		e.alignColumnItem(cblock, st, cstate, contentX, contentW)
 
 		if parent != nil {
 			parent.children = append(parent.children, cblock)
@@ -1081,11 +1145,29 @@ func (e *engine) flowFlexColumn(parent *box, kids []*html.Node, st ResolvedStyle
 		}
 	}
 
-	if contentH >= 0 && endY < cy+contentH {
-		return cy + contentH
+	return endY
+}
+
+func (e *engine) alignColumnItem(cblock *box, st ResolvedStyle, cs ResolvedStyle, contentX, contentW float64) {
+	align := st.AlignItems
+	if cs.AlignSelf != "" && cs.AlignSelf != fxAuto {
+		align = cs.AlignSelf
 	}
 
-	return endY
+	switch align {
+	case fxCenter:
+		adx := contentX + (contentW-cblock.w)/two - cblock.x
+		if adx != 0 {
+			e.shiftBoxOps(cblock, adx, 0)
+			cblock.x += adx
+		}
+	case "flex-end", fxEnd:
+		adx := contentX + contentW - cblock.w - cblock.x
+		if adx != 0 {
+			e.shiftBoxOps(cblock, adx, 0)
+			cblock.x += adx
+		}
+	}
 }
 
 // applyRelativeOffset shifts a position:relative box and its ops by top/left

@@ -61,20 +61,13 @@ func (d *Document) ensureFont(fnt *Font, used []rune) (objRef, error) {
 
 	pdfName := pdfNameToken(baseName)
 
-	fileRef, descRef, err := d.embedFontFile(fnt, sub, pdfName)
-	if err != nil {
-		return 0, err
-	}
+	fileRef, descRef := d.embedFontFile(fnt, sub, pdfName)
 
 	var ref objRef
 	if type0 {
-		ref, err = d.emitType0(fnt, sub, pdfName+"Identity", fileRef, descRef)
+		ref = d.emitType0(fnt, sub, pdfName+"Identity", fileRef, descRef)
 	} else {
-		ref, err = d.emitSimple(fnt, sub, pdfName, descRef)
-	}
-
-	if err != nil {
-		return 0, err
+		ref = d.emitSimple(fnt, sub, pdfName, descRef)
 	}
 
 	d.fontCache[key] = ref
@@ -84,9 +77,9 @@ func (d *Document) ensureFont(fnt *Font, used []rune) (objRef, error) {
 
 // embedFontFile emits the FontFile2 stream and its FontDescriptor, shared by
 // the simple and Type0 tails. fontName is the /FontName token without /.
-func (d *Document) embedFontFile(f *Font, sub *subsetResult, fontName string) (fileRef, descRef objRef, err error) {
-	fileRef = d.newObject()
-	descRef = d.newObject()
+func (d *Document) embedFontFile(fnt *Font, sub *subsetResult, fontName string) (objRef, objRef) {
+	fileRef := d.newObject()
+	descRef := d.newObject()
 
 	raw := flateBytes(sub.data)
 	d.setDict(fileRef, dict{}.add("/Length", strconv.Itoa(len(raw))).
@@ -94,29 +87,30 @@ func (d *Document) embedFontFile(f *Font, sub *subsetResult, fontName string) (f
 		add("/Length1", strconv.Itoa(len(sub.data))).String())
 	d.setStream(fileRef, raw)
 
-	xMin, yMin, xMax, yMax := f.PDFBBox()
+	xMin, yMin, xMax, yMax := fnt.PDFBBox()
 	flags := 32
 
 	italicAngle := 0
-	if f.Italic() {
+	if fnt.Italic() {
 		italicAngle = defaultItalicAngle
 		flags |= 64
 	}
 
-	if f.Bold() {
+	if fnt.Bold() {
 		flags |= 4
 	}
 
 	d.setDict(descRef, fmt.Sprintf(
-		"<< /Type /FontDescriptor /FontName /%s /Flags %d /FontBBox [%d %d %d %d] /ItalicAngle %d /Ascent %d /Descent %d /CapHeight %d /StemV 80 /FontFile2 %s >>",
+		"<< /Type /FontDescriptor /FontName /%s /Flags %d /FontBBox [%d %d %d %d] "+
+			"/ItalicAngle %d /Ascent %d /Descent %d /CapHeight %d /StemV 80 /FontFile2 %s >>",
 		fontName, flags, xMin, yMin, xMax, yMax, italicAngle,
-		f.PDFAscent(), f.PDFDescent(), f.PDFCapHeight(), fileRef))
+		fnt.PDFAscent(), fnt.PDFDescent(), fnt.PDFCapHeight(), fileRef))
 
-	return fileRef, descRef, nil
+	return fileRef, descRef
 }
 
 // emitSimple writes the simple TrueType font dict (WinAnsi single-byte).
-func (d *Document) emitSimple(f *Font, sub *subsetResult, pdfName string, descRef objRef) (objRef, error) {
+func (d *Document) emitSimple(f *Font, sub *subsetResult, pdfName string, descRef objRef) objRef {
 	first, last, widths := subsetWidths(sub, f.UnitsPerEm())
 	wspace := make([]string, len(widths))
 
@@ -135,53 +129,17 @@ func (d *Document) emitSimple(f *Font, sub *subsetResult, pdfName string, descRe
 		add("/Encoding", "/WinAnsiEncoding").
 		add("/ToUnicode", d.ensureToUnicode(sub, 1).String()).String())
 
-	return fontRef, nil
+	return fontRef
 }
 
 // emitType0 writes the CID-keyed Type0 font objects. Content streams must
 // show text as Identity-H CIDs equal to Unicode code points (see pdfHexCIDs).
-func (d *Document) emitType0(f *Font, sub *subsetResult, pdfName string, fileRef, descRef objRef) (objRef, error) {
+func (d *Document) emitType0(fnt *Font, sub *subsetResult, pdfName string, _ objRef, descRef objRef) objRef {
 	cidRef := d.newObject()
 	type0Ref := d.newObject()
 	mapRef := d.newObject()
 
-	// CIDToGIDMap: 2 bytes per CID from 0..maxCID.
-	maxCID := 0
-	for r := range sub.glyphIDs {
-		if int(r) > maxCID {
-			maxCID = int(r)
-		}
-	}
-
-	cidMap := make([]byte, (maxCID+1)*cidBytesPerEntry)
-	wspace := widthsInEm(sub, f.UnitsPerEm())
-
-	var wParts []string
-
-	type rw struct {
-		r rune
-		w float64
-	}
-
-	var rows []rw
-
-	for rVal, glob := range sub.glyphIDs {
-		cidMap[int(rVal)*cidBytesPerEntry] = byte(glob >> cidGlyphHighShift)
-		cidMap[int(rVal)*cidBytesPerEntry+1] = byte(glob)
-
-		adv := 0.0
-		if int(glob) < len(wspace) {
-			adv = wspace[glob]
-		}
-
-		rows = append(rows, rw{rVal, adv})
-	}
-
-	sort.Slice(rows, func(i, j int) bool { return rows[i].r < rows[j].r })
-
-	for _, row := range rows {
-		wParts = append(wParts, fmt.Sprintf("%d [%s]", row.r, num(row.w)))
-	}
+	cidMap, wParts := buildCIDMap(sub, fnt.UnitsPerEm())
 
 	mapRaw := cidMap // keep uncompressed; some viewers mishandle Flate CIDToGIDMap
 	d.setDict(mapRef, dict{}.add("/Length", strconv.Itoa(len(mapRaw))).String())
@@ -203,7 +161,50 @@ func (d *Document) emitType0(f *Font, sub *subsetResult, pdfName string, fileRef
 		add("/DescendantFonts", "["+cidRef.String()+"]").
 		add("/ToUnicode", d.ensureToUnicode(sub, toUnicodeTwoByte).String()).String())
 
-	return type0Ref, nil
+	return type0Ref
+}
+
+// buildCIDMap renders the CIDToGIDMap bytes and the sorted /W width runs.
+func buildCIDMap(sub *subsetResult, unitsPerEm int16) ([]byte, []string) {
+	// CIDToGIDMap: 2 bytes per CID from 0..maxCID.
+	maxCID := 0
+	for r := range sub.glyphIDs {
+		if int(r) > maxCID {
+			maxCID = int(r)
+		}
+	}
+
+	cidMap := make([]byte, (maxCID+1)*cidBytesPerEntry)
+	wspace := widthsInEm(sub, unitsPerEm)
+
+	wParts := make([]string, 0, len(sub.glyphIDs))
+
+	type rw struct {
+		r rune
+		w float64
+	}
+
+	rows := make([]rw, 0, len(sub.glyphIDs))
+
+	for rVal, glob := range sub.glyphIDs {
+		cidMap[int(rVal)*cidBytesPerEntry] = byte(glob >> cidGlyphHighShift)
+		cidMap[int(rVal)*cidBytesPerEntry+1] = byte(glob)
+
+		adv := 0.0
+		if int(glob) < len(wspace) {
+			adv = wspace[glob]
+		}
+
+		rows = append(rows, rw{rVal, adv})
+	}
+
+	sort.Slice(rows, func(i, j int) bool { return rows[i].r < rows[j].r })
+
+	for _, row := range rows {
+		wParts = append(wParts, fmt.Sprintf("%d [%s]", row.r, num(row.w)))
+	}
+
+	return cidMap, wParts
 }
 
 // pdfHexCIDs encodes s as an Identity-H hex string of Unicode CIDs.

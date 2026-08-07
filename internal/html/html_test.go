@@ -1,3 +1,4 @@
+//nolint:testpackage // tokenizer/tree internals (tokenize, tokenKind) are tested from the same package
 package html
 
 import (
@@ -162,28 +163,24 @@ func TestTokenizeComments(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(toks) != 5 {
-		t.Fatalf("got %d tokens, want 5: %+v", len(toks), toks)
+	want := []struct {
+		kind tokenKind
+		data string
+	}{
+		{tokText, "a"},
+		{tokComment, " hello "},
+		{tokText, "b"},
+		{tokComment, ""},
+		{tokText, "c"},
+	}
+	if len(toks) != len(want) {
+		t.Fatalf("got %d tokens, want %d: %+v", len(toks), len(want), toks)
 	}
 
-	if toks[0].kind != tokText || toks[0].data != "a" {
-		t.Errorf("token 0 = %+v", toks[0])
-	}
-
-	if toks[1].kind != tokComment || toks[1].data != " hello " {
-		t.Errorf("token 1 = %+v", toks[1])
-	}
-
-	if toks[2].kind != tokText || toks[2].data != "b" {
-		t.Errorf("token 2 = %+v", toks[2])
-	}
-
-	if toks[3].kind != tokComment || toks[3].data != "" {
-		t.Errorf("token 3 = %+v", toks[3])
-	}
-
-	if toks[4].kind != tokText || toks[4].data != "c" {
-		t.Errorf("token 4 = %+v", toks[4])
+	for i, wantTok := range want {
+		if toks[i].kind != wantTok.kind || toks[i].data != wantTok.data {
+			t.Errorf("token %d = %+v, want %+v", i, toks[i], wantTok)
+		}
 	}
 }
 
@@ -566,6 +563,7 @@ func TestParseHeadBodyTransition(t *testing.T) {
 	assertChildren(t, html, "head", "body")
 }
 
+//nolint:cyclop // sequential scenario assertions, not branch logic
 func TestParseTextMerging(t *testing.T) {
 	t.Parallel()
 	// adjacent text tokens merge into a single TextNode
@@ -693,6 +691,7 @@ func TestParseRawTextTree(t *testing.T) {
 	}
 }
 
+//nolint:cyclop,funlen // table-driven scenario checks (closures are the scenario assertions)
 func TestParseMalformed(t *testing.T) {
 	t.Parallel()
 
@@ -703,6 +702,8 @@ func TestParseMalformed(t *testing.T) {
 		{
 			src: `<p><b>bold`,
 			check: func(t *testing.T, root *Node) {
+				t.Helper()
+
 				p := root.FirstChild("p")
 				assertChildren(t, p, "b")
 				if got := root.TextContent(); got != "bold" {
@@ -713,6 +714,8 @@ func TestParseMalformed(t *testing.T) {
 		{
 			src: `</div>text`,
 			check: func(t *testing.T, root *Node) {
+				t.Helper()
+
 				for _, c := range root.Children {
 					if c.Type == ElementNode {
 						t.Errorf("stray end tag produced element:\n%s", treeString(root))
@@ -728,6 +731,8 @@ func TestParseMalformed(t *testing.T) {
 		{
 			src: `<div><span><p>x</div>`,
 			check: func(t *testing.T, root *Node) {
+				t.Helper()
+
 				div := root.FirstChild("div")
 				assertChildren(t, div, "span")
 				assertChildren(t, div.FirstChild("span"), "p")
@@ -736,6 +741,8 @@ func TestParseMalformed(t *testing.T) {
 		{
 			src: `<table><tr><td>cell`,
 			check: func(t *testing.T, root *Node) {
+				t.Helper()
+
 				table := root.FirstChild("table")
 				assertChildren(t, table, "tr")
 				assertChildren(t, table.FirstChild("tr"), "td")
@@ -747,6 +754,8 @@ func TestParseMalformed(t *testing.T) {
 		{
 			src: `<>empty<>`,
 			check: func(t *testing.T, root *Node) {
+				t.Helper()
+
 				if got := root.TextContent(); got != "<>empty<>" {
 					t.Errorf("TextContent = %q, want %q", got, "<>empty<>")
 				}
@@ -758,6 +767,8 @@ func TestParseMalformed(t *testing.T) {
 		{
 			src: `<div a=b/ c="d" e>`,
 			check: func(t *testing.T, root *Node) {
+				t.Helper()
+
 				div := root.FirstChild("div")
 				if div == nil {
 					t.Fatalf("no <div>:\n%s", treeString(root))
@@ -770,6 +781,8 @@ func TestParseMalformed(t *testing.T) {
 		{
 			src: `<ul><li>a<li>b`,
 			check: func(t *testing.T, root *Node) {
+				t.Helper()
+
 				assertChildren(t, root.FirstChild("ul"), "li", "li")
 			},
 		},

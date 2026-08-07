@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -10,7 +11,9 @@ import (
 	"gowkhtmltopdf/internal/pdf"
 )
 
-func TestCJKFontFamilyFallback(t *testing.T) {
+func TestCJKFontFamilyFallback(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	notoPath := filepath.Join("..", "..", "testdata", "fonts")
 
 	droidPath := "/usr/share/fonts/truetype/droid"

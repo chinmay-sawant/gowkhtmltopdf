@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -8,6 +9,7 @@ import (
 // outer perimeter). Missing internal rules show up as "broken" wiki tables.
 func TestCollapsedTableInternalBorders(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 table { border-collapse: collapse; width: 200pt; }
@@ -39,6 +41,7 @@ td, th { border: 1px solid #999; padding: 2pt; }
 // with no table or cell border declarations has no grid to paint.
 func TestCollapsedTableWithoutBordersDoesNotPaintGrid(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 table { border-collapse: collapse; width: 200pt; }
@@ -59,6 +62,7 @@ table { border-collapse: collapse; width: 200pt; }
 // bottom-only dotted border must not become a full solid-looking grid.
 func TestCollapsedTableUsesDeclaredBorderSides(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 table { border-collapse: collapse; width: 240pt; }

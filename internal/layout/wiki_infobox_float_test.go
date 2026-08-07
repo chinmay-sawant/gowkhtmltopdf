@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -10,6 +11,7 @@ import (
 
 func TestInfoboxResolvedWidth22em(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 body { margin: 0; font-size: 12pt; }
 @media (min-width: 640px) {
@@ -42,7 +44,8 @@ body { margin: 0; font-size: 12pt; }
 	walk(root)
 
 	sty := styles[table]
-	t.Logf("float=%q width=%.2f width%%=%.2f fontSize=%.2f display=%q", sty.Float, sty.Width, sty.WidthPercent, sty.FontSize, sty.Display)
+	t.Logf("float=%q width=%.2f width%%=%.2f fontSize=%.2f display=%q",
+		sty.Float, sty.Width, sty.WidthPercent, sty.FontSize, sty.Display)
 
 	if sty.Float != "right" {
 		t.Fatalf("float=%q, want right (min-width:640px rule)", sty.Float)
@@ -60,7 +63,9 @@ body { margin: 0; font-size: 12pt; }
 // TestWikiInfoboxFloatLeavesReadableTextColumn reproduces the Ana/wiki print
 // layout bug: a floated .infobox { width:22em } must leave a usable text
 // column (Chrome ~360pt on A4), not a ~120pt ribbon.
-func TestWikiInfoboxFloatLeavesReadableTextColumn(t *testing.T) {
+func TestWikiInfoboxFloatLeavesReadableTextColumn(t *testing.T) { //nolint:gocognit,cyclop,funlen
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 body { margin: 0; font-size: 12pt; }
 @media (min-width: 640px) {
@@ -79,14 +84,17 @@ p { font-size: 12pt; line-height: 16pt; text-align: left; }
 <tr><th>Born</th><td>30 April 1988 Havana</td></tr>
 <tr><th>Citizenship</th><td>Cuba Spain United States</td></tr>
 </table>
-<p>Ana Celia de Armas Caso is a Cuban-born actress holding Cuban Spanish and American citizenship in Hollywood films.</p>
-<p>She began her career in Cuba with a leading role in the romantic drama Mona and later moved to Spain and Hollywood studios.</p>
+<p>Ana Celia de Armas Caso is a Cuban-born actress holding Cuban Spanish and American citizenship in ` +
+		`Hollywood films.</p>
+<p>She began her career in Cuba with a leading role in the romantic drama ` +
+		`Mona and later moved to Spain and Hollywood studios.</p>
 </body></html>`
 
 	root, err := html.Parse(htmlSrc)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
 		Width: contentW, Height: 800, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true,
@@ -171,7 +179,9 @@ p { font-size: 12pt; line-height: 16pt; text-align: left; }
 	}
 }
 
-func TestWikiInfoboxFloatWithWideImage(t *testing.T) {
+func TestWikiInfoboxFloatWithWideImage(t *testing.T) { //nolint:cyclop,funlen
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 body { margin: 0; font-size: 12pt; }
 .infobox { float: right; clear: right; width: 22em; font-size: 88%; }
@@ -186,13 +196,15 @@ img { max-width: 100%; height: auto; }
 <table class="infobox"><tr><td><img src="photo.png" width="400" height="500"></td></tr>
 <tr><th>Born</th><td>30 April 1988</td></tr>
 </table>
-<p>Ana Celia de Armas Caso is a Cuban-born actress holding Cuban Spanish and American citizenship in Hollywood films today.</p>
+<p>Ana Celia de Armas Caso is a Cuban-born actress holding Cuban Spanish and American citizenship in ` +
+		`Hollywood films today.</p>
 </body></html>`
 
 	root, err := html.Parse(htmlSrc)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
 		Width: contentW, Height: 800, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true,

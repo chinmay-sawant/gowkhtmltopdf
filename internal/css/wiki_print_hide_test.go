@@ -1,18 +1,22 @@
-package css
+package css_test
 
 import (
 	"strings"
 	"testing"
+
+	"gowkhtmltopdf/internal/css"
 )
 
 func TestWikiPrintHideSelectorsParse(t *testing.T) {
 	t.Parallel()
 
 	rule := `#mw-navigation,.noprint,.mw-jump-link,.mw-portlet-lang,.toc .tocnumber{display:none}`
-	rule2 := `.vector-page-toolbar,.vector-header-start > *:not(.mw-logo),.vector-header-end,#mw-panel-toc,#vector-sticky-header,#p-lang-btn,.vector-menu-checkbox,nav,#vector-page-titlebar-toc,#footer{display:none}`
+	rule2 := ".vector-page-toolbar,.vector-header-start > *:not(.mw-logo),.vector-header-end," +
+		"#mw-panel-toc,#vector-sticky-header,#p-lang-btn,.vector-menu-checkbox,nav," +
+		"#vector-page-titlebar-toc,#footer{display:none}"
 
 	for _, src := range []string{rule, rule2} {
-		sheet, err := Parse(src)
+		sheet, err := css.Parse(src)
 		if err != nil {
 			t.Fatalf("Parse(%s): %v", src[:40], err)
 		}

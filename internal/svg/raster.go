@@ -19,8 +19,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/tdewolff/canvas"
-	"github.com/tdewolff/canvas/renderers/rasterizer"
+	"github.com/tdewolff/canvas"                      //nolint:depguard // sole SVG raster path, allowlisted (Makefile)
+	"github.com/tdewolff/canvas/renderers/rasterizer" //nolint:depguard // sole SVG raster path, allowlisted (Makefile)
 )
 
 const (
@@ -29,18 +29,26 @@ const (
 	viewBoxNumParts = 4
 )
 
+// Static errors returned by Rasterize; callers can match with errors.Is.
+var (
+	errNotSVG          = errors.New("svg: not SVG")
+	errCanvasEmptySize = errors.New("svg canvas: empty size")
+	errCanvasPanic     = errors.New("svg canvas: panic")
+	errCanvasZeroPixel = errors.New("svg canvas: zero pixel size")
+)
+
 // Rasterize decodes SVG XML into a PNG image via tdewolff/canvas only.
 // maxSide caps the longer edge in pixels (default 512).
 // On failure (not SVG, parse/draw error, empty size, or canvas panic),
 // returns err with nil pngBytes and zero w/h — callers must treat error
 // as "no image". There is no second rasterizer or shell fallback.
-func Rasterize(data []byte, maxSide int) (pngBytes []byte, w, h int, err error) {
+func Rasterize(data []byte, maxSide int) ([]byte, int, int, error) {
 	if maxSide <= 0 {
 		maxSide = 512
 	}
 
 	if !looksLikeSVG(data) {
-		return nil, 0, 0, errors.New("svg: not SVG")
+		return nil, 0, 0, errNotSVG
 	}
 
 	return rasterizeCanvas(data, maxSide)
@@ -54,11 +62,13 @@ func Rasterize(data []byte, maxSide int) (pngBytes []byte, w, h int, err error) 
 //
 // Canvas can panic on some malformed paths; recover turns that into a
 // clean error so <img src="bad.svg"> does not crash the converter.
+//
+//nolint:nonamedreturns // defer-recover must override the result values
 func rasterizeCanvas(data []byte, maxSide int) (pngBytes []byte, w, h int, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			pngBytes, w, h = nil, 0, 0
-			err = fmt.Errorf("svg canvas: panic: %v", r)
+			err = fmt.Errorf("%w: %v", errCanvasPanic, r)
 		}
 	}()
 
@@ -69,12 +79,33 @@ func rasterizeCanvas(data []byte, maxSide int) (pngBytes []byte, w, h int, err e
 
 	canvasW, canvasH := svgCanvas.Size()
 	if canvasW <= 0 || canvasH <= 0 {
-		return nil, 0, 0, errors.New("svg canvas: empty size")
+		return nil, 0, 0, errCanvasEmptySize
 	}
 
 	// Intrinsic CSS-pixel size from viewBox / width / height attributes.
 	targetW, targetH := svgCSSPixelSize(data, maxSide)
-	// Map canvas mm → target pixels.
+	dpmm := canvasDPMM(canvasW, canvasH, targetW, targetH)
+
+	img := rasterizer.Draw(svgCanvas, canvas.DPMM(dpmm), nil)
+	bounds := img.Bounds()
+
+	pixW, pixH := bounds.Dx(), bounds.Dy()
+	if pixW < 1 || pixH < 1 {
+		return nil, 0, 0, errCanvasZeroPixel
+	}
+
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		return nil, 0, 0, fmt.Errorf("svg canvas: encode: %w", err)
+	}
+
+	return buf.Bytes(), pixW, pixH, nil
+}
+
+// canvasDPMM maps the canvas mm size to the target CSS-pixel size: it picks
+// the resolution that keeps the longer edge within target, defaulting to CSS
+// 96dpi when the mapping is degenerate.
+func canvasDPMM(canvasW, canvasH float64, targetW, targetH int) float64 {
 	dpmm := float64(targetW) / canvasW
 	if alt := float64(targetH) / canvasH; alt > 0 && (dpmm <= 0 || math.Abs(alt-dpmm) > 1e-6) {
 		// Prefer the resolution that keeps the longer edge within target.
@@ -89,20 +120,7 @@ func rasterizeCanvas(data []byte, maxSide int) (pngBytes []byte, w, h int, err e
 		dpmm = cssDPI / mmPerInch
 	}
 
-	img := rasterizer.Draw(svgCanvas, canvas.DPMM(dpmm), nil)
-	bounds := img.Bounds()
-
-	pixW, pixH := bounds.Dx(), bounds.Dy()
-	if pixW < 1 || pixH < 1 {
-		return nil, 0, 0, errors.New("svg canvas: zero pixel size")
-	}
-
-	var buf bytes.Buffer
-	if err := png.Encode(&buf, img); err != nil {
-		return nil, 0, 0, err
-	}
-
-	return buf.Bytes(), pixW, pixH, nil
+	return dpmm
 }
 
 // svgCSSPixelSize returns the target raster size in CSS pixels (capped by
@@ -138,7 +156,7 @@ func svgCSSPixelSize(data []byte, maxSide int) (int, int) {
 }
 
 // rootSVGSize reads viewBox / width / height from the first <svg> start tag.
-func rootSVGSize(data []byte) (vw, vh float64) {
+func rootSVGSize(data []byte) (float64, float64) {
 	dec := xml.NewDecoder(bytes.NewReader(data))
 	dec.Strict = false
 	dec.AutoClose = xml.HTMLAutoClose
@@ -146,7 +164,7 @@ func rootSVGSize(data []byte) (vw, vh float64) {
 
 	for {
 		tok, err := dec.Token()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 
@@ -163,33 +181,41 @@ func rootSVGSize(data []byte) (vw, vh float64) {
 			continue
 		}
 
-		attrs := map[string]string{}
-		for _, a := range elem.Attr {
-			attrs[strings.ToLower(a.Name.Local)] = a.Value
-		}
-
-		width := parseLen(attrs["width"], 0)
-		height := parseLen(attrs["height"], 0)
-
-		if vb := attrs["viewbox"]; vb != "" {
-			parts := splitNums(vb)
-			if len(parts) >= viewBoxNumParts {
-				vw, vh = parts[2], parts[3]
-			}
-		}
-
-		if vw <= 0 {
-			vw = width
-		}
-
-		if vh <= 0 {
-			vh = height
-		}
-
-		return vw, vh
+		return svgSizeAttrs(elem)
 	}
 
 	return 0, 0
+}
+
+// svgSizeAttrs derives the intrinsic size from one root SVG element: the
+// viewBox wins, falling back to width/height attributes (in CSS pixels).
+func svgSizeAttrs(elem xml.StartElement) (float64, float64) {
+	attrs := map[string]string{}
+	for _, a := range elem.Attr {
+		attrs[strings.ToLower(a.Name.Local)] = a.Value
+	}
+
+	width := parseLen(attrs["width"], 0)
+	height := parseLen(attrs["height"], 0)
+
+	sizeW, sizeH := width, height
+
+	if vb := attrs["viewbox"]; vb != "" {
+		parts := splitNums(vb)
+		if len(parts) >= viewBoxNumParts {
+			sizeW, sizeH = parts[2], parts[3]
+		}
+	}
+
+	if sizeW <= 0 {
+		sizeW = width
+	}
+
+	if sizeH <= 0 {
+		sizeH = height
+	}
+
+	return sizeW, sizeH
 }
 
 func looksLikeSVG(data []byte) bool {

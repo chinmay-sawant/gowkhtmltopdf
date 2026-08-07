@@ -1,3 +1,4 @@
+//nolint:testpackage // tests reach into unexported state
 package pdf
 
 import (
@@ -46,13 +47,20 @@ func TestSubsetGlyfFourByteAligned(t *testing.T) {
 		}
 	}
 	// Hint bytecode must be stripped (no fpgm/prep/cvt in subset).
+	checkHintsStripped(t, sfnt)
+}
+
+// checkHintsStripped verifies simple glyph outlines carry no instructions.
+func checkHintsStripped(t *testing.T, sfnt *Font) {
+	t.Helper()
+
 	for _, run := range "東告" {
 		raw := sfnt.glyphOutline(sfnt.GlyphID(run))
 		if len(raw) < 12 {
 			t.Fatalf("short outline for %c", run)
 		}
 
-		nc := int16(binary.BigEndian.Uint16(raw[0:2]))
+		nc := int16(binary.BigEndian.Uint16(raw[0:2])) //nolint:gosec // numContours is int16 per glyf spec
 		if nc < 0 {
 			continue
 		}

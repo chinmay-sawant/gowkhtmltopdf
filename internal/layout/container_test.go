@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -9,6 +10,7 @@ import (
 
 func TestContainerPropsParsed(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 		.a { container-type: inline-size; container-name: card }
 		.b { container: sidebar / size }
@@ -64,8 +66,9 @@ func TestContainerQueryNamedInlineSize(t *testing.T) {
 		<div class="card wide"><p class="title" id="w">Wide</p></div>
 		<div class="card narrow"><p class="title" id="n">Narrow</p></div>
 	</body></html>`)
-	cinfo := measureSizeContainers(root, resolveStyles(root, []*css.Stylesheet{cssSheet}, "print", testViewport, 800), testViewport)
-	styles := resolveStylesWithContainers(root, []*css.Stylesheet{cssSheet}, "print", testViewport, 800, cinfo)
+	styles := resolveStyles(root, []*css.Stylesheet{cssSheet}, "print", testViewport, 800)
+	cinfo := measureSizeContainers(root, styles, testViewport)
+	styles = resolveStylesWithContainers(root, []*css.Stylesheet{cssSheet}, "print", testViewport, 800, cinfo)
 
 	byID := map[string]*html.Node{}
 
@@ -105,6 +108,7 @@ func TestContainerQueryNamedInlineSize(t *testing.T) {
 
 func TestContainerQueryUnnamedAndOrNot(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 		.box { container-type: inline-size; width: 300px; font-size: 12pt }
 		@container (width > 200px) {
@@ -206,6 +210,7 @@ func TestContainerQueryRequiresContainment(t *testing.T) {
 
 func TestContainerQueryLayoutSwitch(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 		.card { container: card / inline-size; width: 400px; font-size: 12pt }
 		@container card (inline-size > 20em) {
@@ -236,6 +241,7 @@ func TestContainerQueryLayoutSwitch(t *testing.T) {
 
 func TestContainerQueryNearestNamedWins(t *testing.T) {
 	t.Parallel()
+
 	cssSheet := sheet(t, `
 		.outer { container: outer / inline-size; width: 400px; font-size: 12pt }
 		.inner { container: inner / inline-size; width: 50px; font-size: 12pt }

@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -10,7 +11,9 @@ import (
 
 // Print CSS: a.external.text::after { content: ' (' attr(href) ')'; }
 // Must emit the real href, never the literal tokens "attr(href)".
-func TestExternalLinkAttrHrefContent(t *testing.T) {
+func TestExternalLinkAttrHrefContent(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 .mw-parser-output a.external.text::after {
@@ -65,14 +68,19 @@ a { text-decoration: none; color: inherit; }
 
 func TestParseContentValueAttr(t *testing.T) {
 	t.Parallel()
-	n := &html.Node{Type: html.ElementNode, Name: "a", Attrs: map[string]string{"href": "https://ex.test/x"}} //nolint:exhaustruct // intentional zero fields
 
-	got := parseContentValue(`' (' attr(href) ')'`, n)
+	node := &html.Node{ //nolint:exhaustruct // intentional zero fields
+		Type:  html.ElementNode,
+		Name:  "a",
+		Attrs: map[string]string{"href": "https://ex.test/x"},
+	}
+
+	got := parseContentValue(`' (' attr(href) ')'`, node)
 	if got != " (https://ex.test/x)" {
 		t.Fatalf("got %q", got)
 	}
 
-	got2 := parseContentValue(`' (https:' attr(href) ')'`, n)
+	got2 := parseContentValue(`' (https:' attr(href) ')'`, node)
 	// attr returns full href including https, so this doubles scheme — matches CSS
 	// when href is protocol-relative; for absolute hrefs the [href^='//'] rule
 	// does not apply. Still must not emit literal attr(.

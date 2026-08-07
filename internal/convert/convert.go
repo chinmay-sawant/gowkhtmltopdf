@@ -64,17 +64,36 @@ var ErrUnexpectedImageSettings = errors.New("convert: image settings are not val
 // adapter without its mode-specific settings.
 var ErrMissingImageSettings = errors.New("convert: image settings are required")
 
+// errNilRequest reports a nil Request at a method boundary.
+var errNilRequest = errors.New("convert: nil request")
+
+// errNilCommand reports a nil cli.Command to the CLI adapter.
+var errNilCommand = errors.New("convert: nil command")
+
+// errImagesDisabled reports an image request made while images are disabled.
+var errImagesDisabled = errors.New("images disabled")
+
 // NewPDFRequest builds the PDF side of the compatibility union. Callers that
 // already have a writer should prefer this constructor over a partially filled
 // Request literal.
 func NewPDFRequest(global settings.PdfGlobal, objects []settings.PdfObject, output, outline io.Writer) *Request {
-	return &Request{Global: global, Objects: objects, Output: output, OutlineOutput: outline} //nolint:exhaustruct // intentional zero-value fields
+	return &Request{ //nolint:exhaustruct // intentional zero-value fields
+		Global:        global,
+		Objects:       objects,
+		Output:        output,
+		OutlineOutput: outline,
+	}
 }
 
 // NewImageRequest builds the image side of the compatibility union. Image
 // settings are copied so the request owns its mode configuration snapshot.
-func NewImageRequest(global settings.PdfGlobal, image settings.ImageGlobal, objects []settings.PdfObject, output io.Writer) *Request {
-	return &Request{Global: global, Image: &image, Objects: objects, Output: output} //nolint:exhaustruct // intentional zero-value fields
+func NewImageRequest(global settings.PdfGlobal, image settings.ImageGlobal, objects []settings.PdfObject, output io.Writer) *Request { //nolint:lll // constructor signature
+	return &Request{ //nolint:exhaustruct // intentional zero-value fields
+		Global:  global,
+		Image:   &image,
+		Objects: objects,
+		Output:  output,
+	}
 }
 
 // Validate checks the explicit output contract before any loading or font
@@ -82,7 +101,7 @@ func NewImageRequest(global settings.PdfGlobal, image settings.ImageGlobal, obje
 // test through the engine seam.
 func (r *Request) Validate() error {
 	if r == nil {
-		return errors.New("convert: nil request")
+		return errNilRequest
 	}
 
 	if r.Output == nil {
@@ -110,7 +129,7 @@ func (r *Request) ValidatePDF() error {
 // implemented by internal/imageout but shares this boundary contract.
 func (r *Request) ValidateImage() error {
 	if r == nil {
-		return errors.New("convert: nil request")
+		return errNilRequest
 	}
 
 	if r.Image == nil {
@@ -129,14 +148,14 @@ func RunPDF(cmd *cli.Command, log io.Writer) error {
 // RunPDFContext adapts a CLI parse result into a Request and runs the
 // pipeline. Opening/closing the output path (or stdout) stays here so Run
 // only sees an io.Writer. Prefer Run when the caller already has a writer.
-func RunPDFContext(ctx context.Context, cmd *cli.Command, log io.Writer, progress func(phase string, percent int)) error {
+func RunPDFContext(ctx context.Context, cmd *cli.Command, log io.Writer, progress func(phase string, percent int)) error { //nolint:lll // CLI adapter signature
 	if cmd == nil {
-		return errors.New("convert: nil command")
+		return errNilCommand
 	}
 
 	out, closeOut, err := cmd.OpenOutput()
 	if err != nil {
-		return err
+		return fmt.Errorf("open output: %w", err)
 	}
 
 	req := &Request{ //nolint:exhaustruct // intentional zero-value fields
@@ -169,7 +188,7 @@ func RunPDFContext(ctx context.Context, cmd *cli.Command, log io.Writer, progres
 // page count; pages are reordered so all TOC pages come first; then the PDF
 // outline, TOC link annotations and the per-page headers/footers are wired
 // using the final page indices.
-func Run(ctx context.Context, req *Request, log io.Writer, progress func(phase string, percent int)) error {
+func Run(ctx context.Context, req *Request, log io.Writer, progress func(phase string, percent int)) error { //nolint:gocognit,contextcheck,cyclop,funlen,lll // linear pipeline; nil-ctx guard falls back to a fresh context
 	if err := req.ValidatePDF(); err != nil {
 		return err
 	}
@@ -249,7 +268,9 @@ func Run(ctx context.Context, req *Request, log io.Writer, progress func(phase s
 		// applies outline-depth separately below.
 		// Use the explicit document-page ordering contract; keep Heading.Page
 		// object-local for headers, links, and page ownership.
-		tocTree := outline.BuildTreeBy(headings, outline.Options{Exclude: exclude}, outline.DocumentPage) //nolint:exhaustruct // intentional zero-value fields
+		tocTree := outline.BuildTreeBy(headings, outline.Options{ //nolint:exhaustruct // intentional zero-value fields
+			Exclude: exclude,
+		}, outline.DocumentPage)
 
 		tocTotal, err = renderTOCObjects(ctx, font, doc, req, tocs, tocTree.Flatten(), log)
 		if err != nil {
@@ -456,7 +477,7 @@ func (pp *pagePlan) Ranges() []pageRange {
 		return nil
 	}
 
-	var ranges []pageRange
+	ranges := make([]pageRange, 0, len(pp.owners))
 
 	var cur *objectState
 
@@ -576,7 +597,7 @@ func newHFGeom(glob settings.PdfGlobal) (hfGeom, error) {
 
 // initTOCState builds the per-object state of a table-of-contents object:
 // geometry (with auto margins resolved) and the effective TOC settings.
-func initTOCState(ctx context.Context, loader *load.Loader, font *pdf.Font, registry *pdf.Registry, req *Request, obj *settings.PdfObject, idx int, log io.Writer) (*objectState, error) {
+func initTOCState(ctx context.Context, loader *load.Loader, font *pdf.Font, registry *pdf.Registry, req *Request, obj *settings.PdfObject, idx int, log io.Writer) (*objectState, error) { //nolint:lll // signature mirrors renderObject
 	geom, err := newHFGeom(req.Global)
 	if err != nil {
 		return nil, fmt.Errorf("object %d: %w", idx+1, err)
@@ -609,7 +630,7 @@ func initTOCState(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 // renderObject loads, lays out and paints one body object into doc and
 // returns the per-object state the later passes need (nil when the load
 // policy skipped the object).
-func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, registry *pdf.Registry, doc *pdf.Document, req *Request, obj *settings.PdfObject, idx int, log io.Writer) (*objectState, error) {
+func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, registry *pdf.Registry, doc *pdf.Document, req *Request, obj *settings.PdfObject, idx int, log io.Writer) (*objectState, error) { //nolint:cyclop,funlen,lll // sequential per-object pipeline
 	geom, err := newHFGeom(req.Global)
 	if err != nil {
 		return nil, fmt.Errorf("object %d (%s): %w", idx+1, obj.Page, err)
@@ -632,7 +653,7 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 	if prep.Resource.Skip {
 		line.Emit(log, line.Warn, "object %d (%s): load error policy is skip, omitting", idx+1, obj.Page)
 
-		return nil, nil
+		return nil, nil //nolint:nilnil // skip is a valid (nil, nil) outcome handled by Run
 	}
 
 	root := prep.Root
@@ -641,7 +662,7 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 
 	imagesFn := func(src string) ([]byte, error) {
 		if !req.Global.Web.Images {
-			return nil, errors.New("images disabled")
+			return nil, errImagesDisabled
 		}
 
 		r, err := prep.Resources.Fetch(ctx, src)
@@ -678,29 +699,34 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 	state.registry = reg
 	registry = reg
 
-	lres, err := layout.LayoutContext(ctx, root, state.bodyLayoutOpts(font, registry, sheets, obj.Load.ZoomFactor, imagesFn, req.Global.Background, printUL))
+	lres, err := layout.LayoutContext(ctx, root, state.bodyLayoutOpts(
+		font, registry, sheets, obj.Load.ZoomFactor, imagesFn, req.Global.Background, printUL,
+	))
 	if err != nil {
 		return nil, fmt.Errorf("object %d (%s): layout: %w", idx+1, obj.Page, err)
 	}
 
-	if req.Global.SmartShrinking {
+	if req.Global.SmartShrinking { //nolint:nestif // sequential width-check/zoom/relayout steps
 		contentW := state.geom.contentW
-		if contentW_2 := measuredWidth(lres); contentW_2 > contentW {
+		if contentW2 := measuredWidth(lres); contentW2 > contentW {
 			// Smart shrinking: scale-to-width re-layout. The layout engine
 			// scales everything by Options.Zoom; the page geometry is
 			// unchanged, so the content fits the content area. A user
 			// zoom factor composes multiplicatively.
-			zoom := contentW / contentW_2
+			zoom := contentW / contentW2
 			if zoom > 0 && zoom < 1 {
-				line.Emit(log, line.Info, "object %d (%s): content width %.1fpt exceeds the %.1fpt content area; smart shrinking with zoom %.3f",
-					idx+1, obj.Page, contentW_2, contentW, zoom)
+				line.Emit(log, line.Info,
+					"object %d (%s): content width %.1fpt exceeds the %.1fpt content area; smart shrinking with zoom %.3f",
+					idx+1, obj.Page, contentW2, contentW, zoom)
 
 				effZoom := zoom
 				if zf := obj.Load.ZoomFactor; zf > 0 {
 					effZoom = zoom * zf
 				}
 
-				lres, err = layout.LayoutContext(ctx, root, state.bodyLayoutOpts(font, registry, sheets, effZoom, imagesFn, req.Global.Background, printUL))
+				lres, err = layout.LayoutContext(ctx, root, state.bodyLayoutOpts(
+					font, registry, sheets, effZoom, imagesFn, req.Global.Background, printUL,
+				))
 				if err != nil {
 					return nil, fmt.Errorf("object %d (%s): smart-shrink layout: %w", idx+1, obj.Page, err)
 				}
@@ -734,7 +760,7 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 
 // bodyLayoutOpts builds layout.Options for a body (or smart-shrink) pass
 // from the object's resolved geometry and shared render knobs.
-func (st *objectState) bodyLayoutOpts(font *pdf.Font, registry *pdf.Registry, sheets []*css.Stylesheet, zoom float64, imagesFn func(string) ([]byte, error), background, printLinkUnderline bool) layout.Options {
+func (st *objectState) bodyLayoutOpts(font *pdf.Font, registry *pdf.Registry, sheets []*css.Stylesheet, zoom float64, imagesFn func(string) ([]byte, error), background, printLinkUnderline bool) layout.Options { //nolint:lll // option bundle signature
 	media := st.media
 	if media == "" {
 		media = mediaPrint
@@ -793,6 +819,9 @@ func measuredWidth(res *layout.Result) float64 {
 			if ext := op.X + op.W; ext > width {
 				width = ext
 			}
+		case layout.OpLine, layout.OpText, layout.OpLinkURI, layout.OpBullet:
+			// Text and link ops never force a page wider; ignore.
+			continue
 		}
 	}
 
@@ -802,26 +831,30 @@ func measuredWidth(res *layout.Result) float64 {
 // pageGeometry resolves the page size in points from the single size model:
 // Size.Width/Height (mm) override a named PageSize / Size.PageSize.
 // Landscape swaps the pair. Legacy PageWidth/PageHeight fields are gone.
-func pageGeometry(g settings.PdfGlobal) (w, h float64, err error) {
-	if g.Size.Width > 0 && g.Size.Height > 0 {
-		w, h = g.Size.Width*mmToPt, g.Size.Height*mmToPt
+func pageGeometry(glob settings.PdfGlobal) (float64, float64, error) {
+	var width, height float64
+
+	if glob.Size.Width > 0 && glob.Size.Height > 0 {
+		width, height = glob.Size.Width*mmToPt, glob.Size.Height*mmToPt
 	} else {
-		name := g.PageSize
+		name := glob.PageSize
 		if name == "" {
-			name = g.Size.PageSize
+			name = glob.Size.PageSize
 		}
 
-		w, h, err = settings.ParsePageSize(name)
+		var err error
+
+		width, height, err = settings.ParsePageSize(name)
 		if err != nil {
-			return 0, 0, err
+			return 0, 0, fmt.Errorf("parse page size %q: %w", name, err)
 		}
 	}
 
-	if g.Orientation == settings.OrientationLandscape {
-		w, h = h, w
+	if glob.Orientation == settings.OrientationLandscape {
+		width, height = height, width
 	}
 
-	return w, h, nil
+	return width, height, nil
 }
 
 // mediaFor resolves layout CSS media for PDF mode via settings.ResolveMedia.
@@ -831,7 +864,10 @@ func mediaFor(glob settings.PdfGlobal, obj *settings.PdfObject) string {
 	var objWeb *settings.Web
 
 	if obj != nil {
-		w := settings.Web{PrintMediaType: obj.Load.PrintMediaType, MediaType: obj.Load.MediaType} //nolint:exhaustruct // intentional zero-value fields
+		w := settings.Web{ //nolint:exhaustruct // intentional zero-value fields
+			PrintMediaType: obj.Load.PrintMediaType,
+			MediaType:      obj.Load.MediaType,
+		}
 		objWeb = &w
 	}
 
@@ -851,7 +887,7 @@ type SheetOptions struct {
 // CollectSheets gathers <style> blocks and <link rel="stylesheet"> resources
 // from the DOM in document order. A failed stylesheet only logs a warning;
 // the layout proceeds without it. Shared by PDF convert and (wave 2) imageout.
-func CollectSheets(ctx context.Context, loader *load.Loader, root *html.Node, base string, lp settings.LoadPage, opts SheetOptions, log io.Writer) []*css.Stylesheet {
+func CollectSheets(ctx context.Context, loader *load.Loader, root *html.Node, base string, loadPage settings.LoadPage, opts SheetOptions, log io.Writer) []*css.Stylesheet { //nolint:gocognit,cyclop,funlen,lll // per-node style/link handling with warn fallbacks
 	warn := func(format string, args ...any) {
 		if log == nil {
 			return
@@ -866,7 +902,7 @@ func CollectSheets(ctx context.Context, loader *load.Loader, root *html.Node, ba
 
 	var sheets []*css.Stylesheet
 
-	if root != nil {
+	if root != nil { //nolint:nestif // per-element walk with two resource kinds
 		root.Walk(func(num *html.Node) {
 			if num.Type != html.ElementNode {
 				return
@@ -884,7 +920,7 @@ func CollectSheets(ctx context.Context, loader *load.Loader, root *html.Node, ba
 				if linkStylesheet(num, opts.ViewportW, opts.ViewportH, opts.MediaType) {
 					href := num.Attribute("href")
 
-					rVal, err := loader.FetchSub(ctx, base, href, lp)
+					rVal, err := loader.FetchSub(ctx, base, href, loadPage)
 					if err != nil {
 						warn("skipping <link href=%q>: %v", href, err)
 
@@ -982,22 +1018,31 @@ func resolveRelativeLinkURIs(ops []layout.Op, base string) {
 	}
 
 	for idx := range ops {
-		if ops[idx].Kind != layout.OpLinkURI || ops[idx].URI == "" {
-			continue
+		if newURI, ok := resolveRelativeLinkURI(ops[idx], bufU); ok {
+			ops[idx].URI = newURI
 		}
-
-		u := ops[idx].URI
-		if strings.HasPrefix(u, "#") || strings.Contains(u, "://") || strings.HasPrefix(strings.ToLower(u), "mailto:") {
-			continue
-		}
-
-		ref, err := url.Parse(u)
-		if err != nil {
-			continue
-		}
-
-		ops[idx].URI = bufU.ResolveReference(ref).String()
 	}
+}
+
+// resolveRelativeLinkURI rewrites one OpLinkURI against base, reporting
+// whether the op's URI should be replaced. Fragments (#id), scheme URLs,
+// mailto links and unparsable references are left unchanged.
+func resolveRelativeLinkURI(op layout.Op, base *url.URL) (string, bool) {
+	if op.Kind != layout.OpLinkURI || op.URI == "" {
+		return "", false
+	}
+
+	u := op.URI
+	if strings.HasPrefix(u, "#") || strings.Contains(u, "://") || strings.HasPrefix(strings.ToLower(u), "mailto:") {
+		return "", false
+	}
+
+	ref, err := url.Parse(u)
+	if err != nil {
+		return "", false
+	}
+
+	return base.ResolveReference(ref).String(), true
 }
 
 // loadFontRegistry builds the opt-in font registry from --font-path and
@@ -1027,7 +1072,7 @@ func loadFontRegistry(glob settings.PdfGlobal, log io.Writer) *pdf.Registry {
 // registry (local and remote https via FetchSub ACL/timeouts). WOFF2 (.woff2),
 // EOT, and data: src are skipped until WOFF2 decode ships. Shared by PDF
 // convert and image mode.
-func MergeFontFaces(ctx context.Context, loader *load.Loader, reg *pdf.Registry, sheets []*css.Stylesheet, base string, lp settings.LoadPage, idx int, log io.Writer) *pdf.Registry {
+func MergeFontFaces(ctx context.Context, loader *load.Loader, reg *pdf.Registry, sheets []*css.Stylesheet, base string, loadPage settings.LoadPage, idx int, log io.Writer) *pdf.Registry { //nolint:gocognit,cyclop,lll // nested per-sheet/per-face/per-uri loops with skips
 	for _, sheet := range sheets {
 		if sheet == nil {
 			continue
@@ -1037,7 +1082,9 @@ func MergeFontFaces(ctx context.Context, loader *load.Loader, reg *pdf.Registry,
 			for _, uri := range css.FontFaceURLs(fontFace.Src) {
 				low := strings.ToLower(uri)
 				if strings.HasSuffix(low, ".woff2") || strings.HasSuffix(low, ".eot") {
-					line.Emit(log, line.Warn, "object %d: @font-face src %q skipped (WOFF2/EOT unsupported; WOFF1/TTF/OTF only)", idx, uri)
+					line.Emit(log, line.Warn,
+						"object %d: @font-face src %q skipped (WOFF2/EOT unsupported; WOFF1/TTF/OTF only)",
+						idx, uri)
 
 					continue
 				}
@@ -1049,7 +1096,7 @@ func MergeFontFaces(ctx context.Context, loader *load.Loader, reg *pdf.Registry,
 					continue
 				}
 
-				rVal, err := loader.FetchSub(ctx, base, uri, lp)
+				rVal, err := loader.FetchSub(ctx, base, uri, loadPage)
 				if err != nil {
 					line.Emit(log, line.Warn, "object %d: @font-face src %q: %v", idx, uri, err)
 

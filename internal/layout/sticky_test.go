@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -11,7 +12,8 @@ import (
 	"gowkhtmltopdf/internal/pdf"
 )
 
-func TestStickyOverflowScrollportNoPageClone(t *testing.T) {
+func TestStickyOverflowScrollportNoPageClone(t *testing.T) { //nolint:cyclop,funlen
+	t.Parallel()
 	// Sticky inside overflow:auto must use that box as scrollport at offset 0
 	// (no page-edge continuation clones). Without overflow, the same sticky
 	// would stick across pages (print scrollport).
@@ -156,6 +158,7 @@ func TestStickyOverflowClampAtOffsetZero(t *testing.T) {
 
 func TestStickyClampYTop(t *testing.T) {
 	t.Parallel()
+
 	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
 		sticky:       true,
 		stickyTopSet: true,
@@ -176,6 +179,7 @@ func TestStickyClampYTop(t *testing.T) {
 
 func TestStickyClampYContainingBlockLimit(t *testing.T) {
 	t.Parallel()
+
 	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
 		sticky:       true,
 		stickyTopSet: true,
@@ -189,7 +193,8 @@ func TestStickyClampYContainingBlockLimit(t *testing.T) {
 	}
 }
 
-func TestStickyTopContinuationPages(t *testing.T) {
+func TestStickyTopContinuationPages(t *testing.T) { //nolint:cyclop,funlen
+	t.Parallel()
 	// Section CB spans multiple pages; print pagination must keep sticky in its
 	// containing block instead of stamping it on continuation pages like fixed.
 	var body strings.Builder
@@ -267,7 +272,8 @@ p { margin: 4pt 0; font-size: 12pt; }
 	}
 }
 
-func TestStickyContainingBlockStops(t *testing.T) {
+func TestStickyContainingBlockStops(t *testing.T) { //nolint:cyclop,funlen
+	t.Parallel()
 	// Short CB: sticky must not paint past the section end on later pages.
 	src := `<html><body>
 <div class="sec">
@@ -440,7 +446,9 @@ func TestStickyNotRelativeOffsetAtLayout(t *testing.T) {
 
 // TestStickyFixture31DoesNotCloneAcrossPages ensures the sticky header stays
 // inside its containing block and does not become a position:fixed stamp.
-func TestStickyFixture31DoesNotCloneAcrossPages(t *testing.T) {
+func TestStickyFixture31DoesNotCloneAcrossPages(t *testing.T) { //nolint:cyclop,funlen
+	t.Parallel()
+
 	res, contentH, doc := paintFixture31(t)
 	if doc.PageCount() < 2 {
 		t.Fatalf("fixture-31 expected ≥2 pages, got %d", doc.PageCount())
@@ -516,13 +524,15 @@ func TestStickyFixture31DoesNotCloneAcrossPages(t *testing.T) {
 
 // TestStickyFixture31SplitFillsPreservePaintOrder ensures page-split section/row
 // fills are not appended after continuation text (which would wash out rows).
-func TestStickyFixture31SplitFillsPreservePaintOrder(t *testing.T) {
+func TestStickyFixture31SplitFillsPreservePaintOrder(t *testing.T) { //nolint:gocognit,cyclop,funlen
+	t.Parallel()
+
 	res, contentH, doc := paintFixture31(t)
 	if doc.PageCount() < 2 {
 		t.Fatalf("fixture-31 expected ≥2 pages, got %d", doc.PageCount())
 	}
 
-	var row28Idx int = -1
+	var row28Idx = -1
 
 	var row28Y float64
 
@@ -627,13 +637,15 @@ func TestStickyFixture31SplitFillsPreservePaintOrder(t *testing.T) {
 
 // TestStickyFixture31AfterSectionNotCovered ensures the After-section note is
 // present after Row 35 (not overlapping it) and not buried under section fill.
-func TestStickyFixture31AfterSectionNotCovered(t *testing.T) {
+func TestStickyFixture31AfterSectionNotCovered(t *testing.T) { //nolint:cyclop,funlen
+	t.Parallel()
+
 	res, contentH, doc := paintFixture31(t)
 	if doc.PageCount() < 2 {
 		t.Fatalf("fixture-31 expected ≥2 pages, got %d", doc.PageCount())
 	}
 
-	var afterIdx int = -1
+	var afterIdx = -1
 
 	var afterY, row35Y float64
 
@@ -694,7 +706,8 @@ func TestStickyFixture31AfterSectionNotCovered(t *testing.T) {
 
 	for i := range res.Ops {
 		paintOp := &res.Ops[i]
-		if paintOp.Kind != OpLine || paintOp.H >= 1 || paintOp.W < 500 || !nearRGB(paintOp, 0.271, 0.353, 0.392) || paintOp.Y >= afterY {
+		if paintOp.Kind != OpLine || paintOp.H >= 1 || paintOp.W < 500 ||
+			!nearRGB(paintOp, 0.271, 0.353, 0.392) || paintOp.Y >= afterY {
 			continue
 		}
 
@@ -758,7 +771,9 @@ func paintFixture31(t *testing.T) (*Result, float64, *pdf.Document) {
 	return res, contentH, doc
 }
 
-func TestStickyFixture31Row28HasWhiteBackground(t *testing.T) {
+func TestStickyFixture31Row28HasWhiteBackground(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
 	res, contentH, _ := paintFixture31(t)
 
 	var row28Y float64
@@ -810,7 +825,9 @@ func TestStickyFixture31Row28HasWhiteBackground(t *testing.T) {
 	}
 }
 
-func TestStickyFixture31NoOrphanRowsOnPage1(t *testing.T) {
+func TestStickyFixture31NoOrphanRowsOnPage1(t *testing.T) { //nolint:gocognit,gocyclo,cyclop,funlen
+	t.Parallel()
+
 	res, contentH, _ := paintFixture31(t)
 
 	var last0 float64

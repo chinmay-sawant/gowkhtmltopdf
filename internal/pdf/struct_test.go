@@ -1,3 +1,4 @@
+//nolint:testpackage // tests reach into unexported state
 package pdf
 
 import (
@@ -76,7 +77,22 @@ func parseObjects(t *testing.T, out []byte) (map[int][]byte, map[int]int) {
 
 	str := string(out)
 
-	// trailer info
+	checkTrailer(t, str)
+
+	objs := map[int][]byte{}
+	offsets := map[int]int{}
+
+	collectObjectSpans(t, str, objs, offsets)
+	checkXrefOffsets(t, str, offsets)
+	checkObjectRefs(t, objs)
+
+	return objs, offsets
+}
+
+// checkTrailer verifies the trailer carries /Root and /Info.
+func checkTrailer(t *testing.T, str string) {
+	t.Helper()
+
 	trailerIdx := strings.Index(str, "trailer")
 	if trailerIdx < 0 {
 		t.Fatal("no trailer")
@@ -86,11 +102,13 @@ func parseObjects(t *testing.T, out []byte) (map[int][]byte, map[int]int) {
 	if !strings.Contains(tr, "/Root ") || !strings.Contains(tr, "/Info ") {
 		t.Error("trailer missing /Root or /Info")
 	}
+}
 
-	// every "N 0 obj" must be matched by "endobj"
+// collectObjectSpans records each "N 0 obj" … "endobj" span.
+func collectObjectSpans(t *testing.T, str string, objs map[int][]byte, offsets map[int]int) {
+	t.Helper()
+
 	re := regexp.MustCompile(`(\d+) 0 obj`)
-	objs := map[int][]byte{}
-	offsets := map[int]int{}
 
 	for _, m := range re.FindAllStringSubmatchIndex(str, -1) {
 		idVal, _ := strconv.Atoi(str[m[2]:m[3]])
@@ -104,8 +122,12 @@ func parseObjects(t *testing.T, out []byte) (map[int][]byte, map[int]int) {
 		offsets[idVal] = start
 		objs[idVal] = []byte(str[start : start+endMark+len("endobj")])
 	}
+}
 
-	// xref offsets must agree with "N 0 obj" positions
+// checkXrefOffsets verifies the xref table agrees with the object spans.
+func checkXrefOffsets(t *testing.T, str string, offsets map[int]int) {
+	t.Helper()
+
 	xrefIdx := strings.Index(str, "xref")
 	lines := strings.Split(str[xrefIdx:], "\n")
 	count := 0
@@ -137,8 +159,12 @@ func parseObjects(t *testing.T, out []byte) (map[int][]byte, map[int]int) {
 			}
 		}
 	}
+}
 
-	// every referenced object must exist
+// checkObjectRefs verifies every referenced object exists.
+func checkObjectRefs(t *testing.T, objs map[int][]byte) {
+	t.Helper()
+
 	for idVal := range objs {
 		for _, rm := range refRe.FindAllStringSubmatch(string(objs[idVal]), -1) {
 			ref, _ := strconv.Atoi(rm[1])
@@ -151,8 +177,6 @@ func parseObjects(t *testing.T, out []byte) (map[int][]byte, map[int]int) {
 			}
 		}
 	}
-
-	return objs, offsets
 }
 
 // decompress streams and sanity-check dicts.

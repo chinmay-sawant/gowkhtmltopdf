@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -10,7 +11,9 @@ import (
 )
 
 // Leading all-<th> rows without <thead> still repeat on continuation pages.
-func TestLeadingTHRowsRepeatAsHeader(t *testing.T) {
+func TestLeadingTHRowsRepeatAsHeader(t *testing.T) { //nolint:cyclop,funlen
+	t.Parallel()
+
 	src := `<html><body>
 <table>
 <tr><th>ColA</th><th>ColB</th></tr>
@@ -26,7 +29,9 @@ func TestLeadingTHRowsRepeatAsHeader(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{Width: 400, Height: 200, Background: true}) //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 400, Height: 200, Background: true,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

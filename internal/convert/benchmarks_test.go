@@ -27,13 +27,19 @@ import (
 	"gowkhtmltopdf/internal/settings"
 )
 
-var benchmarkPageSizes = []int{2, 5, 10, 20, 50, 100, 200, 250, 500}
+var benchmarkPageSizes = []int{2, 5, 10, 20, 50, 100, 200, 250, 500} //nolint:gochecknoglobals // fixed benchmark matrix
 
 const (
 	benchmarkRowsPerPage = 20
 	liveBenchmarkEnv     = "GOWKHTMLTOPDF_LIVE_BENCHMARK"
 	tvMazeShowsURL       = "https://api.tvmaze.com/shows?page=0"
 )
+
+// errTVMazeBadStatus reports a non-200 TVmaze API response.
+var errTVMazeBadStatus = errors.New("TVmaze API returned non-200 status")
+
+// errTVMazeNoShows reports an empty TVmaze show list.
+var errTVMazeNoShows = errors.New("TVmaze API returned no shows")
 
 // Baseline snapshot from benchmark-results.txt, recorded with
 // go1.26.4 linux/amd64 on WSL2 (24 CPUs), -benchtime=1x -count=1. The
@@ -185,34 +191,34 @@ func fetchTVMazeShows(ctx context.Context, client *http.Client) ([]tvMazeShow, i
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, tvMazeShowsURL, nil)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("create TVmaze request: %w", err)
 	}
 
 	req.Header.Set("User-Agent", "gowkhtmltopdf-benchmark/1.0")
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("fetch TVmaze shows: %w", err)
 	}
 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, 0, fmt.Errorf("TVmaze API returned HTTP %d", resp.StatusCode)
+		return nil, 0, fmt.Errorf("%w: HTTP %d", errTVMazeBadStatus, resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 32<<20))
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("read TVmaze response: %w", err)
 	}
 
 	var shows []tvMazeShow
 	if err := json.Unmarshal(body, &shows); err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("decode TVmaze shows: %w", err)
 	}
 
 	if len(shows) == 0 {
-		return nil, len(body), errors.New("TVmaze API returned no shows")
+		return nil, len(body), errTVMazeNoShows
 	}
 
 	return shows, len(body), nil
@@ -257,7 +263,9 @@ func liveBenchmarkShows(tb testing.TB) []tvMazeShow {
 	ctx, cancel := context.WithTimeout(tb.Context(), 30*time.Second)
 	defer cancel()
 
-	shows, _, err := fetchTVMazeShows(ctx, &http.Client{Timeout: 30 * time.Second}) //nolint:exhaustruct // intentional zero-value fields
+	shows, _, err := fetchTVMazeShows(ctx, &http.Client{ //nolint:exhaustruct // intentional zero-value fields
+		Timeout: 30 * time.Second,
+	})
 	if err != nil {
 		tb.Fatalf("fetch TVmaze shows: %v", err)
 	}
@@ -308,8 +316,8 @@ func benchmarkPNG() []byte {
 	for y := range size {
 		for x := range size {
 			img.SetNRGBA(x, y, color.NRGBA{
-				R: uint8(30 + x*3),
-				G: uint8(80 + y*2),
+				R: uint8(30 + x*3), //nolint:gosec // bounded by image size
+				G: uint8(80 + y*2), //nolint:gosec // bounded by image size
 				B: 180,
 				A: 255,
 			})
@@ -336,7 +344,7 @@ func BenchmarkPDFPages(b *testing.B) {
 	sources := make(map[int][]byte, len(benchmarkPageSizes))
 
 	for _, pages := range benchmarkPageSizes {
-		sources[pages] = executeBenchmarkTemplate(b, tpl, benchmarkTemplateData{ //nolint:exhaustruct // intentional zero-value fields
+		sources[pages] = executeBenchmarkTemplate(b, tpl, benchmarkTemplateData{ //nolint:exhaustruct,lll // intentional zero-value fields
 			Pages: benchmarkPages(pages),
 		})
 	}
@@ -411,7 +419,7 @@ func benchmarkImageServer(tb testing.TB, sources map[int][]byte, imageData []byt
 	tb.Helper()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/benchmark-image.png", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/benchmark-image.png", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "image/png")
 		_, _ = w.Write(imageData)
 	})
@@ -465,7 +473,7 @@ func writeBenchmarkOutput(t *testing.T, name string, data []byte) {
 		t.Fatalf("create benchmark output directory: %v", err)
 	}
 
-	if err := os.WriteFile(filepath.Join(dir, name), data, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, name), data, 0o600); err != nil {
 		t.Fatalf("write benchmark output %s: %v", name, err)
 	}
 }
@@ -476,7 +484,7 @@ func writeBenchmarkOutput(t *testing.T, name string, data []byte) {
 // The output directory is ignored by Git; run this test after benchmarking:
 //
 //	GOWKHTMLTOPDF_GENERATE_BENCHMARK_OUTPUTS=1 go test ./internal/convert -run '^TestGenerateBenchmarkOutputs$' -count=1
-func TestGenerateBenchmarkOutputs(t *testing.T) {
+func TestGenerateBenchmarkOutputs(t *testing.T) { //nolint:cyclop,funlen // materializes several artifact kinds
 	t.Parallel()
 
 	if os.Getenv("GOWKHTMLTOPDF_GENERATE_BENCHMARK_OUTPUTS") != "1" {
@@ -485,7 +493,7 @@ func TestGenerateBenchmarkOutputs(t *testing.T) {
 
 	reportTemplate := loadBenchmarkTemplate(t, "report.html.tmpl")
 	for _, pages := range benchmarkPageSizes {
-		source := executeBenchmarkTemplate(t, reportTemplate, benchmarkTemplateData{ //nolint:exhaustruct // intentional zero-value fields
+		source := executeBenchmarkTemplate(t, reportTemplate, benchmarkTemplateData{ //nolint:exhaustruct,lll // intentional zero-value fields
 			Pages: benchmarkPages(pages),
 		})
 
@@ -505,7 +513,7 @@ func TestGenerateBenchmarkOutputs(t *testing.T) {
 		output.Reset()
 		templateRequest := benchmarkPDFRequest(nil, &output)
 
-		if err := reportTemplate.Execute(&output, benchmarkTemplateData{ //nolint:exhaustruct // intentional zero-value fields
+		if err := reportTemplate.Execute(&output, benchmarkTemplateData{ //nolint:exhaustruct,lll // intentional zero-value fields
 			Pages: benchmarkPages(pages),
 		}); err != nil {
 			t.Fatalf("render report template for %d pages: %v", pages, err)
@@ -530,7 +538,7 @@ func TestGenerateBenchmarkOutputs(t *testing.T) {
 	webSources := make(map[int][]byte, len(benchmarkPageSizes))
 
 	for _, images := range benchmarkPageSizes {
-		webSources[images] = executeBenchmarkTemplate(t, webTemplate, benchmarkTemplateData{ //nolint:exhaustruct // intentional zero-value fields
+		webSources[images] = executeBenchmarkTemplate(t, webTemplate, benchmarkTemplateData{ //nolint:exhaustruct,lll // intentional zero-value fields
 			Images:   benchmarkImages(images, "/benchmark-image.png"),
 			ImageSrc: "/benchmark-image.png",
 		})
@@ -564,7 +572,7 @@ func TestGenerateBenchmarkOutputs(t *testing.T) {
 	imageURL := benchmarkDataURL(pngData)
 
 	for _, images := range benchmarkPageSizes {
-		source := executeBenchmarkTemplate(t, imageTemplate, benchmarkTemplateData{ //nolint:exhaustruct // intentional zero-value fields
+		source := executeBenchmarkTemplate(t, imageTemplate, benchmarkTemplateData{ //nolint:exhaustruct,lll // intentional zero-value fields
 			Images: benchmarkImages(images, imageURL),
 		})
 
@@ -579,16 +587,14 @@ func TestGenerateBenchmarkOutputs(t *testing.T) {
 	}
 }
 
-func liveBenchmarkEnabled(tb testing.TB) bool {
+func liveBenchmarkEnabled(tb testing.TB) {
 	tb.Helper()
 
 	if os.Getenv(liveBenchmarkEnv) == "1" {
-		return true
+		return
 	}
 
 	tb.Skipf("set %s=1 to use the live TVmaze benchmark", liveBenchmarkEnv)
-
-	return false
 }
 
 // TestGenerateLiveMovieOutput fetches current TVmaze show data and writes one
@@ -596,7 +602,8 @@ func liveBenchmarkEnabled(tb testing.TB) bool {
 // It requires both opt-in environment variables because it uses the public
 // internet and writes files:
 //
-//	GOWKHTMLTOPDF_LIVE_BENCHMARK=1 GOWKHTMLTOPDF_GENERATE_BENCHMARK_OUTPUTS=1 go test ./internal/convert -run '^TestGenerateLiveMovieOutput$' -count=1
+//	GOWKHTMLTOPDF_LIVE_BENCHMARK=1 GOWKHTMLTOPDF_GENERATE_BENCHMARK_OUTPUTS=1 go test
+//	./internal/convert -run '^TestGenerateLiveMovieOutput$' -count=1
 func TestGenerateLiveMovieOutput(t *testing.T) {
 	t.Parallel()
 	liveBenchmarkEnabled(t)
@@ -702,7 +709,7 @@ func BenchmarkWebFetchImage(b *testing.B) {
 
 	sources := make(map[int][]byte, len(benchmarkPageSizes))
 	for _, images := range benchmarkPageSizes {
-		sources[images] = executeBenchmarkTemplate(b, tpl, benchmarkTemplateData{ //nolint:exhaustruct // intentional zero-value fields
+		sources[images] = executeBenchmarkTemplate(b, tpl, benchmarkTemplateData{ //nolint:exhaustruct,lll // intentional zero-value fields
 			Images:   benchmarkImages(images, "/benchmark-image.png"),
 			ImageSrc: "/benchmark-image.png",
 		})
@@ -753,7 +760,7 @@ func BenchmarkImageAssets(b *testing.B) {
 	sources := make(map[int][]byte, len(benchmarkPageSizes))
 
 	for _, images := range benchmarkPageSizes {
-		sources[images] = executeBenchmarkTemplate(b, tpl, benchmarkTemplateData{ //nolint:exhaustruct // intentional zero-value fields
+		sources[images] = executeBenchmarkTemplate(b, tpl, benchmarkTemplateData{ //nolint:exhaustruct,lll // intentional zero-value fields
 			Images: benchmarkImages(images, imageURL),
 		})
 	}

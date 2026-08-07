@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -11,7 +12,9 @@ import (
 
 // Reproduce blank page between short filmography tables and a tall awards
 // table with rowspan + page-break-inside:avoid (wiki pattern).
-func TestAwardsAfterFilmographyNoBlankPage(t *testing.T) {
+func TestAwardsAfterFilmographyNoBlankPage(t *testing.T) { //nolint:cyclop,funlen
+	t.Parallel()
+
 	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 h2, h3 { font-size: 14pt; margin: 8pt 0 4pt; page-break-after: avoid; }
@@ -33,7 +36,8 @@ td, th { border: 1px solid #aaa; padding: 3pt; }
 	}
 
 	for y := 2020; y <= 2024; y++ {
-		awardRows.WriteString(fmt.Sprintf(`<tr><td rowspan="4">%d</td><td>Award</td><td>Cat</td><td>Work</td><td>Nom</td></tr>`, y))
+		awardRows.WriteString(fmt.Sprintf(
+			`<tr><td rowspan="4">%d</td><td>Award</td><td>Cat</td><td>Work</td><td>Nom</td></tr>`, y))
 
 		for range 3 {
 			awardRows.WriteString(`<tr><td>Award</td><td>Cat</td><td>Work</td><td>Nom</td></tr>`)

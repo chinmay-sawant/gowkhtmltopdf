@@ -190,14 +190,14 @@ func SortHeadingsBy(hs []*Heading, pageOf PageOf) {
 
 // SectionOf mirrors the wkhtmltopdf outline cache: section = first heading at
 // or before page, subsection = last. Headings must be in SortHeadings order.
-func SectionOf(hs []*Heading, page int) (section, subsection string) {
+func SectionOf(hs []*Heading, page int) (string, string) {
 	return SectionOfBy(hs, page, LocalPage)
 }
 
 // SectionOfBy returns the section/subsection for page using the supplied
 // explicit ordering accessor. The input must already be sorted with the same
 // accessor.
-func SectionOfBy(hs []*Heading, page int, pageOf PageOf) (section, subsection string) {
+func SectionOfBy(hs []*Heading, page int, pageOf PageOf) (string, string) {
 	pageOf = normalizePageOf(pageOf)
 
 	var first, last *Heading
@@ -214,15 +214,15 @@ func SectionOfBy(hs []*Heading, page int, pageOf PageOf) (section, subsection st
 		last = heading
 	}
 
+	if first != nil && last != nil {
+		return first.Title, last.Title
+	}
+
 	if first != nil {
-		section = first.Title
+		return first.Title, ""
 	}
 
-	if last != nil {
-		subsection = last.Title
-	}
-
-	return section, subsection
+	return "", ""
 }
 
 // BuildTree sorts headings by (page, y, x) - within a page, y-down order so a

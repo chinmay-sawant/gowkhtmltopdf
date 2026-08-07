@@ -1,8 +1,10 @@
+//nolint:testpackage // white-box tests need raster internals (paint order, ptToPx)
 package imageout
 
 import (
 	"context"
 	"errors"
+	"image"
 	"image/color"
 	"testing"
 
@@ -59,7 +61,9 @@ func TestTTFRasterAntiAliased(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	img, err := Render(root, RenderOptions{Width: 400, Font: face, Background: true}) //nolint:exhaustruct // intentional zero/partial fields
+	img, err := Render(root, RenderOptions{ //nolint:exhaustruct // intentional zero/partial fields
+		Width: 400, Font: face, Background: true,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,6 +83,41 @@ func TestTTFRasterAntiAliased(t *testing.T) {
 	if len(seen) < 10 {
 		t.Errorf("unique colors = %d, want >= 10 (AA TTF text)", len(seen))
 	}
+}
+
+// inkSpan returns the min/max X of painted (non-white) pixels.
+func inkSpan(img image.Image) (int, int) {
+	b := img.Bounds()
+	minX, maxX := b.Max.X, b.Min.X
+
+	for py := b.Min.Y; py < b.Max.Y; py++ {
+		for pixelX := b.Min.X; pixelX < b.Max.X; pixelX++ {
+			r, g, bl, _ := img.At(pixelX, py).RGBA()
+			if r < 0xf000 || g < 0xf000 || bl < 0xf000 {
+				if pixelX < minX {
+					minX = pixelX
+				}
+
+				if pixelX > maxX {
+					maxX = pixelX
+				}
+			}
+		}
+	}
+
+	return minX, maxX
+}
+
+// renderForInk renders root and returns its ink span.
+func renderForInk(t *testing.T, root *html.Node, opts RenderOptions) (int, int) {
+	t.Helper()
+
+	img, err := Render(root, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return inkSpan(img)
 }
 
 func TestTTFAdvanceMatchesLayoutWidth(t *testing.T) {
@@ -102,34 +141,17 @@ func TestTTFAdvanceMatchesLayoutWidth(t *testing.T) {
 		t.Fatalf("unexpected width scale %v", imgW)
 	}
 	// render single line and ensure non-white span is roughly that width
-	root, err := html.Parse(`<html><body style="margin:0;padding:0"><p style="margin:0;font-size:12pt">` + sample + `</p></body></html>`)
+	htmlSrc := `<html><body style="margin:0;padding:0"><p style="margin:0;font-size:12pt">` +
+		sample + `</p></body></html>`
+
+	root, err := html.Parse(htmlSrc)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	img, err := Render(root, RenderOptions{Width: 200, Font: face, SmartWidth: false, Background: true}) //nolint:exhaustruct // intentional zero/partial fields
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	b := img.Bounds()
-	minX, maxX := b.Max.X, b.Min.X
-
-	for py := b.Min.Y; py < b.Max.Y; py++ {
-		for pixelX := b.Min.X; pixelX < b.Max.X; pixelX++ {
-			r, g, bl, _ := img.At(pixelX, py).RGBA()
-			if r < 0xf000 || g < 0xf000 || bl < 0xf000 {
-				if pixelX < minX {
-					minX = pixelX
-				}
-
-				if pixelX > maxX {
-					maxX = pixelX
-				}
-			}
-		}
-	}
-
+	minX, maxX := renderForInk(t, root, RenderOptions{ //nolint:exhaustruct // intentional zero/partial fields
+		Width: 200, Font: face, SmartWidth: false, Background: true,
+	})
 	if maxX <= minX {
 		t.Fatal("no ink found")
 	}

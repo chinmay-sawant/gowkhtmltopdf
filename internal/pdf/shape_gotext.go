@@ -2,12 +2,17 @@ package pdf
 
 import (
 	"bytes"
+	"strings"
 	"sync"
 	"unicode"
 
+	//nolint:depguard // go-text/typesetting is the repo's fixed text-shaping dependency
 	"github.com/go-text/typesetting/di"
+	//nolint:depguard // go-text/typesetting is the repo's fixed text-shaping dependency
 	gtfont "github.com/go-text/typesetting/font"
+	//nolint:depguard // go-text/typesetting is the repo's fixed text-shaping dependency
 	ot "github.com/go-text/typesetting/font/opentype"
+	//nolint:depguard // go-text/typesetting is the repo's fixed text-shaping dependency
 	"github.com/go-text/typesetting/shaping"
 )
 
@@ -17,10 +22,10 @@ import (
 //
 // ponytail: go-text OT shaping when GSUB available; manual Arabic/RTL fallback otherwise.
 var (
-	shaperPool = sync.Pool{
+	shaperPool = sync.Pool{ //nolint:gochecknoglobals // pooled shapers are immutable after init
 		New: func() any { return &shaping.HarfbuzzShaper{} },
 	}
-	segmenterPool = sync.Pool{
+	segmenterPool = sync.Pool{ //nolint:gochecknoglobals // pooled segmenters are immutable after init
 		New: func() any { return &shaping.Segmenter{} },
 	}
 )
@@ -105,18 +110,26 @@ func tryShapeOpenType(str string, fnt *Font, features []shaping.FontFeature) (sh
 		return shapedRun{}, false //nolint:exhaustruct // intentional zero-value fields
 	}
 
-	face, ok := fnt.gotextFace()
-	if !ok {
+	face, faceOK := fnt.gotextFace()
+	if !faceOK {
 		return shapedRun{}, false //nolint:exhaustruct // intentional zero-value fields
 	}
 
 	rev := fnt.reverseCmap()
 	text := []rune(str)
 
-	seg := segmenterPool.Get().(*shaping.Segmenter)
+	seg, segOK := segmenterPool.Get().(*shaping.Segmenter)
+	if !segOK {
+		return shapedRun{}, false //nolint:exhaustruct // intentional zero-value fields
+	}
+
 	defer segmenterPool.Put(seg)
 
-	shaper := shaperPool.Get().(*shaping.HarfbuzzShaper)
+	shaper, shaperOK := shaperPool.Get().(*shaping.HarfbuzzShaper)
+	if !shaperOK {
+		return shapedRun{}, false //nolint:exhaustruct // intentional zero-value fields
+	}
+
 	defer shaperPool.Put(shaper)
 
 	// Size left at zero so we do not import golang.org/x/image (keep
@@ -131,7 +144,24 @@ func tryShapeOpenType(str string, fnt *Font, features []shaping.FontFeature) (sh
 		FontFeatures: features,
 	}, singleFaceMap{face})
 
-	outRunes := make([]rune, 0, len(text))
+	outRunes, ok := collectShapedRunes(shaper, inputs, face, features, rev)
+	if !ok {
+		return shapedRun{}, false //nolint:exhaustruct // intentional zero-value fields
+	}
+
+	return shapedRun{text: string(outRunes)}, true
+}
+
+// collectShapedRunes shapes the inputs and maps the resulting glyphs back
+// to Unicode via the reverse cmap; false when a glyph cannot be mapped.
+func collectShapedRunes(
+	shaper *shaping.HarfbuzzShaper,
+	inputs []shaping.Input,
+	face *gtfont.Face,
+	features []shaping.FontFeature,
+	rev map[uint16]rune,
+) ([]rune, bool) {
+	outRunes := make([]rune, 0)
 
 	for _, inVal := range inputs {
 		if inVal.Face == nil {
@@ -146,18 +176,18 @@ func tryShapeOpenType(str string, fnt *Font, features []shaping.FontFeature) (sh
 				continue
 			}
 
-			gid := uint16(g.GlyphID)
+			gid := uint16(g.GlyphID) //nolint:gosec // font cmap is uint16; larger ids cannot reverse-map
 
 			r, ok := rev[gid]
 			if !ok {
-				return shapedRun{}, false //nolint:exhaustruct // intentional zero-value fields
+				return nil, false
 			}
 
 			outRunes = append(outRunes, r)
 		}
 	}
 
-	return shapedRun{text: string(outRunes)}, true
+	return outRunes, true
 }
 
 // ParseFontFeatureSettings parses a CSS font-feature-settings value into
@@ -223,9 +253,9 @@ func textNeedsCJKFeatures(s string) bool {
 }
 
 func splitCSSList(val string) []string {
-	parts := []string{}
+	var parts []string
 
-	var cur []byte
+	cur := make([]byte, 0, len(val))
 
 	inQ := byte(0)
 
@@ -266,28 +296,12 @@ func splitCSSList(val string) []string {
 }
 
 func trimSpace(s string) string {
-	leftIdx, jdx := 0, len(s)
-	for leftIdx < jdx && (s[leftIdx] == ' ' || s[leftIdx] == '\t' || s[leftIdx] == '\n' || s[leftIdx] == '\r') {
-		leftIdx++
-	}
-
-	for jdx > leftIdx && (s[jdx-1] == ' ' || s[jdx-1] == '\t' || s[jdx-1] == '\n' || s[jdx-1] == '\r') {
-		jdx--
-	}
-
-	return s[leftIdx:jdx]
+	return strings.Trim(s, " \t\n\r")
 }
 
-func parseOneFontFeature(part string) (ot.Tag, uint32, bool) {
-	part = trimSpace(part)
-	if part == "" {
-		return 0, 0, false
-	}
-
-	var tagStr string
-
-	var rest string
-
+// parseFeatureTag splits an optional quoted tag from the trailing value
+// part, mirroring CSS font-feature-settings syntax.
+func parseFeatureTag(part string) (string, string, bool) {
 	if part[0] == '"' || part[0] == '\'' {
 		q := part[0]
 		end := -1
@@ -301,18 +315,47 @@ func parseOneFontFeature(part string) (ot.Tag, uint32, bool) {
 		}
 		// Quoted 4-letter tag: `"halt"` → indices 0 and 5.
 		if end != featureEndTagIdx {
-			return 0, 0, false
+			return "", "", false
 		}
 
-		tagStr = part[1:end]
-		rest = trimSpace(part[end+1:])
-	} else {
-		if len(part) < featureTagLen {
-			return 0, 0, false
+		return part[1:end], trimSpace(part[end+1:]), true
+	}
+
+	if len(part) < featureTagLen {
+		return "", "", false
+	}
+
+	return part[:4], trimSpace(part[4:]), true
+}
+
+// parseFeatureCount parses a decimal feature value, bounded to uint16 per
+// the OpenType feature-value width.
+func parseFeatureCount(rest string) (uint32, bool) {
+	count := 0
+
+	for _, c := range rest {
+		if c < '0' || c > '9' {
+			return 0, false
 		}
 
-		tagStr = part[:4]
-		rest = trimSpace(part[4:])
+		count = count*decimalBase + int(c-'0')
+		if count > maxUint16Val {
+			return 0, false
+		}
+	}
+
+	return uint32(count), true //nolint:gosec // count bounded by maxUint16Val above
+}
+
+func parseOneFontFeature(part string) (ot.Tag, uint32, bool) {
+	part = trimSpace(part)
+	if part == "" {
+		return 0, 0, false
+	}
+
+	tagStr, rest, ok := parseFeatureTag(part)
+	if !ok {
+		return 0, 0, false
 	}
 
 	val := uint32(1)
@@ -324,17 +367,12 @@ func parseOneFontFeature(part string) (ot.Tag, uint32, bool) {
 		case "off", "Off", "OFF":
 			val = 0
 		default:
-			count := 0
-
-			for _, c := range rest {
-				if c < '0' || c > '9' {
-					return 0, 0, false
-				}
-
-				count = count*decimalBase + int(c-'0')
+			count, ok := parseFeatureCount(rest)
+			if !ok {
+				return 0, 0, false
 			}
 
-			val = uint32(count)
+			val = count
 		}
 	}
 

@@ -1,4 +1,4 @@
-package convert
+package convert //nolint:testpackage // white-box tests need unexported access
 
 import (
 	"bytes"
@@ -116,7 +116,11 @@ func TestSectionSubsectionPlaceholder(t *testing.T) {
 
 func TestOutlineWiring(t *testing.T) {
 	t.Parallel()
-	cmd, _ := newCommand(t, `<html><body><h1>Book One</h1><p>text</p></body></html>`, filepath.Join(t.TempDir(), "out.pdf"))
+	cmd, _ := newCommand(
+		t,
+		`<html><body><h1>Book One</h1><p>text</p></body></html>`,
+		filepath.Join(t.TempDir(), "out.pdf"),
+	)
 
 	data := runPDF(t, cmd)
 	for _, want := range []string{
@@ -203,7 +207,7 @@ func TestHTMLHeader(t *testing.T) {
 	dir := t.TempDir()
 
 	headerPath := filepath.Join(dir, "header.html")
-	if err := os.WriteFile(headerPath, []byte(`<html><body><b>HEADERMARK</b> from file</body></html>`), 0o644); err != nil {
+	if err := os.WriteFile(headerPath, []byte(`<html><body><b>HEADERMARK</b> from file</body></html>`), 0o600); err != nil { //nolint:lll // fixture write
 		t.Fatal(err)
 	}
 
@@ -222,7 +226,7 @@ func TestHTMLHeaderPlaceholderPerPage(t *testing.T) {
 	dir := t.TempDir()
 
 	headerPath := filepath.Join(dir, "header.html")
-	if err := os.WriteFile(headerPath, []byte(`<html><body><p>page [page] of [topage]</p></body></html>`), 0o644); err != nil {
+	if err := os.WriteFile(headerPath, []byte(`<html><body><p>page [page] of [topage]</p></body></html>`), 0o600); err != nil { //nolint:lll // fixture write
 		t.Fatal(err)
 	}
 
@@ -261,7 +265,7 @@ func TestHTMLHeaderRawMarkupRejected(t *testing.T) {
 // TestHTMLHeaderRelativePathCWD ensures --header-html paths resolve like a
 // top-level page (CWD-relative), not as a subresource of the body document.
 // Path doubling ("…/golden/testdata/golden/header.html") previously skipped HF.
-func TestHTMLHeaderRelativePathCWD(t *testing.T) {
+func TestHTMLHeaderRelativePathCWD(t *testing.T) { //nolint:paralleltest // os.Chdir is process-global
 	// Not parallel: os.Chdir is process-global and races other tests that use
 	// CWD-relative paths (e.g. goldenDir under testdata/golden).
 	root := t.TempDir()
@@ -274,24 +278,15 @@ func TestHTMLHeaderRelativePathCWD(t *testing.T) {
 	headerRel := filepath.Join("testdata", "golden", "header.html")
 	pageRel := filepath.Join("testdata", "golden", "page.html")
 
-	if err := os.WriteFile(filepath.Join(root, headerRel), []byte(`<html><body><b>RELHFMARK</b></body></html>`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(root, headerRel), []byte(`<html><body><b>RELHFMARK</b></body></html>`), 0o600); err != nil { //nolint:lll // fixture write
 		t.Fatal(err)
 	}
 
-	if err := os.WriteFile(filepath.Join(root, pageRel), []byte(`<html><body><p>BODYREL</p></body></html>`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(root, pageRel), []byte(`<html><body><p>BODYREL</p></body></html>`), 0o600); err != nil { //nolint:lll // fixture write
 		t.Fatal(err)
 	}
 
-	old, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := os.Chdir(root); err != nil {
-		t.Fatal(err)
-	}
-
-	t.Cleanup(func() { _ = os.Chdir(old) })
+	t.Chdir(root)
 
 	obj := settings.DefaultPdfObject()
 	obj.Page = pageRel

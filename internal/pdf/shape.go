@@ -102,25 +102,27 @@ func reverseRTLRuns(s string) string {
 	return string(out)
 }
 
-func isRTLRune(r rune) bool {
-	switch {
-	case r >= 0x0590 && r <= 0x05FF:
-		return true
-	case r >= 0x0600 && r <= 0x06FF:
-		return true
-	case r >= 0x0700 && r <= 0x074F:
-		return true
-	case r >= 0x0750 && r <= 0x077F:
-		return true
-	case r >= 0x08A0 && r <= 0x08FF:
-		return true
-	case r >= 0xFB50 && r <= 0xFDFF:
-		return true
-	case r >= 0xFE70 && r <= 0xFEFF:
-		return true
+// rtlRanges are the Unicode blocks treated as right-to-left by the fallback
+// pipeline (Hebrew, Arabic, Syriac, Arabic Supplement/Extended-A and the
+// Arabic presentation forms).
+var rtlRanges = [][2]rune{ //nolint:gochecknoglobals // immutable lookup table
+	{0x0590, 0x05FF}, // Hebrew
+	{0x0600, 0x06FF}, // Arabic
+	{0x0700, 0x074F}, // Syriac
+	{0x0750, 0x077F}, // Arabic Supplement
+	{0x08A0, 0x08FF}, // Arabic Extended-A
+	{0xFB50, 0xFDFF}, // Arabic Presentation Forms-A
+	{0xFE70, 0xFEFF}, // Arabic Presentation Forms-B
+}
+
+func isRTLRune(rVal rune) bool {
+	for _, rg := range rtlRanges {
+		if rVal >= rg[0] && rVal <= rg[1] {
+			return true
+		}
 	}
 
-	return unicode.Is(unicode.Hebrew, r) || unicode.Is(unicode.Arabic, r)
+	return unicode.Is(unicode.Hebrew, rVal) || unicode.Is(unicode.Arabic, rVal)
 }
 
 func isRTLNeutral(r rune) bool {
@@ -142,9 +144,19 @@ const (
 	joinTrans // transparent (harakat) — ignore for joining adjacency
 )
 
+// Arabic presentation form indices (0 isol 1 fina 2 init 3 medi).
+const (
+	formIsol = iota
+	formFina
+	formInit
+	formMedi
+)
+
 // arabicForms: base → [isolated, final, initial, medial]; 0 = use isolated.
 // Covers U+0621..U+064A presentation forms only — enough for common Arabic
 // without OT; expand only if a no-GSUB face is a product requirement.
+//
+//nolint:gochecknoglobals // immutable Arabic presentation-form lookup tables
 var arabicForms = map[rune][4]rune{
 	0x0621: {0xFE80, 0, 0, 0},
 	0x0622: {0xFE81, 0xFE82, 0, 0},
@@ -185,7 +197,7 @@ var arabicForms = map[rune][4]rune{
 }
 
 // Lam-Alef ligatures: lam + alef variants → presentation ligature.
-var lamAlef = map[rune][2]rune{ // [isolated, final]
+var lamAlef = map[rune][2]rune{ //nolint:gochecknoglobals // immutable lookup table; [isolated, final]
 	0x0622: {0xFEF5, 0xFEF6},
 	0x0623: {0xFEF7, 0xFEF8},
 	0x0625: {0xFEF9, 0xFEFA},
@@ -221,12 +233,9 @@ func arabicJoinType(rVal rune) int {
 	return joinNone
 }
 
-func shapeArabicJoining(s string) string {
-	runes := []rune(s)
-	if len(runes) == 0 {
-		return s
-	}
-	// Lam-Alef ligatures (logical order).
+// applyLamAlef folds lam + alef pairs into their presentation ligatures
+// (logical order).
+func applyLamAlef(runes []rune) []rune {
 	tmp := make([]rune, 0, len(runes))
 
 	for idx := 0; idx < len(runes); idx++ {
@@ -242,59 +251,86 @@ func shapeArabicJoining(s string) string {
 		tmp = append(tmp, runes[idx])
 	}
 
-	runes = tmp
+	return tmp
+}
+
+// dualForm selects the presentation form for a dual-joining letter from its
+// joining context.
+func dualForm(prev, next bool) int {
+	switch {
+	case prev && next:
+		return formMedi
+	case !prev && next:
+		return formInit
+	case prev && !next:
+		return formFina
+	default:
+		return formIsol
+	}
+}
+
+// selectArabicForm picks the presentation form index (isolated/final/
+// initial/medial) from the joining type and the joining context.
+func selectArabicForm(jt int, prev, next bool) int {
+	if jt == joinDual {
+		return dualForm(prev, next)
+	}
+
+	if jt == joinRight && prev {
+		return formFina
+	}
+
+	return formIsol
+}
+
+// isLamAlefLigature reports whether run is a lam-alef presentation ligature.
+func isLamAlefLigature(run rune) bool {
+	return run >= 0xFEF5 && run <= 0xFEFC
+}
+
+// shapeArabicRune writes the shaped form of runes[idx] into out.
+func shapeArabicRune(out []rune, runes []rune, idx int) {
+	run := runes[idx]
+	jtVal := arabicJoinType(run)
+
+	if jtVal == joinNone || jtVal == joinTrans {
+		return
+	}
+
+	if isLamAlefLigature(run) {
+		if prevJoinCause(runes, idx) {
+			out[idx] = run + 1 // final = isol+1 in this block
+		}
+
+		return
+	}
+
+	forms, ok := arabicForms[run]
+	if !ok {
+		return
+	}
+
+	form := selectArabicForm(jtVal, prevJoinCause(runes, idx), nextJoinCause(runes, idx))
+
+	if forms[form] != 0 {
+		out[idx] = forms[form]
+	} else if forms[0] != 0 {
+		out[idx] = forms[0]
+	}
+}
+
+func shapeArabicJoining(s string) string {
+	runes := []rune(s)
+	if len(runes) == 0 {
+		return s
+	}
+
+	runes = applyLamAlef(runes)
 	out := make([]rune, len(runes))
 	copy(out, runes)
 
-	for idx, run := range runes {
-		jtVal := arabicJoinType(run)
-		if jtVal == joinNone || jtVal == joinTrans {
-			continue
-		}
-
-		if run >= 0xFEF5 && run <= 0xFEFC {
-			if prevJoinCause(runes, idx) {
-				out[idx] = run + 1 // final = isol+1 in this block
-			}
-
-			continue
-		}
-
-		forms, ok := arabicForms[run]
-		if !ok {
-			continue
-		}
-
-		prev := prevJoinCause(runes, idx)
-		next := nextJoinCause(runes, idx)
-
-		var form int // 0 isol 1 fina 2 init 3 medi
-
-		switch jtVal {
-		case joinDual:
-			switch {
-			case prev && next:
-				form = 3
-			case !prev && next:
-				form = 2
-			case prev && !next:
-				form = 1
-			default:
-				form = 0
-			}
-		case joinRight:
-			if prev {
-				form = 1
-			} else {
-				form = 0
-			}
-		}
-
-		if forms[form] != 0 {
-			out[idx] = forms[form]
-		} else if forms[0] != 0 {
-			out[idx] = forms[0]
-		}
+	for idx := range runes {
+		shapeArabicRune(out, runes, idx)
 	}
 
 	return string(out)

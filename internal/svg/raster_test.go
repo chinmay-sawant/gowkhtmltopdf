@@ -1,6 +1,10 @@
-package svg
+package svg_test
 
-import "testing"
+import (
+	"testing"
+
+	"gowkhtmltopdf/internal/svg"
+)
 
 // Tests exercise the canvas-only Rasterize path (tdewolff/canvas).
 
@@ -11,7 +15,7 @@ func TestRasterizeRect(t *testing.T) {
   <rect x="0" y="0" width="40" height="20" fill="#0645ad"/>
 </svg>`)
 
-	png, width, height, err := Rasterize(src, 256)
+	png, width, height, err := svg.Rasterize(src, 256)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,7 +34,7 @@ func TestRasterizePath(t *testing.T) {
 
 	src := []byte(`<svg viewBox="0 0 10 10"><path d="M0 0 L10 0 L10 10 Z" fill="#000"/></svg>`)
 
-	png, width, height, err := Rasterize(src, 128)
+	png, width, height, err := svg.Rasterize(src, 128)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,7 +47,7 @@ func TestRasterizePath(t *testing.T) {
 func TestRasterizeNotSVG(t *testing.T) {
 	t.Parallel()
 
-	png, width, height, err := Rasterize([]byte("not an svg"), 64)
+	png, width, height, err := svg.Rasterize([]byte("not an svg"), 64)
 	if err == nil {
 		t.Fatal("expected error for non-SVG input")
 	}
@@ -59,7 +63,7 @@ func TestRasterizeBrokenSVG(t *testing.T) {
 	// and return a clean error (no second rasterizer / no shell fallback).
 	src := []byte(`<svg xmlns="http://www.w3.org/2000/svg"><path d="M this is garbage"/></svg>`)
 
-	png, width, height, err := Rasterize(src, 64)
+	png, width, height, err := svg.Rasterize(src, 64)
 	if err == nil {
 		// If canvas ever starts tolerating this, still require a real image.
 		if width < 1 || height < 1 || len(png) < 1 {

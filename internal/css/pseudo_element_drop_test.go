@@ -1,18 +1,19 @@
-package css
+package css_test
 
 import (
 	"testing"
 
+	"gowkhtmltopdf/internal/css"
 	"gowkhtmltopdf/internal/html"
 )
 
 // TestPseudoElementSelectorDoesNotApplyToHost: p::before { width:120pt } must
 // not match the host <p> (that crushed wiki body columns to 120pt when
 // ::before was stripped). Pseudo rules are kept for generated content.
-func TestPseudoElementSelectorDoesNotApplyToHost(t *testing.T) {
+func TestPseudoElementSelectorDoesNotApplyToHost(t *testing.T) { //nolint:cyclop // host-vs-pseudo match bookkeeping
 	t.Parallel()
 
-	str, err := Parse(`p::before { width: 120pt; content: ''; display: block }
+	str, err := css.Parse(`p::before { width: 120pt; content: ''; display: block }
 p:before { width: 99pt }
 p { color: #000 }`)
 	if err != nil {
@@ -47,7 +48,7 @@ p { color: #000 }`)
 
 	for _, r := range str.Rules {
 		for _, sel := range r.Selectors {
-			if Match(sel, page) {
+			if css.Match(sel, page) {
 				hostMatches++
 
 				for _, d := range r.Decls {
@@ -57,7 +58,7 @@ p { color: #000 }`)
 				}
 			}
 
-			if MatchPseudo(sel, page, "before") {
+			if css.MatchPseudo(sel, page, "before") {
 				pseudoMatches++
 			}
 		}
