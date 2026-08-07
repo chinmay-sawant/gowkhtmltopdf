@@ -229,6 +229,47 @@ assemble → write).
 - **Budget asserted in CI:** < 5 s per run (generous - catches
   order-of-magnitude regressions only)
 
+### Benchmark matrix
+
+The reproducible Go benchmark matrix covers 2, 5, 10, 20, 50, 100, 200, 250,
+and 500 pages for PDF and template rendering. Web-fetch and inline-image
+benchmarks use 2, 5, 10, 20, 50, 100, 200, 250, and 500 image tiles because
+image mode renders one raster canvas rather than paginated PDF pages.
+
+The Phase 9.3 gate above is a separate 10-section × 40-row invoice fixture;
+the matrix below uses the checked-in benchmark templates (20 realistic rows per
+page), so those timings are not directly comparable.
+
+| Workload | 2 | 5 | 10 | 20 | 50 | 100 | 200 | 250 | 500 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| PDF pages | 10.31ms | 22.87ms | 36.91ms | 77.74ms | 226.25ms | 528.33ms | 1.51s | 3.47s | 14.14s |
+| Template + PDF pages | 9.56ms | 25.55ms | 46.39ms | 100.62ms | 250.62ms | 621.44ms | 2.02s | 3.62s | 13.67s |
+| Web-fetch image tiles | 257.33ms | 258.05ms | 281.10ms | 310.47ms | 356.66ms | 413.68ms | 506.42ms | 564.00ms | 970.72ms |
+| Inline image tiles | 209.50ms | 220.61ms | 255.35ms | 282.33ms | 303.54ms | 340.31ms | 439.46ms | 491.22ms | 788.43ms |
+
+- [Benchmark implementation](internal/convert/benchmarks_test.go)
+- [Benchmark templates and recorded results](testdata/golden/benchmarks/README.md)
+- [Raw generated benchmark output](testdata/golden/benchmarks/benchmark-results.txt)
+
+Live movie/TV listing benchmark (opt-in, real TVmaze API data and poster CDN):
+
+```sh
+GOWKHTMLTOPDF_LIVE_BENCHMARK=1 \
+  go test ./internal/convert -run '^$' \
+  -bench '^BenchmarkLiveMovieListing/(2Images|5Images|10Images)$' \
+  -benchmem -benchtime=1x -count=1
+```
+
+See the [live benchmark instructions](testdata/golden/benchmarks/README.md#live-movie-listing-benchmark).
+
+Snapshot command:
+
+```sh
+go test ./internal/convert -run '^$' \
+  -bench 'Benchmark(PDFPages|TemplatePages|WebFetchImage|ImageAssets)$' \
+  -benchmem -benchtime=1x -count=1
+```
+
 CPU profiling (stdlib pprof):
 
 ```sh
