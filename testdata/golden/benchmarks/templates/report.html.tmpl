@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<!-- report.html.tmpl: paginated benchmark report -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Benchmark report</title>
+  <style>
+    body {
+      color: #172033;
+      font-family: sans-serif;
+      font-size: 9pt;
+      margin: 0;
+    }
+    .benchmark-page {
+      page-break-before: always;
+      page-break-inside: avoid;
+      padding: 2mm 0;
+    }
+    .benchmark-page.first {
+      page-break-before: auto;
+    }
+    h1 {
+      color: #174a7c;
+      font-size: 16pt;
+      margin: 0 0 3mm;
+    }
+    p {
+      margin: 0 0 3mm;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+    tr {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    th, td {
+      border: 1px solid #a8b5c5;
+      padding: 1.5mm 2mm;
+      white-space: nowrap;
+    }
+    th {
+      background: #e6eef7;
+      text-align: left;
+    }
+    td.amount {
+      text-align: right;
+    }
+  </style>
+</head>
+<body>
+{{range .Pages}}
+  <section class="benchmark-page{{if .First}} first{{end}}">
+    <h1>Benchmark report — page {{.Number}}</h1>
+    <p>Representative invoice and operations data for the full HTML-to-PDF pipeline.</p>
+    <table>
+      <thead>
+        <tr><th>Line</th><th>SKU</th><th>Description</th><th>Quantity</th><th>Amount</th></tr>
+      </thead>
+      <tbody>
+      {{range .Rows}}
+        <tr><td>{{.Number}}</td><td>{{.SKU}}</td><td>{{.Description}}</td><td>{{.Quantity}}</td><td class="amount">{{.Amount}}</td></tr>
+      {{end}}
+      </tbody>
+    </table>
+  </section>
+{{end}}
+</body>
+</html>

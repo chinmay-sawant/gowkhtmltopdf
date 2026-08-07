@@ -646,6 +646,12 @@ func capTablePageBreaks(res *Result, contentH float64) {
 // pages derive from the final Y positions. Rect-type ops crossing a boundary
 // are split by Paint.
 func paginateOps(res *Result, contentH float64) []int {
+	// Resolve forced section starts before snapping text to provisional page
+	// boundaries. Otherwise a row near the boundary of the unbroken flow can
+	// move its text alone; a later page-break-before shift then leaves the
+	// collapsed-table chrome behind at the old row position.
+	for iter := 0; iter < 10 && beforeAlways(res, contentH); iter++ {
+	}
 	for i := 0; i < len(res.Ops); i++ {
 		op := &res.Ops[i]
 		if op.Fixed {

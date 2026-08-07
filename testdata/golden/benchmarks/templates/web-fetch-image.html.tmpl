@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<!-- web-fetch-image.html.tmpl: HTTP document with fetched image assets -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Web fetch image benchmark</title>
+  <style>
+    body {
+      color: #172033;
+      font-family: sans-serif;
+      font-size: 9pt;
+      margin: 12px;
+    }
+    .image-tile {
+      border: 1px solid #a8b5c5;
+      display: inline-block;
+      margin: 2px;
+      padding: 4px;
+      vertical-align: top;
+      width: 78px;
+    }
+    .image-tile img {
+      display: block;
+      height: 48px;
+      margin-bottom: 3px;
+      width: 72px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Fetched image grid</h1>
+  <p>Every tile resolves through the document's HTTP base URL.</p>
+  <main>
+  {{range .Images}}
+    <span class="image-tile"><img src="{{.Src}}" alt="{{.Label}}"><span>{{.Label}}</span></span>
+  {{end}}
+  </main>
+</body>
+</html>
