@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Architecture review — gowkhtmltopdf follow-up</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+    mermaid.initialize({startOnLoad:true,securityLevel:"loose",theme:"neutral"});
+  </script>
+  <style>
+    .seam { border-style: dashed; }
+    .leak { color:#b91c1c; border-color:#ef4444; }
+    .deep { background:#172033; color:#f8fafc; }
+    .code { white-space:pre-wrap; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+  </style>
+</head>
+<body class="bg-stone-50 text-slate-900">
+<main class="mx-auto max-w-6xl space-y-10 px-6 py-12">
+  <header class="space-y-4">
+    <p class="text-xs font-semibold uppercase tracking-[.24em] text-indigo-700">gowkhtmltopdf · 2026-08-07 · five-agent follow-up</p>
+    <div class="flex flex-wrap items-end justify-between gap-6">
+      <div>
+        <h1 class="font-serif text-5xl leading-none tracking-tight">Residual architecture friction</h1>
+        <p class="mt-4 max-w-3xl text-lg text-slate-600">Current architecture rating: <span class="font-semibold text-slate-900">7.9 / 10</span>. The code is product-capable and well-tested; these candidates deepen the remaining seams.</p>
+      </div>
+      <div class="rounded-xl border border-slate-300 bg-white px-5 py-4 text-sm shadow-sm">
+        <div class="font-semibold">Legend</div>
+        <div class="mt-2 space-y-1 text-slate-600">
+          <div>solid box = module</div><div class="border-t border-dashed border-slate-500 pt-1">dashed = seam</div><div class="text-red-700">red = leakage</div><div class="font-semibold text-slate-900">dark = deep implementation</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Current evidence</p>
+    <div class="mt-4 grid gap-4 md:grid-cols-4">
+      <div><div class="text-2xl font-semibold">7.9</div><div class="text-sm text-slate-500">architecture / 10</div></div>
+      <div><div class="text-2xl font-semibold">5</div><div class="text-sm text-slate-500">parallel read-only scouts</div></div>
+      <div><div class="text-2xl font-semibold">pass</div><div class="text-sm text-slate-500">make lint</div></div>
+      <div><div class="text-2xl font-semibold">pass</div><div class="text-sm text-slate-500">make test</div></div>
+    </div>
+  </section>
+
+  <section id="candidates" class="space-y-8">
+    <article id="contracts" class="rounded-2xl border border-indigo-200 bg-white p-6 shadow-sm">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h2 class="font-serif text-3xl">1. Close the mode and output contracts</h2>
+        <span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold uppercase tracking-wider text-emerald-800">Strong</span>
+      </div>
+      <p class="mt-2 text-sm text-slate-500">Files: <code>internal/cli/cli.go</code>, <code>internal/cli/flags.go</code>, <code>internal/convert/convert.go</code>, <code>api.go</code></p>
+      <div class="mt-6 grid gap-5 md:grid-cols-2">
+        <div class="rounded-xl border border-red-200 bg-red-50 p-4">
+          <div class="mb-3 text-xs font-bold uppercase tracking-wider text-red-700">Before · leakage</div>
+          <div class="flex min-h-48 items-center justify-center gap-2 text-center text-xs">
+            <div class="rounded border border-slate-400 bg-white p-3">argv<br><span class="text-slate-500">mode unknown</span></div>
+            <div class="text-red-700">→</div>
+            <div class="rounded border border-red-400 bg-white p-3">Command<br><span class="text-red-700">invalid flags</span></div>
+            <div class="text-red-700">→</div>
+            <div class="rounded border border-red-400 bg-white p-3">os.Stdout<br><span class="text-red-700">engine escape</span></div>
+          </div>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div class="mb-3 text-xs font-bold uppercase tracking-wider text-indigo-700">After · deep seam</div>
+          <div class="flex min-h-48 items-center justify-center gap-2 text-center text-xs">
+            <div class="rounded border border-dashed border-indigo-500 bg-white p-3">Parse(argv,<br>Mode)</div>
+            <div class="text-indigo-700">→</div>
+            <div class="deep rounded border border-slate-700 p-4">Request<br><span class="text-slate-300">explicit sinks</span></div>
+            <div class="text-indigo-700">→</div>
+            <div class="rounded border border-slate-400 bg-white p-3">CLI / library<br>adapters</div>
+          </div>
+        </div>
+      </div>
+      <div class="mt-5 grid gap-4 md:grid-cols-3 text-sm">
+        <div><div class="font-semibold">Problem</div><p class="mt-1 text-slate-600">`Mode` exists in flag metadata but is not a parser invariant; outline and PDF output can bypass the request sink.</p></div>
+        <div><div class="font-semibold">Solution</div><p class="mt-1 text-slate-600">Make mode validation and document/outline sinks part of the engine interface.</p></div>
+        <div><div class="font-semibold">Benefits</div><p class="mt-1 text-slate-600">Locality for policy; leverage across two binaries and library tests; no stdout mutation.</p></div>
+      </div>
+    </article>
+
+    <article id="prep" class="rounded-2xl border border-indigo-200 bg-white p-6 shadow-sm">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h2 class="font-serif text-3xl">2. Prepare one document/resource context</h2>
+        <span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold uppercase tracking-wider text-emerald-800">Strong</span>
+      </div>
+      <p class="mt-2 text-sm text-slate-500">Files: <code>internal/convert/convert.go:464-527</code>, <code>internal/imageout/imageout.go:499-544</code>, <code>internal/load/load.go</code></p>
+      <div class="mt-6 grid gap-5 md:grid-cols-2">
+        <div class="rounded-xl border border-red-200 bg-red-50 p-4"><div class="mb-3 text-xs font-bold uppercase tracking-wider text-red-700">Before · forked preparation</div><pre class="code text-xs text-slate-700">PDF: load → parse → media → sheets → fonts → images
+
+Image: load → parse → media → sheets → fonts → images
+
+base + LoadPage travel through every call</pre></div>
+        <div class="rounded-xl border border-slate-200 bg-slate-50 p-4"><div class="mb-3 text-xs font-bold uppercase tracking-wider text-indigo-700">After · deep module</div><div class="flex min-h-32 items-center justify-center gap-2 text-center text-xs"><div class="rounded border border-dashed border-indigo-500 bg-white p-3">DocumentSource<br>ResourceContext</div><div class="text-indigo-700">→</div><div class="deep rounded border border-slate-700 p-4">PreparedDocument<br><span class="text-slate-300">shared policy</span></div><div class="text-indigo-700">→</div><div class="space-y-2"><div class="rounded border bg-white p-2">PDF adapter</div><div class="rounded border bg-white p-2">Image adapter</div></div></div></div>
+      </div>
+      <div class="mt-5 grid gap-4 md:grid-cols-3 text-sm"><div><div class="font-semibold">Problem</div><p class="mt-1 text-slate-600">The helper modules are shared but their orchestration and base/load policy still diverge.</p></div><div><div class="font-semibold">Solution</div><p class="mt-1 text-slate-600">Bind source, base, policy, media, sheets, fonts, and fetch behavior once.</p></div><div><div class="font-semibold">Benefits</div><p class="mt-1 text-slate-600">Locality for ACL and URL rules; leverage across PDF and raster output; one contract matrix.</p></div></div>
+    </article>
+
+    <article id="layout" class="rounded-2xl border border-amber-200 bg-white p-6 shadow-sm">
+      <div class="flex flex-wrap items-center justify-between gap-3"><h2 class="font-serif text-3xl">3. Stabilize CSS/layout state</h2><span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold uppercase tracking-wider text-emerald-800">Strong</span></div>
+      <p class="mt-2 text-sm text-slate-500">Files: <code>internal/layout/layout.go</code>, <code>internal/layout/paint.go</code>, <code>internal/css/container.go</code></p>
+      <div class="mt-6 grid gap-5 md:grid-cols-2"><div class="rounded-xl border border-red-200 bg-red-50 p-4"><div class="mb-3 text-xs font-bold uppercase tracking-wider text-red-700">Before · storage details leak</div><div class="flex min-h-40 items-center justify-center gap-3 text-xs"><div class="rounded border bg-white p-3">box<br><span class="text-red-700">opStart/opEnd</span></div><div class="text-red-700">→ rebuild slice →</div><div class="rounded border bg-white p-3">Ops[]<br><span class="text-red-700">indices shift</span></div></div></div><div class="rounded-xl border border-slate-200 bg-slate-50 p-4"><div class="mb-3 text-xs font-bold uppercase tracking-wider text-indigo-700">After · owned state</div><div class="flex min-h-40 items-center justify-center gap-3 text-xs"><div class="deep rounded border border-slate-700 p-4">DisplayList<br><span class="text-slate-300">stable tokens</span></div><div class="text-indigo-700">→</div><div class="rounded border border-dashed border-indigo-500 bg-white p-3">pagination<br>locations</div></div></div></div>
+      <div class="mt-5 grid gap-4 md:grid-cols-3 text-sm"><div><div class="font-semibold">Problem</div><p class="mt-1 text-slate-600">Container convergence ignores font size; op rewriting can invalidate box identity; image sizing has two policies.</p></div><div><div class="font-semibold">Solution</div><p class="mt-1 text-slate-600">Own equality, stable display identity, and used-image sizing inside layout.</p></div><div><div class="font-semibold">Benefits</div><p class="mt-1 text-slate-600">Correctness stays local; tests observe one layout interface; benchmarks target real state churn.</p></div></div>
+    </article>
+
+    <article id="output" class="rounded-2xl border border-amber-200 bg-white p-6 shadow-sm">
+      <div class="flex flex-wrap items-center justify-between gap-3"><h2 class="font-serif text-3xl">4. Deepen output resources and paint traversal</h2><span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold uppercase tracking-wider text-emerald-800">Strong</span></div>
+      <p class="mt-2 text-sm text-slate-500">Files: <code>internal/layout/paint.go</code>, <code>internal/imageout/imageout.go</code>, <code>internal/convert/hf.go</code>, <code>internal/pdf/content.go</code></p>
+      <div class="mt-6 grid gap-5 md:grid-cols-2"><div class="rounded-xl border border-red-200 bg-red-50 p-4"><div class="mb-3 text-xs font-bold uppercase tracking-wider text-red-700">Before · three policy owners</div><pre class="code text-xs text-slate-700">PDF body: F0/I0 + z-order + CTM
+HTML HF:  F0/I0 + its own names
+Raster:  raw order + partial policy</pre></div><div class="rounded-xl border border-slate-200 bg-slate-50 p-4"><div class="mb-3 text-xs font-bold uppercase tracking-wider text-indigo-700">After · one traversal seam</div><div class="flex min-h-32 items-center justify-center gap-3 text-xs"><div class="deep rounded border border-slate-700 p-4">Traversal<br><span class="text-slate-300">order · transform · resources</span></div><div class="text-indigo-700">→</div><div class="space-y-2"><div class="rounded border bg-white p-2">PDF adapter</div><div class="rounded border bg-white p-2">Raster adapter</div></div></div></div></div>
+      <div class="mt-5 grid gap-4 md:grid-cols-3 text-sm"><div><div class="font-semibold">Problem</div><p class="mt-1 text-slate-600">Resource names can collide across cloned pages; raster and PDF traversal do not share all display-list policy.</p></div><div><div class="font-semibold">Solution</div><p class="mt-1 text-slate-600">Let resource ownership and traversal policy live behind the real two-adapter seam.</p></div><div><div class="font-semibold">Benefits</div><p class="mt-1 text-slate-600">Leverage across body, header/footer, and raster; locality for resource correctness.</p></div></div>
+    </article>
+
+    <article id="fonts" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div class="flex flex-wrap items-center justify-between gap-3"><h2 class="font-serif text-3xl">5. Make font identity and shaping explicit</h2><span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold uppercase tracking-wider text-amber-800">Worth exploring</span></div>
+      <p class="mt-2 text-sm text-slate-500">Files: <code>internal/pdf/fonttype0.go</code>, <code>internal/convert/convert.go</code>, <code>internal/layout/inline.go</code>, <code>internal/imageout/ttfraster.go</code></p>
+      <div class="mt-6 grid gap-5 md:grid-cols-2"><div class="rounded-xl border border-red-200 bg-red-50 p-4"><div class="mb-3 text-xs font-bold uppercase tracking-wider text-red-700">Before · display-name identity</div><pre class="code text-xs text-slate-700">key := mode + PostScriptName + runes
+
+layout measures, PDF shapes,
+raster shapes again</pre></div><div class="rounded-xl border border-slate-200 bg-slate-50 p-4"><div class="mb-3 text-xs font-bold uppercase tracking-wider text-indigo-700">After · face-owned runs</div><div class="flex min-h-32 items-center justify-center gap-3 text-xs"><div class="deep rounded border border-slate-700 p-4">Font module<br><span class="text-slate-300">FaceID · shaped run · advance</span></div><div class="text-indigo-700">→</div><div class="space-y-2"><div class="rounded border bg-white p-2">PDF subset adapter</div><div class="rounded border bg-white p-2">Raster adapter</div></div></div></div></div>
+      <div class="mt-5 grid gap-4 md:grid-cols-3 text-sm"><div><div class="font-semibold">Problem</div><p class="mt-1 text-slate-600">Same-family style variants can share a cache identity; shaping and measurement are split across outputs.</p></div><div><div class="font-semibold">Solution</div><p class="mt-1 text-slate-600">Own face identity, fallback, shaping, and advances before backend adapters.</p></div><div><div class="font-semibold">Benefits</div><p class="mt-1 text-slate-600">Correctness and locality for Unicode typography; leverage across PDF and PNG.</p></div></div>
+    </article>
+
+    <article id="cross-cutting" class="rounded-2xl border border-amber-200 bg-white p-6 shadow-sm">
+      <div class="flex flex-wrap items-center justify-between gap-3"><h2 class="font-serif text-3xl">6. Localize CLI, cancellation, and snapshots</h2><span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold uppercase tracking-wider text-emerald-800">Strong</span></div>
+      <p class="mt-2 text-sm text-slate-500">Files: <code>internal/convert/convert.go</code>, <code>internal/imageout/imageout.go</code>, <code>internal/layout/layout.go</code>, <code>api.go</code></p>
+      <div class="mt-6 grid gap-5 md:grid-cols-2"><div class="rounded-xl border border-red-200 bg-red-50 p-4"><div class="mb-3 text-xs font-bold uppercase tracking-wider text-red-700">Before · caller-owned invariants</div><pre class="code text-xs text-slate-700">engine imports cli
+ctx stops before layout/raster
+AddObject copies only the outer struct</pre></div><div class="rounded-xl border border-slate-200 bg-slate-50 p-4"><div class="mb-3 text-xs font-bold uppercase tracking-wider text-indigo-700">After · explicit ownership</div><div class="flex min-h-32 items-center justify-center gap-3 text-xs"><div class="rounded border border-dashed border-indigo-500 bg-white p-3">outer adapters<br>deep snapshots<br>ctx checkpoints</div><div class="text-indigo-700">→</div><div class="deep rounded border border-slate-700 p-4">engine modules<br><span class="text-slate-300">small interface</span></div></div></div></div>
+      <div class="mt-5 grid gap-4 md:grid-cols-3 text-sm"><div><div class="font-semibold">Problem</div><p class="mt-1 text-slate-600">CLI translation remains in engine packages, cancellation is partial, and public copies do not own nested data.</p></div><div><div class="font-semibold">Solution</div><p class="mt-1 text-slate-600">Move adapters outward, checkpoint expensive passes, and define deep snapshot ownership.</p></div><div><div class="font-semibold">Benefits</div><p class="mt-1 text-slate-600">Locality for lifecycle policy; safer concurrency; tests can prove ownership through the interface.</p></div></div>
+    </article>
+  </section>
+
+  <section id="top-recommendation" class="rounded-2xl border-2 border-indigo-300 bg-indigo-50 p-7">
+    <p class="text-xs font-bold uppercase tracking-wider text-indigo-700">Top recommendation</p>
+    <h2 class="mt-2 font-serif text-4xl">Close the mode and output contracts first</h2>
+    <p class="mt-3 max-w-3xl text-slate-700">It is the smallest high-leverage seam: explicit mode validation and sink ownership improve testability immediately and give the later document-preparation and output work a stable interface.</p>
+    <pre class="mermaid mt-6 overflow-x-auto rounded-xl bg-white p-4">flowchart LR
+      CLI[CLI adapter] -->|Mode + sinks| REQ[Explicit request]
+      LIB[Library adapter] -->|buffers + callbacks| REQ
+      REQ --> PREP[Prepared document]
+      PREP --> PDF[PDF adapter]
+      PREP --> IMG[Raster adapter]
+      classDef deep fill:#172033,color:#fff,stroke:#172033;
+      class REQ,PREP deep;</pre>
+    <p class="mt-5 text-sm text-indigo-900">Full snippets and phase rows are in the sibling Markdown files. This report proposes candidates; it does not choose an implementation interface for the next step.</p>
+  </section>
+</main>
+</body>
+</html>
