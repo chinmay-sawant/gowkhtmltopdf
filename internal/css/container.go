@@ -106,44 +106,34 @@ const (
 // (the element's font size). Same conversions as the former internal helper;
 // % and viewport units are unsupported (return false). Unknown units return
 // false so callers can apply their own policy (e.g. line-height inherits).
+//
+// Physical units use multiply-then-divide (val * 72 / 25.4) so values like
+// 25.4mm cancel cleanly to 72pt in IEEE float arithmetic. Precomputing
+// (72/25.4) and multiplying loses that cancellation (25.4mm → 71.999…).
 func LengthToPt(val float64, unit string, basePt float64) (float64, bool) {
 	low := strings.ToLower(unit)
 
 	switch low {
+	case "px":
+		return val * pxToPt, true
+	case "pt":
+		return val, true
+	case "in":
+		return val * pointsPerInch, true
+	case "cm":
+		return val * pointsPerInch / cmPerInch, true
+	case "mm":
+		return val * pointsPerInch / mmPerInch, true
+	case "pc":
+		return val * pointsPerPica, true
 	case "em", unitRem:
-		if unit == unitRem {
+		if low == unitRem {
 			return val * rootFontSizePx * pxToPt, true
 		}
 
 		return val * basePt, true
 	case "ex", "ch":
 		return val * basePt * exChToEmFactor, true
-	}
-
-	factor, ok := fixedUnitFactor(low)
-	if !ok {
-		return 0, false
-	}
-
-	return val * factor, true
-}
-
-// fixedUnitFactor returns the constant points-per-unit factor for CSS length
-// units whose size does not depend on the element.
-func fixedUnitFactor(unit string) (float64, bool) {
-	switch unit {
-	case "px":
-		return pxToPt, true
-	case "pt":
-		return 1, true
-	case "in":
-		return pointsPerInch, true
-	case "cm":
-		return pointsPerInch / cmPerInch, true
-	case "mm":
-		return pointsPerInch / mmPerInch, true
-	case "pc":
-		return pointsPerPica, true
 	default:
 		return 0, false
 	}

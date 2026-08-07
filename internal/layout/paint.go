@@ -640,16 +640,18 @@ func bandImage(chld *pdf.Content, opts BandOptions, paintOp *Op, posX float64, n
 
 	posY := opts.OriginY - (paintOp.Y + paintOp.H)
 	if paintOp.IsJPEG {
-		return fmt.Errorf(
-			"layout: band image %s: %w", name,
-			chld.AddJPEGImage(name, posX, posY, paintOp.W, paintOp.H, paintOp.Image),
-		)
+		if err := chld.AddJPEGImage(name, posX, posY, paintOp.W, paintOp.H, paintOp.Image); err != nil {
+			return fmt.Errorf("layout: band image %s: %w", name, err)
+		}
+
+		return nil
 	}
 
-	return fmt.Errorf(
-		"layout: band image %s: %w", name,
-		chld.AddPNGImage(name, posX, posY, paintOp.W, paintOp.H, paintOp.Image),
-	)
+	if err := chld.AddPNGImage(name, posX, posY, paintOp.W, paintOp.H, paintOp.Image); err != nil {
+		return fmt.Errorf("layout: band image %s: %w", name, err)
+	}
+
+	return nil
 }
 
 func isSplittable(op *Op) bool {
@@ -3529,16 +3531,18 @@ func drawImage(
 	}
 
 	if paintOp.IsJPEG {
-		return fmt.Errorf(
-			"layout: embed jpeg %s: %w", name,
-			chld.AddJPEGImage(name, posX, posY, paintOp.W, paintOp.H, paintOp.Image),
-		)
+		if err := chld.AddJPEGImage(name, posX, posY, paintOp.W, paintOp.H, paintOp.Image); err != nil {
+			return fmt.Errorf("layout: embed jpeg %s: %w", name, err)
+		}
+
+		return nil
 	}
 
-	return fmt.Errorf(
-		"layout: embed png %s: %w", name,
-		chld.AddPNGImage(name, posX, posY, paintOp.W, paintOp.H, paintOp.Image),
-	)
+	if err := chld.AddPNGImage(name, posX, posY, paintOp.W, paintOp.H, paintOp.Image); err != nil {
+		return fmt.Errorf("layout: embed png %s: %w", name, err)
+	}
+
+	return nil
 }
 
 // drawLinkXform places a URI annotation. Annotations are page-space (not under

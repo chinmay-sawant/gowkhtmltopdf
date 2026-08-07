@@ -2457,6 +2457,8 @@ func imageDims(data []byte) (int, int, bool, bool) {
 }
 
 // jpegDims scans JPEG segment markers for a SOF segment carrying dimensions.
+// Layout matches pdf/images.go jpegScan SOF field order: after the marker and
+// 2-byte length, precision (1), height (2), width (2).
 func jpegDims(data []byte) (int, int, bool, bool) {
 	pos := 2
 	for pos+4 <= len(data) {
@@ -2472,18 +2474,27 @@ func jpegDims(data []byte) (int, int, bool, bool) {
 		}
 
 		if isSOFMarker(marker) {
-			width := int(binary.BigEndian.Uint16(data[pos+5 : pos+7]))
-			height := int(binary.BigEndian.Uint16(data[pos+3 : pos+5]))
+			// SOF: FF mm LL LL P YY YY XX XX …
+			// Need through width (pos+8 inclusive).
+			if pos+9 > len(data) {
+				return 0, 0, false, false
+			}
+
+			height := int(binary.BigEndian.Uint16(data[pos+5 : pos+7]))
+			width := int(binary.BigEndian.Uint16(data[pos+7 : pos+9]))
+			if width <= 0 || height <= 0 {
+				return 0, 0, false, false
+			}
 
 			return width, height, true, true
 		}
 
-		segLen := int(data[pos+2])<<maxGlueEm | int(data[pos+3])
-		if segLen < two {
+		segLen := int(data[pos+2])<<byteShift | int(data[pos+3])
+		if segLen < jpegSegHeaderLen {
 			return 0, 0, false, false
 		}
 
-		pos += two + segLen
+		pos += jpegSegHeaderLen + segLen
 	}
 
 	return 0, 0, false, false

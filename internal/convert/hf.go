@@ -440,20 +440,22 @@ func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hfVal se
 	c.Save()
 	c.Rect(0, bandTop, page.Width(), bandH)
 	c.Clip()
-	paintLayoutOps(ctx, page, c, res.Ops, geom.marginLeft, yTop, links)
+	err := paintLayoutOps(ctx, page, c, res.Ops, geom.marginLeft, yTop, links)
 	c.Restore()
 
-	return nil
+	return err
 }
 
 // paintLayoutOps paints visual ops via layout.PaintBand (shared fake-bold /
 // alpha / stroke policy with body paint), then wires link annotations that
 // need document context (fragment GoTo / external URI).
-func paintLayoutOps(ctx context.Context, page *pdf.Page, c *pdf.Content, ops []layout.Op, originX, yTop float64, links hfLinkContext) { //nolint:cyclop,funlen,lll // band paint plus per-op link wiring
-	_ = layout.PaintBandContext(ctx, page, c, ops, layout.BandOptions{ //nolint:exhaustruct,lll // intentional zero-value fields
+func paintLayoutOps(ctx context.Context, page *pdf.Page, c *pdf.Content, ops []layout.Op, originX, yTop float64, links hfLinkContext) error { //nolint:cyclop,funlen,lll // band paint plus per-op link wiring
+	if err := layout.PaintBandContext(ctx, page, c, ops, layout.BandOptions{ //nolint:exhaustruct,lll // intentional zero-value fields
 		OriginX: originX,
 		OriginY: yTop,
-	})
+	}); err != nil {
+		return err
+	}
 
 	for i := range ops {
 		oper := &ops[i]
@@ -516,6 +518,8 @@ func paintLayoutOps(ctx context.Context, page *pdf.Page, c *pdf.Content, ops []l
 
 		page.AddLinkURI(rect, uri)
 	}
+
+	return nil
 }
 
 // hfHeightFor returns the drawn height of a text or HTML header/footer in

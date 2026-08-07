@@ -518,9 +518,11 @@ func (c *Content) imageResources() map[string]string {
 	out := map[string]string{}
 
 	for name, img := range c.imageRefs {
-		if img.ref != 0 {
-			out[name] = img.ref.String()
+		if img == nil || img.ref == 0 {
+			continue
 		}
+
+		out[name] = img.ref.String()
 	}
 
 	return out

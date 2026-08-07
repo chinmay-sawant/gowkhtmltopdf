@@ -179,22 +179,22 @@ func (e *engine) lineBounds(floats *floatState, contentX, contentW, lineY float6
 
 // preferClearForTail drops the current line below active floats when the
 // remaining tail fits one full-width line (see preferFloatClearForTail).
-// Returns the updated line origin, width and Y.
+// Returns (lineY, lineX, lineW) to match the call site assignment order.
 func (e *engine) preferClearForTail(
 	items []inlineItem, idx int, lineX, lineW, contentX, contentW, lineY float64,
 	floats *floatState,
 ) (float64, float64, float64) {
 	if floats == nil || lineW >= contentW-0.5 {
-		return lineX, lineW, lineY
+		return lineY, lineX, lineW
 	}
 
 	if next, ok := e.preferFloatClearForTail(items, idx, contentW, lineW, lineY, floats); ok {
 		nextX, nextW := e.lineBounds(floats, contentX, contentW, next)
 
-		return nextX, nextW, next
+		return next, nextX, nextW
 	}
 
-	return lineX, lineW, lineY
+	return lineY, lineX, lineW
 }
 
 // maybeSplitOverflow splits an unbreakable text item that would overflow the
@@ -279,29 +279,29 @@ func isNowrapCluster(a, b inlineItem) bool {
 }
 
 // clearFloatBelow drops the current (empty) line below active floats when it
-// is too narrow for the next item; returns the updated line geometry and
-// whether the caller should retry the item on the new line.
+// is too narrow for the next item; returns (lineY, lineX, lineW, retry) to
+// match the call site assignment order.
 func (e *engine) clearFloatBelow(
 	lineX, lineW, lineY, adv, contentX, contentW float64,
 	floats *floatState,
 ) (float64, float64, float64, bool) {
 	if floats == nil || adv <= lineW || lineW >= contentW-0.5 {
-		return lineX, lineW, lineY, false
+		return lineY, lineX, lineW, false
 	}
 
 	next := floats.clearY(lineY)
 	if next <= lineY+0.5 {
-		return lineX, lineW, lineY, false
+		return lineY, lineX, lineW, false
 	}
 
 	nextX, nextW := e.lineBounds(floats, contentX, contentW, next)
 	// Retry this item at the new Y (do not advance i).
 	if nextW >= contentW-0.5 || adv <= nextW {
-		return nextX, nextW, next, true
+		return next, nextX, nextW, true
 	}
 
 	// Still too narrow (e.g. both sides floated) — emit anyway.
-	return nextX, nextW, next, false
+	return next, nextX, nextW, false
 }
 
 // breakOverflowItem splits a text item that cannot fit in remainW on the
