@@ -1501,11 +1501,15 @@ func shiftIndexedBox(res *Result, index int, dy float64) {
 // Used when rejoining a page-break-after:avoid box to a following box that
 // already sits on the next page.
 func shiftOpsOnly(res *Result, from, to int, dy float64) {
+	if res == nil || len(res.Ops) == 0 || dy == 0 {
+		return
+	}
+	ensureFlowIndex(res, flowIndexPageSize(res))
 	for i := from; i <= to; i++ {
-		if i >= 0 && i < len(res.Ops) && res.Ops[i].Fixed {
+		if i < 0 || i >= len(res.Ops) || res.Ops[i].Fixed {
 			continue
 		}
-		res.Ops[i].Y += dy
+		shiftIndexedOp(res, i, dy)
 	}
 }
 
