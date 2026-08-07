@@ -1311,15 +1311,21 @@ func shiftFlowY(res *Result, from, to int, fromY, dy float64) {
 			}
 		}
 	} else {
-		// Negative shifts are uncommon in the pagination fixpoint. Keep the
-		// exact legacy semantics for that direction; no allocation index is
-		// needed on the normal positive path.
-		for i := range res.Ops {
-			if i >= from && i <= to {
-				continue
-			}
-			if res.Ops[i].Y > fromY {
-				res.Ops[i].Y += dy
+		// Negative shifts move operations to the same or an earlier page.
+		// Process buckets in ascending order so an operation moved backward is
+		// not visited twice, while keeping the index in sync for later passes.
+		for p := startPage; p < len(res.flowPages); p++ {
+			for j := 0; j < len(res.flowPages[p]); {
+				i := res.flowPages[p][j]
+				if (i >= from && i <= to) || res.Ops[i].Y <= fromY {
+					j++
+					continue
+				}
+				oldPage := res.flowPageOf[i]
+				shiftIndexedOp(res, i, dy)
+				if res.flowPageOf[i] == oldPage {
+					j++
+				}
 			}
 		}
 	}
