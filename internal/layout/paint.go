@@ -1,6 +1,7 @@
 package layout
 
 import (
+	"context"
 	"math"
 	"sort"
 	"strconv"
@@ -30,8 +31,21 @@ type PaintOptions struct {
 // After pagination Paint fills res.Pages (page → op indices) and res.Locations
 // (element boxes in document order with their page and canvas rect).
 func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
+	return PaintContext(context.Background(), doc, res, opts)
+}
+
+// PaintContext is the cancellation-aware form of Paint. The legacy Paint
+// entrypoint remains a background-context adapter for package callers that do
+// not have a request context.
+func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts PaintOptions) error {
 	if doc == nil || res == nil {
 		return nil
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 	contentH := opts.PageHeight - opts.MarginTop - opts.MarginBottom
 	if contentH <= 0 {
@@ -100,6 +114,9 @@ func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 
 	var paintErr error
 	for pageIdx, idxs := range res.Pages {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		p := doc.AddPage(opts.PageWidth, opts.PageHeight)
 		c := p.Content()
 		fontNames := map[*pdf.Font]string{}
@@ -159,11 +176,17 @@ func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 		}
 		sortPaintIndices(res.Ops, idxs)
 		for _, idx := range idxs {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
 			paintOp(&res.Ops[idx], pageIdx)
 		}
 		// Fixed layer: page-local coords (pageIdx 0 math on every page).
 		sortPaintIndices(res.Ops, fixedIdx)
 		for _, idx := range fixedIdx {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
 			paintOp(&res.Ops[idx], 0)
 		}
 	}
@@ -272,8 +295,20 @@ type BandOptions struct {
 // are skipped. Link ops are left to the caller (annotations need document
 // context). Returns the first image-embed error, if any.
 func PaintBand(p *pdf.Page, c *pdf.Content, ops []Op, opts BandOptions) error {
+	return PaintBandContext(context.Background(), p, c, ops, opts)
+}
+
+// PaintBandContext is the cancellation-aware form of PaintBand used for
+// HTML headers and footers.
+func PaintBandContext(ctx context.Context, p *pdf.Page, c *pdf.Content, ops []Op, opts BandOptions) error {
 	if p == nil || c == nil {
 		return nil
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 	fontNames := map[*pdf.Font]string{}
 	nextFont := 0
@@ -302,6 +337,9 @@ func PaintBand(p *pdf.Page, c *pdf.Content, ops []Op, opts BandOptions) error {
 	useSimple := contentH <= 0
 	var firstErr error
 	for i := range ops {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		op := &ops[i]
 		if op.Kind == OpLinkURI || op.Kind == opKindNoop {
 			continue
@@ -715,16 +753,37 @@ func paginateOps(res *Result, contentH float64) []int {
 // remainders immediately after (document paint order). Built into a new slice
 // rather than mid-slice insert+copy (O(n²) and float-edge infinite loops when
 // Y sits on a page boundary — TestTenPageTableReportPerformance hang).
+type opSpan struct{ start, end int }
+
 func splitCrossingRects(res *Result, contentH float64, opPage []int) {
 	_ = opPage
 	if res == nil || contentH <= 0 {
 		return
 	}
+	// Give legacy/test-constructed operations an identity before any rewrite.
+	// Layout-generated operations already receive IDs from engine.add. A split
+	// fragment keeps its source ID; the box-range remap below is what makes all
+	// fragments remain owned by the same element.
+	var nextID uint64
+	for i := range res.Ops {
+		if res.Ops[i].ID > nextID {
+			nextID = res.Ops[i].ID
+		}
+	}
+	for i := range res.Ops {
+		if res.Ops[i].ID == 0 {
+			nextID++
+			res.Ops[i].ID = nextID
+		}
+	}
+	spans := make([]opSpan, len(res.Ops))
 	out := make([]Op, 0, len(res.Ops)+8)
 	for i := range res.Ops {
 		op := res.Ops[i]
+		start := len(out)
 		if op.Fixed || !isSplittable(&op) || op.H <= 0 {
 			out = append(out, op)
+			spans[i] = opSpan{start: start, end: len(out) - 1}
 			continue
 		}
 		guard := 0
@@ -758,8 +817,27 @@ func splitCrossingRects(res *Result, contentH float64, opPage []int) {
 			op.Y = boundary
 			op.H -= firstH
 		}
+		spans[i] = opSpan{start: start, end: len(out) - 1}
 	}
 	res.Ops = out
+	remapBoxOpRanges(res.root, spans)
+}
+
+// remapBoxOpRanges updates the layout-owned operation ranges after a display
+// list rewrite. In particular, a source rectangle can become two or more
+// page fragments; mapping the box end to the final fragment keeps pagination,
+// sticky/fixed stamping, and ElementLocation ownership aligned.
+func remapBoxOpRanges(b *box, spans []opSpan) {
+	if b == nil {
+		return
+	}
+	if b.opStart >= 0 && b.opEnd >= b.opStart && b.opStart < len(spans) && b.opEnd < len(spans) {
+		b.opStart = spans[b.opStart].start
+		b.opEnd = spans[b.opEnd].end
+	}
+	for _, child := range b.children {
+		remapBoxOpRanges(child, spans)
+	}
 }
 
 // stripOrphanRowChrome removes row-sized fills and horizontal rules that sit

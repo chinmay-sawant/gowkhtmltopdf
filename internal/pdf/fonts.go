@@ -2,6 +2,7 @@ package pdf
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -19,6 +20,10 @@ import (
 // subset the font into the PDF.
 type Font struct {
 	data []byte
+	// fingerprint identifies the loaded face independently of its display
+	// name. Registries may assign the same PostScriptName to different files;
+	// subset caching must not merge those faces.
+	fingerprint [32]byte
 
 	// PostScriptName is the PDF /BaseFont label (e.g. LiberationSans-Bold).
 	// Empty when the font was loaded without a registry name.
@@ -67,7 +72,7 @@ func ParseTTF(data []byte) (*Font, error) {
 	if 12+16*numTables > len(data) {
 		return nil, errors.New("font: truncated table directory")
 	}
-	f := &Font{data: data, tables: map[string][]byte{}}
+	f := &Font{data: data, fingerprint: sha256.Sum256(data), tables: map[string][]byte{}}
 	for i := 0; i < numTables; i++ {
 		rec := data[12+16*i:]
 		tag := string(rec[0:4])

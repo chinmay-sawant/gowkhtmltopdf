@@ -1,6 +1,7 @@
 package layout
 
 import (
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -215,6 +216,21 @@ type sizeContainer struct {
 	inlineSize float64 // content-box inline size in pt
 	fontSize   float64 // used font-size (em base for query lengths)
 	names      string  // space-separated container-name values
+}
+
+// sameSizeContainerState reports whether a second container measurement is
+// equivalent to the previous one. Container queries can use em lengths, so a
+// changed used font-size is just as significant as a changed inline size or
+// name. Keeping this comparison here gives the convergence loop one policy
+// for deciding whether a second style pass is required.
+func sameSizeContainerState(a, b sizeContainer) bool {
+	return nearlyEqual(a.inlineSize, b.inlineSize) &&
+		nearlyEqual(a.fontSize, b.fontSize) &&
+		a.names == b.names
+}
+
+func nearlyEqual(a, b float64) bool {
+	return math.Abs(a-b) <= 1e-9
 }
 
 // resolveStylesWith is the single cascade entry: Options + optional size

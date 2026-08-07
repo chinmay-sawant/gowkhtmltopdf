@@ -30,6 +30,31 @@ type shapedRun struct {
 	text string // reverse-cmap Unicode when fully mapped; else ""
 }
 
+// ShapedRun is the canonical text result consumed by layout-independent
+// emitters. Text is shaped once, then Runes and Advances describe that exact
+// shaped sequence. Keeping the advance calculation next to shaping prevents
+// PDF and raster output from independently walking the pre-shaped source
+// string and drifting on ligatures or presentation forms.
+type ShapedRun struct {
+	Text     string
+	Runes    []rune
+	Advances []float64 // points at the requested font size, one per Rune
+}
+
+// ShapeRun shapes s and computes advances for the resulting run. The returned
+// slices are owned by the result and may be retained by the caller.
+func ShapeRun(s string, f *Font, size float64) ShapedRun {
+	text := ShapeTextFont(s, f)
+	runes := []rune(text)
+	advances := make([]float64, len(runes))
+	if f != nil {
+		for i, r := range runes {
+			advances[i] = f.AdvanceInPoints(r, size)
+		}
+	}
+	return ShapedRun{Text: text, Runes: runes, Advances: advances}
+}
+
 // ShapeTextFont shapes s for PDF/image emission using OpenType when f has a
 // GSUB table and reverse-cmap can map every shaped glyph to Unicode. Otherwise
 // it falls back to presentation-form ShapeText.

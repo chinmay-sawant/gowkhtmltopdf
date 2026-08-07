@@ -1,14 +1,13 @@
 # Architecture deepening follow-up — gowkhtmltopdf
 
-> **Status:** proposed follow-up; no production implementation performed
+> **Status:** complete; five-agent implementation and validation closed
 > **Generated:** 2026-08-07
 > **Parent:** [`../README.md`](../README.md)
 > **Method:** `improve-codebase-architecture`, `codebase-design`, and `skills/phase-wise-checklist/SKILLS.md`
 
-This is a new residual review after the existing 2026-08-07 architecture ledger.
-It preserves that ledger and the user's current worktree changes. The review uses
-five parallel read-only scouts and records only friction that remains in the current
-source.
+This is the residual review and implementation record after the existing
+2026-08-07 architecture ledger. It preserves that ledger and records the
+five-agent implementation, integration, and validation evidence.
 
 ## Canonical artifacts
 
@@ -19,15 +18,13 @@ source.
 
 ## Evidence boundary
 
-- Current branch: `chore/ponytail-review-1`
-- Current commit at scan start: `37f5ee2 fix(cli): restore pre-object pending for page-only flags`
-- Worktree changes were documentation-only and were not overwritten.
-- Five read-only scouts ran concurrently, covering the CLI/API, document/load pipeline,
-  CSS/layout, output/fonts/raster, and whole-tree validation concerns.
-- Current gates: `make lint` passed (`go vet ./...` and clean `gofmt`); `make test`
-  passed (`go test ./...`).
-- The checklist is intentionally not closed: every new implementation row is `[ ]`
-  until its source, tests, and (where relevant) benchmark evidence exist.
+- Five focused implementation agents ran concurrently across the CLI/API,
+  document/load/outline, CSS/layout, convert/application, and PDF/image/font
+  scopes; the orchestrator integrated the cross-scope seams.
+- Final gates: `make lint`, `make test`, `go test -race ./...`, and the focused
+  CSS/layout gate all passed.
+- Every phase row is closed with current source, test, and benchmark evidence;
+  no checklist row remains deferred or unstarted.
 
 ## Preserved architecture
 

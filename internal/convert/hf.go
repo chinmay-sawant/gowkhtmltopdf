@@ -212,19 +212,20 @@ func drawTextHF(page *pdf.Page, hf settings.HeaderFooter, geom hfGeom, parms hfP
 // the placeholder-free case lays out once and reuses the display list.
 // Fonts use the same Registry + MergeFontFaces path as the body.
 type htmlHFLayout struct {
-	raw      string
-	skip     bool // value looked like raw markup, not a URL
-	perPage  bool
-	base     string
-	lp       settings.LoadPage
-	sheets   []*css.Stylesheet
-	res      *layout.Result
-	imagesFn func(src string) ([]byte, error)
-	font     *pdf.Font
-	registry *pdf.Registry
-	width    float64
-	height   float64
-	media    string
+	raw       string
+	skip      bool // value looked like raw markup, not a URL
+	perPage   bool
+	base      string
+	lp        settings.LoadPage
+	sheets    []*css.Stylesheet
+	res       *layout.Result
+	imagesFn  func(src string) ([]byte, error)
+	font      *pdf.Font
+	registry  *pdf.Registry
+	resources ResourceContext
+	width     float64
+	height    float64
+	media     string
 }
 
 // loadHTMLHF loads an HTML header/footer as a nested child document: fetch
@@ -246,7 +247,14 @@ func loadHTMLHF(ctx context.Context, loader *load.Loader, font *pdf.Font, st *ob
 		line.Emit(log, line.Warn, "object %d: header/footer html value looks like markup, not a URL; ignoring", st.idx)
 		return &htmlHFLayout{skip: true}, st.registry, nil
 	}
-	res, err := loader.Load(ctx, rawOrURL, st.lp)
+	if st.resources.Loader != nil {
+		loader = st.resources.Loader
+	}
+	lp := st.lp
+	if st.resources.Loader != nil {
+		lp = st.resources.Load
+	}
+	res, err := loader.Load(ctx, rawOrURL, lp)
 	if err != nil {
 		return nil, nil, fmt.Errorf("header/footer html: %w", err)
 	}
@@ -273,35 +281,47 @@ func loadHTMLHF(ctx context.Context, loader *load.Loader, font *pdf.Font, st *ob
 	if media == "" {
 		media = "print"
 	}
-	sheets := CollectSheets(ctx, loader, root, res.Base, st.lp, SheetOptions{
+	resources := NewResourceContext(loader, res.Base, lp)
+	sheets := resources.CollectSheets(ctx, root, SheetOptions{
 		ViewportW:   st.geom.contentW,
 		ViewportH:   st.geom.contentH,
 		MediaType:   media,
 		ObjectIndex: st.idx + 1,
 	}, log)
-	reg := MergeFontFaces(ctx, loader, st.registry, sheets, res.Base, st.lp, st.idx+1, log)
+	reg := resources.MergeFontFaces(ctx, st.registry, sheets, st.idx+1, log)
 	if reg == nil {
 		reg = st.registry
 	}
+	imagesFn := func(src string) ([]byte, error) {
+		if !st.imagesEnabled {
+			return nil, fmt.Errorf("images disabled")
+		}
+		r, err := resources.Fetch(ctx, src)
+		if err != nil {
+			return nil, err
+		}
+		return r.Body, nil
+	}
 	l := &htmlHFLayout{
-		raw:      raw,
-		perPage:  perPage,
-		base:     res.Base,
-		lp:       st.lp,
-		sheets:   sheets,
-		imagesFn: st.imagesFn,
-		font:     font,
-		registry: reg,
-		width:    st.geom.contentW,
-		height:   st.geom.contentH,
-		media:    media,
+		raw:       raw,
+		perPage:   perPage,
+		base:      res.Base,
+		lp:        lp,
+		sheets:    sheets,
+		imagesFn:  imagesFn,
+		font:      font,
+		registry:  reg,
+		resources: resources,
+		width:     st.geom.contentW,
+		height:    st.geom.contentH,
+		media:     media,
 	}
 	// Lay out once regardless: placeholder-free docs reuse this display list
 	// for every page; placeholder docs use it only for the natural height
 	// (auto margins) and re-layout per page at draw time.
-	l.res, err = layout.Layout(root, layout.Options{
+	l.res, err = layout.LayoutContext(ctx, root, layout.Options{
 		Width: l.width, Height: l.height, Font: font, Registry: l.registry,
-		Sheets: sheets, Media: media, Images: st.imagesFn,
+		Sheets: sheets, Media: media, Images: imagesFn,
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("header/footer html: layout: %w", err)
@@ -343,7 +363,7 @@ func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hf setti
 		if err != nil {
 			return err
 		}
-		res, err = layout.Layout(root, layout.Options{
+		res, err = layout.LayoutContext(ctx, root, layout.Options{
 			Width: hfL.width, Height: hfL.height, Font: hfL.font, Registry: hfL.registry,
 			Sheets: hfL.sheets, Media: media, Images: hfL.imagesFn,
 		})
@@ -379,7 +399,7 @@ func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hf setti
 	c.Save()
 	c.Rect(0, bandTop, page.Width(), bandH)
 	c.Clip()
-	paintLayoutOps(page, c, res.Ops, geom.marginLeft, yTop, links)
+	paintLayoutOps(ctx, page, c, res.Ops, geom.marginLeft, yTop, links)
 	c.Restore()
 	return nil
 }
@@ -387,8 +407,8 @@ func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hf setti
 // paintLayoutOps paints visual ops via layout.PaintBand (shared fake-bold /
 // alpha / stroke policy with body paint), then wires link annotations that
 // need document context (fragment GoTo / external URI).
-func paintLayoutOps(page *pdf.Page, c *pdf.Content, ops []layout.Op, originX, yTop float64, links hfLinkContext) {
-	_ = layout.PaintBand(page, c, ops, layout.BandOptions{
+func paintLayoutOps(ctx context.Context, page *pdf.Page, c *pdf.Content, ops []layout.Op, originX, yTop float64, links hfLinkContext) {
+	_ = layout.PaintBandContext(ctx, page, c, ops, layout.BandOptions{
 		OriginX: originX,
 		OriginY: yTop,
 	})
@@ -509,8 +529,6 @@ func drawHeadersFooters(ctx context.Context, loader *load.Loader, font *pdf.Font
 	date := now.Format("2006-01-02")
 	clock := now.Format("15:04:05")
 	idIndex := buildBodyIDIndex(planBodyStates(plan))
-	// SectionOf keys on Page; view maps Page=DocPage for body-global lookup.
-	secHeads := headingsDocPageView(headings)
 	tocTotal := 0
 	if plan != nil {
 		tocTotal = plan.tocTotal
@@ -535,7 +553,7 @@ func drawHeadersFooters(ctx context.Context, loader *load.Loader, font *pdf.Font
 			replaces: own.st.repl,
 		}
 		if !own.st.isTOC {
-			parms.section, parms.subsection = outline.SectionOf(secHeads, p-tocTotal)
+			parms.section, parms.subsection = outline.SectionOfBy(headings, p-tocTotal, outline.DocumentPage)
 		}
 		page := doc.PageAt(p)
 		if page == nil {

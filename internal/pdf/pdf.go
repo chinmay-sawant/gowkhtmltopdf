@@ -200,9 +200,9 @@ func (d *Document) ReorderPages(order []int) error {
 
 // DuplicatePage appends a fresh page object that paints the same content as
 // the page at index i: same size, a new /Contents object with the same
-// stream bytes, and independent copies of the link annotations. Font and
-// image resources are shared with the source (they are read-only after
-// painting), so both pages resolve to the same XObjects. Used to materialize
+// stream bytes, and independent copies of the link annotations. Parsed fonts
+// and already-materialized image objects may be shared by the document, but
+// each page owns its resource maps. Used to materialize
 // copies/collate page runs before ReorderPages.
 func (d *Document) DuplicatePage(i int) (*Page, error) {
 	if d.finalized {

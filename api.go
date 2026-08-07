@@ -97,7 +97,7 @@ func (s *ObjectSettings) SetPage(page string) *ObjectSettings {
 // involved: the bytes are always treated as a document.
 func (s *ObjectSettings) SetBody(html []byte, base string) *ObjectSettings {
 	s.o.Page = ""
-	s.o.Load.InlineHTML = html
+	s.o.Load.InlineHTML = cloneBytes(html)
 	s.o.Load.InlineBase = base
 	return s
 }
@@ -145,9 +145,60 @@ func (c *Converter) Global() *GlobalSettings {
 // settings are copied, so later mutations of s do not affect the converter.
 // A converter needs at least one object to convert.
 func (c *Converter) AddObject(s *ObjectSettings) *Converter {
-	cp := *s
-	c.objects = append(c.objects, &cp)
+	cp := &ObjectSettings{o: clonePdfObject(s.o)}
+	c.objects = append(c.objects, cp)
 	return c
+}
+
+// clonePdfObject creates an ownership boundary at the public API. PdfObject
+// contains maps and slices in load, header/footer, ignored-setting, and
+// inline-document fields; a struct assignment alone would let callers mutate
+// a converter after AddObject returned.
+func clonePdfObject(src settings.PdfObject) settings.PdfObject {
+	dst := src
+	dst.Header = cloneHeaderFooter(src.Header)
+	dst.Footer = cloneHeaderFooter(src.Footer)
+	dst.Load.CustomHeaders = cloneStringMap(src.Load.CustomHeaders)
+	dst.Load.Cookies = cloneStringMap(src.Load.Cookies)
+	dst.Load.Post = clonePostItems(src.Load.Post)
+	dst.Load.InlineHTML = cloneBytes(src.Load.InlineHTML)
+	dst.Ignored = cloneStringMap(src.Ignored)
+	return dst
+}
+
+func cloneHeaderFooter(src settings.HeaderFooter) settings.HeaderFooter {
+	dst := src
+	dst.Replace = cloneStringMap(src.Replace)
+	return dst
+}
+
+func clonePostItems(src []settings.PostItem) []settings.PostItem {
+	if src == nil {
+		return nil
+	}
+	dst := make([]settings.PostItem, len(src))
+	copy(dst, src)
+	return dst
+}
+
+func cloneStringMap(src map[string]string) map[string]string {
+	if src == nil {
+		return nil
+	}
+	dst := make(map[string]string, len(src))
+	for key, value := range src {
+		dst[key] = value
+	}
+	return dst
+}
+
+func cloneBytes(src []byte) []byte {
+	if src == nil {
+		return nil
+	}
+	dst := make([]byte, len(src))
+	copy(dst, src)
+	return dst
 }
 
 // AddHTML appends an in-memory HTML document as a page object and returns c
@@ -171,10 +222,7 @@ func (c *Converter) Convert(ctx context.Context) error {
 	for i, o := range c.objects {
 		objects[i] = o.o
 	}
-	req := &convert.Request{
-		Global:  c.global.g,
-		Objects: objects,
-	}
+	req := convert.NewPDFRequest(c.global.g, objects, nil, nil)
 	h := convertHooks{
 		OnInfo: c.OnInfo, OnWarn: c.OnWarn, OnError: c.OnError,
 		OnPhase: c.OnPhase, OnProgress: c.OnProgress,
@@ -292,11 +340,7 @@ func (c *ImageConverter) Convert(ctx context.Context) error {
 		return errors.New("gowkhtmltopdf: no input page added")
 	}
 	img := c.image
-	req := &convert.Request{
-		Global:  c.global.g,
-		Image:   &img,
-		Objects: []settings.PdfObject{c.object.o},
-	}
+	req := convert.NewImageRequest(c.global.g, img, []settings.PdfObject{c.object.o}, nil)
 	h := convertHooks{
 		OnInfo: c.OnInfo, OnWarn: c.OnWarn, OnError: c.OnError,
 	}

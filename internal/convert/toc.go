@@ -1,6 +1,7 @@
 package convert
 
 import (
+	"context"
 	"fmt"
 	stdlibhtml "html"
 	"io"
@@ -128,9 +129,9 @@ func paintOptions(g hfGeom) layout.PaintOptions {
 
 // paintCount lays the result out into a scratch document and returns its
 // page count, leaving res untouched.
-func paintCount(res *layout.Result, g hfGeom) (int, error) {
+func paintCount(ctx context.Context, res *layout.Result, g hfGeom) (int, error) {
 	scratch := pdf.NewDocument()
-	if err := layout.Paint(scratch, cloneResult(res), paintOptions(g)); err != nil {
+	if err := layout.PaintContext(ctx, scratch, cloneResult(res), paintOptions(g)); err != nil {
 		return 0, err
 	}
 	return scratch.PageCount(), nil
@@ -140,7 +141,7 @@ func paintCount(res *layout.Result, g hfGeom) (int, error) {
 // Entry page numbers are offset by tocGuess - the assumed number of pages the
 // TOC objects will occupy at the front of the document.
 // Headings typically come from BuildTree on a DocPage view, so h.Page is body-global.
-func layoutTOC(font *pdf.Font, st *objectState, entries []*outline.Node, tocGuess int, g settings.PdfGlobal, log io.Writer) (*html.Node, *layout.Result, error) {
+func layoutTOC(ctx context.Context, font *pdf.Font, st *objectState, entries []*outline.Node, tocGuess int, g settings.PdfGlobal, log io.Writer) (*html.Node, *layout.Result, error) {
 	toc := st.toc
 	if toc.XSLStyleSheet != "" {
 		line.Emit(log, line.Warn, "object %d: --xsl-style-sheet is not supported; using the built-in TOC template", st.idx)
@@ -163,7 +164,7 @@ func layoutTOC(font *pdf.Font, st *objectState, entries []*outline.Node, tocGues
 	if media == "" {
 		media = "print"
 	}
-	res, err := layout.Layout(root, layout.Options{
+	res, err := layout.LayoutContext(ctx, root, layout.Options{
 		Width:  contentW,
 		Height: st.geom.contentH,
 		Font:   font,
@@ -181,7 +182,7 @@ func layoutTOC(font *pdf.Font, st *objectState, entries []*outline.Node, tocGues
 // layouts into doc. It returns the total number of TOC pages. The renumbering
 // is done twice at most; if the second measurement changed the count the
 // entry numbers may be off by the delta (documented, rare in practice).
-func renderTOCObjects(font *pdf.Font, doc *pdf.Document, req *Request, tocs []*objectState, entries []*outline.Node, log io.Writer) (int, error) {
+func renderTOCObjects(ctx context.Context, font *pdf.Font, doc *pdf.Document, req *Request, tocs []*objectState, entries []*outline.Node, log io.Writer) (int, error) {
 	if len(tocs) == 0 {
 		return 0, nil
 	}
@@ -190,12 +191,12 @@ func renderTOCObjects(font *pdf.Font, doc *pdf.Document, req *Request, tocs []*o
 	// Iteration 1: measure with tocGuess = 0.
 	guess := 0
 	for _, st := range tocs {
-		root, res, err := layoutTOC(font, st, entries, guess, g, log)
+		root, res, err := layoutTOC(ctx, font, st, entries, guess, g, log)
 		if err != nil {
 			return 0, err
 		}
 		st.tocRoot, st.tocRes = root, res
-		n, err := paintCount(res, st.geom)
+		n, err := paintCount(ctx, res, st.geom)
 		if err != nil {
 			return 0, fmt.Errorf("object %d: toc: paintCount: %w", st.idx+1, err)
 		}
@@ -206,12 +207,12 @@ func renderTOCObjects(font *pdf.Font, doc *pdf.Document, req *Request, tocs []*o
 	// the final layout for painting.
 	if guess > 0 {
 		for _, st := range tocs {
-			root, res, err := layoutTOC(font, st, entries, guess, g, log)
+			root, res, err := layoutTOC(ctx, font, st, entries, guess, g, log)
 			if err != nil {
 				return 0, err
 			}
 			st.tocRoot, st.tocRes = root, res
-			n, err := paintCount(res, st.geom)
+			n, err := paintCount(ctx, res, st.geom)
 			if err != nil {
 				return 0, fmt.Errorf("object %d: toc: paintCount: %w", st.idx+1, err)
 			}
@@ -224,7 +225,7 @@ func renderTOCObjects(font *pdf.Font, doc *pdf.Document, req *Request, tocs []*o
 	for _, st := range tocs {
 		st.start = doc.PageCount()
 		painted := cloneResult(st.tocRes)
-		if err := layout.Paint(doc, painted, paintOptions(st.geom)); err != nil {
+		if err := layout.PaintContext(ctx, doc, painted, paintOptions(st.geom)); err != nil {
 			return 0, fmt.Errorf("object %d: toc: paint: %w", st.idx+1, err)
 		}
 		st.tocRes = painted

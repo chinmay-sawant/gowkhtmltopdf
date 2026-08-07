@@ -1,6 +1,7 @@
 package pdf
 
 import (
+	"bytes"
 	"encoding/binary"
 	"strings"
 	"testing"
@@ -234,6 +235,41 @@ func TestFontCacheSharedAcrossPages(t *testing.T) {
 	// same font ref used on both pages
 	if strings.Count(out, "/FontFile2") != 1 {
 		t.Errorf("expected 1 FontFile2, got %d", strings.Count(out, "/FontFile2"))
+	}
+}
+
+func TestFontCacheSeparatesLoadedFacesWithSameDisplayName(t *testing.T) {
+	faces, err := LoadDefaultFaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A registry/display label is not a face identity. Deliberately give
+	// regular and bold the same label and ensure their embedded subsets remain
+	// separate.
+	regular, err := ParseTTF(bytes.Clone(faces.Regular.data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	regular.PostScriptName = "SameFace"
+	bold, err := ParseTTF(bytes.Clone(faces.Bold.data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	bold.PostScriptName = "SameFace"
+	d := fixedDoc(t)
+	d.SetCompression(false)
+	for _, face := range []*Font{regular, bold} {
+		p := d.AddPage(100, 100)
+		c := p.Content()
+		c.UseEmbeddedFont("F1", face)
+		c.BeginText()
+		c.SetFont("F1", 10)
+		c.TextAt(5, 5)
+		c.TextShow("H")
+		c.EndText()
+	}
+	if got := strings.Count(string(writePDF(t, d)), "/FontFile2"); got != 2 {
+		t.Fatalf("FontFile2 count = %d, want 2 for distinct loaded faces", got)
 	}
 }
 

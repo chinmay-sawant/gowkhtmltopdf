@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"os"
 
+	"gowkhtmltopdf/internal/app"
 	"gowkhtmltopdf/internal/cli"
-	"gowkhtmltopdf/internal/imageout"
 )
 
 func main() {
@@ -16,7 +16,7 @@ func main() {
 }
 
 func run(argv []string) int {
-	cmd, err := cli.Parse(argv)
+	cmd, err := cli.Parse(argv, cli.ModeImage)
 	if err != nil {
 		switch {
 		case errors.Is(err, cli.ErrHelp), errors.Is(err, cli.ErrExtHelp):
@@ -33,9 +33,7 @@ func run(argv []string) int {
 		return cli.ExitError
 	}
 
-	// imageout.Run opens the output sink, resolves --format from the path,
-	// builds convert.Request, and calls RunRequest (P1-1 adapter).
-	if err := imageout.Run(context.Background(), cmd, os.Stderr); err != nil {
+	if err := app.RunImage(context.Background(), cmd, os.Stderr); err != nil {
 		fmt.Fprintf(os.Stderr, "gowkhtmltoimage: %v\n", err)
 		return cli.ExitCode(err)
 	}

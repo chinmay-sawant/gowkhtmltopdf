@@ -1,12 +1,44 @@
 package imageout
 
 import (
+	"context"
+	"errors"
 	"image/color"
 	"testing"
 
 	"gowkhtmltopdf/internal/html"
+	"gowkhtmltopdf/internal/layout"
 	"gowkhtmltopdf/internal/pdf"
 )
+
+func TestRasterPaintOrderMatchesPDFLayerPolicy(t *testing.T) {
+	ops := []layout.Op{
+		{Kind: layout.OpText, ZIndex: 0, ZIndexSet: true},
+		{Kind: layout.OpFillRect, ZIndex: 0, ZIndexSet: true},
+		{Kind: layout.OpText, ZIndex: 2, ZIndexSet: true},
+		{Kind: layout.OpFillRect, ZIndex: -1, ZIndexSet: true},
+	}
+	order := rasterPaintOrder(ops)
+	want := []int{3, 1, 0, 2}
+	for i := range want {
+		if order[i] != want[i] {
+			t.Fatalf("paint order = %v, want %v", order, want)
+		}
+	}
+}
+
+func TestRenderContextHonorsCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	root, err := html.Parse(`<html><body><p>cancel me</p></body></html>`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = RenderContext(ctx, root, RenderOptions{Width: 200})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("RenderContext error = %v, want context.Canceled", err)
+	}
+}
 
 func TestTTFRasterAntiAliased(t *testing.T) {
 	face, err := pdf.DefaultFont()

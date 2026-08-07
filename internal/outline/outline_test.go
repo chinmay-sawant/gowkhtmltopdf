@@ -303,3 +303,51 @@ func TestDumpOutlineXML(t *testing.T) {
 		}
 	}
 }
+
+func TestExplicitDocumentPageOrderingDoesNotMutateLocalPage(t *testing.T) {
+	root := treeHTML(t, "<h1>First in document</h1><h1>Second in document</h1>")
+	nodes := headNodes(t, root)
+	hs := Lookup(CollectHeadings(root), []layout.ElementLocation{
+		{Node: nodes[0], Page: 3, X: 0, Y: 10, W: 100, H: 20},
+		{Node: nodes[1], Page: 0, X: 0, Y: 10, W: 100, H: 20},
+	})
+	hs[0].DocPage = 0
+	hs[1].DocPage = 2
+	localPages := []int{hs[0].Page, hs[1].Page}
+
+	tree := BuildTreeBy(hs, Options{}, DocumentPage)
+	if got := tree.Children[0].Heading.Title; got != "First in document" {
+		t.Fatalf("first heading = %q, want First in document", got)
+	}
+	if got := tree.Children[1].Heading.Title; got != "Second in document" {
+		t.Fatalf("second heading = %q, want Second in document", got)
+	}
+	if hs[0].Page != localPages[0] || hs[1].Page != localPages[1] {
+		t.Fatalf("document ordering mutated local pages: got %d,%d want %d,%d", hs[0].Page, hs[1].Page, localPages[0], localPages[1])
+	}
+
+	SortHeadingsBy(hs, DocumentPage)
+	section, subsection := SectionOfBy(hs, 1, DocumentPage)
+	if section != "First in document" || subsection != "First in document" {
+		t.Errorf("SectionOfBy = %q, %q", section, subsection)
+	}
+
+	xml := DumpOutlineXMLBy(tree, 0, DocumentPage)
+	if !bytes.Contains(xml, []byte(`title="First in document" page="1"`)) {
+		t.Errorf("document-page XML missing page 1:\n%s", xml)
+	}
+	if !bytes.Contains(xml, []byte(`title="Second in document" page="3"`)) {
+		t.Errorf("document-page XML missing page 3:\n%s", xml)
+	}
+}
+
+func TestNilPageAccessorUsesLocalPage(t *testing.T) {
+	root := treeHTML(t, "<h1>Local</h1>")
+	node := headNodes(t, root)[0]
+	hs := Lookup(CollectHeadings(root), []layout.ElementLocation{{Node: node, Page: 4, X: 0, Y: 0, W: 1, H: 1}})
+	SortHeadingsBy(hs, nil)
+	xml := DumpOutlineXMLBy(BuildTreeBy(hs, Options{}, nil), 0, nil)
+	if !bytes.Contains(xml, []byte(`page="5"`)) {
+		t.Errorf("nil accessor should use local page:\n%s", xml)
+	}
+}

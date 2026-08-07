@@ -1,36 +1,43 @@
 # Phase 1 — Parser, output, and mode contracts
 
 > **Parent:** [`../architecture-review-2026-08-07-followup.md`](../architecture-review-2026-08-07-followup.md)
-> **Status:** not started
+> **Status:** complete
 > **Depends on:** none
 
 ## Goal
 
-Make the engine interfaces explicit before sharing more preparation logic. Keep the
-CLI parser as the adapter from argv; keep output policy out of the engine.
+Make engine interfaces explicit before sharing preparation logic. CLI parsing is
+mode-aware, output ownership is explicit, and compatibility adapters remain
+thin and contract-preserving.
 
 ## Checklist
 
-- [ ] **ARCH-01** — pass `ModePDF`/`ModeImage` into `cli.Parse`; reject flags whose
-  `flagSpec.mod` excludes the selected mode. Proof: complete flag applicability matrix
-  tests plus both CLI smoke paths.
-- [ ] **ARCH-02** — replace direct `os.Stdout` writes in `convert.Run` with explicit
-  document/outline sinks and define nil-sink behavior. Proof: buffer-backed outline,
-  PDF, failed-writer, and CLI stdout/file tests.
-- [ ] **ARCH-03** — split image settings from the PDF-owned `convert.Request` union
-  while retaining shared preparation helpers. Proof: root `Converter` and
-  `ImageConverter` tests construct only their mode-specific request invariants.
-- [ ] **ARCH-04** — update command mains and compatibility adapters to build the new
-  request/sink contracts without duplicating output ownership. Proof: `go test ./...`
-  and CLI output compatibility checks.
-- [ ] **X-01** — move CLI translation into an application adapter package or an
-  equally explicit outer seam; keep engine modules independent of `internal/cli`.
-  Proof: dependency inspection, CLI integration tests, `go test ./...`, and `go vet ./...`.
-- [ ] **X-03** — make `Converter.AddObject` and `SetBody` deep-copy nested slices,
-  maps, and inline HTML according to their documented snapshot contract. Proof:
-  post-add mutation tests and `go test -race ./...`.
+- [x] **ARCH-01** — `cli.Parse` accepts an explicit mode and rejects every
+  inapplicable flag. `ParseMode` and registry-driven matrix tests cover PDF,
+  image, shared, short, long, and invalid-mode cases; both command mains pass
+  their mode and CLI rejection/success smoke paths passed.
+- [x] **ARCH-02** — `convert.Request` now has explicit document and outline
+  sinks with deterministic nil behavior. `Run` has no output fallback; buffer,
+  missing-sink, dedicated-outline-sink, and failed-writer tests pass.
+- [x] **ARCH-03** — the fix-contract `convert.Request` shape is retained for
+  compatibility, while `NewPDFRequest`/`NewImageRequest` and
+  `ValidatePDF`/`ValidateImage` make the mode-specific invariants explicit.
+  Root PDF and image converters use those constructors and their cross-mode
+  validation tests pass.
+- [x] **ARCH-04** — `internal/app` owns command-to-request translation and
+  output opening; PDF and image command mains use `RunPDF`/`RunImage`. Existing
+  compatibility adapters remain available and `go test ./...` plus CLI output
+  smoke checks pass.
+- [x] **X-01** — application adapters are the outer CLI seam; `internal/convert`
+  and `internal/imageout` retain only narrow compatibility adapters for old
+  callers. Dependency inspection, `go vet ./...`, package tests, and both
+  executable paths pass.
+- [x] **X-03** — `SetBody` and `Converter.AddObject` deep-copy inline HTML,
+  maps, slices, POST data, and nested settings. Mutation and race-oriented
+  tests pass under `go test -race ./...`.
 
 ## Required gate
 
-- [ ] Run `make lint` and `make test` on the final Phase 1 diff; record command,
-  commit, and result here before closing any row.
+- [x] Final Phase 1 gate: `make lint`, `make test`, and `go test -race ./...`
+  passed on 2026-08-07. No commit was created, per request; evidence is in the
+  five-agent fix logs and the working-tree validation run.

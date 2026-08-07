@@ -25,8 +25,8 @@ func ttfDrawString(img *image.NRGBA, basex, basey float64, s string, sizePt floa
 	if atlas == nil {
 		atlas = newGlyphAtlas()
 	}
-	s = pdf.ShapeTextFont(s, face)
-	if s == "" {
+	run := pdf.ShapeRun(s, face, sizePt)
+	if run.Text == "" {
 		return
 	}
 	pxSize := sizePt * pxPerPt
@@ -36,8 +36,8 @@ func ttfDrawString(img *image.NRGBA, basex, basey float64, s string, sizePt floa
 	}
 	scale := pxSize / upm
 	x := basex
-	for _, r := range s {
-		adv := face.AdvanceInPoints(r, sizePt) * pxPerPt
+	for i, r := range run.Runes {
+		adv := run.Advances[i] * pxPerPt
 		drawGlyphAA(img, x, basey, r, face, scale, col, atlas)
 		x += adv
 	}

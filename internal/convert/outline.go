@@ -57,7 +57,9 @@ type objectState struct {
 	// shared with nested HTML HF layout so HF can resolve the same faces.
 	// effectiveMargins returns the HF-extended registry; callers assign it
 	// explicitly (see renderObject handshake).
-	registry *pdf.Registry
+	registry      *pdf.Registry
+	resources     ResourceContext
+	imagesEnabled bool
 
 	base     string
 	lp       settings.LoadPage
@@ -133,9 +135,8 @@ func flatHeadings(bodies []*objectState) []*outline.Heading {
 		}
 	}
 	outline.AssignAnchors(all)
-	// Document order by DocPage. outline.SortHeadings keys on Page (object-local);
-	// multi-object flat lists need DocPage order for TOC/HF/outline.
-	// BuildTree receives headingsDocPageView so its SortHeadings sees DocPage in Page.
+	// Document order by the explicit DocPage field. The object-local Page field
+	// remains unchanged for page-local layout and header/footer semantics.
 	sort.SliceStable(all, func(i, j int) bool {
 		a, b := all[i], all[j]
 		if a.DocPage != b.DocPage {
@@ -147,19 +148,6 @@ func flatHeadings(bodies []*objectState) []*outline.Heading {
 		return a.X < b.X
 	})
 	return all
-}
-
-// headingsDocPageView returns copies with Page set to DocPage so outline
-// package helpers (SortHeadings, SectionOf, BuildTree) operate in document
-// order without mutating the shared object-local Page field.
-func headingsDocPageView(hs []*outline.Heading) []*outline.Heading {
-	out := make([]*outline.Heading, len(hs))
-	for i, h := range hs {
-		cp := *h
-		cp.Page = h.DocPage
-		out[i] = &cp
-	}
-	return out
 }
 
 // bodyStateFor returns the body object whose page span contains the body
@@ -176,19 +164,14 @@ func bodyStateFor(bodies []*objectState, page int) *objectState {
 // emitOutline converts the outline tree (canvas coordinates) into pdf.Outline
 // nodes with final page refs and PDF (y-up) coordinates. The root is a
 // container for the top-level headings, as pdf.Document.SetOutline expects.
-// Tree headings typically carry Page=DocPage (via headingsDocPageView).
+// Tree headings retain object-local Page and carry document-global DocPage.
 func emitOutline(doc *pdf.Document, tree *outline.Node, bodies []*objectState, tocTotal int) *pdf.Outline {
 	root := &pdf.Outline{}
 	var conv func(n *outline.Node) *pdf.Outline
 	conv = func(n *outline.Node) *pdf.Outline {
 		h := n.Heading
 		o := &pdf.Outline{Title: h.Title}
-		// View copies used by BuildTree set Page = DocPage; prefer DocPage when
-		// non-zero, else Page (covers page 0 via Page on the view).
 		docPage := h.DocPage
-		if h.DocPage == 0 {
-			docPage = h.Page // view: Page holds DocPage including 0
-		}
 		if st := bodyStateFor(bodies, docPage); st != nil {
 			locPage := docPage - st.offset
 			o.PageRef = doc.PageRef(tocTotal + docPage)

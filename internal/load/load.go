@@ -55,6 +55,36 @@ type Resource struct {
 	Skip        bool // set when load-error policy = skip
 }
 
+// ResourceContext binds a loaded document's base URL and load policy. It is
+// the narrow seam consumers should use when fetching CSS, images, fonts, or
+// other document-relative resources. The loader remains the owner of URL
+// resolution, ACL checks, body limits, and error handling.
+type ResourceContext struct {
+	loader *Loader
+	base   string
+	lp     settings.LoadPage
+}
+
+// ForResource returns a context for resources relative to res. A nil
+// resource is allowed for callers that only need absolute references; those
+// references still go through the same loader policy.
+func (l *Loader) ForResource(res *Resource, lp settings.LoadPage) ResourceContext {
+	var base string
+	if res != nil {
+		base = res.Base
+	}
+	return ResourceContext{loader: l, base: base, lp: lp}
+}
+
+// Fetch resolves ref against the document base and fetches it using the
+// document's load policy.
+func (c ResourceContext) Fetch(ctx context.Context, ref string) (*Resource, error) {
+	if c.loader == nil {
+		return nil, errors.New("nil resource loader")
+	}
+	return c.loader.FetchSub(ctx, c.base, ref, c.lp)
+}
+
 // AccessController implements the local-file ACL: default deny; an explicit
 // allow-prefix list (--allow) expands access.
 type AccessController struct {
@@ -223,6 +253,9 @@ func (l *Loader) initClient() {
 // for a supported charset at this seam (see checkDocumentCharset).
 func (l *Loader) Load(ctx context.Context, input string, lp settings.LoadPage) (*Resource, error) {
 	if len(lp.InlineHTML) > 0 {
+		if err := checkBodyLimit("inline HTML", len(lp.InlineHTML), l.MaxBodySize); err != nil {
+			return nil, err
+		}
 		res := &Resource{
 			Kind:        KindInline,
 			URL:         "inline:",
@@ -244,7 +277,7 @@ func (l *Loader) Load(ctx context.Context, input string, lp settings.LoadPage) (
 		} else if strings.HasPrefix(target, "data:") {
 			var body []byte
 			var ctype string
-			body, ctype, err = decodeDataURL(target)
+			body, ctype, err = decodeDataURLLimited(target, l.MaxBodySize)
 			if err != nil {
 				return nil, err
 			}
@@ -554,15 +587,23 @@ func (l *Loader) loadHTTP(ctx context.Context, target string, lp settings.LoadPa
 
 // FetchSub fetches a subresource (css/img) resolved against base.
 func (l *Loader) FetchSub(ctx context.Context, base, ref string, lp settings.LoadPage) (*Resource, error) {
-	baseURL, err := url.Parse(base)
-	if err != nil {
-		return nil, err
-	}
 	refURL, err := url.Parse(strings.TrimSpace(ref))
 	if err != nil {
 		return nil, err
 	}
-	abs := baseURL.ResolveReference(refURL)
+	if !refURL.IsAbs() && base == "" {
+		return nil, fmt.Errorf("cannot resolve relative subresource %q without a document base URL", ref)
+	}
+	var abs *url.URL
+	if refURL.IsAbs() {
+		abs = refURL
+	} else {
+		baseURL, err := url.Parse(base)
+		if err != nil {
+			return nil, err
+		}
+		abs = baseURL.ResolveReference(refURL)
+	}
 	switch abs.Scheme {
 	case "file", "":
 		p := abs.Path
@@ -573,7 +614,7 @@ func (l *Loader) FetchSub(ctx context.Context, base, ref string, lp settings.Loa
 	case "http", "https":
 		return l.loadHTTP(ctx, abs.String(), lp)
 	case "data":
-		body, ctype, err := decodeDataURL(abs.String())
+		body, ctype, err := decodeDataURLLimited(abs.String(), l.MaxBodySize)
 		if err != nil {
 			return nil, err
 		}
@@ -591,6 +632,13 @@ func urlEncodePost(items []settings.PostItem) string {
 }
 
 func decodeDataURL(s string) ([]byte, string, error) {
+	return decodeDataURLLimited(s, -1)
+}
+
+// decodeDataURLLimited decodes a data URL while enforcing the same body cap
+// used by file and HTTP resources. A negative max means unlimited and exists
+// only for the package-local compatibility helper above.
+func decodeDataURLLimited(s string, max int64) ([]byte, string, error) {
 	rest := strings.TrimPrefix(s, "data:")
 	comma := strings.IndexByte(rest, ',')
 	if comma < 0 {
@@ -602,7 +650,7 @@ func decodeDataURL(s string) ([]byte, string, error) {
 		parts := strings.Split(meta, ";")
 		for _, p := range parts {
 			if strings.HasPrefix(p, "base64") {
-				dec, err := decodeBase64(data)
+				dec, err := decodeBase64Limited(data, max)
 				if err != nil {
 					return nil, "", err
 				}
@@ -613,14 +661,119 @@ func decodeDataURL(s string) ([]byte, string, error) {
 			}
 		}
 	}
-	dec, err := url.QueryUnescape(data)
+	dec, err := unescapeDataLimited(data, max)
 	if err != nil {
 		return nil, "", err
 	}
-	return []byte(dec), ctype, nil
+	return dec, ctype, nil
 }
 
 func decodeBase64(s string) ([]byte, error) {
-	r := strings.NewReplacer("\n", "", "\r", "", " ", "")
-	return base64.StdEncoding.DecodeString(r.Replace(s))
+	return decodeBase64Limited(s, -1)
+}
+
+func decodeBase64Limited(s string, max int64) ([]byte, error) {
+	// Count first so a large amount of whitespace cannot force an equally
+	// large compacted allocation before the body limit is checked.
+	compactLen := 0
+	for i := 0; i < len(s); i++ {
+		if s[i] != '\n' && s[i] != '\r' && s[i] != ' ' && s[i] != '\t' {
+			compactLen++
+		}
+	}
+	if max >= 0 {
+		decodedLen := base64.StdEncoding.DecodedLen(compactLen)
+		if compactLen > 0 && s != "" {
+			// DecodedLen includes the bytes represented by padding. Account for
+			// it so a one-byte data URL is not rejected with a one-byte limit.
+			seen := 0
+			for i := len(s) - 1; i >= 0 && seen < 2; i-- {
+				switch s[i] {
+				case ' ', '\t', '\n', '\r':
+					continue
+				case '=':
+					decodedLen--
+					seen++
+				default:
+					seen = 2
+				}
+			}
+		}
+		if int64(decodedLen) > max {
+			return nil, fmt.Errorf("data URL exceeds max body size %d", max)
+		}
+	}
+	var b strings.Builder
+	b.Grow(compactLen)
+	for i := 0; i < len(s); i++ {
+		if s[i] != '\n' && s[i] != '\r' && s[i] != ' ' && s[i] != '\t' {
+			b.WriteByte(s[i])
+		}
+	}
+	dec, err := base64.StdEncoding.DecodeString(b.String())
+	if err != nil {
+		return nil, err
+	}
+	if err := checkBodyLimit("data URL", len(dec), max); err != nil {
+		return nil, err
+	}
+	return dec, nil
+}
+
+func unescapeDataLimited(s string, max int64) ([]byte, error) {
+	if max >= 0 && int64(len(s)) < max {
+		// This is only a capacity hint. Percent escapes and '+' can make the
+		// decoded body shorter, never longer, than the source string.
+		max = int64(len(s))
+	}
+	capacity := len(s)
+	if max >= 0 && int64(capacity) > max {
+		capacity = int(max)
+	}
+	out := make([]byte, 0, capacity)
+	for i := 0; i < len(s); i++ {
+		var b byte
+		switch s[i] {
+		case '%':
+			if i+2 >= len(s) {
+				return nil, fmt.Errorf("invalid URL escape in data URL")
+			}
+			hi, okHi := fromHex(s[i+1])
+			lo, okLo := fromHex(s[i+2])
+			if !okHi || !okLo {
+				return nil, fmt.Errorf("invalid URL escape in data URL")
+			}
+			b = hi<<4 | lo
+			i += 2
+		case '+':
+			b = ' '
+		default:
+			b = s[i]
+		}
+		if max >= 0 && int64(len(out)) >= max {
+			return nil, fmt.Errorf("data URL exceeds max body size %d", max)
+		}
+		out = append(out, b)
+	}
+	return out, nil
+}
+
+func fromHex(b byte) (byte, bool) {
+	switch {
+	case b >= '0' && b <= '9':
+		return b - '0', true
+	case b >= 'a' && b <= 'f':
+		return b - 'a' + 10, true
+	case b >= 'A' && b <= 'F':
+		return b - 'A' + 10, true
+	default:
+		return 0, false
+	}
+}
+
+func checkBodyLimit(source string, length int, max int64) error {
+	if max >= 0 && int64(length) > max {
+		return fmt.Errorf("%s exceeds max body size %d", source, max)
+	}
+	return nil
 }

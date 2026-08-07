@@ -13,6 +13,7 @@ import (
 	"io"
 	"math"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"gowkhtmltopdf/internal/cli"
@@ -68,8 +69,20 @@ type RenderOptions struct {
 // wide and max(content height, Height) tall. A non-empty Crop is applied to
 // the rasterized canvas.
 func Render(root *html.Node, opts RenderOptions) (image.Image, error) {
+	return RenderContext(context.Background(), root, opts)
+}
+
+// RenderContext lays out and rasterizes root while observing ctx. Render is
+// retained as the source-compatible background-context adapter.
+func RenderContext(ctx context.Context, root *html.Node, opts RenderOptions) (image.Image, error) {
 	if root == nil {
 		return nil, errors.New("imageout: nil root")
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	font := opts.Font
 	if font == nil {
@@ -83,19 +96,22 @@ func Render(root *html.Node, opts RenderOptions) (image.Image, error) {
 	var res *layout.Result
 	var err error
 	if opts.SmartWidth {
-		res, err = layoutSmartWidth(root, opts, font)
+		res, err = layoutSmartWidth(ctx, root, opts, font)
 	} else {
 		viewport := float64(opts.Width)
 		if viewport <= 0 {
 			viewport = screenWidthDefault
 		}
-		res, err = layout.Layout(root, layoutOptions(opts, font, viewport))
+		res, err = layout.LayoutContext(ctx, root, layoutOptions(opts, font, viewport))
 	}
 	if err != nil {
 		return nil, fmt.Errorf("imageout: layout: %w", err)
 	}
 
-	img := rasterize(res, maxHeight(res, opts), opts.Transparent)
+	img, err := rasterizeContext(ctx, res, maxHeight(res, opts), opts.Transparent)
+	if err != nil {
+		return nil, err
+	}
 	var out image.Image = img
 	if crop := opts.Crop; !crop.Empty() {
 		inter := crop.Intersect(img.Bounds())
@@ -140,15 +156,18 @@ func layoutOptions(opts RenderOptions, font *pdf.Font, viewportPx float64) layou
 // painted content overflows the right edge (the layout engine always fills
 // the full viewport width, so overflow is measured from the display list:
 // max op.X+op.W). Growth is capped at maxSmartViewport pixels.
-func layoutSmartWidth(root *html.Node, opts RenderOptions, font *pdf.Font) (*layout.Result, error) {
+func layoutSmartWidth(ctx context.Context, root *html.Node, opts RenderOptions, font *pdf.Font) (*layout.Result, error) {
 	viewport := float64(opts.Width)
 	if viewport <= 0 {
 		viewport = screenWidthDefault
 	}
 	var res *layout.Result
 	for i := 0; i < 8; i++ {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		var err error
-		res, err = layout.Layout(root, layoutOptions(opts, font, viewport))
+		res, err = layout.LayoutContext(ctx, root, layoutOptions(opts, font, viewport))
 		if err != nil {
 			return nil, err
 		}
@@ -197,6 +216,11 @@ func maxHeight(res *layout.Result, opts RenderOptions) float64 {
 // run live on a per-rasterize atlas (P5-05) so concurrent Renders do not share
 // mutable cache state.
 func rasterize(res *layout.Result, height float64, transparent bool) *image.NRGBA {
+	img, _ := rasterizeContext(context.Background(), res, height, transparent)
+	return img
+}
+
+func rasterizeContext(ctx context.Context, res *layout.Result, height float64, transparent bool) (*image.NRGBA, error) {
 	pxPerPt := ptToPx * float64(rasterSS)
 	w := int(math.Round(res.Width * pxPerPt))
 	h := int(math.Round(height * pxPerPt))
@@ -211,13 +235,59 @@ func rasterize(res *layout.Result, height float64, transparent bool) *image.NRGB
 		draw.Draw(img, img.Bounds(), image.NewUniform(color.White), image.Point{}, draw.Src)
 	}
 	atlas := newGlyphAtlas()
-	for i := range res.Ops {
+	for _, i := range rasterPaintOrder(res.Ops) {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		paint(img, &res.Ops[i], pxPerPt, atlas)
 	}
 	if rasterSS <= 1 {
-		return img
+		return img, nil
 	}
-	return downscaleBox(img, rasterSS)
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return downscaleBox(img, rasterSS), nil
+}
+
+// rasterPaintOrder mirrors layout's PDF display-list policy: z-index first,
+// then chrome (backgrounds/borders/lines) below content (text/images), with
+// stable source order as the final tie breaker. Raster output used to walk
+// Result.Ops directly, so a list produced by layout could render differently
+// from the PDF page even though both consumed the same display list.
+// FIX-REVIEW: PAINT-01 PDF body/header/footer traversal remains owned by
+// internal/layout.Paint and PaintBand; this package consumes the same ordering
+// and StyleOf policy without duplicating pagination or annotation semantics.
+func rasterPaintOrder(ops []layout.Op) []int {
+	idx := make([]int, len(ops))
+	for i := range ops {
+		idx[i] = i
+	}
+	sort.SliceStable(idx, func(i, j int) bool {
+		a, b := ops[idx[i]], ops[idx[j]]
+		az, bz := 0, 0
+		if a.ZIndexSet {
+			az = a.ZIndex
+		}
+		if b.ZIndexSet {
+			bz = b.ZIndex
+		}
+		if az != bz {
+			return az < bz
+		}
+		la, lb := rasterPaintLayer(a.Kind), rasterPaintLayer(b.Kind)
+		return la < lb
+	})
+	return idx
+}
+
+func rasterPaintLayer(k layout.OpKind) int {
+	switch k {
+	case layout.OpFillRect, layout.OpStrokeRect, layout.OpLine:
+		return 0
+	default:
+		return 1
+	}
 }
 
 // downscaleBox averages factor×factor blocks of src into one output pixel.
@@ -438,12 +508,7 @@ func Run(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 		return err
 	}
 	img.Format = format
-	req := &convert.Request{
-		Global:  cmd.Global,
-		Image:   &img,
-		Objects: cmd.Objects,
-		Output:  out,
-	}
+	req := convert.NewImageRequest(cmd.Global, img, cmd.Objects, out)
 	runErr := RunRequest(ctx, req, log)
 	if closeErr := closeOut(); closeErr != nil && runErr == nil {
 		return closeErr
@@ -458,8 +523,8 @@ func RunRequest(ctx context.Context, req *convert.Request, log io.Writer) error 
 	if req == nil {
 		return errors.New("imageout: nil request")
 	}
-	if req.Image == nil {
-		return errors.New("imageout: nil Image settings")
+	if err := req.ValidateImage(); err != nil {
+		return err
 	}
 	if log == nil {
 		log = io.Discard
@@ -496,36 +561,30 @@ func RunRequest(ctx context.Context, req *convert.Request, log io.Writer) error 
 		}
 	}
 
-	res, err := loader.Load(ctx, obj.Page, obj.Load)
-	if err != nil {
-		return fmt.Errorf("load %q: %w", obj.Page, err)
-	}
-	if res.Skip {
-		return fmt.Errorf("load %q: load-error policy is skip; nothing to render", obj.Page)
-	}
-
-	root, err := html.ParseDocument(res.Body)
-	if err != nil {
-		return fmt.Errorf("parse html: %w", err)
-	}
-
 	imgSet := req.Image
 	media := mediaFor(req.Global, *imgSet, obj)
-	// P2-01/P2-14: shared gatherer; default ~1024×768 CSS-px viewport in pt
-	// (768×576) for <link media> feature queries. Media matches layout.
-	sheets := convert.CollectSheets(ctx, loader, root, res.Base, obj.Load, convert.SheetOptions{
-		ViewportW: 768.0,
-		ViewportH: 576.0,
-		MediaType: media,
-		// ObjectIndex 0: image mode has one page; omit "object N:" prefix.
-	}, log)
 	enabled := convert.SimplifyDOMEnabled(imgSet.Web, obj.Web) || req.Global.Web.SimplifyDOM
 	profile := convert.SimplifyDOMProfile(imgSet.Web, obj.Web)
 	if profile == "" {
 		profile = convert.SimplifyDOMProfile(req.Global.Web, settings.Web{})
 	}
-	sheets = convert.AppendSimplifySheet(sheets, enabled, profile)
-	registry = convert.MergeFontFaces(ctx, loader, registry, sheets, res.Base, obj.Load, 1, log)
+	prep, err := convert.PrepareDocument(ctx, loader, obj.Page, obj.Load, registry, convert.PrepareOptions{
+		ViewportW:       768.0,
+		ViewportH:       576.0,
+		MediaType:       media,
+		SimplifyDOM:     enabled,
+		SimplifyProfile: profile,
+		ObjectIndex:     1,
+	}, log)
+	if err != nil {
+		return err
+	}
+	if prep.Resource.Skip {
+		return fmt.Errorf("load %q: load-error policy is skip; nothing to render", obj.Page)
+	}
+	root := prep.Root
+	sheets := prep.Sheets
+	registry = prep.Registry
 
 	cache := map[string][]byte{}
 	imagesFn := func(src string) ([]byte, error) {
@@ -535,7 +594,7 @@ func RunRequest(ctx context.Context, req *convert.Request, log io.Writer) error 
 		if b, ok := cache[src]; ok {
 			return b, nil
 		}
-		r, err := loader.FetchSub(ctx, res.Base, src, obj.Load)
+		r, err := prep.Resources.Fetch(ctx, src)
 		if err != nil {
 			return nil, err
 		}
@@ -545,7 +604,7 @@ func RunRequest(ctx context.Context, req *convert.Request, log io.Writer) error 
 
 	// Policy A: Quiet is Global.Quiet; body paint background is Global.Background
 	// only (single field for PDF + image; CLI --background / library Set).
-	img, err := Render(root, RenderOptions{
+	img, err := RenderContext(ctx, root, RenderOptions{
 		Width:              imgSet.Width,
 		Height:             imgSet.Height,
 		Font:               font,

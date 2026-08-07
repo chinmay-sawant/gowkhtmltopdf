@@ -20,6 +20,22 @@ func TestShapeTextRTLReverse(t *testing.T) {
 	}
 }
 
+func TestShapeRunKeepsTextAndAdvancesAligned(t *testing.T) {
+	f := testFont(t)
+	run := ShapeRun("A\u0301B", f, 12)
+	if len(run.Runes) != len(run.Advances) {
+		t.Fatalf("runes=%d advances=%d", len(run.Runes), len(run.Advances))
+	}
+	if run.Text == "" || len(run.Runes) == 0 {
+		t.Fatal("empty shaped run")
+	}
+	for i, advance := range run.Advances {
+		if advance <= 0 {
+			t.Errorf("advance[%d] = %v, want positive", i, advance)
+		}
+	}
+}
+
 func TestArabicJoiningBehProducesConnectedForms(t *testing.T) {
 	got := shapeArabicJoining("ب")
 	if got == "ب" {

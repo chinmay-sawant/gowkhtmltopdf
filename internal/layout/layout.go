@@ -14,6 +14,7 @@
 package layout
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"math"
@@ -91,6 +92,12 @@ const (
 // Op is one display-list operation. Coordinates are in canvas points; for
 // OpText and OpBullet, Y is the baseline.
 type Op struct {
+	// ID is the stable logical identity of the operation. Pagination may split
+	// one operation into several fragments; fragments retain this ID so
+	// location/range ownership can be remapped without treating a fragment as
+	// a new document operation.
+	ID uint64
+
 	Kind    OpKind
 	X, Y    float64
 	W, H    float64
@@ -138,6 +145,8 @@ type Op struct {
 
 type engine struct {
 	opts      Options
+	ctx       context.Context
+	err       error
 	font      *pdf.Font // default/regular face (metrics fallback)
 	faces     *pdf.FaceSet
 	registry  *pdf.Registry
@@ -171,6 +180,7 @@ type engine struct {
 	// pass (finalizeChrome) for the common non-sticky/non-fixed/non-transform
 	// path. Sticky/fixed/transform boxes still splice immediately.
 	deferredChrome []chromeEntry
+	nextOpID       uint64
 }
 
 // chromeEntry records one box's background/border ops for insertion before
@@ -245,11 +255,36 @@ func zoomScale(z float64) float64 {
 }
 
 func (e *engine) add(op Op) {
+	if e.checkContext() || e.noEmit {
+		return
+	}
+	if op.ID == 0 {
+		e.nextOpID++
+		op.ID = e.nextOpID
+	}
 	if !e.noEmit {
 		op.ZIndex = e.zIndex
 		op.ZIndexSet = e.zIndexSet
 		e.ops = append(e.ops, op)
 	}
+}
+
+// checkContext is intentionally cheap and is called at recursive layout
+// boundaries. Existing Layout callers keep the same behavior through the
+// background-context wrapper, while LayoutContext can stop large documents
+// during tree construction instead of waiting for painting.
+func (e *engine) checkContext() bool {
+	if e.err != nil {
+		return true
+	}
+	if e.ctx == nil {
+		return false
+	}
+	if err := e.ctx.Err(); err != nil {
+		e.err = err
+		return true
+	}
+	return false
 }
 
 func (e *engine) pushZ(st ResolvedStyle) (prevZ int, prevSet bool) {
@@ -271,8 +306,21 @@ func (e *engine) popZ(prevZ int, prevSet bool) {
 
 // Layout renders the document into a display list.
 func Layout(root *html.Node, opts Options) (*Result, error) {
+	return LayoutContext(context.Background(), root, opts)
+}
+
+// LayoutContext renders the document into a display list and observes ctx at
+// style-pass and recursive tree-construction checkpoints. Layout remains the
+// compatibility entry point for callers that do not need cancellation.
+func LayoutContext(ctx context.Context, root *html.Node, opts Options) (*Result, error) {
 	if root == nil {
 		return nil, errors.New("layout: nil root")
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	faces, err := pdf.LoadDefaultFaces()
 	if err != nil {
@@ -280,6 +328,9 @@ func Layout(root *html.Node, opts Options) (*Result, error) {
 	}
 	if opts.Faces != nil {
 		faces = opts.Faces
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	font := opts.Font
 	if font == nil {
@@ -304,7 +355,7 @@ func Layout(root *html.Node, opts Options) (*Result, error) {
 			} else {
 				for n, a := range cinfo {
 					b, ok := cinfo2[n]
-					if !ok || a.inlineSize != b.inlineSize || a.names != b.names {
+					if !ok || !sameSizeContainerState(a, b) {
 						styles = resolveStylesWith(root, opts, cinfo2)
 						containers = cinfo2
 						break
@@ -316,6 +367,7 @@ func Layout(root *html.Node, opts Options) (*Result, error) {
 
 	e := &engine{
 		opts:       opts,
+		ctx:        ctx,
 		font:       font,
 		faces:      faces,
 		registry:   opts.Registry,
@@ -325,6 +377,9 @@ func Layout(root *html.Node, opts Options) (*Result, error) {
 	}
 
 	b := e.build(root, opts.Width, 0, 0)
+	if e.err != nil {
+		return nil, e.err
+	}
 	// Merge deferred background/border ops before stamping sticky/fixed flags
 	// and CSS transforms (those passes need final op indices).
 	e.finalizeChrome(b)
@@ -389,6 +444,9 @@ type box struct {
 }
 
 func (e *engine) build(n *html.Node, availW, x, y float64) *box {
+	if e.checkContext() {
+		return nil
+	}
 	st := e.styles[n]
 	if n.Type == html.TextNode {
 		return nil
@@ -1034,6 +1092,9 @@ func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedSty
 	}
 	i := 0
 	for i < len(children) {
+		if e.checkContext() {
+			return cy
+		}
 		n := children[i]
 		if n.Type == html.ElementNode && e.styles[n].Display == "none" {
 			i++
@@ -1449,64 +1510,112 @@ func (e *engine) emitBorders(st ResolvedStyle, x, y, w, h float64) {
 
 // --- replaced elements ---
 
-func (e *engine) buildImage(n *html.Node, st ResolvedStyle, x, y float64) *box {
-	b := &box{node: n, style: st, kind: "replaced", x: x, y: y}
-	b.img = e.resolveImage(n.Attribute("src"))
-	var iw, ih int
-	if b.img != nil {
-		iw, ih = b.img.w, b.img.h
+type imageUsedSize struct {
+	w, h float64
+}
+
+// imageContainingWidth is the width used by percentage/max-width image
+// constraints. imgMaxW is set by inline, float, and table-cell layout; the
+// viewport is the fallback for ordinary block images.
+func (e *engine) imageContainingWidth() float64 {
+	if e.imgMaxW > 0 {
+		return e.imgMaxW
 	}
-	b.w = e.scalePt(pxToPt(float64(iw)))
-	b.h = e.scalePt(pxToPt(float64(ih)))
-	// width/height HTML attributes are pixel values at 96dpi
-	if v, err := strconv.Atoi(n.Attribute("width")); err == nil && v > 0 {
-		if n.Attribute("height") == "" && st.Height < 0 && b.w > 0 {
-			b.h = b.h * e.scalePt(pxToPt(float64(v))) / b.w
+	return e.opts.Width
+}
+
+// usedImageSize is the single sizing policy for replaced images. It starts
+// from intrinsic dimensions, applies HTML attributes, then CSS dimensions and
+// finally max constraints while preserving the intrinsic aspect ratio for a
+// one-dimensional constraint. The same helper is used by block, inline,
+// float, and table intrinsic measurement paths.
+func (e *engine) usedImageSize(n *html.Node, st ResolvedStyle, ref *imageRef) imageUsedSize {
+	var size imageUsedSize
+	if ref != nil {
+		size.w = e.scalePt(pxToPt(float64(ref.w)))
+		size.h = e.scalePt(pxToPt(float64(ref.h)))
+	}
+
+	attrW, attrH := 0.0, 0.0
+	if n != nil {
+		if v, err := strconv.Atoi(strings.TrimSpace(n.Attribute("width"))); err == nil && v > 0 {
+			attrW = e.scalePt(pxToPt(float64(v)))
 		}
-		b.w = e.scalePt(pxToPt(float64(v)))
-	}
-	if v, err := strconv.Atoi(n.Attribute("height")); err == nil && v > 0 {
-		if n.Attribute("width") == "" && st.Width < 0 && b.h > 0 {
-			b.w = b.w * e.scalePt(pxToPt(float64(v))) / b.h
+		if v, err := strconv.Atoi(strings.TrimSpace(n.Attribute("height"))); err == nil && v > 0 {
+			attrH = e.scalePt(pxToPt(float64(v)))
 		}
-		b.h = e.scalePt(pxToPt(float64(v)))
 	}
-	if st.Width >= 0 {
-		b.w = e.scalePt(st.Width)
+	if attrW > 0 {
+		size.w = attrW
 	}
-	if st.Height >= 0 {
-		b.h = e.scalePt(st.Height)
+	if attrH > 0 {
+		size.h = attrH
 	}
+	if attrW > 0 && attrH == 0 && ref != nil && ref.w > 0 && ref.h > 0 {
+		size.h = attrW * float64(ref.h) / float64(ref.w)
+	}
+	if attrH > 0 && attrW == 0 && ref != nil && ref.w > 0 && ref.h > 0 {
+		size.w = attrH * float64(ref.w) / float64(ref.h)
+	}
+
+	cssW, cssH := st.Width >= 0, st.Height >= 0
+	if st.WidthPercent >= 0 {
+		if cb := e.imageContainingWidth(); cb > 0 {
+			size.w = cb * st.WidthPercent / 100
+			cssW = true
+		}
+	} else if cssW {
+		size.w = e.scalePt(st.Width)
+	}
+	if cssH {
+		size.h = e.scalePt(st.Height)
+	}
+	if cssW && !cssH && ref != nil && ref.w > 0 && ref.h > 0 {
+		size.h = size.w * float64(ref.h) / float64(ref.w)
+	}
+	if cssH && !cssW && ref != nil && ref.w > 0 && ref.h > 0 {
+		size.w = size.h * float64(ref.w) / float64(ref.h)
+	}
+
 	maxW := -1.0
 	if st.MaxWidth >= 0 {
 		maxW = e.scalePt(st.MaxWidth)
 	}
 	if st.MaxWidthPercent >= 0 {
-		cb := e.imgMaxW
-		if cb <= 0 {
-			cb = e.opts.Width
-		}
-		if cb > 0 {
+		if cb := e.imageContainingWidth(); cb > 0 {
 			pct := cb * st.MaxWidthPercent / 100
 			if maxW < 0 || pct < maxW {
 				maxW = pct
 			}
 		}
 	}
-	// imgMaxW caps auto-sized images inside floats/narrow BFCs. A definite
-	// CSS width (wiki wordmark 8.75em) must win — otherwise header logos
-	// collapse to a few points beside the globe icon.
-	if st.Width < 0 && e.imgMaxW > 0 && (maxW < 0 || e.imgMaxW < maxW) {
+	// A float/table/inline containing block caps auto-sized images. A
+	// definite image width remains authoritative, as required by existing
+	// wordmark/thumbnail layouts.
+	if !cssW && e.imgMaxW > 0 && (maxW < 0 || e.imgMaxW < maxW) {
 		maxW = e.imgMaxW
 	}
-	if maxW >= 0 && b.w > maxW && b.w > 0 {
-		b.h = b.h * maxW / b.w
-		b.w = maxW
+	if maxW >= 0 && size.w > maxW && size.w > 0 {
+		factor := maxW / size.w
+		size.w = maxW
+		size.h *= factor
 	}
-	if st.MaxHeight >= 0 && b.h > e.scalePt(st.MaxHeight) {
-		b.w = b.w * e.scalePt(st.MaxHeight) / b.h
-		b.h = e.scalePt(st.MaxHeight)
+	if st.MaxHeight >= 0 {
+		maxH := e.scalePt(st.MaxHeight)
+		if maxH >= 0 && size.h > maxH && size.h > 0 {
+			factor := maxH / size.h
+			size.w *= factor
+			size.h = maxH
+		}
 	}
+	return size
+}
+
+func (e *engine) buildImage(n *html.Node, st ResolvedStyle, x, y float64) *box {
+	b := &box{node: n, style: st, kind: "replaced", x: x, y: y}
+	b.img = e.resolveImage(n.Attribute("src"))
+	size := e.usedImageSize(n, st, b.img)
+	b.w, b.h = size.w, size.h
 	// Paint replaced images that are not deferred to the inline line box.
 	// Inline/inline-block <img> is collected by collectInline and painted in
 	// emitLine; block-level and floated images paint here (wiki logo tagline
@@ -2596,23 +2705,15 @@ func isHTMLSpace(b byte) bool {
 	return b == ' ' || b == '\t' || b == '\n' || b == '\r' || b == '\f'
 }
 
-// measureImageWidth returns the used content width of an <img> in points
-// (HTML width attribute or decoded intrinsic size), for shrink-to-fit.
+// measureImageWidth returns the same used content width that buildImage and
+// inline painting use. Keeping intrinsic/attribute/CSS/max/containing-block
+// policy in usedImageSize prevents float/table shrink-to-fit from disagreeing
+// with the eventually painted image.
 func (e *engine) measureImageWidth(n *html.Node, st ResolvedStyle) float64 {
 	if n == nil {
 		return 0
 	}
-	// Prefer explicit width attribute (wiki thumbs: width="250").
-	if v, err := strconv.Atoi(strings.TrimSpace(n.Attribute("width"))); err == nil && v > 0 {
-		return e.scalePt(pxToPt(float64(v)))
-	}
-	if st.Width >= 0 {
-		return e.scalePt(st.Width)
-	}
-	if ref := e.resolveImage(n.Attribute("src")); ref != nil && ref.w > 0 {
-		return e.scalePt(pxToPt(float64(ref.w)))
-	}
-	return 0
+	return e.usedImageSize(n, st, e.resolveImage(n.Attribute("src"))).w
 }
 
 // measureLargestImageWidth walks n for the widest descendant <img>.

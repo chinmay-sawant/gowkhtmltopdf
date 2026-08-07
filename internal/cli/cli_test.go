@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"math"
+	"strings"
 	"testing"
 
 	"gowkhtmltopdf/internal/settings"
@@ -485,6 +486,65 @@ func TestImageFlags(t *testing.T) {
 	}
 	if cmd.Output != "out.png" {
 		t.Errorf("output = %q", cmd.Output)
+	}
+}
+
+func TestParseModeRejectsInapplicableFlags(t *testing.T) {
+	for name, spec := range flagTable {
+		if spec.mod == ModeBoth {
+			continue
+		}
+		mode := ModeImage
+		if spec.mod == ModeImage {
+			mode = ModePDF
+		}
+		_, err := Parse([]string{"--" + name, "input.html", "output"}, mode)
+		if err == nil {
+			t.Errorf("Parse(%q, %v) accepted an inapplicable flag", name, mode)
+			continue
+		}
+		if !strings.Contains(err.Error(), "not supported") {
+			t.Errorf("Parse(%q, %v) error = %v, want applicability error", name, mode, err)
+		}
+	}
+
+	for name, spec := range shortFlags {
+		if spec.mod == ModeBoth {
+			continue
+		}
+		if _, err := Parse([]string{"-" + name, "input.html", "output"}, ModeImage); err == nil {
+			t.Errorf("Parse(%q, image mode) accepted an inapplicable short flag", name)
+		}
+	}
+}
+
+func TestParseModeAcceptsApplicableFlags(t *testing.T) {
+	if _, err := Parse([]string{"--page-size", "Letter", "input.html", "output.pdf"}, ModePDF); err != nil {
+		t.Fatalf("PDF flag rejected in PDF mode: %v", err)
+	}
+	if _, err := Parse([]string{"--width", "800", "input.html", "output.png"}, ModeImage); err != nil {
+		t.Fatalf("image flag rejected in image mode: %v", err)
+	}
+	if _, err := Parse([]string{"--quiet", "input.html", "output"}, ModePDF); err != nil {
+		t.Fatalf("shared flag rejected in PDF mode: %v", err)
+	}
+	if _, err := Parse([]string{"--quiet", "input.html", "output"}, ModeImage); err != nil {
+		t.Fatalf("shared flag rejected in image mode: %v", err)
+	}
+	if _, err := ParseMode([]string{"--width", "800", "input.html", "output.png"}, ModeImage); err != nil {
+		t.Fatalf("ParseMode rejected image flag: %v", err)
+	}
+}
+
+func TestParseModeValidation(t *testing.T) {
+	if _, err := Parse([]string{"input.html", "output"}, 0); err == nil {
+		t.Fatal("zero mode accepted")
+	}
+	if _, err := Parse([]string{"input.html", "output"}, Mode(8)); err == nil {
+		t.Fatal("unknown mode accepted")
+	}
+	if _, err := Parse([]string{"input.html", "output"}, ModePDF, ModeImage); err == nil {
+		t.Fatal("multiple modes accepted")
 	}
 }
 

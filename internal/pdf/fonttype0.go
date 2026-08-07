@@ -39,7 +39,7 @@ func (d *Document) ensureFont(f *Font, used []rune) (objRef, error) {
 	if type0 {
 		mode = 1
 	}
-	key := fmt.Sprintf("v%d|%s|%s", mode, baseName, runesKey(used))
+	key := fmt.Sprintf("v%d|%x|%s|%s", mode, f.fingerprint, baseName, runesKey(used))
 	if ref, ok := d.fontCache[key]; ok {
 		return ref, nil
 	}

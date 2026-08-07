@@ -750,6 +750,100 @@ func TestLoadInlineHTML(t *testing.T) {
 	}
 }
 
+func TestDataURLHonorsBodyLimitForPrimaryAndSubresource(t *testing.T) {
+	l := NewLoader(settings.LoadGlobal{})
+	l.MaxBodySize = 4
+	lp := defaultLP()
+
+	if _, err := l.Load(context.Background(), "data:text/plain,12345", lp); err == nil {
+		t.Fatal("oversized primary data URL must be rejected")
+	} else if !strings.Contains(err.Error(), "data URL exceeds max body size 4") {
+		t.Fatalf("primary error = %v", err)
+	}
+	if _, err := l.FetchSub(context.Background(), "", "data:text/plain,12345", lp); err == nil {
+		t.Fatal("oversized data subresource must be rejected")
+	} else if !strings.Contains(err.Error(), "data URL exceeds max body size 4") {
+		t.Fatalf("subresource error = %v", err)
+	}
+	if _, err := l.Load(context.Background(), "data:text/plain;base64,MTIzNDU=", lp); err == nil {
+		t.Fatal("oversized base64 data URL must be rejected")
+	} else if !strings.Contains(err.Error(), "data URL exceeds max body size 4") {
+		t.Fatalf("base64 error = %v", err)
+	}
+
+	res, err := l.FetchSub(context.Background(), "", "data:text/plain,1234", lp)
+	if err != nil {
+		t.Fatalf("data URL at the body limit: %v", err)
+	}
+	if string(res.Body) != "1234" {
+		t.Errorf("body = %q, want 1234", res.Body)
+	}
+}
+
+func TestInlineHTMLHonorsBodyLimit(t *testing.T) {
+	l := NewLoader(settings.LoadGlobal{})
+	l.MaxBodySize = 4
+	lp := defaultLP()
+	lp.InlineHTML = []byte("12345")
+	if _, err := l.Load(context.Background(), "ignored", lp); err == nil {
+		t.Fatal("oversized inline HTML must be rejected")
+	} else if !strings.Contains(err.Error(), "inline HTML exceeds max body size 4") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestEmptyInlineBaseRejectsRelativeSubresources(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "local.css")
+	if err := os.WriteFile(path, []byte("body{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	l := NewLoader(settings.LoadGlobal{})
+	// Even with local access enabled, an inline document without a base must
+	// not reinterpret a relative reference as a process-working-directory
+	// file. The reference is unresolved, not an implicit local path.
+	l.EnableLocalFileAccess = true
+	if _, err := l.FetchSub(context.Background(), "", path, defaultLP()); err == nil {
+		t.Fatal("relative reference without a base must be rejected")
+	} else if !strings.Contains(err.Error(), "without a document base URL") {
+		t.Fatalf("error = %v", err)
+	}
+
+	res, err := l.FetchSub(context.Background(), "", "data:text/plain,ok", defaultLP())
+	if err != nil {
+		t.Fatalf("absolute data reference without a base: %v", err)
+	}
+	if string(res.Body) != "ok" {
+		t.Errorf("body = %q, want ok", res.Body)
+	}
+}
+
+func TestResourceContextBindsBaseAndPolicy(t *testing.T) {
+	dir := t.TempDir()
+	styleDir := filepath.Join(dir, "styles")
+	if err := os.Mkdir(styleDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	stylePath := filepath.Join(styleDir, "site.css")
+	if err := os.WriteFile(stylePath, []byte("body{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	l := NewLoader(settings.LoadGlobal{})
+	l.EnableLocalFileAccess = true
+	base := &Resource{Base: "file://" + filepath.ToSlash(filepath.Join(dir, "page.html"))}
+	lp := defaultLP()
+	lp.BlockLocalFileAccess = false
+	ctx := l.ForResource(base, lp)
+	res, err := ctx.Fetch(context.Background(), "styles/site.css")
+	if err != nil {
+		t.Fatalf("relative fetch = %v", err)
+	}
+	if string(res.Body) != "body{}" {
+		t.Errorf("body = %q, want body{}", res.Body)
+	}
+}
+
 func TestLoadCharsetContentType(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", r.URL.Query().Get("ct"))

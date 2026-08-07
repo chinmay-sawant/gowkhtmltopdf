@@ -2,6 +2,7 @@ package convert
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -31,8 +32,80 @@ type Request struct {
 	Global  settings.PdfGlobal
 	Image   *settings.ImageGlobal
 	Objects []settings.PdfObject
-	// Output receives the finished PDF bytes. Nil writes to os.Stdout.
+	// Output receives the finished PDF bytes. Run requires this sink to be
+	// explicit; CLI adapters select stdout when the user asks for it.
 	Output io.Writer
+	// OutlineOutput receives --dump-outline XML. It is separate from Output so
+	// diagnostics/document metadata can never be appended to a PDF stream.
+	// It is only required when Global.DumpOutline is true.
+	OutlineOutput io.Writer
+}
+
+// ErrMissingOutput reports a request that did not choose a document sink.
+var ErrMissingOutput = errors.New("convert: output sink is required")
+
+// ErrMissingOutlineOutput reports a dump-outline request without its metadata
+// sink. Keeping this separate from Output prevents accidental mixed formats.
+var ErrMissingOutlineOutput = errors.New("convert: outline output sink is required")
+
+// ErrUnexpectedImageSettings reports an image-mode union member passed to the
+// PDF engine. The shared Request remains the compatibility contract, while
+// these constructors and validators make each mode's invariant explicit at
+// its boundary.
+var ErrUnexpectedImageSettings = errors.New("convert: image settings are not valid for PDF")
+
+// ErrMissingImageSettings reports an image request sent through the image
+// adapter without its mode-specific settings.
+var ErrMissingImageSettings = errors.New("convert: image settings are required")
+
+// NewPDFRequest builds the PDF side of the compatibility union. Callers that
+// already have a writer should prefer this constructor over a partially filled
+// Request literal.
+func NewPDFRequest(global settings.PdfGlobal, objects []settings.PdfObject, output, outline io.Writer) *Request {
+	return &Request{Global: global, Objects: objects, Output: output, OutlineOutput: outline}
+}
+
+// NewImageRequest builds the image side of the compatibility union. Image
+// settings are copied so the request owns its mode configuration snapshot.
+func NewImageRequest(global settings.PdfGlobal, image settings.ImageGlobal, objects []settings.PdfObject, output io.Writer) *Request {
+	return &Request{Global: global, Image: &image, Objects: objects, Output: output}
+}
+
+// Validate checks the explicit output contract before any loading or font
+// initialization occurs. This makes a missing sink deterministic and cheap to
+// test through the engine seam.
+func (r *Request) Validate() error {
+	if r == nil {
+		return errors.New("convert: nil request")
+	}
+	if r.Output == nil {
+		return ErrMissingOutput
+	}
+	if r.Global.DumpOutline && r.OutlineOutput == nil {
+		return ErrMissingOutlineOutput
+	}
+	return nil
+}
+
+// ValidatePDF checks the PDF-specific request invariant before running the
+// document pipeline.
+func (r *Request) ValidatePDF() error {
+	if r != nil && r.Image != nil {
+		return ErrUnexpectedImageSettings
+	}
+	return r.Validate()
+}
+
+// ValidateImage checks the image-specific request invariant. Image output is
+// implemented by internal/imageout but shares this boundary contract.
+func (r *Request) ValidateImage() error {
+	if r == nil {
+		return errors.New("convert: nil request")
+	}
+	if r.Image == nil {
+		return ErrMissingImageSettings
+	}
+	return r.Validate()
 }
 
 // RunPDF executes the full pdf conversion with a background context and no
@@ -53,9 +126,10 @@ func RunPDFContext(ctx context.Context, cmd *cli.Command, log io.Writer, progres
 		return err
 	}
 	req := &Request{
-		Global:  cmd.Global,
-		Objects: cmd.Objects,
-		Output:  out,
+		Global:        cmd.Global,
+		Objects:       cmd.Objects,
+		Output:        out,
+		OutlineOutput: os.Stdout,
 	}
 	// CLI may still set the legacy Command.DumpOutline bit; OR into Global.
 	if cmd.DumpOutline {
@@ -80,8 +154,11 @@ func RunPDFContext(ctx context.Context, cmd *cli.Command, log io.Writer, progres
 // outline, TOC link annotations and the per-page headers/footers are wired
 // using the final page indices.
 func Run(ctx context.Context, req *Request, log io.Writer, progress func(phase string, percent int)) error {
-	if req == nil {
-		return fmt.Errorf("convert: nil request")
+	if err := req.ValidatePDF(); err != nil {
+		return err
+	}
+	if ctx == nil {
+		ctx = context.Background()
 	}
 	// load.NewLoader applies Allow / EnableLocalFileAccess from LoadGlobal.
 	loader := load.NewLoader(req.Global.Load)
@@ -141,10 +218,10 @@ func Run(ctx context.Context, req *Request, log io.Writer, progress func(phase s
 		report("Building table of contents", percent(n, n+1))
 		// The TOC lists the full outline (all levels); the PDF outline
 		// applies outline-depth separately below.
-		// BuildTree / SortHeadings key on Page; pass DocPage via a view so
-		// multi-object outlines stay in document order (P2-02).
-		tocTree := outline.BuildTree(headingsDocPageView(headings), outline.Options{Exclude: exclude})
-		tocTotal, err = renderTOCObjects(font, doc, req, tocs, tocTree.Flatten(), log)
+		// Use the explicit document-page ordering contract; keep Heading.Page
+		// object-local for headers, links, and page ownership.
+		tocTree := outline.BuildTreeBy(headings, outline.Options{Exclude: exclude}, outline.DocumentPage)
+		tocTotal, err = renderTOCObjects(ctx, font, doc, req, tocs, tocTree.Flatten(), log)
 		if err != nil {
 			return err
 		}
@@ -163,13 +240,14 @@ func Run(ctx context.Context, req *Request, log io.Writer, progress func(phase s
 	}
 
 	if req.Global.Outline {
-		outTree := outline.BuildTree(headingsDocPageView(headings), outline.Options{
+		outTree := outline.BuildTreeBy(headings, outline.Options{
 			MaxDepth: req.Global.OutlineDepth,
 			Exclude:  exclude,
-		})
-		// --dump-outline writes the wkhtmltopdf XML to stdout (engine-owned bit on Global).
+		}, outline.DocumentPage)
+		// --dump-outline uses its dedicated metadata sink. The engine never
+		// reaches into os.Stdout; CLI adapters own stdout selection.
 		if req.Global.DumpOutline {
-			if _, err := os.Stdout.Write(outline.DumpOutlineXMLOffset(outTree, tocTotal)); err != nil {
+			if _, err := req.OutlineOutput.Write(outline.DumpOutlineXMLBy(outTree, tocTotal, outline.DocumentPage)); err != nil {
 				return fmt.Errorf("dump outline: %w", err)
 			}
 		}
@@ -213,11 +291,7 @@ func Run(ctx context.Context, req *Request, log io.Writer, progress func(phase s
 
 	report("Done", 100)
 
-	out := req.Output
-	if out == nil {
-		out = os.Stdout
-	}
-	if err := doc.Write(out); err != nil {
+	if err := doc.Write(req.Output); err != nil {
 		return fmt.Errorf("write output: %w", err)
 	}
 	return nil
@@ -462,39 +536,35 @@ func initTOCState(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 // returns the per-object state the later passes need (nil when the load
 // policy skipped the object).
 func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, registry *pdf.Registry, doc *pdf.Document, req *Request, obj *settings.PdfObject, idx int, log io.Writer) (*objectState, error) {
-	res, err := loader.Load(ctx, obj.Page, obj.Load)
-	if err != nil {
-		return nil, fmt.Errorf("object %d (%s): load: %w", idx+1, obj.Page, err)
-	}
-	if res.Skip {
-		line.Emit(log, line.Warn, "object %d (%s): load error policy is skip, omitting", idx+1, obj.Page)
-		return nil, nil
-	}
-
-	root, err := html.ParseDocument(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("object %d (%s): parse html: %w", idx+1, obj.Page, err)
-	}
-
 	geom, err := newHFGeom(req.Global)
 	if err != nil {
 		return nil, fmt.Errorf("object %d (%s): %w", idx+1, obj.Page, err)
 	}
 	media := mediaFor(req.Global, obj)
-	sheets := CollectSheets(ctx, loader, root, res.Base, obj.Load, SheetOptions{
-		ViewportW:   geom.contentW,
-		ViewportH:   geom.contentH,
-		MediaType:   media,
-		ObjectIndex: idx + 1,
+	prep, err := PrepareDocument(ctx, loader, obj.Page, obj.Load, registry, PrepareOptions{
+		ViewportW:       geom.contentW,
+		ViewportH:       geom.contentH,
+		MediaType:       media,
+		ObjectIndex:     idx + 1,
+		SimplifyDOM:     SimplifyDOMEnabled(req.Global.Web, obj.Web),
+		SimplifyProfile: SimplifyDOMProfile(req.Global.Web, obj.Web),
 	}, log)
-	sheets = AppendSimplifySheet(sheets, SimplifyDOMEnabled(req.Global.Web, obj.Web), SimplifyDOMProfile(req.Global.Web, obj.Web))
-	registry = MergeFontFaces(ctx, loader, registry, sheets, res.Base, obj.Load, idx+1, log)
+	if err != nil {
+		return nil, fmt.Errorf("object %d (%s): %w", idx+1, obj.Page, err)
+	}
+	if prep.Resource.Skip {
+		line.Emit(log, line.Warn, "object %d (%s): load error policy is skip, omitting", idx+1, obj.Page)
+		return nil, nil
+	}
+	root := prep.Root
+	registry = prep.Registry
+	sheets := prep.Sheets
 
 	imagesFn := func(src string) ([]byte, error) {
 		if !req.Global.Web.Images {
 			return nil, fmt.Errorf("images disabled")
 		}
-		r, err := loader.FetchSub(ctx, res.Base, src, obj.Load)
+		r, err := prep.Resources.Fetch(ctx, src)
 		if err != nil {
 			return nil, err
 		}
@@ -503,18 +573,20 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 
 	printUL := req.Global.Web.PrintLinkUnderline || obj.Web.PrintLinkUnderline
 	st := &objectState{
-		obj:      obj,
-		idx:      idx,
-		header:   obj.HeaderFor(req.Global),
-		footer:   obj.FooterFor(req.Global),
-		repl:     mergedReplaces(obj, req.Global),
-		base:     res.Base,
-		lp:       obj.Load,
-		registry: registry,
-		media:    media,
-		geom:     geom,
-		imagesFn: imagesFn,
-		doctitle: docTitle(root),
+		obj:           obj,
+		idx:           idx,
+		header:        obj.HeaderFor(req.Global),
+		footer:        obj.FooterFor(req.Global),
+		repl:          mergedReplaces(obj, req.Global),
+		base:          prep.Resources.Base,
+		lp:            obj.Load,
+		registry:      registry,
+		resources:     prep.Resources,
+		imagesEnabled: req.Global.Web.Images,
+		media:         media,
+		geom:          geom,
+		imagesFn:      imagesFn,
+		doctitle:      docTitle(root),
 	}
 	reg, err := effectiveMargins(ctx, loader, font, req.Global, st, log)
 	if err != nil {
@@ -524,7 +596,7 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 	st.registry = reg
 	registry = reg
 
-	lres, err := layout.Layout(root, st.bodyLayoutOpts(font, registry, sheets, obj.Load.ZoomFactor, imagesFn, req.Global.Background, printUL))
+	lres, err := layout.LayoutContext(ctx, root, st.bodyLayoutOpts(font, registry, sheets, obj.Load.ZoomFactor, imagesFn, req.Global.Background, printUL))
 	if err != nil {
 		return nil, fmt.Errorf("object %d (%s): layout: %w", idx+1, obj.Page, err)
 	}
@@ -544,7 +616,7 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 				if zf := obj.Load.ZoomFactor; zf > 0 {
 					effZoom = zoom * zf
 				}
-				lres, err = layout.Layout(root, st.bodyLayoutOpts(font, registry, sheets, effZoom, imagesFn, req.Global.Background, printUL))
+				lres, err = layout.LayoutContext(ctx, root, st.bodyLayoutOpts(font, registry, sheets, effZoom, imagesFn, req.Global.Background, printUL))
 				if err != nil {
 					return nil, fmt.Errorf("object %d (%s): smart-shrink layout: %w", idx+1, obj.Page, err)
 				}
@@ -563,7 +635,7 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 	}
 
 	before := doc.PageCount()
-	if err := layout.Paint(doc, lres, paintOptions(st.geom)); err != nil {
+	if err := layout.PaintContext(ctx, doc, lres, paintOptions(st.geom)); err != nil {
 		return nil, fmt.Errorf("object %d (%s): paint: %w", idx+1, obj.Page, err)
 	}
 	st.pages = doc.PageCount() - before

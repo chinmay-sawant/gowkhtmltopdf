@@ -548,6 +548,28 @@ func TestDuplicatePage(t *testing.T) {
 	}
 }
 
+func TestDuplicatePageOwnsResourceMaps(t *testing.T) {
+	d := fixedDoc(t)
+	d.SetCompression(false)
+	p := d.AddPage(100, 100)
+	if err := p.Content().AddPNGImage("I0", 0, 0, 10, 10, makePNG(t, false)); err != nil {
+		t.Fatalf("source image: %v", err)
+	}
+	dup, err := d.DuplicatePage(0)
+	if err != nil {
+		t.Fatalf("DuplicatePage: %v", err)
+	}
+	if err := dup.Content().AddPNGImage("I1", 20, 20, 10, 10, makePNG(t, true)); err != nil {
+		t.Fatalf("duplicate image: %v", err)
+	}
+	if _, ok := p.Content().imageRefs["I1"]; ok {
+		t.Fatal("duplicate resource was added to source page")
+	}
+	if _, ok := dup.Content().imageRefs["I1"]; !ok {
+		t.Fatal("duplicate page did not retain its own resource")
+	}
+}
+
 func TestReorderPagesValidation(t *testing.T) {
 	d := fixedDoc(t)
 	d.AddPage(100, 100)

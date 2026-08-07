@@ -91,6 +91,7 @@ func (c *Content) AddJPEGImage(name string, x, y, w, h float64, data []byte) err
 	if components == 1 {
 		cs = "DeviceGray"
 	}
+	name = c.uniqueImageName(name)
 	ref := c.doc.newObject()
 	c.doc.setDict(ref, dict{}.add("/Type", "/XObject").
 		add("/Subtype", "/Image").
@@ -177,6 +178,7 @@ func (c *Content) AddPNGImage(name string, x, y, w, h float64, data []byte) erro
 		}
 	}
 
+	name = c.uniqueImageName(name)
 	raw := rgba
 	dct := dict{}.add("/Type", "/XObject").
 		add("/Subtype", "/Image").
@@ -213,4 +215,25 @@ func (c *Content) AddPNGImage(name string, x, y, w, h float64, data []byte) erro
 	c.buf.WriteString("/" + name + " Do\n")
 	c.Restore()
 	return nil
+}
+
+// uniqueImageName returns a page-local resource name that has not already
+// been registered on this content stream. Header/footer bands and body paint
+// can each start at I0; silently reusing that name makes the second image
+// replace the first image in /Resources while both operators still say /I0.
+// Suffixing the requested name keeps existing callers source-compatible while
+// making the emitted operator and resource dictionary agree.
+func (c *Content) uniqueImageName(name string) string {
+	if name == "" {
+		name = "I0"
+	}
+	if _, exists := c.imageRefs[name]; !exists {
+		return name
+	}
+	for i := 1; ; i++ {
+		candidate := fmt.Sprintf("%s_%d", name, i)
+		if _, exists := c.imageRefs[candidate]; !exists {
+			return candidate
+		}
+	}
 }

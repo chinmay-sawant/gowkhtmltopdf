@@ -32,6 +32,31 @@ type Heading struct {
 	Anchor  string // synthetic __WKANCHOR_<base36>, stable across runs
 }
 
+// PageOf is the explicit ordering contract used when headings from more than
+// one page-producing scope are combined. It returns the page number used for
+// ordering, section lookup, and outline serialization; it does not mutate the
+// heading. Use LocalPage for an object's local layout or DocumentPage for a
+// flattened document view.
+type PageOf func(*Heading) int
+
+// LocalPage orders a heading by the page in its object's layout.
+func LocalPage(h *Heading) int {
+	if h == nil {
+		return 0
+	}
+	return h.Page
+}
+
+// DocumentPage orders a heading by the page assigned during document
+// assembly. Unlike the old Page/DocPage view convention, this accessor keeps
+// the object-local Page field unchanged.
+func DocumentPage(h *Heading) int {
+	if h == nil {
+		return 0
+	}
+	return h.DocPage
+}
+
 // headingLevel maps an element name to its outline level, 0 when it is not a
 // heading. h1..h6 are accepted (h7..h9 are not part of the HTML vocabulary).
 func headingLevel(name string) int {
@@ -123,10 +148,17 @@ type Options struct {
 // SortHeadings brings headings into the order used by the tree, the TOC and
 // the section lookup: page, y-down within a page, then x.
 func SortHeadings(hs []*Heading) {
+	SortHeadingsBy(hs, LocalPage)
+}
+
+// SortHeadingsBy sorts headings using pageOf without changing any Heading
+// fields. This is the preferred API for flattened multi-object outlines.
+func SortHeadingsBy(hs []*Heading, pageOf PageOf) {
+	pageOf = normalizePageOf(pageOf)
 	sort.SliceStable(hs, func(i, j int) bool {
 		a, b := hs[i], hs[j]
-		if a.Page != b.Page {
-			return a.Page < b.Page
+		if pageOf(a) != pageOf(b) {
+			return pageOf(a) < pageOf(b)
 		}
 		if a.Y != b.Y {
 			return a.Y < b.Y
@@ -138,9 +170,17 @@ func SortHeadings(hs []*Heading) {
 // SectionOf mirrors the wkhtmltopdf outline cache: section = first heading at
 // or before page, subsection = last. Headings must be in SortHeadings order.
 func SectionOf(hs []*Heading, page int) (section, subsection string) {
+	return SectionOfBy(hs, page, LocalPage)
+}
+
+// SectionOfBy returns the section/subsection for page using the supplied
+// explicit ordering accessor. The input must already be sorted with the same
+// accessor.
+func SectionOfBy(hs []*Heading, page int, pageOf PageOf) (section, subsection string) {
+	pageOf = normalizePageOf(pageOf)
 	var first, last *Heading
 	for _, h := range hs {
-		if h.Page > page {
+		if pageOf(h) > page {
 			break
 		}
 		if first == nil {
@@ -168,6 +208,14 @@ func SectionOf(hs []*Heading, page int) (section, subsection string) {
 // never skips levels. Titles, anchors and sort order are unaffected by the
 // clamp.
 func BuildTree(headings []*Heading, opts Options) *Node {
+	return BuildTreeBy(headings, opts, LocalPage)
+}
+
+// BuildTreeBy builds an outline tree using pageOf for ordering. The accessor
+// is carried explicitly instead of requiring callers to copy document-global
+// pages into Heading.Page.
+func BuildTreeBy(headings []*Heading, opts Options, pageOf PageOf) *Node {
+	pageOf = normalizePageOf(pageOf)
 	sel := make([]*Heading, 0, len(headings))
 	for _, h := range headings {
 		if matchAny(opts.Exclude, h.Node) {
@@ -175,7 +223,7 @@ func BuildTree(headings []*Heading, opts Options) *Node {
 		}
 		sel = append(sel, h)
 	}
-	SortHeadings(sel)
+	SortHeadingsBy(sel, pageOf)
 
 	root := &Node{}
 	stack := []*Node{root}
@@ -220,21 +268,28 @@ func (n *Node) Flatten() []*Node {
 // and backLink attributes carry the heading's synthetic anchor. Valid XML,
 // no CDATA.
 func DumpOutlineXML(root *Node) []byte {
-	return DumpOutlineXMLOffset(root, 0)
+	return DumpOutlineXMLBy(root, 0, LocalPage)
 }
 
 // DumpOutlineXMLOffset is DumpOutlineXML with a page offset (e.g. TOC page
 // count) added to every item's page number so dump matches final PDF pages.
 func DumpOutlineXMLOffset(root *Node, pageOffset int) []byte {
+	return DumpOutlineXMLBy(root, pageOffset, LocalPage)
+}
+
+// DumpOutlineXMLBy serializes an outline using pageOf for the 1-based page
+// attribute. It is the explicit counterpart to the legacy local-page helper.
+func DumpOutlineXMLBy(root *Node, pageOffset int, pageOf PageOf) []byte {
+	pageOf = normalizePageOf(pageOf)
 	var b strings.Builder
 	b.WriteString("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
 	b.WriteString("<outline xmlns=\"http://wkhtmltopdf.org/outline\">\n")
-	dumpNode(root, &b, 1, pageOffset)
+	dumpNode(root, &b, 1, pageOffset, pageOf)
 	b.WriteString("</outline>\n")
 	return []byte(b.String())
 }
 
-func dumpNode(n *Node, b *strings.Builder, depth, pageOffset int) {
+func dumpNode(n *Node, b *strings.Builder, depth, pageOffset int, pageOf PageOf) {
 	pad := strings.Repeat("  ", depth)
 	for _, c := range n.Children {
 		h := c.Heading
@@ -245,7 +300,7 @@ func dumpNode(n *Node, b *strings.Builder, depth, pageOffset int) {
 		b.WriteString("<item title=\"")
 		b.WriteString(xmlEscape(h.Title))
 		b.WriteString("\" page=\"")
-		b.WriteString(strconv.Itoa(h.Page + 1 + pageOffset))
+		b.WriteString(strconv.Itoa(pageOf(h) + 1 + pageOffset))
 		b.WriteString("\" link=\"")
 		b.WriteString(h.Anchor)
 		b.WriteString("\" backLink=\"")
@@ -255,10 +310,17 @@ func dumpNode(n *Node, b *strings.Builder, depth, pageOffset int) {
 			continue
 		}
 		b.WriteString("\">\n")
-		dumpNode(c, b, depth+1, pageOffset)
+		dumpNode(c, b, depth+1, pageOffset, pageOf)
 		b.WriteString(pad)
 		b.WriteString("</item>\n")
 	}
+}
+
+func normalizePageOf(pageOf PageOf) PageOf {
+	if pageOf == nil {
+		return LocalPage
+	}
+	return pageOf
 }
 
 func matchAny(sels []css.Selector, n *html.Node) bool {

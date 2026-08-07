@@ -116,7 +116,17 @@ func (ctx *objectCtx) newFreshObject(c *Command) *settings.PdfObject {
 }
 
 // Parse parses wkhtmltopdf-style arguments.
-func Parse(argv []string) (*Command, error) {
+//
+// The optional mode restricts the flags accepted by the parser. Omitting it
+// preserves the historical library behaviour and accepts the union of PDF
+// and image flags; command binaries should pass their concrete mode. A
+// variadic parameter keeps existing callers source-compatible while making
+// the mode contract explicit for new callers.
+func Parse(argv []string, modes ...Mode) (*Command, error) {
+	mode, err := parseMode(modes)
+	if err != nil {
+		return nil, err
+	}
 	cmd := &Command{Global: settings.DefaultPdfGlobal(), Image: settings.DefaultImageGlobal()}
 	cur := &objectCtx{}
 	var free []string
@@ -148,6 +158,9 @@ func Parse(argv []string) (*Command, error) {
 			if !ok {
 				return nil, fmt.Errorf("unknown option --%s", name)
 			}
+			if err := checkMode(name, spec, mode); err != nil {
+				return nil, err
+			}
 			if err := apply(cmd, cur, name, spec, negated, val, hasVal, argv, &i); err != nil {
 				return nil, err
 			}
@@ -157,6 +170,9 @@ func Parse(argv []string) (*Command, error) {
 			spec, ok := shortFlags[name]
 			if !ok {
 				return nil, fmt.Errorf("unknown option -%s", name)
+			}
+			if err := checkMode(name, spec, mode); err != nil {
+				return nil, err
 			}
 			if err := apply(cmd, cur, name, spec, false, "", false, argv, &i); err != nil {
 				return nil, err
@@ -171,6 +187,39 @@ func Parse(argv []string) (*Command, error) {
 		return nil, err
 	}
 	return cmd, nil
+}
+
+// ParseMode is the explicit form of Parse for callers that know which
+// executable mode they are implementing.
+func ParseMode(argv []string, mode Mode) (*Command, error) {
+	return Parse(argv, mode)
+}
+
+func parseMode(modes []Mode) (Mode, error) {
+	if len(modes) > 1 {
+		return 0, fmt.Errorf("cli: Parse accepts at most one mode")
+	}
+	if len(modes) == 0 {
+		return ModeBoth, nil
+	}
+	mode := modes[0]
+	if mode == 0 || mode&^ModeBoth != 0 {
+		return 0, fmt.Errorf("cli: invalid mode %d", mode)
+	}
+	return mode, nil
+}
+
+func checkMode(name string, spec flagSpec, mode Mode) error {
+	if spec.mod&mode != 0 {
+		return nil
+	}
+	modeName := "requested mode"
+	if mode == ModePDF {
+		modeName = "pdf mode"
+	} else if mode == ModeImage {
+		modeName = "image mode"
+	}
+	return fmt.Errorf("option --%s is not supported in %s", name, modeName)
 }
 
 // positional handles object keywords and queues bare positionals.

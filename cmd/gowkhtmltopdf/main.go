@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 
+	"gowkhtmltopdf/internal/app"
 	"gowkhtmltopdf/internal/cli"
 	"gowkhtmltopdf/internal/convert"
 )
@@ -17,7 +18,7 @@ func main() {
 }
 
 func run(argv []string) int {
-	cmd, err := cli.Parse(argv)
+	cmd, err := cli.Parse(argv, cli.ModePDF)
 	if err != nil {
 		switch {
 		case errors.Is(err, cli.ErrHelp), errors.Is(err, cli.ErrExtHelp):
@@ -53,25 +54,7 @@ func run(argv []string) int {
 		logw = io.Discard
 	}
 
-	out, closeOut, err := cmd.OpenOutput()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "gowkhtmltopdf: %v\n", err)
-		return cli.ExitCode(err)
-	}
-	req := &convert.Request{
-		Global:  cmd.Global,
-		Objects: cmd.Objects,
-		Output:  out,
-	}
-	// CLI may still set the legacy Command.DumpOutline bit; OR into Global
-	// (same as convert.RunPDFContext adapter).
-	if cmd.DumpOutline {
-		req.Global.DumpOutline = true
-	}
-	runErr := convert.Run(context.Background(), req, logw, nil)
-	if closeErr := closeOut(); closeErr != nil && runErr == nil {
-		runErr = closeErr
-	}
+	runErr := app.RunPDF(context.Background(), cmd, logw, nil)
 	if runErr != nil {
 		fmt.Fprintf(os.Stderr, "gowkhtmltopdf: %v\n", runErr)
 		return cli.ExitCode(runErr)

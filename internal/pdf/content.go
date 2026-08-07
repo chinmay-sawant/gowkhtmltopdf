@@ -42,25 +42,63 @@ func NewContent() *Content {
 // Bytes returns the raw (uncompressed) content stream.
 func (c *Content) Bytes() []byte { return c.buf.Bytes() }
 
-// cloneContent returns a copy of c that paints the same operators. Font,
-// image and rune maps are shared with the source: they are only written
-// during painting (before clone time) and at finalize, where writes are
-// idempotent, so both pages resolve to the same resource objects. A fresh
-// bytes.Buffer is used because Buffer values must not be copied after use.
+// cloneContent returns a copy of c that paints the same operators. Resource
+// maps are copied rather than aliased: a duplicated page may add a resource
+// after cloning and must not mutate the source page's resource dictionary.
+// The parsed fonts themselves are immutable, so their pointers remain shared.
+// A fresh bytes.Buffer is used because Buffer values must not be copied after
+// use.
 func cloneContent(c *Content) *Content {
 	nc := &Content{
-		fontUses:  c.fontUses,
-		fontFiles: c.fontFiles,
-		used:      c.used,
+		fontUses:  cloneStringMap(c.fontUses),
+		fontFiles: cloneFontMap(c.fontFiles),
+		used:      cloneRuneMap(c.used),
 		curFont:   c.curFont,
 		curSize:   c.curSize,
-		imageUses: c.imageUses,
-		imageRefs: c.imageRefs,
+		imageUses: cloneStringMap(c.imageUses),
+		imageRefs: cloneImageMap(c.imageRefs),
 		opacity:   c.opacity,
 		doc:       c.doc,
 	}
 	nc.buf.Write(c.buf.Bytes())
 	return nc
+}
+
+func cloneStringMap(src map[string]string) map[string]string {
+	dst := make(map[string]string, len(src))
+	for k, v := range src {
+		dst[k] = v
+	}
+	return dst
+}
+
+func cloneFontMap(src map[string]*Font) map[string]*Font {
+	dst := make(map[string]*Font, len(src))
+	for k, v := range src {
+		dst[k] = v
+	}
+	return dst
+}
+
+func cloneRuneMap(src map[string][]rune) map[string][]rune {
+	dst := make(map[string][]rune, len(src))
+	for k, v := range src {
+		dst[k] = append([]rune(nil), v...)
+	}
+	return dst
+}
+
+func cloneImageMap(src map[string]*imageResource) map[string]*imageResource {
+	dst := make(map[string]*imageResource, len(src))
+	for k, v := range src {
+		if v == nil {
+			dst[k] = nil
+			continue
+		}
+		copy := *v
+		dst[k] = &copy
+	}
+	return dst
 }
 
 // graphics state
@@ -194,7 +232,7 @@ func (c *Content) TextRenderMode(mode int) {
 // is drawn with an embedded Liberation fallback so ASCII does not become tofu.
 func (c *Content) TextShow(s string) {
 	f := c.fontFiles[c.curFont]
-	s = ShapeTextFont(s, f)
+	s = ShapeRun(s, f, c.curSize).Text
 	if f == nil || !c.textNeedsType0(s) {
 		c.textShowSimple(s)
 		return

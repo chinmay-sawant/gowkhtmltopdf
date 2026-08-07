@@ -106,6 +106,29 @@ func TestAddPNGImage(t *testing.T) {
 	}
 }
 
+func TestImageResourceNamesDoNotCollideAcrossBands(t *testing.T) {
+	d := fixedDoc(t)
+	d.SetCompression(false)
+	p := d.AddPage(100, 100)
+	c := p.Content()
+	if err := c.AddPNGImage("I0", 0, 0, 10, 10, makePNG(t, false)); err != nil {
+		t.Fatalf("body image: %v", err)
+	}
+	// PaintBand and body Paint both use page-local counters. Content must
+	// preserve both operators instead of allowing the second I0 to replace
+	// the first entry in /Resources.
+	if err := c.AddPNGImage("I0", 20, 20, 10, 10, makePNG(t, true)); err != nil {
+		t.Fatalf("band image: %v", err)
+	}
+	out := string(writePDF(t, d))
+	if !strings.Contains(out, "/I0 Do") || !strings.Contains(out, "/I0_1 Do") {
+		t.Fatalf("image operators did not receive distinct resource names:\n%s", out)
+	}
+	if !strings.Contains(out, "/I0 3 0 R") || !strings.Contains(out, "/I0_1 5 0 R") {
+		t.Fatalf("resource dictionary does not contain both image names:\n%s", out)
+	}
+}
+
 func TestAddPNGNoAlpha(t *testing.T) {
 	d := fixedDoc(t)
 	d.SetCompression(false)
