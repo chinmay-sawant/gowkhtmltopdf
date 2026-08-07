@@ -85,7 +85,7 @@ Worked examples:
 - Unknown names: `Set` returns an error  
 - Defaults mirror upstream wkhtmltopdf where implemented  
 
-**Pagination / tables:** `<thead>` repeats on continuation pages; `position: sticky` clamps to the page content box (print scrollport) within its containing block, or to a nearest `overflow:auto|scroll|hidden|clip` ancestor at scroll offset 0; `zoom` /
+**Pagination / tables:** `<thead>` repeats on continuation pages; `position: sticky` clamps to the page content box (print scrollport) within its containing block without fixed-style continuation-page clones, or to a nearest `overflow:auto|scroll|hidden|clip` ancestor at scroll offset 0; `zoom` /
 smart-shrinking settings re-layout when wired (same behavior as CLI `--zoom` /
 `--smart-shrinking`). CSS `orphans`/`widows` are parsed with Rule 3 when line
 boxes exist; geometric heuristic fallback — see matrix §2.6.

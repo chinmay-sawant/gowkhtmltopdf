@@ -2,8 +2,8 @@
 <!--
   fixture-31-sticky-top
   Proves: position:sticky with top inset clamps to the page content box
-  (print scrollport) within the containing block; continuation pages show
-  the sticky bar near the page top while the section CB continues.
+  (print scrollport) within the containing block; continuation pages keep
+  the sticky bar inside its natural fragment rather than replaying it.
   Not position:fixed (no stamp outside the section). Expected: ≥2 pages.
 -->
 <html>
@@ -46,7 +46,7 @@
   <div class="section">
     <div class="sticky-bar">Section header (sticky top:0)</div>
     <div class="row">Row 01 — long section body so pagination crosses pages.</div>
-    <div class="row">Row 02 — sticky bar should reappear near page tops.</div>
+    <div class="row">Row 02 — sticky bar remains in its natural fragment.</div>
     <div class="row">Row 03 — while this containing block continues.</div>
     <div class="row">Row 04 — filler content for multi-page layout.</div>
     <div class="row">Row 05 — filler content for multi-page layout.</div>

@@ -67,9 +67,8 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 		}
 	}
 
-	// Split rect ops at page boundaries first. Sticky must run after this:
-	// continuation fragments are created at the page-top boundary and would
-	// otherwise cover sticky clones / reserved flow (fixture-31).
+	// Split rect ops at page boundaries first so sticky clamps the natural
+	// fragment geometry that will actually be painted (fixture-31).
 	splitCrossingRects(res, contentH, opPage)
 
 	// Drop row shells left behind when text snapped to the next page
@@ -79,7 +78,8 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 	// Close open tops on table continuations after rowspan/vertical splits.
 	capTablePageBreaks(res, contentH)
 
-	// Print-scoped sticky: clamp + continuation clones + reserve flow space.
+	// Print-scoped sticky: clamp the natural fragment without fixed-style
+	// continuation clones.
 	applyStickyPrint(res, contentH)
 
 	// Re-derive pages after splits and sticky (new ops / Y shifts).
@@ -1031,12 +1031,16 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 			}
 			switch op.Kind {
 			case OpFillRect:
-				if op.H > 40 && isSectionWashRGB(op.R, op.G, op.B) &&
+				// Only continuation fragments that begin at the page top are
+				// eligible for this trailing-band cleanup. A normal block fill
+				// (for example a <pre> with bottom padding) must retain its full
+				// box height through its bottom border.
+				if op.Y <= pageTop+1 && op.H > 40 && isSectionWashRGB(op.R, op.G, op.B) &&
 					op.Y+op.H > contentBot+1 && op.Y < contentBot {
 					op.H = contentBot - op.Y
 				}
 			case OpLine:
-				if op.H > 40 && nearSectionBorderRGB(op.R, op.G, op.B) &&
+				if op.Y <= pageTop+1 && op.H > 40 && nearSectionBorderRGB(op.R, op.G, op.B) &&
 					op.Y+op.H > contentBot+1 && op.Y < contentBot {
 					op.H = contentBot - op.Y
 				} else if op.H < 1 && op.Width > 0 && nearSectionBorderRGB(op.R, op.G, op.B) &&
@@ -1045,7 +1049,160 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 				}
 			}
 		}
+		// A sticky containing block may begin on this page and continue onto
+		// the next one. Its page fragment must still end at the last real row;
+		// otherwise the unsplit section wash fills the unused page tail.
+		for _, target := range stickySectionChromeTargets(res.root) {
+			for _, i := range pageOps[p] {
+				op := &res.Ops[i]
+				if op.StickyID != 0 || op.Kind != OpFillRect || !target.hasBackground ||
+					op.H <= 40 || !sameRectFrame(op, target) || !sameRGB(op, target.background) ||
+					op.Y < pageTop-1e-9 || op.Y >= pageBot-1e-9 || op.Y+op.H <= contentBot+1 {
+					continue
+				}
+				op.H = contentBot - op.Y
+			}
+		}
 	}
+	closePageLeadingSectionChrome(res, contentH)
+}
+
+// closePageLeadingSectionChrome keeps continuation-page section washes and
+// side borders aligned with their horizontal closing border. Pagination can
+// move the last child row without updating the original block chrome. Only
+// sections that contain a sticky box are considered, and their own box
+// geometry/colors identify the chrome; unrelated wide rules cannot match.
+func closePageLeadingSectionChrome(res *Result, contentH float64) {
+	if res == nil || res.root == nil || contentH <= 0 {
+		return
+	}
+	targets := stickySectionChromeTargets(res.root)
+	if len(targets) == 0 {
+		return
+	}
+	maxPage := 0
+	for _, op := range res.Ops {
+		if op.Fixed {
+			continue
+		}
+		if page := int(op.Y / contentH); page > maxPage {
+			maxPage = page
+		}
+	}
+	for page := 1; page <= maxPage; page++ {
+		pageTop := float64(page) * contentH
+		pageBottom := pageTop + contentH
+		for _, target := range targets {
+			closeY := -1.0
+			for i := range res.Ops {
+				op := &res.Ops[i]
+				if op.Fixed || op.Kind != OpLine || op.H >= 1 || op.Y <= pageTop+1 || op.Y >= pageBottom {
+					continue
+				}
+				if !sameHorizontalFrame(op, target) || !sameRGB(op, target.borderBottom) {
+					continue
+				}
+				if op.Y > closeY {
+					closeY = op.Y
+				}
+			}
+			if closeY < 0 {
+				continue
+			}
+			for i := range res.Ops {
+				op := &res.Ops[i]
+				if op.Fixed || op.Y < pageTop-1 || op.Y > pageTop+1 || op.Y >= pageBottom {
+					continue
+				}
+				switch op.Kind {
+				case OpFillRect:
+					if target.hasBackground && op.H > 40 && sameRectFrame(op, target) && sameRGB(op, target.background) && op.Y+op.H < closeY {
+						op.H = closeY - op.Y
+					}
+				case OpLine:
+					if op.H > 40 && target.sideMatches(op) && op.Y+op.H < closeY {
+						op.H = closeY - op.Y
+					}
+				}
+			}
+		}
+	}
+}
+
+type stickySectionChromeTarget struct {
+	x, y, w           float64
+	background        [3]float64
+	hasBackground     bool
+	borderLeft        [3]float64
+	borderRight       [3]float64
+	borderBottom      [3]float64
+	hasBottom         bool
+	hasLeft, hasRight bool
+}
+
+func stickySectionChromeTargets(root *box) []stickySectionChromeTarget {
+	var targets []stickySectionChromeTarget
+	var walk func(b, parent *box)
+	walk = func(b, parent *box) {
+		if b == nil {
+			return
+		}
+		if b.sticky && parent != nil {
+			st := parent.style
+			target := stickySectionChromeTarget{
+				x:            parent.x,
+				y:            parent.y,
+				w:            parent.w,
+				borderLeft:   st.BorderLeft.Color,
+				borderRight:  st.BorderRight.Color,
+				borderBottom: st.BorderBottom.Color,
+				hasBottom:    st.BorderBottom.Width > 0 && st.BorderBottom.Style != "none",
+				hasLeft:      st.BorderLeft.Width > 0 && st.BorderLeft.Style != "none",
+				hasRight:     st.BorderRight.Width > 0 && st.BorderRight.Style != "none",
+			}
+			if st.BGColor[3] > 0 {
+				target.background = [3]float64{st.BGColor[0], st.BGColor[1], st.BGColor[2]}
+				target.hasBackground = true
+			}
+			duplicate := false
+			for _, prior := range targets {
+				if math.Abs(prior.x-target.x) < 0.01 && math.Abs(prior.y-target.y) < 0.01 && math.Abs(prior.w-target.w) < 0.01 {
+					duplicate = true
+					break
+				}
+			}
+			if !duplicate {
+				targets = append(targets, target)
+			}
+		}
+		for _, child := range b.children {
+			walk(child, b)
+		}
+	}
+	walk(root, nil)
+	return targets
+}
+
+func sameHorizontalFrame(op *Op, target stickySectionChromeTarget) bool {
+	return target.hasBottom && math.Abs(op.X-target.x) < 1 && math.Abs(op.W-target.w) < 1
+}
+
+func sameRectFrame(op *Op, target stickySectionChromeTarget) bool {
+	return sameHorizontalFrame(op, target)
+}
+
+func (target stickySectionChromeTarget) sideMatches(op *Op) bool {
+	if op.W > 1 || math.Abs(op.X-target.x) >= 1 && math.Abs(op.X-(target.x+target.w)) >= 1 {
+		return false
+	}
+	if math.Abs(op.X-target.x) < 1 {
+		return target.hasLeft && sameRGB(op, target.borderLeft)
+	}
+	return target.hasRight && sameRGB(op, target.borderRight)
+}
+
+func sameRGB(op *Op, rgb [3]float64) bool {
+	return math.Abs(op.R-rgb[0]) < 0.01 && math.Abs(op.G-rgb[1]) < 0.01 && math.Abs(op.B-rgb[2]) < 0.01
 }
 
 // isSectionWashRGB reports near-neutral cool greys like fixture-31 .section

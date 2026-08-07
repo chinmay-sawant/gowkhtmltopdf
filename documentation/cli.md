@@ -83,7 +83,8 @@ Custom: `--replace name value`.
 - Multi-page tables with `<thead>` / `table-header-group` **repeat** the header
   row(s) on continuation pages (fixture-23).
 - `position: sticky` clamps to the page content box (print scrollport) within
-  the containing block (fixture-31). Inside `overflow: auto|scroll|hidden|clip`,
+  the containing block without fixed-style continuation-page clones (fixture-31).
+  Inside `overflow: auto|scroll|hidden|clip`,
   that box is the sticky scrollport at scroll offset 0 (PDF has no user scroll;
   no page-edge clones for overflow-contained sticky).
 - `--zoom` scales layout (forwarded to the layout engine).
