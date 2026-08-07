@@ -47,10 +47,13 @@ func setForKey[T any](t *T, tables keyTable[T], known map[string]struct{}, ignor
 	if f, ok := tables[key]; ok {
 		return f.apply(t, value)
 	}
+
 	if _, ok := known[key]; ok {
 		storeIgnored(ignored, key, value)
+
 		return nil
 	}
+
 	return fmt.Errorf("unknown %s setting %q", kind, name)
 }
 
@@ -61,11 +64,13 @@ func getForKey[T any](t *T, tables keyTable[T], ignored *map[string]string, name
 	if f, ok := tables[key]; ok {
 		return f.get(t)
 	}
+
 	if *ignored != nil {
 		if v, ok := (*ignored)[key]; ok {
 			return v, true
 		}
 	}
+
 	return "", false
 }
 
@@ -133,6 +138,7 @@ func storeIgnored(dst *map[string]string, key, value string) {
 	if *dst == nil {
 		*dst = make(map[string]string)
 	}
+
 	(*dst)[key] = value
 }
 
@@ -145,11 +151,14 @@ func setBool(t *bool) setter {
 		switch strings.ToLower(raw) {
 		case "", "true", "1", "yes", "on":
 			*t = true
+
 			return nil
 		case "false", "0", "no", "off":
 			*t = false
+
 			return nil
 		}
+
 		return fmt.Errorf("invalid boolean %q", raw)
 	}
 }
@@ -160,7 +169,9 @@ func setFloat(t *float64) setter {
 		if err != nil {
 			return fmt.Errorf("invalid number %q", raw)
 		}
+
 		*t = v
+
 		return nil
 	}
 }
@@ -171,7 +182,9 @@ func setInt(t *int) setter {
 		if err != nil {
 			return fmt.Errorf("invalid integer %q", raw)
 		}
+
 		*t = v
+
 		return nil
 	}
 }
@@ -179,6 +192,7 @@ func setInt(t *int) setter {
 func setString(t *string) setter {
 	return func(raw string) error {
 		*t = raw
+
 		return nil
 	}
 }
@@ -186,6 +200,7 @@ func setString(t *string) setter {
 func setStringDefault(t *string) setter {
 	return func(raw string) error {
 		*t = strings.TrimSpace(raw)
+
 		return nil
 	}
 }
@@ -196,7 +211,9 @@ func setOrientation(o *Orientation) setter {
 		if err != nil {
 			return err
 		}
+
 		*o = v
+
 		return nil
 	}
 }
@@ -207,7 +224,9 @@ func setLoadErrorHandling(h *LoadErrorHandling) setter {
 		if err != nil {
 			return err
 		}
+
 		*h = v
+
 		return nil
 	}
 }
@@ -217,14 +236,18 @@ func setMediaType(m *MediaType) setter {
 		switch normalize(raw) {
 		case "", "ignore":
 			*m = MediaIgnore
+
 			return nil
 		case "screen":
 			*m = MediaScreen
+
 			return nil
 		case "print":
 			*m = MediaPrint
+
 			return nil
 		}
+
 		return fmt.Errorf("invalid media type %q", raw)
 	}
 }
@@ -236,7 +259,9 @@ func setGrayscaleFromColorMode(g *bool) setter {
 		if err != nil {
 			return err
 		}
+
 		*g = m == ColorModeGrayscale
+
 		return nil
 	}
 }
@@ -248,10 +273,12 @@ func marginSetter(m *Margin, edge string) setter {
 		if err != nil {
 			return err
 		}
+
 		mm, ok := u.Mm()
 		if !ok {
 			return fmt.Errorf("margin %s: unit %q not convertible", edge, u.Unit)
 		}
+
 		switch edge {
 		case "top":
 			m.Top = mm
@@ -262,6 +289,7 @@ func marginSetter(m *Margin, edge string) setter {
 		case "right":
 			m.Right = mm
 		}
+
 		return nil
 	}
 }
@@ -269,6 +297,7 @@ func marginSetter(m *Margin, edge string) setter {
 func appendString(dst *[]string) setter {
 	return func(raw string) error {
 		*dst = append(*dst, raw)
+
 		return nil
 	}
 }
@@ -294,6 +323,7 @@ func subTable[S any](entries []subEntry[S]) map[string]field[S] {
 	for _, e := range entries {
 		m[e.name] = field[S]{apply: e.apply, get: e.get}
 	}
+
 	return m
 }
 
@@ -313,6 +343,7 @@ func init() {
 			if x.Grayscale {
 				return "grayscale", true
 			}
+
 			return "color", true
 		},
 	)
@@ -404,6 +435,7 @@ func init() {
 			func(x *PdfGlobal, raw string) error { return marginSetter(&x.Margin, edge)(raw) },
 			func(x *PdfGlobal) (string, bool) {
 				var v float64
+
 				switch edge {
 				case "top":
 					v = x.Margin.Top
@@ -414,6 +446,7 @@ func init() {
 				case "right":
 					v = x.Margin.Right
 				}
+
 				return fmtFloat(v), true
 			},
 		)
@@ -424,12 +457,14 @@ func init() {
 			v := strings.TrimSpace(raw)
 			x.PageSize = v
 			x.Size.PageSize = v
+
 			return nil
 		},
 		func(x *PdfGlobal) (string, bool) {
 			if x.PageSize != "" {
 				return x.PageSize, true
 			}
+
 			return x.Size.PageSize, true
 		},
 	)
@@ -439,11 +474,14 @@ func init() {
 			if err != nil {
 				return err
 			}
+
 			mm, ok := u.Mm()
 			if !ok {
 				return fmt.Errorf("size.width: unit %q not convertible", u.Unit)
 			}
+
 			x.Size.Width = mm
+
 			return nil
 		},
 		func(x *PdfGlobal) (string, bool) { return fmtFloat(x.Size.Width), true },
@@ -454,11 +492,14 @@ func init() {
 			if err != nil {
 				return err
 			}
+
 			mm, ok := u.Mm()
 			if !ok {
 				return fmt.Errorf("size.height: unit %q not convertible", u.Unit)
 			}
+
 			x.Size.Height = mm
+
 			return nil
 		},
 		func(x *PdfGlobal) (string, bool) { return fmtFloat(x.Size.Height), true },
@@ -481,6 +522,7 @@ func init() {
 		objectKeys["header."+key] = field[PdfObject]{
 			apply: func(o *PdfObject, raw string) error {
 				o.HeaderSet = true
+
 				return d.apply(&o.Header, raw)
 			},
 			get: func(o *PdfObject) (string, bool) { return d.get(&o.Header) },
@@ -488,6 +530,7 @@ func init() {
 		objectKeys["footer."+key] = field[PdfObject]{
 			apply: func(o *PdfObject, raw string) error {
 				o.FooterSet = true
+
 				return d.apply(&o.Footer, raw)
 			},
 			get: func(o *PdfObject) (string, bool) { return d.get(&o.Footer) },

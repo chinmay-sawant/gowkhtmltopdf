@@ -5,7 +5,7 @@ package app
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"io"
 	"os"
 
@@ -18,15 +18,18 @@ import (
 // and optional outline sinks explicitly.
 func BuildPDFRequest(cmd *cli.Command, output, outline io.Writer) (*convert.Request, error) {
 	if cmd == nil {
-		return nil, fmt.Errorf("app: nil command")
+		return nil, errors.New("app: nil command")
 	}
+
 	req := convert.NewPDFRequest(cmd.Global, cmd.Objects, output, outline)
 	if cmd.DumpOutline {
 		req.Global.DumpOutline = true
 	}
+
 	if err := req.Validate(); err != nil {
 		return nil, err
 	}
+
 	return req, nil
 }
 
@@ -35,22 +38,27 @@ func BuildPDFRequest(cmd *cli.Command, output, outline io.Writer) (*convert.Requ
 // writers and never reaches into process-global stdout.
 func RunPDF(ctx context.Context, cmd *cli.Command, log io.Writer, progress func(string, int)) error {
 	if cmd == nil {
-		return fmt.Errorf("app: nil command")
+		return errors.New("app: nil command")
 	}
+
 	out, closeOut, err := cmd.OpenOutput()
 	if err != nil {
 		return err
 	}
+
 	outline := io.Writer(nil)
 	if cmd.DumpOutline || cmd.Global.DumpOutline {
 		outline = os.Stdout
 	}
+
 	req, err := BuildPDFRequest(cmd, out, outline)
 	if err == nil {
 		err = convert.Run(ctx, req, log, progress)
 	}
+
 	if closeErr := closeOut(); closeErr != nil && err == nil {
 		err = closeErr
 	}
+
 	return err
 }

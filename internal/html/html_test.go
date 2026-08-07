@@ -8,19 +8,23 @@ import (
 
 func mustParse(t *testing.T, src string) *Node {
 	t.Helper()
+
 	root, err := Parse(src)
 	if err != nil {
 		t.Fatalf("Parse(%q) returned error: %v", src, err)
 	}
+
 	return root
 }
 
 // treeString renders the tree for failure messages.
 func treeString(n *Node) string {
 	var b strings.Builder
+
 	var rec func(*Node, int)
 	rec = func(n *Node, d int) {
 		b.WriteString(strings.Repeat("  ", d))
+
 		switch n.Type {
 		case ElementNode:
 			fmt.Fprintf(&b, "<%s>", n.Name)
@@ -31,27 +35,35 @@ func treeString(n *Node) string {
 		case DoctypeNode:
 			fmt.Fprintf(&b, "<!%s>", n.Text)
 		}
+
 		b.WriteByte('\n')
+
 		for _, c := range n.Children {
 			rec(c, d+1)
 		}
 	}
 	rec(n, 0)
+
 	return b.String()
 }
 
 func assertChildren(t *testing.T, n *Node, names ...string) {
 	t.Helper()
+
 	var got []*Node
+
 	for _, c := range n.Children {
 		if c.Type == ElementNode {
 			got = append(got, c)
 		}
 	}
+
 	if len(got) != len(names) {
 		t.Errorf("children of <%s>: got %d elements, want %d\n%s", n.Name, len(got), len(names), treeString(n))
+
 		return
 	}
+
 	for i, want := range names {
 		if got[i].Name != want {
 			t.Errorf("child %d of <%s>: got <%s>, want <%s>\n%s", i, n.Name, got[i].Name, want, treeString(n))
@@ -66,17 +78,21 @@ func TestTokenizeAttributes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if len(toks) != 1 {
 		t.Fatalf("got %d tokens, want 1: %+v", len(toks), toks)
 	}
+
 	got := toks[0]
 	if got.kind != tokStart || got.data != "p" {
 		t.Fatalf("token = %+v, want start <p>", got)
 	}
+
 	want := []string{"id", "a1", "class", "b2", "data-x", "unquoted", "hidden", "", "checked", "yes"}
 	if len(got.attrs) != len(want) {
 		t.Fatalf("attrs = %v, want %v", got.attrs, want)
 	}
+
 	for i := range want {
 		if got.attrs[i] != want[i] {
 			t.Fatalf("attr %d = %q, want %q", i, got.attrs[i], want[i])
@@ -89,14 +105,18 @@ func TestTokenizeWhitespaceAroundEquals(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if len(toks) != 1 {
 		t.Fatalf("got %d tokens, want 1: %+v", len(toks), toks)
 	}
+
 	attrs := toks[0].attrs
 	want := []string{"a", "x", "b", "y"}
+
 	if len(attrs) != len(want) {
 		t.Fatalf("attrs = %v, want %v", attrs, want)
 	}
+
 	for i := range want {
 		if attrs[i] != want[i] {
 			t.Fatalf("attr %d = %q, want %q", i, attrs[i], want[i])
@@ -109,14 +129,18 @@ func TestTokenizeGreaterThanInQuotedValue(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if len(toks) != 3 {
 		t.Fatalf("got %d tokens, want 3: %+v", len(toks), toks)
 	}
+
 	attrs := toks[0].attrs
 	want := []string{"title", "a > b", "data-x", "1>0"}
+
 	if len(attrs) != len(want) {
 		t.Fatalf("attrs = %v, want %v", attrs, want)
 	}
+
 	for i := range want {
 		if attrs[i] != want[i] {
 			t.Fatalf("attr %d = %q, want %q", i, attrs[i], want[i])
@@ -129,21 +153,27 @@ func TestTokenizeComments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if len(toks) != 5 {
 		t.Fatalf("got %d tokens, want 5: %+v", len(toks), toks)
 	}
+
 	if toks[0].kind != tokText || toks[0].data != "a" {
 		t.Errorf("token 0 = %+v", toks[0])
 	}
+
 	if toks[1].kind != tokComment || toks[1].data != " hello " {
 		t.Errorf("token 1 = %+v", toks[1])
 	}
+
 	if toks[2].kind != tokText || toks[2].data != "b" {
 		t.Errorf("token 2 = %+v", toks[2])
 	}
+
 	if toks[3].kind != tokComment || toks[3].data != "" {
 		t.Errorf("token 3 = %+v", toks[3])
 	}
+
 	if toks[4].kind != tokText || toks[4].data != "c" {
 		t.Errorf("token 4 = %+v", toks[4])
 	}
@@ -154,12 +184,15 @@ func TestTokenizeDoctype(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if len(toks) != 4 {
 		t.Fatalf("got %d tokens, want 4: %+v", len(toks), toks)
 	}
+
 	if toks[0].kind != tokDoctype || toks[0].data != "DOCTYPE html" {
 		t.Errorf("token 0 = %+v", toks[0])
 	}
+
 	for i, wantKind := range []tokenKind{tokDoctype, tokStart, tokText, tokEnd} {
 		if toks[i].kind != wantKind {
 			t.Errorf("token %d kind = %v, want %v", i, toks[i].kind, wantKind)
@@ -170,6 +203,7 @@ func TestTokenizeDoctype(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if len(toks) != 2 || toks[0].kind != tokDoctype {
 		t.Fatalf("mixed-case doctype = %+v, want doctype token", toks)
 	}
@@ -180,9 +214,11 @@ func TestTokenizeDeclarationsAndPI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if len(toks) != 3 {
 		t.Fatalf("got %d tokens, want 3: %+v", len(toks), toks)
 	}
+
 	for i, wantKind := range []tokenKind{tokStart, tokText, tokEnd} {
 		if toks[i].kind != wantKind {
 			t.Errorf("token %d kind = %v, want %v", i, toks[i].kind, wantKind)
@@ -208,12 +244,15 @@ func TestTokenizeRawText(t *testing.T) {
 		if err != nil {
 			t.Fatalf("tokenize(%q): %v", tc.src, err)
 		}
+
 		var content string
+
 		for _, tk := range toks {
 			if tk.kind == tokText {
 				content += tk.data
 			}
 		}
+
 		if content != tc.content {
 			t.Errorf("tokenize(%q): raw text = %q, want %q (tokens %+v)", tc.src, content, tc.content, toks)
 		}
@@ -225,12 +264,15 @@ func TestTokenizeRawTextClosesOnlyRealEndTag(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	var text string
+
 	for _, tk := range toks {
 		if tk.kind == tokText {
 			text += tk.data
 		}
 	}
+
 	if text != "a</scriptx>b" {
 		t.Errorf("raw text = %q, want %q (tokens %+v)", text, "a</scriptx>b", toks)
 	}
@@ -251,13 +293,17 @@ func TestTokenizeBareLessThanIsText(t *testing.T) {
 		if err != nil {
 			t.Fatalf("tokenize(%q): %v", tc.src, err)
 		}
+
 		var text string
+
 		for _, tk := range toks {
 			if tk.kind != tokText {
 				t.Fatalf("tokenize(%q): unexpected non-text token %+v", tc.src, tk)
 			}
+
 			text += tk.data
 		}
+
 		if text != tc.want {
 			t.Errorf("tokenize(%q) = %q, want %q", tc.src, text, tc.want)
 		}
@@ -291,13 +337,16 @@ func TestTokenizeUnterminated(t *testing.T) {
 func TestUnescapeEntitiesInText(t *testing.T) {
 	root := mustParse(t, `<html><body><h2>Docs &amp; forms</h2><p>a &lt; b &#38; c</p></body></html>`)
 	body := root.FirstChild("body")
+
 	if body == nil {
 		body = root.FirstChild("html").FirstChild("body")
 	}
+
 	h2 := body.FirstChild("h2")
 	if h2 == nil || h2.TextContent() != "Docs & forms" {
 		t.Fatalf("h2 text = %q, want Docs & forms", h2.TextContent())
 	}
+
 	p := body.FirstChild("p")
 	if p == nil || p.TextContent() != "a < b & c" {
 		t.Fatalf("p text = %q", p.TextContent())
@@ -307,13 +356,16 @@ func TestUnescapeEntitiesInText(t *testing.T) {
 func TestParseNesting(t *testing.T) {
 	root := mustParse(t, `<html><head><title>t</title></head><body><div><p>hi</p></div></body></html>`)
 	html := root.FirstChild("html")
+
 	if html == nil {
 		t.Fatalf("no <html>:\n%s", treeString(root))
 	}
+
 	assertChildren(t, html, "head", "body")
 	assertChildren(t, html.FirstChild("head"), "title")
 	assertChildren(t, html.FirstChild("body"), "div")
 	assertChildren(t, html.FirstChild("body").FirstChild("div"), "p")
+
 	if got := html.FirstChild("body").TextContent(); got != "hi" {
 		t.Errorf("TextContent = %q, want %q", got, "hi")
 	}
@@ -321,12 +373,14 @@ func TestParseNesting(t *testing.T) {
 
 func TestParseParentPointers(t *testing.T) {
 	root := mustParse(t, `<html><body><div>x</div><p>y</p></body></html>`)
+
 	var walk func(*Node)
 	walk = func(n *Node) {
 		for _, c := range n.Children {
 			if c.Parent != n {
 				t.Errorf("Parent of %s = %v, want %s", c.Name, c.Parent, n.Name)
 			}
+
 			walk(c)
 		}
 	}
@@ -336,6 +390,7 @@ func TestParseParentPointers(t *testing.T) {
 func TestParseVoidElements(t *testing.T) {
 	root := mustParse(t, `<p>a<br>x<img src="y.png" alt="y"><input type="text" disabled><hr></p>`)
 	p := root.FirstChild("p")
+
 	if p == nil {
 		t.Fatalf("no <p>:\n%s", treeString(root))
 	}
@@ -343,14 +398,18 @@ func TestParseVoidElements(t *testing.T) {
 	if len(p.Children) != 6 {
 		t.Fatalf("<p> has %d children, want 6:\n%s", len(p.Children), treeString(p))
 	}
+
 	assertChildren(t, p, "br", "img", "input", "hr")
+
 	if got := p.TextContent(); got != "ax" {
 		t.Errorf("TextContent = %q, want %q", got, "ax")
 	}
+
 	img := p.FirstChild("img")
 	if img.Attribute("src") != "y.png" || img.Attribute("alt") != "y" {
 		t.Errorf("img attrs = %v", img.Attrs)
 	}
+
 	if len(img.Children) != 0 {
 		t.Errorf("void <img> has children:\n%s", treeString(img))
 	}
@@ -369,6 +428,7 @@ func TestParseAutoCloseTable(t *testing.T) {
 	assertChildren(t, table, "tr", "tr")
 	assertChildren(t, table.Children[0], "td")
 	assertChildren(t, table.Children[1], "td")
+
 	if got := table.TextContent(); got != "ab" {
 		t.Errorf("TextContent = %q, want %q", got, "ab")
 	}
@@ -383,6 +443,7 @@ func TestParseAutoCloseP(t *testing.T) {
 	root := mustParse(t, `<div><p>a<p>b</div>`)
 	div := root.FirstChild("div")
 	assertChildren(t, div, "p", "p")
+
 	if got := div.TextContent(); got != "ab" {
 		t.Errorf("TextContent = %q, want %q", got, "ab")
 	}
@@ -420,10 +481,13 @@ func TestParseHtmlHeadBodyMerge(t *testing.T) {
 	// second <head> merges into the existing one at the same level
 	root := mustParse(t, `<html><head>a</head><head>b</head></html>`)
 	html := root.FirstChild("html")
+
 	if html == nil {
 		t.Fatalf("no <html>:\n%s", treeString(root))
 	}
+
 	assertChildren(t, html, "head")
+
 	if got := html.TextContent(); got != "ab" {
 		t.Errorf("TextContent = %q, want %q", got, "ab")
 	}
@@ -431,6 +495,7 @@ func TestParseHtmlHeadBodyMerge(t *testing.T) {
 	// second <body> merges into the existing one at the same level
 	root = mustParse(t, `<body>x</body><body>y</body>`)
 	assertChildren(t, root, "body")
+
 	if got := root.TextContent(); got != "xy" {
 		t.Errorf("TextContent = %q, want %q", got, "xy")
 	}
@@ -438,6 +503,7 @@ func TestParseHtmlHeadBodyMerge(t *testing.T) {
 	// second <html> merges into the existing one
 	root = mustParse(t, `<html>a</html><html>b</html>`)
 	assertChildren(t, root, "html")
+
 	if got := root.TextContent(); got != "ab" {
 		t.Errorf("TextContent = %q, want %q", got, "ab")
 	}
@@ -445,6 +511,7 @@ func TestParseHtmlHeadBodyMerge(t *testing.T) {
 	// nested duplicate <body> is dropped, not nested and not closed
 	root = mustParse(t, `<body><body>z</body>`)
 	assertChildren(t, root, "body")
+
 	if got := root.TextContent(); got != "z" {
 		t.Errorf("TextContent = %q, want %q", got, "z")
 	}
@@ -453,6 +520,7 @@ func TestParseHtmlHeadBodyMerge(t *testing.T) {
 	root = mustParse(t, `<html><body>x<body>y</html>`)
 	html = root.FirstChild("html")
 	assertChildren(t, html, "body")
+
 	if got := html.TextContent(); got != "xy" {
 		t.Errorf("TextContent = %q, want %q", got, "xy")
 	}
@@ -474,6 +542,7 @@ func TestParseTextMerging(t *testing.T) {
 	if len(root.Children) != 1 {
 		t.Fatalf("root has %d children, want 1:\n%s", len(root.Children), treeString(root))
 	}
+
 	txt := root.Children[0]
 	if txt.Type != TextNode || txt.Text != "1 < 2" {
 		t.Errorf("child = %+v, want single TextNode \"1 < 2\"", txt)
@@ -484,15 +553,18 @@ func TestParseTextMerging(t *testing.T) {
 	if len(root.Children) != 3 {
 		t.Fatalf("root has %d children, want 3:\n%s", len(root.Children), treeString(root))
 	}
+
 	if root.Children[0].Type != TextNode || root.Children[0].Text != "a" {
 		t.Errorf("child 0 = %+v", root.Children[0])
 	}
+
 	if root.Children[2].Type != TextNode || root.Children[2].Text != "b" {
 		t.Errorf("child 2 = %+v", root.Children[2])
 	}
 
 	// bare '<' sequences inside an element merge
 	root = mustParse(t, `<p>x <3>y</p>`)
+
 	p := root.FirstChild("p")
 	if len(p.Children) != 1 || p.Children[0].Type != TextNode || p.Children[0].Text != "x <3>y" {
 		t.Fatalf("p children = %+v, want one TextNode \"x <3>y\"\n%s", p.Children, treeString(p))
@@ -501,6 +573,7 @@ func TestParseTextMerging(t *testing.T) {
 
 func TestParseAttrDuplicates(t *testing.T) {
 	root := mustParse(t, `<div ID="a" class="b" data-x="1" hidden id="dup">x</div>`)
+
 	div := root.FirstChild("div")
 	if len(div.Attrs) != 4 {
 		t.Errorf("Attrs = %v, want 4 entries", div.Attrs)
@@ -513,9 +586,11 @@ func TestParseAttrDuplicates(t *testing.T) {
 	if div.Attribute("ID") != "a" || div.Attribute("Class") != "b" {
 		t.Errorf("case-sensitive lookup failed: %v", div.Attrs)
 	}
+
 	if div.Attribute("hidden") != "" {
 		t.Errorf("boolean attr hidden = %q, want \"\"", div.Attribute("hidden"))
 	}
+
 	if div.Attribute("data-x") != "1" {
 		t.Errorf("data-x = %q, want %q", div.Attribute("data-x"), "1")
 	}
@@ -524,6 +599,7 @@ func TestParseAttrDuplicates(t *testing.T) {
 func TestParseSelfClosing(t *testing.T) {
 	root := mustParse(t, `<div/><span>x</span>`)
 	assertChildren(t, root, "div", "span")
+
 	div := root.FirstChild("div")
 	if len(div.Children) != 0 {
 		t.Errorf("self-closing <div/> has children:\n%s", treeString(div))
@@ -532,6 +608,7 @@ func TestParseSelfClosing(t *testing.T) {
 	// self-closing raw-text element takes no raw content
 	root = mustParse(t, `<script src="x.js"/>ok`)
 	assertChildren(t, root, "script")
+
 	if got := root.TextContent(); got != "ok" {
 		t.Errorf("TextContent = %q, want %q", got, "ok")
 	}
@@ -542,16 +619,20 @@ func TestParseCommentsAndDoctype(t *testing.T) {
 	if len(root.Children) != 2 {
 		t.Fatalf("root has %d children, want 2:\n%s", len(root.Children), treeString(root))
 	}
+
 	if root.Children[0].Type != DoctypeNode || root.Children[0].Text != "DOCTYPE html" {
 		t.Errorf("child 0 = %+v", root.Children[0])
 	}
+
 	body := root.FirstChild("html").FirstChild("body")
 	if len(body.Children) != 2 {
 		t.Fatalf("body has %d children, want 2:\n%s", len(body.Children), treeString(body))
 	}
+
 	if body.Children[0].Type != CommentNode || body.Children[0].Text != " hello " {
 		t.Errorf("child 0 = %+v", body.Children[0])
 	}
+
 	if body.Children[1].Type != TextNode || body.Children[1].Text != "x" {
 		t.Errorf("child 1 = %+v", body.Children[1])
 	}
@@ -560,13 +641,17 @@ func TestParseCommentsAndDoctype(t *testing.T) {
 func TestParseRawTextTree(t *testing.T) {
 	root := mustParse(t, `<script>if (a < b) { f(); }</script><p>ok</p>`)
 	script := root.FirstChild("script")
+
 	if len(script.Children) != 1 || script.Children[0].Type != TextNode {
 		t.Fatalf("script children = %+v, want one TextNode\n%s", script.Children, treeString(root))
 	}
+
 	if script.Children[0].Text != "if (a < b) { f(); }" {
 		t.Errorf("script text = %q", script.Children[0].Text)
 	}
+
 	assertChildren(t, root, "script", "p")
+
 	if got := root.TextContent(); got != "if (a < b) { f(); }ok" {
 		t.Errorf("TextContent = %q", got)
 	}
@@ -593,6 +678,7 @@ func TestParseMalformed(t *testing.T) {
 				for _, c := range root.Children {
 					if c.Type == ElementNode {
 						t.Errorf("stray end tag produced element:\n%s", treeString(root))
+
 						return
 					}
 				}
@@ -677,16 +763,20 @@ func TestParseUsableTreeNoPanic(t *testing.T) {
 
 func TestWalkPreOrder(t *testing.T) {
 	root := mustParse(t, `<html><head><title>t</title></head><body><h1>x</h1><p>y</p></body></html>`)
+
 	var names []string
+
 	root.Walk(func(n *Node) {
 		if n.Type == ElementNode {
 			names = append(names, n.Name)
 		}
 	})
+
 	want := []string{"#document", "html", "head", "title", "body", "h1", "p"}
 	if len(names) != len(want) {
 		t.Fatalf("walk order = %v, want %v", names, want)
 	}
+
 	for i := range want {
 		if names[i] != want[i] {
 			t.Fatalf("walk order = %v, want %v", names, want)
@@ -699,9 +789,11 @@ func TestTextContentOf(t *testing.T) {
 	if got := root.TextContentOf("title"); got != "One" {
 		t.Errorf("TextContentOf(title) = %q, want %q", got, "One")
 	}
+
 	if got := root.TextContentOf("section"); got != "" {
 		t.Errorf("TextContentOf(section) = %q, want %q", got, "")
 	}
+
 	if got := root.TextContentOf("p"); got != "body text" {
 		t.Errorf("TextContentOf(p) = %q, want %q", got, "body text")
 	}
@@ -714,6 +806,7 @@ func TestParseDocument(t *testing.T) {
 		if err != nil {
 			t.Fatalf("ParseDocument: %v", err)
 		}
+
 		if root.FirstChild("html") == nil {
 			t.Errorf("ParseDocument(%q): no html element", body[:4])
 		}

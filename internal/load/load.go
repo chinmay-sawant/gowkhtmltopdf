@@ -73,6 +73,7 @@ func (l *Loader) ForResource(res *Resource, lp settings.LoadPage) ResourceContex
 	if res != nil {
 		base = res.Base
 	}
+
 	return ResourceContext{loader: l, base: base, lp: lp}
 }
 
@@ -82,6 +83,7 @@ func (c ResourceContext) Fetch(ctx context.Context, ref string) (*Resource, erro
 	if c.loader == nil {
 		return nil, errors.New("nil resource loader")
 	}
+
 	return c.loader.FetchSub(ctx, c.base, ref, c.lp)
 }
 
@@ -103,15 +105,18 @@ func (a *AccessController) Allowed(path string) bool {
 	if abs == "" {
 		return false
 	}
+
 	for _, p := range a.AllowPrefixes {
 		if p == "" {
 			continue
 		}
+
 		ap := resolvePath(p)
 		if abs == ap || strings.HasPrefix(abs, ap+string(filepath.Separator)) {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -122,15 +127,18 @@ func resolvePath(path string) string {
 	if err != nil {
 		return ""
 	}
+
 	if resolved, err := filepath.EvalSymlinks(abs); err == nil {
 		return filepath.Clean(resolved)
 	}
+
 	return filepath.Clean(abs)
 }
 
 // IsHTML reports whether s looks like inline HTML rather than a URL/path.
 func IsHTML(s string) bool {
 	s = strings.TrimSpace(s)
+
 	return strings.HasPrefix(s, "<") || strings.HasPrefix(s, "\ufeff<")
 }
 
@@ -141,16 +149,20 @@ func GuessURL(input string) (Kind, string, error) {
 	if IsHTML(input) {
 		return KindInline, "inline:" + input, nil
 	}
+
 	lower := strings.ToLower(input)
 	if strings.HasPrefix(lower, "inline:") {
 		return KindInline, input, nil
 	}
+
 	if strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://") {
 		return KindHTTP, input, nil
 	}
+
 	if strings.HasPrefix(lower, "file://") {
 		return KindFile, input, nil
 	}
+
 	if strings.HasPrefix(lower, "data:") {
 		return KindInline, input, nil
 	}
@@ -166,6 +178,7 @@ func GuessURL(input string) (Kind, string, error) {
 		if err == nil {
 			return KindFile, "file://" + filepath.ToSlash(abs), nil
 		}
+
 		return KindFile, "file://" + filepath.ToSlash(input), nil
 	}
 	// default: treat as http URL
@@ -177,7 +190,9 @@ func isHostPort(s string) bool {
 	if err != nil || port == "" {
 		return false
 	}
+
 	_ = host
+
 	return true
 }
 
@@ -214,6 +229,7 @@ func NewLoader(g settings.LoadGlobal) *Loader {
 		EnableLocalFileAccess: g.EnableLocalFileAccess,
 	}
 	l.initClient()
+
 	return l
 }
 
@@ -227,11 +243,13 @@ func (l *Loader) initClient() {
 			KeepAlive: 30 * time.Second,
 		}).DialContext,
 	}
+
 	if l.Global.Proxy != "" {
 		if pu, err := url.Parse(l.Global.Proxy); err == nil {
 			transport.Proxy = http.ProxyURL(pu)
 		}
 	}
+
 	l.Client = &http.Client{
 		Transport: transport,
 		Jar:       jar,
@@ -242,6 +260,7 @@ func (l *Loader) initClient() {
 			if len(via) > l.MaxRedirects {
 				return fmt.Errorf("stopped after %d redirects", l.MaxRedirects)
 			}
+
 			return nil
 		},
 	}
@@ -256,6 +275,7 @@ func (l *Loader) Load(ctx context.Context, input string, lp settings.LoadPage) (
 		if err := checkBodyLimit("inline HTML", len(lp.InlineHTML), l.MaxBodySize); err != nil {
 			return nil, err
 		}
+
 		res := &Resource{
 			Kind:        KindInline,
 			URL:         "inline:",
@@ -263,24 +283,31 @@ func (l *Loader) Load(ctx context.Context, input string, lp settings.LoadPage) (
 			Body:        lp.InlineHTML,
 			ContentType: "text/html",
 		}
+
 		return res, checkDocumentCharset(res)
 	}
+
 	kind, target, err := GuessURL(input)
 	if err != nil {
 		return nil, err
 	}
+
 	var res *Resource
+
 	switch kind {
 	case KindInline:
 		if strings.HasPrefix(target, "inline:") {
 			res = &Resource{Kind: KindInline, URL: "inline:", Body: []byte(target[len("inline:"):]), ContentType: "text/html"}
 		} else if strings.HasPrefix(target, "data:") {
 			var body []byte
+
 			var ctype string
+
 			body, ctype, err = decodeDataURLLimited(target, l.MaxBodySize)
 			if err != nil {
 				return nil, err
 			}
+
 			res = &Resource{Kind: KindInline, URL: target, Body: body, ContentType: ctype}
 		}
 	case KindFile:
@@ -288,15 +315,19 @@ func (l *Loader) Load(ctx context.Context, input string, lp settings.LoadPage) (
 	case KindHTTP:
 		res, err = l.loadHTTP(ctx, target, lp)
 	}
+
 	if err != nil {
 		return nil, err
 	}
+
 	if res == nil {
 		return nil, fmt.Errorf("cannot load %q", input)
 	}
+
 	if !res.Skip {
 		return res, checkDocumentCharset(res)
 	}
+
 	return res, nil
 }
 
@@ -311,9 +342,11 @@ func checkDocumentCharset(res *Resource) error {
 	if cs == "" {
 		cs = metaCharset(res.Body)
 	}
+
 	if cs == "" || charsetSupported(cs) {
 		return nil
 	}
+
 	return fmt.Errorf("unsupported charset: %s (only UTF-8/ASCII)", cs)
 }
 
@@ -324,6 +357,7 @@ func charsetSupported(cs string) bool {
 	case "utf-8", "utf8", "us-ascii", "ascii":
 		return true
 	}
+
 	return false
 }
 
@@ -333,10 +367,12 @@ func charsetFromContentType(ct string) string {
 	if ct == "" {
 		return ""
 	}
+
 	_, params, err := mime.ParseMediaType(ct)
 	if err != nil {
 		return ""
 	}
+
 	return params["charset"]
 }
 
@@ -348,19 +384,24 @@ func metaCharset(body []byte) string {
 	if len(s) > 1024 {
 		s = s[:1024]
 	}
+
 	low := strings.ToLower(s)
+
 	for {
 		i := strings.Index(low, "<meta")
 		if i < 0 {
 			return ""
 		}
+
 		j := strings.IndexByte(s[i:], '>')
 		if j < 0 {
 			return ""
 		}
+
 		if cs := metaTagCharset(s[i : i+j]); cs != "" {
 			return cs
 		}
+
 		s = s[i+j+1:]
 		low = strings.ToLower(s)
 	}
@@ -375,9 +416,11 @@ func metaTagCharset(tag string) string {
 			return cs
 		}
 	}
+
 	if cs := attrValue(tag, "charset"); cs != "" {
 		return cs
 	}
+
 	return ""
 }
 
@@ -385,14 +428,17 @@ func metaTagCharset(tag string) string {
 // attribute value (e.g. "text/html; charset=windows-1252").
 func charsetInContent(content string) string {
 	low := strings.ToLower(content)
+
 	i := strings.Index(low, "charset")
 	if i < 0 {
 		return ""
 	}
+
 	rest := strings.TrimLeft(content[i+len("charset"):], " \t\n\r\f")
 	if !strings.HasPrefix(rest, "=") {
 		return ""
 	}
+
 	return strings.Trim(strings.TrimLeft(rest[1:], " \t\n\r\f"), "\"' ;")
 }
 
@@ -401,40 +447,50 @@ func charsetInContent(content string) string {
 func attrValue(tag, name string) string {
 	low := strings.ToLower(tag)
 	needle := strings.ToLower(name)
+
 	for {
 		i := strings.Index(low, needle)
 		if i < 0 {
 			return ""
 		}
+
 		if i > 0 {
 			c := tag[i-1]
 			if c != ' ' && c != '\t' && c != '\n' && c != '\r' && c != '\f' {
 				tag = tag[i+len(needle):]
 				low = low[i+len(needle):]
+
 				continue
 			}
 		}
+
 		rest := strings.TrimLeft(tag[i+len(needle):], " \t\n\r\f")
 		if !strings.HasPrefix(rest, "=") {
 			tag = tag[i+len(needle):]
 			low = low[i+len(needle):]
+
 			continue
 		}
+
 		rest = strings.TrimLeft(rest[1:], " \t\n\r\f")
 		if rest == "" {
 			return ""
 		}
+
 		if rest[0] == '"' || rest[0] == '\'' {
 			q := rest[0]
 			if k := strings.IndexByte(rest[1:], q); k >= 0 {
 				return rest[1 : k+1]
 			}
+
 			return ""
 		}
+
 		k := 0
 		for k < len(rest) && !isMetaWhitespace(rest[k]) {
 			k++
 		}
+
 		return rest[:k]
 	}
 }
@@ -448,6 +504,7 @@ func (l *Loader) loadFile(ctx context.Context, path string, lp settings.LoadPage
 	if err != nil {
 		return nil, err
 	}
+
 	if !l.fileAccessAllowed(p, lp) {
 		return nil, fmt.Errorf("%w: %s", ErrAccessDenied, p)
 	}
@@ -457,14 +514,18 @@ func (l *Loader) loadFile(ctx context.Context, path string, lp settings.LoadPage
 	if err != nil {
 		return nil, err
 	}
+
 	defer f.Close()
+
 	b, err := io.ReadAll(io.LimitReader(f, l.MaxBodySize+1))
 	if err != nil {
 		return nil, err
 	}
+
 	if int64(len(b)) > l.MaxBodySize {
 		return nil, fmt.Errorf("file %s exceeds max body size %d", p, l.MaxBodySize)
 	}
+
 	return &Resource{
 		Kind:        KindFile,
 		URL:         "file://" + filepath.ToSlash(filepath.Clean(p)),
@@ -483,12 +544,15 @@ func filePathFromURL(path string) (string, error) {
 	if err != nil || u.Scheme != "file" {
 		return path, nil
 	}
+
 	if u.Host != "" && u.Host != "localhost" {
 		return "", fmt.Errorf("blocked file access to %q", path)
 	}
+
 	if u.Path != "" {
 		return u.Path, nil
 	}
+
 	return strings.TrimPrefix(path, "file://"), nil
 }
 
@@ -500,6 +564,7 @@ func (l *Loader) fileAccessAllowed(path string, lp settings.LoadPage) bool {
 	if ctrl.Allowed(path) {
 		return true
 	}
+
 	return l.EnableLocalFileAccess && !lp.BlockLocalFileAccess
 }
 
@@ -508,26 +573,35 @@ func (l *Loader) loadHTTP(ctx context.Context, target string, lp settings.LoadPa
 	if err != nil {
 		return nil, err
 	}
+
 	method := http.MethodGet
+
 	var body io.Reader
+
 	if len(lp.Post) > 0 {
 		method = http.MethodPost
 		body = strings.NewReader(urlEncodePost(lp.Post))
 	}
+
 	req, err := http.NewRequestWithContext(ctx, method, u.String(), body)
 	if err != nil {
 		return nil, err
 	}
+
 	req.Header.Set("User-Agent", "gowkhtmltopdf/0.1 (pure-Go wkhtmltopdf reimplementation)")
+
 	if method == http.MethodPost {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}
+
 	if lp.Username != "" {
 		req.SetBasicAuth(lp.Username, lp.Password)
 	}
+
 	for k, v := range lp.CustomHeaders {
 		req.Header.Set(k, v)
 	}
+
 	for k, v := range lp.Cookies {
 		req.AddCookie(&http.Cookie{Name: k, Value: v})
 	}
@@ -536,6 +610,7 @@ func (l *Loader) loadHTTP(ctx context.Context, target string, lp settings.LoadPa
 	if timeout <= 0 {
 		timeout = DefaultResponseTimeout
 	}
+
 	c := l.Client
 	client := *c
 	client.Timeout = timeout
@@ -566,15 +641,19 @@ func (l *Loader) loadHTTP(ctx context.Context, target string, lp settings.LoadPa
 		return nil, fmt.Errorf("response from %s exceeds max body size %d (Content-Length %d)",
 			u.String(), l.MaxBodySize, resp.ContentLength)
 	}
+
 	b, err := io.ReadAll(io.LimitReader(resp.Body, l.MaxBodySize+1))
 	if err != nil {
 		return nil, err
 	}
+
 	if int64(len(b)) > l.MaxBodySize {
 		return nil, fmt.Errorf("response from %s exceeds max body size %d", u.String(), l.MaxBodySize)
 	}
+
 	ctype := resp.Header.Get("Content-Type")
 	final := resp.Request.URL.String()
+
 	return &Resource{
 		Kind:        KindHTTP,
 		URL:         final,
@@ -591,9 +670,11 @@ func (l *Loader) FetchSub(ctx context.Context, base, ref string, lp settings.Loa
 	if err != nil {
 		return nil, err
 	}
+
 	if !refURL.IsAbs() && base == "" {
 		return nil, fmt.Errorf("cannot resolve relative subresource %q without a document base URL", ref)
 	}
+
 	var abs *url.URL
 	if refURL.IsAbs() {
 		abs = refURL
@@ -602,14 +683,18 @@ func (l *Loader) FetchSub(ctx context.Context, base, ref string, lp settings.Loa
 		if err != nil {
 			return nil, err
 		}
+
 		abs = baseURL.ResolveReference(refURL)
 	}
+
 	switch abs.Scheme {
 	case "file", "":
 		p := abs.Path
+
 		if abs.Host != "" && abs.Host != "localhost" {
 			return nil, fmt.Errorf("blocked file access to %q", abs.String())
 		}
+
 		return l.loadFile(ctx, p, lp)
 	case "http", "https":
 		return l.loadHTTP(ctx, abs.String(), lp)
@@ -618,8 +703,10 @@ func (l *Loader) FetchSub(ctx context.Context, base, ref string, lp settings.Loa
 		if err != nil {
 			return nil, err
 		}
+
 		return &Resource{Kind: KindInline, URL: abs.String(), Body: body, ContentType: ctype}, nil
 	}
+
 	return nil, fmt.Errorf("unsupported subresource scheme %q", abs.Scheme)
 }
 
@@ -628,6 +715,7 @@ func urlEncodePost(items []settings.PostItem) string {
 	for _, it := range items {
 		vals.Add(it.Name, it.Value)
 	}
+
 	return vals.Encode()
 }
 
@@ -640,12 +728,15 @@ func decodeDataURL(s string) ([]byte, string, error) {
 // only for the package-local compatibility helper above.
 func decodeDataURLLimited(s string, max int64) ([]byte, string, error) {
 	rest := strings.TrimPrefix(s, "data:")
+
 	comma := strings.IndexByte(rest, ',')
 	if comma < 0 {
-		return nil, "", fmt.Errorf("malformed data URL")
+		return nil, "", errors.New("malformed data URL")
 	}
+
 	meta, data := rest[:comma], rest[comma+1:]
 	ctype := "text/plain"
+
 	if meta != "" {
 		parts := strings.Split(meta, ";")
 		for _, p := range parts {
@@ -654,17 +745,21 @@ func decodeDataURLLimited(s string, max int64) ([]byte, string, error) {
 				if err != nil {
 					return nil, "", err
 				}
+
 				return dec, ctype, nil
 			}
+
 			if !strings.Contains(p, "=") {
 				ctype = p
 			}
 		}
 	}
+
 	dec, err := unescapeDataLimited(data, max)
 	if err != nil {
 		return nil, "", err
 	}
+
 	return dec, ctype, nil
 }
 
@@ -676,13 +771,16 @@ func decodeBase64Limited(s string, max int64) ([]byte, error) {
 	// Count first so a large amount of whitespace cannot force an equally
 	// large compacted allocation before the body limit is checked.
 	compactLen := 0
-	for i := 0; i < len(s); i++ {
+
+	for i := range len(s) {
 		if s[i] != '\n' && s[i] != '\r' && s[i] != ' ' && s[i] != '\t' {
 			compactLen++
 		}
 	}
+
 	if max >= 0 {
 		decodedLen := base64.StdEncoding.DecodedLen(compactLen)
+
 		if compactLen > 0 && s != "" {
 			// DecodedLen includes the bytes represented by padding. Account for
 			// it so a one-byte data URL is not rejected with a one-byte limit.
@@ -699,24 +797,31 @@ func decodeBase64Limited(s string, max int64) ([]byte, error) {
 				}
 			}
 		}
+
 		if int64(decodedLen) > max {
 			return nil, fmt.Errorf("data URL exceeds max body size %d", max)
 		}
 	}
+
 	var b strings.Builder
+
 	b.Grow(compactLen)
-	for i := 0; i < len(s); i++ {
+
+	for i := range len(s) {
 		if s[i] != '\n' && s[i] != '\r' && s[i] != ' ' && s[i] != '\t' {
 			b.WriteByte(s[i])
 		}
 	}
+
 	dec, err := base64.StdEncoding.DecodeString(b.String())
 	if err != nil {
 		return nil, err
 	}
+
 	if err := checkBodyLimit("data URL", len(dec), max); err != nil {
 		return nil, err
 	}
+
 	return dec, nil
 }
 
@@ -726,23 +831,30 @@ func unescapeDataLimited(s string, max int64) ([]byte, error) {
 		// decoded body shorter, never longer, than the source string.
 		max = int64(len(s))
 	}
+
 	capacity := len(s)
 	if max >= 0 && int64(capacity) > max {
 		capacity = int(max)
 	}
+
 	out := make([]byte, 0, capacity)
+
 	for i := 0; i < len(s); i++ {
 		var b byte
+
 		switch s[i] {
 		case '%':
 			if i+2 >= len(s) {
-				return nil, fmt.Errorf("invalid URL escape in data URL")
+				return nil, errors.New("invalid URL escape in data URL")
 			}
+
 			hi, okHi := fromHex(s[i+1])
 			lo, okLo := fromHex(s[i+2])
+
 			if !okHi || !okLo {
-				return nil, fmt.Errorf("invalid URL escape in data URL")
+				return nil, errors.New("invalid URL escape in data URL")
 			}
+
 			b = hi<<4 | lo
 			i += 2
 		case '+':
@@ -750,11 +862,14 @@ func unescapeDataLimited(s string, max int64) ([]byte, error) {
 		default:
 			b = s[i]
 		}
+
 		if max >= 0 && int64(len(out)) >= max {
 			return nil, fmt.Errorf("data URL exceeds max body size %d", max)
 		}
+
 		out = append(out, b)
 	}
+
 	return out, nil
 }
 
@@ -775,5 +890,6 @@ func checkBodyLimit(source string, length int, max int64) error {
 	if max >= 0 && int64(length) > max {
 		return fmt.Errorf("%s exceeds max body size %d", source, max)
 	}
+
 	return nil
 }

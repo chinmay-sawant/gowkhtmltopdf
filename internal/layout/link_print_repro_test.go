@@ -18,29 +18,37 @@ body { color: #000000; }
 }
 a { text-decoration: none; color: #36c }
 `)
+
 	root, err := html.Parse(`<html><body><p>Hello <a href="/wiki/Cuba">Cuba</a> world</p></body></html>`)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	styles := resolveStyles(root, []*css.Stylesheet{s}, "print", 500, 800)
+
 	var a *html.Node
+
 	var walk func(*html.Node)
 	walk = func(n *html.Node) {
 		if n.Type == html.ElementNode && n.Name == "a" {
 			a = n
 		}
+
 		for _, c := range n.Children {
 			walk(c)
 		}
 	}
 	walk(root)
+
 	if a == nil {
 		t.Fatal("no anchor")
 	}
+
 	st := styles[a]
 	if st.TextDecoration == "underline" {
 		t.Fatalf("decoration=%q: inherit must not force underline without --print-link-underline", st.TextDecoration)
 	}
+
 	res, err := Layout(root, Options{
 		Width: 500, Height: 800, Sheets: []*css.Stylesheet{s},
 		Media: "print", Background: true,
@@ -68,10 +76,12 @@ body { color: #000000; }
 }
 a { text-decoration: none; color: #36c }
 `)
+
 	root, err := html.Parse(`<html><body><p>Hello <a href="/wiki/Cuba">Cuba</a> world</p></body></html>`)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	res, err := Layout(root, Options{
 		Width: 500, Height: 800, Sheets: []*css.Stylesheet{s},
 		Media: "print", Background: true, PrintLinkUnderline: true,
@@ -79,12 +89,15 @@ a { text-decoration: none; color: #36c }
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	foundLine := false
+
 	for _, op := range res.Ops {
 		if op.Kind == OpLine {
 			foundLine = true
 		}
 	}
+
 	if !foundLine {
 		t.Fatal("expected underline OpLine with PrintLinkUnderline")
 	}

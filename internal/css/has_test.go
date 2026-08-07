@@ -8,20 +8,25 @@ import (
 
 func byID(root *html.Node, id string) *html.Node {
 	var found *html.Node
+
 	var walk func(*html.Node)
 	walk = func(n *html.Node) {
 		if found != nil || n == nil {
 			return
 		}
+
 		if n.Type == html.ElementNode && n.Attribute("id") == id {
 			found = n
+
 			return
 		}
+
 		for _, c := range n.Children {
 			walk(c)
 		}
 	}
 	walk(root)
+
 	return found
 }
 
@@ -65,10 +70,12 @@ func TestHasParseAndMatch(t *testing.T) {
 		if !ok {
 			t.Fatalf("parseSelector(%q) failed", tc.sel)
 		}
+
 		n := byID(root, tc.id)
 		if n == nil {
 			t.Fatalf("missing id %q", tc.id)
 		}
+
 		if got := Match(sel, n); got != tc.want {
 			t.Errorf("Match(%q, #%s) = %v, want %v", tc.sel, tc.id, got, tc.want)
 		}
@@ -113,6 +120,7 @@ func TestHasSpecificity(t *testing.T) {
 		if !ok {
 			t.Fatalf("parseSelector(%q) failed", tc.sel)
 		}
+
 		a, b, c := Specificity(sel)
 		if a != tc.a || b != tc.b || c != tc.c {
 			t.Errorf("Specificity(%q) = (%d,%d,%d), want (%d,%d,%d)", tc.sel, a, b, c, tc.a, tc.b, tc.c)
@@ -125,18 +133,22 @@ func TestNotMatch(t *testing.T) {
 	body := root.FirstChild("html").FirstChild("body")
 	note := body.FirstChild("p")
 	plain := note
+
 	for _, c := range body.Children {
 		if c.Type == html.ElementNode && c.Name == "p" && c.Attribute("class") == "" {
 			plain = c
 		}
 	}
+
 	sel, ok := parseSelector("p:not(.note)")
 	if !ok {
 		t.Fatal("parse")
 	}
+
 	if Match(sel, note) {
 		t.Error("p:not(.note) should not match .note")
 	}
+
 	if !Match(sel, plain) {
 		t.Error("p:not(.note) should match plain p")
 	}

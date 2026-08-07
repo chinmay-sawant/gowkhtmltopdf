@@ -20,23 +20,29 @@ td, th { border: 1px solid #999; padding: 2pt; }
 </body></html>`, s)
 
 	var tb *box
+
 	var walk func(b *box)
 	walk = func(b *box) {
 		if b.kind == "table" {
 			tb = b
+
 			return
 		}
+
 		for _, c := range b.children {
 			walk(c)
 		}
 	}
 	walk(res.root)
+
 	if tb == nil {
 		t.Fatal("no table")
 	}
+
 	if len(tb.rows) != 2 {
 		t.Fatalf("rows=%d, want 2 (empty tr stripped)", len(tb.rows))
 	}
+
 	if tb.headerRows != 1 {
 		t.Fatalf("headerRows=%d, want 1 after stripping empty leading tr", tb.headerRows)
 	}
@@ -44,6 +50,7 @@ td, th { border: 1px solid #999; padding: 2pt; }
 	if len(tb.rows[0]) == 0 || tb.rows[0][0].h <= 0 {
 		t.Fatal("header row missing height")
 	}
+
 	hdrH := tb.rows[0][0].h
 	if hdrH > 28 {
 		t.Fatalf("header row h=%.1f, want compact single-line (~<=28pt)", hdrH)
@@ -51,6 +58,7 @@ td, th { border: 1px solid #999; padding: 2pt; }
 
 	// Horizontal grid: top of header, mid, bottom — no extra rule for empty tr.
 	var hlines []float64
+
 	for _, op := range res.Ops {
 		if op.Kind == OpLine && op.H == 0 && op.W > 30 {
 			hlines = append(hlines, op.Y)
@@ -63,9 +71,11 @@ td, th { border: 1px solid #999; padding: 2pt; }
 		// quantize
 		uniq[float64(int(y*10+0.5))/10] = true
 	}
+
 	if len(uniq) < 3 {
 		t.Fatalf("horizontal Y bands=%d, want ≥3 (got %v)", len(uniq), hlines)
 	}
+
 	if len(uniq) > 4 {
 		t.Fatalf("horizontal Y bands=%d, want ≤4 (phantom empty row?) ys=%v", len(uniq), hlines)
 	}
@@ -86,20 +96,25 @@ td, th { border: 1px solid #999; padding: 4pt; }
 </body></html>`, s)
 
 	var tb *box
+
 	var walk func(b *box)
 	walk = func(b *box) {
 		if b.kind == "table" {
 			tb = b
+
 			return
 		}
+
 		for _, c := range b.children {
 			walk(c)
 		}
 	}
 	walk(res.root)
+
 	if tb == nil {
 		t.Fatal("no table")
 	}
+
 	if len(tb.rows) != 2 {
 		t.Fatalf("rows=%d, want 2", len(tb.rows))
 	}
@@ -107,6 +122,7 @@ td, th { border: 1px solid #999; padding: 4pt; }
 	if len(tb.rows[0]) > 0 && tb.rows[0][0].h > 0.5 {
 		t.Fatalf("empty row cell h=%.2f, want ~0 (collapsed)", tb.rows[0][0].h)
 	}
+
 	if len(tb.rows[1]) == 0 || tb.rows[1][0].h < 8 {
 		t.Fatalf("data row missing height")
 	}
@@ -129,21 +145,27 @@ th, td { border: 1px solid #ccc; padding: 2pt; }
 <tr><td>1</td><td>2</td></tr>
 </table>
 </body></html>`, s)
+
 	var tb *box
+
 	var walk func(b *box)
 	walk = func(b *box) {
 		if b.kind == "table" {
 			tb = b
+
 			return
 		}
+
 		for _, c := range b.children {
 			walk(c)
 		}
 	}
 	walk(res.root)
+
 	if tb == nil {
 		t.Fatal("no table")
 	}
+
 	if tb.headerRows != 1 {
 		t.Fatalf("headerRows=%d, want 1", tb.headerRows)
 	}
@@ -162,7 +184,9 @@ td, th { border: 1px solid #999; padding: 2pt; }
 <tr><td>2018</td><td>Song B</td><td>Act</td></tr>
 </table>
 </body></html>`, s)
+
 	var hlines []float64
+
 	for _, op := range res.Ops {
 		if op.Kind == OpLine && op.H == 0 && op.W > 50 {
 			hlines = append(hlines, op.Y)

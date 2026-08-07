@@ -280,28 +280,37 @@ func resolveStylesWithContainersOpts(
 
 func resolveStylesCtx(root *html.Node, ctx *styleContext) map[*html.Node]ResolvedStyle {
 	out := map[*html.Node]ResolvedStyle{}
+
 	var walk func(n *html.Node, parent ResolvedStyle, hasParent bool)
 	walk = func(n *html.Node, parent ResolvedStyle, hasParent bool) {
 		var st ResolvedStyle
+
 		switch n.Type {
 		case html.ElementNode:
 			raw := cascadeRaw(ctx, n)
 			st = initialStyle()
+
 			var parentProps map[string]string
+
 			if hasParent {
 				inheritProps(&st, parent, raw)
 				parentProps = parent.CustomProps
 			}
+
 			st.CustomProps = mergeCustomProps(parentProps, raw)
 			raw = resolveRawVars(raw, st.CustomProps)
+
 			parentSize := st.FontSize
 			if hasParent {
 				parentSize = parent.FontSize
 			}
+
 			applyFontProps(&st, raw, parentSize, ctx)
+
 			if n.Name == "html" && st.FontSize > 0 {
 				ctx.remBase = st.FontSize
 			}
+
 			applyRestProps(&st, raw, ctx, parent, hasParent)
 			// Opt-in operator policy (--print-link-underline): underline
 			// anchors with href after the cascade. Default off — author CSS
@@ -322,12 +331,15 @@ func resolveStylesCtx(root *html.Node, ctx *styleContext) map[*html.Node]Resolve
 				st.CustomProps = parent.CustomProps
 			}
 		}
+
 		out[n] = st
+
 		for _, c := range n.Children {
 			walk(c, st, true)
 		}
 	}
 	walk(root, ResolvedStyle{}, false)
+
 	return out
 }
 
@@ -335,14 +347,17 @@ func resolveStylesCtx(root *html.Node, ctx *styleContext) map[*html.Node]Resolve
 // declarations from raw, resolving var() chains via css.ResolveCustomProps.
 func mergeCustomProps(parentProps map[string]string, raw map[string]string) map[string]string {
 	declared := map[string]string{}
+
 	for prop, v := range raw {
 		if strings.HasPrefix(prop, "--") {
 			declared[prop] = v
 		}
 	}
+
 	if len(declared) == 0 {
 		return parentProps
 	}
+
 	return css.ResolveCustomProps(declared, parentProps)
 }
 
@@ -352,25 +367,32 @@ func resolveRawVars(raw map[string]string, customProps map[string]string) map[st
 	if len(raw) == 0 {
 		return raw
 	}
+
 	lookup := func(name string) (string, bool) {
 		if customProps == nil {
 			return "", false
 		}
+
 		v, ok := customProps[name]
+
 		return v, ok && strings.TrimSpace(v) != ""
 	}
 	out := make(map[string]string, len(raw))
+
 	for prop, v := range raw {
 		if strings.HasPrefix(prop, "--") {
 			out[prop] = v
+
 			continue
 		}
+
 		if strings.Contains(strings.ToLower(v), "var(") {
 			out[prop] = css.ResolveVar(v, lookup)
 		} else {
 			out[prop] = v
 		}
 	}
+
 	return out
 }
 
@@ -396,30 +418,39 @@ func inheritProps(st *ResolvedStyle, parent ResolvedStyle, raw map[string]string
 		if raw == nil {
 			return false
 		}
+
 		_, ok := raw[prop]
+
 		return ok
 	}
 	if !set("color") {
 		st.Color = parent.Color
 	}
+
 	if !set("font-family") {
 		st.FontFamily = parent.FontFamily
 	}
+
 	if !set("font-size") {
 		st.FontSize = parent.FontSize
 	}
+
 	if !set("font-weight") {
 		st.FontWeight = parent.FontWeight
 	}
+
 	if !set("font-style") {
 		st.FontItalic = parent.FontItalic
 	}
+
 	if !set("line-height") {
 		st.LineHeight = parent.LineHeight
 	}
+
 	if !set("text-align") {
 		st.TextAlign = parent.TextAlign
 	}
+
 	if !set("white-space") {
 		st.WhiteSpace = parent.WhiteSpace
 	}
@@ -427,30 +458,39 @@ func inheritProps(st *ResolvedStyle, parent ResolvedStyle, raw map[string]string
 	if !set("overflow-wrap") && !set("word-wrap") {
 		st.OverflowWrap = parent.OverflowWrap
 	}
+
 	if !set("word-break") {
 		st.WordBreak = parent.WordBreak
 	}
+
 	if !set("vertical-align") {
 		st.VerticalAlign = parent.VerticalAlign
 	}
+
 	if !set("text-decoration") {
 		st.TextDecoration = parent.TextDecoration
 	}
+
 	if !set("letter-spacing") {
 		st.LetterSpacing = parent.LetterSpacing
 	}
+
 	if !set("list-style-type") && !set("list-style") {
 		st.ListStyleType = parent.ListStyleType
 	}
+
 	if !set("border-collapse") {
 		st.BorderCollapse = parent.BorderCollapse
 	}
+
 	if !set("border-spacing") {
 		st.BorderSpacing = parent.BorderSpacing
 	}
+
 	if !set("orphans") {
 		st.Orphans = parent.Orphans
 	}
+
 	if !set("widows") {
 		st.Widows = parent.Widows
 	}
@@ -471,24 +511,30 @@ func (ctx *styleContext) matchedRules(n *html.Node, pe string) []ruleHit {
 	if ctx == nil {
 		return nil
 	}
+
 	var hits []ruleHit
+
 	for _, sheet := range ctx.sheets {
 		if sheet == nil {
 			continue
 		}
+
 		for _, r := range sheet.Rules {
 			if !css.MediaMatches(r.Media, ctx.media, ctx.viewportW, ctx.viewportH) {
 				continue
 			}
+
 			if r.Container != nil {
 				if ctx.containers == nil {
 					continue // pass 1 / pseudo pass without sizes: skip
 				}
+
 				info, ok := findSizeContainer(n, r.Container.Name, ctx.containers)
 				if !ok || !r.Container.Cond.Matches(info.inlineSize, info.fontSize) {
 					continue
 				}
 			}
+
 			for _, sel := range r.Selectors {
 				if pe != "" {
 					if !css.MatchPseudo(sel, n, pe) {
@@ -497,19 +543,23 @@ func (ctx *styleContext) matchedRules(n *html.Node, pe string) []ruleHit {
 				} else if !css.Match(sel, n) {
 					continue
 				}
+
 				a, b, c := css.Specificity(sel)
 				hits = append(hits, ruleHit{r: r, a: a, b: b, c: c})
 			}
 		}
 	}
+
 	return hits
 }
 
 func cascadeRaw(ctx *styleContext, n *html.Node) map[string]string {
 	normal := map[string]string{}
 	important := map[string]string{}
-	var nSpec, nOrder = map[string][4]int{}, map[string]int{}
-	var iSpec, iOrder = map[string][4]int{}, map[string]int{}
+
+	nSpec, nOrder := map[string][4]int{}, map[string]int{}
+
+	iSpec, iOrder := map[string][4]int{}, map[string]int{}
 
 	apply := func(m map[string]string, spec map[string][4]int, ord map[string]int, prop, value string, a, b, c, order int) {
 		prop = strings.ToLower(prop)
@@ -517,8 +567,10 @@ func cascadeRaw(ctx *styleContext, n *html.Node) map[string]string {
 			m[prop] = value
 			spec[prop] = [4]int{a, b, c, 0}
 			ord[prop] = order
+
 			return
 		}
+
 		cur := spec[prop]
 		if a > cur[0] || (a == cur[0] && b > cur[1]) || (a == cur[0] && b == cur[1] && c > cur[2]) ||
 			(a == cur[0] && b == cur[1] && c == cur[2] && order >= ord[prop]) {
@@ -559,9 +611,11 @@ func cascadeRaw(ctx *styleContext, n *html.Node) map[string]string {
 	for prop, v := range normal {
 		out[prop] = v
 	}
+
 	for prop, v := range important {
 		out[prop] = v // important beats normal
 	}
+
 	return out
 }
 
@@ -572,14 +626,17 @@ func applyFontProps(st *ResolvedStyle, raw map[string]string, parentSize float64
 	if ctx != nil && ctx.remBase > 0 {
 		remBase = ctx.remBase
 	}
+
 	if v, ok := raw["font-size"]; ok {
 		st.FontSize = fontSize(v, parentSize, remBase)
 	}
+
 	if v, ok := raw["font-family"]; ok {
 		if fam := css.ParseFontFamily(v); len(fam) > 0 {
 			st.FontFamily = fam
 		}
 	}
+
 	if v, ok := raw["font-weight"]; ok {
 		switch v {
 		case "normal":
@@ -596,9 +653,11 @@ func applyFontProps(st *ResolvedStyle, raw map[string]string, parentSize float64
 			}
 		}
 	}
+
 	if v, ok := raw["font-style"]; ok {
 		st.FontItalic = v == "italic" || v == "oblique"
 	}
+
 	if v, ok := raw["font"]; ok {
 		parseFontShorthand(st, v, remBase)
 	}
@@ -619,23 +678,28 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext,
 		"border-color", "gap", "flex", "container",
 	}
 	rest := make([]string, 0, len(raw))
+
 	for prop := range raw {
 		switch prop {
 		case "margin", "padding", "border", "border-width", "border-style",
 			"border-color", "gap", "flex", "container":
 			continue
 		}
+
 		rest = append(rest, prop)
 	}
+
 	sort.Strings(rest)
 	props := make([]string, 0, len(shorthands)+len(rest))
 	props = append(props, shorthands[:]...)
 	props = append(props, rest...)
+
 	for _, prop := range props {
 		value, ok := raw[prop]
 		if !ok {
 			continue
 		}
+
 		switch prop {
 		case "display":
 			switch value {
@@ -949,6 +1013,7 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext,
 			if s != "solid" && s != "dashed" && s != "dotted" {
 				s = "none"
 			}
+
 			st.BorderTop.Style, st.BorderRight.Style, st.BorderBottom.Style, st.BorderLeft.Style = s, s, s, s
 		case "border-color":
 			if r, g, b, _, ok := css.ParseColor(value); ok {
@@ -972,6 +1037,7 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext,
 			for _, tok := range strings.Fields(value) {
 				if r, g, b, a, ok := css.ParseColor(tok); ok {
 					st.BGColor = [4]float64{float64(r) / 255, float64(g) / 255, float64(b) / 255, a}
+
 					break
 				}
 			}
@@ -1097,6 +1163,7 @@ func applyRestProps(st *ResolvedStyle, raw map[string]string, ctx *styleContext,
 		case "container":
 			name, ctype := css.ParseContainerShorthand(value)
 			st.ContainerName = name
+
 			if ctype != "" {
 				st.ContainerType = ctype
 			}
@@ -1136,10 +1203,12 @@ func parseOrphansWidowsInt(value string) (int, bool) {
 	if value == "" {
 		return 0, false
 	}
+
 	n, err := strconv.Atoi(value)
 	if err != nil || n < 1 {
 		return 0, false
 	}
+
 	return n, true
 }
 
@@ -1148,15 +1217,19 @@ func parseOrphansWidowsInt(value string) (int, bool) {
 func parseColumnsShorthand(st *ResolvedStyle, value string, fs, viewportW float64) {
 	st.ColumnCount = 0
 	st.ColumnWidth = -1
+
 	for _, tok := range strings.Fields(value) {
 		tok = strings.TrimSpace(tok)
 		if tok == "" || tok == "auto" {
 			continue
 		}
+
 		if n, err := strconv.Atoi(tok); err == nil && n >= 1 {
 			st.ColumnCount = n
+
 			continue
 		}
+
 		if v, ok := lengthBox(tok, fs, viewportW, "auto"); ok && v >= 0 {
 			st.ColumnWidth = v
 		}
@@ -1175,14 +1248,19 @@ func parseFontShorthand(st *ResolvedStyle, value string, remBase float64) {
 	for i, p := range parts {
 		if p == "italic" || p == "oblique" {
 			st.FontItalic = true
+
 			continue
 		}
+
 		if p == "bold" {
 			st.FontWeight = 700
+
 			continue
 		}
+
 		if n, ok := css.ParseNumber(p); ok && n >= 100 && n <= 900 {
 			st.FontWeight = int(n)
+
 			continue
 		}
 		// first size token
@@ -1191,12 +1269,15 @@ func parseFontShorthand(st *ResolvedStyle, value string, remBase float64) {
 			st.LineHeight = lineHeight(rest[j+1:], st.FontSize)
 			rest = rest[:j]
 		}
+
 		st.FontSize = fontSize(rest, st.FontSize, remBase)
+
 		if i+1 < len(parts) {
 			if fam := css.ParseFontFamily(strings.Join(parts[i+1:], " ")); len(fam) > 0 {
 				st.FontFamily = fam
 			}
 		}
+
 		return
 	}
 }
@@ -1208,41 +1289,52 @@ func parseFlexShorthand(st *ResolvedStyle, value string, fs, pctBase float64) {
 	case "none":
 		st.FlexGrow, st.FlexShrink = 0, 0
 		st.FlexBasis, st.FlexBasisPercent = -1, -1
+
 		return
 	case "auto":
 		st.FlexGrow, st.FlexShrink = 1, 1
 		st.FlexBasis, st.FlexBasisPercent = -1, -1
+
 		return
 	}
+
 	parts := strings.Fields(value)
 	if len(parts) == 0 {
 		return
 	}
+
 	isBasis := func(tok string) bool {
 		if tok == "auto" || tok == "content" {
 			return true
 		}
+
 		if _, _, ok := css.ParseLength(tok); ok {
 			return true
 		}
+
 		return false
 	}
 	setBasis := func(tok string) {
 		if tok == "auto" || tok == "content" {
 			st.FlexBasis = -1
 			st.FlexBasisPercent = -1
+
 			return
 		}
+
 		if v, unit, ok := css.ParseLength(tok); ok && unit == "%" {
 			st.FlexBasisPercent = v
 			st.FlexBasis = -1
+
 			return
 		}
+
 		if v, ok := lengthBox(tok, fs, pctBase, "auto"); ok {
 			st.FlexBasis = v
 			st.FlexBasisPercent = -1
 		}
 	}
+
 	switch len(parts) {
 	case 1:
 		if g, err := strconv.ParseFloat(parts[0], 64); err == nil {
@@ -1251,10 +1343,13 @@ func parseFlexShorthand(st *ResolvedStyle, value string, fs, pctBase float64) {
 			st.FlexShrink = 1
 			st.FlexBasis = -1
 			st.FlexBasisPercent = 0
+
 			return
 		}
+
 		if isBasis(parts[0]) {
 			st.FlexGrow, st.FlexShrink = 1, 1
+
 			setBasis(parts[0])
 		}
 	case 2:
@@ -1262,24 +1357,31 @@ func parseFlexShorthand(st *ResolvedStyle, value string, fs, pctBase float64) {
 		if errG != nil {
 			return
 		}
+
 		st.FlexGrow = g
 		if sh, err := strconv.ParseFloat(parts[1], 64); err == nil {
 			st.FlexShrink = sh
 			st.FlexBasis = -1
 			st.FlexBasisPercent = 0
+
 			return
 		}
+
 		st.FlexShrink = 1
+
 		if isBasis(parts[1]) {
 			setBasis(parts[1])
 		}
 	default:
 		g, errG := strconv.ParseFloat(parts[0], 64)
 		sh, errS := strconv.ParseFloat(parts[1], 64)
+
 		if errG != nil || errS != nil {
 			return
 		}
+
 		st.FlexGrow, st.FlexShrink = g, sh
+
 		setBasis(parts[2])
 	}
 }
@@ -1288,6 +1390,7 @@ func parseFlexShorthand(st *ResolvedStyle, value string, fs, pctBase float64) {
 func setFourMargin(st *ResolvedStyle, value string, fs, ctxW float64) {
 	v := strings.Fields(value)
 	st.MarginLeftAuto, st.MarginRightAuto = false, false
+
 	switch len(v) {
 	case 0:
 		return
@@ -1319,24 +1422,31 @@ func setFour(st *ResolvedStyle, value string, top, right, bottom, left *float64,
 	if len(v) == 0 {
 		return
 	}
+
 	if len(v) == 1 {
 		*top = marginLen(v[0], fs, ctxW)
 		*right, *bottom, *left = *top, *top, *top
+
 		return
 	}
+
 	if len(v) == 2 {
 		*top = marginLen(v[0], fs, ctxW)
 		*right = marginLen(v[1], fs, ctxW)
 		*bottom, *left = *top, *right
+
 		return
 	}
+
 	if len(v) == 3 {
 		*top = marginLen(v[0], fs, ctxW)
 		*right = marginLen(v[1], fs, ctxW)
 		*bottom = marginLen(v[2], fs, ctxW)
 		*left = *right
+
 		return
 	}
+
 	*top = marginLen(v[0], fs, ctxW)
 	*right = marginLen(v[1], fs, ctxW)
 	*bottom = marginLen(v[2], fs, ctxW)
@@ -1345,6 +1455,7 @@ func setFour(st *ResolvedStyle, value string, top, right, bottom, left *float64,
 
 func parseBorder(value string, fs float64) (border, bool) {
 	var b border
+
 	for _, f := range strings.Fields(value) {
 		switch f {
 		case "solid", "dashed", "dotted":
@@ -1359,12 +1470,15 @@ func parseBorder(value string, fs float64) (border, bool) {
 			}
 		}
 	}
+
 	if b.Style == "" {
 		b.Style = "solid"
 	}
+
 	if b.Width == 0 {
 		b.Width = 1
 	}
+
 	return b, b.Style != "none"
 }
 
@@ -1377,9 +1491,11 @@ func borderWidth(value string, fs float64) float64 {
 	case "thick":
 		return pxToPt(5)
 	}
+
 	if v, _, ok := css.ParseLength(value); ok {
 		return v
 	}
+
 	return 0
 }
 
@@ -1387,6 +1503,7 @@ func fontSize(value string, parent, remBase float64) float64 {
 	if remBase <= 0 {
 		remBase = pxToPt(16)
 	}
+
 	switch value {
 	case "xx-small":
 		return pxToPt(9)
@@ -1407,6 +1524,7 @@ func fontSize(value string, parent, remBase float64) float64 {
 	case "larger":
 		return parent * 1.2
 	}
+
 	if v, unit, ok := css.ParseLength(value); ok {
 		switch unit {
 		case "%":
@@ -1419,6 +1537,7 @@ func fontSize(value string, parent, remBase float64) float64 {
 			}
 		}
 	}
+
 	return parent
 }
 
@@ -1426,17 +1545,21 @@ func lineHeight(value string, fs float64) float64 {
 	if value == "normal" {
 		return 0
 	}
+
 	if v, ok := css.ParseNumber(value); ok {
 		return v * fs
 	}
+
 	if v, unit, ok := css.ParseLength(value); ok {
 		if unit == "%" {
 			return fs * v / 100
 		}
+
 		if pt, ok := css.LengthToPt(v, unit, fs); ok {
 			return pt
 		}
 	}
+
 	return 0
 }
 
@@ -1447,6 +1570,7 @@ func parseOverflowKeyword(value string) (string, bool) {
 	case "visible", "hidden", "scroll", "auto", "clip":
 		return strings.ToLower(strings.TrimSpace(value)), true
 	}
+
 	return "", false
 }
 
@@ -1458,6 +1582,7 @@ func parseListStyleType(value string) string {
 		"upper-alpha", "upper-latin", "none":
 		return strings.ToLower(strings.TrimSpace(value))
 	}
+
 	return ""
 }
 
@@ -1469,6 +1594,7 @@ func overflowCreatesStickyScrollport(overflow string) bool {
 	case "auto", "scroll", "hidden", "clip":
 		return true
 	}
+
 	return false
 }
 
@@ -1479,10 +1605,12 @@ func lengthBox(value string, fs, containing float64, autoValue string) (float64,
 	if value == autoValue || value == "inherit" || value == "initial" {
 		return -1, true
 	}
+
 	v, unit, ok := css.ParseLength(value)
 	if !ok {
 		return 0, false
 	}
+
 	switch unit {
 	case "%", "vw", "vh":
 		return containing * v / 100, true
@@ -1493,9 +1621,11 @@ func lengthBox(value string, fs, containing float64, autoValue string) (float64,
 			if unit == "rem" {
 				return pxToPt(16) * v, true
 			}
+
 			return pt, true
 		}
 	}
+
 	return 0, false
 }
 
@@ -1504,6 +1634,7 @@ func marginLenAuto(value string, fs, ctxW float64) (float64, bool) {
 	if value == "auto" {
 		return 0, true
 	}
+
 	return marginLen(value, fs, ctxW), false
 }
 
@@ -1513,19 +1644,24 @@ func marginLen(value string, fs, ctxW float64) float64 {
 	if value == "auto" || value == "inherit" || value == "initial" {
 		return 0
 	}
+
 	v, unit, ok := css.ParseLength(value)
 	if !ok {
 		return 0
 	}
+
 	if unit == "%" {
 		return ctxW * v / 100
 	}
+
 	if unit == "rem" {
 		return pxToPt(16) * v
 	}
+
 	if pt, ok := css.LengthToPt(v, unit, fs); ok {
 		return pt
 	}
+
 	return 0
 }
 
@@ -1536,6 +1672,7 @@ func pxToPt(px float64) float64 { return px * 0.75 }
 func parseGridAutoFlowValue(value string) string {
 	toks := strings.Fields(strings.ToLower(strings.TrimSpace(value)))
 	row, col, dense := false, false, false
+
 	for _, t := range toks {
 		switch t {
 		case "row":
@@ -1546,6 +1683,7 @@ func parseGridAutoFlowValue(value string) string {
 			dense = true
 		}
 	}
+
 	switch {
 	case col && dense:
 		return "column dense"
@@ -1566,29 +1704,37 @@ func parseGridArea(st *ResolvedStyle, value string) {
 	value = strings.TrimSpace(value)
 	if value == "" || strings.EqualFold(value, "auto") {
 		st.GridArea = ""
+
 		return
 	}
+
 	parts := strings.Split(value, "/")
 	for i := range parts {
 		parts[i] = strings.TrimSpace(parts[i])
 	}
+
 	if len(parts) == 1 {
 		tok := parts[0]
 		if _, err := strconv.Atoi(tok); err == nil {
 			// Single line index → row-start (CSS shorthand lite).
 			parseGridRow(st, tok)
 			st.GridArea = ""
+
 			return
 		}
+
 		if strings.HasPrefix(tok, "span ") {
 			parseGridRow(st, tok)
 			st.GridArea = ""
+
 			return
 		}
 		// Named area.
 		st.GridArea = tok
+
 		return
 	}
+
 	st.GridArea = ""
 	switch len(parts) {
 	case 2:
@@ -1617,23 +1763,28 @@ func applyGridLineEnd(st *ResolvedStyle, isRow bool, end string) {
 		if err != nil || n < 1 {
 			return
 		}
+
 		if isRow {
 			st.GridRowSpan = n
 		} else {
 			st.GridColumnSpan = n
 		}
+
 		return
 	}
+
 	v, err := strconv.Atoi(end)
 	if err != nil {
 		return
 	}
+
 	if isRow {
 		if st.GridRowStart > 0 {
 			sp := v - st.GridRowStart
 			if sp < 1 {
 				sp = 1
 			}
+
 			st.GridRowSpan = sp
 		}
 	} else if st.GridColumnStart > 0 {
@@ -1641,6 +1792,7 @@ func applyGridLineEnd(st *ResolvedStyle, isRow bool, end string) {
 		if sp < 1 {
 			sp = 1
 		}
+
 		st.GridColumnSpan = sp
 	}
 }
@@ -1652,6 +1804,7 @@ func parseGridColumn(st *ResolvedStyle, value string) {
 		if err == nil && n > 0 {
 			st.GridColumnSpan = n
 		}
+
 		return
 	}
 	// "1 / 3" or "1 / span 2"
@@ -1661,24 +1814,30 @@ func parseGridColumn(st *ResolvedStyle, value string) {
 			st.GridColumnStart = v
 			st.GridColumnSpan = 1
 		}
+
 		return
 	}
+
 	if v, err := strconv.Atoi(strings.TrimSpace(parts[0])); err == nil && v > 0 {
 		st.GridColumnStart = v
 	}
+
 	end := strings.TrimSpace(parts[1])
 	if strings.HasPrefix(end, "span ") {
 		n, err := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(end, "span ")))
 		if err == nil && n > 0 {
 			st.GridColumnSpan = n
 		}
+
 		return
 	}
+
 	if v, err := strconv.Atoi(end); err == nil && st.GridColumnStart > 0 {
 		sp := v - st.GridColumnStart
 		if sp < 1 {
 			sp = 1
 		}
+
 		st.GridColumnSpan = sp
 	}
 }
@@ -1690,6 +1849,7 @@ func parseGridRow(st *ResolvedStyle, value string) {
 		if err == nil && n > 0 {
 			st.GridRowSpan = n
 		}
+
 		return
 	}
 	// "1 / 3" or "1 / span 2"
@@ -1699,24 +1859,30 @@ func parseGridRow(st *ResolvedStyle, value string) {
 			st.GridRowStart = v
 			st.GridRowSpan = 1
 		}
+
 		return
 	}
+
 	if v, err := strconv.Atoi(strings.TrimSpace(parts[0])); err == nil && v > 0 {
 		st.GridRowStart = v
 	}
+
 	end := strings.TrimSpace(parts[1])
 	if strings.HasPrefix(end, "span ") {
 		n, err := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(end, "span ")))
 		if err == nil && n > 0 {
 			st.GridRowSpan = n
 		}
+
 		return
 	}
+
 	if v, err := strconv.Atoi(end); err == nil && st.GridRowStart > 0 {
 		sp := v - st.GridRowStart
 		if sp < 1 {
 			sp = 1
 		}
+
 		st.GridRowSpan = sp
 	}
 }
@@ -1806,5 +1972,6 @@ func uaRules(name string) []css.Declaration {
 	case "br":
 		return []css.Declaration{{Prop: "display", Value: "block"}}
 	}
+
 	return nil
 }

@@ -21,26 +21,32 @@ func (e *engine) tagSticky(b *box) {
 	if b == nil || b.style.Position != "sticky" {
 		return
 	}
+
 	b.sticky = true
 	e.stickySeq++
 	b.stickyID = e.stickySeq
 	st := b.style
+
 	if !st.TopAuto {
 		b.stickyTopSet = true
 		b.stickyTop = e.scalePt(st.Top)
 	}
+
 	if !st.RightAuto {
 		b.stickyRightSet = true
 		b.stickyRight = e.scalePt(st.Right)
 	}
+
 	if !st.BottomAuto {
 		b.stickyBottomSet = true
 		b.stickyBottom = e.scalePt(st.Bottom)
 	}
+
 	if !st.LeftAuto {
 		b.stickyLeftSet = true
 		b.stickyLeft = e.scalePt(st.Left)
 	}
+
 	if b.opEnd >= b.opStart && b.opStart >= 0 {
 		for i := b.opStart; i <= b.opEnd && i < len(e.ops); i++ {
 			e.ops[i].StickyID = b.stickyID
@@ -61,13 +67,16 @@ func applyStickyPrint(res *Result, contentH float64) {
 	if res == nil || res.root == nil || contentH <= 0 {
 		return
 	}
+
 	var stickies []*box
+
 	var walk func(b, parent, overflowPort *box)
 	walk = func(b, parent, overflowPort *box) {
 		port := overflowPort
 		if overflowCreatesStickyScrollport(b.style.Overflow) {
 			port = b
 		}
+
 		if b.sticky {
 			if parent != nil {
 				b.cbX, b.cbY, b.cbW, b.cbH = parent.x, parent.y, parent.w, parent.h
@@ -76,16 +85,20 @@ func applyStickyPrint(res *Result, contentH float64) {
 				if h < b.y+b.h {
 					h = b.y + b.h
 				}
+
 				b.cbX, b.cbY, b.cbW, b.cbH = 0, 0, res.Width, h
 			}
+
 			b.stickyPort = port
 			stickies = append(stickies, b)
 		}
+
 		for _, c := range b.children {
 			walk(c, b, port)
 		}
 	}
 	walk(res.root, nil, nil)
+
 	for _, b := range stickies {
 		applyOneSticky(res, b, contentH)
 	}
@@ -100,17 +113,21 @@ func applyOneSticky(res *Result, b *box, contentH float64) {
 	// only — no print page continuation clones (PDF has no scroll).
 	if b.stickyPort != nil {
 		applyStickyOverflowClamp(res, b)
+
 		return
 	}
 
 	origX, origY := b.x, b.y
+
 	natPage := int(origY / contentH)
 	if natPage < 0 {
 		natPage = 0
 	}
+
 	pageTop := float64(natPage) * contentH
 	x1 := clampStickyX(origX, b.w, b.cbX, b.cbW, 0, res.Width, b)
 	y1 := clampStickyY(origY, b.h, b.cbY, b.cbH, pageTop, pageTop+contentH, b)
+
 	dx, dy := x1-origX, y1-origY
 	if dx != 0 || dy != 0 {
 		shiftStickyOps(res, b.stickyID, dx, dy)
@@ -125,11 +142,13 @@ func applyStickyOverflowClamp(res *Result, b *box) {
 	if port == nil {
 		return
 	}
+
 	origX, origY := b.x, b.y
 	portLeft, portTop := port.x, port.y
 	portRight, portBottom := port.x+port.w, port.y+port.h
 	x1 := clampStickyX(origX, b.w, b.cbX, b.cbW, portLeft, portRight, b)
 	y1 := clampStickyY(origY, b.h, b.cbY, b.cbH, portTop, portBottom, b)
+
 	dx, dy := x1-origX, y1-origY
 	if dx != 0 || dy != 0 {
 		shiftStickyOps(res, b.stickyID, dx, dy)
@@ -146,6 +165,7 @@ func shiftStickyOps(res *Result, stickyID int, dx, dy float64) {
 	if (dx == 0 && dy == 0) || stickyID == 0 {
 		return
 	}
+
 	for i := range res.Ops {
 		if res.Ops[i].StickyID == stickyID {
 			res.Ops[i].X += dx
@@ -158,27 +178,32 @@ func shiftStickyOps(res *Result, stickyID int, dx, dy float64) {
 // block limit (CSS Position 3 algorithm lite).
 func clampStickyY(naturalY, h, cbY, cbH, pageTop, pageBottom float64, b *box) float64 {
 	y := naturalY
+
 	if b.stickyTopSet {
 		edge := pageTop + b.stickyTop
 		if y < edge {
 			y = edge
 		}
 	}
+
 	if b.stickyBottomSet {
 		edge := pageBottom - b.stickyBottom
 		if y+h > edge {
 			y = edge - h
 		}
 	}
+
 	if y < cbY {
 		y = cbY
 	}
+
 	if cbH > 0 && y+h > cbY+cbH {
 		y = cbY + cbH - h
 		if y < cbY {
 			y = cbY
 		}
 	}
+
 	return y
 }
 
@@ -186,26 +211,31 @@ func clampStickyY(naturalY, h, cbY, cbH, pageTop, pageBottom float64, b *box) fl
 // block limit. Page scrollport horizontal edges are [pageLeft, pageRight).
 func clampStickyX(naturalX, w, cbX, cbW, pageLeft, pageRight float64, b *box) float64 {
 	x := naturalX
+
 	if b.stickyLeftSet {
 		edge := pageLeft + b.stickyLeft
 		if x < edge {
 			x = edge
 		}
 	}
+
 	if b.stickyRightSet {
 		edge := pageRight - b.stickyRight
 		if x+w > edge {
 			x = edge - w
 		}
 	}
+
 	if x < cbX {
 		x = cbX
 	}
+
 	if cbW > 0 && x+w > cbX+cbW {
 		x = cbX + cbW - w
 		if x < cbX {
 			x = cbX
 		}
 	}
+
 	return x
 }

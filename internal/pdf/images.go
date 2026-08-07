@@ -22,6 +22,7 @@ func jpegLengthMarkers(b byte) bool {
 	case b >= 0xC0 && b <= 0xFE:
 		return true
 	}
+
 	return false
 }
 
@@ -37,38 +38,51 @@ func jpegScan(data []byte) (w, h, components int, err error) {
 	if !isJPEG(data) {
 		return 0, 0, 0, errors.New("image: not a JPEG")
 	}
+
 	pos := 2
 	for pos+4 <= len(data) {
 		if data[pos] != 0xFF {
 			pos++
+
 			continue
 		}
+
 		marker := data[pos+1]
 		if marker == 0xD9 || marker == 0xDA { // EOI or SOS
 			return 0, 0, 0, errors.New("image: no SOF marker found")
 		}
+
 		if !jpegLengthMarkers(marker) {
 			pos += 2
+
 			continue
 		}
+
 		if pos+4 > len(data) {
 			break
 		}
+
 		segLen := int(data[pos+2])<<8 | int(data[pos+3])
+
 		if marker >= 0xC0 && marker <= 0xCF && marker != 0xC4 && marker != 0xC8 && marker != 0xCC {
 			if pos+9 > len(data) {
 				break
 			}
+
 			h := int(data[pos+5])<<8 | int(data[pos+6])
 			w := int(data[pos+7])<<8 | int(data[pos+8])
 			components = int(data[pos+9])
+
 			if w <= 0 || h <= 0 {
 				return 0, 0, 0, errors.New("image: bad JPEG dimensions")
 			}
+
 			return w, h, components, nil
 		}
+
 		pos += 2 + segLen
 	}
+
 	return 0, 0, 0, errors.New("image: malformed JPEG")
 }
 
@@ -87,10 +101,12 @@ func (c *Content) AddJPEGImage(name string, x, y, w, h float64, data []byte) err
 			components = 1
 		}
 	}
+
 	cs := "DeviceRGB"
 	if components == 1 {
 		cs = "DeviceGray"
 	}
+
 	name = c.uniqueImageName(name)
 	ref := c.doc.newObject()
 	c.doc.setDict(ref, dict{}.add("/Type", "/XObject").
@@ -108,6 +124,7 @@ func (c *Content) AddJPEGImage(name string, x, y, w, h float64, data []byte) err
 	c.Transform(w, 0, 0, h, x, y)
 	c.buf.WriteString("/" + name + " Do\n")
 	c.Restore()
+
 	return nil
 }
 
@@ -118,20 +135,24 @@ func grayJPEG(data []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	b := img.Bounds()
 	gray := image.NewGray(image.Rect(0, 0, b.Dx(), b.Dy()))
-	for yy := 0; yy < b.Dy(); yy++ {
-		for xx := 0; xx < b.Dx(); xx++ {
+
+	for yy := range b.Dy() {
+		for xx := range b.Dx() {
 			r, g, bl, _ := img.At(b.Min.X+xx, b.Min.Y+yy).RGBA()
 			gray.SetGray(xx, yy, color.Gray{
 				Y: uint8(0.299*float64(r>>8) + 0.587*float64(g>>8) + 0.114*float64(bl>>8)),
 			})
 		}
 	}
+
 	var buf bytes.Buffer
 	if err := jpeg.Encode(&buf, gray, nil); err != nil {
 		return nil, err
 	}
+
 	return buf.Bytes(), nil
 }
 
@@ -142,19 +163,25 @@ func (c *Content) AddPNGImage(name string, x, y, w, h float64, data []byte) erro
 	if err != nil {
 		return fmt.Errorf("image: %w", err)
 	}
+
 	bounds := img.Bounds()
+
 	width, height := bounds.Dx(), bounds.Dy()
 	if width <= 0 || height <= 0 {
 		return errors.New("image: empty PNG")
 	}
+
 	hasAlpha := false
 	grayscale := c.doc != nil && c.doc.grayscale
 	rgba := make([]byte, width*height*3)
+
 	var mask []byte // 8-bit alpha, 0 = transparent
-	for yy := 0; yy < height; yy++ {
-		for xx := 0; xx < width; xx++ {
+
+	for yy := range height {
+		for xx := range width {
 			r, g, b, a := img.At(bounds.Min.X+xx, bounds.Min.Y+yy).RGBA()
 			off := (yy*width + xx) * 3
+
 			if grayscale {
 				v := byte(0.299*float64(r>>8) + 0.587*float64(g>>8) + 0.114*float64(b>>8))
 				rgba[off], rgba[off+1], rgba[off+2] = v, v, v
@@ -163,15 +190,18 @@ func (c *Content) AddPNGImage(name string, x, y, w, h float64, data []byte) erro
 				rgba[off+1] = byte(g >> 8)
 				rgba[off+2] = byte(b >> 8)
 			}
+
 			if a < 0xFFFF {
 				hasAlpha = true
 			}
 		}
 	}
+
 	if hasAlpha {
 		mask = make([]byte, width*height)
-		for yy := 0; yy < height; yy++ {
-			for xx := 0; xx < width; xx++ {
+
+		for yy := range height {
+			for xx := range width {
 				_, _, _, a := img.At(bounds.Min.X+xx, bounds.Min.Y+yy).RGBA()
 				mask[yy*width+xx] = byte(a >> 8)
 			}
@@ -186,10 +216,12 @@ func (c *Content) AddPNGImage(name string, x, y, w, h float64, data []byte) erro
 		add("/Height", strconv.Itoa(height)).
 		add("/ColorSpace", "/DeviceRGB").
 		add("/BitsPerComponent", "8")
+
 	if c.doc.useCompression {
 		raw = flateBytes(raw)
 		dct = dct.add("/Filter", "/FlateDecode")
 	}
+
 	if hasAlpha {
 		m := flateBytes(mask)
 		maskRef := c.doc.newObject()
@@ -204,6 +236,7 @@ func (c *Content) AddPNGImage(name string, x, y, w, h float64, data []byte) erro
 		c.doc.setStream(maskRef, m)
 		dct = dct.add("/SMask", maskRef.String())
 	}
+
 	dct = dct.add("/Length", strconv.Itoa(len(raw)))
 	ref := c.doc.newObject()
 	c.doc.setDict(ref, dct.String())
@@ -214,6 +247,7 @@ func (c *Content) AddPNGImage(name string, x, y, w, h float64, data []byte) erro
 	c.Transform(w, 0, 0, h, x, y)
 	c.buf.WriteString("/" + name + " Do\n")
 	c.Restore()
+
 	return nil
 }
 
@@ -227,9 +261,11 @@ func (c *Content) uniqueImageName(name string) string {
 	if name == "" {
 		name = "I0"
 	}
+
 	if _, exists := c.imageRefs[name]; !exists {
 		return name
 	}
+
 	for i := 1; ; i++ {
 		candidate := fmt.Sprintf("%s_%d", name, i)
 		if _, exists := c.imageRefs[candidate]; !exists {

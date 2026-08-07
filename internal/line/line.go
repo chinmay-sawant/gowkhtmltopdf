@@ -27,12 +27,14 @@ const (
 // "warning: " or "error: ").
 func Emit(w io.Writer, sev Severity, format string, args ...any) {
 	prefix := "info: "
+
 	switch sev {
 	case Warn:
 		prefix = "warning: "
 	case Error:
 		prefix = "error: "
 	}
+
 	fmt.Fprintf(w, prefix+format+"\n", args...)
 }
 
@@ -40,6 +42,7 @@ func Emit(w io.Writer, sev Severity, format string, args ...any) {
 // lines without a marker (or with an unknown one) are Info.
 func SeverityOf(s string) Severity {
 	lower := strings.ToLower(strings.TrimSpace(s))
+
 	switch {
 	case strings.HasPrefix(lower, "warning:"), strings.HasPrefix(lower, "warn:"):
 		return Warn

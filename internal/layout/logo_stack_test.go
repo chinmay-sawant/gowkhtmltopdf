@@ -33,6 +33,7 @@ func TestWikiLogoWordmarkAboveTagline(t *testing.T) {
 		0x00, 0x00, 0x03, 0x00, 0x01, 0x00, 0x05, 0xfe, 0xd4, 0xef, 0x00, 0x00,
 		0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
 	}
+
 	root, err := html.Parse(`<html><body>
 <a class="mw-logo" href="/">
 <img class="mw-logo-icon" width="50" height="50" src="icon.png">
@@ -45,8 +46,11 @@ func TestWikiLogoWordmarkAboveTagline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	styles := resolveStyles(root, []*css.Stylesheet{s}, "print", 700, 900)
+
 	var word, tagline, cont *html.Node
+
 	var walk func(*html.Node)
 	walk = func(n *html.Node) {
 		if n.Type == html.ElementNode {
@@ -54,25 +58,32 @@ func TestWikiLogoWordmarkAboveTagline(t *testing.T) {
 			if strings.Contains(cl, "wordmark") {
 				word = n
 			}
+
 			if strings.Contains(cl, "tagline") {
 				tagline = n
 			}
+
 			if strings.Contains(cl, "mw-logo-container") {
 				cont = n
 			}
 		}
+
 		for _, c := range n.Children {
 			walk(c)
 		}
 	}
 	walk(root)
+
 	if styles[word].Display != "block" {
 		t.Fatalf("wordmark display=%q want block", styles[word].Display)
 	}
+
 	if styles[tagline].Display != "block" {
 		t.Fatalf("tagline display=%q want block", styles[tagline].Display)
 	}
+
 	_ = cont
+
 	res, err := Layout(root, Options{
 		Width: 700, Height: 200, Sheets: []*css.Stylesheet{s}, Background: true,
 		Images: func(src string) ([]byte, error) { return png, nil },
@@ -80,14 +91,18 @@ func TestWikiLogoWordmarkAboveTagline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	type iy struct{ y, x, w, h float64 }
+
 	var imgs []iy
+
 	for _, op := range res.Ops {
 		if op.Kind == OpImage {
 			imgs = append(imgs, iy{op.Y, op.X, op.W, op.H})
 			t.Logf("img x=%.1f y=%.1f w=%.1f h=%.1f", op.X, op.Y, op.W, op.H)
 		}
 	}
+
 	if len(imgs) < 3 {
 		t.Fatalf("imgs=%d", len(imgs))
 	}
@@ -96,6 +111,7 @@ func TestWikiLogoWordmarkAboveTagline(t *testing.T) {
 	if absF(wm.x-tl.x) > 20 {
 		t.Fatalf("wordmark/tagline not stacked in column: word x=%.1f tag x=%.1f (imgs=%v)", wm.x, tl.x, imgs)
 	}
+
 	if tl.y < wm.y+wm.h-1 {
 		t.Fatalf("tagline not below wordmark: word y=%.1f h=%.1f tag y=%.1f", wm.y, wm.h, tl.y)
 	}

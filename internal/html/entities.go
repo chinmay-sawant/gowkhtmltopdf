@@ -13,5 +13,6 @@ func UnescapeEntities(s string) string {
 	if s == "" || !strings.Contains(s, "&") {
 		return s
 	}
+
 	return stdhtml.UnescapeString(s)
 }

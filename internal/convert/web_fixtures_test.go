@@ -15,10 +15,12 @@ func webFixturePath(file string) string {
 // loadWebFixture reads a vendored web fixture for acceptance tests.
 func loadWebFixture(t *testing.T, file string) string {
 	t.Helper()
+
 	html, err := os.ReadFile(webFixturePath(file))
 	if err != nil {
 		t.Fatalf("read web fixture %s: %v", file, err)
 	}
+
 	return string(html)
 }
 
@@ -34,6 +36,7 @@ func TestWebWikiFixtureAcceptance(t *testing.T) {
 	if len(data) == 0 {
 		t.Fatal("PDF is empty")
 	}
+
 	assertPDFStructure(t, data)
 
 	if !bytes.Contains(data, []byte("Ana de Armas")) {
@@ -41,7 +44,9 @@ func TestWebWikiFixtureAcceptance(t *testing.T) {
 	}
 
 	n := pageCount(data)
+
 	const minPages, maxPages = 1, 3
+
 	if n < minPages || n > maxPages {
 		t.Errorf("pages = %d, want %d..%d", n, minPages, maxPages)
 	}
@@ -69,6 +74,7 @@ func TestWebMarketingFixtureAcceptance(t *testing.T) {
 	if len(data) == 0 {
 		t.Fatal("PDF is empty")
 	}
+
 	assertPDFStructure(t, data)
 
 	if !bytes.Contains(data, []byte("Ship readable PDFs from any HTML")) {

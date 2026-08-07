@@ -13,7 +13,9 @@ func TestBoxSizingBorderBox(t *testing.T) {
 	res := layoutHTML(t, `<html><body>
 <div class="a">a</div><div class="b">b</div>
 </body></html>`, s)
+
 	var boxes []*box
+
 	var walk func(b *box)
 	walk = func(b *box) {
 		if b.node != nil && b.node.Name == "div" {
@@ -21,11 +23,13 @@ func TestBoxSizingBorderBox(t *testing.T) {
 				boxes = append(boxes, b)
 			}
 		}
+
 		for _, c := range b.children {
 			walk(c)
 		}
 	}
 	walk(res.root)
+
 	if len(boxes) != 2 {
 		t.Fatalf("div boxes = %d, want 2", len(boxes))
 	}
@@ -48,9 +52,12 @@ p { width: 300pt }`)
 <p>Hello <span class="badge">NEW</span> world</p>
 </body></html>`, s)
 	texts := opsOfKind(res, OpText)
+
 	var hello, badge, world *Op
+
 	for i := range texts {
 		op := &texts[i]
+
 		switch {
 		case strings.HasPrefix(strings.TrimSpace(op.Text), "Hello"):
 			hello = op
@@ -60,6 +67,7 @@ p { width: 300pt }`)
 			world = op
 		}
 	}
+
 	if hello == nil || badge == nil || world == nil {
 		t.Fatalf("missing text ops hello=%v badge=%v world=%v in %+v", hello != nil, badge != nil, world != nil, texts)
 	}
@@ -67,12 +75,15 @@ p { width: 300pt }`)
 	if math.Abs(hello.Y-world.Y) > 0.5 {
 		t.Errorf("hello/world baselines diverge: %v vs %v", hello.Y, world.Y)
 	}
+
 	if math.Abs(hello.Y-badge.Y) > hello.H+2 {
 		t.Errorf("badge baseline %v far from hello %v", badge.Y, hello.Y)
 	}
+
 	if badge.X < hello.X+hello.W-1 {
 		t.Errorf("badge x=%v should be after hello (x=%v w=%v)", badge.X, hello.X, hello.W)
 	}
+
 	if world.X < badge.X {
 		t.Errorf("world x=%v should be after badge x=%v", world.X, badge.X)
 	}
@@ -91,6 +102,7 @@ body { width: 400pt }`)
 </body></html>`, s)
 
 	var logo, meta, clear *box
+
 	var walk func(b *box)
 	walk = func(b *box) {
 		if b.node != nil && b.node.Name == "div" {
@@ -103,11 +115,13 @@ body { width: 400pt }`)
 				clear = b
 			}
 		}
+
 		for _, c := range b.children {
 			walk(c)
 		}
 	}
 	walk(res.root)
+
 	if logo == nil || meta == nil || clear == nil {
 		t.Fatalf("missing boxes logo=%v meta=%v clear=%v", logo != nil, meta != nil, clear != nil)
 	}
@@ -115,6 +129,7 @@ body { width: 400pt }`)
 	if logo.x >= meta.x {
 		t.Errorf("logo x=%v should be left of meta x=%v", logo.x, meta.x)
 	}
+
 	if math.Abs(logo.y-meta.y) > 1 {
 		t.Errorf("logo/meta should share y band: %v vs %v", logo.y, meta.y)
 	}
@@ -123,6 +138,7 @@ body { width: 400pt }`)
 	if meta.y+meta.h > below {
 		below = meta.y + meta.h
 	}
+
 	if clear.y+0.01 < below {
 		t.Errorf("clear y=%v should be >= float bottoms %v", clear.y, below)
 	}
@@ -132,6 +148,7 @@ func TestTextAlignJustify(t *testing.T) {
 	s := sheet(t, `div { width: 200pt; text-align: justify }`)
 	// Long enough to wrap into multiple lines.
 	res := layoutHTML(t, `<html><body><div>alpha bravo charlie delta echo foxtrot golf hotel india</div></body></html>`, s)
+
 	texts := opsOfKind(res, OpText)
 	if len(texts) < 2 {
 		t.Fatalf("expected wrapped lines, got %d ops", len(texts))
@@ -139,15 +156,18 @@ func TestTextAlignJustify(t *testing.T) {
 	// First line should be stretched toward the content edge (not clustered left).
 	// With justify, the last word on a non-final line sits near the right edge.
 	firstLine := []Op{}
+
 	y0 := texts[0].Y
 	for _, op := range texts {
 		if math.Abs(op.Y-y0) < 0.01 {
 			firstLine = append(firstLine, op)
 		}
 	}
+
 	if len(firstLine) < 2 {
 		t.Fatalf("first line should have multiple words, got %d", len(firstLine))
 	}
+
 	last := firstLine[len(firstLine)-1]
 	right := last.X + last.W
 	// body margin 6 + width 200 = 206 content right edge
@@ -168,13 +188,17 @@ td { border: 1pt solid black; padding: 0 }
 </tr></table>
 </body></html>`, s)
 	texts := opsOfKind(res, OpText)
+
 	var xOp *Op
+
 	for i := range texts {
 		if texts[i].Text == "X" || texts[i].Text == "X " {
 			xOp = &texts[i]
+
 			break
 		}
 	}
+
 	if xOp == nil {
 		t.Fatal("missing X text op")
 	}

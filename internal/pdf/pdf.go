@@ -40,10 +40,12 @@ func parseRef(s string) (objRef, bool) {
 	if len(fields) != 3 || fields[1] != "0" || fields[2] != "R" {
 		return 0, false
 	}
+
 	n, err := strconv.Atoi(fields[0])
 	if err != nil || n <= 0 {
 		return 0, false
 	}
+
 	return objRef(n), true
 }
 
@@ -100,6 +102,7 @@ func (d *Document) newObject() objRef {
 	d.nextID++
 	id := d.nextID
 	d.objects = append(d.objects, &object{id: id})
+
 	return objRef(id)
 }
 
@@ -144,6 +147,7 @@ func (d *Document) AddPage(width, height float64) *Page {
 	p.content = NewContent()
 	p.content.doc = d
 	d.pages = append(d.pages, p)
+
 	return p
 }
 
@@ -158,6 +162,7 @@ func (d *Document) PageRef(idx int) string {
 	if idx < 0 || idx >= len(d.pages) {
 		return ""
 	}
+
 	return d.pages[idx].ref.String()
 }
 
@@ -167,6 +172,7 @@ func (d *Document) PageAt(idx int) *Page {
 	if idx < 0 || idx >= len(d.pages) {
 		return nil
 	}
+
 	return d.pages[idx]
 }
 
@@ -179,23 +185,30 @@ func (d *Document) ReorderPages(order []int) error {
 	if d.finalized {
 		return errors.New("pdf: reorder: document already finalized")
 	}
+
 	if len(order) != len(d.pages) {
 		return fmt.Errorf("pdf: reorder: order has %d entries, document has %d pages",
 			len(order), len(d.pages))
 	}
+
 	seen := make([]bool, len(d.pages))
 	next := make([]*Page, len(d.pages))
+
 	for i, idx := range order {
 		if idx < 0 || idx >= len(d.pages) {
 			return fmt.Errorf("pdf: reorder: index %d out of range (0..%d)", idx, len(d.pages)-1)
 		}
+
 		if seen[idx] {
 			return fmt.Errorf("pdf: reorder: index %d appears more than once", idx)
 		}
+
 		seen[idx] = true
 		next[i] = d.pages[idx]
 	}
+
 	d.pages = next
+
 	return nil
 }
 
@@ -209,13 +222,16 @@ func (d *Document) DuplicatePage(i int) (*Page, error) {
 	if d.finalized {
 		return nil, errors.New("pdf: duplicate: document already finalized")
 	}
+
 	if i < 0 || i >= len(d.pages) {
 		return nil, fmt.Errorf("pdf: duplicate: page index %d out of range (0..%d)", i, len(d.pages)-1)
 	}
+
 	src := d.pages[i]
 	p := d.AddPage(src.width, src.height)
 	p.content = cloneContent(src.content)
 	p.annots = append([]annotation(nil), src.annots...)
+
 	return p, nil
 }
 
@@ -256,25 +272,31 @@ func (d *Document) Write(w io.Writer) error {
 	if err := d.finalize(); err != nil {
 		return err
 	}
+
 	var buf bytes.Buffer
+
 	fmt.Fprintf(&buf, "%%PDF-%s\n", Version)
 	fmt.Fprintln(&buf, "%\xe2\xe3\xcf\xd3") // binary comment
 
 	offsets := make([]int64, len(d.objects)+1)
+
 	for _, o := range d.objects {
 		if o.dict == "" {
 			// Object was allocated but never materialized; leave its offset
 			// unrecorded so the xref cannot point at the *next* object.
 			continue
 		}
+
 		offsets[o.id] = int64(buf.Len())
 		fmt.Fprintf(&buf, "%d 0 obj\n", o.id)
 		buf.WriteString(o.dict)
+
 		if len(o.stream) > 0 {
 			buf.WriteString("\nstream\n")
 			buf.Write(o.stream)
 			buf.WriteString("\nendstream")
 		}
+
 		fmt.Fprintln(&buf)
 		fmt.Fprintln(&buf, "endobj")
 	}
@@ -282,13 +304,16 @@ func (d *Document) Write(w io.Writer) error {
 	xrefPos := int64(buf.Len())
 	fmt.Fprintf(&buf, "xref\n0 %d\n", len(d.objects)+1)
 	fmt.Fprintln(&buf, "0000000000 65535 f ")
+
 	for i := 1; i <= len(d.objects); i++ {
 		fmt.Fprintf(&buf, "%010d 00000 n \n", offsets[i])
 	}
+
 	fmt.Fprintln(&buf, "trailer")
 	fmt.Fprintf(&buf, "<< /Size %d /Root %s /Info %s >>\n", len(d.objects)+1, d.catalogRef, d.infoRef)
 	fmt.Fprintf(&buf, "startxref\n%d\n%%%%EOF\n", xrefPos)
 	_, err := w.Write(buf.Bytes())
+
 	return err
 }
 
@@ -298,9 +323,11 @@ func (d *Document) WriteTo(w io.Writer) (int64, error) {
 	if err := d.Write(&buf); err != nil {
 		return 0, err
 	}
+
 	if _, err := w.Write(buf.Bytes()); err != nil {
 		return 0, err
 	}
+
 	return int64(buf.Len()), nil
 }
 
@@ -310,8 +337,9 @@ func (d *Document) finalize() error {
 	if d.finalized {
 		return nil
 	}
+
 	if len(d.pages) == 0 {
-		return fmt.Errorf("pdf: no pages")
+		return errors.New("pdf: no pages")
 	}
 
 	catalogRef := d.newObject()
@@ -342,6 +370,7 @@ func (d *Document) finalize() error {
 	if d.outlineRoot != nil {
 		cat = cat.add("/Outlines", d.outlineRoot.refStr.String()).add("/PageMode", "/UseOutlines")
 	}
+
 	d.setDict(catalogRef, cat.String())
 
 	// info dict
@@ -349,12 +378,14 @@ func (d *Document) finalize() error {
 	if now.IsZero() {
 		now = time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC) // deterministic default
 	}
+
 	info := dict{}
 	for _, k := range []string{"Title", "Subject", "Author", "Keywords"} {
 		if v, ok := d.info[k]; ok && v != "" {
 			info = info.add("/"+k, pdfString(v))
 		}
 	}
+
 	info = info.add("/Creator", pdfString(d.info["Creator"])).
 		add("/Producer", pdfString("gowkhtmltopdf "+Version)).
 		add("/CreationDate", pdfString(pdfDate(now))).
@@ -371,6 +402,7 @@ func (d *Document) finalize() error {
 	d.catalogRef = catalogRef
 	d.infoRef = infoRef
 	d.finalized = true
+
 	return nil
 }
 
@@ -390,26 +422,37 @@ func (d *Document) finalizePage(p *Page, pagesRef objRef) error {
 	if err != nil {
 		return err
 	}
+
 	imgResources := p.content.imageResources()
+
 	var res strings.Builder
+
 	res.WriteString("<< /ProcSet [/PDF /Text /ImageB /ImageC /ImageI]")
+
 	if len(fonts) > 0 {
 		res.WriteString(" /Font <<")
+
 		for name, ref := range fonts {
 			res.WriteString(" /" + name + " " + ref)
 		}
+
 		res.WriteString(" >>")
 	}
+
 	if len(imgResources) > 0 {
 		res.WriteString(" /XObject <<")
+
 		for name, ref := range imgResources {
 			res.WriteString(" /" + name + " " + ref)
 		}
+
 		res.WriteString(" >>")
 	}
+
 	if gs := p.content.extGState(); gs != "" {
 		res.WriteString(" " + gs)
 	}
+
 	res.WriteString(" >>")
 
 	parts := []string{
@@ -419,16 +462,21 @@ func (d *Document) finalizePage(p *Page, pagesRef objRef) error {
 		"/Resources " + res.String(),
 		"/Contents " + p.contentRef.String(),
 	}
+
 	if len(p.annots) > 0 {
 		d.buildAnnots(p)
+
 		var refs []string
 		for _, a := range p.annots {
 			refs = append(refs, a.annotRef.String())
 		}
+
 		parts = append(parts, "/Annots ["+strings.Join(refs, " ")+"]")
 	}
+
 	parts = append(parts, ">>")
 	d.setDict(p.ref, strings.Join(parts, "\n"))
+
 	return nil
 }
 
@@ -437,9 +485,12 @@ func (d *Document) buildAnnots(p *Page) {
 		a := &p.annots[i]
 		a.annotRef = d.newObject()
 		r := a.rect
+
 		var b strings.Builder
+
 		fmt.Fprintf(&b, "<< /Type /Annot /Subtype /Link /Rect [%s %s %s %s]",
 			num(r[0]), num(r[1]), num(r[2]), num(r[3]))
+
 		if a.hasDest {
 			if a.destPage >= 0 && a.destPage < len(d.pages) {
 				fmt.Fprintf(&b, " /Dest [%s /XYZ %s %s null]",
@@ -448,6 +499,7 @@ func (d *Document) buildAnnots(p *Page) {
 		} else {
 			fmt.Fprintf(&b, " /A << /S /URI /URI %s >>", pdfString(a.uri))
 		}
+
 		b.WriteString(" >>")
 		d.setDict(a.annotRef, b.String())
 	}
@@ -459,15 +511,19 @@ func (d *Document) buildAnnots(p *Page) {
 // document instead of emitting a corrupt /Dest.
 func (d *Document) finalizeOutlines(root *Outline) error {
 	assignRefs(root, d)
+
 	if len(root.Children) == 0 {
 		d.setDict(root.refStr, "<< /Type /Outlines /Count 0 >>")
+
 		return nil
 	}
+
 	first := root.Children[0].refStr
 	last := root.Children[len(root.Children)-1].refStr
 	d.setDict(root.refStr, fmt.Sprintf(
 		"<< /Type /Outlines /First %s /Last %s /Count %d >>",
 		first, last, outlineCount(root)))
+
 	return buildOutlineItems(root, root.refStr, d)
 }
 
@@ -477,36 +533,45 @@ func buildOutlineItems(parent *Outline, parentRef objRef, d *Document) error {
 	for i, n := range parent.Children {
 		var parts []string
 		parts = append(parts, "<< /Title "+pdfString(n.Title))
+
 		if n.PageRef != "" {
 			ref, ok := parseRef(n.PageRef)
 			if !ok {
 				return fmt.Errorf("pdf: outline %q: bad PageRef %q", n.Title, n.PageRef)
 			}
+
 			if int(ref) < 1 || int(ref) > len(d.objects) {
 				return fmt.Errorf("pdf: outline %q: PageRef %q out of range", n.Title, n.PageRef)
 			}
+
 			parts = append(parts, fmt.Sprintf("/Dest [%s /XYZ %s %s null]", ref, num(n.X), num(n.Y)))
 		}
+
 		if len(n.Children) > 0 {
 			first := n.Children[0].refStr
 			last := n.Children[len(n.Children)-1].refStr
 			parts = append(parts, fmt.Sprintf("/First %s /Last %s /Count %d", first, last, countChildren(n)))
 		}
+
 		parts = append(parts, "/Parent "+parentRef.String())
 		if i > 0 {
 			parts = append(parts, "/Prev "+parent.Children[i-1].refStr.String())
 		}
+
 		if i < len(parent.Children)-1 {
 			parts = append(parts, "/Next "+parent.Children[i+1].refStr.String())
 		}
+
 		parts = append(parts, ">>")
 		d.setDict(n.refStr, strings.Join(parts, " "))
+
 		if len(n.Children) > 0 {
 			if err := buildOutlineItems(n, n.refStr, d); err != nil {
 				return err
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -521,6 +586,7 @@ func countChildren(n *Outline) int {
 	if len(n.Children) == 0 {
 		return 0
 	}
+
 	return len(n.Children) + sumChildren(n.Children)
 }
 
@@ -529,6 +595,7 @@ func sumChildren(nodes []*Outline) int {
 	for _, n := range nodes {
 		s += countChildren(n)
 	}
+
 	return s
 }
 
@@ -536,10 +603,12 @@ func outlineCount(root *Outline) int {
 	if len(root.Children) == 0 {
 		return 0
 	}
+
 	c := 0
 	for _, ch := range root.Children {
 		c += 1 + countChildren(ch)
 	}
+
 	return c
 }
 
@@ -551,15 +620,20 @@ func outlineCount(root *Outline) int {
 // and missing glyphs (e.g. "·" as "\302\267").
 func pdfString(s string) string {
 	var b strings.Builder
+
 	b.WriteByte('(')
+
 	for _, r := range s {
 		if r > 0xFF {
 			r = winAnsiFold(r)
 		}
+
 		if r > 0xFF {
 			r = '?'
 		}
+
 		c := byte(r)
+
 		switch {
 		case c == '(' || c == ')' || c == '\\':
 			b.WriteByte('\\')
@@ -570,7 +644,9 @@ func pdfString(s string) string {
 			b.WriteByte(c)
 		}
 	}
+
 	b.WriteByte(')')
+
 	return b.String()
 }
 
@@ -596,6 +672,7 @@ func winAnsiFold(r rune) rune {
 	case '\u00F7': // division sign
 		return '/'
 	}
+
 	return r
 }
 
@@ -607,9 +684,11 @@ func num(v float64) string {
 	if v == float64(int(v)) {
 		return strconv.Itoa(int(v))
 	}
+
 	s := strconv.FormatFloat(v, 'f', 3, 64)
 	s = strings.TrimRight(s, "0")
 	s = strings.TrimRight(s, ".")
+
 	return s
 }
 
@@ -634,6 +713,7 @@ func flateBytes(raw []byte) []byte {
 		state.buf.Reset()
 		state.zw.Reset(&state.buf)
 	}
+
 	_, _ = state.zw.Write(raw)
 	_ = state.zw.Close()
 	out := state.buf.Bytes()
@@ -643,6 +723,7 @@ func flateBytes(raw []byte) []byte {
 	state.buf = bytes.Buffer{}
 	state.zw.Reset(&state.buf)
 	flatePool.Put(state)
+
 	return out
 }
 
@@ -657,8 +738,10 @@ func outlineLess(a, b *Outline) bool {
 	if a.PageRef != b.PageRef {
 		return a.PageRef < b.PageRef
 	}
+
 	if a.Y != b.Y {
 		return a.Y > b.Y // y-down coordinate: higher on page first
 	}
+
 	return a.X < b.X
 }

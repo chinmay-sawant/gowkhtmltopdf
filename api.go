@@ -88,6 +88,7 @@ func (s *ObjectSettings) Get(name string) (string, bool) {
 // and returns s so calls can be chained.
 func (s *ObjectSettings) SetPage(page string) *ObjectSettings {
 	s.o.Page = page
+
 	return s
 }
 
@@ -99,6 +100,7 @@ func (s *ObjectSettings) SetBody(html []byte, base string) *ObjectSettings {
 	s.o.Page = ""
 	s.o.Load.InlineHTML = cloneBytes(html)
 	s.o.Load.InlineBase = base
+
 	return s
 }
 
@@ -147,6 +149,7 @@ func (c *Converter) Global() *GlobalSettings {
 func (c *Converter) AddObject(s *ObjectSettings) *Converter {
 	cp := &ObjectSettings{o: clonePdfObject(s.o)}
 	c.objects = append(c.objects, cp)
+
 	return c
 }
 
@@ -163,12 +166,14 @@ func clonePdfObject(src settings.PdfObject) settings.PdfObject {
 	dst.Load.Post = clonePostItems(src.Load.Post)
 	dst.Load.InlineHTML = cloneBytes(src.Load.InlineHTML)
 	dst.Ignored = cloneStringMap(src.Ignored)
+
 	return dst
 }
 
 func cloneHeaderFooter(src settings.HeaderFooter) settings.HeaderFooter {
 	dst := src
 	dst.Replace = cloneStringMap(src.Replace)
+
 	return dst
 }
 
@@ -176,8 +181,10 @@ func clonePostItems(src []settings.PostItem) []settings.PostItem {
 	if src == nil {
 		return nil
 	}
+
 	dst := make([]settings.PostItem, len(src))
 	copy(dst, src)
+
 	return dst
 }
 
@@ -185,10 +192,12 @@ func cloneStringMap(src map[string]string) map[string]string {
 	if src == nil {
 		return nil
 	}
+
 	dst := make(map[string]string, len(src))
 	for key, value := range src {
 		dst[key] = value
 	}
+
 	return dst
 }
 
@@ -196,8 +205,10 @@ func cloneBytes(src []byte) []byte {
 	if src == nil {
 		return nil
 	}
+
 	dst := make([]byte, len(src))
 	copy(dst, src)
+
 	return dst
 }
 
@@ -207,6 +218,7 @@ func cloneBytes(src []byte) []byte {
 // a document - no URL guessing is applied.
 func (c *Converter) AddHTML(page []byte, baseURL string) *Converter {
 	c.AddObject(NewObjectSettings().SetBody(page, baseURL))
+
 	return c
 }
 
@@ -218,20 +230,25 @@ func (c *Converter) Convert(ctx context.Context) error {
 	if len(c.objects) == 0 {
 		return errors.New("gowkhtmltopdf: no page objects added")
 	}
+
 	objects := make([]settings.PdfObject, len(c.objects))
 	for i, o := range c.objects {
 		objects[i] = o.o
 	}
+
 	req := convert.NewPDFRequest(c.global.g, objects, nil, nil)
 	h := convertHooks{
 		OnInfo: c.OnInfo, OnWarn: c.OnWarn, OnError: c.OnError,
 		OnPhase: c.OnPhase, OnProgress: c.OnProgress,
 	}
+
 	out, err := h.executePDF(ctx, req)
 	if err != nil {
 		return err
 	}
+
 	c.output = out
+
 	return nil
 }
 
@@ -250,17 +267,22 @@ func ConvertHTML(ctx context.Context, html []byte, global *GlobalSettings) ([]by
 	if ctx == nil {
 		ctx = context.Background()
 	}
+
 	if len(html) == 0 {
 		return nil, errors.New("gowkhtmltopdf: empty HTML")
 	}
+
 	c := NewConverter()
 	if global != nil {
 		c.global = global
 	}
+
 	c.AddObject(NewObjectSettings().SetBody(html, ""))
+
 	if err := c.Convert(ctx); err != nil {
 		return nil, err
 	}
+
 	return c.Output(), nil
 }
 
@@ -318,6 +340,7 @@ func (c *ImageConverter) AddObject(page string) *ImageConverter {
 	o := NewObjectSettings()
 	o.SetPage(page)
 	c.object = o
+
 	return c
 }
 
@@ -339,16 +362,20 @@ func (c *ImageConverter) Convert(ctx context.Context) error {
 	if strings.TrimSpace(c.object.o.Page) == "" && len(c.object.o.Load.InlineHTML) == 0 {
 		return errors.New("gowkhtmltopdf: no input page added")
 	}
+
 	img := c.image
 	req := convert.NewImageRequest(c.global.g, img, []settings.PdfObject{c.object.o}, nil)
 	h := convertHooks{
 		OnInfo: c.OnInfo, OnWarn: c.OnWarn, OnError: c.OnError,
 	}
+
 	out, err := h.executeImage(ctx, req)
 	if err != nil {
 		return err
 	}
+
 	c.output = out
+
 	return nil
 }
 
@@ -384,10 +411,12 @@ func (h convertHooks) progress() func(string, int) {
 	if h.OnPhase == nil && h.OnProgress == nil {
 		return nil
 	}
+
 	return func(phase string, percent int) {
 		if h.OnPhase != nil {
 			h.OnPhase(phase)
 		}
+
 		if h.OnProgress != nil {
 			h.OnProgress(percent)
 		}
@@ -400,14 +429,18 @@ func (h convertHooks) executePDF(ctx context.Context, req *convert.Request) ([]b
 	if ctx == nil {
 		ctx = context.Background()
 	}
+
 	var buf bytes.Buffer
+
 	req.Output = &buf
 	if err := convert.Run(ctx, req, h.lineLog(), h.progress()); err != nil {
 		if h.OnError != nil {
 			h.OnError(err.Error())
 		}
+
 		return nil, err
 	}
+
 	return buf.Bytes(), nil
 }
 
@@ -417,14 +450,18 @@ func (h convertHooks) executeImage(ctx context.Context, req *convert.Request) ([
 	if ctx == nil {
 		ctx = context.Background()
 	}
+
 	var buf bytes.Buffer
+
 	req.Output = &buf
 	if err := imageout.RunRequest(ctx, req, h.lineLog()); err != nil {
 		if h.OnError != nil {
 			h.OnError(err.Error())
 		}
+
 		return nil, err
 	}
+
 	return buf.Bytes(), nil
 }
 
@@ -445,17 +482,22 @@ type lineLog struct {
 
 func (w *lineLog) Write(p []byte) (int, error) {
 	w.buf.Write(p)
+
 	for {
 		raw := w.buf.Bytes()
+
 		i := bytes.IndexByte(raw, '\n')
 		if i < 0 {
 			break
 		}
+
 		l := strings.TrimSpace(string(raw[:i]))
 		w.buf.Next(i + 1)
+
 		if l == "" {
 			continue
 		}
+
 		switch line.SeverityOf(l) {
 		case line.Warn:
 			if w.onWarn != nil {
@@ -471,5 +513,6 @@ func (w *lineLog) Write(p []byte) (int, error) {
 			}
 		}
 	}
+
 	return len(p), nil
 }

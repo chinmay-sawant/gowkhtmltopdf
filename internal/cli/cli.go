@@ -14,10 +14,10 @@ import (
 // ErrHelp / ErrVersion / ErrLicense / ErrExtHelp are returned for doc flags
 // so the caller can print and exit 0.
 var (
-	ErrHelp    = fmt.Errorf("help requested")
-	ErrVersion = fmt.Errorf("version requested")
-	ErrLicense = fmt.Errorf("license requested")
-	ErrExtHelp = fmt.Errorf("extended help requested")
+	ErrHelp    = errors.New("help requested")
+	ErrVersion = errors.New("version requested")
+	ErrLicense = errors.New("license requested")
+	ErrExtHelp = errors.New("extended help requested")
 )
 
 // Exit codes (utilities.cc): 0 ok, 1 error, 2 HTTP 404, 3 HTTP 401.
@@ -48,13 +48,16 @@ func (cmd *Command) OpenOutput() (io.Writer, func() error, error) {
 	if cmd.OutputWriter != nil {
 		return cmd.OutputWriter, func() error { return nil }, nil
 	}
+
 	if cmd.Output != "" && cmd.Output != "-" {
 		f, err := os.Create(cmd.Output)
 		if err != nil {
 			return nil, nil, fmt.Errorf("output %q: %w", cmd.Output, err)
 		}
+
 		return f, f.Close, nil
 	}
+
 	return os.Stdout, func() error { return nil }, nil
 }
 
@@ -90,6 +93,7 @@ func (ctx *objectCtx) object(c *Command) *settings.PdfObject {
 	if ctx.obj == nil {
 		return ctx.newObject(c)
 	}
+
 	return ctx.obj
 }
 
@@ -102,7 +106,9 @@ func (ctx *objectCtx) newObject(c *Command) *settings.PdfObject {
 	} else {
 		c.Objects = append(c.Objects, settings.DefaultPdfObject())
 	}
+
 	ctx.obj = &c.Objects[len(c.Objects)-1]
+
 	return ctx.obj
 }
 
@@ -112,6 +118,7 @@ func (ctx *objectCtx) newObject(c *Command) *settings.PdfObject {
 func (ctx *objectCtx) newFreshObject(c *Command) *settings.PdfObject {
 	c.Objects = append(c.Objects, settings.DefaultPdfObject())
 	ctx.obj = &c.Objects[len(c.Objects)-1]
+
 	return ctx.obj
 }
 
@@ -127,14 +134,17 @@ func Parse(argv []string, modes ...Mode) (*Command, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	cmd := &Command{Global: settings.DefaultPdfGlobal(), Image: settings.DefaultImageGlobal()}
 	cur := &objectCtx{}
+
 	var free []string
 
 	i := 0
 	for i < len(argv) {
 		arg := argv[i]
 		i++
+
 		switch {
 		case arg == "-h" || arg == "--help":
 			return cmd, ErrHelp
@@ -149,43 +159,56 @@ func Parse(argv []string, modes ...Mode) (*Command, error) {
 			for ; i < len(argv); i++ {
 				free = append(free, argv[i])
 			}
+
 			i = len(argv)
+
 			continue
 		case strings.HasPrefix(arg, "--"):
 			name, val, hasVal := splitFlag(arg[2:])
 			name = strings.ToLower(name)
 			spec, negated, ok := lookupFlag(name)
+
 			if !ok {
 				return nil, fmt.Errorf("unknown option --%s", name)
 			}
+
 			if err := checkMode(name, spec, mode); err != nil {
 				return nil, err
 			}
+
 			if err := apply(cmd, cur, name, spec, negated, val, hasVal, argv, &i); err != nil {
 				return nil, err
 			}
+
 			continue
 		case strings.HasPrefix(arg, "-") && len(arg) == 2:
 			name := arg[1:]
 			spec, ok := shortFlags[name]
+
 			if !ok {
 				return nil, fmt.Errorf("unknown option -%s", name)
 			}
+
 			if err := checkMode(name, spec, mode); err != nil {
 				return nil, err
 			}
+
 			if err := apply(cmd, cur, name, spec, false, "", false, argv, &i); err != nil {
 				return nil, err
 			}
+
 			continue
 		}
+
 		if err := cmd.positional(arg, cur, &free); err != nil {
 			return nil, err
 		}
 	}
+
 	if err := cmd.resolveFree(cur, free); err != nil {
 		return nil, err
 	}
+
 	return cmd, nil
 }
 
@@ -197,15 +220,18 @@ func ParseMode(argv []string, mode Mode) (*Command, error) {
 
 func parseMode(modes []Mode) (Mode, error) {
 	if len(modes) > 1 {
-		return 0, fmt.Errorf("cli: Parse accepts at most one mode")
+		return 0, errors.New("cli: Parse accepts at most one mode")
 	}
+
 	if len(modes) == 0 {
 		return ModeBoth, nil
 	}
+
 	mode := modes[0]
 	if mode == 0 || mode&^ModeBoth != 0 {
 		return 0, fmt.Errorf("cli: invalid mode %d", mode)
 	}
+
 	return mode, nil
 }
 
@@ -213,12 +239,14 @@ func checkMode(name string, spec flagSpec, mode Mode) error {
 	if spec.mod&mode != 0 {
 		return nil
 	}
+
 	modeName := "requested mode"
 	if mode == ModePDF {
 		modeName = "pdf mode"
 	} else if mode == ModeImage {
 		modeName = "image mode"
 	}
+
 	return fmt.Errorf("option --%s is not supported in %s", name, modeName)
 }
 
@@ -227,6 +255,7 @@ func (c *Command) positional(arg string, cur *objectCtx, free *[]string) error {
 	switch arg {
 	case "page":
 		cur.newObject(c)
+
 		return nil
 	case "cover":
 		obj := cur.newObject(c)
@@ -234,20 +263,25 @@ func (c *Command) positional(arg string, cur *objectCtx, free *[]string) error {
 		obj.IncludeInOutline = false
 		obj.HeaderSet, obj.FooterSet = true, true
 		obj.Header, obj.Footer = settings.HeaderFooter{}, settings.HeaderFooter{}
+
 		return nil
 	case "toc":
 		obj := cur.newFreshObject(c)
 		obj.IsTableOfContent = true
 		obj.UseOutline = false
+
 		return nil
 	}
 	// Fill an explicit empty page object first; else queue for resolution
 	// (last free arg is the output, the rest become implicit pages).
 	if cur.obj != nil && cur.obj.Page == "" && !cur.obj.IsTableOfContent {
 		cur.obj.Page = arg
+
 		return nil
 	}
+
 	*free = append(*free, arg)
+
 	return nil
 }
 
@@ -258,11 +292,14 @@ func (c *Command) resolveFree(cur *objectCtx, free []string) error {
 	if len(free) == 0 {
 		return c.validate()
 	}
+
 	c.Output = free[len(free)-1]
+
 	for _, u := range free[:len(free)-1] {
 		// Prefer filling an already-opened empty page/cover object.
 		if cur.obj != nil && cur.obj.Page == "" && !cur.obj.IsTableOfContent {
 			cur.obj.Page = u
+
 			continue
 		}
 		// Next: promote pending pre-object page settings into this page.
@@ -272,24 +309,30 @@ func (c *Command) resolveFree(cur *objectCtx, free []string) error {
 			c.Objects = append(c.Objects, o)
 			cur.pending = nil
 			cur.obj = &c.Objects[len(c.Objects)-1]
+
 			continue
 		}
+
 		cur.newObject(c).Page = u
 	}
+
 	return c.validate()
 }
 
 func (c *Command) validate() error {
 	// At least one page-like object with a URL must exist.
 	hasInput := false
+
 	for _, o := range c.Objects {
 		if !o.IsTableOfContent && o.Page != "" {
 			hasInput = true
 		}
 	}
+
 	if !hasInput {
-		return fmt.Errorf("you need to specify at least one input file")
+		return errors.New("you need to specify at least one input file")
 	}
+
 	return nil
 }
 
@@ -298,17 +341,21 @@ func (c *Command) validate() error {
 // address remapping: page settings before any object keyword apply to the
 // first page).
 func (ctx *objectCtx) applyPage(c *Command, glob func(g *settings.PdfGlobal, val string) error,
-	obj func(o *settings.PdfObject, val string) error, val string) error {
+	obj func(o *settings.PdfObject, val string) error, val string,
+) error {
 	if err := glob(&c.Global, val); err != nil {
 		return err
 	}
+
 	if ctx.obj != nil {
 		return obj(ctx.obj, val)
 	}
+
 	if ctx.pending == nil {
 		o := settings.DefaultPdfObject()
 		ctx.pending = &o
 	}
+
 	return obj(ctx.pending, val)
 }
 
@@ -322,16 +369,20 @@ func apply(c *Command, cur *objectCtx, name string, spec flagSpec, negated bool,
 		if err != nil {
 			return err
 		}
+
 		return spec.app(c, cur, []string{strconv.FormatBool(b)})
 	case flagValue:
 		vals := []string{inlineVal}
+
 		if !hasInline {
 			if *i >= len(argv) {
-				return fmt.Errorf("option requires a value")
+				return errors.New("option requires a value")
 			}
+
 			vals[0] = argv[*i]
 			*i++
 		}
+
 		return spec.app(c, cur, vals)
 	case flagPair:
 		vals := [2]string{}
@@ -339,18 +390,23 @@ func apply(c *Command, cur *objectCtx, name string, spec flagSpec, negated bool,
 			vals[0] = inlineVal
 		} else {
 			if *i >= len(argv) {
-				return fmt.Errorf("option requires two values (name value)")
+				return errors.New("option requires two values (name value)")
 			}
+
 			vals[0] = argv[*i]
 			*i++
 		}
+
 		if *i >= len(argv) {
-			return fmt.Errorf("option requires two values (name value)")
+			return errors.New("option requires two values (name value)")
 		}
+
 		vals[1] = argv[*i]
 		*i++
+
 		return spec.app(c, cur, vals[:])
 	}
+
 	return fmt.Errorf("internal: unknown flag kind for --%s", name)
 }
 
@@ -364,8 +420,10 @@ func parseBool(inlineVal string, negated, hasInline bool) (bool, error) {
 		case "false", "0", "no", "off":
 			return false, nil
 		}
+
 		return false, fmt.Errorf("invalid boolean value %q", inlineVal)
 	}
+
 	return !negated, nil
 }
 
@@ -373,6 +431,7 @@ func splitFlag(name string) (string, string, bool) {
 	if eq := strings.IndexByte(name, '='); eq >= 0 {
 		return name[:eq], name[eq+1:], true
 	}
+
 	return name, "", false
 }
 
@@ -381,11 +440,13 @@ func lookupFlag(name string) (flagSpec, bool, bool) {
 	if spec, ok := flagTable[name]; ok {
 		return spec, false, true
 	}
+
 	if strings.HasPrefix(name, "no-") {
 		if spec, ok := flagTable[name[3:]]; ok && spec.kind == flagBool {
 			return spec, true, true
 		}
 	}
+
 	return flagSpec{}, false, false
 }
 
@@ -397,5 +458,6 @@ func ExitCode(err error) int {
 	if errors.As(err, &hc) {
 		return hc.HttpErrorCode()
 	}
+
 	return ExitError
 }

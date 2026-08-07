@@ -7,12 +7,21 @@
 # }
 # (enforced by internal/pdf.TestDirectModuleAllowlist).
 
+# Pin golangci-lint for local + CI reproducibility. Override: make lint GOLANGCI_LINT_VERSION=vX.Y.Z
+GOLANGCI_LINT_VERSION ?= v1.64.8
+
 test:
 	go test ./...
 
+# Runs every linter enabled in .golangci.yml (enable-all). Installs the pinned
+# binary into $(go env GOPATH)/bin when missing.
 lint:
-	go vet ./...
-	@out="$$(gofmt -l .)"; if [ -n "$$out" ]; then echo "gofmt needed:"; echo "$$out"; exit 1; fi
+	@command -v golangci-lint >/dev/null 2>&1 || { \
+		echo "golangci-lint not found; installing $(GOLANGCI_LINT_VERSION)..."; \
+		go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION); \
+	}
+	golangci-lint version
+	golangci-lint run ./...
 
 build:
 	mkdir -p bin

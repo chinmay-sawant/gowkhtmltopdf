@@ -22,6 +22,7 @@ td, th { border: 1px solid #999; padding: 2pt; }
 </body></html>`, s)
 
 	var hlines []float64
+
 	for _, op := range res.Ops {
 		if op.Kind == OpLine && op.H == 0 && op.W > 50 {
 			hlines = append(hlines, op.Y)
@@ -67,20 +68,25 @@ td { border: none; border-bottom: 1px dotted #bbb; padding: 2pt; }
 </body></html>`, s)
 
 	horizontal, vertical := 0, 0
+
 	for _, op := range res.Ops {
 		if op.Kind != OpLine {
 			continue
 		}
+
 		if op.H == 0 && op.W > 0 {
 			horizontal++
 		}
+
 		if op.W == 0 && op.H > 0 {
 			vertical++
 		}
 	}
+
 	if horizontal == 0 {
 		t.Fatal("bottom border did not produce horizontal lines")
 	}
+
 	if vertical != 0 {
 		t.Fatalf("bottom-only border produced %d vertical lines", vertical)
 	}

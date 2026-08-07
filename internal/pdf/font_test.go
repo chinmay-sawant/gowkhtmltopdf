@@ -9,10 +9,12 @@ import (
 
 func testFont(t *testing.T) *Font {
 	t.Helper()
+
 	f, err := DefaultFont()
 	if err != nil {
 		t.Fatalf("DefaultFont: %v", err)
 	}
+
 	return f
 }
 
@@ -21,9 +23,11 @@ func TestParseDefaultFont(t *testing.T) {
 	if f.UnitsPerEm() <= 0 {
 		t.Errorf("bad unitsPerEm %d", f.UnitsPerEm())
 	}
+
 	if f.numGlyphs == 0 {
 		t.Error("no glyphs")
 	}
+
 	if f.Advance('A') <= 0 {
 		t.Errorf("bad advance for A: %v", f.Advance('A'))
 	}
@@ -49,6 +53,7 @@ func TestParseCmapFormats(t *testing.T) {
 	if g := f.GlyphID('A'); g != f.GlyphID('A') {
 		t.Error("unstable glyph id")
 	}
+
 	if f.GlyphID('A') == f.GlyphID('Z') {
 		t.Error("A and Z must differ")
 	}
@@ -62,21 +67,27 @@ func TestSubsetUnicodeCmap(t *testing.T) {
 		{code: 67, glyph: 4},
 		{code: 233, glyph: 5},
 	}
+
 	cmap, err := unicodeCmap4(mappings)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if got := binary.BigEndian.Uint16(cmap[0:2]); got != 0 {
 		t.Errorf("cmap version = %d, want 0", got)
 	}
+
 	if got := binary.BigEndian.Uint16(cmap[2:4]); got != 1 {
 		t.Errorf("numTables = %d, want 1", got)
 	}
+
 	subOff := binary.BigEndian.Uint32(cmap[8:12])
+
 	st := cmap[subOff:]
 	if fmt := binary.BigEndian.Uint16(st[0:2]); fmt != 4 {
 		t.Errorf("subtable format %d, want 4", fmt)
 	}
+
 	segCount := int(binary.BigEndian.Uint16(st[6:8])) / 2
 	endOff := 14
 	startOff := endOff + 2*segCount + 2
@@ -86,9 +97,10 @@ func TestSubsetUnicodeCmap(t *testing.T) {
 		t.Errorf("sentinel endCode = %#x, want 0xFFFF", e)
 	}
 	// the A,B,C run (codes 65,66,67 → glyphs 2,3,4) should be one segment
-	for i := 0; i < segCount; i++ {
+	for i := range segCount {
 		start := binary.BigEndian.Uint16(st[startOff+i*2 : startOff+i*2+2])
 		end := binary.BigEndian.Uint16(st[endOff+i*2 : endOff+i*2+2])
+
 		if start == 65 {
 			delta := binary.BigEndian.Uint16(st[deltaOff+i*2 : deltaOff+i*2+2])
 			if end != 67 || delta != 0xFFC1 { // (2-65) & 0xFFFF
@@ -102,16 +114,20 @@ func TestSubsetFont(t *testing.T) {
 	f := testFont(t)
 	used := []rune("Hello, PDF! 123")
 	distinct := map[rune]bool{}
+
 	for _, r := range used {
 		distinct[r] = true
 	}
+
 	sub, err := subsetFont(f, used, subsetSimple)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if len(sub.data) >= len(f.data) {
 		t.Errorf("subset (%d) not smaller than full font (%d)", len(sub.data), len(f.data))
 	}
+
 	if len(sub.widths) < len(distinct)+1 {
 		t.Errorf("subset has %d glyphs, want >= %d used runes + .notdef", len(sub.widths), len(distinct))
 	}
@@ -123,15 +139,19 @@ func TestSubsetFont(t *testing.T) {
 	// identity mapping: every used rune still maps to a glyph, and each
 	// distinct rune maps to a distinct glyph id in the subset
 	seen := map[uint16]bool{}
+
 	for _, r := range used {
 		g := subFont.GlyphID(r)
 		if g == 0 {
 			t.Errorf("rune %q lost in subset", r)
+
 			continue
 		}
+
 		if seen[g] {
 			continue // duplicate rune in input
 		}
+
 		seen[g] = true
 	}
 	// advance widths preserved in font units
@@ -142,10 +162,12 @@ func TestSubsetFont(t *testing.T) {
 
 func TestSubsetChecksum(t *testing.T) {
 	f := testFont(t)
+
 	sub, err := subsetFont(f, []rune("abc"), subsetSimple)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if got := checksum(sub.data); got != 0xB1B0AFBA {
 		t.Errorf("font checksum = %#x, want 0xB1B0AFBA", got)
 	}
@@ -156,25 +178,32 @@ func TestCompositeSubset(t *testing.T) {
 	// find a rune whose glyph is composite (accents, e.g. é 'à' 'ñ')
 	used := []rune("éàñüÄÖ")
 	allSimple := true
+
 	var comp rune
+
 	for _, r := range used {
 		if len(f.compositeGlyphIDs(f.GlyphID(r))) > 0 {
 			comp = r
 			allSimple = false
+
 			break
 		}
 	}
+
 	if allSimple {
 		t.Skip("font has no composite glyphs in test set")
 	}
+
 	sub, err := subsetFont(f, []rune{comp}, subsetSimple)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	subFont, err := ParseTTF(sub.data)
 	if err != nil {
 		t.Fatalf("composite subset does not reparse: %v", err)
 	}
+
 	if g := subFont.GlyphID(comp); g == 0 {
 		t.Errorf("rune %q lost in composite subset", comp)
 	}
@@ -192,6 +221,7 @@ func TestEmbeddedFontInPDF(t *testing.T) {
 	c.TextAt(10, 20)
 	c.TextShow("Hello")
 	c.EndText()
+
 	out := string(writePDF(t, d))
 	for _, want := range []string{
 		"/Type /Font /Subtype /TrueType",
@@ -221,7 +251,8 @@ func TestFontCacheSharedAcrossPages(t *testing.T) {
 	f := testFont(t)
 	d := fixedDoc(t)
 	d.SetCompression(false)
-	for i := 0; i < 2; i++ {
+
+	for range 2 {
 		p := d.AddPage(100, 100)
 		c := p.Content()
 		c.UseEmbeddedFont("F1", f)
@@ -231,6 +262,7 @@ func TestFontCacheSharedAcrossPages(t *testing.T) {
 		c.TextShow("Hi")
 		c.EndText()
 	}
+
 	out := string(writePDF(t, d))
 	// same font ref used on both pages
 	if strings.Count(out, "/FontFile2") != 1 {
@@ -250,14 +282,18 @@ func TestFontCacheSeparatesLoadedFacesWithSameDisplayName(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	regular.PostScriptName = "SameFace"
+
 	bold, err := ParseTTF(bytes.Clone(faces.Bold.data))
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	bold.PostScriptName = "SameFace"
 	d := fixedDoc(t)
 	d.SetCompression(false)
+
 	for _, face := range []*Font{regular, bold} {
 		p := d.AddPage(100, 100)
 		c := p.Content()
@@ -268,6 +304,7 @@ func TestFontCacheSeparatesLoadedFacesWithSameDisplayName(t *testing.T) {
 		c.TextShow("H")
 		c.EndText()
 	}
+
 	if got := strings.Count(string(writePDF(t, d)), "/FontFile2"); got != 2 {
 		t.Fatalf("FontFile2 count = %d, want 2 for distinct loaded faces", got)
 	}
@@ -278,6 +315,7 @@ func TestEmbeddedFontStillWorks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	d := fixedDoc(t)
 	d.SetCompression(false)
 	p := d.AddPage(100, 100)
@@ -288,10 +326,12 @@ func TestEmbeddedFontStillWorks(t *testing.T) {
 	c.TextAt(5, 5)
 	c.TextShow("x")
 	c.EndText()
+
 	out := string(writePDF(t, d))
 	if !strings.Contains(out, "/Subtype /TrueType") {
 		t.Error("embedded TrueType font dict missing")
 	}
+
 	if !strings.Contains(out, "/FontFile2") {
 		t.Error("embedded font file stream missing")
 	}

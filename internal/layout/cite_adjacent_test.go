@@ -17,22 +17,27 @@ body { margin: 0; font-size: 10pt; }
 more</p></body></html>`, s)
 
 	var parts []string
+
 	var xs []float64
+
 	for _, op := range res.Ops {
 		if op.Kind != OpText {
 			continue
 		}
+
 		if strings.ContainsAny(op.Text, "[]0123456789") && !strings.Contains(op.Text, "end") && !strings.Contains(op.Text, "more") {
 			parts = append(parts, op.Text)
 			xs = append(xs, op.X)
 		}
 	}
+
 	joined := strings.Join(parts, "")
 	// Strip hair/normal spaces for containment check.
 	compact := strings.Map(func(r rune) rune {
 		if r == ' ' || r == '\u200a' || r == '\u2009' {
 			return -1
 		}
+
 		return r
 	}, joined)
 	if !strings.Contains(compact, "[90][91][92]") && !strings.Contains(compact, "[90]") {

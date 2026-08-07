@@ -39,9 +39,11 @@ func (r ResourceContext) Fetch(ctx context.Context, ref string) (*load.Resource,
 	if r.Loader == nil {
 		return nil, errors.New("convert: resource context has no loader")
 	}
+
 	if ctx == nil {
 		ctx = context.Background()
 	}
+
 	return r.Loader.FetchSub(ctx, r.Base, ref, r.Load)
 }
 
@@ -52,6 +54,7 @@ func (r ResourceContext) CollectSheets(ctx context.Context, root *html.Node, opt
 	if r.Loader == nil {
 		return nil
 	}
+
 	return CollectSheets(ctx, r.Loader, root, r.Base, r.Load, opts, log)
 }
 
@@ -60,6 +63,7 @@ func (r ResourceContext) MergeFontFaces(ctx context.Context, registry *pdf.Regis
 	if r.Loader == nil {
 		return registry
 	}
+
 	return MergeFontFaces(ctx, r.Loader, registry, sheets, r.Base, r.Load, idx, log)
 }
 
@@ -95,13 +99,16 @@ func PrepareDocument(ctx context.Context, loader *load.Loader, page string, lp s
 	if loader == nil {
 		return nil, errors.New("convert: nil loader")
 	}
+
 	if ctx == nil {
 		ctx = context.Background()
 	}
+
 	res, err := loader.Load(ctx, page, lp)
 	if err != nil {
 		return nil, fmt.Errorf("load %q: %w", page, err)
 	}
+
 	prep := &PreparedDocument{
 		Resource:  res,
 		Resources: NewResourceContext(loader, res.Base, lp),
@@ -110,10 +117,12 @@ func PrepareDocument(ctx context.Context, loader *load.Loader, page string, lp s
 	if res.Skip {
 		return prep, nil
 	}
+
 	root, err := html.ParseDocument(res.Body)
 	if err != nil {
 		return nil, fmt.Errorf("parse html: %w", err)
 	}
+
 	prep.Root = root
 	prep.Sheets = prep.Resources.CollectSheets(ctx, root, SheetOptions{
 		ViewportW:   opts.ViewportW,
@@ -123,5 +132,6 @@ func PrepareDocument(ctx context.Context, loader *load.Loader, page string, lp s
 	}, log)
 	prep.Sheets = AppendSimplifySheet(prep.Sheets, opts.SimplifyDOM, opts.SimplifyProfile)
 	prep.Registry = prep.Resources.MergeFontFaces(ctx, registry, prep.Sheets, opts.ObjectIndex, log)
+
 	return prep, nil
 }

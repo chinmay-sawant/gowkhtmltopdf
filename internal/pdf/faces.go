@@ -29,25 +29,35 @@ var (
 func LoadDefaultFaces() (*FaceSet, error) {
 	defaultFacesOnce.Do(func() {
 		fs := &FaceSet{}
+
 		var err error
 		if fs.Regular, err = parseNamed("LiberationSans", assets.LiberationSansRegularTTF); err != nil {
 			defaultFacesErr = err
+
 			return
 		}
+
 		if fs.Bold, err = parseNamed("LiberationSans-Bold", assets.LiberationSansBoldTTF); err != nil {
 			defaultFacesErr = err
+
 			return
 		}
+
 		if fs.Italic, err = parseNamed("LiberationSans-Italic", assets.LiberationSansItalicTTF); err != nil {
 			defaultFacesErr = err
+
 			return
 		}
+
 		if fs.BoldItalic, err = parseNamed("LiberationSans-BoldItalic", assets.LiberationSansBoldItalicTTF); err != nil {
 			defaultFacesErr = err
+
 			return
 		}
+
 		defaultFaces = fs
 	})
+
 	return defaultFaces, defaultFacesErr
 }
 
@@ -56,7 +66,9 @@ func parseNamed(name string, data []byte) (*Font, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	f.PostScriptName = name
+
 	return f, nil
 }
 
@@ -66,7 +78,9 @@ func (fs *FaceSet) Resolve(weight int, italic bool) *Font {
 	if fs == nil {
 		return nil
 	}
+
 	bold := weight >= 700
+
 	switch {
 	case bold && italic && fs.BoldItalic != nil:
 		return fs.BoldItalic
@@ -89,5 +103,6 @@ func DefaultFont() (*Font, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return fs.Regular, nil
 }

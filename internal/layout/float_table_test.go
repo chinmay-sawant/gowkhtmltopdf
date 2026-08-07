@@ -27,6 +27,7 @@ body { width: 400pt }
 </body></html>`, s)
 
 	var icon, clear, cell *box
+
 	var walk func(b *box)
 	walk = func(b *box) {
 		if b.node != nil {
@@ -39,11 +40,13 @@ body { width: 400pt }
 				cell = b
 			}
 		}
+
 		for _, c := range b.children {
 			walk(c)
 		}
 	}
 	walk(res.root)
+
 	if icon == nil || clear == nil || cell == nil {
 		t.Fatalf("missing boxes icon=%v clear=%v cell=%v", icon != nil, clear != nil, cell != nil)
 	}
@@ -53,15 +56,19 @@ body { width: 400pt }
 	}
 	// Wrapping text sits to the right of the float (fill + text ops).
 	var wrapX float64
+
 	var sawWrap bool
+
 	for _, op := range res.Ops {
 		if op.Kind == OpText && strings.Contains(op.Text, "wrap") {
 			wrapX, sawWrap = op.X, true
 		}
 	}
+
 	if !sawWrap {
 		t.Fatal("expected wrapping text op")
 	}
+
 	if wrapX+0.01 < icon.x+icon.w {
 		t.Errorf("wrap text x=%.1f should be >= icon right edge %.1f", wrapX, icon.x+icon.w)
 	}
@@ -71,11 +78,13 @@ body { width: 400pt }
 	}
 	// Neighbor cell shares the row top (vertical-align:top).
 	var neighborY float64
+
 	for _, op := range res.Ops {
 		if op.Kind == OpText && op.Text == "neighbor" {
 			neighborY = op.Y
 		}
 	}
+
 	if math.Abs(neighborY-icon.y) > 20 {
 		t.Errorf("neighbor text y=%.1f should be near icon top y=%.1f (top-aligned row)", neighborY, icon.y)
 	}
@@ -96,24 +105,29 @@ td { border: 1px solid #000; padding: 4pt }
 </body></html>`, s)
 
 	var f, tb *box
+
 	var walk func(b *box)
 	walk = func(b *box) {
 		if b.node != nil {
 			if b.node.Attribute("class") == "f" {
 				f = b
 			}
+
 			if b.node.Name == "table" {
 				tb = b
 			}
 		}
+
 		for _, c := range b.children {
 			walk(c)
 		}
 	}
 	walk(res.root)
+
 	if f == nil || tb == nil {
 		t.Fatalf("missing boxes float=%v table=%v", f != nil, tb != nil)
 	}
+
 	bottom := f.y + f.h
 	if tb.y+0.01 < bottom {
 		t.Errorf("table y=%.1f should clear below float bottom %.1f (got shrink-beside)", tb.y, bottom)
@@ -143,21 +157,26 @@ func TestFloatOnTableCellBlockifies(t *testing.T) {
 		if n.Type == html.ElementNode && n.Attribute("class") == class {
 			return n
 		}
+
 		for _, c := range n.Children {
 			if hit := find(c, class); hit != nil {
 				return hit
 			}
 		}
+
 		return nil
 	}
 	cell := find(root, "cell")
 	row := find(root, "row")
+
 	if cell == nil || row == nil {
 		t.Fatal("missing nodes")
 	}
+
 	if styles[cell].Display != "block" || styles[cell].Float != "left" {
 		t.Fatalf("table-cell+float: display=%q float=%q, want block/left", styles[cell].Display, styles[cell].Float)
 	}
+
 	if styles[row].Display != "block" || styles[row].Float != "left" {
 		t.Fatalf("table-row+float: display=%q float=%q, want block/left", styles[row].Display, styles[row].Float)
 	}
@@ -167,23 +186,29 @@ func TestFloatOnTableCellBlockifies(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Layout: %v", err)
 	}
+
 	var aBox *box
+
 	var walk func(b *box)
 	walk = func(b *box) {
 		if b.node != nil && b.node.Attribute("class") == "cell" {
 			aBox = b
 		}
+
 		for _, c := range b.children {
 			walk(c)
 		}
 	}
 	walk(res.root)
+
 	if aBox == nil {
 		t.Fatal("expected floated cell box")
 	}
+
 	if aBox.kind == "table" {
 		t.Fatalf("blockified float should not build as empty table, kind=%s w=%.1f", aBox.kind, aBox.w)
 	}
+
 	if aBox.w < 70 {
 		t.Errorf("floated block width=%.1f, want ~80", aBox.w)
 	}
@@ -194,20 +219,25 @@ func TestFloatedTableKeepsDisplay(t *testing.T) {
 	s := sheet(t, `table.infobox { float: right; width: 100pt }`)
 	root := mustParse(t, `<html><body><table class="infobox"><tr><td>X</td></tr></table></body></html>`)
 	styles := resolveStyles(root, []*css.Stylesheet{s}, "", testViewport, 800)
+
 	var table *html.Node
+
 	var walk func(n *html.Node)
 	walk = func(n *html.Node) {
 		if n.Type == html.ElementNode && n.Name == "table" {
 			table = n
 		}
+
 		for _, c := range n.Children {
 			walk(c)
 		}
 	}
 	walk(root)
+
 	if table == nil {
 		t.Fatal("no table")
 	}
+
 	st := styles[table]
 	if st.Display != "table" || st.Float != "right" {
 		t.Fatalf("floated table: display=%q float=%q, want table/right", st.Display, st.Float)

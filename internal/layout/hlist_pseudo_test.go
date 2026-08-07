@@ -20,15 +20,19 @@ body { margin: 0; font-size: 10pt; }
 <li><a href="/u">United States</a></li>
 </ul>
 </body></html>`, s)
+
 	var got string
+
 	for _, op := range res.Ops {
 		if op.Kind == OpText {
 			got += op.Text
 		}
 	}
+
 	if strings.Contains(got, "CubaSpain") || strings.Contains(got, "SpainUnited") {
 		t.Fatalf("missing hlist separators: %q", got)
 	}
+
 	if !strings.Contains(got, "Cuba") || !strings.Contains(got, "Spain") {
 		t.Fatalf("missing labels: %q", got)
 	}

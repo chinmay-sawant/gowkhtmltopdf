@@ -19,10 +19,12 @@ import (
 // writeHTML writes a temp HTML file and returns its path.
 func writeHTML(t *testing.T, body string) string {
 	t.Helper()
+
 	path := filepath.Join(t.TempDir(), "input.html")
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Fatalf("write input: %v", err)
 	}
+
 	return path
 }
 
@@ -30,28 +32,35 @@ func writeHTML(t *testing.T, body string) string {
 // enable flag on and object-level block flag off (the frozen ACL pair).
 func newPDFConverter(t *testing.T, path string) *Converter {
 	t.Helper()
+
 	c := NewConverter()
 	if err := c.Global().Set("enablelocalfileaccess", "true"); err != nil {
 		t.Fatalf("global set: %v", err)
 	}
+
 	obj := NewObjectSettings().SetPage(path)
 	if err := obj.Set("load.blocklocalfileaccess", "false"); err != nil {
 		t.Fatalf("object set: %v", err)
 	}
+
 	c.AddObject(obj)
+
 	return c
 }
 
 func TestConvertPDFToBytes(t *testing.T) {
 	path := writeHTML(t, "<html><body><h1>Hello</h1><p>world</p></body></html>")
+
 	c := newPDFConverter(t, path)
-	if err := c.Convert(context.Background()); err != nil {
+	if err := c.Convert(t.Context()); err != nil {
 		t.Fatalf("Convert: %v", err)
 	}
+
 	data := c.Output()
 	if !bytes.HasPrefix(data, []byte("%PDF-")) {
 		t.Fatalf("output does not start with %%PDF- (got %q)", data[:min(len(data), 8)])
 	}
+
 	if !bytes.Contains(data, []byte("/Type /Page")) {
 		t.Error("output does not contain /Type /Page")
 	}
@@ -62,19 +71,23 @@ func TestConvertPDFToBytes(t *testing.T) {
 }
 
 func TestConvertHTMLHelper(t *testing.T) {
-	pdf, err := ConvertHTML(context.Background(), []byte("<html><body><p>inline html</p></body></html>"), nil)
+	pdf, err := ConvertHTML(t.Context(), []byte("<html><body><p>inline html</p></body></html>"), nil)
 	if err != nil {
 		t.Fatalf("ConvertHTML: %v", err)
 	}
+
 	if !bytes.HasPrefix(pdf, []byte("%PDF-")) {
 		t.Fatalf("ConvertHTML output is not a PDF")
 	}
+
 	g := NewGlobalSettings()
 	_ = g.Set("size.pagesize", "Letter")
-	pdf2, err := ConvertHTML(context.Background(), []byte("<html><body><p>letter</p></body></html>"), g)
+
+	pdf2, err := ConvertHTML(t.Context(), []byte("<html><body><p>letter</p></body></html>"), g)
 	if err != nil {
 		t.Fatalf("ConvertHTML with global: %v", err)
 	}
+
 	if !bytes.HasPrefix(pdf2, []byte("%PDF-")) {
 		t.Fatal("ConvertHTML+global output is not a PDF")
 	}
@@ -97,10 +110,12 @@ func TestGlobalSettingsGetSetRoundTrip(t *testing.T) {
 			if err := g.Set(tc.name, tc.value); err != nil {
 				t.Fatalf("Set(%q): %v", tc.name, err)
 			}
+
 			got, ok := g.Get(tc.name)
 			if !ok {
 				t.Fatalf("Get(%q) not found after Set", tc.name)
 			}
+
 			if got != tc.value {
 				t.Errorf("Get(%q) = %q, want %q", tc.name, got, tc.value)
 			}
@@ -125,9 +140,11 @@ func TestGlobalSettingsGetSetRoundTrip(t *testing.T) {
 	if _, ok := g.Get("bogus.key"); ok {
 		t.Error("Get(bogus.key) found, want not found")
 	}
+
 	if err := g.Set("bogus.key", "x"); err == nil {
 		t.Error("Set(bogus.key) succeeded, want error")
 	}
+
 	if err := g.Set("margin.top", "not-a-length"); err == nil {
 		t.Error("Set(margin.top, not-a-length) succeeded, want error")
 	}
@@ -138,18 +155,23 @@ func TestObjectSettingsGetSet(t *testing.T) {
 	if got, _ := o.Get("page"); got != "in.html" {
 		t.Errorf("Get(page) = %q, want in.html", got)
 	}
+
 	if err := o.Set("load.blocklocalfileaccess", "false"); err != nil {
 		t.Fatalf("Set(load.blocklocalfileaccess): %v", err)
 	}
+
 	if got, ok := o.Get("load.blocklocalfileaccess"); !ok || got != "false" {
 		t.Errorf("Get(load.blocklocalfileaccess) = %q, %v; want false, true", got, ok)
 	}
+
 	if err := o.Set("footer.right", "[page]"); err != nil {
 		t.Fatalf("Set(footer.right): %v", err)
 	}
+
 	if got, ok := o.Get("footer.right"); !ok || got != "[page]" {
 		t.Errorf("Get(footer.right) = %q, %v; want [page], true", got, ok)
 	}
+
 	if err := o.Set("unknown.key", "x"); err == nil {
 		t.Error("Set(unknown.key) succeeded, want error")
 	}
@@ -159,6 +181,7 @@ func TestObjectSettingsSetBodyCopiesInput(t *testing.T) {
 	html := []byte("<p>original</p>")
 	o := NewObjectSettings().SetBody(html, "https://example.test/")
 	html[4] = 'X'
+
 	if got := string(o.o.Load.InlineHTML); got != "<p>original</p>" {
 		t.Fatalf("SetBody retained caller buffer: %q", got)
 	}
@@ -189,18 +212,23 @@ func TestConverterAddObjectDeepCopiesNestedData(t *testing.T) {
 	if string(got.Load.InlineHTML) != "<p>original</p>" {
 		t.Errorf("inline HTML changed through source mutation: %q", got.Load.InlineHTML)
 	}
+
 	if got.Load.CustomHeaders["X-Request"] != "before" || got.Load.CustomHeaders["X-New"] != "" {
 		t.Errorf("custom headers were not copied: %v", got.Load.CustomHeaders)
 	}
+
 	if got.Load.Cookies["session"] != "before" {
 		t.Errorf("cookies were not copied: %v", got.Load.Cookies)
 	}
+
 	if len(got.Load.Post) != 1 || got.Load.Post[0].Value != "before" {
 		t.Errorf("post data was not copied: %v", got.Load.Post)
 	}
+
 	if got.Header.Replace["[name]"] != "before" || got.Footer.Replace["[page]"] != "before" {
 		t.Errorf("header/footer replacements were not copied: header=%v footer=%v", got.Header.Replace, got.Footer.Replace)
 	}
+
 	if got.Ignored["stub"] != "before" || got.Page != "" {
 		t.Errorf("object snapshot changed through source mutation: %+v", got)
 	}
@@ -215,27 +243,33 @@ func TestConverterAddObjectSnapshotIsIndependentUnderMutation(t *testing.T) {
 	snapshot := c.objects[0].o
 
 	var wg sync.WaitGroup
+
 	wg.Add(1)
+
 	go func() {
 		defer wg.Done()
-		for i := 0; i < 1000; i++ {
+
+		for i := range 1000 {
 			source.o.Load.InlineHTML[0] = byte('a' + i%26)
 			source.o.Load.CustomHeaders["X-Request"] = "mutated"
 			source.o.Load.Post[0].Value = "mutated"
 			source.o.Header.Replace["[name]"] = "mutated"
 		}
 	}()
-	for i := 0; i < 1000; i++ {
+
+	for range 1000 {
 		_ = snapshot.Load.InlineHTML[0]
 		_ = snapshot.Load.CustomHeaders["X-Request"]
 		_ = snapshot.Load.Post[0].Value
 		_ = snapshot.Header.Replace["[name]"]
 	}
+
 	wg.Wait()
 
 	if got := string(snapshot.Load.InlineHTML); got != "<p>original</p>" {
 		t.Errorf("snapshot changed during source mutation: %q", got)
 	}
+
 	if snapshot.Load.CustomHeaders["X-Request"] != "before" || snapshot.Load.Post[0].Value != "before" || snapshot.Header.Replace["[name]"] != "before" {
 		t.Errorf("snapshot nested data changed during source mutation: %+v", snapshot)
 	}
@@ -244,8 +278,9 @@ func TestConverterAddObjectSnapshotIsIndependentUnderMutation(t *testing.T) {
 func TestConvertContextCancel(t *testing.T) {
 	path := writeHTML(t, "<html><body><p>cancel me</p></body></html>")
 	c := newPDFConverter(t, path)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
+
 	if err := c.Convert(ctx); err == nil {
 		t.Fatal("Convert with canceled context succeeded, want error")
 	}
@@ -256,26 +291,33 @@ func TestConverterCallbacks(t *testing.T) {
 	c := newPDFConverter(t, path)
 
 	var phases, infos []string
+
 	var progs []int
+
 	c.OnPhase = func(p string) { phases = append(phases, p) }
 	c.OnProgress = func(p int) { progs = append(progs, p) }
 	c.OnInfo = func(line string) { infos = append(infos, line) }
 
-	if err := c.Convert(context.Background()); err != nil {
+	if err := c.Convert(t.Context()); err != nil {
 		t.Fatalf("Convert: %v", err)
 	}
+
 	if len(phases) == 0 {
 		t.Error("OnPhase never called")
 	}
+
 	if len(progs) == 0 {
 		t.Error("OnProgress never called")
 	}
+
 	if len(infos) == 0 {
 		t.Error("OnInfo never called")
 	}
+
 	if last := progs[len(progs)-1]; last != 100 {
 		t.Errorf("last progress = %d, want 100", last)
 	}
+
 	if !bytes.HasPrefix(c.Output(), []byte("%PDF-")) {
 		t.Error("Output after Convert is not a PDF")
 	}
@@ -283,18 +325,23 @@ func TestConverterCallbacks(t *testing.T) {
 
 func TestImageConverterPNG(t *testing.T) {
 	path := writeHTML(t, `<html><body><div style="width:120px;height:80px;background-color:#336699"></div></body></html>`)
+
 	c := NewImageConverter()
 	if err := c.Global().Set("enablelocalfileaccess", "true"); err != nil {
 		t.Fatalf("global set: %v", err)
 	}
+
 	c.AddObject(path)
+
 	if err := c.Object().Set("load.blocklocalfileaccess", "false"); err != nil {
 		t.Fatalf("object set: %v", err)
 	}
+
 	if err := c.Set("width", "200"); err != nil {
 		t.Fatalf("Set(width): %v", err)
 	}
-	if err := c.Convert(context.Background()); err != nil {
+
+	if err := c.Convert(t.Context()); err != nil {
 		t.Fatalf("Convert: %v", err)
 	}
 
@@ -302,10 +349,12 @@ func TestImageConverterPNG(t *testing.T) {
 	if err != nil {
 		t.Fatalf("output is not a decodable PNG: %v", err)
 	}
+
 	b := img.Bounds()
 	if b.Dx() != 200 {
 		t.Errorf("width = %d, want 200 (viewport)", b.Dx())
 	}
+
 	if b.Dy() < 80 {
 		t.Errorf("height = %d, want >= 80 (content + body margins)", b.Dy())
 	}
@@ -317,20 +366,26 @@ func TestImageConverterPNG(t *testing.T) {
 
 func TestImageConverterJPEG(t *testing.T) {
 	path := writeHTML(t, `<html><body><p>hello image</p></body></html>`)
+
 	c := NewImageConverter()
 	if err := c.Global().Set("enablelocalfileaccess", "true"); err != nil {
 		t.Fatalf("global set: %v", err)
 	}
+
 	c.AddObject(path)
+
 	if err := c.Object().Set("load.blocklocalfileaccess", "false"); err != nil {
 		t.Fatalf("object set: %v", err)
 	}
+
 	if err := c.Set("format", "jpg"); err != nil {
 		t.Fatalf("Set(format): %v", err)
 	}
-	if err := c.Convert(context.Background()); err != nil {
+
+	if err := c.Convert(t.Context()); err != nil {
 		t.Fatalf("Convert: %v", err)
 	}
+
 	if _, err := jpeg.Decode(bytes.NewReader(c.Output())); err != nil {
 		t.Fatalf("output is not a decodable JPEG: %v", err)
 	}
@@ -348,6 +403,7 @@ func TestVersion(t *testing.T) {
 // and a line whose *message* mentions "error" is not an error line.
 func TestLineLogSeverity(t *testing.T) {
 	var infos, warns, errs []string
+
 	w := &lineLog{
 		onInfo:  func(l string) { infos = append(infos, l) },
 		onWarn:  func(l string) { warns = append(warns, l) },
@@ -357,12 +413,15 @@ func TestLineLogSeverity(t *testing.T) {
 	w.Write([]byte("warning: object 1: large stylesheet volume\n"))
 	w.Write([]byte("error: failed to load http://x\n"))
 	w.Write([]byte("info: load error policy is skip, omitting\n"))
+
 	if len(infos) != 2 {
 		t.Errorf("infos = %v, want 2 lines", infos)
 	}
+
 	if len(warns) != 1 || warns[0] != "warning: object 1: large stylesheet volume" {
 		t.Errorf("warns = %v", warns)
 	}
+
 	if len(errs) != 1 || errs[0] != "error: failed to load http://x" {
 		t.Errorf("errs = %v", errs)
 	}
@@ -370,7 +429,7 @@ func TestLineLogSeverity(t *testing.T) {
 
 func TestImageConverterNeedsPage(t *testing.T) {
 	c := NewImageConverter()
-	if err := c.Convert(context.Background()); err == nil {
+	if err := c.Convert(t.Context()); err == nil {
 		t.Fatal("Convert without a page succeeded, want error")
 	}
 }
@@ -380,23 +439,27 @@ func TestImageConverterNeedsPage(t *testing.T) {
 func TestImageConverterSetBody(t *testing.T) {
 	c := NewImageConverter()
 	c.Object().SetBody([]byte(`<html><body><div style="width:40px;height:30px;background-color:#112233"></div></body></html>`), "")
+
 	if err := c.Set("width", "100"); err != nil {
 		t.Fatalf("Set(width): %v", err)
 	}
-	if err := c.Convert(context.Background()); err != nil {
+
+	if err := c.Convert(t.Context()); err != nil {
 		t.Fatalf("Convert: %v", err)
 	}
+
 	img, err := png.Decode(bytes.NewReader(c.Output()))
 	if err != nil {
 		t.Fatalf("output is not a decodable PNG: %v", err)
 	}
+
 	if img.Bounds().Dx() != 100 {
 		t.Errorf("width = %d, want 100", img.Bounds().Dx())
 	}
 }
 
 func TestConverterNeedsObject(t *testing.T) {
-	if err := NewConverter().Convert(context.Background()); err == nil {
+	if err := NewConverter().Convert(t.Context()); err == nil {
 		t.Fatal("Convert without objects succeeded, want error")
 	}
 }

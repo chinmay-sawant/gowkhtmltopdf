@@ -22,15 +22,18 @@ func (r *Registry) AddFont(f *Font) {
 	if r == nil || f == nil {
 		return
 	}
+
 	names := f.LoadNames()
 	if len(names) == 0 && f.PostScriptName != "" {
 		names = []string{f.PostScriptName}
 	}
+
 	for _, n := range names {
 		key := strings.ToLower(strings.TrimSpace(n))
 		if key == "" {
 			continue
 		}
+
 		r.byFamily[key] = append(r.byFamily[key], f)
 	}
 }
@@ -40,11 +43,14 @@ func (r *Registry) AddFamilyAlias(family string, f *Font) {
 	if r == nil || f == nil {
 		return
 	}
+
 	key := strings.ToLower(strings.TrimSpace(family))
 	key = strings.Trim(key, `"'`)
+
 	if key == "" {
 		return
 	}
+
 	r.byFamily[key] = append(r.byFamily[key], f)
 }
 
@@ -56,17 +62,20 @@ func (r *Registry) Lookup(families []string, weight int, italic bool) *Font {
 	if r == nil {
 		return nil
 	}
+
 	for _, fam := range families {
 		for _, key := range fontFamilyKeys(fam) {
 			faces := r.byFamily[key]
 			if len(faces) == 0 {
 				continue
 			}
+
 			if f := pickFace(faces, weight, italic); f != nil {
 				return f
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -75,9 +84,11 @@ func (r *Registry) Lookup(families []string, weight int, italic bool) *Font {
 func fontFamilyKeys(fam string) []string {
 	key := strings.ToLower(strings.TrimSpace(fam))
 	key = strings.Trim(key, `"'`)
+
 	if key == "" {
 		return nil
 	}
+
 	switch key {
 	case "serif":
 		return []string{"liberation serif", "dejavu serif", "noto serif"}
@@ -97,20 +108,27 @@ func (reg *Registry) FindWithGlyph(ch rune, weight int, italic bool) *Font {
 	if reg == nil {
 		return nil
 	}
+
 	bold := weight >= 700
+
 	var best *Font
+
 	bestScore := -1
 	seen := map[*Font]bool{}
+
 	for _, faces := range reg.byFamily {
 		for _, f := range faces {
 			if f == nil || seen[f] || f.GlyphID(ch) == 0 {
 				continue
 			}
+
 			seen[f] = true
+
 			score := 1
 			if f.Bold() == bold {
 				score += 2
 			}
+
 			if f.Italic() == italic {
 				score += 2
 			}
@@ -119,35 +137,44 @@ func (reg *Registry) FindWithGlyph(ch rune, weight int, italic bool) *Font {
 				low := strings.ToLower(n)
 				if strings.Contains(low, "dejavu") || strings.Contains(low, "noto") || strings.Contains(low, "freesans") {
 					score += 3
+
 					break
 				}
 			}
+
 			if score > bestScore {
 				bestScore = score
 				best = f
 			}
 		}
 	}
+
 	return best
 }
 
 func pickFace(faces []*Font, weight int, italic bool) *Font {
 	bold := weight >= 700
+
 	var best *Font
+
 	bestScore := -1
+
 	for _, f := range faces {
 		score := 0
 		if f.Bold() == bold {
 			score += 2
 		}
+
 		if f.Italic() == italic {
 			score += 2
 		}
+
 		if score > bestScore {
 			bestScore = score
 			best = f
 		}
 	}
+
 	return best
 }
 
@@ -163,6 +190,7 @@ func DefaultSystemFontDirs() []string {
 		"/usr/share/fonts/truetype/droid",
 		"/usr/share/fonts/opentype",
 	}
+
 	if home, err := os.UserHomeDir(); err == nil {
 		for _, rel := range []string{".fonts", ".local/share/fonts"} {
 			d := filepath.Join(home, rel)
@@ -171,6 +199,7 @@ func DefaultSystemFontDirs() []string {
 			}
 		}
 	}
+
 	return dirs
 }
 
@@ -179,44 +208,57 @@ func DefaultSystemFontDirs() []string {
 func ScanFontDirs(dirs []string) *Registry {
 	out := NewRegistry()
 	seen := map[string]bool{}
+
 	var scan func(string, int)
+
 	scan = func(dir string, depth int) {
 		if dir == "" || seen[dir] {
 			return
 		}
+
 		seen[dir] = true
+
 		entries, err := os.ReadDir(dir)
 		if err != nil {
 			return
 		}
+
 		for _, e := range entries {
 			path := filepath.Join(dir, e.Name())
+
 			if e.IsDir() {
 				if depth > 0 {
 					scan(path, depth-1)
 				}
+
 				continue
 			}
+
 			low := strings.ToLower(e.Name())
 			if !strings.HasSuffix(low, ".ttf") && !strings.HasSuffix(low, ".otf") {
 				continue
 			}
+
 			data, err := os.ReadFile(path)
 			if err != nil {
 				continue
 			}
+
 			f, err := ParseTTF(data)
 			if err != nil {
 				continue
 			}
+
 			if f.PostScriptName == "" {
 				f.PostScriptName = strings.TrimSuffix(e.Name(), filepath.Ext(e.Name()))
 			}
+
 			out.AddFont(f)
 		}
 	}
 	for _, d := range dirs {
 		scan(d, 2)
 	}
+
 	return out
 }

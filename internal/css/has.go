@@ -13,16 +13,20 @@ func matchingParen(s string, open int) (close int, ok bool) {
 	if open >= len(s) || s[open] != '(' {
 		return -1, false
 	}
+
 	depth := 0
+
 	for i := open; i < len(s); i++ {
 		switch s[i] {
 		case '"', '\'':
 			q := s[i]
 			i++
+
 			for i < len(s) && s[i] != q {
 				if s[i] == '\\' && i+1 < len(s) {
 					i++
 				}
+
 				i++
 			}
 		case '(':
@@ -34,6 +38,7 @@ func matchingParen(s string, open int) (close int, ok bool) {
 			}
 		}
 	}
+
 	return -1, false
 }
 
@@ -44,6 +49,7 @@ func takeParenArg(s string, open int) (inner string, end int, ok bool) {
 	if !ok {
 		return "", open, false
 	}
+
 	return s[open+1 : close], close + 1, true
 }
 
@@ -54,44 +60,54 @@ func takeParen(s string) (inner, rest string, ok bool) {
 	if !strings.HasPrefix(s, "(") {
 		return "", s, false
 	}
+
 	inner, end, ok := takeParenArg(s, 0)
 	if !ok {
 		return "", s, false
 	}
+
 	return inner, s[end:], true
 }
 
 func parseSelectorListStrict(s string, insideHas bool) ([]Selector, bool) {
 	var out []Selector
+
 	for _, part := range splitTopLevel(s, ',') {
 		part = strings.TrimSpace(part)
 		if part == "" {
 			return nil, false
 		}
+
 		sel, ok := parseSelectorCtx(part, insideHas)
 		if !ok {
 			return nil, false
 		}
+
 		out = append(out, sel)
 	}
+
 	return out, len(out) > 0
 }
 
 func parseSelectorCtx(s string, insideHas bool) (Selector, bool) {
 	var sel Selector
+
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return sel, false
 	}
+
 	parts := splitSelectorChain(s)
 	for i, ch := range parts {
 		if ch == ">" || ch == "+" || ch == "~" || ch == " " {
 			continue
 		}
+
 		part, ok := parseCompoundCtx(ch, insideHas)
 		if !ok {
 			return sel, false
 		}
+
 		if len(sel.Parts) > 0 {
 			switch parts[i-1] {
 			case ">", "+", "~":
@@ -100,24 +116,30 @@ func parseSelectorCtx(s string, insideHas bool) (Selector, bool) {
 				part.Combinator = " "
 			}
 		}
+
 		sel.Parts = append(sel.Parts, part)
 	}
+
 	return sel, len(sel.Parts) > 0
 }
 
 func parseRelativeSelectorList(s string) ([]RelativeSelector, bool) {
 	var out []RelativeSelector
+
 	for _, part := range splitTopLevel(s, ',') {
 		part = strings.TrimSpace(part)
 		if part == "" {
 			return nil, false
 		}
+
 		rs, ok := parseRelativeSelector(part)
 		if !ok {
 			return nil, false
 		}
+
 		out = append(out, rs)
 	}
+
 	return out, len(out) > 0
 }
 
@@ -126,6 +148,7 @@ func parseRelativeSelector(s string) (RelativeSelector, bool) {
 	if s == "" {
 		return RelativeSelector{}, false
 	}
+
 	lead := " "
 	switch {
 	case strings.HasPrefix(s, ">"):
@@ -138,13 +161,16 @@ func parseRelativeSelector(s string) (RelativeSelector, bool) {
 		lead = "~"
 		s = strings.TrimSpace(s[1:])
 	}
+
 	if s == "" {
 		return RelativeSelector{}, false
 	}
+
 	sel, ok := parseSelectorCtx(s, true)
 	if !ok {
 		return RelativeSelector{}, false
 	}
+
 	return RelativeSelector{Leading: lead, Parts: sel.Parts}, true
 }
 
@@ -153,13 +179,16 @@ func matchRelative(rs RelativeSelector, subject *html.Node) bool {
 	if subject == nil || len(rs.Parts) == 0 {
 		return false
 	}
+
 	sel := Selector{Parts: rs.Parts}
+
 	switch rs.Leading {
 	case "+":
 		sib := nextElementSibling(subject)
 		if sib == nil {
 			return false
 		}
+
 		return matchRelativeFrom(sel, sib)
 	case "~":
 		for sib := nextElementSibling(subject); sib != nil; sib = nextElementSibling(sib) {
@@ -167,28 +196,33 @@ func matchRelative(rs RelativeSelector, subject *html.Node) bool {
 				return true
 			}
 		}
+
 		return false
 	case ">":
 		for _, d := range elementDescendants(subject) {
 			if !Match(sel, d) {
 				continue
 			}
+
 			left := leftmostMatch(sel, d)
 			if left != nil && left.Parent == subject {
 				return true
 			}
 		}
+
 		return false
 	default: // descendant
 		for _, d := range elementDescendants(subject) {
 			if !Match(sel, d) {
 				continue
 			}
+
 			left := leftmostMatch(sel, d)
 			if left != nil && isElementDescendant(left, subject) {
 				return true
 			}
 		}
+
 		return false
 	}
 }
@@ -199,15 +233,18 @@ func matchRelativeFrom(sel Selector, anchor *html.Node) bool {
 	if len(sel.Parts) == 1 {
 		return Match(sel, anchor)
 	}
+
 	if !matchPart(sel.Parts[0], anchor) {
 		return false
 	}
+
 	cands := append([]*html.Node{anchor}, elementDescendants(anchor)...)
 	for _, d := range cands {
 		if Match(sel, d) && leftmostMatch(sel, d) == anchor {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -218,14 +255,17 @@ func leftmostMatch(sel Selector, n *html.Node) *html.Node {
 	if n == nil || n.Type != html.ElementNode || len(sel.Parts) == 0 {
 		return nil
 	}
+
 	if !matchPart(sel.Parts[len(sel.Parts)-1], n) {
 		return nil
 	}
+
 	cur := n
 	// Combinator is stored on the right-hand part of each pair (how that
 	// part attaches to the previous). Walk left using Parts[i+1].Combinator.
 	for i := len(sel.Parts) - 2; i >= 0; i-- {
 		part := sel.Parts[i]
+
 		switch sel.Parts[i+1].Combinator {
 		case ">":
 			cur = cur.Parent
@@ -237,16 +277,20 @@ func leftmostMatch(sel Selector, n *html.Node) *html.Node {
 			if prev == nil || !matchPart(part, prev) {
 				return nil
 			}
+
 			cur = prev
 		case "~":
 			found := false
+
 			for sib := previousElementSibling(cur); sib != nil; sib = previousElementSibling(sib) {
 				if matchPart(part, sib) {
 					cur = sib
 					found = true
+
 					break
 				}
 			}
+
 			if !found {
 				return nil
 			}
@@ -255,22 +299,27 @@ func leftmostMatch(sel Selector, n *html.Node) *html.Node {
 			for cur != nil && (cur.Type != html.ElementNode || !matchPart(part, cur)) {
 				cur = cur.Parent
 			}
+
 			if cur == nil {
 				return nil
 			}
 		}
 	}
+
 	return cur
 }
 
 func elementDescendants(n *html.Node) []*html.Node {
 	var out []*html.Node
+
 	var walk func(*html.Node)
+
 	walk = func(node *html.Node) {
 		for _, c := range node.Children {
 			if c.Type != html.ElementNode {
 				continue
 			}
+
 			out = append(out, c)
 			walk(c)
 		}
@@ -278,6 +327,7 @@ func elementDescendants(n *html.Node) []*html.Node {
 	if n != nil {
 		walk(n)
 	}
+
 	return out
 }
 
@@ -285,11 +335,13 @@ func isElementDescendant(n, ancestor *html.Node) bool {
 	if n == nil || ancestor == nil || n == ancestor {
 		return false
 	}
+
 	for p := n.Parent; p != nil; p = p.Parent {
 		if p == ancestor {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -300,6 +352,7 @@ func maxRelativeSpecificity(rels []RelativeSelector) (a, b, c int) {
 			a, b, c = sa, sb, sc
 		}
 	}
+
 	return a, b, c
 }
 
@@ -310,6 +363,7 @@ func maxSelectorSpecificity(sels []Selector) (a, b, c int) {
 			a, b, c = sa, sb, sc
 		}
 	}
+
 	return a, b, c
 }
 

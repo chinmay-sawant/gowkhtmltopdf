@@ -27,16 +27,19 @@ func TestParseTransformMatrixAndSkew(t *testing.T) {
 	if !ok || !has {
 		t.Fatal("matrix parse failed")
 	}
+
 	x, y := m.Apply(0, 0)
 	// 30 CSS px → 22.5 pt
 	want := pxToPt(30)
 	if math.Abs(x-want) > 1e-6 || math.Abs(y) > 1e-6 {
 		t.Fatalf("matrix translate got (%v,%v), want (%v,0)", x, y, want)
 	}
+
 	sk, has, ok := parseTransformList("skewX(45deg)", 12)
 	if !ok || !has {
 		t.Fatal("skewX parse failed")
 	}
+
 	sx, sy := sk.Apply(10, 10)
 	if math.Abs(sx-20) > 1e-6 || math.Abs(sy-10) > 1e-6 {
 		t.Fatalf("skewX Apply got (%v,%v)", sx, sy)
@@ -48,6 +51,7 @@ func TestParseTransformNoneAnd3DRejected(t *testing.T) {
 	if !ok || has {
 		t.Fatalf("none: ok=%v has=%v", ok, has)
 	}
+
 	_, _, ok = parseTransformList("translate3d(1px,2px,3px)", 12)
 	if ok {
 		t.Fatal("3d transform should be rejected")
@@ -59,9 +63,11 @@ func TestParseTransformOriginKeywords(t *testing.T) {
 	if !ok {
 		t.Fatal("origin parse failed")
 	}
+
 	if !spec.XPercent || !spec.YPercent || spec.X != 0 || spec.Y != 0 {
 		t.Fatalf("top left → %+v", spec)
 	}
+
 	spec, ok = parseTransformOrigin("50% 50%", 12)
 	if !ok || spec.X != 50 || spec.Y != 50 {
 		t.Fatalf("50%% 50%% → %+v", spec)
@@ -82,34 +88,44 @@ func TestTransformRotateBadgeSiblingsUnmoved(t *testing.T) {
 .plain { display: inline-block; background: #eee; padding: 4pt 8pt; }
 `)
 	res := layoutHTML(t, `<div class="row"><span class="badge">NEW</span> <span class="plain">Sibling</span></div>`, s)
+
 	var badge, plain, plainFill *Op
+
 	for i := range res.Ops {
 		op := &res.Ops[i]
 		if op.Kind == OpFillRect && op.R > 0.8 && op.G > 0.8 && op.B > 0.8 {
 			plainFill = op
 		}
+
 		if op.Kind != OpText {
 			continue
 		}
+
 		if strings.Contains(op.Text, "NEW") {
 			badge = op
 		}
+
 		if strings.Contains(op.Text, "Sibling") {
 			plain = op
 		}
 	}
+
 	if badge == nil || plain == nil {
 		t.Fatal("missing text ops")
 	}
+
 	if !badge.XformSet {
 		t.Fatal("badge should have transform stamped")
 	}
+
 	if plain.XformSet {
 		t.Fatal("sibling must not inherit paint transform on its own ops incorrectly — wait, sibling is not under badge")
 	}
+
 	if plainFill == nil {
 		t.Fatal("plain sibling background missing")
 	}
+
 	if math.Abs(plainFill.X-(plain.X-8)) > 1 {
 		t.Fatalf("plain sibling background x=%.1f, text x=%.1f; chrome was not moved with inline-block", plainFill.X, plain.X)
 	}
@@ -123,9 +139,11 @@ func TestTransformRotateBadgeSiblingsUnmoved(t *testing.T) {
 	if err := Paint(doc, res, PaintOptions{PageWidth: 612, PageHeight: 792, MarginTop: 36, MarginBottom: 36, MarginLeft: 36, MarginRight: 36}); err != nil {
 		t.Fatal(err)
 	}
+
 	if doc.PageCount() < 1 {
 		t.Fatal("no pages")
 	}
+
 	raw := string(doc.PageAt(0).Content().Bytes())
 	if !strings.Contains(raw, " cm\n") && !strings.Contains(raw, " cm") {
 		// num() may format without always matching; look for cm operator
@@ -161,17 +179,22 @@ func TestTransformAbsposContainingBlockScale(t *testing.T) {
 	// Padding-box CB: child top-left at host padding edge.
 	expectX := host.x + host.style.BorderLeft.Width
 	expectY := host.y + host.style.BorderTop.Width
+
 	if math.Abs(child.x-expectX) > 0.5 || math.Abs(child.y-expectY) > 0.5 {
 		t.Fatalf("abs child at (%.2f,%.2f), want padding-box (%.2f,%.2f); host=(%.2f,%.2f) padL=%.1f",
 			child.x, child.y, expectX, expectY, host.x, host.y, host.style.PaddingLeft)
 	}
+
 	var sawXform bool
+
 	for i := child.opStart; i <= child.opEnd && i < len(res.Ops); i++ {
 		if res.Ops[i].XformSet {
 			sawXform = true
+
 			break
 		}
 	}
+
 	if !sawXform {
 		t.Fatal("child ops should carry composed scale transform")
 	}
@@ -183,13 +206,17 @@ func TestTransformNestedScaleTranslate(t *testing.T) {
 .inner { transform: scale(2); transform-origin: top left; width: 40pt; height: 20pt; background: #090; }
 `)
 	res := layoutHTML(t, `<div class="outer"><div class="inner">X</div></div>`, s)
+
 	var text *Op
+
 	for i := range res.Ops {
 		if res.Ops[i].Kind == OpText && strings.Contains(res.Ops[i].Text, "X") {
 			text = &res.Ops[i]
+
 			break
 		}
 	}
+
 	if text == nil || !text.XformSet {
 		t.Fatal("inner text missing composed transform")
 	}
@@ -210,13 +237,17 @@ func TestTransformKeyframesStaticCascaded(t *testing.T) {
 }
 `)
 	res := layoutHTML(t, `<span class="badge">A</span>`, s)
+
 	var text *Op
+
 	for i := range res.Ops {
 		if res.Ops[i].Kind == OpText {
 			text = &res.Ops[i]
+
 			break
 		}
 	}
+
 	if text == nil || !text.XformSet {
 		t.Fatal("expected static rotate(45deg) stamped")
 	}
@@ -230,24 +261,31 @@ func TestTransformKeyframesStaticCascaded(t *testing.T) {
 func TestOpacityExtGState(t *testing.T) {
 	s := sheet(t, `.faded { opacity: 0.5; background: #00f; width: 40pt; height: 20pt; }`)
 	res := layoutHTML(t, `<div class="faded">Hi</div>`, s)
+
 	var saw bool
+
 	for _, op := range res.Ops {
 		if op.PaintOpacity > 0 && op.PaintOpacity < 1 {
 			saw = true
+
 			if math.Abs(op.PaintOpacity-0.5) > 1e-6 {
 				t.Fatalf("opacity=%v", op.PaintOpacity)
 			}
 		}
 	}
+
 	if !saw {
 		t.Fatal("no PaintOpacity stamped")
 	}
+
 	doc := pdf.NewDocument()
 	_ = Paint(doc, res, PaintOptions{PageWidth: 612, PageHeight: 792, MarginTop: 36, MarginBottom: 36, MarginLeft: 36, MarginRight: 36})
+
 	var buf bytes.Buffer
 	if err := doc.Write(&buf); err != nil {
 		t.Fatal(err)
 	}
+
 	raw := buf.String()
 	if !strings.Contains(raw, "/opacity") && !strings.Contains(raw, "gs") {
 		t.Fatalf("expected ExtGState opacity, got %q", raw[:min(300, len(raw))])
@@ -256,25 +294,32 @@ func TestOpacityExtGState(t *testing.T) {
 
 func findBoxByClass(t *testing.T, res *Result, class string) *box {
 	t.Helper()
+
 	var found *box
+
 	var walk func(b *box)
 	walk = func(b *box) {
 		if b == nil || found != nil {
 			return
 		}
+
 		if b.node != nil {
 			if strings.Contains(b.node.Attribute("class"), class) {
 				found = b
+
 				return
 			}
 		}
+
 		for _, c := range b.children {
 			walk(c)
 		}
 	}
 	walk(res.root)
+
 	if found == nil {
 		t.Fatalf("box class %q not found", class)
 	}
+
 	return found
 }

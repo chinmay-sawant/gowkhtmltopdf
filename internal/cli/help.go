@@ -59,14 +59,19 @@ See LICENSE for the full text of the MIT License.
 // flagList renders a "--name" list filtered by Mode.
 func flagList(m Mode) string {
 	var names []string
+
 	for name, spec := range flagTable {
 		if spec.mod&m == 0 {
 			continue
 		}
+
 		names = append(names, name)
 	}
+
 	sort.Strings(names)
+
 	var b strings.Builder
+
 	for _, n := range names {
 		spec := flagTable[n]
 		if spec.kind == flagBool {
@@ -75,5 +80,6 @@ func flagList(m Mode) string {
 			fmt.Fprintf(&b, "  --%s <value>\n", n)
 		}
 	}
+
 	return b.String()
 }

@@ -85,9 +85,11 @@ func docTitle(root *html.Node) string {
 	if root == nil {
 		return ""
 	}
+
 	if t := root.TextContentOf("title"); t != "" {
 		return outline.CollapseWS(t)
 	}
+
 	return ""
 }
 
@@ -100,11 +102,14 @@ func collectObjectHeadings(root *html.Node, res *layout.Result, _ int, _ setting
 	if !obj.UseOutline || !obj.IncludeInOutline {
 		return nil
 	}
+
 	hs := outline.CollectHeadings(root)
 	hs = outline.Lookup(hs, res.Locations)
+
 	if len(hs) == 0 {
 		return nil
 	}
+
 	return hs
 }
 
@@ -112,14 +117,18 @@ func collectObjectHeadings(root *html.Node, res *layout.Result, _ int, _ setting
 // css.Selector values for outline.Options.Exclude (matching lives in outline).
 func parseExcludeSelectors(specs []string, log io.Writer) []css.Selector {
 	var out []css.Selector
+
 	for _, s := range specs {
 		sels, ok := css.ParseSelectors(s)
 		if !ok || len(sels) == 0 {
 			line.Emit(log, line.Warn, "ignoring invalid --exclude-from-outline selector %q", s)
+
 			continue
 		}
+
 		out = append(out, sels...)
 	}
+
 	return out
 }
 
@@ -128,12 +137,14 @@ func parseExcludeSelectors(specs []string, log io.Writer) []css.Selector {
 // sorts by document page order.
 func flatHeadings(bodies []*objectState) []*outline.Heading {
 	var all []*outline.Heading
+
 	for _, st := range bodies {
 		for _, h := range st.headings {
 			h.DocPage = st.offset + h.Page
 			all = append(all, h)
 		}
 	}
+
 	outline.AssignAnchors(all)
 	// Document order by the explicit DocPage field. The object-local Page field
 	// remains unchanged for page-local layout and header/footer semantics.
@@ -142,11 +153,14 @@ func flatHeadings(bodies []*objectState) []*outline.Heading {
 		if a.DocPage != b.DocPage {
 			return a.DocPage < b.DocPage
 		}
+
 		if a.Y != b.Y {
 			return a.Y < b.Y
 		}
+
 		return a.X < b.X
 	})
+
 	return all
 }
 
@@ -158,6 +172,7 @@ func bodyStateFor(bodies []*objectState, page int) *objectState {
 			return st
 		}
 	}
+
 	return nil
 }
 
@@ -167,10 +182,13 @@ func bodyStateFor(bodies []*objectState, page int) *objectState {
 // Tree headings retain object-local Page and carry document-global DocPage.
 func emitOutline(doc *pdf.Document, tree *outline.Node, bodies []*objectState, tocTotal int) *pdf.Outline {
 	root := &pdf.Outline{}
+
 	var conv func(n *outline.Node) *pdf.Outline
+
 	conv = func(n *outline.Node) *pdf.Outline {
 		h := n.Heading
 		o := &pdf.Outline{Title: h.Title}
+
 		docPage := h.DocPage
 		if st := bodyStateFor(bodies, docPage); st != nil {
 			locPage := docPage - st.offset
@@ -178,13 +196,16 @@ func emitOutline(doc *pdf.Document, tree *outline.Node, bodies []*objectState, t
 			loc := layout.ElementLocation{Page: locPage, X: h.X, Y: h.Y, W: h.W, H: h.H}
 			o.X, o.Y = st.geom.pdfXY(loc)
 		}
+
 		for _, c := range n.Children {
 			o.Children = append(o.Children, conv(c))
 		}
+
 		return o
 	}
 	for _, c := range tree.Children {
 		root.Children = append(root.Children, conv(c))
 	}
+
 	return root
 }

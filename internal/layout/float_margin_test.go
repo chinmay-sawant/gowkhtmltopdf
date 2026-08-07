@@ -27,11 +27,14 @@ p { margin: 0; }
 <div class="box">FRAME</div>
 <p>Lead paragraph words that wrap beside the floated frame and must leave the margin gap clear.</p>
 </body></html>`
+
 	root, err := html.Parse(htmlSrc)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	const pageW = 400.0
+
 	res, err := Layout(root, Options{
 		Width: pageW, Height: 400, Sheets: []*css.Stylesheet{s},
 		Media: "print", Background: true,
@@ -39,7 +42,9 @@ p { margin: 0; }
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	var frameX float64 = pageW
+
 	for _, op := range res.Ops {
 		if op.Kind == OpText && strings.Contains(op.Text, "FRAME") {
 			if op.X < frameX {
@@ -47,15 +52,18 @@ p { margin: 0; }
 			}
 		}
 	}
+
 	if frameX > pageW-40 {
 		t.Fatal("float frame text not found on the right")
 	}
 	// Exclusion edge = frame border-box left − margin-left (24pt).
 	limit := frameX - 24
+
 	for _, op := range res.Ops {
 		if op.Kind != OpText || strings.Contains(op.Text, "FRAME") {
 			continue
 		}
+
 		right := op.X + op.W
 		if right > limit+1.5 {
 			t.Fatalf("in-flow text %q ends at x=%.1f, enters float margin (limit %.1f, frame %.1f)",

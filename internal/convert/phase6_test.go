@@ -15,14 +15,18 @@ import (
 // longBody builds an HTML body long enough to span at least two pages.
 func longBody(marker string) string {
 	var b bytes.Buffer
+
 	b.WriteString("<html><body>")
-	for i := 0; i < 60; i++ {
+
+	for i := range 60 {
 		b.WriteString("<p>paragraph ")
-		b.WriteString(string(rune('a' + i%26)))
+		b.WriteRune(rune('a' + i%26))
 		b.WriteString(" with some words to wrap across the page width</p>")
 	}
+
 	b.WriteString(marker)
 	b.WriteString("</body></html>")
+
 	return b.String()
 }
 
@@ -38,30 +42,38 @@ func TestTextHeaderFooter(t *testing.T) {
 	if pages < 2 {
 		t.Fatalf("pages = %d, want >= 2", pages)
 	}
+
 	want1 := []byte("Page 1/" + itoa(pages))
 	want2 := []byte("Page 2/" + itoa(pages))
+
 	if !bytes.Contains(data, want1) {
 		t.Errorf("page 1 header missing %q", want1)
 	}
+
 	if !bytes.Contains(data, want2) {
 		t.Errorf("page 2 header missing %q", want2)
 	}
+
 	if !bytes.Contains(data, []byte("doc T")) {
 		t.Error("[title] placeholder not substituted in footer")
 	}
 	// Baselines must sit inside the page (ascent below top, descent above bottom).
 	// The previous sign error placed headers at pageH+ascent and footers at -descent.
 	re := regexp.MustCompile(`([\d.]+)\s+([\d.\-]+)\s+Td\n\((Page \d+/|doc T)`)
+
 	matches := re.FindAllSubmatch(data, -1)
 	if len(matches) == 0 {
 		t.Fatal("no header/footer Td positions found")
 	}
+
 	pageH := 841.89 // A4 default
+
 	for _, m := range matches {
 		y, err := strconv.ParseFloat(string(m[2]), 64)
 		if err != nil {
 			t.Fatal(err)
 		}
+
 		if y < 0 || y > pageH {
 			t.Errorf("HF baseline y=%.3f for %q is outside page [0, %.2f]", y, m[3], pageH)
 		}
@@ -73,10 +85,12 @@ func TestPlaceholderReplace(t *testing.T) {
 	cmd.Global.Footer.Center = "[who] inc. - [unknown]"
 	cmd.Global.Header.Replace = map[string]string{"[who]": "Acme"}
 	cmd.Global.UseCompression = false
+
 	data := runPDF(t, cmd)
 	if !bytes.Contains(data, []byte("Acme inc.")) {
 		t.Error("--replace key not substituted in footer text")
 	}
+
 	if !bytes.Contains(data, []byte("[unknown]")) {
 		t.Error("unknown placeholder must pass through literally")
 	}
@@ -84,11 +98,12 @@ func TestPlaceholderReplace(t *testing.T) {
 
 func TestSectionSubsectionPlaceholder(t *testing.T) {
 	body := `<html><body><h1>Chap A</h1><h2>Sec B</h2><p>` +
-		`text text text text text text text text text text text text ` +
-		`text text text text text text text text text text text text</p></body></html>`
+		"text " +
+		"text text</p></body></html>"
 	cmd, _ := newCommand(t, body, filepath.Join(t.TempDir(), "out.pdf"))
 	cmd.Global.Header.Right = "[section]/[subsection]"
 	cmd.Global.UseCompression = false
+
 	data := runPDF(t, cmd)
 	if !bytes.Contains(data, []byte("Chap A/Sec B")) {
 		t.Error("[section]/[subsection] placeholders not resolved from the outline")
@@ -97,6 +112,7 @@ func TestSectionSubsectionPlaceholder(t *testing.T) {
 
 func TestOutlineWiring(t *testing.T) {
 	cmd, _ := newCommand(t, `<html><body><h1>Book One</h1><p>text</p></body></html>`, filepath.Join(t.TempDir(), "out.pdf"))
+
 	data := runPDF(t, cmd)
 	for _, want := range []string{
 		"/Outlines", "/PageMode /UseOutlines",
@@ -113,6 +129,7 @@ func TestOutlineWiring(t *testing.T) {
 func TestOutlineDisabled(t *testing.T) {
 	cmd, _ := newCommand(t, `<html><body><h1>Book</h1></body></html>`, filepath.Join(t.TempDir(), "out.pdf"))
 	cmd.Global.Outline = false
+
 	data := runPDF(t, cmd)
 	if bytes.Contains(data, []byte("/Outlines")) {
 		t.Error("outline present although --outline is disabled")
@@ -135,6 +152,7 @@ func tocCommand(t *testing.T, out string) *cli.Command {
 	cmd.Objects = append([]settings.PdfObject{toc}, cmd.Objects...)
 	cmd.Global.TOC.ForwardLinks = true
 	cmd.Global.UseCompression = false
+
 	return cmd
 }
 
@@ -174,13 +192,16 @@ func TestInternalLinkDest(t *testing.T) {
 
 func TestHTMLHeader(t *testing.T) {
 	dir := t.TempDir()
+
 	headerPath := filepath.Join(dir, "header.html")
 	if err := os.WriteFile(headerPath, []byte(`<html><body><b>HEADERMARK</b> from file</body></html>`), 0o644); err != nil {
 		t.Fatal(err)
 	}
+
 	cmd, _ := newCommand(t, `<html><body><p>body</p></body></html>`, filepath.Join(t.TempDir(), "out.pdf"))
 	cmd.Global.Header.HTMLURL = headerPath
 	cmd.Global.UseCompression = false
+
 	data := runPDF(t, cmd)
 	if !bytes.Contains(data, []byte("HEADERMARK")) {
 		t.Error("HTML header text not present in output")
@@ -189,14 +210,17 @@ func TestHTMLHeader(t *testing.T) {
 
 func TestHTMLHeaderPlaceholderPerPage(t *testing.T) {
 	dir := t.TempDir()
+
 	headerPath := filepath.Join(dir, "header.html")
 	if err := os.WriteFile(headerPath, []byte(`<html><body><p>page [page] of [topage]</p></body></html>`), 0o644); err != nil {
 		t.Fatal(err)
 	}
+
 	cmd, _ := newCommand(t, longBody(""), filepath.Join(t.TempDir(), "out.pdf"))
 	cmd.Global.Header.HTMLURL = headerPath
 	cmd.Global.UseCompression = false
 	data := runPDF(t, cmd)
+
 	pages := pageCount(data)
 	if pages < 2 {
 		t.Fatalf("pages = %d, want >= 2", pages)
@@ -211,10 +235,13 @@ func TestHTMLHeaderPlaceholderPerPage(t *testing.T) {
 func TestHTMLHeaderRawMarkupRejected(t *testing.T) {
 	cmd, _ := newCommand(t, `<html><body><p>x</p></body></html>`, filepath.Join(t.TempDir(), "out.pdf"))
 	cmd.Global.Header.HTMLURL = "<html><body>bad</body></html>"
+
 	var log bytes.Buffer
+
 	if err := RunPDF(cmd, &log); err != nil {
 		t.Fatalf("RunPDF: %v", err)
 	}
+
 	if !bytes.Contains(log.Bytes(), []byte("warning")) {
 		t.Errorf("expected a warning for markup-as-URL, log: %q", log.String())
 	}
@@ -225,25 +252,32 @@ func TestHTMLHeaderRawMarkupRejected(t *testing.T) {
 // Path doubling ("…/golden/testdata/golden/header.html") previously skipped HF.
 func TestHTMLHeaderRelativePathCWD(t *testing.T) {
 	root := t.TempDir()
+
 	dir := filepath.Join(root, "testdata", "golden")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
+
 	headerRel := filepath.Join("testdata", "golden", "header.html")
 	pageRel := filepath.Join("testdata", "golden", "page.html")
+
 	if err := os.WriteFile(filepath.Join(root, headerRel), []byte(`<html><body><b>RELHFMARK</b></body></html>`), 0o644); err != nil {
 		t.Fatal(err)
 	}
+
 	if err := os.WriteFile(filepath.Join(root, pageRel), []byte(`<html><body><p>BODYREL</p></body></html>`), 0o644); err != nil {
 		t.Fatal(err)
 	}
+
 	old, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if err := os.Chdir(root); err != nil {
 		t.Fatal(err)
 	}
+
 	t.Cleanup(func() { _ = os.Chdir(old) })
 
 	obj := settings.DefaultPdfObject()
@@ -259,20 +293,26 @@ func TestHTMLHeaderRelativePathCWD(t *testing.T) {
 	cmd.Global.Margin.Top = -1
 	cmd.Global.UseCompression = false
 	cmd.Global.Outline = false
+
 	var log bytes.Buffer
+
 	if err := RunPDF(cmd, &log); err != nil {
 		t.Fatalf("RunPDF: %v\nlog: %s", err, log.String())
 	}
+
 	data, err := os.ReadFile(cmd.Output)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if bytes.Contains(log.Bytes(), []byte("no such file")) {
 		t.Fatalf("HF path failed to resolve (path doubling?): %s", log.String())
 	}
+
 	if !bytes.Contains(data, []byte("RELHFMARK")) {
 		t.Error("relative --header-html text missing from PDF")
 	}
+
 	if !bytes.Contains(data, []byte("BODYREL")) {
 		t.Error("body text missing")
 	}
@@ -284,10 +324,12 @@ func TestAutoMargin(t *testing.T) {
 	cmd.Global.Margin.Bottom = 10
 	cmd.Global.Header.Left = "TOPHEADER"
 	cmd.Global.UseCompression = false
+
 	data := runPDF(t, cmd)
 	if !bytes.Contains(data, []byte("TOPHEADER")) {
 		t.Error("auto-margin header text missing")
 	}
+
 	if !bytes.Contains(data, []byte("BODYTEXT")) {
 		t.Error("auto-margin body text missing")
 	}
@@ -299,10 +341,12 @@ func TestExternalLinksDefaultOn(t *testing.T) {
 	body := `<html><body><p>see <a href="http://example.com/x">link</a></p></body></html>`
 	cmd, _ := newCommand(t, body, filepath.Join(t.TempDir(), "out.pdf"))
 	cmd.Global.UseCompression = false
+
 	data := runPDF(t, cmd)
 	if !bytes.Contains(data, []byte("/Annots [")) {
 		t.Fatal("expected a link annotation")
 	}
+
 	if !bytes.Contains(data, []byte("/URI")) || !bytes.Contains(data, []byte("http://example.com/x")) {
 		t.Error("expected an external URI annotation")
 	}
@@ -313,6 +357,7 @@ func TestExternalLinksDisableHonored(t *testing.T) {
 	cmd, _ := newCommand(t, body, filepath.Join(t.TempDir(), "out.pdf"))
 	cmd.Objects[0].ExternalLinks = false
 	cmd.Global.UseCompression = false
+
 	data := runPDF(t, cmd)
 	if bytes.Contains(data, []byte("http://example.com/x")) {
 		t.Error("ExternalLinks=false must strip external URI annotations")
@@ -328,6 +373,7 @@ func TestCoverNoHeaderFooter(t *testing.T) {
 	cmd.Global.Header.Left = "HDR"
 	cmd.Global.Footer.Right = "FTR"
 	cmd.Global.UseCompression = false
+
 	data := runPDF(t, cmd)
 	if n := pageCount(data); n != 2 {
 		t.Fatalf("pages = %d, want 2", n)
@@ -342,6 +388,7 @@ func TestFromPagePlaceholder(t *testing.T) {
 	cmd, _ := newCommand(t, longBody(""), filepath.Join(t.TempDir(), "out.pdf"))
 	cmd.Global.Header.Left = "f[frompage]"
 	cmd.Global.UseCompression = false
+
 	data := runPDF(t, cmd)
 	if !bytes.Contains(data, []byte("(f1) Tj")) {
 		t.Error("[frompage] placeholder not substituted on the first page")

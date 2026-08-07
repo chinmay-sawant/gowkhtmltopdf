@@ -8,6 +8,7 @@ import (
 
 func TestDefaultPdfGlobalSnapshot(t *testing.T) {
 	g := DefaultPdfGlobal()
+
 	checks := []struct {
 		name string
 		got  any
@@ -30,12 +31,15 @@ func TestDefaultPdfGlobalSnapshot(t *testing.T) {
 			t.Errorf("%s = %v, want %v", c.name, c.got, c.want)
 		}
 	}
+
 	if g.Margin.Top != 10 || g.Margin.Bottom != 10 || g.Margin.Left != 10 || g.Margin.Right != 10 {
 		t.Errorf("default margins = %+v, want 10mm all sides", g.Margin)
 	}
+
 	if g.Header.FontSize != 12 || g.Header.FontName != "Arial" || g.Header.Spacing != 0 {
 		t.Errorf("default header = %+v, want Arial 12 spacing 0", g.Header)
 	}
+
 	if g.TOC.CaptionText != "Table of Contents" || g.TOC.FontScale != 0.8 || !g.TOC.DottedLines {
 		t.Errorf("default toc = %+v", g.TOC)
 	}
@@ -53,6 +57,7 @@ func TestDefaultLoadPageSnapshot(t *testing.T) {
 	if !o.Load.BlockLocalFileAccess {
 		t.Error("default blockLocalFileAccess must be true")
 	}
+
 	if o.Load.LoadErrorHandling != LoadErrorAbort {
 		t.Error("default loadErrorHandling must be abort")
 	}
@@ -160,11 +165,14 @@ func TestGlobalSetDottedKeys(t *testing.T) {
 			}
 		}},
 	}
+
 	for _, tt := range tests {
 		if err := g.Set(tt.key, tt.val); err != nil {
 			t.Errorf("Set(%q, %q) error: %v", tt.key, tt.val, err)
+
 			continue
 		}
+
 		tt.check(t)
 	}
 }
@@ -176,6 +184,7 @@ func TestGlobalSetIgnoredKeys(t *testing.T) {
 		if err := g.Set(key, "1"); err != nil {
 			t.Errorf("Set(%q) should accept ignored key: %v", key, err)
 		}
+
 		if g.Ignored[key] != "1" {
 			t.Errorf("Ignored[%q] = %q, want 1", key, g.Ignored[key])
 		}
@@ -198,36 +207,47 @@ func TestObjectSetDottedKeys(t *testing.T) {
 	if err := o.Set("load.blocklocalfileaccess", "false"); err != nil {
 		t.Fatal(err)
 	}
+
 	if o.Load.BlockLocalFileAccess {
 		t.Error("blocklocalfileaccess should be false")
 	}
+
 	if err := o.Set("load.timeout", "30"); err != nil {
 		t.Fatal(err)
 	}
+
 	if o.Load.Timeout != 30 {
 		t.Errorf("timeout = %d", o.Load.Timeout)
 	}
+
 	if err := o.Set("header.left", "objheader"); err != nil {
 		t.Fatal(err)
 	}
+
 	if !o.HeaderSet || o.Header.Left != "objheader" {
 		t.Errorf("object header = %+v (set=%v)", o.Header, o.HeaderSet)
 	}
+
 	if err := o.Set("footer.right", "objfooter"); err != nil {
 		t.Fatal(err)
 	}
+
 	if !o.FooterSet || o.Footer.Right != "objfooter" {
 		t.Errorf("object footer = %+v (set=%v)", o.Footer, o.FooterSet)
 	}
+
 	if err := o.Set("web.images", "false"); err != nil {
 		t.Fatal(err)
 	}
+
 	if o.Web.Images {
 		t.Error("web.images should be false")
 	}
+
 	if err := o.Set("web.simplifydom", "true"); err != nil {
 		t.Fatal(err)
 	}
+
 	if !o.Web.SimplifyDOM {
 		t.Error("web.simplifydom should be true")
 	}
@@ -238,15 +258,19 @@ func TestObjectSetIgnoredKeys(t *testing.T) {
 	if err := o.Set("load.jsdelay", "500"); err != nil {
 		t.Fatalf("jsdelay should be accepted as ignored: %v", err)
 	}
+
 	if o.Ignored["load.jsdelay"] != "500" {
 		t.Errorf("Ignored jsdelay = %q", o.Ignored["load.jsdelay"])
 	}
+
 	if err := o.Set("web.javascript", "false"); err != nil {
 		t.Fatalf("web.javascript should be accepted as ignored: %v", err)
 	}
+
 	if o.Ignored["web.javascript"] != "false" {
 		t.Errorf("Ignored web.javascript = %q", o.Ignored["web.javascript"])
 	}
+
 	if err := o.Set("pagescount", "false"); err != nil {
 		t.Fatalf("pagescount should be accepted as ignored: %v", err)
 	}
@@ -272,15 +296,19 @@ func TestParseUnitReal(t *testing.T) {
 		u, err := ParseUnitReal(tt.in, "")
 		if err != nil {
 			t.Errorf("ParseUnitReal(%q): %v", tt.in, err)
+
 			continue
 		}
+
 		if u.Value != tt.val || u.Unit != tt.unit {
 			t.Errorf("ParseUnitReal(%q) = %+v, want val=%v unit=%q", tt.in, u, tt.val, tt.unit)
 		}
 	}
+
 	if _, err := ParseUnitReal("abc", "mm"); !errors.Is(err, ErrInvalidUnitReal) {
 		t.Errorf("expected ErrInvalidUnitReal for %q, got %v", "abc", err)
 	}
+
 	if _, err := ParseUnitReal("", "mm"); !errors.Is(err, ErrInvalidUnitReal) {
 		t.Errorf("expected ErrInvalidUnitReal for empty")
 	}
@@ -288,18 +316,22 @@ func TestParseUnitReal(t *testing.T) {
 
 func TestUnitRealPoints(t *testing.T) {
 	u, _ := ParseUnitReal("10mm", "mm")
+
 	pt, ok := u.Points()
 	if !ok || math.Abs(pt-28.346) > 0.01 {
 		t.Errorf("10mm = %v pt (ok=%v)", pt, ok)
 	}
+
 	u, _ = ParseUnitReal("72pt", "pt")
 	if pt, _ := u.Points(); pt != 72 {
 		t.Errorf("72pt = %v", pt)
 	}
+
 	u, _ = ParseUnitReal("96px", "px")
 	if pt, _ := u.Points(); pt != 72 {
 		t.Errorf("96px = %v pt, want 72", pt)
 	}
+
 	u, _ = ParseUnitReal("2em", "em")
 	if _, ok := u.Points(); ok {
 		t.Error("em must not convert without font context")
@@ -311,10 +343,12 @@ func TestParsePageSize(t *testing.T) {
 	if err != nil || math.Abs(w-595.28) > 0.1 || math.Abs(h-841.89) > 0.1 {
 		t.Errorf("A4 = %v x %v, err %v", w, h, err)
 	}
+
 	w, h, err = ParsePageSize("letter")
 	if err != nil || w != 612 || h != 792 {
 		t.Errorf("letter = %v x %v, err %v", w, h, err)
 	}
+
 	if _, _, err := ParsePageSize("Bogus"); err == nil {
 		t.Error("expected error for unknown size")
 	}
@@ -324,12 +358,15 @@ func TestParseEnums(t *testing.T) {
 	if v, _ := ParseOrientation("LANDSCAPE"); v != OrientationLandscape {
 		t.Error("orientation case-insensitive")
 	}
+
 	if v, err := ParseOrientation("diagonal"); err == nil || v != OrientationPortrait {
 		t.Error("invalid orientation must error")
 	}
+
 	if v, _ := ParseColorMode("grayscale"); v != ColorModeGrayscale {
 		t.Error("color-mode grayscale")
 	}
+
 	if v, _ := ParseLoadErrorHandling("skip"); v != LoadErrorSkip {
 		t.Error("load-error-handling skip")
 	}
@@ -339,9 +376,11 @@ func TestHttpErrorCode(t *testing.T) {
 	if HttpErrorCode(404) != 2 {
 		t.Error("404 must map to exit 2")
 	}
+
 	if HttpErrorCode(401) != 3 {
 		t.Error("401 must map to exit 3")
 	}
+
 	if HttpErrorCode(500) != 1 {
 		t.Error("500 must map to exit 1")
 	}
@@ -351,11 +390,14 @@ func TestHeaderForFooterForInherit(t *testing.T) {
 	g := DefaultPdfGlobal()
 	g.Header.Left = "global header"
 	o := DefaultPdfObject()
+
 	if o.HeaderFor(g).Left != "global header" {
 		t.Error("object must inherit global header")
 	}
+
 	o.HeaderSet = true
 	o.Header.Left = "own header"
+
 	if o.HeaderFor(g).Left != "own header" {
 		t.Error("object header override must win")
 	}
@@ -374,12 +416,15 @@ func TestImageSet(t *testing.T) {
 	if err := img.Set("width", "800"); err != nil {
 		t.Fatal(err)
 	}
+
 	if img.Width != 800 {
 		t.Errorf("width = %d", img.Width)
 	}
+
 	if err := img.Set("web.images", "false"); err != nil {
 		t.Fatal(err)
 	}
+
 	if img.Web.Images {
 		t.Error("web.images should be false")
 	}
@@ -387,6 +432,7 @@ func TestImageSet(t *testing.T) {
 	if err := img.Set("web.javascript", "true"); err != nil {
 		t.Fatal(err)
 	}
+
 	if img.Ignored["web.javascript"] != "true" {
 		t.Errorf("Ignored = %v", img.Ignored)
 	}
@@ -397,21 +443,27 @@ func TestGlobalGetSetRoundTripAndIgnored(t *testing.T) {
 	if err := g.Set("title", "Hi"); err != nil {
 		t.Fatal(err)
 	}
+
 	if got, ok := g.Get("title"); !ok || got != "Hi" {
 		t.Fatalf("Get(title)=%q,%v", got, ok)
 	}
+
 	if err := g.Set("dpi", "150"); err != nil {
 		t.Fatal(err)
 	}
+
 	if got, ok := g.Get("dpi"); !ok || got != "150" {
 		t.Fatalf("Get(dpi ignored)=%q,%v want 150,true", got, ok)
 	}
+
 	if _, ok := g.Get("totally.unknown"); ok {
 		t.Fatal("unknown key should not Get")
 	}
+
 	if err := g.Set("background", "false"); err != nil {
 		t.Fatal(err)
 	}
+
 	if got, ok := g.Get("web.background"); !ok || got != "false" {
 		t.Fatalf("Get(web.background)=%q,%v after Set(background)", got, ok)
 	}
@@ -423,16 +475,19 @@ func TestKeyTableSetGetParity(t *testing.T) {
 	g := DefaultPdfGlobal()
 	o := DefaultPdfObject()
 	img := DefaultImageGlobal()
+
 	for k := range globalKeys {
 		if _, ok := getForKey(&g, globalKeys, &g.Ignored, k); !ok {
 			t.Errorf("global key %q missing Get", k)
 		}
 	}
+
 	for k := range objectKeys {
 		if _, ok := getForKey(&o, objectKeys, &o.Ignored, k); !ok {
 			t.Errorf("object key %q missing Get", k)
 		}
 	}
+
 	for k := range imageKeys {
 		if _, ok := getForKey(&img, imageKeys, &img.Ignored, k); !ok {
 			t.Errorf("image key %q missing Get", k)
@@ -445,6 +500,7 @@ func TestBackgroundSingleFieldNoWebMirror(t *testing.T) {
 	if err := g.Set("web.background", "false"); err != nil {
 		t.Fatal(err)
 	}
+
 	if g.Background {
 		t.Fatal("Global.Background should be false")
 	}
@@ -453,6 +509,7 @@ func TestBackgroundSingleFieldNoWebMirror(t *testing.T) {
 	if !ok || got != "false" {
 		t.Fatalf("Get(web.background)=%q,%v", got, ok)
 	}
+
 	got2, ok := g.Get("background")
 	if !ok || got2 != "false" {
 		t.Fatalf("Get(background)=%q,%v", got2, ok)
@@ -469,18 +526,23 @@ func TestResolveMedia(t *testing.T) {
 	if got := ResolveMedia(base, none, nil); got != "print" {
 		t.Errorf("default PDF = %q", got)
 	}
+
 	if got := ResolveMedia("screen", none, nil); got != "screen" {
 		t.Errorf("default image = %q", got)
 	}
+
 	if got := ResolveMedia(base, pmt, nil); got != "print" {
 		t.Errorf("global print-media-type = %q", got)
 	}
+
 	if got := ResolveMedia(base, none, &pmt); got != "print" {
 		t.Errorf("obj print-media-type = %q", got)
 	}
+
 	if got := ResolveMedia(base, screen, nil); got != "screen" {
 		t.Errorf("global media-type screen = %q", got)
 	}
+
 	if got := ResolveMedia(base, none, &screen); got != "screen" {
 		t.Errorf("obj media-type screen = %q", got)
 	}
@@ -497,21 +559,27 @@ func TestResolveMedia(t *testing.T) {
 func TestApplyImageKeyBackgroundAlias(t *testing.T) {
 	g := DefaultPdfGlobal()
 	img := DefaultImageGlobal()
+
 	if err := ApplyImageKey(&g, &img, "web.background", "false"); err != nil {
 		t.Fatal(err)
 	}
+
 	if g.Background {
 		t.Error("web.background must route to PdfGlobal.Background")
 	}
+
 	if err := ApplyImageKey(&g, &img, "background", "true"); err != nil {
 		t.Fatal(err)
 	}
+
 	if !g.Background {
 		t.Error("background must route to PdfGlobal.Background")
 	}
+
 	if err := ApplyImageKey(&g, &img, "width", "800"); err != nil {
 		t.Fatal(err)
 	}
+
 	if img.Width != 800 {
 		t.Errorf("width must route to ImageGlobal: %d", img.Width)
 	}

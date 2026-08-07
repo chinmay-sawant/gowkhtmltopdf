@@ -30,7 +30,9 @@ func TestSeverityOf(t *testing.T) {
 
 func TestEmit(t *testing.T) {
 	var buf w
+
 	Emit(&buf, Warn, "object %d: %s", 1, "boom")
+
 	if got := buf.String(); got != "warning: object 1: boom\n" {
 		t.Errorf("Emit(Warn) = %q", got)
 	}
@@ -40,6 +42,7 @@ type w struct{ s string }
 
 func (w *w) Write(p []byte) (int, error) {
 	w.s += string(p)
+
 	return len(p), nil
 }
 

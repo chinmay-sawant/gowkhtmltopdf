@@ -22,6 +22,7 @@ func HttpErrorCode(status int) int {
 	case 401:
 		return 3
 	}
+
 	return 1
 }
 

@@ -2,6 +2,7 @@ package convert
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"regexp"
@@ -33,6 +34,7 @@ type hfGeom struct {
 func (g *hfGeom) recomputeContent() {
 	g.contentW = g.pageW - g.marginLeft - g.marginRight
 	g.contentH = g.pageH - g.marginTop - g.marginBottom
+
 	if g.contentH <= 0 {
 		g.contentH = g.pageH
 	}
@@ -55,6 +57,7 @@ func (g hfGeom) pdfRect(loc layout.ElementLocation) [4]float64 {
 	x1 := g.marginLeft + loc.X
 	yTop := g.pdfY(loc.Page, loc.Y)
 	yBot := g.pageH - g.marginTop - (loc.Y + loc.H - float64(loc.Page)*g.contentH)
+
 	return [4]float64{x1, yBot, x1 + loc.W, yTop}
 }
 
@@ -87,8 +90,10 @@ func (p hfParms) substitute(s string) string {
 		if k == "" {
 			continue
 		}
+
 		s = strings.ReplaceAll(s, k, v)
 	}
+
 	return placeholderToken.ReplaceAllStringFunc(s, func(tok string) string {
 		name := tok[1 : len(tok)-1]
 		switch name {
@@ -115,6 +120,7 @@ func (p hfParms) substitute(s string) string {
 		case "subject":
 			return "" // no Subject setting in this build; expands to empty
 		}
+
 		return tok
 	})
 }
@@ -127,6 +133,7 @@ func knownIn(s string) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -136,6 +143,7 @@ func measureHF(font *pdf.Font, s string, size float64) float64 {
 	for _, r := range s {
 		w += font.AdvanceInPoints(r, size)
 	}
+
 	return w
 }
 
@@ -153,12 +161,15 @@ func drawTextHF(page *pdf.Page, hf settings.HeaderFooter, geom hfGeom, parms hfP
 	if !headerHasContent(hf) {
 		return
 	}
+
 	c := page.Content()
 	c.UseEmbeddedFont("F0", font)
+
 	size := hf.FontSize
 	if size <= 0 {
 		size = 12
 	}
+
 	spacing := hf.Spacing * mmToPt
 	ascent := float64(font.Ascent()) * size / float64(font.UnitsPerEm())
 	descent := float64(-font.Descent()) * size / float64(font.UnitsPerEm())
@@ -173,11 +184,13 @@ func drawTextHF(page *pdf.Page, hf settings.HeaderFooter, geom hfGeom, parms hfP
 	}
 
 	c.SetFillColor(0, 0, 0)
+
 	if hf.Line {
 		ly := geom.marginBottom
 		if isHeader {
 			ly = page.Height() - geom.marginTop
 		}
+
 		c.SetStrokeColor(0, 0, 0)
 		c.SetLineWidth(1)
 		c.MoveTo(geom.marginLeft, ly)
@@ -190,6 +203,7 @@ func drawTextHF(page *pdf.Page, hf settings.HeaderFooter, geom hfGeom, parms hfP
 		if text == "" {
 			return
 		}
+
 		c.SetFont("F0", size)
 		c.BeginText()
 		c.TextAt(x, baseY)
@@ -199,9 +213,11 @@ func drawTextHF(page *pdf.Page, hf settings.HeaderFooter, geom hfGeom, parms hfP
 	if hf.Left != "" {
 		draw(hf.Left, geom.marginLeft)
 	}
+
 	if hf.Center != "" {
 		draw(hf.Center, (page.Width()-measureHF(font, parms.substitute(hf.Center), size))/2)
 	}
+
 	if hf.Right != "" {
 		draw(hf.Right, page.Width()-geom.marginRight-measureHF(font, parms.substitute(hf.Right), size))
 	}
@@ -245,42 +261,53 @@ func loadHTMLHF(ctx context.Context, loader *load.Loader, font *pdf.Font, st *ob
 	if load.IsHTML(rawOrURL) {
 		// upstream looksLikeHtmlAndNotAUrl: raw markup is not a URL
 		line.Emit(log, line.Warn, "object %d: header/footer html value looks like markup, not a URL; ignoring", st.idx)
+
 		return &htmlHFLayout{skip: true}, st.registry, nil
 	}
+
 	if st.resources.Loader != nil {
 		loader = st.resources.Loader
 	}
+
 	lp := st.lp
 	if st.resources.Loader != nil {
 		lp = st.resources.Load
 	}
+
 	res, err := loader.Load(ctx, rawOrURL, lp)
 	if err != nil {
 		return nil, nil, fmt.Errorf("header/footer html: %w", err)
 	}
+
 	raw := string(res.Body)
 	// Detect placeholders on the pristine document. Applying full substitute
 	// here with zero page counters used to rewrite [page]/[topage] to "0"
 	// and clear perPage, so draw never re-expanded them.
 	perPage := knownIn(raw)
+
 	for k, v := range st.repl {
 		if k == "" {
 			continue
 		}
+
 		raw = strings.ReplaceAll(raw, k, v)
 	}
+
 	measureRaw := raw
 	if perPage {
 		measureRaw = (hfParms{page: 1, topage: 1}).substitute(raw)
 	}
+
 	root, err := html.Parse(measureRaw)
 	if err != nil {
 		return nil, nil, fmt.Errorf("header/footer html: parse: %w", err)
 	}
+
 	media := st.media
 	if media == "" {
 		media = "print"
 	}
+
 	resources := NewResourceContext(loader, res.Base, lp)
 	sheets := resources.CollectSheets(ctx, root, SheetOptions{
 		ViewportW:   st.geom.contentW,
@@ -288,18 +315,22 @@ func loadHTMLHF(ctx context.Context, loader *load.Loader, font *pdf.Font, st *ob
 		MediaType:   media,
 		ObjectIndex: st.idx + 1,
 	}, log)
+
 	reg := resources.MergeFontFaces(ctx, st.registry, sheets, st.idx+1, log)
 	if reg == nil {
 		reg = st.registry
 	}
+
 	imagesFn := func(src string) ([]byte, error) {
 		if !st.imagesEnabled {
-			return nil, fmt.Errorf("images disabled")
+			return nil, errors.New("images disabled")
 		}
+
 		r, err := resources.Fetch(ctx, src)
 		if err != nil {
 			return nil, err
 		}
+
 		return r.Body, nil
 	}
 	l := &htmlHFLayout{
@@ -326,6 +357,7 @@ func loadHTMLHF(ctx context.Context, loader *load.Loader, font *pdf.Font, st *ob
 	if err != nil {
 		return nil, nil, fmt.Errorf("header/footer html: layout: %w", err)
 	}
+
 	return l, reg, nil
 }
 
@@ -352,17 +384,22 @@ func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hf setti
 	if hfL == nil || hfL.skip {
 		return nil
 	}
+
 	res := hfL.res
+
 	media := hfL.media
 	if media == "" {
 		media = "print"
 	}
+
 	if hfL.perPage {
 		raw := parms.substitute(hfL.raw)
+
 		root, err := html.Parse(raw)
 		if err != nil {
 			return err
 		}
+
 		res, err = layout.LayoutContext(ctx, root, layout.Options{
 			Width: hfL.width, Height: hfL.height, Font: hfL.font, Registry: hfL.registry,
 			Sheets: hfL.sheets, Media: media, Images: hfL.imagesFn,
@@ -371,9 +408,11 @@ func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hf setti
 			return err
 		}
 	}
+
 	if links.resolve {
 		resolveRelativeLinkURIs(res.Ops, hfL.base)
 	}
+
 	spacing := hf.Spacing * mmToPt
 	pageH := page.Height()
 	// Clip to the reserved margin band. Footer band is the bottom strip
@@ -382,6 +421,7 @@ func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hf setti
 	// incorrectly clipped footer ink out of the page.)
 	bandTop := 0.0
 	bandH := geom.marginBottom
+
 	if isHeader {
 		bandTop = pageH - geom.marginTop
 		bandH = geom.marginTop
@@ -401,6 +441,7 @@ func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hf setti
 	c.Clip()
 	paintLayoutOps(ctx, page, c, res.Ops, geom.marginLeft, yTop, links)
 	c.Restore()
+
 	return nil
 }
 
@@ -412,49 +453,63 @@ func paintLayoutOps(ctx context.Context, page *pdf.Page, c *pdf.Content, ops []l
 		OriginX: originX,
 		OriginY: yTop,
 	})
+
 	for i := range ops {
 		op := &ops[i]
 		if op.Kind != layout.OpLinkURI {
 			continue
 		}
+
 		x := originX + op.X
 		y1 := yTop - (op.Y + op.H)
 		y2 := yTop - op.Y
+
 		if y2 < y1 {
 			y1, y2 = y2, y1
 		}
+
 		rect := [4]float64{x, y1, x + op.W, y2}
 		if op.W <= 0 {
 			rect[2] = x + 10
 		}
+
 		if op.H <= 0 {
 			rect[1] = yTop - op.Y - 10
 		}
+
 		uri := op.URI
 		if uri == "" {
 			continue
 		}
+
 		if len(uri) > 0 && uri[0] == '#' {
 			frag := uri[1:]
 			if !links.useLocal || frag == "" || links.idIndex == nil {
 				continue
 			}
+
 			dest, ok := links.idIndex[frag]
 			if !ok {
 				continue
 			}
+
 			logical := logicalDestPage(dest, links.tocTotal)
 			destPage := logical
+
 			if links.plan != nil {
 				destPage = links.plan.Remap(logical, links.srcPage)
 			}
+
 			dx, dy := dest.st.geom.pdfXY(dest.loc)
 			page.AddLinkDest(rect, destPage, dx, dy)
+
 			continue
 		}
+
 		if !links.useExt {
 			continue
 		}
+
 		page.AddLinkURI(rect, uri)
 	}
 }
@@ -467,29 +522,37 @@ func hfHeightFor(ctx context.Context, loader *load.Loader, font *pdf.Font, st *o
 	if !headerHasContent(hf) {
 		return 0, st.registry, nil
 	}
+
 	if hf.HTMLURL != "" {
 		l, reg, err := loadHTMLHF(ctx, loader, font, st, hf.HTMLURL, log)
 		if err != nil {
 			return 0, nil, err
 		}
+
 		if reg != nil {
 			st.registry = reg // next HF band (footer) sees header faces
 		}
+
 		if isHeader {
 			st.headerHTML = l
 		} else {
 			st.footerHTML = l
 		}
+
 		if l.skip || l.res == nil {
 			return 0, st.registry, nil
 		}
+
 		return l.res.Height, st.registry, nil
 	}
+
 	size := hf.FontSize
 	if size <= 0 {
 		size = 12
 	}
+
 	h := (float64(font.Ascent()) - float64(font.Descent())) / float64(font.UnitsPerEm()) * size
+
 	return h, st.registry, nil
 }
 
@@ -506,16 +569,21 @@ func effectiveMargins(ctx context.Context, loader *load.Loader, font *pdf.Font, 
 		if err != nil {
 			return nil, err
 		}
+
 		st.geom.marginTop = h + st.header.Spacing*mmToPt
 	}
+
 	if g.Margin.Bottom < 0 {
 		h, _, err := hfHeightFor(ctx, loader, font, st, st.footer, false, log)
 		if err != nil {
 			return nil, err
 		}
+
 		st.geom.marginBottom = h + st.footer.Spacing*mmToPt
 	}
+
 	st.geom.recomputeContent()
+
 	return st.registry, nil
 }
 
@@ -529,18 +597,22 @@ func drawHeadersFooters(ctx context.Context, loader *load.Loader, font *pdf.Font
 	date := now.Format("2006-01-02")
 	clock := now.Format("15:04:05")
 	idIndex := buildBodyIDIndex(planBodyStates(plan))
+
 	tocTotal := 0
 	if plan != nil {
 		tocTotal = plan.tocTotal
 	}
-	for p := 0; p < total; p++ {
+
+	for p := range total {
 		own, ok := plan.OwnerOf(p)
 		if !ok || own.st == nil {
 			continue
 		}
+
 		if own.st.obj.IsCover {
 			continue
 		}
+
 		parms := hfParms{
 			page:     p + 1 + req.Global.PageOffset,
 			topage:   total,
@@ -555,10 +627,12 @@ func drawHeadersFooters(ctx context.Context, loader *load.Loader, font *pdf.Font
 		if !own.st.isTOC {
 			parms.section, parms.subsection = outline.SectionOfBy(headings, p-tocTotal, outline.DocumentPage)
 		}
+
 		page := doc.PageAt(p)
 		if page == nil {
 			continue
 		}
+
 		links := hfLinkContext{
 			idIndex:  idIndex,
 			tocTotal: tocTotal,
@@ -572,33 +646,43 @@ func drawHeadersFooters(ctx context.Context, loader *load.Loader, font *pdf.Font
 			if !headerHasContent(hf) {
 				return
 			}
+
 			if hf.HTMLURL != "" {
 				l := own.st.headerHTML
 				if !isHeader {
 					l = own.st.footerHTML
 				}
+
 				if l == nil {
 					var err error
+
 					var reg *pdf.Registry
+
 					l, reg, err = loadHTMLHF(ctx, loader, font, own.st, hf.HTMLURL, log)
 					if err != nil {
 						line.Emit(log, line.Warn, "object %d: header/footer html: %v", own.st.idx, err)
+
 						return
 					}
+
 					if reg != nil {
 						own.st.registry = reg
 					}
+
 					if isHeader {
 						own.st.headerHTML = l
 					} else {
 						own.st.footerHTML = l
 					}
 				}
+
 				if err := drawHTMLHF(ctx, page, l, hf, own.st.geom, parms, isHeader, links); err != nil {
 					line.Emit(log, line.Warn, "object %d: header/footer html draw: %v", own.st.idx, err)
 				}
+
 				return
 			}
+
 			drawTextHF(page, hf, own.st.geom, parms, font, isHeader)
 		}
 		draw(own.st.header, true)
@@ -611,14 +695,20 @@ func planBodyStates(plan *pagePlan) []*objectState {
 	if plan == nil {
 		return nil
 	}
+
 	seen := map[*objectState]bool{}
+
 	var out []*objectState
+
 	for _, own := range plan.owners {
 		if own.st == nil || own.st.isTOC || seen[own.st] {
 			continue
 		}
+
 		seen[own.st] = true
+
 		out = append(out, own.st)
 	}
+
 	return out
 }

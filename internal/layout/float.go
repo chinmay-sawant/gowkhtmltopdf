@@ -43,11 +43,13 @@ func newFloatState(contentX, contentW float64) floatState {
 // the floats named by clear ("left"|"right"|"both").
 func (f *floatState) clear(clear string, y, cy float64) float64 {
 	need := y + cy
+
 	switch clear {
 	case "left":
 		if f.hasLeft && f.leftBottom > need {
 			need = f.leftBottom
 		}
+
 		f.hasLeft = false
 		f.leftBottom = 0
 		f.leftTop = 0
@@ -56,6 +58,7 @@ func (f *floatState) clear(clear string, y, cy float64) float64 {
 		if f.hasRight && f.rightBottom > need {
 			need = f.rightBottom
 		}
+
 		f.hasRight = false
 		f.rightBottom = 0
 		f.rightTop = 0
@@ -64,18 +67,22 @@ func (f *floatState) clear(clear string, y, cy float64) float64 {
 		if f.hasLeft && f.leftBottom > need {
 			need = f.leftBottom
 		}
+
 		if f.hasRight && f.rightBottom > need {
 			need = f.rightBottom
 		}
+
 		f.hasLeft, f.hasRight = false, false
 		f.leftBottom, f.rightBottom = 0, 0
 		f.leftTop, f.rightTop = 0, 0
 		f.leftEdge = f.contentX
 		f.rightEdge = f.contentX + f.contentW
 	}
+
 	if need > y+cy {
 		return need - y
 	}
+
 	return cy
 }
 
@@ -85,30 +92,37 @@ func (f *floatState) clear(clear string, y, cy float64) float64 {
 // float:right; margin-left:1em), instead of painting flush against the frame.
 func (f *floatState) place(side string, b *box, ml, mr float64) {
 	bottom := b.y + b.h
+
 	switch side {
 	case "left":
 		if !f.hasLeft || bottom > f.leftBottom {
 			f.leftBottom = bottom
 		}
+
 		if !f.hasLeft || b.y < f.leftTop {
 			f.leftTop = b.y
 		}
+
 		edge := b.x + b.w + mr
 		if !f.hasLeft || edge > f.leftEdge {
 			f.leftEdge = edge
 		}
+
 		f.hasLeft = true
 	case "right":
 		if !f.hasRight || bottom > f.rightBottom {
 			f.rightBottom = bottom
 		}
+
 		if !f.hasRight || b.y < f.rightTop {
 			f.rightTop = b.y
 		}
+
 		edge := b.x - ml
 		if !f.hasRight || edge < f.rightEdge {
 			f.rightEdge = edge
 		}
+
 		f.hasRight = true
 	}
 }
@@ -119,21 +133,25 @@ func (f *floatState) place(side string, b *box, ml, mr float64) {
 func (f *floatState) exclusion(contentX, contentW, y, cy float64) (x, w float64) {
 	x, w = contentX, contentW
 	top := y + cy
+
 	if f.hasLeft && f.leftBottom > top {
 		if f.leftEdge > x {
 			w -= f.leftEdge - x
 			x = f.leftEdge
 		}
 	}
+
 	if f.hasRight && f.rightBottom > top {
 		limit := f.rightEdge
 		if limit < x+w {
 			w = limit - x
 		}
 	}
+
 	if w < 0 {
 		w = 0
 	}
+
 	return x, w
 }
 
@@ -144,9 +162,11 @@ func (f *floatState) clearY(top float64) float64 {
 	if f.hasLeft && f.leftBottom > next {
 		next = f.leftBottom
 	}
+
 	if f.hasRight && f.rightBottom > next {
 		next = f.rightBottom
 	}
+
 	return next
 }
 
@@ -158,9 +178,11 @@ func (f *floatState) extentCy(y, cy float64) float64 {
 	if f.hasLeft && f.leftBottom > end {
 		end = f.leftBottom
 	}
+
 	if f.hasRight && f.rightBottom > end {
 		end = f.rightBottom
 	}
+
 	return end - y
 }
 
@@ -171,14 +193,17 @@ func establishesBFC(st ResolvedStyle) bool {
 	if st.Float != "none" {
 		return true
 	}
+
 	switch st.Display {
 	case "flow-root", "inline-block", "table-cell", "table-caption",
 		"flex", "inline-flex", "grid", "inline-grid":
 		return true
 	}
+
 	switch st.Overflow {
 	case "hidden", "scroll", "auto", "clip":
 		return true
 	}
+
 	return false
 }

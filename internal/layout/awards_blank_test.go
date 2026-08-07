@@ -18,22 +18,28 @@ h2, h3 { font-size: 14pt; margin: 8pt 0 4pt; page-break-after: avoid; }
 .wikitable { border-collapse: collapse; page-break-inside: avoid; margin: 1em 0; font-size: 10pt; }
 td, th { border: 1px solid #aaa; padding: 3pt; }
 `)
+
 	var filmRows strings.Builder
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		filmRows.WriteString(fmt.Sprintf(`<tr><td>%d</td><td>Film %d</td><td>Role</td><td>Notes here</td></tr>`, 2006+i, i))
 	}
+
 	var awardRows strings.Builder
 	// rowspan=6 on year like wiki awards
 	awardRows.WriteString(`<tr><td rowspan="6">2019</td><td>Award A</td><td>Cat</td><td>Work</td><td>Nom</td></tr>`)
-	for i := 0; i < 5; i++ {
+
+	for i := range 5 {
 		awardRows.WriteString(fmt.Sprintf(`<tr><td>Award %d</td><td>Cat</td><td>Work</td><td>Nom</td></tr>`, i))
 	}
+
 	for y := 2020; y <= 2024; y++ {
 		awardRows.WriteString(fmt.Sprintf(`<tr><td rowspan="4">%d</td><td>Award</td><td>Cat</td><td>Work</td><td>Nom</td></tr>`, y))
-		for i := 0; i < 3; i++ {
+
+		for range 3 {
 			awardRows.WriteString(`<tr><td>Award</td><td>Cat</td><td>Work</td><td>Nom</td></tr>`)
 		}
 	}
+
 	src := `<html><body>
 <section>
 <h2>Filmography</h2>
@@ -51,11 +57,14 @@ td, th { border: 1px solid #aaa; padding: 3pt; }
 ` + awardRows.String() + `</table>
 </section>
 </body></html>`
+
 	root, err := html.Parse(src)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	const pageH = 750.0
+
 	res, err := Layout(root, Options{
 		Width: 538, Height: pageH, Sheets: []*css.Stylesheet{s},
 		Media: "print", Background: true,
@@ -63,38 +72,51 @@ td, th { border: 1px solid #aaa; padding: 3pt; }
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	opPage := paginateOps(res, pageH)
 	maxPage := 0
 	pagesWithText := map[int]int{}
+
 	var awardsY, videoY float64
 	awardsY, videoY = -1, -1
+
 	for i, op := range res.Ops {
 		if op.Kind != OpText {
 			continue
 		}
+
 		p := opPage[i]
 		if p > maxPage {
 			maxPage = p
 		}
+
 		pagesWithText[p]++
+
 		if op.Text == "Awards and nominations" {
 			awardsY = op.Y
 		}
+
 		if strings.Contains(op.Text, "Call of Duty") {
 			videoY = op.Y
 		}
 	}
+
 	blank := 0
+
 	for p := 0; p <= maxPage; p++ {
 		if pagesWithText[p] == 0 {
 			blank++
+
 			t.Logf("blank page %d", p)
 		}
 	}
+
 	t.Logf("pages=%d blank=%d videoY=%.0f awardsY=%.0f gap=%.0f", maxPage+1, blank, videoY, awardsY, awardsY-videoY)
+
 	if blank > 0 {
 		t.Fatalf("%d blank page(s)", blank)
 	}
+
 	if awardsY > 0 && videoY > 0 && awardsY-videoY > pageH*1.2 {
 		t.Fatalf("gap video→awards = %.0f (>%.0f)", awardsY-videoY, pageH*1.2)
 	}

@@ -25,11 +25,14 @@ p { margin: 0; text-align: left; }
 <p>Ana Celia de Armas Caso <span class="IPA">[ˈana ˈselja ðe ˈaɾmas ˈkaso]</span>
 is a Cuban-born actress holding citizenship.</p>
 </body></html>`
+
 	root, err := html.Parse(htmlSrc)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	const pageW = 500.0
+
 	res, err := Layout(root, Options{
 		Width: pageW, Height: 700, Sheets: []*css.Stylesheet{s},
 		Media: "print", Background: true,
@@ -37,7 +40,9 @@ is a Cuban-born actress holding citizenship.</p>
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	var floatLeft float64 = pageW
+
 	for _, op := range res.Ops {
 		if op.Kind == OpText && strings.HasPrefix(strings.TrimSpace(op.Text), "Portrait") {
 			if op.X < floatLeft {
@@ -45,9 +50,11 @@ is a Cuban-born actress holding citizenship.</p>
 			}
 		}
 	}
+
 	if floatLeft > pageW-50 {
 		t.Fatal("infobox not found on the right")
 	}
+
 	for _, op := range res.Ops {
 		if op.Kind != OpText {
 			continue
@@ -60,6 +67,7 @@ is a Cuban-born actress holding citizenship.</p>
 		if !lead {
 			continue
 		}
+
 		right := op.X + op.W
 		if right > floatLeft+2 {
 			t.Fatalf("lead text %q ends at x=%.1f, overlaps float starting ~%.1f",

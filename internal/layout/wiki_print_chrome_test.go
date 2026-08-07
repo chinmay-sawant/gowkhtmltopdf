@@ -22,14 +22,18 @@ a:link { color: #0645ad }
 <footer id="footer">Footer chrome</footer>
 </body></html>`
 	res := layoutHTML(t, html, s)
+
 	var texts []string
+
 	for _, op := range res.Ops {
 		if op.Kind == OpText {
 			texts = append(texts, strings.TrimSpace(op.Text))
 		}
 	}
+
 	joined := strings.Join(texts, " | ")
 	t.Log(joined)
+
 	for _, bad := range []string{"Main page", "Sidebar", "Donate", "Footer chrome"} {
 		for _, tx := range texts {
 			if strings.Contains(tx, bad) {
@@ -37,24 +41,31 @@ a:link { color: #0645ad }
 			}
 		}
 	}
+
 	foundTitle, foundLink := false, false
+
 	for _, op := range res.Ops {
 		if op.Kind != OpText {
 			continue
 		}
+
 		if strings.Contains(op.Text, "Ana de Armas") {
 			foundTitle = true
 		}
+
 		if strings.Contains(op.Text, "Cuban") {
 			foundLink = true
+
 			if op.B < 0.5 {
 				t.Errorf("Cuban link color = (%v,%v,%v), want blue", op.R, op.G, op.B)
 			}
 		}
 	}
+
 	if !foundTitle {
 		t.Error("missing title")
 	}
+
 	if !foundLink {
 		t.Error("missing link text")
 	}

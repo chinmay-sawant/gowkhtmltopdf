@@ -2,7 +2,6 @@ package imageout
 
 import (
 	"bytes"
-	"context"
 	"encoding/base64"
 	"image"
 	"image/color"
@@ -23,10 +22,12 @@ import (
 // backgrounds on. Tests that need more call renderHTMLOpts.
 func renderHTML(t *testing.T, src string) image.Image {
 	t.Helper()
+
 	img, err := renderHTMLOpts(src, RenderOptions{Width: 200, Background: true})
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}
+
 	return img
 }
 
@@ -35,16 +36,20 @@ func renderHTMLOpts(src string, opts RenderOptions) (image.Image, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if opts.Width <= 0 {
 		opts.Width = 200
 	}
+
 	opts.Background = true
+
 	return Render(root, opts)
 }
 
 // countPixels returns the number of pixels in b whose color matches want.
 func countPixels(img image.Image, b image.Rectangle, want color.NRGBA) int {
 	n := 0
+
 	for y := b.Min.Y; y < b.Max.Y; y++ {
 		for x := b.Min.X; x < b.Max.X; x++ {
 			got := color.NRGBAModel.Convert(img.At(x, y)).(color.NRGBA)
@@ -53,17 +58,21 @@ func countPixels(img image.Image, b image.Rectangle, want color.NRGBA) int {
 			}
 		}
 	}
+
 	return n
 }
 
 func redPNG(t *testing.T, w, h int) []byte {
 	t.Helper()
+
 	img := image.NewNRGBA(image.Rect(0, 0, w, h))
 	drawSolid(img, color.NRGBA{R: 255, A: 255})
+
 	var buf bytes.Buffer
 	if err := png.Encode(&buf, img); err != nil {
 		t.Fatalf("png encode: %v", err)
 	}
+
 	return buf.Bytes()
 }
 
@@ -80,15 +89,19 @@ func dataURIImages(src string) ([]byte, error) {
 	if !strings.HasPrefix(src, "data:") {
 		return nil, os.ErrNotExist
 	}
+
 	rest := src[len("data:"):]
+
 	comma := strings.IndexByte(rest, ',')
 	if comma < 0 {
 		return nil, os.ErrNotExist
 	}
+
 	meta, data := rest[:comma], rest[comma+1:]
 	if !strings.Contains(meta, "base64") {
 		return nil, os.ErrNotExist
 	}
+
 	return base64.StdEncoding.DecodeString(data)
 }
 
@@ -100,12 +113,15 @@ func TestRenderSolidColor(t *testing.T) {
 	if got := img.Bounds().Dx(); got != 200 {
 		t.Errorf("canvas width = %d, want 200", got)
 	}
+
 	if got := img.Bounds().Dy(); got < 50 {
 		t.Errorf("canvas height = %d, want >= 50", got)
 	}
+
 	if n := countPixels(img, image.Rect(0, 0, 200, img.Bounds().Dy()), color.NRGBA{R: 255, A: 255}); n == 0 {
 		t.Error("no solid red pixels found")
 	}
+
 	if got := color.NRGBAModel.Convert(img.At(0, 0)).(color.NRGBA); got != (color.NRGBA{R: 255, G: 255, B: 255, A: 255}) {
 		t.Errorf("corner pixel = %v, want white", got)
 	}
@@ -119,9 +135,11 @@ func TestRenderTransparent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}
+
 	if got := color.NRGBAModel.Convert(img.At(0, 0)).(color.NRGBA); got.A != 0 {
 		t.Errorf("background alpha = %d, want 0 (transparent)", got.A)
 	}
+
 	if n := countPixels(img, image.Rect(0, 0, 200, img.Bounds().Dy()), color.NRGBA{R: 255, A: 255}); n == 0 {
 		t.Error("no opaque red pixels found")
 	}
@@ -131,25 +149,31 @@ func TestRenderTransparent(t *testing.T) {
 // cropped at (50,50,150,100) yields 100x50 and preserves pixels.
 func TestRenderCrop(t *testing.T) {
 	src := `<html><body><div style="background-color:#0000ff;width:120px;height:60px"></div></body></html>`
+
 	full, err := renderHTMLOpts(src, RenderOptions{Width: 200, Height: 100})
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}
+
 	if full.Bounds().Dx() != 200 || full.Bounds().Dy() != 100 {
 		t.Fatalf("full canvas = %v, want 200x100", full.Bounds())
 	}
 
 	crop := image.Rect(50, 50, 150, 100)
+
 	img, err := renderHTMLOpts(src, RenderOptions{Width: 200, Height: 100, Crop: crop})
 	if err != nil {
 		t.Fatalf("Render crop: %v", err)
 	}
+
 	if img.Bounds().Dx() != 100 || img.Bounds().Dy() != 50 {
 		t.Errorf("cropped canvas = %v, want 100x50", img.Bounds())
 	}
+
 	for _, p := range []image.Point{{0, 0}, {99, 49}, {50, 25}} {
 		want := color.NRGBAModel.Convert(full.At(p.X+50, p.Y+50)).(color.NRGBA)
 		got := color.NRGBAModel.Convert(img.At(p.X, p.Y)).(color.NRGBA)
+
 		if got != want {
 			t.Errorf("pixel %v = %v, want %v (matches uncropped)", p, got, want)
 		}
@@ -162,7 +186,9 @@ func TestRenderText(t *testing.T) {
 	if n := countPixels(img, img.Bounds(), color.NRGBA{A: 255}); n == 0 {
 		t.Fatal("canvas is entirely background")
 	}
+
 	dark := 0
+
 	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y++ {
 		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
 			c := color.NRGBAModel.Convert(img.At(x, y)).(color.NRGBA)
@@ -171,6 +197,7 @@ func TestRenderText(t *testing.T) {
 			}
 		}
 	}
+
 	if dark == 0 {
 		t.Error("no dark (text) pixels found for <b>Hi</b>")
 	}
@@ -181,6 +208,7 @@ func TestRenderImageDataURI(t *testing.T) {
 	raw := redPNG(t, 16, 16)
 	src := `<html><body><img src="data:image/png;base64,` +
 		base64.StdEncoding.EncodeToString(raw) + `"></body></html>`
+
 	img, err := renderHTMLOpts(src, RenderOptions{Images: dataURIImages})
 	if err != nil {
 		t.Fatalf("Render: %v", err)
@@ -195,10 +223,12 @@ func TestRenderImageDataURI(t *testing.T) {
 func TestScaleNearest(t *testing.T) {
 	src := image.NewNRGBA(image.Rect(0, 0, 2, 2))
 	src.SetNRGBA(0, 0, color.NRGBA{R: 255, A: 255})
+
 	dst := scaleNearest(src, 4, 4)
 	if got := dst.At(0, 0); color.NRGBAModel.Convert(got) != (color.NRGBA{R: 255, A: 255}) {
 		t.Errorf("scaled (0,0) = %v, want red", got)
 	}
+
 	if got := dst.At(3, 3); color.NRGBAModel.Convert(got) != (color.NRGBA{}) {
 		t.Errorf("scaled (3,3) = %v, want transparent", got)
 	}
@@ -210,8 +240,9 @@ type imageWrapper struct {
 
 func TestScaleNearestNRGBAMatchesGeneric(t *testing.T) {
 	src := image.NewNRGBA(image.Rect(0, 0, 3, 2))
-	for y := 0; y < 2; y++ {
-		for x := 0; x < 3; x++ {
+
+	for y := range 2 {
+		for x := range 3 {
 			src.SetNRGBA(x, y, color.NRGBA{
 				R: uint8(20 + x*30),
 				G: uint8(40 + y*50),
@@ -223,6 +254,7 @@ func TestScaleNearestNRGBAMatchesGeneric(t *testing.T) {
 
 	got := scaleNearest(src, 7, 5)
 	want := scaleNearestGeneric(imageWrapper{Image: src}, 7, 5)
+
 	if string(got.Pix) != string(want.Pix) {
 		t.Fatalf("NRGBA fast path differs from generic path")
 	}
@@ -237,6 +269,7 @@ func TestDownscaleBoxUsesExactNRGBAAverages(t *testing.T) {
 
 	got := downscaleBox(src, 2)
 	want := color.NRGBA{R: 25, G: 35, B: 45, A: 55}
+
 	if pixel := got.NRGBAAt(0, 0); pixel != want {
 		t.Fatalf("downscaled pixel = %v, want %v", pixel, want)
 	}
@@ -252,17 +285,21 @@ func TestEncodeFormats(t *testing.T) {
 	if err != nil {
 		t.Fatalf("png encode: %v", err)
 	}
+
 	jpgBytes, err := encode(img, "jpg", 94)
 	if err != nil {
 		t.Fatalf("jpg encode: %v", err)
 	}
+
 	if len(pngBytes) == 0 || len(jpgBytes) == 0 {
 		t.Fatal("empty encoding")
 	}
+
 	dec, err := jpeg.Decode(bytes.NewReader(jpgBytes))
 	if err != nil {
 		t.Fatalf("jpeg decode: %v", err)
 	}
+
 	if dec.Bounds().Dx() != 64 || dec.Bounds().Dy() != 64 {
 		t.Errorf("jpeg size = %v, want 64x64", dec.Bounds())
 	}
@@ -270,22 +307,26 @@ func TestEncodeFormats(t *testing.T) {
 	// quality must change the compressed size on noisy content
 	noise := image.NewNRGBA(image.Rect(0, 0, 100, 80))
 	rng := rand.New(rand.NewSource(7))
-	for y := 0; y < 80; y++ {
-		for x := 0; x < 100; x++ {
+
+	for y := range 80 {
+		for x := range 100 {
 			noise.SetNRGBA(x, y, color.NRGBA{
 				R: uint8(rng.Intn(256)), G: uint8(rng.Intn(256)),
 				B: uint8(rng.Intn(256)), A: 255,
 			})
 		}
 	}
+
 	q10, err := encode(noise, "jpg", 10)
 	if err != nil {
 		t.Fatalf("jpg q10: %v", err)
 	}
+
 	q100, err := encode(noise, "jpg", 100)
 	if err != nil {
 		t.Fatalf("jpg q100: %v", err)
 	}
+
 	if len(q10) == len(q100) {
 		t.Errorf("jpeg quality did not change output size (%d == %d)", len(q10), len(q100))
 	}
@@ -294,14 +335,17 @@ func TestEncodeFormats(t *testing.T) {
 // runCommand builds a parsed cli.Command pointing at input with output file.
 func runCommand(t *testing.T, args ...string) *cli.Command {
 	t.Helper()
+
 	cmd, err := cli.Parse(args)
 	if err != nil {
 		t.Fatalf("cli.Parse(%v): %v", args, err)
 	}
+
 	cmd.Global.Load.EnableLocalFileAccess = true
 	for i := range cmd.Objects {
 		cmd.Objects[i].Load.BlockLocalFileAccess = false
 	}
+
 	return cmd
 }
 
@@ -309,43 +353,54 @@ func runCommand(t *testing.T, args ...string) *cli.Command {
 // JPEG, checking flags (--width/--format/--quality) reach the output.
 func TestRunEndToEnd(t *testing.T) {
 	dir := t.TempDir()
+
 	input := filepath.Join(dir, "in.html")
 	if err := os.WriteFile(input, []byte(`<html><body><div style="background-color:#ff0000;width:100px;height:50px"></div></body></html>`), 0o644); err != nil {
 		t.Fatalf("write input: %v", err)
 	}
 
 	pngOut := filepath.Join(dir, "out.png")
+
 	cmd := runCommand(t, "--width", "200", "--format", "png", input, pngOut)
-	if err := Run(context.Background(), cmd, io.Discard); err != nil {
+	if err := Run(t.Context(), cmd, io.Discard); err != nil {
 		t.Fatalf("Run png: %v", err)
 	}
+
 	f, err := os.Open(pngOut)
 	if err != nil {
 		t.Fatalf("open png: %v", err)
 	}
+
 	defer f.Close()
+
 	img, err := png.Decode(f)
 	if err != nil {
 		t.Fatalf("decode png: %v", err)
 	}
+
 	if img.Bounds().Dx() != 200 {
 		t.Errorf("png width = %d, want 200", img.Bounds().Dx())
 	}
 
 	jpgOut := filepath.Join(dir, "out.jpg")
+
 	cmd = runCommand(t, "--width", "200", "--format", "jpg", "--quality", "30", input, jpgOut)
-	if err := Run(context.Background(), cmd, io.Discard); err != nil {
+	if err := Run(t.Context(), cmd, io.Discard); err != nil {
 		t.Fatalf("Run jpg: %v", err)
 	}
+
 	fj, err := os.Open(jpgOut)
 	if err != nil {
 		t.Fatalf("open jpg: %v", err)
 	}
+
 	defer fj.Close()
+
 	jimg, err := jpeg.Decode(fj)
 	if err != nil {
 		t.Fatalf("decode jpg: %v", err)
 	}
+
 	if jimg.Bounds().Dx() != 200 {
 		t.Errorf("jpg width = %d, want 200", jimg.Bounds().Dx())
 	}
@@ -360,6 +415,7 @@ func TestSmartWidth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Render smart: %v", err)
 	}
+
 	if got := smart.Bounds().Dx(); got != 1536 {
 		t.Errorf("smart width canvas = %d, want 1536 (1024*1.5)", got)
 	}
@@ -368,6 +424,7 @@ func TestSmartWidth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Render fixed: %v", err)
 	}
+
 	if got := fixed.Bounds().Dx(); got != 1024 {
 		t.Errorf("fixed canvas = %d, want 1024", got)
 	}
@@ -376,10 +433,12 @@ func TestSmartWidth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
+
 	def, err := Render(defRoot, RenderOptions{Width: 0, SmartWidth: false, Background: true})
 	if err != nil {
 		t.Fatalf("Render default: %v", err)
 	}
+
 	if got := def.Bounds().Dx(); got != 1024 {
 		t.Errorf("default canvas = %d, want 1024", got)
 	}

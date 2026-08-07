@@ -33,28 +33,34 @@ type inlineItem struct {
 // at its canvas Y so text widens again after a float ends mid-paragraph.
 func (e *engine) layoutInlineFloats(b *box, nodes []*html.Node, contentW, contentX, y float64, floats *floatState) float64 {
 	var items []inlineItem
+
 	oldMax := e.imgMaxW
 	oldCB := e.inlineCBW
+
 	if contentW > 0 {
 		e.imgMaxW = contentW
 		e.inlineCBW = contentW
 	}
+
 	e.collectInline(nodes, &items)
 	e.imgMaxW = oldMax
 	e.inlineCBW = oldCB
 	items = squeezeInlineSpaces(items)
 	items = separateAdjacentCites(items, e)
+
 	if len(items) == 0 {
 		return 0
 	}
 
 	ly := y
+
 	i := 0
 	for i < len(items) {
 		lineX, lineW := contentX, contentW
 		if floats != nil {
 			lineX, lineW = floats.exclusion(contentX, contentW, 0, ly)
 		}
+
 		if lineW < 0 {
 			lineW = 0
 		}
@@ -64,6 +70,7 @@ func (e *engine) layoutInlineFloats(b *box, nodes []*html.Node, contentW, conten
 		if floats != nil && lineW < contentW-0.5 {
 			if next, ok := e.preferFloatClearForTail(items, i, contentW, lineW, ly, floats); ok {
 				ly = next
+
 				lineX, lineW = floats.exclusion(contentX, contentW, 0, ly)
 				if lineW < 0 {
 					lineW = 0
@@ -73,6 +80,7 @@ func (e *engine) layoutInlineFloats(b *box, nodes []*html.Node, contentW, conten
 		// Pack one line under current exclusion width.
 		start := i
 		lineAdv := 0.0
+
 		for i < len(items) {
 			it := &items[i]
 			if it.forceBreak {
@@ -89,15 +97,18 @@ func (e *engine) layoutInlineFloats(b *box, nodes []*html.Node, contentW, conten
 				if room < 0 {
 					room = 0
 				}
+
 				restW := contentW
 				if restW < lineW {
 					restW = lineW
 				}
+
 				if parts := e.breakOverflowItem(*it, room, lineW, restW, lineAdv == 0); len(parts) > 1 {
 					items = append(items[:i], append(parts, items[i+1:]...)...)
 					it = &items[i]
 				}
 			}
+
 			adv := it.marginL + it.w + it.marginR
 			// Always wrap to the next line when the next item does not fit.
 			// white-space:nowrap must not glue an unbreakable span onto a line
@@ -118,14 +129,18 @@ func (e *engine) layoutInlineFloats(b *box, nodes []*html.Node, contentW, conten
 					if em < 1 {
 						em = 10
 					}
+
 					nowrapCluster := items[i-1].style.WhiteSpace == "nowrap" &&
 						items[i].style.WhiteSpace == "nowrap"
 					limit := em * 2.5
+
 					if nowrapCluster {
 						limit = em * 8 // multi-cite / IPA fragments
 					}
+
 					if adv <= limit {
 						lineAdv += adv
+
 						i++
 						for i < len(items) && !items[i].forceBreak &&
 							noBreakBefore(items[i-1], items[i]) {
@@ -133,17 +148,21 @@ func (e *engine) layoutInlineFloats(b *box, nodes []*html.Node, contentW, conten
 							nc := items[i-1].style.WhiteSpace == "nowrap" &&
 								items[i].style.WhiteSpace == "nowrap"
 							lim := em * 2.5
+
 							if nc {
 								lim = em * 8
 							}
+
 							if a > lim {
 								break
 							}
+
 							lineAdv += a
 							i++
 						}
 					}
 				}
+
 				break
 			}
 			// Empty line beside a float too narrow for this item: CSS2.1 §9.5
@@ -151,6 +170,7 @@ func (e *engine) layoutInlineFloats(b *box, nodes []*html.Node, contentW, conten
 			if lineAdv == 0 && adv > lineW && floats != nil && lineW < contentW-0.5 {
 				if next := floats.clearY(ly); next > ly+0.5 {
 					ly = next
+
 					lineX, lineW = floats.exclusion(contentX, contentW, 0, ly)
 					if lineW < 0 {
 						lineW = 0
@@ -163,13 +183,17 @@ func (e *engine) layoutInlineFloats(b *box, nodes []*html.Node, contentW, conten
 					}
 				}
 			}
+
 			lineAdv += adv
 			i++
 		}
+
 		end := i
+
 		if i < len(items) && items[i].forceBreak {
 			i++ // consume br
 		}
+
 		if end == start {
 			// Single unbreakable item wider than line — still emit it.
 			if i < len(items) && !items[i].forceBreak {
@@ -179,9 +203,11 @@ func (e *engine) layoutInlineFloats(b *box, nodes []*html.Node, contentW, conten
 				continue
 			}
 		}
+
 		lastLine := i >= len(items)
 		ly += e.emitLine(b, items, start, end, lineW, lineX, ly, lastLine)
 	}
+
 	return ly - y
 }
 
@@ -202,15 +228,18 @@ func (e *engine) breakOverflowItem(it inlineItem, remainW, fullLineW, restLineW 
 	if it.img || it.blockBox != nil || it.forceBreak || it.text == "" {
 		return nil
 	}
+
 	pol := wordBreakOf(*it.style)
 	if pol == breakNever {
 		return nil
 	}
+
 	adv := it.marginL + it.w + it.marginR
 	// Nothing to do when the whole item fits on this line.
 	if adv <= remainW+0.01 {
 		return nil
 	}
+
 	tokenExceedsLine := adv > fullLineW+0.01
 	// Mid-line: a normal / break-word token that fits a full next line must
 	// wrap whole — not mid-break into a tight remainW (captions: "International").
@@ -233,41 +262,54 @@ func (e *engine) breakOverflowItem(it inlineItem, remainW, fullLineW, restLineW 
 		if !aloneOnLine {
 			return nil
 		}
+
 		firstRoom = fullLineW - it.marginL - it.marginR
 	}
+
 	if firstRoom < 1 {
 		firstRoom = fullLineW
 	}
+
 	if firstRoom < 1 {
 		return nil
 	}
+
 	if restLineW < fullLineW {
 		restLineW = fullLineW
 	}
+
 	restRoom := restLineW - it.marginL - it.marginR
 	if restRoom < 1 {
 		restRoom = restLineW
 	}
+
 	if restRoom < 1 {
 		return nil
 	}
+
 	chunks := e.breakToken(it.text, *it.style, firstRoom, restRoom)
 	if len(chunks) <= 1 {
 		return nil
 	}
+
 	out := make([]inlineItem, 0, len(chunks))
+
 	for i, chunk := range chunks {
 		part := it
 		part.text = chunk
 		part.w = e.measureTextFace(chunk, *it.style)
+
 		if i > 0 {
 			part.marginL = 0
 		}
+
 		if i < len(chunks)-1 {
 			part.marginR = 0
 		}
+
 		out = append(out, part)
 	}
+
 	return out
 }
 
@@ -278,10 +320,12 @@ func (e *engine) breakToken(s string, st ResolvedStyle, firstMax, restMax float6
 	if s == "" {
 		return nil
 	}
+
 	pol := wordBreakOf(st)
 	if pol == breakNever {
 		return []string{s}
 	}
+
 	return e.splitTextToWidth(s, st, firstMax, restMax, softModeOf(pol))
 }
 
@@ -292,27 +336,36 @@ func (e *engine) preferFloatClearForTail(items []inlineItem, i int, contentW, li
 	if floats == nil || i >= len(items) {
 		return ly, false
 	}
+
 	next := floats.clearY(ly)
+
 	gap := next - ly
 	if gap <= 0.5 {
 		return ly, false
 	}
+
 	var rem float64
+
 	estLH := 0.0
+
 	for j := i; j < len(items); j++ {
 		it := items[j]
 		if it.forceBreak {
 			// Hard break ends the tail we consider for a single-line clear.
 			break
 		}
+
 		rem += it.marginL + it.w + it.marginR
+
 		if estLH <= 0 && it.h > 0 {
 			estLH = it.h
 		}
 	}
+
 	if rem <= 0 {
 		return ly, false
 	}
+
 	if estLH < 1 {
 		estLH = 12
 	}
@@ -330,9 +383,11 @@ func (e *engine) preferFloatClearForTail(items []inlineItem, i int, contentW, li
 	if rem > lineW+0.01 {
 		maxGap = estLH * 3.5
 	}
+
 	if gap <= maxGap {
 		return next, true
 	}
+
 	return ly, false
 }
 
@@ -343,28 +398,35 @@ func separateAdjacentCites(items []inlineItem, e *engine) []inlineItem {
 	if len(items) < 2 {
 		return items
 	}
+
 	out := make([]inlineItem, 0, len(items))
 	out = append(out, items[0])
+
 	for i := 1; i < len(items); i++ {
 		cur := items[i]
 		prev := &out[len(out)-1]
+
 		if !prev.img && !cur.img && !prev.forceBreak && !cur.forceBreak &&
 			prev.blockBox == nil && cur.blockBox == nil {
 			pt := strings.TrimRight(prev.text, " ")
 			ct := strings.TrimLeft(cur.text, " ")
+
 			if strings.HasSuffix(pt, "]") && strings.HasPrefix(ct, "[") &&
 				!strings.HasSuffix(prev.text, " ") && !strings.HasPrefix(cur.text, " ") {
 				// Prefer a hair space so markers stay visually tight but not
 				// colliding; fall back to a normal space if measure fails.
 				gap := "\u200a" // hair space
+
 				cur.text = gap + cur.text
 				if e != nil {
 					cur.w = e.measureTextFace(cur.text, *cur.style)
 				}
 			}
 		}
+
 		out = append(out, cur)
 	}
+
 	return out
 }
 
@@ -384,22 +446,28 @@ func (e *engine) splitTextToWidth(s string, st ResolvedStyle, firstMax, restMax 
 	if s == "" {
 		return nil
 	}
+
 	runes := []rune(s)
 	if len(runes) <= 1 {
 		return []string{s}
 	}
+
 	var out []string
+
 	for len(runes) > 0 {
 		limit := restMax
 		if len(out) == 0 {
 			limit = firstMax
 		}
+
 		if limit < 1 {
 			limit = restMax
 		}
 		// Find the longest prefix that fits limit.
 		n := 0
+
 		var w float64
+
 		for n < len(runes) {
 			rw := e.measureTextFace(string(runes[n]), st)
 			if n > 0 && w+rw > limit+0.01 {
@@ -409,11 +477,14 @@ func (e *engine) splitTextToWidth(s string, st ResolvedStyle, firstMax, restMax 
 			if n == 0 && rw > limit+0.01 {
 				n = 1
 				w = rw
+
 				break
 			}
+
 			w += rw
 			n++
 		}
+
 		if n <= 0 {
 			n = 1
 		}
@@ -424,9 +495,11 @@ func (e *engine) splitTextToWidth(s string, st ResolvedStyle, firstMax, restMax 
 				n = soft
 			}
 		}
+
 		out = append(out, string(runes[:n]))
 		runes = runes[n:]
 	}
+
 	return out
 }
 
@@ -438,6 +511,7 @@ func lastSoftBreak(runes []rune, mode softBreakMode) int {
 			return i
 		}
 	}
+
 	return 0
 }
 
@@ -451,6 +525,7 @@ func isSoftWrapRune(r rune, mode softBreakMode) bool {
 		// emergency (keeps "inner-a" / file names intact when slightly tight).
 		return mode == softBreakWord
 	}
+
 	return false
 }
 
@@ -467,6 +542,7 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 	if !line[len(line)-1].img {
 		last := &line[len(line)-1]
 		trimmed := strings.TrimRight(last.text, " ")
+
 		if trimmed != last.text {
 			last.text = trimmed
 			last.w = e.measureTextFace(trimmed, *last.style)
@@ -487,29 +563,36 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 
 	// line metrics
 	maxAscent, maxDescent := 0.0, 0.0
+
 	for i := range line {
 		it := &line[i]
 		if it.forceBreak || it.style == nil || it.img || it.blockBox != nil {
 			if it.h > maxAscent {
 				maxAscent = it.h
 			}
+
 			continue
 		}
+
 		as := e.fontAscent(it.style.FontSize * e.scale)
 		de := e.fontDescent(it.style.FontSize * e.scale)
 		lh := lineHeightOf(it.style) * e.scale
+
 		extra := (lh - as - de) / 2
 		if as+extra > maxAscent {
 			maxAscent = as + extra
 		}
+
 		if de+extra > maxDescent {
 			maxDescent = de + extra
 		}
 	}
+
 	lh := maxAscent + maxDescent
 	if lh <= 0 {
 		lh = 1
 	}
+
 	baseline := y + maxAscent
 
 	totalW := 0.0
@@ -518,6 +601,7 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 	}
 
 	var lx float64
+
 	justifyGap := 0.0
 	// CSS justify expands inter-word spaces only — not every inline box
 	// boundary. Expanding after every item put rivers before commas, cites
@@ -529,25 +613,31 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 		lx = x + (availW-totalW)/2
 	case "justify":
 		lx = x
+
 		if !lastLine && availW > totalW && len(line) > 1 {
 			gaps := 0
-			for i := 0; i < len(line)-1; i++ {
+
+			for i := range len(line) - 1 {
 				if isJustifyGapAfter(line[i]) {
 					gaps++
 				}
 			}
+
 			if gaps > 0 {
 				raw := (availW - totalW) / float64(gaps)
+
 				maxGap := 6.0 // pt
 				for i := range line {
 					if fs := line[i].style.FontSize * e.scale; fs > maxGap {
 						maxGap = fs // up to 1em extra between words
 					}
 				}
+
 				if raw <= maxGap*2 {
 					if raw > maxGap {
 						raw = maxGap // soft-cap rivers without abandoning justify
 					}
+
 					justifyGap = raw
 				}
 			}
@@ -569,12 +659,17 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 		href    string
 		hasHref bool
 	}
+
 	var und undRun
+
 	flushUnd := func() {
 		if und.active && und.w > 0.01 {
-			e.add(Op{Kind: OpLine, X: und.x, Y: und.y, W: und.w, H: 0,
-				Width: und.uw, R: und.r, G: und.g, B: und.b})
+			e.add(Op{
+				Kind: OpLine, X: und.x, Y: und.y, W: und.w, H: 0,
+				Width: und.uw, R: und.r, G: und.g, B: und.b,
+			})
 		}
+
 		und = undRun{}
 	}
 
@@ -583,9 +678,12 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 		if it.forceBreak || it.style == nil {
 			continue
 		}
+
 		lx += it.marginL
+
 		if it.blockBox != nil {
 			flushUnd()
+
 			dx := lx - it.blockBox.x
 			dy := baseline - it.h - it.blockBox.y
 			e.shiftBoxOps(it.blockBox, dx, dy)
@@ -595,16 +693,21 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 			if b != nil {
 				b.children = append(b.children, it.blockBox)
 			}
+
 			lx += it.blockBox.w + it.marginR
 			if i < len(line)-1 && isJustifyGapAfter(*it) {
 				lx += justifyGap
 			}
+
 			continue
 		}
+
 		if it.img {
 			flushUnd()
+
 			top := baseline - it.h
 			va := it.style.VerticalAlign
+
 			switch va {
 			case "top":
 				top = y
@@ -613,38 +716,53 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 			case "bottom":
 				top = y + lh - it.h
 			}
+
 			if it.imgRef != nil && it.imgRef.data != nil {
-				e.add(Op{Kind: OpImage, X: lx, Y: top, W: it.w, H: it.h,
-					Image: it.imgRef.data, ImgW: it.imgRef.w, ImgH: it.imgRef.h, IsJPEG: it.imgRef.isJPEG})
+				e.add(Op{
+					Kind: OpImage, X: lx, Y: top, W: it.w, H: it.h,
+					Image: it.imgRef.data, ImgW: it.imgRef.w, ImgH: it.imgRef.h, IsJPEG: it.imgRef.isJPEG,
+				})
 			}
+
 			if it.href != "" {
 				e.add(Op{Kind: OpLinkURI, X: lx, Y: top, W: it.w, H: it.h, URI: it.href})
 			}
+
 			lx += it.w + it.marginR
 			if i < len(line)-1 && isJustifyGapAfter(*it) {
 				lx += justifyGap
 			}
+
 			continue
 		}
+
 		c := it.style.Color
 		size := it.style.FontSize * e.scale
 		as := e.fontAscent(size)
 		de := e.fontDescent(size)
+
 		if as+de < size*0.5 {
 			// Fallback when font metrics are missing — keep hit targets usable.
 			as = size * 0.8
 			de = size * 0.2
 		}
+
 		runs := e.splitTextByFace(it.text, *it.style)
 		runStart := lx
+
 		var runSpan float64
+
 		for _, run := range runs {
-			e.add(Op{Kind: OpText, X: lx, Y: baseline, W: run.w, H: it.h,
+			e.add(Op{
+				Kind: OpText, X: lx, Y: baseline, W: run.w, H: it.h,
 				Text: run.text, Font: run.face, Size: size, Bold: it.style.FontWeight >= 700,
-				R: c[0], G: c[1], B: c[2]})
+				R: c[0], G: c[1], B: c[2],
+			})
+
 			if it.href != "" {
 				e.add(Op{Kind: OpLinkURI, X: lx, Y: baseline - as, W: run.w, H: as + de, URI: it.href})
 			}
+
 			lx += run.w
 			runSpan += run.w
 		}
@@ -658,11 +776,14 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 		wantUnderline := !bareURL && (it.style.TextDecoration == "underline" ||
 			(it.href != "" && it.style.TextDecoration != "line-through"))
 		wsOnly := strings.TrimSpace(it.text) == ""
+
 		if runSpan > 0.01 && (wantUnderline || it.style.TextDecoration == "line-through") {
 			uw := underlineStrokeWidth(size)
+
 			if wantUnderline {
 				// Sit clearly below glyph descenders (~1–2mm visual gap).
 				uy := baseline + de + size*0.22
+
 				if wsOnly {
 					// Do not start an underline on whitespace-only, but extend
 					// an active same-href run across inter-word spaces.
@@ -671,6 +792,7 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 						if end > und.x+und.w {
 							und.w = end - und.x
 						}
+
 						if uw < und.uw {
 							und.uw = uw
 						}
@@ -686,12 +808,14 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 					if end > und.x+und.w {
 						und.w = end - und.x
 					}
+
 					if uw < und.uw {
 						und.uw = uw
 					}
 					// Prefer first chunk's color (title) when styles mix.
 				} else {
 					flushUnd()
+
 					und = undRun{
 						active: true, x: runStart, y: uy, w: runSpan, uw: uw,
 						r: c[0], g: c[1], b: c[2],
@@ -701,23 +825,29 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 			} else {
 				flushUnd()
 			}
+
 			if it.style.TextDecoration == "line-through" && !wsOnly {
-				e.add(Op{Kind: OpLine, X: runStart, Y: baseline - as*0.3, W: runSpan, H: 0,
-					Width: uw, R: c[0], G: c[1], B: c[2]})
+				e.add(Op{
+					Kind: OpLine, X: runStart, Y: baseline - as*0.3, W: runSpan, H: 0,
+					Width: uw, R: c[0], G: c[1], B: c[2],
+				})
 			}
 		} else if !wantUnderline {
 			flushUnd()
 		}
+
 		lx += it.marginR
 		if i < len(line)-1 && isJustifyGapAfter(*it) {
 			lx += justifyGap
 		}
 	}
+
 	flushUnd()
 
 	if b != nil && b.firstBaseline == 0 {
 		b.firstBaseline = baseline
 	}
+
 	return lh
 }
 
@@ -728,9 +858,11 @@ func underlineStrokeWidth(em float64) float64 {
 	if uw < 0.25 {
 		uw = 0.25
 	}
+
 	if uw > 0.45 {
 		uw = 0.45
 	}
+
 	return uw
 }
 
@@ -740,9 +872,11 @@ func underlineStrokeWidth(em float64) float64 {
 func isBareURLText(s string) bool {
 	t := strings.TrimSpace(s)
 	t = strings.TrimLeft(t, "([\"' \t")
+
 	if t == "" {
 		return false
 	}
+
 	low := strings.ToLower(t)
 	if strings.HasPrefix(low, "https://") || strings.HasPrefix(low, "http://") ||
 		strings.HasPrefix(low, "www.") {
@@ -755,6 +889,7 @@ func isBareURLText(s string) bool {
 			strings.Contains(t, ".php") || strings.Count(t, "/") >= 2) {
 		return true
 	}
+
 	return false
 }
 
@@ -763,6 +898,7 @@ func nearUndY(a, b float64) bool {
 	if d < 0 {
 		d = -d
 	}
+
 	return d < 0.5
 }
 
@@ -775,11 +911,13 @@ func (e *engine) collectInline(nodes []*html.Node, out *[]inlineItem) {
 
 func (e *engine) collectInlineNode(n *html.Node, out *[]inlineItem) {
 	st := e.styles[n]
+
 	switch n.Type {
 	case html.TextNode:
 		if st.Display == "none" {
 			return
 		}
+
 		switch st.WhiteSpace {
 		case "pre":
 			parts := strings.Split(n.Text, "\n")
@@ -787,6 +925,7 @@ func (e *engine) collectInlineNode(n *html.Node, out *[]inlineItem) {
 				if p != "" {
 					*out = append(*out, e.textItem(p, e.stylePtr(n)))
 				}
+
 				if i < len(parts)-1 {
 					*out = append(*out, inlineItem{forceBreak: true})
 				}
@@ -803,8 +942,10 @@ func (e *engine) collectInlineNode(n *html.Node, out *[]inlineItem) {
 						*out = append(*out, e.textItem(" ", e.stylePtr(n)))
 					}
 				}
+
 				return
 			}
+
 			text := collapseWS(n.Text)
 			if text == "" {
 				return
@@ -813,8 +954,10 @@ func (e *engine) collectInlineNode(n *html.Node, out *[]inlineItem) {
 			// cite markers in narrow table columns).
 			if st.WhiteSpace == "nowrap" {
 				*out = append(*out, e.textItem(text, e.stylePtr(n)))
+
 				return
 			}
+
 			words := strings.Fields(text)
 			// collapseWS / Fields strip a leading space that still separates
 			// this node from the previous inline ("</a> in" → "Reeves"+"in").
@@ -832,6 +975,7 @@ func (e *engine) collectInlineNode(n *html.Node, out *[]inlineItem) {
 					}
 				}
 			}
+
 			for i, word := range words {
 				// Space only between words of this text node — not after the
 				// last token. Appending " " to every field made cite brackets
@@ -839,6 +983,7 @@ func (e *engine) collectInlineNode(n *html.Node, out *[]inlineItem) {
 				if i < len(words)-1 {
 					word += " "
 				}
+
 				*out = append(*out, e.textItem(word, e.stylePtr(n)))
 			}
 			// Preserve a trailing word-separator when the source text node
@@ -855,23 +1000,29 @@ func (e *engine) collectInlineNode(n *html.Node, out *[]inlineItem) {
 		if st.Display == "none" {
 			return
 		}
+
 		if n.Name == "br" {
 			*out = append(*out, inlineItem{forceBreak: true})
+
 			return
 		}
+
 		if n.Name == "img" {
 			ib := e.buildImage(n, st, 0, 0)
 			*out = append(*out, inlineItem{
 				img: true, imgRef: ib.img, w: ib.w, h: ib.h, style: e.stylePtr(n),
 				marginL: e.scalePt(st.MarginLeft), marginR: e.scalePt(st.MarginRight),
 			})
+
 			return
 		}
+
 		if st.Display == "inline-block" {
 			avail := e.inlineBlockAvail(n, st, e.inlineCBW)
 			opStart := len(e.ops)
 			cb := e.build(n, avail, 0, 0)
 			opEnd := len(e.ops)
+
 			if cb != nil {
 				*out = append(*out, inlineItem{
 					img: true, w: cb.w, h: cb.h, style: e.stylePtr(n),
@@ -879,23 +1030,30 @@ func (e *engine) collectInlineNode(n *html.Node, out *[]inlineItem) {
 					marginL: e.scalePt(st.MarginLeft), marginR: e.scalePt(st.MarginRight),
 				})
 			}
+
 			return
 		}
+
 		if st.Display == "inline" {
 			href := ""
+
 			if n.Name == "a" {
 				h := n.Attribute("href")
 				if isExternalHref(h) || isInternalHref(h) {
 					href = h
 				}
 			}
+
 			before := len(*out)
+
 			if txt := e.pseudoContent(n, "before"); txt != "" {
 				*out = append(*out, e.textItem(txt, e.stylePtr(n)))
 			}
+
 			for _, c := range n.Children {
 				e.collectInlineNode(c, out)
 			}
+
 			if txt := e.pseudoContent(n, "after"); txt != "" {
 				*out = append(*out, e.textItem(txt, e.stylePtr(n)))
 			}
@@ -905,11 +1063,13 @@ func (e *engine) collectInlineNode(n *html.Node, out *[]inlineItem) {
 				(*out)[before].marginL += e.scalePt(st.MarginLeft)
 				(*out)[len(*out)-1].marginR += e.scalePt(st.MarginRight)
 			}
+
 			if href != "" {
 				for i := before; i < len(*out); i++ {
 					(*out)[i].href = href
 				}
 			}
+
 			return
 		}
 		// block-level element inside inline context: lay out at a throwaway
@@ -917,6 +1077,7 @@ func (e *engine) collectInlineNode(n *html.Node, out *[]inlineItem) {
 		opStart := len(e.ops)
 		cb := e.build(n, availWForInline(), 0, 0)
 		opEnd := len(e.ops)
+
 		if cb != nil {
 			*out = append(*out, inlineItem{
 				img: true, w: cb.w, h: cb.h, style: e.stylePtr(n),
@@ -935,10 +1096,12 @@ func (e *engine) inlineBlockAvail(n *html.Node, st ResolvedStyle, cbW float64) f
 		if cbW > 0 {
 			return cbW * st.WidthPercent / 100
 		}
+
 		if e.opts.Width > 0 {
 			return e.opts.Width * st.WidthPercent / 100
 		}
 	}
+
 	if st.Width >= 0 {
 		// buildBlock applies box-sizing to the specified width; pass enough
 		// avail that auto-fill does not stretch a definite-width box.
@@ -947,8 +1110,10 @@ func (e *engine) inlineBlockAvail(n *html.Node, st ResolvedStyle, cbW float64) f
 			w += e.scalePt(st.PaddingLeft) + e.scalePt(st.PaddingRight) +
 				e.scalePt(st.BorderLeft.Width) + e.scalePt(st.BorderRight.Width)
 		}
+
 		return w + e.scalePt(st.MarginLeft) + e.scalePt(st.MarginRight)
 	}
+
 	if isSizeContainer(st) {
 		// Size containment: shrink-to-fit as-if-empty.
 		intr := e.scalePt(st.PaddingLeft) + e.scalePt(st.PaddingRight) +
@@ -957,15 +1122,19 @@ func (e *engine) inlineBlockAvail(n *html.Node, st ResolvedStyle, cbW float64) f
 		if intr < 1 {
 			intr = 1
 		}
+
 		return intr
 	}
+
 	intr := e.measureCellContent(n, st)
 	intr += e.scalePt(st.PaddingLeft) + e.scalePt(st.PaddingRight) +
 		e.scalePt(st.BorderLeft.Width) + e.scalePt(st.BorderRight.Width) +
 		e.scalePt(st.MarginLeft) + e.scalePt(st.MarginRight)
+
 	if intr < 1 {
 		intr = 1
 	}
+
 	return intr
 }
 
@@ -974,6 +1143,7 @@ func availWForInline() float64 { return 1 << 30 }
 
 func (e *engine) textItem(text string, st *ResolvedStyle) inlineItem {
 	w := e.measureTextFace(text, *st)
+
 	return inlineItem{text: text, style: st, w: w, h: lineHeightOf(st) * e.scale}
 }
 
@@ -984,8 +1154,10 @@ func squeezeInlineSpaces(items []inlineItem) []inlineItem {
 	if len(items) < 2 {
 		return items
 	}
+
 	out := make([]inlineItem, 0, len(items))
-	for i := 0; i < len(items); i++ {
+
+	for i := range len(items) {
 		it := items[i]
 		if !it.img && !it.forceBreak && it.blockBox == nil && strings.TrimSpace(it.text) == "" {
 			// Pure space item.
@@ -994,16 +1166,20 @@ func squeezeInlineSpaces(items []inlineItem) []inlineItem {
 				if !next.img && !next.forceBreak && isAttachPunct(next.text) {
 					continue // drop space before "," / ")" / "]" …
 				}
+
 				if strings.HasPrefix(strings.TrimSpace(next.text), "[") {
 					continue // drop space before citation bracket
 				}
 			}
+
 			if len(out) > 0 && strings.HasSuffix(out[len(out)-1].text, " ") {
 				continue // redundant double space
 			}
 		}
+
 		out = append(out, it)
 	}
+
 	return out
 }
 
@@ -1013,6 +1189,7 @@ func isJustifyGapAfter(it inlineItem) bool {
 	if it.img || it.forceBreak || it.blockBox != nil {
 		return false
 	}
+
 	return strings.HasSuffix(it.text, " ")
 }
 
@@ -1022,12 +1199,14 @@ func isAttachPunct(s string) bool {
 	if s == "" {
 		return false
 	}
+
 	r := []rune(s)[0]
 	switch r {
 	case ',', '.', ';', ':', '!', '?', ')', ']', '}', '\'', '"', '%',
 		'\u201d' /* ” */, '\u2019' /* ’ */, '\u2013' /* – */, '\u2014': /* — */
 		return true
 	}
+
 	return false
 }
 
@@ -1037,6 +1216,7 @@ func noBreakBefore(prev, cur inlineItem) bool {
 	if cur.forceBreak || prev.forceBreak {
 		return false
 	}
+
 	if cur.img || prev.img || cur.blockBox != nil || prev.blockBox != nil {
 		return false
 	}
@@ -1044,6 +1224,7 @@ func noBreakBefore(prev, cur inlineItem) bool {
 	if prev.style.WhiteSpace == "nowrap" && cur.style.WhiteSpace == "nowrap" {
 		return true
 	}
+
 	ct := strings.TrimSpace(cur.text)
 	if ct == "" {
 		return false
@@ -1068,6 +1249,7 @@ func noBreakBefore(prev, cur inlineItem) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -1075,11 +1257,13 @@ func isAllDigits(s string) bool {
 	if s == "" {
 		return false
 	}
-	for i := 0; i < len(s); i++ {
+
+	for i := range len(s) {
 		if s[i] < '0' || s[i] > '9' {
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -1089,21 +1273,27 @@ func coalesceTextItems(line []inlineItem) []inlineItem {
 	if len(line) < 2 {
 		return line
 	}
+
 	out := make([]inlineItem, 0, len(line))
 	out = append(out, line[0])
+
 	for i := 1; i < len(line); i++ {
 		cur := line[i]
 		prev := &out[len(out)-1]
+
 		if !cur.img && !prev.img && !cur.forceBreak && cur.href == prev.href &&
 			sameInlineStyle(prev.style, cur.style) {
 			prev.text += cur.text
 			prev.w += cur.w
 			// first item keeps marginL; last item's marginR wins
 			prev.marginR = cur.marginR
+
 			continue
 		}
+
 		out = append(out, cur)
 	}
+
 	return out
 }
 
@@ -1111,6 +1301,7 @@ func sameInlineStyle(a, b *ResolvedStyle) bool {
 	if a == nil || b == nil {
 		return a == b
 	}
+
 	return a.FontSize == b.FontSize &&
 		a.FontWeight == b.FontWeight &&
 		a.FontItalic == b.FontItalic &&
@@ -1124,23 +1315,31 @@ func lineHeightOf(st *ResolvedStyle) float64 {
 	if st.LineHeight > 0 {
 		return st.LineHeight
 	}
+
 	return 1.2 * st.FontSize
 }
 
 func collapseWS(s string) string {
 	var b strings.Builder
+
 	prevSpace := true
+
 	for _, r := range s {
 		if r == ' ' || r == '\t' || r == '\n' || r == '\r' || r == '\f' {
 			if !prevSpace {
 				b.WriteByte(' ')
+
 				prevSpace = true
 			}
+
 			continue
 		}
+
 		b.WriteRune(r)
+
 		prevSpace = false
 	}
+
 	return strings.TrimRight(b.String(), " ")
 }
 
@@ -1155,19 +1354,25 @@ func (e *engine) measureText(s string, size float64) float64 {
 func (e *engine) measureTextFace(s string, st ResolvedStyle) float64 {
 	size := st.FontSize * e.scale
 	ls := st.LetterSpacing * e.scale
+
 	var total float64
+
 	n := 0
+
 	for _, r := range s {
 		face := e.faceForRune(st, r)
 		if face == nil {
 			face = e.font
 		}
+
 		total += face.AdvanceInPoints(r, size)
 		n++
 	}
+
 	if ls != 0 && n > 0 {
 		total += ls * float64(n)
 	}
+
 	return total
 }
 
@@ -1183,16 +1388,21 @@ func (e *engine) splitTextByFace(s string, st ResolvedStyle) []faceRun {
 	if s == "" {
 		return nil
 	}
+
 	size := st.FontSize * e.scale
 	runs := make([]faceRun, 0, 1)
 	start := 0
+
 	var current *pdf.Font
+
 	var width float64
+
 	for i, r := range s {
 		face := e.faceForRune(st, r)
 		if face == nil {
 			face = e.font
 		}
+
 		if current != nil && face != current {
 			runs = append(runs, faceRun{
 				text: s[start:i],
@@ -1202,12 +1412,15 @@ func (e *engine) splitTextByFace(s string, st ResolvedStyle) []faceRun {
 			start = i
 			width = 0
 		}
+
 		if current == nil {
 			start = i
 		}
+
 		current = face
 		width += face.AdvanceInPoints(r, size)
 	}
+
 	if current != nil {
 		runs = append(runs, faceRun{
 			text: s[start:],
@@ -1215,6 +1428,7 @@ func (e *engine) splitTextByFace(s string, st ResolvedStyle) []faceRun {
 			w:    width,
 		})
 	}
+
 	return runs
 }
 
@@ -1222,20 +1436,27 @@ func (e *engine) measureWith(face *pdf.Font, s string, size, letterSpacing float
 	if face == nil {
 		face = e.font
 	}
+
 	fallback := e.font // Liberation (or engine default) for glyphs the face lacks
+
 	var total float64
+
 	n := 0
+
 	for _, r := range s {
 		advFace := face
 		if face.GlyphID(r) == 0 && fallback != nil && fallback.GlyphID(r) != 0 {
 			advFace = fallback
 		}
+
 		total += advFace.AdvanceInPoints(r, size)
 		n++
 	}
+
 	if letterSpacing != 0 && n > 0 {
 		total += letterSpacing * float64(n)
 	}
+
 	return total
 }
 
@@ -1252,6 +1473,7 @@ func (e *engine) fontDescent(size float64) float64 {
 // separately as internal GoTo links.
 func isExternalHref(href string) bool {
 	low := strings.ToLower(href)
+
 	return strings.HasPrefix(low, "http://") || strings.HasPrefix(low, "https://") || strings.HasPrefix(low, "mailto:")
 }
 

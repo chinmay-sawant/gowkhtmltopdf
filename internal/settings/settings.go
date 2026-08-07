@@ -17,6 +17,7 @@ func (m ColorMode) String() string {
 	if m == ColorModeGrayscale {
 		return "grayscale"
 	}
+
 	return "color"
 }
 
@@ -28,6 +29,7 @@ func ParseColorMode(s string) (ColorMode, error) {
 	case "grayscale":
 		return ColorModeGrayscale, nil
 	}
+
 	return ColorModeColor, errInvalid("color-mode", s, "color|grayscale")
 }
 
@@ -43,6 +45,7 @@ func (o Orientation) String() string {
 	if o == OrientationLandscape {
 		return "Landscape"
 	}
+
 	return "Portrait"
 }
 
@@ -54,6 +57,7 @@ func ParseOrientation(s string) (Orientation, error) {
 	case "landscape":
 		return OrientationLandscape, nil
 	}
+
 	return OrientationPortrait, errInvalid("orientation", s, "portrait|landscape")
 }
 
@@ -73,6 +77,7 @@ func (h LoadErrorHandling) String() string {
 	case LoadErrorIgnore:
 		return "ignore"
 	}
+
 	return "abort"
 }
 
@@ -86,6 +91,7 @@ func ParseLoadErrorHandling(s string) (LoadErrorHandling, error) {
 	case "ignore":
 		return LoadErrorIgnore, nil
 	}
+
 	return LoadErrorAbort, errInvalid("load-error-handling", s, "abort|skip|ignore")
 }
 
@@ -106,6 +112,7 @@ func (m MediaType) String() string {
 	case MediaPrint:
 		return "print"
 	}
+
 	return "ignore"
 }
 
@@ -117,6 +124,7 @@ func ResolveMedia(base string, global Web, obj *Web) string {
 	if global.PrintMediaType || obj != nil && obj.PrintMediaType {
 		return "print"
 	}
+
 	if obj != nil {
 		switch obj.MediaType {
 		case MediaPrint:
@@ -125,12 +133,14 @@ func ResolveMedia(base string, global Web, obj *Web) string {
 			return "screen"
 		}
 	}
+
 	switch global.MediaType {
 	case MediaPrint:
 		return "print"
 	case MediaScreen:
 		return "screen"
 	}
+
 	return base
 }
 
@@ -352,6 +362,7 @@ func (o *PdfObject) HeaderFor(g PdfGlobal) HeaderFooter {
 	if o.HeaderSet {
 		return o.Header
 	}
+
 	return g.Header
 }
 
@@ -360,6 +371,7 @@ func (o *PdfObject) FooterFor(g PdfGlobal) HeaderFooter {
 	if o.FooterSet {
 		return o.Footer
 	}
+
 	return g.Footer
 }
 

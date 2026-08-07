@@ -24,20 +24,26 @@ func TestCSSVarFontSizeMedium(t *testing.T) {
   font-family: Georgia, "Liberation Serif", serif;
 }
 `)
+
 	root, err := html.Parse(`<html><body class="vector-body"><p id="t">Hello</p></body></html>`)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	styles := resolveStyles(root, []*css.Stylesheet{s}, "print", 800, 600)
+
 	p := findEl(root, "p")
 	if p == nil {
 		t.Fatal("p not found")
 	}
+
 	st := styles[p]
 	want := 10.5 // 0.875rem × 12pt root
+
 	if math.Abs(st.FontSize-want) > 0.05 {
 		t.Fatalf("font-size=%.2f want ~%.1f (custom prop chain)", st.FontSize, want)
 	}
+
 	if len(st.FontFamily) == 0 || st.FontFamily[0] != "Georgia" {
 		t.Fatalf("font-family=%v want Georgia first", st.FontFamily)
 	}
@@ -49,15 +55,19 @@ func TestCSSVarFontSizeMediumUnresolved(t *testing.T) {
 	s := sheet(t, `
 .vector-body { font-size: var(--font-size-medium); }
 `)
+
 	root, err := html.Parse(`<html><body class="vector-body"><p>Hello</p></body></html>`)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	styles := resolveStyles(root, []*css.Stylesheet{s}, "print", 800, 600)
+
 	p := findEl(root, "p")
 	if p == nil {
 		t.Fatal("p not found")
 	}
+
 	st := styles[p]
 	// Unresolved var → empty → fontSize("", parent) keeps inherited/UA 12pt.
 	if math.Abs(st.FontSize-12) > 0.05 {
@@ -69,10 +79,12 @@ func findEl(n *html.Node, name string) *html.Node {
 	if n.Type == html.ElementNode && n.Name == name {
 		return n
 	}
+
 	for _, c := range n.Children {
 		if f := findEl(c, name); f != nil {
 			return f
 		}
 	}
+
 	return nil
 }

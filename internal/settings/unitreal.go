@@ -25,18 +25,23 @@ func ParseUnitReal(s string, impliedUnit string) (UnitReal, error) {
 	if s == "" {
 		return UnitReal{}, fmt.Errorf("%w: empty", ErrInvalidUnitReal)
 	}
+
 	unit := impliedUnit
+
 	for _, u := range []string{"rem", "em", "ex", "ch", "mm", "cm", "in", "pt", "px", "m", "%"} {
 		if strings.HasSuffix(s, u) {
 			unit = u
 			s = s[:len(s)-len(u)]
+
 			break
 		}
 	}
+
 	v, err := strconv.ParseFloat(strings.TrimSpace(s), 64)
 	if err != nil {
 		return UnitReal{}, fmt.Errorf("%w: %q", ErrInvalidUnitReal, s)
 	}
+
 	return UnitReal{Value: v, Unit: unit}, nil
 }
 
@@ -44,6 +49,7 @@ func ParseUnitReal(s string, impliedUnit string) (UnitReal, error) {
 // 96 px per inch. % is not convertible and returns 0 with ok=false.
 func (u UnitReal) Points() (float64, bool) {
 	var perInch float64
+
 	switch u.Unit {
 	case "mm":
 		perInch = 25.4
@@ -62,9 +68,11 @@ func (u UnitReal) Points() (float64, bool) {
 	case "%":
 		return 0, false
 	}
+
 	if perInch == 0 {
 		return 0, false
 	}
+
 	return u.Value / perInch * 72, true
 }
 
@@ -74,5 +82,6 @@ func (u UnitReal) Mm() (float64, bool) {
 	if !ok {
 		return 0, false
 	}
+
 	return pt * 25.4 / 72, true
 }

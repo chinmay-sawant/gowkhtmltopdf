@@ -25,18 +25,23 @@ func effectiveTOC(o settings.PdfObject, g settings.PdfGlobal) settings.TableOfCo
 	if o.TOC.FontScale != 0 {
 		t.FontScale = o.TOC.FontScale
 	}
+
 	if o.TOC.Indentation != "" {
 		t.Indentation = o.TOC.Indentation
 	}
+
 	if o.TOC.CaptionText != "" {
 		t.CaptionText = o.TOC.CaptionText
 	}
+
 	if o.TOC.XSLStyleSheet != "" {
 		t.XSLStyleSheet = o.TOC.XSLStyleSheet
 	}
+
 	t.DottedLines = o.TOC.DottedLines || t.DottedLines
 	t.ForwardLinks = o.TOC.ForwardLinks || t.ForwardLinks
 	t.BackLinks = o.TOC.BackLinks || t.BackLinks
+
 	return t
 }
 
@@ -48,10 +53,12 @@ func lengthToPt(v string, baseSize float64) float64 {
 	if !ok {
 		return -1
 	}
+
 	pt, ok := css.LengthToPt(val, unit, baseSize)
 	if !ok {
 		return -1
 	}
+
 	return pt
 }
 
@@ -64,46 +71,58 @@ func genTOCHTML(toc settings.TableOfContent, entries []*outline.Node, pageOf fun
 	if toc.CaptionText == "" {
 		toc.CaptionText = "Table of Contents"
 	}
+
 	scale := toc.FontScale
 	if scale <= 0 {
 		scale = 0.8
 	}
+
 	indentPt := lengthToPt(toc.Indentation, 12)
 	if indentPt < 0 {
 		indentPt = 12
 	}
+
 	const baseSize = 12.0 // the layout engine's default font size
 
 	var b strings.Builder
+
 	b.WriteString("<html><body>")
 	b.WriteString("<h1>" + stdlibhtml.EscapeString(toc.CaptionText) + "</h1>")
+
 	for _, n := range entries {
 		h := n.Heading
 		if h == nil || h.Title == "" {
 			continue
 		}
+
 		size := baseSize * scale
 		pad := indentPt * float64(h.Level-1)
 		pageNum := strconv.Itoa(pageOf(h))
 		entry := h.Title + "  " + pageNum
+
 		if toc.DottedLines {
 			titleW := measureHF(font, h.Title, size)
 			pageW := measureHF(font, pageNum, size)
+
 			avail := contentW - pad - titleW - pageW - 2*size
 			if dots := int(avail / (0.4 * size)); dots > 0 {
 				entry = h.Title + " " + strings.Repeat(".", dots) + " " + pageNum
 			}
 		}
+
 		start, end := "", ""
 		if toc.ForwardLinks {
 			start = `<a href="#` + h.Anchor + `">`
 			end = "</a>"
 		}
+
 		fmt.Fprintf(&b,
 			`<div data-wk-target="%s" style="padding-left:%gpt;font-size:%gpt;">%s%s%s</div>`,
 			h.Anchor, pad, size, start, entry, end)
 	}
+
 	b.WriteString("</body></html>")
+
 	return b.String()
 }
 
@@ -112,6 +131,7 @@ func genTOCHTML(toc settings.TableOfContent, entries []*outline.Node, pageOf fun
 func cloneResult(res *layout.Result) *layout.Result {
 	c := *res
 	c.Ops = append([]layout.Op(nil), res.Ops...)
+
 	return &c
 }
 
@@ -134,6 +154,7 @@ func paintCount(ctx context.Context, res *layout.Result, g hfGeom) (int, error) 
 	if err := layout.PaintContext(ctx, scratch, cloneResult(res), paintOptions(g)); err != nil {
 		return 0, err
 	}
+
 	return scratch.PageCount(), nil
 }
 
@@ -146,12 +167,14 @@ func layoutTOC(ctx context.Context, font *pdf.Font, st *objectState, entries []*
 	if toc.XSLStyleSheet != "" {
 		line.Emit(log, line.Warn, "object %d: --xsl-style-sheet is not supported; using the built-in TOC template", st.idx)
 	}
+
 	contentW := st.geom.contentW
 	pageOf := func(h *outline.Heading) int {
 		p := h.DocPage
 		if h.DocPage == 0 {
 			p = h.Page // view copies put DocPage into Page (including 0)
 		}
+
 		return tocGuess + p + 1 + g.PageOffset
 	}
 	htmlDoc := genTOCHTML(toc, entries, pageOf, font, contentW)
@@ -160,10 +183,12 @@ func layoutTOC(ctx context.Context, font *pdf.Font, st *objectState, entries []*
 	if err != nil {
 		return nil, nil, fmt.Errorf("object %d: toc: parse: %w", st.idx+1, err)
 	}
+
 	media := st.media
 	if media == "" {
 		media = "print"
 	}
+
 	res, err := layout.LayoutContext(ctx, root, layout.Options{
 		Width:  contentW,
 		Height: st.geom.contentH,
@@ -173,6 +198,7 @@ func layoutTOC(ctx context.Context, font *pdf.Font, st *objectState, entries []*
 	if err != nil {
 		return nil, nil, fmt.Errorf("object %d: toc: layout: %w", st.idx+1, err)
 	}
+
 	return root, res, nil
 }
 
@@ -186,6 +212,7 @@ func renderTOCObjects(ctx context.Context, font *pdf.Font, doc *pdf.Document, re
 	if len(tocs) == 0 {
 		return 0, nil
 	}
+
 	g := req.Global
 
 	// Iteration 1: measure with tocGuess = 0.
@@ -195,11 +222,13 @@ func renderTOCObjects(ctx context.Context, font *pdf.Font, doc *pdf.Document, re
 		if err != nil {
 			return 0, err
 		}
+
 		st.tocRoot, st.tocRes = root, res
 		n, err := paintCount(ctx, res, st.geom)
 		if err != nil {
 			return 0, fmt.Errorf("object %d: toc: paintCount: %w", st.idx+1, err)
 		}
+
 		st.tocPages = n
 		guess += st.tocPages
 	}
@@ -211,25 +240,31 @@ func renderTOCObjects(ctx context.Context, font *pdf.Font, doc *pdf.Document, re
 			if err != nil {
 				return 0, err
 			}
+
 			st.tocRoot, st.tocRes = root, res
 			n, err := paintCount(ctx, res, st.geom)
 			if err != nil {
 				return 0, fmt.Errorf("object %d: toc: paintCount: %w", st.idx+1, err)
 			}
+
 			st.tocPages = n
 		}
 	}
 	// Paint the final TOC pages into doc, keeping the painted result (its
 	// Locations feed the link pass).
 	total := 0
+
 	for _, st := range tocs {
 		st.start = doc.PageCount()
 		painted := cloneResult(st.tocRes)
+
 		if err := layout.PaintContext(ctx, doc, painted, paintOptions(st.geom)); err != nil {
 			return 0, fmt.Errorf("object %d: toc: paint: %w", st.idx+1, err)
 		}
+
 		st.tocRes = painted
 		total += st.tocPages
 	}
+
 	return total, nil
 }

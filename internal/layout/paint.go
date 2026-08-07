@@ -41,19 +41,24 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 	if doc == nil || res == nil {
 		return nil
 	}
+
 	if ctx == nil {
 		ctx = context.Background()
 	}
+
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+
 	contentH := opts.PageHeight - opts.MarginTop - opts.MarginBottom
 	if contentH <= 0 {
 		contentH = opts.PageHeight
 	}
+
 	if len(res.Ops) == 0 {
 		doc.AddPage(opts.PageWidth, opts.PageHeight)
 		populateLocations(res, contentH, nil)
+
 		return nil
 	}
 
@@ -61,6 +66,7 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 
 	// Fixed ops are stamped on every page at viewport-relative coords.
 	var fixedIdx []int
+
 	for i := range res.Ops {
 		if res.Ops[i].Fixed {
 			fixedIdx = append(fixedIdx, i)
@@ -85,38 +91,47 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 	// Re-derive pages after splits and sticky (new ops / Y shifts).
 	opPage = make([]int, len(res.Ops))
 	perPage := map[int][]int{}
+
 	for i := range res.Ops {
 		if res.Ops[i].Fixed {
 			continue
 		}
+
 		p := int(res.Ops[i].Y / contentH)
 		opPage[i] = p
 		perPage[p] = append(perPage[p], i)
 	}
+
 	maxP := 0
 	for p := range perPage {
 		if p > maxP {
 			maxP = p
 		}
 	}
+
 	if len(fixedIdx) > 0 && maxP < 0 {
 		maxP = 0
 	}
+
 	if len(perPage) == 0 && len(fixedIdx) > 0 {
 		maxP = 0
 		perPage[0] = nil
 	}
+
 	res.Pages = make([][]int, maxP+1)
 	for p := 0; p <= maxP; p++ {
 		res.Pages[p] = perPage[p]
 	}
+
 	populateLocations(res, contentH, opPage)
 
 	var paintErr error
+
 	for pageIdx, idxs := range res.Pages {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
+
 		p := doc.AddPage(opts.PageWidth, opts.PageHeight)
 		c := p.Content()
 		fontNames := map[*pdf.Font]string{}
@@ -125,13 +140,16 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 			if f == nil {
 				return "F0"
 			}
+
 			if n, ok := fontNames[f]; ok {
 				return n
 			}
+
 			n := "F" + strconv.Itoa(nextFont)
 			nextFont++
 			fontNames[f] = n
 			c.UseEmbeddedFont(n, f)
+
 			return n
 		}
 		nextImg := 0
@@ -139,21 +157,27 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 			if op.Kind == opKindNoop {
 				return
 			}
+
 			if op.Kind == OpLinkURI {
 				drawLinkXform(p, op, pg, contentH, opts)
+
 				return
 			}
+
 			needGS := op.XformSet || (op.PaintOpacity > 0 && op.PaintOpacity < 1)
 			if needGS {
 				c.Save()
 			}
+
 			if op.XformSet {
 				a, b, cc, d, e, f := pdfCTMFromCSS(op.Xform, pg, contentH, opts, p.Height())
 				c.Transform(a, b, cc, d, e, f)
 			}
+
 			if op.PaintOpacity > 0 && op.PaintOpacity < 1 {
 				c.SetOpacity(op.PaintOpacity)
 			}
+
 			switch op.Kind {
 			case OpFillRect:
 				drawFill(c, op, pg, contentH, opts, p.Height())
@@ -166,30 +190,38 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 			case OpImage:
 				name := "I" + strconv.Itoa(nextImg)
 				nextImg++
+
 				if err := drawImage(p, c, op, pg, contentH, opts, name); err != nil && paintErr == nil {
 					paintErr = err
 				}
 			}
+
 			if needGS {
 				c.Restore()
 			}
 		}
+
 		sortPaintIndices(res.Ops, idxs)
+
 		for _, idx := range idxs {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
+
 			paintOp(&res.Ops[idx], pageIdx)
 		}
 		// Fixed layer: page-local coords (pageIdx 0 math on every page).
 		sortPaintIndices(res.Ops, fixedIdx)
+
 		for _, idx := range fixedIdx {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
+
 			paintOp(&res.Ops[idx], 0)
 		}
 	}
+
 	return paintErr
 }
 
@@ -197,15 +229,19 @@ func sortPaintIndices(ops []Op, idxs []int) {
 	sort.SliceStable(idxs, func(i, j int) bool {
 		a, b := ops[idxs[i]], ops[idxs[j]]
 		az, bz := 0, 0
+
 		if a.ZIndexSet {
 			az = a.ZIndex
 		}
+
 		if b.ZIndexSet {
 			bz = b.ZIndex
 		}
+
 		if az != bz {
 			return az < bz
 		}
+
 		if a.Positioned != b.Positioned {
 			return !a.Positioned
 		}
@@ -216,6 +252,7 @@ func sortPaintIndices(ops []Op, idxs []int) {
 		if la != lb {
 			return la < lb
 		}
+
 		return idxs[i] < idxs[j]
 	})
 }
@@ -246,6 +283,7 @@ func StyleOf(op *Op) PaintStyle {
 	if op == nil {
 		return PaintStyle{FillAlpha: 1, StrokeWidth: 1}
 	}
+
 	ps := PaintStyle{
 		FillR: op.R, FillG: op.G, FillB: op.B, FillAlpha: 1,
 		StrokeWidth: op.Width,
@@ -263,7 +301,9 @@ func StyleOf(op *Op) PaintStyle {
 	} else if op.Alpha > 0 {
 		ps.FillAlpha = op.Alpha
 	}
+
 	ps.FakeBold = FakeBoldFor(op)
+
 	return ps
 }
 
@@ -273,11 +313,13 @@ func FakeBoldFor(op *Op) bool {
 	if op == nil || !op.Bold || (op.Font != nil && op.Font.Bold()) {
 		return false
 	}
+
 	for _, r := range op.Text {
 		if r > 0xFF {
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -307,30 +349,37 @@ func PaintBandContext(ctx context.Context, p *pdf.Page, c *pdf.Content, ops []Op
 	if p == nil || c == nil {
 		return nil
 	}
+
 	if ctx == nil {
 		ctx = context.Background()
 	}
+
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+
 	fontNames := map[*pdf.Font]string{}
 	nextFont := 0
 	resName := func(f *pdf.Font) string {
 		if f == nil {
 			return "F0"
 		}
+
 		if n, ok := fontNames[f]; ok {
 			return n
 		}
+
 		n := "B" + strconv.Itoa(nextFont)
 		nextFont++
 		fontNames[f] = n
 		c.UseEmbeddedFont(n, f)
+
 		return n
 	}
 	nextImg := 0
 	po := opts.Margins
 	contentH := opts.ContentH
+
 	pageH := opts.PageH
 	if pageH <= 0 {
 		pageH = p.Height()
@@ -338,26 +387,33 @@ func PaintBandContext(ctx context.Context, p *pdf.Page, c *pdf.Content, ops []Op
 	// Band mode without full page geometry: map canvas (y down) to PDF using
 	// OriginY as the top edge and OriginX as left origin.
 	useSimple := contentH <= 0
+
 	var firstErr error
+
 	for i := range ops {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
+
 		op := &ops[i]
 		if op.Kind == OpLinkURI || op.Kind == opKindNoop {
 			continue
 		}
+
 		needGS := op.XformSet || (op.PaintOpacity > 0 && op.PaintOpacity < 1)
 		if needGS {
 			c.Save()
 		}
+
 		if op.XformSet && !useSimple {
 			a, b, cc, d, e, f := pdfCTMFromCSS(op.Xform, 0, contentH, po, pageH)
 			c.Transform(a, b, cc, d, e, f)
 		}
+
 		if op.PaintOpacity > 0 && op.PaintOpacity < 1 {
 			c.SetOpacity(op.PaintOpacity)
 		}
+
 		if useSimple {
 			if err := paintOpBandSimple(c, p, op, opts, resName(op.Font), &nextImg); err != nil && firstErr == nil {
 				firstErr = err
@@ -375,24 +431,29 @@ func PaintBandContext(ctx context.Context, p *pdf.Page, c *pdf.Content, ops []Op
 			case OpImage:
 				name := "I" + strconv.Itoa(nextImg)
 				nextImg++
+
 				if err := drawImage(p, c, op, 0, contentH, po, name); err != nil && firstErr == nil {
 					firstErr = err
 				}
 			}
 		}
+
 		if needGS {
 			c.Restore()
 		}
 	}
+
 	return firstErr
 }
 
 func paintOpBandSimple(c *pdf.Content, p *pdf.Page, op *Op, opts BandOptions, fontName string, nextImg *int) error {
 	x := opts.OriginX + op.X
+
 	switch op.Kind {
 	case OpFillRect:
 		ps := StyleOf(op)
 		y := opts.OriginY - (op.Y + op.H)
+
 		c.SetFillColor(ps.FillR, ps.FillG, ps.FillB)
 		c.Rect(x, y, op.W, op.H)
 		c.Fill()
@@ -405,10 +466,12 @@ func paintOpBandSimple(c *pdf.Content, p *pdf.Page, op *Op, opts BandOptions, fo
 	case OpLine:
 		y1 := opts.OriginY - op.Y
 		y2 := opts.OriginY - (op.Y + op.H)
+
 		w := op.Width
 		if w <= 0 {
 			w = 1
 		}
+
 		c.SetStrokeColor(op.R, op.G, op.B)
 		c.SetLineWidth(w)
 		c.MoveTo(x, y1)
@@ -417,30 +480,39 @@ func paintOpBandSimple(c *pdf.Content, p *pdf.Page, op *Op, opts BandOptions, fo
 	case OpText, OpBullet:
 		y := opts.OriginY - op.Y
 		c.SetFillColor(op.R, op.G, op.B)
+
 		if fontName == "" {
 			fontName = "F0"
 		}
+
 		c.SetFont(fontName, op.Size)
 		c.BeginText()
 		c.TextAt(x, y)
+
 		if FakeBoldFor(op) {
 			c.SetLineWidth(op.Size * 0.06)
 			c.TextRenderMode(2)
 		}
+
 		c.TextShow(op.Text)
+
 		if FakeBoldFor(op) {
 			c.TextRenderMode(0)
 		}
+
 		c.EndText()
 	case OpImage:
 		name := "I" + strconv.Itoa(*nextImg)
 		*nextImg++
+
 		y := opts.OriginY - (op.Y + op.H)
 		if op.IsJPEG {
 			return c.AddJPEGImage(name, x, y, op.W, op.H, op.Image)
 		}
+
 		return c.AddPNGImage(name, x, y, op.W, op.H, op.Image)
 	}
+
 	return nil
 }
 
@@ -457,31 +529,42 @@ func capTablePageBreaks(res *Result, contentH float64) {
 	if res == nil || contentH <= 0 || len(res.Ops) == 0 {
 		return
 	}
+
 	maxPage := 0
+
 	for i := range res.Ops {
 		if res.Ops[i].Fixed {
 			continue
 		}
+
 		p := int(res.Ops[i].Y / contentH)
 		if p > maxPage {
 			maxPage = p
 		}
 	}
+
 	const eps = 2.0
+
 	type vseg struct{ x, y0, y1, w, r, g, b float64 }
 	// Collect non-fixed vertical and horizontal line ops once.
 	var verts []vseg
+
 	type hseg struct{ x0, x1, y, w, r, g, b float64 }
+
 	var horiz []hseg
+
 	for i := range res.Ops {
 		op := &res.Ops[i]
 		if op.Fixed || op.Kind != OpLine {
 			continue
 		}
+
 		if op.H > 2 && (op.W < 1 || op.W < op.H*0.05) {
 			verts = append(verts, vseg{op.X, op.Y, op.Y + op.H, op.Width, op.R, op.G, op.B})
+
 			continue
 		}
+
 		if op.W > 2 && op.H < 1 {
 			horiz = append(horiz, hseg{op.X, op.X + op.W, op.Y, op.Width, op.R, op.G, op.B})
 		}
@@ -491,42 +574,53 @@ func capTablePageBreaks(res *Result, contentH float64) {
 	vertStarts := map[int][]vseg{}
 	vertEnds := map[int][]vseg{}
 	horizByY := map[int][]hseg{}
+
 	for _, v := range verts {
 		vertStarts[roundY(v.y0)] = append(vertStarts[roundY(v.y0)], v)
 		vertEnds[roundY(v.y1)] = append(vertEnds[roundY(v.y1)], v)
 	}
+
 	for _, h := range horiz {
 		horizByY[roundY(h.y)] = append(horizByY[roundY(h.y)], h)
 	}
+
 	type cluster struct {
 		y           float64
 		minX, maxX  float64
 		bw, r, g, b float64
 		n           int
 	}
+
 	clusterAt := func(byStart bool) map[int]*cluster {
 		out := map[int]*cluster{}
+
 		groups := vertStarts
 		if !byStart {
 			groups = vertEnds
 		}
+
 		for _, group := range groups {
 			for _, v := range group {
 				keyY := v.y0
 				if !byStart {
 					keyY = v.y1
 				}
+
 				k := roundY(keyY)
+
 				c := out[k]
 				if c == nil {
 					c = &cluster{y: keyY, minX: v.x, maxX: v.x, bw: v.w, r: v.r, g: v.g, b: v.b, n: 1}
 					out[k] = c
+
 					continue
 				}
+
 				c.n++
 				if v.x < c.minX {
 					c.minX = v.x
 				}
+
 				if v.x > c.maxX {
 					c.maxX = v.x
 				}
@@ -534,6 +628,7 @@ func capTablePageBreaks(res *Result, contentH float64) {
 				c.y = (c.y*float64(c.n-1) + keyY) / float64(c.n)
 			}
 		}
+
 		return out
 	}
 	hCoverage := func(y, minX, maxX float64) (full bool, covMin, covMax float64, has bool) {
@@ -547,28 +642,34 @@ func capTablePageBreaks(res *Result, contentH float64) {
 				if h.x1 < minX-eps || h.x0 > maxX+eps {
 					continue
 				}
+
 				if !has {
 					covMin, covMax, has = h.x0, h.x1, true
 				} else {
 					if h.x0 < covMin {
 						covMin = h.x0
 					}
+
 					if h.x1 > covMax {
 						covMax = h.x1
 					}
 				}
 			}
 		}
+
 		if !has {
 			return false, 0, 0, false
 		}
+
 		full = covMin <= minX+eps && covMax >= maxX-eps
+
 		return full, covMin, covMax, true
 	}
 	seal := func(y, minX, maxX, bw, r, g, b float64) {
 		if maxX-minX < 20 || bw < 0 {
 			return
 		}
+
 		if bw < 0.3 {
 			bw = 0.5
 		}
@@ -578,6 +679,7 @@ func capTablePageBreaks(res *Result, contentH float64) {
 				return
 			}
 		}
+
 		op := Op{
 			Kind: OpLine, X: minX, Y: y, W: maxX - minX, H: 0,
 			Width: bw, R: r, G: g, B: b,
@@ -591,33 +693,42 @@ func capTablePageBreaks(res *Result, contentH float64) {
 	// (1) Classic page-top stubs.
 	for p := 1; p <= maxPage; p++ {
 		pageTop := float64(p) * contentH
+
 		var minX, maxX, bw, r, g, b float64
+
 		n := 0
+
 		key := roundY(pageTop)
 		for k := key - int(eps*2) - 1; k <= key+int(eps*2)+1; k++ {
 			for _, v := range vertStarts[k] {
 				if v.y0 < pageTop-eps || v.y0 > pageTop+eps {
 					continue
 				}
+
 				if n == 0 {
 					minX, maxX, bw, r, g, b = v.x, v.x, v.w, v.r, v.g, v.b
 				} else {
 					if v.x < minX {
 						minX = v.x
 					}
+
 					if v.x > maxX {
 						maxX = v.x
 					}
 				}
+
 				n++
 			}
 		}
+
 		if n < 2 {
 			continue
 		}
+
 		if full, _, _, _ := hCoverage(pageTop, minX, maxX); full {
 			continue
 		}
+
 		seal(pageTop, minX, maxX, bw, r, g, b)
 	}
 
@@ -629,19 +740,23 @@ func capTablePageBreaks(res *Result, contentH float64) {
 		if c.n < 3 || c.maxX-c.minX < 20 {
 			continue
 		}
+
 		full, _, _, _ := hCoverage(c.y, c.minX, c.maxX)
 		if full {
 			continue
 		}
+
 		page := int(c.y / contentH)
 		if page <= 0 {
 			continue
 		}
+
 		pageTop := float64(page) * contentH
 		// Body under thead typically starts within ~header+padding of page top.
 		if c.y > pageTop+80 {
 			continue
 		}
+
 		seal(c.y, c.minX, c.maxX, c.bw, c.r, c.g, c.b)
 	}
 	// Row bottoms: seal when verticals end near a page bottom and no full
@@ -650,15 +765,18 @@ func capTablePageBreaks(res *Result, contentH float64) {
 		if c.n < 3 || c.maxX-c.minX < 20 {
 			continue
 		}
+
 		page := int((c.y - 0.01) / contentH)
 		pageBot := float64(page+1) * contentH
 		// Only near the page boundary (row ended as last on page).
 		if c.y < pageBot-40 || c.y > pageBot+eps {
 			continue
 		}
+
 		if full, _, _, _ := hCoverage(c.y, c.minX, c.maxX); full {
 			continue
 		}
+
 		if page >= 0 {
 			seal(c.y, c.minX, c.maxX, c.bw, c.r, c.g, c.b)
 		}
@@ -678,21 +796,25 @@ func paginateOps(res *Result, contentH float64) []int {
 	// collapsed-table chrome behind at the old row position.
 	for iter := 0; iter < 10 && beforeAlways(res, contentH); iter++ {
 	}
-	for i := 0; i < len(res.Ops); i++ {
+
+	for i := range len(res.Ops) {
 		op := &res.Ops[i]
 		if op.Fixed {
 			continue
 		}
+
 		switch op.Kind {
 		case OpText, OpBullet, OpImage, OpLinkURI:
 			opH := op.H
 			if op.Kind == OpText || op.Kind == OpBullet {
 				opH = op.Size * 1.2
 			}
+
 			page := int(op.Y / contentH)
 			if page < 0 {
 				page = 0
 			}
+
 			boundary := float64(page+1) * contentH
 			if op.Y+opH > boundary+1e-9 {
 				if dy := boundary - op.Y; dy > 1e-6 {
@@ -705,25 +827,33 @@ func paginateOps(res *Result, contentH float64) []int {
 					// gray showing through the ascent/padding band.
 					oldY := op.Y
 					minY := oldY
+
 					var chrome []int
+
 					for j := range res.Ops {
 						o := &res.Ops[j]
 						if o.Fixed || j == i {
 							continue
 						}
+
 						if o.Kind != OpFillRect && o.Kind != OpStrokeRect {
 							continue
 						}
+
 						if o.H <= 0.5 || o.H > 40 {
 							continue
 						}
+
 						if o.Y > oldY+0.5 || o.Y+o.H < oldY-0.5 {
 							continue
 						}
+
 						if oldY-o.Y > o.H+2 {
 							continue
 						}
+
 						chrome = append(chrome, j)
+
 						if o.Y < minY {
 							minY = o.Y
 						}
@@ -737,8 +867,10 @@ func paginateOps(res *Result, contentH float64) []int {
 							lead = 8
 						}
 					}
+
 					dy = boundary + lead - minY
 					shiftFlowY(res, i, i, oldY-0.01, dy)
+
 					for _, j := range chrome {
 						o := &res.Ops[j]
 						if o.Y < oldY-0.01 {
@@ -751,23 +883,29 @@ func paginateOps(res *Result, contentH float64) []int {
 			}
 		}
 	}
-	for iter := 0; iter < 10; iter++ {
+
+	for range 10 {
 		changed := avoidInside(res, contentH)
 		if beforeAlways(res, contentH) {
 			changed = true
 		}
+
 		if afterBreaks(res, contentH) {
 			changed = true
 		}
+
 		if rowsIntact(res, contentH) {
 			changed = true
 		}
+
 		if keepHeadingWithNext(res, contentH) {
 			changed = true
 		}
+
 		if orphansWidows(res, contentH) {
 			changed = true
 		}
+
 		if !changed {
 			break
 		}
@@ -781,6 +919,7 @@ func paginateOps(res *Result, contentH float64) []int {
 	for i := range res.Ops {
 		opPage[i] = int(res.Ops[i].Y / contentH)
 	}
+
 	return opPage
 }
 
@@ -792,6 +931,7 @@ type opSpan struct{ start, end int }
 
 func splitCrossingRects(res *Result, contentH float64, opPage []int) {
 	_ = opPage
+
 	if res == nil || contentH <= 0 {
 		return
 	}
@@ -805,28 +945,35 @@ func splitCrossingRects(res *Result, contentH float64, opPage []int) {
 			nextID = res.Ops[i].ID
 		}
 	}
+
 	for i := range res.Ops {
 		if res.Ops[i].ID == 0 {
 			nextID++
 			res.Ops[i].ID = nextID
 		}
 	}
+
 	spans := make([]opSpan, len(res.Ops))
 	out := make([]Op, 0, len(res.Ops)+8)
+
 	for i := range res.Ops {
 		op := res.Ops[i]
 		start := len(out)
+
 		if op.Fixed || !isSplittable(&op) || op.H <= 0 {
 			out = append(out, op)
 			spans[i] = opSpan{start: start, end: len(out) - 1}
+
 			continue
 		}
+
 		guard := 0
 		for op.H > 1e-9 {
 			guard++
 			if guard > 10000 {
 				// Defensive: never hang the paint pipeline.
 				out = append(out, op)
+
 				break
 			}
 			// Epsilon bump so Y exactly on a page top maps to that page, not
@@ -835,25 +982,32 @@ func splitCrossingRects(res *Result, contentH float64, opPage []int) {
 			if p < 0 {
 				p = 0
 			}
+
 			boundary := float64(p+1) * contentH
 			if op.Y+op.H <= boundary+1e-9 {
 				out = append(out, op)
+
 				break
 			}
+
 			firstH := boundary - op.Y
 			if firstH <= 1e-6 {
 				// Start is at/past boundary; advance to next page top via p++.
 				op.Y = float64(p+1) * contentH
+
 				continue
 			}
+
 			frag := op
 			frag.H = firstH
 			out = append(out, frag)
 			op.Y = boundary
 			op.H -= firstH
 		}
+
 		spans[i] = opSpan{start: start, end: len(out) - 1}
 	}
+
 	res.Ops = out
 	remapBoxOpRanges(res.root, spans)
 }
@@ -866,10 +1020,12 @@ func remapBoxOpRanges(b *box, spans []opSpan) {
 	if b == nil {
 		return
 	}
+
 	if b.opStart >= 0 && b.opEnd >= b.opStart && b.opStart < len(spans) && b.opEnd < len(spans) {
 		b.opStart = spans[b.opStart].start
 		b.opEnd = spans[b.opEnd].end
 	}
+
 	for _, child := range b.children {
 		remapBoxOpRanges(child, spans)
 	}
@@ -883,71 +1039,92 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 	if res == nil || contentH <= 0 || len(res.Ops) == 0 {
 		return
 	}
+
 	maxPage := 0
+
 	for i := range res.Ops {
 		if res.Ops[i].Fixed {
 			continue
 		}
+
 		p := int(res.Ops[i].Y / contentH)
 		if p > maxPage {
 			maxPage = p
 		}
 	}
+
 	pageOps := make([][]int, maxPage+1)
+
 	for i := range res.Ops {
 		if res.Ops[i].Fixed {
 			continue
 		}
+
 		page := int(res.Ops[i].Y / contentH)
 		if page < 0 || page > maxPage {
 			continue
 		}
+
 		pageOps[page] = append(pageOps[page], i)
 	}
+
 	stickyTargets := stickySectionChromeTargets(res.root)
+
 	for p := 0; p <= maxPage; p++ {
 		pageTop := float64(p) * contentH
 		pageBot := pageTop + contentH
 		lastInkBot := pageTop
 		hasInk := false
+
 		for _, i := range pageOps[p] {
 			op := &res.Ops[i]
 			if op.Y < pageTop-1e-9 || op.Y >= pageBot-1e-9 {
 				continue
 			}
+
 			var bot float64
+
 			switch op.Kind {
 			case OpText, OpBullet:
 				h := op.Size * 1.2
 				if op.H > h {
 					h = op.H
 				}
+
 				if h < 4 {
 					h = 4
 				}
+
 				bot = op.Y + h
 			case OpImage:
 				bot = op.Y + op.H
 			default:
 				continue
 			}
+
 			hasInk = true
+
 			if bot > lastInkBot {
 				lastInkBot = bot
 			}
 		}
+
 		if !hasInk {
 			continue
 		}
+
 		stripped := false
+
 		for _, i := range pageOps[p] {
 			op := &res.Ops[i]
 			if op.StickyID != 0 {
 				continue
 			}
+
 			if op.Y < pageTop-1e-9 || op.Y >= pageBot-1e-9 {
 				continue
 			}
+
 			switch op.Kind {
 			case OpFillRect, OpStrokeRect:
 				// Row-sized shells whose center sits below the last ink are
@@ -956,6 +1133,7 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 				if op.H <= 0.5 || op.H > 40 {
 					continue
 				}
+
 				if op.Y+op.H/2 > lastInkBot+0.5 {
 					op.H = 0
 					stripped = true
@@ -971,18 +1149,22 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 				}
 			}
 		}
+
 		if stripped {
 			// Tighten the last row fill so padding under the final baseline does
 			// not read as another empty row (fixture-31 Row 27 cell).
 			const underPad = 8.0
+
 			for _, i := range pageOps[p] {
 				op := &res.Ops[i]
 				if op.StickyID != 0 {
 					continue
 				}
+
 				if op.Y < pageTop-1e-9 || op.Y >= pageBot-1e-9 {
 					continue
 				}
+
 				if (op.Kind == OpFillRect || op.Kind == OpStrokeRect) &&
 					op.H > 0.5 && op.H <= 40 &&
 					op.Y < lastInkBot && op.Y+op.H > lastInkBot+underPad+2 {
@@ -991,6 +1173,7 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 						op.H = 1
 					}
 				}
+
 				if op.Kind == OpLine && op.H < 1 && op.Width > 0 &&
 					op.Y > lastInkBot+underPad+1 && op.Y < lastInkBot+40 {
 					op.Y = lastInkBot + underPad
@@ -1002,34 +1185,42 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 		// Only section-colored chrome is clipped — arbitrary tall fills
 		// (TestBoundaryFillSplit) are left to the normal page-split remnant.
 		contentBot := lastInkBot
+
 		for _, i := range pageOps[p] {
 			op := &res.Ops[i]
 			if op.StickyID != 0 {
 				continue
 			}
+
 			if op.Y < pageTop-1e-9 || op.Y >= pageBot-1e-9 {
 				continue
 			}
+
 			if (op.Kind == OpFillRect || op.Kind == OpStrokeRect) && op.H > 0.5 && op.H <= 40 {
 				if bot := op.Y + op.H; bot > contentBot {
 					contentBot = bot
 				}
 			}
+
 			if op.Kind == OpLine && op.H < 1 && op.Width > 0 && op.Y > contentBot {
 				contentBot = op.Y
 			}
 		}
+
 		if pageBot-contentBot < 8 {
 			continue
 		}
+
 		for _, i := range pageOps[p] {
 			op := &res.Ops[i]
 			if op.StickyID != 0 {
 				continue
 			}
+
 			if op.Y < pageTop-1e-9 || op.Y >= pageBot-1e-9 {
 				continue
 			}
+
 			switch op.Kind {
 			case OpFillRect:
 				// Only continuation fragments that begin at the page top are
@@ -1060,6 +1251,7 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 					op.Y+op.H <= contentBot+1 {
 					continue
 				}
+
 				switch op.Kind {
 				case OpFillRect:
 					if target.hasBackground && sameRectFrame(op, target) && sameRGB(op, target.background) {
@@ -1071,6 +1263,7 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 					}
 				}
 			}
+
 			if target.hasBottom && stickySectionContinuesAfterPage(res, target, pageBot) &&
 				!hasStickySectionBottomBorder(res, target, contentBot) {
 				res.Ops = append(res.Ops, Op{
@@ -1081,6 +1274,7 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 			}
 		}
 	}
+
 	closePageLeadingSectionChromeWithTargets(res, contentH, stickyTargets)
 }
 
@@ -1093,6 +1287,7 @@ func closePageLeadingSectionChrome(res *Result, contentH float64) {
 	if res == nil {
 		return
 	}
+
 	closePageLeadingSectionChromeWithTargets(res, contentH, stickySectionChromeTargets(res.root))
 }
 
@@ -1100,43 +1295,55 @@ func closePageLeadingSectionChromeWithTargets(res *Result, contentH float64, tar
 	if res == nil || res.root == nil || contentH <= 0 {
 		return
 	}
+
 	if len(targets) == 0 {
 		return
 	}
+
 	maxPage := 0
+
 	for _, op := range res.Ops {
 		if op.Fixed {
 			continue
 		}
+
 		if page := int(op.Y / contentH); page > maxPage {
 			maxPage = page
 		}
 	}
+
 	for page := 1; page <= maxPage; page++ {
 		pageTop := float64(page) * contentH
 		pageBottom := pageTop + contentH
+
 		for _, target := range targets {
 			closeY := -1.0
+
 			for i := range res.Ops {
 				op := &res.Ops[i]
 				if op.Fixed || op.Kind != OpLine || op.H >= 1 || op.Y <= pageTop+1 || op.Y >= pageBottom {
 					continue
 				}
+
 				if !sameHorizontalFrame(op, target) || !sameRGB(op, target.borderBottom) {
 					continue
 				}
+
 				if op.Y > closeY {
 					closeY = op.Y
 				}
 			}
+
 			if closeY < 0 {
 				continue
 			}
+
 			for i := range res.Ops {
 				op := &res.Ops[i]
 				if op.Fixed || op.Y < pageTop-1 || op.Y > pageTop+1 || op.Y >= pageBottom {
 					continue
 				}
+
 				switch op.Kind {
 				case OpFillRect:
 					if target.hasBackground && op.H > 40 && sameRectFrame(op, target) && sameRGB(op, target.background) && op.Y+op.H < closeY {
@@ -1166,11 +1373,13 @@ type stickySectionChromeTarget struct {
 
 func stickySectionChromeTargets(root *box) []stickySectionChromeTarget {
 	var targets []stickySectionChromeTarget
+
 	var walk func(b, parent *box)
 	walk = func(b, parent *box) {
 		if b == nil {
 			return
 		}
+
 		if b.sticky && parent != nil {
 			st := parent.style
 			target := stickySectionChromeTarget{
@@ -1185,26 +1394,33 @@ func stickySectionChromeTargets(root *box) []stickySectionChromeTarget {
 				hasLeft:           st.BorderLeft.Width > 0 && st.BorderLeft.Style != "none",
 				hasRight:          st.BorderRight.Width > 0 && st.BorderRight.Style != "none",
 			}
+
 			if st.BGColor[3] > 0 {
 				target.background = [3]float64{st.BGColor[0], st.BGColor[1], st.BGColor[2]}
 				target.hasBackground = true
 			}
+
 			duplicate := false
+
 			for _, prior := range targets {
 				if math.Abs(prior.x-target.x) < 0.01 && math.Abs(prior.y-target.y) < 0.01 && math.Abs(prior.w-target.w) < 0.01 {
 					duplicate = true
+
 					break
 				}
 			}
+
 			if !duplicate {
 				targets = append(targets, target)
 			}
 		}
+
 		for _, child := range b.children {
 			walk(child, b)
 		}
 	}
 	walk(root, nil)
+
 	return targets
 }
 
@@ -1216,14 +1432,17 @@ func stickySectionContinuesAfterPage(res *Result, target stickySectionChromeTarg
 	if res == nil {
 		return false
 	}
+
 	for _, op := range res.Ops {
 		if op.Fixed || (op.Kind != OpText && op.Kind != OpBullet) || op.Y < pageBottom {
 			continue
 		}
+
 		if op.X >= target.x-1 && op.X <= target.x+target.w+1 {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -1231,14 +1450,17 @@ func hasStickySectionBottomBorder(res *Result, target stickySectionChromeTarget,
 	if res == nil {
 		return false
 	}
+
 	for _, op := range res.Ops {
 		if op.Fixed || op.Kind != OpLine || op.H >= 1 || math.Abs(op.Y-y) >= 1 {
 			continue
 		}
+
 		if sameHorizontalFrame(&op, target) && sameRGB(&op, target.borderBottom) {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -1250,9 +1472,11 @@ func (target stickySectionChromeTarget) sideMatches(op *Op) bool {
 	if op.W > 1 || math.Abs(op.X-target.x) >= 1 && math.Abs(op.X-(target.x+target.w)) >= 1 {
 		return false
 	}
+
 	if math.Abs(op.X-target.x) < 1 {
 		return target.hasLeft && sameRGB(op, target.borderLeft)
 	}
+
 	return target.hasRight && sameRGB(op, target.borderRight)
 }
 
@@ -1267,6 +1491,7 @@ func isSectionWashRGB(r, g, b float64) bool {
 	if math.Abs(r-g) > 0.035 || math.Abs(g-b) > 0.035 || math.Abs(r-b) > 0.035 {
 		return false
 	}
+
 	return r > 0.88 && g > 0.88 && b > 0.88 && r < 0.97 && g < 0.97 && b < 0.97
 }
 
@@ -1279,17 +1504,22 @@ func shiftFlowY(res *Result, from, to int, fromY, dy float64) {
 	if res == nil || len(res.Ops) == 0 || dy == 0 {
 		return
 	}
+
 	ensureFlowIndex(res, flowIndexPageSize(res))
+
 	for i := from; i <= to; i++ {
 		if i < 0 || i >= len(res.Ops) || res.Ops[i].Fixed {
 			continue
 		}
+
 		shiftIndexedOp(res, i, dy)
 	}
+
 	startPage := int(fromY / res.flowPageSize)
 	if startPage < 0 {
 		startPage = 0
 	}
+
 	if dy > 0 {
 		// Positive flow shifts move an operation to the same or a later page.
 		// Process buckets from the end so an operation moved to another bucket
@@ -1301,10 +1531,13 @@ func shiftFlowY(res *Result, from, to int, fromY, dy float64) {
 				i := res.flowPages[p][j]
 				if (i >= from && i <= to) || res.Ops[i].Y <= fromY {
 					j++
+
 					continue
 				}
+
 				oldPage := res.flowPageOf[i]
 				shiftIndexedOp(res, i, dy)
+
 				if res.flowPageOf[i] == oldPage {
 					j++
 				}
@@ -1319,19 +1552,24 @@ func shiftFlowY(res *Result, from, to int, fromY, dy float64) {
 				i := res.flowPages[p][j]
 				if (i >= from && i <= to) || res.Ops[i].Y <= fromY {
 					j++
+
 					continue
 				}
+
 				oldPage := res.flowPageOf[i]
 				shiftIndexedOp(res, i, dy)
+
 				if res.flowPageOf[i] == oldPage {
 					j++
 				}
 			}
 		}
 	}
+
 	if res.root == nil {
 		return
 	}
+
 	if len(res.flowBoxes) == 0 {
 		boxes := res.boxes
 		if len(boxes) == 0 {
@@ -1339,19 +1577,25 @@ func shiftFlowY(res *Result, from, to int, fromY, dy float64) {
 			flattenBoxes(res.root, &boxes)
 			res.boxes = boxes
 		}
+
 		ensureFlowBoxIndex(res, boxes)
 	}
+
 	for p := len(res.flowBoxes) - 1; p >= startPage; p-- {
 		for j := 0; j < len(res.flowBoxes[p]); {
 			boxIndex := res.flowBoxes[p][j]
+
 			b := res.boxes[boxIndex]
 			if p == startPage && !(b.y > fromY ||
 				(b.y == fromY && b.opStart >= from && b.opEnd <= to)) {
 				j++
+
 				continue
 			}
+
 			oldPage := res.flowBoxPage[boxIndex]
 			shiftIndexedBox(res, boxIndex, dy)
+
 			if res.flowBoxPage[boxIndex] == oldPage {
 				j++
 			}
@@ -1363,6 +1607,7 @@ func flowIndexPageSize(res *Result) float64 {
 	if res.flowPageSize > 0 {
 		return res.flowPageSize
 	}
+
 	return 1
 }
 
@@ -1370,48 +1615,60 @@ func ensureFlowIndex(res *Result, pageSize float64) {
 	if res == nil || len(res.Ops) == 0 || pageSize <= 0 {
 		return
 	}
+
 	if res.flowPageSize == pageSize && len(res.flowPageOf) == len(res.Ops) {
 		return
 	}
+
 	res.flowPageSize = pageSize
 	maxPage := 0
+
 	for i := range res.Ops {
 		if res.Ops[i].Fixed {
 			continue
 		}
+
 		page := int(res.Ops[i].Y / pageSize)
 		if page < 0 {
 			page = 0
 		}
+
 		if page > maxPage {
 			maxPage = page
 		}
 	}
+
 	res.flowPages = make([][]int, maxPage+1)
 	res.flowPageOf = make([]int, len(res.Ops))
 	res.flowPos = make([]int, len(res.Ops))
+
 	for i := range res.flowPageOf {
 		res.flowPageOf[i] = -1
 		res.flowPos[i] = -1
 	}
+
 	for i := range res.Ops {
 		if res.Ops[i].Fixed {
 			continue
 		}
+
 		page := int(res.Ops[i].Y / pageSize)
 		if page < 0 {
 			page = 0
 		}
+
 		res.flowPageOf[i] = page
 		res.flowPos[i] = len(res.flowPages[page])
 		res.flowPages[page] = append(res.flowPages[page], i)
 	}
+
 	boxes := res.boxes
 	if len(boxes) == 0 && res.root != nil {
 		boxes = make([]*box, 0)
 		flattenBoxes(res.root, &boxes)
 		res.boxes = boxes
 	}
+
 	ensureFlowBoxIndex(res, boxes)
 }
 
@@ -1419,21 +1676,27 @@ func ensureFlowBoxIndex(res *Result, boxes []*box) {
 	if res == nil {
 		return
 	}
+
 	if len(res.flowBoxPage) == len(boxes) && len(res.flowBoxes) > 0 {
 		return
 	}
+
 	res.flowBoxes = make([][]int, len(res.flowPages))
 	res.flowBoxPage = make([]int, len(boxes))
 	res.flowBoxPos = make([]int, len(boxes))
+
 	for i, b := range boxes {
 		b.flowIndex = i
+
 		page := int(b.y / res.flowPageSize)
 		if page < 0 {
 			page = 0
 		}
+
 		for len(res.flowBoxes) <= page {
 			res.flowBoxes = append(res.flowBoxes, nil)
 		}
+
 		res.flowBoxPage[i] = page
 		res.flowBoxPos[i] = len(res.flowBoxes[page])
 		res.flowBoxes[page] = append(res.flowBoxes[page], i)
@@ -1444,18 +1707,23 @@ func shiftIndexedOp(res *Result, index int, dy float64) {
 	if index < 0 || index >= len(res.Ops) || res.Ops[index].Fixed {
 		return
 	}
+
 	oldPage := res.flowPageOf[index]
 	res.Ops[index].Y += dy
+
 	newPage := int(res.Ops[index].Y / res.flowPageSize)
 	if newPage < 0 {
 		newPage = 0
 	}
+
 	if oldPage == newPage {
 		return
 	}
+
 	if oldPage >= 0 && oldPage < len(res.flowPages) {
 		bucket := res.flowPages[oldPage]
 		pos := res.flowPos[index]
+
 		if pos >= 0 && pos < len(bucket) {
 			last := bucket[len(bucket)-1]
 			bucket[pos] = last
@@ -1463,9 +1731,11 @@ func shiftIndexedOp(res *Result, index int, dy float64) {
 			res.flowPages[oldPage] = bucket[:len(bucket)-1]
 		}
 	}
+
 	for len(res.flowPages) <= newPage {
 		res.flowPages = append(res.flowPages, nil)
 	}
+
 	res.flowPageOf[index] = newPage
 	res.flowPos[index] = len(res.flowPages[newPage])
 	res.flowPages[newPage] = append(res.flowPages[newPage], index)
@@ -1475,19 +1745,24 @@ func shiftIndexedBox(res *Result, index int, dy float64) {
 	if index < 0 || index >= len(res.boxes) {
 		return
 	}
+
 	b := res.boxes[index]
 	oldPage := res.flowBoxPage[index]
 	b.y += dy
+
 	newPage := int(b.y / res.flowPageSize)
 	if newPage < 0 {
 		newPage = 0
 	}
+
 	if oldPage == newPage {
 		return
 	}
+
 	if oldPage >= 0 && oldPage < len(res.flowBoxes) {
 		bucket := res.flowBoxes[oldPage]
 		pos := res.flowBoxPos[index]
+
 		if pos >= 0 && pos < len(bucket) {
 			last := bucket[len(bucket)-1]
 			bucket[pos] = last
@@ -1495,9 +1770,11 @@ func shiftIndexedBox(res *Result, index int, dy float64) {
 			res.flowBoxes[oldPage] = bucket[:len(bucket)-1]
 		}
 	}
+
 	for len(res.flowBoxes) <= newPage {
 		res.flowBoxes = append(res.flowBoxes, nil)
 	}
+
 	res.flowBoxPage[index] = newPage
 	res.flowBoxPos[index] = len(res.flowBoxes[newPage])
 	res.flowBoxes[newPage] = append(res.flowBoxes[newPage], index)
@@ -1510,11 +1787,14 @@ func shiftOpsOnly(res *Result, from, to int, dy float64) {
 	if res == nil || len(res.Ops) == 0 || dy == 0 {
 		return
 	}
+
 	ensureFlowIndex(res, flowIndexPageSize(res))
+
 	for i := from; i <= to; i++ {
 		if i < 0 || i >= len(res.Ops) || res.Ops[i].Fixed {
 			continue
 		}
+
 		shiftIndexedOp(res, i, dy)
 	}
 }
@@ -1525,20 +1805,24 @@ func avoidInside(res *Result, contentH float64) bool {
 	var walk func(b *box) bool
 	walk = func(b *box) bool {
 		changed := false
+
 		for _, c := range b.children {
 			if walk(c) {
 				changed = true
 			}
 		}
+
 		if b.style.PageBreakInside == "avoid" && b.h > 0 {
 			h := b.h
 			// Prefer ink extent when taller than the border box (rowspan /
 			// deferred paint can make ops protrude past b.h — wiki awards).
 			if b.opStart <= b.opEnd && b.opStart >= 0 && b.opEnd < len(res.Ops) {
 				bot := b.y
+
 				for k := b.opStart; k <= b.opEnd; k++ {
 					op := res.Ops[k]
 					ob := op.Y
+
 					switch op.Kind {
 					case OpText, OpBullet:
 						ob += op.Size * 1.2
@@ -1547,16 +1831,20 @@ func avoidInside(res *Result, contentH float64) bool {
 							ob += op.H
 						}
 					}
+
 					if ob > bot {
 						bot = ob
 					}
 				}
+
 				if ink := bot - b.y; ink > h {
 					h = ink
 				}
 			}
+
 			lo := int(b.y / contentH)
 			hi := int((b.y + h) / contentH)
+
 			if hi > lo && h <= contentH+0.01 {
 				remaining := float64(lo+1)*contentH - b.y
 				// Prefer splitting over large empty bands. Use border-box
@@ -1572,15 +1860,19 @@ func avoidInside(res *Result, contentH float64) bool {
 				if remaining < b.h*0.5 && b.h > contentH*0.35 {
 					return changed
 				}
+
 				dy := float64(lo+1)*contentH - b.y
 				if dy > 0.01 {
 					shiftFlowY(res, b.opStart, b.opEnd, b.y, dy)
+
 					changed = true
 				}
 			}
 		}
+
 		return changed
 	}
+
 	return walk(res.root)
 }
 
@@ -1601,6 +1893,7 @@ func beforeAlways(res *Result, contentH float64) bool {
 			prefixMaxY[i+1] = op.Y
 		}
 	}
+
 	var walk func(b *box) bool
 	walk = func(b *box) bool {
 		if b.style.PageBreakBefore == "always" {
@@ -1608,24 +1901,31 @@ func beforeAlways(res *Result, contentH float64) bool {
 			if b.opStart > 0 && b.opStart < len(prefixMaxY) {
 				lastBefore = prefixMaxY[b.opStart]
 			}
+
 			loPage := int(b.y / contentH)
 			lastPage := int(lastBefore / contentH)
+
 			if loPage <= lastPage {
 				dy := float64(lastPage+1)*contentH - b.y
 				if dy > 0 {
 					shiftFlowY(res, b.opStart, b.opEnd, b.y, dy)
+
 					return true
 				}
 			}
 		}
+
 		changed := false
+
 		for _, c := range b.children {
 			if walk(c) {
 				return true
 			}
 		}
+
 		return changed
 	}
+
 	return walk(res.root)
 }
 
@@ -1633,9 +1933,12 @@ func beforeAlways(res *Result, contentH float64) bool {
 // always|avoid to the box that follows each box in flow.
 func afterBreaks(res *Result, contentH float64) bool {
 	var boxes []*box
+
 	var flatten func(b *box)
+
 	flatten = func(b *box) {
 		boxes = append(boxes, b)
+
 		for _, c := range b.children {
 			flatten(c)
 		}
@@ -1643,30 +1946,38 @@ func afterBreaks(res *Result, contentH float64) bool {
 	if res.root != nil {
 		flatten(res.root)
 	}
+
 	changed := false
+
 	for i, b := range boxes {
 		var next *box
+
 		for j := i + 1; j < len(boxes); j++ {
 			if boxes[j].opStart <= boxes[j].opEnd {
 				next = boxes[j]
+
 				break
 			}
 		}
+
 		if next == nil || b.opStart > b.opEnd {
 			continue
 		}
+
 		lastY := res.Ops[b.opStart].Y
 		for k := b.opStart + 1; k <= b.opEnd; k++ {
 			if res.Ops[k].Y > lastY {
 				lastY = res.Ops[k].Y
 			}
 		}
+
 		lastPage := int(lastY / contentH)
 		switch {
 		case b.style.PageBreakAfter == "always":
 			dy := float64(lastPage+1)*contentH - next.y
 			if dy > 0 {
 				shiftFlowY(res, next.opStart, next.opEnd, next.y, dy)
+
 				changed = true
 			}
 		case b.style.PageBreakAfter == "avoid":
@@ -1685,15 +1996,19 @@ func afterBreaks(res *Result, contentH float64) bool {
 			// NOT `next` (next is the following sibling), so we must push
 			// every op in the landing band, not only next.
 			pageStart := float64(nextPage) * contentH
+
 			need := b.h
 			if need < 1 {
 				need = 12
 			}
+
 			if b.opStart <= b.opEnd && b.opStart >= 0 && b.opEnd < len(res.Ops) {
 				top, bot := b.y, b.y
+
 				for k := b.opStart; k <= b.opEnd; k++ {
 					op := res.Ops[k]
 					y0, y1 := op.Y, op.Y
+
 					switch op.Kind {
 					case OpText, OpBullet:
 						y0 = op.Y - op.Size*0.8
@@ -1709,42 +2024,52 @@ func afterBreaks(res *Result, contentH float64) bool {
 							y1 = op.Y + op.H
 						}
 					}
+
 					if y0 < top {
 						top = y0
 					}
+
 					if y1 > bot {
 						bot = y1
 					}
 				}
+
 				if ink := bot - top; ink > need {
 					need = ink
 				}
+
 				if ink := bot - b.y; ink > need {
 					need = ink
 				}
 			}
+
 			const gap = 10.0
 			need += gap
 			bandTop := pageStart + need
 			minY := bandTop
 			minIdx := -1
+
 			for i := range res.Ops {
 				op := &res.Ops[i]
 				if op.Fixed {
 					continue
 				}
+
 				if int(op.Y/contentH) != nextPage {
 					continue
 				}
+
 				if op.Y < minY {
 					minY = op.Y
 					minIdx = i
 				}
 			}
+
 			if minIdx >= 0 && minY < bandTop-0.01 {
 				push := bandTop - minY
 				shiftFlowY(res, minIdx, minIdx, minY-0.01, push)
 			}
+
 			target := bandTop - need // == pageStart when band was cleared
 			if target < pageStart {
 				target = pageStart
@@ -1753,9 +2078,11 @@ func afterBreaks(res *Result, contentH float64) bool {
 			if next.y-need > target {
 				target = next.y - need
 			}
+
 			if target < pageStart {
 				target = pageStart
 			}
+
 			dy := target - b.y
 			if dy > 0.001 {
 				shiftOpsOnly(res, b.opStart, b.opEnd, dy)
@@ -1764,6 +2091,7 @@ func afterBreaks(res *Result, contentH float64) bool {
 			}
 		}
 	}
+
 	return changed
 }
 
@@ -1773,23 +2101,28 @@ func rowsIntact(res *Result, contentH float64) bool {
 	var walk func(b *box) bool
 	walk = func(b *box) bool {
 		changed := false
+
 		for _, c := range b.children {
 			if walk(c) {
 				changed = true
 			}
 		}
+
 		for _, row := range b.rows {
 			if len(row) == 0 {
 				continue
 			}
+
 			first, last := -1, -1
 			rowTop, rowBottom := 0.0, 0.0
 			haveGeom := false
+
 			for _, cell := range row {
 				if cell.opStart <= cell.opEnd {
 					if first < 0 {
 						first = cell.opStart
 					}
+
 					if cell.opEnd > last {
 						last = cell.opEnd
 					}
@@ -1799,10 +2132,12 @@ func rowsIntact(res *Result, contentH float64) bool {
 				// those ops made the first row look multi-page and cascaded
 				// blank pages (wiki awards tables with rowspan=10+).
 				top := cell.y
+
 				h := cell.h
 				if cell.rowSpan > 1 && cell.rowBoxH > 0 {
 					h = cell.rowBoxH
 				}
+
 				bot := top + h
 				if !haveGeom {
 					rowTop, rowBottom, haveGeom = top, bot, true
@@ -1810,14 +2145,17 @@ func rowsIntact(res *Result, contentH float64) bool {
 					if top < rowTop {
 						rowTop = top
 					}
+
 					if bot > rowBottom {
 						rowBottom = bot
 					}
 				}
 			}
+
 			if first < 0 || !haveGeom {
 				continue
 			}
+
 			lo, hi := int(rowTop/contentH), int(rowBottom/contentH)
 			if hi > lo {
 				// Move only to the next page start. Using hi*contentH when the
@@ -1832,12 +2170,15 @@ func rowsIntact(res *Result, contentH float64) bool {
 					// content moves and the grid stays behind (gapped /
 					// misaligned music-video tables across page breaks).
 					shiftFlowY(res, first, last, rowTop-0.01, dy)
+
 					changed = true
 				}
 			}
 		}
+
 		return changed
 	}
+
 	return walk(res.root)
 }
 
@@ -1847,36 +2188,47 @@ func keepHeadingWithNext(res *Result, contentH float64) bool {
 	if res.root == nil {
 		return false
 	}
+
 	var boxes []*box
+
 	var flatten func(b *box)
 	flatten = func(b *box) {
 		boxes = append(boxes, b)
+
 		for _, c := range b.children {
 			flatten(c)
 		}
 	}
 	flatten(res.root)
+
 	changed := false
+
 	for i, b := range boxes {
 		if b.node == nil || !isHeadingName(b.node.Name) || b.opStart > b.opEnd {
 			continue
 		}
+
 		page := int(b.y / contentH)
+
 		room := float64(page+1)*contentH - (b.y + b.h)
 		if room >= 24 { // ~2 lines at 12pt
 			continue
 		}
 		// Find next flow sibling with ops.
 		var next *box
+
 		for j := i + 1; j < len(boxes); j++ {
 			if boxes[j].opStart <= boxes[j].opEnd && boxes[j].y >= b.y {
 				next = boxes[j]
+
 				break
 			}
 		}
+
 		if next == nil {
 			continue
 		}
+
 		nextPage := int(next.y / contentH)
 		if nextPage > page {
 			continue // already separated by a break
@@ -1886,9 +2238,11 @@ func keepHeadingWithNext(res *Result, contentH float64) bool {
 		dy := float64(page+1)*contentH - b.y
 		if dy > 0 {
 			shiftFlowY(res, b.opStart, b.opEnd, b.y, dy)
+
 			changed = true
 		}
 	}
+
 	return changed
 }
 
@@ -1897,6 +2251,7 @@ func isHeadingName(name string) bool {
 	case "h1", "h2", "h3", "h4", "h5", "h6":
 		return true
 	}
+
 	return false
 }
 
@@ -1914,12 +2269,15 @@ func orphansWidows(res *Result, contentH float64) bool {
 	if res.root == nil || contentH <= 0 {
 		return false
 	}
+
 	changed := false
+
 	var walk func(b *box)
 	walk = func(b *box) {
 		for _, c := range b.children {
 			walk(c)
 		}
+
 		if b.kind != "block" || b.h <= 0 || b.opStart > b.opEnd {
 			return
 		}
@@ -1929,30 +2287,39 @@ func orphansWidows(res *Result, contentH float64) bool {
 			if orphansWidowsHeuristic(res, b, contentH) {
 				changed = true
 			}
+
 			return
 		}
+
 		lines := countBlockLineYs(res, b)
 		if len(lines) == 0 {
 			if orphansWidowsHeuristic(res, b, contentH) {
 				changed = true
 			}
+
 			return
 		}
+
 		orphans := b.style.Orphans
 		if orphans < 1 {
 			orphans = 2
 		}
+
 		widows := b.style.Widows
 		if widows < 1 {
 			widows = 2
 		}
+
 		lo := int(b.y / contentH)
 		hi := int((b.y + b.h) / contentH)
+
 		if hi <= lo {
 			return
 		}
+
 		boundary := float64(lo+1) * contentH
 		before, after := 0, 0
+
 		for _, y := range lines {
 			if y < boundary-1e-6 {
 				before++
@@ -1967,6 +2334,7 @@ func orphansWidows(res *Result, contentH float64) bool {
 			if orphansWidowsHeuristic(res, b, contentH) {
 				changed = true
 			}
+
 			return
 		}
 		// Rule 3: legal Class B break only if both sides meet the minima.
@@ -1982,14 +2350,17 @@ func orphansWidows(res *Result, contentH float64) bool {
 			if preferSplitOverBlank(remaining, b.h, contentH) {
 				return
 			}
+
 			dy := float64(hi)*contentH - b.y
 			if dy > 1e-6 {
 				shiftFlowY(res, b.opStart, b.opEnd, b.y, dy)
+
 				changed = true
 			}
 		}
 	}
 	walk(res.root)
+
 	return changed
 }
 
@@ -1999,20 +2370,26 @@ func orphansWidowsHeuristic(res *Result, b *box, contentH float64) bool {
 	if b.h < 14 || b.h > 60 {
 		return false
 	}
+
 	lo := int(b.y / contentH)
 	hi := int((b.y + b.h) / contentH)
+
 	if hi <= lo || b.h > contentH {
 		return false
 	}
+
 	remaining := float64(lo+1)*contentH - b.y
 	if preferSplitOverBlank(remaining, b.h, contentH) {
 		return false
 	}
+
 	dy := float64(hi)*contentH - b.y
 	if dy <= 1e-6 {
 		return false
 	}
+
 	shiftFlowY(res, b.opStart, b.opEnd, b.y, dy)
+
 	return true
 }
 
@@ -2045,10 +2422,12 @@ func preferSplitOverBlank(remaining, h, contentH float64) bool {
 		if h*0.5 > maxBlank {
 			maxBlank = h * 0.5
 		}
+
 		if remaining > maxBlank {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -2058,6 +2437,7 @@ func hasNestedFlowChild(b *box) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -2067,29 +2447,38 @@ func countBlockLineYs(res *Result, b *box) []float64 {
 	if res == nil || b.opStart > b.opEnd || b.opStart < 0 {
 		return nil
 	}
+
 	const eps = 0.5
+
 	ys := make([]float64, 0, 8)
+
 	end := b.opEnd
 	if end >= len(res.Ops) {
 		end = len(res.Ops) - 1
 	}
+
 	for i := b.opStart; i <= end; i++ {
 		op := &res.Ops[i]
 		if op.Kind != OpText && op.Kind != OpBullet {
 			continue
 		}
+
 		y := op.Y
 		found := false
+
 		for _, ey := range ys {
 			if math.Abs(ey-y) <= eps {
 				found = true
+
 				break
 			}
 		}
+
 		if !found {
 			ys = append(ys, y)
 		}
 	}
+
 	return ys
 }
 
@@ -2100,12 +2489,15 @@ func repeatTableHeaders(res *Result, contentH float64) {
 	if res.root == nil || contentH <= 0 {
 		return
 	}
+
 	var tables []*box
+
 	var walk func(b *box)
 	walk = func(b *box) {
 		if b.kind == "table" && b.headerRows > 0 && b.headerRows < len(b.rows) {
 			tables = append(tables, b)
 		}
+
 		for _, c := range b.children {
 			walk(c)
 		}
@@ -2117,52 +2509,66 @@ func repeatTableHeaders(res *Result, contentH float64) {
 		if nHdr > len(tb.rows) {
 			nHdr = len(tb.rows)
 		}
+
 		hdrFirst, hdrLast, hdrTop, hdrH := rowSpan(tb.rows[:nHdr], res)
 		if hdrFirst < 0 || hdrH <= 0 {
 			continue
 		}
+
 		firstPage := int(tb.y / contentH)
 		pages := map[int]bool{}
+
 		for _, row := range tb.rows[nHdr:] {
 			top, _ := rowYBounds(row, res)
 			if top < 0 {
 				continue
 			}
+
 			pages[int(top/contentH)] = true
 		}
+
 		for page := range pages {
 			if page <= firstPage {
 				continue
 			}
+
 			pageTop := float64(page) * contentH
 			bodyTop := -1.0
 			shiftFrom, shiftTo := -1, -1
+
 			for _, row := range tb.rows[nHdr:] {
 				f, l := rowOpRange(row)
 				if f < 0 {
 					continue
 				}
+
 				top, _ := rowYBounds(row, res)
 				if int(top/contentH) < page {
 					continue
 				}
+
 				if bodyTop < 0 || top < bodyTop {
 					bodyTop = top
 				}
+
 				if shiftFrom < 0 || f < shiftFrom {
 					shiftFrom = f
 				}
+
 				if l > shiftTo {
 					shiftTo = l
 				}
 			}
+
 			if shiftFrom >= 0 && bodyTop >= 0 && bodyTop < pageTop+hdrH-0.5 {
 				dy := pageTop + hdrH - bodyTop
 				if dy > 0 {
 					shiftFlowY(res, shiftFrom, shiftTo, bodyTop-0.01, dy)
 				}
 			}
+
 			baseY := hdrTop
+
 			for k := hdrFirst; k <= hdrLast && k < len(res.Ops); k++ {
 				op := res.Ops[k]
 				op.Y = pageTop + (op.Y - baseY)
@@ -2174,16 +2580,19 @@ func repeatTableHeaders(res *Result, contentH float64) {
 
 func rowOpRange(row []*box) (first, last int) {
 	first, last = -1, -1
+
 	for _, cell := range row {
 		if cell.opStart <= cell.opEnd {
 			if first < 0 || cell.opStart < first {
 				first = cell.opStart
 			}
+
 			if cell.opEnd > last {
 				last = cell.opEnd
 			}
 		}
 	}
+
 	return first, last
 }
 
@@ -2192,28 +2601,36 @@ func rowYBounds(row []*box, res *Result) (top, bottom float64) {
 	if first < 0 || first >= len(res.Ops) {
 		return -1, -1
 	}
+
 	top, bottom = res.Ops[first].Y, res.Ops[first].Y
+
 	for k := first; k <= last && k < len(res.Ops); k++ {
 		y := res.Ops[k].Y
+
 		h := res.Ops[k].H
 		if res.Ops[k].Kind == OpText || res.Ops[k].Kind == OpBullet {
 			h = res.Ops[k].Size * 1.2
 		}
+
 		if y < top {
 			top = y
 		}
+
 		if y+h > bottom {
 			bottom = y + h
 		}
 	}
+
 	for _, cell := range row {
 		if cell.h > 0 && cell.y+cell.h > bottom {
 			bottom = cell.y + cell.h
 		}
+
 		if cell.y < top && cell.y > 0 {
 			top = cell.y
 		}
 	}
+
 	return top, bottom
 }
 
@@ -2221,35 +2638,45 @@ func rowSpan(rows [][]*box, res *Result) (first, last int, top, height float64) 
 	first, last = -1, -1
 	top, bottom := 0.0, 0.0
 	set := false
+
 	for _, row := range rows {
 		f, l := rowOpRange(row)
 		if f < 0 {
 			continue
 		}
+
 		if first < 0 || f < first {
 			first = f
 		}
+
 		if l > last {
 			last = l
 		}
+
 		rt, rb := rowYBounds(row, res)
 		if rt < 0 {
 			continue
 		}
+
 		if !set || rt < top {
 			top = rt
 		}
+
 		if !set || rb > bottom {
 			bottom = rb
 		}
+
 		set = true
 	}
+
 	if first < 0 || !set {
 		return -1, -1, 0, 0
 	}
+
 	height = bottom - top
 	if height < 1 {
 		height = 0
+
 		for _, row := range rows {
 			rowH := 0.0
 			for _, cell := range row {
@@ -2257,9 +2684,11 @@ func rowSpan(rows [][]*box, res *Result) (first, last int, top, height float64) 
 					rowH = cell.h
 				}
 			}
+
 			height += rowH
 		}
 	}
+
 	return first, last, top, height
 }
 
@@ -2271,6 +2700,7 @@ func populateLocations(res *Result, contentH float64, opPage []int) {
 	if res.root == nil {
 		return
 	}
+
 	var walk func(b *box)
 	walk = func(b *box) {
 		if b.node != nil {
@@ -2278,16 +2708,19 @@ func populateLocations(res *Result, contentH float64, opPage []int) {
 			if b.opStart <= b.opEnd && b.opStart < len(opPage) {
 				page = opPage[b.opStart]
 			}
+
 			if page < 0 {
 				page = int(b.y / contentH)
 				if page < 0 {
 					page = 0
 				}
 			}
+
 			res.Locations = append(res.Locations, ElementLocation{
 				Node: b.node, Page: page, X: b.x, Y: b.y, W: b.w, H: b.h,
 			})
 		}
+
 		for _, c := range b.children {
 			walk(c)
 		}
@@ -2300,6 +2733,7 @@ func populateLocations(res *Result, contentH float64, opPage []int) {
 func canvasToPDF(opX, opY float64, pageIdx int, contentH float64, opts PaintOptions, pageH float64) (x, y float64) {
 	x = opts.MarginLeft + opX
 	y = pageH - opts.MarginTop - opY + float64(pageIdx)*contentH
+
 	return x, y
 }
 
@@ -2322,10 +2756,12 @@ func drawStroke(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts Pain
 func drawLine(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintOptions, pageH float64) {
 	x1, y1 := canvasToPDF(op.X, op.Y, pageIdx, contentH, opts, pageH)
 	x2, y2 := canvasToPDF(op.X+op.W, op.Y+op.H, pageIdx, contentH, opts, pageH)
+
 	w := op.Width
 	if w <= 0 {
 		w = 1
 	}
+
 	c.SetStrokeColor(op.R, op.G, op.B)
 	c.SetLineWidth(w)
 	c.MoveTo(x1, y1)
@@ -2336,11 +2772,14 @@ func drawLine(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintO
 func drawText(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintOptions, pageH float64, fontName string) {
 	x, y := canvasToPDF(op.X, op.Y, pageIdx, contentH, opts, pageH)
 	c.SetFillColor(op.R, op.G, op.B)
+
 	if fontName == "" {
 		fontName = "F0"
 	}
+
 	c.SetFont(fontName, op.Size)
 	c.BeginText()
+
 	if op.RotateDeg == 90 || op.RotateDeg == -90 {
 		c.TextMatrix(0, 1, -1, 0, x, y)
 	} else {
@@ -2353,21 +2792,27 @@ func drawText(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintO
 		c.SetLineWidth(op.Size * 0.06)
 		c.TextRenderMode(2) // fill + stroke
 	}
+
 	c.TextShow(op.Text)
+
 	if fakeBold {
 		c.TextRenderMode(0)
 	}
+
 	c.EndText()
 }
 
 func drawImage(p *pdf.Page, c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintOptions, name string) error {
 	x, y := canvasToPDF(op.X, op.Y+op.H, pageIdx, contentH, opts, p.Height())
+
 	if name == "" {
 		name = "I0"
 	}
+
 	if op.IsJPEG {
 		return c.AddJPEGImage(name, x, y, op.W, op.H, op.Image)
 	}
+
 	return c.AddPNGImage(name, x, y, op.W, op.H, op.Image)
 }
 
@@ -2377,6 +2822,7 @@ func drawLink(p *pdf.Page, op *Op, pageIdx int, contentH float64, opts PaintOpti
 	if len(op.URI) > 0 && op.URI[0] == '#' {
 		return
 	}
+
 	x, y := canvasToPDF(op.X, op.Y+op.H, pageIdx, contentH, opts, p.Height())
 	p.AddLinkURI([4]float64{x, y, x + op.W, y + op.H}, op.URI)
 }
@@ -2387,6 +2833,7 @@ func drawLinkXform(p *pdf.Page, op *Op, pageIdx int, contentH float64, opts Pain
 	if len(op.URI) > 0 && op.URI[0] == '#' {
 		return
 	}
+
 	x0, y0, x1, y1 := op.X, op.Y, op.X+op.W, op.Y+op.H
 	if op.XformSet {
 		corners := [4][2]float64{
@@ -2394,30 +2841,39 @@ func drawLinkXform(p *pdf.Page, op *Op, pageIdx int, contentH float64, opts Pain
 		}
 		minX, minY := math.MaxFloat64, math.MaxFloat64
 		maxX, maxY := -math.MaxFloat64, -math.MaxFloat64
+
 		for _, pt := range corners {
 			tx, ty := op.Xform.Apply(pt[0], pt[1])
 			if tx < minX {
 				minX = tx
 			}
+
 			if ty < minY {
 				minY = ty
 			}
+
 			if tx > maxX {
 				maxX = tx
 			}
+
 			if ty > maxY {
 				maxY = ty
 			}
 		}
+
 		x0, y0, x1, y1 = minX, minY, maxX, maxY
 	}
+
 	llx, lly := canvasToPDF(x0, y1, pageIdx, contentH, opts, p.Height())
 	urx, ury := canvasToPDF(x1, y0, pageIdx, contentH, opts, p.Height())
+
 	if llx > urx {
 		llx, urx = urx, llx
 	}
+
 	if lly > ury {
 		lly, ury = ury, lly
 	}
+
 	p.AddLinkURI([4]float64{llx, lly, urx, ury}, op.URI)
 }

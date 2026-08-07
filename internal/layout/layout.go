@@ -221,11 +221,13 @@ func (e *engine) faceFor(st ResolvedStyle) *pdf.Font {
 			return f
 		}
 	}
+
 	if e.faces != nil {
 		if f := e.faces.Resolve(st.FontWeight, st.FontItalic); f != nil {
 			return f
 		}
 	}
+
 	return e.font
 }
 
@@ -236,6 +238,7 @@ func (e *engine) faceForRune(st ResolvedStyle, r rune) *pdf.Font {
 	if r == ' ' || r == '\t' || r == '\n' || r == '\r' {
 		return e.faceFor(st)
 	}
+
 	if e.registry != nil {
 		for _, fam := range st.FontFamily {
 			f := e.registry.Lookup([]string{fam}, st.FontWeight, st.FontItalic)
@@ -244,11 +247,13 @@ func (e *engine) faceForRune(st ResolvedStyle, r rune) *pdf.Font {
 			}
 		}
 	}
+
 	if e.faces != nil {
 		if f := e.faces.Resolve(st.FontWeight, st.FontItalic); f != nil && f.GlyphID(r) != 0 {
 			return f
 		}
 	}
+
 	if e.font != nil && e.font.GlyphID(r) != 0 {
 		return e.font
 	}
@@ -259,6 +264,7 @@ func (e *engine) faceForRune(st ResolvedStyle, r rune) *pdf.Font {
 			return f
 		}
 	}
+
 	return e.faceFor(st)
 }
 
@@ -271,6 +277,7 @@ func zoomScale(z float64) float64 {
 	if z > 0 {
 		return z
 	}
+
 	return 1
 }
 
@@ -278,10 +285,12 @@ func (e *engine) add(op Op) {
 	if e.checkContext() || e.noEmit {
 		return
 	}
+
 	if op.ID == 0 {
 		e.nextOpID++
 		op.ID = e.nextOpID
 	}
+
 	if !e.noEmit {
 		op.ZIndex = e.zIndex
 		op.ZIndexSet = e.zIndexSet
@@ -298,21 +307,27 @@ func (e *engine) checkContext() bool {
 	if e.err != nil {
 		return true
 	}
+
 	if e.ctx == nil {
 		return false
 	}
+
 	if err := e.ctx.Err(); err != nil {
 		e.err = err
+
 		return true
 	}
+
 	return false
 }
 
 func (e *engine) pushZ(st ResolvedStyle) (prevZ int, prevSet bool, prevPositioned bool) {
 	prevZ, prevSet, prevPositioned = e.zIndex, e.zIndexSet, e.positioned
+
 	if st.Position == "absolute" || st.Position == "fixed" {
 		e.positioned = true
 	}
+
 	if st.ZIndexSet {
 		e.zIndex = st.ZIndex
 		e.zIndexSet = true
@@ -321,6 +336,7 @@ func (e *engine) pushZ(st ResolvedStyle) (prevZ int, prevSet bool, prevPositione
 		e.zIndex = 0
 		e.zIndexSet = true
 	}
+
 	return prevZ, prevSet, prevPositioned
 }
 
@@ -340,22 +356,28 @@ func LayoutContext(ctx context.Context, root *html.Node, opts Options) (*Result,
 	if root == nil {
 		return nil, errors.New("layout: nil root")
 	}
+
 	if ctx == nil {
 		ctx = context.Background()
 	}
+
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+
 	faces, err := pdf.LoadDefaultFaces()
 	if err != nil {
 		return nil, err
 	}
+
 	if opts.Faces != nil {
 		faces = opts.Faces
 	}
+
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+
 	font := opts.Font
 	if font == nil {
 		font = faces.Regular
@@ -363,6 +385,7 @@ func LayoutContext(ctx context.Context, root *html.Node, opts Options) (*Result,
 
 	// Pass 1: cascade without @container (used sizes unknown).
 	styles := resolveStylesWith(root, opts, nil)
+
 	var containers map[*html.Node]sizeContainer
 	// After definite inline sizes of size containers are known, re-cascade so
 	// matching @container rules apply, then lay out once with final styles.
@@ -382,6 +405,7 @@ func LayoutContext(ctx context.Context, root *html.Node, opts Options) (*Result,
 					if !ok || !sameSizeContainerState(a, b) {
 						styles = resolveStylesWith(root, opts, cinfo2)
 						containers = cinfo2
+
 						break
 					}
 				}
@@ -403,14 +427,17 @@ func LayoutContext(ctx context.Context, root *html.Node, opts Options) (*Result,
 	}
 
 	b := e.build(root, opts.Width, 0, 0)
+
 	if e.err != nil {
 		return nil, e.err
 	}
 	// Merge deferred background/border ops before stamping sticky/fixed flags
 	// and CSS transforms (those passes need final op indices).
 	e.finalizeChrome(b)
+
 	boxes := make([]*box, 0)
 	flattenBoxes(b, &boxes)
+
 	res := &Result{
 		Ops:    e.ops,
 		Width:  opts.Width,
@@ -421,12 +448,14 @@ func LayoutContext(ctx context.Context, root *html.Node, opts Options) (*Result,
 	if b != nil {
 		res.Height = b.y + b.h
 	}
+
 	if res.Height < e.height {
 		res.Height = e.height
 	}
 	// Paint-time CSS transforms/opacity: stamp composed CTMs after geometry
 	// is final so transform-origin % resolves against the border box.
 	stampBoxTransforms(b, IdentityMatrix(), res.Ops)
+
 	return res, nil
 }
 
@@ -434,10 +463,12 @@ func (e *engine) stylePtr(n *html.Node) *ResolvedStyle {
 	if p, ok := e.stylePtrs[n]; ok {
 		return p
 	}
+
 	st := e.styles[n]
 	p := new(ResolvedStyle)
 	*p = st
 	e.stylePtrs[n] = p
+
 	return p
 }
 
@@ -445,6 +476,7 @@ func flattenBoxes(b *box, out *[]*box) {
 	if b == nil {
 		return
 	}
+
 	*out = append(*out, b)
 	for _, child := range b.children {
 		flattenBoxes(child, out)
@@ -455,16 +487,21 @@ func estimateOpCapacity(root *html.Node) int {
 	if root == nil {
 		return 0
 	}
+
 	nodes := 0
+
 	root.Walk(func(*html.Node) { nodes++ })
+
 	capacity := nodes * 4
 	if capacity < 64 {
 		capacity = 64
 	}
+
 	const maxCapacity = 1 << 20
 	if capacity > maxCapacity {
 		capacity = maxCapacity
 	}
+
 	return capacity
 }
 
@@ -520,18 +557,23 @@ func (e *engine) build(n *html.Node, availW, x, y float64) *box {
 	if e.checkContext() {
 		return nil
 	}
+
 	st := e.styles[n]
+
 	if n.Type == html.TextNode {
 		return nil
 	}
+
 	if st.Display == "none" {
 		return nil
 	}
+
 	prevZ, prevSet, prevPositioned := e.pushZ(st)
 	defer e.popZ(prevZ, prevSet, prevPositioned)
 	// Ancestor transforms only (own transform does not change this box's CB).
 	underXformCB := e.transformCBDepth > 0
 	start := len(e.ops)
+
 	var b *box
 	switch n.Name {
 	case "img":
@@ -545,6 +587,7 @@ func (e *engine) build(n *html.Node, availW, x, y float64) *box {
 	if b == nil && st.Position == "fixed" {
 		b = e.buildOutOfFlow(n, st, availW, x, y, !underXformCB)
 	}
+
 	if b == nil && st.Position == "absolute" {
 		b = e.buildOutOfFlow(n, st, availW, x, y, false)
 	}
@@ -553,22 +596,27 @@ func (e *engine) build(n *html.Node, availW, x, y float64) *box {
 		e.transformCBDepth++
 		defer func() { e.transformCBDepth-- }()
 	}
+
 	if b == nil {
 		b = e.buildInFlowDisplay(n, st, availW, x, y)
 	}
+
 	if b != nil {
 		b.opStart, b.opEnd = start, len(e.ops)-1
 		if st.Position == "relative" {
 			e.applyRelativeOffset(b)
 		}
 	}
+
 	if b != nil && st.Position == "sticky" {
 		e.tagSticky(b)
 	}
+
 	if b != nil && st.Position == "fixed" && !underXformCB {
 		// Only viewport-fixed when not under a transformed ancestor CB.
 		e.markOpsFixed(b.opStart, b.opEnd)
 	}
+
 	return b
 }
 
@@ -578,6 +626,7 @@ func isTableDisplay(d string) bool {
 		"table-footer-group", "table-cell", "table-caption":
 		return true
 	}
+
 	return false
 }
 
@@ -587,6 +636,7 @@ func useBlockForTableDisplay(n *html.Node) bool {
 	if n == nil || n.Type != html.ElementNode {
 		return false
 	}
+
 	if n.Name == "table" {
 		return false
 	}
@@ -595,11 +645,13 @@ func useBlockForTableDisplay(n *html.Node) bool {
 		if c.Type != html.ElementNode {
 			continue
 		}
+
 		switch c.Name {
 		case "tr", "tbody", "thead", "tfoot", "colgroup", "col", "caption":
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -612,7 +664,9 @@ func (e *engine) buildBlock(n *html.Node, st ResolvedStyle, availW, x, y float64
 	if b.w < 0 {
 		b.w = 0
 	}
+
 	definiteW := st.Width >= 0 || st.WidthPercent >= 0
+
 	if st.WidthPercent >= 0 {
 		// Cyclic % honesty: indefinite containing block → treat as auto.
 		if availW > 0 && availW < 1e12 {
@@ -630,6 +684,7 @@ func (e *engine) buildBlock(n *html.Node, st ResolvedStyle, availW, x, y float64
 		b.w += e.scalePt(st.PaddingLeft) + e.scalePt(st.PaddingRight) +
 			e.scalePt(st.BorderLeft.Width) + e.scalePt(st.BorderRight.Width)
 	}
+
 	if st.MinWidthPercent >= 0 && availW > 0 && availW < 1e12 {
 		mn := availW * st.MinWidthPercent / 100
 		if b.w < mn {
@@ -638,6 +693,7 @@ func (e *engine) buildBlock(n *html.Node, st ResolvedStyle, availW, x, y float64
 	} else if st.MinWidth > 0 && b.w < e.scalePt(st.MinWidth) {
 		b.w = e.scalePt(st.MinWidth)
 	}
+
 	if st.MaxWidth >= 0 && b.w > e.scalePt(st.MaxWidth) {
 		b.w = e.scalePt(st.MaxWidth)
 	}
@@ -647,6 +703,7 @@ func (e *engine) buildBlock(n *html.Node, st ResolvedStyle, availW, x, y float64
 		if free < 0 {
 			free = 0
 		}
+
 		switch {
 		case st.MarginLeftAuto && st.MarginRightAuto:
 			ml = free / 2
@@ -663,6 +720,7 @@ func (e *engine) buildBlock(n *html.Node, st ResolvedStyle, availW, x, y float64
 			}
 		}
 	}
+
 	b.x = x + ml
 	contentX, contentW := e.contentBox(b.x, b.w, st)
 
@@ -674,9 +732,11 @@ func (e *engine) buildBlock(n *html.Node, st ResolvedStyle, availW, x, y float64
 	cy := e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)
 	pop, enclose := e.pushBFCFloats(st, contentX, contentW)
 	cy = e.flowChildren(b, n.Children, st, contentW, contentX, y, cy)
+
 	if enclose && e.bfcFloats != nil {
 		cy = e.bfcFloats.extentCy(y, cy)
 	}
+
 	pop()
 	// padding-bottom is inside the border box (space above border-bottom /
 	// letterhead rules — fixture-07/16).
@@ -692,15 +752,19 @@ func (e *engine) buildBlock(n *html.Node, st ResolvedStyle, availW, x, y float64
 			cy = h
 		}
 	}
+
 	if st.MinHeight > 0 && cy < e.scalePt(st.MinHeight) {
 		cy = e.scalePt(st.MinHeight)
 	}
+
 	if st.MaxHeight >= 0 && cy > e.scalePt(st.MaxHeight) {
 		cy = e.scalePt(st.MaxHeight)
 	}
+
 	b.h = cy
 
 	e.prependChrome(contentStart, b, st, b.x, y, b.w, b.h)
+
 	return b
 }
 
@@ -712,21 +776,26 @@ func resolveUsedHeight(st ResolvedStyle, cbH float64, e *engine) (float64, bool)
 		if cbH < 0 {
 			return 0, false
 		}
+
 		h := cbH * st.HeightPercent / 100
 		if st.BoxSizing != "border-box" {
 			h += e.scalePt(st.PaddingTop) + e.scalePt(st.PaddingBottom) +
 				e.scalePt(st.BorderTop.Width) + e.scalePt(st.BorderBottom.Width)
 		}
+
 		return h, true
 	}
+
 	if st.Height < 0 {
 		return 0, false
 	}
+
 	h := e.scalePt(st.Height)
 	if st.BoxSizing != "border-box" {
 		h += e.scalePt(st.PaddingTop) + e.scalePt(st.PaddingBottom) +
 			e.scalePt(st.BorderTop.Width) + e.scalePt(st.BorderBottom.Width)
 	}
+
 	return h, true
 }
 
@@ -737,23 +806,29 @@ func (e *engine) buildOutOfFlow(n *html.Node, st ResolvedStyle, availW, x, y flo
 	cbX, cbY, cbW := x, y, availW
 	if viewportFixed {
 		cbX, cbY = 0, 0
+
 		cbW = e.opts.Width
 		if cbW <= 0 {
 			cbW = availW
 		}
 	}
+
 	start := len(e.ops)
+
 	b := e.buildInFlowDisplay(n, st, cbW, cbX, cbY)
 	if b == nil {
 		return nil
 	}
+
 	b.opStart, b.opEnd = start, len(e.ops)-1
+
 	ax, ay := cbX, cbY
 	if !st.LeftAuto {
 		ax = cbX + e.scalePt(st.Left)
 	} else if !st.RightAuto {
 		ax = cbX + cbW - b.w - e.scalePt(st.Right)
 	}
+
 	if !st.TopAuto {
 		ay = cbY + e.scalePt(st.Top)
 	} else if !st.BottomAuto {
@@ -767,9 +842,11 @@ func (e *engine) buildOutOfFlow(n *html.Node, st ResolvedStyle, availW, x, y flo
 			ay = cbY + e.scalePt(st.Bottom)
 		}
 	}
+
 	dx, dy := ax-b.x, ay-b.y
 	b.x, b.y = ax, ay
 	e.shiftBoxOps(b, dx, dy)
+
 	return b
 }
 
@@ -780,12 +857,15 @@ func (e *engine) buildInFlowDisplay(n *html.Node, st ResolvedStyle, availW, x, y
 	if st.Display == "flex" || st.Display == "inline-flex" {
 		return e.buildFlex(n, st, availW, x, y)
 	}
+
 	if st.Display == "grid" || st.Display == "inline-grid" || st.Display == "subgrid" {
 		return e.buildGrid(n, st, availW, x, y)
 	}
+
 	if isMulticol(st) {
 		return e.buildMulticol(n, st, availW, x, y)
 	}
+
 	if isTableDisplay(st.Display) {
 		// MediaWiki thumbs use figure{display:table;float:right} purely for
 		// shrink-to-fit. Routing those through buildTable drops nested <img>
@@ -795,8 +875,10 @@ func (e *engine) buildInFlowDisplay(n *html.Node, st ResolvedStyle, availW, x, y
 		if useBlockForTableDisplay(n) {
 			return e.buildBlock(n, st, availW, x, y)
 		}
+
 		return e.buildTable(n, st, availW, x, y)
 	}
+
 	return e.buildBlock(n, st, availW, x, y)
 }
 
@@ -804,6 +886,7 @@ func (e *engine) markOpsFixed(start, end int) {
 	if end < start {
 		return
 	}
+
 	for i := start; i <= end && i < len(e.ops); i++ {
 		e.ops[i].Fixed = true
 	}
@@ -816,43 +899,53 @@ func borderLineOps(x, y, w, h, width float64, style string, r, g, b float64) []O
 	if width <= 0 || style == "none" || (w <= 0 && h <= 0) {
 		return nil
 	}
+
 	if style != "dashed" && style != "dotted" {
 		return []Op{{Kind: OpLine, X: x, Y: y, W: w, H: h, Width: width, R: r, G: g, B: b}}
 	}
 
 	horizontal := w > 0
 	length := w
+
 	if !horizontal {
 		length = h
 	}
+
 	drawLen, gap := width*3, width*2
 	if style == "dotted" {
 		drawLen, gap = width, width*1.5
 	}
+
 	if drawLen < 0.5 {
 		drawLen = 0.5
 	}
+
 	if gap < 0.5 {
 		gap = 0.5
 	}
+
 	ops := make([]Op, 0, int(length/(drawLen+gap))+1)
+
 	for pos := 0.0; pos < length-0.001; pos += drawLen + gap {
 		seg := math.Min(drawLen, length-pos)
 		if seg <= 0 {
 			break
 		}
+
 		if horizontal {
 			ops = append(ops, Op{Kind: OpLine, X: x + pos, Y: y, W: seg, H: 0, Width: width, R: r, G: g, B: b})
 		} else {
 			ops = append(ops, Op{Kind: OpLine, X: x, Y: y + pos, W: 0, H: seg, Width: width, R: r, G: g, B: b})
 		}
 	}
+
 	return ops
 }
 
 // borderOps returns the four border line ops for the given border box.
 func (e *engine) borderOps(st ResolvedStyle, x, y, w, h float64) []Op {
 	var ops []Op
+
 	appendSide := func(side border, sx, sy, sw, sh float64) {
 		width := e.scalePt(side.Width)
 		ops = append(ops, borderLineOps(sx, sy, sw, sh, width, side.Style,
@@ -862,6 +955,7 @@ func (e *engine) borderOps(st ResolvedStyle, x, y, w, h float64) []Op {
 	appendSide(st.BorderRight, x+w, y, 0, h)
 	appendSide(st.BorderBottom, x, y+h, w, 0)
 	appendSide(st.BorderLeft, x, y, 0, h)
+
 	return ops
 }
 
@@ -872,10 +966,12 @@ func chromeMustSpliceImmediately(st ResolvedStyle) bool {
 	if st.HasTransform {
 		return true
 	}
+
 	switch st.Position {
 	case "sticky", "fixed":
 		return true
 	}
+
 	return false
 }
 
@@ -889,22 +985,29 @@ func (e *engine) prependChrome(insertAt int, b *box, st ResolvedStyle, x, y, w, 
 	if e.noEmit {
 		return
 	}
+
 	var chrome []Op
 	if st.BGColor[3] > 0 && e.opts.Background {
-		chrome = append(chrome, Op{Kind: OpFillRect, X: x, Y: y, W: w, H: h,
-			R: st.BGColor[0], G: st.BGColor[1], B: st.BGColor[2], Alpha: st.BGColor[3]})
+		chrome = append(chrome, Op{
+			Kind: OpFillRect, X: x, Y: y, W: w, H: h,
+			R: st.BGColor[0], G: st.BGColor[1], B: st.BGColor[2], Alpha: st.BGColor[3],
+		})
 	}
+
 	chrome = append(chrome, e.borderOps(st, x, y, w, h)...)
 	if len(chrome) == 0 {
 		return
 	}
+
 	for i := range chrome {
 		chrome[i].ZIndex = e.zIndex
 		chrome[i].ZIndexSet = e.zIndexSet
 		chrome[i].Positioned = e.positioned
 	}
+
 	if !chromeMustSpliceImmediately(st) {
 		e.deferredChrome = append(e.deferredChrome, chromeEntry{at: insertAt, ops: chrome, b: b})
+
 		return
 	}
 	// Immediate splice (sticky/fixed/transform).
@@ -914,6 +1017,7 @@ func (e *engine) prependChrome(insertAt int, b *box, st ResolvedStyle, x, y, w, 
 	e.ops = append(e.ops, tail...)
 	// Keep deferred insert indices valid after this mid-build splice.
 	n := len(chrome)
+
 	for i := range e.deferredChrome {
 		if e.deferredChrome[i].at >= insertAt {
 			e.deferredChrome[i].at += n
@@ -929,6 +1033,7 @@ func (e *engine) finalizeChrome(root *box) {
 	if len(e.deferredChrome) == 0 {
 		return
 	}
+
 	entries := e.deferredChrome
 	e.deferredChrome = nil
 
@@ -938,10 +1043,12 @@ func (e *engine) finalizeChrome(root *box) {
 		ord int
 		ent chromeEntry
 	}
+
 	order := make([]indexed, len(entries))
 	for i, ent := range entries {
 		order[i] = indexed{ord: i, ent: ent}
 	}
+
 	sort.SliceStable(order, func(i, j int) bool {
 		if order[i].ent.at != order[j].ent.at {
 			return order[i].ent.at < order[j].ent.at
@@ -954,26 +1061,34 @@ func (e *engine) finalizeChrome(root *box) {
 	for _, it := range order {
 		totalChrome += len(it.ent.ops)
 	}
+
 	oldOps := e.ops
 	out := make([]Op, 0, len(oldOps)+totalChrome)
 	oldToNew := make([]int, len(oldOps))
+
 	type span struct{ start, end int }
+
 	ownerChrome := map[*box]span{}
 
 	recordOwner := func(b *box, cs, ce int) {
 		if b == nil || ce < cs {
 			return
 		}
+
 		if prev, ok := ownerChrome[b]; ok {
 			if cs < prev.start {
 				prev.start = cs
 			}
+
 			if ce > prev.end {
 				prev.end = ce
 			}
+
 			ownerChrome[b] = prev
+
 			return
 		}
+
 		ownerChrome[b] = span{cs, ce}
 	}
 
@@ -984,8 +1099,10 @@ func (e *engine) finalizeChrome(root *box) {
 			cs := len(out)
 			out = append(out, ent.ops...)
 			recordOwner(ent.b, cs, len(out)-1)
+
 			oi++
 		}
+
 		oldToNew[i] = len(out)
 		out = append(out, op)
 	}
@@ -995,8 +1112,10 @@ func (e *engine) finalizeChrome(root *box) {
 		cs := len(out)
 		out = append(out, ent.ops...)
 		recordOwner(ent.b, cs, len(out)-1)
+
 		oi++
 	}
+
 	e.ops = out
 
 	// Remap content op ranges, expand owners with their chrome, then union
@@ -1006,10 +1125,12 @@ func (e *engine) finalizeChrome(root *box) {
 		if b == nil {
 			return
 		}
+
 		if b.opEnd >= b.opStart && b.opStart >= 0 && b.opEnd < len(oldToNew) {
 			b.opStart = oldToNew[b.opStart]
 			b.opEnd = oldToNew[b.opEnd]
 		}
+
 		if sp, ok := ownerChrome[b]; ok {
 			if b.opEnd < b.opStart {
 				b.opStart, b.opEnd = sp.start, sp.end
@@ -1017,11 +1138,13 @@ func (e *engine) finalizeChrome(root *box) {
 				if sp.start < b.opStart {
 					b.opStart = sp.start
 				}
+
 				if sp.end > b.opEnd {
 					b.opEnd = sp.end
 				}
 			}
 		}
+
 		for _, c := range b.children {
 			remap(c)
 		}
@@ -1033,18 +1156,24 @@ func (e *engine) finalizeChrome(root *box) {
 		if b == nil {
 			return
 		}
+
 		for _, c := range b.children {
 			unionChildren(c)
+
 			if c.opEnd < c.opStart {
 				continue
 			}
+
 			if b.opEnd < b.opStart {
 				b.opStart, b.opEnd = c.opStart, c.opEnd
+
 				continue
 			}
+
 			if c.opStart < b.opStart {
 				b.opStart = c.opStart
 			}
+
 			if c.opEnd > b.opEnd {
 				b.opEnd = c.opEnd
 			}
@@ -1064,25 +1193,31 @@ func restampStickyFixed(b *box, ops []Op) {
 	if b == nil {
 		return
 	}
+
 	if b.sticky && b.stickyID != 0 && b.opEnd >= b.opStart && b.opStart >= 0 {
 		for i := b.opStart; i <= b.opEnd && i < len(ops); i++ {
 			ops[i].StickyID = b.stickyID
 		}
 	}
+
 	if b.style.Position == "fixed" && b.opEnd >= b.opStart && b.opStart >= 0 {
 		hasFixed := false
+
 		for i := b.opStart; i <= b.opEnd && i < len(ops); i++ {
 			if ops[i].Fixed {
 				hasFixed = true
+
 				break
 			}
 		}
+
 		if hasFixed {
 			for i := b.opStart; i <= b.opEnd && i < len(ops); i++ {
 				ops[i].Fixed = true
 			}
 		}
 	}
+
 	for _, c := range b.children {
 		restampStickyFixed(c, ops)
 	}
@@ -1096,6 +1231,7 @@ func (e *engine) contentBox(x, w float64, st ResolvedStyle) (cx, cw float64) {
 	if cw < 0 {
 		cw = 0
 	}
+
 	return x + e.scalePt(st.BorderLeft.Width) + e.scalePt(st.PaddingLeft), cw
 }
 
@@ -1113,25 +1249,32 @@ func (e *engine) resolveImage(src string) *imageRef {
 	if src == "" || e.opts.Images == nil {
 		return nil
 	}
+
 	if e.imgCache == nil {
 		e.imgCache = map[string]*imageRef{}
 	}
+
 	if ref, ok := e.imgCache[src]; ok {
 		return ref
 	}
+
 	data, err := e.opts.Images(src)
 	if err != nil {
 		// Cache nil-miss? Store a sentinel empty ref so we do not re-fetch.
 		e.imgCache[src] = nil
+
 		return nil
 	}
+
 	ref := &imageRef{src: src, data: data}
 	if png, pw, ph, err := svg.Rasterize(data, 1024); err == nil {
 		ref.data, ref.w, ref.h = png, pw, ph
 	} else if w, h, jpeg, ok := imageDims(data); ok {
 		ref.w, ref.h, ref.isJPEG = w, h, jpeg
 	}
+
 	e.imgCache[src] = ref
+
 	return ref
 }
 
@@ -1140,9 +1283,11 @@ func (e *engine) isInlineChild(n *html.Node) bool {
 	if n.Type == html.TextNode {
 		return true
 	}
+
 	if n.Type != html.ElementNode {
 		return false
 	}
+
 	cs := e.styles[n]
 	if cs.Display == "none" || cs.Float != "none" || cs.Position == "absolute" || cs.Position == "fixed" {
 		return false
@@ -1157,6 +1302,7 @@ func (e *engine) isInlineChild(n *html.Node) bool {
 			return true
 		}
 	}
+
 	return cs.Display == "inline" || cs.Display == "inline-block" || cs.Display == "inline-flex"
 }
 
@@ -1166,11 +1312,13 @@ func onlyCollapsibleWS(nodes []*html.Node) bool {
 	if len(nodes) == 0 {
 		return true
 	}
+
 	for _, n := range nodes {
 		if n.Type != html.TextNode || strings.TrimSpace(n.Text) != "" {
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -1182,7 +1330,9 @@ func onlyCollapsibleWS(nodes []*html.Node) bool {
 // Float enclosure (extentCy) is the caller's job when it owns a BFC.
 func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedStyle, contentW, contentX, y, cy float64) float64 {
 	prevBottom := 0.0
+
 	var local floatState
+
 	floats := e.bfcFloats
 	if floats == nil {
 		// Defensive: callers should pushBFCFloats first. Keep a local state
@@ -1190,10 +1340,12 @@ func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedSty
 		local = newFloatState(contentX, contentW)
 		floats = &local
 	}
+
 	var deferred []*html.Node
 	// Absolute/fixed containing-block origin is the content edge at entry.
 	// Do not use the post-flow cy or deferred boxes sit below in-flow siblings.
 	absOriginY := y + cy
+
 	absCBX, absCBW := contentX, contentW
 	if st.HasTransform {
 		// Transformed element: padding box is the CB for abs/fixed descendants.
@@ -1201,88 +1353,114 @@ func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedSty
 		absOriginY = absOriginY - e.scalePt(st.PaddingTop)
 		absCBW = contentW + e.scalePt(st.PaddingLeft) + e.scalePt(st.PaddingRight)
 	}
+
 	i := 0
 	for i < len(children) {
 		if e.checkContext() {
 			return cy
 		}
+
 		n := children[i]
 		if n.Type == html.ElementNode && e.styles[n].Display == "none" {
 			i++
+
 			continue
 		}
 		// Skip pure whitespace text so it does not interrupt margin collapse
 		// between block siblings (fixture-19 margin-bottom between divs).
 		if n.Type == html.TextNode && strings.TrimSpace(n.Text) == "" {
 			i++
+
 			continue
 		}
+
 		if n.Type == html.ElementNode && (e.styles[n].Position == "absolute" || e.styles[n].Position == "fixed") {
 			// Defer out-of-flow boxes so they paint above in-flow content
 			// (absolute overlays sit on top of later siblings' text).
 			deferred = append(deferred, n)
 			i++
+
 			continue
 		}
+
 		if n.Type == html.ElementNode && e.styles[n].Float != "none" {
 			cs := e.styles[n]
 			cy = floats.clear(cs.Clear, y, cy)
+
 			fb := e.placeFloat(n, cs, floats, contentW, contentX, y, cy)
 			if fb != nil && parent != nil {
 				parent.children = append(parent.children, fb)
+
 				if e.opts.DebugBoxes {
 					e.add(Op{Kind: OpStrokeRect, X: fb.x, Y: fb.y, W: fb.w, H: fb.h, R: 1, G: 0, B: 0})
 				}
 			}
+
 			prevBottom = 0
 			i++
+
 			continue
 		}
+
 		if e.isInlineChild(n) {
 			var run []*html.Node
+
 			for i < len(children) {
 				c := children[i]
 				if c.Type == html.ElementNode && e.styles[c].Display == "none" {
 					i++
+
 					continue
 				}
+
 				if c.Type == html.ElementNode && e.styles[c].Float != "none" {
 					break
 				}
+
 				if c.Type == html.TextNode && strings.TrimSpace(c.Text) == "" {
 					// keep interior whitespace inside an inline run, but a
 					// run that is only WS is dropped below.
 					run = append(run, c)
 					i++
+
 					continue
 				}
+
 				if !e.isInlineChild(c) {
 					break
 				}
+
 				run = append(run, c)
 				i++
 			}
+
 			if onlyCollapsibleWS(run) {
 				continue
 			}
+
 			if len(run) > 0 {
 				pb := parent
 				if pb == nil {
 					pb = &box{style: st}
 				}
+
 				h := e.layoutInlineFloats(pb, run, contentW, contentX, y+cy, floats)
 				cy += h
+
 				if h > 0 {
 					prevBottom = 0
 				}
 			}
+
 			continue
 		}
 		// block-level
 		if n.Type != html.ElementNode {
 			i++
+
 			continue
 		}
+
 		cs := e.styles[n]
 		// In-flow tables always clear below preceding floats (deterministic
 		// report policy). Shrink-to-fit / squeeze-beside is unsupported.
@@ -1290,6 +1468,7 @@ func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedSty
 		if cs.Display == "table" {
 			clear = "both"
 		}
+
 		cy = floats.clear(clear, y, cy)
 		cy += collapseMargins(prevBottom, e.scalePt(cs.MarginTop))
 		// CSS2.1 §9.5: line boxes next to floats are shortened, not the
@@ -1302,28 +1481,36 @@ func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedSty
 		if establishesBFC(cs) {
 			bx, bw = floats.exclusion(contentX, contentW, y, cy)
 		}
+
 		cb := e.build(n, bw, bx, y+cy)
 		if cb == nil {
 			prevBottom = 0
 			i++
+
 			continue
 		}
+
 		cy += cb.h
 		prevBottom = e.scalePt(cs.MarginBottom)
+
 		if parent != nil {
 			parent.children = append(parent.children, cb)
+
 			if e.opts.DebugBoxes {
 				e.add(Op{Kind: OpStrokeRect, X: cb.x, Y: cb.y, W: cb.w, H: cb.h, R: 1, G: 0, B: 0})
 			}
 		}
+
 		i++
 	}
+
 	for _, n := range deferred {
 		ab := e.build(n, absCBW, absCBX, absOriginY)
 		if ab != nil && parent != nil {
 			parent.children = append(parent.children, ab)
 		}
 	}
+
 	return cy
 }
 
@@ -1336,8 +1523,10 @@ func (e *engine) pushBFCFloats(st ResolvedStyle, contentX, contentW float64) (po
 	if prev == nil || establishesBFC(st) {
 		fs := newFloatState(contentX, contentW)
 		e.bfcFloats = &fs
+
 		return func() { e.bfcFloats = prev }, true
 	}
+
 	return func() { e.bfcFloats = prev }, false
 }
 
@@ -1348,11 +1537,14 @@ func (e *engine) emitListMarker(n *html.Node, st ResolvedStyle, contentX, baseli
 	if typ == "" {
 		typ = "disc"
 	}
+
 	if typ == "none" {
 		return
 	}
+
 	size := e.scalePt(st.FontSize)
 	face := e.faceFor(st)
+
 	var text string
 	switch typ {
 	case "disc":
@@ -1374,21 +1566,26 @@ func (e *engine) emitListMarker(n *html.Node, st ResolvedStyle, contentX, baseli
 	default:
 		text = "\u2022"
 	}
+
 	mw := 0.0
+
 	if face != nil {
 		for _, r := range text {
 			mw += face.AdvanceInPoints(r, size)
 		}
 	}
+
 	if mw <= 0 {
 		mw = size * float64(len([]rune(text))) * 0.5
 	}
 	// Outside marker: sit in the padding/margin gutter left of contentX.
 	gap := size * 0.35
+
 	x := contentX - gap - mw
 	if x < 0 {
 		x = 0
 	}
+
 	e.add(Op{
 		Kind: OpBullet, X: x, Y: baseline, Text: text, Font: face, Size: size,
 		R: st.Color[0], G: st.Color[1], B: st.Color[2],
@@ -1400,19 +1597,24 @@ func listItemIndex(n *html.Node) int {
 	if n == nil || n.Parent == nil {
 		return 1
 	}
+
 	i := 0
+
 	for _, c := range n.Parent.Children {
 		if c.Type != html.ElementNode {
 			continue
 		}
+
 		if !strings.EqualFold(c.Name, "li") {
 			continue
 		}
+
 		i++
 		if c == n {
 			return i
 		}
 	}
+
 	return 1
 }
 
@@ -1420,19 +1622,25 @@ func alphaMarker(n int, upper bool) string {
 	if n < 1 {
 		n = 1
 	}
+
 	var chars []byte
+
 	for n > 0 {
 		n--
+
 		ch := byte('a' + (n % 26))
 		if upper {
 			ch = byte('A' + (n % 26))
 		}
+
 		chars = append(chars, ch)
 		n /= 26
 	}
+
 	for i, j := 0, len(chars)-1; i < j; i, j = i+1, j-1 {
 		chars[i], chars[j] = chars[j], chars[i]
 	}
+
 	return string(chars)
 }
 
@@ -1440,19 +1648,25 @@ func romanMarker(n int, upper bool) string {
 	if n < 1 {
 		n = 1
 	}
+
 	vals := []int{1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1}
 	syms := []string{"m", "cm", "d", "cd", "c", "xc", "l", "xl", "x", "ix", "v", "iv", "i"}
+
 	var b strings.Builder
+
 	for i, v := range vals {
 		for n >= v {
 			b.WriteString(syms[i])
+
 			n -= v
 		}
 	}
+
 	s := b.String()
 	if upper {
 		return strings.ToUpper(s)
 	}
+
 	return s
 }
 
@@ -1461,6 +1675,7 @@ func romanMarker(n int, upper bool) string {
 // otherwise they stack below the previous float bottom.
 func (e *engine) placeFloat(n *html.Node, cs ResolvedStyle, floats *floatState, contentW, contentX, y, cy float64) *box {
 	avail := contentW
+
 	if cs.Width < 0 && cs.WidthPercent < 0 {
 		var intr float64
 		if isSizeContainer(cs) {
@@ -1482,10 +1697,12 @@ func (e *engine) placeFloat(n *html.Node, cs ResolvedStyle, floats *floatState, 
 				e.scalePt(cs.BorderLeft.Width) + e.scalePt(cs.BorderRight.Width) +
 				e.scalePt(cs.MarginLeft) + e.scalePt(cs.MarginRight)
 		}
+
 		if intr > 0 && intr < avail {
 			avail = intr
 		}
 	}
+
 	flowY := y + cy
 	fx, fy := contentX, flowY
 
@@ -1496,12 +1713,15 @@ func (e *engine) placeFloat(n *html.Node, cs ResolvedStyle, floats *floatState, 
 			if floats.hasRight && floats.rightEdge-floats.leftEdge < room {
 				room = floats.rightEdge - floats.leftEdge
 			}
+
 			if room >= avail*0.5 { // enough room to attempt side-by-side
 				fx = floats.leftEdge
+
 				fy = floats.leftTop
 				if fy < flowY {
 					fy = flowY
 				}
+
 				if avail > room {
 					avail = room
 				}
@@ -1515,11 +1735,13 @@ func (e *engine) placeFloat(n *html.Node, cs ResolvedStyle, floats *floatState, 
 			if floats.hasLeft && floats.rightEdge-floats.leftEdge < room {
 				room = floats.rightEdge - floats.leftEdge
 			}
+
 			if room >= avail*0.5 {
 				fy = floats.rightTop
 				if fy < flowY {
 					fy = flowY
 				}
+
 				if avail > room {
 					avail = room
 				}
@@ -1530,6 +1752,7 @@ func (e *engine) placeFloat(n *html.Node, cs ResolvedStyle, floats *floatState, 
 	}
 
 	oldMax := e.imgMaxW
+
 	if cs.Width >= 0 {
 		e.imgMaxW = e.scalePt(cs.Width)
 	} else if cs.WidthPercent >= 0 && contentW > 0 {
@@ -1537,22 +1760,28 @@ func (e *engine) placeFloat(n *html.Node, cs ResolvedStyle, floats *floatState, 
 	} else if avail > 0 && avail < contentW {
 		e.imgMaxW = avail
 	}
+
 	fb := e.build(n, avail, fx, fy)
 	e.imgMaxW = oldMax
+
 	if fb == nil {
 		return nil
 	}
+
 	if cs.Float == "left" && floats.hasLeft && fb.x+fb.w > contentX+contentW {
 		// Overflowed the pack attempt — stack below.
 		fy = floats.leftBottom
 		if fy < flowY {
 			fy = flowY
 		}
+
 		dx, dy := contentX-fb.x, fy-fb.y
 		fb.x, fb.y = contentX, fy
 		e.shiftBoxOps(fb, dx, dy)
 	}
+
 	ml := e.scalePt(cs.MarginLeft)
+
 	mr := e.scalePt(cs.MarginRight)
 	if cs.Float == "right" {
 		wantX := contentX + contentW - fb.w - mr
@@ -1560,7 +1789,9 @@ func (e *engine) placeFloat(n *html.Node, cs ResolvedStyle, floats *floatState, 
 		fb.x = wantX
 		e.shiftBoxOps(fb, dx, 0)
 	}
+
 	floats.place(cs.Float, fb, ml, mr)
+
 	return fb
 }
 
@@ -1571,31 +1802,39 @@ func (e *engine) shiftBoxOps(b *box, dx, dy float64) {
 	if dx == 0 && dy == 0 || b == nil {
 		return
 	}
+
 	if b.opEnd >= b.opStart {
 		for k := b.opStart; k <= b.opEnd && k < len(e.ops); k++ {
 			e.ops[k].X += dx
 			e.ops[k].Y += dy
 		}
 	}
+
 	if len(e.deferredChrome) == 0 {
 		return
 	}
+
 	inSubtree := map[*box]struct{}{}
+
 	var mark func(*box)
 	mark = func(x *box) {
 		if x == nil {
 			return
 		}
+
 		inSubtree[x] = struct{}{}
+
 		for _, c := range x.children {
 			mark(c)
 		}
 	}
 	mark(b)
+
 	for i := range e.deferredChrome {
 		if _, ok := inSubtree[e.deferredChrome[i].b]; !ok {
 			continue
 		}
+
 		for j := range e.deferredChrome[i].ops {
 			e.deferredChrome[i].ops[j].X += dx
 			e.deferredChrome[i].ops[j].Y += dy
@@ -1607,9 +1846,11 @@ func collapseMargins(a, b float64) float64 {
 	if a <= 0 && b <= 0 {
 		return a + b
 	}
+
 	if a > b {
 		return a
 	}
+
 	return b
 }
 
@@ -1632,6 +1873,7 @@ func (e *engine) imageContainingWidth() float64 {
 	if e.imgMaxW > 0 {
 		return e.imgMaxW
 	}
+
 	return e.opts.Width
 }
 
@@ -1648,28 +1890,35 @@ func (e *engine) usedImageSize(n *html.Node, st ResolvedStyle, ref *imageRef) im
 	}
 
 	attrW, attrH := 0.0, 0.0
+
 	if n != nil {
 		if v, err := strconv.Atoi(strings.TrimSpace(n.Attribute("width"))); err == nil && v > 0 {
 			attrW = e.scalePt(pxToPt(float64(v)))
 		}
+
 		if v, err := strconv.Atoi(strings.TrimSpace(n.Attribute("height"))); err == nil && v > 0 {
 			attrH = e.scalePt(pxToPt(float64(v)))
 		}
 	}
+
 	if attrW > 0 {
 		size.w = attrW
 	}
+
 	if attrH > 0 {
 		size.h = attrH
 	}
+
 	if attrW > 0 && attrH == 0 && ref != nil && ref.w > 0 && ref.h > 0 {
 		size.h = attrW * float64(ref.h) / float64(ref.w)
 	}
+
 	if attrH > 0 && attrW == 0 && ref != nil && ref.w > 0 && ref.h > 0 {
 		size.w = attrH * float64(ref.w) / float64(ref.h)
 	}
 
 	cssW, cssH := st.Width >= 0, st.Height >= 0
+
 	if st.WidthPercent >= 0 {
 		if cb := e.imageContainingWidth(); cb > 0 {
 			size.w = cb * st.WidthPercent / 100
@@ -1678,12 +1927,15 @@ func (e *engine) usedImageSize(n *html.Node, st ResolvedStyle, ref *imageRef) im
 	} else if cssW {
 		size.w = e.scalePt(st.Width)
 	}
+
 	if cssH {
 		size.h = e.scalePt(st.Height)
 	}
+
 	if cssW && !cssH && ref != nil && ref.w > 0 && ref.h > 0 {
 		size.h = size.w * float64(ref.h) / float64(ref.w)
 	}
+
 	if cssH && !cssW && ref != nil && ref.w > 0 && ref.h > 0 {
 		size.w = size.h * float64(ref.w) / float64(ref.h)
 	}
@@ -1692,6 +1944,7 @@ func (e *engine) usedImageSize(n *html.Node, st ResolvedStyle, ref *imageRef) im
 	if st.MaxWidth >= 0 {
 		maxW = e.scalePt(st.MaxWidth)
 	}
+
 	if st.MaxWidthPercent >= 0 {
 		if cb := e.imageContainingWidth(); cb > 0 {
 			pct := cb * st.MaxWidthPercent / 100
@@ -1706,11 +1959,13 @@ func (e *engine) usedImageSize(n *html.Node, st ResolvedStyle, ref *imageRef) im
 	if !cssW && e.imgMaxW > 0 && (maxW < 0 || e.imgMaxW < maxW) {
 		maxW = e.imgMaxW
 	}
+
 	if maxW >= 0 && size.w > maxW && size.w > 0 {
 		factor := maxW / size.w
 		size.w = maxW
 		size.h *= factor
 	}
+
 	if st.MaxHeight >= 0 {
 		maxH := e.scalePt(st.MaxHeight)
 		if maxH >= 0 && size.h > maxH && size.h > 0 {
@@ -1719,6 +1974,7 @@ func (e *engine) usedImageSize(n *html.Node, st ResolvedStyle, ref *imageRef) im
 			size.h = maxH
 		}
 	}
+
 	return size
 }
 
@@ -1735,10 +1991,13 @@ func (e *engine) buildImage(n *html.Node, st ResolvedStyle, x, y float64) *box {
 		inlineLevel := st.Display == "inline" || st.Display == "inline-block" ||
 			st.Display == "inline-flex" || st.Display == ""
 		if st.Float != "none" || !inlineLevel {
-			e.add(Op{Kind: OpImage, X: x, Y: y, W: b.w, H: b.h,
-				Image: b.img.data, ImgW: b.img.w, ImgH: b.img.h, IsJPEG: b.img.isJPEG})
+			e.add(Op{
+				Kind: OpImage, X: x, Y: y, W: b.w, H: b.h,
+				Image: b.img.data, ImgW: b.img.w, ImgH: b.img.h, IsJPEG: b.img.isJPEG,
+			})
 		}
 	}
+
 	return b
 }
 
@@ -1747,17 +2006,21 @@ func (e *engine) buildHR(n *html.Node, st ResolvedStyle, availW, x, y float64) *
 	if st.Width >= 0 {
 		b.w = e.scalePt(st.Width)
 	}
+
 	b.h = e.scalePt(st.BorderTop.Width) + e.scalePt(st.BorderBottom.Width)
 	if b.h <= 0 {
 		b.h = 1
 	}
+
 	c := [3]float64{0, 0, 0}
 	if st.BorderTop.Style != "none" {
 		c = st.BorderTop.Color
 	}
+
 	if b.h > 0 {
 		e.add(Op{Kind: OpFillRect, X: x, Y: y, W: b.w, H: b.h, R: c[0], G: c[1], B: c[2]})
 	}
+
 	return b
 }
 
@@ -1766,27 +2029,34 @@ func imageDims(data []byte) (w, h int, isJPEG bool, ok bool) {
 	if len(data) >= 24 && string(data[:8]) == "\x89PNG\r\n\x1a\n" {
 		return int(binary.BigEndian.Uint32(data[16:20])), int(binary.BigEndian.Uint32(data[20:24])), false, true
 	}
+
 	if len(data) >= 2 && data[0] == 0xFF && data[1] == 0xD8 {
 		pos := 2
 		for pos+4 <= len(data) {
 			if data[pos] != 0xFF {
 				pos++
+
 				continue
 			}
+
 			marker := data[pos+1]
 			if marker == 0xD9 || marker == 0xDA {
 				return 0, 0, false, false
 			}
+
 			if marker >= 0xC0 && marker <= 0xCF && marker != 0xC4 && marker != 0xC8 && marker != 0xCC {
 				return int(binary.BigEndian.Uint16(data[pos+5 : pos+7])), int(binary.BigEndian.Uint16(data[pos+3 : pos+5])), true, true
 			}
+
 			segLen := int(data[pos+2])<<8 | int(data[pos+3])
 			if segLen < 2 {
 				return 0, 0, false, false
 			}
+
 			pos += 2 + segLen
 		}
 	}
+
 	return 0, 0, false, false
 }
 
@@ -1795,26 +2065,33 @@ func imageDims(data []byte) (w, h int, isJPEG bool, ok bool) {
 func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64) *box {
 	// flatten row groups into rows; count leading header-group rows
 	var rows [][]*html.Node
+
 	headerRows := 0
+
 	var collect func(n *html.Node, inHeader bool)
 	collect = func(n *html.Node, inHeader bool) {
 		for _, c := range n.Children {
 			if c.Type != html.ElementNode {
 				continue
 			}
+
 			cs := e.styles[c]
 			if cs.Display == "none" {
 				continue
 			}
+
 			switch {
 			case cs.Display == "table-row":
 				var cells []*html.Node
+
 				for _, cell := range c.Children {
 					if cell.Type == html.ElementNode && e.styles[cell].Display == "table-cell" {
 						cells = append(cells, cell)
 					}
 				}
+
 				rows = append(rows, cells)
+
 				if inHeader {
 					headerRows++
 				}
@@ -1870,29 +2147,38 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 		row, col     int
 		cSpan, rSpan int
 	}
+
 	var placed []tcell
+
 	occupied := make([][]int, nRows) // per-row remaining coverage counts
 	nCols := 0
+
 	for ri, r := range rows {
 		if occupied[ri] == nil {
 			occupied[ri] = make([]int, nCols)
 		}
+
 		ci := 0
+
 		for _, cellNode := range r {
 			cs, rs := colSpan(cellNode), cellRowSpan(cellNode)
 			if cs < 1 {
 				cs = 1
 			}
+
 			if rs < 1 {
 				rs = 1
 			}
+
 			for ci < len(occupied[ri]) && occupied[ri][ci] > 0 {
 				ci++
 			}
+
 			for len(occupied[ri]) < ci+cs {
 				occupied[ri] = append(occupied[ri], 0)
 			}
-			for k := 0; k < cs; k++ {
+
+			for k := range cs {
 				occupied[ri][ci+k] = rs // covered for rs rows including this one
 			}
 			// Mark subsequent rows.
@@ -1900,22 +2186,28 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 				for len(occupied[ri+rr]) < ci+cs {
 					occupied[ri+rr] = append(occupied[ri+rr], 0)
 				}
-				for k := 0; k < cs; k++ {
+
+				for k := range cs {
 					if occupied[ri+rr][ci+k] < rs-rr {
 						occupied[ri+rr][ci+k] = rs - rr
 					}
 				}
 			}
+
 			placed = append(placed, tcell{node: cellNode, row: ri, col: ci, cSpan: cs, rSpan: rs})
+
 			if end := ci + cs; end > nCols {
 				nCols = end
 			}
+
 			ci += cs
 		}
+
 		if len(occupied[ri]) > nCols {
 			nCols = len(occupied[ri])
 		}
 	}
+
 	if nCols == 0 {
 		return tb
 	}
@@ -1932,26 +2224,33 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 	colMin := make([]float64, nCols) // shrink floor = min-content
 	colPct := make([]float64, nCols) // >=0 means width:% of table; -1 = auto
 	colAbs := make([]float64, nCols) // >=0 means absolute width pt; -1 = auto
+
 	for i := range colPct {
 		colPct[i] = -1
 		colAbs[i] = -1
 	}
+
 	cellData := make([][]*box, nRows)
+
 	for _, p := range placed {
 		cell := e.buildCell(p.node, p.col, p.cSpan)
 		cell.row, cell.rowSpan = p.row, p.rSpan
 		cellData[p.row] = append(cellData[p.row], cell)
 		cs := e.styles[p.node]
+
 		if p.cSpan == 1 {
 			if cell.contentW > colW[p.col] {
 				colW[p.col] = cell.contentW
 			}
+
 			if cell.contentMin > colMin[p.col] {
 				colMin[p.col] = cell.contentMin
 			}
+
 			if cs.WidthPercent >= 0 && colPct[p.col] < 0 {
 				colPct[p.col] = cs.WidthPercent
 			}
+
 			if cs.Width >= 0 && colAbs[p.col] < 0 {
 				colAbs[p.col] = e.scalePt(cs.Width)
 			}
@@ -1961,12 +2260,14 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 				sumMax += colW[p.col+k]
 				sumMin += colMin[p.col+k]
 			}
+
 			if cell.contentW > sumMax {
 				extra := (cell.contentW - sumMax) / float64(p.cSpan)
 				for k := 0; k < p.cSpan && p.col+k < nCols; k++ {
 					colW[p.col+k] += extra
 				}
 			}
+
 			if cell.contentMin > sumMin {
 				extra := (cell.contentMin - sumMin) / float64(p.cSpan)
 				for k := 0; k < p.cSpan && p.col+k < nCols; k++ {
@@ -1983,9 +2284,11 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 	if st.BorderCollapse == "collapse" {
 		spacing = 0
 	}
+
 	chrome := spacing*float64(nCols+1) +
 		e.scalePt(st.BorderLeft.Width) + e.scalePt(st.BorderRight.Width) +
 		e.scalePt(st.PaddingLeft) + e.scalePt(st.PaddingRight)
+
 	var tableWidthHint float64 = -1 // auto
 	if st.WidthPercent >= 0 {
 		tableWidthHint = availW * st.WidthPercent / 100
@@ -1995,6 +2298,7 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 			tableWidthHint = availW
 		}
 	}
+
 	colW, tableW := sizeTableColumns(tableColumnEnv{
 		colMin: colMin, colW: colW, colPct: colPct, colAbs: colAbs,
 		chrome: chrome, availW: availW, tableW: tableWidthHint,
@@ -2011,25 +2315,32 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 	for ri, cells := range cellData {
 		rowTops[ri] = y + cy
 		rowH := 0.0
+
 		for _, cell := range cells {
 			if cell.rowSpan < 1 {
 				cell.rowSpan = 1
 			}
+
 			cellW := 0.0
 			for k := 0; k < cell.span && cell.col+k < nCols; k++ {
 				cellW += colW[cell.col+k]
 			}
+
 			cellW += spacing * float64(cell.span-1)
 			cell.w = cellW
 			cell.x = x + padL
+
 			for c := 0; c < cell.col && c < nCols; c++ {
 				cell.x += colW[c] + spacing
 			}
+
 			cell.y = rowTops[ri]
 			e.measureCellHeight(cell, cellW)
+
 			if cell.rowSpan == 1 && cell.contentH > rowH {
 				rowH = cell.contentH
 			}
+
 			tb.children = append(tb.children, cell)
 		}
 		// Collapse rows whose cells have no ink (only padding/borders of empty
@@ -2040,7 +2351,9 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 		if rowH > 0 && rowCellsHaveNoInk(rows[ri]) {
 			rowH = 0
 		}
+
 		rowHeights[ri] = rowH
+
 		if rowH > 0 || spacing > 0 {
 			cy += rowH + spacing
 		}
@@ -2050,14 +2363,17 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 		if cell.rowSpan <= 1 {
 			continue
 		}
+
 		start := cell.row
 		if start < 0 {
 			continue
 		}
+
 		end := start + cell.rowSpan
 		if end > nRows {
 			end = nRows
 		}
+
 		sum := 0.0
 		for ri := start; ri < end; ri++ {
 			sum += rowHeights[ri]
@@ -2065,6 +2381,7 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 				sum += spacing
 			}
 		}
+
 		if cell.contentH > sum {
 			extra := (cell.contentH - sum) / float64(end-start)
 			for ri := start; ri < end; ri++ {
@@ -2078,20 +2395,25 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 		rowTops[ri] = y + cy
 		cy += rowHeights[ri] + spacing
 	}
+
 	for _, cell := range tb.children {
 		start := cell.row
 		if start < 0 {
 			continue
 		}
+
 		cell.y = rowTops[start]
+
 		rs := cell.rowSpan
 		if rs < 1 {
 			rs = 1
 		}
+
 		end := start + rs
 		if end > nRows {
 			end = nRows
 		}
+
 		h := 0.0
 		for ri := start; ri < end; ri++ {
 			h += rowHeights[ri]
@@ -2099,16 +2421,21 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 				h += spacing
 			}
 		}
+
 		cell.h = h
 		cell.rowBoxH = rowHeights[start]
 	}
+
 	tb.rows = cellData
 	tb.h = cy + e.scalePt(st.PaddingBottom) + e.scalePt(st.BorderBottom.Width)
 
 	if st.BGColor[3] > 0 && e.opts.Background {
-		e.add(Op{Kind: OpFillRect, X: x, Y: y, W: tb.w, H: tb.h,
-			R: st.BGColor[0], G: st.BGColor[1], B: st.BGColor[2], Alpha: st.BGColor[3]})
+		e.add(Op{
+			Kind: OpFillRect, X: x, Y: y, W: tb.w, H: tb.h,
+			R: st.BGColor[0], G: st.BGColor[1], B: st.BGColor[2], Alpha: st.BGColor[3],
+		})
 	}
+
 	collapse := st.BorderCollapse == "collapse"
 	// Separate borders: stroke the table box. Collapsed grids include the
 	// outer perimeter — stroking both doubles the outer edge and leaves the
@@ -2120,11 +2447,13 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 	// Emit cells row-by-row so collapsed grid segments for a row land in the
 	// same op index span as that row's cells (pagination moves them together).
 	lastNonEmpty := -1
+
 	for ri := range rowHeights {
 		if rowHeights[ri] > 0.01 {
 			lastNonEmpty = ri
 		}
 	}
+
 	if collapse {
 		for ri, cells := range cellData {
 			for _, cell := range cells {
@@ -2134,6 +2463,7 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 					e.emitCell(cell, true)
 				}
 			}
+
 			if rowHeights[ri] > 0.01 {
 				e.emitCollapsedRowGrid(tb, ri, ri == lastNonEmpty, padL, colW, rowTops, rowHeights)
 			}
@@ -2145,6 +2475,7 @@ func (e *engine) buildTable(n *html.Node, st ResolvedStyle, availW, x, y float64
 			}
 		}
 	}
+
 	return tb
 }
 
@@ -2155,13 +2486,16 @@ func (e *engine) emitCollapsedRowGrid(tb *box, ri int, lastRow bool, padL float6
 	if ri < 0 || ri >= len(rowHeights) || rowHeights[ri] <= 0.01 || len(colW) == 0 {
 		return
 	}
+
 	nCols := len(colW)
 	left := tb.x + padL
 	xs := make([]float64, nCols+1)
 	xs[0] = left
-	for i := 0; i < nCols; i++ {
+
+	for i := range nCols {
 		xs[i+1] = xs[i] + colW[i]
 	}
+
 	y0 := rowTops[ri]
 	y1 := y0 + rowHeights[ri]
 	gridStart := len(e.ops)
@@ -2169,6 +2503,7 @@ func (e *engine) emitCollapsedRowGrid(tb *box, ri int, lastRow bool, padL float6
 		if x1-x0 <= 0 || !borderVisible(side) {
 			return
 		}
+
 		for _, op := range borderLineOps(x0, yy, x1-x0, 0,
 			e.scalePt(side.Width), side.Style, side.Color[0], side.Color[1], side.Color[2]) {
 			e.add(op)
@@ -2178,6 +2513,7 @@ func (e *engine) emitCollapsedRowGrid(tb *box, ri int, lastRow bool, padL float6
 		if yb-ya <= 0.01 || !borderVisible(side) {
 			return
 		}
+
 		for _, op := range borderLineOps(xx, ya, 0, yb-ya,
 			e.scalePt(side.Width), side.Style, side.Color[0], side.Color[1], side.Color[2]) {
 			e.add(op)
@@ -2186,10 +2522,11 @@ func (e *engine) emitCollapsedRowGrid(tb *box, ri int, lastRow bool, padL float6
 	// Top edge. Skip under rowspan continuations so a multi-row Year cell is
 	// not bisected mid-table; paint.capTablePageBreaks re-seals full tops for
 	// page fragments where those holes look open.
-	for ci := 0; ci < nCols; ci++ {
+	for ci := range nCols {
 		if ri > 0 && rowspanCovers(tb, ri-1, ri, ci) {
 			continue
 		}
+
 		if side, ok := horizontalTableBorder(tb, ri, ci); ok {
 			hline(xs[ci], xs[ci+1], y0, side)
 		}
@@ -2199,17 +2536,20 @@ func (e *engine) emitCollapsedRowGrid(tb *box, ri int, lastRow bool, padL float6
 		if ci > 0 && ci < nCols && colspanCovers(tb, ri, ci-1, ci) {
 			continue
 		}
+
 		if side, ok := verticalTableBorder(tb, ri, ci); ok {
 			vline(xs[ci], y0, y1, side)
 		}
 	}
+
 	if lastRow {
-		for ci := 0; ci < nCols; ci++ {
+		for ci := range nCols {
 			if side, ok := horizontalTableBorder(tb, ri+1, ci); ok {
 				hline(xs[ci], xs[ci+1], y1, side)
 			}
 		}
 	}
+
 	gridEnd := len(e.ops) - 1
 	if gridEnd >= gridStart && ri < len(tb.rows) {
 		expandRowOpRange(tb.rows[ri], gridStart, gridEnd)
@@ -2225,13 +2565,16 @@ func horizontalTableBorder(tb *box, boundary, col int) (border, bool) {
 		if cell.col > col || cell.col+cell.span <= col {
 			continue
 		}
+
 		if cell.row == boundary && borderVisible(cell.style.BorderTop) {
 			return cell.style.BorderTop, true
 		}
+
 		if cell.row+cell.rowSpan == boundary && borderVisible(cell.style.BorderBottom) {
 			return cell.style.BorderBottom, true
 		}
 	}
+
 	return border{}, false
 }
 
@@ -2240,13 +2583,16 @@ func verticalTableBorder(tb *box, row, boundary int) (border, bool) {
 		if cell.row > row || cell.row+cell.rowSpan <= row {
 			continue
 		}
+
 		if cell.col == boundary && borderVisible(cell.style.BorderLeft) {
 			return cell.style.BorderLeft, true
 		}
+
 		if cell.col+cell.span == boundary && borderVisible(cell.style.BorderRight) {
 			return cell.style.BorderRight, true
 		}
 	}
+
 	return border{}, false
 }
 
@@ -2256,18 +2602,23 @@ func expandRowOpRange(row []*box, start, end int) {
 	if start > end || len(row) == 0 {
 		return
 	}
+
 	for _, cell := range row {
 		if cell == nil {
 			continue
 		}
+
 		if cell.opStart > cell.opEnd {
 			// Cell emitted nothing (empty); claim the grid ops alone.
 			cell.opStart, cell.opEnd = start, end
+
 			continue
 		}
+
 		if start < cell.opStart {
 			cell.opStart = start
 		}
+
 		if end > cell.opEnd {
 			cell.opEnd = end
 		}
@@ -2281,15 +2632,18 @@ func rowspanCovers(tb *box, above, below, ci int) bool {
 		if cell.rowSpan <= 1 {
 			continue
 		}
+
 		start := cell.row
 		if start < 0 {
 			continue
 		}
+
 		if start <= above && start+cell.rowSpan > below &&
 			cell.col <= ci && cell.col+cell.span > ci {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -2297,6 +2651,7 @@ func colspanCovers(tb *box, ri, leftCol, rightCol int) bool {
 	if ri < 0 || ri >= len(tb.rows) {
 		return false
 	}
+
 	for _, cell := range tb.rows[ri] {
 		if cell.span > 1 && cell.col <= leftCol && cell.col+cell.span > rightCol {
 			return true
@@ -2308,15 +2663,18 @@ func colspanCovers(tb *box, ri, leftCol, rightCol int) bool {
 		if start < 0 {
 			continue
 		}
+
 		rs := cell.rowSpan
 		if rs < 1 {
 			rs = 1
 		}
+
 		if start <= ri && start+rs > ri &&
 			cell.span > 1 && cell.col <= leftCol && cell.col+cell.span > rightCol {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -2328,6 +2686,7 @@ func (e *engine) buildCell(n *html.Node, col, span int) *box {
 	st := e.styles[n]
 	b := &box{node: n, style: st, kind: "cell", col: col, span: span}
 	b.contentMin, b.contentW = e.measureCellMinMax(n, st)
+
 	return b
 }
 
@@ -2352,11 +2711,13 @@ func (e *engine) cellBG(b *box) (r, g, bl, a float64, ok bool) {
 	if st.BGColor[3] > 0 {
 		return st.BGColor[0], st.BGColor[1], st.BGColor[2], st.BGColor[3], true
 	}
+
 	if b.node != nil && b.node.Parent != nil {
 		if ps, has := e.styles[b.node.Parent]; has && ps.Display == "table-row" && ps.BGColor[3] > 0 {
 			return ps.BGColor[0], ps.BGColor[1], ps.BGColor[2], ps.BGColor[3], true
 		}
 	}
+
 	return 0, 0, 0, 0, false
 }
 
@@ -2366,15 +2727,20 @@ func (e *engine) cellBG(b *box) (r, g, bl, a float64, ok bool) {
 func (e *engine) emitCell(b *box, skipBorders bool) {
 	st := b.style
 	start := len(e.ops)
+
 	if e.opts.Background {
 		if r, g, bl, a, ok := e.cellBG(b); ok {
-			e.add(Op{Kind: OpFillRect, X: b.x, Y: b.y, W: b.w, H: b.h,
-				R: r, G: g, B: bl, Alpha: a})
+			e.add(Op{
+				Kind: OpFillRect, X: b.x, Y: b.y, W: b.w, H: b.h,
+				R: r, G: g, B: bl, Alpha: a,
+			})
 		}
 	}
+
 	if !skipBorders {
 		e.emitBorders(st, b.x, b.y, b.w, b.h)
 	}
+
 	cx, contentW := e.contentBox(b.x, b.w, st)
 	cy := b.y + e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)
 	// vertical-align on table cells: shift content within the row box.
@@ -2390,16 +2756,21 @@ func (e *engine) emitCell(b *box, skipBorders bool) {
 	// (pass y=0, contentX=cx, cy=content top) so floats pack inside the cell
 	// BFC. Pass the cell as parent so float/block children attach for tests.
 	oldMax := e.imgMaxW
+
 	if contentW > 0 {
 		e.imgMaxW = contentW
 	}
+
 	pop, enclose := e.pushBFCFloats(st, cx, contentW)
 	_ = e.flowChildren(b, b.node.Children, st, contentW, cx, 0, cy)
+
 	if enclose && e.bfcFloats != nil {
 		// Cell border box already sized; floats are clipped to the cell BFC.
 		_ = e.bfcFloats.extentCy(0, cy)
 	}
+
 	pop()
+
 	e.imgMaxW = oldMax
 	// Rowspan cells with forced multi-line content (wiki Ref: [127]<br>[128]
 	// in rowspan=2) pack lines at the top with normal line-height, so both
@@ -2410,6 +2781,7 @@ func (e *engine) emitCell(b *box, skipBorders bool) {
 			e.scalePt(st.PaddingTop)+e.scalePt(st.BorderTop.Width),
 			e.scalePt(st.PaddingBottom)+e.scalePt(st.BorderBottom.Width))
 	}
+
 	b.opStart, b.opEnd = start, len(e.ops)-1
 }
 
@@ -2420,18 +2792,24 @@ func distributeRowspanLines(ops []Op, start, end int, cellY, cellH, padTop, padB
 	if end <= start || cellH <= 0 || ops == nil {
 		return
 	}
+
 	type band struct {
 		y   float64
 		idx []int
 	}
+
 	const yEps = 0.75
+
 	var bands []band
+
 	for i := start; i < end && i < len(ops); i++ {
 		op := ops[i]
 		if op.Kind != OpText && op.Kind != OpBullet {
 			continue
 		}
+
 		placed := false
+
 		for bi := range bands {
 			if math.Abs(bands[bi].y-op.Y) <= yEps {
 				bands[bi].idx = append(bands[bi].idx, i)
@@ -2439,13 +2817,16 @@ func distributeRowspanLines(ops []Op, start, end int, cellY, cellH, padTop, padB
 				n := float64(len(bands[bi].idx))
 				bands[bi].y = (bands[bi].y*(n-1) + op.Y) / n
 				placed = true
+
 				break
 			}
 		}
+
 		if !placed {
 			bands = append(bands, band{y: op.Y, idx: []int{i}})
 		}
 	}
+
 	if len(bands) < 2 {
 		return
 	}
@@ -2457,8 +2838,10 @@ func distributeRowspanLines(ops []Op, start, end int, cellY, cellH, padTop, padB
 			}
 		}
 	}
+
 	innerTop := cellY + padTop
 	innerBot := cellY + cellH - padBot
+
 	if innerBot-innerTop < 4 {
 		return
 	}
@@ -2468,26 +2851,33 @@ func distributeRowspanLines(ops []Op, start, end int, cellY, cellH, padTop, padB
 	if natural >= (innerBot-innerTop)*0.55 {
 		return
 	}
+
 	n := len(bands)
 	targets := make([]float64, n)
+
 	if n == 1 {
 		return
 	}
 	// Place first baseline ~0.7em into the cell, last near bottom; interpolate.
 	// Use first text size as em estimate.
 	em := 8.0
+
 	for _, i := range bands[0].idx {
 		if ops[i].Size > 0 {
 			em = ops[i].Size
+
 			break
 		}
 	}
+
 	first := innerTop + em*0.85
 	last := innerBot - em*0.25
+
 	if last <= first {
 		return
 	}
-	for i := 0; i < n; i++ {
+
+	for i := range n {
 		if n == 1 {
 			targets[i] = first
 		} else {
@@ -2496,21 +2886,25 @@ func distributeRowspanLines(ops []Op, start, end int, cellY, cellH, padTop, padB
 	}
 	// Map old baseline → dy, apply to all ops near that baseline.
 	type shift struct{ y0, dy float64 }
+
 	var shifts []shift
 	for i, b := range bands {
 		shifts = append(shifts, shift{y0: b.y, dy: targets[i] - b.y})
 	}
+
 	for i := start; i < end && i < len(ops); i++ {
 		y := ops[i].Y
 		// Nearest band baseline.
 		best := 0
 		bestD := math.Abs(y - shifts[0].y0)
+
 		for si := 1; si < len(shifts); si++ {
 			d := math.Abs(y - shifts[si].y0)
 			if d < bestD {
 				bestD, best = d, si
 			}
 		}
+
 		if bestD <= em*1.5 {
 			ops[i].Y += shifts[best].dy
 		}
@@ -2524,6 +2918,7 @@ func distributeRowspanLines(ops []Op, start, end int, cellY, cellH, padTop, padB
 func (e *engine) measureCellContent(n *html.Node, st ResolvedStyle) float64 {
 	minW, maxW := e.measureCellMinMax(n, st)
 	_ = minW
+
 	return maxW
 }
 
@@ -2548,6 +2943,7 @@ func (e *engine) measureCellMinMax(n *html.Node, st ResolvedStyle) (minW, maxW f
 		if lineW > maxW {
 			maxW = lineW
 		}
+
 		if lineHasInk && lineOnlyNowrap && lineW > longestWord {
 			// Cap so a pathological nowrap paragraph does not freeze the table
 			// at max-content; multi-cite clusters are well under ~10em.
@@ -2555,14 +2951,17 @@ func (e *engine) measureCellMinMax(n *html.Node, st ResolvedStyle) (minW, maxW f
 			if em < 1 {
 				em = 10
 			}
+
 			if lineW <= em*10*e.scale {
 				longestWord = lineW
 			}
 		}
+
 		lineW = 0
 		lineOnlyNowrap = true
 		lineHasInk = false
 	}
+
 	var walk func(n *html.Node, cs ResolvedStyle, nowrap bool)
 	walk = func(n *html.Node, cs ResolvedStyle, nowrap bool) {
 		switch n.Type {
@@ -2578,41 +2977,53 @@ func (e *engine) measureCellMinMax(n *html.Node, st ResolvedStyle) (minW, maxW f
 				if len(fields) == 0 {
 					return
 				}
+
 				lineOnlyNowrap = false
 				lineHasInk = true
 				// Leading space if original had leading WS and line already started.
 				if lineW > 0 && len(text) > 0 && isHTMLSpace(text[0]) {
 					lineW += e.measureTextFace(" ", cs)
 				}
+
 				for i, word := range fields {
 					if i > 0 {
 						lineW += e.measureTextFace(" ", cs)
 					}
+
 					w := e.measureTextFace(word, cs)
+
 					uw := e.minContentWidth(word, cs)
 					if uw > longestWord {
 						longestWord = uw
 					}
+
 					lineW += w
 				}
+
 				return
 			}
+
 			w := e.measureTextFace(text, cs)
+
 			uw := e.minContentWidth(text, cs)
 			if uw > longestWord {
 				longestWord = uw
 			}
+
 			if strings.TrimSpace(text) != "" {
 				lineHasInk = true
 			}
+
 			lineW += w
 		case html.ElementNode:
 			childCS := e.styles[n]
 			if childCS.Display == "none" {
 				return
 			}
+
 			if n.Name == "br" {
 				flushLine()
+
 				return
 			}
 			// Replaced images contribute their used CSS-pixel width (wiki thumbs).
@@ -2621,9 +3032,11 @@ func (e *engine) measureCellMinMax(n *html.Node, st ResolvedStyle) (minW, maxW f
 				if iw > longestWord {
 					longestWord = iw
 				}
+
 				lineOnlyNowrap = false
 				lineHasInk = true
 				lineW += iw
+
 				return
 			}
 			// Block-level in-cell boxes start a new line (simplified).
@@ -2632,10 +3045,12 @@ func (e *engine) measureCellMinMax(n *html.Node, st ResolvedStyle) (minW, maxW f
 			if blockish {
 				flushLine()
 			}
+
 			childNowrap := nowrap || childCS.WhiteSpace == "nowrap" || childCS.WhiteSpace == "pre"
 			for _, c := range n.Children {
 				walk(c, childCS, childNowrap)
 			}
+
 			if blockish {
 				flushLine()
 			}
@@ -2643,13 +3058,16 @@ func (e *engine) measureCellMinMax(n *html.Node, st ResolvedStyle) (minW, maxW f
 	}
 	walk(n, st, st.WhiteSpace == "nowrap" || st.WhiteSpace == "pre")
 	flushLine()
+
 	chrome := e.scalePt(st.PaddingLeft) + e.scalePt(st.PaddingRight) +
 		e.scalePt(st.BorderLeft.Width) + e.scalePt(st.BorderRight.Width)
 	minW = longestWord + chrome
 	maxW += chrome
+
 	if maxW < minW {
 		maxW = minW
 	}
+
 	return minW, maxW
 }
 
@@ -2669,12 +3087,15 @@ func wordBreakOf(st ResolvedStyle) wordBreakPolicy {
 	if st.WhiteSpace == "nowrap" || st.WhiteSpace == "pre" {
 		return breakNever
 	}
+
 	if st.WordBreak == "break-all" || st.OverflowWrap == "anywhere" {
 		return breakAll
 	}
+
 	if st.OverflowWrap == "break-word" {
 		return breakWord
 	}
+
 	return breakNormal
 }
 
@@ -2700,6 +3121,7 @@ func (e *engine) minContentWidth(s string, st ResolvedStyle) float64 {
 	if s == "" {
 		return 0
 	}
+
 	full := e.measureTextFace(s, st)
 	switch wordBreakOf(st) {
 	case breakNever:
@@ -2716,12 +3138,14 @@ func (e *engine) minContentWidth(s string, st ResolvedStyle) float64 {
 
 func (e *engine) maxRuneWidth(s string, st ResolvedStyle) float64 {
 	var max float64
+
 	for _, r := range s {
 		w := e.measureTextFace(string(r), st)
 		if w > max {
 			max = w
 		}
 	}
+
 	return max
 }
 
@@ -2730,20 +3154,26 @@ func (e *engine) maxSoftSegmentWidth(s string, st ResolvedStyle) float64 {
 	if len(runes) == 0 {
 		return 0
 	}
+
 	var max, cur float64
+
 	for i, r := range runes {
 		rw := e.measureTextFace(string(r), st)
+
 		cur += rw
 		if isSoftWrapRune(r, softBreakWord) || i == len(runes)-1 {
 			if cur > max {
 				max = cur
 			}
+
 			cur = 0
 		}
 	}
+
 	if max <= 0 {
 		return e.maxRuneWidth(s, st)
 	}
+
 	return max
 }
 
@@ -2753,22 +3183,29 @@ func (e *engine) maxSoftSegmentWidth(s string, st ResolvedStyle) float64 {
 // detection of the real header band.
 func countLeadingTHRows(rows [][]*html.Node) int {
 	n := 0
+
 	for _, row := range rows {
 		if len(row) == 0 {
 			continue
 		}
+
 		allTH := true
+
 		for _, cell := range row {
 			if cell == nil || cell.Name != "th" {
 				allTH = false
+
 				break
 			}
 		}
+
 		if !allTH {
 			break
 		}
+
 		n++
 	}
+
 	return n
 }
 
@@ -2780,17 +3217,21 @@ func stripEmptyTableRows(rows [][]*html.Node) [][]*html.Node {
 	if len(rows) == 0 {
 		return rows
 	}
+
 	out := rows[:0]
+
 	for _, row := range rows {
 		if len(row) == 0 {
 			continue
 		}
+
 		out = append(out, row)
 	}
 	// If every row was empty, return a fresh empty slice (not a shared buf).
 	if len(out) == 0 {
 		return nil
 	}
+
 	return out
 }
 
@@ -2800,14 +3241,17 @@ func rowCellsHaveNoInk(cells []*html.Node) bool {
 	if len(cells) == 0 {
 		return true
 	}
+
 	for _, c := range cells {
 		if c == nil {
 			continue
 		}
+
 		if nodeHasTableInk(c) {
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -2815,6 +3259,7 @@ func nodeHasTableInk(n *html.Node) bool {
 	if n == nil {
 		return false
 	}
+
 	switch n.Type {
 	case html.TextNode:
 		return strings.TrimSpace(n.Text) != ""
@@ -2823,12 +3268,14 @@ func nodeHasTableInk(n *html.Node) bool {
 		case "img", "svg", "video", "canvas", "br":
 			return true
 		}
+
 		for _, c := range n.Children {
 			if nodeHasTableInk(c) {
 				return true
 			}
 		}
 	}
+
 	return false
 }
 
@@ -2844,6 +3291,7 @@ func (e *engine) measureImageWidth(n *html.Node, st ResolvedStyle) float64 {
 	if n == nil {
 		return 0
 	}
+
 	return e.usedImageSize(n, st, e.resolveImage(n.Attribute("src"))).w
 }
 
@@ -2852,7 +3300,9 @@ func (e *engine) measureLargestImageWidth(n *html.Node) float64 {
 	if n == nil {
 		return 0
 	}
+
 	var best float64
+
 	var walk func(*html.Node)
 	walk = func(n *html.Node) {
 		if n.Type == html.ElementNode {
@@ -2862,12 +3312,14 @@ func (e *engine) measureLargestImageWidth(n *html.Node) float64 {
 					best = w
 				}
 			}
+
 			for _, c := range n.Children {
 				walk(c)
 			}
 		}
 	}
 	walk(n)
+
 	return best
 }
 
@@ -2877,10 +3329,13 @@ func (e *engine) layoutCell(n *html.Node, st ResolvedStyle, width float64) float
 	cy := e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)
 	pop, enclose := e.pushBFCFloats(st, 0, contentW)
 	cy = e.flowChildren(nil, n.Children, st, contentW, 0, 0, cy)
+
 	if enclose && e.bfcFloats != nil {
 		cy = e.bfcFloats.extentCy(0, cy)
 	}
+
 	pop()
+
 	return cy + e.scalePt(st.PaddingBottom) + e.scalePt(st.BorderBottom.Width)
 }
 
@@ -2888,6 +3343,7 @@ func colSpan(n *html.Node) int {
 	if v, err := strconv.Atoi(strings.TrimSpace(n.Attribute("colspan"))); err == nil && v > 1 {
 		return v
 	}
+
 	return 1
 }
 
@@ -2895,6 +3351,7 @@ func cellRowSpan(n *html.Node) int {
 	if v, err := strconv.Atoi(strings.TrimSpace(n.Attribute("rowspan"))); err == nil && v > 1 {
 		return v
 	}
+
 	return 1
 }
 
@@ -2919,20 +3376,24 @@ func sizeTableColumns(env tableColumnEnv) (colW []float64, tableW float64) {
 	colAbs := env.colAbs
 	chrome := env.chrome
 	availW := env.availW
+
 	nCols := len(colW)
 	if nCols == 0 {
 		if env.tableW >= 0 {
 			return colW, env.tableW
 		}
+
 		return colW, availW
 	}
 
 	sumMax := 0.0
 	sumMin := 0.0
+
 	for i := range colW {
 		sumMax += colW[i]
 		sumMin += colMin[i]
 	}
+
 	sumMax += chrome
 	sumMin += chrome
 
@@ -2948,19 +3409,24 @@ func sizeTableColumns(env tableColumnEnv) (colW []float64, tableW float64) {
 	}
 
 	hasColHint := false
+
 	for i := range colPct {
 		if colPct[i] >= 0 || colAbs[i] >= 0 {
 			hasColHint = true
+
 			break
 		}
 	}
+
 	if definiteTable && hasColHint {
 		inner := tableW - chrome
 		if inner < 0 {
 			inner = 0
 		}
+
 		used := 0.0
 		autoMax := 0.0
+
 		for i := range colW {
 			switch {
 			case colPct[i] >= 0:
@@ -2968,21 +3434,25 @@ func sizeTableColumns(env tableColumnEnv) (colW []float64, tableW float64) {
 				if colW[i] < colMin[i] {
 					colW[i] = colMin[i]
 				}
+
 				used += colW[i]
 			case colAbs[i] >= 0:
 				colW[i] = colAbs[i]
 				if colW[i] < colMin[i] {
 					colW[i] = colMin[i]
 				}
+
 				used += colW[i]
 			default:
 				autoMax += colW[i]
 			}
 		}
+
 		remain := inner - used
 		if remain < 0 {
 			remain = 0
 		}
+
 		if autoMax > 0 && remain > 0 {
 			for i := range colW {
 				if colPct[i] < 0 && colAbs[i] < 0 {
@@ -2995,11 +3465,13 @@ func sizeTableColumns(env tableColumnEnv) (colW []float64, tableW float64) {
 		} else if autoMax == 0 && remain > 0 {
 			// All columns hinted — distribute leftover by % share, else evenly.
 			pctTotal := 0.0
+
 			for i := range colPct {
 				if colPct[i] > 0 {
 					pctTotal += colPct[i]
 				}
 			}
+
 			for i := range colW {
 				if pctTotal > 0 && colPct[i] > 0 {
 					colW[i] += remain * (colPct[i] / pctTotal)
@@ -3018,17 +3490,21 @@ func sizeTableColumns(env tableColumnEnv) (colW []float64, tableW float64) {
 		if innerAvail < 0 {
 			innerAvail = 0
 		}
+
 		innerMax := sumMax - chrome
 		innerMin := sumMin - chrome
+
 		if innerAvail >= innerMin && innerMax > innerMin {
 			// Grow each column from min toward max proportional to free space.
 			free := innerAvail - innerMin
 			span := innerMax - innerMin
+
 			for i := range colW {
 				grow := colW[i] - colMin[i]
 				if grow < 0 {
 					grow = 0
 				}
+
 				colW[i] = colMin[i] + free*(grow/span)
 			}
 		} else if innerMin > 0 && innerAvail < innerMin {
@@ -3040,6 +3516,7 @@ func sizeTableColumns(env tableColumnEnv) (colW []float64, tableW float64) {
 				if scale < 0 {
 					scale = 0
 				}
+
 				for i := range colW {
 					colW[i] = colMin[i] * scale
 				}
@@ -3055,6 +3532,7 @@ func sizeTableColumns(env tableColumnEnv) (colW []float64, tableW float64) {
 			if scale < 0 {
 				scale = 0
 			}
+
 			for i := range colW {
 				colW[i] *= scale
 				if !definiteTable && colW[i] < colMin[i] {
@@ -3069,10 +3547,12 @@ func sizeTableColumns(env tableColumnEnv) (colW []float64, tableW float64) {
 		for i := range colW {
 			sumCols += colW[i]
 		}
+
 		if sumCols > tableW {
 			tableW = sumCols
 		}
 	}
+
 	return colW, tableW
 }
 
@@ -3086,6 +3566,7 @@ func DeactivateOp(op *Op) {
 	if op == nil {
 		return
 	}
+
 	op.Kind = opKindNoop
 	op.URI = ""
 }

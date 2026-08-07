@@ -33,6 +33,7 @@ figcaption { font-size: 8pt; width: 120pt; }
 </figure>
 <p>Body text beside the float.</p>
 </body></html>`)
+
 	out, err := Layout(root, Options{
 		Width: 400, Height: 400, Sheets: []*css.Stylesheet{s}, Background: true,
 		Images: func(string) ([]byte, error) { return png, nil },
@@ -42,6 +43,7 @@ figcaption { font-size: 8pt; width: 120pt; }
 	}
 
 	var texts []string
+
 	for _, op := range out.Ops {
 		if op.Kind == OpText && !strings.Contains(op.Text, "Body") {
 			// Caption-ish ops (exclude body).
@@ -50,6 +52,7 @@ figcaption { font-size: 8pt; width: 120pt; }
 			}
 		}
 	}
+
 	if len(texts) == 0 {
 		// Fallback: collect any non-body text.
 		for _, op := range out.Ops {
@@ -58,8 +61,9 @@ figcaption { font-size: 8pt; width: 120pt; }
 			}
 		}
 	}
+
 	joined := strings.Join(texts, "")
-	if !strings.Contains(joined, "International") && !strings.Contains(joined, "Internation") {
+	if !strings.Contains(joined, "International") && !strings.Contains(joined, "International") {
 		// Allow soft line break that keeps the word intact across ops only if
 		// whole "International" appears concatenated.
 		t.Fatalf("caption missing International: %v", texts)
@@ -78,13 +82,16 @@ figcaption { font-size: 8pt; width: 120pt; }
 	}
 	// Positive: at least one op should contain a full long word.
 	okWord := false
+
 	for _, op := range texts {
 		if strings.Contains(op, "International") || strings.Contains(op, "Sebastian") ||
 			strings.Contains(op, "Festival") {
 			okWord = true
+
 			break
 		}
 	}
+
 	if !okWord {
 		t.Fatalf("expected intact long words in caption ops, got %v", texts)
 	}
@@ -100,25 +107,31 @@ p { margin: 0; width: 140pt; overflow-wrap: break-word; }
 	// "International" fits 140pt; after "The " remainW is tight enough that a
 	// greedy mid-break would split it — we must wrap the whole word.
 	res := layoutHTML(t, `<html><body><p style="overflow-wrap:break-word">The International festival</p></body></html>`, s)
+
 	var texts []string
+
 	for _, op := range res.Ops {
 		if op.Kind == OpText {
 			texts = append(texts, op.Text)
 		}
 	}
+
 	joined := strings.Join(texts, "")
 	if !strings.Contains(joined, "International") {
 		// Word may be a single op.
 		found := false
+
 		for _, tx := range texts {
 			if strings.Contains(tx, "International") {
 				found = true
 			}
 		}
+
 		if !found {
 			t.Fatalf("missing International in %v", texts)
 		}
 	}
+
 	for _, tx := range texts {
 		tok := strings.TrimSpace(tx)
 		if tok == "Int" || tok == "ernational" || tok == "Internationa" {

@@ -27,6 +27,7 @@ img { display: block; width: 80pt; height: 60pt; }
 `)
 	// One long paragraph that starts beside the float and continues below it.
 	words := strings.Repeat("word ", 80)
+
 	root, err := html.Parse(`<html><body>
 <figure><img width="80" height="60" src="t.png"><figcaption>c</figcaption></figure>
 <p>` + words + `</p>
@@ -34,6 +35,7 @@ img { display: block; width: 80pt; height: 60pt; }
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	res, err := Layout(root, Options{
 		Width: 360, Height: 400, Sheets: []*css.Stylesheet{s}, Background: true,
 		Images: func(string) ([]byte, error) { return png, nil },
@@ -41,12 +43,15 @@ img { display: block; width: 80pt; height: 60pt; }
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	var texts []Op
+
 	for _, op := range res.Ops {
 		if op.Kind == OpText && strings.Contains(op.Text, "word") {
 			texts = append(texts, op)
 		}
 	}
+
 	if len(texts) < 4 {
 		t.Fatalf("expected multi-line text, got %d", len(texts))
 	}
@@ -54,9 +59,11 @@ img { display: block; width: 80pt; height: 60pt; }
 	// first line should start right of the float (~88pt).
 	first := texts[0]
 	last := texts[len(texts)-1]
+
 	if first.X < 50 {
 		t.Fatalf("first line x=%.1f, want beside float (>=50)", first.X)
 	}
+
 	if last.X > 20 {
 		t.Fatalf("last line x=%.1f, want full-width reclaim (~0) after float", last.X)
 	}
@@ -83,6 +90,7 @@ img { display: block; width: 100pt; height: 120pt; }
 	// short marker that must reclaim full width under the float rather than
 	// sit alone in the narrow column (wiki "big time."[71]).
 	lead := strings.Repeat("words beside the float image ", 18)
+
 	root, err := html.Parse(`<html><body>
 <figure><img width="100" height="120" src="t.png"><figcaption>cap</figcaption></figure>
 <p>` + lead + `big time."[71]</p>
@@ -90,6 +98,7 @@ img { display: block; width: 100pt; height: 120pt; }
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	res, err := Layout(root, Options{
 		Width: 360, Height: 500, Sheets: []*css.Stylesheet{s}, Background: true,
 		Images: func(string) ([]byte, error) { return png, nil },
@@ -97,13 +106,16 @@ img { display: block; width: 100pt; height: 120pt; }
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	var tail *Op
+
 	for i := range res.Ops {
 		op := &res.Ops[i]
 		if op.Kind == OpText && strings.Contains(op.Text, "big") {
 			tail = op
 		}
 	}
+
 	if tail == nil {
 		t.Fatal("missing big time tail text")
 	}

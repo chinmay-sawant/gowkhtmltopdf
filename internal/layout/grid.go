@@ -35,11 +35,13 @@ func (e *engine) buildGrid(n *html.Node, st ResolvedStyle, availW, x, y float64)
 
 	colDefs := parseGridTrackDefs(st.GridTemplateColumns)
 	areas := parseGridTemplateAreas(st.GridTemplateAreas)
+
 	if len(colDefs) == 0 {
 		n := areas.cols
 		if n < 1 {
 			n = 1
 		}
+
 		colDefs = make([]gridTrackDef, n)
 		for i := range colDefs {
 			colDefs[i] = flexibleTrack(1)
@@ -51,18 +53,22 @@ func (e *engine) buildGrid(n *html.Node, st ResolvedStyle, availW, x, y float64)
 	}
 
 	var kids []*html.Node
+
 	for _, c := range n.Children {
 		if c.Type != html.ElementNode {
 			continue
 		}
+
 		if e.styles[c].Display == "none" {
 			continue
 		}
+
 		kids = append(kids, c)
 	}
 
 	// Intrinsic measure lite for min-content / max-content column mins.
 	colIntrinsics := measureTrackIntrinsics(e, kids, len(colDefs), true)
+
 	cols := resolveGridTrackSizes(colDefs, contentW, columnGap, e, colIntrinsics)
 	if len(cols) == 0 {
 		cols = []float64{contentW}
@@ -75,7 +81,9 @@ func (e *engine) buildGrid(n *html.Node, st ResolvedStyle, availW, x, y float64)
 		col, colSpan int
 		row, rowSpan int
 	}
+
 	var placed []cell
+
 	occ := map[int]map[int]bool{}
 	ensure := func(row int) {
 		if occ[row] == nil {
@@ -83,21 +91,24 @@ func (e *engine) buildGrid(n *html.Node, st ResolvedStyle, availW, x, y float64)
 		}
 	}
 	freeAt := func(row, col, rowSpan, colSpan int) bool {
-		for r := 0; r < rowSpan; r++ {
+		for r := range rowSpan {
 			ensure(row + r)
-			for i := 0; i < colSpan; i++ {
+
+			for i := range colSpan {
 				c := col + i
 				if c >= len(cols) || occ[row+r][c] {
 					return false
 				}
 			}
 		}
+
 		return true
 	}
 	mark := func(row, col, rowSpan, colSpan int) {
-		for r := 0; r < rowSpan; r++ {
+		for r := range rowSpan {
 			ensure(row + r)
-			for i := 0; i < colSpan; i++ {
+
+			for i := range colSpan {
 				occ[row+r][col+i] = true
 			}
 		}
@@ -106,19 +117,24 @@ func (e *engine) buildGrid(n *html.Node, st ResolvedStyle, availW, x, y float64)
 	columnMajor, densePack := gridAutoFlowMode(st.GridAutoFlow)
 	cursorRow, cursorCol := 0, 0
 	nCols := len(cols)
+
 	for _, kid := range kids {
 		cs := e.styles[kid]
+
 		colSpan := cs.GridColumnSpan
 		if colSpan < 1 {
 			colSpan = 1
 		}
+
 		rowSpan := cs.GridRowSpan
 		if rowSpan < 1 {
 			rowSpan = 1
 		}
+
 		colStart := cs.GridColumnStart - 1 // 0-based; -1 = auto
 		rowStart := cs.GridRowStart - 1
 		definite := false
+
 		if name := strings.TrimSpace(cs.GridArea); name != "" {
 			if rect, ok := resolveNamedGridArea(areas, name); ok {
 				rowStart, colStart = rect.row, rect.col
@@ -126,47 +142,58 @@ func (e *engine) buildGrid(n *html.Node, st ResolvedStyle, availW, x, y float64)
 				definite = true
 			}
 		}
+
 		if colSpan > nCols {
 			colSpan = nCols
 		}
+
 		if rowStart >= 0 && colStart >= 0 {
 			definite = true
 		}
 
 		var row, col int
+
 		switch {
 		case definite:
 			row, col = rowStart, colStart
 			if row < 0 {
 				row = 0
 			}
+
 			if col < 0 {
 				col = 0
 			}
+
 			for !freeAt(row, col, rowSpan, colSpan) {
 				row++
 			}
 		case colStart >= 0:
 			col = colStart
+
 			row = 0
 			if !densePack {
 				row = cursorRow
 			}
+
 			for !freeAt(row, col, rowSpan, colSpan) {
 				row++
 			}
 		case rowStart >= 0:
 			row = rowStart
 			col = 0
+
 			for {
 				if col+colSpan > nCols {
 					col = 0
 					row++
+
 					continue
 				}
+
 				if freeAt(row, col, rowSpan, colSpan) {
 					break
 				}
+
 				col++
 			}
 		default:
@@ -174,6 +201,7 @@ func (e *engine) buildGrid(n *html.Node, st ResolvedStyle, availW, x, y float64)
 			if densePack {
 				startRow, startCol = 0, 0
 			}
+
 			if columnMajor {
 				minRows := areas.rows
 				if minRows < 1 {
@@ -182,20 +210,25 @@ func (e *engine) buildGrid(n *html.Node, st ResolvedStyle, availW, x, y float64)
 						minRows = 1
 					}
 				}
+
 				row, col = findGridSlotColumnMajor(freeAt, nCols, startRow, startCol, rowSpan, colSpan, minRows)
 			} else {
 				row, col = findGridSlotRowMajor(freeAt, nCols, startRow, startCol, rowSpan, colSpan)
 			}
 		}
+
 		mark(row, col, rowSpan, colSpan)
 		placed = append(placed, cell{n: kid, col: col, colSpan: colSpan, row: row, rowSpan: rowSpan})
+
 		if columnMajor {
 			cursorRow = row + rowSpan
 			cursorCol = col
+
 			flowRows := areas.rows
 			if flowRows < 1 {
 				flowRows = (len(kids) + nCols - 1) / nCols
 			}
+
 			if flowRows > 0 && cursorRow >= flowRows {
 				cursorRow = 0
 				cursorCol++
@@ -210,16 +243,19 @@ func (e *engine) buildGrid(n *html.Node, st ResolvedStyle, availW, x, y float64)
 	}
 
 	maxRow := 0
+
 	for _, p := range placed {
 		end := p.row + p.rowSpan - 1
 		if end > maxRow {
 			maxRow = end
 		}
 	}
+
 	numRows := maxRow + 1
 	if areas.rows > numRows {
 		numRows = areas.rows
 	}
+
 	if numRows < 1 {
 		numRows = 1
 	}
@@ -227,18 +263,23 @@ func (e *engine) buildGrid(n *html.Node, st ResolvedStyle, availW, x, y float64)
 	rowTemplate := strings.TrimSpace(st.GridTemplateRows)
 	definiteRows := contentH >= 0 && rowTemplate != "" &&
 		strings.ToLower(rowTemplate) != "none"
+
 	var rows []float64
+
 	if definiteRows {
 		rowDefs := parseGridTrackDefs(st.GridTemplateRows)
 		// Pad/truncate defs to placed row count when template is shorter.
 		for len(rowDefs) < numRows {
 			rowDefs = append(rowDefs, flexibleTrack(1))
 		}
+
 		rowIntrinsics := measureTrackIntrinsics(e, kids, len(rowDefs), false)
 		rows = resolveGridTrackSizes(rowDefs, contentH, rowGap, e, rowIntrinsics)
 	}
+
 	if len(rows) == 0 {
 		rows = make([]float64, numRows)
+
 		if mins := parseGridTrackFixedMins(st.GridTemplateRows, e); len(mins) > 0 {
 			for i := 0; i < numRows && i < len(mins); i++ {
 				if mins[i] > 0 {
@@ -260,30 +301,37 @@ func (e *engine) buildGrid(n *html.Node, st ResolvedStyle, availW, x, y float64)
 		cellW, cx float64
 		prefH     float64
 	}
+
 	var pboxes []placedBox
 
 	// Measure preferred heights without emitting (needed for auto row tracks).
 	for _, p := range placed {
 		cw := 0.0
+
 		cx := contentX
-		for j := 0; j < p.col; j++ {
+		for j := range p.col {
 			cx += cols[j] + columnGap
 		}
-		for j := 0; j < p.colSpan; j++ {
+
+		for j := range p.colSpan {
 			cw += cols[p.col+j]
 			if j > 0 {
 				cw += columnGap
 			}
 		}
+
 		was := e.noEmit
 		e.noEmit = true
 		mb := e.build(p.n, cw, cx, y+cy)
 		e.noEmit = was
+
 		prefH := 0.0
 		if mb != nil {
 			prefH = mb.h
 		}
+
 		pboxes = append(pboxes, placedBox{cell: p, cellW: cw, cx: cx, prefH: prefH})
+
 		if !definiteRows && p.rowSpan == 1 && prefH > rows[p.row] {
 			rows[p.row] = prefH
 		}
@@ -294,16 +342,18 @@ func (e *engine) buildGrid(n *html.Node, st ResolvedStyle, availW, x, y float64)
 			if pb.rowSpan <= 1 {
 				continue
 			}
+
 			sum := 0.0
-			for r := 0; r < pb.rowSpan; r++ {
+			for r := range pb.rowSpan {
 				sum += rows[pb.row+r]
 				if r > 0 {
 					sum += rowGap
 				}
 			}
+
 			if pb.prefH > sum {
 				extra := (pb.prefH - sum) / float64(pb.rowSpan)
-				for r := 0; r < pb.rowSpan; r++ {
+				for r := range pb.rowSpan {
 					rows[pb.row+r] += extra
 				}
 			}
@@ -312,6 +362,7 @@ func (e *engine) buildGrid(n *html.Node, st ResolvedStyle, availW, x, y float64)
 
 	rowYs := make([]float64, numRows)
 	rowYs[0] = cy
+
 	for r := 1; r < numRows; r++ {
 		rowYs[r] = rowYs[r-1] + rows[r-1] + rowGap
 	}
@@ -320,6 +371,7 @@ func (e *engine) buildGrid(n *html.Node, st ResolvedStyle, availW, x, y float64)
 	if containerJustify == "" {
 		containerJustify = "stretch"
 	}
+
 	containerAlign := st.AlignItems
 	if containerAlign == "" {
 		containerAlign = "stretch"
@@ -328,20 +380,24 @@ func (e *engine) buildGrid(n *html.Node, st ResolvedStyle, availW, x, y float64)
 	for i := range pboxes {
 		pb := &pboxes[i]
 		cellH := 0.0
-		for r := 0; r < pb.rowSpan; r++ {
+
+		for r := range pb.rowSpan {
 			cellH += rows[pb.row+r]
 			if r > 0 {
 				cellH += rowGap
 			}
 		}
+
 		targetX := pb.cx
 		targetY := y + rowYs[pb.row]
 
 		cs := e.styles[pb.n]
+
 		justify := cs.JustifySelf
 		if justify == "" || justify == "auto" {
 			justify = containerJustify
 		}
+
 		align := cs.AlignSelf
 		if align == "" || align == "auto" {
 			align = containerAlign
@@ -355,6 +411,7 @@ func (e *engine) buildGrid(n *html.Node, st ResolvedStyle, availW, x, y float64)
 		}
 
 		var cb *box
+
 		if buildH > 0 {
 			prev := e.styles[pb.n]
 			mod := prev
@@ -367,9 +424,11 @@ func (e *engine) buildGrid(n *html.Node, st ResolvedStyle, availW, x, y float64)
 		} else {
 			cb = e.build(pb.n, pb.cellW, pb.cx, targetY)
 		}
+
 		if cb == nil {
 			continue
 		}
+
 		pb.b = cb
 
 		dx := targetX - pb.b.x
@@ -387,27 +446,34 @@ func (e *engine) buildGrid(n *html.Node, st ResolvedStyle, availW, x, y float64)
 	if numRows > 0 {
 		usedH = rowYs[numRows-1] + rows[numRows-1]
 	}
+
 	usedH += e.scalePt(st.PaddingBottom)
+
 	if st.Height >= 0 {
 		h := e.scalePt(st.Height)
 		if st.BoxSizing != "border-box" {
 			h += e.scalePt(st.PaddingTop) + e.scalePt(st.PaddingBottom) +
 				e.scalePt(st.BorderTop.Width) + e.scalePt(st.BorderBottom.Width)
 		}
+
 		if usedH < h {
 			usedH = h
 		}
 	}
+
 	minBorderH := e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width) +
 		e.scalePt(st.PaddingBottom) + e.scalePt(st.BorderBottom.Width)
 	if contentH >= 0 {
 		minBorderH += contentH
 	}
+
 	if usedH < minBorderH {
 		usedH = minBorderH
 	}
+
 	b.h = usedH
 	e.prependChrome(contentStart, b, st, b.x, y, b.w, b.h)
+
 	return b
 }
 
@@ -417,6 +483,7 @@ func stripMasonryKeyword(raw string) string {
 	if strings.ToLower(strings.TrimSpace(raw)) == "masonry" {
 		return ""
 	}
+
 	return raw
 }
 
@@ -427,10 +494,12 @@ func stripMasonryKeyword(raw string) string {
 // Shared by flex/grid/multicol (block keeps its own min/max/margin-auto path).
 func resolveUsedWidth(st ResolvedStyle, availW float64, e *engine) float64 {
 	ml, mr := e.scalePt(st.MarginLeft), e.scalePt(st.MarginRight)
+
 	w := availW - ml - mr
 	if w < 0 {
 		w = 0
 	}
+
 	if st.WidthPercent >= 0 {
 		if availW > 0 && !math.IsInf(availW, 0) && availW < 1e12 {
 			w = availW * st.WidthPercent / 100
@@ -443,6 +512,7 @@ func resolveUsedWidth(st ResolvedStyle, availW float64, e *engine) float64 {
 				e.scalePt(st.BorderLeft.Width) + e.scalePt(st.BorderRight.Width)
 		}
 	}
+
 	return w
 }
 
@@ -455,17 +525,21 @@ func resolveContentHeight(st ResolvedStyle, e *engine) float64 {
 		// Cyclic % honesty: indefinite containing block → auto.
 		return -1
 	}
+
 	if st.Height < 0 {
 		return -1
 	}
+
 	h := e.scalePt(st.Height)
 	if st.BoxSizing == "border-box" {
 		h -= e.scalePt(st.PaddingTop) + e.scalePt(st.PaddingBottom) +
 			e.scalePt(st.BorderTop.Width) + e.scalePt(st.BorderBottom.Width)
 	}
+
 	if h < 0 {
 		h = 0
 	}
+
 	return h
 }
 
@@ -476,8 +550,10 @@ func resolveContentHeight(st ResolvedStyle, e *engine) float64 {
 func (e *engine) styleGaps(st ResolvedStyle) (rowGap, columnGap float64) {
 	if st.RowGap == 0 && st.ColumnGap == 0 {
 		g := e.scalePt(st.Gap)
+
 		return g, g
 	}
+
 	return e.scalePt(st.RowGap), e.scalePt(st.ColumnGap)
 }
 
@@ -494,6 +570,7 @@ func gridAlignOffset(value string, cell, item float64) float64 {
 			return (cell - item) / 2
 		}
 	}
+
 	return 0
 }
 
@@ -515,44 +592,57 @@ type gridTemplateAreasMap struct {
 func parseGridTemplateAreas(raw string) gridTemplateAreasMap {
 	out := gridTemplateAreasMap{names: map[string]gridAreaRect{}}
 	raw = strings.TrimSpace(raw)
+
 	if raw == "" || strings.EqualFold(raw, "none") {
 		return out
 	}
 	// Collect quoted strings: "a b" "c d" or 'a b'
 	var rows [][]string
+
 	for i := 0; i < len(raw); {
 		for i < len(raw) && (raw[i] == ' ' || raw[i] == '\t' || raw[i] == '\n' || raw[i] == '\r') {
 			i++
 		}
+
 		if i >= len(raw) {
 			break
 		}
+
 		q := raw[i]
 		if q != '"' && q != '\'' {
 			// Unquoted token — skip (invalid lite)
 			for i < len(raw) && raw[i] != ' ' && raw[i] != '\t' && raw[i] != '"' && raw[i] != '\'' {
 				i++
 			}
+
 			continue
 		}
+
 		i++
 		start := i
+
 		for i < len(raw) && raw[i] != q {
 			i++
 		}
+
 		cell := raw[start:i]
+
 		if i < len(raw) {
 			i++ // closing quote
 		}
+
 		toks := strings.Fields(cell)
 		if len(toks) == 0 {
 			continue
 		}
+
 		rows = append(rows, toks)
 	}
+
 	if len(rows) == 0 {
 		return out
 	}
+
 	out.rows = len(rows)
 	for _, r := range rows {
 		if len(r) > out.cols {
@@ -565,36 +655,46 @@ func parseGridTemplateAreas(raw string) gridTemplateAreasMap {
 			rows[i] = append(rows[i], ".")
 		}
 	}
+
 	type bounds struct {
 		r0, c0, r1, c1 int
 		seen           bool
 	}
+
 	acc := map[string]*bounds{}
+
 	for r, row := range rows {
 		for c, name := range row {
 			if name == "." || strings.EqualFold(name, "none") {
 				continue
 			}
+
 			b := acc[name]
 			if b == nil {
 				b = &bounds{r0: r, c0: c, r1: r, c1: c, seen: true}
 				acc[name] = b
+
 				continue
 			}
+
 			if r < b.r0 {
 				b.r0 = r
 			}
+
 			if r > b.r1 {
 				b.r1 = r
 			}
+
 			if c < b.c0 {
 				b.c0 = c
 			}
+
 			if c > b.c1 {
 				b.c1 = c
 			}
 		}
 	}
+
 	for name, b := range acc {
 		out.names[name] = gridAreaRect{
 			row:     b.r0,
@@ -603,6 +703,7 @@ func parseGridTemplateAreas(raw string) gridTemplateAreasMap {
 			colSpan: b.c1 - b.c0 + 1,
 		}
 	}
+
 	return out
 }
 
@@ -611,7 +712,9 @@ func resolveNamedGridArea(areas gridTemplateAreasMap, name string) (gridAreaRect
 	if areas.names == nil {
 		return gridAreaRect{}, false
 	}
+
 	rect, ok := areas.names[name]
+
 	return rect, ok
 }
 
@@ -634,15 +737,19 @@ type gridFreeFn func(row, col, rowSpan, colSpan int) bool
 // findGridSlotRowMajor searches row-major from (startRow, startCol).
 func findGridSlotRowMajor(free gridFreeFn, nCols, startRow, startCol, rowSpan, colSpan int) (int, int) {
 	row, col := startRow, startCol
+
 	for {
 		if col+colSpan > nCols {
 			col = 0
 			row++
+
 			continue
 		}
+
 		if free(row, col, rowSpan, colSpan) {
 			return row, col
 		}
+
 		col++
 	}
 }
@@ -654,21 +761,25 @@ func findGridSlotColumnMajor(free gridFreeFn, nCols, startRow, startCol, rowSpan
 	if colSpan > nCols {
 		colSpan = nCols
 	}
+
 	if minRows < rowSpan {
 		minRows = rowSpan
 	}
+
 	for maxRows := minRows; maxRows < 4096; maxRows++ {
 		for col := 0; col+colSpan <= nCols; col++ {
 			for row := 0; row+rowSpan <= maxRows; row++ {
 				if row < startRow || (row == startRow && col < startCol) {
 					continue
 				}
+
 				if free(row, col, rowSpan, colSpan) {
 					return row, col
 				}
 			}
 		}
 	}
+
 	return findGridSlotRowMajor(free, nCols, startRow, startCol, rowSpan, colSpan)
 }
 
@@ -700,6 +811,7 @@ func flexibleTrack(fr float64) gridTrackDef {
 	if fr <= 0 {
 		fr = 1
 	}
+
 	return gridTrackDef{
 		min: gridTrackSize{kind: trackAuto},
 		max: gridTrackSize{kind: trackFr, val: fr},
@@ -713,12 +825,15 @@ func parseGridTrackFixedMins(raw string, e *engine) []float64 {
 	if len(defs) == 0 {
 		return nil
 	}
+
 	out := make([]float64, len(defs))
+
 	for i, d := range defs {
 		if d.min.kind == trackFixed {
 			out[i] = e.scalePt(d.min.val)
 		}
 	}
+
 	return out
 }
 
@@ -731,6 +846,7 @@ func parseGridTracks(raw string, contentW, columnGap float64, e *engine) []float
 	if len(defs) == 0 {
 		return nil
 	}
+
 	return resolveGridTrackSizes(defs, contentW, columnGap, e, nil)
 }
 
@@ -740,49 +856,65 @@ func parseGridTrackDefs(raw string) []gridTrackDef {
 	if raw == "" || strings.EqualFold(raw, "none") || strings.EqualFold(raw, "masonry") {
 		return nil
 	}
+
 	raw = expandRepeatFunctions(raw)
+
 	toks := tokenizeGridTracks(raw)
 	if len(toks) == 0 {
 		return nil
 	}
+
 	out := make([]gridTrackDef, 0, len(toks))
 	for _, t := range toks {
 		out = append(out, parseOneTrackDef(t))
 	}
+
 	return out
 }
 
 // expandRepeatFunctions replaces repeat(N, <track-list>) with N copies.
 func expandRepeatFunctions(raw string) string {
 	lower := strings.ToLower(raw)
+
 	for {
 		idx := strings.Index(lower, "repeat(")
 		if idx < 0 {
 			return raw
 		}
+
 		start := idx + len("repeat(")
+
 		end := findMatchingParen(raw, start-1)
 		if end < 0 {
 			return raw
 		}
+
 		inner := raw[start:end]
+
 		parts := splitTopLevelComma(inner)
 		if len(parts) != 2 {
 			return raw
 		}
+
 		n, err := strconv.Atoi(strings.TrimSpace(parts[0]))
 		if err != nil || n <= 0 || n >= 64 {
 			return raw
 		}
+
 		track := strings.TrimSpace(parts[1])
+
 		var b strings.Builder
+
 		b.WriteString(raw[:idx])
-		for i := 0; i < n; i++ {
+
+		for i := range n {
 			if i > 0 {
 				b.WriteByte(' ')
 			}
+
 			b.WriteString(track)
 		}
+
 		b.WriteString(raw[end+1:])
 		raw = b.String()
 		lower = strings.ToLower(raw)
@@ -791,6 +923,7 @@ func expandRepeatFunctions(raw string) string {
 
 func findMatchingParen(s string, openIdx int) int {
 	depth := 0
+
 	for i := openIdx; i < len(s); i++ {
 		switch s[i] {
 		case '(':
@@ -802,14 +935,17 @@ func findMatchingParen(s string, openIdx int) int {
 			}
 		}
 	}
+
 	return -1
 }
 
 func splitTopLevelComma(s string) []string {
 	var parts []string
+
 	depth := 0
 	start := 0
-	for i := 0; i < len(s); i++ {
+
+	for i := range len(s) {
 		switch s[i] {
 		case '(':
 			depth++
@@ -822,32 +958,41 @@ func splitTopLevelComma(s string) []string {
 			}
 		}
 	}
+
 	parts = append(parts, s[start:])
+
 	return parts
 }
 
 // tokenizeGridTracks splits on whitespace but keeps function calls intact.
 func tokenizeGridTracks(raw string) []string {
 	var toks []string
+
 	var b strings.Builder
+
 	depth := 0
 	flush := func() {
 		if b.Len() == 0 {
 			return
 		}
+
 		toks = append(toks, b.String())
 		b.Reset()
 	}
-	for i := 0; i < len(raw); i++ {
+
+	for i := range len(raw) {
 		c := raw[i]
+
 		switch {
 		case c == '(':
 			depth++
+
 			b.WriteByte(c)
 		case c == ')':
 			if depth > 0 {
 				depth--
 			}
+
 			b.WriteByte(c)
 		case (c == ' ' || c == '\t' || c == '\n' || c == '\r') && depth == 0:
 			flush()
@@ -855,15 +1000,19 @@ func tokenizeGridTracks(raw string) []string {
 			b.WriteByte(c)
 		}
 	}
+
 	flush()
+
 	return toks
 }
 
 func parseOneTrackDef(tok string) gridTrackDef {
 	tok = strings.TrimSpace(tok)
 	lower := strings.ToLower(tok)
+
 	if strings.HasPrefix(lower, "minmax(") && strings.HasSuffix(tok, ")") {
 		inner := tok[len("minmax(") : len(tok)-1]
+
 		parts := splitTopLevelComma(inner)
 		if len(parts) == 2 {
 			minS := parseTrackSize(strings.TrimSpace(parts[0]))
@@ -872,9 +1021,11 @@ func parseOneTrackDef(tok string) gridTrackDef {
 			if minS.kind == trackFixed && maxS.kind == trackFixed && maxS.val < minS.val {
 				maxS = minS
 			}
+
 			return gridTrackDef{min: minS, max: maxS}
 		}
 	}
+
 	sz := parseTrackSize(tok)
 	if sz.kind == trackFr {
 		return gridTrackDef{
@@ -882,11 +1033,13 @@ func parseOneTrackDef(tok string) gridTrackDef {
 			max: sz,
 		}
 	}
+
 	return gridTrackDef{min: sz, max: sz}
 }
 
 func parseTrackSize(tok string) gridTrackSize {
 	tok = strings.TrimSpace(tok)
+
 	lower := strings.ToLower(tok)
 	switch lower {
 	case "auto":
@@ -896,13 +1049,16 @@ func parseTrackSize(tok string) gridTrackSize {
 	case "max-content":
 		return gridTrackSize{kind: trackMaxContent}
 	}
+
 	if strings.HasSuffix(lower, "fr") {
 		v, err := strconv.ParseFloat(strings.TrimSuffix(lower, "fr"), 64)
 		if err != nil || v <= 0 {
 			v = 1
 		}
+
 		return gridTrackSize{kind: trackFr, val: v}
 	}
+
 	if v, ok := lengthBox(tok, 12, 0, "auto"); ok && v >= 0 {
 		// Percentages are re-resolved in resolveGridTrackSizes against the
 		// definite container; store raw % as a sentinel via kind+val.
@@ -912,8 +1068,10 @@ func parseTrackSize(tok string) gridTrackSize {
 				return gridTrackSize{kind: trackFixed, val: -pct} // negative → %
 			}
 		}
+
 		return gridTrackSize{kind: trackFixed, val: v}
 	}
+
 	return gridTrackSize{kind: trackAuto}
 }
 
@@ -929,18 +1087,22 @@ func measureTrackIntrinsics(e *engine, kids []*html.Node, nTracks int, axisColum
 	if nTracks < 1 {
 		return nil
 	}
+
 	out := make([]trackIntrinsic, nTracks)
 	if e == nil || len(kids) == 0 {
 		return out
 	}
+
 	for i, kid := range kids {
 		cs := e.styles[kid]
 		ti := i % nTracks
+
 		if axisColumns {
 			mc := e.measureCellContent(kid, cs)
 			if mc > out[ti].minContent {
 				out[ti].minContent = mc
 			}
+
 			if mc > out[ti].maxContent {
 				out[ti].maxContent = mc
 			}
@@ -949,14 +1111,17 @@ func measureTrackIntrinsics(e *engine, kids []*html.Node, nTracks int, axisColum
 			h := e.scalePt(cs.FontSize) * 1.2
 			h += e.scalePt(cs.PaddingTop) + e.scalePt(cs.PaddingBottom) +
 				e.scalePt(cs.BorderTop.Width) + e.scalePt(cs.BorderBottom.Width)
+
 			if h > out[ti].minContent {
 				out[ti].minContent = h
 			}
+
 			if h > out[ti].maxContent {
 				out[ti].maxContent = h
 			}
 		}
 	}
+
 	return out
 }
 
@@ -972,10 +1137,12 @@ func resolveGridTrackSizes(
 	if n == 0 {
 		return nil
 	}
+
 	gapTotal := 0.0
 	if n > 1 {
 		gapTotal = gap * float64(n-1)
 	}
+
 	definite := contentSize >= 0 && !math.IsNaN(contentSize) && !math.IsInf(contentSize, 0)
 
 	base := make([]float64, n)
@@ -988,13 +1155,16 @@ func resolveGridTrackSizes(
 		if i < len(intrinsics) {
 			intr = intrinsics[i]
 		}
+
 		base[i] = resolveTrackSide(d.min, contentSize, definite, e, intr, true)
 		lim := resolveTrackSide(d.max, contentSize, definite, e, intr, false)
+
 		if d.max.kind == trackFr {
 			frCoef[i] = d.max.val
 			if frCoef[i] <= 0 {
 				frCoef[i] = 1
 			}
+
 			frSum += frCoef[i]
 			limit[i] = math.Inf(1)
 		} else if d.min.kind == trackFr && d.max.kind != trackFr {
@@ -1003,6 +1173,7 @@ func resolveGridTrackSizes(
 			if frCoef[i] <= 0 {
 				frCoef[i] = 1
 			}
+
 			frSum += frCoef[i]
 			base[i] = 0
 			limit[i] = lim
@@ -1026,10 +1197,12 @@ func resolveGridTrackSizes(
 	for i := range base {
 		fixedSum += base[i]
 	}
+
 	free := contentSize - gapTotal - fixedSum
 	if !definite {
 		free = 0
 	}
+
 	if free < 0 {
 		free = 0
 	}
@@ -1039,6 +1212,7 @@ func resolveGridTrackSizes(
 		for i := range out {
 			if frCoef[i] > 0 {
 				grow := free * (frCoef[i] / frSum)
+
 				out[i] = base[i] + grow
 				if out[i] > limit[i] {
 					out[i] = limit[i]
@@ -1053,12 +1227,15 @@ func resolveGridTrackSizes(
 	} else {
 		// No fr: if all auto and definite, share leftover equally among auto maxes.
 		autoIdx := []int{}
+
 		for i, d := range defs {
 			out[i] = base[i]
+
 			if d.max.kind == trackAuto || d.max.kind == trackMaxContent || d.max.kind == trackMinContent {
 				autoIdx = append(autoIdx, i)
 			}
 		}
+
 		if free > 0 && len(autoIdx) > 0 && frSum == 0 {
 			each := free / float64(len(autoIdx))
 			for _, i := range autoIdx {
@@ -1069,11 +1246,13 @@ func resolveGridTrackSizes(
 			}
 		}
 	}
+
 	for i := range out {
 		if out[i] < 0 || math.IsNaN(out[i]) {
 			out[i] = 0
 		}
 	}
+
 	return out
 }
 
@@ -1095,19 +1274,25 @@ func resolveTrackSide(
 				if isMin {
 					return 0
 				}
+
 				return math.Inf(1)
 			}
+
 			pct := -sz.val
+
 			return contentSize * pct / 100
 		}
+
 		if e != nil {
 			return e.scalePt(sz.val)
 		}
+
 		return sz.val
 	case trackFr:
 		if isMin {
 			return 0
 		}
+
 		return math.Inf(1)
 	case trackMinContent:
 		return intr.minContent
@@ -1115,12 +1300,15 @@ func resolveTrackSide(
 		if isMin {
 			return intr.maxContent
 		}
+
 		return intr.maxContent
 	case trackAuto:
 		if isMin {
 			return intr.minContent // auto min ≈ min-content lite
 		}
+
 		return math.Inf(1)
 	}
+
 	return 0
 }

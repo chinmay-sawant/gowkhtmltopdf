@@ -16,19 +16,25 @@ p { text-align: justify; font-size: 12pt }
 <p>one two three four</p>
 </div></body></html>`, s)
 	texts := opsOfKind(res, OpText)
+
 	var line []Op
+
 	for _, op := range texts {
 		if op.Text == "x" {
 			continue
 		}
+
 		if len(line) == 0 {
 			line = append(line, op)
+
 			continue
 		}
+
 		if math.Abs(op.Y-line[0].Y) < 0.5 {
 			line = append(line, op)
 		}
 	}
+
 	if len(line) < 2 {
 		t.Fatalf("expected multi-word line beside float, got %+v", texts)
 	}

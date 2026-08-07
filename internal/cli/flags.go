@@ -30,6 +30,7 @@ func setMapEntry(m *map[string]string, k, v string) {
 	if *m == nil {
 		*m = map[string]string{}
 	}
+
 	(*m)[k] = v
 }
 
@@ -228,20 +229,24 @@ func init() {
 	add("cookie", ModeBoth, flagPair, func(c *Command, cur *objectCtx, vals []string) error {
 		o := cur.object(c)
 		setMapEntry(&o.Load.Cookies, vals[0], vals[1])
+
 		return nil
 	})
 	add("custom-header", ModeBoth, flagPair, func(c *Command, cur *objectCtx, vals []string) error {
 		o := cur.object(c)
 		setMapEntry(&o.Load.CustomHeaders, vals[0], vals[1])
+
 		return nil
 	})
 	add("post", ModeBoth, flagPair, func(c *Command, cur *objectCtx, vals []string) error {
 		o := cur.object(c)
 		o.Load.Post = append(o.Load.Post, settings.PostItem{Name: vals[0], Value: vals[1]})
+
 		return nil
 	})
 	add("replace", ModePDF, flagPair, func(c *Command, cur *objectCtx, vals []string) error {
 		o := cur.object(c)
+
 		return c.replaceHF(o, vals[0], vals[1])
 	})
 
@@ -251,6 +256,7 @@ func init() {
 			prefix, side := prefix, side
 			add(prefix+"-"+side, ModePDF, flagValue, hfFlag(prefix, side))
 		}
+
 		add(prefix+"-font-name", ModePDF, flagValue, hfFlag(prefix, "fontname"))
 		add(prefix+"-font-size", ModePDF, flagValue, hfFlag(prefix, "fontsize"))
 		add(prefix+"-spacing", ModePDF, flagValue, hfFlag(prefix, "spacing"))
@@ -331,6 +337,7 @@ func printMediaFlag(enable bool) flagApplier {
 		if enable {
 			on = vals[0] == "true"
 		}
+
 		return cur.applyPage(c,
 			func(g *settings.PdfGlobal, val string) error { return g.Set("web.printmediatype", val) },
 			func(o *settings.PdfObject, val string) error { return o.Set("load.printmediatype", val) },
@@ -351,10 +358,12 @@ func pageOnlyFlag(obj func(o *settings.PdfObject, val string) error) flagApplier
 		if cur.obj != nil {
 			return obj(cur.obj, vals[0])
 		}
+
 		if cur.pending == nil {
 			o := settings.DefaultPdfObject()
 			cur.pending = &o
 		}
+
 		return obj(cur.pending, vals[0])
 	}
 }
@@ -369,6 +378,7 @@ func hfFlag(prefix, field string) flagApplier {
 		if cur.obj != nil {
 			return cur.obj.Set(key, vals[0])
 		}
+
 		return c.Global.Set(key, vals[0])
 	}
 }
@@ -380,6 +390,7 @@ func tocFlag(field string) flagApplier {
 		if cur.obj != nil && cur.obj.IsTableOfContent {
 			return cur.obj.Set("toc."+field, vals[0])
 		}
+
 		return c.Global.Set("toc."+field, vals[0])
 	}
 }
@@ -390,9 +401,11 @@ func tocFlagBool(field string, on bool) flagApplier {
 		if !on {
 			v = negBool(v)
 		}
+
 		if cur.obj != nil && cur.obj.IsTableOfContent {
 			return cur.obj.Set("toc."+field, v)
 		}
+
 		return c.Global.Set("toc."+field, v)
 	}
 }
@@ -402,13 +415,18 @@ func (c *Command) replaceHF(o *settings.PdfObject, k, v string) error {
 		if o.Header.Replace == nil {
 			o.Header.Replace = map[string]string{}
 		}
+
 		o.Header.Replace[k] = v
+
 		return nil
 	}
+
 	if c.Global.Header.Replace == nil {
 		c.Global.Header.Replace = map[string]string{}
 	}
+
 	c.Global.Header.Replace[k] = v
+
 	return nil
 }
 
@@ -417,5 +435,6 @@ func negBool(v string) string {
 	if v == "true" {
 		return "false"
 	}
+
 	return "true"
 }

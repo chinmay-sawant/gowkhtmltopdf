@@ -22,6 +22,7 @@ func TestMediaFeatureQueryPrint(t *testing.T) {
 <p class="huge">HugeKeep</p>
 <p class="tight">TightKeep</p>
 </body></html>`
+
 	root, err := html.Parse(src)
 	if err != nil {
 		t.Fatal(err)
@@ -34,26 +35,34 @@ func TestMediaFeatureQueryPrint(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	var texts []string
+
 	for _, op := range res.Ops {
 		if op.Kind == OpText {
 			texts = append(texts, strings.TrimSpace(op.Text))
 		}
 	}
+
 	joined := strings.Join(texts, " | ")
 	t.Log(joined)
+
 	for _, want := range []string{"ScreenRule", "WideGreen", "HugeKeep", "TightKeep"} {
 		found := false
+
 		for _, tx := range texts {
 			if strings.Contains(tx, want) {
 				found = true
+
 				break
 			}
 		}
+
 		if !found {
 			t.Errorf("missing text %q in %q", want, joined)
 		}
 	}
+
 	for _, op := range res.Ops {
 		if op.Kind == OpText && strings.Contains(op.Text, "WideGreen") {
 			if op.G < 0.9 {

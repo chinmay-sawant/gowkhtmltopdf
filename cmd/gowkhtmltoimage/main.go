@@ -21,21 +21,28 @@ func run(argv []string) int {
 		switch {
 		case errors.Is(err, cli.ErrHelp), errors.Is(err, cli.ErrExtHelp):
 			cli.PrintHelp(os.Stdout, cli.ModeImage)
+
 			return cli.ExitOK
 		case errors.Is(err, cli.ErrVersion):
 			cli.PrintVersion(os.Stdout)
+
 			return cli.ExitOK
 		case errors.Is(err, cli.ErrLicense):
 			cli.PrintLicense(os.Stdout)
+
 			return cli.ExitOK
 		}
+
 		fmt.Fprintf(os.Stderr, "gowkhtmltoimage: %v\n", err)
+
 		return cli.ExitError
 	}
 
 	if err := app.RunImage(context.Background(), cmd, os.Stderr); err != nil {
 		fmt.Fprintf(os.Stderr, "gowkhtmltoimage: %v\n", err)
+
 		return cli.ExitCode(err)
 	}
+
 	return cli.ExitOK
 }

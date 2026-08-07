@@ -18,6 +18,7 @@ import (
 // generated in-test; nothing is committed.
 func tenPageTableReportHTML() string {
 	var b strings.Builder
+
 	b.WriteString(`<!DOCTYPE html><html><head><style>
 body { font-family: sans-serif; font-size: 9pt; color: #111; }
 h2 { font-size: 12pt; color: #1a3d6d; }
@@ -27,29 +28,36 @@ thead th { background-color: #e8eef5; }
 .section { page-break-before: always; }
 .num { text-align: right; }
 </style></head><body>`)
+
 	const sections, items = 10, 40
 	for s := 1; s <= sections; s++ {
 		cls := "section"
 		if s == 1 {
 			cls = "first"
 		}
+
 		fmt.Fprintf(&b, `<div class="%s"><h2>Invoice %d - line items</h2>`, cls, s)
 		b.WriteString(`<table><thead><tr><th>#</th><th>Item</th><th>SKU</th><th class="num">Qty</th><th class="num">Unit</th><th class="num">Total</th></tr></thead><tbody>`)
+
 		for i := 1; i <= items; i++ {
 			qty := (i*3)%7 + 1
 			unit := 12.5*float64(i%9+1) + float64(i%100)/100.0
 			fmt.Fprintf(&b, `<tr><td>%d</td><td>Line item %d - consulting service %s</td><td>SKU-%04d</td><td class="num">%d</td><td class="num">%.2f</td><td class="num">%.2f</td></tr>`,
 				i, i, descriptionWord(i), i, qty, unit, unit*float64(qty))
 		}
+
 		b.WriteString(`</tbody></table></div>`)
 	}
+
 	b.WriteString(`</body></html>`)
+
 	return b.String()
 }
 
 // descriptionWord yields a short realistic descriptor for line-item text.
 func descriptionWord(i int) string {
 	words := []string{"setup", "deployment", "maintenance", "migration", "support", "training", "review", "integration", "consulting"}
+
 	return words[i%len(words)]
 }
 
@@ -81,29 +89,38 @@ func TestTenPageTableReportPerformance(t *testing.T) {
 	cmd, _ := newCommand(t, tenPageTableReportHTML(), filepath.Join(t.TempDir(), "out.pdf"))
 
 	var sizes []int64
+
 	for run := 1; run <= 2; run++ {
 		start := time.Now()
+
 		if err := RunPDF(cmd, io.Discard); err != nil {
 			t.Fatalf("run %d: RunPDF: %v", run, err)
 		}
+
 		dur := time.Since(start)
+
 		data, err := os.ReadFile(cmd.Output)
 		if err != nil {
 			t.Fatalf("run %d: read output: %v", run, err)
 		}
+
 		sizes = append(sizes, int64(len(data)))
 		t.Logf("run %d (cold=%v): full pipeline %v, %d bytes, %d pages",
 			run, run == 1, dur, len(data), pageCount(data))
+
 		if dur >= budget {
 			t.Errorf("run %d took %v, want < %v", run, dur, budget)
 		}
 	}
+
 	data, err := os.ReadFile(cmd.Output)
 	if err != nil {
 		t.Fatalf("read output: %v", err)
 	}
+
 	if n := pageCount(data); n < 10 {
 		t.Errorf("pages = %d, want >= 10", n)
 	}
+
 	t.Logf("pdf byte sizes: cold=%d warm=%d", sizes[0], sizes[1])
 }

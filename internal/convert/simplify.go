@@ -43,6 +43,7 @@ func SimplifyDOMProfile(global, obj settings.Web) string {
 	if p == "" {
 		p = strings.ToLower(strings.TrimSpace(global.SimplifyDOMProfile))
 	}
+
 	switch p {
 	case "mediawiki", "wiki", "mw":
 		return "mediawiki"
@@ -57,16 +58,20 @@ func AppendSimplifySheet(sheets []*css.Stylesheet, enabled bool, profile string)
 	if !enabled {
 		return sheets
 	}
+
 	sheet, err := css.Parse(SimplifyChromeCSS)
 	if err != nil || sheet == nil {
 		return sheets
 	}
+
 	sheets = append(sheets, sheet)
+
 	if strings.EqualFold(strings.TrimSpace(profile), "mediawiki") {
 		mw, err := css.Parse(SimplifyMediaWikiCSS)
 		if err == nil && mw != nil {
 			sheets = append(sheets, mw)
 		}
 	}
+
 	return sheets
 }

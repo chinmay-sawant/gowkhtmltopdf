@@ -16,21 +16,28 @@ func TestLongURLEmergencyWrap(t *testing.T) {
 	res := layoutHTML(t, `<html><body><p>`+url+`</p></body></html>`, s)
 
 	const contentW = testViewport
+
 	var maxRight float64
+
 	var texts []string
+
 	for _, op := range res.Ops {
 		if op.Kind != OpText {
 			continue
 		}
+
 		texts = append(texts, op.Text)
+
 		if r := op.X + op.W; r > maxRight {
 			maxRight = r
 		}
 	}
+
 	joined := strings.Join(texts, "")
 	if !strings.Contains(joined, "web.archive.org") {
 		t.Fatalf("missing URL text in ops: %q", joined)
 	}
+
 	if len(texts) < 2 {
 		t.Fatalf("expected URL to wrap across ≥2 text ops, got %d: %v", len(texts), texts)
 	}
@@ -48,31 +55,41 @@ body { margin: 0; font-size: 12pt; }
 p { margin: 0; width: 120pt; overflow-wrap: break-word; }
 `)
 	res := layoutHTML(t, `<html><body><p style="overflow-wrap:break-word">`+url+`</p></body></html>`, s)
+
 	var texts []string
+
 	var maxRight float64
+
 	for _, op := range res.Ops {
 		if op.Kind != OpText {
 			continue
 		}
+
 		texts = append(texts, op.Text)
+
 		if r := op.X + op.W; r > maxRight {
 			maxRight = r
 		}
 	}
+
 	if len(texts) < 2 {
 		t.Fatalf("expected wrap, got %v", texts)
 	}
 	// At least one soft break should land after a slash.
 	soft := false
+
 	for _, tx := range texts[:len(texts)-1] {
 		if strings.HasSuffix(tx, "/") {
 			soft = true
+
 			break
 		}
 	}
+
 	if !soft {
 		t.Logf("note: no chunk ended with / (still OK if wrapped): %v", texts)
 	}
+
 	if maxRight > testViewport+1 {
 		t.Fatalf("overflow maxRight=%.1f texts=%v", maxRight, texts)
 	}
@@ -83,20 +100,27 @@ func TestWordBreakBreakAll(t *testing.T) {
 	// No soft opportunities — must still wrap under break-all.
 	token := strings.Repeat("W", 80)
 	res := layoutHTML(t, `<html><body><p style="word-break:break-all">`+token+`</p></body></html>`, s)
+
 	var n int
+
 	var maxRight float64
+
 	for _, op := range res.Ops {
 		if op.Kind != OpText {
 			continue
 		}
+
 		n++
+
 		if r := op.X + op.W; r > maxRight {
 			maxRight = r
 		}
 	}
+
 	if n < 2 {
 		t.Fatalf("break-all should wrap long token into ≥2 ops, got %d", n)
 	}
+
 	if maxRight > testViewport+1 {
 		t.Fatalf("break-all still overflows: maxRight=%.1f", maxRight)
 	}
@@ -107,7 +131,9 @@ func TestNowrapDoesNotEmergencySplit(t *testing.T) {
 	s := sheet(t, `body { margin: 0; font-size: 10pt; } .nw { white-space: nowrap; }`)
 	token := "https://example.com/" + strings.Repeat("segment/", 20)
 	res := layoutHTML(t, `<html><body><span class="nw">`+token+`</span></body></html>`, s)
+
 	var texts []string
+
 	for _, op := range res.Ops {
 		if op.Kind == OpText {
 			texts = append(texts, op.Text)
@@ -128,25 +154,34 @@ func TestOverflowWrapInheritsToText(t *testing.T) {
 	s := sheet(t, `body { margin: 0; font-size: 10pt; } a { overflow-wrap: break-word; }`)
 	src := `<html><body><p>Lead (` + `<a href="` + url + `">` + url + `</a>)</p></body></html>`
 	root := mustParse(t, src)
+
 	const contentW = 280.0
+
 	res, err := Layout(root, Options{Width: contentW, Height: 800, Sheets: []*css.Stylesheet{s}, Background: true})
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	var maxRight float64
+
 	var n int
+
 	for _, op := range res.Ops {
 		if op.Kind != OpText {
 			continue
 		}
+
 		n++
+
 		if r := op.X + op.W; r > maxRight {
 			maxRight = r
 		}
 	}
+
 	if n < 2 {
 		t.Fatalf("expected wrapped URL (≥2 text ops), got %d", n)
 	}
+
 	if maxRight > contentW+1 {
 		t.Fatalf("inherited overflow-wrap still overflows: maxRight=%.1f", maxRight)
 	}

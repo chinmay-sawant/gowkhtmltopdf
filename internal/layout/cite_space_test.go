@@ -18,12 +18,15 @@ td { border: 1px solid #aaa; padding: 2pt; width: 20pt; }
 	res := layoutHTML(t, `<html><body><table><tr><td>
 <sup class="reference"><a href="#c"><span class="cite-bracket">[</span>111<span class="cite-bracket">]</span></a></sup>
 </td></tr></table></body></html>`, s)
+
 	var got string
+
 	for _, op := range res.Ops {
 		if op.Kind == OpText {
 			got += op.Text
 		}
 	}
+
 	got = strings.ReplaceAll(got, " ", "")
 	if !strings.Contains(got, "[111]") {
 		t.Fatalf("cite text=%q, want [111] without interstitial spaces in layout", got)

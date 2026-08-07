@@ -13,31 +13,41 @@ func BenchmarkWrite50Pages(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
+
 	build := func() *Document {
 		d := NewDocument()
 		d.SetInfo("Title", "Bench")
-		for i := 0; i < 50; i++ {
+
+		for i := range 50 {
 			p := d.AddPage(595, 842)
 			c := p.Content()
 			c.UseEmbeddedFont("F1", f)
 			c.BeginText()
 			c.SetFont("F1", 11)
 			c.TextAt(50, 800)
-			for l := 0; l < 40; l++ {
+
+			for l := range 40 {
 				c.TextShow(fmt.Sprintf("Page %d line %d - the quick brown fox jumps over the lazy dog", i, l))
 				c.TextNextLine()
 			}
+
 			c.EndText()
 		}
+
 		return d
 	}
+
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		d := build()
+
 		var buf bytes.Buffer
+
 		if err := d.Write(&buf); err != nil {
 			b.Fatal(err)
 		}
+
 		b.SetBytes(int64(buf.Len()))
 	}
 }
@@ -49,9 +59,12 @@ func BenchmarkShapeRun(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
+
 	const text = "The quick brown fox jumps over the lazy dog"
+
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		run := ShapeRun(text, f, 11)
 		if len(run.Runes) != len(run.Advances) {
 			b.Fatal("shaped run has unpaired advances")

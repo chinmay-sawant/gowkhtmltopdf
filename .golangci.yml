@@ -1,0 +1,21 @@
+# golangci-lint configuration for gowkhtmltopdf.
+# All available linters are enabled; tune via `disable` / linters-settings as needed.
+# Docs: https://golangci-lint.run/usage/configuration/
+
+run:
+  timeout: 10m
+  tests: true
+
+linters:
+  enable-all: true
+  disable:
+    # Deprecated since v1.64; replaced by usetesting (already enabled via enable-all).
+    - tenv
+
+issues:
+  # Report every finding (default caps hide most of an enable-all run).
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+output:
+  sort-results: true

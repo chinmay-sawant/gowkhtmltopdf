@@ -40,10 +40,12 @@ func ParsePageSize(name string) (w, h float64, err error) {
 	if name == "" {
 		name = "A4"
 	}
+
 	key := strings.ToLower(name)
 	if sz, ok := pageSizes[canonical(key)]; ok {
 		return sz[0], sz[1], nil
 	}
+
 	return 0, 0, fmt.Errorf("unknown page size %q", name)
 }
 
@@ -73,8 +75,10 @@ func canonical(key string) string {
 	case "b0", "b1", "b2", "b3", "b4", "b5", "b6":
 		return strings.ToUpper(key)
 	}
+
 	if len(key) == 2 && (key[0] == 'a' || key[0] == 'b' || key[0] == 'c') {
 		return strings.ToUpper(key)
 	}
+
 	return key
 }

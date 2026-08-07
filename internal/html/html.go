@@ -42,19 +42,23 @@ func (n *Node) FirstChild(name string) *Node {
 			return c
 		}
 	}
+
 	return nil
 }
 
 // TextContent concatenates all descendant text.
 func (n *Node) TextContent() string {
 	var b strings.Builder
+
 	n.appendText(&b)
+
 	return b.String()
 }
 
 // Walk visits n and every descendant in pre-order (document order).
 func (n *Node) Walk(f func(*Node)) {
 	f(n)
+
 	for _, c := range n.Children {
 		c.Walk(f)
 	}
@@ -64,11 +68,13 @@ func (n *Node) Walk(f func(*Node)) {
 // named name, or "" when there is none.
 func (n *Node) TextContentOf(name string) string {
 	var out string
+
 	n.Walk(func(c *Node) {
 		if out == "" && c.Type == ElementNode && c.Name == name {
 			out = c.TextContent()
 		}
 	})
+
 	return out
 }
 
@@ -121,11 +127,13 @@ func Parse(source string) (*Node, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	root := &Node{Type: ElementNode, Name: "#document"}
 	stack := []*Node{root}
 
 	for _, t := range tok {
 		top := stack[len(stack)-1]
+
 		switch t.kind {
 		case tokDoctype:
 			top.Children = append(top.Children, &Node{Type: DoctypeNode, Text: t.data})
@@ -135,14 +143,18 @@ func Parse(source string) (*Node, error) {
 			if len(t.data) == 0 {
 				continue
 			}
+
 			data := UnescapeEntities(t.data)
+
 			if len(top.Children) > 0 {
 				last := top.Children[len(top.Children)-1]
 				if last.Type == TextNode {
 					last.Text += data
+
 					continue
 				}
 			}
+
 			node := &Node{Type: TextNode, Text: data}
 			node.Parent = top
 			top.Children = append(top.Children, node)
@@ -155,18 +167,23 @@ func Parse(source string) (*Node, error) {
 				if openInStack(stack, name) {
 					continue
 				}
+
 				if existing := findImplicit(top, name); existing != nil {
 					stack = append(stack, existing)
+
 					continue
 				}
 			}
+
 			closedCell := false
+
 			for len(stack) > 1 {
 				openName := stack[len(stack)-1].Name
 				if shouldAutoClose(openName, name) {
 					if openName == "td" || openName == "th" {
 						closedCell = true
 					}
+
 					stack = stack[:len(stack)-1]
 				} else {
 					break
@@ -178,31 +195,39 @@ func Parse(source string) (*Node, error) {
 					stack = stack[:len(stack)-1]
 				}
 			}
+
 			top = stack[len(stack)-1]
 			node := &Node{Type: ElementNode, Name: name, Attrs: map[string]string{}}
+
 			for i := 0; i+1 < len(t.attrs); i += 2 {
 				key := strings.ToLower(t.attrs[i])
 				val := UnescapeEntities(t.attrs[i+1])
+
 				if _, dup := node.Attrs[key]; !dup {
 					node.Attrs[key] = val
 				}
 			}
+
 			top.Children = append(top.Children, node)
 			node.Parent = top
+
 			if t.selfClosing || voidElements[name] {
 				continue // no child content
 			}
+
 			stack = append(stack, node)
 		case tokEnd:
 			name := strings.ToLower(t.data)
 			for i := len(stack) - 1; i > 0; i-- {
 				if stack[i].Name == name {
 					stack = stack[:i]
+
 					break
 				}
 			}
 		}
 	}
+
 	return root, nil
 }
 
@@ -214,6 +239,7 @@ func ParseDocument(body []byte) (*Node, error) {
 	if strings.HasPrefix(s, "\ufeff") { // BOM, mirroring load.IsHTML
 		s = s[1:]
 	}
+
 	return Parse(s)
 }
 
@@ -224,6 +250,7 @@ func openInStack(stack []*Node, name string) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -235,6 +262,7 @@ func findImplicit(top *Node, name string) *Node {
 			return c
 		}
 	}
+
 	return nil
 }
 
@@ -246,6 +274,7 @@ func shouldAutoClose(open, next string) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -270,22 +299,29 @@ type token struct {
 // tokenize scans raw HTML into tokens without parsing structure.
 func tokenize(src string) ([]token, error) {
 	var toks []token
+
 	i := 0
 	n := len(src)
+
 	for i < n {
 		if src[i] != '<' {
 			j := strings.IndexByte(src[i:], '<')
 			if j < 0 {
 				j = n - i
 			}
+
 			toks = append(toks, token{kind: tokText, data: src[i : i+j]})
 			i += j
+
 			continue
 		}
+
 		if i+1 >= n {
 			toks = append(toks, token{kind: tokText, data: "<"})
+
 			break
 		}
+
 		switch {
 		case src[i+1] == '!':
 			if strings.HasPrefix(src[i:], "<!--") {
@@ -293,17 +329,22 @@ func tokenize(src string) ([]token, error) {
 				if end < 0 {
 					return nil, errors.New("html: unterminated comment")
 				}
+
 				toks = append(toks, token{kind: tokComment, data: src[i+4 : i+4+end]})
 				i += 4 + end + 3
+
 				continue
 			}
+
 			if len(src)-i >= 9 && strings.EqualFold(src[i:i+9], "<!doctype") {
 				end := strings.IndexByte(src[i:], '>')
 				if end < 0 {
 					return nil, errors.New("html: unterminated doctype")
 				}
+
 				toks = append(toks, token{kind: tokDoctype, data: src[i+2 : i+end]})
 				i += end + 1
+
 				continue
 			}
 			// other bogus declaration → skip to >
@@ -311,12 +352,14 @@ func tokenize(src string) ([]token, error) {
 			if end < 0 {
 				return nil, errors.New("html: unterminated declaration")
 			}
+
 			i += end + 1
 		case src[i+1] == '/':
 			end := strings.IndexByte(src[i:], '>')
 			if end < 0 {
 				return nil, errors.New("html: unterminated end tag")
 			}
+
 			name := strings.TrimSpace(src[i+2 : i+end])
 			toks = append(toks, token{kind: tokEnd, data: strings.ToLower(name)})
 			i += end + 1
@@ -325,33 +368,43 @@ func tokenize(src string) ([]token, error) {
 			if end < 0 {
 				return nil, errors.New("html: unterminated processing instruction")
 			}
+
 			i += end + 2
 		default:
 			if !isASCIILetter(src[i+1]) {
 				// bare '<' followed by no valid tag start becomes text
 				toks = append(toks, token{kind: tokText, data: "<"})
 				i++
+
 				continue
 			}
+
 			end, err := tagEnd(src, i)
 			if err != nil {
 				return nil, err
 			}
+
 			if end < 0 {
 				// no closing '>' - treat the rest as text
 				toks = append(toks, token{kind: tokText, data: src[i:]})
 				i = n
+
 				continue
 			}
+
 			tag := src[i+1 : end]
+
 			name, attrs, selfClose, err := parseTag(tag)
 			if err != nil {
 				return nil, err
 			}
+
 			if name == "" {
 				i = end + 1
+
 				continue
 			}
+
 			name = strings.ToLower(name)
 			toks = append(toks, token{kind: tokStart, data: name, attrs: attrs, selfClosing: selfClose})
 			i = end + 1
@@ -361,16 +414,20 @@ func tokenize(src string) ([]token, error) {
 				if !ok {
 					toks = append(toks, token{kind: tokText, data: src[i:]})
 					i = n
+
 					continue
 				}
+
 				if s > i {
 					toks = append(toks, token{kind: tokText, data: src[i:s]})
 				}
+
 				toks = append(toks, token{kind: tokEnd, data: name})
 				i = e + 1
 			}
 		}
 	}
+
 	return toks, nil
 }
 
@@ -381,15 +438,18 @@ func tagEnd(src string, start int) (int, error) {
 		switch src[j] {
 		case '"', '\'':
 			q := src[j]
+
 			k := strings.IndexByte(src[j+1:], q)
 			if k < 0 {
 				return 0, errors.New("html: unterminated attribute value")
 			}
+
 			j += k + 1
 		case '>':
 			return j, nil
 		}
 	}
+
 	return -1, nil
 }
 
@@ -399,19 +459,24 @@ func tagEnd(src string, start int) (int, error) {
 func rawTextEnd(src string, from int, name string) (start, end int, ok bool) {
 	low := strings.ToLower(src)
 	needle := "</" + name
+
 	for {
 		k := strings.Index(low[from:], needle)
 		if k < 0 {
 			return 0, 0, false
 		}
+
 		k += from
+
 		j := k + len(needle)
 		for j < len(src) && isWhitespace(src[j]) {
 			j++
 		}
+
 		if j < len(src) && src[j] == '>' {
 			return k, j, true
 		}
+
 		from = k + 2
 	}
 }
@@ -424,17 +489,23 @@ func parseTag(body string) (string, []string, bool, error) {
 	}
 	// name ends at first whitespace or '/'
 	nameEnd := len(body)
-	for j := 0; j < len(body); j++ {
+
+	for j := range len(body) {
 		if isWhitespace(body[j]) || body[j] == '/' {
 			nameEnd = j
+
 			break
 		}
 	}
+
 	name := body[:nameEnd]
 	selfClose := strings.HasSuffix(body, "/")
+
 	var attrs []string
+
 	rest := strings.TrimSpace(body[nameEnd:])
 	rest = strings.TrimSuffix(rest, "/")
+
 	for rest != "" {
 		rest = strings.TrimLeft(rest, " \t\n\r")
 		if rest == "" {
@@ -445,25 +516,35 @@ func parseTag(body string) (string, []string, bool, error) {
 		for j < len(rest) && rest[j] != '=' && !isWhitespace(rest[j]) {
 			j++
 		}
+
 		key := rest[:j]
 		rest = strings.TrimLeft(rest[j:], " \t\n\r")
+
 		if !strings.HasPrefix(rest, "=") {
 			attrs = append(attrs, key, "")
+
 			continue
 		}
+
 		rest = strings.TrimLeft(rest[1:], " \t\n\r")
+
 		var val string
+
 		if rest == "" {
 			attrs = append(attrs, key, "")
+
 			continue
 		}
+
 		switch rest[0] {
 		case '"', '\'':
 			q := rest[0]
+
 			end := strings.IndexByte(rest[1:], q)
 			if end < 0 {
 				return "", nil, false, errors.New("html: unterminated attribute value")
 			}
+
 			val = rest[1 : end+1]
 			rest = rest[end+2:]
 		default:
@@ -476,8 +557,10 @@ func parseTag(body string) (string, []string, bool, error) {
 				rest = rest[end:]
 			}
 		}
+
 		attrs = append(attrs, key, val)
 	}
+
 	return name, attrs, selfClose, nil
 }
 

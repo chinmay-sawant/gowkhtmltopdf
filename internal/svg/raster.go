@@ -11,6 +11,7 @@ package svg
 import (
 	"bytes"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"image/png"
 	"io"
@@ -31,9 +32,11 @@ func Rasterize(data []byte, maxSide int) (pngBytes []byte, w, h int, err error) 
 	if maxSide <= 0 {
 		maxSide = 512
 	}
+
 	if !looksLikeSVG(data) {
-		return nil, 0, 0, fmt.Errorf("svg: not SVG")
+		return nil, 0, 0, errors.New("svg: not SVG")
 	}
+
 	return rasterizeCanvas(data, maxSide)
 }
 
@@ -57,9 +60,10 @@ func rasterizeCanvas(data []byte, maxSide int) (pngBytes []byte, w, h int, err e
 	if err != nil {
 		return nil, 0, 0, fmt.Errorf("svg canvas: %w", err)
 	}
+
 	cw, ch := c.Size()
 	if cw <= 0 || ch <= 0 {
-		return nil, 0, 0, fmt.Errorf("svg canvas: empty size")
+		return nil, 0, 0, errors.New("svg canvas: empty size")
 	}
 
 	// Intrinsic CSS-pixel size from viewBox / width / height attributes.
@@ -74,20 +78,24 @@ func rasterizeCanvas(data []byte, maxSide int) (pngBytes []byte, w, h int, err e
 			dpmm = float64(targetH) / ch
 		}
 	}
+
 	if dpmm <= 0 {
 		dpmm = 96.0 / 25.4
 	}
 
 	img := rasterizer.Draw(c, canvas.DPMM(dpmm), nil)
 	bounds := img.Bounds()
+
 	pw, ph := bounds.Dx(), bounds.Dy()
 	if pw < 1 || ph < 1 {
-		return nil, 0, 0, fmt.Errorf("svg canvas: zero pixel size")
+		return nil, 0, 0, errors.New("svg canvas: zero pixel size")
 	}
+
 	var buf bytes.Buffer
 	if err := png.Encode(&buf, img); err != nil {
 		return nil, 0, 0, err
 	}
+
 	return buf.Bytes(), pw, ph, nil
 }
 
@@ -99,21 +107,27 @@ func svgCSSPixelSize(data []byte, maxSide int) (int, int) {
 	if vw <= 0 {
 		vw = 100
 	}
+
 	if vh <= 0 {
 		vh = 100
 	}
+
 	scale := 1.0
 	if vw > float64(maxSide) || vh > float64(maxSide) {
 		scale = float64(maxSide) / math.Max(vw, vh)
 	}
+
 	pw := int(math.Ceil(vw * scale))
 	ph := int(math.Ceil(vh * scale))
+
 	if pw < 1 {
 		pw = 1
 	}
+
 	if ph < 1 {
 		ph = 1
 	}
+
 	return pw, ph
 }
 
@@ -123,41 +137,52 @@ func rootSVGSize(data []byte) (vw, vh float64) {
 	dec.Strict = false
 	dec.AutoClose = xml.HTMLAutoClose
 	dec.Entity = xml.HTMLEntity
+
 	for {
 		tok, err := dec.Token()
 		if err == io.EOF {
 			break
 		}
+
 		if err != nil {
 			return 0, 0
 		}
+
 		el, ok := tok.(xml.StartElement)
 		if !ok {
 			continue
 		}
+
 		if strings.ToLower(el.Name.Local) != "svg" {
 			continue
 		}
+
 		attrs := map[string]string{}
 		for _, a := range el.Attr {
 			attrs[strings.ToLower(a.Name.Local)] = a.Value
 		}
+
 		width := parseLen(attrs["width"], 0)
 		height := parseLen(attrs["height"], 0)
+
 		if vb := attrs["viewbox"]; vb != "" {
 			parts := splitNums(vb)
 			if len(parts) >= 4 {
 				vw, vh = parts[2], parts[3]
 			}
 		}
+
 		if vw <= 0 {
 			vw = width
 		}
+
 		if vh <= 0 {
 			vh = height
 		}
+
 		return vw, vh
 	}
+
 	return 0, 0
 }
 
@@ -166,7 +191,9 @@ func looksLikeSVG(data []byte) bool {
 	if strings.HasPrefix(s, "\xef\xbb\xbf") {
 		s = strings.TrimSpace(s[3:])
 	}
+
 	low := strings.ToLower(s)
+
 	return strings.Contains(low, "<svg") || strings.HasPrefix(low, "<?xml")
 }
 
@@ -175,23 +202,29 @@ func parseLen(s string, def float64) float64 {
 	if s == "" {
 		return def
 	}
+
 	s = strings.TrimSuffix(s, "px")
 	s = strings.TrimSuffix(s, "pt")
+
 	f, err := strconv.ParseFloat(strings.TrimSpace(s), 64)
 	if err != nil {
 		return def
 	}
+
 	return f
 }
 
 func splitNums(s string) []float64 {
 	s = strings.ReplaceAll(s, ",", " ")
+
 	var out []float64
+
 	for _, p := range strings.Fields(s) {
 		f, err := strconv.ParseFloat(p, 64)
 		if err == nil {
 			out = append(out, f)
 		}
 	}
+
 	return out
 }

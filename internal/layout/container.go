@@ -16,15 +16,18 @@ func findSizeContainer(n *html.Node, name string, containers map[*html.Node]size
 		if !ok {
 			continue
 		}
+
 		if name == "" {
 			return info, true
 		}
+
 		for _, nm := range strings.Fields(info.names) {
 			if nm == name {
 				return info, true
 			}
 		}
 	}
+
 	return sizeContainer{}, false
 }
 
@@ -34,15 +37,18 @@ func findSizeContainer(n *html.Node, name string, containers map[*html.Node]size
 // contribution), matching buildBlock's definite-width rules.
 func measureSizeContainers(root *html.Node, styles map[*html.Node]ResolvedStyle, viewportW float64) map[*html.Node]sizeContainer {
 	out := map[*html.Node]sizeContainer{}
+
 	var walk func(n *html.Node, availW float64)
 	walk = func(n *html.Node, availW float64) {
 		if n.Type != html.ElementNode {
 			return
 		}
+
 		st := styles[n]
 		if st.Display == "none" {
 			return
 		}
+
 		borderW := contentInlineSize(st, availW)
 		if st.ContainerType == "inline-size" || st.ContainerType == "size" {
 			out[n] = sizeContainer{
@@ -51,12 +57,14 @@ func measureSizeContainers(root *html.Node, styles map[*html.Node]ResolvedStyle,
 				names:      st.ContainerName,
 			}
 		}
+
 		childAvail := borderW
 		for _, c := range n.Children {
 			walk(c, childAvail)
 		}
 	}
 	walk(root, viewportW)
+
 	return out
 }
 
@@ -68,14 +76,18 @@ func contentInlineSize(st ResolvedStyle, availW float64) float64 {
 	if st.MarginLeftAuto {
 		ml = 0
 	}
+
 	if st.MarginRightAuto {
 		mr = 0
 	}
+
 	w := availW - ml - mr
 	if w < 0 {
 		w = 0
 	}
+
 	definiteW := st.Width >= 0 || st.WidthPercent >= 0
+
 	if st.WidthPercent >= 0 {
 		if availW > 0 && availW < 1e12 {
 			w = availW * st.WidthPercent / 100
@@ -85,19 +97,24 @@ func contentInlineSize(st ResolvedStyle, availW float64) float64 {
 	} else if st.Width >= 0 {
 		w = st.Width
 	}
+
 	if definiteW && st.BoxSizing != "border-box" {
 		w += st.PaddingLeft + st.PaddingRight + st.BorderLeft.Width + st.BorderRight.Width
 	}
+
 	if st.MinWidth > 0 && w < st.MinWidth {
 		w = st.MinWidth
 	}
+
 	if st.MaxWidth >= 0 && w > st.MaxWidth {
 		w = st.MaxWidth
 	}
+
 	contentW := w - st.PaddingLeft - st.PaddingRight - st.BorderLeft.Width - st.BorderRight.Width
 	if contentW < 0 {
 		contentW = 0
 	}
+
 	return contentW
 }
 

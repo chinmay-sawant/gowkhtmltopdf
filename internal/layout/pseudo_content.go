@@ -15,30 +15,39 @@ func (e *engine) pseudoContent(n *html.Node, pe string) string {
 	if e == nil || n == nil || (pe != "before" && pe != "after") {
 		return ""
 	}
+
 	type hit struct {
 		value          string
 		a, b, c, order int
 		important      bool
 	}
+
 	var best *hit
+
 	better := func(h hit) bool {
 		if best == nil {
 			return true
 		}
+
 		if h.important != best.important {
 			return h.important
 		}
+
 		if h.a != best.a {
 			return h.a > best.a
 		}
+
 		if h.b != best.b {
 			return h.b > best.b
 		}
+
 		if h.c != best.c {
 			return h.c > best.c
 		}
+
 		return h.order >= best.order
 	}
+
 	media := e.opts.Media
 	if media == "" {
 		media = "print"
@@ -63,6 +72,7 @@ func (e *engine) pseudoContent(n *html.Node, pe string) string {
 			if !strings.EqualFold(d.Prop, "content") {
 				continue
 			}
+
 			h := hit{value: d.Value, a: rh.a, b: rh.b, c: rh.c, order: rh.r.Order, important: d.Important}
 			if better(h) {
 				hh := h
@@ -70,9 +80,11 @@ func (e *engine) pseudoContent(n *html.Node, pe string) string {
 			}
 		}
 	}
+
 	if best == nil {
 		return ""
 	}
+
 	return parseContentValue(best.value, n)
 }
 
@@ -82,6 +94,7 @@ func (e *engine) pseudoContent(n *html.Node, pe string) string {
 func parseContentValue(v string, n *html.Node) string {
 	v = strings.TrimSpace(v)
 	low := strings.ToLower(v)
+
 	if low == "none" || low == "normal" || v == "" {
 		return ""
 	}
@@ -92,33 +105,43 @@ func parseContentValue(v string, n *html.Node) string {
 			return decodeCSSString(v[1 : len(v)-1])
 		}
 	}
+
 	var b strings.Builder
+
 	i := 0
 	for i < len(v) {
 		for i < len(v) && (v[i] == ' ' || v[i] == '\t' || v[i] == '\n' || v[i] == '\r') {
 			i++
 		}
+
 		if i >= len(v) {
 			break
 		}
+
 		c := v[i]
 		if c == '"' || c == '\'' {
 			j := i + 1
 			for j < len(v) {
 				if v[j] == '\\' && j+1 < len(v) {
 					j += 2
+
 					continue
 				}
+
 				if v[j] == c {
 					break
 				}
+
 				j++
 			}
+
 			if j < len(v) {
 				b.WriteString(decodeCSSString(v[i+1 : j]))
 				i = j + 1
+
 				continue
 			}
+
 			break
 		}
 		// attr(name) or attr(name, …) — only the attribute name is used.
@@ -126,6 +149,7 @@ func parseContentValue(v string, n *html.Node) string {
 			start := i + len("attr(")
 			depth := 1
 			j := start
+
 			for j < len(v) && depth > 0 {
 				if v[j] == '(' {
 					depth++
@@ -135,22 +159,28 @@ func parseContentValue(v string, n *html.Node) string {
 						break
 					}
 				}
+
 				j++
 			}
+
 			arg := strings.TrimSpace(v[start:j])
 			// First token is the attribute name (ignore type/fallback args).
 			name := arg
 			if sp := strings.IndexAny(arg, " \t,"); sp >= 0 {
 				name = arg[:sp]
 			}
+
 			name = strings.Trim(name, `"'`)
 			if n != nil && name != "" {
 				b.WriteString(n.Attribute(name))
 			}
+
 			if j < len(v) && v[j] == ')' {
 				j++
 			}
+
 			i = j
+
 			continue
 		}
 		// Skip unknown function tokens: counter(...), counters(...), url(...).
@@ -158,15 +188,19 @@ func parseContentValue(v string, n *html.Node) string {
 			// function name
 			k := i + j + 1
 			depth := 1
+
 			for k < len(v) && depth > 0 {
 				if v[k] == '(' {
 					depth++
 				} else if v[k] == ')' {
 					depth--
 				}
+
 				k++
 			}
+
 			i = k
+
 			continue
 		}
 		// Bare ident (open-quote, etc.) — skip one word.
@@ -175,11 +209,15 @@ func parseContentValue(v string, n *html.Node) string {
 			for j < len(v) && isIdentCont(v[j]) {
 				j++
 			}
+
 			i = j
+
 			continue
 		}
+
 		i++
 	}
+
 	return b.String()
 }
 
@@ -193,30 +231,39 @@ func isIdentCont(c byte) bool {
 
 func decodeCSSString(s string) string {
 	var b strings.Builder
+
 	for i := 0; i < len(s); i++ {
 		if s[i] != '\\' || i+1 >= len(s) {
 			b.WriteByte(s[i])
+
 			continue
 		}
+
 		i++
 		if isHex(s[i]) {
 			j := i
 			for j < len(s) && j-i < 6 && isHex(s[j]) {
 				j++
 			}
+
 			var code int
+
 			fmt.Sscanf(s[i:j], "%x", &code)
+
 			if code != 0 {
 				b.WriteRune(rune(code))
 			}
+
 			i = j
 			if i < len(s) && (s[i] == ' ' || s[i] == '\t' || s[i] == '\n' || s[i] == '\r' || s[i] == '\f') {
 				// skip one whitespace terminator after hex escape
 			} else {
 				i--
 			}
+
 			continue
 		}
+
 		switch s[i] {
 		case 'n':
 			b.WriteByte('\n')
@@ -228,6 +275,7 @@ func decodeCSSString(s string) string {
 			b.WriteByte(s[i])
 		}
 	}
+
 	return b.String()
 }
 

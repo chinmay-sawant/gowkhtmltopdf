@@ -2,7 +2,6 @@ package convert
 
 import (
 	"bytes"
-	"context"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -54,15 +53,18 @@ func isHFCompanionHTML(name string) bool {
 // does not match the corpus convention.
 func fixtureIDPrefix(file string) string {
 	base := strings.TrimSuffix(filepath.Base(file), ".html")
+
 	parts := strings.SplitN(base, "-", 3)
 	if len(parts) < 2 || parts[0] != "fixture" {
 		return ""
 	}
+
 	for _, c := range parts[1] {
 		if c < '0' || c > '9' {
 			return ""
 		}
 	}
+
 	return parts[0] + "-" + parts[1]
 }
 
@@ -74,11 +76,13 @@ func attachHFCompanions(cmd *cli.Command, dir, file string) {
 	if prefix == "" || isHFCompanionHTML(file) {
 		return
 	}
+
 	header := filepath.Join(dir, prefix+"-header.html")
 	if _, err := os.Stat(header); err == nil {
 		cmd.Global.Header.HTMLURL = header
 		cmd.Global.Margin.Top = -1
 	}
+
 	footer := filepath.Join(dir, prefix+"-footer.html")
 	if _, err := os.Stat(footer); err == nil {
 		cmd.Global.Footer.HTMLURL = footer
@@ -96,22 +100,27 @@ func attachHFCompanions(cmd *cli.Command, dir, file string) {
 func commandForFixture(t *testing.T, file string) *cli.Command {
 	t.Helper()
 	dir := t.TempDir()
+
 	entries, err := os.ReadDir(goldenDir())
 	if err != nil {
 		t.Fatalf("read golden dir: %v", err)
 	}
+
 	for _, e := range entries {
 		if e.IsDir() {
 			continue
 		}
+
 		content, err := os.ReadFile(goldenPath(e.Name()))
 		if err != nil {
 			t.Fatalf("read %s: %v", e.Name(), err)
 		}
+
 		if err := os.WriteFile(filepath.Join(dir, e.Name()), content, 0o644); err != nil {
 			t.Fatalf("write %s: %v", e.Name(), err)
 		}
 	}
+
 	obj := settings.DefaultPdfObject()
 	obj.Page = filepath.Join(dir, file)
 	obj.Load.BlockLocalFileAccess = false
@@ -133,11 +142,14 @@ func commandForFixture(t *testing.T, file string) *cli.Command {
 	if _, err := os.Stat("/usr/share/fonts/truetype/droid"); err == nil {
 		fontDirs = append(fontDirs, "/usr/share/fonts/truetype/droid")
 	}
+
 	testFonts := filepath.Join("..", "..", "testdata", "fonts")
 	if _, err := os.Stat(testFonts); err == nil {
 		fontDirs = append(fontDirs, testFonts)
 	}
+
 	cmd.Global.FontPaths = fontDirs
+
 	return cmd
 }
 
@@ -146,14 +158,18 @@ func commandForFixture(t *testing.T, file string) *cli.Command {
 // byte offset printed just before %%EOF.
 func assertPDFStructure(t *testing.T, data []byte) {
 	t.Helper()
+
 	if !bytes.HasPrefix(data, []byte("%PDF-")) {
 		t.Fatalf("output does not start with %%PDF-")
 	}
+
 	trimmed := bytes.TrimRight(data, "\r\n")
 	if !bytes.HasSuffix(trimmed, []byte("%%EOF")) {
 		t.Errorf("output does not end with %%EOF")
+
 		return
 	}
+
 	lines := bytes.Split(trimmed, []byte("\n"))
 	if len(lines) < 2 {
 		t.Fatalf("trailer has %d lines, want at least 2", len(lines))
@@ -163,11 +179,14 @@ func assertPDFStructure(t *testing.T, data []byte) {
 	off, err := strconv.ParseInt(offsetLine, 10, 64)
 	if err != nil {
 		t.Errorf("line before %%EOF is %q, want a decimal xref offset", offsetLine)
+
 		return
 	}
+
 	if off < 0 || off >= int64(len(data)) {
 		t.Fatalf("xref offset %d out of range (output length %d)", off, len(data))
 	}
+
 	if !bytes.HasPrefix(data[off:], []byte("xref")) {
 		t.Errorf("bytes at xref offset %d start with %q, want \"xref\"", off, data[off:off+4])
 	}
@@ -182,6 +201,7 @@ func TestGoldenCorpus(t *testing.T) {
 			if n := pageCount(data); n < tc.minPages {
 				t.Errorf("pages = %d, want >= %d", n, tc.minPages)
 			}
+
 			if !bytes.Contains(data, []byte("/FontFile2")) {
 				t.Error("expected embedded subset font (/FontFile2)")
 			}
@@ -254,15 +274,19 @@ var fixturePageBounds = map[string]fixtureBounds{
 // with a DOCTYPE and its opening comment header names the fixture.
 func fixtureHeaderOK(t *testing.T, file string, data []byte) {
 	t.Helper()
+
 	name := strings.TrimSuffix(file, ".html")
+
 	lines := strings.Split(string(data), "\n")
 	if len(lines) > 6 {
 		lines = lines[:6]
 	}
+
 	head := strings.Join(lines, "\n")
 	if !strings.HasPrefix(head, "<!DOCTYPE html>") {
 		t.Errorf("fixture %s must start with a DOCTYPE", file)
 	}
+
 	if !strings.Contains(head, "<!--") || !strings.Contains(head, name) {
 		t.Errorf("fixture %s: opening comment header must name the fixture (found %q)", file, head)
 	}
@@ -279,18 +303,23 @@ func TestGoldenCorpusAllFixtures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read golden dir: %v", err)
 	}
+
 	fixtureCount := 0
+
 	for _, e := range entries {
 		file := e.Name()
 		if e.IsDir() || !strings.HasSuffix(file, ".html") || isHFCompanionHTML(file) {
 			continue
 		}
+
 		fixtureCount++
+
 		t.Run(file, func(t *testing.T) {
 			content, err := os.ReadFile(goldenPath(file))
 			if err != nil {
 				t.Fatalf("read fixture: %v", err)
 			}
+
 			fixtureHeaderOK(t, file, content)
 
 			cmd := commandForFixture(t, file)
@@ -298,27 +327,34 @@ func TestGoldenCorpusAllFixtures(t *testing.T) {
 
 			n := pageCount(data)
 			b := fixturePageBounds[file]
+
 			if n < b.minPages || (b.maxPages > 0 && n > b.maxPages) {
 				t.Errorf("pages = %d, want [%d, %d]", n, b.minPages, b.maxPages)
 			}
+
 			if !bytes.Contains(data, []byte("/FontFile2")) {
 				t.Error("expected embedded subset font (/FontFile2)")
 			}
+
 			if b.images && !bytes.Contains(data, []byte("/Subtype /Image")) {
 				t.Error("expected an embedded image xobject (/Subtype /Image)")
 			}
+
 			if b.uris && !bytes.Contains(data, []byte("/S /URI")) {
 				t.Error("expected a URI link annotation (/S /URI)")
 			}
+
 			if file == "fixture-27-cjk-fontpath.html" && bytes.Contains(data, []byte("NotoSansKR")) {
 				// Hangul subset on testdata/fonts — prove Type0 path for KR glyphs.
 				if !bytes.Contains(data, []byte("/Subtype /Type0")) {
 					t.Error("fixture-27: expected Type0 font when NotoSansKR is embedded")
 				}
 			}
+
 			assertPDFStructure(t, data)
 		})
 	}
+
 	if fixtureCount < 20 {
 		t.Errorf("golden corpus has %d html fixtures, want >= 20", fixtureCount)
 	}
@@ -331,19 +367,24 @@ func TestGoldenFixture03Performance(t *testing.T) {
 	if testing.Short() {
 		t.Skip("perf budget test skipped in -short mode")
 	}
+
 	cmd := commandForFixture(t, "fixture-03-multi-page-invoice.html")
 
-	ctx := context.Background()
+	ctx := t.Context()
 	loader := load.NewLoader(cmd.Global.Load)
+
 	res, err := loader.Load(ctx, cmd.Objects[0].Page, cmd.Objects[0].Load)
 	if err != nil {
 		t.Fatalf("load fixture: %v", err)
 	}
+
 	root, err := html.ParseDocument(res.Body)
 	if err != nil {
 		t.Fatalf("parse fixture: %v", err)
 	}
+
 	sheets := collectStyleSheets(root)
+
 	font, err := pdf.DefaultFont()
 	if err != nil {
 		t.Fatalf("default font: %v", err)
@@ -354,12 +395,15 @@ func TestGoldenFixture03Performance(t *testing.T) {
 	if err != nil {
 		t.Fatalf("page size: %v", err)
 	}
+
 	const mm = 72.0 / 25.4
+
 	m := settings.DefaultMargins()
 	contentW := pageW - (m.Left+m.Right)*mm
 	contentH := pageH - (m.Top+m.Bottom)*mm
 
 	layoutStart := time.Now()
+
 	lres, err := layout.Layout(root, layout.Options{
 		Width:      contentW,
 		Height:     contentH,
@@ -371,9 +415,11 @@ func TestGoldenFixture03Performance(t *testing.T) {
 	if err != nil {
 		t.Fatalf("layout: %v", err)
 	}
+
 	layoutDur := time.Since(layoutStart)
 
 	paintStart := time.Now()
+
 	doc := pdf.NewDocument()
 	if err := layout.Paint(doc, lres, layout.PaintOptions{
 		PageWidth:    pageW,
@@ -385,10 +431,12 @@ func TestGoldenFixture03Performance(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("paint: %v", err)
 	}
+
 	paintDur := time.Since(paintStart)
 
 	total := layoutDur + paintDur
 	t.Logf("fixture-03 layout+paint: layout=%v paint=%v total=%v", layoutDur, paintDur, total)
+
 	if total >= 2*time.Second {
 		t.Errorf("layout+paint took %v, want < 2s", total)
 	}
@@ -397,27 +445,34 @@ func TestGoldenFixture03Performance(t *testing.T) {
 // collectStyleSheets extracts inline <style> blocks from the fixture's head.
 func collectStyleSheets(root *html.Node) []*css.Stylesheet {
 	var sheets []*css.Stylesheet
+
 	var walk func(n *html.Node)
 	walk = func(n *html.Node) {
 		if n.Type != html.ElementNode {
 			return
 		}
+
 		if n.Name == "style" {
 			var sb strings.Builder
+
 			for _, c := range n.Children {
 				if c.Type == html.TextNode {
 					sb.WriteString(c.Text)
 				}
 			}
+
 			if s, err := css.Parse(sb.String()); err == nil && s != nil {
 				sheets = append(sheets, s)
 			}
+
 			return
 		}
+
 		for _, c := range n.Children {
 			walk(c)
 		}
 	}
 	walk(root)
+
 	return sheets
 }

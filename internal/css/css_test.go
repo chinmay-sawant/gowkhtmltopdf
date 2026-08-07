@@ -10,10 +10,12 @@ import (
 
 func mustSheet(t *testing.T, src string) *Stylesheet {
 	t.Helper()
+
 	s, err := Parse(src)
 	if err != nil {
 		t.Fatalf("Parse(%q): %v", src, err)
 	}
+
 	return s
 }
 
@@ -22,16 +24,20 @@ func TestParseBasic(t *testing.T) {
 	if len(s.Rules) != 1 {
 		t.Fatalf("got %d rules, want 1", len(s.Rules))
 	}
+
 	r := s.Rules[0]
 	if len(r.Selectors) != 1 || r.Selectors[0].Parts[0].Tag != "p" {
 		t.Fatalf("selectors = %+v", r.Selectors)
 	}
+
 	if len(r.Decls) != 2 {
 		t.Fatalf("decls = %+v", r.Decls)
 	}
+
 	if r.Decls[0].Prop != "color" || r.Decls[0].Value != "red" {
 		t.Errorf("decl 0 = %+v", r.Decls[0])
 	}
+
 	if r.Decls[1].Prop != "font-size" || r.Decls[1].Value != "12pt" {
 		t.Errorf("decl 1 = %+v", r.Decls[1])
 	}
@@ -42,6 +48,7 @@ func TestParseSelectorLists(t *testing.T) {
 	if len(s.Rules) != 1 || len(s.Rules[0].Selectors) != 3 {
 		t.Fatalf("rules = %+v", s.Rules)
 	}
+
 	for i, tag := range []string{"h1", "h2", "*"} {
 		got := s.Rules[0].Selectors[i].Parts[0].Tag
 		if got != tag {
@@ -61,6 +68,7 @@ func TestParseCommentsAndGarbage(t *testing.T) {
 	if len(s.Rules) != 2 {
 		t.Fatalf("got %d rules, want 2: %+v", len(s.Rules), s.Rules)
 	}
+
 	if len(s.Rules[1].Decls) != 1 {
 		t.Errorf("p decls = %+v", s.Rules[1].Decls)
 	}
@@ -68,13 +76,16 @@ func TestParseCommentsAndGarbage(t *testing.T) {
 
 func TestParseImportant(t *testing.T) {
 	s := mustSheet(t, "p { color: red !important; margin: 0 ! IMPORTANT }")
+
 	d := s.Rules[0].Decls
 	if len(d) != 2 || !d[0].Important || !d[1].Important {
 		t.Fatalf("decls = %+v", d)
 	}
+
 	if d[0].Value != "red" || d[1].Value != "0" {
 		t.Errorf("values not stripped: %+v", d)
 	}
+
 	if !isImportant("red !important") || isImportant("red") {
 		t.Errorf("isImportant broken")
 	}
@@ -91,6 +102,7 @@ func TestParseMedia(t *testing.T) {
 	if len(s.Rules) != 5 {
 		t.Fatalf("got %d rules: %+v", len(s.Rules), s.Rules)
 	}
+
 	want := []string{"print", "screen", "screen and (max-width: 600px)", "all", "all"}
 	for i, w := range want {
 		if s.Rules[i].Media != w {
@@ -110,9 +122,11 @@ func TestParseAtRulesSkipped(t *testing.T) {
 	if len(s.Rules) != 1 || s.Rules[0].Selectors[0].Parts[0].Tag != "p" {
 		t.Fatalf("rules = %+v", s.Rules)
 	}
+
 	if len(s.FontFaces) != 1 || s.FontFaces[0].Family != "X" {
 		t.Fatalf("font-faces = %+v", s.FontFaces)
 	}
+
 	urls := FontFaceURLs(s.FontFaces[0].Src)
 	if len(urls) != 1 || urls[0] != "x.woff" {
 		t.Fatalf("font-face urls = %v", urls)
@@ -124,6 +138,7 @@ func TestParseOrderAndNestedMediaOrder(t *testing.T) {
 	if len(s.Rules) != 3 {
 		t.Fatalf("rules = %+v", s.Rules)
 	}
+
 	for i, want := range []int{0, 1, 2} {
 		if s.Rules[i].Order != want {
 			t.Errorf("rule %d order = %d, want %d", i, s.Rules[i].Order, want)
@@ -154,6 +169,7 @@ func TestParseNeverPanics(t *testing.T) {
 			// unbalanced braces may error; that is fine as long as nothing panics
 			continue
 		}
+
 		_ = s
 	}
 }
@@ -171,6 +187,7 @@ func TestParseInline(t *testing.T) {
 	if len(d) != 2 {
 		t.Fatalf("decls = %+v", d)
 	}
+
 	if d[0].Prop != "color" || d[1].Prop != "font-size" || !d[1].Important {
 		t.Errorf("decls = %+v", d)
 	}
@@ -203,12 +220,16 @@ func TestParseSelectorCompounds(t *testing.T) {
 		sel, ok := parseSelector(tc.src)
 		if !ok {
 			t.Errorf("parseSelector(%q): !ok", tc.src)
+
 			continue
 		}
+
 		if len(sel.Parts) != len(tc.want) {
 			t.Errorf("parseSelector(%q): %d parts, want %d: %+v", tc.src, len(sel.Parts), len(tc.want), sel.Parts)
+
 			continue
 		}
+
 		for i := range tc.want {
 			got, want := sel.Parts[i], tc.want[i]
 			if got.Tag != want.Tag || got.ID != want.ID || got.Combinator != want.Combinator ||
@@ -221,10 +242,12 @@ func TestParseSelectorCompounds(t *testing.T) {
 
 func treeFor(t *testing.T, src string) *html.Node {
 	t.Helper()
+
 	root, err := html.Parse(src)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	return root
 }
 
@@ -240,14 +263,17 @@ func TestMatch(t *testing.T) {
 	body := root.FirstChild("html").FirstChild("body")
 	div := body.FirstChild("div")
 	ps := []*html.Node{}
+
 	for _, c := range div.Children {
 		if c.Type == html.ElementNode && c.Name == "p" {
 			ps = append(ps, c)
 		}
 	}
+
 	if len(ps) != 2 {
 		t.Fatalf("want 2 <p> in div, got %d", len(ps))
 	}
+
 	note, plain := ps[0], ps[1]
 	bold := div.FirstChild("span").FirstChild("b")
 	second := body.FirstChild("p")
@@ -300,6 +326,7 @@ func TestMatch(t *testing.T) {
 		if !ok {
 			t.Fatalf("parseSelector(%q) failed", tc.sel)
 		}
+
 		if got := Match(sel, tc.node); got != tc.want {
 			t.Errorf("Match(%q) = %v, want %v", tc.sel, got, tc.want)
 		}
@@ -315,16 +342,19 @@ func TestLinkVisitedPseudos(t *testing.T) {
 	</body></html>`)
 	p := root.FirstChild("html").FirstChild("body").FirstChild("p")
 	byID := map[string]*html.Node{}
+
 	for _, c := range p.Children {
 		if c.Type == html.ElementNode && c.Name == "a" {
 			byID[c.Attribute("id")] = c
 		}
 	}
+
 	for _, id := range []string{"ext", "frag", "empty", "bare"} {
 		if byID[id] == nil {
 			t.Fatalf("missing #%s", id)
 		}
 	}
+
 	cases := []struct {
 		sel  string
 		id   string
@@ -345,6 +375,7 @@ func TestLinkVisitedPseudos(t *testing.T) {
 		if !ok {
 			t.Fatalf("parseSelector(%q) failed", tc.sel)
 		}
+
 		if got := Match(sel, byID[tc.id]); got != tc.want {
 			t.Errorf("Match(%q, #%s) = %v, want %v", tc.sel, tc.id, got, tc.want)
 		}
@@ -354,15 +385,19 @@ func TestLinkVisitedPseudos(t *testing.T) {
 	if !ok {
 		t.Fatal("parse a")
 	}
+
 	sl, ok := parseSelector("a:link")
 	if !ok {
 		t.Fatal("parse a:link")
 	}
+
 	_, ba, ca := Specificity(sa)
 	_, bl, cl := Specificity(sl)
+
 	if !(bl > ba || (bl == ba && cl >= ca)) {
 		t.Fatalf("a:link specificity (%d,%d) should outrank a (%d,%d) on b-axis", bl, cl, ba, ca)
 	}
+
 	if bl < 1 {
 		t.Fatalf("a:link b-specificity = %d, want >= 1", bl)
 	}
@@ -375,16 +410,20 @@ func TestRootPseudo(t *testing.T) {
 	htmlEl := doc.FirstChild("html")
 	body := htmlEl.FirstChild("body")
 	p := body.FirstChild("p")
+
 	sel, ok := parseSelector(":root")
 	if !ok {
 		t.Fatal("parseSelector(:root) failed")
 	}
+
 	if Match(sel, doc) {
 		t.Fatal(":root must not match synthetic #document")
 	}
+
 	if !Match(sel, htmlEl) {
 		t.Fatal(":root must match <html>")
 	}
+
 	if Match(sel, body) || Match(sel, p) {
 		t.Fatal(":root must not match body or p")
 	}
@@ -393,6 +432,7 @@ func TestRootPseudo(t *testing.T) {
 	if !ok {
 		t.Fatal("parseSelector(html:root) failed")
 	}
+
 	if !Match(sel2, htmlEl) {
 		t.Fatal("html:root must match <html>")
 	}
@@ -406,25 +446,31 @@ func TestAttrWordAndSubstring(t *testing.T) {
 	body := root.FirstChild("html").FirstChild("body")
 	f1 := body.FirstChild("figure")
 	f2 := f1
+
 	for _, c := range body.Children {
 		if c.Type == html.ElementNode && c.Attribute("id") == "f2" {
 			f2 = c
 		}
 	}
+
 	sel, ok := parseSelector(`figure[typeof~="mw:File/Thumb"]`)
 	if !ok {
 		t.Fatal("parse ~=")
 	}
+
 	if !Match(sel, f1) {
 		t.Error("f1 should match typeof~=mw:File/Thumb")
 	}
+
 	if Match(sel, f2) {
 		t.Error("f2 Frame should not match Thumb word")
 	}
+
 	sel2, ok := parseSelector(`figure[typeof*="File/Fr"]`)
 	if !ok {
 		t.Fatal("parse *=")
 	}
+
 	if !Match(sel2, f2) {
 		t.Error("f2 should match typeof*=File/Fr")
 	}
@@ -441,35 +487,44 @@ func TestAttrPrefixSuffixDash(t *testing.T) {
 	</body></html>`)
 	body := root.FirstChild("html").FirstChild("body")
 	byID := map[string]*html.Node{}
+
 	for _, c := range body.Children {
 		if c.Type == html.ElementNode {
 			byID[c.Attribute("id")] = c
 		}
 	}
+
 	sel, ok := parseSelector(`a[href$=".pdf"]`)
 	if !ok {
 		t.Fatal("parse $=")
 	}
+
 	if !Match(sel, byID["pdf"]) {
 		t.Error("pdf should match href$=.pdf")
 	}
+
 	if Match(sel, byID["png"]) || Match(sel, byID["PDF"]) {
 		t.Error("$= is case-sensitive; png/PDF must not match .pdf")
 	}
+
 	sel2, ok := parseSelector(`a[href^="/files/"]`)
 	if !ok {
 		t.Fatal("parse ^=")
 	}
+
 	if !Match(sel2, byID["pdf"]) || Match(sel2, byID["en"]) {
 		t.Error("^= /files/ should match pdf links only")
 	}
+
 	sel3, ok := parseSelector(`[lang|="en"]`)
 	if !ok {
 		t.Fatal("parse |=")
 	}
+
 	if !Match(sel3, byID["en"]) || !Match(sel3, byID["enus"]) {
 		t.Error("|=en should match en and en-US")
 	}
+
 	if Match(sel3, byID["fr"]) {
 		t.Error("fr should not match lang|=en")
 	}
@@ -478,11 +533,14 @@ func TestAttrPrefixSuffixDash(t *testing.T) {
 func TestSiblingCombinators(t *testing.T) {
 	root := treeFor(t, `<html><body><div><p id="a">A</p><span>x</span><p id="b">B</p><p id="c">C</p></div></body></html>`)
 	div := root.FirstChild("html").FirstChild("body").FirstChild("div")
+
 	var a, b, c *html.Node
+
 	for _, ch := range div.Children {
 		if ch.Type != html.ElementNode || ch.Name != "p" {
 			continue
 		}
+
 		switch ch.Attribute("id") {
 		case "a":
 			a = ch
@@ -492,6 +550,7 @@ func TestSiblingCombinators(t *testing.T) {
 			c = ch
 		}
 	}
+
 	if a == nil || b == nil || c == nil {
 		t.Fatal("missing siblings")
 	}
@@ -501,19 +560,24 @@ func TestSiblingCombinators(t *testing.T) {
 	if !ok {
 		t.Fatal("parse")
 	}
+
 	if Match(sel, b) {
 		t.Error("p+p should not match b (previous element is span)")
 	}
+
 	if !Match(sel, c) {
 		t.Error("p+p should match c")
 	}
+
 	sel, ok = parseSelector("p ~ p")
 	if !ok {
 		t.Fatal("parse ~")
 	}
+
 	if !Match(sel, b) || !Match(sel, c) {
 		t.Error("p~p should match b and c")
 	}
+
 	if Match(sel, a) {
 		t.Error("p~p should not match first p")
 	}
@@ -537,6 +601,7 @@ func TestSpecificity(t *testing.T) {
 		if !ok {
 			t.Fatalf("parseSelector(%q) failed", tc.sel)
 		}
+
 		a, b, c := Specificity(sel)
 		if a != tc.a || b != tc.b || c != tc.c {
 			t.Errorf("Specificity(%q) = (%d,%d,%d), want (%d,%d,%d)", tc.sel, a, b, c, tc.a, tc.b, tc.c)
@@ -577,6 +642,7 @@ func TestParseNumber(t *testing.T) {
 	if f, ok := ParseNumber("1.4"); !ok || f != 1.4 {
 		t.Errorf("ParseNumber(1.4) = %v, %v", f, ok)
 	}
+
 	if _, ok := ParseNumber("bold"); ok {
 		t.Error("ParseNumber(bold) should fail")
 	}
@@ -618,9 +684,11 @@ func TestParseColor(t *testing.T) {
 func TestParseFontFamily(t *testing.T) {
 	got := ParseFontFamily(`"Helvetica Neue", Arial, sans-serif`)
 	want := []string{"Helvetica Neue", "Arial", "sans-serif"}
+
 	if len(got) != len(want) {
 		t.Fatalf("got %v, want %v", got, want)
 	}
+
 	for i := range want {
 		if got[i] != want[i] {
 			t.Errorf("family %d = %q, want %q", i, got[i], want[i])
@@ -633,6 +701,7 @@ func TestParseStripCommentsPreservesNewlines(t *testing.T) {
 	if len(s.Rules) != 1 || len(s.Rules[0].Decls) != 1 {
 		t.Fatalf("rules = %+v", s.Rules)
 	}
+
 	if s.Rules[0].Decls[0].Value != "red" {
 		t.Errorf("decl = %+v", s.Rules[0].Decls[0])
 	}
@@ -687,6 +756,7 @@ func TestResolveCustomProps(t *testing.T) {
 		"--c": "10px",
 		"--d": "5px",
 	}
+
 	for k, v := range want {
 		if got[k] != v {
 			t.Errorf("ResolveCustomProps(%q) = %q, want %q", k, got[k], v)
@@ -697,13 +767,16 @@ func TestResolveCustomProps(t *testing.T) {
 func TestResolveCustomPropsInheritedOverlay(t *testing.T) {
 	inherited := map[string]string{"--size": "12px", "--color": "red"}
 	declared := map[string]string{"--size": "14px", "--double": "var(--size)"}
+
 	got := ResolveCustomProps(declared, inherited)
 	if got["--size"] != "14px" {
 		t.Errorf("declared must win over inherited: %q", got["--size"])
 	}
+
 	if got["--color"] != "red" {
 		t.Errorf("inherited-only prop missing: %q", got["--color"])
 	}
+
 	if got["--double"] != "14px" {
 		t.Errorf("chain into overlaid prop: %q", got["--double"])
 	}
@@ -719,6 +792,7 @@ func TestResolveCustomPropsCycle(t *testing.T) {
 	if got["--x"] != "" {
 		t.Errorf("--x cycle = %q, want empty", got["--x"])
 	}
+
 	if got["--y"] != "" {
 		t.Errorf("--y cycle = %q, want empty", got["--y"])
 	}
@@ -733,6 +807,7 @@ func TestResolveCustomPropsDeepChain(t *testing.T) {
 	for i := 1; i <= 20; i++ {
 		declared[fmt.Sprintf("--v%d", i)] = fmt.Sprintf("var(--v%d)", i-1)
 	}
+
 	got := ResolveCustomProps(declared, nil)
 	if got["--v20"] != "final" {
 		t.Errorf("deep chain --v20 = %q, want final", got["--v20"])
@@ -747,6 +822,7 @@ func TestResolveCustomPropsSelfReferenceWithFallback(t *testing.T) {
 		"--a": "var(--a, 9px)",
 		"--b": "var(--a)",
 	}
+
 	got := ResolveCustomProps(declared, nil)
 	if got["--b"] != "9px" {
 		t.Errorf("--b through cyclic --a with fallback = %q, want 9px", got["--b"])
@@ -758,6 +834,7 @@ func TestParseSelectors(t *testing.T) {
 	if !ok || len(sels) != 3 {
 		t.Fatalf("ParseSelectors(h1, h2, .title) = %d sels, ok=%v", len(sels), ok)
 	}
+
 	for i, tag := range []string{"h1", "h2", "*"} {
 		if got := sels[i].Parts[0].Tag; got != tag {
 			t.Errorf("selector %d tag = %q, want %q", i, got, tag)
@@ -776,6 +853,7 @@ func TestParseSelectors(t *testing.T) {
 	if _, ok := ParseSelectors(""); ok {
 		t.Error("ParseSelectors(\"\") must fail")
 	}
+
 	if _, ok := ParseSelectors("  , p"); ok {
 		t.Error("ParseSelectors with empty list item must fail")
 	}

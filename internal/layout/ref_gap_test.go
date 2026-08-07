@@ -23,26 +23,33 @@ ol { margin: 0; padding-left: 24pt; }
 li { page-break-inside: avoid; margin: 0 0 0.4em 0; }
 p { margin: 0.4em 0; }
 `)
+
 	var b strings.Builder
+
 	b.WriteString(`<html><body>`)
 	// Push the list so items straddle multiple page boundaries.
-	for i := 0; i < 28; i++ {
+	for i := range 28 {
 		b.WriteString(fmt.Sprintf(
 			`<p>Filler paragraph %d with enough words to approach the natural page-break zone for list pagination testing.</p>`, i))
 	}
+
 	b.WriteString(`<ol start="1">`)
-	for i := 0; i < 35; i++ {
+
+	for i := range 35 {
 		b.WriteString(fmt.Sprintf(
 			`<li id="r%d">"Citation title number %d with a fairly long path" (https://example.com/article/%d/long-path-name-here). Journal Name. 12 December 2022. Archived from the original. Retrieved 12 December 2022.</li>`,
 			i, i+1, i))
 	}
+
 	b.WriteString(`</ol></body></html>`)
 
 	root, err := html.Parse(b.String())
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	const pageH = 750.0
+
 	res, err := Layout(root, Options{
 		Width: 538, Height: pageH, Sheets: []*css.Stylesheet{s},
 		Media: "print", Background: true,
@@ -50,20 +57,25 @@ p { margin: 0.4em 0; }
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	doc := pdf.NewDocument()
 	po := PaintOptions{PageWidth: 595, PageHeight: pageH + 50, MarginTop: 25, MarginBottom: 25}
+
 	if err := Paint(doc, res, po); err != nil {
 		t.Fatal(err)
 	}
+
 	contentH := pageH // Paint margins subtract from PageHeight; here content = pageH
 
 	// Collect list-item top Y from bullets (decimal markers).
 	var starts []float64
+
 	for _, op := range res.Ops {
 		if op.Kind == OpBullet {
 			starts = append(starts, op.Y)
 		}
 	}
+
 	if len(starts) < 20 {
 		// Fall back to li locations if markers missing.
 		for _, loc := range res.Locations {
@@ -72,6 +84,7 @@ p { margin: 0.4em 0; }
 			}
 		}
 	}
+
 	if len(starts) < 10 {
 		t.Fatalf("expected many list starts, got %d", len(starts))
 	}
@@ -86,12 +99,15 @@ p { margin: 0.4em 0; }
 
 	// Inter-item empty air (next start − prev location bottom) via Locations.
 	type liY struct{ y, h float64 }
+
 	var lis []liY
+
 	for _, loc := range res.Locations {
 		if loc.Node != nil && loc.Node.Name == "li" {
 			lis = append(lis, liY{loc.Y, loc.H})
 		}
 	}
+
 	for i := 0; i < len(lis); i++ {
 		for j := i + 1; j < len(lis); j++ {
 			if lis[j].y < lis[i].y {
@@ -102,10 +118,12 @@ p { margin: 0.4em 0; }
 
 	maxSamePageGap := 0.0
 	bigGaps := 0
+
 	for i := 1; i < len(starts); i++ {
 		if int(starts[i-1]/contentH) != int(starts[i]/contentH) {
 			continue
 		}
+
 		g := starts[i] - starts[i-1]
 		if g > maxSamePageGap {
 			maxSamePageGap = g
@@ -115,6 +133,7 @@ p { margin: 0.4em 0; }
 		// are still too airy vs Chrome.
 		if g > 55 {
 			bigGaps++
+
 			t.Logf("large gap %.1f between items at y=%.1f and y=%.1f (page %d)",
 				g, starts[i-1], starts[i], int(starts[i]/contentH))
 		}
@@ -122,10 +141,12 @@ p { margin: 0.4em 0; }
 
 	maxEmpty := 0.0
 	emptyBig := 0
+
 	for i := 1; i < len(lis); i++ {
 		if int(lis[i].y/contentH) != int(lis[i-1].y/contentH) {
 			continue
 		}
+
 		empty := lis[i].y - (lis[i-1].y + lis[i-1].h)
 		if empty > maxEmpty {
 			maxEmpty = empty
@@ -134,6 +155,7 @@ p { margin: 0.4em 0; }
 		// a line of slack; 2.5 line-heights at 10pt/1.2 ≈ 30pt is the cap.
 		if empty > 30 {
 			emptyBig++
+
 			t.Logf("empty air %.1f between li y=%.1f h=%.1f and y=%.1f",
 				empty, lis[i-1].y, lis[i-1].h, lis[i].y)
 		}
@@ -141,15 +163,19 @@ p { margin: 0.4em 0; }
 
 	t.Logf("list starts=%d maxSamePageGap=%.1f bigGaps>55=%d maxEmpty=%.1f empty>30=%d",
 		len(starts), maxSamePageGap, bigGaps, maxEmpty, emptyBig)
+
 	if maxSamePageGap > 55 {
 		t.Fatalf("cascading avoid-inside gaps: max same-page inter-item start gap %.1f (want ≤55)", maxSamePageGap)
 	}
+
 	if bigGaps > 1 {
 		t.Fatalf("%d same-page inter-item start gaps >55pt (want ≤1)", bigGaps)
 	}
+
 	if maxEmpty > 30 {
 		t.Fatalf("avoid-item empty air: max same-page empty %.1f (want ≤30 ≈ 2.5 line heights)", maxEmpty)
 	}
+
 	if emptyBig > 1 {
 		t.Fatalf("%d same-page empty gaps >30pt (want ≤1)", emptyBig)
 	}

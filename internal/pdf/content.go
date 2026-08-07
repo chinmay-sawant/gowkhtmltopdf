@@ -46,13 +46,16 @@ func appendPDFNum(dst []byte, v float64) []byte {
 	if v == float64(int(v)) {
 		return strconv.AppendInt(dst, int64(int(v)), 10)
 	}
+
 	dst = strconv.AppendFloat(dst, v, 'f', 3, 64)
 	for len(dst) > 0 && dst[len(dst)-1] == '0' {
 		dst = dst[:len(dst)-1]
 	}
+
 	if len(dst) > 0 && dst[len(dst)-1] == '.' {
 		dst = dst[:len(dst)-1]
 	}
+
 	return dst
 }
 
@@ -62,26 +65,32 @@ func appendPDFNum(dst []byte, v float64) []byte {
 func (c *Content) writePDFNums(suffix string, n int, a, b, cc, d, e, f float64) {
 	out := c.buf.AvailableBuffer()
 	out = appendPDFNum(out, a)
+
 	if n > 1 {
 		out = append(out, ' ')
 		out = appendPDFNum(out, b)
 	}
+
 	if n > 2 {
 		out = append(out, ' ')
 		out = appendPDFNum(out, cc)
 	}
+
 	if n > 3 {
 		out = append(out, ' ')
 		out = appendPDFNum(out, d)
 	}
+
 	if n > 4 {
 		out = append(out, ' ')
 		out = appendPDFNum(out, e)
 	}
+
 	if n > 5 {
 		out = append(out, ' ')
 		out = appendPDFNum(out, f)
 	}
+
 	out = append(out, suffix...)
 	_, _ = c.buf.Write(out)
 }
@@ -105,6 +114,7 @@ func cloneContent(c *Content) *Content {
 		doc:       c.doc,
 	}
 	nc.buf.Write(c.buf.Bytes())
+
 	return nc
 }
 
@@ -113,6 +123,7 @@ func cloneStringMap(src map[string]string) map[string]string {
 	for k, v := range src {
 		dst[k] = v
 	}
+
 	return dst
 }
 
@@ -121,6 +132,7 @@ func cloneFontMap(src map[string]*Font) map[string]*Font {
 	for k, v := range src {
 		dst[k] = v
 	}
+
 	return dst
 }
 
@@ -129,19 +141,24 @@ func cloneRuneMap(src map[string][]rune) map[string][]rune {
 	for k, v := range src {
 		dst[k] = append([]rune(nil), v...)
 	}
+
 	return dst
 }
 
 func cloneImageMap(src map[string]*imageResource) map[string]*imageResource {
 	dst := make(map[string]*imageResource, len(src))
+
 	for k, v := range src {
 		if v == nil {
 			dst[k] = nil
+
 			continue
 		}
+
 		copy := *v
 		dst[k] = &copy
 	}
+
 	return dst
 }
 
@@ -160,6 +177,7 @@ func (c *Content) SetFillColor(r, g, b float64) {
 		v := 0.299*r + 0.587*g + 0.114*b // Rec.601 luma
 		r, g, b = v, v, v
 	}
+
 	c.writePDFNums(" rg\n", 3, r, g, b, 0, 0, 0)
 }
 
@@ -170,6 +188,7 @@ func (c *Content) SetStrokeColor(r, g, b float64) {
 		v := 0.299*r + 0.587*g + 0.114*b // Rec.601 luma
 		r, g, b = v, v, v
 	}
+
 	c.writePDFNums(" RG\n", 3, r, g, b, 0, 0, 0)
 }
 
@@ -182,8 +201,10 @@ func (c *Content) SetLineWidth(w float64) {
 func (c *Content) SetOpacity(a float64) {
 	if a >= 1 || a <= 0 {
 		c.opacity = 0
+
 		return
 	}
+
 	c.opacity = a
 	c.buf.WriteString("/opacity gs\n")
 }
@@ -279,67 +300,89 @@ func (c *Content) TextRenderMode(mode int) {
 func (c *Content) TextShow(s string) {
 	f := c.fontFiles[c.curFont]
 	s = ShapeRun(s, f, c.curSize).Text
+
 	if f == nil || !c.textNeedsType0(s) {
 		c.textShowSimple(s)
+
 		return
 	}
+
 	type run struct {
 		s     string
 		type0 bool
 	}
+
 	var runs []run
+
 	var buf strings.Builder
+
 	mode := -1 // -1 unset, 0 simple, 1 type0
 	flush := func() {
 		if buf.Len() == 0 {
 			return
 		}
+
 		runs = append(runs, run{s: buf.String(), type0: mode == 1})
 		buf.Reset()
 	}
+
 	for _, r := range s {
 		has := f.GlyphID(r) != 0
+
 		next := 0
 		if r > 0xFF {
 			next = 1
 		} else if !has {
 			next = 0 // missing Latin on CJK face → Liberation
 		}
+
 		if mode < 0 {
 			mode = next
 		} else if next != mode {
 			flush()
+
 			mode = next
 		}
+
 		buf.WriteRune(r)
 	}
+
 	flush()
 	// Keep the caller's face as the Type0 source. Latin fallback may switch
 	// curFont to FL; Type0 must still subset the original Unicode face, not FL_u.
 	base := strings.TrimSuffix(c.curFont, "_u")
 	size := c.curSize
+
 	for _, rn := range runs {
 		if rn.type0 {
 			if c.curFont != base && c.curFont != base+"_u" {
 				c.SetFont(base, size)
 			}
+
 			c.textShowType0(rn.s)
+
 			continue
 		}
+
 		name := base
+
 		if face := c.fontFiles[base]; face != nil {
 			for _, r := range rn.s {
 				if face.GlyphID(r) == 0 {
 					name = c.ensureLatinFallback()
+
 					break
 				}
 			}
 		}
+
 		if c.curFont != name {
 			c.SetFont(name, size)
 		}
+
 		c.textShowSimple(rn.s)
 	}
+
 	if c.curFont != base {
 		c.SetFont(base, size)
 	}
@@ -350,11 +393,14 @@ func (c *Content) ensureLatinFallback() string {
 	if c.fontFiles[name] != nil {
 		return name
 	}
+
 	lf, err := DefaultFont()
 	if err != nil || lf == nil {
 		return c.curFont
 	}
+
 	c.UseEmbeddedFont(name, lf)
+
 	return name
 }
 
@@ -363,11 +409,14 @@ func (c *Content) textShowSimple(s string) {
 		if r > 0xFF {
 			r = winAnsiFold(r)
 		}
+
 		if r > 0xFF {
 			r = '?'
 		}
+
 		c.used[c.curFont] = append(c.used[c.curFont], r)
 	}
+
 	c.buf.WriteString(pdfString(s) + " Tj\n")
 }
 
@@ -375,34 +424,42 @@ func (c *Content) textNeedsType0(s string) bool {
 	if _, ok := c.fontFiles[c.curFont]; !ok {
 		return false
 	}
+
 	for _, r := range s {
 		if r > 0xFF {
 			r = winAnsiFold(r)
 		}
+
 		if r > 0xFF {
 			return true
 		}
 	}
+
 	return false
 }
 
 func (c *Content) textShowType0(s string) {
 	base := strings.TrimSuffix(c.curFont, "_u")
 	uname := base + "_u"
+
 	if f := c.fontFiles[base]; f != nil {
 		c.UseEmbeddedFont(uname, f)
 	} else if f := c.fontFiles[c.curFont]; f != nil && c.curFont == uname {
 		c.UseEmbeddedFont(uname, f)
 	}
+
 	if c.curFont != uname {
 		c.SetFont(uname, c.curSize)
 	}
+
 	for _, r := range s {
 		if r > 0xFFFF {
 			r = '?'
 		}
+
 		c.used[uname] = append(c.used[uname], r)
 	}
+
 	c.buf.WriteString(pdfHexCIDs(s) + " Tj\n")
 }
 
@@ -410,23 +467,27 @@ func (c *Content) textShowType0(s string) {
 
 // fonts returns the map of font resource name to object ref, allocating the
 // font objects and their dicts lazily. Embedded fonts are subset for the
-// runes used on this content. A font whose subset fails fails the page: text
+// runes used on this content. A font whose subset fails the page: text
 // that names a missing /Resources entry renders invisible, so the error is
 // propagated instead of dropped.
 func (c *Content) fonts() (map[string]string, error) {
 	out := map[string]string{}
+
 	for name := range c.fontUses {
 		f, ok := c.fontFiles[name]
 		if !ok {
 			continue
 		}
+
 		ref, err := c.doc.ensureFont(f, c.used[name])
 		if err != nil {
 			return nil, fmt.Errorf("embed font %s: %w", name, err)
 		}
+
 		c.fontUses[name] = ref.String()
 		out[name] = ref.String()
 	}
+
 	return out, nil
 }
 
@@ -434,11 +495,13 @@ func (c *Content) fonts() (map[string]string, error) {
 // JPEG/PNG paths allocate the XObject eagerly in AddJPEGImage/AddPNGImage.
 func (c *Content) imageResources() map[string]string {
 	out := map[string]string{}
+
 	for name, img := range c.imageRefs {
 		if img.ref != 0 {
 			out[name] = img.ref.String()
 		}
 	}
+
 	return out
 }
 
@@ -447,5 +510,6 @@ func (c *Content) extGState() string {
 	if c.opacity > 0 {
 		return fmt.Sprintf("/ExtGState << /opacity << /CA %s /ca %s >> >>", num(c.opacity), num(c.opacity))
 	}
+
 	return ""
 }

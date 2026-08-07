@@ -44,6 +44,7 @@ func LocalPage(h *Heading) int {
 	if h == nil {
 		return 0
 	}
+
 	return h.Page
 }
 
@@ -54,6 +55,7 @@ func DocumentPage(h *Heading) int {
 	if h == nil {
 		return 0
 	}
+
 	return h.DocPage
 }
 
@@ -74,6 +76,7 @@ func headingLevel(name string) int {
 	case "h6":
 		return 6
 	}
+
 	return 0
 }
 
@@ -82,10 +85,12 @@ func headingLevel(name string) int {
 // are zero until Lookup runs.
 func CollectHeadings(root *html.Node) []*Heading {
 	var out []*Heading
+
 	root.Walk(func(n *html.Node) {
 		if n.Type != html.ElementNode {
 			return
 		}
+
 		if lvl := headingLevel(n.Name); lvl > 0 {
 			out = append(out, &Heading{
 				Node:  n,
@@ -94,6 +99,7 @@ func CollectHeadings(root *html.Node) []*Heading {
 			})
 		}
 	})
+
 	return out
 }
 
@@ -106,15 +112,19 @@ func Lookup(headings []*Heading, locs []layout.ElementLocation) []*Heading {
 	for _, l := range locs {
 		byNode[l.Node] = l
 	}
+
 	out := make([]*Heading, 0, len(headings))
+
 	for _, h := range headings {
 		l, ok := byNode[h.Node]
 		if !ok {
 			continue
 		}
+
 		h.Page, h.X, h.Y, h.W, h.H = l.Page, l.X, l.Y, l.W, l.H
 		out = append(out, h)
 	}
+
 	return out
 }
 
@@ -155,14 +165,17 @@ func SortHeadings(hs []*Heading) {
 // fields. This is the preferred API for flattened multi-object outlines.
 func SortHeadingsBy(hs []*Heading, pageOf PageOf) {
 	pageOf = normalizePageOf(pageOf)
+
 	sort.SliceStable(hs, func(i, j int) bool {
 		a, b := hs[i], hs[j]
 		if pageOf(a) != pageOf(b) {
 			return pageOf(a) < pageOf(b)
 		}
+
 		if a.Y != b.Y {
 			return a.Y < b.Y
 		}
+
 		return a.X < b.X
 	})
 }
@@ -178,22 +191,29 @@ func SectionOf(hs []*Heading, page int) (section, subsection string) {
 // accessor.
 func SectionOfBy(hs []*Heading, page int, pageOf PageOf) (section, subsection string) {
 	pageOf = normalizePageOf(pageOf)
+
 	var first, last *Heading
+
 	for _, h := range hs {
 		if pageOf(h) > page {
 			break
 		}
+
 		if first == nil {
 			first = h
 		}
+
 		last = h
 	}
+
 	if first != nil {
 		section = first.Title
 	}
+
 	if last != nil {
 		subsection = last.Title
 	}
+
 	return section, subsection
 }
 
@@ -217,34 +237,42 @@ func BuildTree(headings []*Heading, opts Options) *Node {
 func BuildTreeBy(headings []*Heading, opts Options, pageOf PageOf) *Node {
 	pageOf = normalizePageOf(pageOf)
 	sel := make([]*Heading, 0, len(headings))
+
 	for _, h := range headings {
 		if matchAny(opts.Exclude, h.Node) {
 			continue
 		}
+
 		sel = append(sel, h)
 	}
+
 	SortHeadingsBy(sel, pageOf)
 
 	root := &Node{}
 	stack := []*Node{root}
 	stackLevel := []int{0}
+
 	for _, h := range sel {
 		lvl := h.Level
 		if lvl > stackLevel[len(stackLevel)-1]+1 {
 			lvl = stackLevel[len(stackLevel)-1] + 1 // clamp non-monotonic jump
 		}
+
 		if opts.MaxDepth > 0 && lvl > opts.MaxDepth {
 			continue
 		}
+
 		for stackLevel[len(stackLevel)-1] >= lvl {
 			stack = stack[:len(stack)-1]
 			stackLevel = stackLevel[:len(stackLevel)-1]
 		}
+
 		n := &Node{Heading: h}
 		stack[len(stack)-1].Children = append(stack[len(stack)-1].Children, n)
 		stack = append(stack, n)
 		stackLevel = append(stackLevel, lvl)
 	}
+
 	return root
 }
 
@@ -252,14 +280,17 @@ func BuildTreeBy(headings []*Heading, opts Options, pageOf PageOf) *Node {
 // the TOC lists its entries in, with each node's clamped level.
 func (n *Node) Flatten() []*Node {
 	var out []*Node
+
 	var walk func(n *Node)
 	walk = func(n *Node) {
 		out = append(out, n)
+
 		for _, c := range n.Children {
 			walk(c)
 		}
 	}
 	walk(n)
+
 	return out
 }
 
@@ -281,21 +312,26 @@ func DumpOutlineXMLOffset(root *Node, pageOffset int) []byte {
 // attribute. It is the explicit counterpart to the legacy local-page helper.
 func DumpOutlineXMLBy(root *Node, pageOffset int, pageOf PageOf) []byte {
 	pageOf = normalizePageOf(pageOf)
+
 	var b strings.Builder
+
 	b.WriteString("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
 	b.WriteString("<outline xmlns=\"http://wkhtmltopdf.org/outline\">\n")
 	dumpNode(root, &b, 1, pageOffset, pageOf)
 	b.WriteString("</outline>\n")
+
 	return []byte(b.String())
 }
 
 func dumpNode(n *Node, b *strings.Builder, depth, pageOffset int, pageOf PageOf) {
 	pad := strings.Repeat("  ", depth)
+
 	for _, c := range n.Children {
 		h := c.Heading
 		if h == nil {
 			continue
 		}
+
 		b.WriteString(pad)
 		b.WriteString("<item title=\"")
 		b.WriteString(xmlEscape(h.Title))
@@ -305,10 +341,13 @@ func dumpNode(n *Node, b *strings.Builder, depth, pageOffset int, pageOf PageOf)
 		b.WriteString(h.Anchor)
 		b.WriteString("\" backLink=\"")
 		b.WriteString(h.Anchor)
+
 		if len(c.Children) == 0 {
 			b.WriteString("\"/>\n")
+
 			continue
 		}
+
 		b.WriteString("\">\n")
 		dumpNode(c, b, depth+1, pageOffset, pageOf)
 		b.WriteString(pad)
@@ -320,6 +359,7 @@ func normalizePageOf(pageOf PageOf) PageOf {
 	if pageOf == nil {
 		return LocalPage
 	}
+
 	return pageOf
 }
 
@@ -329,6 +369,7 @@ func matchAny(sels []css.Selector, n *html.Node) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -337,24 +378,32 @@ func matchAny(sels []css.Selector, n *html.Node) bool {
 // title collection; convert may reuse for document titles and similar.
 func CollapseWS(s string) string {
 	var b strings.Builder
+
 	prevSpace := true
+
 	for _, r := range s {
 		if r == ' ' || r == '\t' || r == '\n' || r == '\r' || r == '\f' {
 			if !prevSpace {
 				b.WriteByte(' ')
+
 				prevSpace = true
 			}
+
 			continue
 		}
+
 		b.WriteRune(r)
+
 		prevSpace = false
 	}
+
 	return strings.TrimRight(b.String(), " ")
 }
 
 // xmlEscape escapes the five XML special characters.
 func xmlEscape(s string) string {
 	var b strings.Builder
+
 	for _, r := range s {
 		switch r {
 		case '&':
@@ -371,5 +420,6 @@ func xmlEscape(s string) string {
 			b.WriteRune(r)
 		}
 	}
+
 	return b.String()
 }

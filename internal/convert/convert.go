@@ -78,12 +78,15 @@ func (r *Request) Validate() error {
 	if r == nil {
 		return errors.New("convert: nil request")
 	}
+
 	if r.Output == nil {
 		return ErrMissingOutput
 	}
+
 	if r.Global.DumpOutline && r.OutlineOutput == nil {
 		return ErrMissingOutlineOutput
 	}
+
 	return nil
 }
 
@@ -93,6 +96,7 @@ func (r *Request) ValidatePDF() error {
 	if r != nil && r.Image != nil {
 		return ErrUnexpectedImageSettings
 	}
+
 	return r.Validate()
 }
 
@@ -102,9 +106,11 @@ func (r *Request) ValidateImage() error {
 	if r == nil {
 		return errors.New("convert: nil request")
 	}
+
 	if r.Image == nil {
 		return ErrMissingImageSettings
 	}
+
 	return r.Validate()
 }
 
@@ -119,12 +125,14 @@ func RunPDF(cmd *cli.Command, log io.Writer) error {
 // only sees an io.Writer. Prefer Run when the caller already has a writer.
 func RunPDFContext(ctx context.Context, cmd *cli.Command, log io.Writer, progress func(phase string, percent int)) error {
 	if cmd == nil {
-		return fmt.Errorf("convert: nil command")
+		return errors.New("convert: nil command")
 	}
+
 	out, closeOut, err := cmd.OpenOutput()
 	if err != nil {
 		return err
 	}
+
 	req := &Request{
 		Global:        cmd.Global,
 		Objects:       cmd.Objects,
@@ -135,10 +143,12 @@ func RunPDFContext(ctx context.Context, cmd *cli.Command, log io.Writer, progres
 	if cmd.DumpOutline {
 		req.Global.DumpOutline = true
 	}
+
 	runErr := Run(ctx, req, log, progress)
 	if closeErr := closeOut(); closeErr != nil && runErr == nil {
 		return closeErr
 	}
+
 	return runErr
 }
 
@@ -157,6 +167,7 @@ func Run(ctx context.Context, req *Request, log io.Writer, progress func(phase s
 	if err := req.ValidatePDF(); err != nil {
 		return err
 	}
+
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -168,12 +179,14 @@ func Run(ctx context.Context, req *Request, log io.Writer, progress func(phase s
 	if err != nil {
 		return fmt.Errorf("default font: %w", err)
 	}
+
 	registry := loadFontRegistry(req.Global, log)
 
 	report := func(phase string, percent int) {
 		if progress != nil {
 			progress(phase, percent)
 		}
+
 		if log != nil && log != io.Discard && !req.Global.Quiet {
 			fmt.Fprintf(log, "%s\n", phase)
 		}
@@ -181,26 +194,35 @@ func Run(ctx context.Context, req *Request, log io.Writer, progress func(phase s
 
 	doc := pdf.NewDocument()
 	n := len(req.Objects)
+
 	var bodies []*objectState
+
 	var tocs []*objectState
+
 	for i := range req.Objects {
 		if err := ctx.Err(); err != nil {
 			return fmt.Errorf("object %d: %w", i+1, err)
 		}
+
 		report(fmt.Sprintf("Loading pages (%d/%d)", i+1, n), percent(i+1, n))
+
 		obj := &req.Objects[i]
 		if obj.IsTableOfContent {
 			st, err := initTOCState(ctx, loader, font, registry, req, obj, i, log)
 			if err != nil {
 				return err
 			}
+
 			tocs = append(tocs, st)
+
 			continue
 		}
+
 		st, err := renderObject(ctx, loader, font, registry, doc, req, obj, i, log)
 		if err != nil {
 			return err
 		}
+
 		if st != nil {
 			bodies = append(bodies, st)
 		}
@@ -213,6 +235,7 @@ func Run(ctx context.Context, req *Request, log io.Writer, progress func(phase s
 	exclude := parseExcludeSelectors(req.Global.ExcludeFromOutline, log)
 
 	tocTotal := 0
+
 	if len(tocs) > 0 {
 		// Real phase: TOC layout + paint (page count unknown until finished).
 		report("Building table of contents", percent(n, n+1))
@@ -221,19 +244,23 @@ func Run(ctx context.Context, req *Request, log io.Writer, progress func(phase s
 		// Use the explicit document-page ordering contract; keep Heading.Page
 		// object-local for headers, links, and page ownership.
 		tocTree := outline.BuildTreeBy(headings, outline.Options{Exclude: exclude}, outline.DocumentPage)
+
 		tocTotal, err = renderTOCObjects(ctx, font, doc, req, tocs, tocTree.Flatten(), log)
 		if err != nil {
 			return err
 		}
+
 		order := tocFirstOrder(tocs, bodies)
 		if err := doc.ReorderPages(order); err != nil {
 			return fmt.Errorf("toc assembly: %w", err)
 		}
+
 		pos := 0
 		for _, tr := range tocs {
 			tr.start = pos
 			pos += tr.tocPages
 		}
+
 		for _, bg := range bodies {
 			bg.start = tocTotal + bg.offset
 		}
@@ -251,6 +278,7 @@ func Run(ctx context.Context, req *Request, log io.Writer, progress func(phase s
 				return fmt.Errorf("dump outline: %w", err)
 			}
 		}
+
 		root := emitOutline(doc, outTree, bodies, tocTotal)
 		if len(root.Children) > 0 {
 			doc.SetOutline(root)
@@ -260,6 +288,7 @@ func Run(ctx context.Context, req *Request, log io.Writer, progress func(phase s
 	if len(tocs) > 0 {
 		applyTOCLinks(doc, tocs, bodies, tocTotal, headings)
 	}
+
 	applyInternalLinks(doc, bodies, tocTotal)
 
 	plan := newPagePlan(tocs, bodies, req.Global.Copies, req.Global.Collate)
@@ -268,6 +297,7 @@ func Run(ctx context.Context, req *Request, log io.Writer, progress func(phase s
 	if req.Global.Title != "" {
 		doc.SetInfo("Title", req.Global.Title)
 	}
+
 	doc.SetInfo("Producer", "gowkhtmltopdf")
 	doc.SetCompression(req.Global.UseCompression)
 	// Grayscale is the sole color bit (settings maps colormode → Grayscale).
@@ -278,6 +308,7 @@ func Run(ctx context.Context, req *Request, log io.Writer, progress func(phase s
 		if err := materializeCopies(doc, ranges, plan.copies); err != nil {
 			return err
 		}
+
 		if !plan.collate {
 			order := nonCollateOrder(ranges, plan.copies)
 			if err := doc.ReorderPages(order); err != nil {
@@ -294,6 +325,7 @@ func Run(ctx context.Context, req *Request, log io.Writer, progress func(phase s
 	if err := doc.Write(req.Output); err != nil {
 		return fmt.Errorf("write output: %w", err)
 	}
+
 	return nil
 }
 
@@ -302,6 +334,7 @@ func percent(i, n int) int {
 	if n <= 0 {
 		return 100
 	}
+
 	return int(math.Round(float64(i) * 100 / float64(n)))
 }
 
@@ -334,18 +367,21 @@ func newPagePlan(tocs, bodies []*objectState, copies int, collate bool) *pagePla
 	if copies < 1 {
 		copies = 1
 	}
+
 	pp := &pagePlan{copies: copies, collate: collate}
 	for _, st := range tocs {
 		pp.tocTotal += st.tocPages
-		for i := 0; i < st.tocPages; i++ {
+		for i := range st.tocPages {
 			pp.owners = append(pp.owners, pageOwner{st, i})
 		}
 	}
+
 	for _, st := range bodies {
-		for i := 0; i < st.pages; i++ {
+		for i := range st.pages {
 			pp.owners = append(pp.owners, pageOwner{st, i})
 		}
 	}
+
 	return pp
 }
 
@@ -355,10 +391,12 @@ func (pp *pagePlan) OwnerOf(p int) (pageOwner, bool) {
 	if pp == nil {
 		return pageOwner{}, false
 	}
+
 	n := len(pp.owners)
 	if n == 0 {
 		return pageOwner{}, false
 	}
+
 	var i int
 	switch {
 	case pp.copies <= 1:
@@ -368,9 +406,11 @@ func (pp *pagePlan) OwnerOf(p int) (pageOwner, bool) {
 	default: // non-collate: copies of page i are contiguous
 		i = p / pp.copies
 	}
+
 	if i < 0 || i >= n {
 		return pageOwner{}, false
 	}
+
 	return pp.owners[i], true
 }
 
@@ -380,13 +420,16 @@ func (pp *pagePlan) Remap(logicalDest, srcPage int) int {
 	if pp == nil {
 		return logicalDest
 	}
+
 	n := len(pp.owners)
 	if pp.copies <= 1 || n <= 0 {
 		return logicalDest
 	}
+
 	if pp.collate {
 		return (srcPage/n)*n + logicalDest
 	}
+
 	return logicalDest*pp.copies + srcPage%pp.copies
 }
 
@@ -395,6 +438,7 @@ func (pp *pagePlan) LogicalN() int {
 	if pp == nil {
 		return 0
 	}
+
 	return len(pp.owners)
 }
 
@@ -404,29 +448,39 @@ func (pp *pagePlan) Ranges() []pageRange {
 	if pp == nil || len(pp.owners) == 0 {
 		return nil
 	}
+
 	var ranges []pageRange
+
 	var cur *objectState
+
 	start := 0
 	count := 0
+
 	for i, own := range pp.owners {
 		if cur == nil {
 			cur = own.st
 			start = i
 			count = 1
+
 			continue
 		}
+
 		if own.st == cur {
 			count++
+
 			continue
 		}
+
 		ranges = append(ranges, pageRange{start: start, count: count})
 		cur = own.st
 		start = i
 		count = 1
 	}
+
 	if cur != nil {
 		ranges = append(ranges, pageRange{start: start, count: count})
 	}
+
 	return ranges
 }
 
@@ -434,16 +488,19 @@ func (pp *pagePlan) Ranges() []pageRange {
 // pages (in object order) before every body object's pages.
 func tocFirstOrder(tocs, bodies []*objectState) []int {
 	order := make([]int, 0, len(tocs)+len(bodies))
+
 	for _, tr := range tocs {
-		for i := 0; i < tr.tocPages; i++ {
+		for i := range tr.tocPages {
 			order = append(order, tr.start+i)
 		}
 	}
+
 	for _, bg := range bodies {
-		for i := 0; i < bg.pages; i++ {
+		for i := range bg.pages {
 			order = append(order, bg.offset+i)
 		}
 	}
+
 	return order
 }
 
@@ -461,6 +518,7 @@ func materializeCopies(doc *pdf.Document, ranges []pageRange, copies int) error 
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -474,14 +532,17 @@ func nonCollateOrder(ranges []pageRange, copies int) []int {
 	for _, r := range ranges {
 		origTotal += r.count
 	}
+
 	var order []int
+
 	for _, r := range ranges {
-		for c := 0; c < copies; c++ {
+		for c := range copies {
 			for i := r.start; i < r.start+r.count; i++ {
 				order = append(order, i+c*origTotal)
 			}
 		}
 	}
+
 	return order
 }
 
@@ -492,6 +553,7 @@ func newHFGeom(g settings.PdfGlobal) (hfGeom, error) {
 	if err != nil {
 		return hfGeom{}, err
 	}
+
 	geom := hfGeom{
 		pageW:        pageW,
 		pageH:        pageH,
@@ -501,6 +563,7 @@ func newHFGeom(g settings.PdfGlobal) (hfGeom, error) {
 		marginRight:  g.Margin.Right * mmToPt,
 	}
 	geom.recomputeContent()
+
 	return geom, nil
 }
 
@@ -511,6 +574,7 @@ func initTOCState(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 	if err != nil {
 		return nil, fmt.Errorf("object %d: %w", idx+1, err)
 	}
+
 	st := &objectState{
 		obj:      obj,
 		idx:      idx,
@@ -524,11 +588,14 @@ func initTOCState(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 		geom:     geom,
 		lp:       obj.Load,
 	}
+
 	reg, err := effectiveMargins(ctx, loader, font, req.Global, st, log)
 	if err != nil {
 		return nil, fmt.Errorf("object %d: %w", idx+1, err)
 	}
+
 	st.registry = reg
+
 	return st, nil
 }
 
@@ -540,7 +607,9 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 	if err != nil {
 		return nil, fmt.Errorf("object %d (%s): %w", idx+1, obj.Page, err)
 	}
+
 	media := mediaFor(req.Global, obj)
+
 	prep, err := PrepareDocument(ctx, loader, obj.Page, obj.Load, registry, PrepareOptions{
 		ViewportW:       geom.contentW,
 		ViewportH:       geom.contentH,
@@ -552,22 +621,27 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 	if err != nil {
 		return nil, fmt.Errorf("object %d (%s): %w", idx+1, obj.Page, err)
 	}
+
 	if prep.Resource.Skip {
 		line.Emit(log, line.Warn, "object %d (%s): load error policy is skip, omitting", idx+1, obj.Page)
+
 		return nil, nil
 	}
+
 	root := prep.Root
 	registry = prep.Registry
 	sheets := prep.Sheets
 
 	imagesFn := func(src string) ([]byte, error) {
 		if !req.Global.Web.Images {
-			return nil, fmt.Errorf("images disabled")
+			return nil, errors.New("images disabled")
 		}
+
 		r, err := prep.Resources.Fetch(ctx, src)
 		if err != nil {
 			return nil, err
 		}
+
 		return r.Body, nil
 	}
 
@@ -588,6 +662,7 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 		imagesFn:      imagesFn,
 		doctitle:      docTitle(root),
 	}
+
 	reg, err := effectiveMargins(ctx, loader, font, req.Global, st, log)
 	if err != nil {
 		return nil, fmt.Errorf("object %d (%s): %w", idx+1, obj.Page, err)
@@ -612,10 +687,12 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 			if zoom > 0 && zoom < 1 {
 				line.Emit(log, line.Info, "object %d (%s): content width %.1fpt exceeds the %.1fpt content area; smart shrinking with zoom %.3f",
 					idx+1, obj.Page, cw, contentW, zoom)
+
 				effZoom := zoom
 				if zf := obj.Load.ZoomFactor; zf > 0 {
 					effZoom = zoom * zf
 				}
+
 				lres, err = layout.LayoutContext(ctx, root, st.bodyLayoutOpts(font, registry, sheets, effZoom, imagesFn, req.Global.Background, printUL))
 				if err != nil {
 					return nil, fmt.Errorf("object %d (%s): smart-shrink layout: %w", idx+1, obj.Page, err)
@@ -635,13 +712,16 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 	}
 
 	before := doc.PageCount()
+
 	if err := layout.PaintContext(ctx, doc, lres, paintOptions(st.geom)); err != nil {
 		return nil, fmt.Errorf("object %d (%s): paint: %w", idx+1, obj.Page, err)
 	}
+
 	st.pages = doc.PageCount() - before
 	st.offset = before
 	st.res = lres
 	st.headings = collectObjectHeadings(root, lres, before, req.Global, *obj, log)
+
 	return st, nil
 }
 
@@ -652,6 +732,7 @@ func (st *objectState) bodyLayoutOpts(font *pdf.Font, registry *pdf.Registry, sh
 	if media == "" {
 		media = "print"
 	}
+
 	return layout.Options{
 		Width:              st.geom.contentW,
 		Height:             st.geom.contentH,
@@ -674,15 +755,19 @@ func mergedReplaces(obj *settings.PdfObject, g settings.PdfGlobal) map[string]st
 	for k, v := range g.Header.Replace {
 		out[k] = v
 	}
+
 	for k, v := range obj.Header.Replace {
 		out[k] = v
 	}
+
 	for k, v := range g.Footer.Replace {
 		out[k] = v
 	}
+
 	for k, v := range obj.Footer.Replace {
 		out[k] = v
 	}
+
 	return out
 }
 
@@ -694,6 +779,7 @@ func mergedReplaces(obj *settings.PdfObject, g settings.PdfGlobal) map[string]st
 // wider, so they are ignored; rects and images are what push content out.
 func measuredWidth(res *layout.Result) float64 {
 	w := res.Width
+
 	for _, op := range res.Ops {
 		switch op.Kind {
 		case layout.OpFillRect, layout.OpStrokeRect, layout.OpImage:
@@ -702,6 +788,7 @@ func measuredWidth(res *layout.Result) float64 {
 			}
 		}
 	}
+
 	return w
 }
 
@@ -716,14 +803,17 @@ func pageGeometry(g settings.PdfGlobal) (w, h float64, err error) {
 		if name == "" {
 			name = g.Size.PageSize
 		}
+
 		w, h, err = settings.ParsePageSize(name)
 		if err != nil {
 			return 0, 0, err
 		}
 	}
+
 	if g.Orientation == settings.OrientationLandscape {
 		w, h = h, w
 	}
+
 	return w, h, nil
 }
 
@@ -732,10 +822,12 @@ func pageGeometry(g settings.PdfGlobal) (w, h float64, err error) {
 // it is projected onto a temporary Web for the shared resolver. PDF default is "print".
 func mediaFor(g settings.PdfGlobal, obj *settings.PdfObject) string {
 	var objWeb *settings.Web
+
 	if obj != nil {
 		w := settings.Web{PrintMediaType: obj.Load.PrintMediaType, MediaType: obj.Load.MediaType}
 		objWeb = &w
 	}
+
 	return settings.ResolveMedia("print", g.Web, objWeb)
 }
 
@@ -757,18 +849,22 @@ func CollectSheets(ctx context.Context, loader *load.Loader, root *html.Node, ba
 		if log == nil {
 			return
 		}
+
 		if opts.ObjectIndex > 0 {
 			line.Emit(log, line.Warn, "object %d: "+format, append([]any{opts.ObjectIndex}, args...)...)
 		} else {
 			line.Emit(log, line.Warn, format, args...)
 		}
 	}
+
 	var sheets []*css.Stylesheet
+
 	if root != nil {
 		root.Walk(func(n *html.Node) {
 			if n.Type != html.ElementNode {
 				return
 			}
+
 			switch n.Name {
 			case "style":
 				sheet, err := css.Parse(styleText(n))
@@ -783,37 +879,46 @@ func CollectSheets(ctx context.Context, loader *load.Loader, root *html.Node, ba
 					r, err := loader.FetchSub(ctx, base, href, lp)
 					if err != nil {
 						warn("skipping <link href=%q>: %v", href, err)
+
 						return
 					}
+
 					sheet, err := css.Parse(string(r.Body))
 					if err != nil {
 						warn("skipping <link href=%q>: %v", href, err)
+
 						return
 					}
+
 					sheets = append(sheets, sheet)
 				}
 			}
 		})
 	}
+
 	nRules := 0
 	for _, s := range sheets {
 		nRules += len(s.Rules)
 	}
+
 	const softRuleWarn = 25000
 	if nRules >= softRuleWarn {
 		warn("large stylesheet volume (%d rules); print may be slow", nRules)
 	}
+
 	return sheets
 }
 
 // styleText concatenates the raw text of a <style> element.
 func styleText(n *html.Node) string {
 	var sb strings.Builder
+
 	for _, c := range n.Children {
 		if c.Type == html.TextNode {
 			sb.WriteString(c.Text)
 		}
 	}
+
 	return sb.String()
 }
 
@@ -824,13 +929,16 @@ func linkStylesheet(n *html.Node, viewportW, viewportH float64, mediaType string
 	if n.Name != "link" || !strings.Contains(strings.ToLower(n.Attribute("rel")), "stylesheet") {
 		return false
 	}
+
 	if n.Attribute("href") == "" {
 		return false
 	}
+
 	media := n.Attribute("media")
 	if media == "" {
 		return true
 	}
+
 	return css.MediaMatches(media, mediaType, viewportW, viewportH)
 }
 
@@ -859,22 +967,27 @@ func resolveRelativeLinkURIs(ops []layout.Op, base string) {
 	if base == "" {
 		return
 	}
+
 	bu, err := url.Parse(base)
 	if err != nil || bu == nil {
 		return
 	}
+
 	for i := range ops {
 		if ops[i].Kind != layout.OpLinkURI || ops[i].URI == "" {
 			continue
 		}
+
 		u := ops[i].URI
 		if strings.HasPrefix(u, "#") || strings.Contains(u, "://") || strings.HasPrefix(strings.ToLower(u), "mailto:") {
 			continue
 		}
+
 		ref, err := url.Parse(u)
 		if err != nil {
 			continue
 		}
+
 		ops[i].URI = bu.ResolveReference(ref).String()
 	}
 }
@@ -883,17 +996,22 @@ func resolveRelativeLinkURIs(ops []layout.Op, base string) {
 // optional --use-system-fonts. Returns nil when nothing was configured.
 func loadFontRegistry(g settings.PdfGlobal, log io.Writer) *pdf.Registry {
 	var dirs []string
+
 	dirs = append(dirs, g.FontPaths...)
 	if g.UseSystemFonts {
 		dirs = append(dirs, pdf.DefaultSystemFontDirs()...)
 	}
+
 	if len(dirs) == 0 {
 		return nil
 	}
+
 	reg := pdf.ScanFontDirs(dirs)
+
 	if log != nil && log != io.Discard && !g.Quiet {
 		line.Emit(log, line.Info, "scanned %d font path(s)", len(dirs))
 	}
+
 	return reg
 }
 
@@ -906,41 +1024,53 @@ func MergeFontFaces(ctx context.Context, loader *load.Loader, reg *pdf.Registry,
 		if sheet == nil {
 			continue
 		}
+
 		for _, ff := range sheet.FontFaces {
 			for _, u := range css.FontFaceURLs(ff.Src) {
 				low := strings.ToLower(u)
 				if strings.HasSuffix(low, ".woff2") || strings.HasSuffix(low, ".eot") {
 					line.Emit(log, line.Warn, "object %d: @font-face src %q skipped (WOFF2/EOT unsupported; WOFF1/TTF/OTF only)", idx, u)
+
 					continue
 				}
 				// data: would bypass the network:// gate; reject so we never
 				// ParseTTF untrusted inline payloads from CSS.
 				if strings.HasPrefix(low, "data:") {
 					line.Emit(log, line.Warn, "object %d: @font-face data: src skipped", idx)
+
 					continue
 				}
+
 				r, err := loader.FetchSub(ctx, base, u, lp)
 				if err != nil {
 					line.Emit(log, line.Warn, "object %d: @font-face src %q: %v", idx, u, err)
+
 					continue
 				}
+
 				f, err := pdf.ParseFontBytes(r.Body)
 				if err != nil {
 					line.Emit(log, line.Warn, "object %d: @font-face src %q: %v", idx, u, err)
+
 					continue
 				}
+
 				if ff.Family != "" {
 					f.PostScriptName = strings.ReplaceAll(ff.Family, " ", "")
 				}
+
 				if reg == nil {
 					reg = pdf.NewRegistry()
 				}
+
 				reg.AddFont(f)
+
 				if ff.Family != "" {
 					reg.AddFamilyAlias(ff.Family, f)
 				}
 			}
 		}
 	}
+
 	return reg
 }
