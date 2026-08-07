@@ -99,15 +99,15 @@ func (ctx *objectCtx) object(c *Command) *settings.PdfObject {
 
 // newObject appends a page/cover object and makes it current. If page-scoped
 // flags were collected before any object keyword, they seed this object.
-func (ctx *objectCtx) newObject(c *Command) *settings.PdfObject {
+func (ctx *objectCtx) newObject(cmd *Command) *settings.PdfObject {
 	if ctx.pending != nil {
-		c.Objects = append(c.Objects, *ctx.pending)
+		cmd.Objects = append(cmd.Objects, *ctx.pending)
 		ctx.pending = nil
 	} else {
-		c.Objects = append(c.Objects, settings.DefaultPdfObject())
+		cmd.Objects = append(cmd.Objects, settings.DefaultPdfObject())
 	}
 
-	ctx.obj = &c.Objects[len(c.Objects)-1]
+	ctx.obj = &cmd.Objects[len(cmd.Objects)-1]
 
 	return ctx.obj
 }
@@ -115,9 +115,9 @@ func (ctx *objectCtx) newObject(c *Command) *settings.PdfObject {
 // newFreshObject appends a new object without consuming pending page-scoped
 // settings. Used for toc so pre-object page flags apply to the first real
 // page that follows, not to the TOC entry itself.
-func (ctx *objectCtx) newFreshObject(c *Command) *settings.PdfObject {
-	c.Objects = append(c.Objects, settings.DefaultPdfObject())
-	ctx.obj = &c.Objects[len(c.Objects)-1]
+func (ctx *objectCtx) newFreshObject(cmd *Command) *settings.PdfObject {
+	cmd.Objects = append(cmd.Objects, settings.DefaultPdfObject())
+	ctx.obj = &cmd.Objects[len(cmd.Objects)-1]
 
 	return ctx.obj
 }
@@ -135,15 +135,15 @@ func Parse(argv []string, modes ...Mode) (*Command, error) {
 		return nil, err
 	}
 
-	cmd := &Command{Global: settings.DefaultPdfGlobal(), Image: settings.DefaultImageGlobal()}
-	cur := &objectCtx{}
+	cmd := &Command{Global: settings.DefaultPdfGlobal(), Image: settings.DefaultImageGlobal()} //nolint:exhaustruct // intentional zero/partial fields
+	cur := &objectCtx{}                                                                        //nolint:exhaustruct // intentional zero/partial fields
 
 	var free []string
 
-	i := 0
-	for i < len(argv) {
-		arg := argv[i]
-		i++
+	idx := 0
+	for idx < len(argv) {
+		arg := argv[idx]
+		idx++
 
 		switch {
 		case arg == "-h" || arg == "--help":
@@ -156,11 +156,11 @@ func Parse(argv []string, modes ...Mode) (*Command, error) {
 			return cmd, ErrExtHelp
 		case arg == "--":
 			// end of options; remaining args are positional
-			for ; i < len(argv); i++ {
-				free = append(free, argv[i])
+			for ; idx < len(argv); idx++ {
+				free = append(free, argv[idx])
 			}
 
-			i = len(argv)
+			idx = len(argv)
 
 			continue
 		case strings.HasPrefix(arg, "--"):
@@ -176,7 +176,7 @@ func Parse(argv []string, modes ...Mode) (*Command, error) {
 				return nil, err
 			}
 
-			if err := apply(cmd, cur, name, spec, negated, val, hasVal, argv, &i); err != nil {
+			if err := apply(cmd, cur, name, spec, negated, val, hasVal, argv, &idx); err != nil {
 				return nil, err
 			}
 
@@ -193,7 +193,7 @@ func Parse(argv []string, modes ...Mode) (*Command, error) {
 				return nil, err
 			}
 
-			if err := apply(cmd, cur, name, spec, false, "", false, argv, &i); err != nil {
+			if err := apply(cmd, cur, name, spec, false, "", false, argv, &idx); err != nil {
 				return nil, err
 			}
 
@@ -262,7 +262,7 @@ func (c *Command) positional(arg string, cur *objectCtx, free *[]string) error {
 		obj.IsCover = true
 		obj.IncludeInOutline = false
 		obj.HeaderSet, obj.FooterSet = true, true
-		obj.Header, obj.Footer = settings.HeaderFooter{}, settings.HeaderFooter{}
+		obj.Header, obj.Footer = settings.HeaderFooter{}, settings.HeaderFooter{} //nolint:exhaustruct // intentional zero/partial fields
 
 		return nil
 	case "toc":
@@ -295,17 +295,17 @@ func (c *Command) resolveFree(cur *objectCtx, free []string) error {
 
 	c.Output = free[len(free)-1]
 
-	for _, u := range free[:len(free)-1] {
+	for _, pageURL := range free[:len(free)-1] {
 		// Prefer filling an already-opened empty page/cover object.
 		if cur.obj != nil && cur.obj.Page == "" && !cur.obj.IsTableOfContent {
-			cur.obj.Page = u
+			cur.obj.Page = pageURL
 
 			continue
 		}
 		// Next: promote pending pre-object page settings into this page.
 		if cur.pending != nil {
 			o := *cur.pending
-			o.Page = u
+			o.Page = pageURL
 			c.Objects = append(c.Objects, o)
 			cur.pending = nil
 			cur.obj = &c.Objects[len(c.Objects)-1]
@@ -313,7 +313,7 @@ func (c *Command) resolveFree(cur *objectCtx, free []string) error {
 			continue
 		}
 
-		cur.newObject(c).Page = u
+		cur.newObject(c).Page = pageURL
 	}
 
 	return c.validate()
@@ -362,7 +362,7 @@ func (ctx *objectCtx) applyPage(c *Command, glob func(g *settings.PdfGlobal, val
 // apply runs a flag with value extraction (next-arg or =value). Bool flags
 // arrive pre-parsed as canonical "true"/"false"; pair flags arrive as two
 // separate tokens.
-func apply(c *Command, cur *objectCtx, name string, spec flagSpec, negated bool, inlineVal string, hasInline bool, argv []string, i *int) error {
+func apply(cmd *Command, cur *objectCtx, name string, spec flagSpec, negated bool, inlineVal string, hasInline bool, argv []string, i *int) error {
 	switch spec.kind {
 	case flagBool:
 		b, err := parseBool(inlineVal, negated, hasInline)
@@ -370,7 +370,7 @@ func apply(c *Command, cur *objectCtx, name string, spec flagSpec, negated bool,
 			return err
 		}
 
-		return spec.app(c, cur, []string{strconv.FormatBool(b)})
+		return spec.app(cmd, cur, []string{strconv.FormatBool(b)})
 	case flagValue:
 		vals := []string{inlineVal}
 
@@ -383,7 +383,7 @@ func apply(c *Command, cur *objectCtx, name string, spec flagSpec, negated bool,
 			*i++
 		}
 
-		return spec.app(c, cur, vals)
+		return spec.app(cmd, cur, vals)
 	case flagPair:
 		vals := [2]string{}
 		if hasInline {
@@ -404,7 +404,7 @@ func apply(c *Command, cur *objectCtx, name string, spec flagSpec, negated bool,
 		vals[1] = argv[*i]
 		*i++
 
-		return spec.app(c, cur, vals[:])
+		return spec.app(cmd, cur, vals[:])
 	}
 
 	return fmt.Errorf("internal: unknown flag kind for --%s", name)
@@ -447,7 +447,7 @@ func lookupFlag(name string) (flagSpec, bool, bool) {
 		}
 	}
 
-	return flagSpec{}, false, false
+	return flagSpec{}, false, false //nolint:exhaustruct // intentional zero/partial fields
 }
 
 // ExitCode converts an error into a process exit code: errors carrying an

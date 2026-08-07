@@ -10,7 +10,8 @@ import (
 )
 
 func TestEmdashLinkNoGap(t *testing.T) {
-	s := sheet(t, `
+	t.Parallel()
+	cssSheet := sheet(t, `
 body { margin: 0; font-size: 12pt; }
 p { text-align: justify; margin: 0; }
 a { color: #0645ad; text-decoration: underline; }
@@ -21,8 +22,7 @@ a { color: #0645ad; text-decoration: underline; }
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	res, err := Layout(root, Options{Width: 500, Height: 400, Sheets: []*css.Stylesheet{s}})
+	res, err := Layout(root, Options{Width: 500, Height: 400, Sheets: []*css.Stylesheet{cssSheet}}) //nolint:exhaustruct // intentional zero fields
 	if err != nil {
 		t.Fatal(err)
 	}

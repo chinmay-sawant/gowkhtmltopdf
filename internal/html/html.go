@@ -78,13 +78,13 @@ func (n *Node) TextContentOf(name string) string {
 	return out
 }
 
-func (n *Node) appendText(b *strings.Builder) {
+func (n *Node) appendText(buf *strings.Builder) {
 	switch n.Type {
 	case TextNode:
-		b.WriteString(n.Text)
+		buf.WriteString(n.Text)
 	case ElementNode:
 		for _, c := range n.Children {
-			c.appendText(b)
+			c.appendText(buf)
 		}
 	}
 }
@@ -128,23 +128,23 @@ func Parse(source string) (*Node, error) {
 		return nil, err
 	}
 
-	root := &Node{Type: ElementNode, Name: "#document"}
+	root := &Node{Type: ElementNode, Name: "#document"} //nolint:exhaustruct // intentional zero/partial fields
 	stack := []*Node{root}
 
-	for _, t := range tok {
+	for _, tokItem := range tok {
 		top := stack[len(stack)-1]
 
-		switch t.kind {
+		switch tokItem.kind {
 		case tokDoctype:
-			top.Children = append(top.Children, &Node{Type: DoctypeNode, Text: t.data})
+			top.Children = append(top.Children, &Node{Type: DoctypeNode, Text: tokItem.data}) //nolint:exhaustruct // intentional zero/partial fields
 		case tokComment:
-			top.Children = append(top.Children, &Node{Type: CommentNode, Text: t.data})
+			top.Children = append(top.Children, &Node{Type: CommentNode, Text: tokItem.data}) //nolint:exhaustruct // intentional zero/partial fields
 		case tokText:
-			if len(t.data) == 0 {
+			if len(tokItem.data) == 0 {
 				continue
 			}
 
-			data := UnescapeEntities(t.data)
+			data := UnescapeEntities(tokItem.data)
 
 			if len(top.Children) > 0 {
 				last := top.Children[len(top.Children)-1]
@@ -155,11 +155,11 @@ func Parse(source string) (*Node, error) {
 				}
 			}
 
-			node := &Node{Type: TextNode, Text: data}
+			node := &Node{Type: TextNode, Text: data} //nolint:exhaustruct // intentional zero/partial fields
 			node.Parent = top
 			top.Children = append(top.Children, node)
 		case tokStart:
-			name := strings.ToLower(t.data)
+			name := strings.ToLower(tokItem.data)
 			// html/head/body duplicates merge into the existing element
 			// instead of nesting: drop the token if one is already open,
 			// otherwise re-open a closed same-level sibling.
@@ -197,11 +197,11 @@ func Parse(source string) (*Node, error) {
 			}
 
 			top = stack[len(stack)-1]
-			node := &Node{Type: ElementNode, Name: name, Attrs: map[string]string{}}
+			node := &Node{Type: ElementNode, Name: name, Attrs: map[string]string{}} //nolint:exhaustruct // intentional zero/partial fields
 
-			for i := 0; i+1 < len(t.attrs); i += 2 {
-				key := strings.ToLower(t.attrs[i])
-				val := UnescapeEntities(t.attrs[i+1])
+			for i := 0; i+1 < len(tokItem.attrs); i += 2 {
+				key := strings.ToLower(tokItem.attrs[i])
+				val := UnescapeEntities(tokItem.attrs[i+1])
 
 				if _, dup := node.Attrs[key]; !dup {
 					node.Attrs[key] = val
@@ -211,13 +211,13 @@ func Parse(source string) (*Node, error) {
 			top.Children = append(top.Children, node)
 			node.Parent = top
 
-			if t.selfClosing || voidElements[name] {
+			if tokItem.selfClosing || voidElements[name] {
 				continue // no child content
 			}
 
 			stack = append(stack, node)
 		case tokEnd:
-			name := strings.ToLower(t.data)
+			name := strings.ToLower(tokItem.data)
 			for i := len(stack) - 1; i > 0; i-- {
 				if stack[i].Name == name {
 					stack = stack[:i]
@@ -289,6 +289,13 @@ const (
 	tokComment
 )
 
+const (
+	commentPrefixLen = 4 // len("<!--")
+	commentSuffixLen = 3 // len("-->")
+	piCloseLen       = 2 // len("?>")
+	rawCloseMinSkip  = 2 // len("</")
+)
+
 type token struct {
 	kind        tokenKind
 	data        string
@@ -300,99 +307,99 @@ type token struct {
 func tokenize(src string) ([]token, error) {
 	var toks []token
 
-	i := 0
-	n := len(src)
+	pos := 0
+	srcLen := len(src)
 
-	for i < n {
-		if src[i] != '<' {
-			j := strings.IndexByte(src[i:], '<')
-			if j < 0 {
-				j = n - i
+	for pos < srcLen {
+		if src[pos] != '<' {
+			span := strings.IndexByte(src[pos:], '<')
+			if span < 0 {
+				span = srcLen - pos
 			}
 
-			toks = append(toks, token{kind: tokText, data: src[i : i+j]})
-			i += j
+			toks = append(toks, token{kind: tokText, data: src[pos : pos+span]}) //nolint:exhaustruct // intentional zero/partial fields
+			pos += span
 
 			continue
 		}
 
-		if i+1 >= n {
-			toks = append(toks, token{kind: tokText, data: "<"})
+		if pos+1 >= srcLen {
+			toks = append(toks, token{kind: tokText, data: "<"}) //nolint:exhaustruct // intentional zero/partial fields
 
 			break
 		}
 
 		switch {
-		case src[i+1] == '!':
-			if strings.HasPrefix(src[i:], "<!--") {
-				end := strings.Index(src[i+4:], "-->")
+		case src[pos+1] == '!':
+			if strings.HasPrefix(src[pos:], "<!--") {
+				end := strings.Index(src[pos+commentPrefixLen:], "-->")
 				if end < 0 {
 					return nil, errors.New("html: unterminated comment")
 				}
 
-				toks = append(toks, token{kind: tokComment, data: src[i+4 : i+4+end]})
-				i += 4 + end + 3
+				toks = append(toks, token{kind: tokComment, data: src[pos+commentPrefixLen : pos+commentPrefixLen+end]}) //nolint:exhaustruct // intentional zero/partial fields
+				pos += commentPrefixLen + end + commentSuffixLen
 
 				continue
 			}
 
-			if len(src)-i >= 9 && strings.EqualFold(src[i:i+9], "<!doctype") {
-				end := strings.IndexByte(src[i:], '>')
+			if len(src)-pos >= 9 && strings.EqualFold(src[pos:pos+9], "<!doctype") {
+				end := strings.IndexByte(src[pos:], '>')
 				if end < 0 {
 					return nil, errors.New("html: unterminated doctype")
 				}
 
-				toks = append(toks, token{kind: tokDoctype, data: src[i+2 : i+end]})
-				i += end + 1
+				toks = append(toks, token{kind: tokDoctype, data: src[pos+2 : pos+end]}) //nolint:exhaustruct // intentional zero/partial fields
+				pos += end + 1
 
 				continue
 			}
 			// other bogus declaration → skip to >
-			end := strings.IndexByte(src[i:], '>')
+			end := strings.IndexByte(src[pos:], '>')
 			if end < 0 {
 				return nil, errors.New("html: unterminated declaration")
 			}
 
-			i += end + 1
-		case src[i+1] == '/':
-			end := strings.IndexByte(src[i:], '>')
+			pos += end + 1
+		case src[pos+1] == '/':
+			end := strings.IndexByte(src[pos:], '>')
 			if end < 0 {
 				return nil, errors.New("html: unterminated end tag")
 			}
 
-			name := strings.TrimSpace(src[i+2 : i+end])
-			toks = append(toks, token{kind: tokEnd, data: strings.ToLower(name)})
-			i += end + 1
-		case src[i+1] == '?':
-			end := strings.Index(src[i:], "?>")
+			name := strings.TrimSpace(src[pos+2 : pos+end])
+			toks = append(toks, token{kind: tokEnd, data: strings.ToLower(name)}) //nolint:exhaustruct // intentional zero/partial fields
+			pos += end + 1
+		case src[pos+1] == '?':
+			end := strings.Index(src[pos:], "?>")
 			if end < 0 {
 				return nil, errors.New("html: unterminated processing instruction")
 			}
 
-			i += end + 2
+			pos += end + piCloseLen
 		default:
-			if !isASCIILetter(src[i+1]) {
+			if !isASCIILetter(src[pos+1]) {
 				// bare '<' followed by no valid tag start becomes text
-				toks = append(toks, token{kind: tokText, data: "<"})
-				i++
+				toks = append(toks, token{kind: tokText, data: "<"}) //nolint:exhaustruct // intentional zero/partial fields
+				pos++
 
 				continue
 			}
 
-			end, err := tagEnd(src, i)
+			end, err := tagEnd(src, pos)
 			if err != nil {
 				return nil, err
 			}
 
 			if end < 0 {
 				// no closing '>' - treat the rest as text
-				toks = append(toks, token{kind: tokText, data: src[i:]})
-				i = n
+				toks = append(toks, token{kind: tokText, data: src[pos:]}) //nolint:exhaustruct // intentional zero/partial fields
+				pos = srcLen
 
 				continue
 			}
 
-			tag := src[i+1 : end]
+			tag := src[pos+1 : end]
 
 			name, attrs, selfClose, err := parseTag(tag)
 			if err != nil {
@@ -400,30 +407,30 @@ func tokenize(src string) ([]token, error) {
 			}
 
 			if name == "" {
-				i = end + 1
+				pos = end + 1
 
 				continue
 			}
 
 			name = strings.ToLower(name)
 			toks = append(toks, token{kind: tokStart, data: name, attrs: attrs, selfClosing: selfClose})
-			i = end + 1
+			pos = end + 1
 			// raw-text elements capture everything until their closing tag
 			if rawTextElements[name] && !selfClose {
-				s, e, ok := rawTextEnd(src, i, name)
+				rawStart, rawEnd, ok := rawTextEnd(src, pos, name)
 				if !ok {
-					toks = append(toks, token{kind: tokText, data: src[i:]})
-					i = n
+					toks = append(toks, token{kind: tokText, data: src[pos:]}) //nolint:exhaustruct // intentional zero/partial fields
+					pos = srcLen
 
 					continue
 				}
 
-				if s > i {
-					toks = append(toks, token{kind: tokText, data: src[i:s]})
+				if rawStart > pos {
+					toks = append(toks, token{kind: tokText, data: src[pos:rawStart]}) //nolint:exhaustruct // intentional zero/partial fields
 				}
 
-				toks = append(toks, token{kind: tokEnd, data: name})
-				i = e + 1
+				toks = append(toks, token{kind: tokEnd, data: name}) //nolint:exhaustruct // intentional zero/partial fields
+				pos = rawEnd + 1
 			}
 		}
 	}
@@ -434,19 +441,19 @@ func tokenize(src string) ([]token, error) {
 // tagEnd returns the index of the '>' closing the start tag that begins at
 // start, respecting quoted attribute values; -1 if the tag never closes.
 func tagEnd(src string, start int) (int, error) {
-	for j := start + 1; j < len(src); j++ {
-		switch src[j] {
+	for idx := start + 1; idx < len(src); idx++ {
+		switch src[idx] {
 		case '"', '\'':
-			q := src[j]
+			q := src[idx]
 
-			k := strings.IndexByte(src[j+1:], q)
+			k := strings.IndexByte(src[idx+1:], q)
 			if k < 0 {
 				return 0, errors.New("html: unterminated attribute value")
 			}
 
-			j += k + 1
+			idx += k + 1
 		case '>':
-			return j, nil
+			return idx, nil
 		}
 	}
 
@@ -461,23 +468,23 @@ func rawTextEnd(src string, from int, name string) (start, end int, ok bool) {
 	needle := "</" + name
 
 	for {
-		k := strings.Index(low[from:], needle)
-		if k < 0 {
+		found := strings.Index(low[from:], needle)
+		if found < 0 {
 			return 0, 0, false
 		}
 
-		k += from
+		found += from
 
-		j := k + len(needle)
-		for j < len(src) && isWhitespace(src[j]) {
-			j++
+		after := found + len(needle)
+		for after < len(src) && isWhitespace(src[after]) {
+			after++
 		}
 
-		if j < len(src) && src[j] == '>' {
-			return k, j, true
+		if after < len(src) && src[after] == '>' {
+			return found, after, true
 		}
 
-		from = k + 2
+		from = found + rawCloseMinSkip
 	}
 }
 
@@ -490,9 +497,9 @@ func parseTag(body string) (string, []string, bool, error) {
 	// name ends at first whitespace or '/'
 	nameEnd := len(body)
 
-	for j := range len(body) {
-		if isWhitespace(body[j]) || body[j] == '/' {
-			nameEnd = j
+	for idx := range len(body) {
+		if isWhitespace(body[idx]) || body[idx] == '/' {
+			nameEnd = idx
 
 			break
 		}
@@ -512,13 +519,13 @@ func parseTag(body string) (string, []string, bool, error) {
 			break
 		}
 		// attribute name: up to '=' or whitespace
-		j := 0
-		for j < len(rest) && rest[j] != '=' && !isWhitespace(rest[j]) {
-			j++
+		idx := 0
+		for idx < len(rest) && rest[idx] != '=' && !isWhitespace(rest[idx]) {
+			idx++
 		}
 
-		key := rest[:j]
-		rest = strings.TrimLeft(rest[j:], " \t\n\r")
+		key := rest[:idx]
+		rest = strings.TrimLeft(rest[idx:], " \t\n\r")
 
 		if !strings.HasPrefix(rest, "=") {
 			attrs = append(attrs, key, "")

@@ -11,7 +11,7 @@ import (
 var Version = "0.1.0-dev"
 
 // PrintHelp writes usage text for the given Mode.
-func PrintHelp(w io.Writer, m Mode) {
+func PrintHelp(w io.Writer, mode Mode) {
 	fmt.Fprintf(w, `Name:
   gowkhtmltopdf - Convert HTML to PDF using the Qt WebKit engine (pure-Go reimplementation)
 
@@ -34,7 +34,7 @@ Description:
   (see documentation/compatibility-matrix.md). No JavaScript.
 
 %s
-`, flagList(m))
+`, flagList(mode))
 }
 
 // PrintVersion writes the version banner.
@@ -57,11 +57,11 @@ See LICENSE for the full text of the MIT License.
 }
 
 // flagList renders a "--name" list filtered by Mode.
-func flagList(m Mode) string {
+func flagList(mode Mode) string {
 	var names []string
 
 	for name, spec := range flagTable {
-		if spec.mod&m == 0 {
+		if spec.mod&mode == 0 {
 			continue
 		}
 
@@ -70,16 +70,16 @@ func flagList(m Mode) string {
 
 	sort.Strings(names)
 
-	var b strings.Builder
+	var buf strings.Builder
 
 	for _, n := range names {
 		spec := flagTable[n]
 		if spec.kind == flagBool {
-			fmt.Fprintf(&b, "  --%s\n", n)
+			fmt.Fprintf(&buf, "  --%s\n", n)
 		} else {
-			fmt.Fprintf(&b, "  --%s <value>\n", n)
+			fmt.Fprintf(&buf, "  --%s <value>\n", n)
 		}
 	}
 
-	return b.String()
+	return buf.String()
 }

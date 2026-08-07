@@ -9,32 +9,32 @@ import (
 // BenchmarkWrite50Pages measures full PDF serialization cost for 50 pages
 // of text (embedded subset font, compressed streams).
 func BenchmarkWrite50Pages(b *testing.B) {
-	f, err := DefaultFont()
+	fnt, err := DefaultFont()
 	if err != nil {
 		b.Fatal(err)
 	}
 
 	build := func() *Document {
-		d := NewDocument()
-		d.SetInfo("Title", "Bench")
+		doc := NewDocument()
+		doc.SetInfo("Title", "Bench")
 
-		for i := range 50 {
-			p := d.AddPage(595, 842)
-			c := p.Content()
-			c.UseEmbeddedFont("F1", f)
-			c.BeginText()
-			c.SetFont("F1", 11)
-			c.TextAt(50, 800)
+		for idx := range 50 {
+			p := doc.AddPage(595, 842)
+			cur := p.Content()
+			cur.UseEmbeddedFont("F1", fnt)
+			cur.BeginText()
+			cur.SetFont("F1", 11)
+			cur.TextAt(50, 800)
 
 			for l := range 40 {
-				c.TextShow(fmt.Sprintf("Page %d line %d - the quick brown fox jumps over the lazy dog", i, l))
-				c.TextNextLine()
+				cur.TextShow(fmt.Sprintf("Page %d line %d - the quick brown fox jumps over the lazy dog", idx, l))
+				cur.TextNextLine()
 			}
 
-			c.EndText()
+			cur.EndText()
 		}
 
-		return d
+		return doc
 	}
 
 	b.ResetTimer()
@@ -55,7 +55,7 @@ func BenchmarkWrite50Pages(b *testing.B) {
 // BenchmarkShapeRun measures the shared shaping + advance path consumed by
 // both PDF text emission and image rasterization.
 func BenchmarkShapeRun(b *testing.B) {
-	f, err := DefaultFont()
+	fnt, err := DefaultFont()
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -65,7 +65,7 @@ func BenchmarkShapeRun(b *testing.B) {
 	b.ResetTimer()
 
 	for range b.N {
-		run := ShapeRun(text, f, 11)
+		run := ShapeRun(text, fnt, 11)
 		if len(run.Runes) != len(run.Advances) {
 			b.Fatal("shaped run has unpaired advances")
 		}

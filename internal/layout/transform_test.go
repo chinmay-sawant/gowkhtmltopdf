@@ -10,6 +10,7 @@ import (
 )
 
 func TestParseTransformTranslateRotateScale(t *testing.T) {
+	t.Parallel()
 	m, has, ok := parseTransformList("translate(10pt, 20pt) rotate(90deg) scale(2)", 12)
 	if !ok || !has {
 		t.Fatalf("parse ok=%v has=%v", ok, has)
@@ -23,8 +24,9 @@ func TestParseTransformTranslateRotateScale(t *testing.T) {
 }
 
 func TestParseTransformMatrixAndSkew(t *testing.T) {
-	m, has, ok := parseTransformList("matrix(1, 0, 0, 1, 30, 0)", 12)
-	if !ok || !has {
+	t.Parallel()
+	m, has, isOK := parseTransformList("matrix(1, 0, 0, 1, 30, 0)", 12)
+	if !isOK || !has {
 		t.Fatal("matrix parse failed")
 	}
 
@@ -35,8 +37,8 @@ func TestParseTransformMatrixAndSkew(t *testing.T) {
 		t.Fatalf("matrix translate got (%v,%v), want (%v,0)", x, y, want)
 	}
 
-	sk, has, ok := parseTransformList("skewX(45deg)", 12)
-	if !ok || !has {
+	sk, has, isOK := parseTransformList("skewX(45deg)", 12)
+	if !isOK || !has {
 		t.Fatal("skewX parse failed")
 	}
 
@@ -47,20 +49,22 @@ func TestParseTransformMatrixAndSkew(t *testing.T) {
 }
 
 func TestParseTransformNoneAnd3DRejected(t *testing.T) {
-	_, has, ok := parseTransformList("none", 12)
-	if !ok || has {
-		t.Fatalf("none: ok=%v has=%v", ok, has)
+	t.Parallel()
+	_, has, isOK := parseTransformList("none", 12)
+	if !isOK || has {
+		t.Fatalf("none: ok=%v has=%v", isOK, has)
 	}
 
-	_, _, ok = parseTransformList("translate3d(1px,2px,3px)", 12)
-	if ok {
+	_, _, isOK = parseTransformList("translate3d(1px,2px,3px)", 12)
+	if isOK {
 		t.Fatal("3d transform should be rejected")
 	}
 }
 
 func TestParseTransformOriginKeywords(t *testing.T) {
-	spec, ok := parseTransformOrigin("top left", 12)
-	if !ok {
+	t.Parallel()
+	spec, isOK := parseTransformOrigin("top left", 12)
+	if !isOK {
 		t.Fatal("origin parse failed")
 	}
 
@@ -68,14 +72,14 @@ func TestParseTransformOriginKeywords(t *testing.T) {
 		t.Fatalf("top left → %+v", spec)
 	}
 
-	spec, ok = parseTransformOrigin("50% 50%", 12)
-	if !ok || spec.X != 50 || spec.Y != 50 {
+	spec, isOK = parseTransformOrigin("50% 50%", 12)
+	if !isOK || spec.X != 50 || spec.Y != 50 {
 		t.Fatalf("50%% 50%% → %+v", spec)
 	}
 }
 
 func TestTransformRotateBadgeSiblingsUnmoved(t *testing.T) {
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 .row { font-size: 12pt; }
 .badge {
   display: inline-block;
@@ -87,26 +91,26 @@ func TestTransformRotateBadgeSiblingsUnmoved(t *testing.T) {
 }
 .plain { display: inline-block; background: #eee; padding: 4pt 8pt; }
 `)
-	res := layoutHTML(t, `<div class="row"><span class="badge">NEW</span> <span class="plain">Sibling</span></div>`, s)
+	res := layoutHTML(t, `<div class="row"><span class="badge">NEW</span> <span class="plain">Sibling</span></div>`, cssSheet)
 
 	var badge, plain, plainFill *Op
 
 	for i := range res.Ops {
-		op := &res.Ops[i]
-		if op.Kind == OpFillRect && op.R > 0.8 && op.G > 0.8 && op.B > 0.8 {
-			plainFill = op
+		paintOp := &res.Ops[i]
+		if paintOp.Kind == OpFillRect && paintOp.R > 0.8 && paintOp.G > 0.8 && paintOp.B > 0.8 {
+			plainFill = paintOp
 		}
 
-		if op.Kind != OpText {
+		if paintOp.Kind != OpText {
 			continue
 		}
 
-		if strings.Contains(op.Text, "NEW") {
-			badge = op
+		if strings.Contains(paintOp.Text, "NEW") {
+			badge = paintOp
 		}
 
-		if strings.Contains(op.Text, "Sibling") {
-			plain = op
+		if strings.Contains(paintOp.Text, "Sibling") {
+			plain = paintOp
 		}
 	}
 
@@ -154,7 +158,8 @@ func TestTransformRotateBadgeSiblingsUnmoved(t *testing.T) {
 }
 
 func TestTransformAbsposContainingBlockScale(t *testing.T) {
-	s := sheet(t, `
+	t.Parallel()
+	cssSheet := sheet(t, `
 .host {
   position: relative;
   transform: scale(2);
@@ -173,7 +178,7 @@ func TestTransformAbsposContainingBlockScale(t *testing.T) {
   background: #f44336;
 }
 `)
-	res := layoutHTML(t, `<div class="host"><div class="child"></div></div>`, s)
+	res := layoutHTML(t, `<div class="host"><div class="child"></div></div>`, cssSheet)
 	host := findBoxByClass(t, res, "host")
 	child := findBoxByClass(t, res, "child")
 	// Padding-box CB: child top-left at host padding edge.
@@ -201,6 +206,7 @@ func TestTransformAbsposContainingBlockScale(t *testing.T) {
 }
 
 func TestTransformNestedScaleTranslate(t *testing.T) {
+	t.Parallel()
 	s := sheet(t, `
 .outer { transform: translate(10pt, 0); }
 .inner { transform: scale(2); transform-origin: top left; width: 40pt; height: 20pt; background: #090; }
@@ -228,7 +234,8 @@ func TestTransformNestedScaleTranslate(t *testing.T) {
 }
 
 func TestTransformKeyframesStaticCascaded(t *testing.T) {
-	s := sheet(t, `
+	t.Parallel()
+	cssSheet := sheet(t, `
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .badge {
   transform: rotate(45deg);
@@ -236,7 +243,7 @@ func TestTransformKeyframesStaticCascaded(t *testing.T) {
   display: inline-block;
 }
 `)
-	res := layoutHTML(t, `<span class="badge">A</span>`, s)
+	res := layoutHTML(t, `<span class="badge">A</span>`, cssSheet)
 
 	var text *Op
 
@@ -259,6 +266,7 @@ func TestTransformKeyframesStaticCascaded(t *testing.T) {
 }
 
 func TestOpacityExtGState(t *testing.T) {
+	t.Parallel()
 	s := sheet(t, `.faded { opacity: 0.5; background: #00f; width: 40pt; height: 20pt; }`)
 	res := layoutHTML(t, `<div class="faded">Hi</div>`, s)
 
@@ -298,20 +306,20 @@ func findBoxByClass(t *testing.T, res *Result, class string) *box {
 	var found *box
 
 	var walk func(b *box)
-	walk = func(b *box) {
-		if b == nil || found != nil {
+	walk = func(boxNode *box) {
+		if boxNode == nil || found != nil {
 			return
 		}
 
-		if b.node != nil {
-			if strings.Contains(b.node.Attribute("class"), class) {
-				found = b
+		if boxNode.node != nil {
+			if strings.Contains(boxNode.node.Attribute("class"), class) {
+				found = boxNode
 
 				return
 			}
 		}
 
-		for _, c := range b.children {
+		for _, c := range boxNode.children {
 			walk(c)
 		}
 	}

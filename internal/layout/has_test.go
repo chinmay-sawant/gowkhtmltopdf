@@ -18,17 +18,17 @@ func TestHasSelectorArticleBorder(t *testing.T) {
 	var with, without *html.Node
 
 	var walk func(*html.Node)
-	walk = func(n *html.Node) {
-		if n.Type == html.ElementNode && n.Name == "article" {
-			switch n.Attribute("id") {
+	walk = func(node *html.Node) {
+		if node.Type == html.ElementNode && node.Name == "article" {
+			switch node.Attribute("id") {
 			case "with":
-				with = n
+				with = node
 			case "without":
-				without = n
+				without = node
 			}
 		}
 
-		for _, c := range n.Children {
+		for _, c := range node.Children {
 			walk(c)
 		}
 	}

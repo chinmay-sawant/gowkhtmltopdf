@@ -9,7 +9,7 @@ import (
 )
 
 func TestMediaFeatureQueryPrint(t *testing.T) {
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 @media screen { .screen-only { display: none } }
 @media (min-width: 400px) { .wide { color: #00ff00 } }
 @media (min-width: 2000px) { .huge { display: none } }
@@ -28,8 +28,8 @@ func TestMediaFeatureQueryPrint(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Viewport 500pt — matches min-width 400px (300pt), not 2000px / max 100px.
-	res, err := Layout(root, Options{
-		Width: testViewport, Height: 800, Sheets: []*css.Stylesheet{s},
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: testViewport, Height: 800, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true,
 	})
 	if err != nil {

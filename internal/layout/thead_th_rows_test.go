@@ -26,33 +26,33 @@ func TestLeadingTHRowsRepeatAsHeader(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{Width: 400, Height: 200, Background: true})
+	res, err := Layout(root, Options{Width: 400, Height: 200, Background: true}) //nolint:exhaustruct // intentional zero fields
 	if err != nil {
 		t.Fatal(err)
 	}
 	// headerRows must be detected from first all-th row.
-	var tb *box
+	var tblBox *box
 
 	var walk func(b *box)
-	walk = func(b *box) {
-		if b.kind == "table" {
-			tb = b
+	walk = func(boxNode *box) {
+		if boxNode.kind == "table" {
+			tblBox = boxNode
 
 			return
 		}
 
-		for _, c := range b.children {
+		for _, c := range boxNode.children {
 			walk(c)
 		}
 	}
 	walk(res.root)
 
-	if tb == nil {
+	if tblBox == nil {
 		t.Fatal("no table")
 	}
 
-	if tb.headerRows != 1 {
-		t.Fatalf("headerRows=%d, want 1 (leading th row)", tb.headerRows)
+	if tblBox.headerRows != 1 {
+		t.Fatalf("headerRows=%d, want 1 (leading th row)", tblBox.headerRows)
 	}
 
 	doc := pdf.NewDocument()
@@ -70,13 +70,13 @@ func TestLeadingTHRowsRepeatAsHeader(t *testing.T) {
 	contentH := 280.0 - 40.0
 	pagesWithHeader := map[int]bool{}
 
-	for _, op := range res.Ops {
-		if op.Kind != OpText {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpText {
 			continue
 		}
 
-		if strings.Contains(op.Text, "ColA") || strings.Contains(op.Text, "ColB") {
-			pagesWithHeader[int(op.Y/contentH)] = true
+		if strings.Contains(paintOp.Text, "ColA") || strings.Contains(paintOp.Text, "ColB") {
+			pagesWithHeader[int(paintOp.Y/contentH)] = true
 		}
 	}
 
@@ -86,6 +86,7 @@ func TestLeadingTHRowsRepeatAsHeader(t *testing.T) {
 }
 
 func TestMixedFirstRowNotHeader(t *testing.T) {
+	t.Parallel()
 	// Row headers (th+td) must not be treated as a repeating column header band.
 	src := `<html><body><table>
 <tr><th>Name</th><td>Alice</td></tr>
@@ -93,27 +94,27 @@ func TestMixedFirstRowNotHeader(t *testing.T) {
 </table></body></html>`
 	res := layoutHTML(t, src)
 
-	var tb *box
+	var tblBox *box
 
 	var walk func(b *box)
-	walk = func(b *box) {
-		if b.kind == "table" {
-			tb = b
+	walk = func(boxNode *box) {
+		if boxNode.kind == "table" {
+			tblBox = boxNode
 
 			return
 		}
 
-		for _, c := range b.children {
+		for _, c := range boxNode.children {
 			walk(c)
 		}
 	}
 	walk(res.root)
 
-	if tb == nil {
+	if tblBox == nil {
 		t.Fatal("no table")
 	}
 
-	if tb.headerRows != 0 {
-		t.Fatalf("headerRows=%d, want 0 for th+td first row", tb.headerRows)
+	if tblBox.headerRows != 0 {
+		t.Fatalf("headerRows=%d, want 0 for th+td first row", tblBox.headerRows)
 	}
 }

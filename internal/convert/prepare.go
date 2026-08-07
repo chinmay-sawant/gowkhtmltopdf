@@ -109,7 +109,7 @@ func PrepareDocument(ctx context.Context, loader *load.Loader, page string, lp s
 		return nil, fmt.Errorf("load %q: %w", page, err)
 	}
 
-	prep := &PreparedDocument{
+	prep := &PreparedDocument{ //nolint:exhaustruct // intentional zero-value fields
 		Resource:  res,
 		Resources: NewResourceContext(loader, res.Base, lp),
 		Registry:  registry,

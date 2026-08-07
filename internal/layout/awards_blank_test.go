@@ -12,7 +12,7 @@ import (
 // Reproduce blank page between short filmography tables and a tall awards
 // table with rowspan + page-break-inside:avoid (wiki pattern).
 func TestAwardsAfterFilmographyNoBlankPage(t *testing.T) {
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 h2, h3 { font-size: 14pt; margin: 8pt 0 4pt; page-break-after: avoid; }
 .wikitable { border-collapse: collapse; page-break-inside: avoid; margin: 1em 0; font-size: 10pt; }
@@ -65,8 +65,8 @@ td, th { border: 1px solid #aaa; padding: 3pt; }
 
 	const pageH = 750.0
 
-	res, err := Layout(root, Options{
-		Width: 538, Height: pageH, Sheets: []*css.Stylesheet{s},
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 538, Height: pageH, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true,
 	})
 	if err != nil {
@@ -80,24 +80,24 @@ td, th { border: 1px solid #aaa; padding: 3pt; }
 	var awardsY, videoY float64
 	awardsY, videoY = -1, -1
 
-	for i, op := range res.Ops {
-		if op.Kind != OpText {
+	for paintOp, paintOp2 := range res.Ops {
+		if paintOp2.Kind != OpText {
 			continue
 		}
 
-		p := opPage[i]
+		p := opPage[paintOp]
 		if p > maxPage {
 			maxPage = p
 		}
 
 		pagesWithText[p]++
 
-		if op.Text == "Awards and nominations" {
-			awardsY = op.Y
+		if paintOp2.Text == "Awards and nominations" {
+			awardsY = paintOp2.Y
 		}
 
-		if strings.Contains(op.Text, "Call of Duty") {
-			videoY = op.Y
+		if strings.Contains(paintOp2.Text, "Call of Duty") {
+			videoY = paintOp2.Y
 		}
 	}
 

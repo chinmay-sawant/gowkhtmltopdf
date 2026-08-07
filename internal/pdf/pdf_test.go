@@ -34,10 +34,11 @@ func writePDF(t *testing.T, d *Document) []byte {
 }
 
 func TestWriteHeaderAndTrailer(t *testing.T) {
+	t.Parallel()
 	d := fixedDoc(t)
 	d.AddPage(595.276, 841.89) // A4 portrait
 	out := writePDF(t, d)
-	s := string(out)
+	str := string(out)
 
 	for _, want := range []string{
 		"%PDF-1.4",
@@ -51,35 +52,37 @@ func TestWriteHeaderAndTrailer(t *testing.T) {
 		"startxref",
 		"%%EOF",
 	} {
-		if !strings.Contains(s, want) {
+		if !strings.Contains(str, want) {
 			t.Errorf("output missing %q", want)
 		}
 	}
 
-	if !strings.HasPrefix(s, "%PDF-") {
+	if !strings.HasPrefix(str, "%PDF-") {
 		t.Errorf("output must start with PDF header")
 	}
 }
 
 func TestDeterministicOutput(t *testing.T) {
-	f, err := DefaultFont()
+	t.Parallel()
+
+	fnt, err := DefaultFont()
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	build := func() []byte {
-		d := fixedDoc(t)
-		p := d.AddPage(200, 200)
-		c := p.Content()
-		c.UseEmbeddedFont("F1", f)
-		c.BeginText()
-		c.SetFont("F1", 12)
-		c.TextAt(10, 20)
-		c.TextShow("hello")
-		c.EndText()
-		d.SetOutline(&Outline{Title: "root", Children: []*Outline{{Title: "child"}}})
+		data := fixedDoc(t)
+		p := data.AddPage(200, 200)
+		cur := p.Content()
+		cur.UseEmbeddedFont("F1", fnt)
+		cur.BeginText()
+		cur.SetFont("F1", 12)
+		cur.TextAt(10, 20)
+		cur.TextShow("hello")
+		cur.EndText()
+		data.SetOutline(&Outline{Title: "root", Children: []*Outline{{Title: "child"}}}) //nolint:exhaustruct // intentional zero-value fields
 
-		return writePDF(t, d)
+		return writePDF(t, data)
 	}
 
 	a, b := build(), build()
@@ -89,14 +92,16 @@ func TestDeterministicOutput(t *testing.T) {
 }
 
 func TestXrefOffsets(t *testing.T) {
-	f, err := DefaultFont()
+	t.Parallel()
+
+	fnt, err := DefaultFont()
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	d := fixedDoc(t)
 	p := d.AddPage(100, 100)
-	p.Content().UseEmbeddedFont("F1", f)
+	p.Content().UseEmbeddedFont("F1", fnt)
 
 	out := writePDF(t, d)
 
@@ -132,13 +137,13 @@ func TestXrefOffsets(t *testing.T) {
 
 	offsets := map[int]int{}
 
-	for i := xrefIdx + 3; i < startxref-2; i++ {
-		fields := strings.Fields(lines[i])
+	for idx := xrefIdx + 3; idx < startxref-2; idx++ {
+		fields := strings.Fields(lines[idx])
 		if len(fields) != 3 || fields[1] != "00000" {
 			continue
 		}
 
-		obj := i - xrefIdx - 2
+		obj := idx - xrefIdx - 2
 
 		off, err := strconv.Atoi(fields[0])
 		if err != nil {
@@ -157,6 +162,8 @@ func TestXrefOffsets(t *testing.T) {
 }
 
 func TestEmptyDocFails(t *testing.T) {
+	t.Parallel()
+
 	d := NewDocument()
 
 	var buf bytes.Buffer
@@ -167,21 +174,22 @@ func TestEmptyDocFails(t *testing.T) {
 }
 
 func TestContentOperators(t *testing.T) {
-	d := fixedDoc(t)
-	p := d.AddPage(300, 300)
-	c := p.Content()
-	c.Save()
-	c.SetFillColor(0.5, 0.25, 0.75)
-	c.Rect(10, 10, 50, 60)
-	c.Fill()
-	c.SetLineWidth(1.5)
-	c.MoveTo(0, 0)
-	c.LineTo(100, 100)
-	c.Stroke()
-	c.Restore()
+	t.Parallel()
+	data := fixedDoc(t)
+	p := data.AddPage(300, 300)
+	cur := p.Content()
+	cur.Save()
+	cur.SetFillColor(0.5, 0.25, 0.75)
+	cur.Rect(10, 10, 50, 60)
+	cur.Fill()
+	cur.SetLineWidth(1.5)
+	cur.MoveTo(0, 0)
+	cur.LineTo(100, 100)
+	cur.Stroke()
+	cur.Restore()
 
-	out := writePDF(t, d)
-	s := string(out)
+	out := writePDF(t, data)
+	str := string(out)
 	// content stream is flate-compressed, so check compressed-free page by
 	// disabling compression instead.
 	d2 := fixedDoc(t)
@@ -194,30 +202,32 @@ func TestContentOperators(t *testing.T) {
 		t.Errorf("rect operator missing in uncompressed stream")
 	}
 
-	_ = s
+	_ = str
 }
 
 func TestTextStream(t *testing.T) {
-	f, err := DefaultFont()
+	t.Parallel()
+
+	fnt, err := DefaultFont()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	d := fixedDoc(t)
-	d.SetCompression(false)
-	p := d.AddPage(300, 300)
-	c := p.Content()
-	c.UseEmbeddedFont("F1", f)
-	c.BeginText()
-	c.SetFont("F1", 14)
-	c.TextLeading(18)
-	c.TextAt(20, 280)
-	c.TextShow("line one")
-	c.TextNextLine()
-	c.TextShow("line two")
-	c.EndText()
+	data := fixedDoc(t)
+	data.SetCompression(false)
+	p := data.AddPage(300, 300)
+	cur := p.Content()
+	cur.UseEmbeddedFont("F1", fnt)
+	cur.BeginText()
+	cur.SetFont("F1", 14)
+	cur.TextLeading(18)
+	cur.TextAt(20, 280)
+	cur.TextShow("line one")
+	cur.TextNextLine()
+	cur.TextShow("line two")
+	cur.EndText()
 
-	out := string(writePDF(t, d))
+	out := string(writePDF(t, data))
 	for _, want := range []string{
 		"/F1 14 Tf",
 		"20 280 Td",
@@ -234,15 +244,16 @@ func TestTextStream(t *testing.T) {
 }
 
 func TestImageXObject(t *testing.T) {
-	d := fixedDoc(t)
-	d.SetCompression(false)
+	t.Parallel()
+	data := fixedDoc(t)
+	data.SetCompression(false)
 
-	p := d.AddPage(200, 200)
+	p := data.AddPage(200, 200)
 	if err := p.Content().AddPNGImage("Im1", 10, 10, 100, 50, makePNG(t, false)); err != nil {
 		t.Fatal(err)
 	}
 
-	out := string(writePDF(t, d))
+	out := string(writePDF(t, data))
 	for _, want := range []string{
 		"/Im1 Do",
 		"/Subtype /Image",
@@ -257,14 +268,15 @@ func TestImageXObject(t *testing.T) {
 }
 
 func TestLinkAnnotations(t *testing.T) {
-	d := fixedDoc(t)
-	d.SetCompression(false)
-	p1 := d.AddPage(200, 200)
+	t.Parallel()
+	data := fixedDoc(t)
+	data.SetCompression(false)
+	p1 := data.AddPage(200, 200)
 	p1.AddLinkURI([4]float64{10, 10, 110, 30}, "https://example.com")
 	p1.AddLinkDest([4]float64{10, 40, 110, 60}, 1, 50, 150)
-	d.AddPage(200, 200)
+	data.AddPage(200, 200)
 
-	out := string(writePDF(t, d))
+	out := string(writePDF(t, data))
 	for _, want := range []string{
 		"/Subtype /Link",
 		"/A << /S /URI /URI (https://example.com) >>",
@@ -279,6 +291,7 @@ func TestLinkAnnotations(t *testing.T) {
 }
 
 func TestPDFStringLatin1NotUTF8(t *testing.T) {
+	t.Parallel()
 	// Middle dot must be one WinAnsi byte 0xB7, not UTF-8 C2 B7.
 	got := pdfString("a·b")
 	want := "(a\\267b)"
@@ -298,17 +311,19 @@ func TestPDFStringLatin1NotUTF8(t *testing.T) {
 }
 
 func TestSubsetWidthsArePDFUnits(t *testing.T) {
-	f, err := DefaultFont()
+	t.Parallel()
+
+	fnt, err := DefaultFont()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	sub, err := subsetFont(f, []rune("A "), subsetSimple)
+	sub, err := subsetFont(fnt, []rune("A "), subsetSimple)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	first, _, w := subsetWidths(sub, f.UnitsPerEm())
+	first, _, width := subsetWidths(sub, fnt.UnitsPerEm())
 
 	g, ok := sub.glyphIDs['A']
 	if !ok {
@@ -316,8 +331,8 @@ func TestSubsetWidthsArePDFUnits(t *testing.T) {
 	}
 
 	raw := sub.widths[g]
-	aWidth := w[int('A')-first]
-	scaled := raw * 1000 / float64(f.UnitsPerEm())
+	aWidth := width[int('A')-first]
+	scaled := raw * 1000 / float64(fnt.UnitsPerEm())
 	// 'A' is ~667 in 1000-unit em for Liberation Sans (TTF advance ~1366 at 2048/em).
 	if aWidth < 200 || aWidth > 900 {
 		t.Errorf("A width in PDF units = %v, want ~500-700", aWidth)
@@ -333,17 +348,18 @@ func TestSubsetWidthsArePDFUnits(t *testing.T) {
 }
 
 func TestOutlines(t *testing.T) {
-	d := fixedDoc(t)
-	d.SetCompression(false)
-	d.AddPage(200, 200)
+	t.Parallel()
+	data := fixedDoc(t)
+	data.SetCompression(false)
+	data.AddPage(200, 200)
 
-	child := &Outline{Title: "child", PageRef: "4 0 R", X: 10, Y: 100}
-	d.SetOutline(&Outline{
+	child := &Outline{Title: "child", PageRef: "4 0 R", X: 10, Y: 100} //nolint:exhaustruct // intentional zero-value fields
+	data.SetOutline(&Outline{                                          //nolint:exhaustruct // intentional zero-value fields
 		Title:    "root",
 		Children: []*Outline{{Title: "first", Children: []*Outline{child}}, {Title: "second"}},
 	})
 
-	out := string(writePDF(t, d))
+	out := string(writePDF(t, data))
 	for _, want := range []string{
 		"/Type /Outlines",
 		"/PageMode /UseOutlines",
@@ -371,20 +387,21 @@ func TestOutlines(t *testing.T) {
 }
 
 func outlineSnippet(out string) string {
-	i := strings.Index(out, "/Outlines")
-	if i < 0 {
+	idx := strings.Index(out, "/Outlines")
+	if idx < 0 {
 		return "(no /Outlines)"
 	}
 
-	end := i + 40
+	end := idx + 40
 	if end > len(out) {
 		end = len(out)
 	}
 
-	return out[i:end]
+	return out[idx:end]
 }
 
 func TestInfoDict(t *testing.T) {
+	t.Parallel()
 	d := fixedDoc(t)
 	d.AddPage(100, 100)
 
@@ -402,33 +419,36 @@ func TestInfoDict(t *testing.T) {
 }
 
 func TestOutlineCountAndSort(t *testing.T) {
-	a := &Outline{Title: "a", PageRef: "2 0 R", Y: 10}
-	b := &Outline{Title: "b", PageRef: "2 0 R", Y: 5}
-	c := &Outline{Title: "c", PageRef: "1 0 R", Y: 3}
-	nodes := []*Outline{a, b, c}
+	t.Parallel()
+
+	arg := &Outline{Title: "a", PageRef: "2 0 R", Y: 10} //nolint:exhaustruct // intentional zero-value fields
+	b := &Outline{Title: "b", PageRef: "2 0 R", Y: 5}    //nolint:exhaustruct // intentional zero-value fields
+	c := &Outline{Title: "c", PageRef: "1 0 R", Y: 3}    //nolint:exhaustruct // intentional zero-value fields
+	nodes := []*Outline{arg, b, c}
 	SortOutlines(nodes)
 
-	if nodes[0] != c || nodes[1] != a || nodes[2] != b {
+	if nodes[0] != c || nodes[1] != arg || nodes[2] != b {
 		t.Errorf("sort order wrong: %q %q %q", nodes[0].Title, nodes[1].Title, nodes[2].Title)
 	}
 
-	if got := outlineCount(&Outline{Children: []*Outline{{}, {Children: []*Outline{{}}}}}); got != 3 {
+	if got := outlineCount(&Outline{Children: []*Outline{{}, {Children: []*Outline{{}}}}}); got != 3 { //nolint:exhaustruct // intentional zero-value fields
 		t.Errorf("outlineCount = %d, want 3", got)
 	}
 }
 
 func TestSetFillColorGrayscale(t *testing.T) {
+	t.Parallel()
 	// P5-03: Document.SetGrayscale must have its promised paint-time effect.
 	// Fill/stroke colors fold through Rec.601 luma so r=g=b lines are equal.
-	d := fixedDoc(t)
-	d.SetGrayscale(true)
-	d.SetCompression(false)
-	p := d.AddPage(100, 100)
+	doc := fixedDoc(t)
+	doc.SetGrayscale(true)
+	doc.SetCompression(false)
+	p := doc.AddPage(100, 100)
 	c := p.Content()
 	c.SetFillColor(1, 0, 0)   // pure red → luma 0.299
 	c.SetStrokeColor(0, 1, 0) // pure green → luma 0.587
 
-	out := string(writePDF(t, d))
+	out := string(writePDF(t, doc))
 	if !strings.Contains(out, "0.299 0.299 0.299 rg") {
 		t.Errorf("grayscale fill not folded to luma: %q", outlineSnippet(out))
 	}
@@ -442,44 +462,46 @@ func TestSetFillColorGrayscale(t *testing.T) {
 	}
 
 	// Default (off) keeps colors untouched.
-	d2 := fixedDoc(t)
-	d2.SetCompression(false)
-	c2 := d2.AddPage(100, 100).Content()
+	d2Val := fixedDoc(t)
+	d2Val.SetCompression(false)
+	c2 := d2Val.AddPage(100, 100).Content()
 	c2.SetFillColor(1, 0, 0)
 	c2.SetStrokeColor(0, 1, 0)
 
-	out2 := string(writePDF(t, d2))
+	out2 := string(writePDF(t, d2Val))
 	if !strings.Contains(out2, "1 0 0 rg") || !strings.Contains(out2, "0 1 0 RG") {
 		t.Error("color mode must keep the raw RGB color")
 	}
 }
 
 func TestGrayscaleGetter(t *testing.T) {
-	d := NewDocument()
-	if d.Grayscale() {
+	t.Parallel()
+
+	doc := NewDocument()
+	if doc.Grayscale() {
 		t.Error("new document must start in color mode")
 	}
 
-	d.SetGrayscale(true)
+	doc.SetGrayscale(true)
 
-	if !d.Grayscale() {
+	if !doc.Grayscale() {
 		t.Error("SetGrayscale(true) must report Grayscale() == true")
 	}
 }
 
 func TestOutlineBadPageRefFails(t *testing.T) {
+	t.Parallel()
 	// P5-04: a bogus PageRef must fail Write instead of emitting a corrupt
 	// /Dest with no diagnostic.
 	for _, ref := range []string{"", "999999 0 R", "garbage", "4 0 X", "0 0 R"} {
-		d := fixedDoc(t)
-		d.AddPage(200, 200)
-		d.SetOutline(&Outline{Title: "root", Children: []*Outline{{Title: "bad", PageRef: ref}}})
+		data := fixedDoc(t)
+		data.AddPage(200, 200)
+		data.SetOutline(&Outline{Title: "root", Children: []*Outline{{Title: "bad", PageRef: ref}}}) //nolint:exhaustruct // intentional zero-value fields
 
 		var buf bytes.Buffer
 
-		err := d.Write(&buf)
+		err := data.Write(&buf)
 		if ref == "" {
-			// empty PageRef = no /Dest at all; valid.
 			if err != nil {
 				t.Errorf("empty PageRef: unexpected error %v", err)
 			}
@@ -495,7 +517,7 @@ func TestOutlineBadPageRefFails(t *testing.T) {
 	d := fixedDoc(t)
 	d.SetCompression(false)
 	d.AddPage(200, 200)
-	d.SetOutline(&Outline{Title: "root", Children: []*Outline{{Title: "ok", PageRef: "1 0 R", X: 5, Y: 6}}})
+	d.SetOutline(&Outline{Title: "root", Children: []*Outline{{Title: "ok", PageRef: "1 0 R", X: 5, Y: 6}}}) //nolint:exhaustruct // intentional zero-value fields
 
 	out := string(writePDF(t, d))
 	if !strings.Contains(out, "/Dest [1 0 R /XYZ 5 6 null]") {
@@ -504,13 +526,14 @@ func TestOutlineBadPageRefFails(t *testing.T) {
 }
 
 func TestWriteToMemoryBuffer(t *testing.T) {
-	d := fixedDoc(t)
-	d.SetCompression(false)
-	p := d.AddPage(200, 200)
+	t.Parallel()
+	data := fixedDoc(t)
+	data.SetCompression(false)
+	p := data.AddPage(200, 200)
 	p.Content().TextShow("memory buffer")
 
 	var buf bytes.Buffer
-	if err := d.Write(&buf); err != nil {
+	if err := data.Write(&buf); err != nil {
 		t.Fatalf("Write: %v", err)
 	}
 
@@ -548,24 +571,25 @@ func kidsRefs(t *testing.T, out string) []string {
 }
 
 func TestReorderPagesKidsOrder(t *testing.T) {
-	d := fixedDoc(t)
-	pA := d.AddPage(100, 100)
-	pB := d.AddPage(100, 100)
-	pC := d.AddPage(100, 100)
+	t.Parallel()
+	data := fixedDoc(t)
+	pageA := data.AddPage(100, 100)
+	pBVal := data.AddPage(100, 100)
+	pCVal := data.AddPage(100, 100)
 
-	if err := d.ReorderPages([]int{2, 0, 1}); err != nil {
+	if err := data.ReorderPages([]int{2, 0, 1}); err != nil {
 		t.Fatalf("ReorderPages: %v", err)
 	}
 
-	out := string(writePDF(t, d))
+	out := string(writePDF(t, data))
 	kids := kidsRefs(t, out)
-	want := []string{pC.ref.String(), pA.ref.String(), pB.ref.String()}
+	want := []string{pCVal.ref.String(), pageA.ref.String(), pBVal.ref.String()}
 
 	if strings.Join(kids, " ") != strings.Join(want, " ") {
 		t.Errorf("/Kids = %v, want %v", kids, want)
 	}
 	// every page object still owns its original content stream
-	for _, p := range []*Page{pA, pB, pC} {
+	for _, p := range []*Page{pageA, pBVal, pCVal} {
 		if !strings.Contains(out, "/Contents "+p.contentRef.String()) {
 			t.Errorf("page %s lost its content stream %s", p.ref, p.contentRef)
 		}
@@ -573,15 +597,16 @@ func TestReorderPagesKidsOrder(t *testing.T) {
 }
 
 func TestDuplicatePage(t *testing.T) {
-	d := fixedDoc(t)
-	d.SetCompression(false)
-	pA := d.AddPage(100, 100)
-	pA.Content().TextShow("AAA")
+	t.Parallel()
+	data := fixedDoc(t)
+	data.SetCompression(false)
+	pageA := data.AddPage(100, 100)
+	pageA.Content().TextShow("AAA")
 
-	pB := d.AddPage(200, 200)
-	pB.Content().TextShow("BBB")
+	pBVal := data.AddPage(200, 200)
+	pBVal.Content().TextShow("BBB")
 
-	dup, err := d.DuplicatePage(0)
+	dup, err := data.DuplicatePage(0)
 	if err != nil {
 		t.Fatalf("DuplicatePage: %v", err)
 	}
@@ -590,24 +615,24 @@ func TestDuplicatePage(t *testing.T) {
 		t.Errorf("duplicate size = %g x %g, want 100 x 100", dup.Width(), dup.Height())
 	}
 
-	if d.PageCount() != 3 {
-		t.Fatalf("PageCount = %d, want 3", d.PageCount())
+	if data.PageCount() != 3 {
+		t.Fatalf("PageCount = %d, want 3", data.PageCount())
 	}
 
-	if dup.ref == pA.ref || dup.contentRef == pA.contentRef {
+	if dup.ref == pageA.ref || dup.contentRef == pageA.contentRef {
 		t.Error("duplicate must have its own page and content objects")
 	}
 
-	out := string(writePDF(t, d))
+	out := string(writePDF(t, data))
 	// kids must be [A B A'] and every page keeps its own content stream
 	kids := kidsRefs(t, out)
-	wantKids := []string{pA.ref.String(), pB.ref.String(), dup.ref.String()}
+	wantKids := []string{pageA.ref.String(), pBVal.ref.String(), dup.ref.String()}
 
 	if strings.Join(kids, " ") != strings.Join(wantKids, " ") {
 		t.Errorf("/Kids = %v, want %v", kids, wantKids)
 	}
 
-	for _, p := range []*Page{pA, pB, dup} {
+	for _, p := range []*Page{pageA, pBVal, dup} {
 		if !strings.Contains(out, "/Contents "+p.contentRef.String()) {
 			t.Errorf("page %s lost its content stream %s", p.ref, p.contentRef)
 		}
@@ -617,25 +642,26 @@ func TestDuplicatePage(t *testing.T) {
 		t.Errorf("(AAA) appears %d times, want 2", c)
 	}
 
-	if _, err := d.DuplicatePage(5); err == nil {
+	if _, err := data.DuplicatePage(5); err == nil {
 		t.Error("DuplicatePage(5): expected error for out-of-range index")
 	}
 
-	if _, err := d.DuplicatePage(-1); err == nil {
+	if _, err := data.DuplicatePage(-1); err == nil {
 		t.Error("DuplicatePage(-1): expected error for negative index")
 	}
 }
 
 func TestDuplicatePageOwnsResourceMaps(t *testing.T) {
-	d := fixedDoc(t)
-	d.SetCompression(false)
+	t.Parallel()
+	data := fixedDoc(t)
+	data.SetCompression(false)
 
-	p := d.AddPage(100, 100)
-	if err := p.Content().AddPNGImage("I0", 0, 0, 10, 10, makePNG(t, false)); err != nil {
+	page := data.AddPage(100, 100)
+	if err := page.Content().AddPNGImage("I0", 0, 0, 10, 10, makePNG(t, false)); err != nil {
 		t.Fatalf("source image: %v", err)
 	}
 
-	dup, err := d.DuplicatePage(0)
+	dup, err := data.DuplicatePage(0)
 	if err != nil {
 		t.Fatalf("DuplicatePage: %v", err)
 	}
@@ -644,7 +670,7 @@ func TestDuplicatePageOwnsResourceMaps(t *testing.T) {
 		t.Fatalf("duplicate image: %v", err)
 	}
 
-	if _, ok := p.Content().imageRefs["I1"]; ok {
+	if _, ok := page.Content().imageRefs["I1"]; ok {
 		t.Fatal("duplicate resource was added to source page")
 	}
 
@@ -654,9 +680,10 @@ func TestDuplicatePageOwnsResourceMaps(t *testing.T) {
 }
 
 func TestReorderPagesValidation(t *testing.T) {
-	d := fixedDoc(t)
-	d.AddPage(100, 100)
-	d.AddPage(100, 100)
+	t.Parallel()
+	data := fixedDoc(t)
+	data.AddPage(100, 100)
+	data.AddPage(100, 100)
 
 	for _, order := range [][]int{
 		{0},       // wrong length
@@ -665,21 +692,21 @@ func TestReorderPagesValidation(t *testing.T) {
 		{2, 0},    // out of range
 		{0, 0},    // duplicate index
 	} {
-		if err := d.ReorderPages(order); err == nil {
+		if err := data.ReorderPages(order); err == nil {
 			t.Errorf("ReorderPages(%v): expected error, got nil", order)
 		}
 	}
 	// failed reorders must leave the page order untouched
-	if got := kidsRefs(t, string(writePDF(t, d))); len(got) != 2 {
+	if got := kidsRefs(t, string(writePDF(t, data))); len(got) != 2 {
 		t.Errorf("pages corrupted by failed reorders: %v", got)
 	}
 	// reordering after Write (finalize) must fail
 	var buf bytes.Buffer
-	if err := d.Write(&buf); err != nil {
+	if err := data.Write(&buf); err != nil {
 		t.Fatalf("Write: %v", err)
 	}
 
-	if err := d.ReorderPages([]int{1, 0}); err == nil {
+	if err := data.ReorderPages([]int{1, 0}); err == nil {
 		t.Error("ReorderPages after finalize: expected error, got nil")
 	}
 }

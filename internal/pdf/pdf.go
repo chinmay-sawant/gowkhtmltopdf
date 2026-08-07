@@ -75,7 +75,7 @@ type Document struct {
 
 // NewDocument creates an empty PDF document.
 func NewDocument() *Document {
-	return &Document{
+	return &Document{ //nolint:exhaustruct // intentional zero-value fields
 		info:           map[string]string{},
 		useCompression: true,
 		fontCache:      map[string]objRef{},
@@ -101,7 +101,7 @@ func (d *Document) SetInfo(key, value string) { d.info[key] = value }
 func (d *Document) newObject() objRef {
 	d.nextID++
 	id := d.nextID
-	d.objects = append(d.objects, &object{id: id})
+	d.objects = append(d.objects, &object{id: id}) //nolint:exhaustruct // intentional zero-value fields
 
 	return objRef(id)
 }
@@ -140,15 +140,15 @@ type annotation struct {
 
 // AddPage appends a page with the given size in points.
 func (d *Document) AddPage(width, height float64) *Page {
-	p := &Page{doc: d, width: width, height: height}
-	p.ref = d.newObject()
+	page := &Page{doc: d, width: width, height: height} //nolint:exhaustruct // intentional zero-value fields
+	page.ref = d.newObject()
 	contentRef := d.newObject()
-	p.contentRef = contentRef
-	p.content = NewContent()
-	p.content.doc = d
-	d.pages = append(d.pages, p)
+	page.contentRef = contentRef
+	page.content = NewContent()
+	page.content.doc = d
+	d.pages = append(d.pages, page)
 
-	return p
+	return page
 }
 
 // PageCount returns the number of pages currently in the document.
@@ -194,7 +194,7 @@ func (d *Document) ReorderPages(order []int) error {
 	seen := make([]bool, len(d.pages))
 	next := make([]*Page, len(d.pages))
 
-	for i, idx := range order {
+	for index, idx := range order {
 		if idx < 0 || idx >= len(d.pages) {
 			return fmt.Errorf("pdf: reorder: index %d out of range (0..%d)", idx, len(d.pages)-1)
 		}
@@ -204,7 +204,7 @@ func (d *Document) ReorderPages(order []int) error {
 		}
 
 		seen[idx] = true
-		next[i] = d.pages[idx]
+		next[index] = d.pages[idx]
 	}
 
 	d.pages = next
@@ -218,16 +218,16 @@ func (d *Document) ReorderPages(order []int) error {
 // and already-materialized image objects may be shared by the document, but
 // each page owns its resource maps. Used to materialize
 // copies/collate page runs before ReorderPages.
-func (d *Document) DuplicatePage(i int) (*Page, error) {
+func (d *Document) DuplicatePage(idx int) (*Page, error) {
 	if d.finalized {
 		return nil, errors.New("pdf: duplicate: document already finalized")
 	}
 
-	if i < 0 || i >= len(d.pages) {
-		return nil, fmt.Errorf("pdf: duplicate: page index %d out of range (0..%d)", i, len(d.pages)-1)
+	if idx < 0 || idx >= len(d.pages) {
+		return nil, fmt.Errorf("pdf: duplicate: page index %d out of range (0..%d)", idx, len(d.pages)-1)
 	}
 
-	src := d.pages[i]
+	src := d.pages[idx]
 	p := d.AddPage(src.width, src.height)
 	p.content = cloneContent(src.content)
 	p.annots = append([]annotation(nil), src.annots...)
@@ -246,12 +246,12 @@ func (p *Page) Content() *Content { return p.content }
 
 // AddLinkURI adds an external URI annotation.
 func (p *Page) AddLinkURI(rect [4]float64, uri string) {
-	p.annots = append(p.annots, annotation{rect: rect, uri: uri})
+	p.annots = append(p.annots, annotation{rect: rect, uri: uri}) //nolint:exhaustruct // intentional zero-value fields
 }
 
 // AddLinkDest adds an internal GoTo annotation to a page (0-based index).
 func (p *Page) AddLinkDest(rect [4]float64, page int, x, y float64) {
-	p.annots = append(p.annots, annotation{rect: rect, destPage: page, destX: x, destY: y, hasDest: true})
+	p.annots = append(p.annots, annotation{rect: rect, destPage: page, destX: x, destY: y, hasDest: true}) //nolint:exhaustruct // intentional zero-value fields
 }
 
 // Outline is a PDF outline (bookmark) node.
@@ -268,7 +268,7 @@ type Outline struct {
 func (d *Document) SetOutline(root *Outline) { d.outlineRoot = root }
 
 // Write serializes the full PDF to w.
-func (d *Document) Write(w io.Writer) error {
+func (d *Document) Write(width io.Writer) error {
 	if err := d.finalize(); err != nil {
 		return err
 	}
@@ -280,20 +280,20 @@ func (d *Document) Write(w io.Writer) error {
 
 	offsets := make([]int64, len(d.objects)+1)
 
-	for _, o := range d.objects {
-		if o.dict == "" {
+	for _, obj := range d.objects {
+		if obj.dict == "" {
 			// Object was allocated but never materialized; leave its offset
 			// unrecorded so the xref cannot point at the *next* object.
 			continue
 		}
 
-		offsets[o.id] = int64(buf.Len())
-		fmt.Fprintf(&buf, "%d 0 obj\n", o.id)
-		buf.WriteString(o.dict)
+		offsets[obj.id] = int64(buf.Len())
+		fmt.Fprintf(&buf, "%d 0 obj\n", obj.id)
+		buf.WriteString(obj.dict)
 
-		if len(o.stream) > 0 {
+		if len(obj.stream) > 0 {
 			buf.WriteString("\nstream\n")
-			buf.Write(o.stream)
+			buf.Write(obj.stream)
 			buf.WriteString("\nendstream")
 		}
 
@@ -312,19 +312,19 @@ func (d *Document) Write(w io.Writer) error {
 	fmt.Fprintln(&buf, "trailer")
 	fmt.Fprintf(&buf, "<< /Size %d /Root %s /Info %s >>\n", len(d.objects)+1, d.catalogRef, d.infoRef)
 	fmt.Fprintf(&buf, "startxref\n%d\n%%%%EOF\n", xrefPos)
-	_, err := w.Write(buf.Bytes())
+	_, err := width.Write(buf.Bytes())
 
 	return err
 }
 
 // WriteTo implements io.WriterTo.
-func (d *Document) WriteTo(w io.Writer) (int64, error) {
+func (d *Document) WriteTo(width io.Writer) (int64, error) {
 	var buf bytes.Buffer
 	if err := d.Write(&buf); err != nil {
 		return 0, err
 	}
 
-	if _, err := w.Write(buf.Bytes()); err != nil {
+	if _, err := width.Write(buf.Bytes()); err != nil {
 		return 0, err
 	}
 
@@ -482,26 +482,26 @@ func (d *Document) finalizePage(p *Page, pagesRef objRef) error {
 
 func (d *Document) buildAnnots(p *Page) {
 	for i := range p.annots {
-		a := &p.annots[i]
-		a.annotRef = d.newObject()
-		r := a.rect
+		arg := &p.annots[i]
+		arg.annotRef = d.newObject()
+		r := arg.rect
 
-		var b strings.Builder
+		var buf strings.Builder
 
-		fmt.Fprintf(&b, "<< /Type /Annot /Subtype /Link /Rect [%s %s %s %s]",
+		fmt.Fprintf(&buf, "<< /Type /Annot /Subtype /Link /Rect [%s %s %s %s]",
 			num(r[0]), num(r[1]), num(r[2]), num(r[3]))
 
-		if a.hasDest {
-			if a.destPage >= 0 && a.destPage < len(d.pages) {
-				fmt.Fprintf(&b, " /Dest [%s /XYZ %s %s null]",
-					d.pages[a.destPage].ref, num(a.destX), num(a.destY))
+		if arg.hasDest {
+			if arg.destPage >= 0 && arg.destPage < len(d.pages) {
+				fmt.Fprintf(&buf, " /Dest [%s /XYZ %s %s null]",
+					d.pages[arg.destPage].ref, num(arg.destX), num(arg.destY))
 			}
 		} else {
-			fmt.Fprintf(&b, " /A << /S /URI /URI %s >>", pdfString(a.uri))
+			fmt.Fprintf(&buf, " /A << /S /URI /URI %s >>", pdfString(arg.uri))
 		}
 
-		b.WriteString(" >>")
-		d.setDict(a.annotRef, b.String())
+		buf.WriteString(" >>")
+		d.setDict(arg.annotRef, buf.String())
 	}
 }
 
@@ -530,43 +530,43 @@ func (d *Document) finalizeOutlines(root *Outline) error {
 // buildOutlineItems writes each child item of parent, with /Parent /Prev
 // /Next sibling links, recursing into nested children.
 func buildOutlineItems(parent *Outline, parentRef objRef, d *Document) error {
-	for i, n := range parent.Children {
+	for idx, child := range parent.Children {
 		var parts []string
-		parts = append(parts, "<< /Title "+pdfString(n.Title))
+		parts = append(parts, "<< /Title "+pdfString(child.Title))
 
-		if n.PageRef != "" {
-			ref, ok := parseRef(n.PageRef)
+		if child.PageRef != "" {
+			ref, ok := parseRef(child.PageRef)
 			if !ok {
-				return fmt.Errorf("pdf: outline %q: bad PageRef %q", n.Title, n.PageRef)
+				return fmt.Errorf("pdf: outline %q: bad PageRef %q", child.Title, child.PageRef)
 			}
 
 			if int(ref) < 1 || int(ref) > len(d.objects) {
-				return fmt.Errorf("pdf: outline %q: PageRef %q out of range", n.Title, n.PageRef)
+				return fmt.Errorf("pdf: outline %q: PageRef %q out of range", child.Title, child.PageRef)
 			}
 
-			parts = append(parts, fmt.Sprintf("/Dest [%s /XYZ %s %s null]", ref, num(n.X), num(n.Y)))
+			parts = append(parts, fmt.Sprintf("/Dest [%s /XYZ %s %s null]", ref, num(child.X), num(child.Y)))
 		}
 
-		if len(n.Children) > 0 {
-			first := n.Children[0].refStr
-			last := n.Children[len(n.Children)-1].refStr
-			parts = append(parts, fmt.Sprintf("/First %s /Last %s /Count %d", first, last, countChildren(n)))
+		if len(child.Children) > 0 {
+			first := child.Children[0].refStr
+			last := child.Children[len(child.Children)-1].refStr
+			parts = append(parts, fmt.Sprintf("/First %s /Last %s /Count %d", first, last, countChildren(child)))
 		}
 
 		parts = append(parts, "/Parent "+parentRef.String())
-		if i > 0 {
-			parts = append(parts, "/Prev "+parent.Children[i-1].refStr.String())
+		if idx > 0 {
+			parts = append(parts, "/Prev "+parent.Children[idx-1].refStr.String())
 		}
 
-		if i < len(parent.Children)-1 {
-			parts = append(parts, "/Next "+parent.Children[i+1].refStr.String())
+		if idx < len(parent.Children)-1 {
+			parts = append(parts, "/Next "+parent.Children[idx+1].refStr.String())
 		}
 
 		parts = append(parts, ">>")
-		d.setDict(n.refStr, strings.Join(parts, " "))
+		d.setDict(child.refStr, strings.Join(parts, " "))
 
-		if len(n.Children) > 0 {
-			if err := buildOutlineItems(n, n.refStr, d); err != nil {
+		if len(child.Children) > 0 {
+			if err := buildOutlineItems(child, child.refStr, d); err != nil {
 				return err
 			}
 		}
@@ -619,42 +619,42 @@ func outlineCount(root *Outline) int {
 // replaced with '?'; emitting raw UTF-8 bytes made viewers show mojibake
 // and missing glyphs (e.g. "·" as "\302\267").
 func pdfString(s string) string {
-	var b strings.Builder
+	var buf strings.Builder
 
-	b.WriteByte('(')
+	buf.WriteByte('(')
 
-	for _, r := range s {
-		if r > 0xFF {
-			r = winAnsiFold(r)
+	for _, rVal := range s {
+		if rVal > maxLatin1Code {
+			rVal = winAnsiFold(rVal)
 		}
 
-		if r > 0xFF {
-			r = '?'
+		if rVal > maxLatin1Code {
+			rVal = '?'
 		}
 
-		c := byte(r)
+		cur := byte(rVal)
 
 		switch {
-		case c == '(' || c == ')' || c == '\\':
-			b.WriteByte('\\')
-			b.WriteByte(c)
-		case c < 32 || c > 126:
-			fmt.Fprintf(&b, "\\%03o", c)
+		case cur == '(' || cur == ')' || cur == '\\':
+			buf.WriteByte('\\')
+			buf.WriteByte(cur)
+		case cur < 32 || cur > 126:
+			fmt.Fprintf(&buf, "\\%03o", cur)
 		default:
-			b.WriteByte(c)
+			buf.WriteByte(cur)
 		}
 	}
 
-	b.WriteByte(')')
+	buf.WriteByte(')')
 
-	return b.String()
+	return buf.String()
 }
 
 // winAnsiFold maps common Unicode punctuation that appears in HTML/CSS to a
 // single-byte Latin-1/WinAnsi stand-in. Unmapped runes are returned unchanged
 // (caller substitutes '?').
-func winAnsiFold(r rune) rune {
-	switch r {
+func winAnsiFold(rVal rune) rune {
+	switch rVal {
 	case '\u2013', '\u2014': // en/em dash
 		return '-'
 	case '\u2018', '\u2019': // curly single quotes
@@ -673,7 +673,7 @@ func winAnsiFold(r rune) rune {
 		return '/'
 	}
 
-	return r
+	return rVal
 }
 
 func pdfDate(t time.Time) string {
@@ -707,7 +707,7 @@ var flatePool sync.Pool
 func flateBytes(raw []byte) []byte {
 	state, _ := flatePool.Get().(*flateState)
 	if state == nil {
-		state = &flateState{}
+		state = &flateState{} //nolint:exhaustruct // intentional zero-value fields
 		state.zw, _ = zlib.NewWriterLevel(&state.buf, zlib.DefaultCompression)
 	} else {
 		state.buf.Reset()
@@ -734,14 +734,14 @@ func SortOutlines(nodes []*Outline) {
 	})
 }
 
-func outlineLess(a, b *Outline) bool {
-	if a.PageRef != b.PageRef {
-		return a.PageRef < b.PageRef
+func outlineLess(left, right *Outline) bool {
+	if left.PageRef != right.PageRef {
+		return left.PageRef < right.PageRef
 	}
 
-	if a.Y != b.Y {
-		return a.Y > b.Y // y-down coordinate: higher on page first
+	if left.Y != right.Y {
+		return left.Y > right.Y // y-down coordinate: higher on page first
 	}
 
-	return a.X < b.X
+	return left.X < right.X
 }

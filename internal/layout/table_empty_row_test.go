@@ -6,7 +6,7 @@ import (
 
 // Empty <tr></tr> must not invent a bordered band above real headers.
 func TestEmptyTableRowCollapsed(t *testing.T) {
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 table { border-collapse: collapse; width: 200pt; }
 td, th { border: 1px solid #999; padding: 2pt; }
@@ -17,41 +17,41 @@ td, th { border: 1px solid #999; padding: 2pt; }
 <tr><th>Year</th><th>Title</th></tr>
 <tr><td>2007</td><td>Show</td></tr>
 </table>
-</body></html>`, s)
+</body></html>`, cssSheet)
 
-	var tb *box
+	var tblBox *box
 
 	var walk func(b *box)
-	walk = func(b *box) {
-		if b.kind == "table" {
-			tb = b
+	walk = func(boxNode *box) {
+		if boxNode.kind == "table" {
+			tblBox = boxNode
 
 			return
 		}
 
-		for _, c := range b.children {
+		for _, c := range boxNode.children {
 			walk(c)
 		}
 	}
 	walk(res.root)
 
-	if tb == nil {
+	if tblBox == nil {
 		t.Fatal("no table")
 	}
 
-	if len(tb.rows) != 2 {
-		t.Fatalf("rows=%d, want 2 (empty tr stripped)", len(tb.rows))
+	if len(tblBox.rows) != 2 {
+		t.Fatalf("rows=%d, want 2 (empty tr stripped)", len(tblBox.rows))
 	}
 
-	if tb.headerRows != 1 {
-		t.Fatalf("headerRows=%d, want 1 after stripping empty leading tr", tb.headerRows)
+	if tblBox.headerRows != 1 {
+		t.Fatalf("headerRows=%d, want 1 after stripping empty leading tr", tblBox.headerRows)
 	}
 	// First painted row is the Year header — no tall empty band above it.
-	if len(tb.rows[0]) == 0 || tb.rows[0][0].h <= 0 {
+	if len(tblBox.rows[0]) == 0 || tblBox.rows[0][0].height <= 0 {
 		t.Fatal("header row missing height")
 	}
 
-	hdrH := tb.rows[0][0].h
+	hdrH := tblBox.rows[0][0].height
 	if hdrH > 28 {
 		t.Fatalf("header row h=%.1f, want compact single-line (~<=28pt)", hdrH)
 	}
@@ -83,7 +83,8 @@ td, th { border: 1px solid #999; padding: 2pt; }
 
 // Padding-only empty cells collapse to zero row height (no ink).
 func TestPaddingOnlyEmptyRowCollapsed(t *testing.T) {
-	s := sheet(t, `
+	t.Parallel()
+	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 table { border-collapse: collapse; }
 td, th { border: 1px solid #999; padding: 4pt; }
@@ -93,48 +94,49 @@ td, th { border: 1px solid #999; padding: 4pt; }
 <tr><td></td><td></td></tr>
 <tr><td>a</td><td>b</td></tr>
 </table>
-</body></html>`, s)
+</body></html>`, cssSheet)
 
-	var tb *box
+	var tblBox *box
 
 	var walk func(b *box)
-	walk = func(b *box) {
-		if b.kind == "table" {
-			tb = b
+	walk = func(boxNode *box) {
+		if boxNode.kind == "table" {
+			tblBox = boxNode
 
 			return
 		}
 
-		for _, c := range b.children {
+		for _, c := range boxNode.children {
 			walk(c)
 		}
 	}
 	walk(res.root)
 
-	if tb == nil {
+	if tblBox == nil {
 		t.Fatal("no table")
 	}
 
-	if len(tb.rows) != 2 {
-		t.Fatalf("rows=%d, want 2", len(tb.rows))
+	if len(tblBox.rows) != 2 {
+		t.Fatalf("rows=%d, want 2", len(tblBox.rows))
 	}
 	// First row cells should have been collapsed to ~0 height.
-	if len(tb.rows[0]) > 0 && tb.rows[0][0].h > 0.5 {
-		t.Fatalf("empty row cell h=%.2f, want ~0 (collapsed)", tb.rows[0][0].h)
+	if len(tblBox.rows[0]) > 0 && tblBox.rows[0][0].height > 0.5 {
+		t.Fatalf("empty row cell h=%.2f, want ~0 (collapsed)", tblBox.rows[0][0].height)
 	}
 
-	if len(tb.rows[1]) == 0 || tb.rows[1][0].h < 8 {
+	if len(tblBox.rows[1]) == 0 || tblBox.rows[1][0].height < 8 {
 		t.Fatalf("data row missing height")
 	}
 	// Table height should be approximately one data row, not two.
-	if tb.h > tb.rows[1][0].h+4 {
-		t.Fatalf("table h=%.1f >> data row h=%.1f (empty row not collapsed)", tb.h, tb.rows[1][0].h)
+	if tblBox.height > tblBox.rows[1][0].height+4 {
+		t.Fatalf("table h=%.1f >> data row h=%.1f (empty row not collapsed)", tblBox.height, tblBox.rows[1][0].height)
 	}
 }
 
 // Leading all-th detection still works when a blank tr precedes the header.
 func TestLeadingTHAfterEmptyRow(t *testing.T) {
-	s := sheet(t, `
+	t.Parallel()
+	cssSheet := sheet(t, `
 table { border-collapse: collapse; }
 th, td { border: 1px solid #ccc; padding: 2pt; }
 `)
@@ -144,36 +146,37 @@ th, td { border: 1px solid #ccc; padding: 2pt; }
 <tr><th>A</th><th>B</th></tr>
 <tr><td>1</td><td>2</td></tr>
 </table>
-</body></html>`, s)
+</body></html>`, cssSheet)
 
-	var tb *box
+	var tblBox *box
 
 	var walk func(b *box)
-	walk = func(b *box) {
-		if b.kind == "table" {
-			tb = b
+	walk = func(boxNode *box) {
+		if boxNode.kind == "table" {
+			tblBox = boxNode
 
 			return
 		}
 
-		for _, c := range b.children {
+		for _, c := range boxNode.children {
 			walk(c)
 		}
 	}
 	walk(res.root)
 
-	if tb == nil {
+	if tblBox == nil {
 		t.Fatal("no table")
 	}
 
-	if tb.headerRows != 1 {
-		t.Fatalf("headerRows=%d, want 1", tb.headerRows)
+	if tblBox.headerRows != 1 {
+		t.Fatalf("headerRows=%d, want 1", tblBox.headerRows)
 	}
 }
 
 // Normal data tables keep non-empty row heights and internal grid lines.
 func TestNonEmptyRowsNotCollapsed(t *testing.T) {
-	s := sheet(t, `
+	t.Parallel()
+	cssSheet := sheet(t, `
 table { border-collapse: collapse; width: 200pt; }
 td, th { border: 1px solid #999; padding: 2pt; }
 `)
@@ -183,7 +186,7 @@ td, th { border: 1px solid #999; padding: 2pt; }
 <tr><td>2009</td><td>Song A</td><td>Act</td></tr>
 <tr><td>2018</td><td>Song B</td><td>Act</td></tr>
 </table>
-</body></html>`, s)
+</body></html>`, cssSheet)
 
 	var hlines []float64
 

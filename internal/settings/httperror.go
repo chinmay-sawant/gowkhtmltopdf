@@ -2,6 +2,15 @@ package settings
 
 import "fmt"
 
+// HTTP status codes that map to distinct wkhtmltopdf exit codes (utilities.cc).
+const (
+	httpStatusNotFound       = 404
+	httpStatusUnauthorized   = 401
+	exitCodeNotFound         = 2
+	exitCodeUnauthorized     = 3
+	exitCodeGenericLoadError = 1
+)
+
 // HttpStatusError is a load failure carrying the HTTP status so callers can
 // map to wkhtmltopdf exit codes (utilities.cc): 404→2, 401→3, else 1.
 type HttpStatusError struct {
@@ -17,13 +26,13 @@ func (e *HttpStatusError) Error() string {
 // (utilities.cc): 404 → 2, 401 → 3, everything else stays 1.
 func HttpErrorCode(status int) int {
 	switch status {
-	case 404:
-		return 2
-	case 401:
-		return 3
+	case httpStatusNotFound:
+		return exitCodeNotFound
+	case httpStatusUnauthorized:
+		return exitCodeUnauthorized
 	}
 
-	return 1
+	return exitCodeGenericLoadError
 }
 
 // HttpErrorCode reports the exit code this load failure maps to.

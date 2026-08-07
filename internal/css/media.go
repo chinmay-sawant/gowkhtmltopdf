@@ -44,14 +44,14 @@ func MediaMatches(query, mediaType string, widthPt, heightPt float64) bool {
 	return false
 }
 
-func splitMediaList(s string) []string {
+func splitMediaList(str string) []string {
 	var parts []string
 
 	depth := 0
 	start := 0
 
-	for i := range len(s) {
-		switch s[i] {
+	for idx := range len(str) {
+		switch str[idx] {
 		case '(':
 			depth++
 		case ')':
@@ -60,13 +60,13 @@ func splitMediaList(s string) []string {
 			}
 		case ',':
 			if depth == 0 {
-				parts = append(parts, strings.TrimSpace(s[start:i]))
-				start = i + 1
+				parts = append(parts, strings.TrimSpace(str[start:idx]))
+				start = idx + 1
 			}
 		}
 	}
 
-	parts = append(parts, strings.TrimSpace(s[start:]))
+	parts = append(parts, strings.TrimSpace(str[start:]))
 
 	return parts
 }
@@ -83,10 +83,8 @@ func matchOneMediaQuery(q, mediaType string, widthPt, heightPt float64) bool {
 	if strings.HasPrefix(low, "not ") {
 		negated = true
 		q = strings.TrimSpace(q[4:])
-		low = strings.ToLower(q)
 	} else if strings.HasPrefix(low, "only ") {
 		q = strings.TrimSpace(q[5:])
-		low = strings.ToLower(q)
 	}
 
 	features, rest := extractMediaFeatures(q)
@@ -132,31 +130,31 @@ func matchOneMediaQuery(q, mediaType string, widthPt, heightPt float64) bool {
 // extractMediaFeatures pulls parenthesized feature queries and returns the
 // remainder (media type / and keywords).
 func extractMediaFeatures(q string) (features []string, rest string) {
-	var b strings.Builder
+	var buf strings.Builder
 
-	for i := 0; i < len(q); {
-		if q[i] == '(' {
-			inner, end, ok := takeParenArg(q, i)
+	for idx := 0; idx < len(q); {
+		if q[idx] == '(' {
+			inner, end, ok := takeParenArg(q, idx)
 			if !ok {
-				b.WriteByte(q[i])
+				buf.WriteByte(q[idx])
 
-				i++
+				idx++
 
 				continue
 			}
 
 			features = append(features, strings.TrimSpace(inner))
-			i = end
+			idx = end
 
 			continue
 		}
 
-		b.WriteByte(q[i])
+		buf.WriteByte(q[idx])
 
-		i++
+		idx++
 	}
 
-	return features, b.String()
+	return features, buf.String()
 }
 
 func mediaFeatureMatches(inner string, widthPt, heightPt float64) bool {
@@ -188,8 +186,10 @@ func mediaFeatureMatches(inner string, widthPt, heightPt float64) bool {
 
 func matchOrientation(low string, widthPt, heightPt float64) bool {
 	// orientation: portrait | landscape
-	parts := strings.SplitN(low, ":", 2)
-	if len(parts) != 2 {
+	const kvParts = 2
+
+	parts := strings.SplitN(low, ":", kvParts)
+	if len(parts) != kvParts {
 		return false
 	}
 

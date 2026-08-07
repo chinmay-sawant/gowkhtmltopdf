@@ -34,7 +34,7 @@ func subsetFont(f *Font, used []rune, scope subsetScope) (*subsetResult, error) 
 			return simpleFontRune(r)
 		}
 
-		return r <= 0xFFFF
+		return r <= maxBMPCode
 	}
 
 	// .notdef always included
@@ -91,19 +91,19 @@ func subsetFont(f *Font, used []rune, scope subsetScope) (*subsetResult, error) 
 
 	outlines = cloned
 
-	res := &subsetResult{glyphIDs: map[rune]uint16{}}
+	res := &subsetResult{glyphIDs: map[rune]uint16{}} //nolint:exhaustruct // intentional zero-value fields
 
-	for _, r := range used {
-		if !accept(r) {
+	for _, rVal := range used {
+		if !accept(rVal) {
 			continue
 		}
 
-		old := f.GlyphID(r)
+		old := f.GlyphID(rVal)
 		if old == 0 {
 			continue
 		}
 
-		res.glyphIDs[r] = oldToNew[old]
+		res.glyphIDs[rVal] = oldToNew[old]
 	}
 
 	for r := range res.glyphIDs {
@@ -112,7 +112,7 @@ func subsetFont(f *Font, used []rune, scope subsetScope) (*subsetResult, error) 
 
 	sort.Slice(res.runes, func(i, j int) bool { return res.runes[i] < res.runes[j] })
 
-	sub := &subsetter{f: f, glyphs: glyphs, outlines: outlines, advances: advances, lsbs: lsbs}
+	sub := &subsetter{f: f, glyphs: glyphs, outlines: outlines, advances: advances, lsbs: lsbs} //nolint:exhaustruct // intentional zero-value fields
 	sub.mappings = make([]codeGlyph, 0, len(res.glyphIDs))
 
 	for r, g := range res.glyphIDs {
@@ -137,70 +137,71 @@ func subsetFont(f *Font, used []rune, scope subsetScope) (*subsetResult, error) 
 }
 
 // collectGlyph adds g and (for composites) all referenced children.
-func collectGlyph(f *Font, g uint16, set map[uint16]bool) {
-	if set[g] {
+func collectGlyph(fnt *Font, glob uint16, set map[uint16]bool) {
+	if set[glob] {
 		return
 	}
 
-	set[g] = true
-	for _, c := range f.compositeGlyphIDs(g) {
-		collectGlyph(f, c, set)
+	set[glob] = true
+	for _, c := range fnt.compositeGlyphIDs(glob) {
+		collectGlyph(fnt, c, set)
 	}
 }
 
 // stripGlyphHints removes TrueType hinting bytecode from a glyf outline.
 // Subsets omit fpgm/prep/cvt, so leftover instructions can garble CJK
 // composites in PDF viewers (broken 東京都 etc.).
-func stripGlyphHints(b []byte) []byte {
-	if len(b) < 10 {
-		return b
+func stripGlyphHints(buf []byte) []byte {
+	if len(buf) < glyfHeaderSize {
+		return buf
 	}
 
-	numContours := int16(binary.BigEndian.Uint16(b[0:2]))
+	numContours := int16(binary.BigEndian.Uint16(buf[0:2]))
 	if numContours < 0 {
-		return stripCompositeHints(b)
+		return stripCompositeHints(buf)
 	}
 
 	if numContours == 0 {
-		return b
+		return buf
 	}
 
 	n := int(numContours)
-	if len(b) < 10+2*n+2 {
-		return b
+	if len(buf) < 10+2*n+2 {
+		return buf
 	}
 
-	insPos := 10 + 2*n
-	insLen := int(binary.BigEndian.Uint16(b[insPos:]))
+	insPos := glyfHeaderSize + uint16Bytes*n
+	insLen := int(binary.BigEndian.Uint16(buf[insPos:]))
 
-	after := insPos + 2 + insLen
-	if after > len(b) {
-		return b
+	after := insPos + uint16Bytes + insLen
+	if after > len(buf) {
+		return buf
 	}
 
 	if insLen == 0 {
-		return b
+		return buf
 	}
 
-	out := make([]byte, 0, len(b)-insLen)
-	out = append(out, b[:insPos]...)
+	out := make([]byte, 0, len(buf)-insLen)
+	out = append(out, buf[:insPos]...)
 	out = append(out, 0, 0) // instructionLength = 0
-	out = append(out, b[after:]...)
+	out = append(out, buf[after:]...)
 
 	return out
 }
 
-func stripCompositeHints(b []byte) []byte {
+func stripCompositeHints(buf []byte) []byte {
 	pos := 10
-	lastFlagsAt := -1
+
+	var lastFlagsAt int
 
 	for {
-		if pos+4 > len(b) {
-			return b
+		if pos+4 > len(buf) {
+			return buf
 		}
 
 		lastFlagsAt = pos
-		flags := binary.BigEndian.Uint16(b[pos : pos+2])
+		flags := binary.BigEndian.Uint16(buf[pos : pos+2])
 		pos += 4
 
 		if flags&0x0001 != 0 {
@@ -223,25 +224,25 @@ func stripCompositeHints(b []byte) []byte {
 		}
 	}
 
-	if lastFlagsAt < 0 || pos > len(b) {
-		return b
+	if pos > len(buf) {
+		return buf
 	}
 
-	flags := binary.BigEndian.Uint16(b[lastFlagsAt : lastFlagsAt+2])
+	flags := binary.BigEndian.Uint16(buf[lastFlagsAt : lastFlagsAt+2])
 	if flags&0x0100 == 0 { // WE_HAVE_INSTRUCTIONS
 		// Drop any accidental trailing bytes past the component list.
-		return bytes.Clone(b[:pos])
+		return bytes.Clone(buf[:pos])
 	}
 
-	out := bytes.Clone(b[:pos])
-	binary.BigEndian.PutUint16(out[lastFlagsAt:lastFlagsAt+2], flags&^0x0100)
+	out := bytes.Clone(buf[:pos])
+	binary.BigEndian.PutUint16(out[lastFlagsAt:lastFlagsAt+2], flags&^glyfMoreComponents)
 
 	return out
 }
 
 // remapComposite rewrites composite component glyph ids in a glyf outline.
 func remapComposite(b []byte, oldToNew map[uint16]uint16) {
-	if len(b) < 10 {
+	if len(b) < glyfHeaderSize {
 		return
 	}
 
@@ -310,16 +311,16 @@ func (s *subsetter) build() ([]byte, error) {
 	cur := 0
 	padded := make([][]byte, numGlyphs)
 
-	for i, o := range s.outlines {
-		loca[i] = uint32(cur)
+	for idx, o := range s.outlines {
+		loca[idx] = uint32(cur)
 
-		p := bytes.Clone(o)
-		for len(p)%4 != 0 {
-			p = append(p, 0)
+		page := bytes.Clone(o)
+		for len(page)%4 != 0 {
+			page = append(page, 0)
 		}
 
-		padded[i] = p
-		cur += len(p)
+		padded[idx] = page
+		cur += len(page)
 	}
 
 	loca[numGlyphs] = uint32(cur)
@@ -327,14 +328,14 @@ func (s *subsetter) build() ([]byte, error) {
 	// hmtx: advance (2) + lsb (2) per glyph
 	hmtx := new(bytes.Buffer)
 	for i, a := range s.advances {
-		binary.Write(hmtx, binary.BigEndian, uint16(a))
+		_ = binary.Write(hmtx, binary.BigEndian, uint16(a))
 
 		lsb := int16(0)
 		if i < len(s.lsbs) {
 			lsb = s.lsbs[i]
 		}
 
-		binary.Write(hmtx, binary.BigEndian, uint16(lsb))
+		_ = binary.Write(hmtx, binary.BigEndian, uint16(lsb))
 	}
 
 	// cmap: rune codes → renumbered glyph ids
@@ -345,7 +346,7 @@ func (s *subsetter) build() ([]byte, error) {
 
 	// head: copy original, patch indexToLocFormat=1
 	head := bytes.Clone(s.f.tables["head"])
-	if len(head) < 52 {
+	if len(head) < headMinSize {
 		return nil, errors.New("font: bad head in subset")
 	}
 
@@ -353,7 +354,7 @@ func (s *subsetter) build() ([]byte, error) {
 
 	// maxp: copy original, patch numGlyphs
 	maxp := bytes.Clone(s.f.tables["maxp"])
-	if len(maxp) < 6 {
+	if len(maxp) < maxpMinSize {
 		return nil, errors.New("font: bad maxp in subset")
 	}
 
@@ -361,7 +362,7 @@ func (s *subsetter) build() ([]byte, error) {
 
 	// hhea: copy, patch numberOfHMetrics
 	hhea := bytes.Clone(s.f.tables["hhea"])
-	if len(hhea) < 36 {
+	if len(hhea) < hheaMinSize {
 		return nil, errors.New("font: bad hhea in subset")
 	}
 
@@ -381,7 +382,7 @@ func (s *subsetter) build() ([]byte, error) {
 		{"maxp", maxp},
 		{"hmtx", hmtx.Bytes()},
 		{"cmap", cmap},
-		{"loca", uint32Bytes(loca)},
+		{"loca", encodeUint32Slice(loca)},
 		{"glyf", glyf.Bytes()},
 		{"OS/2", cloneTable(s.f, "OS/2")},
 		{"post", cloneTable(s.f, "post")},
@@ -398,10 +399,10 @@ func cloneTable(f *Font, tag string) []byte {
 	return nil
 }
 
-func uint32Bytes(v []uint32) []byte {
-	b := make([]byte, len(v)*4)
+func encodeUint32Slice(v []uint32) []byte {
+	b := make([]byte, len(v)*uint32Bytes)
 	for i, x := range v {
-		binary.BigEndian.PutUint32(b[i*4:], x)
+		binary.BigEndian.PutUint32(b[i*uint32Bytes:], x)
 	}
 
 	return b
@@ -419,57 +420,57 @@ func unicodeCmap4(mappings []codeGlyph) ([]byte, error) {
 
 	var segs []seg
 
-	for i := 0; i < len(mappings); {
-		j := i
-		for j+1 < len(mappings) &&
-			mappings[j+1].code == mappings[j].code+1 &&
-			mappings[j+1].glyph == mappings[j].glyph+1 {
-			j++
+	for idx := 0; idx < len(mappings); {
+		jdx := idx
+		for jdx+1 < len(mappings) &&
+			mappings[jdx+1].code == mappings[jdx].code+1 &&
+			mappings[jdx+1].glyph == mappings[jdx].glyph+1 {
+			jdx++
 		}
 
-		delta := (int(mappings[i].glyph) - int(mappings[i].code)) & 0xFFFF
-		segs = append(segs, seg{mappings[i].code, mappings[j].code, uint16(delta)})
-		i = j + 1
+		delta := (int(mappings[idx].glyph) - int(mappings[idx].code)) & maxUint16Val
+		segs = append(segs, seg{mappings[idx].code, mappings[jdx].code, uint16(delta)})
+		idx = jdx + 1
 	}
 
 	segs = append(segs, seg{0xFFFF, 0xFFFF, 1}) // sentinel
 	segCount := len(segs)
-	length := 16 + 8*segCount // 14-byte header + reservedPad + 4 arrays
-	b := make([]byte, length)
-	binary.BigEndian.PutUint16(b[0:2], 4) // format
-	binary.BigEndian.PutUint16(b[2:4], uint16(length))
-	binary.BigEndian.PutUint16(b[6:8], uint16(segCount*2))
+	length := cmapFormat4LenBase + cmapFormat4SegStride*segCount // 14-byte header + reservedPad + 4 arrays
+	buf := make([]byte, length)
+	binary.BigEndian.PutUint16(buf[0:2], cmapFormat4) // format
+	binary.BigEndian.PutUint16(buf[2:4], uint16(length))
+	binary.BigEndian.PutUint16(buf[6:8], uint16(segCount*uint16Bytes))
 
 	maxPow := 1
 	for maxPow*2 <= segCount {
 		maxPow *= 2
 	}
 
-	binary.BigEndian.PutUint16(b[8:10], uint16(maxPow*2))             // searchRange
-	binary.BigEndian.PutUint16(b[10:12], uint16(maxPow))              // entrySelector
-	binary.BigEndian.PutUint16(b[12:14], uint16(segCount*2-maxPow*2)) // rangeShift
+	binary.BigEndian.PutUint16(buf[8:10], uint16(maxPow*uint16Bytes))   // searchRange
+	binary.BigEndian.PutUint16(buf[10:12], uint16(maxPow))              // entrySelector
+	binary.BigEndian.PutUint16(buf[12:14], uint16(segCount*2-maxPow*2)) // rangeShift
 
 	endOff := 14
-	startOff := endOff + 2*segCount + 2
-	deltaOff := startOff + 2*segCount
-	rangeOff := deltaOff + 2*segCount
+	startOff := endOff + uint16Bytes*segCount + uint16Bytes
+	deltaOff := startOff + uint16Bytes*segCount
+	rangeOff := deltaOff + uint16Bytes*segCount
 
 	for i, s := range segs {
-		binary.BigEndian.PutUint16(b[endOff+i*2:], s.end)
-		binary.BigEndian.PutUint16(b[startOff+i*2:], s.start)
-		binary.BigEndian.PutUint16(b[deltaOff+i*2:], s.delta)
-		binary.BigEndian.PutUint16(b[rangeOff+i*2:], 0)
+		binary.BigEndian.PutUint16(buf[endOff+i*2:], s.end)
+		binary.BigEndian.PutUint16(buf[startOff+i*2:], s.start)
+		binary.BigEndian.PutUint16(buf[deltaOff+i*2:], s.delta)
+		binary.BigEndian.PutUint16(buf[rangeOff+i*2:], 0)
 	}
 	// wrap in cmap table: version, numTables, (3,1) subtable record
-	out := make([]byte, 0, 12+length)
+	out := make([]byte, 0, sfntOffsetTableSize+length)
 	out = append(out, 0, 0, 0, 1)
-	out = append(out, 0, 3, 0, 1)
+	out = append(out, 0, cmapPlatformWin, 0, cmapWinUnicodeBMP)
 
 	var rec [4]byte
 
-	binary.BigEndian.PutUint32(rec[:], 12)
+	binary.BigEndian.PutUint32(rec[:], sfntOffsetTableSize)
 	out = append(out, rec[:]...)
-	out = append(out, b...)
+	out = append(out, buf...)
 
 	return out, nil
 }
@@ -486,27 +487,27 @@ func buildFontFile(tables []struct {
 },
 ) ([]byte, error) {
 	// drop nil tables
-	var t []struct {
+	var tmp []struct {
 		tag  string
 		data []byte
 	}
 
 	for _, x := range tables {
 		if x.data != nil {
-			t = append(t, x)
+			tmp = append(tmp, x)
 		}
 	}
 
-	sort.Slice(t, func(i, j int) bool { return t[i].tag < t[j].tag })
-	num := len(t)
+	sort.Slice(tmp, func(i, j int) bool { return tmp[i].tag < tmp[j].tag })
+	num := len(tmp)
 	// compute head checksum adjustment: total file length must be 0 mod 2^32
-	dirLen := 12 + 16*num
+	dirLen := sfntOffsetTableSize + sfntTableRecordSize*num
 	// align each table to 4 bytes
 	total := dirLen
 	aligned := make([]int, num)
 
-	for i, x := range t {
-		pad := (4 - total%4) % 4
+	for i, x := range tmp {
+		pad := (sfntTableAlign - total%sfntTableAlign) % sfntTableAlign
 		total += pad
 		aligned[i] = pad
 		total += len(x.data)
@@ -514,7 +515,7 @@ func buildFontFile(tables []struct {
 	// file checksum must be 0x1B0BADB0D via head.checksumAdjustment
 	headIdx := -1
 
-	for i, x := range t {
+	for i, x := range tmp {
 		if x.tag == "head" {
 			headIdx = i
 		}
@@ -522,27 +523,27 @@ func buildFontFile(tables []struct {
 
 	if headIdx >= 0 {
 		// checksum of the file with checksumAdjustment zeroed
-		zeroed := make([]byte, len(t[headIdx].data))
-		copy(zeroed, t[headIdx].data)
+		zeroed := make([]byte, len(tmp[headIdx].data))
+		copy(zeroed, tmp[headIdx].data)
 		copy(zeroed[8:12], []byte{0, 0, 0, 0})
-		t[headIdx].data = zeroed
+		tmp[headIdx].data = zeroed
 		zeroedSum := checksum(zeroed)
 
 		// layout the whole file to compute checksum
-		full := assembleFile(t, aligned)
+		full := assembleFile(tmp, aligned)
 		sum := checksum(full)
 		// place adjustment such that the final file sums to 0xB1B0AFBA.
 		// The head checksum in the directory is kept at the zeroed-head
 		// value, so the adjustment only shifts the sum once.
-		adj := 0xB1B0AFBA - sum
+		adj := sfntHeadCheckAdj - sum
 		adjusted := bytes.Clone(zeroed)
 		binary.BigEndian.PutUint32(adjusted[8:12], adj)
-		t[headIdx].data = adjusted
-		full = assembleFile(t, aligned)
+		tmp[headIdx].data = adjusted
+		full = assembleFile(tmp, aligned)
 		// freeze the directory entry for head to the zeroed-head checksum
-		for i := range len(t) {
-			if t[i].tag == "head" {
-				rec := 12 + 16*i + 4
+		for i := range tmp {
+			if tmp[i].tag == "head" {
+				rec := sfntOffsetTableSize + sfntTableRecordSize*i + uint32Bytes
 				binary.BigEndian.PutUint32(full[rec:rec+4], zeroedSum)
 
 				break
@@ -552,7 +553,7 @@ func buildFontFile(tables []struct {
 		return full, nil
 	}
 
-	return assembleFile(t, aligned), nil
+	return assembleFile(tmp, aligned), nil
 }
 
 func assembleFile(t []struct {
@@ -579,7 +580,7 @@ func assembleFile(t []struct {
 
 	var sr [2]byte
 
-	binary.BigEndian.PutUint16(sr[:], uint16(maxPow*16))
+	binary.BigEndian.PutUint16(sr[:], uint16(maxPow*sfntSearchRangeMul))
 	buf.Write(sr[:])
 
 	var es [2]byte
@@ -593,15 +594,15 @@ func assembleFile(t []struct {
 	buf.Write(rs[:])
 
 	// directory
-	offset := 12 + 16*num
-	for i, x := range t {
+	offset := sfntOffsetTableSize + sfntTableRecordSize*num
+	for i, posX := range t {
 		offset += aligned[i] // padding before table i
 
-		buf.WriteString(x.tag)
+		buf.WriteString(posX.tag)
 
 		var cs [4]byte
 
-		binary.BigEndian.PutUint32(cs[:], checksum(x.data))
+		binary.BigEndian.PutUint32(cs[:], checksum(posX.data))
 		buf.Write(cs[:])
 
 		var off [4]byte
@@ -611,10 +612,10 @@ func assembleFile(t []struct {
 
 		var tlen [4]byte
 
-		binary.BigEndian.PutUint32(tlen[:], uint32(len(x.data)))
+		binary.BigEndian.PutUint32(tlen[:], uint32(len(posX.data)))
 		buf.Write(tlen[:])
 
-		offset += len(x.data)
+		offset += len(posX.data)
 	}
 	// table data with alignment
 	for i, x := range t {
@@ -628,15 +629,15 @@ func assembleFile(t []struct {
 	return buf.Bytes()
 }
 
-func checksum(b []byte) uint32 {
+func checksum(buf []byte) uint32 {
 	sum := uint32(0)
-	for i := 0; i+4 <= len(b); i += 4 {
-		sum += binary.BigEndian.Uint32(b[i : i+4])
+	for i := 0; i+4 <= len(buf); i += 4 {
+		sum += binary.BigEndian.Uint32(buf[i : i+4])
 	}
 
-	if rem := len(b) % 4; rem != 0 {
-		pad := make([]byte, 4-rem)
-		sum += binary.BigEndian.Uint32(append(pad, b[len(b)-rem:]...))
+	if rem := len(buf) % sfntTableAlign; rem != 0 {
+		pad := make([]byte, sfntTableAlign-rem)
+		sum += binary.BigEndian.Uint32(append(pad, buf[len(buf)-rem:]...))
 	}
 
 	return sum

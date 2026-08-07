@@ -135,7 +135,7 @@ type Converter struct {
 // NewConverter returns a Converter with the wkhtmltopdf default global
 // settings and no page objects.
 func NewConverter() *Converter {
-	return &Converter{global: NewGlobalSettings()}
+	return &Converter{global: NewGlobalSettings()} //nolint:exhaustruct // intentional zero/partial fields
 }
 
 // Global returns the converter's global settings, for Set/Get.
@@ -272,18 +272,18 @@ func ConvertHTML(ctx context.Context, html []byte, global *GlobalSettings) ([]by
 		return nil, errors.New("gowkhtmltopdf: empty HTML")
 	}
 
-	c := NewConverter()
+	conv := NewConverter()
 	if global != nil {
-		c.global = global
+		conv.global = global
 	}
 
-	c.AddObject(NewObjectSettings().SetBody(html, ""))
+	conv.AddObject(NewObjectSettings().SetBody(html, ""))
 
-	if err := c.Convert(ctx); err != nil {
+	if err := conv.Convert(ctx); err != nil {
 		return nil, err
 	}
 
-	return c.Output(), nil
+	return conv.Output(), nil
 }
 
 // ---------------------------------------------------------------------------
@@ -311,7 +311,7 @@ type ImageConverter struct {
 // settings: 1024 px smart-width viewport, PNG output. Object() is valid
 // immediately; its page is empty until AddObject.
 func NewImageConverter() *ImageConverter {
-	return &ImageConverter{
+	return &ImageConverter{ //nolint:exhaustruct // intentional zero/partial fields
 		global: NewGlobalSettings(),
 		image:  settings.DefaultImageGlobal(),
 		object: NewObjectSettings(),
@@ -365,7 +365,7 @@ func (c *ImageConverter) Convert(ctx context.Context) error {
 
 	img := c.image
 	req := convert.NewImageRequest(c.global.g, img, []settings.PdfObject{c.object.o}, nil)
-	h := convertHooks{
+	h := convertHooks{ //nolint:exhaustruct // intentional zero/partial fields
 		OnInfo: c.OnInfo, OnWarn: c.OnWarn, OnError: c.OnError,
 	}
 
@@ -400,7 +400,7 @@ type convertHooks struct {
 }
 
 func (h convertHooks) lineLog() *lineLog {
-	return &lineLog{
+	return &lineLog{ //nolint:exhaustruct // intentional zero/partial fields
 		onInfo:  h.OnInfo,
 		onWarn:  h.OnWarn,
 		onError: h.OnError,
@@ -480,39 +480,39 @@ type lineLog struct {
 	onError func(string)
 }
 
-func (w *lineLog) Write(p []byte) (int, error) {
-	w.buf.Write(p)
+func (w *lineLog) Write(payload []byte) (int, error) {
+	w.buf.Write(payload)
 
 	for {
 		raw := w.buf.Bytes()
 
-		i := bytes.IndexByte(raw, '\n')
-		if i < 0 {
+		nlIdx := bytes.IndexByte(raw, '\n')
+		if nlIdx < 0 {
 			break
 		}
 
-		l := strings.TrimSpace(string(raw[:i]))
-		w.buf.Next(i + 1)
+		logLine := strings.TrimSpace(string(raw[:nlIdx]))
+		w.buf.Next(nlIdx + 1)
 
-		if l == "" {
+		if logLine == "" {
 			continue
 		}
 
-		switch line.SeverityOf(l) {
+		switch line.SeverityOf(logLine) {
 		case line.Warn:
 			if w.onWarn != nil {
-				w.onWarn(l)
+				w.onWarn(logLine)
 			}
 		case line.Error:
 			if w.onError != nil {
-				w.onError(l)
+				w.onError(logLine)
 			}
 		default:
 			if w.onInfo != nil {
-				w.onInfo(l)
+				w.onInfo(logLine)
 			}
 		}
 	}
 
-	return len(p), nil
+	return len(payload), nil
 }

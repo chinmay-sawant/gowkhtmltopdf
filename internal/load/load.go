@@ -24,6 +24,15 @@ import (
 	"gowkhtmltopdf/internal/settings"
 )
 
+const (
+	defaultKeepAliveSec  = 30
+	metaScanLimit        = 1024
+	httpStatusOK         = 200
+	httpStatusBadRequest = 400
+	hexNibbleBits        = 4
+	hexLetterOffset      = 10
+)
+
 // Defaults for network behaviour (timeout, size caps).
 const (
 	DefaultConnectTimeout  = 30 * time.Second
@@ -60,21 +69,21 @@ type Resource struct {
 // other document-relative resources. The loader remains the owner of URL
 // resolution, ACL checks, body limits, and error handling.
 type ResourceContext struct {
-	loader *Loader
-	base   string
-	lp     settings.LoadPage
+	loader   *Loader
+	base     string
+	pageLoad settings.LoadPage
 }
 
 // ForResource returns a context for resources relative to res. A nil
 // resource is allowed for callers that only need absolute references; those
 // references still go through the same loader policy.
-func (l *Loader) ForResource(res *Resource, lp settings.LoadPage) ResourceContext {
+func (l *Loader) ForResource(res *Resource, pageLoad settings.LoadPage) ResourceContext {
 	var base string
 	if res != nil {
 		base = res.Base
 	}
 
-	return ResourceContext{loader: l, base: base, lp: lp}
+	return ResourceContext{loader: l, base: base, pageLoad: pageLoad}
 }
 
 // Fetch resolves ref against the document base and fetches it using the
@@ -84,7 +93,7 @@ func (c ResourceContext) Fetch(ctx context.Context, ref string) (*Resource, erro
 		return nil, errors.New("nil resource loader")
 	}
 
-	return c.loader.FetchSub(ctx, c.base, ref, c.lp)
+	return c.loader.FetchSub(ctx, c.base, ref, c.pageLoad)
 }
 
 // AccessController implements the local-file ACL: default deny; an explicit
@@ -219,28 +228,28 @@ type Loader struct {
 
 // NewLoader builds a Loader from global load settings, applying the full
 // load policy (proxy, allow prefixes, local-access flag) in one place.
-func NewLoader(g settings.LoadGlobal) *Loader {
-	l := &Loader{
-		Global:                g,
+func NewLoader(global settings.LoadGlobal) *Loader {
+	loader := &Loader{ //nolint:exhaustruct // intentional zero/partial fields
+		Global:                global,
 		Log:                   io.Discard,
 		MaxBodySize:           DefaultMaxBodySize,
 		MaxRedirects:          DefaultMaxRedirects,
-		Allow:                 g.Allow,
-		EnableLocalFileAccess: g.EnableLocalFileAccess,
+		Allow:                 global.Allow,
+		EnableLocalFileAccess: global.EnableLocalFileAccess,
 	}
-	l.initClient()
+	loader.initClient()
 
-	return l
+	return loader
 }
 
 func (l *Loader) initClient() {
 	jar, _ := cookiejar.New(nil)
 	// Default TLS verification stays on (http.Transport system roots).
-	transport := &http.Transport{
+	transport := &http.Transport{ //nolint:exhaustruct // intentional zero/partial fields
 		ForceAttemptHTTP2: true,
-		DialContext: (&net.Dialer{
+		DialContext: (&net.Dialer{ //nolint:exhaustruct // intentional zero/partial fields
 			Timeout:   DefaultConnectTimeout,
-			KeepAlive: 30 * time.Second,
+			KeepAlive: defaultKeepAliveSec * time.Second,
 		}).DialContext,
 	}
 
@@ -250,7 +259,7 @@ func (l *Loader) initClient() {
 		}
 	}
 
-	l.Client = &http.Client{
+	l.Client = &http.Client{ //nolint:exhaustruct // intentional zero/partial fields
 		Transport: transport,
 		Jar:       jar,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
@@ -270,17 +279,17 @@ func (l *Loader) initClient() {
 // (lp.InlineHTML) is returned as-is and skips GuessURL entirely; subresources
 // resolve against lp.InlineBase when set. Every loaded document is checked
 // for a supported charset at this seam (see checkDocumentCharset).
-func (l *Loader) Load(ctx context.Context, input string, lp settings.LoadPage) (*Resource, error) {
-	if len(lp.InlineHTML) > 0 {
-		if err := checkBodyLimit("inline HTML", len(lp.InlineHTML), l.MaxBodySize); err != nil {
+func (l *Loader) Load(ctx context.Context, input string, pageLoad settings.LoadPage) (*Resource, error) {
+	if len(pageLoad.InlineHTML) > 0 {
+		if err := checkBodyLimit("inline HTML", len(pageLoad.InlineHTML), l.MaxBodySize); err != nil {
 			return nil, err
 		}
 
-		res := &Resource{
+		res := &Resource{ //nolint:exhaustruct // intentional zero/partial fields
 			Kind:        KindInline,
 			URL:         "inline:",
-			Base:        lp.InlineBase,
-			Body:        lp.InlineHTML,
+			Base:        pageLoad.InlineBase,
+			Body:        pageLoad.InlineHTML,
 			ContentType: "text/html",
 		}
 
@@ -297,7 +306,7 @@ func (l *Loader) Load(ctx context.Context, input string, lp settings.LoadPage) (
 	switch kind {
 	case KindInline:
 		if strings.HasPrefix(target, "inline:") {
-			res = &Resource{Kind: KindInline, URL: "inline:", Body: []byte(target[len("inline:"):]), ContentType: "text/html"}
+			res = &Resource{Kind: KindInline, URL: "inline:", Body: []byte(target[len("inline:"):]), ContentType: "text/html"} //nolint:exhaustruct // intentional zero/partial fields
 		} else if strings.HasPrefix(target, "data:") {
 			var body []byte
 
@@ -308,12 +317,12 @@ func (l *Loader) Load(ctx context.Context, input string, lp settings.LoadPage) (
 				return nil, err
 			}
 
-			res = &Resource{Kind: KindInline, URL: target, Body: body, ContentType: ctype}
+			res = &Resource{Kind: KindInline, URL: target, Body: body, ContentType: ctype} //nolint:exhaustruct // intentional zero/partial fields
 		}
 	case KindFile:
-		res, err = l.loadFile(ctx, target, lp)
+		res, err = l.loadFile(ctx, target, pageLoad)
 	case KindHTTP:
-		res, err = l.loadHTTP(ctx, target, lp)
+		res, err = l.loadHTTP(ctx, target, pageLoad)
 	}
 
 	if err != nil {
@@ -338,22 +347,22 @@ func (l *Loader) Load(ctx context.Context, input string, lp settings.LoadPage) (
 // body. Anything else is refused with a clear error instead of silently
 // garbling the page.
 func checkDocumentCharset(res *Resource) error {
-	cs := charsetFromContentType(res.ContentType)
-	if cs == "" {
-		cs = metaCharset(res.Body)
+	charset := charsetFromContentType(res.ContentType)
+	if charset == "" {
+		charset = metaCharset(res.Body)
 	}
 
-	if cs == "" || charsetSupported(cs) {
+	if charset == "" || charsetSupported(charset) {
 		return nil
 	}
 
-	return fmt.Errorf("unsupported charset: %s (only UTF-8/ASCII)", cs)
+	return fmt.Errorf("unsupported charset: %s (only UTF-8/ASCII)", charset)
 }
 
 // charsetSupported reports whether a charset name is one the pipeline can
 // decode. Only UTF-8 and ASCII are accepted.
-func charsetSupported(cs string) bool {
-	switch strings.ToLower(strings.TrimSpace(cs)) {
+func charsetSupported(charset string) bool {
+	switch strings.ToLower(strings.TrimSpace(charset)) {
 	case "utf-8", "utf8", "us-ascii", "ascii":
 		return true
 	}
@@ -380,30 +389,30 @@ func charsetFromContentType(ct string) string {
 // <meta http-equiv="content-type"> declaration and returns the declared
 // charset, or "" when there is none.
 func metaCharset(body []byte) string {
-	s := string(body)
-	if len(s) > 1024 {
-		s = s[:1024]
+	html := string(body)
+	if len(html) > metaScanLimit {
+		html = html[:1024]
 	}
 
-	low := strings.ToLower(s)
+	low := strings.ToLower(html)
 
 	for {
-		i := strings.Index(low, "<meta")
-		if i < 0 {
+		pos := strings.Index(low, "<meta")
+		if pos < 0 {
 			return ""
 		}
 
-		j := strings.IndexByte(s[i:], '>')
-		if j < 0 {
+		closeGT := strings.IndexByte(html[pos:], '>')
+		if closeGT < 0 {
 			return ""
 		}
 
-		if cs := metaTagCharset(s[i : i+j]); cs != "" {
+		if cs := metaTagCharset(html[pos : pos+closeGT]); cs != "" {
 			return cs
 		}
 
-		s = s[i+j+1:]
-		low = strings.ToLower(s)
+		html = html[pos+closeGT+1:]
+		low = strings.ToLower(html)
 	}
 }
 
@@ -429,12 +438,12 @@ func metaTagCharset(tag string) string {
 func charsetInContent(content string) string {
 	low := strings.ToLower(content)
 
-	i := strings.Index(low, "charset")
-	if i < 0 {
+	pos := strings.Index(low, "charset")
+	if pos < 0 {
 		return ""
 	}
 
-	rest := strings.TrimLeft(content[i+len("charset"):], " \t\n\r\f")
+	rest := strings.TrimLeft(content[pos+len("charset"):], " \t\n\r\f")
 	if !strings.HasPrefix(rest, "=") {
 		return ""
 	}
@@ -449,25 +458,25 @@ func attrValue(tag, name string) string {
 	needle := strings.ToLower(name)
 
 	for {
-		i := strings.Index(low, needle)
-		if i < 0 {
+		pos := strings.Index(low, needle)
+		if pos < 0 {
 			return ""
 		}
 
-		if i > 0 {
-			c := tag[i-1]
+		if pos > 0 {
+			c := tag[pos-1]
 			if c != ' ' && c != '\t' && c != '\n' && c != '\r' && c != '\f' {
-				tag = tag[i+len(needle):]
-				low = low[i+len(needle):]
+				tag = tag[pos+len(needle):]
+				low = low[pos+len(needle):]
 
 				continue
 			}
 		}
 
-		rest := strings.TrimLeft(tag[i+len(needle):], " \t\n\r\f")
+		rest := strings.TrimLeft(tag[pos+len(needle):], " \t\n\r\f")
 		if !strings.HasPrefix(rest, "=") {
-			tag = tag[i+len(needle):]
-			low = low[i+len(needle):]
+			tag = tag[pos+len(needle):]
+			low = low[pos+len(needle):]
 
 			continue
 		}
@@ -499,40 +508,40 @@ func isMetaWhitespace(b byte) bool {
 	return b == ' ' || b == '\t' || b == '\n' || b == '\r' || b == '\f' || b == '>'
 }
 
-func (l *Loader) loadFile(ctx context.Context, path string, lp settings.LoadPage) (*Resource, error) {
-	p, err := filePathFromURL(path)
+func (l *Loader) loadFile(ctx context.Context, path string, pageLoad settings.LoadPage) (*Resource, error) {
+	filePath, err := filePathFromURL(path)
 	if err != nil {
 		return nil, err
 	}
 
-	if !l.fileAccessAllowed(p, lp) {
-		return nil, fmt.Errorf("%w: %s", ErrAccessDenied, p)
+	if !l.fileAccessAllowed(filePath, pageLoad) {
+		return nil, fmt.Errorf("%w: %s", ErrAccessDenied, filePath)
 	}
 	// blockLocalFileAccess=true blocks local reads even for the primary page
 	// unless the user explicitly enabled local access.
-	f, err := os.Open(p)
+	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
 	}
 
-	defer f.Close()
+	defer file.Close()
 
-	b, err := io.ReadAll(io.LimitReader(f, l.MaxBodySize+1))
+	body, err := io.ReadAll(io.LimitReader(file, l.MaxBodySize+1))
 	if err != nil {
 		return nil, err
 	}
 
-	if int64(len(b)) > l.MaxBodySize {
-		return nil, fmt.Errorf("file %s exceeds max body size %d", p, l.MaxBodySize)
+	if int64(len(body)) > l.MaxBodySize {
+		return nil, fmt.Errorf("file %s exceeds max body size %d", filePath, l.MaxBodySize)
 	}
 
-	return &Resource{
+	return &Resource{ //nolint:exhaustruct // intentional zero/partial fields
 		Kind:        KindFile,
-		URL:         "file://" + filepath.ToSlash(filepath.Clean(p)),
-		Base:        "file://" + filepath.ToSlash(filepath.Dir(p)) + "/",
-		Body:        b,
-		ContentType: mime.TypeByExtension(filepath.Ext(p)),
-		StatusCode:  200,
+		URL:         "file://" + filepath.ToSlash(filepath.Clean(filePath)),
+		Base:        "file://" + filepath.ToSlash(filepath.Dir(filePath)) + "/",
+		Body:        body,
+		ContentType: mime.TypeByExtension(filepath.Ext(filePath)),
+		StatusCode:  httpStatusOK,
 	}, nil
 }
 
@@ -540,17 +549,17 @@ func (l *Loader) loadFile(ctx context.Context, path string, lp settings.LoadPage
 // (or passes a plain path through). Remote file hosts - anything other
 // than the empty host and localhost - are refused.
 func filePathFromURL(path string) (string, error) {
-	u, err := url.Parse(path)
-	if err != nil || u.Scheme != "file" {
+	parsed, err := url.Parse(path)
+	if err != nil || parsed.Scheme != "file" {
 		return path, nil
 	}
 
-	if u.Host != "" && u.Host != "localhost" {
+	if parsed.Host != "" && parsed.Host != "localhost" {
 		return "", fmt.Errorf("blocked file access to %q", path)
 	}
 
-	if u.Path != "" {
-		return u.Path, nil
+	if parsed.Path != "" {
+		return parsed.Path, nil
 	}
 
 	return strings.TrimPrefix(path, "file://"), nil
@@ -559,31 +568,31 @@ func filePathFromURL(path string) (string, error) {
 // fileAccessAllowed implements the frozen security policy: blocked by
 // default; allowed when the global enable flag is on AND the object's block
 // flag is off, or when an --allow prefix matches.
-func (l *Loader) fileAccessAllowed(path string, lp settings.LoadPage) bool {
+func (l *Loader) fileAccessAllowed(path string, pageLoad settings.LoadPage) bool {
 	ctrl := &AccessController{AllowPrefixes: l.Allow}
 	if ctrl.Allowed(path) {
 		return true
 	}
 
-	return l.EnableLocalFileAccess && !lp.BlockLocalFileAccess
+	return l.EnableLocalFileAccess && !pageLoad.BlockLocalFileAccess
 }
 
-func (l *Loader) loadHTTP(ctx context.Context, target string, lp settings.LoadPage) (*Resource, error) {
-	u, err := url.Parse(target)
+func (l *Loader) loadHTTP(ctx context.Context, target string, pageLoad settings.LoadPage) (*Resource, error) {
+	parsed, err := url.Parse(target)
 	if err != nil {
 		return nil, err
 	}
 
 	method := http.MethodGet
 
-	var body io.Reader
+	var reqBody io.Reader
 
-	if len(lp.Post) > 0 {
+	if len(pageLoad.Post) > 0 {
 		method = http.MethodPost
-		body = strings.NewReader(urlEncodePost(lp.Post))
+		reqBody = strings.NewReader(urlEncodePost(pageLoad.Post))
 	}
 
-	req, err := http.NewRequestWithContext(ctx, method, u.String(), body)
+	req, err := http.NewRequestWithContext(ctx, method, parsed.String(), reqBody)
 	if err != nil {
 		return nil, err
 	}
@@ -594,19 +603,19 @@ func (l *Loader) loadHTTP(ctx context.Context, target string, lp settings.LoadPa
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}
 
-	if lp.Username != "" {
-		req.SetBasicAuth(lp.Username, lp.Password)
+	if pageLoad.Username != "" {
+		req.SetBasicAuth(pageLoad.Username, pageLoad.Password)
 	}
 
-	for k, v := range lp.CustomHeaders {
+	for k, v := range pageLoad.CustomHeaders {
 		req.Header.Set(k, v)
 	}
 
-	for k, v := range lp.Cookies {
-		req.AddCookie(&http.Cookie{Name: k, Value: v})
+	for k, v := range pageLoad.Cookies {
+		req.AddCookie(&http.Cookie{Name: k, Value: v}) //nolint:exhaustruct // intentional zero/partial fields
 	}
 
-	timeout := time.Duration(lp.Timeout) * time.Second
+	timeout := time.Duration(pageLoad.Timeout) * time.Second
 	if timeout <= 0 {
 		timeout = DefaultResponseTimeout
 	}
@@ -621,15 +630,15 @@ func (l *Loader) loadHTTP(ctx context.Context, target string, lp settings.LoadPa
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode >= 400 {
+	if resp.StatusCode >= httpStatusBadRequest {
 		// skip / ignore policy
-		switch lp.LoadErrorHandling {
+		switch pageLoad.LoadErrorHandling {
 		case settings.LoadErrorSkip:
-			return &Resource{Kind: KindHTTP, URL: u.String(), StatusCode: resp.StatusCode, Skip: true}, nil
+			return &Resource{Kind: KindHTTP, URL: parsed.String(), StatusCode: resp.StatusCode, Skip: true}, nil //nolint:exhaustruct // intentional zero/partial fields
 		case settings.LoadErrorIgnore:
-			return &Resource{Kind: KindHTTP, URL: u.String(), StatusCode: resp.StatusCode, Body: nil, Skip: false}, nil
+			return &Resource{Kind: KindHTTP, URL: parsed.String(), StatusCode: resp.StatusCode, Body: nil, Skip: false}, nil //nolint:exhaustruct // intentional zero/partial fields
 		default:
-			return nil, &settings.HttpStatusError{Status: resp.StatusCode, URL: u.String()}
+			return nil, &settings.HttpStatusError{Status: resp.StatusCode, URL: parsed.String()}
 		}
 	}
 
@@ -639,33 +648,33 @@ func (l *Loader) loadHTTP(ctx context.Context, target string, lp settings.LoadPa
 	// chunked or unknown-length responses.
 	if resp.ContentLength > l.MaxBodySize {
 		return nil, fmt.Errorf("response from %s exceeds max body size %d (Content-Length %d)",
-			u.String(), l.MaxBodySize, resp.ContentLength)
+			parsed.String(), l.MaxBodySize, resp.ContentLength)
 	}
 
-	b, err := io.ReadAll(io.LimitReader(resp.Body, l.MaxBodySize+1))
+	bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, l.MaxBodySize+1))
 	if err != nil {
 		return nil, err
 	}
 
-	if int64(len(b)) > l.MaxBodySize {
-		return nil, fmt.Errorf("response from %s exceeds max body size %d", u.String(), l.MaxBodySize)
+	if int64(len(bodyBytes)) > l.MaxBodySize {
+		return nil, fmt.Errorf("response from %s exceeds max body size %d", parsed.String(), l.MaxBodySize)
 	}
 
 	ctype := resp.Header.Get("Content-Type")
 	final := resp.Request.URL.String()
 
-	return &Resource{
+	return &Resource{ //nolint:exhaustruct // intentional zero/partial fields
 		Kind:        KindHTTP,
 		URL:         final,
 		Base:        final,
-		Body:        b,
+		Body:        bodyBytes,
 		ContentType: ctype,
 		StatusCode:  resp.StatusCode,
 	}, nil
 }
 
 // FetchSub fetches a subresource (css/img) resolved against base.
-func (l *Loader) FetchSub(ctx context.Context, base, ref string, lp settings.LoadPage) (*Resource, error) {
+func (l *Loader) FetchSub(ctx context.Context, base, ref string, pageLoad settings.LoadPage) (*Resource, error) {
 	refURL, err := url.Parse(strings.TrimSpace(ref))
 	if err != nil {
 		return nil, err
@@ -689,22 +698,22 @@ func (l *Loader) FetchSub(ctx context.Context, base, ref string, lp settings.Loa
 
 	switch abs.Scheme {
 	case "file", "":
-		p := abs.Path
+		pathPart := abs.Path
 
 		if abs.Host != "" && abs.Host != "localhost" {
 			return nil, fmt.Errorf("blocked file access to %q", abs.String())
 		}
 
-		return l.loadFile(ctx, p, lp)
+		return l.loadFile(ctx, pathPart, pageLoad)
 	case "http", "https":
-		return l.loadHTTP(ctx, abs.String(), lp)
+		return l.loadHTTP(ctx, abs.String(), pageLoad)
 	case "data":
 		body, ctype, err := decodeDataURLLimited(abs.String(), l.MaxBodySize)
 		if err != nil {
 			return nil, err
 		}
 
-		return &Resource{Kind: KindInline, URL: abs.String(), Body: body, ContentType: ctype}, nil
+		return &Resource{Kind: KindInline, URL: abs.String(), Body: body, ContentType: ctype}, nil //nolint:exhaustruct // intentional zero/partial fields
 	}
 
 	return nil, fmt.Errorf("unsupported subresource scheme %q", abs.Scheme)
@@ -739,8 +748,8 @@ func decodeDataURLLimited(s string, max int64) ([]byte, string, error) {
 
 	if meta != "" {
 		parts := strings.Split(meta, ";")
-		for _, p := range parts {
-			if strings.HasPrefix(p, "base64") {
+		for _, part := range parts {
+			if strings.HasPrefix(part, "base64") {
 				dec, err := decodeBase64Limited(data, max)
 				if err != nil {
 					return nil, "", err
@@ -749,8 +758,8 @@ func decodeDataURLLimited(s string, max int64) ([]byte, string, error) {
 				return dec, ctype, nil
 			}
 
-			if !strings.Contains(p, "=") {
-				ctype = p
+			if !strings.Contains(part, "=") {
+				ctype = part
 			}
 		}
 	}
@@ -803,17 +812,17 @@ func decodeBase64Limited(s string, max int64) ([]byte, error) {
 		}
 	}
 
-	var b strings.Builder
+	var buf strings.Builder
 
-	b.Grow(compactLen)
+	buf.Grow(compactLen)
 
 	for i := range len(s) {
 		if s[i] != '\n' && s[i] != '\r' && s[i] != ' ' && s[i] != '\t' {
-			b.WriteByte(s[i])
+			buf.WriteByte(s[i])
 		}
 	}
 
-	dec, err := base64.StdEncoding.DecodeString(b.String())
+	dec, err := base64.StdEncoding.DecodeString(buf.String())
 	if err != nil {
 		return nil, err
 	}
@@ -825,62 +834,62 @@ func decodeBase64Limited(s string, max int64) ([]byte, error) {
 	return dec, nil
 }
 
-func unescapeDataLimited(s string, max int64) ([]byte, error) {
-	if max >= 0 && int64(len(s)) < max {
+func unescapeDataLimited(raw string, max int64) ([]byte, error) {
+	if max >= 0 && int64(len(raw)) < max {
 		// This is only a capacity hint. Percent escapes and '+' can make the
 		// decoded body shorter, never longer, than the source string.
-		max = int64(len(s))
+		max = int64(len(raw))
 	}
 
-	capacity := len(s)
+	capacity := len(raw)
 	if max >= 0 && int64(capacity) > max {
 		capacity = int(max)
 	}
 
 	out := make([]byte, 0, capacity)
 
-	for i := 0; i < len(s); i++ {
-		var b byte
+	for pos := 0; pos < len(raw); pos++ {
+		var cur byte
 
-		switch s[i] {
+		switch raw[pos] {
 		case '%':
-			if i+2 >= len(s) {
+			if pos+2 >= len(raw) {
 				return nil, errors.New("invalid URL escape in data URL")
 			}
 
-			hi, okHi := fromHex(s[i+1])
-			lo, okLo := fromHex(s[i+2])
+			hiNib, okHi := fromHex(raw[pos+1])
+			loNib, okLo := fromHex(raw[pos+2])
 
 			if !okHi || !okLo {
 				return nil, errors.New("invalid URL escape in data URL")
 			}
 
-			b = hi<<4 | lo
-			i += 2
+			cur = hiNib<<hexNibbleBits | loNib
+			pos += 2
 		case '+':
-			b = ' '
+			cur = ' '
 		default:
-			b = s[i]
+			cur = raw[pos]
 		}
 
 		if max >= 0 && int64(len(out)) >= max {
 			return nil, fmt.Errorf("data URL exceeds max body size %d", max)
 		}
 
-		out = append(out, b)
+		out = append(out, cur)
 	}
 
 	return out, nil
 }
 
-func fromHex(b byte) (byte, bool) {
+func fromHex(hexChar byte) (byte, bool) {
 	switch {
-	case b >= '0' && b <= '9':
-		return b - '0', true
-	case b >= 'a' && b <= 'f':
-		return b - 'a' + 10, true
-	case b >= 'A' && b <= 'F':
-		return b - 'A' + 10, true
+	case hexChar >= '0' && hexChar <= '9':
+		return hexChar - '0', true
+	case hexChar >= 'a' && hexChar <= 'f':
+		return hexChar - 'a' + hexLetterOffset, true
+	case hexChar >= 'A' && hexChar <= 'F':
+		return hexChar - 'A' + hexLetterOffset, true
 	default:
 		return 0, false
 	}

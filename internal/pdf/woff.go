@@ -38,7 +38,7 @@ var (
 //
 // ponytail: WOFF1 in-tree only; no Brotli / WOFF2 direct dep.
 func ParseFontBytes(data []byte) (*Font, error) {
-	if len(data) >= 4 {
+	if len(data) >= tagSize {
 		sig := string(data[0:4])
 		switch sig {
 		case woffSignature:
@@ -68,7 +68,7 @@ func DecodeWOFF(data []byte) ([]byte, error) {
 	}
 
 	flavor := binary.BigEndian.Uint32(data[4:8])
-	if flavor == 0x4F54544F { // 'OTTO'
+	if flavor == ottoFlavor { // 'OTTO'
 		return nil, errWOFFFlavorCFF
 	}
 
@@ -99,83 +99,83 @@ func DecodeWOFF(data []byte) ([]byte, error) {
 
 	spans := make([]span, 0, numTables)
 
-	for i := range numTables {
-		off := woffHeaderSize + i*woffEntrySize
+	for idx := range numTables {
+		off := woffHeaderSize + idx*woffEntrySize
 		rec := data[off : off+woffEntrySize]
-		copy(entries[i].tag[:], rec[0:4])
-		entries[i].offset = binary.BigEndian.Uint32(rec[4:8])
-		entries[i].comp = binary.BigEndian.Uint32(rec[8:12])
-		entries[i].orig = binary.BigEndian.Uint32(rec[12:16])
-		entries[i].checksum = binary.BigEndian.Uint32(rec[16:20])
+		copy(entries[idx].tag[:], rec[0:4])
+		entries[idx].offset = binary.BigEndian.Uint32(rec[4:8])
+		entries[idx].comp = binary.BigEndian.Uint32(rec[8:12])
+		entries[idx].orig = binary.BigEndian.Uint32(rec[12:16])
+		entries[idx].checksum = binary.BigEndian.Uint32(rec[16:20])
 
-		e := entries[i]
-		if e.orig == 0 || e.orig > woffMaxTableLen {
+		entry := entries[idx]
+		if entry.orig == 0 || entry.orig > woffMaxTableLen {
 			return nil, errWOFFBadOffset
 		}
 
-		if e.comp == 0 || uint64(e.offset)+uint64(e.comp) > uint64(len(data)) {
+		if entry.comp == 0 || uint64(entry.offset)+uint64(entry.comp) > uint64(len(data)) {
 			return nil, errWOFFBadOffset
 		}
 
-		if e.comp > e.orig {
+		if entry.comp > entry.orig {
 			return nil, errWOFFBadOffset
 		}
 
-		end := e.offset + e.comp
+		end := entry.offset + entry.comp
 		for _, s := range spans {
-			if e.offset < s.end && end > s.start {
+			if entry.offset < s.end && end > s.start {
 				return nil, errWOFFOverlap
 			}
 		}
 
-		spans = append(spans, span{start: e.offset, end: end})
+		spans = append(spans, span{start: entry.offset, end: end})
 	}
 
 	tables := make([][]byte, numTables)
 
 	var sumOrig uint64
 
-	for i, e := range entries {
-		raw := data[e.offset : e.offset+e.comp]
+	for idx, entry := range entries {
+		raw := data[entry.offset : entry.offset+entry.comp]
 
 		var plain []byte
 
-		if e.comp < e.orig {
-			zr, err := zlib.NewReader(bytes.NewReader(raw))
+		if entry.comp < entry.orig {
+			zreader, err := zlib.NewReader(bytes.NewReader(raw))
 			if err != nil {
 				return nil, fmt.Errorf("woff: zlib: %w", err)
 			}
 			// Cap read at origLength; reject trailing junk / under-read.
-			limited := io.LimitReader(zr, int64(e.orig)+1)
+			limited := io.LimitReader(zreader, int64(entry.orig)+1)
 			plain, err = io.ReadAll(limited)
 
-			zr.Close()
+			zreader.Close()
 
 			if err != nil {
 				return nil, fmt.Errorf("woff: decompress: %w", err)
 			}
 
-			if uint32(len(plain)) != e.orig {
-				return nil, fmt.Errorf("woff: table %q decompressed length %d != %d", e.tag, len(plain), e.orig)
+			if uint32(len(plain)) != entry.orig {
+				return nil, fmt.Errorf("woff: table %q decompressed length %d != %d", entry.tag, len(plain), entry.orig)
 			}
 		} else {
 			plain = bytes.Clone(raw)
 		}
 
-		tables[i] = plain
+		tables[idx] = plain
 
-		sumOrig += uint64(e.orig)
+		sumOrig += uint64(entry.orig)
 		if sumOrig > woffMaxSFNTSize {
 			return nil, errWOFFSFNTTooLarge
 		}
 	}
 
 	// SFNT header + directory + 4-byte-padded tables.
-	headerSize := 12 + 16*numTables
+	headerSize := sfntOffsetTableSize + sfntTableRecordSize*numTables
 
 	var dataSize uint64
 	for _, t := range tables {
-		dataSize += uint64((len(t) + 3) &^ 3)
+		dataSize += uint64((len(t) + padMask3) &^ padMask3)
 	}
 
 	total := uint64(headerSize) + dataSize
@@ -187,28 +187,28 @@ func DecodeWOFF(data []byte) ([]byte, error) {
 	binary.BigEndian.PutUint32(out[0:4], flavor)
 	binary.BigEndian.PutUint16(out[4:6], uint16(numTables))
 	// searchRange / entrySelector / rangeShift (OpenType)
-	sr := uint16(1)
-	es := uint16(0)
+	searchR := uint16(1)
+	entrySel := uint16(0)
 
-	for sr*2 <= uint16(numTables) {
-		sr *= 2
-		es++
+	for searchR*2 <= uint16(numTables) {
+		searchR *= 2
+		entrySel++
 	}
 
-	binary.BigEndian.PutUint16(out[6:8], sr*16)
-	binary.BigEndian.PutUint16(out[8:10], es)
-	binary.BigEndian.PutUint16(out[10:12], uint16(numTables)*16-sr*16)
+	binary.BigEndian.PutUint16(out[6:8], searchR*sfntSearchRangeMul)
+	binary.BigEndian.PutUint16(out[8:10], entrySel)
+	binary.BigEndian.PutUint16(out[10:12], uint16(numTables)*16-searchR*16)
 
 	tableOffset := uint32(headerSize)
 
-	for i, e := range entries {
-		rec := out[12+16*i:]
+	for idx, e := range entries {
+		rec := out[12+16*idx:]
 		copy(rec[0:4], e.tag[:])
 		binary.BigEndian.PutUint32(rec[4:8], e.checksum)
 		binary.BigEndian.PutUint32(rec[8:12], tableOffset)
-		binary.BigEndian.PutUint32(rec[12:16], uint32(len(tables[i])))
-		copy(out[tableOffset:], tables[i])
-		padded := uint32((len(tables[i]) + 3) &^ 3)
+		binary.BigEndian.PutUint32(rec[12:16], uint32(len(tables[idx])))
+		copy(out[tableOffset:], tables[idx])
+		padded := uint32((len(tables[idx]) + padMask3) &^ padMask3)
 		tableOffset += padded
 	}
 

@@ -12,7 +12,8 @@ import (
 // var() chains (0.875rem → 10.5pt) when defined; Georgia stays in the family
 // list (paint tries the author's stack order).
 func TestCSSVarFontSizeMedium(t *testing.T) {
-	s := sheet(t, `
+	t.Parallel()
+	cssSheet := sheet(t, `
 :root {
   --font-size-small: 0.875rem;
   --font-size-medium: var(--font-size-small);
@@ -30,29 +31,30 @@ func TestCSSVarFontSizeMedium(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	styles := resolveStyles(root, []*css.Stylesheet{s}, "print", 800, 600)
+	styles := resolveStyles(root, []*css.Stylesheet{cssSheet}, "print", 800, 600)
 
 	p := findEl(root, "p")
 	if p == nil {
 		t.Fatal("p not found")
 	}
 
-	st := styles[p]
+	sty := styles[p]
 	want := 10.5 // 0.875rem × 12pt root
 
-	if math.Abs(st.FontSize-want) > 0.05 {
-		t.Fatalf("font-size=%.2f want ~%.1f (custom prop chain)", st.FontSize, want)
+	if math.Abs(sty.FontSize-want) > 0.05 {
+		t.Fatalf("font-size=%.2f want ~%.1f (custom prop chain)", sty.FontSize, want)
 	}
 
-	if len(st.FontFamily) == 0 || st.FontFamily[0] != "Georgia" {
-		t.Fatalf("font-family=%v want Georgia first", st.FontFamily)
+	if len(sty.FontFamily) == 0 || sty.FontFamily[0] != "Georgia" {
+		t.Fatalf("font-family=%v want Georgia first", sty.FontFamily)
 	}
 }
 
 // TestCSSVarFontSizeMediumUnresolved: bare var(--font-size-medium) without a
 // definition or CSS fallback does not invent 8pt — font-size stays UA/inherited.
 func TestCSSVarFontSizeMediumUnresolved(t *testing.T) {
-	s := sheet(t, `
+	t.Parallel()
+	cssSheet := sheet(t, `
 .vector-body { font-size: var(--font-size-medium); }
 `)
 
@@ -61,7 +63,7 @@ func TestCSSVarFontSizeMediumUnresolved(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	styles := resolveStyles(root, []*css.Stylesheet{s}, "print", 800, 600)
+	styles := resolveStyles(root, []*css.Stylesheet{cssSheet}, "print", 800, 600)
 
 	p := findEl(root, "p")
 	if p == nil {

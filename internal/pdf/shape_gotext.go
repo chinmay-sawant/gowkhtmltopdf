@@ -43,14 +43,14 @@ type ShapedRun struct {
 
 // ShapeRun shapes s and computes advances for the resulting run. The returned
 // slices are owned by the result and may be retained by the caller.
-func ShapeRun(s string, f *Font, size float64) ShapedRun {
-	text := ShapeTextFont(s, f)
+func ShapeRun(s string, fnt *Font, size float64) ShapedRun {
+	text := ShapeTextFont(s, fnt)
 	runes := []rune(text)
 	advances := make([]float64, len(runes))
 
-	if f != nil {
+	if fnt != nil {
 		for i, r := range runes {
-			advances[i] = f.AdvanceInPoints(r, size)
+			advances[i] = fnt.AdvanceInPoints(r, size)
 		}
 	}
 
@@ -72,46 +72,46 @@ func ShapeTextFont(s string, f *Font) string {
 
 // ShapeTextFontWithFeatures is ShapeTextFont with explicit OpenType feature
 // tags. A nil/empty features slice still enables halt/palt for CJK text.
-func ShapeTextFontWithFeatures(s string, f *Font, features []shaping.FontFeature) string {
-	if s == "" {
-		return s
+func ShapeTextFontWithFeatures(text string, fnt *Font, features []shaping.FontFeature) string {
+	if text == "" {
+		return text
 	}
 
-	feats := mergeFontFeatures(s, features)
+	feats := mergeFontFeatures(text, features)
 
-	needShape := ShapeNeeded(s) || len(feats) > 0
+	needShape := ShapeNeeded(text) || len(feats) > 0
 	if !needShape {
-		return s
+		return text
 	}
 
-	if run, ok := tryShapeOpenType(s, f, feats); ok && run.text != "" {
+	if run, ok := tryShapeOpenType(text, fnt, feats); ok && run.text != "" {
 		return run.text
 	}
 
-	if ShapeNeeded(s) {
-		return ShapeText(s)
+	if ShapeNeeded(text) {
+		return ShapeText(text)
 	}
 
-	return s
+	return text
 }
 
-func tryShapeOpenType(s string, f *Font, features []shaping.FontFeature) (shapedRun, bool) {
-	if f == nil {
-		return shapedRun{}, false
+func tryShapeOpenType(str string, fnt *Font, features []shaping.FontFeature) (shapedRun, bool) {
+	if fnt == nil {
+		return shapedRun{}, false //nolint:exhaustruct // intentional zero-value fields
 	}
 	// GSUB covers Arabic ligation; halt/palt live in GPOS and are requested via
 	// FontFeatures — allow the OT path when either applies.
-	if !f.hasGSUB() && len(features) == 0 {
-		return shapedRun{}, false
+	if !fnt.hasGSUB() && len(features) == 0 {
+		return shapedRun{}, false //nolint:exhaustruct // intentional zero-value fields
 	}
 
-	face, ok := f.gotextFace()
+	face, ok := fnt.gotextFace()
 	if !ok {
-		return shapedRun{}, false
+		return shapedRun{}, false //nolint:exhaustruct // intentional zero-value fields
 	}
 
-	rev := f.reverseCmap()
-	text := []rune(s)
+	rev := fnt.reverseCmap()
+	text := []rune(str)
 
 	seg := segmenterPool.Get().(*shaping.Segmenter)
 	defer segmenterPool.Put(seg)
@@ -122,7 +122,7 @@ func tryShapeOpenType(s string, f *Font, features []shaping.FontFeature) (shaped
 	// Size left at zero so we do not import golang.org/x/image (keep
 	// typesetting as the only direct third-party require). Glyph IDs are
 	// still correct; advances come from our Font hmtx below.
-	inputs := seg.Split(shaping.Input{
+	inputs := seg.Split(shaping.Input{ //nolint:exhaustruct // intentional zero-value fields
 		Text:         text,
 		RunStart:     0,
 		RunEnd:       len(text),
@@ -133,14 +133,14 @@ func tryShapeOpenType(s string, f *Font, features []shaping.FontFeature) (shaped
 
 	outRunes := make([]rune, 0, len(text))
 
-	for _, in := range inputs {
-		if in.Face == nil {
-			in.Face = face
+	for _, inVal := range inputs {
+		if inVal.Face == nil {
+			inVal.Face = face
 		}
 
-		in.FontFeatures = features
+		inVal.FontFeatures = features
 
-		out := shaper.Shape(in)
+		out := shaper.Shape(inVal)
 		for _, g := range out.Glyphs {
 			if g.GlyphID == gtfont.EmptyGlyph {
 				continue
@@ -150,7 +150,7 @@ func tryShapeOpenType(s string, f *Font, features []shaping.FontFeature) (shaped
 
 			r, ok := rev[gid]
 			if !ok {
-				return shapedRun{}, false
+				return shapedRun{}, false //nolint:exhaustruct // intentional zero-value fields
 			}
 
 			outRunes = append(outRunes, r)
@@ -205,16 +205,16 @@ func cjkPunctFontFeatures(s string) []shaping.FontFeature {
 }
 
 func textNeedsCJKFeatures(s string) bool {
-	for _, r := range s {
-		if unicode.In(r, unicode.Han, unicode.Hangul, unicode.Hiragana, unicode.Katakana) {
+	for _, rVal := range s {
+		if unicode.In(rVal, unicode.Han, unicode.Hangul, unicode.Hiragana, unicode.Katakana) {
 			return true
 		}
 		// CJK punctuation / fullwidth forms often targeted by halt/palt.
-		if r >= 0x3000 && r <= 0x303F {
+		if rVal >= 0x3000 && rVal <= 0x303F {
 			return true
 		}
 
-		if r >= 0xFF00 && r <= 0xFFEF {
+		if rVal >= 0xFF00 && rVal <= 0xFFEF {
 			return true
 		}
 	}
@@ -222,40 +222,40 @@ func textNeedsCJKFeatures(s string) bool {
 	return false
 }
 
-func splitCSSList(v string) []string {
+func splitCSSList(val string) []string {
 	parts := []string{}
 
 	var cur []byte
 
 	inQ := byte(0)
 
-	for i := range len(v) {
-		c := v[i]
+	for i := range len(val) {
+		cnt := val[i]
 		if inQ != 0 {
-			cur = append(cur, c)
+			cur = append(cur, cnt)
 
-			if c == inQ {
+			if cnt == inQ {
 				inQ = 0
 			}
 
 			continue
 		}
 
-		if c == '"' || c == '\'' {
-			inQ = c
-			cur = append(cur, c)
+		if cnt == '"' || cnt == '\'' {
+			inQ = cnt
+			cur = append(cur, cnt)
 
 			continue
 		}
 
-		if c == ',' {
+		if cnt == ',' {
 			parts = append(parts, string(cur))
 			cur = cur[:0]
 
 			continue
 		}
 
-		cur = append(cur, c)
+		cur = append(cur, cnt)
 	}
 
 	if len(cur) > 0 {
@@ -266,16 +266,16 @@ func splitCSSList(v string) []string {
 }
 
 func trimSpace(s string) string {
-	i, j := 0, len(s)
-	for i < j && (s[i] == ' ' || s[i] == '\t' || s[i] == '\n' || s[i] == '\r') {
-		i++
+	leftIdx, jdx := 0, len(s)
+	for leftIdx < jdx && (s[leftIdx] == ' ' || s[leftIdx] == '\t' || s[leftIdx] == '\n' || s[leftIdx] == '\r') {
+		leftIdx++
 	}
 
-	for j > i && (s[j-1] == ' ' || s[j-1] == '\t' || s[j-1] == '\n' || s[j-1] == '\r') {
-		j--
+	for jdx > leftIdx && (s[jdx-1] == ' ' || s[jdx-1] == '\t' || s[jdx-1] == '\n' || s[jdx-1] == '\r') {
+		jdx--
 	}
 
-	return s[i:j]
+	return s[leftIdx:jdx]
 }
 
 func parseOneFontFeature(part string) (ot.Tag, uint32, bool) {
@@ -286,7 +286,7 @@ func parseOneFontFeature(part string) (ot.Tag, uint32, bool) {
 
 	var tagStr string
 
-	rest := ""
+	var rest string
 
 	if part[0] == '"' || part[0] == '\'' {
 		q := part[0]
@@ -300,14 +300,14 @@ func parseOneFontFeature(part string) (ot.Tag, uint32, bool) {
 			}
 		}
 		// Quoted 4-letter tag: `"halt"` → indices 0 and 5.
-		if end != 5 {
+		if end != featureEndTagIdx {
 			return 0, 0, false
 		}
 
 		tagStr = part[1:end]
 		rest = trimSpace(part[end+1:])
 	} else {
-		if len(part) < 4 {
+		if len(part) < featureTagLen {
 			return 0, 0, false
 		}
 
@@ -324,17 +324,17 @@ func parseOneFontFeature(part string) (ot.Tag, uint32, bool) {
 		case "off", "Off", "OFF":
 			val = 0
 		default:
-			n := 0
+			count := 0
 
 			for _, c := range rest {
 				if c < '0' || c > '9' {
 					return 0, 0, false
 				}
 
-				n = n*10 + int(c-'0')
+				count = count*decimalBase + int(c-'0')
 			}
 
-			val = uint32(n)
+			val = uint32(count)
 		}
 	}
 
@@ -384,14 +384,14 @@ func (f *Font) reverseCmap() map[uint16]rune {
 				continue
 			}
 
-			r := rune(cp)
+			rVal := rune(cp)
 			if prev, ok := out[gid]; ok {
-				if cmapRuneScore(r) <= cmapRuneScore(prev) {
+				if cmapRuneScore(rVal) <= cmapRuneScore(prev) {
 					continue
 				}
 			}
 
-			out[gid] = r
+			out[gid] = rVal
 		}
 
 		f.rev = out
@@ -403,9 +403,9 @@ func (f *Font) reverseCmap() map[uint16]rune {
 func cmapRuneScore(r rune) int {
 	switch {
 	case r >= 0xFE70 && r <= 0xFEFF:
-		return 3 // Arabic presentation forms-B
+		return arabicFormsB // Arabic presentation forms-B
 	case r >= 0xFB50 && r <= 0xFDFF:
-		return 2 // Arabic presentation forms-A
+		return arabicFormsA // Arabic presentation forms-A
 	default:
 		return 1
 	}

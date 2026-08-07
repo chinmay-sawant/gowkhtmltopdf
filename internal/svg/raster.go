@@ -23,6 +23,12 @@ import (
 	"github.com/tdewolff/canvas/renderers/rasterizer"
 )
 
+const (
+	cssDPI          = 96.0
+	mmPerInch       = 25.4
+	viewBoxNumParts = 4
+)
+
 // Rasterize decodes SVG XML into a PNG image via tdewolff/canvas only.
 // maxSide caps the longer edge in pixels (default 512).
 // On failure (not SVG, parse/draw error, empty size, or canvas panic),
@@ -56,38 +62,38 @@ func rasterizeCanvas(data []byte, maxSide int) (pngBytes []byte, w, h int, err e
 		}
 	}()
 
-	c, err := canvas.ParseSVG(bytes.NewReader(data))
+	svgCanvas, err := canvas.ParseSVG(bytes.NewReader(data))
 	if err != nil {
 		return nil, 0, 0, fmt.Errorf("svg canvas: %w", err)
 	}
 
-	cw, ch := c.Size()
-	if cw <= 0 || ch <= 0 {
+	canvasW, canvasH := svgCanvas.Size()
+	if canvasW <= 0 || canvasH <= 0 {
 		return nil, 0, 0, errors.New("svg canvas: empty size")
 	}
 
 	// Intrinsic CSS-pixel size from viewBox / width / height attributes.
 	targetW, targetH := svgCSSPixelSize(data, maxSide)
 	// Map canvas mm → target pixels.
-	dpmm := float64(targetW) / cw
-	if alt := float64(targetH) / ch; alt > 0 && (dpmm <= 0 || math.Abs(alt-dpmm) > 1e-6) {
+	dpmm := float64(targetW) / canvasW
+	if alt := float64(targetH) / canvasH; alt > 0 && (dpmm <= 0 || math.Abs(alt-dpmm) > 1e-6) {
 		// Prefer the resolution that keeps the longer edge within target.
 		if float64(targetW) >= float64(targetH) {
-			dpmm = float64(targetW) / cw
+			dpmm = float64(targetW) / canvasW
 		} else {
-			dpmm = float64(targetH) / ch
+			dpmm = float64(targetH) / canvasH
 		}
 	}
 
 	if dpmm <= 0 {
-		dpmm = 96.0 / 25.4
+		dpmm = cssDPI / mmPerInch
 	}
 
-	img := rasterizer.Draw(c, canvas.DPMM(dpmm), nil)
+	img := rasterizer.Draw(svgCanvas, canvas.DPMM(dpmm), nil)
 	bounds := img.Bounds()
 
-	pw, ph := bounds.Dx(), bounds.Dy()
-	if pw < 1 || ph < 1 {
+	pixW, pixH := bounds.Dx(), bounds.Dy()
+	if pixW < 1 || pixH < 1 {
 		return nil, 0, 0, errors.New("svg canvas: zero pixel size")
 	}
 
@@ -96,39 +102,39 @@ func rasterizeCanvas(data []byte, maxSide int) (pngBytes []byte, w, h int, err e
 		return nil, 0, 0, err
 	}
 
-	return buf.Bytes(), pw, ph, nil
+	return buf.Bytes(), pixW, pixH, nil
 }
 
 // svgCSSPixelSize returns the target raster size in CSS pixels (capped by
 // maxSide), derived from the root SVG viewBox or width/height attributes.
 // Only the root element is scanned; no shape parsing.
 func svgCSSPixelSize(data []byte, maxSide int) (int, int) {
-	vw, vh := rootSVGSize(data)
-	if vw <= 0 {
-		vw = 100
+	viewW, viewH := rootSVGSize(data)
+	if viewW <= 0 {
+		viewW = 100
 	}
 
-	if vh <= 0 {
-		vh = 100
+	if viewH <= 0 {
+		viewH = 100
 	}
 
 	scale := 1.0
-	if vw > float64(maxSide) || vh > float64(maxSide) {
-		scale = float64(maxSide) / math.Max(vw, vh)
+	if viewW > float64(maxSide) || viewH > float64(maxSide) {
+		scale = float64(maxSide) / math.Max(viewW, viewH)
 	}
 
-	pw := int(math.Ceil(vw * scale))
-	ph := int(math.Ceil(vh * scale))
+	pixW := int(math.Ceil(viewW * scale))
+	pixH := int(math.Ceil(viewH * scale))
 
-	if pw < 1 {
-		pw = 1
+	if pixW < 1 {
+		pixW = 1
 	}
 
-	if ph < 1 {
-		ph = 1
+	if pixH < 1 {
+		pixH = 1
 	}
 
-	return pw, ph
+	return pixW, pixH
 }
 
 // rootSVGSize reads viewBox / width / height from the first <svg> start tag.
@@ -148,17 +154,17 @@ func rootSVGSize(data []byte) (vw, vh float64) {
 			return 0, 0
 		}
 
-		el, ok := tok.(xml.StartElement)
+		elem, ok := tok.(xml.StartElement)
 		if !ok {
 			continue
 		}
 
-		if strings.ToLower(el.Name.Local) != "svg" {
+		if strings.ToLower(elem.Name.Local) != "svg" {
 			continue
 		}
 
 		attrs := map[string]string{}
-		for _, a := range el.Attr {
+		for _, a := range elem.Attr {
 			attrs[strings.ToLower(a.Name.Local)] = a.Value
 		}
 
@@ -167,7 +173,7 @@ func rootSVGSize(data []byte) (vw, vh float64) {
 
 		if vb := attrs["viewbox"]; vb != "" {
 			parts := splitNums(vb)
-			if len(parts) >= 4 {
+			if len(parts) >= viewBoxNumParts {
 				vw, vh = parts[2], parts[3]
 			}
 		}
@@ -197,16 +203,16 @@ func looksLikeSVG(data []byte) bool {
 	return strings.Contains(low, "<svg") || strings.HasPrefix(low, "<?xml")
 }
 
-func parseLen(s string, def float64) float64 {
-	s = strings.TrimSpace(s)
-	if s == "" {
+func parseLen(raw string, def float64) float64 {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
 		return def
 	}
 
-	s = strings.TrimSuffix(s, "px")
-	s = strings.TrimSuffix(s, "pt")
+	raw = strings.TrimSuffix(raw, "px")
+	raw = strings.TrimSuffix(raw, "pt")
 
-	f, err := strconv.ParseFloat(strings.TrimSpace(s), 64)
+	f, err := strconv.ParseFloat(strings.TrimSpace(raw), 64)
 	if err != nil {
 		return def
 	}

@@ -7,6 +7,7 @@ import (
 )
 
 func TestBoxSizingBorderBox(t *testing.T) {
+	t.Parallel()
 	// content-box (default): width is content; border box grows by pad+border.
 	s := sheet(t, `.a { width: 100pt; padding: 10pt; border: 5pt solid black }
 .b { width: 100pt; padding: 10pt; border: 5pt solid black; box-sizing: border-box }`)
@@ -17,14 +18,14 @@ func TestBoxSizingBorderBox(t *testing.T) {
 	var boxes []*box
 
 	var walk func(b *box)
-	walk = func(b *box) {
-		if b.node != nil && b.node.Name == "div" {
-			if cls := b.node.Attribute("class"); cls == "a" || cls == "b" {
-				boxes = append(boxes, b)
+	walk = func(boxNode *box) {
+		if boxNode.node != nil && boxNode.node.Name == "div" {
+			if cls := boxNode.node.Attribute("class"); cls == "a" || cls == "b" {
+				boxes = append(boxes, boxNode)
 			}
 		}
 
-		for _, c := range b.children {
+		for _, c := range boxNode.children {
 			walk(c)
 		}
 	}
@@ -44,27 +45,27 @@ func TestBoxSizingBorderBox(t *testing.T) {
 }
 
 func TestInlineBlockBesideText(t *testing.T) {
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 .badge { display: inline-block; width: 40pt; padding: 2pt; border: 1pt solid black;
   box-sizing: border-box; text-align: center }
 p { width: 300pt }`)
 	res := layoutHTML(t, `<html><body>
 <p>Hello <span class="badge">NEW</span> world</p>
-</body></html>`, s)
+</body></html>`, cssSheet)
 	texts := opsOfKind(res, OpText)
 
 	var hello, badge, world *Op
 
 	for i := range texts {
-		op := &texts[i]
+		paintOp := &texts[i]
 
 		switch {
-		case strings.HasPrefix(strings.TrimSpace(op.Text), "Hello"):
-			hello = op
-		case strings.HasPrefix(strings.TrimSpace(op.Text), "NEW"):
-			badge = op
-		case strings.HasPrefix(strings.TrimSpace(op.Text), "world"):
-			world = op
+		case strings.HasPrefix(strings.TrimSpace(paintOp.Text), "Hello"):
+			hello = paintOp
+		case strings.HasPrefix(strings.TrimSpace(paintOp.Text), "NEW"):
+			badge = paintOp
+		case strings.HasPrefix(strings.TrimSpace(paintOp.Text), "world"):
+			world = paintOp
 		}
 	}
 
@@ -90,7 +91,7 @@ p { width: 300pt }`)
 }
 
 func TestFloatLeftRightClear(t *testing.T) {
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 .logo { float: left; width: 60pt; height: 40pt; background-color: #ccc }
 .meta { float: right; width: 80pt; height: 30pt; background-color: #eee }
 .clear { clear: both }
@@ -99,24 +100,24 @@ body { width: 400pt }`)
 <div class="logo">L</div>
 <div class="meta">M</div>
 <div class="clear">Below</div>
-</body></html>`, s)
+</body></html>`, cssSheet)
 
 	var logo, meta, clear *box
 
 	var walk func(b *box)
-	walk = func(b *box) {
-		if b.node != nil && b.node.Name == "div" {
-			switch b.node.Attribute("class") {
+	walk = func(boxNode *box) {
+		if boxNode.node != nil && boxNode.node.Name == "div" {
+			switch boxNode.node.Attribute("class") {
 			case "logo":
-				logo = b
+				logo = boxNode
 			case "meta":
-				meta = b
+				meta = boxNode
 			case "clear":
-				clear = b
+				clear = boxNode
 			}
 		}
 
-		for _, c := range b.children {
+		for _, c := range boxNode.children {
 			walk(c)
 		}
 	}
@@ -134,9 +135,9 @@ body { width: 400pt }`)
 		t.Errorf("logo/meta should share y band: %v vs %v", logo.y, meta.y)
 	}
 	// Clear sits below both floats.
-	below := logo.y + logo.h
-	if meta.y+meta.h > below {
-		below = meta.y + meta.h
+	below := logo.y + logo.height
+	if meta.y+meta.height > below {
+		below = meta.y + meta.height
 	}
 
 	if clear.y+0.01 < below {
@@ -145,6 +146,7 @@ body { width: 400pt }`)
 }
 
 func TestTextAlignJustify(t *testing.T) {
+	t.Parallel()
 	s := sheet(t, `div { width: 200pt; text-align: justify }`)
 	// Long enough to wrap into multiple lines.
 	res := layoutHTML(t, `<html><body><div>alpha bravo charlie delta echo foxtrot golf hotel india</div></body></html>`, s)
@@ -177,7 +179,8 @@ func TestTextAlignJustify(t *testing.T) {
 }
 
 func TestTableCellVerticalAlignMiddle(t *testing.T) {
-	s := sheet(t, `
+	t.Parallel()
+	cssSheet := sheet(t, `
 td { border: 1pt solid black; padding: 0 }
 .tall { height: 60pt }
 .mid { vertical-align: middle }`)
@@ -186,7 +189,7 @@ td { border: 1pt solid black; padding: 0 }
 <td class="tall">Hi<br>there<br>row</td>
 <td class="mid">X</td>
 </tr></table>
-</body></html>`, s)
+</body></html>`, cssSheet)
 	texts := opsOfKind(res, OpText)
 
 	var xOp *Op

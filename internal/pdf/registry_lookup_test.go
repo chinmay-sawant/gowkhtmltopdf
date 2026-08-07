@@ -6,6 +6,8 @@ import (
 )
 
 func TestFontFamilyKeysGenericsOnly(t *testing.T) {
+	t.Parallel()
+
 	if got := fontFamilyKeys("Georgia"); len(got) != 1 || got[0] != "georgia" {
 		t.Fatalf("Georgia keys=%v want exact [georgia]", got)
 	}
@@ -20,6 +22,8 @@ func TestFontFamilyKeysGenericsOnly(t *testing.T) {
 }
 
 func TestLookupExactBeforeGeneric(t *testing.T) {
+	t.Parallel()
+
 	reg := ScanFontDirs(DefaultSystemFontDirs())
 	if len(reg.byFamily["liberation serif"]) == 0 {
 		t.Skip("Liberation Serif not installed")
@@ -33,21 +37,21 @@ func TestLookupExactBeforeGeneric(t *testing.T) {
 		}
 	}
 
-	f := reg.Lookup([]string{"Georgia", "Liberation Serif", "serif"}, 400, false)
-	if f == nil {
+	fnt := reg.Lookup([]string{"Georgia", "Liberation Serif", "serif"}, 400, false)
+	if fnt == nil {
 		t.Fatal("expected Liberation Serif from author stack")
 	}
 
-	ok := false
+	found := false
 
-	for _, n := range f.FamilyNames() {
+	for _, n := range fnt.FamilyNames() {
 		low := strings.ToLower(n)
 		if strings.Contains(low, "liberation") && strings.Contains(low, "serif") {
-			ok = true
+			found = true
 		}
 	}
 
-	if !ok {
-		t.Fatalf("got face %v, want Liberation Serif", f.FamilyNames())
+	if !found {
+		t.Fatalf("got face %v, want Liberation Serif", fnt.FamilyNames())
 	}
 }

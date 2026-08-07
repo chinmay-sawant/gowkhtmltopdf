@@ -44,14 +44,14 @@ var (
 // pageKidsRefs returns the ordered page object numbers from the pages tree
 // /Kids array (first match is the root pages dict).
 func pageKidsRefs(data []byte) []int {
-	m := kidsPageRefsRe.FindSubmatch(data)
-	if m == nil {
+	mVal := kidsPageRefsRe.FindSubmatch(data)
+	if mVal == nil {
 		return nil
 	}
 
 	var out []int
 
-	for _, ref := range pageObjRefRe.FindAllSubmatch(m[1], -1) {
+	for _, ref := range pageObjRefRe.FindAllSubmatch(mVal[1], -1) {
 		n, _ := strconv.Atoi(string(ref[1]))
 		out = append(out, n)
 	}
@@ -71,6 +71,7 @@ func destPageRefs(data []byte) []int {
 }
 
 func TestHTMLHeaderFragmentGoTo(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	headerPath := writeHFLinkHeader(t, dir, "#target")
 	cmd, _ := newCommand(t, bodyWithTargetOnPage2(), filepath.Join(t.TempDir(), "out.pdf"))
@@ -118,6 +119,7 @@ func TestHTMLHeaderFragmentGoTo(t *testing.T) {
 }
 
 func TestHTMLHeaderFragmentGoToCopies(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	headerPath := writeHFLinkHeader(t, dir, "#target")
 	cmd, _ := newCommand(t, bodyWithTargetOnPage2(), filepath.Join(t.TempDir(), "out.pdf"))
@@ -161,6 +163,7 @@ func TestHTMLHeaderFragmentGoToCopies(t *testing.T) {
 }
 
 func TestHTMLHeaderFragmentGoToCopiesNonCollate(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	headerPath := writeHFLinkHeader(t, dir, "#target")
 	cmd, _ := newCommand(t, bodyWithTargetOnPage2(), filepath.Join(t.TempDir(), "out.pdf"))
@@ -194,6 +197,7 @@ func TestHTMLHeaderFragmentGoToCopiesNonCollate(t *testing.T) {
 }
 
 func TestHTMLHeaderExternalURI(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	headerPath := writeHFLinkHeader(t, dir, "http://example.com/hf")
 	cmd, _ := newCommand(t, `<html><body><p>body</p></body></html>`, filepath.Join(t.TempDir(), "out.pdf"))
@@ -208,6 +212,7 @@ func TestHTMLHeaderExternalURI(t *testing.T) {
 }
 
 func TestHTMLHeaderFontFaceLocal(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	ttf := copyTestdataTTF(t, dir)
 	_ = ttf
@@ -240,6 +245,7 @@ body { font-family: Custom, sans-serif; font-size: 12pt; }
 }
 
 func TestHTMLHeaderFlexImage(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	// 1x1 PNG
 	pngPath := filepath.Join(dir, "dot.png")
@@ -286,20 +292,21 @@ img { width: 12pt; height: 12pt; }
 }
 
 func TestHTMLHeaderTallContentClipped(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	headerPath := filepath.Join(dir, "header.html")
 	// Many lines → HF taller than a typical header band; must not panic and must clip.
-	var b strings.Builder
+	var buf strings.Builder
 
-	b.WriteString(`<html><body>`)
+	buf.WriteString(`<html><body>`)
 
 	for range 40 {
-		b.WriteString(`<p>tall line</p>`)
+		buf.WriteString(`<p>tall line</p>`)
 	}
 
-	b.WriteString(`</body></html>`)
+	buf.WriteString(`</body></html>`)
 
-	if err := os.WriteFile(headerPath, []byte(b.String()), 0o644); err != nil {
+	if err := os.WriteFile(headerPath, []byte(buf.String()), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -320,6 +327,7 @@ func TestHTMLHeaderTallContentClipped(t *testing.T) {
 }
 
 func TestHTMLHeaderPlaceholdersCopies(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	headerPath := filepath.Join(dir, "header.html")
 	hdr := `<html><body><p>P[page]/[topage]</p></body></html>`
@@ -351,6 +359,7 @@ func TestHTMLHeaderPlaceholdersCopies(t *testing.T) {
 }
 
 func TestRemapPageForCopies(t *testing.T) {
+	t.Parallel()
 	// collate: [0,1, 0',1'] with logicalN=2, copies=2
 	if got := remapPageForCopies(1, 0, 2, 2, true); got != 1 {
 		t.Errorf("collate src0→dest1 = %d, want 1", got)

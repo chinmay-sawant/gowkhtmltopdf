@@ -9,7 +9,8 @@ import (
 )
 
 func TestTallTableAvoidInsideNoBlankPages(t *testing.T) {
-	s := sheet(t, `
+	t.Parallel()
+	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 table { border-collapse: collapse; page-break-inside: avoid; }
 td, th { border: 1px solid #aaa; padding: 4pt; }
@@ -26,9 +27,8 @@ td, th { border: 1px solid #aaa; padding: 4pt; }
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	res, err := Layout(root, Options{
-		Width: 538, Height: 700, Sheets: []*css.Stylesheet{s},
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 538, Height: 700, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true,
 	})
 	if err != nil {
@@ -72,7 +72,7 @@ td, th { border: 1px solid #aaa; padding: 4pt; }
 // fits one page with page-break-inside:avoid, preceded by enough content and
 // a heading — must not cascade blank pages via avoid+keep-heading.
 func TestAvoidTableAfterContentNoBlankCascade(t *testing.T) {
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 body { margin: 0; font-size: 11pt; }
 p { margin: 0.4em 0; }
 table { border-collapse: collapse; page-break-inside: avoid; width: 100%; }
@@ -104,9 +104,8 @@ h2 { font-size: 14pt; margin: 8pt 0 4pt; }
 	}
 
 	const pageH = 750.0
-
-	res, err := Layout(root, Options{
-		Width: 538, Height: pageH, Sheets: []*css.Stylesheet{s},
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 538, Height: pageH, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true,
 	})
 	if err != nil {

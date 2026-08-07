@@ -19,6 +19,7 @@ func copyTestdataTTF(t *testing.T, dir string) string {
 	t.Helper()
 
 	src := filepath.Join("..", "..", "internal", "pdf", "assets", "LiberationSans-Regular.ttf")
+
 	data, err := os.ReadFile(src)
 	if err != nil {
 		src = filepath.Join("..", "..", "testdata", "fonts", "NotoSansKR-HangulSubset.ttf")
@@ -45,6 +46,7 @@ body { font-family: Custom, sans-serif; font-size: 14pt; }
 }
 
 func TestFontFaceLocalEmbed(t *testing.T) {
+	t.Parallel()
 	cmd, dir := newCommand(t, fontFaceHTML("Custom.ttf"), filepath.Join(t.TempDir(), "out.pdf"))
 	copyTestdataTTF(t, dir)
 
@@ -72,6 +74,7 @@ func TestFontFaceLocalEmbed(t *testing.T) {
 }
 
 func TestFontFaceACLDeny(t *testing.T) {
+	t.Parallel()
 	// Primary page needs a readable path; deny the font by allowing only the
 	// page directory (sibling fonts/ is outside --allow).
 	root := t.TempDir()
@@ -96,14 +99,14 @@ func TestFontFaceACLDeny(t *testing.T) {
 	obj := settings.DefaultPdfObject()
 	obj.Page = htmlPath
 	// ACL test: do not open local file access; only Allow pageDir for the HTML.
-	cmd := &cli.Command{
+	cmd := &cli.Command{ //nolint:exhaustruct // intentional zero-value fields
 		Global:  settings.DefaultPdfGlobal(),
 		Objects: []settings.PdfObject{obj},
 		Output:  filepath.Join(t.TempDir(), "out.pdf"),
 	}
 	cmd.Global.Load.EnableLocalFileAccess = false
 	cmd.Global.Load.Allow = []string{pageDir}
-	cmd.Global.Size = settings.Size{PageSize: cmd.Global.PageSize}
+	cmd.Global.Size = settings.Size{PageSize: cmd.Global.PageSize} //nolint:exhaustruct // intentional zero-value fields
 
 	var log bytes.Buffer
 	if err := RunPDF(cmd, &log); err != nil {
@@ -134,6 +137,7 @@ func TestFontFaceACLDeny(t *testing.T) {
 }
 
 func TestFontFaceWOFFEmbed(t *testing.T) {
+	t.Parallel()
 	cmd, dir := newCommand(t, fontFaceHTML("Custom.woff"), filepath.Join(t.TempDir(), "out.pdf"))
 	ttfPath := copyTestdataTTF(t, dir)
 
@@ -163,6 +167,8 @@ func TestFontFaceWOFFEmbed(t *testing.T) {
 }
 
 func TestFontFaceWOFF2Skipped(t *testing.T) {
+	t.Parallel()
+
 	html := `<html><head><style>
 @font-face { font-family: Custom; src: url(Custom.woff2); }
 body { font-family: Custom, sans-serif; }
@@ -194,6 +200,8 @@ body { font-family: Custom, sans-serif; }
 }
 
 func TestFontFaceBadWOFFSkipped(t *testing.T) {
+	t.Parallel()
+
 	html := `<html><head><style>
 @font-face { font-family: Custom; src: url(Custom.woff); }
 body { font-family: Custom, sans-serif; }
@@ -225,6 +233,7 @@ body { font-family: Custom, sans-serif; }
 }
 
 func TestFontFaceHTTPSFetchAttempted(t *testing.T) {
+	t.Parallel()
 	// Remote https @font-face is allowed through FetchSub; a dead host must
 	// warn and not register the face (no silent skip-by-policy).
 	html := `<html><head><style>
@@ -258,6 +267,8 @@ body { font-family: Custom, sans-serif; }
 }
 
 func TestFontFaceDataSkipped(t *testing.T) {
+	t.Parallel()
+
 	html := `<html><head><style>
 @font-face { font-family: Custom; src: url(data:font/ttf;base64,AAAA); }
 body { font-family: Custom, sans-serif; }
@@ -320,8 +331,8 @@ func encodeWOFF1Test(t *testing.T, sfnt []byte) []byte {
 	origLens := make([]uint32, numTables)
 	compLens := make([]uint32, numTables)
 
-	for i, tb := range tabs {
-		raw := sfnt[tb.offset : tb.offset+tb.length]
+	for idx, table := range tabs {
+		raw := sfnt[table.offset : table.offset+table.length]
 
 		var buf bytes.Buffer
 
@@ -339,9 +350,9 @@ func encodeWOFF1Test(t *testing.T, sfnt []byte) []byte {
 			comp = append([]byte(nil), raw...)
 		}
 
-		compressed[i] = comp
-		origLens[i] = tb.length
-		compLens[i] = uint32(len(comp))
+		compressed[idx] = comp
+		origLens[idx] = table.length
+		compLens[idx] = uint32(len(comp))
 	}
 
 	header := make([]byte, woffHeaderSize)
@@ -355,21 +366,21 @@ func encodeWOFF1Test(t *testing.T, sfnt []byte) []byte {
 
 	var body bytes.Buffer
 
-	for i, tb := range tabs {
+	for table, tbl := range tabs {
 		for payloadOff%4 != 0 {
 			body.WriteByte(0)
 
 			payloadOff++
 		}
 
-		rec := dir[i*woffEntrySize : (i+1)*woffEntrySize]
-		copy(rec[0:4], tb.tag[:])
+		rec := dir[table*woffEntrySize : (table+1)*woffEntrySize]
+		copy(rec[0:4], tbl.tag[:])
 		binary.BigEndian.PutUint32(rec[4:8], payloadOff)
-		binary.BigEndian.PutUint32(rec[8:12], compLens[i])
-		binary.BigEndian.PutUint32(rec[12:16], origLens[i])
-		binary.BigEndian.PutUint32(rec[16:20], tb.checksum)
-		body.Write(compressed[i])
-		payloadOff += compLens[i]
+		binary.BigEndian.PutUint32(rec[8:12], compLens[table])
+		binary.BigEndian.PutUint32(rec[12:16], origLens[table])
+		binary.BigEndian.PutUint32(rec[16:20], tbl.checksum)
+		body.Write(compressed[table])
+		payloadOff += compLens[table]
 	}
 
 	out := append(append(header, dir...), body.Bytes()...)

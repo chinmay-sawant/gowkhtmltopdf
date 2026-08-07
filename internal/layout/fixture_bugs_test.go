@@ -12,7 +12,7 @@ import (
 
 func TestRowBackgroundShowsThroughCells(t *testing.T) {
 	// tr.good { background } must paint on cells that have no own bg.
-	s, err := css.Parse(`
+	cssSheet, err := css.Parse(`
 		td { border: 1px solid #000; }
 		.good { background-color: #e2f2e2; color: #1f5c2e }
 		.warn { background-color: #fdf3d7; color: #7a5c00 }
@@ -29,23 +29,23 @@ func TestRowBackgroundShowsThroughCells(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{Width: 400, Height: 300, Sheets: []*css.Stylesheet{s}, Background: true})
+	res, err := Layout(root, Options{Width: 400, Height: 300, Sheets: []*css.Stylesheet{cssSheet}, Background: true}) //nolint:exhaustruct // intentional zero fields
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var green, yellow int
 
-	for _, op := range res.Ops {
-		if op.Kind != OpFillRect || op.H < 1 {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpFillRect || paintOp.H < 1 {
 			continue
 		}
 		// #e2f2e2
-		if op.G > 0.9 && op.R > 0.8 && op.R < 0.95 && op.B > 0.8 {
+		if paintOp.G > 0.9 && paintOp.R > 0.8 && paintOp.R < 0.95 && paintOp.B > 0.8 {
 			green++
 		}
 		// #fdf3d7 ≈ warm yellow
-		if op.R > 0.95 && op.G > 0.9 && op.B < 0.9 {
+		if paintOp.R > 0.95 && paintOp.G > 0.9 && paintOp.B < 0.9 {
 			yellow++
 		}
 	}
@@ -60,7 +60,7 @@ func TestRowBackgroundShowsThroughCells(t *testing.T) {
 }
 
 func TestRGBABackgroundCompositesLight(t *testing.T) {
-	s, err := css.Parse(`.alpha { background-color: rgba(15, 58, 95, 0.15); padding: 8px }`)
+	cssSheet, err := css.Parse(`.alpha { background-color: rgba(15, 58, 95, 0.15); padding: 8px }`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,7 +70,7 @@ func TestRGBABackgroundCompositesLight(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{Width: 400, Height: 200, Sheets: []*css.Stylesheet{s}, Background: true})
+	res, err := Layout(root, Options{Width: 400, Height: 200, Sheets: []*css.Stylesheet{cssSheet}, Background: true}) //nolint:exhaustruct // intentional zero fields
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +105,7 @@ func TestNestedTableNoMeasureLeak(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{Width: 500, Height: 400, Background: true})
+	res, err := Layout(root, Options{Width: 500, Height: 400, Background: true}) //nolint:exhaustruct // intentional zero fields
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,21 +114,21 @@ func TestNestedTableNoMeasureLeak(t *testing.T) {
 
 	var sawHeader, sawLabel, sawInner bool
 
-	for _, op := range res.Ops {
-		if op.Kind != OpText {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpText {
 			continue
 		}
 
-		if strings.Contains(op.Text, "Header") {
-			headerY, sawHeader = op.Y, true
+		if strings.Contains(paintOp.Text, "Header") {
+			headerY, sawHeader = paintOp.Y, true
 		}
 
-		if strings.Contains(op.Text, "outer-label") {
-			labelY, sawLabel = op.Y, true
+		if strings.Contains(paintOp.Text, "outer-label") {
+			labelY, sawLabel = paintOp.Y, true
 		}
 
-		if strings.Contains(op.Text, "inner-a") {
-			innerY, sawInner = op.Y, true
+		if strings.Contains(paintOp.Text, "inner-a") {
+			innerY, sawInner = paintOp.Y, true
 		}
 	}
 
@@ -144,23 +144,23 @@ func TestNestedTableNoMeasureLeak(t *testing.T) {
 		t.Errorf("inner table Y=%.1f should be below outer-label Y=%.1f (document order)", innerY, labelY)
 	}
 
-	n := 0
+	node := 0
 
 	for _, op := range res.Ops {
 		if op.Kind == OpText && strings.Contains(op.Text, "inner-a") {
-			n++
+			node++
 		}
 	}
 
-	if n != 1 {
-		t.Errorf("inner-a text ops = %d, want 1 (no double emit)", n)
+	if node != 1 {
+		t.Errorf("inner-a text ops = %d, want 1 (no double emit)", node)
 	}
 }
 
 func TestBackgroundPaintsUnderText(t *testing.T) {
 	// Regression: block backgrounds must be emitted before text ops so
 	// yellow/blue notice boxes do not cover their labels.
-	s, err := css.Parse(`.notice { background-color: #fff3d6; color: #233043; padding: 8px }`)
+	cssSheet, err := css.Parse(`.notice { background-color: #fff3d6; color: #233043; padding: 8px }`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,19 +170,19 @@ func TestBackgroundPaintsUnderText(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{Width: 400, Height: 200, Sheets: []*css.Stylesheet{s}, Background: true})
+	res, err := Layout(root, Options{Width: 400, Height: 200, Sheets: []*css.Stylesheet{cssSheet}, Background: true}) //nolint:exhaustruct // intentional zero fields
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var firstFill, firstText int = -1, -1
-	for i, op := range res.Ops {
+	for idx, op := range res.Ops {
 		if op.Kind == OpFillRect && firstFill < 0 && op.R > 0.9 {
-			firstFill = i
+			firstFill = idx
 		}
 
 		if op.Kind == OpText && strings.Contains(op.Text, "Important") {
-			firstText = i
+			firstText = idx
 
 			break
 		}
@@ -200,7 +200,7 @@ func TestBackgroundPaintsUnderText(t *testing.T) {
 // TestTableCellRowHeightUsesFinalWidth guards against measuring cell height at
 // max-content width (too narrow → false wraps → inflated empty row bands).
 func TestTableCellRowHeightUsesFinalWidth(t *testing.T) {
-	s, err := css.Parse(`
+	cssSheet, err := css.Parse(`
 		table { width: 100%; border-collapse: collapse; }
 		td { border: 1px solid #000; padding: 4px; font-size: 10pt; }
 	`)
@@ -218,41 +218,41 @@ func TestTableCellRowHeightUsesFinalWidth(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{Width: 500, Height: 400, Sheets: []*css.Stylesheet{s}, Background: true})
+	res, err := Layout(root, Options{Width: 500, Height: 400, Sheets: []*css.Stylesheet{cssSheet}, Background: true}) //nolint:exhaustruct // intentional zero fields
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	var ys []float64
+	var yCoords []float64
 
-	for _, op := range res.Ops {
-		if op.Kind == OpText && strings.Contains(op.Text, "On-time") {
-			ys = append(ys, op.Y)
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind == OpText && strings.Contains(paintOp.Text, "On-time") {
+			yCoords = append(yCoords, paintOp.Y)
 		}
 
-		if op.Kind == OpText && strings.Contains(op.Text, "First-pass") {
-			ys = append(ys, op.Y)
+		if paintOp.Kind == OpText && strings.Contains(paintOp.Text, "First-pass") {
+			yCoords = append(yCoords, paintOp.Y)
 		}
 	}
 
-	if len(ys) < 2 {
-		t.Fatalf("need both row labels, got ys=%v", ys)
+	if len(yCoords) < 2 {
+		t.Fatalf("need both row labels, got ys=%v", yCoords)
 	}
 
-	dy := ys[1] - ys[0]
+	deltaY := yCoords[1] - yCoords[0]
 	// Single-line 10pt rows with padding should be well under 30pt apart.
 	// The max-content-height bug produced ~35-50pt empty bands between rows.
-	if dy > 28 {
-		t.Errorf("row baseline gap = %.1f pt, want <= 28 (inflated cell height from max-content measure)", dy)
+	if deltaY > 28 {
+		t.Errorf("row baseline gap = %.1f pt, want <= 28 (inflated cell height from max-content measure)", deltaY)
 	}
 
-	if dy < 8 {
-		t.Errorf("row baseline gap = %.1f pt, want >= 8 (rows collapsed?)", dy)
+	if deltaY < 8 {
+		t.Errorf("row baseline gap = %.1f pt, want >= 8 (rows collapsed?)", deltaY)
 	}
 }
 
 func TestTableCellBackgroundHeight(t *testing.T) {
-	s, err := css.Parse(`th { background-color: #1a3d6d; color: #fff } td { background-color: #f2f6fa }`)
+	cssSheet, err := css.Parse(`th { background-color: #1a3d6d; color: #fff } td { background-color: #f2f6fa }`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -265,23 +265,23 @@ func TestTableCellBackgroundHeight(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{Width: 400, Height: 400, Sheets: []*css.Stylesheet{s}, Background: true})
+	res, err := Layout(root, Options{Width: 400, Height: 400, Sheets: []*css.Stylesheet{cssSheet}, Background: true}) //nolint:exhaustruct // intentional zero fields
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var thFills, tdFills int
 
-	for _, op := range res.Ops {
-		if op.Kind != OpFillRect || op.H < 1 {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpFillRect || paintOp.H < 1 {
 			continue
 		}
 		// dark blue header
-		if op.R < 0.2 && op.B > 0.3 {
+		if paintOp.R < 0.2 && paintOp.B > 0.3 {
 			thFills++
 		}
 		// light zebra-ish
-		if op.R > 0.9 && op.B > 0.9 {
+		if paintOp.R > 0.9 && paintOp.B > 0.9 {
 			tdFills++
 		}
 	}
@@ -301,19 +301,19 @@ func TestPrePreservesNewlines(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{Width: 400, Height: 400, Background: true})
+	res, err := Layout(root, Options{Width: 400, Height: 400, Background: true}) //nolint:exhaustruct // intentional zero fields
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var texts []string
 
-	var ys []float64
+	var yCoords []float64
 
 	for _, op := range res.Ops {
 		if op.Kind == OpText {
 			texts = append(texts, op.Text)
-			ys = append(ys, op.Y)
+			yCoords = append(yCoords, op.Y)
 		}
 	}
 
@@ -325,13 +325,13 @@ func TestPrePreservesNewlines(t *testing.T) {
 		t.Errorf("pre segments = %q", texts)
 	}
 
-	if !(ys[1] > ys[0] && ys[2] > ys[1]) {
-		t.Errorf("pre lines should stack downward: %v", ys)
+	if !(yCoords[1] > yCoords[0] && yCoords[2] > yCoords[1]) {
+		t.Errorf("pre lines should stack downward: %v", yCoords)
 	}
 }
 
 func TestMarginAutoCenters(t *testing.T) {
-	s, err := css.Parse(`.rule { width: 100pt; margin: 10pt auto; border-top: 4px solid #000 }`)
+	cssSheet, err := css.Parse(`.rule { width: 100pt; margin: 10pt auto; border-top: 4px solid #000 }`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -341,9 +341,9 @@ func TestMarginAutoCenters(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	const vp = 300.0
+	const viewPortW = 300.0
 
-	res, err := Layout(root, Options{Width: vp, Height: 400, Sheets: []*css.Stylesheet{s}, Background: true})
+	res, err := Layout(root, Options{Width: viewPortW, Height: 400, Sheets: []*css.Stylesheet{cssSheet}, Background: true}) //nolint:exhaustruct // intentional zero fields
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -352,15 +352,15 @@ func TestMarginAutoCenters(t *testing.T) {
 	var line *Op
 
 	for i := range res.Ops {
-		op := &res.Ops[i]
-		if op.Kind == OpLine || (op.Kind == OpFillRect && op.H > 0 && op.H < 5 && op.W > 50) {
-			line = op
+		paintOp := &res.Ops[i]
+		if paintOp.Kind == OpLine || (paintOp.Kind == OpFillRect && paintOp.H > 0 && paintOp.H < 5 && paintOp.W > 50) {
+			line = paintOp
 
 			break
 		}
 
-		if op.Kind == OpStrokeRect && op.W > 50 {
-			line = op
+		if paintOp.Kind == OpStrokeRect && paintOp.W > 50 {
+			line = paintOp
 
 			break
 		}
@@ -369,15 +369,15 @@ func TestMarginAutoCenters(t *testing.T) {
 	var best *Op
 
 	for i := range res.Ops {
-		op := &res.Ops[i]
-		if op.Kind == OpLine && op.W >= 90 {
-			best = op
+		paintOp := &res.Ops[i]
+		if paintOp.Kind == OpLine && paintOp.W >= 90 {
+			best = paintOp
 
 			break
 		}
 
-		if op.Kind == OpFillRect && op.W >= 90 && op.H <= 5 {
-			best = op
+		if paintOp.Kind == OpFillRect && paintOp.W >= 90 && paintOp.H <= 5 {
+			best = paintOp
 
 			break
 		}
@@ -392,14 +392,14 @@ func TestMarginAutoCenters(t *testing.T) {
 		t.Fatal("no centered rule geometry found")
 	}
 
-	op := best
-	if op == nil {
-		op = line
+	paintOp := best
+	if paintOp == nil {
+		paintOp = line
 	}
 	// expect roughly centered in viewport
-	mid := op.X + op.W/2
-	if mid < vp*0.35 || mid > vp*0.65 {
-		t.Errorf("rule center x=%.1f (op x=%.1f w=%.1f), want near viewport center %.1f", mid, op.X, op.W, vp/2)
+	mid := paintOp.X + paintOp.W/2
+	if mid < viewPortW*0.35 || mid > viewPortW*0.65 {
+		t.Errorf("rule center x=%.1f (op x=%.1f w=%.1f), want near viewport center %.1f", mid, paintOp.X, paintOp.W, viewPortW/2)
 	}
 }
 
@@ -417,48 +417,49 @@ func TestFixture16HeaderBG(t *testing.T) {
 	var sheets []*css.Stylesheet
 
 	var walk func(*html.Node)
-	walk = func(n *html.Node) {
-		if n.Name == "style" {
-			var sb strings.Builder
+	walk = func(node *html.Node) {
+		if node.Name == "style" {
+			var sbox strings.Builder
 
-			for _, c := range n.Children {
+			for _, c := range node.Children {
 				if c.Type == html.TextNode {
-					sb.WriteString(c.Text)
+					sbox.WriteString(c.Text)
 				}
 			}
 
-			if s, err := css.Parse(sb.String()); err == nil {
+			if s, err := css.Parse(sbox.String()); err == nil {
 				sheets = append(sheets, s)
 			}
 		}
 
-		for _, c := range n.Children {
+		for _, c := range node.Children {
 			walk(c)
 		}
 	}
 	walk(root)
 
-	res, err := Layout(root, Options{Width: 595, Height: 842, Sheets: sheets, Background: true})
+	res, err := Layout(root, Options{Width: 595, Height: 842, Sheets: sheets, Background: true}) //nolint:exhaustruct // intentional zero fields
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	n := 0
+	node := 0
 
 	for _, op := range res.Ops {
 		// #1a3d6d ≈ 0.102, 0.239, 0.427
 		if op.Kind == OpFillRect && op.H >= 8 &&
 			op.R > 0.08 && op.R < 0.15 && op.B > 0.35 && op.B < 0.5 {
-			n++
+			node++
 		}
 	}
 
-	if n < 4 {
-		t.Errorf("dark header/table fills with real height = %d, want >= 4", n)
+	if node < 4 {
+		t.Errorf("dark header/table fills with real height = %d, want >= 4", node)
 	}
 }
 
 func TestMultiImageUniqueOps(t *testing.T) {
+	t.Parallel()
 	pngA := mustDecodeB64(t, "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAIAAAACUFjqAAAAEklEQVR4nGP8z8AARIDajAoAAgwAAf8C/tH9n9kAAAAASUVORK5CYII=")
 	pngB := mustDecodeB64(t, "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAIAAAACUFjqAAAAEklEQVR4nGN4z8AAQTDqMSoAAgwAAZ0B/vG0cU0AAAAASUVORK5CYII=")
 
@@ -468,8 +469,7 @@ func TestMultiImageUniqueOps(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	res, err := Layout(root, Options{
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
 		Width: 200, Height: 200, Background: true,
 		Images: func(src string) ([]byte, error) {
 			if src == "a.png" {

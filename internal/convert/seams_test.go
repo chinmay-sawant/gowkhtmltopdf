@@ -15,7 +15,9 @@ import (
 )
 
 func TestRunRequiresExplicitOutputSink(t *testing.T) {
-	req := &Request{Global: settings.DefaultPdfGlobal()}
+	t.Parallel()
+
+	req := &Request{Global: settings.DefaultPdfGlobal()} //nolint:exhaustruct // intentional zero-value fields
 
 	err := Run(t.Context(), req, io.Discard, nil)
 	if !errors.Is(err, ErrMissingOutput) {
@@ -24,9 +26,11 @@ func TestRunRequiresExplicitOutputSink(t *testing.T) {
 }
 
 func TestRunRequiresDedicatedOutlineSink(t *testing.T) {
+	t.Parallel()
+
 	global := settings.DefaultPdfGlobal()
 	global.DumpOutline = true
-	req := &Request{Global: global, Output: &bytes.Buffer{}}
+	req := &Request{Global: global, Output: &bytes.Buffer{}} //nolint:exhaustruct // intentional zero-value fields
 
 	err := Run(t.Context(), req, io.Discard, nil)
 	if !errors.Is(err, ErrMissingOutlineOutput) {
@@ -41,7 +45,9 @@ func (failingWriter) Write([]byte) (int, error) {
 }
 
 func TestRunPropagatesDocumentWriterError(t *testing.T) {
-	req := NewPDFRequest(settings.DefaultPdfGlobal(), []settings.PdfObject{{
+	t.Parallel()
+
+	req := NewPDFRequest(settings.DefaultPdfGlobal(), []settings.PdfObject{{ //nolint:exhaustruct // intentional zero-value fields
 		Page: "inline:<html><body><p>writer failure</p></body></html>",
 	}}, failingWriter{}, &bytes.Buffer{})
 
@@ -52,8 +58,10 @@ func TestRunPropagatesDocumentWriterError(t *testing.T) {
 }
 
 func TestModeSpecificRequestConstructors(t *testing.T) {
+	t.Parallel()
+
 	global := settings.DefaultPdfGlobal()
-	objects := []settings.PdfObject{{Page: "inline:<html></html>"}}
+	objects := []settings.PdfObject{{Page: "inline:<html></html>"}} //nolint:exhaustruct // intentional zero-value fields
 
 	pdfReq := NewPDFRequest(global, objects, &bytes.Buffer{}, &bytes.Buffer{})
 	if err := pdfReq.ValidatePDF(); err != nil {
@@ -75,15 +83,17 @@ func TestModeSpecificRequestConstructors(t *testing.T) {
 }
 
 func TestPrepareDocumentBindsSharedResourceContext(t *testing.T) {
-	lp := settings.DefaultLoadPage()
-	lp.InlineHTML = []byte(`<html><head><style>body { color: #123456 }</style></head><body>hello</body></html>`)
-	lp.InlineBase = "https://example.test/reports/"
-	loader := load.NewLoader(settings.LoadGlobal{})
+	t.Parallel()
 
-	prep, err := PrepareDocument(t.Context(), loader, "ignored", lp, nil, PrepareOptions{
+	lineP := settings.DefaultLoadPage()
+	lineP.InlineHTML = []byte(`<html><head><style>body { color: #123456 }</style></head><body>hello</body></html>`)
+	lineP.InlineBase = "https://example.test/reports/"
+	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero-value fields
+
+	prep, err := PrepareDocument(t.Context(), loader, "ignored", lineP, nil, PrepareOptions{ //nolint:exhaustruct // intentional zero-value fields
 		ViewportW:   500,
 		ViewportH:   700,
-		MediaType:   "print",
+		MediaType:   mediaPrint,
 		ObjectIndex: 1,
 	}, io.Discard)
 	if err != nil {
@@ -94,7 +104,7 @@ func TestPrepareDocumentBindsSharedResourceContext(t *testing.T) {
 		t.Fatal("preparation did not return the document")
 	}
 
-	if prep.Resources.Loader != loader || prep.Resources.Base != lp.InlineBase || !reflect.DeepEqual(prep.Resources.Load, lp) {
+	if prep.Resources.Loader != loader || prep.Resources.Base != lineP.InlineBase || !reflect.DeepEqual(prep.Resources.Load, lineP) {
 		t.Fatalf("resource context = %+v, want loader/base/load binding", prep.Resources)
 	}
 
@@ -113,17 +123,19 @@ func TestPrepareDocumentBindsSharedResourceContext(t *testing.T) {
 }
 
 func TestPrepareDocumentPreservesSkipForCallerPolicy(t *testing.T) {
+	t.Parallel()
+
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	}))
 	defer srv.Close()
 
-	global := settings.LoadGlobal{}
+	global := settings.LoadGlobal{} //nolint:exhaustruct // intentional zero-value fields
 	loader := load.NewLoader(global)
 	lp := settings.DefaultLoadPage()
 	lp.LoadErrorHandling = settings.LoadErrorSkip
 
-	prep, err := PrepareDocument(t.Context(), loader, srv.URL, lp, nil, PrepareOptions{}, io.Discard)
+	prep, err := PrepareDocument(t.Context(), loader, srv.URL, lp, nil, PrepareOptions{}, io.Discard) //nolint:exhaustruct // intentional zero-value fields
 	if err != nil {
 		t.Fatalf("PrepareDocument: %v", err)
 	}

@@ -64,7 +64,7 @@ td.amount { text-align: right; }
 	margin := 10 * mm
 	contentH := pageH - 2*margin
 
-	res, err := Layout(root, Options{
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
 		Width: pageW - 2*margin, Height: contentH,
 		Sheets: []*css.Stylesheet{sheet}, Media: "print", Background: true,
 	})
@@ -104,25 +104,25 @@ td.amount { text-align: right; }
 	}
 
 	row := tables[4].rows[12] // thead row plus body rows 1..20
-	rowTop, rowBottom := row[0].y, row[0].y+row[0].h
+	rowTop, rowBottom := row[0].y, row[0].y+row[0].height
 
 	for _, cell := range row[1:] {
 		if cell.y < rowTop {
 			rowTop = cell.y
 		}
 
-		if cell.y+cell.h > rowBottom {
-			rowBottom = cell.y + cell.h
+		if cell.y+cell.height > rowBottom {
+			rowBottom = cell.y + cell.height
 		}
 	}
 
-	for _, op := range res.Ops {
-		if op.Kind != OpText || !strings.Contains(op.Text, "SKU-005-012") {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpText || !strings.Contains(paintOp.Text, "SKU-005-012") {
 			continue
 		}
 
-		if op.Y < rowTop || op.Y >= rowBottom {
-			t.Fatalf("row 12 text y=%.3f outside row box [%.3f, %.3f]", op.Y, rowTop, rowBottom)
+		if paintOp.Y < rowTop || paintOp.Y >= rowBottom {
+			t.Fatalf("row 12 text y=%.3f outside row box [%.3f, %.3f]", paintOp.Y, rowTop, rowBottom)
 		}
 
 		return

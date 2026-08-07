@@ -7,11 +7,13 @@ import (
 )
 
 func TestResolveRelativeLinkURIs(t *testing.T) {
+	t.Parallel()
+
 	ops := []layout.Op{
-		{Kind: layout.OpLinkURI, URI: "docs/a.html"},
-		{Kind: layout.OpLinkURI, URI: "#frag"},
-		{Kind: layout.OpLinkURI, URI: "https://example.com/x"},
-		{Kind: layout.OpLinkURI, URI: "mailto:a@b.c"},
+		{Kind: layout.OpLinkURI, URI: "docs/a.html"},           //nolint:exhaustruct // intentional zero-value fields
+		{Kind: layout.OpLinkURI, URI: "#frag"},                 //nolint:exhaustruct // intentional zero-value fields
+		{Kind: layout.OpLinkURI, URI: "https://example.com/x"}, //nolint:exhaustruct // intentional zero-value fields
+		{Kind: layout.OpLinkURI, URI: "mailto:a@b.c"},          //nolint:exhaustruct // intentional zero-value fields
 	}
 	resolveRelativeLinkURIs(ops, "https://example.com/base/page.html")
 

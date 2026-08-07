@@ -9,6 +9,13 @@ import (
 	"gowkhtmltopdf/internal/pdf"
 )
 
+const (
+	minHintScale     = 18
+	minAAScale       = 16
+	minPolygonVerts  = 3
+	defaultSubsample = 6
+)
+
 // ttfDrawString draws s with face metrics and anti-aliased TTF outlines so
 // image mode advances match layout/PDF (same face + AdvanceInPoints).
 // basex/basey are the baseline-left position in output pixels (may be
@@ -40,13 +47,13 @@ func ttfDrawString(img *image.NRGBA, basex, basey float64, s string, sizePt floa
 	}
 
 	scale := pxSize / upm
-	x := basex
+	cursorX := basex
 
 	for i, r := range run.Runes {
 		adv := run.Advances[i] * pxPerPt
 
-		drawGlyphAA(img, x, basey, r, face, scale, col, atlas)
-		x += adv
+		drawGlyphAA(img, cursorX, basey, r, face, scale, col, atlas)
+		cursorX += adv
 	}
 }
 
@@ -76,7 +83,7 @@ type glyphAtlas struct {
 }
 
 func newGlyphAtlas() *glyphAtlas {
-	return &glyphAtlas{m: make(map[glyphKey]*glyphCacheEntry)}
+	return &glyphAtlas{m: make(map[glyphKey]*glyphCacheEntry)} //nolint:exhaustruct // intentional zero/partial fields
 }
 
 func (a *glyphAtlas) get(key glyphKey, makeEnt func() *glyphCacheEntry) *glyphCacheEntry {
@@ -93,13 +100,13 @@ func (a *glyphAtlas) get(key glyphKey, makeEnt func() *glyphCacheEntry) *glyphCa
 
 	if len(a.m) >= maxGlyphCache {
 		// Drop about half; map iteration order is unspecified (stdlib).
-		n := len(a.m) / 2
+		count := len(a.m) / boxFilterFactor2
 
 		for k := range a.m {
 			delete(a.m, k)
 
-			n--
-			if n <= 0 {
+			count--
+			if count <= 0 {
 				break
 			}
 		}
@@ -132,34 +139,34 @@ func drawGlyphAA(dst *image.NRGBA, basex, basey float64, r rune, face *pdf.Font,
 	// basex/basey is baseline-left in pixels; origin is float offset from that.
 	// Round once per glyph so stems share a stable pixel grid (avoids the old
 	// Floor(origin) + Round(base) combination that made letters bob up/down).
-	ox := int(math.Round(basex + ent.originX))
-	oy := int(math.Round(basey + ent.originY))
+	originX := int(math.Round(basex + ent.originX))
+	originY := int(math.Round(basey + ent.originY))
 
 	bounds := ent.img.Bounds()
-	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-		for x := bounds.Min.X; x < bounds.Max.X; x++ {
-			a := ent.img.AlphaAt(x, y).A
-			if a == 0 {
+	for row := bounds.Min.Y; row < bounds.Max.Y; row++ {
+		for pixelX := bounds.Min.X; pixelX < bounds.Max.X; pixelX++ {
+			alpha := ent.img.AlphaAt(pixelX, row).A
+			if alpha == 0 {
 				continue
 			}
 
-			dx, dy := ox+x, oy+y
-			if !image.Pt(dx, dy).In(dst.Bounds()) {
+			dstX, dstY := originX+pixelX, originY+row
+			if !image.Pt(dstX, dstY).In(dst.Bounds()) {
 				continue
 			}
 
-			srcA := uint32(a) * uint32(col.A) / 255
+			srcA := uint32(alpha) * uint32(col.A) / channelMax
 			if srcA == 0 {
 				continue
 			}
 
-			i := dst.PixOffset(dx, dy)
-			dr, dg, db, da := uint32(dst.Pix[i+0]), uint32(dst.Pix[i+1]), uint32(dst.Pix[i+2]), uint32(dst.Pix[i+3])
-			ia := 255 - srcA
-			dst.Pix[i+0] = uint8((uint32(col.R)*srcA + dr*ia) / 255)
-			dst.Pix[i+1] = uint8((uint32(col.G)*srcA + dg*ia) / 255)
-			dst.Pix[i+2] = uint8((uint32(col.B)*srcA + db*ia) / 255)
-			dst.Pix[i+3] = uint8(srcA + da*ia/255)
+			pixOff := dst.PixOffset(dstX, dstY)
+			dr, dg, db, da := uint32(dst.Pix[pixOff+0]), uint32(dst.Pix[pixOff+1]), uint32(dst.Pix[pixOff+2]), uint32(dst.Pix[pixOff+3])
+			ia := channelMax - srcA
+			dst.Pix[pixOff+0] = uint8((uint32(col.R)*srcA + dr*ia) / channelMax)
+			dst.Pix[pixOff+1] = uint8((uint32(col.G)*srcA + dg*ia) / channelMax)
+			dst.Pix[pixOff+2] = uint8((uint32(col.B)*srcA + db*ia) / channelMax)
+			dst.Pix[pixOff+3] = uint8(srcA + da*ia/channelMax)
 		}
 	}
 }
@@ -167,7 +174,7 @@ func drawGlyphAA(dst *image.NRGBA, basex, basey float64, r rune, face *pdf.Font,
 func rasterGlyph(face *pdf.Font, r rune, scale float64) *glyphCacheEntry {
 	contours := face.GlyphContours(r)
 	if len(contours) == 0 {
-		return &glyphCacheEntry{}
+		return &glyphCacheEntry{} //nolint:exhaustruct // intentional zero/partial fields
 	}
 
 	var flat [][]pdf.GlyphPoint
@@ -177,19 +184,19 @@ func rasterGlyph(face *pdf.Font, r rune, scale float64) *glyphCacheEntry {
 	first := true
 	// More flatten steps at small sizes → smoother curves (less "wobbly" stems).
 	steps := 8
-	if scale*float64(face.UnitsPerEm()) < 18 {
+	if scale*float64(face.UnitsPerEm()) < minHintScale {
 		steps = 12
 	}
 
 	for _, c := range contours {
-		f := pdf.FlattenContour(c, steps)
-		if len(f) < 2 {
+		pts := pdf.FlattenContour(c, steps)
+		if len(pts) < boxFilterFactor2 {
 			continue
 		}
 
-		flat = append(flat, f)
+		flat = append(flat, pts)
 
-		bx0, by0, bx1, by1 := pdf.ContourBounds(f)
+		bx0, by0, bx1, by1 := pdf.ContourBounds(pts)
 		if first {
 			minX, minY, maxX, maxY = bx0, by0, bx1, by1
 			first = false
@@ -213,7 +220,7 @@ func rasterGlyph(face *pdf.Font, r rune, scale float64) *glyphCacheEntry {
 	}
 
 	if first {
-		return &glyphCacheEntry{}
+		return &glyphCacheEntry{} //nolint:exhaustruct // intentional zero/partial fields
 	}
 
 	edges := make([][]glyphEdge, 0, len(flat))
@@ -222,57 +229,57 @@ func rasterGlyph(face *pdf.Font, r rune, scale float64) *glyphCacheEntry {
 	}
 	// scale font units -> pixels; y flips (font y-up, image y-down)
 	pad := 1.5
-	x0 := minX * scale
-	y0 := -maxY * scale // top in image space relative to baseline
+	minXPx := minX * scale
+	minYPx := -maxY * scale // top in image space relative to baseline
 	x1 := maxX * scale
 	y1 := -minY * scale
-	w := int(math.Ceil(x1-x0)) + int(2*pad) + 2
-	h := int(math.Ceil(y1-y0)) + int(2*pad) + 2
+	width := int(math.Ceil(x1-minXPx)) + int(boxFilterFactor2*pad) + boxFilterFactor2
+	height := int(math.Ceil(y1-minYPx)) + int(boxFilterFactor2*pad) + boxFilterFactor2
 
-	if w < 1 {
-		w = 1
+	if width < 1 {
+		width = 1
 	}
 
-	if h < 1 {
-		h = 1
+	if height < 1 {
+		height = 1
 	}
 
-	if w > 2048 || h > 2048 {
-		return &glyphCacheEntry{}
+	if width > 2048 || height > 2048 {
+		return &glyphCacheEntry{} //nolint:exhaustruct // intentional zero/partial fields
 	}
 
-	alpha := image.NewAlpha(image.Rect(0, 0, w, h))
-	ox := x0 - pad
-	oy := y0 - pad
+	alpha := image.NewAlpha(image.Rect(0, 0, width, height))
+	originX := minXPx - pad
+	originY := minYPx - pad
 	// Supersample for greyscale AA. Higher factor for body-size text.
-	ss := 6
-	if scale*float64(face.UnitsPerEm()) < 16 {
-		ss = 8
+	subsample := defaultSubsample
+	if scale*float64(face.UnitsPerEm()) < minAAScale {
+		subsample = 8
 	}
 
-	ss2 := ss * ss
+	ss2 := subsample * subsample
 
 	flatEdges := make([]glyphEdge, 0)
 	for _, contour := range edges {
 		flatEdges = append(flatEdges, contour...)
 	}
 
-	for py := range h {
+	for pixelY := range height {
 		var activeStorage [8][64]glyphEdge
 
 		var activeRows [8][]glyphEdge
 
-		for sy := range ss {
-			iy := -((float64(py) + (float64(sy)+0.5)/float64(ss) + oy) / scale)
-			active := activeStorage[sy][:0]
+		for sampleY := range subsample {
+			fontY := -((float64(pixelY) + (float64(sampleY)+pixelCenter)/float64(subsample) + originY) / scale)
+			active := activeStorage[sampleY][:0]
 
 			var overflow []glyphEdge
 
 			for _, edge := range flatEdges {
-				if iy >= edge.yMin && iy < edge.yMax {
+				if fontY >= edge.yMin && fontY < edge.yMax {
 					if overflow != nil {
 						overflow = append(overflow, edge)
-					} else if len(active) < len(activeStorage[sy]) {
+					} else if len(active) < len(activeStorage[sampleY]) {
 						active = append(active, edge)
 					} else {
 						overflow = append(append([]glyphEdge(nil), active...), edge)
@@ -281,38 +288,38 @@ func rasterGlyph(face *pdf.Font, r rune, scale float64) *glyphCacheEntry {
 			}
 
 			if overflow != nil {
-				activeRows[sy] = overflow
+				activeRows[sampleY] = overflow
 			} else {
-				activeRows[sy] = active
+				activeRows[sampleY] = active
 			}
 		}
 
-		for px := range w {
+		for pixelX := range width {
 			var cover int
 
-			for sy := range ss {
-				iy := -((float64(py) + (float64(sy)+0.5)/float64(ss) + oy) / scale)
-				active := activeRows[sy]
+			for sampleY := range subsample {
+				fontY := -((float64(pixelY) + (float64(sampleY)+pixelCenter)/float64(subsample) + originY) / scale)
+				active := activeRows[sampleY]
 
-				for sx := range ss {
+				for sampleX := range subsample {
 					// sample in font units
-					ix := (float64(px) + (float64(sx)+0.5)/float64(ss) + ox) / scale
-					if pointInActiveEdges(ix, iy, active) {
+					ix := (float64(pixelX) + (float64(sampleX)+pixelCenter)/float64(subsample) + originX) / scale
+					if pointInActiveEdges(ix, fontY, active) {
 						cover++
 					}
 				}
 			}
 
 			if cover > 0 {
-				alpha.SetAlpha(px, py, color.Alpha{A: uint8(255 * cover / ss2)})
+				alpha.SetAlpha(pixelX, pixelY, color.Alpha{A: uint8(255 * cover / ss2)})
 			}
 		}
 	}
 
 	return &glyphCacheEntry{
 		img:     alpha,
-		originX: ox,
-		originY: oy,
+		originX: originX,
+		originY: originY,
 	}
 }
 
@@ -323,19 +330,19 @@ type glyphEdge struct {
 }
 
 func makeGlyphEdges(poly []pdf.GlyphPoint) []glyphEdge {
-	if len(poly) < 3 {
+	if len(poly) < minPolygonVerts {
 		return nil
 	}
 
 	edges := make([]glyphEdge, 0, len(poly))
 
-	for i := range poly {
-		j := i - 1
+	for idx := range poly {
+		j := idx - 1
 		if j < 0 {
 			j = len(poly) - 1
 		}
 
-		a, b := poly[i], poly[j]
+		a, b := poly[idx], poly[j]
 		if a.Y == b.Y {
 			continue
 		}
@@ -406,17 +413,17 @@ func pointInGlyph(x, y float64, contours [][]pdf.GlyphPoint) bool {
 }
 
 func pointInPoly(x, y float64, poly []pdf.GlyphPoint) bool {
-	n := len(poly)
-	if n < 3 {
+	nVerts := len(poly)
+	if nVerts < minPolygonVerts {
 		return false
 	}
 
 	inside := false
 
-	j := n - 1
-	for i := range n {
-		yi, yj := poly[i].Y, poly[j].Y
-		xi, xj := poly[i].X, poly[j].X
+	prev := nVerts - 1
+	for idx := range nVerts {
+		yi, yj := poly[idx].Y, poly[prev].Y
+		xi, xj := poly[idx].X, poly[prev].X
 
 		if (yi > y) != (yj > y) {
 			xint := (xj-xi)*(y-yi)/(yj-yi) + xi
@@ -425,7 +432,7 @@ func pointInPoly(x, y float64, poly []pdf.GlyphPoint) bool {
 			}
 		}
 
-		j = i
+		prev = idx
 	}
 
 	return inside

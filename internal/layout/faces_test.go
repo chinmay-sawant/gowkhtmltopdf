@@ -13,23 +13,23 @@ func TestRealBoldFaceOps(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{Width: 400, Height: 400, Background: true})
+	res, err := Layout(root, Options{Width: 400, Height: 400, Background: true}) //nolint:exhaustruct // intentional zero fields
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var sawBoldFace, sawItalicFace, sawRegular bool
 
-	for _, op := range res.Ops {
-		if op.Kind != OpText || op.Font == nil {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpText || paintOp.Font == nil {
 			continue
 		}
 
-		switch op.Font.PostScriptName {
+		switch paintOp.Font.PostScriptName {
 		case "LiberationSans-Bold":
 			sawBoldFace = true
 
-			if !op.Bold {
+			if !paintOp.Bold {
 				t.Error("bold op should set Bold flag")
 			}
 		case "LiberationSans-Italic":
@@ -53,12 +53,12 @@ func TestRealBoldFaceOps(t *testing.T) {
 }
 
 func TestCoalesceSameStyleWords(t *testing.T) {
+	t.Parallel()
 	root, err := html.Parse(`<html><body><p>one two three</p></body></html>`)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	res, err := Layout(root, Options{Width: 500, Height: 200})
+	res, err := Layout(root, Options{Width: 500, Height: 200}) //nolint:exhaustruct // intentional zero fields
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,6 +74,7 @@ func TestCoalesceSameStyleWords(t *testing.T) {
 }
 
 func TestNthChildZebraSheet(t *testing.T) {
+	t.Parallel()
 	sheet, err := css.Parse(`tr:nth-child(even) td { background-color: #eee }`)
 	if err != nil {
 		t.Fatal(err)
@@ -88,7 +89,7 @@ func TestNthChildZebraSheet(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
 		Width: 300, Height: 400,
 		Sheets:     []*css.Stylesheet{sheet},
 		Background: true,

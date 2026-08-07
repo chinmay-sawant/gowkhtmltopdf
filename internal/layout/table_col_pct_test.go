@@ -9,7 +9,7 @@ import (
 )
 
 func TestTableColumnWidthPercent(t *testing.T) {
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 table { width: 400pt; border-collapse: collapse; }
 td, th { border: 1px solid #000; padding: 2pt; font-size: 10pt; text-align: left; }
 `)
@@ -22,8 +22,8 @@ td, th { border: 1px solid #000; padding: 2pt; font-size: 10pt; text-align: left
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{
-		Width: 500, Height: 400, Sheets: []*css.Stylesheet{s},
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 500, Height: 400, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true, DebugBoxes: true,
 	})
 	if err != nil {
@@ -34,19 +34,19 @@ td, th { border: 1px solid #000; padding: 2pt; font-size: 10pt; text-align: left
 
 	var cells [][4]float64 // x,y,w,h of stroke rects that look like cells
 
-	for _, op := range res.Ops {
-		if op.Kind == OpText {
-			if strings.Contains(op.Text, "short") {
-				shortX = op.X
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind == OpText {
+			if strings.Contains(paintOp.Text, "short") {
+				shortX = paintOp.X
 			}
 
-			if strings.Contains(op.Text, "MARKER") {
-				markerX = op.X
+			if strings.Contains(paintOp.Text, "MARKER") {
+				markerX = paintOp.X
 			}
 		}
 
-		if op.Kind == OpStrokeRect && op.H > 5 && op.W > 20 {
-			cells = append(cells, [4]float64{op.X, op.Y, op.W, op.H})
+		if paintOp.Kind == OpStrokeRect && paintOp.H > 5 && paintOp.W > 20 {
+			cells = append(cells, [4]float64{paintOp.X, paintOp.Y, paintOp.W, paintOp.H})
 		}
 	}
 

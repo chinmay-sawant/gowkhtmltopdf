@@ -24,28 +24,28 @@ func (e *engine) pseudoContent(n *html.Node, pe string) string {
 
 	var best *hit
 
-	better := func(h hit) bool {
+	better := func(height hit) bool {
 		if best == nil {
 			return true
 		}
 
-		if h.important != best.important {
-			return h.important
+		if height.important != best.important {
+			return height.important
 		}
 
-		if h.a != best.a {
-			return h.a > best.a
+		if height.a != best.a {
+			return height.a > best.a
 		}
 
-		if h.b != best.b {
-			return h.b > best.b
+		if height.b != best.b {
+			return height.b > best.b
 		}
 
-		if h.c != best.c {
-			return h.c > best.c
+		if height.c != best.c {
+			return height.c > best.c
 		}
 
-		return h.order >= best.order
+		return height.order >= best.order
 	}
 
 	media := e.opts.Media
@@ -60,20 +60,20 @@ func (e *engine) pseudoContent(n *html.Node, pe string) string {
 	// skip @container rules) matching cascadeRaw's first pass. When
 	// e.styles came from a container pass, non-matching container content
 	// is suppressed here the same way colors are.
-	ctx := &styleContext{
+	ctx := &styleContext{ //nolint:exhaustruct // intentional zero fields
 		sheets:     e.opts.Sheets,
 		media:      media,
 		viewportW:  e.opts.Width,
 		viewportH:  e.opts.Height,
 		containers: e.containers,
 	}
-	for _, rh := range ctx.matchedRules(n, pe) {
-		for _, d := range rh.r.Decls {
+	for _, rowH := range ctx.matchedRules(n, pe) {
+		for _, d := range rowH.r.Decls {
 			if !strings.EqualFold(d.Prop, "content") {
 				continue
 			}
 
-			h := hit{value: d.Value, a: rh.a, b: rh.b, c: rh.c, order: rh.r.Order, important: d.Important}
+			h := hit{value: d.Value, a: rowH.a, b: rowH.b, c: rowH.c, order: rowH.r.Order, important: d.Important}
 			if better(h) {
 				hh := h
 				best = &hh
@@ -99,45 +99,45 @@ func parseContentValue(v string, n *html.Node) string {
 		return ""
 	}
 	// Fast path: single quoted string.
-	if len(v) >= 2 {
+	if len(v) >= two {
 		q := v[0]
 		if (q == '"' || q == '\'') && v[len(v)-1] == q && !strings.Contains(v[1:len(v)-1], string(q)) {
 			return decodeCSSString(v[1 : len(v)-1])
 		}
 	}
 
-	var b strings.Builder
+	var boxNode strings.Builder
 
-	i := 0
-	for i < len(v) {
-		for i < len(v) && (v[i] == ' ' || v[i] == '\t' || v[i] == '\n' || v[i] == '\r') {
-			i++
+	idx := 0
+	for idx < len(v) {
+		for idx < len(v) && (v[idx] == ' ' || v[idx] == '\t' || v[idx] == '\n' || v[idx] == '\r') {
+			idx++
 		}
 
-		if i >= len(v) {
+		if idx >= len(v) {
 			break
 		}
 
-		c := v[i]
-		if c == '"' || c == '\'' {
-			j := i + 1
-			for j < len(v) {
-				if v[j] == '\\' && j+1 < len(v) {
-					j += 2
+		child := v[idx]
+		if child == '"' || child == '\'' {
+			jdx := idx + 1
+			for jdx < len(v) {
+				if v[jdx] == '\\' && jdx+1 < len(v) {
+					jdx += 2
 
 					continue
 				}
 
-				if v[j] == c {
+				if v[jdx] == child {
 					break
 				}
 
-				j++
+				jdx++
 			}
 
-			if j < len(v) {
-				b.WriteString(decodeCSSString(v[i+1 : j]))
-				i = j + 1
+			if jdx < len(v) {
+				boxNode.WriteString(decodeCSSString(v[idx+1 : jdx]))
+				idx = jdx + 1
 
 				continue
 			}
@@ -145,25 +145,25 @@ func parseContentValue(v string, n *html.Node) string {
 			break
 		}
 		// attr(name) or attr(name, …) — only the attribute name is used.
-		if strings.HasPrefix(strings.ToLower(v[i:]), "attr(") {
-			start := i + len("attr(")
+		if strings.HasPrefix(strings.ToLower(v[idx:]), "attr(") {
+			start := idx + len("attr(")
 			depth := 1
-			j := start
+			jdx := start
 
-			for j < len(v) && depth > 0 {
-				if v[j] == '(' {
+			for jdx < len(v) && depth > 0 {
+				if v[jdx] == '(' {
 					depth++
-				} else if v[j] == ')' {
+				} else if v[jdx] == ')' {
 					depth--
 					if depth == 0 {
 						break
 					}
 				}
 
-				j++
+				jdx++
 			}
 
-			arg := strings.TrimSpace(v[start:j])
+			arg := strings.TrimSpace(v[start:jdx])
 			// First token is the attribute name (ignore type/fallback args).
 			name := arg
 			if sp := strings.IndexAny(arg, " \t,"); sp >= 0 {
@@ -172,53 +172,53 @@ func parseContentValue(v string, n *html.Node) string {
 
 			name = strings.Trim(name, `"'`)
 			if n != nil && name != "" {
-				b.WriteString(n.Attribute(name))
+				boxNode.WriteString(n.Attribute(name))
 			}
 
-			if j < len(v) && v[j] == ')' {
-				j++
+			if jdx < len(v) && v[jdx] == ')' {
+				jdx++
 			}
 
-			i = j
+			idx = jdx
 
 			continue
 		}
 		// Skip unknown function tokens: counter(...), counters(...), url(...).
-		if j := strings.IndexByte(v[i:], '('); j > 0 && isIdentStart(v[i]) {
+		if j := strings.IndexByte(v[idx:], '('); j > 0 && isIdentStart(v[idx]) {
 			// function name
-			k := i + j + 1
+			key := idx + j + 1
 			depth := 1
 
-			for k < len(v) && depth > 0 {
-				if v[k] == '(' {
+			for key < len(v) && depth > 0 {
+				if v[key] == '(' {
 					depth++
-				} else if v[k] == ')' {
+				} else if v[key] == ')' {
 					depth--
 				}
 
-				k++
+				key++
 			}
 
-			i = k
+			idx = key
 
 			continue
 		}
 		// Bare ident (open-quote, etc.) — skip one word.
-		if isIdentStart(v[i]) {
-			j := i + 1
+		if isIdentStart(v[idx]) {
+			j := idx + 1
 			for j < len(v) && isIdentCont(v[j]) {
 				j++
 			}
 
-			i = j
+			idx = j
 
 			continue
 		}
 
-		i++
+		idx++
 	}
 
-	return b.String()
+	return boxNode.String()
 }
 
 func isIdentStart(c byte) bool {
@@ -230,53 +230,53 @@ func isIdentCont(c byte) bool {
 }
 
 func decodeCSSString(s string) string {
-	var b strings.Builder
+	var boxNode strings.Builder
 
-	for i := 0; i < len(s); i++ {
-		if s[i] != '\\' || i+1 >= len(s) {
-			b.WriteByte(s[i])
+	for idx := 0; idx < len(s); idx++ {
+		if s[idx] != '\\' || idx+1 >= len(s) {
+			boxNode.WriteByte(s[idx])
 
 			continue
 		}
 
-		i++
-		if isHex(s[i]) {
-			j := i
-			for j < len(s) && j-i < 6 && isHex(s[j]) {
-				j++
+		idx++
+		if isHex(s[idx]) {
+			jdx := idx
+			for jdx < len(s) && jdx-idx < 6 && isHex(s[jdx]) {
+				jdx++
 			}
 
 			var code int
 
-			fmt.Sscanf(s[i:j], "%x", &code)
+			fmt.Sscanf(s[idx:jdx], "%x", &code)
 
 			if code != 0 {
-				b.WriteRune(rune(code))
+				boxNode.WriteRune(rune(code))
 			}
 
-			i = j
-			if i < len(s) && (s[i] == ' ' || s[i] == '\t' || s[i] == '\n' || s[i] == '\r' || s[i] == '\f') {
+			idx = jdx
+			if idx < len(s) && (s[idx] == ' ' || s[idx] == '\t' || s[idx] == '\n' || s[idx] == '\r' || s[idx] == '\f') {
 				// skip one whitespace terminator after hex escape
 			} else {
-				i--
+				idx--
 			}
 
 			continue
 		}
 
-		switch s[i] {
+		switch s[idx] {
 		case 'n':
-			b.WriteByte('\n')
+			boxNode.WriteByte('\n')
 		case 'r':
-			b.WriteByte('\r')
+			boxNode.WriteByte('\r')
 		case 't':
-			b.WriteByte('\t')
+			boxNode.WriteByte('\t')
 		default:
-			b.WriteByte(s[i])
+			boxNode.WriteByte(s[idx])
 		}
 	}
 
-	return b.String()
+	return boxNode.String()
 }
 
 func isHex(c byte) bool {

@@ -39,7 +39,7 @@ func layoutHTMLZoom(t *testing.T, src string, zoom float64, sheets ...*css.Style
 	t.Helper()
 	root := mustParse(t, src)
 
-	res, err := Layout(root, Options{Width: testViewport, Height: 800, Sheets: sheets, Background: true, Zoom: zoom})
+	res, err := Layout(root, Options{Width: testViewport, Height: 800, Sheets: sheets, Background: true, Zoom: zoom}) //nolint:exhaustruct // intentional zero fields
 	if err != nil {
 		t.Fatalf("Layout: %v", err)
 	}
@@ -79,7 +79,7 @@ func firstText(res *Result) Op {
 		}
 	}
 
-	return Op{}
+	return Op{} //nolint:exhaustruct // intentional zero fields
 }
 
 // findBox returns the first box in document order whose node is an element
@@ -90,18 +90,18 @@ func findBox(t *testing.T, res *Result, name string) *box {
 	var found *box
 
 	var walk func(b *box)
-	walk = func(b *box) {
+	walk = func(boxNode *box) {
 		if found != nil {
 			return
 		}
 
-		if b.node != nil && b.node.Type == html.ElementNode && b.node.Name == name {
-			found = b
+		if boxNode.node != nil && boxNode.node.Type == html.ElementNode && boxNode.node.Name == name {
+			found = boxNode
 
 			return
 		}
 
-		for _, c := range b.children {
+		for _, c := range boxNode.children {
 			walk(c)
 		}
 	}
@@ -133,51 +133,52 @@ func TestBoxRanges(t *testing.T) {
 		t.Fatal("div has no box children")
 	}
 
-	p := findBox(t, res, "p")
-	if p.opStart > p.opEnd {
-		t.Fatalf("p op range empty: [%d, %d]", p.opStart, p.opEnd)
+	page := findBox(t, res, "p")
+	if page.opStart > page.opEnd {
+		t.Fatalf("p op range empty: [%d, %d]", page.opStart, page.opEnd)
 	}
 	// children ranges nest inside the parent range
-	if p.opStart < div.opStart || p.opEnd > div.opEnd {
-		t.Errorf("p range [%d, %d] not nested in div [%d, %d]", p.opStart, p.opEnd, div.opStart, div.opEnd)
+	if page.opStart < div.opStart || page.opEnd > div.opEnd {
+		t.Errorf("p range [%d, %d] not nested in div [%d, %d]", page.opStart, page.opEnd, div.opStart, div.opEnd)
 	}
 
 	// noEmit interplay: table/cell ranges (built via the measure pass) must
 	// map to ops that actually exist
 	tres := layoutHTML(t, `<html><body><table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table></body></html>`)
 
-	tb := findBox(t, tres, "table")
-	if tb.opStart > tb.opEnd {
-		t.Fatalf("table op range empty: [%d, %d]", tb.opStart, tb.opEnd)
+	tblBox := findBox(t, tres, "table")
+	if tblBox.opStart > tblBox.opEnd {
+		t.Fatalf("table op range empty: [%d, %d]", tblBox.opStart, tblBox.opEnd)
 	}
 
-	for i := tb.opStart; i <= tb.opEnd; i++ {
+	for i := tblBox.opStart; i <= tblBox.opEnd; i++ {
 		if i < 0 || i >= len(tres.Ops) {
 			t.Fatalf("table range index %d outside Ops (len %d)", i, len(tres.Ops))
 		}
 	}
 
-	if len(tb.children) != 4 {
-		t.Fatalf("table children = %d, want 4 cells", len(tb.children))
+	if len(tblBox.children) != 4 {
+		t.Fatalf("table children = %d, want 4 cells", len(tblBox.children))
 	}
 
-	for _, cell := range tb.children {
+	for _, cell := range tblBox.children {
 		if cell.opStart > cell.opEnd {
 			t.Fatalf("cell op range empty: [%d, %d]", cell.opStart, cell.opEnd)
 		}
 
-		if cell.opStart < tb.opStart || cell.opEnd > tb.opEnd {
-			t.Errorf("cell range [%d, %d] not nested in table [%d, %d]", cell.opStart, cell.opEnd, tb.opStart, tb.opEnd)
+		if cell.opStart < tblBox.opStart || cell.opEnd > tblBox.opEnd {
+			t.Errorf("cell range [%d, %d] not nested in table [%d, %d]", cell.opStart, cell.opEnd, tblBox.opStart, tblBox.opEnd)
 		}
 	}
 }
 
 func TestTableRowRanges(t *testing.T) {
+	t.Parallel()
 	res := layoutHTML(t, `<html><body><table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table></body></html>`)
 
-	tb := findBox(t, res, "table")
-	if len(tb.rows) != 2 {
-		t.Fatalf("table rows = %d, want 2", len(tb.rows))
+	tblBox := findBox(t, res, "table")
+	if len(tblBox.rows) != 2 {
+		t.Fatalf("table rows = %d, want 2", len(tblBox.rows))
 	}
 
 	rowRange := func(row []*box) (int, int) {
@@ -187,16 +188,16 @@ func TestTableRowRanges(t *testing.T) {
 
 		return row[0].opStart, row[len(row)-1].opEnd
 	}
-	r0s, r0e := rowRange(tb.rows[0])
-	r1s, r1e := rowRange(tb.rows[1])
+	r0s, r0e := rowRange(tblBox.rows[0])
+	r1s, r1e := rowRange(tblBox.rows[1])
 	// each row's op range covers (overlaps) its cells' ranges
-	for _, cell := range tb.rows[0] {
+	for _, cell := range tblBox.rows[0] {
 		if cell.opStart < r0s || cell.opEnd > r0e {
 			t.Errorf("row 0 cell range [%d, %d] outside row range [%d, %d]", cell.opStart, cell.opEnd, r0s, r0e)
 		}
 	}
 
-	for _, cell := range tb.rows[1] {
+	for _, cell := range tblBox.rows[1] {
 		if cell.opStart < r1s || cell.opEnd > r1e {
 			t.Errorf("row 1 cell range [%d, %d] outside row range [%d, %d]", cell.opStart, cell.opEnd, r1s, r1e)
 		}
@@ -221,26 +222,26 @@ func TestElementLocations(t *testing.T) {
 		t.Fatalf("Locations = %d entries, want >= 6", len(res.Locations))
 	}
 
-	var h1 *ElementLocation
+	var hOne *ElementLocation
 
 	for i := range res.Locations {
 		if res.Locations[i].Node.Name == "h1" {
-			h1 = &res.Locations[i]
+			hOne = &res.Locations[i]
 
 			break
 		}
 	}
 
-	if h1 == nil {
+	if hOne == nil {
 		t.Fatal("no h1 location")
 	}
 
-	if h1.Page != 0 {
-		t.Errorf("h1 page = %d, want 0", h1.Page)
+	if hOne.Page != 0 {
+		t.Errorf("h1 page = %d, want 0", hOne.Page)
 	}
 
-	if h1.X < 0 || h1.W <= 0 || h1.H <= 0 || h1.Y < 0 {
-		t.Errorf("h1 rect = (%.2f,%.2f) %.2fx%.2f, want X>=0, W>0, H>0, Y>=0", h1.X, h1.Y, h1.W, h1.H)
+	if hOne.X < 0 || hOne.W <= 0 || hOne.H <= 0 || hOne.Y < 0 {
+		t.Errorf("h1 rect = (%.2f,%.2f) %.2fx%.2f, want X>=0, W>0, H>0, Y>=0", hOne.X, hOne.Y, hOne.W, hOne.H)
 	}
 	// document order: h1 before p before table, table cells in order
 	names := make([]string, 0, len(res.Locations))
@@ -276,18 +277,18 @@ func TestElementLocations(t *testing.T) {
 	}
 
 	// multi-page doc: some elements land on page 1
-	var sb strings.Builder
+	var sbox strings.Builder
 
-	sb.WriteString("<html><body>")
+	sbox.WriteString("<html><body>")
 
 	for i := range 60 {
-		sb.WriteString("<p>paragraph of text number ")
-		sb.WriteRune(rune('a' + i%26))
-		sb.WriteString(" with some words to wrap</p>")
+		sbox.WriteString("<p>paragraph of text number ")
+		sbox.WriteRune(rune('a' + i%26))
+		sbox.WriteString(" with some words to wrap</p>")
 	}
 
-	sb.WriteString("</body></html>")
-	res2 := layoutHTML(t, sb.String())
+	sbox.WriteString("</body></html>")
+	res2 := layoutHTML(t, sbox.String())
 	doc2 := pdf.NewDocument()
 	doc2.SetCreationTime(epoch)
 
@@ -336,6 +337,7 @@ func indexOf(seq []string, s string) int {
 }
 
 func TestBlockStacking(t *testing.T) {
+	t.Parallel()
 	res := layoutHTML(t, `<html><body><div>A</div><div>B</div><div>C</div></body></html>`)
 
 	texts := opsOfKind(res, OpText)
@@ -355,6 +357,7 @@ func TestBlockStacking(t *testing.T) {
 }
 
 func TestBlockWidthsAndMargins(t *testing.T) {
+	t.Parallel()
 	s := sheet(t, `div.a { margin: 10pt; width: 200pt } div.b { margin-left: 30pt }`)
 	res := layoutHTML(t, `<html><body><div class="a">x</div><div class="b">y</div></body></html>`, s)
 
@@ -373,6 +376,7 @@ func TestBlockWidthsAndMargins(t *testing.T) {
 }
 
 func TestMarginCollapse(t *testing.T) {
+	t.Parallel()
 	s := sheet(t, `p.a { margin-bottom: 20pt } p.b { margin-top: 30pt }`)
 	res := layoutHTML(t, `<html><body><p class="a">A</p><p class="b">B</p></body></html>`, s)
 
@@ -382,7 +386,7 @@ func TestMarginCollapse(t *testing.T) {
 	}
 	// collapsed gap = max(20, 30) = 30; no body margin in this sheet
 	dy := texts[1].Y - texts[0].Y
-	want := lineHeightOf(&ResolvedStyle{FontSize: 12}) + 30
+	want := lineHeightOf(&ResolvedStyle{FontSize: 12}) + 30 //nolint:exhaustruct // intentional zero fields
 
 	if !near(dy, want) {
 		t.Errorf("gap between lines = %v, want %v (collapsed)", dy, want)
@@ -390,6 +394,7 @@ func TestMarginCollapse(t *testing.T) {
 }
 
 func TestPaddingBorderBox(t *testing.T) {
+	t.Parallel()
 	s := sheet(t, `div { padding: 10pt; border: 2pt solid black; width: 200pt }`)
 	res := layoutHTML(t, `<html><body><div>text</div></body></html>`, s)
 
@@ -413,6 +418,7 @@ func TestPaddingBorderBox(t *testing.T) {
 }
 
 func TestTextAlign(t *testing.T) {
+	t.Parallel()
 	s := sheet(t, `div { width: 300pt } .r { text-align: right } .c { text-align: center }`)
 	res := layoutHTML(t, `<html><body><div>left</div><div class="r">right</div><div class="c">center</div></body></html>`, s)
 
@@ -421,26 +427,27 @@ func TestTextAlign(t *testing.T) {
 		t.Fatalf("texts = %+v", texts)
 	}
 	// widths of the words
-	w0 := texts[0].W
-	w1 := texts[1].W
-	w2 := texts[2].W
+	wZero := texts[0].W
+	wOne := texts[1].W
+	wTwo := texts[2].W
 	// body UA margin is 6pt, so the 300pt content box starts at x=6
 	if !near(texts[0].X, 6) {
 		t.Errorf("left x = %v, want 6", texts[0].X)
 	}
 
-	if !near(texts[1].X+w1, 306) {
-		t.Errorf("right text ends at %v, want 306", texts[1].X+w1)
+	if !near(texts[1].X+wOne, 306) {
+		t.Errorf("right text ends at %v, want 306", texts[1].X+wOne)
 	}
 
-	if !near(texts[2].X, 6+(300-w2)/2) {
-		t.Errorf("center x = %v, want %v", texts[2].X, 6+(300-w2)/2)
+	if !near(texts[2].X, 6+(300-wTwo)/2) {
+		t.Errorf("center x = %v, want %v", texts[2].X, 6+(300-wTwo)/2)
 	}
 
-	_ = w0
+	_ = wZero
 }
 
 func TestTextWrapping(t *testing.T) {
+	t.Parallel()
 	s := sheet(t, `div { width: 60pt }`)
 	// a long sentence in a 60pt box must wrap into multiple lines
 	res := layoutHTML(t, `<html><body><div>the quick brown fox jumps over the lazy dog</div></body></html>`, s)
@@ -464,18 +471,19 @@ func TestTextWrapping(t *testing.T) {
 		t.Fatalf("expected >= 3 wrapped lines, got %d", len(lines))
 	}
 	// successive lines below each other, each starting at x=6
-	for i := 1; i < len(lines); i++ {
-		if !(lines[i][0].Y > lines[i-1][0].Y) {
-			t.Errorf("line %d not below line %d", i, i-1)
+	for idx := 1; idx < len(lines); idx++ {
+		if !(lines[idx][0].Y > lines[idx-1][0].Y) {
+			t.Errorf("line %d not below line %d", idx, idx-1)
 		}
 
-		if !near(lines[i][0].X, 6) {
-			t.Errorf("line %d x = %v, want 6", i, lines[i][0].X)
+		if !near(lines[idx][0].X, 6) {
+			t.Errorf("line %d x = %v, want 6", idx, lines[idx][0].X)
 		}
 	}
 }
 
 func TestWhiteSpacePre(t *testing.T) {
+	t.Parallel()
 	s := sheet(t, `pre { white-space: pre; width: 60pt }`)
 	res := layoutHTML(t, "<html><body><pre>a b\nc</pre></body></html>", s)
 	texts := opsOfKind(res, OpText)
@@ -490,6 +498,7 @@ func TestWhiteSpacePre(t *testing.T) {
 }
 
 func TestFontSizeEmInherit(t *testing.T) {
+	t.Parallel()
 	s := sheet(t, `div { font-size: 20pt } p { font-size: 0.5em } .big { font-size: 2em }`)
 	res := layoutHTML(t, `<html><body><div>parent <p>child</p><p class="big">big</p></div></body></html>`, s)
 
@@ -518,6 +527,7 @@ func TestFontSizeEmInherit(t *testing.T) {
 }
 
 func TestCascadeAndInline(t *testing.T) {
+	t.Parallel()
 	s := sheet(t, `p { color: red; margin: 5pt } p.special { color: blue }`)
 	res := layoutHTML(t, `<html><body><p>one</p><p class="special" style="color: #0f0">two</p></body></html>`, s)
 
@@ -541,7 +551,7 @@ func TestCascadeAndInline(t *testing.T) {
 
 func TestLinkPseudoColor(t *testing.T) {
 	// Author a { black } loses to a:link { blue } on specificity (print = has href).
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 		a { color: #111111; }
 		a:link { color: #0066cc; }
 		a:visited { color: #0066cc; }
@@ -549,18 +559,18 @@ func TestLinkPseudoColor(t *testing.T) {
 	`)
 	res := layoutHTML(t, `<html><body>
 		<p><a href="https://example.com/">with</a> <a>bare</a></p>
-	</body></html>`, s)
+	</body></html>`, cssSheet)
 	texts := opsOfKind(res, OpText)
 
 	var with, bare *Op
 
-	for i := range texts {
-		t := strings.TrimSpace(texts[i].Text)
+	for idx := range texts {
+		t := strings.TrimSpace(texts[idx].Text)
 		switch t {
 		case "with":
-			with = &texts[i]
+			with = &texts[idx]
 		case "bare":
-			bare = &texts[i]
+			bare = &texts[idx]
 		}
 	}
 
@@ -591,7 +601,7 @@ func TestIPAGlyphRegistryFallback(t *testing.T) {
 	ipa := "ˈaɾ"
 	root := mustParse(t, `<html><body><p style="font-family: Liberation Sans, sans-serif">`+ipa+`</p></body></html>`)
 
-	res, err := Layout(root, Options{Width: testViewport, Height: 400, Registry: reg, Media: "print"})
+	res, err := Layout(root, Options{Width: testViewport, Height: 400, Registry: reg, Media: "print"}) //nolint:exhaustruct // intentional zero fields
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -603,20 +613,20 @@ func TestIPAGlyphRegistryFallback(t *testing.T) {
 	// At least one run should use a non-Liberation face that has IPA glyphs.
 	var usedDejaVu bool
 
-	for _, op := range texts {
-		if op.Font == nil {
+	for _, paintOp := range texts {
+		if paintOp.Font == nil {
 			continue
 		}
 
-		for _, n := range op.Font.FamilyNames() {
+		for _, n := range paintOp.Font.FamilyNames() {
 			if strings.Contains(strings.ToLower(n), "dejavu") {
 				usedDejaVu = true
 			}
 		}
 		// Missing-glyph junk often has tiny/wrong advances; ensure ˈ is present as shaped text.
-		if strings.Contains(op.Text, "ˈ") || strings.Contains(op.Text, "ɾ") {
-			if op.Font.GlyphID('ˈ') == 0 && op.Font.GlyphID('ɾ') == 0 {
-				t.Errorf("IPA run still on face without IPA glyphs: families=%v text=%q", op.Font.FamilyNames(), op.Text)
+		if strings.Contains(paintOp.Text, "ˈ") || strings.Contains(paintOp.Text, "ɾ") {
+			if paintOp.Font.GlyphID('ˈ') == 0 && paintOp.Font.GlyphID('ɾ') == 0 {
+				t.Errorf("IPA run still on face without IPA glyphs: families=%v text=%q", paintOp.Font.FamilyNames(), paintOp.Text)
 			}
 		}
 	}
@@ -628,6 +638,7 @@ func TestIPAGlyphRegistryFallback(t *testing.T) {
 }
 
 func TestBackgroundFill(t *testing.T) {
+	t.Parallel()
 	s := sheet(t, `div { background-color: #f00; width: 100pt; height: 50pt }`)
 	res := layoutHTML(t, `<html><body><div>x</div></body></html>`, s)
 
@@ -650,6 +661,7 @@ func TestBackgroundFill(t *testing.T) {
 }
 
 func TestDisplayNone(t *testing.T) {
+	t.Parallel()
 	s := sheet(t, `.hidden { display: none }`)
 	res := layoutHTML(t, `<html><body><div>visible</div><div class="hidden">secret</div></body></html>`, s)
 
@@ -660,6 +672,7 @@ func TestDisplayNone(t *testing.T) {
 }
 
 func TestListBullet(t *testing.T) {
+	t.Parallel()
 	res := layoutHTML(t, `<html><body><ul><li>item</li></ul></body></html>`)
 
 	bullets := opsOfKind(res, OpBullet)
@@ -712,6 +725,7 @@ func TestBoldUnderline(t *testing.T) {
 }
 
 func TestTableLayout(t *testing.T) {
+	t.Parallel()
 	res := layoutHTML(t, `<html><body><table>
 		<tr><th>Name</th><th>Qty</th><th>Total</th></tr>
 		<tr><td>Widget</td><td>2</td><td>$10.00</td></tr>
@@ -744,6 +758,7 @@ func TestTableLayout(t *testing.T) {
 }
 
 func TestTableColspan(t *testing.T) {
+	t.Parallel()
 	res := layoutHTML(t, `<html><body><table>
 		<tr><td colspan="2">wide</td><td>c</td></tr>
 		<tr><td>a</td><td>b</td><td>c</td></tr>
@@ -755,30 +770,31 @@ func TestTableColspan(t *testing.T) {
 	}
 	// "wide" spans cols 0+1; col 2 starts right of it.
 	// Content starts at x=6 (BODY UA margin 8px=6pt) + cell padding 1px=0.75pt.
-	wide, c1 := texts[0], texts[1]
+	wide, cOne := texts[0], texts[1]
 	if !near(wide.X, 6.75) {
 		t.Errorf("wide x = %v, want 6.75 (body 6 + cell padding 0.75)", wide.X)
 	}
 
-	if !(c1.X > wide.X) {
-		t.Errorf("third column x=%v must start right of wide (x=%v)", c1.X, wide.X)
+	if !(cOne.X > wide.X) {
+		t.Errorf("third column x=%v must start right of wide (x=%v)", cOne.X, wide.X)
 	}
 	// "a" at col 0, "b" at col 1, "c" at col 2 - b must sit between a and c
-	a, b, c := texts[2], texts[3], texts[4]
-	if !(a.X < b.X && b.X < c.X) {
-		t.Errorf("column order broken: %v %v %v", a.X, b.X, c.X)
+	acc, b, chld := texts[2], texts[3], texts[4]
+	if !(acc.X < b.X && b.X < chld.X) {
+		t.Errorf("column order broken: %v %v %v", acc.X, b.X, chld.X)
 	}
 
-	if !near(a.X, 6.75) {
-		t.Errorf("a x = %v, want 6.75 (body 6 + cell padding 0.75)", a.X)
+	if !near(acc.X, 6.75) {
+		t.Errorf("a x = %v, want 6.75 (body 6 + cell padding 0.75)", acc.X)
 	}
 
-	if !(c.X >= c1.X) {
-		t.Errorf("c x = %v must be >= single-row col2 x=%v", c.X, c1.X)
+	if !(chld.X >= cOne.X) {
+		t.Errorf("c x = %v must be >= single-row col2 x=%v", chld.X, cOne.X)
 	}
 }
 
 func TestImageIntrinsicAndWidth(t *testing.T) {
+	t.Parallel()
 	// 10x20 pixel PNG
 	png := tinyPNG(10, 20)
 	res := layoutHTMLWithImages(t, `<html><body><img src="x.png"></body></html>`, png, "")
@@ -815,7 +831,7 @@ func layoutHTMLWithImages(t *testing.T, src string, img []byte, imgSrc string) *
 		return img, nil
 	}
 
-	res, err := Layout(root, Options{Width: testViewport, Height: 800, Images: provider, Background: true})
+	res, err := Layout(root, Options{Width: testViewport, Height: 800, Images: provider, Background: true}) //nolint:exhaustruct // intentional zero fields
 	if err != nil {
 		t.Fatalf("Layout: %v", err)
 	}
@@ -844,19 +860,20 @@ func tinyPNG(w, h int) []byte {
 var epoch = time.Unix(0, 0).UTC()
 
 func TestPaginateAndPaint(t *testing.T) {
+	t.Parallel()
 	// long content: many paragraphs → multiple pages
-	var sb strings.Builder
+	var sbox strings.Builder
 
-	sb.WriteString("<html><body>")
+	sbox.WriteString("<html><body>")
 
 	for i := range 60 {
-		sb.WriteString("<p>paragraph of text number ")
-		sb.WriteRune(rune('a' + i%26))
-		sb.WriteString(" with some words to wrap</p>")
+		sbox.WriteString("<p>paragraph of text number ")
+		sbox.WriteRune(rune('a' + i%26))
+		sbox.WriteString(" with some words to wrap</p>")
 	}
 
-	sb.WriteString("</body></html>")
-	res := layoutHTML(t, sb.String())
+	sbox.WriteString("</body></html>")
+	res := layoutHTML(t, sbox.String())
 
 	doc := pdf.NewDocument()
 	doc.SetCreationTime(epoch)
@@ -889,6 +906,7 @@ func TestPaginateAndPaint(t *testing.T) {
 }
 
 func TestPaintSinglePage(t *testing.T) {
+	t.Parallel()
 	res := layoutHTML(t, `<html><body><p>hello</p></body></html>`)
 	doc := pdf.NewDocument()
 	doc.SetCreationTime(epoch)
@@ -910,9 +928,10 @@ func TestPaintSinglePage(t *testing.T) {
 }
 
 func TestDebugBoxes(t *testing.T) {
+	t.Parallel()
 	root := mustParse(t, `<html><body><div>x</div></body></html>`)
 
-	res, err := Layout(root, Options{Width: testViewport, Height: 800, DebugBoxes: true})
+	res, err := Layout(root, Options{Width: testViewport, Height: 800, DebugBoxes: true}) //nolint:exhaustruct // intentional zero fields
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -923,6 +942,7 @@ func TestDebugBoxes(t *testing.T) {
 }
 
 func TestHRElement(t *testing.T) {
+	t.Parallel()
 	res := layoutHTML(t, `<html><body><p>a</p><hr><p>b</p></body></html>`)
 
 	fills := opsOfKind(res, OpFillRect)
@@ -936,17 +956,18 @@ func TestHRElement(t *testing.T) {
 }
 
 func TestZoom(t *testing.T) {
-	s := sheet(t, `div { width: 100pt; margin: 10pt; background-color: #000 }`)
+	t.Parallel()
+	cssSheet := sheet(t, `div { width: 100pt; margin: 10pt; background-color: #000 }`)
 	src := `<html><body><div>abc</div></body></html>`
 
 	// zoom 1: text starts at body margin 6pt + div margin 10pt
-	res1 := layoutHTMLZoom(t, src, 1, s)
+	res1 := layoutHTMLZoom(t, src, 1, cssSheet)
 	if !near(firstText(res1).X, 16) {
 		t.Errorf("zoom 1 text x = %v, want 16 (body 6 + margin 10)", firstText(res1).X)
 	}
 
 	// zoom 2: everything doubles (body 12 + margin 20)
-	res2 := layoutHTMLZoom(t, src, 2, s)
+	res2 := layoutHTMLZoom(t, src, 2, cssSheet)
 	if !near(firstText(res2).X, 32) {
 		t.Errorf("zoom 2 text x = %v, want 32 (12 + 20)", firstText(res2).X)
 	}
@@ -967,35 +988,36 @@ func TestZoom(t *testing.T) {
 }
 
 func TestPageBreakParsing(t *testing.T) {
-	s := sheet(t, `div.brk { page-break-before: always } div.avoid { break-inside: avoid } p.aft { break-after: always }`)
+	t.Parallel()
+	cssSheet := sheet(t, `div.brk { page-break-before: always } div.avoid { break-inside: avoid } p.aft { break-after: always }`)
 	src := `<html><body><div class="brk">x</div><div class="avoid">y</div><p class="aft">z</p></body></html>`
 
 	// parsing must not panic or stall layout
-	res := layoutHTML(t, src, s)
+	res := layoutHTML(t, src, cssSheet)
 	if len(opsOfKind(res, OpText)) != 3 {
 		t.Fatalf("texts = %+v, want 3", opsOfKind(res, OpText))
 	}
 
 	root := mustParse(t, src)
 
-	styles := resolveStyles(root, []*css.Stylesheet{s}, "", testViewport, 800)
-	for n, st := range styles {
+	styles := resolveStyles(root, []*css.Stylesheet{cssSheet}, "", testViewport, 800)
+	for n, sty := range styles {
 		if n.Type != html.ElementNode {
 			continue
 		}
 
 		switch n.Attribute("class") {
 		case "brk":
-			if st.PageBreakBefore != "always" {
-				t.Errorf("div.brk page-break-before = %q, want always", st.PageBreakBefore)
+			if sty.PageBreakBefore != "always" {
+				t.Errorf("div.brk page-break-before = %q, want always", sty.PageBreakBefore)
 			}
 		case "avoid":
-			if st.PageBreakInside != "avoid" {
-				t.Errorf("div.avoid break-inside = %q, want avoid", st.PageBreakInside)
+			if sty.PageBreakInside != "avoid" {
+				t.Errorf("div.avoid break-inside = %q, want avoid", sty.PageBreakInside)
 			}
 		case "aft":
-			if st.PageBreakAfter != "always" {
-				t.Errorf("p.aft break-after = %q, want always", st.PageBreakAfter)
+			if sty.PageBreakAfter != "always" {
+				t.Errorf("p.aft break-after = %q, want always", sty.PageBreakAfter)
 			}
 		}
 	}
@@ -1003,7 +1025,7 @@ func TestPageBreakParsing(t *testing.T) {
 
 // paintOpts is a full-page-content geometry for pagination tests.
 func paintOpts() PaintOptions {
-	return PaintOptions{PageWidth: 595, PageHeight: 842} // contentH = 842
+	return PaintOptions{PageWidth: 595, PageHeight: 842} //nolint:exhaustruct // intentional zero fields — contentH = 842
 }
 
 // pageOf returns the page (0-based) of the first op whose text contains want.
@@ -1028,6 +1050,7 @@ func pageOf(t *testing.T, res *Result, want string) int {
 }
 
 func TestPageBreakBeforeAlways(t *testing.T) {
+	t.Parallel()
 	// div1's text sits on page 1 (padding pushes it past the boundary);
 	// div2 (break-before: always) must start on a fresh page: page 2.
 	s := sheet(t, `div.a { padding-top: 850pt; height: 900pt } div.brk { page-break-before: always }`)
@@ -1039,18 +1062,19 @@ func TestPageBreakBeforeAlways(t *testing.T) {
 	}
 
 	p1 := pageOf(t, res, "one")
-	p2 := pageOf(t, res, "two")
+	pTwo := pageOf(t, res, "two")
 
 	if p1 != 1 {
 		t.Errorf("first div on page %d, want 1", p1)
 	}
 
-	if p2 != 2 {
-		t.Errorf("second div (break-before) on page %d, want 2", p2)
+	if pTwo != 2 {
+		t.Errorf("second div (break-before) on page %d, want 2", pTwo)
 	}
 }
 
 func TestPageBreakInsideAvoid(t *testing.T) {
+	t.Parallel()
 	// div1: y 6..506; div2 (avoid): y 506..906 spans pages 0-1, fits one page
 	// (h=400) → moves wholly to page 1.
 	s := sheet(t, `div.a { height: 500pt } div.b { height: 400pt; page-break-inside: avoid }`)
@@ -1061,14 +1085,14 @@ func TestPageBreakInsideAvoid(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pb := pageOf(t, res, "y")
-	if pb != 1 {
-		t.Errorf("avoid-inside div on page %d, want 1", pb)
+	pbox := pageOf(t, res, "y")
+	if pbox != 1 {
+		t.Errorf("avoid-inside div on page %d, want 1", pbox)
 	}
 	// every "y" text op must be on that single page
 	for i, op := range res.Ops {
-		if op.Kind == OpText && op.Text == "y" && pageOfIdx(t, res, i) != pb {
-			t.Errorf("avoid box op on page %d, want %d", pageOfIdx(t, res, i), pb)
+		if op.Kind == OpText && op.Text == "y" && pageOfIdx(t, res, i) != pbox {
+			t.Errorf("avoid box op on page %d, want %d", pageOfIdx(t, res, i), pbox)
 		}
 	}
 }
@@ -1096,13 +1120,13 @@ func TestBoundaryFillSplit(t *testing.T) {
 		t.Fatalf("fills = %d, want 2 (split at boundary)", len(fillIdx))
 	}
 
-	f0, f1 := res.Ops[fillIdx[0]], res.Ops[fillIdx[1]]
+	f0, fOne := res.Ops[fillIdx[0]], res.Ops[fillIdx[1]]
 	if !near(f0.Y, 700) || !near(f0.H, 142) {
 		t.Errorf("first fill = y %v h %v, want y 700 h 142 (clipped to boundary)", f0.Y, f0.H)
 	}
 
-	if !near(f1.Y, 842) || !near(f1.H, 258) {
-		t.Errorf("second fill = y %v h %v, want y 842 h 258", f1.Y, f1.H)
+	if !near(fOne.Y, 842) || !near(fOne.H, 258) {
+		t.Errorf("second fill = y %v h %v, want y 842 h 258", fOne.Y, fOne.H)
 	}
 
 	if p0, p1 := pageOfIdx(t, res, fillIdx[0]), pageOfIdx(t, res, fillIdx[1]); p0 != 0 || p1 != 1 {
@@ -1114,10 +1138,11 @@ func TestBoundaryFillSplit(t *testing.T) {
 // with Y numerically on a page boundary made int(Y/contentH) report the
 // previous page, so splitCrossingRects inserted forever (mid-slice copy).
 func TestSplitCrossingFloatBoundaryNoHang(t *testing.T) {
+	t.Parallel()
 	contentH := 785.1970866141731
 	// Y just below a page top so truncating division sticks on the prior page.
 	y := contentH*52 - 1e-10
-	res := &Result{Ops: []Op{{
+	res := &Result{Ops: []Op{{ //nolint:exhaustruct // intentional zero fields
 		Kind: OpLine, X: 10, Y: y, W: 0, H: 15.8, Width: 1,
 	}}}
 	done := make(chan struct{})
@@ -1138,23 +1163,24 @@ func TestSplitCrossingFloatBoundaryNoHang(t *testing.T) {
 }
 
 // pageOfIdx returns the page of the op at index i.
-func pageOfIdx(t *testing.T, res *Result, i int) int {
+func pageOfIdx(t *testing.T, res *Result, idx int) int {
 	t.Helper()
 
 	for p, idxs := range res.Pages {
-		for _, idx := range idxs {
-			if idx == i {
+		for _, opIdx := range idxs {
+			if opIdx == idx {
 				return p
 			}
 		}
 	}
 
-	t.Fatalf("op %d not found in any page", i)
+	t.Fatalf("op %d not found in any page", idx)
 
 	return -1
 }
 
 func TestTableRowNoSplit(t *testing.T) {
+	t.Parallel()
 	// three tall rows (padding forces ~750pt rows); each must land on its own
 	// page without splitting.
 	s := sheet(t, `td { padding: 500pt; font-size: 12pt }`)
@@ -1183,25 +1209,26 @@ func TestTableRowNoSplit(t *testing.T) {
 }
 
 func TestPageBreakBeforeStacked(t *testing.T) {
+	t.Parallel()
 	// Regression: a page-break-before box stacked directly on the previous
 	// block (collapsed margins → previous boundary op at exactly the section
 	// top) used to drag that op along each fixpoint iteration, drifting one
 	// page per iteration (fixture-08 produced 26 pages instead of 5).
 	// Four sections, zero margins: intro + 4 section pages = 5 pages.
-	s := sheet(t, `body { margin: 0 } .section { page-break-before: always }`)
+	cssSheet := sheet(t, `body { margin: 0 } .section { page-break-before: always }`)
 
-	var sb strings.Builder
+	var sbox strings.Builder
 
-	sb.WriteString(`<html><body><h1>Intro</h1>`)
+	sbox.WriteString(`<html><body><h1>Intro</h1>`)
 
 	for i := range 4 {
-		sb.WriteString(`<div class="section"><h2>Section `)
-		sb.WriteRune(rune('A' + i))
-		sb.WriteString(`</h2><p>content</p></div>`)
+		sbox.WriteString(`<div class="section"><h2>Section `)
+		sbox.WriteRune(rune('A' + i))
+		sbox.WriteString(`</h2><p>content</p></div>`)
 	}
 
-	sb.WriteString(`</body></html>`)
-	res := layoutHTML(t, sb.String(), s)
+	sbox.WriteString(`</body></html>`)
+	res := layoutHTML(t, sbox.String(), cssSheet)
 	doc := pdf.NewDocument()
 
 	if err := Paint(doc, res, paintOpts()); err != nil {
@@ -1239,7 +1266,7 @@ func TestPageBreakAfterAvoidKeepsSpacing(t *testing.T) {
 	// page-break-after:avoid must not pull the following box up onto the
 	// preceding paragraph's baseline when both already fit on the same page
 	// (fixture-08 Forms index overlapped the summary paragraph).
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt }
 p { margin: 0 0 8px 0 }
 .after-avoid { page-break-after: avoid }
@@ -1248,7 +1275,7 @@ p { margin: 0 0 8px 0 }
 	res := layoutHTML(t, `<html><body>
 <p class="after-avoid">All forms are available from the document server under /operations/forms. Paper copies are stored in the archive room, shelf D, binders 14 to 21.</p>
 <div class="keep"><p><strong>Forms index</strong> - FM-101 shift book.</p></div>
-</body></html>`, s)
+</body></html>`, cssSheet)
 	doc := pdf.NewDocument()
 
 	if err := Paint(doc, res, paintOpts()); err != nil {
@@ -1259,20 +1286,20 @@ p { margin: 0 0 8px 0 }
 
 	var foundPara, foundKeep bool
 
-	for _, op := range res.Ops {
-		if op.Kind == OpText && (strings.Contains(op.Text, "All forms") ||
-			strings.Contains(op.Text, "shelf D") ||
-			strings.Contains(op.Text, "document server") ||
-			strings.Contains(op.Text, "binders")) {
-			if !foundPara || op.Y > lastParaBaseline {
-				lastParaBaseline = op.Y
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind == OpText && (strings.Contains(paintOp.Text, "All forms") ||
+			strings.Contains(paintOp.Text, "shelf D") ||
+			strings.Contains(paintOp.Text, "document server") ||
+			strings.Contains(paintOp.Text, "binders")) {
+			if !foundPara || paintOp.Y > lastParaBaseline {
+				lastParaBaseline = paintOp.Y
 			}
 
 			foundPara = true
 		}
 
-		if op.Kind == OpFillRect && op.R > 0.85 && op.G > 0.85 && op.B > 0.85 {
-			keepTop = op.Y
+		if paintOp.Kind == OpFillRect && paintOp.R > 0.85 && paintOp.G > 0.85 && paintOp.B > 0.85 {
+			keepTop = paintOp.Y
 			foundKeep = true
 		}
 	}

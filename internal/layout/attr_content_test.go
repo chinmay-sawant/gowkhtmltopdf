@@ -11,7 +11,7 @@ import (
 // Print CSS: a.external.text::after { content: ' (' attr(href) ')'; }
 // Must emit the real href, never the literal tokens "attr(href)".
 func TestExternalLinkAttrHrefContent(t *testing.T) {
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 .mw-parser-output a.external.text::after {
   content: ' (' attr(href) ')';
@@ -31,8 +31,8 @@ a { text-decoration: none; color: inherit; }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{
-		Width: 500, Height: 400, Sheets: []*css.Stylesheet{s}, Background: true,
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 500, Height: 400, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -64,7 +64,8 @@ a { text-decoration: none; color: inherit; }
 }
 
 func TestParseContentValueAttr(t *testing.T) {
-	n := &html.Node{Type: html.ElementNode, Name: "a", Attrs: map[string]string{"href": "https://ex.test/x"}}
+	t.Parallel()
+	n := &html.Node{Type: html.ElementNode, Name: "a", Attrs: map[string]string{"href": "https://ex.test/x"}} //nolint:exhaustruct // intentional zero fields
 
 	got := parseContentValue(`' (' attr(href) ')'`, n)
 	if got != " (https://ex.test/x)" {

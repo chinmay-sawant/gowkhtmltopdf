@@ -10,7 +10,7 @@ import (
 
 // Wordmark and tagline must stack vertically (display:block), not sit on one row.
 func TestWikiLogoWordmarkAboveTagline(t *testing.T) {
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 @media all {
 .mw-logo { display: flex; height: 100%; align-items: center; }
 .mw-logo-icon { float: left; margin-right: 10px; display: none; width: 3.125em; height: 3.125em; }
@@ -47,28 +47,28 @@ func TestWikiLogoWordmarkAboveTagline(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	styles := resolveStyles(root, []*css.Stylesheet{s}, "print", 700, 900)
+	styles := resolveStyles(root, []*css.Stylesheet{cssSheet}, "print", 700, 900)
 
 	var word, tagline, cont *html.Node
 
 	var walk func(*html.Node)
-	walk = func(n *html.Node) {
-		if n.Type == html.ElementNode {
-			cl := n.Attribute("class")
-			if strings.Contains(cl, "wordmark") {
-				word = n
+	walk = func(node *html.Node) {
+		if node.Type == html.ElementNode {
+			col := node.Attribute("class")
+			if strings.Contains(col, "wordmark") {
+				word = node
 			}
 
-			if strings.Contains(cl, "tagline") {
-				tagline = n
+			if strings.Contains(col, "tagline") {
+				tagline = node
 			}
 
-			if strings.Contains(cl, "mw-logo-container") {
-				cont = n
+			if strings.Contains(col, "mw-logo-container") {
+				cont = node
 			}
 		}
 
-		for _, c := range n.Children {
+		for _, c := range node.Children {
 			walk(c)
 		}
 	}
@@ -84,9 +84,9 @@ func TestWikiLogoWordmarkAboveTagline(t *testing.T) {
 
 	_ = cont
 
-	res, err := Layout(root, Options{
-		Width: 700, Height: 200, Sheets: []*css.Stylesheet{s}, Background: true,
-		Images: func(src string) ([]byte, error) { return png, nil },
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 700, Height: 200, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
+		Images: func(_ string) ([]byte, error) { return png, nil },
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -107,12 +107,12 @@ func TestWikiLogoWordmarkAboveTagline(t *testing.T) {
 		t.Fatalf("imgs=%d", len(imgs))
 	}
 	// wordmark then tagline (after icon): same X band, tagline below wordmark
-	wm, tl := imgs[1], imgs[2]
-	if absF(wm.x-tl.x) > 20 {
-		t.Fatalf("wordmark/tagline not stacked in column: word x=%.1f tag x=%.1f (imgs=%v)", wm.x, tl.x, imgs)
+	wMode, topL := imgs[1], imgs[2]
+	if absF(wMode.x-topL.x) > 20 {
+		t.Fatalf("wordmark/tagline not stacked in column: word x=%.1f tag x=%.1f (imgs=%v)", wMode.x, topL.x, imgs)
 	}
 
-	if tl.y < wm.y+wm.h-1 {
-		t.Fatalf("tagline not below wordmark: word y=%.1f h=%.1f tag y=%.1f", wm.y, wm.h, tl.y)
+	if topL.y < wMode.y+wMode.h-1 {
+		t.Fatalf("tagline not below wordmark: word y=%.1f h=%.1f tag y=%.1f", wMode.y, wMode.h, topL.y)
 	}
 }

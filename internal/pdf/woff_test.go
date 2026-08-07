@@ -54,8 +54,8 @@ func encodeWOFF1ForTest(t *testing.T, sfnt []byte) []byte {
 
 	var compLens []uint32
 
-	for _, tb := range tabs {
-		raw := sfnt[tb.offset : tb.offset+tb.length]
+	for _, table := range tabs {
+		raw := sfnt[table.offset : table.offset+table.length]
 
 		var buf bytes.Buffer
 
@@ -74,7 +74,7 @@ func encodeWOFF1ForTest(t *testing.T, sfnt []byte) []byte {
 		}
 
 		compressed = append(compressed, comp)
-		origLens = append(origLens, tb.length)
+		origLens = append(origLens, table.length)
 		compLens = append(compLens, uint32(len(comp)))
 	}
 
@@ -89,7 +89,7 @@ func encodeWOFF1ForTest(t *testing.T, sfnt []byte) []byte {
 
 	var body bytes.Buffer
 
-	for i, tb := range tabs {
+	for idx, table := range tabs {
 		// Align each table start to 4 bytes (WOFF).
 		for payloadOff%4 != 0 {
 			body.WriteByte(0)
@@ -97,14 +97,14 @@ func encodeWOFF1ForTest(t *testing.T, sfnt []byte) []byte {
 			payloadOff++
 		}
 
-		rec := dir[i*woffEntrySize : (i+1)*woffEntrySize]
-		copy(rec[0:4], tb.tag[:])
+		rec := dir[idx*woffEntrySize : (idx+1)*woffEntrySize]
+		copy(rec[0:4], table.tag[:])
 		binary.BigEndian.PutUint32(rec[4:8], payloadOff)
-		binary.BigEndian.PutUint32(rec[8:12], compLens[i])
-		binary.BigEndian.PutUint32(rec[12:16], origLens[i])
-		binary.BigEndian.PutUint32(rec[16:20], tb.checksum)
-		body.Write(compressed[i])
-		payloadOff += compLens[i]
+		binary.BigEndian.PutUint32(rec[8:12], compLens[idx])
+		binary.BigEndian.PutUint32(rec[12:16], origLens[idx])
+		binary.BigEndian.PutUint32(rec[16:20], table.checksum)
+		body.Write(compressed[idx])
+		payloadOff += compLens[idx]
 	}
 
 	out := append(append(header, dir...), body.Bytes()...)
@@ -114,6 +114,7 @@ func encodeWOFF1ForTest(t *testing.T, sfnt []byte) []byte {
 }
 
 func TestDecodeWOFFRoundTripParseTTF(t *testing.T) {
+	t.Parallel()
 	sfnt := readLiberationTTF(t)
 	woff := encodeWOFF1ForTest(t, sfnt)
 
@@ -142,6 +143,7 @@ func TestDecodeWOFFRoundTripParseTTF(t *testing.T) {
 }
 
 func TestDecodeWOFFRejectsOTTO(t *testing.T) {
+	t.Parallel()
 	// Minimal fake WOFF with OTTO flavor.
 	buf := make([]byte, woffHeaderSize)
 	copy(buf[0:4], []byte(woffSignature))
@@ -156,6 +158,7 @@ func TestDecodeWOFFRejectsOTTO(t *testing.T) {
 }
 
 func TestDecodeWOFFRejectsOverlap(t *testing.T) {
+	t.Parallel()
 	sfnt := readLiberationTTF(t)
 	woff := encodeWOFF1ForTest(t, sfnt)
 	// Corrupt second table offset to overlap the first compressed span.
@@ -175,6 +178,7 @@ func TestDecodeWOFFRejectsOverlap(t *testing.T) {
 }
 
 func TestDecodeWOFF2Gap(t *testing.T) {
+	t.Parallel()
 	// Concrete gap: WOFF2 needs Brotli; typesetting has no WOFF2 reader and we
 	// do not add direct modules. ParseFontBytes rejects wOF2 with a clear error.
 	buf := []byte("wOF2....fake...")
@@ -186,6 +190,7 @@ func TestDecodeWOFF2Gap(t *testing.T) {
 }
 
 func TestParseFontBytesTTFUnchanged(t *testing.T) {
+	t.Parallel()
 	sfnt := readLiberationTTF(t)
 
 	f, err := ParseFontBytes(sfnt)

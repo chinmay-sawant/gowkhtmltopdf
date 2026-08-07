@@ -8,6 +8,8 @@ import (
 )
 
 func TestWikiLikeArticleFixture(t *testing.T) {
+	t.Parallel()
+
 	src := filepath.Join("..", "..", "testdata", "web", "wiki-like-article.html")
 
 	html, err := os.ReadFile(src)
@@ -40,6 +42,8 @@ func TestWikiLikeArticleFixture(t *testing.T) {
 }
 
 func TestBoldFaceInInvoicePDF(t *testing.T) {
+	t.Parallel()
+
 	src := filepath.Join("..", "..", "testdata", "golden", "fixture-01-simple-invoice.html")
 
 	html, err := os.ReadFile(src)

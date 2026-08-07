@@ -15,16 +15,16 @@ import (
 //  3. RTL run reverse for Arabic/Hebrew ranges
 //
 // Indic remains Partial without OT.
-func ShapeText(s string) string {
-	if s == "" {
-		return s
+func ShapeText(str string) string {
+	if str == "" {
+		return str
 	}
 
-	s = string([]rune(s)) // ensure valid
-	s = stripOrphanMark(s)
-	s = shapeArabicJoining(s)
+	str = string([]rune(str)) // ensure valid
+	str = stripOrphanMark(str)
+	str = shapeArabicJoining(str)
 
-	return reverseRTLRuns(s)
+	return reverseRTLRuns(str)
 }
 
 // stripOrphanMark drops leading combining marks (best-effort stand-in for
@@ -38,18 +38,18 @@ func stripOrphanMark(s string) string {
 	runes := []rune(s)
 	out := make([]rune, 0, len(runes))
 
-	for _, r := range runes {
-		if unicode.Is(unicode.Mn, r) || unicode.Is(unicode.Mc, r) || unicode.Is(unicode.Me, r) {
+	for _, rVal := range runes {
+		if unicode.Is(unicode.Mn, rVal) || unicode.Is(unicode.Mc, rVal) || unicode.Is(unicode.Me, rVal) {
 			if len(out) == 0 {
 				continue // drop leading marks
 			}
 			// Keep marks after a base (no reordering).
-			out = append(out, r)
+			out = append(out, rVal)
 
 			continue
 		}
 
-		out = append(out, r)
+		out = append(out, rVal)
 	}
 
 	return string(out)
@@ -69,34 +69,34 @@ func reverseRTLRuns(s string) string {
 	runes := []rune(s)
 	out := make([]rune, 0, len(runes))
 
-	i := 0
-	for i < len(runes) {
-		if isRTLRune(runes[i]) {
-			j := i + 1
-			for j < len(runes) && (isRTLRune(runes[j]) || isRTLNeutral(runes[j])) {
-				j++
+	idx := 0
+	for idx < len(runes) {
+		if isRTLRune(runes[idx]) {
+			jdx := idx + 1
+			for jdx < len(runes) && (isRTLRune(runes[jdx]) || isRTLNeutral(runes[jdx])) {
+				jdx++
 			}
 
-			end := j
-			for end > i && isRTLNeutral(runes[end-1]) {
+			end := jdx
+			for end > idx && isRTLNeutral(runes[end-1]) {
 				end--
 			}
 
-			for k := end - 1; k >= i; k-- {
+			for k := end - 1; k >= idx; k-- {
 				out = append(out, runes[k])
 			}
 
-			for k := end; k < j; k++ {
+			for k := end; k < jdx; k++ {
 				out = append(out, runes[k])
 			}
 
-			i = j
+			idx = jdx
 
 			continue
 		}
 
-		out = append(out, runes[i])
-		i++
+		out = append(out, runes[idx])
+		idx++
 	}
 
 	return string(out)
@@ -192,20 +192,20 @@ var lamAlef = map[rune][2]rune{ // [isolated, final]
 	0x0627: {0xFEFB, 0xFEFC},
 }
 
-func arabicJoinType(r rune) int {
-	if r >= 0x064B && r <= 0x065F {
+func arabicJoinType(rVal rune) int {
+	if rVal >= 0x064B && rVal <= 0x065F {
 		return joinTrans
 	}
 
-	if r == 0x0670 || r == 0x0640 {
-		if r == 0x0640 {
+	if rVal == 0x0670 || rVal == 0x0640 {
+		if rVal == arabicTatweel {
 			return joinDual
 		}
 
 		return joinTrans
 	}
 
-	forms, ok := arabicForms[r]
+	forms, ok := arabicForms[rVal]
 	if !ok {
 		return joinNone
 	}
@@ -229,48 +229,48 @@ func shapeArabicJoining(s string) string {
 	// Lam-Alef ligatures (logical order).
 	tmp := make([]rune, 0, len(runes))
 
-	for i := 0; i < len(runes); i++ {
-		if runes[i] == 0x0644 && i+1 < len(runes) {
-			if lig, ok := lamAlef[runes[i+1]]; ok {
+	for idx := 0; idx < len(runes); idx++ {
+		if runes[idx] == 0x0644 && idx+1 < len(runes) {
+			if lig, ok := lamAlef[runes[idx+1]]; ok {
 				tmp = append(tmp, lig[0])
-				i++
+				idx++
 
 				continue
 			}
 		}
 
-		tmp = append(tmp, runes[i])
+		tmp = append(tmp, runes[idx])
 	}
 
 	runes = tmp
 	out := make([]rune, len(runes))
 	copy(out, runes)
 
-	for i, r := range runes {
-		jt := arabicJoinType(r)
-		if jt == joinNone || jt == joinTrans {
+	for idx, run := range runes {
+		jtVal := arabicJoinType(run)
+		if jtVal == joinNone || jtVal == joinTrans {
 			continue
 		}
 
-		if r >= 0xFEF5 && r <= 0xFEFC {
-			if prevJoinCause(runes, i) {
-				out[i] = r + 1 // final = isol+1 in this block
+		if run >= 0xFEF5 && run <= 0xFEFC {
+			if prevJoinCause(runes, idx) {
+				out[idx] = run + 1 // final = isol+1 in this block
 			}
 
 			continue
 		}
 
-		forms, ok := arabicForms[r]
+		forms, ok := arabicForms[run]
 		if !ok {
 			continue
 		}
 
-		prev := prevJoinCause(runes, i)
-		next := nextJoinCause(runes, i)
+		prev := prevJoinCause(runes, idx)
+		next := nextJoinCause(runes, idx)
 
 		var form int // 0 isol 1 fina 2 init 3 medi
 
-		switch jt {
+		switch jtVal {
 		case joinDual:
 			switch {
 			case prev && next:
@@ -291,9 +291,9 @@ func shapeArabicJoining(s string) string {
 		}
 
 		if forms[form] != 0 {
-			out[i] = forms[form]
+			out[idx] = forms[form]
 		} else if forms[0] != 0 {
-			out[i] = forms[0]
+			out[idx] = forms[0]
 		}
 	}
 

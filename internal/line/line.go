@@ -25,7 +25,7 @@ const (
 // Emit writes one newline-terminated log line to w, prefixed with the
 // severity marker the engine's consumers understand ("info: ",
 // "warning: " or "error: ").
-func Emit(w io.Writer, sev Severity, format string, args ...any) {
+func Emit(writer io.Writer, sev Severity, format string, args ...any) {
 	prefix := "info: "
 
 	switch sev {
@@ -35,7 +35,7 @@ func Emit(w io.Writer, sev Severity, format string, args ...any) {
 		prefix = "error: "
 	}
 
-	fmt.Fprintf(w, prefix+format+"\n", args...)
+	fmt.Fprintf(writer, prefix+format+"\n", args...)
 }
 
 // SeverityOf classifies one engine log line by its leading marker token;

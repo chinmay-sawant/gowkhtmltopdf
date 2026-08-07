@@ -49,14 +49,14 @@ func newCommand(t *testing.T, html string, output string) (*cli.Command, string)
 		t.Fatalf("write input: %v", err)
 	}
 
-	cmd := &cli.Command{
+	cmd := &cli.Command{ //nolint:exhaustruct // intentional zero-value fields
 		Global:  settings.DefaultPdfGlobal(),
 		Objects: []settings.PdfObject{defaultObject(path)},
 		Output:  output,
 	}
 	// --enable-local-file-access: global flag on, object-level block off.
 	cmd.Global.Load.EnableLocalFileAccess = true
-	cmd.Global.Size = settings.Size{PageSize: cmd.Global.PageSize}
+	cmd.Global.Size = settings.Size{PageSize: cmd.Global.PageSize} //nolint:exhaustruct // intentional zero-value fields
 
 	return cmd, dir
 }
@@ -86,6 +86,7 @@ func pageCount(data []byte) int {
 }
 
 func TestRunPDFSinglePageA4(t *testing.T) {
+	t.Parallel()
 	cmd, _ := newCommand(t, `<html><body><h1>Hello</h1><p>world</p></body></html>`, filepath.Join(t.TempDir(), "out.pdf"))
 
 	data := runPDF(t, cmd)
@@ -103,18 +104,20 @@ func TestRunPDFSinglePageA4(t *testing.T) {
 }
 
 func TestRunPDFMultiPage(t *testing.T) {
-	var sb strings.Builder
+	t.Parallel()
 
-	sb.WriteString("<html><body>")
+	var strB strings.Builder
+
+	strB.WriteString("<html><body>")
 
 	for i := range 200 {
-		sb.WriteString("<p>paragraph of text number ")
-		sb.WriteRune(rune('a' + i%26))
-		sb.WriteString(" with some words to wrap</p>")
+		strB.WriteString("<p>paragraph of text number ")
+		strB.WriteRune(rune('a' + i%26))
+		strB.WriteString(" with some words to wrap</p>")
 	}
 
-	sb.WriteString("</body></html>")
-	cmd, _ := newCommand(t, sb.String(), filepath.Join(t.TempDir(), "out.pdf"))
+	strB.WriteString("</body></html>")
+	cmd, _ := newCommand(t, strB.String(), filepath.Join(t.TempDir(), "out.pdf"))
 
 	data := runPDF(t, cmd)
 	if n := pageCount(data); n < 2 {
@@ -123,6 +126,7 @@ func TestRunPDFMultiPage(t *testing.T) {
 }
 
 func TestRunPDFStyleTableImage(t *testing.T) {
+	t.Parallel()
 	pngB64 := pngDataURL(t, 12, 12)
 	html := `<html><head><style>
 .box { background-color: #336699; width: 80px; height: 30px; }
@@ -144,6 +148,7 @@ func TestRunPDFStyleTableImage(t *testing.T) {
 }
 
 func TestRunPDFWebImagesFalse(t *testing.T) {
+	t.Parallel()
 	pngB64 := pngDataURL(t, 12, 12)
 	html := `<html><body><p>noimg</p><img src="` + pngB64 + `"></body></html>`
 	cmd, _ := newCommand(t, html, filepath.Join(t.TempDir(), "out.pdf"))
@@ -160,6 +165,8 @@ func TestRunPDFWebImagesFalse(t *testing.T) {
 }
 
 func TestRunPDFLinkedStylesheet(t *testing.T) {
+	t.Parallel()
+
 	cmd, dir := newCommand(t, `<html><head><link rel="stylesheet" href="style.css"></head><body><div class="box">styled</div></body></html>`, filepath.Join(t.TempDir(), "out.pdf"))
 	if err := os.WriteFile(filepath.Join(dir, "style.css"), []byte(".box { background-color: #000000; }"), 0o644); err != nil {
 		t.Fatalf("write css: %v", err)
@@ -172,6 +179,8 @@ func TestRunPDFLinkedStylesheet(t *testing.T) {
 }
 
 func TestRunPDFScreenOnlyStylesheetExcluded(t *testing.T) {
+	t.Parallel()
+
 	cmd, dir := newCommand(t, `<html><head><link rel="stylesheet" href="screen.css" media="screen"></head><body><div class="box">styled</div></body></html>`, filepath.Join(t.TempDir(), "out.pdf"))
 	if err := os.WriteFile(filepath.Join(dir, "screen.css"), []byte(".box { background-color: #000000; }"), 0o644); err != nil {
 		t.Fatalf("write css: %v", err)
@@ -183,6 +192,8 @@ func TestRunPDFScreenOnlyStylesheetExcluded(t *testing.T) {
 }
 
 func TestRunPDFPrintLinkMediaFeatures(t *testing.T) {
+	t.Parallel()
+
 	htmlDoc := `<html><head><link rel="stylesheet" href="feat.css" media="(min-width: 500px)"></head>
 <body><p class="hi">Hello</p></body></html>`
 
@@ -198,80 +209,85 @@ func TestRunPDFPrintLinkMediaFeatures(t *testing.T) {
 }
 
 func TestLinkStylesheetMediaMatches(t *testing.T) {
-	mk := func(media string) *html.Node {
-		return &html.Node{Type: html.ElementNode, Name: "link", Attrs: map[string]string{
+	t.Parallel()
+
+	mark := func(media string) *html.Node {
+		return &html.Node{Type: html.ElementNode, Name: "link", Attrs: map[string]string{ //nolint:exhaustruct // intentional zero-value fields
 			"rel": "stylesheet", "href": "x.css", "media": media,
 		}}
 	}
 
-	const vw, vh = 538.0, 785.0
+	const viewW, viewH = 538.0, 785.0
 
-	if !linkStylesheet(mk(""), vw, vh, "print") {
+	if !linkStylesheet(mark(""), viewW, viewH, mediaPrint) {
 		t.Error("empty media should load")
 	}
 
-	if !linkStylesheet(mk("print"), vw, vh, "print") {
+	if !linkStylesheet(mark("print"), viewW, viewH, mediaPrint) {
 		t.Error("print should load")
 	}
 
-	if !linkStylesheet(mk("all"), vw, vh, "print") {
+	if !linkStylesheet(mark("all"), viewW, viewH, mediaPrint) {
 		t.Error("all should load")
 	}
 
-	if linkStylesheet(mk("screen"), vw, vh, "print") {
+	if linkStylesheet(mark("screen"), viewW, viewH, mediaPrint) {
 		t.Error("screen-only must be excluded for print")
 	}
 
-	if !linkStylesheet(mk("(min-width: 500px)"), vw, vh, "print") {
+	if !linkStylesheet(mark("(min-width: 500px)"), viewW, viewH, mediaPrint) {
 		t.Error("min-width feature matching A4 content should load")
 	}
 
-	if linkStylesheet(mk("(min-width: 2000px)"), vw, vh, "print") {
+	if linkStylesheet(mark("(min-width: 2000px)"), viewW, viewH, mediaPrint) {
 		t.Error("unmatched min-width must not load")
 	}
 
-	if !linkStylesheet(mk("screen"), vw, vh, "screen") {
+	if !linkStylesheet(mark("screen"), viewW, viewH, "screen") {
 		t.Error("screen media type should accept screen stylesheets")
 	}
 }
 
 func TestMediaForPDF(t *testing.T) {
-	g := settings.DefaultPdfGlobal()
-	o := settings.DefaultPdfObject()
+	t.Parallel()
 
-	if got := mediaFor(g, &o); got != "print" {
+	glob := settings.DefaultPdfGlobal()
+	obj := settings.DefaultPdfObject()
+
+	if got := mediaFor(glob, &obj); got != mediaPrint {
 		t.Errorf("PDF default media = %q, want print", got)
 	}
 
-	o.Load.MediaType = settings.MediaScreen
-	if got := mediaFor(g, &o); got != "screen" {
+	obj.Load.MediaType = settings.MediaScreen
+	if got := mediaFor(glob, &obj); got != "screen" {
 		t.Errorf("object media-type screen = %q, want screen", got)
 	}
 
-	o.Load.MediaType = settings.MediaPrint
-	if got := mediaFor(g, &o); got != "print" {
+	obj.Load.MediaType = settings.MediaPrint
+	if got := mediaFor(glob, &obj); got != mediaPrint {
 		t.Errorf("object media-type print = %q, want print", got)
 	}
 	// MediaIgnore is zero/unset — keeps PDF print default.
-	o.Load.MediaType = settings.MediaIgnore
-	if got := mediaFor(g, &o); got != "print" {
+	obj.Load.MediaType = settings.MediaIgnore
+	if got := mediaFor(glob, &obj); got != mediaPrint {
 		t.Errorf("object media-type ignore/unset = %q, want print", got)
 	}
 }
 
 func TestRunPDFOutputStdout(t *testing.T) {
+	t.Parallel()
 	cmd, _ := newCommand(t, `<html><body><p>stdout test</p></body></html>`, "-")
 	old := os.Stdout
 
-	r, w, err := os.Pipe()
+	rVal, width, err := os.Pipe()
 	if err != nil {
 		t.Fatalf("pipe: %v", err)
 	}
 
-	os.Stdout = w
+	os.Stdout = width
 	runErr := RunPDF(cmd, &bytes.Buffer{})
 
-	w.Close()
+	width.Close()
 
 	os.Stdout = old
 
@@ -279,7 +295,7 @@ func TestRunPDFOutputStdout(t *testing.T) {
 		t.Fatalf("RunPDF: %v", runErr)
 	}
 
-	data, err := io.ReadAll(r)
+	data, err := io.ReadAll(rVal)
 	if err != nil {
 		t.Fatalf("read stdout capture: %v", err)
 	}
@@ -294,6 +310,7 @@ func TestRunPDFOutputStdout(t *testing.T) {
 }
 
 func TestRunPDFMissingFile(t *testing.T) {
+	t.Parallel()
 	cmd, _ := newCommand(t, `<html><body>x</body></html>`, filepath.Join(t.TempDir(), "out.pdf"))
 	cmd.Objects[0].Page = filepath.Join(t.TempDir(), "does-not-exist.html")
 
@@ -303,13 +320,13 @@ func TestRunPDFMissingFile(t *testing.T) {
 }
 
 // pngDataURL builds a minimal valid RGBA PNG as a data: URL.
-func pngDataURL(t *testing.T, w, h int) string {
+func pngDataURL(t *testing.T, width, h int) string {
 	t.Helper()
 
-	img := image.NewRGBA(image.Rect(0, 0, w, h))
+	img := image.NewRGBA(image.Rect(0, 0, width, h))
 
 	for y := range h {
-		for x := range w {
+		for x := range width {
 			img.Set(x, y, color.RGBA{200, 30, 30, 255})
 		}
 	}
@@ -323,18 +340,17 @@ func pngDataURL(t *testing.T, w, h int) string {
 }
 
 // --- copies / collate assembly (plan 5.4) ---
-
 // newCommandMulti builds a command with one temp input file per html
 // fragment, in order.
 func newCommandMulti(t *testing.T, htmls []string, output string) *cli.Command {
 	t.Helper()
 
-	cmd := &cli.Command{
+	cmd := &cli.Command{ //nolint:exhaustruct // intentional zero-value fields
 		Global: settings.DefaultPdfGlobal(),
 		Output: output,
 	}
 	cmd.Global.Load.EnableLocalFileAccess = true
-	cmd.Global.Size = settings.Size{PageSize: cmd.Global.PageSize}
+	cmd.Global.Size = settings.Size{PageSize: cmd.Global.PageSize} //nolint:exhaustruct // intentional zero-value fields
 
 	for _, h := range htmls {
 		dir := t.TempDir()
@@ -385,17 +401,17 @@ func objectDict(t *testing.T, data []byte, ref int) []byte {
 
 	marker := fmt.Sprintf("%d 0 obj\n", ref)
 
-	i := bytes.Index(data, []byte(marker))
-	if i < 0 {
+	idx := bytes.Index(data, []byte(marker))
+	if idx < 0 {
 		t.Fatalf("object %d not found", ref)
 	}
 
-	end := bytes.Index(data[i:], []byte("\nendobj"))
+	end := bytes.Index(data[idx:], []byte("\nendobj"))
 	if end < 0 {
 		t.Fatalf("object %d has no endobj", ref)
 	}
 
-	return data[i : i+end]
+	return data[idx : idx+end]
 }
 
 // pageLabel resolves a page object to the marker text in its content stream
@@ -404,13 +420,13 @@ func objectDict(t *testing.T, data []byte, ref int) []byte {
 func pageLabel(t *testing.T, data []byte, pageRef int) string {
 	t.Helper()
 	dict := objectDict(t, data, pageRef)
-	m := regexp.MustCompile(`/Contents (\d+) 0 R`).FindSubmatch(dict)
+	mVal := regexp.MustCompile(`/Contents (\d+) 0 R`).FindSubmatch(dict)
 
-	if m == nil {
+	if mVal == nil {
 		t.Fatalf("page %d dict has no /Contents: %q", pageRef, dict)
 	}
 
-	contentRef, err := strconv.Atoi(string(m[1]))
+	contentRef, err := strconv.Atoi(string(mVal[1]))
 	if err != nil {
 		t.Fatalf("bad contents ref: %v", err)
 	}
@@ -440,6 +456,7 @@ func labelsOf(t *testing.T, data []byte) []string {
 }
 
 func TestRunPDFCopiesCollate(t *testing.T) {
+	t.Parallel()
 	cmd := newCommandMulti(t,
 		[]string{
 			`<html><body><h1>AAA</h1></body></html>`,
@@ -464,6 +481,7 @@ func TestRunPDFCopiesCollate(t *testing.T) {
 }
 
 func TestRunPDFCopiesNonCollate(t *testing.T) {
+	t.Parallel()
 	cmd := newCommandMulti(t,
 		[]string{
 			`<html><body><h1>AAA</h1></body></html>`,
@@ -488,6 +506,7 @@ func TestRunPDFCopiesNonCollate(t *testing.T) {
 }
 
 func TestRunPDFThreeObjects(t *testing.T) {
+	t.Parallel()
 	cmd := newCommandMulti(t,
 		[]string{
 			`<html><body><p>one</p></body></html>`,
@@ -505,6 +524,7 @@ func TestRunPDFThreeObjects(t *testing.T) {
 // --- context, progress, quiet (plan 5.5) ---
 
 func TestRunPDFProgress(t *testing.T) {
+	t.Parallel()
 	cmd, _ := newCommand(t, `<html><body><p>progress</p></body></html>`, filepath.Join(t.TempDir(), "out.pdf"))
 
 	var phases []string
@@ -543,6 +563,7 @@ func TestRunPDFProgress(t *testing.T) {
 }
 
 func TestRunPDFQuiet(t *testing.T) {
+	t.Parallel()
 	cmd, _ := newCommand(t, `<html><body><p>quiet</p></body></html>`, filepath.Join(t.TempDir(), "out.pdf"))
 	cmd.Global.Quiet = true
 
@@ -558,6 +579,7 @@ func TestRunPDFQuiet(t *testing.T) {
 }
 
 func TestRunPDFContextCancel(t *testing.T) {
+	t.Parallel()
 	cmd, _ := newCommand(t, `<html><body><p>cancel</p></body></html>`, filepath.Join(t.TempDir(), "out.pdf"))
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
@@ -578,12 +600,14 @@ func TestRunPDFContextCancel(t *testing.T) {
 // Zoom field (added by the parallel layout agent). The re-layout code in
 // convert.go and this test activate once it lands.
 func layoutZoomAvailable() bool {
-	_, ok := reflect.TypeOf(layout.Options{}).FieldByName("Zoom")
+	_, ok := reflect.TypeOf(layout.Options{}).FieldByName("Zoom") //nolint:exhaustruct // intentional zero-value fields
 
 	return ok
 }
 
 func TestRunPDFSmartShrinking(t *testing.T) {
+	t.Parallel()
+
 	if !layoutZoomAvailable() {
 		t.Skip("smart shrinking re-layout needs internal/layout.Options.Zoom (TODO); only the over-width warning is emitted today")
 	}
@@ -650,13 +674,13 @@ func decodeStreams(data []byte) []byte {
 		raw := data[:end]
 		data = data[end+len("endstream"):]
 
-		r, err := zlib.NewReader(bytes.NewReader(raw))
+		rdr, err := zlib.NewReader(bytes.NewReader(raw))
 		if err != nil {
 			continue
 		}
 
-		dec, derr := io.ReadAll(r)
-		r.Close()
+		dec, derr := io.ReadAll(rdr)
+		rdr.Close()
 
 		if derr == nil {
 			out = append(out, dec...)

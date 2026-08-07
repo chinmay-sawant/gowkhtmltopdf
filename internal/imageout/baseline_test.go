@@ -12,12 +12,14 @@ import (
 // TestGlyphBaselineStable checks that non-descender letters share a common
 // baseline within 1px (the pre-fix Floor/Round mix made letters bob).
 func TestGlyphBaselineStable(t *testing.T) {
+	t.Parallel()
+
 	face, err := pdf.DefaultFont()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	s := "Hamburgevons"
+	sample := "Hamburgevons"
 	sizePt := 24.0
 
 	img := image.NewNRGBA(image.Rect(0, 0, 900, 90))
@@ -27,16 +29,16 @@ func TestGlyphBaselineStable(t *testing.T) {
 
 	const baseY = 55.0
 
-	ttfDrawString(img, 10, baseY, s, sizePt, face, color.NRGBA{0, 0, 0, 255}, ptToPx, nil)
+	ttfDrawString(img, 10, baseY, sample, sizePt, face, color.NRGBA{0, 0, 0, 255}, ptToPx, nil)
 
-	x := 10.0
+	penX := 10.0
 
 	var bottoms []int
 
-	for _, r := range s {
-		adv := face.AdvanceInPoints(r, sizePt) * ptToPx
-		x0 := int(math.Floor(x))
-		x1 := int(math.Ceil(x + adv))
+	for _, runeVal := range sample {
+		adv := face.AdvanceInPoints(runeVal, sizePt) * ptToPx
+		x0 := int(math.Floor(penX))
+		x1 := int(math.Ceil(penX + adv))
 		bot := -1
 
 		for yy := range 90 {
@@ -50,12 +52,12 @@ func TestGlyphBaselineStable(t *testing.T) {
 			}
 		}
 
-		if r != 'g' && r != 'y' && r != 'p' && r != 'q' && r != 'j' && bot >= 0 {
+		if runeVal != 'g' && runeVal != 'y' && runeVal != 'p' && runeVal != 'q' && runeVal != 'j' && bot >= 0 {
 			bottoms = append(bottoms, bot)
-			t.Logf("%q bottom=%d (baseline %.0f, off=%d)", r, bot, baseY, bot-int(baseY))
+			t.Logf("%q bottom=%d (baseline %.0f, off=%d)", runeVal, bot, baseY, bot-int(baseY))
 		}
 
-		x += adv
+		penX += adv
 	}
 
 	if len(bottoms) < 4 {
@@ -63,13 +65,13 @@ func TestGlyphBaselineStable(t *testing.T) {
 	}
 
 	minB, maxB := bottoms[0], bottoms[0]
-	for _, b := range bottoms[1:] {
-		if b < minB {
-			minB = b
+	for _, bottom := range bottoms[1:] {
+		if bottom < minB {
+			minB = bottom
 		}
 
-		if b > maxB {
-			maxB = b
+		if bottom > maxB {
+			maxB = bottom
 		}
 	}
 

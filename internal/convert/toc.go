@@ -20,42 +20,42 @@ import (
 // effectiveTOC overlays the object-level TOC settings on the global ones.
 // Scalars replace when set; booleans OR (a false object flag cannot be
 // distinguished from "unset" - documented).
-func effectiveTOC(o settings.PdfObject, g settings.PdfGlobal) settings.TableOfContent {
-	t := g.TOC
-	if o.TOC.FontScale != 0 {
-		t.FontScale = o.TOC.FontScale
+func effectiveTOC(obj settings.PdfObject, g settings.PdfGlobal) settings.TableOfContent {
+	tbl := g.TOC
+	if obj.TOC.FontScale != 0 {
+		tbl.FontScale = obj.TOC.FontScale
 	}
 
-	if o.TOC.Indentation != "" {
-		t.Indentation = o.TOC.Indentation
+	if obj.TOC.Indentation != "" {
+		tbl.Indentation = obj.TOC.Indentation
 	}
 
-	if o.TOC.CaptionText != "" {
-		t.CaptionText = o.TOC.CaptionText
+	if obj.TOC.CaptionText != "" {
+		tbl.CaptionText = obj.TOC.CaptionText
 	}
 
-	if o.TOC.XSLStyleSheet != "" {
-		t.XSLStyleSheet = o.TOC.XSLStyleSheet
+	if obj.TOC.XSLStyleSheet != "" {
+		tbl.XSLStyleSheet = obj.TOC.XSLStyleSheet
 	}
 
-	t.DottedLines = o.TOC.DottedLines || t.DottedLines
-	t.ForwardLinks = o.TOC.ForwardLinks || t.ForwardLinks
-	t.BackLinks = o.TOC.BackLinks || t.BackLinks
+	tbl.DottedLines = obj.TOC.DottedLines || tbl.DottedLines
+	tbl.ForwardLinks = obj.TOC.ForwardLinks || tbl.ForwardLinks
+	tbl.BackLinks = obj.TOC.BackLinks || tbl.BackLinks
 
-	return t
+	return tbl
 }
 
 // lengthToPt converts a CSS length to points. em/rem resolve against the
 // base font size; px at 96 dpi; % is rejected (-1). Unparsable lengths return
 // -1 so callers can fall back.
 func lengthToPt(v string, baseSize float64) float64 {
-	val, unit, ok := css.ParseLength(v)
-	if !ok {
+	found, unit, okVal := css.ParseLength(v)
+	if !okVal {
 		return -1
 	}
 
-	pt, ok := css.LengthToPt(val, unit, baseSize)
-	if !ok {
+	pt, okVal := css.LengthToPt(found, unit, baseSize)
+	if !okVal {
 		return -1
 	}
 
@@ -72,58 +72,69 @@ func genTOCHTML(toc settings.TableOfContent, entries []*outline.Node, pageOf fun
 		toc.CaptionText = "Table of Contents"
 	}
 
+	const (
+		// defaultTOCFontSize is the layout engine's default body size used for TOC entries.
+		defaultTOCFontSize = 12.0
+		// tocDotGapFactor leaves a small gap on each side of the dotted leader (in ems).
+		tocDotGapFactor = 2
+		// tocDotAdvanceFactor is the approximate advance of "." relative to the font size.
+		tocDotAdvanceFactor = 0.4
+		// defaultTOCFontScale is used when TOC.FontScale is unset/non-positive.
+		defaultTOCFontScale = 0.8
+	)
+
 	scale := toc.FontScale
 	if scale <= 0 {
-		scale = 0.8
+		scale = defaultTOCFontScale
 	}
 
-	indentPt := lengthToPt(toc.Indentation, 12)
+	indentPt := lengthToPt(toc.Indentation, defaultTOCFontSize)
 	if indentPt < 0 {
-		indentPt = 12
+		indentPt = defaultTOCFontSize
 	}
 
-	const baseSize = 12.0 // the layout engine's default font size
+	baseSize := defaultTOCFontSize
 
-	var b strings.Builder
+	var buf strings.Builder
 
-	b.WriteString("<html><body>")
-	b.WriteString("<h1>" + stdlibhtml.EscapeString(toc.CaptionText) + "</h1>")
+	buf.WriteString("<html><body>")
+	buf.WriteString("<h1>" + stdlibhtml.EscapeString(toc.CaptionText) + "</h1>")
 
 	for _, n := range entries {
-		h := n.Heading
-		if h == nil || h.Title == "" {
+		hVal := n.Heading
+		if hVal == nil || hVal.Title == "" {
 			continue
 		}
 
 		size := baseSize * scale
-		pad := indentPt * float64(h.Level-1)
-		pageNum := strconv.Itoa(pageOf(h))
-		entry := h.Title + "  " + pageNum
+		pad := indentPt * float64(hVal.Level-1)
+		pageNum := strconv.Itoa(pageOf(hVal))
+		entry := hVal.Title + "  " + pageNum
 
 		if toc.DottedLines {
-			titleW := measureHF(font, h.Title, size)
+			titleW := measureHF(font, hVal.Title, size)
 			pageW := measureHF(font, pageNum, size)
 
-			avail := contentW - pad - titleW - pageW - 2*size
-			if dots := int(avail / (0.4 * size)); dots > 0 {
-				entry = h.Title + " " + strings.Repeat(".", dots) + " " + pageNum
+			avail := contentW - pad - titleW - pageW - float64(tocDotGapFactor)*size
+			if dots := int(avail / (tocDotAdvanceFactor * size)); dots > 0 {
+				entry = hVal.Title + " " + strings.Repeat(".", dots) + " " + pageNum
 			}
 		}
 
 		start, end := "", ""
 		if toc.ForwardLinks {
-			start = `<a href="#` + h.Anchor + `">`
+			start = `<a href="#` + hVal.Anchor + `">`
 			end = "</a>"
 		}
 
-		fmt.Fprintf(&b,
+		fmt.Fprintf(&buf,
 			`<div data-wk-target="%s" style="padding-left:%gpt;font-size:%gpt;">%s%s%s</div>`,
-			h.Anchor, pad, size, start, entry, end)
+			hVal.Anchor, pad, size, start, entry, end)
 	}
 
-	b.WriteString("</body></html>")
+	buf.WriteString("</body></html>")
 
-	return b.String()
+	return buf.String()
 }
 
 // cloneResult deep-copies a layout result so it can be painted more than
@@ -136,14 +147,14 @@ func cloneResult(res *layout.Result) *layout.Result {
 }
 
 // paintOptions converts an object geometry into layout paint options.
-func paintOptions(g hfGeom) layout.PaintOptions {
+func paintOptions(geom hfGeom) layout.PaintOptions {
 	return layout.PaintOptions{
-		PageWidth:    g.pageW,
-		PageHeight:   g.pageH,
-		MarginTop:    g.marginTop,
-		MarginBottom: g.marginBottom,
-		MarginLeft:   g.marginLeft,
-		MarginRight:  g.marginRight,
+		PageWidth:    geom.pageW,
+		PageHeight:   geom.pageH,
+		MarginTop:    geom.marginTop,
+		MarginBottom: geom.marginBottom,
+		MarginLeft:   geom.marginLeft,
+		MarginRight:  geom.marginRight,
 	}
 }
 
@@ -186,10 +197,10 @@ func layoutTOC(ctx context.Context, font *pdf.Font, st *objectState, entries []*
 
 	media := st.media
 	if media == "" {
-		media = "print"
+		media = mediaPrint
 	}
 
-	res, err := layout.LayoutContext(ctx, root, layout.Options{
+	res, err := layout.LayoutContext(ctx, root, layout.Options{ //nolint:exhaustruct // intentional zero-value fields
 		Width:  contentW,
 		Height: st.geom.contentH,
 		Font:   font,
@@ -213,57 +224,59 @@ func renderTOCObjects(ctx context.Context, font *pdf.Font, doc *pdf.Document, re
 		return 0, nil
 	}
 
-	g := req.Global
+	glob := req.Global
 
 	// Iteration 1: measure with tocGuess = 0.
 	guess := 0
-	for _, st := range tocs {
-		root, res, err := layoutTOC(ctx, font, st, entries, guess, g, log)
+	for _, state := range tocs {
+		root, res, err := layoutTOC(ctx, font, state, entries, guess, glob, log)
 		if err != nil {
 			return 0, err
 		}
 
-		st.tocRoot, st.tocRes = root, res
-		n, err := paintCount(ctx, res, st.geom)
+		state.tocRoot, state.tocRes = root, res
+
+		n, err := paintCount(ctx, res, state.geom)
 		if err != nil {
-			return 0, fmt.Errorf("object %d: toc: paintCount: %w", st.idx+1, err)
+			return 0, fmt.Errorf("object %d: toc: paintCount: %w", state.idx+1, err)
 		}
 
-		st.tocPages = n
-		guess += st.tocPages
+		state.tocPages = n
+		guess += state.tocPages
 	}
 	// Iteration 2: renumber with the measured total, measure again, and keep
 	// the final layout for painting.
 	if guess > 0 {
-		for _, st := range tocs {
-			root, res, err := layoutTOC(ctx, font, st, entries, guess, g, log)
+		for _, state := range tocs {
+			root, res, err := layoutTOC(ctx, font, state, entries, guess, glob, log)
 			if err != nil {
 				return 0, err
 			}
 
-			st.tocRoot, st.tocRes = root, res
-			n, err := paintCount(ctx, res, st.geom)
+			state.tocRoot, state.tocRes = root, res
+
+			n, err := paintCount(ctx, res, state.geom)
 			if err != nil {
-				return 0, fmt.Errorf("object %d: toc: paintCount: %w", st.idx+1, err)
+				return 0, fmt.Errorf("object %d: toc: paintCount: %w", state.idx+1, err)
 			}
 
-			st.tocPages = n
+			state.tocPages = n
 		}
 	}
 	// Paint the final TOC pages into doc, keeping the painted result (its
 	// Locations feed the link pass).
 	total := 0
 
-	for _, st := range tocs {
-		st.start = doc.PageCount()
-		painted := cloneResult(st.tocRes)
+	for _, state := range tocs {
+		state.start = doc.PageCount()
+		painted := cloneResult(state.tocRes)
 
-		if err := layout.PaintContext(ctx, doc, painted, paintOptions(st.geom)); err != nil {
-			return 0, fmt.Errorf("object %d: toc: paint: %w", st.idx+1, err)
+		if err := layout.PaintContext(ctx, doc, painted, paintOptions(state.geom)); err != nil {
+			return 0, fmt.Errorf("object %d: toc: paint: %w", state.idx+1, err)
 		}
 
-		st.tocRes = painted
-		total += st.tocPages
+		state.tocRes = painted
+		total += state.tocPages
 	}
 
 	return total, nil

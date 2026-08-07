@@ -7,6 +7,9 @@ import (
 	"gowkhtmltopdf/internal/settings"
 )
 
+// profileMediaWiki is the DOM simplify profile for MediaWiki pages.
+const profileMediaWiki = "mediawiki"
+
 // SimplifyChromeCSS is the default opt-in chrome-strip stylesheet for
 // --simplify-dom. It hides common landmark chrome only — no site-specific
 // IDs/classes. MediaWiki extras live in SimplifyMediaWikiCSS (profile).
@@ -45,8 +48,8 @@ func SimplifyDOMProfile(global, obj settings.Web) string {
 	}
 
 	switch p {
-	case "mediawiki", "wiki", "mw":
-		return "mediawiki"
+	case profileMediaWiki, "wiki", "mw":
+		return profileMediaWiki
 	default:
 		return ""
 	}
@@ -66,7 +69,7 @@ func AppendSimplifySheet(sheets []*css.Stylesheet, enabled bool, profile string)
 
 	sheets = append(sheets, sheet)
 
-	if strings.EqualFold(strings.TrimSpace(profile), "mediawiki") {
+	if strings.EqualFold(strings.TrimSpace(profile), profileMediaWiki) {
 		mw, err := css.Parse(SimplifyMediaWikiCSS)
 		if err == nil && mw != nil {
 			sheets = append(sheets, mw)

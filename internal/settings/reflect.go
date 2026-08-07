@@ -33,19 +33,19 @@ type keyTable[T any] map[string]field[T]
 
 // sub adapts a field descriptor of a sub-struct (HeaderFooter, TableOfContent,
 // Web, LoadPage) to a containing settings type.
-func sub[T any, S any](pick func(*T) *S, d field[S]) field[T] {
+func sub[T any, S any](pick func(*T) *S, desc field[S]) field[T] {
 	return field[T]{
-		apply: func(t *T, raw string) error { return d.apply(pick(t), raw) },
-		get:   func(t *T) (string, bool) { return d.get(pick(t)) },
+		apply: func(target *T, raw string) error { return desc.apply(pick(target), raw) },
+		get:   func(target *T) (string, bool) { return desc.get(pick(target)) },
 	}
 }
 
 // setForKey applies a dotted key through its descriptor table. Known inert
 // keys are stored in the Ignored map (Policy A); truly unknown keys error.
-func setForKey[T any](t *T, tables keyTable[T], known map[string]struct{}, ignored *map[string]string, kind, name, value string) error {
+func setForKey[T any](target *T, tables keyTable[T], known map[string]struct{}, ignored *map[string]string, kind, name, value string) error {
 	key := normalizeDots(name)
 	if f, ok := tables[key]; ok {
-		return f.apply(t, value)
+		return f.apply(target, value)
 	}
 
 	if _, ok := known[key]; ok {
@@ -59,10 +59,10 @@ func setForKey[T any](t *T, tables keyTable[T], known map[string]struct{}, ignor
 
 // getForKey reads a dotted key through its descriptor table. Accepted ignored
 // keys return the last Set value; unknown keys are not found.
-func getForKey[T any](t *T, tables keyTable[T], ignored *map[string]string, name string) (string, bool) {
+func getForKey[T any](target *T, tables keyTable[T], ignored *map[string]string, name string) (string, bool) {
 	key := normalizeDots(name)
 	if f, ok := tables[key]; ok {
-		return f.get(t)
+		return f.get(target)
 	}
 
 	if *ignored != nil {
@@ -146,15 +146,15 @@ func normalizeDots(s string) string { return strings.ToLower(strings.TrimSpace(s
 
 // value helpers
 
-func setBool(t *bool) setter {
+func setBool(target *bool) setter {
 	return func(raw string) error {
 		switch strings.ToLower(raw) {
 		case "", "true", "1", "yes", "on":
-			*t = true
+			*target = true
 
 			return nil
 		case "false", "0", "no", "off":
-			*t = false
+			*target = false
 
 			return nil
 		}
@@ -163,87 +163,87 @@ func setBool(t *bool) setter {
 	}
 }
 
-func setFloat(t *float64) setter {
+func setFloat(target *float64) setter {
 	return func(raw string) error {
 		v, err := strconv.ParseFloat(raw, 64)
 		if err != nil {
 			return fmt.Errorf("invalid number %q", raw)
 		}
 
-		*t = v
+		*target = v
 
 		return nil
 	}
 }
 
-func setInt(t *int) setter {
+func setInt(target *int) setter {
 	return func(raw string) error {
 		v, err := strconv.Atoi(raw)
 		if err != nil {
 			return fmt.Errorf("invalid integer %q", raw)
 		}
 
-		*t = v
+		*target = v
 
 		return nil
 	}
 }
 
-func setString(t *string) setter {
+func setString(target *string) setter {
 	return func(raw string) error {
-		*t = raw
+		*target = raw
 
 		return nil
 	}
 }
 
-func setStringDefault(t *string) setter {
+func setStringDefault(target *string) setter {
 	return func(raw string) error {
-		*t = strings.TrimSpace(raw)
+		*target = strings.TrimSpace(raw)
 
 		return nil
 	}
 }
 
-func setOrientation(o *Orientation) setter {
+func setOrientation(orient *Orientation) setter {
 	return func(raw string) error {
 		v, err := ParseOrientation(raw)
 		if err != nil {
 			return err
 		}
 
-		*o = v
+		*orient = v
 
 		return nil
 	}
 }
 
-func setLoadErrorHandling(h *LoadErrorHandling) setter {
+func setLoadErrorHandling(handling *LoadErrorHandling) setter {
 	return func(raw string) error {
 		v, err := ParseLoadErrorHandling(raw)
 		if err != nil {
 			return err
 		}
 
-		*h = v
+		*handling = v
 
 		return nil
 	}
 }
 
-func setMediaType(m *MediaType) setter {
+func setMediaType(media *MediaType) setter {
 	return func(raw string) error {
 		switch normalize(raw) {
 		case "", "ignore":
-			*m = MediaIgnore
+			*media = MediaIgnore
 
 			return nil
 		case "screen":
-			*m = MediaScreen
+			*media = MediaScreen
 
 			return nil
 		case "print":
-			*m = MediaPrint
+			*media = MediaPrint
 
 			return nil
 		}
@@ -253,41 +253,41 @@ func setMediaType(m *MediaType) setter {
 }
 
 // setGrayscaleFromColorMode maps colormode strings onto the Grayscale bool.
-func setGrayscaleFromColorMode(g *bool) setter {
+func setGrayscaleFromColorMode(grayscale *bool) setter {
 	return func(raw string) error {
 		m, err := ParseColorMode(raw)
 		if err != nil {
 			return err
 		}
 
-		*g = m == ColorModeGrayscale
+		*grayscale = m == ColorModeGrayscale
 
 		return nil
 	}
 }
 
 // marginSetter writes one edge of a Margin, storing millimetres.
-func marginSetter(m *Margin, edge string) setter {
+func marginSetter(margin *Margin, edge string) setter {
 	return func(raw string) error {
-		u, err := ParseUnitReal(raw, "mm")
+		unit, err := ParseUnitReal(raw, "mm")
 		if err != nil {
 			return err
 		}
 
-		mm, ok := u.Mm()
+		mmVal, ok := unit.Mm()
 		if !ok {
-			return fmt.Errorf("margin %s: unit %q not convertible", edge, u.Unit)
+			return fmt.Errorf("margin %s: unit %q not convertible", edge, unit.Unit)
 		}
 
 		switch edge {
 		case "top":
-			m.Top = mm
+			margin.Top = mmVal
 		case "bottom":
-			m.Bottom = mm
+			margin.Bottom = mmVal
 		case "left":
-			m.Left = mm
+			margin.Left = mmVal
 		case "right":
-			m.Right = mm
+			margin.Right = mmVal
 		}
 
 		return nil
@@ -329,185 +329,185 @@ func subTable[S any](entries []subEntry[S]) map[string]field[S] {
 
 func init() {
 	// --- global keys ---
-	g := func(name string, set func(*PdfGlobal, string) error, get func(*PdfGlobal) (string, bool)) {
+	regGlobal := func(name string, set func(*PdfGlobal, string) error, get func(*PdfGlobal) (string, bool)) {
 		globalKeys[name] = field[PdfGlobal]{apply: set, get: get}
 	}
-	g("orientation",
-		func(x *PdfGlobal, raw string) error { return setOrientation(&x.Orientation)(raw) },
-		func(x *PdfGlobal) (string, bool) { return x.Orientation.String(), true },
+	regGlobal("orientation",
+		func(dst *PdfGlobal, raw string) error { return setOrientation(&dst.Orientation)(raw) },
+		func(dst *PdfGlobal) (string, bool) { return dst.Orientation.String(), true },
 	)
 	// colormode and grayscale both share Grayscale.
-	g("colormode",
-		func(x *PdfGlobal, raw string) error { return setGrayscaleFromColorMode(&x.Grayscale)(raw) },
-		func(x *PdfGlobal) (string, bool) {
-			if x.Grayscale {
+	regGlobal("colormode",
+		func(dst *PdfGlobal, raw string) error { return setGrayscaleFromColorMode(&dst.Grayscale)(raw) },
+		func(dst *PdfGlobal) (string, bool) {
+			if dst.Grayscale {
 				return "grayscale", true
 			}
 
 			return "color", true
 		},
 	)
-	g("grayscale",
-		func(x *PdfGlobal, raw string) error { return setBool(&x.Grayscale)(raw) },
-		func(x *PdfGlobal) (string, bool) { return fmtBool(x.Grayscale), true },
+	regGlobal("grayscale",
+		func(dst *PdfGlobal, raw string) error { return setBool(&dst.Grayscale)(raw) },
+		func(dst *PdfGlobal) (string, bool) { return fmtBool(dst.Grayscale), true },
 	)
-	g("pageoffset",
-		func(x *PdfGlobal, raw string) error { return setInt(&x.PageOffset)(raw) },
-		func(x *PdfGlobal) (string, bool) { return fmtInt(x.PageOffset), true },
+	regGlobal("pageoffset",
+		func(dst *PdfGlobal, raw string) error { return setInt(&dst.PageOffset)(raw) },
+		func(dst *PdfGlobal) (string, bool) { return fmtInt(dst.PageOffset), true },
 	)
-	g("copies",
-		func(x *PdfGlobal, raw string) error { return setInt(&x.Copies)(raw) },
-		func(x *PdfGlobal) (string, bool) { return fmtInt(x.Copies), true },
+	regGlobal("copies",
+		func(dst *PdfGlobal, raw string) error { return setInt(&dst.Copies)(raw) },
+		func(dst *PdfGlobal) (string, bool) { return fmtInt(dst.Copies), true },
 	)
-	g("collate",
-		func(x *PdfGlobal, raw string) error { return setBool(&x.Collate)(raw) },
-		func(x *PdfGlobal) (string, bool) { return fmtBool(x.Collate), true },
+	regGlobal("collate",
+		func(dst *PdfGlobal, raw string) error { return setBool(&dst.Collate)(raw) },
+		func(dst *PdfGlobal) (string, bool) { return fmtBool(dst.Collate), true },
 	)
-	g("outline",
-		func(x *PdfGlobal, raw string) error { return setBool(&x.Outline)(raw) },
-		func(x *PdfGlobal) (string, bool) { return fmtBool(x.Outline), true },
+	regGlobal("outline",
+		func(dst *PdfGlobal, raw string) error { return setBool(&dst.Outline)(raw) },
+		func(dst *PdfGlobal) (string, bool) { return fmtBool(dst.Outline), true },
 	)
-	g("outlinedepth",
-		func(x *PdfGlobal, raw string) error { return setInt(&x.OutlineDepth)(raw) },
-		func(x *PdfGlobal) (string, bool) { return fmtInt(x.OutlineDepth), true },
+	regGlobal("outlinedepth",
+		func(dst *PdfGlobal, raw string) error { return setInt(&dst.OutlineDepth)(raw) },
+		func(dst *PdfGlobal) (string, bool) { return fmtInt(dst.OutlineDepth), true },
 	)
-	g("dumpoutline",
-		func(x *PdfGlobal, raw string) error { return setBool(&x.DumpOutline)(raw) },
-		func(x *PdfGlobal) (string, bool) { return fmtBool(x.DumpOutline), true },
+	regGlobal("dumpoutline",
+		func(dst *PdfGlobal, raw string) error { return setBool(&dst.DumpOutline)(raw) },
+		func(dst *PdfGlobal) (string, bool) { return fmtBool(dst.DumpOutline), true },
 	)
-	g("dumpoutlinewithdefaulttocxsl",
-		func(x *PdfGlobal, raw string) error { return setBool(&x.DumpDefaultTOCXSL)(raw) },
-		func(x *PdfGlobal) (string, bool) { return fmtBool(x.DumpDefaultTOCXSL), true },
+	regGlobal("dumpoutlinewithdefaulttocxsl",
+		func(dst *PdfGlobal, raw string) error { return setBool(&dst.DumpDefaultTOCXSL)(raw) },
+		func(dst *PdfGlobal) (string, bool) { return fmtBool(dst.DumpDefaultTOCXSL), true },
 	)
-	g("usecompression",
-		func(x *PdfGlobal, raw string) error { return setBool(&x.UseCompression)(raw) },
-		func(x *PdfGlobal) (string, bool) { return fmtBool(x.UseCompression), true },
+	regGlobal("usecompression",
+		func(dst *PdfGlobal, raw string) error { return setBool(&dst.UseCompression)(raw) },
+		func(dst *PdfGlobal) (string, bool) { return fmtBool(dst.UseCompression), true },
 	)
-	g("title",
-		func(x *PdfGlobal, raw string) error { return setString(&x.Title)(raw) },
-		func(x *PdfGlobal) (string, bool) { return x.Title, true },
+	regGlobal("title",
+		func(dst *PdfGlobal, raw string) error { return setString(&dst.Title)(raw) },
+		func(dst *PdfGlobal) (string, bool) { return dst.Title, true },
 	)
-	g("smartshrinking",
-		func(x *PdfGlobal, raw string) error { return setBool(&x.SmartShrinking)(raw) },
-		func(x *PdfGlobal) (string, bool) { return fmtBool(x.SmartShrinking), true },
+	regGlobal("smartshrinking",
+		func(dst *PdfGlobal, raw string) error { return setBool(&dst.SmartShrinking)(raw) },
+		func(dst *PdfGlobal) (string, bool) { return fmtBool(dst.SmartShrinking), true },
 	)
 	// Sole paint switch for PDF + image (no Web.Background mirror).
-	paintBG := func(x *PdfGlobal, raw string) error { return setBool(&x.Background)(raw) }
-	paintBGGet := func(x *PdfGlobal) (string, bool) { return fmtBool(x.Background), true }
-	g("background", paintBG, paintBGGet)
-	g("web.background", paintBG, paintBGGet)
+	paintBG := func(dst *PdfGlobal, raw string) error { return setBool(&dst.Background)(raw) }
+	paintBGGet := func(dst *PdfGlobal) (string, bool) { return fmtBool(dst.Background), true }
+	regGlobal("background", paintBG, paintBGGet)
+	regGlobal("web.background", paintBG, paintBGGet)
 
-	g("enablelocalfileaccess",
-		func(x *PdfGlobal, raw string) error { return setBool(&x.Load.EnableLocalFileAccess)(raw) },
-		func(x *PdfGlobal) (string, bool) { return fmtBool(x.Load.EnableLocalFileAccess), true },
+	regGlobal("enablelocalfileaccess",
+		func(dst *PdfGlobal, raw string) error { return setBool(&dst.Load.EnableLocalFileAccess)(raw) },
+		func(dst *PdfGlobal) (string, bool) { return fmtBool(dst.Load.EnableLocalFileAccess), true },
 	)
-	g("excludefromoutline",
-		func(x *PdfGlobal, raw string) error { return appendString(&x.ExcludeFromOutline)(raw) },
-		func(x *PdfGlobal) (string, bool) { return fmtStrings(x.ExcludeFromOutline), true },
+	regGlobal("excludefromoutline",
+		func(dst *PdfGlobal, raw string) error { return appendString(&dst.ExcludeFromOutline)(raw) },
+		func(dst *PdfGlobal) (string, bool) { return fmtStrings(dst.ExcludeFromOutline), true },
 	)
-	g("quiet",
-		func(x *PdfGlobal, raw string) error { return setBool(&x.Quiet)(raw) },
-		func(x *PdfGlobal) (string, bool) { return fmtBool(x.Quiet), true },
+	regGlobal("quiet",
+		func(dst *PdfGlobal, raw string) error { return setBool(&dst.Quiet)(raw) },
+		func(dst *PdfGlobal) (string, bool) { return fmtBool(dst.Quiet), true },
 	)
-	g("proxy",
-		func(x *PdfGlobal, raw string) error { return setString(&x.Load.Proxy)(raw) },
-		func(x *PdfGlobal) (string, bool) { return x.Load.Proxy, true },
+	regGlobal("proxy",
+		func(dst *PdfGlobal, raw string) error { return setString(&dst.Load.Proxy)(raw) },
+		func(dst *PdfGlobal) (string, bool) { return dst.Load.Proxy, true },
 	)
-	g("usesystemfonts",
-		func(x *PdfGlobal, raw string) error { return setBool(&x.UseSystemFonts)(raw) },
-		func(x *PdfGlobal) (string, bool) { return fmtBool(x.UseSystemFonts), true },
+	regGlobal("usesystemfonts",
+		func(dst *PdfGlobal, raw string) error { return setBool(&dst.UseSystemFonts)(raw) },
+		func(dst *PdfGlobal) (string, bool) { return fmtBool(dst.UseSystemFonts), true },
 	)
-	g("resolverelativelinks",
-		func(x *PdfGlobal, raw string) error { return setBool(&x.ResolveRelativeLinks)(raw) },
-		func(x *PdfGlobal) (string, bool) { return fmtBool(x.ResolveRelativeLinks), true },
+	regGlobal("resolverelativelinks",
+		func(dst *PdfGlobal, raw string) error { return setBool(&dst.ResolveRelativeLinks)(raw) },
+		func(dst *PdfGlobal) (string, bool) { return fmtBool(dst.ResolveRelativeLinks), true },
 	)
-	g("fontpath",
-		func(x *PdfGlobal, raw string) error { return appendString(&x.FontPaths)(raw) },
-		func(x *PdfGlobal) (string, bool) { return fmtStrings(x.FontPaths), true },
+	regGlobal("fontpath",
+		func(dst *PdfGlobal, raw string) error { return appendString(&dst.FontPaths)(raw) },
+		func(dst *PdfGlobal) (string, bool) { return fmtStrings(dst.FontPaths), true },
 	)
-	g("allow",
-		func(x *PdfGlobal, raw string) error { return appendString(&x.Load.Allow)(raw) },
-		func(x *PdfGlobal) (string, bool) { return fmtStrings(x.Load.Allow), true },
+	regGlobal("allow",
+		func(dst *PdfGlobal, raw string) error { return appendString(&dst.Load.Allow)(raw) },
+		func(dst *PdfGlobal) (string, bool) { return fmtStrings(dst.Load.Allow), true },
 	)
 
 	for _, edge := range []string{"top", "bottom", "left", "right"} {
-		g("margin."+edge,
-			func(x *PdfGlobal, raw string) error { return marginSetter(&x.Margin, edge)(raw) },
-			func(x *PdfGlobal) (string, bool) {
-				var v float64
+		regGlobal("margin."+edge,
+			func(dst *PdfGlobal, raw string) error { return marginSetter(&dst.Margin, edge)(raw) },
+			func(dst *PdfGlobal) (string, bool) {
+				var val float64
 
 				switch edge {
 				case "top":
-					v = x.Margin.Top
+					val = dst.Margin.Top
 				case "bottom":
-					v = x.Margin.Bottom
+					val = dst.Margin.Bottom
 				case "left":
-					v = x.Margin.Left
+					val = dst.Margin.Left
 				case "right":
-					v = x.Margin.Right
+					val = dst.Margin.Right
 				}
 
-				return fmtFloat(v), true
+				return fmtFloat(val), true
 			},
 		)
 	}
 
-	g("size.pagesize",
-		func(x *PdfGlobal, raw string) error {
-			v := strings.TrimSpace(raw)
-			x.PageSize = v
-			x.Size.PageSize = v
+	regGlobal("size.pagesize",
+		func(dst *PdfGlobal, raw string) error {
+			val := strings.TrimSpace(raw)
+			dst.PageSize = val
+			dst.Size.PageSize = val
 
 			return nil
 		},
-		func(x *PdfGlobal) (string, bool) {
-			if x.PageSize != "" {
-				return x.PageSize, true
+		func(dst *PdfGlobal) (string, bool) {
+			if dst.PageSize != "" {
+				return dst.PageSize, true
 			}
 
-			return x.Size.PageSize, true
+			return dst.Size.PageSize, true
 		},
 	)
-	g("size.width",
-		func(x *PdfGlobal, raw string) error {
-			u, err := ParseUnitReal(raw, "mm")
+	regGlobal("size.width",
+		func(dst *PdfGlobal, raw string) error {
+			unit, err := ParseUnitReal(raw, "mm")
 			if err != nil {
 				return err
 			}
 
-			mm, ok := u.Mm()
+			mm, ok := unit.Mm()
 			if !ok {
-				return fmt.Errorf("size.width: unit %q not convertible", u.Unit)
+				return fmt.Errorf("size.width: unit %q not convertible", unit.Unit)
 			}
 
-			x.Size.Width = mm
+			dst.Size.Width = mm
 
 			return nil
 		},
-		func(x *PdfGlobal) (string, bool) { return fmtFloat(x.Size.Width), true },
+		func(dst *PdfGlobal) (string, bool) { return fmtFloat(dst.Size.Width), true },
 	)
-	g("size.height",
-		func(x *PdfGlobal, raw string) error {
-			u, err := ParseUnitReal(raw, "mm")
+	regGlobal("size.height",
+		func(dst *PdfGlobal, raw string) error {
+			unit, err := ParseUnitReal(raw, "mm")
 			if err != nil {
 				return err
 			}
 
-			mm, ok := u.Mm()
+			mm, ok := unit.Mm()
 			if !ok {
-				return fmt.Errorf("size.height: unit %q not convertible", u.Unit)
+				return fmt.Errorf("size.height: unit %q not convertible", unit.Unit)
 			}
 
-			x.Size.Height = mm
+			dst.Size.Height = mm
 
 			return nil
 		},
-		func(x *PdfGlobal) (string, bool) { return fmtFloat(x.Size.Height), true },
+		func(dst *PdfGlobal) (string, bool) { return fmtFloat(dst.Size.Height), true },
 	)
 
 	// header/footer keys share one descriptor table per sub-struct. Object
 	// keys additionally flag the HeaderSet/FooterSet override bit.
-	for key, d := range subTable[HeaderFooter]([]subEntry[HeaderFooter]{
+	for key, entry := range subTable[HeaderFooter]([]subEntry[HeaderFooter]{
 		{"fontsize", func(h *HeaderFooter, raw string) error { return setFloat(&h.FontSize)(raw) }, func(h *HeaderFooter) (string, bool) { return fmtFloat(h.FontSize), true }},
 		{"fontname", func(h *HeaderFooter, raw string) error { return setString(&h.FontName)(raw) }, func(h *HeaderFooter) (string, bool) { return h.FontName, true }},
 		{"left", func(h *HeaderFooter, raw string) error { return setString(&h.Left)(raw) }, func(h *HeaderFooter) (string, bool) { return h.Left, true }},
@@ -517,27 +517,27 @@ func init() {
 		{"spacing", func(h *HeaderFooter, raw string) error { return setFloat(&h.Spacing)(raw) }, func(h *HeaderFooter) (string, bool) { return fmtFloat(h.Spacing), true }},
 		{"htmlurl", func(h *HeaderFooter, raw string) error { return setString(&h.HTMLURL)(raw) }, func(h *HeaderFooter) (string, bool) { return h.HTMLURL, true }},
 	}) {
-		globalKeys["header."+key] = sub(func(x *PdfGlobal) *HeaderFooter { return &x.Header }, d)
-		globalKeys["footer."+key] = sub(func(x *PdfGlobal) *HeaderFooter { return &x.Footer }, d)
+		globalKeys["header."+key] = sub(func(dst *PdfGlobal) *HeaderFooter { return &dst.Header }, entry)
+		globalKeys["footer."+key] = sub(func(dst *PdfGlobal) *HeaderFooter { return &dst.Footer }, entry)
 		objectKeys["header."+key] = field[PdfObject]{
-			apply: func(o *PdfObject, raw string) error {
-				o.HeaderSet = true
+			apply: func(regObject *PdfObject, raw string) error {
+				regObject.HeaderSet = true
 
-				return d.apply(&o.Header, raw)
+				return entry.apply(&regObject.Header, raw)
 			},
-			get: func(o *PdfObject) (string, bool) { return d.get(&o.Header) },
+			get: func(regObject *PdfObject) (string, bool) { return entry.get(&regObject.Header) },
 		}
 		objectKeys["footer."+key] = field[PdfObject]{
-			apply: func(o *PdfObject, raw string) error {
-				o.FooterSet = true
+			apply: func(regObject *PdfObject, raw string) error {
+				regObject.FooterSet = true
 
-				return d.apply(&o.Footer, raw)
+				return entry.apply(&regObject.Footer, raw)
 			},
-			get: func(o *PdfObject) (string, bool) { return d.get(&o.Footer) },
+			get: func(regObject *PdfObject) (string, bool) { return entry.get(&regObject.Footer) },
 		}
 	}
 
-	for key, d := range subTable[TableOfContent]([]subEntry[TableOfContent]{
+	for key, entry := range subTable[TableOfContent]([]subEntry[TableOfContent]{
 		{"fontscale", func(t *TableOfContent, raw string) error { return setFloat(&t.FontScale)(raw) }, func(t *TableOfContent) (string, bool) { return fmtFloat(t.FontScale), true }},
 		{"indentation", func(t *TableOfContent, raw string) error { return setStringDefault(&t.Indentation)(raw) }, func(t *TableOfContent) (string, bool) { return t.Indentation, true }},
 		{"dottedlines", func(t *TableOfContent, raw string) error { return setBool(&t.DottedLines)(raw) }, func(t *TableOfContent) (string, bool) { return fmtBool(t.DottedLines), true }},
@@ -546,12 +546,12 @@ func init() {
 		{"backlinks", func(t *TableOfContent, raw string) error { return setBool(&t.BackLinks)(raw) }, func(t *TableOfContent) (string, bool) { return fmtBool(t.BackLinks), true }},
 		{"xslstylesheet", func(t *TableOfContent, raw string) error { return setString(&t.XSLStyleSheet)(raw) }, func(t *TableOfContent) (string, bool) { return t.XSLStyleSheet, true }},
 	}) {
-		globalKeys["toc."+key] = sub(func(x *PdfGlobal) *TableOfContent { return &x.TOC }, d)
-		objectKeys["toc."+key] = sub(func(o *PdfObject) *TableOfContent { return &o.TOC }, d)
+		globalKeys["toc."+key] = sub(func(dst *PdfGlobal) *TableOfContent { return &dst.TOC }, entry)
+		objectKeys["toc."+key] = sub(func(regObject *PdfObject) *TableOfContent { return &regObject.TOC }, entry)
 	}
 
 	// web.* except background (mapped to Global.Background above)
-	for key, d := range subTable[Web]([]subEntry[Web]{
+	for key, entry := range subTable[Web]([]subEntry[Web]{
 		{"images", func(w *Web, raw string) error { return setBool(&w.Images)(raw) }, func(w *Web) (string, bool) { return fmtBool(w.Images), true }},
 		{"printmediatype", func(w *Web, raw string) error { return setBool(&w.PrintMediaType)(raw) }, func(w *Web) (string, bool) { return fmtBool(w.PrintMediaType), true }},
 		{"mediatype", func(w *Web, raw string) error { return setMediaType(&w.MediaType)(raw) }, func(w *Web) (string, bool) { return w.MediaType.String(), true }},
@@ -559,12 +559,12 @@ func init() {
 		{"simplifydomprofile", func(w *Web, raw string) error { return setString(&w.SimplifyDOMProfile)(raw) }, func(w *Web) (string, bool) { return w.SimplifyDOMProfile, true }},
 		{"printlinkunderline", func(w *Web, raw string) error { return setBool(&w.PrintLinkUnderline)(raw) }, func(w *Web) (string, bool) { return fmtBool(w.PrintLinkUnderline), true }},
 	}) {
-		globalKeys["web."+key] = sub(func(x *PdfGlobal) *Web { return &x.Web }, d)
-		objectKeys["web."+key] = sub(func(o *PdfObject) *Web { return &o.Web }, d)
-		imageKeys["web."+key] = sub(func(x *ImageGlobal) *Web { return &x.Web }, d)
+		globalKeys["web."+key] = sub(func(dst *PdfGlobal) *Web { return &dst.Web }, entry)
+		objectKeys["web."+key] = sub(func(regObject *PdfObject) *Web { return &regObject.Web }, entry)
+		imageKeys["web."+key] = sub(func(dst *ImageGlobal) *Web { return &dst.Web }, entry)
 	}
 
-	for key, d := range subTable[LoadPage]([]subEntry[LoadPage]{
+	for key, entry := range subTable[LoadPage]([]subEntry[LoadPage]{
 		{"zoomfactor", func(l *LoadPage, raw string) error { return setFloat(&l.ZoomFactor)(raw) }, func(l *LoadPage) (string, bool) { return fmtFloat(l.ZoomFactor), true }},
 		{"blocklocalfileaccess", func(l *LoadPage, raw string) error { return setBool(&l.BlockLocalFileAccess)(raw) }, func(l *LoadPage) (string, bool) { return fmtBool(l.BlockLocalFileAccess), true }},
 		{"loaderrorhandling", func(l *LoadPage, raw string) error { return setLoadErrorHandling(&l.LoadErrorHandling)(raw) }, func(l *LoadPage) (string, bool) { return l.LoadErrorHandling.String(), true }},
@@ -574,89 +574,89 @@ func init() {
 		{"printmediatype", func(l *LoadPage, raw string) error { return setBool(&l.PrintMediaType)(raw) }, func(l *LoadPage) (string, bool) { return fmtBool(l.PrintMediaType), true }},
 		{"timeout", func(l *LoadPage, raw string) error { return setInt(&l.Timeout)(raw) }, func(l *LoadPage) (string, bool) { return fmtInt(l.Timeout), true }},
 	}) {
-		objectKeys["load."+key] = sub(func(o *PdfObject) *LoadPage { return &o.Load }, d)
+		objectKeys["load."+key] = sub(func(regObject *PdfObject) *LoadPage { return &regObject.Load }, entry)
 	}
 
 	// --- object keys ---
-	o := func(name string, set func(*PdfObject, string) error, get func(*PdfObject) (string, bool)) {
+	regObject := func(name string, set func(*PdfObject, string) error, get func(*PdfObject) (string, bool)) {
 		objectKeys[name] = field[PdfObject]{apply: set, get: get}
 	}
-	o("page",
-		func(x *PdfObject, raw string) error { return setString(&x.Page)(raw) },
-		func(x *PdfObject) (string, bool) { return x.Page, true },
+	regObject("page",
+		func(dst *PdfObject, raw string) error { return setString(&dst.Page)(raw) },
+		func(dst *PdfObject) (string, bool) { return dst.Page, true },
 	)
-	o("externallinks",
-		func(x *PdfObject, raw string) error { return setBool(&x.ExternalLinks)(raw) },
-		func(x *PdfObject) (string, bool) { return fmtBool(x.ExternalLinks), true },
+	regObject("externallinks",
+		func(dst *PdfObject, raw string) error { return setBool(&dst.ExternalLinks)(raw) },
+		func(dst *PdfObject) (string, bool) { return fmtBool(dst.ExternalLinks), true },
 	)
-	o("locallinks",
-		func(x *PdfObject, raw string) error { return setBool(&x.LocalLinks)(raw) },
-		func(x *PdfObject) (string, bool) { return fmtBool(x.LocalLinks), true },
+	regObject("locallinks",
+		func(dst *PdfObject, raw string) error { return setBool(&dst.LocalLinks)(raw) },
+		func(dst *PdfObject) (string, bool) { return fmtBool(dst.LocalLinks), true },
 	)
-	o("includeinoutline",
-		func(x *PdfObject, raw string) error { return setBool(&x.IncludeInOutline)(raw) },
-		func(x *PdfObject) (string, bool) { return fmtBool(x.IncludeInOutline), true },
+	regObject("includeinoutline",
+		func(dst *PdfObject, raw string) error { return setBool(&dst.IncludeInOutline)(raw) },
+		func(dst *PdfObject) (string, bool) { return fmtBool(dst.IncludeInOutline), true },
 	)
-	o("useoutline",
-		func(x *PdfObject, raw string) error { return setBool(&x.UseOutline)(raw) },
-		func(x *PdfObject) (string, bool) { return fmtBool(x.UseOutline), true },
+	regObject("useoutline",
+		func(dst *PdfObject, raw string) error { return setBool(&dst.UseOutline)(raw) },
+		func(dst *PdfObject) (string, bool) { return fmtBool(dst.UseOutline), true },
 	)
-	o("istableofcontent",
-		func(x *PdfObject, raw string) error { return setBool(&x.IsTableOfContent)(raw) },
-		func(x *PdfObject) (string, bool) { return fmtBool(x.IsTableOfContent), true },
+	regObject("istableofcontent",
+		func(dst *PdfObject, raw string) error { return setBool(&dst.IsTableOfContent)(raw) },
+		func(dst *PdfObject) (string, bool) { return fmtBool(dst.IsTableOfContent), true },
 	)
-	o("iscover",
-		func(x *PdfObject, raw string) error { return setBool(&x.IsCover)(raw) },
-		func(x *PdfObject) (string, bool) { return fmtBool(x.IsCover), true },
+	regObject("iscover",
+		func(dst *PdfObject, raw string) error { return setBool(&dst.IsCover)(raw) },
+		func(dst *PdfObject) (string, bool) { return fmtBool(dst.IsCover), true },
 	)
 
 	// --- image keys ---
-	im := func(name string, set func(*ImageGlobal, string) error, get func(*ImageGlobal) (string, bool)) {
+	regImage := func(name string, set func(*ImageGlobal, string) error, get func(*ImageGlobal) (string, bool)) {
 		imageKeys[name] = field[ImageGlobal]{apply: set, get: get}
 	}
-	im("width",
-		func(x *ImageGlobal, raw string) error { return setInt(&x.Width)(raw) },
-		func(x *ImageGlobal) (string, bool) { return fmtInt(x.Width), true },
+	regImage("width",
+		func(dst *ImageGlobal, raw string) error { return setInt(&dst.Width)(raw) },
+		func(dst *ImageGlobal) (string, bool) { return fmtInt(dst.Width), true },
 	)
-	im("height",
-		func(x *ImageGlobal, raw string) error { return setInt(&x.Height)(raw) },
-		func(x *ImageGlobal) (string, bool) { return fmtInt(x.Height), true },
+	regImage("height",
+		func(dst *ImageGlobal, raw string) error { return setInt(&dst.Height)(raw) },
+		func(dst *ImageGlobal) (string, bool) { return fmtInt(dst.Height), true },
 	)
-	im("quality",
-		func(x *ImageGlobal, raw string) error { return setInt(&x.Quality)(raw) },
-		func(x *ImageGlobal) (string, bool) { return fmtInt(x.Quality), true },
+	regImage("quality",
+		func(dst *ImageGlobal, raw string) error { return setInt(&dst.Quality)(raw) },
+		func(dst *ImageGlobal) (string, bool) { return fmtInt(dst.Quality), true },
 	)
-	im("smartwidth",
-		func(x *ImageGlobal, raw string) error { return setBool(&x.SmartWidth)(raw) },
-		func(x *ImageGlobal) (string, bool) { return fmtBool(x.SmartWidth), true },
+	regImage("smartwidth",
+		func(dst *ImageGlobal, raw string) error { return setBool(&dst.SmartWidth)(raw) },
+		func(dst *ImageGlobal) (string, bool) { return fmtBool(dst.SmartWidth), true },
 	)
-	im("transparent",
-		func(x *ImageGlobal, raw string) error { return setBool(&x.Transparent)(raw) },
-		func(x *ImageGlobal) (string, bool) { return fmtBool(x.Transparent), true },
+	regImage("transparent",
+		func(dst *ImageGlobal, raw string) error { return setBool(&dst.Transparent)(raw) },
+		func(dst *ImageGlobal) (string, bool) { return fmtBool(dst.Transparent), true },
 	)
-	im("format",
-		func(x *ImageGlobal, raw string) error { return setString(&x.Format)(raw) },
-		func(x *ImageGlobal) (string, bool) { return x.Format, true },
+	regImage("format",
+		func(dst *ImageGlobal, raw string) error { return setString(&dst.Format)(raw) },
+		func(dst *ImageGlobal) (string, bool) { return dst.Format, true },
 	)
-	im("crop.left",
-		func(x *ImageGlobal, raw string) error { return setInt(&x.Crop.Left)(raw) },
-		func(x *ImageGlobal) (string, bool) { return fmtInt(x.Crop.Left), true },
+	regImage("crop.left",
+		func(dst *ImageGlobal, raw string) error { return setInt(&dst.Crop.Left)(raw) },
+		func(dst *ImageGlobal) (string, bool) { return fmtInt(dst.Crop.Left), true },
 	)
-	im("crop.top",
-		func(x *ImageGlobal, raw string) error { return setInt(&x.Crop.Top)(raw) },
-		func(x *ImageGlobal) (string, bool) { return fmtInt(x.Crop.Top), true },
+	regImage("crop.top",
+		func(dst *ImageGlobal, raw string) error { return setInt(&dst.Crop.Top)(raw) },
+		func(dst *ImageGlobal) (string, bool) { return fmtInt(dst.Crop.Top), true },
 	)
-	im("crop.width",
-		func(x *ImageGlobal, raw string) error { return setInt(&x.Crop.Width)(raw) },
-		func(x *ImageGlobal) (string, bool) { return fmtInt(x.Crop.Width), true },
+	regImage("crop.width",
+		func(dst *ImageGlobal, raw string) error { return setInt(&dst.Crop.Width)(raw) },
+		func(dst *ImageGlobal) (string, bool) { return fmtInt(dst.Crop.Width), true },
 	)
-	im("crop.height",
-		func(x *ImageGlobal, raw string) error { return setInt(&x.Crop.Height)(raw) },
-		func(x *ImageGlobal) (string, bool) { return fmtInt(x.Crop.Height), true },
+	regImage("crop.height",
+		func(dst *ImageGlobal, raw string) error { return setInt(&dst.Crop.Height)(raw) },
+		func(dst *ImageGlobal) (string, bool) { return fmtInt(dst.Crop.Height), true },
 	)
-	im("proxy",
-		func(x *ImageGlobal, raw string) error { return setString(&x.Load.Proxy)(raw) },
-		func(x *ImageGlobal) (string, bool) { return x.Load.Proxy, true },
+	regImage("proxy",
+		func(dst *ImageGlobal, raw string) error { return setString(&dst.Load.Proxy)(raw) },
+		func(dst *ImageGlobal) (string, bool) { return dst.Load.Proxy, true },
 	)
 	// image web.background is not typed here — ApplyImageKey routes it to
 	// PdfGlobal.Background.

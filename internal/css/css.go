@@ -18,6 +18,22 @@ import (
 	"gowkhtmltopdf/internal/html"
 )
 
+// Numeric constants used by the CSS parser and value helpers.
+const (
+	doubleColonOffset = 2 // bytes past ':' for "::pseudo"
+	minQuotedLen      = 2 // opening + closing quote
+	anPlusBSplitParts = 2 // SplitN(..., "n", 2)
+	hexRGBLen         = 3
+	hexRGBALen        = 4
+	hexRRGGBBLen      = 6
+	hexRRGGBBAALen    = 8
+	maxRGBChannel     = 255
+	percentScale      = 100
+	rgbaChannelCount  = 4
+	hexLetterBase     = 10 // 'a'/'A' → 10 in hex
+	roundHalfUp       = 0.5
+)
+
 // Stylesheet is a parsed stylesheet. Rules keep their source order.
 type Stylesheet struct {
 	Rules     []Rule
@@ -96,7 +112,7 @@ type Declaration struct {
 // garbage; only unbalanced blocks do. @media preambles are stored raw on
 // Rule.Media and evaluated later via MediaMatches.
 func Parse(src string) (*Stylesheet, error) {
-	s := &Stylesheet{}
+	str := &Stylesheet{} //nolint:exhaustruct // intentional zero-value fields
 	src = stripComments(src)
 	order := 0
 
@@ -133,7 +149,7 @@ func Parse(src string) (*Stylesheet, error) {
 					return nil, err
 				}
 
-				s.Rules = append(s.Rules, rules...)
+				str.Rules = append(str.Rules, rules...)
 			case strings.HasPrefix(low, "@container"):
 				open := strings.IndexByte(src, '{')
 				if open < 0 {
@@ -141,7 +157,7 @@ func Parse(src string) (*Stylesheet, error) {
 				}
 
 				prelude := strings.TrimSpace(src[len("@container"):open])
-				cq, ok := parseContainerPrelude(prelude)
+				contQ, found := parseContainerPrelude(prelude)
 
 				block, rest, err := takeBlock(src, open)
 				if err != nil {
@@ -150,16 +166,16 @@ func Parse(src string) (*Stylesheet, error) {
 
 				src = rest
 
-				if !ok {
+				if !found {
 					continue
 				}
 
-				rules, err := parseRuleList("all", &cq, block, &order)
+				rules, err := parseRuleList("all", &contQ, block, &order)
 				if err != nil {
 					return nil, err
 				}
 
-				s.Rules = append(s.Rules, rules...)
+				str.Rules = append(str.Rules, rules...)
 			case strings.HasPrefix(low, "@page"):
 				rest, err := skipAtRule(src)
 				if err != nil {
@@ -196,7 +212,7 @@ func Parse(src string) (*Stylesheet, error) {
 				src = rest
 
 				if ff := parseFontFace(block); ff.Family != "" || ff.Src != "" {
-					s.FontFaces = append(s.FontFaces, ff)
+					str.FontFaces = append(str.FontFaces, ff)
 				}
 			default:
 				rest, err := skipAtRule(src)
@@ -240,36 +256,36 @@ func Parse(src string) (*Stylesheet, error) {
 		}
 
 		if r, ok := parseOneRule(selText, block, "all", nil, &order); ok {
-			s.Rules = append(s.Rules, r)
+			str.Rules = append(str.Rules, r)
 		}
 	}
 
-	return s, nil
+	return str, nil
 }
 
 // parseOneRule builds a Rule from selector text + declaration block, owning
 // the order counter. Shared by Parse and parseRuleList.
-func parseOneRule(selText, block, media string, cq *ContainerQuery, order *int) (Rule, bool) {
+func parseOneRule(selText, block, media string, contQ *ContainerQuery, order *int) (Rule, bool) {
 	sel, ok := parseSelectorList(selText)
 	if !ok || len(sel) == 0 {
-		return Rule{}, false
+		return Rule{}, false //nolint:exhaustruct // intentional zero-value fields
 	}
 
-	r := Rule{
+	rVal := Rule{ //nolint:exhaustruct // intentional zero-value fields
 		Selectors: sel,
 		Decls:     parseDeclarations(block),
 		Media:     media,
 		Order:     *order,
 	}
 
-	if cq != nil {
-		cp := *cq
-		r.Container = &cp
+	if contQ != nil {
+		cp := *contQ
+		rVal.Container = &cp
 	}
 
 	*order++
 
-	return r, true
+	return rVal, true
 }
 
 // skipAtRule consumes one at-rule from src: its braced block when present,
@@ -293,23 +309,23 @@ func skipAtRule(src string) (rest string, err error) {
 }
 
 func parseFontFace(block string) FontFace {
-	var ff FontFace
+	var fontFace FontFace
 
-	for _, d := range parseDeclarations(block) {
-		switch strings.ToLower(d.Prop) {
+	for _, data := range parseDeclarations(block) {
+		switch strings.ToLower(data.Prop) {
 		case "font-family":
-			fams := ParseFontFamily(d.Value)
+			fams := ParseFontFamily(data.Value)
 			if len(fams) > 0 {
-				ff.Family = fams[0]
+				fontFace.Family = fams[0]
 			} else {
-				ff.Family = strings.Trim(d.Value, " \"'")
+				fontFace.Family = strings.Trim(data.Value, " \"'")
 			}
 		case "src":
-			ff.Src = d.Value
+			fontFace.Src = data.Value
 		}
 	}
 
-	return ff
+	return fontFace
 }
 
 // FontFaceURLs extracts url(...) references from an @font-face src value.
@@ -364,7 +380,7 @@ func parseRuleList(media string, cq *ContainerQuery, block string, orderPtr *int
 				}
 
 				prelude := strings.TrimSpace(block[len("@container"):open])
-				innerCQ, ok := parseContainerPrelude(prelude)
+				innerCQ, found := parseContainerPrelude(prelude)
 
 				innerBlock, rem, err := takeBlock(block, open)
 				if err != nil {
@@ -373,7 +389,7 @@ func parseRuleList(media string, cq *ContainerQuery, block string, orderPtr *int
 
 				block = rem
 
-				if !ok {
+				if !found {
 					continue
 				}
 				// Nested @container replaces (does not combine) the query.
@@ -444,31 +460,31 @@ func (e *parseError) Error() string { return "css: " + e.msg }
 // stripComments removes /* ... */ comments, preserving newlines so line
 // numbers stay roughly stable.
 func stripComments(src string) string {
-	var b strings.Builder
+	var buf strings.Builder
 
 	for {
-		i := strings.Index(src, "/*")
-		if i < 0 {
-			b.WriteString(src)
+		idx := strings.Index(src, "/*")
+		if idx < 0 {
+			buf.WriteString(src)
 
-			return b.String()
+			return buf.String()
 		}
 
-		b.WriteString(src[:i])
-		rest := src[i+2:]
+		buf.WriteString(src[:idx])
+		rest := src[idx+2:]
 
-		j := strings.Index(rest, "*/")
-		if j < 0 {
-			return b.String()
+		jdx := strings.Index(rest, "*/")
+		if jdx < 0 {
+			return buf.String()
 		}
 
-		for k := i; k <= i+1+j; k++ {
+		for k := idx; k <= idx+1+jdx; k++ {
 			if src[k] == '\n' {
-				b.WriteByte('\n')
+				buf.WriteByte('\n')
 			}
 		}
 
-		src = rest[j+2:]
+		src = rest[jdx+2:]
 	}
 }
 
@@ -477,17 +493,17 @@ func stripComments(src string) string {
 func findBlock(src string) (int, error) {
 	depth := 0
 
-	for i := 0; i < len(src); i++ {
-		switch src[i] {
+	for idx := 0; idx < len(src); idx++ {
+		switch src[idx] {
 		case '"', '\'':
-			q := src[i]
+			q := src[idx]
 
-			j := strings.IndexByte(src[i+1:], q)
+			j := strings.IndexByte(src[idx+1:], q)
 			if j < 0 {
 				return -1, &parseError{"unterminated string in stylesheet"}
 			}
 
-			i += j + 1
+			idx += j + 1
 		case '(':
 			depth++
 		case ')':
@@ -502,7 +518,7 @@ func findBlock(src string) (int, error) {
 			}
 		case '{':
 			if depth == 0 {
-				return i, nil
+				return idx, nil
 			}
 		case ';':
 			if depth == 0 {
@@ -519,24 +535,24 @@ func findBlock(src string) (int, error) {
 func takeBlock(src string, open int) (string, string, error) {
 	depth := 0
 
-	for i := open; i < len(src); i++ {
-		switch src[i] {
+	for idx := open; idx < len(src); idx++ {
+		switch src[idx] {
 		case '{':
 			depth++
 		case '}':
 			depth--
 			if depth == 0 {
-				return src[open+1 : i], src[i+1:], nil
+				return src[open+1 : idx], src[idx+1:], nil
 			}
 		case '"', '\'':
-			q := src[i]
+			q := src[idx]
 
-			j := strings.IndexByte(src[i+1:], q)
+			j := strings.IndexByte(src[idx+1:], q)
 			if j < 0 {
 				return "", "", &parseError{"unterminated string in stylesheet"}
 			}
 
-			i += j + 1
+			idx += j + 1
 		}
 	}
 
@@ -565,22 +581,22 @@ func parseSelectorList(s string) ([]Selector, bool) {
 }
 
 // splitTopLevel splits on sep outside parens, brackets and quotes.
-func splitTopLevel(s string, sep byte) []string {
+func splitTopLevel(str string, sep byte) []string {
 	var out []string
 
 	depth := 0
 	start := 0
 
-	for i := 0; i < len(s); i++ {
-		switch s[i] {
+	for idx := 0; idx < len(str); idx++ {
+		switch str[idx] {
 		case '"', '\'':
-			q := s[i]
+			q := str[idx]
 
-			j := strings.IndexByte(s[i+1:], q)
+			j := strings.IndexByte(str[idx+1:], q)
 			if j < 0 {
-				i = len(s)
+				idx = len(str)
 			} else {
-				i += j + 1
+				idx += j + 1
 			}
 		case '(', '[', '{':
 			depth++
@@ -590,13 +606,13 @@ func splitTopLevel(s string, sep byte) []string {
 			}
 		case sep:
 			if depth == 0 {
-				out = append(out, strings.TrimSpace(s[start:i]))
-				start = i + 1
+				out = append(out, strings.TrimSpace(str[start:idx]))
+				start = idx + 1
 			}
 		}
 	}
 
-	out = append(out, strings.TrimSpace(s[start:]))
+	out = append(out, strings.TrimSpace(str[start:]))
 
 	return out
 }
@@ -621,42 +637,42 @@ func splitSelectorChain(s string) []string {
 		}
 	}
 
-	for i := 0; i < len(s); i++ {
-		c := s[i]
+	for idx := 0; idx < len(s); idx++ {
+		cnt := s[idx]
 
 		switch {
-		case c == ' ' || c == '\t' || c == '\n' || c == '\r':
+		case cnt == ' ' || cnt == '\t' || cnt == '\n' || cnt == '\r':
 			// skip whitespace; it becomes a descendant combinator only when
 			// it sits between two compounds
 			flush()
 
-			for i+1 < len(s) && (s[i+1] == ' ' || s[i+1] == '\t' || s[i+1] == '\n' || s[i+1] == '\r') {
-				i++
+			for idx+1 < len(s) && (s[idx+1] == ' ' || s[idx+1] == '\t' || s[idx+1] == '\n' || s[idx+1] == '\r') {
+				idx++
 			}
 
 			if len(out) > 0 && out[len(out)-1] != " " && out[len(out)-1] != ">" &&
-				out[len(out)-1] != "+" && out[len(out)-1] != "~" && i+1 < len(s) && s[i+1] != '>' {
+				out[len(out)-1] != "+" && out[len(out)-1] != "~" && idx+1 < len(s) && s[idx+1] != '>' {
 				out = append(out, " ")
 			}
-		case c == '>' || c == '+' || c == '~':
+		case cnt == '>' || cnt == '+' || cnt == '~':
 			flush()
 
-			out = append(out, string(c))
-		case c == '[':
+			out = append(out, string(cnt))
+		case cnt == '[':
 			// keep [attr] / [attr=value] inside the compound
-			j := strings.IndexByte(s[i:], ']')
-			if j < 0 {
-				cur.WriteByte(c)
+			jdx := strings.IndexByte(s[idx:], ']')
+			if jdx < 0 {
+				cur.WriteByte(cnt)
 			} else {
 				if cur.Len() == 0 && (len(out) == 0 || out[len(out)-1] == " " ||
 					out[len(out)-1] == ">" || out[len(out)-1] == "+" || out[len(out)-1] == "~") {
 					cur.WriteByte('*')
 				}
 
-				cur.WriteString(s[i : i+j+1])
-				i += j
+				cur.WriteString(s[idx : idx+jdx+1])
+				idx += jdx
 			}
-		case c == ':':
+		case cnt == ':':
 			// keep :pseudo / :nth-child(n) / :has(...) and ::pseudo-elements
 			// inside the compound so parseCompound can reject unsupported
 			// pseudo-elements. Never strip ::before/::after — that used to
@@ -667,43 +683,43 @@ func splitSelectorChain(s string) []string {
 				cur.WriteByte('*')
 			}
 
-			start := i
+			start := idx
 
-			if i+1 < len(s) && s[i+1] == ':' {
-				i += 2 // ::pseudo-element
+			if idx+1 < len(s) && s[idx+1] == ':' {
+				idx += 2 // ::pseudo-element
 			} else {
-				i++ // :pseudo-class or CSS2 :before/:after
+				idx++ // :pseudo-class or CSS2 :before/:after
 			}
 
-			for i < len(s) && !isSelBreak(s[i]) {
-				if s[i] == '(' {
-					_, end, ok := takeParenArg(s, i)
+			for idx < len(s) && !isSelBreak(s[idx]) {
+				if s[idx] == '(' {
+					_, end, ok := takeParenArg(s, idx)
 					if !ok {
-						i = len(s)
+						idx = len(s)
 
 						break
 					}
 
-					i = end
+					idx = end
 
 					break
 				}
 
-				i++
+				idx++
 			}
 
-			cur.WriteString(s[start:i])
+			cur.WriteString(s[start:idx])
 
-			i--
-		case c == '\\':
+			idx--
+		case cnt == '\\':
 			// escape: keep next char literally
-			if i+1 < len(s) {
-				cur.WriteByte(s[i+1])
+			if idx+1 < len(s) {
+				cur.WriteByte(s[idx+1])
 
-				i++
+				idx++
 			}
 		default:
-			cur.WriteByte(c)
+			cur.WriteByte(cnt)
 		}
 	}
 
@@ -723,175 +739,175 @@ func isSelBreak(b byte) bool {
 func parseCompoundCtx(s string, insideHas bool) (SelectorPart, bool) {
 	s = strings.TrimSpace(s)
 	if s == "" {
-		return SelectorPart{Tag: "*"}, true
+		return SelectorPart{Tag: "*"}, true //nolint:exhaustruct // intentional zero-value fields
 	}
 
 	var part SelectorPart
 
-	i := 0
+	idx := 0
 	// tag name first
-	for i < len(s) && !isCompoundBreak(s[i]) {
-		i++
+	for idx < len(s) && !isCompoundBreak(s[idx]) {
+		idx++
 	}
 
-	part.Tag = s[:i]
+	part.Tag = s[:idx]
 	if part.Tag == "" {
 		part.Tag = "*"
 	} else if part.Tag != "*" && !validIdent(part.Tag) {
-		return SelectorPart{}, false
+		return SelectorPart{}, false //nolint:exhaustruct // intentional zero-value fields
 	}
 
-	for i < len(s) {
-		switch s[i] {
+	for idx < len(s) {
+		switch s[idx] {
 		case '#':
-			j := i + 1
-			for j < len(s) && !isCompoundBreak(s[j]) {
-				j++
+			jdx := idx + 1
+			for jdx < len(s) && !isCompoundBreak(s[jdx]) {
+				jdx++
 			}
 
-			id := s[i+1 : j]
+			id := s[idx+1 : jdx]
 			if !validIdent(id) {
-				return SelectorPart{}, false
+				return SelectorPart{}, false //nolint:exhaustruct // intentional zero-value fields
 			}
 
 			part.ID = id
-			i = j
+			idx = jdx
 		case '.':
-			j := i + 1
-			for j < len(s) && !isCompoundBreak(s[j]) {
-				j++
+			jdx := idx + 1
+			for jdx < len(s) && !isCompoundBreak(s[jdx]) {
+				jdx++
 			}
 
-			if j > i+1 {
-				cls := s[i+1 : j]
+			if jdx > idx+1 {
+				cls := s[idx+1 : jdx]
 				if !validIdent(cls) {
-					return SelectorPart{}, false
+					return SelectorPart{}, false //nolint:exhaustruct // intentional zero-value fields
 				}
 
 				part.Classes = append(part.Classes, cls)
 			}
 
-			i = j
+			idx = jdx
 		case '[':
-			j := strings.IndexByte(s[i:], ']')
-			if j < 0 {
-				return SelectorPart{}, false
+			jdx := strings.IndexByte(s[idx:], ']')
+			if jdx < 0 {
+				return SelectorPart{}, false //nolint:exhaustruct // intentional zero-value fields
 			}
 
-			attr, ok := parseAttrSelector(s[i : i+j+1])
+			attr, ok := parseAttrSelector(s[idx : idx+jdx+1])
 			if !ok {
-				return SelectorPart{}, false
+				return SelectorPart{}, false //nolint:exhaustruct // intentional zero-value fields
 			}
 
 			part.Attrs = append(part.Attrs, attr)
-			i += j + 1
+			idx += jdx + 1
 		case ':':
-			if i+1 < len(s) && s[i+1] == ':' {
+			if idx+1 < len(s) && s[idx+1] == ':' {
 				// ::pseudo-element (Selectors 3+). Only ::before/::after are
 				// supported; others reject the selector so declarations do
 				// not apply to the host.
-				j := i + 2
-				for j < len(s) && s[j] != '(' && !isCompoundBreak(s[j]) {
-					j++
+				jdx := idx + doubleColonOffset
+				for jdx < len(s) && s[jdx] != '(' && !isCompoundBreak(s[jdx]) {
+					jdx++
 				}
 
-				pe := strings.ToLower(s[i+2 : j])
-				if pe != "before" && pe != "after" {
-					return SelectorPart{}, false
+				peVal := strings.ToLower(s[idx+doubleColonOffset : jdx])
+				if peVal != "before" && peVal != "after" {
+					return SelectorPart{}, false //nolint:exhaustruct // intentional zero-value fields
 				}
 
-				if hasParen := j < len(s) && s[j] == '('; hasParen {
-					return SelectorPart{}, false
+				if hasParen := jdx < len(s) && s[jdx] == '('; hasParen {
+					return SelectorPart{}, false //nolint:exhaustruct // intentional zero-value fields
 				}
 
-				part.PseudoElement = pe
-				i = j
+				part.PseudoElement = peVal
+				idx = jdx
 
 				continue
 			}
 
-			j := i + 1
-			for j < len(s) && s[j] != '(' && !isCompoundBreak(s[j]) {
-				j++
+			jdx := idx + 1
+			for jdx < len(s) && s[jdx] != '(' && !isCompoundBreak(s[jdx]) {
+				jdx++
 			}
 
-			name := strings.ToLower(s[i+1 : j])
+			name := strings.ToLower(s[idx+1 : jdx])
 			arg := ""
 
 			var argRaw string
 
-			hasParen := j < len(s) && s[j] == '('
+			hasParen := jdx < len(s) && s[jdx] == '('
 			if hasParen {
-				raw, end, ok := takeParenArg(s, j)
+				raw, end, ok := takeParenArg(s, jdx)
 				if !ok {
-					return SelectorPart{}, false
+					return SelectorPart{}, false //nolint:exhaustruct // intentional zero-value fields
 				}
 
 				argRaw = raw
 				arg = strings.ToLower(strings.TrimSpace(raw))
-				j = end
+				jdx = end
 			}
 
 			if insideHas {
 				switch name {
 				case "has", "before", "after", "first-line", "first-letter":
-					return SelectorPart{}, false
+					return SelectorPart{}, false //nolint:exhaustruct // intentional zero-value fields
 				}
 			}
 
 			switch name {
 			case "first-child", "last-child", "nth-child":
-				part.Pseudos = append(part.Pseudos, PseudoClass{Name: name, Arg: arg})
+				part.Pseudos = append(part.Pseudos, PseudoClass{Name: name, Arg: arg}) //nolint:exhaustruct // intentional zero-value fields
 			case "has":
 				if !hasParen || strings.TrimSpace(argRaw) == "" {
-					return SelectorPart{}, false
+					return SelectorPart{}, false //nolint:exhaustruct // intentional zero-value fields
 				}
 
 				lowArg := strings.ToLower(argRaw)
 				if strings.Contains(lowArg, ":has(") || strings.Contains(argRaw, "::") {
-					return SelectorPart{}, false
+					return SelectorPart{}, false //nolint:exhaustruct // intentional zero-value fields
 				}
 
 				rels, ok := parseRelativeSelectorList(argRaw)
 				if !ok {
-					return SelectorPart{}, false
+					return SelectorPart{}, false //nolint:exhaustruct // intentional zero-value fields
 				}
 
-				part.Pseudos = append(part.Pseudos, PseudoClass{Name: "has", Has: rels})
+				part.Pseudos = append(part.Pseudos, PseudoClass{Name: "has", Has: rels}) //nolint:exhaustruct // intentional zero-value fields
 			case "not":
 				if !hasParen || strings.TrimSpace(argRaw) == "" {
-					return SelectorPart{}, false
+					return SelectorPart{}, false //nolint:exhaustruct // intentional zero-value fields
 				}
 
 				sels, ok := parseSelectorListStrict(argRaw, insideHas)
 				if !ok {
-					return SelectorPart{}, false
+					return SelectorPart{}, false //nolint:exhaustruct // intentional zero-value fields
 				}
 
-				part.Pseudos = append(part.Pseudos, PseudoClass{Name: "not", Not: sels})
+				part.Pseudos = append(part.Pseudos, PseudoClass{Name: "not", Not: sels}) //nolint:exhaustruct // intentional zero-value fields
 			case "link", "visited":
 				// Print semantics: both mean "a[href]" (no browsing history).
-				part.Pseudos = append(part.Pseudos, PseudoClass{Name: name})
+				part.Pseudos = append(part.Pseudos, PseudoClass{Name: name}) //nolint:exhaustruct // intentional zero-value fields
 			case "hover", "active", "focus", "target":
 				// Accepted for parse/cascade structure but never match in print
 				// (static PDF has no pointer/focus/:target fragment state).
 				// Keeping them on the compound prevents li:target from
 				// degrading to bare `li` (wiki reflist highlight blue).
-				part.Pseudos = append(part.Pseudos, PseudoClass{Name: name})
+				part.Pseudos = append(part.Pseudos, PseudoClass{Name: name}) //nolint:exhaustruct // intentional zero-value fields
 			case "before", "after":
 				// CSS2 single-colon pseudo-elements.
 				part.PseudoElement = name
 			case "first-line", "first-letter":
-				return SelectorPart{}, false
+				return SelectorPart{}, false //nolint:exhaustruct // intentional zero-value fields
 			default:
 				// Keep unknown pseudos so they do not degrade to the host
 				// selector (same class of bug as stripping :target / ::before).
-				part.Pseudos = append(part.Pseudos, PseudoClass{Name: name, Arg: arg})
+				part.Pseudos = append(part.Pseudos, PseudoClass{Name: name, Arg: arg}) //nolint:exhaustruct // intentional zero-value fields
 			}
 
-			i = j
+			idx = jdx
 		default:
-			return SelectorPart{}, false
+			return SelectorPart{}, false //nolint:exhaustruct // intentional zero-value fields
 		}
 	}
 
@@ -901,21 +917,21 @@ func parseCompoundCtx(s string, insideHas bool) (SelectorPart, bool) {
 func parseAttrSelector(s string) (AttrSelector, bool) {
 	// s includes brackets: [href], [href="x"], [typeof~='mw:File/Thumb'], [class*="noprint"]
 	if len(s) < 3 || s[0] != '[' || s[len(s)-1] != ']' {
-		return AttrSelector{}, false
+		return AttrSelector{}, false //nolint:exhaustruct // intentional zero-value fields
 	}
 
 	inner := strings.TrimSpace(s[1 : len(s)-1])
 	if inner == "" {
-		return AttrSelector{}, false
+		return AttrSelector{}, false //nolint:exhaustruct // intentional zero-value fields
 	}
 	// Operator forms: ~= *= ^= $= |= =  (check multi-char before bare =)
-	op := ""
+	oper := ""
 	nameEnd := -1
 
 	for _, cand := range []string{"~=", "*=", "^=", "$=", "|="} {
 		if i := strings.Index(inner, cand); i > 0 {
 			nameEnd = i
-			op = cand
+			oper = cand
 
 			break
 		}
@@ -924,36 +940,36 @@ func parseAttrSelector(s string) (AttrSelector, bool) {
 	if nameEnd < 0 {
 		if i := strings.IndexByte(inner, '='); i >= 0 {
 			nameEnd = i
-			op = "="
+			oper = "="
 		}
 	}
 
 	if nameEnd < 0 {
 		if !validIdent(inner) {
-			return AttrSelector{}, false
+			return AttrSelector{}, false //nolint:exhaustruct // intentional zero-value fields
 		}
 
-		return AttrSelector{Name: strings.ToLower(inner)}, true
+		return AttrSelector{Name: strings.ToLower(inner)}, true //nolint:exhaustruct // intentional zero-value fields
 	}
 
 	name := strings.TrimSpace(inner[:nameEnd])
-	val := strings.TrimSpace(inner[nameEnd+len(op):])
+	val := strings.TrimSpace(inner[nameEnd+len(oper):])
 
 	if !validIdent(name) {
-		return AttrSelector{}, false
+		return AttrSelector{}, false //nolint:exhaustruct // intentional zero-value fields
 	}
 
-	if len(val) >= 2 {
+	if len(val) >= minQuotedLen {
 		if (val[0] == '"' && val[len(val)-1] == '"') || (val[0] == '\'' && val[len(val)-1] == '\'') {
 			val = val[1 : len(val)-1]
 		}
 	}
 
-	switch op {
+	switch oper {
 	case "=", "~=", "*=", "^=", "$=", "|=":
-		return AttrSelector{Name: strings.ToLower(name), Op: op, Value: val}, true
+		return AttrSelector{Name: strings.ToLower(name), Op: oper, Value: val}, true
 	default:
-		return AttrSelector{}, false
+		return AttrSelector{}, false //nolint:exhaustruct // intentional zero-value fields
 	}
 }
 
@@ -966,13 +982,13 @@ func validIdent(s string) bool {
 
 	for i := range len(s) {
 		c := s[i]
-		ok := c == '-' || c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+		found := c == '-' || c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
 
 		if i > 0 && (c >= '0' && c <= '9') {
-			ok = true
+			found = true
 		}
 
-		if !ok {
+		if !found {
 			return false
 		}
 	}
@@ -994,21 +1010,21 @@ func Match(s Selector, n *html.Node) bool {
 
 // MatchPseudo reports whether s selects the ::before or ::after pseudo-element
 // of n (pe is "before" or "after").
-func MatchPseudo(s Selector, n *html.Node, pe string) bool {
-	if n == nil || pe == "" || len(s.Parts) == 0 {
+func MatchPseudo(sel Selector, count *html.Node, pseudo string) bool {
+	if count == nil || pseudo == "" || len(sel.Parts) == 0 {
 		return false
 	}
 
-	last := s.Parts[len(s.Parts)-1]
-	if last.PseudoElement != pe {
+	last := sel.Parts[len(sel.Parts)-1]
+	if last.PseudoElement != pseudo {
 		return false
 	}
 
-	parts := make([]SelectorPart, len(s.Parts))
-	copy(parts, s.Parts)
+	parts := make([]SelectorPart, len(sel.Parts))
+	copy(parts, sel.Parts)
 	parts[len(parts)-1].PseudoElement = ""
 
-	return Match(Selector{Parts: parts}, n)
+	return Match(Selector{Parts: parts}, count)
 }
 
 // matchPart matches one compound against an element.
@@ -1039,38 +1055,38 @@ func matchPart(p SelectorPart, n *html.Node) bool {
 		}
 	}
 
-	for _, a := range p.Attrs {
-		val, ok := "", false
+	for _, arg := range p.Attrs {
+		val, found := "", false
 		if n.Attrs != nil {
-			val, ok = n.Attrs[a.Name]
+			val, found = n.Attrs[arg.Name]
 		}
 
-		if a.Op == "" {
-			if !ok {
+		if arg.Op == "" {
+			if !found {
 				return false
 			}
 
 			continue
 		}
 
-		if !ok {
+		if !found {
 			return false
 		}
 
-		switch a.Op {
+		switch arg.Op {
 		case "=":
-			if val != a.Value {
+			if val != arg.Value {
 				return false
 			}
 		case "~=":
-			if a.Value == "" || strings.Contains(a.Value, " ") {
+			if arg.Value == "" || strings.Contains(arg.Value, " ") {
 				return false
 			}
 
 			found := false
 
 			for _, w := range strings.Fields(val) {
-				if w == a.Value {
+				if w == arg.Value {
 					found = true
 
 					break
@@ -1081,24 +1097,24 @@ func matchPart(p SelectorPart, n *html.Node) bool {
 				return false
 			}
 		case "*=":
-			if a.Value == "" || !strings.Contains(val, a.Value) {
+			if arg.Value == "" || !strings.Contains(val, arg.Value) {
 				return false
 			}
 		case "^=":
-			if a.Value == "" || !strings.HasPrefix(val, a.Value) {
+			if arg.Value == "" || !strings.HasPrefix(val, arg.Value) {
 				return false
 			}
 		case "$=":
-			if a.Value == "" || !strings.HasSuffix(val, a.Value) {
+			if arg.Value == "" || !strings.HasSuffix(val, arg.Value) {
 				return false
 			}
 		case "|=":
 			// Exact match or value is followed by a hyphen (HTML lang / BCP47-style).
-			if a.Value == "" {
+			if arg.Value == "" {
 				return false
 			}
 
-			if val != a.Value && !strings.HasPrefix(val, a.Value+"-") {
+			if val != arg.Value && !strings.HasPrefix(val, arg.Value+"-") {
 				return false
 			}
 		default:
@@ -1180,42 +1196,42 @@ func isLinkAnchor(n *html.Node) bool {
 	return href != ""
 }
 
-func previousElementSibling(n *html.Node) *html.Node {
-	if n == nil || n.Parent == nil {
+func previousElementSibling(count *html.Node) *html.Node {
+	if count == nil || count.Parent == nil {
 		return nil
 	}
 
 	var prev *html.Node
 
-	for _, c := range n.Parent.Children {
-		if c == n {
+	for _, cur := range count.Parent.Children {
+		if cur == count {
 			return prev
 		}
 
-		if c.Type == html.ElementNode {
-			prev = c
+		if cur.Type == html.ElementNode {
+			prev = cur
 		}
 	}
 
 	return nil
 }
 
-func nextElementSibling(n *html.Node) *html.Node {
-	if n == nil || n.Parent == nil {
+func nextElementSibling(count *html.Node) *html.Node {
+	if count == nil || count.Parent == nil {
 		return nil
 	}
 
 	seen := false
 
-	for _, c := range n.Parent.Children {
-		if c == n {
+	for _, cur := range count.Parent.Children {
+		if cur == count {
 			seen = true
 
 			continue
 		}
 
-		if seen && c.Type == html.ElementNode {
-			return c
+		if seen && cur.Type == html.ElementNode {
+			return cur
 		}
 	}
 
@@ -1223,21 +1239,21 @@ func nextElementSibling(n *html.Node) *html.Node {
 }
 
 // elementIndex is 1-based among element siblings.
-func elementIndex(n *html.Node) int {
-	if n == nil || n.Parent == nil {
+func elementIndex(count *html.Node) int {
+	if count == nil || count.Parent == nil {
 		return 1
 	}
 
-	i := 0
+	idx := 0
 
-	for _, c := range n.Parent.Children {
-		if c.Type != html.ElementNode {
+	for _, cur := range count.Parent.Children {
+		if cur.Type != html.ElementNode {
 			continue
 		}
 
-		i++
-		if c == n {
-			return i
+		idx++
+		if cur == count {
+			return idx
 		}
 	}
 
@@ -1262,52 +1278,52 @@ func matchNth(arg string, index int) bool {
 	if n, err := strconv.Atoi(arg); err == nil {
 		return index == n
 	}
-	// an+b / n+b / -n+b / an
-	a, b := 0, 0
+	// an+buf / n+buf / -n+buf / an
+	var specA, buf int
 
 	if strings.Contains(arg, "n") {
-		parts := strings.SplitN(arg, "n", 2)
-		as := strings.TrimSpace(parts[0])
+		parts := strings.SplitN(arg, "n", anPlusBSplitParts)
+		asVal := strings.TrimSpace(parts[0])
 
-		bs := ""
-		if len(parts) == 2 {
-			bs = strings.TrimSpace(parts[1])
+		bsVal := ""
+		if len(parts) == anPlusBSplitParts {
+			bsVal = strings.TrimSpace(parts[1])
 		}
 
-		switch as {
+		switch asVal {
 		case "", "+":
-			a = 1
+			specA = 1
 		case "-":
-			a = -1
+			specA = -1
 		default:
 			var err error
 
-			a, err = strconv.Atoi(as)
+			specA, err = strconv.Atoi(asVal)
 			if err != nil {
 				return false
 			}
 		}
 
-		if bs == "" {
-			b = 0
+		if bsVal == "" {
+			buf = 0
 		} else {
 			var err error
 
-			b, err = strconv.Atoi(bs)
+			buf, err = strconv.Atoi(bsVal)
 			if err != nil {
 				return false
 			}
 		}
 
-		if a == 0 {
-			return index == b
+		if specA == 0 {
+			return index == buf
 		}
 		// index = a*k + b for integer k >= 0
-		if (index-b)%a != 0 {
+		if (index-buf)%specA != 0 {
 			return false
 		}
 
-		k := (index - b) / a
+		k := (index - buf) / specA
 
 		return k >= 0
 	}
@@ -1328,30 +1344,30 @@ func classSet(n *html.Node) map[string]bool {
 // :has() / :not() contribute the specificity of their most specific argument
 // (Selectors 4), not a flat class-level count for the pseudo itself.
 func Specificity(s Selector) (a, b, c int) {
-	for _, p := range s.Parts {
-		if p.ID != "" {
+	for _, page := range s.Parts {
+		if page.ID != "" {
 			a++
 		}
 
-		b += len(p.Classes) + len(p.Attrs)
+		b += len(page.Classes) + len(page.Attrs)
 
-		if p.Tag != "*" {
+		if page.Tag != "*" {
 			c++
 		}
 
-		if p.PseudoElement != "" {
+		if page.PseudoElement != "" {
 			c++ // pseudo-elements count like type selectors
 		}
 
-		for _, ps := range p.Pseudos {
-			switch ps.Name {
+		for _, pageSize := range page.Pseudos {
+			switch pageSize.Name {
 			case "has":
-				a2, b2, c2 := maxRelativeSpecificity(ps.Has)
+				a2, b2, c2 := maxRelativeSpecificity(pageSize.Has)
 				a += a2
 				b += b2
 				c += c2
 			case "not":
-				a2, b2, c2 := maxSelectorSpecificity(ps.Not)
+				a2, b2, c2 := maxSelectorSpecificity(pageSize.Not)
 				a += a2
 				b += b2
 				c += c2
@@ -1407,13 +1423,13 @@ func parseDeclarations(block string) []Declaration {
 	return decls
 }
 
-func validPropName(p string) bool {
-	if p == "" {
+func validPropName(page string) bool {
+	if page == "" {
 		return false
 	}
 
-	for i := range len(p) {
-		c := p[i]
+	for i := range len(page) {
+		c := page[i]
 		if !(c == '-' || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) {
 			return false
 		}
@@ -1424,37 +1440,37 @@ func validPropName(p string) bool {
 
 // isImportant reports whether a declaration value carries !important
 // (whitespace between ! and important is allowed).
-func isImportant(v string) bool {
-	v = strings.TrimSpace(v)
+func isImportant(val string) bool {
+	val = strings.TrimSpace(val)
 
 	const word = "important"
 
-	if len(v) < len(word)+1 {
+	if len(val) < len(word)+1 {
 		return false
 	}
 
-	if !strings.EqualFold(v[len(v)-len(word):], word) {
+	if !strings.EqualFold(val[len(val)-len(word):], word) {
 		return false
 	}
 
-	rest := strings.TrimRight(v[:len(v)-len(word)], " \t")
+	rest := strings.TrimRight(val[:len(val)-len(word)], " \t")
 
 	return strings.HasSuffix(rest, "!")
 }
 
 // stripImportant removes a trailing !important (any case, optional space)
 // from a declaration value.
-func stripImportant(v string) string {
-	if !isImportant(v) {
-		return v
+func stripImportant(val string) string {
+	if !isImportant(val) {
+		return val
 	}
 
-	v = strings.TrimRight(v, " \t")
-	v = v[:len(v)-len("important")]
-	v = strings.TrimRight(v, " \t")
-	v = strings.TrimSuffix(v, "!")
+	val = strings.TrimRight(val, " \t")
+	val = val[:len(val)-len("important")]
+	val = strings.TrimRight(val, " \t")
+	val = strings.TrimSuffix(val, "!")
 
-	return strings.TrimSpace(v)
+	return strings.TrimSpace(val)
 }
 
 // ParseLength parses a CSS length: number + unit, where bare numbers are
@@ -1465,27 +1481,27 @@ func ParseLength(v string) (val float64, unit string, ok bool) {
 		return 0, "", false
 	}
 
-	i := 0
+	idx := 0
 	if v[0] == '+' || v[0] == '-' {
-		i++
+		idx++
 	}
 
-	start := i
+	start := idx
 
-	for i < len(v) && (v[i] >= '0' && v[i] <= '9' || v[i] == '.') {
-		i++
+	for idx < len(v) && (v[idx] >= '0' && v[idx] <= '9' || v[idx] == '.') {
+		idx++
 	}
 
-	if i == start {
+	if idx == start {
 		return 0, "", false
 	}
 
-	num, err := strconv.ParseFloat(v[:i], 64)
+	num, err := strconv.ParseFloat(v[:idx], 64)
 	if err != nil {
 		return 0, "", false
 	}
 
-	unit = strings.ToLower(strings.TrimSpace(v[i:]))
+	unit = strings.ToLower(strings.TrimSpace(v[idx:]))
 	if unit == "" {
 		unit = "px"
 	}
@@ -1499,13 +1515,13 @@ func ParseLength(v string) (val float64, unit string, ok bool) {
 }
 
 // ParseNumber parses a bare number, e.g. line-height or font-weight.
-func ParseNumber(v string) (float64, bool) {
-	v = strings.TrimSpace(v)
-	if v == "" {
+func ParseNumber(val string) (float64, bool) {
+	val = strings.TrimSpace(val)
+	if val == "" {
 		return 0, false
 	}
 
-	f, err := strconv.ParseFloat(v, 64)
+	f, err := strconv.ParseFloat(val, 64)
 	if err != nil {
 		return 0, false
 	}
@@ -1538,30 +1554,30 @@ func ParseColor(v string) (r, g, b int, alpha float64, ok bool) {
 	if v[0] == '#' {
 		hex := v[1:]
 		switch len(hex) {
-		case 3:
+		case hexRGBLen:
 			if !isHex(hex) {
 				return 0, 0, 0, 0, false
 			}
 
 			return hexNibble(hex[0]), hexNibble(hex[1]), hexNibble(hex[2]), 1, true
-		case 4:
+		case hexRGBALen:
 			if !isHex(hex) {
 				return 0, 0, 0, 0, false
 			}
 
-			return hexNibble(hex[0]), hexNibble(hex[1]), hexNibble(hex[2]), float64(hexNibble(hex[3])) / 255, true
-		case 6:
+			return hexNibble(hex[0]), hexNibble(hex[1]), hexNibble(hex[2]), float64(hexNibble(hex[3])) / maxRGBChannel, true
+		case hexRRGGBBLen:
 			if !isHex(hex) {
 				return 0, 0, 0, 0, false
 			}
 
 			return hexByte(hex[0:2]), hexByte(hex[2:4]), hexByte(hex[4:6]), 1, true
-		case 8:
+		case hexRRGGBBAALen:
 			if !isHex(hex) {
 				return 0, 0, 0, 0, false
 			}
 
-			return hexByte(hex[0:2]), hexByte(hex[2:4]), hexByte(hex[4:6]), float64(hexByte(hex[6:8])) / 255, true
+			return hexByte(hex[0:2]), hexByte(hex[2:4]), hexByte(hex[4:6]), float64(hexByte(hex[6:8])) / maxRGBChannel, true
 		}
 
 		return 0, 0, 0, 0, false
@@ -1586,9 +1602,9 @@ func ParseColor(v string) (r, g, b int, alpha float64, ok bool) {
 
 		args := strings.Split(v[open+1:closeIdx], ",")
 
-		channels := 3
+		channels := hexRGBLen
 		if strings.HasPrefix(low, "rgba") {
-			channels = 4
+			channels = rgbaChannelCount
 		}
 
 		if len(args) != channels {
@@ -1597,17 +1613,17 @@ func ParseColor(v string) (r, g, b int, alpha float64, ok bool) {
 
 		var vals []float64
 
-		for _, a := range args {
-			a = strings.TrimSpace(a)
-			if strings.HasSuffix(a, "%") {
-				f, err := strconv.ParseFloat(strings.TrimSuffix(a, "%"), 64)
+		for _, arg := range args {
+			arg = strings.TrimSpace(arg)
+			if strings.HasSuffix(arg, "%") {
+				f, err := strconv.ParseFloat(strings.TrimSuffix(arg, "%"), 64)
 				if err != nil {
 					return 0, 0, 0, 0, false
 				}
 
-				vals = append(vals, f*255/100)
+				vals = append(vals, f*maxRGBChannel/percentScale)
 			} else {
-				f, err := strconv.ParseFloat(a, 64)
+				f, err := strconv.ParseFloat(arg, 64)
 				if err != nil {
 					return 0, 0, 0, 0, false
 				}
@@ -1620,11 +1636,11 @@ func ParseColor(v string) (r, g, b int, alpha float64, ok bool) {
 		g = clampByte(vals[1])
 		b = clampByte(vals[2])
 
-		if channels == 4 {
+		if channels == rgbaChannelCount {
 			// alpha: 0..1 float, or percentage
 			alpha = vals[3]
-			if len(args) == 4 && strings.HasSuffix(strings.TrimSpace(args[3]), "%") {
-				alpha /= 255
+			if len(args) == rgbaChannelCount && strings.HasSuffix(strings.TrimSpace(args[3]), "%") {
+				alpha /= maxRGBChannel
 			}
 
 			if alpha > 1 {
@@ -1666,8 +1682,8 @@ func parseVarFn(v string) (name, fallback string, ok bool) {
 	inner = strings.TrimSpace(inner[:len(inner)-1])
 	depth := 0
 
-	for i := range len(inner) {
-		switch inner[i] {
+	for idx := range len(inner) {
+		switch inner[idx] {
 		case '(':
 			depth++
 		case ')':
@@ -1676,8 +1692,8 @@ func parseVarFn(v string) (name, fallback string, ok bool) {
 			}
 		case ',':
 			if depth == 0 {
-				name = strings.ToLower(strings.TrimSpace(inner[:i]))
-				fallback = strings.TrimSpace(inner[i+1:])
+				name = strings.ToLower(strings.TrimSpace(inner[:idx]))
+				fallback = strings.TrimSpace(inner[idx+1:])
 
 				return name, fallback, name != ""
 			}
@@ -1693,28 +1709,28 @@ func parseVarFn(v string) (name, fallback string, ok bool) {
 // Unresolved var() uses the CSS fallback when present; otherwise the empty
 // string (caller treats as invalid / keeps the prior cascaded value).
 // Nested var() expands up to a small depth.
-func ResolveVar(v string, lookup func(name string) (string, bool)) string {
-	v = strings.TrimSpace(v)
+func ResolveVar(val_2 string, lookup func(name string) (string, bool)) string {
+	val_2 = strings.TrimSpace(val_2)
 	for range 16 {
-		if !strings.HasPrefix(strings.ToLower(v), "var(") {
-			return v
+		if !strings.HasPrefix(strings.ToLower(val_2), "var(") {
+			return val_2
 		}
 
-		name, fallback, ok := parseVarFn(v)
+		name, fallback, ok := parseVarFn(val_2)
 		if !ok {
-			return v
+			return val_2
 		}
 
 		if lookup != nil {
 			if val, found := lookup(name); found && strings.TrimSpace(val) != "" {
-				v = strings.TrimSpace(val)
+				val_2 = strings.TrimSpace(val)
 
 				continue
 			}
 		}
 
 		if fallback != "" {
-			v = fallback
+			val_2 = fallback
 
 			continue
 		}
@@ -1722,7 +1738,7 @@ func ResolveVar(v string, lookup func(name string) (string, bool)) string {
 		return ""
 	}
 
-	return v
+	return val_2
 }
 
 // ResolveCustomProps walks a custom-property graph: the inherited overlay
@@ -1791,18 +1807,18 @@ func isHex(s string) bool {
 	return true
 }
 
-func hexNibble(b byte) int {
+func hexNibble(buf byte) int {
 	switch {
-	case b >= '0' && b <= '9':
-		n := int(b - '0')
+	case buf >= '0' && buf <= '9':
+		n := int(buf - '0')
 
 		return n*16 + n
-	case b >= 'a' && b <= 'f':
-		n := int(b-'a') + 10
+	case buf >= 'a' && buf <= 'f':
+		n := int(buf-'a') + hexLetterBase
 
 		return n*16 + n
-	case b >= 'A' && b <= 'F':
-		n := int(b-'A') + 10
+	case buf >= 'A' && buf <= 'F':
+		n := int(buf-'A') + hexLetterBase
 
 		return n*16 + n
 	}
@@ -1817,29 +1833,29 @@ func hexByte(s string) int {
 	return hi*16 + lo
 }
 
-func hexVal(b byte) int {
+func hexVal(buf byte) int {
 	switch {
-	case b >= '0' && b <= '9':
-		return int(b - '0')
-	case b >= 'a' && b <= 'f':
-		return int(b-'a') + 10
-	case b >= 'A' && b <= 'F':
-		return int(b-'A') + 10
+	case buf >= '0' && buf <= '9':
+		return int(buf - '0')
+	case buf >= 'a' && buf <= 'f':
+		return int(buf-'a') + hexLetterBase
+	case buf >= 'A' && buf <= 'F':
+		return int(buf-'A') + hexLetterBase
 	}
 
 	return 0
 }
 
-func clampByte(f float64) int {
-	if f < 0 {
+func clampByte(fVal float64) int {
+	if fVal < 0 {
 		return 0
 	}
 
-	if f > 255 {
-		return 255
+	if fVal > maxRGBChannel {
+		return maxRGBChannel
 	}
 
-	return int(f + 0.5)
+	return int(fVal + roundHalfUp)
 }
 
 // ParseFontFamily splits a font-family value on commas and trims quotes.

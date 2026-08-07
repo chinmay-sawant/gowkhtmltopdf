@@ -10,6 +10,7 @@ import (
 )
 
 func TestContainerStateEqualityIncludesFontSize(t *testing.T) {
+	t.Parallel()
 	a := sizeContainer{inlineSize: 240, fontSize: 12, names: "card"}
 	if !sameSizeContainerState(a, a) {
 		t.Fatal("identical container states should converge")
@@ -21,8 +22,9 @@ func TestContainerStateEqualityIncludesFontSize(t *testing.T) {
 }
 
 func TestSplitCrossingRectsRemapsBoxRangeAndPreservesIdentity(t *testing.T) {
-	root := &box{node: &html.Node{}, opStart: 0, opEnd: 0}
-	res := &Result{root: root, Ops: []Op{{Kind: OpFillRect, X: 10, Y: 40, W: 20, H: 30}}}
+	t.Parallel()
+	root := &box{node: &html.Node{}, opStart: 0, opEnd: 0}                                //nolint:exhaustruct // intentional zero fields
+	res := &Result{root: root, Ops: []Op{{Kind: OpFillRect, X: 10, Y: 40, W: 20, H: 30}}} //nolint:exhaustruct // intentional zero fields
 	splitCrossingRects(res, 50, nil)
 
 	if len(res.Ops) != 2 {
@@ -47,18 +49,18 @@ func TestUsedImageSizeUsesOneAspectAndConstraintPolicy(t *testing.T) {
 	var img *html.Node
 
 	var walk func(*html.Node)
-	walk = func(n *html.Node) {
-		if n == nil {
+	walk = func(node *html.Node) {
+		if node == nil {
 			return
 		}
 
-		if n.Name == "img" {
-			img = n
+		if node.Name == "img" {
+			img = node
 
 			return
 		}
 
-		for _, child := range n.Children {
+		for _, child := range node.Children {
 			walk(child)
 		}
 	}
@@ -67,10 +69,9 @@ func TestUsedImageSizeUsesOneAspectAndConstraintPolicy(t *testing.T) {
 	if img == nil {
 		t.Fatal("parsed image missing")
 	}
-
-	e := &engine{opts: Options{Width: 300}, scale: 1, imgMaxW: 80}
-	ref := &imageRef{w: 400, h: 200}
-	base := ResolvedStyle{Width: -1, WidthPercent: -1, Height: -1, HeightPercent: -1, MaxWidth: -1, MaxWidthPercent: -1, MaxHeight: -1}
+	e := &engine{opts: Options{Width: 300}, scale: 1, imgMaxW: 80}                                                                      //nolint:exhaustruct // intentional zero fields
+	ref := &imageRef{w: 400, h: 200}                                                                                                    //nolint:exhaustruct // intentional zero fields
+	base := ResolvedStyle{Width: -1, WidthPercent: -1, Height: -1, HeightPercent: -1, MaxWidth: -1, MaxWidthPercent: -1, MaxHeight: -1} //nolint:exhaustruct // intentional zero fields
 
 	got := e.usedImageSize(img, base, ref)
 	if got.w != 75 || got.h != 37.5 {
@@ -97,6 +98,7 @@ func TestUsedImageSizeUsesOneAspectAndConstraintPolicy(t *testing.T) {
 }
 
 func TestLayoutContextHonorsCancellation(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
@@ -105,28 +107,29 @@ func TestLayoutContextHonorsCancellation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = LayoutContext(ctx, root, Options{Width: 300, Height: 300})
+	_, err = LayoutContext(ctx, root, Options{Width: 300, Height: 300}) //nolint:exhaustruct // intentional zero fields
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("LayoutContext error = %v, want context.Canceled", err)
 	}
 }
 
 func TestPaintContextHonorsCancellation(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-
 	doc := pdf.NewDocument()
-	res := &Result{Width: 100, Height: 100, Ops: []Op{{Kind: OpFillRect, W: 10, H: 10}}}
+	res := &Result{Width: 100, Height: 100, Ops: []Op{{Kind: OpFillRect, W: 10, H: 10}}} //nolint:exhaustruct // intentional zero fields
 
-	err := PaintContext(ctx, doc, res, PaintOptions{PageWidth: 100, PageHeight: 100})
+	err := PaintContext(ctx, doc, res, PaintOptions{PageWidth: 100, PageHeight: 100}) //nolint:exhaustruct // intentional zero fields
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("PaintContext error = %v, want context.Canceled", err)
 	}
 }
 
 func TestShiftOpsOnlyMaintainsFlowIndex(t *testing.T) {
-	res := &Result{
-		Ops:          []Op{{Y: 10}, {Y: 20}},
+	t.Parallel()
+	res := &Result{ //nolint:exhaustruct // intentional zero fields
+		Ops:          []Op{{Y: 10}, {Y: 20}}, //nolint:exhaustruct // intentional zero fields
 		flowPageSize: 100,
 	}
 
@@ -146,8 +149,9 @@ func TestShiftOpsOnlyMaintainsFlowIndex(t *testing.T) {
 }
 
 func TestShiftFlowYNegativeMaintainsFlowIndex(t *testing.T) {
-	res := &Result{
-		Ops:          []Op{{Y: 110}, {Y: 210}},
+	t.Parallel()
+	res := &Result{ //nolint:exhaustruct // intentional zero fields
+		Ops:          []Op{{Y: 110}, {Y: 210}}, //nolint:exhaustruct // intentional zero fields
 		flowPageSize: 100,
 	}
 
@@ -171,7 +175,7 @@ func TestShiftFlowYNegativeMaintainsFlowIndex(t *testing.T) {
 }
 
 func BenchmarkUsedImageSize(b *testing.B) {
-	e := &engine{opts: Options{Width: 640}, scale: 1, imgMaxW: 320}
+	eng := &engine{opts: Options{Width: 640}, scale: 1, imgMaxW: 320} //nolint:exhaustruct // intentional zero fields
 
 	root, err := html.Parse(`<img width="400" src="x">`)
 	if err != nil {
@@ -181,50 +185,50 @@ func BenchmarkUsedImageSize(b *testing.B) {
 	var img *html.Node
 
 	var walk func(*html.Node)
-	walk = func(n *html.Node) {
-		if n == nil || img != nil {
+	walk = func(node *html.Node) {
+		if node == nil || img != nil {
 			return
 		}
 
-		if n.Name == "img" {
-			img = n
+		if node.Name == "img" {
+			img = node
 
 			return
 		}
 
-		for _, child := range n.Children {
+		for _, child := range node.Children {
 			walk(child)
 		}
 	}
 	walk(root)
 
-	st := ResolvedStyle{Width: -1, WidthPercent: -1, Height: -1, HeightPercent: -1, MaxWidth: -1, MaxWidthPercent: -1, MaxHeight: -1}
-	ref := &imageRef{w: 800, h: 400}
+	st := ResolvedStyle{Width: -1, WidthPercent: -1, Height: -1, HeightPercent: -1, MaxWidth: -1, MaxWidthPercent: -1, MaxHeight: -1} //nolint:exhaustruct // intentional zero fields
+	ref := &imageRef{w: 800, h: 400}                                                                                                  //nolint:exhaustruct // intentional zero fields
 
 	b.ReportAllocs()
 
 	for range b.N {
-		_ = e.usedImageSize(img, st, ref)
+		_ = eng.usedImageSize(img, st, ref)
 	}
 }
 
 func BenchmarkDisplayListIdentity10kOps100Pages(b *testing.B) {
 	makeResult := func() *Result {
 		ops := make([]Op, 10_000)
-		for i := range ops {
-			ops[i] = Op{
+		for idx := range ops {
+			ops[idx] = Op{ //nolint:exhaustruct // intentional zero fields
 				Kind: OpFillRect,
-				X:    float64(i % 100),
-				Y:    float64(i/100) * 100,
+				X:    float64(idx % 100),
+				Y:    float64(idx/100) * 100,
 				W:    1,
 				H:    1,
-				ID:   uint64(i + 1),
+				ID:   uint64(idx + 1),
 			}
 		}
 
-		return &Result{
+		return &Result{ //nolint:exhaustruct // intentional zero fields
 			Width: 640, Height: 10_000, Ops: ops,
-			root: &box{opStart: 0, opEnd: len(ops) - 1, h: 10_000},
+			root: &box{opStart: 0, opEnd: len(ops) - 1, height: 10_000}, //nolint:exhaustruct // intentional zero fields
 		}
 	}
 
@@ -235,7 +239,7 @@ func BenchmarkDisplayListIdentity10kOps100Pages(b *testing.B) {
 		res := makeResult()
 		doc := pdf.NewDocument()
 
-		if err := PaintContext(b.Context(), doc, res, PaintOptions{PageWidth: 640, PageHeight: 100}); err != nil {
+		if err := PaintContext(b.Context(), doc, res, PaintOptions{PageWidth: 640, PageHeight: 100}); err != nil { //nolint:exhaustruct // intentional zero fields
 			b.Fatal(err)
 		}
 

@@ -38,8 +38,8 @@ func parseSel(t *testing.T, sel string) css.Selector {
 // (page, y, x) positions.
 func fakeLocations(nodes []*html.Node, page int, y, x float64) []layout.ElementLocation {
 	var locs []layout.ElementLocation
-	for _, n := range nodes {
-		locs = append(locs, layout.ElementLocation{Node: n, Page: page, X: x, Y: y, W: 100, H: 20})
+	for _, node := range nodes {
+		locs = append(locs, layout.ElementLocation{Node: node, Page: page, X: x, Y: y, W: 100, H: 20})
 		y += 40
 	}
 
@@ -62,13 +62,14 @@ func headNodes(t *testing.T, root *html.Node) []*html.Node {
 }
 
 func TestOutlineTreeNesting(t *testing.T) {
+	t.Parallel()
 	// h1 > h2 > h1: the second h1 closes the h2 and returns to the root.
 	root := treeHTML(t, "<h1>One</h1><h2>Sub</h2><h1>Two</h1>")
 	nodes := headNodes(t, root)
-	hs := CollectHeadings(root)
-	hs = Lookup(hs, fakeLocations(nodes, 0, 10, 0))
-	AssignAnchors(hs)
-	tree := BuildTree(hs, Options{})
+	headings := CollectHeadings(root)
+	headings = Lookup(headings, fakeLocations(nodes, 0, 10, 0))
+	AssignAnchors(headings)
+	tree := BuildTree(headings, Options{}) //nolint:exhaustruct // intentional zero/partial fields
 
 	if len(tree.Children) != 2 {
 		t.Fatalf("root children = %d, want 2", len(tree.Children))
@@ -89,13 +90,14 @@ func TestOutlineTreeNesting(t *testing.T) {
 }
 
 func TestOutlineTreeSortAndClamp(t *testing.T) {
+	t.Parallel()
 	// Document order is h2, h4, h1; the h4 sits mid-page below the h2 and
 	// jumps two levels, clamping to a child of h2 at level 3.
 	root := treeHTML(t, "<h2>A</h2><h4>Deep</h4><h1>B</h1>")
 	nodes := headNodes(t, root)
-	hs := CollectHeadings(root)
-	hs = Lookup(hs, fakeLocations(nodes, 0, 10, 0))
-	tree := BuildTree(hs, Options{})
+	headings := CollectHeadings(root)
+	headings = Lookup(headings, fakeLocations(nodes, 0, 10, 0))
+	tree := BuildTree(headings, Options{}) //nolint:exhaustruct // intentional zero/partial fields
 
 	if len(tree.Children) != 2 || tree.Children[0].Heading.Title != "A" {
 		t.Fatalf("root = %v, want [A B]", tree.Children)
@@ -114,6 +116,7 @@ func TestOutlineTreeSortAndClamp(t *testing.T) {
 }
 
 func TestOutlineTreeLevelStackAcrossPages(t *testing.T) {
+	t.Parallel()
 	// Page 1 ends inside a chapter; page 2 starts with its h2: the h2 nests
 	// under the h1 from page 1 (page order governs, not document order).
 	root := treeHTML(t, "<h1>Ch</h1><h2>Late</h2>")
@@ -122,20 +125,21 @@ func TestOutlineTreeLevelStackAcrossPages(t *testing.T) {
 		{Node: nodes[0], Page: 0, X: 0, Y: 10, W: 100, H: 20},
 		{Node: nodes[1], Page: 1, X: 0, Y: 10, W: 100, H: 20},
 	}
-	hs := Lookup(CollectHeadings(root), locs)
+	headings := Lookup(CollectHeadings(root), locs)
 
-	tree := BuildTree(hs, Options{})
+	tree := BuildTree(headings, Options{}) //nolint:exhaustruct // intentional zero/partial fields
 	if len(tree.Children) != 1 || len(tree.Children[0].Children) != 1 {
 		t.Fatalf("tree = %+v, want Ch > Late", tree)
 	}
 }
 
 func TestOutlineDepth(t *testing.T) {
+	t.Parallel()
 	root := treeHTML(t, "<h1>One</h1><h2>Sub</h2><h2>Sub2</h2>")
 	nodes := headNodes(t, root)
-	hs := Lookup(CollectHeadings(root), fakeLocations(nodes, 0, 10, 0))
+	headings := Lookup(CollectHeadings(root), fakeLocations(nodes, 0, 10, 0))
 
-	tree := BuildTree(hs, Options{MaxDepth: 1})
+	tree := BuildTree(headings, Options{MaxDepth: 1}) //nolint:exhaustruct // intentional zero/partial fields
 	if len(tree.Children) != 1 {
 		t.Fatalf("root children = %d, want 1", len(tree.Children))
 	}
@@ -146,11 +150,12 @@ func TestOutlineDepth(t *testing.T) {
 }
 
 func TestOutlineExclude(t *testing.T) {
+	t.Parallel()
 	root := treeHTML(t, `<h1>Keep</h1><h1 class="hidden">Drop</h1><h1 id="x">Also</h1>`)
 	nodes := headNodes(t, root)
-	hs := Lookup(CollectHeadings(root), fakeLocations(nodes, 0, 10, 0))
+	headings := Lookup(CollectHeadings(root), fakeLocations(nodes, 0, 10, 0))
 
-	tree := BuildTree(hs, Options{Exclude: []css.Selector{
+	tree := BuildTree(headings, Options{Exclude: []css.Selector{ //nolint:exhaustruct // intentional zero/partial fields
 		parseSel(t, ".hidden"),
 		parseSel(t, "#x"),
 	}})
@@ -160,14 +165,15 @@ func TestOutlineExclude(t *testing.T) {
 }
 
 func TestOutlineExcludeNestedAndEmpty(t *testing.T) {
+	t.Parallel()
 	// Descendant/element selectors drop via css.Match; empty Exclude is a no-op.
 	root := treeHTML(t, `<div class="nav"><h2>Nav</h2></div><h1>Body</h1><h2>Sec</h2>`)
 	nodes := headNodes(t, root)
-	hs := Lookup(CollectHeadings(root), fakeLocations(nodes, 0, 10, 0))
+	headings := Lookup(CollectHeadings(root), fakeLocations(nodes, 0, 10, 0))
 
 	// Document order Nav(h2), Body(h1), Sec(h2): Nav clamps to a root child,
 	// Body is a sibling root child, Sec nests under Body.
-	tree := BuildTree(hs, Options{})
+	tree := BuildTree(headings, Options{}) //nolint:exhaustruct // intentional zero/partial fields
 	if len(tree.Children) != 2 || tree.Children[0].Heading.Title != "Nav" || tree.Children[1].Heading.Title != "Body" {
 		t.Fatalf("empty Exclude: root = %+v, want [Nav, Body]", titles(tree.Children))
 	}
@@ -176,7 +182,7 @@ func TestOutlineExcludeNestedAndEmpty(t *testing.T) {
 		t.Fatalf("empty Exclude: Body children = %+v, want [Sec]", titles(tree.Children[1].Children))
 	}
 
-	tree = BuildTree(hs, Options{Exclude: []css.Selector{parseSel(t, ".nav h2")}})
+	tree = BuildTree(headings, Options{Exclude: []css.Selector{parseSel(t, ".nav h2")}}) //nolint:exhaustruct // intentional zero/partial fields
 	if len(tree.Children) != 1 || tree.Children[0].Heading.Title != "Body" {
 		t.Fatalf("after .nav h2: root = %+v, want [Body]", titles(tree.Children))
 	}
@@ -186,7 +192,7 @@ func TestOutlineExcludeNestedAndEmpty(t *testing.T) {
 	}
 
 	// Element selector drops every h2, leaving only the h1.
-	tree = BuildTree(hs, Options{Exclude: []css.Selector{parseSel(t, "h2")}})
+	tree = BuildTree(headings, Options{Exclude: []css.Selector{parseSel(t, "h2")}}) //nolint:exhaustruct // intentional zero/partial fields
 	if len(tree.Children) != 1 || tree.Children[0].Heading.Title != "Body" || len(tree.Children[0].Children) != 0 {
 		t.Fatalf("after h2: tree = %+v, want [Body] with no children", titles(tree.Children))
 	}
@@ -196,9 +202,9 @@ func TestOutlineExcludeNestedAndEmpty(t *testing.T) {
 func titles(ns []*Node) []string {
 	out := make([]string, len(ns))
 
-	for i, n := range ns {
-		if n.Heading != nil {
-			out[i] = n.Heading.Title
+	for i, node := range ns {
+		if node.Heading != nil {
+			out[i] = node.Heading.Title
 		}
 	}
 
@@ -206,18 +212,19 @@ func titles(ns []*Node) []string {
 }
 
 func TestSortHeadings(t *testing.T) {
+	t.Parallel()
 	root := treeHTML(t, "<h1>A</h1><h2>B</h2><h1>C</h1>")
 	nodes := headNodes(t, root)
-	hs := CollectHeadings(root)
+	headings := CollectHeadings(root)
 	locs := []layout.ElementLocation{
 		{Node: nodes[0], Page: 1, X: 5, Y: 30, W: 100, H: 20},
 		{Node: nodes[1], Page: 0, X: 0, Y: 10, W: 100, H: 20},
 		{Node: nodes[2], Page: 1, X: 5, Y: 10, W: 100, H: 20},
 	}
-	hs = Lookup(hs, locs)
+	headings = Lookup(headings, locs)
 
 	// Deliberately out of order: page 1 before page 0; C (y=10) before A (y=30).
-	reversed := []*Heading{hs[0], hs[2], hs[1]}
+	reversed := []*Heading{headings[0], headings[2], headings[1]}
 	SortHeadings(reversed)
 
 	got := []string{}
@@ -234,14 +241,15 @@ func TestSortHeadings(t *testing.T) {
 }
 
 func TestSectionOf(t *testing.T) {
+	t.Parallel()
 	root := treeHTML(t, "<h1>Intro</h1><h2>Deep</h2><h1>Body</h1>")
 	nodes := headNodes(t, root)
-	hs := Lookup(CollectHeadings(root), []layout.ElementLocation{
+	headings := Lookup(CollectHeadings(root), []layout.ElementLocation{
 		{Node: nodes[0], Page: 0, X: 0, Y: 10, W: 100, H: 20},
 		{Node: nodes[1], Page: 0, X: 0, Y: 50, W: 100, H: 20},
 		{Node: nodes[2], Page: 1, X: 0, Y: 10, W: 100, H: 20},
 	})
-	SortHeadings(hs)
+	SortHeadings(headings)
 
 	cases := []struct {
 		page       int
@@ -254,7 +262,7 @@ func TestSectionOf(t *testing.T) {
 		{-1, "", ""},
 	}
 	for _, c := range cases {
-		sec, sub := SectionOf(hs, c.page)
+		sec, sub := SectionOf(headings, c.page)
 		if sec != c.section || sub != c.subsection {
 			t.Errorf("SectionOf(page %d) = %q, %q; want %q, %q", c.page, sec, sub, c.section, c.subsection)
 		}
@@ -262,6 +270,8 @@ func TestSectionOf(t *testing.T) {
 }
 
 func TestCollapseWS(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		in, want string
 	}{
@@ -271,51 +281,54 @@ func TestCollapseWS(t *testing.T) {
 		{" already ", "already"},
 		{"no-space", "no-space"},
 	}
-	for _, tc := range cases {
-		if got := CollapseWS(tc.in); got != tc.want {
-			t.Errorf("CollapseWS(%q) = %q, want %q", tc.in, got, tc.want)
+	for _, testCase := range cases {
+		if got := CollapseWS(testCase.in); got != testCase.want {
+			t.Errorf("CollapseWS(%q) = %q, want %q", testCase.in, got, testCase.want)
 		}
 	}
 }
 
 func TestOutlineCollectTitlesAndAnchors(t *testing.T) {
+	t.Parallel()
 	root := treeHTML(t, "<h1>  Two   Words </h1><p>text</p><h2>Deep</h2>")
 
-	hs := CollectHeadings(root)
-	if len(hs) != 2 {
-		t.Fatalf("headings = %d, want 2", len(hs))
+	headings := CollectHeadings(root)
+	if len(headings) != 2 {
+		t.Fatalf("headings = %d, want 2", len(headings))
 	}
 
-	if hs[0].Title != "Two Words" || hs[1].Title != "Deep" {
-		t.Errorf("titles = %q, %q", hs[0].Title, hs[1].Title)
+	if headings[0].Title != "Two Words" || headings[1].Title != "Deep" {
+		t.Errorf("titles = %q, %q", headings[0].Title, headings[1].Title)
 	}
 
-	AssignAnchors(hs)
+	AssignAnchors(headings)
 
-	if !strings.HasPrefix(hs[0].Anchor, "__WKANCHOR_") || hs[0].Anchor == hs[1].Anchor {
-		t.Errorf("anchors = %q, %q", hs[0].Anchor, hs[1].Anchor)
+	if !strings.HasPrefix(headings[0].Anchor, "__WKANCHOR_") || headings[0].Anchor == headings[1].Anchor {
+		t.Errorf("anchors = %q, %q", headings[0].Anchor, headings[1].Anchor)
 	}
 }
 
 func TestLookupSkipsMissingLocations(t *testing.T) {
+	t.Parallel()
 	root := treeHTML(t, "<h1>Shown</h1><h1>Hidden</h1>")
 	nodes := headNodes(t, root)
-	hs := CollectHeadings(root)
+	headings := CollectHeadings(root)
 	// Only the first heading has a location.
 	locs := fakeLocations(nodes[:1], 0, 10, 0)
 
-	hs = Lookup(hs, locs)
-	if len(hs) != 1 || hs[0].Title != "Shown" {
-		t.Fatalf("lookup = %+v, want [Shown]", hs)
+	headings = Lookup(headings, locs)
+	if len(headings) != 1 || headings[0].Title != "Shown" {
+		t.Fatalf("lookup = %+v, want [Shown]", headings)
 	}
 }
 
 func TestDumpOutlineXML(t *testing.T) {
+	t.Parallel()
 	root := treeHTML(t, "<h1>A & B</h1><h2>Sub</h2>")
 	nodes := headNodes(t, root)
-	hs := Lookup(CollectHeadings(root), fakeLocations(nodes, 0, 10, 0))
-	AssignAnchors(hs)
-	tree := BuildTree(hs, Options{})
+	headings := Lookup(CollectHeadings(root), fakeLocations(nodes, 0, 10, 0))
+	AssignAnchors(headings)
+	tree := BuildTree(headings, Options{}) //nolint:exhaustruct // intentional zero/partial fields
 	xml := DumpOutlineXML(tree)
 
 	for _, want := range []string{
@@ -332,17 +345,18 @@ func TestDumpOutlineXML(t *testing.T) {
 }
 
 func TestExplicitDocumentPageOrderingDoesNotMutateLocalPage(t *testing.T) {
+	t.Parallel()
 	root := treeHTML(t, "<h1>First in document</h1><h1>Second in document</h1>")
 	nodes := headNodes(t, root)
-	hs := Lookup(CollectHeadings(root), []layout.ElementLocation{
+	headings := Lookup(CollectHeadings(root), []layout.ElementLocation{
 		{Node: nodes[0], Page: 3, X: 0, Y: 10, W: 100, H: 20},
 		{Node: nodes[1], Page: 0, X: 0, Y: 10, W: 100, H: 20},
 	})
-	hs[0].DocPage = 0
-	hs[1].DocPage = 2
-	localPages := []int{hs[0].Page, hs[1].Page}
+	headings[0].DocPage = 0
+	headings[1].DocPage = 2
+	localPages := []int{headings[0].Page, headings[1].Page}
 
-	tree := BuildTreeBy(hs, Options{}, DocumentPage)
+	tree := BuildTreeBy(headings, Options{}, DocumentPage) //nolint:exhaustruct // intentional zero/partial fields
 	if got := tree.Children[0].Heading.Title; got != "First in document" {
 		t.Fatalf("first heading = %q, want First in document", got)
 	}
@@ -351,13 +365,13 @@ func TestExplicitDocumentPageOrderingDoesNotMutateLocalPage(t *testing.T) {
 		t.Fatalf("second heading = %q, want Second in document", got)
 	}
 
-	if hs[0].Page != localPages[0] || hs[1].Page != localPages[1] {
-		t.Fatalf("document ordering mutated local pages: got %d,%d want %d,%d", hs[0].Page, hs[1].Page, localPages[0], localPages[1])
+	if headings[0].Page != localPages[0] || headings[1].Page != localPages[1] {
+		t.Fatalf("document ordering mutated local pages: got %d,%d want %d,%d", headings[0].Page, headings[1].Page, localPages[0], localPages[1])
 	}
 
-	SortHeadingsBy(hs, DocumentPage)
+	SortHeadingsBy(headings, DocumentPage)
 
-	section, subsection := SectionOfBy(hs, 1, DocumentPage)
+	section, subsection := SectionOfBy(headings, 1, DocumentPage)
 	if section != "First in document" || subsection != "First in document" {
 		t.Errorf("SectionOfBy = %q, %q", section, subsection)
 	}
@@ -373,12 +387,13 @@ func TestExplicitDocumentPageOrderingDoesNotMutateLocalPage(t *testing.T) {
 }
 
 func TestNilPageAccessorUsesLocalPage(t *testing.T) {
+	t.Parallel()
 	root := treeHTML(t, "<h1>Local</h1>")
 	node := headNodes(t, root)[0]
-	hs := Lookup(CollectHeadings(root), []layout.ElementLocation{{Node: node, Page: 4, X: 0, Y: 0, W: 1, H: 1}})
-	SortHeadingsBy(hs, nil)
+	headings := Lookup(CollectHeadings(root), []layout.ElementLocation{{Node: node, Page: 4, X: 0, Y: 0, W: 1, H: 1}})
+	SortHeadingsBy(headings, nil)
 
-	xml := DumpOutlineXMLBy(BuildTreeBy(hs, Options{}, nil), 0, nil)
+	xml := DumpOutlineXMLBy(BuildTreeBy(headings, Options{}, nil), 0, nil) //nolint:exhaustruct // intentional zero/partial fields
 	if !bytes.Contains(xml, []byte(`page="5"`)) {
 		t.Errorf("nil accessor should use local page:\n%s", xml)
 	}

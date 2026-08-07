@@ -10,7 +10,8 @@ import (
 // TestLinkAnnotationHasHitHeight: URI link ops must cover the glyph box so
 // PDF viewers give a usable hover/click target (not a zero-height line).
 func TestLinkAnnotationHasHitHeight(t *testing.T) {
-	s := sheet(t, `
+	t.Parallel()
+	cssSheet := sheet(t, `
 body { margin: 0; font-size: 12pt; }
 a { color: inherit; text-decoration: underline; }
 `)
@@ -19,9 +20,8 @@ a { color: inherit; text-decoration: underline; }
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	res, err := Layout(root, Options{
-		Width: 400, Height: 200, Sheets: []*css.Stylesheet{s},
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 400, Height: 200, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true,
 	})
 	if err != nil {
@@ -30,15 +30,15 @@ a { color: inherit; text-decoration: underline; }
 
 	var linkH, textSize float64
 
-	for _, op := range res.Ops {
-		if op.Kind == OpLinkURI && op.URI != "" {
-			if op.H > linkH {
-				linkH = op.H
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind == OpLinkURI && paintOp.URI != "" {
+			if paintOp.H > linkH {
+				linkH = paintOp.H
 			}
 		}
 
-		if op.Kind == OpText && op.Size > textSize {
-			textSize = op.Size
+		if paintOp.Kind == OpText && paintOp.Size > textSize {
+			textSize = paintOp.Size
 		}
 	}
 
@@ -51,15 +51,16 @@ a { color: inherit; text-decoration: underline; }
 
 // TestUnderlineSitsBelowDescenders: underline Y must be below the text baseline.
 func TestUnderlineSitsBelowDescenders(t *testing.T) {
-	s := sheet(t, `a { text-decoration: underline; font-size: 14pt; }`)
+	t.Parallel()
+	cssSheet := sheet(t, `a { text-decoration: underline; font-size: 14pt; }`)
 
 	root, err := html.Parse(`<html><body><a href="https://example.com">gyp</a></body></html>`)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{
-		Width: 200, Height: 100, Sheets: []*css.Stylesheet{s}, Media: "print",
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 200, Height: 100, Sheets: []*css.Stylesheet{cssSheet}, Media: "print",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -67,13 +68,13 @@ func TestUnderlineSitsBelowDescenders(t *testing.T) {
 
 	var baseline, underY float64
 
-	for _, op := range res.Ops {
-		if op.Kind == OpText {
-			baseline = op.Y
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind == OpText {
+			baseline = paintOp.Y
 		}
 
-		if op.Kind == OpLine && op.W > 0 && op.H == 0 {
-			underY = op.Y
+		if paintOp.Kind == OpLine && paintOp.W > 0 && paintOp.H == 0 {
+			underY = paintOp.Y
 		}
 	}
 

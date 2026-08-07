@@ -20,7 +20,7 @@ func TestFigureThumbDisplayTableKeepsImage(t *testing.T) {
 		0x00, 0x00, 0x03, 0x00, 0x01, 0x00, 0x05, 0xfe, 0xd4, 0xef, 0x00, 0x00,
 		0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
 	}
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 figure[typeof~="mw:File/Thumb"] {
   display: table;
@@ -45,8 +45,8 @@ p { margin: 0.5em 0; }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{
-		Width: 400, Height: 600, Sheets: []*css.Stylesheet{s},
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 400, Height: 600, Sheets: []*css.Stylesheet{cssSheet},
 		Background: true,
 		Images: func(src string) ([]byte, error) {
 			if strings.Contains(src, "thumb.png") {

@@ -10,7 +10,7 @@ import (
 // TestTableRowspanColumnAlignment: cells after a rowspan must stay in their
 // logical columns (wiki filmography Year rowspan is the motivating case).
 func TestTableRowspanColumnAlignment(t *testing.T) {
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 table { border-collapse: collapse; width: 400pt; }
 td, th { border: 1px solid #aaa; padding: 2pt; text-align: left; }
@@ -27,8 +27,8 @@ td, th { border: 1px solid #aaa; padding: 2pt; text-align: left; }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{
-		Width: 500, Height: 400, Sheets: []*css.Stylesheet{s},
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 500, Height: 400, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true,
 	})
 	if err != nil {
@@ -37,22 +37,22 @@ td, th { border: 1px solid #aaa; padding: 2pt; text-align: left; }
 
 	var yearX, titleX, dessertX, girlX, alleyX float64
 
-	for _, op := range res.Ops {
-		if op.Kind != OpText {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpText {
 			continue
 		}
 
 		switch {
-		case op.Text == "Year":
-			yearX = op.X
-		case op.Text == "Title":
-			titleX = op.X
-		case op.Text == "And for Dessert" || op.Text == "And for Dessert ":
-			dessertX = op.X
-		case op.Text == "Girl" || op.Text == "Girl ":
-			girlX = op.X
-		case op.Text == "Blind Alley" || op.Text == "Blind Alley ":
-			alleyX = op.X
+		case paintOp.Text == "Year":
+			yearX = paintOp.X
+		case paintOp.Text == "Title":
+			titleX = paintOp.X
+		case paintOp.Text == "And for Dessert" || paintOp.Text == "And for Dessert ":
+			dessertX = paintOp.X
+		case paintOp.Text == "Girl" || paintOp.Text == "Girl ":
+			girlX = paintOp.X
+		case paintOp.Text == "Blind Alley" || paintOp.Text == "Blind Alley ":
+			alleyX = paintOp.X
 		}
 	}
 
@@ -79,7 +79,7 @@ td, th { border: 1px solid #aaa; padding: 2pt; text-align: left; }
 // many short rows must not make rowsIntact treat the first row as multi-page
 // (bottom border at full span height) and cascade blank pages.
 func TestTableTallRowspanNoBlankPages(t *testing.T) {
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 table { border-collapse: collapse; width: 100%; }
 td, th { border: 1px solid #333; padding: 3pt; }
@@ -109,8 +109,8 @@ td, th { border: 1px solid #333; padding: 3pt; }
 
 	const pageH = 400.0
 
-	res, err := Layout(root, Options{
-		Width: 500, Height: pageH, Sheets: []*css.Stylesheet{s},
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 500, Height: pageH, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true,
 	})
 	if err != nil {

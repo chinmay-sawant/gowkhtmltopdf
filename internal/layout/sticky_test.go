@@ -28,7 +28,7 @@ func TestStickyOverflowScrollportNoPageClone(t *testing.T) {
 
 	body.WriteString(`</div></body></html>`)
 
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 .scroller { overflow: auto; background: #f5f5f5; }
 .stick {
   position: sticky;
@@ -46,9 +46,9 @@ p { margin: 4pt 0; font-size: 12pt; }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
 		Width: 400, Height: 200, Background: true,
-		Sheets: []*css.Stylesheet{s}, Media: "print",
+		Sheets: []*css.Stylesheet{cssSheet}, Media: "print",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -75,14 +75,14 @@ p { margin: 4pt 0; font-size: 12pt; }
 	var stick *box
 
 	var walk func(b *box)
-	walk = func(b *box) {
-		if b.sticky {
-			stick = b
+	walk = func(boxNode *box) {
+		if boxNode.sticky {
+			stick = boxNode
 
 			return
 		}
 
-		for _, c := range b.children {
+		for _, c := range boxNode.children {
 			walk(c)
 		}
 	}
@@ -100,13 +100,13 @@ p { margin: 4pt 0; font-size: 12pt; }
 		t.Fatalf("stickyPort overflow=%q, want auto/scroll/hidden", stick.stickyPort.style.Overflow)
 	}
 
-	for _, op := range res.Ops {
-		if op.Kind != OpText {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpText {
 			continue
 		}
 
-		if strings.Contains(op.Text, "STICKY") {
-			pagesWithSticky[int(op.Y/contentH)] = true
+		if strings.Contains(paintOp.Text, "STICKY") {
+			pagesWithSticky[int(paintOp.Y/contentH)] = true
 		}
 	}
 
@@ -117,28 +117,29 @@ p { margin: 4pt 0; font-size: 12pt; }
 }
 
 func TestStickyOverflowClampAtOffsetZero(t *testing.T) {
+	t.Parallel()
 	// At scroll offset 0, sticky top:0 inside overflow stays at natural Y when
 	// already below the scrollport top (no spurious jump to page top).
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 .scroller { overflow: hidden; width: 200pt; padding-top: 20pt; background:#eee }
 .stick { position: sticky; top: 0; height: 16pt; background:#333; color:#fff }
 `)
 	res := layoutHTML(t, `<html><body>
 <div class="scroller"><div class="stick">S</div><p>below</p></div>
-</body></html>`, s)
+</body></html>`, cssSheet)
 	doc := pdf.NewDocument()
 
 	if err := Paint(doc, res, paintOpts()); err != nil {
 		t.Fatal(err)
 	}
 
-	var sy float64
+	var startY float64
 
 	var found bool
 
 	for _, op := range res.Ops {
 		if op.Kind == OpText && strings.Contains(op.Text, "S") {
-			sy, found = op.Y, true
+			startY, found = op.Y, true
 
 			break
 		}
@@ -148,39 +149,41 @@ func TestStickyOverflowClampAtOffsetZero(t *testing.T) {
 		t.Fatal("sticky text missing")
 	}
 	// Natural position is below scroller padding — must not jump to y≈0 page top.
-	if sy < 10 {
-		t.Fatalf("sticky y=%.1f jumped toward page top; overflow scrollport at offset 0 should keep natural Y", sy)
+	if startY < 10 {
+		t.Fatalf("sticky y=%.1f jumped toward page top; overflow scrollport at offset 0 should keep natural Y", startY)
 	}
 }
 
 func TestStickyClampYTop(t *testing.T) {
-	b := &box{
+	t.Parallel()
+	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
 		sticky:       true,
 		stickyTopSet: true,
 		stickyTop:    0,
-		h:            20,
+		height:       20,
 	}
 	// Natural y=50; page [200,400): stick to page top.
-	y := clampStickyY(50, 20, 0, 500, 200, 400, b)
-	if y != 200 {
-		t.Fatalf("clampStickyY = %.1f, want 200", y)
+	posY := clampStickyY(50, 20, 0, 500, 200, 400, boxNode)
+	if posY != 200 {
+		t.Fatalf("clampStickyY = %.1f, want 200", posY)
 	}
 	// Already below sticky edge: no move.
-	y = clampStickyY(250, 20, 0, 500, 200, 400, b)
-	if y != 250 {
-		t.Fatalf("clampStickyY natural = %.1f, want 250", y)
+	posY = clampStickyY(250, 20, 0, 500, 200, 400, boxNode)
+	if posY != 250 {
+		t.Fatalf("clampStickyY natural = %.1f, want 250", posY)
 	}
 }
 
 func TestStickyClampYContainingBlockLimit(t *testing.T) {
-	b := &box{
+	t.Parallel()
+	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
 		sticky:       true,
 		stickyTopSet: true,
 		stickyTop:    0,
-		h:            30,
+		height:       30,
 	}
 	// Would stick at 200, but CB ends at 220 → clamp to 190.
-	y := clampStickyY(50, 30, 0, 220, 200, 400, b)
+	y := clampStickyY(50, 30, 0, 220, 200, 400, boxNode)
 	if y != 190 {
 		t.Fatalf("CB limit = %.1f, want 190", y)
 	}
@@ -204,7 +207,7 @@ func TestStickyTopContinuationPages(t *testing.T) {
 
 	body.WriteString(`</div></body></html>`)
 
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 .sec { background: #f5f5f5; }
 .stick {
   position: sticky;
@@ -222,9 +225,9 @@ p { margin: 4pt 0; font-size: 12pt; }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
 		Width: 400, Height: 200, Background: true,
-		Sheets: []*css.Stylesheet{s}, Media: "print",
+		Sheets: []*css.Stylesheet{cssSheet}, Media: "print",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -248,13 +251,13 @@ p { margin: 4pt 0; font-size: 12pt; }
 
 	pagesWithSticky := map[int]bool{}
 
-	for _, op := range res.Ops {
-		if op.Kind != OpText {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpText {
 			continue
 		}
 
-		if strings.Contains(op.Text, "STICKY") {
-			page := int(op.Y / contentH)
+		if strings.Contains(paintOp.Text, "STICKY") {
+			page := int(paintOp.Y / contentH)
 			pagesWithSticky[page] = true
 		}
 	}
@@ -273,7 +276,7 @@ func TestStickyContainingBlockStops(t *testing.T) {
 </div>
 <div class="after">` + strings.Repeat(`<p>after row</p>`, 40) + `</div>
 </body></html>`
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 .sec { height: 80pt; background: #eee; }
 .stick { position: sticky; top: 0; height: 20pt; background: #333; color: #fff; }
 p { margin: 2pt 0; font-size: 11pt; }
@@ -284,9 +287,9 @@ p { margin: 2pt 0; font-size: 11pt; }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
 		Width: 400, Height: 200, Background: true,
-		Sheets: []*css.Stylesheet{s}, Media: "print",
+		Sheets: []*css.Stylesheet{cssSheet}, Media: "print",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -307,14 +310,14 @@ p { margin: 2pt 0; font-size: 11pt; }
 	var stick *box
 
 	var walk func(b *box)
-	walk = func(b *box) {
-		if b.sticky {
-			stick = b
+	walk = func(boxNode *box) {
+		if boxNode.sticky {
+			stick = boxNode
 
 			return
 		}
 
-		for _, c := range b.children {
+		for _, c := range boxNode.children {
 			walk(c)
 		}
 	}
@@ -326,16 +329,16 @@ p { margin: 2pt 0; font-size: 11pt; }
 
 	cbBottom := stick.cbY + stick.cbH
 
-	for _, op := range res.Ops {
-		if op.Kind != OpText || !strings.Contains(op.Text, "STICKY") {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpText || !strings.Contains(paintOp.Text, "STICKY") {
 			continue
 		}
 
-		if op.Y > cbBottom+0.5 {
-			t.Errorf("sticky op y=%.1f past CB bottom %.1f", op.Y, cbBottom)
+		if paintOp.Y > cbBottom+0.5 {
+			t.Errorf("sticky op y=%.1f past CB bottom %.1f", paintOp.Y, cbBottom)
 		}
 		// Must not appear on pages that start after the CB ends.
-		page := int(op.Y / contentH)
+		page := int(paintOp.Y / contentH)
 		pageTop := float64(page) * contentH
 
 		if pageTop >= cbBottom-1e-6 {
@@ -345,13 +348,14 @@ p { margin: 2pt 0; font-size: 11pt; }
 }
 
 func TestStickyNotFixedReplication(t *testing.T) {
+	t.Parallel()
 	// Sticky in a short first section must not stamp onto later pages the way
 	// position:fixed does.
 	src := `<html><body>
 <div class="sec"><div class="stick">STICKY</div><p>a</p></div>
 ` + strings.Repeat(`<p>pad</p>`, 50) + `
 </body></html>`
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 .sec { height: 60pt; }
 .stick { position: sticky; top: 0; height: 18pt; background: #900; color: #fff; }
 p { margin: 3pt 0; font-size: 12pt; }
@@ -362,9 +366,9 @@ p { margin: 3pt 0; font-size: 12pt; }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
 		Width: 400, Height: 200, Background: true,
-		Sheets: []*css.Stylesheet{s}, Media: "print",
+		Sheets: []*css.Stylesheet{cssSheet}, Media: "print",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -403,24 +407,25 @@ p { margin: 3pt 0; font-size: 12pt; }
 }
 
 func TestStickyNotRelativeOffsetAtLayout(t *testing.T) {
+	t.Parallel()
 	// top inset must not shift the box during layout the way relative does.
 	s := sheet(t, `.s { position: sticky; top: 40pt; } .r { position: relative; top: 40pt; }`)
 	resS := layoutHTML(t, `<html><body><div class="s">S</div></body></html>`, s)
 	resR := layoutHTML(t, `<html><body><div class="r">R</div></body></html>`, s)
 
-	var sy, ry float64
+	var startY, ryVal float64
 
 	var gotS, gotR bool
 
 	for _, op := range resS.Ops {
 		if op.Kind == OpText && strings.Contains(op.Text, "S") {
-			sy, gotS = op.Y, true
+			startY, gotS = op.Y, true
 		}
 	}
 
 	for _, op := range resR.Ops {
 		if op.Kind == OpText && strings.Contains(op.Text, "R") {
-			ry, gotR = op.Y, true
+			ryVal, gotR = op.Y, true
 		}
 	}
 
@@ -428,8 +433,8 @@ func TestStickyNotRelativeOffsetAtLayout(t *testing.T) {
 		t.Fatalf("missing text ops sticky=%v relative=%v", gotS, gotR)
 	}
 
-	if sy >= ry-1 {
-		t.Fatalf("sticky y=%.1f should be above relative y=%.1f (relative applies top at layout)", sy, ry)
+	if startY >= ryVal-1 {
+		t.Fatalf("sticky y=%.1f should be above relative y=%.1f (relative applies top at layout)", startY, ryVal)
 	}
 }
 
@@ -459,18 +464,18 @@ func TestStickyFixture31DoesNotCloneAcrossPages(t *testing.T) {
 
 	var found28, found29, found35 bool
 
-	for _, op := range res.Ops {
-		if op.Kind != OpText {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpText {
 			continue
 		}
 
 		switch {
-		case strings.Contains(op.Text, "Row 28"):
-			found28, row28Y = true, op.Y
-		case strings.Contains(op.Text, "Row 29"):
-			found29, row29Y = true, op.Y
-		case strings.Contains(op.Text, "Row 35"):
-			found35, row35Y = true, op.Y
+		case strings.Contains(paintOp.Text, "Row 28"):
+			found28, row28Y = true, paintOp.Y
+		case strings.Contains(paintOp.Text, "Row 29"):
+			found29, row29Y = true, paintOp.Y
+		case strings.Contains(paintOp.Text, "Row 35"):
+			found35, row35Y = true, paintOp.Y
 		}
 	}
 
@@ -543,17 +548,17 @@ func TestStickyFixture31SplitFillsPreservePaintOrder(t *testing.T) {
 	sectionBefore := false
 
 	for i := range row28Idx {
-		op := res.Ops[i]
-		if op.Kind != OpFillRect || op.StickyID != 0 {
+		paintOp := res.Ops[i]
+		if paintOp.Kind != OpFillRect || paintOp.StickyID != 0 {
 			continue
 		}
 
-		if int(op.Y/contentH) != 1 {
+		if int(paintOp.Y/contentH) != 1 {
 			continue
 		}
 		// Gray section background (#eceff1).
-		if op.R > 0.9 && op.G > 0.9 && op.B > 0.9 && op.H > 50 &&
-			op.Y <= row28Y && op.Y+op.H >= row28Y {
+		if paintOp.R > 0.9 && paintOp.G > 0.9 && paintOp.B > 0.9 && paintOp.H > 50 &&
+			paintOp.Y <= row28Y && paintOp.Y+paintOp.H >= row28Y {
 			sectionBefore = true
 
 			break
@@ -568,7 +573,7 @@ func TestStickyFixture31SplitFillsPreservePaintOrder(t *testing.T) {
 	// the text (sortPaintIndices chrome-under-content).
 	pageIdxs := make([]int, 0, 32)
 
-	for i, op := range res.Ops {
+	for idx, op := range res.Ops {
 		if op.Fixed {
 			continue
 		}
@@ -577,7 +582,7 @@ func TestStickyFixture31SplitFillsPreservePaintOrder(t *testing.T) {
 			continue
 		}
 
-		pageIdxs = append(pageIdxs, i)
+		pageIdxs = append(pageIdxs, idx)
 	}
 
 	sortPaintIndices(res.Ops, pageIdxs)
@@ -596,27 +601,27 @@ func TestStickyFixture31SplitFillsPreservePaintOrder(t *testing.T) {
 		t.Fatal("Row 28 not in continuation page paint list")
 	}
 
-	for pi := row28Paint + 1; pi < len(pageIdxs); pi++ {
-		op := res.Ops[pageIdxs[pi]]
-		if op.Kind != OpFillRect {
+	for pidx := row28Paint + 1; pidx < len(pageIdxs); pidx++ {
+		paintOp := res.Ops[pageIdxs[pidx]]
+		if paintOp.Kind != OpFillRect {
 			continue
 		}
 
-		if op.Y >= row28Y || op.Y+op.H <= row28Y {
+		if paintOp.Y >= row28Y || paintOp.Y+paintOp.H <= row28Y {
 			continue
 		}
 
-		oz := 0
-		if op.ZIndexSet {
-			oz = op.ZIndex
+		opZ := 0
+		if paintOp.ZIndexSet {
+			opZ = paintOp.ZIndex
 		}
 
-		if oz >= 1 {
+		if opZ >= 1 {
 			continue
 		}
 
 		t.Errorf("paint-order: fill op[%d] after Row 28 covers baseline with z=%d",
-			pageIdxs[pi], oz)
+			pageIdxs[pidx], opZ)
 	}
 }
 
@@ -636,15 +641,15 @@ func TestStickyFixture31AfterSectionNotCovered(t *testing.T) {
 
 	var found35 bool
 
-	for i, op := range res.Ops {
-		if op.Kind == OpText && strings.Contains(op.Text, "After the section") {
+	for i, paintOp := range res.Ops {
+		if paintOp.Kind == OpText && strings.Contains(paintOp.Text, "After the section") {
 			afterIdx = i
-			afterY = op.Y
-			afterText = op.Text
+			afterY = paintOp.Y
+			afterText = paintOp.Text
 		}
 
-		if op.Kind == OpText && strings.Contains(op.Text, "Row 35") {
-			row35Y = op.Y
+		if paintOp.Kind == OpText && strings.Contains(paintOp.Text, "Row 35") {
+			row35Y = paintOp.Y
 			found35 = true
 		}
 	}
@@ -671,30 +676,30 @@ func TestStickyFixture31AfterSectionNotCovered(t *testing.T) {
 
 	// Section gray must end at its own bottom border and never continue behind
 	// the following sibling's margin/box.
-	for i := range len(res.Ops) {
-		op := res.Ops[i]
-		if op.Kind != OpFillRect || !nearRGB(&op, 0.925, 0.937, 0.945) {
+	for idx := range len(res.Ops) {
+		paintOp := res.Ops[idx]
+		if paintOp.Kind != OpFillRect || !nearRGB(&paintOp, 0.925, 0.937, 0.945) {
 			continue
 		}
 
-		if op.Y >= afterY || op.Y+op.H <= afterY {
+		if paintOp.Y >= afterY || paintOp.Y+paintOp.H <= afterY {
 			continue
 		}
 
 		t.Errorf("op[%d] section fill covers After-text band (y=%.2f h=%.2f afterY=%.2f)",
-			i, op.Y, op.H, afterY)
+			idx, paintOp.Y, paintOp.H, afterY)
 	}
 
 	var sectionBottom *Op
 
 	for i := range res.Ops {
-		op := &res.Ops[i]
-		if op.Kind != OpLine || op.H >= 1 || op.W < 500 || !nearRGB(op, 0.271, 0.353, 0.392) || op.Y >= afterY {
+		paintOp := &res.Ops[i]
+		if paintOp.Kind != OpLine || paintOp.H >= 1 || paintOp.W < 500 || !nearRGB(paintOp, 0.271, 0.353, 0.392) || paintOp.Y >= afterY {
 			continue
 		}
 
-		if sectionBottom == nil || op.Y > sectionBottom.Y {
-			sectionBottom = op
+		if sectionBottom == nil || paintOp.Y > sectionBottom.Y {
+			sectionBottom = paintOp
 		}
 	}
 
@@ -712,14 +717,14 @@ func paintFixture31(t *testing.T) (*Result, float64, *pdf.Document) {
 	}
 
 	htmlSrc := string(src)
-	si := strings.Index(htmlSrc, "<style>")
-	sj := strings.Index(htmlSrc, "</style>")
+	sidx := strings.Index(htmlSrc, "<style>")
+	sjd := strings.Index(htmlSrc, "</style>")
 
-	if si < 0 || sj < 0 {
+	if sidx < 0 || sjd < 0 {
 		t.Fatal("fixture missing <style>")
 	}
 
-	sheet, err := css.Parse(htmlSrc[si+7 : sj])
+	sheet, err := css.Parse(htmlSrc[sidx+7 : sjd])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -730,11 +735,11 @@ func paintFixture31(t *testing.T) (*Result, float64, *pdf.Document) {
 	}
 
 	pageW, pageH := 595.28, 841.89
-	m := 28.35
-	contentW := pageW - 2*m
-	contentH := pageH - 2*m
+	mat := 28.35
+	contentW := pageW - 2*mat
+	contentH := pageH - 2*mat
 
-	res, err := Layout(root, Options{
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
 		Width: contentW, Height: contentH, Background: true,
 		Sheets: []*css.Stylesheet{sheet}, Media: "print",
 	})
@@ -745,7 +750,7 @@ func paintFixture31(t *testing.T) (*Result, float64, *pdf.Document) {
 	doc := pdf.NewDocument()
 	if err := Paint(doc, res, PaintOptions{
 		PageWidth: pageW, PageHeight: pageH,
-		MarginTop: m, MarginBottom: m, MarginLeft: m, MarginRight: m,
+		MarginTop: mat, MarginBottom: mat, MarginLeft: mat, MarginRight: mat,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -780,19 +785,19 @@ func TestStickyFixture31Row28HasWhiteBackground(t *testing.T) {
 
 	var white Op
 
-	for _, op := range res.Ops {
-		if op.Kind != OpFillRect || op.H < 5 || op.H > 40 {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpFillRect || paintOp.H < 5 || paintOp.H > 40 {
 			continue
 		}
 
-		if op.R < 0.99 || op.G < 0.99 || op.B < 0.99 {
+		if paintOp.R < 0.99 || paintOp.G < 0.99 || paintOp.B < 0.99 {
 			continue
 		}
 		// Must cover the text band AND start above the baseline so section
 		// gray cannot show through ascenders/padding (was clamped to text Y).
-		if op.Y <= row28Y-2 && op.Y+op.H >= row28Y+4 {
+		if paintOp.Y <= row28Y-2 && paintOp.Y+paintOp.H >= row28Y+4 {
 			covered = true
-			white = op
+			white = paintOp
 
 			break
 		}
@@ -810,13 +815,13 @@ func TestStickyFixture31NoOrphanRowsOnPage1(t *testing.T) {
 
 	var last0 float64
 
-	for _, op := range res.Ops {
-		if op.Kind != OpText || op.Fixed || int(op.Y/contentH) != 0 {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpText || paintOp.Fixed || int(paintOp.Y/contentH) != 0 {
 			continue
 		}
 
-		if op.Y > last0 {
-			last0 = op.Y
+		if paintOp.Y > last0 {
+			last0 = paintOp.Y
 		}
 	}
 
@@ -826,48 +831,48 @@ func TestStickyFixture31NoOrphanRowsOnPage1(t *testing.T) {
 
 	lastBot := last0 + 14
 
-	for i, op := range res.Ops {
-		if op.Fixed || op.StickyID != 0 || int(op.Y/contentH) != 0 {
+	for idx, paintOp := range res.Ops {
+		if paintOp.Fixed || paintOp.StickyID != 0 || int(paintOp.Y/contentH) != 0 {
 			continue
 		}
 
-		if op.Kind == OpFillRect && op.H > 0.5 && op.H <= 40 && op.Y+op.H/2 > lastBot+1 {
+		if paintOp.Kind == OpFillRect && paintOp.H > 0.5 && paintOp.H <= 40 && paintOp.Y+paintOp.H/2 > lastBot+1 {
 			t.Errorf("op[%d] orphan row fill y=%.2f h=%.2f below last text bot %.2f",
-				i, op.Y, op.H, lastBot)
+				idx, paintOp.Y, paintOp.H, lastBot)
 		}
 	}
 
-	for i, op := range res.Ops {
-		if op.Fixed || op.Kind != OpFillRect || int(op.Y/contentH) != 0 ||
-			!nearRGB(&op, 0.925, 0.937, 0.945) || op.H <= 40 {
+	for idx, paintOp := range res.Ops {
+		if paintOp.Fixed || paintOp.Kind != OpFillRect || int(paintOp.Y/contentH) != 0 ||
+			!nearRGB(&paintOp, 0.925, 0.937, 0.945) || paintOp.H <= 40 {
 			continue
 		}
 
-		if op.Y+op.H > last0+20 {
-			t.Errorf("op[%d] sticky section fill extends %.2fpt below last page-0 row", i, op.Y+op.H-last0)
+		if paintOp.Y+paintOp.H > last0+20 {
+			t.Errorf("op[%d] sticky section fill extends %.2fpt below last page-0 row", idx, paintOp.Y+paintOp.H-last0)
 		}
 	}
 
-	for i, op := range res.Ops {
-		if op.Fixed || op.Kind != OpLine || int(op.Y/contentH) != 0 || op.W > 1 ||
-			op.H <= 40 || !nearRGB(&op, 0.271, 0.353, 0.392) {
+	for idx, paintOp := range res.Ops {
+		if paintOp.Fixed || paintOp.Kind != OpLine || int(paintOp.Y/contentH) != 0 || paintOp.W > 1 ||
+			paintOp.H <= 40 || !nearRGB(&paintOp, 0.271, 0.353, 0.392) {
 			continue
 		}
 
-		if op.Y+op.H > last0+20 {
-			t.Errorf("op[%d] sticky section side border extends %.2fpt below last page-0 row", i, op.Y+op.H-last0)
+		if paintOp.Y+paintOp.H > last0+20 {
+			t.Errorf("op[%d] sticky section side border extends %.2fpt below last page-0 row", idx, paintOp.Y+paintOp.H-last0)
 		}
 	}
 
 	closed := false
 
-	for _, op := range res.Ops {
-		if op.Fixed || op.Kind != OpLine || int(op.Y/contentH) != 0 || op.H >= 1 || op.W < 500 ||
-			!nearRGB(&op, 0.271, 0.353, 0.392) {
+	for _, paintOp := range res.Ops {
+		if paintOp.Fixed || paintOp.Kind != OpLine || int(paintOp.Y/contentH) != 0 || paintOp.H >= 1 || paintOp.W < 500 ||
+			!nearRGB(&paintOp, 0.271, 0.353, 0.392) {
 			continue
 		}
 
-		if op.Y >= last0 && op.Y <= last0+20 {
+		if paintOp.Y >= last0 && paintOp.Y <= last0+20 {
 			closed = true
 
 			break

@@ -66,40 +66,40 @@ func applyTOCLinks(doc *pdf.Document, tocs []*objectState, bodies []*objectState
 		}
 	}
 
-	for _, tr := range tocs {
-		if !tr.toc.ForwardLinks && !tr.toc.BackLinks {
+	for _, trVal := range tocs {
+		if !trVal.toc.ForwardLinks && !trVal.toc.BackLinks {
 			continue
 		}
 
-		entryLocs := tocAnchorLocations(tr.tocRoot, tr.tocRes)
+		entryLocs := tocAnchorLocations(trVal.tocRoot, trVal.tocRes)
 		for anchor, eloc := range entryLocs {
-			h := byAnchor[anchor]
-			if h == nil {
+			hVal := byAnchor[anchor]
+			if hVal == nil {
 				continue
 			}
 
-			srcPage := doc.PageAt(tr.start + eloc.Page)
+			srcPage := doc.PageAt(trVal.start + eloc.Page)
 			if srcPage == nil {
 				continue
 			}
 
-			docPage := h.DocPage
+			docPage := hVal.DocPage
 
-			if tr.toc.ForwardLinks {
+			if trVal.toc.ForwardLinks {
 				// TOC entry → heading
-				destX, destY := headingDest(h, bodies)
-				srcPage.AddLinkDest(tr.geom.pdfRect(eloc), tocTotal+docPage, destX, destY)
+				destX, destY := headingDest(hVal, bodies)
+				srcPage.AddLinkDest(trVal.geom.pdfRect(eloc), tocTotal+docPage, destX, destY)
 			}
 
-			if tr.toc.BackLinks {
+			if trVal.toc.BackLinks {
 				// heading → TOC entry
-				destPage := tr.start + eloc.Page
-				destX, destY := tr.geom.pdfXY(eloc)
+				destPage := trVal.start + eloc.Page
+				destX, destY := trVal.geom.pdfXY(eloc)
 
 				if st := bodyStateFor(bodies, docPage); st != nil {
 					if page := doc.PageAt(tocTotal + docPage); page != nil {
 						locPage := docPage - st.offset
-						hLoc := layout.ElementLocation{Page: locPage, X: h.X, Y: h.Y, W: h.W, H: h.H}
+						hLoc := layout.ElementLocation{Page: locPage, X: hVal.X, Y: hVal.Y, W: hVal.W, H: hVal.H} //nolint:exhaustruct // intentional zero-value fields
 						page.AddLinkDest(st.geom.pdfRect(hLoc), destPage, destX, destY)
 					}
 				}
@@ -110,17 +110,17 @@ func applyTOCLinks(doc *pdf.Document, tocs []*objectState, bodies []*objectState
 
 // headingDest returns the PDF destination (x, y-up) of a heading's top-left
 // corner using the heading's own geometry (no location scan).
-func headingDest(h *outline.Heading, bodies []*objectState) (float64, float64) {
-	docPage := h.DocPage
+func headingDest(hVal *outline.Heading, bodies []*objectState) (float64, float64) {
+	docPage := hVal.DocPage
 
-	st := bodyStateFor(bodies, docPage)
-	if st == nil {
+	state := bodyStateFor(bodies, docPage)
+	if state == nil {
 		return 0, 0
 	}
 
-	locPage := docPage - st.offset
+	locPage := docPage - state.offset
 
-	return st.geom.pdfXY(layout.ElementLocation{Page: locPage, X: h.X, Y: h.Y, W: h.W, H: h.H})
+	return state.geom.pdfXY(layout.ElementLocation{Page: locPage, X: hVal.X, Y: hVal.Y, W: hVal.W, H: hVal.H}) //nolint:exhaustruct // intentional zero-value fields
 }
 
 // bodyIDDest is one body element destination keyed by id attribute.
@@ -135,18 +135,18 @@ type bodyIDDest struct {
 func buildBodyIDIndex(bodies []*objectState) map[string]bodyIDDest {
 	idLoc := map[string]bodyIDDest{}
 
-	for _, st := range bodies {
-		if st == nil || st.res == nil {
+	for _, state := range bodies {
+		if state == nil || state.res == nil {
 			continue
 		}
 
-		for _, loc := range st.res.Locations {
+		for _, loc := range state.res.Locations {
 			if loc.Node == nil {
 				continue
 			}
 
 			if id := loc.Node.Attribute("id"); id != "" {
-				idLoc[id] = bodyIDDest{st, loc}
+				idLoc[id] = bodyIDDest{state, loc}
 			}
 		}
 	}
@@ -163,7 +163,7 @@ func logicalDestPage(dest bodyIDDest, tocTotal int) int {
 // document page index in the same copy group as srcPage. Thin wrapper over
 // pagePlan.Remap kept for unit tests.
 func remapPageForCopies(logicalDest, srcPage, logicalN, copies int, collate bool) int {
-	pp := &pagePlan{copies: copies, collate: collate, owners: make([]pageOwner, logicalN)}
+	pp := &pagePlan{copies: copies, collate: collate, owners: make([]pageOwner, logicalN)} //nolint:exhaustruct // intentional zero-value fields
 
 	return pp.Remap(logicalDest, srcPage)
 }
@@ -178,21 +178,21 @@ func applyInternalLinks(doc *pdf.Document, bodies []*objectState, tocTotal int) 
 
 	idLoc := buildBodyIDIndex(bodies)
 
-	for _, st := range bodies {
-		if st == nil || st.res == nil || st.geom.contentH <= 0 {
+	for _, state := range bodies {
+		if state == nil || state.res == nil || state.geom.contentH <= 0 {
 			continue
 		}
 
-		useLocal := st.obj.LocalLinks
+		useLocal := state.obj.LocalLinks
 
-		for i := range st.res.Ops {
-			op := &st.res.Ops[i]
-			if op.Kind != layout.OpLinkURI || !strings.HasPrefix(op.URI, "#") {
+		for i := range state.res.Ops {
+			oper := &state.res.Ops[i]
+			if oper.Kind != layout.OpLinkURI || !strings.HasPrefix(oper.URI, "#") {
 				continue
 			}
 
-			frag := strings.TrimPrefix(op.URI, "#")
-			layout.DeactivateOp(op)
+			frag := strings.TrimPrefix(oper.URI, "#")
+			layout.DeactivateOp(oper)
 
 			if !useLocal || frag == "" {
 				continue
@@ -203,16 +203,16 @@ func applyInternalLinks(doc *pdf.Document, bodies []*objectState, tocTotal int) 
 				continue
 			}
 
-			srcPageIdx := tocTotal + st.offset + int(op.Y/st.geom.contentH)
+			srcPageIdx := tocTotal + state.offset + int(oper.Y/state.geom.contentH)
 
 			srcPage := doc.PageAt(srcPageIdx)
 			if srcPage == nil {
 				continue
 			}
 
-			srcLoc := layout.ElementLocation{
-				Page: int(op.Y / st.geom.contentH),
-				X:    op.X, Y: op.Y, W: op.W, H: op.H,
+			srcLoc := layout.ElementLocation{ //nolint:exhaustruct // intentional zero-value fields
+				Page: int(oper.Y / state.geom.contentH),
+				X:    oper.X, Y: oper.Y, W: oper.W, H: oper.H,
 			}
 			if srcLoc.H <= 0 {
 				srcLoc.H = 10
@@ -224,7 +224,7 @@ func applyInternalLinks(doc *pdf.Document, bodies []*objectState, tocTotal int) 
 
 			destPage := logicalDestPage(dest, tocTotal)
 			dx, dy := dest.st.geom.pdfXY(dest.loc)
-			srcPage.AddLinkDest(st.geom.pdfRect(srcLoc), destPage, dx, dy)
+			srcPage.AddLinkDest(state.geom.pdfRect(srcLoc), destPage, dx, dy)
 		}
 	}
 }

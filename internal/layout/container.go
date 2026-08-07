@@ -28,7 +28,7 @@ func findSizeContainer(n *html.Node, name string, containers map[*html.Node]size
 		}
 	}
 
-	return sizeContainer{}, false
+	return sizeContainer{}, false //nolint:exhaustruct // intentional zero fields
 }
 
 // measureSizeContainers walks the tree top-down and records used content-box
@@ -39,27 +39,27 @@ func measureSizeContainers(root *html.Node, styles map[*html.Node]ResolvedStyle,
 	out := map[*html.Node]sizeContainer{}
 
 	var walk func(n *html.Node, availW float64)
-	walk = func(n *html.Node, availW float64) {
-		if n.Type != html.ElementNode {
+	walk = func(node *html.Node, availW float64) {
+		if node.Type != html.ElementNode {
 			return
 		}
 
-		st := styles[n]
-		if st.Display == "none" {
+		sty := styles[node]
+		if sty.Display == "none" {
 			return
 		}
 
-		borderW := contentInlineSize(st, availW)
-		if st.ContainerType == "inline-size" || st.ContainerType == "size" {
-			out[n] = sizeContainer{
+		borderW := contentInlineSize(sty, availW)
+		if sty.ContainerType == "inline-size" || sty.ContainerType == "size" {
+			out[node] = sizeContainer{
 				inlineSize: borderW,
-				fontSize:   st.FontSize,
-				names:      st.ContainerName,
+				fontSize:   sty.FontSize,
+				names:      sty.ContainerName,
 			}
 		}
 
 		childAvail := borderW
-		for _, c := range n.Children {
+		for _, c := range node.Children {
 			walk(c, childAvail)
 		}
 	}
@@ -72,45 +72,45 @@ func measureSizeContainers(root *html.Node, styles map[*html.Node]ResolvedStyle,
 // given containing-block availW, mirroring buildBlock without laying out
 // children. Size-contained boxes use this definite width for @container.
 func contentInlineSize(st ResolvedStyle, availW float64) float64 {
-	ml, mr := st.MarginLeft, st.MarginRight
+	margR, margR2 := st.MarginLeft, st.MarginRight
 	if st.MarginLeftAuto {
-		ml = 0
+		margR = 0
 	}
 
 	if st.MarginRightAuto {
-		mr = 0
+		margR2 = 0
 	}
 
-	w := availW - ml - mr
-	if w < 0 {
-		w = 0
+	width := availW - margR - margR2
+	if width < 0 {
+		width = 0
 	}
 
 	definiteW := st.Width >= 0 || st.WidthPercent >= 0
 
 	if st.WidthPercent >= 0 {
 		if availW > 0 && availW < 1e12 {
-			w = availW * st.WidthPercent / 100
+			width = availW * st.WidthPercent / cssPercent
 		} else {
 			definiteW = false
 		}
 	} else if st.Width >= 0 {
-		w = st.Width
+		width = st.Width
 	}
 
 	if definiteW && st.BoxSizing != "border-box" {
-		w += st.PaddingLeft + st.PaddingRight + st.BorderLeft.Width + st.BorderRight.Width
+		width += st.PaddingLeft + st.PaddingRight + st.BorderLeft.Width + st.BorderRight.Width
 	}
 
-	if st.MinWidth > 0 && w < st.MinWidth {
-		w = st.MinWidth
+	if st.MinWidth > 0 && width < st.MinWidth {
+		width = st.MinWidth
 	}
 
-	if st.MaxWidth >= 0 && w > st.MaxWidth {
-		w = st.MaxWidth
+	if st.MaxWidth >= 0 && width > st.MaxWidth {
+		width = st.MaxWidth
 	}
 
-	contentW := w - st.PaddingLeft - st.PaddingRight - st.BorderLeft.Width - st.BorderRight.Width
+	contentW := width - st.PaddingLeft - st.PaddingRight - st.BorderLeft.Width - st.BorderRight.Width
 	if contentW < 0 {
 		contentW = 0
 	}

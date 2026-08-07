@@ -15,7 +15,7 @@ import (
 // continuation page (under repeated thead) must form a closed outer strip —
 // full-width top edge across all columns, including Year/Org rowspan holes.
 func TestRowspanContinuationPageClosedOuterBorders(t *testing.T) {
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 table { border-collapse: collapse; width: 400pt; }
 td, th { border: 1px solid #333; padding: 3pt; }
@@ -48,8 +48,8 @@ td, th { border: 1px solid #333; padding: 3pt; }
 		pageW = 500.0
 	)
 
-	res, err := Layout(root, Options{
-		Width: pageW, Height: pageH, Sheets: []*css.Stylesheet{s},
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: pageW, Height: pageH, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true,
 	})
 	if err != nil {
@@ -71,14 +71,14 @@ td, th { border: 1px solid #333; padding: 3pt; }
 	// as a body year on the same band.
 	opPage := make([]int, len(res.Ops))
 
-	for i, op := range res.Ops {
-		if op.Fixed {
-			opPage[i] = -1
+	for idx, paintOp := range res.Ops {
+		if paintOp.Fixed {
+			opPage[idx] = -1
 
 			continue
 		}
 
-		opPage[i] = int(op.Y / contentH)
+		opPage[idx] = int(paintOp.Y / contentH)
 	}
 
 	type pageInfo struct {
@@ -89,24 +89,24 @@ td, th { border: 1px solid #333; padding: 3pt; }
 
 	pages := map[int]*pageInfo{}
 
-	for i, op := range res.Ops {
-		p := opPage[i]
-		if p < 0 {
+	for i, paintOp := range res.Ops {
+		page := opPage[i]
+		if page < 0 {
 			continue
 		}
 
-		info := pages[p]
+		info := pages[page]
 		if info == nil {
-			info = &pageInfo{}
-			pages[p] = info
+			info = &pageInfo{} //nolint:exhaustruct // intentional zero fields
+			pages[page] = info
 		}
 
-		if op.Kind == OpText {
-			if strings.Contains(op.Text, "Combo") || strings.Contains(op.Text, "Screen") {
+		if paintOp.Kind == OpText {
+			if strings.Contains(paintOp.Text, "Combo") || strings.Contains(paintOp.Text, "Screen") {
 				info.hasCombo = true
 			}
 
-			if op.Text == "2024" {
+			if paintOp.Text == "2024" {
 				info.has2024 = true
 			}
 		}
@@ -144,31 +144,31 @@ td, th { border: 1px solid #333; padding: 3pt; }
 
 	var horiz []struct{ x0, x1, y float64 }
 
-	for _, op := range res.Ops {
-		if op.Fixed || op.Kind != OpLine {
+	for _, paintOp := range res.Ops {
+		if paintOp.Fixed || paintOp.Kind != OpLine {
 			continue
 		}
 
-		if op.Y < pageTop-1 || op.Y > pageBot+1 {
+		if paintOp.Y < pageTop-1 || paintOp.Y > pageBot+1 {
 			// verticals may start in-band
-			if !(op.H > 2 && op.Y+op.H > pageTop && op.Y < pageBot) {
+			if !(paintOp.H > 2 && paintOp.Y+paintOp.H > pageTop && paintOp.Y < pageBot) {
 				continue
 			}
 		}
 
-		if op.H > 2 && (op.W < 1 || op.W < op.H*0.05) {
-			y0, y1 := op.Y, op.Y+op.H
+		if paintOp.H > 2 && (paintOp.W < 1 || paintOp.W < paintOp.H*0.05) {
+			y0, y1 := paintOp.Y, paintOp.Y+paintOp.H
 			if y1 < pageTop+5 {
 				continue // header-only
 			}
 
-			verts = append(verts, struct{ x, y0, y1 float64 }{op.X, y0, y1})
+			verts = append(verts, struct{ x, y0, y1 float64 }{paintOp.X, y0, y1})
 
 			continue
 		}
 
-		if op.W > 10 && op.H < 1 && op.Y >= pageTop && op.Y <= pageBot {
-			horiz = append(horiz, struct{ x0, x1, y float64 }{op.X, op.X + op.W, op.Y})
+		if paintOp.W > 10 && paintOp.H < 1 && paintOp.Y >= pageTop && paintOp.Y <= pageBot {
+			horiz = append(horiz, struct{ x0, x1, y float64 }{paintOp.X, paintOp.X + paintOp.W, paintOp.Y})
 		}
 	}
 
@@ -182,25 +182,25 @@ td, th { border: 1px solid #333; padding: 3pt; }
 	maxBodyY1 := pageTop
 	minX, maxX := verts[0].x, verts[0].x
 
-	for _, v := range verts {
-		if v.y0 < pageTop+15 {
+	for _, val := range verts {
+		if val.y0 < pageTop+15 {
 			continue // skip pure header verticals at page top
 		}
 
-		if v.y0 < minBodyY {
-			minBodyY = v.y0
+		if val.y0 < minBodyY {
+			minBodyY = val.y0
 		}
 
-		if v.y1 > maxBodyY1 {
-			maxBodyY1 = v.y1
+		if val.y1 > maxBodyY1 {
+			maxBodyY1 = val.y1
 		}
 
-		if v.x < minX {
-			minX = v.x
+		if val.x < minX {
+			minX = val.x
 		}
 
-		if v.x > maxX {
-			maxX = v.x
+		if val.x > maxX {
+			maxX = val.x
 		}
 	}
 
@@ -215,17 +215,17 @@ td, th { border: 1px solid #333; padding: 3pt; }
 
 	var topY float64
 
-	for _, h := range horiz {
-		if math.Abs(h.y-minBodyY) > eps {
+	for _, height := range horiz {
+		if math.Abs(height.y-minBodyY) > eps {
 			continue
 		}
 		// Intersection with [minX,maxX].
-		lo := math.Max(h.x0, minX)
-		hi := math.Min(h.x1, maxX)
+		lo := math.Max(height.x0, minX)
+		hi := math.Min(height.x1, maxX)
 
 		if hi > lo {
 			bestCov += hi - lo
-			topY = h.y
+			topY = height.y
 		}
 	}
 	// Allow multiple segments; total coverage should span most of the width.

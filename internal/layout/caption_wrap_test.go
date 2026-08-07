@@ -18,7 +18,7 @@ func TestCaptionPrefersWordBoundaries(t *testing.T) {
 		0x00, 0x00, 0x03, 0x00, 0x01, 0x00, 0x05, 0xfe, 0xd4, 0xef, 0x00, 0x00,
 		0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
 	}
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 body { margin: 0; font-size: 9pt; }
 figure { float: right; width: 120pt; margin: 0; }
 img { display: block; width: 120pt; height: 80pt; }
@@ -34,8 +34,8 @@ figcaption { font-size: 8pt; width: 120pt; }
 <p>Body text beside the float.</p>
 </body></html>`)
 
-	out, err := Layout(root, Options{
-		Width: 400, Height: 400, Sheets: []*css.Stylesheet{s}, Background: true,
+	out, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 400, Height: 400, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
 		Images: func(string) ([]byte, error) { return png, nil },
 	})
 	if err != nil {
@@ -100,13 +100,13 @@ figcaption { font-size: 8pt; width: 120pt; }
 // overflow-wrap:break-word must not mid-break a word that fits the full line
 // width just because remaining space on the current line is tight.
 func TestBreakWordDoesNotMidBreakFittingWord(t *testing.T) {
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 body { margin: 0; font-size: 12pt; }
 p { margin: 0; width: 140pt; overflow-wrap: break-word; }
 `)
 	// "International" fits 140pt; after "The " remainW is tight enough that a
 	// greedy mid-break would split it — we must wrap the whole word.
-	res := layoutHTML(t, `<html><body><p style="overflow-wrap:break-word">The International festival</p></body></html>`, s)
+	res := layoutHTML(t, `<html><body><p style="overflow-wrap:break-word">The International festival</p></body></html>`, cssSheet)
 
 	var texts []string
 

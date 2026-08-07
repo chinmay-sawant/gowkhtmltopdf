@@ -8,7 +8,8 @@ import (
 )
 
 func TestLogoImgHonorsCSSWidth(t *testing.T) {
-	s := sheet(t, `body{margin:0;font-size:16px}`)
+	t.Parallel()
+	cssSheet := sheet(t, `body{margin:0;font-size:16px}`)
 	// Tiny containing float must NOT crush a definite-width logo.
 	htmlSrc := `<html><body>
 <div style="width:40pt;float:left">
@@ -23,11 +24,10 @@ func TestLogoImgHonorsCSSWidth(t *testing.T) {
 	}
 
 	svg := []byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 22"><rect width="140" height="22" fill="#0e65c0"/></svg>`)
-
-	res, err := Layout(root, Options{
-		Width: 500, Height: 400, Sheets: []*css.Stylesheet{s},
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 500, Height: 400, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true,
-		Images: func(src string) ([]byte, error) { return svg, nil },
+		Images: func(_ string) ([]byte, error) { return svg, nil },
 	})
 	if err != nil {
 		t.Fatal(err)

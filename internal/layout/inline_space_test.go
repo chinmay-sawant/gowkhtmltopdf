@@ -11,6 +11,7 @@ import (
 // Adjacent inlines separated by a leading-space text node ("</a> in") must
 // keep that space after collapseWS/Fields (wiki "Reeves in", "Cuba Spain").
 func TestLeadingSpaceBetweenInlines(t *testing.T) {
+	t.Parallel()
 	s := sheet(t, `body { margin: 0; font-size: 10pt; } a { color: blue; }`)
 	res := layoutHTML(t, `<html><body>
 <p><a href="/w">Reeves</a> in her first film. <a href="/c">Cuba</a> <a href="/s">Spain</a></p>
@@ -42,7 +43,7 @@ func TestLeadingSpaceBetweenInlines(t *testing.T) {
 // The overlapping text is often a PRIOR paragraph's continuation, not the
 // heading's following sibling — so clearance must clear the whole page-top band.
 func TestPageBreakAfterAvoidNoOverwrite(t *testing.T) {
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 h3 { font-size: 12pt; margin: 8pt 0 4pt; page-break-after: avoid; }
 p { margin: 0 0 6pt 0; }
@@ -64,9 +65,8 @@ p { margin: 0 0 6pt 0; }
 	}
 
 	const pageH = 400.0
-
-	res, err := Layout(root, Options{
-		Width: 400, Height: pageH, Sheets: []*css.Stylesheet{s}, Background: true,
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 400, Height: pageH, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -77,17 +77,17 @@ p { margin: 0 0 6pt 0; }
 	var headingY, bodyY float64
 	headingY, bodyY = -1, -1
 
-	for _, op := range res.Ops {
-		if op.Kind != OpText {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpText {
 			continue
 		}
 
-		if strings.Contains(op.Text, "Transition to Hollywood") {
-			headingY = op.Y
+		if strings.Contains(paintOp.Text, "Transition to Hollywood") {
+			headingY = paintOp.Y
 		}
 
-		if strings.Contains(op.Text, "from scratch") {
-			bodyY = op.Y
+		if strings.Contains(paintOp.Text, "from scratch") {
+			bodyY = paintOp.Y
 		}
 	}
 

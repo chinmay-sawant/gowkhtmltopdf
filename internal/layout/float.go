@@ -31,7 +31,7 @@ type floatState struct {
 }
 
 func newFloatState(contentX, contentW float64) floatState {
-	return floatState{
+	return floatState{ //nolint:exhaustruct // intentional zero fields
 		contentX:  contentX,
 		contentW:  contentW,
 		leftEdge:  contentX,
@@ -91,7 +91,7 @@ func (f *floatState) clear(clear string, y, cy float64) float64 {
 // the margin box so in-flow text clears the gap before the border (e.g.
 // float:right; margin-left:1em), instead of painting flush against the frame.
 func (f *floatState) place(side string, b *box, ml, mr float64) {
-	bottom := b.y + b.h
+	bottom := b.y + b.height
 
 	switch side {
 	case "left":
@@ -173,8 +173,8 @@ func (f *floatState) clearY(top float64) float64 {
 // extentCy returns cy raised to cover any float that still protrudes below
 // the in-flow content end. Only BFC roots should apply this (CSS2.1 §10.6.7);
 // ordinary blocks leave floats protruding so later siblings can wrap.
-func (f *floatState) extentCy(y, cy float64) float64 {
-	end := y + cy
+func (f *floatState) extentCy(posY, cy float64) float64 {
+	end := posY + cy
 	if f.hasLeft && f.leftBottom > end {
 		end = f.leftBottom
 	}
@@ -183,24 +183,24 @@ func (f *floatState) extentCy(y, cy float64) float64 {
 		end = f.rightBottom
 	}
 
-	return end - y
+	return end - posY
 }
 
 // establishesBFC reports whether st creates a new block formatting context
 // that traps floats (CSS2.1 / Display 3). Descendants' floats do not affect
 // the parent BFC; the box's used height encloses its floats.
-func establishesBFC(st ResolvedStyle) bool {
-	if st.Float != "none" {
+func establishesBFC(sty ResolvedStyle) bool {
+	if sty.Float != "none" {
 		return true
 	}
 
-	switch st.Display {
+	switch sty.Display {
 	case "flow-root", "inline-block", "table-cell", "table-caption",
 		"flex", "inline-flex", "grid", "inline-grid":
 		return true
 	}
 
-	switch st.Overflow {
+	switch sty.Overflow {
 	case "hidden", "scroll", "auto", "clip":
 		return true
 	}

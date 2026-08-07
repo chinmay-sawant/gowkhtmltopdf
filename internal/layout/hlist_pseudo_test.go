@@ -7,7 +7,8 @@ import (
 
 // Wiki .hlist uses li::after{content:"\a0 · "} between citizenship entries.
 func TestHListAfterSeparator(t *testing.T) {
-	s := sheet(t, `
+	t.Parallel()
+	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 .hlist li { display: inline; margin: 0; }
 .hlist li::after { content: "\a0 · "; font-weight: bold; }
@@ -19,7 +20,7 @@ body { margin: 0; font-size: 10pt; }
 <li><a href="/s">Spain</a></li>
 <li><a href="/u">United States</a></li>
 </ul>
-</body></html>`, s)
+</body></html>`, cssSheet)
 
 	var got string
 

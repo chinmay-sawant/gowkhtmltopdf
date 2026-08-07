@@ -162,8 +162,8 @@ func drawTextHF(page *pdf.Page, hf settings.HeaderFooter, geom hfGeom, parms hfP
 		return
 	}
 
-	c := page.Content()
-	c.UseEmbeddedFont("F0", font)
+	cur := page.Content()
+	cur.UseEmbeddedFont("F0", font)
 
 	size := hf.FontSize
 	if size <= 0 {
@@ -183,39 +183,41 @@ func drawTextHF(page *pdf.Page, hf settings.HeaderFooter, geom hfGeom, parms hfP
 		baseY = spacing + descent
 	}
 
-	c.SetFillColor(0, 0, 0)
+	cur.SetFillColor(0, 0, 0)
 
 	if hf.Line {
-		ly := geom.marginBottom
+		lyVal := geom.marginBottom
 		if isHeader {
-			ly = page.Height() - geom.marginTop
+			lyVal = page.Height() - geom.marginTop
 		}
 
-		c.SetStrokeColor(0, 0, 0)
-		c.SetLineWidth(1)
-		c.MoveTo(geom.marginLeft, ly)
-		c.LineTo(page.Width()-geom.marginRight, ly)
-		c.Stroke()
+		cur.SetStrokeColor(0, 0, 0)
+		cur.SetLineWidth(1)
+		cur.MoveTo(geom.marginLeft, lyVal)
+		cur.LineTo(page.Width()-geom.marginRight, lyVal)
+		cur.Stroke()
 	}
 
-	draw := func(text string, x float64) {
+	draw := func(text string, posX float64) {
 		text = parms.substitute(text)
 		if text == "" {
 			return
 		}
 
-		c.SetFont("F0", size)
-		c.BeginText()
-		c.TextAt(x, baseY)
-		c.TextShow(text)
-		c.EndText()
+		cur.SetFont("F0", size)
+		cur.BeginText()
+		cur.TextAt(posX, baseY)
+		cur.TextShow(text)
+		cur.EndText()
 	}
 	if hf.Left != "" {
 		draw(hf.Left, geom.marginLeft)
 	}
 
 	if hf.Center != "" {
-		draw(hf.Center, (page.Width()-measureHF(font, parms.substitute(hf.Center), size))/2)
+		const centerDivisor = 2
+
+		draw(hf.Center, (page.Width()-measureHF(font, parms.substitute(hf.Center), size))/centerDivisor)
 	}
 
 	if hf.Right != "" {
@@ -262,19 +264,19 @@ func loadHTMLHF(ctx context.Context, loader *load.Loader, font *pdf.Font, st *ob
 		// upstream looksLikeHtmlAndNotAUrl: raw markup is not a URL
 		line.Emit(log, line.Warn, "object %d: header/footer html value looks like markup, not a URL; ignoring", st.idx)
 
-		return &htmlHFLayout{skip: true}, st.registry, nil
+		return &htmlHFLayout{skip: true}, st.registry, nil //nolint:exhaustruct // intentional zero-value fields
 	}
 
 	if st.resources.Loader != nil {
 		loader = st.resources.Loader
 	}
 
-	lp := st.lp
+	lineP := st.lp
 	if st.resources.Loader != nil {
-		lp = st.resources.Load
+		lineP = st.resources.Load
 	}
 
-	res, err := loader.Load(ctx, rawOrURL, lp)
+	res, err := loader.Load(ctx, rawOrURL, lineP)
 	if err != nil {
 		return nil, nil, fmt.Errorf("header/footer html: %w", err)
 	}
@@ -295,7 +297,7 @@ func loadHTMLHF(ctx context.Context, loader *load.Loader, font *pdf.Font, st *ob
 
 	measureRaw := raw
 	if perPage {
-		measureRaw = (hfParms{page: 1, topage: 1}).substitute(raw)
+		measureRaw = (hfParms{page: 1, topage: 1}).substitute(raw) //nolint:exhaustruct // intentional zero-value fields
 	}
 
 	root, err := html.Parse(measureRaw)
@@ -305,10 +307,10 @@ func loadHTMLHF(ctx context.Context, loader *load.Loader, font *pdf.Font, st *ob
 
 	media := st.media
 	if media == "" {
-		media = "print"
+		media = mediaPrint
 	}
 
-	resources := NewResourceContext(loader, res.Base, lp)
+	resources := NewResourceContext(loader, res.Base, lineP)
 	sheets := resources.CollectSheets(ctx, root, SheetOptions{
 		ViewportW:   st.geom.contentW,
 		ViewportH:   st.geom.contentH,
@@ -333,11 +335,11 @@ func loadHTMLHF(ctx context.Context, loader *load.Loader, font *pdf.Font, st *ob
 
 		return r.Body, nil
 	}
-	l := &htmlHFLayout{
+	lst := &htmlHFLayout{ //nolint:exhaustruct // intentional zero-value fields
 		raw:       raw,
 		perPage:   perPage,
 		base:      res.Base,
-		lp:        lp,
+		lp:        lineP,
 		sheets:    sheets,
 		imagesFn:  imagesFn,
 		font:      font,
@@ -350,15 +352,15 @@ func loadHTMLHF(ctx context.Context, loader *load.Loader, font *pdf.Font, st *ob
 	// Lay out once regardless: placeholder-free docs reuse this display list
 	// for every page; placeholder docs use it only for the natural height
 	// (auto margins) and re-layout per page at draw time.
-	l.res, err = layout.LayoutContext(ctx, root, layout.Options{
-		Width: l.width, Height: l.height, Font: font, Registry: l.registry,
+	lst.res, err = layout.LayoutContext(ctx, root, layout.Options{ //nolint:exhaustruct // intentional zero-value fields
+		Width: lst.width, Height: lst.height, Font: font, Registry: lst.registry,
 		Sheets: sheets, Media: media, Images: imagesFn,
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("header/footer html: layout: %w", err)
 	}
 
-	return l, reg, nil
+	return lst, reg, nil
 }
 
 // hfLinkContext carries body id destinations and link flags into HTML HF
@@ -389,7 +391,7 @@ func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hf setti
 
 	media := hfL.media
 	if media == "" {
-		media = "print"
+		media = mediaPrint
 	}
 
 	if hfL.perPage {
@@ -400,7 +402,7 @@ func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hf setti
 			return err
 		}
 
-		res, err = layout.LayoutContext(ctx, root, layout.Options{
+		res, err = layout.LayoutContext(ctx, root, layout.Options{ //nolint:exhaustruct // intentional zero-value fields
 			Width: hfL.width, Height: hfL.height, Font: hfL.font, Registry: hfL.registry,
 			Sheets: hfL.sheets, Media: media, Images: hfL.imagesFn,
 		})
@@ -449,35 +451,38 @@ func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hf setti
 // alpha / stroke policy with body paint), then wires link annotations that
 // need document context (fragment GoTo / external URI).
 func paintLayoutOps(ctx context.Context, page *pdf.Page, c *pdf.Content, ops []layout.Op, originX, yTop float64, links hfLinkContext) {
-	_ = layout.PaintBandContext(ctx, page, c, ops, layout.BandOptions{
+	_ = layout.PaintBandContext(ctx, page, c, ops, layout.BandOptions{ //nolint:exhaustruct // intentional zero-value fields
 		OriginX: originX,
 		OriginY: yTop,
 	})
 
 	for i := range ops {
-		op := &ops[i]
-		if op.Kind != layout.OpLinkURI {
+		oper := &ops[i]
+		if oper.Kind != layout.OpLinkURI {
 			continue
 		}
 
-		x := originX + op.X
-		y1 := yTop - (op.Y + op.H)
-		y2 := yTop - op.Y
+		posX := originX + oper.X
+		y1Val := yTop - (oper.Y + oper.H)
+		y2Val := yTop - oper.Y
 
-		if y2 < y1 {
-			y1, y2 = y2, y1
+		if y2Val < y1Val {
+			y1Val, y2Val = y2Val, y1Val
 		}
 
-		rect := [4]float64{x, y1, x + op.W, y2}
-		if op.W <= 0 {
-			rect[2] = x + 10
+		// minHFLinkExtent is a fallback hit-box side when layout reports zero width/height.
+		const minHFLinkExtent = 10
+
+		rect := [4]float64{posX, y1Val, posX + oper.W, y2Val}
+		if oper.W <= 0 {
+			rect[2] = posX + minHFLinkExtent
 		}
 
-		if op.H <= 0 {
-			rect[1] = yTop - op.Y - 10
+		if oper.H <= 0 {
+			rect[1] = yTop - oper.Y - minHFLinkExtent
 		}
 
-		uri := op.URI
+		uri := oper.URI
 		if uri == "" {
 			continue
 		}
@@ -524,7 +529,7 @@ func hfHeightFor(ctx context.Context, loader *load.Loader, font *pdf.Font, st *o
 	}
 
 	if hf.HTMLURL != "" {
-		l, reg, err := loadHTMLHF(ctx, loader, font, st, hf.HTMLURL, log)
+		lst, reg, err := loadHTMLHF(ctx, loader, font, st, hf.HTMLURL, log)
 		if err != nil {
 			return 0, nil, err
 		}
@@ -534,16 +539,16 @@ func hfHeightFor(ctx context.Context, loader *load.Loader, font *pdf.Font, st *o
 		}
 
 		if isHeader {
-			st.headerHTML = l
+			st.headerHTML = lst
 		} else {
-			st.footerHTML = l
+			st.footerHTML = lst
 		}
 
-		if l.skip || l.res == nil {
+		if lst.skip || lst.res == nil {
 			return 0, st.registry, nil
 		}
 
-		return l.res.Height, st.registry, nil
+		return lst.res.Height, st.registry, nil
 	}
 
 	size := hf.FontSize
@@ -603,8 +608,8 @@ func drawHeadersFooters(ctx context.Context, loader *load.Loader, font *pdf.Font
 		tocTotal = plan.tocTotal
 	}
 
-	for p := range total {
-		own, ok := plan.OwnerOf(p)
+	for pVal := range total {
+		own, ok := plan.OwnerOf(pVal)
 		if !ok || own.st == nil {
 			continue
 		}
@@ -613,8 +618,8 @@ func drawHeadersFooters(ctx context.Context, loader *load.Loader, font *pdf.Font
 			continue
 		}
 
-		parms := hfParms{
-			page:     p + 1 + req.Global.PageOffset,
+		parms := hfParms{ //nolint:exhaustruct // intentional zero-value fields
+			page:     pVal + 1 + req.Global.PageOffset,
 			topage:   total,
 			frompage: own.local + 1,
 			date:     date,
@@ -625,10 +630,10 @@ func drawHeadersFooters(ctx context.Context, loader *load.Loader, font *pdf.Font
 			replaces: own.st.repl,
 		}
 		if !own.st.isTOC {
-			parms.section, parms.subsection = outline.SectionOfBy(headings, p-tocTotal, outline.DocumentPage)
+			parms.section, parms.subsection = outline.SectionOfBy(headings, pVal-tocTotal, outline.DocumentPage)
 		}
 
-		page := doc.PageAt(p)
+		page := doc.PageAt(pVal)
 		if page == nil {
 			continue
 		}
@@ -637,28 +642,28 @@ func drawHeadersFooters(ctx context.Context, loader *load.Loader, font *pdf.Font
 			idIndex:  idIndex,
 			tocTotal: tocTotal,
 			plan:     plan,
-			srcPage:  p,
+			srcPage:  pVal,
 			useLocal: own.st.obj.LocalLinks,
 			useExt:   own.st.obj.ExternalLinks,
 			resolve:  req.Global.ResolveRelativeLinks,
 		}
-		draw := func(hf settings.HeaderFooter, isHeader bool) {
-			if !headerHasContent(hf) {
+		draw := func(hfVal settings.HeaderFooter, isHeader bool) {
+			if !headerHasContent(hfVal) {
 				return
 			}
 
-			if hf.HTMLURL != "" {
-				l := own.st.headerHTML
+			if hfVal.HTMLURL != "" {
+				lst := own.st.headerHTML
 				if !isHeader {
-					l = own.st.footerHTML
+					lst = own.st.footerHTML
 				}
 
-				if l == nil {
+				if lst == nil {
 					var err error
 
 					var reg *pdf.Registry
 
-					l, reg, err = loadHTMLHF(ctx, loader, font, own.st, hf.HTMLURL, log)
+					lst, reg, err = loadHTMLHF(ctx, loader, font, own.st, hfVal.HTMLURL, log)
 					if err != nil {
 						line.Emit(log, line.Warn, "object %d: header/footer html: %v", own.st.idx, err)
 
@@ -670,20 +675,20 @@ func drawHeadersFooters(ctx context.Context, loader *load.Loader, font *pdf.Font
 					}
 
 					if isHeader {
-						own.st.headerHTML = l
+						own.st.headerHTML = lst
 					} else {
-						own.st.footerHTML = l
+						own.st.footerHTML = lst
 					}
 				}
 
-				if err := drawHTMLHF(ctx, page, l, hf, own.st.geom, parms, isHeader, links); err != nil {
+				if err := drawHTMLHF(ctx, page, lst, hfVal, own.st.geom, parms, isHeader, links); err != nil {
 					line.Emit(log, line.Warn, "object %d: header/footer html draw: %v", own.st.idx, err)
 				}
 
 				return
 			}
 
-			drawTextHF(page, hf, own.st.geom, parms, font, isHeader)
+			drawTextHF(page, hfVal, own.st.geom, parms, font, isHeader)
 		}
 		draw(own.st.header, true)
 		draw(own.st.footer, false)

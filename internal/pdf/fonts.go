@@ -58,7 +58,7 @@ type Font struct {
 // ParseTTF parses a TrueType (or OpenType with TrueType outlines) font file.
 // CFF-based fonts return an error - this writer targets TrueType outlines.
 func ParseTTF(data []byte) (*Font, error) {
-	if len(data) < 12 {
+	if len(data) < sfntOffsetTableSize {
 		return nil, errors.New("font: file too short")
 	}
 
@@ -76,7 +76,7 @@ func ParseTTF(data []byte) (*Font, error) {
 		return nil, errors.New("font: truncated table directory")
 	}
 
-	f := &Font{data: data, fingerprint: sha256.Sum256(data), tables: map[string][]byte{}}
+	f := &Font{data: data, fingerprint: sha256.Sum256(data), tables: map[string][]byte{}} //nolint:exhaustruct // intentional zero-value fields
 
 	for i := range numTables {
 		rec := data[12+16*i:]
@@ -119,22 +119,22 @@ func ParseTTF(data []byte) (*Font, error) {
 }
 
 func (f *Font) parseHead() error {
-	t, ok := f.tables["head"]
-	if !ok || len(t) < 54 {
+	tbl, ok := f.tables["head"]
+	if !ok || len(tbl) < 54 {
 		return errors.New("font: missing head table")
 	}
 
-	f.unitsPerEm = int16(binary.BigEndian.Uint16(t[18:20]))
+	f.unitsPerEm = int16(binary.BigEndian.Uint16(tbl[18:20]))
 	if f.unitsPerEm <= 0 {
 		return errors.New("font: bad unitsPerEm")
 	}
 
-	f.xMin = int16(binary.BigEndian.Uint16(t[36:38]))
-	f.yMin = int16(binary.BigEndian.Uint16(t[38:40]))
-	f.xMax = int16(binary.BigEndian.Uint16(t[40:42]))
-	f.yMax = int16(binary.BigEndian.Uint16(t[42:44]))
-	f.macStyle = binary.BigEndian.Uint16(t[44:46])
-	f.indexToLocFmt = int16(binary.BigEndian.Uint16(t[50:52]))
+	f.xMin = int16(binary.BigEndian.Uint16(tbl[36:38]))
+	f.yMin = int16(binary.BigEndian.Uint16(tbl[38:40]))
+	f.xMax = int16(binary.BigEndian.Uint16(tbl[40:42]))
+	f.yMax = int16(binary.BigEndian.Uint16(tbl[42:44]))
+	f.macStyle = binary.BigEndian.Uint16(tbl[44:46])
+	f.indexToLocFmt = int16(binary.BigEndian.Uint16(tbl[50:52]))
 
 	return nil
 }
@@ -151,14 +151,14 @@ func (f *Font) parseMaxp() error {
 }
 
 func (f *Font) parseHhea() error {
-	t, ok := f.tables["hhea"]
-	if !ok || len(t) < 36 {
+	tbl, ok := f.tables["hhea"]
+	if !ok || len(tbl) < 36 {
 		return errors.New("font: missing hhea table")
 	}
 
-	f.ascender = int16(binary.BigEndian.Uint16(t[4:6]))
-	f.descender = int16(binary.BigEndian.Uint16(t[6:8]))
-	f.numHMetrics = int(binary.BigEndian.Uint16(t[34:36]))
+	f.ascender = int16(binary.BigEndian.Uint16(tbl[4:6]))
+	f.descender = int16(binary.BigEndian.Uint16(tbl[6:8]))
+	f.numHMetrics = int(binary.BigEndian.Uint16(tbl[34:36]))
 
 	if f.numHMetrics <= 0 {
 		return errors.New("font: bad numberOfHMetrics")
@@ -168,30 +168,30 @@ func (f *Font) parseHhea() error {
 }
 
 func (f *Font) parseHmtx() error {
-	t, ok := f.tables["hmtx"]
+	tbl, ok := f.tables["hmtx"]
 	if !ok {
 		return errors.New("font: missing hmtx table")
 	}
 
-	need := f.numHMetrics * 4
-	if len(t) < need {
+	need := f.numHMetrics * bytesPerHMetric
+	if len(tbl) < need {
 		return errors.New("font: truncated hmtx table")
 	}
 
-	lastAdv := int32(binary.BigEndian.Uint16(t[need-4 : need-2]))
+	lastAdv := int32(binary.BigEndian.Uint16(tbl[need-4 : need-2]))
 	f.advance = make([]int32, f.numGlyphs)
 	f.lsb = make([]int16, f.numGlyphs)
 
 	for i := range f.numHMetrics {
-		f.advance[i] = int32(binary.BigEndian.Uint16(t[i*4 : i*4+2]))
-		f.lsb[i] = int16(binary.BigEndian.Uint16(t[i*4+2 : i*4+4]))
+		f.advance[i] = int32(binary.BigEndian.Uint16(tbl[i*4 : i*4+2]))
+		f.lsb[i] = int16(binary.BigEndian.Uint16(tbl[i*4+2 : i*4+4]))
 	}
 
-	sideBearings := t[need:]
+	sideBearings := tbl[need:]
 
 	for i := f.numHMetrics; i < f.numGlyphs; i++ {
 		f.advance[i] = lastAdv
-		off := (i - f.numHMetrics) * 2
+		off := (i - f.numHMetrics) * bytesPerLongHorMetricSide
 
 		if off+2 <= len(sideBearings) {
 			f.lsb[i] = int16(binary.BigEndian.Uint16(sideBearings[off : off+2]))
@@ -202,15 +202,15 @@ func (f *Font) parseHmtx() error {
 }
 
 func (f *Font) parseOS2() error {
-	t, ok := f.tables["OS/2"]
-	if !ok || len(t) < 90 {
+	tbl, ok := f.tables["OS/2"]
+	if !ok || len(tbl) < 90 {
 		// OS/2 optional; use hhea for cap height fallback
 		f.capHeight = f.ascender
 
 		return nil
 	}
 
-	if v := int16(binary.BigEndian.Uint16(t[88:90])); v != 0 {
+	if v := int16(binary.BigEndian.Uint16(tbl[88:90])); v != 0 {
 		f.capHeight = v
 	} else {
 		f.capHeight = f.ascender
@@ -219,7 +219,7 @@ func (f *Font) parseOS2() error {
 	if f.italicAngle == 0 {
 		// italic angle comes from 'post' when present
 		if post, ok := f.tables["post"]; ok && len(post) >= 4 {
-			f.italicAngle = int16(binary.BigEndian.Uint16(post[4:6]) / 64)
+			f.italicAngle = int16(binary.BigEndian.Uint16(post[4:6]) / fixed14Divisor)
 		}
 	}
 
@@ -227,12 +227,12 @@ func (f *Font) parseOS2() error {
 }
 
 func (f *Font) parseCmap() error {
-	t, ok := f.tables["cmap"]
-	if !ok || len(t) < 4 {
+	tbl, ok := f.tables["cmap"]
+	if !ok || len(tbl) < 4 {
 		return errors.New("font: missing cmap table")
 	}
 
-	num := int(binary.BigEndian.Uint16(t[2:4]))
+	num := int(binary.BigEndian.Uint16(tbl[2:4]))
 
 	type sub struct {
 		platform, encoding int
@@ -242,7 +242,7 @@ func (f *Font) parseCmap() error {
 	var subs []sub
 
 	for i := range num {
-		rec := t[4+i*8:]
+		rec := tbl[4+i*8:]
 		subs = append(subs, sub{
 			platform: int(binary.BigEndian.Uint16(rec[0:2])),
 			encoding: int(binary.BigEndian.Uint16(rec[2:4])),
@@ -257,32 +257,32 @@ func (f *Font) parseCmap() error {
 	parsed := 0
 
 	for _, o := range order {
-		for i := range subs {
-			if subs[i].platform != o[0] || subs[i].encoding != o[1] {
+		for idx := range subs {
+			if subs[idx].platform != o[0] || subs[idx].encoding != o[1] {
 				continue
 			}
 
-			if subs[i].offset < 0 || subs[i].offset+2 > len(t) {
+			if subs[idx].offset < 0 || subs[idx].offset+2 > len(tbl) {
 				continue
 			}
 
-			st := t[subs[i].offset:]
-			format := int(binary.BigEndian.Uint16(st[0:2]))
+			state := tbl[subs[idx].offset:]
+			format := int(binary.BigEndian.Uint16(state[0:2]))
 			before := len(f.cmap)
 
 			switch format {
-			case 4:
-				_ = f.parseCmap4(st)
-			case 12:
-				_ = f.parseCmap12(st)
-			case 6:
-				if len(st) >= 10 {
-					first := binary.BigEndian.Uint16(st[6:8])
+			case cmapFormat4:
+				_ = f.parseCmap4(state)
+			case cmapFormat12:
+				_ = f.parseCmap12(state)
+			case cmapFormat6:
+				if len(state) >= cmapFormat6Header {
+					first := binary.BigEndian.Uint16(state[6:8])
 
-					count := int(binary.BigEndian.Uint16(st[8:10]))
-					if 10+2*count <= len(st) {
+					count := int(binary.BigEndian.Uint16(state[8:10]))
+					if 10+2*count <= len(state) {
 						for j := range count {
-							g := binary.BigEndian.Uint16(st[10+j*2:])
+							g := binary.BigEndian.Uint16(state[10+j*2:])
 							if g != 0 {
 								if _, ok := f.cmap[uint32(first)+uint32(j)]; !ok {
 									f.cmap[uint32(first)+uint32(j)] = g
@@ -292,9 +292,9 @@ func (f *Font) parseCmap() error {
 					}
 				}
 			case 0:
-				if len(st) >= 262 {
+				if len(state) >= cmapFormat0Size {
 					for j := range 256 {
-						if g := st[6+j]; g != 0 {
+						if g := state[6+j]; g != 0 {
 							if _, ok := f.cmap[uint32(j)]; !ok {
 								f.cmap[uint32(j)] = uint16(g)
 							}
@@ -319,41 +319,41 @@ func (f *Font) parseCmap() error {
 }
 
 func (f *Font) parseCmap4(st []byte) error {
-	if len(st) < 14 {
+	if len(st) < cmapFormat4Header {
 		return errors.New("font: truncated cmap format 4")
 	}
 
-	segCount := int(binary.BigEndian.Uint16(st[6:8])) / 2
+	segCount := int(binary.BigEndian.Uint16(st[6:8])) / uint16Bytes
 	endOff := 14
-	startOff := endOff + 2*segCount + 2 // + reservedPad
-	deltaOff := startOff + 2*segCount
+	startOff := endOff + uint16Bytes*segCount + uint16Bytes // + reservedPad
+	deltaOff := startOff + uint16Bytes*segCount
 
-	rangeOff := deltaOff + 2*segCount
+	rangeOff := deltaOff + uint16Bytes*segCount
 	if rangeOff+2*segCount > len(st) {
 		return errors.New("font: truncated cmap format 4 segments")
 	}
 
-	for i := range segCount {
-		end := uint32(binary.BigEndian.Uint16(st[endOff+i*2 : endOff+i*2+2]))
-		start := uint32(binary.BigEndian.Uint16(st[startOff+i*2 : startOff+i*2+2]))
+	for idx := range segCount {
+		end := uint32(binary.BigEndian.Uint16(st[endOff+idx*2 : endOff+idx*2+2]))
+		start := uint32(binary.BigEndian.Uint16(st[startOff+idx*2 : startOff+idx*2+2]))
 
 		if end == 0xFFFF && start == 0xFFFF {
 			continue // final sentinel segment
 		}
 
-		idDelta := int32(int16(binary.BigEndian.Uint16(st[deltaOff+i*2 : deltaOff+i*2+2])))
-		idRange := int32(binary.BigEndian.Uint16(st[rangeOff+i*2 : rangeOff+i*2+2]))
+		idDelta := int32(int16(binary.BigEndian.Uint16(st[deltaOff+idx*2 : deltaOff+idx*2+2])))
+		idRange := int32(binary.BigEndian.Uint16(st[rangeOff+idx*2 : rangeOff+idx*2+2]))
 
-		for cp := start; cp <= end; cp++ {
-			if _, exists := f.cmap[cp]; exists {
+		for codepoint := start; codepoint <= end; codepoint++ {
+			if _, exists := f.cmap[codepoint]; exists {
 				continue
 			}
 
 			var glyph int32
 			if idRange == 0 {
-				glyph = (int32(cp) + idDelta) & 0xFFFF
+				glyph = (int32(codepoint) + idDelta) & maxUint16Val
 			} else {
-				gAddr := rangeOff + i*2 + int(idRange) + int(cp-start)*2
+				gAddr := rangeOff + idx*uint16Bytes + int(idRange) + int(codepoint-start)*uint16Bytes
 				if gAddr+2 > len(st) {
 					continue
 				}
@@ -363,11 +363,11 @@ func (f *Font) parseCmap4(st []byte) error {
 					continue
 				}
 
-				glyph = (int32(g) + idDelta) & 0xFFFF
+				glyph = (int32(g) + idDelta) & maxUint16Val
 			}
 
 			if glyph > 0 && glyph < int32(f.numGlyphs) {
-				f.cmap[cp] = uint16(glyph)
+				f.cmap[codepoint] = uint16(glyph)
 			}
 		}
 	}
@@ -375,26 +375,26 @@ func (f *Font) parseCmap4(st []byte) error {
 	return nil
 }
 
-func (f *Font) parseCmap12(st []byte) error {
-	if len(st) < 16 {
+func (f *Font) parseCmap12(state []byte) error {
+	if len(state) < cmapFormat12Header {
 		return errors.New("font: truncated cmap format 12")
 	}
 
-	groups := int(binary.BigEndian.Uint32(st[12:16]))
+	groups := int(binary.BigEndian.Uint32(state[12:16]))
 	for i := range groups {
-		rec := st[16+i*12:]
+		rec := state[16+i*12:]
 		start := binary.BigEndian.Uint32(rec[0:4])
 		end := binary.BigEndian.Uint32(rec[4:8])
 		startGlyph := binary.BigEndian.Uint32(rec[8:12])
 
-		for cp := start; cp <= end; cp++ {
-			if _, exists := f.cmap[cp]; exists {
+		for codepoint := start; codepoint <= end; codepoint++ {
+			if _, exists := f.cmap[codepoint]; exists {
 				continue
 			}
 
-			g := startGlyph + (cp - start)
+			g := startGlyph + (codepoint - start)
 			if g < uint32(f.numGlyphs) {
-				f.cmap[cp] = uint16(g)
+				f.cmap[codepoint] = uint16(g)
 			}
 		}
 	}
@@ -426,7 +426,7 @@ func (f *Font) pdfEmScale() float64 {
 		return 1
 	}
 
-	return 1000 / upm
+	return pdfUnitsPerEm / upm
 }
 
 func (f *Font) scaleToPDFEm(v int16) int {
@@ -475,84 +475,84 @@ func (f *Font) FamilyNames() []string {
 // mutation can call this once up front. Returns family names (NameIDs 1 and
 // 16), or nil when the name table is missing.
 func (f *Font) LoadNames() []string {
-	t, ok := f.tables["name"]
-	if !ok || len(t) < 6 {
+	tbl, ok := f.tables["name"]
+	if !ok || len(tbl) < 6 {
 		return nil
 	}
 
-	count := int(binary.BigEndian.Uint16(t[2:4]))
-	strOff := int(binary.BigEndian.Uint16(t[4:6]))
+	count := int(binary.BigEndian.Uint16(tbl[2:4]))
+	strOff := int(binary.BigEndian.Uint16(tbl[4:6]))
 	seen := map[string]bool{}
 
 	var out []string
 
-	add := func(s string) {
-		s = strings.TrimSpace(s)
-		if s == "" || seen[s] {
+	add := func(str string) {
+		str = strings.TrimSpace(str)
+		if str == "" || seen[str] {
 			return
 		}
 
-		seen[s] = true
+		seen[str] = true
 
-		out = append(out, s)
+		out = append(out, str)
 	}
 
 	for i := range count {
-		rec := 6 + i*12
-		if rec+12 > len(t) {
+		rec := sfntNameHeaderSize + i*sfntNameRecordSize
+		if rec+12 > len(tbl) {
 			break
 		}
 
-		platform := binary.BigEndian.Uint16(t[rec : rec+2])
-		encoding := binary.BigEndian.Uint16(t[rec+2 : rec+4])
-		nameID := binary.BigEndian.Uint16(t[rec+6 : rec+8])
-		length := int(binary.BigEndian.Uint16(t[rec+8 : rec+10]))
-		offset := int(binary.BigEndian.Uint16(t[rec+10 : rec+12]))
+		platform := binary.BigEndian.Uint16(tbl[rec : rec+2])
+		encoding := binary.BigEndian.Uint16(tbl[rec+2 : rec+4])
+		nameID := binary.BigEndian.Uint16(tbl[rec+6 : rec+8])
+		length := int(binary.BigEndian.Uint16(tbl[rec+8 : rec+10]))
+		offset := int(binary.BigEndian.Uint16(tbl[rec+10 : rec+12]))
 
 		if nameID != 1 && nameID != 16 && nameID != 4 && nameID != 6 {
 			continue
 		}
 
 		start := strOff + offset
-		if start < 0 || start+length > len(t) {
+		if start < 0 || start+length > len(tbl) {
 			continue
 		}
 
-		raw := t[start : start+length]
+		raw := tbl[start : start+length]
 
-		var s string
+		var str string
 
 		switch {
 		case platform == 3 && (encoding == 1 || encoding == 10):
-			s = decodeUTF16BE(raw)
+			str = decodeUTF16BE(raw)
 		case platform == 0:
-			s = decodeUTF16BE(raw)
+			str = decodeUTF16BE(raw)
 		case platform == 1:
-			s = string(raw)
+			str = string(raw)
 		default:
 			continue
 		}
 
 		if nameID == 1 || nameID == 16 {
-			add(s)
+			add(str)
 		}
 
 		if f.PostScriptName == "" && (nameID == 6 || nameID == 4) {
-			f.PostScriptName = strings.ReplaceAll(s, " ", "")
+			f.PostScriptName = strings.ReplaceAll(str, " ", "")
 		}
 	}
 
 	return out
 }
 
-func decodeUTF16BE(b []byte) string {
-	if len(b)%2 != 0 {
-		return string(b)
+func decodeUTF16BE(buf []byte) string {
+	if len(buf)%2 != 0 {
+		return string(buf)
 	}
 
-	u := make([]uint16, len(b)/2)
+	u := make([]uint16, len(buf)/uint16Bytes)
 	for i := range u {
-		u[i] = binary.BigEndian.Uint16(b[i*2:])
+		u[i] = binary.BigEndian.Uint16(buf[i*2:])
 	}
 
 	return string(utf16.Decode(u))
@@ -574,46 +574,46 @@ func (f *Font) AdvanceInPoints(r rune, size float64) float64 {
 }
 
 // glyphOutline returns the glyf bytes for a glyph id (raw, incl. header).
-func (f *Font) glyphOutline(g uint16) []byte {
-	glyf, ok := f.tables["glyf"]
-	if !ok {
+func (f *Font) glyphOutline(glob uint16) []byte {
+	found, okVal := f.tables["glyf"]
+	if !okVal {
 		return nil
 	}
 
-	loca, ok := f.tables["loca"]
-	if !ok {
+	loca, okVal := f.tables["loca"]
+	if !okVal {
 		return nil
 	}
 
-	n := int(g)
+	count := int(glob)
 
 	var off, next int
 
 	if f.indexToLocFmt == 0 {
-		off = int(binary.BigEndian.Uint16(loca[n*2:])) * 2
-		next = int(binary.BigEndian.Uint16(loca[(n+1)*2:])) * 2
+		off = int(binary.BigEndian.Uint16(loca[count*uint16Bytes:])) * uint16Bytes
+		next = int(binary.BigEndian.Uint16(loca[(count+1)*uint16Bytes:])) * uint16Bytes
 	} else {
-		off = int(binary.BigEndian.Uint32(loca[n*4:]))
-		next = int(binary.BigEndian.Uint32(loca[(n+1)*4:]))
+		off = int(binary.BigEndian.Uint32(loca[count*4:]))
+		next = int(binary.BigEndian.Uint32(loca[(count+1)*4:]))
 	}
 
-	if off < 0 || next < off || next > len(glyf) {
+	if off < 0 || next < off || next > len(found) {
 		return nil
 	}
 
-	return glyf[off:next]
+	return found[off:next]
 }
 
 // compositeGlyphIDs returns the glyph ids referenced by a composite glyph.
 func (f *Font) compositeGlyphIDs(g uint16) []uint16 {
 	out := []uint16{}
-	b := f.glyphOutline(g)
+	buf := f.glyphOutline(g)
 
-	if len(b) < 10 {
+	if len(buf) < glyfHeaderSize {
 		return out
 	}
 
-	numContours := int16(binary.BigEndian.Uint16(b[0:2]))
+	numContours := int16(binary.BigEndian.Uint16(buf[0:2]))
 	if numContours >= 0 {
 		return out // simple glyph
 	}
@@ -621,12 +621,12 @@ func (f *Font) compositeGlyphIDs(g uint16) []uint16 {
 	pos := 10
 
 	for {
-		if pos+4 > len(b) {
+		if pos+4 > len(buf) {
 			break
 		}
 
-		flags := binary.BigEndian.Uint16(b[pos : pos+2])
-		child := binary.BigEndian.Uint16(b[pos+2 : pos+4])
+		flags := binary.BigEndian.Uint16(buf[pos : pos+2])
+		child := binary.BigEndian.Uint16(buf[pos+2 : pos+4])
 		out = append(out, child)
 
 		pos += 4

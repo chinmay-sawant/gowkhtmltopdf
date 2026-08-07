@@ -11,7 +11,7 @@ import (
 // TestPrintLinkInheritHonorsCascade: text-decoration:inherit on links must
 // not invent underlines (CSS-faithful default).
 func TestPrintLinkInheritHonorsCascade(t *testing.T) {
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 body { color: #000000; }
 @media print {
   a, a.external, a.new, a.stub { color: inherit !important; text-decoration: inherit !important }
@@ -24,14 +24,14 @@ a { text-decoration: none; color: #36c }
 		t.Fatal(err)
 	}
 
-	styles := resolveStyles(root, []*css.Stylesheet{s}, "print", 500, 800)
+	styles := resolveStyles(root, []*css.Stylesheet{cssSheet}, "print", 500, 800)
 
-	var a *html.Node
+	var acc *html.Node
 
 	var walk func(*html.Node)
 	walk = func(n *html.Node) {
 		if n.Type == html.ElementNode && n.Name == "a" {
-			a = n
+			acc = n
 		}
 
 		for _, c := range n.Children {
@@ -40,17 +40,17 @@ a { text-decoration: none; color: #36c }
 	}
 	walk(root)
 
-	if a == nil {
+	if acc == nil {
 		t.Fatal("no anchor")
 	}
 
-	st := styles[a]
+	st := styles[acc]
 	if st.TextDecoration == "underline" {
 		t.Fatalf("decoration=%q: inherit must not force underline without --print-link-underline", st.TextDecoration)
 	}
 
-	res, err := Layout(root, Options{
-		Width: 500, Height: 800, Sheets: []*css.Stylesheet{s},
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 500, Height: 800, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true,
 	})
 	if err != nil {
@@ -69,7 +69,8 @@ a { text-decoration: none; color: #36c }
 
 // TestPrintLinkUnderlineOptIn: --print-link-underline forces underlines after cascade.
 func TestPrintLinkUnderlineOptIn(t *testing.T) {
-	s := sheet(t, `
+	t.Parallel()
+	cssSheet := sheet(t, `
 body { color: #000000; }
 @media print {
   a { color: inherit !important; text-decoration: inherit !important }
@@ -81,9 +82,8 @@ a { text-decoration: none; color: #36c }
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	res, err := Layout(root, Options{
-		Width: 500, Height: 800, Sheets: []*css.Stylesheet{s},
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 500, Height: 800, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true, PrintLinkUnderline: true,
 	})
 	if err != nil {

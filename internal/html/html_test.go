@@ -18,55 +18,55 @@ func mustParse(t *testing.T, src string) *Node {
 }
 
 // treeString renders the tree for failure messages.
-func treeString(n *Node) string {
-	var b strings.Builder
+func treeString(node *Node) string {
+	var buf strings.Builder
 
 	var rec func(*Node, int)
-	rec = func(n *Node, d int) {
-		b.WriteString(strings.Repeat("  ", d))
+	rec = func(node *Node, depth int) {
+		buf.WriteString(strings.Repeat("  ", depth))
 
-		switch n.Type {
+		switch node.Type {
 		case ElementNode:
-			fmt.Fprintf(&b, "<%s>", n.Name)
+			fmt.Fprintf(&buf, "<%s>", node.Name)
 		case TextNode:
-			fmt.Fprintf(&b, "#text %q", n.Text)
+			fmt.Fprintf(&buf, "#text %q", node.Text)
 		case CommentNode:
-			fmt.Fprintf(&b, "<!--%s-->", n.Text)
+			fmt.Fprintf(&buf, "<!--%s-->", node.Text)
 		case DoctypeNode:
-			fmt.Fprintf(&b, "<!%s>", n.Text)
+			fmt.Fprintf(&buf, "<!%s>", node.Text)
 		}
 
-		b.WriteByte('\n')
+		buf.WriteByte('\n')
 
-		for _, c := range n.Children {
-			rec(c, d+1)
+		for _, c := range node.Children {
+			rec(c, depth+1)
 		}
 	}
-	rec(n, 0)
+	rec(node, 0)
 
-	return b.String()
+	return buf.String()
 }
 
-func assertChildren(t *testing.T, n *Node, names ...string) {
+func assertChildren(t *testing.T, node *Node, names ...string) {
 	t.Helper()
 
 	var got []*Node
 
-	for _, c := range n.Children {
+	for _, c := range node.Children {
 		if c.Type == ElementNode {
 			got = append(got, c)
 		}
 	}
 
 	if len(got) != len(names) {
-		t.Errorf("children of <%s>: got %d elements, want %d\n%s", n.Name, len(got), len(names), treeString(n))
+		t.Errorf("children of <%s>: got %d elements, want %d\n%s", node.Name, len(got), len(names), treeString(node))
 
 		return
 	}
 
 	for i, want := range names {
 		if got[i].Name != want {
-			t.Errorf("child %d of <%s>: got <%s>, want <%s>\n%s", i, n.Name, got[i].Name, want, treeString(n))
+			t.Errorf("child %d of <%s>: got <%s>, want <%s>\n%s", i, node.Name, got[i].Name, want, treeString(node))
 		}
 	}
 }
@@ -74,6 +74,8 @@ func assertChildren(t *testing.T, n *Node, names ...string) {
 // --- tokenizer-level tests ---
 
 func TestTokenizeAttributes(t *testing.T) {
+	t.Parallel()
+
 	toks, err := tokenize(`<p id="a1" class='b2' data-x=unquoted hidden checked="yes">`)
 	if err != nil {
 		t.Fatal(err)
@@ -101,6 +103,8 @@ func TestTokenizeAttributes(t *testing.T) {
 }
 
 func TestTokenizeWhitespaceAroundEquals(t *testing.T) {
+	t.Parallel()
+
 	toks, err := tokenize(`<div a = "x" b= y>`)
 	if err != nil {
 		t.Fatal(err)
@@ -125,6 +129,8 @@ func TestTokenizeWhitespaceAroundEquals(t *testing.T) {
 }
 
 func TestTokenizeGreaterThanInQuotedValue(t *testing.T) {
+	t.Parallel()
+
 	toks, err := tokenize(`<p title="a > b" data-x='1>0'>x</p>`)
 	if err != nil {
 		t.Fatal(err)
@@ -149,6 +155,8 @@ func TestTokenizeGreaterThanInQuotedValue(t *testing.T) {
 }
 
 func TestTokenizeComments(t *testing.T) {
+	t.Parallel()
+
 	toks, err := tokenize(`a<!-- hello -->b<!---->c`)
 	if err != nil {
 		t.Fatal(err)
@@ -180,6 +188,8 @@ func TestTokenizeComments(t *testing.T) {
 }
 
 func TestTokenizeDoctype(t *testing.T) {
+	t.Parallel()
+
 	toks, err := tokenize(`<!DOCTYPE html><p>x</p>`)
 	if err != nil {
 		t.Fatal(err)
@@ -210,6 +220,8 @@ func TestTokenizeDoctype(t *testing.T) {
 }
 
 func TestTokenizeDeclarationsAndPI(t *testing.T) {
+	t.Parallel()
+
 	toks, err := tokenize(`<?xml version="1.0"?><!bogus stuff><p>x</p>`)
 	if err != nil {
 		t.Fatal(err)
@@ -227,6 +239,8 @@ func TestTokenizeDeclarationsAndPI(t *testing.T) {
 }
 
 func TestTokenizeRawText(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		src, content string
 	}{
@@ -239,10 +253,10 @@ func TestTokenizeRawText(t *testing.T) {
 		{`<script>a</SCRIPT>b`, "ab"},
 		{`<script>var x = 1;`, "var x = 1;"},
 	}
-	for _, tc := range cases {
-		toks, err := tokenize(tc.src)
+	for _, testCase := range cases {
+		toks, err := tokenize(testCase.src)
 		if err != nil {
-			t.Fatalf("tokenize(%q): %v", tc.src, err)
+			t.Fatalf("tokenize(%q): %v", testCase.src, err)
 		}
 
 		var content string
@@ -253,13 +267,15 @@ func TestTokenizeRawText(t *testing.T) {
 			}
 		}
 
-		if content != tc.content {
-			t.Errorf("tokenize(%q): raw text = %q, want %q (tokens %+v)", tc.src, content, tc.content, toks)
+		if content != testCase.content {
+			t.Errorf("tokenize(%q): raw text = %q, want %q (tokens %+v)", testCase.src, content, testCase.content, toks)
 		}
 	}
 }
 
 func TestTokenizeRawTextClosesOnlyRealEndTag(t *testing.T) {
+	t.Parallel()
+
 	toks, err := tokenize(`<script>a</scriptx>b</script>`)
 	if err != nil {
 		t.Fatal(err)
@@ -279,6 +295,8 @@ func TestTokenizeRawTextClosesOnlyRealEndTag(t *testing.T) {
 }
 
 func TestTokenizeBareLessThanIsText(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		src, want string
 	}{
@@ -288,29 +306,31 @@ func TestTokenizeBareLessThanIsText(t *testing.T) {
 		{"<>empty<>", "<>empty<>"},
 		{"< -x-", "< -x-"},
 	}
-	for _, tc := range cases {
-		toks, err := tokenize(tc.src)
+	for _, testCase := range cases {
+		toks, err := tokenize(testCase.src)
 		if err != nil {
-			t.Fatalf("tokenize(%q): %v", tc.src, err)
+			t.Fatalf("tokenize(%q): %v", testCase.src, err)
 		}
 
 		var text string
 
 		for _, tk := range toks {
 			if tk.kind != tokText {
-				t.Fatalf("tokenize(%q): unexpected non-text token %+v", tc.src, tk)
+				t.Fatalf("tokenize(%q): unexpected non-text token %+v", testCase.src, tk)
 			}
 
 			text += tk.data
 		}
 
-		if text != tc.want {
-			t.Errorf("tokenize(%q) = %q, want %q", tc.src, text, tc.want)
+		if text != testCase.want {
+			t.Errorf("tokenize(%q) = %q, want %q", testCase.src, text, testCase.want)
 		}
 	}
 }
 
 func TestTokenizeUnterminated(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		src, wantErr string
 	}{
@@ -323,11 +343,11 @@ func TestTokenizeUnterminated(t *testing.T) {
 		{"<!bogus", "unterminated declaration"},
 		{"<?pi", "unterminated processing instruction"},
 	}
-	for _, tc := range cases {
-		if _, err := Parse(tc.src); err == nil {
-			t.Errorf("Parse(%q): want error %q, got nil", tc.src, tc.wantErr)
-		} else if !strings.Contains(err.Error(), tc.wantErr) {
-			t.Errorf("Parse(%q): got error %q, want it to contain %q", tc.src, err, tc.wantErr)
+	for _, testCase := range cases {
+		if _, err := Parse(testCase.src); err == nil {
+			t.Errorf("Parse(%q): want error %q, got nil", testCase.src, testCase.wantErr)
+		} else if !strings.Contains(err.Error(), testCase.wantErr) {
+			t.Errorf("Parse(%q): got error %q, want it to contain %q", testCase.src, err, testCase.wantErr)
 		}
 	}
 }
@@ -335,6 +355,7 @@ func TestTokenizeUnterminated(t *testing.T) {
 // --- tree-level tests ---
 
 func TestUnescapeEntitiesInText(t *testing.T) {
+	t.Parallel()
 	root := mustParse(t, `<html><body><h2>Docs &amp; forms</h2><p>a &lt; b &#38; c</p></body></html>`)
 	body := root.FirstChild("body")
 
@@ -354,6 +375,7 @@ func TestUnescapeEntitiesInText(t *testing.T) {
 }
 
 func TestParseNesting(t *testing.T) {
+	t.Parallel()
 	root := mustParse(t, `<html><head><title>t</title></head><body><div><p>hi</p></div></body></html>`)
 	html := root.FirstChild("html")
 
@@ -372,6 +394,7 @@ func TestParseNesting(t *testing.T) {
 }
 
 func TestParseParentPointers(t *testing.T) {
+	t.Parallel()
 	root := mustParse(t, `<html><body><div>x</div><p>y</p></body></html>`)
 
 	var walk func(*Node)
@@ -388,24 +411,25 @@ func TestParseParentPointers(t *testing.T) {
 }
 
 func TestParseVoidElements(t *testing.T) {
+	t.Parallel()
 	root := mustParse(t, `<p>a<br>x<img src="y.png" alt="y"><input type="text" disabled><hr></p>`)
-	p := root.FirstChild("p")
+	para := root.FirstChild("p")
 
-	if p == nil {
+	if para == nil {
 		t.Fatalf("no <p>:\n%s", treeString(root))
 	}
 	// text a, br, text x, img, input, hr - br/img/input/hr must not consume the following content
-	if len(p.Children) != 6 {
-		t.Fatalf("<p> has %d children, want 6:\n%s", len(p.Children), treeString(p))
+	if len(para.Children) != 6 {
+		t.Fatalf("<p> has %d children, want 6:\n%s", len(para.Children), treeString(para))
 	}
 
-	assertChildren(t, p, "br", "img", "input", "hr")
+	assertChildren(t, para, "br", "img", "input", "hr")
 
-	if got := p.TextContent(); got != "ax" {
+	if got := para.TextContent(); got != "ax" {
 		t.Errorf("TextContent = %q, want %q", got, "ax")
 	}
 
-	img := p.FirstChild("img")
+	img := para.FirstChild("img")
 	if img.Attribute("src") != "y.png" || img.Attribute("alt") != "y" {
 		t.Errorf("img attrs = %v", img.Attrs)
 	}
@@ -416,6 +440,7 @@ func TestParseVoidElements(t *testing.T) {
 }
 
 func TestParseAutoCloseTable(t *testing.T) {
+	t.Parallel()
 	root := mustParse(t, `<table><tr><td>a</td><td>b</td></tr><tr><td>c</td></tr></table>`)
 	table := root.FirstChild("table")
 	assertChildren(t, table, "tr", "tr")
@@ -440,6 +465,7 @@ func TestParseAutoCloseTable(t *testing.T) {
 }
 
 func TestParseAutoCloseP(t *testing.T) {
+	t.Parallel()
 	root := mustParse(t, `<div><p>a<p>b</div>`)
 	div := root.FirstChild("div")
 	assertChildren(t, div, "p", "p")
@@ -450,6 +476,7 @@ func TestParseAutoCloseP(t *testing.T) {
 }
 
 func TestParseAutoCloseList(t *testing.T) {
+	t.Parallel()
 	root := mustParse(t, `<ul><li>a<li>b</ul>`)
 	ul := root.FirstChild("ul")
 	assertChildren(t, ul, "li", "li")
@@ -464,6 +491,7 @@ func TestParseAutoCloseList(t *testing.T) {
 }
 
 func TestParseAutoCloseTableSections(t *testing.T) {
+	t.Parallel()
 	root := mustParse(t, `<table><thead>h<tbody>b<tfoot>f</table>`)
 	table := root.FirstChild("table")
 	assertChildren(t, table, "thead", "tbody", "tfoot")
@@ -478,6 +506,7 @@ func TestParseAutoCloseTableSections(t *testing.T) {
 }
 
 func TestParseHtmlHeadBodyMerge(t *testing.T) {
+	t.Parallel()
 	// second <head> merges into the existing one at the same level
 	root := mustParse(t, `<html><head>a</head><head>b</head></html>`)
 	html := root.FirstChild("html")
@@ -527,6 +556,7 @@ func TestParseHtmlHeadBodyMerge(t *testing.T) {
 }
 
 func TestParseHeadBodyTransition(t *testing.T) {
+	t.Parallel()
 	// <body> closes an open <head>
 	root := mustParse(t, `<head><title>t</title></head><body>b</body>`)
 	assertChildren(t, root, "head", "body")
@@ -537,6 +567,7 @@ func TestParseHeadBodyTransition(t *testing.T) {
 }
 
 func TestParseTextMerging(t *testing.T) {
+	t.Parallel()
 	// adjacent text tokens merge into a single TextNode
 	root := mustParse(t, `1 < 2`)
 	if len(root.Children) != 1 {
@@ -572,6 +603,7 @@ func TestParseTextMerging(t *testing.T) {
 }
 
 func TestParseAttrDuplicates(t *testing.T) {
+	t.Parallel()
 	root := mustParse(t, `<div ID="a" class="b" data-x="1" hidden id="dup">x</div>`)
 
 	div := root.FirstChild("div")
@@ -597,6 +629,7 @@ func TestParseAttrDuplicates(t *testing.T) {
 }
 
 func TestParseSelfClosing(t *testing.T) {
+	t.Parallel()
 	root := mustParse(t, `<div/><span>x</span>`)
 	assertChildren(t, root, "div", "span")
 
@@ -615,6 +648,8 @@ func TestParseSelfClosing(t *testing.T) {
 }
 
 func TestParseCommentsAndDoctype(t *testing.T) {
+	t.Parallel()
+
 	root := mustParse(t, `<!DOCTYPE html><html><body><!-- hello -->x</body></html>`)
 	if len(root.Children) != 2 {
 		t.Fatalf("root has %d children, want 2:\n%s", len(root.Children), treeString(root))
@@ -639,6 +674,7 @@ func TestParseCommentsAndDoctype(t *testing.T) {
 }
 
 func TestParseRawTextTree(t *testing.T) {
+	t.Parallel()
 	root := mustParse(t, `<script>if (a < b) { f(); }</script><p>ok</p>`)
 	script := root.FirstChild("script")
 
@@ -658,6 +694,8 @@ func TestParseRawTextTree(t *testing.T) {
 }
 
 func TestParseMalformed(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		src   string
 		check func(t *testing.T, root *Node)
@@ -736,13 +774,15 @@ func TestParseMalformed(t *testing.T) {
 			},
 		},
 	}
-	for _, tc := range cases {
-		root := mustParse(t, tc.src)
-		tc.check(t, root)
+	for _, testCase := range cases {
+		root := mustParse(t, testCase.src)
+		testCase.check(t, root)
 	}
 }
 
 func TestParseUsableTreeNoPanic(t *testing.T) {
+	t.Parallel()
+
 	inputs := []string{
 		`<div><div><div><div>x`,
 		`<b><i><u>deep</b>`,
@@ -762,6 +802,7 @@ func TestParseUsableTreeNoPanic(t *testing.T) {
 }
 
 func TestWalkPreOrder(t *testing.T) {
+	t.Parallel()
 	root := mustParse(t, `<html><head><title>t</title></head><body><h1>x</h1><p>y</p></body></html>`)
 
 	var names []string
@@ -785,6 +826,8 @@ func TestWalkPreOrder(t *testing.T) {
 }
 
 func TestTextContentOf(t *testing.T) {
+	t.Parallel()
+
 	root := mustParse(t, `<html><head><title>One</title><title>Two</title></head><body><p>body text</p></body></html>`)
 	if got := root.TextContentOf("title"); got != "One" {
 		t.Errorf("TextContentOf(title) = %q, want %q", got, "One")
@@ -800,6 +843,8 @@ func TestTextContentOf(t *testing.T) {
 }
 
 func TestParseDocument(t *testing.T) {
+	t.Parallel()
+
 	src := "<html><body>ok</body></html>"
 	for _, body := range [][]byte{[]byte(src), append([]byte("\ufeff"), src...)} {
 		root, err := ParseDocument(body)

@@ -15,7 +15,7 @@ import (
 // Multi-cite nowrap markers in a narrow Ref td must not stack at the same X
 // (wiki awards: [127][128] for one win). Prefer one horizontal line.
 func TestMultiCiteInNarrowTDNotStacked(t *testing.T) {
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 table { border-collapse: collapse; width: 480pt; }
 td, th { border: 1px solid #a2a9b1; padding: 2pt 3pt; font-size: 9pt; }
@@ -47,8 +47,8 @@ td.ref, th.ref { width: 44pt; }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{
-		Width: 520, Height: 400, Sheets: []*css.Stylesheet{s},
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 520, Height: 400, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true,
 	})
 	if err != nil {
@@ -62,8 +62,8 @@ td.ref, th.ref { width: 44pt; }
 
 	var marks []mark
 
-	for _, op := range res.Ops {
-		if op.Kind != OpText {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpText {
 			continue
 		}
 		// Coalesced cite ops are "[127]" / hair+"[128]" or piece-wise.
@@ -73,10 +73,10 @@ td.ref, th.ref { width: 44pt; }
 			}
 
 			return r
-		}, op.Text)
+		}, paintOp.Text)
 		if strings.Contains(compact, "127") || strings.Contains(compact, "128") ||
 			compact == "[" || compact == "]" {
-			marks = append(marks, mark{op.Text, op.X, op.Y})
+			marks = append(marks, mark{paintOp.Text, paintOp.X, paintOp.Y})
 		}
 	}
 
@@ -85,23 +85,23 @@ td.ref, th.ref { width: 44pt; }
 	}
 
 	// Collect distinct baselines and X positions for cite ink.
-	ys := map[float64]bool{}
+	yCoords := map[float64]bool{}
 	minX, maxX := marks[0].x, marks[0].x
 
-	for _, m := range marks {
-		ys[math.Round(m.y*4)/4] = true // 0.25pt bins
+	for _, mat := range marks {
+		yCoords[math.Round(mat.y*4)/4] = true // 0.25pt bins
 
-		if m.x < minX {
-			minX = m.x
+		if mat.x < minX {
+			minX = mat.x
 		}
 
-		if m.x > maxX {
-			maxX = m.x
+		if mat.x > maxX {
+			maxX = mat.x
 		}
 	}
 	// Prefer a single baseline (horizontal cluster). If wrapped, require
 	// horizontal advance somewhere so markers are not stacked at the same X.
-	if len(ys) == 1 {
+	if len(yCoords) == 1 {
 		if maxX-minX < 6 {
 			t.Fatalf("cite markers share one line but no horizontal advance: %v", marks)
 		}
@@ -120,14 +120,15 @@ td.ref, th.ref { width: 44pt; }
 	}
 
 	if sameX {
-		t.Fatalf("multi-cite markers stacked at same X (ys=%v marks=%v)", ys, marks)
+		t.Fatalf("multi-cite markers stacked at same X (ys=%v marks=%v)", yCoords, marks)
 	}
 }
 
 // Ref cell min-content for [n][m] nowrap cluster must exceed a single marker
 // so the column is not forced to one-marker width.
 func TestMultiCiteRefMinContentWiderThanOneMarker(t *testing.T) {
-	s := sheet(t, `
+	t.Parallel()
+	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 table { border-collapse: collapse; }
 td { border: 1px solid #999; padding: 2pt; font-size: 9pt; }
@@ -135,8 +136,8 @@ td { border: 1px solid #999; padding: 2pt; font-size: 9pt; }
 `)
 	one := `<html><body><table><tr><td><sup class="reference"><a href="#a"><span>[</span>127<span>]</span></a></sup></td></tr></table></body></html>`
 	two := `<html><body><table><tr><td><sup class="reference"><a href="#a"><span>[</span>127<span>]</span></a></sup><sup class="reference"><a href="#b"><span>[</span>128<span>]</span></a></sup></td></tr></table></body></html>`
-	wOne := refCellWidth(t, one, s)
-	wTwo := refCellWidth(t, two, s)
+	wOne := refCellWidth(t, one, cssSheet)
+	wTwo := refCellWidth(t, two, cssSheet)
 	t.Logf("one=%.1f two=%.1f", wOne, wTwo)
 
 	if wTwo < wOne+8 {
@@ -144,16 +145,15 @@ td { border: 1px solid #999; padding: 2pt; font-size: 9pt; }
 	}
 }
 
-func refCellWidth(t *testing.T, src string, s *css.Stylesheet) float64 {
+func refCellWidth(t *testing.T, src string, cssSheet *css.Stylesheet) float64 {
 	t.Helper()
 
 	root, err := html.Parse(src)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	res, err := Layout(root, Options{
-		Width: 400, Height: 200, Sheets: []*css.Stylesheet{s},
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 400, Height: 200, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true,
 	})
 	if err != nil {
@@ -169,7 +169,7 @@ func refCellWidth(t *testing.T, src string, s *css.Stylesheet) float64 {
 }
 
 func TestRowspanBrCitesSpreadVertically(t *testing.T) {
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 table { border-collapse: collapse; width: 480pt; }
 td { border: 1px solid #aaa; padding: 2pt; font-size: 9pt; }
@@ -182,8 +182,7 @@ td { border: 1px solid #aaa; padding: 2pt; font-size: 9pt; }
 <tr><td></td><td>Most Egregious Lovers Age Difference Award</td><td>Nominated</td></tr>
 </table></body></html>`
 	root := mustParse(t, src)
-
-	res, err := Layout(root, Options{Width: 500, Height: 400, Sheets: []*css.Stylesheet{s}, Background: true, Zoom: 0.666667})
+	res, err := Layout(root, Options{Width: 500, Height: 400, Sheets: []*css.Stylesheet{cssSheet}, Background: true, Zoom: 0.666667}) //nolint:exhaustruct // intentional zero fields
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,22 +191,22 @@ td { border: 1px solid #aaa; padding: 2pt; font-size: 9pt; }
 
 	var n127, n128 int
 
-	for _, op := range res.Ops {
-		if op.Kind != OpText {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpText {
 			continue
 		}
 
-		if op.Text == "127" || op.Text == "[127]" || (len(op.Text) >= 3 && op.Text == "127") {
+		if paintOp.Text == "127" || paintOp.Text == "[127]" || (len(paintOp.Text) >= 3 && paintOp.Text == "127") {
 			// collect digit ops
 		}
 
-		if containsCite(op.Text, "127") {
-			y127 += op.Y
+		if containsCite(paintOp.Text, "127") {
+			y127 += paintOp.Y
 			n127++
 		}
 
-		if containsCite(op.Text, "128") {
-			y128 += op.Y
+		if containsCite(paintOp.Text, "128") {
+			y128 += paintOp.Y
 			n128++
 		}
 	}

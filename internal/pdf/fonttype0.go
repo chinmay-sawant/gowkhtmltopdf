@@ -11,7 +11,7 @@ import (
 // (any code point outside the Latin-1 simple-font range).
 func needsType0(used []rune) bool {
 	for _, r := range used {
-		if r > 0xFF {
+		if r > maxLatin1Code {
 			return true
 		}
 	}
@@ -27,14 +27,14 @@ func needsType0(used []rune) bool {
 // dict tails differ.
 //
 // ponytail: Type0+simple dual embed — both product-real (Latin-1 vs CJK/BMP).
-func (d *Document) ensureFont(f *Font, used []rune) (objRef, error) {
+func (d *Document) ensureFont(fnt *Font, used []rune) (objRef, error) {
 	if len(used) == 0 {
 		used = []rune{' '}
 	}
 
 	type0 := needsType0(used)
 
-	baseName := f.PostScriptName
+	baseName := fnt.PostScriptName
 	if baseName == "" {
 		baseName = "LiberationSans"
 	}
@@ -44,7 +44,7 @@ func (d *Document) ensureFont(f *Font, used []rune) (objRef, error) {
 		mode = 1
 	}
 
-	key := fmt.Sprintf("v%d|%x|%s|%s", mode, f.fingerprint, baseName, runesKey(used))
+	key := fmt.Sprintf("v%d|%x|%s|%s", mode, fnt.fingerprint, baseName, runesKey(used))
 	if ref, ok := d.fontCache[key]; ok {
 		return ref, nil
 	}
@@ -54,23 +54,23 @@ func (d *Document) ensureFont(f *Font, used []rune) (objRef, error) {
 		scope = subsetUnicode
 	}
 
-	sub, err := subsetFont(f, used, scope)
+	sub, err := subsetFont(fnt, used, scope)
 	if err != nil {
 		return 0, err
 	}
 
 	pdfName := pdfNameToken(baseName)
 
-	fileRef, descRef, err := d.embedFontFile(f, sub, pdfName)
+	fileRef, descRef, err := d.embedFontFile(fnt, sub, pdfName)
 	if err != nil {
 		return 0, err
 	}
 
 	var ref objRef
 	if type0 {
-		ref, err = d.emitType0(f, sub, pdfName+"Identity", fileRef, descRef)
+		ref, err = d.emitType0(fnt, sub, pdfName+"Identity", fileRef, descRef)
 	} else {
-		ref, err = d.emitSimple(f, sub, pdfName, descRef)
+		ref, err = d.emitSimple(fnt, sub, pdfName, descRef)
 	}
 
 	if err != nil {
@@ -99,7 +99,7 @@ func (d *Document) embedFontFile(f *Font, sub *subsetResult, fontName string) (f
 
 	italicAngle := 0
 	if f.Italic() {
-		italicAngle = -12
+		italicAngle = defaultItalicAngle
 		flags |= 64
 	}
 
@@ -118,10 +118,10 @@ func (d *Document) embedFontFile(f *Font, sub *subsetResult, fontName string) (f
 // emitSimple writes the simple TrueType font dict (WinAnsi single-byte).
 func (d *Document) emitSimple(f *Font, sub *subsetResult, pdfName string, descRef objRef) (objRef, error) {
 	first, last, widths := subsetWidths(sub, f.UnitsPerEm())
-	ws := make([]string, len(widths))
+	wspace := make([]string, len(widths))
 
 	for i, w := range widths {
-		ws[i] = num(w)
+		wspace[i] = num(w)
 	}
 
 	fontRef := d.newObject()
@@ -130,7 +130,7 @@ func (d *Document) emitSimple(f *Font, sub *subsetResult, pdfName string, descRe
 		add("/BaseFont", "/"+pdfName).
 		add("/FirstChar", strconv.Itoa(first)).
 		add("/LastChar", strconv.Itoa(last)).
-		add("/Widths", "["+strings.Join(ws, " ")+"]").
+		add("/Widths", "["+strings.Join(wspace, " ")+"]").
 		add("/FontDescriptor", descRef.String()).
 		add("/Encoding", "/WinAnsiEncoding").
 		add("/ToUnicode", d.ensureToUnicode(sub, 1).String()).String())
@@ -153,8 +153,8 @@ func (d *Document) emitType0(f *Font, sub *subsetResult, pdfName string, fileRef
 		}
 	}
 
-	cidMap := make([]byte, (maxCID+1)*2)
-	ws := widthsInEm(sub, f.UnitsPerEm())
+	cidMap := make([]byte, (maxCID+1)*cidBytesPerEntry)
+	wspace := widthsInEm(sub, f.UnitsPerEm())
 
 	var wParts []string
 
@@ -165,16 +165,16 @@ func (d *Document) emitType0(f *Font, sub *subsetResult, pdfName string, fileRef
 
 	var rows []rw
 
-	for r, g := range sub.glyphIDs {
-		cidMap[int(r)*2] = byte(g >> 8)
-		cidMap[int(r)*2+1] = byte(g)
+	for rVal, glob := range sub.glyphIDs {
+		cidMap[int(rVal)*cidBytesPerEntry] = byte(glob >> cidGlyphHighShift)
+		cidMap[int(rVal)*cidBytesPerEntry+1] = byte(glob)
 
 		adv := 0.0
-		if int(g) < len(ws) {
-			adv = ws[g]
+		if int(glob) < len(wspace) {
+			adv = wspace[glob]
 		}
 
-		rows = append(rows, rw{r, adv})
+		rows = append(rows, rw{rVal, adv})
 	}
 
 	sort.Slice(rows, func(i, j int) bool { return rows[i].r < rows[j].r })
@@ -201,26 +201,26 @@ func (d *Document) emitType0(f *Font, sub *subsetResult, pdfName string, fileRef
 		add("/BaseFont", "/"+pdfName).
 		add("/Encoding", "/Identity-H").
 		add("/DescendantFonts", "["+cidRef.String()+"]").
-		add("/ToUnicode", d.ensureToUnicode(sub, 2).String()).String())
+		add("/ToUnicode", d.ensureToUnicode(sub, toUnicodeTwoByte).String()).String())
 
 	return type0Ref, nil
 }
 
 // pdfHexCIDs encodes s as an Identity-H hex string of Unicode CIDs.
 func pdfHexCIDs(s string) string {
-	var b strings.Builder
+	var buf strings.Builder
 
-	b.WriteByte('<')
+	buf.WriteByte('<')
 
 	for _, r := range s {
-		if r > 0xFFFF {
+		if r > maxBMPCode {
 			r = '?'
 		}
 
-		fmt.Fprintf(&b, "%04X", r)
+		fmt.Fprintf(&buf, "%04X", r)
 	}
 
-	b.WriteByte('>')
+	buf.WriteByte('>')
 
-	return b.String()
+	return buf.String()
 }

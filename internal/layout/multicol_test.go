@@ -9,7 +9,7 @@ import (
 )
 
 func TestMulticolParseProps(t *testing.T) {
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 .a { column-count: 3; column-gap: 12pt; column-fill: auto }
 .b { columns: 100pt 2; column-span: all; column-fill: balance }
 .c { column-gap: normal; column-width: 80pt }
@@ -21,7 +21,7 @@ func TestMulticolParseProps(t *testing.T) {
 <div class="c">C</div>
 <div class="d">D</div>
 </body></html>`)
-	styles := resolveStyles(root, []*css.Stylesheet{s}, "print", 500, 800)
+	styles := resolveStyles(root, []*css.Stylesheet{cssSheet}, "print", 500, 800)
 
 	var nodes []*html.Node
 
@@ -56,37 +56,39 @@ func TestMulticolParseProps(t *testing.T) {
 		t.Fatalf("c: normal=%v width=%.1f count=%d", c.ColumnGapNormal, c.ColumnWidth, c.ColumnCount)
 	}
 
-	d := styles[nodes[3]]
+	decl := styles[nodes[3]]
 	// break-before:column ≈ page always; break-inside:avoid-column is
 	// column-only and must not set page-break-inside:avoid.
-	if d.PageBreakBefore != "always" {
-		t.Fatalf("d break-before: got %q, want always", d.PageBreakBefore)
+	if decl.PageBreakBefore != "always" {
+		t.Fatalf("d break-before: got %q, want always", decl.PageBreakBefore)
 	}
 
-	if d.PageBreakInside == "avoid" {
-		t.Fatalf("d break-inside:avoid-column must not map to page avoid (got %q)", d.PageBreakInside)
+	if decl.PageBreakInside == "avoid" {
+		t.Fatalf("d break-inside:avoid-column must not map to page avoid (got %q)", decl.PageBreakInside)
 	}
 }
 
 func TestUsedColumnCountWidth(t *testing.T) {
-	n, w := usedColumnCountWidth(200, 10, -1, 2)
-	if n != 2 || math.Abs(w-95) > 0.01 {
-		t.Fatalf("count-only: n=%d w=%.2f want 2 / 95", n, w)
+	t.Parallel()
+	nodeN, width := usedColumnCountWidth(200, 10, -1, 2)
+	if nodeN != 2 || math.Abs(width-95) > 0.01 {
+		t.Fatalf("count-only: n=%d w=%.2f want 2 / 95", nodeN, width)
 	}
 
-	n, w = usedColumnCountWidth(200, 10, 60, 0)
-	if n != 3 || math.Abs(w-60) > 0.01 {
-		t.Fatalf("width-only: n=%d w=%.2f want 3 / 60", n, w)
+	nodeN, width = usedColumnCountWidth(200, 10, 60, 0)
+	if nodeN != 3 || math.Abs(width-60) > 0.01 {
+		t.Fatalf("width-only: n=%d w=%.2f want 3 / 60", nodeN, width)
 	}
 
-	n, w = usedColumnCountWidth(100, 10, -1, 0)
-	if n != 1 || math.Abs(w-100) > 0.01 {
-		t.Fatalf("both auto: n=%d w=%.2f", n, w)
+	nodeN, width = usedColumnCountWidth(100, 10, -1, 0)
+	if nodeN != 1 || math.Abs(width-100) > 0.01 {
+		t.Fatalf("both auto: n=%d w=%.2f", nodeN, width)
 	}
 }
 
 func TestMulticolTwoColumnEqualWidths(t *testing.T) {
-	s := sheet(t, `
+	t.Parallel()
+	cssSheet := sheet(t, `
 .mc {
   column-count: 2;
   column-gap: 20pt;
@@ -102,7 +104,7 @@ func TestMulticolTwoColumnEqualWidths(t *testing.T) {
   <p>Charlie right column start.</p>
   <p>Delta trailing paragraph.</p>
 </div>
-</body></html>`, s)
+</body></html>`, cssSheet)
 	pos := map[string]float64{}
 
 	for _, op := range res.Ops {
@@ -142,23 +144,23 @@ func TestMulticolColumnSpanAll(t *testing.T) {
 
 	var gotSpan, gotBefore, gotAfter bool
 
-	for _, op := range res.Ops {
-		if op.Kind != OpText {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpText {
 			continue
 		}
 
-		if len(op.Text) >= 7 && op.Text[:7] == "Spanner" {
-			spanX = op.X
+		if len(paintOp.Text) >= 7 && paintOp.Text[:7] == "Spanner" {
+			spanX = paintOp.X
 			gotSpan = true
 		}
 
-		if len(op.Text) >= 6 && op.Text[:6] == "Before" {
-			beforeX = op.X
+		if len(paintOp.Text) >= 6 && paintOp.Text[:6] == "Before" {
+			beforeX = paintOp.X
 			gotBefore = true
 		}
 
-		if len(op.Text) >= 5 && op.Text[:5] == "After" {
-			afterX = op.X
+		if len(paintOp.Text) >= 5 && paintOp.Text[:5] == "After" {
+			afterX = paintOp.X
 			gotAfter = true
 		}
 	}
@@ -173,7 +175,8 @@ func TestMulticolColumnSpanAll(t *testing.T) {
 }
 
 func TestMulticolLinesDoNotStraddlePages(t *testing.T) {
-	s := sheet(t, `
+	t.Parallel()
+	cssSheet := sheet(t, `
 body { margin: 0 }
 .mc { column-count: 2; column-gap: 8pt; width: 200pt; column-fill: balance; font-size: 10pt }
 .mc p { margin: 0 0 6pt 0 }
@@ -196,22 +199,22 @@ body { margin: 0 }
 </body></html>`)
 	pageH := 120.0
 
-	res, err := Layout(root, Options{Width: 220, Height: pageH, Sheets: []*css.Stylesheet{s}, Background: true})
+	res, err := Layout(root, Options{Width: 220, Height: pageH, Sheets: []*css.Stylesheet{cssSheet}, Background: true}) //nolint:exhaustruct // intentional zero fields
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	for _, op := range res.Ops {
-		if op.Kind != OpText {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpText {
 			continue
 		}
 
-		opH := op.Size * 1.2
-		lo := int(op.Y / pageH)
-		hi := int((op.Y + opH) / pageH)
+		opH := paintOp.Size * 1.2
+		lo := int(paintOp.Y / pageH)
+		hi := int((paintOp.Y + opH) / pageH)
 
 		if hi > lo {
-			t.Fatalf("text %q straddles page at y=%.1f h=%.1f (pages %d-%d)", op.Text, op.Y, opH, lo, hi)
+			t.Fatalf("text %q straddles page at y=%.1f h=%.1f (pages %d-%d)", paintOp.Text, paintOp.Y, opH, lo, hi)
 		}
 	}
 

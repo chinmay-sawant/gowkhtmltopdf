@@ -22,35 +22,35 @@ type multicolItem struct {
 // on the next page. Nested floats/abspos inside columns use the ordinary BFC
 // path (best-effort; not Chrome-balanced with floats).
 func (e *engine) buildMulticol(n *html.Node, st ResolvedStyle, availW, x, y float64) *box {
-	ml := e.scalePt(st.MarginLeft)
-	b := &box{node: n, style: st, kind: "block", x: x, y: y}
-	b.w = resolveUsedWidth(st, availW, e)
+	margL := e.scalePt(st.MarginLeft)
+	boxNode := &box{node: n, style: st, kind: "block", x: x, y: y} //nolint:exhaustruct // intentional zero fields
+	boxNode.w = resolveUsedWidth(st, availW, e)
 
 	if definiteW := st.Width >= 0 || st.WidthPercent >= 0; definiteW && (st.MarginLeftAuto || st.MarginRightAuto) {
-		free := availW - b.w
+		free := availW - boxNode.w
 		if free < 0 {
 			free = 0
 		}
 
-		mr := e.scalePt(st.MarginRight)
+		margR := e.scalePt(st.MarginRight)
 
 		switch {
 		case st.MarginLeftAuto && st.MarginRightAuto:
-			ml = free / 2
+			margL = free / two
 		case st.MarginLeftAuto:
-			ml = free - mr
-			if ml < 0 {
-				ml = 0
+			margL = free - margR
+			if margL < 0 {
+				margL = 0
 			}
 		}
 	}
 
-	b.x = x + ml
+	boxNode.x = x + margL
 
-	contentX, contentW := e.contentBox(b.x, b.w, st)
+	contentX, contentW := e.contentBox(boxNode.x, boxNode.w, st)
 	contentStart := len(e.ops)
 
-	cy := e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)
+	curY := e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)
 	gap := e.multicolGap(st)
 	nCols, colW := usedColumnCountWidth(contentW, gap, st.ColumnWidth, st.ColumnCount)
 	// One column: use ordinary block flow. The multicol line/page snap path
@@ -58,44 +58,44 @@ func (e *engine) buildMulticol(n *html.Node, st ResolvedStyle, availW, x, y floa
 	// (wiki reflist with column-width:30em on a narrow page).
 	if nCols <= 1 {
 		pop, enclose := e.pushBFCFloats(st, contentX, contentW)
-		cy = e.flowChildren(b, n.Children, st, contentW, contentX, y, cy)
+		curY = e.flowChildren(boxNode, n.Children, st, contentW, contentX, y, curY)
 
 		if enclose && e.bfcFloats != nil {
-			cy = e.bfcFloats.extentCy(y, cy)
+			curY = e.bfcFloats.extentCy(y, curY)
 		}
 
 		pop()
 
-		cy += e.scalePt(st.PaddingBottom)
-		if h, ok := resolveUsedHeight(st, -1, e); ok && cy < h {
-			cy = h
+		curY += e.scalePt(st.PaddingBottom)
+		if h, ok := resolveUsedHeight(st, -1, e); ok && curY < h {
+			curY = h
 		}
 
-		if st.MinHeight > 0 && cy < e.scalePt(st.MinHeight) {
-			cy = e.scalePt(st.MinHeight)
+		if st.MinHeight > 0 && curY < e.scalePt(st.MinHeight) {
+			curY = e.scalePt(st.MinHeight)
 		}
 
-		if st.MaxHeight >= 0 && cy > e.scalePt(st.MaxHeight) {
-			cy = e.scalePt(st.MaxHeight)
+		if st.MaxHeight >= 0 && curY > e.scalePt(st.MaxHeight) {
+			curY = e.scalePt(st.MaxHeight)
 		}
 
-		b.h = cy
-		e.prependChrome(contentStart, b, st, b.x, y, b.w, b.h)
+		boxNode.height = curY
+		e.prependChrome(contentStart, boxNode, st, boxNode.x, y, boxNode.w, boxNode.height)
 
-		return b
+		return boxNode
 	}
 
 	var kids []*html.Node
 
-	for _, c := range n.Children {
-		if c.Type == html.ElementNode {
-			if e.styles[c].Display == "none" {
+	for _, child := range n.Children {
+		if child.Type == html.ElementNode {
+			if e.styles[child].Display == "none" {
 				continue
 			}
 
-			kids = append(kids, c)
-		} else if c.Type == html.TextNode && strings.TrimSpace(c.Text) != "" {
-			kids = append(kids, c)
+			kids = append(kids, child)
+		} else if child.Type == html.TextNode && strings.TrimSpace(child.Text) != "" {
+			kids = append(kids, child)
 		}
 	}
 
@@ -115,52 +115,52 @@ func (e *engine) buildMulticol(n *html.Node, st ResolvedStyle, availW, x, y floa
 		}
 
 		if len(segs) == 0 || segs[len(segs)-1].spanner {
-			segs = append(segs, seg{nodes: []*html.Node{kid}})
+			segs = append(segs, seg{nodes: []*html.Node{kid}}) //nolint:exhaustruct // intentional zero fields
 		} else {
 			segs[len(segs)-1].nodes = append(segs[len(segs)-1].nodes, kid)
 		}
 	}
 
-	for _, s := range segs {
-		if s.spanner {
-			for _, kid := range s.nodes {
+	for _, cssSheet := range segs {
+		if cssSheet.spanner {
+			for _, kid := range cssSheet.nodes {
 				cs := e.styles[kid]
-				cy += collapseMargins(0, e.scalePt(cs.MarginTop))
+				curY += collapseMargins(0, e.scalePt(cs.MarginTop))
 
-				cb := e.build(kid, contentW, contentX, y+cy)
-				if cb == nil {
+				cblock := e.build(kid, contentW, contentX, y+curY)
+				if cblock == nil {
 					continue
 				}
 
-				cy += cb.h
-				b.children = append(b.children, cb)
+				curY += cblock.height
+				boxNode.children = append(boxNode.children, cblock)
 			}
 
 			continue
 		}
 
-		cy = e.flowMulticolSegment(b, s.nodes, st, nCols, colW, gap, contentX, y, cy)
+		curY = e.flowMulticolSegment(boxNode, cssSheet.nodes, st, nCols, colW, gap, contentX, y, curY)
 	}
 
-	cy += e.scalePt(st.PaddingBottom)
+	curY += e.scalePt(st.PaddingBottom)
 	if h, ok := resolveUsedHeight(st, -1, e); ok {
-		if cy < h {
-			cy = h
+		if curY < h {
+			curY = h
 		}
 	}
 
-	if st.MinHeight > 0 && cy < e.scalePt(st.MinHeight) {
-		cy = e.scalePt(st.MinHeight)
+	if st.MinHeight > 0 && curY < e.scalePt(st.MinHeight) {
+		curY = e.scalePt(st.MinHeight)
 	}
 
-	if st.MaxHeight >= 0 && cy > e.scalePt(st.MaxHeight) {
-		cy = e.scalePt(st.MaxHeight)
+	if st.MaxHeight >= 0 && curY > e.scalePt(st.MaxHeight) {
+		curY = e.scalePt(st.MaxHeight)
 	}
 
-	b.h = cy
-	e.prependChrome(contentStart, b, st, b.x, y, b.w, b.h)
+	boxNode.height = curY
+	e.prependChrome(contentStart, boxNode, st, boxNode.x, y, boxNode.w, boxNode.height)
 
-	return b
+	return boxNode
 }
 
 // multicolGap returns the used column-gap for a multicol container.
@@ -265,8 +265,8 @@ func (e *engine) flowMulticolSegment(parent *box, nodes []*html.Node, st Resolve
 	definiteH := resolveContentHeight(st, e)
 	padTop := e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)
 
-	i := 0
-	for i < len(items) {
+	idx := 0
+	for idx < len(items) {
 		absTop := y + cy
 
 		pageIdx := int(absTop / pageH)
@@ -277,7 +277,7 @@ func (e *engine) flowMulticolSegment(parent *box, nodes []*html.Node, st Resolve
 		pageTop := float64(pageIdx) * pageH
 		boundary := pageTop + pageH
 		remain := boundary - absTop
-		minUseful := e.scalePt(st.FontSize) * 1.2
+		minUseful := e.scalePt(st.FontSize) * defaultLineHeightRatio
 		// Snap to the next page when little/no room remains. Guard against
 		// float edges where absTop/pageH truncates just below an integer and
 		// remain≈0 (would spin forever on cy += remain).
@@ -305,7 +305,7 @@ func (e *engine) flowMulticolSegment(parent *box, nodes []*html.Node, st Resolve
 			}
 		}
 
-		if items[i].h > maxColH+1e-6 && absTop > pageTop+1e-6 {
+		if items[idx].h > maxColH+1e-6 && absTop > pageTop+1e-6 {
 			target := boundary
 			if target <= absTop+1e-6 {
 				target += pageH
@@ -322,17 +322,17 @@ func (e *engine) flowMulticolSegment(parent *box, nodes []*html.Node, st Resolve
 
 		totalH := 0.0
 
-		for i < len(items) {
-			it := items[i]
-			if len(batch) > 0 && totalH+it.h > capacity+1e-6 {
+		for idx < len(items) {
+			item := items[idx]
+			if len(batch) > 0 && totalH+item.h > capacity+1e-6 {
 				break
 			}
 
-			batch = append(batch, it)
-			totalH += it.h
-			i++
+			batch = append(batch, item)
+			totalH += item.h
+			idx++
 
-			if it.h > maxColH+1e-6 && len(batch) == 1 {
+			if item.h > maxColH+1e-6 && len(batch) == 1 {
 				break
 			}
 		}
@@ -363,27 +363,27 @@ func (e *engine) placeMulticolLine(parent *box, items []multicolItem, nCols int,
 
 	col := 0
 
-	for _, it := range items {
+	for _, item := range items {
 		if balance {
 			if col < nCols-1 && colHeights[col] > 0 &&
-				colHeights[col]+it.h/2 > target &&
+				colHeights[col]+item.h/2 > target &&
 				colHeights[col] >= target*0.85 {
 				col++
 			}
 		} else if col < nCols-1 && colHeights[col] > 0 &&
-			colHeights[col]+it.h > maxColH+1e-6 {
+			colHeights[col]+item.h > maxColH+1e-6 {
 			col++
 		}
 
-		cb := e.build(it.n, colW, colX(col), y+cy+colHeights[col])
-		if cb == nil {
+		cblock := e.build(item.n, colW, colX(col), y+cy+colHeights[col])
+		if cblock == nil {
 			continue
 		}
 
-		colHeights[col] += cb.h
+		colHeights[col] += cblock.height
 
 		if parent != nil {
-			parent.children = append(parent.children, cb)
+			parent.children = append(parent.children, cblock)
 		}
 	}
 
@@ -402,7 +402,7 @@ func (e *engine) measureMulticolChildHeight(n *html.Node, availW float64) float6
 	prev := e.noEmit
 	e.noEmit = true
 	start := len(e.ops)
-	b := e.build(n, availW, 0, 0)
+	boxNode := e.build(n, availW, 0, 0)
 
 	if len(e.ops) > start {
 		e.ops = e.ops[:start]
@@ -410,9 +410,9 @@ func (e *engine) measureMulticolChildHeight(n *html.Node, availW float64) float6
 
 	e.noEmit = prev
 
-	if b == nil {
+	if boxNode == nil {
 		return 0
 	}
 
-	return b.h
+	return boxNode.height
 }

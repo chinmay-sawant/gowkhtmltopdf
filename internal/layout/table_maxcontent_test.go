@@ -11,7 +11,7 @@ import (
 // leave a narrow table and tall wrapped rows. Max-content sizing should give
 // a wide table filling most of the containing block with short rows.
 func TestAutoTableUsesMaxContentColumnWidths(t *testing.T) {
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 table { border-collapse: collapse; }
 td, th { border: 1px solid #aaa; padding: 0.4em 0.6em; }
@@ -33,8 +33,8 @@ td, th { border: 1px solid #aaa; padding: 0.4em 0.6em; }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{
-		Width: contentW, Height: 800, Sheets: []*css.Stylesheet{s},
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: contentW, Height: 800, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true,
 	})
 	if err != nil {
@@ -44,21 +44,21 @@ td, th { border: 1px solid #aaa; padding: 0.4em 0.6em; }
 	var notesX, maxRight, year0Y, year1Y float64
 	year0Y = -1
 
-	for _, op := range res.Ops {
-		if op.Kind == OpText && op.Text == "Notes" {
-			notesX = op.X
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind == OpText && paintOp.Text == "Notes" {
+			notesX = paintOp.X
 		}
 
-		if op.Kind == OpText && op.Text == "2006" {
-			year0Y = op.Y
+		if paintOp.Kind == OpText && paintOp.Text == "2006" {
+			year0Y = paintOp.Y
 		}
 
-		if op.Kind == OpText && op.Text == "2009" {
-			year1Y = op.Y
+		if paintOp.Kind == OpText && paintOp.Text == "2009" {
+			year1Y = paintOp.Y
 		}
 
-		if op.Kind == OpText && op.X+op.W > maxRight {
-			maxRight = op.X + op.W
+		if paintOp.Kind == OpText && paintOp.X+paintOp.W > maxRight {
+			maxRight = paintOp.X + paintOp.W
 		}
 	}
 
@@ -78,21 +78,21 @@ td, th { border: 1px solid #aaa; padding: 0.4em 0.6em; }
 	// "Virgin Rose" should sit on one line (not wrap after Virgin).
 	virginY, roseY := -1.0, -1.0
 
-	for _, op := range res.Ops {
-		if op.Kind != OpText {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpText {
 			continue
 		}
 
-		if op.Text == "Virgin" || op.Text == "Virgin " {
-			virginY = op.Y
+		if paintOp.Text == "Virgin" || paintOp.Text == "Virgin " {
+			virginY = paintOp.Y
 		}
 
-		if op.Text == "Rose" || op.Text == "Rose " {
-			roseY = op.Y
+		if paintOp.Text == "Rose" || paintOp.Text == "Rose " {
+			roseY = paintOp.Y
 		}
 
-		if op.Text == "Virgin Rose" || op.Text == "Virgin Rose " {
-			virginY, roseY = op.Y, op.Y
+		if paintOp.Text == "Virgin Rose" || paintOp.Text == "Virgin Rose " {
+			virginY, roseY = paintOp.Y, paintOp.Y
 		}
 	}
 

@@ -11,6 +11,7 @@ import (
 // After a float ends, subsequent lines must reclaim full content width
 // (CSS2.1 line-box shortening), not stay narrow for the whole paragraph.
 func TestFloatTextReclaimsFullWidthBelow(t *testing.T) {
+	t.Parallel()
 	png := []byte{
 		0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
 		0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
@@ -19,7 +20,7 @@ func TestFloatTextReclaimsFullWidthBelow(t *testing.T) {
 		0x00, 0x00, 0x03, 0x00, 0x01, 0x00, 0x05, 0xfe, 0xd4, 0xef, 0x00, 0x00,
 		0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
 	}
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 p { margin: 0; }
 figure { float: left; width: 80pt; margin: 0 8pt 4pt 0; }
@@ -35,9 +36,8 @@ img { display: block; width: 80pt; height: 60pt; }
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	res, err := Layout(root, Options{
-		Width: 360, Height: 400, Sheets: []*css.Stylesheet{s}, Background: true,
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 360, Height: 400, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
 		Images: func(string) ([]byte, error) { return png, nil },
 	})
 	if err != nil {
@@ -72,6 +72,7 @@ img { display: block; width: 80pt; height: 60pt; }
 // Short end-of-paragraph tails must not sit as orphans in the narrow column
 // beside a float when they fit as one full-width line under the float.
 func TestFloatOrphanTailClearsBelow(t *testing.T) {
+	t.Parallel()
 	png := []byte{
 		0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
 		0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
@@ -80,7 +81,7 @@ func TestFloatOrphanTailClearsBelow(t *testing.T) {
 		0x00, 0x00, 0x03, 0x00, 0x01, 0x00, 0x05, 0xfe, 0xd4, 0xef, 0x00, 0x00,
 		0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
 	}
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 p { margin: 0; }
 figure { float: left; width: 100pt; margin: 0 8pt 4pt 0; }
@@ -99,8 +100,8 @@ img { display: block; width: 100pt; height: 120pt; }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{
-		Width: 360, Height: 500, Sheets: []*css.Stylesheet{s}, Background: true,
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 360, Height: 500, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
 		Images: func(string) ([]byte, error) { return png, nil },
 	})
 	if err != nil {

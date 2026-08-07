@@ -24,41 +24,44 @@ func defaultLP() settings.LoadPage {
 }
 
 func TestGuessURL(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
-	f := filepath.Join(dir, "page.html")
-	if err := os.WriteFile(f, []byte("<html></html>"), 0o644); err != nil {
+	filePath := filepath.Join(dir, "page.html")
+	if err := os.WriteFile(filePath, []byte("<html></html>"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	cases := []struct {
-		in   string
-		kind Kind
-		want string
+		inPath string
+		kind   Kind
+		want   string
 	}{
 		{"http://example.com/a.html", KindHTTP, "http://example.com/a.html"},
 		{"https://example.com", KindHTTP, "https://example.com"},
 		{"example.com:8080/a", KindHTTP, "http://example.com:8080/a"},
 		{"<html>x</html>", KindInline, "inline:"},
 		{"data:text/plain,hi", KindInline, "data:"},
-		{f, KindFile, "file://"},
+		{filePath, KindFile, "file://"},
 		{"not-an-existing-host", KindHTTP, "http://not-an-existing-host"},
 	}
-	for _, c := range cases {
-		kind, target, err := GuessURL(c.in)
+	for _, testCase := range cases {
+		kind, target, err := GuessURL(testCase.inPath)
 		if err != nil {
-			t.Errorf("GuessURL(%q): %v", c.in, err)
+			t.Errorf("GuessURL(%q): %v", testCase.inPath, err)
 
 			continue
 		}
 
-		if kind != c.kind || !strings.HasPrefix(target, c.want) {
-			t.Errorf("GuessURL(%q) = %v, %q; want %v, prefix %q", c.in, kind, target, c.kind, c.want)
+		if kind != testCase.kind || !strings.HasPrefix(target, testCase.want) {
+			t.Errorf("GuessURL(%q) = %v, %q; want %v, prefix %q", testCase.inPath, kind, target, testCase.kind, testCase.want)
 		}
 	}
 }
 
 func TestIsHTML(t *testing.T) {
+	t.Parallel()
+
 	if !IsHTML("<html><body></body></html>") {
 		t.Error("inline html not detected")
 	}
@@ -69,21 +72,23 @@ func TestIsHTML(t *testing.T) {
 }
 
 func TestLoadHTTPBasic(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/page" {
-			w.Header().Set("Content-Type", "text/html")
-			w.Write([]byte("<html><body>ok</body></html>"))
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(respWriter http.ResponseWriter, req *http.Request) {
+		if req.URL.Path == "/page" {
+			respWriter.Header().Set("Content-Type", "text/html")
+			respWriter.Write([]byte("<html><body>ok</body></html>"))
 
 			return
 		}
 
-		http.NotFound(w, r)
+		http.NotFound(respWriter, req)
 	}))
 	defer srv.Close()
 
-	l := NewLoader(settings.LoadGlobal{})
+	loader := NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
 
-	res, err := l.Load(t.Context(), srv.URL+"/page", defaultLP())
+	res, err := loader.Load(t.Context(), srv.URL+"/page", defaultLP())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,40 +103,42 @@ func TestLoadHTTPBasic(t *testing.T) {
 }
 
 func TestLoadHTTPCustomHeadersAndAuth(t *testing.T) {
-	var mu sync.Mutex
+	t.Parallel()
+
+	var muLock sync.Mutex
 
 	got := map[string]string{}
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mu.Lock()
-		defer mu.Unlock()
+	srv := httptest.NewServer(http.HandlerFunc(func(respWriter http.ResponseWriter, req *http.Request) {
+		muLock.Lock()
+		defer muLock.Unlock()
 
-		got["x-token"] = r.Header.Get("X-Token")
-		u, p, ok := r.BasicAuth()
+		got["x-token"] = req.Header.Get("X-Token")
+		targetURL, pathStr, okPath := req.BasicAuth()
 
-		if ok {
-			got["user"] = u
-			got["pass"] = p
+		if okPath {
+			got["user"] = targetURL
+			got["pass"] = pathStr
 		}
 
-		got["ua"] = r.Header.Get("User-Agent")
+		got["ua"] = req.Header.Get("User-Agent")
 
-		w.Write([]byte("ok"))
+		respWriter.Write([]byte("ok"))
 	}))
 	defer srv.Close()
 
-	lp := defaultLP()
-	lp.CustomHeaders = map[string]string{"X-Token": "secret"}
-	lp.Username = "bob"
-	lp.Password = "hunter2"
-	l := NewLoader(settings.LoadGlobal{})
+	pageLoad := defaultLP()
+	pageLoad.CustomHeaders = map[string]string{"X-Token": "secret"}
+	pageLoad.Username = "bob"
+	pageLoad.Password = "hunter2"
+	loader := NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
 
-	if _, err := l.Load(t.Context(), srv.URL, lp); err != nil {
+	if _, err := loader.Load(t.Context(), srv.URL, pageLoad); err != nil {
 		t.Fatal(err)
 	}
 
-	mu.Lock()
-	defer mu.Unlock()
+	muLock.Lock()
+	defer muLock.Unlock()
 
 	if got["x-token"] != "secret" || got["user"] != "bob" || got["pass"] != "hunter2" {
 		t.Errorf("headers/auth = %v", got)
@@ -143,30 +150,32 @@ func TestLoadHTTPCustomHeadersAndAuth(t *testing.T) {
 }
 
 func TestLoadHTTPPost(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			t.Errorf("method = %s", r.Method)
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(respWriter http.ResponseWriter, req *http.Request) {
+		if req.Method != http.MethodPost {
+			t.Errorf("method = %s", req.Method)
 		}
 
-		if ct := r.Header.Get("Content-Type"); ct != "application/x-www-form-urlencoded" {
+		if ct := req.Header.Get("Content-Type"); ct != "application/x-www-form-urlencoded" {
 			t.Errorf("content-type = %q", ct)
 		}
 
-		r.ParseForm()
+		req.ParseForm()
 
-		if r.Form.Get("q") != "hello world" || r.Form.Get("x") != "1" {
-			t.Errorf("form = %v", r.Form)
+		if req.Form.Get("q") != "hello world" || req.Form.Get("x") != "1" {
+			t.Errorf("form = %v", req.Form)
 		}
 
-		w.Write([]byte("posted"))
+		respWriter.Write([]byte("posted"))
 	}))
 	defer srv.Close()
 
-	lp := defaultLP()
-	lp.Post = []settings.PostItem{{Name: "q", Value: "hello world"}, {Name: "x", Value: "1"}}
-	l := NewLoader(settings.LoadGlobal{})
+	pageLoad := defaultLP()
+	pageLoad.Post = []settings.PostItem{{Name: "q", Value: "hello world"}, {Name: "x", Value: "1"}}
+	loader := NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
 
-	res, err := l.Load(t.Context(), srv.URL, lp)
+	res, err := loader.Load(t.Context(), srv.URL, pageLoad)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,41 +186,43 @@ func TestLoadHTTPPost(t *testing.T) {
 }
 
 func TestLoadHTTPErrorCodes(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(respWriter http.ResponseWriter, req *http.Request) {
+		switch req.URL.Path {
 		case "/404":
-			http.NotFound(w, r)
+			http.NotFound(respWriter, req)
 		case "/401":
-			w.WriteHeader(http.StatusUnauthorized)
+			respWriter.WriteHeader(http.StatusUnauthorized)
 		case "/500":
-			w.WriteHeader(http.StatusInternalServerError)
+			respWriter.WriteHeader(http.StatusInternalServerError)
 		default:
-			w.Write([]byte("ok"))
+			respWriter.Write([]byte("ok"))
 		}
 	}))
 	defer srv.Close()
 
-	l := NewLoader(settings.LoadGlobal{})
+	loader := NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
 
-	_, err := l.Load(t.Context(), srv.URL+"/404", defaultLP())
+	_, err := loader.Load(t.Context(), srv.URL+"/404", defaultLP())
 	if err == nil {
 		t.Fatal("404 must error with abort policy")
 	}
 
-	if he, ok := err.(*settings.HttpStatusError); !ok || he.HttpErrorCode() != 2 {
+	if he, okPath := err.(*settings.HttpStatusError); !okPath || he.HttpErrorCode() != 2 {
 		t.Errorf("404 error = %v", err)
 	}
 
-	_, err = l.Load(t.Context(), srv.URL+"/401", defaultLP())
-	if he, ok := err.(*settings.HttpStatusError); !ok || he.HttpErrorCode() != 3 {
+	_, err = loader.Load(t.Context(), srv.URL+"/401", defaultLP())
+	if he, okPath := err.(*settings.HttpStatusError); !okPath || he.HttpErrorCode() != 3 {
 		t.Errorf("401 error = %v", err)
 	}
 
 	// skip policy: no error, Skip=true
-	lp := defaultLP()
-	lp.LoadErrorHandling = settings.LoadErrorSkip
+	pageLoad := defaultLP()
+	pageLoad.LoadErrorHandling = settings.LoadErrorSkip
 
-	res, err := l.Load(t.Context(), srv.URL+"/500", lp)
+	res, err := loader.Load(t.Context(), srv.URL+"/500", pageLoad)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,9 +232,9 @@ func TestLoadHTTPErrorCodes(t *testing.T) {
 	}
 
 	// ignore policy: no error, empty body
-	lp.LoadErrorHandling = settings.LoadErrorIgnore
+	pageLoad.LoadErrorHandling = settings.LoadErrorIgnore
 
-	res, err = l.Load(t.Context(), srv.URL+"/500", lp)
+	res, err = loader.Load(t.Context(), srv.URL+"/500", pageLoad)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -234,28 +245,30 @@ func TestLoadHTTPErrorCodes(t *testing.T) {
 }
 
 func TestLoadCookies(t *testing.T) {
-	var mu sync.Mutex
+	t.Parallel()
+
+	var muLock sync.Mutex
 
 	var gotCookie string
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mu.Lock()
-		gotCookie = r.Header.Get("Cookie")
-		mu.Unlock()
-		w.Write([]byte("ok"))
+	srv := httptest.NewServer(http.HandlerFunc(func(respWriter http.ResponseWriter, req *http.Request) {
+		muLock.Lock()
+		gotCookie = req.Header.Get("Cookie")
+		muLock.Unlock()
+		respWriter.Write([]byte("ok"))
 	}))
 	defer srv.Close()
 
-	lp := defaultLP()
-	lp.Cookies = map[string]string{"session": "abc123"}
-	l := NewLoader(settings.LoadGlobal{})
+	pageLoad := defaultLP()
+	pageLoad.Cookies = map[string]string{"session": "abc123"}
+	loader := NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
 
-	if _, err := l.Load(t.Context(), srv.URL, lp); err != nil {
+	if _, err := loader.Load(t.Context(), srv.URL, pageLoad); err != nil {
 		t.Fatal(err)
 	}
 
-	mu.Lock()
-	defer mu.Unlock()
+	muLock.Lock()
+	defer muLock.Unlock()
 
 	if !strings.Contains(gotCookie, "session=abc123") {
 		t.Errorf("cookie = %q", gotCookie)
@@ -263,14 +276,15 @@ func TestLoadCookies(t *testing.T) {
 }
 
 func TestACLDefaultDeny(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	secret := filepath.Join(dir, "secret.html")
 	os.WriteFile(secret, []byte("secret"), 0o644)
 
-	lp := defaultLP() // BlockLocalFileAccess = true, no allow prefixes
-	l := NewLoader(settings.LoadGlobal{})
+	pageLoad := defaultLP()                    // BlockLocalFileAccess = true, no allow prefixes
+	loader := NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
 
-	_, err := l.Load(t.Context(), secret, lp)
+	_, err := loader.Load(t.Context(), secret, pageLoad)
 	if err == nil {
 		t.Fatal("default policy must deny local file access")
 	}
@@ -281,16 +295,17 @@ func TestACLDefaultDeny(t *testing.T) {
 }
 
 func TestACLAllowPrefix(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	allowed := filepath.Join(dir, "public", "a.html")
 	os.MkdirAll(filepath.Dir(allowed), 0o755)
 	os.WriteFile(allowed, []byte("<html>ok</html>"), 0o644)
 
-	lp := defaultLP()
-	l := NewLoader(settings.LoadGlobal{})
-	l.Allow = []string{filepath.Join(dir, "public")}
+	pageLoad := defaultLP()
+	loader := NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader.Allow = []string{filepath.Join(dir, "public")}
 
-	res, err := l.Load(t.Context(), allowed, lp)
+	res, err := loader.Load(t.Context(), allowed, pageLoad)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -303,52 +318,55 @@ func TestACLAllowPrefix(t *testing.T) {
 	outside := filepath.Join(dir, "other.html")
 	os.WriteFile(outside, []byte("x"), 0o644)
 
-	if _, err := l.Load(t.Context(), outside, lp); err == nil {
+	if _, err := loader.Load(t.Context(), outside, pageLoad); err == nil {
 		t.Error("outside allow prefix must stay denied")
 	}
 }
 
 func TestACLEnableLocalFileAccess(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
-	f := filepath.Join(dir, "page.html")
-	os.WriteFile(f, []byte("<html>ok</html>"), 0o644)
+	filePath := filepath.Join(dir, "page.html")
+	os.WriteFile(filePath, []byte("<html>ok</html>"), 0o644)
 
-	lp := defaultLP()
-	lp.BlockLocalFileAccess = false
-	l := NewLoader(settings.LoadGlobal{})
-	l.EnableLocalFileAccess = true
+	pageLoad := defaultLP()
+	pageLoad.BlockLocalFileAccess = false
+	loader := NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader.EnableLocalFileAccess = true
 
-	if _, err := l.Load(t.Context(), f, lp); err != nil {
+	if _, err := loader.Load(t.Context(), filePath, pageLoad); err != nil {
 		t.Errorf("enabled local access must load: %v", err)
 	}
 
 	// global on but object still blocks → denied
 	lp2 := defaultLP()
-	l2 := NewLoader(settings.LoadGlobal{})
+	l2 := NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
 	l2.EnableLocalFileAccess = true
 
-	if _, err := l2.Load(t.Context(), f, lp2); err == nil {
+	if _, err := l2.Load(t.Context(), filePath, lp2); err == nil {
 		t.Error("object block must still apply")
 	}
 }
 
 func TestSubresourceFetch(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(respWriter http.ResponseWriter, req *http.Request) {
+		switch req.URL.Path {
 		case "/style.css":
-			w.Header().Set("Content-Type", "text/css")
-			w.Write([]byte("body{}"))
+			respWriter.Header().Set("Content-Type", "text/css")
+			respWriter.Write([]byte("body{}"))
 		case "/img/logo.png":
-			w.Write([]byte("PNG"))
+			respWriter.Write([]byte("PNG"))
 		default:
-			http.NotFound(w, r)
+			http.NotFound(respWriter, req)
 		}
 	}))
 	defer srv.Close()
 
-	l := NewLoader(settings.LoadGlobal{})
+	loader := NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
 
-	res, err := l.FetchSub(t.Context(), srv.URL+"/page.html", "/style.css", defaultLP())
+	res, err := loader.FetchSub(t.Context(), srv.URL+"/page.html", "/style.css", defaultLP())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -357,7 +375,7 @@ func TestSubresourceFetch(t *testing.T) {
 		t.Errorf("css = %q", res.Body)
 	}
 
-	res, err = l.FetchSub(t.Context(), srv.URL+"/page.html", "img/logo.png", defaultLP())
+	res, err = loader.FetchSub(t.Context(), srv.URL+"/page.html", "img/logo.png", defaultLP())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -368,30 +386,32 @@ func TestSubresourceFetch(t *testing.T) {
 }
 
 func TestConcurrentLoads(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(respWriter http.ResponseWriter, req *http.Request) {
 		time.Sleep(20 * time.Millisecond)
-		w.Write([]byte("ok"))
+		respWriter.Write([]byte("ok"))
 	}))
 	defer srv.Close()
 
-	l := NewLoader(settings.LoadGlobal{})
+	loader := NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
 
-	var wg sync.WaitGroup
+	var waitGroup sync.WaitGroup
 
 	errs := make(chan error, 8)
 
 	for range 8 {
-		wg.Add(1)
+		waitGroup.Add(1)
 
 		go func() {
-			defer wg.Done()
+			defer waitGroup.Done()
 
-			_, err := l.Load(t.Context(), srv.URL, defaultLP())
+			_, err := loader.Load(t.Context(), srv.URL, defaultLP())
 			errs <- err
 		}()
 	}
 
-	wg.Wait()
+	waitGroup.Wait()
 	close(errs)
 
 	for err := range errs {
@@ -402,23 +422,25 @@ func TestConcurrentLoads(t *testing.T) {
 }
 
 func TestRedirectLimit(t *testing.T) {
-	var n int
+	t.Parallel()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		n++
-		if n < 15 {
-			http.Redirect(w, r, "/next", http.StatusFound)
+	var num int
+
+	srv := httptest.NewServer(http.HandlerFunc(func(respWriter http.ResponseWriter, req *http.Request) {
+		num++
+		if num < 15 {
+			http.Redirect(respWriter, req, "/next", http.StatusFound)
 
 			return
 		}
 
-		w.Write([]byte("done"))
+		respWriter.Write([]byte("done"))
 	}))
 	defer srv.Close()
 
-	l := NewLoader(settings.LoadGlobal{})
+	loader := NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
 
-	_, err := l.Load(t.Context(), srv.URL, defaultLP())
+	_, err := loader.Load(t.Context(), srv.URL, defaultLP())
 	if err == nil {
 		t.Fatal("redirect loop must error")
 	}
@@ -427,24 +449,25 @@ func TestRedirectLimit(t *testing.T) {
 // --- security: file:// scheme, path traversal, symlink escape ---
 
 func TestACLFileURL(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
-	f := filepath.Join(dir, "page.html")
-	if err := os.WriteFile(f, []byte("<html>ok</html>"), 0o644); err != nil {
+	filePath := filepath.Join(dir, "page.html")
+	if err := os.WriteFile(filePath, []byte("<html>ok</html>"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	// default policy denies file:// loads
-	if _, err := NewLoader(settings.LoadGlobal{}).Load(t.Context(), "file://"+f, defaultLP()); err == nil {
+	if _, err := NewLoader(settings.LoadGlobal{}).Load(t.Context(), "file://"+filePath, defaultLP()); err == nil { //nolint:exhaustruct // intentional zero/partial fields
 		t.Error("default policy must deny file:// loads")
 	}
 
-	lp := defaultLP()
-	lp.BlockLocalFileAccess = false
-	l := NewLoader(settings.LoadGlobal{})
-	l.EnableLocalFileAccess = true
+	pageLoad := defaultLP()
+	pageLoad.BlockLocalFileAccess = false
+	loader := NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader.EnableLocalFileAccess = true
 
-	res, err := l.Load(t.Context(), "file://"+f, lp)
+	res, err := loader.Load(t.Context(), "file://"+filePath, pageLoad)
 	if err != nil {
 		t.Fatalf("file:// load: %v", err)
 	}
@@ -454,17 +477,18 @@ func TestACLFileURL(t *testing.T) {
 	}
 
 	// file://localhost/... is the same machine
-	if _, err := l.Load(t.Context(), "file://localhost"+f, lp); err != nil {
+	if _, err := loader.Load(t.Context(), "file://localhost"+filePath, pageLoad); err != nil {
 		t.Errorf("file://localhost load: %v", err)
 	}
 
 	// a remote file host is refused outright
-	if _, err := l.Load(t.Context(), "file://evil.example.com"+f, lp); err == nil {
+	if _, err := loader.Load(t.Context(), "file://evil.example.com"+filePath, pageLoad); err == nil {
 		t.Error("remote file host must be refused")
 	}
 }
 
 func TestACLPathTraversal(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	public := filepath.Join(dir, "public")
@@ -477,37 +501,38 @@ func TestACLPathTraversal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	in := filepath.Join(public, "a.html")
-	if err := os.WriteFile(in, []byte("ok"), 0o644); err != nil {
+	inPath := filepath.Join(public, "a.html")
+	if err := os.WriteFile(inPath, []byte("ok"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	l := NewLoader(settings.LoadGlobal{})
-	l.Allow = []string{public}
+	loader := NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader.Allow = []string{public}
 
 	// a file inside the prefix stays readable
-	if _, err := l.Load(t.Context(), in, defaultLP()); err != nil {
+	if _, err := loader.Load(t.Context(), inPath, defaultLP()); err != nil {
 		t.Fatalf("inside prefix: %v", err)
 	}
 
 	// ../ escape as a plain path
 	esc := public + "/../secret.html"
-	if _, err := l.Load(t.Context(), esc, defaultLP()); err == nil {
+	if _, err := loader.Load(t.Context(), esc, defaultLP()); err == nil {
 		t.Error("path traversal escape must be denied")
 	}
 
 	// ../ escape via a file:// URL, raw and percent-encoded
-	for _, u := range []string{
+	for _, targetURL := range []string{
 		"file://" + public + "/../secret.html",
 		"file://" + public + "/%2e%2e/secret.html",
 	} {
-		if _, err := l.Load(t.Context(), u, defaultLP()); err == nil {
-			t.Errorf("traversal via %q must be denied", u)
+		if _, err := loader.Load(t.Context(), targetURL, defaultLP()); err == nil {
+			t.Errorf("traversal via %q must be denied", targetURL)
 		}
 	}
 }
 
 func TestACLSymlinkEscape(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	public := filepath.Join(dir, "public")
@@ -535,20 +560,21 @@ func TestACLSymlinkEscape(t *testing.T) {
 		t.Skipf("symlinks unsupported: %v", err)
 	}
 
-	l := NewLoader(settings.LoadGlobal{})
-	l.Allow = []string{public}
+	loader := NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader.Allow = []string{public}
 
 	// a symlink inside the prefix pointing outside it must be denied
-	if _, err := l.Load(t.Context(), escapeLink, defaultLP()); err == nil {
+	if _, err := loader.Load(t.Context(), escapeLink, defaultLP()); err == nil {
 		t.Error("symlink escape must be denied")
 	}
 	// a symlink pointing inside the prefix stays allowed
-	if _, err := l.Load(t.Context(), inLink, defaultLP()); err != nil {
+	if _, err := loader.Load(t.Context(), inLink, defaultLP()); err != nil {
 		t.Errorf("symlink inside prefix: %v", err)
 	}
 }
 
 func TestSubresourceFileACL(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	page := filepath.Join(dir, "page.html")
@@ -563,17 +589,17 @@ func TestSubresourceFileACL(t *testing.T) {
 
 	base := "file://" + dir + "/page.html"
 
-	l := NewLoader(settings.LoadGlobal{})
-	if _, err := l.FetchSub(t.Context(), base, "x.png", defaultLP()); err == nil {
+	loader := NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	if _, err := loader.FetchSub(t.Context(), base, "x.png", defaultLP()); err == nil {
 		t.Error("file subresource must be denied by default")
 	}
 
-	lp := defaultLP()
-	lp.BlockLocalFileAccess = false
-	l2 := NewLoader(settings.LoadGlobal{})
+	pageLoad := defaultLP()
+	pageLoad.BlockLocalFileAccess = false
+	l2 := NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
 	l2.EnableLocalFileAccess = true
 
-	res, err := l2.FetchSub(t.Context(), base, "x.png", lp)
+	res, err := l2.FetchSub(t.Context(), base, "x.png", pageLoad)
 	if err != nil {
 		t.Fatalf("enabled: %v", err)
 	}
@@ -591,21 +617,21 @@ func TestSubresourceFileACL(t *testing.T) {
 func lyingContentLength(t *testing.T) string {
 	t.Helper()
 
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	t.Cleanup(func() { ln.Close() })
+	t.Cleanup(func() { listener.Close() })
 
 	go func() {
-		c, err := ln.Accept()
+		conn, err := listener.Accept()
 		if err != nil {
 			return
 		}
 
-		defer c.Close()
-		br := bufio.NewReader(c)
+		defer conn.Close()
+		br := bufio.NewReader(conn)
 
 		for {
 			line, err := br.ReadString('\n')
@@ -618,59 +644,62 @@ func lyingContentLength(t *testing.T) string {
 			}
 		}
 
-		c.Write([]byte("HTTP/1.1 200 OK\r\nContent-Length: 8192\r\nConnection: close\r\n\r\n"))
-		c.Write(make([]byte, 128))
+		conn.Write([]byte("HTTP/1.1 200 OK\r\nContent-Length: 8192\r\nConnection: close\r\n\r\n"))
+		conn.Write(make([]byte, 128))
 	}()
 
-	return "http://" + ln.Addr().String()
+	return "http://" + listener.Addr().String()
 }
 
 func TestMaxBodySizeHTTP(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(respWriter http.ResponseWriter, req *http.Request) {
+		switch req.URL.Path {
 		case "/big": // chunked, no Content-Length
-			w.Write(make([]byte, 4096))
+			respWriter.Write(make([]byte, 4096))
 		case "/exact":
-			w.Write(make([]byte, 1024))
+			respWriter.Write(make([]byte, 1024))
 		case "/small":
-			w.Write(make([]byte, 64))
+			respWriter.Write(make([]byte, 64))
 		}
 	}))
 	defer srv.Close()
 
 	liar := lyingContentLength(t)
 
-	l := NewLoader(settings.LoadGlobal{})
-	l.MaxBodySize = 1024
+	loader := NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader.MaxBodySize = 1024
 
-	for _, u := range []string{srv.URL + "/big", liar} {
-		_, err := l.Load(t.Context(), u, defaultLP())
+	for _, targetURL := range []string{srv.URL + "/big", liar} {
+		_, err := loader.Load(t.Context(), targetURL, defaultLP())
 		if err == nil {
-			t.Errorf("%s: oversized body must be rejected", u)
+			t.Errorf("%s: oversized body must be rejected", targetURL)
 
 			continue
 		}
 
 		if !strings.Contains(err.Error(), "max body size") {
-			t.Errorf("%s: err = %v", u, err)
+			t.Errorf("%s: err = %v", targetURL, err)
 		}
 	}
 
-	for _, p := range []string{"/exact", "/small"} {
-		res, err := l.Load(t.Context(), srv.URL+p, defaultLP())
+	for _, pathStr := range []string{"/exact", "/small"} {
+		res, err := loader.Load(t.Context(), srv.URL+pathStr, defaultLP())
 		if err != nil {
-			t.Errorf("%s: %v", p, err)
+			t.Errorf("%s: %v", pathStr, err)
 
 			continue
 		}
 
 		if len(res.Body) > 1024 {
-			t.Errorf("%s: body length %d", p, len(res.Body))
+			t.Errorf("%s: body length %d", pathStr, len(res.Body))
 		}
 	}
 }
 
 func TestMaxBodySizeFile(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	big := filepath.Join(dir, "big.html")
@@ -678,42 +707,44 @@ func TestMaxBodySizeFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ok := filepath.Join(dir, "ok.html")
-	if err := os.WriteFile(ok, make([]byte, 64), 0o644); err != nil {
+	okPath := filepath.Join(dir, "ok.html")
+	if err := os.WriteFile(okPath, make([]byte, 64), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	lp := defaultLP()
-	lp.BlockLocalFileAccess = false
-	l := NewLoader(settings.LoadGlobal{})
-	l.EnableLocalFileAccess = true
-	l.MaxBodySize = 1024
+	pageLoad := defaultLP()
+	pageLoad.BlockLocalFileAccess = false
+	loader := NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader.EnableLocalFileAccess = true
+	loader.MaxBodySize = 1024
 
-	_, err := l.Load(t.Context(), big, lp)
+	_, err := loader.Load(t.Context(), big, pageLoad)
 	if err == nil {
 		t.Error("oversized local file must be rejected")
 	} else if !strings.Contains(err.Error(), "max body size") {
 		t.Errorf("err = %v", err)
 	}
 
-	if _, err := l.Load(t.Context(), ok, lp); err != nil {
+	if _, err := loader.Load(t.Context(), okPath, pageLoad); err != nil {
 		t.Errorf("small file: %v", err)
 	}
 }
 
 func TestSlowServerTimeout(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(respWriter http.ResponseWriter, req *http.Request) {
 		time.Sleep(3 * time.Second)
-		w.Write([]byte("too late"))
+		respWriter.Write([]byte("too late"))
 	}))
 	defer srv.Close()
 
-	lp := defaultLP()
-	lp.Timeout = 1
-	l := NewLoader(settings.LoadGlobal{})
+	pageLoad := defaultLP()
+	pageLoad.Timeout = 1
+	loader := NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
 	start := time.Now()
 
-	_, err := l.Load(t.Context(), srv.URL, lp)
+	_, err := loader.Load(t.Context(), srv.URL, pageLoad)
 	if err == nil {
 		t.Fatal("slow server must time out")
 	}
@@ -724,15 +755,17 @@ func TestSlowServerTimeout(t *testing.T) {
 }
 
 func TestContextCancelAbortsBodyRead(t *testing.T) {
+	t.Parallel()
+
 	started := make(chan struct{})
 	release := make(chan struct{})
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html")
-		w.WriteHeader(http.StatusOK)
+	srv := httptest.NewServer(http.HandlerFunc(func(respWriter http.ResponseWriter, req *http.Request) {
+		respWriter.Header().Set("Content-Type", "text/html")
+		respWriter.WriteHeader(http.StatusOK)
 
-		if f, ok := w.(http.Flusher); ok {
-			f.Flush()
+		if filePath, okPath := respWriter.(http.Flusher); okPath {
+			filePath.Flush()
 		}
 
 		close(started)
@@ -741,11 +774,11 @@ func TestContextCancelAbortsBodyRead(t *testing.T) {
 	defer srv.Close()
 
 	ctx, cancel := context.WithCancel(t.Context())
-	l := NewLoader(settings.LoadGlobal{})
+	loader := NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
 	errCh := make(chan error, 1)
 
 	go func() {
-		_, err := l.Load(ctx, srv.URL, defaultLP())
+		_, err := loader.Load(ctx, srv.URL, defaultLP())
 		errCh <- err
 	}()
 	<-started
@@ -762,22 +795,24 @@ func TestContextCancelAbortsBodyRead(t *testing.T) {
 }
 
 func TestRedirectLimitExact(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		n, err := strconv.Atoi(strings.TrimPrefix(r.URL.Path, "/r/"))
-		if err != nil || n <= 0 {
-			w.Write([]byte("done"))
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(respWriter http.ResponseWriter, req *http.Request) {
+		num, err := strconv.Atoi(strings.TrimPrefix(req.URL.Path, "/r/"))
+		if err != nil || num <= 0 {
+			respWriter.Write([]byte("done"))
 
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("/r/%d", n-1), http.StatusFound)
+		http.Redirect(respWriter, req, fmt.Sprintf("/r/%d", num-1), http.StatusFound)
 	}))
 	defer srv.Close()
 
-	l := NewLoader(settings.LoadGlobal{})
-	l.MaxRedirects = 2
+	loader := NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader.MaxRedirects = 2
 
-	res, err := l.Load(t.Context(), srv.URL+"/r/2", defaultLP())
+	res, err := loader.Load(t.Context(), srv.URL+"/r/2", defaultLP())
 	if err != nil {
 		t.Fatalf("exactly MaxRedirects redirects must succeed: %v", err)
 	}
@@ -786,7 +821,7 @@ func TestRedirectLimitExact(t *testing.T) {
 		t.Errorf("body = %q", res.Body)
 	}
 
-	if _, err := l.Load(t.Context(), srv.URL+"/r/3", defaultLP()); err == nil {
+	if _, err := loader.Load(t.Context(), srv.URL+"/r/3", defaultLP()); err == nil {
 		t.Error("one more than MaxRedirects must fail")
 	}
 }
@@ -796,14 +831,16 @@ func TestRedirectLimitExact(t *testing.T) {
 // http://localhost - exactly like upstream wkhtmltopdf. Only file:// reads
 // are gated by the ACL.
 func TestHTTPLocalhostAllowedByDesign(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("localhost ok"))
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(respWriter http.ResponseWriter, req *http.Request) {
+		respWriter.Write([]byte("localhost ok"))
 	}))
 	defer srv.Close()
 
-	l := NewLoader(settings.LoadGlobal{})
+	loader := NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
 
-	res, err := l.Load(t.Context(), srv.URL, defaultLP())
+	res, err := loader.Load(t.Context(), srv.URL, defaultLP())
 	if err != nil {
 		t.Fatalf("http://127.0.0.1 must be fetchable: %v", err)
 	}
@@ -816,14 +853,16 @@ func TestHTTPLocalhostAllowedByDesign(t *testing.T) {
 // TestLoadInlineHTML: an explicit in-memory HTML source is returned as-is
 // and skips GuessURL entirely; subresources resolve against InlineBase.
 func TestLoadInlineHTML(t *testing.T) {
-	l := NewLoader(settings.LoadGlobal{})
-	lp := defaultLP()
-	lp.InlineHTML = []byte("<html><body>inline</body></html>")
-	lp.InlineBase = "https://example.com/docs/page.html"
+	t.Parallel()
+
+	loader := NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	pageLoad := defaultLP()
+	pageLoad.InlineHTML = []byte("<html><body>inline</body></html>")
+	pageLoad.InlineBase = "https://example.com/docs/page.html"
 
 	// The input would be treated as an http:// URL by GuessURL; InlineHTML
 	// must short-circuit it without any guessing or fetching.
-	res, err := l.Load(t.Context(), "this is not a url", lp)
+	res, err := loader.Load(t.Context(), "this is not a url", pageLoad)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -843,7 +882,7 @@ func TestLoadInlineHTML(t *testing.T) {
 	lp2 := defaultLP()
 	lp2.InlineHTML = []byte("<html></html>")
 
-	res2, err := l.Load(t.Context(), "ignored", lp2)
+	res2, err := loader.Load(t.Context(), "ignored", lp2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -854,29 +893,31 @@ func TestLoadInlineHTML(t *testing.T) {
 }
 
 func TestDataURLHonorsBodyLimitForPrimaryAndSubresource(t *testing.T) {
-	l := NewLoader(settings.LoadGlobal{})
-	l.MaxBodySize = 4
-	lp := defaultLP()
+	t.Parallel()
 
-	if _, err := l.Load(t.Context(), "data:text/plain,12345", lp); err == nil {
+	loader := NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader.MaxBodySize = 4
+	pageLoad := defaultLP()
+
+	if _, err := loader.Load(t.Context(), "data:text/plain,12345", pageLoad); err == nil {
 		t.Fatal("oversized primary data URL must be rejected")
 	} else if !strings.Contains(err.Error(), "data URL exceeds max body size 4") {
 		t.Fatalf("primary error = %v", err)
 	}
 
-	if _, err := l.FetchSub(t.Context(), "", "data:text/plain,12345", lp); err == nil {
+	if _, err := loader.FetchSub(t.Context(), "", "data:text/plain,12345", pageLoad); err == nil {
 		t.Fatal("oversized data subresource must be rejected")
 	} else if !strings.Contains(err.Error(), "data URL exceeds max body size 4") {
 		t.Fatalf("subresource error = %v", err)
 	}
 
-	if _, err := l.Load(t.Context(), "data:text/plain;base64,MTIzNDU=", lp); err == nil {
+	if _, err := loader.Load(t.Context(), "data:text/plain;base64,MTIzNDU=", pageLoad); err == nil {
 		t.Fatal("oversized base64 data URL must be rejected")
 	} else if !strings.Contains(err.Error(), "data URL exceeds max body size 4") {
 		t.Fatalf("base64 error = %v", err)
 	}
 
-	res, err := l.FetchSub(t.Context(), "", "data:text/plain,1234", lp)
+	res, err := loader.FetchSub(t.Context(), "", "data:text/plain,1234", pageLoad)
 	if err != nil {
 		t.Fatalf("data URL at the body limit: %v", err)
 	}
@@ -887,12 +928,14 @@ func TestDataURLHonorsBodyLimitForPrimaryAndSubresource(t *testing.T) {
 }
 
 func TestInlineHTMLHonorsBodyLimit(t *testing.T) {
-	l := NewLoader(settings.LoadGlobal{})
-	l.MaxBodySize = 4
-	lp := defaultLP()
-	lp.InlineHTML = []byte("12345")
+	t.Parallel()
 
-	if _, err := l.Load(t.Context(), "ignored", lp); err == nil {
+	loader := NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader.MaxBodySize = 4
+	pageLoad := defaultLP()
+	pageLoad.InlineHTML = []byte("12345")
+
+	if _, err := loader.Load(t.Context(), "ignored", pageLoad); err == nil {
 		t.Fatal("oversized inline HTML must be rejected")
 	} else if !strings.Contains(err.Error(), "inline HTML exceeds max body size 4") {
 		t.Fatalf("error = %v", err)
@@ -900,6 +943,7 @@ func TestInlineHTMLHonorsBodyLimit(t *testing.T) {
 }
 
 func TestEmptyInlineBaseRejectsRelativeSubresources(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	path := filepath.Join(dir, "local.css")
@@ -907,18 +951,18 @@ func TestEmptyInlineBaseRejectsRelativeSubresources(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	l := NewLoader(settings.LoadGlobal{})
+	loader := NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
 	// Even with local access enabled, an inline document without a base must
 	// not reinterpret a relative reference as a process-working-directory
 	// file. The reference is unresolved, not an implicit local path.
-	l.EnableLocalFileAccess = true
-	if _, err := l.FetchSub(t.Context(), "", path, defaultLP()); err == nil {
+	loader.EnableLocalFileAccess = true
+	if _, err := loader.FetchSub(t.Context(), "", path, defaultLP()); err == nil {
 		t.Fatal("relative reference without a base must be rejected")
 	} else if !strings.Contains(err.Error(), "without a document base URL") {
 		t.Fatalf("error = %v", err)
 	}
 
-	res, err := l.FetchSub(t.Context(), "", "data:text/plain,ok", defaultLP())
+	res, err := loader.FetchSub(t.Context(), "", "data:text/plain,ok", defaultLP())
 	if err != nil {
 		t.Fatalf("absolute data reference without a base: %v", err)
 	}
@@ -929,6 +973,7 @@ func TestEmptyInlineBaseRejectsRelativeSubresources(t *testing.T) {
 }
 
 func TestResourceContextBindsBaseAndPolicy(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	styleDir := filepath.Join(dir, "styles")
@@ -941,12 +986,12 @@ func TestResourceContextBindsBaseAndPolicy(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	l := NewLoader(settings.LoadGlobal{})
-	l.EnableLocalFileAccess = true
-	base := &Resource{Base: "file://" + filepath.ToSlash(filepath.Join(dir, "page.html"))}
-	lp := defaultLP()
-	lp.BlockLocalFileAccess = false
-	ctx := l.ForResource(base, lp)
+	loader := NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader.EnableLocalFileAccess = true
+	base := &Resource{Base: "file://" + filepath.ToSlash(filepath.Join(dir, "page.html"))} //nolint:exhaustruct // intentional zero/partial fields
+	pageLoad := defaultLP()
+	pageLoad.BlockLocalFileAccess = false
+	ctx := loader.ForResource(base, pageLoad)
 
 	res, err := ctx.Fetch(t.Context(), "styles/site.css")
 	if err != nil {
@@ -959,17 +1004,19 @@ func TestResourceContextBindsBaseAndPolicy(t *testing.T) {
 }
 
 func TestLoadCharsetContentType(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", r.URL.Query().Get("ct"))
-		w.Write([]byte("<html><body>ok</body></html>"))
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(respWriter http.ResponseWriter, req *http.Request) {
+		respWriter.Header().Set("Content-Type", req.URL.Query().Get("ct"))
+		respWriter.Write([]byte("<html><body>ok</body></html>"))
 	}))
 	defer srv.Close()
 
-	l := NewLoader(settings.LoadGlobal{})
-	for _, tc := range []struct {
-		ct   string
-		ok   bool
-		want string
+	loader := NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	for _, testCase := range []struct {
+		ct     string
+		okPath bool
+		want   string
 	}{
 		{"text/html", true, ""},
 		{"text/html; charset=utf-8", true, ""},
@@ -978,37 +1025,38 @@ func TestLoadCharsetContentType(t *testing.T) {
 		{"text/html; charset=ISO-8859-1", false, "unsupported charset: ISO-8859-1 (only UTF-8/ASCII)"},
 		{"text/html; charset=windows-1252", false, "unsupported charset: windows-1252 (only UTF-8/ASCII)"},
 	} {
-		_, err := l.Load(t.Context(), srv.URL+"?ct="+url.QueryEscape(tc.ct), defaultLP())
-		if tc.ok && err != nil {
-			t.Errorf("ct %q: %v", tc.ct, err)
+		_, err := loader.Load(t.Context(), srv.URL+"?ct="+url.QueryEscape(testCase.ct), defaultLP())
+		if testCase.okPath && err != nil {
+			t.Errorf("ct %q: %v", testCase.ct, err)
 		}
 
-		if !tc.ok {
+		if !testCase.okPath {
 			if err == nil {
-				t.Errorf("ct %q: expected error", tc.ct)
-			} else if !strings.Contains(err.Error(), tc.want) {
-				t.Errorf("ct %q: err = %v, want contains %q", tc.ct, err, tc.want)
+				t.Errorf("ct %q: expected error", testCase.ct)
+			} else if !strings.Contains(err.Error(), testCase.want) {
+				t.Errorf("ct %q: err = %v, want contains %q", testCase.ct, err, testCase.want)
 			}
 		}
 	}
 }
 
 func TestLoadCharsetMetaDecl(t *testing.T) {
+	t.Parallel()
 	// Content-Type without a charset parameter: the <meta> declaration is
 	// the only charset signal, and it must be honored at the load seam.
 	var body string
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html")
-		w.Write([]byte(body))
+	srv := httptest.NewServer(http.HandlerFunc(func(respWriter http.ResponseWriter, req *http.Request) {
+		respWriter.Header().Set("Content-Type", "text/html")
+		respWriter.Write([]byte(body))
 	}))
 	defer srv.Close()
 
-	l := NewLoader(settings.LoadGlobal{})
+	loader := NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
 
-	for _, tc := range []struct {
+	for _, testCase := range []struct {
 		name, head string
-		ok         bool
+		okPath     bool
 		want       string
 	}{
 		{"utf8-charset", `<meta charset="utf-8">`, true, ""},
@@ -1017,18 +1065,18 @@ func TestLoadCharsetMetaDecl(t *testing.T) {
 		{"latin1-charset", `<meta charset="windows-1252">`, false, "unsupported charset: windows-1252 (only UTF-8/ASCII)"},
 		{"latin1-content-type", `<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">`, false, "unsupported charset: ISO-8859-1 (only UTF-8/ASCII)"},
 	} {
-		body = tc.head + "<title>t</title></head><body>x</body></html>"
+		body = testCase.head + "<title>t</title></head><body>x</body></html>"
 
-		_, err := l.Load(t.Context(), srv.URL+"/"+tc.name, defaultLP())
-		if tc.ok && err != nil {
-			t.Errorf("%s: %v", tc.name, err)
+		_, err := loader.Load(t.Context(), srv.URL+"/"+testCase.name, defaultLP())
+		if testCase.okPath && err != nil {
+			t.Errorf("%s: %v", testCase.name, err)
 		}
 
-		if !tc.ok {
+		if !testCase.okPath {
 			if err == nil {
-				t.Errorf("%s: expected error", tc.name)
-			} else if !strings.Contains(err.Error(), tc.want) {
-				t.Errorf("%s: err = %v, want contains %q", tc.name, err, tc.want)
+				t.Errorf("%s: expected error", testCase.name)
+			} else if !strings.Contains(err.Error(), testCase.want) {
+				t.Errorf("%s: err = %v, want contains %q", testCase.name, err, testCase.want)
 			}
 		}
 	}

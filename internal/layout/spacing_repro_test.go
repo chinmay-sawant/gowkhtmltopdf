@@ -9,7 +9,7 @@ import (
 )
 
 func TestJustifyDoesNotGapBeforePunctuation(t *testing.T) {
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 p { text-align: justify; margin: 0; }
 a { color: blue; text-decoration: underline; }
@@ -27,7 +27,7 @@ sup.reference { font-size: 8pt; }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{Width: 420, Height: 800, Sheets: []*css.Stylesheet{s}, Background: true})
+	res, err := Layout(root, Options{Width: 420, Height: 800, Sheets: []*css.Stylesheet{cssSheet}, Background: true}) //nolint:exhaustruct // intentional zero fields
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,20 +87,20 @@ sup.reference { font-size: 8pt; }
 
 	if !strings.Contains(got, "Roth's") && !strings.Contains(got, "Roth\u2019s") {
 		// may be split across ops; check geometrically
-		ok := false
+		isOK := false
 
 		for i := 1; i < len(runs); i++ {
 			if strings.HasSuffix(runs[i-1].text, "Roth") && strings.HasPrefix(runs[i].text, "'") {
 				gap := runs[i].x - (runs[i-1].x + runs[i-1].w)
 				if gap <= 0.5 {
-					ok = true
+					isOK = true
 				} else {
 					t.Errorf("geometric space before possessive: gap=%.2f", gap)
 				}
 			}
 		}
 
-		if !ok {
+		if !isOK {
 			t.Logf("Roth's ops not found as expected; text=%q", got)
 		}
 	}
@@ -115,7 +115,7 @@ func absF(v float64) float64 {
 }
 
 func TestCiteDoesNotSplitAcrossLines(t *testing.T) {
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 p { text-align: justify; margin: 0; }
 sup.reference { font-size: 8pt; white-space: nowrap; }
@@ -129,7 +129,7 @@ sup.reference { font-size: 8pt; white-space: nowrap; }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{Width: 200, Height: 800, Sheets: []*css.Stylesheet{s}, Background: true})
+	res, err := Layout(root, Options{Width: 200, Height: 800, Sheets: []*css.Stylesheet{cssSheet}, Background: true}) //nolint:exhaustruct // intentional zero fields
 	if err != nil {
 		t.Fatal(err)
 	}

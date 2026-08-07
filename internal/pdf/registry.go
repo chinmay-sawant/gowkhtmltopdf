@@ -18,14 +18,14 @@ func NewRegistry() *Registry {
 }
 
 // AddFont registers a parsed face under its family name (and PostScript name).
-func (r *Registry) AddFont(f *Font) {
-	if r == nil || f == nil {
+func (r *Registry) AddFont(fnt *Font) {
+	if r == nil || fnt == nil {
 		return
 	}
 
-	names := f.LoadNames()
-	if len(names) == 0 && f.PostScriptName != "" {
-		names = []string{f.PostScriptName}
+	names := fnt.LoadNames()
+	if len(names) == 0 && fnt.PostScriptName != "" {
+		names = []string{fnt.PostScriptName}
 	}
 
 	for _, n := range names {
@@ -34,7 +34,7 @@ func (r *Registry) AddFont(f *Font) {
 			continue
 		}
 
-		r.byFamily[key] = append(r.byFamily[key], f)
+		r.byFamily[key] = append(r.byFamily[key], fnt)
 	}
 }
 
@@ -109,7 +109,7 @@ func (reg *Registry) FindWithGlyph(ch rune, weight int, italic bool) *Font {
 		return nil
 	}
 
-	bold := weight >= 700
+	bold := weight >= fontWeightBoldMin
 
 	var best *Font
 
@@ -117,23 +117,23 @@ func (reg *Registry) FindWithGlyph(ch rune, weight int, italic bool) *Font {
 	seen := map[*Font]bool{}
 
 	for _, faces := range reg.byFamily {
-		for _, f := range faces {
-			if f == nil || seen[f] || f.GlyphID(ch) == 0 {
+		for _, fnt := range faces {
+			if fnt == nil || seen[fnt] || fnt.GlyphID(ch) == 0 {
 				continue
 			}
 
-			seen[f] = true
+			seen[fnt] = true
 
 			score := 1
-			if f.Bold() == bold {
+			if fnt.Bold() == bold {
 				score += 2
 			}
 
-			if f.Italic() == italic {
+			if fnt.Italic() == italic {
 				score += 2
 			}
 			// Prefer known Unicode-capable families when several match.
-			for _, n := range f.FamilyNames() {
+			for _, n := range fnt.FamilyNames() {
 				low := strings.ToLower(n)
 				if strings.Contains(low, "dejavu") || strings.Contains(low, "noto") || strings.Contains(low, "freesans") {
 					score += 3
@@ -144,7 +144,7 @@ func (reg *Registry) FindWithGlyph(ch rune, weight int, italic bool) *Font {
 
 			if score > bestScore {
 				bestScore = score
-				best = f
+				best = fnt
 			}
 		}
 	}
@@ -153,25 +153,25 @@ func (reg *Registry) FindWithGlyph(ch rune, weight int, italic bool) *Font {
 }
 
 func pickFace(faces []*Font, weight int, italic bool) *Font {
-	bold := weight >= 700
+	bold := weight >= fontWeightBoldMin
 
 	var best *Font
 
 	bestScore := -1
 
-	for _, f := range faces {
+	for _, fnt := range faces {
 		score := 0
-		if f.Bold() == bold {
+		if fnt.Bold() == bold {
 			score += 2
 		}
 
-		if f.Italic() == italic {
+		if fnt.Italic() == italic {
 			score += 2
 		}
 
 		if score > bestScore {
 			bestScore = score
-			best = f
+			best = fnt
 		}
 	}
 
@@ -223,10 +223,10 @@ func ScanFontDirs(dirs []string) *Registry {
 			return
 		}
 
-		for _, e := range entries {
-			path := filepath.Join(dir, e.Name())
+		for _, entry := range entries {
+			path := filepath.Join(dir, entry.Name())
 
-			if e.IsDir() {
+			if entry.IsDir() {
 				if depth > 0 {
 					scan(path, depth-1)
 				}
@@ -234,7 +234,7 @@ func ScanFontDirs(dirs []string) *Registry {
 				continue
 			}
 
-			low := strings.ToLower(e.Name())
+			low := strings.ToLower(entry.Name())
 			if !strings.HasSuffix(low, ".ttf") && !strings.HasSuffix(low, ".otf") {
 				continue
 			}
@@ -244,20 +244,20 @@ func ScanFontDirs(dirs []string) *Registry {
 				continue
 			}
 
-			f, err := ParseTTF(data)
+			fnt, err := ParseTTF(data)
 			if err != nil {
 				continue
 			}
 
-			if f.PostScriptName == "" {
-				f.PostScriptName = strings.TrimSuffix(e.Name(), filepath.Ext(e.Name()))
+			if fnt.PostScriptName == "" {
+				fnt.PostScriptName = strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
 			}
 
-			out.AddFont(f)
+			out.AddFont(fnt)
 		}
 	}
 	for _, d := range dirs {
-		scan(d, 2)
+		scan(d, fontScanMaxDepth)
 	}
 
 	return out

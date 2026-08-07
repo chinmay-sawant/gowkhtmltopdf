@@ -16,25 +16,25 @@ func matchingParen(s string, open int) (close int, ok bool) {
 
 	depth := 0
 
-	for i := open; i < len(s); i++ {
-		switch s[i] {
+	for idx := open; idx < len(s); idx++ {
+		switch s[idx] {
 		case '"', '\'':
-			q := s[i]
-			i++
+			q := s[idx]
+			idx++
 
-			for i < len(s) && s[i] != q {
-				if s[i] == '\\' && i+1 < len(s) {
-					i++
+			for idx < len(s) && s[idx] != q {
+				if s[idx] == '\\' && idx+1 < len(s) {
+					idx++
 				}
 
-				i++
+				idx++
 			}
 		case '(':
 			depth++
 		case ')':
 			depth--
 			if depth == 0 {
-				return i, true
+				return idx, true
 			}
 		}
 	}
@@ -98,7 +98,7 @@ func parseSelectorCtx(s string, insideHas bool) (Selector, bool) {
 	}
 
 	parts := splitSelectorChain(s)
-	for i, ch := range parts {
+	for idx, ch := range parts {
 		if ch == ">" || ch == "+" || ch == "~" || ch == " " {
 			continue
 		}
@@ -109,9 +109,9 @@ func parseSelectorCtx(s string, insideHas bool) (Selector, bool) {
 		}
 
 		if len(sel.Parts) > 0 {
-			switch parts[i-1] {
+			switch parts[idx-1] {
 			case ">", "+", "~":
-				part.Combinator = parts[i-1]
+				part.Combinator = parts[idx-1]
 			default:
 				part.Combinator = " "
 			}
@@ -143,32 +143,33 @@ func parseRelativeSelectorList(s string) ([]RelativeSelector, bool) {
 	return out, len(out) > 0
 }
 
-func parseRelativeSelector(s string) (RelativeSelector, bool) {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return RelativeSelector{}, false
+func parseRelativeSelector(str string) (RelativeSelector, bool) {
+	str = strings.TrimSpace(str)
+	if str == "" {
+		return RelativeSelector{}, false //nolint:exhaustruct // intentional zero-value fields
 	}
 
 	lead := " "
+
 	switch {
-	case strings.HasPrefix(s, ">"):
+	case strings.HasPrefix(str, ">"):
 		lead = ">"
-		s = strings.TrimSpace(s[1:])
-	case strings.HasPrefix(s, "+"):
+		str = strings.TrimSpace(str[1:])
+	case strings.HasPrefix(str, "+"):
 		lead = "+"
-		s = strings.TrimSpace(s[1:])
-	case strings.HasPrefix(s, "~"):
+		str = strings.TrimSpace(str[1:])
+	case strings.HasPrefix(str, "~"):
 		lead = "~"
-		s = strings.TrimSpace(s[1:])
+		str = strings.TrimSpace(str[1:])
 	}
 
-	if s == "" {
-		return RelativeSelector{}, false
+	if str == "" {
+		return RelativeSelector{}, false //nolint:exhaustruct // intentional zero-value fields
 	}
 
-	sel, ok := parseSelectorCtx(s, true)
+	sel, ok := parseSelectorCtx(str, true)
 	if !ok {
-		return RelativeSelector{}, false
+		return RelativeSelector{}, false //nolint:exhaustruct // intentional zero-value fields
 	}
 
 	return RelativeSelector{Leading: lead, Parts: sel.Parts}, true
@@ -263,7 +264,9 @@ func leftmostMatch(sel Selector, n *html.Node) *html.Node {
 	cur := n
 	// Combinator is stored on the right-hand part of each pair (how that
 	// part attaches to the previous). Walk left using Parts[i+1].Combinator.
-	for i := len(sel.Parts) - 2; i >= 0; i-- {
+	const prevPartOffset = 2 // walk left: last part is host, start at len-2
+
+	for i := len(sel.Parts) - prevPartOffset; i >= 0; i-- {
 		part := sel.Parts[i]
 
 		switch sel.Parts[i+1].Combinator {
@@ -309,23 +312,23 @@ func leftmostMatch(sel Selector, n *html.Node) *html.Node {
 	return cur
 }
 
-func elementDescendants(n *html.Node) []*html.Node {
+func elementDescendants(count *html.Node) []*html.Node {
 	var out []*html.Node
 
 	var walk func(*html.Node)
 
 	walk = func(node *html.Node) {
-		for _, c := range node.Children {
-			if c.Type != html.ElementNode {
+		for _, cur := range node.Children {
+			if cur.Type != html.ElementNode {
 				continue
 			}
 
-			out = append(out, c)
-			walk(c)
+			out = append(out, cur)
+			walk(cur)
 		}
 	}
-	if n != nil {
-		walk(n)
+	if count != nil {
+		walk(count)
 	}
 
 	return out

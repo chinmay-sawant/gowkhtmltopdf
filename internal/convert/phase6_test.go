@@ -14,23 +14,24 @@ import (
 
 // longBody builds an HTML body long enough to span at least two pages.
 func longBody(marker string) string {
-	var b bytes.Buffer
+	var buf bytes.Buffer
 
-	b.WriteString("<html><body>")
+	buf.WriteString("<html><body>")
 
 	for i := range 60 {
-		b.WriteString("<p>paragraph ")
-		b.WriteRune(rune('a' + i%26))
-		b.WriteString(" with some words to wrap across the page width</p>")
+		buf.WriteString("<p>paragraph ")
+		buf.WriteRune(rune('a' + i%26))
+		buf.WriteString(" with some words to wrap across the page width</p>")
 	}
 
-	b.WriteString(marker)
-	b.WriteString("</body></html>")
+	buf.WriteString(marker)
+	buf.WriteString("</body></html>")
 
-	return b.String()
+	return buf.String()
 }
 
 func TestTextHeaderFooter(t *testing.T) {
+	t.Parallel()
 	cmd, _ := newCommand(t, longBody(""), filepath.Join(t.TempDir(), "out.pdf"))
 	cmd.Global.Header.Left = "Page [page]/[topage]"
 	cmd.Global.Footer.Right = "doc [title]"
@@ -68,19 +69,20 @@ func TestTextHeaderFooter(t *testing.T) {
 
 	pageH := 841.89 // A4 default
 
-	for _, m := range matches {
-		y, err := strconv.ParseFloat(string(m[2]), 64)
+	for _, mVal := range matches {
+		posY, err := strconv.ParseFloat(string(mVal[2]), 64)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		if y < 0 || y > pageH {
-			t.Errorf("HF baseline y=%.3f for %q is outside page [0, %.2f]", y, m[3], pageH)
+		if posY < 0 || posY > pageH {
+			t.Errorf("HF baseline y=%.3f for %q is outside page [0, %.2f]", posY, mVal[3], pageH)
 		}
 	}
 }
 
 func TestPlaceholderReplace(t *testing.T) {
+	t.Parallel()
 	cmd, _ := newCommand(t, `<html><body><p>x</p></body></html>`, filepath.Join(t.TempDir(), "out.pdf"))
 	cmd.Global.Footer.Center = "[who] inc. - [unknown]"
 	cmd.Global.Header.Replace = map[string]string{"[who]": "Acme"}
@@ -97,6 +99,8 @@ func TestPlaceholderReplace(t *testing.T) {
 }
 
 func TestSectionSubsectionPlaceholder(t *testing.T) {
+	t.Parallel()
+
 	body := `<html><body><h1>Chap A</h1><h2>Sec B</h2><p>` +
 		"text " +
 		"text text</p></body></html>"
@@ -111,6 +115,7 @@ func TestSectionSubsectionPlaceholder(t *testing.T) {
 }
 
 func TestOutlineWiring(t *testing.T) {
+	t.Parallel()
 	cmd, _ := newCommand(t, `<html><body><h1>Book One</h1><p>text</p></body></html>`, filepath.Join(t.TempDir(), "out.pdf"))
 
 	data := runPDF(t, cmd)
@@ -127,6 +132,7 @@ func TestOutlineWiring(t *testing.T) {
 }
 
 func TestOutlineDisabled(t *testing.T) {
+	t.Parallel()
 	cmd, _ := newCommand(t, `<html><body><h1>Book</h1></body></html>`, filepath.Join(t.TempDir(), "out.pdf"))
 	cmd.Global.Outline = false
 
@@ -157,6 +163,7 @@ func tocCommand(t *testing.T, out string) *cli.Command {
 }
 
 func TestTOC(t *testing.T) {
+	t.Parallel()
 	cmd := tocCommand(t, filepath.Join(t.TempDir(), "out.pdf"))
 	data := runPDF(t, cmd)
 
@@ -182,6 +189,7 @@ func TestTOC(t *testing.T) {
 var destRe = regexp.MustCompile(`/Dest \[(\d+) 0 R /XYZ`)
 
 func TestInternalLinkDest(t *testing.T) {
+	t.Parallel()
 	cmd := tocCommand(t, filepath.Join(t.TempDir(), "out.pdf"))
 	data := runPDF(t, cmd)
 	// 2 outline items + 2 TOC forward links = 4 GoTo destinations.
@@ -191,6 +199,7 @@ func TestInternalLinkDest(t *testing.T) {
 }
 
 func TestHTMLHeader(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	headerPath := filepath.Join(dir, "header.html")
@@ -209,6 +218,7 @@ func TestHTMLHeader(t *testing.T) {
 }
 
 func TestHTMLHeaderPlaceholderPerPage(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	headerPath := filepath.Join(dir, "header.html")
@@ -233,6 +243,7 @@ func TestHTMLHeaderPlaceholderPerPage(t *testing.T) {
 }
 
 func TestHTMLHeaderRawMarkupRejected(t *testing.T) {
+	t.Parallel()
 	cmd, _ := newCommand(t, `<html><body><p>x</p></body></html>`, filepath.Join(t.TempDir(), "out.pdf"))
 	cmd.Global.Header.HTMLURL = "<html><body>bad</body></html>"
 
@@ -251,6 +262,8 @@ func TestHTMLHeaderRawMarkupRejected(t *testing.T) {
 // top-level page (CWD-relative), not as a subresource of the body document.
 // Path doubling ("…/golden/testdata/golden/header.html") previously skipped HF.
 func TestHTMLHeaderRelativePathCWD(t *testing.T) {
+	// Not parallel: os.Chdir is process-global and races other tests that use
+	// CWD-relative paths (e.g. goldenDir under testdata/golden).
 	root := t.TempDir()
 
 	dir := filepath.Join(root, "testdata", "golden")
@@ -283,7 +296,7 @@ func TestHTMLHeaderRelativePathCWD(t *testing.T) {
 	obj := settings.DefaultPdfObject()
 	obj.Page = pageRel
 	obj.Load.BlockLocalFileAccess = false
-	cmd := &cli.Command{
+	cmd := &cli.Command{ //nolint:exhaustruct // intentional zero-value fields
 		Global:  settings.DefaultPdfGlobal(),
 		Objects: []settings.PdfObject{obj},
 		Output:  filepath.Join(t.TempDir(), "out.pdf"),
@@ -319,6 +332,7 @@ func TestHTMLHeaderRelativePathCWD(t *testing.T) {
 }
 
 func TestAutoMargin(t *testing.T) {
+	t.Parallel()
 	cmd, _ := newCommand(t, `<html><body><p>BODYTEXT</p></body></html>`, filepath.Join(t.TempDir(), "out.pdf"))
 	cmd.Global.Margin.Top = -1
 	cmd.Global.Margin.Bottom = 10
@@ -336,6 +350,7 @@ func TestAutoMargin(t *testing.T) {
 }
 
 func TestExternalLinksDefaultOn(t *testing.T) {
+	t.Parallel()
 	// External links are ON by DefaultPdfObject (callers/CLI must apply defaults;
 	// convert no longer OR-hacks zero-value bools permanently ON).
 	body := `<html><body><p>see <a href="http://example.com/x">link</a></p></body></html>`
@@ -353,6 +368,8 @@ func TestExternalLinksDefaultOn(t *testing.T) {
 }
 
 func TestExternalLinksDisableHonored(t *testing.T) {
+	t.Parallel()
+
 	body := `<html><body><p>see <a href="http://example.com/x">link</a></p></body></html>`
 	cmd, _ := newCommand(t, body, filepath.Join(t.TempDir(), "out.pdf"))
 	cmd.Objects[0].ExternalLinks = false
@@ -365,6 +382,7 @@ func TestExternalLinksDisableHonored(t *testing.T) {
 }
 
 func TestCoverNoHeaderFooter(t *testing.T) {
+	t.Parallel()
 	// Cover pages must not carry headers/footers (wkhtmltopdf parity).
 	cover := `<html><body><h1>COVER</h1></body></html>`
 	body := `<html><body><p>BODY</p></body></html>`
@@ -385,6 +403,7 @@ func TestCoverNoHeaderFooter(t *testing.T) {
 }
 
 func TestFromPagePlaceholder(t *testing.T) {
+	t.Parallel()
 	cmd, _ := newCommand(t, longBody(""), filepath.Join(t.TempDir(), "out.pdf"))
 	cmd.Global.Header.Left = "f[frompage]"
 	cmd.Global.UseCompression = false

@@ -8,17 +8,20 @@
 # (enforced by internal/pdf.TestDirectModuleAllowlist).
 
 # Pin golangci-lint for local + CI reproducibility. Override: make lint GOLANGCI_LINT_VERSION=vX.Y.Z
+# Build with the local toolchain (go1.26.4): golangci-lint refuses to run when the
+# binary's Go version is lower than the module's targeted Go version.
 GOLANGCI_LINT_VERSION ?= v1.64.8
 
 test:
 	go test ./...
 
 # Runs every linter enabled in .golangci.yml (enable-all). Installs the pinned
-# binary into $(go env GOPATH)/bin when missing.
+# binary into $(go env GOPATH)/bin when missing. Always builds with GOTOOLCHAIN=local
+# so the binary matches go.mod's go1.26 toolchain.
 lint:
 	@command -v golangci-lint >/dev/null 2>&1 || { \
-		echo "golangci-lint not found; installing $(GOLANGCI_LINT_VERSION)..."; \
-		go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION); \
+		echo "golangci-lint not found; installing $(GOLANGCI_LINT_VERSION) with local Go toolchain..."; \
+		GOTOOLCHAIN=local go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION); \
 	}
 	golangci-lint version
 	golangci-lint run ./...

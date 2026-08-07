@@ -12,14 +12,14 @@ import (
 )
 
 // jpegMarkers is the set of JPEG marker bytes that precede a length field.
-func jpegLengthMarkers(b byte) bool {
+func jpegLengthMarkers(buf byte) bool {
 	// SOF0-SOF15 (except DHT C4, DAC CC, RST0-D7, TEM 01), SOI D8, EOI D9,
 	// SOS DA, DQT DB, DRI DD, DNL DC, DHP DE, EXP DF, APP0-APP15 E0-EF,
 	// COM FE, DHT C4, DAC CC - all have a 2-byte length after the marker.
 	switch {
-	case b == 0x01, b == 0xD8, b == 0xD9:
+	case buf == jpegTEM, buf == jpegSOI, buf == jpegEOI:
 		return false
-	case b >= 0xC0 && b <= 0xFE:
+	case buf >= 0xC0 && buf <= 0xFE:
 		return true
 	}
 
@@ -41,7 +41,7 @@ func jpegScan(data []byte) (w, h, components int, err error) {
 
 	pos := 2
 	for pos+4 <= len(data) {
-		if data[pos] != 0xFF {
+		if data[pos] != jpegMarkerPrefix {
 			pos++
 
 			continue
@@ -62,25 +62,25 @@ func jpegScan(data []byte) (w, h, components int, err error) {
 			break
 		}
 
-		segLen := int(data[pos+2])<<8 | int(data[pos+3])
+		segLen := int(data[pos+2])<<bitsPerByte | int(data[pos+3])
 
 		if marker >= 0xC0 && marker <= 0xCF && marker != 0xC4 && marker != 0xC8 && marker != 0xCC {
 			if pos+9 > len(data) {
 				break
 			}
 
-			h := int(data[pos+5])<<8 | int(data[pos+6])
-			w := int(data[pos+7])<<8 | int(data[pos+8])
+			height := int(data[pos+5])<<bitsPerByte | int(data[pos+6])
+			width := int(data[pos+7])<<bitsPerByte | int(data[pos+8])
 			components = int(data[pos+9])
 
-			if w <= 0 || h <= 0 {
+			if width <= 0 || height <= 0 {
 				return 0, 0, 0, errors.New("image: bad JPEG dimensions")
 			}
 
-			return w, h, components, nil
+			return width, height, components, nil
 		}
 
-		pos += 2 + segLen
+		pos += uint16Bytes + segLen
 	}
 
 	return 0, 0, 0, errors.New("image: malformed JPEG")
@@ -88,7 +88,7 @@ func jpegScan(data []byte) (w, h, components int, err error) {
 
 // AddJPEGImage embeds a JPEG as a DCTDecode pass-through XObject and paints
 // it into the rect. Errors are returned so the layout can fall back.
-func (c *Content) AddJPEGImage(name string, x, y, w, h float64, data []byte) error {
+func (c *Content) AddJPEGImage(name string, posX, posY, drawW, drawH float64, data []byte) error {
 	width, height, components, err := jpegScan(data)
 	if err != nil {
 		return err
@@ -102,9 +102,9 @@ func (c *Content) AddJPEGImage(name string, x, y, w, h float64, data []byte) err
 		}
 	}
 
-	cs := "DeviceRGB"
+	csVal := "DeviceRGB"
 	if components == 1 {
-		cs = "DeviceGray"
+		csVal = "DeviceGray"
 	}
 
 	name = c.uniqueImageName(name)
@@ -113,7 +113,7 @@ func (c *Content) AddJPEGImage(name string, x, y, w, h float64, data []byte) err
 		add("/Subtype", "/Image").
 		add("/Width", strconv.Itoa(width)).
 		add("/Height", strconv.Itoa(height)).
-		add("/ColorSpace", "/"+cs).
+		add("/ColorSpace", "/"+csVal).
 		add("/BitsPerComponent", "8").
 		add("/Filter", "/DCTDecode").
 		add("/Length", strconv.Itoa(len(data))).String())
@@ -121,7 +121,7 @@ func (c *Content) AddJPEGImage(name string, x, y, w, h float64, data []byte) err
 	c.imageRefs[name] = &imageResource{ref: ref, width: width, height: height}
 	c.imageUses[name] = ref.String()
 	c.Save()
-	c.Transform(w, 0, 0, h, x, y)
+	c.Transform(drawW, 0, 0, drawH, posX, posY)
 	c.buf.WriteString("/" + name + " Do\n")
 	c.Restore()
 
@@ -136,14 +136,14 @@ func grayJPEG(data []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	b := img.Bounds()
-	gray := image.NewGray(image.Rect(0, 0, b.Dx(), b.Dy()))
+	bounds := img.Bounds()
+	gray := image.NewGray(image.Rect(0, 0, bounds.Dx(), bounds.Dy()))
 
-	for yy := range b.Dy() {
-		for xx := range b.Dx() {
-			r, g, bl, _ := img.At(b.Min.X+xx, b.Min.Y+yy).RGBA()
+	for yy := range bounds.Dy() {
+		for xx := range bounds.Dx() {
+			red, green, blue, _ := img.At(bounds.Min.X+xx, bounds.Min.Y+yy).RGBA()
 			gray.SetGray(xx, yy, color.Gray{
-				Y: uint8(0.299*float64(r>>8) + 0.587*float64(g>>8) + 0.114*float64(bl>>8)),
+				Y: uint8(lumaR*float64(red>>bitsPerByte) + lumaG*float64(green>>bitsPerByte) + lumaB*float64(blue>>bitsPerByte)),
 			})
 		}
 	}
@@ -173,25 +173,25 @@ func (c *Content) AddPNGImage(name string, x, y, w, h float64, data []byte) erro
 
 	hasAlpha := false
 	grayscale := c.doc != nil && c.doc.grayscale
-	rgba := make([]byte, width*height*3)
+	rgba := make([]byte, width*height*rgbChannels)
 
 	var mask []byte // 8-bit alpha, 0 = transparent
 
 	for yy := range height {
 		for xx := range width {
-			r, g, b, a := img.At(bounds.Min.X+xx, bounds.Min.Y+yy).RGBA()
-			off := (yy*width + xx) * 3
+			red, green, blue, alpha := img.At(bounds.Min.X+xx, bounds.Min.Y+yy).RGBA()
+			off := (yy*width + xx) * rgbChannels
 
 			if grayscale {
-				v := byte(0.299*float64(r>>8) + 0.587*float64(g>>8) + 0.114*float64(b>>8))
+				v := byte(lumaR*float64(red>>bitsPerByte) + lumaG*float64(green>>bitsPerByte) + lumaB*float64(blue>>bitsPerByte))
 				rgba[off], rgba[off+1], rgba[off+2] = v, v, v
 			} else {
-				rgba[off] = byte(r >> 8)
-				rgba[off+1] = byte(g >> 8)
-				rgba[off+2] = byte(b >> 8)
+				rgba[off] = byte(red >> bitsPerByte)
+				rgba[off+1] = byte(green >> bitsPerByte)
+				rgba[off+2] = byte(blue >> bitsPerByte)
 			}
 
-			if a < 0xFFFF {
+			if alpha < maxUint16Val {
 				hasAlpha = true
 			}
 		}
@@ -203,7 +203,7 @@ func (c *Content) AddPNGImage(name string, x, y, w, h float64, data []byte) erro
 		for yy := range height {
 			for xx := range width {
 				_, _, _, a := img.At(bounds.Min.X+xx, bounds.Min.Y+yy).RGBA()
-				mask[yy*width+xx] = byte(a >> 8)
+				mask[yy*width+xx] = byte(a >> bitsPerByte)
 			}
 		}
 	}
@@ -223,7 +223,7 @@ func (c *Content) AddPNGImage(name string, x, y, w, h float64, data []byte) erro
 	}
 
 	if hasAlpha {
-		m := flateBytes(mask)
+		mVal := flateBytes(mask)
 		maskRef := c.doc.newObject()
 		c.doc.setDict(maskRef, dict{}.add("/Type", "/XObject").
 			add("/Subtype", "/Image").
@@ -232,8 +232,8 @@ func (c *Content) AddPNGImage(name string, x, y, w, h float64, data []byte) erro
 			add("/ColorSpace", "/DeviceGray").
 			add("/BitsPerComponent", "8").
 			add("/Filter", "/FlateDecode").
-			add("/Length", strconv.Itoa(len(m))).String())
-		c.doc.setStream(maskRef, m)
+			add("/Length", strconv.Itoa(len(mVal))).String())
+		c.doc.setStream(maskRef, mVal)
 		dct = dct.add("/SMask", maskRef.String())
 	}
 

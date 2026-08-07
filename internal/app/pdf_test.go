@@ -11,9 +11,11 @@ import (
 )
 
 func TestBuildPDFRequestPreservesEngineContract(t *testing.T) {
-	cmd := &cli.Command{
+	t.Parallel()
+
+	cmd := &cli.Command{ //nolint:exhaustruct // intentional zero/partial fields
 		Global:  settings.DefaultPdfGlobal(),
-		Objects: []settings.PdfObject{{Page: "inline:<html></html>"}},
+		Objects: []settings.PdfObject{{Page: "inline:<html></html>"}}, //nolint:exhaustruct // intentional zero/partial fields
 	}
 
 	var out, outline bytes.Buffer
@@ -35,7 +37,9 @@ func TestBuildPDFRequestPreservesEngineContract(t *testing.T) {
 }
 
 func TestBuildPDFRequestRejectsMissingOutput(t *testing.T) {
-	cmd := &cli.Command{Global: settings.DefaultPdfGlobal()}
+	t.Parallel()
+
+	cmd := &cli.Command{Global: settings.DefaultPdfGlobal()} //nolint:exhaustruct // intentional zero/partial fields
 
 	_, err := BuildPDFRequest(cmd, nil, nil)
 	if err == nil {

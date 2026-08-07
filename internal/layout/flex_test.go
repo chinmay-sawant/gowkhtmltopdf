@@ -10,7 +10,8 @@ import (
 )
 
 func TestFlexOrderAndShrink(t *testing.T) {
-	s := sheet(t, `
+	t.Parallel()
+	cssSheet := sheet(t, `
 .row { display:flex; width:200pt; gap:0 }
 .a { order:2; width:80pt; flex-shrink:0 }
 .b { order:1; width:80pt; flex-shrink:1 }
@@ -18,7 +19,7 @@ func TestFlexOrderAndShrink(t *testing.T) {
 `)
 	res := layoutHTML(t, `<html><body>
 <div class="row"><div class="a">A</div><div class="b">B</div><div class="c">C</div></div>
-</body></html>`, s)
+</body></html>`, cssSheet)
 	pos := map[string]float64{}
 
 	for _, op := range res.Ops {
@@ -42,14 +43,15 @@ func TestFlexOrderAndShrink(t *testing.T) {
 }
 
 func TestFloatWidthPercent(t *testing.T) {
-	s := sheet(t, `
+	t.Parallel()
+	cssSheet := sheet(t, `
 .box { width:200pt }
 .left { float:left; width:50%; background:#eee; padding:2pt }
 .clear { clear:both }
 `)
 	res := layoutHTML(t, `<html><body>
 <div class="box"><div class="left">L</div><p class="clear">after</p></div>
-</body></html>`, s)
+</body></html>`, cssSheet)
 
 	var fillW float64
 
@@ -65,14 +67,14 @@ func TestFloatWidthPercent(t *testing.T) {
 }
 
 func TestZIndexPaintOrder(t *testing.T) {
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 .wrap { position:relative; height:40pt }
 .low { position:absolute; top:0; left:0; width:40pt; height:20pt; background:#f00; z-index:1 }
 .high { position:absolute; top:5pt; left:10pt; width:40pt; height:20pt; background:#00f; z-index:5 }
 `)
 	res := layoutHTML(t, `<html><body>
 <div class="wrap"><div class="low">L</div><div class="high">H</div></div>
-</body></html>`, s)
+</body></html>`, cssSheet)
 	doc := pdf.NewDocument()
 
 	if err := Paint(doc, res, paintOpts()); err != nil {
@@ -81,13 +83,13 @@ func TestZIndexPaintOrder(t *testing.T) {
 
 	lowI, highI := -1, -1
 
-	for i, op := range res.Ops {
+	for idx, op := range res.Ops {
 		if op.Kind == OpFillRect && op.R > 0.9 {
-			lowI = i
+			lowI = idx
 		}
 
 		if op.Kind == OpFillRect && op.B > 0.9 {
-			highI = i
+			highI = idx
 		}
 	}
 
@@ -101,6 +103,7 @@ func TestZIndexPaintOrder(t *testing.T) {
 }
 
 func TestFlexRowLayout(t *testing.T) {
+	t.Parallel()
 	src := `<html><body>
 <div style="display:flex;justify-content:space-between;gap:8pt;width:300pt">
   <div style="width:60pt">A</div>
@@ -128,7 +131,8 @@ func TestFlexRowLayout(t *testing.T) {
 }
 
 func TestFlexRowReverse(t *testing.T) {
-	s := sheet(t, `
+	t.Parallel()
+	cssSheet := sheet(t, `
 .row { display:flex; flex-direction:row-reverse; width:200pt; gap:0 }
 .a { width:40pt }
 .b { width:40pt }
@@ -136,7 +140,7 @@ func TestFlexRowReverse(t *testing.T) {
 `)
 	res := layoutHTML(t, `<html><body>
 <div class="row"><div class="a">A</div><div class="b">B</div><div class="c">C</div></div>
-</body></html>`, s)
+</body></html>`, cssSheet)
 	pos := map[string]float64{}
 
 	for _, op := range res.Ops {
@@ -151,13 +155,14 @@ func TestFlexRowReverse(t *testing.T) {
 }
 
 func TestFlexSpaceEvenly(t *testing.T) {
-	s := sheet(t, `
+	t.Parallel()
+	cssSheet := sheet(t, `
 .row { display:flex; justify-content:space-evenly; width:300pt; gap:0 }
 .item { width:40pt }
 `)
 	res := layoutHTML(t, `<html><body>
 <div class="row"><div class="item">A</div><div class="item">B</div><div class="item">C</div></div>
-</body></html>`, s)
+</body></html>`, cssSheet)
 	pos := map[string]float64{}
 
 	for _, op := range res.Ops {
@@ -170,15 +175,15 @@ func TestFlexSpaceEvenly(t *testing.T) {
 		t.Fatalf("missing texts: %v", pos)
 	}
 	// space-evenly: equal gaps at edges and between; A should not be at x≈0.
-	d1 := pos["B"] - pos["A"]
-	d2 := pos["C"] - pos["B"]
+	dist1 := pos["B"] - pos["A"]
+	dist2 := pos["C"] - pos["B"]
 
-	if d1 < 50 || d2 < 50 {
+	if dist1 < 50 || dist2 < 50 {
 		t.Fatalf("space-evenly gaps too small: A=%.1f B=%.1f C=%.1f", pos["A"], pos["B"], pos["C"])
 	}
 
-	if diff := d1 - d2; diff > 5 || diff < -5 {
-		t.Fatalf("space-evenly gaps unequal: AB=%.1f BC=%.1f", d1, d2)
+	if diff := dist1 - dist2; diff > 5 || diff < -5 {
+		t.Fatalf("space-evenly gaps unequal: AB=%.1f BC=%.1f", dist1, dist2)
 	}
 
 	if pos["A"] < 20 {
@@ -187,7 +192,8 @@ func TestFlexSpaceEvenly(t *testing.T) {
 }
 
 func TestFlexColumnGapVsRowGap(t *testing.T) {
-	s := sheet(t, `
+	t.Parallel()
+	cssSheet := sheet(t, `
 .row {
   display:flex; flex-wrap:wrap; width:100pt;
   column-gap:20pt; row-gap:40pt;
@@ -199,7 +205,7 @@ func TestFlexColumnGapVsRowGap(t *testing.T) {
   <div class="item">A</div><div class="item">B</div>
   <div class="item">C</div><div class="item">D</div>
 </div>
-</body></html>`, s)
+</body></html>`, cssSheet)
 	posX, posY := map[string]float64{}, map[string]float64{}
 
 	for _, op := range res.Ops {
@@ -229,14 +235,15 @@ func TestFlexColumnGapVsRowGap(t *testing.T) {
 }
 
 func TestFlexAlignSelf(t *testing.T) {
-	s := sheet(t, `
+	t.Parallel()
+	cssSheet := sheet(t, `
 .row { display:flex; align-items:flex-start; width:200pt; height:60pt; gap:0 }
 .a { width:40pt; height:10pt }
 .b { width:40pt; height:10pt; align-self:flex-end }
 `)
 	res := layoutHTML(t, `<html><body>
 <div class="row"><div class="a">A</div><div class="b">B</div></div>
-</body></html>`, s)
+</body></html>`, cssSheet)
 	posY := map[string]float64{}
 
 	for _, op := range res.Ops {
@@ -253,23 +260,23 @@ func TestFlexAlignSelf(t *testing.T) {
 // TestFlexAlignItemsStretchRow matches fixture-33 definite row: container
 // height 36pt, items flex-basis 50% with auto height → stretch to line cross size.
 func TestFlexAlignItemsStretchRow(t *testing.T) {
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 .row { display:flex; width:240pt; height:36pt; gap:0; border:1px solid #1565c0; background:#e3f2fd }
 .half { flex:0 0 50%; box-sizing:border-box; padding:6pt; background:#90caf9 }
 `)
 	res := layoutHTML(t, `<html><body>
 <div class="row"><div class="half">Left 50%</div><div class="half">Right 50%</div></div>
-</body></html>`, s)
+</body></html>`, cssSheet)
 
 	var itemH []float64
 
-	for _, op := range res.Ops {
-		if op.Kind != OpFillRect {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpFillRect {
 			continue
 		}
 		// Item blue (#90caf9 ≈ 0.565, 0.792, 0.976), not container wash.
-		if op.R > 0.5 && op.R < 0.7 && op.B > 0.9 && op.W > 80 {
-			itemH = append(itemH, op.H)
+		if paintOp.R > 0.5 && paintOp.R < 0.7 && paintOp.B > 0.9 && paintOp.W > 80 {
+			itemH = append(itemH, paintOp.H)
 		}
 	}
 
@@ -299,30 +306,31 @@ func TestFlexShorthandParsing(t *testing.T) {
 		{"three", "flex:0 0 80pt", 0, 0, 80, -1},
 		{"grow-shrink-auto", "flex:1 1 auto", 1, 1, -1, -1},
 	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			s := sheet(t, ".x { display:flex } .i { "+tc.css+" }")
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			cssSheet := sheet(t, ".x { display:flex } .i { "+testCase.css+" }")
 			doc := `<html><body><div class="x"><div class="i">Z</div></div></body></html>`
 
-			res := layoutHTML(t, doc, s)
+			res := layoutHTML(t, doc, cssSheet)
 			if res == nil {
 				t.Fatal("nil result")
 			}
 			// Re-resolve styles the same way layout does.
 			root := mustParse(t, doc)
-			styles := resolveStyles(root, []*css.Stylesheet{s}, "screen", 612, 792)
+			styles := resolveStyles(root, []*css.Stylesheet{cssSheet}, "screen", 612, 792)
 
 			var item *html.Node
 
 			var find func(*html.Node)
-			find = func(n *html.Node) {
-				if n.Type == html.ElementNode && n.Attribute("class") == "i" {
-					item = n
+			find = func(node *html.Node) {
+				if node.Type == html.ElementNode && node.Attribute("class") == "i" {
+					item = node
 
 					return
 				}
 
-				for _, c := range n.Children {
+				for _, c := range node.Children {
 					find(c)
 				}
 			}
@@ -332,27 +340,28 @@ func TestFlexShorthandParsing(t *testing.T) {
 				t.Fatal("item not found")
 			}
 
-			st := styles[item]
-			if st.FlexGrow != tc.grow || st.FlexShrink != tc.sh {
-				t.Fatalf("grow/shrink = %v/%v, want %v/%v", st.FlexGrow, st.FlexShrink, tc.grow, tc.sh)
+			sty := styles[item]
+			if sty.FlexGrow != testCase.grow || sty.FlexShrink != testCase.sh {
+				t.Fatalf("grow/shrink = %v/%v, want %v/%v", sty.FlexGrow, sty.FlexShrink, testCase.grow, testCase.sh)
 			}
 
-			if st.FlexBasis != tc.basis || st.FlexBasisPercent != tc.basisPct {
-				t.Fatalf("basis/pct = %v/%v, want %v/%v", st.FlexBasis, st.FlexBasisPercent, tc.basis, tc.basisPct)
+			if sty.FlexBasis != testCase.basis || sty.FlexBasisPercent != testCase.basisPct {
+				t.Fatalf("basis/pct = %v/%v, want %v/%v", sty.FlexBasis, sty.FlexBasisPercent, testCase.basis, testCase.basisPct)
 			}
 		})
 	}
 }
 
 func TestFlexBasisPercentDefinite(t *testing.T) {
-	s := sheet(t, `
+	t.Parallel()
+	cssSheet := sheet(t, `
 .row { display:flex; width:200pt; gap:0; height:30pt }
 .a { flex: 0 0 50%; background:#fcc }
 .b { flex: 0 0 50%; background:#ccf }
 `)
 	res := layoutHTML(t, `<html><body>
 <div class="row"><div class="a">A</div><div class="b">B</div></div>
-</body></html>`, s)
+</body></html>`, cssSheet)
 
 	var fills []float64
 
@@ -376,7 +385,7 @@ func TestFlexBasisPercentDefinite(t *testing.T) {
 func TestFlexBasisPercentCyclicColumn(t *testing.T) {
 	// height:auto column → main size indefinite; % flex-basis must act as auto
 	// (content-based), not resolve as 0.
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 .col { display:flex; flex-direction:column; width:120pt; gap:0 }
 .pct { flex: 0 0 50%; background:#cfc; padding:4pt }
 .auto { flex: 0 0 auto; background:#ffc; padding:4pt }
@@ -386,20 +395,20 @@ func TestFlexBasisPercentCyclicColumn(t *testing.T) {
   <div class="pct">PERCENT BASIS</div>
   <div class="auto">AUTO BASIS</div>
 </div>
-</body></html>`, s)
+</body></html>`, cssSheet)
 
 	var pctH, autoH float64
 
-	for _, op := range res.Ops {
-		if op.Kind != OpFillRect || op.H < 2 {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpFillRect || paintOp.H < 2 {
 			continue
 		}
 
 		switch {
-		case op.G > 0.7 && op.R < 0.9: // #cfc
-			pctH = op.H
-		case op.R > 0.9 && op.G > 0.9 && op.B < 0.9: // #ffc
-			autoH = op.H
+		case paintOp.G > 0.7 && paintOp.R < 0.9: // #cfc
+			pctH = paintOp.H
+		case paintOp.R > 0.9 && paintOp.G > 0.9 && paintOp.B < 0.9: // #ffc
+			autoH = paintOp.H
 		}
 	}
 
@@ -417,28 +426,28 @@ func TestFlexBasisPercentCyclicColumn(t *testing.T) {
 }
 
 func TestFlexBasisPercentDefiniteColumn(t *testing.T) {
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 .col { display:flex; flex-direction:column; width:100pt; height:100pt; gap:0 }
 .a { flex: 0 0 40%; background:#f99 }
 .b { flex: 0 0 60%; background:#99f }
 `)
 	res := layoutHTML(t, `<html><body>
 <div class="col"><div class="a">A</div><div class="b">B</div></div>
-</body></html>`, s)
+</body></html>`, cssSheet)
 
 	var h40, h60 float64
 
-	for _, op := range res.Ops {
-		if op.Kind != OpFillRect || op.H < 5 {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpFillRect || paintOp.H < 5 {
 			continue
 		}
 
-		if op.R > 0.9 && op.G < 0.7 {
-			h40 = op.H
+		if paintOp.R > 0.9 && paintOp.G < 0.7 {
+			h40 = paintOp.H
 		}
 
-		if op.B > 0.9 && op.R < 0.7 {
-			h60 = op.H
+		if paintOp.B > 0.9 && paintOp.R < 0.7 {
+			h60 = paintOp.H
 		}
 	}
 
@@ -452,9 +461,10 @@ func TestFlexBasisPercentDefiniteColumn(t *testing.T) {
 }
 
 func TestFlexContentMinSizeDefiniteRow(t *testing.T) {
+	t.Parallel()
 	// Content-based min-width:auto must stop shrink from crushing long
 	// unbreakable text below its intrinsic width inside a definite row.
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 .row { display:flex; width:120pt; gap:0 }
 .a { flex: 1 1 80pt; background:#fcc; white-space:nowrap }
 .b { flex: 1 1 80pt; background:#ccf }
@@ -464,38 +474,39 @@ func TestFlexContentMinSizeDefiniteRow(t *testing.T) {
   <div class="a">LONGWORDWITHOUTSPACES</div>
   <div class="b">B</div>
 </div>
-</body></html>`, s)
+</body></html>`, cssSheet)
 
-	var aw float64
+	var availW float64
 
 	for _, op := range res.Ops {
 		if op.Kind == OpFillRect && op.R > 0.9 && op.G < 0.9 && op.W > 5 {
-			if op.W > aw {
-				aw = op.W
+			if op.W > availW {
+				availW = op.W
 			}
 		}
 	}
 
-	if aw < 50 {
-		t.Fatalf("content min floor crushed A to W=%.1f (want substantial intrinsic)", aw)
+	if availW < 50 {
+		t.Fatalf("content min floor crushed A to W=%.1f (want substantial intrinsic)", availW)
 	}
 	// A should keep more than equal half when content min exceeds shrink share.
-	if aw <= 60 {
-		t.Fatalf("A width=%.1f; content min should prefer A over equal 60pt split", aw)
+	if availW <= 60 {
+		t.Fatalf("A width=%.1f; content min should prefer A over equal 60pt split", availW)
 	}
 }
 
 func TestFlexPercentChildDefiniteRow(t *testing.T) {
+	t.Parallel()
 	// % width child inside a definite flex item re-resolves against the item's
 	// used main size (not the viewport).
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 .row { display:flex; width:200pt; gap:0 }
 .item { flex: 0 0 100pt; background:#eee }
 .inner { width:50%; background:#f99; height:12pt }
 `)
 	res := layoutHTML(t, `<html><body>
 <div class="row"><div class="item"><div class="inner">X</div></div></div>
-</body></html>`, s)
+</body></html>`, cssSheet)
 
 	var innerW float64
 
@@ -512,42 +523,43 @@ func TestFlexPercentChildDefiniteRow(t *testing.T) {
 
 func TestFlexMinWidthPercentDefinite(t *testing.T) {
 	// min-width:% against definite flex container: A cannot shrink below 60%.
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 .row { display:flex; width:200pt; gap:0 }
 .a { flex: 0 1 150pt; min-width: 60%; background:#cfc }
 .b { flex: 0 1 150pt; background:#ffc }
 `)
 	res := layoutHTML(t, `<html><body>
 <div class="row"><div class="a">A</div><div class="b">B</div></div>
-</body></html>`, s)
+</body></html>`, cssSheet)
 
-	var aw, bw float64
+	var availW, boxW float64
 
-	for _, op := range res.Ops {
-		if op.Kind != OpFillRect || op.W < 5 {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpFillRect || paintOp.W < 5 {
 			continue
 		}
 
-		if op.G > 0.7 && op.R < 0.9 {
-			aw = op.W
+		if paintOp.G > 0.7 && paintOp.R < 0.9 {
+			availW = paintOp.W
 		}
 
-		if op.R > 0.9 && op.G > 0.9 && op.B < 0.9 {
-			bw = op.W
+		if paintOp.R > 0.9 && paintOp.G > 0.9 && paintOp.B < 0.9 {
+			boxW = paintOp.W
 		}
 	}
 
-	if aw < 115 || aw > 130 {
-		t.Fatalf("min-width:60%% floor A=%.1f, want ~120", aw)
+	if availW < 115 || availW > 130 {
+		t.Fatalf("min-width:60%% floor A=%.1f, want ~120", availW)
 	}
 
-	if bw < 65 || bw > 90 {
-		t.Fatalf("B after rebalance=%.1f, want ~80", bw)
+	if boxW < 65 || boxW > 90 {
+		t.Fatalf("B after rebalance=%.1f, want ~80", boxW)
 	}
 }
 
 func TestFlexNestedSmoke(t *testing.T) {
-	s := sheet(t, `
+	t.Parallel()
+	cssSheet := sheet(t, `
 .outer { display:flex; width:220pt; gap:4pt }
 .inner { display:flex; flex:1; gap:2pt; background:#eee }
 .cell { flex:1; background:#ddd; min-width:20pt }
@@ -557,7 +569,7 @@ func TestFlexNestedSmoke(t *testing.T) {
   <div class="inner"><div class="cell">1</div><div class="cell">2</div></div>
   <div class="inner"><div class="cell">3</div><div class="cell">4</div></div>
 </div>
-</body></html>`, s)
+</body></html>`, cssSheet)
 	texts := 0
 
 	for _, op := range res.Ops {
@@ -585,32 +597,32 @@ func TestPositionRelativeAbsolute(t *testing.T) {
 
 	absTextIdx, flowTextIdx, absFillIdx := -1, -1, -1
 
-	for i, op := range res.Ops {
-		if op.Kind == OpFillRect && op.R > 0.9 && op.G > 0.9 && op.B > 0.8 {
-			absFillIdx = i
+	for idx, paintOp := range res.Ops {
+		if paintOp.Kind == OpFillRect && paintOp.R > 0.9 && paintOp.G > 0.9 && paintOp.B > 0.8 {
+			absFillIdx = idx
 		}
 
-		if op.Kind != OpText {
+		if paintOp.Kind != OpText {
 			continue
 		}
 
-		t.Logf("text=%q x=%.1f y=%.1f", op.Text, op.X, op.Y)
+		t.Logf("text=%q x=%.1f y=%.1f", paintOp.Text, paintOp.X, paintOp.Y)
 
-		if strings.Contains(op.Text, "rel") && op.X >= 20 {
+		if strings.Contains(paintOp.Text, "rel") && paintOp.X >= 20 {
 			foundRel = true
 		}
 
-		if strings.Contains(op.Text, "abs") {
+		if strings.Contains(paintOp.Text, "abs") {
 			foundAbs = true
-			absTextIdx = i
+			absTextIdx = idx
 
-			if op.X < 10 {
-				t.Errorf("abs x=%.1f, want offset", op.X)
+			if paintOp.X < 10 {
+				t.Errorf("abs x=%.1f, want offset", paintOp.X)
 			}
 		}
 
-		if strings.Contains(op.Text, "in-flow") {
-			flowTextIdx = i
+		if strings.Contains(paintOp.Text, "in-flow") {
+			flowTextIdx = idx
 		}
 	}
 

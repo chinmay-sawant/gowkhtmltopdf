@@ -30,7 +30,7 @@ type imageResource struct {
 
 // NewContent creates an empty content stream builder.
 func NewContent() *Content {
-	return &Content{
+	return &Content{ //nolint:exhaustruct // intentional zero-value fields
 		fontUses:  map[string]string{},
 		fontFiles: map[string]*Font{},
 		used:      map[string][]rune{},
@@ -42,12 +42,14 @@ func NewContent() *Content {
 // Bytes returns the raw (uncompressed) content stream.
 func (c *Content) Bytes() []byte { return c.buf.Bytes() }
 
-func appendPDFNum(dst []byte, v float64) []byte {
-	if v == float64(int(v)) {
-		return strconv.AppendInt(dst, int64(int(v)), 10)
+func appendPDFNum(dst []byte, val float64) []byte {
+	if val == float64(int(val)) {
+		return strconv.AppendInt(dst, int64(int(val)), pdfNumBase)
 	}
 
-	dst = strconv.AppendFloat(dst, v, 'f', 3, 64)
+	const float64Bits = 64
+
+	dst = strconv.AppendFloat(dst, val, 'f', pdfFloatPrec, float64Bits)
 	for len(dst) > 0 && dst[len(dst)-1] == '0' {
 		dst = dst[:len(dst)-1]
 	}
@@ -62,33 +64,33 @@ func appendPDFNum(dst []byte, v float64) []byte {
 // writePDFNums appends a short numeric operator directly into the content
 // buffer. Keeping formatting on the stack avoids the temporary strings that
 // fmt.Sprintf and num used to create for every path and text coordinate.
-func (c *Content) writePDFNums(suffix string, n int, a, b, cc, d, e, f float64) {
+func (c *Content) writePDFNums(suffix string, count int, num1, num2, num3, num4, num5, num6 float64) {
 	out := c.buf.AvailableBuffer()
-	out = appendPDFNum(out, a)
+	out = appendPDFNum(out, num1)
 
-	if n > 1 {
+	if count > 1 {
 		out = append(out, ' ')
-		out = appendPDFNum(out, b)
+		out = appendPDFNum(out, num2)
 	}
 
-	if n > 2 {
+	if count > pointComponents {
 		out = append(out, ' ')
-		out = appendPDFNum(out, cc)
+		out = appendPDFNum(out, num3)
 	}
 
-	if n > 3 {
+	if count > numArgsMin3 {
 		out = append(out, ' ')
-		out = appendPDFNum(out, d)
+		out = appendPDFNum(out, num4)
 	}
 
-	if n > 4 {
+	if count > numArgsMin4 {
 		out = append(out, ' ')
-		out = appendPDFNum(out, e)
+		out = appendPDFNum(out, num5)
 	}
 
-	if n > 5 {
+	if count > numArgsMin5 {
 		out = append(out, ' ')
-		out = appendPDFNum(out, f)
+		out = appendPDFNum(out, num6)
 	}
 
 	out = append(out, suffix...)
@@ -101,21 +103,21 @@ func (c *Content) writePDFNums(suffix string, n int, a, b, cc, d, e, f float64) 
 // The parsed fonts themselves are immutable, so their pointers remain shared.
 // A fresh bytes.Buffer is used because Buffer values must not be copied after
 // use.
-func cloneContent(c *Content) *Content {
-	nc := &Content{
-		fontUses:  cloneStringMap(c.fontUses),
-		fontFiles: cloneFontMap(c.fontFiles),
-		used:      cloneRuneMap(c.used),
-		curFont:   c.curFont,
-		curSize:   c.curSize,
-		imageUses: cloneStringMap(c.imageUses),
-		imageRefs: cloneImageMap(c.imageRefs),
-		opacity:   c.opacity,
-		doc:       c.doc,
+func cloneContent(cur *Content) *Content {
+	ncVal := &Content{ //nolint:exhaustruct // intentional zero-value fields
+		fontUses:  cloneStringMap(cur.fontUses),
+		fontFiles: cloneFontMap(cur.fontFiles),
+		used:      cloneRuneMap(cur.used),
+		curFont:   cur.curFont,
+		curSize:   cur.curSize,
+		imageUses: cloneStringMap(cur.imageUses),
+		imageRefs: cloneImageMap(cur.imageRefs),
+		opacity:   cur.opacity,
+		doc:       cur.doc,
 	}
-	nc.buf.Write(c.buf.Bytes())
+	ncVal.buf.Write(cur.buf.Bytes())
 
-	return nc
+	return ncVal
 }
 
 func cloneStringMap(src map[string]string) map[string]string {
@@ -148,15 +150,15 @@ func cloneRuneMap(src map[string][]rune) map[string][]rune {
 func cloneImageMap(src map[string]*imageResource) map[string]*imageResource {
 	dst := make(map[string]*imageResource, len(src))
 
-	for k, v := range src {
-		if v == nil {
-			dst[k] = nil
+	for name, res := range src {
+		if res == nil {
+			dst[name] = nil
 
 			continue
 		}
 
-		copy := *v
-		dst[k] = &copy
+		copy := *res
+		dst[name] = &copy
 	}
 
 	return dst
@@ -172,24 +174,24 @@ func (c *Content) Restore() { c.buf.WriteString("Q\n") }
 
 // SetFillColor sets the fill color (RGB, 0..1); grayscale is applied at this
 // paint-time seam, which is what Document.SetGrayscale promises today.
-func (c *Content) SetFillColor(r, g, b float64) {
+func (c *Content) SetFillColor(red, green, blue float64) {
 	if c.doc != nil && c.doc.grayscale {
-		v := 0.299*r + 0.587*g + 0.114*b // Rec.601 luma
-		r, g, b = v, v, v
+		v := lumaR*red + lumaG*green + lumaB*blue // Rec.601 luma
+		red, green, blue = v, v, v
 	}
 
-	c.writePDFNums(" rg\n", 3, r, g, b, 0, 0, 0)
+	c.writePDFNums(" rg\n", rgbComponents, red, green, blue, 0, 0, 0)
 }
 
 // SetStrokeColor sets the stroke color (RGB, 0..1); grayscale is applied at
 // this paint-time seam, same fold as SetFillColor.
-func (c *Content) SetStrokeColor(r, g, b float64) {
+func (c *Content) SetStrokeColor(red, green, blue float64) {
 	if c.doc != nil && c.doc.grayscale {
-		v := 0.299*r + 0.587*g + 0.114*b // Rec.601 luma
-		r, g, b = v, v, v
+		v := lumaR*red + lumaG*green + lumaB*blue // Rec.601 luma
+		red, green, blue = v, v, v
 	}
 
-	c.writePDFNums(" RG\n", 3, r, g, b, 0, 0, 0)
+	c.writePDFNums(" RG\n", rgbComponents, red, green, blue, 0, 0, 0)
 }
 
 // SetLineWidth sets the stroked line width in points.
@@ -198,14 +200,14 @@ func (c *Content) SetLineWidth(w float64) {
 }
 
 // SetOpacity sets the fill/stroke opacity (0..1); 0 resets to opaque.
-func (c *Content) SetOpacity(a float64) {
-	if a >= 1 || a <= 0 {
+func (c *Content) SetOpacity(opacity float64) {
+	if opacity >= 1 || opacity <= 0 {
 		c.opacity = 0
 
 		return
 	}
 
-	c.opacity = a
+	c.opacity = opacity
 	c.buf.WriteString("/opacity gs\n")
 }
 
@@ -213,17 +215,17 @@ func (c *Content) SetOpacity(a float64) {
 
 // MoveTo begins a new subpath at (x, y).
 func (c *Content) MoveTo(x, y float64) {
-	c.writePDFNums(" m\n", 2, x, y, 0, 0, 0, 0)
+	c.writePDFNums(" m\n", pointComponents, x, y, 0, 0, 0, 0)
 }
 
 // LineTo appends a line segment to (x, y).
 func (c *Content) LineTo(x, y float64) {
-	c.writePDFNums(" l\n", 2, x, y, 0, 0, 0, 0)
+	c.writePDFNums(" l\n", pointComponents, x, y, 0, 0, 0, 0)
 }
 
 // Rect appends a rectangle to the current path.
 func (c *Content) Rect(x, y, w, h float64) {
-	c.writePDFNums(" re\n", 4, x, y, w, h, 0, 0)
+	c.writePDFNums(" re\n", rectComponents, x, y, w, h, 0, 0)
 }
 
 // Fill paints the current path with the fill color.
@@ -239,7 +241,7 @@ func (c *Content) Clip() { c.buf.WriteString("W n\n") }
 
 // Transform appends a 6-element matrix to the CTM.
 func (c *Content) Transform(a, b, c2, d, e, f float64) {
-	c.writePDFNums(" cm\n", 6, a, b, c2, d, e, f)
+	c.writePDFNums(" cm\n", matrixComponents, a, b, c2, d, e, f)
 }
 
 // text
@@ -271,12 +273,12 @@ func (c *Content) EndText() { c.buf.WriteString("ET\n") }
 
 // TextAt sets the text position.
 func (c *Content) TextAt(x, y float64) {
-	c.writePDFNums(" Td\n", 2, x, y, 0, 0, 0, 0)
+	c.writePDFNums(" Td\n", pointComponents, x, y, 0, 0, 0, 0)
 }
 
 // TextMatrix sets the text matrix via Tm (a b c d e f).
 func (c *Content) TextMatrix(a, b, cc, d, e, f float64) {
-	c.writePDFNums(" Tm\n", 6, a, b, cc, d, e, f)
+	c.writePDFNums(" Tm\n", matrixComponents, a, b, cc, d, e, f)
 }
 
 // TextLeading sets the leading for TL/T*.
@@ -298,10 +300,10 @@ func (c *Content) TextRenderMode(mode int) {
 // through Type0; Latin that the face lacks (typical for CJK fallback fonts)
 // is drawn with an embedded Liberation fallback so ASCII does not become tofu.
 func (c *Content) TextShow(s string) {
-	f := c.fontFiles[c.curFont]
-	s = ShapeRun(s, f, c.curSize).Text
+	fnt := c.fontFiles[c.curFont]
+	s = ShapeRun(s, fnt, c.curSize).Text
 
-	if f == nil || !c.textNeedsType0(s) {
+	if fnt == nil || !c.textNeedsType0(s) {
 		c.textShowSimple(s)
 
 		return
@@ -326,11 +328,11 @@ func (c *Content) TextShow(s string) {
 		buf.Reset()
 	}
 
-	for _, r := range s {
-		has := f.GlyphID(r) != 0
+	for _, rVal := range s {
+		has := fnt.GlyphID(rVal) != 0
 
 		next := 0
-		if r > 0xFF {
+		if rVal > maxLatin1Code {
 			next = 1
 		} else if !has {
 			next = 0 // missing Latin on CJK face → Liberation
@@ -344,7 +346,7 @@ func (c *Content) TextShow(s string) {
 			mode = next
 		}
 
-		buf.WriteRune(r)
+		buf.WriteRune(rVal)
 	}
 
 	flush()
@@ -353,13 +355,13 @@ func (c *Content) TextShow(s string) {
 	base := strings.TrimSuffix(c.curFont, "_u")
 	size := c.curSize
 
-	for _, rn := range runs {
-		if rn.type0 {
+	for _, runVal := range runs {
+		if runVal.type0 {
 			if c.curFont != base && c.curFont != base+"_u" {
 				c.SetFont(base, size)
 			}
 
-			c.textShowType0(rn.s)
+			c.textShowType0(runVal.s)
 
 			continue
 		}
@@ -367,7 +369,7 @@ func (c *Content) TextShow(s string) {
 		name := base
 
 		if face := c.fontFiles[base]; face != nil {
-			for _, r := range rn.s {
+			for _, r := range runVal.s {
 				if face.GlyphID(r) == 0 {
 					name = c.ensureLatinFallback()
 
@@ -380,7 +382,7 @@ func (c *Content) TextShow(s string) {
 			c.SetFont(name, size)
 		}
 
-		c.textShowSimple(rn.s)
+		c.textShowSimple(runVal.s)
 	}
 
 	if c.curFont != base {
@@ -404,20 +406,20 @@ func (c *Content) ensureLatinFallback() string {
 	return name
 }
 
-func (c *Content) textShowSimple(s string) {
-	for _, r := range s {
-		if r > 0xFF {
-			r = winAnsiFold(r)
+func (c *Content) textShowSimple(str string) {
+	for _, rVal := range str {
+		if rVal > maxLatin1Code {
+			rVal = winAnsiFold(rVal)
 		}
 
-		if r > 0xFF {
-			r = '?'
+		if rVal > maxLatin1Code {
+			rVal = '?'
 		}
 
-		c.used[c.curFont] = append(c.used[c.curFont], r)
+		c.used[c.curFont] = append(c.used[c.curFont], rVal)
 	}
 
-	c.buf.WriteString(pdfString(s) + " Tj\n")
+	c.buf.WriteString(pdfString(str) + " Tj\n")
 }
 
 func (c *Content) textNeedsType0(s string) bool {
@@ -426,11 +428,11 @@ func (c *Content) textNeedsType0(s string) bool {
 	}
 
 	for _, r := range s {
-		if r > 0xFF {
+		if r > maxLatin1Code {
 			r = winAnsiFold(r)
 		}
 
-		if r > 0xFF {
+		if r > maxLatin1Code {
 			return true
 		}
 	}
@@ -438,7 +440,7 @@ func (c *Content) textNeedsType0(s string) bool {
 	return false
 }
 
-func (c *Content) textShowType0(s string) {
+func (c *Content) textShowType0(str string) {
 	base := strings.TrimSuffix(c.curFont, "_u")
 	uname := base + "_u"
 
@@ -452,15 +454,15 @@ func (c *Content) textShowType0(s string) {
 		c.SetFont(uname, c.curSize)
 	}
 
-	for _, r := range s {
-		if r > 0xFFFF {
+	for _, r := range str {
+		if r > maxBMPCode {
 			r = '?'
 		}
 
 		c.used[uname] = append(c.used[uname], r)
 	}
 
-	c.buf.WriteString(pdfHexCIDs(s) + " Tj\n")
+	c.buf.WriteString(pdfHexCIDs(str) + " Tj\n")
 }
 
 // resources

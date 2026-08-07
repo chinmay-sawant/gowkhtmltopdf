@@ -25,7 +25,7 @@ func TestTheadRepeatOnContinuationPages(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{Width: 400, Height: 200, Background: true})
+	res, err := Layout(root, Options{Width: 400, Height: 200, Background: true}) //nolint:exhaustruct // intentional zero fields
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,13 +45,13 @@ func TestTheadRepeatOnContinuationPages(t *testing.T) {
 	contentH := 280.0 - 40.0
 	pagesWithHeader := map[int]bool{}
 
-	for _, op := range res.Ops {
-		if op.Kind != OpText {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpText {
 			continue
 		}
 
-		if strings.Contains(op.Text, "ColA") || strings.Contains(op.Text, "ColB") {
-			pagesWithHeader[int(op.Y/contentH)] = true
+		if strings.Contains(paintOp.Text, "ColA") || strings.Contains(paintOp.Text, "ColB") {
+			pagesWithHeader[int(paintOp.Y/contentH)] = true
 		}
 	}
 
@@ -61,31 +61,32 @@ func TestTheadRepeatOnContinuationPages(t *testing.T) {
 }
 
 func TestTheadUADisplay(t *testing.T) {
+	t.Parallel()
 	root := mustParse(t, `<html><body><table><thead><tr><th>H</th></tr></thead><tbody><tr><td>B</td></tr></tbody></table></body></html>`)
 	res := layoutHTML(t, `<html><body><table><thead><tr><th>H</th></tr></thead><tbody><tr><td>B</td></tr></tbody></table></body></html>`)
 	_ = root
 
-	var tb *box
+	var tblBox *box
 
 	var walk func(b *box)
-	walk = func(b *box) {
-		if b.kind == "table" {
-			tb = b
+	walk = func(boxNode *box) {
+		if boxNode.kind == "table" {
+			tblBox = boxNode
 
 			return
 		}
 
-		for _, c := range b.children {
+		for _, c := range boxNode.children {
 			walk(c)
 		}
 	}
 	walk(res.root)
 
-	if tb == nil {
+	if tblBox == nil {
 		t.Fatal("no table box")
 	}
 
-	if tb.headerRows != 1 {
-		t.Errorf("headerRows = %d, want 1", tb.headerRows)
+	if tblBox.headerRows != 1 {
+		t.Errorf("headerRows = %d, want 1", tblBox.headerRows)
 	}
 }

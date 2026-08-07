@@ -51,6 +51,7 @@ body { font-family: Custom, sans-serif; font-size: 14pt; }
 // TestFontFaceLocalUsesCustom proves ACL-allowed local @font-face registers
 // Custom and layout attaches that face (same MergeFontFaces path as Run).
 func TestFontFaceLocalUsesCustom(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	copyTestdataTTF(t, dir)
 
@@ -68,14 +69,14 @@ func TestFontFaceLocalUsesCustom(t *testing.T) {
 		t.Fatalf("Run: %v\nlog: %s", err, log.String())
 	}
 
-	f, err := os.Open(pngOut)
+	file, err := os.Open(pngOut)
 	if err != nil {
 		t.Fatalf("open png: %v", err)
 	}
 
-	defer f.Close()
+	defer file.Close()
 
-	if _, err := png.Decode(f); err != nil {
+	if _, err := png.Decode(file); err != nil {
 		t.Fatalf("decode png: %v", err)
 	}
 
@@ -92,7 +93,7 @@ func TestFontFaceLocalUsesCustom(t *testing.T) {
 		t.Fatalf("parse: %v", err)
 	}
 
-	sheets := convert.CollectSheets(t.Context(), loader, root, res.Base, cmd.Objects[0].Load, convert.SheetOptions{
+	sheets := convert.CollectSheets(t.Context(), loader, root, res.Base, cmd.Objects[0].Load, convert.SheetOptions{ //nolint:exhaustruct // intentional zero/partial fields
 		ViewportW: 768, ViewportH: 576, MediaType: "screen",
 	}, io.Discard)
 
@@ -106,7 +107,7 @@ func TestFontFaceLocalUsesCustom(t *testing.T) {
 		t.Fatalf("default font: %v", err)
 	}
 
-	lay, err := layout.Layout(root, layout.Options{
+	lay, err := layout.Layout(root, layout.Options{ //nolint:exhaustruct // intentional zero/partial fields
 		Width: 200 * 0.75, Height: 200 * 0.75,
 		Font: def, Registry: reg, Sheets: sheets, Background: true,
 	})
@@ -136,6 +137,7 @@ func TestFontFaceLocalUsesCustom(t *testing.T) {
 
 // TestFontFaceACLDeny ensures a denied @font-face src falls back without panic.
 func TestFontFaceACLDeny(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	pageDir := filepath.Join(root, "page")
 	fontDir := filepath.Join(root, "fonts")
@@ -156,11 +158,11 @@ func TestFontFaceACLDeny(t *testing.T) {
 	}
 
 	pngOut := filepath.Join(t.TempDir(), "out.png")
-	cmd := &cli.Command{
+	cmd := &cli.Command{ //nolint:exhaustruct // intentional zero/partial fields
 		Global: settings.DefaultPdfGlobal(),
 		Image:  settings.DefaultImageGlobal(),
 		Objects: []settings.PdfObject{
-			{Page: htmlPath, Load: settings.DefaultLoadPage()},
+			{Page: htmlPath, Load: settings.DefaultLoadPage()}, //nolint:exhaustruct // intentional zero/partial fields
 		},
 		Output: pngOut,
 	}
@@ -179,14 +181,14 @@ func TestFontFaceACLDeny(t *testing.T) {
 		t.Errorf("expected @font-face ACL warning; log=%q", warn)
 	}
 
-	f, err := os.Open(pngOut)
+	file, err := os.Open(pngOut)
 	if err != nil {
 		t.Fatalf("open png: %v", err)
 	}
 
-	defer f.Close()
+	defer file.Close()
 
-	if _, err := png.Decode(f); err != nil {
+	if _, err := png.Decode(file); err != nil {
 		t.Fatalf("decode png: %v", err)
 	}
 
@@ -203,7 +205,7 @@ func TestFontFaceACLDeny(t *testing.T) {
 		t.Fatalf("parse: %v", err)
 	}
 
-	sheets := convert.CollectSheets(t.Context(), loader, rootHTML, res.Base, cmd.Objects[0].Load, convert.SheetOptions{
+	sheets := convert.CollectSheets(t.Context(), loader, rootHTML, res.Base, cmd.Objects[0].Load, convert.SheetOptions{ //nolint:exhaustruct // intentional zero/partial fields
 		ViewportW: 768, ViewportH: 576, MediaType: "screen",
 	}, io.Discard)
 

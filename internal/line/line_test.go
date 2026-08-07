@@ -3,6 +3,8 @@ package line
 import "testing"
 
 func TestSeverityOf(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		in   string
 		want Severity
@@ -29,6 +31,8 @@ func TestSeverityOf(t *testing.T) {
 }
 
 func TestEmit(t *testing.T) {
+	t.Parallel()
+
 	var buf w
 
 	Emit(&buf, Warn, "object %d: %s", 1, "boom")

@@ -18,50 +18,50 @@ import (
 // pitch ≥ 0.95·fontSize.
 func TestNoCompactOverlapsBodyLines(t *testing.T) {
 	const fontSize = 10.0
-	s := sheet(t, fmt.Sprintf(`
+	cssSheet := sheet(t, fmt.Sprintf(`
 body { margin: 0; font-size: %gpt; line-height: 1.25; }
 p { margin: 0.6em 0; }
 ol { margin: 0.5em 0; padding-left: 22pt; }
 li { page-break-inside: avoid; margin: 0 0 0.35em 0; }
 `, fontSize))
 
-	var b strings.Builder
+	var boxNode strings.Builder
 
-	b.WriteString(`<html><body>`)
+	boxNode.WriteString(`<html><body>`)
 	// Several multi-line body paragraphs that can sit near avoid boxes after
 	// pagination shifts (the historical over-pack victim).
 	for i := range 14 {
-		b.WriteString(fmt.Sprintf(
+		boxNode.WriteString(fmt.Sprintf(
 			`<p>Body paragraph %d with enough words that the line box wraps onto a second and sometimes a third line of text so we can measure consecutive baselines after paint packing. More filler about articles and biographies to keep width full.</p>`, i))
 	}
 
-	b.WriteString(`<ol>`)
+	boxNode.WriteString(`<ol>`)
 
 	for i := range 18 {
-		b.WriteString(fmt.Sprintf(
+		boxNode.WriteString(fmt.Sprintf(
 			`<li id="cite-%d">"Reference title %d" (https://example.com/ref/%d/long-path). Publisher. 1 January 2020. Retrieved 2 January 2021.</li>`,
 			i, i+1, i))
 	}
 
-	b.WriteString(`</ol>`)
+	boxNode.WriteString(`</ol>`)
 	// More body after the list so packing cannot "heal" list holes by
 	// collapsing following paragraphs.
 	for i := range 10 {
-		b.WriteString(fmt.Sprintf(
+		boxNode.WriteString(fmt.Sprintf(
 			`<p>Trailing body %d continues the article with multi-line prose that must keep normal leading after any avoid-sibling packing pass.</p>`, i))
 	}
 
-	b.WriteString(`</body></html>`)
+	boxNode.WriteString(`</body></html>`)
 
-	root, err := html.Parse(b.String())
+	root, err := html.Parse(boxNode.String())
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	const pageH = 500.0
 
-	res, err := Layout(root, Options{
-		Width: 420, Height: pageH, Sheets: []*css.Stylesheet{s},
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 420, Height: pageH, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true,
 	})
 	if err != nil {
@@ -69,7 +69,7 @@ li { page-break-inside: avoid; margin: 0 0 0.35em 0; }
 	}
 
 	doc := pdf.NewDocument()
-	if err := Paint(doc, res, PaintOptions{
+	if err := Paint(doc, res, PaintOptions{ //nolint:exhaustruct // intentional zero fields
 		PageWidth: 470, PageHeight: pageH + 40, MarginTop: 20, MarginBottom: 20,
 	}); err != nil {
 		t.Fatal(err)
@@ -107,27 +107,27 @@ li { page-break-inside: avoid; margin: 0 0 0.35em 0; }
 
 	var bodyLines []lineY
 
-	for _, op := range res.Ops {
-		if op.Kind != OpText || op.Text == "" {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpText || paintOp.Text == "" {
 			continue
 		}
 
-		if inList(op.Y) {
+		if inList(paintOp.Y) {
 			continue
 		}
 		// Skip near-empty / marker-like runs.
-		if len(strings.TrimSpace(op.Text)) < 8 {
+		if len(strings.TrimSpace(paintOp.Text)) < 8 {
 			continue
 		}
 
 		merged := false
 
 		for i := range bodyLines {
-			if math.Abs(bodyLines[i].y-op.Y) <= 0.5 {
+			if math.Abs(bodyLines[i].y-paintOp.Y) <= 0.5 {
 				merged = true
 
-				if op.Size > bodyLines[i].size {
-					bodyLines[i].size = op.Size
+				if paintOp.Size > bodyLines[i].size {
+					bodyLines[i].size = paintOp.Size
 				}
 
 				break
@@ -135,12 +135,12 @@ li { page-break-inside: avoid; margin: 0 0 0.35em 0; }
 		}
 
 		if !merged {
-			sz := op.Size
+			sz := paintOp.Size
 			if sz <= 0 {
 				sz = fontSize
 			}
 
-			bodyLines = append(bodyLines, lineY{y: op.Y, size: sz})
+			bodyLines = append(bodyLines, lineY{y: paintOp.Y, size: sz})
 		}
 	}
 	// Sort by Y.
@@ -167,16 +167,16 @@ li { page-break-inside: avoid; margin: 0 0 0.35em 0; }
 			continue
 		}
 
-		dy := cur.y - prev.y
+		deltaY := cur.y - prev.y
 		// Skip large paragraph gaps (new block well below previous).
 		// Overlap bug shows dy of 0.6–5pt for 8–10pt font; wrapped lines
 		// and adjacent paragraphs after collapse sit far below minPitch.
-		if dy > fontSize*4 {
+		if deltaY > fontSize*4 {
 			continue
 		}
 
-		if dy < minDy {
-			minDy = dy
+		if deltaY < minDy {
+			minDy = deltaY
 		}
 
 		need := minPitch
@@ -184,11 +184,11 @@ li { page-break-inside: avoid; margin: 0 0 0.35em 0; }
 			need = 0.95 * s
 		}
 
-		if dy < need {
+		if deltaY < need {
 			overlaps++
 
 			t.Logf("body line pitch too tight: dy=%.2f (need ≥%.2f) at y=%.1f→%.1f page=%d",
-				dy, need, prev.y, cur.y, int(cur.y/contentH))
+				deltaY, need, prev.y, cur.y, int(cur.y/contentH))
 		}
 	}
 

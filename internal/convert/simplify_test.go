@@ -30,6 +30,7 @@ const chromeHTML = `<!DOCTYPE html>
 </body></html>`
 
 func TestSimplifyDOMOffKeepsChrome(t *testing.T) {
+	t.Parallel()
 	cmd, _ := newCommand(t, chromeHTML, filepath.Join(t.TempDir(), "off.pdf"))
 	cmd.Global.UseCompression = false
 
@@ -42,6 +43,7 @@ func TestSimplifyDOMOffKeepsChrome(t *testing.T) {
 }
 
 func TestSimplifyDOMOnHidesChrome(t *testing.T) {
+	t.Parallel()
 	cmd, _ := newCommand(t, chromeHTML, filepath.Join(t.TempDir(), "on.pdf"))
 	cmd.Global.UseCompression = false
 	cmd.Global.Web.SimplifyDOM = true
@@ -70,6 +72,7 @@ func TestSimplifyDOMOnHidesChrome(t *testing.T) {
 }
 
 func TestSimplifyDOMMediaWikiProfile(t *testing.T) {
+	t.Parallel()
 	cmd, _ := newCommand(t, chromeHTML, filepath.Join(t.TempDir(), "mw.pdf"))
 	cmd.Global.UseCompression = false
 	cmd.Global.Web.SimplifyDOM = true
@@ -90,6 +93,8 @@ func TestSimplifyDOMMediaWikiProfile(t *testing.T) {
 }
 
 func TestSimplifyChromeCSSParsesAndMatches(t *testing.T) {
+	t.Parallel()
+
 	sheet, err := css.Parse(SimplifyChromeCSS)
 	if err != nil || sheet == nil {
 		t.Fatalf("parse SimplifyChromeCSS: %v", err)
@@ -128,6 +133,8 @@ func TestSimplifyChromeCSSParsesAndMatches(t *testing.T) {
 }
 
 func TestAppendSimplifySheetNoopWhenOff(t *testing.T) {
+	t.Parallel()
+
 	got := AppendSimplifySheet(nil, false, "")
 	if got != nil {
 		t.Fatalf("want nil, got %d sheets", len(got))
@@ -145,29 +152,33 @@ func TestAppendSimplifySheetNoopWhenOff(t *testing.T) {
 }
 
 func TestSimplifyDOMEnabled(t *testing.T) {
-	if SimplifyDOMEnabled(settings.Web{}, settings.Web{}) {
+	t.Parallel()
+
+	if SimplifyDOMEnabled(settings.Web{}, settings.Web{}) { //nolint:exhaustruct // intentional zero-value fields
 		t.Fatal("default must be off")
 	}
 
-	if !SimplifyDOMEnabled(settings.Web{SimplifyDOM: true}, settings.Web{}) {
+	if !SimplifyDOMEnabled(settings.Web{SimplifyDOM: true}, settings.Web{}) { //nolint:exhaustruct // intentional zero-value fields
 		t.Fatal("global on")
 	}
 
-	if !SimplifyDOMEnabled(settings.Web{}, settings.Web{SimplifyDOM: true}) {
+	if !SimplifyDOMEnabled(settings.Web{}, settings.Web{SimplifyDOM: true}) { //nolint:exhaustruct // intentional zero-value fields
 		t.Fatal("object on")
 	}
 }
 
 func TestSimplifyDOMProfile(t *testing.T) {
-	if SimplifyDOMProfile(settings.Web{}, settings.Web{}) != "" {
+	t.Parallel()
+
+	if SimplifyDOMProfile(settings.Web{}, settings.Web{}) != "" { //nolint:exhaustruct // intentional zero-value fields
 		t.Fatal("default profile empty")
 	}
 
-	if SimplifyDOMProfile(settings.Web{SimplifyDOMProfile: "mediawiki"}, settings.Web{}) != "mediawiki" {
+	if SimplifyDOMProfile(settings.Web{SimplifyDOMProfile: "mediawiki"}, settings.Web{}) != "mediawiki" { //nolint:exhaustruct // intentional zero-value fields
 		t.Fatal("global mediawiki")
 	}
 
-	if SimplifyDOMProfile(settings.Web{}, settings.Web{SimplifyDOMProfile: "wiki"}) != "mediawiki" {
+	if SimplifyDOMProfile(settings.Web{}, settings.Web{SimplifyDOMProfile: "wiki"}) != "mediawiki" { //nolint:exhaustruct // intentional zero-value fields
 		t.Fatal("object wiki alias")
 	}
 }
@@ -175,12 +186,12 @@ func TestSimplifyDOMProfile(t *testing.T) {
 func layoutMust(t *testing.T, root *html.Node, sheets []*css.Stylesheet, font *pdf.Font) *layout.Result {
 	t.Helper()
 
-	res, err := layout.Layout(root, layout.Options{
+	res, err := layout.Layout(root, layout.Options{ //nolint:exhaustruct // intentional zero-value fields
 		Width:  500,
 		Height: 700,
 		Font:   font,
 		Sheets: sheets,
-		Media:  "print",
+		Media:  mediaPrint,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -190,21 +201,23 @@ func layoutMust(t *testing.T, root *html.Node, sheets []*css.Stylesheet, font *p
 }
 
 func layoutText(res *layout.Result) string {
-	var b strings.Builder
+	var buf strings.Builder
 
 	for _, op := range res.Ops {
 		if op.Kind == layout.OpText {
-			b.WriteString(op.Text)
-			b.WriteByte(' ')
+			buf.WriteString(op.Text)
+			buf.WriteByte(' ')
 		}
 	}
 
-	return b.String()
+	return buf.String()
 }
 
 // TestSubresourceFailureIsolation: missing CSS + broken image must not
 // abort conversion; body text still appears (phase 21.5).
 func TestSubresourceFailureIsolation(t *testing.T) {
+	t.Parallel()
+
 	htmlSrc := `<html><head>
 <link rel="stylesheet" href="missing-no-such.css">
 </head><body>

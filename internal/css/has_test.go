@@ -6,22 +6,22 @@ import (
 	"gowkhtmltopdf/internal/html"
 )
 
-func byID(root *html.Node, id string) *html.Node {
+func byID(root *html.Node, idVal string) *html.Node {
 	var found *html.Node
 
 	var walk func(*html.Node)
-	walk = func(n *html.Node) {
-		if found != nil || n == nil {
+	walk = func(count *html.Node) {
+		if found != nil || count == nil {
 			return
 		}
 
-		if n.Type == html.ElementNode && n.Attribute("id") == id {
-			found = n
+		if count.Type == html.ElementNode && count.Attribute("id") == idVal {
+			found = count
 
 			return
 		}
 
-		for _, c := range n.Children {
+		for _, c := range count.Children {
 			walk(c)
 		}
 	}
@@ -31,6 +31,7 @@ func byID(root *html.Node, id string) *html.Node {
 }
 
 func TestHasParseAndMatch(t *testing.T) {
+	t.Parallel()
 	root := treeFor(t, `<html><body>
 		<table>
 			<tr id="warn"><td class="warning">x</td></tr>
@@ -65,24 +66,26 @@ func TestHasParseAndMatch(t *testing.T) {
 		{"tr:has(td.warning, td.missing)", "warn", true},
 		{"tr:has(td.missing)", "warn", false},
 	}
-	for _, tc := range cases {
-		sel, ok := parseSelector(tc.sel)
+	for _, testCase := range cases {
+		sel, ok := parseSelector(testCase.sel)
 		if !ok {
-			t.Fatalf("parseSelector(%q) failed", tc.sel)
+			t.Fatalf("parseSelector(%q) failed", testCase.sel)
 		}
 
-		n := byID(root, tc.id)
+		n := byID(root, testCase.id)
 		if n == nil {
-			t.Fatalf("missing id %q", tc.id)
+			t.Fatalf("missing id %q", testCase.id)
 		}
 
-		if got := Match(sel, n); got != tc.want {
-			t.Errorf("Match(%q, #%s) = %v, want %v", tc.sel, tc.id, got, tc.want)
+		if got := Match(sel, n); got != testCase.want {
+			t.Errorf("Match(%q, #%s) = %v, want %v", testCase.sel, testCase.id, got, testCase.want)
 		}
 	}
 }
 
 func TestHasInvalid(t *testing.T) {
+	t.Parallel()
+
 	invalid := []string{
 		"div:has()",
 		"div:has",
@@ -104,6 +107,8 @@ func TestHasInvalid(t *testing.T) {
 }
 
 func TestHasSpecificity(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sel     string
 		a, b, c int
@@ -115,20 +120,21 @@ func TestHasSpecificity(t *testing.T) {
 		{"p:not(.a)", 0, 1, 1},
 		{"div:has(span:not(.x))", 0, 1, 2},
 	}
-	for _, tc := range cases {
-		sel, ok := parseSelector(tc.sel)
+	for _, testCase := range cases {
+		sel, ok := parseSelector(testCase.sel)
 		if !ok {
-			t.Fatalf("parseSelector(%q) failed", tc.sel)
+			t.Fatalf("parseSelector(%q) failed", testCase.sel)
 		}
 
 		a, b, c := Specificity(sel)
-		if a != tc.a || b != tc.b || c != tc.c {
-			t.Errorf("Specificity(%q) = (%d,%d,%d), want (%d,%d,%d)", tc.sel, a, b, c, tc.a, tc.b, tc.c)
+		if a != testCase.a || b != testCase.b || c != testCase.c {
+			t.Errorf("Specificity(%q) = (%d,%d,%d), want (%d,%d,%d)", testCase.sel, a, b, c, testCase.a, testCase.b, testCase.c)
 		}
 	}
 }
 
 func TestNotMatch(t *testing.T) {
+	t.Parallel()
 	root := treeFor(t, `<html><body><p class="note">a</p><p>b</p></body></html>`)
 	body := root.FirstChild("html").FirstChild("body")
 	note := body.FirstChild("p")

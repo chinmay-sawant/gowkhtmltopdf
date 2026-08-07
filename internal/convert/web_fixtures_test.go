@@ -28,6 +28,7 @@ func loadWebFixture(t *testing.T, file string) string {
 // must produce a non-empty, structurally valid PDF that contains the article
 // title and stays within a small page-count band (no live network).
 func TestWebWikiFixtureAcceptance(t *testing.T) {
+	t.Parallel()
 	html := loadWebFixture(t, "wiki-like-article.html")
 	cmd, _ := newCommand(t, html, filepath.Join(t.TempDir(), "wiki.pdf"))
 	cmd.Global.UseCompression = false
@@ -66,6 +67,7 @@ func TestWebWikiFixtureAcceptance(t *testing.T) {
 // TestWebMarketingFixtureAcceptance is Phase 21 §21.6: marketing landing
 // fixture must surface hero + primary CTA text in the PDF (CI-safe, offline).
 func TestWebMarketingFixtureAcceptance(t *testing.T) {
+	t.Parallel()
 	html := loadWebFixture(t, "marketing-landing.html")
 	cmd, _ := newCommand(t, html, filepath.Join(t.TempDir(), "marketing.pdf"))
 	cmd.Global.UseCompression = false

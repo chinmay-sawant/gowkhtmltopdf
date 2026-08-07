@@ -10,7 +10,9 @@ import (
 // not match the host <p> (that crushed wiki body columns to 120pt when
 // ::before was stripped). Pseudo rules are kept for generated content.
 func TestPseudoElementSelectorDoesNotApplyToHost(t *testing.T) {
-	s, err := Parse(`p::before { width: 120pt; content: ''; display: block }
+	t.Parallel()
+
+	str, err := Parse(`p::before { width: 120pt; content: ''; display: block }
 p:before { width: 99pt }
 p { color: #000 }`)
 	if err != nil {
@@ -22,12 +24,12 @@ p { color: #000 }`)
 		t.Fatal(err)
 	}
 
-	var p *html.Node
+	var page *html.Node
 
 	var walk func(*html.Node)
 	walk = func(n *html.Node) {
 		if n.Type == html.ElementNode && n.Name == "p" {
-			p = n
+			page = n
 		}
 
 		for _, c := range n.Children {
@@ -36,16 +38,16 @@ p { color: #000 }`)
 	}
 	walk(root)
 
-	if p == nil {
+	if page == nil {
 		t.Fatal("no p")
 	}
 
 	hostMatches := 0
 	pseudoMatches := 0
 
-	for _, r := range s.Rules {
+	for _, r := range str.Rules {
 		for _, sel := range r.Selectors {
-			if Match(sel, p) {
+			if Match(sel, page) {
 				hostMatches++
 
 				for _, d := range r.Decls {
@@ -55,7 +57,7 @@ p { color: #000 }`)
 				}
 			}
 
-			if MatchPseudo(sel, p, "before") {
+			if MatchPseudo(sel, page, "before") {
 				pseudoMatches++
 			}
 		}

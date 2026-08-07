@@ -25,22 +25,22 @@ func loadFixture(t *testing.T, name string) (*html.Node, []*css.Stylesheet) {
 	var sheets []*css.Stylesheet
 
 	var walk func(*html.Node)
-	walk = func(n *html.Node) {
-		if n.Name == "style" {
-			var s string
+	walk = func(node *html.Node) {
+		if node.Name == "style" {
+			var cssSheet string
 
-			for _, c := range n.Children {
+			for _, c := range node.Children {
 				if c.Type == html.TextNode {
-					s += c.Text
+					cssSheet += c.Text
 				}
 			}
 
-			if sh, err := css.Parse(s); err == nil {
+			if sh, err := css.Parse(cssSheet); err == nil {
 				sheets = append(sheets, sh)
 			}
 		}
 
-		for _, c := range n.Children {
+		for _, c := range node.Children {
 			walk(c)
 		}
 	}
@@ -57,7 +57,7 @@ func TestLogoTitleGap(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
 		Width: 595 - 56.7, Height: 842, Sheets: sheets, Background: true,
 		Images: func(src string) ([]byte, error) {
 			if strings.HasPrefix(src, "data:") {
@@ -75,14 +75,14 @@ func TestLogoTitleGap(t *testing.T) {
 
 	sawImg, sawText := false, false
 
-	for _, op := range res.Ops {
-		if op.Kind == OpImage && op.Y < 50 {
-			imgRight = op.X + op.W
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind == OpImage && paintOp.Y < 50 {
+			imgRight = paintOp.X + paintOp.W
 			sawImg = true
 		}
 
-		if op.Kind == OpText && strings.Contains(op.Text, "Nordwind Industries GmbH") && op.Y < 50 {
-			textX = op.X
+		if paintOp.Kind == OpText && strings.Contains(paintOp.Text, "Nordwind Industries GmbH") && paintOp.Y < 50 {
+			textX = paintOp.X
 			sawText = true
 		}
 	}
@@ -98,9 +98,9 @@ func TestLogoTitleGap(t *testing.T) {
 }
 
 func TestBlockMarginBottomGap(t *testing.T) {
+	t.Parallel()
 	root, sheets := loadFixture(t, "fixture-19-margin-and-sizing.html")
-
-	res, err := Layout(root, Options{Width: 595, Height: 842, Sheets: sheets, Background: true})
+	res, err := Layout(root, Options{Width: 595, Height: 842, Sheets: sheets, Background: true}) //nolint:exhaustruct // intentional zero fields
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,22 +124,23 @@ func TestBlockMarginBottomGap(t *testing.T) {
 }
 
 func TestNestedTableStaysInCell(t *testing.T) {
+	t.Parallel()
 	root, sheets := loadFixture(t, "fixture-10-table-colspan.html")
-	cw := 595.0 - 2*28.346
+	contW := 595.0 - 2*28.346
 
-	res, err := Layout(root, Options{Width: cw, Height: 842, Sheets: sheets, Background: true})
+	res, err := Layout(root, Options{Width: contW, Height: 842, Sheets: sheets, Background: true}) //nolint:exhaustruct // intentional zero fields
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	for _, op := range res.Ops {
-		right := op.X + op.W
-		if op.Kind == OpLine && op.W == 0 {
-			right = op.X
+	for _, paintOp := range res.Ops {
+		right := paintOp.X + paintOp.W
+		if paintOp.Kind == OpLine && paintOp.W == 0 {
+			right = paintOp.X
 		}
 
-		if right > cw+1 {
-			t.Errorf("op exceeds content: kind=%v X=%.1f W=%.1f right=%.1f cw=%.1f", op.Kind, op.X, op.W, right, cw)
+		if right > contW+1 {
+			t.Errorf("op exceeds content: kind=%v X=%.1f W=%.1f right=%.1f cw=%.1f", paintOp.Kind, paintOp.X, paintOp.W, right, contW)
 		}
 	}
 }
@@ -147,7 +148,7 @@ func TestNestedTableStaysInCell(t *testing.T) {
 func TestPositionLiteFixtureReservesOverlaySpace(t *testing.T) {
 	root, sheets := loadFixture(t, "fixture-26-position-lite.html")
 
-	res, err := Layout(root, Options{Width: 595 - 56.7, Height: 842, Sheets: sheets, Background: true})
+	res, err := Layout(root, Options{Width: 595 - 56.7, Height: 842, Sheets: sheets, Background: true}) //nolint:exhaustruct // intentional zero fields
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,22 +159,22 @@ func TestPositionLiteFixtureReservesOverlaySpace(t *testing.T) {
 	relLeft := 0.0
 	relTextX := 0.0
 
-	for _, op := range res.Ops {
-		if op.Kind == OpFillRect && op.W > 400 && op.H > 20 && op.R > 0.9 && op.G > 0.9 && op.B > 0.9 {
-			relLeft = op.X
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind == OpFillRect && paintOp.W > 400 && paintOp.H > 20 && paintOp.R > 0.9 && paintOp.G > 0.9 && paintOp.B > 0.9 {
+			relLeft = paintOp.X
 		}
 
-		if op.Kind == OpText && strings.Contains(op.Text, "Relatively offset block") {
-			relTextX = op.X
+		if paintOp.Kind == OpText && strings.Contains(paintOp.Text, "Relatively offset block") {
+			relTextX = paintOp.X
 		}
 
-		if op.Kind == OpFillRect && op.W > 100 && op.H > 10 && op.R > 0.9 && op.G > 0.85 && op.G < 0.99 && op.B > 0.8 && op.B < 0.95 {
-			absBottom = op.Y + op.H
+		if paintOp.Kind == OpFillRect && paintOp.W > 100 && paintOp.H > 10 && paintOp.R > 0.9 && paintOp.G > 0.85 && paintOp.G < 0.99 && paintOp.B > 0.8 && paintOp.B < 0.95 {
+			absBottom = paintOp.Y + paintOp.H
 		}
 
-		if op.Kind == OpText && strings.Contains(op.Text, "In-flow text under") {
-			flowY = op.Y
-			flowBold = op.Bold
+		if paintOp.Kind == OpText && strings.Contains(paintOp.Text, "In-flow text under") {
+			flowY = paintOp.Y
+			flowBold = paintOp.Bold
 		}
 	}
 
@@ -197,20 +198,20 @@ func TestPositionLiteFixtureReservesOverlaySpace(t *testing.T) {
 func TestLetterheadPaddingBeforeBorder(t *testing.T) {
 	root, sheets := loadFixture(t, "fixture-16-invoice-with-css.html")
 
-	res, err := Layout(root, Options{Width: 595 - 56.7, Height: 842, Sheets: sheets, Background: true})
+	res, err := Layout(root, Options{Width: 595 - 56.7, Height: 842, Sheets: sheets, Background: true}) //nolint:exhaustruct // intentional zero fields
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var addrY, borderY float64
 
-	for _, op := range res.Ops {
-		if op.Kind == OpText && strings.Contains(op.Text, "Hafenstrasse") {
-			addrY = op.Y
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind == OpText && strings.Contains(paintOp.Text, "Hafenstrasse") {
+			addrY = paintOp.Y
 		}
 
-		if op.Kind == OpLine && op.Width >= 2 && op.W > 400 && op.Y < 80 {
-			borderY = op.Y
+		if paintOp.Kind == OpLine && paintOp.Width >= 2 && paintOp.W > 400 && paintOp.Y < 80 {
+			borderY = paintOp.Y
 		}
 	}
 

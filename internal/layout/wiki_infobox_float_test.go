@@ -9,7 +9,8 @@ import (
 )
 
 func TestInfoboxResolvedWidth22em(t *testing.T) {
-	s := sheet(t, `
+	t.Parallel()
+	cssSheet := sheet(t, `
 body { margin: 0; font-size: 12pt; }
 @media (min-width: 640px) {
   .infobox { margin-left: 1em; float: right; clear: right; width: 22em; font-size: 88%; }
@@ -24,7 +25,7 @@ body { margin: 0; font-size: 12pt; }
 		t.Fatal(err)
 	}
 
-	styles := resolveStyles(root, []*css.Stylesheet{s}, "print", 538, 800)
+	styles := resolveStyles(root, []*css.Stylesheet{cssSheet}, "print", 538, 800)
 
 	var table *html.Node
 
@@ -40,19 +41,19 @@ body { margin: 0; font-size: 12pt; }
 	}
 	walk(root)
 
-	st := styles[table]
-	t.Logf("float=%q width=%.2f width%%=%.2f fontSize=%.2f display=%q", st.Float, st.Width, st.WidthPercent, st.FontSize, st.Display)
+	sty := styles[table]
+	t.Logf("float=%q width=%.2f width%%=%.2f fontSize=%.2f display=%q", sty.Float, sty.Width, sty.WidthPercent, sty.FontSize, sty.Display)
 
-	if st.Float != "right" {
-		t.Fatalf("float=%q, want right (min-width:640px rule)", st.Float)
+	if sty.Float != "right" {
+		t.Fatalf("float=%q, want right (min-width:640px rule)", sty.Float)
 	}
 
-	if st.WidthPercent >= 0 {
-		t.Fatalf("width%%=%v set — max-width:640px rule wrongly won", st.WidthPercent)
+	if sty.WidthPercent >= 0 {
+		t.Fatalf("width%%=%v set — max-width:640px rule wrongly won", sty.WidthPercent)
 	}
 
-	if st.Width < 150 || st.Width > 280 {
-		t.Fatalf("width=%.2fpt, want ~22em (~200-240pt)", st.Width)
+	if sty.Width < 150 || sty.Width > 280 {
+		t.Fatalf("width=%.2fpt, want ~22em (~200-240pt)", sty.Width)
 	}
 }
 
@@ -60,7 +61,7 @@ body { margin: 0; font-size: 12pt; }
 // layout bug: a floated .infobox { width:22em } must leave a usable text
 // column (Chrome ~360pt on A4), not a ~120pt ribbon.
 func TestWikiInfoboxFloatLeavesReadableTextColumn(t *testing.T) {
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 body { margin: 0; font-size: 12pt; }
 @media (min-width: 640px) {
   .infobox { margin-left: 1em; float: right; clear: right; width: 22em; font-size: 88%; }
@@ -86,9 +87,8 @@ p { font-size: 12pt; line-height: 16pt; text-align: left; }
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	res, err := Layout(root, Options{
-		Width: contentW, Height: 800, Sheets: []*css.Stylesheet{s},
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: contentW, Height: 800, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true,
 	})
 	if err != nil {
@@ -113,34 +113,34 @@ p { font-size: 12pt; line-height: 16pt; text-align: left; }
 
 	seenY := map[int]bool{}
 
-	for _, op := range res.Ops {
-		if op.Kind != OpText || op.X > contentW*0.45 || len(op.Text) < 4 {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpText || paintOp.X > contentW*0.45 || len(paintOp.Text) < 4 {
 			continue
 		}
 
-		yi := int(op.Y + 0.5)
+		yi := int(paintOp.Y + 0.5)
 		if seenY[yi] {
 			continue
 		}
 
 		seenY[yi] = true
-		x0, x1 := op.X, op.X+op.W
+		xStart, xEnd := paintOp.X, paintOp.X+paintOp.W
 
-		for _, o2 := range res.Ops {
-			if o2.Kind != OpText || math.Abs(o2.Y-op.Y) > 0.5 || o2.X > contentW*0.45 {
+		for _, otherOp := range res.Ops {
+			if otherOp.Kind != OpText || math.Abs(otherOp.Y-paintOp.Y) > 0.5 || otherOp.X > contentW*0.45 {
 				continue
 			}
 
-			if o2.X < x0 {
-				x0 = o2.X
+			if otherOp.X < xStart {
+				xStart = otherOp.X
 			}
 
-			if o2.X+o2.W > x1 {
-				x1 = o2.X + o2.W
+			if otherOp.X+otherOp.W > xEnd {
+				xEnd = otherOp.X + otherOp.W
 			}
 		}
 
-		w := x1 - x0
+		w := xEnd - xStart
 		if w > 40 {
 			bodyWidths = append(bodyWidths, w)
 		}
@@ -172,7 +172,7 @@ p { font-size: 12pt; line-height: 16pt; text-align: left; }
 }
 
 func TestWikiInfoboxFloatWithWideImage(t *testing.T) {
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 body { margin: 0; font-size: 12pt; }
 .infobox { float: right; clear: right; width: 22em; font-size: 88%; }
 p { font-size: 12pt; line-height: 16pt; text-align: left; }
@@ -193,11 +193,10 @@ img { max-width: 100%; height: auto; }
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	res, err := Layout(root, Options{
-		Width: contentW, Height: 800, Sheets: []*css.Stylesheet{s},
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: contentW, Height: 800, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true,
-		Images: func(src string) ([]byte, error) { return png, nil },
+		Images: func(_ string) ([]byte, error) { return png, nil },
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -218,25 +217,25 @@ img { max-width: 100%; height: auto; }
 
 	var best float64
 
-	for _, op := range res.Ops {
-		if op.Kind != OpText || op.X > 250 {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpText || paintOp.X > 250 {
 			continue
 		}
 
-		if op.W > best {
-			best = op.W
+		if paintOp.W > best {
+			best = paintOp.W
 		}
 	}
 	// Also check line spans
 	seen := map[int]float64{}
 
-	for _, op := range res.Ops {
-		if op.Kind != OpText || op.X > contentW*0.45 {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpText || paintOp.X > contentW*0.45 {
 			continue
 		}
 
-		yi := int(op.Y + 0.5)
-		r := op.X + op.W
+		yi := int(paintOp.Y + 0.5)
+		r := paintOp.X + paintOp.W
 
 		if r > seen[yi] {
 			seen[yi] = r

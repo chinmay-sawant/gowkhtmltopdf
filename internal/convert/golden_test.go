@@ -106,32 +106,32 @@ func commandForFixture(t *testing.T, file string) *cli.Command {
 		t.Fatalf("read golden dir: %v", err)
 	}
 
-	for _, e := range entries {
-		if e.IsDir() {
+	for _, entry := range entries {
+		if entry.IsDir() {
 			continue
 		}
 
-		content, err := os.ReadFile(goldenPath(e.Name()))
+		content, err := os.ReadFile(goldenPath(entry.Name()))
 		if err != nil {
-			t.Fatalf("read %s: %v", e.Name(), err)
+			t.Fatalf("read %s: %v", entry.Name(), err)
 		}
 
-		if err := os.WriteFile(filepath.Join(dir, e.Name()), content, 0o644); err != nil {
-			t.Fatalf("write %s: %v", e.Name(), err)
+		if err := os.WriteFile(filepath.Join(dir, entry.Name()), content, 0o644); err != nil {
+			t.Fatalf("write %s: %v", entry.Name(), err)
 		}
 	}
 
 	obj := settings.DefaultPdfObject()
 	obj.Page = filepath.Join(dir, file)
 	obj.Load.BlockLocalFileAccess = false
-	cmd := &cli.Command{
+	cmd := &cli.Command{ //nolint:exhaustruct // intentional zero-value fields
 		Global:  settings.DefaultPdfGlobal(),
 		Objects: []settings.PdfObject{obj},
 		Output:  filepath.Join(t.TempDir(), "out.pdf"),
 	}
 	// --enable-local-file-access: global flag on, object-level block off.
 	cmd.Global.Load.EnableLocalFileAccess = true
-	cmd.Global.Size = settings.Size{PageSize: cmd.Global.PageSize}
+	cmd.Global.Size = settings.Size{PageSize: cmd.Global.PageSize} //nolint:exhaustruct // intentional zero-value fields
 	// A4, 10 mm margins, backgrounds on (already the defaults; set explicitly).
 	cmd.Global.PageSize = "A4"
 	cmd.Global.Margin = settings.DefaultMargins()
@@ -176,6 +176,7 @@ func assertPDFStructure(t *testing.T, data []byte) {
 	}
 	// The line before %%EOF is the decimal xref offset.
 	offsetLine := strings.TrimSpace(string(lines[len(lines)-2]))
+
 	off, err := strconv.ParseInt(offsetLine, 10, 64)
 	if err != nil {
 		t.Errorf("line before %%EOF is %q, want a decimal xref offset", offsetLine)
@@ -193,13 +194,16 @@ func assertPDFStructure(t *testing.T, data []byte) {
 }
 
 func TestGoldenCorpus(t *testing.T) {
-	for _, tc := range goldenFixtures {
-		t.Run(tc.name, func(t *testing.T) {
-			cmd := commandForFixture(t, tc.file)
+	t.Parallel()
+
+	for _, testCase := range goldenFixtures {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			cmd := commandForFixture(t, testCase.file)
 			data := runPDF(t, cmd)
 
-			if n := pageCount(data); n < tc.minPages {
-				t.Errorf("pages = %d, want >= %d", n, tc.minPages)
+			if n := pageCount(data); n < testCase.minPages {
+				t.Errorf("pages = %d, want >= %d", n, testCase.minPages)
 			}
 
 			if !bytes.Contains(data, []byte("/FontFile2")) {
@@ -221,53 +225,50 @@ type fixtureBounds struct {
 	uris     bool // expect >= 1 URI link annotation (/S /URI)
 }
 
-// fixturePageBounds maps a fixture file name to its expected page envelope.
-// Bounds are recorded from the phase-9.1 measurement pass and pin the
-// pagination behaviour across releases: a change to wrapping, table layout
-// or page-break handling that moves a fixture out of its envelope fails.
+// pagination behaviour across releases: a change to wrapping, table layout.
 var fixturePageBounds = map[string]fixtureBounds{
-	"fixture-01-simple-invoice.html":        {minPages: 1, maxPages: 1},
-	"fixture-02-table-heavy-invoice.html":   {minPages: 1, maxPages: 2},
-	"fixture-03-multi-page-invoice.html":    {minPages: 2, maxPages: 0},
-	"fixture-04-two-column-layout.html":     {minPages: 1, maxPages: 1},
-	"fixture-05-linked-stylesheet.html":     {minPages: 1, maxPages: 1},
-	"fixture-06-external-link.html":         {minPages: 1, maxPages: 1, uris: true},
-	"fixture-07-image-logo.html":            {minPages: 1, maxPages: 1, images: true},
-	"fixture-08-forced-page-breaks.html":    {minPages: 5, maxPages: 5},
-	"fixture-09-multi-section-doc.html":     {minPages: 2, maxPages: 0},
-	"fixture-10-table-colspan.html":         {minPages: 1, maxPages: 1},
-	"fixture-11-long-text-wrap.html":        {minPages: 3, maxPages: 0},
-	"fixture-12-lists.html":                 {minPages: 1, maxPages: 1},
-	"fixture-13-pre-code-block.html":        {minPages: 1, maxPages: 1},
-	"fixture-14-colorful-report.html":       {minPages: 1, maxPages: 1},
-	"fixture-15-bulleted-requirements.html": {minPages: 1, maxPages: 2},
-	"fixture-16-invoice-with-css.html":      {minPages: 1, maxPages: 2},
-	"fixture-17-cover-and-content.html":     {minPages: 2, maxPages: 2},
-	"fixture-18-typography.html":            {minPages: 1, maxPages: 1},
-	"fixture-19-margin-and-sizing.html":     {minPages: 1, maxPages: 1},
-	"fixture-20-image-grid.html":            {minPages: 1, maxPages: 1, images: true},
-	"fixture-21-detailed-report.html":       {minPages: 3, maxPages: 0},
-	"fixture-22-float-invoice-chrome.html":  {minPages: 1, maxPages: 1},
-	"fixture-23-thead-repeat.html":          {minPages: 2, maxPages: 0},
-	"fixture-24-internal-anchors.html":      {minPages: 2, maxPages: 2},
-	"fixture-25-flex-row.html":              {minPages: 1, maxPages: 1},
-	"fixture-26-position-lite.html":         {minPages: 1, maxPages: 1},
-	"fixture-27-cjk-fontpath.html":          {minPages: 1, maxPages: 1},
-	"fixture-28-flex-wrap-grid-fixed.html":  {minPages: 2, maxPages: 2},
-	"fixture-29-float-beside-table.html":    {minPages: 1, maxPages: 1},
-	"fixture-30-orphans-heuristic.html":     {minPages: 2, maxPages: 0},
-	"fixture-31-sticky-top.html":            {minPages: 2, maxPages: 0},
-	"fixture-32-flex-grid-full.html":        {minPages: 1, maxPages: 1},
-	"fixture-33-flex-cyclic-basis.html":     {minPages: 1, maxPages: 1},
-	"fixture-34-grid-areas-dense.html":      {minPages: 1, maxPages: 1},
-	"fixture-35-grid-minmax-intrinsic.html": {minPages: 1, maxPages: 1},
-	"fixture-36-hf-nested-flex.html":        {minPages: 1, maxPages: 1, images: true},
-	"fixture-37-orphans-css.html":           {minPages: 2, maxPages: 0},
-	"fixture-38-float-inside-td.html":       {minPages: 1, maxPages: 1},
-	"fixture-39-multicol-article.html":      {minPages: 2, maxPages: 0},
-	"fixture-40-transform-badge.html":       {minPages: 1, maxPages: 1},
-	"fixture-41-has-selector.html":          {minPages: 1, maxPages: 1},
-	"fixture-42-container-inline-size.html": {minPages: 1, maxPages: 1},
+	"fixture-01-simple-invoice.html":        {minPages: 1, maxPages: 1},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-02-table-heavy-invoice.html":   {minPages: 1, maxPages: 2},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-03-multi-page-invoice.html":    {minPages: 2, maxPages: 0},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-04-two-column-layout.html":     {minPages: 1, maxPages: 1},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-05-linked-stylesheet.html":     {minPages: 1, maxPages: 1},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-06-external-link.html":         {minPages: 1, maxPages: 1, uris: true},   //nolint:exhaustruct // intentional zero-value fields
+	"fixture-07-image-logo.html":            {minPages: 1, maxPages: 1, images: true}, //nolint:exhaustruct // intentional zero-value fields
+	"fixture-08-forced-page-breaks.html":    {minPages: 5, maxPages: 5},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-09-multi-section-doc.html":     {minPages: 2, maxPages: 0},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-10-table-colspan.html":         {minPages: 1, maxPages: 1},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-11-long-text-wrap.html":        {minPages: 3, maxPages: 0},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-12-lists.html":                 {minPages: 1, maxPages: 1},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-13-pre-code-block.html":        {minPages: 1, maxPages: 1},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-14-colorful-report.html":       {minPages: 1, maxPages: 1},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-15-bulleted-requirements.html": {minPages: 1, maxPages: 2},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-16-invoice-with-css.html":      {minPages: 1, maxPages: 2},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-17-cover-and-content.html":     {minPages: 2, maxPages: 2},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-18-typography.html":            {minPages: 1, maxPages: 1},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-19-margin-and-sizing.html":     {minPages: 1, maxPages: 1},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-20-image-grid.html":            {minPages: 1, maxPages: 1, images: true}, //nolint:exhaustruct // intentional zero-value fields
+	"fixture-21-detailed-report.html":       {minPages: 3, maxPages: 0},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-22-float-invoice-chrome.html":  {minPages: 1, maxPages: 1},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-23-thead-repeat.html":          {minPages: 2, maxPages: 0},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-24-internal-anchors.html":      {minPages: 2, maxPages: 2},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-25-flex-row.html":              {minPages: 1, maxPages: 1},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-26-position-lite.html":         {minPages: 1, maxPages: 1},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-27-cjk-fontpath.html":          {minPages: 1, maxPages: 1},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-28-flex-wrap-grid-fixed.html":  {minPages: 2, maxPages: 2},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-29-float-beside-table.html":    {minPages: 1, maxPages: 1},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-30-orphans-heuristic.html":     {minPages: 2, maxPages: 0},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-31-sticky-top.html":            {minPages: 2, maxPages: 0},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-32-flex-grid-full.html":        {minPages: 1, maxPages: 1},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-33-flex-cyclic-basis.html":     {minPages: 1, maxPages: 1},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-34-grid-areas-dense.html":      {minPages: 1, maxPages: 1},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-35-grid-minmax-intrinsic.html": {minPages: 1, maxPages: 1},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-36-hf-nested-flex.html":        {minPages: 1, maxPages: 1, images: true}, //nolint:exhaustruct // intentional zero-value fields
+	"fixture-37-orphans-css.html":           {minPages: 2, maxPages: 0},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-38-float-inside-td.html":       {minPages: 1, maxPages: 1},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-39-multicol-article.html":      {minPages: 2, maxPages: 0},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-40-transform-badge.html":       {minPages: 1, maxPages: 1},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-41-has-selector.html":          {minPages: 1, maxPages: 1},               //nolint:exhaustruct // intentional zero-value fields
+	"fixture-42-container-inline-size.html": {minPages: 1, maxPages: 1},               //nolint:exhaustruct // intentional zero-value fields
 }
 
 // fixtureHeaderOK enforces the corpus hygiene rule: every fixture starts
@@ -299,6 +300,8 @@ func fixtureHeaderOK(t *testing.T, file string, data []byte) {
 // fixturePageBounds, and the feature expectations (embedded images, URI
 // annotations). This is the test the `make golden` target runs.
 func TestGoldenCorpusAllFixtures(t *testing.T) {
+	t.Parallel()
+
 	entries, err := os.ReadDir(goldenDir())
 	if err != nil {
 		t.Fatalf("read golden dir: %v", err)
@@ -315,6 +318,8 @@ func TestGoldenCorpusAllFixtures(t *testing.T) {
 		fixtureCount++
 
 		t.Run(file, func(t *testing.T) {
+			t.Parallel()
+
 			content, err := os.ReadFile(goldenPath(file))
 			if err != nil {
 				t.Fatalf("read fixture: %v", err)
@@ -326,21 +331,21 @@ func TestGoldenCorpusAllFixtures(t *testing.T) {
 			data := runPDF(t, cmd)
 
 			n := pageCount(data)
-			b := fixturePageBounds[file]
+			buf := fixturePageBounds[file]
 
-			if n < b.minPages || (b.maxPages > 0 && n > b.maxPages) {
-				t.Errorf("pages = %d, want [%d, %d]", n, b.minPages, b.maxPages)
+			if n < buf.minPages || (buf.maxPages > 0 && n > buf.maxPages) {
+				t.Errorf("pages = %d, want [%d, %d]", n, buf.minPages, buf.maxPages)
 			}
 
 			if !bytes.Contains(data, []byte("/FontFile2")) {
 				t.Error("expected embedded subset font (/FontFile2)")
 			}
 
-			if b.images && !bytes.Contains(data, []byte("/Subtype /Image")) {
+			if buf.images && !bytes.Contains(data, []byte("/Subtype /Image")) {
 				t.Error("expected an embedded image xobject (/Subtype /Image)")
 			}
 
-			if b.uris && !bytes.Contains(data, []byte("/S /URI")) {
+			if buf.uris && !bytes.Contains(data, []byte("/S /URI")) {
 				t.Error("expected a URI link annotation (/S /URI)")
 			}
 
@@ -364,6 +369,8 @@ func TestGoldenCorpusAllFixtures(t *testing.T) {
 // largest golden fixture (plan item 4.8). It reuses the same load → parse →
 // style → layout → paint path as RunPDF but times only Layout and Paint.
 func TestGoldenFixture03Performance(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip("perf budget test skipped in -short mode")
 	}
@@ -396,20 +403,20 @@ func TestGoldenFixture03Performance(t *testing.T) {
 		t.Fatalf("page size: %v", err)
 	}
 
-	const mm = 72.0 / 25.4
+	const mmPt = 72.0 / 25.4
 
-	m := settings.DefaultMargins()
-	contentW := pageW - (m.Left+m.Right)*mm
-	contentH := pageH - (m.Top+m.Bottom)*mm
+	mVal := settings.DefaultMargins()
+	contentW := pageW - (mVal.Left+mVal.Right)*mmPt
+	contentH := pageH - (mVal.Top+mVal.Bottom)*mmPt
 
 	layoutStart := time.Now()
 
-	lres, err := layout.Layout(root, layout.Options{
+	lres, err := layout.Layout(root, layout.Options{ //nolint:exhaustruct // intentional zero-value fields
 		Width:      contentW,
 		Height:     contentH,
 		Font:       font,
 		Sheets:     sheets,
-		Media:      "print",
+		Media:      mediaPrint,
 		Background: true,
 	})
 	if err != nil {
@@ -424,10 +431,10 @@ func TestGoldenFixture03Performance(t *testing.T) {
 	if err := layout.Paint(doc, lres, layout.PaintOptions{
 		PageWidth:    pageW,
 		PageHeight:   pageH,
-		MarginTop:    m.Top * mm,
-		MarginBottom: m.Bottom * mm,
-		MarginLeft:   m.Left * mm,
-		MarginRight:  m.Right * mm,
+		MarginTop:    mVal.Top * mmPt,
+		MarginBottom: mVal.Bottom * mmPt,
+		MarginLeft:   mVal.Left * mmPt,
+		MarginRight:  mVal.Right * mmPt,
 	}); err != nil {
 		t.Fatalf("paint: %v", err)
 	}
@@ -447,28 +454,28 @@ func collectStyleSheets(root *html.Node) []*css.Stylesheet {
 	var sheets []*css.Stylesheet
 
 	var walk func(n *html.Node)
-	walk = func(n *html.Node) {
-		if n.Type != html.ElementNode {
+	walk = func(num *html.Node) {
+		if num.Type != html.ElementNode {
 			return
 		}
 
-		if n.Name == "style" {
-			var sb strings.Builder
+		if num.Name == "style" {
+			var strB strings.Builder
 
-			for _, c := range n.Children {
+			for _, c := range num.Children {
 				if c.Type == html.TextNode {
-					sb.WriteString(c.Text)
+					strB.WriteString(c.Text)
 				}
 			}
 
-			if s, err := css.Parse(sb.String()); err == nil && s != nil {
+			if s, err := css.Parse(strB.String()); err == nil && s != nil {
 				sheets = append(sheets, s)
 			}
 
 			return
 		}
 
-		for _, c := range n.Children {
+		for _, c := range num.Children {
 			walk(c)
 		}
 	}

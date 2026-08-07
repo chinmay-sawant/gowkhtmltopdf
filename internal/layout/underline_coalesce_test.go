@@ -12,22 +12,22 @@ import (
 // countHorizUnderlines returns OpLine strokes that look like text underlines
 // (horizontal, non-zero width, zero height).
 func countHorizUnderlines(ops []Op) int {
-	n := 0
+	node := 0
 
 	for _, op := range ops {
 		if op.Kind == OpLine && op.H == 0 && op.W > 0.5 {
-			n++
+			node++
 		}
 	}
 
-	return n
+	return node
 }
 
 // TestUnderlineCoalesceMultiFaceSameHref: bold + normal chunks inside one
 // <a href> on a single line must produce ONE underline OpLine, not one per
 // nested style item / face run.
 func TestUnderlineCoalesceMultiFaceSameHref(t *testing.T) {
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 body { margin: 0; font-size: 12pt; }
 a { color: #0645ad; text-decoration: underline; }
 b { font-weight: 700; }
@@ -40,8 +40,8 @@ b { font-weight: 700; }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{
-		Width: 500, Height: 200, Sheets: []*css.Stylesheet{s}, Media: "print",
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 500, Height: 200, Sheets: []*css.Stylesheet{cssSheet}, Media: "print",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -76,7 +76,8 @@ b { font-weight: 700; }
 // TestUnderlineCoalesceHrefForceAcrossChunks: PDF affordance underlines
 // (href set, author decoration none) also coalesce multi-chunk same-href.
 func TestUnderlineCoalesceHrefForceAcrossChunks(t *testing.T) {
-	s := sheet(t, `
+	t.Parallel()
+	cssSheet := sheet(t, `
 body { margin: 0; font-size: 11pt; }
 a { color: #0645ad; text-decoration: none; }
 i { font-style: italic; }
@@ -86,9 +87,8 @@ i { font-style: italic; }
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	res, err := Layout(root, Options{
-		Width: 600, Height: 200, Sheets: []*css.Stylesheet{s}, Media: "print",
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 600, Height: 200, Sheets: []*css.Stylesheet{cssSheet}, Media: "print",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -103,7 +103,8 @@ i { font-style: italic; }
 // TestUnderlineSkipWhitespaceOnly: a lone space item must not invent its own
 // underline stroke; spaces inside a link extend the active run instead.
 func TestUnderlineSkipWhitespaceOnly(t *testing.T) {
-	s := sheet(t, `
+	t.Parallel()
+	cssSheet := sheet(t, `
 body { margin: 0; font-size: 12pt; }
 a { color: blue; text-decoration: underline; }
 `)
@@ -114,8 +115,8 @@ World</a></p></body></html>`)
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{
-		Width: 400, Height: 100, Sheets: []*css.Stylesheet{s}, Media: "print",
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 400, Height: 100, Sheets: []*css.Stylesheet{cssSheet}, Media: "print",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -138,15 +139,16 @@ func TestUnderlineStrokeWidthClamp(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			s := sheet(t, tc.css)
+			t.Parallel()
+			cssSheet := sheet(t, tc.css)
 
 			root, err := html.Parse(`<html><body><a href="https://example.com">gyp</a></body></html>`)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			res, err := Layout(root, Options{
-				Width: 200, Height: 80, Sheets: []*css.Stylesheet{s}, Media: "print",
+			res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+				Width: 200, Height: 80, Sheets: []*css.Stylesheet{cssSheet}, Media: "print",
 			})
 			if err != nil {
 				t.Fatal(err)
@@ -173,6 +175,7 @@ func TestUnderlineStrokeWidthClamp(t *testing.T) {
 
 // TestUnderlineStrokeWidthUnit matches helper directly.
 func TestUnderlineStrokeWidthUnit(t *testing.T) {
+	t.Parallel()
 	if g := underlineStrokeWidth(4); math.Abs(g-0.25) > 1e-9 {
 		t.Errorf("small em: got %.3f want 0.25", g)
 	}
@@ -191,6 +194,7 @@ func TestUnderlineStrokeWidthUnit(t *testing.T) {
 // TestUnderlineWrappedURLOnePerLine: a long bare URL that wraps still gets
 // at most one underline per line (not per soft-break fragment stacked).
 func TestUnderlineWrappedURLOnePerLine(t *testing.T) {
+	t.Parallel()
 	url := "https://web.archive.org/web/20200316084639/https://www.example.com/path/to/article-title-extra"
 	s := sheet(t, `body { margin: 0; font-size: 10pt; } a { overflow-wrap: break-word; text-decoration: underline; color: #0645ad; }`)
 	src := `<html><body><p><a href="` + url + `">` + url + `</a></p></body></html>`
@@ -202,7 +206,7 @@ func TestUnderlineWrappedURLOnePerLine(t *testing.T) {
 
 	const contentW = 220.0
 
-	res, err := Layout(root, Options{
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
 		Width: contentW, Height: 800, Sheets: []*css.Stylesheet{s}, Media: "print",
 	})
 	if err != nil {

@@ -59,6 +59,14 @@ func DocumentPage(h *Heading) int {
 	return h.DocPage
 }
 
+const (
+	headingLevelH2 = 2
+	headingLevelH3 = 3
+	headingLevelH4 = 4
+	headingLevelH5 = 5
+	headingLevelH6 = 6
+)
+
 // headingLevel maps an element name to its outline level, 0 when it is not a
 // heading. h1..h6 are accepted (h7..h9 are not part of the HTML vocabulary).
 func headingLevel(name string) int {
@@ -66,15 +74,15 @@ func headingLevel(name string) int {
 	case "h1":
 		return 1
 	case "h2":
-		return 2
+		return headingLevelH2
 	case "h3":
-		return 3
+		return headingLevelH3
 	case "h4":
-		return 4
+		return headingLevelH4
 	case "h5":
-		return 5
+		return headingLevelH5
 	case "h6":
-		return 6
+		return headingLevelH6
 	}
 
 	return 0
@@ -86,15 +94,15 @@ func headingLevel(name string) int {
 func CollectHeadings(root *html.Node) []*Heading {
 	var out []*Heading
 
-	root.Walk(func(n *html.Node) {
-		if n.Type != html.ElementNode {
+	root.Walk(func(node *html.Node) {
+		if node.Type != html.ElementNode {
 			return
 		}
 
-		if lvl := headingLevel(n.Name); lvl > 0 {
-			out = append(out, &Heading{
-				Node:  n,
-				Title: CollapseWS(n.TextContent()),
+		if lvl := headingLevel(node.Name); lvl > 0 {
+			out = append(out, &Heading{ //nolint:exhaustruct // intentional zero/partial fields
+				Node:  node,
+				Title: CollapseWS(node.TextContent()),
 				Level: lvl,
 			})
 		}
@@ -115,14 +123,14 @@ func Lookup(headings []*Heading, locs []layout.ElementLocation) []*Heading {
 
 	out := make([]*Heading, 0, len(headings))
 
-	for _, h := range headings {
-		l, ok := byNode[h.Node]
+	for _, heading := range headings {
+		l, ok := byNode[heading.Node]
 		if !ok {
 			continue
 		}
 
-		h.Page, h.X, h.Y, h.W, h.H = l.Page, l.X, l.Y, l.W, l.H
-		out = append(out, h)
+		heading.Page, heading.X, heading.Y, heading.W, heading.H = l.Page, l.X, l.Y, l.W, l.H
+		out = append(out, heading)
 	}
 
 	return out
@@ -167,16 +175,16 @@ func SortHeadingsBy(hs []*Heading, pageOf PageOf) {
 	pageOf = normalizePageOf(pageOf)
 
 	sort.SliceStable(hs, func(i, j int) bool {
-		a, b := hs[i], hs[j]
-		if pageOf(a) != pageOf(b) {
-			return pageOf(a) < pageOf(b)
+		leftH, rightH := hs[i], hs[j]
+		if pageOf(leftH) != pageOf(rightH) {
+			return pageOf(leftH) < pageOf(rightH)
 		}
 
-		if a.Y != b.Y {
-			return a.Y < b.Y
+		if leftH.Y != rightH.Y {
+			return leftH.Y < rightH.Y
 		}
 
-		return a.X < b.X
+		return leftH.X < rightH.X
 	})
 }
 
@@ -194,16 +202,16 @@ func SectionOfBy(hs []*Heading, page int, pageOf PageOf) (section, subsection st
 
 	var first, last *Heading
 
-	for _, h := range hs {
-		if pageOf(h) > page {
+	for _, heading := range hs {
+		if pageOf(heading) > page {
 			break
 		}
 
 		if first == nil {
-			first = h
+			first = heading
 		}
 
-		last = h
+		last = heading
 	}
 
 	if first != nil {
@@ -238,22 +246,22 @@ func BuildTreeBy(headings []*Heading, opts Options, pageOf PageOf) *Node {
 	pageOf = normalizePageOf(pageOf)
 	sel := make([]*Heading, 0, len(headings))
 
-	for _, h := range headings {
-		if matchAny(opts.Exclude, h.Node) {
+	for _, heading := range headings {
+		if matchAny(opts.Exclude, heading.Node) {
 			continue
 		}
 
-		sel = append(sel, h)
+		sel = append(sel, heading)
 	}
 
 	SortHeadingsBy(sel, pageOf)
 
-	root := &Node{}
+	root := &Node{} //nolint:exhaustruct // intentional zero/partial fields
 	stack := []*Node{root}
 	stackLevel := []int{0}
 
-	for _, h := range sel {
-		lvl := h.Level
+	for _, heading := range sel {
+		lvl := heading.Level
 		if lvl > stackLevel[len(stackLevel)-1]+1 {
 			lvl = stackLevel[len(stackLevel)-1] + 1 // clamp non-monotonic jump
 		}
@@ -267,9 +275,9 @@ func BuildTreeBy(headings []*Heading, opts Options, pageOf PageOf) *Node {
 			stackLevel = stackLevel[:len(stackLevel)-1]
 		}
 
-		n := &Node{Heading: h}
-		stack[len(stack)-1].Children = append(stack[len(stack)-1].Children, n)
-		stack = append(stack, n)
+		child := &Node{Heading: heading} //nolint:exhaustruct // intentional zero/partial fields
+		stack[len(stack)-1].Children = append(stack[len(stack)-1].Children, child)
+		stack = append(stack, child)
 		stackLevel = append(stackLevel, lvl)
 	}
 
@@ -285,8 +293,8 @@ func (n *Node) Flatten() []*Node {
 	walk = func(n *Node) {
 		out = append(out, n)
 
-		for _, c := range n.Children {
-			walk(c)
+		for _, child := range n.Children {
+			walk(child)
 		}
 	}
 	walk(n)
@@ -313,45 +321,45 @@ func DumpOutlineXMLOffset(root *Node, pageOffset int) []byte {
 func DumpOutlineXMLBy(root *Node, pageOffset int, pageOf PageOf) []byte {
 	pageOf = normalizePageOf(pageOf)
 
-	var b strings.Builder
+	var buf strings.Builder
 
-	b.WriteString("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
-	b.WriteString("<outline xmlns=\"http://wkhtmltopdf.org/outline\">\n")
-	dumpNode(root, &b, 1, pageOffset, pageOf)
-	b.WriteString("</outline>\n")
+	buf.WriteString("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
+	buf.WriteString("<outline xmlns=\"http://wkhtmltopdf.org/outline\">\n")
+	dumpNode(root, &buf, 1, pageOffset, pageOf)
+	buf.WriteString("</outline>\n")
 
-	return []byte(b.String())
+	return []byte(buf.String())
 }
 
-func dumpNode(n *Node, b *strings.Builder, depth, pageOffset int, pageOf PageOf) {
+func dumpNode(node *Node, buf *strings.Builder, depth, pageOffset int, pageOf PageOf) {
 	pad := strings.Repeat("  ", depth)
 
-	for _, c := range n.Children {
-		h := c.Heading
-		if h == nil {
+	for _, child := range node.Children {
+		heading := child.Heading
+		if heading == nil {
 			continue
 		}
 
-		b.WriteString(pad)
-		b.WriteString("<item title=\"")
-		b.WriteString(xmlEscape(h.Title))
-		b.WriteString("\" page=\"")
-		b.WriteString(strconv.Itoa(pageOf(h) + 1 + pageOffset))
-		b.WriteString("\" link=\"")
-		b.WriteString(h.Anchor)
-		b.WriteString("\" backLink=\"")
-		b.WriteString(h.Anchor)
+		buf.WriteString(pad)
+		buf.WriteString("<item title=\"")
+		buf.WriteString(xmlEscape(heading.Title))
+		buf.WriteString("\" page=\"")
+		buf.WriteString(strconv.Itoa(pageOf(heading) + 1 + pageOffset))
+		buf.WriteString("\" link=\"")
+		buf.WriteString(heading.Anchor)
+		buf.WriteString("\" backLink=\"")
+		buf.WriteString(heading.Anchor)
 
-		if len(c.Children) == 0 {
-			b.WriteString("\"/>\n")
+		if len(child.Children) == 0 {
+			buf.WriteString("\"/>\node")
 
 			continue
 		}
 
-		b.WriteString("\">\n")
-		dumpNode(c, b, depth+1, pageOffset, pageOf)
-		b.WriteString(pad)
-		b.WriteString("</item>\n")
+		buf.WriteString("\">\node")
+		dumpNode(child, buf, depth+1, pageOffset, pageOf)
+		buf.WriteString(pad)
+		buf.WriteString("</item>\node")
 	}
 }
 
@@ -376,15 +384,15 @@ func matchAny(sels []css.Selector, n *html.Node) bool {
 // CollapseWS collapses whitespace runs (space, tab, newline, CR, form feed)
 // to a single space and trims leading/trailing spaces. Shared by outline
 // title collection; convert may reuse for document titles and similar.
-func CollapseWS(s string) string {
-	var b strings.Builder
+func CollapseWS(text string) string {
+	var buf strings.Builder
 
 	prevSpace := true
 
-	for _, r := range s {
-		if r == ' ' || r == '\t' || r == '\n' || r == '\r' || r == '\f' {
+	for _, runeVal := range text {
+		if runeVal == ' ' || runeVal == '\t' || runeVal == '\n' || runeVal == '\r' || runeVal == '\f' {
 			if !prevSpace {
-				b.WriteByte(' ')
+				buf.WriteByte(' ')
 
 				prevSpace = true
 			}
@@ -392,34 +400,34 @@ func CollapseWS(s string) string {
 			continue
 		}
 
-		b.WriteRune(r)
+		buf.WriteRune(runeVal)
 
 		prevSpace = false
 	}
 
-	return strings.TrimRight(b.String(), " ")
+	return strings.TrimRight(buf.String(), " ")
 }
 
 // xmlEscape escapes the five XML special characters.
-func xmlEscape(s string) string {
-	var b strings.Builder
+func xmlEscape(text string) string {
+	var buf strings.Builder
 
-	for _, r := range s {
-		switch r {
+	for _, runeVal := range text {
+		switch runeVal {
 		case '&':
-			b.WriteString("&amp;")
+			buf.WriteString("&amp;")
 		case '<':
-			b.WriteString("&lt;")
+			buf.WriteString("&lt;")
 		case '>':
-			b.WriteString("&gt;")
+			buf.WriteString("&gt;")
 		case '"':
-			b.WriteString("&quot;")
+			buf.WriteString("&quot;")
 		case '\'':
-			b.WriteString("&apos;")
+			buf.WriteString("&apos;")
 		default:
-			b.WriteRune(r)
+			buf.WriteRune(runeVal)
 		}
 	}
 
-	return b.String()
+	return buf.String()
 }

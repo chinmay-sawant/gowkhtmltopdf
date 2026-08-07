@@ -12,11 +12,13 @@ import (
 )
 
 func TestRasterPaintOrderMatchesPDFLayerPolicy(t *testing.T) {
+	t.Parallel()
+
 	ops := []layout.Op{
-		{Kind: layout.OpText, ZIndex: 0, ZIndexSet: true},
-		{Kind: layout.OpFillRect, ZIndex: 0, ZIndexSet: true},
-		{Kind: layout.OpText, ZIndex: 2, ZIndexSet: true},
-		{Kind: layout.OpFillRect, ZIndex: -1, ZIndexSet: true},
+		{Kind: layout.OpText, ZIndex: 0, ZIndexSet: true},      //nolint:exhaustruct // intentional zero/partial fields
+		{Kind: layout.OpFillRect, ZIndex: 0, ZIndexSet: true},  //nolint:exhaustruct // intentional zero/partial fields
+		{Kind: layout.OpText, ZIndex: 2, ZIndexSet: true},      //nolint:exhaustruct // intentional zero/partial fields
+		{Kind: layout.OpFillRect, ZIndex: -1, ZIndexSet: true}, //nolint:exhaustruct // intentional zero/partial fields
 	}
 	order := rasterPaintOrder(ops)
 	want := []int{3, 1, 0, 2}
@@ -29,6 +31,7 @@ func TestRasterPaintOrderMatchesPDFLayerPolicy(t *testing.T) {
 }
 
 func TestRenderContextHonorsCancellation(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
@@ -37,13 +40,15 @@ func TestRenderContextHonorsCancellation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = RenderContext(ctx, root, RenderOptions{Width: 200})
+	_, err = RenderContext(ctx, root, RenderOptions{Width: 200}) //nolint:exhaustruct // intentional zero/partial fields
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("RenderContext error = %v, want context.Canceled", err)
 	}
 }
 
 func TestTTFRasterAntiAliased(t *testing.T) {
+	t.Parallel()
+
 	face, err := pdf.DefaultFont()
 	if err != nil {
 		t.Fatal(err)
@@ -54,7 +59,7 @@ func TestTTFRasterAntiAliased(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	img, err := Render(root, RenderOptions{Width: 400, Font: face, Background: true})
+	img, err := Render(root, RenderOptions{Width: 400, Font: face, Background: true}) //nolint:exhaustruct // intentional zero/partial fields
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,9 +67,9 @@ func TestTTFRasterAntiAliased(t *testing.T) {
 	seen := map[color.Color]struct{}{}
 
 	b := img.Bounds()
-	for y := b.Min.Y; y < b.Max.Y; y++ {
-		for x := b.Min.X; x < b.Max.X; x++ {
-			seen[img.At(x, y)] = struct{}{}
+	for py := b.Min.Y; py < b.Max.Y; py++ {
+		for pixelX := b.Min.X; pixelX < b.Max.X; pixelX++ {
+			seen[img.At(pixelX, py)] = struct{}{}
 			if len(seen) > 40 {
 				return
 			}
@@ -77,16 +82,18 @@ func TestTTFRasterAntiAliased(t *testing.T) {
 }
 
 func TestTTFAdvanceMatchesLayoutWidth(t *testing.T) {
+	t.Parallel()
+
 	face, err := pdf.DefaultFont()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	s := "Acme"
+	sample := "Acme"
 
 	var layoutW float64
 
-	for _, r := range s {
+	for _, r := range sample {
 		layoutW += face.AdvanceInPoints(r, 12)
 	}
 	// image advances use same AdvanceInPoints * ptToPx
@@ -95,12 +102,12 @@ func TestTTFAdvanceMatchesLayoutWidth(t *testing.T) {
 		t.Fatalf("unexpected width scale %v", imgW)
 	}
 	// render single line and ensure non-white span is roughly that width
-	root, err := html.Parse(`<html><body style="margin:0;padding:0"><p style="margin:0;font-size:12pt">` + s + `</p></body></html>`)
+	root, err := html.Parse(`<html><body style="margin:0;padding:0"><p style="margin:0;font-size:12pt">` + sample + `</p></body></html>`)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	img, err := Render(root, RenderOptions{Width: 200, Font: face, SmartWidth: false, Background: true})
+	img, err := Render(root, RenderOptions{Width: 200, Font: face, SmartWidth: false, Background: true}) //nolint:exhaustruct // intentional zero/partial fields
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,16 +115,16 @@ func TestTTFAdvanceMatchesLayoutWidth(t *testing.T) {
 	b := img.Bounds()
 	minX, maxX := b.Max.X, b.Min.X
 
-	for y := b.Min.Y; y < b.Max.Y; y++ {
-		for x := b.Min.X; x < b.Max.X; x++ {
-			r, g, bl, _ := img.At(x, y).RGBA()
+	for py := b.Min.Y; py < b.Max.Y; py++ {
+		for pixelX := b.Min.X; pixelX < b.Max.X; pixelX++ {
+			r, g, bl, _ := img.At(pixelX, py).RGBA()
 			if r < 0xf000 || g < 0xf000 || bl < 0xf000 {
-				if x < minX {
-					minX = x
+				if pixelX < minX {
+					minX = pixelX
 				}
 
-				if x > maxX {
-					maxX = x
+				if pixelX > maxX {
+					maxX = pixelX
 				}
 			}
 		}

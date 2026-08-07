@@ -10,7 +10,7 @@ import (
 )
 
 func TestOrphansWidowsParseAndInherit(t *testing.T) {
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 		.o4 { orphans: 4; widows: 2 }
 		.bad { orphans: 0; widows: -1; orphans: 1.5; widows: auto }
 		.outer { orphans: 5; widows: 3 }
@@ -21,26 +21,26 @@ func TestOrphansWidowsParseAndInherit(t *testing.T) {
 		<div class="outer"><p class="inner">c</p></div>
 	</body></html>`
 	root := mustParse(t, src)
-	styles := resolveStyles(root, []*css.Stylesheet{s}, "", testViewport, 800)
+	styles := resolveStyles(root, []*css.Stylesheet{cssSheet}, "", testViewport, 800)
 
 	var gotO4, gotBad, gotInner, gotBody *ResolvedStyle
 
-	for n, st := range styles {
-		if n.Type != html.ElementNode {
+	for node, sty := range styles {
+		if node.Type != html.ElementNode {
 			continue
 		}
 
-		switch n.Attribute("class") {
+		switch node.Attribute("class") {
 		case "o4":
-			gotO4 = &st
+			gotO4 = &sty
 		case "bad":
-			gotBad = &st
+			gotBad = &sty
 		case "inner":
-			gotInner = &st
+			gotInner = &sty
 		}
 
-		if n.Name == "body" {
-			gotBody = &st
+		if node.Name == "body" {
+			gotBody = &sty
 		}
 	}
 
@@ -82,22 +82,22 @@ func ptrWidows(st *ResolvedStyle) int {
 }
 
 func TestOrphansWidowsLineAwareKeepTogether(t *testing.T) {
+	t.Parallel()
 	// Synthetic IFC leaf: 2 lines before the boundary, 3 after. orphans:4 makes
 	// that Class B break illegal → whole block shifts to the next page.
 	contentH := 100.0
 	ops := []Op{
-		{Kind: OpText, Y: 70, Text: "1", Size: 10},
-		{Kind: OpText, Y: 85, Text: "2", Size: 10},
-		{Kind: OpText, Y: 105, Text: "3", Size: 10},
-		{Kind: OpText, Y: 120, Text: "4", Size: 10},
-		{Kind: OpText, Y: 135, Text: "5", Size: 10},
+		{Kind: OpText, Y: 70, Text: "1", Size: 10},  //nolint:exhaustruct // intentional zero fields
+		{Kind: OpText, Y: 85, Text: "2", Size: 10},  //nolint:exhaustruct // intentional zero fields
+		{Kind: OpText, Y: 105, Text: "3", Size: 10}, //nolint:exhaustruct // intentional zero fields
+		{Kind: OpText, Y: 120, Text: "4", Size: 10}, //nolint:exhaustruct // intentional zero fields
+		{Kind: OpText, Y: 135, Text: "5", Size: 10}, //nolint:exhaustruct // intentional zero fields
 	}
-	root := &box{
-		kind: "block", y: 60, h: 90, opStart: 0, opEnd: 4,
-		style: ResolvedStyle{Orphans: 4, Widows: 2},
+	root := &box{ //nolint:exhaustruct // intentional zero fields
+		kind: "block", y: 60, height: 90, opStart: 0, opEnd: 4,
+		style: ResolvedStyle{Orphans: 4, Widows: 2}, //nolint:exhaustruct // intentional zero fields
 	}
-
-	res := &Result{Ops: ops, root: root}
+	res := &Result{Ops: ops, root: root} //nolint:exhaustruct // intentional zero fields
 	if !orphansWidows(res, contentH) {
 		t.Fatal("expected Rule 3 keep-together shift for orphans:4 with 2|3 split")
 	}
@@ -114,18 +114,17 @@ func TestOrphansWidowsLineAwareKeepTogether(t *testing.T) {
 
 	// Legal split (orphans:2, widows:2 with 2|3) must not move.
 	ops2 := []Op{
-		{Kind: OpText, Y: 70, Text: "1", Size: 10},
-		{Kind: OpText, Y: 85, Text: "2", Size: 10},
-		{Kind: OpText, Y: 105, Text: "3", Size: 10},
-		{Kind: OpText, Y: 120, Text: "4", Size: 10},
-		{Kind: OpText, Y: 135, Text: "5", Size: 10},
+		{Kind: OpText, Y: 70, Text: "1", Size: 10},  //nolint:exhaustruct // intentional zero fields
+		{Kind: OpText, Y: 85, Text: "2", Size: 10},  //nolint:exhaustruct // intentional zero fields
+		{Kind: OpText, Y: 105, Text: "3", Size: 10}, //nolint:exhaustruct // intentional zero fields
+		{Kind: OpText, Y: 120, Text: "4", Size: 10}, //nolint:exhaustruct // intentional zero fields
+		{Kind: OpText, Y: 135, Text: "5", Size: 10}, //nolint:exhaustruct // intentional zero fields
 	}
-	root2 := &box{
-		kind: "block", y: 60, h: 90, opStart: 0, opEnd: 4,
-		style: ResolvedStyle{Orphans: 2, Widows: 2},
+	root2 := &box{ //nolint:exhaustruct // intentional zero fields
+		kind: "block", y: 60, height: 90, opStart: 0, opEnd: 4,
+		style: ResolvedStyle{Orphans: 2, Widows: 2}, //nolint:exhaustruct // intentional zero fields
 	}
-
-	res2 := &Result{Ops: ops2, root: root2}
+	res2 := &Result{Ops: ops2, root: root2} //nolint:exhaustruct // intentional zero fields
 	if orphansWidows(res2, contentH) {
 		t.Fatal("legal 2|3 split with orphans:2 widows:2 must not shift")
 	}
@@ -134,7 +133,7 @@ func TestOrphansWidowsLineAwareKeepTogether(t *testing.T) {
 func TestOrphansWidowsCSSIntegration(t *testing.T) {
 	// End-to-end: parsed orphans:4 survives layout+paint; forced multi-line
 	// paragraph text ends on a single page near the boundary.
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 		body { margin: 0; font-size: 12pt; line-height: 14pt }
 		.pad { height: 800pt }
 		.keep { orphans: 4; widows: 2; width: 120pt; margin: 0 }
@@ -144,21 +143,21 @@ func TestOrphansWidowsCSSIntegration(t *testing.T) {
 		<p class="keep">Line one here. Line two here. Line three here.
 		Line four here. Line five here. Line six here. Line seven here.</p>
 	</body></html>`
-	res := layoutHTML(t, src, s)
+	res := layoutHTML(t, src, cssSheet)
 
 	var keep *box
 
 	var find func(b *box)
-	find = func(b *box) {
-		if b == nil {
+	find = func(boxNode *box) {
+		if boxNode == nil {
 			return
 		}
 
-		if b.node != nil && b.node.Attribute("class") == "keep" {
-			keep = b
+		if boxNode.node != nil && boxNode.node.Attribute("class") == "keep" {
+			keep = boxNode
 		}
 
-		for _, c := range b.children {
+		for _, c := range boxNode.children {
 			find(c)
 		}
 	}
@@ -178,13 +177,13 @@ func TestOrphansWidowsCSSIntegration(t *testing.T) {
 	nLines := 0
 
 	for i := keep.opStart; i <= keep.opEnd && i < len(res.Ops); i++ {
-		op := res.Ops[i]
-		if op.Kind != OpText {
+		paintOp := res.Ops[i]
+		if paintOp.Kind != OpText {
 			continue
 		}
 
 		nLines++
-		pages[int(op.Y/contentH)] = true
+		pages[int(paintOp.Y/contentH)] = true
 	}
 
 	if nLines < 4 {
@@ -197,14 +196,15 @@ func TestOrphansWidowsCSSIntegration(t *testing.T) {
 }
 
 func TestOrphansWidowsHeuristicFallback(t *testing.T) {
+	t.Parallel()
 	// Geometric fallback: short straddling block (~14–60pt) moves wholly when
 	// it fits the next page (no line boxes required).
-	res := &Result{
-		Ops: []Op{{Kind: OpFillRect, Y: 830, H: 30}},
+	res := &Result{ //nolint:exhaustruct // intentional zero fields
+		Ops: []Op{{Kind: OpFillRect, Y: 830, H: 30}}, //nolint:exhaustruct // intentional zero fields
 	}
-	b := &box{
-		kind: "block", y: 830, h: 30, opStart: 0, opEnd: 0,
-		style: ResolvedStyle{Orphans: 2, Widows: 2},
+	b := &box{ //nolint:exhaustruct // intentional zero fields
+		kind: "block", y: 830, height: 30, opStart: 0, opEnd: 0,
+		style: ResolvedStyle{Orphans: 2, Widows: 2}, //nolint:exhaustruct // intentional zero fields
 	}
 
 	if !orphansWidowsHeuristic(res, b, 842) {
@@ -215,34 +215,35 @@ func TestOrphansWidowsHeuristicFallback(t *testing.T) {
 		t.Fatalf("op Y = %v, want ≥ 842 after shift", res.Ops[0].Y)
 	}
 	// Outside the short-band → no heuristic move.
-	b2 := &box{kind: "block", y: 800, h: 80, opStart: 0, opEnd: 0}
+	b2 := &box{kind: "block", y: 800, height: 80, opStart: 0, opEnd: 0} //nolint:exhaustruct // intentional zero fields
 	if orphansWidowsHeuristic(res, b2, 842) {
 		t.Fatal("heuristic must not move tall blocks (>60pt)")
 	}
 }
 
 func TestBreakBeforeAlwaysIgnoresOrphans(t *testing.T) {
+	t.Parallel()
 	// Forced break-before:always must land on a new page even when a preceding
 	// paragraph has orphans:4 (forced breaks override widow/orphan limits).
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 		body { margin: 0; font-size: 11pt }
 		.para { orphans: 4; widows: 2; margin: 0 0 8px 0 }
 		.force { break-before: always }
 	`)
 
-	var b strings.Builder
+	var boxNode strings.Builder
 
-	b.WriteString(`<html><body>`)
+	boxNode.WriteString(`<html><body>`)
 
 	for range 40 {
-		b.WriteString(`<p class="para">Forced-break filler paragraph number `)
-		b.WriteString(strings.Repeat("word ", 12))
-		b.WriteString(`MARKER-PRE.</p>`)
+		boxNode.WriteString(`<p class="para">Forced-break filler paragraph number `)
+		boxNode.WriteString(strings.Repeat("word ", 12))
+		boxNode.WriteString(`MARKER-PRE.</p>`)
 	}
 
-	b.WriteString(`<div class="force"><p>FORCED-PAGE-START</p></div>`)
-	b.WriteString(`</body></html>`)
-	res := layoutHTML(t, b.String(), s)
+	boxNode.WriteString(`<div class="force"><p>FORCED-PAGE-START</p></div>`)
+	boxNode.WriteString(`</body></html>`)
+	res := layoutHTML(t, boxNode.String(), cssSheet)
 	doc := pdf.NewDocument()
 
 	if err := Paint(doc, res, paintOpts()); err != nil {

@@ -20,13 +20,13 @@ func TestFixture13PreBackgroundTouchesBottomBorder(t *testing.T) {
 	var fill, bottom *Op
 
 	for i := range res.Ops {
-		op := &res.Ops[i]
-		if op.Kind == OpFillRect && nearRGB(op, 0.957, 0.957, 0.949) && op.Y > 400 && (fill == nil || op.Y > fill.Y) {
-			fill = op
+		paintOp := &res.Ops[i]
+		if paintOp.Kind == OpFillRect && nearRGB(paintOp, 0.957, 0.957, 0.949) && paintOp.Y > 400 && (fill == nil || paintOp.Y > fill.Y) {
+			fill = paintOp
 		}
 
-		if op.Kind == OpLine && nearRGB(op, 0.847, 0.847, 0.831) && op.W > 500 && op.H < 1 && op.Y > 400 && (bottom == nil || op.Y > bottom.Y) {
-			bottom = op
+		if paintOp.Kind == OpLine && nearRGB(paintOp, 0.847, 0.847, 0.831) && paintOp.W > 500 && paintOp.H < 1 && paintOp.Y > 400 && (bottom == nil || paintOp.Y > bottom.Y) {
+			bottom = paintOp
 		}
 	}
 
@@ -40,11 +40,12 @@ func TestFixture13PreBackgroundTouchesBottomBorder(t *testing.T) {
 }
 
 func TestStickySectionChromeRepairUsesContainingBlock(t *testing.T) {
+	t.Parallel()
 	borderRGB := [3]float64{0.271, 0.353, 0.392}
 	background := [4]float64{0.925, 0.937, 0.945, 1}
-	section := &box{
+	section := &box{ //nolint:exhaustruct // intentional zero fields
 		x: 10, y: 0, w: 100,
-		style: ResolvedStyle{
+		style: ResolvedStyle{ //nolint:exhaustruct // intentional zero fields
 			BGColor:      background,
 			BorderLeft:   border{Width: 1, Style: "solid", Color: borderRGB},
 			BorderRight:  border{Width: 1, Style: "solid", Color: borderRGB},
@@ -52,15 +53,15 @@ func TestStickySectionChromeRepairUsesContainingBlock(t *testing.T) {
 		},
 	}
 	section.children = []*box{{sticky: true}}
-	root := &box{children: []*box{section}}
-	priorFill := Op{Kind: OpFillRect, X: 10, Y: 0, W: 100, H: 50, R: background[0], G: background[1], B: background[2]}
-	targetFill := Op{Kind: OpFillRect, X: 10, Y: 100, W: 100, H: 50, R: background[0], G: background[1], B: background[2]}
-	targetLeft := Op{Kind: OpLine, X: 10, Y: 100, H: 50, R: borderRGB[0], G: borderRGB[1], B: borderRGB[2]}
-	targetRight := Op{Kind: OpLine, X: 110, Y: 100, H: 50, R: borderRGB[0], G: borderRGB[1], B: borderRGB[2]}
-	targetBottom := Op{Kind: OpLine, X: 10, Y: 180, W: 100, R: borderRGB[0], G: borderRGB[1], B: borderRGB[2]}
-	unrelatedFill := Op{Kind: OpFillRect, X: 200, Y: 100, W: 300, H: 50, R: background[0], G: background[1], B: background[2]}
-	unrelatedBottom := Op{Kind: OpLine, X: 200, Y: 180, W: 300, R: borderRGB[0], G: borderRGB[1], B: borderRGB[2]}
-	res := &Result{root: root, Ops: []Op{priorFill, targetFill, targetLeft, targetRight, targetBottom, unrelatedFill, unrelatedBottom}}
+	root := &box{children: []*box{section}}                                                                                             //nolint:exhaustruct // intentional zero fields
+	priorFill := Op{Kind: OpFillRect, X: 10, Y: 0, W: 100, H: 50, R: background[0], G: background[1], B: background[2]}                 //nolint:exhaustruct // intentional zero fields
+	targetFill := Op{Kind: OpFillRect, X: 10, Y: 100, W: 100, H: 50, R: background[0], G: background[1], B: background[2]}              //nolint:exhaustruct // intentional zero fields
+	targetLeft := Op{Kind: OpLine, X: 10, Y: 100, H: 50, R: borderRGB[0], G: borderRGB[1], B: borderRGB[2]}                             //nolint:exhaustruct // intentional zero fields
+	targetRight := Op{Kind: OpLine, X: 110, Y: 100, H: 50, R: borderRGB[0], G: borderRGB[1], B: borderRGB[2]}                           //nolint:exhaustruct // intentional zero fields
+	targetBottom := Op{Kind: OpLine, X: 10, Y: 180, W: 100, R: borderRGB[0], G: borderRGB[1], B: borderRGB[2]}                          //nolint:exhaustruct // intentional zero fields
+	unrelatedFill := Op{Kind: OpFillRect, X: 200, Y: 100, W: 300, H: 50, R: background[0], G: background[1], B: background[2]}          //nolint:exhaustruct // intentional zero fields
+	unrelatedBottom := Op{Kind: OpLine, X: 200, Y: 180, W: 300, R: borderRGB[0], G: borderRGB[1], B: borderRGB[2]}                      //nolint:exhaustruct // intentional zero fields
+	res := &Result{root: root, Ops: []Op{priorFill, targetFill, targetLeft, targetRight, targetBottom, unrelatedFill, unrelatedBottom}} //nolint:exhaustruct // intentional zero fields
 
 	closePageLeadingSectionChrome(res, 100)
 
@@ -98,14 +99,14 @@ func paintGoldenFixture(t *testing.T, name string) (*Result, float64, *pdf.Docum
 	}
 
 	htmlSrc := string(src)
-	si := strings.Index(htmlSrc, "<style>")
-	sj := strings.Index(htmlSrc, "</style>")
+	sidx := strings.Index(htmlSrc, "<style>")
+	sjd := strings.Index(htmlSrc, "</style>")
 
-	if si < 0 || sj < si {
+	if sidx < 0 || sjd < sidx {
 		t.Fatalf("%s: missing style", name)
 	}
 
-	sheet, err := css.Parse(htmlSrc[si+len("<style>") : sj])
+	sheet, err := css.Parse(htmlSrc[sidx+len("<style>") : sjd])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,11 +117,10 @@ func paintGoldenFixture(t *testing.T, name string) (*Result, float64, *pdf.Docum
 	}
 
 	pageW, pageH := 595.28, 841.89
-	m := 28.35
-	contentH := pageH - 2*m
-
-	res, err := Layout(root, Options{
-		Width: pageW - 2*m, Height: contentH, Background: true,
+	mat := 28.35
+	contentH := pageH - 2*mat
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: pageW - 2*mat, Height: contentH, Background: true,
 		Sheets: []*css.Stylesheet{sheet}, Media: "print",
 	})
 	if err != nil {
@@ -130,7 +130,7 @@ func paintGoldenFixture(t *testing.T, name string) (*Result, float64, *pdf.Docum
 	doc := pdf.NewDocument()
 	if err := Paint(doc, res, PaintOptions{
 		PageWidth: pageW, PageHeight: pageH,
-		MarginTop: m, MarginBottom: m, MarginLeft: m, MarginRight: m,
+		MarginTop: mat, MarginBottom: mat, MarginLeft: mat, MarginRight: mat,
 	}); err != nil {
 		t.Fatal(err)
 	}

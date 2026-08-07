@@ -103,14 +103,14 @@ func collectObjectHeadings(root *html.Node, res *layout.Result, _ int, _ setting
 		return nil
 	}
 
-	hs := outline.CollectHeadings(root)
-	hs = outline.Lookup(hs, res.Locations)
+	hsVal := outline.CollectHeadings(root)
+	hsVal = outline.Lookup(hsVal, res.Locations)
 
-	if len(hs) == 0 {
+	if len(hsVal) == 0 {
 		return nil
 	}
 
-	return hs
+	return hsVal
 }
 
 // parseExcludeSelectors parses --exclude-from-outline selector strings into
@@ -149,16 +149,16 @@ func flatHeadings(bodies []*objectState) []*outline.Heading {
 	// Document order by the explicit DocPage field. The object-local Page field
 	// remains unchanged for page-local layout and header/footer semantics.
 	sort.SliceStable(all, func(i, j int) bool {
-		a, b := all[i], all[j]
-		if a.DocPage != b.DocPage {
-			return a.DocPage < b.DocPage
+		flag, buf := all[i], all[j]
+		if flag.DocPage != buf.DocPage {
+			return flag.DocPage < buf.DocPage
 		}
 
-		if a.Y != b.Y {
-			return a.Y < b.Y
+		if flag.Y != buf.Y {
+			return flag.Y < buf.Y
 		}
 
-		return a.X < b.X
+		return flag.X < buf.X
 	})
 
 	return all
@@ -181,27 +181,27 @@ func bodyStateFor(bodies []*objectState, page int) *objectState {
 // container for the top-level headings, as pdf.Document.SetOutline expects.
 // Tree headings retain object-local Page and carry document-global DocPage.
 func emitOutline(doc *pdf.Document, tree *outline.Node, bodies []*objectState, tocTotal int) *pdf.Outline {
-	root := &pdf.Outline{}
+	root := &pdf.Outline{} //nolint:exhaustruct // intentional zero-value fields
 
 	var conv func(n *outline.Node) *pdf.Outline
 
-	conv = func(n *outline.Node) *pdf.Outline {
-		h := n.Heading
-		o := &pdf.Outline{Title: h.Title}
+	conv = func(num *outline.Node) *pdf.Outline {
+		hVal := num.Heading
+		obj := &pdf.Outline{Title: hVal.Title} //nolint:exhaustruct // intentional zero-value fields
 
-		docPage := h.DocPage
+		docPage := hVal.DocPage
 		if st := bodyStateFor(bodies, docPage); st != nil {
 			locPage := docPage - st.offset
-			o.PageRef = doc.PageRef(tocTotal + docPage)
-			loc := layout.ElementLocation{Page: locPage, X: h.X, Y: h.Y, W: h.W, H: h.H}
-			o.X, o.Y = st.geom.pdfXY(loc)
+			obj.PageRef = doc.PageRef(tocTotal + docPage)
+			loc := layout.ElementLocation{Page: locPage, X: hVal.X, Y: hVal.Y, W: hVal.W, H: hVal.H} //nolint:exhaustruct // intentional zero-value fields
+			obj.X, obj.Y = st.geom.pdfXY(loc)
 		}
 
-		for _, c := range n.Children {
-			o.Children = append(o.Children, conv(c))
+		for _, c := range num.Children {
+			obj.Children = append(obj.Children, conv(c))
 		}
 
-		return o
+		return obj
 	}
 	for _, c := range tree.Children {
 		root.Children = append(root.Children, conv(c))

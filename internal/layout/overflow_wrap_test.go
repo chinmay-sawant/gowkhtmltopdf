@@ -11,6 +11,7 @@ import (
 // Emergency wrap applies when a token alone exceeds the line width even with
 // overflow-wrap:normal (print PDF usability).
 func TestLongURLEmergencyWrap(t *testing.T) {
+	t.Parallel()
 	url := "https://web.archive.org/web/20200316084639/https://www.example.com/path/to/a/very/long/article-title-with-many-segments"
 	s := sheet(t, `body { margin: 0; font-size: 10pt; } p { margin: 0; }`)
 	res := layoutHTML(t, `<html><body><p>`+url+`</p></body></html>`, s)
@@ -21,14 +22,14 @@ func TestLongURLEmergencyWrap(t *testing.T) {
 
 	var texts []string
 
-	for _, op := range res.Ops {
-		if op.Kind != OpText {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpText {
 			continue
 		}
 
-		texts = append(texts, op.Text)
+		texts = append(texts, paintOp.Text)
 
-		if r := op.X + op.W; r > maxRight {
+		if r := paintOp.X + paintOp.W; r > maxRight {
 			maxRight = r
 		}
 	}
@@ -48,6 +49,7 @@ func TestLongURLEmergencyWrap(t *testing.T) {
 }
 
 func TestOverflowWrapBreakWordSoftBreaks(t *testing.T) {
+	t.Parallel()
 	// Prefer breaks after '/' rather than mid-segment when possible.
 	url := "https://example.com/one/two/three/four/five/six/seven/eight"
 	s := sheet(t, `
@@ -60,14 +62,14 @@ p { margin: 0; width: 120pt; overflow-wrap: break-word; }
 
 	var maxRight float64
 
-	for _, op := range res.Ops {
-		if op.Kind != OpText {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpText {
 			continue
 		}
 
-		texts = append(texts, op.Text)
+		texts = append(texts, paintOp.Text)
 
-		if r := op.X + op.W; r > maxRight {
+		if r := paintOp.X + paintOp.W; r > maxRight {
 			maxRight = r
 		}
 	}
@@ -96,29 +98,30 @@ p { margin: 0; width: 120pt; overflow-wrap: break-word; }
 }
 
 func TestWordBreakBreakAll(t *testing.T) {
+	t.Parallel()
 	s := sheet(t, `body { margin: 0; font-size: 12pt; } p { word-break: break-all; margin: 0; }`)
 	// No soft opportunities — must still wrap under break-all.
 	token := strings.Repeat("W", 80)
 	res := layoutHTML(t, `<html><body><p style="word-break:break-all">`+token+`</p></body></html>`, s)
 
-	var n int
+	var node int
 
 	var maxRight float64
 
-	for _, op := range res.Ops {
-		if op.Kind != OpText {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpText {
 			continue
 		}
 
-		n++
+		node++
 
-		if r := op.X + op.W; r > maxRight {
+		if r := paintOp.X + paintOp.W; r > maxRight {
 			maxRight = r
 		}
 	}
 
-	if n < 2 {
-		t.Fatalf("break-all should wrap long token into ≥2 ops, got %d", n)
+	if node < 2 {
+		t.Fatalf("break-all should wrap long token into ≥2 ops, got %d", node)
 	}
 
 	if maxRight > testViewport+1 {
@@ -127,6 +130,7 @@ func TestWordBreakBreakAll(t *testing.T) {
 }
 
 func TestNowrapDoesNotEmergencySplit(t *testing.T) {
+	t.Parallel()
 	// white-space:nowrap must stay unbreakable (cite markers, badges).
 	s := sheet(t, `body { margin: 0; font-size: 10pt; } .nw { white-space: nowrap; }`)
 	token := "https://example.com/" + strings.Repeat("segment/", 20)
@@ -150,36 +154,37 @@ func TestNowrapDoesNotEmergencySplit(t *testing.T) {
 // overflow-wrap / word-break inherit onto text nodes (CSS Text), so a URL
 // inside <a style="overflow-wrap:break-word"> actually wraps.
 func TestOverflowWrapInheritsToText(t *testing.T) {
+	t.Parallel()
 	url := "https://web.archive.org/web/20200316084639/https://www.example.com/path/to/article-title"
-	s := sheet(t, `body { margin: 0; font-size: 10pt; } a { overflow-wrap: break-word; }`)
+	cssSheet := sheet(t, `body { margin: 0; font-size: 10pt; } a { overflow-wrap: break-word; }`)
 	src := `<html><body><p>Lead (` + `<a href="` + url + `">` + url + `</a>)</p></body></html>`
 	root := mustParse(t, src)
 
 	const contentW = 280.0
 
-	res, err := Layout(root, Options{Width: contentW, Height: 800, Sheets: []*css.Stylesheet{s}, Background: true})
+	res, err := Layout(root, Options{Width: contentW, Height: 800, Sheets: []*css.Stylesheet{cssSheet}, Background: true}) //nolint:exhaustruct // intentional zero fields
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var maxRight float64
 
-	var n int
+	var node int
 
-	for _, op := range res.Ops {
-		if op.Kind != OpText {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpText {
 			continue
 		}
 
-		n++
+		node++
 
-		if r := op.X + op.W; r > maxRight {
+		if r := paintOp.X + paintOp.W; r > maxRight {
 			maxRight = r
 		}
 	}
 
-	if n < 2 {
-		t.Fatalf("expected wrapped URL (≥2 text ops), got %d", n)
+	if node < 2 {
+		t.Fatalf("expected wrapped URL (≥2 text ops), got %d", node)
 	}
 
 	if maxRight > contentW+1 {

@@ -6,75 +6,81 @@ import (
 )
 
 func TestLoadDefaultFaces(t *testing.T) {
-	fs, err := LoadDefaultFaces()
+	t.Parallel()
+
+	faces, err := LoadDefaultFaces()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if fs.Regular == nil || fs.Bold == nil || fs.Italic == nil || fs.BoldItalic == nil {
+	if faces.Regular == nil || faces.Bold == nil || faces.Italic == nil || faces.BoldItalic == nil {
 		t.Fatal("missing face")
 	}
 
-	if !fs.Bold.Bold() {
+	if !faces.Bold.Bold() {
 		t.Error("Bold face should report Bold()")
 	}
 
-	if !fs.Italic.Italic() {
+	if !faces.Italic.Italic() {
 		t.Error("Italic face should report Italic()")
 	}
 
-	if fs.Regular.PostScriptName != "LiberationSans" {
-		t.Errorf("Regular name = %q", fs.Regular.PostScriptName)
+	if faces.Regular.PostScriptName != "LiberationSans" {
+		t.Errorf("Regular name = %q", faces.Regular.PostScriptName)
 	}
 }
 
 func TestFaceResolve(t *testing.T) {
-	fs, err := LoadDefaultFaces()
+	t.Parallel()
+
+	faces, err := LoadDefaultFaces()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if fs.Resolve(400, false) != fs.Regular {
+	if faces.Resolve(400, false) != faces.Regular {
 		t.Error("400 regular")
 	}
 
-	if fs.Resolve(700, false) != fs.Bold {
+	if faces.Resolve(700, false) != faces.Bold {
 		t.Error("700 bold")
 	}
 
-	if fs.Resolve(400, true) != fs.Italic {
+	if faces.Resolve(400, true) != faces.Italic {
 		t.Error("italic")
 	}
 
-	if fs.Resolve(700, true) != fs.BoldItalic {
+	if faces.Resolve(700, true) != faces.BoldItalic {
 		t.Error("bold italic")
 	}
 }
 
 func TestMultiFacePDFEmbed(t *testing.T) {
-	fs, err := LoadDefaultFaces()
+	t.Parallel()
+
+	faces, err := LoadDefaultFaces()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	d := NewDocument()
-	p := d.AddPage(200, 100)
-	c := p.Content()
-	c.UseEmbeddedFont("F0", fs.Regular)
-	c.UseEmbeddedFont("F1", fs.Bold)
-	c.SetFont("F0", 12)
-	c.BeginText()
-	c.TextAt(10, 50)
-	c.TextShow("Regular")
-	c.EndText()
-	c.SetFont("F1", 12)
-	c.BeginText()
-	c.TextAt(10, 30)
-	c.TextShow("Bold")
-	c.EndText()
+	doc := NewDocument()
+	p := doc.AddPage(200, 100)
+	cur := p.Content()
+	cur.UseEmbeddedFont("F0", faces.Regular)
+	cur.UseEmbeddedFont("F1", faces.Bold)
+	cur.SetFont("F0", 12)
+	cur.BeginText()
+	cur.TextAt(10, 50)
+	cur.TextShow("Regular")
+	cur.EndText()
+	cur.SetFont("F1", 12)
+	cur.BeginText()
+	cur.TextAt(10, 30)
+	cur.TextShow("Bold")
+	cur.EndText()
 
 	var buf bytes.Buffer
-	if err := d.Write(&buf); err != nil {
+	if err := doc.Write(&buf); err != nil {
 		t.Fatal(err)
 	}
 
@@ -93,21 +99,23 @@ func TestMultiFacePDFEmbed(t *testing.T) {
 }
 
 func TestBoldWiderThanRegular(t *testing.T) {
-	fs, err := LoadDefaultFaces()
+	t.Parallel()
+
+	faces, err := LoadDefaultFaces()
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	s := "Heading"
 
-	var wr, wb float64
+	var wrVal, wbVal float64
 
 	for _, r := range s {
-		wr += fs.Regular.AdvanceInPoints(r, 12)
-		wb += fs.Bold.AdvanceInPoints(r, 12)
+		wrVal += faces.Regular.AdvanceInPoints(r, 12)
+		wbVal += faces.Bold.AdvanceInPoints(r, 12)
 	}
 
-	if wb <= wr {
-		t.Errorf("bold width %v should be > regular %v", wb, wr)
+	if wbVal <= wrVal {
+		t.Errorf("bold width %v should be > regular %v", wbVal, wrVal)
 	}
 }

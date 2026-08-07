@@ -6,7 +6,7 @@ import (
 )
 
 func TestWikiPrintChromeHidden(t *testing.T) {
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 @media print {
   #mw-navigation, .noprint, .mw-jump-link, nav, #footer { display: none }
   .firstHeading { font-size: 25pt }
@@ -21,7 +21,7 @@ a:link { color: #0645ad }
 <p>She is a <a href="/wiki/Cuba">Cuban</a> actress.</p>
 <footer id="footer">Footer chrome</footer>
 </body></html>`
-	res := layoutHTML(t, html, s)
+	res := layoutHTML(t, html, cssSheet)
 
 	var texts []string
 
@@ -44,20 +44,20 @@ a:link { color: #0645ad }
 
 	foundTitle, foundLink := false, false
 
-	for _, op := range res.Ops {
-		if op.Kind != OpText {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpText {
 			continue
 		}
 
-		if strings.Contains(op.Text, "Ana de Armas") {
+		if strings.Contains(paintOp.Text, "Ana de Armas") {
 			foundTitle = true
 		}
 
-		if strings.Contains(op.Text, "Cuban") {
+		if strings.Contains(paintOp.Text, "Cuban") {
 			foundLink = true
 
-			if op.B < 0.5 {
-				t.Errorf("Cuban link color = (%v,%v,%v), want blue", op.R, op.G, op.B)
+			if paintOp.B < 0.5 {
+				t.Errorf("Cuban link color = (%v,%v,%v), want blue", paintOp.R, paintOp.G, paintOp.B)
 			}
 		}
 	}

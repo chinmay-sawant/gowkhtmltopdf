@@ -332,16 +332,16 @@ func nopFlag(*Command, *objectCtx, []string) error { return nil }
 // router (address remapping included). Image mode shares the global home;
 // ApplyImageKey/ImageConverter.Set route "web.printmediatype" the same way.
 func printMediaFlag(enable bool) flagApplier {
-	return func(c *Command, cur *objectCtx, vals []string) error {
-		on := enable
+	return func(cmd *Command, cur *objectCtx, vals []string) error {
+		enabled := enable
 		if enable {
-			on = vals[0] == "true"
+			enabled = vals[0] == "true"
 		}
 
-		return cur.applyPage(c,
+		return cur.applyPage(cmd,
 			func(g *settings.PdfGlobal, val string) error { return g.Set("web.printmediatype", val) },
 			func(o *settings.PdfObject, val string) error { return o.Set("load.printmediatype", val) },
-			strconv.FormatBool(on),
+			strconv.FormatBool(enabled),
 		)
 	}
 }
@@ -354,14 +354,14 @@ func printMediaFlag(enable bool) flagApplier {
 // not consume pending (see newFreshObject), so pre-object zoom still lands
 // on the first real page after a leading toc.
 func pageOnlyFlag(obj func(o *settings.PdfObject, val string) error) flagApplier {
-	return func(c *Command, cur *objectCtx, vals []string) error {
+	return func(cmd *Command, cur *objectCtx, vals []string) error {
 		if cur.obj != nil {
 			return obj(cur.obj, vals[0])
 		}
 
 		if cur.pending == nil {
-			o := settings.DefaultPdfObject()
-			cur.pending = &o
+			pending := settings.DefaultPdfObject()
+			cur.pending = &pending
 		}
 
 		return obj(cur.pending, vals[0])
@@ -373,50 +373,50 @@ func pageOnlyFlag(obj func(o *settings.PdfObject, val string) error) flagApplier
 // value via HeaderFor/FooterFor). Explicit global-only routing — pending is
 // never created.
 func hfFlag(prefix, field string) flagApplier {
-	return func(c *Command, cur *objectCtx, vals []string) error {
+	return func(cmd *Command, cur *objectCtx, vals []string) error {
 		key := prefix + "." + field
 		if cur.obj != nil {
 			return cur.obj.Set(key, vals[0])
 		}
 
-		return c.Global.Set(key, vals[0])
+		return cmd.Global.Set(key, vals[0])
 	}
 }
 
 // tocFlag targets a toc.* key on the current object when it is a toc object,
 // else global-only (every toc object inherits via effectiveTOC).
 func tocFlag(field string) flagApplier {
-	return func(c *Command, cur *objectCtx, vals []string) error {
+	return func(cmd *Command, cur *objectCtx, vals []string) error {
 		if cur.obj != nil && cur.obj.IsTableOfContent {
 			return cur.obj.Set("toc."+field, vals[0])
 		}
 
-		return c.Global.Set("toc."+field, vals[0])
+		return cmd.Global.Set("toc."+field, vals[0])
 	}
 }
 
 func tocFlagBool(field string, on bool) flagApplier {
-	return func(c *Command, cur *objectCtx, vals []string) error {
-		v := vals[0]
+	return func(cmd *Command, cur *objectCtx, vals []string) error {
+		val := vals[0]
 		if !on {
-			v = negBool(v)
+			val = negBool(val)
 		}
 
 		if cur.obj != nil && cur.obj.IsTableOfContent {
-			return cur.obj.Set("toc."+field, v)
+			return cur.obj.Set("toc."+field, val)
 		}
 
-		return c.Global.Set("toc."+field, v)
+		return cmd.Global.Set("toc."+field, val)
 	}
 }
 
-func (c *Command) replaceHF(o *settings.PdfObject, k, v string) error {
-	if o.HeaderSet {
-		if o.Header.Replace == nil {
-			o.Header.Replace = map[string]string{}
+func (c *Command) replaceHF(obj *settings.PdfObject, key, val string) error {
+	if obj.HeaderSet {
+		if obj.Header.Replace == nil {
+			obj.Header.Replace = map[string]string{}
 		}
 
-		o.Header.Replace[k] = v
+		obj.Header.Replace[key] = val
 
 		return nil
 	}
@@ -425,7 +425,7 @@ func (c *Command) replaceHF(o *settings.PdfObject, k, v string) error {
 		c.Global.Header.Replace = map[string]string{}
 	}
 
-	c.Global.Header.Replace[k] = v
+	c.Global.Header.Replace[key] = val
 
 	return nil
 }

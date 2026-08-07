@@ -17,41 +17,41 @@ import (
 // (preferSplitOverBlank) so same-page inter-item start pitch stays near
 // natural multi-line height (≤ ~2.5 line heights beyond content).
 func TestAvoidListItemsNoCascadingGaps(t *testing.T) {
-	s := sheet(t, `
+	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 ol { margin: 0; padding-left: 24pt; }
 li { page-break-inside: avoid; margin: 0 0 0.4em 0; }
 p { margin: 0.4em 0; }
 `)
 
-	var b strings.Builder
+	var boxNode strings.Builder
 
-	b.WriteString(`<html><body>`)
+	boxNode.WriteString(`<html><body>`)
 	// Push the list so items straddle multiple page boundaries.
 	for i := range 28 {
-		b.WriteString(fmt.Sprintf(
+		boxNode.WriteString(fmt.Sprintf(
 			`<p>Filler paragraph %d with enough words to approach the natural page-break zone for list pagination testing.</p>`, i))
 	}
 
-	b.WriteString(`<ol start="1">`)
+	boxNode.WriteString(`<ol start="1">`)
 
 	for i := range 35 {
-		b.WriteString(fmt.Sprintf(
+		boxNode.WriteString(fmt.Sprintf(
 			`<li id="r%d">"Citation title number %d with a fairly long path" (https://example.com/article/%d/long-path-name-here). Journal Name. 12 December 2022. Archived from the original. Retrieved 12 December 2022.</li>`,
 			i, i+1, i))
 	}
 
-	b.WriteString(`</ol></body></html>`)
+	boxNode.WriteString(`</ol></body></html>`)
 
-	root, err := html.Parse(b.String())
+	root, err := html.Parse(boxNode.String())
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	const pageH = 750.0
 
-	res, err := Layout(root, Options{
-		Width: 538, Height: pageH, Sheets: []*css.Stylesheet{s},
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 538, Height: pageH, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true,
 	})
 	if err != nil {
@@ -59,7 +59,7 @@ p { margin: 0.4em 0; }
 	}
 
 	doc := pdf.NewDocument()
-	po := PaintOptions{PageWidth: 595, PageHeight: pageH + 50, MarginTop: 25, MarginBottom: 25}
+	po := PaintOptions{PageWidth: 595, PageHeight: pageH + 50, MarginTop: 25, MarginBottom: 25} //nolint:exhaustruct // intentional zero fields
 
 	if err := Paint(doc, res, po); err != nil {
 		t.Fatal(err)
@@ -119,35 +119,35 @@ p { margin: 0.4em 0; }
 	maxSamePageGap := 0.0
 	bigGaps := 0
 
-	for i := 1; i < len(starts); i++ {
-		if int(starts[i-1]/contentH) != int(starts[i]/contentH) {
+	for idx := 1; idx < len(starts); idx++ {
+		if int(starts[idx-1]/contentH) != int(starts[idx]/contentH) {
 			continue
 		}
 
-		g := starts[i] - starts[i-1]
-		if g > maxSamePageGap {
-			maxSamePageGap = g
+		gap := starts[idx] - starts[idx-1]
+		if gap > maxSamePageGap {
+			maxSamePageGap = gap
 		}
 		// Natural multi-line item + margin is ~25–45pt; cascading avoid
 		// left 100–150pt bands on wiki references. Residual 26–38pt bands
 		// are still too airy vs Chrome.
-		if g > 55 {
+		if gap > 55 {
 			bigGaps++
 
 			t.Logf("large gap %.1f between items at y=%.1f and y=%.1f (page %d)",
-				g, starts[i-1], starts[i], int(starts[i]/contentH))
+				gap, starts[idx-1], starts[idx], int(starts[idx]/contentH))
 		}
 	}
 
 	maxEmpty := 0.0
 	emptyBig := 0
 
-	for i := 1; i < len(lis); i++ {
-		if int(lis[i].y/contentH) != int(lis[i-1].y/contentH) {
+	for idx := 1; idx < len(lis); idx++ {
+		if int(lis[idx].y/contentH) != int(lis[idx-1].y/contentH) {
 			continue
 		}
 
-		empty := lis[i].y - (lis[i-1].y + lis[i-1].h)
+		empty := lis[idx].y - (lis[idx-1].y + lis[idx-1].h)
 		if empty > maxEmpty {
 			maxEmpty = empty
 		}
@@ -157,7 +157,7 @@ p { margin: 0.4em 0; }
 			emptyBig++
 
 			t.Logf("empty air %.1f between li y=%.1f h=%.1f and y=%.1f",
-				empty, lis[i-1].y, lis[i-1].h, lis[i].y)
+				empty, lis[idx-1].y, lis[idx-1].h, lis[idx].y)
 		}
 	}
 
@@ -183,6 +183,7 @@ p { margin: 0.4em 0; }
 
 // TestPreferSplitOverBlankUnit checks the shared blank-band heuristic.
 func TestPreferSplitOverBlankUnit(t *testing.T) {
+	t.Parallel()
 	contentH := 800.0
 	// Half-page remaining always prefers split.
 	if !preferSplitOverBlank(401, 40, contentH) {

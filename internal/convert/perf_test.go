@@ -17,9 +17,9 @@ import (
 // page; white-space: nowrap keeps one line item per row. All content is
 // generated in-test; nothing is committed.
 func tenPageTableReportHTML() string {
-	var b strings.Builder
+	var buf strings.Builder
 
-	b.WriteString(`<!DOCTYPE html><html><head><style>
+	buf.WriteString(`<!DOCTYPE html><html><head><style>
 body { font-family: sans-serif; font-size: 9pt; color: #111; }
 h2 { font-size: 12pt; color: #1a3d6d; }
 table { width: 100%; border-collapse: collapse; }
@@ -30,28 +30,28 @@ thead th { background-color: #e8eef5; }
 </style></head><body>`)
 
 	const sections, items = 10, 40
-	for s := 1; s <= sections; s++ {
+	for str := 1; str <= sections; str++ {
 		cls := "section"
-		if s == 1 {
+		if str == 1 {
 			cls = "first"
 		}
 
-		fmt.Fprintf(&b, `<div class="%s"><h2>Invoice %d - line items</h2>`, cls, s)
-		b.WriteString(`<table><thead><tr><th>#</th><th>Item</th><th>SKU</th><th class="num">Qty</th><th class="num">Unit</th><th class="num">Total</th></tr></thead><tbody>`)
+		fmt.Fprintf(&buf, `<div class="%s"><h2>Invoice %d - line items</h2>`, cls, str)
+		buf.WriteString(`<table><thead><tr><th>#</th><th>Item</th><th>SKU</th><th class="num">Qty</th><th class="num">Unit</th><th class="num">Total</th></tr></thead><tbody>`)
 
 		for i := 1; i <= items; i++ {
 			qty := (i*3)%7 + 1
 			unit := 12.5*float64(i%9+1) + float64(i%100)/100.0
-			fmt.Fprintf(&b, `<tr><td>%d</td><td>Line item %d - consulting service %s</td><td>SKU-%04d</td><td class="num">%d</td><td class="num">%.2f</td><td class="num">%.2f</td></tr>`,
+			fmt.Fprintf(&buf, `<tr><td>%d</td><td>Line item %d - consulting service %s</td><td>SKU-%04d</td><td class="num">%d</td><td class="num">%.2f</td><td class="num">%.2f</td></tr>`,
 				i, i, descriptionWord(i), i, qty, unit, unit*float64(qty))
 		}
 
-		b.WriteString(`</tbody></table></div>`)
+		buf.WriteString(`</tbody></table></div>`)
 	}
 
-	b.WriteString(`</body></html>`)
+	buf.WriteString(`</body></html>`)
 
-	return b.String()
+	return buf.String()
 }
 
 // descriptionWord yields a short realistic descriptor for line-item text.
@@ -79,6 +79,8 @@ func descriptionWord(i int) string {
 //	warm run:  203.2ms | 131.8ms | 131.8ms   (mean ~156ms)
 //	PDF bytes: 96341, 10 pages (identical across runs)
 func TestTenPageTableReportPerformance(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip("perf budget test skipped in -short mode")
 	}
