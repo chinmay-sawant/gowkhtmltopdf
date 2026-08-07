@@ -1055,12 +1055,20 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 		for _, target := range stickySectionChromeTargets(res.root) {
 			for _, i := range pageOps[p] {
 				op := &res.Ops[i]
-				if op.StickyID != 0 || op.Kind != OpFillRect || !target.hasBackground ||
-					op.H <= 40 || !sameRectFrame(op, target) || !sameRGB(op, target.background) ||
-					op.Y < pageTop-1e-9 || op.Y >= pageBot-1e-9 || op.Y+op.H <= contentBot+1 {
+				if op.StickyID != 0 || op.Y < pageTop-1e-9 || op.Y >= pageBot-1e-9 || op.H <= 40 ||
+					op.Y+op.H <= contentBot+1 {
 					continue
 				}
-				op.H = contentBot - op.Y
+				switch op.Kind {
+				case OpFillRect:
+					if target.hasBackground && sameRectFrame(op, target) && sameRGB(op, target.background) {
+						op.H = contentBot - op.Y
+					}
+				case OpLine:
+					if target.sideMatches(op) {
+						op.H = contentBot - op.Y
+					}
+				}
 			}
 		}
 	}

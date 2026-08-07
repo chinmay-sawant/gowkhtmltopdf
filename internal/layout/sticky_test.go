@@ -699,4 +699,13 @@ func TestStickyFixture31NoOrphanRowsOnPage1(t *testing.T) {
 			t.Errorf("op[%d] sticky section fill extends %.2fpt below last page-0 row", i, op.Y+op.H-last0)
 		}
 	}
+	for i, op := range res.Ops {
+		if op.Fixed || op.Kind != OpLine || int(op.Y/contentH) != 0 || op.W > 1 ||
+			op.H <= 40 || !nearRGB(&op, 0.271, 0.353, 0.392) {
+			continue
+		}
+		if op.Y+op.H > last0+20 {
+			t.Errorf("op[%d] sticky section side border extends %.2fpt below last page-0 row", i, op.Y+op.H-last0)
+		}
+	}
 }
