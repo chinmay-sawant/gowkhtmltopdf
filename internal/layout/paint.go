@@ -904,6 +904,7 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 		}
 		pageOps[page] = append(pageOps[page], i)
 	}
+	stickyTargets := stickySectionChromeTargets(res.root)
 	for p := 0; p <= maxPage; p++ {
 		pageTop := float64(p) * contentH
 		pageBot := pageTop + contentH
@@ -1052,7 +1053,7 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 		// A sticky containing block may begin on this page and continue onto
 		// the next one. Its page fragment must still end at the last real row;
 		// otherwise the unsplit section wash fills the unused page tail.
-		for _, target := range stickySectionChromeTargets(res.root) {
+		for _, target := range stickyTargets {
 			for _, i := range pageOps[p] {
 				op := &res.Ops[i]
 				if op.StickyID != 0 || op.Y < pageTop-1e-9 || op.Y >= pageBot-1e-9 || op.H <= 40 ||
@@ -1080,7 +1081,7 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 			}
 		}
 	}
-	closePageLeadingSectionChrome(res, contentH)
+	closePageLeadingSectionChromeWithTargets(res, contentH, stickyTargets)
 }
 
 // closePageLeadingSectionChrome keeps continuation-page section washes and
@@ -1089,10 +1090,16 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 // sections that contain a sticky box are considered, and their own box
 // geometry/colors identify the chrome; unrelated wide rules cannot match.
 func closePageLeadingSectionChrome(res *Result, contentH float64) {
+	if res == nil {
+		return
+	}
+	closePageLeadingSectionChromeWithTargets(res, contentH, stickySectionChromeTargets(res.root))
+}
+
+func closePageLeadingSectionChromeWithTargets(res *Result, contentH float64, targets []stickySectionChromeTarget) {
 	if res == nil || res.root == nil || contentH <= 0 {
 		return
 	}
-	targets := stickySectionChromeTargets(res.root)
 	if len(targets) == 0 {
 		return
 	}
