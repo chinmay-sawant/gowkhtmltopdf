@@ -13,6 +13,7 @@
     }
     .benchmark-page {
       page-break-before: always;
+      page-break-inside: avoid;
       padding: 2mm 0;
     }
     .benchmark-page.first {
@@ -29,6 +30,10 @@
     table {
       border-collapse: collapse;
       width: 100%;
+    }
+    tr {
+      page-break-inside: avoid;
+      break-inside: avoid;
     }
     th, td {
       border: 1px solid #a8b5c5;
