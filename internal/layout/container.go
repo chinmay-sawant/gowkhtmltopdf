@@ -80,21 +80,21 @@ func measureSizeContainers(
 // contentInlineSize returns the used content-box inline size (pt) for a block
 // given containing-block availW, mirroring buildBlock without laying out
 // children. Size-contained boxes use this definite width for @container.
-func contentInlineSize(st ResolvedStyle, availW float64) float64 {
-	width, definite := contentBaseInlineSize(st, availW)
-	if definite && st.BoxSizing != borderBox {
-		width += st.PaddingLeft + st.PaddingRight + st.BorderLeft.Width + st.BorderRight.Width
+func contentInlineSize(sty ResolvedStyle, availW float64) float64 {
+	width, definite := contentBaseInlineSize(sty, availW)
+	if definite && sty.BoxSizing != borderBox {
+		width += sty.PaddingLeft + sty.PaddingRight + sty.BorderLeft.Width + sty.BorderRight.Width
 	}
 
-	if st.MinWidth > 0 && width < st.MinWidth {
-		width = st.MinWidth
+	if sty.MinWidth > 0 && width < sty.MinWidth {
+		width = sty.MinWidth
 	}
 
-	if st.MaxWidth >= 0 && width > st.MaxWidth {
-		width = st.MaxWidth
+	if sty.MaxWidth >= 0 && width > sty.MaxWidth {
+		width = sty.MaxWidth
 	}
 
-	contentW := width - st.PaddingLeft - st.PaddingRight - st.BorderLeft.Width - st.BorderRight.Width
+	contentW := width - sty.PaddingLeft - sty.PaddingRight - sty.BorderLeft.Width - sty.BorderRight.Width
 	if contentW < 0 {
 		contentW = 0
 	}
@@ -104,28 +104,28 @@ func contentInlineSize(st ResolvedStyle, availW float64) float64 {
 
 // contentBaseInlineSize resolves the specified width (auto → containing-block
 // width minus margins) and whether the width is definite.
-func contentBaseInlineSize(st ResolvedStyle, availW float64) (width float64, definite bool) {
-	margL, margR := st.MarginLeft, st.MarginRight
-	if st.MarginLeftAuto {
+func contentBaseInlineSize(sty ResolvedStyle, availW float64) (float64, bool) {
+	margL, margR := sty.MarginLeft, sty.MarginRight
+	if sty.MarginLeftAuto {
 		margL = 0
 	}
 
-	if st.MarginRightAuto {
+	if sty.MarginRightAuto {
 		margR = 0
 	}
 
-	width = availW - margL - margR
+	width := availW - margL - margR
 	if width < 0 {
 		width = 0
 	}
 
 	switch {
-	case st.WidthPercent >= 0:
+	case sty.WidthPercent >= 0:
 		if availW > 0 && availW < 1e12 {
-			return availW * st.WidthPercent / cssPercent, true
+			return availW * sty.WidthPercent / cssPercent, true
 		}
-	case st.Width >= 0:
-		return st.Width, true
+	case sty.Width >= 0:
+		return sty.Width, true
 	}
 
 	return width, false

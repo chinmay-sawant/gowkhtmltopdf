@@ -26,7 +26,7 @@ td, th { border: 1px solid #999; padding: 2pt; }
 
 	var walk func(b *box)
 	walk = func(boxNode *box) {
-		if boxNode.kind == "table" {
+		if boxNode.kind == displayTable {
 			tblBox = boxNode
 
 			return
@@ -104,7 +104,7 @@ td, th { border: 1px solid #999; padding: 4pt; }
 
 	var walk func(b *box)
 	walk = func(boxNode *box) {
-		if boxNode.kind == "table" {
+		if boxNode.kind == displayTable {
 			tblBox = boxNode
 
 			return
@@ -157,7 +157,7 @@ th, td { border: 1px solid #ccc; padding: 2pt; }
 
 	var walk func(b *box)
 	walk = func(boxNode *box) {
-		if boxNode.kind == "table" {
+		if boxNode.kind == displayTable {
 			tblBox = boxNode
 
 			return

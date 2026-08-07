@@ -30,23 +30,61 @@ type multicolSeg struct {
 // boundary: when remaining page space is exhausted, a new multicol line starts
 // on the next page. Nested floats/abspos inside columns use the ordinary BFC
 // path (best-effort; not Chrome-balanced with floats).
-func (e *engine) buildMulticol(n *html.Node, st ResolvedStyle, availW, x, y float64) *box {
-	margL := e.scalePt(st.MarginLeft)
-	boxNode := &box{node: n, style: st, kind: "block", x: x, y: y} //nolint:exhaustruct // intentional zero fields
-	boxNode.w = resolveUsedWidth(st, availW, e)
+func (e *engine) buildMulticol(node *html.Node, style ResolvedStyle, availW, x, yPos float64) *box {
+	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
+		node: node, style: style, kind: displayBlock, x: x, y: yPos,
+	}
+	boxNode.w = resolveUsedWidth(style, availW, e)
+	boxNode.x = x + e.multicolAutoMargin(style, availW, boxNode.w)
 
-	if definiteW := st.Width >= 0 || st.WidthPercent >= 0; definiteW && (st.MarginLeftAuto || st.MarginRightAuto) {
-		free := availW - boxNode.w
+	contentX, contentW := e.contentBox(boxNode.x, boxNode.w, style)
+	contentStart := len(e.ops)
+
+	curY := e.scalePt(style.PaddingTop) + e.scalePt(style.BorderTop.Width)
+	gap := e.multicolGap(style)
+	nCols, colW := usedColumnCountWidth(contentW, gap, style.ColumnWidth, style.ColumnCount)
+	// One column: use ordinary block flow. The multicol line/page snap path
+	// otherwise reserves a tall empty band before a single wide child
+	// (wiki reflist with column-width:30em on a narrow page).
+	if nCols <= 1 {
+		return e.flowMulticolSingleColumn(boxNode, node, style, contentX, contentW, yPos, curY, contentStart)
+	}
+
+	for _, seg := range e.collectMulticolSegs(node) {
+		if seg.spanner {
+			curY = e.flowMulticolSpanner(boxNode, seg.nodes, contentW, contentX, yPos, curY)
+
+			continue
+		}
+
+		curY = e.flowMulticolSegment(boxNode, seg.nodes, style, nCols, colW, gap, contentX, yPos, curY)
+	}
+
+	curY = clampMulticolHeight(curY, style, e)
+	boxNode.height = curY
+	e.prependChrome(contentStart, boxNode, style, boxNode.x, yPos, boxNode.w, boxNode.height)
+
+	return boxNode
+}
+
+// multicolAutoMargin resolves the used left margin of a multicol container
+// when auto margins are present and the width is definite.
+func (e *engine) multicolAutoMargin(style ResolvedStyle, availW, boxW float64) float64 {
+	margL := e.scalePt(style.MarginLeft)
+
+	if definiteW := style.Width >= 0 || style.WidthPercent >= 0; definiteW &&
+		(style.MarginLeftAuto || style.MarginRightAuto) {
+		free := availW - boxW
 		if free < 0 {
 			free = 0
 		}
 
-		margR := e.scalePt(st.MarginRight)
+		margR := e.scalePt(style.MarginRight)
 
 		switch {
-		case st.MarginLeftAuto && st.MarginRightAuto:
+		case style.MarginLeftAuto && style.MarginRightAuto:
 			margL = free / two
-		case st.MarginLeftAuto:
+		case style.MarginLeftAuto:
 			margL = free - margR
 			if margL < 0 {
 				margL = 0
@@ -54,21 +92,12 @@ func (e *engine) buildMulticol(n *html.Node, st ResolvedStyle, availW, x, y floa
 		}
 	}
 
-	boxNode.x = x + margL
+	return margL
+}
 
-	contentX, contentW := e.contentBox(boxNode.x, boxNode.w, st)
-	contentStart := len(e.ops)
-
-	curY := e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)
-	gap := e.multicolGap(st)
-	nCols, colW := usedColumnCountWidth(contentW, gap, st.ColumnWidth, st.ColumnCount)
-	// One column: use ordinary block flow. The multicol line/page snap path
-	// otherwise reserves a tall empty band before a single wide child
-	// (wiki reflist with column-width:30em on a narrow page).
-	if nCols <= 1 {
-		return e.flowMulticolSingleColumn(boxNode, n, st, contentX, contentW, y, curY, contentStart)
-	}
-
+// collectMulticolSegs groups consecutive in-flow multicol children into
+// segments, with column-span:all children as standalone spanner segments.
+func (e *engine) collectMulticolSegs(n *html.Node) []multicolSeg {
 	var segs []multicolSeg
 
 	for _, kid := range multicolKids(n, e) {
@@ -86,21 +115,7 @@ func (e *engine) buildMulticol(n *html.Node, st ResolvedStyle, availW, x, y floa
 		}
 	}
 
-	for _, cssSheet := range segs {
-		if cssSheet.spanner {
-			curY = e.flowMulticolSpanner(boxNode, cssSheet.nodes, contentW, contentX, y, curY)
-
-			continue
-		}
-
-		curY = e.flowMulticolSegment(boxNode, cssSheet.nodes, st, nCols, colW, gap, contentX, y, curY)
-	}
-
-	curY = clampMulticolHeight(curY, st, e)
-	boxNode.height = curY
-	e.prependChrome(contentStart, boxNode, st, boxNode.x, y, boxNode.w, boxNode.height)
-
-	return boxNode
+	return segs
 }
 
 // multicolKids returns the non-hidden in-flow children of a multicol container.
@@ -124,30 +139,32 @@ func multicolKids(n *html.Node, e *engine) []*html.Node {
 
 // flowMulticolSingleColumn lays out a one-column multicol container with the
 // ordinary block path (no line/page snapping).
-func (e *engine) flowMulticolSingleColumn(boxNode *box, n *html.Node, st ResolvedStyle, contentX, contentW, y, curY float64, contentStart int) *box {
-	pop, enclose := e.pushBFCFloats(st, contentX, contentW)
-	curY = e.flowChildren(boxNode, n.Children, st, contentW, contentX, y, curY)
+func (e *engine) flowMulticolSingleColumn(
+	boxNode *box, node *html.Node, style ResolvedStyle, contentX, contentW, yPos, curY float64, contentStart int,
+) *box {
+	pop, enclose := e.pushBFCFloats(style, contentX, contentW)
+	curY = e.flowChildren(boxNode, node.Children, style, contentW, contentX, yPos, curY)
 
 	if enclose && e.bfcFloats != nil {
-		curY = e.bfcFloats.extentCy(y, curY)
+		curY = e.bfcFloats.extentCy(yPos, curY)
 	}
 
 	pop()
 
-	boxNode.height = clampMulticolHeight(curY, st, e)
-	e.prependChrome(contentStart, boxNode, st, boxNode.x, y, boxNode.w, boxNode.height)
+	boxNode.height = clampMulticolHeight(curY, style, e)
+	e.prependChrome(contentStart, boxNode, style, boxNode.x, yPos, boxNode.w, boxNode.height)
 
 	return boxNode
 }
 
 // flowMulticolSpanner lays out column-span:all children across the full
 // content width. Returns the advanced content-relative cy.
-func (e *engine) flowMulticolSpanner(boxNode *box, nodes []*html.Node, contentW, contentX, y, curY float64) float64 {
+func (e *engine) flowMulticolSpanner(boxNode *box, nodes []*html.Node, contentW, contentX, yPos, curY float64) float64 {
 	for _, kid := range nodes {
 		cs := e.styles[kid]
 		curY += collapseMargins(0, e.scalePt(cs.MarginTop))
 
-		cblock := e.build(kid, contentW, contentX, y+curY)
+		cblock := e.build(kid, contentW, contentX, yPos+curY)
 		if cblock == nil {
 			continue
 		}
@@ -161,20 +178,20 @@ func (e *engine) flowMulticolSpanner(boxNode *box, nodes []*html.Node, contentW,
 
 // clampMulticolHeight applies padding-bottom and min/max height constraints to
 // the accumulated content height of a multicol container.
-func clampMulticolHeight(curY float64, st ResolvedStyle, e *engine) float64 {
-	curY += e.scalePt(st.PaddingBottom)
-	if h, ok := resolveUsedHeight(st, -1, e); ok {
+func clampMulticolHeight(curY float64, style ResolvedStyle, eng *engine) float64 {
+	curY += eng.scalePt(style.PaddingBottom)
+	if h, ok := resolveUsedHeight(style, -1, eng); ok {
 		if curY < h {
 			curY = h
 		}
 	}
 
-	if st.MinHeight > 0 && curY < e.scalePt(st.MinHeight) {
-		curY = e.scalePt(st.MinHeight)
+	if style.MinHeight > 0 && curY < eng.scalePt(style.MinHeight) {
+		curY = eng.scalePt(style.MinHeight)
 	}
 
-	if st.MaxHeight >= 0 && curY > e.scalePt(st.MaxHeight) {
-		curY = e.scalePt(st.MaxHeight)
+	if style.MaxHeight >= 0 && curY > eng.scalePt(style.MaxHeight) {
+		curY = eng.scalePt(style.MaxHeight)
 	}
 
 	return curY
@@ -192,7 +209,7 @@ func (e *engine) multicolGap(st ResolvedStyle) float64 {
 
 // usedColumnCountWidth resolves used column count and width from container
 // content width, gap, and specified column-width / column-count (CSS Multicol §3.3).
-func usedColumnCountWidth(avail, gap, colWidth float64, colCount int) (n int, w float64) {
+func usedColumnCountWidth(avail, gap, colWidth float64, colCount int) (int, float64) {
 	switch {
 	case colCount <= 0 && colWidth < 0:
 		return 1, avail
@@ -228,21 +245,21 @@ func autoColumnCount(avail, gap, colWidth float64) (int, float64) {
 // shrinkColumnCount starts from the specified count and reduces it until all
 // columns fit avail, then stretches the widths to fill.
 func shrinkColumnCount(colCount int, avail, gap, colWidth float64) (int, float64) {
-	n := colCount
-	if n < 1 {
-		n = 1
+	count := colCount
+	if count < 1 {
+		count = 1
 	}
 
-	for n > 1 {
-		need := float64(n)*colWidth + float64(n-1)*gap
+	for count > 1 {
+		need := float64(count)*colWidth + float64(count-1)*gap
 		if need <= avail+1e-6 {
 			break
 		}
 
-		n--
+		count--
 	}
 
-	return fitColumnCount(n, avail, gap)
+	return fitColumnCount(count, avail, gap)
 }
 
 // columnWidth returns the used column width when n columns of the container's
@@ -259,7 +276,9 @@ func columnWidth(n int, avail, gap float64) float64 {
 // flowMulticolSegment places in-flow children across column boxes, starting a
 // new multicol line on the next page when the current line would cross a page
 // boundary. Returns the advanced content-relative cy.
-func (e *engine) flowMulticolSegment(parent *box, nodes []*html.Node, st ResolvedStyle, nCols int, colW, gap, contentX, y, cy float64) float64 {
+func (e *engine) flowMulticolSegment(
+	parent *box, nodes []*html.Node, style ResolvedStyle, nCols int, colW, gap, contentX, yPos, curY float64,
+) float64 {
 	if nCols < 1 {
 		nCols = 1
 	}
@@ -269,6 +288,40 @@ func (e *engine) flowMulticolSegment(parent *box, nodes []*html.Node, st Resolve
 		pageH = 1e12
 	}
 
+	items := e.measureMulticolItems(nodes, colW)
+	if len(items) == 0 {
+		return curY
+	}
+
+	balance := style.ColumnFill != overflowAuto
+	definiteH := resolveContentHeight(style, e)
+	padTop := e.scalePt(style.PaddingTop) + e.scalePt(style.BorderTop.Width)
+
+	idx := 0
+	for idx < len(items) {
+		maxColH, snappedCy, snap := e.multicolColumnHeight(items, idx, style, balance, definiteH, padTop, yPos, curY, pageH)
+		if snap {
+			curY = snappedCy
+
+			continue
+		}
+
+		batch, nextIdx, totalH := collectMulticolBatch(items, idx, maxColH, maxColH*float64(nCols))
+		idx = nextIdx
+
+		if len(batch) == 0 {
+			break
+		}
+
+		curY += e.placeMulticolLine(parent, batch, nCols, colW, gap, contentX, yPos, curY, maxColH, balance, totalH)
+	}
+
+	return curY
+}
+
+// measureMulticolItems measures each in-flow element child at the column width,
+// skipping text nodes that never produce column content.
+func (e *engine) measureMulticolItems(nodes []*html.Node, colW float64) []multicolItem {
 	items := make([]multicolItem, 0, len(nodes))
 
 	for _, kid := range nodes {
@@ -279,69 +332,55 @@ func (e *engine) flowMulticolSegment(parent *box, nodes []*html.Node, st Resolve
 		items = append(items, multicolItem{n: kid, h: e.measureMulticolChildHeight(kid, colW)})
 	}
 
-	if len(items) == 0 {
-		return cy
+	return items
+}
+
+// multicolColumnHeight computes the usable column height at the current page
+// position. When the remaining page space is too small for the next item, it
+// snaps to the next page and reports that via the second return value.
+func (e *engine) multicolColumnHeight(
+	items []multicolItem, idx int, style ResolvedStyle, balance bool, definiteH, padTop, yPos, curY, pageH float64,
+) (float64, float64, bool) {
+	absTop := yPos + curY
+
+	pageIdx := int(absTop / pageH)
+	if pageIdx < 0 {
+		pageIdx = 0
 	}
 
-	balance := st.ColumnFill != "auto"
-	definiteH := resolveContentHeight(st, e)
-	padTop := e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)
-
-	idx := 0
-	for idx < len(items) {
-		absTop := y + cy
-
-		pageIdx := int(absTop / pageH)
-		if pageIdx < 0 {
-			pageIdx = 0
-		}
-
-		pageTop := float64(pageIdx) * pageH
-		boundary := pageTop + pageH
-		remain := boundary - absTop
-		minUseful := e.scalePt(st.FontSize) * defaultLineHeightRatio
-		// Snap to the next page when little/no room remains. Guard against
-		// float edges where absTop/pageH truncates just below an integer and
-		// remain≈0 (would spin forever on cy += remain).
-		if remain < minUseful {
-			cy = snapMulticolToPage(cy, absTop, boundary, pageH)
-
-			continue
-		}
-
-		maxColH := remain
-
-		if !balance && definiteH >= 0 {
-			maxColH = clampMulticolRemainder(maxColH, definiteH-(cy-padTop))
-		}
-
-		if items[idx].h > maxColH+1e-6 && absTop > pageTop+1e-6 {
-			cy = snapMulticolToPage(cy, absTop, boundary, pageH)
-
-			continue
-		}
-
-		batch, nextIdx, totalH := collectMulticolBatch(items, idx, maxColH, maxColH*float64(nCols))
-		idx = nextIdx
-		if len(batch) == 0 {
-			break
-		}
-
-		cy += e.placeMulticolLine(parent, batch, nCols, colW, gap, contentX, y, cy, maxColH, balance, totalH)
+	pageTop := float64(pageIdx) * pageH
+	boundary := pageTop + pageH
+	remain := boundary - absTop
+	minUseful := e.scalePt(style.FontSize) * defaultLineHeightRatio
+	// Snap to the next page when little/no room remains. Guard against
+	// float edges where absTop/pageH truncates just below an integer and
+	// remain≈0 (would spin forever on cy += remain).
+	if remain < minUseful {
+		return 0, snapMulticolToPage(curY, absTop, boundary, pageH), true
 	}
 
-	return cy
+	maxColH := remain
+
+	if !balance && definiteH >= 0 {
+		maxColH = clampMulticolRemainder(maxColH, definiteH-(curY-padTop))
+	}
+
+	if items[idx].h > maxColH+1e-6 && absTop > pageTop+1e-6 {
+		return 0, snapMulticolToPage(curY, absTop, boundary, pageH), true
+	}
+
+	return maxColH, 0, false
 }
 
 // snapMulticolToPage advances cy to the next usable page boundary when the
 // current position is too close to (or past) the page end.
-func snapMulticolToPage(cy, absTop, boundary, pageH float64) float64 {
+func snapMulticolToPage(curY, absTop, boundary, pageH float64) float64 {
 	target := boundary
 	if target <= absTop+1e-6 {
 		target += pageH
 	}
 
-	return cy + target - absTop
+	return curY + target - absTop
 }
 
 // clampMulticolRemainder limits the usable column height to the remaining
@@ -360,7 +399,11 @@ func clampMulticolRemainder(maxColH, left float64) float64 {
 
 // collectMulticolBatch greedily fills one multicol line's worth of items from
 // items[idx:]. Returns the batch, the next index, and the total batch height.
-func collectMulticolBatch(items []multicolItem, idx int, maxColH, capacity float64) (batch []multicolItem, next int, totalH float64) {
+func collectMulticolBatch(items []multicolItem, idx int, maxColH, capacity float64) ([]multicolItem, int, float64) {
+	var batch []multicolItem
+
+	totalH := 0.0
+
 	for idx < len(items) {
 		item := items[idx]
 		if len(batch) > 0 && totalH+item.h > capacity+1e-6 {
@@ -381,7 +424,10 @@ func collectMulticolBatch(items []multicolItem, idx int, maxColH, capacity float
 
 // placeMulticolLine assigns items into columns (balance or auto fill) and
 // builds them. Returns the line's used height (max column stack).
-func (e *engine) placeMulticolLine(parent *box, items []multicolItem, nCols int, colW, gap, contentX, y, cy, maxColH float64, balance bool, totalH float64) float64 {
+func (e *engine) placeMulticolLine(
+	parent *box, items []multicolItem, nCols int, colW, gap, contentX, yPos, curY, maxColH float64,
+	balance bool, totalH float64,
+) float64 {
 	colX := func(c int) float64 {
 		return contentX + float64(c)*(colW+gap)
 	}
@@ -399,7 +445,7 @@ func (e *engine) placeMulticolLine(parent *box, items []multicolItem, nCols int,
 			col++
 		}
 
-		cblock := e.build(item.n, colW, colX(col), y+cy+colHeights[col])
+		cblock := e.build(item.n, colW, colX(col), yPos+curY+colHeights[col])
 		if cblock == nil {
 			continue
 		}
@@ -423,7 +469,9 @@ func (e *engine) placeMulticolLine(parent *box, items []multicolItem, nCols int,
 
 // advanceMulticolColumn reports whether the item must start a new column
 // under balance or auto column-fill.
-func advanceMulticolColumn(col int, colHeights []float64, item multicolItem, nCols int, maxColH, target float64, balance bool) bool {
+func advanceMulticolColumn(
+	col int, colHeights []float64, item multicolItem, nCols int, maxColH, target float64, balance bool,
+) bool {
 	if col >= nCols-1 || colHeights[col] <= 0 {
 		return false
 	}

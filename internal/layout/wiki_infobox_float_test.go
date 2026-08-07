@@ -33,7 +33,7 @@ body { margin: 0; font-size: 12pt; }
 
 	var walk func(*html.Node)
 	walk = func(n *html.Node) {
-		if n.Type == html.ElementNode && n.Name == "table" {
+		if n.Type == html.ElementNode && n.Name == displayTable {
 			table = n
 		}
 
@@ -47,7 +47,7 @@ body { margin: 0; font-size: 12pt; }
 	t.Logf("float=%q width=%.2f width%%=%.2f fontSize=%.2f display=%q",
 		sty.Float, sty.Width, sty.WidthPercent, sty.FontSize, sty.Display)
 
-	if sty.Float != "right" {
+	if sty.Float != floatRight {
 		t.Fatalf("float=%q, want right (min-width:640px rule)", sty.Float)
 	}
 

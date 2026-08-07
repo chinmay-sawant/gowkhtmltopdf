@@ -6,29 +6,20 @@ import (
 	"gowkhtmltopdf/internal/html"
 )
 
-// matchingParen returns the index of the ')' that matches s[open]=='('.
+// matchingParen returns the index of the ')' that matches str[open]=='('.
 // Quoted spans are skipped. ok is false if unbalanced or open is not '('.
 // Shared by media features, container conditions, and :has()/:not() args.
-func matchingParen(s string, open int) (close int, ok bool) {
-	if open >= len(s) || s[open] != '(' {
+func matchingParen(str string, open int) (int, bool) {
+	if open >= len(str) || str[open] != '(' {
 		return -1, false
 	}
 
 	depth := 0
 
-	for idx := open; idx < len(s); idx++ {
-		switch s[idx] {
+	for idx := open; idx < len(str); idx++ {
+		switch str[idx] {
 		case '"', '\'':
-			q := s[idx]
-			idx++
-
-			for idx < len(s) && s[idx] != q {
-				if s[idx] == '\\' && idx+1 < len(s) {
-					idx++
-				}
-
-				idx++
-			}
+			idx = skipQuoted(str, idx, str[idx])
 		case '(':
 			depth++
 		case ')':
@@ -44,35 +35,37 @@ func matchingParen(s string, open int) (close int, ok bool) {
 
 // takeParenArg parses a (...) argument whose '(' sits at open. Returns the
 // inner text, the index just past the matching ')', and ok.
-func takeParenArg(s string, open int) (inner string, end int, ok bool) {
-	close, ok := matchingParen(s, open)
+func takeParenArg(str string, open int) (string, int, bool) {
+	end, ok := matchingParen(str, open)
 	if !ok {
 		return "", open, false
 	}
 
-	return s[open+1 : close], close + 1, true
+	return str[open+1 : end], end + 1, true
 }
 
-// takeParen parses a leading (...) from s (after trim). Returns inner text and
-// the remainder after the matching ')'.
-func takeParen(s string) (inner, rest string, ok bool) {
-	s = strings.TrimSpace(s)
-	if !strings.HasPrefix(s, "(") {
-		return "", s, false
+// takeParen parses a leading (...) from str (after trim). Returns inner text
+// and the remainder after the matching ')'.
+func takeParen(str string) (string, string, bool) {
+	str = strings.TrimSpace(str)
+	if !strings.HasPrefix(str, "(") {
+		return "", str, false
 	}
 
-	inner, end, ok := takeParenArg(s, 0)
+	inner, end, ok := takeParenArg(str, 0)
 	if !ok {
-		return "", s, false
+		return "", str, false
 	}
 
-	return inner, s[end:], true
+	return inner, str[end:], true
 }
 
 func parseSelectorListStrict(s string, insideHas bool) ([]Selector, bool) {
-	var out []Selector
+	parts := splitTopLevel(s, ',')
 
-	for _, part := range splitTopLevel(s, ',') {
+	out := make([]Selector, 0, len(parts))
+
+	for _, part := range parts {
 		part = strings.TrimSpace(part)
 		if part == "" {
 			return nil, false
@@ -89,15 +82,15 @@ func parseSelectorListStrict(s string, insideHas bool) ([]Selector, bool) {
 	return out, len(out) > 0
 }
 
-func parseSelectorCtx(s string, insideHas bool) (Selector, bool) {
+func parseSelectorCtx(str string, insideHas bool) (Selector, bool) {
 	var sel Selector
 
-	s = strings.TrimSpace(s)
-	if s == "" {
+	str = strings.TrimSpace(str)
+	if str == "" {
 		return sel, false
 	}
 
-	parts := splitSelectorChain(s)
+	parts := splitSelectorChain(str)
 	for idx, ch := range parts {
 		if ch == ">" || ch == "+" || ch == "~" || ch == " " {
 			continue
@@ -109,12 +102,7 @@ func parseSelectorCtx(s string, insideHas bool) (Selector, bool) {
 		}
 
 		if len(sel.Parts) > 0 {
-			switch parts[idx-1] {
-			case ">", "+", "~":
-				part.Combinator = parts[idx-1]
-			default:
-				part.Combinator = " "
-			}
+			part.Combinator = combinatorFor(parts[idx-1])
 		}
 
 		sel.Parts = append(sel.Parts, part)
@@ -123,10 +111,23 @@ func parseSelectorCtx(s string, insideHas bool) (Selector, bool) {
 	return sel, len(sel.Parts) > 0
 }
 
-func parseRelativeSelectorList(s string) ([]RelativeSelector, bool) {
-	var out []RelativeSelector
+// combinatorFor maps a chain separator to the combinator stored on the part
+// that follows it.
+func combinatorFor(sep string) string {
+	switch sep {
+	case ">", "+", "~":
+		return sep
+	default:
+		return " "
+	}
+}
 
-	for _, part := range splitTopLevel(s, ',') {
+func parseRelativeSelectorList(s string) ([]RelativeSelector, bool) {
+	parts := splitTopLevel(s, ',')
+
+	out := make([]RelativeSelector, 0, len(parts))
+
+	for _, part := range parts {
 		part = strings.TrimSpace(part)
 		if part == "" {
 			return nil, false
@@ -175,15 +176,15 @@ func parseRelativeSelector(str string) (RelativeSelector, bool) {
 	return RelativeSelector{Leading: lead, Parts: sel.Parts}, true
 }
 
-// matchRelative reports whether relative selector rs matches when anchored at subject.
-func matchRelative(rs RelativeSelector, subject *html.Node) bool {
-	if subject == nil || len(rs.Parts) == 0 {
+// matchRelative reports whether relative selector rel matches when anchored at subject.
+func matchRelative(rel RelativeSelector, subject *html.Node) bool {
+	if subject == nil || len(rel.Parts) == 0 {
 		return false
 	}
 
-	sel := Selector{Parts: rs.Parts}
+	sel := Selector{Parts: rel.Parts}
 
-	switch rs.Leading {
+	switch rel.Leading {
 	case "+":
 		sib := nextElementSibling(subject)
 		if sib == nil {
@@ -200,32 +201,32 @@ func matchRelative(rs RelativeSelector, subject *html.Node) bool {
 
 		return false
 	case ">":
-		for _, d := range elementDescendants(subject) {
-			if !Match(sel, d) {
-				continue
-			}
-
-			left := leftmostMatch(sel, d)
-			if left != nil && left.Parent == subject {
-				return true
-			}
-		}
-
-		return false
+		return matchRelativeDescendant(sel, subject, true)
 	default: // descendant
-		for _, d := range elementDescendants(subject) {
-			if !Match(sel, d) {
-				continue
-			}
+		return matchRelativeDescendant(sel, subject, false)
+	}
+}
 
-			left := leftmostMatch(sel, d)
-			if left != nil && isElementDescendant(left, subject) {
-				return true
-			}
+// matchRelativeDescendant reports whether some descendant d of subject matches
+// sel with its leftmost-match element anchored at subject (directly when
+// direct is true, or anywhere beneath it otherwise).
+func matchRelativeDescendant(sel Selector, subject *html.Node, direct bool) bool {
+	for _, d := range elementDescendants(subject) {
+		if !Match(sel, d) {
+			continue
 		}
 
-		return false
+		left := leftmostMatch(sel, d)
+		if left == nil {
+			continue
+		}
+
+		if (direct && left.Parent == subject) || (!direct && isElementDescendant(left, subject)) {
+			return true
+		}
 	}
+
+	return false
 }
 
 // matchRelativeFrom checks whether sel matches with its leftmost compound equal
@@ -251,62 +252,87 @@ func matchRelativeFrom(sel Selector, anchor *html.Node) bool {
 
 // leftmostMatch walks the selector combinator chain right-to-left (same walk
 // as Match) and returns the element that matched the leftmost compound, or nil
-// if the selector does not match n.
-func leftmostMatch(sel Selector, n *html.Node) *html.Node {
-	if n == nil || n.Type != html.ElementNode || len(sel.Parts) == 0 {
+// if the selector does not match node.
+func leftmostMatch(sel Selector, node *html.Node) *html.Node {
+	if node == nil || node.Type != html.ElementNode || len(sel.Parts) == 0 {
 		return nil
 	}
 
-	if !matchPart(sel.Parts[len(sel.Parts)-1], n) {
+	if !matchPart(sel.Parts[len(sel.Parts)-1], node) {
 		return nil
 	}
 
-	cur := n
+	cur := node
 	// Combinator is stored on the right-hand part of each pair (how that
 	// part attaches to the previous). Walk left using Parts[i+1].Combinator.
 	const prevPartOffset = 2 // walk left: last part is host, start at len-2
 
 	for i := len(sel.Parts) - prevPartOffset; i >= 0; i-- {
-		part := sel.Parts[i]
-
-		switch sel.Parts[i+1].Combinator {
-		case ">":
-			cur = cur.Parent
-			if cur == nil || cur.Type != html.ElementNode || !matchPart(part, cur) {
-				return nil
-			}
-		case "+":
-			prev := previousElementSibling(cur)
-			if prev == nil || !matchPart(part, prev) {
-				return nil
-			}
-
-			cur = prev
-		case "~":
-			found := false
-
-			for sib := previousElementSibling(cur); sib != nil; sib = previousElementSibling(sib) {
-				if matchPart(part, sib) {
-					cur = sib
-					found = true
-
-					break
-				}
-			}
-
-			if !found {
-				return nil
-			}
-		default: // descendant
-			cur = cur.Parent
-			for cur != nil && (cur.Type != html.ElementNode || !matchPart(part, cur)) {
-				cur = cur.Parent
-			}
-
-			if cur == nil {
-				return nil
-			}
+		next := leftmostStep(sel.Parts[i+1].Combinator, sel.Parts[i], cur)
+		if next == nil {
+			return nil
 		}
+
+		cur = next
+	}
+
+	return cur
+}
+
+// leftmostStep advances cur one step left through the combinator chain: it
+// returns the element that must match part, or nil when none exists.
+func leftmostStep(combinator string, part SelectorPart, cur *html.Node) *html.Node {
+	switch combinator {
+	case ">":
+		return matchLeftChild(part, cur)
+	case "+":
+		return matchLeftAdjacent(part, cur)
+	case "~":
+		return matchLeftSibling(part, cur)
+	default: // descendant
+		return matchLeftAncestor(part, cur)
+	}
+}
+
+// matchLeftChild returns cur's element parent when it matches part, else nil.
+func matchLeftChild(part SelectorPart, cur *html.Node) *html.Node {
+	cur = cur.Parent
+	if cur == nil || cur.Type != html.ElementNode || !matchPart(part, cur) {
+		return nil
+	}
+
+	return cur
+}
+
+// matchLeftAdjacent returns cur's previous element sibling when it matches
+// part, else nil.
+func matchLeftAdjacent(part SelectorPart, cur *html.Node) *html.Node {
+	prev := previousElementSibling(cur)
+	if prev == nil || !matchPart(part, prev) {
+		return nil
+	}
+
+	return prev
+}
+
+// matchLeftSibling returns the nearest previous element sibling of cur that
+// matches part, else nil.
+func matchLeftSibling(part SelectorPart, cur *html.Node) *html.Node {
+	for sib := previousElementSibling(cur); sib != nil; sib = previousElementSibling(sib) {
+		if matchPart(part, sib) {
+			return sib
+		}
+	}
+
+	return nil
+}
+
+// matchLeftAncestor returns the nearest element ancestor of cur that matches
+// part, else nil.
+func matchLeftAncestor(part SelectorPart, cur *html.Node) *html.Node {
+	cur = cur.Parent
+	for cur != nil && (cur.Type != html.ElementNode || !matchPart(part, cur)) {
+		cur = cur.Parent
 	}
 
 	return cur
@@ -348,26 +374,30 @@ func isElementDescendant(n, ancestor *html.Node) bool {
 	return false
 }
 
-func maxRelativeSpecificity(rels []RelativeSelector) (a, b, c int) {
+func maxRelativeSpecificity(rels []RelativeSelector) (int, int, int) {
+	maxA, maxB, maxC := 0, 0, 0
+
 	for i, rs := range rels {
 		sa, sb, sc := Specificity(Selector{Parts: rs.Parts})
-		if i == 0 || betterSpec(sa, sb, sc, a, b, c) {
-			a, b, c = sa, sb, sc
+		if i == 0 || betterSpec(sa, sb, sc, maxA, maxB, maxC) {
+			maxA, maxB, maxC = sa, sb, sc
 		}
 	}
 
-	return a, b, c
+	return maxA, maxB, maxC
 }
 
-func maxSelectorSpecificity(sels []Selector) (a, b, c int) {
+func maxSelectorSpecificity(sels []Selector) (int, int, int) {
+	maxA, maxB, maxC := 0, 0, 0
+
 	for i, sel := range sels {
 		sa, sb, sc := Specificity(sel)
-		if i == 0 || betterSpec(sa, sb, sc, a, b, c) {
-			a, b, c = sa, sb, sc
+		if i == 0 || betterSpec(sa, sb, sc, maxA, maxB, maxC) {
+			maxA, maxB, maxC = sa, sb, sc
 		}
 	}
 
-	return a, b, c
+	return maxA, maxB, maxC
 }
 
 // betterSpec reports whether (a1,b1,c1) is more specific than (a2,b2,c2).

@@ -98,7 +98,7 @@ func TestOrphansWidowsLineAwareKeepTogether(t *testing.T) {
 	}
 
 	root := &box{ //nolint:exhaustruct // intentional zero fields
-		kind: "block", y: 60, height: 90, opStart: 0, opEnd: 4,
+		kind: displayBlock, y: 60, height: 90, opStart: 0, opEnd: 4,
 		style: ResolvedStyle{Orphans: 4, Widows: 2}, //nolint:exhaustruct // intentional zero fields
 	}
 
@@ -127,7 +127,7 @@ func TestOrphansWidowsLineAwareKeepTogether(t *testing.T) {
 	}
 
 	root2 := &box{ //nolint:exhaustruct // intentional zero fields
-		kind: "block", y: 60, height: 90, opStart: 0, opEnd: 4,
+		kind: displayBlock, y: 60, height: 90, opStart: 0, opEnd: 4,
 		style: ResolvedStyle{Orphans: 2, Widows: 2}, //nolint:exhaustruct // intentional zero fields
 	}
 
@@ -212,7 +212,7 @@ func TestOrphansWidowsHeuristicFallback(t *testing.T) {
 	}
 
 	b := &box{ //nolint:exhaustruct // intentional zero fields
-		kind: "block", y: 830, height: 30, opStart: 0, opEnd: 0,
+		kind: displayBlock, y: 830, height: 30, opStart: 0, opEnd: 0,
 		style: ResolvedStyle{Orphans: 2, Widows: 2}, //nolint:exhaustruct // intentional zero fields
 	}
 
@@ -224,7 +224,7 @@ func TestOrphansWidowsHeuristicFallback(t *testing.T) {
 		t.Fatalf("op Y = %v, want ≥ 842 after shift", res.Ops[0].Y)
 	}
 	// Outside the short-band → no heuristic move.
-	b2 := &box{kind: "block", y: 800, height: 80, opStart: 0, opEnd: 0} //nolint:exhaustruct // intentional zero fields
+	b2 := &box{kind: displayBlock, y: 800, height: 80, opStart: 0, opEnd: 0} //nolint:exhaustruct // zero fields
 	if orphansWidowsHeuristic(res, b2, 842) {
 		t.Fatal("heuristic must not move tall blocks (>60pt)")
 	}

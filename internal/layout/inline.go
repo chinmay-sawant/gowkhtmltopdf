@@ -46,7 +46,10 @@ type inlineItem struct {
 // text/image ops. It returns the consumed height and records the first line's
 // baseline on the box. When floats is non-nil, each line re-queries exclusion
 // at its canvas Y so text widens again after a float ends mid-paragraph.
-func (e *engine) layoutInlineFloats(b *box, nodes []*html.Node, contentW, contentX, y float64, floats *floatState) float64 {
+func (e *engine) layoutInlineFloats(
+	boxNode *box, nodes []*html.Node, contentW, contentX, lineY float64,
+	floats *floatState,
+) float64 {
 	var items []inlineItem
 
 	oldMax := e.imgMaxW
@@ -67,7 +70,7 @@ func (e *engine) layoutInlineFloats(b *box, nodes []*html.Node, contentW, conten
 		return 0
 	}
 
-	leftY := y
+	leftY := lineY
 
 	idx := 0
 	for idx < len(items) {
@@ -78,47 +81,8 @@ func (e *engine) layoutInlineFloats(b *box, nodes []*html.Node, contentW, conten
 		leftY, lineX, lineW = e.preferClearForTail(items, idx, lineX, lineW, contentX, contentW, leftY, floats)
 		// Pack one line under current exclusion width.
 		start := idx
-		lineAdv := 0.0
 
-		for idx < len(items) {
-			item := &items[idx]
-			if item.forceBreak {
-				break
-			}
-			// Split long unbreakable runs (URLs, paths, base64) that would
-			// overflow the line. Honors overflow-wrap / word-break; also
-			// emergency-breaks when a token is wider than the line so text
-			// does not paint past the page edge (print PDF).
-			// restMax for subsequent chunks uses contentW (full BFC width) so
-			// pre-split fragments can reflow wider after a float ends.
-			if parts := e.maybeSplitOverflow(*item, lineW, lineAdv, contentW); len(parts) > 1 {
-				items = append(items[:idx], append(parts, items[idx+1:]...)...)
-				item = &items[idx]
-			}
-
-			adv := item.marginL + item.w + item.marginR
-			// Always wrap to the next line when the next item does not fit.
-			// white-space:nowrap must not glue an unbreakable span onto a line
-			// that already has content and overflow into a float (wiki .IPA).
-			// Exception: never break before attaching punctuation / mid-cite
-			// (")[37]" → not ")\n[" or "[\n37]" or "saying.[\n7]").
-			if lineAdv > 0 && lineAdv+adv > lineW {
-				idx, lineAdv = e.glueStickyTail(items, idx, start, adv)
-				break
-			}
-			// Empty line beside a float too narrow for this item: CSS2.1 §9.5
-			// pushes the line box below the float and recomputes width.
-			if lineAdv == 0 {
-				nY, nX, nW, retry := e.clearFloatBelow(lineX, lineW, leftY, adv, contentX, contentW, floats)
-				leftY, lineX, lineW = nY, nX, nW
-				if retry {
-					continue
-				}
-			}
-
-			lineAdv += adv
-			idx++
-		}
+		idx, lineX, lineW, leftY = e.packInlineLine(&items, start, lineX, lineW, leftY, contentX, contentW, floats)
 
 		end := idx
 
@@ -137,19 +101,75 @@ func (e *engine) layoutInlineFloats(b *box, nodes []*html.Node, contentW, conten
 		}
 
 		lastLine := idx >= len(items)
-		leftY += e.emitLine(b, items, start, end, lineW, lineX, leftY, lastLine)
+		leftY += e.emitLine(boxNode, items, start, end, lineW, lineX, leftY, lastLine)
 	}
 
-	return leftY - y
+	return leftY - lineY
+}
+
+// packInlineLine advances idx over the items that fit on one line under the
+// current float exclusion, splitting overlong tokens as needed. It returns
+// the next index and the updated line geometry (items may be replaced by the
+// split, hence the pointer).
+func (e *engine) packInlineLine(
+	items *[]inlineItem, start int, lineX, lineW, leftY float64,
+	contentX, contentW float64, floats *floatState,
+) (int, float64, float64, float64) {
+	idx := start
+	lineAdv := 0.0
+
+	for idx < len(*items) {
+		item := &(*items)[idx]
+		if item.forceBreak {
+			break
+		}
+		// Split long unbreakable runs (URLs, paths, base64) that would
+		// overflow the line. Honors overflow-wrap / word-break; also
+		// emergency-breaks when a token is wider than the line so text
+		// does not paint past the page edge (print PDF).
+		// restMax for subsequent chunks uses contentW (full BFC width) so
+		// pre-split fragments can reflow wider after a float ends.
+		if parts := e.maybeSplitOverflow(*item, lineW, lineAdv, contentW); len(parts) > 1 {
+			*items = append((*items)[:idx], append(parts, (*items)[idx+1:]...)...)
+			item = &(*items)[idx]
+		}
+
+		adv := item.marginL + item.w + item.marginR
+		// Always wrap to the next line when the next item does not fit.
+		// white-space:nowrap must not glue an unbreakable span onto a line
+		// that already has content and overflow into a float (wiki .IPA).
+		// Exception: never break before attaching punctuation / mid-cite
+		// (")[37]" → ")\n[" or "[\n37]" or "saying.[\n7]").
+		if lineAdv > 0 && lineAdv+adv > lineW {
+			idx, _ = e.glueStickyTail(*items, idx, start, adv)
+
+			break
+		}
+		// Empty line beside a float too narrow for this item: CSS2.1 §9.5
+		// pushes the line box below the float and recomputes width.
+		if lineAdv == 0 {
+			nY, nX, nW, retry := e.clearFloatBelow(lineX, lineW, leftY, adv, contentX, contentW, floats)
+			leftY, lineX, lineW = nY, nX, nW
+
+			if retry {
+				continue
+			}
+		}
+
+		lineAdv += adv
+		idx++
+	}
+
+	return idx, lineX, lineW, leftY
 }
 
 // lineBounds returns the line origin and width under float exclusion at y.
-func (e *engine) lineBounds(floats *floatState, contentX, contentW, y float64) (float64, float64) {
+func (e *engine) lineBounds(floats *floatState, contentX, contentW, lineY float64) (float64, float64) {
 	if floats == nil {
 		return contentX, contentW
 	}
 
-	lineX, lineW := floats.exclusion(contentX, contentW, 0, y)
+	lineX, lineW := floats.exclusion(contentX, contentW, 0, lineY)
 	if lineW < 0 {
 		lineW = 0
 	}
@@ -160,18 +180,21 @@ func (e *engine) lineBounds(floats *floatState, contentX, contentW, y float64) (
 // preferClearForTail drops the current line below active floats when the
 // remaining tail fits one full-width line (see preferFloatClearForTail).
 // Returns the updated line origin, width and Y.
-func (e *engine) preferClearForTail(items []inlineItem, idx int, lineX, lineW, contentX, contentW, y float64, floats *floatState) (float64, float64, float64) {
+func (e *engine) preferClearForTail(
+	items []inlineItem, idx int, lineX, lineW, contentX, contentW, lineY float64,
+	floats *floatState,
+) (float64, float64, float64) {
 	if floats == nil || lineW >= contentW-0.5 {
-		return lineX, lineW, y
+		return lineX, lineW, lineY
 	}
 
-	if next, ok := e.preferFloatClearForTail(items, idx, contentW, lineW, y, floats); ok {
-		nx, nw := e.lineBounds(floats, contentX, contentW, next)
+	if next, ok := e.preferFloatClearForTail(items, idx, contentW, lineW, lineY, floats); ok {
+		nextX, nextW := e.lineBounds(floats, contentX, contentW, next)
 
-		return nx, nw, next
+		return nextX, nextW, next
 	}
 
-	return lineX, lineW, y
+	return lineX, lineW, lineY
 }
 
 // maybeSplitOverflow splits an unbreakable text item that would overflow the
@@ -214,26 +237,31 @@ func (e *engine) glueStickyTail(items []inlineItem, idx, start int, adv float64)
 		emSize = 10
 	}
 
-	limit := emSize * glueEmSoft
-	if isNowrapCluster(items[idx-1], items[idx]) {
-		limit = emSize * maxGlueEm // multi-cite / IPA fragments
-	}
-
-	if adv > limit {
+	if adv > glueLimit(items[idx-1], items[idx], emSize) {
 		return idx, adv
 	}
 
-	lineAdv := adv
-	idx++
+	return stickChain(items, idx+1, emSize, adv)
+}
 
+// glueLimit returns the max advance that may stick to the current line for
+// the item pair: nowrap clusters (multi-cite / IPA fragments) may glue more.
+func glueLimit(prev, cur inlineItem, emSize float64) float64 {
+	limit := emSize * glueEmSoft
+
+	if isNowrapCluster(prev, cur) {
+		limit = emSize * maxGlueEm // multi-cite / IPA fragments
+	}
+
+	return limit
+}
+
+// stickChain advances idx across consecutive no-break items whose advance
+// stays within the pair's glue limit.
+func stickChain(items []inlineItem, idx int, emSize, lineAdv float64) (int, float64) {
 	for idx < len(items) && !items[idx].forceBreak && noBreakBefore(items[idx-1], items[idx]) {
 		acc := items[idx].marginL + items[idx].w + items[idx].marginR
-		lim := emSize * glueEmSoft
-		if isNowrapCluster(items[idx-1], items[idx]) {
-			lim = emSize * maxGlueEm
-		}
-
-		if acc > lim {
+		if acc > glueLimit(items[idx-1], items[idx], emSize) {
 			break
 		}
 
@@ -253,24 +281,27 @@ func isNowrapCluster(a, b inlineItem) bool {
 // clearFloatBelow drops the current (empty) line below active floats when it
 // is too narrow for the next item; returns the updated line geometry and
 // whether the caller should retry the item on the new line.
-func (e *engine) clearFloatBelow(lineX, lineW, y float64, adv, contentX, contentW float64, floats *floatState) (float64, float64, float64, bool) {
+func (e *engine) clearFloatBelow(
+	lineX, lineW, lineY, adv, contentX, contentW float64,
+	floats *floatState,
+) (float64, float64, float64, bool) {
 	if floats == nil || adv <= lineW || lineW >= contentW-0.5 {
-		return lineX, lineW, y, false
+		return lineX, lineW, lineY, false
 	}
 
-	next := floats.clearY(y)
-	if next <= y+0.5 {
-		return lineX, lineW, y, false
+	next := floats.clearY(lineY)
+	if next <= lineY+0.5 {
+		return lineX, lineW, lineY, false
 	}
 
-	nx, nw := e.lineBounds(floats, contentX, contentW, next)
+	nextX, nextW := e.lineBounds(floats, contentX, contentW, next)
 	// Retry this item at the new Y (do not advance i).
-	if nw >= contentW-0.5 || adv <= nw {
-		return nx, nw, next, true
+	if nextW >= contentW-0.5 || adv <= nextW {
+		return nextX, nextW, next, true
 	}
 
 	// Still too narrow (e.g. both sides floated) — emit anyway.
-	return nx, nw, next, false
+	return nextX, nextW, next, false
 }
 
 // breakOverflowItem splits a text item that cannot fit in remainW on the
@@ -286,17 +317,20 @@ func (e *engine) clearFloatBelow(lineX, lineW, y float64, adv, contentX, content
 //   - white-space:nowrap → never split
 //   - otherwise emergency-split when the token alone exceeds fullLineW so
 //     paint cannot run past the content box (print engines commonly do this)
-func (e *engine) breakOverflowItem(it inlineItem, remainW, fullLineW, restLineW float64, aloneOnLine bool) []inlineItem {
-	if it.img || it.blockBox != nil || it.forceBreak || it.text == "" {
+func (e *engine) breakOverflowItem(
+	item inlineItem, remainW, fullLineW, restLineW float64,
+	aloneOnLine bool,
+) []inlineItem {
+	if item.img || item.blockBox != nil || item.forceBreak || item.text == "" {
 		return nil
 	}
 
-	pol := wordBreakOf(*it.style)
+	pol := wordBreakOf(*item.style)
 	if pol == breakNever {
 		return nil
 	}
 
-	adv := it.marginL + it.w + it.marginR
+	adv := item.marginL + item.w + item.marginR
 	// Nothing to do when the whole item fits on this line.
 	if adv <= remainW+0.01 {
 		return nil
@@ -306,17 +340,17 @@ func (e *engine) breakOverflowItem(it inlineItem, remainW, fullLineW, restLineW 
 		return nil
 	}
 
-	firstRoom, restRoom, ok := breakRooms(remainW, fullLineW, restLineW, it.marginL, it.marginR, aloneOnLine)
+	firstRoom, restRoom, ok := breakRooms(remainW, fullLineW, restLineW, item.marginL, item.marginR, aloneOnLine)
 	if !ok {
 		return nil
 	}
 
-	chunks := e.breakToken(it.text, *it.style, firstRoom, restRoom)
+	chunks := e.breakToken(item.text, *item.style, firstRoom, restRoom)
 	if len(chunks) <= 1 {
 		return nil
 	}
 
-	return e.chunkParts(it, chunks)
+	return e.chunkParts(item, chunks)
 }
 
 // allowMidTokenBreak applies the CSS wrapping policy to decide whether the
@@ -339,9 +373,12 @@ func allowMidTokenBreak(pol wordBreakPolicy, adv, fullLineW float64, aloneOnLine
 
 // breakRooms computes the usable widths for the first and subsequent chunks
 // of a split token, or reports that splitting is not viable.
-func breakRooms(remainW, fullLineW, restLineW float64, marginL, marginR float64, aloneOnLine bool) (firstRoom, restRoom float64, ok bool) {
+func breakRooms(
+	remainW, fullLineW, restLineW, marginL, marginR float64,
+	aloneOnLine bool,
+) (float64, float64, bool) {
 	// Width available for the first chunk of text (exclude leading margin once).
-	firstRoom = remainW - marginL
+	firstRoom := remainW - marginL
 	if firstRoom < 1 {
 		// No room on this line — let the outer packer wrap to the next line
 		// unless we are already alone (then force a progressive split).
@@ -364,7 +401,7 @@ func breakRooms(remainW, fullLineW, restLineW float64, marginL, marginR float64,
 		restLineW = fullLineW
 	}
 
-	restRoom = restLineW - marginL - marginR
+	restRoom := restLineW - marginL - marginR
 	if restRoom < 1 {
 		restRoom = restLineW
 	}
@@ -378,13 +415,13 @@ func breakRooms(remainW, fullLineW, restLineW float64, marginL, marginR float64,
 
 // chunkParts builds the replacement items for a split token, zeroing the
 // margins on fragments that are not at the token's outer edge.
-func (e *engine) chunkParts(it inlineItem, chunks []string) []inlineItem {
+func (e *engine) chunkParts(item inlineItem, chunks []string) []inlineItem {
 	out := make([]inlineItem, 0, len(chunks))
 
 	for idx, chunk := range chunks {
-		part := it
+		part := item
 		part.text = chunk
-		part.w = e.measureTextFace(chunk, *it.style)
+		part.w = e.measureTextFace(chunk, *item.style)
 
 		if idx > 0 {
 			part.marginL = 0
@@ -419,20 +456,23 @@ func (e *engine) breakToken(cssSheet string, sty ResolvedStyle, firstMax, restMa
 // preferFloatClearForTail reports whether remaining inline content from i
 // should drop below active floats so the last line(s) use full content width
 // instead of sitting as a short orphan beside the float.
-func (e *engine) preferFloatClearForTail(items []inlineItem, i int, contentW, lineW, ly float64, floats *floatState) (nextY float64, ok bool) {
-	if floats == nil || i >= len(items) {
-		return ly, false
+func (e *engine) preferFloatClearForTail(
+	items []inlineItem, idx int, contentW, lineW, lineY float64,
+	floats *floatState,
+) (float64, bool) {
+	if floats == nil || idx >= len(items) {
+		return lineY, false
 	}
 
-	next := floats.clearY(ly)
+	next := floats.clearY(lineY)
 
-	if next-ly <= halfRatio {
-		return ly, false
+	if next-lineY <= halfRatio {
+		return lineY, false
 	}
 
-	rem, estLH := tailRemaining(items, i)
+	rem, estLH := tailRemaining(items, idx)
 	if rem <= 0 {
-		return ly, false
+		return lineY, false
 	}
 
 	if estLH < 1 {
@@ -442,7 +482,7 @@ func (e *engine) preferFloatClearForTail(items []inlineItem, i int, contentW, li
 	// short ending), not when a long paragraph still has room to wrap
 	// usefully beside the float.
 	if rem > contentW+1 {
-		return ly, false
+		return lineY, false
 	}
 	// Near the float bottom, pull the last full-width-fitting chunk under the
 	// float so we do not leave "…destined for the" beside + orphan
@@ -453,16 +493,19 @@ func (e *engine) preferFloatClearForTail(items []inlineItem, i int, contentW, li
 		maxGap = estLH * glueEmHard
 	}
 
-	if next-ly <= maxGap {
+	if next-lineY <= maxGap {
 		return next, true
 	}
 
-	return ly, false
+	return lineY, false
 }
 
 // tailRemaining sums the advance of items[i:] up to the next hard break and
 // estimates the line height of the tail.
-func tailRemaining(items []inlineItem, i int) (rem, estLH float64) {
+func tailRemaining(items []inlineItem, i int) (float64, float64) {
+	rem := 0.0
+	estLH := 0.0
+
 	for j := i; j < len(items); j++ {
 		item := items[j]
 		if item.forceBreak {
@@ -483,7 +526,7 @@ func tailRemaining(items []inlineItem, i int) (rem, estLH float64) {
 // separateAdjacentCites inserts a thin space between consecutive citation
 // markers ("][") so [90][91][92] are not painted as a cramped cluster. Does
 // not touch spaces inside a single marker ([111]).
-func separateAdjacentCites(items []inlineItem, e *engine) []inlineItem {
+func separateAdjacentCites(items []inlineItem, eng *engine) []inlineItem {
 	if len(items) < two {
 		return items
 	}
@@ -501,8 +544,8 @@ func separateAdjacentCites(items []inlineItem, e *engine) []inlineItem {
 			gap := "\u200a" // hair space
 
 			cur.text = gap + cur.text
-			if e != nil {
-				cur.w = e.measureTextFace(cur.text, *cur.style)
+			if eng != nil {
+				cur.w = eng.measureTextFace(cur.text, *cur.style)
 			}
 		}
 
@@ -542,14 +585,16 @@ const (
 // splitTextToWidth breaks s into substrings that each fit max widths.
 // firstMax is for the first chunk (remaining space on the current line);
 // restMax is for subsequent chunks (full line content width).
-func (e *engine) splitTextToWidth(s string, st ResolvedStyle, firstMax, restMax float64, mode softBreakMode) []string {
-	if s == "" {
+func (e *engine) splitTextToWidth(
+	text string, style ResolvedStyle, firstMax, restMax float64, mode softBreakMode,
+) []string {
+	if text == "" {
 		return nil
 	}
 
-	runes := []rune(s)
+	runes := []rune(text)
 	if len(runes) <= 1 {
-		return []string{s}
+		return []string{text}
 	}
 
 	var out []string
@@ -564,7 +609,7 @@ func (e *engine) splitTextToWidth(s string, st ResolvedStyle, firstMax, restMax 
 			limit = restMax
 		}
 		// Find the longest prefix that fits limit.
-		node := e.fittingPrefix(runes, limit, st)
+		node := e.fittingPrefix(runes, limit, style)
 		// Prefer a soft wrap opportunity near the end of the fitting prefix
 		// so URLs break after "/" etc. rather than mid-token when possible.
 		if mode != softBreakNone && node < len(runes) && node > 1 {
@@ -582,12 +627,12 @@ func (e *engine) splitTextToWidth(s string, st ResolvedStyle, firstMax, restMax 
 
 // fittingPrefix returns the rune count of the longest prefix of runes that
 // fits within limit, always at least 1 so splitting makes progress.
-func (e *engine) fittingPrefix(runes []rune, limit float64, st ResolvedStyle) int {
+func (e *engine) fittingPrefix(runes []rune, limit float64, style ResolvedStyle) int {
 	node := 0
 	width := 0.0
 
 	for node < len(runes) {
-		rowW := e.measureTextFace(string(runes[node]), st)
+		rowW := e.measureTextFace(string(runes[node]), style)
 		if node > 0 && width+rowW > limit+0.01 {
 			break
 		}
@@ -636,7 +681,10 @@ func isSoftWrapRune(r rune, mode softBreakMode) bool {
 // emitLine renders items[start:end) as one line and returns its height.
 // lastLine is true for the final line of the inline formatting context (used
 // so text-align:justify leaves the last line start-aligned).
-func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x, y float64, lastLine bool) float64 {
+func (e *engine) emitLine(
+	boxNode *box, items []inlineItem, start, end int,
+	availW, startX, lineY float64, lastLine bool,
+) float64 {
 	line := items[start:end]
 	if len(line) == 0 {
 		return 0
@@ -645,9 +693,9 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 	// trim trailing whitespace of the last run
 	e.trimTrailingSpace(line)
 
-	textAlign := "left"
-	if b != nil && b.style.TextAlign != "" {
-		textAlign = b.style.TextAlign
+	textAlign := floatLeft
+	if boxNode != nil && boxNode.style.TextAlign != "" {
+		textAlign = boxNode.style.TextAlign
 	}
 
 	// Coalesce adjacent same-style text runs into one op so PDF/image paint
@@ -658,16 +706,29 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 	}
 
 	// line metrics
-	lineH, baseline := e.lineMetrics(line, y)
+	lineH, baseline := e.lineMetrics(line, lineY)
 
 	totalW := 0.0
 	for i := range line {
 		totalW += line[i].marginL + line[i].w + line[i].marginR
 	}
 
-	leftX, justifyGap := e.lineOriginAndGap(textAlign, x, availW, totalW, line, lastLine)
+	leftX, justifyGap := e.lineOriginAndGap(textAlign, startX, availW, totalW, line, lastLine)
 
-	und := undRun{}
+	e.emitLineItems(boxNode, line, leftX, baseline, lineH, lineY, justifyGap)
+
+	if boxNode != nil && boxNode.firstBaseline == 0 {
+		boxNode.firstBaseline = baseline
+	}
+
+	return lineH
+}
+
+// emitLineItems paints each item of a line at the given baseline, flushing
+// the accumulated underline run when the styling changes.
+func (e *engine) emitLineItems(boxNode *box, line []inlineItem, leftX, baseline, lineH, lineY, justifyGap float64) {
+	var und undRun
+
 	for idx := range line {
 		item := &line[idx]
 		if item.forceBreak || item.style == nil {
@@ -678,21 +739,15 @@ func (e *engine) emitLine(b *box, items []inlineItem, start, end int, availW, x,
 
 		switch {
 		case item.blockBox != nil:
-			leftX = e.emitInlineBlock(b, item, leftX, baseline, justifyGap, idx < len(line)-1, &und)
+			leftX = e.emitInlineBlock(boxNode, item, leftX, baseline, justifyGap, idx < len(line)-1, &und)
 		case item.img:
-			leftX = e.emitInlineImage(item, leftX, y, lineH, baseline, justifyGap, idx < len(line)-1, &und)
+			leftX = e.emitInlineImage(item, leftX, lineY, lineH, baseline, justifyGap, idx < len(line)-1, &und)
 		default:
 			leftX = e.emitInlineText(item, leftX, baseline, justifyGap, idx < len(line)-1, &und)
 		}
 	}
 
 	und.flush(e)
-
-	if b != nil && b.firstBaseline == 0 {
-		b.firstBaseline = baseline
-	}
-
-	return lineH
 }
 
 // trimTrailingSpace drops trailing whitespace from the last run of a line.
@@ -711,7 +766,7 @@ func (e *engine) trimTrailingSpace(line []inlineItem) {
 }
 
 // lineMetrics returns the height of a line and the Y of its baseline.
-func (e *engine) lineMetrics(line []inlineItem, y float64) (lineH, baseline float64) {
+func (e *engine) lineMetrics(line []inlineItem, lineY float64) (float64, float64) {
 	maxAscent, maxDescent := 0.0, 0.0
 
 	for i := range line {
@@ -738,26 +793,29 @@ func (e *engine) lineMetrics(line []inlineItem, y float64) (lineH, baseline floa
 		}
 	}
 
-	lineH = maxAscent + maxDescent
+	lineH := maxAscent + maxDescent
 	if lineH <= 0 {
 		lineH = 1
 	}
 
-	return lineH, y + maxAscent
+	return lineH, lineY + maxAscent
 }
 
 // lineOriginAndGap returns the x where the line content starts and the extra
 // inter-word space added by text-align:justify (0 unless justifying).
-func (e *engine) lineOriginAndGap(textAlign string, x, availW, totalW float64, line []inlineItem, lastLine bool) (float64, float64) {
+func (e *engine) lineOriginAndGap(
+	textAlign string, originX, availW, totalW float64,
+	line []inlineItem, lastLine bool,
+) (float64, float64) {
 	switch textAlign {
-	case "right":
-		return x + availW - totalW, 0
-	case "center":
-		return x + (availW-totalW)/two, 0
+	case floatRight:
+		return originX + availW - totalW, 0
+	case fxCenter:
+		return originX + (availW-totalW)/two, 0
 	case cssTextAlignJustify:
-		return x, e.justifyGapOf(line, availW, totalW, lastLine)
+		return originX, e.justifyGapOf(line, availW, totalW, lastLine)
 	default:
-		return x, 0
+		return originX, 0
 	}
 }
 
@@ -785,12 +843,7 @@ func (e *engine) justifyGapOf(line []inlineItem, availW, totalW float64, lastLin
 
 	raw := (availW - totalW) / float64(gaps)
 
-	maxGap := 6.0 // pt
-	for i := range line {
-		if fs := line[i].style.FontSize * e.scale; fs > maxGap {
-			maxGap = fs // up to 1em extra between words
-		}
-	}
+	maxGap := e.justifyMaxGap(line)
 
 	if raw > maxGap*2 {
 		return 0
@@ -801,6 +854,20 @@ func (e *engine) justifyGapOf(line []inlineItem, availW, totalW float64, lastLin
 	}
 
 	return raw
+}
+
+// justifyMaxGap returns the largest inter-word gap allowed for the line,
+// up to 1em of the largest font size present.
+func (e *engine) justifyMaxGap(line []inlineItem) float64 {
+	maxGap := 6.0 // pt
+
+	for i := range line {
+		if fs := line[i].style.FontSize * e.scale; fs > maxGap {
+			maxGap = fs // up to 1em extra between words
+		}
+	}
+
+	return maxGap
 }
 
 // undRun accumulates one continuous underline stroke across adjacent
@@ -831,7 +898,10 @@ func (u *undRun) flush(e *engine) {
 
 // emitInlineBlock relocates a block-in-inline box onto the current line and
 // returns the updated x cursor.
-func (e *engine) emitInlineBlock(b *box, item *inlineItem, leftX, baseline, justifyGap float64, gapAfter bool, und *undRun) float64 {
+func (e *engine) emitInlineBlock(
+	boxNode *box, item *inlineItem, leftX, baseline, justifyGap float64,
+	gapAfter bool, und *undRun,
+) float64 {
 	und.flush(e)
 
 	dx := leftX - item.blockBox.x
@@ -840,8 +910,8 @@ func (e *engine) emitInlineBlock(b *box, item *inlineItem, leftX, baseline, just
 	item.blockBox.x += dx
 	item.blockBox.y += dy
 	// Attach to parent so paint-time transforms/opacity stamp the subtree.
-	if b != nil {
-		b.children = append(b.children, item.blockBox)
+	if boxNode != nil {
+		boxNode.children = append(boxNode.children, item.blockBox)
 	}
 
 	leftX += item.blockBox.w + item.marginR
@@ -854,17 +924,21 @@ func (e *engine) emitInlineBlock(b *box, item *inlineItem, leftX, baseline, just
 
 // emitInlineImage places an image (or inline-block) item on the line and
 // returns the updated x cursor.
-func (e *engine) emitInlineImage(item *inlineItem, leftX, y, lineH, baseline, justifyGap float64, gapAfter bool, und *undRun) float64 {
+func (e *engine) emitInlineImage(
+	item *inlineItem, leftX, lineY, lineH, baseline, justifyGap float64,
+	gapAfter bool, und *undRun,
+) float64 {
 	und.flush(e)
 
 	top := baseline - item.h
+
 	switch item.style.VerticalAlign {
 	case cssVerticalAlignTop:
-		top = y
+		top = lineY
 	case cssVerticalAlignMiddle:
-		top = y + (lineH-item.h)/two
+		top = lineY + (lineH-item.h)/two
 	case cssVerticalAlignBottom:
-		top = y + lineH - item.h
+		top = lineY + lineH - item.h
 	}
 
 	if item.imgRef != nil && item.imgRef.data != nil {
@@ -890,7 +964,10 @@ func (e *engine) emitInlineImage(item *inlineItem, leftX, y, lineH, baseline, ju
 
 // emitInlineText paints the face runs of one text item and returns the
 // updated x cursor.
-func (e *engine) emitInlineText(item *inlineItem, leftX, baseline, justifyGap float64, gapAfter bool, und *undRun) float64 {
+func (e *engine) emitInlineText(
+	item *inlineItem, leftX, baseline, justifyGap float64,
+	gapAfter bool, und *undRun,
+) float64 {
 	child := item.style.Color
 	size := item.style.FontSize * e.scale
 	ascent := e.fontAscent(size)
@@ -942,13 +1019,16 @@ func (e *engine) emitInlineText(item *inlineItem, leftX, baseline, justifyGap fl
 
 // paintDecoration draws the underline / line-through strokes for one text
 // item, extending the active underline run when the styling continues.
-func (e *engine) paintDecoration(item *inlineItem, runStart, runSpan, size, ascent, descent, baseline float64, child [3]float64, und *undRun) {
+func (e *engine) paintDecoration(
+	item *inlineItem, runStart, runSpan, size, ascent, descent, baseline float64,
+	child [3]float64, und *undRun,
+) {
 	bareURL := isBareURLText(item.text)
 	wantUnderline := !bareURL && (item.style.TextDecoration == cssTextDecorationUnderline ||
 		(item.href != "" && item.style.TextDecoration != cssTextDecorationLineThrough))
 	wsOnly := strings.TrimSpace(item.text) == ""
 
-	if runSpan <= 0.01 {
+	if runSpan <= layoutSlack {
 		if !wantUnderline {
 			und.flush(e)
 		}
@@ -972,6 +1052,14 @@ func (e *engine) paintDecoration(item *inlineItem, runStart, runSpan, size, asce
 		und.flush(e)
 	}
 
+	e.paintLineThrough(item, runStart, runSpan, baseline, ascent, uWidth, wsOnly, child)
+}
+
+// paintLineThrough strokes the strike-through rule for a decorated text item.
+func (e *engine) paintLineThrough(
+	item *inlineItem, runStart, runSpan, baseline, ascent, uWidth float64,
+	wsOnly bool, child [3]float64,
+) {
 	if item.style.TextDecoration == cssTextDecorationLineThrough && !wsOnly {
 		e.add(Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpLine, X: runStart, Y: baseline - ascent*0.3, W: runSpan, H: 0,
@@ -981,7 +1069,10 @@ func (e *engine) paintDecoration(item *inlineItem, runStart, runSpan, size, asce
 }
 
 // paintUnderline extends or starts the active underline run for one text item.
-func (e *engine) paintUnderline(item *inlineItem, runStart, runSpan, underY, uWidth, size float64, wsOnly bool, child [3]float64, und *undRun) {
+func (e *engine) paintUnderline(
+	item *inlineItem, runStart, runSpan, underY, uWidth, size float64,
+	wsOnly bool, child [3]float64, und *undRun,
+) {
 	if wsOnly {
 		// Do not start an underline on whitespace-only, but extend
 		// an active same-href run across inter-word spaces.
@@ -1075,18 +1166,18 @@ func isBareURLText(s string) bool {
 
 // hasURLFragmentMarker applies the tail heuristics for wrapped URLs whose
 // scheme ended up on an earlier line.
-func hasURLFragmentMarker(s string) bool {
-	if !strings.Contains(s, "/") || strings.ContainsAny(s, " \t") {
+func hasURLFragmentMarker(text string) bool {
+	if !strings.Contains(text, "/") || strings.ContainsAny(text, " \t") {
 		return false
 	}
 
 	for _, marker := range []string{".com", ".org", "archive.", ".html", ".php"} {
-		if strings.Contains(s, marker) {
+		if strings.Contains(text, marker) {
 			return true
 		}
 	}
 
-	return strings.Count(s, "/") >= 2
+	return strings.Count(text, "/") >= two
 }
 
 func nearUndY(a, b float64) bool {
@@ -1105,39 +1196,39 @@ func (e *engine) collectInline(nodes []*html.Node, out *[]inlineItem) {
 	}
 }
 
-func (e *engine) collectInlineNode(n *html.Node, out *[]inlineItem) {
-	sty := e.styles[n]
+func (e *engine) collectInlineNode(node *html.Node, out *[]inlineItem) {
+	sty := e.styles[node]
 
-	switch n.Type {
+	switch node.Type {
 	case html.TextNode:
-		e.collectInlineText(n, sty, out)
+		e.collectInlineText(node, sty, out)
 	case html.ElementNode:
-		e.collectInlineElement(n, sty, out)
+		e.collectInlineElement(node, sty, out)
 	case html.CommentNode, html.DoctypeNode:
 		return
 	}
 }
 
 // collectInlineText flattens one text node under its white-space mode.
-func (e *engine) collectInlineText(n *html.Node, sty ResolvedStyle, out *[]inlineItem) {
+func (e *engine) collectInlineText(node *html.Node, sty ResolvedStyle, out *[]inlineItem) {
 	if sty.Display == cssDisplayNone {
 		return
 	}
 
 	switch sty.WhiteSpace {
 	case cssWhiteSpacePre:
-		e.collectPreText(n, sty, out)
+		e.collectPreText(node, sty, out)
 	default:
-		e.collectWrappedText(n, sty, out)
+		e.collectWrappedText(node, sty, out)
 	}
 }
 
 // collectPreText splits a white-space:pre node on newlines.
-func (e *engine) collectPreText(n *html.Node, sty ResolvedStyle, out *[]inlineItem) {
-	parts := strings.Split(n.Text, "\n")
+func (e *engine) collectPreText(node *html.Node, _ ResolvedStyle, out *[]inlineItem) {
+	parts := strings.Split(node.Text, "\n")
 	for i, p := range parts {
 		if p != "" {
-			*out = append(*out, e.textItem(p, e.stylePtr(n)))
+			*out = append(*out, e.textItem(p, e.stylePtr(node)))
 		}
 
 		if i < len(parts)-1 {
@@ -1147,30 +1238,30 @@ func (e *engine) collectPreText(n *html.Node, sty ResolvedStyle, out *[]inlineIt
 }
 
 // collectWrappedText flattens a normal white-space text node into word items.
-func (e *engine) collectWrappedText(n *html.Node, sty ResolvedStyle, out *[]inlineItem) {
+func (e *engine) collectWrappedText(node *html.Node, sty ResolvedStyle, out *[]inlineItem) {
 	// Whitespace-only text nodes still separate adjacent inlines
 	// (wiki "Cuba"+" "+"Spain" / pretty-printed newlines between
 	// anchors). collapseWS would drop them. Skip only after a
 	// replaced element so `<img>\n<span margin-left>` does not add
 	// a space on top of the margin (TestLogoTitleGap).
-	if strings.TrimSpace(n.Text) == "" {
-		if n.Text != "" {
+	if strings.TrimSpace(node.Text) == "" {
+		if node.Text != "" {
 			if len(*out) == 0 || !(*out)[len(*out)-1].img {
-				*out = append(*out, e.textItem(" ", e.stylePtr(n)))
+				*out = append(*out, e.textItem(" ", e.stylePtr(node)))
 			}
 		}
 
 		return
 	}
 
-	text := collapseWS(n.Text)
+	text := collapseWS(node.Text)
 	if text == "" {
 		return
 	}
 	// white-space:nowrap — keep the run unbreakable (wiki .reference
 	// cite markers in narrow table columns).
 	if sty.WhiteSpace == cssWhiteSpaceNowrap {
-		*out = append(*out, e.textItem(text, e.stylePtr(n)))
+		*out = append(*out, e.textItem(text, e.stylePtr(node)))
 
 		return
 	}
@@ -1182,7 +1273,7 @@ func (e *engine) collectWrappedText(n *html.Node, sty ResolvedStyle, out *[]inli
 	// prior item does not already end with a space.
 	// Do not insert a space before attaching punctuation (", . ) ]") —
 	// pretty-printed "</a>\n," must stay "Award," not "Award ,".
-	e.preserveLeadingGap(n, words, out)
+	e.preserveLeadingGap(node, words, out)
 
 	for i, word := range words {
 		// Space only between words of this text node — not after the
@@ -1192,22 +1283,21 @@ func (e *engine) collectWrappedText(n *html.Node, sty ResolvedStyle, out *[]inli
 			word += " "
 		}
 
-		*out = append(*out, e.textItem(word, e.stylePtr(n)))
+		*out = append(*out, e.textItem(word, e.stylePtr(node)))
 	}
 	// Preserve a trailing word-separator when the source text node
 	// ended with whitespace (so "foo <b>bar</b>" keeps the gap).
-	e.preserveTrailingGap(n, words, sty, out)
+	e.preserveTrailingGap(node, words, sty, out)
 }
 
 // preserveLeadingGap re-attaches a leading word separator between this text
 // node and the previous inline item when the source began with whitespace.
-func (e *engine) preserveLeadingGap(n *html.Node, words []string, out *[]inlineItem) {
-	if len(words) == 0 || len(n.Text) == 0 || len(*out) == 0 {
+func (e *engine) preserveLeadingGap(node *html.Node, words []string, out *[]inlineItem) {
+	if len(words) == 0 || len(node.Text) == 0 || len(*out) == 0 {
 		return
 	}
 
-	first := n.Text[0]
-	if first != ' ' && first != '\t' && first != '\n' && first != '\r' && first != '\f' {
+	if !isWSSpaceByte(node.Text[0]) {
 		return
 	}
 
@@ -1217,14 +1307,24 @@ func (e *engine) preserveLeadingGap(n *html.Node, words []string, out *[]inlineI
 	}
 }
 
+// isWSSpaceByte reports that b is one of the CSS white-space characters.
+func isWSSpaceByte(b byte) bool {
+	switch b {
+	case ' ', '\t', '\n', '\r', '\f':
+		return true
+	}
+
+	return false
+}
+
 // preserveTrailingGap keeps a trailing word separator when the source text
 // node ended with whitespace.
-func (e *engine) preserveTrailingGap(n *html.Node, words []string, sty ResolvedStyle, out *[]inlineItem) {
-	if len(words) == 0 || len(n.Text) == 0 {
+func (e *engine) preserveTrailingGap(node *html.Node, words []string, sty ResolvedStyle, out *[]inlineItem) {
+	if len(words) == 0 || len(node.Text) == 0 {
 		return
 	}
 
-	last := n.Text[len(n.Text)-1]
+	last := node.Text[len(node.Text)-1]
 	if last != ' ' && last != '\t' && last != '\n' && last != '\r' && last != '\f' {
 		return
 	}
@@ -1234,68 +1334,68 @@ func (e *engine) preserveTrailingGap(n *html.Node, words []string, sty ResolvedS
 }
 
 // collectInlineElement flattens one element node into inline items.
-func (e *engine) collectInlineElement(n *html.Node, sty ResolvedStyle, out *[]inlineItem) {
+func (e *engine) collectInlineElement(node *html.Node, sty ResolvedStyle, out *[]inlineItem) {
 	if sty.Display == cssDisplayNone {
 		return
 	}
 
-	if n.Name == cssTagBR {
+	if node.Name == cssTagBR {
 		*out = append(*out, inlineItem{forceBreak: true}) //nolint:exhaustruct // intentional zero fields
 
 		return
 	}
 
-	if n.Name == cssTagImg {
-		e.collectImageItem(n, sty, out)
+	if node.Name == cssTagImg {
+		e.collectImageItem(node, sty, out)
 
 		return
 	}
 
 	if sty.Display == cssDisplayInlineBlock {
-		e.collectInlineBlockItem(n, sty, out)
+		e.collectInlineBlockItem(node, sty, out)
 
 		return
 	}
 
 	if sty.Display == cssDisplayInline {
-		e.collectInlineSpan(n, sty, out)
+		e.collectInlineSpan(node, sty, out)
 
 		return
 	}
 	// block-level element inside inline context: lay out at a throwaway
 	// offset, then shift its ops into the line when placed.
 	opStart := len(e.ops)
-	cblock := e.build(n, availWForInline(), 0, 0)
+	cblock := e.build(node, availWForInline(), 0, 0)
 	opEnd := len(e.ops)
 
 	if cblock != nil {
 		*out = append(*out, inlineItem{ //nolint:exhaustruct // intentional zero fields
-			img: true, w: cblock.w, h: cblock.height, style: e.stylePtr(n),
+			img: true, w: cblock.w, h: cblock.height, style: e.stylePtr(node),
 			blockBox: cblock, opStart: opStart, opEnd: opEnd,
 		})
 	}
 }
 
 // collectImageItem flattens an <img> element into one inline item.
-func (e *engine) collectImageItem(n *html.Node, sty ResolvedStyle, out *[]inlineItem) {
-	ib := e.buildImage(n, sty, 0, 0)
+func (e *engine) collectImageItem(node *html.Node, sty ResolvedStyle, out *[]inlineItem) {
+	ib := e.buildImage(node, sty, 0, 0)
 	*out = append(*out, inlineItem{ //nolint:exhaustruct // intentional zero fields
-		img: true, imgRef: ib.img, w: ib.w, h: ib.height, style: e.stylePtr(n),
+		img: true, imgRef: ib.img, w: ib.w, h: ib.height, style: e.stylePtr(node),
 		marginL: e.scalePt(sty.MarginLeft), marginR: e.scalePt(sty.MarginRight),
 	})
 }
 
 // collectInlineBlockItem lays out a display:inline-block element at its
 // containing-block width and flattens it into one inline item.
-func (e *engine) collectInlineBlockItem(n *html.Node, sty ResolvedStyle, out *[]inlineItem) {
-	avail := e.inlineBlockAvail(n, sty, e.inlineCBW)
+func (e *engine) collectInlineBlockItem(node *html.Node, sty ResolvedStyle, out *[]inlineItem) {
+	avail := e.inlineBlockAvail(node, sty, e.inlineCBW)
 	opStart := len(e.ops)
-	cblock := e.build(n, avail, 0, 0)
+	cblock := e.build(node, avail, 0, 0)
 	opEnd := len(e.ops)
 
 	if cblock != nil {
 		*out = append(*out, inlineItem{ //nolint:exhaustruct // intentional zero fields
-			img: true, w: cblock.w, h: cblock.height, style: e.stylePtr(n),
+			img: true, w: cblock.w, h: cblock.height, style: e.stylePtr(node),
 			blockBox: cblock, opStart: opStart, opEnd: opEnd,
 			marginL: e.scalePt(sty.MarginLeft), marginR: e.scalePt(sty.MarginRight),
 		})
@@ -1304,11 +1404,11 @@ func (e *engine) collectInlineBlockItem(n *html.Node, sty ResolvedStyle, out *[]
 
 // collectInlineSpan flattens a display:inline element (e.g. <a>), applying
 // hrefs, pseudo-content and horizontal margins to the generated items.
-func (e *engine) collectInlineSpan(n *html.Node, sty ResolvedStyle, out *[]inlineItem) {
+func (e *engine) collectInlineSpan(node *html.Node, sty ResolvedStyle, out *[]inlineItem) {
 	href := ""
 
-	if n.Name == cssTagA {
-		h := n.Attribute("href")
+	if node.Name == cssTagA {
+		h := node.Attribute("href")
 		if isExternalHref(h) || isInternalHref(h) {
 			href = h
 		}
@@ -1316,16 +1416,16 @@ func (e *engine) collectInlineSpan(n *html.Node, sty ResolvedStyle, out *[]inlin
 
 	before := len(*out)
 
-	if txt := e.pseudoContent(n, "before"); txt != "" {
-		*out = append(*out, e.textItem(txt, e.stylePtr(n)))
+	if txt := e.pseudoContent(node, "before"); txt != "" {
+		*out = append(*out, e.textItem(txt, e.stylePtr(node)))
 	}
 
-	for _, c := range n.Children {
+	for _, c := range node.Children {
 		e.collectInlineNode(c, out)
 	}
 
-	if txt := e.pseudoContent(n, "after"); txt != "" {
-		*out = append(*out, e.textItem(txt, e.stylePtr(n)))
+	if txt := e.pseudoContent(node, "after"); txt != "" {
+		*out = append(*out, e.textItem(txt, e.stylePtr(node)))
 	}
 	// Horizontal margins on inline elements (e.g. .co { margin-left: 10px }
 	// after a logo) apply to the first/last generated items.
@@ -1360,7 +1460,7 @@ func (e *engine) inlineBlockAvail(nodeN *html.Node, sty ResolvedStyle, cbW float
 		// buildBlock applies box-sizing to the specified width; pass enough
 		// avail that auto-fill does not stretch a definite-width box.
 		width := e.scalePt(sty.Width)
-		if sty.BoxSizing != "border-box" {
+		if sty.BoxSizing != borderBox {
 			width += e.scalePt(sty.PaddingLeft) + e.scalePt(sty.PaddingRight) +
 				e.scalePt(sty.BorderLeft.Width) + e.scalePt(sty.BorderRight.Width)
 		}
@@ -1427,8 +1527,8 @@ func squeezeInlineSpaces(items []inlineItem) []inlineItem {
 // dropSpaceItem reports whether the pure-space item at items[i] should be
 // dropped: before attaching punctuation or citation brackets, or after a
 // trailing space already on the previous item.
-func dropSpaceItem(items []inlineItem, i int, out []inlineItem) bool {
-	item := items[i]
+func dropSpaceItem(items []inlineItem, idx int, out []inlineItem) bool {
+	item := items[idx]
 	if item.img || item.forceBreak || item.blockBox != nil {
 		return false
 	}
@@ -1437,15 +1537,8 @@ func dropSpaceItem(items []inlineItem, i int, out []inlineItem) bool {
 		return false
 	}
 	// Pure space item.
-	if i+1 < len(items) {
-		next := items[i+1]
-		if !next.img && !next.forceBreak && isAttachPunct(next.text) {
-			return true
-		}
-
-		if strings.HasPrefix(strings.TrimSpace(next.text), "[") {
-			return true // drop space before citation bracket
-		}
+	if dropBeforeNext(items, idx) {
+		return true
 	}
 
 	if len(out) == 0 {
@@ -1453,6 +1546,21 @@ func dropSpaceItem(items []inlineItem, i int, out []inlineItem) bool {
 	}
 
 	return strings.HasSuffix(out[len(out)-1].text, " ") // redundant double space
+}
+
+// dropBeforeNext reports that the space item at items[i] is followed by
+// attaching punctuation or a citation bracket that should not be spaced.
+func dropBeforeNext(items []inlineItem, i int) bool {
+	if i+1 >= len(items) {
+		return false
+	}
+
+	next := items[i+1]
+	if !next.img && !next.forceBreak && isAttachPunct(next.text) {
+		return true
+	}
+
+	return strings.HasPrefix(strings.TrimSpace(next.text), "[")
 }
 
 // isJustifyGapAfter reports whether CSS text-align:justify may expand after it.
@@ -1489,7 +1597,7 @@ func noBreakBefore(prev, cur inlineItem) bool {
 		return false
 	}
 
-	if cur.img || prev.img || cur.blockBox != nil || prev.blockBox != nil {
+	if isReplacedContent(prev) || isReplacedContent(cur) {
 		return false
 	}
 	// Keep nowrap runs together (wiki .reference / .IPA pieces).
@@ -1506,14 +1614,29 @@ func noBreakBefore(prev, cur inlineItem) bool {
 		return true
 	}
 	// Digits that continue a cite: "[" then "37" then "]".
-	if isAllDigits(count) {
-		pt := strings.TrimSpace(prev.text)
-		if strings.HasSuffix(pt, "[") || isAllDigits(pt) {
-			return true
-		}
+	if digitCiteGlue(prev, cur) {
+		return true
 	}
 	// Do not break after opening brackets / quotes.
 	return endsWithOpenBracket(strings.TrimRight(prev.text, " "))
+}
+
+// digitCiteGlue reports that cur is a digit run continuing a citation begun
+// on prev ("[" then "37" then "]").
+func digitCiteGlue(prev, cur inlineItem) bool {
+	if !isAllDigits(strings.TrimSpace(cur.text)) {
+		return false
+	}
+
+	pt := strings.TrimSpace(prev.text)
+
+	return strings.HasSuffix(pt, "[") || isAllDigits(pt)
+}
+
+// isReplacedContent reports that the item is a replaced or atomic inline
+// (image or laid-out inline-block) rather than text.
+func isReplacedContent(it inlineItem) bool {
+	return it.img || it.blockBox != nil
 }
 
 // endsWithOpenBracket reports that s ends with an opening bracket or quote.

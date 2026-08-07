@@ -314,8 +314,8 @@ func TestFlexShorthandParsing(t *testing.T) { //nolint:cyclop,funlen
 		basis    float64
 		basisPct float64
 	}{
-		{"none", "flex:none", 0, 0, -1, -1},
-		{"auto", "flex:auto", 1, 1, -1, -1},
+		{cssDisplayNone, "flex:none", 0, 0, -1, -1},
+		{overflowAuto, "flex:auto", 1, 1, -1, -1},
 		{"one", "flex:1", 1, 1, -1, 0},
 		{"three", "flex:0 0 80pt", 0, 0, 80, -1},
 		{"grow-shrink-auto", "flex:1 1 auto", 1, 1, -1, -1},

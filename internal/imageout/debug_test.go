@@ -1,3 +1,4 @@
+//nolint:testpackage // white-box test shares unexported helpers (redPNG, renderHTMLOpts) with imageout_test.go
 package imageout
 
 import (
@@ -6,6 +7,7 @@ import (
 )
 
 func TestDebugDataURIRegion(t *testing.T) {
+	t.Parallel()
 	raw := redPNG(t, 16, 16)
 	src := `<html><body><img src="data:image/png;base64,` +
 		base64.StdEncoding.EncodeToString(raw) + `"></body></html>`
@@ -19,18 +21,22 @@ func TestDebugDataURIRegion(t *testing.T) {
 
 	t.Logf("image bounds: %v", img.Bounds())
 
-	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y += 2 {
-		row := make([]byte, 0, img.Bounds().Dx())
-		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x += 2 {
-			c := asNRGBA(img.At(x, y))
-			if c.R > 200 && c.G < 60 && c.B < 60 && c.A > 200 {
-				row = append(row, 'R')
-			} else if c.A == 0 {
-				row = append(row, '.')
-			} else {
-				row = append(row, '-')
+	for row := img.Bounds().Min.Y; row < img.Bounds().Max.Y; row += 2 {
+		line := make([]byte, 0, img.Bounds().Dx())
+
+		for col := img.Bounds().Min.X; col < img.Bounds().Max.X; col += 2 {
+			c := asNRGBA(img.At(col, row))
+
+			switch {
+			case c.R > 200 && c.G < 60 && c.B < 60 && c.A > 200:
+				line = append(line, 'R')
+			case c.A == 0:
+				line = append(line, '.')
+			default:
+				line = append(line, '-')
 			}
 		}
-		t.Logf("y=%3d %s", y, row)
+
+		t.Logf("y=%3d %s", row, line)
 	}
 }

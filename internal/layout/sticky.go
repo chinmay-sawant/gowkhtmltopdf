@@ -17,29 +17,29 @@ package layout
 
 // tagSticky records sticky insets and stamps StickyID on the box's ops so
 // pagination can find them after parent prependChrome shifts op indices.
-func (e *engine) tagSticky(b *box) {
-	if b == nil || b.style.Position != "sticky" {
+func (e *engine) tagSticky(boxNode *box) {
+	if boxNode == nil || boxNode.style.Position != positionSticky {
 		return
 	}
 
-	b.sticky = true
+	boxNode.sticky = true
 	e.stickySeq++
-	b.stickyID = e.stickySeq
+	boxNode.stickyID = e.stickySeq
 
-	b.stickyTopSet, b.stickyTop = stickyInset(e, b.style.TopAuto, b.style.Top)
-	b.stickyRightSet, b.stickyRight = stickyInset(e, b.style.RightAuto, b.style.Right)
-	b.stickyBottomSet, b.stickyBottom = stickyInset(e, b.style.BottomAuto, b.style.Bottom)
-	b.stickyLeftSet, b.stickyLeft = stickyInset(e, b.style.LeftAuto, b.style.Left)
+	boxNode.stickyTopSet, boxNode.stickyTop = stickyInset(e, boxNode.style.TopAuto, boxNode.style.Top)
+	boxNode.stickyRightSet, boxNode.stickyRight = stickyInset(e, boxNode.style.RightAuto, boxNode.style.Right)
+	boxNode.stickyBottomSet, boxNode.stickyBottom = stickyInset(e, boxNode.style.BottomAuto, boxNode.style.Bottom)
+	boxNode.stickyLeftSet, boxNode.stickyLeft = stickyInset(e, boxNode.style.LeftAuto, boxNode.style.Left)
 
-	if b.opEnd >= b.opStart && b.opStart >= 0 {
-		for i := b.opStart; i <= b.opEnd && i < len(e.ops); i++ {
-			e.ops[i].StickyID = b.stickyID
+	if boxNode.opEnd >= boxNode.opStart && boxNode.opStart >= 0 {
+		for i := boxNode.opStart; i <= boxNode.opEnd && i < len(e.ops); i++ {
+			e.ops[i].StickyID = boxNode.stickyID
 		}
 	}
 }
 
 // stickyInset resolves a non-auto sticky inset; auto insets stay unset (0).
-func stickyInset(e *engine, auto bool, v float64) (set bool, inset float64) {
+func stickyInset(e *engine, auto bool, v float64) (bool, float64) {
 	if auto {
 		return false, 0
 	}

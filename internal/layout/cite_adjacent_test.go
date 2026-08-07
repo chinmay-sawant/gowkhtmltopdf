@@ -31,7 +31,7 @@ more</p></body></html>`, cssSheetVal)
 		}
 
 		if strings.ContainsAny(paintOp.Text, "[]0123456789") &&
-			!strings.Contains(paintOp.Text, "end") && !strings.Contains(paintOp.Text, "more") {
+			!strings.Contains(paintOp.Text, fxEnd) && !strings.Contains(paintOp.Text, "more") {
 			parts = append(parts, paintOp.Text)
 			xList = append(xList, paintOp.X)
 		}

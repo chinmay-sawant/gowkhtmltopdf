@@ -45,7 +45,7 @@ func TestMulticolParseProps(t *testing.T) { //nolint:cyclop
 	}
 
 	a := styles[nodes[0]]
-	if a.ColumnCount != 3 || a.ColumnGap != 12 || a.ColumnGapNormal || a.ColumnFill != "auto" {
+	if a.ColumnCount != 3 || a.ColumnGap != 12 || a.ColumnGapNormal || a.ColumnFill != overflowAuto {
 		t.Fatalf("a: count=%d gap=%.1f normal=%v fill=%q", a.ColumnCount, a.ColumnGap, a.ColumnGapNormal, a.ColumnFill)
 	}
 
@@ -63,11 +63,11 @@ func TestMulticolParseProps(t *testing.T) { //nolint:cyclop
 	decl := styles[nodes[3]]
 	// break-before:column ≈ page always; break-inside:avoid-column is
 	// column-only and must not set page-break-inside:avoid.
-	if decl.PageBreakBefore != "always" {
+	if decl.PageBreakBefore != pageBreakAlways {
 		t.Fatalf("d break-before: got %q, want always", decl.PageBreakBefore)
 	}
 
-	if decl.PageBreakInside == "avoid" {
+	if decl.PageBreakInside == avoidKeyword {
 		t.Fatalf("d break-inside:avoid-column must not map to page avoid (got %q)", decl.PageBreakInside)
 	}
 }

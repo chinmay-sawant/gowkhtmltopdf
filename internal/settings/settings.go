@@ -9,6 +9,7 @@ const (
 	defaultOutlineDepth   = 4
 	defaultImageWidth     = 1024
 	defaultImageQuality   = 94
+	sAbort                = "abort"
 )
 
 // ColorMode mirrors wkhtmltopdf --color-mode. Kept as a parse helper for
@@ -81,19 +82,21 @@ const (
 
 func (h LoadErrorHandling) String() string {
 	switch h {
+	case LoadErrorAbort:
+		return sAbort
 	case LoadErrorSkip:
 		return "skip"
 	case LoadErrorIgnore:
-		return "ignore"
+		return sIgnore
 	}
 
-	return "abort"
+	return sAbort
 }
 
 // ParseLoadErrorHandling accepts abort|skip|ignore.
 func ParseLoadErrorHandling(value string) (LoadErrorHandling, error) {
 	switch normalize(value) {
-	case "", "abort":
+	case "", sAbort:
 		return LoadErrorAbort, nil
 	case "skip":
 		return LoadErrorSkip, nil
@@ -116,13 +119,15 @@ const (
 
 func (m MediaType) String() string {
 	switch m {
+	case MediaIgnore:
+		return sIgnore
 	case MediaScreen:
-		return "screen"
+		return sScreen
 	case MediaPrint:
-		return "print"
+		return sPrint
 	}
 
-	return "ignore"
+	return sIgnore
 }
 
 // ResolveMedia computes the effective CSS media type: the print-media-type
@@ -131,23 +136,21 @@ func (m MediaType) String() string {
 // "screen" for image). obj may be nil.
 func ResolveMedia(base string, global Web, obj *Web) string {
 	if global.PrintMediaType || obj != nil && obj.PrintMediaType {
-		return "print"
+		return sPrint
 	}
 
-	if obj != nil {
-		switch obj.MediaType {
-		case MediaPrint:
-			return "print"
-		case MediaScreen:
-			return "screen"
-		}
+	media := global.MediaType
+
+	if obj != nil && obj.MediaType != MediaIgnore {
+		media = obj.MediaType
 	}
 
-	switch global.MediaType {
+	switch media {
 	case MediaPrint:
-		return "print"
+		return sPrint
 	case MediaScreen:
-		return "screen"
+		return sScreen
+	case MediaIgnore:
 	}
 
 	return base

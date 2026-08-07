@@ -149,7 +149,7 @@ func globalDottedGeometryChecks(global *PdfGlobal) []dottedCheck {
 			check: func() bool { return global.Grayscale },
 		},
 		{
-			key: "grayscale", val: "false", desc: "grayscale=false must clear Grayscale",
+			key: "grayscale", val: sFalse, desc: "grayscale=false must clear Grayscale",
 			check: func() bool { return !global.Grayscale },
 		},
 		{
@@ -157,7 +157,7 @@ func globalDottedGeometryChecks(global *PdfGlobal) []dottedCheck {
 			check: func() bool { return global.Grayscale },
 		},
 		{
-			key: "outline", val: "false", desc: "outline must be false",
+			key: "outline", val: sFalse, desc: "outline must be false",
 			check: func() bool { return !global.Outline },
 		},
 	}
@@ -190,7 +190,7 @@ func globalDottedTextChecks(global *PdfGlobal) []dottedCheck {
 			check: func() bool { return global.TOC.CaptionText == "Contents" },
 		},
 		{
-			key: "web.background", val: "false", desc: "web.background must clear Global.Background",
+			key: "web.background", val: sFalse, desc: "web.background must clear Global.Background",
 			check: func() bool { return !global.Background },
 		},
 		{
@@ -235,7 +235,7 @@ func TestObjectSetDottedKeys(t *testing.T) {
 	t.Parallel()
 
 	obj := DefaultPdfObject()
-	setKey(t, &obj, "load.blocklocalfileaccess", "false")
+	setKey(t, &obj, "load.blocklocalfileaccess", sFalse)
 
 	if obj.Load.BlockLocalFileAccess {
 		t.Error("blocklocalfileaccess should be false")
@@ -259,7 +259,7 @@ func TestObjectSetDottedKeys(t *testing.T) {
 		t.Errorf("object footer = %+v (set=%v)", obj.Footer, obj.FooterSet)
 	}
 
-	setKey(t, &obj, "web.images", "false")
+	setKey(t, &obj, "web.images", sFalse)
 
 	if obj.Web.Images {
 		t.Error("web.images should be false")
@@ -292,15 +292,15 @@ func TestObjectSetIgnoredKeys(t *testing.T) {
 		t.Errorf("Ignored jsdelay = %q", obj.Ignored["load.jsdelay"])
 	}
 
-	if err := obj.Set("web.javascript", "false"); err != nil {
+	if err := obj.Set("web.javascript", sFalse); err != nil {
 		t.Fatalf("web.javascript should be accepted as ignored: %v", err)
 	}
 
-	if obj.Ignored["web.javascript"] != "false" {
+	if obj.Ignored["web.javascript"] != sFalse {
 		t.Errorf("Ignored web.javascript = %q", obj.Ignored["web.javascript"])
 	}
 
-	if err := obj.Set("pagescount", "false"); err != nil {
+	if err := obj.Set("pagescount", sFalse); err != nil {
 		t.Fatalf("pagescount should be accepted as ignored: %v", err)
 	}
 }
@@ -466,7 +466,7 @@ func TestImageSet(t *testing.T) {
 		t.Errorf("width = %d", img.Width)
 	}
 
-	if err := img.Set("web.images", "false"); err != nil {
+	if err := img.Set("web.images", sFalse); err != nil {
 		t.Fatal(err)
 	}
 
@@ -500,11 +500,11 @@ func TestGlobalGetSetRoundTripAndIgnored(t *testing.T) {
 	getMust(t, &global, "dpi", "150")
 	getMissing(t, &global, "totally.unknown")
 
-	if err := global.Set("background", "false"); err != nil {
+	if err := global.Set("background", sFalse); err != nil {
 		t.Fatal(err)
 	}
 
-	getMust(t, &global, "web.background", "false")
+	getMust(t, &global, "web.background", sFalse)
 }
 
 func getMust(t *testing.T, g *PdfGlobal, key, want string) {
@@ -555,7 +555,7 @@ func TestBackgroundSingleFieldNoWebMirror(t *testing.T) {
 	t.Parallel()
 
 	global := DefaultPdfGlobal()
-	if err := global.Set("web.background", "false"); err != nil {
+	if err := global.Set("web.background", sFalse); err != nil {
 		t.Fatal(err)
 	}
 
@@ -564,12 +564,12 @@ func TestBackgroundSingleFieldNoWebMirror(t *testing.T) {
 	}
 	// Web has no Background field — compile-time guarantee; runtime Get uses Global.
 	got, found := global.Get("web.background")
-	if !found || got != "false" {
+	if !found || got != sFalse {
 		t.Fatalf("Get(web.background)=%q,%v", got, found)
 	}
 
 	got2, found := global.Get("background")
-	if !found || got2 != "false" {
+	if !found || got2 != sFalse {
 		t.Fatalf("Get(background)=%q,%v", got2, found)
 	}
 }
@@ -577,41 +577,41 @@ func TestBackgroundSingleFieldNoWebMirror(t *testing.T) {
 func TestResolveMedia(t *testing.T) {
 	t.Parallel()
 
-	base := "print"
+	base := sPrint
 	none := Web{}                            //nolint:exhaustruct // intentional zero/partial fields
 	pmt := Web{PrintMediaType: true}         //nolint:exhaustruct // intentional zero/partial fields
 	screen := Web{MediaType: MediaScreen}    //nolint:exhaustruct // intentional zero/partial fields
 	printMedia := Web{MediaType: MediaPrint} //nolint:exhaustruct // intentional zero/partial fields
 
-	if got := ResolveMedia(base, none, nil); got != "print" {
+	if got := ResolveMedia(base, none, nil); got != sPrint {
 		t.Errorf("default PDF = %q", got)
 	}
 
-	if got := ResolveMedia("screen", none, nil); got != "screen" {
+	if got := ResolveMedia(sScreen, none, nil); got != sScreen {
 		t.Errorf("default image = %q", got)
 	}
 
-	if got := ResolveMedia(base, pmt, nil); got != "print" {
+	if got := ResolveMedia(base, pmt, nil); got != sPrint {
 		t.Errorf("global print-media-type = %q", got)
 	}
 
-	if got := ResolveMedia(base, none, &pmt); got != "print" {
+	if got := ResolveMedia(base, none, &pmt); got != sPrint {
 		t.Errorf("obj print-media-type = %q", got)
 	}
 
-	if got := ResolveMedia(base, screen, nil); got != "screen" {
+	if got := ResolveMedia(base, screen, nil); got != sScreen {
 		t.Errorf("global media-type screen = %q", got)
 	}
 
-	if got := ResolveMedia(base, none, &screen); got != "screen" {
+	if got := ResolveMedia(base, none, &screen); got != sScreen {
 		t.Errorf("obj media-type screen = %q", got)
 	}
 	// obj wins over global media-type.
-	if got := ResolveMedia(base, screen, &printMedia); got != "print" {
+	if got := ResolveMedia(base, screen, &printMedia); got != sPrint {
 		t.Errorf("obj media-type print over global screen = %q", got)
 	}
 	// print-media-type override wins over media-type.
-	if got := ResolveMedia(base, screen, &pmt); got != "print" {
+	if got := ResolveMedia(base, screen, &pmt); got != sPrint {
 		t.Errorf("pmt over media-type screen = %q", got)
 	}
 }
@@ -622,7 +622,7 @@ func TestApplyImageKeyBackgroundAlias(t *testing.T) {
 	global := DefaultPdfGlobal()
 	img := DefaultImageGlobal()
 
-	if err := ApplyImageKey(&global, &img, "web.background", "false"); err != nil {
+	if err := ApplyImageKey(&global, &img, "web.background", sFalse); err != nil {
 		t.Fatal(err)
 	}
 

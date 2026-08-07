@@ -8,6 +8,12 @@ import (
 	"gowkhtmltopdf/internal/css"
 )
 
+const (
+	transformFuncTranslatex = "translatex"
+	transformFuncScalex     = "scalex"
+	transformFuncSkewx      = "skewx"
+)
+
 // Matrix2D is a CSS/SVG-style 2D affine transform:
 //
 //	x' = A*x + C*y + E
@@ -96,40 +102,43 @@ func defaultTransformOrigin() transformOriginSpec {
 	return transformOriginSpec{X: cssCenterPercent, Y: cssCenterPercent, XPercent: true, YPercent: true}
 }
 
-func resolveTransformOrigin(spec transformOriginSpec, b *box) (ox, oy float64) {
-	if b == nil {
+func resolveTransformOrigin(spec transformOriginSpec, boxNode *box) (float64, float64) {
+	if boxNode == nil {
 		return 0, 0
 	}
 
+	var originX, originY float64
+
 	if spec.XPercent {
-		ox = b.x + b.w*spec.X/cssPercent
+		originX = boxNode.x + boxNode.w*spec.X/cssPercent
 	} else {
-		ox = b.x + spec.X
+		originX = boxNode.x + spec.X
 	}
 
 	if spec.YPercent {
-		oy = b.y + b.height*spec.Y/cssPercent
+		originY = boxNode.y + boxNode.height*spec.Y/cssPercent
 	} else {
-		oy = b.y + spec.Y
+		originY = boxNode.y + spec.Y
 	}
 
-	return ox, oy
+	return originX, originY
 }
 
 // parseTransformList parses a CSS transform function list into a single matrix.
 // Returns ok=false for unrecognized input (caller keeps prior/initial).
 // "none" yields identity with ok=true and has=false.
-func parseTransformList(value string, fs float64) (m Matrix2D, has bool, ok bool) {
+func parseTransformList(value string, fontSize float64) (Matrix2D, bool, bool) {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return IdentityMatrix(), false, false
 	}
 
-	if strings.EqualFold(value, "none") {
+	if strings.EqualFold(value, cssDisplayNone) {
 		return IdentityMatrix(), false, true
 	}
 
-	m = IdentityMatrix()
+	matrix := IdentityMatrix()
+	has := false
 	rest := value
 
 	for {
@@ -143,223 +152,279 @@ func parseTransformList(value string, fs float64) (m Matrix2D, has bool, ok bool
 			return IdentityMatrix(), false, false
 		}
 
-		fm, fok := parseOneTransformFunc(name, args, fs)
+		fm, fok := parseOneTransformFunc(name, args, fontSize)
 		if !fok {
 			return IdentityMatrix(), false, false
 		}
 		// Left-to-right post-multiply: M = M * Fi
-		m = m.Mul(fm)
+		matrix = matrix.Mul(fm)
 		has = true
 		rest = next
 	}
 
-	return m, has, true
+	return matrix, has, true
 }
 
-func splitTransformFunc(s string) (name, args, rest string, ok bool) {
-	s = strings.TrimSpace(s)
-	idx := 0
-
-	for idx < len(s) && ((s[idx] >= 'a' && s[idx] <= 'z') || (s[idx] >= 'A' && s[idx] <= 'Z') || s[idx] == '-') {
-		idx++
-	}
+func splitTransformFunc(s string) (string, string, string, bool) {
+	text := strings.TrimSpace(s)
+	idx := scanTransformFuncName(text)
 
 	if idx == 0 {
 		return "", "", "", false
 	}
 
-	name = strings.ToLower(s[:idx])
+	name := strings.ToLower(text[:idx])
 
-	s = strings.TrimSpace(s[idx:])
-	if len(s) == 0 || s[0] != '(' {
+	body := strings.TrimSpace(text[idx:])
+	if len(body) == 0 || body[0] != '(' {
 		return "", "", "", false
 	}
 
+	args, rest, ok := scanTransformParens(body)
+
+	return name, args, rest, ok
+}
+
+// scanTransformFuncName returns the length of the leading identifier of a
+// transform function name (letters and hyphens).
+func scanTransformFuncName(text string) int {
+	idx := 0
+
+	for idx < len(text) && ((text[idx] >= 'a' && text[idx] <= 'z') ||
+		(text[idx] >= 'A' && text[idx] <= 'Z') || text[idx] == '-') {
+		idx++
+	}
+
+	return idx
+}
+
+// scanTransformParens extracts the content of the top-level (...) group from
+// text (which must start with '(') and returns it plus the trimmed remainder.
+func scanTransformParens(text string) (string, string, bool) {
 	depth := 0
 
-	for jdx := range len(s) {
-		switch s[jdx] {
+	for jdx := range len(text) {
+		switch text[jdx] {
 		case '(':
 			depth++
 		case ')':
 			depth--
 			if depth == 0 {
-				args = strings.TrimSpace(s[1:jdx])
-				rest = strings.TrimSpace(s[jdx+1:])
-
-				return name, args, rest, true
+				return strings.TrimSpace(text[1:jdx]), strings.TrimSpace(text[jdx+1:]), true
 			}
 		}
 	}
 
-	return "", "", "", false
+	return "", "", false
 }
 
-func parseOneTransformFunc(name, args string, fs float64) (Matrix2D, bool) {
+func parseOneTransformFunc(name, args string, fontSize float64) (Matrix2D, bool) {
 	parts := splitTransformArgs(args)
 
 	switch name {
 	case "matrix":
-		if len(parts) != matrixCoeffCount {
-			return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
-		}
-
-		vals := make([]float64, matrixCoeffCount)
-
-		for idx, p := range parts {
-			// CSS matrix() takes six <number>s (user units ≈ px at 96dpi).
-			val, ok := parseUnitless(p)
-			if !ok {
-				return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
-			}
-
-			if idx >= minBoxPt {
-				// e,f: translate in px → pt for our canvas.
-				vals[idx] = pxToPt(val)
-			} else {
-				vals[idx] = val
-			}
-		}
-		// CSS matrix(a,b,c,d,e,f): x'=ax+cy+e, y'=bx+dy+f
-		return Matrix2D{A: vals[0], B: vals[1], C: vals[2], D: vals[3], E: vals[4], F: vals[5]}, true
-	case "translate":
-		if len(parts) < 1 || len(parts) > 2 {
-			return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
-		}
-
-		textX, isOK := parseTransformLength(parts[0], fs)
-		if !isOK {
-			return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
-		}
-
-		typeY := 0.0
-		if len(parts) == two {
-			typeY, isOK = parseTransformLength(parts[1], fs)
-			if !isOK {
-				return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
-			}
-		}
-
-		return Translate(textX, typeY), true
-	case "translatex":
-		if len(parts) != 1 {
-			return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
-		}
-
-		tx, ok := parseTransformLength(parts[0], fs)
-		if !ok {
-			return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
-		}
-
-		return Translate(tx, 0), true
-	case "translatey":
-		if len(parts) != 1 {
-			return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
-		}
-
-		ty, ok := parseTransformLength(parts[0], fs)
-		if !ok {
-			return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
-		}
-
-		return Translate(0, ty), true
-	case "scale":
-		if len(parts) < 1 || len(parts) > 2 {
-			return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
-		}
-
-		startX, isOK := parseUnitless(parts[0])
-		if !isOK {
-			return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
-		}
-
-		startY := startX
-		if len(parts) == two {
-			startY, isOK = parseUnitless(parts[1])
-			if !isOK {
-				return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
-			}
-		}
-
-		return Scale(startX, startY), true
-	case "scalex":
-		if len(parts) != 1 {
-			return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
-		}
-
-		sx, ok := parseUnitless(parts[0])
-		if !ok {
-			return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
-		}
-
-		return Scale(sx, 1), true
-	case "scaley":
-		if len(parts) != 1 {
-			return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
-		}
-
-		sy, ok := parseUnitless(parts[0])
-		if !ok {
-			return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
-		}
-
-		return Scale(1, sy), true
+		return parseMatrixFunc(parts)
+	case "translate", transformFuncTranslatex, "translatey":
+		return parseTranslateFunc(name, parts, fontSize)
+	case "scale", transformFuncScalex, "scaley":
+		return parseScaleFunc(name, parts)
 	case "rotate":
-		if len(parts) != 1 {
-			return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
-		}
-
-		deg, ok := parseAngleDeg(parts[0])
-		if !ok {
-			return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
-		}
-
-		return RotateDeg(deg), true
-	case "skew":
-		if len(parts) < 1 || len(parts) > 2 {
-			return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
-		}
-
-		axVal, isOK := parseAngleDeg(parts[0])
-		if !isOK {
-			return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
-		}
-
-		absY := 0.0
-		if len(parts) == two {
-			absY, isOK = parseAngleDeg(parts[1])
-			if !isOK {
-				return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
-			}
-		}
-
-		return SkewXDeg(axVal).Mul(SkewYDeg(absY)), true
-	case "skewx":
-		if len(parts) != 1 {
-			return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
-		}
-
-		deg, ok := parseAngleDeg(parts[0])
-		if !ok {
-			return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
-		}
-
-		return SkewXDeg(deg), true
-	case "skewy":
-		if len(parts) != 1 {
-			return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
-		}
-
-		deg, ok := parseAngleDeg(parts[0])
-		if !ok {
-			return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
-		}
-
-		return SkewYDeg(deg), true
+		return parseRotateFunc(parts)
+	case "skew", transformFuncSkewx, "skewy":
+		return parseSkewFunc(name, parts)
 	default:
 		// 3D / perspective / matrix3d: reject (non-goal)
 		return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
 	}
+}
+
+// parseMatrixFunc parses matrix(a,b,c,d,e,f) coefficients.
+func parseMatrixFunc(parts []string) (Matrix2D, bool) {
+	if len(parts) != matrixCoeffCount {
+		return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
+	}
+
+	vals := make([]float64, matrixCoeffCount)
+
+	for idx, p := range parts {
+		// CSS matrix() takes six <number>s (user units ≈ px at 96dpi).
+		val, ok := parseUnitless(p)
+		if !ok {
+			return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
+		}
+
+		if idx >= minBoxPt {
+			// e,f: translate in px → pt for our canvas.
+			vals[idx] = pxToPt(val)
+		} else {
+			vals[idx] = val
+		}
+	}
+	// CSS matrix(a,b,c,d,e,f): x'=ax+cy+e, y'=bx+dy+f
+	return Matrix2D{A: vals[0], B: vals[1], C: vals[2], D: vals[3], E: vals[4], F: vals[5]}, true
+}
+
+// parseTranslateFunc parses translate(tx[, ty]) and its translatex/translatey
+// one-axis variants.
+func parseTranslateFunc(name string, parts []string, fontSize float64) (Matrix2D, bool) {
+	if name == transformFuncTranslatex || name == "translatey" {
+		return parseSingleAxisTranslate(name, parts, fontSize)
+	}
+
+	return parseTwoArgTranslate(parts, fontSize)
+}
+
+// parseSingleAxisTranslate parses translatex(tx) / translatey(ty).
+func parseSingleAxisTranslate(name string, parts []string, fontSize float64) (Matrix2D, bool) {
+	if len(parts) != 1 {
+		return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
+	}
+
+	axisLen, isOK := parseTransformLength(parts[0], fontSize)
+	if !isOK {
+		return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
+	}
+
+	if name == transformFuncTranslatex {
+		return Translate(axisLen, 0), true
+	}
+
+	return Translate(0, axisLen), true
+}
+
+// parseTwoArgTranslate parses translate(tx[, ty]).
+func parseTwoArgTranslate(parts []string, fontSize float64) (Matrix2D, bool) {
+	if len(parts) < 1 || len(parts) > 2 {
+		return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
+	}
+
+	xLen, isOK := parseTransformLength(parts[0], fontSize)
+	if !isOK {
+		return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
+	}
+
+	yLen := 0.0
+	if len(parts) == two {
+		yLen, isOK = parseTransformLength(parts[1], fontSize)
+		if !isOK {
+			return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
+		}
+	}
+
+	return Translate(xLen, yLen), true
+}
+
+// parseScaleFunc parses scale(sx[, sy]) and its scalex/scaley one-axis
+// variants.
+func parseScaleFunc(name string, parts []string) (Matrix2D, bool) {
+	if name == transformFuncScalex || name == "scaley" {
+		return parseSingleAxisScale(name, parts)
+	}
+
+	return parseTwoArgScale(parts)
+}
+
+// parseSingleAxisScale parses scalex(sx) / scaley(sy).
+func parseSingleAxisScale(name string, parts []string) (Matrix2D, bool) {
+	if len(parts) != 1 {
+		return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
+	}
+
+	axisScale, isOK := parseUnitless(parts[0])
+	if !isOK {
+		return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
+	}
+
+	if name == transformFuncScalex {
+		return Scale(axisScale, 1), true
+	}
+
+	return Scale(1, axisScale), true
+}
+
+// parseTwoArgScale parses scale(sx[, sy]).
+func parseTwoArgScale(parts []string) (Matrix2D, bool) {
+	if len(parts) < 1 || len(parts) > 2 {
+		return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
+	}
+
+	xScale, isOK := parseUnitless(parts[0])
+	if !isOK {
+		return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
+	}
+
+	yScale := xScale
+	if len(parts) == two {
+		yScale, isOK = parseUnitless(parts[1])
+		if !isOK {
+			return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
+		}
+	}
+
+	return Scale(xScale, yScale), true
+}
+
+// parseRotateFunc parses rotate(deg).
+func parseRotateFunc(parts []string) (Matrix2D, bool) {
+	if len(parts) != 1 {
+		return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
+	}
+
+	deg, ok := parseAngleDeg(parts[0])
+	if !ok {
+		return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
+	}
+
+	return RotateDeg(deg), true
+}
+
+// parseSkewFunc parses skew(ax[, ay]) and its skewx/skewy one-axis variants.
+func parseSkewFunc(name string, parts []string) (Matrix2D, bool) {
+	if name == transformFuncSkewx || name == "skewy" {
+		return parseSingleAxisSkew(name, parts)
+	}
+
+	return parseTwoArgSkew(parts)
+}
+
+// parseSingleAxisSkew parses skewx(deg) / skewy(deg).
+func parseSingleAxisSkew(name string, parts []string) (Matrix2D, bool) {
+	if len(parts) != 1 {
+		return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
+	}
+
+	deg, isOK := parseAngleDeg(parts[0])
+	if !isOK {
+		return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
+	}
+
+	if name == transformFuncSkewx {
+		return SkewXDeg(deg), true
+	}
+
+	return SkewYDeg(deg), true
+}
+
+// parseTwoArgSkew parses skew(ax[, ay]).
+func parseTwoArgSkew(parts []string) (Matrix2D, bool) {
+	if len(parts) < 1 || len(parts) > 2 {
+		return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
+	}
+
+	xDeg, isOK := parseAngleDeg(parts[0])
+	if !isOK {
+		return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
+	}
+
+	yDeg := 0.0
+	if len(parts) == two {
+		yDeg, isOK = parseAngleDeg(parts[1])
+		if !isOK {
+			return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
+		}
+	}
+
+	return SkewXDeg(xDeg).Mul(SkewYDeg(yDeg)), true
 }
 
 func splitTransformArgs(args string) []string {
@@ -450,7 +515,7 @@ func parseAngleDeg(cssSheet string) (float64, bool) {
 // at parse we store % as a fraction of a 0 base (treated as 0) unless we defer.
 // For static print we resolve % translate against 0 at parse (rare) — prefer
 // absolute lengths in reports. em uses font-size.
-func parseTransformLength(cssS string, fsize float64) (float64, bool) {
+func parseTransformLength(cssS string, fontSize float64) (float64, bool) {
 	cssS = strings.TrimSpace(cssS)
 	if cssS == "0" {
 		return 0, true
@@ -476,7 +541,7 @@ func parseTransformLength(cssS string, fsize float64) (float64, bool) {
 		return pxToPt(cssPxRoot) * val, true
 	}
 
-	if pt, ok := css.LengthToPt(val, unit, fsize); ok {
+	if pt, ok := css.LengthToPt(val, unit, fontSize); ok {
 		return pt, true
 	}
 
@@ -484,7 +549,7 @@ func parseTransformLength(cssS string, fsize float64) (float64, bool) {
 }
 
 // parseTransformOrigin parses CSS transform-origin (1–3 values; z ignored).
-func parseTransformOrigin(value string, fs float64) (transformOriginSpec, bool) {
+func parseTransformOrigin(value string, fontSize float64) (transformOriginSpec, bool) {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return transformOriginSpec{}, false //nolint:exhaustruct // intentional zero fields
@@ -496,37 +561,16 @@ func parseTransformOrigin(value string, fs float64) (transformOriginSpec, bool) 
 	}
 
 	spec := defaultTransformOrigin()
-	parseOne := func(tok string) (v float64, pct bool, ok bool) {
-		tok = strings.ToLower(strings.TrimSpace(tok))
-		switch tok {
-		case "left", "top":
-			return 0, true, true
-		case "center":
-			return cssCenterPercent, true, true
-		case "right", "bottom":
-			return cssPercent, true, true
-		}
-
-		if lv, unit, lok := css.ParseLength(tok); lok && unit == "%" {
-			return lv, true, true
-		}
-
-		if pt, lok := parseTransformLength(tok, fs); lok {
-			return pt, false, true
-		}
-
-		return 0, false, false
-	}
 
 	switch len(parts) {
 	case 1:
-		val, pct, ok := parseOne(parts[0])
+		val, pct, ok := parseTransformOriginToken(parts[0], fontSize)
 		if !ok {
 			return transformOriginSpec{}, false //nolint:exhaustruct // intentional zero fields
 		}
 
 		tok := strings.ToLower(parts[0])
-		if tok == "top" || tok == "bottom" {
+		if tok == cssVerticalAlignTop || tok == cssVerticalAlignBottom {
 			spec.Y, spec.YPercent = val, pct
 			spec.X, spec.XPercent = 50, true
 		} else {
@@ -534,38 +578,64 @@ func parseTransformOrigin(value string, fs float64) (transformOriginSpec, bool) 
 			spec.Y, spec.YPercent = 50, true
 		}
 	case two, three:
-		// Two-value: horizontal then vertical (keywords may be either axis).
-		a, b := strings.ToLower(parts[0]), strings.ToLower(parts[1])
-		axIsY := a == "top" || a == "bottom"
-		bxIsY := b == "top" || b == "bottom"
-		bxIsX := b == "left" || b == "right"
-
-		if axIsY && (bxIsX || !bxIsY) {
-			// vertical horizontal → swap
-			valA, pageA, oka := parseOne(parts[0])
-			valB, pbox, okb := parseOne(parts[1])
-
-			if !oka || !okb {
-				return transformOriginSpec{}, false //nolint:exhaustruct // intentional zero fields
-			}
-
-			spec.Y, spec.YPercent = valA, pageA
-			spec.X, spec.XPercent = valB, pbox
-		} else {
-			valA, pageA, oka := parseOne(parts[0])
-			valB, pbox, okb := parseOne(parts[1])
-
-			if !oka || !okb {
-				return transformOriginSpec{}, false //nolint:exhaustruct // intentional zero fields
-			}
-
-			spec.X, spec.XPercent = valA, pageA
-			spec.Y, spec.YPercent = valB, pbox
-		}
 		// Optional third value (z) ignored for 2D print.
+		if !applyTransformOriginPair(&spec, parts[0], parts[1], fontSize) {
+			return transformOriginSpec{}, false //nolint:exhaustruct // intentional zero fields
+		}
 	}
 
 	return spec, true
+}
+
+// parseTransformOriginToken parses one transform-origin value into its value
+// and whether it is a percentage.
+func parseTransformOriginToken(tok string, fontSize float64) (float64, bool, bool) {
+	tok = strings.ToLower(strings.TrimSpace(tok))
+	switch tok {
+	case floatLeft, cssVerticalAlignTop:
+		return 0, true, true
+	case fxCenter:
+		return cssCenterPercent, true, true
+	case floatRight, cssVerticalAlignBottom:
+		return cssPercent, true, true
+	}
+
+	if lv, unit, lok := css.ParseLength(tok); lok && unit == "%" {
+		return lv, true, true
+	}
+
+	if pt, lok := parseTransformLength(tok, fontSize); lok {
+		return pt, false, true
+	}
+
+	return 0, false, false
+}
+
+// applyTransformOriginPair resolves a two-value horizontal/vertical origin
+// pair, swapping axes when the values come in vertical-first order.
+func applyTransformOriginPair(spec *transformOriginSpec, first, second string, fontSize float64) bool {
+	firstTok, secondTok := strings.ToLower(first), strings.ToLower(second)
+	firstIsY := firstTok == cssVerticalAlignTop || firstTok == cssVerticalAlignBottom
+	secondIsY := secondTok == cssVerticalAlignTop || secondTok == cssVerticalAlignBottom
+	secondIsX := secondTok == floatLeft || secondTok == floatRight
+
+	valA, pageA, oka := parseTransformOriginToken(first, fontSize)
+	valB, pbox, okb := parseTransformOriginToken(second, fontSize)
+
+	if !oka || !okb {
+		return false
+	}
+
+	if firstIsY && (secondIsX || !secondIsY) {
+		// vertical horizontal → swap
+		spec.Y, spec.YPercent = valA, pageA
+		spec.X, spec.XPercent = valB, pbox
+	} else {
+		spec.X, spec.XPercent = valA, pageA
+		spec.Y, spec.YPercent = valB, pbox
+	}
+
+	return true
 }
 
 // parseOpacityValue parses CSS opacity (number 0..1 or percentage).
@@ -596,7 +666,7 @@ func parseOpacityValue(value string) (float64, bool) {
 // are ignored (blur/drop-shadow are permanent print-engine non-goals).
 func parseFilterOpacity(value string) (float64, bool) {
 	value = strings.TrimSpace(strings.ToLower(value))
-	if value == "" || value == "none" {
+	if value == "" || value == cssDisplayNone {
 		return 1, false
 	}
 
@@ -643,68 +713,101 @@ func clamp01(val float64) float64 {
 // stampBoxTransforms walks the laid-out tree and stamps composed 2D
 // transform matrices (origin baked) onto display-list ops. Parent transforms
 // compose around children; sibling flow geometry is unchanged.
-func stampBoxTransforms(b *box, parentAccum Matrix2D, ops []Op) {
-	if b == nil {
+func stampBoxTransforms(boxNode *box, parentAccum Matrix2D, ops []Op) {
+	if boxNode == nil {
 		return
 	}
 
 	accum := parentAccum
 
-	if b.style.HasTransform {
-		ox, oy := resolveTransformOrigin(b.style.TransformOrigin, b)
-		baked := BakeOrigin(b.style.Transform, ox, oy)
+	if boxNode.style.HasTransform {
+		ox, oy := resolveTransformOrigin(boxNode.style.TransformOrigin, boxNode)
+		baked := BakeOrigin(boxNode.style.Transform, ox, oy)
 		accum = parentAccum.Mul(baked)
 	}
 
 	childCovered := map[int]struct{}{}
 
-	for _, c := range b.children {
+	for _, c := range boxNode.children {
 		stampBoxTransforms(c, accum, ops)
-
-		if c.opEnd >= c.opStart && c.opStart >= 0 {
-			for i := c.opStart; i <= c.opEnd && i < len(ops); i++ {
-				childCovered[i] = struct{}{}
-			}
-		}
+		markBoxOpsCovered(c, ops, childCovered)
 	}
 
-	if !accum.IsIdentity() && b.opEnd >= b.opStart && b.opStart >= 0 {
-		for idx := b.opStart; idx <= b.opEnd && idx < len(ops); idx++ {
-			if _, covered := childCovered[idx]; covered {
-				continue
-			}
+	stampExclusiveTransformOps(boxNode, accum, ops, childCovered)
+	stampExclusiveOpacityOps(boxNode, ops, childCovered)
+	stampCoveredOpacityOps(boxNode, ops, childCovered)
+}
 
-			ops[idx].Xform = accum
-			ops[idx].XformSet = true
-		}
+// markBoxOpsCovered records the display-list ops owned exclusively by child c.
+func markBoxOpsCovered(c *box, ops []Op, covered map[int]struct{}) {
+	if !boxOwnsOps(c) {
+		return
 	}
-	// Opacity: multiply down the tree onto exclusive ops.
-	if b.style.Opacity < 1 && b.opEnd >= b.opStart && b.opStart >= 0 {
-		for idx := b.opStart; idx <= b.opEnd && idx < len(ops); idx++ {
-			if _, covered := childCovered[idx]; covered {
-				continue
-			}
 
-			a := b.style.Opacity
-			if ops[idx].PaintOpacity > 0 && ops[idx].PaintOpacity < 1 {
-				a *= ops[idx].PaintOpacity
-			}
+	for idx := c.opStart; idx <= c.opEnd && idx < len(ops); idx++ {
+		covered[idx] = struct{}{}
+	}
+}
 
-			ops[idx].PaintOpacity = a
+// boxOwnsOps reports whether boxNode has a non-empty range of exclusive ops.
+func boxOwnsOps(boxNode *box) bool {
+	return boxNode.opEnd >= boxNode.opStart && boxNode.opStart >= 0
+}
+
+// stampExclusiveTransformOps applies the accumulated transform to ops owned
+// exclusively by boxNode; child-owned ops keep the child's own transform.
+func stampExclusiveTransformOps(boxNode *box, accum Matrix2D, ops []Op, covered map[int]struct{}) {
+	if accum.IsIdentity() || !boxOwnsOps(boxNode) {
+		return
+	}
+
+	for idx := boxNode.opStart; idx <= boxNode.opEnd && idx < len(ops); idx++ {
+		if _, isCovered := covered[idx]; isCovered {
+			continue
 		}
-		// Children already stamped their exclusive ops; multiply ancestor opacity
-		// onto covered child ops as well (opacity composites through descendants).
-		for idx := b.opStart; idx <= b.opEnd && idx < len(ops); idx++ {
-			if _, covered := childCovered[idx]; !covered {
-				continue
-			}
 
-			a := b.style.Opacity
-			if ops[idx].PaintOpacity > 0 && ops[idx].PaintOpacity < 1 {
-				ops[idx].PaintOpacity = a * ops[idx].PaintOpacity
-			} else {
-				ops[idx].PaintOpacity = a
-			}
+		ops[idx].Xform = accum
+		ops[idx].XformSet = true
+	}
+}
+
+// stampExclusiveOpacityOps multiplies boxNode's opacity onto its exclusive ops.
+func stampExclusiveOpacityOps(boxNode *box, ops []Op, covered map[int]struct{}) {
+	if boxNode.style.Opacity >= 1 || !boxOwnsOps(boxNode) {
+		return
+	}
+
+	for idx := boxNode.opStart; idx <= boxNode.opEnd && idx < len(ops); idx++ {
+		if _, isCovered := covered[idx]; isCovered {
+			continue
+		}
+
+		opacity := boxNode.style.Opacity
+		if ops[idx].PaintOpacity > 0 && ops[idx].PaintOpacity < 1 {
+			opacity *= ops[idx].PaintOpacity
+		}
+
+		ops[idx].PaintOpacity = opacity
+	}
+}
+
+// stampCoveredOpacityOps composes boxNode's ancestor opacity through
+// child-owned ops (opacity composites through descendants).
+func stampCoveredOpacityOps(boxNode *box, ops []Op, covered map[int]struct{}) {
+	if boxNode.style.Opacity >= 1 || !boxOwnsOps(boxNode) {
+		return
+	}
+
+	for idx := boxNode.opStart; idx <= boxNode.opEnd && idx < len(ops); idx++ {
+		if _, isCovered := covered[idx]; !isCovered {
+			continue
+		}
+
+		opacity := boxNode.style.Opacity
+		if ops[idx].PaintOpacity > 0 && ops[idx].PaintOpacity < 1 {
+			ops[idx].PaintOpacity = opacity * ops[idx].PaintOpacity
+		} else {
+			ops[idx].PaintOpacity = opacity
 		}
 	}
 }
@@ -713,15 +816,17 @@ func stampBoxTransforms(b *box, parentAccum Matrix2D, ops []Op) {
 // canvas space (y-down) given canvas→PDF map C(x,y)=(ml+x, K-y).
 //
 //	CTM = C ∘ cssXform ∘ C⁻¹
-func pdfCTMFromCSS(m Matrix2D, pageIdx int, contentH float64, opts PaintOptions, pageH float64) (a, b, c, d, e, f float64) {
+func pdfCTMFromCSS(
+	matrix Matrix2D, pageIdx int, contentH float64, opts PaintOptions, pageH float64,
+) (float64, float64, float64, float64, float64, float64) {
 	margL := opts.MarginLeft
 	keyK := pageH - opts.MarginTop + float64(pageIdx)*contentH
-	a = m.A
-	b = -m.B
-	c = -m.C
-	d = m.D
-	e = (1-m.A)*margL + m.C*keyK + m.E
-	f = keyK*(1-m.D) + m.B*margL - m.F
+	coeffA := matrix.A
+	coeffB := -matrix.B
+	coeffC := -matrix.C
+	coeffD := matrix.D
+	offsetE := (1-matrix.A)*margL + matrix.C*keyK + matrix.E
+	offsetF := keyK*(1-matrix.D) + matrix.B*margL - matrix.F
 
-	return a, b, c, d, e, f
+	return coeffA, coeffB, coeffC, coeffD, offsetE, offsetF
 }

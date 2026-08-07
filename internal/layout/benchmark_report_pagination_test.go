@@ -97,7 +97,7 @@ td.amount { text-align: right; }
 
 	var walk func(*box)
 	walk = func(b *box) {
-		if b.kind == "table" {
+		if b.kind == displayTable {
 			tables = append(tables, b)
 		}
 

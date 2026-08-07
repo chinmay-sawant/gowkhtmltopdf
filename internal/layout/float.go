@@ -1,5 +1,17 @@
 package layout
 
+// Float/clear and overflow keyword constants (goconst) kept next to the
+// float engine that uses them.
+const (
+	floatLeft      = "left"
+	floatRight     = "right"
+	clearBoth      = "both"
+	overflowHidden = "hidden"
+	overflowScroll = "scroll"
+	overflowAuto   = "auto"
+	overflowClip   = "clip"
+)
+
 // floatState tracks left/right floats inside one block formatting context.
 // Coordinates are canvas-absolute for bottoms and edges; contentX/contentW
 // define the BFC's content box (exclusion starts from those edges).
@@ -39,120 +51,133 @@ func newFloatState(contentX, contentW float64) floatState {
 	}
 }
 
-// clear advances cy (content-relative) so the next in-flow box sits below
-// the floats named by clear ("left"|"right"|"both").
-func (f *floatState) clear(clear string, y, cy float64) float64 {
-	need := y + cy
+// clearFloats advances cy (content-relative) so the next in-flow box sits
+// below the floats named by clear ("left"|"right"|"both").
+func (f *floatState) clearFloats(clearVal string, posY, curY float64) float64 {
+	need := posY + curY
 
-	switch clear {
-	case "left":
-		if f.hasLeft && f.leftBottom > need {
-			need = f.leftBottom
-		}
-
-		f.hasLeft = false
-		f.leftBottom = 0
-		f.leftTop = 0
-		f.leftEdge = f.contentX
-	case "right":
-		if f.hasRight && f.rightBottom > need {
-			need = f.rightBottom
-		}
-
-		f.hasRight = false
-		f.rightBottom = 0
-		f.rightTop = 0
-		f.rightEdge = f.contentX + f.contentW
-	case "both":
-		if f.hasLeft && f.leftBottom > need {
-			need = f.leftBottom
-		}
-
-		if f.hasRight && f.rightBottom > need {
-			need = f.rightBottom
-		}
-
-		f.hasLeft, f.hasRight = false, false
-		f.leftBottom, f.rightBottom = 0, 0
-		f.leftTop, f.rightTop = 0, 0
-		f.leftEdge = f.contentX
-		f.rightEdge = f.contentX + f.contentW
+	switch clearVal {
+	case floatLeft:
+		need = f.clearLeft(need)
+	case floatRight:
+		need = f.clearRight(need)
+	case clearBoth:
+		need = f.clearLeft(need)
+		need = f.clearRight(need)
 	}
 
-	if need > y+cy {
-		return need - y
+	if need > posY+curY {
+		return need - posY
 	}
 
-	return cy
+	return curY
+}
+
+// clearLeft drops the left float and raises need past its bottom.
+func (f *floatState) clearLeft(need float64) float64 {
+	if f.hasLeft && f.leftBottom > need {
+		need = f.leftBottom
+	}
+
+	f.hasLeft = false
+	f.leftBottom = 0
+	f.leftTop = 0
+	f.leftEdge = f.contentX
+
+	return need
+}
+
+// clearRight drops the right float and raises need past its bottom.
+func (f *floatState) clearRight(need float64) float64 {
+	if f.hasRight && f.rightBottom > need {
+		need = f.rightBottom
+	}
+
+	f.hasRight = false
+	f.rightBottom = 0
+	f.rightTop = 0
+	f.rightEdge = f.contentX + f.contentW
+
+	return need
 }
 
 // place records a laid-out float box on the left or right side.
 // ml/mr are the floated box's horizontal margins (scaled pt); exclusion uses
 // the margin box so in-flow text clears the gap before the border (e.g.
 // float:right; margin-left:1em), instead of painting flush against the frame.
-func (f *floatState) place(side string, b *box, ml, mr float64) {
-	bottom := b.y + b.height
+func (f *floatState) place(side string, fbox *box, margL, margR float64) {
+	bottom := fbox.y + fbox.height
 
 	switch side {
-	case "left":
-		if !f.hasLeft || bottom > f.leftBottom {
-			f.leftBottom = bottom
-		}
-
-		if !f.hasLeft || b.y < f.leftTop {
-			f.leftTop = b.y
-		}
-
-		edge := b.x + b.w + mr
-		if !f.hasLeft || edge > f.leftEdge {
-			f.leftEdge = edge
-		}
-
-		f.hasLeft = true
-	case "right":
-		if !f.hasRight || bottom > f.rightBottom {
-			f.rightBottom = bottom
-		}
-
-		if !f.hasRight || b.y < f.rightTop {
-			f.rightTop = b.y
-		}
-
-		edge := b.x - ml
-		if !f.hasRight || edge < f.rightEdge {
-			f.rightEdge = edge
-		}
-
-		f.hasRight = true
+	case floatLeft:
+		f.placeLeft(fbox, bottom, margR)
+	case floatRight:
+		f.placeRight(fbox, bottom, margL)
 	}
+}
+
+// placeLeft records a left float's bottom/top and the edge of its margin box.
+func (f *floatState) placeLeft(fbox *box, bottom, margR float64) {
+	if !f.hasLeft || bottom > f.leftBottom {
+		f.leftBottom = bottom
+	}
+
+	if !f.hasLeft || fbox.y < f.leftTop {
+		f.leftTop = fbox.y
+	}
+
+	edge := fbox.x + fbox.w + margR
+	if !f.hasLeft || edge > f.leftEdge {
+		f.leftEdge = edge
+	}
+
+	f.hasLeft = true
+}
+
+// placeRight records a right float's bottom/top and the edge of its margin box.
+func (f *floatState) placeRight(fbox *box, bottom, margL float64) {
+	if !f.hasRight || bottom > f.rightBottom {
+		f.rightBottom = bottom
+	}
+
+	if !f.hasRight || fbox.y < f.rightTop {
+		f.rightTop = fbox.y
+	}
+
+	edge := fbox.x - margL
+	if !f.hasRight || edge < f.rightEdge {
+		f.rightEdge = edge
+	}
+
+	f.hasRight = true
 }
 
 // exclusion returns the in-flow content origin and width at canvas y = y+cy
 // after subtracting active float intrusion from the caller's content box
 // (contentX/contentW). Float edges are canvas-absolute.
-func (f *floatState) exclusion(contentX, contentW, y, cy float64) (x, w float64) {
-	x, w = contentX, contentW
+func (f *floatState) exclusion(contentX, contentW, y, cy float64) (float64, float64) {
+	outX, outW := contentX, contentW
 	top := y + cy
 
 	if f.hasLeft && f.leftBottom > top {
-		if f.leftEdge > x {
-			w -= f.leftEdge - x
-			x = f.leftEdge
+		if f.leftEdge > outX {
+			outW -= f.leftEdge - outX
+			outX = f.leftEdge
 		}
 	}
 
 	if f.hasRight && f.rightBottom > top {
 		limit := f.rightEdge
-		if limit < x+w {
-			w = limit - x
+		if limit < outX+outW {
+			outW = limit - outX
 		}
 	}
 
-	if w < 0 {
-		w = 0
+	if outW < 0 {
+		outW = 0
 	}
 
-	return x, w
+	return outX, outW
 }
 
 // clearY returns the canvas Y just past any float that still shortens the
@@ -190,18 +215,18 @@ func (f *floatState) extentCy(posY, cy float64) float64 {
 // that traps floats (CSS2.1 / Display 3). Descendants' floats do not affect
 // the parent BFC; the box's used height encloses its floats.
 func establishesBFC(sty ResolvedStyle) bool {
-	if sty.Float != "none" {
+	if sty.Float != cssDisplayNone {
 		return true
 	}
 
 	switch sty.Display {
-	case "flow-root", "inline-block", "table-cell", "table-caption",
-		"flex", "inline-flex", "grid", "inline-grid":
+	case displayFlowRoot, cssDisplayInlineBlock, displayTableCell, displayTableCaption,
+		displayFlex, displayInlineFlex, displayGrid, displayInlineGrid:
 		return true
 	}
 
 	switch sty.Overflow {
-	case "hidden", "scroll", "auto", "clip":
+	case overflowHidden, overflowScroll, overflowAuto, overflowClip:
 		return true
 	}
 

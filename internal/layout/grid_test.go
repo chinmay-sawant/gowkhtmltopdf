@@ -431,7 +431,7 @@ func TestParseGridTemplateAreas(t *testing.T) { //nolint:cyclop
 		t.Fatalf("main=%v ok=%v", main, isOK)
 	}
 
-	empty := parseGridTemplateAreas("none")
+	empty := parseGridTemplateAreas(cssDisplayNone)
 	if empty.rows != 0 || len(empty.names) != 0 {
 		t.Fatalf("none should be empty: %+v", empty)
 	}
@@ -485,15 +485,15 @@ func TestParseGridAreaAndAutoFlow(t *testing.T) { //nolint:cyclop
 			l.GridRowStart, l.GridColumnStart, l.GridRowSpan, l.GridColumnSpan)
 	}
 
-	if styles[nodes[2]].GridAutoFlow != "dense" {
+	if styles[nodes[2]].GridAutoFlow != gridFlowDense {
 		t.Fatalf("dense: %q", styles[nodes[2]].GridAutoFlow)
 	}
 
-	if styles[nodes[3]].GridAutoFlow != "column dense" {
+	if styles[nodes[3]].GridAutoFlow != gridFlowColumnDense {
 		t.Fatalf("column dense: %q", styles[nodes[3]].GridAutoFlow)
 	}
 
-	col, dense := gridAutoFlowMode("row dense")
+	col, dense := gridAutoFlowMode(gridFlowRowDense)
 	if col || !dense {
 		t.Fatalf("row dense mode: col=%v dense=%v", col, dense)
 	}

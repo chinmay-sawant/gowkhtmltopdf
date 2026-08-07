@@ -78,11 +78,11 @@ func TestWikiLogoWordmarkAboveTagline(t *testing.T) { //nolint:cyclop,funlen
 	}
 	walk(root)
 
-	if styles[word].Display != "block" {
+	if styles[word].Display != displayBlock {
 		t.Fatalf("wordmark display=%q want block", styles[word].Display)
 	}
 
-	if styles[tagline].Display != "block" {
+	if styles[tagline].Display != displayBlock {
 		t.Fatalf("tagline display=%q want block", styles[tagline].Display)
 	}
 

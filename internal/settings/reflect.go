@@ -19,6 +19,58 @@ func errInvalid(key, value, allowed string) error {
 	return invalidError{key: key, value: value, allowed: allowed}
 }
 
+// unknownSettingError reports a settings key with no descriptor and no
+// known-ignored entry.
+type unknownSettingError struct {
+	kind, name string
+}
+
+func (e unknownSettingError) Error() string {
+	return fmt.Sprintf("unknown %s setting %q", e.kind, e.name)
+}
+
+func errUnknownSetting(kind, name string) error {
+	return unknownSettingError{kind: kind, name: name}
+}
+
+// parseError reports a raw value that a setter could not parse.
+type parseError struct {
+	kind string
+	raw  string
+}
+
+func (e parseError) Error() string {
+	return fmt.Sprintf("invalid %s %q", e.kind, e.raw)
+}
+
+func errParse(kind, raw string) error {
+	return parseError{kind: kind, raw: raw}
+}
+
+// unitError reports a measurement unit that cannot be converted to millimetres.
+type unitError struct {
+	ctx  string
+	unit string
+}
+
+func (e unitError) Error() string {
+	return fmt.Sprintf("%s: unit %q not convertible", e.ctx, e.unit)
+}
+
+func errUnitNotConvertible(ctx, unit string) error {
+	return unitError{ctx: ctx, unit: unit}
+}
+
+// Raw string values accepted by the setter helpers.
+const (
+	sFalse     = "false"
+	sIgnore    = "ignore"
+	sScreen    = "screen"
+	sPrint     = "print"
+	sGrayscale = "grayscale"
+	sColor     = "color"
+)
+
 // setter updates a target value. It receives the raw string value.
 type setter func(raw string) error
 
@@ -42,7 +94,9 @@ func sub[T any, S any](pick func(*T) *S, desc field[S]) field[T] {
 
 // setForKey applies a dotted key through its descriptor table. Known inert
 // keys are stored in the Ignored map (Policy A); truly unknown keys error.
-func setForKey[T any](target *T, tables keyTable[T], known map[string]struct{}, ignored *map[string]string, kind, name, value string) error {
+func setForKey[T any](target *T, tables keyTable[T], known map[string]struct{},
+	ignored *map[string]string, kind, name, value string,
+) error {
 	key := normalizeDots(name)
 	if f, ok := tables[key]; ok {
 		return f.apply(target, value)
@@ -54,7 +108,7 @@ func setForKey[T any](target *T, tables keyTable[T], known map[string]struct{}, 
 		return nil
 	}
 
-	return fmt.Errorf("unknown %s setting %q", kind, name)
+	return errUnknownSetting(kind, name)
 }
 
 // getForKey reads a dotted key through its descriptor table. Accepted ignored
@@ -76,62 +130,66 @@ func getForKey[T any](target *T, tables keyTable[T], ignored *map[string]string,
 
 // ignoredGlobalKeys are wkhtml global keys with no engine consumer. Set accepts
 // them into PdfGlobal.Ignored (Policy A) so scripts do not fail on known stubs.
-var ignoredGlobalKeys = map[string]struct{}{
-	"dpi":               {},
-	"resolution":        {},
-	"imagedpi":          {},
-	"imagequality":      {},
-	"lowquality":        {},
-	"usexserver":        {},
-	"readargsfromstdin": {},
-	"log-level":         {},
-	"loglevel":          {},
-	"cookiejar":         {},
-	// ponytail: --default-encoding accepted then ignored; engine is UTF-8/ASCII
-	// only via html.ParseDocument + load charset seam. Upgrade when multi-
-	// charset decode ships.
-	"defaultencoding": {},
-	"produceforms":    {},
-	// Global load-error-handling never reached LoadPage; only load.loaderrorhandling does.
-	"loaderrorhandling": {},
-	// web.* stubs (also listed under object web.)
-	"web.javascript":      {},
-	"web.java":            {},
-	"web.plugins":         {},
-	"web.minimumfontsize": {},
-	"web.defaultencoding": {},
-	"web.userstylesheet":  {},
-	"web.loadimages":      {},
+func ignoredGlobalKeys() map[string]struct{} {
+	return map[string]struct{}{
+		"dpi":               {},
+		"resolution":        {},
+		"imagedpi":          {},
+		"imagequality":      {},
+		"lowquality":        {},
+		"usexserver":        {},
+		"readargsfromstdin": {},
+		"log-level":         {},
+		"loglevel":          {},
+		"cookiejar":         {},
+		// ponytail: --default-encoding accepted then ignored; engine is UTF-8/ASCII
+		// only via html.ParseDocument + load charset seam. Upgrade when multi-
+		// charset decode ships.
+		"defaultencoding": {},
+		"produceforms":    {},
+		// Global load-error-handling never reached LoadPage; only load.loaderrorhandling does.
+		"loaderrorhandling": {},
+		// web.* stubs (also listed under object web.)
+		"web.javascript":      {},
+		"web.java":            {},
+		"web.plugins":         {},
+		"web.minimumfontsize": {},
+		"web.defaultencoding": {},
+		"web.userstylesheet":  {},
+		"web.loadimages":      {},
+	}
 }
 
 // Note: global web.background is a real key (→ PdfGlobal.Background), not ignored.
 
 // ignoredObjectKeys are wkhtml object/load/web keys with no engine consumer.
-var ignoredObjectKeys = map[string]struct{}{
-	"pagescount":   {},
-	"produceforms": {},
-	// load.* stubs
-	"load.jsdelay":               {},
-	"load.stopslowscripts":       {},
-	"load.debugjavascript":       {},
-	"load.windowstatus":          {},
-	"load.runscript":             {},
-	"load.enableplugins":         {},
-	"load.defaultencoding":       {},
-	"load.proxy":                 {}, // only LoadGlobal.Proxy is wired
-	"load.externallinks":         {}, // PdfObject.ExternalLinks is the real gate
-	"load.locallinks":            {},
-	"load.repeatexternalheaders": {},
-	"load.repeatexternalcookies": {},
-	// web.* stubs — paint background is Global only
-	"web.background":      {},
-	"web.javascript":      {},
-	"web.java":            {},
-	"web.plugins":         {},
-	"web.minimumfontsize": {},
-	"web.defaultencoding": {},
-	"web.userstylesheet":  {},
-	"web.loadimages":      {},
+func ignoredObjectKeys() map[string]struct{} {
+	return map[string]struct{}{
+		"pagescount":   {},
+		"produceforms": {},
+		// load.* stubs
+		"load.jsdelay":               {},
+		"load.stopslowscripts":       {},
+		"load.debugjavascript":       {},
+		"load.windowstatus":          {},
+		"load.runscript":             {},
+		"load.enableplugins":         {},
+		"load.defaultencoding":       {},
+		"load.proxy":                 {}, // only LoadGlobal.Proxy is wired
+		"load.externallinks":         {}, // PdfObject.ExternalLinks is the real gate
+		"load.locallinks":            {},
+		"load.repeatexternalheaders": {},
+		"load.repeatexternalcookies": {},
+		// web.* stubs — paint background is Global only
+		"web.background":      {},
+		"web.javascript":      {},
+		"web.java":            {},
+		"web.plugins":         {},
+		"web.minimumfontsize": {},
+		"web.defaultencoding": {},
+		"web.userstylesheet":  {},
+		"web.loadimages":      {},
+	}
 }
 
 func storeIgnored(dst *map[string]string, key, value string) {
@@ -153,13 +211,13 @@ func setBool(target *bool) setter {
 			*target = true
 
 			return nil
-		case "false", "0", "no", "off":
+		case sFalse, "0", "no", "off":
 			*target = false
 
 			return nil
 		}
 
-		return fmt.Errorf("invalid boolean %q", raw)
+		return errParse("boolean", raw)
 	}
 }
 
@@ -167,7 +225,7 @@ func setFloat(target *float64) setter {
 	return func(raw string) error {
 		v, err := strconv.ParseFloat(raw, 64)
 		if err != nil {
-			return fmt.Errorf("invalid number %q", raw)
+			return errParse("number", raw)
 		}
 
 		*target = v
@@ -180,7 +238,7 @@ func setInt(target *int) setter {
 	return func(raw string) error {
 		v, err := strconv.Atoi(raw)
 		if err != nil {
-			return fmt.Errorf("invalid integer %q", raw)
+			return errParse("integer", raw)
 		}
 
 		*target = v
@@ -234,21 +292,21 @@ func setLoadErrorHandling(handling *LoadErrorHandling) setter {
 func setMediaType(media *MediaType) setter {
 	return func(raw string) error {
 		switch normalize(raw) {
-		case "", "ignore":
+		case "", sIgnore:
 			*media = MediaIgnore
 
 			return nil
-		case "screen":
+		case sScreen:
 			*media = MediaScreen
 
 			return nil
-		case "print":
+		case sPrint:
 			*media = MediaPrint
 
 			return nil
 		}
 
-		return fmt.Errorf("invalid media type %q", raw)
+		return errParse("media type", raw)
 	}
 }
 
@@ -266,32 +324,57 @@ func setGrayscaleFromColorMode(grayscale *bool) setter {
 	}
 }
 
-// marginSetter writes one edge of a Margin, storing millimetres.
-func marginSetter(margin *Margin, edge string) setter {
+// marginEdgePtr returns the field of margin named by edge.
+func marginEdgePtr(margin *Margin, edge string) *float64 {
+	switch edge {
+	case "top":
+		return &margin.Top
+	case "bottom":
+		return &margin.Bottom
+	case "left":
+		return &margin.Left
+	default:
+		return &margin.Right
+	}
+}
+
+// marginValue returns the field of margin named by edge.
+func marginValue(margin *Margin, edge string) float64 {
+	switch edge {
+	case "top":
+		return margin.Top
+	case "bottom":
+		return margin.Bottom
+	case "left":
+		return margin.Left
+	default:
+		return margin.Right
+	}
+}
+
+// setUnitMm parses raw as a real number in millimetres and stores it on target.
+// ctx names the settings key for conversion errors.
+func setUnitMm(target *float64, ctx string) setter {
 	return func(raw string) error {
 		unit, err := ParseUnitReal(raw, "mm")
 		if err != nil {
 			return err
 		}
 
-		mmVal, ok := unit.Mm()
+		mm, ok := unit.Mm()
 		if !ok {
-			return fmt.Errorf("margin %s: unit %q not convertible", edge, unit.Unit)
+			return errUnitNotConvertible(ctx, unit.Unit)
 		}
 
-		switch edge {
-		case "top":
-			margin.Top = mmVal
-		case "bottom":
-			margin.Bottom = mmVal
-		case "left":
-			margin.Left = mmVal
-		case "right":
-			margin.Right = mmVal
-		}
+		*target = mm
 
 		return nil
 	}
+}
+
+// marginSetter writes one edge of a Margin, storing millimetres.
+func marginSetter(margin *Margin, edge string) setter {
+	return setUnitMm(marginEdgePtr(margin, edge), "margin "+edge)
 }
 
 func appendString(dst *[]string) setter {
@@ -302,12 +385,12 @@ func appendString(dst *[]string) setter {
 	}
 }
 
-// globalKeys / objectKeys / imageKeys are the one field-descriptor tables.
-var (
-	globalKeys = keyTable[PdfGlobal]{}
-	objectKeys = keyTable[PdfObject]{}
-	imageKeys  = keyTable[ImageGlobal]{}
-)
+// globalKeys / objectKeys / imageKeys are the one field-descriptor tables. They
+// are read as package-level identifiers by getters.go and settings_test.go, so
+// they cannot be function-local.
+//
+//nolint:gochecknoglobals // required: shared with getters.go and settings_test.go.
+var globalKeys, objectKeys, imageKeys = buildKeyTables()
 
 // subEntry describes one key of a sub-struct table: its apply closure and its
 // getter.
@@ -327,10 +410,10 @@ func subTable[S any](entries []subEntry[S]) map[string]field[S] {
 	return m
 }
 
-func init() {
-	// --- global keys ---
+// registerGlobalKeys wires the core page keys of the global table.
+func registerGlobalKeys(keys keyTable[PdfGlobal]) {
 	regGlobal := func(name string, set func(*PdfGlobal, string) error, get func(*PdfGlobal) (string, bool)) {
-		globalKeys[name] = field[PdfGlobal]{apply: set, get: get}
+		keys[name] = field[PdfGlobal]{apply: set, get: get}
 	}
 	regGlobal("orientation",
 		func(dst *PdfGlobal, raw string) error { return setOrientation(&dst.Orientation)(raw) },
@@ -341,10 +424,10 @@ func init() {
 		func(dst *PdfGlobal, raw string) error { return setGrayscaleFromColorMode(&dst.Grayscale)(raw) },
 		func(dst *PdfGlobal) (string, bool) {
 			if dst.Grayscale {
-				return "grayscale", true
+				return sGrayscale, true
 			}
 
-			return "color", true
+			return sColor, true
 		},
 	)
 	regGlobal("grayscale",
@@ -371,6 +454,13 @@ func init() {
 		func(dst *PdfGlobal, raw string) error { return setInt(&dst.OutlineDepth)(raw) },
 		func(dst *PdfGlobal) (string, bool) { return fmtInt(dst.OutlineDepth), true },
 	)
+}
+
+// registerGlobalDocumentKeys wires the document-level keys of the global table.
+func registerGlobalDocumentKeys(keys keyTable[PdfGlobal]) {
+	regGlobal := func(name string, set func(*PdfGlobal, string) error, get func(*PdfGlobal) (string, bool)) {
+		keys[name] = field[PdfGlobal]{apply: set, get: get}
+	}
 	regGlobal("dumpoutline",
 		func(dst *PdfGlobal, raw string) error { return setBool(&dst.DumpOutline)(raw) },
 		func(dst *PdfGlobal) (string, bool) { return fmtBool(dst.DumpOutline), true },
@@ -396,7 +486,13 @@ func init() {
 	paintBGGet := func(dst *PdfGlobal) (string, bool) { return fmtBool(dst.Background), true }
 	regGlobal("background", paintBG, paintBGGet)
 	regGlobal("web.background", paintBG, paintBGGet)
+}
 
+// registerGlobalLoadKeys wires the load-level keys of the global table.
+func registerGlobalLoadKeys(keys keyTable[PdfGlobal]) {
+	regGlobal := func(name string, set func(*PdfGlobal, string) error, get func(*PdfGlobal) (string, bool)) {
+		keys[name] = field[PdfGlobal]{apply: set, get: get}
+	}
 	regGlobal("enablelocalfileaccess",
 		func(dst *PdfGlobal, raw string) error { return setBool(&dst.Load.EnableLocalFileAccess)(raw) },
 		func(dst *PdfGlobal) (string, bool) { return fmtBool(dst.Load.EnableLocalFileAccess), true },
@@ -429,26 +525,17 @@ func init() {
 		func(dst *PdfGlobal, raw string) error { return appendString(&dst.Load.Allow)(raw) },
 		func(dst *PdfGlobal) (string, bool) { return fmtStrings(dst.Load.Allow), true },
 	)
+}
 
+// registerGlobalGeometryKeys wires the margin and custom-size keys.
+func registerGlobalGeometryKeys(keys keyTable[PdfGlobal]) {
+	regGlobal := func(name string, set func(*PdfGlobal, string) error, get func(*PdfGlobal) (string, bool)) {
+		keys[name] = field[PdfGlobal]{apply: set, get: get}
+	}
 	for _, edge := range []string{"top", "bottom", "left", "right"} {
 		regGlobal("margin."+edge,
 			func(dst *PdfGlobal, raw string) error { return marginSetter(&dst.Margin, edge)(raw) },
-			func(dst *PdfGlobal) (string, bool) {
-				var val float64
-
-				switch edge {
-				case "top":
-					val = dst.Margin.Top
-				case "bottom":
-					val = dst.Margin.Bottom
-				case "left":
-					val = dst.Margin.Left
-				case "right":
-					val = dst.Margin.Right
-				}
-
-				return fmtFloat(val), true
-			},
+			func(dst *PdfGlobal) (string, bool) { return fmtFloat(marginValue(&dst.Margin, edge)), true },
 		)
 	}
 
@@ -469,57 +556,55 @@ func init() {
 		},
 	)
 	regGlobal("size.width",
-		func(dst *PdfGlobal, raw string) error {
-			unit, err := ParseUnitReal(raw, "mm")
-			if err != nil {
-				return err
-			}
-
-			mm, ok := unit.Mm()
-			if !ok {
-				return fmt.Errorf("size.width: unit %q not convertible", unit.Unit)
-			}
-
-			dst.Size.Width = mm
-
-			return nil
-		},
+		func(dst *PdfGlobal, raw string) error { return setUnitMm(&dst.Size.Width, "size.width")(raw) },
 		func(dst *PdfGlobal) (string, bool) { return fmtFloat(dst.Size.Width), true },
 	)
 	regGlobal("size.height",
-		func(dst *PdfGlobal, raw string) error {
-			unit, err := ParseUnitReal(raw, "mm")
-			if err != nil {
-				return err
-			}
-
-			mm, ok := unit.Mm()
-			if !ok {
-				return fmt.Errorf("size.height: unit %q not convertible", unit.Unit)
-			}
-
-			dst.Size.Height = mm
-
-			return nil
-		},
+		func(dst *PdfGlobal, raw string) error { return setUnitMm(&dst.Size.Height, "size.height")(raw) },
 		func(dst *PdfGlobal) (string, bool) { return fmtFloat(dst.Size.Height), true },
 	)
+}
 
-	// header/footer keys share one descriptor table per sub-struct. Object
-	// keys additionally flag the HeaderSet/FooterSet override bit.
+// registerHeaderFooterKeys wires header.*/footer.* keys. Object keys
+// additionally flag the HeaderSet/FooterSet override bit.
+func registerHeaderFooterKeys(globals keyTable[PdfGlobal], objects keyTable[PdfObject]) {
 	for key, entry := range subTable[HeaderFooter]([]subEntry[HeaderFooter]{
-		{"fontsize", func(h *HeaderFooter, raw string) error { return setFloat(&h.FontSize)(raw) }, func(h *HeaderFooter) (string, bool) { return fmtFloat(h.FontSize), true }},
-		{"fontname", func(h *HeaderFooter, raw string) error { return setString(&h.FontName)(raw) }, func(h *HeaderFooter) (string, bool) { return h.FontName, true }},
-		{"left", func(h *HeaderFooter, raw string) error { return setString(&h.Left)(raw) }, func(h *HeaderFooter) (string, bool) { return h.Left, true }},
-		{"right", func(h *HeaderFooter, raw string) error { return setString(&h.Right)(raw) }, func(h *HeaderFooter) (string, bool) { return h.Right, true }},
-		{"center", func(h *HeaderFooter, raw string) error { return setString(&h.Center)(raw) }, func(h *HeaderFooter) (string, bool) { return h.Center, true }},
-		{"line", func(h *HeaderFooter, raw string) error { return setBool(&h.Line)(raw) }, func(h *HeaderFooter) (string, bool) { return fmtBool(h.Line), true }},
-		{"spacing", func(h *HeaderFooter, raw string) error { return setFloat(&h.Spacing)(raw) }, func(h *HeaderFooter) (string, bool) { return fmtFloat(h.Spacing), true }},
-		{"htmlurl", func(h *HeaderFooter, raw string) error { return setString(&h.HTMLURL)(raw) }, func(h *HeaderFooter) (string, bool) { return h.HTMLURL, true }},
+		{"fontsize",
+			func(h *HeaderFooter, raw string) error { return setFloat(&h.FontSize)(raw) },
+			func(h *HeaderFooter) (string, bool) { return fmtFloat(h.FontSize), true },
+		},
+		{"fontname",
+			func(h *HeaderFooter, raw string) error { return setString(&h.FontName)(raw) },
+			func(h *HeaderFooter) (string, bool) { return h.FontName, true },
+		},
+		{"left",
+			func(h *HeaderFooter, raw string) error { return setString(&h.Left)(raw) },
+			func(h *HeaderFooter) (string, bool) { return h.Left, true },
+		},
+		{"right",
+			func(h *HeaderFooter, raw string) error { return setString(&h.Right)(raw) },
+			func(h *HeaderFooter) (string, bool) { return h.Right, true },
+		},
+		{"center",
+			func(h *HeaderFooter, raw string) error { return setString(&h.Center)(raw) },
+			func(h *HeaderFooter) (string, bool) { return h.Center, true },
+		},
+		{"line",
+			func(h *HeaderFooter, raw string) error { return setBool(&h.Line)(raw) },
+			func(h *HeaderFooter) (string, bool) { return fmtBool(h.Line), true },
+		},
+		{"spacing",
+			func(h *HeaderFooter, raw string) error { return setFloat(&h.Spacing)(raw) },
+			func(h *HeaderFooter) (string, bool) { return fmtFloat(h.Spacing), true },
+		},
+		{"htmlurl",
+			func(h *HeaderFooter, raw string) error { return setString(&h.HTMLURL)(raw) },
+			func(h *HeaderFooter) (string, bool) { return h.HTMLURL, true },
+		},
 	}) {
-		globalKeys["header."+key] = sub(func(dst *PdfGlobal) *HeaderFooter { return &dst.Header }, entry)
-		globalKeys["footer."+key] = sub(func(dst *PdfGlobal) *HeaderFooter { return &dst.Footer }, entry)
-		objectKeys["header."+key] = field[PdfObject]{
+		globals["header."+key] = sub(func(dst *PdfGlobal) *HeaderFooter { return &dst.Header }, entry)
+		globals["footer."+key] = sub(func(dst *PdfGlobal) *HeaderFooter { return &dst.Footer }, entry)
+		objects["header."+key] = field[PdfObject]{
 			apply: func(regObject *PdfObject, raw string) error {
 				regObject.HeaderSet = true
 
@@ -527,7 +612,7 @@ func init() {
 			},
 			get: func(regObject *PdfObject) (string, bool) { return entry.get(&regObject.Header) },
 		}
-		objectKeys["footer."+key] = field[PdfObject]{
+		objects["footer."+key] = field[PdfObject]{
 			apply: func(regObject *PdfObject, raw string) error {
 				regObject.FooterSet = true
 
@@ -536,50 +621,125 @@ func init() {
 			get: func(regObject *PdfObject) (string, bool) { return entry.get(&regObject.Footer) },
 		}
 	}
+}
 
+// registerTOCKeys wires toc.* keys for global and object tables.
+func registerTOCKeys(globals keyTable[PdfGlobal], objects keyTable[PdfObject]) {
 	for key, entry := range subTable[TableOfContent]([]subEntry[TableOfContent]{
-		{"fontscale", func(t *TableOfContent, raw string) error { return setFloat(&t.FontScale)(raw) }, func(t *TableOfContent) (string, bool) { return fmtFloat(t.FontScale), true }},
-		{"indentation", func(t *TableOfContent, raw string) error { return setStringDefault(&t.Indentation)(raw) }, func(t *TableOfContent) (string, bool) { return t.Indentation, true }},
-		{"dottedlines", func(t *TableOfContent, raw string) error { return setBool(&t.DottedLines)(raw) }, func(t *TableOfContent) (string, bool) { return fmtBool(t.DottedLines), true }},
-		{"captiontext", func(t *TableOfContent, raw string) error { return setString(&t.CaptionText)(raw) }, func(t *TableOfContent) (string, bool) { return t.CaptionText, true }},
-		{"forwardlinks", func(t *TableOfContent, raw string) error { return setBool(&t.ForwardLinks)(raw) }, func(t *TableOfContent) (string, bool) { return fmtBool(t.ForwardLinks), true }},
-		{"backlinks", func(t *TableOfContent, raw string) error { return setBool(&t.BackLinks)(raw) }, func(t *TableOfContent) (string, bool) { return fmtBool(t.BackLinks), true }},
-		{"xslstylesheet", func(t *TableOfContent, raw string) error { return setString(&t.XSLStyleSheet)(raw) }, func(t *TableOfContent) (string, bool) { return t.XSLStyleSheet, true }},
+		{"fontscale",
+			func(t *TableOfContent, raw string) error { return setFloat(&t.FontScale)(raw) },
+			func(t *TableOfContent) (string, bool) { return fmtFloat(t.FontScale), true },
+		},
+		{"indentation",
+			func(t *TableOfContent, raw string) error { return setStringDefault(&t.Indentation)(raw) },
+			func(t *TableOfContent) (string, bool) { return t.Indentation, true },
+		},
+		{"dottedlines",
+			func(t *TableOfContent, raw string) error { return setBool(&t.DottedLines)(raw) },
+			func(t *TableOfContent) (string, bool) { return fmtBool(t.DottedLines), true },
+		},
+		{"captiontext",
+			func(t *TableOfContent, raw string) error { return setString(&t.CaptionText)(raw) },
+			func(t *TableOfContent) (string, bool) { return t.CaptionText, true },
+		},
+		{"forwardlinks",
+			func(t *TableOfContent, raw string) error { return setBool(&t.ForwardLinks)(raw) },
+			func(t *TableOfContent) (string, bool) { return fmtBool(t.ForwardLinks), true },
+		},
+		{"backlinks",
+			func(t *TableOfContent, raw string) error { return setBool(&t.BackLinks)(raw) },
+			func(t *TableOfContent) (string, bool) { return fmtBool(t.BackLinks), true },
+		},
+		{"xslstylesheet",
+			func(t *TableOfContent, raw string) error { return setString(&t.XSLStyleSheet)(raw) },
+			func(t *TableOfContent) (string, bool) { return t.XSLStyleSheet, true },
+		},
 	}) {
-		globalKeys["toc."+key] = sub(func(dst *PdfGlobal) *TableOfContent { return &dst.TOC }, entry)
-		objectKeys["toc."+key] = sub(func(regObject *PdfObject) *TableOfContent { return &regObject.TOC }, entry)
+		globals["toc."+key] = sub(func(dst *PdfGlobal) *TableOfContent { return &dst.TOC }, entry)
+		objects["toc."+key] = sub(func(regObject *PdfObject) *TableOfContent { return &regObject.TOC }, entry)
 	}
+}
 
-	// web.* except background (mapped to Global.Background above)
+// registerWebKeys wires web.* keys for global, object and image tables.
+// web.background is not typed here — ApplyImageKey routes it to
+// PdfGlobal.Background.
+func registerWebKeys(globals keyTable[PdfGlobal], objects keyTable[PdfObject], images keyTable[ImageGlobal]) {
 	for key, entry := range subTable[Web]([]subEntry[Web]{
-		{"images", func(w *Web, raw string) error { return setBool(&w.Images)(raw) }, func(w *Web) (string, bool) { return fmtBool(w.Images), true }},
-		{"printmediatype", func(w *Web, raw string) error { return setBool(&w.PrintMediaType)(raw) }, func(w *Web) (string, bool) { return fmtBool(w.PrintMediaType), true }},
-		{"mediatype", func(w *Web, raw string) error { return setMediaType(&w.MediaType)(raw) }, func(w *Web) (string, bool) { return w.MediaType.String(), true }},
-		{"simplifydom", func(w *Web, raw string) error { return setBool(&w.SimplifyDOM)(raw) }, func(w *Web) (string, bool) { return fmtBool(w.SimplifyDOM), true }},
-		{"simplifydomprofile", func(w *Web, raw string) error { return setString(&w.SimplifyDOMProfile)(raw) }, func(w *Web) (string, bool) { return w.SimplifyDOMProfile, true }},
-		{"printlinkunderline", func(w *Web, raw string) error { return setBool(&w.PrintLinkUnderline)(raw) }, func(w *Web) (string, bool) { return fmtBool(w.PrintLinkUnderline), true }},
+		{"images",
+			func(w *Web, raw string) error { return setBool(&w.Images)(raw) },
+			func(w *Web) (string, bool) { return fmtBool(w.Images), true },
+		},
+		{"printmediatype",
+			func(w *Web, raw string) error { return setBool(&w.PrintMediaType)(raw) },
+			func(w *Web) (string, bool) { return fmtBool(w.PrintMediaType), true },
+		},
+		{"mediatype",
+			func(w *Web, raw string) error { return setMediaType(&w.MediaType)(raw) },
+			func(w *Web) (string, bool) { return w.MediaType.String(), true },
+		},
+		{"simplifydom",
+			func(w *Web, raw string) error { return setBool(&w.SimplifyDOM)(raw) },
+			func(w *Web) (string, bool) { return fmtBool(w.SimplifyDOM), true },
+		},
+		{"simplifydomprofile",
+			func(w *Web, raw string) error { return setString(&w.SimplifyDOMProfile)(raw) },
+			func(w *Web) (string, bool) { return w.SimplifyDOMProfile, true },
+		},
+		{"printlinkunderline",
+			func(w *Web, raw string) error { return setBool(&w.PrintLinkUnderline)(raw) },
+			func(w *Web) (string, bool) { return fmtBool(w.PrintLinkUnderline), true },
+		},
 	}) {
-		globalKeys["web."+key] = sub(func(dst *PdfGlobal) *Web { return &dst.Web }, entry)
-		objectKeys["web."+key] = sub(func(regObject *PdfObject) *Web { return &regObject.Web }, entry)
-		imageKeys["web."+key] = sub(func(dst *ImageGlobal) *Web { return &dst.Web }, entry)
+		globals["web."+key] = sub(func(dst *PdfGlobal) *Web { return &dst.Web }, entry)
+		objects["web."+key] = sub(func(regObject *PdfObject) *Web { return &regObject.Web }, entry)
+		images["web."+key] = sub(func(dst *ImageGlobal) *Web { return &dst.Web }, entry)
 	}
+}
 
+// registerLoadPageKeys wires load.* keys for the object table.
+func registerLoadPageKeys(objects keyTable[PdfObject]) {
 	for key, entry := range subTable[LoadPage]([]subEntry[LoadPage]{
-		{"zoomfactor", func(l *LoadPage, raw string) error { return setFloat(&l.ZoomFactor)(raw) }, func(l *LoadPage) (string, bool) { return fmtFloat(l.ZoomFactor), true }},
-		{"blocklocalfileaccess", func(l *LoadPage, raw string) error { return setBool(&l.BlockLocalFileAccess)(raw) }, func(l *LoadPage) (string, bool) { return fmtBool(l.BlockLocalFileAccess), true }},
-		{"loaderrorhandling", func(l *LoadPage, raw string) error { return setLoadErrorHandling(&l.LoadErrorHandling)(raw) }, func(l *LoadPage) (string, bool) { return l.LoadErrorHandling.String(), true }},
-		{"username", func(l *LoadPage, raw string) error { return setString(&l.Username)(raw) }, func(l *LoadPage) (string, bool) { return l.Username, true }},
-		{"password", func(l *LoadPage, raw string) error { return setString(&l.Password)(raw) }, func(l *LoadPage) (string, bool) { return l.Password, true }},
-		{"mediatype", func(l *LoadPage, raw string) error { return setMediaType(&l.MediaType)(raw) }, func(l *LoadPage) (string, bool) { return l.MediaType.String(), true }},
-		{"printmediatype", func(l *LoadPage, raw string) error { return setBool(&l.PrintMediaType)(raw) }, func(l *LoadPage) (string, bool) { return fmtBool(l.PrintMediaType), true }},
-		{"timeout", func(l *LoadPage, raw string) error { return setInt(&l.Timeout)(raw) }, func(l *LoadPage) (string, bool) { return fmtInt(l.Timeout), true }},
+		{"zoomfactor",
+			func(l *LoadPage, raw string) error { return setFloat(&l.ZoomFactor)(raw) },
+			func(l *LoadPage) (string, bool) { return fmtFloat(l.ZoomFactor), true },
+		},
+		{"blocklocalfileaccess",
+			func(l *LoadPage, raw string) error { return setBool(&l.BlockLocalFileAccess)(raw) },
+			func(l *LoadPage) (string, bool) { return fmtBool(l.BlockLocalFileAccess), true },
+		},
+		{"loaderrorhandling",
+			func(l *LoadPage, raw string) error { return setLoadErrorHandling(&l.LoadErrorHandling)(raw) },
+			func(l *LoadPage) (string, bool) { return l.LoadErrorHandling.String(), true },
+		},
+		{"username",
+			func(l *LoadPage, raw string) error { return setString(&l.Username)(raw) },
+			func(l *LoadPage) (string, bool) { return l.Username, true },
+		},
+		{"password",
+			func(l *LoadPage, raw string) error { return setString(&l.Password)(raw) },
+			func(l *LoadPage) (string, bool) { return l.Password, true },
+		},
+		{"mediatype",
+			func(l *LoadPage, raw string) error { return setMediaType(&l.MediaType)(raw) },
+			func(l *LoadPage) (string, bool) { return l.MediaType.String(), true },
+		},
+		{"printmediatype",
+			func(l *LoadPage, raw string) error { return setBool(&l.PrintMediaType)(raw) },
+			func(l *LoadPage) (string, bool) { return fmtBool(l.PrintMediaType), true },
+		},
+		{"timeout",
+			func(l *LoadPage, raw string) error { return setInt(&l.Timeout)(raw) },
+			func(l *LoadPage) (string, bool) { return fmtInt(l.Timeout), true },
+		},
 	}) {
-		objectKeys["load."+key] = sub(func(regObject *PdfObject) *LoadPage { return &regObject.Load }, entry)
+		objects["load."+key] = sub(func(regObject *PdfObject) *LoadPage { return &regObject.Load }, entry)
 	}
+}
 
-	// --- object keys ---
+// registerObjectKeys wires the object field-descriptor table.
+func registerObjectKeys(keys keyTable[PdfObject]) {
 	regObject := func(name string, set func(*PdfObject, string) error, get func(*PdfObject) (string, bool)) {
-		objectKeys[name] = field[PdfObject]{apply: set, get: get}
+		keys[name] = field[PdfObject]{apply: set, get: get}
 	}
 	regObject("page",
 		func(dst *PdfObject, raw string) error { return setString(&dst.Page)(raw) },
@@ -609,10 +769,12 @@ func init() {
 		func(dst *PdfObject, raw string) error { return setBool(&dst.IsCover)(raw) },
 		func(dst *PdfObject) (string, bool) { return fmtBool(dst.IsCover), true },
 	)
+}
 
-	// --- image keys ---
+// registerImageKeys wires the image-mode field-descriptor table.
+func registerImageKeys(keys keyTable[ImageGlobal]) {
 	regImage := func(name string, set func(*ImageGlobal, string) error, get func(*ImageGlobal) (string, bool)) {
-		imageKeys[name] = field[ImageGlobal]{apply: set, get: get}
+		keys[name] = field[ImageGlobal]{apply: set, get: get}
 	}
 	regImage("width",
 		func(dst *ImageGlobal, raw string) error { return setInt(&dst.Width)(raw) },
@@ -658,26 +820,49 @@ func init() {
 		func(dst *ImageGlobal, raw string) error { return setString(&dst.Load.Proxy)(raw) },
 		func(dst *ImageGlobal) (string, bool) { return dst.Load.Proxy, true },
 	)
-	// image web.background is not typed here — ApplyImageKey routes it to
-	// PdfGlobal.Background.
+}
+
+// buildKeyTables wires the field-descriptor tables used by Set and Get.
+func buildKeyTables() (keyTable[PdfGlobal], keyTable[PdfObject], keyTable[ImageGlobal]) {
+	globals := keyTable[PdfGlobal]{}
+	objects := keyTable[PdfObject]{}
+	images := keyTable[ImageGlobal]{}
+
+	// --- global keys ---
+	registerGlobalKeys(globals)
+	registerGlobalDocumentKeys(globals)
+	registerGlobalLoadKeys(globals)
+	registerGlobalGeometryKeys(globals)
+	registerHeaderFooterKeys(globals, objects)
+	registerTOCKeys(globals, objects)
+	registerWebKeys(globals, objects, images)
+	registerLoadPageKeys(objects)
+
+	// --- object keys ---
+	registerObjectKeys(objects)
+
+	// --- image keys ---
+	registerImageKeys(images)
+
+	return globals, objects, images
 }
 
 // Global.Set applies a dotted settings key ("margin.top", "load.jsdelay",
 // "web.background", …) to a PdfGlobal. Known inert keys are stored in
 // Ignored and succeed; truly unknown keys return an error.
 func (g *PdfGlobal) Set(name, value string) error {
-	return setForKey(g, globalKeys, ignoredGlobalKeys, &g.Ignored, "global", name, value)
+	return setForKey(g, globalKeys, ignoredGlobalKeys(), &g.Ignored, "global", name, value)
 }
 
 // Object.Set applies a dotted settings key to a PdfObject. Known inert keys
 // go to Ignored; unknown keys return an error.
 func (o *PdfObject) Set(name, value string) error {
-	return setForKey(o, objectKeys, ignoredObjectKeys, &o.Ignored, "object", name, value)
+	return setForKey(o, objectKeys, ignoredObjectKeys(), &o.Ignored, "object", name, value)
 }
 
 // ImageGlobal.Set applies an image-mode dotted settings key.
 func (g *ImageGlobal) Set(name, value string) error {
-	return setForKey(g, imageKeys, ignoredGlobalKeys, &g.Ignored, "image", name, value)
+	return setForKey(g, imageKeys, ignoredGlobalKeys(), &g.Ignored, "image", name, value)
 }
 
 // ApplyImageKey routes an image-mode key: "background"/"web.background" alias

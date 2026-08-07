@@ -171,7 +171,7 @@ func refCellWidth(t *testing.T, src string, cssSheet *css.Stylesheet) float64 {
 		t.Fatal(err)
 	}
 
-	tb := findBox(t, res, "table")
+	tb := findBox(t, res, displayTable)
 	if len(tb.rows) == 0 || len(tb.rows[0]) == 0 {
 		t.Fatal("no cell")
 	}

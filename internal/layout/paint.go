@@ -37,6 +37,16 @@ type PaintOptions struct {
 //
 // After pagination Paint fills res.Pages (page → op indices) and res.Locations
 // (element boxes in document order with their page and canvas rect).
+// backgroundIfNil returns the caller's context, or a fresh background context
+// when nil so derived contexts never panic on legacy callers.
+func backgroundIfNil(ctx context.Context) context.Context {
+	if ctx == nil {
+		return context.Background()
+	}
+
+	return ctx
+}
+
 func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 	return PaintContext(context.Background(), doc, res, opts)
 }
@@ -45,12 +55,11 @@ func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 // entrypoint remains a background-context adapter for package callers that do
 // not have a request context.
 func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts PaintOptions) error {
+	ctx, cancel := context.WithCancel(backgroundIfNil(ctx))
+	defer cancel()
+
 	if doc == nil || res == nil {
 		return nil
-	}
-
-	if ctx == nil {
-		ctx = context.Background()
 	}
 
 	if err := ctx.Err(); err != nil {
@@ -70,15 +79,7 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 	}
 
 	opPage := paginateOps(res, contentH)
-
-	// Fixed ops are stamped on every page at viewport-relative coords.
-	var fixedIdx []int
-
-	for i := range res.Ops {
-		if res.Ops[i].Fixed {
-			fixedIdx = append(fixedIdx, i)
-		}
-	}
+	fixedIdx := fixedOpIndices(res)
 
 	// Split rect ops at page boundaries first so sticky clamps the natural
 	// fragment geometry that will actually be painted (fixture-31).
@@ -96,7 +97,31 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 	applyStickyPrint(res, contentH)
 
 	// Re-derive pages after splits and sticky (new ops / Y shifts).
-	opPage = make([]int, len(res.Ops))
+	opPage = buildPagesAfterSplits(res, contentH, fixedIdx)
+
+	populateLocations(res, contentH, opPage)
+
+	return paintPages(ctx, doc, res, opts, contentH, fixedIdx)
+}
+
+// fixedOpIndices collects the indices of viewport-fixed ops, which are
+// stamped on every page at viewport-relative coords.
+func fixedOpIndices(res *Result) []int {
+	var fixedIdx []int
+
+	for i := range res.Ops {
+		if res.Ops[i].Fixed {
+			fixedIdx = append(fixedIdx, i)
+		}
+	}
+
+	return fixedIdx
+}
+
+// buildPagesAfterSplits re-derives page buckets from the final op Y
+// positions after rect splits and sticky shifts added or moved ops.
+func buildPagesAfterSplits(res *Result, contentH float64, fixedIdx []int) []int {
+	opPage := make([]int, len(res.Ops))
 	perPage := map[int][]int{}
 
 	for idx := range res.Ops {
@@ -130,114 +155,145 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 		res.Pages[p] = perPage[p]
 	}
 
-	populateLocations(res, contentH, opPage)
-
-	return paintPages(ctx, doc, res, opts, contentH, fixedIdx)
+	return opPage
 }
 
 // paintPages paints every page: page content ops first, then the fixed layer
 // with page-local coordinates.
-func paintPages(ctx context.Context, doc *pdf.Document, res *Result, opts PaintOptions, contentH float64, fixedIdx []int) error {
+func paintPages(
+	ctx context.Context, doc *pdf.Document, res *Result, opts PaintOptions, contentH float64, fixedIdx []int,
+) error {
 	var paintErr error
 
 	for pageIdx, idxs := range res.Pages {
-		if err := ctx.Err(); err != nil {
-			return fmt.Errorf("layout: paint context: %w", err)
-		}
-
-		page := doc.AddPage(opts.PageWidth, opts.PageHeight)
-		child := page.Content()
-		fontNames := map[*pdf.Font]string{}
-		nextFont := 0
-		resName := func(face *pdf.Font) string {
-			if face == nil {
-				return "F0"
-			}
-
-			if n, ok := fontNames[face]; ok {
-				return n
-			}
-
-			n := "F" + strconv.Itoa(nextFont)
-			nextFont++
-			fontNames[face] = n
-			child.UseEmbeddedFont(n, face)
-
-			return n
-		}
-		nextImg := 0
-		paintOp := func(paintOp *Op, pageN int) {
-			if paintOp.Kind == opKindNoop {
-				return
-			}
-
-			if paintOp.Kind == OpLinkURI {
-				drawLinkXform(page, paintOp, pageN, contentH, opts)
-
-				return
-			}
-
-			needGS := paintOp.XformSet || (paintOp.PaintOpacity > 0 && paintOp.PaintOpacity < 1)
-			if needGS {
-				child.Save()
-			}
-
-			if paintOp.XformSet {
-				a, b, cc, d, e, f := pdfCTMFromCSS(paintOp.Xform, pageN, contentH, opts, page.Height())
-				child.Transform(a, b, cc, d, e, f)
-			}
-
-			if paintOp.PaintOpacity > 0 && paintOp.PaintOpacity < 1 {
-				child.SetOpacity(paintOp.PaintOpacity)
-			}
-
-			switch paintOp.Kind {
-			case OpFillRect:
-				drawFill(child, paintOp, pageN, contentH, opts, page.Height())
-			case OpStrokeRect:
-				drawStroke(child, paintOp, pageN, contentH, opts, page.Height())
-			case OpLine:
-				drawLine(child, paintOp, pageN, contentH, opts, page.Height())
-			case OpText, OpBullet:
-				drawText(child, paintOp, pageN, contentH, opts, page.Height(), resName(paintOp.Font))
-			case OpImage:
-				name := "I" + strconv.Itoa(nextImg)
-				nextImg++
-
-				if err := drawImage(page, child, paintOp, pageN, contentH, opts, name); err != nil && paintErr == nil {
-					paintErr = err
-				}
-			case OpLinkURI, opKindNoop:
-				// handled above
-			}
-
-			if needGS {
-				child.Restore()
-			}
-		}
-
-		sortPaintIndices(res.Ops, idxs)
-
-		for _, idx := range idxs {
-			if err := ctx.Err(); err != nil {
-				return fmt.Errorf("layout: paint context: %w", err)
-			}
-
-			paintOp(&res.Ops[idx], pageIdx)
-		}
-		// Fixed layer: page-local coords (pageIdx 0 math on every page).
-		sortPaintIndices(res.Ops, fixedIdx)
-
-		for _, idx := range fixedIdx {
-			if err := ctx.Err(); err != nil {
-				return fmt.Errorf("layout: paint context: %w", err)
-			}
-
-			paintOp(&res.Ops[idx], 0)
+		if err := paintPageOps(ctx, doc, res, opts, contentH, pageIdx, idxs, fixedIdx, &paintErr); err != nil {
+			return err
 		}
 	}
 
 	return paintErr
+}
+
+// paintPageOps paints one page's content ops and its fixed layer, returning
+// the first context error.
+func paintPageOps(
+	ctx context.Context, doc *pdf.Document, res *Result, opts PaintOptions, contentH float64,
+	pageIdx int, idxs, fixedIdx []int, paintErr *error,
+) error {
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("layout: paint context: %w", err)
+	}
+
+	page := doc.AddPage(opts.PageWidth, opts.PageHeight)
+	child := page.Content()
+	fontNames := map[*pdf.Font]string{}
+	nextFont := 0
+	resName := func(face *pdf.Font) string {
+		if face == nil {
+			return "F0"
+		}
+
+		if n, ok := fontNames[face]; ok {
+			return n
+		}
+
+		n := "F" + strconv.Itoa(nextFont)
+		nextFont++
+		fontNames[face] = n
+		child.UseEmbeddedFont(n, face)
+
+		return n
+	}
+	nextImg := 0
+	paintOp := func(paintOp *Op, pageN int) {
+		paintOpOnPage(child, page, paintOp, pageN, contentH, opts, page.Height(), resName, &nextImg, paintErr)
+	}
+
+	sortPaintIndices(res.Ops, idxs)
+
+	for _, idx := range idxs {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("layout: paint context: %w", err)
+		}
+
+		paintOp(&res.Ops[idx], pageIdx)
+	}
+	// Fixed layer: page-local coords (pageIdx 0 math on every page).
+	sortPaintIndices(res.Ops, fixedIdx)
+
+	for _, idx := range fixedIdx {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("layout: paint context: %w", err)
+		}
+
+		paintOp(&res.Ops[idx], 0)
+	}
+
+	return nil
+}
+
+// paintOpOnPage dispatches one op onto a page's content stream: transforms,
+// opacity, fill/stroke/line/text/image drawing, then restores the graphics
+// state. The first image-embed error is recorded into paintErr.
+func paintOpOnPage(
+	child *pdf.Content, page *pdf.Page, paintOp *Op, pageN int, contentH float64, opts PaintOptions,
+	pageH float64, resName func(*pdf.Font) string, nextImg *int, paintErr *error,
+) {
+	if paintOp.Kind == opKindNoop {
+		return
+	}
+
+	if paintOp.Kind == OpLinkURI {
+		drawLinkXform(page, paintOp, pageN, contentH, opts)
+
+		return
+	}
+
+	needGS := paintOp.XformSet || (paintOp.PaintOpacity > 0 && paintOp.PaintOpacity < 1)
+	if needGS {
+		child.Save()
+	}
+
+	if paintOp.XformSet {
+		a, b, cc, d, e, f := pdfCTMFromCSS(paintOp.Xform, pageN, contentH, opts, page.Height())
+		child.Transform(a, b, cc, d, e, f)
+	}
+
+	if paintOp.PaintOpacity > 0 && paintOp.PaintOpacity < 1 {
+		child.SetOpacity(paintOp.PaintOpacity)
+	}
+
+	drawPageOp(child, page, paintOp, pageN, contentH, opts, pageH, resName, nextImg, paintErr)
+
+	if needGS {
+		child.Restore()
+	}
+}
+
+// drawPageOp dispatches one op to the shared fill/stroke/line/text/image
+// drawing routines.
+func drawPageOp(
+	child *pdf.Content, page *pdf.Page, paintOp *Op, pageN int, contentH float64, opts PaintOptions,
+	pageH float64, resName func(*pdf.Font) string, nextImg *int, paintErr *error,
+) {
+	switch paintOp.Kind {
+	case OpFillRect:
+		drawFill(child, paintOp, pageN, contentH, opts, pageH)
+	case OpStrokeRect:
+		drawStroke(child, paintOp, pageN, contentH, opts, pageH)
+	case OpLine:
+		drawLine(child, paintOp, pageN, contentH, opts, pageH)
+	case OpText, OpBullet:
+		drawText(child, paintOp, pageN, contentH, opts, pageH, resName(paintOp.Font))
+	case OpImage:
+		name := "I" + strconv.Itoa(*nextImg)
+		*nextImg++
+
+		if err := drawImage(page, child, paintOp, pageN, contentH, opts, name); err != nil && *paintErr == nil {
+			*paintErr = err
+		}
+	case OpLinkURI, opKindNoop:
+	}
 }
 
 func sortPaintIndices(ops []Op, idxs []int) {
@@ -362,13 +418,12 @@ func PaintBand(p *pdf.Page, c *pdf.Content, ops []Op, opts BandOptions) error {
 
 // PaintBandContext is the cancellation-aware form of PaintBand used for
 // HTML headers and footers.
-func PaintBandContext(ctx context.Context, p *pdf.Page, c *pdf.Content, ops []Op, opts BandOptions) error {
-	if p == nil || c == nil {
-		return nil
-	}
+func PaintBandContext(ctx context.Context, page *pdf.Page, chld *pdf.Content, ops []Op, opts BandOptions) error {
+	ctx, cancel := context.WithCancel(backgroundIfNil(ctx))
+	defer cancel()
 
-	if ctx == nil {
-		ctx = context.Background()
+	if page == nil || chld == nil {
+		return nil
 	}
 
 	if err := ctx.Err(); err != nil {
@@ -389,25 +444,27 @@ func PaintBandContext(ctx context.Context, p *pdf.Page, c *pdf.Content, ops []Op
 		n := "B" + strconv.Itoa(nextFont)
 		nextFont++
 		fontNames[face] = n
-		c.UseEmbeddedFont(n, face)
+		chld.UseEmbeddedFont(n, face)
 
 		return n
 	}
 
-	return paintBandOps(ctx, p, c, ops, opts, resName)
+	return paintBandOps(ctx, page, chld, ops, opts, resName)
 }
 
 // paintBandOps dispatches every op onto the band content stream, honoring the
 // shared colors/opacity/transform/fake-bold policy. Returns the first
 // image-embed error, if any.
-func paintBandOps(ctx context.Context, p *pdf.Page, c *pdf.Content, ops []Op, opts BandOptions, resName func(*pdf.Font) string) error {
+func paintBandOps(
+	ctx context.Context, page *pdf.Page, chld *pdf.Content, ops []Op, opts BandOptions,
+	resName func(*pdf.Font) string,
+) error {
 	nextImg := 0
-	pos := opts.Margins
 	contentH := opts.ContentH
 
 	pageH := opts.PageH
 	if pageH <= 0 {
-		pageH = p.Height()
+		pageH = page.Height()
 	}
 	// Band mode without full page geometry: map canvas (y down) to PDF using
 	// OriginY as the top edge and OriginX as left origin.
@@ -425,145 +482,174 @@ func paintBandOps(ctx context.Context, p *pdf.Page, c *pdf.Content, ops []Op, op
 			continue
 		}
 
-		needGS := paintOp.XformSet || (paintOp.PaintOpacity > 0 && paintOp.PaintOpacity < 1)
-		if needGS {
-			c.Save()
-		}
-
-		if paintOp.XformSet && !useSimple {
-			a, b, cc, d, e, f := pdfCTMFromCSS(paintOp.Xform, 0, contentH, pos, pageH)
-			c.Transform(a, b, cc, d, e, f)
-		}
-
-		if paintOp.PaintOpacity > 0 && paintOp.PaintOpacity < 1 {
-			c.SetOpacity(paintOp.PaintOpacity)
-		}
-
-		if useSimple {
-			if err := paintOpBandSimple(c, p, paintOp, opts, resName(paintOp.Font), &nextImg); err != nil && firstErr == nil {
-				firstErr = err
-			}
-		} else {
-			switch paintOp.Kind {
-			case OpFillRect:
-				drawFill(c, paintOp, 0, contentH, pos, pageH)
-			case OpStrokeRect:
-				drawStroke(c, paintOp, 0, contentH, pos, pageH)
-			case OpLine:
-				drawLine(c, paintOp, 0, contentH, pos, pageH)
-			case OpText, OpBullet:
-				drawText(c, paintOp, 0, contentH, pos, pageH, resName(paintOp.Font))
-			case OpImage:
-				name := "I" + strconv.Itoa(nextImg)
-				nextImg++
-
-				if err := drawImage(p, c, paintOp, 0, contentH, pos, name); err != nil && firstErr == nil {
-					firstErr = err
-				}
-			case OpLinkURI, opKindNoop:
-				// skipped above
-			}
-		}
-
-		if needGS {
-			c.Restore()
-		}
+		paintBandOp(chld, page, paintOp, opts, contentH, pageH, useSimple, resName, &nextImg, &firstErr)
 	}
 
 	return firstErr
 }
 
-func paintOpBandSimple(c *pdf.Content, _ *pdf.Page, op *Op, opts BandOptions, fontName string, nextImg *int) error {
-	posX := opts.OriginX + op.X
+// paintBandOp paints one band op: graphics-state save, transform, opacity,
+// then the shared draw dispatch, and a final restore.
+func paintBandOp(
+	chld *pdf.Content, page *pdf.Page, paintOp *Op, opts BandOptions, contentH, pageH float64,
+	useSimple bool, resName func(*pdf.Font) string, nextImg *int, firstErr *error,
+) {
+	needGS := paintOp.XformSet || (paintOp.PaintOpacity > 0 && paintOp.PaintOpacity < 1)
+	if needGS {
+		chld.Save()
+	}
 
-	switch op.Kind {
+	if paintOp.XformSet && !useSimple {
+		a, b, cc, d, e, f := pdfCTMFromCSS(paintOp.Xform, 0, contentH, opts.Margins, pageH)
+		chld.Transform(a, b, cc, d, e, f)
+	}
+
+	if paintOp.PaintOpacity > 0 && paintOp.PaintOpacity < 1 {
+		chld.SetOpacity(paintOp.PaintOpacity)
+	}
+
+	drawBandOp(chld, page, paintOp, opts, contentH, pageH, useSimple, resName, nextImg, firstErr)
+
+	if needGS {
+		chld.Restore()
+	}
+}
+
+// drawBandOp dispatches one band op to the simple band path or the shared
+// draw routines.
+func drawBandOp(
+	chld *pdf.Content, page *pdf.Page, paintOp *Op, opts BandOptions, contentH, pageH float64,
+	useSimple bool, resName func(*pdf.Font) string, nextImg *int, firstErr *error,
+) {
+	if useSimple {
+		recordBandError(firstErr, paintOpBandSimple(chld, page, paintOp, opts, resName(paintOp.Font), nextImg))
+
+		return
+	}
+
+	switch paintOp.Kind {
 	case OpFillRect:
-		bandFillRect(c, opts, op, posX)
+		drawFill(chld, paintOp, 0, contentH, opts.Margins, pageH)
 	case OpStrokeRect:
-		bandStrokeRect(c, opts, op, posX)
+		drawStroke(chld, paintOp, 0, contentH, opts.Margins, pageH)
 	case OpLine:
-		bandStrokeLine(c, opts, op, posX)
+		drawLine(chld, paintOp, 0, contentH, opts.Margins, pageH)
 	case OpText, OpBullet:
-		bandText(c, opts, op, posX, fontName)
+		drawText(chld, paintOp, 0, contentH, opts.Margins, pageH, resName(paintOp.Font))
+	case OpImage:
+		name := "I" + strconv.Itoa(*nextImg)
+		*nextImg++
+
+		recordBandError(firstErr, drawImage(page, chld, paintOp, 0, contentH, opts.Margins, name))
+	case OpLinkURI, opKindNoop:
+	}
+}
+
+// recordBandError keeps the first image-embed error.
+func recordBandError(firstErr *error, err error) {
+	if err != nil && *firstErr == nil {
+		*firstErr = err
+	}
+}
+
+func paintOpBandSimple(
+	chld *pdf.Content, _ *pdf.Page, paintOp *Op, opts BandOptions, fontName string, nextImg *int,
+) error {
+	posX := opts.OriginX + paintOp.X
+
+	switch paintOp.Kind {
+	case OpFillRect:
+		bandFillRect(chld, opts, paintOp, posX)
+	case OpStrokeRect:
+		bandStrokeRect(chld, opts, paintOp, posX)
+	case OpLine:
+		bandStrokeLine(chld, opts, paintOp, posX)
+	case OpText, OpBullet:
+		bandText(chld, opts, paintOp, posX, fontName)
 
 	case OpImage:
-		return bandImage(c, opts, op, posX, nextImg)
+		return bandImage(chld, opts, paintOp, posX, nextImg)
 	case OpLinkURI, opKindNoop:
-		// Links are the caller's job; deactivated ops are skipped.
 	}
 
 	return nil
 }
 
-func bandFillRect(c *pdf.Content, opts BandOptions, op *Op, posX float64) {
-	ps := StyleOf(op)
-	y := opts.OriginY - (op.Y + op.H)
+func bandFillRect(chld *pdf.Content, opts BandOptions, paintOp *Op, posX float64) {
+	ps := StyleOf(paintOp)
+	y := opts.OriginY - (paintOp.Y + paintOp.H)
 
-	c.SetFillColor(ps.FillR, ps.FillG, ps.FillB)
-	c.Rect(posX, y, op.W, op.H)
-	c.Fill()
+	chld.SetFillColor(ps.FillR, ps.FillG, ps.FillB)
+	chld.Rect(posX, y, paintOp.W, paintOp.H)
+	chld.Fill()
 }
 
-func bandStrokeRect(c *pdf.Content, opts BandOptions, op *Op, posX float64) {
-	y := opts.OriginY - (op.Y + op.H)
-	c.SetStrokeColor(op.R, op.G, op.B)
-	c.SetLineWidth(1)
-	c.Rect(posX, y, op.W, op.H)
-	c.Stroke()
+func bandStrokeRect(chld *pdf.Content, opts BandOptions, paintOp *Op, posX float64) {
+	y := opts.OriginY - (paintOp.Y + paintOp.H)
+	chld.SetStrokeColor(paintOp.R, paintOp.G, paintOp.B)
+	chld.SetLineWidth(1)
+	chld.Rect(posX, y, paintOp.W, paintOp.H)
+	chld.Stroke()
 }
 
-func bandStrokeLine(c *pdf.Content, opts BandOptions, op *Op, posX float64) {
-	yEnd := opts.OriginY - op.Y
-	yTwo := opts.OriginY - (op.Y + op.H)
+func bandStrokeLine(chld *pdf.Content, opts BandOptions, paintOp *Op, posX float64) {
+	yEnd := opts.OriginY - paintOp.Y
+	yTwo := opts.OriginY - (paintOp.Y + paintOp.H)
 
-	width := op.Width
+	width := paintOp.Width
 	if width <= 0 {
 		width = 1
 	}
 
-	c.SetStrokeColor(op.R, op.G, op.B)
-	c.SetLineWidth(width)
-	c.MoveTo(posX, yEnd)
-	c.LineTo(opts.OriginX+op.X+op.W, yTwo)
-	c.Stroke()
+	chld.SetStrokeColor(paintOp.R, paintOp.G, paintOp.B)
+	chld.SetLineWidth(width)
+	chld.MoveTo(posX, yEnd)
+	chld.LineTo(opts.OriginX+paintOp.X+paintOp.W, yTwo)
+	chld.Stroke()
 }
 
-func bandText(c *pdf.Content, opts BandOptions, op *Op, posX float64, fontName string) {
-	posY := opts.OriginY - op.Y
-	c.SetFillColor(op.R, op.G, op.B)
+func bandText(chld *pdf.Content, opts BandOptions, paintOp *Op, posX float64, fontName string) {
+	posY := opts.OriginY - paintOp.Y
+	chld.SetFillColor(paintOp.R, paintOp.G, paintOp.B)
 
 	if fontName == "" {
 		fontName = "F0"
 	}
 
-	c.SetFont(fontName, op.Size)
-	c.BeginText()
-	c.TextAt(posX, posY)
+	chld.SetFont(fontName, paintOp.Size)
+	chld.BeginText()
+	chld.TextAt(posX, posY)
 
-	if FakeBoldFor(op) {
-		c.SetLineWidth(op.Size * outlineStrokeRatio)
-		c.TextRenderMode(two)
+	if FakeBoldFor(paintOp) {
+		chld.SetLineWidth(paintOp.Size * outlineStrokeRatio)
+		chld.TextRenderMode(two)
 	}
 
-	c.TextShow(op.Text)
+	chld.TextShow(paintOp.Text)
 
-	if FakeBoldFor(op) {
-		c.TextRenderMode(0)
+	if FakeBoldFor(paintOp) {
+		chld.TextRenderMode(0)
 	}
 
-	c.EndText()
+	chld.EndText()
 }
 
-func bandImage(c *pdf.Content, opts BandOptions, op *Op, posX float64, nextImg *int) error {
+func bandImage(chld *pdf.Content, opts BandOptions, paintOp *Op, posX float64, nextImg *int) error {
 	name := "I" + strconv.Itoa(*nextImg)
 	*nextImg++
 
-	y := opts.OriginY - (op.Y + op.H)
-	if op.IsJPEG {
-		return fmt.Errorf("layout: band image %s: %w", name, c.AddJPEGImage(name, posX, y, op.W, op.H, op.Image))
+	posY := opts.OriginY - (paintOp.Y + paintOp.H)
+	if paintOp.IsJPEG {
+		return fmt.Errorf(
+			"layout: band image %s: %w", name,
+			chld.AddJPEGImage(name, posX, posY, paintOp.W, paintOp.H, paintOp.Image),
+		)
 	}
 
-	return fmt.Errorf("layout: band image %s: %w", name, c.AddPNGImage(name, posX, y, op.W, op.H, op.Image))
+	return fmt.Errorf(
+		"layout: band image %s: %w", name,
+		chld.AddPNGImage(name, posX, posY, paintOp.W, paintOp.H, paintOp.Image),
+	)
 }
 
 func isSplittable(op *Op) bool {
@@ -589,31 +675,11 @@ func capTablePageBreaks(res *Result, contentH float64) {
 
 	_, horiz, vertStarts, vertEnds, horizByY := collectTableBorderSegments(res)
 	seal := func(gVal, minX, maxX, borderW, red, green, blue float64) {
-		if maxX-minX < 20 || borderW < 0 {
-			return
-		}
-
-		if borderW < minBorderWidthPt {
-			borderW = 0.5
-		}
-		// Avoid exact duplicates.
-		for _, h := range horiz {
-			if math.Abs(h.y-gVal) <= 0.5 && math.Abs(h.x0-minX) <= eps && math.Abs(h.x1-maxX) <= eps {
-				return
-			}
-		}
-
-		op := Op{ //nolint:exhaustruct // intentional zero fields
-			Kind: OpLine, X: minX, Y: gVal, W: maxX - minX, H: 0,
-			Width: borderW, R: red, G: green, B: blue,
-		}
-		res.Ops = append(res.Ops, op)
-		sealed := hseg{minX, maxX, gVal, borderW, red, green, blue}
-		horiz = append(horiz, sealed)
-		horizByY[roundY(gVal)] = append(horizByY[roundY(gVal)], sealed)
+		sealBorderGap(res, &horiz, horizByY, eps, gVal, minX, maxX, borderW, red, green, blue)
 	}
 	coverage := func(y, minX, maxX float64) bool {
 		full, _, _, _ := hCoverage(horizByY, y, minX, maxX)
+
 		return full
 	}
 
@@ -624,6 +690,49 @@ func capTablePageBreaks(res *Result, contentH float64) {
 	// continuation-page body band (under repeated thead or at page top).
 	// Mid-table rowspan holes keep skipped tops so continuous year cells stay
 	// unsplit; only the page-fragment open edge is closed.
+	sealPageTopClusters(vertStarts, vertEnds, contentH, coverage, seal)
+
+	// Row bottoms: seal when verticals end near a page bottom and no full
+	// horizontal closes the strip (next row's top moved to the following page).
+	sealPageBottomClusters(vertStarts, vertEnds, contentH, coverage, seal, eps)
+}
+
+// sealBorderGap appends a horizontal rule at gVal spanning [minX, maxX] unless
+// a near-identical rule already exists.
+func sealBorderGap(
+	res *Result, horiz *[]hseg, horizByY map[int][]hseg, eps, gVal, minX, maxX, borderW, red, green, blue float64,
+) {
+	if maxX-minX < 20 || borderW < 0 {
+		return
+	}
+
+	if borderW < minBorderWidthPt {
+		borderW = 0.5
+	}
+	// Avoid exact duplicates.
+	for _, h := range *horiz {
+		if math.Abs(h.y-gVal) <= 0.5 && math.Abs(h.x0-minX) <= eps && math.Abs(h.x1-maxX) <= eps {
+			return
+		}
+	}
+
+	op := Op{ //nolint:exhaustruct // intentional zero fields
+		Kind: OpLine, X: minX, Y: gVal, W: maxX - minX, H: 0,
+		Width: borderW, R: red, G: green, B: blue,
+	}
+	res.Ops = append(res.Ops, op)
+	sealed := hseg{minX, maxX, gVal, borderW, red, green, blue}
+	*horiz = append(*horiz, sealed)
+	horizByY[roundY(gVal)] = append(horizByY[roundY(gVal)], sealed)
+}
+
+// sealPageTopClusters closes vertical clusters that start near the top of a
+// continuation page's body band.
+func sealPageTopClusters(
+	vertStarts, vertEnds map[int][]vseg, contentH float64,
+	coverage func(y, minX, maxX float64) bool,
+	seal func(gVal, minX, maxX, borderW, red, green, blue float64),
+) {
 	for _, child := range clusterVerticals(vertStarts, vertEnds, true) {
 		if child.n < three || child.maxX-child.minX < 20 {
 			continue
@@ -646,8 +755,16 @@ func capTablePageBreaks(res *Result, contentH float64) {
 
 		seal(child.y, child.minX, child.maxX, child.bw, child.r, child.g, child.b)
 	}
-	// Row bottoms: seal when verticals end near a page bottom and no full
-	// horizontal closes the strip (next row's top moved to the following page).
+}
+
+// sealPageBottomClusters closes vertical clusters that end near a page bottom
+// with no full horizontal rule (next row's top moved to the following page).
+func sealPageBottomClusters(
+	vertStarts, vertEnds map[int][]vseg, contentH float64,
+	coverage func(y, minX, maxX float64) bool,
+	seal func(gVal, minX, maxX, borderW, red, green, blue float64),
+	eps float64,
+) {
 	for _, child := range clusterVerticals(vertStarts, vertEnds, false) {
 		if child.n < three || child.maxX-child.minX < 20 {
 			continue
@@ -704,26 +821,8 @@ func capTableMaxPage(res *Result, contentH float64) int {
 // collectTableBorderSegments gathers non-fixed vertical/horizontal line ops
 // once and groups them by rounded Y.
 func collectTableBorderSegments(res *Result) ([]vseg, []hseg, map[int][]vseg, map[int][]vseg, map[int][]hseg) {
-	var verts []vseg
+	verts, horiz := collectBorderSegmentOps(res.Ops)
 
-	var horiz []hseg
-
-	for i := range res.Ops {
-		paintOp := &res.Ops[i]
-		if paintOp.Fixed || paintOp.Kind != OpLine {
-			continue
-		}
-
-		if paintOp.H > 2 && (paintOp.W < 1 || paintOp.W < paintOp.H*0.05) {
-			verts = append(verts, vseg{paintOp.X, paintOp.Y, paintOp.Y + paintOp.H, paintOp.Width, paintOp.R, paintOp.G, paintOp.B})
-
-			continue
-		}
-
-		if paintOp.W > 2 && paintOp.H < 1 {
-			horiz = append(horiz, hseg{paintOp.X, paintOp.X + paintOp.W, paintOp.Y, paintOp.Width, paintOp.R, paintOp.G, paintOp.B})
-		}
-	}
 	// Group verticals that share a start Y (row top) or end Y (row bottom).
 	vertStarts := map[int][]vseg{}
 	vertEnds := map[int][]vseg{}
@@ -739,6 +838,39 @@ func collectTableBorderSegments(res *Result) ([]vseg, []hseg, map[int][]vseg, ma
 	}
 
 	return verts, horiz, vertStarts, vertEnds, horizByY
+}
+
+// collectBorderSegmentOps gathers non-fixed line ops as vertical or horizontal
+// border segments.
+func collectBorderSegmentOps(ops []Op) ([]vseg, []hseg) {
+	var verts []vseg
+
+	var horiz []hseg
+
+	for i := range ops {
+		paintOp := &ops[i]
+		if paintOp.Fixed || paintOp.Kind != OpLine {
+			continue
+		}
+
+		if paintOp.H > 2 && (paintOp.W < 1 || paintOp.W < paintOp.H*0.05) {
+			verts = append(verts, vseg{
+				x: paintOp.X, y0: paintOp.Y, y1: paintOp.Y + paintOp.H,
+				w: paintOp.Width, r: paintOp.R, g: paintOp.G, b: paintOp.B,
+			})
+
+			continue
+		}
+
+		if paintOp.W > 2 && paintOp.H < 1 {
+			horiz = append(horiz, hseg{
+				x0: paintOp.X, x1: paintOp.X + paintOp.W, y: paintOp.Y,
+				w: paintOp.Width, r: paintOp.R, g: paintOp.G, b: paintOp.B,
+			})
+		}
+	}
+
+	return verts, horiz
 }
 
 // roundY bins a canvas Y into 0.5pt buckets.
@@ -787,32 +919,18 @@ func clusterVerticals(vertStarts, vertEnds map[int][]vseg, byStart bool) map[int
 	return out
 }
 
-// hCoverage reports whether horizontal segments near y span [minX, maxX].
-func hCoverage(horizByY map[int][]hseg, y, minX, maxX float64) (full bool, covMin, covMax float64, has bool) {
+// hCoverage reports whether horizontal segments near posY span [minX, maxX].
+func hCoverage(horizByY map[int][]hseg, posY, minX, maxX float64) (bool, float64, float64, bool) {
 	const eps = 2.0
 
-	key := roundY(y)
+	var covMin, covMax float64
+
+	has := false
+
+	key := roundY(posY)
 	for k := key - int(eps*two) - 1; k <= key+int(eps*two)+1; k++ {
 		for _, height := range horizByY[k] {
-			if math.Abs(height.y-y) > eps {
-				continue
-			}
-			// Only count segments that overlap the vertical band.
-			if height.x1 < minX-eps || height.x0 > maxX+eps {
-				continue
-			}
-
-			if !has {
-				covMin, covMax, has = height.x0, height.x1, true
-			} else {
-				if height.x0 < covMin {
-					covMin = height.x0
-				}
-
-				if height.x1 > covMax {
-					covMax = height.x1
-				}
-			}
+			covMin, covMax, has = mergeCoverageSeg(height, posY, minX, maxX, eps, covMin, covMax, has)
 		}
 	}
 
@@ -820,9 +938,37 @@ func hCoverage(horizByY map[int][]hseg, y, minX, maxX float64) (full bool, covMi
 		return false, 0, 0, false
 	}
 
-	full = covMin <= minX+eps && covMax >= maxX-eps
+	full := covMin <= minX+eps && covMax >= maxX-eps
 
 	return full, covMin, covMax, true
+}
+
+// mergeCoverageSeg extends the running coverage with one segment that lies at
+// posY within eps and overlaps the vertical band.
+func mergeCoverageSeg(
+	height hseg, posY, minX, maxX, eps float64, covMin, covMax float64, has bool,
+) (float64, float64, bool) {
+	if math.Abs(height.y-posY) > eps {
+		return covMin, covMax, has
+	}
+	// Only count segments that overlap the vertical band.
+	if height.x1 < minX-eps || height.x0 > maxX+eps {
+		return covMin, covMax, has
+	}
+
+	if !has {
+		return height.x0, height.x1, true
+	}
+
+	if height.x0 < covMin {
+		covMin = height.x0
+	}
+
+	if height.x1 > covMax {
+		covMax = height.x1
+	}
+
+	return covMin, covMax, true
 }
 
 // sealPageTopStubs seals vertical stubs that start exactly at a page top with
@@ -836,43 +982,53 @@ func sealPageTopStubs(
 	for p := 1; p <= maxPage; p++ {
 		pageTop := float64(p) * contentH
 
-		var bwVal, maxX, borderW, redN, green, blueN float64
-
-		node := 0
-
-		key := roundY(pageTop)
-		for k := key - int(eps*two) - 1; k <= key+int(eps*two)+1; k++ {
-			for _, val := range vertStarts[k] {
-				if val.y0 < pageTop-eps || val.y0 > pageTop+eps {
-					continue
-				}
-
-				if node == 0 {
-					bwVal, maxX, borderW, redN, green, blueN = val.x, val.x, val.w, val.r, val.g, val.b
-				} else {
-					if val.x < bwVal {
-						bwVal = val.x
-					}
-
-					if val.x > maxX {
-						maxX = val.x
-					}
-				}
-
-				node++
-			}
-		}
+		minX, maxX, borderW, redN, green, blueN, node := pageTopStubBounds(vertStarts, pageTop, eps)
 
 		if node < two {
 			continue
 		}
 
-		if coverage(pageTop, bwVal, maxX) {
+		if coverage(pageTop, minX, maxX) {
 			continue
 		}
 
-		seal(pageTop, bwVal, maxX, borderW, redN, green, blueN)
+		seal(pageTop, minX, maxX, borderW, redN, green, blueN)
 	}
+}
+
+// pageTopStubBounds scans vertical segments at pageTop for the min/max x and
+// dominant stroke of the stub cluster, returning how many stubs matched.
+func pageTopStubBounds(
+	vertStarts map[int][]vseg, pageTop, eps float64,
+) (float64, float64, float64, float64, float64, float64, int) {
+	var minX, maxX, borderW, red, green, blue float64
+
+	node := 0
+
+	key := roundY(pageTop)
+	for k := key - int(eps*two) - 1; k <= key+int(eps*two)+1; k++ {
+		for _, val := range vertStarts[k] {
+			if val.y0 < pageTop-eps || val.y0 > pageTop+eps {
+				continue
+			}
+
+			if node == 0 {
+				minX, maxX, borderW, red, green, blue = val.x, val.x, val.w, val.r, val.g, val.b
+			} else {
+				if val.x < minX {
+					minX = val.x
+				}
+
+				if val.x > maxX {
+					maxX = val.x
+				}
+			}
+
+			node++
+		}
+	}
+
+	return minX, maxX, borderW, red, green, blue, node
 }
 
 // paginateOps assigns every op a page. Crossing text/image/link ops snap to
@@ -886,11 +1042,32 @@ func paginateOps(res *Result, contentH float64) []int {
 	// boundaries. Otherwise a row near the boundary of the unbroken flow can
 	// move its text alone; a later page-break-before shift then leaves the
 	// collapsed-table chrome behind at the old row position.
-	for iter := 0; iter < 10 && beforeAlways(res, contentH); iter++ {
+	for range 10 {
+		if !beforeAlways(res, contentH) {
+			break
+		}
 	}
 
 	snapCrossingTextOps(res, contentH)
 
+	paginationFixpoint(res, contentH)
+
+	// After flow has settled, clone <thead> onto continuation pages.
+	// Blank avoid-list bands are controlled by preferSplitOverBlank during
+	// the fixpoint above (former packAvoidGaps sibling packing was a no-op).
+	repeatTableHeaders(res, contentH)
+	// Sticky is applied in Paint after rect splitting (see splitCrossingRects).
+	opPage := make([]int, len(res.Ops))
+	for i := range res.Ops {
+		opPage[i] = int(res.Ops[i].Y / contentH)
+	}
+
+	return opPage
+}
+
+// paginationFixpoint runs the page-break policies until none of them move
+// anything or the iteration cap is reached.
+func paginationFixpoint(res *Result, contentH float64) {
 	for range 10 {
 		changed := avoidInside(res, contentH)
 		if beforeAlways(res, contentH) {
@@ -917,17 +1094,6 @@ func paginateOps(res *Result, contentH float64) []int {
 			break
 		}
 	}
-	// After flow has settled, clone <thead> onto continuation pages.
-	// Blank avoid-list bands are controlled by preferSplitOverBlank during
-	// the fixpoint above (former packAvoidGaps sibling packing was a no-op).
-	repeatTableHeaders(res, contentH)
-	// Sticky is applied in Paint after rect splitting (see splitCrossingRects).
-	opPage := make([]int, len(res.Ops))
-	for i := range res.Ops {
-		opPage[i] = int(res.Ops[i].Y / contentH)
-	}
-
-	return opPage
 }
 
 // snapCrossingTextOps moves text/image/link ops that cross a page boundary to
@@ -955,6 +1121,7 @@ func snapCrossingTextOps(res *Result, contentH float64) {
 			if paintOp.Y+opH > boundary+1e-9 {
 				snapOpToBoundary(res, idx, paintOp, boundary)
 			}
+		case OpFillRect, OpStrokeRect, OpLine, opKindNoop:
 		}
 	}
 }
@@ -962,71 +1129,91 @@ func snapCrossingTextOps(res *Result, contentH float64) {
 // snapOpToBoundary shifts one crossing op (and the row chrome under it) onto
 // the next page, leaving ascender room above the boundary.
 func snapOpToBoundary(res *Result, idx int, paintOp *Op, boundary float64) {
-	if deltaY := boundary - paintOp.Y; deltaY > layoutEpsilon {
-		// Snap text (+ following flow). Same-row fills sit above the
-		// baseline; include them in dy via minY so their tops clear
-		// onto this page with the text (fixture-31 Row 28 white bg).
-		// Keep chrome matching tight (one row) so table reports do
-		// not inflate dy. Never clamp fill tops to `boundary` alone
-		// — that collapses them onto the text Y and leaves section
-		// gray showing through the ascent/padding band.
-		oldY := paintOp.Y
-		minY := oldY
-
-		var chrome []int
-
-		for jdx := range res.Ops {
-			obj := &res.Ops[jdx]
-			if obj.Fixed || jdx == idx {
-				continue
-			}
-
-			if obj.Kind != OpFillRect && obj.Kind != OpStrokeRect {
-				continue
-			}
-
-			if obj.H <= 0.5 || obj.H > 40 {
-				continue
-			}
-
-			if obj.Y > oldY+0.5 || obj.Y+obj.H < oldY-0.5 {
-				continue
-			}
-
-			if oldY-obj.Y > obj.H+2 {
-				continue
-			}
-
-			chrome = append(chrome, jdx)
-
-			if obj.Y < minY {
-				minY = obj.Y
-			}
-		}
-		// Leave room for ascenders above the baseline so snapped
-		// lines do not paint into the top margin (page-4/5 bleed).
-		lead := 0.0
-		if paintOp.Kind == OpText || paintOp.Kind == OpBullet {
-			lead = paintOp.Size * pxToPtFactor
-			if lead < maxGlueEm {
-				lead = 8
-			}
-		}
-
-		deltaY = boundary + lead - minY
-		shiftFlowY(res, idx, idx, oldY-layoutSlack, deltaY)
-
-		for _, j := range chrome {
-			o := &res.Ops[j]
-			if o.Y < oldY-0.01 {
-				o.Y += deltaY
-			}
-		}
+	if boundary-paintOp.Y > layoutEpsilon {
+		snapOpForward(res, idx, paintOp, boundary)
 
 		return
 	}
 
 	paintOp.Y = boundary
+}
+
+// snapOpForward snaps the op forward to the next page with the row chrome
+// that belongs to it, keeping the same-row fill tops above the text.
+func snapOpForward(res *Result, idx int, paintOp *Op, boundary float64) {
+	// Snap text (+ following flow). Same-row fills sit above the
+	// baseline; include them in deltaY via minY so their tops clear
+	// onto this page with the text (fixture-31 Row 28 white bg).
+	// Keep chrome matching tight (one row) so table reports do
+	// not inflate deltaY. Never clamp fill tops to `boundary` alone
+	// — that collapses them onto the text Y and leaves section
+	// gray showing through the ascent/padding band.
+	oldY := paintOp.Y
+	chrome, minY := rowChromeAbove(res, idx, oldY)
+	// Leave room for ascenders above the baseline so snapped
+	// lines do not paint into the top margin (page-4/5 bleed).
+	lead := 0.0
+	if paintOp.Kind == OpText || paintOp.Kind == OpBullet {
+		lead = paintOp.Size * pxToPtFactor
+		if lead < maxGlueEm {
+			lead = 8
+		}
+	}
+
+	deltaY := boundary + lead - minY
+	shiftFlowY(res, idx, idx, oldY-layoutSlack, deltaY)
+
+	for _, j := range chrome {
+		o := &res.Ops[j]
+		if o.Y < oldY-0.01 {
+			o.Y += deltaY
+		}
+	}
+}
+
+// rowChromeAbove collects fill/stroke rects whose band touches oldY, with
+// their minimum top Y.
+func rowChromeAbove(res *Result, idx int, oldY float64) ([]int, float64) {
+	chrome := make([]int, 0, len(res.Ops))
+
+	minY := oldY
+
+	for jdx := range res.Ops {
+		obj := &res.Ops[jdx]
+		if !rowChromeBandCandidate(obj, jdx, idx, oldY) {
+			continue
+		}
+
+		chrome = append(chrome, jdx)
+
+		if obj.Y < minY {
+			minY = obj.Y
+		}
+	}
+
+	return chrome, minY
+}
+
+// rowChromeBandCandidate reports whether obj is a one-row fill/stroke rect
+// sitting on the same band as the op at oldY (not the op itself).
+func rowChromeBandCandidate(obj *Op, jdx, idx int, oldY float64) bool {
+	if obj.Fixed || jdx == idx {
+		return false
+	}
+
+	if obj.Kind != OpFillRect && obj.Kind != OpStrokeRect {
+		return false
+	}
+
+	if obj.H <= 0.5 || obj.H > 40 {
+		return false
+	}
+
+	if obj.Y > oldY+0.5 || obj.Y+obj.H < oldY-0.5 {
+		return false
+	}
+
+	return oldY-obj.Y <= obj.H+2
 }
 
 // splitCrossingRects truncates splittable ops at each page boundary and keeps
@@ -1045,19 +1232,7 @@ func splitCrossingRects(res *Result, contentH float64, opPage []int) {
 	// Layout-generated operations already receive IDs from engine.add. A split
 	// fragment keeps its source ID; the box-range remap below is what makes all
 	// fragments remain owned by the same element.
-	var nextID uint64
-	for i := range res.Ops {
-		if res.Ops[i].ID > nextID {
-			nextID = res.Ops[i].ID
-		}
-	}
-
-	for i := range res.Ops {
-		if res.Ops[i].ID == 0 {
-			nextID++
-			res.Ops[i].ID = nextID
-		}
-	}
+	assignOpIDs(res)
 
 	spans := make([]opSpan, len(res.Ops))
 	out := make([]Op, 0, len(res.Ops)+maxGlueEm)
@@ -1079,6 +1254,25 @@ func splitCrossingRects(res *Result, contentH float64, opPage []int) {
 
 	res.Ops = out
 	remapBoxOpRanges(res.root, spans)
+}
+
+// assignOpIDs gives legacy/test-constructed operations an identity, keeping
+// every ID unique across the display list.
+func assignOpIDs(res *Result) {
+	var nextID uint64
+
+	for i := range res.Ops {
+		if res.Ops[i].ID > nextID {
+			nextID = res.Ops[i].ID
+		}
+	}
+
+	for i := range res.Ops {
+		if res.Ops[i].ID == 0 {
+			nextID++
+			res.Ops[i].ID = nextID
+		}
+	}
 }
 
 // splitOpFragments truncates one splittable rect at each page boundary and
@@ -1282,34 +1476,45 @@ func stripOrphanRows(res *Result, idxs []int, pageTop, pageBot, lastInkBot float
 			continue
 		}
 
-		switch paintOp.Kind {
-		case OpFillRect, OpStrokeRect:
-			// Row-sized shells whose center sits below the last ink are
-			// empty trailing row backgrounds (not the cell that holds the
-			// last text, whose center is at/above the baseline band).
-			if paintOp.H <= 0.5 || paintOp.H > 40 {
-				continue
-			}
-
-			if paintOp.Y+paintOp.H/2 > lastInkBot+0.5 {
-				paintOp.H = 0
-				stripped = true
-			}
-		case OpLine:
-			if paintOp.H >= 1 {
-				continue
-			}
-			// Horizontal rule below the last ink (empty row separator).
-			if paintOp.Y > lastInkBot+0.5 {
-				paintOp.Width = 0
-				stripped = true
-			}
-		case OpText, OpImage, OpLinkURI, OpBullet, opKindNoop:
-			// Not row chrome; left alone.
+		if stripOrphanRowOp(paintOp, lastInkBot) {
+			stripped = true
 		}
 	}
 
 	return stripped
+}
+
+// stripOrphanRowOp zeros one row-sized fill or horizontal rule that sits
+// below the last ink. Returns whether it was stripped.
+func stripOrphanRowOp(paintOp *Op, lastInkBot float64) bool {
+	switch paintOp.Kind {
+	case OpFillRect, OpStrokeRect:
+		// Row-sized shells whose center sits below the last ink are
+		// empty trailing row backgrounds (not the cell that holds the
+		// last text, whose center is at/above the baseline band).
+		if paintOp.H <= 0.5 || paintOp.H > 40 {
+			return false
+		}
+
+		if paintOp.Y+paintOp.H/2 > lastInkBot+0.5 {
+			paintOp.H = 0
+
+			return true
+		}
+	case OpLine:
+		if paintOp.H >= 1 {
+			return false
+		}
+		// Horizontal rule below the last ink (empty row separator).
+		if paintOp.Y > lastInkBot+0.5 {
+			paintOp.Width = 0
+
+			return true
+		}
+	case OpText, OpImage, OpLinkURI, OpBullet, opKindNoop:
+	}
+
+	return false
 }
 
 // tightenLastRowChrome shortens the last row's fill so padding under the
@@ -1323,20 +1528,41 @@ func tightenLastRowChrome(res *Result, idxs []int, pageTop, pageBot, lastInkBot 
 			continue
 		}
 
-		if (paintOp.Kind == OpFillRect || paintOp.Kind == OpStrokeRect) &&
-			paintOp.H > 0.5 && paintOp.H <= 40 &&
-			paintOp.Y < lastInkBot && paintOp.Y+paintOp.H > lastInkBot+underPad+2 {
-			paintOp.H = lastInkBot + underPad - paintOp.Y
-			if paintOp.H < 1 {
-				paintOp.H = 1
-			}
-		}
+		tightenLastRowOp(paintOp, lastInkBot, underPad)
+	}
+}
 
-		if paintOp.Kind == OpLine && paintOp.H < 1 && paintOp.Width > 0 &&
-			paintOp.Y > lastInkBot+underPad+1 && paintOp.Y < lastInkBot+40 {
-			paintOp.Y = lastInkBot + underPad
+// tightenLastRowOp shortens the last row's fill and pulls the trailing rule
+// up under the final baseline.
+func tightenLastRowOp(paintOp *Op, lastInkBot, underPad float64) {
+	if isLastRowFill(paintOp, lastInkBot, underPad) {
+		paintOp.H = lastInkBot + underPad - paintOp.Y
+		if paintOp.H < 1 {
+			paintOp.H = 1
 		}
 	}
+
+	if isTrailingRowRule(paintOp, lastInkBot, underPad) {
+		paintOp.Y = lastInkBot + underPad
+	}
+}
+
+// isLastRowFill reports whether paintOp is the row-sized fill that runs under
+// the last ink plus more than a small padding.
+func isLastRowFill(paintOp *Op, lastInkBot, underPad float64) bool {
+	if paintOp.Kind != OpFillRect && paintOp.Kind != OpStrokeRect {
+		return false
+	}
+
+	return paintOp.H > 0.5 && paintOp.H <= 40 &&
+		paintOp.Y < lastInkBot && paintOp.Y+paintOp.H > lastInkBot+underPad+2
+}
+
+// isTrailingRowRule reports whether paintOp is the horizontal rule that sits
+// just below the last ink's padding band.
+func isTrailingRowRule(paintOp *Op, lastInkBot, underPad float64) bool {
+	return paintOp.Kind == OpLine && paintOp.H < 1 && paintOp.Width > 0 &&
+		paintOp.Y > lastInkBot+underPad+1 && paintOp.Y < lastInkBot+40
 }
 
 // sectionContentBottom extends the content bottom over the last row chrome.
@@ -1347,15 +1573,22 @@ func sectionContentBottom(res *Result, idxs []int, pageTop, pageBot, contentBot 
 			continue
 		}
 
-		if (paintOp.Kind == OpFillRect || paintOp.Kind == OpStrokeRect) && paintOp.H > 0.5 && paintOp.H <= 40 {
-			if bot := paintOp.Y + paintOp.H; bot > contentBot {
-				contentBot = bot
-			}
-		}
+		contentBot = extendSectionContentBot(paintOp, contentBot)
+	}
 
-		if paintOp.Kind == OpLine && paintOp.H < 1 && paintOp.Width > 0 && paintOp.Y > contentBot {
-			contentBot = paintOp.Y
+	return contentBot
+}
+
+// extendSectionContentBot extends the content bottom over one row-chrome op.
+func extendSectionContentBot(paintOp *Op, contentBot float64) float64 {
+	if (paintOp.Kind == OpFillRect || paintOp.Kind == OpStrokeRect) && paintOp.H > 0.5 && paintOp.H <= 40 {
+		if bot := paintOp.Y + paintOp.H; bot > contentBot {
+			contentBot = bot
 		}
+	}
+
+	if paintOp.Kind == OpLine && paintOp.H < 1 && paintOp.Width > 0 && paintOp.Y > contentBot {
+		contentBot = paintOp.Y
 	}
 
 	return contentBot
@@ -1370,33 +1603,55 @@ func clipSectionTrailingBand(res *Result, idxs []int, pageTop, pageBot, contentB
 			continue
 		}
 
-		switch paintOp.Kind {
-		case OpFillRect:
-			// Only continuation fragments that begin at the page top are
-			// eligible for this trailing-band cleanup. A normal block fill
-			// (for example a <pre> with bottom padding) must retain its full
-			// box height through its bottom border.
-			if paintOp.Y <= pageTop+1 && paintOp.H > 40 && isSectionWashRGB(paintOp.R, paintOp.G, paintOp.B) &&
-				paintOp.Y+paintOp.H > contentBot+1 && paintOp.Y < contentBot {
-				paintOp.H = contentBot - paintOp.Y
-			}
-		case OpLine:
-			if paintOp.Y <= pageTop+1 && paintOp.H > 40 && nearSectionBorderRGB(paintOp.R, paintOp.G, paintOp.B) &&
-				paintOp.Y+paintOp.H > contentBot+1 && paintOp.Y < contentBot {
-				paintOp.H = contentBot - paintOp.Y
-			} else if paintOp.H < 1 && paintOp.Width > 0 && nearSectionBorderRGB(paintOp.R, paintOp.G, paintOp.B) &&
-				paintOp.Y > contentBot+1 && paintOp.Y > pageBot-30 {
-				paintOp.Y = contentBot
-			}
-		case OpStrokeRect, OpText, OpImage, OpLinkURI, OpBullet, opKindNoop:
-			// Not trailing section chrome; left alone.
-		}
+		clipTrailingBandOp(paintOp, pageTop, pageBot, contentBot)
 	}
+}
+
+// clipTrailingBandOp trims one trailing section wash or border to contentBot.
+func clipTrailingBandOp(paintOp *Op, pageTop, pageBot, contentBot float64) {
+	switch paintOp.Kind {
+	case OpFillRect:
+		if isTrailingSectionWash(paintOp, pageTop, contentBot) {
+			paintOp.H = contentBot - paintOp.Y
+		}
+	case OpLine:
+		if isTrailingSectionBorder(paintOp, pageTop, contentBot) {
+			paintOp.H = contentBot - paintOp.Y
+		} else if isTrailingPageRule(paintOp, pageBot, contentBot) {
+			paintOp.Y = contentBot
+		}
+	case OpStrokeRect, OpText, OpImage, OpLinkURI, OpBullet, opKindNoop:
+	}
+}
+
+// isTrailingSectionWash reports a continuation-fragment wash that begins at
+// the page top and runs past the content bottom. A normal block fill (for
+// example a <pre> with bottom padding) must retain its full box height
+// through its bottom border, so only the section color matches.
+func isTrailingSectionWash(paintOp *Op, pageTop, contentBot float64) bool {
+	return paintOp.Y <= pageTop+1 && paintOp.H > 40 && isSectionWashRGB(paintOp.R, paintOp.G, paintOp.B) &&
+		paintOp.Y+paintOp.H > contentBot+1 && paintOp.Y < contentBot
+}
+
+// isTrailingSectionBorder reports a page-top section side border that runs
+// past the content bottom.
+func isTrailingSectionBorder(paintOp *Op, pageTop, contentBot float64) bool {
+	return paintOp.Y <= pageTop+1 && paintOp.H > 40 && nearSectionBorderRGB(paintOp.R, paintOp.G, paintOp.B) &&
+		paintOp.Y+paintOp.H > contentBot+1 && paintOp.Y < contentBot
+}
+
+// isTrailingPageRule reports a thin section-colored rule stranded near the
+// page bottom, below the last content.
+func isTrailingPageRule(paintOp *Op, pageBot, contentBot float64) bool {
+	return paintOp.H < 1 && paintOp.Width > 0 && nearSectionBorderRGB(paintOp.R, paintOp.G, paintOp.B) &&
+		paintOp.Y > contentBot+1 && paintOp.Y > pageBot-30
 }
 
 // clipStickySectionChrome ends sticky-section chrome at the last real row and
 // seals the section bottom border when the section continues on the next page.
-func clipStickySectionChrome(res *Result, idxs []int, pageTop, pageBot, contentBot float64, targets []stickySectionChromeTarget) {
+func clipStickySectionChrome(
+	res *Result, idxs []int, pageTop, pageBot, contentBot float64, targets []stickySectionChromeTarget,
+) {
 	for _, target := range targets {
 		for _, i := range idxs {
 			paintOp := &res.Ops[i]
@@ -1405,28 +1660,39 @@ func clipStickySectionChrome(res *Result, idxs []int, pageTop, pageBot, contentB
 				continue
 			}
 
-			switch paintOp.Kind {
-			case OpFillRect:
-				if target.hasBackground && sameRectFrame(paintOp, target) && sameRGB(paintOp, target.background) {
-					paintOp.H = contentBot - paintOp.Y
-				}
-			case OpLine:
-				if target.sideMatches(paintOp) {
-					paintOp.H = contentBot - paintOp.Y
-				}
-			case OpStrokeRect, OpText, OpImage, OpLinkURI, OpBullet, opKindNoop:
-				// Not sticky-section chrome; left alone.
-			}
+			clipStickySectionChromeOp(paintOp, target, contentBot)
 		}
 
-		if target.hasBottom && stickySectionContinuesAfterPage(res, target, pageBot) &&
-			!hasStickySectionBottomBorder(res, target, contentBot) {
-			res.Ops = append(res.Ops, Op{ //nolint:exhaustruct // intentional zero fields
-				Kind: OpLine, X: target.x, Y: contentBot, W: target.w,
-				Width: target.borderBottomWidth,
-				R:     target.borderBottom[0], G: target.borderBottom[1], B: target.borderBottom[2],
-			})
+		sealStickySectionBottom(res, target, pageBot, contentBot)
+	}
+}
+
+// clipStickySectionChromeOp trims one sticky-section wash or side border to
+// the content bottom.
+func clipStickySectionChromeOp(paintOp *Op, target stickySectionChromeTarget, contentBot float64) {
+	switch paintOp.Kind {
+	case OpFillRect:
+		if target.hasBackground && sameRectFrame(paintOp, target) && sameRGB(paintOp, target.background) {
+			paintOp.H = contentBot - paintOp.Y
 		}
+	case OpLine:
+		if target.sideMatches(paintOp) {
+			paintOp.H = contentBot - paintOp.Y
+		}
+	case OpStrokeRect, OpText, OpImage, OpLinkURI, OpBullet, opKindNoop:
+	}
+}
+
+// sealStickySectionBottom appends the section's bottom border when the
+// section continues on the next page and no closing border exists yet.
+func sealStickySectionBottom(res *Result, target stickySectionChromeTarget, pageBot, contentBot float64) {
+	if target.hasBottom && stickySectionContinuesAfterPage(res, target, pageBot) &&
+		!hasStickySectionBottomBorder(res, target, contentBot) {
+		res.Ops = append(res.Ops, Op{ //nolint:exhaustruct // intentional zero fields
+			Kind: OpLine, X: target.x, Y: contentBot, W: target.w,
+			Width: target.borderBottomWidth,
+			R:     target.borderBottom[0], G: target.borderBottom[1], B: target.borderBottom[2],
+		})
 	}
 }
 
@@ -1518,20 +1784,36 @@ func clipSectionChromeToCloseY(res *Result, target stickySectionChromeTarget, pa
 			continue
 		}
 
-		switch paintOp.Kind {
-		case OpFillRect:
-			if target.hasBackground && paintOp.H > 40 && sameRectFrame(paintOp, target) &&
-				sameRGB(paintOp, target.background) && paintOp.Y+paintOp.H < closeY {
-				paintOp.H = closeY - paintOp.Y
-			}
-		case OpLine:
-			if paintOp.H > 40 && target.sideMatches(paintOp) && paintOp.Y+paintOp.H < closeY {
-				paintOp.H = closeY - paintOp.Y
-			}
-		case OpStrokeRect, OpText, OpImage, OpLinkURI, OpBullet, opKindNoop:
-			// Not section chrome; left alone.
-		}
+		clipSectionChromeOp(paintOp, target, closeY)
 	}
+}
+
+// clipSectionChromeOp trims one page-leading wash or side border to closeY.
+func clipSectionChromeOp(paintOp *Op, target stickySectionChromeTarget, closeY float64) {
+	switch paintOp.Kind {
+	case OpFillRect:
+		if isSectionChromeWash(paintOp, target, closeY) {
+			paintOp.H = closeY - paintOp.Y
+		}
+	case OpLine:
+		if isSectionChromeSideBorder(paintOp, target, closeY) {
+			paintOp.H = closeY - paintOp.Y
+		}
+	case OpStrokeRect, OpText, OpImage, OpLinkURI, OpBullet, opKindNoop:
+	}
+}
+
+// isSectionChromeWash reports a page-leading section background wash that
+// runs past closeY.
+func isSectionChromeWash(paintOp *Op, target stickySectionChromeTarget, closeY float64) bool {
+	return target.hasBackground && paintOp.H > 40 && sameRectFrame(paintOp, target) &&
+		sameRGB(paintOp, target.background) && paintOp.Y+paintOp.H < closeY
+}
+
+// isSectionChromeSideBorder reports a page-leading section side border that
+// runs past closeY.
+func isSectionChromeSideBorder(paintOp *Op, target stickySectionChromeTarget, closeY float64) bool {
+	return paintOp.H > 40 && target.sideMatches(paintOp) && paintOp.Y+paintOp.H < closeY
 }
 
 type stickySectionChromeTarget struct {
@@ -1583,9 +1865,9 @@ func stickyTargetFor(parent *box) stickySectionChromeTarget {
 		borderRight:       sty.BorderRight.Color,
 		borderBottom:      sty.BorderBottom.Color,
 		borderBottomWidth: sty.BorderBottom.Width,
-		hasBottom:         sty.BorderBottom.Width > 0 && sty.BorderBottom.Style != "none",
-		hasLeft:           sty.BorderLeft.Width > 0 && sty.BorderLeft.Style != "none",
-		hasRight:          sty.BorderRight.Width > 0 && sty.BorderRight.Style != "none",
+		hasBottom:         sty.BorderBottom.Width > 0 && sty.BorderBottom.Style != cssDisplayNone,
+		hasLeft:           sty.BorderLeft.Width > 0 && sty.BorderLeft.Style != cssDisplayNone,
+		hasRight:          sty.BorderRight.Width > 0 && sty.BorderRight.Style != cssDisplayNone,
 	}
 
 	if sty.BGColor[3] > 0 {
@@ -1680,82 +1962,92 @@ func isSectionWashRGB(r, g, b float64) bool {
 }
 
 // shiftFlowY moves the ops of the target range [from,to] - plus every op
-// strictly below fromY - down by dy canvas points. Ops of earlier boxes that
-// touch fromY exactly (collapsed margins) are left alone so the page-break
-// fixpoint converges instead of dragging boundary ops along each iteration.
-// Box.y is kept in sync for boxes whose top moved.
-func shiftFlowY(res *Result, from, to int, fromY, dy float64) {
-	if res == nil || len(res.Ops) == 0 || dy == 0 {
+// strictly below fromY - down by deltaY canvas points. Ops of earlier boxes
+// that touch fromY exactly (collapsed margins) are left alone so the
+// page-break fixpoint converges instead of dragging boundary ops along each
+// iteration. Box.y is kept in sync for boxes whose top moved.
+func shiftFlowY(res *Result, from, toIdx int, fromY, deltaY float64) {
+	if res == nil || len(res.Ops) == 0 || deltaY == 0 {
 		return
 	}
 
 	ensureFlowIndex(res, flowIndexPageSize(res))
 
-	for i := from; i <= to; i++ {
-		if i < 0 || i >= len(res.Ops) || res.Ops[i].Fixed {
-			continue
-		}
-
-		shiftIndexedOp(res, i, dy)
-	}
+	shiftOpsRange(res, from, toIdx, deltaY)
 
 	startPage := int(fromY / res.flowPageSize)
 	if startPage < 0 {
 		startPage = 0
 	}
 
-	shiftFlowOps(res, from, to, fromY, dy, startPage)
+	shiftFlowOps(res, from, toIdx, fromY, deltaY, startPage)
 
 	if res.root == nil {
 		return
 	}
 
 	if len(res.flowBoxes) == 0 {
-		boxes := res.boxes
-		if len(boxes) == 0 {
-			boxes = make([]*box, 0)
-			flattenBoxes(res.root, &boxes)
-			res.boxes = boxes
-		}
-
-		ensureFlowBoxIndex(res, boxes)
+		ensureFlowBoxIndex(res, flowBoxList(res))
 	}
 
-	shiftFlowBoxes(res, from, to, fromY, startPage, dy)
+	shiftFlowBoxes(res, from, toIdx, fromY, startPage, deltaY)
+}
+
+// shiftOpsRange shifts the non-fixed ops of [from,to] by deltaY.
+func shiftOpsRange(res *Result, from, to int, deltaY float64) {
+	for i := from; i <= to; i++ {
+		if i < 0 || i >= len(res.Ops) || res.Ops[i].Fixed {
+			continue
+		}
+
+		shiftIndexedOp(res, i, deltaY)
+	}
+}
+
+// flowBoxList returns the flattened box list, caching it on res.
+func flowBoxList(res *Result) []*box {
+	boxes := res.boxes
+	if len(boxes) == 0 {
+		boxes = make([]*box, 0)
+		flattenBoxes(res.root, &boxes)
+		res.boxes = boxes
+	}
+
+	return boxes
 }
 
 // shiftFlowOps moves the ops of every page bucket in the direction of the
 // shift: positive shifts process buckets from the end so an operation moved
 // to another bucket is never visited twice; negative shifts go ascending so
 // an operation moved backward is not revisited.
-func shiftFlowOps(res *Result, from, to int, fromY, dy float64, startPage int) {
-	if dy > 0 {
+func shiftFlowOps(res *Result, from, toIdx int, fromY, deltaY float64, startPage int) {
+	if deltaY > 0 {
 		for p := len(res.flowPages) - 1; p >= startPage; p-- {
-			shiftOpsBucket(res, res.flowPages[p], from, to, fromY, dy)
+			shiftOpsBucket(res, res.flowPages[p], from, toIdx, fromY, deltaY)
 		}
 
 		return
 	}
 
 	for p := startPage; p < len(res.flowPages); p++ {
-		shiftOpsBucket(res, res.flowPages[p], from, to, fromY, dy)
+		shiftOpsBucket(res, res.flowPages[p], from, toIdx, fromY, deltaY)
 	}
 }
 
 // shiftOpsBucket shifts the ops of one page bucket that sit strictly below
 // fromY. Removing the current item in shiftIndexedOp swaps the bucket's last
 // item into its place; keep the cursor in place when that happens.
-func shiftOpsBucket(res *Result, bucket []int, from, to int, fromY, dy float64) {
+func shiftOpsBucket(res *Result, bucket []int, from, toIdx int, fromY, deltaY float64) {
 	for jdx := 0; jdx < len(bucket); {
 		idx := bucket[jdx]
-		if (idx >= from && idx <= to) || res.Ops[idx].Y <= fromY {
+		if (idx >= from && idx <= toIdx) || res.Ops[idx].Y <= fromY {
 			jdx++
 
 			continue
 		}
 
 		oldPage := res.flowPageOf[idx]
-		shiftIndexedOp(res, idx, dy)
+		shiftIndexedOp(res, idx, deltaY)
 
 		if res.flowPageOf[idx] == oldPage {
 			jdx++
@@ -1764,35 +2056,35 @@ func shiftOpsBucket(res *Result, bucket []int, from, to int, fromY, dy float64) 
 }
 
 // shiftFlowBoxes moves the box buckets in the direction of the shift.
-func shiftFlowBoxes(res *Result, from, to int, fromY float64, startPage int, dy float64) {
-	if dy > 0 {
+func shiftFlowBoxes(res *Result, from, toIdx int, fromY float64, startPage int, deltaY float64) {
+	if deltaY > 0 {
 		for p := len(res.flowBoxes) - 1; p >= startPage; p-- {
-			shiftBoxesBucket(res, res.flowBoxes[p], from, to, fromY, startPage, dy)
+			shiftBoxesBucket(res, res.flowBoxes[p], from, toIdx, fromY, startPage, deltaY)
 		}
 
 		return
 	}
 
 	for p := startPage; p < len(res.flowBoxes); p++ {
-		shiftBoxesBucket(res, res.flowBoxes[p], from, to, fromY, startPage, dy)
+		shiftBoxesBucket(res, res.flowBoxes[p], from, toIdx, fromY, startPage, deltaY)
 	}
 }
 
 // shiftBoxesBucket shifts the boxes of one page bucket whose top moved.
-func shiftBoxesBucket(res *Result, bucket []int, from, to int, fromY float64, startPage int, dy float64) {
+func shiftBoxesBucket(res *Result, bucket []int, from, toIdx int, fromY float64, startPage int, deltaY float64) {
 	for jdx := 0; jdx < len(bucket); {
 		boxIndex := bucket[jdx]
 
 		b := res.boxes[boxIndex]
 		if startPage == res.flowBoxPage[boxIndex] && !(b.y > fromY ||
-			(b.y == fromY && b.opStart >= from && b.opEnd <= to)) {
+			(b.y == fromY && b.opStart >= from && b.opEnd <= toIdx)) {
 			jdx++
 
 			continue
 		}
 
 		oldPage := res.flowBoxPage[boxIndex]
-		shiftIndexedBox(res, boxIndex, dy)
+		shiftIndexedBox(res, boxIndex, deltaY)
 
 		if res.flowBoxPage[boxIndex] == oldPage {
 			jdx++
@@ -1831,7 +2123,7 @@ func ensureFlowIndex(res *Result, pageSize float64) {
 }
 
 // buildFlowOpIndex buckets non-fixed ops by their canvas page.
-func buildFlowOpIndex(ops []Op, pageSize float64) (pages [][]int, pageOf, pos []int) {
+func buildFlowOpIndex(ops []Op, pageSize float64) ([][]int, []int, []int) {
 	maxPage := 0
 
 	for i := range ops {
@@ -1849,9 +2141,9 @@ func buildFlowOpIndex(ops []Op, pageSize float64) (pages [][]int, pageOf, pos []
 		}
 	}
 
-	pages = make([][]int, maxPage+1)
-	pageOf = make([]int, len(ops))
-	pos = make([]int, len(ops))
+	pages := make([][]int, maxPage+1)
+	pageOf := make([]int, len(ops))
+	pos := make([]int, len(ops))
 
 	for i := range pageOf {
 		pageOf[i] = -1
@@ -1907,13 +2199,13 @@ func ensureFlowBoxIndex(res *Result, boxes []*box) {
 	}
 }
 
-func shiftIndexedOp(res *Result, index int, dy float64) {
+func shiftIndexedOp(res *Result, index int, deltaY float64) {
 	if index < 0 || index >= len(res.Ops) || res.Ops[index].Fixed {
 		return
 	}
 
 	oldPage := res.flowPageOf[index]
-	res.Ops[index].Y += dy
+	res.Ops[index].Y += deltaY
 
 	newPage := flowPageOfY(res.Ops[index].Y, res.flowPageSize)
 	if oldPage == newPage {
@@ -1961,6 +2253,7 @@ func removeFromFlowBucket(buckets [][]int, pos []int, page, index int) {
 
 	bucket := buckets[page]
 	slot := pos[index]
+
 	if slot < 0 || slot >= len(bucket) {
 		return
 	}
@@ -2033,30 +2326,8 @@ func keepTogetherForAvoid(res *Result, boxNode *box, contentH float64) bool {
 	height := boxNode.height
 	// Prefer ink extent when taller than the border box (rowspan /
 	// deferred paint can make ops protrude past b.h — wiki awards).
-	if boxNode.opStart <= boxNode.opEnd && boxNode.opStart >= 0 && boxNode.opEnd < len(res.Ops) {
-		bot := boxNode.y
-
-		for k := boxNode.opStart; k <= boxNode.opEnd; k++ {
-			paintOp := res.Ops[k]
-			outBox := paintOp.Y
-
-			switch paintOp.Kind {
-			case OpText, OpBullet:
-				outBox += paintOp.Size * defaultLineHeightRatio
-			case OpFillRect, OpStrokeRect, OpLine, OpImage, OpLinkURI, opKindNoop:
-				if paintOp.H > 0 {
-					outBox += paintOp.H
-				}
-			}
-
-			if outBox > bot {
-				bot = outBox
-			}
-		}
-
-		if ink := bot - boxNode.y; ink > height {
-			height = ink
-		}
+	if ink := boxInkExtent(res, boxNode); ink > height {
+		height = ink
 	}
 
 	layoutOut := int(boxNode.y / contentH)
@@ -2089,6 +2360,36 @@ func keepTogetherForAvoid(res *Result, boxNode *box, contentH float64) bool {
 	shiftFlowY(res, boxNode.opStart, boxNode.opEnd, boxNode.y, dy)
 
 	return true
+}
+
+// boxInkExtent returns the bottom edge of the box's ink ops (boxNode.y when
+// the op range is invalid or holds no ink).
+func boxInkExtent(res *Result, boxNode *box) float64 {
+	if boxNode.opStart > boxNode.opEnd || boxNode.opStart < 0 || boxNode.opEnd >= len(res.Ops) {
+		return boxNode.y
+	}
+
+	bot := boxNode.y
+
+	for k := boxNode.opStart; k <= boxNode.opEnd; k++ {
+		paintOp := res.Ops[k]
+		outBox := paintOp.Y
+
+		switch paintOp.Kind {
+		case OpText, OpBullet:
+			outBox += paintOp.Size * defaultLineHeightRatio
+		case OpFillRect, OpStrokeRect, OpLine, OpImage, OpLinkURI, opKindNoop:
+			if paintOp.H > 0 {
+				outBox += paintOp.H
+			}
+		}
+
+		if outBox > bot {
+			bot = outBox
+		}
+	}
+
+	return bot
 }
 
 // beforeAlways walks pre-order and moves page-break-before: always boxes to a
@@ -2201,6 +2502,7 @@ func flattenAllBoxes(root *box) []*box {
 			flatten(c)
 		}
 	}
+
 	if root != nil {
 		flatten(root)
 	}
@@ -2267,24 +2569,7 @@ func keepAfterAvoid(res *Result, boxNode, next *box, lastPage int, contentH floa
 	const gap = 10.0
 	need += gap
 	bandTop := pageStart + need
-	minY := bandTop
-	minIdx := -1
-
-	for idx := range res.Ops {
-		paintOp := &res.Ops[idx]
-		if paintOp.Fixed {
-			continue
-		}
-
-		if int(paintOp.Y/contentH) != nextPage {
-			continue
-		}
-
-		if paintOp.Y < minY {
-			minY = paintOp.Y
-			minIdx = idx
-		}
-	}
+	minY, minIdx := minOpYOnPage(res, nextPage, contentH, bandTop)
 
 	if minIdx >= 0 && minY < bandTop-0.01 {
 		push := bandTop - minY
@@ -2304,15 +2589,40 @@ func keepAfterAvoid(res *Result, boxNode, next *box, lastPage int, contentH floa
 		target = pageStart
 	}
 
-	dy := target - boxNode.y
-	if dy <= layoutSlackFine {
+	deltaY := target - boxNode.y
+	if deltaY <= layoutSlackFine {
 		return false
 	}
 
-	shiftOpsOnly(res, boxNode.opStart, boxNode.opEnd, dy)
-	boxNode.y += dy
+	shiftOpsOnly(res, boxNode.opStart, boxNode.opEnd, deltaY)
+	boxNode.y += deltaY
 
 	return true
+}
+
+// minOpYOnPage finds the lowest non-fixed op on the page, starting from
+// bandTop (returns -1 when none sit above it).
+func minOpYOnPage(res *Result, nextPage int, contentH, bandTop float64) (float64, int) {
+	minY := bandTop
+	minIdx := -1
+
+	for idx := range res.Ops {
+		paintOp := &res.Ops[idx]
+		if paintOp.Fixed {
+			continue
+		}
+
+		if int(paintOp.Y/contentH) != nextPage {
+			continue
+		}
+
+		if paintOp.Y < minY {
+			minY = paintOp.Y
+			minIdx = idx
+		}
+	}
+
+	return minY, minIdx
 }
 
 // avoidKeepBand measures how much room the box needs on next's page (ink
@@ -2323,48 +2633,58 @@ func avoidKeepBand(res *Result, boxNode *box) float64 {
 		need = 12
 	}
 
-	if boxNode.opStart <= boxNode.opEnd && boxNode.opStart >= 0 && boxNode.opEnd < len(res.Ops) {
-		top, bot := boxNode.y, boxNode.y
-
-		for k := boxNode.opStart; k <= boxNode.opEnd; k++ {
-			paintOp := res.Ops[k]
-			yStart, yEnd := paintOp.Y, paintOp.Y
-
-			switch paintOp.Kind {
-			case OpText, OpBullet:
-				yStart = paintOp.Y - paintOp.Size*ascentRatio
-				yEnd = paintOp.Y + paintOp.Size*bulletGapRatio
-			case OpLine:
-				if paintOp.H == 0 {
-					yEnd = paintOp.Y + math.Max(paintOp.Width, 1)
-				} else {
-					yEnd = paintOp.Y + paintOp.H
-				}
-			case OpFillRect, OpStrokeRect, OpImage, OpLinkURI, opKindNoop:
-				if paintOp.H > 0 {
-					yEnd = paintOp.Y + paintOp.H
-				}
-			}
-
-			if yStart < top {
-				top = yStart
-			}
-
-			if yEnd > bot {
-				bot = yEnd
-			}
-		}
-
-		if ink := bot - top; ink > need {
-			need = ink
-		}
-
-		if ink := bot - boxNode.y; ink > need {
-			need = ink
-		}
+	if ink := avoidKeepInkExtent(res, boxNode); ink > need {
+		need = ink
 	}
 
 	return need
+}
+
+// avoidKeepInkExtent returns the ink band height of the box's ops (0 when the
+// op range is invalid).
+func avoidKeepInkExtent(res *Result, boxNode *box) float64 {
+	if boxNode.opStart > boxNode.opEnd || boxNode.opStart < 0 || boxNode.opEnd >= len(res.Ops) {
+		return 0
+	}
+
+	top, bot := boxNode.y, boxNode.y
+
+	for k := boxNode.opStart; k <= boxNode.opEnd; k++ {
+		yStart, yEnd := opInkEdges(res.Ops[k])
+
+		if yStart < top {
+			top = yStart
+		}
+
+		if yEnd > bot {
+			bot = yEnd
+		}
+	}
+
+	return bot - top
+}
+
+// opInkEdges returns the top and bottom ink edges of one op.
+func opInkEdges(paintOp Op) (float64, float64) {
+	yStart, yEnd := paintOp.Y, paintOp.Y
+
+	switch paintOp.Kind {
+	case OpText, OpBullet:
+		yStart = paintOp.Y - paintOp.Size*ascentRatio
+		yEnd = paintOp.Y + paintOp.Size*bulletGapRatio
+	case OpLine:
+		if paintOp.H == 0 {
+			yEnd = paintOp.Y + math.Max(paintOp.Width, 1)
+		} else {
+			yEnd = paintOp.Y + paintOp.H
+		}
+	case OpFillRect, OpStrokeRect, OpImage, OpLinkURI, opKindNoop:
+		if paintOp.H > 0 {
+			yEnd = paintOp.Y + paintOp.H
+		}
+	}
+
+	return yStart, yEnd
 }
 
 // rowsIntact keeps each table row on a single page: a row spanning multiple
@@ -2429,46 +2749,66 @@ func shiftRowToPage(res *Result, row []*box, contentH float64) bool {
 // rowOpGeometry returns the op range and starting-row geometry of a row:
 // opStart..opEnd across its cells and the row band top/bottom (rowspan cells
 // use their starting-row height, not the full span paint extent).
-func rowOpGeometry(row []*box) (first, last int, rowTop, rowBottom float64, ok bool) {
-	first, last = -1, -1
+func rowOpGeometry(row []*box) (int, int, float64, float64, bool) {
+	first, last := -1, -1
 	haveGeom := false
 
-	for _, cell := range row {
-		if cell.opStart <= cell.opEnd {
-			if first < 0 {
-				first = cell.opStart
-			}
+	var rowTop, rowBottom float64
 
-			if cell.opEnd > last {
-				last = cell.opEnd
-			}
-		}
+	for _, cell := range row {
+		first, last = extendRowOpRange(first, last, cell)
 		// Use starting-row geometry, not full rowspan paint extent.
 		// Rowspan cells emit bottom borders at y+h (full span); scanning
 		// those ops made the first row look multi-page and cascaded
 		// blank pages (wiki awards tables with rowspan=10+).
-		top := cell.y
+		top, bot := rowCellGeometry(cell)
 
-		h := cell.height
-		if cell.rowSpan > 1 && cell.rowBoxH > 0 {
-			h = cell.rowBoxH
-		}
-
-		bot := top + h
 		if !haveGeom {
 			rowTop, rowBottom, haveGeom = top, bot, true
-		} else {
-			if top < rowTop {
-				rowTop = top
-			}
 
-			if bot > rowBottom {
-				rowBottom = bot
-			}
+			continue
+		}
+
+		if top < rowTop {
+			rowTop = top
+		}
+
+		if bot > rowBottom {
+			rowBottom = bot
 		}
 	}
 
 	return first, last, rowTop, rowBottom, first >= 0 && haveGeom
+}
+
+// extendRowOpRange widens the row's op range with one cell's ops.
+func extendRowOpRange(first, last int, cell *box) (int, int) {
+	if cell.opStart > cell.opEnd {
+		return first, last
+	}
+
+	if first < 0 {
+		first = cell.opStart
+	}
+
+	if cell.opEnd > last {
+		last = cell.opEnd
+	}
+
+	return first, last
+}
+
+// rowCellGeometry returns the starting-row band of one cell: rowspan cells
+// use their starting-row height, not the full span paint extent.
+func rowCellGeometry(cell *box) (float64, float64) {
+	top := cell.y
+
+	h := cell.height
+	if cell.rowSpan > 1 && cell.rowBoxH > 0 {
+		h = cell.rowBoxH
+	}
+
+	return top, top + h
 }
 
 // keepHeadingWithNext moves a heading to the next page when it would sit alone
@@ -2559,29 +2899,7 @@ func orphansWidows(res *Result, contentH float64) bool {
 			walk(c)
 		}
 
-		if boxNode.kind != "block" || boxNode.height <= 0 || boxNode.opStart > boxNode.opEnd {
-			return
-		}
-		// Nested block containers: children apply Rule 3; only heuristic on
-		// short straddlers here.
-		if hasNestedFlowChild(boxNode) {
-			if orphansWidowsHeuristic(res, boxNode, contentH) {
-				changed = true
-			}
-
-			return
-		}
-
-		lines := countBlockLineYs(res, boxNode)
-		if len(lines) == 0 {
-			if orphansWidowsHeuristic(res, boxNode, contentH) {
-				changed = true
-			}
-
-			return
-		}
-
-		if enforceOrphansWidows(res, boxNode, lines, contentH) {
+		if orphansWidowsBox(res, boxNode, contentH) {
 			changed = true
 		}
 	}
@@ -2590,18 +2908,30 @@ func orphansWidows(res *Result, contentH float64) bool {
 	return changed
 }
 
+// orphansWidowsBox applies Rule 3 (or the geometric fallback) to one block
+// box. Returns whether anything moved.
+func orphansWidowsBox(res *Result, boxNode *box, contentH float64) bool {
+	if boxNode.kind != displayBlock || boxNode.height <= 0 || boxNode.opStart > boxNode.opEnd {
+		return false
+	}
+	// Nested block containers: children apply Rule 3; only heuristic on
+	// short straddlers here.
+	if hasNestedFlowChild(boxNode) {
+		return orphansWidowsHeuristic(res, boxNode, contentH)
+	}
+
+	lines := countBlockLineYs(res, boxNode)
+	if len(lines) == 0 {
+		return orphansWidowsHeuristic(res, boxNode, contentH)
+	}
+
+	return enforceOrphansWidows(res, boxNode, lines, contentH)
+}
+
 // enforceOrphansWidows applies CSS Fragmentation Rule 3 (orphans/widows) to a
 // leaf block that straddles a page boundary. Returns whether it moved.
 func enforceOrphansWidows(res *Result, boxNode *box, lines []float64, contentH float64) bool {
-	orphans := boxNode.style.Orphans
-	if orphans < 1 {
-		orphans = 2
-	}
-
-	widows := boxNode.style.Widows
-	if widows < 1 {
-		widows = 2
-	}
+	orphans, widows := resolveOrphansWidows(boxNode)
 
 	layoutOut := int(boxNode.y / contentH)
 	hIdx := int((boxNode.y + boxNode.height) / contentH)
@@ -2611,15 +2941,7 @@ func enforceOrphansWidows(res *Result, boxNode *box, lines []float64, contentH f
 	}
 
 	boundary := float64(layoutOut+1) * contentH
-	before, after := 0, 0
-
-	for _, y := range lines {
-		if y < boundary-1e-6 {
-			before++
-		} else {
-			after++
-		}
-	}
+	before, after := countLinesAroundBoundary(lines, boundary)
 	// Rule 3 applies to Class B breaks *between line boxes*. If all text
 	// lines sit on one side of the boundary (only padding/bg straddles),
 	// do not keep-together tall boxes — fall back to the short heuristic.
@@ -2650,6 +2972,36 @@ func enforceOrphansWidows(res *Result, boxNode *box, lines []float64, contentH f
 	shiftFlowY(res, boxNode.opStart, boxNode.opEnd, boxNode.y, dy)
 
 	return true
+}
+
+// resolveOrphansWidows returns the effective orphans/widows minima.
+func resolveOrphansWidows(boxNode *box) (int, int) {
+	orphans := boxNode.style.Orphans
+	if orphans < 1 {
+		orphans = defaultOrphansWidows
+	}
+
+	widows := boxNode.style.Widows
+	if widows < 1 {
+		widows = defaultOrphansWidows
+	}
+
+	return orphans, widows
+}
+
+// countLinesAroundBoundary splits line baselines into before/after counts.
+func countLinesAroundBoundary(lines []float64, boundary float64) (int, int) {
+	before, after := 0, 0
+
+	for _, y := range lines {
+		if y < boundary-1e-6 {
+			before++
+		} else {
+			after++
+		}
+	}
+
+	return before, after
 }
 
 // orphansWidowsHeuristic is the phase-18 geometric fallback: short blocks
@@ -2719,9 +3071,9 @@ func preferSplitOverBlank(remaining, height, contentH float64) bool {
 	return false
 }
 
-func hasNestedFlowChild(b *box) bool {
-	for _, c := range b.children {
-		if c.kind == "block" || c.kind == "table" {
+func hasNestedFlowChild(boxNode *box) bool {
+	for _, c := range boxNode.children {
+		if c.kind == displayBlock || c.kind == displayTable {
 			return true
 		}
 	}
@@ -2729,10 +3081,10 @@ func hasNestedFlowChild(b *box) bool {
 	return false
 }
 
-// countBlockLineYs returns distinct text/bullet baseline Y positions in b's
-// op range (approximate line boxes for an IFC leaf block).
-func countBlockLineYs(res *Result, b *box) []float64 {
-	if res == nil || b.opStart > b.opEnd || b.opStart < 0 {
+// countBlockLineYs returns distinct text/bullet baseline Y positions in the
+// box's op range (approximate line boxes for an IFC leaf block).
+func countBlockLineYs(res *Result, boxNode *box) []float64 {
+	if res == nil || boxNode.opStart > boxNode.opEnd || boxNode.opStart < 0 {
 		return nil
 	}
 
@@ -2740,19 +3092,19 @@ func countBlockLineYs(res *Result, b *box) []float64 {
 
 	yCoords := make([]float64, 0, maxGlueEm)
 
-	end := b.opEnd
+	end := boxNode.opEnd
 	if end >= len(res.Ops) {
 		end = len(res.Ops) - 1
 	}
 
-	for i := b.opStart; i <= end; i++ {
-		op := &res.Ops[i]
-		if op.Kind != OpText && op.Kind != OpBullet {
+	for i := boxNode.opStart; i <= end; i++ {
+		paintOp := &res.Ops[i]
+		if paintOp.Kind != OpText && paintOp.Kind != OpBullet {
 			continue
 		}
 
-		if !hasLineY(yCoords, op.Y, eps) {
-			yCoords = append(yCoords, op.Y)
+		if !hasLineY(yCoords, paintOp.Y, eps) {
+			yCoords = append(yCoords, paintOp.Y)
 		}
 	}
 
@@ -2789,7 +3141,7 @@ func tableBoxes(root *box) []*box {
 
 	var walk func(b *box)
 	walk = func(b *box) {
-		if b.kind == "table" && b.headerRows > 0 && b.headerRows < len(b.rows) {
+		if b.kind == displayTable && b.headerRows > 0 && b.headerRows < len(b.rows) {
 			tables = append(tables, b)
 		}
 
@@ -2838,7 +3190,7 @@ func repeatTableHeaderOnPages(res *Result, tblBox *box, contentH float64) {
 }
 
 // headerContinuationPages is the set of pages holding table body rows.
-func headerContinuationPages(tblBox *box, firstPage int, res *Result, contentH float64) map[int]bool {
+func headerContinuationPages(tblBox *box, _ int, res *Result, contentH float64) map[int]bool {
 	pages := map[int]bool{}
 
 	for _, row := range tblBox.rows[tblBox.headerRows:] {
@@ -2855,9 +3207,9 @@ func headerContinuationPages(tblBox *box, firstPage int, res *Result, contentH f
 
 // tableBodyRange returns the op range and top Y of the body rows that start
 // on the given page.
-func tableBodyRange(tblBox *box, page int, res *Result, contentH float64) (shiftFrom, shiftTo int, bodyTop float64) {
-	shiftFrom, shiftTo = -1, -1
-	bodyTop = -1.0
+func tableBodyRange(tblBox *box, page int, res *Result, contentH float64) (int, int, float64) {
+	shiftFrom, shiftTo := -1, -1
+	bodyTop := -1.0
 
 	for _, row := range tblBox.rows[tblBox.headerRows:] {
 		face, lst := rowOpRange(row)
@@ -2920,6 +3272,7 @@ func rowYBounds(row []*box, res *Result) (float64, float64) {
 	}
 
 	top, bottom := opBottomEdge(res.Ops[first])
+
 	for k := first + 1; k <= last && k < len(res.Ops); k++ {
 		posY, bot := opBottomEdge(res.Ops[k])
 		if posY < top {
@@ -2976,42 +3329,63 @@ func rowSpan(rows [][]*box, res *Result) (int, int, float64, float64) {
 }
 
 // rowsBandGeometry returns the op range and Y band of the rows.
-func rowsBandGeometry(rows [][]*box, res *Result) (first, last int, top, bottom float64, ok bool) {
-	first, last = -1, -1
-	top, bottom = 0, 0
+func rowsBandGeometry(rows [][]*box, res *Result) (int, int, float64, float64, bool) {
+	first, last := -1, -1
+	top, bottom := 0.0, 0.0
 	set := false
 
 	for _, row := range rows {
-		face, lst := rowOpRange(row)
-		if face < 0 {
+		rowFirst, rowLast, rowTop, rowBottom, rowOK := rowBandExtent(row, res)
+		if !rowOK {
 			continue
 		}
 
-		if first < 0 || face < first {
-			first = face
-		}
-
-		if lst > last {
-			last = lst
-		}
-
-		right, rowB := rowYBounds(row, res)
-		if right < 0 {
-			continue
-		}
-
-		if !set || right < top {
-			top = right
-		}
-
-		if !set || rowB > bottom {
-			bottom = rowB
-		}
-
-		set = true
+		first, last = extendBandRange(first, last, rowFirst, rowLast)
+		top, bottom, set = extendBandBounds(top, bottom, rowTop, rowBottom, set)
 	}
 
 	return first, last, top, bottom, first >= 0 && set
+}
+
+// rowBandExtent returns the op range and Y band of one row.
+func rowBandExtent(row []*box, res *Result) (int, int, float64, float64, bool) {
+	face, lst := rowOpRange(row)
+	if face < 0 {
+		return -1, -1, 0, 0, false
+	}
+
+	right, rowB := rowYBounds(row, res)
+	if right < 0 {
+		return -1, -1, 0, 0, false
+	}
+
+	return face, lst, right, rowB, true
+}
+
+// extendBandRange widens the band's op range with one row's range.
+func extendBandRange(first, last, rowFirst, rowLast int) (int, int) {
+	if first < 0 || rowFirst < first {
+		first = rowFirst
+	}
+
+	if rowLast > last {
+		last = rowLast
+	}
+
+	return first, last
+}
+
+// extendBandBounds widens the band's Y bounds with one row's band.
+func extendBandBounds(top, bottom, rowTop, rowBottom float64, set bool) (float64, float64, bool) {
+	if !set || rowTop < top {
+		top = rowTop
+	}
+
+	if !set || rowBottom > bottom {
+		bottom = rowBottom
+	}
+
+	return top, bottom, true
 }
 
 // sumRowHeights falls back to the sum of the cells' heights when the op band
@@ -3111,70 +3485,76 @@ func drawLine(chld *pdf.Content, paintOp *Op, pageIdx int, contentH float64, opt
 }
 
 func drawText(
-	c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintOptions, pageH float64, fontName string,
+	chld *pdf.Content, paintOp *Op, pageIdx int, contentH float64, opts PaintOptions, pageH float64, fontName string,
 ) {
-	posX, posY := canvasToPDF(op.X, op.Y, pageIdx, contentH, opts, pageH)
-	c.SetFillColor(op.R, op.G, op.B)
+	posX, posY := canvasToPDF(paintOp.X, paintOp.Y, pageIdx, contentH, opts, pageH)
+	chld.SetFillColor(paintOp.R, paintOp.G, paintOp.B)
 
 	if fontName == "" {
 		fontName = "F0"
 	}
 
-	c.SetFont(fontName, op.Size)
-	c.BeginText()
+	chld.SetFont(fontName, paintOp.Size)
+	chld.BeginText()
 
-	if op.RotateDeg == 90 || op.RotateDeg == -90 {
-		c.TextMatrix(0, 1, -1, 0, posX, posY)
+	if paintOp.RotateDeg == 90 || paintOp.RotateDeg == -90 {
+		chld.TextMatrix(0, 1, -1, 0, posX, posY)
 	} else {
-		c.TextAt(posX, posY)
+		chld.TextAt(posX, posY)
 	}
 	// Fake bold only for Latin when CSS wants bold but the face is not bold.
 	// Stroking CJK/Type0 outlines creates horizontal streak artifacts.
-	fakeBold := FakeBoldFor(op)
+	fakeBold := FakeBoldFor(paintOp)
 	if fakeBold {
-		c.SetLineWidth(op.Size * outlineStrokeRatio)
-		c.TextRenderMode(two) // fill + stroke
+		chld.SetLineWidth(paintOp.Size * outlineStrokeRatio)
+		chld.TextRenderMode(two) // fill + stroke
 	}
 
-	c.TextShow(op.Text)
+	chld.TextShow(paintOp.Text)
 
 	if fakeBold {
-		c.TextRenderMode(0)
+		chld.TextRenderMode(0)
 	}
 
-	c.EndText()
+	chld.EndText()
 }
 
 func drawImage(
-	p *pdf.Page, c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintOptions, name string,
+	page *pdf.Page, chld *pdf.Content, paintOp *Op, pageIdx int, contentH float64, opts PaintOptions, name string,
 ) error {
-	posX, posY := canvasToPDF(op.X, op.Y+op.H, pageIdx, contentH, opts, p.Height())
+	posX, posY := canvasToPDF(paintOp.X, paintOp.Y+paintOp.H, pageIdx, contentH, opts, page.Height())
 
 	if name == "" {
 		name = "I0"
 	}
 
-	if op.IsJPEG {
-		return fmt.Errorf("layout: embed jpeg %s: %w", name, c.AddJPEGImage(name, posX, posY, op.W, op.H, op.Image))
+	if paintOp.IsJPEG {
+		return fmt.Errorf(
+			"layout: embed jpeg %s: %w", name,
+			chld.AddJPEGImage(name, posX, posY, paintOp.W, paintOp.H, paintOp.Image),
+		)
 	}
 
-	return fmt.Errorf("layout: embed png %s: %w", name, c.AddPNGImage(name, posX, posY, op.W, op.H, op.Image))
+	return fmt.Errorf(
+		"layout: embed png %s: %w", name,
+		chld.AddPNGImage(name, posX, posY, paintOp.W, paintOp.H, paintOp.Image),
+	)
 }
 
 // drawLinkXform places a URI annotation. Annotations are page-space (not under
 // content-stream CTM), so CSS transforms are applied to the canvas rect first.
-func drawLinkXform(p *pdf.Page, op *Op, pageIdx int, contentH float64, opts PaintOptions) {
-	if len(op.URI) > 0 && op.URI[0] == '#' {
+func drawLinkXform(page *pdf.Page, paintOp *Op, pageIdx int, contentH float64, opts PaintOptions) {
+	if len(paintOp.URI) > 0 && paintOp.URI[0] == '#' {
 		return
 	}
 
-	x1Val, yMin, xMax, y1Val := op.X, op.Y, op.X+op.W, op.Y+op.H
-	if op.XformSet {
-		x1Val, yMin, xMax, y1Val = linkXformBounds(op)
+	x1Val, yMin, xMax, y1Val := paintOp.X, paintOp.Y, paintOp.X+paintOp.W, paintOp.Y+paintOp.H
+	if paintOp.XformSet {
+		x1Val, yMin, xMax, y1Val = linkXformBounds(paintOp)
 	}
 
-	llx, lly := canvasToPDF(x1Val, y1Val, pageIdx, contentH, opts, p.Height())
-	urx, ury := canvasToPDF(xMax, yMin, pageIdx, contentH, opts, p.Height())
+	llx, lly := canvasToPDF(x1Val, y1Val, pageIdx, contentH, opts, page.Height())
+	urx, ury := canvasToPDF(xMax, yMin, pageIdx, contentH, opts, page.Height())
 
 	if llx > urx {
 		llx, urx = urx, llx
@@ -3184,20 +3564,21 @@ func drawLinkXform(p *pdf.Page, op *Op, pageIdx int, contentH float64, opts Pain
 		lly, ury = ury, lly
 	}
 
-	p.AddLinkURI([4]float64{llx, lly, urx, ury}, op.URI)
+	page.AddLinkURI([4]float64{llx, lly, urx, ury}, paintOp.URI)
 }
 
 // linkXformBounds returns the axis-aligned canvas bounds of the op rect after
 // its CSS transform (annotation rectangles are page-space, not CTM-space).
-func linkXformBounds(op *Op) (float64, float64, float64, float64) {
+func linkXformBounds(paintOp *Op) (float64, float64, float64, float64) {
 	corners := [4][2]float64{
-		{op.X, op.Y}, {op.X + op.W, op.Y}, {op.X, op.Y + op.H}, {op.X + op.W, op.Y + op.H},
+		{paintOp.X, paintOp.Y}, {paintOp.X + paintOp.W, paintOp.Y},
+		{paintOp.X, paintOp.Y + paintOp.H}, {paintOp.X + paintOp.W, paintOp.Y + paintOp.H},
 	}
 	minX, minY := math.MaxFloat64, math.MaxFloat64
 	maxX, maxY := -math.MaxFloat64, -math.MaxFloat64
 
 	for _, pt := range corners {
-		textX, typeY := op.Xform.Apply(pt[0], pt[1])
+		textX, typeY := paintOp.Xform.Apply(pt[0], pt[1])
 		minX = math.Min(minX, textX)
 		minY = math.Min(minY, typeY)
 		maxX = math.Max(maxX, textX)

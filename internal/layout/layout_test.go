@@ -153,7 +153,7 @@ func TestBoxRanges(t *testing.T) { //nolint:cyclop
 		`<table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table>`+
 		`</body></html>`)
 
-	tblBox := findBox(t, tres, "table")
+	tblBox := findBox(t, tres, displayTable)
 	if tblBox.opStart > tblBox.opEnd {
 		t.Fatalf("table op range empty: [%d, %d]", tblBox.opStart, tblBox.opEnd)
 	}
@@ -186,7 +186,7 @@ func TestTableRowRanges(t *testing.T) {
 		`<table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table>`+
 		`</body></html>`)
 
-	tblBox := findBox(t, res, "table")
+	tblBox := findBox(t, res, displayTable)
 	if len(tblBox.rows) != 2 {
 		t.Fatalf("table rows = %d, want 2", len(tblBox.rows))
 	}
@@ -267,7 +267,7 @@ func TestElementLocations(t *testing.T) { //nolint:gocognit,gocyclo,cyclop,funle
 		names = append(names, loc.Node.Name)
 	}
 
-	h1i, pi, ti := indexOf(names, "h1"), indexOf(names, "p"), indexOf(names, "table")
+	h1i, pi, ti := indexOf(names, "h1"), indexOf(names, "p"), indexOf(names, displayTable)
 	if h1i < 0 || pi < 0 || ti < 0 {
 		t.Fatalf("missing h1/p/table in %v", names)
 	}
@@ -1061,15 +1061,15 @@ func TestPageBreakParsing(t *testing.T) {
 
 		switch n.Attribute("class") {
 		case "brk":
-			if sty.PageBreakBefore != "always" {
+			if sty.PageBreakBefore != pageBreakAlways {
 				t.Errorf("div.brk page-break-before = %q, want always", sty.PageBreakBefore)
 			}
-		case "avoid":
-			if sty.PageBreakInside != "avoid" {
+		case avoidKeyword:
+			if sty.PageBreakInside != avoidKeyword {
 				t.Errorf("div.avoid break-inside = %q, want avoid", sty.PageBreakInside)
 			}
 		case "aft":
-			if sty.PageBreakAfter != "always" {
+			if sty.PageBreakAfter != pageBreakAlways {
 				t.Errorf("p.aft break-after = %q, want always", sty.PageBreakAfter)
 			}
 		}

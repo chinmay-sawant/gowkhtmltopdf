@@ -37,8 +37,15 @@ const (
 	positionRelative      = "relative"
 	positionSticky        = "sticky"
 	displayBlock          = "block"
+	displayFlex           = "flex"
+	displayGrid           = "grid"
+	displayInlineFlex     = "inline-flex"
+	displayInlineGrid     = "inline-grid"
+	displaySubgrid        = "subgrid"
+	displayFlowRoot       = "flow-root"
 	displayTable          = "table"
 	displayTableCell      = "table-cell"
+	displayTableCaption   = "table-caption"
 	displayTableRow       = "table-row"
 	displayRowGroup       = "table-row-group"
 	displayHeaderGroup    = "table-header-group"
@@ -259,29 +266,29 @@ func (e *engine) faceFor(sty ResolvedStyle) *pdf.Font {
 // faceForRune picks the first CSS font-family face (then defaults) that has a
 // glyph for r — browser-like fallback so Hangul/Latin/CJK can come from
 // different faces in one run.
-func (e *engine) faceForRune(st ResolvedStyle, r rune) *pdf.Font {
-	if isRuneWhitespace(r) {
-		return e.faceFor(st)
+func (e *engine) faceForRune(sty ResolvedStyle, runeValue rune) *pdf.Font {
+	if isRuneWhitespace(runeValue) {
+		return e.faceFor(sty)
 	}
 
-	if f := e.registryFamilyWithGlyph(st, r); f != nil {
+	if f := e.registryFamilyWithGlyph(sty, runeValue); f != nil {
 		return f
 	}
 
-	if f := e.facesWithGlyph(st, r); f != nil {
+	if f := e.facesWithGlyph(sty, runeValue); f != nil {
 		return f
 	}
 
-	if e.font != nil && e.font.GlyphID(r) != 0 {
+	if e.font != nil && e.font.GlyphID(runeValue) != 0 {
 		return e.font
 	}
 	// Last resort: any opt-in registry face that covers this codepoint
 	// (DejaVu/Noto when --font-path / --use-system-fonts scanned them).
-	if f := e.registryGlyphFallback(st, r); f != nil {
+	if f := e.registryGlyphFallback(sty, runeValue); f != nil {
 		return f
 	}
 
-	return e.faceFor(st)
+	return e.faceFor(sty)
 }
 
 // isRuneWhitespace reports whether r is a rune that inline layout trims.
@@ -414,7 +421,9 @@ func Layout(root *html.Node, opts Options) (*Result, error) {
 // LayoutContext renders the document into a display list and observes ctx at
 // style-pass and recursive tree-construction checkpoints. Layout remains the
 // compatibility entry point for callers that do not need cancellation.
-func LayoutContext(ctx context.Context, root *html.Node, opts Options) (*Result, error) { //nolint:revive,contextcheck // stutter + nil-ctx background adapter for the legacy Layout entry point
+func LayoutContext(ctx context.Context, //nolint:revive,contextcheck // legacy Layout adapter (stutter + nil ctx)
+	root *html.Node, opts Options,
+) (*Result, error) {
 	if root == nil {
 		return nil, errors.New("layout: nil root") //nolint:err113 // static sentinel-free message matches legacy behavior
 	}
@@ -656,7 +665,7 @@ func (e *engine) build(node *html.Node, availW, posX, posY float64) *box {
 		return nil
 	}
 
-	if sty.Display == "none" {
+	if sty.Display == cssDisplayNone {
 		return nil
 	}
 
@@ -734,7 +743,7 @@ func (e *engine) buildOutOfFlowIfPositioned(
 func isTableDisplay(d string) bool {
 	switch d {
 	case displayTable, displayTableRow, displayRowGroup, displayHeaderGroup,
-		displayFooterGroup, displayTableCell, "table-caption":
+		displayFooterGroup, displayTableCell, displayTableCaption:
 		return true
 	}
 
@@ -767,12 +776,14 @@ func useBlockForTableDisplay(node *html.Node) bool {
 }
 
 // buildBlock lays out a block-level box.
-func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, x, y float64) *box {
-	boxNode := &box{node: node, style: style, kind: "block", x: x, y: y} //nolint:exhaustruct // intentional zero fields
+func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, posY float64) *box {
+	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
+		node: node, style: style, kind: displayBlock, x: posX, y: posY,
+	}
 	w, margL := resolveBlockWidth(e, style, availW)
 	boxNode.w = w
 
-	boxNode.x = x + margL
+	boxNode.x = posX + margL
 	contentX, contentW := e.contentBox(boxNode.x, boxNode.w, style)
 
 	// Content ops are recorded first so we know the box height; background
@@ -782,10 +793,10 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, x, y f
 
 	curY := e.scalePt(style.PaddingTop) + e.scalePt(style.BorderTop.Width)
 	pop, enclose := e.pushBFCFloats(style, contentX, contentW)
-	curY = e.flowChildren(boxNode, node.Children, style, contentW, contentX, y, curY)
+	curY = e.flowChildren(boxNode, node.Children, style, contentW, contentX, posY, curY)
 
 	if enclose && e.bfcFloats != nil {
-		curY = e.bfcFloats.extentCy(y, curY)
+		curY = e.bfcFloats.extentCy(posY, curY)
 	}
 
 	pop()
@@ -800,7 +811,7 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, x, y f
 
 	boxNode.height = e.applyHeightConstraints(style, curY)
 
-	e.prependChrome(contentStart, boxNode, style, boxNode.x, y, boxNode.w, boxNode.height)
+	e.prependChrome(contentStart, boxNode, style, boxNode.x, posY, boxNode.w, boxNode.height)
 
 	return boxNode
 }
@@ -840,7 +851,7 @@ func resolveBlockWidth(eng *engine, style ResolvedStyle, availW float64) (float6
 	// content-box (default): specified width is the content width, so the
 	// border box grows by horizontal padding + border. border-box: specified
 	// width already is the border-box size.
-	if definiteW && style.BoxSizing != "border-box" {
+	if definiteW && style.BoxSizing != borderBox {
 		width += eng.scalePt(style.PaddingLeft) + eng.scalePt(style.PaddingRight) +
 			eng.scalePt(style.BorderLeft.Width) + eng.scalePt(style.BorderRight.Width)
 	}
@@ -922,7 +933,7 @@ func resolveUsedHeight(sty ResolvedStyle, cbH float64, engN *engine) (float64, b
 		}
 
 		height := cbH * sty.HeightPercent / cssPercent
-		if sty.BoxSizing != "border-box" {
+		if sty.BoxSizing != borderBox {
 			height += engN.scalePt(sty.PaddingTop) + engN.scalePt(sty.PaddingBottom) +
 				engN.scalePt(sty.BorderTop.Width) + engN.scalePt(sty.BorderBottom.Width)
 		}
@@ -935,7 +946,7 @@ func resolveUsedHeight(sty ResolvedStyle, cbH float64, engN *engine) (float64, b
 	}
 
 	height := engN.scalePt(sty.Height)
-	if sty.BoxSizing != "border-box" {
+	if sty.BoxSizing != borderBox {
 		height += engN.scalePt(sty.PaddingTop) + engN.scalePt(sty.PaddingBottom) +
 			engN.scalePt(sty.BorderTop.Width) + engN.scalePt(sty.BorderBottom.Width)
 	}
@@ -1009,11 +1020,11 @@ func (e *engine) resolveAbsY(sty ResolvedStyle, boxNode *box, cbY float64, viewp
 // Single display dispatch shared with build() so abspos/fixed get the same
 // formatting context (including table display:table-as-block heuristic).
 func (e *engine) buildInFlowDisplay(nodeN *html.Node, sty ResolvedStyle, availW, posX, posY float64) *box {
-	if sty.Display == "flex" || sty.Display == "inline-flex" {
+	if sty.Display == displayFlex || sty.Display == displayInlineFlex {
 		return e.buildFlex(nodeN, sty, availW, posX, posY)
 	}
 
-	if sty.Display == "grid" || sty.Display == "inline-grid" || sty.Display == "subgrid" {
+	if sty.Display == displayGrid || sty.Display == displayInlineGrid || sty.Display == displaySubgrid {
 		return e.buildGrid(nodeN, sty, availW, posX, posY)
 	}
 
@@ -1051,7 +1062,7 @@ func (e *engine) markOpsFixed(start, end int) {
 // consumed by both PDF and raster painting. Keeping the pattern as segments
 // avoids adding a second stroke-style protocol to Op.
 func borderLineOps(posX, posY, boxW, boxH, width float64, style string, red, green, blue float64) []Op {
-	if width <= 0 || style == "none" || (boxW <= 0 && boxH <= 0) {
+	if width <= 0 || style == cssDisplayNone || (boxW <= 0 && boxH <= 0) {
 		return nil
 	}
 
@@ -1501,7 +1512,7 @@ func (e *engine) isInlineChild(node *html.Node) bool {
 	}
 
 	cstate := e.styles[node]
-	if cstate.Display == "none" || cstate.Float != "none" ||
+	if cstate.Display == cssDisplayNone || cstate.Float != cssDisplayNone ||
 		cstate.Position == positionAbsolute || cstate.Position == positionFixed {
 		return false
 	}
@@ -1511,14 +1522,15 @@ func (e *engine) isInlineChild(node *html.Node) bool {
 		return !blockishDisplay(cstate.Display)
 	}
 
-	return cstate.Display == cssDisplayInline || cstate.Display == "inline-block" || cstate.Display == "inline-flex"
+	return cstate.Display == cssDisplayInline || cstate.Display == cssDisplayInlineBlock ||
+		cstate.Display == displayInlineFlex
 }
 
 // blockishDisplay reports display values that force a block formatting
 // context for <img> and inline-level replaced elements.
 func blockishDisplay(display string) bool {
 	switch display {
-	case displayBlock, "flex", "grid", displayTable, displayListItem, "flow-root":
+	case displayBlock, displayFlex, displayGrid, displayTable, displayListItem, displayFlowRoot:
 		return true
 	default:
 		return false
@@ -1547,7 +1559,10 @@ func onlyCollapsibleWS(nodes []*html.Node) bool {
 // Returns the advanced content height (cy end − cy start contribution is
 // encoded as the final cy relative to start; callers pass starting cy).
 // Float enclosure (extentCy) is the caller's job when it owns a BFC.
-func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedStyle, contentW, contentX, y, cy float64) float64 {
+func (e *engine) flowChildren(
+	parent *box, children []*html.Node, sty ResolvedStyle,
+	contentW, contentX, posY, curY float64,
+) float64 {
 	prevBottom := 0.0
 
 	var local floatState
@@ -1563,24 +1578,24 @@ func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedSty
 	var deferred []*html.Node
 	// Absolute/fixed containing-block origin is the content edge at entry.
 	// Do not use the post-flow cy or deferred boxes sit below in-flow siblings.
-	absOriginY := y + cy
+	absOriginY := posY + curY
 
 	absCBX, absCBW := contentX, contentW
-	if st.HasTransform {
+	if sty.HasTransform {
 		// Transformed element: padding box is the CB for abs/fixed descendants.
-		absCBX = contentX - e.scalePt(st.PaddingLeft)
-		absOriginY -= e.scalePt(st.PaddingTop)
-		absCBW = contentW + e.scalePt(st.PaddingLeft) + e.scalePt(st.PaddingRight)
+		absCBX = contentX - e.scalePt(sty.PaddingLeft)
+		absOriginY -= e.scalePt(sty.PaddingTop)
+		absCBW = contentW + e.scalePt(sty.PaddingLeft) + e.scalePt(sty.PaddingRight)
 	}
 
 	idx := 0
 	for idx < len(children) {
 		if e.checkContext() {
-			return cy
+			return curY
 		}
 
-		cy, prevBottom, idx, deferred = e.flowOneChild(parent, children, idx, st,
-			contentW, contentX, y, cy, prevBottom, floats, deferred)
+		curY, prevBottom, idx, deferred = e.flowOneChild(parent, children, idx, sty,
+			contentW, contentX, posY, curY, prevBottom, floats, deferred)
 	}
 
 	for _, n := range deferred {
@@ -1590,15 +1605,15 @@ func (e *engine) flowChildren(parent *box, children []*html.Node, st ResolvedSty
 		}
 	}
 
-	return cy
+	return curY
 }
 
 // flowOneChild advances one flow child (inline run, block, float or
 // out-of-flow deferral), returning the updated cy, prevBottom, loop index and
 // deferred list (extracted from flowChildren to keep each piece focused).
 func (e *engine) flowOneChild(
-	parent *box, children []*html.Node, idx int, st ResolvedStyle,
-	contentW, contentX, y, cy, prevBottom float64, floats *floatState, deferred []*html.Node,
+	parent *box, children []*html.Node, idx int, sty ResolvedStyle,
+	contentW, contentX, posY, curY, prevBottom float64, floats *floatState, deferred []*html.Node,
 ) (float64, float64, int, []*html.Node) {
 	node := children[idx]
 
@@ -1612,18 +1627,18 @@ func (e *engine) flowOneChild(
 		idx++
 	case isFlowFloat(node, e):
 		cs := e.styles[node]
-		cy = floats.clear(cs.Clear, y, cy)
-		attachFlowBox(parent, e.placeFloat(node, cs, floats, contentW, contentX, y, cy), e)
+		curY = floats.clearFloats(cs.Clear, posY, curY)
+		attachFlowBox(parent, e.placeFloat(node, cs, floats, contentW, contentX, posY, curY), e)
 
 		prevBottom = 0
 		idx++
 	case e.isInlineChild(node):
 		run, next := collectInlineRun(children, idx, e)
 		idx = next
-		cy, prevBottom = e.layoutInlineRun(parent, st, run, contentW, contentX, y, cy, floats, prevBottom)
+		curY, prevBottom = e.layoutInlineRun(parent, sty, run, contentW, contentX, posY, curY, floats, prevBottom)
 	case node.Type == html.ElementNode:
 		var cblock *box
-		cy, prevBottom, cblock = e.layoutBlockChild(node, floats, contentW, contentX, y, cy, prevBottom)
+		curY, prevBottom, cblock = e.layoutBlockChild(node, floats, contentW, contentX, posY, curY, prevBottom)
 		attachFlowBox(parent, cblock, e)
 
 		idx++
@@ -1631,36 +1646,36 @@ func (e *engine) flowOneChild(
 		idx++
 	}
 
-	return cy, prevBottom, idx, deferred
+	return curY, prevBottom, idx, deferred
 }
 
 // layoutInlineRun lays out one maximal inline run, returning the advanced cy
 // and the margin accumulator.
 func (e *engine) layoutInlineRun(
-	parent *box, st ResolvedStyle, run []*html.Node, contentW, contentX, y, cy float64,
+	parent *box, sty ResolvedStyle, run []*html.Node, contentW, contentX, posY, curY float64,
 	floats *floatState, prevBottom float64,
 ) (float64, float64) {
 	if onlyCollapsibleWS(run) {
-		return cy, prevBottom
+		return curY, prevBottom
 	}
 
 	if len(run) > 0 {
-		h := e.layoutInlineFloats(inlineRunParent(parent, st), run, contentW, contentX, y+cy, floats)
-		cy += h
+		h := e.layoutInlineFloats(inlineRunParent(parent, sty), run, contentW, contentX, posY+curY, floats)
+		curY += h
 
 		if h > 0 {
 			prevBottom = 0
 		}
 	}
 
-	return cy, prevBottom
+	return curY, prevBottom
 }
 
 // isSkippableFlowNode reports nodes that are dropped from flow: display:none
 // elements and pure-whitespace text (so margin collapse between block
 // siblings is not interrupted — fixture-19 margin-bottom between divs).
 func isSkippableFlowNode(node *html.Node, engine *engine) bool {
-	if node.Type == html.ElementNode && engine.styles[node].Display == "none" {
+	if node.Type == html.ElementNode && engine.styles[node].Display == cssDisplayNone {
 		return true
 	}
 
@@ -1681,7 +1696,7 @@ func isOutOfFlowNode(node *html.Node, engine *engine) bool {
 
 // isFlowFloat reports floated element children.
 func isFlowFloat(node *html.Node, engine *engine) bool {
-	return node.Type == html.ElementNode && engine.styles[node].Float != "none"
+	return node.Type == html.ElementNode && engine.styles[node].Float != cssDisplayNone
 }
 
 // collectInlineRun gathers a maximal run of inline children starting at idx,
@@ -1691,13 +1706,13 @@ func collectInlineRun(children []*html.Node, idx int, engine *engine) ([]*html.N
 
 	for idx < len(children) {
 		child := children[idx]
-		if child.Type == html.ElementNode && engine.styles[child].Display == "none" {
+		if child.Type == html.ElementNode && engine.styles[child].Display == cssDisplayNone {
 			idx++
 
 			continue
 		}
 
-		if child.Type == html.ElementNode && engine.styles[child].Float != "none" {
+		if child.Type == html.ElementNode && engine.styles[child].Float != cssDisplayNone {
 			break
 		}
 
@@ -1751,17 +1766,17 @@ func attachFlowBox(parent *box, child *box, engine *engine) {
 // margins with the previous sibling, applies the BFC float exclusion, and
 // returns the advanced cy, the next margin accumulator, and the built box.
 func (e *engine) layoutBlockChild(
-	node *html.Node, floats *floatState, contentW, contentX, y, curY, prevBottom float64,
+	node *html.Node, floats *floatState, contentW, contentX, posY, curY, prevBottom float64,
 ) (float64, float64, *box) {
 	cstate := e.styles[node]
 	// In-flow tables always clear below preceding floats (deterministic
 	// report policy). Shrink-to-fit / squeeze-beside is unsupported.
 	clearVal := cstate.Clear
 	if cstate.Display == displayTable {
-		clearVal = "both"
+		clearVal = clearBoth
 	}
 
-	curY = floats.clear(clearVal, y, curY)
+	curY = floats.clearFloats(clearVal, posY, curY)
 	curY += collapseMargins(prevBottom, e.scalePt(cstate.MarginTop))
 	// CSS2.1 §9.5: line boxes next to floats are shortened, not the
 	// block box — so normal paragraphs get full content width and
@@ -1771,10 +1786,10 @@ func (e *engine) layoutBlockChild(
 	// paints through the infobox (wiki .mw-heading{display:flow-root}).
 	bx, bw := contentX, contentW
 	if establishesBFC(cstate) {
-		bx, bw = floats.exclusion(contentX, contentW, y, curY)
+		bx, bw = floats.exclusion(contentX, contentW, posY, curY)
 	}
 
-	cblock := e.build(node, bw, bx, y+curY)
+	cblock := e.build(node, bw, bx, posY+curY)
 	if cblock == nil {
 		return curY, 0, nil
 	}
@@ -1808,7 +1823,7 @@ func (e *engine) emitListMarker(node *html.Node, style ResolvedStyle, contentX, 
 		typ = listStyleDisc
 	}
 
-	if typ == "none" {
+	if typ == cssDisplayNone {
 		return
 	}
 
@@ -1947,31 +1962,34 @@ func romanMarker(node int, upper bool) string {
 // placeFloat lays out n as a float:left|right box and records it in floats.
 // Consecutive same-side floats pack horizontally when width remains;
 // otherwise they stack below the previous float bottom.
-func (e *engine) placeFloat(n *html.Node, cs ResolvedStyle, floats *floatState, contentW, contentX, posY, cy float64) *box {
+func (e *engine) placeFloat(
+	node *html.Node, cstate ResolvedStyle, floats *floatState, contentW, contentX, posY, curY float64,
+) *box {
 	avail := contentW
-	if cs.Width < 0 && cs.WidthPercent < 0 {
-		avail = e.floatIntrinsicAvail(n, cs, avail)
+	if cstate.Width < 0 && cstate.WidthPercent < 0 {
+		avail = e.floatIntrinsicAvail(node, cstate, avail)
 	}
 
-	flowY := posY + cy
+	flowY := posY + curY
 
 	fixX, fromY := contentX, flowY
-	switch cs.Float {
-	case "left", "right":
-		fixX, fromY, avail = packFloatPosition(floats, contentX, contentW, flowY, avail, cs.Float == "left")
+
+	switch cstate.Float {
+	case floatLeft, floatRight:
+		fixX, fromY, avail = packFloatPosition(floats, contentX, contentW, flowY, avail, cstate.Float == floatLeft)
 	}
 
 	oldMax := e.imgMaxW
-	e.setFloatImgMaxW(cs, contentW, avail)
+	e.setFloatImgMaxW(cstate, contentW, avail)
 
-	fbox := e.build(n, avail, fixX, fromY)
+	fbox := e.build(node, avail, fixX, fromY)
 	e.imgMaxW = oldMax
 
 	if fbox == nil {
 		return nil
 	}
 
-	if cs.Float == "left" && floats.hasLeft && fbox.x+fbox.w > contentX+contentW {
+	if cstate.Float == floatLeft && floats.hasLeft && fbox.x+fbox.w > contentX+contentW {
 		// Overflowed the pack attempt — stack below.
 		fromY = maxY(floats.leftBottom, flowY)
 		dx, dy := contentX-fbox.x, fromY-fbox.y
@@ -1979,17 +1997,17 @@ func (e *engine) placeFloat(n *html.Node, cs ResolvedStyle, floats *floatState, 
 		e.shiftBoxOps(fbox, dx, dy)
 	}
 
-	margL := e.scalePt(cs.MarginLeft)
-	margR := e.scalePt(cs.MarginRight)
+	margL := e.scalePt(cstate.MarginLeft)
+	margR := e.scalePt(cstate.MarginRight)
 
-	if cs.Float == "right" {
+	if cstate.Float == floatRight {
 		wantX := contentX + contentW - fbox.w - margR
 		dx := wantX - fbox.x
 		fbox.x = wantX
 		e.shiftBoxOps(fbox, dx, 0)
 	}
 
-	floats.place(cs.Float, fbox, margL, margR)
+	floats.place(cstate.Float, fbox, margL, margR)
 
 	return fbox
 }
@@ -2216,7 +2234,7 @@ func (e *engine) imageContainingWidth() float64 {
 // finally max constraints while preserving the intrinsic aspect ratio for a
 // one-dimensional constraint. The same helper is used by block, inline,
 // float, and table intrinsic measurement paths.
-func (e *engine) usedImageSize( //nolint:cyclop // single sizing policy, split into ratio/clamp helpers above
+func (e *engine) usedImageSize(
 	node *html.Node, style ResolvedStyle, ref *imageRef,
 ) imageUsedSize {
 	var size imageUsedSize
@@ -2380,9 +2398,9 @@ func (e *engine) buildImage(n *html.Node, sty ResolvedStyle, posX, posY float64)
 	// emitLine; block-level and floated images paint here (wiki logo tagline
 	// uses display:block and must stack under the wordmark).
 	if boxNode.img != nil && boxNode.img.data != nil {
-		inlineLevel := sty.Display == cssDisplayInline || sty.Display == "inline-block" ||
-			sty.Display == "inline-flex" || sty.Display == ""
-		if sty.Float != "none" || !inlineLevel {
+		inlineLevel := sty.Display == cssDisplayInline || sty.Display == cssDisplayInlineBlock ||
+			sty.Display == displayInlineFlex || sty.Display == ""
+		if sty.Float != cssDisplayNone || !inlineLevel {
 			e.add(Op{ //nolint:exhaustruct // intentional zero fields
 				Kind:  OpImage,
 				X:     posX,
@@ -2411,7 +2429,7 @@ func (e *engine) buildHR(n *html.Node, sty ResolvedStyle, availW, posX, posY flo
 	}
 
 	child := [3]float64{0, 0, 0}
-	if sty.BorderTop.Style != "none" {
+	if sty.BorderTop.Style != cssDisplayNone {
 		child = sty.BorderTop.Color
 	}
 
@@ -2486,7 +2504,7 @@ func (e *engine) buildTable(node *html.Node, style ResolvedStyle, availW, posX, 
 	headerRows = resolveHeaderRows(rows, headerRows)
 
 	tableBox := &box{ //nolint:exhaustruct // intentional zero fields
-		node: node, style: style, kind: "table", x: posX, y: posY, headerRows: headerRows,
+		node: node, style: style, kind: displayTable, x: posX, y: posY, headerRows: headerRows,
 	}
 	if len(rows) == 0 {
 		return tableBox
@@ -2545,15 +2563,15 @@ func (e *engine) tableSpacing(st ResolvedStyle) float64 {
 // row-by-row so a row's grid segments land in the same op index span as its
 // cells (pagination moves them together).
 func (e *engine) emitTableCells(
-	tableBox *box, st ResolvedStyle, x, y, padL float64,
+	tableBox *box, sty ResolvedStyle, posX, posY, padL float64,
 	colW, rowTops, rowHeights []float64, cellData [][]*box,
 ) {
-	collapse := st.BorderCollapse == borderCollapseValue
+	collapse := sty.BorderCollapse == borderCollapseValue
 	// Separate borders: stroke the table box. Collapsed grids include the
 	// outer perimeter — stroking both doubles the outer edge and leaves the
 	// table chrome behind when only cell ops shift across pages.
 	if !collapse {
-		e.emitBorders(st, x, y, tableBox.w, tableBox.height)
+		e.emitBorders(sty, posX, posY, tableBox.w, tableBox.height)
 	}
 
 	lastNonEmpty := lastNonEmptyRow(rowHeights)
@@ -2605,7 +2623,7 @@ func (e *engine) collectTableRows(node *html.Node) ([][]*html.Node, int) {
 			}
 
 			cstate := e.styles[child]
-			if cstate.Display == "none" {
+			if cstate.Display == cssDisplayNone {
 				continue
 			}
 
@@ -2868,19 +2886,20 @@ func (e *engine) tableWidthHint(st ResolvedStyle, availW float64) float64 {
 // row heights: single-row cells first, then rowspan growth, then final tops
 // and cell heights. Returns rowHeights, rowTops and the content height.
 func (e *engine) measureTableRows(
-	tb *box, rows [][]*html.Node, cellData [][]*box, colW []float64, spacing float64, nCols int, x, y, padL float64,
+	tableBox *box, rows [][]*html.Node, cellData [][]*box, colW []float64,
+	spacing float64, nCols int, posX, posY, padL float64,
 ) ([]float64, []float64, float64) {
 	nRows := len(cellData)
 	rowHeights := make([]float64, nRows)
 	rowTops := make([]float64, nRows)
-	curY := e.scalePt(tb.style.PaddingTop) + e.scalePt(tb.style.BorderTop.Width)
+	curY := e.scalePt(tableBox.style.PaddingTop) + e.scalePt(tableBox.style.BorderTop.Width)
 	// Measure each cell at its final column width; row height from single-row
 	// cells first. Rowspan cells enlarge the spanned rows afterward.
 	// Rows with no local cells (rowspan holes) or only ink-less cells stay at
 	// height 0 until rowspan growth — do not invent a 1pt phantom band.
 	for rowIdx, cells := range cellData {
-		rowTops[rowIdx] = y + curY
-		rowH := e.measureRowCells(tb, cells, rowIdx, colW, spacing, nCols, x, padL, rowTops)
+		rowTops[rowIdx] = posY + curY
+		rowH := e.measureRowCells(tableBox, cells, rowIdx, colW, spacing, nCols, posX, padL, rowTops)
 		// Collapse rows whose cells have no ink (only padding/borders of empty
 		// th/td). Keep a hairline only when the row has cells that paint
 		// borders in separate-border mode and measured some chrome — pure
@@ -2897,16 +2916,16 @@ func (e *engine) measureTableRows(
 		}
 	}
 
-	growRowspanRows(tb, nRows, rowHeights, spacing)
+	growRowspanRows(tableBox, nRows, rowHeights, spacing)
 
 	// Recompute tops and assign final cell heights after rowspan growth.
-	curY = e.scalePt(tb.style.PaddingTop) + e.scalePt(tb.style.BorderTop.Width)
-	for ri := range rowHeights {
-		rowTops[ri] = y + curY
-		curY += rowHeights[ri] + spacing
+	curY = e.scalePt(tableBox.style.PaddingTop) + e.scalePt(tableBox.style.BorderTop.Width)
+	for rowIdx := range rowHeights {
+		rowTops[rowIdx] = posY + curY
+		curY += rowHeights[rowIdx] + spacing
 	}
 
-	assignFinalCellHeights(tb, nRows, rowHeights, rowTops, spacing)
+	assignFinalCellHeights(tableBox, nRows, rowHeights, rowTops, spacing)
 
 	return rowHeights, rowTops, curY
 }
@@ -2914,7 +2933,8 @@ func (e *engine) measureTableRows(
 // measureRowCells sizes and measures the cells of one row at their final
 // column widths, returning the row height (single-row cells only).
 func (e *engine) measureRowCells(
-	tableBox *box, cells []*box, rowIdx int, colW []float64, spacing float64, nCols int, posX, padL float64, rowTops []float64,
+	tableBox *box, cells []*box, rowIdx int, colW []float64,
+	spacing float64, nCols int, posX, padL float64, rowTops []float64,
 ) float64 {
 	rowH := 0.0
 
@@ -3034,33 +3054,33 @@ func lastNonEmptyRow(rowHeights []float64) int {
 // row (top edge + verticals; bottom edge when lastRow). Ops are appended
 // immediately after that row's cells and folded into the row's op range.
 func (e *engine) emitCollapsedRowGrid(
-	tableBox *box, ri int, lastRow bool, padL float64, colW, rowTops, rowHeights []float64,
+	tableBox *box, rowIdx int, lastRow bool, padL float64, colW, rowTops, rowHeights []float64,
 ) {
-	if ri < 0 || ri >= len(rowHeights) || rowHeights[ri] <= 0.01 || len(colW) == 0 {
+	if rowIdx < 0 || rowIdx >= len(rowHeights) || rowHeights[rowIdx] <= 0.01 || len(colW) == 0 {
 		return
 	}
 
 	nCols := len(colW)
 	xList := gridColumnEdges(tableBox.x+padL, colW)
 
-	yStart := rowTops[ri]
-	yEnd := yStart + rowHeights[ri]
+	yStart := rowTops[rowIdx]
+	yEnd := yStart + rowHeights[rowIdx]
 	gridStart := len(e.ops)
 	stroke := &rowGridStroker{e: e}
 	// Top edge. Skip under rowspan continuations so a multi-row Year cell is
 	// not bisected mid-table; paint.capTablePageBreaks re-seals full tops for
 	// page fragments where those holes look open.
-	emitGridTopEdges(stroke, tableBox, ri, xList, yStart)
+	emitGridTopEdges(stroke, tableBox, rowIdx, xList, yStart)
 	// Verticals only exist where an adjacent cell declares a left/right side.
-	emitGridVerticals(stroke, tableBox, ri, nCols, xList, yStart, yEnd)
+	emitGridVerticals(stroke, tableBox, rowIdx, nCols, xList, yStart, yEnd)
 
 	if lastRow {
-		emitGridBottomEdges(stroke, tableBox, ri, xList, yEnd)
+		emitGridBottomEdges(stroke, tableBox, rowIdx, xList, yEnd)
 	}
 
 	gridEnd := len(e.ops) - 1
-	if gridEnd >= gridStart && ri < len(tableBox.rows) {
-		expandRowOpRange(tableBox.rows[ri], gridStart, gridEnd)
+	if gridEnd >= gridStart && rowIdx < len(tableBox.rows) {
+		expandRowOpRange(tableBox.rows[rowIdx], gridStart, gridEnd)
 	}
 }
 
@@ -3142,7 +3162,7 @@ func (s *rowGridStroker) vline(xx, ya, yb float64, side border) {
 }
 
 func borderVisible(side border) bool {
-	return side.Width > 0 && side.Style != "none"
+	return side.Width > 0 && side.Style != cssDisplayNone
 }
 
 func horizontalTableBorder(tb *box, boundary, col int) (border, bool) {
@@ -3379,9 +3399,9 @@ func cellVerticalAlignOffset(cell *box, curY float64) float64 {
 	}
 
 	switch cell.style.VerticalAlign {
-	case "middle":
+	case cssVerticalAlignMiddle:
 		return curY + extra/two
-	case "bottom":
+	case cssVerticalAlignBottom:
 		return curY + extra
 	default:
 		return curY
@@ -3435,6 +3455,7 @@ func distributeRowspanLines(ops []Op, start, end int, cellY, cellH, padTop, padB
 // bandEmSize estimates the em size from the first band's text ops.
 func bandEmSize(ops []Op, indices []int) float64 {
 	emSize := 8.0
+
 	for _, i := range indices {
 		if ops[i].Size > 0 {
 			emSize = ops[i].Size
@@ -3578,7 +3599,7 @@ func (e *engine) measureCellMinMax(node *html.Node, style ResolvedStyle) (float6
 		em:     style.FontSize,
 		style:  style,
 	}
-	cellMeas.walk(node, style, style.WhiteSpace == "nowrap" || style.WhiteSpace == cssWhiteSpacePre)
+	cellMeas.walk(node, style, style.WhiteSpace == cssWhiteSpaceNowrap || style.WhiteSpace == cssWhiteSpacePre)
 	cellMeas.flushLine()
 
 	chrome := e.scalePt(style.PaddingLeft) + e.scalePt(style.PaddingRight) +
@@ -3647,6 +3668,7 @@ func (m *cellMeasure) walk(nodeN *html.Node, cstate ResolvedStyle, nowrap bool) 
 // columns and force emergency wraps on words that should fit.
 func (m *cellMeasure) measureText(text string, cstate ResolvedStyle, nowrap bool) {
 	eng := m.engine
+
 	if !nowrap {
 		// Collapse runs of whitespace to a single space for measure,
 		// matching normal white-space:normal inline layout.
@@ -3692,7 +3714,7 @@ func (m *cellMeasure) noteWord(uw float64) {
 
 // measureElement handles br, replaced images, and block-level in-cell boxes.
 func (m *cellMeasure) measureElement(nodeN *html.Node, childCS ResolvedStyle, nowrap bool) {
-	if childCS.Display == "none" {
+	if childCS.Display == cssDisplayNone {
 		return
 	}
 
@@ -3719,7 +3741,7 @@ func (m *cellMeasure) measureElement(nodeN *html.Node, childCS ResolvedStyle, no
 // isCellBlockish reports displays that break the current measured line.
 func isCellBlockish(display string) bool {
 	switch display {
-	case displayBlock, displayTable, displayListItem, "flex", "grid":
+	case displayBlock, displayTable, displayListItem, displayFlex, displayGrid:
 		return true
 	default:
 		return false
@@ -3733,7 +3755,7 @@ func (m *cellMeasure) walkBlockChildren(nodeN *html.Node, childCS ResolvedStyle,
 		m.flushLine()
 	}
 
-	childNowrap := nowrap || childCS.WhiteSpace == "nowrap" || childCS.WhiteSpace == cssWhiteSpacePre
+	childNowrap := nowrap || childCS.WhiteSpace == cssWhiteSpaceNowrap || childCS.WhiteSpace == cssWhiteSpacePre
 	for _, child := range nodeN.Children {
 		m.walk(child, childCS, childNowrap)
 	}
@@ -3756,7 +3778,7 @@ const (
 )
 
 func wordBreakOf(sty ResolvedStyle) wordBreakPolicy {
-	if sty.WhiteSpace == "nowrap" || sty.WhiteSpace == cssWhiteSpacePre {
+	if sty.WhiteSpace == cssWhiteSpaceNowrap || sty.WhiteSpace == cssWhiteSpacePre {
 		return breakNever
 	}
 

@@ -11,6 +11,7 @@ const (
 	condKindOr     = "or"
 	condKindNot    = "not"
 	featInlineSize = "inline-size"
+	featWidth      = "width"
 	unitRem        = "rem"
 )
 
@@ -47,41 +48,43 @@ type SizeFeature struct {
 func (c ContainerCond) Matches(inlineSizePt, fontSizePt float64) bool {
 	switch c.Kind {
 	case condKindFeat:
-		if c.Feat == nil {
-			return false
-		}
-
-		return c.Feat.matches(inlineSizePt, fontSizePt)
+		return c.Feat != nil && c.Feat.matches(inlineSizePt, fontSizePt)
 	case condKindNot:
-		if len(c.Kids) == 0 {
-			return false
-		}
-
-		return !c.Kids[0].Matches(inlineSizePt, fontSizePt)
+		return len(c.Kids) > 0 && !c.Kids[0].Matches(inlineSizePt, fontSizePt)
 	case condKindAnd:
-		for _, k := range c.Kids {
-			if !k.Matches(inlineSizePt, fontSizePt) {
-				return false
-			}
-		}
-
-		return len(c.Kids) > 0
-	case "or":
-		for _, k := range c.Kids {
-			if k.Matches(inlineSizePt, fontSizePt) {
-				return true
-			}
-		}
-
-		return false
+		return matchAllKids(c.Kids, inlineSizePt, fontSizePt)
+	case condKindOr:
+		return matchAnyKid(c.Kids, inlineSizePt, fontSizePt)
 	default:
 		return false
 	}
 }
 
+// matchAllKids reports whether every kid matches (false when there are none).
+func matchAllKids(kids []ContainerCond, inlineSizePt, fontSizePt float64) bool {
+	for _, k := range kids {
+		if !k.Matches(inlineSizePt, fontSizePt) {
+			return false
+		}
+	}
+
+	return len(kids) > 0
+}
+
+// matchAnyKid reports whether any kid matches.
+func matchAnyKid(kids []ContainerCond, inlineSizePt, fontSizePt float64) bool {
+	for _, k := range kids {
+		if k.Matches(inlineSizePt, fontSizePt) {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (f SizeFeature) matches(inlineSizePt, fontSizePt float64) bool {
 	switch f.Name {
-	case "width", featInlineSize:
+	case featWidth, featInlineSize:
 		return f.matchesAxis(inlineSizePt, fontSizePt)
 	default:
 		return false
@@ -104,19 +107,9 @@ const (
 // % and viewport units are unsupported (return false). Unknown units return
 // false so callers can apply their own policy (e.g. line-height inherits).
 func LengthToPt(val float64, unit string, basePt float64) (float64, bool) {
-	switch strings.ToLower(unit) {
-	case "px":
-		return val * pxToPt, true
-	case "pt":
-		return val, true
-	case "in":
-		return val * pointsPerInch, true
-	case "cm":
-		return val * pointsPerInch / cmPerInch, true
-	case "mm":
-		return val * pointsPerInch / mmPerInch, true
-	case "pc":
-		return val * pointsPerPica, true
+	low := strings.ToLower(unit)
+
+	switch low {
 	case "em", unitRem:
 		if unit == unitRem {
 			return val * rootFontSizePx * pxToPt, true
@@ -125,6 +118,32 @@ func LengthToPt(val float64, unit string, basePt float64) (float64, bool) {
 		return val * basePt, true
 	case "ex", "ch":
 		return val * basePt * exChToEmFactor, true
+	}
+
+	factor, ok := fixedUnitFactor(low)
+	if !ok {
+		return 0, false
+	}
+
+	return val * factor, true
+}
+
+// fixedUnitFactor returns the constant points-per-unit factor for CSS length
+// units whose size does not depend on the element.
+func fixedUnitFactor(unit string) (float64, bool) {
+	switch unit {
+	case "px":
+		return pxToPt, true
+	case "pt":
+		return 1, true
+	case "in":
+		return pointsPerInch, true
+	case "cm":
+		return pointsPerInch / cmPerInch, true
+	case "mm":
+		return pointsPerInch / mmPerInch, true
+	case "pc":
+		return pointsPerPica, true
 	default:
 		return 0, false
 	}
@@ -141,9 +160,11 @@ func ParseContainerNameValue(value string) string {
 		return ""
 	}
 
-	var names []string
+	fields := strings.Fields(value)
 
-	for _, tok := range strings.Fields(value) {
+	names := make([]string, 0, len(fields))
+
+	for _, tok := range fields {
 		low := strings.ToLower(tok)
 		if low == "none" || low == condKindAnd || low == condKindOr || low == condKindNot || low == "default" {
 			continue
@@ -157,14 +178,16 @@ func ParseContainerNameValue(value string) string {
 
 // ParseContainerShorthand parses container: <name>+ [ / <type> ]?.
 // Returns name string and type ("", "normal", "size", or "inline-size").
-func ParseContainerShorthand(value string) (name, ctype string) {
+func ParseContainerShorthand(value string) (string, string) {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return "", ""
 	}
 
 	namePart, typePart, hasSlash := strings.Cut(value, "/")
-	name = ParseContainerNameValue(strings.TrimSpace(namePart))
+	name := ParseContainerNameValue(strings.TrimSpace(namePart))
+
+	ctype := ""
 
 	if hasSlash {
 		t := strings.ToLower(strings.TrimSpace(typePart))
@@ -206,30 +229,44 @@ func parseContainerPrelude(prelude string) (ContainerQuery, bool) {
 	return ContainerQuery{Name: name, Cond: cond}, true
 }
 
-func readIdent(s string) (ident, rest string, ok bool) {
-	s = strings.TrimLeft(s, " \t\r\n")
-	if s == "" {
-		return "", s, false
+func readIdent(str string) (string, string, bool) {
+	str = strings.TrimLeft(str, " \t\r\n")
+	if str == "" {
+		return "", str, false
 	}
 
+	end := identEnd(str)
+
+	if end == 0 {
+		return "", str, false
+	}
+
+	return str[:end], str[end:], true
+}
+
+// identEnd returns the length of the leading CSS identifier in str.
+func identEnd(str string) int {
 	idx := 0
-	for idx < len(s) {
-		c := s[idx]
-		if c == '-' || c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-			(idx > 0 && c >= '0' && c <= '9') {
+	for idx < len(str) {
+		if idx > 0 && str[idx] >= '0' && str[idx] <= '9' {
 			idx++
 
 			continue
 		}
 
-		break
+		if !isIdentStart(str[idx]) {
+			break
+		}
+
+		idx++
 	}
 
-	if idx == 0 {
-		return "", s, false
-	}
+	return idx
+}
 
-	return s[:idx], s[idx:], true
+// isIdentStart reports whether c can begin a CSS identifier.
+func isIdentStart(c byte) bool {
+	return c == '-' || c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
 }
 
 // parseContainerCond parses a container condition with or < and < not precedence.
@@ -305,7 +342,10 @@ func parseNotCond(str string) (ContainerCond, bool) {
 			return ContainerCond{}, false //nolint:exhaustruct // intentional zero-value fields
 		}
 
-		return ContainerCond{Kind: condKindNot, Kids: []ContainerCond{inner}}, true //nolint:exhaustruct // intentional zero-value fields
+		kids := []ContainerCond{inner}
+		cond := ContainerCond{Kind: condKindNot, Kids: kids} //nolint:exhaustruct // intentional zero-value fields
+
+		return cond, true
 	}
 
 	return parseParenOrFeat(str)
@@ -339,33 +379,20 @@ func parseParenOrFeat(str string) (ContainerCond, bool) {
 }
 
 // splitCondKeyword splits on top-level `and`/`or` keywords (not inside parens).
-func splitCondKeyword(s, kw string) ([]string, bool) {
-	s = strings.TrimSpace(s)
+func splitCondKeyword(str, keyword string) ([]string, bool) {
+	str = strings.TrimSpace(str)
 
 	var parts []string
 
 	depth := 0
 	start := 0
-	low := strings.ToLower(s)
+	low := strings.ToLower(str)
 
-	for idx := 0; idx < len(s); {
-		c := s[idx]
+	for idx := 0; idx < len(str); {
+		c := str[idx]
 		switch c {
 		case '"', '\'':
-			q := c
-			idx++
-
-			for idx < len(s) && s[idx] != q {
-				if s[idx] == '\\' && idx+1 < len(s) {
-					idx++
-				}
-
-				idx++
-			}
-
-			if idx < len(s) {
-				idx++
-			}
+			idx = skipQuoted(str, idx, c)
 
 			continue
 		case '(':
@@ -380,9 +407,9 @@ func splitCondKeyword(s, kw string) ([]string, bool) {
 			continue
 		}
 
-		if depth == 0 && hasKeywordAt(low, idx, kw) {
-			parts = append(parts, strings.TrimSpace(s[start:idx]))
-			idx += len(kw)
+		if depth == 0 && hasKeywordAt(low, idx, keyword) {
+			parts = append(parts, strings.TrimSpace(str[start:idx]))
+			idx += len(keyword)
 			start = idx
 
 			continue
@@ -391,7 +418,7 @@ func splitCondKeyword(s, kw string) ([]string, bool) {
 		idx++
 	}
 
-	parts = append(parts, strings.TrimSpace(s[start:]))
+	parts = append(parts, strings.TrimSpace(str[start:]))
 	for _, p := range parts {
 		if p == "" {
 			return nil, false
@@ -399,6 +426,26 @@ func splitCondKeyword(s, kw string) ([]string, bool) {
 	}
 
 	return parts, true
+}
+
+// skipQuoted advances idx past the quoted string starting at value[idx] == q,
+// honoring backslash escapes, and returns the index just past the closing
+// quote (len(value) when unbalanced).
+func skipQuoted(value string, idx int, q byte) int {
+	idx++
+	for idx < len(value) && value[idx] != q {
+		if value[idx] == '\\' && idx+1 < len(value) {
+			idx++
+		}
+
+		idx++
+	}
+
+	if idx < len(value) {
+		idx++
+	}
+
+	return idx
 }
 
 func hasKeywordAt(low string, idx int, kwVal string) bool {
@@ -455,20 +502,20 @@ func parseSizeFeature(inner string) (SizeFeature, bool) {
 
 		switch name {
 		case "min-width", "min-inline-size":
-			feat := "width"
+			feat := featWidth
 			if strings.HasSuffix(name, featInlineSize) {
 				feat = featInlineSize
 			}
 
 			return SizeFeature{Name: feat, Op: ">=", Value: val, Unit: unit}, true
 		case "max-width", "max-inline-size":
-			feat := "width"
+			feat := featWidth
 			if strings.HasSuffix(name, featInlineSize) {
 				feat = featInlineSize
 			}
 
 			return SizeFeature{Name: feat, Op: "<=", Value: val, Unit: unit}, true
-		case "width", featInlineSize:
+		case featWidth, featInlineSize:
 			return SizeFeature{Name: name, Op: "=", Value: val, Unit: unit}, true
 		default:
 			return SizeFeature{}, false //nolint:exhaustruct // intentional zero-value fields
@@ -478,16 +525,30 @@ func parseSizeFeature(inner string) (SizeFeature, bool) {
 	return parseRangeFeature(inner)
 }
 
+// rangeTok is one token of a range-feature comparison.
+type rangeTok struct {
+	kind string // "ident", "num", "op"
+	val  string
+	num  float64
+	unit string
+}
+
 func parseRangeFeature(inner string) (SizeFeature, bool) {
-	// Tokenize roughly: ident/number/op
-	type tok struct {
-		kind string // "ident", "num", "op"
-		val  string
-		num  float64
-		unit string
+	toks, ok := tokenizeRangeFeature(inner)
+	if !ok {
+		return SizeFeature{}, false //nolint:exhaustruct // intentional zero-value fields
 	}
 
-	var toks []tok
+	if len(toks) != 3 || toks[1].kind != "op" {
+		return SizeFeature{}, false //nolint:exhaustruct // intentional zero-value fields
+	}
+
+	return rangeFeatureFromTokens(toks)
+}
+
+// tokenizeRangeFeature splits a range-feature body into ident/num/op tokens.
+func tokenizeRangeFeature(inner string) ([]rangeTok, bool) {
+	var toks []rangeTok
 
 	str := strings.TrimSpace(inner)
 	for str != "" {
@@ -496,86 +557,122 @@ func parseRangeFeature(inner string) (SizeFeature, bool) {
 			break
 		}
 
-		if strings.HasPrefix(str, "<=") || strings.HasPrefix(str, ">=") {
-			toks = append(toks, tok{kind: "op", val: str[:2]}) //nolint:exhaustruct // intentional zero-value fields
-			str = str[2:]
+		if op, ok := rangeOpPrefix(str); ok {
+			toks = append(toks, rangeTok{kind: "op", val: op}) //nolint:exhaustruct // intentional zero-value fields
+			str = str[len(op):]
 
 			continue
 		}
 
-		if str[0] == '<' || str[0] == '>' || str[0] == '=' {
-			toks = append(toks, tok{kind: "op", val: str[:1]}) //nolint:exhaustruct // intentional zero-value fields
-			str = str[1:]
-
-			continue
-		}
-		// length or ident
-		if (str[0] >= '0' && str[0] <= '9') || str[0] == '.' || str[0] == '+' || str[0] == '-' {
-			// find end of length token
-			idx := 0
-			if str[0] == '+' || str[0] == '-' {
-				idx++
-			}
-
-			for idx < len(str) && (str[idx] >= '0' && str[idx] <= '9' || str[idx] == '.') {
-				idx++
-			}
-
-			jdx := idx
-			for jdx < len(str) && ((str[jdx] >= 'a' && str[jdx] <= 'z') || (str[jdx] >= 'A' && str[jdx] <= 'Z') || str[jdx] == '%') {
-				jdx++
-			}
-
-			val, unit, ok := ParseLength(str[:jdx])
+		if isRangeNumberStart(str[0]) {
+			tok, rem, ok := scanRangeLength(str)
 			if !ok {
-				// bare number?
-				if n, err := strconv.ParseFloat(str[:idx], 64); err == nil && idx == jdx {
-					toks = append(toks, tok{kind: "num", num: n, unit: "px", val: str[:idx]})
-					str = str[idx:]
-
-					continue
-				}
-
-				return SizeFeature{}, false //nolint:exhaustruct // intentional zero-value fields
+				return nil, false
 			}
 
-			toks = append(toks, tok{kind: "num", num: val, unit: unit, val: str[:jdx]})
-			str = str[jdx:]
+			toks = append(toks, tok)
+			str = rem
 
 			continue
 		}
 
 		ident, rem, ok := readIdent(str)
 		if !ok {
-			return SizeFeature{}, false //nolint:exhaustruct // intentional zero-value fields
+			return nil, false
 		}
 
-		toks = append(toks, tok{kind: "ident", val: strings.ToLower(ident)}) //nolint:exhaustruct // intentional zero-value fields
+		tok := rangeTok{kind: "ident", val: strings.ToLower(ident)} //nolint:exhaustruct // intentional zero-value fields
+
+		toks = append(toks, tok)
 		str = rem
 	}
-	// Patterns: name op num  OR  num op name
-	if len(toks) == 3 && toks[1].kind == "op" {
-		if toks[0].kind == "ident" && toks[2].kind == "num" {
-			name := toks[0].val
-			if name != "width" && name != featInlineSize {
-				return SizeFeature{}, false //nolint:exhaustruct // intentional zero-value fields
-			}
 
-			return SizeFeature{Name: name, Op: toks[1].val, Value: toks[2].num, Unit: toks[2].unit}, true
+	return toks, true
+}
+
+// rangeOpPrefix returns the comparison operator at the start of str, if any.
+func rangeOpPrefix(str string) (string, bool) {
+	if strings.HasPrefix(str, "<=") || strings.HasPrefix(str, ">=") {
+		return str[:2], true
+	}
+
+	if str[0] == '<' || str[0] == '>' || str[0] == '=' {
+		return str[:1], true
+	}
+
+	return "", false
+}
+
+// isRangeNumberStart reports whether c can begin a numeric length token.
+func isRangeNumberStart(c byte) bool {
+	return (c >= '0' && c <= '9') || c == '.' || c == '+' || c == '-'
+}
+
+// scanRangeLength parses a number-with-optional-unit token at the start of
+// str (which begins a numeric token). Returns the token and the remainder.
+func scanRangeLength(str string) (rangeTok, string, bool) {
+	idx := numberEnd(str)
+	jdx := unitEnd(str, idx)
+
+	val, unit, ok := ParseLength(str[:jdx])
+	if !ok {
+		// bare number?
+		if n, err := strconv.ParseFloat(str[:idx], 64); err == nil && idx == jdx {
+			return rangeTok{kind: "num", num: n, unit: "px", val: str[:idx]}, str[idx:], true
 		}
 
-		if toks[0].kind == "num" && toks[2].kind == "ident" {
-			name := toks[2].val
-			if name != "width" && name != featInlineSize {
-				return SizeFeature{}, false //nolint:exhaustruct // intentional zero-value fields
-			}
+		return rangeTok{}, str, false //nolint:exhaustruct // intentional zero-value fields
+	}
+
+	return rangeTok{kind: "num", num: val, unit: unit, val: str[:jdx]}, str[jdx:], true
+}
+
+// numberEnd returns the length of the leading numeric part of str.
+func numberEnd(str string) int {
+	idx := 0
+	if str[0] == '+' || str[0] == '-' {
+		idx++
+	}
+
+	for idx < len(str) && (str[idx] >= '0' && str[idx] <= '9' || str[idx] == '.') {
+		idx++
+	}
+
+	return idx
+}
+
+// unitEnd returns the length of the leading unit part of str starting at idx.
+func unitEnd(str string, idx int) int {
+	for idx < len(str) && isRangeUnitChar(str[idx]) {
+		idx++
+	}
+
+	return idx
+}
+
+// isRangeUnitChar reports whether c may continue a length unit token.
+func isRangeUnitChar(c byte) bool {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '%'
+}
+
+// rangeFeatureFromTokens matches the two supported 3-token range forms:
+// name op num  OR  num op name (flipped to name op num).
+func rangeFeatureFromTokens(toks []rangeTok) (SizeFeature, bool) {
+	if toks[0].kind == "ident" && toks[2].kind == "num" {
+		name := toks[0].val
+		if name == featWidth || name == featInlineSize {
+			return SizeFeature{Name: name, Op: toks[1].val, Value: toks[2].num, Unit: toks[2].unit}, true
+		}
+	}
+
+	if toks[0].kind == "num" && toks[2].kind == "ident" {
+		name := toks[2].val
+		if name == featWidth || name == featInlineSize {
 			// flip: 20em < width  →  width > 20em
 			op := flipOp(toks[1].val)
-			if op == "" {
-				return SizeFeature{}, false //nolint:exhaustruct // intentional zero-value fields
+			if op != "" {
+				return SizeFeature{Name: name, Op: op, Value: toks[0].num, Unit: toks[0].unit}, true
 			}
-
-			return SizeFeature{Name: name, Op: op, Value: toks[0].num, Unit: toks[0].unit}, true
 		}
 	}
 

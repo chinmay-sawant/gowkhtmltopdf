@@ -118,7 +118,7 @@ td { border: 1px solid #000; padding: 4pt }
 				face = boxNode
 			}
 
-			if boxNode.node.Name == "table" {
+			if boxNode.node.Name == displayTable {
 				tblB = boxNode
 			}
 		}
@@ -181,11 +181,11 @@ func TestFloatOnTableCellBlockifies(t *testing.T) { //nolint:cyclop,funlen
 		t.Fatal("missing nodes")
 	}
 
-	if styles[cell].Display != "block" || styles[cell].Float != "left" {
+	if styles[cell].Display != displayBlock || styles[cell].Float != floatLeft {
 		t.Fatalf("table-cell+float: display=%q float=%q, want block/left", styles[cell].Display, styles[cell].Float)
 	}
 
-	if styles[row].Display != "block" || styles[row].Float != "left" {
+	if styles[row].Display != displayBlock || styles[row].Float != floatLeft {
 		t.Fatalf("table-row+float: display=%q float=%q, want block/left", styles[row].Display, styles[row].Float)
 	}
 
@@ -215,7 +215,7 @@ func TestFloatOnTableCellBlockifies(t *testing.T) { //nolint:cyclop,funlen
 		t.Fatal("expected floated cell box")
 	}
 
-	if aBox.kind == "table" {
+	if aBox.kind == displayTable {
 		t.Fatalf("blockified float should not build as empty table, kind=%s w=%.1f", aBox.kind, aBox.w)
 	}
 
@@ -236,7 +236,7 @@ func TestFloatedTableKeepsDisplay(t *testing.T) {
 
 	var walk func(n *html.Node)
 	walk = func(n *html.Node) {
-		if n.Type == html.ElementNode && n.Name == "table" {
+		if n.Type == html.ElementNode && n.Name == displayTable {
 			table = n
 		}
 
@@ -251,7 +251,7 @@ func TestFloatedTableKeepsDisplay(t *testing.T) {
 	}
 
 	st := styles[table]
-	if st.Display != "table" || st.Float != "right" {
+	if st.Display != displayTable || st.Float != floatRight {
 		t.Fatalf("floated table: display=%q float=%q, want table/right", st.Display, st.Float)
 	}
 }
