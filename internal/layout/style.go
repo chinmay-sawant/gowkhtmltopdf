@@ -2,7 +2,6 @@ package layout
 
 import (
 	"math"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -260,9 +259,10 @@ func nearlyEqual(a, b float64) bool {
 
 // resolveStylesWith is the single cascade entry: Options + optional size
 // containers for @container rules (nil = first pass, skip container queries).
+// Values are heap-backed once; the engine reuses these pointers (no second copy).
 func resolveStylesWith(
 	root *html.Node, opts Options, containers map[*html.Node]sizeContainer,
-) map[*html.Node]ResolvedStyle {
+) map[*html.Node]*ResolvedStyle {
 	return resolveStylesCtx(root, &styleContext{ //nolint:exhaustruct // intentional zero fields
 		sheets:             opts.Sheets,
 		media:              opts.Media,
@@ -277,7 +277,7 @@ func resolveStylesWith(
 // @container rules are ignored on this first pass (no used sizes yet).
 func resolveStyles(
 	root *html.Node, sheets []*css.Stylesheet, media string, viewportW, viewportH float64,
-) map[*html.Node]ResolvedStyle {
+) map[*html.Node]*ResolvedStyle {
 	return resolveStylesWith(root, Options{ //nolint:exhaustruct // intentional zero fields
 		Sheets: sheets, Media: media, Width: viewportW, Height: viewportH,
 	}, nil)
@@ -292,51 +292,58 @@ func resolveStylesWithContainers(
 	media string, //nolint:unparam // test helper: media fixed per call site
 	viewportW, viewportH float64, //nolint:unparam // test helper: viewport fixed per call site
 	containers map[*html.Node]sizeContainer,
-) map[*html.Node]ResolvedStyle {
+) map[*html.Node]*ResolvedStyle {
 	return resolveStylesWith(root, Options{ //nolint:exhaustruct // intentional zero fields
 		Sheets: sheets, Media: media, Width: viewportW, Height: viewportH,
 	}, containers)
 }
 
-func resolveStylesCtx(root *html.Node, ctx *styleContext) map[*html.Node]ResolvedStyle {
-	out := map[*html.Node]ResolvedStyle{}
+func resolveStylesCtx(root *html.Node, ctx *styleContext) map[*html.Node]*ResolvedStyle {
+	out := map[*html.Node]*ResolvedStyle{}
 
-	var walk func(n *html.Node, parent ResolvedStyle, hasParent bool)
-	walk = func(node *html.Node, parent ResolvedStyle, hasParent bool) {
-		var sty ResolvedStyle
+	var walk func(n *html.Node, parent *ResolvedStyle)
+	walk = func(node *html.Node, parent *ResolvedStyle) {
+		var sty *ResolvedStyle
 
 		switch node.Type {
 		case html.ElementNode:
-			sty = resolveElementStyle(node, ctx, parent, hasParent)
+			s := resolveElementStyle(node, ctx, parent)
+			sty = &s
 		case html.TextNode:
-			sty = initialStyle()
-			if hasParent {
-				inheritProps(&sty, parent, nil)
-				sty.CustomProps = parent.CustomProps
+			s := initialStyle()
+			if parent != nil {
+				inheritProps(&s, parent, nil)
+				s.CustomProps = parent.CustomProps
 			}
-		case html.CommentNode, html.DoctypeNode: // no style resolution; keep the zero value
+			sty = &s
+		case html.CommentNode, html.DoctypeNode:
+			// No style resolution; store a shared zero so map lookups stay non-nil.
+			sty = &zeroResolvedStyle
 		}
 
 		out[node] = sty
 
 		for _, c := range node.Children {
-			walk(c, sty, true)
+			walk(c, sty)
 		}
 	}
-	walk(root, ResolvedStyle{}, false) //nolint:exhaustruct // intentional zero fields
+	walk(root, nil)
 
 	return out
 }
 
+// zeroResolvedStyle is the empty style for comment/doctype nodes (shared).
+var zeroResolvedStyle ResolvedStyle //nolint:gochecknoglobals // immutable zero sentinel
+
 // resolveElementStyle cascades one element: inheritance, custom properties,
 // fonts, the remaining properties, and the operator/blockify policies.
-func resolveElementStyle(node *html.Node, ctx *styleContext, parent ResolvedStyle, hasParent bool) ResolvedStyle {
+func resolveElementStyle(node *html.Node, ctx *styleContext, parent *ResolvedStyle) ResolvedStyle {
 	raw := cascadeRaw(ctx, node)
 	sty := initialStyle()
 
 	var parentProps map[string]string
 
-	if hasParent {
+	if parent != nil {
 		inheritProps(&sty, parent, raw)
 		parentProps = parent.CustomProps
 	}
@@ -345,7 +352,7 @@ func resolveElementStyle(node *html.Node, ctx *styleContext, parent ResolvedStyl
 	raw = resolveRawVars(raw, sty.CustomProps)
 
 	parentSize := sty.FontSize
-	if hasParent {
+	if parent != nil {
 		parentSize = parent.FontSize
 	}
 
@@ -355,7 +362,7 @@ func resolveElementStyle(node *html.Node, ctx *styleContext, parent ResolvedStyl
 		ctx.remBase = sty.FontSize
 	}
 
-	applyRestProps(&sty, raw, ctx, parent, hasParent)
+	applyRestProps(&sty, raw, ctx, parent)
 	// Opt-in operator policy (--print-link-underline): underline
 	// anchors with href after the cascade. Default off — author CSS
 	// (including text-decoration: inherit → parent) wins otherwise.
@@ -392,8 +399,27 @@ func mergeCustomProps(parentProps map[string]string, raw map[string]string) map[
 
 // resolveRawVars expands var() in cascaded property values using customProps.
 // Custom property keys (--*) are left unchanged (already resolved in the map).
+// When no value contains var(), raw is returned as-is (no map copy).
 func resolveRawVars(raw map[string]string, customProps map[string]string) map[string]string {
 	if len(raw) == 0 {
+		return raw
+	}
+
+	needs := false
+
+	for prop, val := range raw {
+		if strings.HasPrefix(prop, "--") {
+			continue
+		}
+
+		if containsVarFunc(val) {
+			needs = true
+
+			break
+		}
+	}
+
+	if !needs {
 		return raw
 	}
 
@@ -415,7 +441,7 @@ func resolveRawVars(raw map[string]string, customProps map[string]string) map[st
 			continue
 		}
 
-		if strings.Contains(strings.ToLower(val), "var(") {
+		if containsVarFunc(val) {
 			out[prop] = css.ResolveVar(val, lookup)
 		} else {
 			out[prop] = val
@@ -423,6 +449,18 @@ func resolveRawVars(raw map[string]string, customProps map[string]string) map[st
 	}
 
 	return out
+}
+
+// containsVarFunc reports whether s has a CSS var( function (ASCII, case-insensitive)
+// without allocating a lowercased copy of s.
+func containsVarFunc(s string) bool {
+	for i := 0; i+4 <= len(s); i++ {
+		if (s[i]|0x20) == 'v' && (s[i+1]|0x20) == 'a' && (s[i+2]|0x20) == 'r' && s[i+3] == '(' {
+			return true
+		}
+	}
+
+	return false
 }
 
 // blockifyDisplayForFloat maps specified display to the used value when
@@ -445,76 +483,72 @@ func blockifyDisplayForFloat(decl string) string {
 // that copies the parent's resolved value into the child.
 type inheritCopy struct {
 	names []string
-	copy  func(dst *ResolvedStyle, src ResolvedStyle)
+	copy  func(dst, src *ResolvedStyle)
 }
 
 // inheritableProps is the immutable inherit table used by inheritProps.
 // Package-level so inheritProps does not allocate a new slice, name slices,
 // and closures on every styled node (was ~40% of alloc_objects on 500-page PDF).
 var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inherit table
-	{[]string{"color"}, func(dst *ResolvedStyle, src ResolvedStyle) { dst.Color = src.Color }},
-	{[]string{"font-family"}, func(dst *ResolvedStyle, src ResolvedStyle) { dst.FontFamily = src.FontFamily }},
-	{[]string{"font-size"}, func(dst *ResolvedStyle, src ResolvedStyle) { dst.FontSize = src.FontSize }},
-	{[]string{"font-weight"}, func(dst *ResolvedStyle, src ResolvedStyle) { dst.FontWeight = src.FontWeight }},
-	{[]string{"font-style"}, func(dst *ResolvedStyle, src ResolvedStyle) { dst.FontItalic = src.FontItalic }},
-	{[]string{"line-height"}, func(dst *ResolvedStyle, src ResolvedStyle) { dst.LineHeight = src.LineHeight }},
-	{[]string{"text-align"}, func(dst *ResolvedStyle, src ResolvedStyle) { dst.TextAlign = src.TextAlign }},
-	{[]string{"white-space"}, func(dst *ResolvedStyle, src ResolvedStyle) { dst.WhiteSpace = src.WhiteSpace }},
+	{[]string{"color"}, func(dst, src *ResolvedStyle) { dst.Color = src.Color }},
+	{[]string{"font-family"}, func(dst, src *ResolvedStyle) { dst.FontFamily = src.FontFamily }},
+	{[]string{"font-size"}, func(dst, src *ResolvedStyle) { dst.FontSize = src.FontSize }},
+	{[]string{"font-weight"}, func(dst, src *ResolvedStyle) { dst.FontWeight = src.FontWeight }},
+	{[]string{"font-style"}, func(dst, src *ResolvedStyle) { dst.FontItalic = src.FontItalic }},
+	{[]string{"line-height"}, func(dst, src *ResolvedStyle) { dst.LineHeight = src.LineHeight }},
+	{[]string{"text-align"}, func(dst, src *ResolvedStyle) { dst.TextAlign = src.TextAlign }},
+	{[]string{"white-space"}, func(dst, src *ResolvedStyle) { dst.WhiteSpace = src.WhiteSpace }},
 	// overflow-wrap / word-wrap and word-break are inherited (CSS Text).
 	{
 		[]string{"overflow-wrap", "word-wrap"},
-		func(dst *ResolvedStyle, src ResolvedStyle) { dst.OverflowWrap = src.OverflowWrap },
+		func(dst, src *ResolvedStyle) { dst.OverflowWrap = src.OverflowWrap },
 	},
-	{[]string{"word-break"}, func(dst *ResolvedStyle, src ResolvedStyle) { dst.WordBreak = src.WordBreak }},
+	{[]string{"word-break"}, func(dst, src *ResolvedStyle) { dst.WordBreak = src.WordBreak }},
 	{
 		[]string{"vertical-align"},
-		func(dst *ResolvedStyle, src ResolvedStyle) { dst.VerticalAlign = src.VerticalAlign },
+		func(dst, src *ResolvedStyle) { dst.VerticalAlign = src.VerticalAlign },
 	},
 	{
 		[]string{"text-decoration"},
-		func(dst *ResolvedStyle, src ResolvedStyle) { dst.TextDecoration = src.TextDecoration },
+		func(dst, src *ResolvedStyle) { dst.TextDecoration = src.TextDecoration },
 	},
 	{
 		[]string{"letter-spacing"},
-		func(dst *ResolvedStyle, src ResolvedStyle) { dst.LetterSpacing = src.LetterSpacing },
+		func(dst, src *ResolvedStyle) { dst.LetterSpacing = src.LetterSpacing },
 	},
 	{
 		[]string{"list-style-type", "list-style"},
-		func(dst *ResolvedStyle, src ResolvedStyle) { dst.ListStyleType = src.ListStyleType },
+		func(dst, src *ResolvedStyle) { dst.ListStyleType = src.ListStyleType },
 	},
 	{
 		[]string{"border-collapse"},
-		func(dst *ResolvedStyle, src ResolvedStyle) { dst.BorderCollapse = src.BorderCollapse },
+		func(dst, src *ResolvedStyle) { dst.BorderCollapse = src.BorderCollapse },
 	},
 	{
 		[]string{"border-spacing"},
-		func(dst *ResolvedStyle, src ResolvedStyle) { dst.BorderSpacing = src.BorderSpacing },
+		func(dst, src *ResolvedStyle) { dst.BorderSpacing = src.BorderSpacing },
 	},
-	{[]string{"orphans"}, func(dst *ResolvedStyle, src ResolvedStyle) { dst.Orphans = src.Orphans }},
-	{[]string{"widows"}, func(dst *ResolvedStyle, src ResolvedStyle) { dst.Widows = src.Widows }},
+	{[]string{"orphans"}, func(dst, src *ResolvedStyle) { dst.Orphans = src.Orphans }},
+	{[]string{"widows"}, func(dst, src *ResolvedStyle) { dst.Widows = src.Widows }},
 }
 
 // inheritProps copies inheritable properties from the parent, unless the
 // element declares its own value (present in raw).
-func inheritProps(dst *ResolvedStyle, parent ResolvedStyle, raw map[string]string) {
-	set := func(prop string) bool {
-		if raw == nil {
-			return false
-		}
-
-		_, ok := raw[prop]
-
-		return ok
+func inheritProps(dst *ResolvedStyle, parent *ResolvedStyle, raw map[string]string) {
+	if parent == nil {
+		return
 	}
 
 	for _, entry := range inheritableProps {
 		declared := false
 
-		for _, name := range entry.names {
-			if set(name) {
-				declared = true
+		if raw != nil {
+			for _, name := range entry.names {
+				if _, ok := raw[name]; ok {
+					declared = true
 
-				break
+					break
+				}
 			}
 		}
 
@@ -524,8 +558,6 @@ func inheritProps(dst *ResolvedStyle, parent ResolvedStyle, raw map[string]strin
 	}
 }
 
-// cascadeRaw returns the winning declaration per property for the element
-// across UA sheet, author sheets and the inline style attribute.
 // ruleHit is one selector match from the shared cascade rule walk.
 type ruleHit struct {
 	r       css.Rule
@@ -625,27 +657,37 @@ func (ctx *styleContext) containerGateMatches(node *html.Node, runic css.Rule) b
 	return ok && runic.Container.Cond.Matches(info.inlineSize, info.fontSize)
 }
 
+// cascadeWinHint is the initial capacity for cascade winner maps. Most elements
+// win a small handful of properties (UA + a few author rules).
+const cascadeWinHint = 8
+
+// cascadeWin is the winning cascaded declaration for one property: value plus
+// the specificity/order bits needed to compare later candidates. important is
+// a separate cascade layer (any !important beats any normal).
+type cascadeWin struct {
+	value                 string
+	ids, classes, types   int
+	order                 int
+	important             bool
+}
+
+// cascadeRaw returns the winning declaration per property for the element
+// across UA sheet, author sheets and the inline style attribute.
+// Uses one winner map (value+spec+order+important) instead of six maps.
 func cascadeRaw(ctx *styleContext, node *html.Node) map[string]string {
-	normal := map[string]string{}
-	important := map[string]string{}
-
-	nSpec, nOrder := map[string][4]int{}, map[string]int{}
-
-	iSpec, iOrder := map[string][4]int{}, map[string]int{}
+	wins := make(map[string]cascadeWin, cascadeWinHint)
 
 	// UA sheet (lowest priority; specificity 0, order -1)
 	for _, d := range uaRules(node.Name) {
-		applyDeclaration(normal, nSpec, nOrder, d.Prop, d.Value, 0, 0, 0, -1)
+		applyCascadeWin(wins, d.Prop, d.Value, 0, 0, 0, -1, false)
 	}
 
 	// author sheets in source order (shared matchedRules walk)
-	for _, hit := range ctx.matchedRules(node, "") {
-		r := hit.r
-		for _, d := range r.Decls {
-			if d.Important {
-				applyDeclaration(important, iSpec, iOrder, d.Prop, d.Value, hit.a, hit.b, hit.c, r.Order)
-			} else {
-				applyDeclaration(normal, nSpec, nOrder, d.Prop, d.Value, hit.a, hit.b, hit.c, r.Order)
+	if ctx != nil {
+		for _, hit := range ctx.matchedRules(node, "") {
+			r := hit.r
+			for _, d := range r.Decls {
+				applyCascadeWin(wins, d.Prop, d.Value, hit.a, hit.b, hit.c, r.Order, d.Important)
 			}
 		}
 	}
@@ -653,40 +695,57 @@ func cascadeRaw(ctx *styleContext, node *html.Node) map[string]string {
 	// inline style attribute: outranks all normal declarations and all sheet
 	// important declarations (spec 1<<maxIntShift).
 	for _, d := range css.ParseInline(node.Attribute("style")) {
-		if d.Important {
-			applyDeclaration(important, iSpec, iOrder, d.Prop, d.Value, 1<<maxIntShift, 0, 0, 1<<maxIntShift)
-		} else {
-			applyDeclaration(normal, nSpec, nOrder, d.Prop, d.Value, 1<<maxIntShift, 0, 0, 1<<maxIntShift)
-		}
+		applyCascadeWin(wins, d.Prop, d.Value, 1<<maxIntShift, 0, 0, 1<<maxIntShift, d.Important)
 	}
 
-	// Merge important into normal and return normal (skip a third map + full copy).
-	for prop, v := range important {
-		normal[prop] = v
+	if len(wins) == 0 {
+		return nil
 	}
 
-	return normal
+	out := make(map[string]string, len(wins))
+	for prop, w := range wins {
+		out[prop] = w.value
+	}
+
+	return out
 }
 
-// applyDeclaration folds one declaration into the winning map when its
-// specificity/order beats the current winner.
-func applyDeclaration(
-	winning map[string]string, spec map[string][4]int, ord map[string]int,
-	prop, value string, ids, classes, types, order int,
+// applyCascadeWin folds one declaration into the winner map when its layer,
+// specificity, or source order beats the current winner.
+func applyCascadeWin(
+	wins map[string]cascadeWin,
+	prop, value string, ids, classes, types, order int, important bool,
 ) {
 	prop = strings.ToLower(prop)
-	if _, ok := winning[prop]; !ok {
-		winning[prop] = value
-		spec[prop] = [4]int{ids, classes, types, 0}
-		ord[prop] = order
+	cur, ok := wins[prop]
+	if !ok {
+		wins[prop] = cascadeWin{
+			value: value, ids: ids, classes: classes, types: types,
+			order: order, important: important,
+		}
 
 		return
 	}
 
-	if specificityBeats(spec[prop], ids, classes, types, order, ord[prop]) {
-		winning[prop] = value
-		spec[prop] = [4]int{ids, classes, types, 0}
-		ord[prop] = order
+	// !important is a higher cascade layer than normal (any origin here).
+	if important != cur.important {
+		if !important {
+			return
+		}
+
+		wins[prop] = cascadeWin{
+			value: value, ids: ids, classes: classes, types: types,
+			order: order, important: true,
+		}
+
+		return
+	}
+
+	if specificityBeats([4]int{cur.ids, cur.classes, cur.types, 0}, ids, classes, types, order, cur.order) {
+		wins[prop] = cascadeWin{
+			value: value, ids: ids, classes: classes, types: types,
+			order: order, important: important,
+		}
 	}
 }
 
@@ -771,43 +830,43 @@ func resolveFontWeight(current int, val string) int {
 	return current
 }
 
+// restShorthandProps are applied before other cascaded properties so a winning
+// longhand (e.g. margin-bottom) always overrides its shorthand (margin).
+// Package-level to avoid per-node slice/array rebuilds.
+var restShorthandProps = [...]string{ //nolint:gochecknoglobals // static apply order
+	"margin", "padding", "border", borderWidthKeyword, borderStyleKeyword,
+	borderColorKeyword, gapKeyword, flexKeyword, containerKeyword,
+}
+
 // applyRestProps resolves every non-font property once the font size is known.
-// Properties are applied in a fixed order: the shorthand groups first, then
-// every other property alphabetically. raw is a map, so iterating it directly
-// would be nondeterministic and could let a shorthand (e.g. UA "margin")
-// clobber a winning longhand (e.g. author "margin-bottom") depending on map
-// iteration order.
+// Shorthands run first in a fixed order; remaining longhands run in any order
+// (longhands do not clobber each other via shorthand expansion). This avoids
+// sorting and intermediate prop slices on every element.
 func applyRestProps(
 	style *ResolvedStyle, raw map[string]string, ctx *styleContext,
-	parent ResolvedStyle, hasParent bool,
+	parent *ResolvedStyle,
 ) {
-	fsize := style.FontSize
-	// gap/flex/container applied before longhands so row-gap/column-gap,
-	// flex-*, and container-type/name win over shorthands.
-	shorthands := [...]string{
-		"margin", "padding", "border", borderWidthKeyword, borderStyleKeyword,
-		borderColorKeyword, gapKeyword, flexKeyword, containerKeyword,
+	if len(raw) == 0 {
+		return
 	}
-	rest := make([]string, 0, len(raw))
 
-	for prop := range raw {
-		switch prop {
-		case "margin", "padding", "border", borderWidthKeyword, borderStyleKeyword,
-			borderColorKeyword, gapKeyword, flexKeyword, containerKeyword:
+	fsize := style.FontSize
+	hasParent := parent != nil
+
+	for i := range restShorthandProps {
+		prop := restShorthandProps[i]
+		value, ok := raw[prop]
+		if !ok {
 			continue
 		}
 
-		rest = append(rest, prop)
+		applyStyleProp(style, prop, value, fsize, ctx, parent, hasParent)
 	}
 
-	sort.Strings(rest)
-	props := make([]string, 0, len(shorthands)+len(rest))
-	props = append(props, shorthands[:]...)
-	props = append(props, rest...)
-
-	for _, prop := range props {
-		value, ok := raw[prop]
-		if !ok {
+	for prop, value := range raw {
+		switch prop {
+		case "margin", "padding", "border", borderWidthKeyword, borderStyleKeyword,
+			borderColorKeyword, gapKeyword, flexKeyword, containerKeyword:
 			continue
 		}
 
@@ -819,13 +878,13 @@ func applyRestProps(
 // Groups return false when they do not own prop.
 type styleGroupFn func(
 	style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext,
-	parent ResolvedStyle, hasParent bool,
+	parent *ResolvedStyle, hasParent bool,
 ) bool
 
 // applyStyleProp routes one cascaded property to the group that owns it.
 func applyStyleProp(
 	style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext,
-	parent ResolvedStyle, hasParent bool,
+	parent *ResolvedStyle, hasParent bool,
 ) {
 	groups := [...]styleGroupFn{
 		applyDisplayGroup,
@@ -851,7 +910,7 @@ func applyStyleProp(
 
 // applyDisplayGroup handles display, position-adjacent flow and stacking props.
 func applyDisplayGroup(
-	style *ResolvedStyle, prop, value string, _ float64, _ *styleContext, _ ResolvedStyle, _ bool,
+	style *ResolvedStyle, prop, value string, _ float64, _ *styleContext, _ *ResolvedStyle, _ bool,
 ) bool {
 	if applyDisplayFlowProps(style, prop, value) {
 		return true
@@ -984,7 +1043,7 @@ func setFilterValue(style *ResolvedStyle, value string) {
 
 // applyPositionGroup handles the top/right/bottom/left offsets.
 func applyPositionGroup(
-	style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext, _ ResolvedStyle, _ bool,
+	style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext, _ *ResolvedStyle, _ bool,
 ) bool {
 	switch prop {
 	case cssVerticalAlignTop:
@@ -1004,7 +1063,7 @@ func applyPositionGroup(
 
 // applyFlexGroup handles flex layout props and the gap family.
 func applyFlexGroup(
-	style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext, _ ResolvedStyle, _ bool,
+	style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext, _ *ResolvedStyle, _ bool,
 ) bool {
 	switch prop {
 	case gapKeyword, "row-gap", "column-gap":
@@ -1205,7 +1264,7 @@ func setFlexOrderValue(style *ResolvedStyle, value string) {
 
 // applyMulticolGroup handles column-* props.
 func applyMulticolGroup(
-	style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext, _ ResolvedStyle, _ bool,
+	style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext, _ *ResolvedStyle, _ bool,
 ) bool {
 	if applyColumnCountWidthProps(style, prop, value, fsize, ctx.viewportW) {
 		return true
@@ -1270,7 +1329,7 @@ func applyColumnFillSpanProps(style *ResolvedStyle, prop, value string) bool {
 
 // applyGridGroup handles grid template/placement props.
 func applyGridGroup(
-	style *ResolvedStyle, prop, value string, _ float64, _ *styleContext, _ ResolvedStyle, _ bool,
+	style *ResolvedStyle, prop, value string, _ float64, _ *styleContext, _ *ResolvedStyle, _ bool,
 ) bool {
 	if applyGridTemplateProps(style, prop, value) {
 		return true
@@ -1331,7 +1390,7 @@ func setGridStartIndex(style *ResolvedStyle, prop, value string) {
 
 // applyBoxGroup handles the sizing and box props (width/height/margins/padding).
 func applyBoxGroup(
-	style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext, _ ResolvedStyle, _ bool,
+	style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext, _ *ResolvedStyle, _ bool,
 ) bool {
 	if applyBoxSizingProps(style, prop, value, fsize, ctx) {
 		return true
@@ -1549,7 +1608,7 @@ func applyPaddingSideProps(style *ResolvedStyle, prop, value string, fsize, view
 
 // applyBorderGroup handles the border shorthand and per-side props.
 func applyBorderGroup(
-	style *ResolvedStyle, prop, value string, fsize float64, _ *styleContext, _ ResolvedStyle, _ bool,
+	style *ResolvedStyle, prop, value string, fsize float64, _ *styleContext, _ *ResolvedStyle, _ bool,
 ) bool {
 	switch prop {
 	case "border":
@@ -1639,7 +1698,7 @@ func applyBorderStyleColorProps(style *ResolvedStyle, prop, value string) bool {
 
 // applyColorGroup handles foreground and background colors.
 func applyColorGroup(
-	style *ResolvedStyle, prop, value string, _ float64, _ *styleContext, parent ResolvedStyle, hasParent bool,
+	style *ResolvedStyle, prop, value string, _ float64, _ *styleContext, parent *ResolvedStyle, hasParent bool,
 ) bool {
 	if applyColorForegroundProps(style, prop, value, parent, hasParent) {
 		return true
@@ -1648,11 +1707,11 @@ func applyColorGroup(
 	return applyColorBackgroundProps(style, prop, value)
 }
 
-func applyColorForegroundProps(style *ResolvedStyle, prop, value string, parent ResolvedStyle, hasParent bool) bool {
+func applyColorForegroundProps(style *ResolvedStyle, prop, value string, parent *ResolvedStyle, hasParent bool) bool {
 	switch prop {
 	case "color":
 		if value == inheritKeyword {
-			if hasParent {
+			if hasParent && parent != nil {
 				style.Color = parent.Color
 			}
 		} else if r, g, b, _, ok := css.ParseColor(value); ok {
@@ -1690,7 +1749,7 @@ func applyColorBackgroundProps(style *ResolvedStyle, prop, value string) bool {
 // applyTextGroup handles typography and list props.
 func applyTextGroup(
 	style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext,
-	parent ResolvedStyle, hasParent bool,
+	parent *ResolvedStyle, hasParent bool,
 ) bool {
 	if applyTextLayoutProps(style, prop, value) {
 		return true
@@ -1789,7 +1848,7 @@ func setWordBreakValue(style *ResolvedStyle, value string) {
 	}
 }
 
-func applyTextDecorationProps(style *ResolvedStyle, prop, value string, parent ResolvedStyle, hasParent bool) bool {
+func applyTextDecorationProps(style *ResolvedStyle, prop, value string, parent *ResolvedStyle, hasParent bool) bool {
 	switch prop {
 	case "text-decoration":
 		switch value {
@@ -1800,7 +1859,7 @@ func applyTextDecorationProps(style *ResolvedStyle, prop, value string, parent R
 		case cssDisplayNone:
 			style.TextDecoration = cssDisplayNone
 		case inheritKeyword:
-			if hasParent {
+			if hasParent && parent != nil {
 				style.TextDecoration = parent.TextDecoration
 			}
 		}
@@ -1846,7 +1905,7 @@ func applyTextSpacingProps(style *ResolvedStyle, prop, value string, fsize float
 
 // applyTableBreakGroup handles table borders/spacing and page-break props.
 func applyTableBreakGroup(
-	style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext, _ ResolvedStyle, _ bool,
+	style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext, _ *ResolvedStyle, _ bool,
 ) bool {
 	switch prop {
 	case "border-collapse", "border-spacing", "table-layout":
@@ -1981,7 +2040,7 @@ func applyContainerProps(style *ResolvedStyle, prop, value string) bool {
 
 // applyTransformGroup handles transform and transform-origin.
 func applyTransformGroup(
-	style *ResolvedStyle, prop, value string, fsize float64, _ *styleContext, _ ResolvedStyle, _ bool,
+	style *ResolvedStyle, prop, value string, fsize float64, _ *styleContext, _ *ResolvedStyle, _ bool,
 ) bool {
 	switch prop {
 	case "transform":

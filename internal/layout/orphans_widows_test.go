@@ -35,15 +35,15 @@ func TestOrphansWidowsParseAndInherit(t *testing.T) { //nolint:cyclop
 
 		switch node.Attribute("class") {
 		case "o4":
-			gotO4 = &sty
+			gotO4 = sty
 		case "bad":
-			gotBad = &sty
+			gotBad = sty
 		case "inner":
-			gotInner = &sty
+			gotInner = sty
 		}
 
 		if node.Name == "body" {
-			gotBody = &sty
+			gotBody = sty
 		}
 	}
 
@@ -99,7 +99,7 @@ func TestOrphansWidowsLineAwareKeepTogether(t *testing.T) {
 
 	root := &box{ //nolint:exhaustruct // intentional zero fields
 		kind: displayBlock, y: 60, height: 90, opStart: 0, opEnd: 4,
-		style: ResolvedStyle{Orphans: 4, Widows: 2}, //nolint:exhaustruct // intentional zero fields
+		style: &ResolvedStyle{Orphans: 4, Widows: 2}, //nolint:exhaustruct // intentional zero fields
 	}
 
 	res := &Result{Ops: ops, root: root} //nolint:exhaustruct // intentional zero fields
@@ -128,7 +128,7 @@ func TestOrphansWidowsLineAwareKeepTogether(t *testing.T) {
 
 	root2 := &box{ //nolint:exhaustruct // intentional zero fields
 		kind: displayBlock, y: 60, height: 90, opStart: 0, opEnd: 4,
-		style: ResolvedStyle{Orphans: 2, Widows: 2}, //nolint:exhaustruct // intentional zero fields
+		style: &ResolvedStyle{Orphans: 2, Widows: 2}, //nolint:exhaustruct // intentional zero fields
 	}
 
 	res2 := &Result{Ops: ops2, root: root2} //nolint:exhaustruct // intentional zero fields
@@ -213,7 +213,7 @@ func TestOrphansWidowsHeuristicFallback(t *testing.T) {
 
 	b := &box{ //nolint:exhaustruct // intentional zero fields
 		kind: displayBlock, y: 830, height: 30, opStart: 0, opEnd: 0,
-		style: ResolvedStyle{Orphans: 2, Widows: 2}, //nolint:exhaustruct // intentional zero fields
+		style: &ResolvedStyle{Orphans: 2, Widows: 2}, //nolint:exhaustruct // intentional zero fields
 	}
 
 	if !orphansWidowsHeuristic(res, b, 842) {

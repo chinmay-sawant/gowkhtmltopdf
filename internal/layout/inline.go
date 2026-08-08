@@ -2,6 +2,7 @@ package layout
 
 import (
 	"strings"
+	"unicode/utf8"
 
 	"gowkhtmltopdf/internal/html"
 	"gowkhtmltopdf/internal/pdf"
@@ -632,7 +633,8 @@ func (e *engine) fittingPrefix(runes []rune, limit float64, style ResolvedStyle)
 	width := 0.0
 
 	for node < len(runes) {
-		rowW := e.measureTextFace(string(runes[node]), style)
+		// measureRuneFace avoids per-rune string(r) allocations.
+		rowW := e.measureRuneFace(runes[node], style)
 		if node > 0 && width+rowW > limit+0.01 {
 			break
 		}
@@ -1197,7 +1199,7 @@ func (e *engine) collectInline(nodes []*html.Node, out *[]inlineItem) {
 }
 
 func (e *engine) collectInlineNode(node *html.Node, out *[]inlineItem) {
-	sty := e.styles[node]
+	sty := e.styleVal(node)
 
 	switch node.Type {
 	case html.TextNode:
@@ -1244,7 +1246,7 @@ func (e *engine) collectWrappedText(node *html.Node, sty ResolvedStyle, out *[]i
 	// anchors). collapseWS would drop them. Skip only after a
 	// replaced element so `<img>\n<span margin-left>` does not add
 	// a space on top of the margin (TestLogoTitleGap).
-	if strings.TrimSpace(node.Text) == "" {
+	if !hasNonHTMLSpace(node.Text) {
 		if node.Text != "" {
 			if len(*out) == 0 || !(*out)[len(*out)-1].img {
 				*out = append(*out, e.textItem(" ", e.stylePtr(node)))
@@ -1258,52 +1260,71 @@ func (e *engine) collectWrappedText(node *html.Node, sty ResolvedStyle, out *[]i
 	if text == "" {
 		return
 	}
+
+	st := e.stylePtr(node)
 	// white-space:nowrap — keep the run unbreakable (wiki .reference
 	// cite markers in narrow table columns).
 	if sty.WhiteSpace == cssWhiteSpaceNowrap {
-		*out = append(*out, e.textItem(text, e.stylePtr(node)))
+		*out = append(*out, e.textItem(text, st))
 
 		return
 	}
 
-	words := strings.Fields(text)
-	// collapseWS / Fields strip a leading space that still separates
-	// this node from the previous inline ("</a> in" → "Reeves"+"in").
-	// Re-introduce one when the source began with whitespace and the
-	// prior item does not already end with a space.
-	// Do not insert a space before attaching punctuation (", . ) ]") —
-	// pretty-printed "</a>\n," must stay "Award," not "Award ,".
-	e.preserveLeadingGap(node, words, out)
+	// Walk collapsed words without strings.Fields / word+" " copies.
+	// Substrings of `text` share the underlying bytes; inter-word spaces
+	// stay attached to the preceding word ("hello ", "world") so paint
+	// and justify see the same trailing-space convention as before.
+	//
+	// collapseWS strips a leading space that still separates this node
+	// from the previous inline ("</a> in" → "Reeves"+"in"). Re-introduce
+	// one when the source began with whitespace and the prior item does
+	// not already end with a space. Do not insert a space before attaching
+	// punctuation (", . ) ]") — pretty-printed "</a>\n," must stay "Award,".
+	needLead := false
+	if len(node.Text) > 0 && isWSSpaceByte(node.Text[0]) && len(*out) > 0 {
+		prev := &(*out)[len(*out)-1]
+		if !prev.forceBreak && !strings.HasSuffix(prev.text, " ") {
+			needLead = true
+		}
+	}
 
-	for i, word := range words {
-		// Space only between words of this text node — not after the
-		// last token. Appending " " to every field made cite brackets
-		// render as "[ 111 ]" and wrap/overlap in narrow Ref columns.
-		if i < len(words)-1 {
-			word += " "
+	startOut := len(*out)
+	i := 0
+
+	for i < len(text) {
+		// Skip any residual spaces (collapseWS normally leaves single
+		// separators only between words).
+		for i < len(text) && text[i] == ' ' {
+			i++
 		}
 
-		*out = append(*out, e.textItem(word, e.stylePtr(node)))
+		if i >= len(text) {
+			break
+		}
+
+		j := i
+		for j < len(text) && text[j] != ' ' {
+			j++
+		}
+
+		// Include one trailing space when another word follows.
+		end := j
+		if j < len(text) {
+			end = j + 1
+		}
+
+		word := text[i:end]
+		if startOut == len(*out) && needLead && !isAttachPunct(word) {
+			word = " " + word
+		}
+
+		*out = append(*out, e.textItem(word, st))
+		i = end
 	}
 	// Preserve a trailing word-separator when the source text node
 	// ended with whitespace (so "foo <b>bar</b>" keeps the gap).
-	e.preserveTrailingGap(node, words, sty, out)
-}
-
-// preserveLeadingGap re-attaches a leading word separator between this text
-// node and the previous inline item when the source began with whitespace.
-func (e *engine) preserveLeadingGap(node *html.Node, words []string, out *[]inlineItem) {
-	if len(words) == 0 || len(node.Text) == 0 || len(*out) == 0 {
-		return
-	}
-
-	if !isWSSpaceByte(node.Text[0]) {
-		return
-	}
-
-	prev := &(*out)[len(*out)-1]
-	if !prev.forceBreak && !strings.HasSuffix(prev.text, " ") && !isAttachPunct(words[0]) {
-		words[0] = " " + words[0]
+	if len(*out) > startOut {
+		e.preserveTrailingGap(node, sty, out)
 	}
 }
 
@@ -1319,18 +1340,23 @@ func isWSSpaceByte(b byte) bool {
 
 // preserveTrailingGap keeps a trailing word separator when the source text
 // node ended with whitespace.
-func (e *engine) preserveTrailingGap(node *html.Node, words []string, sty ResolvedStyle, out *[]inlineItem) {
-	if len(words) == 0 || len(node.Text) == 0 {
+func (e *engine) preserveTrailingGap(node *html.Node, sty ResolvedStyle, out *[]inlineItem) {
+	if len(*out) == 0 || len(node.Text) == 0 {
 		return
 	}
 
 	last := node.Text[len(node.Text)-1]
-	if last != ' ' && last != '\t' && last != '\n' && last != '\r' && last != '\f' {
+	if !isWSSpaceByte(last) {
 		return
 	}
 
-	(*out)[len(*out)-1].text += " "
-	(*out)[len(*out)-1].w = e.measureTextFace((*out)[len(*out)-1].text, sty)
+	item := &(*out)[len(*out)-1]
+	if strings.HasSuffix(item.text, " ") {
+		return
+	}
+
+	item.text += " "
+	item.w = e.measureTextFace(item.text, sty)
 }
 
 // collectInlineElement flattens one element node into inline items.
@@ -1721,54 +1747,142 @@ func lineHeightOf(st *ResolvedStyle) float64 {
 }
 
 func collapseWS(s string) string {
+	// Fast path: already a single-space-collapsed ASCII-friendly run with
+	// no tab/newline/formfeed and no double spaces. Skip Builder entirely.
+	if collapseWSNoop(s) {
+		return strings.TrimRight(s, " ")
+	}
+
 	var boxNode strings.Builder
+
+	boxNode.Grow(len(s))
 
 	prevSpace := true
 
-	for _, runic := range s {
-		if runic == ' ' || runic == '\t' || runic == '\n' || runic == '\r' || runic == '\f' {
+	for i := 0; i < len(s); {
+		c := s[i]
+		// ASCII whitespace (HTML space set).
+		if c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' {
 			if !prevSpace {
 				boxNode.WriteByte(' ')
 
 				prevSpace = true
 			}
 
+			i++
+
 			continue
 		}
+		// ASCII ink: WriteByte avoids utf8.AppendRune per character.
+		if c < 0x80 {
+			boxNode.WriteByte(c)
 
-		boxNode.WriteRune(runic)
+			prevSpace = false
+			i++
+
+			continue
+		}
+		// Multi-byte UTF-8: copy the full rune bytes without WriteRune→AppendRune.
+		_, size := utf8.DecodeRuneInString(s[i:])
+		if size < 1 {
+			size = 1
+		}
+
+		boxNode.WriteString(s[i : i+size])
 
 		prevSpace = false
+		i += size
 	}
 
 	return strings.TrimRight(boxNode.String(), " ")
 }
 
+// collapseWSNoop reports that s needs no whitespace collapsing (only possible
+// trailing spaces remain, handled by TrimRight).
+func collapseWSNoop(s string) bool {
+	prevSpace := false
+
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c == '\t' || c == '\n' || c == '\r' || c == '\f' {
+			return false
+		}
+
+		if c == ' ' {
+			if prevSpace {
+				return false
+			}
+
+			prevSpace = true
+
+			continue
+		}
+
+		prevSpace = false
+	}
+
+	return true
+}
+
 // measureTextFace measures s using per-rune CSS font-family fallback
 // (same face selection as paint).
+//
+// Primary-face fast path: resolve the style face once and only consult the
+// fallback cache when a glyph is missing — Latin report text almost never
+// leaves the primary face.
 func (e *engine) measureTextFace(cssSheet string, sty ResolvedStyle) float64 {
+	if cssSheet == "" {
+		return 0
+	}
+
 	size := sty.FontSize * e.scale
 	lstyle := sty.LetterSpacing * e.scale
+	primary := e.faceFor(sty)
+
+	if primary == nil {
+		primary = e.font
+	}
 
 	var total float64
 
-	node := 0
+	n := 0
 
 	for _, runic := range cssSheet {
-		face := e.faceForRune(sty, runic)
-		if face == nil {
-			face = e.font
+		face := primary
+		if !isRuneWhitespace(runic) && primary.GlyphID(runic) == 0 {
+			face = e.faceForRuneFallback(sty, runic, primary)
+			if face == nil {
+				face = e.font
+			}
 		}
 
 		total += face.AdvanceInPoints(runic, size)
-		node++
+		n++
 	}
 
-	if lstyle != 0 && node > 0 {
-		total += lstyle * float64(node)
+	if lstyle != 0 && n > 0 {
+		total += lstyle * float64(n)
 	}
 
 	return total
+}
+
+// measureRuneFace measures a single rune with the same face selection as
+// measureTextFace, without allocating string(r).
+func (e *engine) measureRuneFace(r rune, sty ResolvedStyle) float64 {
+	size := sty.FontSize * e.scale
+	face := e.faceForRune(sty, r)
+
+	if face == nil {
+		face = e.font
+	}
+
+	w := face.AdvanceInPoints(r, size)
+	if sty.LetterSpacing != 0 {
+		w += sty.LetterSpacing * e.scale
+	}
+
+	return w
 }
 
 type faceRun struct {
@@ -1785,6 +1899,22 @@ func (e *engine) splitTextByFace(cssSheet string, sty ResolvedStyle) []faceRun {
 	}
 
 	size := sty.FontSize * e.scale
+	primary := e.faceFor(sty)
+
+	if primary == nil {
+		primary = e.font
+	}
+	// Fast path: every non-whitespace glyph is on the primary face (typical
+	// for Latin). One faceFor + per-rune GlyphID, single output run.
+	if faceRunAllPrimary(cssSheet, primary) {
+		var width float64
+		for _, runic := range cssSheet {
+			width += primary.AdvanceInPoints(runic, size)
+		}
+
+		return []faceRun{{text: cssSheet, face: primary, w: width}}
+	}
+
 	runs := make([]faceRun, 0, 1)
 	start := 0
 
@@ -1793,9 +1923,14 @@ func (e *engine) splitTextByFace(cssSheet string, sty ResolvedStyle) []faceRun {
 	var width float64
 
 	for idx, runic := range cssSheet {
-		face := e.faceForRune(sty, runic)
-		if face == nil {
-			face = e.font
+		face := primary
+		if isRuneWhitespace(runic) {
+			face = primary
+		} else if primary.GlyphID(runic) == 0 {
+			face = e.faceForRuneFallback(sty, runic, primary)
+			if face == nil {
+				face = e.font
+			}
 		}
 
 		if current != nil && face != current {
@@ -1825,6 +1960,26 @@ func (e *engine) splitTextByFace(cssSheet string, sty ResolvedStyle) []faceRun {
 	}
 
 	return runs
+}
+
+// faceRunAllPrimary reports that every non-whitespace rune in s is covered by
+// primary (so splitTextByFace can emit a single run).
+func faceRunAllPrimary(s string, primary *pdf.Font) bool {
+	if primary == nil {
+		return false
+	}
+
+	for _, r := range s {
+		if isRuneWhitespace(r) {
+			continue
+		}
+
+		if primary.GlyphID(r) == 0 {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (e *engine) fontAscent(size float64) float64 {

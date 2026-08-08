@@ -141,9 +141,9 @@ body { margin: 0; font-size: 12pt; }
 	}
 
 	st := styles[header]
-	t.Logf("hd display=%q overflow=%q establishesBFC=%v", st.Display, st.Overflow, establishesBFC(st))
+	t.Logf("hd display=%q overflow=%q establishesBFC=%v", st.Display, st.Overflow, establishesBFC(*st))
 
-	if !establishesBFC(st) {
+	if !establishesBFC(*st) {
 		t.Fatal("flow-root must establish BFC")
 	}
 

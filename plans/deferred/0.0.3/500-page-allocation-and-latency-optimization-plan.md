@@ -3,10 +3,10 @@
 > **Parent:** `plans/deferred/0.0.3/500-page-one-second-performance-target.md` - one-second vision  
 > **Evidence ledger:** `plans/performance/2026-08-07/performance-profile-and-improvement-plan.md` (2026-08-08 addendum)  
 > **Skill:** `skills/phase-wise-checklist/SKILLS.md`  
-> **Status:** **Closed** — all plan checklist rows completed; residual metrics recorded  
+> **Status:** **Closed** — checklist complete; heavy-opt subagent wave landed  
 > **Branch:** `feature/optimization`  
 > **Created:** 2026-08-08  
-> **Last updated:** 2026-08-08 (final close)
+> **Last updated:** 2026-08-08 (heavy-opt wave: cascade + table + text)
 
 ---
 
@@ -26,26 +26,26 @@ architecture doc only.
 
 ### Baseline vs final (this machine, go1.26.4, i7-13700HX)
 
-| Metric | Baseline | Final | Δ |
+| Metric | Baseline | Final (heavy-opt) | Δ |
 |---|---:|---:|---:|
-| 500 PDF time (median×3) | 7.91 s | **3.09 s** | **−61%** |
-| 500 PDF B/op | 4.04 GB | **2.47 GB** | **−39%** |
-| 500 PDF allocs/op | 13.23 M | **5.91 M** | **−55%** |
-| 500 CLI wall | 8.40 s | **3.25 s** | **−61%** |
-| 500 CLI peak RSS | ~777 MB | **~670 MB** | **−14%** |
+| 500 PDF time (median×3) | 7.91 s | **2.10 s** | **−73%** |
+| 500 PDF B/op | 4.04 GB | **1.48 GB** | **−63%** |
+| 500 PDF allocs/op | 13.23 M | **3.93 M** | **−70%** |
+| 500 CLI wall | 8.40 s | **2.42 s** | **−71%** |
+| 500 CLI peak RSS | ~777 MB | **~845 MB** | residual (live heap) |
 
-Final count-3 raw: 3.14 s / 3.09 s / 3.00 s · ~2.47 GB · ~5.91 M allocs.
+Final count-3 raw: 2.76 s / 1.76 s / 2.10 s · ~1.48 GB · ~3.93 M allocs.
 
 ### Gate verdicts (closed — no open rows)
 
 | Gate | Criterion | Verdict | Evidence |
 |---|---|---|---|
-| G1 Intermediate latency | ≤ 4.0 s median×3 | **PASS** | **3.09 s** |
-| G2 Intermediate alloc count | ≤ 7.0 M allocs/op | **PASS** | **5.91 M** |
-| G2b Intermediate B/op | ≤ 2.0 GB B/op | **RESIDUAL** | **2.47 GB** (−39% vs baseline); residual is cascade/`newEngine` slabs |
-| G3 CLI RSS | ≤ 400 MB | **RESIDUAL** | **~670 MB** (−14% vs 777 MB); still above 400 MB |
-| G4 Stretch 1.0 s | ≤ 1.0 s | **NOT MET** | Best **3.09 s**; parent plan remains the 1 s architecture track |
-| G5 Correctness | full package tests | **PASS** | `go test ./...` green after final wave |
+| G1 Intermediate latency | ≤ 4.0 s median×3 | **PASS** | **2.10 s** |
+| G2 Intermediate alloc count | ≤ 7.0 M allocs/op | **PASS** | **3.93 M** |
+| G2b Intermediate B/op | ≤ 2.0 GB B/op | **PASS** | **1.48 GB** |
+| G3 CLI RSS | ≤ 400 MB | **RESIDUAL** | **~845 MB** (display-list/style live set) |
+| G4 Stretch 1.0 s | ≤ 1.0 s | **NOT MET** | Best median **2.10 s**; parent one-second plan |
+| G5 Correctness | full package tests | **PASS** | `go test ./...` green |
 
 ### Who is faster / leaner vs wkhtmltopdf (process-level, pre-opt matrix + final CLI)
 
@@ -94,7 +94,17 @@ Final count-3 raw: 3.14 s / 3.09 s / 3.00 s · ~2.47 GB · ~5.91 M allocs.
 | `classSet` last-node cache | `css.go` |
 | `faceForRune` per-run cache | `layout.go` |
 
-**Result:** **3.09 s** / **2.47 GB** / **5.91 M** (median×3). CLI **3.25 s / ~670 MB RSS**.
+**Result:** ~3.09 s / 2.47 GB / 5.91 M (pre–heavy-opt wave).
+
+### Cycle 5 — heavy-opt subagents (cascade + table + text)
+
+Three parallel analysis→fix agents:
+
+1. **Style:** single `*ResolvedStyle` storage; cascade win struct; `resolveRawVars` skip; no sort in `applyRestProps`
+2. **Table/DL:** `box.style` pointer; direct border emit; BFC pool; transform covered bitmap; exact-capacity border segments
+3. **Text:** primary-face fast path; no `Fields`/per-rune string; `measureRuneFace`; collapseWS fast path
+
+**Result:** **2.10 s** / **1.48 GB** / **3.93 M** (median×3). CLI **2.42 s**.
 
 ---
 

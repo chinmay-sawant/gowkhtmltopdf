@@ -51,7 +51,7 @@ func TestStickySectionChromeRepairUsesContainingBlock(t *testing.T) { //nolint:f
 	background := [4]float64{0.925, 0.937, 0.945, 1}
 	section := &box{ //nolint:exhaustruct // intentional zero fields
 		x: 10, y: 0, w: 100,
-		style: ResolvedStyle{ //nolint:exhaustruct // intentional zero fields
+		style: &ResolvedStyle{ //nolint:exhaustruct // intentional zero fields
 			BGColor:      background,
 			BorderLeft:   border{Width: 1, Style: "solid", Color: borderRGB},
 			BorderRight:  border{Width: 1, Style: "solid", Color: borderRGB},

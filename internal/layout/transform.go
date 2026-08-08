@@ -713,39 +713,64 @@ func clamp01(val float64) float64 {
 // stampBoxTransforms walks the laid-out tree and stamps composed 2D
 // transform matrices (origin baked) onto display-list ops. Parent transforms
 // compose around children; sibling flow geometry is unchanged.
+//
+// A single []bool covered bitmap replaces per-node map[int]struct{} sets —
+// multi-page tables allocate tens of thousands of boxes and the map path was
+// a top alloc_space hotspot.
 func stampBoxTransforms(boxNode *box, parentAccum Matrix2D, ops []Op) {
+	if boxNode == nil || len(ops) == 0 {
+		return
+	}
+
+	covered := make([]bool, len(ops))
+	stampBoxTransformsRec(boxNode, parentAccum, ops, covered)
+}
+
+func stampBoxTransformsRec(boxNode *box, parentAccum Matrix2D, ops []Op, covered []bool) {
 	if boxNode == nil {
 		return
 	}
 
 	accum := parentAccum
+	sty := boxNode.style
 
-	if boxNode.style.HasTransform {
-		ox, oy := resolveTransformOrigin(boxNode.style.TransformOrigin, boxNode)
-		baked := BakeOrigin(boxNode.style.Transform, ox, oy)
+	if sty != nil && sty.HasTransform {
+		ox, oy := resolveTransformOrigin(sty.TransformOrigin, boxNode)
+		baked := BakeOrigin(sty.Transform, ox, oy)
 		accum = parentAccum.Mul(baked)
 	}
 
-	childCovered := map[int]struct{}{}
-
 	for _, c := range boxNode.children {
-		stampBoxTransforms(c, accum, ops)
-		markBoxOpsCovered(c, ops, childCovered)
+		stampBoxTransformsRec(c, accum, ops, covered)
 	}
 
-	stampExclusiveTransformOps(boxNode, accum, ops, childCovered)
-	stampExclusiveOpacityOps(boxNode, ops, childCovered)
-	stampCoveredOpacityOps(boxNode, ops, childCovered)
+	// Mark child-owned ranges, stamp exclusive ops, then clear for siblings.
+	for _, c := range boxNode.children {
+		markBoxOpsCovered(c, ops, covered, true)
+	}
+
+	stampExclusiveTransformOps(boxNode, accum, ops, covered)
+	stampExclusiveOpacityOps(boxNode, ops, covered)
+	stampCoveredOpacityOps(boxNode, ops, covered)
+
+	for _, c := range boxNode.children {
+		markBoxOpsCovered(c, ops, covered, false)
+	}
 }
 
-// markBoxOpsCovered records the display-list ops owned exclusively by child c.
-func markBoxOpsCovered(c *box, ops []Op, covered map[int]struct{}) {
+// markBoxOpsCovered records or clears the display-list ops owned by child c.
+func markBoxOpsCovered(c *box, ops []Op, covered []bool, on bool) {
 	if !boxOwnsOps(c) {
 		return
 	}
 
-	for idx := c.opStart; idx <= c.opEnd && idx < len(ops); idx++ {
-		covered[idx] = struct{}{}
+	end := c.opEnd
+	if end >= len(ops) {
+		end = len(ops) - 1
+	}
+
+	for idx := c.opStart; idx <= end; idx++ {
+		covered[idx] = on
 	}
 }
 
@@ -756,13 +781,18 @@ func boxOwnsOps(boxNode *box) bool {
 
 // stampExclusiveTransformOps applies the accumulated transform to ops owned
 // exclusively by boxNode; child-owned ops keep the child's own transform.
-func stampExclusiveTransformOps(boxNode *box, accum Matrix2D, ops []Op, covered map[int]struct{}) {
+func stampExclusiveTransformOps(boxNode *box, accum Matrix2D, ops []Op, covered []bool) {
 	if accum.IsIdentity() || !boxOwnsOps(boxNode) {
 		return
 	}
 
-	for idx := boxNode.opStart; idx <= boxNode.opEnd && idx < len(ops); idx++ {
-		if _, isCovered := covered[idx]; isCovered {
+	end := boxNode.opEnd
+	if end >= len(ops) {
+		end = len(ops) - 1
+	}
+
+	for idx := boxNode.opStart; idx <= end; idx++ {
+		if covered[idx] {
 			continue
 		}
 
@@ -772,17 +802,23 @@ func stampExclusiveTransformOps(boxNode *box, accum Matrix2D, ops []Op, covered 
 }
 
 // stampExclusiveOpacityOps multiplies boxNode's opacity onto its exclusive ops.
-func stampExclusiveOpacityOps(boxNode *box, ops []Op, covered map[int]struct{}) {
-	if boxNode.style.Opacity >= 1 || !boxOwnsOps(boxNode) {
+func stampExclusiveOpacityOps(boxNode *box, ops []Op, covered []bool) {
+	if boxNode.style == nil || boxNode.style.Opacity >= 1 || !boxOwnsOps(boxNode) {
 		return
 	}
 
-	for idx := boxNode.opStart; idx <= boxNode.opEnd && idx < len(ops); idx++ {
-		if _, isCovered := covered[idx]; isCovered {
+	end := boxNode.opEnd
+	if end >= len(ops) {
+		end = len(ops) - 1
+	}
+
+	opacityBase := boxNode.style.Opacity
+	for idx := boxNode.opStart; idx <= end; idx++ {
+		if covered[idx] {
 			continue
 		}
 
-		opacity := boxNode.style.Opacity
+		opacity := opacityBase
 		if ops[idx].PaintOpacity > 0 && ops[idx].PaintOpacity < 1 {
 			opacity *= ops[idx].PaintOpacity
 		}
@@ -793,21 +829,26 @@ func stampExclusiveOpacityOps(boxNode *box, ops []Op, covered map[int]struct{}) 
 
 // stampCoveredOpacityOps composes boxNode's ancestor opacity through
 // child-owned ops (opacity composites through descendants).
-func stampCoveredOpacityOps(boxNode *box, ops []Op, covered map[int]struct{}) {
-	if boxNode.style.Opacity >= 1 || !boxOwnsOps(boxNode) {
+func stampCoveredOpacityOps(boxNode *box, ops []Op, covered []bool) {
+	if boxNode.style == nil || boxNode.style.Opacity >= 1 || !boxOwnsOps(boxNode) {
 		return
 	}
 
-	for idx := boxNode.opStart; idx <= boxNode.opEnd && idx < len(ops); idx++ {
-		if _, isCovered := covered[idx]; !isCovered {
+	end := boxNode.opEnd
+	if end >= len(ops) {
+		end = len(ops) - 1
+	}
+
+	opacityBase := boxNode.style.Opacity
+	for idx := boxNode.opStart; idx <= end; idx++ {
+		if !covered[idx] {
 			continue
 		}
 
-		opacity := boxNode.style.Opacity
 		if ops[idx].PaintOpacity > 0 && ops[idx].PaintOpacity < 1 {
-			ops[idx].PaintOpacity = opacity * ops[idx].PaintOpacity
+			ops[idx].PaintOpacity = opacityBase * ops[idx].PaintOpacity
 		} else {
-			ops[idx].PaintOpacity = opacity
+			ops[idx].PaintOpacity = opacityBase
 		}
 	}
 }

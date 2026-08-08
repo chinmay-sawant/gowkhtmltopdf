@@ -200,8 +200,9 @@ type engine struct {
 	font       *pdf.Font // default/regular face (metrics fallback)
 	faces      *pdf.FaceSet
 	registry   *pdf.Registry
-	styles     map[*html.Node]ResolvedStyle
-	stylePtrs  map[*html.Node]*ResolvedStyle
+	// styles holds one heap ResolvedStyle per node (from resolveStylesCtx).
+	// Callers use stylePtr for shared *ResolvedStyle without a second copy.
+	styles map[*html.Node]*ResolvedStyle
 	ops        []Op
 	noEmit     bool // measurement mode: compute geometry without emitting ops
 	height     float64
@@ -228,22 +229,63 @@ type engine struct {
 	// blocks reuse it so floats affect later siblings; BFC roots push a
 	// fresh state (see pushBFCFloats).
 	bfcFloats *floatState
+	// bfcStack restores previous BFC float states without allocating a
+	// closure per push (table cells establish a BFC each).
+	bfcStack []*floatState
+	// bfcPool recycles floatState values for pushBFCFloats.
+	bfcPool []*floatState
 	// deferredChrome holds background/border ops to splice in one linear
 	// pass (finalizeChrome) for the common non-sticky/non-fixed/non-transform
 	// path. Sticky/fixed/transform boxes still splice immediately.
 	deferredChrome []chromeEntry
 	nextOpID       uint64
-	// faceByRune caches faceForRune results for this Layout run (key mixes
-	// family/weight/italic with the rune).
+	// faceByStyle caches faceFor results for this Layout run (family hash +
+	// weight/italic). Avoids repeating registry lookups on every measure call.
+	faceByStyle map[faceStyleKey]*pdf.Font
+	// faceByRune caches faceForRune fallback results for this Layout run
+	// (only glyphs missing from the primary face). Key uses a family hash so
+	// lookups allocate no joined family string.
 	faceByRune map[faceRuneKey]*pdf.Font
+	// needsXformStamp is set when any built box has transform≠none or
+	// opacity<1 so stampBoxTransforms can skip the full tree walk.
+	needsXformStamp bool
 }
 
-// faceRuneKey is the faceForRune cache key for one (style face identity, rune).
+// faceStyleKey is the faceFor cache key for one CSS face identity.
+type faceStyleKey struct {
+	famHash uint64
+	weight  int
+	italic  bool
+}
+
+// faceRuneKey is the faceForRune fallback cache key for one (style face
+// identity, rune). famHash is FNV-1a over FontFamily tokens (no Join alloc).
 type faceRuneKey struct {
-	family string
-	weight int
-	italic bool
-	r      rune
+	famHash uint64
+	weight  int
+	italic  bool
+	r       rune
+}
+
+// hashFontFamily fingerprints a CSS font-family list without allocating.
+func hashFontFamily(fams []string) uint64 {
+	const (
+		offset64 = 14695981039346656037
+		prime64  = 1099511628211
+	)
+
+	h := uint64(offset64)
+	for _, fam := range fams {
+		for i := 0; i < len(fam); i++ {
+			h ^= uint64(fam[i])
+			h *= prime64
+		}
+
+		h ^= 0xff // token separator
+		h *= prime64
+	}
+
+	return h
 }
 
 // chromeEntry records one box's background/border ops for insertion before
@@ -259,6 +301,29 @@ type chromeEntry struct {
 // preferring CSS font-family matches from the opt-in registry, then the
 // bundled Liberation FaceSet.
 func (e *engine) faceFor(sty ResolvedStyle) *pdf.Font {
+	key := faceStyleKey{
+		famHash: hashFontFamily(sty.FontFamily),
+		weight:  sty.FontWeight,
+		italic:  sty.FontItalic,
+	}
+	if e.faceByStyle != nil {
+		if f, ok := e.faceByStyle[key]; ok {
+			return f
+		}
+	}
+
+	f := e.lookupFaceFor(sty)
+	if e.faceByStyle == nil {
+		e.faceByStyle = make(map[faceStyleKey]*pdf.Font)
+	}
+
+	e.faceByStyle[key] = f
+
+	return f
+}
+
+// lookupFaceFor is the uncached faceFor path.
+func (e *engine) lookupFaceFor(sty ResolvedStyle) *pdf.Font {
 	if e.registry != nil {
 		if f := e.registry.Lookup(sty.FontFamily, sty.FontWeight, sty.FontItalic); f != nil {
 			return f
@@ -277,16 +342,30 @@ func (e *engine) faceFor(sty ResolvedStyle) *pdf.Font {
 // faceForRune picks the first CSS font-family face (then defaults) that has a
 // glyph for r — browser-like fallback so Hangul/Latin/CJK can come from
 // different faces in one run.
+//
+// Fast path: when the primary face covers r (common for Latin/report text),
+// return it without a map lookup. Fallback faces are cached under a hash key
+// that does not allocate a joined family string.
 func (e *engine) faceForRune(sty ResolvedStyle, runeValue rune) *pdf.Font {
+	primary := e.faceFor(sty)
 	if isRuneWhitespace(runeValue) {
-		return e.faceFor(sty)
+		return primary
 	}
 
+	if primary != nil && primary.GlyphID(runeValue) != 0 {
+		return primary
+	}
+
+	return e.faceForRuneFallback(sty, runeValue, primary)
+}
+
+// faceForRuneFallback resolves and caches a non-primary face for a missing glyph.
+func (e *engine) faceForRuneFallback(sty ResolvedStyle, runeValue rune, primary *pdf.Font) *pdf.Font {
 	key := faceRuneKey{
-		family: strings.Join(sty.FontFamily, ","),
-		weight: sty.FontWeight,
-		italic: sty.FontItalic,
-		r:      runeValue,
+		famHash: hashFontFamily(sty.FontFamily),
+		weight:  sty.FontWeight,
+		italic:  sty.FontItalic,
+		r:       runeValue,
 	}
 	if e.faceByRune != nil {
 		if f, ok := e.faceByRune[key]; ok {
@@ -295,6 +374,10 @@ func (e *engine) faceForRune(sty ResolvedStyle, runeValue rune) *pdf.Font {
 	}
 
 	f := e.lookupFaceForRune(sty, runeValue)
+	if f == nil {
+		f = primary
+	}
+
 	if e.faceByRune == nil {
 		e.faceByRune = make(map[faceRuneKey]*pdf.Font)
 	}
@@ -348,8 +431,13 @@ func (e *engine) registryFamilyWithGlyph(style ResolvedStyle, runeValue rune) *p
 		return nil
 	}
 
+	// Reuse a one-element slice header so Lookup does not allocate per family.
+	var one [1]string
+
 	for _, fam := range style.FontFamily {
-		f := e.registry.Lookup([]string{fam}, style.FontWeight, style.FontItalic)
+		one[0] = fam
+
+		f := e.registry.Lookup(one[:], style.FontWeight, style.FontItalic)
 		if f != nil && f.GlyphID(runeValue) != 0 {
 			return f
 		}
@@ -441,6 +529,10 @@ func (e *engine) pushZ(style ResolvedStyle) (int, bool, bool) {
 		e.zIndexSet = true
 	}
 
+	if style.HasTransform || style.Opacity < 1 {
+		e.needsXformStamp = true
+	}
+
 	return prevZ, prevSet, prevPositioned
 }
 
@@ -499,7 +591,7 @@ func LayoutContext(ctx context.Context, //nolint:revive,contextcheck // legacy L
 // for clarity).
 func newEngine(
 	ctx context.Context, root *html.Node, opts Options,
-	faces *pdf.FaceSet, font *pdf.Font, styles map[*html.Node]ResolvedStyle, containers map[*html.Node]sizeContainer,
+	faces *pdf.FaceSet, font *pdf.Font, styles map[*html.Node]*ResolvedStyle, containers map[*html.Node]sizeContainer,
 ) *engine {
 	return &engine{ //nolint:exhaustruct // intentional zero fields
 		opts:       opts,
@@ -508,7 +600,6 @@ func newEngine(
 		faces:      faces,
 		registry:   opts.Registry,
 		styles:     styles,
-		stylePtrs:  make(map[*html.Node]*ResolvedStyle),
 		scale:      zoomScale(opts.Zoom),
 		containers: containers,
 		ops:        make([]Op, 0, estimateOpCapacity(root)),
@@ -546,7 +637,10 @@ func finalizeResult(eng *engine, root *html.Node, opts Options) (*Result, error)
 	}
 	// Paint-time CSS transforms/opacity: stamp composed CTMs after geometry
 	// is final so transform-origin % resolves against the border box.
-	stampBoxTransforms(boxNode, IdentityMatrix(), res.Ops)
+	// Skip the full tree walk when no element had transform/opacity.
+	if eng.needsXformStamp {
+		stampBoxTransforms(boxNode, IdentityMatrix(), res.Ops)
+	}
 
 	return res, nil
 }
@@ -557,7 +651,7 @@ func finalizeResult(eng *engine, root *html.Node, opts Options) (*Result, error)
 // size containers matched).
 func resolveStylesForLayout(
 	root *html.Node, opts Options,
-) (map[*html.Node]ResolvedStyle, map[*html.Node]sizeContainer) {
+) (map[*html.Node]*ResolvedStyle, map[*html.Node]sizeContainer) {
 	// Pass 1: cascade without @container (used sizes unknown).
 	styles := resolveStylesWith(root, opts, nil)
 
@@ -596,16 +690,22 @@ func sameSizeContainers(a, b map[*html.Node]sizeContainer) bool {
 }
 
 func (e *engine) stylePtr(node *html.Node) *ResolvedStyle {
-	if p, ok := e.stylePtrs[node]; ok {
+	if p := e.styles[node]; p != nil {
 		return p
 	}
 
-	st := e.styles[node]
-	p := new(ResolvedStyle)
-	*p = st
-	e.stylePtrs[node] = p
+	// Missing node (should not happen for walked trees): stable empty style.
+	return &zeroResolvedStyle
+}
 
-	return p
+// styleVal returns a by-value ResolvedStyle for APIs that still take values.
+// Prefer field access on e.styles[node] / stylePtr to avoid the copy.
+func (e *engine) styleVal(node *html.Node) ResolvedStyle {
+	if p := e.styles[node]; p != nil {
+		return *p
+	}
+
+	return ResolvedStyle{} //nolint:exhaustruct // intentional zero fields
 }
 
 func flattenBoxes(boxNode *box, out *[]*box) {
@@ -643,8 +743,11 @@ func estimateOpCapacity(root *html.Node) int {
 
 // box is one laid-out box.
 type box struct {
-	node      *html.Node
-	style     ResolvedStyle
+	node *html.Node
+	// style points at the shared cascade ResolvedStyle (engine.styles).
+	// Using a pointer avoids embedding ~1.3KB of style into every box — table
+	// cells dominate box count on multi-page reports.
+	style     *ResolvedStyle
 	x, y      float64 // border-box top-left
 	w, height float64 // border-box size
 	kind      string  // "block" | "table" | "cell" | "replaced"
@@ -694,11 +797,11 @@ func (e *engine) build(node *html.Node, availW, posX, posY float64) *box {
 		return nil
 	}
 
-	sty := e.styles[node]
-
 	if node.Type == html.TextNode {
 		return nil
 	}
+
+	sty := e.styleVal(node)
 
 	if sty.Display == cssDisplayNone {
 		return nil
@@ -813,7 +916,7 @@ func useBlockForTableDisplay(node *html.Node) bool {
 // buildBlock lays out a block-level box.
 func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, posY float64) *box {
 	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
-		node: node, style: style, kind: displayBlock, x: posX, y: posY,
+		node: node, style: e.stylePtr(node), kind: displayBlock, x: posX, y: posY,
 	}
 	w, margL := resolveBlockWidth(e, style, availW)
 	boxNode.w = w
@@ -827,14 +930,14 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 	contentStart := len(e.ops)
 
 	curY := e.scalePt(style.PaddingTop) + e.scalePt(style.BorderTop.Width)
-	pop, enclose := e.pushBFCFloats(style, contentX, contentW)
+	enclose := e.pushBFCFloats(style, contentX, contentW)
 	curY = e.flowChildren(boxNode, node.Children, style, contentW, contentX, posY, curY)
 
 	if enclose && e.bfcFloats != nil {
 		curY = e.bfcFloats.extentCy(posY, curY)
 	}
 
-	pop()
+	e.popBFCFloats(enclose)
 	// padding-bottom is inside the border box (space above border-bottom /
 	// letterhead rules — fixture-07/16).
 	curY += e.scalePt(style.PaddingBottom)
@@ -1096,22 +1199,32 @@ func (e *engine) markOpsFixed(start, end int) {
 // borderLineOps expands solid/dashed/dotted borders into the line operations
 // consumed by both PDF and raster painting. Keeping the pattern as segments
 // avoids adding a second stroke-style protocol to Op.
+// Prefer appendBorderLineOps / emitBorderLine to avoid per-edge slice headers.
 func borderLineOps(posX, posY, boxW, boxH, width float64, style string, red, green, blue float64) []Op {
+	return appendBorderLineOps(nil, posX, posY, boxW, boxH, width, style, red, green, blue)
+}
+
+// appendBorderLineOps appends border segment ops into dst (may be nil).
+func appendBorderLineOps(
+	dst []Op, posX, posY, boxW, boxH, width float64, style string, red, green, blue float64,
+) []Op {
 	if width <= 0 || style == cssDisplayNone || (boxW <= 0 && boxH <= 0) {
-		return nil
+		return dst
 	}
 
 	if style != borderStyleDashed && style != borderStyleDotted {
-		return []Op{{ //nolint:exhaustruct // intentional zero fields
+		return append(dst, Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpLine, X: posX, Y: posY, W: boxW, H: boxH, Width: width, R: red, G: green, B: blue,
-		}}
+		})
 	}
 
-	return dashedLineSegments(posX, posY, boxW, boxH, width, style == borderStyleDotted, red, green, blue)
+	return appendDashedLineSegments(dst, posX, posY, boxW, boxH, width, style == borderStyleDotted, red, green, blue)
 }
 
-// dashedLineSegments expands a dashed/dotted border edge into segment ops.
-func dashedLineSegments(posX, posY, boxW, boxH, width float64, dotted bool, red, green, blue float64) []Op {
+// appendDashedLineSegments expands a dashed/dotted border edge into segment ops.
+func appendDashedLineSegments(
+	dst []Op, posX, posY, boxW, boxH, width float64, dotted bool, red, green, blue float64,
+) []Op {
 	horizontal := boxW > 0
 	length := boxW
 
@@ -1132,7 +1245,12 @@ func dashedLineSegments(posX, posY, boxW, boxH, width float64, dotted bool, red,
 		gap = 0.5
 	}
 
-	ops := make([]Op, 0, int(length/(drawLen+gap))+1)
+	if n := int(length/(drawLen+gap)) + 1; cap(dst)-len(dst) < n {
+		// Grow once for the expected segment count.
+		grown := make([]Op, len(dst), len(dst)+n)
+		copy(grown, dst)
+		dst = grown
+	}
 
 	for pos := 0.0; pos < length-0.001; pos += drawLen + gap {
 		seg := math.Min(drawLen, length-pos)
@@ -1145,28 +1263,50 @@ func dashedLineSegments(posX, posY, boxW, boxH, width float64, dotted bool, red,
 			segX, segY, segW, segH = posX, posY+pos, 0.0, seg
 		}
 
-		ops = append(ops, Op{ //nolint:exhaustruct // intentional zero fields
+		dst = append(dst, Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpLine, X: segX, Y: segY, W: segW, H: segH,
 			Width: width, R: red, G: green, B: blue,
 		})
 	}
 
-	return ops
+	return dst
+}
+
+// emitBorderLine appends one edge's border segments straight onto e.ops —
+// no intermediate []Op (hot path for collapsed table grids).
+func (e *engine) emitBorderLine(posX, posY, boxW, boxH, width float64, style string, red, green, blue float64) {
+	if width <= 0 || style == cssDisplayNone || (boxW <= 0 && boxH <= 0) {
+		return
+	}
+
+	if style != borderStyleDashed && style != borderStyleDotted {
+		e.add(Op{ //nolint:exhaustruct // intentional zero fields
+			Kind: OpLine, X: posX, Y: posY, W: boxW, H: boxH, Width: width, R: red, G: green, B: blue,
+		})
+
+		return
+	}
+
+	// Dashed/dotted: append into a tiny stack buffer then emit.
+	var buf [8]Op
+	segs := appendDashedLineSegments(buf[:0], posX, posY, boxW, boxH, width, style == borderStyleDotted, red, green, blue)
+	for i := range segs {
+		e.add(segs[i])
+	}
 }
 
 // borderOps returns the four border line ops for the given border box.
 func (e *engine) borderOps(sty ResolvedStyle, posX, posY, wid, height float64) []Op {
-	var ops []Op
+	ops := make([]Op, 0, 4)
 
-	appendSide := func(side border, sx, sy, sw, sh float64) {
-		width := e.scalePt(side.Width)
-		ops = append(ops, borderLineOps(sx, sy, sw, sh, width, side.Style,
-			side.Color[0], side.Color[1], side.Color[2])...)
-	}
-	appendSide(sty.BorderTop, posX, posY, wid, 0)
-	appendSide(sty.BorderRight, posX+wid, posY, 0, height)
-	appendSide(sty.BorderBottom, posX, posY+height, wid, 0)
-	appendSide(sty.BorderLeft, posX, posY, 0, height)
+	ops = appendBorderLineOps(ops, posX, posY, wid, 0, e.scalePt(sty.BorderTop.Width), sty.BorderTop.Style,
+		sty.BorderTop.Color[0], sty.BorderTop.Color[1], sty.BorderTop.Color[2])
+	ops = appendBorderLineOps(ops, posX+wid, posY, 0, height, e.scalePt(sty.BorderRight.Width), sty.BorderRight.Style,
+		sty.BorderRight.Color[0], sty.BorderRight.Color[1], sty.BorderRight.Color[2])
+	ops = appendBorderLineOps(ops, posX, posY+height, wid, 0, e.scalePt(sty.BorderBottom.Width), sty.BorderBottom.Style,
+		sty.BorderBottom.Color[0], sty.BorderBottom.Color[1], sty.BorderBottom.Color[2])
+	ops = appendBorderLineOps(ops, posX, posY, 0, height, e.scalePt(sty.BorderLeft.Width), sty.BorderLeft.Style,
+		sty.BorderLeft.Color[0], sty.BorderLeft.Color[1], sty.BorderLeft.Color[2])
 
 	return ops
 }
@@ -1661,7 +1801,7 @@ func (e *engine) flowOneChild(
 		deferred = append(deferred, node)
 		idx++
 	case isFlowFloat(node, e):
-		cs := e.styles[node]
+		cs := e.styleVal(node)
 		curY = floats.clearFloats(cs.Clear, posY, curY)
 		attachFlowBox(parent, e.placeFloat(node, cs, floats, contentW, contentX, posY, curY), e)
 
@@ -1695,7 +1835,10 @@ func (e *engine) layoutInlineRun(
 	}
 
 	if len(run) > 0 {
-		h := e.layoutInlineFloats(inlineRunParent(parent, sty), run, contentW, contentX, posY+curY, floats)
+		// Pass the real parent only. Synthetic measure-only boxes used to
+		// allocate a full ResolvedStyle per inline run (hot on table cells);
+		// emitLine tolerates a nil box (skips firstBaseline / text-align).
+		h := e.layoutInlineFloats(parent, run, contentW, contentX, posY+curY, floats)
 		curY += h
 
 		if h > 0 {
@@ -1710,8 +1853,10 @@ func (e *engine) layoutInlineRun(
 // elements and pure-whitespace text (so margin collapse between block
 // siblings is not interrupted — fixture-19 margin-bottom between divs).
 func isSkippableFlowNode(node *html.Node, engine *engine) bool {
-	if node.Type == html.ElementNode && engine.styles[node].Display == cssDisplayNone {
-		return true
+	if node.Type == html.ElementNode {
+		if st := engine.styles[node]; st != nil && st.Display == cssDisplayNone {
+			return true
+		}
 	}
 
 	return node.Type == html.TextNode && strings.TrimSpace(node.Text) == ""
@@ -1724,14 +1869,23 @@ func isOutOfFlowNode(node *html.Node, engine *engine) bool {
 		return false
 	}
 
-	pos := engine.styles[node].Position
+	st := engine.styles[node]
+	if st == nil {
+		return false
+	}
 
-	return pos == positionAbsolute || pos == positionFixed
+	return st.Position == positionAbsolute || st.Position == positionFixed
 }
 
 // isFlowFloat reports floated element children.
 func isFlowFloat(node *html.Node, engine *engine) bool {
-	return node.Type == html.ElementNode && engine.styles[node].Float != cssDisplayNone
+	if node.Type != html.ElementNode {
+		return false
+	}
+
+	st := engine.styles[node]
+
+	return st != nil && st.Float != cssDisplayNone
 }
 
 // collectInlineRun gathers a maximal run of inline children starting at idx,
@@ -1771,16 +1925,6 @@ func collectInlineRun(children []*html.Node, idx int, engine *engine) ([]*html.N
 	return run, idx
 }
 
-// inlineRunParent returns the box that owns an inline run, synthesizing a
-// style-only parent when the run has no real parent box (measure passes).
-func inlineRunParent(parent *box, style ResolvedStyle) *box {
-	if parent != nil {
-		return parent
-	}
-
-	return &box{style: style} //nolint:exhaustruct // intentional zero fields
-}
-
 // attachFlowBox appends a built child to its parent and draws the debug
 // outline when DebugBoxes is on.
 func attachFlowBox(parent *box, child *box, engine *engine) {
@@ -1803,7 +1947,7 @@ func attachFlowBox(parent *box, child *box, engine *engine) {
 func (e *engine) layoutBlockChild(
 	node *html.Node, floats *floatState, contentW, contentX, posY, curY, prevBottom float64,
 ) (float64, float64, *box) {
-	cstate := e.styles[node]
+	cstate := e.styleVal(node)
 	// In-flow tables always clear below preceding floats (deterministic
 	// report policy). Shrink-to-fit / squeeze-beside is unsupported.
 	clearVal := cstate.Clear
@@ -1836,18 +1980,50 @@ func (e *engine) layoutBlockChild(
 // establishes a BFC (or is the root), a fresh state is used and enclose is
 // true so the caller should extend height with extentCy. Otherwise the
 // parent BFC's state is reused and floats may protrude.
-func (e *engine) pushBFCFloats(style ResolvedStyle, contentX, contentW float64) (func(), bool) {
-	prev := e.bfcFloats
-	pop := func() { e.bfcFloats = prev }
-
-	if prev == nil || establishesBFC(style) {
-		fs := newFloatState(contentX, contentW)
-		e.bfcFloats = &fs
-
-		return pop, true
+//
+// Pair every push with popBFCFloats(enclose). No per-call closure is allocated.
+func (e *engine) pushBFCFloats(style ResolvedStyle, contentX, contentW float64) bool {
+	if e.bfcFloats != nil && !establishesBFC(style) {
+		return false
 	}
 
-	return pop, false
+	e.bfcStack = append(e.bfcStack, e.bfcFloats)
+
+	var fs *floatState
+	if n := len(e.bfcPool); n > 0 {
+		fs = e.bfcPool[n-1]
+		e.bfcPool = e.bfcPool[:n-1]
+	} else {
+		fs = new(floatState)
+	}
+
+	*fs = newFloatState(contentX, contentW)
+	e.bfcFloats = fs
+
+	return true
+}
+
+// popBFCFloats restores the BFC float state installed by a matching
+// pushBFCFloats that returned enclose=true.
+func (e *engine) popBFCFloats(enclose bool) {
+	if !enclose {
+		return
+	}
+
+	if cur := e.bfcFloats; cur != nil {
+		*cur = floatState{} //nolint:exhaustruct // clear before pool reuse
+		e.bfcPool = append(e.bfcPool, cur)
+	}
+
+	n := len(e.bfcStack)
+	if n == 0 {
+		e.bfcFloats = nil
+
+		return
+	}
+
+	e.bfcFloats = e.bfcStack[n-1]
+	e.bfcStack = e.bfcStack[:n-1]
 }
 
 // emitListMarker paints the list marker in the marker area to the left of
@@ -2242,9 +2418,14 @@ func collapseMargins(acc, boxN float64) float64 {
 }
 
 func (e *engine) emitBorders(st ResolvedStyle, x, y, w, h float64) {
-	for _, op := range e.borderOps(st, x, y, w, h) {
-		e.add(op)
-	}
+	e.emitBorderLine(x, y, w, 0, e.scalePt(st.BorderTop.Width), st.BorderTop.Style,
+		st.BorderTop.Color[0], st.BorderTop.Color[1], st.BorderTop.Color[2])
+	e.emitBorderLine(x+w, y, 0, h, e.scalePt(st.BorderRight.Width), st.BorderRight.Style,
+		st.BorderRight.Color[0], st.BorderRight.Color[1], st.BorderRight.Color[2])
+	e.emitBorderLine(x, y+h, w, 0, e.scalePt(st.BorderBottom.Width), st.BorderBottom.Style,
+		st.BorderBottom.Color[0], st.BorderBottom.Color[1], st.BorderBottom.Color[2])
+	e.emitBorderLine(x, y, 0, h, e.scalePt(st.BorderLeft.Width), st.BorderLeft.Style,
+		st.BorderLeft.Color[0], st.BorderLeft.Color[1], st.BorderLeft.Color[2])
 }
 
 // --- replaced elements ---
@@ -2423,7 +2604,7 @@ func (e *engine) imageMaxWidth(style ResolvedStyle, cssW bool) float64 {
 
 func (e *engine) buildImage(n *html.Node, sty ResolvedStyle, posX, posY float64) *box {
 	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
-		node: n, style: sty, kind: "replaced", x: posX, y: posY,
+		node: n, style: e.stylePtr(n), kind: "replaced", x: posX, y: posY,
 	}
 	boxNode.img = e.resolveImage(n.Attribute("src"))
 	size := e.usedImageSize(n, sty, boxNode.img)
@@ -2452,7 +2633,7 @@ func (e *engine) buildImage(n *html.Node, sty ResolvedStyle, posX, posY float64)
 
 func (e *engine) buildHR(n *html.Node, sty ResolvedStyle, availW, posX, posY float64) *box {
 	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
-		node: n, style: sty, kind: "replaced", x: posX, y: posY, w: availW,
+		node: n, style: e.stylePtr(n), kind: "replaced", x: posX, y: posY, w: availW,
 	}
 	if sty.Width >= 0 {
 		boxNode.w = e.scalePt(sty.Width)
@@ -2551,7 +2732,7 @@ func (e *engine) buildTable(node *html.Node, style ResolvedStyle, availW, posX, 
 	headerRows = resolveHeaderRows(rows, headerRows)
 
 	tableBox := &box{ //nolint:exhaustruct // intentional zero fields
-		node: node, style: style, kind: displayTable, x: posX, y: posY, headerRows: headerRows,
+		node: node, style: e.stylePtr(node), kind: displayTable, x: posX, y: posY, headerRows: headerRows,
 	}
 	if len(rows) == 0 {
 		return tableBox
@@ -2855,7 +3036,7 @@ func (e *engine) measureTableColumns(
 		cell := e.buildCell(page.node, page.col, page.cSpan)
 		cell.row, cell.rowSpan = page.row, page.rSpan
 		cellData[page.row] = append(cellData[page.row], cell)
-		cstate := e.styles[page.node]
+		cstate := e.styleVal(page.node)
 
 		switch {
 		case page.cSpan == 1:
@@ -3191,10 +3372,8 @@ func (s *rowGridStroker) hline(x0, x1, yy float64, side border) {
 		return
 	}
 
-	for _, op := range borderLineOps(x0, yy, x1-x0, 0,
-		s.e.scalePt(side.Width), side.Style, side.Color[0], side.Color[1], side.Color[2]) {
-		s.e.add(op)
-	}
+	s.e.emitBorderLine(x0, yy, x1-x0, 0,
+		s.e.scalePt(side.Width), side.Style, side.Color[0], side.Color[1], side.Color[2])
 }
 
 func (s *rowGridStroker) vline(xx, ya, yb float64, side border) {
@@ -3202,10 +3381,8 @@ func (s *rowGridStroker) vline(xx, ya, yb float64, side border) {
 		return
 	}
 
-	for _, op := range borderLineOps(xx, ya, 0, yb-ya,
-		s.e.scalePt(side.Width), side.Style, side.Color[0], side.Color[1], side.Color[2]) {
-		s.e.add(op)
-	}
+	s.e.emitBorderLine(xx, ya, 0, yb-ya,
+		s.e.scalePt(side.Width), side.Style, side.Color[0], side.Color[1], side.Color[2])
 }
 
 func borderVisible(side border) bool {
@@ -3342,9 +3519,9 @@ func rowspanCellCovers(tableBox *box, rowIdx, leftCol, rightCol int) bool {
 // width after column sizing, or narrow max-content widths force false wraps
 // and inflate row heights (empty bands under single-line cell text).
 func (e *engine) buildCell(n *html.Node, col, span int) *box {
-	st := e.styles[n]
+	st := e.stylePtr(n)
 	b := &box{node: n, style: st, kind: "cell", col: col, span: span} //nolint:exhaustruct // intentional zero fields
-	b.contentMin, b.contentW = e.measureCellMinMax(n, st)
+	b.contentMin, b.contentW = e.measureCellMinMax(n, *st)
 
 	return b
 }
@@ -3357,7 +3534,7 @@ func (e *engine) measureCellHeight(boxNode *box, width float64) {
 	// Preserve the caller's noEmit flag. Nested tables call this during an
 	// outer measure pass; restoring false mid-measure leaked ops at wrong
 	// positions (fixture-10 nested table borders/text).
-	boxNode.contentH = e.layoutCell(boxNode.node, boxNode.style, width)
+	boxNode.contentH = e.layoutCell(boxNode.node, *boxNode.style, width)
 	e.noEmit = was
 }
 
@@ -3385,7 +3562,7 @@ func (e *engine) cellBG(cell *box) (float64, float64, float64, float64, bool) {
 // skipBorders is set for border-collapse tables whose grid is stroked once
 // by the parent table (avoids doubled/gapped per-cell edges).
 func (e *engine) emitCell(cell *box, skipBorders bool) {
-	sty := cell.style
+	sty := *cell.style
 	start := len(e.ops)
 
 	if e.opts.Background {
@@ -3413,7 +3590,7 @@ func (e *engine) emitCell(cell *box, skipBorders bool) {
 		e.imgMaxW = contentW
 	}
 
-	pop, enclose := e.pushBFCFloats(sty, curX, contentW)
+	enclose := e.pushBFCFloats(sty, curX, contentW)
 	_ = e.flowChildren(cell, cell.node.Children, sty, contentW, curX, 0, curY)
 
 	if enclose && e.bfcFloats != nil {
@@ -3421,7 +3598,7 @@ func (e *engine) emitCell(cell *box, skipBorders bool) {
 		_ = e.bfcFloats.extentCy(0, curY)
 	}
 
-	pop()
+	e.popBFCFloats(enclose)
 
 	e.imgMaxW = oldMax
 	// Rowspan cells with forced multi-line content (wiki Ref: [127]<br>[128]
@@ -3717,28 +3894,48 @@ func (m *cellMeasure) measureText(text string, cstate ResolvedStyle, nowrap bool
 	eng := m.engine
 
 	if !nowrap {
-		// Collapse runs of whitespace to a single space for measure,
-		// matching normal white-space:normal inline layout.
-		fields := strings.Fields(text)
-		if len(fields) == 0 {
+		// Walk words without strings.Fields: no []string or word copies.
+		// Matching white-space:normal — runs of HTML space collapse to one gap.
+		if !hasNonHTMLSpace(text) {
 			return
 		}
 
 		m.lineOnlyNowrap = false
 		m.lineHasInk = true
 
+		spaceW := eng.measureTextFace(" ", cstate)
+
 		// Leading space if original had leading WS and line already started.
 		if m.lineW > 0 && len(text) > 0 && isHTMLSpace(text[0]) {
-			m.lineW += eng.measureTextFace(" ", cstate)
+			m.lineW += spaceW
 		}
 
-		for i, word := range fields {
-			if i > 0 {
-				m.lineW += eng.measureTextFace(" ", cstate)
+		i := 0
+		first := true
+
+		for i < len(text) {
+			for i < len(text) && isHTMLSpace(text[i]) {
+				i++
 			}
 
+			if i >= len(text) {
+				break
+			}
+
+			j := i
+			for j < len(text) && !isHTMLSpace(text[j]) {
+				j++
+			}
+
+			word := text[i:j]
+			if !first {
+				m.lineW += spaceW
+			}
+
+			first = false
 			m.lineW += eng.measureTextFace(word, cstate)
 			m.noteWord(eng.minContentWidth(word, cstate))
+			i = j
 		}
 
 		return
@@ -3747,7 +3944,7 @@ func (m *cellMeasure) measureText(text string, cstate ResolvedStyle, nowrap bool
 	m.lineW += eng.measureTextFace(text, cstate)
 	m.noteWord(eng.minContentWidth(text, cstate))
 
-	if strings.TrimSpace(text) != "" {
+	if hasNonHTMLSpace(text) {
 		m.lineHasInk = true
 	}
 }
@@ -3888,7 +4085,7 @@ func (e *engine) maxRuneWidth(s string, st ResolvedStyle) float64 {
 	var widest float64
 
 	for _, r := range s {
-		w := e.measureTextFace(string(r), st)
+		w := e.measureRuneFace(r, st)
 		if w > widest {
 			widest = w
 		}
@@ -3898,24 +4095,27 @@ func (e *engine) maxRuneWidth(s string, st ResolvedStyle) float64 {
 }
 
 func (e *engine) maxSoftSegmentWidth(cssS string, sty ResolvedStyle) float64 {
-	runes := []rune(cssS)
-	if len(runes) == 0 {
+	if cssS == "" {
 		return 0
 	}
 
 	var widest, cur float64
 
-	for i, r := range runes {
-		rw := e.measureTextFace(string(r), sty)
-
-		cur += rw
-		if isSoftWrapRune(r, softBreakWord) || i == len(runes)-1 {
+	for _, r := range cssS {
+		cur += e.measureRuneFace(r, sty)
+		// Soft-break runes end a min-content segment; residual after the
+		// last break is flushed below (covers tokens with no soft points).
+		if isSoftWrapRune(r, softBreakWord) {
 			if cur > widest {
 				widest = cur
 			}
 
 			cur = 0
 		}
+	}
+
+	if cur > widest {
+		widest = cur
 	}
 
 	if widest <= 0 {
@@ -4042,6 +4242,18 @@ func isHTMLSpace(b byte) bool {
 	return b == ' ' || b == '\t' || b == '\n' || b == '\r' || b == '\f'
 }
 
+// hasNonHTMLSpace reports that s contains at least one non-HTML-whitespace byte.
+// Used instead of strings.TrimSpace(s) != "" to avoid the TrimSpace string header.
+func hasNonHTMLSpace(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if !isHTMLSpace(s[i]) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // measureImageWidth returns the same used content width that buildImage and
 // inline painting use. Keeping intrinsic/attribute/CSS/max/containing-block
 // policy in usedImageSize prevents float/table shrink-to-fit from disagreeing
@@ -4066,7 +4278,7 @@ func (e *engine) measureLargestImageWidth(node *html.Node) float64 {
 	walk = func(node *html.Node) {
 		if node.Type == html.ElementNode {
 			if node.Name == cssTagImg {
-				st := e.styles[node]
+				st := e.styleVal(node)
 				if w := e.measureImageWidth(node, st); w > best {
 					best = w
 				}
@@ -4086,14 +4298,14 @@ func (e *engine) measureLargestImageWidth(node *html.Node) float64 {
 func (e *engine) layoutCell(n *html.Node, sty ResolvedStyle, width float64) float64 {
 	_, contentW := e.contentBox(0, width, sty)
 	curY := e.scalePt(sty.PaddingTop) + e.scalePt(sty.BorderTop.Width)
-	pop, enclose := e.pushBFCFloats(sty, 0, contentW)
+	enclose := e.pushBFCFloats(sty, 0, contentW)
 	curY = e.flowChildren(nil, n.Children, sty, contentW, 0, 0, curY)
 
 	if enclose && e.bfcFloats != nil {
 		curY = e.bfcFloats.extentCy(0, curY)
 	}
 
-	pop()
+	e.popBFCFloats(enclose)
 
 	return curY + e.scalePt(sty.PaddingBottom) + e.scalePt(sty.BorderBottom.Width)
 }

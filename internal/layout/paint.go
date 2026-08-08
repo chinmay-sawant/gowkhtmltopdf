@@ -825,18 +825,24 @@ func capTableMaxPage(res *Result, contentH float64) int {
 func collectTableBorderSegments(res *Result) ([]vseg, []hseg, map[int][]vseg, map[int][]vseg, map[int][]hseg) {
 	verts, horiz := collectBorderSegmentOps(res.Ops)
 
-	// Group verticals that share a start Y (row top) or end Y (row bottom).
-	vertStarts := map[int][]vseg{}
-	vertEnds := map[int][]vseg{}
-	horizByY := map[int][]hseg{}
+	// Pre-size maps from segment count so rehash churn stays low on table-
+	// heavy multi-page documents (each row contributes several segments).
+	estY := len(verts)/2 + len(horiz)/4 + 8
+	vertStarts := make(map[int][]vseg, estY)
+	vertEnds := make(map[int][]vseg, estY)
+	horizByY := make(map[int][]hseg, estY)
 
-	for _, v := range verts {
-		vertStarts[roundY(v.y0)] = append(vertStarts[roundY(v.y0)], v)
-		vertEnds[roundY(v.y1)] = append(vertEnds[roundY(v.y1)], v)
+	for i := range verts {
+		v := verts[i]
+		k0, k1 := roundY(v.y0), roundY(v.y1)
+		vertStarts[k0] = append(vertStarts[k0], v)
+		vertEnds[k1] = append(vertEnds[k1], v)
 	}
 
-	for _, h := range horiz {
-		horizByY[roundY(h.y)] = append(horizByY[roundY(h.y)], h)
+	for i := range horiz {
+		h := horiz[i]
+		ky := roundY(h.y)
+		horizByY[ky] = append(horizByY[ky], h)
 	}
 
 	return verts, horiz, vertStarts, vertEnds, horizByY
@@ -845,9 +851,27 @@ func collectTableBorderSegments(res *Result) ([]vseg, []hseg, map[int][]vseg, ma
 // collectBorderSegmentOps gathers non-fixed line ops as vertical or horizontal
 // border segments.
 func collectBorderSegmentOps(ops []Op) ([]vseg, []hseg) {
-	var verts []vseg
+	// First pass: count so we allocate exact-capacity slices once.
+	nVert, nHoriz := 0, 0
+	for i := range ops {
+		paintOp := &ops[i]
+		if paintOp.Fixed || paintOp.Kind != OpLine {
+			continue
+		}
 
-	var horiz []hseg
+		if paintOp.H > 2 && (paintOp.W < 1 || paintOp.W < paintOp.H*0.05) {
+			nVert++
+
+			continue
+		}
+
+		if paintOp.W > 2 && paintOp.H < 1 {
+			nHoriz++
+		}
+	}
+
+	verts := make([]vseg, 0, nVert)
+	horiz := make([]hseg, 0, nHoriz)
 
 	for i := range ops {
 		paintOp := &ops[i]

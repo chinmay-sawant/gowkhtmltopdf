@@ -57,7 +57,7 @@ type flexPlacedItem struct {
 func (e *engine) buildFlex(node *html.Node, sty ResolvedStyle, availW, x, posY float64) *box {
 	ml := e.scalePt(sty.MarginLeft)
 	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
-		node: node, style: sty, kind: displayBlock, x: x + ml, y: posY,
+		node: node, style: e.stylePtr(node), kind: displayBlock, x: x + ml, y: posY,
 	}
 	boxNode.w = resolveUsedWidth(sty, availW, e)
 	contentX, contentW := e.contentBox(boxNode.x, boxNode.w, sty)
@@ -173,7 +173,7 @@ func (e *engine) flexRowItems(kids []*html.Node, contentW float64) []flexMeas {
 		}
 
 		items = append(items, flexMeas{
-			n: kid, baseW: e.flexItemBaseWidth(kid, cstate, contentW),
+			n: kid, baseW: e.flexItemBaseWidth(kid, *cstate, contentW),
 			grow: grow, shrink: shrink, order: cstate.FlexOrder,
 		})
 	}
@@ -389,12 +389,12 @@ func (e *engine) flexMinMainSize(item flexMeas, mainSize float64) float64 {
 		floor = e.scalePt(cstate.MinWidth)
 	}
 	// Automatic minimum (min-width:auto): content size suggestion.
-	intr := e.measureCellContent(item.n, cstate)
+	intr := e.measureCellContent(item.n, *cstate)
 	pad := e.scalePt(cstate.PaddingLeft) + e.scalePt(cstate.PaddingRight) +
 		e.scalePt(cstate.BorderLeft.Width) + e.scalePt(cstate.BorderRight.Width)
 	contentSug := intr + pad
 	// Specified size suggestion when width/% is definite against mainSize.
-	specSug := e.flexSpecifiedWidthSuggestion(cstate, item.baseW, mainSize, pad)
+	specSug := e.flexSpecifiedWidthSuggestion(*cstate, item.baseW, mainSize, pad)
 
 	autoMin := contentSug
 	if specSug >= 0 && specSug < autoMin {
@@ -710,6 +710,9 @@ func (e *engine) forceFlexItemCrossSize(node *html.Node, forceH float64) {
 	}
 
 	cstate := e.styles[node]
+	if cstate == nil {
+		return
+	}
 
 	if cstate.BoxSizing == borderBox {
 		cstate.Height = forceH / e.scale
@@ -722,8 +725,6 @@ func (e *engine) forceFlexItemCrossSize(node *html.Node, forceH float64) {
 
 		cstate.Height = inner / e.scale
 	}
-
-	e.styles[node] = cstate
 }
 
 func (e *engine) buildRowItems(
@@ -738,7 +739,7 @@ func (e *engine) buildRowItems(
 		cstate := e.styles[item.n]
 		origH := cstate.Height
 
-		forceStretch := flexItemCrossStretch(style, cstate) && targetCross > 0
+		forceStretch := flexItemCrossStretch(style, *cstate) && targetCross > 0
 		if forceStretch {
 			// Used cross size = line cross size (border box), matching column
 			// main-size forcing so backgrounds fill the flex line (fixture-33).
@@ -749,7 +750,6 @@ func (e *engine) buildRowItems(
 
 		if forceStretch {
 			cstate.Height = origH
-			e.styles[item.n] = cstate
 		}
 
 		if cblock == nil {
@@ -899,14 +899,14 @@ func (e *engine) flexMinCrossMainSize(node *html.Node, baseH, mainSize float64) 
 	padV := e.scalePt(cstate.PaddingTop) + e.scalePt(cstate.PaddingBottom) +
 		e.scalePt(cstate.BorderTop.Width) + e.scalePt(cstate.BorderBottom.Width)
 	start := len(e.ops)
-	contentSug := e.layoutCell(node, cstate, infiniteMeasure)
+	contentSug := e.layoutCell(node, *cstate, infiniteMeasure)
 	e.ops = e.ops[:start]
 
 	if contentSug < padV {
 		contentSug = padV + e.scalePt(cstate.FontSize)*defaultLineHeightRatio
 	}
 
-	specSug := e.flexSpecifiedHeightSuggestion(cstate, baseH, mainSize, padV)
+	specSug := e.flexSpecifiedHeightSuggestion(*cstate, baseH, mainSize, padV)
 
 	autoMin := contentSug
 	if specSug >= 0 && specSug < autoMin {
@@ -990,7 +990,7 @@ func (e *engine) flexColumnItems(kids []*html.Node, contentW, contentH float64) 
 		}
 
 		items = append(items, flexColMeas{
-			n: kid, baseH: e.flexItemBaseHeight(kid, cstate, contentW, contentH),
+			n: kid, baseH: e.flexItemBaseHeight(kid, *cstate, contentW, contentH),
 			grow: grow, shrink: shrink,
 		})
 	}
@@ -1137,7 +1137,6 @@ func (e *engine) buildColumnItems(
 
 		cblock := e.build(item.n, contentW, contentX, topY+leftY)
 		cstate.Height = origH
-		e.styles[item.n] = cstate
 
 		if cblock == nil {
 			leftY += heights[idx]
@@ -1154,7 +1153,7 @@ func (e *engine) buildColumnItems(
 		cblock.x += dx
 		cblock.y += dy
 
-		e.alignColumnItem(cblock, style, cstate, contentX, contentW)
+		e.alignColumnItem(cblock, style, *cstate, contentX, contentW)
 
 		if parent != nil {
 			parent.children = append(parent.children, cblock)

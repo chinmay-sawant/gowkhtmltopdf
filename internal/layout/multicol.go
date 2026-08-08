@@ -32,7 +32,7 @@ type multicolSeg struct {
 // path (best-effort; not Chrome-balanced with floats).
 func (e *engine) buildMulticol(node *html.Node, style ResolvedStyle, availW, x, yPos float64) *box {
 	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
-		node: node, style: style, kind: displayBlock, x: x, y: yPos,
+		node: node, style: e.stylePtr(node), kind: displayBlock, x: x, y: yPos,
 	}
 	boxNode.w = resolveUsedWidth(style, availW, e)
 	boxNode.x = x + e.multicolAutoMargin(style, availW, boxNode.w)
@@ -142,14 +142,14 @@ func multicolKids(n *html.Node, e *engine) []*html.Node {
 func (e *engine) flowMulticolSingleColumn(
 	boxNode *box, node *html.Node, style ResolvedStyle, contentX, contentW, yPos, curY float64, contentStart int,
 ) *box {
-	pop, enclose := e.pushBFCFloats(style, contentX, contentW)
+	enclose := e.pushBFCFloats(style, contentX, contentW)
 	curY = e.flowChildren(boxNode, node.Children, style, contentW, contentX, yPos, curY)
 
 	if enclose && e.bfcFloats != nil {
 		curY = e.bfcFloats.extentCy(yPos, curY)
 	}
 
-	pop()
+	e.popBFCFloats(enclose)
 
 	boxNode.height = clampMulticolHeight(curY, style, e)
 	e.prependChrome(contentStart, boxNode, style, boxNode.x, yPos, boxNode.w, boxNode.height)

@@ -68,15 +68,14 @@ image mode renders one raster canvas.
 
 | Workload | 2 | 5 | 10 | 20 | 50 | 100 | 200 | 250 | 500 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| PDF pages | 7.8ms | 16.0ms | 33.0ms | 59.9ms | 159ms | 348ms | 700ms | 854ms | 3.09s |
-| Template + PDF pages | 6.0ms | 15.2ms | 31.8ms | 57.5ms | 165ms | 324ms | 709ms | 891ms | 3.03s |
+| PDF pages | 5.5ms | 11.8ms | 21.0ms | 46.0ms | 113ms | 239ms | 695ms | 1.13s | 2.10s |
+| Template + PDF pages | 4.0ms | 10.8ms | 20.7ms | 41.8ms | 102ms | 237ms | 465ms | 579ms | 1.93s |
 | Web-fetch image tiles | 257.33ms | 258.05ms | 281.10ms | 310.47ms | 356.66ms | 413.68ms | 506.42ms | 564.00ms | 970.72ms |
 | Inline image tiles | 209.50ms | 220.61ms | 255.35ms | 282.33ms | 303.54ms | 340.31ms | 439.46ms | 491.22ms | 788.43ms |
 
-PDF / Template rows: post-optimization baseline on `feature/optimization`
-(2026-08-08). 500-page PDF is count-3 median (~3.09s / 2.47GB / 5.91M allocs);
-smaller sizes are one-shot. Image-tile rows are still the prior full-matrix
-snapshot.
+PDF / Template: heavy-opt wave on `feature/optimization` (2026-08-08). 500-page
+PDF is count-3 median (**~2.10s / 1.48GB / 3.93M allocs**). Image-tile rows
+unchanged.
 
 The raw `go test` output, including allocations, is in
 [`benchmark-results.txt`](benchmark-results.txt). The benchmark implementation
