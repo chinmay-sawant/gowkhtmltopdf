@@ -2437,35 +2437,35 @@ func boxInkExtent(res *Result, boxNode *box) float64 {
 }
 
 // beforeAlways walks pre-order and moves page-break-before: always boxes to a
-// fresh page after everything preceding them.
+// fresh page after everything preceding them. Every matching box is handled in
+// one walk so multi-section reports (benchmarks, long fixtures) are not capped
+// by the outer fixpoint iteration budget. After each shift, prefix maxima are
+// rebuilt because later ops and boxes have moved.
 func beforeAlways(res *Result, contentH float64) bool {
 	if res == nil || res.root == nil || contentH <= 0 {
 		return false
 	}
-	// The previous implementation recomputed the maximum Y of every prefix
-	// once per forced-break box. Build the same mutation-safe metadata once per
-	// pass instead; a successful shift returns immediately and the next pass
-	// rebuilds the prefix from the updated operation coordinates.
-	prefixMaxY := prefixMaxOfOps(res.Ops)
 
-	var walk func(b *box) bool
-	walk = func(boxNode *box) bool {
+	prefixMaxY := prefixMaxOfOps(res.Ops)
+	changed := false
+
+	var walk func(b *box)
+	walk = func(boxNode *box) {
 		if boxNode.style.PageBreakBefore == pageBreakAlways {
 			if shiftForcedBreak(res, boxNode, prefixMaxY, contentH) {
-				return true
+				prefixMaxY = prefixMaxOfOps(res.Ops)
+				changed = true
 			}
 		}
 
 		for _, c := range boxNode.children {
-			if walk(c) {
-				return true
-			}
+			walk(c)
 		}
-
-		return false
 	}
 
-	return walk(res.root)
+	walk(res.root)
+
+	return changed
 }
 
 // prefixMaxOfOps returns prefixMax[i] = max Y of ops[0:i].
