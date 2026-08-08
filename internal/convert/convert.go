@@ -25,6 +25,13 @@ import (
 // mmToPt converts millimetres to PostScript points.
 const mmToPt = 72.0 / 25.4
 
+// smartShrinkMinOverflow is the smallest content overflow (in points) that
+// justifies a full smart-shrink re-layout. Sub-tenth-point overflows are
+// float rounding in box geometry (the benchmark report overflows its 538.6pt
+// content area by 0.00pt and re-laid out 500 pages at zoom 1.000); zooming
+// a whole document for an invisible hair costs a second full layout pass.
+const smartShrinkMinOverflow = 0.1
+
 // progressComplete is the final progress percentage reported to the CLI.
 const progressComplete = 100
 
@@ -708,7 +715,7 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 
 	if req.Global.SmartShrinking { //nolint:nestif // sequential width-check/zoom/relayout steps
 		contentW := state.geom.contentW
-		if contentW2 := measuredWidth(lres); contentW2 > contentW {
+		if contentW2 := measuredWidth(lres); contentW2 > contentW+smartShrinkMinOverflow {
 			// Smart shrinking: scale-to-width re-layout. The layout engine
 			// scales everything by Options.Zoom; the page geometry is
 			// unchanged, so the content fits the content area. A user

@@ -36,6 +36,10 @@ const (
 // weight (CSS Fonts 3 §3.3; clamped by the 100..900 numeric range).
 const fontWeightStep = 100
 
+// asciiFoldBit is the single-bit mask that lowercases an ASCII letter
+// (s[i]|asciiFoldBit maps 'A'-'Z' to 'a'-'z').
+const asciiFoldBit = 0x20
+
 // ResolvedStyle is the used style of one element: values the layout engine
 // consumes, in points (or unitless where noted). Only the phase-04 subset is
 // modeled; everything else keeps its initial value.
@@ -348,14 +352,14 @@ func resolveStylesCtx(root *html.Node, ctx *styleContext) map[*html.Node]*Resolv
 		// Text nodes have no declarations of their own. Pointing them at the
 		// already-resolved parent avoids allocating another full style copy per
 		// text-bearing element while preserving inherited text properties.
-		for _, c := range node.Children {
-			if c.Type == html.TextNode {
-				out[c] = sty
+		for _, child := range node.Children {
+			if child.Type == html.TextNode {
+				out[child] = sty
 
 				continue
 			}
 
-			walk(c, sty)
+			walk(child, sty)
 		}
 	}
 	walk(root, nil)
@@ -366,7 +370,9 @@ func resolveStylesCtx(root *html.Node, ctx *styleContext) map[*html.Node]*Resolv
 // countStyleSlots counts the nodes needed for the result map and the element
 // ResolvedStyle values that will live in one stable backing array. Text nodes
 // point at their parent style and therefore consume no style slots.
-func countStyleSlots(root *html.Node) (nodeCount, styleCount int) {
+func countStyleSlots(root *html.Node) (int, int) {
+	nodeCount, styleCount := 0, 0
+
 	var walk func(*html.Node)
 	walk = func(node *html.Node) {
 		nodeCount++
@@ -374,6 +380,8 @@ func countStyleSlots(root *html.Node) (nodeCount, styleCount int) {
 		switch node.Type {
 		case html.ElementNode:
 			styleCount++
+		// Text/comment/doctype nodes consume no style slot.
+		case html.TextNode, html.CommentNode, html.DoctypeNode:
 		}
 
 		for _, child := range node.Children {
@@ -385,7 +393,6 @@ func countStyleSlots(root *html.Node) (nodeCount, styleCount int) {
 
 			walk(child)
 		}
-
 	}
 
 	walk(root)
@@ -445,13 +452,13 @@ func resolveElementStyle(
 func mergeCustomProps(parentProps map[string]string, raw map[string]string) map[string]string {
 	var declared map[string]string
 
-	for prop, v := range raw {
+	for prop, value := range raw {
 		if strings.HasPrefix(prop, "--") {
 			if declared == nil {
 				declared = make(map[string]string)
 			}
 
-			declared[prop] = v
+			declared[prop] = value
 		}
 	}
 
@@ -465,6 +472,8 @@ func mergeCustomProps(parentProps map[string]string, raw map[string]string) map[
 // resolveRawVars expands var() in cascaded property values using customProps.
 // Custom property keys (--*) are left unchanged (already resolved in the map).
 // When no value contains var(), raw is returned as-is (no map copy).
+//
+//nolint:cyclop // hot path; flat scan then expand of var() refs stays readable
 func resolveRawVars(raw map[string]string, customProps map[string]string) map[string]string {
 	if len(raw) == 0 {
 		return raw
@@ -520,7 +529,7 @@ func resolveRawVars(raw map[string]string, customProps map[string]string) map[st
 // without allocating a lowercased copy of s.
 func containsVarFunc(s string) bool {
 	for i := 0; i+4 <= len(s); i++ {
-		if (s[i]|0x20) == 'v' && (s[i+1]|0x20) == 'a' && (s[i+2]|0x20) == 'r' && s[i+3] == '(' {
+		if (s[i]|asciiFoldBit) == 'v' && (s[i+1]|asciiFoldBit) == 'a' && (s[i+2]|asciiFoldBit) == 'r' && s[i+3] == '(' {
 			return true
 		}
 	}
@@ -643,6 +652,7 @@ func (ctx *styleContext) matchedRules(node *html.Node, pseudoElem string) []rule
 	for _, sheet := range ctx.sheets {
 		hits = ctx.appendSheetRuleHits(hits, sheet, node, pseudoElem)
 	}
+
 	ctx.ruleHits = hits
 
 	return hits
@@ -671,11 +681,6 @@ func (ctx *styleContext) appendSheetRuleHits(
 	return hits
 }
 
-// sheetRuleHits walks one stylesheet's rules (test/helper path).
-func (ctx *styleContext) sheetRuleHits(sheet *css.Stylesheet, node *html.Node, pseudoElem string) []ruleHit {
-	return ctx.appendSheetRuleHits(nil, sheet, node, pseudoElem)
-}
-
 // appendRuleSelectorHits appends matching selectors of one rule into hits.
 func (ctx *styleContext) appendRuleSelectorHits(
 	hits []ruleHit, rule css.Rule, node *html.Node, pseudoElem string,
@@ -690,11 +695,6 @@ func (ctx *styleContext) appendRuleSelectorHits(
 	}
 
 	return hits
-}
-
-// ruleSelectorHits scores every selector of one rule that matches the node.
-func (ctx *styleContext) ruleSelectorHits(rule css.Rule, node *html.Node, pseudoElem string) []ruleHit {
-	return ctx.appendRuleSelectorHits(nil, rule, node, pseudoElem)
 }
 
 // selectorMatches reports whether sel matches node, using the pseudo-shape
@@ -740,6 +740,8 @@ type cascadeWin struct {
 // cascadeRaw returns the winning declaration per property for the element
 // across UA sheet, author sheets and the inline style attribute.
 // Uses one winner map (value+spec+order+important) instead of six maps.
+//
+//nolint:cyclop // hot path; three fixed cascade tiers read clearer than one loop
 func cascadeRaw(ctx *styleContext, node *html.Node) map[string]string {
 	var wins map[string]cascadeWin
 	if ctx == nil {
@@ -810,6 +812,7 @@ func applyCascadeWin(
 	prop, value string, ids, classes, types, order int, important bool,
 ) {
 	prop = strings.ToLower(prop)
+
 	cur, ok := wins[prop]
 	if !ok {
 		wins[prop] = cascadeWin{
@@ -948,6 +951,7 @@ func applyRestProps(
 
 	for i := range restShorthandProps {
 		prop := restShorthandProps[i]
+
 		value, ok := raw[prop]
 		if !ok {
 			continue
@@ -2446,6 +2450,7 @@ func setFourMargin(sty *ResolvedStyle, value string, fsize, ctxW float64) {
 
 func setFour(_ *ResolvedStyle, value string, top, right, bottom, left *float64, fsVal, ctxW float64) {
 	var val [4]string
+
 	count := splitSpaceTokens(value, val[:])
 	if count == 0 {
 		return
@@ -2522,6 +2527,7 @@ func parseBorder(value string, _ float64) (border, bool) {
 // preserve strings.Fields' len>4 behavior without allocating a larger slice.
 func splitSpaceTokens(value string, tokens []string) int {
 	count := 0
+
 	for start := 0; ; {
 		token, next, ok := nextSpaceToken(value, start)
 		if !ok {
@@ -2541,6 +2547,7 @@ func nextSpaceToken(value string, start int) (string, int, bool) {
 	for start < len(value) && isCSSSpace(value[start]) {
 		start++
 	}
+
 	if start == len(value) {
 		return "", start, false
 	}

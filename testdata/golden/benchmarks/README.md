@@ -66,34 +66,48 @@ filling the available page without spilling into a second physical page.
 PDF and template rows are page counts; image rows are image tile counts because
 image mode renders one raster canvas.
 
+Re-measured 2026-08-09 on the working tree (lint-cleanup wave, no benchmark
+code changed). Image rows were re-run in the same session: the previously
+recorded image numbers were stale carry-overs from an older era.
+
 | Workload | 2 | 5 | 10 | 20 | 50 | 100 | 200 | 250 | 500 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| PDF pages | 6.7ms | 11.6ms | 22.2ms | 41.1ms | 115ms | 249ms | 481ms | 590ms | 1.90s |
-| Template + PDF pages | 5.2ms | 9.2ms | 18.6ms | 48.5ms | 117ms | 223ms | 459ms | 588ms | 1.69s |
-| Web-fetch image tiles | 257.33ms | 258.05ms | 281.10ms | 310.47ms | 356.66ms | 413.68ms | 506.42ms | 564.00ms | 970.72ms |
-| Inline image tiles | 209.50ms | 220.61ms | 255.35ms | 282.33ms | 303.54ms | 340.31ms | 439.46ms | 491.22ms | 788.43ms |
+| PDF pages | 5.8ms | 7.8ms | 14.2ms | 33.2ms | 79.8ms | 207ms | 384ms | 422ms | 1.01s |
+| Template + PDF pages | 4.2ms | 7.7ms | 16.4ms | 27.0ms | 85.1ms | 175ms | 393ms | 439ms | 1.05s |
+| Web-fetch image tiles | 19.93ms | 17.79ms | 22.38ms | 22.95ms | 33.34ms | 58.80ms | 92.40ms | 103.43ms | 199.89ms |
+| Inline image tiles | 16.77ms | 14.97ms | 20.17ms | 19.06ms | 31.13ms | 51.24ms | 84.08ms | 93.75ms | 179.23ms |
 
 PDF / Template: profile-guided residual optimization wave on
-`feature/optimization` (2026-08-09). The locked 500-page PDF count-3 median is
-**1.628s / 678.8MB / 1.103M allocs**, versus the published
-**2.10s / 1.48GB / 3.93M** bar. Image-tile rows are unchanged.
+`feature/optimization` (2026-08-09), re-measured after the lint-cleanup wave.
+The current 500-page PDF count-3 median is **0.936s / 392.8MB / 535K allocs**
+(latest count-3 run; median across two count-3 runs is 1.067s / ~393MB /
+~535K allocs), versus the published **2.10s / 1.48GB / 3.93M** bar. Image-tile
+rows were re-measured in the same session (previously carried from an older
+era).
 
-### Original snapshot comparison
+### Snapshot comparison
 
-The first committed benchmark snapshot on this branch is `2a0f18b`
-(`chore: add conversion benchmarks`). The current matrix below uses the same
-one-iteration command, so this is the direct recorded comparison for the
-500-page report:
+The 500-page report dropped further versus the previous committed snapshot
+(`aa8d446`, recorded 2026-08-09). The main driver is the working tree's
+`smartShrinkMinOverflow` threshold in `internal/convert`: the benchmark report
+overflows its content area by 0.00pt, so it no longer pays a second full
+500-page smart-shrink layout pass. Both snapshots use the same one-iteration
+matrix command:
 
-| Metric | Original snapshot | Current snapshot | Change |
+| Metric | aa8d446 snapshot | Current snapshot | Change |
 |---|---:|---:|---:|
-| PDF time | 14.135s | 1.903s | **−86.5%** |
-| PDF B/op | 3.80GB | 678.6MB | **−82.1%** |
-| PDF allocs/op | 14.35M | 1.103M | **−92.3%** |
-| Template + PDF time | 13.670s | 1.693s | **−87.6%** |
-| Template + PDF B/op | 3.80GB | 683.5MB | **−82.0%** |
-| Template + PDF allocs/op | 14.40M | 1.154M | **−92.0%** |
+| PDF time | 1.903s | 1.013s | **−46.8%** |
+| PDF B/op | 678.6MB | 392.2MB | **−42.1%** |
+| PDF allocs/op | 1.103M | 535,064 | **−51.5%** |
+| Template + PDF time | 1.693s | 1.047s | **−38.2%** |
+| Template + PDF B/op | 683.5MB | 397.6MB | **−41.8%** |
+| Template + PDF allocs/op | 1.154M | 586,355 | **−49.2%** |
+| Web-fetch 500 tiles | 970.72ms | 199.89ms | **−79.4%** |
+| Inline 500 tiles | 788.43ms | 179.23ms | **−77.3%** |
 
+The image rows are not directly comparable: the previous rows were carried
+forward from an earlier era rather than re-measured at the wave; the current
+rows are re-measured with the identical benchmark code on the same host.
 The separate locked-gate result is the more stable count-3 median shown above;
 the comparison table intentionally uses one iteration on both snapshots.
 
@@ -105,22 +119,20 @@ adds the current in-process Go benchmark metrics for context:
 
 | Pages | wkhtmltopdf wall | wk peak RSS | Current Go PDF wall | Current Go B/op | Current Go allocs/op |
 |---:|---:|---:|---:|---:|---:|
-| 2 | 0.39s* | 34MB | 6.7ms | 3.8MB | 5,075 |
-| 5 | 0.23s | 35MB | 11.6ms | 6.1MB | 10,928 |
-| 10 | 0.25s | 35MB | 22.2ms | 11.3MB | 20,970 |
-| 20 | 0.28s | 37MB | 41.1ms | 21.8MB | 40,768 |
-| 50 | 0.37s | 42MB | 114.6ms | 52.8MB | 98,585 |
-| 100 | 0.60s | 50MB | 249.0ms | 100.9MB | 188,179 |
-| 200 | 0.89s | 66MB | 481.4ms | 200.1MB | 370,373 |
-| 250 | 0.99s | 74MB | 590.2ms | 248.9MB | 461,490 |
-| 500 | 2.05s | 114MB | 1.903s | 678.6MB | 1,102,840 |
+| 2 | 0.39s* | 34MB | 5.8ms | 3.4MB | 3,472 |
+| 5 | 0.23s | 35MB | 7.8ms | 5.2MB | 6,511 |
+| 10 | 0.25s | 35MB | 14.2ms | 9.0MB | 11,837 |
+| 20 | 0.28s | 37MB | 33.2ms | 16.8MB | 22,383 |
+| 50 | 0.37s | 42MB | 79.8ms | 40.4MB | 54,342 |
+| 100 | 0.60s | 50MB | 207.5ms | 79.6MB | 107,689 |
+| 200 | 0.89s | 66MB | 383.6ms | 158.2MB | 214,516 |
+| 250 | 0.99s | 74MB | 422.2ms | 196.9MB | 267,961 |
+| 500 | 2.05s | 114MB | 1.013s | 392.2MB | 535,064 |
 
 This is directional, not a strict apples-to-apples process comparison:
 wkhtmltopdf wall/RSS includes its native process, while the current Go wall and
 `B/op` columns are from the in-process `testing.B` benchmark. `B/op` is
-cumulative allocation traffic, not peak RSS. The current profiled benchmark
-process reached about **391MiB RSS** at 500 pages; a fresh current CLI
-process-level matrix has not been recorded in this snapshot.
+cumulative allocation traffic, not peak RSS.
 
 \* The first wkhtmltopdf invocation was colder because of Qt startup.
 

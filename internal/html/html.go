@@ -168,9 +168,10 @@ func appendTextToken(stack *[]*Node, data string) {
 	top.Children = append(top.Children, node)
 }
 
-// openElement applies one start tag to the open-element stack.
+// openElement applies one start tag to the open-element stack. Token data is
+// already lowercased by the tokenizer.
 func openElement(stack *[]*Node, tokItem token) {
-	name := strings.ToLower(tokItem.data)
+	name := tokItem.data
 	if mergeRootElement(stack, name) {
 		return
 	}
@@ -178,11 +179,16 @@ func openElement(stack *[]*Node, tokItem token) {
 	autoCloseOpen(stack, name)
 
 	top := (*stack)[len(*stack)-1]
+
 	node := &Node{Type: ElementNode, Name: name} //nolint:exhaustruct
+
 	if len(tokItem.attrs) > 0 {
-		node.Attrs = make(map[string]string, len(tokItem.attrs)/2)
+		const attrPairSize = 2 // attrs slice interleaves name and value
+
+		node.Attrs = make(map[string]string, len(tokItem.attrs)/attrPairSize)
 		applyAttributes(node, tokItem.attrs)
 	}
+
 	top.Children = append(top.Children, node)
 	node.Parent = top
 
@@ -241,22 +247,23 @@ func autoCloseOpen(stack *[]*Node, name string) {
 }
 
 // applyAttributes stores the interleaved name/value pairs on node, keeping
-// the first value of a duplicated attribute.
+// the first value of a duplicated attribute. Names are already lowercased
+// by the tokenizer.
 func applyAttributes(node *Node, attrs []string) {
 	for i := 0; i+1 < len(attrs); i += 2 {
-		key := strings.ToLower(attrs[i])
 		val := UnescapeEntities(attrs[i+1])
 
-		if _, dup := node.Attrs[key]; !dup {
-			node.Attrs[key] = val
+		if _, dup := node.Attrs[attrs[i]]; !dup {
+			node.Attrs[attrs[i]] = val
 		}
 	}
 }
 
 // closeElement pops the open-element stack back to (and including) the
-// first element with name; a stray end tag is a no-op.
+// first element with name; a stray end tag is a no-op. Token data is already
+// lowercased by the tokenizer.
 func closeElement(stack *[]*Node, data string) {
-	name := strings.ToLower(data)
+	name := data
 
 	for i := len(*stack) - 1; i > 0; i-- {
 		if (*stack)[i].Name == name {
@@ -381,7 +388,7 @@ type token struct {
 
 // tokenize scans raw HTML into tokens without parsing structure.
 func tokenize(src string) ([]token, error) {
-	var toks []token
+	toks := make([]token, 0, strings.Count(src, "<")+1)
 
 	pos := 0
 	srcLen := len(src)
@@ -405,28 +412,25 @@ func tokenize(src string) ([]token, error) {
 			break
 		}
 
-		var extra []token
-
 		var next int
 
 		var err error
 
 		switch {
 		case src[pos+1] == '!':
-			extra, next, err = scanBang(src, pos)
+			next, err = scanBang(src, pos, &toks)
 		case src[pos+1] == '/':
-			extra, next, err = scanEndTag(src, pos)
+			next, err = scanEndTag(src, pos, &toks)
 		case src[pos+1] == '?':
 			next, err = scanPI(src, pos)
 		default:
-			extra, next, err = scanStartTag(src, pos)
+			next, err = scanStartTag(src, pos, &toks)
 		}
 
 		if err != nil {
 			return nil, err
 		}
 
-		toks = append(toks, extra...)
 		pos = next
 	}
 
@@ -435,47 +439,52 @@ func tokenize(src string) ([]token, error) {
 
 // scanBang tokenizes a '!' construct at pos: comment, doctype, or a bogus
 // declaration that is skipped.
-func scanBang(src string, pos int) ([]token, int, error) {
+func scanBang(src string, pos int, toks *[]token) (int, error) {
 	if strings.HasPrefix(src[pos:], "<!--") {
 		end := strings.Index(src[pos+commentPrefixLen:], "-->")
 		if end < 0 {
-			return nil, 0, errUnterminatedComment
+			return 0, errUnterminatedComment
 		}
 
 		data := src[pos+commentPrefixLen : pos+commentPrefixLen+end]
 		next := pos + commentPrefixLen + end + commentSuffixLen
 
-		return []token{{kind: tokComment, data: data}}, next, nil //nolint:exhaustruct
+		*toks = append(*toks, token{kind: tokComment, data: data}) //nolint:exhaustruct
+
+		return next, nil
 	}
 
 	if len(src)-pos >= 9 && strings.EqualFold(src[pos:pos+9], "<!doctype") {
 		end := strings.IndexByte(src[pos:], '>')
 		if end < 0 {
-			return nil, 0, errUnterminatedDoctype
+			return 0, errUnterminatedDoctype
 		}
 
-		return []token{{kind: tokDoctype, data: src[pos+2 : pos+end]}}, pos + end + 1, nil //nolint:exhaustruct
+		*toks = append(*toks, token{kind: tokDoctype, data: src[pos+2 : pos+end]}) //nolint:exhaustruct
+
+		return pos + end + 1, nil
 	}
 
 	// other bogus declaration → skip to >
 	end := strings.IndexByte(src[pos:], '>')
 	if end < 0 {
-		return nil, 0, errUnterminatedDecl
+		return 0, errUnterminatedDecl
 	}
 
-	return nil, pos + end + 1, nil
+	return pos + end + 1, nil
 }
 
 // scanEndTag tokenizes a closing tag at pos.
-func scanEndTag(src string, pos int) ([]token, int, error) {
+func scanEndTag(src string, pos int, toks *[]token) (int, error) {
 	end := strings.IndexByte(src[pos:], '>')
 	if end < 0 {
-		return nil, 0, errUnterminatedEndTag
+		return 0, errUnterminatedEndTag
 	}
 
-	name := strings.TrimSpace(src[pos+2 : pos+end])
+	name := strings.ToLower(strings.TrimSpace(src[pos+2 : pos+end]))
+	*toks = append(*toks, token{kind: tokEnd, data: name}) //nolint:exhaustruct
 
-	return []token{{kind: tokEnd, data: strings.ToLower(name)}}, pos + end + 1, nil //nolint:exhaustruct
+	return pos + end + 1, nil
 }
 
 // scanPI skips a processing instruction at pos.
@@ -490,55 +499,58 @@ func scanPI(src string, pos int) (int, error) {
 
 // scanStartTag tokenizes a start tag at pos, including the raw-text content
 // of script/style/textarea/title elements up to their closing tag.
-func scanStartTag(src string, pos int) ([]token, int, error) {
+func scanStartTag(src string, pos int, toks *[]token) (int, error) {
 	if !isASCIILetter(src[pos+1]) {
 		// bare '<' followed by no valid tag start becomes text
-		return []token{{kind: tokText, data: "<"}}, pos + 1, nil //nolint:exhaustruct
+		*toks = append(*toks, token{kind: tokText, data: "<"}) //nolint:exhaustruct
+
+		return pos + 1, nil
 	}
 
 	end, err := tagEnd(src, pos)
 	if err != nil {
-		return nil, 0, err
+		return 0, err
 	}
 
 	if end < 0 {
 		// no closing '>' - treat the rest as text
-		return []token{{kind: tokText, data: src[pos:]}}, len(src), nil //nolint:exhaustruct
+		*toks = append(*toks, token{kind: tokText, data: src[pos:]}) //nolint:exhaustruct
+
+		return len(src), nil
 	}
 
 	tag := src[pos+1 : end]
 
 	name, attrs, selfClose, err := parseTag(tag)
 	if err != nil {
-		return nil, 0, err
+		return 0, err
 	}
 
 	if name == "" {
-		return nil, end + 1, nil
+		return end + 1, nil
 	}
 
 	name = strings.ToLower(name)
-	toks := []token{{kind: tokStart, data: name, attrs: attrs, selfClosing: selfClose}}
+	*toks = append(*toks, token{kind: tokStart, data: name, attrs: attrs, selfClosing: selfClose})
 	next := end + 1
 	// raw-text elements capture everything until their closing tag
 	if isRawTextElement(name) && !selfClose {
 		rawStart, rawEnd, ok := rawTextEnd(src, next, name)
 		if !ok {
-			toks = append(toks, token{kind: tokText, data: src[next:]}) //nolint:exhaustruct
-			next = len(src)
+			*toks = append(*toks, token{kind: tokText, data: src[next:]}) //nolint:exhaustruct
 
-			return toks, next, nil
+			return len(src), nil
 		}
 
 		if rawStart > next {
-			toks = append(toks, token{kind: tokText, data: src[next:rawStart]}) //nolint:exhaustruct
+			*toks = append(*toks, token{kind: tokText, data: src[next:rawStart]}) //nolint:exhaustruct
 		}
 
-		toks = append(toks, token{kind: tokEnd, data: name}) //nolint:exhaustruct
+		*toks = append(*toks, token{kind: tokEnd, data: name}) //nolint:exhaustruct
 		next = rawEnd + 1
 	}
 
-	return toks, next, nil
+	return next, nil
 }
 
 // tagEnd returns the index of the '>' closing the start tag that begins at
@@ -567,27 +579,28 @@ func tagEnd(src string, start int) (int, error) {
 // at from. It returns the span of the closing tag, or ok=false if the content
 // runs to the end of the source.
 func rawTextEnd(src string, from int, name string) (int, int, bool) {
-	low := strings.ToLower(src)
 	needle := "</" + name
 
+	low := strings.ToLower(src[from:])
+	offset := from
+
 	for {
-		found := strings.Index(low[from:], needle)
+		found := strings.Index(low, needle)
 		if found < 0 {
 			return 0, 0, false
 		}
 
-		found += from
-
 		after := found + len(needle)
-		for after < len(src) && isWhitespace(src[after]) {
+		for after < len(low) && isWhitespace(low[after]) {
 			after++
 		}
 
-		if after < len(src) && src[after] == '>' {
-			return found, after, true
+		if after < len(low) && low[after] == '>' {
+			return offset + found, offset + after, true
 		}
 
-		from = found + rawCloseMinSkip
+		low = low[found+rawCloseMinSkip:]
+		offset += found + rawCloseMinSkip
 	}
 }
 
@@ -611,7 +624,9 @@ func parseTag(body string) (string, []string, bool, error) {
 	name := body[:nameEnd]
 	selfClose := strings.HasSuffix(body, "/")
 
-	var attrs []string
+	const attrPairSize = 2 // attrs slice interleaves name and value
+
+	attrs := make([]string, 0, attrPairSize*strings.Count(body, "="))
 
 	rest := strings.TrimSpace(body[nameEnd:])
 	rest = strings.TrimSuffix(rest, "/")
@@ -626,7 +641,7 @@ func parseTag(body string) (string, []string, bool, error) {
 			break
 		}
 
-		attrs = append(attrs, key, val)
+		attrs = append(attrs, strings.ToLower(key), val)
 		rest = after
 	}
 

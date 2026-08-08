@@ -34,6 +34,7 @@ const (
 	rgbaChannelCount  = 4
 	hexLetterBase     = 10 // 'a'/'A' → 10 in hex
 	roundHalfUp       = 0.5
+	nonASCIIStart     = 0x80
 )
 
 // Pseudo-class and pseudo-element names shared across selector parsing.
@@ -1523,7 +1524,7 @@ func hasClassToken(value, want string) bool {
 
 		end := start
 		for end < len(value) && !isClassSpace(value[end]) {
-			if value[end] >= 0x80 {
+			if value[end] >= nonASCIIStart {
 				return hasUnicodeClassToken(value, want)
 			}
 
@@ -2163,7 +2164,7 @@ func ParseFontFamily(v string) []string {
 // names used by fixtures and layout tests (ponytail: not the full CSS Color 4
 // list). Cached at package level so color parsing does not allocate a new map
 // on every call; callers must treat the map as read-only.
-var namedColorTable = map[string][3]int{
+var namedColorTable = map[string][3]int{ //nolint:gochecknoglobals // read-only cache; avoids per-call allocation
 	// CSS2 core
 	"black": {0, 0, 0}, "silver": {192, 192, 192}, "gray": {128, 128, 128},
 	"grey": {128, 128, 128}, "white": {255, 255, 255}, "maroon": {128, 0, 0},

@@ -8,6 +8,8 @@ import (
 )
 
 func TestCollectInlineRunUsesContiguousChildren(t *testing.T) {
+	t.Parallel()
+
 	root := mustParse(t, `<div>one<span>two</span> three</div>`)
 	container := firstElementNamed(root, "div")
 	span := firstElementNamed(root, "span")
@@ -34,6 +36,8 @@ func TestCollectInlineRunUsesContiguousChildren(t *testing.T) {
 }
 
 func TestCollectInlineRunFiltersDisplayNoneChildren(t *testing.T) {
+	t.Parallel()
+
 	root := mustParse(t, `<div>one<span>hidden</span>two</div>`)
 	container := firstElementNamed(root, "div")
 	span := firstElementNamed(root, "span")

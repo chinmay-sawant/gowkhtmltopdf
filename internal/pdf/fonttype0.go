@@ -7,6 +7,10 @@ import (
 	"strings"
 )
 
+// fallbackFontName is the PostScript name substituted when a loaded face has
+// none (the embedded default face uses the same name).
+const fallbackFontName = "LiberationSans"
+
 // needsType0 reports whether the rune set requires a CID/Type0 font
 // (any code point outside the Latin-1 simple-font range).
 func needsType0(used []rune) bool {
@@ -27,24 +31,37 @@ func needsType0(used []rune) bool {
 // dict tails differ.
 //
 // ponytail: Type0+simple dual embed — both product-real (Latin-1 vs CJK/BMP).
-func (d *Document) ensureFont(fnt *Font, used []rune) (objRef, error) {
+func (d *Document) ensureFont(fnt *Font, name string, used []rune) (objRef, error) {
 	if len(used) == 0 {
 		used = []rune{' '}
 	}
 
-	type0 := needsType0(used)
-
 	baseName := fnt.PostScriptName
 	if baseName == "" {
-		baseName = "LiberationSans"
+		baseName = fallbackFontName
 	}
 
-	mode := 0
-	if type0 {
-		mode = 1
+	// The finalize-time rune union makes the cache key and the Type0
+	// decision identical for every page, so both are precomputed once per
+	// document (unionFontRunes) and reused on the hot path.
+	var key string
+
+	var type0 bool
+
+	if pre, ok := d.fontKeys[name]; ok && d.fontKeyFonts[name] == fnt {
+		key = pre
+		type0 = d.fontType0[name]
+	} else {
+		type0 = needsType0(used)
+		mode := 0
+
+		if type0 {
+			mode = 1
+		}
+
+		key = fmt.Sprintf("v%d|%x|%s|%s", mode, fnt.fingerprint, baseName, runesKey(used))
 	}
 
-	key := fmt.Sprintf("v%d|%x|%s|%s", mode, fnt.fingerprint, baseName, runesKey(used))
 	if ref, ok := d.fontCache[key]; ok {
 		return ref, nil
 	}
@@ -205,23 +222,4 @@ func buildCIDMap(sub *subsetResult, unitsPerEm int16) ([]byte, []string) {
 	}
 
 	return cidMap, wParts
-}
-
-// pdfHexCIDs encodes s as an Identity-H hex string of Unicode CIDs.
-func pdfHexCIDs(s string) string {
-	var buf strings.Builder
-
-	buf.WriteByte('<')
-
-	for _, r := range s {
-		if r > maxBMPCode {
-			r = '?'
-		}
-
-		fmt.Fprintf(&buf, "%04X", r)
-	}
-
-	buf.WriteByte('>')
-
-	return buf.String()
 }

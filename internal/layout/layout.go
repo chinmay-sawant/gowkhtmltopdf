@@ -278,18 +278,19 @@ func hashFontFamily(fams []string) uint64 {
 		prime64  = 1099511628211
 	)
 
-	h := uint64(offset64)
+	hash := uint64(offset64)
+
 	for _, fam := range fams {
-		for i := 0; i < len(fam); i++ {
-			h ^= uint64(fam[i])
-			h *= prime64
+		for i := range len(fam) {
+			hash ^= uint64(fam[i])
+			hash *= prime64
 		}
 
-		h ^= 0xff // token separator
-		h *= prime64
+		hash ^= 0xff // token separator
+		hash *= prime64
 	}
 
-	return h
+	return hash
 }
 
 // chromeEntry records one box's background/border ops for insertion before
@@ -316,14 +317,15 @@ func (e *engine) faceFor(sty ResolvedStyle) *pdf.Font {
 		}
 	}
 
-	f := e.lookupFaceFor(sty)
+	face := e.lookupFaceFor(sty)
+
 	if e.faceByStyle == nil {
 		e.faceByStyle = make(map[faceStyleKey]*pdf.Font)
 	}
 
-	e.faceByStyle[key] = f
+	e.faceByStyle[key] = face
 
-	return f
+	return face
 }
 
 // lookupFaceFor is the uncached faceFor path.
@@ -377,18 +379,18 @@ func (e *engine) faceForRuneFallback(sty ResolvedStyle, runeValue rune, primary 
 		}
 	}
 
-	f := e.lookupFaceForRune(sty, runeValue)
-	if f == nil {
-		f = primary
+	face := e.lookupFaceForRune(sty, runeValue)
+	if face == nil {
+		face = primary
 	}
 
 	if e.faceByRune == nil {
 		e.faceByRune = make(map[faceRuneKey]*pdf.Font)
 	}
 
-	e.faceByRune[key] = f
+	e.faceByRune[key] = face
 
-	return f
+	return face
 }
 
 // lookupFaceForRune is the uncached face resolution path.
@@ -1200,14 +1202,6 @@ func (e *engine) markOpsFixed(start, end int) {
 	}
 }
 
-// borderLineOps expands solid/dashed/dotted borders into the line operations
-// consumed by both PDF and raster painting. Keeping the pattern as segments
-// avoids adding a second stroke-style protocol to Op.
-// Prefer appendBorderLineOps / emitBorderLine to avoid per-edge slice headers.
-func borderLineOps(posX, posY, boxW, boxH, width float64, style string, red, green, blue float64) []Op {
-	return appendBorderLineOps(nil, posX, posY, boxW, boxH, width, style, red, green, blue)
-}
-
 // appendBorderLineOps appends border segment ops into dst (may be nil).
 func appendBorderLineOps(
 	dst []Op, posX, posY, boxW, boxH, width float64, style string, red, green, blue float64,
@@ -1293,6 +1287,7 @@ func (e *engine) emitBorderLine(posX, posY, boxW, boxH, width float64, style str
 
 	// Dashed/dotted: append into a tiny stack buffer then emit.
 	var buf [8]Op
+
 	segs := appendDashedLineSegments(buf[:0], posX, posY, boxW, boxH, width, style == borderStyleDotted, red, green, blue)
 	for i := range segs {
 		e.add(segs[i])
@@ -1301,7 +1296,9 @@ func (e *engine) emitBorderLine(posX, posY, boxW, boxH, width float64, style str
 
 // borderOps returns the four border line ops for the given border box.
 func (e *engine) borderOps(sty ResolvedStyle, posX, posY, wid, height float64) []Op {
-	ops := make([]Op, 0, 4)
+	const borderSideCount = 4
+
+	ops := make([]Op, 0, borderSideCount)
 
 	ops = appendBorderLineOps(ops, posX, posY, wid, 0, e.scalePt(sty.BorderTop.Width), sty.BorderTop.Style,
 		sty.BorderTop.Color[0], sty.BorderTop.Color[1], sty.BorderTop.Color[2])
@@ -1831,7 +1828,7 @@ func (e *engine) flowOneChild(
 // layoutInlineRun lays out one maximal inline run, returning the advanced cy
 // and the margin accumulator.
 func (e *engine) layoutInlineRun(
-	parent *box, sty ResolvedStyle, run []*html.Node, contentW, contentX, posY, curY float64,
+	parent *box, _ ResolvedStyle, run []*html.Node, contentW, contentX, posY, curY float64,
 	floats *floatState, prevBottom float64,
 ) (float64, float64) {
 	if onlyCollapsibleWS(run) {
@@ -1894,6 +1891,8 @@ func isFlowFloat(node *html.Node, engine *engine) bool {
 
 // collectInlineRun gathers a maximal run of inline children starting at idx,
 // skipping display:none elements and keeping interior whitespace.
+//
+//nolint:cyclop // hot-path run scanner; splitting adds indirection for no clarity
 func collectInlineRun(children []*html.Node, idx int, engine *engine) ([]*html.Node, int) {
 	start := idx
 	hasDisplayNone := false
@@ -1931,6 +1930,7 @@ func collectInlineRun(children []*html.Node, idx int, engine *engine) ([]*html.N
 	}
 
 	run := make([]*html.Node, 0, idx-start)
+
 	for _, child := range children[start:idx] {
 		if child.Type == html.ElementNode && engine.styles[child].Display == cssDisplayNone {
 			continue
@@ -2006,16 +2006,16 @@ func (e *engine) pushBFCFloats(style ResolvedStyle, contentX, contentW float64) 
 
 	e.bfcStack = append(e.bfcStack, e.bfcFloats)
 
-	var fs *floatState
+	var state *floatState
 	if n := len(e.bfcPool); n > 0 {
-		fs = e.bfcPool[n-1]
+		state = e.bfcPool[n-1]
 		e.bfcPool = e.bfcPool[:n-1]
 	} else {
-		fs = new(floatState)
+		state = new(floatState)
 	}
 
-	*fs = newFloatState(contentX, contentW)
-	e.bfcFloats = fs
+	*state = newFloatState(contentX, contentW)
+	e.bfcFloats = state
 
 	return true
 }
@@ -2032,15 +2032,15 @@ func (e *engine) popBFCFloats(enclose bool) {
 		e.bfcPool = append(e.bfcPool, cur)
 	}
 
-	n := len(e.bfcStack)
-	if n == 0 {
+	stackLen := len(e.bfcStack)
+	if stackLen == 0 {
 		e.bfcFloats = nil
 
 		return
 	}
 
-	e.bfcFloats = e.bfcStack[n-1]
-	e.bfcStack = e.bfcStack[:n-1]
+	e.bfcFloats = e.bfcStack[stackLen-1]
+	e.bfcStack = e.bfcStack[:stackLen-1]
 }
 
 // emitListMarker paints the list marker in the marker area to the left of
@@ -2434,15 +2434,15 @@ func collapseMargins(acc, boxN float64) float64 {
 	return boxN
 }
 
-func (e *engine) emitBorders(st ResolvedStyle, x, y, w, h float64) {
-	e.emitBorderLine(x, y, w, 0, e.scalePt(st.BorderTop.Width), st.BorderTop.Style,
-		st.BorderTop.Color[0], st.BorderTop.Color[1], st.BorderTop.Color[2])
-	e.emitBorderLine(x+w, y, 0, h, e.scalePt(st.BorderRight.Width), st.BorderRight.Style,
-		st.BorderRight.Color[0], st.BorderRight.Color[1], st.BorderRight.Color[2])
-	e.emitBorderLine(x, y+h, w, 0, e.scalePt(st.BorderBottom.Width), st.BorderBottom.Style,
-		st.BorderBottom.Color[0], st.BorderBottom.Color[1], st.BorderBottom.Color[2])
-	e.emitBorderLine(x, y, 0, h, e.scalePt(st.BorderLeft.Width), st.BorderLeft.Style,
-		st.BorderLeft.Color[0], st.BorderLeft.Color[1], st.BorderLeft.Color[2])
+func (e *engine) emitBorders(sty ResolvedStyle, posX, posY, boxW, boxH float64) {
+	e.emitBorderLine(posX, posY, boxW, 0, e.scalePt(sty.BorderTop.Width), sty.BorderTop.Style,
+		sty.BorderTop.Color[0], sty.BorderTop.Color[1], sty.BorderTop.Color[2])
+	e.emitBorderLine(posX+boxW, posY, 0, boxH, e.scalePt(sty.BorderRight.Width), sty.BorderRight.Style,
+		sty.BorderRight.Color[0], sty.BorderRight.Color[1], sty.BorderRight.Color[2])
+	e.emitBorderLine(posX, posY+boxH, boxW, 0, e.scalePt(sty.BorderBottom.Width), sty.BorderBottom.Style,
+		sty.BorderBottom.Color[0], sty.BorderBottom.Color[1], sty.BorderBottom.Color[2])
+	e.emitBorderLine(posX, posY, 0, boxH, e.scalePt(sty.BorderLeft.Width), sty.BorderLeft.Style,
+		sty.BorderLeft.Color[0], sty.BorderLeft.Color[1], sty.BorderLeft.Color[2])
 }
 
 // --- replaced elements ---
@@ -2937,6 +2937,7 @@ func placeTableCells(rows [][]*html.Node) ([]tcell, int) {
 	nRows := len(rows)
 	occupied := make([][]int, nRows) // per-row remaining coverage counts
 	nCols := 0
+
 	var rowCols int
 
 	for rowI, runic := range rows {
@@ -3060,7 +3061,15 @@ func (e *engine) measureTableColumns(
 		}
 	}
 
+	rowCounts := make([]int, nRows)
+	for _, p := range placed {
+		rowCounts[p.row]++
+	}
+
 	cellData := make([][]*box, nRows)
+	for i := range cellData {
+		cellData[i] = make([]*box, 0, rowCounts[i])
+	}
 
 	for _, page := range placed {
 		cell := e.buildCell(page.node, page.col, page.cSpan)
@@ -3920,6 +3929,8 @@ func (m *cellMeasure) walk(nodeN *html.Node, cstate ResolvedStyle, nowrap bool) 
 // measureText accumulates a text run into the current line, using the same
 // face selection as paint (measureTextFace) — mismatched metrics undersize
 // columns and force emergency wraps on words that should fit.
+//
+//nolint:cyclop // word-scan and nowrap paths share state; splitting hurts readability
 func (m *cellMeasure) measureText(text string, cstate ResolvedStyle, nowrap bool) {
 	eng := m.engine
 
@@ -3940,24 +3951,25 @@ func (m *cellMeasure) measureText(text string, cstate ResolvedStyle, nowrap bool
 			m.lineW += spaceW
 		}
 
-		i := 0
+		wStart := 0
 		first := true
 
-		for i < len(text) {
-			for i < len(text) && isHTMLSpace(text[i]) {
-				i++
+		for wStart < len(text) {
+			for wStart < len(text) && isHTMLSpace(text[wStart]) {
+				wStart++
 			}
 
-			if i >= len(text) {
+			if wStart >= len(text) {
 				break
 			}
 
-			j := i
-			for j < len(text) && !isHTMLSpace(text[j]) {
-				j++
+			wEnd := wStart
+			for wEnd < len(text) && !isHTMLSpace(text[wEnd]) {
+				wEnd++
 			}
 
-			word := text[i:j]
+			word := text[wStart:wEnd]
+
 			if !first {
 				m.lineW += spaceW
 			}
@@ -3965,7 +3977,8 @@ func (m *cellMeasure) measureText(text string, cstate ResolvedStyle, nowrap bool
 			first = false
 			m.lineW += eng.measureTextFace(word, cstate)
 			m.noteWord(eng.minContentWidth(word, cstate))
-			i = j
+
+			wStart = wEnd
 		}
 
 		return
@@ -4275,7 +4288,7 @@ func isHTMLSpace(b byte) bool {
 // hasNonHTMLSpace reports that s contains at least one non-HTML-whitespace byte.
 // Used instead of strings.TrimSpace(s) != "" to avoid the TrimSpace string header.
 func hasNonHTMLSpace(s string) bool {
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		if !isHTMLSpace(s[i]) {
 			return true
 		}

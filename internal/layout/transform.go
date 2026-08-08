@@ -758,19 +758,19 @@ func stampBoxTransformsRec(boxNode *box, parentAccum Matrix2D, ops []Op, covered
 	}
 }
 
-// markBoxOpsCovered records or clears the display-list ops owned by child c.
-func markBoxOpsCovered(c *box, ops []Op, covered []bool, on bool) {
-	if !boxOwnsOps(c) {
+// markBoxOpsCovered records or clears the display-list ops owned by child boxNode.
+func markBoxOpsCovered(boxNode *box, ops []Op, covered []bool, record bool) {
+	if !boxOwnsOps(boxNode) {
 		return
 	}
 
-	end := c.opEnd
+	end := boxNode.opEnd
 	if end >= len(ops) {
 		end = len(ops) - 1
 	}
 
-	for idx := c.opStart; idx <= end; idx++ {
-		covered[idx] = on
+	for idx := boxNode.opStart; idx <= end; idx++ {
+		covered[idx] = record
 	}
 }
 
@@ -813,6 +813,7 @@ func stampExclusiveOpacityOps(boxNode *box, ops []Op, covered []bool) {
 	}
 
 	opacityBase := boxNode.style.Opacity
+
 	for idx := boxNode.opStart; idx <= end; idx++ {
 		if covered[idx] {
 			continue
@@ -840,6 +841,7 @@ func stampCoveredOpacityOps(boxNode *box, ops []Op, covered []bool) {
 	}
 
 	opacityBase := boxNode.style.Opacity
+
 	for idx := boxNode.opStart; idx <= end; idx++ {
 		if !covered[idx] {
 			continue

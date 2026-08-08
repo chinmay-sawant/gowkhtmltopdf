@@ -42,6 +42,10 @@ func NewContent() *Content {
 // Bytes returns the raw (uncompressed) content stream.
 func (c *Content) Bytes() []byte { return c.buf.Bytes() }
 
+// Grow reserves content-stream capacity up front so per-page buffers do not
+// reallocate geometrically while a dense op list is painted.
+func (c *Content) Grow(n int) { c.buf.Grow(n) }
+
 func appendPDFNum(dst []byte, val float64) []byte {
 	if val == float64(int(val)) {
 		return strconv.AppendInt(dst, int64(int(val)), pdfNumBase)
@@ -428,7 +432,67 @@ func (c *Content) ensureLatinFallback() string {
 	return name
 }
 
+const (
+	octalBase   = 8
+	byteShift   = 8
+	nibbleMask  = 0xf
+	nibbleShift = 4
+	hiByteShift = 12
+)
+
+// appendPDFLiteralByte appends cur as one PDF literal-string byte, escaping
+// parens/backslashes and emitting octal escapes for control bytes.
+func appendPDFLiteralByte(dst []byte, cur byte) []byte {
+	switch {
+	case cur == '(' || cur == ')' || cur == '\\':
+		return append(dst, '\\', cur)
+	case cur < 32 || cur > 126:
+		return append(dst, '\\', '0'+cur/64, '0'+(cur/octalBase)%octalBase, '0'+cur%octalBase)
+	default:
+		return append(dst, cur)
+	}
+}
+
+// appendPDFString appends s as a PDF literal string, folding code points
+// above U+00FF via winAnsiFold (with '?' fallback) so every emitted byte
+// matches the subset cmap and /Widths indices.
+func appendPDFString(dst []byte, s string) []byte {
+	dst = append(dst, '(')
+
+	for _, rVal := range s {
+		if rVal > maxLatin1Code {
+			rVal = winAnsiFold(rVal)
+		}
+
+		if rVal > maxLatin1Code {
+			rVal = '?'
+		}
+
+		dst = appendPDFLiteralByte(dst, byte(rVal))
+	}
+
+	return append(dst, ')')
+}
+
+// appendHex4 appends rVal as a zero-padded 4-digit uppercase hex number.
+func appendHex4(dst []byte, rVal rune) []byte {
+	const hexDigits = "0123456789ABCDEF"
+
+	return append(dst,
+		hexDigits[rVal>>hiByteShift],
+		hexDigits[(rVal>>byteShift)&nibbleMask],
+		hexDigits[(rVal>>nibbleShift)&nibbleMask],
+		hexDigits[rVal&nibbleMask],
+	)
+}
+
+// textShowSimple appends str as a Latin-1 literal string, folding and
+// escaping in the same pass that records the used runes for subsetting.
 func (c *Content) textShowSimple(str string) {
+	used := c.used[c.curFont]
+	out := c.buf.AvailableBuffer()
+	out = append(out, '(')
+
 	for _, rVal := range str {
 		if rVal > maxLatin1Code {
 			rVal = winAnsiFold(rVal)
@@ -438,10 +502,13 @@ func (c *Content) textShowSimple(str string) {
 			rVal = '?'
 		}
 
-		c.used[c.curFont] = append(c.used[c.curFont], rVal)
+		used = append(used, rVal)
+		out = appendPDFLiteralByte(out, byte(rVal))
 	}
 
-	c.buf.WriteString(pdfString(str) + " Tj\n")
+	out = append(out, ')', ' ', 'T', 'j', '\n')
+	_, _ = c.buf.Write(out)
+	c.used[c.curFont] = used
 }
 
 func (c *Content) textNeedsType0(s string) bool {
@@ -476,15 +543,24 @@ func (c *Content) textShowType0(str string) {
 		c.SetFont(uname, c.curSize)
 	}
 
-	for _, r := range str {
-		if r > maxBMPCode {
-			r = '?'
+	// Hex CIDs are the Unicode code points themselves (Identity-H), so the
+	// recording pass and the hex pass can be one walk.
+	used := c.used[uname]
+	out := c.buf.AvailableBuffer()
+	out = append(out, '<')
+
+	for _, rVal := range str {
+		if rVal > maxBMPCode {
+			rVal = '?'
 		}
 
-		c.used[uname] = append(c.used[uname], r)
+		used = append(used, rVal)
+		out = appendHex4(out, rVal)
 	}
 
-	c.buf.WriteString(pdfHexCIDs(str) + " Tj\n")
+	out = append(out, '>', ' ', 'T', 'j', '\n')
+	_, _ = c.buf.Write(out)
+	c.used[uname] = used
 }
 
 // resources
@@ -496,14 +572,22 @@ func (c *Content) textShowType0(str string) {
 // propagated instead of dropped.
 func (c *Content) fonts() (map[string]string, error) {
 	for name := range c.fontUses {
-		f, ok := c.fontFiles[name]
+		face, ok := c.fontFiles[name]
 		if !ok {
 			delete(c.fontUses, name)
 
 			continue
 		}
 
-		ref, err := c.doc.ensureFont(f, c.used[name])
+		// Subset from the document-wide rune union when the document has
+		// been finalized (unionFontRunes): one subset per font, shared by
+		// every page, instead of a near-identical subset per page.
+		used := c.used[name]
+		if union, ok := c.doc.fontRunes[name]; ok {
+			used = union
+		}
+
+		ref, err := c.doc.ensureFont(face, name, used)
 		if err != nil {
 			return nil, fmt.Errorf("embed font %s: %w", name, err)
 		}

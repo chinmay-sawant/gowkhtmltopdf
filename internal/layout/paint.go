@@ -120,9 +120,21 @@ func fixedOpIndices(res *Result) []int {
 
 // buildPagesAfterSplits re-derives page buckets from the final op Y
 // positions after rect splits and sticky shifts added or moved ops.
-func buildPagesAfterSplits(res *Result, contentH float64, fixedIdx []int) []int {
+func buildPagesAfterSplits(res *Result, contentH float64, _ []int) []int { //nolint:cyclop // count-then-fill bucketing
+	// Page numbers are dense from 0..maxP, so counts index directly instead
+	// of a per-page map (page buckets below are exact-capacity, no growth).
+	maxP := 0
+
+	for idx := range res.Ops {
+		if !res.Ops[idx].Fixed {
+			if p := int(res.Ops[idx].Y / contentH); p > maxP {
+				maxP = p
+			}
+		}
+	}
+
 	opPage := make([]int, len(res.Ops))
-	perPage := map[int][]int{}
+	counts := make([]int, maxP+1)
 
 	for idx := range res.Ops {
 		if res.Ops[idx].Fixed {
@@ -131,31 +143,51 @@ func buildPagesAfterSplits(res *Result, contentH float64, fixedIdx []int) []int 
 
 		p := int(res.Ops[idx].Y / contentH)
 		opPage[idx] = p
-		perPage[p] = append(perPage[p], idx)
-	}
 
-	maxP := 0
-	for p := range perPage {
-		if p > maxP {
-			maxP = p
+		if p >= 0 && p <= maxP {
+			counts[p]++
 		}
 	}
 
-	if len(fixedIdx) > 0 && maxP < 0 {
-		maxP = 0
-	}
-
-	if len(perPage) == 0 && len(fixedIdx) > 0 {
-		maxP = 0
-		perPage[0] = nil
-	}
-
 	res.Pages = make([][]int, maxP+1)
+
 	for p := 0; p <= maxP; p++ {
-		res.Pages[p] = perPage[p]
+		if counts[p] > 0 {
+			res.Pages[p] = make([]int, 0, counts[p])
+		}
+	}
+
+	for idx, p := range opPage {
+		if p >= 0 && p <= maxP {
+			res.Pages[p] = append(res.Pages[p], idx)
+		}
 	}
 
 	return opPage
+}
+
+// contentSizeHint estimates the content-stream bytes a page's ops will emit:
+// a fixed per-op operator budget plus the escaped text payload (most runes
+// emit one byte, escaped to at most four).
+func contentSizeHint(ops []Op, groups ...[]int) int {
+	const opBudget = 64
+
+	const avgEscapedRuneBytes = 2
+
+	size := 0
+
+	for _, group := range groups {
+		for _, idx := range group {
+			op := &ops[idx]
+			size += opBudget
+
+			if op.Kind == OpText || op.Kind == OpBullet {
+				size += len(op.Text) * avgEscapedRuneBytes
+			}
+		}
+	}
+
+	return size
 }
 
 // paintPages paints every page: page content ops first, then the fixed layer
@@ -186,6 +218,8 @@ func paintPageOps(
 
 	page := doc.AddPage(opts.PageWidth, opts.PageHeight)
 	child := page.Content()
+	child.Grow(contentSizeHint(res.Ops, idxs, fixedIdx))
+
 	fontNames := map[*pdf.Font]string{}
 	nextFont := 0
 	resName := func(face *pdf.Font) string {
@@ -879,9 +913,10 @@ func collectTableBorderSegments(res *Result) ([]vseg, []hseg, map[int][]vseg, ma
 
 // collectBorderSegmentOps gathers non-fixed line ops as vertical or horizontal
 // border segments.
-func collectBorderSegmentOps(ops []Op) ([]vseg, []hseg) {
+func collectBorderSegmentOps(ops []Op) ([]vseg, []hseg) { //nolint:cyclop // two-pass classify-then-build
 	// First pass: count so we allocate exact-capacity slices once.
 	nVert, nHoriz := 0, 0
+
 	for i := range ops {
 		paintOp := &ops[i]
 		if paintOp.Fixed || paintOp.Kind != OpLine {
@@ -938,6 +973,7 @@ func clusterVerticals(vertStarts, vertEnds map[int][]vseg, byStart bool) map[int
 	if !byStart {
 		groups = vertEnds
 	}
+
 	out := make(map[int]borderCluster, len(groups))
 
 	for _, group := range groups {
@@ -947,11 +983,11 @@ func clusterVerticals(vertStarts, vertEnds map[int][]vseg, byStart bool) map[int
 				keyY = val.y1
 			}
 
-			k := roundY(keyY)
+			bucket := roundY(keyY)
 
-			child, ok := out[k]
+			child, ok := out[bucket]
 			if !ok {
-				out[k] = borderCluster{y: keyY, minX: val.x, maxX: val.x, bw: val.w, r: val.r, g: val.g, b: val.b, n: 1}
+				out[bucket] = borderCluster{y: keyY, minX: val.x, maxX: val.x, bw: val.w, r: val.r, g: val.g, b: val.b, n: 1}
 
 				continue
 			}
@@ -966,7 +1002,7 @@ func clusterVerticals(vertStarts, vertEnds map[int][]vseg, byStart bool) map[int
 			}
 			// Prefer average y so we sit on the dominant edge.
 			child.y = (child.y*float64(child.n-1) + keyY) / float64(child.n)
-			out[k] = child
+			out[bucket] = child
 		}
 	}
 
@@ -1370,15 +1406,6 @@ func appendOpFragments(dst []Op, paintOp Op, contentH float64) []Op {
 	return dst
 }
 
-// splitOpFragments truncates one splittable rect at each page boundary and
-// returns the fragments in document paint order. It remains as a small
-// compatibility helper for focused tests; the production path appends into
-// the display-list destination directly via appendOpFragments.
-func splitOpFragments(paintOp Op, contentH float64) []Op {
-	var frags []Op
-	return appendOpFragments(frags, paintOp, contentH)
-}
-
 // remapBoxOpRanges updates the layout-owned operation ranges after a display
 // list rewrite. In particular, a source rectangle can become two or more
 // page fragments; mapping the box end to the final fragment keeps pagination,
@@ -1445,7 +1472,7 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 }
 
 // pageIndexedOps buckets non-fixed ops by their canvas page.
-func pageIndexedOps(res *Result, contentH float64) [][]int {
+func pageIndexedOps(res *Result, contentH float64) [][]int { //nolint:cyclop // count-then-fill bucketing
 	maxPage := 0
 
 	for i := range res.Ops {
@@ -1459,7 +1486,23 @@ func pageIndexedOps(res *Result, contentH float64) [][]int {
 		}
 	}
 
+	counts := make([]int, maxPage+1)
+
+	for idx := range res.Ops {
+		if res.Ops[idx].Fixed {
+			continue
+		}
+
+		page := int(res.Ops[idx].Y / contentH)
+		if page >= 0 && page <= maxPage {
+			counts[page]++
+		}
+	}
+
 	pageOps := make([][]int, maxPage+1)
+	for p := range counts {
+		pageOps[p] = make([]int, 0, counts[p])
+	}
 
 	for idx := range res.Ops {
 		if res.Ops[idx].Fixed {
@@ -2051,37 +2094,6 @@ func shiftFlowY(res *Result, from, toIdx int, fromY, deltaY float64) {
 	shiftFlowBoxes(res, from, toIdx, fromY, startPage, deltaY)
 }
 
-// shiftFlowYCoords applies the same op/box selection as shiftFlowY but only
-// mutates coordinates. Flow page indexes are left stale (caller must rebuild
-// or avoid index-based shifts until ensureFlowIndex runs again). Used by
-// beforeAlways so hundreds of forced breaks do not rebuild indexes each time.
-func shiftFlowYCoords(res *Result, from, toIdx int, fromY, deltaY float64) {
-	if res == nil || len(res.Ops) == 0 || deltaY == 0 {
-		return
-	}
-
-	for i := range res.Ops {
-		if res.Ops[i].Fixed {
-			continue
-		}
-
-		if (i >= from && i <= toIdx) || res.Ops[i].Y > fromY {
-			res.Ops[i].Y += deltaY
-		}
-	}
-
-	if res.root == nil {
-		return
-	}
-
-	for _, boxNode := range flowBoxList(res) {
-		if boxNode.y > fromY ||
-			(boxNode.y == fromY && boxNode.opStart >= from && boxNode.opEnd <= toIdx) {
-			boxNode.y += deltaY
-		}
-	}
-}
-
 // invalidateFlowIndex drops cached page buckets so the next ensureFlowIndex
 // rebuilds from current coordinates.
 func invalidateFlowIndex(res *Result) {
@@ -2264,7 +2276,7 @@ func ensureFlowIndex(res *Result, pageSize float64) {
 }
 
 // buildFlowOpIndex buckets non-fixed ops by their canvas page.
-func buildFlowOpIndex(ops []Op, pageSize float64) ([][]int, []int, []int) {
+func buildFlowOpIndex(ops []Op, pageSize float64) ([][]int, []int, []int) { //nolint:cyclop,funlen // count-then-fill
 	maxPage := 0
 
 	for i := range ops {
@@ -2282,7 +2294,28 @@ func buildFlowOpIndex(ops []Op, pageSize float64) ([][]int, []int, []int) {
 		}
 	}
 
+	// Count-then-fill: page buckets get exact capacity instead of growing
+	// geometrically from zero.
+	counts := make([]int, maxPage+1)
+
+	for idx := range ops {
+		if ops[idx].Fixed {
+			continue
+		}
+
+		page := int(ops[idx].Y / pageSize)
+		if page < 0 {
+			page = 0
+		}
+
+		counts[page]++
+	}
+
 	pages := make([][]int, maxPage+1)
+	for p := range counts {
+		pages[p] = make([]int, 0, counts[p])
+	}
+
 	pageOf := make([]int, len(ops))
 	pos := make([]int, len(ops))
 
@@ -2543,7 +2576,7 @@ func boxInkExtent(res *Result, boxNode *box) float64 {
 // processed by ascending opStart. Forced-break dys are recorded on a difference
 // array and applied to ops in one O(n) pass (plus O(boxes) live box updates per
 // break). Flow indexes are rebuilt once at the end.
-func beforeAlways(res *Result, contentH float64) bool {
+func beforeAlways(res *Result, contentH float64) bool { //nolint:gocognit,cyclop,funlen // break-difference bookkeeping
 	if res == nil || res.root == nil || contentH <= 0 {
 		return false
 	}
@@ -2560,9 +2593,9 @@ func beforeAlways(res *Result, contentH float64) bool {
 	}
 
 	ops := res.Ops
-	n := len(ops)
+	opCount := len(ops)
 	// suffixDy[i] is the additional Y applied to all ops at indices >= i.
-	suffixDy := make([]float64, n+1)
+	suffixDy := make([]float64, opCount+1)
 	boxes := flowBoxList(res)
 
 	changed := false
@@ -2574,12 +2607,13 @@ func beforeAlways(res *Result, contentH float64) bool {
 	curOff := 0.0
 	// events with start <= opIdx have been folded into curOff via eventAt.
 	eventAt := 0
+
 	type breakEvent struct {
 		start int
 		dy    float64
 	}
 
-	var events []breakEvent
+	events := make([]breakEvent, 0, len(targets))
 
 	for _, boxNode := range targets {
 		start := boxNode.opStart
@@ -2587,8 +2621,8 @@ func beforeAlways(res *Result, contentH float64) bool {
 			start = 0
 		}
 
-		if start > n {
-			start = n
+		if start > opCount {
+			start = opCount
 		}
 
 		for opIdx < start {
@@ -2614,25 +2648,25 @@ func beforeAlways(res *Result, contentH float64) bool {
 			continue
 		}
 
-		dy := float64(lastPage+1)*contentH - boxY
-		if dy <= 0 {
+		deltaY := float64(lastPage+1)*contentH - boxY
+		if deltaY <= 0 {
 			continue
 		}
 
 		// Record op suffix shift; update boxes immediately (few relative to ops).
-		if start < n {
-			suffixDy[start] += dy
+		if start < opCount {
+			suffixDy[start] += deltaY
 		}
 
 		fromY := boxY
 		for _, b := range boxes {
 			if b.y > fromY ||
 				(b.y == fromY && b.opStart >= boxNode.opStart && b.opEnd <= boxNode.opEnd) {
-				b.y += dy
+				b.y += deltaY
 			}
 		}
 
-		events = append(events, breakEvent{start: start, dy: dy})
+		events = append(events, breakEvent{start: start, dy: deltaY})
 		changed = true
 	}
 
@@ -2643,13 +2677,13 @@ func beforeAlways(res *Result, contentH float64) bool {
 	// One linear apply of the difference array onto ops.
 	cum := 0.0
 
-	for i := 0; i < n; i++ {
-		cum += suffixDy[i]
-		if cum == 0 || ops[i].Fixed {
+	for idx := range opCount {
+		cum += suffixDy[idx]
+		if cum == 0 || ops[idx].Fixed {
 			continue
 		}
 
-		ops[i].Y += cum
+		ops[idx].Y += cum
 	}
 
 	invalidateFlowIndex(res)
@@ -2678,56 +2712,10 @@ func collectBeforeAlwaysBoxes(root *box) []*box {
 	return out
 }
 
-// prefixMaxOfOps returns prefixMax[i] = max Y of ops[0:i].
-// When buf has capacity >= len(ops)+1 it is reused (no allocation); otherwise
-// a new slice is allocated. Kept for tests/callers that need random access.
-func prefixMaxOfOps(ops []Op, buf []float64) []float64 {
-	need := len(ops) + 1
-	if cap(buf) < need {
-		buf = make([]float64, need)
-	} else {
-		buf = buf[:need]
-	}
-	// Empty-prefix max; must be zero when reusing a dirty buffer.
-	if need > 0 {
-		buf[0] = 0
-	}
-
-	for i, op := range ops {
-		buf[i+1] = buf[i]
-		if op.Y > buf[i+1] {
-			buf[i+1] = op.Y
-		}
-	}
-
-	return buf
-}
-
-// shiftForcedBreakCoords moves a page-break-before:always box below lastBefore
-// (max Y of ops that precede the box) using coordinate-only shifts. Returns
-// whether it shifted.
-func shiftForcedBreakCoords(res *Result, boxNode *box, lastBefore, contentH float64) bool {
-	loPage := int(boxNode.y / contentH)
-	lastPage := int(lastBefore / contentH)
-
-	if loPage > lastPage {
-		return false
-	}
-
-	dy := float64(lastPage+1)*contentH - boxNode.y
-	if dy <= 0 {
-		return false
-	}
-
-	shiftFlowYCoords(res, boxNode.opStart, boxNode.opEnd, boxNode.y, dy)
-
-	return true
-}
-
 // afterBreaks walks in document order and applies page-break-after:
 // always|avoid to the box that follows each box in flow.
 func afterBreaks(res *Result, contentH float64) bool {
-	boxes := flattenAllBoxes(res.root)
+	boxes := flowBoxList(res)
 
 	changed := false
 
@@ -2752,26 +2740,6 @@ func afterBreaks(res *Result, contentH float64) bool {
 	}
 
 	return changed
-}
-
-// flattenAllBoxes returns the box tree in document order.
-func flattenAllBoxes(root *box) []*box {
-	var boxes []*box
-
-	var flatten func(b *box)
-	flatten = func(b *box) {
-		boxes = append(boxes, b)
-
-		for _, c := range b.children {
-			flatten(c)
-		}
-	}
-
-	if root != nil {
-		flatten(root)
-	}
-
-	return boxes
 }
 
 // nextFlowSibling returns the first box after i that emitted ops.
@@ -3082,7 +3050,7 @@ func keepHeadingWithNext(res *Result, contentH float64) bool {
 		return false
 	}
 
-	boxes := flattenAllBoxes(res.root)
+	boxes := flowBoxList(res)
 
 	changed := false
 
@@ -3679,6 +3647,18 @@ func populateLocations(res *Result, contentH float64, opPage []int) {
 	if res.root == nil {
 		return
 	}
+
+	// The flattened box list mirrors the preorder walk below, so the
+	// element-location count is known in advance: one append, no growth.
+	count := 0
+
+	for _, b := range res.boxes {
+		if b.node != nil {
+			count++
+		}
+	}
+
+	res.Locations = make([]ElementLocation, 0, count)
 
 	var walk func(b *box)
 	walk = func(boxNode *box) {

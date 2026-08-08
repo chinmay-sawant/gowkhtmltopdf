@@ -73,6 +73,10 @@ type Document struct {
 	pages          []*Page
 	outlineRoot    *Outline
 	fontCache      map[string]objRef // subset key -> font dict ref
+	fontRunes      map[string][]rune // font resource name -> document-wide rune union (finalize-time)
+	fontKeys       map[string]string // font resource name -> precomputed subset cache key
+	fontKeyFonts   map[string]*Font  // font resource name -> the face the precomputed key belongs to
+	fontType0      map[string]bool   // font resource name -> precomputed needsType0(union)
 	catalogRef     objRef            // set by finalize
 	infoRef        objRef            // set by finalize
 	finalized      bool
@@ -364,6 +368,8 @@ func (d *Document) finalize() error {
 	infoRef := d.newObject()
 	pagesRef := d.newObject()
 
+	d.unionFontRunes()
+
 	pageRefs := make([]string, 0, len(d.pages))
 	for _, p := range d.pages {
 		pageRefs = append(pageRefs, p.ref.String())
@@ -399,6 +405,62 @@ func (d *Document) finalize() error {
 	d.finalized = true
 
 	return nil
+}
+
+// unionFontRunes merges every page's used-rune set per font resource name
+// into one document-wide set. Page numbers make per-page rune sets differ
+// (each page subsets the same font), so without this each font is subset and
+// embedded ~once per page instead of once per document. The union order is
+// sorted and the subset cache key and Type0 decision are precomputed here
+// (they are identical for every page) so ensureFont per page is a map lookup.
+func (d *Document) unionFontRunes() {
+	union := map[string][]rune{}
+	fonts := map[string]*Font{}
+
+	for _, p := range d.pages {
+		for name, runes := range p.content.used {
+			union[name] = append(union[name], runes...)
+
+			if fonts[name] == nil {
+				fonts[name] = p.content.fontFiles[name]
+			}
+		}
+	}
+
+	if len(union) == 0 {
+		return
+	}
+
+	d.fontRunes = make(map[string][]rune, len(union))
+	d.fontKeys = make(map[string]string, len(union))
+	d.fontKeyFonts = make(map[string]*Font, len(union))
+	d.fontType0 = make(map[string]bool, len(union))
+
+	for name, runes := range union {
+		sort.Slice(runes, func(i, j int) bool { return runes[i] < runes[j] })
+		d.fontRunes[name] = runes
+
+		fnt := fonts[name]
+		if fnt == nil {
+			continue
+		}
+
+		type0 := needsType0(runes)
+		d.fontType0[name] = type0
+
+		mode := 0
+		if type0 {
+			mode = 1
+		}
+
+		baseName := fnt.PostScriptName
+		if baseName == "" {
+			baseName = fallbackFontName
+		}
+
+		d.fontKeyFonts[name] = fnt
+		d.fontKeys[name] = fmt.Sprintf("v%d|%x|%s|%s", mode, fnt.fingerprint, baseName, runesKey(runes))
+	}
 }
 
 // catalogDict builds the /Catalog dictionary, wiring /Outlines when set.
@@ -673,36 +735,9 @@ func outlineCount(root *Outline) int {
 // replaced with '?'; emitting raw UTF-8 bytes made viewers show mojibake
 // and missing glyphs (e.g. "·" as "\302\267").
 func pdfString(s string) string {
-	var buf strings.Builder
-	buf.Grow(len(s) + 2)
+	const literalDelims = 2 // '(' and ')' framing the literal
 
-	buf.WriteByte('(')
-
-	for _, rVal := range s {
-		if rVal > maxLatin1Code {
-			rVal = winAnsiFold(rVal)
-		}
-
-		if rVal > maxLatin1Code {
-			rVal = '?'
-		}
-
-		cur := byte(rVal)
-
-		switch {
-		case cur == '(' || cur == ')' || cur == '\\':
-			buf.WriteByte('\\')
-			buf.WriteByte(cur)
-		case cur < 32 || cur > 126:
-			fmt.Fprintf(&buf, "\\%03o", cur)
-		default:
-			buf.WriteByte(cur)
-		}
-	}
-
-	buf.WriteByte(')')
-
-	return buf.String()
+	return string(appendPDFString(make([]byte, 0, len(s)+literalDelims), s))
 }
 
 // winAnsiFold maps common Unicode punctuation that appears in HTML/CSS to a

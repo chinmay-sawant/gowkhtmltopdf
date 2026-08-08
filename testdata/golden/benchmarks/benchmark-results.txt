@@ -1,13 +1,19 @@
 # Generated benchmark snapshot
-# Command (PDF/Template residual optimization wave 2026-08-09, feature/optimization, aa8d446):
-#   go test ./internal/convert -run '^$' -bench 'Benchmark(PDFPages|TemplatePages)$' -benchmem -benchtime=1x -count=1
+# Command (post-lint-cleanup re-measurement, 2026-08-09, working tree after aa8d446 + lint wave):
+#   go test ./internal/convert -run '^$' -bench 'Benchmark(PDFPages|TemplatePages|WebFetchImage|ImageAssets)$' -benchmem -benchtime=1x -count=1
 # Locked 500 PDF bar: 2.10s / 1.48GB / 3.93M allocs
 # Separate locked-gate command: go test -run '^$' -bench '^BenchmarkPDFPages/500Pages$' -benchmem -benchtime=1x -count=3
-# 500 PDF count-3 median after wave: 1.628s / 678.8MB / 1.103M allocs
+# 500 PDF count-3 median: 0.936s / 392.8MB / 535,088 allocs (latest count-3 run)
 # Toolchain: go1.26.4 linux/amd64 · Host: WSL2 24 CPUs · i7-13700HX
+# Previous committed snapshot (aa8d446): PDF 500 = 1.903s / 678.6MB / 1.103M allocs.
+# 500 PDF versus that snapshot: -46.8% time / -42.1% B/op / -51.5% allocs.
+# Main driver: the working tree skips the redundant smart-shrink re-layout for
+# sub-0.1pt overflows (smartShrinkMinOverflow in internal/convert); the matrix
+# report overflows its content area by 0.00pt, so it no longer pays a second
+# full 500-page layout pass. Image rows were also re-measured: the previous
+# rows had been carried forward from an older era, not re-run at the wave.
 # Original first snapshot: commit 2a0f18b, same one-iteration matrix command.
 # Original 500 PDF: 14.135s / 3798107576 B/op / 14345183 allocs/op.
-# Current 500 PDF versus that snapshot: -86.5% time / -82.1% B/op / -92.3% allocs.
 # Earlier wkhtmltopdf 0.12.6.1 process reference: 2.05s / ~114MB peak RSS / ~2.0MB PDF.
 # The wkhtmltopdf reference is process-level; Go B/op is cumulative allocation
 # traffic, so it must not be presented as a direct RSS comparison.
@@ -16,43 +22,50 @@ goos: linux
 goarch: amd64
 pkg: gowkhtmltopdf/internal/convert
 cpu: 13th Gen Intel(R) Core(TM) i7-13700HX
-# PDF/Template after the profile-guided residual optimization wave.
-BenchmarkPDFPages/2Pages-24  	       1	   6657852 ns/op	   4.33 MB/s	 3767496 B/op	    5075 allocs/op
-BenchmarkPDFPages/5Pages-24  	       1	  11614599 ns/op	   5.06 MB/s	 6107328 B/op	   10928 allocs/op
-BenchmarkPDFPages/10Pages-24 	       1	  22182020 ns/op	   4.90 MB/s	11285992 B/op	   20970 allocs/op
-BenchmarkPDFPages/20Pages-24 	       1	  41082993 ns/op	   4.92 MB/s	21830240 B/op	   40768 allocs/op
-BenchmarkPDFPages/50Pages-24 	       1	 114566265 ns/op	   3.83 MB/s	52768184 B/op	   98585 allocs/op
-BenchmarkPDFPages/100Pages-24         	       1	 248962639 ns/op	   2.72 MB/s	100919816 B/op	  188179 allocs/op
-BenchmarkPDFPages/200Pages-24         	       1	 481444251 ns/op	   2.53 MB/s	200081760 B/op	  370373 allocs/op
-BenchmarkPDFPages/250Pages-24         	       1	 590165606 ns/op	   2.52 MB/s	248902672 B/op	  461490 allocs/op
-BenchmarkPDFPages/500Pages-24         	       1	1903482150 ns/op	   1.32 MB/s	678645808 B/op	 1102840 allocs/op
-BenchmarkTemplatePages/2Pages-24      	       1	   5238716 ns/op	   5.50 MB/s	 3099472 B/op	    5099 allocs/op
-BenchmarkTemplatePages/5Pages-24      	       1	   9235655 ns/op	   6.36 MB/s	 6178672 B/op	   11446 allocs/op
-BenchmarkTemplatePages/10Pages-24     	       1	  18619190 ns/op	   5.84 MB/s	11423760 B/op	   21992 allocs/op
-BenchmarkTemplatePages/20Pages-24     	       1	  48513911 ns/op	   4.16 MB/s	22118192 B/op	   42823 allocs/op
-BenchmarkTemplatePages/50Pages-24     	       1	 117083200 ns/op	   3.75 MB/s	53277168 B/op	  103675 allocs/op
-BenchmarkTemplatePages/100Pages-24    	       1	 223408911 ns/op	   3.03 MB/s	102045520 B/op	  198369 allocs/op
-BenchmarkTemplatePages/200Pages-24    	       1	 458802353 ns/op	   2.65 MB/s	202423160 B/op	  390765 allocs/op
-BenchmarkTemplatePages/250Pages-24    	       1	 588033962 ns/op	   2.53 MB/s	251061912 B/op	  486984 allocs/op
-BenchmarkTemplatePages/500Pages-24    	       1	1693149654 ns/op	   1.49 MB/s	683490784 B/op	 1154097 allocs/op
-BenchmarkWebFetchImage/2Images-24     	       1	 257331813 ns/op	   0.04 MB/s	   5952576 B/op	   57314 allocs/op
-BenchmarkWebFetchImage/5Images-24     	       1	 258052625 ns/op	   0.05 MB/s	   6845392 B/op	  140716 allocs/op
-BenchmarkWebFetchImage/10Images-24    	       1	 281101386 ns/op	   0.05 MB/s	   8351296 B/op	  279772 allocs/op
-BenchmarkWebFetchImage/20Images-24    	       1	 310473055 ns/op	   0.06 MB/s	  12606288 B/op	  557610 allocs/op
-BenchmarkWebFetchImage/50Images-24    	       1	 356655248 ns/op	   0.10 MB/s	  25228048 B/op	 1391103 allocs/op
-BenchmarkWebFetchImage/100Images-24   	       1	 413681572 ns/op	   0.16 MB/s	  46378416 B/op	 2780252 allocs/op
-BenchmarkWebFetchImage/200Images-24   	       1	 506420577 ns/op	   0.24 MB/s	  88634240 B/op	 5558496 allocs/op
-BenchmarkWebFetchImage/250Images-24   	       1	 564001087 ns/op	   0.27 MB/s	 109365272 B/op	 6947628 allocs/op
-BenchmarkWebFetchImage/500Images-24   	       1	 970724892 ns/op	   0.30 MB/s	 215054208 B/op	13893228 allocs/op
-BenchmarkImageAssets/2Images-24       	       1	 209500224 ns/op	   0.05 MB/s	   5768048 B/op	   56812 allocs/op
-BenchmarkImageAssets/5Images-24       	       1	 220612212 ns/op	   0.05 MB/s	   6669288 B/op	  140242 allocs/op
-BenchmarkImageAssets/10Images-24      	       1	 255354913 ns/op	   0.05 MB/s	   8178424 B/op	  279284 allocs/op
-BenchmarkImageAssets/20Images-24      	       1	 282332856 ns/op	   0.07 MB/s	  12438760 B/op	  557124 allocs/op
-BenchmarkImageAssets/50Images-24      	       1	 303540577 ns/op	   0.12 MB/s	  25081384 B/op	 1390609 allocs/op
-BenchmarkImageAssets/100Images-24     	       1	 340306269 ns/op	   0.19 MB/s	  46254824 B/op	 2779741 allocs/op
-BenchmarkImageAssets/200Images-24     	       1	 439458516 ns/op	   0.27 MB/s	  88577944 B/op	 5557997 allocs/op
-BenchmarkImageAssets/250Images-24     	       1	 491219435 ns/op	   0.30 MB/s	 109354376 B/op	 6947107 allocs/op
-BenchmarkImageAssets/500Images-24     	       1	 788426966 ns/op	   0.37 MB/s	 215184680 B/op	13892715 allocs/op
+# PDF/Template after the profile-guided residual optimization wave; image rows
+# re-measured in the same session (previous rows were stale carry-overs).
+BenchmarkPDFPages/2Pages-24  	       1	   5818480 ns/op	   3.72 MB/s	 3377112 B/op	    3472 allocs/op
+BenchmarkPDFPages/5Pages-24  	       1	   7825825 ns/op	   3.83 MB/s	 5154272 B/op	    6511 allocs/op
+BenchmarkPDFPages/10Pages-24 	       1	  14244022 ns/op	   3.09 MB/s	 9049304 B/op	   11837 allocs/op
+BenchmarkPDFPages/20Pages-24 	       1	  33227343 ns/op	   2.12 MB/s	16798856 B/op	   22383 allocs/op
+BenchmarkPDFPages/50Pages-24 	       1	  79773238 ns/op	   1.89 MB/s	40361832 B/op	   54342 allocs/op
+BenchmarkPDFPages/100Pages-24         	       1	 207486625 ns/op	   1.37 MB/s	79642352 B/op	  107689 allocs/op
+BenchmarkPDFPages/200Pages-24         	       1	 383619172 ns/op	   1.44 MB/s	158242840 B/op	  214516 allocs/op
+BenchmarkPDFPages/250Pages-24         	       1	 422150655 ns/op	   1.63 MB/s	196949048 B/op	  267961 allocs/op
+BenchmarkPDFPages/500Pages-24         	       1	1013521913 ns/op	   1.35 MB/s	392180856 B/op	  535064 allocs/op
+BenchmarkTemplatePages/2Pages-24      	       1	   4217532 ns/op	   5.13 MB/s	 2709120 B/op	    3497 allocs/op
+BenchmarkTemplatePages/5Pages-24      	       1	   7733612 ns/op	   3.88 MB/s	 5228200 B/op	    7029 allocs/op
+BenchmarkTemplatePages/10Pages-24     	       1	  16394852 ns/op	   2.68 MB/s	 9192760 B/op	   12869 allocs/op
+BenchmarkTemplatePages/20Pages-24     	       1	  26961090 ns/op	   2.62 MB/s	17086936 B/op	   24442 allocs/op
+BenchmarkTemplatePages/50Pages-24     	       1	  85119472 ns/op	   1.77 MB/s	40914184 B/op	   59451 allocs/op
+BenchmarkTemplatePages/100Pages-24    	       1	 174948712 ns/op	   1.63 MB/s	80757320 B/op	  117865 allocs/op
+BenchmarkTemplatePages/200Pages-24    	       1	 392570613 ns/op	   1.41 MB/s	160543768 B/op	  234897 allocs/op
+BenchmarkTemplatePages/250Pages-24    	       1	 438736153 ns/op	   1.57 MB/s	199615464 B/op	  293459 allocs/op
+BenchmarkTemplatePages/500Pages-24    	       1	1046586434 ns/op	   1.30 MB/s	397569992 B/op	  586355 allocs/op
+BenchmarkWebFetchImage/2Images-24     	       1	  19934723 ns/op	   0.54 MB/s	39955960 B/op	    7776 allocs/op
+BenchmarkWebFetchImage/5Images-24     	       1	  17791661 ns/op	   0.69 MB/s	42935992 B/op	    8296 allocs/op
+BenchmarkWebFetchImage/10Images-24    	       1	  22382706 ns/op	   0.63 MB/s	49248480 B/op	    9101 allocs/op
+BenchmarkWebFetchImage/20Images-24    	       1	  22948790 ns/op	   0.86 MB/s	50893864 B/op	    9361 allocs/op
+BenchmarkWebFetchImage/50Images-24    	       1	  33342932 ns/op	   1.11 MB/s	55800208 B/op	   10119 allocs/op
+BenchmarkWebFetchImage/100Images-24   	       1	  58801705 ns/op	   1.11 MB/s	64021272 B/op	   11393 allocs/op
+BenchmarkWebFetchImage/200Images-24   	       1	  92401922 ns/op	   1.32 MB/s	80506064 B/op	   13921 allocs/op
+BenchmarkWebFetchImage/250Images-24   	       1	 103426434 ns/op	   1.45 MB/s	88605760 B/op	   15170 allocs/op
+BenchmarkWebFetchImage/500Images-24   	       1	 199887750 ns/op	   1.46 MB/s	129889704 B/op	   21484 allocs/op
+BenchmarkImageAssets/2Images-24       	       1	  16767521 ns/op	   0.56 MB/s	34050320 B/op	    5989 allocs/op
+BenchmarkImageAssets/5Images-24       	       1	  14966496 ns/op	   0.75 MB/s	37041560 B/op	    6541 allocs/op
+BenchmarkImageAssets/10Images-24      	       1	  20174367 ns/op	   0.64 MB/s	43359192 B/op	    7342 allocs/op
+BenchmarkImageAssets/20Images-24      	       1	  19063780 ns/op	   0.97 MB/s	45008936 B/op	    7600 allocs/op
+BenchmarkImageAssets/50Images-24      	       1	  31132347 ns/op	   1.15 MB/s	49939640 B/op	    8360 allocs/op
+BenchmarkImageAssets/100Images-24     	       1	  51244215 ns/op	   1.25 MB/s	58198936 B/op	    9622 allocs/op
+BenchmarkImageAssets/200Images-24     	       1	  84076119 ns/op	   1.43 MB/s	74743840 B/op	   12142 allocs/op
+BenchmarkImageAssets/250Images-24     	       1	  93752572 ns/op	   1.58 MB/s	82894832 B/op	   13400 allocs/op
+BenchmarkImageAssets/500Images-24     	       1	 179231641 ns/op	   1.62 MB/s	124329936 B/op	   19687 allocs/op
 
 PASS
-ok  	gowkhtmltopdf/internal/convert	47.762s
+ok  	gowkhtmltopdf/internal/convert	5.576s
+
+# Count-3 locked-gate runs (2026-08-09, same tree):
+#   go test -run '^$' -bench '^Benchmark(PDFPages|TemplatePages)/500Pages$' -benchmem -benchtime=1x -count=3
+# PDF 500 raw: 1.085s / 1.149s / 1.049s (median 1.085s); re-run: 1.232s / 0.936s / 0.871s (median 0.936s).
+# Median across both count-3 runs (n=6): (1.049+1.085)/2 = 1.067s / ~393MB / ~535K allocs.
+# Template 500 raw: 0.929s / 0.899s / 0.926s (median 0.926s / ~397MB / ~586K allocs).

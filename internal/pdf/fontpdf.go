@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -145,7 +146,9 @@ func runesKey(used []rune) string {
 	slices.Sort(used)
 
 	unique := 0
+
 	var previous rune
+
 	for _, posX := range used {
 		if unique > 0 && posX == previous {
 			continue
@@ -155,20 +158,26 @@ func runesKey(used []rune) string {
 		unique++
 	}
 
-	var strB strings.Builder
-	strB.Grow(unique * 4)
+	const (
+		hexDigitsPerRune = 4
+		hexBase          = 16
+	)
+
+	out := make([]byte, 0, unique*hexDigitsPerRune)
 
 	previous = 0
 	havePrevious := false
+
 	for _, posX := range used {
 		if havePrevious && posX == previous {
 			continue
 		}
 
-		fmt.Fprintf(&strB, "%x,", posX)
+		out = strconv.AppendUint(out, uint64(posX), hexBase)
+		out = append(out, ',')
 		previous = posX
 		havePrevious = true
 	}
 
-	return strB.String()
+	return string(out)
 }

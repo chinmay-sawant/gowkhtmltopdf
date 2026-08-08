@@ -32,7 +32,7 @@ func LoadDefaultFaces() (*FaceSet, error) {
 		faces := &FaceSet{} //nolint:exhaustruct // intentional zero-value fields
 
 		var err error
-		if faces.Regular, err = parseNamed("LiberationSans", assets.LiberationSansRegularTTF); err != nil {
+		if faces.Regular, err = parseNamed(fallbackFontName, assets.LiberationSansRegularTTF); err != nil {
 			errDefaultFaces = err
 
 			return
