@@ -242,13 +242,15 @@ page), so those timings are not directly comparable.
 
 | Workload | 2 | 5 | 10 | 20 | 50 | 100 | 200 | 250 | 500 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| PDF pages | 5.5ms | 11.8ms | 21.0ms | 46.0ms | 113ms | 239ms | 695ms | 1.13s | 2.10s |
-| Template + PDF pages | 4.0ms | 10.8ms | 20.7ms | 41.8ms | 102ms | 237ms | 465ms | 579ms | 1.93s |
+| PDF pages | 6.4ms | 9.1ms | 18.6ms | 36.0ms | 97.3ms | 201ms | 431ms | 504ms | 1.61s |
+| Template + PDF pages | 3.7ms | 9.3ms | 18.2ms | 36.6ms | 106ms | 213ms | 406ms | 533ms | 1.63s |
 | Web-fetch image tiles | 257.33ms | 258.05ms | 281.10ms | 310.47ms | 356.66ms | 413.68ms | 506.42ms | 564.00ms | 970.72ms |
 | Inline image tiles | 209.50ms | 220.61ms | 255.35ms | 282.33ms | 303.54ms | 340.31ms | 439.46ms | 491.22ms | 788.43ms |
 
-PDF / Template: heavy-opt wave (2026-08-08). 500-page PDF count-3 median
-(~2.10s / 1.48GB / 3.93M allocs). Image-tile rows unchanged.
+PDF / Template: profile-guided residual optimization wave (2026-08-08).
+The locked 500-page PDF count-3 median is **1.643s / 1.225GB / 3.196M
+allocs**, versus the published **2.10s / 1.48GB / 3.93M** bar. Image-tile rows
+are unchanged.
 
 - [Benchmark implementation](internal/convert/benchmarks_test.go)
 - [Benchmark templates and recorded results](testdata/golden/benchmarks/README.md)

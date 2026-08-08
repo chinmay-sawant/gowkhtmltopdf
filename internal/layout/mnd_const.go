@@ -51,7 +51,7 @@ const (
 	minDashPt              = 0.5
 	minLeadPt              = 8
 	minOpsCapacity         = 64
-	opsPerNodeHint         = 4
+	opsPerNodeHint         = 2
 	outlineStrokeRatio     = 0.06
 	paginationGuardMax     = 10000
 	pairLen                = 2

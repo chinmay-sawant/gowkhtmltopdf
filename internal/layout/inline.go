@@ -51,7 +51,7 @@ func (e *engine) layoutInlineFloats(
 	boxNode *box, nodes []*html.Node, contentW, contentX, lineY float64,
 	floats *floatState,
 ) float64 {
-	var items []inlineItem
+	items := e.acquireInlineItems()
 
 	oldMax := e.imgMaxW
 	oldCB := e.inlineCBW
@@ -64,8 +64,20 @@ func (e *engine) layoutInlineFloats(
 	e.collectInline(nodes, &items)
 	e.imgMaxW = oldMax
 	e.inlineCBW = oldCB
-	items = squeezeInlineSpaces(items)
-	items = separateAdjacentCites(items, e)
+
+	if len(items) >= two {
+		oldItems := items
+		items = squeezeInlineSpaces(items)
+		e.releaseInlineItems(oldItems)
+	}
+
+	if len(items) >= two {
+		oldItems := items
+		items = separateAdjacentCites(items, e)
+		e.releaseInlineItems(oldItems)
+	}
+
+	defer e.releaseInlineItems(items)
 
 	if len(items) == 0 {
 		return 0
@@ -106,6 +118,34 @@ func (e *engine) layoutInlineFloats(
 	}
 
 	return leftY - lineY
+}
+
+const maxPooledInlineItems = 256
+
+// acquireInlineItems returns a reusable temporary item slice for one inline
+// formatting context. Nested contexts consume separate entries from the same
+// engine-local stack.
+func (e *engine) acquireInlineItems() []inlineItem {
+	if n := len(e.inlineItemPool); n > 0 {
+		items := e.inlineItemPool[n-1]
+		e.inlineItemPool = e.inlineItemPool[:n-1]
+
+		return items[:0]
+	}
+
+	return make([]inlineItem, 0)
+}
+
+// releaseInlineItems returns a temporary item slice to the engine-local pool.
+// Very large contexts are left for GC so one pathological line cannot pin a
+// large backing array for the rest of the document.
+func (e *engine) releaseInlineItems(items []inlineItem) {
+	if cap(items) == 0 || cap(items) > maxPooledInlineItems {
+		return
+	}
+
+	clear(items)
+	e.inlineItemPool = append(e.inlineItemPool, items[:0])
 }
 
 // packInlineLine advances idx over the items that fit on one line under the

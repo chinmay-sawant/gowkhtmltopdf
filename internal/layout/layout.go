@@ -194,15 +194,15 @@ type Op struct {
 }
 
 type engine struct {
-	opts       Options
-	ctx        context.Context //nolint:containedctx // ctx is checked at recursion boundaries (checkContext)
-	err        error
-	font       *pdf.Font // default/regular face (metrics fallback)
-	faces      *pdf.FaceSet
-	registry   *pdf.Registry
+	opts     Options
+	ctx      context.Context //nolint:containedctx // ctx is checked at recursion boundaries (checkContext)
+	err      error
+	font     *pdf.Font // default/regular face (metrics fallback)
+	faces    *pdf.FaceSet
+	registry *pdf.Registry
 	// styles holds one heap ResolvedStyle per node (from resolveStylesCtx).
 	// Callers use stylePtr for shared *ResolvedStyle without a second copy.
-	styles map[*html.Node]*ResolvedStyle
+	styles     map[*html.Node]*ResolvedStyle
 	ops        []Op
 	noEmit     bool // measurement mode: compute geometry without emitting ops
 	height     float64
@@ -234,6 +234,10 @@ type engine struct {
 	bfcStack []*floatState
 	// bfcPool recycles floatState values for pushBFCFloats.
 	bfcPool []*floatState
+	// inlineItemPool recycles temporary inline-item backing arrays. The pool is
+	// engine-local because layout is single-threaded and nested inline layout
+	// must retain each active caller's slice.
+	inlineItemPool [][]inlineItem
 	// deferredChrome holds background/border ops to splice in one linear
 	// pass (finalizeChrome) for the common non-sticky/non-fixed/non-transform
 	// path. Sticky/fixed/transform boxes still splice immediately.
@@ -728,7 +732,7 @@ func estimateOpCapacity(root *html.Node) int {
 
 	root.Walk(func(*html.Node) { nodes++ })
 
-	capacity := nodes * minBoxPt
+	capacity := nodes * opsPerNodeHint
 	if capacity < minOpsCapacity {
 		capacity = 64
 	}
@@ -1891,11 +1895,13 @@ func isFlowFloat(node *html.Node, engine *engine) bool {
 // collectInlineRun gathers a maximal run of inline children starting at idx,
 // skipping display:none elements and keeping interior whitespace.
 func collectInlineRun(children []*html.Node, idx int, engine *engine) ([]*html.Node, int) {
-	var run []*html.Node
+	start := idx
+	hasDisplayNone := false
 
 	for idx < len(children) {
 		child := children[idx]
 		if child.Type == html.ElementNode && engine.styles[child].Display == cssDisplayNone {
+			hasDisplayNone = true
 			idx++
 
 			continue
@@ -1908,7 +1914,6 @@ func collectInlineRun(children []*html.Node, idx int, engine *engine) ([]*html.N
 		if child.Type == html.TextNode && strings.TrimSpace(child.Text) == "" {
 			// keep interior whitespace inside an inline run, but a run that
 			// is only WS is dropped below.
-			run = append(run, child)
 			idx++
 
 			continue
@@ -1918,8 +1923,20 @@ func collectInlineRun(children []*html.Node, idx int, engine *engine) ([]*html.N
 			break
 		}
 
-		run = append(run, child)
 		idx++
+	}
+
+	if !hasDisplayNone {
+		return children[start:idx], idx
+	}
+
+	run := make([]*html.Node, 0, idx-start)
+	for _, child := range children[start:idx] {
+		if child.Type == html.ElementNode && engine.styles[child].Display == cssDisplayNone {
+			continue
+		}
+
+		run = append(run, child)
 	}
 
 	return run, idx

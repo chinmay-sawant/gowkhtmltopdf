@@ -233,6 +233,9 @@ type styleContext struct {
 	// containers maps size-query containers (inline-size|size) to their used
 	// content-box inline size. nil means first pass: skip @container rules.
 	containers map[*html.Node]sizeContainer
+	// ruleHits is reused between sequential cascade lookups. A lookup consumes
+	// the returned slice before the next element is resolved.
+	ruleHits []ruleHit
 }
 
 // sizeContainer is one element that establishes a size query container.
@@ -323,7 +326,25 @@ func resolveStylesCtx(root *html.Node, ctx *styleContext) map[*html.Node]*Resolv
 
 		out[node] = sty
 
+		// Direct text-node styles are immutable during layout, so adjacent text
+		// nodes can share one inherited value without changing element styles.
+		var textStyle *ResolvedStyle
 		for _, c := range node.Children {
+			if c.Type == html.TextNode {
+				if textStyle == nil {
+					s := initialStyle()
+					if sty != nil {
+						inheritProps(&s, sty, nil)
+						s.CustomProps = sty.CustomProps
+					}
+					textStyle = &s
+				}
+
+				out[c] = textStyle
+
+				continue
+			}
+
 			walk(c, sty)
 		}
 	}
@@ -572,12 +593,13 @@ func (ctx *styleContext) matchedRules(node *html.Node, pseudoElem string) []rule
 		return nil
 	}
 
-	// Single growable buffer — avoid per-sheet intermediate slices (hot on
-	// large documents: ruleSelectorHits was ~16% of alloc_objects at 500 pages).
-	var hits []ruleHit
+	// Reuse one growable buffer across sequential element lookups. The caller
+	// consumes the returned slice before resolving the next element.
+	hits := ctx.ruleHits[:0]
 	for _, sheet := range ctx.sheets {
 		hits = ctx.appendSheetRuleHits(hits, sheet, node, pseudoElem)
 	}
+	ctx.ruleHits = hits
 
 	return hits
 }
@@ -665,10 +687,10 @@ const cascadeWinHint = 8
 // the specificity/order bits needed to compare later candidates. important is
 // a separate cascade layer (any !important beats any normal).
 type cascadeWin struct {
-	value                 string
-	ids, classes, types   int
-	order                 int
-	important             bool
+	value               string
+	ids, classes, types int
+	order               int
+	important           bool
 }
 
 // cascadeRaw returns the winning declaration per property for the element

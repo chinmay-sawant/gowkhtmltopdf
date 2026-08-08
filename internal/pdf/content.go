@@ -307,7 +307,10 @@ type textRun struct {
 // is drawn with an embedded Liberation fallback so ASCII does not become tofu.
 func (c *Content) TextShow(text string) {
 	fnt := c.fontFiles[c.curFont]
-	text = ShapeRun(text, fnt, c.curSize).Text
+	// PDF emission needs the shaped text only. ShapeRun also computes per-rune
+	// advances for the raster adapter, which is unnecessary here and creates
+	// two slices for every text operator.
+	text = ShapeTextFont(text, fnt)
 
 	if fnt == nil || !c.textNeedsType0(text) {
 		c.textShowSimple(text)
@@ -492,11 +495,11 @@ func (c *Content) textShowType0(str string) {
 // that names a missing /Resources entry renders invisible, so the error is
 // propagated instead of dropped.
 func (c *Content) fonts() (map[string]string, error) {
-	out := map[string]string{}
-
 	for name := range c.fontUses {
 		f, ok := c.fontFiles[name]
 		if !ok {
+			delete(c.fontUses, name)
+
 			continue
 		}
 
@@ -506,26 +509,15 @@ func (c *Content) fonts() (map[string]string, error) {
 		}
 
 		c.fontUses[name] = ref.String()
-		out[name] = ref.String()
 	}
 
-	return out, nil
+	return c.fontUses, nil
 }
 
 // imageResources returns the map of image resource name to object ref.
 // JPEG/PNG paths allocate the XObject eagerly in AddJPEGImage/AddPNGImage.
 func (c *Content) imageResources() map[string]string {
-	out := map[string]string{}
-
-	for name, img := range c.imageRefs {
-		if img == nil || img.ref == 0 {
-			continue
-		}
-
-		out[name] = img.ref.String()
-	}
-
-	return out
+	return c.imageUses
 }
 
 // extGState returns the ExtGState dict for the page resources ("" when none).
