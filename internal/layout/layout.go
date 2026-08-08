@@ -2474,7 +2474,7 @@ func jpegDims(data []byte) (int, int, bool, bool) {
 		}
 
 		if isSOFMarker(marker) {
-			// SOF: FF mm LL LL P YY YY XX XX …
+			// SOF layout: marker, 2-byte length, precision, height, width.
 			// Need through width (pos+8 inclusive).
 			if pos+9 > len(data) {
 				return 0, 0, false, false
@@ -2482,6 +2482,7 @@ func jpegDims(data []byte) (int, int, bool, bool) {
 
 			height := int(binary.BigEndian.Uint16(data[pos+5 : pos+7]))
 			width := int(binary.BigEndian.Uint16(data[pos+7 : pos+9]))
+
 			if width <= 0 || height <= 0 {
 				return 0, 0, false, false
 			}

@@ -2065,7 +2065,6 @@ func shiftOpsBucket(res *Result, page, from, toIdx int, fromY, deltaY float64) {
 		if res.flowPageOf[idx] == oldPage {
 			jdx++
 		}
-		// else: swap-remove put another index at jdx (or shortened the bucket).
 	}
 }
 
@@ -2098,10 +2097,7 @@ func shiftBoxesBucket(res *Result, page, from, toIdx int, fromY float64, startPa
 		}
 
 		boxIndex := bucket[jdx]
-
-		b := res.boxes[boxIndex]
-		if startPage == res.flowBoxPage[boxIndex] && !(b.y > fromY ||
-			(b.y == fromY && b.opStart >= from && b.opEnd <= toIdx)) {
+		if skipBoxShift(res, boxIndex, from, toIdx, fromY, startPage) {
 			jdx++
 
 			continue
@@ -2114,6 +2110,25 @@ func shiftBoxesBucket(res *Result, page, from, toIdx int, fromY float64, startPa
 			jdx++
 		}
 	}
+}
+
+// skipBoxShift reports whether a box on startPage should stay put during a
+// flow shift (top at/above fromY, except the target op range sitting on fromY).
+func skipBoxShift(res *Result, boxIndex, from, toIdx int, fromY float64, startPage int) bool {
+	if startPage != res.flowBoxPage[boxIndex] {
+		return false
+	}
+
+	b := res.boxes[boxIndex]
+	if b.y > fromY {
+		return false
+	}
+
+	if b.y == fromY && b.opStart >= from && b.opEnd <= toIdx {
+		return false
+	}
+
+	return true
 }
 
 func flowIndexPageSize(res *Result) float64 {

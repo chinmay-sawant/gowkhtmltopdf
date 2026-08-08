@@ -454,7 +454,7 @@ func paintLayoutOps(ctx context.Context, page *pdf.Page, c *pdf.Content, ops []l
 		OriginX: originX,
 		OriginY: yTop,
 	}); err != nil {
-		return err
+		return fmt.Errorf("convert: paint HF layout band: %w", err)
 	}
 
 	for i := range ops {

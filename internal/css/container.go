@@ -112,8 +112,25 @@ const (
 // (72/25.4) and multiplying loses that cancellation (25.4mm → 71.999…).
 func LengthToPt(val float64, unit string, basePt float64) (float64, bool) {
 	low := strings.ToLower(unit)
+	if pt, ok := absoluteLengthToPt(val, low); ok {
+		return pt, true
+	}
 
 	switch low {
+	case "em":
+		return val * basePt, true
+	case unitRem:
+		return val * rootFontSizePx * pxToPt, true
+	case "ex", "ch":
+		return val * basePt * exChToEmFactor, true
+	default:
+		return 0, false
+	}
+}
+
+// absoluteLengthToPt converts non-relative CSS length units to points.
+func absoluteLengthToPt(val float64, unit string) (float64, bool) {
+	switch unit {
 	case "px":
 		return val * pxToPt, true
 	case "pt":
@@ -126,14 +143,6 @@ func LengthToPt(val float64, unit string, basePt float64) (float64, bool) {
 		return val * pointsPerInch / mmPerInch, true
 	case "pc":
 		return val * pointsPerPica, true
-	case "em", unitRem:
-		if low == unitRem {
-			return val * rootFontSizePx * pxToPt, true
-		}
-
-		return val * basePt, true
-	case "ex", "ch":
-		return val * basePt * exChToEmFactor, true
 	default:
 		return 0, false
 	}
