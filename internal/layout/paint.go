@@ -1995,6 +1995,52 @@ func shiftFlowY(res *Result, from, toIdx int, fromY, deltaY float64) {
 	shiftFlowBoxes(res, from, toIdx, fromY, startPage, deltaY)
 }
 
+// shiftFlowYCoords applies the same op/box selection as shiftFlowY but only
+// mutates coordinates. Flow page indexes are left stale (caller must rebuild
+// or avoid index-based shifts until ensureFlowIndex runs again). Used by
+// beforeAlways so hundreds of forced breaks do not rebuild indexes each time.
+func shiftFlowYCoords(res *Result, from, toIdx int, fromY, deltaY float64) {
+	if res == nil || len(res.Ops) == 0 || deltaY == 0 {
+		return
+	}
+
+	for i := range res.Ops {
+		if res.Ops[i].Fixed {
+			continue
+		}
+
+		if (i >= from && i <= toIdx) || res.Ops[i].Y > fromY {
+			res.Ops[i].Y += deltaY
+		}
+	}
+
+	if res.root == nil {
+		return
+	}
+
+	for _, boxNode := range flowBoxList(res) {
+		if boxNode.y > fromY ||
+			(boxNode.y == fromY && boxNode.opStart >= from && boxNode.opEnd <= toIdx) {
+			boxNode.y += deltaY
+		}
+	}
+}
+
+// invalidateFlowIndex drops cached page buckets so the next ensureFlowIndex
+// rebuilds from current coordinates.
+func invalidateFlowIndex(res *Result) {
+	if res == nil {
+		return
+	}
+
+	res.flowPageOf = nil
+	res.flowPages = nil
+	res.flowPos = nil
+	res.flowBoxes = nil
+	res.flowBoxPage = nil
+	res.flowBoxPos = nil
+}
+
 // shiftOpsRange shifts the non-fixed ops of [from,to] by deltaY.
 func shiftOpsRange(res *Result, from, to int, deltaY float64) {
 	for i := from; i <= to; i++ {
@@ -2436,44 +2482,149 @@ func boxInkExtent(res *Result, boxNode *box) float64 {
 	return bot
 }
 
-// beforeAlways walks pre-order and moves page-break-before: always boxes to a
-// fresh page after everything preceding them. Every matching box is handled in
-// one walk so multi-section reports (benchmarks, long fixtures) are not capped
-// by the outer fixpoint iteration budget. After each shift, prefix maxima are
-// rebuilt because later ops and boxes have moved. One prefix buffer is reused
-// for the whole walk so repeated rebuilds do not allocate.
+// beforeAlways moves page-break-before:always boxes onto a fresh page after
+// everything that precedes them. Targets are collected in document order and
+// processed by ascending opStart. Forced-break dys are recorded on a difference
+// array and applied to ops in one O(n) pass (plus O(boxes) live box updates per
+// break). Flow indexes are rebuilt once at the end.
 func beforeAlways(res *Result, contentH float64) bool {
 	if res == nil || res.root == nil || contentH <= 0 {
 		return false
 	}
 
-	var prefixMaxY []float64
-	prefixMaxY = prefixMaxOfOps(res.Ops, prefixMaxY)
-	changed := false
+	targets := collectBeforeAlwaysBoxes(res.root)
+	if len(targets) == 0 {
+		return false
+	}
 
-	var walk func(b *box)
-	walk = func(boxNode *box) {
-		if boxNode.style.PageBreakBefore == pageBreakAlways {
-			if shiftForcedBreak(res, boxNode, prefixMaxY, contentH) {
-				prefixMaxY = prefixMaxOfOps(res.Ops, prefixMaxY)
-				changed = true
+	if len(targets) > 1 {
+		sort.SliceStable(targets, func(i, j int) bool {
+			return targets[i].opStart < targets[j].opStart
+		})
+	}
+
+	ops := res.Ops
+	n := len(ops)
+	// suffixDy[i] is the additional Y applied to all ops at indices >= i.
+	suffixDy := make([]float64, n+1)
+	boxes := flowBoxList(res)
+
+	changed := false
+	opIdx := 0
+	// maxEff tracks max effective Y of ops already scanned (original Y +
+	// cumulative suffix dys from earlier breaks that cover that op).
+	maxEff := 0.0
+	// curOff is sum of break dys with start <= the next op index to be read.
+	curOff := 0.0
+	// events with start <= opIdx have been folded into curOff via eventAt.
+	eventAt := 0
+	type breakEvent struct {
+		start int
+		dy    float64
+	}
+
+	var events []breakEvent
+
+	for _, boxNode := range targets {
+		start := boxNode.opStart
+		if start < 0 {
+			start = 0
+		}
+
+		if start > n {
+			start = n
+		}
+
+		for opIdx < start {
+			for eventAt < len(events) && events[eventAt].start <= opIdx {
+				curOff += events[eventAt].dy
+				eventAt++
+			}
+
+			eff := ops[opIdx].Y + curOff
+			if eff > maxEff {
+				maxEff = eff
+			}
+
+			opIdx++
+		}
+
+		// Box Y has been kept live (updated when earlier breaks applied).
+		boxY := boxNode.y
+		loPage := int(boxY / contentH)
+		lastPage := int(maxEff / contentH)
+
+		if loPage > lastPage {
+			continue
+		}
+
+		dy := float64(lastPage+1)*contentH - boxY
+		if dy <= 0 {
+			continue
+		}
+
+		// Record op suffix shift; update boxes immediately (few relative to ops).
+		if start < n {
+			suffixDy[start] += dy
+		}
+
+		fromY := boxY
+		for _, b := range boxes {
+			if b.y > fromY ||
+				(b.y == fromY && b.opStart >= boxNode.opStart && b.opEnd <= boxNode.opEnd) {
+				b.y += dy
 			}
 		}
 
-		for _, c := range boxNode.children {
-			walk(c)
-		}
+		events = append(events, breakEvent{start: start, dy: dy})
+		changed = true
 	}
 
-	walk(res.root)
+	if !changed {
+		return false
+	}
 
-	return changed
+	// One linear apply of the difference array onto ops.
+	cum := 0.0
+
+	for i := 0; i < n; i++ {
+		cum += suffixDy[i]
+		if cum == 0 || ops[i].Fixed {
+			continue
+		}
+
+		ops[i].Y += cum
+	}
+
+	invalidateFlowIndex(res)
+	ensureFlowIndex(res, contentH)
+
+	return true
+}
+
+// collectBeforeAlwaysBoxes returns boxes with page-break-before:always in
+// preorder (document order).
+func collectBeforeAlwaysBoxes(root *box) []*box {
+	var out []*box
+
+	var walk func(*box)
+	walk = func(boxNode *box) {
+		if boxNode.style.PageBreakBefore == pageBreakAlways {
+			out = append(out, boxNode)
+		}
+
+		for _, child := range boxNode.children {
+			walk(child)
+		}
+	}
+	walk(root)
+
+	return out
 }
 
 // prefixMaxOfOps returns prefixMax[i] = max Y of ops[0:i].
 // When buf has capacity >= len(ops)+1 it is reused (no allocation); otherwise
-// a new slice is allocated. Callers that rebuild after each mutation should
-// pass the previous result as buf.
+// a new slice is allocated. Kept for tests/callers that need random access.
 func prefixMaxOfOps(ops []Op, buf []float64) []float64 {
 	need := len(ops) + 1
 	if cap(buf) < need {
@@ -2485,36 +2636,36 @@ func prefixMaxOfOps(ops []Op, buf []float64) []float64 {
 	if need > 0 {
 		buf[0] = 0
 	}
+
 	for i, op := range ops {
 		buf[i+1] = buf[i]
 		if op.Y > buf[i+1] {
 			buf[i+1] = op.Y
 		}
 	}
+
 	return buf
 }
 
-// shiftForcedBreak moves a page-break-before:always box below the last op
-// that precedes it. Returns whether it shifted.
-func shiftForcedBreak(res *Result, boxNode *box, prefixMaxY []float64, contentH float64) bool {
-	lastBefore := 0.0
-	if boxNode.opStart > 0 && boxNode.opStart < len(prefixMaxY) {
-		lastBefore = prefixMaxY[boxNode.opStart]
-	}
-
+// shiftForcedBreakCoords moves a page-break-before:always box below lastBefore
+// (max Y of ops that precede the box) using coordinate-only shifts. Returns
+// whether it shifted.
+func shiftForcedBreakCoords(res *Result, boxNode *box, lastBefore, contentH float64) bool {
 	loPage := int(boxNode.y / contentH)
 	lastPage := int(lastBefore / contentH)
 
-	if loPage <= lastPage {
-		dy := float64(lastPage+1)*contentH - boxNode.y
-		if dy > 0 {
-			shiftFlowY(res, boxNode.opStart, boxNode.opEnd, boxNode.y, dy)
-
-			return true
-		}
+	if loPage > lastPage {
+		return false
 	}
 
-	return false
+	dy := float64(lastPage+1)*contentH - boxNode.y
+	if dy <= 0 {
+		return false
+	}
+
+	shiftFlowYCoords(res, boxNode.opStart, boxNode.opEnd, boxNode.y, dy)
+
+	return true
 }
 
 // afterBreaks walks in document order and applies page-break-after:

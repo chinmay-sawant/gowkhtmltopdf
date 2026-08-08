@@ -233,6 +233,17 @@ type engine struct {
 	// path. Sticky/fixed/transform boxes still splice immediately.
 	deferredChrome []chromeEntry
 	nextOpID       uint64
+	// faceByRune caches faceForRune results for this Layout run (key mixes
+	// family/weight/italic with the rune).
+	faceByRune map[faceRuneKey]*pdf.Font
+}
+
+// faceRuneKey is the faceForRune cache key for one (style face identity, rune).
+type faceRuneKey struct {
+	family string
+	weight int
+	italic bool
+	r      rune
 }
 
 // chromeEntry records one box's background/border ops for insertion before
@@ -271,6 +282,30 @@ func (e *engine) faceForRune(sty ResolvedStyle, runeValue rune) *pdf.Font {
 		return e.faceFor(sty)
 	}
 
+	key := faceRuneKey{
+		family: strings.Join(sty.FontFamily, ","),
+		weight: sty.FontWeight,
+		italic: sty.FontItalic,
+		r:      runeValue,
+	}
+	if e.faceByRune != nil {
+		if f, ok := e.faceByRune[key]; ok {
+			return f
+		}
+	}
+
+	f := e.lookupFaceForRune(sty, runeValue)
+	if e.faceByRune == nil {
+		e.faceByRune = make(map[faceRuneKey]*pdf.Font)
+	}
+
+	e.faceByRune[key] = f
+
+	return f
+}
+
+// lookupFaceForRune is the uncached face resolution path.
+func (e *engine) lookupFaceForRune(sty ResolvedStyle, runeValue rune) *pdf.Font {
 	if f := e.registryFamilyWithGlyph(sty, runeValue); f != nil {
 		return f
 	}

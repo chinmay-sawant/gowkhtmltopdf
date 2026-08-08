@@ -1506,11 +1506,26 @@ func parseAnPlusB(arg string) (int, int, bool) {
 	return specA, specB, true
 }
 
+// classSet returns the class tokens of n. Match() calls this once per selector
+// probe; a single-node cache avoids rebuilding the map for every selector on
+// the same element during cascade (hot on large documents).
+var (
+	classSetNode *html.Node       //nolint:gochecknoglobals // single-threaded cascade cache
+	classSetCached map[string]bool //nolint:gochecknoglobals // single-threaded cascade cache
+)
+
 func classSet(n *html.Node) map[string]bool {
+	if n == classSetNode && classSetCached != nil {
+		return classSetCached
+	}
+
 	set := map[string]bool{}
 	for _, c := range strings.Fields(n.Attribute("class")) {
 		set[c] = true
 	}
+
+	classSetNode = n
+	classSetCached = set
 
 	return set
 }

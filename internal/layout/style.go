@@ -540,23 +540,23 @@ func (ctx *styleContext) matchedRules(node *html.Node, pseudoElem string) []rule
 		return nil
 	}
 
-	hits := make([]ruleHit, 0, len(ctx.sheets))
-
+	// Single growable buffer — avoid per-sheet intermediate slices (hot on
+	// large documents: ruleSelectorHits was ~16% of alloc_objects at 500 pages).
+	var hits []ruleHit
 	for _, sheet := range ctx.sheets {
-		hits = append(hits, ctx.sheetRuleHits(sheet, node, pseudoElem)...)
+		hits = ctx.appendSheetRuleHits(hits, sheet, node, pseudoElem)
 	}
 
 	return hits
 }
 
-// sheetRuleHits walks one stylesheet's rules, gating on media and @container
-// before descending into selector matching.
-func (ctx *styleContext) sheetRuleHits(sheet *css.Stylesheet, node *html.Node, pseudoElem string) []ruleHit {
+// appendSheetRuleHits appends matches from one stylesheet into hits.
+func (ctx *styleContext) appendSheetRuleHits(
+	hits []ruleHit, sheet *css.Stylesheet, node *html.Node, pseudoElem string,
+) []ruleHit {
 	if sheet == nil {
-		return nil
+		return hits
 	}
-
-	hits := make([]ruleHit, 0, len(sheet.Rules))
 
 	for _, rule := range sheet.Rules {
 		if !css.MediaMatches(rule.Media, ctx.media, ctx.viewportW, ctx.viewportH) {
@@ -567,16 +567,21 @@ func (ctx *styleContext) sheetRuleHits(sheet *css.Stylesheet, node *html.Node, p
 			continue
 		}
 
-		hits = append(hits, ctx.ruleSelectorHits(rule, node, pseudoElem)...)
+		hits = ctx.appendRuleSelectorHits(hits, rule, node, pseudoElem)
 	}
 
 	return hits
 }
 
-// ruleSelectorHits scores every selector of one rule that matches the node.
-func (ctx *styleContext) ruleSelectorHits(rule css.Rule, node *html.Node, pseudoElem string) []ruleHit {
-	hits := make([]ruleHit, 0, len(rule.Selectors))
+// sheetRuleHits walks one stylesheet's rules (test/helper path).
+func (ctx *styleContext) sheetRuleHits(sheet *css.Stylesheet, node *html.Node, pseudoElem string) []ruleHit {
+	return ctx.appendSheetRuleHits(nil, sheet, node, pseudoElem)
+}
 
+// appendRuleSelectorHits appends matching selectors of one rule into hits.
+func (ctx *styleContext) appendRuleSelectorHits(
+	hits []ruleHit, rule css.Rule, node *html.Node, pseudoElem string,
+) []ruleHit {
 	for _, sel := range rule.Selectors {
 		if !selectorMatches(sel, node, pseudoElem) {
 			continue
@@ -587,6 +592,11 @@ func (ctx *styleContext) ruleSelectorHits(rule css.Rule, node *html.Node, pseudo
 	}
 
 	return hits
+}
+
+// ruleSelectorHits scores every selector of one rule that matches the node.
+func (ctx *styleContext) ruleSelectorHits(rule css.Rule, node *html.Node, pseudoElem string) []ruleHit {
+	return ctx.appendRuleSelectorHits(nil, rule, node, pseudoElem)
 }
 
 // selectorMatches reports whether sel matches node, using the pseudo-shape
@@ -650,16 +660,12 @@ func cascadeRaw(ctx *styleContext, node *html.Node) map[string]string {
 		}
 	}
 
-	out := map[string]string{}
-	for prop, v := range normal {
-		out[prop] = v
-	}
-
+	// Merge important into normal and return normal (skip a third map + full copy).
 	for prop, v := range important {
-		out[prop] = v // important beats normal
+		normal[prop] = v
 	}
 
-	return out
+	return normal
 }
 
 // applyDeclaration folds one declaration into the winning map when its
