@@ -884,7 +884,7 @@ func setDisplayKeyword(style *ResolvedStyle, value string) {
 	case displayBlock, "inline", cssDisplayNone, displayListItem, displayTable, displayTableRow, displayTableCell,
 		displayRowGroup, displayHeaderGroup, displayFooterGroup,
 		cssDisplayInlineBlock, displayTableCaption, "table-column", "table-column-group",
-		displayInlineFlex, "inline-grid", displaySubgrid, displayFlowRoot:
+		displayFlex, displayInlineFlex, displayGrid, displayInlineGrid, displaySubgrid, displayFlowRoot:
 		style.Display = value
 	}
 }

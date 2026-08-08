@@ -2025,22 +2025,33 @@ func flowBoxList(res *Result) []*box {
 func shiftFlowOps(res *Result, from, toIdx int, fromY, deltaY float64, startPage int) {
 	if deltaY > 0 {
 		for p := len(res.flowPages) - 1; p >= startPage; p-- {
-			shiftOpsBucket(res, res.flowPages[p], from, toIdx, fromY, deltaY)
+			shiftOpsBucket(res, p, from, toIdx, fromY, deltaY)
 		}
 
 		return
 	}
 
 	for p := startPage; p < len(res.flowPages); p++ {
-		shiftOpsBucket(res, res.flowPages[p], from, toIdx, fromY, deltaY)
+		shiftOpsBucket(res, p, from, toIdx, fromY, deltaY)
 	}
 }
 
 // shiftOpsBucket shifts the ops of one page bucket that sit strictly below
 // fromY. Removing the current item in shiftIndexedOp swaps the bucket's last
-// item into its place; keep the cursor in place when that happens.
-func shiftOpsBucket(res *Result, bucket []int, from, toIdx int, fromY, deltaY float64) {
-	for jdx := 0; jdx < len(bucket); {
+// item into its place; re-read the live bucket each step so a stale slice
+// header cannot re-process an op that already left the page (that bug caused
+// double negative shifts and infinite positive-shift loops).
+func shiftOpsBucket(res *Result, page, from, toIdx int, fromY, deltaY float64) {
+	if page < 0 || page >= len(res.flowPages) {
+		return
+	}
+
+	for jdx := 0; ; {
+		bucket := res.flowPages[page]
+		if jdx >= len(bucket) {
+			return
+		}
+
 		idx := bucket[jdx]
 		if (idx >= from && idx <= toIdx) || res.Ops[idx].Y <= fromY {
 			jdx++
@@ -2054,6 +2065,7 @@ func shiftOpsBucket(res *Result, bucket []int, from, toIdx int, fromY, deltaY fl
 		if res.flowPageOf[idx] == oldPage {
 			jdx++
 		}
+		// else: swap-remove put another index at jdx (or shortened the bucket).
 	}
 }
 
@@ -2061,20 +2073,30 @@ func shiftOpsBucket(res *Result, bucket []int, from, toIdx int, fromY, deltaY fl
 func shiftFlowBoxes(res *Result, from, toIdx int, fromY float64, startPage int, deltaY float64) {
 	if deltaY > 0 {
 		for p := len(res.flowBoxes) - 1; p >= startPage; p-- {
-			shiftBoxesBucket(res, res.flowBoxes[p], from, toIdx, fromY, startPage, deltaY)
+			shiftBoxesBucket(res, p, from, toIdx, fromY, startPage, deltaY)
 		}
 
 		return
 	}
 
 	for p := startPage; p < len(res.flowBoxes); p++ {
-		shiftBoxesBucket(res, res.flowBoxes[p], from, toIdx, fromY, startPage, deltaY)
+		shiftBoxesBucket(res, p, from, toIdx, fromY, startPage, deltaY)
 	}
 }
 
 // shiftBoxesBucket shifts the boxes of one page bucket whose top moved.
-func shiftBoxesBucket(res *Result, bucket []int, from, toIdx int, fromY float64, startPage int, deltaY float64) {
-	for jdx := 0; jdx < len(bucket); {
+// Re-reads res.flowBoxes[page] each step (same swap-remove hazard as ops).
+func shiftBoxesBucket(res *Result, page, from, toIdx int, fromY float64, startPage int, deltaY float64) {
+	if page < 0 || page >= len(res.flowBoxes) {
+		return
+	}
+
+	for jdx := 0; ; {
+		bucket := res.flowBoxes[page]
+		if jdx >= len(bucket) {
+			return
+		}
+
 		boxIndex := bucket[jdx]
 
 		b := res.boxes[boxIndex]
@@ -2214,8 +2236,8 @@ func shiftIndexedOp(res *Result, index int, deltaY float64) {
 		return
 	}
 
-	removeFromFlowBucket(res.flowPages, res.flowPos, oldPage, index)
-	appendToFlowBucket(res.flowPages, &res.flowPageOf, &res.flowPos, index, newPage)
+	removeFromFlowBucket(&res.flowPages, res.flowPos, oldPage, index)
+	appendToFlowBucket(&res.flowPages, &res.flowPageOf, &res.flowPos, index, newPage)
 }
 
 func shiftIndexedBox(res *Result, index int, deltaY float64) {
@@ -2232,8 +2254,8 @@ func shiftIndexedBox(res *Result, index int, deltaY float64) {
 		return
 	}
 
-	removeFromFlowBucket(res.flowBoxes, res.flowBoxPos, oldPage, index)
-	appendToFlowBucket(res.flowBoxes, &res.flowBoxPage, &res.flowBoxPos, index, newPage)
+	removeFromFlowBucket(&res.flowBoxes, res.flowBoxPos, oldPage, index)
+	appendToFlowBucket(&res.flowBoxes, &res.flowBoxPage, &res.flowBoxPos, index, newPage)
 }
 
 // flowPageOfY maps a canvas Y to its page index.
@@ -2248,12 +2270,12 @@ func flowPageOfY(y, pageSize float64) int {
 
 // removeFromFlowBucket swaps the entry out of its bucket (keeping cursor
 // positions valid for shiftIndexedOp's in-place iteration).
-func removeFromFlowBucket(buckets [][]int, pos []int, page, index int) {
-	if page < 0 || page >= len(buckets) {
+func removeFromFlowBucket(buckets *[][]int, pos []int, page, index int) {
+	if buckets == nil || page < 0 || page >= len(*buckets) {
 		return
 	}
 
-	bucket := buckets[page]
+	bucket := (*buckets)[page]
 	slot := pos[index]
 
 	if slot < 0 || slot >= len(bucket) {
@@ -2263,18 +2285,23 @@ func removeFromFlowBucket(buckets [][]int, pos []int, page, index int) {
 	last := bucket[len(bucket)-1]
 	bucket[slot] = last
 	pos[last] = slot
-	buckets[page] = bucket[:len(bucket)-1]
+	(*buckets)[page] = bucket[:len(bucket)-1]
 }
 
 // appendToFlowBucket registers the entry in its new page bucket.
-func appendToFlowBucket(buckets [][]int, pageOf *[]int, pos *[]int, index, page int) {
-	for len(buckets) <= page {
-		buckets = append(buckets, nil)
+// buckets is a pointer so growing the outer page slice is visible to the caller.
+func appendToFlowBucket(buckets *[][]int, pageOf *[]int, pos *[]int, index, page int) {
+	if buckets == nil {
+		return
+	}
+
+	for len(*buckets) <= page {
+		*buckets = append(*buckets, nil)
 	}
 
 	(*pageOf)[index] = page
-	(*pos)[index] = len(buckets[page])
-	buckets[page] = append(buckets[page], index)
+	(*pos)[index] = len((*buckets)[page])
+	(*buckets)[page] = append((*buckets)[page], index)
 }
 
 // shiftOpsOnly moves ops in [from,to] by dy without dragging later flow.
