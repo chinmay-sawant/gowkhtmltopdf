@@ -68,10 +68,13 @@ image mode renders one raster canvas.
 
 | Workload | 2 | 5 | 10 | 20 | 50 | 100 | 200 | 250 | 500 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| PDF pages | 10.31ms | 22.87ms | 36.91ms | 77.74ms | 226.25ms | 528.33ms | 1.51s | 3.47s | 14.14s |
-| Template + PDF pages | 9.56ms | 25.55ms | 46.39ms | 100.62ms | 250.62ms | 621.44ms | 2.02s | 3.62s | 13.67s |
+| PDF pages | 9.20ms | 15.89ms | 31.61ms | 78.63ms | 185.99ms | 455.05ms | 1.27s | 1.61s | 6.89s |
+| Template + PDF pages | 8.13ms | 18.42ms | 35.76ms | 71.28ms | 184.69ms | 407.52ms | 1.15s | 1.64s | 6.74s |
 | Web-fetch image tiles | 257.33ms | 258.05ms | 281.10ms | 310.47ms | 356.66ms | 413.68ms | 506.42ms | 564.00ms | 970.72ms |
 | Inline image tiles | 209.50ms | 220.61ms | 255.35ms | 282.33ms | 303.54ms | 340.31ms | 439.46ms | 491.22ms | 788.43ms |
+
+PDF / Template rows refreshed 2026-08-08 (`-benchtime=1x -count=1`). Image-tile
+rows are still the prior full-matrix snapshot.
 
 The raw `go test` output, including allocations, is in
 [`benchmark-results.txt`](benchmark-results.txt). The benchmark implementation

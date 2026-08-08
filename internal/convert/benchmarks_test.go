@@ -44,12 +44,12 @@ var errTVMazeNoShows = errors.New("TVmaze API returned no shows")
 // Baseline snapshot from benchmark-results.txt, recorded with
 // go1.26.4 linux/amd64 on WSL2 (24 CPUs), -benchtime=1x -count=1. The
 // report template uses 20 realistic rows per physical page:
-// PDF pages:     2=10.31ms, 5=22.87ms, 10=36.91ms, 20=77.74ms,
-//                50=226.25ms, 100=528.33ms, 200=1.51s, 250=3.47s,
-//                500=14.14s.
-// Template+PDF:  2=9.56ms, 5=25.55ms, 10=46.39ms, 20=100.62ms,
-//                50=250.62ms, 100=621.44ms, 200=2.02s, 250=3.62s,
-//                500=13.67s.
+// PDF pages:     2=9.20ms, 5=15.89ms, 10=31.61ms, 20=78.63ms,
+//                50=185.99ms, 100=455.05ms, 200=1.27s, 250=1.61s,
+//                500=6.89s.  (refreshed 2026-08-08)
+// Template+PDF:  2=8.13ms, 5=18.42ms, 10=35.76ms, 20=71.28ms,
+//                50=184.69ms, 100=407.52ms, 200=1.15s, 250=1.64s,
+//                500=6.74s.  (refreshed 2026-08-08)
 // Web images:    2=257.33ms, 5=258.05ms, 10=281.10ms, 20=310.47ms,
 //                50=356.66ms, 100=413.68ms, 200=506.42ms, 250=564.00ms,
 //                500=970.72ms.
