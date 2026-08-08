@@ -38,7 +38,7 @@ make build
 | Target | Purpose |
 |--------|---------|
 | `make test` | Full `go test ./...` |
-| `make lint` | `go vet` + gofmt check |
+| `make lint` | `golangci-lint run` (all linters via `.golangci.yml`) |
 | `make build` | `bin/gowkhtmltopdf`, `bin/gowkhtmltoimage` |
 | `make golden` | Golden fixture corpus (`internal/convert`) |
 | `make samples` | Regenerate `output/` fixtures + optional live wiki smoke |

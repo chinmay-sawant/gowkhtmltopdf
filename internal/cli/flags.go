@@ -10,6 +10,9 @@ import (
 // one canonical "true"/"false"; value flags one token; pair flags two.
 type flagApplier func(c *Command, cur *objectCtx, vals []string) error
 
+// flagAdder registers one flag spec into the table being built.
+type flagAdder func(name string, m Mode, kind flagKind, app flagApplier)
+
 // mode selects which binaries accept a flag.
 type Mode int
 
@@ -19,106 +22,155 @@ const (
 	ModeBoth = ModePDF | ModeImage
 )
 
-var flagTable = map[string]flagSpec{}
+// flagTable maps long flag names to their specs. It is a static lookup table
+// (built once at package init, never mutated afterwards).
+var flagTable = buildFlagTable() //nolint:gochecknoglobals // static flag lookup table
 
-// shortFlags maps single-char flags to their long-form specs. Populated in
-// init after flagTable so lookups resolve.
-var shortFlags = map[string]flagSpec{}
+// shortFlags maps single-char flags to their long-form specs. It must be
+// declared after flagTable so initialization dependencies resolve in order.
+var shortFlags = map[string]flagSpec{ //nolint:gochecknoglobals // static flag lookup table
+	"q": flagTable["quiet"],
+	"g": flagTable["grayscale"],
+	"O": flagTable["orientation"],
+	"s": flagTable["page-size"],
+	"T": flagTable["margin-top"],
+	"B": flagTable["margin-bottom"],
+	"L": flagTable["margin-left"],
+	"R": flagTable["margin-right"],
+	"c": flagTable["copies"],
+	"t": flagTable["title"],
+}
+
+// Canonical boolean strings stored in settings; negBool flips between them.
+const (
+	canonicalTrue  = "true"
+	canonicalFalse = "false"
+)
+
+// flagTableSize is the estimated long-flag count (capacity hint only).
+const flagTableSize = 120
 
 // setMapEntry inserts into a nil-safe string map.
 func setMapEntry(m *map[string]string, k, v string) {
 	if *m == nil {
 		*m = map[string]string{}
 	}
+
 	(*m)[k] = v
 }
 
-func init() {
+// buildFlagTable assembles the long-flag table, grouped by policy so each
+// group stays small and reviewable.
+func buildFlagTable() map[string]flagSpec {
+	table := make(map[string]flagSpec, flagTableSize)
 	add := func(name string, m Mode, kind flagKind, app flagApplier) {
-		flagTable[name] = flagSpec{kind: kind, mod: m, app: app}
+		table[name] = flagSpec{kind: kind, mod: m, app: app}
 	}
 
-	// --- doc flags (handled by Parse before table lookup; present so
-	// --help listing can include them) ---
+	addDocFlags(add)
+	addGlobalFlags(add)
+	addOutlineFlags(add)
+	addLocalAccessFlags(add)
+	addWebPageFlags(add)
+	addLoadPageFlags(add)
+	addFontFlags(add)
+	addPairFlags(add)
+	addHeaderFooterFlags(add)
+	addTOCFlags(add)
+	addImageFlags(add)
+
+	return table
+}
+
+// addDocFlags registers doc flags (handled by Parse before table lookup;
+// present so the --help listing can include them).
+func addDocFlags(add flagAdder) {
 	add("help", ModeBoth, flagBool, nopFlag)
 	add("version", ModeBoth, flagBool, nopFlag)
 	add("license", ModeBoth, flagBool, nopFlag)
 	add("extended-help", ModeBoth, flagBool, nopFlag)
+}
 
-	// --- global PDF flags (engine-consumed only; Policy A) ---
-	add("quiet", ModeBoth, flagBool, func(c *Command, cur *objectCtx, vals []string) error {
+// addGlobalFlags registers global PDF flags (engine-consumed only; Policy A).
+func addGlobalFlags(add flagAdder) {
+	add("quiet", ModeBoth, flagBool, func(c *Command, _ *objectCtx, vals []string) error {
 		return c.Global.Set("quiet", vals[0])
 	})
-	add("collate", ModePDF, flagBool, func(c *Command, cur *objectCtx, vals []string) error {
+	add("collate", ModePDF, flagBool, func(c *Command, _ *objectCtx, vals []string) error {
 		return c.Global.Set("collate", vals[0])
 	})
-	add("copies", ModePDF, flagValue, func(c *Command, cur *objectCtx, vals []string) error {
+	add("copies", ModePDF, flagValue, func(c *Command, _ *objectCtx, vals []string) error {
 		return c.Global.Set("copies", vals[0])
 	})
-	add("orientation", ModePDF, flagValue, func(c *Command, cur *objectCtx, vals []string) error {
+	add("orientation", ModePDF, flagValue, func(c *Command, _ *objectCtx, vals []string) error {
 		return c.Global.Set("orientation", vals[0])
 	})
-	add("page-size", ModePDF, flagValue, func(c *Command, cur *objectCtx, vals []string) error {
+	add("page-size", ModePDF, flagValue, func(c *Command, _ *objectCtx, vals []string) error {
 		return c.Global.Set("size.pagesize", vals[0])
 	})
 	// convert reads Global.Grayscale only (ColorMode is not a stored field).
-	add("grayscale", ModePDF, flagBool, func(c *Command, cur *objectCtx, vals []string) error {
+	add("grayscale", ModePDF, flagBool, func(c *Command, _ *objectCtx, vals []string) error {
 		return c.Global.Set("grayscale", vals[0])
 	})
-	add("title", ModePDF, flagValue, func(c *Command, cur *objectCtx, vals []string) error {
+	add("title", ModePDF, flagValue, func(c *Command, _ *objectCtx, vals []string) error {
 		return c.Global.Set("title", vals[0])
 	})
-	add("margin-top", ModePDF, flagValue, func(c *Command, cur *objectCtx, vals []string) error {
+	add("margin-top", ModePDF, flagValue, func(c *Command, _ *objectCtx, vals []string) error {
 		return c.Global.Set("margin.top", vals[0])
 	})
-	add("margin-bottom", ModePDF, flagValue, func(c *Command, cur *objectCtx, vals []string) error {
+	add("margin-bottom", ModePDF, flagValue, func(c *Command, _ *objectCtx, vals []string) error {
 		return c.Global.Set("margin.bottom", vals[0])
 	})
-	add("margin-left", ModePDF, flagValue, func(c *Command, cur *objectCtx, vals []string) error {
+	add("margin-left", ModePDF, flagValue, func(c *Command, _ *objectCtx, vals []string) error {
 		return c.Global.Set("margin.left", vals[0])
 	})
-	add("margin-right", ModePDF, flagValue, func(c *Command, cur *objectCtx, vals []string) error {
+	add("margin-right", ModePDF, flagValue, func(c *Command, _ *objectCtx, vals []string) error {
 		return c.Global.Set("margin.right", vals[0])
 	})
-	add("page-width", ModePDF, flagValue, func(c *Command, cur *objectCtx, vals []string) error {
+	add("page-width", ModePDF, flagValue, func(c *Command, _ *objectCtx, vals []string) error {
 		return c.Global.Set("size.width", vals[0])
 	})
-	add("page-height", ModePDF, flagValue, func(c *Command, cur *objectCtx, vals []string) error {
+	add("page-height", ModePDF, flagValue, func(c *Command, _ *objectCtx, vals []string) error {
 		return c.Global.Set("size.height", vals[0])
 	})
-	add("no-pdf-compression", ModePDF, flagBool, func(c *Command, cur *objectCtx, vals []string) error {
+	add("no-pdf-compression", ModePDF, flagBool, func(c *Command, _ *objectCtx, vals []string) error {
 		return c.Global.Set("usecompression", negBool(vals[0]))
 	})
-	add("page-offset", ModePDF, flagValue, func(c *Command, cur *objectCtx, vals []string) error {
+	add("page-offset", ModePDF, flagValue, func(c *Command, _ *objectCtx, vals []string) error {
 		return c.Global.Set("pageoffset", vals[0])
 	})
 	// Smart-shrinking: enable/disable pair only (no bare --smart-shrinking).
-	add("enable-smart-shrinking", ModePDF, flagBool, func(c *Command, cur *objectCtx, vals []string) error {
+	add("enable-smart-shrinking", ModePDF, flagBool, func(c *Command, _ *objectCtx, _ []string) error {
 		return c.Global.Set("smartshrinking", "true")
 	})
-	add("disable-smart-shrinking", ModePDF, flagBool, func(c *Command, cur *objectCtx, vals []string) error {
+	add("disable-smart-shrinking", ModePDF, flagBool, func(c *Command, _ *objectCtx, _ []string) error {
 		return c.Global.Set("smartshrinking", "false")
 	})
+}
 
-	// --- outline flags ---
-	add("outline", ModePDF, flagBool, func(c *Command, cur *objectCtx, vals []string) error {
+// addOutlineFlags registers outline flags.
+func addOutlineFlags(add flagAdder) {
+	add("outline", ModePDF, flagBool, func(c *Command, _ *objectCtx, vals []string) error {
 		return c.Global.Set("outline", vals[0])
 	})
-	add("outline-depth", ModePDF, flagValue, func(c *Command, cur *objectCtx, vals []string) error {
+	add("outline-depth", ModePDF, flagValue, func(c *Command, _ *objectCtx, vals []string) error {
 		return c.Global.Set("outlinedepth", vals[0])
 	})
 	// One home: Global settings (CLI and library both write it); the engine
 	// reads Global only. Negation rides the value.
 	// Dump homes: Global settings only (engine reads Global; main uses
 	// Global.DumpDefaultTOCXSL; convert adapter ORs legacy Command.DumpOutline).
-	add("dump-outline", ModePDF, flagBool, func(c *Command, cur *objectCtx, vals []string) error {
+	add("dump-outline", ModePDF, flagBool, func(c *Command, _ *objectCtx, vals []string) error {
 		return c.Global.Set("dumpoutline", vals[0])
 	})
-	add("dump-default-toc-xsl", ModePDF, flagBool, func(c *Command, cur *objectCtx, vals []string) error {
+	add("dump-default-toc-xsl", ModePDF, flagBool, func(c *Command, _ *objectCtx, vals []string) error {
 		return c.Global.Set("dumpoutlinewithdefaulttocxsl", vals[0])
 	})
+}
 
-	// --- shared load / web flags (page-scoped through the one router) ---
+// addLocalAccessFlags registers the local-file-access pair and the shared
+// background paint switch (page-scoped through the one router).
+func addLocalAccessFlags(add flagAdder) {
 	add("enable-local-file-access", ModeBoth, flagBool, func(c *Command, cur *objectCtx, vals []string) error {
 		return cur.applyPage(c,
 			func(g *settings.PdfGlobal, val string) error { return g.Set("enablelocalfileaccess", val) },
@@ -128,21 +180,26 @@ func init() {
 	})
 	add("disable-local-file-access", ModeBoth, flagBool, func(c *Command, cur *objectCtx, vals []string) error {
 		return cur.applyPage(c,
-			func(g *settings.PdfGlobal, val string) error { return g.Set("enablelocalfileaccess", "false") },
-			func(o *settings.PdfObject, val string) error { return o.Set("load.blocklocalfileaccess", "true") },
+			func(g *settings.PdfGlobal, _ string) error { return g.Set("enablelocalfileaccess", "false") },
+			func(o *settings.PdfObject, _ string) error { return o.Set("load.blocklocalfileaccess", "true") },
 			vals[0],
 		)
 	})
-	add("allow", ModePDF, flagValue, func(c *Command, cur *objectCtx, vals []string) error {
+	add("allow", ModePDF, flagValue, func(c *Command, _ *objectCtx, vals []string) error {
 		return c.Global.Set("allow", vals[0])
 	})
 	// PDF convert and imageout both read Global.Background (Policy A single field).
-	add("background", ModeBoth, flagBool, func(c *Command, cur *objectCtx, vals []string) error {
+	add("background", ModeBoth, flagBool, func(c *Command, _ *objectCtx, vals []string) error {
 		return c.Global.Set("background", vals[0])
 	})
-	add("no-background", ModeBoth, flagBool, func(c *Command, cur *objectCtx, vals []string) error {
+	add("no-background", ModeBoth, flagBool, func(c *Command, _ *objectCtx, _ []string) error {
 		return c.Global.Set("background", "false")
 	})
+}
+
+// addWebPageFlags registers the web engine flags (simplify-dom, link
+// underline, print media type) routed global+object.
+func addWebPageFlags(add flagAdder) {
 	// Opt-in chrome-strip for arbitrary websites (phase 21.4). Default off.
 	// Distinct from --print-media-type (PDF layout always uses Media:"print").
 	add("simplify-dom", ModeBoth, flagBool, func(c *Command, cur *objectCtx, vals []string) error {
@@ -179,6 +236,11 @@ func init() {
 			vals[0],
 		)
 	})
+}
+
+// addLoadPageFlags registers loader/page flags: page-only flags (zoom, auth,
+// timeout, links) plus the load-error-handling and proxy routers.
+func addLoadPageFlags(add flagAdder) {
 	add("zoom", ModeBoth, flagValue, pageOnlyFlag(func(o *settings.PdfObject, val string) error {
 		return o.Set("load.zoomfactor", val)
 	}))
@@ -211,54 +273,69 @@ func init() {
 	add("internal-links", ModePDF, flagBool, pageOnlyFlag(func(o *settings.PdfObject, val string) error {
 		return o.Set("locallinks", val)
 	}))
-	add("resolve-relative-links", ModePDF, flagBool, func(c *Command, cur *objectCtx, vals []string) error {
+	add("resolve-relative-links", ModePDF, flagBool, func(c *Command, _ *objectCtx, vals []string) error {
 		return c.Global.Set("resolverelativelinks", vals[0])
 	})
-	add("keep-relative-links", ModePDF, flagBool, func(c *Command, cur *objectCtx, vals []string) error {
+	add("keep-relative-links", ModePDF, flagBool, func(c *Command, _ *objectCtx, _ []string) error {
 		return c.Global.Set("resolverelativelinks", "false")
 	})
-	add("font-path", ModeBoth, flagValue, func(c *Command, cur *objectCtx, vals []string) error {
+}
+
+// addFontFlags registers the font-path flags.
+func addFontFlags(add flagAdder) {
+	add("font-path", ModeBoth, flagValue, func(c *Command, _ *objectCtx, vals []string) error {
 		return c.Global.Set("fontpath", vals[0])
 	})
-	add("use-system-fonts", ModeBoth, flagBool, func(c *Command, cur *objectCtx, vals []string) error {
+	add("use-system-fonts", ModeBoth, flagBool, func(c *Command, _ *objectCtx, vals []string) error {
 		return c.Global.Set("usesystemfonts", vals[0])
 	})
+}
 
-	// --- pair flags (two values: name value) ---
+// addPairFlags registers pair flags (two values: name value).
+func addPairFlags(add flagAdder) {
 	add("cookie", ModeBoth, flagPair, func(c *Command, cur *objectCtx, vals []string) error {
 		o := cur.object(c)
 		setMapEntry(&o.Load.Cookies, vals[0], vals[1])
+
 		return nil
 	})
 	add("custom-header", ModeBoth, flagPair, func(c *Command, cur *objectCtx, vals []string) error {
 		o := cur.object(c)
 		setMapEntry(&o.Load.CustomHeaders, vals[0], vals[1])
+
 		return nil
 	})
 	add("post", ModeBoth, flagPair, func(c *Command, cur *objectCtx, vals []string) error {
 		o := cur.object(c)
 		o.Load.Post = append(o.Load.Post, settings.PostItem{Name: vals[0], Value: vals[1]})
+
 		return nil
 	})
 	add("replace", ModePDF, flagPair, func(c *Command, cur *objectCtx, vals []string) error {
 		o := cur.object(c)
+
 		return c.replaceHF(o, vals[0], vals[1])
 	})
+}
 
-	// --- header/footer flags (name encodes header|footer) ---
+// addHeaderFooterFlags registers header/footer flags (name encodes
+// header|footer).
+func addHeaderFooterFlags(add flagAdder) {
 	for _, prefix := range []string{"header", "footer"} {
 		for _, side := range []string{"left", "right", "center"} {
-			prefix, side := prefix, side
 			add(prefix+"-"+side, ModePDF, flagValue, hfFlag(prefix, side))
 		}
+
 		add(prefix+"-font-name", ModePDF, flagValue, hfFlag(prefix, "fontname"))
 		add(prefix+"-font-size", ModePDF, flagValue, hfFlag(prefix, "fontsize"))
 		add(prefix+"-spacing", ModePDF, flagValue, hfFlag(prefix, "spacing"))
 		add(prefix+"-line", ModePDF, flagBool, hfFlag(prefix, "line"))
 		add(prefix+"-html", ModePDF, flagValue, hfFlag(prefix, "htmlurl"))
 	}
+}
 
-	// --- TOC flags ---
+// addTOCFlags registers TOC flags.
+func addTOCFlags(add flagAdder) {
 	add("xsl-style-sheet", ModePDF, flagValue, tocFlag("xslstylesheet"))
 	add("toc-header-text", ModePDF, flagValue, tocFlag("captiontext"))
 	add("toc-text-size-shrink", ModePDF, flagValue, tocFlag("fontscale"))
@@ -267,56 +344,43 @@ func init() {
 	add("toc-level-indentation", ModePDF, flagValue, tocFlag("indentation"))
 	add("toc-forward-links", ModePDF, flagBool, tocFlagBool("forwardlinks", true))
 	add("toc-back-links", ModePDF, flagBool, tocFlagBool("backlinks", true))
-
-	// --- image flags (wkhtmltoimage) ---
-	add("width", ModeImage, flagValue, func(c *Command, cur *objectCtx, vals []string) error {
-		return c.Image.Set("width", vals[0])
-	})
-	add("height", ModeImage, flagValue, func(c *Command, cur *objectCtx, vals []string) error {
-		return c.Image.Set("height", vals[0])
-	})
-	add("crop-x", ModeImage, flagValue, func(c *Command, cur *objectCtx, vals []string) error {
-		return c.Image.Set("crop.left", vals[0])
-	})
-	add("crop-y", ModeImage, flagValue, func(c *Command, cur *objectCtx, vals []string) error {
-		return c.Image.Set("crop.top", vals[0])
-	})
-	add("crop-w", ModeImage, flagValue, func(c *Command, cur *objectCtx, vals []string) error {
-		return c.Image.Set("crop.width", vals[0])
-	})
-	add("crop-h", ModeImage, flagValue, func(c *Command, cur *objectCtx, vals []string) error {
-		return c.Image.Set("crop.height", vals[0])
-	})
-	add("format", ModeImage, flagValue, func(c *Command, cur *objectCtx, vals []string) error {
-		return c.Image.Set("format", vals[0])
-	})
-	add("quality", ModeImage, flagValue, func(c *Command, cur *objectCtx, vals []string) error {
-		return c.Image.Set("quality", vals[0])
-	})
-	add("transparent", ModeImage, flagBool, func(c *Command, cur *objectCtx, vals []string) error {
-		return c.Image.Set("transparent", vals[0])
-	})
-	add("smart-width", ModeImage, flagBool, func(c *Command, cur *objectCtx, vals []string) error {
-		return c.Image.Set("smartwidth", vals[0])
-	})
-	add("no-smart-width", ModeImage, flagBool, func(c *Command, cur *objectCtx, vals []string) error {
-		return c.Image.Set("smartwidth", "false")
-	})
 }
 
-func init() {
-	shortFlags = map[string]flagSpec{
-		"q": flagTable["quiet"],
-		"g": flagTable["grayscale"],
-		"O": flagTable["orientation"],
-		"s": flagTable["page-size"],
-		"T": flagTable["margin-top"],
-		"B": flagTable["margin-bottom"],
-		"L": flagTable["margin-left"],
-		"R": flagTable["margin-right"],
-		"c": flagTable["copies"],
-		"t": flagTable["title"],
-	}
+// addImageFlags registers image flags (wkhtmltoimage).
+func addImageFlags(add flagAdder) {
+	add("width", ModeImage, flagValue, func(c *Command, _ *objectCtx, vals []string) error {
+		return c.Image.Set("width", vals[0])
+	})
+	add("height", ModeImage, flagValue, func(c *Command, _ *objectCtx, vals []string) error {
+		return c.Image.Set("height", vals[0])
+	})
+	add("crop-x", ModeImage, flagValue, func(c *Command, _ *objectCtx, vals []string) error {
+		return c.Image.Set("crop.left", vals[0])
+	})
+	add("crop-y", ModeImage, flagValue, func(c *Command, _ *objectCtx, vals []string) error {
+		return c.Image.Set("crop.top", vals[0])
+	})
+	add("crop-w", ModeImage, flagValue, func(c *Command, _ *objectCtx, vals []string) error {
+		return c.Image.Set("crop.width", vals[0])
+	})
+	add("crop-h", ModeImage, flagValue, func(c *Command, _ *objectCtx, vals []string) error {
+		return c.Image.Set("crop.height", vals[0])
+	})
+	add("format", ModeImage, flagValue, func(c *Command, _ *objectCtx, vals []string) error {
+		return c.Image.Set("format", vals[0])
+	})
+	add("quality", ModeImage, flagValue, func(c *Command, _ *objectCtx, vals []string) error {
+		return c.Image.Set("quality", vals[0])
+	})
+	add("transparent", ModeImage, flagBool, func(c *Command, _ *objectCtx, vals []string) error {
+		return c.Image.Set("transparent", vals[0])
+	})
+	add("smart-width", ModeImage, flagBool, func(c *Command, _ *objectCtx, vals []string) error {
+		return c.Image.Set("smartwidth", vals[0])
+	})
+	add("no-smart-width", ModeImage, flagBool, func(c *Command, _ *objectCtx, _ []string) error {
+		return c.Image.Set("smartwidth", "false")
+	})
 }
 
 func nopFlag(*Command, *objectCtx, []string) error { return nil }
@@ -326,15 +390,16 @@ func nopFlag(*Command, *objectCtx, []string) error { return nil }
 // router (address remapping included). Image mode shares the global home;
 // ApplyImageKey/ImageConverter.Set route "web.printmediatype" the same way.
 func printMediaFlag(enable bool) flagApplier {
-	return func(c *Command, cur *objectCtx, vals []string) error {
-		on := enable
+	return func(cmd *Command, cur *objectCtx, vals []string) error {
+		enabled := enable
 		if enable {
-			on = vals[0] == "true"
+			enabled = vals[0] == "true"
 		}
-		return cur.applyPage(c,
+
+		return cur.applyPage(cmd,
 			func(g *settings.PdfGlobal, val string) error { return g.Set("web.printmediatype", val) },
 			func(o *settings.PdfObject, val string) error { return o.Set("load.printmediatype", val) },
-			strconv.FormatBool(on),
+			strconv.FormatBool(enabled),
 		)
 	}
 }
@@ -347,14 +412,16 @@ func printMediaFlag(enable bool) flagApplier {
 // not consume pending (see newFreshObject), so pre-object zoom still lands
 // on the first real page after a leading toc.
 func pageOnlyFlag(obj func(o *settings.PdfObject, val string) error) flagApplier {
-	return func(c *Command, cur *objectCtx, vals []string) error {
+	return func(_ *Command, cur *objectCtx, vals []string) error {
 		if cur.obj != nil {
 			return obj(cur.obj, vals[0])
 		}
+
 		if cur.pending == nil {
-			o := settings.DefaultPdfObject()
-			cur.pending = &o
+			pending := settings.DefaultPdfObject()
+			cur.pending = &pending
 		}
+
 		return obj(cur.pending, vals[0])
 	}
 }
@@ -364,58 +431,68 @@ func pageOnlyFlag(obj func(o *settings.PdfObject, val string) error) flagApplier
 // value via HeaderFor/FooterFor). Explicit global-only routing — pending is
 // never created.
 func hfFlag(prefix, field string) flagApplier {
-	return func(c *Command, cur *objectCtx, vals []string) error {
+	return func(cmd *Command, cur *objectCtx, vals []string) error {
 		key := prefix + "." + field
 		if cur.obj != nil {
 			return cur.obj.Set(key, vals[0])
 		}
-		return c.Global.Set(key, vals[0])
+
+		return cmd.Global.Set(key, vals[0])
 	}
 }
 
 // tocFlag targets a toc.* key on the current object when it is a toc object,
 // else global-only (every toc object inherits via effectiveTOC).
 func tocFlag(field string) flagApplier {
-	return func(c *Command, cur *objectCtx, vals []string) error {
+	return func(cmd *Command, cur *objectCtx, vals []string) error {
 		if cur.obj != nil && cur.obj.IsTableOfContent {
 			return cur.obj.Set("toc."+field, vals[0])
 		}
-		return c.Global.Set("toc."+field, vals[0])
+
+		return cmd.Global.Set("toc."+field, vals[0])
 	}
 }
 
 func tocFlagBool(field string, on bool) flagApplier {
-	return func(c *Command, cur *objectCtx, vals []string) error {
-		v := vals[0]
+	return func(cmd *Command, cur *objectCtx, vals []string) error {
+		val := vals[0]
 		if !on {
-			v = negBool(v)
+			val = negBool(val)
 		}
+
 		if cur.obj != nil && cur.obj.IsTableOfContent {
-			return cur.obj.Set("toc."+field, v)
+			return cur.obj.Set("toc."+field, val)
 		}
-		return c.Global.Set("toc."+field, v)
+
+		return cmd.Global.Set("toc."+field, val)
 	}
 }
 
-func (c *Command) replaceHF(o *settings.PdfObject, k, v string) error {
-	if o.HeaderSet {
-		if o.Header.Replace == nil {
-			o.Header.Replace = map[string]string{}
+func (c *Command) replaceHF(obj *settings.PdfObject, key, val string) error {
+	if obj.HeaderSet {
+		if obj.Header.Replace == nil {
+			obj.Header.Replace = map[string]string{}
 		}
-		o.Header.Replace[k] = v
+
+		obj.Header.Replace[key] = val
+
 		return nil
 	}
+
 	if c.Global.Header.Replace == nil {
 		c.Global.Header.Replace = map[string]string{}
 	}
-	c.Global.Header.Replace[k] = v
+
+	c.Global.Header.Replace[key] = val
+
 	return nil
 }
 
 // negBool flips a canonical bool string.
 func negBool(v string) string {
-	if v == "true" {
-		return "false"
+	if v == canonicalTrue {
+		return canonicalFalse
 	}
-	return "true"
+
+	return canonicalTrue
 }

@@ -27,10 +27,40 @@ import (
 	"gowkhtmltopdf/internal/settings"
 )
 
+const (
+	channelMax        = 255
+	fnvOffsetBasis    = 14695981039346656037
+	boxFilterFactor2  = 2
+	boxFilterStride   = 8
+	boxFilterHalf     = 4
+	boxFilterArea     = 4 // 2x2 block of pixels (boxFilterFactor2 squared)
+	pixelCenter       = 0.5
+	defaultViewportW  = 768.0
+	defaultViewportH  = 576.0
+	qualityMaxPercent = 100
+	opaqueAlpha       = 255
+	formatPNG         = "png"
+	formatJPG         = "jpg"
+)
+
+var (
+	errNilRoot          = errors.New("imageout: nil root")
+	errCropNoIntersect  = errors.New("imageout: crop rectangle does not intersect the canvas")
+	errNilCommand       = errors.New("imageout: nil command")
+	errNilRequest       = errors.New("imageout: nil request")
+	errNothingToRender  = errors.New("load-error policy is skip; nothing to render")
+	errImagesDisabled   = errors.New("images disabled")
+	errNilOutput        = errors.New("imageout: nil Output writer")
+	errNoInputToConvert = errors.New("no input to convert")
+	errUnsupportedFmt   = errors.New("unsupported format")
+)
+
 // ptToPx maps layout canvas points to output pixels. The layout engine works
 // in points with CSS pixels at 96 dpi (1 px = 0.75 pt, see
 // layout/style.go pxToPt), so rasterizing at 1 CSS px = 1 output px means
 // multiplying every point by 96/72.
+const cssPxToPt = 0.75 // CSS px to layout points (1px = 0.75pt at 96dpi)
+
 const ptToPx = 96.0 / 72.0
 
 // rasterSS is the supersample factor for the paint canvas. Ops are painted
@@ -74,55 +104,82 @@ func Render(root *html.Node, opts RenderOptions) (image.Image, error) {
 
 // RenderContext lays out and rasterizes root while observing ctx. Render is
 // retained as the source-compatible background-context adapter.
+//
+//nolint:contextcheck // background fallback for nil-context callers (Render adapter)
 func RenderContext(ctx context.Context, root *html.Node, opts RenderOptions) (image.Image, error) {
 	if root == nil {
-		return nil, errors.New("imageout: nil root")
+		return nil, errNilRoot
 	}
+
 	if ctx == nil {
 		ctx = context.Background()
 	}
+
 	if err := ctx.Err(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("imageout: context: %w", err)
 	}
+
 	font := opts.Font
 	if font == nil {
 		var err error
+
 		font, err = pdf.DefaultFont()
 		if err != nil {
 			return nil, fmt.Errorf("imageout: default font: %w", err)
 		}
 	}
 
-	var res *layout.Result
-	var err error
-	if opts.SmartWidth {
-		res, err = layoutSmartWidth(ctx, root, opts, font)
-	} else {
-		viewport := float64(opts.Width)
-		if viewport <= 0 {
-			viewport = screenWidthDefault
-		}
-		res, err = layout.LayoutContext(ctx, root, layoutOptions(opts, font, viewport))
-	}
+	res, err := layoutResult(ctx, root, opts, font)
 	if err != nil {
-		return nil, fmt.Errorf("imageout: layout: %w", err)
+		return nil, err
 	}
 
 	img, err := rasterizeContext(ctx, res, maxHeight(res, opts), opts.Transparent)
 	if err != nil {
 		return nil, err
 	}
-	var out image.Image = img
-	if crop := opts.Crop; !crop.Empty() {
-		inter := crop.Intersect(img.Bounds())
-		if inter.Empty() {
-			return nil, errors.New("imageout: crop rectangle does not intersect the canvas")
-		}
-		// re-origin the crop to (0,0): SubImage keeps the canvas
-		// coordinate system, which is awkward for library callers
-		out = reOrigin(img.SubImage(inter))
+
+	out, err := applyCrop(img, opts.Crop)
+	if err != nil {
+		return nil, err
 	}
+
 	return out, nil
+}
+
+// layoutResult lays out root at the SmartWidth-grown or fixed viewport.
+func layoutResult(ctx context.Context, root *html.Node, opts RenderOptions, font *pdf.Font) (*layout.Result, error) {
+	if opts.SmartWidth {
+		return layoutSmartWidth(ctx, root, opts, font)
+	}
+
+	viewport := float64(opts.Width)
+	if viewport <= 0 {
+		viewport = screenWidthDefault
+	}
+
+	res, err := layout.LayoutContext(ctx, root, layoutOptions(opts, font, viewport))
+	if err != nil {
+		return nil, fmt.Errorf("imageout: layout: %w", err)
+	}
+
+	return res, nil
+}
+
+// applyCrop clips img to crop, re-origin to (0,0); a zero rectangle is a no-op.
+func applyCrop(img *image.NRGBA, crop image.Rectangle) (image.Image, error) {
+	if crop.Empty() {
+		return img, nil
+	}
+
+	inter := crop.Intersect(img.Bounds())
+	if inter.Empty() {
+		return nil, errCropNoIntersect
+	}
+
+	// re-origin the crop to (0,0): SubImage keeps the canvas
+	// coordinate system, which is awkward for library callers
+	return reOrigin(img.SubImage(inter)), nil
 }
 
 // reOrigin copies src into a fresh image whose bounds start at (0,0).
@@ -130,17 +187,19 @@ func reOrigin(src image.Image) *image.NRGBA {
 	b := src.Bounds()
 	dst := image.NewNRGBA(image.Rect(0, 0, b.Dx(), b.Dy()))
 	draw.Draw(dst, dst.Bounds(), src, b.Min, draw.Src)
+
 	return dst
 }
 
 // layoutOptions builds layout.Options for a viewport of viewportPx pixels.
 func layoutOptions(opts RenderOptions, font *pdf.Font, viewportPx float64) layout.Options {
-	heightPt := float64(opts.Height) * 0.75
+	heightPt := float64(opts.Height) * cssPxToPt
 	if heightPt <= 0 {
-		heightPt = viewportPx * 0.75
+		heightPt = viewportPx * cssPxToPt
 	}
-	return layout.Options{
-		Width:              viewportPx * 0.75,
+
+	return layout.Options{ //nolint:exhaustruct // intentional zero/partial fields
+		Width:              viewportPx * cssPxToPt,
 		Height:             heightPt,
 		Font:               font,
 		Registry:           opts.Registry,
@@ -156,29 +215,38 @@ func layoutOptions(opts RenderOptions, font *pdf.Font, viewportPx float64) layou
 // painted content overflows the right edge (the layout engine always fills
 // the full viewport width, so overflow is measured from the display list:
 // max op.X+op.W). Growth is capped at maxSmartViewport pixels.
-func layoutSmartWidth(ctx context.Context, root *html.Node, opts RenderOptions, font *pdf.Font) (*layout.Result, error) {
+func layoutSmartWidth(
+	ctx context.Context, root *html.Node, opts RenderOptions, font *pdf.Font,
+) (*layout.Result, error) {
 	viewport := float64(opts.Width)
 	if viewport <= 0 {
 		viewport = screenWidthDefault
 	}
+
 	var res *layout.Result
-	for i := 0; i < 8; i++ {
+
+	for range 8 {
 		if err := ctx.Err(); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("imageout: context: %w", err)
 		}
+
 		var err error
+
 		res, err = layout.LayoutContext(ctx, root, layoutOptions(opts, font, viewport))
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("imageout: layout: %w", err)
 		}
+
 		if viewport >= maxSmartViewport || contentWidthPx(res) <= viewport+0.5 {
 			return res, nil
 		}
+
 		viewport *= 1.5
 		if viewport > maxSmartViewport {
 			viewport = maxSmartViewport
 		}
 	}
+
 	return res, nil
 }
 
@@ -186,15 +254,18 @@ func layoutSmartWidth(ctx context.Context, root *html.Node, opts RenderOptions, 
 // converted to pixels. Link annotations do not paint and are ignored.
 func contentWidthPx(res *layout.Result) float64 {
 	maxW := 0.0
+
 	for i := range res.Ops {
 		op := &res.Ops[i]
 		if op.Kind == layout.OpLinkURI {
 			continue
 		}
+
 		if e := op.X + op.W; e > maxW {
 			maxW = e
 		}
 	}
+
 	return maxW * ptToPx
 }
 
@@ -203,51 +274,56 @@ func contentWidthPx(res *layout.Result) float64 {
 // the content height only, so the minimum must be applied here.
 func maxHeight(res *layout.Result, opts RenderOptions) float64 {
 	h := res.Height
-	if hp := float64(opts.Height) * 0.75; hp > h {
+	if hp := float64(opts.Height) * cssPxToPt; hp > h {
 		h = hp
 	}
+
 	return h
 }
 
-// rasterize paints the display list into an NRGBA canvas. The canvas is
+// rasterizeContext paints the display list into an NRGBA canvas. The canvas is
 // white unless transparent is set, in which case it starts fully transparent
 // and only painted ops become visible. Painting uses rasterSS supersampling
 // then box-filters down to the final CSS-pixel size. Glyph bitmaps for this
 // run live on a per-rasterize atlas (P5-05) so concurrent Renders do not share
 // mutable cache state.
-func rasterize(res *layout.Result, height float64, transparent bool) *image.NRGBA {
-	img, _ := rasterizeContext(context.Background(), res, height, transparent)
-	return img
-}
-
 func rasterizeContext(ctx context.Context, res *layout.Result, height float64, transparent bool) (*image.NRGBA, error) {
 	pxPerPt := ptToPx * float64(rasterSS)
-	w := int(math.Round(res.Width * pxPerPt))
-	h := int(math.Round(height * pxPerPt))
-	if w < 1 {
-		w = 1
+	widthPx := int(math.Round(res.Width * pxPerPt))
+	heightPx := int(math.Round(height * pxPerPt))
+
+	if widthPx < 1 {
+		widthPx = 1
 	}
-	if h < 1 {
-		h = 1
+
+	if heightPx < 1 {
+		heightPx = 1
 	}
-	img := image.NewNRGBA(image.Rect(0, 0, w, h))
+
+	img := image.NewNRGBA(image.Rect(0, 0, widthPx, heightPx))
 	if !transparent {
-		fillNRGBAOpaque(img, img.Bounds(), color.NRGBA{R: 255, G: 255, B: 255, A: 255})
+		fillNRGBAOpaque(img, img.Bounds(), color.NRGBA{R: channelMax, G: channelMax, B: channelMax, A: opaqueAlpha})
 	}
+
 	atlas := newGlyphAtlas()
 	imageCache := newRasterImageCache()
+
 	for _, i := range rasterPaintOrder(res.Ops) {
 		if err := ctx.Err(); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("imageout: context: %w", err)
 		}
+
 		paint(img, &res.Ops[i], pxPerPt, atlas, imageCache)
 	}
+
 	if rasterSS <= 1 {
 		return img, nil
 	}
+
 	if err := ctx.Err(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("imageout: context: %w", err)
 	}
+
 	return downscaleBox(img, rasterSS), nil
 }
 
@@ -264,24 +340,32 @@ func rasterPaintOrder(ops []layout.Op) []int {
 	for i := range ops {
 		idx[i] = i
 	}
+
 	sort.SliceStable(idx, func(i, j int) bool {
-		a, b := ops[idx[i]], ops[idx[j]]
-		az, bz := 0, 0
-		if a.ZIndexSet {
-			az = a.ZIndex
+		entryA, bucket := ops[idx[i]], ops[idx[j]]
+		sortKey, zIndexB := 0, 0
+
+		if entryA.ZIndexSet {
+			sortKey = entryA.ZIndex
 		}
-		if b.ZIndexSet {
-			bz = b.ZIndex
+
+		if bucket.ZIndexSet {
+			zIndexB = bucket.ZIndex
 		}
-		if az != bz {
-			return az < bz
+
+		if sortKey != zIndexB {
+			return sortKey < zIndexB
 		}
-		if a.Positioned != b.Positioned {
-			return !a.Positioned
+
+		if entryA.Positioned != bucket.Positioned {
+			return !entryA.Positioned
 		}
-		la, lb := rasterPaintLayer(a.Kind), rasterPaintLayer(b.Kind)
+
+		la, lb := rasterPaintLayer(entryA.Kind), rasterPaintLayer(bucket.Kind)
+
 		return la < lb
 	})
+
 	return idx
 }
 
@@ -289,9 +373,11 @@ func rasterPaintLayer(k layout.OpKind) int {
 	switch k {
 	case layout.OpFillRect, layout.OpStrokeRect, layout.OpLine:
 		return 0
-	default:
+	case layout.OpText, layout.OpImage, layout.OpLinkURI, layout.OpBullet:
 		return 1
 	}
+
+	return 1
 }
 
 type decodedRasterImage struct {
@@ -301,8 +387,8 @@ type decodedRasterImage struct {
 }
 
 type scaledRasterImageKey struct {
-	decoded *decodedRasterImage
-	w, h    int
+	decoded       *decodedRasterImage
+	width, height int
 }
 
 type rasterImageCache struct {
@@ -321,41 +407,46 @@ func rasterImageHash(data []byte, isJPEG bool) uint64 {
 	// FNV-1a is sufficient as a lookup accelerator; bytes.Equal below keeps
 	// collisions correct. Include the source kind because PNG and JPEG have
 	// different decoders even if their payloads happen to match.
-	hash := uint64(14695981039346656037)
+	hash := uint64(fnvOffsetBasis)
 	if isJPEG {
 		hash ^= 1
 		hash *= 1099511628211
 	}
+
 	for _, b := range data {
 		hash ^= uint64(b)
 		hash *= 1099511628211
 	}
+
 	return hash
 }
 
-func (c *rasterImageCache) decode(op *layout.Op) (*decodedRasterImage, error) {
-	key := rasterImageHash(op.Image, op.IsJPEG)
+func (c *rasterImageCache) decode(paintOp *layout.Op) (*decodedRasterImage, error) {
+	key := rasterImageHash(paintOp.Image, paintOp.IsJPEG)
 	for _, entry := range c.decoded[key] {
-		if entry.jpeg == op.IsJPEG && bytes.Equal(entry.raw, op.Image) {
+		if entry.jpeg == paintOp.IsJPEG && bytes.Equal(entry.raw, paintOp.Image) {
 			return entry, nil
 		}
 	}
+
 	var (
 		src image.Image
 		err error
 	)
-	if op.IsJPEG {
-		src, err = jpeg.Decode(bytes.NewReader(op.Image))
+
+	if paintOp.IsJPEG {
+		src, err = jpeg.Decode(bytes.NewReader(paintOp.Image))
 	} else {
-		src, err = png.Decode(bytes.NewReader(op.Image))
+		src, err = png.Decode(bytes.NewReader(paintOp.Image))
 	}
+
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("imageout: decode image: %w", err)
 	}
 	// PNG decoders may return RGBA for some color types. Normalize once per
 	// source so repeated tiles can use the direct NRGBA scaling path without
 	// changing the generic decoder semantics.
-	if !op.IsJPEG {
+	if !paintOp.IsJPEG {
 		if nrgba, ok := src.(*image.NRGBA); !ok {
 			normalized := image.NewNRGBA(src.Bounds())
 			draw.Draw(normalized, normalized.Bounds(), src, src.Bounds().Min, draw.Src)
@@ -364,18 +455,22 @@ func (c *rasterImageCache) decode(op *layout.Op) (*decodedRasterImage, error) {
 			src = nrgba
 		}
 	}
-	entry := &decodedRasterImage{raw: op.Image, jpeg: op.IsJPEG, image: src}
+
+	entry := &decodedRasterImage{raw: paintOp.Image, jpeg: paintOp.IsJPEG, image: src}
 	c.decoded[key] = append(c.decoded[key], entry)
+
 	return entry, nil
 }
 
-func (c *rasterImageCache) scaledImage(src *decodedRasterImage, w, h int) *image.NRGBA {
-	key := scaledRasterImageKey{decoded: src, w: w, h: h}
+func (c *rasterImageCache) scaledImage(src *decodedRasterImage, width, height int) *image.NRGBA {
+	key := scaledRasterImageKey{decoded: src, width: width, height: height}
 	if scaled, ok := c.scaled[key]; ok {
 		return scaled
 	}
-	scaled := scaleNearest(src.image, w, h)
+
+	scaled := scaleNearest(src.image, width, height)
 	c.scaled[key] = scaled
+
 	return scaled
 }
 
@@ -384,75 +479,93 @@ func downscaleBox(src *image.NRGBA, factor int) *image.NRGBA {
 	if factor <= 1 {
 		return src
 	}
-	if factor == 2 {
+
+	if factor == boxFilterFactor2 {
 		return downscaleBox2(src)
 	}
-	sb := src.Bounds()
-	dw := sb.Dx() / factor
-	dh := sb.Dy() / factor
-	if dw < 1 {
-		dw = 1
+
+	srcBounds := src.Bounds()
+	dstW := srcBounds.Dx() / factor
+	dstH := srcBounds.Dy() / factor
+
+	if dstW < 1 {
+		dstW = 1
 	}
-	if dh < 1 {
-		dh = 1
+
+	if dstH < 1 {
+		dstH = 1
 	}
-	dst := image.NewNRGBA(image.Rect(0, 0, dw, dh))
-	n := uint32(factor * factor)
-	for y := 0; y < dh; y++ {
-		for x := 0; x < dw; x++ {
-			var r, g, b, a uint32
-			for dy := 0; dy < factor; dy++ {
-				for dx := 0; dx < factor; dx++ {
+
+	dst := image.NewNRGBA(image.Rect(0, 0, dstW, dstH))
+	blockArea := uint32(factor * factor) //nolint:gosec // factor is a small constant (2..rasterSS)
+
+	for row := range dstH {
+		for col := range dstW {
+			var sumR, sumG, sumB, sumA uint32
+
+			for dy := range factor {
+				for dx := range factor {
 					srcOffset := src.PixOffset(
-						sb.Min.X+x*factor+dx,
-						sb.Min.Y+y*factor+dy,
+						srcBounds.Min.X+col*factor+dx,
+						srcBounds.Min.Y+row*factor+dy,
 					)
-					r += uint32(src.Pix[srcOffset])
-					g += uint32(src.Pix[srcOffset+1])
-					b += uint32(src.Pix[srcOffset+2])
-					a += uint32(src.Pix[srcOffset+3])
+					sumR += uint32(src.Pix[srcOffset])
+					sumG += uint32(src.Pix[srcOffset+1])
+					sumB += uint32(src.Pix[srcOffset+2])
+					sumA += uint32(src.Pix[srcOffset+3])
 				}
 			}
-			dstOffset := dst.PixOffset(x, y)
-			dst.Pix[dstOffset] = uint8(r / n)
-			dst.Pix[dstOffset+1] = uint8(g / n)
-			dst.Pix[dstOffset+2] = uint8(b / n)
-			dst.Pix[dstOffset+3] = uint8(a / n)
+
+			dstOffset := dst.PixOffset(col, row)
+			dst.Pix[dstOffset] = uint8(sumR / blockArea)   //nolint:gosec // average of byte channels stays in uint8 range
+			dst.Pix[dstOffset+1] = uint8(sumG / blockArea) //nolint:gosec // average of byte channels stays in uint8 range
+			dst.Pix[dstOffset+2] = uint8(sumB / blockArea) //nolint:gosec // average of byte channels stays in uint8 range
+			dst.Pix[dstOffset+3] = uint8(sumA / blockArea) //nolint:gosec // average of byte channels stays in uint8 range
 		}
 	}
+
 	return dst
 }
 
 func downscaleBox2(src *image.NRGBA) *image.NRGBA {
-	sb := src.Bounds()
-	dw := sb.Dx() / 2
-	dh := sb.Dy() / 2
-	if dw < 1 {
-		dw = 1
+	srcBounds := src.Bounds()
+	dstW := srcBounds.Dx() / boxFilterFactor2
+	dstH := srcBounds.Dy() / boxFilterFactor2
+
+	if dstW < 1 {
+		dstW = 1
 	}
-	if dh < 1 {
-		dh = 1
+
+	if dstH < 1 {
+		dstH = 1
 	}
-	dst := image.NewNRGBA(image.Rect(0, 0, dw, dh))
-	for y := 0; y < dh; y++ {
-		srcTop := src.PixOffset(sb.Min.X, sb.Min.Y+y*2)
-		srcBottom := src.PixOffset(sb.Min.X, sb.Min.Y+y*2+1)
+
+	dst := image.NewNRGBA(image.Rect(0, 0, dstW, dstH))
+
+	for y := range dstH {
+		srcTop := src.PixOffset(srcBounds.Min.X, srcBounds.Min.Y+y*2)
+		srcBottom := src.PixOffset(srcBounds.Min.X, srcBounds.Min.Y+y*2+1)
 		dstOffset := dst.PixOffset(0, y)
-		for x := 0; x < dw; x++ {
-			left := x * 8
-			right := left + 4
-			r, g, b, a := uint32(src.Pix[srcTop+left]), uint32(src.Pix[srcTop+left+1]), uint32(src.Pix[srcTop+left+2]), uint32(src.Pix[srcTop+left+3])
-			r += uint32(src.Pix[srcTop+right]) + uint32(src.Pix[srcBottom+left]) + uint32(src.Pix[srcBottom+right])
-			g += uint32(src.Pix[srcTop+right+1]) + uint32(src.Pix[srcBottom+left+1]) + uint32(src.Pix[srcBottom+right+1])
-			b += uint32(src.Pix[srcTop+right+2]) + uint32(src.Pix[srcBottom+left+2]) + uint32(src.Pix[srcBottom+right+2])
-			a += uint32(src.Pix[srcTop+right+3]) + uint32(src.Pix[srcBottom+left+3]) + uint32(src.Pix[srcBottom+right+3])
-			dst.Pix[dstOffset] = uint8(r / 4)
-			dst.Pix[dstOffset+1] = uint8(g / 4)
-			dst.Pix[dstOffset+2] = uint8(b / 4)
-			dst.Pix[dstOffset+3] = uint8(a / 4)
+
+		for x := range dstW {
+			left := x * boxFilterStride
+			right := left + boxFilterHalf
+			sumR := uint32(src.Pix[srcTop+left])
+			sumG := uint32(src.Pix[srcTop+left+1])
+			sumB := uint32(src.Pix[srcTop+left+2])
+			sumA := uint32(src.Pix[srcTop+left+3])
+			sumR += uint32(src.Pix[srcTop+right]) + uint32(src.Pix[srcBottom+left]) + uint32(src.Pix[srcBottom+right])
+			sumG += uint32(src.Pix[srcTop+right+1]) + uint32(src.Pix[srcBottom+left+1]) + uint32(src.Pix[srcBottom+right+1])
+			sumB += uint32(src.Pix[srcTop+right+2]) + uint32(src.Pix[srcBottom+left+2]) + uint32(src.Pix[srcBottom+right+2])
+			sumA += uint32(src.Pix[srcTop+right+3]) + uint32(src.Pix[srcBottom+left+3]) + uint32(src.Pix[srcBottom+right+3])
+			dst.Pix[dstOffset] = uint8(sumR / boxFilterArea)   //nolint:gosec // average of 4 byte channels stays in uint8 range
+			dst.Pix[dstOffset+1] = uint8(sumG / boxFilterArea) //nolint:gosec // average of 4 byte channels stays in uint8 range
+			dst.Pix[dstOffset+2] = uint8(sumB / boxFilterArea) //nolint:gosec // average of 4 byte channels stays in uint8 range
+			dst.Pix[dstOffset+3] = uint8(sumA / boxFilterArea) //nolint:gosec // average of 4 byte channels stays in uint8 range
 			dstOffset += 4
 		}
 	}
+
 	return dst
 }
 
@@ -468,112 +581,157 @@ func downscaleBox2(src *image.NRGBA) *image.NRGBA {
 //
 // Page assembly: prologue already shares convert.CollectSheets +
 // MergeFontFaces; multi-page PDF assembly remains convert-specific (P5-02).
-func paint(img *image.NRGBA, op *layout.Op, pxPerPt float64, atlas *glyphAtlas, imageCache *rasterImageCache) {
-	ps := layout.StyleOf(op)
-	switch op.Kind {
+func paint(img *image.NRGBA, paintOp *layout.Op, pxPerPt float64, atlas *glyphAtlas, imageCache *rasterImageCache) {
+	paintStyle := layout.StyleOf(paintOp)
+
+	switch paintOp.Kind {
 	case layout.OpFillRect:
-		// Raw alpha for Over compositing — see paint comment (PDF vs raster).
-		c := color.NRGBA{
-			R: uint8(op.R * 255), G: uint8(op.G * 255), B: uint8(op.B * 255),
-			A: uint8(op.Alpha * 255),
-		}
-		r := ptRectScale(op.X, op.Y, op.W, op.H, pxPerPt).Intersect(img.Bounds())
-		if !r.Empty() {
-			if c.A == 255 {
-				fillNRGBAOpaque(img, r, c)
-			} else {
-				draw.Draw(img, r, image.NewUniform(c), image.Point{}, draw.Over)
-			}
-		}
+		paintFillRect(img, paintOp, pxPerPt)
 
 	case layout.OpStrokeRect:
-		c := color.NRGBA{
-			R: uint8(op.R * 255), G: uint8(op.G * 255), B: uint8(op.B * 255), A: 255,
-		}
-		lw := strokeWidthScale(ps.StrokeWidth, pxPerPt)
-		r := ptRectScale(op.X, op.Y, op.W, op.H, pxPerPt)
-		rects := [4]image.Rectangle{
-			image.Rect(r.Min.X, r.Min.Y, r.Max.X, r.Min.Y+lw),
-			image.Rect(r.Min.X, r.Max.Y-lw, r.Max.X, r.Max.Y),
-			image.Rect(r.Min.X, r.Min.Y, r.Min.X+lw, r.Max.Y),
-			image.Rect(r.Max.X-lw, r.Min.Y, r.Max.X, r.Max.Y),
-		}
-		for _, rr := range rects {
-			if rr = rr.Intersect(img.Bounds()); !rr.Empty() {
-				fillNRGBAOpaque(img, rr, c)
-			}
-		}
+		paintStrokeRect(img, paintOp, paintStyle, pxPerPt)
 
 	case layout.OpLine:
-		c := color.NRGBA{
-			R: uint8(op.R * 255), G: uint8(op.G * 255), B: uint8(op.B * 255), A: 255,
-		}
-		lw := strokeWidthScale(ps.StrokeWidth, pxPerPt)
-		// centre the stroke on the line: half its width, in points
-		half := float64(lw) / 2 / pxPerPt
-		var r image.Rectangle
-		if op.H <= 0 { // horizontal line
-			r = ptRectScale(op.X, op.Y-half, op.W, 2*half, pxPerPt)
-		} else { // vertical line
-			r = ptRectScale(op.X-half, op.Y, 2*half, op.H, pxPerPt)
-		}
-		if r = r.Intersect(img.Bounds()); !r.Empty() {
-			fillNRGBAOpaque(img, r, c)
-		}
+		paintLine(img, paintOp, paintStyle, pxPerPt)
 
 	case layout.OpText, layout.OpBullet:
-		c := color.NRGBA{
-			R: uint8(op.R * 255), G: uint8(op.G * 255), B: uint8(op.B * 255), A: 255,
-		}
-		// Keep fractional baselines so glyphs share one stable baseline
-		// instead of independently rounded Y positions (bobbing text).
-		bx := op.X * pxPerPt
-		by := op.Y * pxPerPt
-		face := op.Font
-		if face == nil {
-			// Layout always attaches a face when DefaultFont is available;
-			// this is defensive only (no 5×7 bitmap dual path).
-			var err error
-			face, err = pdf.DefaultFont()
-			if err != nil || face == nil {
-				return
-			}
-		}
-		ttfDrawString(img, bx, by, op.Text, op.Size, face, c, pxPerPt, atlas)
-		// Latin-only fake-bold (CJK gate lives in layout.FakeBoldFor).
-		if layout.FakeBoldFor(op) {
-			ttfDrawString(img, bx+float64(rasterSS), by, op.Text, op.Size, face, c, pxPerPt, atlas)
-		}
+		paintText(img, paintOp, pxPerPt, atlas)
 
 	case layout.OpImage:
-		decoded, err := imageCache.decode(op)
-		if err != nil || op.W <= 0 || op.H <= 0 {
-			return // layout already validated the bytes; skip on failure
+		paintImage(img, paintOp, pxPerPt, imageCache)
+
+	case layout.OpLinkURI: // annotations do not paint
+	}
+}
+
+// paintFillRect fills rect with the paintOp color, over-composited unless opaque.
+func paintFillRect(img *image.NRGBA, paintOp *layout.Op, pxPerPt float64) {
+	// Raw alpha for Over compositing — see paint comment (PDF vs raster).
+	col := color.NRGBA{
+		R: uint8(paintOp.R * channelMax), G: uint8(paintOp.G * channelMax), B: uint8(paintOp.B * channelMax),
+		A: uint8(paintOp.Alpha * channelMax),
+	}
+	rect := ptRectScale(paintOp.X, paintOp.Y, paintOp.W, paintOp.H, pxPerPt).Intersect(img.Bounds())
+
+	if !rect.Empty() {
+		if col.A == opaqueAlpha {
+			fillNRGBAOpaque(img, rect, col)
+		} else {
+			draw.Draw(
+				img,
+				rect,
+				image.NewUniform(col),
+				image.Point{}, //nolint:exhaustruct // intentional zero/partial fields
+				draw.Over,
+			)
 		}
-		src := decoded.image
-		r := ptRectScale(op.X, op.Y, op.W, op.H, pxPerPt).Intersect(img.Bounds())
-		if !r.Empty() {
-			sb := src.Bounds()
-			if r.Dx() == sb.Dx() && r.Dy() == sb.Dy() {
-				if nrgba, ok := src.(*image.NRGBA); ok && nrgba.Opaque() {
-					drawNRGBAOpaque(img, r, nrgba, sb.Min)
-				} else {
-					draw.Draw(img, r, src, sb.Min, draw.Over)
-				}
-			} else {
-				// Go 1.26 removed image/draw's scalers; nearest
-				// neighbour keeps it stdlib-only.
-				scaled := imageCache.scaledImage(decoded, r.Dx(), r.Dy())
-				if scaled.Opaque() {
-					drawNRGBAOpaque(img, r, scaled, image.Point{})
-				} else {
-					draw.Draw(img, r, scaled, image.Point{}, draw.Over)
-				}
-			}
+	}
+}
+
+// paintStrokeRect paints the four border strips of a stroked rectangle.
+func paintStrokeRect(img *image.NRGBA, paintOp *layout.Op, paintStyle layout.PaintStyle, pxPerPt float64) {
+	col := color.NRGBA{
+		R: uint8(paintOp.R * channelMax), G: uint8(paintOp.G * channelMax), B: uint8(paintOp.B * channelMax), A: opaqueAlpha,
+	}
+	lineWidth := strokeWidthScale(paintStyle.StrokeWidth, pxPerPt)
+	rect := ptRectScale(paintOp.X, paintOp.Y, paintOp.W, paintOp.H, pxPerPt)
+
+	rects := [4]image.Rectangle{
+		image.Rect(rect.Min.X, rect.Min.Y, rect.Max.X, rect.Min.Y+lineWidth),
+		image.Rect(rect.Min.X, rect.Max.Y-lineWidth, rect.Max.X, rect.Max.Y),
+		image.Rect(rect.Min.X, rect.Min.Y, rect.Min.X+lineWidth, rect.Max.Y),
+		image.Rect(rect.Max.X-lineWidth, rect.Min.Y, rect.Max.X, rect.Max.Y),
+	}
+	for _, rr := range rects {
+		if rr = rr.Intersect(img.Bounds()); !rr.Empty() {
+			fillNRGBAOpaque(img, rr, col)
+		}
+	}
+}
+
+// paintLine paints a horizontal or vertical stroke centred on the paintOp.
+func paintLine(img *image.NRGBA, paintOp *layout.Op, paintStyle layout.PaintStyle, pxPerPt float64) {
+	col := color.NRGBA{
+		R: uint8(paintOp.R * channelMax), G: uint8(paintOp.G * channelMax), B: uint8(paintOp.B * channelMax), A: opaqueAlpha,
+	}
+	lineWidth := strokeWidthScale(paintStyle.StrokeWidth, pxPerPt)
+	// centre the stroke on the line: half its width, in points
+	half := float64(lineWidth) / boxFilterFactor2 / pxPerPt
+
+	var rect image.Rectangle
+
+	if paintOp.H <= 0 { // horizontal line
+		rect = ptRectScale(paintOp.X, paintOp.Y-half, paintOp.W, boxFilterFactor2*half, pxPerPt)
+	} else { // vertical line
+		rect = ptRectScale(paintOp.X-half, paintOp.Y, boxFilterFactor2*half, paintOp.H, pxPerPt)
+	}
+
+	if rect = rect.Intersect(img.Bounds()); !rect.Empty() {
+		fillNRGBAOpaque(img, rect, col)
+	}
+}
+
+// paintText draws the run (and fake-bold pass) at fractional baselines.
+func paintText(img *image.NRGBA, paintOp *layout.Op, pxPerPt float64, atlas *glyphAtlas) {
+	col := color.NRGBA{
+		R: uint8(paintOp.R * channelMax), G: uint8(paintOp.G * channelMax), B: uint8(paintOp.B * channelMax), A: opaqueAlpha,
+	}
+	// Keep fractional baselines so glyphs share one stable baseline
+	// instead of independently rounded Y positions (bobbing text).
+	baseX := paintOp.X * pxPerPt
+	baseY := paintOp.Y * pxPerPt
+
+	face := paintOp.Font
+	if face == nil {
+		// Layout always attaches a face when DefaultFont is available;
+		// this is defensive only (no 5×7 bitmap dual path).
+		var err error
+
+		face, err = pdf.DefaultFont()
+		if err != nil || face == nil {
+			return
+		}
+	}
+
+	ttfDrawString(img, baseX, baseY, paintOp.Text, paintOp.Size, face, col, pxPerPt, atlas)
+	// Latin-only fake-bold (CJK gate lives in layout.FakeBoldFor).
+	if layout.FakeBoldFor(paintOp) {
+		ttfDrawString(img, baseX+float64(rasterSS), baseY, paintOp.Text, paintOp.Size, face, col, pxPerPt, atlas)
+	}
+}
+
+// paintImage draws a decoded paintOp image, scaled via the per-run cache.
+func paintImage(img *image.NRGBA, paintOp *layout.Op, pxPerPt float64, imageCache *rasterImageCache) {
+	decoded, err := imageCache.decode(paintOp)
+	if err != nil || paintOp.W <= 0 || paintOp.H <= 0 {
+		return // layout already validated the bytes; skip on failure
+	}
+
+	src := decoded.image
+	rect := ptRectScale(paintOp.X, paintOp.Y, paintOp.W, paintOp.H, pxPerPt).Intersect(img.Bounds())
+
+	if rect.Empty() {
+		return
+	}
+
+	sb := src.Bounds()
+	if rect.Dx() == sb.Dx() && rect.Dy() == sb.Dy() {
+		if nrgba, ok := src.(*image.NRGBA); ok && nrgba.Opaque() {
+			drawNRGBAOpaque(img, rect, nrgba, sb.Min)
+		} else {
+			draw.Draw(img, rect, src, sb.Min, draw.Over)
 		}
 
-	case layout.OpLinkURI:
-		// annotations do not paint
+		return
+	}
+
+	// Go 1.26 removed image/draw's scalers; nearest
+	// neighbour keeps it stdlib-only.
+	scaled := imageCache.scaledImage(decoded, rect.Dx(), rect.Dy())
+	if scaled.Opaque() {
+		drawNRGBAOpaque(img, rect, scaled, image.Point{}) //nolint:exhaustruct // intentional zero/partial fields
+	} else {
+		draw.Draw(img, rect, scaled, image.Point{}, draw.Over) //nolint:exhaustruct // intentional zero/partial fields
 	}
 }
 
@@ -584,9 +742,11 @@ func strokeWidthScale(strokeWidth float64, pxPerPt float64) int {
 	if w <= 0 {
 		w = 1
 	}
+
 	if lw := int(math.Round(w * pxPerPt)); lw >= 1 {
 		return lw
 	}
+
 	return 1
 }
 
@@ -598,27 +758,29 @@ func ptRectScale(x, y, w, h, pxPerPt float64) image.Rectangle {
 	)
 }
 
-func fillNRGBAOpaque(dst *image.NRGBA, r image.Rectangle, c color.NRGBA) {
-	if r.Empty() {
+func fillNRGBAOpaque(dst *image.NRGBA, rect image.Rectangle, col color.NRGBA) {
+	if rect.Empty() {
 		return
 	}
-	for y := r.Min.Y; y < r.Max.Y; y++ {
-		offset := dst.PixOffset(r.Min.X, y)
-		for x := r.Min.X; x < r.Max.X; x++ {
-			dst.Pix[offset] = c.R
-			dst.Pix[offset+1] = c.G
-			dst.Pix[offset+2] = c.B
+
+	for y := rect.Min.Y; y < rect.Max.Y; y++ {
+		offset := dst.PixOffset(rect.Min.X, y)
+
+		for x := rect.Min.X; x < rect.Max.X; x++ {
+			dst.Pix[offset] = col.R
+			dst.Pix[offset+1] = col.G
+			dst.Pix[offset+2] = col.B
 			dst.Pix[offset+3] = 255
 			offset += 4
 		}
 	}
 }
 
-func drawNRGBAOpaque(dst *image.NRGBA, r image.Rectangle, src *image.NRGBA, sp image.Point) {
-	for y := 0; y < r.Dy(); y++ {
-		dstOffset := dst.PixOffset(r.Min.X, r.Min.Y+y)
+func drawNRGBAOpaque(dst *image.NRGBA, rect image.Rectangle, src *image.NRGBA, sp image.Point) {
+	for y := range rect.Dy() {
+		dstOffset := dst.PixOffset(rect.Min.X, rect.Min.Y+y)
 		srcOffset := src.PixOffset(sp.X, sp.Y+y)
-		copy(dst.Pix[dstOffset:dstOffset+4*r.Dx()], src.Pix[srcOffset:srcOffset+4*r.Dx()])
+		copy(dst.Pix[dstOffset:dstOffset+4*rect.Dx()], src.Pix[srcOffset:srcOffset+4*rect.Dx()])
 	}
 }
 
@@ -629,60 +791,74 @@ func scaleNearest(src image.Image, w, h int) *image.NRGBA {
 	if nrgba, ok := src.(*image.NRGBA); ok {
 		return scaleNearestNRGBA(nrgba, w, h)
 	}
+
 	return scaleNearestGeneric(src, w, h)
 }
 
-func scaleNearestNRGBA(src *image.NRGBA, w, h int) *image.NRGBA {
-	dst := image.NewNRGBA(image.Rect(0, 0, w, h))
-	sb := src.Bounds()
-	if sb.Dx() == 0 || sb.Dy() == 0 {
+func scaleNearestNRGBA(src *image.NRGBA, width, height int) *image.NRGBA {
+	dst := image.NewNRGBA(image.Rect(0, 0, width, height))
+	srcBounds := src.Bounds()
+
+	if srcBounds.Dx() == 0 || srcBounds.Dy() == 0 {
 		return dst
 	}
-	fx := float64(sb.Dx()) / float64(w)
-	fy := float64(sb.Dy()) / float64(h)
-	for y := 0; y < h; y++ {
-		sy := sb.Min.Y + int((float64(y)+0.5)*fy)
-		if sy > sb.Max.Y-1 {
-			sy = sb.Max.Y - 1
+
+	scaleX := float64(srcBounds.Dx()) / float64(width)
+
+	scaleY := float64(srcBounds.Dy()) / float64(height)
+	for row := range height {
+		srcY := srcBounds.Min.Y + int((float64(row)+pixelCenter)*scaleY)
+		if srcY > srcBounds.Max.Y-1 {
+			srcY = srcBounds.Max.Y - 1
 		}
-		for x := 0; x < w; x++ {
-			sx := sb.Min.X + int((float64(x)+0.5)*fx)
-			if sx > sb.Max.X-1 {
-				sx = sb.Max.X - 1
+
+		for col := range width {
+			srcX := srcBounds.Min.X + int((float64(col)+pixelCenter)*scaleX)
+			if srcX > srcBounds.Max.X-1 {
+				srcX = srcBounds.Max.X - 1
 			}
-			srcOffset := src.PixOffset(sx, sy)
-			dstOffset := dst.PixOffset(x, y)
+
+			srcOffset := src.PixOffset(srcX, srcY)
+			dstOffset := dst.PixOffset(col, row)
 			copy(dst.Pix[dstOffset:dstOffset+4], src.Pix[srcOffset:srcOffset+4])
 		}
 	}
+
 	return dst
 }
 
-func scaleNearestGeneric(src image.Image, w, h int) *image.NRGBA {
-	dst := image.NewNRGBA(image.Rect(0, 0, w, h))
-	sb := src.Bounds()
-	if sb.Dx() == 0 || sb.Dy() == 0 {
+func scaleNearestGeneric(src image.Image, width, height int) *image.NRGBA {
+	dst := image.NewNRGBA(image.Rect(0, 0, width, height))
+	srcBounds := src.Bounds()
+
+	if srcBounds.Dx() == 0 || srcBounds.Dy() == 0 {
 		return dst
 	}
-	fx := float64(sb.Dx()) / float64(w)
-	fy := float64(sb.Dy()) / float64(h)
-	for y := 0; y < h; y++ {
-		sy := sb.Min.Y + int((float64(y)+0.5)*fy)
-		if sy > sb.Max.Y-1 {
-			sy = sb.Max.Y - 1
+
+	scaleX := float64(srcBounds.Dx()) / float64(width)
+
+	scaleY := float64(srcBounds.Dy()) / float64(height)
+	for row := range height {
+		srcY := srcBounds.Min.Y + int((float64(row)+pixelCenter)*scaleY)
+		if srcY > srcBounds.Max.Y-1 {
+			srcY = srcBounds.Max.Y - 1
 		}
-		for x := 0; x < w; x++ {
-			sx := sb.Min.X + int((float64(x)+0.5)*fx)
-			if sx > sb.Max.X-1 {
-				sx = sb.Max.X - 1
+
+		for col := range width {
+			srcX := srcBounds.Min.X + int((float64(col)+pixelCenter)*scaleX)
+			if srcX > srcBounds.Max.X-1 {
+				srcX = srcBounds.Max.X - 1
 			}
-			dst.SetNRGBA(
-				x,
-				y,
-				color.NRGBAModel.Convert(src.At(sx, sy)).(color.NRGBA),
-			)
+
+			nc, ok := color.NRGBAModel.Convert(src.At(srcX, srcY)).(color.NRGBA)
+			if !ok {
+				continue
+			}
+
+			dst.SetNRGBA(col, row, nc)
 		}
 	}
+
 	return dst
 }
 
@@ -692,26 +868,32 @@ func scaleNearestGeneric(src image.Image, w, h int) *image.NRGBA {
 // OpenOutput and output-path format sniffing.
 func Run(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 	if cmd == nil {
-		return errors.New("imageout: nil command")
+		return errNilCommand
 	}
+
 	out, closeOut, err := cmd.OpenOutput()
 	if err != nil {
-		return err
+		return fmt.Errorf("imageout: open output: %w", err)
 	}
+
 	img := cmd.Image
 	// Resolve --format / extension before the engine so Request only needs
 	// Image.Format (library callers set Format explicitly or get PNG).
 	format, err := resolveFormat(img.Format, cmd.Output)
 	if err != nil {
-		closeOut()
+		_ = closeOut()
+
 		return err
 	}
+
 	img.Format = format
 	req := convert.NewImageRequest(cmd.Global, img, cmd.Objects, out)
+
 	runErr := RunRequest(ctx, req, log)
 	if closeErr := closeOut(); closeErr != nil && runErr == nil {
 		return closeErr
 	}
+
 	return runErr
 }
 
@@ -720,11 +902,13 @@ func Run(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 // bytes (nil → os.Stdout is not auto-selected; callers must supply a writer).
 func RunRequest(ctx context.Context, req *convert.Request, log io.Writer) error {
 	if req == nil {
-		return errors.New("imageout: nil request")
+		return errNilRequest
 	}
+
 	if err := req.ValidateImage(); err != nil {
-		return err
+		return fmt.Errorf("imageout: validate: %w", err)
 	}
+
 	if log == nil {
 		log = io.Discard
 	}
@@ -732,6 +916,7 @@ func RunRequest(ctx context.Context, req *convert.Request, log io.Writer) error 
 	if req.Global.Quiet {
 		log = io.Discard
 	}
+
 	obj, err := firstObject(req.Objects, log)
 	if err != nil {
 		return err
@@ -748,58 +933,36 @@ func RunRequest(ctx context.Context, req *convert.Request, log io.Writer) error 
 	if err != nil {
 		return fmt.Errorf("default font: %w", err)
 	}
-	var registry *pdf.Registry
-	if dirs := req.Global.FontPaths; len(dirs) > 0 || req.Global.UseSystemFonts {
-		scan := append([]string{}, dirs...)
-		if req.Global.UseSystemFonts {
-			scan = append(scan, pdf.DefaultSystemFontDirs()...)
-		}
-		registry = pdf.ScanFontDirs(scan)
-		if log != io.Discard && len(scan) > 0 {
-			line.Emit(log, line.Info, "scanned %d font path(s)", len(scan))
-		}
-	}
 
+	registry := fontRegistry(req.Global, log)
+
+	return renderRequest(ctx, req, obj, loader, font, registry, log)
+}
+
+// renderRequest renders the image object and writes the encoded bytes to
+// req.Output; the loader/font/registry prelude lives in RunRequest.
+func renderRequest(
+	ctx context.Context,
+	req *convert.Request,
+	obj *settings.PdfObject,
+	loader *load.Loader,
+	font *pdf.Font,
+	registry *pdf.Registry,
+	log io.Writer,
+) error {
 	imgSet := req.Image
-	media := mediaFor(req.Global, *imgSet, obj)
-	enabled := convert.SimplifyDOMEnabled(imgSet.Web, obj.Web) || req.Global.Web.SimplifyDOM
-	profile := convert.SimplifyDOMProfile(imgSet.Web, obj.Web)
-	if profile == "" {
-		profile = convert.SimplifyDOMProfile(req.Global.Web, settings.Web{})
-	}
-	prep, err := convert.PrepareDocument(ctx, loader, obj.Page, obj.Load, registry, convert.PrepareOptions{
-		ViewportW:       768.0,
-		ViewportH:       576.0,
-		MediaType:       media,
-		SimplifyDOM:     enabled,
-		SimplifyProfile: profile,
-		ObjectIndex:     1,
-	}, log)
+
+	prep, media, err := prepareImageDocument(ctx, loader, obj, req.Global, imgSet, registry, log)
 	if err != nil {
 		return err
 	}
-	if prep.Resource.Skip {
-		return fmt.Errorf("load %q: load-error policy is skip; nothing to render", obj.Page)
-	}
+
 	root := prep.Root
 	sheets := prep.Sheets
 	registry = prep.Registry
 
 	cache := map[string][]byte{}
-	imagesFn := func(src string) ([]byte, error) {
-		if !imgSet.Web.Images {
-			return nil, fmt.Errorf("images disabled")
-		}
-		if b, ok := cache[src]; ok {
-			return b, nil
-		}
-		r, err := prep.Resources.Fetch(ctx, src)
-		if err != nil {
-			return nil, err
-		}
-		cache[src] = r.Body
-		return r.Body, nil
-	}
+	imagesFn := makeImageFetcher(ctx, imgSet, prep, cache)
 
 	// Policy A: Quiet is Global.Quiet; body paint background is Global.Background
 	// only (single field for PDF + image; CLI --background / library Set).
@@ -821,14 +984,25 @@ func RunRequest(ctx context.Context, req *convert.Request, log io.Writer) error 
 		return err
 	}
 
+	return writeEncodedOutput(req, img, log)
+}
+
+// writeEncodedOutput resolves the format, composites onto white for
+// transparent JPEG, and writes the encoded bytes to req.Output.
+func writeEncodedOutput(req *convert.Request, img image.Image, log io.Writer) error {
+	imgSet := req.Image
+
 	format, err := resolveFormat(imgSet.Format, "")
 	if err != nil {
 		return err
 	}
-	if format == "jpg" && imgSet.Transparent {
+
+	if format == formatJPG && imgSet.Transparent {
 		line.Emit(log, line.Warn, "--transparent ignored for JPEG output (white background used)")
+
 		img = onWhite(img)
 	}
+
 	data, err := encode(img, format, imgSet.Quality)
 	if err != nil {
 		return fmt.Errorf("encode %s: %w", format, err)
@@ -836,26 +1010,118 @@ func RunRequest(ctx context.Context, req *convert.Request, log io.Writer) error 
 
 	out := req.Output
 	if out == nil {
-		return errors.New("imageout: nil Output writer")
+		return errNilOutput
 	}
+
 	if _, err := out.Write(data); err != nil {
 		return fmt.Errorf("write output: %w", err)
 	}
+
 	return nil
+}
+
+// prepareImageDocument resolves the media/SimplifyDOM profile and runs
+// PrepareDocument for image mode (single page).
+func prepareImageDocument(
+	ctx context.Context,
+	loader *load.Loader,
+	obj *settings.PdfObject,
+	global settings.PdfGlobal,
+	imgSet *settings.ImageGlobal,
+	registry *pdf.Registry,
+	log io.Writer,
+) (*convert.PreparedDocument, string, error) {
+	media := mediaFor(global, *imgSet, obj)
+	enabled := convert.SimplifyDOMEnabled(imgSet.Web, obj.Web) || global.Web.SimplifyDOM
+
+	profile := convert.SimplifyDOMProfile(imgSet.Web, obj.Web)
+	if profile == "" {
+		profile = convert.SimplifyDOMProfile(
+			global.Web,
+			settings.Web{}, //nolint:exhaustruct // intentional zero/partial fields
+		)
+	}
+
+	prep, err := convert.PrepareDocument(ctx, loader, obj.Page, obj.Load, registry, convert.PrepareOptions{
+		ViewportW:       defaultViewportW,
+		ViewportH:       defaultViewportH,
+		MediaType:       media,
+		SimplifyDOM:     enabled,
+		SimplifyProfile: profile,
+		ObjectIndex:     1,
+	}, log)
+	if err != nil {
+		return nil, "", fmt.Errorf("imageout: prepare: %w", err)
+	}
+
+	if prep.Resource.Skip {
+		return nil, "", fmt.Errorf("load %q: %w", obj.Page, errNothingToRender)
+	}
+
+	return prep, media, nil
+}
+
+// makeImageFetcher wraps prep.Resources.Fetch with a per-run byte cache and
+// the --no-images gate.
+func makeImageFetcher(
+	ctx context.Context,
+	imgSet *settings.ImageGlobal,
+	prep *convert.PreparedDocument,
+	cache map[string][]byte,
+) func(string) ([]byte, error) {
+	return func(src string) ([]byte, error) {
+		if !imgSet.Web.Images {
+			return nil, errImagesDisabled
+		}
+
+		if b, ok := cache[src]; ok {
+			return b, nil
+		}
+
+		res, err := prep.Resources.Fetch(ctx, src)
+		if err != nil {
+			return nil, fmt.Errorf("fetch %q: %w", src, err)
+		}
+
+		cache[src] = res.Body
+
+		return res.Body, nil
+	}
+}
+
+// fontRegistry builds a font registry from Global.FontPaths and system font
+// dirs, logging what was scanned (nil when nothing to scan).
+func fontRegistry(global settings.PdfGlobal, log io.Writer) *pdf.Registry {
+	if len(global.FontPaths) == 0 && !global.UseSystemFonts {
+		return nil
+	}
+
+	scan := append([]string{}, global.FontPaths...)
+	if global.UseSystemFonts {
+		scan = append(scan, pdf.DefaultSystemFontDirs()...)
+	}
+
+	if log != io.Discard && len(scan) > 0 {
+		line.Emit(log, line.Info, "scanned %d font path(s)", len(scan))
+	}
+
+	return pdf.ScanFontDirs(scan)
 }
 
 // imageLoadGlobal builds the LoadGlobal for image mode: Proxy from Image.Load
 // plus ACL (Allow / EnableLocalFileAccess) from Global.Load, where CLI and
 // ImageConverter.Global set them. NewLoader applies the full policy.
 func imageLoadGlobal(global settings.PdfGlobal, image settings.ImageGlobal) settings.LoadGlobal {
-	lg := image.Load
+	loadGlobal := image.Load
 	// Global.Load is the ACL home (enablelocalfileaccess / allow keys).
 	// Prefer Global when set; keep any Image.Load ACL already present (OR).
 	if len(global.Load.Allow) > 0 {
-		lg.Allow = append(append([]string(nil), lg.Allow...), global.Load.Allow...)
+		loadGlobal.Allow = append(append([]string(nil), loadGlobal.Allow...), global.Load.Allow...)
 	}
-	lg.EnableLocalFileAccess = lg.EnableLocalFileAccess || global.Load.EnableLocalFileAccess
-	return lg
+
+	loadGlobal.EnableLocalFileAccess = loadGlobal.EnableLocalFileAccess || global.Load.EnableLocalFileAccess
+
+	return loadGlobal
 }
 
 // imageLoadGlobalCmd is a test helper: ACL merge from a parsed Command.
@@ -869,23 +1135,30 @@ func imageLoadGlobalCmd(cmd *cli.Command) settings.LoadGlobal {
 // source kind via ObjectSettings.SetBody).
 func firstObject(objects []settings.PdfObject, log io.Writer) (*settings.PdfObject, error) {
 	var first *settings.PdfObject
-	for i := range objects {
-		o := &objects[i]
-		if o.IsTableOfContent {
+
+	for idx := range objects {
+		obj := &objects[idx]
+		if obj.IsTableOfContent {
 			continue
 		}
-		if o.Page == "" && len(o.Load.InlineHTML) == 0 {
+
+		if obj.Page == "" && len(obj.Load.InlineHTML) == 0 {
 			continue
 		}
+
 		if first == nil {
-			first = o
+			first = obj
+
 			continue
 		}
-		line.Emit(log, line.Warn, "image mode renders the first page only; ignoring object %d", i+1)
+
+		line.Emit(log, line.Warn, "image mode renders the first page only; ignoring object %d", idx+1)
 	}
+
 	if first == nil {
-		return nil, errors.New("no input to convert")
+		return nil, errNoInputToConvert
 	}
+
 	return first, nil
 }
 
@@ -898,20 +1171,25 @@ func mediaFor(global settings.PdfGlobal, image settings.ImageGlobal, obj *settin
 	if global.Web.PrintMediaType {
 		web.PrintMediaType = true
 	}
+
 	if web.MediaType == settings.MediaIgnore {
 		web.MediaType = global.Web.MediaType
 	}
+
 	var objWeb *settings.Web
+
 	if obj != nil {
-		w := settings.Web{
+		web := settings.Web{ //nolint:exhaustruct // intentional zero/partial fields
 			PrintMediaType: obj.Load.PrintMediaType || obj.Web.PrintMediaType,
 			MediaType:      obj.Load.MediaType,
 		}
 		if obj.Web.MediaType != settings.MediaIgnore {
-			w.MediaType = obj.Web.MediaType
+			web.MediaType = obj.Web.MediaType
 		}
-		objWeb = &w
+
+		objWeb = &web
 	}
+
 	return settings.ResolveMedia("screen", web, objWeb)
 }
 
@@ -919,61 +1197,75 @@ func mediaFor(global settings.PdfGlobal, image settings.ImageGlobal, obj *settin
 // rectangle (no crop) when any value is unset (defaults are -1).
 func cropRect(c settings.CropSettings) image.Rectangle {
 	if c.Left < 0 || c.Top < 0 || c.Width <= 0 || c.Height <= 0 {
-		return image.Rectangle{}
+		return image.Rectangle{} //nolint:exhaustruct // intentional zero/partial fields
 	}
+
 	return image.Rect(c.Left, c.Top, c.Left+c.Width, c.Top+c.Height)
 }
 
 // resolveFormat picks the output format: the --format flag wins, otherwise
 // the output file extension (.jpg/.jpeg), otherwise PNG.
 func resolveFormat(flag, output string) (string, error) {
-	f := strings.ToLower(strings.TrimSpace(flag))
-	if f == "" {
+	fmtName := strings.ToLower(strings.TrimSpace(flag))
+	if fmtName == "" {
 		switch strings.ToLower(filepath.Ext(output)) {
 		case ".jpg", ".jpeg":
-			f = "jpg"
+			fmtName = formatJPG
 		default:
-			f = "png"
+			fmtName = formatPNG
 		}
 	}
-	switch f {
-	case "png":
-		return "png", nil
-	case "jpg", "jpeg":
-		return "jpg", nil
+
+	switch fmtName {
+	case formatPNG:
+		return formatPNG, nil
+	case formatJPG, "jpeg":
+		return formatJPG, nil
 	}
-	return "", fmt.Errorf("unsupported format %q (supported: png, jpg)", flag)
+
+	return "", fmt.Errorf("%w %q (supported: png, jpg)", errUnsupportedFmt, flag)
 }
 
 // encode serializes img as PNG or JPEG. quality applies to JPEG only
 // (1..100); PNG is lossless and ignores it.
 func encode(img image.Image, format string, quality int) ([]byte, error) {
 	var buf bytes.Buffer
+
 	switch format {
-	case "png":
+	case formatPNG:
 		if err := png.Encode(&buf, img); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("png encode: %w", err)
 		}
-	case "jpg":
+	case formatJPG:
 		if quality < 1 {
 			quality = 1
 		}
-		if quality > 100 {
+
+		if quality > qualityMaxPercent {
 			quality = 100
 		}
+
 		if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: quality}); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("jpeg encode: %w", err)
 		}
 	default:
-		return nil, fmt.Errorf("unsupported format %q", format)
+		return nil, fmt.Errorf("%w %q", errUnsupportedFmt, format)
 	}
+
 	return buf.Bytes(), nil
 }
 
 // onWhite composites img onto a white background (JPEG has no alpha).
 func onWhite(img image.Image) image.Image {
 	dst := image.NewNRGBA(img.Bounds())
-	draw.Draw(dst, dst.Bounds(), image.NewUniform(color.White), image.Point{}, draw.Src)
+	draw.Draw(
+		dst,
+		dst.Bounds(),
+		image.NewUniform(color.White),
+		image.Point{}, //nolint:exhaustruct // intentional zero/partial fields
+		draw.Src,
+	)
 	draw.Draw(dst, dst.Bounds(), img, img.Bounds().Min, draw.Over)
+
 	return dst
 }

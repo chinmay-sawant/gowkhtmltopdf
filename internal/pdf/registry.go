@@ -18,34 +18,40 @@ func NewRegistry() *Registry {
 }
 
 // AddFont registers a parsed face under its family name (and PostScript name).
-func (r *Registry) AddFont(f *Font) {
-	if r == nil || f == nil {
+func (r *Registry) AddFont(fnt *Font) {
+	if r == nil || fnt == nil {
 		return
 	}
-	names := f.LoadNames()
-	if len(names) == 0 && f.PostScriptName != "" {
-		names = []string{f.PostScriptName}
+
+	names := fnt.LoadNames()
+	if len(names) == 0 && fnt.PostScriptName != "" {
+		names = []string{fnt.PostScriptName}
 	}
+
 	for _, n := range names {
 		key := strings.ToLower(strings.TrimSpace(n))
 		if key == "" {
 			continue
 		}
-		r.byFamily[key] = append(r.byFamily[key], f)
+
+		r.byFamily[key] = append(r.byFamily[key], fnt)
 	}
 }
 
 // AddFamilyAlias registers f under an explicit CSS family name.
-func (r *Registry) AddFamilyAlias(family string, f *Font) {
-	if r == nil || f == nil {
+func (r *Registry) AddFamilyAlias(family string, font *Font) {
+	if r == nil || font == nil {
 		return
 	}
+
 	key := strings.ToLower(strings.TrimSpace(family))
 	key = strings.Trim(key, `"'`)
+
 	if key == "" {
 		return
 	}
-	r.byFamily[key] = append(r.byFamily[key], f)
+
+	r.byFamily[key] = append(r.byFamily[key], font)
 }
 
 // Lookup returns a face matching family list + weight/italic, or nil.
@@ -56,17 +62,20 @@ func (r *Registry) Lookup(families []string, weight int, italic bool) *Font {
 	if r == nil {
 		return nil
 	}
+
 	for _, fam := range families {
 		for _, key := range fontFamilyKeys(fam) {
 			faces := r.byFamily[key]
 			if len(faces) == 0 {
 				continue
 			}
+
 			if f := pickFace(faces, weight, italic); f != nil {
 				return f
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -75,9 +84,11 @@ func (r *Registry) Lookup(families []string, weight int, italic bool) *Font {
 func fontFamilyKeys(fam string) []string {
 	key := strings.ToLower(strings.TrimSpace(fam))
 	key = strings.Trim(key, `"'`)
+
 	if key == "" {
 		return nil
 	}
+
 	switch key {
 	case "serif":
 		return []string{"liberation serif", "dejavu serif", "noto serif"}
@@ -93,61 +104,89 @@ func fontFamilyKeys(fam string) []string {
 // FindWithGlyph returns any registered face that has a glyph for ch, preferring
 // weight/italic match. Used as a last-resort Unicode fallback when CSS
 // font-family faces (and Liberation) lack the codepoint (e.g. IPA ˈ/ɾ).
-func (reg *Registry) FindWithGlyph(ch rune, weight int, italic bool) *Font {
-	if reg == nil {
+func (r *Registry) FindWithGlyph(codePoint rune, weight int, italic bool) *Font {
+	if r == nil {
 		return nil
 	}
-	bold := weight >= 700
+
+	bold := weight >= fontWeightBoldMin
+
 	var best *Font
+
 	bestScore := -1
 	seen := map[*Font]bool{}
-	for _, faces := range reg.byFamily {
-		for _, f := range faces {
-			if f == nil || seen[f] || f.GlyphID(ch) == 0 {
+
+	for _, faces := range r.byFamily {
+		for _, fnt := range faces {
+			score := glyphFaceScore(fnt, codePoint, bold, italic)
+			if score < 0 || seen[fnt] {
 				continue
 			}
-			seen[f] = true
-			score := 1
-			if f.Bold() == bold {
-				score += 2
-			}
-			if f.Italic() == italic {
-				score += 2
-			}
-			// Prefer known Unicode-capable families when several match.
-			for _, n := range f.FamilyNames() {
-				low := strings.ToLower(n)
-				if strings.Contains(low, "dejavu") || strings.Contains(low, "noto") || strings.Contains(low, "freesans") {
-					score += 3
-					break
-				}
-			}
+
+			seen[fnt] = true
+
 			if score > bestScore {
 				bestScore = score
-				best = f
+				best = fnt
 			}
 		}
 	}
+
 	return best
 }
 
-func pickFace(faces []*Font, weight int, italic bool) *Font {
-	bold := weight >= 700
-	var best *Font
-	bestScore := -1
-	for _, f := range faces {
-		score := 0
-		if f.Bold() == bold {
-			score += 2
-		}
-		if f.Italic() == italic {
-			score += 2
-		}
-		if score > bestScore {
-			bestScore = score
-			best = f
+// glyphFaceScore scores a face for ch: -1 when it lacks the glyph, plus
+// weight/italic match bonuses and a premium for known Unicode-capable
+// families (DejaVu/Noto/FreeSans).
+func glyphFaceScore(fnt *Font, codePoint rune, bold, italic bool) int {
+	if fnt == nil || fnt.GlyphID(codePoint) == 0 {
+		return -1
+	}
+
+	score := 1
+	if fnt.Bold() == bold {
+		score += 2
+	}
+
+	if fnt.Italic() == italic {
+		score += 2
+	}
+
+	for _, n := range fnt.FamilyNames() {
+		low := strings.ToLower(n)
+		if strings.Contains(low, "dejavu") || strings.Contains(low, "noto") || strings.Contains(low, "freesans") {
+			score += 3
+
+			break
 		}
 	}
+
+	return score
+}
+
+func pickFace(faces []*Font, weight int, italic bool) *Font {
+	bold := weight >= fontWeightBoldMin
+
+	var best *Font
+
+	bestScore := -1
+
+	for _, fnt := range faces {
+		score := 0
+		if fnt.Bold() == bold {
+			score += 2
+		}
+
+		if fnt.Italic() == italic {
+			score += 2
+		}
+
+		if score > bestScore {
+			bestScore = score
+			best = fnt
+		}
+	}
+
 	return best
 }
 
@@ -163,6 +202,7 @@ func DefaultSystemFontDirs() []string {
 		"/usr/share/fonts/truetype/droid",
 		"/usr/share/fonts/opentype",
 	}
+
 	if home, err := os.UserHomeDir(); err == nil {
 		for _, rel := range []string{".fonts", ".local/share/fonts"} {
 			d := filepath.Join(home, rel)
@@ -171,6 +211,7 @@ func DefaultSystemFontDirs() []string {
 			}
 		}
 	}
+
 	return dirs
 }
 
@@ -179,44 +220,63 @@ func DefaultSystemFontDirs() []string {
 func ScanFontDirs(dirs []string) *Registry {
 	out := NewRegistry()
 	seen := map[string]bool{}
+
 	var scan func(string, int)
+
 	scan = func(dir string, depth int) {
 		if dir == "" || seen[dir] {
 			return
 		}
+
 		seen[dir] = true
+
 		entries, err := os.ReadDir(dir)
 		if err != nil {
 			return
 		}
-		for _, e := range entries {
-			path := filepath.Join(dir, e.Name())
-			if e.IsDir() {
+
+		for _, entry := range entries {
+			path := filepath.Join(dir, entry.Name())
+
+			if entry.IsDir() {
 				if depth > 0 {
 					scan(path, depth-1)
 				}
+
 				continue
 			}
-			low := strings.ToLower(e.Name())
-			if !strings.HasSuffix(low, ".ttf") && !strings.HasSuffix(low, ".otf") {
-				continue
-			}
-			data, err := os.ReadFile(path)
-			if err != nil {
-				continue
-			}
-			f, err := ParseTTF(data)
-			if err != nil {
-				continue
-			}
-			if f.PostScriptName == "" {
-				f.PostScriptName = strings.TrimSuffix(e.Name(), filepath.Ext(e.Name()))
-			}
-			out.AddFont(f)
+
+			scanFontFile(out, path, entry)
 		}
 	}
 	for _, d := range dirs {
-		scan(d, 2)
+		scan(d, fontScanMaxDepth)
 	}
+
 	return out
+}
+
+// scanFontFile parses a font file into the registry, skipping anything that
+// is not a TTF/OTF or fails to parse.
+func scanFontFile(out *Registry, path string, entry os.DirEntry) {
+	low := strings.ToLower(entry.Name())
+	if !strings.HasSuffix(low, ".ttf") && !strings.HasSuffix(low, ".otf") {
+		return
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+
+	fnt, err := ParseTTF(data)
+	if err != nil {
+		return
+	}
+
+	if fnt.PostScriptName == "" {
+		fnt.PostScriptName = strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
+	}
+
+	out.AddFont(fnt)
 }

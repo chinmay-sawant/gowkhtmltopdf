@@ -1,0 +1,29 @@
+# golangci-lint configuration for gowkhtmltopdf.
+# All available linters are enabled except those listed under disable.
+# Docs: https://golangci-lint.run/usage/configuration/
+#
+# Toolchain note: this module is go 1.26 / toolchain go1.26.4.
+# golangci-lint must be built with Go >= the module version (see Makefile).
+
+run:
+  timeout: 10m
+  tests: true
+
+linters:
+  enable-all: true
+  disable:
+    # Deprecated since v1.64; replaced by usetesting (already enabled via enable-all).
+    - tenv
+    # Go 1.26: golangci-lint v1.64 embeds gofumpt v0.7, which does not correctly
+    # handle module language version 1.26 (false "File is not properly formatted"
+    # reports; standalone gofumpt/gofmt on the same tree is clean). Prefer gofmt
+    # (still enabled) until golangci-lint ships a gofumpt that supports go1.26.
+    - gofumpt
+
+issues:
+  # Report every finding (default caps hide most of an enable-all run).
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+output:
+  sort-results: true

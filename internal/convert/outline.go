@@ -85,9 +85,11 @@ func docTitle(root *html.Node) string {
 	if root == nil {
 		return ""
 	}
+
 	if t := root.TextContentOf("title"); t != "" {
 		return outline.CollapseWS(t)
 	}
+
 	return ""
 }
 
@@ -96,30 +98,37 @@ func docTitle(root *html.Node) string {
 // Lookup); DocPage is filled once in flatHeadings. Objects opted out of the
 // outline (UseOutline/IncludeInOutline false) are dropped here;
 // --exclude-from-outline is applied later via outline.BuildTree Options.Exclude.
-func collectObjectHeadings(root *html.Node, res *layout.Result, _ int, _ settings.PdfGlobal, obj settings.PdfObject, _ io.Writer) []*outline.Heading {
+func collectObjectHeadings(root *html.Node, res *layout.Result, _ int, _ settings.PdfGlobal, obj settings.PdfObject, _ io.Writer) []*outline.Heading { //nolint:lll // shared heading collection signature
 	if !obj.UseOutline || !obj.IncludeInOutline {
 		return nil
 	}
-	hs := outline.CollectHeadings(root)
-	hs = outline.Lookup(hs, res.Locations)
-	if len(hs) == 0 {
+
+	hsVal := outline.CollectHeadings(root)
+	hsVal = outline.Lookup(hsVal, res.Locations)
+
+	if len(hsVal) == 0 {
 		return nil
 	}
-	return hs
+
+	return hsVal
 }
 
 // parseExcludeSelectors parses --exclude-from-outline selector strings into
 // css.Selector values for outline.Options.Exclude (matching lives in outline).
 func parseExcludeSelectors(specs []string, log io.Writer) []css.Selector {
 	var out []css.Selector
+
 	for _, s := range specs {
 		sels, ok := css.ParseSelectors(s)
 		if !ok || len(sels) == 0 {
 			line.Emit(log, line.Warn, "ignoring invalid --exclude-from-outline selector %q", s)
+
 			continue
 		}
+
 		out = append(out, sels...)
 	}
+
 	return out
 }
 
@@ -128,25 +137,30 @@ func parseExcludeSelectors(specs []string, log io.Writer) []css.Selector {
 // sorts by document page order.
 func flatHeadings(bodies []*objectState) []*outline.Heading {
 	var all []*outline.Heading
+
 	for _, st := range bodies {
 		for _, h := range st.headings {
 			h.DocPage = st.offset + h.Page
 			all = append(all, h)
 		}
 	}
+
 	outline.AssignAnchors(all)
 	// Document order by the explicit DocPage field. The object-local Page field
 	// remains unchanged for page-local layout and header/footer semantics.
 	sort.SliceStable(all, func(i, j int) bool {
-		a, b := all[i], all[j]
-		if a.DocPage != b.DocPage {
-			return a.DocPage < b.DocPage
+		flag, buf := all[i], all[j]
+		if flag.DocPage != buf.DocPage {
+			return flag.DocPage < buf.DocPage
 		}
-		if a.Y != b.Y {
-			return a.Y < b.Y
+
+		if flag.Y != buf.Y {
+			return flag.Y < buf.Y
 		}
-		return a.X < b.X
+
+		return flag.X < buf.X
 	})
+
 	return all
 }
 
@@ -158,6 +172,7 @@ func bodyStateFor(bodies []*objectState, page int) *objectState {
 			return st
 		}
 	}
+
 	return nil
 }
 
@@ -166,25 +181,33 @@ func bodyStateFor(bodies []*objectState, page int) *objectState {
 // container for the top-level headings, as pdf.Document.SetOutline expects.
 // Tree headings retain object-local Page and carry document-global DocPage.
 func emitOutline(doc *pdf.Document, tree *outline.Node, bodies []*objectState, tocTotal int) *pdf.Outline {
-	root := &pdf.Outline{}
+	root := &pdf.Outline{} //nolint:exhaustruct // intentional zero-value fields
+
 	var conv func(n *outline.Node) *pdf.Outline
-	conv = func(n *outline.Node) *pdf.Outline {
-		h := n.Heading
-		o := &pdf.Outline{Title: h.Title}
-		docPage := h.DocPage
-		if st := bodyStateFor(bodies, docPage); st != nil {
-			locPage := docPage - st.offset
-			o.PageRef = doc.PageRef(tocTotal + docPage)
-			loc := layout.ElementLocation{Page: locPage, X: h.X, Y: h.Y, W: h.W, H: h.H}
-			o.X, o.Y = st.geom.pdfXY(loc)
+
+	conv = func(num *outline.Node) *pdf.Outline {
+		hVal := num.Heading
+		obj := &pdf.Outline{Title: hVal.Title} //nolint:exhaustruct // intentional zero-value fields
+
+		docPage := hVal.DocPage
+		if stVal := bodyStateFor(bodies, docPage); stVal != nil {
+			locPage := docPage - stVal.offset
+			obj.PageRef = doc.PageRef(tocTotal + docPage)
+			loc := layout.ElementLocation{ //nolint:exhaustruct // intentional zero-value fields
+				Page: locPage, X: hVal.X, Y: hVal.Y, W: hVal.W, H: hVal.H,
+			}
+			obj.X, obj.Y = stVal.geom.pdfXY(loc)
 		}
-		for _, c := range n.Children {
-			o.Children = append(o.Children, conv(c))
+
+		for _, c := range num.Children {
+			obj.Children = append(obj.Children, conv(c))
 		}
-		return o
+
+		return obj
 	}
 	for _, c := range tree.Children {
 		root.Children = append(root.Children, conv(c))
 	}
+
 	return root
 }

@@ -5,6 +5,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -13,20 +14,26 @@ import (
 	"gowkhtmltopdf/internal/convert"
 )
 
+// errNilCommand guards the command-facing adapters against nil dereferences.
+var errNilCommand = errors.New("app: nil command")
+
 // BuildPDFRequest translates a parsed CLI command into the stable engine
 // request. The caller owns output-sink creation and supplies both document
 // and optional outline sinks explicitly.
 func BuildPDFRequest(cmd *cli.Command, output, outline io.Writer) (*convert.Request, error) {
 	if cmd == nil {
-		return nil, fmt.Errorf("app: nil command")
+		return nil, errNilCommand
 	}
+
 	req := convert.NewPDFRequest(cmd.Global, cmd.Objects, output, outline)
 	if cmd.DumpOutline {
 		req.Global.DumpOutline = true
 	}
+
 	if err := req.Validate(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("app: validate: %w", err)
 	}
+
 	return req, nil
 }
 
@@ -35,22 +42,27 @@ func BuildPDFRequest(cmd *cli.Command, output, outline io.Writer) (*convert.Requ
 // writers and never reaches into process-global stdout.
 func RunPDF(ctx context.Context, cmd *cli.Command, log io.Writer, progress func(string, int)) error {
 	if cmd == nil {
-		return fmt.Errorf("app: nil command")
+		return errNilCommand
 	}
+
 	out, closeOut, err := cmd.OpenOutput()
 	if err != nil {
-		return err
+		return fmt.Errorf("app: open output: %w", err)
 	}
+
 	outline := io.Writer(nil)
 	if cmd.DumpOutline || cmd.Global.DumpOutline {
 		outline = os.Stdout
 	}
+
 	req, err := BuildPDFRequest(cmd, out, outline)
 	if err == nil {
 		err = convert.Run(ctx, req, log, progress)
 	}
+
 	if closeErr := closeOut(); closeErr != nil && err == nil {
 		err = closeErr
 	}
+
 	return err
 }

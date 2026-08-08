@@ -1,3 +1,4 @@
+//nolint:testpackage // tests reach into unexported state
 package pdf
 
 import (
@@ -9,35 +10,45 @@ import (
 // BenchmarkWrite50Pages measures full PDF serialization cost for 50 pages
 // of text (embedded subset font, compressed streams).
 func BenchmarkWrite50Pages(b *testing.B) {
-	f, err := DefaultFont()
+	fnt, err := DefaultFont()
 	if err != nil {
 		b.Fatal(err)
 	}
+
 	build := func() *Document {
-		d := NewDocument()
-		d.SetInfo("Title", "Bench")
-		for i := 0; i < 50; i++ {
-			p := d.AddPage(595, 842)
-			c := p.Content()
-			c.UseEmbeddedFont("F1", f)
-			c.BeginText()
-			c.SetFont("F1", 11)
-			c.TextAt(50, 800)
-			for l := 0; l < 40; l++ {
-				c.TextShow(fmt.Sprintf("Page %d line %d - the quick brown fox jumps over the lazy dog", i, l))
-				c.TextNextLine()
+		doc := NewDocument()
+		doc.SetInfo("Title", "Bench")
+
+		for idx := range 50 {
+			p := doc.AddPage(595, 842)
+			cur := p.Content()
+			cur.UseEmbeddedFont("F1", fnt)
+			cur.BeginText()
+			cur.SetFont("F1", 11)
+			cur.TextAt(50, 800)
+
+			for l := range 40 {
+				cur.TextShow(fmt.Sprintf("Page %d line %d - the quick brown fox jumps over the lazy dog", idx, l))
+				cur.TextNextLine()
 			}
-			c.EndText()
+
+			cur.EndText()
 		}
-		return d
+
+		return doc
 	}
+
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		d := build()
+
 		var buf bytes.Buffer
+
 		if err := d.Write(&buf); err != nil {
 			b.Fatal(err)
 		}
+
 		b.SetBytes(int64(buf.Len()))
 	}
 }
@@ -45,14 +56,17 @@ func BenchmarkWrite50Pages(b *testing.B) {
 // BenchmarkShapeRun measures the shared shaping + advance path consumed by
 // both PDF text emission and image rasterization.
 func BenchmarkShapeRun(b *testing.B) {
-	f, err := DefaultFont()
+	fnt, err := DefaultFont()
 	if err != nil {
 		b.Fatal(err)
 	}
+
 	const text = "The quick brown fox jumps over the lazy dog"
+
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		run := ShapeRun(text, f, 11)
+
+	for range b.N {
+		run := ShapeRun(text, fnt, 11)
 		if len(run.Runes) != len(run.Advances) {
 			b.Fatal("shaped run has unpaired advances")
 		}

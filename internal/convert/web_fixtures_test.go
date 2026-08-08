@@ -1,4 +1,4 @@
-package convert
+package convert //nolint:testpackage // white-box tests need unexported access
 
 import (
 	"bytes"
@@ -15,10 +15,12 @@ func webFixturePath(file string) string {
 // loadWebFixture reads a vendored web fixture for acceptance tests.
 func loadWebFixture(t *testing.T, file string) string {
 	t.Helper()
+
 	html, err := os.ReadFile(webFixturePath(file))
 	if err != nil {
 		t.Fatalf("read web fixture %s: %v", file, err)
 	}
+
 	return string(html)
 }
 
@@ -26,6 +28,7 @@ func loadWebFixture(t *testing.T, file string) string {
 // must produce a non-empty, structurally valid PDF that contains the article
 // title and stays within a small page-count band (no live network).
 func TestWebWikiFixtureAcceptance(t *testing.T) {
+	t.Parallel()
 	html := loadWebFixture(t, "wiki-like-article.html")
 	cmd, _ := newCommand(t, html, filepath.Join(t.TempDir(), "wiki.pdf"))
 	cmd.Global.UseCompression = false
@@ -34,6 +37,7 @@ func TestWebWikiFixtureAcceptance(t *testing.T) {
 	if len(data) == 0 {
 		t.Fatal("PDF is empty")
 	}
+
 	assertPDFStructure(t, data)
 
 	if !bytes.Contains(data, []byte("Ana de Armas")) {
@@ -41,7 +45,9 @@ func TestWebWikiFixtureAcceptance(t *testing.T) {
 	}
 
 	n := pageCount(data)
+
 	const minPages, maxPages = 1, 3
+
 	if n < minPages || n > maxPages {
 		t.Errorf("pages = %d, want %d..%d", n, minPages, maxPages)
 	}
@@ -61,6 +67,7 @@ func TestWebWikiFixtureAcceptance(t *testing.T) {
 // TestWebMarketingFixtureAcceptance is Phase 21 §21.6: marketing landing
 // fixture must surface hero + primary CTA text in the PDF (CI-safe, offline).
 func TestWebMarketingFixtureAcceptance(t *testing.T) {
+	t.Parallel()
 	html := loadWebFixture(t, "marketing-landing.html")
 	cmd, _ := newCommand(t, html, filepath.Join(t.TempDir(), "marketing.pdf"))
 	cmd.Global.UseCompression = false
@@ -69,6 +76,7 @@ func TestWebMarketingFixtureAcceptance(t *testing.T) {
 	if len(data) == 0 {
 		t.Fatal("PDF is empty")
 	}
+
 	assertPDFStructure(t, data)
 
 	if !bytes.Contains(data, []byte("Ship readable PDFs from any HTML")) {

@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -6,7 +7,9 @@ import (
 )
 
 func TestJustifyCapsRiversBesideFloat(t *testing.T) {
-	s := sheet(t, `
+	t.Parallel()
+
+	cssSheet := sheet(t, `
 .wrap { width: 300pt }
 .box { float: right; width: 180pt; height: 80pt; background: #ccc }
 p { text-align: justify; font-size: 12pt }
@@ -14,21 +17,27 @@ p { text-align: justify; font-size: 12pt }
 	res := layoutHTML(t, `<html><body><div class="wrap">
 <div class="box">x</div>
 <p>one two three four</p>
-</div></body></html>`, s)
+</div></body></html>`, cssSheet)
 	texts := opsOfKind(res, OpText)
+
 	var line []Op
-	for _, op := range texts {
-		if op.Text == "x" {
+
+	for _, paintOp := range texts {
+		if paintOp.Text == "x" {
 			continue
 		}
+
 		if len(line) == 0 {
-			line = append(line, op)
+			line = append(line, paintOp)
+
 			continue
 		}
-		if math.Abs(op.Y-line[0].Y) < 0.5 {
-			line = append(line, op)
+
+		if math.Abs(paintOp.Y-line[0].Y) < 0.5 {
+			line = append(line, paintOp)
 		}
 	}
+
 	if len(line) < 2 {
 		t.Fatalf("expected multi-word line beside float, got %+v", texts)
 	}

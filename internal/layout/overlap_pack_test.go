@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -16,52 +17,63 @@ import (
 // consecutive baselines collapse (wiki page-2 stacked paragraphs; ref lines
 // with dy ≪ fontSize). Multi-paragraph body + avoid list must keep body line
 // pitch ≥ 0.95·fontSize.
-func TestNoCompactOverlapsBodyLines(t *testing.T) {
+func TestNoCompactOverlapsBodyLines(t *testing.T) { //nolint:gocognit,gocyclo,cyclop,funlen,maintidx
+	t.Parallel()
+
 	const fontSize = 10.0
-	s := sheet(t, fmt.Sprintf(`
+	cssSheet := sheet(t, fmt.Sprintf(`
 body { margin: 0; font-size: %gpt; line-height: 1.25; }
 p { margin: 0.6em 0; }
 ol { margin: 0.5em 0; padding-left: 22pt; }
 li { page-break-inside: avoid; margin: 0 0 0.35em 0; }
 `, fontSize))
 
-	var b strings.Builder
-	b.WriteString(`<html><body>`)
+	var boxNode strings.Builder
+
+	boxNode.WriteString(`<html><body>`)
 	// Several multi-line body paragraphs that can sit near avoid boxes after
 	// pagination shifts (the historical over-pack victim).
-	for i := 0; i < 14; i++ {
-		b.WriteString(fmt.Sprintf(
-			`<p>Body paragraph %d with enough words that the line box wraps onto a second and sometimes a third line of text so we can measure consecutive baselines after paint packing. More filler about articles and biographies to keep width full.</p>`, i))
+	for i := range 14 {
+		boxNode.WriteString(fmt.Sprintf(
+			`<p>Body paragraph %d with enough words that the line box wraps onto a second and sometimes a third line of text so we can measure consecutive baselines after paint packing. More filler about articles and biographies to keep width full.</p>`, i)) //nolint:lll // fixture copy must stay one paragraphixture copy must stay one paragraph //nolint:lll // fixture copy must stay one paragraph
 	}
-	b.WriteString(`<ol>`)
-	for i := 0; i < 18; i++ {
-		b.WriteString(fmt.Sprintf(
-			`<li id="cite-%d">"Reference title %d" (https://example.com/ref/%d/long-path). Publisher. 1 January 2020. Retrieved 2 January 2021.</li>`,
+
+	boxNode.WriteString(`<ol>`)
+
+	for i := range 18 {
+		boxNode.WriteString(fmt.Sprintf(
+			`<li id="cite-%d">"Reference title %d" (https://example.com/ref/%d/long-path). Publisher. `+
+				`1 January 2020. Retrieved 2 January 2021.</li>`,
 			i, i+1, i))
 	}
-	b.WriteString(`</ol>`)
+
+	boxNode.WriteString(`</ol>`)
 	// More body after the list so packing cannot "heal" list holes by
 	// collapsing following paragraphs.
-	for i := 0; i < 10; i++ {
-		b.WriteString(fmt.Sprintf(
-			`<p>Trailing body %d continues the article with multi-line prose that must keep normal leading after any avoid-sibling packing pass.</p>`, i))
+	for i := range 10 {
+		boxNode.WriteString(fmt.Sprintf(
+			`<p>Trailing body %d continues the article with multi-line prose that must keep normal leading after any avoid-sibling packing pass.</p>`, i)) //nolint:lll // fixture copy must stay one paragraphixture copy must stay one paragraph
 	}
-	b.WriteString(`</body></html>`)
 
-	root, err := html.Parse(b.String())
+	boxNode.WriteString(`</body></html>`)
+
+	root, err := html.Parse(boxNode.String())
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	const pageH = 500.0
-	res, err := Layout(root, Options{
-		Width: 420, Height: pageH, Sheets: []*css.Stylesheet{s},
+
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 420, Height: pageH, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	doc := pdf.NewDocument()
-	if err := Paint(doc, res, PaintOptions{
+	if err := Paint(doc, res, PaintOptions{ //nolint:exhaustruct // intentional zero fields
 		PageWidth: 470, PageHeight: pageH + 40, MarginTop: 20, MarginBottom: 20,
 	}); err != nil {
 		t.Fatal(err)
@@ -69,56 +81,70 @@ li { page-break-inside: avoid; margin: 0 0 0.35em 0; }
 
 	// Collect body paragraph text baselines (exclude list-item ops via Locations).
 	type liSpan struct{ y0, y1 float64 }
+
 	var liSpans []liSpan
+
 	for _, loc := range res.Locations {
 		if loc.Node != nil && loc.Node.Name == "li" {
 			liSpans = append(liSpans, liSpan{loc.Y - 1, loc.Y + loc.H + 2})
 		}
 	}
+
 	inList := func(y float64) bool {
 		for _, s := range liSpans {
 			if y >= s.y0 && y <= s.y1 {
 				return true
 			}
 		}
+
 		return false
 	}
 
 	// Group non-list text ops into approximate lines by Y, per page, then
 	// require consecutive body line dy ≥ 0.95·fontSize.
 	minPitch := 0.95 * fontSize
+
 	type lineY struct {
 		y    float64
 		size float64
 	}
+
 	var bodyLines []lineY
-	for _, op := range res.Ops {
-		if op.Kind != OpText || op.Text == "" {
+
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpText || paintOp.Text == "" {
 			continue
 		}
-		if inList(op.Y) {
+
+		if inList(paintOp.Y) {
 			continue
 		}
 		// Skip near-empty / marker-like runs.
-		if len(strings.TrimSpace(op.Text)) < 8 {
+		if len(strings.TrimSpace(paintOp.Text)) < 8 {
 			continue
 		}
+
 		merged := false
+
 		for i := range bodyLines {
-			if math.Abs(bodyLines[i].y-op.Y) <= 0.5 {
+			if math.Abs(bodyLines[i].y-paintOp.Y) <= 0.5 {
 				merged = true
-				if op.Size > bodyLines[i].size {
-					bodyLines[i].size = op.Size
+
+				if paintOp.Size > bodyLines[i].size {
+					bodyLines[i].size = paintOp.Size
 				}
+
 				break
 			}
 		}
+
 		if !merged {
-			sz := op.Size
+			sz := paintOp.Size
 			if sz <= 0 {
 				sz = fontSize
 			}
-			bodyLines = append(bodyLines, lineY{y: op.Y, size: sz})
+
+			bodyLines = append(bodyLines, lineY{y: paintOp.Y, size: sz})
 		}
 	}
 	// Sort by Y.
@@ -129,6 +155,7 @@ li { page-break-inside: avoid; margin: 0 0 0.35em 0; }
 			}
 		}
 	}
+
 	if len(bodyLines) < 12 {
 		t.Fatalf("expected many body lines, got %d", len(bodyLines))
 	}
@@ -136,37 +163,46 @@ li { page-break-inside: avoid; margin: 0 0 0.35em 0; }
 	contentH := pageH
 	overlaps := 0
 	minDy := 1e9
+
 	for i := 1; i < len(bodyLines); i++ {
 		prev, cur := bodyLines[i-1], bodyLines[i]
 		// Only same-page consecutive body lines (paragraph stack / wrap).
 		if int(prev.y/contentH) != int(cur.y/contentH) {
 			continue
 		}
-		dy := cur.y - prev.y
+
+		deltaY := cur.y - prev.y
 		// Skip large paragraph gaps (new block well below previous).
 		// Overlap bug shows dy of 0.6–5pt for 8–10pt font; wrapped lines
 		// and adjacent paragraphs after collapse sit far below minPitch.
-		if dy > fontSize*4 {
+		if deltaY > fontSize*4 {
 			continue
 		}
-		if dy < minDy {
-			minDy = dy
+
+		if deltaY < minDy {
+			minDy = deltaY
 		}
+
 		need := minPitch
 		if s := prev.size; s > 0 && 0.95*s > need {
 			need = 0.95 * s
 		}
-		if dy < need {
+
+		if deltaY < need {
 			overlaps++
+
 			t.Logf("body line pitch too tight: dy=%.2f (need ≥%.2f) at y=%.1f→%.1f page=%d",
-				dy, need, prev.y, cur.y, int(cur.y/contentH))
+				deltaY, need, prev.y, cur.y, int(cur.y/contentH))
 		}
 	}
+
 	t.Logf("bodyLines=%d minDy=%.2f overlaps=%d", len(bodyLines), minDy, overlaps)
+
 	if overlaps > 0 {
 		t.Fatalf("packAvoidGaps over-pulled body lines: %d pairs with dy < 0.95*fontSize (minDy=%.2f)",
 			overlaps, minDy)
 	}
+
 	if minDy < minPitch {
 		t.Fatalf("minimum same-page body line pitch %.2f < 0.95*fontSize (%.2f)", minDy, minPitch)
 	}

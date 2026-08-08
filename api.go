@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	"gowkhtmltopdf/internal/convert"
@@ -18,6 +19,13 @@ import (
 // LibraryVersion is the wkhtmltopdf release this library tracks; upstream
 // 0.12.x compatibility surface.
 const LibraryVersion = "0.12.7-dev"
+
+// Static conversion errors; callers can match with errors.Is.
+var (
+	errNoPageObjectsAdded = errors.New("gowkhtmltopdf: no page objects added")
+	errEmptyHTML          = errors.New("gowkhtmltopdf: empty HTML")
+	errNoInputPageAdded   = errors.New("gowkhtmltopdf: no input page added")
+)
 
 // Version returns the library version banner.
 func Version() string {
@@ -45,7 +53,11 @@ func NewGlobalSettings() *GlobalSettings {
 // "orientation", "web.background", "load.timeout", …). Unknown names return
 // an error.
 func (s *GlobalSettings) Set(name, value string) error {
-	return s.g.Set(name, value)
+	if err := s.g.Set(name, value); err != nil {
+		return fmt.Errorf("global set %q: %w", name, err)
+	}
+
+	return nil
 }
 
 // Get reads a dotted settings key back as its canonical string form via the
@@ -76,7 +88,11 @@ func NewObjectSettings() *ObjectSettings {
 // "web.images", "header.left", "footer.right", …). Unknown names return an
 // error.
 func (s *ObjectSettings) Set(name, value string) error {
-	return s.o.Set(name, value)
+	if err := s.o.Set(name, value); err != nil {
+		return fmt.Errorf("object set %q: %w", name, err)
+	}
+
+	return nil
 }
 
 // Get reads a dotted object settings key via the same key table as Set.
@@ -88,6 +104,7 @@ func (s *ObjectSettings) Get(name string) (string, bool) {
 // and returns s so calls can be chained.
 func (s *ObjectSettings) SetPage(page string) *ObjectSettings {
 	s.o.Page = page
+
 	return s
 }
 
@@ -99,6 +116,7 @@ func (s *ObjectSettings) SetBody(html []byte, base string) *ObjectSettings {
 	s.o.Page = ""
 	s.o.Load.InlineHTML = cloneBytes(html)
 	s.o.Load.InlineBase = base
+
 	return s
 }
 
@@ -133,7 +151,7 @@ type Converter struct {
 // NewConverter returns a Converter with the wkhtmltopdf default global
 // settings and no page objects.
 func NewConverter() *Converter {
-	return &Converter{global: NewGlobalSettings()}
+	return &Converter{global: NewGlobalSettings()} //nolint:exhaustruct // intentional zero/partial fields
 }
 
 // Global returns the converter's global settings, for Set/Get.
@@ -147,6 +165,7 @@ func (c *Converter) Global() *GlobalSettings {
 func (c *Converter) AddObject(s *ObjectSettings) *Converter {
 	cp := &ObjectSettings{o: clonePdfObject(s.o)}
 	c.objects = append(c.objects, cp)
+
 	return c
 }
 
@@ -163,12 +182,14 @@ func clonePdfObject(src settings.PdfObject) settings.PdfObject {
 	dst.Load.Post = clonePostItems(src.Load.Post)
 	dst.Load.InlineHTML = cloneBytes(src.Load.InlineHTML)
 	dst.Ignored = cloneStringMap(src.Ignored)
+
 	return dst
 }
 
 func cloneHeaderFooter(src settings.HeaderFooter) settings.HeaderFooter {
 	dst := src
 	dst.Replace = cloneStringMap(src.Replace)
+
 	return dst
 }
 
@@ -176,8 +197,10 @@ func clonePostItems(src []settings.PostItem) []settings.PostItem {
 	if src == nil {
 		return nil
 	}
+
 	dst := make([]settings.PostItem, len(src))
 	copy(dst, src)
+
 	return dst
 }
 
@@ -185,10 +208,12 @@ func cloneStringMap(src map[string]string) map[string]string {
 	if src == nil {
 		return nil
 	}
+
 	dst := make(map[string]string, len(src))
 	for key, value := range src {
 		dst[key] = value
 	}
+
 	return dst
 }
 
@@ -196,8 +221,10 @@ func cloneBytes(src []byte) []byte {
 	if src == nil {
 		return nil
 	}
+
 	dst := make([]byte, len(src))
 	copy(dst, src)
+
 	return dst
 }
 
@@ -207,6 +234,7 @@ func cloneBytes(src []byte) []byte {
 // a document - no URL guessing is applied.
 func (c *Converter) AddHTML(page []byte, baseURL string) *Converter {
 	c.AddObject(NewObjectSettings().SetBody(page, baseURL))
+
 	return c
 }
 
@@ -216,22 +244,27 @@ func (c *Converter) AddHTML(page []byte, baseURL string) *Converter {
 // writer (no temp file).
 func (c *Converter) Convert(ctx context.Context) error {
 	if len(c.objects) == 0 {
-		return errors.New("gowkhtmltopdf: no page objects added")
+		return errNoPageObjectsAdded
 	}
+
 	objects := make([]settings.PdfObject, len(c.objects))
 	for i, o := range c.objects {
 		objects[i] = o.o
 	}
+
 	req := convert.NewPDFRequest(c.global.g, objects, nil, nil)
 	h := convertHooks{
 		OnInfo: c.OnInfo, OnWarn: c.OnWarn, OnError: c.OnError,
 		OnPhase: c.OnPhase, OnProgress: c.OnProgress,
 	}
+
 	out, err := h.executePDF(ctx, req)
 	if err != nil {
 		return err
 	}
+
 	c.output = out
+
 	return nil
 }
 
@@ -246,22 +279,29 @@ func (c *Converter) Output() []byte {
 // PDF bytes without creating a temp input file. global may be nil (defaults
 // apply). Local file / subresource ACL is unchanged — linked local assets
 // still need enablelocalfileaccess + load.blocklocalfileaccess=false.
+//
+//nolint:contextcheck // defensive nil-context contract
 func ConvertHTML(ctx context.Context, html []byte, global *GlobalSettings) ([]byte, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
+
 	if len(html) == 0 {
-		return nil, errors.New("gowkhtmltopdf: empty HTML")
+		return nil, errEmptyHTML
 	}
-	c := NewConverter()
+
+	conv := NewConverter()
 	if global != nil {
-		c.global = global
+		conv.global = global
 	}
-	c.AddObject(NewObjectSettings().SetBody(html, ""))
-	if err := c.Convert(ctx); err != nil {
+
+	conv.AddObject(NewObjectSettings().SetBody(html, ""))
+
+	if err := conv.Convert(ctx); err != nil {
 		return nil, err
 	}
-	return c.Output(), nil
+
+	return conv.Output(), nil
 }
 
 // ---------------------------------------------------------------------------
@@ -289,7 +329,7 @@ type ImageConverter struct {
 // settings: 1024 px smart-width viewport, PNG output. Object() is valid
 // immediately; its page is empty until AddObject.
 func NewImageConverter() *ImageConverter {
-	return &ImageConverter{
+	return &ImageConverter{ //nolint:exhaustruct // intentional zero/partial fields
 		global: NewGlobalSettings(),
 		image:  settings.DefaultImageGlobal(),
 		object: NewObjectSettings(),
@@ -302,7 +342,11 @@ func NewImageConverter() *ImageConverter {
 // an error. "web.background" also updates the shared Global.Background paint
 // switch so image and PDF share one background field.
 func (c *ImageConverter) Set(name, value string) error {
-	return settings.ApplyImageKey(&c.global.g, &c.image, name, value)
+	if err := settings.ApplyImageKey(&c.global.g, &c.image, name, value); err != nil {
+		return fmt.Errorf("image set %q: %w", name, err)
+	}
+
+	return nil
 }
 
 // Global returns the shared global settings (only "enablelocalfileaccess"
@@ -318,6 +362,7 @@ func (c *ImageConverter) AddObject(page string) *ImageConverter {
 	o := NewObjectSettings()
 	o.SetPage(page)
 	c.object = o
+
 	return c
 }
 
@@ -337,18 +382,22 @@ func (c *ImageConverter) Object() *ObjectSettings {
 // Object().SetBody (P2-04 InlineHTML source kind).
 func (c *ImageConverter) Convert(ctx context.Context) error {
 	if strings.TrimSpace(c.object.o.Page) == "" && len(c.object.o.Load.InlineHTML) == 0 {
-		return errors.New("gowkhtmltopdf: no input page added")
+		return errNoInputPageAdded
 	}
+
 	img := c.image
 	req := convert.NewImageRequest(c.global.g, img, []settings.PdfObject{c.object.o}, nil)
-	h := convertHooks{
+	h := convertHooks{ //nolint:exhaustruct // intentional zero/partial fields
 		OnInfo: c.OnInfo, OnWarn: c.OnWarn, OnError: c.OnError,
 	}
+
 	out, err := h.executeImage(ctx, req)
 	if err != nil {
 		return err
 	}
+
 	c.output = out
+
 	return nil
 }
 
@@ -373,7 +422,7 @@ type convertHooks struct {
 }
 
 func (h convertHooks) lineLog() *lineLog {
-	return &lineLog{
+	return &lineLog{ //nolint:exhaustruct // intentional zero/partial fields
 		onInfo:  h.OnInfo,
 		onWarn:  h.OnWarn,
 		onError: h.OnError,
@@ -384,10 +433,12 @@ func (h convertHooks) progress() func(string, int) {
 	if h.OnPhase == nil && h.OnProgress == nil {
 		return nil
 	}
+
 	return func(phase string, percent int) {
 		if h.OnPhase != nil {
 			h.OnPhase(phase)
 		}
+
 		if h.OnProgress != nil {
 			h.OnProgress(percent)
 		}
@@ -396,35 +447,47 @@ func (h convertHooks) progress() func(string, int) {
 
 // executePDF runs the PDF pipeline into an in-memory buffer and reports
 // failures to OnError.
+//
+//nolint:contextcheck // defensive nil-context contract
 func (h convertHooks) executePDF(ctx context.Context, req *convert.Request) ([]byte, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
+
 	var buf bytes.Buffer
+
 	req.Output = &buf
 	if err := convert.Run(ctx, req, h.lineLog(), h.progress()); err != nil {
 		if h.OnError != nil {
 			h.OnError(err.Error())
 		}
-		return nil, err
+
+		return nil, fmt.Errorf("convert: %w", err)
 	}
+
 	return buf.Bytes(), nil
 }
 
 // executeImage runs the image pipeline into an in-memory buffer and reports
 // failures to OnError.
+//
+//nolint:contextcheck // defensive nil-context contract
 func (h convertHooks) executeImage(ctx context.Context, req *convert.Request) ([]byte, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
+
 	var buf bytes.Buffer
+
 	req.Output = &buf
 	if err := imageout.RunRequest(ctx, req, h.lineLog()); err != nil {
 		if h.OnError != nil {
 			h.OnError(err.Error())
 		}
-		return nil, err
+
+		return nil, fmt.Errorf("image convert: %w", err)
 	}
+
 	return buf.Bytes(), nil
 }
 
@@ -443,33 +506,39 @@ type lineLog struct {
 	onError func(string)
 }
 
-func (w *lineLog) Write(p []byte) (int, error) {
-	w.buf.Write(p)
+func (w *lineLog) Write(payload []byte) (int, error) {
+	w.buf.Write(payload)
+
 	for {
 		raw := w.buf.Bytes()
-		i := bytes.IndexByte(raw, '\n')
-		if i < 0 {
+
+		nlIdx := bytes.IndexByte(raw, '\n')
+		if nlIdx < 0 {
 			break
 		}
-		l := strings.TrimSpace(string(raw[:i]))
-		w.buf.Next(i + 1)
-		if l == "" {
+
+		logLine := strings.TrimSpace(string(raw[:nlIdx]))
+		w.buf.Next(nlIdx + 1)
+
+		if logLine == "" {
 			continue
 		}
-		switch line.SeverityOf(l) {
+
+		switch line.SeverityOf(logLine) {
 		case line.Warn:
 			if w.onWarn != nil {
-				w.onWarn(l)
+				w.onWarn(logLine)
 			}
 		case line.Error:
 			if w.onError != nil {
-				w.onError(l)
+				w.onError(logLine)
 			}
-		default:
+		case line.Info:
 			if w.onInfo != nil {
-				w.onInfo(l)
+				w.onInfo(logLine)
 			}
 		}
 	}
-	return len(p), nil
+
+	return len(payload), nil
 }

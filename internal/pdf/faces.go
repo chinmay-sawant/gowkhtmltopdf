@@ -18,46 +18,59 @@ type FaceSet struct {
 	BoldItalic *Font
 }
 
+//nolint:gochecknoglobals // lazy init of the embedded-family cache
 var (
 	defaultFacesOnce sync.Once
 	defaultFaces     *FaceSet
-	defaultFacesErr  error
+	errDefaultFaces  error
 )
 
 // LoadDefaultFaces returns the embedded Liberation Sans family
 // (Regular, Bold, Italic, BoldItalic). The result is cached.
 func LoadDefaultFaces() (*FaceSet, error) {
 	defaultFacesOnce.Do(func() {
-		fs := &FaceSet{}
+		faces := &FaceSet{} //nolint:exhaustruct // intentional zero-value fields
+
 		var err error
-		if fs.Regular, err = parseNamed("LiberationSans", assets.LiberationSansRegularTTF); err != nil {
-			defaultFacesErr = err
+		if faces.Regular, err = parseNamed("LiberationSans", assets.LiberationSansRegularTTF); err != nil {
+			errDefaultFaces = err
+
 			return
 		}
-		if fs.Bold, err = parseNamed("LiberationSans-Bold", assets.LiberationSansBoldTTF); err != nil {
-			defaultFacesErr = err
+
+		if faces.Bold, err = parseNamed("LiberationSans-Bold", assets.LiberationSansBoldTTF); err != nil {
+			errDefaultFaces = err
+
 			return
 		}
-		if fs.Italic, err = parseNamed("LiberationSans-Italic", assets.LiberationSansItalicTTF); err != nil {
-			defaultFacesErr = err
+
+		if faces.Italic, err = parseNamed("LiberationSans-Italic", assets.LiberationSansItalicTTF); err != nil {
+			errDefaultFaces = err
+
 			return
 		}
-		if fs.BoldItalic, err = parseNamed("LiberationSans-BoldItalic", assets.LiberationSansBoldItalicTTF); err != nil {
-			defaultFacesErr = err
+
+		if faces.BoldItalic, err = parseNamed("LiberationSans-BoldItalic", assets.LiberationSansBoldItalicTTF); err != nil {
+			errDefaultFaces = err
+
 			return
 		}
-		defaultFaces = fs
+
+		defaultFaces = faces
 	})
-	return defaultFaces, defaultFacesErr
+
+	return defaultFaces, errDefaultFaces
 }
 
 func parseNamed(name string, data []byte) (*Font, error) {
-	f, err := ParseTTF(bytes.Clone(data))
+	fnt, err := ParseTTF(bytes.Clone(data))
 	if err != nil {
 		return nil, err
 	}
-	f.PostScriptName = name
-	return f, nil
+
+	fnt.PostScriptName = name
+
+	return fnt, nil
 }
 
 // Resolve picks a face for the given CSS weight and italic flag.
@@ -66,21 +79,32 @@ func (fs *FaceSet) Resolve(weight int, italic bool) *Font {
 	if fs == nil {
 		return nil
 	}
-	bold := weight >= 700
-	switch {
-	case bold && italic && fs.BoldItalic != nil:
-		return fs.BoldItalic
-	case bold && fs.Bold != nil:
-		return fs.Bold
-	case italic && fs.Italic != nil:
-		return fs.Italic
-	case fs.Regular != nil:
-		return fs.Regular
-	case fs.Bold != nil:
-		return fs.Bold
-	default:
+
+	bold := weight >= fontWeightBoldMin
+
+	if bold {
+		if italic && fs.BoldItalic != nil {
+			return fs.BoldItalic
+		}
+
+		if fs.Bold != nil {
+			return fs.Bold
+		}
+	}
+
+	if italic && fs.Italic != nil {
 		return fs.Italic
 	}
+
+	if fs.Regular != nil {
+		return fs.Regular
+	}
+
+	if fs.Bold != nil {
+		return fs.Bold
+	}
+
+	return fs.Italic
 }
 
 // DefaultFont returns the embedded Liberation Sans regular face.
@@ -89,5 +113,6 @@ func DefaultFont() (*Font, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return fs.Regular, nil
 }

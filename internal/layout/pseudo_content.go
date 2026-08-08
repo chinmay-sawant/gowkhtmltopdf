@@ -7,38 +7,17 @@ import (
 	"gowkhtmltopdf/internal/html"
 )
 
+const contentNormal = "normal"
+
 // pseudoContent cascades the CSS content property for ::before/::after on n.
 // Supports string literals, attr(name), and none/normal (empty). Wiki hlist
 // separators use li::after{content:"\a0 · "}; print external links use
 // a.external::after{content:' (' attr(href) ')'}.
-func (e *engine) pseudoContent(n *html.Node, pe string) string {
-	if e == nil || n == nil || (pe != "before" && pe != "after") {
+func (e *engine) pseudoContent(node *html.Node, pseudoEl string) string {
+	if e == nil || node == nil || (pseudoEl != "before" && pseudoEl != "after") {
 		return ""
 	}
-	type hit struct {
-		value          string
-		a, b, c, order int
-		important      bool
-	}
-	var best *hit
-	better := func(h hit) bool {
-		if best == nil {
-			return true
-		}
-		if h.important != best.important {
-			return h.important
-		}
-		if h.a != best.a {
-			return h.a > best.a
-		}
-		if h.b != best.b {
-			return h.b > best.b
-		}
-		if h.c != best.c {
-			return h.c > best.c
-		}
-		return h.order >= best.order
-	}
+
 	media := e.opts.Media
 	if media == "" {
 		media = "print"
@@ -51,136 +30,254 @@ func (e *engine) pseudoContent(n *html.Node, pe string) string {
 	// skip @container rules) matching cascadeRaw's first pass. When
 	// e.styles came from a container pass, non-matching container content
 	// is suppressed here the same way colors are.
-	ctx := &styleContext{
+	ctx := &styleContext{ //nolint:exhaustruct // intentional zero fields
 		sheets:     e.opts.Sheets,
 		media:      media,
 		viewportW:  e.opts.Width,
 		viewportH:  e.opts.Height,
 		containers: e.containers,
 	}
-	for _, rh := range ctx.matchedRules(n, pe) {
-		for _, d := range rh.r.Decls {
+
+	best := selectContentDecl(ctx, node, pseudoEl)
+	if best == nil {
+		return ""
+	}
+
+	return parseContentValue(best.value, node)
+}
+
+// contentHit is one content: declaration with its cascade priority.
+type contentHit struct {
+	value          string
+	a, b, c, order int
+	important      bool
+}
+
+// selectContentDecl picks the winning content declaration for the pseudo
+// element pe on n.
+func selectContentDecl(ctx *styleContext, n *html.Node, pseudoEl string) *contentHit {
+	var best *contentHit
+
+	for _, rowH := range ctx.matchedRules(n, pseudoEl) {
+		for _, d := range rowH.r.Decls {
 			if !strings.EqualFold(d.Prop, "content") {
 				continue
 			}
-			h := hit{value: d.Value, a: rh.a, b: rh.b, c: rh.c, order: rh.r.Order, important: d.Important}
-			if better(h) {
+
+			h := contentHit{value: d.Value, a: rowH.a, b: rowH.b, c: rowH.c, order: rowH.r.Order, important: d.Important}
+			if betterContentHit(h, best) {
 				hh := h
 				best = &hh
 			}
 		}
 	}
+
+	return best
+}
+
+// betterContentHit reports whether candidate outranks best by importance,
+// then specificity, then source order.
+func betterContentHit(candidate contentHit, best *contentHit) bool {
 	if best == nil {
-		return ""
+		return true
 	}
-	return parseContentValue(best.value, n)
+
+	if candidate.important != best.important {
+		return candidate.important
+	}
+
+	if candidate.a != best.a {
+		return candidate.a > best.a
+	}
+
+	if candidate.b != best.b {
+		return candidate.b > best.b
+	}
+
+	if candidate.c != best.c {
+		return candidate.c > best.c
+	}
+
+	return candidate.order >= best.order
 }
 
 // parseContentValue evaluates a CSS content list: quoted strings, attr(name),
 // and none/normal. Unsupported tokens (counter(), url(), …) are skipped so we
 // never paint the literal source text "attr(href)".
-func parseContentValue(v string, n *html.Node) string {
-	v = strings.TrimSpace(v)
-	low := strings.ToLower(v)
-	if low == "none" || low == "normal" || v == "" {
+func parseContentValue(value string, node *html.Node) string {
+	value = strings.TrimSpace(value)
+	low := strings.ToLower(value)
+
+	if low == displayNone || low == contentNormal || value == "" {
 		return ""
 	}
 	// Fast path: single quoted string.
-	if len(v) >= 2 {
-		q := v[0]
-		if (q == '"' || q == '\'') && v[len(v)-1] == q && !strings.Contains(v[1:len(v)-1], string(q)) {
-			return decodeCSSString(v[1 : len(v)-1])
-		}
+	if content, ok := singleQuotedContent(value); ok {
+		return decodeCSSString(content)
 	}
-	var b strings.Builder
-	i := 0
-	for i < len(v) {
-		for i < len(v) && (v[i] == ' ' || v[i] == '\t' || v[i] == '\n' || v[i] == '\r') {
-			i++
-		}
-		if i >= len(v) {
+
+	var boxNode strings.Builder
+
+	idx := 0
+	for idx < len(value) {
+		next, ok := scanContentToken(value, idx, node, &boxNode)
+		if !ok {
 			break
 		}
-		c := v[i]
-		if c == '"' || c == '\'' {
-			j := i + 1
-			for j < len(v) {
-				if v[j] == '\\' && j+1 < len(v) {
-					j += 2
-					continue
-				}
-				if v[j] == c {
-					break
-				}
-				j++
-			}
-			if j < len(v) {
-				b.WriteString(decodeCSSString(v[i+1 : j]))
-				i = j + 1
-				continue
-			}
-			break
-		}
-		// attr(name) or attr(name, …) — only the attribute name is used.
-		if strings.HasPrefix(strings.ToLower(v[i:]), "attr(") {
-			start := i + len("attr(")
-			depth := 1
-			j := start
-			for j < len(v) && depth > 0 {
-				if v[j] == '(' {
-					depth++
-				} else if v[j] == ')' {
-					depth--
-					if depth == 0 {
-						break
-					}
-				}
-				j++
-			}
-			arg := strings.TrimSpace(v[start:j])
-			// First token is the attribute name (ignore type/fallback args).
-			name := arg
-			if sp := strings.IndexAny(arg, " \t,"); sp >= 0 {
-				name = arg[:sp]
-			}
-			name = strings.Trim(name, `"'`)
-			if n != nil && name != "" {
-				b.WriteString(n.Attribute(name))
-			}
-			if j < len(v) && v[j] == ')' {
-				j++
-			}
-			i = j
-			continue
-		}
-		// Skip unknown function tokens: counter(...), counters(...), url(...).
-		if j := strings.IndexByte(v[i:], '('); j > 0 && isIdentStart(v[i]) {
-			// function name
-			k := i + j + 1
-			depth := 1
-			for k < len(v) && depth > 0 {
-				if v[k] == '(' {
-					depth++
-				} else if v[k] == ')' {
-					depth--
-				}
-				k++
-			}
-			i = k
-			continue
-		}
-		// Bare ident (open-quote, etc.) — skip one word.
-		if isIdentStart(v[i]) {
-			j := i + 1
-			for j < len(v) && isIdentCont(v[j]) {
-				j++
-			}
-			i = j
-			continue
-		}
-		i++
+
+		idx = next
 	}
-	return b.String()
+
+	return boxNode.String()
+}
+
+// scanContentToken consumes one token of a content list at idx, appending any
+// text to boxNode, and returns the index just past it. ok is false when
+// scanning must stop (unbalanced quote).
+func scanContentToken(value string, idx int, node *html.Node, boxNode *strings.Builder) (int, bool) {
+	idx = skipCSSWhitespace(value, idx)
+	if idx >= len(value) {
+		return idx, false
+	}
+
+	child := value[idx]
+	if child == '"' || child == '\'' {
+		if end, ok := scanQuotedContent(value, idx+1, child); ok {
+			boxNode.WriteString(decodeCSSString(value[idx+1 : end]))
+
+			return end + 1, true
+		}
+
+		return idx, false
+	}
+	// attr(name) or attr(name, …) — only the attribute name is used.
+	if strings.HasPrefix(strings.ToLower(value[idx:]), "attr(") {
+		val, next := parseAttrToken(value, idx, node)
+		boxNode.WriteString(val)
+
+		return next, true
+	}
+	// Skip unknown function tokens: counter(...), counters(...), url(...).
+	if j := strings.IndexByte(value[idx:], '('); j > 0 && isIdentStart(value[idx]) {
+		return skipCSSFunction(value, idx+j+1), true
+	}
+	// Bare ident (open-quote, etc.) — skip one word.
+	if isIdentStart(value[idx]) {
+		return skipCSSIdent(value, idx), true
+	}
+
+	return idx + 1, true
+}
+
+// singleQuotedContent returns the inner text when value is exactly one quoted
+// string with no inner unescaped quote.
+func singleQuotedContent(value string) (string, bool) {
+	if len(value) < two {
+		return "", false
+	}
+
+	q := value[0]
+	if (q != '"' && q != '\'') || value[len(value)-1] != q || strings.Contains(value[1:len(value)-1], string(q)) {
+		return "", false
+	}
+
+	return value[1 : len(value)-1], true
+}
+
+// scanQuotedContent finds the closing quote of a string whose opening quote is
+// value[open-1], honoring backslash escapes.
+func scanQuotedContent(value string, open int, quote byte) (int, bool) {
+	jdx := open
+	for jdx < len(value) {
+		if value[jdx] == '\\' && jdx+1 < len(value) {
+			jdx += 2
+
+			continue
+		}
+
+		if value[jdx] == quote {
+			return jdx, true
+		}
+
+		jdx++
+	}
+
+	return 0, false
+}
+
+// parseAttrToken evaluates attr(...) starting at idx (value[idx:] begins with
+// "attr("). Returns the attribute value ("" when absent) and the index just
+// past the closing paren.
+func parseAttrToken(value string, idx int, node *html.Node) (string, int) {
+	arg, next := attrArg(value, idx)
+
+	name := arg
+	if sp := strings.IndexAny(arg, " \t,"); sp >= 0 {
+		name = arg[:sp]
+	}
+
+	name = strings.Trim(name, `"'`)
+
+	val := ""
+	if node != nil && name != "" {
+		val = node.Attribute(name)
+	}
+
+	if next < len(value) && value[next] == ')' {
+		next++
+	}
+
+	return val, next
+}
+
+// attrArg returns the trimmed argument text of the attr(...) call starting at
+// idx (value[idx:] begins with "attr(") plus the index just past the closing
+// paren (len(value) when unbalanced).
+func attrArg(value string, idx int) (string, int) {
+	start := idx + len("attr(")
+
+	end, depth := start, 1
+	for end < len(value) && depth > 0 {
+		if value[end] == '(' {
+			depth++
+		} else if value[end] == ')' {
+			depth--
+			if depth == 0 {
+				break
+			}
+		}
+
+		end++
+	}
+
+	return strings.TrimSpace(value[start:end]), end
+}
+
+// skipCSSFunction returns the index just past the closing paren of the
+// function whose opening paren is at start (value[start-1] == '(').
+func skipCSSFunction(value string, start int) int {
+	depth := 1
+
+	for start < len(value) && depth > 0 {
+		if value[start] == '(' {
+			depth++
+		} else if value[start] == ')' {
+			depth--
+		}
+
+		start++
+	}
+
+	return start
+}
+
+// skipCSSIdent advances idx past a CSS identifier (one word).
+func skipCSSIdent(v string, idx int) int {
+	for idx < len(v) && isIdentCont(v[idx]) {
+		idx++
+	}
+
+	return idx
 }
 
 func isIdentStart(c byte) bool {
@@ -191,44 +288,78 @@ func isIdentCont(c byte) bool {
 	return isIdentStart(c) || (c >= '0' && c <= '9')
 }
 
-func decodeCSSString(s string) string {
-	var b strings.Builder
-	for i := 0; i < len(s); i++ {
-		if s[i] != '\\' || i+1 >= len(s) {
-			b.WriteByte(s[i])
+// isCSSWhitespace reports whether c is CSS whitespace.
+func isCSSWhitespace(c byte) bool {
+	return c == ' ' || c == '\t' || c == '\n' || c == '\r'
+}
+
+// skipCSSWhitespace advances idx past CSS whitespace.
+func skipCSSWhitespace(v string, idx int) int {
+	for idx < len(v) && isCSSWhitespace(v[idx]) {
+		idx++
+	}
+
+	return idx
+}
+
+func decodeCSSString(value string) string {
+	var boxNode strings.Builder
+
+	for idx := 0; idx < len(value); idx++ {
+		if value[idx] != '\\' || idx+1 >= len(value) {
+			boxNode.WriteByte(value[idx])
+
 			continue
 		}
-		i++
-		if isHex(s[i]) {
-			j := i
-			for j < len(s) && j-i < 6 && isHex(s[j]) {
-				j++
+
+		idx++
+		if isHex(value[idx]) {
+			r, next := decodeHexEscape(value, idx)
+			if r != 0 {
+				boxNode.WriteRune(r)
 			}
-			var code int
-			fmt.Sscanf(s[i:j], "%x", &code)
-			if code != 0 {
-				b.WriteRune(rune(code))
-			}
-			i = j
-			if i < len(s) && (s[i] == ' ' || s[i] == '\t' || s[i] == '\n' || s[i] == '\r' || s[i] == '\f') {
-				// skip one whitespace terminator after hex escape
-			} else {
-				i--
-			}
+
+			idx = next
+
 			continue
 		}
-		switch s[i] {
+
+		switch value[idx] {
 		case 'n':
-			b.WriteByte('\n')
+			boxNode.WriteByte('\n')
 		case 'r':
-			b.WriteByte('\r')
+			boxNode.WriteByte('\r')
 		case 't':
-			b.WriteByte('\t')
+			boxNode.WriteByte('\t')
 		default:
-			b.WriteByte(s[i])
+			boxNode.WriteByte(value[idx])
 		}
 	}
-	return b.String()
+
+	return boxNode.String()
+}
+
+// decodeHexEscape consumes up to six hex digits at value[start] (the digits
+// after a backslash), honors the optional single-whitespace terminator, and
+// returns the decoded rune plus the index to resume from.
+func decodeHexEscape(value string, start int) (rune, int) {
+	jdx := start
+	for jdx < len(value) && jdx-start < 6 && isHex(value[jdx]) {
+		jdx++
+	}
+
+	idx := jdx
+	if idx >= len(value) || !isCSSWhitespace(value[idx]) {
+		idx--
+	}
+
+	var code int
+
+	if _, err := fmt.Sscanf(value[start:jdx], "%x", &code); err != nil {
+		return 0, idx
+	}
+
+	return rune(code), idx
 }
 
 func isHex(c byte) bool {

@@ -2,6 +2,16 @@ package settings
 
 import "strings"
 
+const (
+	defaultMarginMM       = 10
+	defaultHeaderFontSize = 12
+	defaultTOCFontScale   = 0.8
+	defaultOutlineDepth   = 4
+	defaultImageWidth     = 1024
+	defaultImageQuality   = 94
+	sAbort                = "abort"
+)
+
 // ColorMode mirrors wkhtmltopdf --color-mode. Kept as a parse helper for
 // Set("colormode"); the engine stores only PdfGlobal.Grayscale.
 //
@@ -17,18 +27,20 @@ func (m ColorMode) String() string {
 	if m == ColorModeGrayscale {
 		return "grayscale"
 	}
+
 	return "color"
 }
 
 // ParseColorMode accepts "color" (default) or "grayscale".
-func ParseColorMode(s string) (ColorMode, error) {
-	switch s {
+func ParseColorMode(value string) (ColorMode, error) {
+	switch value {
 	case "", "color":
 		return ColorModeColor, nil
 	case "grayscale":
 		return ColorModeGrayscale, nil
 	}
-	return ColorModeColor, errInvalid("color-mode", s, "color|grayscale")
+
+	return ColorModeColor, errInvalid("color-mode", value, "color|grayscale")
 }
 
 // Orientation mirrors wkhtmltopdf --orientation.
@@ -43,18 +55,20 @@ func (o Orientation) String() string {
 	if o == OrientationLandscape {
 		return "Landscape"
 	}
+
 	return "Portrait"
 }
 
 // ParseOrientation accepts "portrait" or "landscape" (case-insensitive).
-func ParseOrientation(s string) (Orientation, error) {
-	switch normalize(s) {
+func ParseOrientation(value string) (Orientation, error) {
+	switch normalize(value) {
 	case "", "portrait":
 		return OrientationPortrait, nil
 	case "landscape":
 		return OrientationLandscape, nil
 	}
-	return OrientationPortrait, errInvalid("orientation", s, "portrait|landscape")
+
+	return OrientationPortrait, errInvalid("orientation", value, "portrait|landscape")
 }
 
 // LoadErrorHandling mirrors wkhtmltopdf --load-error-handling.
@@ -68,25 +82,29 @@ const (
 
 func (h LoadErrorHandling) String() string {
 	switch h {
+	case LoadErrorAbort:
+		return sAbort
 	case LoadErrorSkip:
 		return "skip"
 	case LoadErrorIgnore:
-		return "ignore"
+		return sIgnore
 	}
-	return "abort"
+
+	return sAbort
 }
 
 // ParseLoadErrorHandling accepts abort|skip|ignore.
-func ParseLoadErrorHandling(s string) (LoadErrorHandling, error) {
-	switch normalize(s) {
-	case "", "abort":
+func ParseLoadErrorHandling(value string) (LoadErrorHandling, error) {
+	switch normalize(value) {
+	case "", sAbort:
 		return LoadErrorAbort, nil
 	case "skip":
 		return LoadErrorSkip, nil
 	case "ignore":
 		return LoadErrorIgnore, nil
 	}
-	return LoadErrorAbort, errInvalid("load-error-handling", s, "abort|skip|ignore")
+
+	return LoadErrorAbort, errInvalid("load-error-handling", value, "abort|skip|ignore")
 }
 
 // MediaType mirrors wkhtmltopdf --print-media-type (screen|print) and the
@@ -101,12 +119,15 @@ const (
 
 func (m MediaType) String() string {
 	switch m {
+	case MediaIgnore:
+		return sIgnore
 	case MediaScreen:
-		return "screen"
+		return sScreen
 	case MediaPrint:
-		return "print"
+		return sPrint
 	}
-	return "ignore"
+
+	return sIgnore
 }
 
 // ResolveMedia computes the effective CSS media type: the print-media-type
@@ -115,22 +136,23 @@ func (m MediaType) String() string {
 // "screen" for image). obj may be nil.
 func ResolveMedia(base string, global Web, obj *Web) string {
 	if global.PrintMediaType || obj != nil && obj.PrintMediaType {
-		return "print"
+		return sPrint
 	}
-	if obj != nil {
-		switch obj.MediaType {
-		case MediaPrint:
-			return "print"
-		case MediaScreen:
-			return "screen"
-		}
+
+	media := global.MediaType
+
+	if obj != nil && obj.MediaType != MediaIgnore {
+		media = obj.MediaType
 	}
-	switch global.MediaType {
+
+	switch media {
 	case MediaPrint:
-		return "print"
+		return sPrint
 	case MediaScreen:
-		return "screen"
+		return sScreen
+	case MediaIgnore:
 	}
+
 	return base
 }
 
@@ -144,7 +166,7 @@ type Margin struct {
 
 // DefaultMargins match pdfsettings.cc: 10 mm on all sides.
 func DefaultMargins() Margin {
-	return Margin{Top: 10, Bottom: 10, Left: 10, Right: 10}
+	return Margin{Top: defaultMarginMM, Bottom: defaultMarginMM, Left: defaultMarginMM, Right: defaultMarginMM}
 }
 
 // Size holds optional custom page dimensions in millimetres (0 = unset).
@@ -229,8 +251,8 @@ type HeaderFooter struct {
 
 // DefaultHeaderFooter matches pdfsettings.cc defaults (Arial 12, no spacing).
 func DefaultHeaderFooter() HeaderFooter {
-	return HeaderFooter{
-		FontSize: 12,
+	return HeaderFooter{ //nolint:exhaustruct // intentional zero/partial fields
+		FontSize: defaultHeaderFontSize,
 		FontName: "Arial",
 		Spacing:  0,
 	}
@@ -249,8 +271,8 @@ type TableOfContent struct {
 
 // DefaultTableOfContent matches pdfsettings.cc defaults.
 func DefaultTableOfContent() TableOfContent {
-	return TableOfContent{
-		FontScale:   0.8,
+	return TableOfContent{ //nolint:exhaustruct // intentional zero/partial fields
+		FontScale:   defaultTOCFontScale,
 		Indentation: "1em",
 		DottedLines: true,
 		CaptionText: "Table of Contents",
@@ -305,14 +327,14 @@ type PdfGlobal struct {
 // DefaultPdfGlobal returns the pdfsettings.cc-compatible defaults for fields
 // the engine actually uses.
 func DefaultPdfGlobal() PdfGlobal {
-	return PdfGlobal{
+	return PdfGlobal{ //nolint:exhaustruct // intentional zero/partial fields
 		PageSize:       "A4",
-		Size:           Size{PageSize: "A4"},
+		Size:           Size{PageSize: "A4"}, //nolint:exhaustruct // intentional zero/partial fields
 		Orientation:    OrientationPortrait,
 		Copies:         1,
 		Collate:        true,
 		Outline:        true,
-		OutlineDepth:   4,
+		OutlineDepth:   defaultOutlineDepth,
 		UseCompression: true,
 		Margin:         DefaultMargins(),
 		SmartShrinking: true,
@@ -320,7 +342,7 @@ func DefaultPdfGlobal() PdfGlobal {
 		Header:         DefaultHeaderFooter(),
 		TOC:            DefaultTableOfContent(),
 		Background:     true,
-		Web: Web{
+		Web: Web{ //nolint:exhaustruct // intentional zero/partial fields
 			Images: true,
 		},
 		ResolveRelativeLinks: true,
@@ -352,6 +374,7 @@ func (o *PdfObject) HeaderFor(g PdfGlobal) HeaderFooter {
 	if o.HeaderSet {
 		return o.Header
 	}
+
 	return g.Header
 }
 
@@ -360,12 +383,13 @@ func (o *PdfObject) FooterFor(g PdfGlobal) HeaderFooter {
 	if o.FooterSet {
 		return o.Footer
 	}
+
 	return g.Footer
 }
 
 // DefaultPdfObject matches pdfsettings.cc defaults for engine-consumed fields.
 func DefaultPdfObject() PdfObject {
-	return PdfObject{
+	return PdfObject{ //nolint:exhaustruct // intentional zero/partial fields
 		ExternalLinks:    true,
 		LocalLinks:       true,
 		IncludeInOutline: true,
@@ -378,7 +402,7 @@ func DefaultPdfObject() PdfObject {
 // blockLocalFileAccess true, load error abort. JS-delay and similar stubs are
 // not typed (Policy A).
 func DefaultLoadPage() LoadPage {
-	return LoadPage{
+	return LoadPage{ //nolint:exhaustruct // intentional zero/partial fields
 		BlockLocalFileAccess: true,
 		LoadErrorHandling:    LoadErrorAbort,
 	}
@@ -410,13 +434,13 @@ type CropSettings struct {
 
 // DefaultImageGlobal matches imagesettings.cc defaults for engine fields.
 func DefaultImageGlobal() ImageGlobal {
-	return ImageGlobal{
-		Width:      1024,
+	return ImageGlobal{ //nolint:exhaustruct // intentional zero/partial fields
+		Width:      defaultImageWidth,
 		Height:     0,
-		Quality:    94,
+		Quality:    defaultImageQuality,
 		SmartWidth: true,
 		Crop:       CropSettings{Left: -1, Top: -1, Width: -1, Height: -1},
-		Web: Web{
+		Web: Web{ //nolint:exhaustruct // intentional zero/partial fields
 			Images: true,
 		},
 	}

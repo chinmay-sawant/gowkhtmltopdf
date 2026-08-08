@@ -25,27 +25,33 @@ func MediaMatches(query, mediaType string, widthPt, heightPt float64) bool {
 	if mediaType == "" {
 		return true
 	}
+
 	query = strings.TrimSpace(query)
 	if len(query) >= 6 && strings.EqualFold(query[:6], "@media") {
 		query = strings.TrimSpace(query[6:])
 	}
+
 	if query == "" || strings.EqualFold(query, "all") {
 		return true
 	}
+
 	for _, part := range splitMediaList(query) {
 		if matchOneMediaQuery(part, mediaType, widthPt, heightPt) {
 			return true
 		}
 	}
+
 	return false
 }
 
-func splitMediaList(s string) []string {
+func splitMediaList(str string) []string {
 	var parts []string
+
 	depth := 0
 	start := 0
-	for i := 0; i < len(s); i++ {
-		switch s[i] {
+
+	for idx := range len(str) {
+		switch str[idx] {
 		case '(':
 			depth++
 		case ')':
@@ -54,84 +60,99 @@ func splitMediaList(s string) []string {
 			}
 		case ',':
 			if depth == 0 {
-				parts = append(parts, strings.TrimSpace(s[start:i]))
-				start = i + 1
+				parts = append(parts, strings.TrimSpace(str[start:idx]))
+				start = idx + 1
 			}
 		}
 	}
-	parts = append(parts, strings.TrimSpace(s[start:]))
+
+	parts = append(parts, strings.TrimSpace(str[start:]))
+
 	return parts
 }
 
-func matchOneMediaQuery(q, mediaType string, widthPt, heightPt float64) bool {
-	q = strings.TrimSpace(q)
-	if q == "" {
+func matchOneMediaQuery(query, mediaType string, widthPt, heightPt float64) bool {
+	query = strings.TrimSpace(query)
+	if query == "" {
 		return true
 	}
-	low := strings.ToLower(q)
+
+	low := strings.ToLower(query)
 	negated := false
+
 	if strings.HasPrefix(low, "not ") {
 		negated = true
-		q = strings.TrimSpace(q[4:])
-		low = strings.ToLower(q)
+		query = strings.TrimSpace(query[4:])
 	} else if strings.HasPrefix(low, "only ") {
-		q = strings.TrimSpace(q[5:])
-		low = strings.ToLower(q)
+		query = strings.TrimSpace(query[5:])
 	}
 
-	features, rest := extractMediaFeatures(q)
-	rest = strings.ToLower(strings.TrimSpace(rest))
+	features, rest := extractMediaFeatures(query)
 	// Drop leftover "and" tokens; remainder should be a media type or empty.
-	fields := strings.Fields(rest)
-	var typeWord string
-	for _, f := range fields {
-		if f == "and" {
-			continue
-		}
-		typeWord = f
-		break
-	}
+	typeWord := mediaTypeWord(strings.ToLower(strings.TrimSpace(rest)))
 
 	typeOK := true
 	if typeWord != "" && typeWord != "all" {
 		typeOK = typeWord == strings.ToLower(mediaType)
 	}
 
-	featOK := true
 	for _, feat := range features {
 		if !mediaFeatureMatches(feat, widthPt, heightPt) {
-			featOK = false
-			break
+			return negated
 		}
 	}
 
-	ok := typeOK && featOK
 	if negated {
-		return !ok
+		return !typeOK
 	}
-	return ok
+
+	return typeOK
+}
+
+// mediaTypeWord returns the first non-"and" token of the media query
+// remainder (the media type, or "" when there is none).
+func mediaTypeWord(rest string) string {
+	for _, f := range strings.Fields(rest) {
+		if f == "and" {
+			continue
+		}
+
+		return f
+	}
+
+	return ""
 }
 
 // extractMediaFeatures pulls parenthesized feature queries and returns the
 // remainder (media type / and keywords).
-func extractMediaFeatures(q string) (features []string, rest string) {
-	var b strings.Builder
-	for i := 0; i < len(q); {
-		if q[i] == '(' {
-			inner, end, ok := takeParenArg(q, i)
+func extractMediaFeatures(query string) ([]string, string) {
+	var buf strings.Builder
+
+	var features []string
+
+	for idx := 0; idx < len(query); {
+		if query[idx] == '(' {
+			inner, end, ok := takeParenArg(query, idx)
 			if !ok {
-				b.WriteByte(q[i])
-				i++
+				buf.WriteByte(query[idx])
+
+				idx++
+
 				continue
 			}
+
 			features = append(features, strings.TrimSpace(inner))
-			i = end
+			idx = end
+
 			continue
 		}
-		b.WriteByte(q[i])
-		i++
+
+		buf.WriteByte(query[idx])
+
+		idx++
 	}
-	return features, b.String()
+
+	return features, buf.String()
 }
 
 func mediaFeatureMatches(inner string, widthPt, heightPt float64) bool {
@@ -139,16 +160,19 @@ func mediaFeatureMatches(inner string, widthPt, heightPt float64) bool {
 	if inner == "" {
 		return false
 	}
+
 	low := strings.ToLower(inner)
 	if strings.HasPrefix(low, "orientation") {
 		return matchOrientation(low, widthPt, heightPt)
 	}
+
 	feat, ok := parseSizeFeature(inner)
 	if !ok {
 		return false
 	}
+
 	switch feat.Name {
-	case "width", "inline-size":
+	case "width", featInlineSize:
 		return feat.matchesAxis(widthPt, defaultMediaFontPt)
 	case "height", "block-size":
 		return feat.matchesAxis(heightPt, defaultMediaFontPt)
@@ -160,12 +184,16 @@ func mediaFeatureMatches(inner string, widthPt, heightPt float64) bool {
 
 func matchOrientation(low string, widthPt, heightPt float64) bool {
 	// orientation: portrait | landscape
-	parts := strings.SplitN(low, ":", 2)
-	if len(parts) != 2 {
+	const kvParts = 2
+
+	parts := strings.SplitN(low, ":", kvParts)
+	if len(parts) != kvParts {
 		return false
 	}
+
 	val := strings.TrimSpace(parts[1])
 	portrait := heightPt >= widthPt
+
 	switch val {
 	case "portrait":
 		return portrait
@@ -182,6 +210,7 @@ func (f SizeFeature) matchesAxis(sizePt, fontSizePt float64) bool {
 	if !ok {
 		return false
 	}
+
 	switch f.Op {
 	case "<":
 		return sizePt < thresh
@@ -193,6 +222,7 @@ func (f SizeFeature) matchesAxis(sizePt, fontSizePt float64) bool {
 		return sizePt >= thresh
 	case "=":
 		const eps = 0.01
+
 		return sizePt > thresh-eps && sizePt < thresh+eps
 	default:
 		return false

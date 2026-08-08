@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -10,13 +11,17 @@ import (
 // Filmography-like auto table: columns sized from longest-word (min-content)
 // leave a narrow table and tall wrapped rows. Max-content sizing should give
 // a wide table filling most of the containing block with short rows.
-func TestAutoTableUsesMaxContentColumnWidths(t *testing.T) {
-	s := sheet(t, `
+func TestAutoTableUsesMaxContentColumnWidths(t *testing.T) { //nolint:gocognit,cyclop,funlen
+	t.Parallel()
+
+	cssSheet := sheet(t, `
 body { margin: 0; font-size: 10pt; }
 table { border-collapse: collapse; }
 td, th { border: 1px solid #aaa; padding: 0.4em 0.6em; }
 `)
+
 	const contentW = 538.0
+
 	htmlSrc := `<html><body>
 <table>
 <tr><th>Year</th><th>Title</th><th>Role</th><th>Notes</th></tr>
@@ -25,12 +30,14 @@ td, th { border: 1px solid #aaa; padding: 0.4em 0.6em; }
 <tr><td>2007</td><td>Madrigal</td><td>Stella Maris</td><td></td></tr>
 </table>
 </body></html>`
+
 	root, err := html.Parse(htmlSrc)
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := Layout(root, Options{
-		Width: contentW, Height: 800, Sheets: []*css.Stylesheet{s},
+
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: contentW, Height: 800, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true,
 	})
 	if err != nil {
@@ -39,24 +46,31 @@ td, th { border: 1px solid #aaa; padding: 0.4em 0.6em; }
 	// Find Notes header x and rightmost text in first data row.
 	var notesX, maxRight, year0Y, year1Y float64
 	year0Y = -1
-	for _, op := range res.Ops {
-		if op.Kind == OpText && op.Text == "Notes" {
-			notesX = op.X
+
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind == OpText && paintOp.Text == "Notes" {
+			notesX = paintOp.X
 		}
-		if op.Kind == OpText && op.Text == "2006" {
-			year0Y = op.Y
+
+		if paintOp.Kind == OpText && paintOp.Text == "2006" {
+			year0Y = paintOp.Y
 		}
-		if op.Kind == OpText && op.Text == "2009" {
-			year1Y = op.Y
+
+		if paintOp.Kind == OpText && paintOp.Text == "2009" {
+			year1Y = paintOp.Y
 		}
-		if op.Kind == OpText && op.X+op.W > maxRight {
-			maxRight = op.X + op.W
+
+		if paintOp.Kind == OpText && paintOp.X+paintOp.W > maxRight {
+			maxRight = paintOp.X + paintOp.W
 		}
 	}
+
 	t.Logf("Notes header x=%.0f maxRight=%.0f row delta=%.0f", notesX, maxRight, year1Y-year0Y)
+
 	if notesX < 200 {
 		t.Fatalf("Notes column starts at x=%.0f; want further right (max-content distribution)", notesX)
 	}
+
 	if maxRight < contentW*0.65 {
 		t.Fatalf("table only reaches x=%.0f; want >= %.0f (max-content shrink-wrap)", maxRight, contentW*0.65)
 	}
@@ -66,20 +80,25 @@ td, th { border: 1px solid #aaa; padding: 0.4em 0.6em; }
 	}
 	// "Virgin Rose" should sit on one line (not wrap after Virgin).
 	virginY, roseY := -1.0, -1.0
-	for _, op := range res.Ops {
-		if op.Kind != OpText {
+
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpText {
 			continue
 		}
-		if op.Text == "Virgin" || op.Text == "Virgin " {
-			virginY = op.Y
+
+		if paintOp.Text == "Virgin" || paintOp.Text == "Virgin " {
+			virginY = paintOp.Y
 		}
-		if op.Text == "Rose" || op.Text == "Rose " {
-			roseY = op.Y
+
+		if paintOp.Text == "Rose" || paintOp.Text == "Rose " {
+			roseY = paintOp.Y
 		}
-		if op.Text == "Virgin Rose" || op.Text == "Virgin Rose " {
-			virginY, roseY = op.Y, op.Y
+
+		if paintOp.Text == "Virgin Rose" || paintOp.Text == "Virgin Rose " {
+			virginY, roseY = paintOp.Y, paintOp.Y
 		}
 	}
+
 	if virginY >= 0 && roseY >= 0 && roseY-virginY > 2 {
 		t.Fatalf("Title 'Virgin Rose' wrapped across lines (y=%.1f vs %.1f)", virginY, roseY)
 	}

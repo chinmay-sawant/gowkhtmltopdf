@@ -23,15 +23,20 @@ func run(argv []string) int {
 		switch {
 		case errors.Is(err, cli.ErrHelp), errors.Is(err, cli.ErrExtHelp):
 			cli.PrintHelp(os.Stdout, cli.ModePDF)
+
 			return cli.ExitOK
 		case errors.Is(err, cli.ErrVersion):
 			cli.PrintVersion(os.Stdout)
+
 			return cli.ExitOK
 		case errors.Is(err, cli.ErrLicense):
 			cli.PrintLicense(os.Stdout)
+
 			return cli.ExitOK
 		}
+
 		fmt.Fprintf(os.Stderr, "gowkhtmltopdf: %v\n", err)
+
 		return cli.ExitError
 	}
 
@@ -39,11 +44,13 @@ func run(argv []string) int {
 	// (CLI appliers write Global now). --dump-outline is convert's job.
 	if cmd.Global.DumpDefaultTOCXSL {
 		fmt.Fprint(os.Stdout, convert.DefaultTOCXSL())
+
 		return cli.ExitOK
 	}
 
 	if cmd.Output == "" {
 		fmt.Fprintln(os.Stderr, "gowkhtmltopdf: no output file specified (use '-' for stdout)")
+
 		return cli.ExitError
 	}
 
@@ -57,7 +64,9 @@ func run(argv []string) int {
 	runErr := app.RunPDF(context.Background(), cmd, logw, nil)
 	if runErr != nil {
 		fmt.Fprintf(os.Stderr, "gowkhtmltopdf: %v\n", runErr)
+
 		return cli.ExitCode(runErr)
 	}
+
 	return cli.ExitOK
 }

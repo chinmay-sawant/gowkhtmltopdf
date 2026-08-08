@@ -14,7 +14,12 @@ import (
 // through its compatibility adapter and library request seam.
 func RunImage(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 	if cmd == nil {
-		return fmt.Errorf("app: nil command")
+		return errNilCommand
 	}
-	return imageout.Run(ctx, cmd, log)
+
+	if err := imageout.Run(ctx, cmd, log); err != nil {
+		return fmt.Errorf("app: image: %w", err)
+	}
+
+	return nil
 }

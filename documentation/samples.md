@@ -90,7 +90,7 @@ Contributor setup and PR expectations: [CONTRIBUTIONS.md](../CONTRIBUTIONS.md).
 | Target | Action |
 |--------|--------|
 | `make test` | `go test ./...` |
-| `make lint` | `go vet` + gofmt check |
+| `make lint` | `golangci-lint run` (all linters via `.golangci.yml`) |
 | `make build` | `bin/gowkhtmltopdf`, `bin/gowkhtmltoimage` |
 | `make golden` | Golden corpus tests |
 | `make samples` | Refresh `output/` |

@@ -2,12 +2,17 @@ package pdf
 
 import (
 	"bytes"
+	"strings"
 	"sync"
 	"unicode"
 
+	//nolint:depguard // go-text/typesetting is the repo's fixed text-shaping dependency
 	"github.com/go-text/typesetting/di"
+	//nolint:depguard // go-text/typesetting is the repo's fixed text-shaping dependency
 	gtfont "github.com/go-text/typesetting/font"
+	//nolint:depguard // go-text/typesetting is the repo's fixed text-shaping dependency
 	ot "github.com/go-text/typesetting/font/opentype"
+	//nolint:depguard // go-text/typesetting is the repo's fixed text-shaping dependency
 	"github.com/go-text/typesetting/shaping"
 )
 
@@ -17,10 +22,10 @@ import (
 //
 // ponytail: go-text OT shaping when GSUB available; manual Arabic/RTL fallback otherwise.
 var (
-	shaperPool = sync.Pool{
+	shaperPool = sync.Pool{ //nolint:gochecknoglobals // pooled shapers are immutable after init
 		New: func() any { return &shaping.HarfbuzzShaper{} },
 	}
-	segmenterPool = sync.Pool{
+	segmenterPool = sync.Pool{ //nolint:gochecknoglobals // pooled segmenters are immutable after init
 		New: func() any { return &shaping.Segmenter{} },
 	}
 )
@@ -43,15 +48,17 @@ type ShapedRun struct {
 
 // ShapeRun shapes s and computes advances for the resulting run. The returned
 // slices are owned by the result and may be retained by the caller.
-func ShapeRun(s string, f *Font, size float64) ShapedRun {
-	text := ShapeTextFont(s, f)
+func ShapeRun(s string, fnt *Font, size float64) ShapedRun {
+	text := ShapeTextFont(s, fnt)
 	runes := []rune(text)
 	advances := make([]float64, len(runes))
-	if f != nil {
+
+	if fnt != nil {
 		for i, r := range runes {
-			advances[i] = f.AdvanceInPoints(r, size)
+			advances[i] = fnt.AdvanceInPoints(r, size)
 		}
 	}
+
 	return ShapedRun{Text: text, Runes: runes, Advances: advances}
 }
 
@@ -70,49 +77,65 @@ func ShapeTextFont(s string, f *Font) string {
 
 // ShapeTextFontWithFeatures is ShapeTextFont with explicit OpenType feature
 // tags. A nil/empty features slice still enables halt/palt for CJK text.
-func ShapeTextFontWithFeatures(s string, f *Font, features []shaping.FontFeature) string {
-	if s == "" {
-		return s
+func ShapeTextFontWithFeatures(text string, fnt *Font, features []shaping.FontFeature) string {
+	if text == "" {
+		return text
 	}
-	feats := mergeFontFeatures(s, features)
-	needShape := ShapeNeeded(s) || len(feats) > 0
+
+	feats := mergeFontFeatures(text, features)
+
+	needShape := ShapeNeeded(text) || len(feats) > 0
 	if !needShape {
-		return s
+		return text
 	}
-	if run, ok := tryShapeOpenType(s, f, feats); ok && run.text != "" {
+
+	if run, ok := tryShapeOpenType(text, fnt, feats); ok && run.text != "" {
 		return run.text
 	}
-	if ShapeNeeded(s) {
-		return ShapeText(s)
+
+	if ShapeNeeded(text) {
+		return ShapeText(text)
 	}
-	return s
+
+	return text
 }
 
-func tryShapeOpenType(s string, f *Font, features []shaping.FontFeature) (shapedRun, bool) {
-	if f == nil {
-		return shapedRun{}, false
+func tryShapeOpenType(str string, fnt *Font, features []shaping.FontFeature) (shapedRun, bool) {
+	if fnt == nil {
+		return shapedRun{}, false //nolint:exhaustruct // intentional zero-value fields
 	}
 	// GSUB covers Arabic ligation; halt/palt live in GPOS and are requested via
 	// FontFeatures — allow the OT path when either applies.
-	if !f.hasGSUB() && len(features) == 0 {
-		return shapedRun{}, false
+	if !fnt.hasGSUB() && len(features) == 0 {
+		return shapedRun{}, false //nolint:exhaustruct // intentional zero-value fields
 	}
-	face, ok := f.gotextFace()
-	if !ok {
-		return shapedRun{}, false
-	}
-	rev := f.reverseCmap()
-	text := []rune(s)
 
-	seg := segmenterPool.Get().(*shaping.Segmenter)
+	face, faceOK := fnt.gotextFace()
+	if !faceOK {
+		return shapedRun{}, false //nolint:exhaustruct // intentional zero-value fields
+	}
+
+	rev := fnt.reverseCmap()
+	text := []rune(str)
+
+	seg, segOK := segmenterPool.Get().(*shaping.Segmenter)
+	if !segOK {
+		return shapedRun{}, false //nolint:exhaustruct // intentional zero-value fields
+	}
+
 	defer segmenterPool.Put(seg)
-	shaper := shaperPool.Get().(*shaping.HarfbuzzShaper)
+
+	shaper, shaperOK := shaperPool.Get().(*shaping.HarfbuzzShaper)
+	if !shaperOK {
+		return shapedRun{}, false //nolint:exhaustruct // intentional zero-value fields
+	}
+
 	defer shaperPool.Put(shaper)
 
 	// Size left at zero so we do not import golang.org/x/image (keep
 	// typesetting as the only direct third-party require). Glyph IDs are
 	// still correct; advances come from our Font hmtx below.
-	inputs := seg.Split(shaping.Input{
+	inputs := seg.Split(shaping.Input{ //nolint:exhaustruct // intentional zero-value fields
 		Text:         text,
 		RunStart:     0,
 		RunEnd:       len(text),
@@ -121,26 +144,50 @@ func tryShapeOpenType(s string, f *Font, features []shaping.FontFeature) (shaped
 		FontFeatures: features,
 	}, singleFaceMap{face})
 
-	outRunes := make([]rune, 0, len(text))
-	for _, in := range inputs {
-		if in.Face == nil {
-			in.Face = face
+	outRunes, ok := collectShapedRunes(shaper, inputs, face, features, rev)
+	if !ok {
+		return shapedRun{}, false //nolint:exhaustruct // intentional zero-value fields
+	}
+
+	return shapedRun{text: string(outRunes)}, true
+}
+
+// collectShapedRunes shapes the inputs and maps the resulting glyphs back
+// to Unicode via the reverse cmap; false when a glyph cannot be mapped.
+func collectShapedRunes(
+	shaper *shaping.HarfbuzzShaper,
+	inputs []shaping.Input,
+	face *gtfont.Face,
+	features []shaping.FontFeature,
+	rev map[uint16]rune,
+) ([]rune, bool) {
+	outRunes := make([]rune, 0)
+
+	for _, inVal := range inputs {
+		if inVal.Face == nil {
+			inVal.Face = face
 		}
-		in.FontFeatures = features
-		out := shaper.Shape(in)
+
+		inVal.FontFeatures = features
+
+		out := shaper.Shape(inVal)
 		for _, g := range out.Glyphs {
 			if g.GlyphID == gtfont.EmptyGlyph {
 				continue
 			}
-			gid := uint16(g.GlyphID)
+
+			gid := uint16(g.GlyphID) //nolint:gosec // font cmap is uint16; larger ids cannot reverse-map
+
 			r, ok := rev[gid]
 			if !ok {
-				return shapedRun{}, false
+				return nil, false
 			}
+
 			outRunes = append(outRunes, r)
 		}
 	}
-	return shapedRun{text: string(outRunes)}, true
+
+	return outRunes, true
 }
 
 // ParseFontFeatureSettings parses a CSS font-feature-settings value into
@@ -148,17 +195,21 @@ func tryShapeOpenType(s string, f *Font, features []shaping.FontFeature) (shaped
 // (e.g. `"halt" 1, "palt" on`). Unknown junk is skipped.
 func ParseFontFeatureSettings(v string) []shaping.FontFeature {
 	out := []shaping.FontFeature{}
+
 	for _, part := range splitCSSList(v) {
 		part = trimSpace(part)
 		if part == "" {
 			continue
 		}
+
 		tag, val, ok := parseOneFontFeature(part)
 		if !ok {
 			continue
 		}
+
 		out = append(out, shaping.FontFeature{Tag: tag, Value: val})
 	}
+
 	return out
 }
 
@@ -166,6 +217,7 @@ func mergeFontFeatures(s string, requested []shaping.FontFeature) []shaping.Font
 	if len(requested) > 0 {
 		return requested
 	}
+
 	return cjkPunctFontFeatures(s)
 }
 
@@ -175,6 +227,7 @@ func cjkPunctFontFeatures(s string) []shaping.FontFeature {
 	if !textNeedsCJKFeatures(s) {
 		return nil
 	}
+
 	return []shaping.FontFeature{
 		{Tag: ot.MustNewTag("halt"), Value: 1},
 		{Tag: ot.MustNewTag("palt"), Value: 1},
@@ -182,61 +235,116 @@ func cjkPunctFontFeatures(s string) []shaping.FontFeature {
 }
 
 func textNeedsCJKFeatures(s string) bool {
-	for _, r := range s {
-		if unicode.In(r, unicode.Han, unicode.Hangul, unicode.Hiragana, unicode.Katakana) {
+	for _, rVal := range s {
+		if unicode.In(rVal, unicode.Han, unicode.Hangul, unicode.Hiragana, unicode.Katakana) {
 			return true
 		}
 		// CJK punctuation / fullwidth forms often targeted by halt/palt.
-		if r >= 0x3000 && r <= 0x303F {
+		if rVal >= 0x3000 && rVal <= 0x303F {
 			return true
 		}
-		if r >= 0xFF00 && r <= 0xFFEF {
+
+		if rVal >= 0xFF00 && rVal <= 0xFFEF {
 			return true
 		}
 	}
+
 	return false
 }
 
-func splitCSSList(v string) []string {
-	parts := []string{}
-	var cur []byte
+func splitCSSList(val string) []string {
+	var parts []string
+
+	cur := make([]byte, 0, len(val))
+
 	inQ := byte(0)
-	for i := 0; i < len(v); i++ {
-		c := v[i]
+
+	for i := range len(val) {
+		cnt := val[i]
 		if inQ != 0 {
-			cur = append(cur, c)
-			if c == inQ {
+			cur = append(cur, cnt)
+
+			if cnt == inQ {
 				inQ = 0
 			}
+
 			continue
 		}
-		if c == '"' || c == '\'' {
-			inQ = c
-			cur = append(cur, c)
+
+		if cnt == '"' || cnt == '\'' {
+			inQ = cnt
+			cur = append(cur, cnt)
+
 			continue
 		}
-		if c == ',' {
+
+		if cnt == ',' {
 			parts = append(parts, string(cur))
 			cur = cur[:0]
+
 			continue
 		}
-		cur = append(cur, c)
+
+		cur = append(cur, cnt)
 	}
+
 	if len(cur) > 0 {
 		parts = append(parts, string(cur))
 	}
+
 	return parts
 }
 
 func trimSpace(s string) string {
-	i, j := 0, len(s)
-	for i < j && (s[i] == ' ' || s[i] == '\t' || s[i] == '\n' || s[i] == '\r') {
-		i++
+	return strings.Trim(s, " \t\n\r")
+}
+
+// parseFeatureTag splits an optional quoted tag from the trailing value
+// part, mirroring CSS font-feature-settings syntax.
+func parseFeatureTag(part string) (string, string, bool) {
+	if part[0] == '"' || part[0] == '\'' {
+		q := part[0]
+		end := -1
+
+		for i := 1; i < len(part); i++ {
+			if part[i] == q {
+				end = i
+
+				break
+			}
+		}
+		// Quoted 4-letter tag: `"halt"` → indices 0 and 5.
+		if end != featureEndTagIdx {
+			return "", "", false
+		}
+
+		return part[1:end], trimSpace(part[end+1:]), true
 	}
-	for j > i && (s[j-1] == ' ' || s[j-1] == '\t' || s[j-1] == '\n' || s[j-1] == '\r') {
-		j--
+
+	if len(part) < featureTagLen {
+		return "", "", false
 	}
-	return s[i:j]
+
+	return part[:4], trimSpace(part[4:]), true
+}
+
+// parseFeatureCount parses a decimal feature value, bounded to uint16 per
+// the OpenType feature-value width.
+func parseFeatureCount(rest string) (uint32, bool) {
+	count := 0
+
+	for _, c := range rest {
+		if c < '0' || c > '9' {
+			return 0, false
+		}
+
+		count = count*decimalBase + int(c-'0')
+		if count > maxUint16Val {
+			return 0, false
+		}
+	}
+
+	return uint32(count), true //nolint:gosec // count bounded by maxUint16Val above
 }
 
 func parseOneFontFeature(part string) (ot.Tag, uint32, bool) {
@@ -244,31 +352,14 @@ func parseOneFontFeature(part string) (ot.Tag, uint32, bool) {
 	if part == "" {
 		return 0, 0, false
 	}
-	var tagStr string
-	rest := ""
-	if part[0] == '"' || part[0] == '\'' {
-		q := part[0]
-		end := -1
-		for i := 1; i < len(part); i++ {
-			if part[i] == q {
-				end = i
-				break
-			}
-		}
-		// Quoted 4-letter tag: `"halt"` → indices 0 and 5.
-		if end != 5 {
-			return 0, 0, false
-		}
-		tagStr = part[1:end]
-		rest = trimSpace(part[end+1:])
-	} else {
-		if len(part) < 4 {
-			return 0, 0, false
-		}
-		tagStr = part[:4]
-		rest = trimSpace(part[4:])
+
+	tagStr, rest, ok := parseFeatureTag(part)
+	if !ok {
+		return 0, 0, false
 	}
+
 	val := uint32(1)
+
 	if rest != "" {
 		switch rest {
 		case "on", "On", "ON":
@@ -276,16 +367,15 @@ func parseOneFontFeature(part string) (ot.Tag, uint32, bool) {
 		case "off", "Off", "OFF":
 			val = 0
 		default:
-			n := 0
-			for _, c := range rest {
-				if c < '0' || c > '9' {
-					return 0, 0, false
-				}
-				n = n*10 + int(c-'0')
+			count, ok := parseFeatureCount(rest)
+			if !ok {
+				return 0, 0, false
 			}
-			val = uint32(n)
+
+			val = count
 		}
 	}
+
 	return ot.MustNewTag(tagStr), val, true
 }
 
@@ -297,7 +387,9 @@ func (f *Font) hasGSUB() bool {
 	if f == nil {
 		return false
 	}
+
 	_, ok := f.tables["GSUB"]
+
 	return ok
 }
 
@@ -308,11 +400,13 @@ func (f *Font) gotextFace() (*gtfont.Face, bool) {
 	if f == nil || len(f.data) == 0 {
 		return nil, false
 	}
+
 	f.gotOnce.Do(func() {
 		if face, err := gtfont.ParseTTF(bytes.NewReader(f.data)); err == nil && face != nil {
 			f.gotFace = face
 		}
 	})
+
 	return f.gotFace, f.gotFace != nil
 }
 
@@ -322,29 +416,34 @@ func (f *Font) gotextFace() (*gtfont.Face, bool) {
 func (f *Font) reverseCmap() map[uint16]rune {
 	f.revOnce.Do(func() {
 		out := make(map[uint16]rune, len(f.cmap))
+
 		for cp, gid := range f.cmap {
 			if gid == 0 {
 				continue
 			}
-			r := rune(cp)
+
+			rVal := rune(cp)
 			if prev, ok := out[gid]; ok {
-				if cmapRuneScore(r) <= cmapRuneScore(prev) {
+				if cmapRuneScore(rVal) <= cmapRuneScore(prev) {
 					continue
 				}
 			}
-			out[gid] = r
+
+			out[gid] = rVal
 		}
+
 		f.rev = out
 	})
+
 	return f.rev
 }
 
 func cmapRuneScore(r rune) int {
 	switch {
 	case r >= 0xFE70 && r <= 0xFEFF:
-		return 3 // Arabic presentation forms-B
+		return arabicFormsB // Arabic presentation forms-B
 	case r >= 0xFB50 && r <= 0xFDFF:
-		return 2 // Arabic presentation forms-A
+		return arabicFormsA // Arabic presentation forms-A
 	default:
 		return 1
 	}
