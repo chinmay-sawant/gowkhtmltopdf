@@ -448,50 +448,50 @@ type inheritCopy struct {
 	copy  func(dst *ResolvedStyle, src ResolvedStyle)
 }
 
-// inheritableProps lists the inheritable property groups used by inheritProps.
-func inheritableProps() []inheritCopy {
-	return []inheritCopy{
-		{[]string{"color"}, func(dst *ResolvedStyle, src ResolvedStyle) { dst.Color = src.Color }},
-		{[]string{"font-family"}, func(dst *ResolvedStyle, src ResolvedStyle) { dst.FontFamily = src.FontFamily }},
-		{[]string{"font-size"}, func(dst *ResolvedStyle, src ResolvedStyle) { dst.FontSize = src.FontSize }},
-		{[]string{"font-weight"}, func(dst *ResolvedStyle, src ResolvedStyle) { dst.FontWeight = src.FontWeight }},
-		{[]string{"font-style"}, func(dst *ResolvedStyle, src ResolvedStyle) { dst.FontItalic = src.FontItalic }},
-		{[]string{"line-height"}, func(dst *ResolvedStyle, src ResolvedStyle) { dst.LineHeight = src.LineHeight }},
-		{[]string{"text-align"}, func(dst *ResolvedStyle, src ResolvedStyle) { dst.TextAlign = src.TextAlign }},
-		{[]string{"white-space"}, func(dst *ResolvedStyle, src ResolvedStyle) { dst.WhiteSpace = src.WhiteSpace }},
-		// overflow-wrap / word-wrap and word-break are inherited (CSS Text).
-		{
-			[]string{"overflow-wrap", "word-wrap"},
-			func(dst *ResolvedStyle, src ResolvedStyle) { dst.OverflowWrap = src.OverflowWrap },
-		},
-		{[]string{"word-break"}, func(dst *ResolvedStyle, src ResolvedStyle) { dst.WordBreak = src.WordBreak }},
-		{
-			[]string{"vertical-align"},
-			func(dst *ResolvedStyle, src ResolvedStyle) { dst.VerticalAlign = src.VerticalAlign },
-		},
-		{
-			[]string{"text-decoration"},
-			func(dst *ResolvedStyle, src ResolvedStyle) { dst.TextDecoration = src.TextDecoration },
-		},
-		{
-			[]string{"letter-spacing"},
-			func(dst *ResolvedStyle, src ResolvedStyle) { dst.LetterSpacing = src.LetterSpacing },
-		},
-		{
-			[]string{"list-style-type", "list-style"},
-			func(dst *ResolvedStyle, src ResolvedStyle) { dst.ListStyleType = src.ListStyleType },
-		},
-		{
-			[]string{"border-collapse"},
-			func(dst *ResolvedStyle, src ResolvedStyle) { dst.BorderCollapse = src.BorderCollapse },
-		},
-		{
-			[]string{"border-spacing"},
-			func(dst *ResolvedStyle, src ResolvedStyle) { dst.BorderSpacing = src.BorderSpacing },
-		},
-		{[]string{"orphans"}, func(dst *ResolvedStyle, src ResolvedStyle) { dst.Orphans = src.Orphans }},
-		{[]string{"widows"}, func(dst *ResolvedStyle, src ResolvedStyle) { dst.Widows = src.Widows }},
-	}
+// inheritableProps is the immutable inherit table used by inheritProps.
+// Package-level so inheritProps does not allocate a new slice, name slices,
+// and closures on every styled node (was ~40% of alloc_objects on 500-page PDF).
+var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inherit table
+	{[]string{"color"}, func(dst *ResolvedStyle, src ResolvedStyle) { dst.Color = src.Color }},
+	{[]string{"font-family"}, func(dst *ResolvedStyle, src ResolvedStyle) { dst.FontFamily = src.FontFamily }},
+	{[]string{"font-size"}, func(dst *ResolvedStyle, src ResolvedStyle) { dst.FontSize = src.FontSize }},
+	{[]string{"font-weight"}, func(dst *ResolvedStyle, src ResolvedStyle) { dst.FontWeight = src.FontWeight }},
+	{[]string{"font-style"}, func(dst *ResolvedStyle, src ResolvedStyle) { dst.FontItalic = src.FontItalic }},
+	{[]string{"line-height"}, func(dst *ResolvedStyle, src ResolvedStyle) { dst.LineHeight = src.LineHeight }},
+	{[]string{"text-align"}, func(dst *ResolvedStyle, src ResolvedStyle) { dst.TextAlign = src.TextAlign }},
+	{[]string{"white-space"}, func(dst *ResolvedStyle, src ResolvedStyle) { dst.WhiteSpace = src.WhiteSpace }},
+	// overflow-wrap / word-wrap and word-break are inherited (CSS Text).
+	{
+		[]string{"overflow-wrap", "word-wrap"},
+		func(dst *ResolvedStyle, src ResolvedStyle) { dst.OverflowWrap = src.OverflowWrap },
+	},
+	{[]string{"word-break"}, func(dst *ResolvedStyle, src ResolvedStyle) { dst.WordBreak = src.WordBreak }},
+	{
+		[]string{"vertical-align"},
+		func(dst *ResolvedStyle, src ResolvedStyle) { dst.VerticalAlign = src.VerticalAlign },
+	},
+	{
+		[]string{"text-decoration"},
+		func(dst *ResolvedStyle, src ResolvedStyle) { dst.TextDecoration = src.TextDecoration },
+	},
+	{
+		[]string{"letter-spacing"},
+		func(dst *ResolvedStyle, src ResolvedStyle) { dst.LetterSpacing = src.LetterSpacing },
+	},
+	{
+		[]string{"list-style-type", "list-style"},
+		func(dst *ResolvedStyle, src ResolvedStyle) { dst.ListStyleType = src.ListStyleType },
+	},
+	{
+		[]string{"border-collapse"},
+		func(dst *ResolvedStyle, src ResolvedStyle) { dst.BorderCollapse = src.BorderCollapse },
+	},
+	{
+		[]string{"border-spacing"},
+		func(dst *ResolvedStyle, src ResolvedStyle) { dst.BorderSpacing = src.BorderSpacing },
+	},
+	{[]string{"orphans"}, func(dst *ResolvedStyle, src ResolvedStyle) { dst.Orphans = src.Orphans }},
+	{[]string{"widows"}, func(dst *ResolvedStyle, src ResolvedStyle) { dst.Widows = src.Widows }},
 }
 
 // inheritProps copies inheritable properties from the parent, unless the
@@ -507,7 +507,7 @@ func inheritProps(dst *ResolvedStyle, parent ResolvedStyle, raw map[string]strin
 		return ok
 	}
 
-	for _, entry := range inheritableProps() {
+	for _, entry := range inheritableProps {
 		declared := false
 
 		for _, name := range entry.names {

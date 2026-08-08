@@ -2440,20 +2440,22 @@ func boxInkExtent(res *Result, boxNode *box) float64 {
 // fresh page after everything preceding them. Every matching box is handled in
 // one walk so multi-section reports (benchmarks, long fixtures) are not capped
 // by the outer fixpoint iteration budget. After each shift, prefix maxima are
-// rebuilt because later ops and boxes have moved.
+// rebuilt because later ops and boxes have moved. One prefix buffer is reused
+// for the whole walk so repeated rebuilds do not allocate.
 func beforeAlways(res *Result, contentH float64) bool {
 	if res == nil || res.root == nil || contentH <= 0 {
 		return false
 	}
 
-	prefixMaxY := prefixMaxOfOps(res.Ops)
+	var prefixMaxY []float64
+	prefixMaxY = prefixMaxOfOps(res.Ops, prefixMaxY)
 	changed := false
 
 	var walk func(b *box)
 	walk = func(boxNode *box) {
 		if boxNode.style.PageBreakBefore == pageBreakAlways {
 			if shiftForcedBreak(res, boxNode, prefixMaxY, contentH) {
-				prefixMaxY = prefixMaxOfOps(res.Ops)
+				prefixMaxY = prefixMaxOfOps(res.Ops, prefixMaxY)
 				changed = true
 			}
 		}
@@ -2469,16 +2471,27 @@ func beforeAlways(res *Result, contentH float64) bool {
 }
 
 // prefixMaxOfOps returns prefixMax[i] = max Y of ops[0:i].
-func prefixMaxOfOps(ops []Op) []float64 {
-	prefixMaxY := make([]float64, len(ops)+1)
+// When buf has capacity >= len(ops)+1 it is reused (no allocation); otherwise
+// a new slice is allocated. Callers that rebuild after each mutation should
+// pass the previous result as buf.
+func prefixMaxOfOps(ops []Op, buf []float64) []float64 {
+	need := len(ops) + 1
+	if cap(buf) < need {
+		buf = make([]float64, need)
+	} else {
+		buf = buf[:need]
+	}
+	// Empty-prefix max; must be zero when reusing a dirty buffer.
+	if need > 0 {
+		buf[0] = 0
+	}
 	for i, op := range ops {
-		prefixMaxY[i+1] = prefixMaxY[i]
-		if op.Y > prefixMaxY[i+1] {
-			prefixMaxY[i+1] = op.Y
+		buf[i+1] = buf[i]
+		if op.Y > buf[i+1] {
+			buf[i+1] = op.Y
 		}
 	}
-
-	return prefixMaxY
+	return buf
 }
 
 // shiftForcedBreak moves a page-break-before:always box below the last op

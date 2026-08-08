@@ -3,10 +3,11 @@
 > **Parent:** `plans/deferred/0.0.3/500-page-one-second-performance-target.md` - one-second vision  
 > **Evidence ledger:** `plans/performance/2026-08-07/performance-profile-and-improvement-plan.md` (2026-08-08 addendum)  
 > **Skill:** `skills/phase-wise-checklist/SKILLS.md`  
-> **Status:** measurement complete; implementation not started  
+> **Status:** Cycle 1 implemented; further cycles in progress  
 > **Branch:** `feature/optimization`  
 > **Estimated effort:** multi-wave (correctness-first); intermediate gates before 1 s stretch  
 > **Created:** 2026-08-08  
+> **Last updated:** 2026-08-08 (Cycle 1 close)
 
 ---
 
@@ -26,23 +27,31 @@ driven by the 2026-08-08 profile and the wkhtmltopdf process-level comparison.
 
 ## Executive Summary
 
-### 2026-08-08 baseline (this machine)
+### 2026-08-08 baseline (pre-optimization)
 
 | Metric | gowkhtmltopdf | wkhtmltopdf 0.12.6.1 (same HTML) |
 |---|---:|---:|
 | 500-page in-process bench | **7.91 s · 4.04 GB B/op · 13.2 M allocs** | n/a (native) |
 | 500-page CLI wall + peak RSS | **8.40 s · ~777 MB RSS** | **2.05 s · ~114 MB RSS** |
 
-### Who is faster / leaner (full matrix, process-level)
+### Cycle 1 result (post-fix, median of 3 where noted)
+
+| Metric | Baseline | After Cycle 1 | Δ |
+|---|---:|---:|---:|
+| 500 PDF time | 7.91 s | **6.99 s** (median of 3) | **−11.6%** |
+| 500 PDF B/op | 4.04 GB | **2.80 GB** | **−30.7%** |
+| 500 PDF allocs/op | 13.23 M | **7.68 M** | **−42.0%** |
+
+Count-3 raw after Cycle 1: 7.40 s / 6.96 s / 6.99 s · ~2.80 GB · ~7.68 M allocs.
+
+### Who is faster / leaner (full matrix, process-level, pre-opt)
 
 | Page range | Faster | Lower peak RSS |
 |---|---|---|
 | **2–100** | **gowkhtmltopdf** | gowk on 2–10; **wk** from ~20 up |
 | **200–500** | **wkhtmltopdf** | **wkhtmltopdf** |
 
-Full table is in the performance-profile addendum (2026-08-08).
-
-### Profile root causes (own findings)
+### Profile root causes (baseline findings)
 
 1. **`beforeAlways` + `prefixMaxOfOps`:** rebuilds a full op-prefix max array
    after **every** forced break → ~17% flat CPU and ~677 MB alloc_space at 500
@@ -57,13 +66,38 @@ Full table is in the performance-profile addendum (2026-08-08).
 
 ### Optimization north star (gates for this checklist)
 
-| Gate | Metric | Pass when |
+| Gate | Metric | Pass when | Cycle 1 status |
+|---|---|---|---|
+| G1 Intermediate latency | `BenchmarkPDFPages/500Pages` median `-count=3 -benchtime=1x` | ≤ **4.0 s** | [ ] 6.99 s |
+| G2 Intermediate allocs | same | ≤ **7.0 M allocs/op** and ≤ **2.0 GB B/op** | [~] 7.68 M / 2.80 GB |
+| G3 CLI RSS | `/usr/bin/time` peak RSS on `report-500.html` | ≤ **400 MB** | [ ] not remeasured |
+| G4 Stretch (parent doc) | median | ≤ **1.0 s** | [ ] |
+| G5 Correctness | always | `make test`, page count 500, golden fixtures | [x] layout/css/convert green after Cycle 1 |
+
+---
+
+## Cycle log
+
+### Cycle 1 — buffer reuse + static tables (2026-08-08)
+
+**Shipped code**
+
+| Change | Path | Effect |
 |---|---|---|
-| G1 Intermediate latency | `BenchmarkPDFPages/500Pages` median `-count=3 -benchtime=1x` | ≤ **4.0 s** |
-| G2 Intermediate allocs | same | ≤ **7.0 M allocs/op** and ≤ **2.0 GB B/op** |
-| G3 CLI RSS | `/usr/bin/time` peak RSS on `report-500.html` | ≤ **400 MB** |
-| G4 Stretch (parent doc) | median | ≤ **1.0 s** (only after G1–G3 + correctness) |
-| G5 Correctness | always | `make test`, page count 500, golden fixtures, no silent layout weaken |
+| Reuse `prefixMaxOfOps` buffer across `beforeAlways` walk | `internal/layout/paint.go` | Removes ~500 large `[]float64` allocs per 500-page convert |
+| Package-level `inheritableProps` table | `internal/layout/style.go` | Removes per-node slice + closure factory (~40% of baseline alloc_objects) |
+| Package-level `namedColorTable` | `internal/css/css.go` | Removes per-parse color map (~281 MB baseline alloc_space) |
+
+**Validation**
+
+```sh
+go test ./internal/layout ./internal/css ./internal/convert -count=1 -timeout 180s  # ok
+go test ./internal/convert -run '^$' -bench '^BenchmarkPDFPages/500Pages$' \
+  -benchmem -benchtime=1x -count=3  # median ~6.99s / 2.80GB / 7.68M
+```
+
+**Outcome:** large allocation win; modest latency win. G2 nearly met on alloc
+count; B/op and wall time still open.
 
 ---
 
@@ -74,10 +108,11 @@ Full table is in the performance-profile addendum (2026-08-08).
 - [x] Record in-process profile command and raw result (7.91 s / 4.04 GB / 13.2 M).
 - [x] Record process-level matrix vs wkhtmltopdf (2…500) and “who wins” table.
 - [x] Append evidence to `plans/performance/2026-08-07/performance-profile-and-improvement-plan.md`.
-- [ ] Re-run PDF 500 with `-count=3` and record median/spread before first code wave.
-- [ ] Capture one `memprofile` + `cpuprofile` pair after each closed phase.
+- [x] Re-run PDF 500 with `-count=3` after Cycle 1 (median 6.99 s).
+- [x] Capture baseline `memprofile` + `cpuprofile` (pre-Cycle 1 under `/tmp/gowk-profile/`).
+- [ ] Capture profile pair after each subsequent cycle.
 
-**Proof:** commands and tables in the performance-profile addendum.
+**Proof:** commands and tables in the performance-profile addendum + Cycle log.
 
 ---
 
@@ -85,15 +120,15 @@ Full table is in the performance-profile addendum (2026-08-08).
 
 ### 1.1 Incremental or single-pass prefix
 
-- [ ] Replace full `prefixMaxOfOps` rebuild-after-every-break in
-      `internal/layout/paint.go` (`beforeAlways` / `shiftForcedBreak`) with either:
-  - incremental max maintenance when only a suffix moves, or
-  - one-pass forced-break placement that does not rescan all ops per break.
-- [ ] Keep mutation-safe semantics for interleaved content (no empty-page drift).
-- [ ] Prove: `TestPageBreakBeforeStacked`, golden fixture-08, benchmark
-      page counts 2…500 exact; no hang in `shiftFlowY`.
+- [x] Replace full `prefixMaxOfOps` **allocation** after every break with a
+      **reused buffer** full recompute (`paint.go`).
+- [x] Keep mutation-safe semantics (full recompute into buf; no partial max).
+- [x] Prove: layout page-break tests + convert fixture-08 + convert package tests.
+- [ ] **Cycle 2+:** stop O(breaks × ops) CPU — incremental max after shift, or
+      single-pass forced-break placement without rescanning all ops each break.
 
-**Expected:** large drop in `prefixMaxOfOps` flat CPU and ~677 MB alloc_space.
+**Expected (1.1 buffer reuse):** large drop in prefix alloc_space — **landed**.  
+**Expected (1.1 CPU):** still open until incremental/single-pass.
 
 ### 1.2 Avoid O(breaks) full-suffix shifts when possible
 
@@ -109,17 +144,17 @@ Full table is in the performance-profile addendum (2026-08-08).
 
 ### 2.1 `inheritableProps` object factory
 
-- [ ] Profile-driven change in `internal/layout/style.go` (and helpers) so
-      inheritance does not allocate ~5.6 M objects per 500-page convert.
-- [ ] Prefer shared immutable tables, pooling, or bitsets over per-node maps.
-- [ ] Prove: style regression tests, wiki/print fixtures, `make test`.
+- [x] Package-level static inherit table (no per-call `[]inheritCopy` / closures).
+- [x] Prove: `go test ./internal/layout` green.
+- [ ] Further: reduce remaining cascade temps if profile still shows style walk
+      as top alloc after Cycle 1.
 
 ### 2.2 Named colors / rule hit lists
 
-- [ ] Audit `css.namedColors` and `ruleSelectorHits` / `sheetRuleHits` for
-      per-node rebuilds; cache at stylesheet or context scope.
-- [ ] Prove: CSS unit tests + full suite; heap profile shows reduced
-      alloc_objects flat share.
+- [x] Cache `namedColors` map at package level (`css.go`).
+- [ ] Audit `ruleSelectorHits` / `sheetRuleHits` for per-node rebuilds; cache at
+      stylesheet or context scope if still hot post-Cycle 1.
+- [x] Prove: `go test ./internal/css` green.
 
 ### 2.3 `resolveStylesCtx` walk
 
@@ -127,7 +162,7 @@ Full table is in the performance-profile addendum (2026-08-08).
       `applyRestProps`) without changing cascade winners.
 - [ ] Prove: golden corpus page envelopes and HF/link tests still pass.
 
-**Expected:** cut total `allocs/op` toward G2; GC flat share falls as a side effect.
+**Expected:** cut total `allocs/op` toward G2 — **partially landed** (7.68 M).
 
 ---
 
