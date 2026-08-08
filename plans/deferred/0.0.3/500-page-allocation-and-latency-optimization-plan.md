@@ -247,3 +247,85 @@ Template 500 one-shot: **3.03 s / 2.48 GB / 5.97 M**.
    optional 1.5 s stretch and remains above the parent 1.0 s target.
 
 No checklist rows remain open or deferred inside this file.
+
+## Addendum: current integrated profile-guided wave (2026-08-08)
+
+This addendum supersedes Cycle 6 for the current working tree. The previously
+published commit was pushed as 596c6e2; the changes below are intentionally
+still uncommitted pending explicit publication approval.
+
+### Locked-gate result
+
+Command:
+
+    cd internal/convert
+    go test -run '^$' -bench '^BenchmarkPDFPages/500Pages$' \
+      -benchmem -benchtime=1x -count=3
+
+| Metric | Locked bar | Current count-3 median | Change |
+|---|---:|---:|---:|
+| Time | 2.10 s | **1.628 s** | **−22.5%** |
+| B/op | 1.48 GB | **678.8 MB** | **−54.1%** |
+| Allocs/op | 3.93 M | **1.103 M** | **−71.9%** |
+
+The three current samples were 1.808 / 1.549 / 1.628 s, 679.4 / 678.6 /
+678.8 MB/op, and 1.103 / 1.103 / 1.103 M allocs/op. WSL2 one-iteration
+latency remains noisy; the latest count-3 median is the recorded gate result.
+
+### Current matrix and profile evidence
+
+The final one-iteration PDF/template matrix is recorded in
+testdata/golden/benchmarks/benchmark-results.txt. The 500-page matrix
+samples were 1.903 s / 678.6 MB / 1.103 M allocs for PDF and 1.693 s /
+683.5 MB / 1.154 M allocs for template plus PDF.
+
+The final profile artifacts are /tmp/gowk-profile/wave-final.cpu,
+/tmp/gowk-profile/wave-final.mem, and the /usr/bin/time -v output from the
+same run. The profile run measured 679.1 MB/op and a peak RSS of 400,636 kB
+(about 391 MiB). B/op is cumulative allocation traffic, while RSS is the
+process live/high-water resident set; neither is the same as the other.
+
+The current alloc_space ordering is:
+
+| Hotspot | Allocation traffic | Interpretation |
+|---|---:|---|
+| resolveStylesCtx | 179.38 MB | Element-style arena after text-style sharing |
+| newEngine | 111.27 MB | Display-list capacity reservation |
+| html.tokenize | 73.72 MB cumulative | Full token slice plus HTML tree construction |
+| bytes.growSlice | 67.74 MB | Buffer/string/display-list growth |
+| splitCrossingRects | 50.47 MB | Correctness-preserving display-list rewrite for page crossings |
+| buildCell | 34.01 MB | Table intrinsic measurement boxes |
+
+The CPU profile is now led by style application (resolveElementStyle),
+forced-break placement (beforeAlways), map operations, text measurement,
+and zlib compression. The former per-rune text and large GC hotspots are no
+longer dominant application nodes.
+
+### Accepted source changes
+
+- Reuse cascade winner/property maps and pre-count one contiguous element
+  ResolvedStyle arena.
+- Point text nodes at their already-resolved parent style; text nodes have no
+  declarations and the inline path consumes the inherited text properties.
+- Replace class-token maps, shorthand strings.Fields, and common PDF string
+  builder growth with allocation-free scans/pre-sizing.
+- Reduce display-list over-reservation to a measured 1.5 operation-per-node
+  estimate, retain direct fragment appends, and store border clusters as map
+  values instead of individually allocated pointers.
+- Pre-size table placement/border buckets and table-cell slices.
+- Allocate HTML attribute maps only for elements that actually carry
+  attributes.
+
+All changes preserve page counts, layout semantics, and PDF generation; the
+full go test ./... suite is green.
+
+### Residual boundary
+
+The optional 1.5 s stretch is not met by the latest median, and the
+wkhtmltopdf-like sub-100-MB process target is not met: the current profiled
+peak is about 391 MiB. Reaching that target requires an architectural
+streaming/repeated-section path that avoids retaining the complete DOM,
+style/display-list state, and page-crossing rewrite buffers. It should be a
+separate parent-plan track rather than a local allocation tweak, because
+discarding those structures prematurely would weaken pagination or PDF
+correctness.

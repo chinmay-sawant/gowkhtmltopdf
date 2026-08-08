@@ -732,7 +732,7 @@ func estimateOpCapacity(root *html.Node) int {
 
 	root.Walk(func(*html.Node) { nodes++ })
 
-	capacity := nodes * opsPerNodeHint
+	capacity := nodes * opsPerNodeHint / two
 	if capacity < minOpsCapacity {
 		capacity = 64
 	}
@@ -2893,7 +2893,7 @@ func (e *engine) collectTableRows(node *html.Node) ([][]*html.Node, int) {
 
 // rowCellNodes returns the table-cell children of a <tr>.
 func rowCellNodes(tr *html.Node, e *engine) []*html.Node {
-	var cells []*html.Node
+	cells := make([]*html.Node, 0, len(tr.Children))
 
 	for _, cell := range tr.Children {
 		if cell.Type == html.ElementNode && e.styles[cell].Display == displayTableCell {
@@ -2932,19 +2932,19 @@ func resolveHeaderRows(rows [][]*html.Node, headerRows int) int {
 // placeTableCells assigns each cell a column index honoring rowspan holes and
 // discovers the column count. Returns the placed cells and nCols.
 func placeTableCells(rows [][]*html.Node) ([]tcell, int) {
-	var placed []tcell
+	placed := make([]tcell, 0, tableCellCount(rows))
 
 	nRows := len(rows)
 	occupied := make([][]int, nRows) // per-row remaining coverage counts
 	nCols := 0
+	var rowCols int
 
 	for rowI, runic := range rows {
 		if occupied[rowI] == nil {
 			occupied[rowI] = make([]int, nCols)
 		}
 
-		rowPlaced, rowCols := placeRowCells(occupied, rowI, runic, nRows)
-		placed = append(placed, rowPlaced...)
+		placed, rowCols = placeRowCells(occupied, rowI, runic, nRows, placed)
 
 		if rowCols > nCols {
 			nCols = rowCols
@@ -2965,10 +2965,23 @@ func placeTableCells(rows [][]*html.Node) ([]tcell, int) {
 	return placed, nCols
 }
 
-// placeRowCells assigns one row's cells to columns, honoring rowspan holes.
-func placeRowCells(occupied [][]int, rowI int, runic []*html.Node, nRows int) ([]tcell, int) {
-	placed := make([]tcell, 0, len(runic))
+func tableCellCount(rows [][]*html.Node) int {
+	count := 0
+	for _, row := range rows {
+		count += len(row)
+	}
 
+	return count
+}
+
+// placeRowCells assigns one row's cells to columns, honoring rowspan holes.
+func placeRowCells(
+	occupied [][]int,
+	rowI int,
+	runic []*html.Node,
+	nRows int,
+	placed []tcell,
+) ([]tcell, int) {
 	nCols := 0
 	cidx := 0
 
@@ -4328,15 +4341,20 @@ func (e *engine) layoutCell(n *html.Node, sty ResolvedStyle, width float64) floa
 }
 
 func colSpan(n *html.Node) int {
-	if v, err := strconv.Atoi(strings.TrimSpace(n.Attribute("colspan"))); err == nil && v > 1 {
-		return v
-	}
-
-	return 1
+	return tableSpan(n.Attribute("colspan"))
 }
 
 func cellRowSpan(n *html.Node) int {
-	if v, err := strconv.Atoi(strings.TrimSpace(n.Attribute("rowspan"))); err == nil && v > 1 {
+	return tableSpan(n.Attribute("rowspan"))
+}
+
+func tableSpan(value string) int {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 1
+	}
+
+	if v, err := strconv.Atoi(value); err == nil && v > 1 {
 		return v
 	}
 

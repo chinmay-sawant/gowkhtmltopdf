@@ -674,6 +674,7 @@ func outlineCount(root *Outline) int {
 // and missing glyphs (e.g. "·" as "\302\267").
 func pdfString(s string) string {
 	var buf strings.Builder
+	buf.Grow(len(s) + 2)
 
 	buf.WriteByte('(')
 

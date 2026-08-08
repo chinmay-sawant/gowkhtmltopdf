@@ -178,8 +178,11 @@ func openElement(stack *[]*Node, tokItem token) {
 	autoCloseOpen(stack, name)
 
 	top := (*stack)[len(*stack)-1]
-	node := &Node{Type: ElementNode, Name: name, Attrs: map[string]string{}} //nolint:exhaustruct
-	applyAttributes(node, tokItem.attrs)
+	node := &Node{Type: ElementNode, Name: name} //nolint:exhaustruct
+	if len(tokItem.attrs) > 0 {
+		node.Attrs = make(map[string]string, len(tokItem.attrs)/2)
+		applyAttributes(node, tokItem.attrs)
+	}
 	top.Children = append(top.Children, node)
 	node.Parent = top
 

@@ -825,12 +825,41 @@ func capTableMaxPage(res *Result, contentH float64) int {
 func collectTableBorderSegments(res *Result) ([]vseg, []hseg, map[int][]vseg, map[int][]vseg, map[int][]hseg) {
 	verts, horiz := collectBorderSegmentOps(res.Ops)
 
-	// Pre-size maps from segment count so rehash churn stays low on table-
-	// heavy multi-page documents (each row contributes several segments).
-	estY := len(verts)/2 + len(horiz)/4 + 8
-	vertStarts := make(map[int][]vseg, estY)
-	vertEnds := make(map[int][]vseg, estY)
-	horizByY := make(map[int][]hseg, estY)
+	// Count each rounded-Y bucket first so the segment slices grow once. A
+	// table-heavy document has many repeated Y keys; appending directly to the
+	// maps makes each bucket repeatedly reallocate as rows accumulate.
+	startCounts := make(map[int]int)
+	endCounts := make(map[int]int)
+	horizCounts := make(map[int]int)
+
+	for i := range verts {
+		v := verts[i]
+		k0, k1 := roundY(v.y0), roundY(v.y1)
+		startCounts[k0]++
+		endCounts[k1]++
+	}
+
+	for i := range horiz {
+		h := horiz[i]
+		ky := roundY(h.y)
+		horizCounts[ky]++
+	}
+
+	vertStarts := make(map[int][]vseg, len(startCounts))
+	vertEnds := make(map[int][]vseg, len(endCounts))
+	horizByY := make(map[int][]hseg, len(horizCounts))
+
+	for key, count := range startCounts {
+		vertStarts[key] = make([]vseg, 0, count)
+	}
+
+	for key, count := range endCounts {
+		vertEnds[key] = make([]vseg, 0, count)
+	}
+
+	for key, count := range horizCounts {
+		horizByY[key] = make([]hseg, 0, count)
+	}
 
 	for i := range verts {
 		v := verts[i]
@@ -904,13 +933,12 @@ func roundY(y float64) int { return int(math.Round(y * two)) }
 
 // clusterVerticals merges vertical segments sharing a start (byStart) or end
 // Y into clusters with the min/max x and dominant stroke.
-func clusterVerticals(vertStarts, vertEnds map[int][]vseg, byStart bool) map[int]*borderCluster {
-	out := map[int]*borderCluster{}
-
+func clusterVerticals(vertStarts, vertEnds map[int][]vseg, byStart bool) map[int]borderCluster {
 	groups := vertStarts
 	if !byStart {
 		groups = vertEnds
 	}
+	out := make(map[int]borderCluster, len(groups))
 
 	for _, group := range groups {
 		for _, val := range group {
@@ -921,10 +949,9 @@ func clusterVerticals(vertStarts, vertEnds map[int][]vseg, byStart bool) map[int
 
 			k := roundY(keyY)
 
-			child := out[k]
-			if child == nil {
-				child = &borderCluster{y: keyY, minX: val.x, maxX: val.x, bw: val.w, r: val.r, g: val.g, b: val.b, n: 1}
-				out[k] = child
+			child, ok := out[k]
+			if !ok {
+				out[k] = borderCluster{y: keyY, minX: val.x, maxX: val.x, bw: val.w, r: val.r, g: val.g, b: val.b, n: 1}
 
 				continue
 			}
@@ -939,6 +966,7 @@ func clusterVerticals(vertStarts, vertEnds map[int][]vseg, byStart bool) map[int
 			}
 			// Prefer average y so we sit on the dominant edge.
 			child.y = (child.y*float64(child.n-1) + keyY) / float64(child.n)
+			out[k] = child
 		}
 	}
 
@@ -1274,7 +1302,7 @@ func splitCrossingRects(res *Result, contentH float64, opPage []int) {
 			continue
 		}
 
-		out = append(out, splitOpFragments(paintOp, contentH)...)
+		out = appendOpFragments(out, paintOp, contentH)
 		spans[idx] = opSpan{start: start, end: len(out) - 1}
 	}
 
@@ -1301,19 +1329,16 @@ func assignOpIDs(res *Result) {
 	}
 }
 
-// splitOpFragments truncates one splittable rect at each page boundary and
-// returns the fragments in document paint order.
-func splitOpFragments(paintOp Op, contentH float64) []Op {
-	var frags []Op
-
+// appendOpFragments truncates one splittable rect at each page boundary and
+// appends the fragments in document paint order. Keeping the destination
+// owned by splitCrossingRects avoids one temporary slice allocation per op.
+func appendOpFragments(dst []Op, paintOp Op, contentH float64) []Op {
 	guard := 0
 	for paintOp.H > 1e-9 {
 		guard++
 		if guard > paginationGuardMax {
 			// Defensive: never hang the paint pipeline.
-			frags = append(frags, paintOp)
-
-			break
+			return append(dst, paintOp)
 		}
 		// Epsilon bump so Y exactly on a page top maps to that page, not
 		// the previous one (int truncates 52.0-ε down to 51).
@@ -1324,9 +1349,7 @@ func splitOpFragments(paintOp Op, contentH float64) []Op {
 
 		boundary := float64(page+1) * contentH
 		if paintOp.Y+paintOp.H <= boundary+1e-9 {
-			frags = append(frags, paintOp)
-
-			break
+			return append(dst, paintOp)
 		}
 
 		firstH := boundary - paintOp.Y
@@ -1339,12 +1362,21 @@ func splitOpFragments(paintOp Op, contentH float64) []Op {
 
 		frag := paintOp
 		frag.H = firstH
-		frags = append(frags, frag)
+		dst = append(dst, frag)
 		paintOp.Y = boundary
 		paintOp.H -= firstH
 	}
 
-	return frags
+	return dst
+}
+
+// splitOpFragments truncates one splittable rect at each page boundary and
+// returns the fragments in document paint order. It remains as a small
+// compatibility helper for focused tests; the production path appends into
+// the display-list destination directly via appendOpFragments.
+func splitOpFragments(paintOp Op, contentH float64) []Op {
+	var frags []Op
+	return appendOpFragments(frags, paintOp, contentH)
 }
 
 // remapBoxOpRanges updates the layout-owned operation ranges after a display

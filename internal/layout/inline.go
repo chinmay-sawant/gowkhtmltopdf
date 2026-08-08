@@ -1021,27 +1021,36 @@ func (e *engine) emitInlineText(
 		descent = size * descentRatio
 	}
 
-	runs := e.splitTextByFace(item.text, *item.style)
 	runStart := leftX
 
 	var runSpan float64
 
-	for _, run := range runs {
-		e.add(Op{ //nolint:exhaustruct // intentional zero fields
-			Kind: OpText, X: leftX, Y: baseline, W: run.w, H: item.h,
-			Text: run.text, Font: run.face, Size: size, Bold: item.style.FontWeight >= fontWeightBold,
-			R: child[0], G: child[1], B: child[2],
-		})
-
-		if item.href != "" {
-			e.add(Op{ //nolint:exhaustruct // intentional zero fields
-				Kind: OpLinkURI, X: leftX, Y: baseline - ascent, W: run.w,
-				H: ascent + descent, URI: item.href,
-			})
-		}
-
+	if run, ok := e.primaryFaceRun(item.text, *item.style); ok {
+		e.emitInlineTextRun(
+			item,
+			run,
+			leftX,
+			baseline,
+			size,
+			ascent,
+			descent,
+		)
 		leftX += run.w
-		runSpan += run.w
+		runSpan = run.w
+	} else {
+		for _, run := range e.splitTextByFace(item.text, *item.style) {
+			e.emitInlineTextRun(
+				item,
+				run,
+				leftX,
+				baseline,
+				size,
+				ascent,
+				descent,
+			)
+			leftX += run.w
+			runSpan += run.w
+		}
 	}
 	// Decoration: one stroke per logical link run on this line (not per
 	// face-run / nested style chunk). Thin stroke ~5% em, clamped for
@@ -1057,6 +1066,26 @@ func (e *engine) emitInlineText(
 	}
 
 	return leftX
+}
+
+func (e *engine) emitInlineTextRun(
+	item *inlineItem,
+	run faceRun,
+	leftX, baseline, size, ascent, descent float64,
+) {
+	child := item.style.Color
+	e.add(Op{ //nolint:exhaustruct // intentional zero fields
+		Kind: OpText, X: leftX, Y: baseline, W: run.w, H: item.h,
+		Text: run.text, Font: run.face, Size: size, Bold: item.style.FontWeight >= fontWeightBold,
+		R: child[0], G: child[1], B: child[2],
+	})
+
+	if item.href != "" {
+		e.add(Op{ //nolint:exhaustruct // intentional zero fields
+			Kind: OpLinkURI, X: leftX, Y: baseline - ascent, W: run.w,
+			H: ascent + descent, URI: item.href,
+		})
+	}
 }
 
 // paintDecoration draws the underline / line-through strokes for one text
@@ -1938,21 +1967,17 @@ func (e *engine) splitTextByFace(cssSheet string, sty ResolvedStyle) []faceRun {
 		return nil
 	}
 
-	size := sty.FontSize * e.scale
-	primary := e.faceFor(sty)
-
-	if primary == nil {
-		primary = e.font
-	}
+	primaryRun, allPrimary := e.primaryFaceRun(cssSheet, sty)
 	// Fast path: every non-whitespace glyph is on the primary face (typical
 	// for Latin). One faceFor + per-rune GlyphID, single output run.
-	if faceRunAllPrimary(cssSheet, primary) {
-		var width float64
-		for _, runic := range cssSheet {
-			width += primary.AdvanceInPoints(runic, size)
-		}
+	if allPrimary {
+		return []faceRun{primaryRun}
+	}
 
-		return []faceRun{{text: cssSheet, face: primary, w: width}}
+	size := sty.FontSize * e.scale
+	primary := e.faceFor(sty)
+	if primary == nil {
+		primary = e.font
 	}
 
 	runs := make([]faceRun, 0, 1)
@@ -2000,6 +2025,29 @@ func (e *engine) splitTextByFace(cssSheet string, sty ResolvedStyle) []faceRun {
 	}
 
 	return runs
+}
+
+func (e *engine) primaryFaceRun(cssSheet string, sty ResolvedStyle) (faceRun, bool) {
+	if cssSheet == "" {
+		return faceRun{}, false
+	}
+
+	primary := e.faceFor(sty)
+	if primary == nil {
+		primary = e.font
+	}
+
+	if !faceRunAllPrimary(cssSheet, primary) {
+		return faceRun{}, false
+	}
+
+	size := sty.FontSize * e.scale
+	var width float64
+	for _, runic := range cssSheet {
+		width += primary.AdvanceInPoints(runic, size)
+	}
+
+	return faceRun{text: cssSheet, face: primary, w: width}, true
 }
 
 // faceRunAllPrimary reports that every non-whitespace rune in s is covered by

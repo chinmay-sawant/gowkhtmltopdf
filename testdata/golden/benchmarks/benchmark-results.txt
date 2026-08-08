@@ -3,7 +3,7 @@
 #   go test ./internal/convert -run '^$' -bench 'Benchmark(PDFPages|TemplatePages)$' -benchmem -benchtime=1x -count=1
 # Locked 500 PDF bar: 2.10s / 1.48GB / 3.93M allocs
 # Separate locked-gate command: go test -run '^$' -bench '^BenchmarkPDFPages/500Pages$' -benchmem -benchtime=1x -count=3
-# 500 PDF count-3 median after wave: 1.643s / 1.225GB / 3.196M allocs
+# 500 PDF count-3 median after wave: 1.628s / 678.8MB / 1.103M allocs
 # Toolchain: go1.26.4 linux/amd64 · Host: WSL2 24 CPUs · i7-13700HX
 
 goos: linux
@@ -11,24 +11,24 @@ goarch: amd64
 pkg: gowkhtmltopdf/internal/convert
 cpu: 13th Gen Intel(R) Core(TM) i7-13700HX
 # PDF/Template after the profile-guided residual optimization wave.
-BenchmarkPDFPages/2Pages-24  	       1	   6384732 ns/op	   4.51 MB/s	 5790176 B/op	    9907 allocs/op
-BenchmarkPDFPages/5Pages-24  	       1	   9130160 ns/op	   6.43 MB/s	 9120376 B/op	   22835 allocs/op
-BenchmarkPDFPages/10Pages-24 	       1	  18613517 ns/op	   5.84 MB/s	17284928 B/op	   44740 allocs/op
-BenchmarkPDFPages/20Pages-24 	       1	  35971880 ns/op	   5.61 MB/s	33819872 B/op	   88258 allocs/op
-BenchmarkPDFPages/50Pages-24 	       1	  97278748 ns/op	   4.51 MB/s	82919712 B/op	  217247 allocs/op
-BenchmarkPDFPages/100Pages-24         	       1	 200987965 ns/op	   3.37 MB/s	159652184 B/op	  425699 allocs/op
-BenchmarkPDFPages/200Pages-24         	       1	 430605909 ns/op	   2.83 MB/s	317396464 B/op	  846353 allocs/op
-BenchmarkPDFPages/250Pages-24         	       1	 504320119 ns/op	   2.95 MB/s	396147640 B/op	 1056875 allocs/op
-BenchmarkPDFPages/500Pages-24         	       1	1611944433 ns/op	   1.56 MB/s	1224322464 B/op	 3196039 allocs/op
-BenchmarkTemplatePages/2Pages-24      	       1	   3707641 ns/op	   7.77 MB/s	 4294968 B/op	    9896 allocs/op
-BenchmarkTemplatePages/5Pages-24      	       1	   9303881 ns/op	   6.31 MB/s	 9192152 B/op	   23360 allocs/op
-BenchmarkTemplatePages/10Pages-24     	       1	  18249226 ns/op	   5.96 MB/s	17428128 B/op	   45767 allocs/op
-BenchmarkTemplatePages/20Pages-24     	       1	  36603829 ns/op	   5.52 MB/s	34927880 B/op	   90336 allocs/op
-BenchmarkTemplatePages/50Pages-24     	       1	 105692106 ns/op	   4.15 MB/s	82665080 B/op	  222297 allocs/op
-BenchmarkTemplatePages/100Pages-24    	       1	 213310214 ns/op	   3.18 MB/s	161556608 B/op	  435909 allocs/op
-BenchmarkTemplatePages/200Pages-24    	       1	 405919510 ns/op	   3.00 MB/s	319717848 B/op	  866721 allocs/op
-BenchmarkTemplatePages/250Pages-24    	       1	 533189891 ns/op	   2.79 MB/s	398311592 B/op	 1082381 allocs/op
-BenchmarkTemplatePages/500Pages-24    	       1	1626368991 ns/op	   1.55 MB/s	1229833712 B/op	 3247322 allocs/op
+BenchmarkPDFPages/2Pages-24  	       1	   6657852 ns/op	   4.33 MB/s	 3767496 B/op	    5075 allocs/op
+BenchmarkPDFPages/5Pages-24  	       1	  11614599 ns/op	   5.06 MB/s	 6107328 B/op	   10928 allocs/op
+BenchmarkPDFPages/10Pages-24 	       1	  22182020 ns/op	   4.90 MB/s	11285992 B/op	   20970 allocs/op
+BenchmarkPDFPages/20Pages-24 	       1	  41082993 ns/op	   4.92 MB/s	21830240 B/op	   40768 allocs/op
+BenchmarkPDFPages/50Pages-24 	       1	 114566265 ns/op	   3.83 MB/s	52768184 B/op	   98585 allocs/op
+BenchmarkPDFPages/100Pages-24         	       1	 248962639 ns/op	   2.72 MB/s	100919816 B/op	  188179 allocs/op
+BenchmarkPDFPages/200Pages-24         	       1	 481444251 ns/op	   2.53 MB/s	200081760 B/op	  370373 allocs/op
+BenchmarkPDFPages/250Pages-24         	       1	 590165606 ns/op	   2.52 MB/s	248902672 B/op	  461490 allocs/op
+BenchmarkPDFPages/500Pages-24         	       1	1903482150 ns/op	   1.32 MB/s	678645808 B/op	 1102840 allocs/op
+BenchmarkTemplatePages/2Pages-24      	       1	   5238716 ns/op	   5.50 MB/s	 3099472 B/op	    5099 allocs/op
+BenchmarkTemplatePages/5Pages-24      	       1	   9235655 ns/op	   6.36 MB/s	 6178672 B/op	   11446 allocs/op
+BenchmarkTemplatePages/10Pages-24     	       1	  18619190 ns/op	   5.84 MB/s	11423760 B/op	   21992 allocs/op
+BenchmarkTemplatePages/20Pages-24     	       1	  48513911 ns/op	   4.16 MB/s	22118192 B/op	   42823 allocs/op
+BenchmarkTemplatePages/50Pages-24     	       1	 117083200 ns/op	   3.75 MB/s	53277168 B/op	  103675 allocs/op
+BenchmarkTemplatePages/100Pages-24    	       1	 223408911 ns/op	   3.03 MB/s	102045520 B/op	  198369 allocs/op
+BenchmarkTemplatePages/200Pages-24    	       1	 458802353 ns/op	   2.65 MB/s	202423160 B/op	  390765 allocs/op
+BenchmarkTemplatePages/250Pages-24    	       1	 588033962 ns/op	   2.53 MB/s	251061912 B/op	  486984 allocs/op
+BenchmarkTemplatePages/500Pages-24    	       1	1693149654 ns/op	   1.49 MB/s	683490784 B/op	 1154097 allocs/op
 BenchmarkWebFetchImage/2Images-24     	       1	 257331813 ns/op	   0.04 MB/s	   5952576 B/op	   57314 allocs/op
 BenchmarkWebFetchImage/5Images-24     	       1	 258052625 ns/op	   0.05 MB/s	   6845392 B/op	  140716 allocs/op
 BenchmarkWebFetchImage/10Images-24    	       1	 281101386 ns/op	   0.05 MB/s	   8351296 B/op	  279772 allocs/op

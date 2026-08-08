@@ -4,6 +4,8 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"gowkhtmltopdf/internal/css"
 	"gowkhtmltopdf/internal/html"
@@ -219,6 +221,11 @@ func initialStyle() ResolvedStyle {
 	}
 }
 
+// defaultTextStyle covers a text node without an element parent. Ordinary
+// text nodes reuse their parent's style because text has no declarations of
+// its own and the inline layout path only consumes inherited text properties.
+var defaultTextStyle = initialStyle() //nolint:gochecknoglobals // immutable text default
+
 // styleContext carries per-element resolution inputs.
 type styleContext struct {
 	sheets    []*css.Stylesheet
@@ -236,6 +243,10 @@ type styleContext struct {
 	// ruleHits is reused between sequential cascade lookups. A lookup consumes
 	// the returned slice before the next element is resolved.
 	ruleHits []ruleHit
+	// Cascade maps are reused between sequential element lookups. Their values
+	// are consumed before the next element is resolved.
+	cascadeWins  map[string]cascadeWin
+	cascadeProps map[string]string
 }
 
 // sizeContainer is one element that establishes a size query container.
@@ -302,7 +313,17 @@ func resolveStylesWithContainers(
 }
 
 func resolveStylesCtx(root *html.Node, ctx *styleContext) map[*html.Node]*ResolvedStyle {
-	out := map[*html.Node]*ResolvedStyle{}
+	nodeCount, styleCount := countStyleSlots(root)
+	out := make(map[*html.Node]*ResolvedStyle, nodeCount)
+	styles := make([]ResolvedStyle, styleCount)
+	nextStyle := 0
+
+	nextResolvedStyle := func() *ResolvedStyle {
+		style := &styles[nextStyle]
+		nextStyle++
+
+		return style
+	}
 
 	var walk func(n *html.Node, parent *ResolvedStyle)
 	walk = func(node *html.Node, parent *ResolvedStyle) {
@@ -310,15 +331,13 @@ func resolveStylesCtx(root *html.Node, ctx *styleContext) map[*html.Node]*Resolv
 
 		switch node.Type {
 		case html.ElementNode:
-			s := resolveElementStyle(node, ctx, parent)
-			sty = &s
+			sty = nextResolvedStyle()
+			resolveElementStyle(node, ctx, parent, sty)
 		case html.TextNode:
-			s := initialStyle()
-			if parent != nil {
-				inheritProps(&s, parent, nil)
-				s.CustomProps = parent.CustomProps
+			sty = parent
+			if sty == nil {
+				sty = &defaultTextStyle
 			}
-			sty = &s
 		case html.CommentNode, html.DoctypeNode:
 			// No style resolution; store a shared zero so map lookups stay non-nil.
 			sty = &zeroResolvedStyle
@@ -326,21 +345,12 @@ func resolveStylesCtx(root *html.Node, ctx *styleContext) map[*html.Node]*Resolv
 
 		out[node] = sty
 
-		// Direct text-node styles are immutable during layout, so adjacent text
-		// nodes can share one inherited value without changing element styles.
-		var textStyle *ResolvedStyle
+		// Text nodes have no declarations of their own. Pointing them at the
+		// already-resolved parent avoids allocating another full style copy per
+		// text-bearing element while preserving inherited text properties.
 		for _, c := range node.Children {
 			if c.Type == html.TextNode {
-				if textStyle == nil {
-					s := initialStyle()
-					if sty != nil {
-						inheritProps(&s, sty, nil)
-						s.CustomProps = sty.CustomProps
-					}
-					textStyle = &s
-				}
-
-				out[c] = textStyle
+				out[c] = sty
 
 				continue
 			}
@@ -353,19 +363,51 @@ func resolveStylesCtx(root *html.Node, ctx *styleContext) map[*html.Node]*Resolv
 	return out
 }
 
+// countStyleSlots counts the nodes needed for the result map and the element
+// ResolvedStyle values that will live in one stable backing array. Text nodes
+// point at their parent style and therefore consume no style slots.
+func countStyleSlots(root *html.Node) (nodeCount, styleCount int) {
+	var walk func(*html.Node)
+	walk = func(node *html.Node) {
+		nodeCount++
+
+		switch node.Type {
+		case html.ElementNode:
+			styleCount++
+		}
+
+		for _, child := range node.Children {
+			if child.Type == html.TextNode {
+				nodeCount++
+
+				continue
+			}
+
+			walk(child)
+		}
+
+	}
+
+	walk(root)
+
+	return nodeCount, styleCount
+}
+
 // zeroResolvedStyle is the empty style for comment/doctype nodes (shared).
 var zeroResolvedStyle ResolvedStyle //nolint:gochecknoglobals // immutable zero sentinel
 
 // resolveElementStyle cascades one element: inheritance, custom properties,
 // fonts, the remaining properties, and the operator/blockify policies.
-func resolveElementStyle(node *html.Node, ctx *styleContext, parent *ResolvedStyle) ResolvedStyle {
+func resolveElementStyle(
+	node *html.Node, ctx *styleContext, parent, sty *ResolvedStyle,
+) {
 	raw := cascadeRaw(ctx, node)
-	sty := initialStyle()
+	*sty = initialStyle()
 
 	var parentProps map[string]string
 
 	if parent != nil {
-		inheritProps(&sty, parent, raw)
+		inheritProps(sty, parent, raw)
 		parentProps = parent.CustomProps
 	}
 
@@ -377,13 +419,13 @@ func resolveElementStyle(node *html.Node, ctx *styleContext, parent *ResolvedSty
 		parentSize = parent.FontSize
 	}
 
-	applyFontProps(&sty, raw, parentSize, ctx)
+	applyFontProps(sty, raw, parentSize, ctx)
 
 	if node.Name == "html" && sty.FontSize > 0 {
 		ctx.remBase = sty.FontSize
 	}
 
-	applyRestProps(&sty, raw, ctx, parent)
+	applyRestProps(sty, raw, ctx, parent)
 	// Opt-in operator policy (--print-link-underline): underline
 	// anchors with href after the cascade. Default off — author CSS
 	// (including text-decoration: inherit → parent) wins otherwise.
@@ -396,17 +438,19 @@ func resolveElementStyle(node *html.Node, ctx *styleContext, parent *ResolvedSty
 	if sty.Float != cssDisplayNone {
 		sty.Display = blockifyDisplayForFloat(sty.Display)
 	}
-
-	return sty
 }
 
 // mergeCustomProps inherits parent custom properties and overlays any --*
 // declarations from raw, resolving var() chains via css.ResolveCustomProps.
 func mergeCustomProps(parentProps map[string]string, raw map[string]string) map[string]string {
-	declared := map[string]string{}
+	var declared map[string]string
 
 	for prop, v := range raw {
 		if strings.HasPrefix(prop, "--") {
+			if declared == nil {
+				declared = make(map[string]string)
+			}
+
 			declared[prop] = v
 		}
 	}
@@ -697,7 +741,18 @@ type cascadeWin struct {
 // across UA sheet, author sheets and the inline style attribute.
 // Uses one winner map (value+spec+order+important) instead of six maps.
 func cascadeRaw(ctx *styleContext, node *html.Node) map[string]string {
-	wins := make(map[string]cascadeWin, cascadeWinHint)
+	var wins map[string]cascadeWin
+	if ctx == nil {
+		wins = make(map[string]cascadeWin, cascadeWinHint)
+	} else {
+		wins = ctx.cascadeWins
+		if wins == nil {
+			wins = make(map[string]cascadeWin, cascadeWinHint)
+			ctx.cascadeWins = wins
+		} else {
+			clear(wins)
+		}
+	}
 
 	// UA sheet (lowest priority; specificity 0, order -1)
 	for _, d := range uaRules(node.Name) {
@@ -721,10 +776,26 @@ func cascadeRaw(ctx *styleContext, node *html.Node) map[string]string {
 	}
 
 	if len(wins) == 0 {
+		if ctx != nil && ctx.cascadeProps != nil {
+			clear(ctx.cascadeProps)
+		}
+
 		return nil
 	}
 
-	out := make(map[string]string, len(wins))
+	var out map[string]string
+	if ctx == nil {
+		out = make(map[string]string, len(wins))
+	} else {
+		out = ctx.cascadeProps
+		if out == nil {
+			out = make(map[string]string, len(wins))
+			ctx.cascadeProps = out
+		} else {
+			clear(out)
+		}
+	}
+
 	for prop, w := range wins {
 		out[prop] = w.value
 	}
@@ -1753,19 +1824,55 @@ func applyColorBackgroundProps(style *ResolvedStyle, prop, value string) bool {
 			style.BGColor = [4]float64{float64(r) / 255, float64(g) / 255, float64(b) / 255, a}
 		}
 	case "background":
-		// Shorthand: take the first parseable color token (ignore images/repeat).
-		for _, tok := range strings.Fields(value) {
-			if r, g, b, a, ok := css.ParseColor(tok); ok {
-				style.BGColor = [4]float64{float64(r) / 255, float64(g) / 255, float64(b) / 255, a}
-
-				break
-			}
+		if r, g, b, a, ok := firstBackgroundColor(value); ok {
+			style.BGColor = [4]float64{float64(r) / 255, float64(g) / 255, float64(b) / 255, a}
 		}
 	default:
 		return false
 	}
 
 	return true
+}
+
+// firstBackgroundColor returns the first parseable color field in a
+// background shorthand without materializing strings.Fields. The full-value
+// fast path covers the common single-color shorthand; the scanner preserves
+// the previous field-by-field fallback for image/repeat tokens.
+func firstBackgroundColor(value string) (int, int, int, float64, bool) {
+	if r, g, b, a, ok := css.ParseColor(value); ok {
+		return r, g, b, a, true
+	}
+
+	for start := 0; start < len(value); {
+		for start < len(value) {
+			runeValue, size := utf8.DecodeRuneInString(value[start:])
+			if !unicode.IsSpace(runeValue) {
+				break
+			}
+
+			start += size
+		}
+
+		end := start
+		for end < len(value) {
+			runeValue, size := utf8.DecodeRuneInString(value[end:])
+			if unicode.IsSpace(runeValue) {
+				break
+			}
+
+			end += size
+		}
+
+		if start < end {
+			if r, g, b, a, ok := css.ParseColor(value[start:end]); ok {
+				return r, g, b, a, true
+			}
+		}
+
+		start = end
+	}
+
+	return 0, 0, 0, 0, false
 }
 
 // applyTextGroup handles typography and list props.
@@ -2307,10 +2414,11 @@ func parseFlexThree(style *ResolvedStyle, parts []string, fontSize, pctBase floa
 
 // setFourMargin applies a margin shorthand and tracks horizontal auto.
 func setFourMargin(sty *ResolvedStyle, value string, fsize, ctxW float64) {
-	val := strings.Fields(value)
+	var val [4]string
+	count := splitSpaceTokens(value, val[:])
 	sty.MarginLeftAuto, sty.MarginRightAuto = false, false
 
-	switch len(val) {
+	switch count {
 	case 0:
 		return
 	case 1:
@@ -2337,19 +2445,20 @@ func setFourMargin(sty *ResolvedStyle, value string, fsize, ctxW float64) {
 }
 
 func setFour(_ *ResolvedStyle, value string, top, right, bottom, left *float64, fsVal, ctxW float64) {
-	val := strings.Fields(value)
-	if len(val) == 0 {
+	var val [4]string
+	count := splitSpaceTokens(value, val[:])
+	if count == 0 {
 		return
 	}
 
-	if len(val) == 1 {
+	if count == 1 {
 		*top = marginLen(val[0], fsVal, ctxW)
 		*right, *bottom, *left = *top, *top, *top
 
 		return
 	}
 
-	if len(val) == two {
+	if count == two {
 		*top = marginLen(val[0], fsVal, ctxW)
 		*right = marginLen(val[1], fsVal, ctxW)
 		*bottom, *left = *top, *right
@@ -2357,7 +2466,7 @@ func setFour(_ *ResolvedStyle, value string, top, right, bottom, left *float64, 
 		return
 	}
 
-	if len(val) == three {
+	if count == three {
 		*top = marginLen(val[0], fsVal, ctxW)
 		*right = marginLen(val[1], fsVal, ctxW)
 		*bottom = marginLen(val[2], fsVal, ctxW)
@@ -2375,7 +2484,12 @@ func setFour(_ *ResolvedStyle, value string, top, right, bottom, left *float64, 
 func parseBorder(value string, _ float64) (border, bool) {
 	var boxNode border
 
-	for _, face := range strings.Fields(value) {
+	for start := 0; ; {
+		face, next, ok := nextSpaceToken(value, start)
+		if !ok {
+			break
+		}
+
 		switch face {
 		case "solid", "dashed", "dotted":
 			boxNode.Style = face
@@ -2388,6 +2502,8 @@ func parseBorder(value string, _ float64) (border, bool) {
 				boxNode.Width = v
 			}
 		}
+
+		start = next
 	}
 
 	if boxNode.Style == "" {
@@ -2399,6 +2515,46 @@ func parseBorder(value string, _ float64) (border, bool) {
 	}
 
 	return boxNode, boxNode.Style != cssDisplayNone
+}
+
+// splitSpaceTokens writes up to len(tokens) CSS whitespace-separated tokens
+// into tokens and returns the actual token count. Counts above the capacity
+// preserve strings.Fields' len>4 behavior without allocating a larger slice.
+func splitSpaceTokens(value string, tokens []string) int {
+	count := 0
+	for start := 0; ; {
+		token, next, ok := nextSpaceToken(value, start)
+		if !ok {
+			return count
+		}
+
+		if count < len(tokens) {
+			tokens[count] = token
+		}
+
+		count++
+		start = next
+	}
+}
+
+func nextSpaceToken(value string, start int) (string, int, bool) {
+	for start < len(value) && isCSSSpace(value[start]) {
+		start++
+	}
+	if start == len(value) {
+		return "", start, false
+	}
+
+	end := start
+	for end < len(value) && !isCSSSpace(value[end]) {
+		end++
+	}
+
+	return value[start:end], end, true
+}
+
+func isCSSSpace(value byte) bool {
+	return value == ' ' || value == '\t' || value == '\n' || value == '\v' || value == '\f' || value == '\r'
 }
 
 func borderWidth(value string, _ float64) float64 {

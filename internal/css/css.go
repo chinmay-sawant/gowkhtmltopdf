@@ -14,6 +14,8 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"gowkhtmltopdf/internal/html"
 )
@@ -1211,9 +1213,8 @@ func hasClasses(part SelectorPart, node *html.Node) bool {
 		return true
 	}
 
-	classes := classSet(node)
 	for _, c := range part.Classes {
-		if !classes[c] {
+		if !hasClassToken(node.Attribute("class"), c) {
 			return false
 		}
 	}
@@ -1506,28 +1507,72 @@ func parseAnPlusB(arg string) (int, int, bool) {
 	return specA, specB, true
 }
 
-// classSet returns the class tokens of n. Match() calls this once per selector
-// probe; a single-node cache avoids rebuilding the map for every selector on
-// the same element during cascade (hot on large documents).
-var (
-	classSetNode *html.Node       //nolint:gochecknoglobals // single-threaded cascade cache
-	classSetCached map[string]bool //nolint:gochecknoglobals // single-threaded cascade cache
-)
-
-func classSet(n *html.Node) map[string]bool {
-	if n == classSetNode && classSetCached != nil {
-		return classSetCached
+// hasClassToken reports whether want is one whitespace-separated class token.
+// The ASCII path covers HTML/CSS's normal class syntax without allocating a
+// token slice or map. Non-ASCII whitespace falls back to the same Unicode
+// whitespace behavior previously provided by strings.Fields.
+func hasClassToken(value, want string) bool {
+	if want == "" {
+		return false
 	}
 
-	set := map[string]bool{}
-	for _, c := range strings.Fields(n.Attribute("class")) {
-		set[c] = true
+	for start := 0; start < len(value); {
+		for start < len(value) && isClassSpace(value[start]) {
+			start++
+		}
+
+		end := start
+		for end < len(value) && !isClassSpace(value[end]) {
+			if value[end] >= 0x80 {
+				return hasUnicodeClassToken(value, want)
+			}
+
+			end++
+		}
+
+		if start < end && value[start:end] == want {
+			return true
+		}
+
+		start = end
 	}
 
-	classSetNode = n
-	classSetCached = set
+	return false
+}
 
-	return set
+func hasUnicodeClassToken(value, want string) bool {
+	for start := 0; start < len(value); {
+		for start < len(value) {
+			runeValue, size := utf8.DecodeRuneInString(value[start:])
+			if !unicode.IsSpace(runeValue) {
+				break
+			}
+
+			start += size
+		}
+
+		end := start
+		for end < len(value) {
+			runeValue, size := utf8.DecodeRuneInString(value[end:])
+			if unicode.IsSpace(runeValue) {
+				break
+			}
+
+			end += size
+		}
+
+		if start < end && value[start:end] == want {
+			return true
+		}
+
+		start = end
+	}
+
+	return false
+}
+
+func isClassSpace(value byte) bool {
+	return value == ' ' || value == '\t' || value == '\n' || value == '\v' || value == '\f' || value == '\r'
 }
 
 // Specificity returns (a, b, c): ID count, class/attribute/pseudo count, type count.
@@ -1580,6 +1625,10 @@ func ParseInline(style string) []Declaration {
 // parseDeclarations splits a declaration block on top-level ';' and parses
 // each "prop: value" pair. Garbage pairs are skipped.
 func parseDeclarations(block string) []Declaration {
+	if strings.TrimSpace(block) == "" {
+		return nil
+	}
+
 	parts := splitTopLevel(block, ';')
 	decls := make([]Declaration, 0, len(parts))
 
