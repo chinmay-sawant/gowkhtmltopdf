@@ -184,6 +184,58 @@ func benchmarkImages(count int, source string) []benchmarkImage {
 	return images
 }
 
+// tvMazeShowsWithPosters keeps shows that advertise a medium or original poster URL.
+func tvMazeShowsWithPosters(shows []tvMazeShow) []tvMazeShow {
+	out := make([]tvMazeShow, 0, len(shows))
+
+	for _, show := range shows {
+		if show.Image == nil {
+			continue
+		}
+
+		if show.Image.Medium == "" && show.Image.Original == "" {
+			continue
+		}
+
+		out = append(out, show)
+	}
+
+	return out
+}
+
+// posterURL returns the preferred TVmaze CDN poster URL for a show.
+func posterURL(show tvMazeShow) string {
+	if show.Image == nil {
+		return ""
+	}
+
+	if show.Image.Medium != "" {
+		return show.Image.Medium
+	}
+
+	return show.Image.Original
+}
+
+// benchmarkImagesFromShows builds image tiles whose Src is a real TVmaze CDN
+// poster URL (cycles through shows that have posters).
+func benchmarkImagesFromShows(shows []tvMazeShow, count int) []benchmarkImage {
+	posters := tvMazeShowsWithPosters(shows)
+	if len(posters) == 0 {
+		return benchmarkImages(count, "")
+	}
+
+	images := make([]benchmarkImage, count)
+	for i := range images {
+		show := posters[i%len(posters)]
+		images[i] = benchmarkImage{
+			Src:   posterURL(show),
+			Label: fmt.Sprintf("%s-%03d", show.Name, i+1),
+		}
+	}
+
+	return images
+}
+
 func fetchTVMazeShows(ctx context.Context, client *http.Client) ([]tvMazeShow, int, error) {
 	if client == nil {
 		client = &http.Client{Timeout: 30 * time.Second} //nolint:exhaustruct // intentional zero-value fields
@@ -481,7 +533,8 @@ func writeBenchmarkOutput(t *testing.T, name string, data []byte) {
 // TestGenerateBenchmarkOutputs materializes viewable artifacts for the same
 // workloads measured by the benchmarks. It is intentionally explicit so
 // normal go test runs do not write files or add filesystem work to timings.
-// The output directory is ignored by Git; run this test after benchmarking:
+// web-fetch-images-* use live TVmaze poster CDN URLs (network required).
+// Run after benchmarking:
 //
 //	GOWKHTMLTOPDF_GENERATE_BENCHMARK_OUTPUTS=1 go test ./internal/convert -run '^TestGenerateBenchmarkOutputs$' -count=1
 func TestGenerateBenchmarkOutputs(t *testing.T) { //nolint:cyclop,funlen // materializes several artifact kinds
@@ -533,41 +586,33 @@ func TestGenerateBenchmarkOutputs(t *testing.T) { //nolint:cyclop,funlen // mate
 		writeBenchmarkOutput(t, fmt.Sprintf("template-pages-%03d.pdf", pages), output.Bytes())
 	}
 
-	pngData := benchmarkPNG()
-	webTemplate := loadBenchmarkTemplate(t, "web-fetch-image.html.tmpl")
-	webSources := make(map[int][]byte, len(benchmarkPageSizes))
-
-	for _, images := range benchmarkPageSizes {
-		webSources[images] = executeBenchmarkTemplate(t, webTemplate, benchmarkTemplateData{ //nolint:exhaustruct,lll // intentional zero-value fields
-			Images:   benchmarkImages(images, "/benchmark-image.png"),
-			ImageSrc: "/benchmark-image.png",
-		})
+	// web-fetch-images-*: real TVmaze poster CDN URLs (public HTTPS), so the
+	// converter exercises the same remote image-fetch path as production. The
+	// timed BenchmarkWebFetchImage still uses a local httptest server so CI stays
+	// offline and deterministic.
+	shows := liveBenchmarkShows(t)
+	if len(tvMazeShowsWithPosters(shows)) == 0 {
+		t.Fatal("TVmaze returned no shows with poster images")
 	}
 
-	server := benchmarkImageServer(t, webSources, pngData)
-	defer server.Close()
+	webTemplate := loadBenchmarkTemplate(t, "web-fetch-image.html.tmpl")
 
 	for _, images := range benchmarkPageSizes {
+		source := executeBenchmarkTemplate(t, webTemplate, benchmarkTemplateData{ //nolint:exhaustruct,lll // intentional zero-value fields
+			Images: benchmarkImagesFromShows(shows, images),
+		})
+
 		var output bytes.Buffer
 
-		global := settings.DefaultPdfGlobal()
-		global.Quiet = true
-		object := settings.DefaultPdfObject()
-		object.Page = fmt.Sprintf("%s/document-%d.html", server.URL, images)
-
-		request := convert.NewImageRequest(
-			global,
-			settings.DefaultImageGlobal(),
-			[]settings.PdfObject{object},
-			&output,
-		)
+		request := benchmarkImageRequest(source, &output)
 		if err := imageout.RunRequest(t.Context(), request, io.Discard); err != nil {
-			t.Fatalf("generate web image output for %d images: %v", images, err)
+			t.Fatalf("generate web-fetch image output for %d images: %v", images, err)
 		}
 
 		writeBenchmarkOutput(t, fmt.Sprintf("web-fetch-images-%03d.png", images), output.Bytes())
 	}
 
+	pngData := benchmarkPNG()
 	imageTemplate := loadBenchmarkTemplate(t, "image-grid.html.tmpl")
 	imageURL := benchmarkDataURL(pngData)
 

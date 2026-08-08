@@ -79,16 +79,25 @@ is [`internal/convert/benchmarks_test.go`](../../../internal/convert/benchmarks_
 
 ## Local generated artifacts
 
-To save viewable PDF and PNG artifacts for every matrix size into the ignored
-`output/` directory, run:
+To save viewable PDF and PNG artifacts for every matrix size into
+`output/`, run (needs network for TVmaze poster CDN tiles):
 
 ```sh
 GOWKHTMLTOPDF_GENERATE_BENCHMARK_OUTPUTS=1 \
   go test ./internal/convert -run '^TestGenerateBenchmarkOutputs$' -count=1
 ```
 
-The files are named `pdf-pages-*.pdf`, `template-pages-*.pdf`,
-`web-fetch-images-*.png`, and `inline-images-*.png`.
+| Files | Source |
+|-------|--------|
+| `pdf-pages-*.pdf` | Local report template → PDF |
+| `template-pages-*.pdf` | Template execution + PDF |
+| `inline-images-*.png` | Synthetic PNG as `data:` URLs (offline) |
+| `web-fetch-images-*.png` | **Real TVmaze CDN poster URLs** fetched over HTTPS |
+| `live-movie-listing-010.*` | Live catalogue (separate test; see above) |
+
+Timed `BenchmarkWebFetchImage` still uses an in-process `httptest` server so
+CI remains offline and the recorded timing matrix stays reproducible. Artifact
+generation intentionally hits the public CDN so samples match real-world fetch.
 
 Run the focused benchmarks with:
 
