@@ -1,10 +1,16 @@
 # Generated benchmark snapshot
-# Command (PDF/Template residual optimization wave 2026-08-08, feature/optimization):
+# Command (PDF/Template residual optimization wave 2026-08-09, feature/optimization, aa8d446):
 #   go test ./internal/convert -run '^$' -bench 'Benchmark(PDFPages|TemplatePages)$' -benchmem -benchtime=1x -count=1
 # Locked 500 PDF bar: 2.10s / 1.48GB / 3.93M allocs
 # Separate locked-gate command: go test -run '^$' -bench '^BenchmarkPDFPages/500Pages$' -benchmem -benchtime=1x -count=3
 # 500 PDF count-3 median after wave: 1.628s / 678.8MB / 1.103M allocs
 # Toolchain: go1.26.4 linux/amd64 · Host: WSL2 24 CPUs · i7-13700HX
+# Original first snapshot: commit 2a0f18b, same one-iteration matrix command.
+# Original 500 PDF: 14.135s / 3798107576 B/op / 14345183 allocs/op.
+# Current 500 PDF versus that snapshot: -86.5% time / -82.1% B/op / -92.3% allocs.
+# Earlier wkhtmltopdf 0.12.6.1 process reference: 2.05s / ~114MB peak RSS / ~2.0MB PDF.
+# The wkhtmltopdf reference is process-level; Go B/op is cumulative allocation
+# traffic, so it must not be presented as a direct RSS comparison.
 
 goos: linux
 goarch: amd64

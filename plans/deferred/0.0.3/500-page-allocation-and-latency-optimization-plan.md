@@ -6,7 +6,7 @@
 > **Status:** **Closed** — residual optimization wave landed; hard gates green; 1 s/RSS residuals remain
 > **Branch:** `feature/optimization`  
 > **Created:** 2026-08-08  
-> **Last updated:** 2026-08-08 (residual cascade + display-list + inline/text wave)
+> **Last updated:** 2026-08-09 (publication comparison and wkhtmltopdf reference refresh)
 
 ---
 
@@ -22,7 +22,10 @@ This plan does **not** replace `500-page-one-second-performance-target.md`
 here as not met** with measured residual; further 1 s work stays on the parent
 architecture doc only.
 
-## Current wave result — profile-guided residual optimization
+## Historical wave result — profile-guided residual optimization
+
+The following section records the pre-publication intermediate wave. The
+latest committed result is in the addendum below and in the benchmark snapshot.
 
 The published bar for this wave was **2.10 s / 1.48 GB / 3.93 M allocs** for
 the 500-page PDF count-3 median. The latest exact post-review runs were
@@ -86,7 +89,7 @@ Final count-3 raw: 2.76 s / 1.76 s / 2.10 s · ~1.48 GB · ~3.93 M allocs.
 | G4 Stretch 1.0 s | ≤ 1.0 s | **NOT MET** | Best median **2.10 s**; parent one-second plan |
 | G5 Correctness | full package tests | **PASS** | `go test ./...` green |
 
-### Who is faster / leaner vs wkhtmltopdf (process-level, pre-opt matrix + final CLI)
+### Historical wkhtmltopdf comparison (process-level, pre-`aa8d446`)
 
 | Pages | Faster (pre-opt matrix) | Final 500 CLI |
 |------:|---|---|
@@ -205,14 +208,15 @@ was not remeasured.
 - [x] Evaluated: true ≤1.0 s needs parent-plan architecture (parallel
       paint/compress, repeated-section fast path). **Not implemented** in this
       plan; the historical pre-Cycle-5 residual was **3.09 s**, and the current
-      wave records **1.546 s**; parent doc remains the 1 s track.
+      wave records **1.628 s**; parent doc remains the 1 s track.
 - [x] G1 (≤4.0 s) **achieved** without parallel paint.
 
 ### Phase 5: Closure
 
 - [x] Plan updated with final metrics and closed checklist (this file).
 - [x] Benchmark matrix re-run for PDF/Template after final wave (see below).
-- [x] CLI 500 remeasured: 3.25 s, ~670 MB RSS.
+- [x] Historical CLI 500 measurement recorded: 3.25 s, ~670 MB RSS before
+      commit `aa8d446`; the current profile process measured ~391 MiB RSS.
 - [x] Correctness: `go test ./...` green.
 - [x] `make lint` was not re-run in the current close window; all changed Go
       packages compile under `go test ./...` (lint remains optional follow-up).
@@ -243,7 +247,7 @@ Template 500 one-shot: **3.03 s / 2.48 GB / 5.97 M**.
    cumulative in the post-wave profile, despite total B/op falling to 1.225 GB.
 2. **CLI RSS was not remeasured** — the prior approximately 845 MB live-heap
    result remains above the 500 MB soft stretch and 400 MB historical gate.
-3. **Wall 1.643 s** is below the locked 2.10 s bar but above the
+3. **Wall 1.628 s** is below the locked 2.10 s bar but above the
    optional 1.5 s stretch and remains above the parent 1.0 s target.
 
 No checklist rows remain open or deferred inside this file.
@@ -251,8 +255,8 @@ No checklist rows remain open or deferred inside this file.
 ## Addendum: current integrated profile-guided wave (2026-08-08)
 
 This addendum supersedes Cycle 6 for the current working tree. The previously
-published commit was pushed as 596c6e2; the changes below are intentionally
-still uncommitted pending explicit publication approval.
+published commit was pushed as 596c6e2; the current wave is committed as
+`aa8d446` and pushed on `feature/optimization`.
 
 ### Locked-gate result
 

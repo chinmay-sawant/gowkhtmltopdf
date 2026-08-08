@@ -1,7 +1,7 @@
 # Performance - Profiling and Improvement Checklist
 
 > **Parent:** `skills/phase-wise-checklist/SKILLS.md` - canonical phase-wise execution ledger
-> **Status:** all phase-wise performance rows implemented and validated; changes remain uncommitted by request
+> **Status:** all phase-wise performance rows implemented and validated; the current optimization wave is committed and pushed as `aa8d446`
 > **Date:** 2026-08-07
 > **Baseline commit:** `93f32e7cf8c6` (`master`, merged benchmark work)
 > **Target:** 10/10 performance after the implementation and validation gates below
@@ -544,10 +544,11 @@ decision requiring visual comparison, not as a free optimization.
 
 ## Validation Boundary
 
-All performance checklist rows are implemented in the working tree but have not
-been committed, as requested. `go test ./...`, `make lint`, the focused CPU/
-heap profiles, the complete count-3 benchmark matrix, and `git diff --check`
-passed on 2026-08-07. The final score is 10.0/10, with no partial or open rows.
+All performance checklist rows are implemented and validated. The current
+optimization wave is committed as `aa8d446` on `feature/optimization` and
+pushed to `origin`. `go test ./...`, the focused CPU/heap profiles, the
+complete PDF/template matrix, and `git diff --check` passed; no correctness
+regression is recorded.
 
 ---
 
@@ -708,3 +709,53 @@ Canonical next checklist:
 
 Parent one-second vision (unchanged file):
 [`plans/deferred/0.0.3/500-page-one-second-performance-target.md`](../../deferred/0.0.3/500-page-one-second-performance-target.md)
+
+## Current publication addendum (2026-08-09)
+
+The profile-guided residual wave is now committed as `aa8d446` and pushed on
+`feature/optimization`. The authoritative one-iteration matrix is
+`testdata/golden/benchmarks/benchmark-results.txt`; the locked 500-page gate
+uses the separate count-3 median.
+
+### Current versus first committed snapshot
+
+The first benchmark file on this branch is `2a0f18b`. Using the same
+one-iteration command for both snapshots, the 500-page PDF changed from
+**14.135s / 3.80GB / 14.35M allocs** to **1.903s / 678.6MB / 1.103M allocs**:
+
+| Metric | Original `2a0f18b` | Current `aa8d446` | Change |
+|---|---:|---:|---:|
+| PDF time | 14.135s | 1.903s | **−86.5%** |
+| PDF B/op | 3.80GB | 678.6MB | **−82.1%** |
+| PDF allocs/op | 14.35M | 1.103M | **−92.3%** |
+| Template + PDF time | 13.670s | 1.693s | **−87.6%** |
+| Template + PDF B/op | 3.80GB | 683.5MB | **−82.0%** |
+| Template + PDF allocs/op | 14.40M | 1.154M | **−92.0%** |
+
+### wkhtmltopdf reference comparison
+
+The earlier process-level reference used wkhtmltopdf 0.12.6.1 on the same
+generated report matrix. It measured **2.05s / approximately 114MB peak RSS /
+approximately 2.0MB PDF** at 500 pages. The current Go values below are
+in-process benchmark values, so the table is directional rather than a strict
+process-to-process comparison:
+
+| Pages | wk wall | wk peak RSS | Current Go wall | Current Go B/op | Current Go allocs/op |
+|---:|---:|---:|---:|---:|---:|
+| 2 | 0.39s* | 34MB | 6.7ms | 3.8MB | 5,075 |
+| 5 | 0.23s | 35MB | 11.6ms | 6.1MB | 10,928 |
+| 10 | 0.25s | 35MB | 22.2ms | 11.3MB | 20,970 |
+| 20 | 0.28s | 37MB | 41.1ms | 21.8MB | 40,768 |
+| 50 | 0.37s | 42MB | 114.6ms | 52.8MB | 98,585 |
+| 100 | 0.60s | 50MB | 249.0ms | 100.9MB | 188,179 |
+| 200 | 0.89s | 66MB | 481.4ms | 200.1MB | 370,373 |
+| 250 | 0.99s | 74MB | 590.2ms | 248.9MB | 461,490 |
+| 500 | 2.05s | 114MB | 1.903s | 678.6MB | 1,102,840 |
+
+`B/op` is cumulative allocation traffic, not RSS. The current profiled Go
+benchmark process reached approximately **391MiB RSS** at 500 pages; a fresh
+current CLI process-level matrix has not been recorded after `aa8d446`. The
+earlier CLI comparison remains **8.40s / ~777MB** for gowkhtmltopdf versus
+**2.05s / ~114MB** for wkhtmltopdf and must remain labeled historical.
+
+\* The first wkhtmltopdf invocation was colder because of Qt startup.

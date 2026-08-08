@@ -247,10 +247,32 @@ page), so those timings are not directly comparable.
 | Web-fetch image tiles | 257.33ms | 258.05ms | 281.10ms | 310.47ms | 356.66ms | 413.68ms | 506.42ms | 564.00ms | 970.72ms |
 | Inline image tiles | 209.50ms | 220.61ms | 255.35ms | 282.33ms | 303.54ms | 340.31ms | 439.46ms | 491.22ms | 788.43ms |
 
-PDF / Template: profile-guided residual optimization wave (2026-08-08).
+PDF / Template: profile-guided residual optimization wave (2026-08-09).
 The locked 500-page PDF count-3 median is **1.628s / 678.8MB / 1.103M
 allocs**, versus the published **2.10s / 1.48GB / 3.93M** bar. Image-tile rows
 are unchanged.
+
+Against the first committed benchmark snapshot on this branch (`2a0f18b`),
+the same one-iteration 500-page measurements changed as follows:
+
+| Metric | Original | Current | Change |
+|---|---:|---:|---:|
+| PDF time | 14.135s | 1.903s | **−86.5%** |
+| PDF B/op | 3.80GB | 678.6MB | **−82.1%** |
+| PDF allocs/op | 14.35M | 1.103M | **−92.3%** |
+| Template + PDF time | 13.670s | 1.693s | **−87.6%** |
+| Template + PDF B/op | 3.80GB | 683.5MB | **−82.0%** |
+| Template + PDF allocs/op | 14.40M | 1.154M | **−92.0%** |
+
+### wkhtmltopdf reference
+
+The earlier process-level reference for wkhtmltopdf 0.12.6.1 on the same
+500-page fixture was **2.05s / ~114MB peak RSS / ~2.0MB PDF**. The current
+in-process Go benchmark is **1.903s / 678.6MB B/op / 1.103M allocs** for the
+same page count. This is directional only: Go `B/op` is cumulative allocation
+traffic, not RSS, and the current profiled benchmark process measured about
+**391MiB RSS**. The detailed matrix and caveat are in the
+[benchmark documentation](testdata/golden/benchmarks/README.md).
 
 - [Benchmark implementation](internal/convert/benchmarks_test.go)
 - [Benchmark templates and recorded results](testdata/golden/benchmarks/README.md)

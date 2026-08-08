@@ -74,9 +74,55 @@ image mode renders one raster canvas.
 | Inline image tiles | 209.50ms | 220.61ms | 255.35ms | 282.33ms | 303.54ms | 340.31ms | 439.46ms | 491.22ms | 788.43ms |
 
 PDF / Template: profile-guided residual optimization wave on
-`feature/optimization` (2026-08-08). The locked 500-page PDF count-3 median is
+`feature/optimization` (2026-08-09). The locked 500-page PDF count-3 median is
 **1.628s / 678.8MB / 1.103M allocs**, versus the published
 **2.10s / 1.48GB / 3.93M** bar. Image-tile rows are unchanged.
+
+### Original snapshot comparison
+
+The first committed benchmark snapshot on this branch is `2a0f18b`
+(`chore: add conversion benchmarks`). The current matrix below uses the same
+one-iteration command, so this is the direct recorded comparison for the
+500-page report:
+
+| Metric | Original snapshot | Current snapshot | Change |
+|---|---:|---:|---:|
+| PDF time | 14.135s | 1.903s | **−86.5%** |
+| PDF B/op | 3.80GB | 678.6MB | **−82.1%** |
+| PDF allocs/op | 14.35M | 1.103M | **−92.3%** |
+| Template + PDF time | 13.670s | 1.693s | **−87.6%** |
+| Template + PDF B/op | 3.80GB | 683.5MB | **−82.0%** |
+| Template + PDF allocs/op | 14.40M | 1.154M | **−92.0%** |
+
+The separate locked-gate result is the more stable count-3 median shown above;
+the comparison table intentionally uses one iteration on both snapshots.
+
+### Earlier wkhtmltopdf reference
+
+The performance ledger recorded a process-level run of wkhtmltopdf 0.12.6.1
+against the same generated report matrix on the same WSL2 host. The table below
+adds the current in-process Go benchmark metrics for context:
+
+| Pages | wkhtmltopdf wall | wk peak RSS | Current Go PDF wall | Current Go B/op | Current Go allocs/op |
+|---:|---:|---:|---:|---:|---:|
+| 2 | 0.39s* | 34MB | 6.7ms | 3.8MB | 5,075 |
+| 5 | 0.23s | 35MB | 11.6ms | 6.1MB | 10,928 |
+| 10 | 0.25s | 35MB | 22.2ms | 11.3MB | 20,970 |
+| 20 | 0.28s | 37MB | 41.1ms | 21.8MB | 40,768 |
+| 50 | 0.37s | 42MB | 114.6ms | 52.8MB | 98,585 |
+| 100 | 0.60s | 50MB | 249.0ms | 100.9MB | 188,179 |
+| 200 | 0.89s | 66MB | 481.4ms | 200.1MB | 370,373 |
+| 250 | 0.99s | 74MB | 590.2ms | 248.9MB | 461,490 |
+| 500 | 2.05s | 114MB | 1.903s | 678.6MB | 1,102,840 |
+
+This is directional, not a strict apples-to-apples process comparison:
+wkhtmltopdf wall/RSS includes its native process, while the current Go wall and
+`B/op` columns are from the in-process `testing.B` benchmark. `B/op` is
+cumulative allocation traffic, not peak RSS. The current profiled benchmark
+process reached about **391MiB RSS** at 500 pages; a fresh current CLI
+process-level matrix has not been recorded in this snapshot.
+
+\* The first wkhtmltopdf invocation was colder because of Qt startup.
 
 The raw `go test` output, including allocations, is in
 [`benchmark-results.txt`](benchmark-results.txt). The benchmark implementation
