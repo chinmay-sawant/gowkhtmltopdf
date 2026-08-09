@@ -1,0 +1,103 @@
+{
+ "id": "overview",
+ "nav": "Overview",
+ "content": [
+  {
+   "type": "hero",
+   "title": "Pure-Go HTML to PDF, no browser",
+   "lede": "A clean-room, stdlib-first work-alike of the wkhtmltopdf CLI that turns server-generated HTML into multi-page PDFs (or PNG/JPEG) entirely in-process. MVP v0.1.0: phases 0-9 of the canonical plan are implemented, with committed samples under output/."
+  },
+  {
+   "type": "bullets",
+   "heading": "Design principles",
+   "items": [
+    "From scratch: the whole pipeline, load to PDF write, lives in this repository. No binding to wkhtmltopdf, Qt, or WebKit, and no third-party PDF/HTML/CSS API or SaaS service.",
+    "Stdlib by default: runtime deps are the Go standard library plus one documented exception, github.com/go-text/typesetting, for OpenType shaping.",
+    "No browser, no cgo: no Chrome or WebKit process is spawned, and CGO_ENABLED=0 builds produce statically linked binaries with no runtime library requirements.",
+    "Deterministic output: identical input bytes and settings produce identical PDF bytes, so builds are cacheable and output diffs are trustworthy.",
+    "Report-grade scope: an allowlisted HTML model and a documented CSS subset, with the compatibility matrix as the normative per-property contract.",
+    "Two surfaces: the gowkhtmltopdf and gowkhtmltoimage CLI binaries, plus an idiomatic Go library API in the root gowkhtmltopdf package (NewConverter, NewImageConverter)."
+   ]
+  },
+  {
+   "type": "cards",
+   "heading": "Good for, not for",
+   "items": [
+    {
+     "title": "Invoices and statements",
+     "body": "Server-generated report templates: multi-section documents, tables with colspan, repeated table headers, and page-break-* control."
+    },
+    {
+     "title": "Structured PDFs",
+     "body": "Text headers/footers with [page]-style placeholders, TOC objects, PDF outlines, internal and external links, copies and collate."
+    },
+    {
+     "title": "Not: full CSS or browser layout",
+     "body": "Flex and grid are partial, floats and positioned layout are lite, and some selectors are limited. The compatibility matrix states exactly what is supported."
+    },
+    {
+     "title": "Not: JavaScript or pixel parity",
+     "body": "<script> content is stripped at load and JS flags such as --enable-javascript are accepted with warnings. Output is not a pixel-identical WebKit or wkhtmltopdf clone."
+    }
+   ]
+  },
+  {
+   "type": "prose",
+   "heading": "Pipeline",
+   "sections": [
+    {
+     "heading": "1. Load: internal/load",
+     "body": "Turns a file path, HTTP(S) URL, data: URI, or stdin into bytes. Local file access is denied by default and opens only with --enable-local-file-access or the equivalent settings key; --allow prefixes permit selective paths. HTTP fetches honor cookies and auth and enforce connect/response timeouts, a max redirect count, and a max body size."
+    },
+    {
+     "heading": "2. Parse and style: internal/html and internal/css",
+     "body": "The allowlisted HTML tokenizer builds a tree, then the CSS engine applies its subset (boxes, margins/padding/borders, tables, lists, images, colors, page-break-*) with a real cascade.",
+     "bullets": [
+      "Inline and linked stylesheets are applied only when permitted.",
+      "Character entities are unescaped via the stdlib.",
+      "<script> content is stripped at load."
+     ]
+    },
+    {
+     "heading": "3. Layout: internal/layout",
+     "body": "Resolves styles and runs block, inline, and table layout to produce a display list of text, rectangles, images, and links, ready for painting."
+    },
+    {
+     "heading": "4. Paginate, TOC, outline: internal/convert",
+     "body": "Splits the display list across pages using page size, margins, orientation, and page-break-* rules; draws text headers and footers with placeholders such as [page] and [topage]; builds TOC pages with a two-iteration page-count fixpoint and reorders them first; and assembles PDF outline bookmarks via internal/outline."
+    },
+    {
+     "heading": "5. Write: internal/pdf or internal/imageout",
+     "body": "PDF mode writes PDF 1.4 with zlib Flate streams, an embedded Liberation Sans subset with /Widths in 1000 units/em, link annotations, and a valid xref. Image mode rasterizes the same display list to PNG or JPEG. Both paths are orchestrated by internal/convert."
+    }
+   ]
+  },
+  {
+   "type": "stats",
+   "items": [
+    {
+     "value": "890 ms",
+     "label": "500-page PDF, direct CLI run"
+    },
+    {
+     "value": "1.9x",
+     "label": "faster than wkhtmltopdf at 500 pages"
+    },
+    {
+     "value": "56%",
+     "label": "less peak RSS than wkhtmltopdf at 500 pages"
+    },
+    {
+     "value": "0",
+     "label": "third-party PDF/HTML/CSS APIs"
+    }
+   ]
+  },
+  {
+   "type": "callout",
+   "variant": "info",
+   "title": "A kvetch: this is not a browser",
+   "body": "gowkhtmltopdf implements a report-grade subset of HTML and CSS and deliberately has no JavaScript runtime. If you need full flexbox parity, interactive scripts, or pixel-identical WebKit output, use a real browser engine. This project is the fast, deterministic, static-binary choice for controlled documents such as invoices and statements."
+  }
+ ]
+}

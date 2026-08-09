@@ -1,0 +1,1518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>wkhtmltopdf — Open Issue Dossier</title>
+<style>
+  :root {
+    --bg: #FBFBFA;
+    --surface: #FFFFFF;
+    --ink: #2F3437;
+    --muted: #787774;
+    --line: #EAEAEA;
+    --serif: 'Newsreader', 'Playfair Display', 'Instrument Serif', Georgia, serif;
+    --sans: 'SF Pro Display', 'Geist Sans', 'Helvetica Neue', Arial, sans-serif;
+    --mono: 'SF Mono', 'Geist Mono', 'JetBrains Mono', Menlo, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 32px 120px; }
+  .hero { padding: 96px 0 56px; max-width: 780px; }
+  .kicker {
+    font-family: var(--mono); font-size: 12px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 24px;
+  }
+  h1 {
+    font-family: var(--serif); font-weight: 500;
+    font-size: clamp(44px, 7vw, 76px);
+    line-height: 1.06; letter-spacing: -0.03em;
+    margin-bottom: 32px;
+  }
+  .lede { font-size: 18px; color: #4A4F52; max-width: 60ch; margin-bottom: 34px; }
+  .lede code, .kd code {
+    font-family: var(--mono); font-size: 0.85em;
+    background: #F0EFEA; padding: 2px 6px; border-radius: 4px; color: #3A3F42;
+  }
+  .hero-meta { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+  .sep { margin: 0 8px; color: #C9C6BF; }
+
+  h2 {
+    font-family: var(--serif); font-weight: 500; font-size: 28px;
+    letter-spacing: -0.01em; margin: 0 0 20px;
+  }
+  section { padding-top: 72px; }
+  .section-head { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
+  .section-head .note { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 40px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 9999px; padding: 7px 14px;
+    font-family: var(--sans); font-size: 13px; color: var(--ink);
+    cursor: pointer; transition: box-shadow .2s; letter-spacing: 0;
+  }
+  .chip:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+  .chip.active { border-color: var(--cc); background: color-mix(in srgb, var(--cc) 10%, white); }
+  .chips.status-row { margin-top: -24px; }
+  .chips.status-row .chip { border-width: 2px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
+  .chip-n { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .controls-note { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+
+  .status-badge {
+    font-family: var(--mono); font-size: 10px; text-transform: uppercase;
+    letter-spacing: 0.05em; padding: 3px 9px; border-radius: 9999px; font-weight: 600;
+  }
+  .st-implemented { background: #EDF3EC; color: #346538; }
+  .st-partial { background: #FBF3DB; color: #956400; }
+  .st-not-implemented { background: #FDEBEC; color: #9F2F2D; }
+
+  .issue { position: relative; overflow: hidden; }
+  .issue::before {
+    content: ""; position: absolute; inset: 0 0 0 auto; width: 4px; height: 100%;
+    background: var(--stripe, #EAEAEA);
+  }
+  .issue[data-status="implemented"] { --stripe: #9BBF88; background: #F6FAF5; }
+  .issue[data-status="partial"] { --stripe: #E7CD80; background: #FCF9F1; }
+  .issue[data-status="not-implemented"] { --stripe: #D89A8B; background: #FBF4F2; }
+  .issue[data-status="implemented"] .title { color: #346538; }
+  .issue[data-status="partial"] .title { color: #7A5A05; }
+  .issue[data-status="not-implemented"] .title { color: #8A3A2E; }
+
+  .layout { display: grid; grid-template-columns: 1fr 300px; gap: 56px; align-items: start; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } .stats { order: -1; } }
+
+  .issues { display: grid; gap: 14px; }
+  .issue {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 10px; padding: 24px 28px;
+    transition: box-shadow .2s, opacity .3s, transform .3s;
+  }
+  .issue:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+  .issue.hidden { display: none; }
+  .issue.reveal { animation: rise .6s cubic-bezier(0.16,1,0.3,1) both; animation-delay: calc(var(--index) * 24ms); }
+  @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  .title { font-family: var(--serif); font-weight: 500; font-size: 20px; line-height: 1.25; letter-spacing: -0.01em; margin-bottom: 12px; }
+  .meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .num { font-family: var(--mono); font-size: 12px; text-decoration: none; color: var(--muted); }
+  .num:hover { color: var(--ink); }
+  .cat-tag { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+  .badge { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; padding: 3px 9px; border-radius: 9999px; }
+  .summary { font-size: 15px; color: #4A4F52; margin-bottom: 10px; }
+  .wa, .kd, .ev { font-size: 13px; color: var(--muted); }
+  .wa-label, .kd-label, .ev-label {
+    font-family: var(--mono); font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.07em; margin-right: 8px; color: var(--muted);
+  }
+  .wa { color: #346538; }
+  .wa-label { color: #346538; }
+  .ev { margin-bottom: 10px; }
+  .ev-label { font-weight: 600; }
+  .issue[data-status="implemented"] .ev-label { color: #346538; }
+  .issue[data-status="partial"] .ev-label { color: #956400; }
+  .issue[data-status="not-implemented"] .ev-label { color: #9F2F2D; }
+
+  .stats { position: sticky; top: 32px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 24px; }
+  .stats h3 { font-family: var(--serif); font-size: 18px; font-weight: 500; margin-bottom: 20px; }
+  .stat-group { margin-bottom: 24px; }
+  .stat-group:last-child { margin-bottom: 0; }
+  .stat-group h4 { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 12px; font-weight: 500; }
+  .stat-row { display: grid; grid-template-columns: 130px 1fr 34px; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 13px; }
+  .stat-row .num { text-align: right; font-family: var(--mono); font-size: 12px; color: var(--ink); }
+  .stat-row .num small { color: var(--muted); }
+  .bar { height: 6px; background: #F0EFEA; border-radius: 3px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: #B9B5AA; border-radius: 3px; }
+  .sev-row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 8px; }
+  .sev-row .num { font-family: var(--mono); font-size: 12px; }
+
+  footer { margin-top: 96px; padding-top: 24px; border-top: 1px solid var(--line); font-family: var(--mono); font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+  <div class="kicker">Issue Report · 100 most recent open</div>
+  <h1>wkhtmltopdf<br>Issue Dossier</h1>
+  <p class="lede">A distilled view of the newest one hundred open issues
+  from <code>wkhtmltopdf/wkhtmltopdf</code> — classified by area, severity, and
+  how much of each the sibling <code>gowkhtmltopdf</code> project already covers
+  (implemented, partial, or not implemented), each with a short reading of the report.</p>
+  <div class="hero-meta">
+    <span>100 issues</span><span class="sep">·</span>
+    <span>34 implemented</span><span class="sep">·</span>
+    <span>29 partial</span><span class="sep">·</span>
+    <span>37 not implemented</span>
+  </div>
+</div>
+
+  <nav class="chips status-row" id="chips-status">
+    <button class="chip chip-status active" data-status="all" style="--cc:#B9B5AA"><span class="dot" style="background:#B9B5AA"></span>All statuses</button>
+    <button class="chip chip-status" data-status="implemented" style="--cc:#9BBF88">
+  <span class="dot" style="background:#9BBF88"></span>Implemented<span class="chip-n">34</span>
+</button>
+<button class="chip chip-status" data-status="partial" style="--cc:#E7CD80">
+  <span class="dot" style="background:#E7CD80"></span>Partial<span class="chip-n">29</span>
+</button>
+<button class="chip chip-status" data-status="not-implemented" style="--cc:#D89A8B">
+  <span class="dot" style="background:#D89A8B"></span>Not implemented<span class="chip-n">37</span>
+</button>
+  </nav>
+  <nav class="chips" id="chips">
+    <button class="chip active" data-cat="all" style="--cc:#B9B5AA"><span class="dot" style="background:#B9B5AA"></span>All<span class="chip-n">100</span></button>
+    <button class="chip" data-cat="CSS/layout" style="--cc:#E7CD80">
+  <span class="dot" style="background:#E7CD80"></span>CSS/layout<span class="chip-n">20</span>
+</button>
+<button class="chip" data-cat="JavaScript/interactive" style="--cc:#7FA8C9">
+  <span class="dot" style="background:#7FA8C9"></span>JavaScript/interactive<span class="chip-n">10</span>
+</button>
+<button class="chip" data-cat="Images" style="--cc:#9BBF88">
+  <span class="dot" style="background:#9BBF88"></span>Images<span class="chip-n">9</span>
+</button>
+<button class="chip" data-cat="Fonts/encoding/text" style="--cc:#C9A6B5">
+  <span class="dot" style="background:#C9A6B5"></span>Fonts/encoding/text<span class="chip-n">16</span>
+</button>
+<button class="chip" data-cat="Page size/margins/header-footer" style="--cc:#8FB8A0">
+  <span class="dot" style="background:#8FB8A0"></span>Page size/margins/header-footer<span class="chip-n">7</span>
+</button>
+<button class="chip" data-cat="Crash/hang/memory" style="--cc:#D89A8B">
+  <span class="dot" style="background:#D89A8B"></span>Crash/hang/memory<span class="chip-n">10</span>
+</button>
+<button class="chip" data-cat="CLI/args" style="--cc:#B0A8D9">
+  <span class="dot" style="background:#B0A8D9"></span>CLI/args<span class="chip-n">6</span>
+</button>
+<button class="chip" data-cat="Feature request" style="--cc:#C4B58C">
+  <span class="dot" style="background:#C4B58C"></span>Feature request<span class="chip-n">10</span>
+</button>
+<button class="chip" data-cat="Docs" style="--cc:#A8A8A8">
+  <span class="dot" style="background:#A8A8A8"></span>Docs<span class="chip-n">3</span>
+</button>
+<button class="chip" data-cat="Other" style="--cc:#D1C2B5">
+  <span class="dot" style="background:#D1C2B5"></span>Other<span class="chip-n">9</span>
+</button>
+  </nav>
+  <p class="controls-note" id="controls-note">Showing all 100 issues. Filter by coverage status or area.</p>
+
+  <div class="layout">
+    <div class="issues" id="issues">
+      <article class="issue" data-cat="JavaScript/interactive" data-sev="Medium" data-status="not-implemented" style="--index:0">
+      <h3 class="title">Cannot recognize html img tag style if add img tag dynamically</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5295" target="_blank" rel="noopener">#5295</a>
+      <span class="cat-tag">JavaScript/interactive</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">The reporter adds an &lt;img&gt; tag dynamically via JavaScript (createElement) with a base64 data URI, and the image does not render with its style as expected in the generated PDF. The output differs from what browsers produce.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Image added at runtime via document.createElement/window.onload requires a JS engine; matrix §5 strips &lt;script&gt;/DOM APIs at load, --enable-javascript ignored.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>wkhtmltopdf 0.12.6 on Windows 11; img added via window.onload with data:image/png;base64 source</code></p>
+    </article><article class="issue" data-cat="CSS/layout" data-sev="Medium" data-status="implemented" style="--index:1">
+      <h3 class="title">wkhtmltopdf doesn&#x27;t recognize justify-content</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5294" target="_blank" rel="noopener">#5294</a>
+      <span class="cat-tag">CSS/layout</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-implemented">Implemented</span>
+    </div>
+      <p class="summary">CSS flexbox property justify-content: space-evenly works in the HTML/browser but is not honored when rendering a PDF. The user reports the layout difference while generating a PDF.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Matrix §2.7: justify-content (incl. space-evenly) marked Implemented in internal/layout/flex.go with TestFlexSpaceEvenly.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>justify-content : space-evenly not supported in the Qt WebKit rendering</code></p>
+    </article><article class="issue" data-cat="JavaScript/interactive" data-sev="High" data-status="not-implemented" style="--index:2">
+      <h3 class="title">HTML page turns completely white/empty</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5293" target="_blank" rel="noopener">#5293</a>
+      <span class="cat-tag">JavaScript/interactive</span>
+      <span class="badge sev-high" style="background:#FDEBEC;color:#9F2F2D">High</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">Converting a live Angular-rendered invoice page to PDF succeeds without errors but produces a completely blank PDF. The reporter suspects the page&#x27;s JavaScript/Angular rendering is the cause.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Angular-SPA content is JS-generated; gowkhtmltopdf strips JavaScript at load (matrix §5) — framework pages unsupported.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>wkhtmltopdf 0.12.6 (with patched qt), Linux Mint 19.1 and Docker; full command output shows no error despite blank result</code></p>
+    </article><article class="issue" data-cat="Other" data-sev="Medium" data-status="implemented" style="--index:3">
+      <h3 class="title">ContentNotFoundError is thrown if HTML file contains links to filenames with multiple dots &#x27;.&#x27;</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5291" target="_blank" rel="noopener">#5291</a>
+      <span class="cat-tag">Other</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-implemented">Implemented</span>
+    </div>
+      <p class="summary">Converting HTML that links or scripts files whose filenames contain multiple dots (e.g. materialdesignicons.min.css) fails with a ContentNotFoundError. Removing the extra dot in the filename makes it work.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Loader has no dot-count restriction: FetchSub/resolveReference resolve refs via net/url and os paths (internal/load/load.go).</p>
+      <p class="wa"><span class="wa-label">Workaround</span>Removing the extra &#x27;.&#x27; (e.g. using materialdesignicons.css instead of .min.css) avoids the error</p>
+      <p class="kd"><span class="kd-label">Detail</span><code>ContentNotFoundError; href=&quot;/assets/vendors/node_modules/font/css/materialdesignicons.min.css?tag={{ back_tag }}&quot; on Windows 10 with 0.12.6</code></p>
+    </article><article class="issue" data-cat="Feature request" data-sev="Low" data-status="implemented" style="--index:4">
+      <h3 class="title">PDF with hundreds of images, how to avoid loading all images concurrently</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5290" target="_blank" rel="noopener">#5290</a>
+      <span class="cat-tag">Feature request</span>
+      <span class="badge sev-low" style="background:#EDF3EC;color:#346538">Low</span>
+      <span class="status-badge st-implemented">Implemented</span>
+    </div>
+      <p class="summary">A PDF containing hundreds of HTTPS images loads them all concurrently, flooding the web server with requests. The reporter asks whether images can be batch-loaded or concurrency limited.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>No concurrent image fan-out: image fetcher pulls each img on demand, single-threaded, size-capped cache (internal/imageout).</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Hundreds of images loaded over HTTPS all at once</code></p>
+    </article><article class="issue" data-cat="JavaScript/interactive" data-sev="Medium" data-status="not-implemented" style="--index:5">
+      <h3 class="title">Vanilla Javascript won&#x27;t render</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5289" target="_blank" rel="noopener">#5289</a>
+      <span class="cat-tag">JavaScript/interactive</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">A simple HTML file with a canvas-based pie chart drawn by vanilla JavaScript renders fine in the browser but produces no chart in the PDF. The reporter stripped all CSS to isolate the problem and asks how to debug it.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Canvas pie chart drawn by vanilla JS; matrix §5 strips JavaScript at load — JS-driven rendering out of scope.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>macOS 11.6, wkhtmltopdf 0.12.6 (with patched qt); uses canvas getContext(&quot;2d&quot;) to draw the pie chart</code></p>
+    </article><article class="issue" data-cat="Fonts/encoding/text" data-sev="Low" data-status="partial" style="--index:6">
+      <h3 class="title">Q: why does the font look so bad?</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5288" target="_blank" rel="noopener">#5288</a>
+      <span class="cat-tag">Fonts/encoding/text</span>
+      <span class="badge sev-low" style="background:#EDF3EC;color:#346538">Low</span>
+      <span class="status-badge st-partial">Partial</span>
+    </div>
+      <p class="summary">When generating a PDF from a simple markdown test document, the font looks distorted and squashed. The user wonders if it is a DPI-related rendering issue.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Fonts are a Partial subset: Liberation + registry/--font-path (matrix §2.3); fixed 96 dpi, --dpi Ignored, no FreeType hinting.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>User suspects DPI is causing the wrongly rendered and squashed font</code></p>
+    </article><article class="issue" data-cat="Images" data-sev="Medium" data-status="partial" style="--index:7">
+      <h3 class="title">Error with https url</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5287" target="_blank" rel="noopener">#5287</a>
+      <span class="cat-tag">Images</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-partial">Partial</span>
+    </div>
+      <p class="summary">Generating a PDF via PHP in Docker/Ubuntu fails with an image loading error; absolute paths stop working once a view is added to the header. This happens only in the Docker/PHP/Ubuntu environment.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>--header-html is Partial (matrix §7.7); local files blocked by default, need --enable-local-file-access/--allow (matrix §6).</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Issue occurs in Docker with PHP and Ubuntu; tried all latest wkhtmltopdf versions without success</code></p>
+    </article><article class="issue" data-cat="Other" data-sev="Low" data-status="implemented" style="--index:8">
+      <h3 class="title">Anchor target _blank not working inside pdf content using wkhtmltopdf</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5286" target="_blank" rel="noopener">#5286</a>
+      <span class="cat-tag">Other</span>
+      <span class="badge sev-low" style="background:#EDF3EC;color:#346538">Low</span>
+      <span class="status-badge st-implemented">Implemented</span>
+    </div>
+      <p class="summary">Links inside PDF content with target=&quot;_blank&quot; open in the same tab instead of a new one after conversion. The reporter asks for issue #3788 to be reopened since the problem persists.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>a[href] http/https/mailto external URI annotations implemented (matrix §1); target=_blank is a PDF-viewer concern.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>wkhtmltopdf 0.12.6.1 (with patched qt); reopening prior issue 3788</code></p>
+    </article><article class="issue" data-cat="JavaScript/interactive" data-sev="Medium" data-status="not-implemented" style="--index:9">
+      <h3 class="title">Problem creating a pdf file from icecat live pages</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5285" target="_blank" rel="noopener">#5285</a>
+      <span class="cat-tag">JavaScript/interactive</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">Generating a PDF from IceCat live pages fails because the pages use CORS requests over HTTPS; since the HTML is downloaded locally for conversion, the CORS-dependent content does not appear in the PDF.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Icecat pages populate via JS/CORS XHR; JS stripped at load (matrix §5) — JS-dependent pages render empty.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>CORS requests handled by an HTTPS webserver break after local HTML download; test link https://www.antoninolumia.it/test.html</code></p>
+    </article><article class="issue" data-cat="CSS/layout" data-sev="Medium" data-status="implemented" style="--index:10">
+      <h3 class="title">--print-media-type all images not displayed</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5284" target="_blank" rel="noopener">#5284</a>
+      <span class="cat-tag">CSS/layout</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-implemented">Implemented</span>
+    </div>
+      <p class="summary">When using --print-media-type with @media print CSS, all images disappear from the generated PDF, while other CSS loads fine; removing the flag restores images but drops the chapter breaks. The user relies on @media print rules for page breaks.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>@media print Implemented (matrix §4); --print-media-type Ignored because layout always runs Media:&quot;print&quot; (matrix §7.5).</p>
+      <p class="wa"><span class="wa-label">Workaround</span>Remove the --print-media-type flag</p>
+      <p class="kd"><span class="kd-label">Detail</span><code>wkhtmltopdf 0.12.6 (with patched qt) on OSX 12.6.1</code></p>
+    </article><article class="issue" data-cat="CSS/layout" data-sev="Medium" data-status="implemented" style="--index:11">
+      <h3 class="title">header on each page of the pdf is not correct where HTML doc repeats the header on each page</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5283" target="_blank" rel="noopener">#5283</a>
+      <span class="cat-tag">CSS/layout</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-implemented">Implemented</span>
+    </div>
+      <p class="summary">The HTML repeats column headers on each page, but in the converted PDF the first page is correct while from the second page onward the header data and the real data are printed on top of each other in the same space.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>&lt;thead&gt;/table-header-group repeat on continuation pages via repeatTableHeaders (fixture-23); matrix pagination row.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>wkhtmltopdf 0.12.6 on Windows 2019, reproduction files in wkhtmltopdf.zip</code></p>
+    </article><article class="issue" data-cat="CSS/layout" data-sev="Medium" data-status="not-implemented" style="--index:12">
+      <h3 class="title">wkhtmlimages doesn&#x27;t output multiple images when break-*:always are used</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5282" target="_blank" rel="noopener">#5282</a>
+      <span class="cat-tag">CSS/layout</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">wkhtmltoimage converts a document containing break-after:always page breaks into a single image with the different pages layered on top of each other, instead of outputting one image per page.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Image mode renders one raster canvas; no per-page/multi-image output (internal/imageout Render returns single image).</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>wkhtmltopdf 0.12.6 on Ubuntu 22.04, repro uses div with break-after:always</code></p>
+    </article><article class="issue" data-cat="Images" data-sev="Medium" data-status="implemented" style="--index:13">
+      <h3 class="title">Generating PDFs with many images fails.</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5281" target="_blank" rel="noopener">#5281</a>
+      <span class="cat-tag">Images</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-implemented">Implemented</span>
+    </div>
+      <p class="summary">Generating large PDFs with many images fails with &#x27;Warning: Failed to load file:///... (ignore)&#x27; once the OS open-file limit is exceeded, silently dropping images from the output. The reporter suggests the implementation need not hold all files open in parallel.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>FetchSub is synchronous/sequential, no parallel fan-out (load.go) — hundreds of FDs never held; fd-exhaustion cannot occur.</p>
+      <p class="wa"><span class="wa-label">Workaround</span>Increase the file limit, e.g. ulimit -n 9999</p>
+      <p class="kd"><span class="kd-label">Detail</span><code>Fails with ulimit -n 20 and 21 images; wkhtmltopdf 0.12.6 on Debian Bullseye</code></p>
+    </article><article class="issue" data-cat="CSS/layout" data-sev="Medium" data-status="partial" style="--index:14">
+      <h3 class="title">Pdf content not displaying</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5279" target="_blank" rel="noopener">#5279</a>
+      <span class="cat-tag">CSS/layout</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-partial">Partial</span>
+    </div>
+      <p class="summary">Some HTML content (approval metadata rows with user signatures) is not rendering in the PDF, only the &lt;hr/&gt; line appears, though the same HTML renders fine in the browser. The user suspects wkhtmltopdf or a Bootstrap 4-to-5 CSS incompatibility.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Flex/grid report subset exists (§2.7/§2.8) but Bootstrap 5 needs CSS custom props + full flex; no Bootstrap parity.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>wkhtmltox_0.12.5-1.bionic_amd64.deb used via Rails/wicked_pdf; Bootstrap 4 to 5 upgrade suspected</code></p>
+    </article><article class="issue" data-cat="Images" data-sev="Low" data-status="partial" style="--index:15">
+      <h3 class="title">The image quality in wkhtmltopdf is not good</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5278" target="_blank" rel="noopener">#5278</a>
+      <span class="cat-tag">Images</span>
+      <span class="badge sev-low" style="background:#EDF3EC;color:#346538">Low</span>
+      <span class="status-badge st-partial">Partial</span>
+    </div>
+      <p class="summary">Images in the output are darker and not exactly like the source, and the documented --image-dpi and --image-quality options appear to have little effect.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>--image-dpi Ignored, --image-quality Ignored for PDF (JPEG pass-through); only image mode --quality (matrix §7.9).</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Tried --image-dpi and --image-quality flags without noticeable improvement</code></p>
+    </article><article class="issue" data-cat="Other" data-sev="Medium" data-status="not-implemented" style="--index:16">
+      <h3 class="title">qt submodule needs updating</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5277" target="_blank" rel="noopener">#5277</a>
+      <span class="cat-tag">Other</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">The qt submodule is pinned to an old commit that lacks fixes for gcc 9+, so a fresh recursive clone of the repo does not compile until the submodule is updated remotely. Discovered while building packages for Fedora 37.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Issue is wkhtmltopdf&#x27;s Qt submodule/gcc-9 build problem; gowkhtmltopdf is pure Go, no Qt/CMake — no analogue.</p>
+      <p class="wa"><span class="wa-label">Workaround</span>Run git submodule update --recursive --remote</p>
+      <p class="kd"><span class="kd-label">Detail</span><code>qt submodule pinned at commit cb88757; fails to compile with gcc 9+</code></p>
+    </article><article class="issue" data-cat="Crash/hang/memory" data-sev="High" data-status="implemented" style="--index:17">
+      <h3 class="title">System.AccessViolationException Attempted to read or write protected memory.</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5276" target="_blank" rel="noopener">#5276</a>
+      <span class="cat-tag">Crash/hang/memory</span>
+      <span class="badge sev-high" style="background:#FDEBEC;color:#9F2F2D">High</span>
+      <span class="status-badge st-implemented">Implemented</span>
+    </div>
+      <p class="summary">PDF conversion of an HTML file that includes image generation crashes with a System.AccessViolationException (attempted to read/write protected memory) when wkhtmlto is used embedded in IronPdf.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Crash is Qt/C++ FFI memory corruption; pure-Go with no cgo/native bindings — structurally impossible.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>IronPdf 2021.1.29 embedded wkhtmlto; crash at WkhtmltoxBindings.viapdo on Windows 10</code></p>
+    </article><article class="issue" data-cat="CSS/layout" data-sev="Low" data-status="not-implemented" style="--index:18">
+      <h3 class="title">text-underline-offset not working</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5275" target="_blank" rel="noopener">#5275</a>
+      <span class="cat-tag">CSS/layout</span>
+      <span class="badge sev-low" style="background:#EDF3EC;color:#346538">Low</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">The CSS property text-underline-offset: 10px applied to &lt;u&gt; elements has no effect in PDFs produced by wkhtmltopdf.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>text-underline-offset absent from code; matrix §2.3 only text-decoration none/underline/line-through Implemented.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>CSS used: u { text-underline-offset: 10px; }</code></p>
+    </article><article class="issue" data-cat="Fonts/encoding/text" data-sev="Medium" data-status="implemented" style="--index:19">
+      <h3 class="title">Error: Failed to load about:blank, with network status code 301 and http status code 0 - Protocol &quot;about&quot; is unknown</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5274" target="_blank" rel="noopener">#5274</a>
+      <span class="cat-tag">Fonts/encoding/text</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-implemented">Implemented</span>
+    </div>
+      <p class="summary">Converting an email-generated HTML containing a protocol-relative Google Fonts stylesheet link fails with &#x27;Protocol &quot;about&quot; is unknown&#x27; and exits with code 1, even though --disable-local-file-access was passed; wkhtmltopdf seems to treat the element as a local file.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>resolveReference uses baseURL.ResolveReference (Go handles scheme-relative); no about: misparse; link rel=stylesheet fetched.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>wkhtmltopdf 0.12.6.1 (with patched qt); error &#x27;Failed to load about:blank ... Protocol &quot;about&quot; is unknown&#x27;, exit code 1 ProtocolUnknownError</code></p>
+    </article><article class="issue" data-cat="CSS/layout" data-sev="High" data-status="partial" style="--index:20">
+      <h3 class="title">html page rendered to pdf shrinks and splits.</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5272" target="_blank" rel="noopener">#5272</a>
+      <span class="cat-tag">CSS/layout</span>
+      <span class="badge sev-high" style="background:#FDEBEC;color:#9F2F2D">High</span>
+      <span class="status-badge st-partial">Partial</span>
+    </div>
+      <p class="summary">The reporter converts an HTML page to PDF with wkhtmltopdf 0.12.6 on Windows 10 and the rendered page shrinks in width (leaving a gap on the right instead of fitting A4 with 10mm margins) and gains extra lines and page breaks. Chrome and Safari print the same page correctly.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Chrome-parity fit for arbitrary HTML is a stated non-goal (README Phase 21); only report-subset HTML matched.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>wkhtmltopdf 0.12.6, Windows 10, A4 page with 10mm margins, default options</code></p>
+    </article><article class="issue" data-cat="Fonts/encoding/text" data-sev="Medium" data-status="partial" style="--index:21">
+      <h3 class="title">Exit with code 1 due to network error: ContentNotFoundError</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5271" target="_blank" rel="noopener">#5271</a>
+      <span class="cat-tag">Fonts/encoding/text</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-partial">Partial</span>
+    </div>
+      <p class="summary">The reporter generates a PDF from HTML containing Persian text and a custom font via the Python pdfkit wrapper, and wkhtmltopdf exits with code 1 and a ContentNotFoundError network error. The error appears only when the custom (Persian) font is used in the CSS.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>@font-face Partial: local TTF/OTF/WOFF1 via FetchSub ACL; WOFF2/remote src skipped (matrix §4/§5); Arabic OT shaping.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Exit code 1 with ContentNotFoundError; used pdfkit with encoding &#x27;utf-8&#x27; and an @font-face Persian font</code></p>
+    </article><article class="issue" data-cat="Docs" data-sev="Low" data-status="not-implemented" style="--index:22">
+      <h3 class="title">I want to update wkhtmltopdf from 0.12.5 to 0.12.6</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5270" target="_blank" rel="noopener">#5270</a>
+      <span class="cat-tag">Docs</span>
+      <span class="badge sev-low" style="background:#EDF3EC;color:#346538">Low</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">The reporter wants guidance on updating wkhtmltopdf from 0.12.5 to 0.12.6, believing the update will fix issues they hit while using it inside ERPNext. No technical problem or reproduction is provided.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Version-upgrade of wkhtmltopdf 0.12.x is N/A: clean-room rewrite with own VERSION 0.1.0, no drop-in binary.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Version upgrade 0.12.5 to 0.12.6 in ERPNext</code></p>
+    </article><article class="issue" data-cat="CLI/args" data-sev="Low" data-status="implemented" style="--index:23">
+      <h3 class="title">wkhtmltopdf behind a htaccess/htpasswd authentification wall</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5269" target="_blank" rel="noopener">#5269</a>
+      <span class="cat-tag">CLI/args</span>
+      <span class="badge sev-low" style="background:#EDF3EC;color:#346538">Low</span>
+      <span class="status-badge st-implemented">Implemented</span>
+    </div>
+      <p class="summary">The reporter wants to convert a web page that sits behind an htaccess/htpasswd basic authentication wall and asks how to pass the login/password to wkhtmltopdf. This is a usage question rather than a bug report.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>--username/--password passed as HTTP basic auth (flags.go -&gt; load.username/password; matrix §7.5 Supported).</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>htaccess/htpasswd basic auth protected page</code></p>
+    </article><article class="issue" data-cat="Feature request" data-sev="Low" data-status="not-implemented" style="--index:24">
+      <h3 class="title">Add the Possibility of Page Grouping</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5268" target="_blank" rel="noopener">#5268</a>
+      <span class="cat-tag">Feature request</span>
+      <span class="badge sev-low" style="background:#EDF3EC;color:#346538">Low</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">The reporter requests a feature to restart page numbering within groups of pages in a single PDF, e.g. a 15-page PDF made of three 5-page sections each numbered 1-5 based on a variable. This is a feature request for grouping-based page numbering.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Per-group page-number restart needs per-section counters; only document-wide counter + [page]/[topage] exist.</p>
+      <p class="wa"><span class="wa-label">Workaround</span>Generate the groups separately and join them into one PDF</p>
+      <p class="kd"><span class="kd-label">Detail</span><code>Example: 15-page PDF with 3 state groups (Ohio, Texas, Florida) each numbered 1-5</code></p>
+    </article><article class="issue" data-cat="CSS/layout" data-sev="High" data-status="implemented" style="--index:25">
+      <h3 class="title">Wkhtmltopdf 0.12.4 can support the installation package of aarch64. If I use 0.12.5 and 0.12.6, the content will be squeezed beyond the border when paging. If I use 0.12.4, there is no problem</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5267" target="_blank" rel="noopener">#5267</a>
+      <span class="cat-tag">CSS/layout</span>
+      <span class="badge sev-high" style="background:#FDEBEC;color:#9F2F2D">High</span>
+      <span class="status-badge st-implemented">Implemented</span>
+    </div>
+      <p class="summary">On aarch64, the reporter finds that wkhtmltopdf 0.12.5 and 0.12.6 squeeze page content beyond the border when paging, while 0.12.4 renders correctly. They are asking for an aarch64 installation package that does not regress.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Pure-Go CGO_ENABLED=0 static binary: no WebKit/Qt, so aarch64 render regressions cannot occur; --smart-shrinking re-layout.</p>
+      <p class="wa"><span class="wa-label">Workaround</span>Downgrade to wkhtmltopdf 0.12.4</p>
+      <p class="kd"><span class="kd-label">Detail</span><code>aarch64 architecture; regression in 0.12.5 and 0.12.6 vs 0.12.4</code></p>
+    </article><article class="issue" data-cat="Page size/margins/header-footer" data-sev="Low" data-status="partial" style="--index:26">
+      <h3 class="title">Cover page with body</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5266" target="_blank" rel="noopener">#5266</a>
+      <span class="cat-tag">Page size/margins/header-footer</span>
+      <span class="badge sev-low" style="background:#EDF3EC;color:#346538">Low</span>
+      <span class="status-badge st-partial">Partial</span>
+    </div>
+      <p class="summary">The reporter wants to generate a PDF whose first page is a cover page, followed by body.html with header and footer files, and asks whether different margins can be used for the cover and the body. This is a usage question about combining cover, body, header/footer, and per-page margins.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>cover object + per-object header/footer exist, but --margin-* are global-only — per-cover/body margins unsupported.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Cover page plus header/footer files and differing margins for body vs cover</code></p>
+    </article><article class="issue" data-cat="Fonts/encoding/text" data-sev="Medium" data-status="implemented" style="--index:27">
+      <h3 class="title">Problem with unicode characters in &lt;pre&gt;</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5265" target="_blank" rel="noopener">#5265</a>
+      <span class="cat-tag">Fonts/encoding/text</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-implemented">Implemented</span>
+    </div>
+      <p class="summary">Unicode box-drawing frame characters such as U+2500 inside a &lt;pre&gt; block render as garbage and euro characters in the PDF on Archlinux instead of a clean border. The reporter suspects a UTF-8 encoding or font-selection problem.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>UTF-8 Type0/CID Identity-H BMP via Liberation faces (matrix §5); pre honors white-space:pre; no Latin-1 substitution bug.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>U+2500 box-drawing characters in &lt;pre&gt;, Archlinux; suspect UTF-8/font selection</code></p>
+    </article><article class="issue" data-cat="Other" data-sev="Low" data-status="not-implemented" style="--index:28">
+      <h3 class="title">pdf output cannot read on scanner reader</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5264" target="_blank" rel="noopener">#5264</a>
+      <span class="cat-tag">Other</span>
+      <span class="badge sev-low" style="background:#EDF3EC;color:#346538">Low</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">The issue body contains only the repository&#x27;s boilerplate reply redirecting usage questions to the support channels and Stack Overflow, so the actual reported problem (PDF output unreadable on a scanner reader) has no technical details.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Issue is a support-redirect, not a bug; output is plain PDF 1.4, PDF/A/ICC out of scope (matrix §5).</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Auto-reply redirecting to wkhtmltopdf.org/support.html or Stack Overflow</code></p>
+    </article><article class="issue" data-cat="Other" data-sev="Medium" data-status="implemented" style="--index:29">
+      <h3 class="title">wkhtmltopdf generates junk content</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5262" target="_blank" rel="noopener">#5262</a>
+      <span class="cat-tag">Other</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-implemented">Implemented</span>
+    </div>
+      <p class="summary">The reporter generates PDFs from HTML using the DinkToPdf wrapper around wkhtmltopdf inside an Azure Function, and the PDF contains junk content when deployed to Azure even though the same code produces a correct PDF locally. They ask what could cause the difference.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Junk-PDF cause missing native libs in Azure; gowkhtmltopdf statically linked, no runtime lib requirements.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>DinkToPdf wrapper on Azure Functions; works locally but junk PDF when deployed</code></p>
+    </article><article class="issue" data-cat="CSS/layout" data-sev="Medium" data-status="not-implemented" style="--index:30">
+      <h3 class="title">CSS and Javascript notworking on server but localhost fine</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5261" target="_blank" rel="noopener">#5261</a>
+      <span class="cat-tag">CSS/layout</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">The reporter&#x27;s HTML renders with CSS and JavaScript correctly on localhost but loses styling and interactivity when run on a Linux Docker server. They include two comparison screenshots and ask how to fix it.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>JS stripped at load (matrix §5); server-vs-localhost CSS/JS failure needs JS rendering — out of scope (fidelity.md).</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Works on localhost, fails on Linux server running in Docker</code></p>
+    </article><article class="issue" data-cat="Page size/margins/header-footer" data-sev="Medium" data-status="implemented" style="--index:31">
+      <h3 class="title">using in docker container alpine image</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5260" target="_blank" rel="noopener">#5260</a>
+      <span class="cat-tag">Page size/margins/header-footer</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-implemented">Implemented</span>
+    </div>
+      <p class="summary">Using aspnet:6.0-alpine as the base Docker image, PDF generation works and base64 images render, but headers and footers with page numbers are not rendered. The reporter asks why the header/footer is missing.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>--footer-left/center/right + --footer-spacing + --page-offset Supported (matrix §7.7, TestTextHeaderFooter).</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>aspnet:6.0-alpine base image; footer/header with page number not rendered</code></p>
+    </article><article class="issue" data-cat="Crash/hang/memory" data-sev="High" data-status="not-implemented" style="--index:32">
+      <h3 class="title">Segmentation fault (core dumped)</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5259" target="_blank" rel="noopener">#5259</a>
+      <span class="cat-tag">Crash/hang/memory</span>
+      <span class="badge sev-high" style="background:#FDEBEC;color:#9F2F2D">High</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">Converting a URL to PDF works on a Mac but crashes with &#x27;Segmentation fault (core dumped)&#x27; on Ubuntu 20.04.5. The reporter wants to know why the same command works on macOS but not Ubuntu.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Segfault is Qt WebKit crash on JS/Math-heavy page; JS stripped at load; arbitrary-site rendering non-goal.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Ubuntu 20.04.5 LTS (kernel 5.4.0-66); command: wkhtmltopdf &lt;url&gt; outputFileName.pdf</code></p>
+    </article><article class="issue" data-cat="CSS/layout" data-sev="Medium" data-status="partial" style="--index:33">
+      <h3 class="title">Row Height Problem (in _some_ packages of 12.5 and 12.6)</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5258" target="_blank" rel="noopener">#5258</a>
+      <span class="cat-tag">CSS/layout</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-partial">Partial</span>
+    </div>
+      <p class="summary">The same HTML produces incorrect table row heights in the official macOS and bionic .deb packages of 0.12.5/0.12.6 (same problem as issue 3405), but renders fine with a specific 0.12.5 Windows binary. The reporter notes only that Windows build behaves differently.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Table subset: colspan yes, rowspan no, border-collapse separate-only (matrix §2.5); page-break-inside:avoid Implemented (§2.6).</p>
+      <p class="wa"><span class="wa-label">Workaround</span>page-break-inside: avoid !important; (works only on the Windows build)</p>
+      <p class="kd"><span class="kd-label">Detail</span><code>Affects 0.12.5/0.12.6 macos-cocoa.pkg and bionic_amd64.deb; not the Windows exe (0.12.5.0)</code></p>
+    </article><article class="issue" data-cat="Fonts/encoding/text" data-sev="Medium" data-status="implemented" style="--index:34">
+      <h3 class="title">Non-ascii links getting destroyed</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5257" target="_blank" rel="noopener">#5257</a>
+      <span class="cat-tag">Fonts/encoding/text</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-implemented">Implemented</span>
+    </div>
+      <p class="summary">Links containing properly percent-encoded non-ASCII characters are double-encoded in the output PDF: http://localhost/ASDF%C3%B5.pdf becomes http://localhost/ASDF%25C3%25B5.pdf. The reporter suspects an extra encodeURI-like call in the link re-encoding logic.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>href emitted verbatim, no double percent-encode path (html.go, OpLinkURI, resolveRelativeLinkURIs).</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Versions 0.12.5 and 0.12.6; %C3%B5 is re-encoded to %25C3%25B5</code></p>
+    </article><article class="issue" data-cat="CLI/args" data-sev="Low" data-status="implemented" style="--index:35">
+      <h3 class="title">[powershell] use variables with html code instead of filepaths</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5256" target="_blank" rel="noopener">#5256</a>
+      <span class="cat-tag">CLI/args</span>
+      <span class="badge sev-low" style="background:#EDF3EC;color:#346538">Low</span>
+      <span class="status-badge st-implemented">Implemented</span>
+    </div>
+      <p class="summary">The user asks whether wkhtmltopdf can accept an HTML string held in a PowerShell variable directly instead of a file path, and provides an example command. They wonder if they missed something in the documentation.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>GuessURL IsHTML-&gt;KindInline accepts raw HTML string as page argument (load.go:182-194); convert_test feeds raw HTML.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Example: wkhtmltopdf --no-images --disable-internal-links -q --encoding UTF-8 $HtmlCode Output.pdf</code></p>
+    </article><article class="issue" data-cat="Crash/hang/memory" data-sev="High" data-status="implemented" style="--index:36">
+      <h3 class="title">QSslSocket: cannot resolve CRYPTO_num_locks</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5255" target="_blank" rel="noopener">#5255</a>
+      <span class="cat-tag">Crash/hang/memory</span>
+      <span class="badge sev-high" style="background:#FDEBEC;color:#9F2F2D">High</span>
+      <span class="status-badge st-implemented">Implemented</span>
+    </div>
+      <p class="summary">On an Ubuntu 22.04 server, wkhtmltopdf fails with exit status 1 while loading pages, printing a long list of QSslSocket errors about unresolved OpenSSL symbols (CRYPTO_num_locks, SSL_library_init, etc.). The failure appears to stem from an OpenSSL library version mismatch.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Pure-Go net/http + crypto/tls (load.go); Qt/OpenSSL symbol-resolution failure cannot occur.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Ubuntu 22.04 server; exit status 1 with &#x27;QSslSocket: cannot resolve CRYPTO_num_locks&#x27;</code></p>
+    </article><article class="issue" data-cat="Page size/margins/header-footer" data-sev="Medium" data-status="partial" style="--index:37">
+      <h3 class="title">I have issue of footer overlap with tbody, table body sometimes get very large and because of that it mixup with footer</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5253" target="_blank" rel="noopener">#5253</a>
+      <span class="cat-tag">Page size/margins/header-footer</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-partial">Partial</span>
+    </div>
+      <p class="summary">In a PHP-generated A4 HTML page, when a table body grows very large it overlaps and mixes up with the page footer in the rendered PDF. The reporter includes a large HTML/PHP snippet and screenshots.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Footer bands measured (§7.7); paginator fragments, rows never split + thead repeat; but HTML footer Partial, flex/grid Partial.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Page size A4; footer overlaps tbody when table body grows large</code></p>
+    </article><article class="issue" data-cat="CLI/args" data-sev="Medium" data-status="not-implemented" style="--index:38">
+      <h3 class="title">Facing error while compiling using go templates</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5252" target="_blank" rel="noopener">#5252</a>
+      <span class="cat-tag">CLI/args</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">Passing a Go-template-generated HTML (containing a CanvasJS chart script) to wkhtmltopdf fails with &#x27;Blocked access to file&#x27; and &#x27;Failed to load about:blank, Protocol &quot;about&quot; is unknown&#x27;, then exits with code 1 due to ProtocolUnknownError. The reporter is compiling via go run main.go.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>CanvasJS chart needs a JS engine; JS stripped (matrix §5); &#x27;Blocked access to file&#x27; is default security policy §6.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Exit code 1: &#x27;Failed to load about:blank ... Protocol &quot;about&quot; is unknown&#x27;; template uses canvasjs.min.js</code></p>
+    </article><article class="issue" data-cat="Feature request" data-sev="Low" data-status="not-implemented" style="--index:39">
+      <h3 class="title">Install path on Windows</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5251" target="_blank" rel="noopener">#5251</a>
+      <span class="cat-tag">Feature request</span>
+      <span class="badge sev-low" style="background:#EDF3EC;color:#346538">Low</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">The user asks whether the Windows installer allows choosing a custom install location for a side-by-side install, and whether there are command-line switches for silent installation to deploy to a fleet of machines.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>No installer/packaging exists: single static binary via make build; no Windows silent/side-by-side install.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Wants a silent install to a fleet of Windows machines</code></p>
+    </article><article class="issue" data-cat="Images" data-sev="Medium" data-status="partial" style="--index:40">
+      <h3 class="title">wkhtmltoimage outputs black picture for height &gt; 30000 pixels</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5250" target="_blank" rel="noopener">#5250</a>
+      <span class="cat-tag">Images</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-partial">Partial</span>
+    </div>
+      <p class="summary">The reporter confirms they hit the same bug from issue #3604 where wkhtmltoimage produces a completely black picture when the output height exceeds 30000 pixels. No additional detail is given beyond the cross-reference.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Image mode raster capped at 16384px/64MP returning errRasterTooLarge (imageout.go:45-48) — error, never silent black.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Black output only when height exceeds 30000 pixels; references issue #3604</code></p>
+    </article><article class="issue" data-cat="Other" data-sev="High" data-status="implemented" style="--index:41">
+      <h3 class="title">[Security 9.8 CRITICAL] CVE-2022-35583 - wkhtmlTOpdf 0.12.6 is vulnerable to SSRF (Server-side request forgery)</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5249" target="_blank" rel="noopener">#5249</a>
+      <span class="cat-tag">Other</span>
+      <span class="badge sev-high" style="background:#FDEBEC;color:#9F2F2D">High</span>
+      <span class="status-badge st-implemented">Implemented</span>
+    </div>
+      <p class="summary">The reporter flags that wkhtmltopdf 0.12.6 is vulnerable to server-side request forgery (CVE-2022-35583, rated 9.8 critical), linking to NVD details and a blog about initial access via PDF files. This is a security advisory rather than a reproduction report.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>SSRF posture documented &amp; enforced (matrix §6): local file blocked, POST only via --post; loader timeouts + redirect cap.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>CVE-2022-35583, CVSS 9.8 critical, SSRF in wkhtmltopdf 0.12.6</code></p>
+    </article><article class="issue" data-cat="Fonts/encoding/text" data-sev="Medium" data-status="implemented" style="--index:42">
+      <h3 class="title">have some wired characters( �� ) appear after send pdf stream to react frontend</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5248" target="_blank" rel="noopener">#5248</a>
+      <span class="cat-tag">Fonts/encoding/text</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-implemented">Implemented</span>
+    </div>
+      <p class="summary">After updating their React app, the user sees U+FFFD replacement characters and a corrupt, unopenable PDF when piping the wkhtmltopdf byte stream through a Blob in the frontend, even though the same call works in Postman and in the older app version. The corruption is in their client-side handling of the response stream, not necessarily in wkhtmltopdf.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Client-side Blob charset=utf8 corruption; gowkhtmltopdf emits raw binary PDF bytes, no charset mangling.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Blob created with type &quot;application/pdf;charset=utf8&quot; in React; U+FFFD (efbfbd) bytes; works in Postman</code></p>
+    </article><article class="issue" data-cat="JavaScript/interactive" data-sev="Medium" data-status="not-implemented" style="--index:43">
+      <h3 class="title">wkhtmltopdf using old internet explorer browser by default</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5247" target="_blank" rel="noopener">#5247</a>
+      <span class="cat-tag">JavaScript/interactive</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">A user converting the finviz.com stock page with wkhtmltopdf 0.12.6 finds the stock charts are missing from the PDF and an &quot;unsupported browser&quot; banner appears, leading them to believe wkhtmltopdf uses the system&#x27;s default browser (they think IE). In reality wkhtmltopdf always renders with its embedded Qt WebKit engine, so the page&#x27;s modern browser requirements are simply not supported.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Requires modern JS browser engine (finviz charts); JS stripped, --enable-javascript Ignored (matrix §5/§7.5).</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Windows 10, wkhtmltopdf 0.12.6, URL https://finviz.com/quote.ashx?t=HLBZ; chart elements missing</code></p>
+    </article><article class="issue" data-cat="CSS/layout" data-sev="Medium" data-status="partial" style="--index:44">
+      <h3 class="title">Bootstrap v5.2.0 exception with custom properties</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5246" target="_blank" rel="noopener">#5246</a>
+      <span class="cat-tag">CSS/layout</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-partial">Partial</span>
+    </div>
+      <p class="summary">After upgrading from Bootstrap 4.6.0 to 5.2.0, some elements (e.g. alerts) render incorrectly in generated PDFs because wkhtmltopdf&#x27;s WebKit does not interpret CSS custom properties (CSS variables). The reporter supplies a minimal HTML page loading the Bootstrap 5.2.0 CDN stylesheet to reproduce the issue.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>CSS custom properties + var() ARE implemented (css.ResolveCustomProps/ResolveVar); but no Bootstrap 5.2 full support.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>wkhtmltopdf 0.12.5 on CentOS; CSS variables like --bs-alert-bg and var() usage not interpreted</code></p>
+    </article><article class="issue" data-cat="Crash/hang/memory" data-sev="High" data-status="not-implemented" style="--index:45">
+      <h3 class="title">Dot net process crashing after call to wkhtmltopdf_converter from DinkToPDF</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5244" target="_blank" rel="noopener">#5244</a>
+      <span class="cat-tag">Crash/hang/memory</span>
+      <span class="badge sev-high" style="background:#FDEBEC;color:#9F2F2D">High</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">Using DinkToPDF (a .NET wrapper) with wkhtmltopdf 0.12.5, the whole .NET process crashes when generating a PDF from a large dataset; the call to wkhtmltopdf_converter never returns. The reporter asks for the library to throw an exception instead of halting the process.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>DinkToPDF needs wkhtmltopdf C ABI; README deferred: &#x27;C ABI (wkhtmltopdf_* cgo exports) — stdlib mandate forbids cgo&#x27;.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>wkhtmltopdf 0.12.5 (64), .NET Core via DinkToPDF, crashes on large datasets with JavaScript-generated DOM</code></p>
+    </article><article class="issue" data-cat="Images" data-sev="Medium" data-status="implemented" style="--index:46">
+      <h3 class="title">Unable to determine the problem, no feedback (some images not loading)</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5243" target="_blank" rel="noopener">#5243</a>
+      <span class="cat-tag">Images</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-implemented">Implemented</span>
+    </div>
+      <p class="summary">When converting a simple HTML file with three publicly accessible PNG images, only the last image renders in the PDF while the others appear blank with a border, and no error or warning is printed. The reporter is looking for a way to diagnose why some images silently fail to load.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Remote img fetch PNG/JPEG/SVG (matrix §1) + --load-error-handling abort/skip/ignore Supported (§7.5).</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>wkhtmltopdf 0.12.6 with patched qt on macOS Monterey 12.3; 3 images from crownbase.be, only the last renders</code></p>
+    </article><article class="issue" data-cat="JavaScript/interactive" data-sev="Medium" data-status="not-implemented" style="--index:47">
+      <h3 class="title">wkHTMLtoImage: cant use javascript</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5242" target="_blank" rel="noopener">#5242</a>
+      <span class="cat-tag">JavaScript/interactive</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">When calling wkhtmltoimage as a library (C API) on Linux, JavaScript never runs and the setting &quot;web.enableJavascript&quot; appears to fail silently (returns 0 like other settings), even though the same conversion works when invoked via the wkhtmltoimage executable. The user needs JS to generate objects in the image.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>JS disabled in all modes: &lt;script&gt; stripped, --enable-javascript Ignored (matrix §5/§7.5) for PDF and image.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>wkhtmltoimage 0.12.6 on Linux Mint 20.1; wkhtmltoimage_set_global_setting with &quot;web.enableJavascript&quot; returns 0 but has no effect; executable works</code></p>
+    </article><article class="issue" data-cat="Crash/hang/memory" data-sev="High" data-status="not-implemented" style="--index:48">
+      <h3 class="title">Wkhtmltopdf failed (error code: -8). Message: b&#x27;&#x27;</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5241" target="_blank" rel="noopener">#5241</a>
+      <span class="cat-tag">Crash/hang/memory</span>
+      <span class="badge sev-high" style="background:#FDEBEC;color:#9F2F2D">High</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">The reporter&#x27;s process reports a wkhtmltopdf failure with error code -8 (a crash signal) and an empty stderr message, but the body contains only the empty template with no reproduction details. There is insufficient information to diagnose the failure.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Empty template, no repro/capability to map; nothing corresponds to a bare crash-without-diagnostics report.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Error &quot;Wkhtmltopdf failed (error code: -8)&quot; with empty message b&#x27;&#x27;</code></p>
+    </article><article class="issue" data-cat="JavaScript/interactive" data-sev="Medium" data-status="not-implemented" style="--index:49">
+      <h3 class="title">MathJax still not rendering even with --javascript-delay</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5240" target="_blank" rel="noopener">#5240</a>
+      <span class="cat-tag">JavaScript/interactive</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">MathJax-rendered equations are missing from PDFs generated from a Project Euler page even when a long --javascript-delay (10000 ms) is given on wkhtmltopdf 0.12.6. The JavaScript apparently runs or the delay is honored, yet the MathJax output still does not appear in the PDF.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>MathJax is JS-driven; --javascript-delay Ignored, JS stripped (matrix §5/§7.5) — cannot render.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Command: wkhtmltopdf --javascript-delay 10000 https://projecteuler.net/problem=805 on Ubuntu 20.04, version 0.12.6</code></p>
+    </article><article class="issue" data-cat="JavaScript/interactive" data-sev="Medium" data-status="not-implemented" style="--index:50">
+      <h3 class="title">wkhtmltoimage problem with mermaid.js</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5239" target="_blank" rel="noopener">#5239</a>
+      <span class="cat-tag">JavaScript/interactive</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">User renders a mermaid.js flowchart HTML page with wkhtmltoimage and all the arrows disappear, while the same page renders fine in a browser. They reproduce with a simple mermaid graph and --enable-local-file-access on Windows.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>mermaid.js renders via JS; &lt;script&gt; stripped at load (matrix §5); no JS engine.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>wkhtmltopdf 0.12.6 with qt (also 0.12.5/0.12.0), mermaid.js v8.5.2, .\wkhtmltoimage.exe --enable-local-file-access</code></p>
+    </article><article class="issue" data-cat="Feature request" data-sev="Low" data-status="not-implemented" style="--index:51">
+      <h3 class="title">Any options to generate image PDF</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5238" target="_blank" rel="noopener">#5238</a>
+      <span class="cat-tag">Feature request</span>
+      <span class="badge sev-low" style="background:#EDF3EC;color:#346538">Low</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">User asks whether wkhtmltopdf has any option or CSS/JS technique to produce a PDF whose pages are images instead of the default non-image text PDF. They cannot find such an option in the docs.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>No option to rasterize pages into image-based PDF; image mode only PNG/JPEG (§7.9), writer emits vector ops.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>wkhtmltopdf generates non-image PDF as default</code></p>
+    </article><article class="issue" data-cat="CSS/layout" data-sev="Medium" data-status="not-implemented" style="--index:52">
+      <h3 class="title">Problem when converting pages to pdf after a huge css update</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5237" target="_blank" rel="noopener">#5237</a>
+      <span class="cat-tag">CSS/layout</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">After heavily modifying their CSS stylesheets, the PDFs generated from their web pages are no longer satisfactory, even after upgrading from 0.12.5.x to 0.12.6.2 and trying many wkhtmltopdf options. They link a live page they are trying to export and ask for advice.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Arbitrary modern website CSS fidelity (service-public.fr) explicitly out of scope (fidelity.md Phase 21).</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Used v0.12.5.x for years, tried upgrading to 0.12.6.2, links to https://lannuaire.service-public.fr/... example page</code></p>
+    </article><article class="issue" data-cat="Crash/hang/memory" data-sev="High" data-status="partial" style="--index:53">
+      <h3 class="title">Large html conversion issue</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5236" target="_blank" rel="noopener">#5236</a>
+      <span class="cat-tag">Crash/hang/memory</span>
+      <span class="badge sev-high" style="background:#FDEBEC;color:#9F2F2D">High</span>
+      <span class="status-badge st-partial">Partial</span>
+    </div>
+      <p class="summary">Converting a 95MB+ HTML document to PDF via pdfkit in Docker fails immediately with an OSError because wkhtmltopdf exits with code -9 (SIGKILL). The user works around it by splitting the document into smaller parts.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Loader buffers whole body, MaxBodySize 100MiB; &gt;limit rejected with error; no large-doc streaming.</p>
+      <p class="wa"><span class="wa-label">Workaround</span>Split the large HTML document into smaller parts before conversion</p>
+      <p class="kd"><span class="kd-label">Detail</span><code>Exit code -9, unpatched qt 0.12.5 from apt-get; --header-right ignored with unpatched qt; XDG_RUNTIME_DIR warning</code></p>
+    </article><article class="issue" data-cat="Docs" data-sev="Low" data-status="not-implemented" style="--index:54">
+      <h3 class="title">Is it better to label the package to something like EL9 instead of alamlinux 9?</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5235" target="_blank" rel="noopener">#5235</a>
+      <span class="cat-tag">Docs</span>
+      <span class="badge sev-low" style="background:#EDF3EC;color:#346538">Low</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">User suggests renaming the download page packages from AlmaLinux-specific labels to a more general EL9 label, since Rocky Linux/RHEL users can also use them as CentOS replacements. This is a packaging/docs naming suggestion.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Issue is distro package naming; gowkhtmltopdf ships no OS packages — single pure-Go binary.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Download page lists packages for Alamlinux 8 and 9 but none for Rocky Linux</code></p>
+    </article><article class="issue" data-cat="Fonts/encoding/text" data-sev="Medium" data-status="partial" style="--index:55">
+      <h3 class="title">mac m1 转PDFwk中文不显示</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5234" target="_blank" rel="noopener">#5234</a>
+      <span class="cat-tag">Fonts/encoding/text</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-partial">Partial</span>
+    </div>
+      <p class="summary">Title reports that Chinese characters are not displayed when converting to PDF on a Mac M1 with wkhtmltopdf. The issue body contains only the repository&#x27;s support-redirect boilerplate, so no technical detail was provided.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>CJK needs a capable face: Type0/CID Identity-H (pdf/subset.go) but embedded Liberation has no CJK; needs --font-path.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Mac M1 platform; body is only the GitHub-issues support redirect boilerplate</code></p>
+    </article><article class="issue" data-cat="Feature request" data-sev="Low" data-status="not-implemented" style="--index:56">
+      <h3 class="title">version cut for ES6 support</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5233" target="_blank" rel="noopener">#5233</a>
+      <span class="cat-tag">Feature request</span>
+      <span class="badge sev-low" style="background:#EDF3EC;color:#346538">Low</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">User asks whether the project has any planned version/release that will add ES6 (modern JavaScript) support to its Qt WebKit engine.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>ES6 needs a JS engine; none exists — JS stripped at load (matrix §5); all --*javascript flags Ignored.</p>
+      
+      
+    </article><article class="issue" data-cat="JavaScript/interactive" data-sev="High" data-status="not-implemented" style="--index:57">
+      <h3 class="title">jQuery.Deferred exception: &#x27;null&#x27; is not an object</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5231" target="_blank" rel="noopener">#5231</a>
+      <span class="cat-tag">JavaScript/interactive</span>
+      <span class="badge sev-high" style="background:#FDEBEC;color:#9F2F2D">High</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">Converting HTML files to PDF produces a PDF with all-blank content, accompanied by jQuery.Deferred and TypeError &#x27;null&#x27; is not an object warnings during page loading. The conversion completes but the output is empty.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>jQuery/JS error producing blank PDF; JS stripped so jQuery exceptions cannot occur.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>wkhtmltopdf 0.12.6 with patched qt; warning file:///.../jquery.js:2 jQuery.Deferred exception: &#x27;null&#x27; is not an object; PDF generated but blank</code></p>
+    </article><article class="issue" data-cat="Page size/margins/header-footer" data-sev="High" data-status="partial" style="--index:58">
+      <h3 class="title">Footer HTML results in empty output</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5230" target="_blank" rel="noopener">#5230</a>
+      <span class="cat-tag">Page size/margins/header-footer</span>
+      <span class="badge sev-high" style="background:#FDEBEC;color:#9F2F2D">High</span>
+      <span class="status-badge st-partial">Partial</span>
+    </div>
+      <p class="summary">Using an HTML footer file that contains markup such as a &lt;b&gt; tag via --footer-html causes wkhtmltopdf to generate a completely empty PDF, while a plain-text footer works fine. The reporter notes that &#x27;invisible&#x27; tags like &lt;html&gt;, &lt;body&gt; and &lt;script&gt; are tolerated but visible markup breaks output.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>--footer-html/--header-html Partial (matrix §7.7): nested HTML HF works but clipped to margin band, URL values only.</p>
+      <p class="wa"><span class="wa-label">Workaround</span>Use plain text without markup in the footer HTML</p>
+      <p class="kd"><span class="kd-label">Detail</span><code>0.12.6 with patched qt, Windows 10 19044.1826; footer with &#x27;Footer &lt;b&gt;text&lt;/b&gt;&#x27; yields empty result2.pdf</code></p>
+    </article><article class="issue" data-cat="Fonts/encoding/text" data-sev="Medium" data-status="partial" style="--index:59">
+      <h3 class="title">Font glyphs are non functional</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5228" target="_blank" rel="noopener">#5228</a>
+      <span class="cat-tag">Fonts/encoding/text</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-partial">Partial</span>
+    </div>
+      <p class="summary">Font ligatures/glyphs (contextual letter-joining glyphs) do not render when using a custom font via @font-face with wkhtmltoimage, although the font itself loads and the HTML looks correct in a browser. No errors are shown at launch.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Local WOFF1 @font-face loaded/embedded (fontface_test.go), but OpenType &#x27;liga&#x27; shaping for Latin not claimed.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>wkhtmltopdf 0.12.6 latest, Windows 10, wkhtmltoimage, @font-face with file:/// URL to local Formula1-Regular.woff / Formula1-Bold.woff</code></p>
+    </article><article class="issue" data-cat="Other" data-sev="High" data-status="implemented" style="--index:60">
+      <h3 class="title">MacOS host not found</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5226" target="_blank" rel="noopener">#5226</a>
+      <span class="cat-tag">Other</span>
+      <span class="badge sev-high" style="background:#FDEBEC;color:#9F2F2D">High</span>
+      <span class="status-badge st-implemented">Implemented</span>
+    </div>
+      <p class="summary">Running `wkhtmltopdf &quot;$f&quot; &quot;$f.pdf&quot;` on a Mac fails with &quot;Host not found&quot; and exits with code 1, so no PDF is produced. The input file argument appears to be treated as a URL and fails to load.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Root cause URL guessing; GuessURL mirrors guessUrlFromString; --load-error-handling/--enable-local-file-access Supported.</p>
+      <p class="wa"><span class="wa-label">Workaround</span>ignore the load error with --load-error-handling ignore</p>
+      <p class="kd"><span class="kd-label">Detail</span><code>Failed to load http://, with network status code 3 and http status code 0 - Host not found; exit code 1 HostNotFoundError</code></p>
+    </article><article class="issue" data-cat="CSS/layout" data-sev="Medium" data-status="partial" style="--index:61">
+      <h3 class="title">表格中嵌套高度会跨页的子表格会导致父表格td的高度计算有问题</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5225" target="_blank" rel="noopener">#5225</a>
+      <span class="cat-tag">CSS/layout</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-partial">Partial</span>
+    </div>
+      <p class="summary">When a table contains a nested child table whose height spans more than one page, the parent table&#x27;s td height is computed too short by exactly the height of the blank area created where the child table crosses the page break. The reporter expects the parent td to have a normal height.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Nested tables render + thead repeat nested-aware, but multi-page child-table height accounting in parent td documented edge case.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>wkhtmltopdf 0.12.6 on Linux; repro uses a table with ~50 nested tr rows of height 120px each</code></p>
+    </article><article class="issue" data-cat="CSS/layout" data-sev="Medium" data-status="partial" style="--index:62">
+      <h3 class="title">表格中嵌套高度会跨页的子表格会导致父表格td的高度计算有问题</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5224" target="_blank" rel="noopener">#5224</a>
+      <span class="cat-tag">CSS/layout</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-partial">Partial</span>
+    </div>
+      <p class="summary">Duplicate report of the same bug: a nested child table taller than one page causes the parent table td height to be under-calculated by the height of the blank region where the child table breaks across pages. Reporter expects the parent td height to be correct.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Duplicate of 5225: parent-td height across child-table page fragments is a documented residual edge case.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>wkhtmltopdf 0.12.6 on Linux; same reproduction as issue 5225</code></p>
+    </article><article class="issue" data-cat="Fonts/encoding/text" data-sev="Medium" data-status="partial" style="--index:63">
+      <h3 class="title">Incorrect Characters is converted</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5223" target="_blank" rel="noopener">#5223</a>
+      <span class="cat-tag">Fonts/encoding/text</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-partial">Partial</span>
+    </div>
+      <p class="summary">The reporter states that the character corruption problem from issue #3841 still exists in the wkhtmltox 0.12.6.1-2.jammy_amd64 build on Ubuntu 22.04. No new reproduction or details beyond the linked issue.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>CJK mojibake (#3841): UTF-8 assumed; CJK needs capable face via Type0/CID + --font-path — no bundled CJK face.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>wkhtmltox_0.12.6.1-2.jammy_amd64 on Ubuntu 22.04; references issue #3841</code></p>
+    </article><article class="issue" data-cat="Fonts/encoding/text" data-sev="Medium" data-status="partial" style="--index:64">
+      <h3 class="title">Urgent: Google API Fonts are not functional in 0.12.6</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5222" target="_blank" rel="noopener">#5222</a>
+      <span class="cat-tag">Fonts/encoding/text</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-partial">Partial</span>
+    </div>
+      <p class="summary">Google Fonts loaded via the Google Fonts API links are not applied in generated PDFs, and even base64-encoded @font-face woff2 data fails, with output falling back to Times. The fonts render fine in the front end UI but not in the downloaded PDF.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>@font-face Partial: local+https TTF/OTF/WOFF1 work; Google WOFF2 and data: base64 font sources skipped.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>wkhtmltopdf 0.12.6-1; base64 &#x27;Playfair Display&#x27; @font-face falls back to Times; fonts such as Cormorant Garamond, Enriqueta, Noto Serif, Noticia Text via fonts.googleapis.com</code></p>
+    </article><article class="issue" data-cat="Fonts/encoding/text" data-sev="Medium" data-status="not-implemented" style="--index:65">
+      <h3 class="title">wkhtmltopdf 0.12.6 - Open Suse 15.3 pre don&#x27;t use monospace font</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5221" target="_blank" rel="noopener">#5221</a>
+      <span class="cat-tag">Fonts/encoding/text</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">On OpenSuse 15.3 with wkhtmltopdf 0.12.6, `&lt;pre&gt;` blocks do not use a monospace font, so numbers no longer align in columns. The same version works correctly on OpenSuse 15.0.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>No monospace face: pre/code fall back to Liberation Sans metrics (matrix §1 single embedded font).</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>OpenSuse 15.3, version 0.12.6; works fine on OpenSuse 15.0</code></p>
+    </article><article class="issue" data-cat="Feature request" data-sev="Medium" data-status="implemented" style="--index:66">
+      <h3 class="title">Mac M1/M2 support</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5219" target="_blank" rel="noopener">#5219</a>
+      <span class="cat-tag">Feature request</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-implemented">Implemented</span>
+    </div>
+      <p class="summary">There is no macOS build supporting Apple M1/M2 (ARM64) processors, so users on modern Macs cannot run the tool natively. The reporter requests an ARM64 release since not all Macs are Intel-based anymore.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Pure-Go CGO_ENABLED=0 cross-compiles to darwin/arm64; no native Qt/WebKit blobs — no M1/M2 packaging issue.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>No ARM64 build; existing releases assume Intel Macs</code></p>
+    </article><article class="issue" data-cat="Fonts/encoding/text" data-sev="Medium" data-status="partial" style="--index:67">
+      <h3 class="title">UTF8 in links</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5218" target="_blank" rel="noopener">#5218</a>
+      <span class="cat-tag">Fonts/encoding/text</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-partial">Partial</span>
+    </div>
+      <p class="summary">Arabic characters in an HTML page render correctly in most elements (p, span, b, div) but are shown as &#x27;????&#x27; inside `&lt;a href&gt;` link text in the PDF. The reporter asks how to fix it.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Arabic OT GSUB via go-text/typesetting only with capable face; default Liberation lacks Arabic; needs --font-path.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Arabic chars in link text like http://mywebsite.com/link/chb375-????-???? render as question marks</code></p>
+    </article><article class="issue" data-cat="CSS/layout" data-sev="Medium" data-status="implemented" style="--index:68">
+      <h3 class="title">Can your tool export text in light colors?</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5217" target="_blank" rel="noopener">#5217</a>
+      <span class="cat-tag">CSS/layout</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-implemented">Implemented</span>
+    </div>
+      <p class="summary">The certificate generator in the reporter&#x27;s LMS cannot export text in white or light colors: #ffffff or #fafafa in the code renders as a #8A8A8A grey in the PDF. The reporter asks if this is a known tool limitation or a configuration issue.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>color Implemented, exact RGB written (style.go:402-405, inline.go:152-155); no Qt color darkening — #ffffff renders white.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>#ffffff or #fafafa renders as #8A8A8A grey in the produced certificate PDF</code></p>
+    </article><article class="issue" data-cat="Images" data-sev="Medium" data-status="implemented" style="--index:69">
+      <h3 class="title">【Help!!!】Base64 pictures cannot be rendered</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5216" target="_blank" rel="noopener">#5216</a>
+      <span class="cat-tag">Images</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-implemented">Implemented</span>
+    </div>
+      <p class="summary">Base64-encoded images inside `&lt;img&gt;` tags are not rendered in the PDF output; the image shows as a white box even after adjusting CSS width and height. The reporter needs this working for their PDFs.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>data: base64 URLs decoded into KindInline and used by FetchSub (load.go:209); PNG subset, TestRenderImageDataURI.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>wkhtmltopdf 0.12.6 on CentOS 7; base64 image under IMG tag renders as a white box</code></p>
+    </article><article class="issue" data-cat="JavaScript/interactive" data-sev="High" data-status="not-implemented" style="--index:70">
+      <h3 class="title">Empty PDF for reactJs page</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5215" target="_blank" rel="noopener">#5215</a>
+      <span class="cat-tag">JavaScript/interactive</span>
+      <span class="badge sev-high" style="background:#FDEBEC;color:#9F2F2D">High</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">Reporter tries to convert a ReactJS-rendered web page to PDF on Ubuntu with wkhtmltopdf 0.12.6 and gets an empty (or almost empty) PDF, while simple static pages convert fine with no console errors.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>ReactJS rendering needs a JS engine; &lt;script&gt; stripped at load, --enable-javascript accepted with warning only.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Uses --debug-javascript --enable-forms against https://utarit.github.io/react-welcome-page-color-form/</code></p>
+    </article><article class="issue" data-cat="CSS/layout" data-sev="Medium" data-status="partial" style="--index:71">
+      <h3 class="title">If having more columns in a table, some contents are displayed in next line</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5213" target="_blank" rel="noopener">#5213</a>
+      <span class="cat-tag">CSS/layout</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-partial">Partial</span>
+    </div>
+      <p class="summary">When rendering an HTML table with many columns, some text/numbers that appear on one line in the browser wrap to the next line in the generated PDF, diverging from the source HTML layout.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Table subset: colspan only, no rowspan, separate model, auto layout (§1/§2.5); cell-width/wrap parity not claimed.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>wkhtmltopdf 0.12.6 on Windows 10 Enterprise</code></p>
+    </article><article class="issue" data-cat="CLI/args" data-sev="Medium" data-status="implemented" style="--index:72">
+      <h3 class="title">Wkhtmltopdf not supported the --allow command</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5212" target="_blank" rel="noopener">#5212</a>
+      <span class="cat-tag">CLI/args</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-implemented">Implemented</span>
+    </div>
+      <p class="summary">User wants to print a background image/watermark on every page of a PDF but cannot get the --allow, --background, and --enable-local-file-access flags to load local resources, producing a PDF without the requested background.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>--allow, --enable-local-file-access, --background all Supported end-to-end via AccessController (matrix §7.5).</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Command includes --allow &quot;F:\bg-overlay.jpg&quot; with --enable-local-file-access; referenced StackOverflow question 72583805</code></p>
+    </article><article class="issue" data-cat="Crash/hang/memory" data-sev="Medium" data-status="not-implemented" style="--index:73">
+      <h3 class="title">wkhtmltopdf is suddenly slow?</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5211" target="_blank" rel="noopener">#5211</a>
+      <span class="cat-tag">Crash/hang/memory</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">On a CentOS server with PHP 7, previously fast PDF generation (a couple seconds) suddenly took 1 minute 30 seconds for a simple task like converting google.com, hanging on &#x27;Loading Pages 1/6&#x27; with no obvious resource issue.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Arbitrary-site (google.com) behavior; no QtWebKit pipeline to hang — plain net/http fetch, JS stripped.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Stuck on &#x27;Loading Pages 1/6&#x27; at 10% for 1 minute, then 80% for 30 seconds</code></p>
+    </article><article class="issue" data-cat="Images" data-sev="Medium" data-status="implemented" style="--index:74">
+      <h3 class="title">&quot;--enable-local-file-access&quot; still showing blocked access to file.</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5210" target="_blank" rel="noopener">#5210</a>
+      <span class="cat-tag">Images</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-implemented">Implemented</span>
+    </div>
+      <p class="summary">On Windows with 0.12.6, running wkhtmltopdf with --enable-local-file-access still reports blocked/non-loading access to local image files referenced from an HTML file, so the images fail to render.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Local file access works via --enable-local-file-access + --allow (AccessController symlink-real, load.go:104-152).</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Command: wkhtmltopdf.exe C:\tmp\TECH-37596.html C:\tmp\TECH-37596.pdf --enable-local-file-access</code></p>
+    </article><article class="issue" data-cat="CLI/args" data-sev="Medium" data-status="implemented" style="--index:75">
+      <h3 class="title">params --disable-smart-width not take effect</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5209" target="_blank" rel="noopener">#5209</a>
+      <span class="cat-tag">CLI/args</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-implemented">Implemented</span>
+    </div>
+      <p class="summary">Reporter finds that the --disable-smart-width parameter has no effect in wkhtmltopdf 0.12.7-dev, meaning the page width is not being handled as requested.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>--smart-width/--no-smart-width Supported, grow-to-fit viewport (matrix §7.9; flags.go:378-381).</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Version 0.12.7-dev</code></p>
+    </article><article class="issue" data-cat="Fonts/encoding/text" data-sev="Low" data-status="implemented" style="--index:76">
+      <h3 class="title">wkhtmltoimage: how change line spacing?</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5208" target="_blank" rel="noopener">#5208</a>
+      <span class="cat-tag">Fonts/encoding/text</span>
+      <span class="badge sev-low" style="background:#EDF3EC;color:#346538">Low</span>
+      <span class="status-badge st-implemented">Implemented</span>
+    </div>
+      <p class="summary">User asks how to increase the line spacing in wkhtmltoimage output because the default spacing is too small for their needs.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Line spacing = CSS line-height, Implemented (matrix §2.3); same layout engine used by gowkhtmltoimage.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Question about wkhtmltoimage default line spacing</code></p>
+    </article><article class="issue" data-cat="Feature request" data-sev="Low" data-status="not-implemented" style="--index:77">
+      <h3 class="title">How to obtain the html source code of each page after paging according to the width and height</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5207" target="_blank" rel="noopener">#5207</a>
+      <span class="cat-tag">Feature request</span>
+      <span class="badge sev-low" style="background:#EDF3EC;color:#346538">Low</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">Reporter asks whether it is possible to obtain the HTML source of each page after wkhtmltopdf paginates content by page width and height, presumably to access per-page HTML rather than just the final PDF.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>No per-page HTML-source export exists; pagination only splits layout into PDF pages.</p>
+      
+      
+    </article><article class="issue" data-cat="Fonts/encoding/text" data-sev="Medium" data-status="partial" style="--index:78">
+      <h3 class="title">how to custom font in mac with using golang</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5206" target="_blank" rel="noopener">#5206</a>
+      <span class="cat-tag">Fonts/encoding/text</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-partial">Partial</span>
+    </div>
+      <p class="summary">A Go user on macOS M1 cannot get custom fonts to render in wkhtmltopdf output, and embedding the font as base64 data did not work.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>--font-path/--use-system-fonts + local @font-face work, but data: base64 @font-face skipped with warning.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Tried base64-embedded custom font on Mac M1; not working</code></p>
+    </article><article class="issue" data-cat="Other" data-sev="Medium" data-status="not-implemented" style="--index:79">
+      <h3 class="title">Build from wkhtmltopdf.org cannot process a .mhtml file, even though builds from Distros can</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5205" target="_blank" rel="noopener">#5205</a>
+      <span class="cat-tag">Other</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">On CentOS 7, the statically-linked wkhtmltopdf.org RPM fails to load a .mhtml file (&#x27;Failed loading page&#x27;), producing an empty PDF even with --load-error-handling ignore, while the distro EPEL build converts the same file fine but requires Xvfb.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>No MHTML/MIME-archive support anywhere (grep of internal/ finds no mhtml); loader handles HTML URLs/files only.</p>
+      <p class="wa"><span class="wa-label">Workaround</span>Use the EPEL/distribution build (or --load-error-handling ignore, though that yields an empty PDF)</p>
+      <p class="kd"><span class="kd-label">Detail</span><code>Error: Failed loading page file:///vmshare/Dance+Hall.mhtml; official build is statically linked with patched Qt</code></p>
+    </article><article class="issue" data-cat="Crash/hang/memory" data-sev="High" data-status="not-implemented" style="--index:80">
+      <h3 class="title">Cannot generate PDF</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5203" target="_blank" rel="noopener">#5203</a>
+      <span class="cat-tag">Crash/hang/memory</span>
+      <span class="badge sev-high" style="background:#FDEBEC;color:#9F2F2D">High</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">A .NET 4.6.1 app using NReco.PdfGenerator (which wraps wkhtmltopdf) intermittently fails PDF generation with the exception &#x27;Cannot generate PDF: (exit code: 255)&#x27;. It works fine most of the time and the reporter doesn&#x27;t know why.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>NReco/.NET-wrapper + Qt subprocess exit-255; JS-dependent rendering stripped at load; no equivalent capability.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Exit code 255 raised by NReco.PdfGenerator.HtmlToPdfConverter.CheckExitCode (NReco.PdfGenerator v1.2.0.0)</code></p>
+    </article><article class="issue" data-cat="Fonts/encoding/text" data-sev="Medium" data-status="partial" style="--index:81">
+      <h3 class="title">Thai font display incorrect</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5202" target="_blank" rel="noopener">#5202</a>
+      <span class="cat-tag">Fonts/encoding/text</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-partial">Partial</span>
+    </div>
+      <p class="summary">A Thai font renders correctly in the HTML but incorrectly after conversion to PDF: small characters render too high and underlines render too low. The reporter asks how to fix the glyph positioning.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Complex-script shaping deferred (README): Type0/CID + --font-path, Arabic OT, Indic Partial — Thai metrics not claimed.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Thai script font: small characters should sit lower and underlines should sit higher in the PDF output</code></p>
+    </article><article class="issue" data-cat="Other" data-sev="Medium" data-status="implemented" style="--index:82">
+      <h3 class="title">0.12.6 QSslSocket errors Ubuntu 20.04</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5201" target="_blank" rel="noopener">#5201</a>
+      <span class="cat-tag">Other</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-implemented">Implemented</span>
+    </div>
+      <p class="summary">Running wkhtmltopdf 0.12.6 on Ubuntu 20.04 produces QSslSocket errors during conversion. The body is mostly a template with a screenshot and lacks detailed reproduction steps.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Pure-Go net/http TLS replaces Qt/QSslSocket (matrix §6); --timeout/--proxy Supported; QSslSocket error class impossible.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Ubuntu 20.04.4 LTS, wkhtmltopdf 0.12.6, QSslSocket error screenshot</code></p>
+    </article><article class="issue" data-cat="Feature request" data-sev="Low" data-status="not-implemented" style="--index:83">
+      <h3 class="title">Add option to provide content type for main input file (e.g. multipart/related application/x-mimearchive)</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5200" target="_blank" rel="noopener">#5200</a>
+      <span class="cat-tag">Feature request</span>
+      <span class="badge sev-low" style="background:#EDF3EC;color:#346538">Low</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">wkhtmltopdf detects input file type by extension, so .mhtml content with a different extension can&#x27;t be processed without renaming. The reporter requests a CLI option to explicitly set the content type of the main input file.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>No MHTML/multipart support: loader identifies input by extension; no content-type flag in CLI; no archive parser.</p>
+      <p class="wa"><span class="wa-label">Workaround</span>Rename the input file so its extension matches the content type (e.g. .mhtml)</p>
+      <p class="kd"><span class="kd-label">Detail</span><code>Proposed flag example: wkhtmltopdf --content-type multipart/related application/x-mimearchive example.doc example.pdf</code></p>
+    </article><article class="issue" data-cat="Docs" data-sev="Low" data-status="not-implemented" style="--index:84">
+      <h3 class="title">What &quot;flavor&quot; of PDF is created?</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5198" target="_blank" rel="noopener">#5198</a>
+      <span class="cat-tag">Docs</span>
+      <span class="badge sev-low" style="background:#EDF3EC;color:#346538">Low</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">A user asks which PDF encoding/flavor wkhtmltopdf produces, specifically whether it can create PDF/X-1a output like Adobe&#x27;s PDF settings tab, which Amazon KDP accepts. It is a question rather than a bug report.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>PDF/X-1a not produced: writer emits plain PDF 1.4; PDF/A, encryption, ICC out of scope (matrix §5).</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Question about PDF/X-1a compatibility for Amazon KDP publishing</code></p>
+    </article><article class="issue" data-cat="CSS/layout" data-sev="Medium" data-status="not-implemented" style="--index:85">
+      <h3 class="title">Incorrect table cell border</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5196" target="_blank" rel="noopener">#5196</a>
+      <span class="cat-tag">CSS/layout</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">With border-collapse:collapse, the top border of a table cell is drawn extending beyond the cell in the generated PDF. Removing border-collapse fixes that cell but changes how other cells are drawn.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>border-collapse:collapse Not implemented — matrix §2.5 &#x27;parsed, never consumed; always separate model&#x27;.</p>
+      <p class="wa"><span class="wa-label">Workaround</span>Swap/reorder the cells in the row, or remove border-collapse:collapse from the table</p>
+      <p class="kd"><span class="kd-label">Detail</span><code>wkhtmltopdf 0.12.6, Windows 10, cells with rowspan=5 and border:3px solid black</code></p>
+    </article><article class="issue" data-cat="Images" data-sev="Medium" data-status="partial" style="--index:86">
+      <h3 class="title">SVG image gets distorted</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5195" target="_blank" rel="noopener">#5195</a>
+      <span class="cat-tag">Images</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-partial">Partial</span>
+    </div>
+      <p class="summary">An HTML page containing an SVG image (GitHub icon) converts to PDF with the image distorted and shrunk. The reporter expects the image to render undistorted at the CSS-specified 1em by 1em size.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>SVG-as-img Partial: rasterized via internal/svg subset; CSS width+height applied independently, no preserveAspectRatio.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>wkhtmltopdf 0.12.6, Windows 11, img with height/width: 1em loading https://unpkg.com/simple-icons@6.21.0/icons/github.svg</code></p>
+    </article><article class="issue" data-cat="CLI/args" data-sev="Medium" data-status="implemented" style="--index:87">
+      <h3 class="title">Exit code when on from_string(html, False)</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5194" target="_blank" rel="noopener">#5194</a>
+      <span class="cat-tag">CLI/args</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-implemented">Implemented</span>
+    </div>
+      <p class="summary">Calling pdfkit.from_string(html, False) to get PDF bytes raises OSError with exit code 1 due to &#x27;Protocol about is unknown&#x27;, while the same call writing to a file path works. The reporter wants a half-generated PDF instead of a failure when resources fail to load.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>--load-error-handling Supported (§7.5): abort/skip/ignore policies let conversion continue past failed loads.</p>
+      <p class="wa"><span class="wa-label">Workaround</span>Write output to a file path with pdfkit.from_string(html, file_path) instead of requesting bytes</p>
+      <p class="kd"><span class="kd-label">Detail</span><code>Error &#x27;Failed to load about:blank ... Protocol &quot;about&quot; is unknown&#x27;, exit code 1; Python 3.8, wkhtmltopdf 0.12.6, pdfkit 0.6.1</code></p>
+    </article><article class="issue" data-cat="CSS/layout" data-sev="Medium" data-status="implemented" style="--index:88">
+      <h3 class="title">Page break ignored on long text from td</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5192" target="_blank" rel="noopener">#5192</a>
+      <span class="cat-tag">CSS/layout</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-implemented">Implemented</span>
+    </div>
+      <p class="summary">Page breaks don&#x27;t work when a table cell (td) contains long content, even with page-break-inside: avoid applied to table elements. The reporter shows a screenshot of content that won&#x27;t break across pages.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>page-break-inside:avoid Implemented (§2.6) with preferSplitOverBlank fallback (paint_flow.go:1311).</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>CSS tried: table, tr, td, th, tbody, thead, tfoot { page-break-inside: avoid !important; }</code></p>
+    </article><article class="issue" data-cat="Crash/hang/memory" data-sev="High" data-status="partial" style="--index:89">
+      <h3 class="title">Segmentation Fault issue</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5190" target="_blank" rel="noopener">#5190</a>
+      <span class="cat-tag">Crash/hang/memory</span>
+      <span class="badge sev-high" style="background:#FDEBEC;color:#9F2F2D">High</span>
+      <span class="status-badge st-partial">Partial</span>
+    </div>
+      <p class="summary">Converting HTML to PDF via wkhtmltopdf crashes with a segmentation fault during the Loading pages phase. The reporter uses the wkhtmltopdf-java wrapper on Linux with header/footer HTML files and JavaScript enabled.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Maps to --header-html/--footer-html Partial (§7.7) + JS flags Ignored; no Qt crash class in pure-Go pipeline.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Command: wkhtmltopdf --margin-right 20.0px ... --enable-javascript --javascript-delay 500 --dpi 96 --header-html ... --footer-html ... ; segfault at 37% during page load</code></p>
+    </article><article class="issue" data-cat="Images" data-sev="Medium" data-status="not-implemented" style="--index:90">
+      <h3 class="title">c# - WKHTMLTOPDF Not Rendering Base64 Image/bmp</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5186" target="_blank" rel="noopener">#5186</a>
+      <span class="cat-tag">Images</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">A user building a C# app wants a barcode embedded in HTML as a base64 data URI via an &lt;object type=&quot;image/bmp&quot;&gt; tag to appear in the generated PDF, but the image is not rendered.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>BMP not decodable (only PNG/JPEG decoders); &lt;object&gt; tag unsupported; matrix §1 img=PNG/JPEG/SVG subset.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>barcode embedded as data:image/bmp;base64 in an &lt;object&gt; element</code></p>
+    </article><article class="issue" data-cat="CSS/layout" data-sev="Medium" data-status="implemented" style="--index:91">
+      <h3 class="title">Size mismatch: content to small.</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5185" target="_blank" rel="noopener">#5185</a>
+      <span class="cat-tag">CSS/layout</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-implemented">Implemented</span>
+    </div>
+      <p class="summary">With a div of height: 5in and width: 5in in CSS plus --page-width 10in --page-height 5in and zero margins, the content renders about 25% smaller than the page. The reporter suspects PT (72/in) and PX (96/in) units are being mixed up.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>in/pt/mm Implemented, 1px=0.75pt fixed 96dpi — no pt/px mixing (matrix §3); --page-width/--page-height Supported.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>wkhtmltopdf 0.12.6; command: -B 0 -T 0 -L 0 -R 0 --page-width 10in --page-height 5in</code></p>
+    </article><article class="issue" data-cat="Fonts/encoding/text" data-sev="Low" data-status="partial" style="--index:92">
+      <h3 class="title">wkhtmltoimage does not render U+2705 (White Heavy Checkmark with Green Background) correctly.</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5184" target="_blank" rel="noopener">#5184</a>
+      <span class="cat-tag">Fonts/encoding/text</span>
+      <span class="badge sev-low" style="background:#EDF3EC;color:#346538">Low</span>
+      <span class="status-badge st-partial">Partial</span>
+    </div>
+      <p class="summary">wkhtmltoimage renders the U+2705 character as a clear checkmark with a gray border and no green background instead of the expected emoji glyph, while the same font renders it correctly via printf. Only this glyph is affected.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>BMP Unicode via Type0/CID + codepoint fallback to registry faces; no color-emoji/font-fallback chain.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>wkhtmltopdf 0.12.6 with patched qt on Debian 11, font Freefont FreeSerif.ttf, command wkhtmltoimage --crop-y 100 odd.html image6.png</code></p>
+    </article><article class="issue" data-cat="Page size/margins/header-footer" data-sev="Medium" data-status="implemented" style="--index:93">
+      <h3 class="title">How to remove header and footer in cover page</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5182" target="_blank" rel="noopener">#5182</a>
+      <span class="cat-tag">Page size/margins/header-footer</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-implemented">Implemented</span>
+    </div>
+      <p class="summary">The user configures --header-html and --footer-html so headers/footers load on all pages, but the cover page shows default white space where the header and footer should be, and they want to restrict headers/footers from the cover page.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Cover pages never carry headers/footers: TestCoverNoHeaderFooter (phase6_test.go:379), hf.go:657.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Uses --header-html and --footer-html options with a cover page</code></p>
+    </article><article class="issue" data-cat="Feature request" data-sev="Low" data-status="partial" style="--index:94">
+      <h3 class="title">How to exclude some entries from TOC summary</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5181" target="_blank" rel="noopener">#5181</a>
+      <span class="cat-tag">Feature request</span>
+      <span class="badge sev-low" style="background:#EDF3EC;color:#346538">Low</span>
+      <span class="status-badge st-partial">Partial</span>
+    </div>
+      <p class="summary">The user wants to exclude headings carrying a class=&quot;ignore&quot; attribute from the generated TOC, so only non-ignored h1-h4 tags appear in the summary. They ask if this is possible while using a custom toc.xsl.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>TOC exists (heading-&gt;outline-&gt;Go template) with Supported --toc-* flags, but no class=&quot;ignore&quot; exclusion.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Custom toc.xsl using the wkhtmltopdf.org/outline namespace; wants &lt;h1 class=&quot;ignore&quot;&gt; excluded</code></p>
+    </article><article class="issue" data-cat="CSS/layout" data-sev="Low" data-status="not-implemented" style="--index:95">
+      <h3 class="title">no effect when I use style &quot;-webkit-filter&quot; or &quot;filter&quot; on image tag</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5180" target="_blank" rel="noopener">#5180</a>
+      <span class="cat-tag">CSS/layout</span>
+      <span class="badge sev-low" style="background:#EDF3EC;color:#346538">Low</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">Applying CSS filters like grayscale/contrast/brightness/saturate to &lt;img&gt; tags has no visible effect in the PDF generated by wkhtmltopdf 0.12.6 on Windows 10 via pdfkit.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>filter accepts only opacity(); grayscale/contrast/brightness/saturate ignored (matrix §2.4/§5).</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>filter:grayscale(10%) contrast(110%) brightness(180%) saturate(0%) on an img; driven through pdfkit in Python 3.8</code></p>
+    </article><article class="issue" data-cat="Feature request" data-sev="Low" data-status="not-implemented" style="--index:96">
+      <h3 class="title">Add Digital Signature</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5179" target="_blank" rel="noopener">#5179</a>
+      <span class="cat-tag">Feature request</span>
+      <span class="badge sev-low" style="background:#EDF3EC;color:#346538">Low</span>
+      <span class="status-badge st-not-implemented">Not implemented</span>
+    </div>
+      <p class="summary">The user asks whether wkhtmltopdf can add a digital signature to the output PDF and how to correctly use the signature-related options, which lack documentation.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>PDF encryption, PDF/A, AcroForm out of scope (matrix §5); no --ssl-* flags; no signing support.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Asks about --ssl-crt-path, --ssl-key-password, --ssl-key-path options</code></p>
+    </article><article class="issue" data-cat="Crash/hang/memory" data-sev="High" data-status="implemented" style="--index:97">
+      <h3 class="title">wkhtmltopdf hangs on long-running webpage (anything over 5min 40sec)</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5177" target="_blank" rel="noopener">#5177</a>
+      <span class="cat-tag">Crash/hang/memory</span>
+      <span class="badge sev-high" style="background:#FDEBEC;color:#9F2F2D">High</span>
+      <span class="status-badge st-implemented">Implemented</span>
+    </div>
+      <p class="summary">Converting a webpage that takes longer than about 340 seconds to respond makes wkhtmltopdf hang forever at &quot;Loading pages (1/6) 10%&quot;, while pages at 340 seconds or less work fine. The timeout is confirmed not to be a website or network issue via curl.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>No JS engine to wait on; load.go request/response timeouts, --timeout Supported — no Qt-style hang.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>wkhtmltopdf 0.12.6 with patched qt on Windows Server 2016; works at WaitSeconds=340, fails at 350+; command includes --cookie and --disable-smart-shrinking</code></p>
+    </article><article class="issue" data-cat="Page size/margins/header-footer" data-sev="Medium" data-status="partial" style="--index:98">
+      <h3 class="title">&quot;margin-top&quot; option does not work</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5176" target="_blank" rel="noopener">#5176</a>
+      <span class="cat-tag">Page size/margins/header-footer</span>
+      <span class="badge sev-medium" style="background:#FBF3DB;color:#956400">Medium</span>
+      <span class="status-badge st-partial">Partial</span>
+    </div>
+      <p class="summary">When --footer-html is used together with --margin-top, the margins disappear from the PDF; removing --footer-html makes margins behave normally.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>Margins Supported (§7.2) + footer band measurement; but --footer-html Partial (clipped margin band) — partial coverage.</p>
+      <p class="wa"><span class="wa-label">Workaround</span>remove --footer-html option</p>
+      <p class="kd"><span class="kd-label">Detail</span><code>Command: wkhtmltopdf -s A4 --footer-html ... --margin-top 10 --footer-line --footer-right &quot;Page [page] of [topage]&quot; --disable-javascript; win 10 19042, version 0.12.6</code></p>
+    </article><article class="issue" data-cat="Page size/margins/header-footer" data-sev="Low" data-status="partial" style="--index:99">
+      <h3 class="title">Set page borders to entire pdf page</h3>
+      <div class="meta">
+      <a class="num" href="https://github.com/wkhtmltopdf/wkhtmltopdf/issues/5175" target="_blank" rel="noopener">#5175</a>
+      <span class="cat-tag">Page size/margins/header-footer</span>
+      <span class="badge sev-low" style="background:#EDF3EC;color:#346538">Low</span>
+      <span class="status-badge st-partial">Partial</span>
+    </div>
+      <p class="summary">A page with header, footer, and a dynamic grid content wants a border spanning the entire PDF page, but the CSS border only renders up to where the content ends instead of reaching the footer.</p>
+      <p class="ev"><span class="ev-label">Codebase status</span>@page borders Not implemented (matrix §4); workaround position:fixed lite paints every page but not full running model.</p>
+      
+      <p class="kd"><span class="kd-label">Detail</span><code>Border stops at end of content; grid row count varies each run</code></p>
+    </article>
+    </div>
+    <aside class="stats" id="stats">
+      <h3>Breakdown</h3>
+      <div class="stat-group">
+        <h4>Coverage in gowkhtmltopdf</h4>
+        <div class="sev-row" data-status="implemented"><span><span class="dot" style="background:#9BBF88"></span>&nbsp;Implemented</span><span class="num">34</span></div>
+<div class="sev-row" data-status="partial"><span><span class="dot" style="background:#E7CD80"></span>&nbsp;Partial</span><span class="num">29</span></div>
+<div class="sev-row" data-status="not-implemented"><span><span class="dot" style="background:#D89A8B"></span>&nbsp;Not implemented</span><span class="num">37</span></div>
+      </div>
+      <div class="stat-group">
+        <h4>Area</h4>
+        <div class="stat-row" data-index="{}">
+  <div><span class="dot" style="background:var(--c-#E7CD80)"></span>CSS/layout</div>
+  <div class="bar"><i style="width:20%"></i></div>
+  <div class="num">20<small>/100</small></div>
+</div>
+<div class="stat-row" data-index="{}">
+  <div><span class="dot" style="background:var(--c-#7FA8C9)"></span>JavaScript/interactive</div>
+  <div class="bar"><i style="width:10%"></i></div>
+  <div class="num">10<small>/100</small></div>
+</div>
+<div class="stat-row" data-index="{}">
+  <div><span class="dot" style="background:var(--c-#9BBF88)"></span>Images</div>
+  <div class="bar"><i style="width:9%"></i></div>
+  <div class="num">9<small>/100</small></div>
+</div>
+<div class="stat-row" data-index="{}">
+  <div><span class="dot" style="background:var(--c-#C9A6B5)"></span>Fonts/encoding/text</div>
+  <div class="bar"><i style="width:16%"></i></div>
+  <div class="num">16<small>/100</small></div>
+</div>
+<div class="stat-row" data-index="{}">
+  <div><span class="dot" style="background:var(--c-#8FB8A0)"></span>Page size/margins/header-footer</div>
+  <div class="bar"><i style="width:7%"></i></div>
+  <div class="num">7<small>/100</small></div>
+</div>
+<div class="stat-row" data-index="{}">
+  <div><span class="dot" style="background:var(--c-#D89A8B)"></span>Crash/hang/memory</div>
+  <div class="bar"><i style="width:10%"></i></div>
+  <div class="num">10<small>/100</small></div>
+</div>
+<div class="stat-row" data-index="{}">
+  <div><span class="dot" style="background:var(--c-#B0A8D9)"></span>CLI/args</div>
+  <div class="bar"><i style="width:6%"></i></div>
+  <div class="num">6<small>/100</small></div>
+</div>
+<div class="stat-row" data-index="{}">
+  <div><span class="dot" style="background:var(--c-#C4B58C)"></span>Feature request</div>
+  <div class="bar"><i style="width:10%"></i></div>
+  <div class="num">10<small>/100</small></div>
+</div>
+<div class="stat-row" data-index="{}">
+  <div><span class="dot" style="background:var(--c-#A8A8A8)"></span>Docs</div>
+  <div class="bar"><i style="width:3%"></i></div>
+  <div class="num">3<small>/100</small></div>
+</div>
+<div class="stat-row" data-index="{}">
+  <div><span class="dot" style="background:var(--c-#D1C2B5)"></span>Other</div>
+  <div class="bar"><i style="width:9%"></i></div>
+  <div class="num">9<small>/100</small></div>
+</div>
+      </div>
+      <div class="stat-group">
+        <h4>Severity</h4>
+        <div class="sev-row" data-sev="high"><span>High</span><span class="num">17</span></div><div class="sev-row" data-sev="medium"><span>Medium</span><span class="num">59</span></div><div class="sev-row" data-sev="low"><span>Low</span><span class="num">24</span></div>
+      </div>
+    </aside>
+  </div>
+
+  <footer>
+    <span>Source: wkhtmltopdf/wkhtmltopdf · GitHub Issues API</span>
+    <span>Generated from the 100 most recent open issues</span>
+  </footer>
+</div>
+
+<script>
+  const issues = document.querySelectorAll('.issue');
+  const note = document.getElementById('controls-note');
+
+  let curCat = 'all';
+  let curStatus = 'all';
+
+  function refilter() {
+    let n = 0;
+    issues.forEach(iss => {
+      const showCat = curCat === 'all' || iss.dataset.cat === curCat;
+      const showStatus = curStatus === 'all' || iss.dataset.status === curStatus;
+      const show = showCat && showStatus;
+      iss.classList.toggle('hidden', !show);
+      if (show) n++;
+    });
+    const parts = [];
+    if (curCat !== 'all') parts.push(curCat);
+    if (curStatus !== 'all') parts.push(curStatus.replace('-', ' '));
+    note.textContent = parts.length === 0
+      ? `Showing all ${issues.length} issues. Filter by coverage status or area.`
+      : `Showing ${n} issue${n === 1 ? '' : 's'} — ${parts.join(' + ')}.`;
+  }
+
+  document.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const group = chip.classList.contains('chip-status') ? '#chips-status' : '#chips';
+      document.querySelectorAll(group + ' .chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      if (chip.classList.contains('chip-status')) curStatus = chip.dataset.status;
+      else curCat = chip.dataset.cat;
+      refilter();
+    });
+  });
+</script>
+</body>
+</html>

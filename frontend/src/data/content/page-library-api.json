@@ -1,0 +1,104 @@
+{
+ "id": "library-api",
+ "nav": "Library API",
+ "content": [
+  {
+   "type": "hero",
+   "title": "HTML to PDF and images in pure Go",
+   "lede": "gowkhtmltopdf exposes the internal convert and imageout pipelines through an idiomatic, stdlib-only Go surface: build a Converter or ImageConverter, set wkhtmltopdf-style dotted settings, attach callbacks, and Convert. The module import path is gowkhtmltopdf."
+  },
+  {
+   "type": "code",
+   "heading": "PDF converter in Go",
+   "language": "go",
+   "code": "import (\n\t\"context\"\n\t\"fmt\"\n\t\"os\"\n\n\tgowkhtmltopdf \"gowkhtmltopdf\"\n)\n\nfunc renderPDF() error {\n\tc := gowkhtmltopdf.NewConverter()\n\n\t// Global settings use wkhtmltopdf-style dotted names.\n\t_ = c.Global().Set(\"size.pagesize\", \"A4\")\n\t_ = c.Global().Set(\"orientation\", \"Portrait\")\n\t_ = c.Global().Set(\"margin.top\", \"15\")\n\t_ = c.Global().Set(\"title\", \"Invoice\")\n\t_ = c.Global().Set(\"outline\", \"true\")\n\n\tobj := gowkhtmltopdf.NewObjectSettings().SetPage(\"invoice.html\")\n\n\t// Local inputs need the global enable plus the object-side unblock:\n\t// the upstream-compatible local file ACL pair.\n\t_ = c.Global().Set(\"enablelocalfileaccess\", \"true\")\n\t_ = obj.Set(\"load.blocklocalfileaccess\", \"false\")\n\tc.AddObject(obj)\n\n\t// Optional callbacks: OnInfo, OnWarn, OnError, OnPhase, OnProgress.\n\tc.OnPhase = func(phase string) { fmt.Println(phase) }\n\tc.OnProgress = func(percent int) { fmt.Printf(\"progress: %d%%\\n\", percent) }\n\n\tif err := c.Convert(context.Background()); err != nil {\n\t\treturn err\n\t}\n\treturn os.WriteFile(\"invoice.pdf\", c.Output(), 0o644)\n}"
+  },
+  {
+   "type": "prose",
+   "heading": "Settings model",
+   "sections": [
+    {
+     "heading": "Dotted names and defaults",
+     "body": "Both GlobalSettings.Set and ObjectSettings.Set take wkhtmltopdf-style dotted keys: size.pagesize, orientation, margin.top, header.left, footer.right, load.* and web.*. Unknown names return an error, and Get reads a key back in canonical string form. NewGlobalSettings and NewObjectSettings start from the upstream wkhtmltopdf defaults (A4 portrait, 10 mm margins, background on), mirroring upstream where implemented. The same examples/pdf example drives these calls from CLI-style flags, including the identical local file ACL pair.",
+     "bullets": [
+      "Global keys: size.pagesize, margin.top, orientation, title, outline, enablelocalfileaccess, and the web.* / load.* families.",
+      "Object keys: page, web.images, header.left, footer.right, load.jsdelay, load.blocklocalfileaccess, and friends.",
+      "web.images=false set globally disables <img> fetch and paint in both PDF and image mode."
+     ]
+    },
+    {
+     "heading": "The local file ACL pair",
+     "body": "Both halves are required before a normal local path converts: global enablelocalfileaccess=true and object load.blocklocalfileaccess=false. This matches the CLI pair of --enable-local-file-access with the blocked-by-default load policy. AddObject copies the object's settings, so later mutations of s do not affect the converter.",
+     "bullets": [
+      "SetPage accepts a path, a URL, or an inline:/data: source.",
+      "SetBody(html, base) treats the bytes as an in-memory document with base resolving relative subresources, and AddHTML chains the same into a converter.",
+      "ConvertHTML(ctx, html, global) is a one-shot helper that returns PDF bytes without creating a temp input file; linked local assets still need the ACL pair."
+     ]
+    },
+    {
+     "heading": "Typed builders",
+     "body": "For compile-time-checked configuration, NewPdfGlobalOptions returns a typed builder with WithPageSize, WithMargins, WithTitle, WithCopies, WithOutline, WithSmartShrinking, WithBackground, WithCompression and WithResolveRelativeLinks; Build() yields GlobalSettings. PDFRequest plus RunPDF is the type-safe one-shot API, writing output to an io.Writer instead of returning bytes."
+    }
+   ]
+  },
+  {
+   "type": "code",
+   "heading": "Image converter in Go",
+   "language": "go",
+   "code": "func renderPNG() error {\n\tc := gowkhtmltopdf.NewImageConverter()\n\n\t// Image-mode keys: width, height, quality, smartwidth, transparent,\n\t// format (png or jpg) and the crop.left/crop.top/crop.width/crop.height\n\t// family.\n\t_ = c.Set(\"format\", \"png\")\n\t_ = c.Set(\"width\", \"1024\")\n\n\t// Local files need the same ACL pair as PDF mode.\n\t_ = c.Global().Set(\"enablelocalfileaccess\", \"true\")\n\tc.AddObject(\"page.png.html\")\n\t_ = c.Object().Set(\"load.blocklocalfileaccess\", \"false\")\n\n\tif err := c.Convert(context.Background()); err != nil {\n\t\treturn err\n\t}\n\treturn os.WriteFile(\"out.png\", c.Output(), 0o644)\n}"
+  },
+  {
+   "type": "table",
+   "heading": "Key types and the synchronous model",
+   "headers": [
+    "Type",
+    "Role",
+    "Notes"
+   ],
+   "rows": [
+    [
+     "NewConverter / Converter",
+     "PDF pipeline; config via Global() and AddObject, then Convert(ctx).",
+     "Convert runs synchronously and replaces Output(); a converter needs at least one object, else ErrNoPageObjectsAdded. Output returns a copy of the PDF bytes."
+    ],
+    [
+     "NewImageConverter / ImageConverter",
+     "wkhtmltoimage counterpart; renders the first added page.",
+     "Default 1024 px smart-width viewport, PNG output; Set/AddObject/Object/Convert/Output. Converting without a page returns ErrNoInputPageAdded."
+    ],
+    [
+     "GlobalSettings / ObjectSettings",
+     "Dotted-string settings surfaces with Get and Set.",
+     "Unknown names error; defaults mirror upstream wkhtmltopdf. PdfGlobalOptions offers a typed builder alternative."
+    ],
+    [
+     "OnInfo / OnWarn / OnError",
+     "Log-line callbacks on both converter types.",
+     "Severity is decided by line markers (warning:/warn:, error:/err:); errors also surface through OnError when a Convert fails."
+    ],
+    [
+     "OnPhase / OnProgress",
+     "PDF-only progress callbacks.",
+     "Phase names like Loading pages (1/1), Printing pages (1/1) and Done; OnProgress receives the 0-100 percentage."
+    ],
+    [
+     "ConvertHTML / RunPDF / RunImage",
+     "One-shot helpers.",
+     "ConvertHTML returns []byte; the Run* functions write to req.Output and cannot carry image-mode settings in a PDF request, giving compile-time safety."
+    ]
+   ]
+  },
+  {
+   "type": "callout",
+   "variant": "info",
+   "title": "Module path and install",
+   "body": "go.mod declares the module path gowkhtmltopdf with zero third-party require entries (stdlib only), and LibraryVersion tracks upstream 0.12.x as 0.12.7-dev. Until the module is published to a reachable path, point consumers at a checkout: go mod edit -replace gowkhtmltopdf=/path/to/gowkhtmltopdf, then go get gowkhtmltopdf@v0.0.0. Once tagged, go get gowkhtmltopdf@v0.1.0 works as normal."
+  },
+  {
+   "type": "callout",
+   "variant": "info",
+   "title": "Planned: Python bindings",
+   "body": "A Python package wrapping the Go library is on the roadmap and not yet released. No pip package or pythonic API exists today; until it ships, Python callers drive the gowkhtmltopdf binary as a subprocess, the same way pdfkit drives wkhtmltopdf."
+  }
+ ]
+}

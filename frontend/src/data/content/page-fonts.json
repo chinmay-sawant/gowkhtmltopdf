@@ -1,0 +1,113 @@
+{
+ "id": "fonts",
+ "nav": "Fonts",
+ "content": [
+  {
+   "type": "hero",
+   "title": "Fonts: embedded defaults, opt-in discovery",
+   "lede": "Every PDF embeds the Liberation Sans family by default, with no font scanning at all. Non-Latin runs switch to a Type0/CID path, and complex-script shaping goes only as far as the pure-Go engine can take it."
+  },
+  {
+   "type": "cards",
+   "heading": "Bundled vs discovered faces",
+   "items": [
+    {
+     "title": "Bundled: Liberation Sans",
+     "body": "By default every PDF embeds the Liberation Sans family (Regular / Bold / Italic / BoldItalic). Latin-1 text uses a simple TrueType subset with WinAnsi-style single-byte codes; nothing is scanned and no directories are touched."
+    },
+    {
+     "title": "Opt-in: discovered faces",
+     "body": "`--font-path DIR` scans `DIR` (and shallow children) for `.ttf` and TrueType-flavored `.otf` files and is repeatable. `--use-system-fonts` also scans common OS font directories such as `/usr/share/fonts` while skipping proprietary Windows and corefont trees."
+    },
+    {
+     "title": "Matching and fallback",
+     "body": "CSS `font-family` lists are matched against discovered family names (name table) before falling back to Liberation. Only the generic families `serif`, `sans-serif`, and `monospace` expand to Liberation by name."
+    },
+    {
+     "title": "CJK readiness",
+     "body": "Han, kana, and Hangul render when a capable TTF is on the font path, for example `fonts-noto-cjk`. The tiny OFL subset `NotoSansKR-HangulSubset.ttf` in `testdata/fonts` exists for CI and the fixture-27 smoke test only, not as a production CJK face."
+    }
+   ]
+  },
+  {
+   "type": "table",
+   "heading": "Font flags and discovery behavior",
+   "headers": [
+    "Flag / case",
+    "Behavior"
+   ],
+   "rows": [
+    [
+     "`--font-path DIR`",
+     "Scan `DIR` (and shallow children) for `.ttf` / TrueType-flavored `.otf`; repeatable"
+    ],
+    [
+     "`--use-system-fonts`",
+     "Also scan common OS font directories (e.g. `/usr/share/fonts`); skips proprietary Windows/corefont trees"
+    ],
+    [
+     "Family matching",
+     "Named CSS families resolve as named via the name table; only generics (`serif` / `sans-serif` / `monospace`) expand to Liberation"
+    ],
+    [
+     "Glyph coverage fallback",
+     "Missing IPA / uncommon Unicode glyphs fall back to any face on the opt-in registry that covers the codepoint, preferring DejaVu and Noto family names"
+    ],
+    [
+     "Default (no flags)",
+     "Liberation Sans Regular / Bold / Italic / BoldItalic embedded; Latin-1 uses a simple TrueType subset with WinAnsi-style single-byte codes"
+    ]
+   ]
+  },
+  {
+   "type": "code",
+   "heading": "CJK / Hangul with --font-path",
+   "language": "sh",
+   "code": "gowkhtmltopdf --font-path /usr/share/fonts/truetype/droid \\\n  --font-path testdata/fonts \\\n  fixture-27-cjk-fontpath.html out.pdf\n# Production Hangul: fonts-noto-cjk or any Hangul-capable TTF on --font-path\n#   --font-path /usr/share/fonts/opentype/noto\n# testdata/fonts/NotoSansKR-HangulSubset.ttf is a tiny OFL subset for CI\n# and the fixture-27 smoke test only, not a full CJK face."
+  },
+  {
+   "type": "prose",
+   "heading": "Type0/CID path and complex-script limits",
+   "sections": [
+    {
+     "heading": "Type0 / CID for code points above U+00FF",
+     "body": "When a text run contains code points above U+00FF (after punctuation folding), the writer switches that run onto a Type0 / CIDFontType2 sibling resource with Identity-H encoding and Unicode CIDs. Glyphs must exist in the selected face; Liberation Sans alone still shows `?` for CJK."
+    },
+    {
+     "heading": "Arabic and Hebrew: OT shaping via go-text/typesetting",
+     "body": "OpenType shaping runs through the allowlisted pure-Go module `github.com/go-text/typesetting` (`CGO_ENABLED=0`) when the active face has a GSUB table. `TextShow` / `ShapeTextFont` drive the pure-Go HarfBuzz port, then reverse-cmap shaped glyphs to Unicode CIDs for Type0 Identity-H.",
+     "bullets": [
+      "OT joining and ligation (e.g. Lam-Alef) apply when GSUB is present and the reverse-cmap covers the glyphs.",
+      "Fallback with no face, no GSUB, or unmapped glyphs: RTL run reverse plus best-effort presentation-form joining in `ShapeText`.",
+      "Faces with neither Presentation Forms nor a usable GSUB reverse-cmap will still look disconnected.",
+      "Real CGO HarfBuzz is rejected; `TestDirectModuleAllowlist` pins the module list."
+     ]
+    },
+    {
+     "heading": "CJK needs a capable face",
+     "body": "CJK (Han, kana, Hangul) works when a capable TTF is on the font path; Hangul specifically needs `fonts-noto-cjk` or any Hangul-capable TTF on `--font-path`. `writing-mode: vertical-rl|lr` is parsed but lays out as a horizontal block. In mixed Latin + CJK runs, Latin glyphs missing from the CJK face are drawn with embedded Liberation while CJK continues on the Type0 sibling of the original face."
+    },
+    {
+     "heading": "Indic and other complex scripts: partial",
+     "body": "OpenType applies when the face and reverse-cmap succeed, but production Indic quality is not claimed beyond that. The fallback keeps combining marks after the base with no in-tree matra reordering."
+    },
+    {
+     "heading": "@font-face: local WOFF1 and TTF only",
+     "body": "`@font-face` is partial: local `url(...ttf|otf|woff)` under the loader ACL (`--enable-local-file-access` / `--allow`) is fetched via `FetchSub`, parsed (WOFF1 to SFNT via stdlib zlib), and registered for the document on both PDF and image paths (`convert.MergeFontFaces`).",
+     "bullets": [
+      "WOFF1 is supported: decompress, then `ParseTTF`, TrueType outlines only.",
+      "WOFF2, EOT, remote `https://`, and `data:` sources are skipped with a warning.",
+      "`font-weight` and `font-style` on `@font-face` are parsed but ignored at register time (the alias is the family name only).",
+      "`halt` / `palt` are requested via typesetting `FontFeatures` for CJK / East-Asian punctuation runs, and via `ParseFontFeatureSettings` / `ShapeTextFontWithFeatures` when CSS `font-feature-settings` is supplied."
+     ]
+    }
+   ]
+  },
+  {
+   "type": "callout",
+   "variant": "warn",
+   "title": "Rejected and skipped formats",
+   "body": "CFF / `OTTO` OpenType fonts are rejected outright: TrueType outlines only. WOFF2 is not supported (it needs Brotli, `go-text/typesetting` has WOFF1 only, and no new direct modules are added; the gap is tracked as `DecodeWOFF2` / `TestDecodeWOFF2Gap`). Remote `https://` and `data:` `@font-face` sources are skipped with a warning by design (ACL and no-webfont-CDN policy)."
+  }
+ ]
+}

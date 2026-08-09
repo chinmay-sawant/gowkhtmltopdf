@@ -2,10 +2,11 @@
 
 ## Golden HTML (`testdata/golden/`)
 
-Thirty report-style HTML fixtures (`fixture-01` … `fixture-30`) exercise
-invoices, tables (incl. thead repeat), page breaks, CSS (float/flex/grid/
-position lite), links, images, lists, typography, CJK/`--font-path`, and
-orphan/widow heuristics. See
+Forty-eight report-style HTML fixtures (`fixture-01` … `fixture-48`) exercise
+invoices, receipts, reports, statements, purchase orders, contracts,
+certificates, shipping documents, tables (incl. thead repeat), page breaks,
+CSS (float/flex/grid/position lite), links, images, lists, typography,
+CJK/`--font-path`, and orphan/widow heuristics. See
 [`testdata/golden/README.md`](../testdata/golden/README.md).
 
 CI / local structure tests:

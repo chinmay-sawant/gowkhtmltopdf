@@ -1,0 +1,268 @@
+{
+ "id": "compatibility",
+ "nav": "Compatibility",
+ "content": [
+  {
+   "type": "hero",
+   "id": "intro",
+   "title": "The compatibility contract",
+   "lede": "gowkhtmltopdf converts controlled, server-generated report HTML to PDF and PNG: invoices, statements, multi-page tables, headers and footers. It is a report engine, not a browser, and the compatibility matrix is the normative contract."
+  },
+  {
+   "type": "bullets",
+   "id": "supported-input",
+   "heading": "What supported input means",
+   "items": [
+    "A feature is supported only when the matrix says so: \"Implemented\" means parsed and consumed by layout and paint, backed by a code path in `internal/layout` or `internal/css` and usually a test or golden fixture under `testdata/golden/fixture-*.html`.",
+    "Anything not listed in the matrix is unsupported, and unsupported input must degrade gracefully: the declaration is ignored, the node is skipped, or a documented error is returned. It never crashes (`documentation/fidelity.md`, Failure modes).",
+    "The status legend is three-valued: Implemented, Partial (parsed and used for a subset; the rest degrades silently), and Not implemented (parsed and dropped, or never parsed).",
+    "Prefer the matrix over marketing prose: if a row says Implemented, there should be a code path and preferably a test or golden fixture to prove it.",
+    "CLI URL fetch over `http`/`https` is a supported input path, but it is not the same as browser-grade print: live URL output stays exploratory until Phase 21 acceptance against vendored fixtures."
+   ]
+  },
+  {
+   "type": "table",
+   "id": "html-tags",
+   "heading": "HTML tag support",
+   "headers": [
+    "Tag",
+    "Behavior"
+   ],
+   "rows": [
+    [
+     "html, head, body",
+     "Document shell"
+    ],
+    [
+     "title, meta, style, link",
+     "Metadata; `link rel=stylesheet` is fetched"
+    ],
+    [
+     "div, span",
+     "Generic block and inline boxes"
+    ],
+    [
+     "p",
+     "Block with default margins"
+    ],
+    [
+     "br, hr",
+     "Forced line break; block-level horizontal rule"
+    ],
+    [
+     "h1-h6",
+     "Heading levels; source of the PDF outline"
+    ],
+    [
+     "ul, ol, li",
+     "Simple lists with bullet markers; `ol` also renders bullets (decimal markers not implemented)"
+    ],
+    [
+     "table, thead, tbody, tfoot, tr, th, td",
+     "Table subset; `colspan` yes, `rowspan` no; `thead` repeats on continuation pages"
+    ],
+    [
+     "img",
+     "Replaced element; PNG/JPEG/SVG subset. JPEG is DCTDecode pass-through; PNG decoded with alpha soft-mask; SVG rasterized via `internal/svg` (rect/circle/path)"
+    ],
+    [
+     "a",
+     "Hyperlink annotations for `http`/`https`/`mailto`; `#id` and `#name` internal GoTo destinations"
+    ],
+    [
+     "strong, em, b, i, u, small",
+     "Bold and italic faces (Liberation family), underline, smaller text"
+    ],
+    [
+     "pre, code",
+     "`pre` honors `white-space: pre`; `code` has no monospace face (single embedded font family)"
+    ],
+    [
+     "blockquote",
+     "Block-level only; no indent margins"
+    ],
+    [
+     "header, footer, main, section, article, aside, nav",
+     "Semantic aliases treated as `div`"
+    ]
+   ]
+  },
+  {
+   "type": "table",
+   "id": "css-status",
+   "heading": "CSS property status",
+   "headers": [
+    "Area",
+    "Property",
+    "Status",
+    "Notes"
+   ],
+   "rows": [
+    [
+     "Box",
+     "margin, padding, border (+ longhands)",
+     "Implemented",
+     "Four-side shorthands; `solid`/`dashed`/`dotted`/`none` border styles; `thin`/`medium`/`thick` widths; sibling margin collapsing"
+    ],
+    [
+     "Box",
+     "width, height, min/max-width/height",
+     "Implemented",
+     "`%` resolves against a viewport approximation; consumed by blocks and images"
+    ],
+    [
+     "Box",
+     "box-sizing",
+     "Implemented",
+     "`content-box` (default) and `border-box`"
+    ],
+    [
+     "Box",
+     "overflow",
+     "Partial",
+     "Used to pick sticky scrollports; no general paint clipping"
+    ],
+    [
+     "Flow",
+     "display",
+     "Implemented / Partial",
+     "Core values implemented; `flex` and `grid` route to the report subset; `none` tested; `table-caption` and `table-column(-group)` not implemented"
+    ],
+    [
+     "Flow",
+     "float, clear",
+     "Implemented (lite)",
+     "Out-of-flow packing with simple exclusion; in-flow tables always clear below floats"
+    ],
+    [
+     "Flow",
+     "position",
+     "Partial",
+     "Static; `relative`/`absolute`/`fixed` lite; `sticky` clamps to the page content box (print scrollport) or an overflow box at offset 0"
+    ],
+    [
+     "Text",
+     "font-family",
+     "Partial",
+     "Embedded Liberation Sans family plus `--font-path`, `--use-system-fonts`, and local `@font-face` TTF/OTF/WOFF1; missing faces fall back to Liberation"
+    ],
+    [
+     "Text",
+     "font-size",
+     "Implemented",
+     "px/pt/em/%/rem/in/cm/mm/pc and keywords; `%`/`em` resolve against the parent"
+    ],
+    [
+     "Text",
+     "font-weight, font-style",
+     "Implemented",
+     "Weight 700+ selects Liberation Bold; fake stroke bold only if the bold face is missing"
+    ],
+    [
+     "Text",
+     "text-align",
+     "Implemented (justify lite)",
+     "Left/right/center; `justify` distributes leftover space on non-final lines"
+    ],
+    [
+     "Text",
+     "line-height, letter-spacing",
+     "Implemented",
+     "Consumed in line metrics and run width"
+    ],
+    [
+     "Text",
+     "text-indent, word-spacing, text-transform",
+     "Not implemented",
+     "Parsed and dropped, or never parsed; no crash"
+    ],
+    [
+     "Text",
+     "white-space",
+     "Partial",
+     "normal/nowrap/pre implemented; `pre-wrap` and `pre-line` collapse to `pre`"
+    ],
+    [
+     "Text",
+     "vertical-align",
+     "Partial",
+     "Table cells top/middle/bottom; inline replaced elements"
+    ],
+    [
+     "Color",
+     "color, background-color",
+     "Implemented",
+     "Foreground cascade; background paint gated by `--background`"
+    ],
+    [
+     "Color",
+     "background (shorthand)",
+     "Not implemented",
+     "Only `background-color` exists; gradients are ignored"
+    ],
+    [
+     "Color",
+     "opacity",
+     "Partial",
+     "PDF ExtGState; nested opacities multiply; `filter: opacity()` accepted, other filters ignored"
+    ],
+    [
+     "Table",
+     "border-spacing",
+     "Implemented",
+     "Separate border model with spacing"
+    ],
+    [
+     "Table",
+     "border-collapse, table-layout, caption-side",
+     "Not implemented",
+     "Parsed, never consumed; separate model and auto layout only; `<caption>` does not render"
+    ],
+    [
+     "Paged",
+     "page-break-before/after/inside",
+     "Implemented",
+     "Canvas-Y flow shifts; table rows never split; `page-break-inside: avoid` honored"
+    ],
+    [
+     "Paged",
+     "orphans, widows",
+     "Partial",
+     "Parsed (initial 2); fragmentation Rule 3 when line boxes are countable, geometric heuristic otherwise"
+    ],
+    [
+     "Paged",
+     "@media print / screen",
+     "Implemented",
+     "Media filtering against `Media: \"print\"`; size feature queries partial"
+    ],
+    [
+     "Paged",
+     "@page",
+     "Not implemented",
+     "Skipped gracefully at parse"
+    ]
+   ]
+  },
+  {
+   "type": "bullets",
+   "id": "unsupported",
+   "heading": "Explicitly unsupported",
+   "items": [
+    "JavaScript: `<script>` is stripped at load and DOM APIs do not exist; `--enable-javascript` is accepted but ignored with a warning.",
+    "Browser parity: full WebKit or Chrome print parity is an explicit non-milestone; banned claims include pixel-perfect output, full CSS, and browser replacement (`documentation/fidelity.md`, Claims language).",
+    "WebP, AVIF, SVG-as-img: not decodable by the stdlib; the image is skipped or a broken-image placeholder is painted. The `internal/svg` subset (rect/circle/path) covers inline SVG logos and grids.",
+    "PDF encryption, PDF/A, duplex, AcroForm: out of scope; `--produce-forms` is accepted and ignored.",
+    "Remote and WOFF2 `@font-face` sources plus `data:` URLs: skipped by policy; only local TTF/OTF/WOFF1 load through the `FetchSub` ACL.",
+    "Complex-script shaping is partial: Arabic OT via `go-text/typesetting` (GSUB) with presentation-form fallback, CJK via Type0/CID; no CGO HarfBuzz."
+   ]
+  },
+  {
+   "type": "callout",
+   "id": "contract",
+   "variant": "warn",
+   "title": "Flex and grid are a report subset",
+   "body": "Stage A flex and Stage B/C grid lite cover grow/shrink/basis, order, wrap, `minmax()`, areas, dense packing, and `gap`. They are not Bootstrap or Tailwind parity and not Chrome layout-test parity. This page is a summary; the normative contract is `documentation/compatibility-matrix.md`, and any change to it goes through plan review as a plan amendment."
+  }
+ ]
+}

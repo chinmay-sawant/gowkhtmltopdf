@@ -1,0 +1,120 @@
+{
+ "id": "dossier",
+ "nav": "Issue Dossier",
+ "content": [
+  {
+   "type": "hero",
+   "title": "All 1,329 open wkhtmltopdf issues, classified",
+   "lede": "Every open issue in the wkhtmltopdf/wkhtmltopdf repository, mapped against what gowkhtmltopdf can do. All 1,329 issues carry a verdict with evidence: 450 implemented, 278 partial, 601 not implemented."
+  },
+  {
+   "type": "callout",
+   "variant": "warn",
+   "title": "These verdicts are a starting point, not the final word",
+   "body": "The status of every issue was assigned by AI subagents that read the issue and scanned the gowkhtmltopdf codebase. They work from the title, summary, and available metadata rather than a full manual review, so a classification can be wrong, an edge case can be missed, or the evidence can be imprecise. Treat each row as a flag for follow-up, and verify with the linked issue and the cited code path before relying on it."
+  },
+  {
+   "type": "prose",
+   "heading": "What the dossier tracks",
+   "sections": [
+    {
+     "heading": "A full scrape, fully classified",
+     "body": "The dossier starts from all 1,329 open issues scraped from the upstream wkhtmltopdf issue tracker, including title, body, labels, and dates. Every issue was read and classified against the gowkhtmltopdf codebase; there are no unassessed rows left. The first 100 were analyzed in depth with a full summary and category; the remaining 1,229 received a verdict plus evidence, with their raw metadata retained."
+    },
+    {
+     "heading": "Every verdict cites evidence",
+     "body": "Each row records a codebase-status note that names the concrete code path behind the verdict: a package such as `internal/load/load.go`, a test such as `TestFlexSpaceEvenly`, or a row in the compatibility matrix. The dashboard renders that evidence verbatim next to each issue card.",
+     "bullets": [
+      "Categories follow the tracker's own labels: CSS/layout, JavaScript/interactive, Images, Fonts/encoding/text, and the rest",
+      "Every row links back to the upstream issue via its `#number` on github.com/wkhtmltopdf/wkhtmltopdf"
+     ]
+    }
+   ]
+  },
+  {
+   "type": "stats",
+   "items": [
+    {
+     "value": "1,329",
+     "percent": "100%",
+     "label": "open wkhtmltopdf issues tracked"
+    },
+    {
+     "value": "450",
+     "percent": "34%",
+     "label": "implemented"
+    },
+    {
+     "value": "278",
+     "percent": "21%",
+     "label": "partial"
+    },
+    {
+     "value": "601",
+     "percent": "45%",
+     "label": "not implemented"
+    }
+   ]
+  },
+  {
+   "type": "cards",
+   "heading": "Coverage verdicts",
+   "items": [
+    {
+     "title": "Implemented",
+     "body": "gowkhtmltopdf reproduces the reported behavior, and the evidence points to the code path that does it, for example `internal/load/load.go`, `internal/layout/flex.go`, or a matrix row with its tests. Many implemented issues are ones where the pure-Go design sidesteps the bug: no double percent-encoding, no fd exhaustion, no Qt crash class."
+    },
+    {
+     "title": "Partial",
+     "body": "The behavior is covered but not fully replicated. Typical residual edges: `--header-html`/`--footer-html` clipped to the margin band, `@font-face` restricted to local TTF/OTF/WOFF1 with WOFF2 and data: sources skipped, tables without `rowspan`, and complex-script shaping such as Thai or Arabic."
+    },
+    {
+     "title": "Not implemented",
+     "body": "Deliberately out of scope or absent, and the evidence names the missing piece. Common reasons: the behavior needs a JavaScript engine, MHTML parsing, PDF/X or PDF/A output, or a Qt/WebKit-specific failure that a static pure-Go binary cannot exhibit."
+    }
+   ]
+  },
+  {
+   "type": "prose",
+   "heading": "Why JavaScript-heavy issues are not implemented",
+   "sections": [
+    {
+     "heading": "JavaScript is stripped at load",
+     "body": "gowkhtmltopdf removes `<script>` elements when a document is loaded, and the JS flags such as `--enable-javascript` and `--javascript-delay` are accepted only with a warning (compatibility matrix, section 5; fidelity.md). The Go standard library has no JavaScript engine, so there is nothing to execute the page's code."
+    },
+    {
+     "heading": "What that means for the classified issues",
+     "body": "Every JavaScript/interactive report is marked not implemented, because the capability requires a running JS engine. MathJax equations (#5240), mermaid.js diagrams (#5239), and CanvasJS charts (#5252) all fall in this class. Angular, React, and Vue pages come out blank because their DOM is built by scripts at runtime.",
+     "bullets": [
+      "JS-heavy issues are not silent regressions: each one was checked against the no-JS subset and the capability was marked absent with evidence",
+      "A JavaScript engine is on the roadmap, so this verdict class may shrink later"
+     ]
+    },
+    {
+     "heading": "Arbitrary-website parity is a non-goal",
+     "body": "The README and fidelity.md are explicit: pixel-fidelity for arbitrary modern websites is not a goal (fidelity.md, phase 21). Issues that demand Chrome-level rendering of a live site, such as the service-public.fr CSS case (#5237), are marked not implemented for that reason, not because of a specific missing flag."
+    }
+   ]
+  },
+  {
+   "type": "prose",
+   "heading": "Security tradeoff",
+   "sections": [
+    {
+     "heading": "No scripts means a smaller attack surface",
+     "body": "A converter that never runs scripts cannot be hijacked through them, and the loader enforces that posture: local files are blocked by default and require `--enable-local-file-access` or an explicit `--allow` path, POST bodies go out only via `--post`, and fetches run under timeouts plus a redirect cap (compatibility matrix, section 6; integration-security.md). That reduces several attack classes a scripted engine would add, but it is not a full SSRF firewall: the loader still fetches `http://localhost` and RFC1918 hosts by design, and remote-HTML input is trusted, so SSRF-class issues such as CVE-2022-35583 (#5249) remain relevant and are mapped to not implemented."
+    },
+    {
+     "heading": "Pure Go removes the Qt crash class",
+     "body": "Many classified crashes are Qt/C++ problems: segfaults on Ubuntu (#5259), QSslSocket symbol failures (#5255), and IronPdf memory corruption (#5276). A static `CGO_ENABLED=0` binary with no cgo and no Qt/WebKit dependency cannot exhibit those specific failure classes. For remote URL input, the loader fetches via `net/http` with stdlib TLS verification instead of Qt's `QSslSocket`/OpenSSL runtime bindings (internal/load/load.go); local files and stdin never touch the network stack, and #5259 is marked not implemented because the page needs JavaScript, not because of an equivalent crash."
+    }
+   ]
+  },
+  {
+   "type": "callout",
+   "variant": "info",
+   "title": "Using the dashboard: row filters and pagination",
+   "body": "The dashboard below is the same dataset as rows. Use the status and category chips to filter (for example, Not implemented + JavaScript/interactive to see the JS gap), and the sidebar shows counts per status, category, and severity. The 1,329-row list is paginated, and each row is a card with its verdict evidence, workaround, and a link to the upstream issue."
+  }
+ ]
+}
