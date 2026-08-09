@@ -66,9 +66,8 @@ filling the available page without spilling into a second physical page.
 PDF and template rows are page counts; image rows are image tile counts because
 image mode renders one raster canvas.
 
-Re-measured 2026-08-09 on the working tree after the perf-review wave (5
-the certified workspace path on `feature/optimization`. Image rows were
-re-run in the same session.
+Re-measured 2026-08-09 on `feature/optimization` after the certified
+workspace path landed. Image rows were re-run in the same session.
 
 | Workload | 2 | 5 | 10 | 20 | 50 | 100 | 200 | 250 | 500 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
