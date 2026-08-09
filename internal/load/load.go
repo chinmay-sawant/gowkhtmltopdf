@@ -436,11 +436,11 @@ func charsetFromContentType(ct string) string {
 // <meta http-equiv="content-type"> declaration and returns the declared
 // charset, or "" when there is none.
 func metaCharset(body []byte) string {
-	html := string(body)
-	if len(html) > metaScanLimit {
-		html = html[:1024]
+	if len(body) > metaScanLimit {
+		body = body[:metaScanLimit]
 	}
 
+	html := string(body)
 	low := strings.ToLower(html)
 
 	for {

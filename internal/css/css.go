@@ -496,6 +496,10 @@ func (e *parseError) Error() string { return "css: " + e.msg }
 // stripComments removes /* ... */ comments, preserving newlines so line
 // numbers stay roughly stable.
 func stripComments(src string) string {
+	if !strings.Contains(src, "/*") {
+		return src
+	}
+
 	var buf strings.Builder
 
 	for {

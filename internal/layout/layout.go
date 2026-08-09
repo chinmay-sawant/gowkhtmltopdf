@@ -2768,6 +2768,10 @@ func (e *engine) buildTable(node *html.Node, style ResolvedStyle, availW, posX, 
 	if nCols == 0 {
 		return tableBox
 	}
+	// Every placed cell is appended once while measuring rows. Reserve the
+	// exact backing array so large tables do not retain geometric-growth
+	// copies of their child pointers.
+	tableBox.children = make([]*box, 0, len(placed))
 
 	colW, colMin, colPct, colAbs, cellData := e.measureTableColumns(placed, nCols)
 

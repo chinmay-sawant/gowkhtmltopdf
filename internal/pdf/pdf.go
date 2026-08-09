@@ -422,17 +422,25 @@ func (d *Document) finalize() error {
 // sorted and the subset cache key and Type0 decision are precomputed here
 // (they are identical for every page) so ensureFont per page is a map lookup.
 //
-//nolint:cyclop // two-pass union: per-page rune merge, then dedupe/sort/key per font
+//nolint:cyclop // two-pass union: per-page rune dedupe, then sort/key per font
 func (d *Document) unionFontRunes() {
-	union := map[string][]rune{}
+	union := map[string]map[rune]struct{}{}
 	fonts := map[string]*Font{}
 
-	for _, p := range d.pages {
-		for name, runes := range p.content.used {
-			union[name] = append(union[name], runes...)
+	for _, page := range d.pages {
+		for name, runes := range page.content.used {
+			used := union[name]
+			if used == nil {
+				used = make(map[rune]struct{}, len(runes))
+				union[name] = used
+			}
+
+			for _, rVal := range runes {
+				used[rVal] = struct{}{}
+			}
 
 			if fonts[name] == nil {
-				fonts[name] = p.content.fontFiles[name]
+				fonts[name] = page.content.fontFiles[name]
 			}
 		}
 	}
@@ -446,21 +454,13 @@ func (d *Document) unionFontRunes() {
 	d.fontKeyFonts = make(map[string]*Font, len(union))
 	d.fontType0 = make(map[string]bool, len(union))
 
-	for name, runes := range union {
-		sort.Slice(runes, func(i, j int) bool { return runes[i] < runes[j] })
-
-		// Pages repeat the same codepoints heavily; compact duplicates in
-		// place so the stored union (and every later walk of it) sees only
-		// unique runes.
-		runesW := 0
-		for _, rVal := range runes {
-			if runesW == 0 || runes[runesW-1] != rVal {
-				runes[runesW] = rVal
-				runesW++
-			}
+	for name, used := range union {
+		runes := make([]rune, 0, len(used))
+		for rVal := range used {
+			runes = append(runes, rVal)
 		}
 
-		runes = runes[:runesW]
+		sort.Slice(runes, func(i, j int) bool { return runes[i] < runes[j] })
 		d.fontRunes[name] = runes
 
 		fnt := fonts[name]

@@ -1565,27 +1565,67 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 
 // pageIndexedOps buckets non-fixed ops by their canvas page.
 func pageIndexedOps(res *Result, contentH float64) [][]int {
-	pageOf, counts := pageBuckets(res.Ops, contentH)
+	maxPage := maxNonFixedOpPage(res.Ops, contentH)
+
+	counts := pageOpCounts(res.Ops, contentH, maxPage)
 
 	pageOps := make([][]int, len(counts))
+
 	for p := range counts {
 		pageOps[p] = make([]int, 0, counts[p])
 	}
 
-	for idx := range res.Ops {
-		if res.Ops[idx].Fixed {
+	fillPageOpBuckets(pageOps, res.Ops, contentH)
+
+	return pageOps
+}
+
+func maxNonFixedOpPage(ops []Op, contentH float64) int {
+	maxPage := 0
+
+	for idx := range ops {
+		if ops[idx].Fixed {
 			continue
 		}
 
-		page := pageOf[idx]
-		if page < 0 || page >= len(counts) {
+		if page := int(ops[idx].Y / contentH); page > maxPage {
+			maxPage = page
+		}
+	}
+
+	return maxPage
+}
+
+func pageOpCounts(ops []Op, contentH float64, maxPage int) []int {
+	counts := make([]int, maxPage+1)
+
+	for idx := range ops {
+		if ops[idx].Fixed {
+			continue
+		}
+
+		page := int(ops[idx].Y / contentH)
+		if page >= 0 && page <= maxPage {
+			counts[page]++
+		}
+	}
+
+	return counts
+}
+
+func fillPageOpBuckets(pageOps [][]int, ops []Op, contentH float64) {
+	for idx := range ops {
+		if ops[idx].Fixed {
+			continue
+		}
+
+		page := int(ops[idx].Y / contentH)
+		if page < 0 || page >= len(pageOps) {
 			continue
 		}
 
 		pageOps[page] = append(pageOps[page], idx)
 	}
-
-	return pageOps
 }
 
 // opInPageBand reports whether the op's top edge sits within [pageTop, pageBot).

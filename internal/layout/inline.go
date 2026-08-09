@@ -171,7 +171,22 @@ func (e *engine) packInlineLine(
 		// restMax for subsequent chunks uses contentW (full BFC width) so
 		// pre-split fragments can reflow wider after a float ends.
 		if parts := e.maybeSplitOverflow(*item, lineW, lineAdv, contentW); len(parts) > 1 {
-			*items = append((*items)[:idx], append(parts, (*items)[idx+1:]...)...)
+			// Open space in-place for the split fragments. The former nested
+			// append always allocated for the tail because chunkParts returns a
+			// full-capacity slice, even when items already had enough room.
+			oldLen := len(*items)
+			extra := len(parts) - 1
+
+			if oldLen+extra > cap(*items) {
+				grown := make([]inlineItem, oldLen+extra)
+				copy(grown, *items)
+				*items = grown
+			} else {
+				*items = (*items)[:oldLen+extra]
+			}
+
+			copy((*items)[idx+len(parts):], (*items)[idx+1:oldLen])
+			copy((*items)[idx:idx+len(parts)], parts)
 			item = &(*items)[idx]
 		}
 
@@ -1299,15 +1314,29 @@ func (e *engine) collectInlineText(node *html.Node, sty ResolvedStyle, out *[]in
 
 // collectPreText splits a white-space:pre node on newlines.
 func (e *engine) collectPreText(node *html.Node, _ ResolvedStyle, out *[]inlineItem) {
-	parts := strings.Split(node.Text, "\n")
-	for i, p := range parts {
-		if p != "" {
-			*out = append(*out, e.textItem(p, e.stylePtr(node)))
+	style := e.stylePtr(node)
+	text := node.Text
+
+	for start := 0; ; {
+		end := strings.IndexByte(text[start:], '\n')
+		if end < 0 {
+			p := text[start:]
+			if p != "" {
+				*out = append(*out, e.textItem(p, style))
+			}
+
+			return
 		}
 
-		if i < len(parts)-1 {
-			*out = append(*out, inlineItem{forceBreak: true}) //nolint:exhaustruct // intentional zero fields
+		end += start
+
+		p := text[start:end]
+		if p != "" {
+			*out = append(*out, e.textItem(p, style))
 		}
+
+		*out = append(*out, inlineItem{forceBreak: true}) //nolint:exhaustruct // intentional zero fields
+		start = end + 1
 	}
 }
 
