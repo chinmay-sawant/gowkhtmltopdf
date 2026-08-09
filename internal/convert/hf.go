@@ -112,7 +112,7 @@ func (p hfParms) substitute(src string) string { //nolint:cyclop // per-token sw
 			return p.doctitle
 		case "webpage":
 			return p.webpage
-		case "section":
+		case htmlSectionName:
 			return p.section
 		case "subsection":
 			return p.subsection

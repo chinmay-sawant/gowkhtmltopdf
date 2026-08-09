@@ -169,6 +169,57 @@ func TestGridTemplateRowsEqualFr(t *testing.T) { //nolint:cyclop
 	}
 }
 
+func TestGridStretchKeepsSiblingStyleIndependent(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+.grid { display:grid; grid-template-columns:1fr; grid-template-rows:1fr 1fr; height:160pt; width:100pt; gap:0 }
+.stretch { background:#fcc }
+.fixed { background:#cfc; height:20pt; align-self:start }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="grid"><div class="stretch">stretch</div><div class="fixed">fixed</div></div>
+</body></html>`, cssSheet)
+
+	var stretchH, fixedH, stretchY, fixedY float64
+
+	var foundStretch, foundFixed bool
+
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpFillRect {
+			continue
+		}
+
+		if paintOp.R > 0.9 && paintOp.G < 0.9 && paintOp.B < 0.9 { // #fcc
+			stretchH = paintOp.H
+			stretchY = paintOp.Y
+			foundStretch = true
+		}
+
+		if paintOp.G > 0.7 && paintOp.R < 0.9 && paintOp.B < 0.9 { // #cfc
+			fixedH = paintOp.H
+			fixedY = paintOp.Y
+			foundFixed = true
+		}
+	}
+
+	if !foundStretch || !foundFixed {
+		t.Fatalf("missing fills stretch=%v fixed=%v", foundStretch, foundFixed)
+	}
+
+	if stretchH < 75 || stretchH > 85 {
+		t.Fatalf("stretched item height=%.1f, want ~80", stretchH)
+	}
+
+	if fixedH < 19 || fixedH > 21 {
+		t.Fatalf("fixed sibling height=%.1f, want 20", fixedH)
+	}
+
+	if fixedY-stretchY < 75 || fixedY-stretchY > 85 {
+		t.Fatalf("second-row offset=%.1f, want ~80", fixedY-stretchY)
+	}
+}
+
 func TestGridRowSpan(t *testing.T) { //nolint:cyclop
 	t.Parallel()
 

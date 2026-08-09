@@ -111,6 +111,38 @@ type Result struct {
 	Locations []ElementLocation
 }
 
+// Workspace owns reusable display-list storage for sequential internal
+// layouts. It is deliberately separate from Result so the established Layout
+// and LayoutContext APIs keep their independent-result contract.
+//
+// A Workspace is not safe for concurrent use. Call Release only after Paint
+// and every consumer has copied the result metadata it needs.
+type Workspace struct {
+	ops []Op
+}
+
+// Release returns a painted Result's display-list backing storage to w and
+// clears Result references that would otherwise retain its box tree and paint
+// indexes. It is a no-op for nil inputs.
+func (w *Workspace) Release(res *Result) {
+	if w == nil || res == nil {
+		return
+	}
+
+	w.ops = res.Ops[:0]
+	res.Ops = nil
+	res.root = nil
+	res.boxes = nil
+	res.flowPages = nil
+	res.flowPageOf = nil
+	res.flowPos = nil
+	res.flowBoxes = nil
+	res.flowBoxPage = nil
+	res.flowBoxPos = nil
+	res.Pages = nil
+	res.Locations = nil
+}
+
 // ElementLocation describes where one element box landed after pagination.
 // X/Y/W/H are in canvas coordinates (y down from the top of the page content
 // area); Page is the page index the box's first op was painted on.
@@ -200,17 +232,19 @@ type engine struct {
 	font     *pdf.Font // default/regular face (metrics fallback)
 	faces    *pdf.FaceSet
 	registry *pdf.Registry
-	// styles holds one heap ResolvedStyle per node (from resolveStylesCtx).
-	// Callers use stylePtr for shared *ResolvedStyle without a second copy.
-	styles     map[*html.Node]*ResolvedStyle
-	ops        []Op
-	noEmit     bool // measurement mode: compute geometry without emitting ops
-	height     float64
-	scale      float64 // zoom factor applied to style lengths (>= 1)
-	zIndex     int
-	zIndexSet  bool
-	positioned bool
-	stickySeq  int // monotonically increasing sticky box IDs (for Op.StickyID)
+	// styles holds immutable resolved styles per node (from resolveStylesCtx).
+	// Transient layout sizes use styleOverrides; callers use stylePtr for
+	// shared *ResolvedStyle without a second copy.
+	styles         map[*html.Node]*ResolvedStyle
+	styleOverrides []styleOverride
+	ops            []Op
+	noEmit         bool // measurement mode: compute geometry without emitting ops
+	height         float64
+	scale          float64 // zoom factor applied to style lengths (>= 1)
+	zIndex         int
+	zIndexSet      bool
+	positioned     bool
+	stickySeq      int // monotonically increasing sticky box IDs (for Op.StickyID)
 	// transformCBDepth counts ancestors with transform≠none; fixed→absolute CB.
 	transformCBDepth int
 	// imgMaxW > 0 clamps replaced <img> boxes to this containing-block width
@@ -253,6 +287,14 @@ type engine struct {
 	// needsXformStamp is set when any built box has transform≠none or
 	// opacity<1 so stampBoxTransforms can skip the full tree walk.
 	needsXformStamp bool
+}
+
+// styleOverride temporarily substitutes one node's resolved style while that
+// node is built. Overrides are engine-local and form a stack so nested builds
+// always observe the most recent override for the same node.
+type styleOverride struct {
+	node  *html.Node
+	style *ResolvedStyle
 }
 
 // faceStyleKey is the faceFor cache key for one CSS face identity.
@@ -554,8 +596,22 @@ func Layout(root *html.Node, opts Options) (*Result, error) {
 // LayoutContext renders the document into a display list and observes ctx at
 // style-pass and recursive tree-construction checkpoints. Layout remains the
 // compatibility entry point for callers that do not need cancellation.
-func LayoutContext(ctx context.Context, //nolint:revive,contextcheck // legacy Layout adapter (stutter + nil ctx)
+func LayoutContext(ctx context.Context, //nolint:revive // legacy Layout adapter
 	root *html.Node, opts Options,
+) (*Result, error) {
+	return layoutContext(ctx, root, opts, nil)
+}
+
+// WithWorkspace is the sequential internal layout form that
+// borrows display-list storage from workspace. Call workspace.Release after
+// Paint and metadata projection, before the next layout using it.
+func WithWorkspace(ctx context.Context, root *html.Node, opts Options, workspace *Workspace) (*Result, error) {
+	return layoutContext(ctx, root, opts, workspace)
+}
+
+func layoutContext(
+	ctx context.Context, //nolint:contextcheck // compatibility adapter validates nil context
+	root *html.Node, opts Options, workspace *Workspace,
 ) (*Result, error) {
 	if root == nil {
 		return nil, errors.New("layout: nil root") //nolint:err113 // static sentinel-free message matches legacy behavior
@@ -590,14 +646,22 @@ func LayoutContext(ctx context.Context, //nolint:revive,contextcheck // legacy L
 
 	styles, containers := resolveStylesForLayout(root, opts)
 
-	return finalizeResult(newEngine(ctx, root, opts, faces, font, styles, containers), root, opts)
+	var ops []Op
+
+	if workspace == nil || cap(workspace.ops) == 0 {
+		ops = make([]Op, 0, estimateOpCapacity(root))
+	} else {
+		ops = workspace.ops[:0]
+	}
+
+	return finalizeResult(newEngine(ctx, opts, faces, font, styles, containers, ops), root, opts)
 }
 
 // newEngine constructs the layout engine state (extracted from LayoutContext
 // for clarity).
 func newEngine(
-	ctx context.Context, root *html.Node, opts Options,
-	faces *pdf.FaceSet, font *pdf.Font, styles map[*html.Node]*ResolvedStyle, containers map[*html.Node]sizeContainer,
+	ctx context.Context, opts Options, faces *pdf.FaceSet, font *pdf.Font,
+	styles map[*html.Node]*ResolvedStyle, containers map[*html.Node]sizeContainer, ops []Op,
 ) *engine {
 	return &engine{ //nolint:exhaustruct // intentional zero fields
 		opts:       opts,
@@ -608,7 +672,7 @@ func newEngine(
 		styles:     styles,
 		scale:      zoomScale(opts.Zoom),
 		containers: containers,
-		ops:        make([]Op, 0, estimateOpCapacity(root)),
+		ops:        ops,
 	}
 }
 
@@ -696,6 +760,13 @@ func sameSizeContainers(a, b map[*html.Node]sizeContainer) bool {
 }
 
 func (e *engine) stylePtr(node *html.Node) *ResolvedStyle {
+	for idx := len(e.styleOverrides) - 1; idx >= 0; idx-- {
+		override := e.styleOverrides[idx]
+		if override.node == node {
+			return override.style
+		}
+	}
+
 	if p := e.styles[node]; p != nil {
 		return p
 	}
@@ -705,13 +776,30 @@ func (e *engine) stylePtr(node *html.Node) *ResolvedStyle {
 }
 
 // styleVal returns a by-value ResolvedStyle for APIs that still take values.
-// Prefer field access on e.styles[node] / stylePtr to avoid the copy.
+// Prefer field access on stylePtr to avoid the copy when possible.
 func (e *engine) styleVal(node *html.Node) ResolvedStyle {
-	if p := e.styles[node]; p != nil {
-		return *p
+	return *e.stylePtr(node)
+}
+
+// buildWithStyle builds node with an engine-local style override. The override
+// remains live through the complete recursive build, so boxes created for node
+// can safely retain its pointer while descendants continue to read their own
+// resolved styles from e.styles.
+func (e *engine) buildWithStyle(
+	node *html.Node, override *ResolvedStyle, availW, posX, posY float64,
+) *box {
+	if override == nil {
+		return e.build(node, availW, posX, posY)
 	}
 
-	return ResolvedStyle{} //nolint:exhaustruct // intentional zero fields
+	e.styleOverrides = append(e.styleOverrides, styleOverride{node: node, style: override})
+	defer e.popStyleOverride()
+
+	return e.build(node, availW, posX, posY)
+}
+
+func (e *engine) popStyleOverride() {
+	e.styleOverrides = e.styleOverrides[:len(e.styleOverrides)-1]
 }
 
 func flattenBoxes(boxNode *box, out *[]*box) {

@@ -36,7 +36,7 @@ type objectPlacement struct {
 // Fields are grouped by lifecycle:
 //   - identity / settings: obj, idx, isTOC, header, footer, repl, toc, media, …
 //   - load-time resources: registry, base, lp, imagesFn, geom, headerHTML/footerHTML
-//   - body content: res, headings
+//   - body content: navigation, headings
 //   - TOC content: tocPages, tocRoot, tocRes
 //   - placement (post-paint): embedded objectPlacement (pages, offset, start)
 type objectState struct {
@@ -67,9 +67,10 @@ type objectState struct {
 	imagesFn func(src string) ([]byte, error)
 	doctitle string // <title> of the object document
 
-	// body objects:
-	res      *layout.Result
-	headings []*outline.Heading
+	// body objects. navigation is the post-paint projection needed by later
+	// link passes; it intentionally does not retain the full layout result.
+	navigation bodyNavigation
+	headings   []*outline.Heading
 
 	// TOC objects:
 	tocPages int

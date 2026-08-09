@@ -32,6 +32,46 @@ type object struct {
 	stream []byte
 }
 
+// countingWriter forwards PDF bytes while tracking their exact offset. It
+// turns a silent short write into io.ErrShortWrite so xref offsets can never
+// be reported as though a truncated stream were complete.
+type countingWriter struct {
+	w io.Writer
+	n int64
+}
+
+func (w *countingWriter) Write(data []byte) (int, error) {
+	count, err := w.w.Write(data)
+	w.n += int64(count)
+
+	if err == nil && count != len(data) {
+		err = io.ErrShortWrite
+	}
+
+	return count, err
+}
+
+func (w *countingWriter) WriteString(text string) (int, error) {
+	var (
+		count int
+		err   error
+	)
+
+	if stringWriter, ok := w.w.(io.StringWriter); ok {
+		count, err = stringWriter.WriteString(text)
+	} else {
+		count, err = w.w.Write([]byte(text))
+	}
+
+	w.n += int64(count)
+
+	if err == nil && count != len(text) {
+		err = io.ErrShortWrite
+	}
+
+	return count, err
+}
+
 // objRef is a typed indirect-object handle; the "N 0 R" spelling is a
 // formatting concern, not a data type, and refs cannot be malformed.
 type objRef int
@@ -294,16 +334,118 @@ type Outline struct {
 // SetOutline installs the document outline tree.
 func (d *Document) SetOutline(root *Outline) { d.outlineRoot = root }
 
-// Write serializes the full PDF to w.
+// Write serializes the full PDF to w without staging another complete copy in
+// memory. The counting writer supplies the xref offsets as bytes are emitted.
 func (d *Document) Write(width io.Writer) error {
-	if err := d.finalize(); err != nil {
+	_, err := d.writeTo(width)
+
+	return err
+}
+
+// WriteTo implements io.WriterTo.
+func (d *Document) WriteTo(width io.Writer) (int64, error) {
+	return d.writeTo(width)
+}
+
+func writePDFFormat(out *countingWriter, format string, args ...any) error {
+	_, err := fmt.Fprintf(out, format, args...)
+
+	if err != nil {
+		return fmt.Errorf("write PDF format: %w", err)
+	}
+
+	return nil
+}
+
+func writePDFString(out *countingWriter, text string) error {
+	_, err := io.WriteString(out, text)
+
+	if err != nil {
+		return fmt.Errorf("write PDF text: %w", err)
+	}
+
+	return nil
+}
+
+func writePDFHeader(out *countingWriter) error {
+	if err := writePDFFormat(out, "%%PDF-%s\n", Version); err != nil {
 		return err
 	}
 
-	var buf bytes.Buffer
+	return writePDFString(out, "%\xe2\xe3\xcf\xd3\n") // binary comment
+}
 
-	fmt.Fprintf(&buf, "%%PDF-%s\n", Version)
-	fmt.Fprintln(&buf, "%\xe2\xe3\xcf\xd3") // binary comment
+func writePDFObject(out *countingWriter, obj *object) (int64, error) {
+	offset := out.n
+
+	if err := writePDFFormat(out, "%d 0 obj\n", obj.id); err != nil {
+		return 0, err
+	}
+
+	if err := writePDFString(out, obj.dict); err != nil {
+		return 0, err
+	}
+
+	if len(obj.stream) > 0 {
+		if err := writePDFString(out, "\nstream\n"); err != nil {
+			return 0, err
+		}
+
+		if _, err := out.Write(obj.stream); err != nil {
+			return 0, err
+		}
+
+		if err := writePDFString(out, "\nendstream"); err != nil {
+			return 0, err
+		}
+	}
+
+	if err := writePDFString(out, "\nendobj\n"); err != nil {
+		return 0, err
+	}
+
+	return offset, nil
+}
+
+func writePDFTrailer(out *countingWriter, doc *Document, offsets []int64) error {
+	xrefPos := out.n
+
+	if err := writePDFFormat(out, "xref\n0 %d\n", len(doc.objects)+1); err != nil {
+		return err
+	}
+
+	if err := writePDFString(out, "0000000000 65535 f \n"); err != nil {
+		return err
+	}
+
+	for idx := 1; idx <= len(doc.objects); idx++ {
+		if err := writePDFFormat(out, "%010d 00000 n \n", offsets[idx]); err != nil {
+			return err
+		}
+	}
+
+	if err := writePDFString(out, "trailer\n"); err != nil {
+		return err
+	}
+
+	if err := writePDFFormat(
+		out, "<< /Size %d /Root %s /Info %s >>\n", len(doc.objects)+1, doc.catalogRef, doc.infoRef,
+	); err != nil {
+		return err
+	}
+
+	return writePDFFormat(out, "startxref\n%d\n%%%%EOF\n", xrefPos)
+}
+
+func (d *Document) writeTo(width io.Writer) (int64, error) {
+	if err := d.finalize(); err != nil {
+		return 0, err
+	}
+
+	out := &countingWriter{w: width} //nolint:exhaustruct // count starts at zero
+	if err := writePDFHeader(out); err != nil {
+		return out.n, fmt.Errorf("pdf: write: %w", err)
+	}
 
 	offsets := make([]int64, len(d.objects)+1)
 
@@ -314,51 +456,20 @@ func (d *Document) Write(width io.Writer) error {
 			continue
 		}
 
-		offsets[obj.id] = int64(buf.Len())
-		fmt.Fprintf(&buf, "%d 0 obj\n", obj.id)
-		buf.WriteString(obj.dict)
+		offset, err := writePDFObject(out, obj)
 
-		if len(obj.stream) > 0 {
-			buf.WriteString("\nstream\n")
-			buf.Write(obj.stream)
-			buf.WriteString("\nendstream")
+		if err != nil {
+			return out.n, fmt.Errorf("pdf: write: %w", err)
 		}
 
-		fmt.Fprintln(&buf)
-		fmt.Fprintln(&buf, "endobj")
+		offsets[obj.id] = offset
 	}
 
-	xrefPos := int64(buf.Len())
-	fmt.Fprintf(&buf, "xref\n0 %d\n", len(d.objects)+1)
-	fmt.Fprintln(&buf, "0000000000 65535 f ")
-
-	for i := 1; i <= len(d.objects); i++ {
-		fmt.Fprintf(&buf, "%010d 00000 n \n", offsets[i])
+	if err := writePDFTrailer(out, d, offsets); err != nil {
+		return out.n, fmt.Errorf("pdf: write: %w", err)
 	}
 
-	fmt.Fprintln(&buf, "trailer")
-	fmt.Fprintf(&buf, "<< /Size %d /Root %s /Info %s >>\n", len(d.objects)+1, d.catalogRef, d.infoRef)
-	fmt.Fprintf(&buf, "startxref\n%d\n%%%%EOF\n", xrefPos)
-
-	if _, err := width.Write(buf.Bytes()); err != nil {
-		return fmt.Errorf("pdf: write: %w", err)
-	}
-
-	return nil
-}
-
-// WriteTo implements io.WriterTo.
-func (d *Document) WriteTo(width io.Writer) (int64, error) {
-	var buf bytes.Buffer
-	if err := d.Write(&buf); err != nil {
-		return 0, err
-	}
-
-	if _, err := width.Write(buf.Bytes()); err != nil {
-		return 0, fmt.Errorf("pdf: write: %w", err)
-	}
-
-	return int64(buf.Len()), nil
+	return out.n, nil
 }
 
 // finalize builds catalog, pages tree, fonts, images, annots, outlines and

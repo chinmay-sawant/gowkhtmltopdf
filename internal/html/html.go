@@ -116,30 +116,33 @@ func (n *Node) appendText(buf *strings.Builder) {
 // decoded UTF-8; charset detection happens at the load seam (internal/load).
 // Use ParseDocument for the bytes-to-tree path (it strips the BOM).
 func Parse(source string) (*Node, error) {
-	tok, err := tokenize(source)
+	root := &Node{Type: ElementNode, Name: "#document"} //nolint:exhaustruct
+	stack := []*Node{root}
+
+	err := scanTokens(source, func(tokItem token) {
+		appendToken(&stack, tokItem)
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	root := &Node{Type: ElementNode, Name: "#document"} //nolint:exhaustruct
-	stack := []*Node{root}
-
-	for _, tokItem := range tok {
-		switch tokItem.kind {
-		case tokDoctype:
-			appendDoctypeToken(&stack, tokItem.data)
-		case tokComment:
-			appendCommentToken(&stack, tokItem.data)
-		case tokText:
-			appendTextToken(&stack, tokItem.data)
-		case tokStart:
-			openElement(&stack, tokItem)
-		case tokEnd:
-			closeElement(&stack, tokItem.data)
-		}
-	}
-
 	return root, nil
+}
+
+// appendToken applies one scanned token to the tree builder stack.
+func appendToken(stack *[]*Node, tokItem token) {
+	switch tokItem.kind {
+	case tokDoctype:
+		appendDoctypeToken(stack, tokItem.data)
+	case tokComment:
+		appendCommentToken(stack, tokItem.data)
+	case tokText:
+		appendTextToken(stack, tokItem.data)
+	case tokStart:
+		openElement(stack, tokItem)
+	case tokEnd:
+		closeElement(stack, tokItem.data)
+	}
 }
 
 // appendDoctypeToken attaches a doctype node to the current top of stack.
@@ -398,10 +401,28 @@ type token struct {
 	selfClosing bool
 }
 
-// tokenize scans raw HTML into tokens without parsing structure.
+// tokenSink consumes one scanned HTML token.
+type tokenSink func(token)
+
+// tokenize collects tokens for tokenizer-level tests. Parse uses scanTokens
+// directly so a document does not retain a whole token slice before tree build.
 func tokenize(src string) ([]token, error) {
 	toks := make([]token, 0, strings.Count(src, "<")+1)
 
+	err := scanTokens(src, func(tok token) {
+		toks = append(toks, tok)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return toks, nil
+}
+
+// scanTokens scans raw HTML and emits each token as soon as it is recognized.
+// Scanner errors stop further emission and preserve the tokenizer's existing
+// malformed-input behavior.
+func scanTokens(src string, emit tokenSink) error {
 	pos := 0
 	srcLen := len(src)
 
@@ -412,14 +433,14 @@ func tokenize(src string) ([]token, error) {
 				span = srcLen - pos
 			}
 
-			toks = append(toks, token{kind: tokText, data: src[pos : pos+span]}) //nolint:exhaustruct
+			emit(token{kind: tokText, data: src[pos : pos+span]}) //nolint:exhaustruct
 			pos += span
 
 			continue
 		}
 
 		if pos+1 >= srcLen {
-			toks = append(toks, token{kind: tokText, data: "<"}) //nolint:exhaustruct
+			emit(token{kind: tokText, data: "<"}) //nolint:exhaustruct
 
 			break
 		}
@@ -430,28 +451,28 @@ func tokenize(src string) ([]token, error) {
 
 		switch {
 		case src[pos+1] == '!':
-			next, err = scanBang(src, pos, &toks)
+			next, err = scanBang(src, pos, emit)
 		case src[pos+1] == '/':
-			next, err = scanEndTag(src, pos, &toks)
+			next, err = scanEndTag(src, pos, emit)
 		case src[pos+1] == '?':
 			next, err = scanPI(src, pos)
 		default:
-			next, err = scanStartTag(src, pos, &toks)
+			next, err = scanStartTag(src, pos, emit)
 		}
 
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		pos = next
 	}
 
-	return toks, nil
+	return nil
 }
 
 // scanBang tokenizes a '!' construct at pos: comment, doctype, or a bogus
 // declaration that is skipped.
-func scanBang(src string, pos int, toks *[]token) (int, error) {
+func scanBang(src string, pos int, emit tokenSink) (int, error) {
 	if strings.HasPrefix(src[pos:], "<!--") {
 		end := strings.Index(src[pos+commentPrefixLen:], "-->")
 		if end < 0 {
@@ -461,7 +482,7 @@ func scanBang(src string, pos int, toks *[]token) (int, error) {
 		data := src[pos+commentPrefixLen : pos+commentPrefixLen+end]
 		next := pos + commentPrefixLen + end + commentSuffixLen
 
-		*toks = append(*toks, token{kind: tokComment, data: data}) //nolint:exhaustruct
+		emit(token{kind: tokComment, data: data}) //nolint:exhaustruct
 
 		return next, nil
 	}
@@ -472,7 +493,7 @@ func scanBang(src string, pos int, toks *[]token) (int, error) {
 			return 0, errUnterminatedDoctype
 		}
 
-		*toks = append(*toks, token{kind: tokDoctype, data: src[pos+2 : pos+end]}) //nolint:exhaustruct
+		emit(token{kind: tokDoctype, data: src[pos+2 : pos+end]}) //nolint:exhaustruct
 
 		return pos + end + 1, nil
 	}
@@ -487,14 +508,14 @@ func scanBang(src string, pos int, toks *[]token) (int, error) {
 }
 
 // scanEndTag tokenizes a closing tag at pos.
-func scanEndTag(src string, pos int, toks *[]token) (int, error) {
+func scanEndTag(src string, pos int, emit tokenSink) (int, error) {
 	end := strings.IndexByte(src[pos:], '>')
 	if end < 0 {
 		return 0, errUnterminatedEndTag
 	}
 
 	name := endTagName(src[pos+2 : pos+end])
-	*toks = append(*toks, token{kind: tokEnd, data: name}) //nolint:exhaustruct
+	emit(token{kind: tokEnd, data: name}) //nolint:exhaustruct
 
 	return pos + end + 1, nil
 }
@@ -573,10 +594,10 @@ func scanPI(src string, pos int) (int, error) {
 
 // scanStartTag tokenizes a start tag at pos, including the raw-text content
 // of script/style/textarea/title elements up to their closing tag.
-func scanStartTag(src string, pos int, toks *[]token) (int, error) {
+func scanStartTag(src string, pos int, emit tokenSink) (int, error) {
 	if !isASCIILetter(src[pos+1]) {
 		// bare '<' followed by no valid tag start becomes text
-		*toks = append(*toks, token{kind: tokText, data: "<"}) //nolint:exhaustruct
+		emit(token{kind: tokText, data: "<"}) //nolint:exhaustruct
 
 		return pos + 1, nil
 	}
@@ -588,7 +609,7 @@ func scanStartTag(src string, pos int, toks *[]token) (int, error) {
 
 	if end < 0 {
 		// no closing '>' - treat the rest as text
-		*toks = append(*toks, token{kind: tokText, data: src[pos:]}) //nolint:exhaustruct
+		emit(token{kind: tokText, data: src[pos:]}) //nolint:exhaustruct
 
 		return len(src), nil
 	}
@@ -605,22 +626,24 @@ func scanStartTag(src string, pos int, toks *[]token) (int, error) {
 	}
 
 	name = strings.ToLower(name)
-	*toks = append(*toks, token{kind: tokStart, data: name, attrs: attrs, selfClosing: selfClose})
+	emit(token{kind: tokStart, data: name, attrs: attrs, selfClosing: selfClose})
+
 	next := end + 1
 	// raw-text elements capture everything until their closing tag
 	if isRawTextElement(name) && !selfClose {
 		rawStart, rawEnd, ok := rawTextEnd(src, next, name)
 		if !ok {
-			*toks = append(*toks, token{kind: tokText, data: src[next:]}) //nolint:exhaustruct
+			emit(token{kind: tokText, data: src[next:]}) //nolint:exhaustruct
 
 			return len(src), nil
 		}
 
 		if rawStart > next {
-			*toks = append(*toks, token{kind: tokText, data: src[next:rawStart]}) //nolint:exhaustruct
+			emit(token{kind: tokText, data: src[next:rawStart]}) //nolint:exhaustruct
 		}
 
-		*toks = append(*toks, token{kind: tokEnd, data: name}) //nolint:exhaustruct
+		emit(token{kind: tokEnd, data: name}) //nolint:exhaustruct
+
 		next = rawEnd + 1
 	}
 

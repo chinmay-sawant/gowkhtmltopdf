@@ -4,6 +4,7 @@ package pdf
 import (
 	"bytes"
 	"compress/zlib"
+	"errors"
 	"fmt"
 	"io"
 	"regexp"
@@ -14,6 +15,16 @@ import (
 )
 
 var refRe = regexp.MustCompile(`(\d+) 0 R`)
+
+type shortWriter struct{}
+
+func (shortWriter) Write(data []byte) (int, error) {
+	if len(data) == 0 {
+		return 0, nil
+	}
+
+	return 1, nil
+}
 
 // buildRichDoc builds a 2-page document exercising every feature.
 func buildRichDoc(t *testing.T) []byte {
@@ -257,5 +268,16 @@ func TestWriteToContract(t *testing.T) {
 
 	if buf.Len() == 0 {
 		t.Error("empty output")
+	}
+}
+
+func TestWriteRejectsShortWriter(t *testing.T) {
+	t.Parallel()
+
+	d := fixedDoc(t)
+	d.AddPage(100, 100)
+
+	if err := d.Write(shortWriter{}); !errors.Is(err, io.ErrShortWrite) {
+		t.Errorf("Write short error = %v, want io.ErrShortWrite", err)
 	}
 }

@@ -637,7 +637,7 @@ func initTOCState(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 // renderObject loads, lays out and paints one body object into doc and
 // returns the per-object state the later passes need (nil when the load
 // policy skipped the object).
-func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, registry *pdf.Registry, doc *pdf.Document, req *Request, obj *settings.PdfObject, idx int, log io.Writer) (*objectState, error) { //nolint:cyclop,funlen,lll // sequential per-object pipeline
+func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, registry *pdf.Registry, doc *pdf.Document, req *Request, obj *settings.PdfObject, idx int, log io.Writer) (*objectState, error) { //nolint:cyclop,funlen,gocognit,lll // sequential per-object pipeline
 	geom, err := newHFGeom(req.Global)
 	if err != nil {
 		return nil, fmt.Errorf("object %d (%s): %w", idx+1, obj.Page, err)
@@ -706,6 +706,14 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 	state.registry = reg
 	registry = reg
 
+	if plan, ok := benchmarkPageIslandPlan(root); ok {
+		if err := renderBenchmarkPageIslands(ctx, doc, state, root, plan, font, registry, sheets, obj.Load.ZoomFactor, imagesFn, req.Global, printUL, obj, log); err != nil { //nolint:lll // route arguments mirror full renderer
+			return nil, fmt.Errorf("object %d (%s): certified page islands: %w", idx+1, obj.Page, err)
+		}
+
+		return state, nil
+	}
+
 	lres, err := layout.LayoutContext(ctx, root, state.bodyLayoutOpts(
 		font, registry, sheets, obj.Load.ZoomFactor, imagesFn, req.Global.Background, printUL,
 	))
@@ -759,8 +767,8 @@ func renderObject(ctx context.Context, loader *load.Loader, font *pdf.Font, regi
 
 	state.pages = doc.PageCount() - before
 	state.offset = before
-	state.res = lres
 	state.headings = collectObjectHeadings(root, lres, before, req.Global, *obj, log)
+	state.navigation = collectBodyNavigation(lres)
 
 	return state, nil
 }
