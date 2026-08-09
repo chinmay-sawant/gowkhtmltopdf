@@ -111,7 +111,16 @@ const (
 // 25.4mm cancel cleanly to 72pt in IEEE float arithmetic. Precomputing
 // (72/25.4) and multiplying loses that cancellation (25.4mm → 71.999…).
 func LengthToPt(val float64, unit string, basePt float64) (float64, bool) {
-	low := strings.ToLower(unit)
+	low := unit
+
+	for i := range len(unit) {
+		if unit[i] >= 'A' && unit[i] <= 'Z' {
+			low = strings.ToLower(unit)
+
+			break
+		}
+	}
+
 	if pt, ok := absoluteLengthToPt(val, low); ok {
 		return pt, true
 	}

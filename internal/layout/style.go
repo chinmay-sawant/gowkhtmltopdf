@@ -119,13 +119,17 @@ type ResolvedStyle struct {
 	Color               [3]float64
 	BGColor             [4]float64 // rgba, 0..1
 	FontFamily          []string
-	FontSize            float64 // pts
-	FontWeight          int
-	FontItalic          bool
-	LineHeight          float64 // pts; 0 = "normal"
-	TextAlign           string  // floatLeft | floatRight | "center" | "justify"
-	VerticalAlign       string  // "baseline" | "top" | "middle" | cssVerticalAlignBottom
-	WhiteSpace          string  // "normal" | "nowrap" | "pre"
+	// famHash is the FNV-1a fingerprint of FontFamily, computed once during
+	// style resolution (hashFontFamily in layout.go). Text measurement reuses
+	// it instead of re-hashing the family list per run.
+	famHash       uint64
+	FontSize      float64 // pts
+	FontWeight    int
+	FontItalic    bool
+	LineHeight    float64 // pts; 0 = "normal"
+	TextAlign     string  // floatLeft | floatRight | "center" | "justify"
+	VerticalAlign string  // "baseline" | "top" | "middle" | cssVerticalAlignBottom
+	WhiteSpace    string  // "normal" | "nowrap" | "pre"
 	// OverflowWrap is CSS overflow-wrap / word-wrap: "normal" | "break-word" | "anywhere".
 	OverflowWrap string
 	// WordBreak is CSS word-break: "normal" | "break-all" | "keep-all".
@@ -203,25 +207,29 @@ func initialStyle() ResolvedStyle {
 		Overflow:         "visible",
 		Color:            [3]float64{0, 0, 0},
 		BGColor:          [4]float64{0, 0, 0, 0},
-		FontSize:         defaultFontSizePt, // 16px at 96dpi
-		FontWeight:       fontWeightNormal,
-		VerticalAlign:    "baseline",
-		WhiteSpace:       "normal",
-		OverflowWrap:     "normal",
-		WordBreak:        "normal",
-		TextDecoration:   cssDisplayNone,
-		ListStyleType:    "disc",
-		BorderCollapse:   "separate",
-		BorderSpacing:    0,
-		TableLayout:      overflowAuto,
-		GridColumnSpan:   1,
-		GridRowSpan:      1,
-		WritingMode:      "horizontal-tb",
-		Orphans:          two,
-		Widows:           two,
-		Transform:        IdentityMatrix(),
-		TransformOrigin:  defaultTransformOrigin(),
-		Opacity:          1,
+		FontFamily:       nil,
+		// Empty family hashes to the FNV-1a offset, matching what
+		// resolveElementStyle records for elements without font-family.
+		famHash:         hashFontFamily(nil),
+		FontSize:        defaultFontSizePt, // 16px at 96dpi
+		FontWeight:      fontWeightNormal,
+		VerticalAlign:   "baseline",
+		WhiteSpace:      "normal",
+		OverflowWrap:    "normal",
+		WordBreak:       "normal",
+		TextDecoration:  cssDisplayNone,
+		ListStyleType:   "disc",
+		BorderCollapse:  "separate",
+		BorderSpacing:   0,
+		TableLayout:     overflowAuto,
+		GridColumnSpan:  1,
+		GridRowSpan:     1,
+		WritingMode:     "horizontal-tb",
+		Orphans:         two,
+		Widows:          two,
+		Transform:       IdentityMatrix(),
+		TransformOrigin: defaultTransformOrigin(),
+		Opacity:         1,
 	}
 }
 
@@ -445,6 +453,11 @@ func resolveElementStyle(
 	if sty.Float != cssDisplayNone {
 		sty.Display = blockifyDisplayForFloat(sty.Display)
 	}
+
+	// FontFamily is final here (inherited, or parsed by applyFontProps /
+	// parseFontShorthand); fingerprint it once so inline text measurement
+	// does not re-hash the family list per run.
+	sty.famHash = hashFontFamily(sty.FontFamily)
 }
 
 // mergeCustomProps inherits parent custom properties and overlays any --*
@@ -811,8 +824,8 @@ func applyCascadeWin(
 	wins map[string]cascadeWin,
 	prop, value string, ids, classes, types, order int, important bool,
 ) {
-	prop = strings.ToLower(prop)
-
+	// prop is already lowercase: sheet and inline declarations are folded by
+	// css.parseDeclarations and the UA table is hard-coded lowercase.
 	cur, ok := wins[prop]
 	if !ok {
 		wins[prop] = cascadeWin{
@@ -978,25 +991,29 @@ type styleGroupFn func(
 	parent *ResolvedStyle, hasParent bool,
 ) bool
 
+// styleGroups is the immutable dispatch order for applyStyleProp.
+// Package-level so applyStyleProp does not rebuild the 11-entry array on
+// every cascaded property of every element.
+var styleGroups = [...]styleGroupFn{ //nolint:gochecknoglobals // static dispatch table
+	applyDisplayGroup,
+	applyPositionGroup,
+	applyFlexGroup,
+	applyMulticolGroup,
+	applyGridGroup,
+	applyBoxGroup,
+	applyBorderGroup,
+	applyColorGroup,
+	applyTextGroup,
+	applyTableBreakGroup,
+	applyTransformGroup,
+}
+
 // applyStyleProp routes one cascaded property to the group that owns it.
 func applyStyleProp(
 	style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext,
 	parent *ResolvedStyle, hasParent bool,
 ) {
-	groups := [...]styleGroupFn{
-		applyDisplayGroup,
-		applyPositionGroup,
-		applyFlexGroup,
-		applyMulticolGroup,
-		applyGridGroup,
-		applyBoxGroup,
-		applyBorderGroup,
-		applyColorGroup,
-		applyTextGroup,
-		applyTableBreakGroup,
-		applyTransformGroup,
-	}
-	for _, group := range groups {
+	for _, group := range styleGroups {
 		if group(style, prop, value, fsize, ctx, parent, hasParent) {
 			return
 		}

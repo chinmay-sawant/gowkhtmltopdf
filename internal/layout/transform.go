@@ -432,7 +432,11 @@ func splitTransformArgs(args string) []string {
 		return nil
 	}
 
-	var parts []string
+	// Most transform functions take at most 4 args (translate/scale/rotate/
+	// skew/matrix6). The stack array avoids a heap slice per function; a 5th
+	// append grows onto the heap exactly like the old nil-slice append did.
+	var buf [4]string
+	parts := buf[:0]
 
 	start := 0
 	depth := 0

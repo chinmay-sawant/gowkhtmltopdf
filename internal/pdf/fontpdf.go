@@ -143,7 +143,9 @@ func (d *Document) ensureToUnicode(sub *subsetResult, codeBytes int) objRef {
 // runesKey builds a stable cache key for a rune set. It sorts used in place;
 // callers pass the content-owned set only after all text emission is complete.
 func runesKey(used []rune) string {
-	slices.Sort(used)
+	if !slices.IsSorted(used) {
+		slices.Sort(used)
+	}
 
 	unique := 0
 

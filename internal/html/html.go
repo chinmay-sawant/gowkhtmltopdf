@@ -42,8 +42,18 @@ type Node struct {
 	Parent   *Node
 }
 
-// Attribute returns an attribute value, or "".
-func (n *Node) Attribute(name string) string { return n.Attrs[strings.ToLower(name)] }
+// Attribute returns an attribute value, or "". Attribute keys are stored
+// lowercased by the tokenizer, so lookups of already-lowercase names skip the
+// ToLower copy; uppercase lookups (e.g. CSS attr(NAME)) keep the fallback.
+func (n *Node) Attribute(name string) string {
+	for i := range len(name) {
+		if name[i] >= 'A' && name[i] <= 'Z' {
+			return n.Attrs[strings.ToLower(name)]
+		}
+	}
+
+	return n.Attrs[name]
+}
 
 // FirstChild returns the first element child with name, or nil.
 func (n *Node) FirstChild(name string) *Node {
@@ -373,10 +383,12 @@ const (
 )
 
 const (
-	commentPrefixLen = 4 // len("<!--")
-	commentSuffixLen = 3 // len("-->")
-	piCloseLen       = 2 // len("?>")
-	rawCloseMinSkip  = 2 // len("</")
+	commentPrefixLen = 4    // len("<!--")
+	commentSuffixLen = 3    // len("-->")
+	piCloseLen       = 2    // len("?>")
+	rawCloseMinSkip  = 2    // len("</")
+	asciiFoldBit     = 0x20 // bit that maps an ASCII uppercase byte to lowercase
+	nonASCIIStart    = 0x80 // first byte value of a multi-byte UTF-8 sequence
 )
 
 type token struct {
@@ -481,10 +493,72 @@ func scanEndTag(src string, pos int, toks *[]token) (int, error) {
 		return 0, errUnterminatedEndTag
 	}
 
-	name := strings.ToLower(strings.TrimSpace(src[pos+2 : pos+end]))
+	name := endTagName(src[pos+2 : pos+end])
 	*toks = append(*toks, token{kind: tokEnd, data: name}) //nolint:exhaustruct
 
 	return pos + end + 1, nil
+}
+
+// endTagName trims surrounding whitespace from an end-tag name and
+// lowercases it, copying only when the name actually differs from the source
+// (the common "</name>" form returns a zero-copy substring of src). Names
+// with non-ASCII bytes keep the Unicode behavior of TrimSpace/ToLower.
+//
+//nolint:cyclop // trim, classify, and fold passes share the same body slice
+func endTagName(body string) string {
+	start := 0
+	for start < len(body) && isTrimSpace(body[start]) {
+		start++
+	}
+
+	end := len(body)
+	for end > start && isTrimSpace(body[end-1]) {
+		end--
+	}
+
+	hasNonASCII := false
+	hasUpper := false
+
+	for idx := start; idx < end; idx++ {
+		switch {
+		case body[idx] >= nonASCIIStart:
+			hasNonASCII = true
+		case body[idx] >= 'A' && body[idx] <= 'Z':
+			hasUpper = true
+		}
+	}
+
+	if hasNonASCII {
+		return strings.ToLower(strings.TrimSpace(body))
+	}
+
+	if !hasUpper {
+		return body[start:end]
+	}
+
+	out := make([]byte, end-start)
+
+	for idx := start; idx < end; idx++ {
+		bodyByte := body[idx]
+		if bodyByte >= 'A' && bodyByte <= 'Z' {
+			bodyByte |= asciiFoldBit
+		}
+
+		out[idx-start] = bodyByte
+	}
+
+	return string(out)
+}
+
+// isTrimSpace reports whether b is one of the ASCII whitespace bytes
+// strings.TrimSpace removes.
+func isTrimSpace(b byte) bool {
+	switch b {
+	case ' ', '\t', '\n', '\v', '\f', '\r':
+		return true
+	}
+
+	return false
 }
 
 // scanPI skips a processing instruction at pos.
@@ -577,31 +651,51 @@ func tagEnd(src string, start int) (int, error) {
 
 // rawTextEnd finds the closing tag of a raw-text element whose content starts
 // at from. It returns the span of the closing tag, or ok=false if the content
-// runs to the end of the source.
+// runs to the end of the source. The scan is byte-wise: no lowered copy of
+// the remaining document, no needle string.
 func rawTextEnd(src string, from int, name string) (int, int, bool) {
-	needle := "</" + name
-
-	low := strings.ToLower(src[from:])
 	offset := from
+	srcLen := len(src)
 
-	for {
-		found := strings.Index(low, needle)
-		if found < 0 {
+	for offset < srcLen {
+		lt := strings.IndexByte(src[offset:], '<')
+		if lt < 0 {
 			return 0, 0, false
 		}
 
-		after := found + len(needle)
-		for after < len(low) && isWhitespace(low[after]) {
-			after++
-		}
+		candidate := offset + lt
+		if candidate+1 < srcLen && src[candidate+1] == '/' && rawNameFolds(src[candidate+2:], name) {
+			after := candidate + rawCloseMinSkip + len(name)
+			for after < srcLen && isWhitespace(src[after]) {
+				after++
+			}
 
-		if after < len(low) && low[after] == '>' {
-			return offset + found, offset + after, true
+			if after < srcLen && src[after] == '>' {
+				return candidate, after, true
+			}
 		}
-
-		low = low[found+rawCloseMinSkip:]
-		offset += found + rawCloseMinSkip
+		// the candidate did not close the element: continue right after "</",
+		// mirroring the original search over the (previously lowered) rest
+		offset = candidate + rawCloseMinSkip
 	}
+
+	return 0, 0, false
+}
+
+// rawNameFolds reports whether s starts with the lowercase tag name name,
+// comparing ASCII bytes case-insensitively (names are stored lowercased).
+func rawNameFolds(src string, name string) bool {
+	if len(src) < len(name) {
+		return false
+	}
+
+	for i := range len(name) {
+		if src[i]|asciiFoldBit != name[i] {
+			return false
+		}
+	}
+
+	return true
 }
 
 // parseTag extracts the tag name and attribute pairs from a <...> body.

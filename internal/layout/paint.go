@@ -16,6 +16,19 @@ const (
 	pageBreakAlways = "always"
 )
 
+// rowChromeCap bounds the initial row-chrome candidate slice; a snap touches
+// one row's fills (a handful) regardless of display-list size.
+const rowChromeCap = 4
+
+// rowChromeBandTolerance is the widest band row chrome can sit in above a
+// snapped op: candidate fills are at most 40pt tall and may reach 2pt past
+// the op's top.
+const rowChromeBandTolerance = 42
+
+// splitSlackPerCrossing is the per-op headroom reserved for page-split
+// fragments; a crossing rect yields at least two fragments.
+const splitSlackPerCrossing = 2
+
 // PaintOptions describes the destination page geometry, in points.
 type PaintOptions struct {
 	PageWidth    float64
@@ -120,50 +133,61 @@ func fixedOpIndices(res *Result) []int {
 
 // buildPagesAfterSplits re-derives page buckets from the final op Y
 // positions after rect splits and sticky shifts added or moved ops.
-func buildPagesAfterSplits(res *Result, contentH float64, _ []int) []int { //nolint:cyclop // count-then-fill bucketing
-	// Page numbers are dense from 0..maxP, so counts index directly instead
-	// of a per-page map (page buckets below are exact-capacity, no growth).
-	maxP := 0
+func buildPagesAfterSplits(res *Result, contentH float64, _ []int) []int {
+	opPage, counts := pageBuckets(res.Ops, contentH)
 
-	for idx := range res.Ops {
-		if !res.Ops[idx].Fixed {
-			if p := int(res.Ops[idx].Y / contentH); p > maxP {
-				maxP = p
-			}
-		}
-	}
+	res.Pages = make([][]int, len(counts))
 
-	opPage := make([]int, len(res.Ops))
-	counts := make([]int, maxP+1)
-
-	for idx := range res.Ops {
-		if res.Ops[idx].Fixed {
-			continue
-		}
-
-		p := int(res.Ops[idx].Y / contentH)
-		opPage[idx] = p
-
-		if p >= 0 && p <= maxP {
-			counts[p]++
-		}
-	}
-
-	res.Pages = make([][]int, maxP+1)
-
-	for p := 0; p <= maxP; p++ {
+	for p := range counts {
 		if counts[p] > 0 {
 			res.Pages[p] = make([]int, 0, counts[p])
 		}
 	}
 
 	for idx, p := range opPage {
-		if p >= 0 && p <= maxP {
+		if p >= 0 && p < len(counts) {
 			res.Pages[p] = append(res.Pages[p], idx)
 		}
 	}
 
 	return opPage
+}
+
+// pageBuckets maps every op to its canvas page in one pass, with per-page
+// non-fixed op counts for exact-capacity buckets. Fixed ops leave pageOf at
+// its zero value; callers decide whether their fill pass includes them.
+func pageBuckets(ops []Op, contentH float64) ([]int, []int) {
+	// Page numbers are dense from 0..maxP, so counts index directly instead
+	// of a per-page map (page buckets below are exact-capacity, no growth).
+	maxPage := 0
+
+	for idx := range ops {
+		if ops[idx].Fixed {
+			continue
+		}
+
+		if p := int(ops[idx].Y / contentH); p > maxPage {
+			maxPage = p
+		}
+	}
+
+	pageOf := make([]int, len(ops))
+	counts := make([]int, maxPage+1)
+
+	for idx := range ops {
+		if ops[idx].Fixed {
+			continue
+		}
+
+		p := int(ops[idx].Y / contentH)
+		pageOf[idx] = p
+
+		if p >= 0 && p <= maxPage {
+			counts[p]++
+		}
+	}
+
+	return pageOf, counts
 }
 
 // contentSizeHint estimates the content-stream bytes a page's ops will emit:
@@ -191,37 +215,28 @@ func contentSizeHint(ops []Op, groups ...[]int) int {
 }
 
 // paintPages paints every page: page content ops first, then the fixed layer
-// with page-local coordinates.
+// with page-local coordinates. The font-name map and paint closures are
+// allocated once and reused across pages; names still re-register per page via
+// UseEmbeddedFont after the map is cleared.
+//
+//nolint:funlen // one pass per page; shared paint/resName closures cover content and fixed layers
 func paintPages(
 	ctx context.Context, doc *pdf.Document, res *Result, opts PaintOptions, contentH float64, fixedIdx []int,
 ) error {
 	var paintErr error
 
-	for pageIdx, idxs := range res.Pages {
-		if err := paintPageOps(ctx, doc, res, opts, contentH, pageIdx, idxs, fixedIdx, &paintErr); err != nil {
-			return err
-		}
-	}
-
-	return paintErr
-}
-
-// paintPageOps paints one page's content ops and its fixed layer, returning
-// the first context error.
-func paintPageOps(
-	ctx context.Context, doc *pdf.Document, res *Result, opts PaintOptions, contentH float64,
-	pageIdx int, idxs, fixedIdx []int, paintErr *error,
-) error {
-	if err := ctx.Err(); err != nil {
-		return fmt.Errorf("layout: paint context: %w", err)
-	}
-
-	page := doc.AddPage(opts.PageWidth, opts.PageHeight)
-	child := page.Content()
-	child.Grow(contentSizeHint(res.Ops, idxs, fixedIdx))
+	// fixedIdx is page-independent and never mutated between pages, so sort it
+	// once here instead of once per page.
+	sortPaintIndices(res.Ops, fixedIdx)
 
 	fontNames := map[*pdf.Font]string{}
 	nextFont := 0
+	nextImg := 0
+
+	var child *pdf.Content
+
+	var page *pdf.Page
+
 	resName := func(face *pdf.Font) string {
 		if face == nil {
 			return "F0"
@@ -238,32 +253,45 @@ func paintPageOps(
 
 		return n
 	}
-	nextImg := 0
+
 	paintOp := func(paintOp *Op, pageN int) {
-		paintOpOnPage(child, page, paintOp, pageN, contentH, opts, page.Height(), resName, &nextImg, paintErr)
+		paintOpOnPage(child, page, paintOp, pageN, contentH, opts, page.Height(), resName, &nextImg, &paintErr)
 	}
 
-	sortPaintIndices(res.Ops, idxs)
-
-	for _, idx := range idxs {
+	for pageIdx, idxs := range res.Pages {
 		if err := ctx.Err(); err != nil {
 			return fmt.Errorf("layout: paint context: %w", err)
 		}
 
-		paintOp(&res.Ops[idx], pageIdx)
-	}
-	// Fixed layer: page-local coords (pageIdx 0 math on every page).
-	sortPaintIndices(res.Ops, fixedIdx)
+		clear(fontNames)
 
-	for _, idx := range fixedIdx {
-		if err := ctx.Err(); err != nil {
-			return fmt.Errorf("layout: paint context: %w", err)
+		nextFont = 0
+		nextImg = 0
+
+		page = doc.AddPage(opts.PageWidth, opts.PageHeight)
+		child = page.Content()
+		child.Grow(contentSizeHint(res.Ops, idxs, fixedIdx))
+
+		sortPaintIndices(res.Ops, idxs)
+
+		for _, idx := range idxs {
+			if err := ctx.Err(); err != nil {
+				return fmt.Errorf("layout: paint context: %w", err)
+			}
+
+			paintOp(&res.Ops[idx], pageIdx)
 		}
+		// Fixed layer: page-local coords (pageIdx 0 math on every page).
+		for _, idx := range fixedIdx {
+			if err := ctx.Err(); err != nil {
+				return fmt.Errorf("layout: paint context: %w", err)
+			}
 
-		paintOp(&res.Ops[idx], 0)
+			paintOp(&res.Ops[idx], 0)
+		}
 	}
 
-	return nil
+	return paintErr
 }
 
 // paintOpOnPage dispatches one op onto a page's content stream: transforms,
@@ -332,7 +360,7 @@ func drawPageOp(
 
 func sortPaintIndices(ops []Op, idxs []int) {
 	sort.SliceStable(idxs, func(idx, jdx int) bool {
-		acc, boxN := ops[idxs[idx]], ops[idxs[jdx]]
+		acc, boxN := &ops[idxs[idx]], &ops[idxs[jdx]]
 		absZ, boxZ := 0, 0
 
 		if acc.ZIndexSet {
@@ -1262,14 +1290,53 @@ func snapOpForward(res *Result, idx int, paintOp *Op, boundary float64) {
 }
 
 // rowChromeAbove collects fill/stroke rects whose band touches oldY, with
-// their minimum top Y.
+// their minimum top Y. Chrome is row-tight (rows never split), so when the
+// flow index is available the scan is limited to the op's page bucket; the
+// page above is scanned too when the band reaches across the page top. A full
+// display-list scan is the fallback.
 func rowChromeAbove(res *Result, idx int, oldY float64) ([]int, float64) {
-	chrome := make([]int, 0, len(res.Ops))
+	chrome := make([]int, 0, rowChromeCap)
 
 	minY := oldY
 
+	if res.flowPageSize > 0 {
+		page := int(oldY / res.flowPageSize)
+		if page < 0 {
+			page = 0
+		}
+
+		if page < len(res.flowPages) {
+			if page > 0 && oldY-float64(page)*res.flowPageSize < rowChromeBandTolerance {
+				chrome, minY = appendRowChromeCandidates(chrome, res.Ops, res.flowPages[page-1], idx, oldY, minY)
+			}
+
+			chrome, minY = appendRowChromeCandidates(chrome, res.Ops, res.flowPages[page], idx, oldY, minY)
+
+			return chrome, minY
+		}
+	}
+
 	for jdx := range res.Ops {
 		obj := &res.Ops[jdx]
+		if !rowChromeBandCandidate(obj, jdx, idx, oldY) {
+			continue
+		}
+
+		chrome = append(chrome, jdx)
+
+		if obj.Y < minY {
+			minY = obj.Y
+		}
+	}
+
+	return chrome, minY
+}
+
+// appendRowChromeCandidates appends the band candidates of idxs to chrome,
+// lowering minY for candidates whose top sits above oldY.
+func appendRowChromeCandidates(chrome []int, ops []Op, idxs []int, idx int, oldY, minY float64) ([]int, float64) {
+	for _, jdx := range idxs {
+		obj := &ops[jdx]
 		if !rowChromeBandCandidate(obj, jdx, idx, oldY) {
 			continue
 		}
@@ -1312,6 +1379,7 @@ func rowChromeBandCandidate(obj *Op, jdx, idx int, oldY float64) bool {
 // Y sits on a page boundary — TestTenPageTableReportPerformance hang).
 type opSpan struct{ start, end int }
 
+//nolint:cyclop // per-op page math plus fragment clone/remap bookkeeping
 func splitCrossingRects(res *Result, contentH float64, opPage []int) {
 	_ = opPage
 
@@ -1324,8 +1392,32 @@ func splitCrossingRects(res *Result, contentH float64, opPage []int) {
 	// fragments remain owned by the same element.
 	assignOpIDs(res)
 
+	// Count crossing ops first: when none split, the display list, box-range
+	// remap (identity spans) and any growth are skipped entirely.
+	crossings := 0
+
+	for idx := range res.Ops {
+		paintOp := &res.Ops[idx]
+		if paintOp.Fixed || !isSplittable(paintOp) || paintOp.H <= 0 {
+			continue
+		}
+
+		page := int((paintOp.Y + layoutEpsilon) / contentH)
+		if page < 0 {
+			page = 0
+		}
+
+		if paintOp.Y+paintOp.H > float64(page+1)*contentH+1e-9 {
+			crossings++
+		}
+	}
+
+	if crossings == 0 {
+		return
+	}
+
 	spans := make([]opSpan, len(res.Ops))
-	out := make([]Op, 0, len(res.Ops)+maxGlueEm)
+	out := make([]Op, 0, len(res.Ops)+crossings*splitSlackPerCrossing)
 
 	for idx := range res.Ops {
 		paintOp := res.Ops[idx]
@@ -1472,34 +1564,10 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 }
 
 // pageIndexedOps buckets non-fixed ops by their canvas page.
-func pageIndexedOps(res *Result, contentH float64) [][]int { //nolint:cyclop // count-then-fill bucketing
-	maxPage := 0
+func pageIndexedOps(res *Result, contentH float64) [][]int {
+	pageOf, counts := pageBuckets(res.Ops, contentH)
 
-	for i := range res.Ops {
-		if res.Ops[i].Fixed {
-			continue
-		}
-
-		p := int(res.Ops[i].Y / contentH)
-		if p > maxPage {
-			maxPage = p
-		}
-	}
-
-	counts := make([]int, maxPage+1)
-
-	for idx := range res.Ops {
-		if res.Ops[idx].Fixed {
-			continue
-		}
-
-		page := int(res.Ops[idx].Y / contentH)
-		if page >= 0 && page <= maxPage {
-			counts[page]++
-		}
-	}
-
-	pageOps := make([][]int, maxPage+1)
+	pageOps := make([][]int, len(counts))
 	for p := range counts {
 		pageOps[p] = make([]int, 0, counts[p])
 	}
@@ -1509,8 +1577,8 @@ func pageIndexedOps(res *Result, contentH float64) [][]int { //nolint:cyclop // 
 			continue
 		}
 
-		page := int(res.Ops[idx].Y / contentH)
-		if page < 0 || page > maxPage {
+		page := pageOf[idx]
+		if page < 0 || page >= len(counts) {
 			continue
 		}
 
@@ -2276,18 +2344,25 @@ func ensureFlowIndex(res *Result, pageSize float64) {
 }
 
 // buildFlowOpIndex buckets non-fixed ops by their canvas page.
-func buildFlowOpIndex(ops []Op, pageSize float64) ([][]int, []int, []int) { //nolint:cyclop,funlen // count-then-fill
+func buildFlowOpIndex(ops []Op, pageSize float64) ([][]int, []int, []int) {
+	// Page numbers are dense from 0..maxP, so counts index directly instead
+	// of a per-page map (page buckets below are exact-capacity, no growth).
+	// Fixed ops leave pageOf/pos at their zero values; every reader guards
+	// Fixed before use, so no explicit fill is needed.
 	maxPage := 0
+	pageOf := make([]int, len(ops))
 
-	for i := range ops {
-		if ops[i].Fixed {
+	for idx := range ops {
+		if ops[idx].Fixed {
 			continue
 		}
 
-		page := int(ops[i].Y / pageSize)
+		page := int(ops[idx].Y / pageSize)
 		if page < 0 {
 			page = 0
 		}
+
+		pageOf[idx] = page
 
 		if page > maxPage {
 			maxPage = page
@@ -2303,12 +2378,7 @@ func buildFlowOpIndex(ops []Op, pageSize float64) ([][]int, []int, []int) { //no
 			continue
 		}
 
-		page := int(ops[idx].Y / pageSize)
-		if page < 0 {
-			page = 0
-		}
-
-		counts[page]++
+		counts[pageOf[idx]]++
 	}
 
 	pages := make([][]int, maxPage+1)
@@ -2316,25 +2386,14 @@ func buildFlowOpIndex(ops []Op, pageSize float64) ([][]int, []int, []int) { //no
 		pages[p] = make([]int, 0, counts[p])
 	}
 
-	pageOf := make([]int, len(ops))
 	pos := make([]int, len(ops))
-
-	for i := range pageOf {
-		pageOf[i] = -1
-		pos[i] = -1
-	}
 
 	for idx := range ops {
 		if ops[idx].Fixed {
 			continue
 		}
 
-		page := int(ops[idx].Y / pageSize)
-		if page < 0 {
-			page = 0
-		}
-
-		pageOf[idx] = page
+		page := pageOf[idx]
 		pos[idx] = len(pages[page])
 		pages[page] = append(pages[page], idx)
 	}
@@ -3470,12 +3529,24 @@ func tableBodyRange(tblBox *box, page int, res *Result, contentH float64) (int, 
 	return shiftFrom, shiftTo, bodyTop
 }
 
-// cloneHeaderOps copies the thead op range to the page top.
+// cloneHeaderOps copies the thead op range to the page top. The clone count
+// is known up front, so the display list grows once instead of per op.
 func cloneHeaderOps(res *Result, hdrFirst, hdrLast int, hdrTop, pageTop float64) {
-	for k := hdrFirst; k <= hdrLast && k < len(res.Ops); k++ {
+	if hdrFirst < 0 || hdrFirst > hdrLast || hdrFirst >= len(res.Ops) {
+		return
+	}
+
+	if hdrLast >= len(res.Ops) {
+		hdrLast = len(res.Ops) - 1
+	}
+
+	start := len(res.Ops)
+	res.Ops = append(res.Ops, make([]Op, hdrLast-hdrFirst+1)...)
+
+	for k := hdrFirst; k <= hdrLast; k++ {
 		op := res.Ops[k]
 		op.Y = pageTop + (op.Y - hdrTop)
-		res.Ops = append(res.Ops, op)
+		res.Ops[start+k-hdrFirst] = op
 	}
 }
 

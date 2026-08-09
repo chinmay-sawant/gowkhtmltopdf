@@ -58,7 +58,15 @@ func parseRef(s string) (objRef, bool) {
 // pdfString folding) lives in one place instead of ~20 fmt.Sprintf sites.
 type dict []string
 
-func (d dict) add(k string, v ...string) dict { return append(d, append([]string{k}, v...)...) }
+func (d dict) add(k string, v ...string) dict {
+	d = append(d, k)
+
+	for _, s := range v {
+		d = append(d, s)
+	}
+
+	return d
+}
 
 func (d dict) String() string { return "<< " + strings.Join(d, " ") + " >>" }
 
@@ -413,6 +421,8 @@ func (d *Document) finalize() error {
 // embedded ~once per page instead of once per document. The union order is
 // sorted and the subset cache key and Type0 decision are precomputed here
 // (they are identical for every page) so ensureFont per page is a map lookup.
+//
+//nolint:cyclop // two-pass union: per-page rune merge, then dedupe/sort/key per font
 func (d *Document) unionFontRunes() {
 	union := map[string][]rune{}
 	fonts := map[string]*Font{}
@@ -438,6 +448,19 @@ func (d *Document) unionFontRunes() {
 
 	for name, runes := range union {
 		sort.Slice(runes, func(i, j int) bool { return runes[i] < runes[j] })
+
+		// Pages repeat the same codepoints heavily; compact duplicates in
+		// place so the stored union (and every later walk of it) sees only
+		// unique runes.
+		runesW := 0
+		for _, rVal := range runes {
+			if runesW == 0 || runes[runesW-1] != rVal {
+				runes[runesW] = rVal
+				runesW++
+			}
+		}
+
+		runes = runes[:runesW]
 		d.fontRunes[name] = runes
 
 		fnt := fonts[name]
@@ -771,15 +794,9 @@ func pdfDate(t time.Time) string {
 }
 
 func num(v float64) string {
-	if v == float64(int(v)) {
-		return strconv.Itoa(int(v))
-	}
+	var buf [24]byte
 
-	s := strconv.FormatFloat(v, 'f', 3, 64)
-	s = strings.TrimRight(s, "0")
-	s = strings.TrimRight(s, ".")
-
-	return s
+	return string(appendPDFNum(buf[:0], v))
 }
 
 type flateState struct {

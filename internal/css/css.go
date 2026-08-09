@@ -42,6 +42,7 @@ const (
 	pseudoClassHas   = "has"
 	pseudoElemBefore = "before"
 	pseudoElemAfter  = "after"
+	nthChildPseudo   = "nth-child"
 )
 
 // Stylesheet is a parsed stylesheet. Rules keep their source order.
@@ -71,6 +72,11 @@ type Rule struct {
 // Selector is a chain of compound parts linked by combinators.
 type Selector struct {
 	Parts []SelectorPart
+	// spec caches the specificity of parsed selectors (see Specificity).
+	// The zero value means "not yet computed": Specificity falls back to a
+	// walk so hand-built selectors keep working unchanged.
+	spec      [3]int `exhaustruct:"optional"`
+	specValid bool   `exhaustruct:"optional"`
 }
 
 // SelectorPart is one compound selector. Combinator describes how it links to
@@ -109,6 +115,9 @@ type PseudoClass struct {
 	Arg  string // nth-child argument, lower-case, trimmed
 	Has  []RelativeSelector
 	Not  []Selector
+	// nth caches the parsed :nth-child argument (see nthForm) so matching is
+	// pure integer arithmetic; kind zero (unparseable) never matches.
+	nth nthForm `exhaustruct:"optional"`
 }
 
 // Declaration is one property: value pair.
@@ -344,15 +353,21 @@ func parseFontFace(block string) FontFace {
 func FontFaceURLs(src string) []string {
 	var out []string
 
+	// Search the lowercased copy for "url(" but extract from the original
+	// case: the URL itself must keep its case (file paths are case-sensitive).
+	// ToLower is 1:1 in byte length for the ASCII "url(" marker, so both
+	// remainders advance by the same offsets.
 	low := src
+	search := strings.ToLower(src)
 
 	for {
-		i := strings.Index(strings.ToLower(low), "url(")
-		if i < 0 {
+		urlIdx := strings.Index(search, "url(")
+		if urlIdx < 0 {
 			break
 		}
 
-		rest := low[i+4:]
+		rest := low[urlIdx+4:]
+		search = search[urlIdx+4:]
 
 		end := strings.IndexByte(rest, ')')
 		if end < 0 {
@@ -367,6 +382,7 @@ func FontFaceURLs(src string) []string {
 		}
 
 		low = rest[end+1:]
+		search = search[end+1:]
 	}
 
 	return out
@@ -594,6 +610,10 @@ func parseSelectorList(s string) ([]Selector, bool) {
 		if !ok {
 			continue
 		}
+
+		a, b, c := computeSpecificity(sel)
+		sel.spec = [3]int{a, b, c}
+		sel.specValid = true
 
 		out = append(out, sel)
 	}
@@ -1022,7 +1042,7 @@ func appendFunctionalPseudo(part SelectorPart, name, argRaw string, hasParen, in
 // CSS2 single-colon pseudo-elements.
 func appendSimplePseudo(part SelectorPart, name, arg string) (SelectorPart, bool) {
 	switch name {
-	case "first-child", "last-child", "nth-child":
+	case "first-child", "last-child", nthChildPseudo:
 		part.Pseudos = append(part.Pseudos, pseudoClass(name, arg, nil, nil))
 	case "link", "visited":
 		// Print semantics: both mean "a[href]" (no browsing history).
@@ -1050,7 +1070,13 @@ func appendSimplePseudo(part SelectorPart, name, arg string) (SelectorPart, bool
 // pseudoClass builds a PseudoClass with explicit zero Has/Not slices so the
 // literal stays exhaustive without per-use nolint comments.
 func pseudoClass(name, arg string, has []RelativeSelector, not []Selector) PseudoClass {
-	return PseudoClass{Name: name, Arg: arg, Has: has, Not: not}
+	pseudo := PseudoClass{Name: name, Arg: arg, Has: has, Not: not}
+
+	if name == nthChildPseudo {
+		pseudo.nth = parseNthArg(arg)
+	}
+
+	return pseudo
 }
 
 func parseAttrSelector(sel string) (AttrSelector, bool) {
@@ -1155,16 +1181,42 @@ func MatchPseudo(sel Selector, count *html.Node, pseudo string) bool {
 		return false
 	}
 
-	last := sel.Parts[len(sel.Parts)-1]
-	if last.PseudoElement != pseudo {
+	if sel.Parts[len(sel.Parts)-1].PseudoElement != pseudo {
 		return false
 	}
 
-	parts := make([]SelectorPart, len(sel.Parts))
-	copy(parts, sel.Parts)
-	parts[len(parts)-1].PseudoElement = ""
+	return matchPseudoWalk(sel, count)
+}
 
-	return Match(Selector{Parts: parts}, count)
+// matchPseudoWalk mirrors leftmostMatch with the final part's PseudoElement
+// treated as cleared, without copying the parts slice (the host element must
+// match the pseudo's compound, not the pseudo itself).
+func matchPseudoWalk(sel Selector, node *html.Node) bool {
+	if node == nil || node.Type != html.ElementNode || len(sel.Parts) == 0 {
+		return false
+	}
+
+	last := sel.Parts[len(sel.Parts)-1]
+	last.PseudoElement = ""
+
+	if !matchPart(last, node) {
+		return false
+	}
+
+	cur := node
+
+	const prevPartOffset = 2 // walk left: last part is host, start at len-2
+
+	for i := len(sel.Parts) - prevPartOffset; i >= 0; i-- {
+		next := leftmostStep(sel.Parts[i+1].Combinator, sel.Parts[i], cur)
+		if next == nil {
+			return false
+		}
+
+		cur = next
+	}
+
+	return true
 }
 
 // matchPart matches one compound against an element.
@@ -1279,16 +1331,34 @@ func attrValueMatches(oper, val, want string) bool {
 }
 
 // containsWord reports whether want (a single space-free word) is one of the
-// space-separated words of val.
+// space-separated words of val. Tokenizes val without allocating a fields
+// slice (same whitespace definition and Unicode fallback as hasClassToken).
+//
+//nolint:cyclop // two-zone token walk (ASCII, then Unicode fallback) stays linear
 func containsWord(val, want string) bool {
 	if want == "" || strings.Contains(want, " ") {
 		return false
 	}
 
-	for _, w := range strings.Fields(val) {
-		if w == want {
+	for start := 0; start < len(val); {
+		for start < len(val) && isClassSpace(val[start]) {
+			start++
+		}
+
+		end := start
+		for end < len(val) && !isClassSpace(val[end]) {
+			if val[end] >= nonASCIIStart {
+				return hasUnicodeClassToken(val, want)
+			}
+
+			end++
+		}
+
+		if start < end && val[start:end] == want {
 			return true
 		}
+
+		start = end
 	}
 
 	return false
@@ -1300,10 +1370,10 @@ func matchPseudo(pseudo PseudoClass, node *html.Node) bool {
 		return previousElementSibling(node) == nil
 	case "last-child":
 		return nextElementSibling(node) == nil
-	case "nth-child":
+	case nthChildPseudo:
 		idx := elementIndex(node)
 
-		return matchNth(pseudo.Arg, idx)
+		return matchNth(pseudo.nth, idx)
 	case pseudoClassHas:
 		return matchAnyRelative(pseudo.Has, node)
 	case condKindNot:
@@ -1437,45 +1507,86 @@ func elementIndex(count *html.Node) int {
 	return 0
 }
 
-// matchNth implements :nth-child(an+b) / odd / even for 1-based index.
-func matchNth(arg string, index int) bool {
+// nthKind discriminates the pre-parsed :nth-child() argument forms.
+type nthKind int
+
+const (
+	nthInvalid nthKind = iota // unparseable, or not a :nth-child pseudo
+	nthOdd
+	nthEven
+	nthInt
+	nthAnB
+)
+
+// nthForm is a :nth-child() argument parsed at selector-parse time so that
+// matching is pure integer arithmetic (see matchNth).
+type nthForm struct {
+	kind nthKind `exhaustruct:"optional"` // nthInt: exact index; nthAnB: coefficient
+	a    int     `exhaustruct:"optional"` // nthAnB: the constant
+	b    int     `exhaustruct:"optional"`
+}
+
+// parseNthArg pre-parses a :nth-child() argument into the form matchNth
+// evaluates. The argument is already lower-cased and trimmed at parse time;
+// normalizing again here keeps the acceptance rules identical to the former
+// string-based parser, including the never-match fallback.
+func parseNthArg(arg string) nthForm {
 	arg = strings.TrimSpace(strings.ToLower(arg))
 	if arg == "" {
-		return false
+		return nthForm{}
 	}
 
 	if arg == "odd" {
-		return index%2 == 1
+		return nthForm{kind: nthOdd}
 	}
 
 	if arg == "even" {
-		return index%2 == 0
+		return nthForm{kind: nthEven}
 	}
 	// plain integer
 	if n, err := strconv.Atoi(arg); err == nil {
-		return index == n
+		return nthForm{kind: nthInt, a: n}
 	}
 	// an+b / n+b / -n+b / an
 	if !strings.Contains(arg, "n") {
-		return false
+		return nthForm{}
 	}
 
-	specA, buf, ok := parseAnPlusB(arg)
+	a, b, ok := parseAnPlusB(arg)
 	if !ok {
+		return nthForm{}
+	}
+
+	return nthForm{kind: nthAnB, a: a, b: b}
+}
+
+// matchNth implements :nth-child(an+b) / odd / even for 1-based index,
+// evaluating the pre-parsed argument form.
+func matchNth(nth nthForm, index int) bool {
+	switch nth.kind {
+	case nthOdd:
+		return index%2 == 1
+	case nthEven:
+		return index%2 == 0
+	case nthInt:
+		return index == nth.a
+	case nthAnB:
+		if nth.a == 0 {
+			return index == nth.b
+		}
+
+		if (index-nth.b)%nth.a != 0 {
+			return false
+		}
+
+		k := (index - nth.b) / nth.a
+
+		return k >= 0
+	case nthInvalid:
 		return false
 	}
 
-	if specA == 0 {
-		return index == buf
-	}
-	// index = a*k + b for integer k >= 0
-	if (index-buf)%specA != 0 {
-		return false
-	}
-
-	k := (index - buf) / specA
-
-	return k >= 0
+	return false
 }
 
 // parseAnPlusB parses the "an+b" form of a nth-child argument: "an", "n+b",
@@ -1578,8 +1689,19 @@ func isClassSpace(value byte) bool {
 
 // Specificity returns (a, b, c): ID count, class/attribute/pseudo count, type count.
 // :has() / :not() contribute the specificity of their most specific argument
-// (Selectors 4), not a flat class-level count for the pseudo itself.
+// (Selectors 4), not a flat class-level count for the pseudo itself. Parsed
+// selectors return their cached triple; selectors built by hand (or by
+// wrappers that recombine parts) compute it on the fly.
 func Specificity(s Selector) (int, int, int) {
+	if s.specValid {
+		return s.spec[0], s.spec[1], s.spec[2]
+	}
+
+	return computeSpecificity(s)
+}
+
+// computeSpecificity walks the selector parts; see Specificity.
+func computeSpecificity(s Selector) (int, int, int) {
 	idCount, classCount, typeCount := 0, 0, 0
 
 	for _, page := range s.Parts {
@@ -1790,6 +1912,8 @@ func ParseNumber(val string) (float64, bool) {
 // ParseColor parses #rgb, #rrggbb, #rrggbbaa, rgb()/rgba() with integer,
 // float or percentage channels, and a named-color subset. It returns RGB in
 // 0..255 and alpha in 0..1; ok=false for anything unrecognized.
+//
+//nolint:cyclop // linear dispatch across color forms; extraction would obscure it
 func ParseColor(val string) (int, int, int, float64, bool) {
 	val = strings.TrimSpace(val)
 	if val == "" {
@@ -1811,7 +1935,16 @@ func ParseColor(val string) (int, int, int, float64, bool) {
 		return parseHexColor(val[1:])
 	}
 
-	low := strings.ToLower(val)
+	low := val
+
+	for i := range len(val) {
+		if val[i] >= 'A' && val[i] <= 'Z' {
+			low = strings.ToLower(val)
+
+			break
+		}
+	}
+
 	if low == "transparent" {
 		return 0, 0, 0, 0, true
 	}
@@ -1861,7 +1994,11 @@ func parseHexColor(hex string) (int, int, int, float64, bool) {
 }
 
 // parseRGBColor parses rgb()/rgba() with integer, float or percentage
-// channels (low is the lower-cased original).
+// channels (low is the lower-cased original). The channel list is scanned in
+// place between '(' and ')': no split slice, no per-channel allocation except
+// the trimmed channel strings themselves.
+//
+//nolint:cyclop // single-pass in-place channel scan; splitting loses the no-alloc property
 func parseRGBColor(val, low string) (int, int, int, float64, bool) {
 	open := strings.IndexByte(val, '(')
 	closeIdx := strings.LastIndexByte(val, ')')
@@ -1870,19 +2007,39 @@ func parseRGBColor(val, low string) (int, int, int, float64, bool) {
 		return 0, 0, 0, 0, false
 	}
 
-	args := strings.Split(val[open+1:closeIdx], ",")
-
 	channels := hexRGBLen
 	if strings.HasPrefix(low, "rgba") {
 		channels = rgbaChannelCount
 	}
 
-	if len(args) != channels {
-		return 0, 0, 0, 0, false
+	var vals [rgbaChannelCount]float64
+
+	alphaRaw := ""
+
+	idx := open + 1
+	for channel := range channels {
+		start := idx
+
+		for idx < closeIdx && val[idx] != ',' {
+			idx++
+		}
+
+		if channel == rgbaChannelCount-1 {
+			alphaRaw = val[start:idx]
+		}
+
+		chVal, ok := parseColorChannel(val[start:idx])
+		if !ok {
+			return 0, 0, 0, 0, false
+		}
+
+		vals[channel] = chVal
+		idx++
 	}
 
-	vals, valid := parseColorChannels(args)
-	if !valid {
+	// the scan must have consumed exactly the channel list: anything between
+	// the last comma and ')' (including a trailing comma) is a mismatch
+	if idx != closeIdx+1 {
 		return 0, 0, 0, 0, false
 	}
 
@@ -1895,40 +2052,32 @@ func parseRGBColor(val, low string) (int, int, int, float64, bool) {
 	}
 
 	alpha := vals[3]
-	if strings.HasSuffix(strings.TrimSpace(args[3]), "%") {
+	if strings.HasSuffix(strings.TrimSpace(alphaRaw), "%") {
 		alpha /= maxRGBChannel
 	}
 
 	return red, green, blue, clampAlpha(alpha), true
 }
 
-// parseColorChannels parses comma-separated rgb()/rgba() channels, where
-// percentages scale to 0..255.
-func parseColorChannels(args []string) ([]float64, bool) {
-	vals := make([]float64, 0, len(args))
-
-	for _, arg := range args {
-		arg = strings.TrimSpace(arg)
-		if strings.HasSuffix(arg, "%") {
-			f, err := strconv.ParseFloat(strings.TrimSuffix(arg, "%"), 64)
-			if err != nil {
-				return nil, false
-			}
-
-			vals = append(vals, f*maxRGBChannel/percentScale)
-
-			continue
-		}
-
-		f, err := strconv.ParseFloat(arg, 64)
+// parseColorChannel parses one rgb()/rgba() channel: a number with an
+// optional trailing '%' scaling 0..100 onto 0..255.
+func parseColorChannel(chVal string) (float64, bool) {
+	chVal = strings.TrimSpace(chVal)
+	if strings.HasSuffix(chVal, "%") {
+		f, err := strconv.ParseFloat(strings.TrimSuffix(chVal, "%"), 64)
 		if err != nil {
-			return nil, false
+			return 0, false
 		}
 
-		vals = append(vals, f)
+		return f * maxRGBChannel / percentScale, true
 	}
 
-	return vals, true
+	f, err := strconv.ParseFloat(chVal, 64)
+	if err != nil {
+		return 0, false
+	}
+
+	return f, true
 }
 
 // clampAlpha clamps an alpha value to 0..1.
@@ -2145,16 +2294,29 @@ func clampByte(fVal float64) int {
 }
 
 // ParseFontFamily splits a font-family value on commas and trims quotes.
-func ParseFontFamily(v string) []string {
+func ParseFontFamily(value string) []string {
 	var out []string
 
-	for _, part := range strings.Split(v, ",") {
+	for {
+		comma := strings.IndexByte(value, ',')
+
+		part := value
+		if comma >= 0 {
+			part = value[:comma]
+		}
+
 		part = strings.TrimSpace(part)
 		part = strings.Trim(part, "\"'")
 
 		if part != "" {
 			out = append(out, part)
 		}
+
+		if comma < 0 {
+			break
+		}
+
+		value = value[comma+1:]
 	}
 
 	return out

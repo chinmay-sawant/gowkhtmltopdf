@@ -197,8 +197,11 @@ func drawTextHF(page *pdf.Page, hfVal settings.HeaderFooter, geom hfGeom, parms 
 		cur.Stroke()
 	}
 
+	left := parms.substitute(hfVal.Left)
+	center := parms.substitute(hfVal.Center)
+	right := parms.substitute(hfVal.Right)
+
 	draw := func(text string, posX float64) {
-		text = parms.substitute(text)
 		if text == "" {
 			return
 		}
@@ -209,18 +212,18 @@ func drawTextHF(page *pdf.Page, hfVal settings.HeaderFooter, geom hfGeom, parms 
 		cur.TextShow(text)
 		cur.EndText()
 	}
-	if hfVal.Left != "" {
-		draw(hfVal.Left, geom.marginLeft)
+	if left != "" {
+		draw(left, geom.marginLeft)
 	}
 
-	if hfVal.Center != "" {
+	if center != "" {
 		const centerDivisor = 2
 
-		draw(hfVal.Center, (page.Width()-measureHF(font, parms.substitute(hfVal.Center), size))/centerDivisor)
+		draw(center, (page.Width()-measureHF(font, center, size))/centerDivisor)
 	}
 
-	if hfVal.Right != "" {
-		draw(hfVal.Right, page.Width()-geom.marginRight-measureHF(font, parms.substitute(hfVal.Right), size))
+	if right != "" {
+		draw(right, page.Width()-geom.marginRight-measureHF(font, right, size))
 	}
 }
 

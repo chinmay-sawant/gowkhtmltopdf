@@ -342,7 +342,7 @@ func rasterPaintOrder(ops []layout.Op) []int {
 	}
 
 	sort.SliceStable(idx, func(i, j int) bool {
-		entryA, bucket := ops[idx[i]], ops[idx[j]]
+		entryA, bucket := &ops[idx[i]], &ops[idx[j]]
 		sortKey, zIndexB := 0, 0
 
 		if entryA.ZIndexSet {

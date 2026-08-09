@@ -368,6 +368,7 @@ type subsetter struct {
 	mappings []codeGlyph // sorted by code
 }
 
+//nolint:funlen // one sequential sfnt assembly: tables, glyph data, loca, checksums
 func (s *subsetter) build() ([]byte, error) {
 	numGlyphs := len(s.glyphs)
 	// long loca always (format 1). TrueType requires each glyph to start on a
@@ -377,16 +378,22 @@ func (s *subsetter) build() ([]byte, error) {
 	padded := padOutlines(s.outlines, loca)
 
 	// hmtx: advance (2) + lsb (2) per glyph
-	hmtx := new(bytes.Buffer)
-	for i, a := range s.advances {
-		_ = binary.Write(hmtx, binary.BigEndian, uint16(a)) //nolint:gosec // advance is int32 stored as uint16 per hmtx spec
+	hmtx := make([]byte, len(s.advances)*bytesPerHMetric)
+	for idx, a := range s.advances {
+		binary.BigEndian.PutUint16(
+			hmtx[idx*bytesPerHMetric:],
+			uint16(a), //nolint:gosec // advance is int32 stored as uint16 per hmtx spec
+		)
 
 		lsb := int16(0)
-		if i < len(s.lsbs) {
-			lsb = s.lsbs[i]
+		if idx < len(s.lsbs) {
+			lsb = s.lsbs[idx]
 		}
 
-		_ = binary.Write(hmtx, binary.BigEndian, uint16(lsb)) //nolint:gosec // lsb is int16 stored as uint16 per hmtx spec
+		binary.BigEndian.PutUint16(
+			hmtx[idx*bytesPerHMetric+uint16Bytes:],
+			uint16(lsb), //nolint:gosec // lsb is int16 stored as uint16 per hmtx spec
+		)
 	}
 
 	// cmap: rune codes → renumbered glyph ids
@@ -431,7 +438,7 @@ func (s *subsetter) build() ([]byte, error) {
 		{"head", head},
 		{"hhea", hhea},
 		{"maxp", maxp},
-		{"hmtx", hmtx.Bytes()},
+		{"hmtx", hmtx},
 		{"cmap", cmap},
 		{"loca", encodeUint32Slice(loca)},
 		{"glyf", glyf.Bytes()},

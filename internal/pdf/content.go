@@ -7,6 +7,14 @@ import (
 	"strings"
 )
 
+// fontState is the active-font tracking saved across a q/Q pair: Q restores
+// the PDF text state, so the tracked font must be restored with it or a
+// later redundant SetFont could be skipped against a stale value.
+type fontState struct {
+	name string
+	size float64
+}
+
 // Content builds a page content stream. Every emitted operator is recorded
 // as a string; fonts and images used are registered for the page /Resources.
 type Content struct {
@@ -16,6 +24,7 @@ type Content struct {
 	used      map[string][]rune // resource name -> runes seen
 	curFont   string            // active font from last SetFont
 	curSize   float64           // active font size from last SetFont
+	fontStack []fontState       // active font before each open Save
 	imageUses map[string]string // resource name -> image object ref
 	imageRefs map[string]*imageResource
 	opacity   float64 // 0 disables
@@ -114,6 +123,7 @@ func cloneContent(cur *Content) *Content {
 		used:      cloneRuneMap(cur.used),
 		curFont:   cur.curFont,
 		curSize:   cur.curSize,
+		fontStack: append([]fontState(nil), cur.fontStack...),
 		imageUses: cloneStringMap(cur.imageUses),
 		imageRefs: cloneImageMap(cur.imageRefs),
 		opacity:   cur.opacity,
@@ -171,10 +181,22 @@ func cloneImageMap(src map[string]*imageResource) map[string]*imageResource {
 // graphics state
 
 // Save restores the graphics state stack.
-func (c *Content) Save() { c.buf.WriteString("q\n") }
+func (c *Content) Save() {
+	c.fontStack = append(c.fontStack, fontState{name: c.curFont, size: c.curSize})
+	c.buf.WriteString("q\n")
+}
 
 // Restore pops the graphics state stack.
-func (c *Content) Restore() { c.buf.WriteString("Q\n") }
+func (c *Content) Restore() {
+	if n := len(c.fontStack); n > 0 {
+		prev := c.fontStack[n-1]
+		c.fontStack = c.fontStack[:n-1]
+		c.curFont = prev.name
+		c.curSize = prev.size
+	}
+
+	c.buf.WriteString("Q\n")
+}
 
 // SetFillColor sets the fill color (RGB, 0..1); grayscale is applied at this
 // paint-time seam, which is what Document.SetGrayscale promises today.
@@ -252,6 +274,10 @@ func (c *Content) Transform(a, b, c2, d, e, f float64) {
 
 // SetFont selects a registered font resource by name and size.
 func (c *Content) SetFont(name string, size float64) {
+	if name == c.curFont && size == c.curSize {
+		return
+	}
+
 	c.curFont = name
 	c.curSize = size
 	_ = c.buf.WriteByte('/')
@@ -310,6 +336,25 @@ type textRun struct {
 // through Type0; Latin that the face lacks (typical for CJK fallback fonts)
 // is drawn with an embedded Liberation fallback so ASCII does not become tofu.
 func (c *Content) TextShow(text string) {
+	// Pure-ASCII text is untouched by shaping (no RTL/combining/CJK
+	// features) and never needs Type0, so skip the decision passes below
+	// and go straight to the simple emitter.
+	ascii := true
+
+	for i := range len(text) {
+		if text[i] > asciiMax {
+			ascii = false
+
+			break
+		}
+	}
+
+	if ascii {
+		c.textShowSimple(text)
+
+		return
+	}
+
 	fnt := c.fontFiles[c.curFont]
 	// PDF emission needs the shaped text only. ShapeRun also computes per-rune
 	// advances for the raster adapter, which is unnecessary here and creates
@@ -433,6 +478,7 @@ func (c *Content) ensureLatinFallback() string {
 }
 
 const (
+	asciiMax    = 0x7F
 	octalBase   = 8
 	byteShift   = 8
 	nibbleMask  = 0xf

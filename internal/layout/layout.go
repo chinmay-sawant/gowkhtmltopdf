@@ -307,7 +307,7 @@ type chromeEntry struct {
 // bundled Liberation FaceSet.
 func (e *engine) faceFor(sty ResolvedStyle) *pdf.Font {
 	key := faceStyleKey{
-		famHash: hashFontFamily(sty.FontFamily),
+		famHash: sty.famHash,
 		weight:  sty.FontWeight,
 		italic:  sty.FontItalic,
 	}
@@ -368,7 +368,7 @@ func (e *engine) faceForRune(sty ResolvedStyle, runeValue rune) *pdf.Font {
 // faceForRuneFallback resolves and caches a non-primary face for a missing glyph.
 func (e *engine) faceForRuneFallback(sty ResolvedStyle, runeValue rune, primary *pdf.Font) *pdf.Font {
 	key := faceRuneKey{
-		famHash: hashFontFamily(sty.FontFamily),
+		famHash: sty.famHash,
 		weight:  sty.FontWeight,
 		italic:  sty.FontItalic,
 		r:       runeValue,
@@ -768,6 +768,10 @@ type box struct {
 	col, span int
 	row       int // owning table row index, set once at placement
 	rowSpan   int // vertical span (default 1) for <td rowspan>
+	// hasInk is set at cell build time from nodeHasTableInk (any
+	// non-whitespace text, br, img, svg, video or canvas in the subtree);
+	// row collapse uses the flag instead of re-walking each cell's tree.
+	hasInk bool
 	// rowBoxH is the height of the cell's starting row only. For rowspan>1,
 	// h covers the full span (background/borders) while rowBoxH is what
 	// rowsIntact uses so bottom-edge paint ops do not make the first row
@@ -1792,19 +1796,26 @@ func (e *engine) flowOneChild(
 	contentW, contentX, posY, curY, prevBottom float64, floats *floatState, deferred []*html.Node,
 ) (float64, float64, int, []*html.Node) {
 	node := children[idx]
+	// Fetch the child's resolved style once; all flow-child predicates and
+	// the float branch reuse it (was four e.styles map lookups per child).
+	cst := e.styles[node]
 
 	switch {
-	case isSkippableFlowNode(node, e):
+	case isSkippableFlowNode(node, cst):
 		idx++
-	case isOutOfFlowNode(node, e):
+	case isOutOfFlowNode(node, cst):
 		// Defer out-of-flow boxes so they paint above in-flow content
 		// (absolute overlays sit on top of later siblings' text).
 		deferred = append(deferred, node)
 		idx++
-	case isFlowFloat(node, e):
-		cs := e.styleVal(node)
-		curY = floats.clearFloats(cs.Clear, posY, curY)
-		attachFlowBox(parent, e.placeFloat(node, cs, floats, contentW, contentX, posY, curY), e)
+	case isFlowFloat(node, cst):
+		var childStyle ResolvedStyle
+		if cst != nil {
+			childStyle = *cst
+		}
+
+		curY = floats.clearFloats(childStyle.Clear, posY, curY)
+		attachFlowBox(parent, e.placeFloat(node, childStyle, floats, contentW, contentX, posY, curY), e)
 
 		prevBottom = 0
 		idx++
@@ -1853,9 +1864,10 @@ func (e *engine) layoutInlineRun(
 // isSkippableFlowNode reports nodes that are dropped from flow: display:none
 // elements and pure-whitespace text (so margin collapse between block
 // siblings is not interrupted — fixture-19 margin-bottom between divs).
-func isSkippableFlowNode(node *html.Node, engine *engine) bool {
+// st is the node's resolved style (nil when the element has none).
+func isSkippableFlowNode(node *html.Node, st *ResolvedStyle) bool {
 	if node.Type == html.ElementNode {
-		if st := engine.styles[node]; st != nil && st.Display == cssDisplayNone {
+		if st != nil && st.Display == cssDisplayNone {
 			return true
 		}
 	}
@@ -1865,26 +1877,23 @@ func isSkippableFlowNode(node *html.Node, engine *engine) bool {
 
 // isOutOfFlowNode reports absolute/fixed children (deferred to paint above
 // the in-flow content of the current box).
-func isOutOfFlowNode(node *html.Node, engine *engine) bool {
+func isOutOfFlowNode(node *html.Node, stylePtr *ResolvedStyle) bool {
 	if node.Type != html.ElementNode {
 		return false
 	}
 
-	st := engine.styles[node]
-	if st == nil {
+	if stylePtr == nil {
 		return false
 	}
 
-	return st.Position == positionAbsolute || st.Position == positionFixed
+	return stylePtr.Position == positionAbsolute || stylePtr.Position == positionFixed
 }
 
 // isFlowFloat reports floated element children.
-func isFlowFloat(node *html.Node, engine *engine) bool {
+func isFlowFloat(node *html.Node, st *ResolvedStyle) bool {
 	if node.Type != html.ElementNode {
 		return false
 	}
-
-	st := engine.styles[node]
 
 	return st != nil && st.Float != cssDisplayNone
 }
@@ -1910,7 +1919,7 @@ func collectInlineRun(children []*html.Node, idx int, engine *engine) ([]*html.N
 			break
 		}
 
-		if child.Type == html.TextNode && strings.TrimSpace(child.Text) == "" {
+		if child.Type == html.TextNode && isAllWhitespace(child.Text) {
 			// keep interior whitespace inside an inline run, but a run that
 			// is only WS is dropped below.
 			idx++
@@ -2822,6 +2831,10 @@ func (e *engine) emitTableCells(
 	lastNonEmpty := lastNonEmptyRow(rowHeights)
 
 	if collapse {
+		// Column boundaries are the same for every row; compute once instead
+		// of reallocating nCols+1 floats per row inside emitCollapsedRowGrid.
+		xList := gridColumnEdges(tableBox.x+padL, colW)
+
 		for rowIdx, cells := range cellData {
 			for _, cell := range cells {
 				// Skip paint for collapsed empty rows (h≈0); content was
@@ -2832,7 +2845,7 @@ func (e *engine) emitTableCells(
 			}
 
 			if rowHeights[rowIdx] > layoutSlack {
-				e.emitCollapsedRowGrid(tableBox, rowIdx, rowIdx == lastNonEmpty, padL, colW, rowTops, rowHeights)
+				e.emitCollapsedRowGrid(tableBox, rowIdx, rowIdx == lastNonEmpty, xList, rowTops, rowHeights)
 			}
 		}
 
@@ -3156,6 +3169,11 @@ func (e *engine) measureTableRows(
 	tableBox *box, rows [][]*html.Node, cellData [][]*box, colW []float64,
 	spacing float64, nCols int, posX, posY, padL float64,
 ) ([]float64, []float64, float64) {
+	// rows stays for the layoutTable call contract; ink flags now live on the
+	// cell boxes in cellData (recorded once at build time), so the row loop
+	// below reads flags instead of re-walking each cell's subtree.
+	_ = rows
+
 	nRows := len(cellData)
 	rowHeights := make([]float64, nRows)
 	rowTops := make([]float64, nRows)
@@ -3172,7 +3190,7 @@ func (e *engine) measureTableRows(
 		// borders in separate-border mode and measured some chrome — pure
 		// empty content collapses to 0 so border-collapse grids do not draw
 		// a phantom empty band above real headers.
-		if rowH > 0 && rowCellsHaveNoInk(rows[rowIdx]) {
+		if rowH > 0 && rowCellsHaveNoInk(cells) {
 			rowH = 0
 		}
 
@@ -3320,15 +3338,15 @@ func lastNonEmptyRow(rowHeights []float64) int {
 // emitCollapsedRowGrid strokes the shared border-collapse grid for one table
 // row (top edge + verticals; bottom edge when lastRow). Ops are appended
 // immediately after that row's cells and folded into the row's op range.
+// xList holds the precomputed column boundary positions (shared across rows).
 func (e *engine) emitCollapsedRowGrid(
-	tableBox *box, rowIdx int, lastRow bool, padL float64, colW, rowTops, rowHeights []float64,
+	tableBox *box, rowIdx int, lastRow bool, xList []float64, rowTops, rowHeights []float64,
 ) {
-	if rowIdx < 0 || rowIdx >= len(rowHeights) || rowHeights[rowIdx] <= 0.01 || len(colW) == 0 {
+	if rowIdx < 0 || rowIdx >= len(rowHeights) || rowHeights[rowIdx] <= 0.01 || len(xList) < two {
 		return
 	}
 
-	nCols := len(colW)
-	xList := gridColumnEdges(tableBox.x+padL, colW)
+	nCols := len(xList) - 1
 
 	yStart := rowTops[rowIdx]
 	yEnd := yStart + rowHeights[rowIdx]
@@ -3557,12 +3575,19 @@ func rowspanCellCovers(tableBox *box, rowIdx, leftCol, rightCol int) bool {
 // Height is not final here: layoutCell must run again with the real column
 // width after column sizing, or narrow max-content widths force false wraps
 // and inflate row heights (empty bands under single-line cell text).
-func (e *engine) buildCell(n *html.Node, col, span int) *box {
-	st := e.stylePtr(n)
-	b := &box{node: n, style: st, kind: "cell", col: col, span: span} //nolint:exhaustruct // intentional zero fields
-	b.contentMin, b.contentW = e.measureCellMinMax(n, *st)
+func (e *engine) buildCell(node *html.Node, col, span int) *box {
+	cellStyle := e.stylePtr(node)
+	cellBox := &box{ //nolint:exhaustruct // intentional zero fields
+		node:   node,
+		style:  cellStyle,
+		kind:   "cell",
+		col:    col,
+		span:   span,
+		hasInk: nodeHasTableInk(node),
+	}
+	cellBox.contentMin, cellBox.contentW = e.measureCellMinMax(node, *cellStyle)
 
-	return b
+	return cellBox
 }
 
 // measureCellHeight lays out the cell at width (border-box) without emitting
@@ -3888,6 +3913,16 @@ type cellMeasure struct {
 	longestWord    float64
 	lineOnlyNowrap bool
 	lineHasInk     bool
+	// spaceW is the memoized width of one ASCII space for the last measured
+	// style identity, so a cell with many text nodes does not re-measure " "
+	// per node.
+	spaceSet      bool
+	spaceFamHash  uint64
+	spaceWeight   int
+	spaceItalic   bool
+	spaceFontSize float64
+	spaceLSpacing float64
+	spaceW        float64
 }
 
 // flushLine folds the current line into maxW and resets the line state.
@@ -3912,6 +3947,31 @@ func (m *cellMeasure) flushLine() {
 	m.lineW = 0
 	m.lineOnlyNowrap = true
 	m.lineHasInk = false
+}
+
+// spaceWidth returns the measured width of one ASCII space for sty. The
+// advance depends only on the style's family hash, weight/italic face
+// variant, font size and letter-spacing, so the result is cached per style
+// identity and reused across text nodes in one cell.
+func (m *cellMeasure) spaceWidth(sty ResolvedStyle) float64 {
+	if m.spaceSet &&
+		m.spaceFamHash == sty.famHash &&
+		m.spaceWeight == sty.FontWeight &&
+		m.spaceItalic == sty.FontItalic &&
+		m.spaceFontSize == sty.FontSize &&
+		m.spaceLSpacing == sty.LetterSpacing {
+		return m.spaceW
+	}
+
+	m.spaceW = m.engine.measureTextFace(" ", sty)
+	m.spaceSet = true
+	m.spaceFamHash = sty.famHash
+	m.spaceWeight = sty.FontWeight
+	m.spaceItalic = sty.FontItalic
+	m.spaceFontSize = sty.FontSize
+	m.spaceLSpacing = sty.LetterSpacing
+
+	return m.spaceW
 }
 
 // walk measures one node's contribution to the current line.
@@ -3944,7 +4004,7 @@ func (m *cellMeasure) measureText(text string, cstate ResolvedStyle, nowrap bool
 		m.lineOnlyNowrap = false
 		m.lineHasInk = true
 
-		spaceW := eng.measureTextFace(" ", cstate)
+		spaceW := m.spaceWidth(cstate)
 
 		// Leading space if original had leading WS and line already started.
 		if m.lineW > 0 && len(text) > 0 && isHTMLSpace(text[0]) {
@@ -3975,8 +4035,9 @@ func (m *cellMeasure) measureText(text string, cstate ResolvedStyle, nowrap bool
 			}
 
 			first = false
-			m.lineW += eng.measureTextFace(word, cstate)
-			m.noteWord(eng.minContentWidth(word, cstate))
+			wordW := eng.measureTextFace(word, cstate)
+			m.lineW += wordW
+			m.noteWord(eng.minContentWidth(word, cstate, wordW))
 
 			wStart = wEnd
 		}
@@ -3984,8 +4045,9 @@ func (m *cellMeasure) measureText(text string, cstate ResolvedStyle, nowrap bool
 		return
 	}
 
-	m.lineW += eng.measureTextFace(text, cstate)
-	m.noteWord(eng.minContentWidth(text, cstate))
+	full := eng.measureTextFace(text, cstate)
+	m.lineW += full
+	m.noteWord(eng.minContentWidth(text, cstate, full))
 
 	if hasNonHTMLSpace(text) {
 		m.lineHasInk = true
@@ -4099,15 +4161,15 @@ func softModeOf(pol wordBreakPolicy) softBreakMode {
 }
 
 // minContentWidth is the min-content contribution of a single token under
-// the element's word-break / overflow-wrap policy (CSS min-content).
+// the element's word-break / overflow-wrap policy (CSS min-content). full is
+// the token's already-measured full advance (the caller measures it for the
+// line anyway), so breakNormal/breakNever return it without re-measuring.
 // Emergency print wrapping (tokens wider than the used line) is layout-only
 // and must not shrink table column mins to a single rune.
-func (e *engine) minContentWidth(cssSheet string, sty ResolvedStyle) float64 {
+func (e *engine) minContentWidth(cssSheet string, sty ResolvedStyle, full float64) float64 {
 	if cssSheet == "" {
 		return 0
 	}
-
-	full := e.measureTextFace(cssSheet, sty)
 
 	switch wordBreakOf(sty) {
 	case breakNever:
@@ -4228,17 +4290,11 @@ func stripEmptyTableRows(rows [][]*html.Node) [][]*html.Node {
 
 // rowCellsHaveNoInk reports whether every cell in the row is free of text,
 // images, and other non-whitespace content (padding-only empty th/td).
-func rowCellsHaveNoInk(cells []*html.Node) bool {
-	if len(cells) == 0 {
-		return true
-	}
-
-	for _, c := range cells {
-		if c == nil {
-			continue
-		}
-
-		if nodeHasTableInk(c) {
+// The ink flags are recorded once per cell at build time (buildCell), so
+// this is a flat flag loop instead of a per-row subtree walk.
+func rowCellsHaveNoInk(cells []*box) bool {
+	for _, cell := range cells {
+		if cell != nil && cell.hasInk {
 			return false
 		}
 	}

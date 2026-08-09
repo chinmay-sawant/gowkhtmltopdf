@@ -221,6 +221,17 @@ func mergeFontFeatures(s string, requested []shaping.FontFeature) []shaping.Font
 	return cjkPunctFontFeatures(s)
 }
 
+// cjkPunctThreshold is the lowest codepoint of the CJK punctuation/script
+// ranges halt/palt targets; runes below it are never CJK.
+const cjkPunctThreshold = 0x3000
+
+// cjkPunctFeatures is the shared halt/palt feature list returned by
+// cjkPunctFontFeatures; consumers only read it.
+var cjkPunctFeatures = []shaping.FontFeature{ //nolint:gochecknoglobals // immutable feature list, never mutated
+	{Tag: ot.MustNewTag("halt"), Value: 1},
+	{Tag: ot.MustNewTag("palt"), Value: 1},
+}
+
 // cjkPunctFontFeatures enables halt/palt for runs that include CJK or
 // East-Asian punctuation when CSS did not request features explicitly.
 func cjkPunctFontFeatures(s string) []shaping.FontFeature {
@@ -228,14 +239,15 @@ func cjkPunctFontFeatures(s string) []shaping.FontFeature {
 		return nil
 	}
 
-	return []shaping.FontFeature{
-		{Tag: ot.MustNewTag("halt"), Value: 1},
-		{Tag: ot.MustNewTag("palt"), Value: 1},
-	}
+	return cjkPunctFeatures
 }
 
 func textNeedsCJKFeatures(s string) bool {
 	for _, rVal := range s {
+		if rVal < cjkPunctThreshold {
+			continue // all CJK/EA-punct ranges start at or above U+3000
+		}
+
 		if unicode.In(rVal, unicode.Han, unicode.Hangul, unicode.Hiragana, unicode.Katakana) {
 			return true
 		}

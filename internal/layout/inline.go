@@ -2,6 +2,7 @@ package layout
 
 import (
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
 	"gowkhtmltopdf/internal/html"
@@ -49,7 +50,7 @@ type inlineItem struct {
 // baseline on the box. When floats is non-nil, each line re-queries exclusion
 // at its canvas Y so text widens again after a float ends mid-paragraph.
 //
-//nolint:cyclop,funlen // hot path: per-line wrap against float exclusion zones
+//nolint:cyclop // hot path: per-line wrap against float exclusion zones
 func (e *engine) layoutInlineFloats(
 	boxNode *box, nodes []*html.Node, contentW, contentX, lineY float64,
 	floats *floatState,
@@ -69,16 +70,11 @@ func (e *engine) layoutInlineFloats(
 	e.inlineCBW = oldCB
 
 	if len(items) >= two {
-		oldItems := items
 		items = squeezeInlineSpaces(items)
-
-		e.releaseInlineItems(oldItems)
 	}
 
 	if len(items) >= two {
-		oldItems := items
 		items = separateAdjacentCites(items, e)
-		e.releaseInlineItems(oldItems)
 	}
 
 	defer e.releaseInlineItems(items)
@@ -570,20 +566,18 @@ func tailRemaining(items []inlineItem, i int) (float64, float64) {
 
 // separateAdjacentCites inserts a thin space between consecutive citation
 // markers ("][") so [90][91][92] are not painted as a cramped cluster. Does
-// not touch spaces inside a single marker ([111]).
+// not touch spaces inside a single marker ([111]). Items are mutated in
+// place (only the current item's text/w change), so no copy slice is needed.
 func separateAdjacentCites(items []inlineItem, eng *engine) []inlineItem {
 	if len(items) < two {
 		return items
 	}
 
-	out := make([]inlineItem, 0, len(items))
-	out = append(out, items[0])
-
 	for i := 1; i < len(items); i++ {
-		cur := items[i]
-		prev := &out[len(out)-1]
+		cur := &items[i]
+		prev := &items[i-1]
 
-		if isCiteBoundary(*prev, cur) {
+		if isCiteBoundary(*prev, *cur) {
 			// Prefer a hair space so markers stay visually tight but not
 			// colliding; fall back to a normal space if measure fails.
 			gap := "\u200a" // hair space
@@ -593,11 +587,9 @@ func separateAdjacentCites(items []inlineItem, eng *engine) []inlineItem {
 				cur.w = eng.measureTextFace(cur.text, *cur.style)
 			}
 		}
-
-		out = append(out, cur)
 	}
 
-	return out
+	return items
 }
 
 // isCiteBoundary reports that prev followed by cur are two adjacent citation
@@ -797,6 +789,9 @@ func (e *engine) emitLineItems(boxNode *box, line []inlineItem, leftX, baseline,
 }
 
 // trimTrailingSpace drops trailing whitespace from the last run of a line.
+// Only ASCII spaces are trimmed; each one contributes exactly its per-rune
+// measured width (advance + letter-spacing), so the width is adjusted by
+// subtraction instead of re-measuring the whole run.
 func (e *engine) trimTrailingSpace(line []inlineItem) {
 	if len(line) == 0 || line[len(line)-1].img {
 		return
@@ -806,8 +801,10 @@ func (e *engine) trimTrailingSpace(line []inlineItem) {
 	trimmed := strings.TrimRight(last.text, " ")
 
 	if trimmed != last.text {
+		spaceCount := len(last.text) - len(trimmed)
+
 		last.text = trimmed
-		last.w = e.measureTextFace(trimmed, *last.style)
+		last.w -= float64(spaceCount) * e.measureRuneFace(' ', *last.style)
 	}
 }
 
@@ -1609,23 +1606,25 @@ func (e *engine) textItem(text string, st *ResolvedStyle) inlineItem {
 
 // squeezeInlineSpaces drops artificial space items that sit immediately before
 // attaching punctuation (pretty-printed "</a>\n," → "Award ,") or that are
-// redundant after a trailing space already on the previous item.
+// redundant after a trailing space already on the previous item. Survivors
+// are compacted in place; the surviving prefix is returned.
 func squeezeInlineSpaces(items []inlineItem) []inlineItem {
 	if len(items) < two {
 		return items
 	}
 
-	out := make([]inlineItem, 0, len(items))
+	writeIdx := 0
 
 	for i := range items {
-		if dropSpaceItem(items, i, out) {
+		if dropSpaceItem(items, i, items[:writeIdx]) {
 			continue // drop space before "," / ")" / "]" …
 		}
 
-		out = append(out, items[i])
+		items[writeIdx] = items[i]
+		writeIdx++
 	}
 
-	return out
+	return items[:writeIdx]
 }
 
 // dropSpaceItem reports whether the pure-space item at items[i] should be
@@ -1684,7 +1683,7 @@ func isAttachPunct(cssSheet string) bool {
 		return false
 	}
 
-	r := []rune(cssSheet)[0]
+	r, _ := utf8.DecodeRuneInString(cssSheet)
 	switch r {
 	case ',', '.', ';', ':', '!', '?', ')', ']', '}', '\'', '"', '%',
 		'\u201d' /* ” */, '\u2019' /* ’ */, '\u2013' /* – */, '\u2014': /* — */
@@ -1749,8 +1748,8 @@ func endsWithOpenBracket(s string) bool {
 		return false
 	}
 
-	runes := []rune(s)
-	switch runes[len(runes)-1] {
+	r, _ := utf8.DecodeLastRuneInString(s)
+	switch r {
 	case '[', '(', '{', '"', '\'', '\u201c' /* “ */, '\u2018': /* ‘ */
 		return true
 	}
@@ -1772,34 +1771,75 @@ func isAllDigits(cssSheet string) bool {
 	return true
 }
 
+// isAllWhitespace reports that s consists only of Unicode whitespace — the
+// same emptiness test as strings.TrimSpace(s) == "" without the TrimSpace
+// string header allocation.
+func isAllWhitespace(s string) bool {
+	for _, r := range s {
+		if !unicode.IsSpace(r) {
+			return false
+		}
+	}
+
+	return true
+}
+
 // coalesceTextItems merges consecutive non-image text runs that share style
-// and href so one text op paints the whole phrase.
+// and href so one text op paints the whole phrase. Each merged string is
+// built once with a Builder (no per-merge string churn); items are compacted
+// in place, returning the surviving prefix.
+//
+//nolint:cyclop // per-item merge decision: image/break/href/style compare plus in-place compaction
 func coalesceTextItems(line []inlineItem) []inlineItem {
 	if len(line) < two {
 		return line
 	}
 
-	out := make([]inlineItem, 0, len(line))
-	out = append(out, line[0])
+	var builder strings.Builder
 
-	for i := 1; i < len(line); i++ {
+	writeIdx := 0
+	merged := false
+
+	for i := range line {
 		cur := line[i]
-		prev := &out[len(out)-1]
+		mergeable := writeIdx > 0 &&
+			!cur.img && !line[writeIdx-1].img && !cur.forceBreak &&
+			cur.href == line[writeIdx-1].href &&
+			sameInlineStyle(line[writeIdx-1].style, cur.style)
 
-		if !cur.img && !prev.img && !cur.forceBreak && cur.href == prev.href &&
-			sameInlineStyle(prev.style, cur.style) {
-			prev.text += cur.text
-			prev.w += cur.w
+		if mergeable {
+			if !merged {
+				merged = true
+
+				builder.WriteString(line[writeIdx-1].text)
+			}
+
+			builder.WriteString(cur.text)
+
+			prev := &line[writeIdx-1]
 			// first item keeps marginL; last item's marginR wins
+			prev.w += cur.w
 			prev.marginR = cur.marginR
 
 			continue
 		}
 
-		out = append(out, cur)
+		if merged {
+			line[writeIdx-1].text = builder.String()
+			builder.Reset()
+
+			merged = false
+		}
+
+		line[writeIdx] = cur
+		writeIdx++
 	}
 
-	return out
+	if merged {
+		line[writeIdx-1].text = builder.String()
+	}
+
+	return line[:writeIdx]
 }
 
 func sameInlineStyle(acc, boxN *ResolvedStyle) bool {
@@ -1934,7 +1974,7 @@ func (e *engine) measureTextFace(cssSheet string, sty ResolvedStyle) float64 {
 			}
 		}
 
-		total += face.AdvanceInPoints(runic, size)
+		total += face.GlyphAdvancePoints(runic, size)
 		runeCount++
 	}
 
@@ -1955,7 +1995,7 @@ func (e *engine) measureRuneFace(curRune rune, sty ResolvedStyle) float64 {
 		face = e.font
 	}
 
-	w := face.AdvanceInPoints(curRune, size)
+	w := face.GlyphAdvancePoints(curRune, size)
 	if sty.LetterSpacing != 0 {
 		w += sty.LetterSpacing * e.scale
 	}
