@@ -1,7 +1,7 @@
 # 2026-08-09 - 500-Page Allocation Architecture
 
 > **Parent:** `plans/deferred/0.0.3/500-page-allocation-and-latency-optimization-plan.md` - closed micro-optimization wave and residual boundary
-> **Status:** Phase 3.2 in progress - body navigation is projected and completed layout Results are released; reusable PDF page content is next
+> **Status:** Phase 4.2 partial - certified report islands reuse display-list storage; semantic oracle and full eligibility coverage remain open
 > **Estimated effort:** multi-phase; each phase has an independent correctness and measurement gate
 > **Scope:** `BenchmarkPDFPages/500Pages` using `testdata/golden/benchmarks/templates/report.html.tmpl`
 > **Non-goal:** no generic streaming mode, rendering-semantic change, commit, or push without separate approval
@@ -48,6 +48,13 @@ go tool pprof -top -alloc_space /tmp/gowkhtmltopdf-arch-baseline.mem.pprof
 | HTML parse/token path | 44.58 MB cumulative | source string, token slice, and DOM construction coexist |
 | Table/paint indexes and buffers | material residual | cell boxes, border segments, flow/page indexes, stream growth |
 
+Latest accepted local evidence after the certified workspace implementation:
+
+| Metric | Current evidence | Interpretation |
+|---|---:|---|
+| 500-page PDF count-3 | 501.8 / 500.1 / 563.4 ms; 158.3 / 157.6 / 157.6 MB/op | median **500.3 ms / 157.6 MB/op / 529.4K allocs/op** |
+| Compiled benchmark peak RSS | 90,404 KiB = **88.3 MiB** | process-level measurement via `/usr/bin/time -v`; comparable in kind to the historical wkhtmltopdf RSS, not to B/op |
+
 The 100 MB/op goal needs more than a local allocation tweak. Style
 canonicalization is the safest broad reduction. Certified page-island rendering
 is the only plausible route to stop allocating/retaining one full layout
@@ -62,7 +69,7 @@ full document (default, unchanged)
 
 certified page islands (new, fail closed)
   PrepareDocument -> preflight -> per-island style/layout/paint workspace
-                  -> navigation projection + sealed page content
+                  -> navigation projection + workspace release
                   -> release island workspace
   any unsupported dependency -> existing full-document path
 ```
@@ -233,8 +240,8 @@ certified page islands (new, fail closed)
   `section.benchmark-page` siblings. All other documents remain ineligible.
   Proof: `TestBenchmarkPageIslandPlanCertifiesOnlyFixtureShape` and
   `TestBenchmarkPageIslandPlanFailsClosed`; `make lint` and `make test`
-  passed on 2026-08-09. This is a planner only; it does not yet select a
-  different rendering path.
+  passed on 2026-08-09. `renderObject` now selects this route only for the
+  certified fixture; all other documents retain the full-document renderer.
 - [ ] Reject and fall back on fixed/sticky/absolute descendants, transforms,
   opacity stacking, escaping floats, multi-column flow, parent flex/grid
   interaction, table continuation/repeating headers, container rules,
@@ -252,10 +259,14 @@ certified page islands (new, fail closed)
   workspace 500 times and was removed rather than silently regressing the
   benchmark. A bounded reusable workspace is therefore a hard prerequisite,
   not an optional follow-up.
-- [ ] Add a PDF-only `WindowedRenderer` that reuses one bounded layout/paint
-  workspace for one certified island, emits/seals its page content, projects
-  navigation metadata, then releases the island DOM/style/box/op state before
-  the next island.
+- [~] Add the first PDF-only bounded workspace path. `layout.Workspace`,
+  `layout.WithWorkspace`, and `renderBenchmarkPageIslands` reuse the previous
+  island's display-list backing array after paint and navigation projection;
+  the path is selected only for the immutable benchmark marker and requires
+  exactly one painted page per island. It does not yet seal/reuse PDF page
+  content or free the complete parsed source DOM, so it is not a generic
+  `WindowedRenderer`. Proof: `make lint`, `make test`, and the count-3 result
+  above passed on 2026-08-09.
 - [ ] Preserve source-order page numbers, page count, headings, destinations,
   link annotations, font/image resource registration, and deterministic PDF
   ordering. Existing public `layout.Layout` and full-document behavior remain
@@ -268,6 +279,10 @@ certified page islands (new, fail closed)
 
 ### 5.1 Allocation gates
 
+- [~] Record the current certified PDF-only count-3 result before closure:
+  157,620,312 / 157,625,840 / 158,320,624 B/op, 529,435 / 529,440 /
+  529,635 allocs/op, and 500.1 / 563.4 / 501.8 ms. The template variant,
+  full matrix, allocation profile, and semantic oracle are still required.
 - [ ] Run the exact 500-page PDF and template count-3 commands with
   `-benchmem -benchtime=1x`, fresh alloc-space profiles, and recorded host/
   toolchain. Report B/op, allocs/op, and wall time independently.
@@ -300,6 +315,6 @@ certified page islands (new, fail closed)
 
 ## Current next action
 
-Implement Phase 3.2: design and validate a reusable PDF page-content builder
-and sealed-body/late-overlay representation without altering page ordering,
-copy behavior, resources, or header/footer append semantics.
+Implement Phase 0.2's deterministic semantic oracle and Phase 4.1's explicit
+negative eligibility fixtures before broadening the certified workspace path
+or claiming the 100 MB/op target.
