@@ -176,7 +176,7 @@ var ignoredObjectKeySet = map[string]struct{}{
 	"load.defaultencoding":       {},
 	"load.proxy":                 {}, // only LoadGlobal.Proxy is wired
 	"load.externallinks":         {}, // PdfObject.ExternalLinks is the real gate
-	"load.locallinks":             {},
+	"load.locallinks":            {},
 	"load.repeatexternalheaders": {},
 	"load.repeatexternalcookies": {},
 	// web.* stubs — paint background is Global only
@@ -566,7 +566,7 @@ func registerGlobalGeometryKeys(keys keyTable[PdfGlobal]) {
 // registerHeaderFooterKeys wires header.*/footer.* keys. Object keys
 // additionally flag the HeaderSet/FooterSet override bit.
 func registerHeaderFooterKeys(globals keyTable[PdfGlobal], objects keyTable[PdfObject]) {
-	for key, entry := range subTable[HeaderFooter]([]subEntry[HeaderFooter]{
+	for key, entry := range subTable([]subEntry[HeaderFooter]{
 		{"fontsize",
 			func(h *HeaderFooter, raw string) error { return setFloat(&h.FontSize)(raw) },
 			func(h *HeaderFooter) (string, bool) { return fmtFloat(h.FontSize), true },
@@ -623,7 +623,7 @@ func registerHeaderFooterKeys(globals keyTable[PdfGlobal], objects keyTable[PdfO
 
 // registerTOCKeys wires toc.* keys for global and object tables.
 func registerTOCKeys(globals keyTable[PdfGlobal], objects keyTable[PdfObject]) {
-	for key, entry := range subTable[TableOfContent]([]subEntry[TableOfContent]{
+	for key, entry := range subTable([]subEntry[TableOfContent]{
 		{"fontscale",
 			func(t *TableOfContent, raw string) error { return setFloat(&t.FontScale)(raw) },
 			func(t *TableOfContent) (string, bool) { return fmtFloat(t.FontScale), true },
@@ -662,7 +662,7 @@ func registerTOCKeys(globals keyTable[PdfGlobal], objects keyTable[PdfObject]) {
 // web.background is not typed here — ApplyImageKey routes it to
 // PdfGlobal.Background.
 func registerWebKeys(globals keyTable[PdfGlobal], objects keyTable[PdfObject], images keyTable[ImageGlobal]) {
-	for key, entry := range subTable[Web]([]subEntry[Web]{
+	for key, entry := range subTable([]subEntry[Web]{
 		{"images",
 			func(w *Web, raw string) error { return setBool(&w.Images)(raw) },
 			func(w *Web) (string, bool) { return fmtBool(w.Images), true },
@@ -696,7 +696,7 @@ func registerWebKeys(globals keyTable[PdfGlobal], objects keyTable[PdfObject], i
 
 // registerLoadPageKeys wires load.* keys for the object table.
 func registerLoadPageKeys(objects keyTable[PdfObject]) {
-	for key, entry := range subTable[LoadPage]([]subEntry[LoadPage]{
+	for key, entry := range subTable([]subEntry[LoadPage]{
 		{"zoomfactor",
 			func(l *LoadPage, raw string) error { return setFloat(&l.ZoomFactor)(raw) },
 			func(l *LoadPage) (string, bool) { return fmtFloat(l.ZoomFactor), true },
