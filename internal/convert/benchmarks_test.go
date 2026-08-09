@@ -694,9 +694,7 @@ func BenchmarkLiveMovieData(b *testing.B) {
 
 	var showCount int
 
-	b.ResetTimer()
-
-	for range b.N {
+	for b.Loop() {
 		shows, size, err := fetchTVMazeShows(b.Context(), client)
 		if err != nil {
 			b.Fatalf("fetch live TVmaze data: %v", err)
