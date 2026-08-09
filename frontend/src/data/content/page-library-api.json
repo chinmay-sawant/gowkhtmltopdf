@@ -4,7 +4,6 @@
  "content": [
   {
    "type": "hero",
-   "kicker": "Library API",
    "title": "HTML to PDF and images in pure Go",
    "lede": "gowkhtmltopdf exposes the internal convert and imageout pipelines through an idiomatic, stdlib-only Go surface: build a Converter or ImageConverter, set wkhtmltopdf-style dotted settings, attach callbacks, and Convert. The module import path is gowkhtmltopdf."
   },
@@ -94,6 +93,12 @@
    "variant": "info",
    "title": "Module path and install",
    "body": "go.mod declares the module path gowkhtmltopdf with zero third-party require entries (stdlib only), and LibraryVersion tracks upstream 0.12.x as 0.12.7-dev. Until the module is published to a reachable path, point consumers at a checkout: go mod edit -replace gowkhtmltopdf=/path/to/gowkhtmltopdf, then go get gowkhtmltopdf@v0.0.0. Once tagged, go get gowkhtmltopdf@v0.1.0 works as normal."
+  },
+  {
+   "type": "callout",
+   "variant": "info",
+   "title": "Planned: Python bindings",
+   "body": "A Python package wrapping the Go library is on the roadmap and not yet released. No pip package or pythonic API exists today; until it ships, Python callers drive the gowkhtmltopdf binary as a subprocess, the same way pdfkit drives wkhtmltopdf."
   }
  ]
 }

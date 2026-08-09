@@ -4,7 +4,6 @@
  "content": [
   {
    "type": "hero",
-   "kicker": "Getting started",
    "title": "Your first PDF in five minutes",
    "lede": "Build two static, stdlib-only binaries offline, then turn a local HTML file into a PDF with a single opt-in flag."
   },

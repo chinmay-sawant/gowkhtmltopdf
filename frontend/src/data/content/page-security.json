@@ -4,7 +4,6 @@
  "content": [
   {
    "type": "hero",
-   "kicker": "Security",
    "title": "Local reads denied, fetches bounded, no code execution",
    "lede": "The document is the attack surface: it can name network resources and, only when the operator opts in, local files. Nothing in the pipeline executes document code. This page maps the controls and how to embed the converter safely."
   },

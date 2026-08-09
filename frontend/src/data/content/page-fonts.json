@@ -4,7 +4,6 @@
  "content": [
   {
    "type": "hero",
-   "kicker": "Typography internals",
    "title": "Fonts: embedded defaults, opt-in discovery",
    "lede": "Every PDF embeds the Liberation Sans family by default, with no font scanning at all. Non-Latin runs switch to a Type0/CID path, and complex-script shaping goes only as far as the pure-Go engine can take it."
   },

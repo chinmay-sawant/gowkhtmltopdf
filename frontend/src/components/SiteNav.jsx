@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
+import GitHubStars from './GitHubStars'
 
 const LINKS = [
   { to: '/', label: 'Overview' },
@@ -11,6 +12,7 @@ const LINKS = [
   { to: '/fonts', label: 'Fonts' },
   { to: '/security', label: 'Security' },
   { to: '/dossier', label: 'Issue Dossier' },
+  { to: '/showcase', label: 'Showcase' },
   { to: '/about', label: 'About' },
 ]
 
@@ -50,14 +52,15 @@ export default function SiteNav() {
             </NavLink>
           ))}
         </div>
-        <button
-          type="button"
-          className="theme-toggle"
-          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-        >
-          {theme === 'dark' ? 'Light' : 'Dark'}
-        </button>
+          <GitHubStars />
+          <button
+            type="button"
+            className="theme-toggle"
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+          >
+            {theme === 'dark' ? 'Light' : 'Dark'}
+          </button>
       </div>
     </nav>
   )

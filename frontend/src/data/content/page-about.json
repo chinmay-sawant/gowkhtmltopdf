@@ -4,7 +4,6 @@
  "content": [
   {
    "type": "hero",
-   "kicker": "About gowkhtmltopdf",
    "title": "A pure-Go HTML to PDF converter",
    "lede": "gowkhtmltopdf is a clean-room, stdlib-only work-alike for wkhtmltopdf that turns server-generated HTML into multi-page PDFs and images. It is built for controlled reports: invoices, statements, tables, and documents with headers, footers, TOCs, and PDF outlines."
   },

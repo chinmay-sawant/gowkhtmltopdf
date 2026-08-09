@@ -5,7 +5,6 @@
   {
    "type": "hero",
    "id": "intro",
-   "kicker": "What the engine renders",
    "title": "The compatibility contract",
    "lede": "gowkhtmltopdf converts controlled, server-generated report HTML to PDF and PNG: invoices, statements, multi-page tables, headers and footers. It is a report engine, not a browser, and the compatibility matrix is the normative contract."
   },

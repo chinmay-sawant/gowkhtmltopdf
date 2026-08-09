@@ -4,7 +4,6 @@
  "content": [
   {
    "type": "hero",
-   "kicker": "Issue Dossier",
    "title": "All 1,329 open wkhtmltopdf issues, classified",
    "lede": "Every open issue in the wkhtmltopdf/wkhtmltopdf repository, mapped against what gowkhtmltopdf can do. All 1,329 issues carry a verdict with evidence: 450 implemented, 278 partial, 601 not implemented."
   },

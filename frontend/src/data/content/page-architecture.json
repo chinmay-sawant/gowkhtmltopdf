@@ -4,7 +4,6 @@
  "content": [
   {
    "type": "hero",
-   "kicker": "Under the hood",
    "title": "A pipeline of small stdlib-only packages",
    "lede": "gowkhtmltopdf is a clean-room work-alike of wkhtmltopdf: HTML is loaded, parsed, laid out, paginated, and painted into a PDF 1.4 document (or a PNG/JPEG bitmap) using only the Go standard library plus a small tdewolff/canvas helper for SVG rasterization."
   },

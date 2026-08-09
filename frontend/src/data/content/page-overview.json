@@ -4,7 +4,6 @@
  "content": [
   {
    "type": "hero",
-   "kicker": "gowkhtmltopdf",
    "title": "Pure-Go HTML to PDF, no browser",
    "lede": "A clean-room, stdlib-first work-alike of the wkhtmltopdf CLI that turns server-generated HTML into multi-page PDFs (or PNG/JPEG) entirely in-process. MVP v0.1.0: phases 0-9 of the canonical plan are implemented, with committed samples under output/."
   },

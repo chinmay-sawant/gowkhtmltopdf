@@ -4,7 +4,6 @@
  "content": [
   {
    "type": "hero",
-   "kicker": "Command line",
    "title": "One grammar, three object kinds",
    "lede": "gowkhtmltopdf accepts wkhtmltopdf-style multi-object command lines: page, cover, and toc objects, each with their own flag scope, ending in a single output path."
   },
