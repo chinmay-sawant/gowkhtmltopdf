@@ -41,21 +41,9 @@ var errTVMazeBadStatus = errors.New("TVmaze API returned non-200 status")
 // errTVMazeNoShows reports an empty TVmaze show list.
 var errTVMazeNoShows = errors.New("TVmaze API returned no shows")
 
-// Baseline snapshot from benchmark-results.txt, recorded with
-// go1.26.4 linux/amd64 on WSL2 (24 CPUs), -benchtime=1x -count=1. The
-// report template uses 20 realistic rows per physical page:
-// PDF pages:     2=5.5ms, 5=11.8ms, 10=21.0ms, 20=46.0ms,
-//                50=113ms, 100=239ms, 200=695ms, 250=1.13s,
-//                500=2.10s (count-3 median; ~1.48GB / 3.93M allocs).
-// Template+PDF:  2=4.0ms, 5=10.8ms, 10=20.7ms, 20=41.8ms,
-//                50=102ms, 100=237ms, 200=465ms, 250=579ms,
-//                500=1.93s.
-// Web images:    2=257.33ms, 5=258.05ms, 10=281.10ms, 20=310.47ms,
-//                50=356.66ms, 100=413.68ms, 200=506.42ms, 250=564.00ms,
-//                500=970.72ms.
-// Inline images: 2=209.50ms, 5=220.61ms, 10=255.35ms, 20=282.33ms,
-//                50=303.54ms, 100=340.31ms, 200=439.46ms, 250=491.22ms,
-//                500=788.43ms.
+// Benchmark baselines are maintained in the checked-in benchmark artifact.
+// Keep this source file focused on workload construction and benchmark logic;
+// a benchmark run must not require updating duplicated timing comments here.
 
 type benchmarkPage struct {
 	Number int

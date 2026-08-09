@@ -105,6 +105,92 @@ type Result struct {
 	Locations []ElementLocation
 }
 
+// CloneResult returns an independent pagination result. Display-list image
+// bytes, page/index slices, and the layout-owned box graph are copied so a
+// second paint or pagination pass cannot mutate the source result through a
+// shallow alias.
+func CloneResult(res *Result) *Result {
+	if res == nil {
+		return nil
+	}
+
+	clone := *res
+	clone.Ops = cloneOps(res.Ops)
+	clone.Pages = cloneIndexPages(res.Pages)
+	clone.Locations = append([]ElementLocation(nil), res.Locations...)
+	clone.flowPages = cloneIndexPages(res.flowPages)
+	clone.flowPageOf = append([]int(nil), res.flowPageOf...)
+	clone.flowPos = append([]int(nil), res.flowPos...)
+	clone.flowBoxes = cloneIndexPages(res.flowBoxes)
+	clone.flowBoxPage = append([]int(nil), res.flowBoxPage...)
+	clone.flowBoxPos = append([]int(nil), res.flowBoxPos...)
+
+	boxes := make(map[*box]*box, len(res.boxes))
+	clone.root = cloneBoxGraph(res.root, boxes)
+	clone.boxes = make([]*box, len(res.boxes))
+	for i, source := range res.boxes {
+		clone.boxes[i] = cloneBoxGraph(source, boxes)
+	}
+
+	return &clone
+}
+
+func cloneOps(src []Op) []Op {
+	if src == nil {
+		return nil
+	}
+
+	dst := make([]Op, len(src))
+	for i := range src {
+		dst[i] = src[i]
+		dst[i].Image = append([]byte(nil), src[i].Image...)
+	}
+
+	return dst
+}
+
+func cloneIndexPages(src [][]int) [][]int {
+	if src == nil {
+		return nil
+	}
+
+	dst := make([][]int, len(src))
+	for i := range src {
+		dst[i] = append([]int(nil), src[i]...)
+	}
+
+	return dst
+}
+
+func cloneBoxGraph(src *box, seen map[*box]*box) *box {
+	if src == nil {
+		return nil
+	}
+	if clone, ok := seen[src]; ok {
+		return clone
+	}
+
+	clone := *src
+	clone.children = nil
+	clone.rows = nil
+	clone.stickyPort = nil
+	seen[src] = &clone
+
+	for _, child := range src.children {
+		clone.children = append(clone.children, cloneBoxGraph(child, seen))
+	}
+	for _, row := range src.rows {
+		clonedRow := make([]*box, 0, len(row))
+		for _, cell := range row {
+			clonedRow = append(clonedRow, cloneBoxGraph(cell, seen))
+		}
+		clone.rows = append(clone.rows, clonedRow)
+	}
+	clone.stickyPort = cloneBoxGraph(src.stickyPort, seen)
+
+	return &clone
+}
+
 // Workspace owns reusable display-list storage for sequential internal
 // layouts. It is deliberately separate from Result so the established Layout
 // and LayoutContext APIs keep their independent-result contract.
@@ -145,6 +231,17 @@ type ElementLocation struct {
 	Page int
 	X, Y float64
 	W, H float64
+}
+
+// NodeRef provides the neutral node projection used by outline.
+func (loc ElementLocation) NodeRef() *html.Node { return loc.Node }
+
+// PageIndex provides the neutral page projection used by outline.
+func (loc ElementLocation) PageIndex() int { return loc.Page }
+
+// Bounds provides the neutral rectangle projection used by outline.
+func (loc ElementLocation) Bounds() (float64, float64, float64, float64) {
+	return loc.X, loc.Y, loc.W, loc.H
 }
 
 // OpKind discriminates display-list operations.
@@ -590,8 +687,7 @@ func layoutContext(
 	}
 
 	if ctx == nil {
-		// Legacy callers without a request context get a background context.
-		ctx = context.Background()
+		return nil, errors.New("layout: nil context") //nolint:err113 // stable internal boundary error
 	}
 
 	if err := ctx.Err(); err != nil {

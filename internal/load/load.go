@@ -54,6 +54,7 @@ var ErrInvalidProxy = errors.New("invalid proxy configuration")
 // dynamic messages wrap a static error and stay matchable with errors.Is.
 var (
 	errNilLoader          = errors.New("nil resource loader")
+	errNilContext         = errors.New("nil load context")
 	errCannotLoad         = errors.New("cannot load")
 	errUnsupportedCharset = errors.New("unsupported charset")
 	errBlockedFileAccess  = errors.New("blocked file access")
@@ -63,6 +64,8 @@ var (
 	errInvalidDataURL     = errors.New("invalid URL escape in data URL")
 	errTooManyRedirects   = errors.New("too many redirects")
 	errBodyTooLarge       = errors.New("exceeds max body size")
+	errInvalidBodyLimit   = errors.New("invalid max body size")
+	errInvalidRedirects   = errors.New("invalid max redirects")
 	errUninitializedLoader = errors.New("loader client is not initialized")
 )
 
@@ -113,6 +116,9 @@ func (l *Loader) ForResource(res *Resource, pageLoad settings.LoadPage) Resource
 func (c ResourceContext) Fetch(ctx context.Context, ref string) (*Resource, error) {
 	if c.loader == nil {
 		return nil, errNilLoader
+	}
+	if ctx == nil {
+		return nil, errNilContext
 	}
 
 	return c.loader.FetchSub(ctx, c.base, ref, c.pageLoad)
@@ -273,11 +279,25 @@ type Loader struct {
 // load policy (proxy, allow prefixes, local-access flag) in one place.
 func NewLoader(global settings.LoadGlobal) *Loader {
 	loader, err := NewLoaderWithError(global)
-	if err != nil {
-		loader.initErr = err
+	if err == nil {
+		return loader
 	}
 
-	return loader
+	// Preserve the historical constructor shape for existing callers. New
+	// callers should use NewLoaderWithError so initialization failures are
+	// handled at their request boundary instead of on the first load.
+	policy := global
+	policy.Allow = cloneStrings(global.Allow)
+
+	return &Loader{ //nolint:exhaustruct // intentional zero/partial fields
+		Global:                policy,
+		Log:                   io.Discard,
+		MaxBodySize:           DefaultMaxBodySize,
+		MaxRedirects:          DefaultMaxRedirects,
+		Allow:                 cloneStrings(policy.Allow),
+		EnableLocalFileAccess: policy.EnableLocalFileAccess,
+		initErr:               err,
+	}
 }
 
 // NewLoaderWithError builds a Loader from global load settings and validates
@@ -296,7 +316,7 @@ func NewLoaderWithError(global settings.LoadGlobal) (*Loader, error) {
 		EnableLocalFileAccess: policy.EnableLocalFileAccess,
 	}
 	if err := loader.initClient(); err != nil {
-		return loader, err
+		return nil, err
 	}
 
 	return loader, nil
@@ -376,8 +396,12 @@ func (l *Loader) Load(ctx context.Context, input string, pageLoad settings.LoadP
 		return nil, l.initErr
 	}
 
+	if err := l.validateLimits(); err != nil {
+		return nil, err
+	}
+
 	if ctx == nil {
-		ctx = context.Background()
+		return nil, errNilContext
 	}
 
 	pageLoad = cloneLoadPage(pageLoad)
@@ -628,7 +652,77 @@ func isMetaWhitespace(b byte) bool {
 	return b == ' ' || b == '\t' || b == '\n' || b == '\r' || b == '\f' || b == '>'
 }
 
-func (l *Loader) loadFile(_ context.Context, path string, pageLoad settings.LoadPage) (*Resource, error) {
+func (l *Loader) validateLimits() error {
+	if err := validateBodyLimit(l.MaxBodySize); err != nil {
+		return err
+	}
+
+	if l.MaxRedirects < 0 {
+		return fmt.Errorf("%w: %d must be non-negative", errInvalidRedirects, l.MaxRedirects)
+	}
+
+	return nil
+}
+
+func validateBodyLimit(maxBytes int64) error {
+	if maxBytes < 0 {
+		return fmt.Errorf("%w: %d must be non-negative", errInvalidBodyLimit, maxBytes)
+	}
+
+	return nil
+}
+
+// bodyReadLimit adds one probe byte so callers can distinguish a body at the
+// limit from one that exceeds it. Avoid overflowing when the compatibility
+// field is set to the largest int64 value.
+func bodyReadLimit(maxBytes int64) int64 {
+	if maxBytes == 1<<63-1 {
+		return maxBytes
+	}
+
+	return maxBytes + 1
+}
+
+// readFileBody reads at most maxBytes plus one byte and closes the file when
+// ctx is cancelled. os.File reads do not otherwise observe context
+// cancellation, so the watcher makes a blocked local-file read abort at the
+// same request boundary as an HTTP read.
+func readFileBody(ctx context.Context, file *os.File, maxBytes int64) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	stop := make(chan struct{})
+	watcherDone := make(chan struct{})
+	go func() {
+		defer close(watcherDone)
+
+		select {
+		case <-ctx.Done():
+			_ = file.Close()
+		case <-stop:
+		}
+	}()
+
+	body, err := io.ReadAll(io.LimitReader(file, bodyReadLimit(maxBytes)))
+	close(stop)
+	<-watcherDone
+	if err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, ctxErr
+		}
+
+		return nil, err
+	}
+
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	return body, nil
+}
+
+func (l *Loader) loadFile(ctx context.Context, path string, pageLoad settings.LoadPage) (*Resource, error) {
 	filePath, err := filePathFromURL(path)
 	if err != nil {
 		return nil, err
@@ -646,7 +740,7 @@ func (l *Loader) loadFile(_ context.Context, path string, pageLoad settings.Load
 
 	defer file.Close()
 
-	body, err := io.ReadAll(io.LimitReader(file, l.MaxBodySize+1))
+	body, err := readFileBody(ctx, file, l.MaxBodySize)
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", filePath, err)
 	}
@@ -741,7 +835,7 @@ func (l *Loader) loadHTTP(ctx context.Context, target string, pageLoad settings.
 			parsed.String(), errBodyTooLarge, l.MaxBodySize, resp.ContentLength)
 	}
 
-	bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, l.MaxBodySize+1))
+	bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, bodyReadLimit(l.MaxBodySize)))
 	if err != nil {
 		return nil, fmt.Errorf("read response from %s: %w", parsed.String(), err)
 	}
@@ -905,8 +999,12 @@ func (l *Loader) FetchSub(ctx context.Context, base, ref string, pageLoad settin
 		return nil, l.initErr
 	}
 
+	if err := l.validateLimits(); err != nil {
+		return nil, err
+	}
+
 	if ctx == nil {
-		ctx = context.Background()
+		return nil, errNilContext
 	}
 
 	pageLoad = cloneLoadPage(pageLoad)
@@ -975,9 +1073,13 @@ func urlEncodePost(items []settings.PostItem) string {
 	return vals.Encode()
 }
 
-// decodeDataURLLimited decodes a data URL while enforcing the same body cap
-// used by file and HTTP resources. A negative maxBytes means unlimited.
+// decodeDataURLLimited decodes a data URL while enforcing the same non-negative
+// body cap used by file and HTTP resources.
 func decodeDataURLLimited(s string, maxBytes int64) ([]byte, string, error) {
+	if err := validateBodyLimit(maxBytes); err != nil {
+		return nil, "", err
+	}
+
 	rest := strings.TrimPrefix(s, "data:")
 
 	comma := strings.IndexByte(rest, ',')
@@ -1015,6 +1117,10 @@ func decodeDataURLLimited(s string, maxBytes int64) ([]byte, string, error) {
 }
 
 func decodeBase64Limited(encoded string, maxBytes int64) ([]byte, error) {
+	if err := validateBodyLimit(maxBytes); err != nil {
+		return nil, err
+	}
+
 	// Count first so a large amount of whitespace cannot force an equally
 	// large compacted allocation before the body limit is checked.
 	compactLen := compactBase64Len(encoded)
@@ -1098,6 +1204,10 @@ func isBase64Space(b byte) bool {
 }
 
 func unescapeDataLimited(raw string, maxBytes int64) ([]byte, error) {
+	if err := validateBodyLimit(maxBytes); err != nil {
+		return nil, err
+	}
+
 	limit, capacity := unescapeCapacity(raw, maxBytes)
 
 	out := make([]byte, 0, capacity)
@@ -1177,7 +1287,11 @@ func fromHex(hexChar byte) (byte, bool) {
 }
 
 func checkBodyLimit(source string, length int, maxBytes int64) error {
-	if maxBytes >= 0 && int64(length) > maxBytes {
+	if err := validateBodyLimit(maxBytes); err != nil {
+		return err
+	}
+
+	if int64(length) > maxBytes {
 		return fmt.Errorf("%s %w %d", source, errBodyTooLarge, maxBytes)
 	}
 

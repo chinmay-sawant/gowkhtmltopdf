@@ -87,8 +87,6 @@ func descriptionWord(itemIdx int) string {
 // it is executed; cold/warm runs intentionally reuse the command state and
 // are not required to produce byte-identical PDF streams.
 func TestTenPageTableReportPerformance(t *testing.T) {
-	t.Parallel()
-
 	if testing.Short() {
 		t.Skip("perf budget test skipped in -short mode")
 	}
@@ -115,6 +113,9 @@ func TestTenPageTableReportPerformance(t *testing.T) {
 		}
 
 		sizes = append(sizes, int64(len(data)))
+		if len(data) == 0 {
+			t.Errorf("run %d produced an empty PDF", run)
+		}
 		t.Logf("run %d (first=%v): full pipeline %v, %d bytes, %d pages",
 			run, run == 1, dur, len(data), pageCount(data))
 

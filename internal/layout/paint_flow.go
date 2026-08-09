@@ -5,9 +5,9 @@ import (
 	"sort"
 )
 
-// maxFlowPageIndex bounds the outer pagination-index slices. Normal documents
-// stay well below this limit; adversarial coordinates above it share the final
-// bucket instead of turning one sparse operation into an enormous allocation.
+// maxFlowPageIndex is the exclusive upper bound for the outer pagination-index
+// slices. Coordinates beyond it are rejected instead of being aliased into a
+// final catch-all bucket.
 const maxFlowPageIndex = 16384
 
 // shiftFlowY moves the ops of the target range [from,to] - plus every op
@@ -23,9 +23,14 @@ func shiftFlowY(res *Result, from, toIdx int, fromY, deltaY float64) {
 
 	ensureFlowIndex(res, flowIndexPageSize(res))
 
-	shiftOpsRange(res, from, toIdx, deltaY)
+	startPage, ok := checkedFlowPageOfY(fromY, res.flowPageSize)
+	if !ok || len(res.flowPageOf) != len(res.Ops) {
+		invalidateFlowIndex(res)
 
-	startPage := flowPageOfY(fromY, res.flowPageSize)
+		return
+	}
+
+	shiftOpsRange(res, from, toIdx, deltaY)
 
 	shiftFlowOps(res, from, toIdx, fromY, deltaY, startPage)
 
@@ -113,6 +118,12 @@ func shiftOpsBucket(res *Result, page, from, toIdx int, fromY, deltaY float64) {
 		}
 
 		idx := bucket[jdx]
+		if idx < 0 || idx >= len(res.Ops) || idx >= len(res.flowPageOf) {
+			jdx++
+
+			continue
+		}
+
 		if (idx >= from && idx <= toIdx) || res.Ops[idx].Y <= fromY {
 			jdx++
 
@@ -157,6 +168,12 @@ func shiftBoxesBucket(res *Result, page, from, toIdx int, fromY float64, startPa
 		}
 
 		boxIndex := bucket[jdx]
+		if boxIndex < 0 || boxIndex >= len(res.boxes) || boxIndex >= len(res.flowBoxPage) {
+			jdx++
+
+			continue
+		}
+
 		if skipBoxShift(res, boxIndex, from, toIdx, fromY, startPage) {
 			jdx++
 
@@ -209,7 +226,14 @@ func ensureFlowIndex(res *Result, pageSize float64) {
 	}
 
 	res.flowPageSize = pageSize
-	res.flowPages, res.flowPageOf, res.flowPos = buildFlowOpIndex(res.Ops, pageSize)
+	var ok bool
+	res.flowPages, res.flowPageOf, res.flowPos, ok = buildFlowOpIndex(res.Ops, pageSize)
+	if !ok {
+		invalidateFlowIndex(res)
+		res.flowPageSize = pageSize
+
+		return
+	}
 
 	boxes := res.boxes
 	if len(boxes) == 0 && res.root != nil {
@@ -222,7 +246,7 @@ func ensureFlowIndex(res *Result, pageSize float64) {
 }
 
 // buildFlowOpIndex buckets non-fixed ops by their canvas page.
-func buildFlowOpIndex(ops []Op, pageSize float64) ([][]int, []int, []int) {
+func buildFlowOpIndex(ops []Op, pageSize float64) ([][]int, []int, []int, bool) {
 	// Page numbers are dense from 0..maxP, so counts index directly instead
 	// of a per-page map (page buckets below are exact-capacity, no growth).
 	// Fixed ops leave pageOf/pos at their zero values; every reader guards
@@ -235,7 +259,10 @@ func buildFlowOpIndex(ops []Op, pageSize float64) ([][]int, []int, []int) {
 			continue
 		}
 
-		page := flowPageOfY(ops[idx].Y, pageSize)
+		page, ok := checkedFlowPageOfY(ops[idx].Y, pageSize)
+		if !ok {
+			return nil, nil, nil, false
+		}
 
 		pageOf[idx] = page
 
@@ -273,7 +300,7 @@ func buildFlowOpIndex(ops []Op, pageSize float64) ([][]int, []int, []int) {
 		pages[page] = append(pages[page], idx)
 	}
 
-	return pages, pageOf, pos
+	return pages, pageOf, pos, true
 }
 
 func ensureFlowBoxIndex(res *Result, boxes []*box) {
@@ -292,7 +319,14 @@ func ensureFlowBoxIndex(res *Result, boxes []*box) {
 	for idx, b := range boxes {
 		b.flowIndex = idx
 
-		page := flowPageOfY(b.y, res.flowPageSize)
+		page, ok := checkedFlowPageOfY(b.y, res.flowPageSize)
+		if !ok {
+			res.flowBoxes = nil
+			res.flowBoxPage = nil
+			res.flowBoxPos = nil
+
+			return
+		}
 
 		for len(res.flowBoxes) <= page {
 			res.flowBoxes = append(res.flowBoxes, nil)
@@ -305,14 +339,19 @@ func ensureFlowBoxIndex(res *Result, boxes []*box) {
 }
 
 func shiftIndexedOp(res *Result, index int, deltaY float64) {
-	if index < 0 || index >= len(res.Ops) || res.Ops[index].Fixed {
+	if index < 0 || index >= len(res.Ops) || index >= len(res.flowPageOf) || res.Ops[index].Fixed {
 		return
 	}
 
 	oldPage := res.flowPageOf[index]
 	res.Ops[index].Y += deltaY
 
-	newPage := flowPageOfY(res.Ops[index].Y, res.flowPageSize)
+	newPage, ok := checkedFlowPageOfY(res.Ops[index].Y, res.flowPageSize)
+	if !ok {
+		invalidateFlowIndex(res)
+
+		return
+	}
 	if oldPage == newPage {
 		return
 	}
@@ -322,7 +361,7 @@ func shiftIndexedOp(res *Result, index int, deltaY float64) {
 }
 
 func shiftIndexedBox(res *Result, index int, deltaY float64) {
-	if index < 0 || index >= len(res.boxes) {
+	if index < 0 || index >= len(res.boxes) || index >= len(res.flowBoxPage) {
 		return
 	}
 
@@ -330,7 +369,12 @@ func shiftIndexedBox(res *Result, index int, deltaY float64) {
 	oldPage := res.flowBoxPage[index]
 	b.y += deltaY
 
-	newPage := flowPageOfY(b.y, res.flowPageSize)
+	newPage, ok := checkedFlowPageOfY(b.y, res.flowPageSize)
+	if !ok {
+		invalidateFlowIndex(res)
+
+		return
+	}
 	if oldPage == newPage {
 		return
 	}
@@ -339,24 +383,30 @@ func shiftIndexedBox(res *Result, index int, deltaY float64) {
 	appendToFlowBucket(&res.flowBoxes, &res.flowBoxPage, &res.flowBoxPos, index, newPage)
 }
 
-// flowPageOfY maps a canvas Y to its page index.
-func flowPageOfY(y, pageSize float64) int {
-	if pageSize <= 0 || math.IsNaN(pageSize) || math.IsNaN(y) || y <= 0 {
-		return 0
+// checkedFlowPageOfY maps a canvas Y to its page index and reports whether the
+// index is safe for the bounded flow slices. Non-positive Y remains page zero
+// for compatibility; invalid or oversized values are rejected explicitly.
+func checkedFlowPageOfY(y, pageSize float64) (int, bool) {
+	if pageSize <= 0 || math.IsNaN(pageSize) || math.IsInf(pageSize, 0) || math.IsNaN(y) || math.IsInf(y, 0) {
+		return 0, false
+	}
+
+	if y <= 0 {
+		return 0, true
 	}
 
 	page := y / pageSize
-	if page >= float64(maxFlowPageIndex) {
-		return maxFlowPageIndex
+	if page < 0 || page >= float64(maxFlowPageIndex) {
+		return 0, false
 	}
 
-	return int(page)
+	return int(page), true
 }
 
 // removeFromFlowBucket swaps the entry out of its bucket (keeping cursor
 // positions valid for shiftIndexedOp's in-place iteration).
 func removeFromFlowBucket(buckets *[][]int, pos []int, page, index int) {
-	if buckets == nil || page < 0 || page >= len(*buckets) {
+	if buckets == nil || page < 0 || page >= len(*buckets) || index < 0 || index >= len(pos) {
 		return
 	}
 
@@ -376,15 +426,12 @@ func removeFromFlowBucket(buckets *[][]int, pos []int, page, index int) {
 // appendToFlowBucket registers the entry in its new page bucket.
 // buckets is a pointer so growing the outer page slice is visible to the caller.
 func appendToFlowBucket(buckets *[][]int, pageOf *[]int, pos *[]int, index, page int) {
-	if buckets == nil {
+	if buckets == nil || pageOf == nil || pos == nil || index < 0 || index >= len(*pageOf) || index >= len(*pos) {
 		return
 	}
 
-	if page < 0 {
-		page = 0
-	}
-	if page > maxFlowPageIndex {
-		page = maxFlowPageIndex
+	if page < 0 || page >= maxFlowPageIndex {
+		return
 	}
 
 	for len(*buckets) <= page {
@@ -1341,7 +1388,10 @@ func repeatTableHeaderOnPages(res *Result, tblBox *box, contentH float64) {
 		return
 	}
 
-	firstPage := int(tblBox.y / contentH)
+	firstPage, ok := checkedFlowPageOfY(tblBox.y, contentH)
+	if !ok {
+		return
+	}
 	pages := headerContinuationPages(tblBox, firstPage, res, contentH)
 
 	for page := range pages {
@@ -1373,7 +1423,10 @@ func headerContinuationPages(tblBox *box, _ int, res *Result, contentH float64) 
 			continue
 		}
 
-		pages[int(top/contentH)] = true
+		page, ok := checkedFlowPageOfY(top, contentH)
+		if ok {
+			pages[page] = true
+		}
 	}
 
 	return pages
@@ -1392,7 +1445,8 @@ func tableBodyRange(tblBox *box, page int, res *Result, contentH float64) (int, 
 		}
 
 		top, _ := rowYBounds(row, res)
-		if int(top/contentH) < page {
+		topPage, ok := checkedFlowPageOfY(top, contentH)
+		if !ok || topPage < page {
 			continue
 		}
 

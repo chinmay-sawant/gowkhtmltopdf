@@ -40,6 +40,9 @@ var errNoResourceLoader = errors.New("convert: resource context has no loader")
 // errNilLoader reports a nil loader at the document-prep boundary.
 var errNilLoader = errors.New("convert: nil loader")
 
+// errNilContext reports a nil context at a preparation/resource boundary.
+var errNilContext = errors.New("convert: nil context")
+
 // NewResourceContext creates the resource seam shared by PDF and image
 // preparation. The loader owns global ACL/network policy; Load carries the
 // per-document credentials, headers, cookies and error policy.
@@ -54,13 +57,15 @@ func NewResourceContext(loader *load.Loader, base string, lp settings.LoadPage) 
 
 // Fetch resolves and loads a document-relative subresource using the bound
 // base URL and load policy.
-func (r ResourceContext) Fetch(ctx context.Context, ref string) (*load.Resource, error) { //nolint:contextcheck,lll // nil-ctx guard falls back to a fresh context
+func (r ResourceContext) Fetch(
+	ctx context.Context, ref string,
+) (*load.Resource, error) {
 	if r.Loader == nil {
 		return nil, errNoResourceLoader
 	}
 
 	if ctx == nil {
-		ctx = context.Background()
+		return nil, errNilContext
 	}
 
 	res, err := r.resource.Fetch(ctx, ref)
@@ -74,8 +79,17 @@ func (r ResourceContext) Fetch(ctx context.Context, ref string) (*load.Resource,
 // CollectSheets gathers stylesheets through this document's resource policy.
 // The implementation remains CollectSheets so existing callers and the
 // fix-contract's shared gatherer stay compatible.
-func (r ResourceContext) CollectSheets(ctx context.Context, root *html.Node, opts SheetOptions, log io.Writer) []*css.Stylesheet { //nolint:lll // resource seam signature
+func (r ResourceContext) CollectSheets(
+	ctx context.Context, root *html.Node, opts SheetOptions, log io.Writer,
+) []*css.Stylesheet {
 	if r.Loader == nil {
+		return nil
+	}
+	if ctx == nil {
+		if log != nil {
+			line.Emit(log, line.Warn, "stylesheet collection: %v", errNilContext)
+		}
+
 		return nil
 	}
 
@@ -88,8 +102,18 @@ func (r ResourceContext) CollectSheets(ctx context.Context, root *html.Node, opt
 }
 
 // MergeFontFaces loads @font-face resources through this document's policy.
-func (r ResourceContext) MergeFontFaces(ctx context.Context, registry *pdf.Registry, sheets []*css.Stylesheet, idx int, log io.Writer) *pdf.Registry { //nolint:lll // resource seam signature
+func (r ResourceContext) MergeFontFaces(
+	ctx context.Context, registry *pdf.Registry, sheets []*css.Stylesheet,
+	idx int, log io.Writer,
+) *pdf.Registry {
 	if r.Loader == nil {
+		return registry
+	}
+	if ctx == nil {
+		if log != nil {
+			line.Emit(log, line.Warn, "font-face merge: %v", errNilContext)
+		}
+
 		return registry
 	}
 
@@ -124,13 +148,21 @@ type PreparedDocument struct {
 // Root and no error so the caller can apply its mode-specific skip policy.
 // All subresources are bound to one ResourceContext before any CSS or font
 // work begins.
-func PrepareDocument(ctx context.Context, loader *load.Loader, page string, loadPage settings.LoadPage, registry *pdf.Registry, opts PrepareOptions, log io.Writer) (*PreparedDocument, error) { //nolint:contextcheck,lll // nil-ctx guard falls back to a fresh context
+func PrepareDocument(
+	ctx context.Context,
+	loader *load.Loader,
+	page string,
+	loadPage settings.LoadPage,
+	registry *pdf.Registry,
+	opts PrepareOptions,
+	log io.Writer,
+) (*PreparedDocument, error) {
 	if loader == nil {
 		return nil, errNilLoader
 	}
 
 	if ctx == nil {
-		ctx = context.Background()
+		return nil, errNilContext
 	}
 
 	res, err := loader.Load(ctx, page, loadPage)
@@ -174,6 +206,9 @@ func (r ResourceContext) collectSheets(
 	if r.Loader == nil {
 		return nil, errNoResourceLoader
 	}
+	if ctx == nil {
+		return nil, errNilContext
+	}
 
 	return collectSheets(ctx, r.resource, root, opts, log)
 }
@@ -183,6 +218,13 @@ func (r ResourceContext) mergeFontFaces(
 	idx int, log io.Writer,
 ) *pdf.Registry {
 	if r.Loader == nil {
+		return registry
+	}
+	if ctx == nil {
+		if log != nil {
+			line.Emit(log, line.Warn, "font-face merge: %v", errNilContext)
+		}
+
 		return registry
 	}
 

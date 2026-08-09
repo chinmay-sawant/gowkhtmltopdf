@@ -2,12 +2,15 @@ package layout
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
 
 	"gowkhtmltopdf/internal/pdf"
 )
+
+var errNilContext = errors.New("layout: nil context")
 
 // Page-break keyword constants shared by the pagination passes.
 const (
@@ -53,10 +56,6 @@ type PaintOptions struct {
 // this painting slice. Both legacy and cancellation-aware entrypoints use it,
 // so nil-context compatibility does not leak into the paint implementation.
 func beginPaintContext(ctx context.Context) (context.Context, context.CancelFunc) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
 	return context.WithCancel(ctx)
 }
 
@@ -68,6 +67,10 @@ func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 // entrypoint remains a background-context adapter for package callers that do
 // not have a request context.
 func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts PaintOptions) error {
+	if ctx == nil {
+		return errNilContext
+	}
+
 	ctx, cancel := beginPaintContext(ctx)
 	defer cancel()
 
@@ -83,6 +86,9 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 	if contentH <= 0 {
 		contentH = opts.PageHeight
 	}
+	if err := validatePaintPageIndices(res.Ops, contentH); err != nil {
+		return err
+	}
 
 	if len(res.Ops) == 0 {
 		doc.AddPage(opts.PageWidth, opts.PageHeight)
@@ -92,6 +98,9 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 	}
 
 	opPage := paginateOps(res, contentH)
+	if err := validatePaintPageIndices(res.Ops, contentH); err != nil {
+		return err
+	}
 	fixedIdx := fixedOpIndices(res)
 
 	// Split rect ops at page boundaries first so sticky clamps the natural
@@ -108,6 +117,9 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 	// Print-scoped sticky: clamp the natural fragment without fixed-style
 	// continuation clones.
 	applyStickyPrint(res, contentH)
+	if err := validatePaintPageIndices(res.Ops, contentH); err != nil {
+		return err
+	}
 
 	// Re-derive pages after splits and sticky (new ops / Y shifts).
 	opPage = buildPagesAfterSplits(res, contentH, fixedIdx)
@@ -153,6 +165,27 @@ func buildPagesAfterSplits(res *Result, contentH float64, _ []int) []int {
 	return opPage
 }
 
+// validatePaintPageIndices rejects coordinates that cannot be represented by
+// the bounded pagination index. Returning an error keeps an oversized page
+// distinct from page zero or the final index bucket.
+func validatePaintPageIndices(ops []Op, contentH float64) error {
+	if contentH <= 0 || math.IsNaN(contentH) || math.IsInf(contentH, 0) {
+		return fmt.Errorf("layout: invalid content height %v", contentH)
+	}
+
+	for idx := range ops {
+		if ops[idx].Fixed {
+			continue
+		}
+
+		if _, ok := checkedFlowPageOfY(ops[idx].Y, contentH); !ok {
+			return fmt.Errorf("layout: operation %d has an out-of-range page index", idx)
+		}
+	}
+
+	return nil
+}
+
 // pageBuckets maps every op to its canvas page in one pass, with per-page
 // non-fixed op counts for exact-capacity buckets. Fixed ops leave pageOf at
 // its zero value; callers decide whether their fill pass includes them.
@@ -166,7 +199,12 @@ func pageBuckets(ops []Op, contentH float64) ([]int, []int) {
 			continue
 		}
 
-		if p := int(ops[idx].Y / contentH); p > maxPage {
+		p, ok := checkedFlowPageOfY(ops[idx].Y, contentH)
+		if !ok {
+			return nil, nil
+		}
+
+		if p > maxPage {
 			maxPage = p
 		}
 	}
@@ -179,12 +217,13 @@ func pageBuckets(ops []Op, contentH float64) ([]int, []int) {
 			continue
 		}
 
-		p := int(ops[idx].Y / contentH)
+		p, ok := checkedFlowPageOfY(ops[idx].Y, contentH)
+		if !ok {
+			return nil, nil
+		}
 		pageOf[idx] = p
 
-		if p >= 0 && p <= maxPage {
-			counts[p]++
-		}
+		counts[p]++
 	}
 
 	return pageOf, counts
@@ -227,7 +266,8 @@ func paintPages(
 
 	// fixedIdx is page-independent and never mutated between pages, so apply
 	// the shared PaintOrder policy once instead of once per page.
-	fixedOrder := paintOrderSubset(res.Ops, fixedIdx)
+	fixedOrder := fixedIdx
+	sortPaintIndices(res.Ops, fixedOrder)
 
 	fontNames := map[*pdf.Font]string{}
 	nextFont := 0
@@ -236,6 +276,7 @@ func paintPages(
 	var child *pdf.Content
 
 	var page *pdf.Page
+	pageOrder := make([]int, 0)
 
 	resName := func(face *pdf.Font) string {
 		if face == nil {
@@ -272,7 +313,8 @@ func paintPages(
 		child = page.Content()
 		child.Grow(contentSizeHint(res.Ops, idxs, fixedOrder))
 
-		pageOrder := paintOrderSubset(res.Ops, idxs)
+		pageOrder = append(pageOrder[:0], idxs...)
+		sortPaintIndices(res.Ops, pageOrder)
 
 		for _, idx := range pageOrder {
 			if err := ctx.Err(); err != nil {
@@ -438,6 +480,10 @@ func PaintBand(p *pdf.Page, c *pdf.Content, ops []Op, opts BandOptions) error {
 // PaintBandContext is the cancellation-aware form of PaintBand used for
 // HTML headers and footers.
 func PaintBandContext(ctx context.Context, page *pdf.Page, chld *pdf.Content, ops []Op, opts BandOptions) error {
+	if ctx == nil {
+		return errNilContext
+	}
+
 	ctx, cancel := beginPaintContext(ctx)
 	defer cancel()
 

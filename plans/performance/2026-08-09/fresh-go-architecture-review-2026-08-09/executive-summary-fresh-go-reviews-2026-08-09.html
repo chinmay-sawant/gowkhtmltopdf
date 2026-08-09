@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>gowkhtmltopdf Go Review Executive Summary</title>
+  <style>
+    body{margin:0;background:#f3f6f9;color:#18212f;font:15px/1.6 system-ui,sans-serif}main{max-width:1060px;margin:auto;padding:28px 18px 50px}header,section,footer{background:#fff;border:1px solid #d8e0e8;border-radius:12px;padding:24px;margin-bottom:16px}header{border-top:5px solid #2457a6}h1,h2{line-height:1.25}h1{font-size:38px;margin:0 0 8px}h2{font-size:21px;border-bottom:1px solid #d8e0e8;padding-bottom:8px}.muted{color:#5d6877}.scores{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}.score{background:#eaf1ff;border:1px solid #c7d8fb;border-radius:9px;padding:14px}.score strong{display:block;color:#2457a6}.number{display:block;color:#2457a6;font-size:35px;font-weight:750}table{width:100%;border-collapse:collapse}th,td{text-align:left;vertical-align:top;padding:9px;border-bottom:1px solid #d8e0e8}th{background:#f8fafc}code{background:#f0f3f6;border-radius:4px;padding:1px 4px}.callout{background:#fff3df;border-left:4px solid #8a4b08;padding:14px 16px}li{margin:5px 0}pre{overflow:auto;background:#17202d;color:#eef4ff;padding:15px;border-radius:8px}@media(max-width:650px){header,section,footer{padding:18px 15px}h1{font-size:29px}th,td{font-size:13px}}
+  </style>
+</head>
+<body><main>
+  <header>
+    <h1>gowkhtmltopdf Go Architecture &amp; Style Review</h1>
+    <p class="muted">Post-remediation executive summary · 2026-08-09</p>
+    <p>Four independent implementation agents addressed the fresh design-pattern and code-style findings. The review remains source-only because Git and Go validation commands were not run during implementation.</p>
+  </header>
+  <section>
+    <h2>Updated ratings</h2>
+    <div class="scores">
+      <div class="score"><strong>golang-design-patterns v1.1.5</strong><span class="number">7.6/10</span>Baseline: 5.4/10</div>
+      <div class="score"><strong>golang-code-style v1.2.2</strong><span class="number">7.5/10</span>Baseline: 5.3/10</div>
+    </div>
+    <p class="muted">The scores improved from implemented source changes, not runtime certification. Tests, benchmarks, and lint remain unexecuted by explicit instruction.</p>
+  </section>
+  <section>
+    <h2>Executive conclusion</h2>
+    <p>Ownership, cancellation, loader construction, image/resource budgets, pagination bounds, shared paint ordering, outline locality, output closure, deterministic time injection, and safe result cloning were implemented.</p>
+    <div class="callout"><strong>HTTP clarification:</strong> the application is an HTML-to-PDF/image renderer, not an HTTP-cleanup application. HTTP cleanup describes only the remote-resource loader, which already has timeouts, redirect/body limits, request contexts, and response cleanup.</div>
+  </section>
+  <section>
+    <h2>Primary completed areas</h2>
+    <table><thead><tr><th>Area</th><th>Result</th></tr></thead><tbody>
+      <tr><td>Ownership</td><td>Page islands and layout results now clone mutable trees, indexes, image bytes, and parent relationships safely.</td></tr>
+      <tr><td>Resource safety</td><td>Loader reads, raster dimensions, decoded images, encoded output, and image caches have explicit bounds.</td></tr>
+      <tr><td>Pagination/paint</td><td>Shared paint order is reused and invalid oversized page indexes fail instead of aliasing.</td></tr>
+      <tr><td>Boundaries</td><td>Outline uses a neutral location projection; assets and page-size lookup no longer expose mutable backing storage.</td></tr>
+      <tr><td>Lifecycle</td><td>Output closure is deferred/preserved, header/footer failures are aggregated, and conversion time is injectable.</td></tr>
+    </tbody></table>
+  </section>
+  <section>
+    <h2>Implementation snippet</h2>
+    <pre><code>type prepareContext struct {
+    ctx      context.Context
+    loader   *load.Loader
+    registry *pdf.Registry
+    log      io.Writer
+}</code></pre>
+  </section>
+  <footer class="muted">All review checklist rows are marked [x] with source evidence or an explicit validation-boundary note. No Git or Go commands were run.</footer>
+</main></body>
+</html>

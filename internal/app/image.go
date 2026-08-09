@@ -21,7 +21,7 @@ func RunImage(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 	}
 
 	if ctx == nil {
-		ctx = context.Background()
+		return errNilContext
 	}
 
 	// Validate the request before imageout opens the command's output sink.

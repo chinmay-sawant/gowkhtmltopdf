@@ -11,7 +11,9 @@ func PaintOrder(ops []Op) []int {
 		idx[i] = i
 	}
 
-	return paintOrderSubset(ops, idx)
+	sortPaintIndices(ops, idx)
+
+	return idx
 }
 
 // paintOrderSubset returns an ordered copy of an operation subset. All
@@ -19,18 +21,18 @@ func PaintOrder(ops []Op) []int {
 // order while the paginated body uses paint order.
 func paintOrderSubset(ops []Op, idxs []int) []int {
 	ordered := append([]int(nil), idxs...)
-	sort.SliceStable(ordered, func(i, j int) bool {
-		return paintOrderBefore(ops, ordered[i], ordered[j])
-	})
+	sortPaintIndices(ops, ordered)
 
 	return ordered
 }
 
 // sortPaintIndices sorts an existing operation subset without changing which
 // operations it contains. Pagination tests use this compatibility helper for
-// fixed and per-page lists; the comparison itself lives in paintOrderSubset.
+// fixed and per-page lists; the comparison itself lives in paintOrderBefore.
 func sortPaintIndices(ops []Op, idxs []int) {
-	copy(idxs, paintOrderSubset(ops, idxs))
+	sort.SliceStable(idxs, func(i, j int) bool {
+		return paintOrderBefore(ops, idxs[i], idxs[j])
+	})
 }
 
 func paintOrderBefore(ops []Op, left, right int) bool {

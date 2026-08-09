@@ -94,7 +94,10 @@ func sealPageTopClusters(
 			continue
 		}
 
-		page := int(child.y / contentH)
+		page, ok := checkedFlowPageOfY(child.y, contentH)
+		if !ok {
+			continue
+		}
 		if page <= 0 {
 			continue
 		}
@@ -161,7 +164,10 @@ func capTableMaxPage(res *Result, contentH float64) int {
 			continue
 		}
 
-		p := int(res.Ops[i].Y / contentH)
+		p, ok := checkedFlowPageOfY(res.Ops[i].Y, contentH)
+		if !ok {
+			continue
+		}
 		if p > maxPage {
 			maxPage = p
 		}
@@ -465,7 +471,14 @@ func paginateOps(res *Result, contentH float64) []int {
 	// Sticky is applied in Paint after rect splitting (see splitCrossingRects).
 	opPage := make([]int, len(res.Ops))
 	for i := range res.Ops {
-		opPage[i] = int(res.Ops[i].Y / contentH)
+		page, ok := checkedFlowPageOfY(res.Ops[i].Y, contentH)
+		if !ok {
+			opPage[i] = -1
+
+			continue
+		}
+
+		opPage[i] = page
 	}
 
 	return opPage
@@ -518,9 +531,9 @@ func snapCrossingTextOps(res *Result, contentH float64) {
 				opH = paintOp.Size * defaultLineHeightRatio
 			}
 
-			page := int(paintOp.Y / contentH)
-			if page < 0 {
-				page = 0
+			page, ok := checkedFlowPageOfY(paintOp.Y, contentH)
+			if !ok {
+				continue
 			}
 
 			boundary := float64(page+1) * contentH
@@ -588,7 +601,10 @@ func rowChromeAbove(res *Result, idx int, oldY float64) ([]int, float64) {
 	minY := oldY
 
 	if res.flowPageSize > 0 {
-		page := int(oldY / res.flowPageSize)
+		page, ok := checkedFlowPageOfY(oldY, res.flowPageSize)
+		if !ok {
+			return chrome, minY
+		}
 		if page < 0 {
 			page = 0
 		}
@@ -690,9 +706,9 @@ func splitCrossingRects(res *Result, contentH float64, opPage []int) {
 			continue
 		}
 
-		page := int((paintOp.Y + layoutEpsilon) / contentH)
-		if page < 0 {
-			page = 0
+		page, ok := checkedFlowPageOfY(paintOp.Y+layoutEpsilon, contentH)
+		if !ok {
+			continue
 		}
 
 		if paintOp.Y+paintOp.H > float64(page+1)*contentH+1e-9 {
@@ -758,9 +774,9 @@ func appendOpFragments(dst []Op, paintOp Op, contentH float64) []Op {
 		}
 		// Epsilon bump so Y exactly on a page top maps to that page, not
 		// the previous one (int truncates 52.0-ε down to 51).
-		page := int((paintOp.Y + layoutEpsilon) / contentH)
-		if page < 0 {
-			page = 0
+		page, ok := checkedFlowPageOfY(paintOp.Y+layoutEpsilon, contentH)
+		if !ok {
+			return append(dst, paintOp)
 		}
 
 		boundary := float64(page+1) * contentH
@@ -853,6 +869,16 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 
 // pageIndexedOps buckets non-fixed ops by their canvas page.
 func pageIndexedOps(res *Result, contentH float64) [][]int {
+	for idx := range res.Ops {
+		if res.Ops[idx].Fixed {
+			continue
+		}
+
+		if _, ok := checkedFlowPageOfY(res.Ops[idx].Y, contentH); !ok {
+			return nil
+		}
+	}
+
 	maxPage := maxNonFixedOpPage(res.Ops, contentH)
 
 	counts := pageOpCounts(res.Ops, contentH, maxPage)
@@ -876,7 +902,12 @@ func maxNonFixedOpPage(ops []Op, contentH float64) int {
 			continue
 		}
 
-		if page := int(ops[idx].Y / contentH); page > maxPage {
+		page, ok := checkedFlowPageOfY(ops[idx].Y, contentH)
+		if !ok {
+			continue
+		}
+
+		if page > maxPage {
 			maxPage = page
 		}
 	}
@@ -892,8 +923,12 @@ func pageOpCounts(ops []Op, contentH float64, maxPage int) []int {
 			continue
 		}
 
-		page := int(ops[idx].Y / contentH)
-		if page >= 0 && page <= maxPage {
+		page, ok := checkedFlowPageOfY(ops[idx].Y, contentH)
+		if !ok {
+			continue
+		}
+
+		if page <= maxPage {
 			counts[page]++
 		}
 	}
@@ -907,8 +942,8 @@ func fillPageOpBuckets(pageOps [][]int, ops []Op, contentH float64) {
 			continue
 		}
 
-		page := int(ops[idx].Y / contentH)
-		if page < 0 || page >= len(pageOps) {
+		page, ok := checkedFlowPageOfY(ops[idx].Y, contentH)
+		if !ok || page >= len(pageOps) {
 			continue
 		}
 
@@ -1241,7 +1276,12 @@ func pageMaxOfOps(res *Result, contentH float64) int {
 			continue
 		}
 
-		if page := int(op.Y / contentH); page > maxPage {
+		page, ok := checkedFlowPageOfY(op.Y, contentH)
+		if !ok {
+			continue
+		}
+
+		if page > maxPage {
 			maxPage = page
 		}
 	}

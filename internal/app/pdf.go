@@ -16,6 +16,7 @@ import (
 // errNilCommand guards the command-facing adapters against nil dereferences.
 var errNilCommand = errors.New("app: nil command")
 var errNoPageObjects = errors.New("app: no page objects")
+var errNilContext = errors.New("app: nil context")
 
 // BuildPDFRequest translates a parsed CLI command into the stable engine
 // request. The caller owns output-sink creation and supplies both document
@@ -47,13 +48,13 @@ func RunPDF(
 	log io.Writer,
 	progress func(string, int),
 	outline io.Writer,
-) error {
+) (err error) {
 	if cmd == nil {
 		return errNilCommand
 	}
 
 	if ctx == nil {
-		ctx = context.Background()
+		return errNilContext
 	}
 
 	// Validate the complete command before creating or truncating a file. The
@@ -72,13 +73,12 @@ func RunPDF(
 	if err != nil {
 		return fmt.Errorf("app: open output: %w", err)
 	}
+	defer func() {
+		if closeErr := closeOut(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
 
 	req.Output = out
-	err = convert.Run(ctx, req, log, progress)
-
-	if closeErr := closeOut(); closeErr != nil && err == nil {
-		err = closeErr
-	}
-
-	return err
+	return convert.Run(ctx, req, log, progress)
 }

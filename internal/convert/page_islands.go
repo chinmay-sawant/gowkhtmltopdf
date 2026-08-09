@@ -202,20 +202,75 @@ func (island pageIslandRenderContext) render(section *html.Node) error {
 }
 
 func benchmarkIslandRoot(root, section *html.Node) *html.Node {
-	document := root.FirstChild("html")
-	body := document.FirstChild("body")
-	copyRoot := &html.Node{Type: root.Type, Name: root.Name} //nolint:exhaustruct // tree wrapper
+	if root == nil || section == nil {
+		return nil
+	}
 
-	copyDocument := &html.Node{ //nolint:exhaustruct // tree wrapper
-		Type: document.Type, Name: document.Name, Attrs: document.Attrs, Parent: copyRoot,
+	document := root.FirstChild("html")
+	if document == nil {
+		return nil
 	}
-	copyBody := &html.Node{ //nolint:exhaustruct // tree wrapper
-		Type: body.Type, Name: body.Name, Attrs: body.Attrs, Parent: copyDocument, Children: []*html.Node{section},
+
+	body := document.FirstChild("body")
+	if body == nil {
+		return nil
 	}
+
+	copyRoot := cloneHTMLNodeShell(root, nil)
+
+	copyDocument := cloneHTMLNodeShell(document, copyRoot)
+
+	copyBody := cloneHTMLNodeShell(body, copyDocument)
+	copyBody.Children = []*html.Node{cloneHTMLNode(section, copyBody)}
 	copyDocument.Children = []*html.Node{copyBody}
 	copyRoot.Children = []*html.Node{copyDocument}
 
 	return copyRoot
+}
+
+func cloneHTMLNode(node, parent *html.Node) *html.Node {
+	if node == nil {
+		return nil
+	}
+
+	clone := cloneHTMLNodeShell(node, parent)
+	if node.Children == nil {
+		return clone
+	}
+
+	clone.Children = make([]*html.Node, 0, len(node.Children))
+	for _, child := range node.Children {
+		clone.Children = append(clone.Children, cloneHTMLNode(child, clone))
+	}
+
+	return clone
+}
+
+func cloneHTMLNodeShell(node, parent *html.Node) *html.Node {
+	if node == nil {
+		return nil
+	}
+
+	return &html.Node{ //nolint:exhaustruct // children are populated by the clone caller
+		Type:     node.Type,
+		Name:     node.Name,
+		Attrs:    cloneHTMLAttrs(node.Attrs),
+		Text:     node.Text,
+		Parent:   parent,
+	}
+}
+
+func cloneHTMLAttrs(attrs map[string]string) map[string]string {
+	if attrs == nil {
+		return nil
+	}
+
+	clone := make(map[string]string, len(attrs))
+	for name, value := range attrs {
+		clone[name] = value
+	}
+
+	return clone
 }
 
 func appendIslandNavigation(dst *bodyNavigation, src bodyNavigation, pageOffset int, contentH float64) {

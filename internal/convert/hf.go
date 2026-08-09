@@ -2,12 +2,12 @@ package convert
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"gowkhtmltopdf/internal/css"
 	"gowkhtmltopdf/internal/html"
@@ -393,6 +393,23 @@ type hfDrawResult struct {
 	warnings []hfDrawWarning
 }
 
+// Err returns the aggregate failure for strict conversion callers. The
+// compatibility adapter may still emit warnings, but the primary PDF engine
+// must not report success when required header/footer content was omitted.
+func (r hfDrawResult) Err() error {
+	if len(r.warnings) == 0 {
+		return nil
+	}
+
+	errs := make([]error, 0, len(r.warnings))
+	for _, warning := range r.warnings {
+		errs = append(errs, fmt.Errorf("object %d page %d %s: %w",
+			warning.object, warning.page+1, warning.band, warning.err))
+	}
+
+	return errors.Join(errs...)
+}
+
 func (r *hfDrawResult) warn(object, page int, band string, err error) {
 	if err == nil {
 		return
@@ -651,7 +668,7 @@ func drawHeadersFooters(ctx context.Context, loader *load.Loader, font *pdf.Font
 func drawHeadersFootersResult(ctx context.Context, loader *load.Loader, font *pdf.Font, doc *pdf.Document, req *Request, plan *pagePlan, headings []*outline.Heading, log io.Writer) hfDrawResult { //nolint:gocognit,cyclop,funlen,lll // per-page draw dispatch with lazy HF load
 	var result hfDrawResult
 	total := doc.PageCount()
-	now := time.Now()
+	now := req.now()
 	date := now.Format("2006-01-02")
 	clock := now.Format("15:04:05")
 	idIndex := buildBodyIDIndex(planBodyStates(plan))

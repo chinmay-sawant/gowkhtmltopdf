@@ -31,6 +31,14 @@ var (
 	// ErrNilImageConverter reports a conversion attempted through a nil
 	// ImageConverter receiver.
 	ErrNilImageConverter = errors.New("gowkhtmltopdf: nil image converter")
+	// ErrNilConverter reports a conversion attempted through a nil Converter.
+	ErrNilConverter = errors.New("gowkhtmltopdf: nil converter")
+	// ErrNilGlobalSettings reports a method call on nil global settings.
+	ErrNilGlobalSettings = errors.New("gowkhtmltopdf: nil global settings")
+	// ErrNilObjectSettings reports a method call on nil object settings.
+	ErrNilObjectSettings = errors.New("gowkhtmltopdf: nil object settings")
+	// ErrNilContext reports a cancellation-aware operation without a context.
+	ErrNilContext = errors.New("gowkhtmltopdf: nil context")
 )
 
 // Version returns the library version banner.
@@ -60,7 +68,7 @@ func NewGlobalSettings() *GlobalSettings {
 // an error.
 func (s *GlobalSettings) Set(name, value string) error {
 	if s == nil {
-		return errors.New("gowkhtmltopdf: nil global settings")
+		return ErrNilGlobalSettings
 	}
 
 	if err := s.g.Set(name, value); err != nil {
@@ -103,7 +111,7 @@ func NewObjectSettings() *ObjectSettings {
 // error.
 func (s *ObjectSettings) Set(name, value string) error {
 	if s == nil {
-		return errors.New("gowkhtmltopdf: nil object settings")
+		return ErrNilObjectSettings
 	}
 
 	if err := s.o.Set(name, value); err != nil {
@@ -310,7 +318,7 @@ func (c *Converter) AddHTML(page []byte, baseURL string) *Converter {
 // writer (no temp file).
 func (c *Converter) Convert(ctx context.Context) error {
 	if c == nil {
-		return ErrNoPageObjectsAdded
+		return ErrNilConverter
 	}
 
 	if c.global == nil {
@@ -361,7 +369,7 @@ func (c *Converter) Output() []byte {
 //nolint:contextcheck // defensive nil-context contract
 func ConvertHTML(ctx context.Context, html []byte, global *GlobalSettings) ([]byte, error) {
 	if ctx == nil {
-		ctx = context.Background()
+		return nil, ErrNilContext
 	}
 
 	if len(html) == 0 {
@@ -581,7 +589,7 @@ func (h convertHooks) progress() func(string, int) {
 //nolint:contextcheck // defensive nil-context contract
 func (h convertHooks) executePDF(ctx context.Context, req *convert.Request) ([]byte, error) {
 	if ctx == nil {
-		ctx = context.Background()
+		return nil, ErrNilContext
 	}
 
 	var buf bytes.Buffer
@@ -604,7 +612,7 @@ func (h convertHooks) executePDF(ctx context.Context, req *convert.Request) ([]b
 //nolint:contextcheck // defensive nil-context contract
 func (h convertHooks) executeImage(ctx context.Context, req *convert.Request) ([]byte, error) {
 	if ctx == nil {
-		ctx = context.Background()
+		return nil, ErrNilContext
 	}
 
 	var buf bytes.Buffer

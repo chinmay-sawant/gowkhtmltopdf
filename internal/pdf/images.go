@@ -12,12 +12,51 @@ import (
 )
 
 var (
-	errImageNotJPEG   = errors.New("image: not a JPEG")
-	errImageNoSOF     = errors.New("image: no SOF marker found")
-	errImageBadDims   = errors.New("image: bad JPEG dimensions")
-	errImageMalformed = errors.New("image: malformed JPEG")
-	errImageEmptyPNG  = errors.New("image: empty PNG")
+	errImageNotJPEG         = errors.New("image: not a JPEG")
+	errImageNoSOF           = errors.New("image: no SOF marker found")
+	errImageBadDims         = errors.New("image: bad JPEG dimensions")
+	errImageMalformed       = errors.New("image: malformed JPEG")
+	errImageEmptyPNG        = errors.New("image: empty PNG")
+	errImageEncodedTooLarge = errors.New("image: encoded body too large")
+	errImageDecodedTooLarge = errors.New("image: decoded image too large")
 )
+
+const (
+	maxEmbeddedImageDimension = 16_384
+	maxEmbeddedImagePixels    = 16 * 1024 * 1024
+	maxEmbeddedEncodedBytes   = 32 << 20
+	maxEmbeddedDecodedBytes   = 128 << 20
+	decodedImageBytesPerPixel = 8 // decoder plus RGB/alpha output working set
+)
+
+func validateEmbeddedImage(dataLen, width, height int) error {
+	if dataLen > maxEmbeddedEncodedBytes {
+		return fmt.Errorf(
+			"%w: %d bytes, limit %d",
+			errImageEncodedTooLarge,
+			dataLen,
+			maxEmbeddedEncodedBytes,
+		)
+	}
+
+	if width <= 0 || height <= 0 || width > maxEmbeddedImageDimension || height > maxEmbeddedImageDimension {
+		return fmt.Errorf(
+			"%w: dimensions %dx%d exceed %dx%d",
+			errImageDecodedTooLarge,
+			width,
+			height,
+			maxEmbeddedImageDimension,
+			maxEmbeddedImageDimension,
+		)
+	}
+
+	pixels := int64(width) * int64(height)
+	if pixels > maxEmbeddedImagePixels || pixels*decodedImageBytesPerPixel > maxEmbeddedDecodedBytes {
+		return fmt.Errorf("%w: %d pixels exceed budget", errImageDecodedTooLarge, pixels)
+	}
+
+	return nil
+}
 
 // jpegMarkers is the set of JPEG marker bytes that precede a length field.
 func jpegLengthMarkers(buf byte) bool {
@@ -113,8 +152,20 @@ func validJPEGDims(width, height int) bool {
 // AddJPEGImage embeds a JPEG as a DCTDecode pass-through XObject and paints
 // it into the rect. Errors are returned so the layout can fall back.
 func (c *Content) AddJPEGImage(name string, posX, posY, drawW, drawH float64, data []byte) error {
+	if len(data) > maxEmbeddedEncodedBytes {
+		return fmt.Errorf(
+			"%w: %d bytes, limit %d",
+			errImageEncodedTooLarge,
+			len(data),
+			maxEmbeddedEncodedBytes,
+		)
+	}
+
 	width, height, components, err := jpegScan(data)
 	if err != nil {
+		return err
+	}
+	if err := validateEmbeddedImage(len(data), width, height); err != nil {
 		return err
 	}
 	// Grayscale mode desaturates at embed time: decode, fold Rec.601 luma,
@@ -155,12 +206,32 @@ func (c *Content) AddJPEGImage(name string, posX, posY, drawW, drawH float64, da
 // grayJPEG decodes a JPEG and re-encodes it as a grayscale JPEG. The decode
 // is a best effort: a malformed stream keeps its original bytes.
 func grayJPEG(data []byte) ([]byte, error) {
+	if len(data) > maxEmbeddedEncodedBytes {
+		return nil, fmt.Errorf(
+			"%w: %d bytes, limit %d",
+			errImageEncodedTooLarge,
+			len(data),
+			maxEmbeddedEncodedBytes,
+		)
+	}
+
+	width, height, _, err := jpegScan(data)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateEmbeddedImage(len(data), width, height); err != nil {
+		return nil, err
+	}
+
 	img, err := jpeg.Decode(bytes.NewReader(data))
 	if err != nil {
 		return nil, fmt.Errorf("image: decode: %w", err)
 	}
 
 	bounds := img.Bounds()
+	if err := validateEmbeddedImage(len(data), bounds.Dx(), bounds.Dy()); err != nil {
+		return nil, err
+	}
 	gray := image.NewGray(image.Rect(0, 0, bounds.Dx(), bounds.Dy()))
 
 	for yy := range bounds.Dy() {
@@ -172,7 +243,7 @@ func grayJPEG(data []byte) ([]byte, error) {
 		}
 	}
 
-	var buf bytes.Buffer
+	buf := limitedImageBuffer{limit: maxEmbeddedEncodedBytes}
 	if err := jpeg.Encode(&buf, gray, nil); err != nil {
 		return nil, fmt.Errorf("image: encode: %w", err)
 	}
@@ -180,9 +251,39 @@ func grayJPEG(data []byte) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+type limitedImageBuffer struct {
+	bytes.Buffer
+	limit int
+}
+
+func (b *limitedImageBuffer) Write(data []byte) (int, error) {
+	if len(data) > b.limit-b.Len() {
+		return 0, errImageEncodedTooLarge
+	}
+
+	return b.Buffer.Write(data)
+}
+
 // AddPNGImage decodes PNG with image/png and embeds as a Flate RGB
 // XObject (alpha channel becomes a soft-mask when present).
 func (c *Content) AddPNGImage(name string, posX, posY, drawWidth, drawHeight float64, data []byte) error {
+	if len(data) > maxEmbeddedEncodedBytes {
+		return fmt.Errorf(
+			"%w: %d bytes, limit %d",
+			errImageEncodedTooLarge,
+			len(data),
+			maxEmbeddedEncodedBytes,
+		)
+	}
+
+	cfg, err := png.DecodeConfig(bytes.NewReader(data))
+	if err != nil {
+		return fmt.Errorf("image: config: %w", err)
+	}
+	if err := validateEmbeddedImage(len(data), cfg.Width, cfg.Height); err != nil {
+		return err
+	}
+
 	img, err := png.Decode(bytes.NewReader(data))
 	if err != nil {
 		return fmt.Errorf("image: %w", err)
@@ -193,6 +294,9 @@ func (c *Content) AddPNGImage(name string, posX, posY, drawWidth, drawHeight flo
 	width, height := bounds.Dx(), bounds.Dy()
 	if width <= 0 || height <= 0 {
 		return errImageEmptyPNG
+	}
+	if err := validateEmbeddedImage(len(data), width, height); err != nil {
+		return err
 	}
 
 	grayscale := c.doc != nil && c.doc.grayscale

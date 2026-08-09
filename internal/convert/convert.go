@@ -54,6 +54,10 @@ type Request struct {
 	Global  settings.PdfGlobal
 	Image   *settings.ImageGlobal
 	Objects []settings.PdfObject
+	// Now supplies conversion metadata time. A nil function uses the
+	// production wall clock; tests and deterministic callers can inject a
+	// stable value shared by PDF metadata and header/footer substitutions.
+	Now func() time.Time
 	// Output receives the finished PDF bytes. Run requires this sink to be
 	// explicit; CLI adapters select stdout when the user asks for it.
 	Output io.Writer
@@ -61,6 +65,14 @@ type Request struct {
 	// diagnostics/document metadata can never be appended to a PDF stream.
 	// It is only required when Global.DumpOutline is true.
 	OutlineOutput io.Writer
+}
+
+func (r *Request) now() time.Time {
+	if r != nil && r.Now != nil {
+		return r.Now()
+	}
+
+	return time.Now()
 }
 
 // ErrMissingOutput reports a request that did not choose a document sink.
@@ -127,6 +139,14 @@ func (r *Request) Validate() error {
 		return errNilRequest
 	}
 
+	// PageSize is the canonical geometry key. Keep the legacy Size.PageSize
+	// mirror synchronized at the request boundary so direct settings literals
+	// cannot make page geometry depend on which consumer reads first.
+	if strings.TrimSpace(r.Global.PageSize) == "" {
+		r.Global.PageSize = r.Global.Size.PageSize
+	}
+	r.Global.Size.PageSize = r.Global.PageSize
+
 	if r.Output == nil {
 		return ErrMissingOutput
 	}
@@ -179,9 +199,12 @@ func RunPDF(cmd *cli.Command, log io.Writer) error {
 // RunPDFContext adapts a CLI parse result into a Request and runs the
 // pipeline. Opening/closing the output path (or stdout) stays here so Run
 // only sees an io.Writer. Prefer Run when the caller already has a writer.
-func RunPDFContext(ctx context.Context, cmd *cli.Command, log io.Writer, progress func(phase string, percent int)) error { //nolint:lll // CLI adapter signature
+func RunPDFContext(ctx context.Context, cmd *cli.Command, log io.Writer, progress func(phase string, percent int)) (err error) { //nolint:lll // CLI adapter signature
 	if cmd == nil {
 		return errNilCommand
+	}
+	if ctx == nil {
+		return errNilContext
 	}
 
 	outline := cmd.OutlineWriter
@@ -202,14 +225,14 @@ func RunPDFContext(ctx context.Context, cmd *cli.Command, log io.Writer, progres
 	if err != nil {
 		return fmt.Errorf("open output: %w", err)
 	}
+	defer func() {
+		if closeErr := closeOut(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
 	req.Output = out
 
-	runErr := Run(ctx, req, log, progress)
-	if closeErr := closeOut(); closeErr != nil && runErr == nil {
-		return closeErr
-	}
-
-	return runErr
+	return Run(ctx, req, log, progress)
 }
 
 // runContext owns the dependencies for one conversion lifecycle.
@@ -279,10 +302,15 @@ func Run(ctx context.Context, req *Request, log io.Writer, progress func(phase s
 	}
 
 	if ctx == nil {
-		ctx = context.Background()
+		return errNilContext
 	}
-	// load.NewLoader applies Allow / EnableLocalFileAccess from LoadGlobal.
-	loader := load.NewLoader(req.Global.Load)
+	// Construct the loader at the request boundary so invalid proxy policy is
+	// returned before fonts, layout state, or document output are initialized.
+	loader, err := load.NewLoaderWithError(req.Global.Load)
+	if err != nil {
+		return fmt.Errorf("initialize loader: %w", err)
+	}
+
 	loader.Log = log
 
 	font, err := pdf.DefaultFont()
@@ -386,7 +414,7 @@ func Run(ctx context.Context, req *Request, log io.Writer, progress func(phase s
 	run.doc.SetCompression(req.Global.UseCompression)
 	// Grayscale is the sole color bit (settings maps colormode → Grayscale).
 	run.doc.SetGrayscale(req.Global.Grayscale)
-	run.doc.SetCreationTime(time.Now())
+	run.doc.SetCreationTime(req.now())
 
 	if plan.copies > 1 {
 		if err := materializeCopies(run.doc, ranges, plan.copies); err != nil {
@@ -401,8 +429,13 @@ func Run(ctx context.Context, req *Request, log io.Writer, progress func(phase s
 		}
 	}
 
-	// Headers/footers after copies so [page]/[topage] reflect the final page set.
-	drawHeadersFooters(ctx, loader, font, run.doc, req, plan, headings, log)
+	// Headers/footers after copies so [page]/[topage] reflect the final page
+	// set. Missing required bands are conversion failures; silently producing a
+	// PDF without requested header/footer content is not a successful render.
+	hfResult := drawHeadersFootersResult(ctx, loader, font, run.doc, req, plan, headings, log)
+	if err := hfResult.Err(); err != nil {
+		return fmt.Errorf("header/footer: %w", err)
+	}
 
 	run.report("Done", progressComplete)
 
