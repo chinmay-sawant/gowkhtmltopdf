@@ -117,7 +117,6 @@ func renderBenchmarkPageIslands(
 	start := doc.PageCount()
 	workspace := &layout.Workspace{}
 	island := pageIslandRenderContext{
-		ctx:       ctx,
 		doc:       doc,
 		state:     state,
 		root:      root,
@@ -129,7 +128,7 @@ func renderBenchmarkPageIslands(
 	}
 
 	for _, section := range plan.sections {
-		if err := island.render(section); err != nil {
+		if err := island.render(ctx, section); err != nil {
 			return err
 		}
 	}
@@ -140,9 +139,7 @@ func renderBenchmarkPageIslands(
 	return nil
 }
 
-//nolint:containedctx // page island rendering context
 type pageIslandRenderContext struct {
-	ctx       context.Context
 	doc       *pdf.Document
 	state     *objectState
 	root      *html.Node
@@ -153,10 +150,10 @@ type pageIslandRenderContext struct {
 	log       io.Writer
 }
 
-func (island pageIslandRenderContext) render(section *html.Node) error {
+func (island pageIslandRenderContext) render(ctx context.Context, section *html.Node) error {
 	islandRoot := benchmarkIslandRoot(island.root, section)
 
-	res, err := layout.WithWorkspace(island.ctx, islandRoot, island.state.bodyLayoutOpts(
+	res, err := layout.WithWorkspace(ctx, islandRoot, island.state.bodyLayoutOpts(
 		objectRenderContext{
 			global:             island.renderCtx.global,
 			obj:                island.renderCtx.obj,
@@ -176,7 +173,7 @@ func (island pageIslandRenderContext) render(section *html.Node) error {
 
 	before := island.doc.PageCount()
 
-	if err := layout.PaintContext(island.ctx, island.doc, res, paintOptions(island.state.geom)); err != nil {
+	if err := layout.PaintContext(ctx, island.doc, res, paintOptions(island.state.geom)); err != nil {
 		return fmt.Errorf("paint certified page island: %w", err)
 	}
 
@@ -227,24 +224,18 @@ func benchmarkIslandRoot(root, section *html.Node) *html.Node {
 	copyDocument := cloneHTMLNodeShell(document, copyRoot)
 
 	copyBody := cloneHTMLNodeShell(body, copyDocument)
-	copyBody.Children = []*html.Node{cloneHTMLNode(section, copyBody)}
+	// Shallow section clone: copy the section shell (1 allocation) and share
+	// the original children slice. The layout engine reads the node tree
+	// read-only (no .Parent or .Children mutations), so sharing is safe and
+	// eliminates the recursive deep copy that generated >20,000 transient
+	// heap objects for large documents.
+	copySection := cloneHTMLNodeShell(section, nil)
+	copySection.Children = section.Children
+	copyBody.Children = []*html.Node{copySection}
 	copyDocument.Children = []*html.Node{copyBody}
 	copyRoot.Children = []*html.Node{copyDocument}
 
 	return copyRoot
-}
-
-func cloneHTMLNode(node, parent *html.Node) *html.Node {
-	if node == nil {
-		return nil
-	}
-
-	clone := cloneHTMLNodeShell(node, parent)
-	for _, child := range node.Children {
-		_ = cloneHTMLNode(child, clone)
-	}
-
-	return clone
 }
 
 func cloneHTMLNodeShell(node, parent *html.Node) *html.Node {

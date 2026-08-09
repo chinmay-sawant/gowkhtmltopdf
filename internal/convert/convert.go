@@ -241,10 +241,7 @@ func RunPDFContext(ctx context.Context, cmd *cli.Command, log io.Writer, progres
 }
 
 // runContext owns the dependencies for one conversion lifecycle.
-//
-//nolint:containedctx // internal pipeline lifecycle dependencies
 type runContext struct {
-	ctx      context.Context
 	req      *Request
 	loader   *load.Loader
 	font     *pdf.Font
@@ -264,13 +261,13 @@ func (run *runContext) report(phase string, value int) {
 	}
 }
 
-func (run *runContext) renderObjects() ([]*objectState, []*objectState, error) {
+func (run *runContext) renderObjects(ctx context.Context) ([]*objectState, []*objectState, error) {
 	var tocs, bodies []*objectState
 
 	count := len(run.req.Objects)
 
 	for idx := range run.req.Objects {
-		if err := run.ctx.Err(); err != nil {
+		if err := ctx.Err(); err != nil {
 			return nil, nil, fmt.Errorf("object %d: %w", idx+1, err)
 		}
 
@@ -278,7 +275,7 @@ func (run *runContext) renderObjects() ([]*objectState, []*objectState, error) {
 
 		obj := &run.req.Objects[idx]
 		if obj.IsTableOfContent {
-			state, err := initTOCState(run, obj, idx)
+			state, err := initTOCState(ctx, run, obj, idx)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -288,7 +285,7 @@ func (run *runContext) renderObjects() ([]*objectState, []*objectState, error) {
 			continue
 		}
 
-		state, err := renderObject(run, obj, idx)
+		state, err := renderObject(ctx, run, obj, idx)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -334,7 +331,6 @@ func Run(ctx context.Context, req *Request, log io.Writer, progress func(phase s
 
 	registry := loadFontRegistry(req.Global, log)
 	run := &runContext{
-		ctx:      ctx,
 		req:      req,
 		loader:   loader,
 		font:     font,
@@ -344,7 +340,7 @@ func Run(ctx context.Context, req *Request, log io.Writer, progress func(phase s
 		progress: progress,
 	}
 
-	tocs, bodies, err := run.renderObjects()
+	tocs, bodies, err := run.renderObjects(ctx)
 	if err != nil {
 		return err
 	}
@@ -752,7 +748,7 @@ func newHFGeom(glob settings.PdfGlobal) (hfGeom, error) {
 
 // initTOCState builds the per-object state of a table-of-contents object:
 // geometry (with auto margins resolved) and the effective TOC settings.
-func initTOCState(run *runContext, obj *settings.PdfObject, idx int) (*objectState, error) {
+func initTOCState(ctx context.Context, run *runContext, obj *settings.PdfObject, idx int) (*objectState, error) {
 	geom, err := newHFGeom(run.req.Global)
 	if err != nil {
 		return nil, fmt.Errorf("object %d: %w", idx+1, err)
@@ -772,7 +768,7 @@ func initTOCState(run *runContext, obj *settings.PdfObject, idx int) (*objectSta
 		lp:       obj.Load,
 	}
 
-	reg, err := effectiveMargins(run.ctx, run.loader, run.font, run.req.Global, state, run.log)
+	reg, err := effectiveMargins(ctx, run.loader, run.font, run.req.Global, state, run.log)
 	if err != nil {
 		return nil, fmt.Errorf("object %d: %w", idx+1, err)
 	}
@@ -787,7 +783,7 @@ func initTOCState(run *runContext, obj *settings.PdfObject, idx int) (*objectSta
 // policy skipped the object).
 //
 //nolint:gocognit,cyclop,funlen // per-object rendering lifecycle
-func renderObject(run *runContext, obj *settings.PdfObject, idx int) (*objectState, error) {
+func renderObject(ctx context.Context, run *runContext, obj *settings.PdfObject, idx int) (*objectState, error) {
 	geom, err := newHFGeom(run.req.Global)
 	if err != nil {
 		return nil, fmt.Errorf("object %d (%s): %w", idx+1, obj.Page, err)
@@ -795,7 +791,7 @@ func renderObject(run *runContext, obj *settings.PdfObject, idx int) (*objectSta
 
 	media := mediaFor(run.req.Global, obj)
 
-	prep, err := PrepareDocument(run.ctx, run.loader, obj.Page, obj.Load, run.registry, PrepareOptions{
+	prep, err := PrepareDocument(ctx, run.loader, obj.Page, obj.Load, run.registry, PrepareOptions{
 		ViewportW:       geom.contentW,
 		ViewportH:       geom.contentH,
 		MediaType:       media,
@@ -822,7 +818,7 @@ func renderObject(run *runContext, obj *settings.PdfObject, idx int) (*objectSta
 			return nil, errImagesDisabled
 		}
 
-		r, err := prep.Resources.Fetch(run.ctx, src)
+		r, err := prep.Resources.Fetch(ctx, src)
 		if err != nil {
 			return nil, err
 		}
@@ -848,7 +844,7 @@ func renderObject(run *runContext, obj *settings.PdfObject, idx int) (*objectSta
 		doctitle:      docTitle(root),
 	}
 
-	reg, err := effectiveMargins(run.ctx, run.loader, run.font, run.req.Global, state, run.log)
+	reg, err := effectiveMargins(ctx, run.loader, run.font, run.req.Global, state, run.log)
 	if err != nil {
 		return nil, fmt.Errorf("object %d (%s): %w", idx+1, obj.Page, err)
 	}
@@ -868,14 +864,14 @@ func renderObject(run *runContext, obj *settings.PdfObject, idx int) (*objectSta
 	}
 
 	if plan, ok := benchmarkPageIslandPlan(root); ok {
-		if err := renderBenchmarkPageIslands(run.ctx, run.doc, state, root, plan, objectRender, run.log); err != nil {
+		if err := renderBenchmarkPageIslands(ctx, run.doc, state, root, plan, objectRender, run.log); err != nil {
 			return nil, fmt.Errorf("object %d (%s): certified page islands: %w", idx+1, obj.Page, err)
 		}
 
 		return state, nil
 	}
 
-	lres, err := layout.LayoutContext(run.ctx, root, state.bodyLayoutOpts(objectRender))
+	lres, err := layout.LayoutContext(ctx, root, state.bodyLayoutOpts(objectRender))
 	if err != nil {
 		return nil, fmt.Errorf("object %d (%s): layout: %w", idx+1, obj.Page, err)
 	}
@@ -900,7 +896,7 @@ func renderObject(run *runContext, obj *settings.PdfObject, idx int) (*objectSta
 
 				objectRender.zoom = effZoom
 
-				lres, err = layout.LayoutContext(run.ctx, root, state.bodyLayoutOpts(objectRender))
+				lres, err = layout.LayoutContext(ctx, root, state.bodyLayoutOpts(objectRender))
 				if err != nil {
 					return nil, fmt.Errorf("object %d (%s): smart-shrink layout: %w", idx+1, obj.Page, err)
 				}
@@ -920,7 +916,7 @@ func renderObject(run *runContext, obj *settings.PdfObject, idx int) (*objectSta
 
 	before := run.doc.PageCount()
 
-	if err := layout.PaintContext(run.ctx, run.doc, lres, paintOptions(state.geom)); err != nil {
+	if err := layout.PaintContext(ctx, run.doc, lres, paintOptions(state.geom)); err != nil {
 		return nil, fmt.Errorf("object %d (%s): paint: %w", idx+1, obj.Page, err)
 	}
 
@@ -1091,9 +1087,7 @@ func CollectSheets(
 	return sheets
 }
 
-//nolint:containedctx // internal collector context
 type sheetCollector struct {
-	ctx       context.Context
 	resources load.ResourceContext
 	opts      SheetOptions
 	log       io.Writer
@@ -1107,9 +1101,12 @@ func collectSheets(
 	opts SheetOptions, log io.Writer,
 ) ([]*css.Stylesheet, error) {
 	//nolint:exhaustruct // zero sheets/rules/err fields
-	collector := sheetCollector{ctx: ctx, resources: resources, opts: opts, log: log}
+	collector := sheetCollector{resources: resources, opts: opts, log: log}
+
 	if root != nil {
-		root.Walk(collector.visit)
+		root.Walk(func(node *html.Node) {
+			collector.visit(ctx, node)
+		})
 	}
 
 	const softRuleWarn = 25000
@@ -1124,7 +1121,7 @@ func collectSheets(
 	return collector.sheets, nil
 }
 
-func (collector *sheetCollector) visit(node *html.Node) {
+func (collector *sheetCollector) visit(ctx context.Context, node *html.Node) {
 	if collector.err != nil || node.Type != html.ElementNode {
 		return
 	}
@@ -1133,7 +1130,7 @@ func (collector *sheetCollector) visit(node *html.Node) {
 	case "style":
 		collector.collectStyle(node)
 	case "link":
-		collector.collectLink(node)
+		collector.collectLink(ctx, node)
 	}
 }
 
@@ -1148,13 +1145,13 @@ func (collector *sheetCollector) collectStyle(node *html.Node) {
 	collector.add(sheet)
 }
 
-func (collector *sheetCollector) collectLink(node *html.Node) {
+func (collector *sheetCollector) collectLink(ctx context.Context, node *html.Node) {
 	if !linkStylesheet(node, collector.opts.ViewportW, collector.opts.ViewportH, collector.opts.MediaType) {
 		return
 	}
 
 	href := node.Attribute("href")
-	resource, err := collector.resources.Fetch(collector.ctx, href)
+	resource, err := collector.resources.Fetch(ctx, href)
 
 	if err != nil {
 		collector.warn("skipping <link href=%q>: %v", href, err)

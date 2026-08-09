@@ -104,6 +104,60 @@ func TestConvertHTMLHelper(t *testing.T) {
 	}
 }
 
+func TestRunPDFTypedRequest(t *testing.T) {
+	t.Parallel()
+
+	var output bytes.Buffer
+	req := &PDFRequest{
+		Global: NewGlobalSettings(),
+		Objects: []*ObjectSettings{
+			NewObjectSettings().SetBody(
+				[]byte("<html><body><h1>typed PDF</h1></body></html>"),
+				"",
+			),
+		},
+		Now:           nil,
+		Output:        &output,
+		OutlineOutput: nil,
+	}
+
+	if err := RunPDF(t.Context(), req); err != nil {
+		t.Fatalf("RunPDF: %v", err)
+	}
+
+	if !bytes.HasPrefix(output.Bytes(), []byte("%PDF-")) {
+		t.Fatalf("typed PDF output does not start with %%PDF-")
+	}
+}
+
+func TestRunImageTypedRequest(t *testing.T) {
+	t.Parallel()
+
+	var output bytes.Buffer
+
+	imageSettings := NewImageSettings()
+
+	if err := imageSettings.Set("format", "png"); err != nil {
+		t.Fatalf("image settings: %v", err)
+	}
+
+	req := &ImageRequest{
+		Global: NewGlobalSettings(),
+		Image:  imageSettings,
+		Object: NewObjectSettings().SetBody([]byte("<html><body>typed image</body></html>"), ""),
+		Now:    nil,
+		Output: &output,
+	}
+
+	if err := RunImage(t.Context(), req); err != nil {
+		t.Fatalf("RunImage: %v", err)
+	}
+
+	if !bytes.HasPrefix(output.Bytes(), []byte("\x89PNG\r\n\x1a\n")) {
+		t.Fatalf("typed image output does not start with PNG signature")
+	}
+}
+
 func TestGlobalSettingsGetSetRoundTrip(t *testing.T) {
 	t.Parallel()
 

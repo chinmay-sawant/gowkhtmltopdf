@@ -8,7 +8,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
+	"time"
 
 	"gowkhtmltopdf/internal/convert"
 	"gowkhtmltopdf/internal/errs"
@@ -38,6 +40,8 @@ var (
 	ErrNilGlobalSettings = errors.New("gowkhtmltopdf: nil global settings")
 	// ErrNilObjectSettings reports a method call on nil object settings.
 	ErrNilObjectSettings = errors.New("gowkhtmltopdf: nil object settings")
+	// ErrNilImageSettings reports a method call on nil image settings.
+	ErrNilImageSettings = errors.New("gowkhtmltopdf: nil image settings")
 	// ErrNilContext reports a cancellation-aware operation without a context.
 	ErrNilContext = errs.ErrNilContext
 )
@@ -245,6 +249,14 @@ func clonePdfGlobal(src settings.PdfGlobal) settings.PdfGlobal {
 	dst.Load.Allow = cloneStrings(src.Load.Allow)
 	dst.ExcludeFromOutline = cloneStrings(src.ExcludeFromOutline)
 	dst.FontPaths = cloneStrings(src.FontPaths)
+	dst.Ignored = cloneStringMap(src.Ignored)
+
+	return dst
+}
+
+func cloneImageGlobal(src settings.ImageGlobal) settings.ImageGlobal {
+	dst := src
+	dst.Load.Allow = cloneStrings(src.Load.Allow)
 	dst.Ignored = cloneStringMap(src.Ignored)
 
 	return dst
@@ -628,6 +640,177 @@ func (h convertHooks) executeImage(ctx context.Context, req *convert.Request) ([
 	}
 
 	return buf.Bytes(), nil
+}
+
+// ---------------------------------------------------------------------------
+// Typed request API (Phase 2)
+// ---------------------------------------------------------------------------
+
+// PDFRequest is the type-safe public API for PDF-only conversions. Public
+// wrapper types keep internal/settings out of the library interface while the
+// conversion engine retains its internal request representation.
+type PDFRequest struct {
+	Global        *GlobalSettings
+	Objects       []*ObjectSettings
+	Now           func() time.Time
+	Output        io.Writer
+	OutlineOutput io.Writer
+}
+
+// ImageSettings is the type-safe image-mode settings surface for ImageRequest.
+type ImageSettings struct {
+	i             settings.ImageGlobal
+	background    bool
+	backgroundSet bool
+}
+
+// NewImageSettings returns the default wkhtmltoimage settings.
+func NewImageSettings() *ImageSettings {
+	return &ImageSettings{
+		i:             settings.DefaultImageGlobal(),
+		background:    true,
+		backgroundSet: false,
+	}
+}
+
+// Set applies an image-mode settings key such as "width", "quality", or
+// "format".
+func (s *ImageSettings) Set(name, value string) error {
+	if s == nil {
+		return ErrNilImageSettings
+	}
+
+	global := settings.DefaultPdfGlobal()
+	if err := settings.ApplyImageKey(&global, &s.i, name, value); err != nil {
+		return fmt.Errorf("image set %q: %w", name, err)
+	}
+
+	if name == "background" || name == "web.background" {
+		s.background = global.Background
+		s.backgroundSet = true
+	}
+
+	return nil
+}
+
+// Get reads an image-mode setting by its dotted key.
+func (s *ImageSettings) Get(name string) (string, bool) {
+	if s == nil {
+		return "", false
+	}
+
+	return s.i.Get(name)
+}
+
+// ImageRequest is the type-safe public API for image-only conversions. It
+// accepts one object because image mode renders one input document.
+type ImageRequest struct {
+	Global *GlobalSettings
+	Image  *ImageSettings
+	Object *ObjectSettings
+	Now    func() time.Time
+	Output io.Writer
+}
+
+func (r *PDFRequest) toRequest() *convert.PDFRequest {
+	if r == nil {
+		return nil
+	}
+
+	global := settings.DefaultPdfGlobal()
+	if r.Global != nil {
+		global = clonePdfGlobal(r.Global.g)
+	}
+
+	objects := make([]settings.PdfObject, len(r.Objects))
+
+	for idx, object := range r.Objects {
+		if object != nil {
+			objects[idx] = clonePdfObject(object.o)
+		}
+	}
+
+	return &convert.PDFRequest{
+		Global:        global,
+		Objects:       objects,
+		Now:           r.Now,
+		Output:        r.Output,
+		OutlineOutput: r.OutlineOutput,
+	}
+}
+
+func (r *ImageRequest) toRequest() *convert.ImageRequest {
+	if r == nil {
+		return nil
+	}
+
+	global := settings.DefaultPdfGlobal()
+	if r.Global != nil {
+		global = clonePdfGlobal(r.Global.g)
+	}
+
+	imageSettings := settings.DefaultImageGlobal()
+
+	if r.Image != nil {
+		imageSettings = cloneImageGlobal(r.Image.i)
+
+		if r.Image.backgroundSet {
+			global.Background = r.Image.background
+		}
+	}
+
+	var object settings.PdfObject
+	if r.Object != nil {
+		object = clonePdfObject(r.Object.o)
+	}
+
+	return &convert.ImageRequest{
+		Global: global,
+		Image:  imageSettings,
+		Object: object,
+		Now:    r.Now,
+		Output: r.Output,
+	}
+}
+
+// RunPDF is a one-shot typed PDF conversion. It accepts a PDFRequest that
+// cannot carry image-mode settings, providing compile-time safety. The
+// conversion runs synchronously; cancel ctx to abort. Output bytes are
+// written to req.Output.
+func RunPDF(ctx context.Context, req *PDFRequest) error {
+	if ctx == nil {
+		return ErrNilContext
+	}
+
+	if req == nil {
+		return ErrNilConverter
+	}
+
+	if err := convert.RunTypedPDF(ctx, req.toRequest(), nil, nil); err != nil {
+		return fmt.Errorf("pdf: %w", err)
+	}
+
+	return nil
+}
+
+// RunImage is a one-shot typed image conversion. It accepts an ImageRequest
+// that cannot carry PDF-specific multi-object or outline settings, providing
+// compile-time safety. The conversion runs synchronously; cancel ctx to abort.
+// Output bytes (PNG or JPEG) are written to req.Output.
+func RunImage(ctx context.Context, req *ImageRequest) error {
+	if ctx == nil {
+		return ErrNilContext
+	}
+
+	if req == nil {
+		return ErrNilImageConverter
+	}
+
+	if err := imageout.RunRequest(ctx, req.toRequest().ToRequest(), nil); err != nil {
+		return fmt.Errorf("image: %w", err)
+	}
+
+	return nil
 }
 
 // ---------------------------------------------------------------------------
