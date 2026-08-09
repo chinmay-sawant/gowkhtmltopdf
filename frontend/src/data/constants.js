@@ -1,17 +1,15 @@
-export const STATUS_ORDER = ['implemented', 'partial', 'not-implemented', 'unassessed']
+export const STATUS_ORDER = ['implemented', 'partial', 'not-implemented']
 
 export const STATUS_META = {
   implemented: { label: 'Implemented', color: '#9BBF88', accent: '#EDF3EC', text: '#346538' },
   partial: { label: 'Partial', color: '#E7CD80', accent: '#FBF3DB', text: '#956400' },
   'not-implemented': { label: 'Not implemented', color: '#D89A8B', accent: '#FDEBEC', text: '#9F2F2D' },
-  unassessed: { label: 'Unassessed', color: '#A8A8A8', accent: '#F0EFEA', text: '#5F5F5C' },
 }
 
 export const STATUS_CARD = {
   implemented: { stripe: '#9BBF88', bg: '#F6FAF5', title: '#346538', label: '#346538' },
   partial: { stripe: '#E7CD80', bg: '#FCF9F1', title: '#7A5A05', label: '#956400' },
   'not-implemented': { stripe: '#D89A8B', bg: '#FBF4F2', title: '#8A3A2E', label: '#9F2F2D' },
-  unassessed: { stripe: '#C4C4C0', bg: '#FAFAF8', title: '#4A4A47', label: '#5F5F5C' },
   unknown: { stripe: '#EAEAEA', bg: '#FFFFFF', title: '#2F3437', label: '#787774' },
 }
 

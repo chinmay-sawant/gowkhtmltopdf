@@ -15,6 +15,7 @@ export default function DossierPage() {
   const issues = useMemo(() => sortIssues(), [])
   const [status, setStatus] = useState('all')
   const [category, setCategory] = useState('all')
+  const [severity, setSeverity] = useState('all')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
 
@@ -23,9 +24,10 @@ export default function DossierPage() {
       issues.filter(
         (it) =>
           (status === 'all' || it.status === status) &&
-          (category === 'all' || it.category === category),
+          (category === 'all' || it.category === category) &&
+          (severity === 'all' || it.severity === severity),
       ),
-    [issues, status, category],
+    [issues, status, category, severity],
   )
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
@@ -37,7 +39,7 @@ export default function DossierPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [status, category, pageSize])
+  }, [status, category, severity, pageSize])
 
   const catCounts = countBy(issues, 'category')
   const statusCounts = countBy(issues, 'status')
@@ -50,11 +52,12 @@ export default function DossierPage() {
   }, [])
 
   const selectionNote =
-    status === 'all' && category === 'all'
-      ? `Showing all ${issues.length} issues. Filter by coverage status or area, or page through the results.`
+    status === 'all' && category === 'all' && severity === 'all'
+      ? `Showing all ${issues.length} issues. Filter by coverage status, area, or severity, or page through the results.`
       : `Showing ${filtered.length} of ${issues.length} issue${filtered.length === 1 ? '' : 's'}${[
           status !== 'all' ? statusSave[status].toLowerCase() : '',
           category !== 'all' ? category.toLowerCase() : '',
+          severity !== 'all' ? `${severity.toLowerCase()} severity` : '',
         ]
           .filter(Boolean)
           .join(' + ')}`
@@ -104,7 +107,11 @@ export default function DossierPage() {
           sevCounts={sevCounts}
           total={issues.length}
           status={status}
+          category={category}
+          severity={severity}
           onStatusChange={setStatus}
+          onCategoryChange={setCategory}
+          onSeverityChange={setSeverity}
         />
       </div>
 

@@ -7,22 +7,40 @@ import {
   CATEGORY_ORDER,
 } from '../data/constants'
 
-function BarRow({ label, count, total, color }) {
+function Row({ label, count, total, color, active, onClick, bar }) {
   const pct = total ? Math.round((count / total) * 100) : 0
   return (
-    <div className="stat-row">
-      <div>
-        <span className="dot" style={{ background: color }} />
-        {label}
-      </div>
-      <div className="bar">
-        <i style={{ width: `${pct}%` }} />
-      </div>
-      <div className="num">
-        {count}
-        <small>/{total}</small>
-      </div>
-    </div>
+    <button
+      type="button"
+      className={active ? 'stat-row clickable active' : 'stat-row clickable'}
+      style={{ '--cc': color }}
+      onClick={onClick}
+      title={`Filter by ${label}`}
+    >
+      {bar ? (
+        <>
+          <span className="stat-label">
+            <span className="dot" style={{ background: color }} />
+            {label}
+          </span>
+          <span className="bar">
+            <i style={{ width: `${pct}%` }} />
+          </span>
+          <span className="num">{count}</span>
+        </>
+      ) : (
+        <>
+          <span className="stat-label">
+            <span className="dot" style={{ background: color }} />
+            {label}
+          </span>
+          <span className="bar bar-fill">
+            <i style={{ width: `${pct}%`, background: color }} />
+          </span>
+          <span className="num">{count}</span>
+        </>
+      )}
+    </button>
   )
 }
 
@@ -32,48 +50,59 @@ export default function StatsSidebar({
   sevCounts,
   total,
   status,
+  category,
+  severity,
   onStatusChange,
+  onCategoryChange,
+  onSeverityChange,
 }) {
   return (
     <aside className="stats">
       <h3>Breakdown</h3>
+
       <div className="stat-group">
-        <h4>Coverage in gowkhtmltopdf</h4>
-        {STATUS_ORDER.map((s) => {
-          const active = status === s
-          return (
-            <button
-              type="button"
-              className={active ? 'sev-row clickable active' : 'sev-row clickable'}
-              key={s}
-              data-status={s}
-              style={{ '--cc': STATUS_META[s].color }}
-              onClick={() => onStatusChange(active ? 'all' : s)}
-            >
-              <span>
-                <span className="dot" style={{ background: STATUS_META[s].color }} />{' '}
-                {STATUS_META[s].label}
-              </span>
-              <span className="num">{statusCounts[s] ?? 0}</span>
-            </button>
-          )
-        })}
+        <h4>Coverage</h4>
+        {STATUS_ORDER.map((s) => (
+          <Row
+            key={s}
+            label={STATUS_META[s].label}
+            count={statusCounts[s] ?? 0}
+            total={total}
+            color={STATUS_META[s].color}
+            active={status === s}
+            onClick={() => onStatusChange(status === s ? 'all' : s)}
+          />
+        ))}
       </div>
+
       <div className="stat-group">
         <h4>Area</h4>
         {CATEGORY_ORDER.filter((c) => catCounts[c]).map((c) => (
-          <BarRow key={c} label={c} count={catCounts[c]} total={total} color={CATEGORY_COLOR[c]} />
+          <Row
+            key={c}
+            label={c}
+            count={catCounts[c]}
+            total={total}
+            color={CATEGORY_COLOR[c]}
+            active={category === c}
+            onClick={() => onCategoryChange(category === c ? 'all' : c)}
+            bar
+          />
         ))}
       </div>
+
       <div className="stat-group">
         <h4>Severity</h4>
         {SEVERITY_ORDER.map((s) => (
-          <div className="sev-row" key={s}>
-            <span>
-              <span className="dot" style={{ background: SEVERITY_META[s].bg }} /> {s}
-            </span>
-            <span className="num">{sevCounts[s] ?? 0}</span>
-          </div>
+          <Row
+            key={s}
+            label={s}
+            count={sevCounts[s] ?? 0}
+            total={total}
+            color={SEVERITY_META[s].bg}
+            active={severity === s}
+            onClick={() => onSeverityChange(severity === s ? 'all' : s)}
+          />
         ))}
       </div>
     </aside>
