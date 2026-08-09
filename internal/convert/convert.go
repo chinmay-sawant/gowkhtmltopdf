@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"gowkhtmltopdf/internal/cli"
+	"gowkhtmltopdf/internal/convert/render"
 	"gowkhtmltopdf/internal/css"
 	"gowkhtmltopdf/internal/layout"
 	"gowkhtmltopdf/internal/line"
@@ -248,6 +249,12 @@ type runContext struct {
 	doc      *pdf.Document
 	log      io.Writer
 	progress func(phase string, percent int)
+	tocs     []*objectState
+	bodies   []*objectState
+	headings []*outline.Heading
+	tocTotal int
+	plan     *pagePlan
+	exclude  []css.Selector
 }
 
 func (run *runContext) report(phase string, value int) {
@@ -297,15 +304,9 @@ func (run *runContext) renderObjects(ctx context.Context) ([]*objectState, []*ob
 	return tocs, bodies, nil
 }
 
-// Run executes the full PDF conversion pipeline for req.
-// ctx is threaded into every load; progress receives human-readable phase
-// names and a 0-100 percentage as the conversion advances (nil disables it).
-// Progress lines are also written to log unless req.Global.Quiet is set.
-//
-// The lifecycle is intentionally explicit: object rendering, outline/TOC
-// assembly, copy materialization, and final output each have one owner.
-//
-//nolint:gocognit,cyclop,funlen // conversion pipeline runner
+// Run executes the full PDF conversion pipeline for req. The lifecycle is
+// delegated to render.Pipeline; this package supplies the PDF-specific adapter
+// and keeps its private state out of the orchestration module.
 func Run(ctx context.Context, req *Request, log io.Writer, progress func(phase string, percent int)) error {
 	if err := req.ValidatePDF(); err != nil {
 		return err
@@ -337,120 +338,16 @@ func Run(ctx context.Context, req *Request, log io.Writer, progress func(phase s
 		doc:      pdf.NewDocument(),
 		log:      log,
 		progress: progress,
+		tocs:     nil,
+		bodies:   nil,
+		headings: nil,
+		tocTotal: 0,
+		plan:     nil,
+		exclude:  nil,
 	}
 
-	tocs, bodies, err := run.renderObjects(ctx)
-	if err != nil {
-		return err
-	}
-
-	headings := flatHeadings(bodies)
-
-	// Exclude selectors are applied in outline.BuildTree (not at collect time)
-	// so TOC and PDF outline share one filter path.
-	exclude := parseExcludeSelectors(req.Global.ExcludeFromOutline, log)
-
-	tocTotal := 0
-
-	if len(tocs) > 0 {
-		// Real phase: TOC layout + paint (page count unknown until finished).
-		run.report("Building table of contents", percent(len(req.Objects), len(req.Objects)+1))
-		// The TOC lists the full outline (all levels); the PDF outline
-		// applies outline-depth separately below.
-		// Use the explicit document-page ordering contract; keep Heading.Page
-		// object-local for headers, links, and page ownership.
-		tocTree := outline.BuildTreeBy(headings, outline.Options{ //nolint:exhaustruct // intentional zero-value fields
-			Exclude: exclude,
-		}, outline.DocumentPage)
-
-		tocTotal, err = renderTOCObjects(ctx, font, run.doc, req, tocs, tocTree.Flatten(), log)
-		if err != nil {
-			return err
-		}
-
-		order := tocFirstOrder(tocs, bodies)
-		if err := run.doc.ReorderPages(order); err != nil {
-			return fmt.Errorf("toc assembly: %w", err)
-		}
-
-		pos := 0
-		for _, tr := range tocs {
-			tr.start = pos
-			pos += tr.tocPages
-		}
-
-		for _, bg := range bodies {
-			bg.start = tocTotal + bg.offset
-		}
-	}
-
-	if req.Global.Outline {
-		outTree := outline.BuildTreeBy(headings, outline.Options{
-			MaxDepth: req.Global.OutlineDepth,
-			Exclude:  exclude,
-		}, outline.DocumentPage)
-		// --dump-outline uses its dedicated metadata sink. The engine never
-		// reaches into os.Stdout; CLI adapters own stdout selection.
-		if req.Global.DumpOutline {
-			if _, err := req.OutlineOutput.Write(outline.DumpOutlineXMLBy(outTree, tocTotal, outline.DocumentPage)); err != nil {
-				return fmt.Errorf("dump outline: %w", err)
-			}
-		}
-
-		root := emitOutline(run.doc, outTree, bodies, tocTotal)
-		if len(root.Children) > 0 {
-			run.doc.SetOutline(root)
-		}
-	}
-
-	if len(tocs) > 0 {
-		applyTOCLinks(run.doc, tocs, bodies, tocTotal, headings)
-	}
-
-	applyInternalLinks(run.doc, bodies, tocTotal)
-
-	plan, err := newPagePlan(tocs, bodies, req.Global.Copies, req.Global.Collate)
-	if err != nil {
-		return err
-	}
-
-	ranges := plan.Ranges()
-
-	if req.Global.Title != "" {
-		run.doc.SetInfo("Title", req.Global.Title)
-	}
-
-	run.doc.SetInfo("Producer", "gowkhtmltopdf")
-	run.doc.SetCompression(req.Global.UseCompression)
-	// Grayscale is the sole color bit (settings maps colormode → Grayscale).
-	run.doc.SetGrayscale(req.Global.Grayscale)
-	run.doc.SetCreationTime(req.now())
-
-	if plan.copies > 1 {
-		if err := materializeCopies(run.doc, ranges, plan.copies); err != nil {
-			return err
-		}
-
-		if !plan.collate {
-			order := nonCollateOrder(ranges, plan.copies)
-			if err := run.doc.ReorderPages(order); err != nil {
-				return fmt.Errorf("assemble copies: %w", err)
-			}
-		}
-	}
-
-	// Headers/footers after copies so [page]/[topage] reflect the final page
-	// set. Missing required bands are conversion failures; silently producing a
-	// PDF without requested header/footer content is not a successful render.
-	hfResult := drawHeadersFootersResult(ctx, loader, font, run.doc, req, plan, headings, log)
-	if err := hfResult.Err(); err != nil {
-		return fmt.Errorf("header/footer: %w", err)
-	}
-
-	run.report("Done", progressComplete)
-
-	if err := run.doc.Write(req.Output); err != nil {
-		return fmt.Errorf("write output: %w", err)
+	if err := render.Run(ctx, &pdfPipeline{run: run}); err != nil {
+		return fmt.Errorf("render pipeline: %w", err)
 	}
 
 	return nil

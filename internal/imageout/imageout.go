@@ -18,6 +18,7 @@ import (
 
 	"gowkhtmltopdf/internal/cli"
 	"gowkhtmltopdf/internal/convert"
+	renderpipeline "gowkhtmltopdf/internal/convert/render"
 	"gowkhtmltopdf/internal/css"
 	"gowkhtmltopdf/internal/html"
 	"gowkhtmltopdf/internal/layout"
@@ -1130,55 +1131,83 @@ func RunRequest(ctx context.Context, req *convert.Request, log io.Writer) error 
 
 	registry := fontRegistry(req.Global, log)
 
-	return renderRequest(ctx, req, obj, loader, font, registry, log)
+	pipeline := &imagePipeline{ //nolint:exhaustruct // image is populated during RenderObjects
+		req:      req,
+		obj:      obj,
+		loader:   loader,
+		font:     font,
+		registry: registry,
+		log:      log,
+	}
+	if err := renderpipeline.Run(ctx, pipeline); err != nil {
+		return fmt.Errorf("imageout: render pipeline: %w", err)
+	}
+
+	return nil
 }
 
-// renderRequest renders the image object and writes the encoded bytes to
-// req.Output; the loader/font/registry prelude lives in RunRequest.
-func renderRequest(
-	ctx context.Context,
-	req *convert.Request,
-	obj *settings.PdfObject,
-	loader *load.Loader,
-	font *pdf.Font,
-	registry *pdf.Registry,
-	log io.Writer,
-) error {
-	imgSet := req.Image
+// imagePipeline adapts image-specific state to the shared render lifecycle.
+// Rendering and encoding stay private to imageout; render owns sequencing and
+// cancellation checks shared with the PDF pipeline.
+type imagePipeline struct {
+	req      *convert.Request
+	obj      *settings.PdfObject
+	loader   *load.Loader
+	font     *pdf.Font
+	registry *pdf.Registry
+	log      io.Writer
+	img      image.Image
+}
 
-	prep, media, err := prepareImageDocument(ctx, loader, obj, req.Global, imgSet, registry, log)
+func (p *imagePipeline) RenderObjects(ctx context.Context) error {
+	imgSet := p.req.Image
+
+	prep, media, err := prepareImageDocument(ctx, p.loader, p.obj, p.req.Global, imgSet, p.registry, p.log)
 	if err != nil {
 		return err
 	}
 
 	root := prep.Root
 	sheets := prep.Sheets
-	registry = prep.Registry
+	p.registry = prep.Registry
 
 	cache := map[string][]byte{}
 	imagesFn := makeImageFetcher(ctx, imgSet, prep, cache)
+	printLinkUnderline := imgSet.Web.PrintLinkUnderline ||
+		p.req.Global.Web.PrintLinkUnderline ||
+		p.obj.Web.PrintLinkUnderline
 
 	// Policy A: Quiet is Global.Quiet; body paint background is Global.Background
 	// only (single field for PDF + image; CLI --background / library Set).
 	img, err := RenderContext(ctx, root, RenderOptions{
 		Width:              imgSet.Width,
 		Height:             imgSet.Height,
-		Font:               font,
-		Registry:           registry,
+		Font:               p.font,
+		Registry:           p.registry,
 		Sheets:             sheets,
 		Media:              media,
 		Images:             imagesFn,
-		Background:         req.Global.Background,
+		Background:         p.req.Global.Background,
 		Transparent:        imgSet.Transparent,
 		Crop:               cropRect(imgSet.Crop),
 		SmartWidth:         imgSet.SmartWidth,
-		PrintLinkUnderline: imgSet.Web.PrintLinkUnderline || req.Global.Web.PrintLinkUnderline || obj.Web.PrintLinkUnderline,
+		PrintLinkUnderline: printLinkUnderline,
 	})
 	if err != nil {
 		return err
 	}
 
-	return writeEncodedOutput(req, img, log)
+	p.img = img
+
+	return nil
+}
+
+func (p *imagePipeline) Assemble(context.Context) error {
+	return nil
+}
+
+func (p *imagePipeline) Finalize(context.Context) error {
+	return writeEncodedOutput(p.req, p.img, p.log)
 }
 
 // writeEncodedOutput resolves the format, composites onto white for

@@ -1,7 +1,7 @@
 # gowkhtmltopdf — Phase-Wise Implementation Checklist
 
 > **Parent:** `plans/performance/2026-08-09/fresh-go-architecture-review-2026-08-09/critical-golang-architecture-review.md` — Critical Golang Architecture Review (9.2/10 → 9.5/10)
-> **Status:** Phases 1–4 Complete · Rendering closure Complete · Phase 5 implementation in progress
+> **Status:** Phases 1–4 Complete · Rendering closure Complete · Phase 5 implementation slice complete · Follow-up backlog in progress
 > **Estimated effort:** ~1 sprint remaining (Phase 5 v2.0 decomposition)
 
 ---
@@ -229,8 +229,8 @@ API/data contracts, then performance/cleanup, then closure gates.
 - [x] Create `internal/convert/islands/` — page island splitting and virtual views
   - **Path:** `internal/convert/islands/plan.go`; certified island planning and shallow virtual-root construction are exposed through a focused package
 - [x] Create `internal/convert/render/` — PDF/Image rendering orchestration seam
-  - **Path:** `internal/convert/render/plan.go`; page ownership, copy materialization, and non-collated ordering now have a focused package
-  - **Boundary:** Existing PDF/image routines remain behind compatibility adapters while they still depend on private `convert` state; a later slice can move the full orchestration without a package cycle
+  - **Path:** `internal/convert/render/{plan,pipeline}.go`; page ownership, copy materialization, non-collated ordering, lifecycle ordering, and cancellation now have focused interfaces
+  - **Boundary:** `convert.pdfPipeline` and `imageout.imagePipeline` are mode-specific adapters behind `render.Pipeline`; the shared orchestration seam no longer depends on their private state
 
 ### 5.2 Verify Package DAG
 - [x] Run `go vet ./...` and verify 0 import cycles across new sub-packages
@@ -259,6 +259,45 @@ API/data contracts, then performance/cleanup, then closure gates.
 - [~] `grep -rn "nolint" internal/ | wc -l` — current count is 1204; the historical baseline is not recorded, so reduction is not claimed
 - [ ] Tag release `v2.0.0`
   - **Reason open:** release tagging requires explicit release approval and Git operations; no Git commands were run for this update
+
+---
+
+## Follow-up Improvement Backlog
+
+> **Status:** 🟡 Item 6.1 complete; item 6.2 next
+> **Tracking rule:** Each item must retain a focused interface, targeted tests, and a recorded validation result before it is marked complete.
+
+### 6.1 Complete the `internal/convert` Decomposition
+- [x] Move the remaining private PDF/image orchestration behind a small, deep rendering interface
+  - **Resolved seam:** `internal/convert/render` owns lifecycle/page-plan mechanics while private PDF and image state remains behind mode-specific adapters
+  - **Progress:** `render.Pipeline` owns stage ordering and cancellation checks; `convert.pdfPipeline` and `imageout.imagePipeline` adapt private mode state through `RenderObjects`, `Assemble`, and `Finalize`
+  - **Validation:** `go test ./...`, `go test -race ./...`, `go vet ./...`, and `make lint` pass
+  - **Acceptance:** `convert` supplies prepared inputs and rendering callbacks through one narrow interface; `render` no longer needs compatibility adapters for orchestration
+
+### 6.2 Make Benchmark Certification Reproducible
+- [ ] Add a pinned `benchstat` workflow with stable multi-run baselines
+  - **Acceptance:** Timing, allocation, and PDF-validity gates are reported separately; image allocation noise is identified rather than hidden
+
+### 6.3 Remove Deferred `layout.engine.ctx` Storage
+- [ ] Finish explicit context propagation in `internal/layout/layout.go` after the package split
+  - **Acceptance:** `engine` no longer stores `context.Context`; cancellation tests continue to pass
+
+### 6.4 Reduce `nolint` Debt Deliberately
+- [ ] Reduce the current 1,204 suppressions using hotspot-specific refactors
+  - **Initial hotspot:** `internal/layout/style_values.go`
+  - **Acceptance:** A measurable suppression budget is enforced in CI; no mechanical or unjustified suppression removal
+
+### 6.5 Strengthen Untrusted-Input and Resource Limits
+- [ ] Audit and harden remote URLs, redirects, DNS/private-network access, local-file permissions, response sizes, and fetch timeouts
+  - **Acceptance:** Security/resource-policy tests cover the HTML-to-PDF untrusted-input path
+
+### 6.6 Improve Visual Regression Coverage
+- [ ] Add raster/page-image comparisons and semantic assertions for important fixture elements
+  - **Acceptance:** Layout tests detect both structural regressions and visual spacing/box regressions
+
+### 6.7 Add CI Automation
+- [ ] Add checked-in CI automation for lint, tests, vet, race, golden fixtures, and a benchmark smoke gate
+  - **Acceptance:** Pull requests run the same required validation commands used locally
 
 ---
 
@@ -294,6 +333,7 @@ flowchart LR
 - `go test -race ./...` — **exit 0** (0 races detected)
 - `go test ./...` after rendering changes — **exit 0**
 - `go list -f '{{.ImportPath}} -> {{join .Imports " "}}' ./internal/convert/... ./internal/settings/...` — **0 import cycles**
+- Shared `render.Pipeline` used by PDF and image adapters — **validated by full tests, race tests, vet, and lint**
 - `wc -l internal/convert/*.go` — **maximum 783 LOC**
 - Full three-run benchmark matrix — **exit 0**; primary PDF/template medians recorded in Phase 5.4
 - `grep -rn "nolint" internal/ | wc -l` — **1204 current entries; baseline unavailable**
