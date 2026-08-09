@@ -1,7 +1,7 @@
 # gowkhtmltopdf — Phase-Wise Implementation Checklist
 
 > **Parent:** `plans/performance/2026-08-09/fresh-go-architecture-review-2026-08-09/critical-golang-architecture-review.md` — Critical Golang Architecture Review (9.2/10 → 9.5/10)
-> **Status:** Phases 1–4 Complete · Phase 5 Planned
+> **Status:** Phases 1–4 Complete · Rendering closure Complete · Phase 5 Planned
 > **Estimated effort:** ~1 sprint remaining (Phase 5 v2.0 decomposition)
 
 ---
@@ -21,6 +21,7 @@ API/data contracts, then performance/cleanup, then closure gates.
 | 2 | Sealed Request API | High | ✅ Complete | 5/5 |
 | 3 | Virtual Layout Views | Medium | ✅ Complete | 4/4 |
 | 4 | Explicit Context Propagation | Medium | ✅ Complete (3/3 convert; 1 layout deferred) | 4/4 |
+| R | Rendering Pagination Fidelity Closure | High | ✅ Complete | 3/3 fixtures |
 | 5 | Package Decomposition & Release Gates | Low (v2.0) | 🔶 Planned | 0/5 |
 
 ---
@@ -191,6 +192,29 @@ API/data contracts, then performance/cleanup, then closure gates.
 
 ---
 
+## Rendering Closure: Pagination and Fixture Fidelity
+
+> **Scope:** Follow-up rendering fixes found during visual validation; this is a completed closure item, not a change to the Phase 5 architecture scope.
+> **Status:** ✅ Complete in commit `43c21d9`
+> **Regenerated artifacts:** Only `fixture-21-detailed-report.pdf`, `fixture-23-thead-repeat.pdf`, and `fixture-28-flex-wrap-grid-fixed.pdf`
+
+### R.1 Forced-break suffix handling
+- [x] Resolve empty `page-break-before: always` markers to the first following valid paint operation and keep the marker box position live during suffix shifts
+  - **Path:** `internal/layout/paint_flow.go:574-725`
+  - **Regression coverage:** `TestFixture21ParagraphAfterForcedBreakStaysContiguous`, `TestFixture28FlexWrapGridItemsStayInFirstPageLayout`
+
+### R.2 Repeated table-header band geometry
+- [x] Use the visible row-cell operation band, rather than text-ink bounds, when positioning repeated table headers
+  - **Path:** `internal/layout/paint_flow.go:1618-1645`
+  - **Regression coverage:** `TestFixture23RepeatedHeaderHasNoVisualGap`
+
+### R.3 Rendering validation gate
+- [x] Run the three fixture regression tests and the full `go test ./...` suite — **exit 0**
+- [x] Capture before/after page screenshots and visually verify the three requested corrections
+- [x] Confirm fixture 21 paragraphs remain intact, fixture 23 has no gap below the repeated header, and fixture 28 contains A1–A4 and G1–G4 in the first-page layout
+
+---
+
 ## Phase 5: Package Decomposition & Release Gates
 
 > **Priority:** Low (v2.0 milestone)
@@ -251,6 +275,7 @@ flowchart LR
 ```
 
 - **Phases 2, 3, 4** completed in parallel after Phase 1. ✅
+- **Rendering closure R** is complete and independent of the planned Phase 5 package decomposition. ✅
 - **Phase 5** remains intentionally open: package decomposition, typed settings builders,
   benchmark comparison, and release tagging require a separate v2.0 slice.
 
@@ -260,3 +285,7 @@ flowchart LR
 - `make test` — **exit 0** (all packages)
 - `go vet ./...` — **exit 0**
 - `go test -race ./...` — **exit 0** (0 races detected)
+- `go test ./...` after rendering changes — **exit 0**
+- Targeted golden tests for fixtures 21, 23, and 28 — **exit 0**
+- `git diff --check` — **exit 0**
+- Visual before/after screenshots reviewed; only the three requested PDFs regenerated
