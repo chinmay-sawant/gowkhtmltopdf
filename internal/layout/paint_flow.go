@@ -571,7 +571,11 @@ func boxInkExtent(res *Result, boxNode *box) float64 {
 // processed by ascending opStart. Forced-break dys are recorded on a difference
 // array and applied to ops in one O(n) pass (plus O(boxes) live box updates per
 // break). Flow indexes are rebuilt once at the end.
-func beforeAlways(res *Result, contentH float64) bool { //nolint:gocognit,cyclop,funlen // break-difference bookkeeping
+//
+//nolint:wsl // break-difference bookkeeping
+func beforeAlways( //nolint:gocognit,cyclop,funlen // break-difference bookkeeping
+	res *Result, contentH float64,
+) bool {
 	if res == nil || res.root == nil || contentH <= 0 {
 		return false
 	}
@@ -1464,7 +1468,7 @@ func headerContinuationPages(tblBox *box, _ int, res *Result, contentH float64) 
 	pages := map[int]bool{}
 
 	for _, row := range tblBox.rows[tblBox.headerRows:] {
-		top, _ := rowYBounds(row, res)
+		top := rowYBounds(row, res)
 		if top < 0 {
 			continue
 		}
@@ -1490,7 +1494,7 @@ func tableBodyRange(tblBox *box, page int, res *Result, contentH float64) (int, 
 			continue
 		}
 
-		top, _ := rowYBounds(row, res)
+		top := rowYBounds(row, res)
 
 		topPage, ok := checkedFlowPageOfY(top, contentH)
 		if !ok || topPage < page {
@@ -1552,10 +1556,10 @@ func rowOpRange(row []*box) (int, int) {
 	return first, last
 }
 
-func rowYBounds(row []*box, res *Result) (float64, float64) {
+func rowYBounds(row []*box, res *Result) float64 {
 	first, last := rowOpRange(row)
 	if first < 0 || first >= len(res.Ops) {
-		return -1, -1
+		return -1
 	}
 
 	top, bottom := opBottomEdge(res.Ops[first])
@@ -1587,7 +1591,7 @@ func opBottomEdge(paintOp Op) (float64, float64) {
 }
 
 // rowCellBounds widens the row band with the cells' own geometry.
-func rowCellBounds(row []*box, top, bottom float64) (float64, float64) {
+func rowCellBounds(row []*box, top, bottom float64) float64 {
 	for _, cell := range row {
 		if cell.height > 0 && cell.y+cell.height > bottom {
 			bottom = cell.y + cell.height
@@ -1598,7 +1602,7 @@ func rowCellBounds(row []*box, top, bottom float64) (float64, float64) {
 		}
 	}
 
-	return top, bottom
+	return top
 }
 
 func rowSpan(rows [][]*box, res *Result) (int, int, float64, float64) {

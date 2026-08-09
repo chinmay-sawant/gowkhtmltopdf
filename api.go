@@ -62,6 +62,100 @@ type GlobalSettings struct {
 	g settings.PdfGlobal
 }
 
+// PdfGlobalOptions is the typed builder for common PDF global settings. It is
+// an alternative to GlobalSettings.Set for library callers; CLI-compatible
+// string settings remain available through GlobalSettings.
+type PdfGlobalOptions struct {
+	options settings.PdfGlobalOptions
+}
+
+// NewPdfGlobalOptions returns a typed builder initialized with PDF defaults.
+func NewPdfGlobalOptions() *PdfGlobalOptions {
+	return &PdfGlobalOptions{options: settings.NewPdfGlobalOptions()}
+}
+
+func (o *PdfGlobalOptions) WithPageSize(pageSize string) *PdfGlobalOptions {
+	if o != nil {
+		o.options = o.options.WithPageSize(pageSize)
+	}
+
+	return o
+}
+
+func (o *PdfGlobalOptions) WithMargins(top, right, bottom, left float64) *PdfGlobalOptions {
+	if o != nil {
+		o.options = o.options.WithMargins(top, right, bottom, left)
+	}
+
+	return o
+}
+
+func (o *PdfGlobalOptions) WithTitle(title string) *PdfGlobalOptions {
+	if o != nil {
+		o.options = o.options.WithTitle(title)
+	}
+
+	return o
+}
+
+func (o *PdfGlobalOptions) WithCopies(copies int, collate bool) *PdfGlobalOptions {
+	if o != nil {
+		o.options = o.options.WithCopies(copies, collate)
+	}
+
+	return o
+}
+
+func (o *PdfGlobalOptions) WithOutline(enabled bool, depth int) *PdfGlobalOptions {
+	if o != nil {
+		o.options = o.options.WithOutline(enabled, depth)
+	}
+
+	return o
+}
+
+func (o *PdfGlobalOptions) WithSmartShrinking(enabled bool) *PdfGlobalOptions {
+	if o != nil {
+		o.options = o.options.WithSmartShrinking(enabled)
+	}
+
+	return o
+}
+
+func (o *PdfGlobalOptions) WithBackground(enabled bool) *PdfGlobalOptions {
+	if o != nil {
+		o.options = o.options.WithBackground(enabled)
+	}
+
+	return o
+}
+
+func (o *PdfGlobalOptions) WithCompression(enabled bool) *PdfGlobalOptions {
+	if o != nil {
+		o.options = o.options.WithCompression(enabled)
+	}
+
+	return o
+}
+
+func (o *PdfGlobalOptions) WithResolveRelativeLinks(enabled bool) *PdfGlobalOptions {
+	if o != nil {
+		o.options = o.options.WithResolveRelativeLinks(enabled)
+	}
+
+	return o
+}
+
+// Build returns independent public settings that can be passed to a typed
+// PDFRequest or copied into a Converter's GlobalSettings.
+func (o *PdfGlobalOptions) Build() *GlobalSettings {
+	if o == nil {
+		return nil
+	}
+
+	return &GlobalSettings{g: o.options.Build()}
+}
+
 // NewGlobalSettings returns the wkhtmltopdf-compatible default global
 // settings (A4 portrait, 10 mm margins, background on, …).
 func NewGlobalSettings() *GlobalSettings {

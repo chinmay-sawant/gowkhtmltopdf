@@ -18,7 +18,7 @@ import (
 func TestFixture13PreBackgroundTouchesBottomBorder(t *testing.T) { //nolint:cyclop
 	t.Parallel()
 
-	res, _, _ := paintGoldenFixture(t, "fixture-13-pre-code-block.html")
+	res, _ := paintGoldenFixture(t, "fixture-13-pre-code-block.html")
 
 	var fill, bottom *Op
 
@@ -123,7 +123,7 @@ func TestStickySectionChromeRepairUsesContainingBlock(t *testing.T) { //nolint:f
 	}
 }
 
-func paintGoldenFixture(t *testing.T, name string) (*Result, float64, *pdf.Document) {
+func paintGoldenFixture(t *testing.T, name string) (*Result, float64) {
 	t.Helper()
 
 	src, err := os.ReadFile("../../testdata/golden/" + name)
@@ -169,7 +169,7 @@ func paintGoldenFixture(t *testing.T, name string) (*Result, float64, *pdf.Docum
 		t.Fatal(err)
 	}
 
-	return res, contentH, doc
+	return res, contentH
 }
 
 func nearRGB(op *Op, r, g, b float64) bool {

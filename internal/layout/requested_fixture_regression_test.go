@@ -1,4 +1,4 @@
-//nolint:testpackage // tests exercise unexported layout geometry helpers
+//nolint:testpackage,wsl,nlreturn,varnamelen,lll // white-box geometry regression tests
 package layout
 
 import (
@@ -10,7 +10,7 @@ import (
 func TestFixture21ParagraphAfterForcedBreakStaysContiguous(t *testing.T) {
 	t.Parallel()
 
-	res, contentH, _ := paintGoldenFixture(t, "fixture-21-detailed-report.html")
+	res, contentH := paintGoldenFixture(t, "fixture-21-detailed-report.html")
 	needles := []string{"The HMI software team", "release 3.1.2.", "support procedures."}
 	var ys []float64
 	var pages []int
@@ -42,7 +42,7 @@ func TestFixture21ParagraphAfterForcedBreakStaysContiguous(t *testing.T) {
 func TestFixture23RepeatedHeaderHasNoVisualGap(t *testing.T) {
 	t.Parallel()
 
-	res, contentH, _ := paintGoldenFixture(t, "fixture-23-thead-repeat.html")
+	res, contentH := paintGoldenFixture(t, "fixture-23-thead-repeat.html")
 	var table *box
 	var find func(*box)
 	find = func(b *box) {
@@ -59,7 +59,7 @@ func TestFixture23RepeatedHeaderHasNoVisualGap(t *testing.T) {
 	}
 
 	headerBottom := table.rows[0][0].y + table.rows[0][0].height
-	bodyTop, _ := rowYBounds(table.rows[37], res)
+	bodyTop := rowYBounds(table.rows[37], res)
 	wantBodyTop := contentH + table.rows[0][0].height
 	if math.Abs(bodyTop-wantBodyTop) > 0.5 {
 		t.Fatalf("continuation body starts %.2fpt from repeated header band: body=%.2f want=%.2f header cell band=%.2f..%.2f", bodyTop-wantBodyTop, bodyTop, wantBodyTop, table.rows[0][0].y, headerBottom)
@@ -69,7 +69,7 @@ func TestFixture23RepeatedHeaderHasNoVisualGap(t *testing.T) {
 func TestFixture28FlexWrapGridItemsStayInFirstPageLayout(t *testing.T) {
 	t.Parallel()
 
-	res, contentH, _ := paintGoldenFixture(t, "fixture-28-flex-wrap-grid-fixed.html")
+	res, contentH := paintGoldenFixture(t, "fixture-28-flex-wrap-grid-fixed.html")
 	labels := []string{"A1", "A2", "A3", "A4", "G1", "G2", "G3", "G4"}
 	positions := make(map[string]float64, len(labels))
 	for _, op := range res.Ops {

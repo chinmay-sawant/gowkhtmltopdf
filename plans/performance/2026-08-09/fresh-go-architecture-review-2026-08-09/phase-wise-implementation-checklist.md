@@ -1,7 +1,7 @@
 # gowkhtmltopdf — Phase-Wise Implementation Checklist
 
 > **Parent:** `plans/performance/2026-08-09/fresh-go-architecture-review-2026-08-09/critical-golang-architecture-review.md` — Critical Golang Architecture Review (9.2/10 → 9.5/10)
-> **Status:** Phases 1–4 Complete · Rendering closure Complete · Phase 5 Planned
+> **Status:** Phases 1–4 Complete · Rendering closure Complete · Phase 5 implementation in progress
 > **Estimated effort:** ~1 sprint remaining (Phase 5 v2.0 decomposition)
 
 ---
@@ -22,7 +22,7 @@ API/data contracts, then performance/cleanup, then closure gates.
 | 3 | Virtual Layout Views | Medium | ✅ Complete | 4/4 |
 | 4 | Explicit Context Propagation | Medium | ✅ Complete (3/3 convert; 1 layout deferred) | 4/4 |
 | R | Rendering Pagination Fidelity Closure | High | ✅ Complete | 3/3 fixtures |
-| 5 | Package Decomposition & Release Gates | Low (v2.0) | 🔶 Planned | 0/5 |
+| 5 | Package Decomposition & Release Gates | Low (v2.0) | 🟡 In progress | Implementation slice complete; release residuals open |
 
 ---
 
@@ -218,41 +218,47 @@ API/data contracts, then performance/cleanup, then closure gates.
 ## Phase 5: Package Decomposition & Release Gates
 
 > **Priority:** Low (v2.0 milestone)
-> **Status:** 🔶 Planned after the current typed-request/context work
+> **Status:** 🟡 Implementation slice complete; full orchestration move and release gates remain
 > **Estimated effort:** 1–2 sprints
 > **Depends on:** Phases 2, 3, 4 complete ✅
 
 ### 5.1 Split `internal/convert` into Sub-Packages
-- [ ] Create `internal/convert/prepare/` — document preparation pipeline
-  - **Move:** `PrepareDocument`, `prepareObjects`, document loading functions
+- [x] Create `internal/convert/prepare/` — document preparation pipeline
+  - **Path:** `internal/convert/prepare/{prepare,styles,simplify}.go`; compatibility adapters remain in `internal/convert/prepare.go` and `simplify.go`
   - **Issue ID:** V-09
-- [ ] Create `internal/convert/islands/` — page island splitting and virtual views
-  - **Move:** `VirtualNode`, `renderPageIslands`, header/footer island logic
-- [ ] Create `internal/convert/render/` — PDF/Image rendering orchestration
-  - **Move:** `Run`, `runPDF`, `runImage`, output finalization
+- [x] Create `internal/convert/islands/` — page island splitting and virtual views
+  - **Path:** `internal/convert/islands/plan.go`; certified island planning and shallow virtual-root construction are exposed through a focused package
+- [x] Create `internal/convert/render/` — PDF/Image rendering orchestration seam
+  - **Path:** `internal/convert/render/plan.go`; page ownership, copy materialization, and non-collated ordering now have a focused package
+  - **Boundary:** Existing PDF/image routines remain behind compatibility adapters while they still depend on private `convert` state; a later slice can move the full orchestration without a package cycle
 
 ### 5.2 Verify Package DAG
-- [ ] Run `go vet ./...` and verify 0 import cycles across new sub-packages
+- [x] Run `go vet ./...` and verify 0 import cycles across new sub-packages
   - **Acceptance:** No circular dependencies; each sub-package has a single clear responsibility
+  - **Proof:** `go list -f '{{.ImportPath}} -> {{join .Imports " "}}' ./internal/convert/... ./internal/settings/...` shows `convert -> prepare/islands/render` and no reverse imports
 
 ### 5.3 Add Typed Options for Library Consumers
-- [ ] Create `PdfGlobalOptions` builder alongside existing reflection-based `Set()` method
+- [x] Create `PdfGlobalOptions` builder alongside existing reflection-based `Set()` method
   - **Path:** `internal/settings/` (new builder file)
   - **Issue ID:** V-08
   - **Acceptance:** Library consumers can configure PDF settings with typed methods; CLI continues to use `Set()`
+  - **Proof:** `internal/settings/options.go`, `api.go`, and `internal/settings/options_test.go`
 
 ### 5.4 Full Benchmark Regression Suite
-- [ ] Run full benchmark suite and compare against Phase 1 baseline
+- [~] Run full benchmark suite and compare against Phase 1 baseline
   - **Acceptance:** No performance regression >5% in any benchmark
-  - **Proof:** Benchmark comparison output (`benchstat` old vs new) recorded here
+  - **Command:** `go test ./internal/convert -run '^$' -bench 'Benchmark(PDFPages|TemplatePages|WebFetchImage|ImageAssets)$' -benchmem -benchtime=1x -count=3`
+  - **Result:** Full PDF, template, web-fetch, and asset matrices completed. Against checked Snapshot B, current three-run medians for PDF 500 were 524.0 ms / 161.7 MB / 534.9k allocs versus 518.1 ms / 157.6 MB / 529.5k; template 500 were 536.2 ms / 166.6 MB / 586.2k versus 552.1 ms / 162.5 MB / 580.7k. Timing and allocation changes are within 5% for these primary gates.
+  - **Residual:** `benchstat` is not installed in this environment, and one-shot image allocation samples varied materially; retain this as a directional comparison until a stable benchstat capture is available
 
 ### 5.5 Phase 5 Closure Gate (v2.0 Release Gate)
-- [ ] Run `make lint` — must exit 0
-- [ ] Run `make test` — must exit 0
-- [ ] `go test -race ./...` — 0 races
-- [ ] `wc -l internal/convert/*.go` — no single file exceeds 800 LOC
-- [ ] `grep -rn "nolint" internal/ | wc -l` — reduced from current baseline
+- [x] Run `make lint` — exit 0 (`golangci-lint v1.64.8`)
+- [x] Run `make test` — exit 0
+- [x] `go test -race ./...` — exit 0; 0 races reported
+- [x] `wc -l internal/convert/*.go` — maximum is 783 LOC (`benchmarks_test.go`)
+- [~] `grep -rn "nolint" internal/ | wc -l` — current count is 1204; the historical baseline is not recorded, so reduction is not claimed
 - [ ] Tag release `v2.0.0`
+  - **Reason open:** release tagging requires explicit release approval and Git operations; no Git commands were run for this update
 
 ---
 
@@ -276,8 +282,9 @@ flowchart LR
 
 - **Phases 2, 3, 4** completed in parallel after Phase 1. ✅
 - **Rendering closure R** is complete and independent of the planned Phase 5 package decomposition. ✅
-- **Phase 5** remains intentionally open: package decomposition, typed settings builders,
-  benchmark comparison, and release tagging require a separate v2.0 slice.
+- **Phase 5** now has its preparation/island/render planning seams and typed settings builder in place.
+  The full private-state orchestration move, stable benchmark certification, nolint-baseline
+  comparison, and release tagging remain explicit follow-up gates.
 
 ## Validation Record — 2026-08-09
 
@@ -286,6 +293,10 @@ flowchart LR
 - `go vet ./...` — **exit 0**
 - `go test -race ./...` — **exit 0** (0 races detected)
 - `go test ./...` after rendering changes — **exit 0**
+- `go list -f '{{.ImportPath}} -> {{join .Imports " "}}' ./internal/convert/... ./internal/settings/...` — **0 import cycles**
+- `wc -l internal/convert/*.go` — **maximum 783 LOC**
+- Full three-run benchmark matrix — **exit 0**; primary PDF/template medians recorded in Phase 5.4
+- `grep -rn "nolint" internal/ | wc -l` — **1204 current entries; baseline unavailable**
 - Targeted golden tests for fixtures 21, 23, and 28 — **exit 0**
 - `git diff --check` — **exit 0**
 - Visual before/after screenshots reviewed; only the three requested PDFs regenerated
