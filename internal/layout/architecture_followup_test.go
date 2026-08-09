@@ -254,7 +254,7 @@ func BenchmarkUsedImageSize(b *testing.B) {
 
 	b.ReportAllocs()
 
-	for range b.N {
+	for b.Loop() {
 		_ = eng.usedImageSize(img, baseStyle, ref)
 	}
 }
@@ -280,9 +280,8 @@ func BenchmarkDisplayListIdentity10kOps100Pages(b *testing.B) {
 	}
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		res := makeResult()
 		doc := pdf.NewDocument()
 

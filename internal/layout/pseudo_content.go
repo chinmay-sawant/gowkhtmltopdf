@@ -259,9 +259,10 @@ func skipCSSFunction(value string, start int) int {
 	depth := 1
 
 	for start < len(value) && depth > 0 {
-		if value[start] == '(' {
+		switch value[start] {
+		case '(':
 			depth++
-		} else if value[start] == ')' {
+		case ')':
 			depth--
 		}
 
