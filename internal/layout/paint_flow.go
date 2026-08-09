@@ -576,14 +576,22 @@ func beforeAlways(res *Result, contentH float64) bool { //nolint:gocognit,cyclop
 		return false
 	}
 
-	targets := collectBeforeAlwaysBoxes(res.root)
+	boxes := flowBoxList(res)
+	targetBoxes := collectBeforeAlwaysBoxes(res.root)
+	targets := make([]beforeAlwaysTarget, 0, len(targetBoxes))
+	for _, boxNode := range targetBoxes {
+		targets = append(targets, beforeAlwaysTarget{
+			box:   boxNode,
+			start: beforeAlwaysOpStart(boxNode, boxes, len(res.Ops)),
+		})
+	}
 	if len(targets) == 0 {
 		return false
 	}
 
 	if len(targets) > 1 {
 		sort.SliceStable(targets, func(i, j int) bool {
-			return targets[i].opStart < targets[j].opStart
+			return targets[i].start < targets[j].start
 		})
 	}
 
@@ -591,8 +599,6 @@ func beforeAlways(res *Result, contentH float64) bool { //nolint:gocognit,cyclop
 	opCount := len(ops)
 	// suffixDy[i] is the additional Y applied to all ops at indices >= i.
 	suffixDy := make([]float64, opCount+1)
-	boxes := flowBoxList(res)
-
 	changed := false
 	opIdx := 0
 	// maxEff tracks max effective Y of ops already scanned (original Y +
@@ -610,8 +616,9 @@ func beforeAlways(res *Result, contentH float64) bool { //nolint:gocognit,cyclop
 
 	events := make([]breakEvent, 0, len(targets))
 
-	for _, boxNode := range targets {
-		start := boxNode.opStart
+	for _, target := range targets {
+		boxNode := target.box
+		start := target.start
 		if start < 0 {
 			start = 0
 		}
@@ -655,8 +662,8 @@ func beforeAlways(res *Result, contentH float64) bool { //nolint:gocognit,cyclop
 
 		fromY := boxY
 		for _, b := range boxes {
-			if b.y > fromY ||
-				(b.y == fromY && b.opStart >= boxNode.opStart && b.opEnd <= boxNode.opEnd) {
+			if b == boxNode || b.y > fromY ||
+				(b.y == fromY && b.opStart >= start) {
 				b.y += deltaY
 			}
 		}
@@ -685,6 +692,36 @@ func beforeAlways(res *Result, contentH float64) bool { //nolint:gocognit,cyclop
 	ensureFlowIndex(res, contentH)
 
 	return true
+}
+
+type beforeAlwaysTarget struct {
+	box   *box
+	start int
+}
+
+// beforeAlwaysOpStart returns the first operation after a forced-break box.
+// Empty break markers have no own operation range; using their stale build
+// start would shift a suffix from an earlier sibling (fixture-21/28).
+func beforeAlwaysOpStart(boxNode *box, boxes []*box, opCount int) int {
+	if boxNode.opStart >= 0 && boxNode.opStart <= boxNode.opEnd {
+		return boxNode.opStart
+	}
+
+	for idx, candidate := range boxes {
+		if candidate != boxNode {
+			continue
+		}
+
+		for _, following := range boxes[idx+1:] {
+			if following.opStart >= 0 && following.opStart <= following.opEnd {
+				return following.opStart
+			}
+		}
+
+		return opCount
+	}
+
+	return opCount
 }
 
 // collectBeforeAlwaysBoxes returns boxes with page-break-before:always in
@@ -1598,18 +1635,13 @@ func rowsBandGeometry(rows [][]*box, res *Result) (int, int, float64, float64, b
 }
 
 // rowBandExtent returns the op range and Y band of one row.
-func rowBandExtent(row []*box, res *Result) (int, int, float64, float64, bool) {
-	face, lst := rowOpRange(row)
-	if face < 0 {
+func rowBandExtent(row []*box, _ *Result) (int, int, float64, float64, bool) {
+	first, last, top, bottom, ok := rowOpGeometry(row)
+	if !ok {
 		return -1, -1, 0, 0, false
 	}
 
-	right, rowB := rowYBounds(row, res)
-	if right < 0 {
-		return -1, -1, 0, 0, false
-	}
-
-	return face, lst, right, rowB, true
+	return first, last, top, bottom, true
 }
 
 // extendBandRange widens the band's op range with one row's range.
