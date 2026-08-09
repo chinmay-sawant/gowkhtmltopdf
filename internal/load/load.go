@@ -53,19 +53,19 @@ var ErrInvalidProxy = errors.New("invalid proxy configuration")
 // Package-level sentinels for the loader's internal failure modes, so
 // dynamic messages wrap a static error and stay matchable with errors.Is.
 var (
-	errNilLoader          = errors.New("nil resource loader")
-	errNilContext         = errors.New("nil load context")
-	errCannotLoad         = errors.New("cannot load")
-	errUnsupportedCharset = errors.New("unsupported charset")
-	errBlockedFileAccess  = errors.New("blocked file access")
-	errNoDocumentBase     = errors.New("cannot resolve relative subresource")
-	errUnsupportedScheme  = errors.New("unsupported subresource scheme")
-	errMalformedDataURL   = errors.New("malformed data URL")
-	errInvalidDataURL     = errors.New("invalid URL escape in data URL")
-	errTooManyRedirects   = errors.New("too many redirects")
-	errBodyTooLarge       = errors.New("exceeds max body size")
-	errInvalidBodyLimit   = errors.New("invalid max body size")
-	errInvalidRedirects   = errors.New("invalid max redirects")
+	errNilLoader           = errors.New("nil resource loader")
+	errNilContext          = errors.New("nil load context")
+	errCannotLoad          = errors.New("cannot load")
+	errUnsupportedCharset  = errors.New("unsupported charset")
+	errBlockedFileAccess   = errors.New("blocked file access")
+	errNoDocumentBase      = errors.New("cannot resolve relative subresource")
+	errUnsupportedScheme   = errors.New("unsupported subresource scheme")
+	errMalformedDataURL    = errors.New("malformed data URL")
+	errInvalidDataURL      = errors.New("invalid URL escape in data URL")
+	errTooManyRedirects    = errors.New("too many redirects")
+	errBodyTooLarge        = errors.New("exceeds max body size")
+	errInvalidBodyLimit    = errors.New("invalid max body size")
+	errInvalidRedirects    = errors.New("invalid max redirects")
 	errUninitializedLoader = errors.New("loader client is not initialized")
 )
 
@@ -73,7 +73,8 @@ var (
 type Kind int
 
 const (
-	KindHTTP Kind = iota
+	KindUnknown Kind = iota
+	KindHTTP
 	KindFile
 	KindInline
 )
@@ -117,6 +118,7 @@ func (c ResourceContext) Fetch(ctx context.Context, ref string) (*Resource, erro
 	if c.loader == nil {
 		return nil, errNilLoader
 	}
+
 	if ctx == nil {
 		return nil, errNilContext
 	}
@@ -367,7 +369,7 @@ func (l *Loader) initClient() error {
 func parseProxy(raw string) (*url.URL, error) {
 	proxy, err := url.Parse(strings.TrimSpace(raw))
 	if err != nil {
-		return nil, fmt.Errorf("%w %q: %v", ErrInvalidProxy, raw, err)
+		return nil, fmt.Errorf("%w %q: %w", ErrInvalidProxy, raw, err)
 	}
 
 	if proxy.Scheme == "" || proxy.Host == "" || proxy.Hostname() == "" {
@@ -387,6 +389,8 @@ func parseProxy(raw string) (*url.URL, error) {
 // (lp.InlineHTML) is returned as-is and skips GuessURL entirely; subresources
 // resolve against lp.InlineBase when set. Every loaded document is checked
 // for a supported charset at this seam (see checkDocumentCharset).
+//
+//nolint:cyclop // multi-branch resource loader
 func (l *Loader) Load(ctx context.Context, input string, pageLoad settings.LoadPage) (*Resource, error) {
 	if l == nil {
 		return nil, errNilLoader
@@ -478,6 +482,8 @@ func (l *Loader) loadByKind(
 		return l.loadFile(ctx, target, pageLoad)
 	case KindHTTP:
 		return l.loadHTTP(ctx, target, pageLoad)
+	case KindUnknown:
+		return nil, fmt.Errorf("%w: %v", errCannotLoad, target)
 	}
 
 	return res, nil
@@ -689,11 +695,12 @@ func bodyReadLimit(maxBytes int64) int64 {
 // same request boundary as an HTTP read.
 func readFileBody(ctx context.Context, file *os.File, maxBytes int64) ([]byte, error) {
 	if err := ctx.Err(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("file read ctx: %w", err)
 	}
 
 	stop := make(chan struct{})
 	watcherDone := make(chan struct{})
+
 	go func() {
 		defer close(watcherDone)
 
@@ -705,27 +712,41 @@ func readFileBody(ctx context.Context, file *os.File, maxBytes int64) ([]byte, e
 	}()
 
 	body, err := io.ReadAll(io.LimitReader(file, bodyReadLimit(maxBytes)))
+
 	close(stop)
 	<-watcherDone
+
 	if err != nil {
 		if ctxErr := ctx.Err(); ctxErr != nil {
-			return nil, ctxErr
+			return nil, fmt.Errorf("file read canceled: %w", ctxErr)
 		}
 
-		return nil, err
+		return nil, fmt.Errorf("file read io: %w", err)
 	}
 
 	if err := ctx.Err(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("file read finish: %w", err)
 	}
 
 	return body, nil
 }
 
 func (l *Loader) loadFile(ctx context.Context, path string, pageLoad settings.LoadPage) (*Resource, error) {
+	if ctx == nil {
+		return nil, errNilContext
+	}
+
+	if err := ctx.Err(); err != nil {
+		return nil, fmt.Errorf("load file: %w", err)
+	}
+
 	filePath, err := filePathFromURL(path)
 	if err != nil {
 		return nil, err
+	}
+
+	if err := ctx.Err(); err != nil {
+		return nil, fmt.Errorf("load file: %w", err)
 	}
 
 	if !l.fileAccessAllowed(filePath, pageLoad) {
@@ -990,6 +1011,8 @@ func (l *Loader) loadErrorResponse(
 }
 
 // FetchSub fetches a subresource (css/img) resolved against base.
+//
+//nolint:cyclop // multi-branch subresource loader
 func (l *Loader) FetchSub(ctx context.Context, base, ref string, pageLoad settings.LoadPage) (*Resource, error) {
 	if l == nil {
 		return nil, errNilLoader

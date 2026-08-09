@@ -98,6 +98,7 @@ func sealPageTopClusters(
 		if !ok {
 			continue
 		}
+
 		if page <= 0 {
 			continue
 		}
@@ -164,12 +165,13 @@ func capTableMaxPage(res *Result, contentH float64) int {
 			continue
 		}
 
-		p, ok := checkedFlowPageOfY(res.Ops[i].Y, contentH)
+		pageVal, ok := checkedFlowPageOfY(res.Ops[i].Y, contentH)
 		if !ok {
 			continue
 		}
-		if p > maxPage {
-			maxPage = p
+
+		if pageVal > maxPage {
+			maxPage = pageVal
 		}
 	}
 
@@ -470,15 +472,14 @@ func paginateOps(res *Result, contentH float64) []int {
 	repeatTableHeaders(res, contentH)
 	// Sticky is applied in Paint after rect splitting (see splitCrossingRects).
 	opPage := make([]int, len(res.Ops))
-	for i := range res.Ops {
-		page, ok := checkedFlowPageOfY(res.Ops[i].Y, contentH)
+
+	for opIdx := range res.Ops {
+		page, ok := checkedFlowPageOfY(res.Ops[opIdx].Y, contentH)
 		if !ok {
-			opPage[i] = -1
-
-			continue
+			opPage[opIdx] = -1
+		} else {
+			opPage[opIdx] = page
 		}
-
-		opPage[i] = page
 	}
 
 	return opPage
@@ -600,11 +601,13 @@ func rowChromeAbove(res *Result, idx int, oldY float64) ([]int, float64) {
 
 	minY := oldY
 
+	//nolint:nestif // row chrome candidate resolution
 	if res.flowPageSize > 0 {
 		page, ok := checkedFlowPageOfY(oldY, res.flowPageSize)
 		if !ok {
 			return chrome, minY
 		}
+
 		if page < 0 {
 			page = 0
 		}

@@ -1,8 +1,9 @@
 package layout
 
 import (
-	"gowkhtmltopdf/internal/pdf"
 	"strings"
+
+	"gowkhtmltopdf/internal/pdf"
 )
 
 // undRun accumulates one continuous underline stroke across adjacent

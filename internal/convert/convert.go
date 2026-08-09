@@ -145,6 +145,7 @@ func (r *Request) Validate() error {
 	if strings.TrimSpace(r.Global.PageSize) == "" {
 		r.Global.PageSize = r.Global.Size.PageSize
 	}
+
 	r.Global.Size.PageSize = r.Global.PageSize
 
 	if r.Output == nil {
@@ -203,6 +204,7 @@ func RunPDFContext(ctx context.Context, cmd *cli.Command, log io.Writer, progres
 	if cmd == nil {
 		return errNilCommand
 	}
+
 	if ctx == nil {
 		return errNilContext
 	}
@@ -217,6 +219,7 @@ func RunPDFContext(ctx context.Context, cmd *cli.Command, log io.Writer, progres
 	if cmd.DumpOutline {
 		req.Global.DumpOutline = true
 	}
+
 	if err := req.ValidatePDF(); err != nil {
 		return err
 	}
@@ -225,17 +228,21 @@ func RunPDFContext(ctx context.Context, cmd *cli.Command, log io.Writer, progres
 	if err != nil {
 		return fmt.Errorf("open output: %w", err)
 	}
+
 	defer func() {
 		if closeErr := closeOut(); closeErr != nil && err == nil {
 			err = closeErr
 		}
 	}()
+
 	req.Output = out
 
 	return Run(ctx, req, log, progress)
 }
 
 // runContext owns the dependencies for one conversion lifecycle.
+//
+//nolint:containedctx // internal pipeline lifecycle dependencies
 type runContext struct {
 	ctx      context.Context
 	req      *Request
@@ -257,8 +264,11 @@ func (run *runContext) report(phase string, value int) {
 	}
 }
 
-func (run *runContext) renderObjects() (tocs, bodies []*objectState, err error) {
+func (run *runContext) renderObjects() ([]*objectState, []*objectState, error) {
+	var tocs, bodies []*objectState
+
 	count := len(run.req.Objects)
+
 	for idx := range run.req.Objects {
 		if err := run.ctx.Err(); err != nil {
 			return nil, nil, fmt.Errorf("object %d: %w", idx+1, err)
@@ -274,6 +284,7 @@ func (run *runContext) renderObjects() (tocs, bodies []*objectState, err error) 
 			}
 
 			tocs = append(tocs, state)
+
 			continue
 		}
 
@@ -281,6 +292,7 @@ func (run *runContext) renderObjects() (tocs, bodies []*objectState, err error) 
 		if err != nil {
 			return nil, nil, err
 		}
+
 		if state != nil {
 			bodies = append(bodies, state)
 		}
@@ -296,6 +308,8 @@ func (run *runContext) renderObjects() (tocs, bodies []*objectState, err error) 
 //
 // The lifecycle is intentionally explicit: object rendering, outline/TOC
 // assembly, copy materialization, and final output each have one owner.
+//
+//nolint:gocognit,cyclop,funlen // conversion pipeline runner
 func Run(ctx context.Context, req *Request, log io.Writer, progress func(phase string, percent int)) error {
 	if err := req.ValidatePDF(); err != nil {
 		return err
@@ -404,6 +418,7 @@ func Run(ctx context.Context, req *Request, log io.Writer, progress func(phase s
 	if err != nil {
 		return err
 	}
+
 	ranges := plan.Ranges()
 
 	if req.Global.Title != "" {
@@ -480,10 +495,13 @@ type pagePlan struct {
 
 // newPagePlan builds the logical owner list (TOC pages then body pages) and
 // the copy/collate parameters used by HF drawing and link remapping.
+//
+//nolint:cyclop // page planning calculation
 func newPagePlan(tocs, bodies []*objectState, copies int, collate bool) (*pagePlan, error) {
 	if copies < 1 {
 		copies = 1
 	}
+
 	if copies > maxConversionCopies {
 		return nil, fmt.Errorf("%w: got %d, limit %d", errTooManyCopies, copies, maxConversionCopies)
 	}
@@ -492,12 +510,15 @@ func newPagePlan(tocs, bodies []*objectState, copies int, collate bool) (*pagePl
 	for _, state := range tocs {
 		logicalPages += state.tocPages
 	}
+
 	for _, state := range bodies {
 		logicalPages += state.pages
 	}
+
 	if logicalPages > maxConversionPages {
 		return nil, fmt.Errorf("%w: got %d, limit %d", errTooManyPages, logicalPages, maxConversionPages)
 	}
+
 	if logicalPages > 0 && copies > maxConversionPages/logicalPages {
 		return nil, fmt.Errorf(
 			"%w: %d pages x %d copies exceeds %d",
@@ -508,7 +529,7 @@ func newPagePlan(tocs, bodies []*objectState, copies int, collate bool) (*pagePl
 		)
 	}
 
-	pagePlan := &pagePlan{
+	pagePlan := &pagePlan{ //nolint:exhaustruct // intentional zero-value field
 		owners:  make([]pageOwner, 0, logicalPages),
 		copies:  copies,
 		collate: collate,
@@ -657,6 +678,7 @@ func materializeCopies(doc *pdf.Document, ranges []pageRange, copies int) error 
 	if copies < 1 {
 		return nil
 	}
+
 	if copies > maxConversionCopies {
 		return fmt.Errorf("%w: got %d, limit %d", errTooManyCopies, copies, maxConversionCopies)
 	}
@@ -665,14 +687,9 @@ func materializeCopies(doc *pdf.Document, ranges []pageRange, copies int) error 
 	for _, r := range ranges {
 		origTotal += r.count
 	}
-	if origTotal > maxConversionPages || (origTotal > 0 && copies > maxConversionPages/origTotal) {
-		return fmt.Errorf(
-			"%w: %d pages x %d copies exceeds %d",
-			errTooManyPages,
-			origTotal,
-			copies,
-			maxConversionPages,
-		)
+
+	if origTotal == 0 {
+		return nil
 	}
 
 	for c := 1; c < copies; c++ {
@@ -768,6 +785,8 @@ func initTOCState(run *runContext, obj *settings.PdfObject, idx int) (*objectSta
 // renderObject loads, lays out and paints one body object into doc and
 // returns the per-object state the later passes need (nil when the load
 // policy skipped the object).
+//
+//nolint:gocognit,cyclop,funlen // per-object rendering lifecycle
 func renderObject(run *runContext, obj *settings.PdfObject, idx int) (*objectState, error) {
 	geom, err := newHFGeom(run.req.Global)
 	if err != nil {
@@ -880,6 +899,7 @@ func renderObject(run *runContext, obj *settings.PdfObject, idx int) (*objectSta
 				}
 
 				objectRender.zoom = effZoom
+
 				lres, err = layout.LayoutContext(run.ctx, root, state.bodyLayoutOpts(objectRender))
 				if err != nil {
 					return nil, fmt.Errorf("object %d (%s): smart-shrink layout: %w", idx+1, obj.Page, err)
@@ -1060,7 +1080,9 @@ func CollectSheets(
 		return nil
 	}
 
+	//nolint:exhaustruct // base-only resource reference
 	resources := loader.ForResource(&load.Resource{Base: base}, loadPage)
+
 	sheets, err := collectSheets(ctx, resources, root, opts, log)
 	if err != nil && log != nil {
 		line.Emit(log, line.Warn, "stylesheet collection: %v", err)
@@ -1069,6 +1091,7 @@ func CollectSheets(
 	return sheets
 }
 
+//nolint:containedctx // internal collector context
 type sheetCollector struct {
 	ctx       context.Context
 	resources load.ResourceContext
@@ -1083,6 +1106,7 @@ func collectSheets(
 	ctx context.Context, resources load.ResourceContext, root *html.Node,
 	opts SheetOptions, log io.Writer,
 ) ([]*css.Stylesheet, error) {
+	//nolint:exhaustruct // zero sheets/rules/err fields
 	collector := sheetCollector{ctx: ctx, resources: resources, opts: opts, log: log}
 	if root != nil {
 		root.Walk(collector.visit)
@@ -1092,6 +1116,7 @@ func collectSheets(
 	if collector.rules >= softRuleWarn {
 		collector.warn("large stylesheet volume (%d rules); print may be slow", collector.rules)
 	}
+
 	if collector.err != nil {
 		return collector.sheets, collector.err
 	}
@@ -1116,6 +1141,7 @@ func (collector *sheetCollector) collectStyle(node *html.Node) {
 	sheet, err := css.Parse(styleText(node))
 	if err != nil {
 		collector.warn("skipping <style>: %v", err)
+
 		return
 	}
 
@@ -1129,14 +1155,17 @@ func (collector *sheetCollector) collectLink(node *html.Node) {
 
 	href := node.Attribute("href")
 	resource, err := collector.resources.Fetch(collector.ctx, href)
+
 	if err != nil {
 		collector.warn("skipping <link href=%q>: %v", href, err)
+
 		return
 	}
 
 	sheet, err := css.Parse(string(resource.Body))
 	if err != nil {
 		collector.warn("skipping <link href=%q>: %v", href, err)
+
 		return
 	}
 
@@ -1151,6 +1180,7 @@ func (collector *sheetCollector) add(sheet *css.Stylesheet) {
 	collector.rules += len(sheet.Rules)
 	if collector.rules > maxStylesheetRules {
 		collector.err = fmt.Errorf("%w: got %d, limit %d", errTooManyStyles, collector.rules, maxStylesheetRules)
+
 		return
 	}
 
@@ -1169,6 +1199,7 @@ func (collector *sheetCollector) warn(format string, args ...any) {
 			"object %d: "+format,
 			append([]any{collector.opts.ObjectIndex}, args...)...,
 		)
+
 		return
 	}
 
@@ -1302,7 +1333,9 @@ func MergeFontFaces(
 		return reg
 	}
 
+	//nolint:exhaustruct // base-only resource reference
 	resources := loader.ForResource(&load.Resource{Base: base}, loadPage)
+
 	return mergeFontFaces(ctx, resources, reg, sheets, idx, log)
 }
 
@@ -1336,11 +1369,13 @@ func mergeFontFace(
 		if fontFace.Family != "" {
 			font.PostScriptName = strings.ReplaceAll(fontFace.Family, " ", "")
 		}
+
 		if reg == nil {
 			reg = pdf.NewRegistry()
 		}
 
 		reg.AddFont(font)
+
 		if fontFace.Family != "" {
 			reg.AddFamilyAlias(fontFace.Family, font)
 		}
@@ -1358,24 +1393,28 @@ func fetchFontFace(
 		line.Emit(log, line.Warn,
 			"object %d: @font-face src %q skipped (WOFF2/EOT unsupported; WOFF1/TTF/OTF only)",
 			idx, uri)
+
 		return nil, false
 	}
 	// data: would bypass the network:// gate; reject so we never ParseTTF
 	// untrusted inline payloads from CSS.
 	if strings.HasPrefix(low, "data:") {
 		line.Emit(log, line.Warn, "object %d: @font-face data: src skipped", idx)
+
 		return nil, false
 	}
 
 	resource, err := resources.Fetch(ctx, uri)
 	if err != nil {
 		line.Emit(log, line.Warn, "object %d: @font-face src %q: %v", idx, uri, err)
+
 		return nil, false
 	}
 
 	font, err := pdf.ParseFontBytes(resource.Body)
 	if err != nil {
 		line.Emit(log, line.Warn, "object %d: @font-face src %q: %v", idx, uri, err)
+
 		return nil, false
 	}
 

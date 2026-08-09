@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"gowkhtmltopdf/internal/convert"
+	"gowkhtmltopdf/internal/errs"
 	"gowkhtmltopdf/internal/imageout"
 	"gowkhtmltopdf/internal/line"
 	"gowkhtmltopdf/internal/settings"
@@ -38,7 +39,7 @@ var (
 	// ErrNilObjectSettings reports a method call on nil object settings.
 	ErrNilObjectSettings = errors.New("gowkhtmltopdf: nil object settings")
 	// ErrNilContext reports a cancellation-aware operation without a context.
-	ErrNilContext = errors.New("gowkhtmltopdf: nil context")
+	ErrNilContext = errs.ErrNilContext
 )
 
 // Version returns the library version banner.
@@ -366,7 +367,7 @@ func (c *Converter) Output() []byte {
 // apply). Local file / subresource ACL is unchanged — linked local assets
 // still need enablelocalfileaccess + load.blocklocalfileaccess=false.
 //
-//nolint:contextcheck // defensive nil-context contract
+
 func ConvertHTML(ctx context.Context, html []byte, global *GlobalSettings) ([]byte, error) {
 	if ctx == nil {
 		return nil, ErrNilContext
@@ -586,7 +587,7 @@ func (h convertHooks) progress() func(string, int) {
 // executePDF runs the PDF pipeline into an in-memory buffer and reports
 // failures to OnError.
 //
-//nolint:contextcheck // defensive nil-context contract
+
 func (h convertHooks) executePDF(ctx context.Context, req *convert.Request) ([]byte, error) {
 	if ctx == nil {
 		return nil, ErrNilContext
@@ -609,7 +610,7 @@ func (h convertHooks) executePDF(ctx context.Context, req *convert.Request) ([]b
 // executeImage runs the image pipeline into an in-memory buffer and reports
 // failures to OnError.
 //
-//nolint:contextcheck // defensive nil-context contract
+
 func (h convertHooks) executeImage(ctx context.Context, req *convert.Request) ([]byte, error) {
 	if ctx == nil {
 		return nil, ErrNilContext

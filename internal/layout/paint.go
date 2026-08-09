@@ -86,6 +86,7 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 	if contentH <= 0 {
 		contentH = opts.PageHeight
 	}
+
 	if err := validatePaintPageIndices(res.Ops, contentH); err != nil {
 		return err
 	}
@@ -98,9 +99,11 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 	}
 
 	opPage := paginateOps(res, contentH)
+
 	if err := validatePaintPageIndices(res.Ops, contentH); err != nil {
 		return err
 	}
+
 	fixedIdx := fixedOpIndices(res)
 
 	// Split rect ops at page boundaries first so sticky clamps the natural
@@ -117,6 +120,7 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 	// Print-scoped sticky: clamp the natural fragment without fixed-style
 	// continuation clones.
 	applyStickyPrint(res, contentH)
+
 	if err := validatePaintPageIndices(res.Ops, contentH); err != nil {
 		return err
 	}
@@ -165,12 +169,17 @@ func buildPagesAfterSplits(res *Result, contentH float64, _ []int) []int {
 	return opPage
 }
 
+var (
+	errInvalidContentHeight = errors.New("layout: invalid content height")
+	errOutOfRangePageIndex  = errors.New("layout: operation has an out-of-range page index")
+)
+
 // validatePaintPageIndices rejects coordinates that cannot be represented by
 // the bounded pagination index. Returning an error keeps an oversized page
 // distinct from page zero or the final index bucket.
 func validatePaintPageIndices(ops []Op, contentH float64) error {
 	if contentH <= 0 || math.IsNaN(contentH) || math.IsInf(contentH, 0) {
-		return fmt.Errorf("layout: invalid content height %v", contentH)
+		return fmt.Errorf("%w: %v", errInvalidContentHeight, contentH)
 	}
 
 	for idx := range ops {
@@ -179,7 +188,7 @@ func validatePaintPageIndices(ops []Op, contentH float64) error {
 		}
 
 		if _, ok := checkedFlowPageOfY(ops[idx].Y, contentH); !ok {
-			return fmt.Errorf("layout: operation %d has an out-of-range page index", idx)
+			return fmt.Errorf("layout: operation %d %w", idx, errOutOfRangePageIndex)
 		}
 	}
 
@@ -199,13 +208,13 @@ func pageBuckets(ops []Op, contentH float64) ([]int, []int) {
 			continue
 		}
 
-		p, ok := checkedFlowPageOfY(ops[idx].Y, contentH)
+		pageVal, ok := checkedFlowPageOfY(ops[idx].Y, contentH)
 		if !ok {
 			return nil, nil
 		}
 
-		if p > maxPage {
-			maxPage = p
+		if pageVal > maxPage {
+			maxPage = pageVal
 		}
 	}
 
@@ -217,13 +226,13 @@ func pageBuckets(ops []Op, contentH float64) ([]int, []int) {
 			continue
 		}
 
-		p, ok := checkedFlowPageOfY(ops[idx].Y, contentH)
+		pageVal, ok := checkedFlowPageOfY(ops[idx].Y, contentH)
 		if !ok {
 			return nil, nil
 		}
-		pageOf[idx] = p
 
-		counts[p]++
+		pageOf[idx] = pageVal
+		counts[pageVal]++
 	}
 
 	return pageOf, counts
@@ -271,11 +280,11 @@ func paintPages(
 
 	fontNames := map[*pdf.Font]string{}
 	nextFont := 0
-	nextImg := 0
 
 	var child *pdf.Content
 
 	var page *pdf.Page
+
 	pageOrder := make([]int, 0)
 
 	resName := func(face *pdf.Font) string {
@@ -295,10 +304,6 @@ func paintPages(
 		return n
 	}
 
-	paintOp := func(paintOp *Op, pageN int) {
-		paintOpOnPage(child, page, paintOp, pageN, contentH, opts, page.Height(), resName, &nextImg, &paintErr)
-	}
-
 	for pageIdx, idxs := range res.Pages {
 		if err := ctx.Err(); err != nil {
 			return fmt.Errorf("layout: paint context: %w", err)
@@ -307,7 +312,6 @@ func paintPages(
 		clear(fontNames)
 
 		nextFont = 0
-		nextImg = 0
 
 		page = doc.AddPage(opts.PageWidth, opts.PageHeight)
 		child = page.Content()
@@ -316,85 +320,104 @@ func paintPages(
 		pageOrder = append(pageOrder[:0], idxs...)
 		sortPaintIndices(res.Ops, pageOrder)
 
+		painter := pagePainter{
+			child:    child,
+			page:     page,
+			pageN:    pageIdx,
+			contentH: contentH,
+			pageH:    page.Height(),
+			opts:     opts,
+			resName:  resName,
+			nextImg:  0,
+			err:      paintErr,
+		}
+
 		for _, idx := range pageOrder {
 			if err := ctx.Err(); err != nil {
 				return fmt.Errorf("layout: paint context: %w", err)
 			}
 
-			paintOp(&res.Ops[idx], pageIdx)
+			painter.paintOp(&res.Ops[idx])
 		}
 		// Fixed layer: page-local coords (pageIdx 0 math on every page).
+		painter.pageN = 0
+
 		for _, idx := range fixedOrder {
 			if err := ctx.Err(); err != nil {
 				return fmt.Errorf("layout: paint context: %w", err)
 			}
 
-			paintOp(&res.Ops[idx], 0)
+			painter.paintOp(&res.Ops[idx])
 		}
+
+		paintErr = painter.err
 	}
 
 	return paintErr
 }
 
-// paintOpOnPage dispatches one op onto a page's content stream: transforms,
-// opacity, fill/stroke/line/text/image drawing, then restores the graphics
-// state. The first image-embed error is recorded into paintErr.
-func paintOpOnPage(
-	child *pdf.Content, page *pdf.Page, paintOp *Op, pageN int, contentH float64, opts PaintOptions,
-	pageH float64, resName func(*pdf.Font) string, nextImg *int, paintErr *error,
-) {
+type pagePainter struct {
+	child    *pdf.Content
+	page     *pdf.Page
+	pageN    int
+	contentH float64
+	pageH    float64
+	opts     PaintOptions
+	resName  func(*pdf.Font) string
+	nextImg  int
+	err      error
+}
+
+func (p *pagePainter) paintOp(paintOp *Op) {
 	if paintOp.Kind == opKindNoop {
 		return
 	}
 
 	if paintOp.Kind == OpLinkURI {
-		drawLinkXform(page, paintOp, pageN, contentH, opts)
+		drawLinkXform(p.page, paintOp, p.pageN, p.contentH, p.opts)
 
 		return
 	}
 
 	needGS := paintOp.XformSet || (paintOp.PaintOpacity > 0 && paintOp.PaintOpacity < 1)
 	if needGS {
-		child.Save()
+		p.child.Save()
 	}
 
 	if paintOp.XformSet {
-		a, b, cc, d, e, f := pdfCTMFromCSS(paintOp.Xform, pageN, contentH, opts, page.Height())
-		child.Transform(a, b, cc, d, e, f)
+		a, b, cc, d, e, f := pdfCTMFromCSS(paintOp.Xform, p.pageN, p.contentH, p.opts, p.page.Height())
+		p.child.Transform(a, b, cc, d, e, f)
 	}
 
 	if paintOp.PaintOpacity > 0 && paintOp.PaintOpacity < 1 {
-		child.SetOpacity(paintOp.PaintOpacity)
+		p.child.SetOpacity(paintOp.PaintOpacity)
 	}
 
-	drawPageOp(child, page, paintOp, pageN, contentH, opts, pageH, resName, nextImg, paintErr)
+	p.drawPageOp(paintOp)
 
 	if needGS {
-		child.Restore()
+		p.child.Restore()
 	}
 }
 
 // drawPageOp dispatches one op to the shared fill/stroke/line/text/image
 // drawing routines.
-func drawPageOp(
-	child *pdf.Content, page *pdf.Page, paintOp *Op, pageN int, contentH float64, opts PaintOptions,
-	pageH float64, resName func(*pdf.Font) string, nextImg *int, paintErr *error,
-) {
+func (p *pagePainter) drawPageOp(paintOp *Op) {
 	switch paintOp.Kind {
 	case OpFillRect:
-		drawFill(child, paintOp, pageN, contentH, opts, pageH)
+		drawFill(p.child, paintOp, p.pageN, p.contentH, p.opts, p.pageH)
 	case OpStrokeRect:
-		drawStroke(child, paintOp, pageN, contentH, opts, pageH)
+		drawStroke(p.child, paintOp, p.pageN, p.contentH, p.opts, p.pageH)
 	case OpLine:
-		drawLine(child, paintOp, pageN, contentH, opts, pageH)
+		drawLine(p.child, paintOp, p.pageN, p.contentH, p.opts, p.pageH)
 	case OpText, OpBullet:
-		drawText(child, paintOp, pageN, contentH, opts, pageH, resName(paintOp.Font))
+		drawText(p.child, paintOp, p.pageN, p.contentH, p.opts, p.pageH, p.resName(paintOp.Font))
 	case OpImage:
-		name := "I" + strconv.Itoa(*nextImg)
-		*nextImg++
+		name := "I" + strconv.Itoa(p.nextImg)
+		p.nextImg++
 
-		if err := drawImage(page, child, paintOp, pageN, contentH, opts, name); err != nil && *paintErr == nil {
-			*paintErr = err
+		if err := drawImage(p.page, p.child, paintOp, p.pageN, p.contentH, p.opts, name); err != nil && p.err == nil {
+			p.err = err
 		}
 	case OpLinkURI, opKindNoop:
 	}

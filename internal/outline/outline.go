@@ -144,6 +144,7 @@ func CollectHeadings(root *html.Node) []*Heading {
 // or never emitted a box.
 func Lookup[T locationReader](headings []*Heading, locs []T) []*Heading {
 	byNode := make(map[*html.Node]Location, len(locs))
+
 	for _, l := range locs {
 		x, y, w, h := l.Bounds()
 		node := l.NodeRef()

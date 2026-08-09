@@ -19,6 +19,7 @@ func main() {
 	os.Exit(run(os.Args[1:]))
 }
 
+//nolint:cyclop // CLI entry point option parsing
 func run(argv []string) int {
 	cmd, err := cli.Parse(argv, cli.ModePDF)
 	if err != nil {

@@ -165,6 +165,7 @@ func (c *Content) AddJPEGImage(name string, posX, posY, drawW, drawH float64, da
 	if err != nil {
 		return err
 	}
+
 	if err := validateEmbeddedImage(len(data), width, height); err != nil {
 		return err
 	}
@@ -219,6 +220,7 @@ func grayJPEG(data []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if err := validateEmbeddedImage(len(data), width, height); err != nil {
 		return nil, err
 	}
@@ -232,6 +234,7 @@ func grayJPEG(data []byte) ([]byte, error) {
 	if err := validateEmbeddedImage(len(data), bounds.Dx(), bounds.Dy()); err != nil {
 		return nil, err
 	}
+
 	gray := image.NewGray(image.Rect(0, 0, bounds.Dx(), bounds.Dy()))
 
 	for yy := range bounds.Dy() {
@@ -243,7 +246,7 @@ func grayJPEG(data []byte) ([]byte, error) {
 		}
 	}
 
-	buf := limitedImageBuffer{limit: maxEmbeddedEncodedBytes}
+	buf := limitedImageBuffer{Buffer: bytes.Buffer{}, limit: maxEmbeddedEncodedBytes}
 	if err := jpeg.Encode(&buf, gray, nil); err != nil {
 		return nil, fmt.Errorf("image: encode: %w", err)
 	}
@@ -261,7 +264,12 @@ func (b *limitedImageBuffer) Write(data []byte) (int, error) {
 		return 0, errImageEncodedTooLarge
 	}
 
-	return b.Buffer.Write(data)
+	n, err := b.Buffer.Write(data)
+	if err != nil {
+		return n, fmt.Errorf("buffer write: %w", err)
+	}
+
+	return n, nil
 }
 
 // AddPNGImage decodes PNG with image/png and embeds as a Flate RGB
@@ -280,6 +288,7 @@ func (c *Content) AddPNGImage(name string, posX, posY, drawWidth, drawHeight flo
 	if err != nil {
 		return fmt.Errorf("image: config: %w", err)
 	}
+
 	if err := validateEmbeddedImage(len(data), cfg.Width, cfg.Height); err != nil {
 		return err
 	}
@@ -295,6 +304,7 @@ func (c *Content) AddPNGImage(name string, posX, posY, drawWidth, drawHeight flo
 	if width <= 0 || height <= 0 {
 		return errImageEmptyPNG
 	}
+
 	if err := validateEmbeddedImage(len(data), width, height); err != nil {
 		return err
 	}

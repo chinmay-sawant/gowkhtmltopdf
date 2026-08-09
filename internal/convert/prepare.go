@@ -47,8 +47,10 @@ var errNilContext = errors.New("convert: nil context")
 // preparation. The loader owns global ACL/network policy; Load carries the
 // per-document credentials, headers, cookies and error policy.
 func NewResourceContext(loader *load.Loader, base string, lp settings.LoadPage) ResourceContext {
+	//nolint:exhaustruct // intentional zero-value resource field
 	resources := ResourceContext{Loader: loader, Base: base, Load: lp}
 	if loader != nil {
+		//nolint:exhaustruct // base-only resource reference
 		resources.resource = loader.ForResource(&load.Resource{Base: base}, lp)
 	}
 
@@ -85,6 +87,7 @@ func (r ResourceContext) CollectSheets(
 	if r.Loader == nil {
 		return nil
 	}
+
 	if ctx == nil {
 		if log != nil {
 			line.Emit(log, line.Warn, "stylesheet collection: %v", errNilContext)
@@ -109,6 +112,7 @@ func (r ResourceContext) MergeFontFaces(
 	if r.Loader == nil {
 		return registry
 	}
+
 	if ctx == nil {
 		if log != nil {
 			line.Emit(log, line.Warn, "font-face merge: %v", errNilContext)
@@ -185,6 +189,7 @@ func PrepareDocument(
 	}
 
 	prep.Root = root
+
 	prep.Sheets, err = prep.Resources.collectSheets(ctx, root, SheetOptions{
 		ViewportW:   opts.ViewportW,
 		ViewportH:   opts.ViewportH,
@@ -194,6 +199,7 @@ func PrepareDocument(
 	if err != nil {
 		return nil, fmt.Errorf("collect stylesheets: %w", err)
 	}
+
 	prep.Sheets = AppendSimplifySheet(prep.Sheets, opts.SimplifyDOM, opts.SimplifyProfile)
 	prep.Registry = prep.Resources.mergeFontFaces(ctx, registry, prep.Sheets, opts.ObjectIndex, log)
 
@@ -206,6 +212,7 @@ func (r ResourceContext) collectSheets(
 	if r.Loader == nil {
 		return nil, errNoResourceLoader
 	}
+
 	if ctx == nil {
 		return nil, errNilContext
 	}
@@ -220,6 +227,7 @@ func (r ResourceContext) mergeFontFaces(
 	if r.Loader == nil {
 		return registry
 	}
+
 	if ctx == nil {
 		if log != nil {
 			line.Emit(log, line.Warn, "font-face merge: %v", errNilContext)

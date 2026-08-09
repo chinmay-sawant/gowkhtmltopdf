@@ -1,10 +1,11 @@
 package layout
 
 import (
-	"gowkhtmltopdf/internal/html"
 	"math"
 	"strconv"
 	"strings"
+
+	"gowkhtmltopdf/internal/html"
 )
 
 func bandEmSize(ops []Op, indices []int) float64 {

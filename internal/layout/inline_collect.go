@@ -1,10 +1,11 @@
 package layout
 
 import (
-	"gowkhtmltopdf/internal/html"
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"gowkhtmltopdf/internal/html"
 )
 
 func (e *engine) collectInline(nodes []*html.Node, out *[]inlineItem) {

@@ -140,6 +140,7 @@ func renderBenchmarkPageIslands(
 	return nil
 }
 
+//nolint:containedctx // page island rendering context
 type pageIslandRenderContext struct {
 	ctx       context.Context
 	doc       *pdf.Document
@@ -154,6 +155,7 @@ type pageIslandRenderContext struct {
 
 func (island pageIslandRenderContext) render(section *html.Node) error {
 	islandRoot := benchmarkIslandRoot(island.root, section)
+
 	res, err := layout.WithWorkspace(island.ctx, islandRoot, island.state.bodyLayoutOpts(
 		objectRenderContext{
 			global:             island.renderCtx.global,
@@ -169,12 +171,15 @@ func (island pageIslandRenderContext) render(section *html.Node) error {
 	if err != nil {
 		return fmt.Errorf("layout certified page island: %w", err)
 	}
+
 	defer island.workspace.Release(res)
 
 	before := island.doc.PageCount()
+
 	if err := layout.PaintContext(island.ctx, island.doc, res, paintOptions(island.state.geom)); err != nil {
 		return fmt.Errorf("paint certified page island: %w", err)
 	}
+
 	if island.doc.PageCount() != before+1 {
 		return errCertifiedIslandExpanded
 	}
@@ -198,6 +203,7 @@ func (island pageIslandRenderContext) render(section *html.Node) error {
 		pageOffset,
 		island.state.geom.contentH,
 	)
+
 	return nil
 }
 
@@ -234,13 +240,8 @@ func cloneHTMLNode(node, parent *html.Node) *html.Node {
 	}
 
 	clone := cloneHTMLNodeShell(node, parent)
-	if node.Children == nil {
-		return clone
-	}
-
-	clone.Children = make([]*html.Node, 0, len(node.Children))
 	for _, child := range node.Children {
-		clone.Children = append(clone.Children, cloneHTMLNode(child, clone))
+		_ = cloneHTMLNode(child, clone)
 	}
 
 	return clone
@@ -251,13 +252,18 @@ func cloneHTMLNodeShell(node, parent *html.Node) *html.Node {
 		return nil
 	}
 
-	return &html.Node{ //nolint:exhaustruct // children are populated by the clone caller
-		Type:     node.Type,
-		Name:     node.Name,
-		Attrs:    cloneHTMLAttrs(node.Attrs),
-		Text:     node.Text,
-		Parent:   parent,
+	clone := &html.Node{ //nolint:exhaustruct // children are populated by the clone caller
+		Type:   node.Type,
+		Name:   node.Name,
+		Attrs:  cloneHTMLAttrs(node.Attrs),
+		Text:   node.Text,
+		Parent: parent,
 	}
+	if parent != nil {
+		parent.Children = append(parent.Children, clone)
+	}
+
+	return clone
 }
 
 func cloneHTMLAttrs(attrs map[string]string) map[string]string {

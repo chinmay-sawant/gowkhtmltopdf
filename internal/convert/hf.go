@@ -71,12 +71,14 @@ type hfParms struct {
 	replaces               map[string]string
 }
 
-// knownPlaceholders are the [..] tokens the engine substitutes. Everything
-// else passes through literally.
-var knownPlaceholders = map[string]bool{ //nolint:gochecknoglobals // immutable lookup table
-	"page": true, "topage": true, "frompage": true,
-	"date": true, "time": true, "title": true, "doctitle": true,
-	"webpage": true, "section": true, "subsection": true, "subject": true,
+func isKnownPlaceholder(token string) bool {
+	switch token {
+	case "page", "topage", "frompage", "date", "time", "title",
+		"doctitle", "webpage", htmlSectionName, "subsection", "subject":
+		return true
+	default:
+		return false
+	}
 }
 
 // placeholderToken matches one [name] token.
@@ -95,13 +97,14 @@ func (p hfParms) substitute(src string) string { //nolint:cyclop // per-token sw
 
 	return placeholderToken.ReplaceAllStringFunc(src, func(tok string) string {
 		name := tok[1 : len(tok)-1]
+
 		switch name {
 		case "page":
 			return strconv.Itoa(p.page)
-		case "topage":
-			return strconv.Itoa(p.topage)
 		case "frompage":
 			return strconv.Itoa(p.frompage)
+		case "topage":
+			return strconv.Itoa(p.topage)
 		case "date":
 			return p.date
 		case "time":
@@ -112,7 +115,7 @@ func (p hfParms) substitute(src string) string { //nolint:cyclop // per-token sw
 			return p.doctitle
 		case "webpage":
 			return p.webpage
-		case htmlSectionName:
+		case "section":
 			return p.section
 		case "subsection":
 			return p.subsection
@@ -128,7 +131,7 @@ func (p hfParms) substitute(src string) string { //nolint:cyclop // per-token sw
 func knownIn(s string) bool {
 	for _, m := range placeholderToken.FindAllString(s, -1) {
 		name := m[1 : len(m)-1]
-		if knownPlaceholders[name] {
+		if isKnownPlaceholder(name) {
 			return true
 		}
 	}
@@ -396,7 +399,10 @@ type hfDrawResult struct {
 // Err returns the aggregate failure for strict conversion callers. The
 // compatibility adapter may still emit warnings, but the primary PDF engine
 // must not report success when required header/footer content was omitted.
-func (r hfDrawResult) Err() error {
+// Err returns the aggregate failure for strict conversion callers. The
+// compatibility adapter may still emit warnings, but the primary PDF engine
+// must not report success when required header/footer content was omitted.
+func (r *hfDrawResult) Err() error {
 	if len(r.warnings) == 0 {
 		return nil
 	}
@@ -415,7 +421,7 @@ func (r *hfDrawResult) warn(object, page int, band string, err error) {
 		return
 	}
 
-	r.warnings = append(r.warnings, hfDrawWarning{ //nolint:exhaustruct // all warning fields are intentional
+	r.warnings = append(r.warnings, hfDrawWarning{
 		object: object,
 		page:   page,
 		band:   band,
@@ -423,7 +429,8 @@ func (r *hfDrawResult) warn(object, page int, band string, err error) {
 	})
 }
 
-func (r hfDrawResult) emitWarnings(log io.Writer) {
+//nolint:unused // warning emitter helper for compatibility adapter
+func (r *hfDrawResult) emitWarnings(log io.Writer) {
 	for _, warning := range r.warnings {
 		line.Emit(log, line.Warn, "object %d page %d: %s header/footer: %v",
 			warning.object, warning.page+1, warning.band, warning.err)
@@ -655,8 +662,11 @@ func effectiveMargins(ctx context.Context, loader *load.Loader, font *pdf.Font, 
 // The result-producing implementation below keeps the failure policy
 // explicit: body output remains usable, every recoverable HF error is
 // collected, and the adapter emits one warning per failed band.
-func drawHeadersFooters(ctx context.Context, loader *load.Loader, font *pdf.Font, doc *pdf.Document, req *Request, plan *pagePlan, headings []*outline.Heading, log io.Writer) { //nolint:gocognit,cyclop,funlen,lll // per-page draw dispatch with lazy HF load
-	drawHeadersFootersResult(ctx, loader, font, doc, req, plan, headings, log).emitWarnings(log)
+//
+//nolint:lll,unused // compatibility adapter for existing caller
+func drawHeadersFooters(ctx context.Context, loader *load.Loader, font *pdf.Font, doc *pdf.Document, req *Request, plan *pagePlan, headings []*outline.Heading, log io.Writer) {
+	res := drawHeadersFootersResult(ctx, loader, font, doc, req, plan, headings, log)
+	res.emitWarnings(log)
 }
 
 // drawHeadersFootersResult is the final pass that paints the effective
@@ -667,6 +677,7 @@ func drawHeadersFooters(ctx context.Context, loader *load.Loader, font *pdf.Font
 // the current convert.Run signature.
 func drawHeadersFootersResult(ctx context.Context, loader *load.Loader, font *pdf.Font, doc *pdf.Document, req *Request, plan *pagePlan, headings []*outline.Heading, log io.Writer) hfDrawResult { //nolint:gocognit,cyclop,funlen,lll // per-page draw dispatch with lazy HF load
 	var result hfDrawResult
+
 	total := doc.PageCount()
 	now := req.now()
 	date := now.Format("2006-01-02")

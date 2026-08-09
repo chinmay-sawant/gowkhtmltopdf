@@ -1,8 +1,9 @@
 package layout
 
 import (
-	"gowkhtmltopdf/internal/html"
 	"strings"
+
+	"gowkhtmltopdf/internal/html"
 )
 
 func (e *engine) buildTable(node *html.Node, style ResolvedStyle, availW, posX, posY float64) *box {

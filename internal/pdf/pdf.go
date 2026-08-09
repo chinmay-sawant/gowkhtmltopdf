@@ -112,6 +112,7 @@ func (d dict) String() string { return "<< " + strings.Join(d, " ") + " >>" }
 
 // Document is a PDF under construction.
 type Document struct {
+	mu             sync.RWMutex
 	objects        []*object
 	info           map[string]string
 	useCompression bool
@@ -156,6 +157,9 @@ func (d *Document) SetInfo(key, value string) { d.info[key] = value }
 
 // newObject allocates an indirect object and returns its typed reference.
 func (d *Document) newObject() objRef {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
 	d.nextID++
 	id := d.nextID
 	d.objects = append(d.objects, &object{id: id}) //nolint:exhaustruct // intentional zero-value fields
@@ -165,11 +169,17 @@ func (d *Document) newObject() objRef {
 
 // setDict replaces the object's dict body.
 func (d *Document) setDict(r objRef, dict string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
 	d.objects[int(r)-1].dict = dict
 }
 
 // setStream attaches a raw stream (compressed later at write time).
 func (d *Document) setStream(r objRef, raw []byte) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
 	d.objects[int(r)-1].stream = raw
 }
 
@@ -203,7 +213,10 @@ func (d *Document) AddPage(width, height float64) *Page {
 	page.contentRef = contentRef
 	page.content = NewContent()
 	page.content.doc = d
+
+	d.mu.Lock()
 	d.pages = append(d.pages, page)
+	d.mu.Unlock()
 
 	return page
 }
@@ -935,15 +948,11 @@ func flateBytes(raw []byte) []byte {
 
 	_, _ = state.zw.Write(raw)
 	_ = state.zw.Close()
-	out := state.buf.Bytes()
-	// Transfer the completed buffer to the caller and give the pooled writer a
-	// fresh destination before it is reused. This keeps compressor state pooled
-	// without copying every compressed page stream.
-	state.buf = bytes.Buffer{}
-	state.zw.Reset(&state.buf)
+
+	res := append([]byte(nil), state.buf.Bytes()...)
 	flatePool.Put(state)
 
-	return out
+	return res
 }
 
 // SortOutlines sorts children by (pageIndex, y, x) - used by layout/outline.

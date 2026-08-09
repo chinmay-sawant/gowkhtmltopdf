@@ -83,9 +83,10 @@ func (c *Command) OpenOutput() (io.Writer, func() error, error) {
 type flagKind uint8
 
 const (
-	flagBool  flagKind = iota // app receives one canonical "true"/"false"
-	flagValue                 // app receives one value token
-	flagPair                  // app receives exactly two tokens (name value)
+	flagKindUnknown flagKind = iota
+	flagBool                 // app receives one canonical "true"/"false"
+	flagValue                // app receives one value token
+	flagPair                 // app receives exactly two tokens (name value)
 )
 
 // flagSpec describes one accepted flag.
@@ -170,7 +171,7 @@ func Parse(argv []string, modes ...Mode) (*Command, error) {
 	}
 	state := &parseState{ //nolint:exhaustruct // intentional zero/partial fields
 		cmd:  cmd,
-		cur:  &objectCtx{},
+		cur:  &objectCtx{}, //nolint:exhaustruct // empty initial object context
 		argv: argv,
 		mode: mode,
 	}
@@ -421,6 +422,8 @@ func (ctx *objectCtx) applyPage(c *Command, glob func(g *settings.PdfGlobal, val
 // apply runs a flag with value extraction (next-arg or =value). Bool flags
 // arrive pre-parsed as canonical "true"/"false"; pair flags arrive as two
 // separate tokens.
+//
+//nolint:cyclop // flag application dispatch
 func (s *parseState) apply(name string, spec flagSpec, negated bool, inlineVal string, hasInline bool) error {
 	switch spec.kind {
 	case flagBool:
@@ -464,6 +467,8 @@ func (s *parseState) apply(name string, spec flagSpec, negated bool, inlineVal s
 		s.idx++
 
 		return spec.app(s.cmd, s.cur, vals[:])
+	case flagKindUnknown:
+		return fmt.Errorf("%w --%s", errUnknownFlagKind, name)
 	}
 
 	return fmt.Errorf("%w --%s", errUnknownFlagKind, name)

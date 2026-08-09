@@ -126,14 +126,22 @@ func canvasDPMM(canvasW, canvasH float64, targetW, targetH int) float64 {
 // svgCSSPixelSize returns the target raster size in CSS pixels (capped by
 // maxSide), derived from the root SVG viewBox or width/height attributes.
 // Only the root element is scanned; no shape parsing.
+//
+//nolint:cyclop,mnd // pixel size scaling with bounds check
 func svgCSSPixelSize(data []byte, maxSide int) (int, int) {
 	viewW, viewH := rootSVGSize(data)
-	if viewW <= 0 {
+	if math.IsNaN(viewW) || math.IsInf(viewW, 0) || viewW <= 0 {
 		viewW = 100
 	}
 
-	if viewH <= 0 {
+	if math.IsNaN(viewH) || math.IsInf(viewH, 0) || viewH <= 0 {
 		viewH = 100
+	}
+
+	if maxSide <= 0 {
+		maxSide = 512
+	} else if maxSide > 4096 {
+		maxSide = 4096
 	}
 
 	scale := 1.0
@@ -146,10 +154,14 @@ func svgCSSPixelSize(data []byte, maxSide int) (int, int) {
 
 	if pixW < 1 {
 		pixW = 1
+	} else if pixW > maxSide {
+		pixW = maxSide
 	}
 
 	if pixH < 1 {
 		pixH = 1
+	} else if pixH > maxSide {
+		pixH = maxSide
 	}
 
 	return pixW, pixH

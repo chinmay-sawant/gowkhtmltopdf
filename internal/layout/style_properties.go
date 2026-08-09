@@ -1,11 +1,12 @@
 package layout
 
 import (
-	"gowkhtmltopdf/internal/css"
 	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"gowkhtmltopdf/internal/css"
 )
 
 func applyDisplayGroup(

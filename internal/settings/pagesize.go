@@ -15,6 +15,7 @@ type pageSizeEntry struct {
 	height float64
 }
 
+//nolint:gochecknoglobals,mnd // static page size lookup table
 var pageSizes = [...]pageSizeEntry{
 	{name: "a0", width: 2383.94, height: 3370.39},
 	{name: "a1", width: 1683.78, height: 2383.94},

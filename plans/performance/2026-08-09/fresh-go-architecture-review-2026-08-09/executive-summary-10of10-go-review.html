@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>gowkhtmltopdf 10/10 Architecture & Roadmap Executive Summary</title>
+  <style>
+    body{margin:0;background:#f3f6f9;color:#18212f;font:15px/1.6 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+    main{max-width:1060px;margin:auto;padding:28px 18px 50px}
+    header,section,footer{background:#fff;border:1px solid #d8e0e8;border-radius:12px;padding:24px;margin-bottom:16px}
+    header{border-top:5px solid #0d9488}
+    h1,h2{line-height:1.25}
+    h1{font-size:36px;margin:0 0 8px;color:#0f766e}
+    h2{font-size:21px;border-bottom:1px solid #d8e0e8;padding-bottom:8px;color:#111827}
+    .muted{color:#5d6877}
+    .scores{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin-top:16px}
+    .score{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:9px;padding:14px}
+    .score strong{display:block;color:#15803d}
+    .score.current{background:#fff7ed;border-color:#ffedd5}
+    .score.current strong{color:#c2410c}
+    .number{display:block;font-size:35px;font-weight:750}
+    .number.target{color:#15803d}
+    .number.previous{color:#c2410c}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{text-align:left;vertical-align:top;padding:9px;border-bottom:1px solid #d8e0e8}
+    th{background:#f8fafc}
+    code{background:#f0f3f6;border-radius:4px;padding:1px 4px;font-size:13px}
+    .callout{background:#ecfdf5;border-left:4px solid #10b981;padding:14px 16px;margin:16px 0;border-radius:0 8px 8px 0}
+    li{margin:5px 0}
+    pre{overflow:auto;background:#17202d;color:#eef4ff;padding:15px;border-radius:8px;font-size:13px}
+    @media(max-width:650px){header,section,footer{padding:18px 15px}h1{font-size:28px}th,td{font-size:13px}}
+  </style>
+</head>
+<body><main>
+  <header>
+    <h1>gowkhtmltopdf 10/10 Architecture &amp; Quality Roadmap</h1>
+    <p class="muted">Codebase Audit &amp; 10/10 Target Architecture Blueprint · 2026-08-09</p>
+    <p>Four independent specialized subagent tracks completed a line-by-line audit across API, settings, loader, layout engine, conversion pipeline, performance, memory allocation, concurrency, and Go code style. Below is the executive roadmap to achieve a perfect 10/10 rating.</p>
+  </header>
+  
+  <section>
+    <h2>Rating Synthesis &amp; Target Roadmap</h2>
+    <div class="scores">
+      <div class="score current">
+        <strong>Previous Baseline Score</strong>
+        <span class="number previous">7.5/10</span>
+        Source-only verification without Go runtime/race/linter execution proof
+      </div>
+      <div class="score">
+        <strong>10/10 Roadmap Score Target</strong>
+        <span class="number target">10.0/10</span>
+        Full runtime certification, zero races, zero allocations, type-safe API
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Why the Rating Was Previously Capped at 7.5</h2>
+    <ul>
+      <li><strong>Source-Only Verification Boundary:</strong> No Go commands (`go test`, `go bench`, `golangci-lint`, race detector) were run, placing an upper ceiling on confidence scores.</li>
+      <li><strong>Untyped Tagged Union Request:</strong> `convert.Request` co-located PDF and Image settings in a single struct, permitting unrepresentable invalid states.</li>
+      <li><strong>Anti-Pattern Deferred Loader Error (`initErr`):</strong> `NewLoader` stored initialization errors in `initErr` rather than failing fast in constructor.</li>
+      <li><strong>Discarded Context on I/O:</strong> Local file loading ignored `ctx.Err()`, and functions used `context.Background()` fallbacks.</li>
+      <li><strong>DOM Ancestor Severing:</strong> Synthetic page island DOMs severed parent chains and left dangling heading pointers.</li>
+      <li><strong>Parameter Bloat &amp; Broad Suppressions:</strong> Core functions accepted 7–10 parameters, and `hf.go` suppressed cyclomatic complexity linters with broad `//nolint` comments.</li>
+      <li><strong>Package-Level Mutable State &amp; Concurrency Risks:</strong> Package `var` maps (`namedColorTable`, `flagTable`) and un-synchronized structures (`pdf.Registry`, `pdf.Document`).</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>5 Phase Execution Plan to 10/10</h2>
+    <table>
+      <thead>
+        <tr><th>Phase</th><th>Focus Area</th><th>Key Architectural Remediation</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Phase 1</strong></td>
+          <td>Type Safety &amp; Concurrency Core</td>
+          <td>Sealed `Request` interface (`PDFRequest` vs `ImageRequest`), `sync.RWMutex` on `pdf.Document` &amp; `pdf.Registry`, replace `var` maps with `sync.OnceValue`.</td>
+        </tr>
+        <tr>
+          <td><strong>Phase 2</strong></td>
+          <td>Loader &amp; Context Enforcement</td>
+          <td>Fail-fast `NewLoader`, pre-I/O `ctx.Err()` checks, `HardMaxBodyCap` (1 GiB) security ceiling, canonical `errs.ErrNilContext`.</td>
+        </tr>
+        <tr>
+          <td><strong>Phase 3</strong></td>
+          <td>Layout Engine &amp; DOM Integrity</td>
+          <td>Encapsulate parameter lists (`pagePainter`, `PrepareParams`), atomic DOM child creation, build-time HF link resolution, pristine TOC result isolation.</td>
+        </tr>
+        <tr>
+          <td><strong>Phase 4</strong></td>
+          <td>Performance &amp; Memory Allocation</td>
+          <td>Recycle `flateBytes` buffer capacity, `sync.Pool` for supersampled pixel buffers, NaN/Inf SVG float bounds check, deterministic time pinning.</td>
+        </tr>
+        <tr>
+          <td><strong>Phase 5</strong></td>
+          <td>Lint Elimination &amp; Certification</td>
+          <td>Remove all broad `//nolint` comments, execute full test suite, benchmark suite, race detector, and linter to certify 10/10 perfection.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer class="muted">
+    Detailed line-by-line findings and code solutions stored in <a href="file:///home/chinmay/ChinmayPersonalProjects/gowkhtmltopdf/plans/performance/2026-08-09/fresh-go-architecture-review-2026-08-09/golang-10-out-of-10-architecture-review.md">golang-10-out-of-10-architecture-review.md</a>.
+  </footer>
+</main></body>
+</html>

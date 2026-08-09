@@ -11,19 +11,22 @@ import (
 
 	"gowkhtmltopdf/internal/cli"
 	"gowkhtmltopdf/internal/convert"
+	"gowkhtmltopdf/internal/errs"
 )
 
-// errNilCommand guards the command-facing adapters against nil dereferences.
-var errNilCommand = errors.New("app: nil command")
-var errNoPageObjects = errors.New("app: no page objects")
-var errNilContext = errors.New("app: nil context")
+// Shared app-level sentinel errors; exported so callers can match with errors.Is.
+var (
+	ErrNilCommand    = errors.New("app: nil command")
+	ErrNoPageObjects = errors.New("app: no page objects")
+	ErrNilContext    = errs.ErrNilContext
+)
 
 // BuildPDFRequest translates a parsed CLI command into the stable engine
 // request. The caller owns output-sink creation and supplies both document
 // and optional outline sinks explicitly.
 func BuildPDFRequest(cmd *cli.Command, output, outline io.Writer) (*convert.Request, error) {
 	if cmd == nil {
-		return nil, errNilCommand
+		return nil, ErrNilCommand
 	}
 
 	req := convert.NewPDFRequest(cmd.Global, cmd.Objects, output, outline)
@@ -50,11 +53,11 @@ func RunPDF(
 	outline io.Writer,
 ) (err error) {
 	if cmd == nil {
-		return errNilCommand
+		return ErrNilCommand
 	}
 
 	if ctx == nil {
-		return errNilContext
+		return ErrNilContext
 	}
 
 	// Validate the complete command before creating or truncating a file. The
@@ -66,13 +69,14 @@ func RunPDF(
 	}
 
 	if len(cmd.Objects) == 0 {
-		return errNoPageObjects
+		return ErrNoPageObjects
 	}
 
 	out, closeOut, err := cmd.OpenOutput()
 	if err != nil {
 		return fmt.Errorf("app: open output: %w", err)
 	}
+
 	defer func() {
 		if closeErr := closeOut(); closeErr != nil && err == nil {
 			err = closeErr
@@ -80,5 +84,10 @@ func RunPDF(
 	}()
 
 	req.Output = out
-	return convert.Run(ctx, req, log, progress)
+
+	if err := convert.Run(ctx, req, log, progress); err != nil {
+		return fmt.Errorf("app: pdf conversion: %w", err)
+	}
+
+	return nil
 }

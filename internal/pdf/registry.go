@@ -4,17 +4,21 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 // Registry indexes discoverable TTF faces by CSS family name (lowercased).
 // Liberation defaults stay available via FaceSet; this holds opt-in folder fonts.
 type Registry struct {
+	mu       sync.RWMutex
 	byFamily map[string][]*Font // family → faces (any weight/style)
 }
 
 // NewRegistry returns an empty font registry.
 func NewRegistry() *Registry {
-	return &Registry{byFamily: map[string][]*Font{}}
+	return &Registry{ //nolint:exhaustruct // intentional zero-value mu field
+		byFamily: map[string][]*Font{},
+	}
 }
 
 // AddFont registers a parsed face under its family name (and PostScript name).
@@ -22,6 +26,9 @@ func (r *Registry) AddFont(fnt *Font) {
 	if r == nil || fnt == nil {
 		return
 	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
 	names := fnt.LoadNames()
 	if len(names) == 0 && fnt.PostScriptName != "" {
@@ -44,6 +51,9 @@ func (r *Registry) AddFamilyAlias(family string, font *Font) {
 		return
 	}
 
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	key := strings.ToLower(strings.TrimSpace(family))
 	key = strings.Trim(key, `"'`)
 
@@ -62,6 +72,9 @@ func (r *Registry) Lookup(families []string, weight int, italic bool) *Font {
 	if r == nil {
 		return nil
 	}
+
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 
 	for _, fam := range families {
 		for _, key := range fontFamilyKeys(fam) {
@@ -108,6 +121,9 @@ func (r *Registry) FindWithGlyph(codePoint rune, weight int, italic bool) *Font 
 	if r == nil {
 		return nil
 	}
+
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 
 	bold := weight >= fontWeightBoldMin
 

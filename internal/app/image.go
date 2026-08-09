@@ -17,11 +17,11 @@ import (
 // through its compatibility adapter and library request seam.
 func RunImage(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 	if cmd == nil {
-		return errNilCommand
+		return ErrNilCommand
 	}
 
 	if ctx == nil {
-		return errNilContext
+		return ErrNilContext
 	}
 
 	// Validate the request before imageout opens the command's output sink.
@@ -33,7 +33,7 @@ func RunImage(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 	}
 
 	if !hasImageInput(cmd.Objects) {
-		return fmt.Errorf("app: validate image: no input page")
+		return fmt.Errorf("app: validate image: %w", ErrNoPageObjects)
 	}
 
 	if err := imageout.Run(ctx, cmd, log); err != nil {

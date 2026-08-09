@@ -106,6 +106,8 @@ func shiftFlowOps(res *Result, from, toIdx int, fromY, deltaY float64, startPage
 // item into its place; re-read the live bucket each step so a stale slice
 // header cannot re-process an op that already left the page (that bug caused
 // double negative shifts and infinite positive-shift loops).
+//
+//nolint:cyclop // page-bucket shift algorithm
 func shiftOpsBucket(res *Result, page, from, toIdx int, fromY, deltaY float64) {
 	if page < 0 || page >= len(res.flowPages) {
 		return
@@ -226,7 +228,9 @@ func ensureFlowIndex(res *Result, pageSize float64) {
 	}
 
 	res.flowPageSize = pageSize
+
 	var ok bool
+
 	res.flowPages, res.flowPageOf, res.flowPos, ok = buildFlowOpIndex(res.Ops, pageSize)
 	if !ok {
 		invalidateFlowIndex(res)
@@ -352,6 +356,7 @@ func shiftIndexedOp(res *Result, index int, deltaY float64) {
 
 		return
 	}
+
 	if oldPage == newPage {
 		return
 	}
@@ -375,6 +380,7 @@ func shiftIndexedBox(res *Result, index int, deltaY float64) {
 
 		return
 	}
+
 	if oldPage == newPage {
 		return
 	}
@@ -386,16 +392,16 @@ func shiftIndexedBox(res *Result, index int, deltaY float64) {
 // checkedFlowPageOfY maps a canvas Y to its page index and reports whether the
 // index is safe for the bounded flow slices. Non-positive Y remains page zero
 // for compatibility; invalid or oversized values are rejected explicitly.
-func checkedFlowPageOfY(y, pageSize float64) (int, bool) {
-	if pageSize <= 0 || math.IsNaN(pageSize) || math.IsInf(pageSize, 0) || math.IsNaN(y) || math.IsInf(y, 0) {
+func checkedFlowPageOfY(yCoord, pageSize float64) (int, bool) {
+	if pageSize <= 0 || math.IsNaN(pageSize) || math.IsInf(pageSize, 0) || math.IsNaN(yCoord) || math.IsInf(yCoord, 0) {
 		return 0, false
 	}
 
-	if y <= 0 {
+	if yCoord <= 0 {
 		return 0, true
 	}
 
-	page := y / pageSize
+	page := yCoord / pageSize
 	if page < 0 || page >= float64(maxFlowPageIndex) {
 		return 0, false
 	}
@@ -1377,6 +1383,8 @@ func tableBoxes(root *box) []*box {
 
 // repeatTableHeaderOnPages clones one table's thead onto its continuation
 // pages, shifting the body rows down by the header height.
+//
+//nolint:cyclop // table header repetition algorithm
 func repeatTableHeaderOnPages(res *Result, tblBox *box, contentH float64) {
 	nHdr := tblBox.headerRows
 	if nHdr > len(tblBox.rows) {
@@ -1392,6 +1400,7 @@ func repeatTableHeaderOnPages(res *Result, tblBox *box, contentH float64) {
 	if !ok {
 		return
 	}
+
 	pages := headerContinuationPages(tblBox, firstPage, res, contentH)
 
 	for page := range pages {
@@ -1445,6 +1454,7 @@ func tableBodyRange(tblBox *box, page int, res *Result, contentH float64) (int, 
 		}
 
 		top, _ := rowYBounds(row, res)
+
 		topPage, ok := checkedFlowPageOfY(top, contentH)
 		if !ok || topPage < page {
 			continue

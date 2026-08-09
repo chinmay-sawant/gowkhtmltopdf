@@ -42,6 +42,7 @@ func paintOrderBefore(ops []Op, left, right int) bool {
 	if leftOp.ZIndexSet {
 		leftZ = leftOp.ZIndex
 	}
+
 	if rightOp.ZIndexSet {
 		rightZ = rightOp.ZIndex
 	}

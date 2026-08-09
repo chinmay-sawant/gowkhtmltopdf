@@ -128,6 +128,7 @@ func CloneResult(res *Result) *Result {
 	boxes := make(map[*box]*box, len(res.boxes))
 	clone.root = cloneBoxGraph(res.root, boxes)
 	clone.boxes = make([]*box, len(res.boxes))
+
 	for i, source := range res.boxes {
 		clone.boxes[i] = cloneBoxGraph(source, boxes)
 	}
@@ -166,6 +167,7 @@ func cloneBoxGraph(src *box, seen map[*box]*box) *box {
 	if src == nil {
 		return nil
 	}
+
 	if clone, ok := seen[src]; ok {
 		return clone
 	}
@@ -179,13 +181,16 @@ func cloneBoxGraph(src *box, seen map[*box]*box) *box {
 	for _, child := range src.children {
 		clone.children = append(clone.children, cloneBoxGraph(child, seen))
 	}
+
 	for _, row := range src.rows {
 		clonedRow := make([]*box, 0, len(row))
 		for _, cell := range row {
 			clonedRow = append(clonedRow, cloneBoxGraph(cell, seen))
 		}
+
 		clone.rows = append(clone.rows, clonedRow)
 	}
+
 	clone.stickyPort = cloneBoxGraph(src.stickyPort, seen)
 
 	return &clone
@@ -679,7 +684,7 @@ func WithWorkspace(ctx context.Context, root *html.Node, opts Options, workspace
 }
 
 func layoutContext(
-	ctx context.Context, //nolint:contextcheck // compatibility adapter validates nil context
+	ctx context.Context,
 	root *html.Node, opts Options, workspace *Workspace,
 ) (*Result, error) {
 	if root == nil {

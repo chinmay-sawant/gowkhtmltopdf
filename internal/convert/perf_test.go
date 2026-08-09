@@ -77,7 +77,9 @@ func descriptionWord(itemIdx int) string {
 // stays stable. Skipped in -short mode.
 //
 // Documentation command (not run as part of this change):
+//
 //	go test ./internal/convert -run TestTenPageTableReportPerformance -v
+//
 // Machine:  go1.26.4 linux/amd64, Linux x86_64, 13th Gen Intel(R) Core(TM)
 //
 //	i7-13700HX (24 threads), 2026-08-03
@@ -87,6 +89,8 @@ func descriptionWord(itemIdx int) string {
 // it is executed; cold/warm runs intentionally reuse the command state and
 // are not required to produce byte-identical PDF streams.
 func TestTenPageTableReportPerformance(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip("perf budget test skipped in -short mode")
 	}
@@ -113,9 +117,11 @@ func TestTenPageTableReportPerformance(t *testing.T) {
 		}
 
 		sizes = append(sizes, int64(len(data)))
+
 		if len(data) == 0 {
 			t.Errorf("run %d produced an empty PDF", run)
 		}
+
 		t.Logf("run %d (first=%v): full pipeline %v, %d bytes, %d pages",
 			run, run == 1, dur, len(data), pageCount(data))
 

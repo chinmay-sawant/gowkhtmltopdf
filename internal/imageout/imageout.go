@@ -14,6 +14,7 @@ import (
 	"math"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"gowkhtmltopdf/internal/cli"
 	"gowkhtmltopdf/internal/convert"
@@ -27,28 +28,28 @@ import (
 )
 
 const (
-	channelMax        = 255
-	fnvOffsetBasis    = 14695981039346656037
-	boxFilterFactor2  = 2
-	boxFilterStride   = 8
-	boxFilterHalf     = 4
-	boxFilterArea     = 4 // 2x2 block of pixels (boxFilterFactor2 squared)
-	pixelCenter       = 0.5
-	defaultViewportW  = 768.0
-	defaultViewportH  = 576.0
-	qualityMaxPercent = 100
-	opaqueAlpha       = 255
-	formatPNG         = "png"
-	formatJPG         = "jpg"
-	maxRasterWidth    = 16_384
-	maxRasterHeight   = 16_384
-	maxRasterPixels   = 64 * 1024 * 1024
-	maxRasterBytes    = 256 << 20
-	maxImageDimension = 16_384
-	maxImagePixels    = 16 * 1024 * 1024
-	maxImageEncoded   = 32 << 20
-	maxImageDecoded   = 128 << 20
-	imageDecodeBPP    = 8 // decoder and normalized/scaled working-set estimate
+	channelMax         = 255
+	fnvOffsetBasis     = 14695981039346656037
+	boxFilterFactor2   = 2
+	boxFilterStride    = 8
+	boxFilterHalf      = 4
+	boxFilterArea      = 4 // 2x2 block of pixels (boxFilterFactor2 squared)
+	pixelCenter        = 0.5
+	defaultViewportW   = 768.0
+	defaultViewportH   = 576.0
+	qualityMaxPercent  = 100
+	opaqueAlpha        = 255
+	formatPNG          = "png"
+	formatJPG          = "jpg"
+	maxRasterWidth     = 16_384
+	maxRasterHeight    = 16_384
+	maxRasterPixels    = 64 * 1024 * 1024
+	maxRasterBytes     = 256 << 20
+	maxImageDimension  = 16_384
+	maxImagePixels     = 16 * 1024 * 1024
+	maxImageEncoded    = 32 << 20
+	maxImageDecoded    = 128 << 20
+	imageDecodeBPP     = 8 // decoder and normalized/scaled working-set estimate
 	maxImageFetches    = 64
 	maxImageFetchBytes = 32 << 20
 )
@@ -127,6 +128,7 @@ func RenderContext(ctx context.Context, root *html.Node, opts RenderOptions) (im
 	if root == nil {
 		return nil, errNilRoot
 	}
+
 	if ctx == nil {
 		return nil, errNilContext
 	}
@@ -200,12 +202,14 @@ func applyCrop(img *image.NRGBA, crop image.Rectangle) (image.Image, error) {
 
 // reOrigin copies src into a fresh image whose bounds start at (0,0).
 func reOrigin(src image.Image) (*image.NRGBA, error) {
-	b := src.Bounds()
-	dst, err := newRasterImage(b.Dx(), b.Dy())
+	srcBounds := src.Bounds()
+
+	dst, err := newRasterImage(srcBounds.Dx(), srcBounds.Dy())
 	if err != nil {
 		return nil, err
 	}
-	draw.Draw(dst, dst.Bounds(), src, b.Min, draw.Src)
+
+	draw.Draw(dst, dst.Bounds(), src, srcBounds.Min, draw.Src)
 
 	return dst, nil
 }
@@ -246,7 +250,7 @@ func layoutSmartWidth(
 
 	var res *layout.Result
 
-	for layoutAttempt := 0; layoutAttempt < maxSmartWidthLayouts; layoutAttempt++ {
+	for range maxSmartWidthLayouts {
 		if err := ctx.Err(); err != nil {
 			return nil, fmt.Errorf("imageout: context: %w", err)
 		}
@@ -308,19 +312,46 @@ func maxHeight(res *layout.Result, opts RenderOptions) float64 {
 // then box-filters down to the final CSS-pixel size. Glyph bitmaps for this
 // run live on a per-rasterize atlas (P5-05) so concurrent Renders do not share
 // mutable cache state.
+//
+//nolint:gochecknoglobals // supersample pixel buffer recycling
+var supersamplePixPool = sync.Pool{
+	New: func() any {
+		return make([]byte, 0, 16<<20) //nolint:mnd // 16 MiB default capacity
+	},
+}
+
+//nolint:cyclop,funlen,mnd // supersampled rasterization pipeline
 func rasterizeContext(ctx context.Context, res *layout.Result, height float64, transparent bool) (*image.NRGBA, error) {
 	pxPerPt := ptToPx * float64(rasterSS)
+
 	widthPx, err := rasterDimension(res.Width*pxPerPt, maxRasterWidth)
 	if err != nil {
 		return nil, err
 	}
+
 	heightPx, err := rasterDimension(height*pxPerPt, maxRasterHeight)
 	if err != nil {
 		return nil, err
 	}
+
 	if err := validateRasterSize(widthPx, heightPx); err != nil {
 		return nil, err
 	}
+
+	neededBytes := widthPx * heightPx * 4
+	bufPtr, ok := supersamplePixPool.Get().(*[]byte)
+
+	var bufBytes []byte
+
+	if ok && bufPtr != nil && cap(*bufPtr) >= neededBytes {
+		bufBytes = (*bufPtr)[:neededBytes]
+		clear(bufBytes)
+	} else {
+		bufBytes = make([]byte, neededBytes)
+		bufPtr = &bufBytes
+	}
+
+	defer supersamplePixPool.Put(bufPtr)
 
 	img := image.NewNRGBA(image.Rect(0, 0, widthPx, heightPx))
 	if !transparent {
@@ -354,10 +385,11 @@ func rasterizeContext(ctx context.Context, res *layout.Result, height float64, t
 	return downscaled, nil
 }
 
-func rasterDimension(value float64, max int) (int, error) {
+func rasterDimension(value float64, maxVal int) (int, error) {
 	if math.IsNaN(value) || math.IsInf(value, 0) {
 		return 0, fmt.Errorf("%w: non-finite dimension", errRasterTooLarge)
 	}
+
 	if value <= 0 {
 		return 1, nil
 	}
@@ -366,8 +398,9 @@ func rasterDimension(value float64, max int) (int, error) {
 	if rounded < 1 {
 		return 1, nil
 	}
-	if rounded > float64(max) {
-		return 0, fmt.Errorf("%w: dimension %.0f exceeds %d", errRasterTooLarge, rounded, max)
+
+	if rounded > float64(maxVal) {
+		return 0, fmt.Errorf("%w: dimension %.0f exceeds %d", errRasterTooLarge, rounded, maxVal)
 	}
 
 	return int(rounded), nil
@@ -410,11 +443,13 @@ func validateImageInput(data []byte, isJPEG bool) (int, int, error) {
 		cfg image.Config
 		err error
 	)
+
 	if isJPEG {
 		cfg, err = jpeg.DecodeConfig(bytes.NewReader(data))
 	} else {
 		cfg, err = png.DecodeConfig(bytes.NewReader(data))
 	}
+
 	if err != nil {
 		return 0, 0, fmt.Errorf("imageout: decode config: %w", err)
 	}
@@ -461,25 +496,25 @@ type scaledRasterImageKey struct {
 }
 
 type rasterImageCache struct {
-	decoded              map[uint64][]*decodedRasterImage
-	decodedRawBytes      int64
-	decodedMemoryBytes   int64
-	decodedEntries       int
-	scaled               map[scaledRasterImageKey]*image.NRGBA
-	scaledBytes          int64
-	scaledEntries        int
+	decoded            map[uint64][]*decodedRasterImage
+	decodedRawBytes    int64
+	decodedMemoryBytes int64
+	decodedEntries     int
+	scaled             map[scaledRasterImageKey]*image.NRGBA
+	scaledBytes        int64
+	scaledEntries      int
 }
 
 const (
-	maxDecodedCacheEntries      = 64
-	maxDecodedCacheRawBytes     = 32 << 20
-	maxDecodedCacheMemoryBytes  = 64 << 20
-	maxScaledCacheEntries       = 128
-	maxScaledCacheBytes         = 64 << 20
+	maxDecodedCacheEntries     = 64
+	maxDecodedCacheRawBytes    = 32 << 20
+	maxDecodedCacheMemoryBytes = 64 << 20
+	maxScaledCacheEntries      = 128
+	maxScaledCacheBytes        = 64 << 20
 )
 
 func newRasterImageCache() *rasterImageCache {
-	return &rasterImageCache{
+	return &rasterImageCache{ //nolint:exhaustruct // intentional zero fields
 		decoded: make(map[uint64][]*decodedRasterImage),
 		scaled:  make(map[scaledRasterImageKey]*image.NRGBA),
 	}
@@ -503,6 +538,7 @@ func rasterImageHash(data []byte, isJPEG bool) uint64 {
 	return hash
 }
 
+//nolint:cyclop // raster image decoding pipeline
 func (c *rasterImageCache) decode(paintOp *layout.Op) (*decodedRasterImage, error) {
 	if _, _, err := validateImageInput(paintOp.Image, paintOp.IsJPEG); err != nil {
 		return nil, err
@@ -535,10 +571,12 @@ func (c *rasterImageCache) decode(paintOp *layout.Op) (*decodedRasterImage, erro
 	if !paintOp.IsJPEG {
 		if nrgba, ok := src.(*image.NRGBA); !ok {
 			bounds := src.Bounds()
+
 			normalized, normalizeErr := newRasterImage(bounds.Dx(), bounds.Dy())
 			if normalizeErr != nil {
 				return nil, normalizeErr
 			}
+
 			draw.Draw(normalized, normalized.Bounds(), src, src.Bounds().Min, draw.Src)
 			src = normalized
 		} else {
@@ -548,6 +586,7 @@ func (c *rasterImageCache) decode(paintOp *layout.Op) (*decodedRasterImage, erro
 
 	entry := &decodedRasterImage{raw: paintOp.Image, jpeg: paintOp.IsJPEG, image: src}
 	decodedMemory := decodedImageMemory(src)
+
 	if c.decodedEntries < maxDecodedCacheEntries &&
 		c.decodedRawBytes+int64(len(paintOp.Image)) <= maxDecodedCacheRawBytes &&
 		c.decodedMemoryBytes+decodedMemory <= maxDecodedCacheMemoryBytes {
@@ -562,6 +601,7 @@ func (c *rasterImageCache) decode(paintOp *layout.Op) (*decodedRasterImage, erro
 
 func decodedImageMemory(src image.Image) int64 {
 	bounds := src.Bounds()
+
 	return int64(bounds.Dx()) * int64(bounds.Dy()) * imageDecodeBPP
 }
 
@@ -575,6 +615,7 @@ func (c *rasterImageCache) scaledImage(src *decodedRasterImage, width, height in
 	if scaled == nil {
 		return nil
 	}
+
 	if c.scaledEntries < maxScaledCacheEntries && c.scaledBytes+int64(len(scaled.Pix)) <= maxScaledCacheBytes {
 		c.scaled[key] = scaled
 		c.scaledEntries++
@@ -610,6 +651,7 @@ func downscaleBox(src *image.NRGBA, factor int) *image.NRGBA {
 	if err != nil {
 		return nil
 	}
+
 	blockArea := uint32(factor * factor) //nolint:gosec // factor is a small constant (2..rasterSS)
 
 	for row := range dstH {
@@ -817,6 +859,8 @@ func paintText(img *image.NRGBA, paintOp *layout.Op, pxPerPt float64, atlas *gly
 }
 
 // paintImage draws a decoded paintOp image, scaled via the per-run cache.
+//
+//nolint:cyclop // raster image painting pipeline
 func paintImage(img *image.NRGBA, paintOp *layout.Op, pxPerPt float64, imageCache *rasterImageCache) {
 	decoded, err := imageCache.decode(paintOp)
 	if err != nil || paintOp.W <= 0 || paintOp.H <= 0 {
@@ -847,6 +891,7 @@ func paintImage(img *image.NRGBA, paintOp *layout.Op, pxPerPt float64, imageCach
 	if scaled == nil {
 		return
 	}
+
 	if scaled.Opaque() {
 		drawNRGBAOpaque(img, rect, scaled, image.Point{}) //nolint:exhaustruct // intentional zero/partial fields
 	} else {
@@ -919,6 +964,7 @@ func scaleNearestNRGBA(src *image.NRGBA, width, height int) *image.NRGBA {
 	if err != nil {
 		return nil
 	}
+
 	srcBounds := src.Bounds()
 
 	if srcBounds.Dx() == 0 || srcBounds.Dy() == 0 {
@@ -954,6 +1000,7 @@ func scaleNearestGeneric(src image.Image, width, height int) *image.NRGBA {
 	if err != nil {
 		return nil
 	}
+
 	srcBounds := src.Bounds()
 
 	if srcBounds.Dx() == 0 || srcBounds.Dy() == 0 {
@@ -995,6 +1042,7 @@ func Run(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 	if cmd == nil {
 		return errNilCommand
 	}
+
 	if ctx == nil {
 		return errNilContext
 	}
@@ -1019,9 +1067,11 @@ func Run(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("imageout: open output: %w", err)
 	}
+
 	req.Output = out
 
 	runErr := RunRequest(ctx, req, log)
+
 	return errors.Join(runErr, closeOut())
 }
 
@@ -1032,6 +1082,7 @@ func RunRequest(ctx context.Context, req *convert.Request, log io.Writer) error 
 	if req == nil {
 		return errNilRequest
 	}
+
 	if ctx == nil {
 		return errNilContext
 	}
@@ -1122,6 +1173,7 @@ func renderRequest(
 // transparent JPEG, and writes the encoded bytes to req.Output.
 func writeEncodedOutput(req *convert.Request, img image.Image, log io.Writer) error {
 	imgSet := req.Image
+
 	if req.Output == nil {
 		return errNilOutput
 	}
@@ -1363,7 +1415,7 @@ func resolveFormat(flag, output string) (string, error) {
 // encode serializes img as PNG or JPEG. quality applies to JPEG only
 // (1..100); PNG is lossless and ignores it.
 func encode(img image.Image, format string, quality int) ([]byte, error) {
-	buf := limitedImageBuffer{limit: maxImageEncoded}
+	buf := limitedImageBuffer{Buffer: bytes.Buffer{}, limit: maxImageEncoded}
 
 	switch format {
 	case formatPNG:
@@ -1399,7 +1451,12 @@ func (b *limitedImageBuffer) Write(data []byte) (int, error) {
 		return 0, errEncodedTooLarge
 	}
 
-	return b.Buffer.Write(data)
+	n, err := b.Buffer.Write(data)
+	if err != nil {
+		return n, fmt.Errorf("write buffer: %w", err)
+	}
+
+	return n, nil
 }
 
 // onWhite composites img onto a white background (JPEG has no alpha).
@@ -1408,6 +1465,7 @@ func onWhite(img image.Image) image.Image {
 	if err := validateRasterSize(bounds.Dx(), bounds.Dy()); err != nil {
 		return img
 	}
+
 	dst := image.NewNRGBA(bounds)
 	draw.Draw(
 		dst,

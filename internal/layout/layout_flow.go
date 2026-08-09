@@ -1,10 +1,11 @@
 package layout
 
 import (
-	"gowkhtmltopdf/internal/html"
-	"gowkhtmltopdf/internal/svg"
 	"strconv"
 	"strings"
+
+	"gowkhtmltopdf/internal/html"
+	"gowkhtmltopdf/internal/svg"
 )
 
 func (e *engine) contentBox(posX, boxW float64, style ResolvedStyle) (float64, float64) {

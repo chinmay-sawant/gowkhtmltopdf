@@ -131,6 +131,8 @@ func getForKey[T any](target *T, tables keyTable[T], ignored *map[string]string,
 // ignoredGlobalKeySet is the immutable-by-convention table of wkhtml global
 // keys with no engine consumer. Keeping it at package scope avoids rebuilding
 // the same map for every Set call.
+//
+//nolint:gochecknoglobals // static lookup map
 var ignoredGlobalKeySet = map[string]struct{}{
 	"dpi":               {},
 	"resolution":        {},
@@ -163,6 +165,8 @@ var ignoredGlobalKeySet = map[string]struct{}{
 
 // ignoredObjectKeySet is the immutable-by-convention table of wkhtml
 // object/load/web keys with no engine consumer.
+//
+//nolint:gochecknoglobals // static lookup map
 var ignoredObjectKeySet = map[string]struct{}{
 	"pagescount":   {},
 	"produceforms": {},

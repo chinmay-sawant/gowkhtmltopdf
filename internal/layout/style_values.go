@@ -1,9 +1,10 @@
 package layout
 
 import (
-	"gowkhtmltopdf/internal/css"
 	"strconv"
 	"strings"
+
+	"gowkhtmltopdf/internal/css"
 )
 
 func parseColumnsShorthand(sty *ResolvedStyle, value string, fsize, viewportW float64) {
