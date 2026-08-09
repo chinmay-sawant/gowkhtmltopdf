@@ -11,17 +11,26 @@ func PaintOrder(ops []Op) []int {
 		idx[i] = i
 	}
 
-	sortPaintIndices(ops, idx)
+	return paintOrderSubset(ops, idx)
+}
 
-	return idx
+// paintOrderSubset returns an ordered copy of an operation subset. All
+// adapters use this policy so a band cannot accidentally fall back to source
+// order while the paginated body uses paint order.
+func paintOrderSubset(ops []Op, idxs []int) []int {
+	ordered := append([]int(nil), idxs...)
+	sort.SliceStable(ordered, func(i, j int) bool {
+		return paintOrderBefore(ops, ordered[i], ordered[j])
+	})
+
+	return ordered
 }
 
 // sortPaintIndices sorts an existing operation subset without changing which
-// operations it contains. Pagination uses this for fixed and per-page lists.
+// operations it contains. Pagination tests use this compatibility helper for
+// fixed and per-page lists; the comparison itself lives in paintOrderSubset.
 func sortPaintIndices(ops []Op, idxs []int) {
-	sort.SliceStable(idxs, func(i, j int) bool {
-		return paintOrderBefore(ops, idxs[i], idxs[j])
-	})
+	copy(idxs, paintOrderSubset(ops, idxs))
 }
 
 func paintOrderBefore(ops []Op, left, right int) bool {

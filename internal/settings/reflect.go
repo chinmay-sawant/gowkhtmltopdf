@@ -128,68 +128,66 @@ func getForKey[T any](target *T, tables keyTable[T], ignored *map[string]string,
 	return "", false
 }
 
-// ignoredGlobalKeys are wkhtml global keys with no engine consumer. Set accepts
-// them into PdfGlobal.Ignored (Policy A) so scripts do not fail on known stubs.
-func ignoredGlobalKeys() map[string]struct{} {
-	return map[string]struct{}{
-		"dpi":               {},
-		"resolution":        {},
-		"imagedpi":          {},
-		"imagequality":      {},
-		"lowquality":        {},
-		"usexserver":        {},
-		"readargsfromstdin": {},
-		"log-level":         {},
-		"loglevel":          {},
-		"cookiejar":         {},
-		// ponytail: --default-encoding accepted then ignored; engine is UTF-8/ASCII
-		// only via html.ParseDocument + load charset seam. Upgrade when multi-
-		// charset decode ships.
-		"defaultencoding": {},
-		"produceforms":    {},
-		// Global load-error-handling never reached LoadPage; only load.loaderrorhandling does.
-		"loaderrorhandling": {},
-		// web.* stubs (also listed under object web.)
-		"web.javascript":      {},
-		"web.java":            {},
-		"web.plugins":         {},
-		"web.minimumfontsize": {},
-		"web.defaultencoding": {},
-		"web.userstylesheet":  {},
-		"web.loadimages":      {},
-	}
+// ignoredGlobalKeySet is the immutable-by-convention table of wkhtml global
+// keys with no engine consumer. Keeping it at package scope avoids rebuilding
+// the same map for every Set call.
+var ignoredGlobalKeySet = map[string]struct{}{
+	"dpi":               {},
+	"resolution":        {},
+	"imagedpi":          {},
+	"imagequality":      {},
+	"lowquality":        {},
+	"usexserver":        {},
+	"readargsfromstdin": {},
+	"log-level":         {},
+	"loglevel":          {},
+	"cookiejar":         {},
+	// ponytail: --default-encoding accepted then ignored; engine is UTF-8/ASCII
+	// only via html.ParseDocument + load charset seam. Upgrade when multi-
+	// charset decode ships.
+	"defaultencoding": {},
+	"produceforms":    {},
+	// Global load-error-handling never reached LoadPage; only load.loaderrorhandling does.
+	"loaderrorhandling": {},
+	// web.* stubs (also listed under object web.)
+	"web.javascript":      {},
+	"web.java":            {},
+	"web.plugins":         {},
+	"web.minimumfontsize": {},
+	"web.defaultencoding": {},
+	"web.userstylesheet":  {},
+	"web.loadimages":      {},
 }
 
 // Note: global web.background is a real key (→ PdfGlobal.Background), not ignored.
 
-// ignoredObjectKeys are wkhtml object/load/web keys with no engine consumer.
-func ignoredObjectKeys() map[string]struct{} {
-	return map[string]struct{}{
-		"pagescount":   {},
-		"produceforms": {},
-		// load.* stubs
-		"load.jsdelay":               {},
-		"load.stopslowscripts":       {},
-		"load.debugjavascript":       {},
-		"load.windowstatus":          {},
-		"load.runscript":             {},
-		"load.enableplugins":         {},
-		"load.defaultencoding":       {},
-		"load.proxy":                 {}, // only LoadGlobal.Proxy is wired
-		"load.externallinks":         {}, // PdfObject.ExternalLinks is the real gate
-		"load.locallinks":            {},
-		"load.repeatexternalheaders": {},
-		"load.repeatexternalcookies": {},
-		// web.* stubs — paint background is Global only
-		"web.background":      {},
-		"web.javascript":      {},
-		"web.java":            {},
-		"web.plugins":         {},
-		"web.minimumfontsize": {},
-		"web.defaultencoding": {},
-		"web.userstylesheet":  {},
-		"web.loadimages":      {},
-	}
+// ignoredObjectKeySet is the immutable-by-convention table of wkhtml
+// object/load/web keys with no engine consumer.
+var ignoredObjectKeySet = map[string]struct{}{
+	"pagescount":   {},
+	"produceforms": {},
+	// load.* stubs
+	"load.jsdelay":               {},
+	"load.stopslowscripts":       {},
+	"load.debugjavascript":       {},
+	"load.windowstatus":          {},
+	"load.runscript":             {},
+	"load.enableplugins":         {},
+	"load.defaultencoding":       {},
+	"load.proxy":                 {}, // only LoadGlobal.Proxy is wired
+	"load.externallinks":         {}, // PdfObject.ExternalLinks is the real gate
+	"load.locallinks":             {},
+	"load.repeatexternalheaders": {},
+	"load.repeatexternalcookies": {},
+	// web.* stubs — paint background is Global only
+	"web.background":      {},
+	"web.javascript":      {},
+	"web.java":            {},
+	"web.plugins":         {},
+	"web.minimumfontsize": {},
+	"web.defaultencoding": {},
+	"web.userstylesheet":  {},
+	"web.loadimages":      {},
 }
 
 func storeIgnored(dst *map[string]string, key, value string) {
@@ -851,18 +849,18 @@ func buildKeyTables() (keyTable[PdfGlobal], keyTable[PdfObject], keyTable[ImageG
 // "web.background", …) to a PdfGlobal. Known inert keys are stored in
 // Ignored and succeed; truly unknown keys return an error.
 func (g *PdfGlobal) Set(name, value string) error {
-	return setForKey(g, globalKeys, ignoredGlobalKeys(), &g.Ignored, "global", name, value)
+	return setForKey(g, globalKeys, ignoredGlobalKeySet, &g.Ignored, "global", name, value)
 }
 
 // Object.Set applies a dotted settings key to a PdfObject. Known inert keys
 // go to Ignored; unknown keys return an error.
 func (o *PdfObject) Set(name, value string) error {
-	return setForKey(o, objectKeys, ignoredObjectKeys(), &o.Ignored, "object", name, value)
+	return setForKey(o, objectKeys, ignoredObjectKeySet, &o.Ignored, "object", name, value)
 }
 
 // ImageGlobal.Set applies an image-mode dotted settings key.
 func (g *ImageGlobal) Set(name, value string) error {
-	return setForKey(g, imageKeys, ignoredGlobalKeys(), &g.Ignored, "image", name, value)
+	return setForKey(g, imageKeys, ignoredGlobalKeySet, &g.Ignored, "image", name, value)
 }
 
 // ApplyImageKey routes an image-mode key: "background"/"web.background" alias

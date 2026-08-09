@@ -1,25 +1,26 @@
-# Historical perf-wave benchmark snapshot
-# Command (post perf-review wave, 2026-08-09, working tree after lint wave + perf wave):
+# Checked-in benchmark evidence; no new measurements are claimed by this change.
+# All rows below are historical samples and retain their original units.
+# Snapshot A: perf-wave workload matrix, one iteration per workload (-count=1).
+# Command (2026-08-09, working tree after lint wave + perf wave):
 #   go test ./internal/convert -run '^$' -bench 'Benchmark(PDFPages|TemplatePages|WebFetchImage|ImageAssets)$' -benchmem -benchtime=1x -count=1
-# Locked 500 PDF bar: 2.10s / 1.48GB / 3.93M allocs
-# Separate locked-gate command: go test -run '^$' -bench '^BenchmarkPDFPages/500Pages$' -benchmem -benchtime=1x -count=3
-# 500 PDF count-3 median after perf wave: 0.878s / 335.7MB / 517.9K allocs
-# Toolchain: go1.26.4 linux/amd64 · Host: WSL2 24 CPUs · i7-13700HX
-# Previous snapshot (pre perf wave, same day): PDF 500 = 1.013s / 392.2MB / 535K allocs.
-# 500 PDF versus that snapshot: -14.4% B/op / -3.2% allocs (wall time is noisy one-shot).
+# Snapshot A toolchain: go1.26.4 linux/amd64 · Host: WSL2 24 CPUs · i7-13700HX
+# Snapshot A raw rows below are the authoritative values for this capture.
 # Main wave drivers: single cmap lookup per rune (GlyphAdvancePoints), no
 # duplicate min-content re-measure, in-place inline-item compaction, ASCII
 # fast paths in TextShow/html scanning, rune-union dedup in font subsetting,
 # pointer-compare op sorts, zero-crossing split fast path, styleGroups hoist.
 # Earlier wkhtmltopdf 0.12.6.1 process reference: 2.05s / ~114MB peak RSS / ~2.0MB PDF.
-# The wkhtmltopdf reference is process-level; Go B/op is cumulative allocation
-# traffic, so it must not be presented as a direct RSS comparison.
+# This is process-level RSS, while Go B/op is cumulative allocation traffic;
+# the values are not directly comparable.
 
-# Latest certified-workspace snapshot (2026-08-09; feature/optimization):
+# Snapshot B: separately recorded certified-workspace matrix sample, one
+# iteration per workload (-count=1). It is not the same capture as Snapshot A.
+# Command (2026-08-09; feature/optimization):
 #   go test ./internal/convert -run '^$' -bench 'Benchmark(PDFPages|TemplatePages|WebFetchImage|ImageAssets)$' -benchmem -benchtime=1x -count=1
-# PDF 500: 518,117,894 ns/op / 157,636,704 B/op / 529,451 allocs/op.
-# Template 500: 552,115,316 ns/op / 162,493,632 B/op / 580,715 allocs/op.
-# Full current matrix is summarized in testdata/golden/benchmarks/README.md.
+# Snapshot B summary: PDF 500: 518,117,894 ns/op / 157,636,704 B/op / 529,451 allocs/op.
+# Snapshot B summary: Template 500: 552,115,316 ns/op / 162,493,632 B/op / 580,715 allocs/op.
+# Snapshot B toolchain: go1.26.4 linux/amd64 · Host: WSL2 24 CPUs · i7-13700HX
+# The full Snapshot B matrix is summarized in testdata/golden/benchmarks/README.md.
 # Generated PDF artifacts were refreshed locally but intentionally are not
 # included in the benchmark snapshot commit.
 
@@ -27,7 +28,8 @@ goos: linux
 goarch: amd64
 pkg: gowkhtmltopdf/internal/convert
 cpu: 13th Gen Intel(R) Core(TM) i7-13700HX
-# PDF/Template after the perf-review wave (2026-08-09).
+# Snapshot A raw workload rows: PDF/Template after the perf-review wave
+# (2026-08-09; command and count are documented above).
 BenchmarkPDFPages/2Pages-24  	       1	   5202528 ns/op	   4.16 MB/s	 3148480 B/op	    3222 allocs/op
 BenchmarkPDFPages/5Pages-24  	       1	   7134246 ns/op	   4.19 MB/s	 3763904 B/op	    6121 allocs/op
 BenchmarkPDFPages/10Pages-24 	       1	  16343658 ns/op	   2.69 MB/s	 7889472 B/op	   11301 allocs/op
@@ -65,10 +67,14 @@ BenchmarkImageAssets/200Images-24     	       1	  83271010 ns/op	   1.44 MB/s	74
 BenchmarkImageAssets/250Images-24     	       1	 101904392 ns/op	   1.46 MB/s	82628512 B/op	   13357 allocs/op
 BenchmarkImageAssets/500Images-24     	       1	 192132565 ns/op	   1.51 MB/s	123834752 B/op	   19620 allocs/op
 
+# Snapshot A command output footer:
 PASS
 ok  	gowkhtmltopdf/internal/convert	5.4s
 
-# Count-3 locked-gate runs (2026-08-09, perf-review wave):
-#   go test -run '^$' -bench '^Benchmark(PDFPages|TemplatePages)/500Pages$' -benchmem -benchtime=1x -count=3
-# PDF 500 raw: 0.992s / 0.864s / 0.878s (median 0.878s / 335.7MB / 517.9K allocs).
-# Template 500 raw: 0.925s / 0.848s / 0.944s (median 0.925s / 340.4MB / 569.1K allocs).
+# Snapshot C: locked-gate count-3 sample, 3 iterations of the 500-page PDF
+# and Template workloads only. These rows are not part of Snapshot A or B.
+#   go test ./internal/convert -run '^$' -bench '^Benchmark(PDFPages|TemplatePages)/500Pages$' -benchmem -benchtime=1x -count=3
+# Snapshot C toolchain: go1.26.4 linux/amd64 · Host: WSL2 24 CPUs · i7-13700HX
+# Snapshot C PDF 500 raw: 0.992s / 0.864s / 0.878s (median 0.878s / 335.7MB / 517.9K allocs).
+# Snapshot C Template 500 raw: 0.925s / 0.848s / 0.944s (median 0.925s / 340.4MB / 569.1K allocs).
+# As above, B/op is cumulative allocation traffic and is not RSS.

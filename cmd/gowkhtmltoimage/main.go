@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"gowkhtmltopdf/internal/app"
 	"gowkhtmltopdf/internal/cli"
@@ -38,7 +40,10 @@ func run(argv []string) int {
 		return cli.ExitError
 	}
 
-	if err := app.RunImage(context.Background(), cmd, os.Stderr); err != nil {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	if err := app.RunImage(ctx, cmd, os.Stderr); err != nil {
 		fmt.Fprintf(os.Stderr, "gowkhtmltoimage: %v\n", err)
 
 		return cli.ExitCode(err)

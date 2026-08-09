@@ -11,7 +11,6 @@ import (
 	"gowkhtmltopdf/internal/html"
 	"gowkhtmltopdf/internal/layout"
 	"gowkhtmltopdf/internal/pdf"
-	"gowkhtmltopdf/internal/settings"
 )
 
 // benchmarkFixtureMarker is the checked-in benchmark template's immutable
@@ -107,52 +106,98 @@ func hasHTMLClass(node *html.Node, class string) bool {
 
 func renderBenchmarkPageIslands(
 	ctx context.Context, doc *pdf.Document, state *objectState, root *html.Node, plan pageIslandPlan,
-	font *pdf.Font, registry *pdf.Registry, sheets []*css.Stylesheet, zoom float64,
-	imagesFn func(string) ([]byte, error), global settings.PdfGlobal, printLinkUnderline bool,
-	obj *settings.PdfObject, log io.Writer,
+	render objectRenderContext, log io.Writer,
 ) error {
 	breakSheet, err := css.Parse(islandBreakOverrideCSS)
 	if err != nil {
 		return fmt.Errorf("parse certified island break override: %w", err)
 	}
 
-	islandSheets := append(append([]*css.Stylesheet(nil), sheets...), breakSheet)
+	islandSheets := append(append([]*css.Stylesheet(nil), render.sheets...), breakSheet)
 	start := doc.PageCount()
 	workspace := &layout.Workspace{}
+	island := pageIslandRenderContext{
+		ctx:       ctx,
+		doc:       doc,
+		state:     state,
+		root:      root,
+		start:     start,
+		sheets:    islandSheets,
+		renderCtx: render,
+		workspace: workspace,
+		log:       log,
+	}
 
 	for _, section := range plan.sections {
-		islandRoot := benchmarkIslandRoot(root, section)
-		res, err := layout.WithWorkspace(ctx, islandRoot, state.bodyLayoutOpts(
-			font, registry, islandSheets, zoom, imagesFn, global.Background, printLinkUnderline,
-		), workspace)
-
-		if err != nil {
-			return fmt.Errorf("layout certified page island: %w", err)
+		if err := island.render(section); err != nil {
+			return err
 		}
-
-		before := doc.PageCount()
-
-		if err := layout.PaintContext(ctx, doc, res, paintOptions(state.geom)); err != nil {
-			return fmt.Errorf("paint certified page island: %w", err)
-		}
-
-		if doc.PageCount() != before+1 {
-			return errCertifiedIslandExpanded
-		}
-
-		pageOffset := before - start
-		for _, heading := range collectObjectHeadings(islandRoot, res, before, global, *obj, log) {
-			heading.Page += pageOffset
-			state.headings = append(state.headings, heading)
-		}
-
-		appendIslandNavigation(&state.navigation, collectBodyNavigation(res), pageOffset, state.geom.contentH)
-		workspace.Release(res)
 	}
 
 	state.pages = doc.PageCount() - start
 	state.offset = start
 
+	return nil
+}
+
+type pageIslandRenderContext struct {
+	ctx       context.Context
+	doc       *pdf.Document
+	state     *objectState
+	root      *html.Node
+	start     int
+	sheets    []*css.Stylesheet
+	renderCtx objectRenderContext
+	workspace *layout.Workspace
+	log       io.Writer
+}
+
+func (island pageIslandRenderContext) render(section *html.Node) error {
+	islandRoot := benchmarkIslandRoot(island.root, section)
+	res, err := layout.WithWorkspace(island.ctx, islandRoot, island.state.bodyLayoutOpts(
+		objectRenderContext{
+			global:             island.renderCtx.global,
+			obj:                island.renderCtx.obj,
+			font:               island.renderCtx.font,
+			registry:           island.renderCtx.registry,
+			sheets:             island.sheets,
+			zoom:               island.renderCtx.zoom,
+			imagesFn:           island.renderCtx.imagesFn,
+			printLinkUnderline: island.renderCtx.printLinkUnderline,
+		},
+	), island.workspace)
+	if err != nil {
+		return fmt.Errorf("layout certified page island: %w", err)
+	}
+	defer island.workspace.Release(res)
+
+	before := island.doc.PageCount()
+	if err := layout.PaintContext(island.ctx, island.doc, res, paintOptions(island.state.geom)); err != nil {
+		return fmt.Errorf("paint certified page island: %w", err)
+	}
+	if island.doc.PageCount() != before+1 {
+		return errCertifiedIslandExpanded
+	}
+
+	pageOffset := before - island.start
+	for _, heading := range collectObjectHeadings(
+		islandRoot,
+		res,
+		before,
+		island.renderCtx.global,
+		*island.renderCtx.obj,
+		island.log,
+	) {
+		heading.Page += pageOffset
+		island.state.headings = append(island.state.headings, heading)
+	}
+
+	appendIslandNavigation(
+		&island.state.navigation,
+		collectBodyNavigation(res),
+		pageOffset,
+		island.state.geom.contentH,
+	)
 	return nil
 }
 

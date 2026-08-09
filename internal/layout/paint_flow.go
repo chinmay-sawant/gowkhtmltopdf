@@ -5,6 +5,11 @@ import (
 	"sort"
 )
 
+// maxFlowPageIndex bounds the outer pagination-index slices. Normal documents
+// stay well below this limit; adversarial coordinates above it share the final
+// bucket instead of turning one sparse operation into an enormous allocation.
+const maxFlowPageIndex = 16384
+
 // shiftFlowY moves the ops of the target range [from,to] - plus every op
 // strictly below fromY - down by deltaY canvas points. Ops of earlier boxes
 // that touch fromY exactly (collapsed margins) are left alone so the
@@ -20,10 +25,7 @@ func shiftFlowY(res *Result, from, toIdx int, fromY, deltaY float64) {
 
 	shiftOpsRange(res, from, toIdx, deltaY)
 
-	startPage := int(fromY / res.flowPageSize)
-	if startPage < 0 {
-		startPage = 0
-	}
+	startPage := flowPageOfY(fromY, res.flowPageSize)
 
 	shiftFlowOps(res, from, toIdx, fromY, deltaY, startPage)
 
@@ -233,10 +235,7 @@ func buildFlowOpIndex(ops []Op, pageSize float64) ([][]int, []int, []int) {
 			continue
 		}
 
-		page := int(ops[idx].Y / pageSize)
-		if page < 0 {
-			page = 0
-		}
+		page := flowPageOfY(ops[idx].Y, pageSize)
 
 		pageOf[idx] = page
 
@@ -293,10 +292,7 @@ func ensureFlowBoxIndex(res *Result, boxes []*box) {
 	for idx, b := range boxes {
 		b.flowIndex = idx
 
-		page := int(b.y / res.flowPageSize)
-		if page < 0 {
-			page = 0
-		}
+		page := flowPageOfY(b.y, res.flowPageSize)
 
 		for len(res.flowBoxes) <= page {
 			res.flowBoxes = append(res.flowBoxes, nil)
@@ -345,12 +341,16 @@ func shiftIndexedBox(res *Result, index int, deltaY float64) {
 
 // flowPageOfY maps a canvas Y to its page index.
 func flowPageOfY(y, pageSize float64) int {
-	page := int(y / pageSize)
-	if page < 0 {
+	if pageSize <= 0 || math.IsNaN(pageSize) || math.IsNaN(y) || y <= 0 {
 		return 0
 	}
 
-	return page
+	page := y / pageSize
+	if page >= float64(maxFlowPageIndex) {
+		return maxFlowPageIndex
+	}
+
+	return int(page)
 }
 
 // removeFromFlowBucket swaps the entry out of its bucket (keeping cursor
@@ -378,6 +378,13 @@ func removeFromFlowBucket(buckets *[][]int, pos []int, page, index int) {
 func appendToFlowBucket(buckets *[][]int, pageOf *[]int, pos *[]int, index, page int) {
 	if buckets == nil {
 		return
+	}
+
+	if page < 0 {
+		page = 0
+	}
+	if page > maxFlowPageIndex {
+		page = maxFlowPageIndex
 	}
 
 	for len(*buckets) <= page {

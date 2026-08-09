@@ -73,19 +73,19 @@ func descriptionWord(itemIdx int) string {
 // invoice table report (10 sections x 40 line-item rows, repeated <thead>,
 // page-break-before sections) converted through the FULL RunPDF pipeline
 // (load -> parse -> style -> layout -> paginate -> paint -> assemble -> write).
-// It runs twice (cold, then warm) and asserts a generous per-run budget so CI
+// It runs exactly twice (first, then second) and asserts a generous per-run budget so CI
 // stays stable. Skipped in -short mode.
 //
-// Command:  go test ./internal/convert -run TestTenPageTableReportPerformance -v
+// Documentation command (not run as part of this change):
+//	go test ./internal/convert -run TestTenPageTableReportPerformance -v
 // Machine:  go1.26.4 linux/amd64, Linux x86_64, 13th Gen Intel(R) Core(TM)
 //
 //	i7-13700HX (24 threads), 2026-08-03
 //
-// Measured (three runs; output bytes deterministic):
-//
-//	cold run:  120.3ms | 149.1ms | 149.1ms   (mean ~140ms)
-//	warm run:  203.2ms | 131.8ms | 131.8ms   (mean ~156ms)
-//	PDF bytes: 96341, 10 pages (identical across runs)
+// Historical timing samples are maintained in the checked-in benchmark
+// artifact. This gate validates the two-run budget and final page count when
+// it is executed; cold/warm runs intentionally reuse the command state and
+// are not required to produce byte-identical PDF streams.
 func TestTenPageTableReportPerformance(t *testing.T) {
 	t.Parallel()
 
@@ -115,7 +115,7 @@ func TestTenPageTableReportPerformance(t *testing.T) {
 		}
 
 		sizes = append(sizes, int64(len(data)))
-		t.Logf("run %d (cold=%v): full pipeline %v, %d bytes, %d pages",
+		t.Logf("run %d (first=%v): full pipeline %v, %d bytes, %d pages",
 			run, run == 1, dur, len(data), pageCount(data))
 
 		if dur >= budget {
@@ -132,5 +132,5 @@ func TestTenPageTableReportPerformance(t *testing.T) {
 		t.Errorf("pages = %d, want >= 10", n)
 	}
 
-	t.Logf("pdf byte sizes: cold=%d warm=%d", sizes[0], sizes[1])
+	t.Logf("pdf byte sizes: first=%d second=%d", sizes[0], sizes[1])
 }

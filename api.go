@@ -22,9 +22,15 @@ const LibraryVersion = "0.12.7-dev"
 
 // Static conversion errors; callers can match with errors.Is.
 var (
-	errNoPageObjectsAdded = errors.New("gowkhtmltopdf: no page objects added")
-	errEmptyHTML          = errors.New("gowkhtmltopdf: empty HTML")
-	errNoInputPageAdded   = errors.New("gowkhtmltopdf: no input page added")
+	// ErrNoPageObjectsAdded reports a PDF conversion without any page objects.
+	ErrNoPageObjectsAdded = errors.New("gowkhtmltopdf: no page objects added")
+	// ErrEmptyHTML reports an empty document passed to ConvertHTML.
+	ErrEmptyHTML = errors.New("gowkhtmltopdf: empty HTML")
+	// ErrNoInputPageAdded reports an image conversion without an input page.
+	ErrNoInputPageAdded = errors.New("gowkhtmltopdf: no input page added")
+	// ErrNilImageConverter reports a conversion attempted through a nil
+	// ImageConverter receiver.
+	ErrNilImageConverter = errors.New("gowkhtmltopdf: nil image converter")
 )
 
 // Version returns the library version banner.
@@ -53,6 +59,10 @@ func NewGlobalSettings() *GlobalSettings {
 // "orientation", "web.background", "load.timeout", …). Unknown names return
 // an error.
 func (s *GlobalSettings) Set(name, value string) error {
+	if s == nil {
+		return errors.New("gowkhtmltopdf: nil global settings")
+	}
+
 	if err := s.g.Set(name, value); err != nil {
 		return fmt.Errorf("global set %q: %w", name, err)
 	}
@@ -66,6 +76,10 @@ func (s *GlobalSettings) Set(name, value string) error {
 // name ("Portrait", "print", "abort", …), floats with the shortest round-trip
 // representation.
 func (s *GlobalSettings) Get(name string) (string, bool) {
+	if s == nil {
+		return "", false
+	}
+
 	return s.g.Get(name)
 }
 
@@ -88,6 +102,10 @@ func NewObjectSettings() *ObjectSettings {
 // "web.images", "header.left", "footer.right", …). Unknown names return an
 // error.
 func (s *ObjectSettings) Set(name, value string) error {
+	if s == nil {
+		return errors.New("gowkhtmltopdf: nil object settings")
+	}
+
 	if err := s.o.Set(name, value); err != nil {
 		return fmt.Errorf("object set %q: %w", name, err)
 	}
@@ -97,12 +115,20 @@ func (s *ObjectSettings) Set(name, value string) error {
 
 // Get reads a dotted object settings key via the same key table as Set.
 func (s *ObjectSettings) Get(name string) (string, bool) {
+	if s == nil {
+		return "", false
+	}
+
 	return s.o.Get(name)
 }
 
 // SetPage sets the input page (a path, URL or "inline:…" / "data:…" source)
 // and returns s so calls can be chained.
 func (s *ObjectSettings) SetPage(page string) *ObjectSettings {
+	if s == nil {
+		return nil
+	}
+
 	s.o.Page = page
 
 	return s
@@ -113,6 +139,10 @@ func (s *ObjectSettings) SetPage(page string) *ObjectSettings {
 // <img>, <a>); an empty base leaves them unresolvable. No URL guessing is
 // involved: the bytes are always treated as a document.
 func (s *ObjectSettings) SetBody(html []byte, base string) *ObjectSettings {
+	if s == nil {
+		return nil
+	}
+
 	s.o.Page = ""
 	s.o.Load.InlineHTML = cloneBytes(html)
 	s.o.Load.InlineBase = base
@@ -156,13 +186,26 @@ func NewConverter() *Converter {
 
 // Global returns the converter's global settings, for Set/Get.
 func (c *Converter) Global() *GlobalSettings {
+	if c == nil {
+		return nil
+	}
+
+	if c.global == nil {
+		c.global = NewGlobalSettings()
+	}
+
 	return c.global
 }
 
 // AddObject appends a page object and returns c for chaining. The object's
 // settings are copied, so later mutations of s do not affect the converter.
-// A converter needs at least one object to convert.
+// A converter needs at least one object to convert. A nil settings pointer is
+// ignored so an optional object cannot panic the conversion setup.
 func (c *Converter) AddObject(s *ObjectSettings) *Converter {
+	if c == nil || s == nil {
+		return c
+	}
+
 	cp := &ObjectSettings{o: clonePdfObject(s.o)}
 	c.objects = append(c.objects, cp)
 
@@ -186,6 +229,18 @@ func clonePdfObject(src settings.PdfObject) settings.PdfObject {
 	return dst
 }
 
+func clonePdfGlobal(src settings.PdfGlobal) settings.PdfGlobal {
+	dst := src
+	dst.Header = cloneHeaderFooter(src.Header)
+	dst.Footer = cloneHeaderFooter(src.Footer)
+	dst.Load.Allow = cloneStrings(src.Load.Allow)
+	dst.ExcludeFromOutline = cloneStrings(src.ExcludeFromOutline)
+	dst.FontPaths = cloneStrings(src.FontPaths)
+	dst.Ignored = cloneStringMap(src.Ignored)
+
+	return dst
+}
+
 func cloneHeaderFooter(src settings.HeaderFooter) settings.HeaderFooter {
 	dst := src
 	dst.Replace = cloneStringMap(src.Replace)
@@ -199,6 +254,17 @@ func clonePostItems(src []settings.PostItem) []settings.PostItem {
 	}
 
 	dst := make([]settings.PostItem, len(src))
+	copy(dst, src)
+
+	return dst
+}
+
+func cloneStrings(src []string) []string {
+	if src == nil {
+		return nil
+	}
+
+	dst := make([]string, len(src))
 	copy(dst, src)
 
 	return dst
@@ -243,8 +309,16 @@ func (c *Converter) AddHTML(page []byte, baseURL string) *Converter {
 // also reported to OnError when set. Output is captured via an in-memory
 // writer (no temp file).
 func (c *Converter) Convert(ctx context.Context) error {
+	if c == nil {
+		return ErrNoPageObjectsAdded
+	}
+
+	if c.global == nil {
+		c.global = NewGlobalSettings()
+	}
+
 	if len(c.objects) == 0 {
-		return errNoPageObjectsAdded
+		return ErrNoPageObjectsAdded
 	}
 
 	objects := make([]settings.PdfObject, len(c.objects))
@@ -272,6 +346,10 @@ func (c *Converter) Convert(ctx context.Context) error {
 // nil if none ran yet. The returned slice is a copy; it stays valid across
 // later conversions.
 func (c *Converter) Output() []byte {
+	if c == nil {
+		return nil
+	}
+
 	return append([]byte(nil), c.output...)
 }
 
@@ -287,12 +365,12 @@ func ConvertHTML(ctx context.Context, html []byte, global *GlobalSettings) ([]by
 	}
 
 	if len(html) == 0 {
-		return nil, errEmptyHTML
+		return nil, ErrEmptyHTML
 	}
 
 	conv := NewConverter()
 	if global != nil {
-		conv.global = global
+		conv.global = &GlobalSettings{g: clonePdfGlobal(global.g)}
 	}
 
 	conv.AddObject(NewObjectSettings().SetBody(html, ""))
@@ -313,10 +391,11 @@ func ConvertHTML(ctx context.Context, html []byte, global *GlobalSettings) ([]by
 // JPEG. Configure with Set/AddObject, then Convert produces the encoded
 // bytes via Output(). Not safe for concurrent Convert calls.
 type ImageConverter struct {
-	global *GlobalSettings
-	image  settings.ImageGlobal
-	object *ObjectSettings
-	output []byte
+	global      *GlobalSettings
+	image       settings.ImageGlobal
+	object      *ObjectSettings
+	output      []byte
+	initialized bool
 
 	// OnInfo, OnWarn and OnError receive the conversion's log lines,
 	// classified like Converter's. They may be nil.
@@ -330,9 +409,10 @@ type ImageConverter struct {
 // immediately; its page is empty until AddObject.
 func NewImageConverter() *ImageConverter {
 	return &ImageConverter{ //nolint:exhaustruct // intentional zero/partial fields
-		global: NewGlobalSettings(),
-		image:  settings.DefaultImageGlobal(),
-		object: NewObjectSettings(),
+		global:      NewGlobalSettings(),
+		image:       settings.DefaultImageGlobal(),
+		object:      NewObjectSettings(),
+		initialized: true,
 	}
 }
 
@@ -342,6 +422,12 @@ func NewImageConverter() *ImageConverter {
 // an error. "web.background" also updates the shared Global.Background paint
 // switch so image and PDF share one background field.
 func (c *ImageConverter) Set(name, value string) error {
+	if c == nil {
+		return ErrNilImageConverter
+	}
+
+	c.ensureDefaults()
+
 	if err := settings.ApplyImageKey(&c.global.g, &c.image, name, value); err != nil {
 		return fmt.Errorf("image set %q: %w", name, err)
 	}
@@ -352,6 +438,12 @@ func (c *ImageConverter) Set(name, value string) error {
 // Global returns the shared global settings (only "enablelocalfileaccess"
 // and "allow" influence image conversion, via the loader ACL).
 func (c *ImageConverter) Global() *GlobalSettings {
+	if c == nil {
+		return nil
+	}
+
+	c.ensureDefaults()
+
 	return c.global
 }
 
@@ -359,6 +451,12 @@ func (c *ImageConverter) Global() *GlobalSettings {
 // source) and returns c for chaining. Image conversion renders the first
 // added page only. The page's load settings can be adjusted through Object.
 func (c *ImageConverter) AddObject(page string) *ImageConverter {
+	if c == nil {
+		return nil
+	}
+
+	c.ensureDefaults()
+
 	o := NewObjectSettings()
 	o.SetPage(page)
 	c.object = o
@@ -371,7 +469,28 @@ func (c *ImageConverter) AddObject(page string) *ImageConverter {
 // "load.blocklocalfileaccess" = "false" to allow local inputs. Object is
 // always valid; its page is empty until AddObject is called.
 func (c *ImageConverter) Object() *ObjectSettings {
+	if c == nil {
+		return nil
+	}
+
+	c.ensureDefaults()
+
 	return c.object
+}
+
+func (c *ImageConverter) ensureDefaults() {
+	if !c.initialized {
+		c.image = settings.DefaultImageGlobal()
+		c.initialized = true
+	}
+
+	if c.global == nil {
+		c.global = NewGlobalSettings()
+	}
+
+	if c.object == nil {
+		c.object = NewObjectSettings()
+	}
 }
 
 // Convert runs the conversion, replacing the previous Output. ctx is threaded
@@ -381,12 +500,19 @@ func (c *ImageConverter) Object() *ObjectSettings {
 // The page may be a path/URL via AddObject/SetPage, or in-memory HTML via
 // Object().SetBody (P2-04 InlineHTML source kind).
 func (c *ImageConverter) Convert(ctx context.Context) error {
+	if c == nil {
+		return ErrNilImageConverter
+	}
+
+	c.ensureDefaults()
+
 	if strings.TrimSpace(c.object.o.Page) == "" && len(c.object.o.Load.InlineHTML) == 0 {
-		return errNoInputPageAdded
+		return ErrNoInputPageAdded
 	}
 
 	img := c.image
-	req := convert.NewImageRequest(c.global.g, img, []settings.PdfObject{c.object.o}, nil)
+	obj := clonePdfObject(c.object.o)
+	req := convert.NewImageRequest(c.global.g, img, []settings.PdfObject{obj}, nil)
 	h := convertHooks{ //nolint:exhaustruct // intentional zero/partial fields
 		OnInfo: c.OnInfo, OnWarn: c.OnWarn, OnError: c.OnError,
 	}
@@ -405,6 +531,10 @@ func (c *ImageConverter) Convert(ctx context.Context) error {
 // to "jpg") from the last successful Convert, or nil if none ran yet. The
 // returned slice is a copy.
 func (c *ImageConverter) Output() []byte {
+	if c == nil {
+		return nil
+	}
+
 	return append([]byte(nil), c.output...)
 }
 

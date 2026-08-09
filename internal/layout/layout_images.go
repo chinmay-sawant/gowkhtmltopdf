@@ -2,9 +2,10 @@ package layout
 
 import (
 	"encoding/binary"
-	"gowkhtmltopdf/internal/html"
 	"strconv"
 	"strings"
+
+	"gowkhtmltopdf/internal/html"
 )
 
 func (e *engine) emitBorders(sty ResolvedStyle, posX, posY, boxW, boxH float64) {

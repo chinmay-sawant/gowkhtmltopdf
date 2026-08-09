@@ -98,7 +98,9 @@ func genTOCHTML(toc settings.TableOfContent, entries []*outline.Node, pageOf fun
 	var buf strings.Builder
 
 	buf.WriteString("<html><body>")
-	buf.WriteString("<h1>" + stdlibhtml.EscapeString(toc.CaptionText) + "</h1>")
+	buf.WriteString("<h1>")
+	buf.WriteString(stdlibhtml.EscapeString(toc.CaptionText))
+	buf.WriteString("</h1>")
 
 	for _, n := range entries {
 		hVal := n.Heading

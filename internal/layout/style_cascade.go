@@ -1,9 +1,10 @@
 package layout
 
 import (
+	"strings"
+
 	"gowkhtmltopdf/internal/css"
 	"gowkhtmltopdf/internal/html"
-	"strings"
 )
 
 // mergeCustomProps inherits parent custom properties and overlays any --*

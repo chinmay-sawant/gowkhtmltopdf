@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"gowkhtmltopdf/internal/app"
 	"gowkhtmltopdf/internal/cli"
@@ -61,7 +63,15 @@ func run(argv []string) int {
 		logw = io.Discard
 	}
 
-	runErr := app.RunPDF(context.Background(), cmd, logw, nil)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	outline := io.Writer(nil)
+	if cmd.DumpOutline || cmd.Global.DumpOutline {
+		outline = os.Stdout
+	}
+
+	runErr := app.RunPDF(ctx, cmd, logw, nil, outline)
 	if runErr != nil {
 		fmt.Fprintf(os.Stderr, "gowkhtmltopdf: %v\n", runErr)
 

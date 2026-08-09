@@ -44,6 +44,12 @@ const (
 // ErrAccessDenied is returned when the local-file ACL blocks a path.
 var ErrAccessDenied = errors.New("local file access denied")
 
+// ErrInvalidProxy is returned when a configured proxy is not an absolute URL
+// with a scheme and host. NewLoader preserves its historical return shape and
+// records this error for the first Load call; NewLoaderWithError exposes the
+// fail-fast form for new callers.
+var ErrInvalidProxy = errors.New("invalid proxy configuration")
+
 // Package-level sentinels for the loader's internal failure modes, so
 // dynamic messages wrap a static error and stay matchable with errors.Is.
 var (
@@ -57,6 +63,7 @@ var (
 	errInvalidDataURL     = errors.New("invalid URL escape in data URL")
 	errTooManyRedirects   = errors.New("too many redirects")
 	errBodyTooLarge       = errors.New("exceeds max body size")
+	errUninitializedLoader = errors.New("loader client is not initialized")
 )
 
 // Kind classifies a resolved input.
@@ -98,7 +105,7 @@ func (l *Loader) ForResource(res *Resource, pageLoad settings.LoadPage) Resource
 		base = res.Base
 	}
 
-	return ResourceContext{loader: l, base: base, pageLoad: pageLoad}
+	return ResourceContext{loader: l, base: base, pageLoad: cloneLoadPage(pageLoad)}
 }
 
 // Fetch resolves ref against the document base and fetches it using the
@@ -125,6 +132,10 @@ type AccessController struct {
 // would follow. Paths that do not exist fall back to their cleaned
 // absolute form (reading them fails anyway).
 func (a *AccessController) Allowed(path string) bool {
+	if a == nil {
+		return false
+	}
+
 	abs := resolvePath(path)
 	if abs == "" {
 		return false
@@ -249,31 +260,54 @@ type Loader struct {
 	MaxBodySize  int64
 	MaxRedirects int
 
-	// Allow prefixes and the effective local-access flag, applied by
-	// NewLoader from settings.LoadGlobal (caller-side pokes are being
-	// removed in parallel). Kept exported for tests.
+	// Global is an owned snapshot of the caller's load policy. Allow and
+	// EnableLocalFileAccess remain exported compatibility fields for existing
+	// internal callers; NewLoader initializes them from cloned policy values,
+	// and file-access checks intentionally read these effective fields.
 	Allow                 []string
 	EnableLocalFileAccess bool
+	initErr               error
 }
 
 // NewLoader builds a Loader from global load settings, applying the full
 // load policy (proxy, allow prefixes, local-access flag) in one place.
 func NewLoader(global settings.LoadGlobal) *Loader {
-	loader := &Loader{ //nolint:exhaustruct // intentional zero/partial fields
-		Global:                global,
-		Log:                   io.Discard,
-		MaxBodySize:           DefaultMaxBodySize,
-		MaxRedirects:          DefaultMaxRedirects,
-		Allow:                 global.Allow,
-		EnableLocalFileAccess: global.EnableLocalFileAccess,
+	loader, err := NewLoaderWithError(global)
+	if err != nil {
+		loader.initErr = err
 	}
-	loader.initClient()
 
 	return loader
 }
 
-func (l *Loader) initClient() {
-	jar, _ := cookiejar.New(nil)
+// NewLoaderWithError builds a Loader from global load settings and validates
+// proxy configuration before installing the HTTP transport. It is the
+// fail-fast constructor; NewLoader remains available for existing callers.
+func NewLoaderWithError(global settings.LoadGlobal) (*Loader, error) {
+	policy := global
+	policy.Allow = cloneStrings(global.Allow)
+
+	loader := &Loader{ //nolint:exhaustruct // intentional zero/partial fields
+		Global:                policy,
+		Log:                   io.Discard,
+		MaxBodySize:           DefaultMaxBodySize,
+		MaxRedirects:          DefaultMaxRedirects,
+		Allow:                 cloneStrings(policy.Allow),
+		EnableLocalFileAccess: policy.EnableLocalFileAccess,
+	}
+	if err := loader.initClient(); err != nil {
+		return loader, err
+	}
+
+	return loader, nil
+}
+
+func (l *Loader) initClient() error {
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		return fmt.Errorf("create cookie jar: %w", err)
+	}
+
 	// Default TLS verification stays on (http.Transport system roots).
 	transport := &http.Transport{ //nolint:exhaustruct // intentional zero/partial fields
 		ForceAttemptHTTP2: true,
@@ -284,9 +318,12 @@ func (l *Loader) initClient() {
 	}
 
 	if l.Global.Proxy != "" {
-		if pu, err := url.Parse(l.Global.Proxy); err == nil {
-			transport.Proxy = http.ProxyURL(pu)
+		pu, err := parseProxy(l.Global.Proxy)
+		if err != nil {
+			return err
 		}
+
+		transport.Proxy = http.ProxyURL(pu)
 	}
 
 	l.Client = &http.Client{ //nolint:exhaustruct // intentional zero/partial fields
@@ -303,6 +340,27 @@ func (l *Loader) initClient() {
 			return nil
 		},
 	}
+
+	return nil
+}
+
+func parseProxy(raw string) (*url.URL, error) {
+	proxy, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil {
+		return nil, fmt.Errorf("%w %q: %v", ErrInvalidProxy, raw, err)
+	}
+
+	if proxy.Scheme == "" || proxy.Host == "" || proxy.Hostname() == "" {
+		return nil, fmt.Errorf("%w %q: absolute URL with scheme and host required", ErrInvalidProxy, raw)
+	}
+
+	switch strings.ToLower(proxy.Scheme) {
+	case "http", "https":
+	default:
+		return nil, fmt.Errorf("%w %q: only http and https proxies are supported", ErrInvalidProxy, raw)
+	}
+
+	return proxy, nil
 }
 
 // Load fetches the primary resource for an object. In-memory HTML
@@ -310,6 +368,20 @@ func (l *Loader) initClient() {
 // resolve against lp.InlineBase when set. Every loaded document is checked
 // for a supported charset at this seam (see checkDocumentCharset).
 func (l *Loader) Load(ctx context.Context, input string, pageLoad settings.LoadPage) (*Resource, error) {
+	if l == nil {
+		return nil, errNilLoader
+	}
+
+	if l.initErr != nil {
+		return nil, l.initErr
+	}
+
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	pageLoad = cloneLoadPage(pageLoad)
+
 	if len(pageLoad.InlineHTML) > 0 {
 		if err := checkBodyLimit("inline HTML", len(pageLoad.InlineHTML), l.MaxBodySize); err != nil {
 			return nil, err
@@ -631,6 +703,10 @@ func (l *Loader) fileAccessAllowed(path string, pageLoad settings.LoadPage) bool
 }
 
 func (l *Loader) loadHTTP(ctx context.Context, target string, pageLoad settings.LoadPage) (*Resource, error) {
+	if l.Client == nil {
+		return nil, errUninitializedLoader
+	}
+
 	parsed, err := url.Parse(target)
 	if err != nil {
 		return nil, fmt.Errorf("parse %s: %w", target, err)
@@ -685,6 +761,62 @@ func (l *Loader) loadHTTP(ctx context.Context, target string, pageLoad settings.
 		ContentType: ctype,
 		StatusCode:  resp.StatusCode,
 	}, nil
+}
+
+func cloneLoadPage(src settings.LoadPage) settings.LoadPage {
+	dst := src
+	dst.CustomHeaders = cloneStringMap(src.CustomHeaders)
+	dst.Cookies = cloneStringMap(src.Cookies)
+	dst.Post = clonePostItems(src.Post)
+	dst.InlineHTML = cloneBytes(src.InlineHTML)
+
+	return dst
+}
+
+func cloneStringMap(src map[string]string) map[string]string {
+	if src == nil {
+		return nil
+	}
+
+	dst := make(map[string]string, len(src))
+	for key, value := range src {
+		dst[key] = value
+	}
+
+	return dst
+}
+
+func cloneStrings(src []string) []string {
+	if src == nil {
+		return nil
+	}
+
+	dst := make([]string, len(src))
+	copy(dst, src)
+
+	return dst
+}
+
+func clonePostItems(src []settings.PostItem) []settings.PostItem {
+	if src == nil {
+		return nil
+	}
+
+	dst := make([]settings.PostItem, len(src))
+	copy(dst, src)
+
+	return dst
+}
+
+func cloneBytes(src []byte) []byte {
+	if src == nil {
+		return nil
+	}
+
+	dst := make([]byte, len(src))
+	copy(dst, src)
+
+	return dst
 }
 
 // buildHTTPRequest assembles the request for target according to the page
@@ -765,6 +897,20 @@ func (l *Loader) loadErrorResponse(
 
 // FetchSub fetches a subresource (css/img) resolved against base.
 func (l *Loader) FetchSub(ctx context.Context, base, ref string, pageLoad settings.LoadPage) (*Resource, error) {
+	if l == nil {
+		return nil, errNilLoader
+	}
+
+	if l.initErr != nil {
+		return nil, l.initErr
+	}
+
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	pageLoad = cloneLoadPage(pageLoad)
+
 	abs, err := resolveReference(base, ref)
 	if err != nil {
 		return nil, err

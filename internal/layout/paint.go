@@ -49,14 +49,15 @@ type PaintOptions struct {
 //
 // After pagination Paint fills res.Pages (page → op indices) and res.Locations
 // (element boxes in document order with their page and canvas rect).
-// backgroundIfNil returns the caller's context, or a fresh background context
-// when nil so derived contexts never panic on legacy callers.
-func backgroundIfNil(ctx context.Context) context.Context {
+// beginPaintContext is the single context-normalization boundary owned by
+// this painting slice. Both legacy and cancellation-aware entrypoints use it,
+// so nil-context compatibility does not leak into the paint implementation.
+func beginPaintContext(ctx context.Context) (context.Context, context.CancelFunc) {
 	if ctx == nil {
-		return context.Background()
+		ctx = context.Background()
 	}
 
-	return ctx
+	return context.WithCancel(ctx)
 }
 
 func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
@@ -67,7 +68,7 @@ func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 // entrypoint remains a background-context adapter for package callers that do
 // not have a request context.
 func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts PaintOptions) error {
-	ctx, cancel := context.WithCancel(backgroundIfNil(ctx))
+	ctx, cancel := beginPaintContext(ctx)
 	defer cancel()
 
 	if doc == nil || res == nil {
@@ -119,7 +120,7 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 // fixedOpIndices collects the indices of viewport-fixed ops, which are
 // stamped on every page at viewport-relative coords.
 func fixedOpIndices(res *Result) []int {
-	var fixedIdx []int
+	fixedIdx := make([]int, 0, len(res.Ops))
 
 	for i := range res.Ops {
 		if res.Ops[i].Fixed {
@@ -224,9 +225,9 @@ func paintPages(
 ) error {
 	var paintErr error
 
-	// fixedIdx is page-independent and never mutated between pages, so sort it
-	// once here instead of once per page.
-	sortPaintIndices(res.Ops, fixedIdx)
+	// fixedIdx is page-independent and never mutated between pages, so apply
+	// the shared PaintOrder policy once instead of once per page.
+	fixedOrder := paintOrderSubset(res.Ops, fixedIdx)
 
 	fontNames := map[*pdf.Font]string{}
 	nextFont := 0
@@ -269,11 +270,11 @@ func paintPages(
 
 		page = doc.AddPage(opts.PageWidth, opts.PageHeight)
 		child = page.Content()
-		child.Grow(contentSizeHint(res.Ops, idxs, fixedIdx))
+		child.Grow(contentSizeHint(res.Ops, idxs, fixedOrder))
 
-		sortPaintIndices(res.Ops, idxs)
+		pageOrder := paintOrderSubset(res.Ops, idxs)
 
-		for _, idx := range idxs {
+		for _, idx := range pageOrder {
 			if err := ctx.Err(); err != nil {
 				return fmt.Errorf("layout: paint context: %w", err)
 			}
@@ -281,7 +282,7 @@ func paintPages(
 			paintOp(&res.Ops[idx], pageIdx)
 		}
 		// Fixed layer: page-local coords (pageIdx 0 math on every page).
-		for _, idx := range fixedIdx {
+		for _, idx := range fixedOrder {
 			if err := ctx.Err(); err != nil {
 				return fmt.Errorf("layout: paint context: %w", err)
 			}
@@ -426,9 +427,10 @@ type BandOptions struct {
 
 // PaintBand paints ops onto an existing page's content stream. Same dispatch
 // as Paint for fill/stroke/line/text/image (colors, opacity, transforms,
-// embedded fonts, fake-bold policy). Pagination, z-sorting and fixed stamps
-// are skipped. Link ops are left to the caller (annotations need document
-// context). Returns the first image-embed error, if any.
+// embedded fonts, fake-bold policy). Pagination and fixed stamps are skipped;
+// z-sorting uses the shared PaintOrder policy. Link ops are left to the caller
+// (annotations need document context). Returns the first image-embed error, if
+// any.
 func PaintBand(p *pdf.Page, c *pdf.Content, ops []Op, opts BandOptions) error {
 	return PaintBandContext(context.Background(), p, c, ops, opts)
 }
@@ -436,7 +438,7 @@ func PaintBand(p *pdf.Page, c *pdf.Content, ops []Op, opts BandOptions) error {
 // PaintBandContext is the cancellation-aware form of PaintBand used for
 // HTML headers and footers.
 func PaintBandContext(ctx context.Context, page *pdf.Page, chld *pdf.Content, ops []Op, opts BandOptions) error {
-	ctx, cancel := context.WithCancel(backgroundIfNil(ctx))
+	ctx, cancel := beginPaintContext(ctx)
 	defer cancel()
 
 	if page == nil || chld == nil {
@@ -469,9 +471,10 @@ func PaintBandContext(ctx context.Context, page *pdf.Page, chld *pdf.Content, op
 	return paintBandOps(ctx, page, chld, ops, opts, resName)
 }
 
-// paintBandOps dispatches every op onto the band content stream, honoring the
-// shared colors/opacity/transform/fake-bold policy. Returns the first
-// image-embed error, if any.
+// paintBandOps dispatches every op onto the band content stream in the same
+// PaintOrder used by the paginated body and raster adapter. Link operations
+// are still skipped here because annotations need document context and are
+// wired by the caller in display-list order.
 func paintBandOps(
 	ctx context.Context, page *pdf.Page, chld *pdf.Content, ops []Op, opts BandOptions,
 	resName func(*pdf.Font) string,
@@ -489,12 +492,12 @@ func paintBandOps(
 
 	var firstErr error
 
-	for i := range ops {
+	for _, idx := range PaintOrder(ops) {
 		if err := ctx.Err(); err != nil {
 			return fmt.Errorf("layout: paint band context: %w", err)
 		}
 
-		paintOp := &ops[i]
+		paintOp := &ops[idx]
 		if paintOp.Kind == OpLinkURI || paintOp.Kind == opKindNoop {
 			continue
 		}

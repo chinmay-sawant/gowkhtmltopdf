@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 
 	"gowkhtmltopdf/internal/cli"
 	"gowkhtmltopdf/internal/convert"
@@ -16,6 +15,7 @@ import (
 
 // errNilCommand guards the command-facing adapters against nil dereferences.
 var errNilCommand = errors.New("app: nil command")
+var errNoPageObjects = errors.New("app: no page objects")
 
 // BuildPDFRequest translates a parsed CLI command into the stable engine
 // request. The caller owns output-sink creation and supplies both document
@@ -37,12 +37,35 @@ func BuildPDFRequest(cmd *cli.Command, output, outline io.Writer) (*convert.Requ
 	return req, nil
 }
 
-// RunPDF is the command-facing adapter. It owns opening the document sink and
-// selecting stdout for --dump-outline; convert.Run only receives explicit
-// writers and never reaches into process-global stdout.
-func RunPDF(ctx context.Context, cmd *cli.Command, log io.Writer, progress func(string, int)) error {
+// RunPDF is the command-facing adapter. It validates the request before
+// opening the document sink and receives the optional outline sink explicitly.
+// convert.Run only receives explicit writers and never reaches into
+// process-global stdout.
+func RunPDF(
+	ctx context.Context,
+	cmd *cli.Command,
+	log io.Writer,
+	progress func(string, int),
+	outline io.Writer,
+) error {
 	if cmd == nil {
 		return errNilCommand
+	}
+
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	// Validate the complete command before creating or truncating a file. The
+	// discard sink satisfies the request's explicit output contract while
+	// keeping validation side-effect free.
+	req, err := BuildPDFRequest(cmd, io.Discard, outline)
+	if err != nil {
+		return err
+	}
+
+	if len(cmd.Objects) == 0 {
+		return errNoPageObjects
 	}
 
 	out, closeOut, err := cmd.OpenOutput()
@@ -50,15 +73,8 @@ func RunPDF(ctx context.Context, cmd *cli.Command, log io.Writer, progress func(
 		return fmt.Errorf("app: open output: %w", err)
 	}
 
-	outline := io.Writer(nil)
-	if cmd.DumpOutline || cmd.Global.DumpOutline {
-		outline = os.Stdout
-	}
-
-	req, err := BuildPDFRequest(cmd, out, outline)
-	if err == nil {
-		err = convert.Run(ctx, req, log, progress)
-	}
+	req.Output = out
+	err = convert.Run(ctx, req, log, progress)
 
 	if closeErr := closeOut(); closeErr != nil && err == nil {
 		err = closeErr

@@ -75,6 +75,10 @@ const screenWidthDefault = 1024
 // maxSmartViewport caps the smart-width viewport growth in pixels.
 const maxSmartViewport = 4096
 
+// maxSmartWidthLayouts bounds complete layout passes for one image render.
+// The final layout result is returned when content still exceeds the cap.
+const maxSmartWidthLayouts = 8
+
 // RenderOptions controls one Render call. Width/Height and Crop are in
 // output pixels; the layout viewport is Width CSS pixels at 96 dpi.
 type RenderOptions struct {
@@ -213,7 +217,9 @@ func layoutOptions(opts RenderOptions, font *pdf.Font, viewportPx float64) layou
 // layoutSmartWidth lays out repeatedly, growing the viewport by 1.5x while
 // painted content overflows the right edge (the layout engine always fills
 // the full viewport width, so overflow is measured from the display list:
-// max op.X+op.W). Growth is capped at maxSmartViewport pixels.
+// max op.X+op.W). Growth is capped at maxSmartViewport pixels and at
+// maxSmartWidthLayouts complete layout passes. The latter makes the bounded
+// fallback explicit without changing the normal fitting result.
 func layoutSmartWidth(
 	ctx context.Context, root *html.Node, opts RenderOptions, font *pdf.Font,
 ) (*layout.Result, error) {
@@ -224,7 +230,7 @@ func layoutSmartWidth(
 
 	var res *layout.Result
 
-	for range 8 {
+	for layoutAttempt := 0; layoutAttempt < maxSmartWidthLayouts; layoutAttempt++ {
 		if err := ctx.Err(); err != nil {
 			return nil, fmt.Errorf("imageout: context: %w", err)
 		}
