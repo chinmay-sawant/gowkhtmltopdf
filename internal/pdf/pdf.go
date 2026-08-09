@@ -172,7 +172,12 @@ func (d *Document) setDict(r objRef, dict string) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	d.objects[int(r)-1].dict = dict
+	idx := int(r) - 1
+	if idx < 0 || idx >= len(d.objects) {
+		return
+	}
+
+	d.objects[idx].dict = dict
 }
 
 // setStream attaches a raw stream (compressed later at write time).
@@ -180,7 +185,12 @@ func (d *Document) setStream(r objRef, raw []byte) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	d.objects[int(r)-1].stream = raw
+	idx := int(r) - 1
+	if idx < 0 || idx >= len(d.objects) {
+		return
+	}
+
+	d.objects[idx].stream = raw
 }
 
 // Page is one page of the document.
