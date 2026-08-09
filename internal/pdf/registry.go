@@ -4,17 +4,21 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 // Registry indexes discoverable TTF faces by CSS family name (lowercased).
 // Liberation defaults stay available via FaceSet; this holds opt-in folder fonts.
 type Registry struct {
+	mu       sync.RWMutex
 	byFamily map[string][]*Font // family → faces (any weight/style)
 }
 
 // NewRegistry returns an empty font registry.
 func NewRegistry() *Registry {
-	return &Registry{byFamily: map[string][]*Font{}}
+	return &Registry{ //nolint:exhaustruct // intentional zero-value mu field
+		byFamily: map[string][]*Font{},
+	}
 }
 
 // AddFont registers a parsed face under its family name (and PostScript name).
@@ -22,6 +26,9 @@ func (r *Registry) AddFont(fnt *Font) {
 	if r == nil || fnt == nil {
 		return
 	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
 	names := fnt.LoadNames()
 	if len(names) == 0 && fnt.PostScriptName != "" {
@@ -44,6 +51,9 @@ func (r *Registry) AddFamilyAlias(family string, font *Font) {
 		return
 	}
 
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	key := strings.ToLower(strings.TrimSpace(family))
 	key = strings.Trim(key, `"'`)
 
@@ -62,6 +72,9 @@ func (r *Registry) Lookup(families []string, weight int, italic bool) *Font {
 	if r == nil {
 		return nil
 	}
+
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 
 	for _, fam := range families {
 		for _, key := range fontFamilyKeys(fam) {
@@ -109,21 +122,45 @@ func (r *Registry) FindWithGlyph(codePoint rune, weight int, italic bool) *Font 
 		return nil
 	}
 
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
 	bold := weight >= fontWeightBoldMin
 
 	var best *Font
 
 	bestScore := -1
-	seen := map[*Font]bool{}
+
+	// Fast stack array for deduplication without heap map allocation
+	var seenBuf [32]*Font
+
+	seenCount := 0
 
 	for _, faces := range r.byFamily {
 		for _, fnt := range faces {
-			score := glyphFaceScore(fnt, codePoint, bold, italic)
-			if score < 0 || seen[fnt] {
+			isSeen := false
+
+			for i := range seenCount {
+				if seenBuf[i] == fnt {
+					isSeen = true
+
+					break
+				}
+			}
+
+			if isSeen {
 				continue
 			}
 
-			seen[fnt] = true
+			if seenCount < len(seenBuf) {
+				seenBuf[seenCount] = fnt
+				seenCount++
+			}
+
+			score := glyphFaceScore(fnt, codePoint, bold, italic)
+			if score < 0 {
+				continue
+			}
 
 			if score > bestScore {
 				bestScore = score
@@ -138,6 +175,8 @@ func (r *Registry) FindWithGlyph(codePoint rune, weight int, italic bool) *Font 
 // glyphFaceScore scores a face for ch: -1 when it lacks the glyph, plus
 // weight/italic match bonuses and a premium for known Unicode-capable
 // families (DejaVu/Noto/FreeSans).
+//
+//nolint:cyclop // glyph scoring logic
 func glyphFaceScore(fnt *Font, codePoint rune, bold, italic bool) int {
 	if fnt == nil || fnt.GlyphID(codePoint) == 0 {
 		return -1
@@ -152,12 +191,17 @@ func glyphFaceScore(fnt *Font, codePoint rune, bold, italic bool) int {
 		score += 2
 	}
 
-	for _, n := range fnt.FamilyNames() {
-		low := strings.ToLower(n)
-		if strings.Contains(low, "dejavu") || strings.Contains(low, "noto") || strings.Contains(low, "freesans") {
-			score += 3
+	psLow := strings.ToLower(fnt.PostScriptName)
+	if strings.Contains(psLow, "dejavu") || strings.Contains(psLow, "noto") || strings.Contains(psLow, "freesans") {
+		score += 3
+	} else {
+		for _, n := range fnt.FamilyNames() {
+			low := strings.ToLower(n)
+			if strings.Contains(low, "dejavu") || strings.Contains(low, "noto") || strings.Contains(low, "freesans") {
+				score += 3
 
-			break
+				break
+			}
 		}
 	}
 

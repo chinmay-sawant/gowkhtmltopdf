@@ -7,15 +7,23 @@ import (
 	"strings"
 )
 
+// fontState is the active-font tracking saved across a q/Q pair: Q restores
+// the PDF text state, so the tracked font must be restored with it or a
+// later redundant SetFont could be skipped against a stale value.
+type fontState struct {
+	name string
+	size float64
+}
+
 // Content builds a page content stream. Every emitted operator is recorded
 // as a string; fonts and images used are registered for the page /Resources.
 type Content struct {
 	buf       bytes.Buffer
 	fontUses  map[string]string // resource name -> font object ref (allocated at finalize)
 	fontFiles map[string]*Font  // resource name -> parsed font (embedded)
-	used      map[string][]rune // resource name -> runes seen
 	curFont   string            // active font from last SetFont
 	curSize   float64           // active font size from last SetFont
+	fontStack []fontState       // active font before each open Save
 	imageUses map[string]string // resource name -> image object ref
 	imageRefs map[string]*imageResource
 	opacity   float64 // 0 disables
@@ -28,12 +36,13 @@ type imageResource struct {
 	height int
 }
 
+const fontRuneInitialCapacity = 32
+
 // NewContent creates an empty content stream builder.
 func NewContent() *Content {
 	return &Content{ //nolint:exhaustruct // intentional zero-value fields
 		fontUses:  map[string]string{},
 		fontFiles: map[string]*Font{},
-		used:      map[string][]rune{},
 		imageUses: map[string]string{},
 		imageRefs: map[string]*imageResource{},
 	}
@@ -41,6 +50,10 @@ func NewContent() *Content {
 
 // Bytes returns the raw (uncompressed) content stream.
 func (c *Content) Bytes() []byte { return c.buf.Bytes() }
+
+// Grow reserves content-stream capacity up front so per-page buffers do not
+// reallocate geometrically while a dense op list is painted.
+func (c *Content) Grow(n int) { c.buf.Grow(n) }
 
 func appendPDFNum(dst []byte, val float64) []byte {
 	if val == float64(int(val)) {
@@ -107,9 +120,9 @@ func cloneContent(cur *Content) *Content {
 	ncVal := &Content{ //nolint:exhaustruct // intentional zero-value fields
 		fontUses:  cloneStringMap(cur.fontUses),
 		fontFiles: cloneFontMap(cur.fontFiles),
-		used:      cloneRuneMap(cur.used),
 		curFont:   cur.curFont,
 		curSize:   cur.curSize,
+		fontStack: append([]fontState(nil), cur.fontStack...),
 		imageUses: cloneStringMap(cur.imageUses),
 		imageRefs: cloneImageMap(cur.imageRefs),
 		opacity:   cur.opacity,
@@ -138,15 +151,6 @@ func cloneFontMap(src map[string]*Font) map[string]*Font {
 	return dst
 }
 
-func cloneRuneMap(src map[string][]rune) map[string][]rune {
-	dst := make(map[string][]rune, len(src))
-	for k, v := range src {
-		dst[k] = append([]rune(nil), v...)
-	}
-
-	return dst
-}
-
 func cloneImageMap(src map[string]*imageResource) map[string]*imageResource {
 	dst := make(map[string]*imageResource, len(src))
 
@@ -167,10 +171,22 @@ func cloneImageMap(src map[string]*imageResource) map[string]*imageResource {
 // graphics state
 
 // Save restores the graphics state stack.
-func (c *Content) Save() { c.buf.WriteString("q\n") }
+func (c *Content) Save() {
+	c.fontStack = append(c.fontStack, fontState{name: c.curFont, size: c.curSize})
+	c.buf.WriteString("q\n")
+}
 
 // Restore pops the graphics state stack.
-func (c *Content) Restore() { c.buf.WriteString("Q\n") }
+func (c *Content) Restore() {
+	if n := len(c.fontStack); n > 0 {
+		prev := c.fontStack[n-1]
+		c.fontStack = c.fontStack[:n-1]
+		c.curFont = prev.name
+		c.curSize = prev.size
+	}
+
+	c.buf.WriteString("Q\n")
+}
 
 // SetFillColor sets the fill color (RGB, 0..1); grayscale is applied at this
 // paint-time seam, which is what Document.SetGrayscale promises today.
@@ -248,6 +264,10 @@ func (c *Content) Transform(a, b, c2, d, e, f float64) {
 
 // SetFont selects a registered font resource by name and size.
 func (c *Content) SetFont(name string, size float64) {
+	if name == c.curFont && size == c.curSize {
+		return
+	}
+
 	c.curFont = name
 	c.curSize = size
 	_ = c.buf.WriteByte('/')
@@ -306,8 +326,30 @@ type textRun struct {
 // through Type0; Latin that the face lacks (typical for CJK fallback fonts)
 // is drawn with an embedded Liberation fallback so ASCII does not become tofu.
 func (c *Content) TextShow(text string) {
+	// Pure-ASCII text is untouched by shaping (no RTL/combining/CJK
+	// features) and never needs Type0, so skip the decision passes below
+	// and go straight to the simple emitter.
+	ascii := true
+
+	for i := range len(text) {
+		if text[i] > asciiMax {
+			ascii = false
+
+			break
+		}
+	}
+
+	if ascii {
+		c.textShowSimple(text)
+
+		return
+	}
+
 	fnt := c.fontFiles[c.curFont]
-	text = ShapeRun(text, fnt, c.curSize).Text
+	// PDF emission needs the shaped text only. ShapeRun also computes per-rune
+	// advances for the raster adapter, which is unnecessary here and creates
+	// two slices for every text operator.
+	text = ShapeTextFont(text, fnt)
 
 	if fnt == nil || !c.textNeedsType0(text) {
 		c.textShowSimple(text)
@@ -425,7 +467,67 @@ func (c *Content) ensureLatinFallback() string {
 	return name
 }
 
+const (
+	asciiMax    = 0x7F
+	octalBase   = 8
+	byteShift   = 8
+	nibbleMask  = 0xf
+	nibbleShift = 4
+	hiByteShift = 12
+)
+
+// appendPDFLiteralByte appends cur as one PDF literal-string byte, escaping
+// parens/backslashes and emitting octal escapes for control bytes.
+func appendPDFLiteralByte(dst []byte, cur byte) []byte {
+	switch {
+	case cur == '(' || cur == ')' || cur == '\\':
+		return append(dst, '\\', cur)
+	case cur < 32 || cur > 126:
+		return append(dst, '\\', '0'+cur/64, '0'+(cur/octalBase)%octalBase, '0'+cur%octalBase)
+	default:
+		return append(dst, cur)
+	}
+}
+
+// appendPDFString appends s as a PDF literal string, folding code points
+// above U+00FF via winAnsiFold (with '?' fallback) so every emitted byte
+// matches the subset cmap and /Widths indices.
+func appendPDFString(dst []byte, s string) []byte {
+	dst = append(dst, '(')
+
+	for _, rVal := range s {
+		if rVal > maxLatin1Code {
+			rVal = winAnsiFold(rVal)
+		}
+
+		if rVal > maxLatin1Code {
+			rVal = '?'
+		}
+
+		dst = appendPDFLiteralByte(dst, byte(rVal))
+	}
+
+	return append(dst, ')')
+}
+
+// appendHex4 appends rVal as a zero-padded 4-digit uppercase hex number.
+func appendHex4(dst []byte, rVal rune) []byte {
+	const hexDigits = "0123456789ABCDEF"
+
+	return append(dst,
+		hexDigits[rVal>>hiByteShift],
+		hexDigits[(rVal>>byteShift)&nibbleMask],
+		hexDigits[(rVal>>nibbleShift)&nibbleMask],
+		hexDigits[rVal&nibbleMask],
+	)
+}
+
+// textShowSimple appends str as a Latin-1 literal string, folding and
+// escaping in the same pass that records the used runes for subsetting.
 func (c *Content) textShowSimple(str string) {
+	out := c.buf.AvailableBuffer()
+	out = append(out, '(')
+
 	for _, rVal := range str {
 		if rVal > maxLatin1Code {
 			rVal = winAnsiFold(rVal)
@@ -435,10 +537,12 @@ func (c *Content) textShowSimple(str string) {
 			rVal = '?'
 		}
 
-		c.used[c.curFont] = append(c.used[c.curFont], rVal)
+		c.recordFontRune(c.curFont, rVal)
+		out = appendPDFLiteralByte(out, byte(rVal))
 	}
 
-	c.buf.WriteString(pdfString(str) + " Tj\n")
+	out = append(out, ')', ' ', 'T', 'j', '\n')
+	_, _ = c.buf.Write(out)
 }
 
 func (c *Content) textNeedsType0(s string) bool {
@@ -473,15 +577,40 @@ func (c *Content) textShowType0(str string) {
 		c.SetFont(uname, c.curSize)
 	}
 
-	for _, r := range str {
-		if r > maxBMPCode {
-			r = '?'
+	// Hex CIDs are the Unicode code points themselves (Identity-H), so the
+	// recording pass and the hex pass can be one walk.
+	out := c.buf.AvailableBuffer()
+	out = append(out, '<')
+
+	for _, rVal := range str {
+		if rVal > maxBMPCode {
+			rVal = '?'
 		}
 
-		c.used[uname] = append(c.used[uname], r)
+		c.recordFontRune(uname, rVal)
+		out = appendHex4(out, rVal)
 	}
 
-	c.buf.WriteString(pdfHexCIDs(str) + " Tj\n")
+	out = append(out, '>', ' ', 'T', 'j', '\n')
+	_, _ = c.buf.Write(out)
+}
+
+func (c *Content) recordFontRune(name string, rVal rune) {
+	if c.doc == nil {
+		return
+	}
+
+	if c.doc.fontRuneSet == nil {
+		c.doc.fontRuneSet = make(map[string]map[rune]struct{})
+	}
+
+	used := c.doc.fontRuneSet[name]
+	if used == nil {
+		used = make(map[rune]struct{}, fontRuneInitialCapacity)
+		c.doc.fontRuneSet[name] = used
+	}
+
+	used[rVal] = struct{}{}
 }
 
 // resources
@@ -492,40 +621,34 @@ func (c *Content) textShowType0(str string) {
 // that names a missing /Resources entry renders invisible, so the error is
 // propagated instead of dropped.
 func (c *Content) fonts() (map[string]string, error) {
-	out := map[string]string{}
-
-	for name := range c.fontUses {
-		f, ok := c.fontFiles[name]
+	for _, name := range sortedStringKeys(c.fontUses) {
+		face, ok := c.fontFiles[name]
 		if !ok {
+			delete(c.fontUses, name)
+
 			continue
 		}
 
-		ref, err := c.doc.ensureFont(f, c.used[name])
+		// Subset from the document-wide rune union when the document has
+		// been finalized (unionFontRunes): one subset per font, shared by
+		// every page, instead of a near-identical subset per page.
+		used := c.doc.fontRunes[name]
+
+		ref, err := c.doc.ensureFont(face, name, used)
 		if err != nil {
 			return nil, fmt.Errorf("embed font %s: %w", name, err)
 		}
 
 		c.fontUses[name] = ref.String()
-		out[name] = ref.String()
 	}
 
-	return out, nil
+	return c.fontUses, nil
 }
 
 // imageResources returns the map of image resource name to object ref.
 // JPEG/PNG paths allocate the XObject eagerly in AddJPEGImage/AddPNGImage.
 func (c *Content) imageResources() map[string]string {
-	out := map[string]string{}
-
-	for name, img := range c.imageRefs {
-		if img == nil || img.ref == 0 {
-			continue
-		}
-
-		out[name] = img.ref.String()
-	}
-
-	return out
+	return c.imageUses
 }
 
 // extGState returns the ExtGState dict for the page resources ("" when none).

@@ -6,35 +6,40 @@ import (
 	"strings"
 )
 
-// pageSizes maps ISO/ANSI/other named page sizes to points (1 pt = 1/72 in),
-// matching Qt QPrinter / wkhtmltopdf page size names. Keys are lowercase;
-// ParsePageSize lowercases its input before lookup.
-func pageSizes() map[string][2]float64 {
-	return map[string][2]float64{
-		"a0":        {2383.94, 3370.39},
-		"a1":        {1683.78, 2383.94},
-		"a2":        {1190.55, 1683.78},
-		"a3":        {841.89, 1190.55},
-		"a4":        {595.28, 841.89},
-		"a5":        {419.53, 595.28},
-		"a6":        {297.64, 419.53},
-		"b0":        {2834.65, 4008.19},
-		"b1":        {2004.09, 2834.65},
-		"b2":        {1417.32, 2004.09},
-		"b3":        {1000.63, 1417.32},
-		"b4":        {708.66, 1000.63},
-		"b5":        {498.90, 708.66},
-		"b6":        {354.33, 498.90},
-		"c5e":       {459.21, 649.13},
-		"comm10e":   {297.00, 684.00},
-		"dle":       {311.81, 623.62},
-		"executive": {521.86, 756.00},
-		"folio":     {612.00, 936.00},
-		"ledger":    {1224.00, 792.00},
-		"legal":     {612.00, 1008.00},
-		"letter":    {612.00, 792.00},
-		"tabloid":   {792.00, 1224.00},
-	}
+// pageSizeEntry stores one ISO/ANSI/other named page size in points (1 pt =
+// 1/72 in), matching Qt QPrinter / wkhtmltopdf page size names. The fixed
+// table avoids exposing a mutable map to package-local callers.
+type pageSizeEntry struct {
+	name   string
+	width  float64
+	height float64
+}
+
+//nolint:gochecknoglobals,mnd // static page size lookup table
+var pageSizes = [...]pageSizeEntry{
+	{name: "a0", width: 2383.94, height: 3370.39},
+	{name: "a1", width: 1683.78, height: 2383.94},
+	{name: "a2", width: 1190.55, height: 1683.78},
+	{name: "a3", width: 841.89, height: 1190.55},
+	{name: "a4", width: 595.28, height: 841.89},
+	{name: "a5", width: 419.53, height: 595.28},
+	{name: "a6", width: 297.64, height: 419.53},
+	{name: "b0", width: 2834.65, height: 4008.19},
+	{name: "b1", width: 2004.09, height: 2834.65},
+	{name: "b2", width: 1417.32, height: 2004.09},
+	{name: "b3", width: 1000.63, height: 1417.32},
+	{name: "b4", width: 708.66, height: 1000.63},
+	{name: "b5", width: 498.90, height: 708.66},
+	{name: "b6", width: 354.33, height: 498.90},
+	{name: "c5e", width: 459.21, height: 649.13},
+	{name: "comm10e", width: 297.00, height: 684.00},
+	{name: "dle", width: 311.81, height: 623.62},
+	{name: "executive", width: 521.86, height: 756.00},
+	{name: "folio", width: 612.00, height: 936.00},
+	{name: "ledger", width: 1224.00, height: 792.00},
+	{name: "legal", width: 612.00, height: 1008.00},
+	{name: "letter", width: 612.00, height: 792.00},
+	{name: "tabloid", width: 792.00, height: 1224.00},
 }
 
 // errUnknownPageSize is returned by ParsePageSize for unrecognized names.
@@ -48,8 +53,11 @@ func ParsePageSize(name string) (float64, float64, error) {
 		name = "A4"
 	}
 
-	if sz, ok := pageSizes()[strings.ToLower(name)]; ok {
-		return sz[0], sz[1], nil
+	key := strings.ToLower(name)
+	for _, sz := range pageSizes {
+		if sz.name == key {
+			return sz.width, sz.height, nil
+		}
 	}
 
 	return 0, 0, fmt.Errorf("%w %q", errUnknownPageSize, name)

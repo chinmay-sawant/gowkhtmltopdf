@@ -349,6 +349,35 @@ func TestTokenizeUnterminated(t *testing.T) {
 	}
 }
 
+func TestParseMatchesCollectedTokenBuilder(t *testing.T) {
+	t.Parallel()
+
+	const source = `<!DOCTYPE html><html><body><!-- note --><p data-x="a &amp; b">x < y</p>` +
+		`<script>if (a < b) {}</script></body></html>`
+
+	streamed := mustParse(t, source)
+
+	tokens, err := tokenize(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	collected := &Node{Type: ElementNode, Name: "#document"} //nolint:exhaustruct
+	stack := []*Node{collected}
+
+	for _, token := range tokens {
+		appendToken(&stack, token)
+	}
+
+	if got, want := treeString(streamed), treeString(collected); got != want {
+		t.Fatalf("streamed Parse tree differs from collected-token builder:\nstreamed:\n%scollected:\n%s", got, want)
+	}
+
+	if got := streamed.FirstChild("html").FirstChild("body").FirstChild("p").Attribute("data-x"); got != "a & b" {
+		t.Fatalf("streamed attribute = %q, want decoded value", got)
+	}
+}
+
 // --- tree-level tests ---
 
 func TestUnescapeEntitiesInText(t *testing.T) {

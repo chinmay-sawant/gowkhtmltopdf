@@ -50,6 +50,10 @@ type Command struct {
 	// OutputWriter, when non-nil, receives PDF/image bytes directly (library
 	// path). Takes precedence over Output so embedders need no temp files.
 	OutputWriter io.Writer
+	// OutlineWriter receives dump-outline XML when the internal request adapter
+	// is used. A nil writer means discard; application adapters may inject
+	// stdout explicitly without making the parser depend on process globals.
+	OutlineWriter io.Writer
 
 	DumpDefaultTOCXSL bool
 	DumpOutline       bool
@@ -79,9 +83,10 @@ func (c *Command) OpenOutput() (io.Writer, func() error, error) {
 type flagKind uint8
 
 const (
-	flagBool  flagKind = iota // app receives one canonical "true"/"false"
-	flagValue                 // app receives one value token
-	flagPair                  // app receives exactly two tokens (name value)
+	flagKindUnknown flagKind = iota
+	flagBool                 // app receives one canonical "true"/"false"
+	flagValue                // app receives one value token
+	flagPair                 // app receives exactly two tokens (name value)
 )
 
 // flagSpec describes one accepted flag.
@@ -99,6 +104,17 @@ type objectCtx struct {
 	// objects do not consume pending, so `--enable-local-file-access toc page
 	// in.html out.pdf` does not leave an empty ghost page.
 	pending *settings.PdfObject
+}
+
+// parseState groups the mutable parser lifecycle so flag helpers do not expose
+// argv/index/mode/free-argument plumbing at every call site.
+type parseState struct {
+	cmd  *Command
+	cur  *objectCtx
+	argv []string
+	idx  int
+	mode Mode
+	free []string
 }
 
 // object returns the current object, creating one if needed (promoting
@@ -153,21 +169,23 @@ func Parse(argv []string, modes ...Mode) (*Command, error) {
 		Global: settings.DefaultPdfGlobal(),
 		Image:  settings.DefaultImageGlobal(),
 	}
-	cur := &objectCtx{} //nolint:exhaustruct // intentional zero/partial fields
+	state := &parseState{ //nolint:exhaustruct // intentional zero/partial fields
+		cmd:  cmd,
+		cur:  &objectCtx{}, //nolint:exhaustruct // empty initial object context
+		argv: argv,
+		mode: mode,
+	}
 
-	var free []string
+	for state.idx < len(state.argv) {
+		arg := state.argv[state.idx]
+		state.idx++
 
-	idx := 0
-	for idx < len(argv) {
-		arg := argv[idx]
-		idx++
-
-		if err := step(cmd, cur, arg, argv, &idx, mode, &free); err != nil {
+		if err := state.step(arg); err != nil {
 			return cmd, err
 		}
 	}
 
-	if err := cmd.resolveFree(cur, free); err != nil {
+	if err := cmd.resolveFree(state.cur, state.free); err != nil {
 		return nil, err
 	}
 
@@ -176,7 +194,7 @@ func Parse(argv []string, modes ...Mode) (*Command, error) {
 
 // step processes one argv token. Doc flags return their sentinel error; the
 // caller returns cmd alongside so --help/-h etc. exit with a parsed command.
-func step(cmd *Command, cur *objectCtx, arg string, argv []string, idx *int, mode Mode, free *[]string) error {
+func (s *parseState) step(arg string) error {
 	if ok, err := docFlagErr(arg); ok {
 		return err
 	}
@@ -184,14 +202,14 @@ func step(cmd *Command, cur *objectCtx, arg string, argv []string, idx *int, mod
 	switch {
 	case arg == "--":
 		// end of options; remaining args are positional
-		*free = append(*free, argv[*idx:]...)
-		*idx = len(argv)
+		s.free = append(s.free, s.argv[s.idx:]...)
+		s.idx = len(s.argv)
 	case strings.HasPrefix(arg, "--"):
-		return parseLongFlag(cmd, cur, arg, argv, idx, mode)
+		return s.parseLongFlag(arg)
 	case isShortFlag(arg):
-		return parseShortFlag(cmd, cur, arg, argv, idx, mode)
+		return s.parseShortFlag(arg)
 	default:
-		cmd.positional(arg, cur, free)
+		s.cmd.positional(arg, s.cur, &s.free)
 
 		return nil
 	}
@@ -222,7 +240,7 @@ func isShortFlag(arg string) bool {
 
 // parseLongFlag handles one "--name" token: lookup, mode check and value
 // application. negated is true for --no-<bool> forms.
-func parseLongFlag(cmd *Command, cur *objectCtx, arg string, argv []string, idx *int, mode Mode) error {
+func (s *parseState) parseLongFlag(arg string) error {
 	name, val, hasVal := splitFlag(arg[2:])
 	name = strings.ToLower(name)
 	spec, negated, ok := lookupFlag(name)
@@ -231,16 +249,16 @@ func parseLongFlag(cmd *Command, cur *objectCtx, arg string, argv []string, idx 
 		return fmt.Errorf("%w --%s", errUnknownOption, name)
 	}
 
-	if err := checkMode(name, spec, mode); err != nil {
+	if err := checkMode(name, spec, s.mode); err != nil {
 		return err
 	}
 
-	return apply(cmd, cur, name, spec, negated, val, hasVal, argv, idx)
+	return s.apply(name, spec, negated, val, hasVal)
 }
 
 // parseShortFlag handles one "-x" token: lookup, mode check and value
 // application. Short flags never carry inline values or negation.
-func parseShortFlag(cmd *Command, cur *objectCtx, arg string, argv []string, idx *int, mode Mode) error {
+func (s *parseState) parseShortFlag(arg string) error {
 	name := arg[1:]
 	spec, ok := shortFlags[name]
 
@@ -248,11 +266,11 @@ func parseShortFlag(cmd *Command, cur *objectCtx, arg string, argv []string, idx
 		return fmt.Errorf("%w -%s", errUnknownOption, name)
 	}
 
-	if err := checkMode(name, spec, mode); err != nil {
+	if err := checkMode(name, spec, s.mode); err != nil {
 		return err
 	}
 
-	return apply(cmd, cur, name, spec, false, "", false, argv, idx)
+	return s.apply(name, spec, false, "", false)
 }
 
 // ParseMode is the explicit form of Parse for callers that know which
@@ -404,10 +422,9 @@ func (ctx *objectCtx) applyPage(c *Command, glob func(g *settings.PdfGlobal, val
 // apply runs a flag with value extraction (next-arg or =value). Bool flags
 // arrive pre-parsed as canonical "true"/"false"; pair flags arrive as two
 // separate tokens.
-func apply(
-	cmd *Command, cur *objectCtx, name string, spec flagSpec,
-	negated bool, inlineVal string, hasInline bool, argv []string, idx *int,
-) error {
+//
+//nolint:cyclop // flag application dispatch
+func (s *parseState) apply(name string, spec flagSpec, negated bool, inlineVal string, hasInline bool) error {
 	switch spec.kind {
 	case flagBool:
 		b, err := parseBool(inlineVal, negated, hasInline)
@@ -415,41 +432,43 @@ func apply(
 			return err
 		}
 
-		return spec.app(cmd, cur, []string{strconv.FormatBool(b)})
+		return spec.app(s.cmd, s.cur, []string{strconv.FormatBool(b)})
 	case flagValue:
 		vals := []string{inlineVal}
 
 		if !hasInline {
-			if *idx >= len(argv) {
+			if s.idx >= len(s.argv) {
 				return errOptionRequiresValue
 			}
 
-			vals[0] = argv[*idx]
-			*idx++
+			vals[0] = s.argv[s.idx]
+			s.idx++
 		}
 
-		return spec.app(cmd, cur, vals)
+		return spec.app(s.cmd, s.cur, vals)
 	case flagPair:
 		vals := [2]string{}
 		if hasInline {
 			vals[0] = inlineVal
 		} else {
-			if *idx >= len(argv) {
+			if s.idx >= len(s.argv) {
 				return errOptionRequiresPair
 			}
 
-			vals[0] = argv[*idx]
-			*idx++
+			vals[0] = s.argv[s.idx]
+			s.idx++
 		}
 
-		if *idx >= len(argv) {
+		if s.idx >= len(s.argv) {
 			return errOptionRequiresPair
 		}
 
-		vals[1] = argv[*idx]
-		*idx++
+		vals[1] = s.argv[s.idx]
+		s.idx++
 
-		return spec.app(cmd, cur, vals[:])
+		return spec.app(s.cmd, s.cur, vals[:])
+	case flagKindUnknown:
+		return fmt.Errorf("%w --%s", errUnknownFlagKind, name)
 	}
 
 	return fmt.Errorf("%w --%s", errUnknownFlagKind, name)

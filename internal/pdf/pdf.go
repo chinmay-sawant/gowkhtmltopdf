@@ -32,6 +32,46 @@ type object struct {
 	stream []byte
 }
 
+// countingWriter forwards PDF bytes while tracking their exact offset. It
+// turns a silent short write into io.ErrShortWrite so xref offsets can never
+// be reported as though a truncated stream were complete.
+type countingWriter struct {
+	w io.Writer
+	n int64
+}
+
+func (w *countingWriter) Write(data []byte) (int, error) {
+	count, err := w.w.Write(data)
+	w.n += int64(count)
+
+	if err == nil && count != len(data) {
+		err = io.ErrShortWrite
+	}
+
+	return count, err
+}
+
+func (w *countingWriter) WriteString(text string) (int, error) {
+	var (
+		count int
+		err   error
+	)
+
+	if stringWriter, ok := w.w.(io.StringWriter); ok {
+		count, err = stringWriter.WriteString(text)
+	} else {
+		count, err = w.w.Write([]byte(text))
+	}
+
+	w.n += int64(count)
+
+	if err == nil && count != len(text) {
+		err = io.ErrShortWrite
+	}
+
+	return count, err
+}
+
 // objRef is a typed indirect-object handle; the "N 0 R" spelling is a
 // formatting concern, not a data type, and refs cannot be malformed.
 type objRef int
@@ -58,12 +98,21 @@ func parseRef(s string) (objRef, bool) {
 // pdfString folding) lives in one place instead of ~20 fmt.Sprintf sites.
 type dict []string
 
-func (d dict) add(k string, v ...string) dict { return append(d, append([]string{k}, v...)...) }
+func (d dict) add(k string, v ...string) dict {
+	d = append(d, k)
+
+	for _, s := range v {
+		d = append(d, s)
+	}
+
+	return d
+}
 
 func (d dict) String() string { return "<< " + strings.Join(d, " ") + " >>" }
 
 // Document is a PDF under construction.
 type Document struct {
+	mu             sync.RWMutex
 	objects        []*object
 	info           map[string]string
 	useCompression bool
@@ -73,6 +122,11 @@ type Document struct {
 	pages          []*Page
 	outlineRoot    *Outline
 	fontCache      map[string]objRef // subset key -> font dict ref
+	fontRuneSet    map[string]map[rune]struct{}
+	fontRunes      map[string][]rune // font resource name -> document-wide rune union (finalize-time)
+	fontKeys       map[string]string // font resource name -> precomputed subset cache key
+	fontKeyFonts   map[string]*Font  // font resource name -> the face the precomputed key belongs to
+	fontType0      map[string]bool   // font resource name -> precomputed needsType0(union)
 	catalogRef     objRef            // set by finalize
 	infoRef        objRef            // set by finalize
 	finalized      bool
@@ -84,6 +138,7 @@ func NewDocument() *Document {
 		info:           map[string]string{},
 		useCompression: true,
 		fontCache:      map[string]objRef{},
+		fontRuneSet:    map[string]map[rune]struct{}{},
 	}
 }
 
@@ -104,6 +159,9 @@ func (d *Document) SetInfo(key, value string) { d.info[key] = value }
 
 // newObject allocates an indirect object and returns its typed reference.
 func (d *Document) newObject() objRef {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
 	d.nextID++
 	id := d.nextID
 	d.objects = append(d.objects, &object{id: id}) //nolint:exhaustruct // intentional zero-value fields
@@ -113,12 +171,28 @@ func (d *Document) newObject() objRef {
 
 // setDict replaces the object's dict body.
 func (d *Document) setDict(r objRef, dict string) {
-	d.objects[int(r)-1].dict = dict
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	idx := int(r) - 1
+	if idx < 0 || idx >= len(d.objects) {
+		return
+	}
+
+	d.objects[idx].dict = dict
 }
 
 // setStream attaches a raw stream (compressed later at write time).
 func (d *Document) setStream(r objRef, raw []byte) {
-	d.objects[int(r)-1].stream = raw
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	idx := int(r) - 1
+	if idx < 0 || idx >= len(d.objects) {
+		return
+	}
+
+	d.objects[idx].stream = raw
 }
 
 // Page is one page of the document.
@@ -151,7 +225,10 @@ func (d *Document) AddPage(width, height float64) *Page {
 	page.contentRef = contentRef
 	page.content = NewContent()
 	page.content.doc = d
+
+	d.mu.Lock()
 	d.pages = append(d.pages, page)
+	d.mu.Unlock()
 
 	return page
 }
@@ -282,16 +359,118 @@ type Outline struct {
 // SetOutline installs the document outline tree.
 func (d *Document) SetOutline(root *Outline) { d.outlineRoot = root }
 
-// Write serializes the full PDF to w.
+// Write serializes the full PDF to w without staging another complete copy in
+// memory. The counting writer supplies the xref offsets as bytes are emitted.
 func (d *Document) Write(width io.Writer) error {
-	if err := d.finalize(); err != nil {
+	_, err := d.writeTo(width)
+
+	return err
+}
+
+// WriteTo implements io.WriterTo.
+func (d *Document) WriteTo(width io.Writer) (int64, error) {
+	return d.writeTo(width)
+}
+
+func writePDFFormat(out *countingWriter, format string, args ...any) error {
+	_, err := fmt.Fprintf(out, format, args...)
+
+	if err != nil {
+		return fmt.Errorf("write PDF format: %w", err)
+	}
+
+	return nil
+}
+
+func writePDFString(out *countingWriter, text string) error {
+	_, err := io.WriteString(out, text)
+
+	if err != nil {
+		return fmt.Errorf("write PDF text: %w", err)
+	}
+
+	return nil
+}
+
+func writePDFHeader(out *countingWriter) error {
+	if err := writePDFFormat(out, "%%PDF-%s\n", Version); err != nil {
 		return err
 	}
 
-	var buf bytes.Buffer
+	return writePDFString(out, "%\xe2\xe3\xcf\xd3\n") // binary comment
+}
 
-	fmt.Fprintf(&buf, "%%PDF-%s\n", Version)
-	fmt.Fprintln(&buf, "%\xe2\xe3\xcf\xd3") // binary comment
+func writePDFObject(out *countingWriter, obj *object) (int64, error) {
+	offset := out.n
+
+	if err := writePDFFormat(out, "%d 0 obj\n", obj.id); err != nil {
+		return 0, err
+	}
+
+	if err := writePDFString(out, obj.dict); err != nil {
+		return 0, err
+	}
+
+	if len(obj.stream) > 0 {
+		if err := writePDFString(out, "\nstream\n"); err != nil {
+			return 0, err
+		}
+
+		if _, err := out.Write(obj.stream); err != nil {
+			return 0, err
+		}
+
+		if err := writePDFString(out, "\nendstream"); err != nil {
+			return 0, err
+		}
+	}
+
+	if err := writePDFString(out, "\nendobj\n"); err != nil {
+		return 0, err
+	}
+
+	return offset, nil
+}
+
+func writePDFTrailer(out *countingWriter, doc *Document, offsets []int64) error {
+	xrefPos := out.n
+
+	if err := writePDFFormat(out, "xref\n0 %d\n", len(doc.objects)+1); err != nil {
+		return err
+	}
+
+	if err := writePDFString(out, "0000000000 65535 f \n"); err != nil {
+		return err
+	}
+
+	for idx := 1; idx <= len(doc.objects); idx++ {
+		if err := writePDFFormat(out, "%010d 00000 n \n", offsets[idx]); err != nil {
+			return err
+		}
+	}
+
+	if err := writePDFString(out, "trailer\n"); err != nil {
+		return err
+	}
+
+	if err := writePDFFormat(
+		out, "<< /Size %d /Root %s /Info %s >>\n", len(doc.objects)+1, doc.catalogRef, doc.infoRef,
+	); err != nil {
+		return err
+	}
+
+	return writePDFFormat(out, "startxref\n%d\n%%%%EOF\n", xrefPos)
+}
+
+func (d *Document) writeTo(width io.Writer) (int64, error) {
+	if err := d.finalize(); err != nil {
+		return 0, err
+	}
+
+	out := &countingWriter{w: width} //nolint:exhaustruct // count starts at zero
+	if err := writePDFHeader(out); err != nil {
+		return out.n, fmt.Errorf("pdf: write: %w", err)
+	}
 
 	offsets := make([]int64, len(d.objects)+1)
 
@@ -302,51 +481,20 @@ func (d *Document) Write(width io.Writer) error {
 			continue
 		}
 
-		offsets[obj.id] = int64(buf.Len())
-		fmt.Fprintf(&buf, "%d 0 obj\n", obj.id)
-		buf.WriteString(obj.dict)
+		offset, err := writePDFObject(out, obj)
 
-		if len(obj.stream) > 0 {
-			buf.WriteString("\nstream\n")
-			buf.Write(obj.stream)
-			buf.WriteString("\nendstream")
+		if err != nil {
+			return out.n, fmt.Errorf("pdf: write: %w", err)
 		}
 
-		fmt.Fprintln(&buf)
-		fmt.Fprintln(&buf, "endobj")
+		offsets[obj.id] = offset
 	}
 
-	xrefPos := int64(buf.Len())
-	fmt.Fprintf(&buf, "xref\n0 %d\n", len(d.objects)+1)
-	fmt.Fprintln(&buf, "0000000000 65535 f ")
-
-	for i := 1; i <= len(d.objects); i++ {
-		fmt.Fprintf(&buf, "%010d 00000 n \n", offsets[i])
+	if err := writePDFTrailer(out, d, offsets); err != nil {
+		return out.n, fmt.Errorf("pdf: write: %w", err)
 	}
 
-	fmt.Fprintln(&buf, "trailer")
-	fmt.Fprintf(&buf, "<< /Size %d /Root %s /Info %s >>\n", len(d.objects)+1, d.catalogRef, d.infoRef)
-	fmt.Fprintf(&buf, "startxref\n%d\n%%%%EOF\n", xrefPos)
-
-	if _, err := width.Write(buf.Bytes()); err != nil {
-		return fmt.Errorf("pdf: write: %w", err)
-	}
-
-	return nil
-}
-
-// WriteTo implements io.WriterTo.
-func (d *Document) WriteTo(width io.Writer) (int64, error) {
-	var buf bytes.Buffer
-	if err := d.Write(&buf); err != nil {
-		return 0, err
-	}
-
-	if _, err := width.Write(buf.Bytes()); err != nil {
-		return 0, fmt.Errorf("pdf: write: %w", err)
-	}
-
-	return int64(buf.Len()), nil
+	return out.n, nil
 }
 
 // finalize builds catalog, pages tree, fonts, images, annots, outlines and
@@ -363,6 +511,8 @@ func (d *Document) finalize() error {
 	catalogRef := d.newObject()
 	infoRef := d.newObject()
 	pagesRef := d.newObject()
+
+	d.unionFontRunes()
 
 	pageRefs := make([]string, 0, len(d.pages))
 	for _, p := range d.pages {
@@ -399,6 +549,70 @@ func (d *Document) finalize() error {
 	d.finalized = true
 
 	return nil
+}
+
+// unionFontRunes materializes the document-wide rune sets collected while
+// content streams were painted. Keeping one set on Document avoids retaining
+// a duplicate rune slice on every page until finalization.
+func (d *Document) unionFontRunes() {
+	if len(d.fontRuneSet) == 0 {
+		return
+	}
+
+	d.fontRunes = make(map[string][]rune, len(d.fontRuneSet))
+	d.fontKeys = make(map[string]string, len(d.fontRuneSet))
+	d.fontKeyFonts = make(map[string]*Font, len(d.fontRuneSet))
+	d.fontType0 = make(map[string]bool, len(d.fontRuneSet))
+
+	for _, name := range sortedStringKeys(d.fontRuneSet) {
+		used := d.fontRuneSet[name]
+		runes := make([]rune, 0, len(used))
+
+		for rVal := range used {
+			runes = append(runes, rVal)
+		}
+
+		sort.Slice(runes, func(i, j int) bool { return runes[i] < runes[j] })
+		d.fontRunes[name] = runes
+
+		var fnt *Font
+		for _, page := range d.pages {
+			if fnt = page.content.fontFiles[name]; fnt != nil {
+				break
+			}
+		}
+
+		if fnt == nil {
+			continue
+		}
+
+		type0 := needsType0(runes)
+		d.fontType0[name] = type0
+
+		mode := 0
+		if type0 {
+			mode = 1
+		}
+
+		baseName := fnt.PostScriptName
+		if baseName == "" {
+			baseName = fallbackFontName
+		}
+
+		d.fontKeyFonts[name] = fnt
+		d.fontKeys[name] = fmt.Sprintf("v%d|%x|%s|%s", mode, fnt.fingerprint, baseName, runesKey(runes))
+	}
+}
+
+func sortedStringKeys[V any](values map[string]V) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+
+	sort.Strings(keys)
+
+	return keys
 }
 
 // catalogDict builds the /Catalog dictionary, wiring /Outlines when set.
@@ -490,7 +704,8 @@ func buildPageResources(content *Content) (string, error) {
 	if len(fonts) > 0 {
 		res.WriteString(" /Font <<")
 
-		for name, ref := range fonts {
+		for _, name := range sortedStringKeys(fonts) {
+			ref := fonts[name]
 			res.WriteString(" /" + name + " " + ref)
 		}
 
@@ -500,7 +715,8 @@ func buildPageResources(content *Content) (string, error) {
 	if len(imgResources) > 0 {
 		res.WriteString(" /XObject <<")
 
-		for name, ref := range imgResources {
+		for _, name := range sortedStringKeys(imgResources) {
+			ref := imgResources[name]
 			res.WriteString(" /" + name + " " + ref)
 		}
 
@@ -673,35 +889,9 @@ func outlineCount(root *Outline) int {
 // replaced with '?'; emitting raw UTF-8 bytes made viewers show mojibake
 // and missing glyphs (e.g. "·" as "\302\267").
 func pdfString(s string) string {
-	var buf strings.Builder
+	const literalDelims = 2 // '(' and ')' framing the literal
 
-	buf.WriteByte('(')
-
-	for _, rVal := range s {
-		if rVal > maxLatin1Code {
-			rVal = winAnsiFold(rVal)
-		}
-
-		if rVal > maxLatin1Code {
-			rVal = '?'
-		}
-
-		cur := byte(rVal)
-
-		switch {
-		case cur == '(' || cur == ')' || cur == '\\':
-			buf.WriteByte('\\')
-			buf.WriteByte(cur)
-		case cur < 32 || cur > 126:
-			fmt.Fprintf(&buf, "\\%03o", cur)
-		default:
-			buf.WriteByte(cur)
-		}
-	}
-
-	buf.WriteByte(')')
-
-	return buf.String()
+	return string(appendPDFString(make([]byte, 0, len(s)+literalDelims), s))
 }
 
 // winAnsiFold maps common Unicode punctuation that appears in HTML/CSS to a
@@ -735,15 +925,9 @@ func pdfDate(t time.Time) string {
 }
 
 func num(v float64) string {
-	if v == float64(int(v)) {
-		return strconv.Itoa(int(v))
-	}
+	var buf [24]byte
 
-	s := strconv.FormatFloat(v, 'f', 3, 64)
-	s = strings.TrimRight(s, "0")
-	s = strings.TrimRight(s, ".")
-
-	return s
+	return string(appendPDFNum(buf[:0], v))
 }
 
 type flateState struct {
@@ -771,15 +955,11 @@ func flateBytes(raw []byte) []byte {
 
 	_, _ = state.zw.Write(raw)
 	_ = state.zw.Close()
-	out := state.buf.Bytes()
-	// Transfer the completed buffer to the caller and give the pooled writer a
-	// fresh destination before it is reused. This keeps compressor state pooled
-	// without copying every compressed page stream.
-	state.buf = bytes.Buffer{}
-	state.zw.Reset(&state.buf)
+
+	res := append([]byte(nil), state.buf.Bytes()...)
 	flatePool.Put(state)
 
-	return out
+	return res
 }
 
 // SortOutlines sorts children by (pageIndex, y, x) - used by layout/outline.

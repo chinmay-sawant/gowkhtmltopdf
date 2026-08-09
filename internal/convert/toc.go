@@ -98,7 +98,9 @@ func genTOCHTML(toc settings.TableOfContent, entries []*outline.Node, pageOf fun
 	var buf strings.Builder
 
 	buf.WriteString("<html><body>")
-	buf.WriteString("<h1>" + stdlibhtml.EscapeString(toc.CaptionText) + "</h1>")
+	buf.WriteString("<h1>")
+	buf.WriteString(stdlibhtml.EscapeString(toc.CaptionText))
+	buf.WriteString("</h1>")
 
 	for _, n := range entries {
 		hVal := n.Heading
@@ -140,10 +142,7 @@ func genTOCHTML(toc settings.TableOfContent, entries []*outline.Node, pageOf fun
 // cloneResult deep-copies a layout result so it can be painted more than
 // once (Paint splits rects and mutates op positions in place).
 func cloneResult(res *layout.Result) *layout.Result {
-	c := *res
-	c.Ops = append([]layout.Op(nil), res.Ops...)
-
-	return &c
+	return layout.CloneResult(res)
 }
 
 // paintOptions converts an object geometry into layout paint options.

@@ -34,7 +34,7 @@ func (e *engine) buildGrid(node *html.Node, sty ResolvedStyle, availW, posX, pos
 
 	ml := e.scalePt(sty.MarginLeft)
 	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
-		node: node, style: sty, kind: displayBlock, x: posX + ml, y: posY,
+		node: node, style: e.stylePtr(node), kind: displayBlock, x: posX + ml, y: posY,
 	}
 	boxNode.w = resolveUsedWidth(sty, availW, e)
 	contentX, contentW := e.contentBox(boxNode.x, boxNode.w, sty)
@@ -212,7 +212,7 @@ func placeGridItems(
 
 	for _, kid := range kids {
 		row, col, rowSpan, colSpan := planGridItemPlacement(
-			eng.styles[kid], areas, occ, nCols, cursorRow, cursorCol,
+			*eng.styles[kid], areas, occ, nCols, cursorRow, cursorCol,
 			columnMajor, densePack, minRows,
 		)
 		occ.mark(row, col, rowSpan, colSpan)
@@ -603,22 +603,19 @@ func emitGridItem(
 	targetY := posY + rowYs[pbox.row]
 
 	cstate := eng.styles[pbox.n]
-	justify := gridItemJustify(cstate, containerJustify)
-	align := gridItemAlign(cstate, containerAlign)
+	justify := gridItemJustify(*cstate, containerJustify)
+	align := gridItemAlign(*cstate, containerAlign)
 
-	buildH := gridStretchBuildHeight(align, cellH, cstate)
+	buildH := gridStretchBuildHeight(align, cellH, *cstate)
 
 	var cblock *box
 
 	if buildH > 0 {
-		prev := eng.styles[pbox.n]
-		mod := prev
-		mod.Height = buildH
-		mod.HeightPercent = -1
-		mod.BoxSizing = borderBox
-		eng.styles[pbox.n] = mod
-		cblock = eng.build(pbox.n, pbox.cellW, pbox.cx, targetY)
-		eng.styles[pbox.n] = prev
+		override := *cstate
+		override.Height = buildH
+		override.HeightPercent = -1
+		override.BoxSizing = borderBox
+		cblock = eng.buildWithStyle(pbox.n, &override, pbox.cellW, pbox.cx, targetY)
 	} else {
 		cblock = eng.build(pbox.n, pbox.cellW, pbox.cx, targetY)
 	}
@@ -1402,7 +1399,7 @@ func measureTrackIntrinsics(eng *engine, kids []*html.Node, nTracks int, axisCol
 
 		var val float64
 		if axisColumns {
-			val = eng.measureCellContent(kid, cstate)
+			val = eng.measureCellContent(kid, *cstate)
 		} else {
 			// Height intrinsic: single-line text approximation via font size.
 			val = eng.scalePt(cstate.FontSize) * defaultLineHeightRatio

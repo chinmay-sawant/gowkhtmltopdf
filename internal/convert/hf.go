@@ -2,12 +2,12 @@ package convert
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"gowkhtmltopdf/internal/css"
 	"gowkhtmltopdf/internal/html"
@@ -18,47 +18,6 @@ import (
 	"gowkhtmltopdf/internal/pdf"
 	"gowkhtmltopdf/internal/settings"
 )
-
-// hfGeom is the page geometry of one object, in points. contentW/contentH
-// are the content-area dimensions the object's layout was paginated with.
-type hfGeom struct {
-	pageW, pageH            float64
-	marginTop, marginBottom float64
-	marginLeft, marginRight float64
-	contentW, contentH      float64
-}
-
-// recomputeContent refreshes contentW/contentH from page size and margins.
-// contentH falls back to pageH when margins would leave a non-positive band.
-func (g *hfGeom) recomputeContent() {
-	g.contentW = g.pageW - g.marginLeft - g.marginRight
-	g.contentH = g.pageH - g.marginTop - g.marginBottom
-
-	if g.contentH <= 0 {
-		g.contentH = g.pageH
-	}
-}
-
-// pdfY converts a y-down canvas coordinate on object-local page locPage into
-// PDF y-up coordinates (top of the box).
-func (g *hfGeom) pdfY(locPage int, y float64) float64 {
-	return g.pageH - g.marginTop - (y - float64(locPage)*g.contentH)
-}
-
-// pdfXY converts a y-down element location into PDF (x, y-up) destination.
-func (g *hfGeom) pdfXY(loc layout.ElementLocation) (float64, float64) {
-	return g.marginLeft + loc.X, g.pdfY(loc.Page, loc.Y)
-}
-
-// pdfRect converts a y-down element location into a PDF annotation rect
-// [x1 y1 x2 y2] with y-up coordinates.
-func (g *hfGeom) pdfRect(loc layout.ElementLocation) [4]float64 {
-	x1 := g.marginLeft + loc.X
-	yTop := g.pdfY(loc.Page, loc.Y)
-	yBot := g.pageH - g.marginTop - (loc.Y + loc.H - float64(loc.Page)*g.contentH)
-
-	return [4]float64{x1, yBot, x1 + loc.W, yTop}
-}
 
 // hfParms is the per-page substitution state for header/footer text. page,
 // topage and frompage are 1-based; replaces holds the merged --replace map.
@@ -71,12 +30,14 @@ type hfParms struct {
 	replaces               map[string]string
 }
 
-// knownPlaceholders are the [..] tokens the engine substitutes. Everything
-// else passes through literally.
-var knownPlaceholders = map[string]bool{ //nolint:gochecknoglobals // immutable lookup table
-	"page": true, "topage": true, "frompage": true,
-	"date": true, "time": true, "title": true, "doctitle": true,
-	"webpage": true, "section": true, "subsection": true, "subject": true,
+func isKnownPlaceholder(token string) bool {
+	switch token {
+	case "page", "topage", "frompage", "date", "time", "title",
+		"doctitle", "webpage", htmlSectionName, "subsection", "subject":
+		return true
+	default:
+		return false
+	}
 }
 
 // placeholderToken matches one [name] token.
@@ -95,13 +56,14 @@ func (p hfParms) substitute(src string) string { //nolint:cyclop // per-token sw
 
 	return placeholderToken.ReplaceAllStringFunc(src, func(tok string) string {
 		name := tok[1 : len(tok)-1]
+
 		switch name {
 		case "page":
 			return strconv.Itoa(p.page)
-		case "topage":
-			return strconv.Itoa(p.topage)
 		case "frompage":
 			return strconv.Itoa(p.frompage)
+		case "topage":
+			return strconv.Itoa(p.topage)
 		case "date":
 			return p.date
 		case "time":
@@ -128,7 +90,7 @@ func (p hfParms) substitute(src string) string { //nolint:cyclop // per-token sw
 func knownIn(s string) bool {
 	for _, m := range placeholderToken.FindAllString(s, -1) {
 		name := m[1 : len(m)-1]
-		if knownPlaceholders[name] {
+		if isKnownPlaceholder(name) {
 			return true
 		}
 	}
@@ -197,8 +159,11 @@ func drawTextHF(page *pdf.Page, hfVal settings.HeaderFooter, geom hfGeom, parms 
 		cur.Stroke()
 	}
 
+	left := parms.substitute(hfVal.Left)
+	center := parms.substitute(hfVal.Center)
+	right := parms.substitute(hfVal.Right)
+
 	draw := func(text string, posX float64) {
-		text = parms.substitute(text)
 		if text == "" {
 			return
 		}
@@ -209,18 +174,18 @@ func drawTextHF(page *pdf.Page, hfVal settings.HeaderFooter, geom hfGeom, parms 
 		cur.TextShow(text)
 		cur.EndText()
 	}
-	if hfVal.Left != "" {
-		draw(hfVal.Left, geom.marginLeft)
+	if left != "" {
+		draw(left, geom.marginLeft)
 	}
 
-	if hfVal.Center != "" {
+	if center != "" {
 		const centerDivisor = 2
 
-		draw(hfVal.Center, (page.Width()-measureHF(font, parms.substitute(hfVal.Center), size))/centerDivisor)
+		draw(center, (page.Width()-measureHF(font, center, size))/centerDivisor)
 	}
 
-	if hfVal.Right != "" {
-		draw(hfVal.Right, page.Width()-geom.marginRight-measureHF(font, parms.substitute(hfVal.Right), size))
+	if right != "" {
+		draw(right, page.Width()-geom.marginRight-measureHF(font, right, size))
 	}
 }
 
@@ -329,7 +294,7 @@ func loadHTMLHF(ctx context.Context, loader *load.Loader, font *pdf.Font, state 
 
 		r, err := resources.Fetch(ctx, src)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("fetch header/footer resource: %w", err)
 		}
 
 		return r.Body, nil
@@ -372,6 +337,63 @@ type hfLinkContext struct {
 	useLocal bool
 	useExt   bool
 	resolve  bool
+}
+
+// hfDrawWarning records a recoverable header/footer failure with enough
+// locality to explain which band was omitted. Header/footer failures do not
+// invalidate an already-painted body document, so the compatibility adapter
+// below reports every warning instead of dropping the error or aborting the
+// conversion after body output exists.
+type hfDrawWarning struct {
+	object int
+	page   int
+	band   string
+	err    error
+}
+
+type hfDrawResult struct {
+	warnings []hfDrawWarning
+}
+
+// Err returns the aggregate failure for strict conversion callers. The
+// compatibility adapter may still emit warnings, but the primary PDF engine
+// must not report success when required header/footer content was omitted.
+// Err returns the aggregate failure for strict conversion callers. The
+// compatibility adapter may still emit warnings, but the primary PDF engine
+// must not report success when required header/footer content was omitted.
+func (r *hfDrawResult) Err() error {
+	if len(r.warnings) == 0 {
+		return nil
+	}
+
+	errs := make([]error, 0, len(r.warnings))
+	for _, warning := range r.warnings {
+		errs = append(errs, fmt.Errorf("object %d page %d %s: %w",
+			warning.object, warning.page+1, warning.band, warning.err))
+	}
+
+	return errors.Join(errs...)
+}
+
+func (r *hfDrawResult) warn(object, page int, band string, err error) {
+	if err == nil {
+		return
+	}
+
+	r.warnings = append(r.warnings, hfDrawWarning{
+		object: object,
+		page:   page,
+		band:   band,
+		err:    err,
+	})
+}
+
+//nolint:unused // warning emitter helper for compatibility adapter
+func (r *hfDrawResult) emitWarnings(log io.Writer) {
+	for _, warning := range r.warnings {
+		line.Emit(log, line.Warn, "object %d page %d: %s header/footer: %v",
+			warning.object, warning.page+1, warning.band, warning.err)
+	}
 }
 
 // drawHTMLHF paints a cached HTML header/footer onto page, clipped to the
@@ -595,13 +617,28 @@ func effectiveMargins(ctx context.Context, loader *load.Loader, font *pdf.Font, 
 	return state.registry, nil
 }
 
-// drawHeadersFooters is the final pass that paints the effective text/HTML
-// header and footer of every page once the whole document exists (so [topage]
-// and the page indices are final). Cover pages are skipped. Errors loading an
-// HTML header/footer here only warn - the body content is already painted.
-func drawHeadersFooters(ctx context.Context, loader *load.Loader, font *pdf.Font, doc *pdf.Document, req *Request, plan *pagePlan, headings []*outline.Heading, log io.Writer) { //nolint:gocognit,cyclop,funlen,lll // per-page draw dispatch with lazy HF load
+// drawHeadersFooters is the compatibility adapter for the existing caller.
+// The result-producing implementation below keeps the failure policy
+// explicit: body output remains usable, every recoverable HF error is
+// collected, and the adapter emits one warning per failed band.
+//
+//nolint:lll,unused // compatibility adapter for existing caller
+func drawHeadersFooters(ctx context.Context, loader *load.Loader, font *pdf.Font, doc *pdf.Document, req *Request, plan *pagePlan, headings []*outline.Heading, log io.Writer) {
+	res := drawHeadersFootersResult(ctx, loader, font, doc, req, plan, headings, log)
+	res.emitWarnings(log)
+}
+
+// drawHeadersFootersResult is the final pass that paints the effective
+// text/HTML header and footer of every page once the whole document exists
+// (so [topage] and the page indices are final). Cover pages are skipped.
+// Returning a result keeps failure handling testable and gives a future
+// caller a precise integration point for a strict policy without changing
+// the current convert.Run signature.
+func drawHeadersFootersResult(ctx context.Context, loader *load.Loader, font *pdf.Font, doc *pdf.Document, req *Request, plan *pagePlan, headings []*outline.Heading, log io.Writer) hfDrawResult { //nolint:gocognit,cyclop,funlen,lll // per-page draw dispatch with lazy HF load
+	var result hfDrawResult
+
 	total := doc.PageCount()
-	now := time.Now()
+	now := req.now()
 	date := now.Format("2006-01-02")
 	clock := now.Format("15:04:05")
 	idIndex := buildBodyIDIndex(planBodyStates(plan))
@@ -655,6 +692,11 @@ func drawHeadersFooters(ctx context.Context, loader *load.Loader, font *pdf.Font
 				return
 			}
 
+			band := "footer"
+			if isHeader {
+				band = "header"
+			}
+
 			if hfVal.HTMLURL != "" { //nolint:nestif // lazy load, cache and draw for one band
 				lst := own.st.headerHTML
 				if !isHeader {
@@ -668,7 +710,7 @@ func drawHeadersFooters(ctx context.Context, loader *load.Loader, font *pdf.Font
 
 					lst, reg, err = loadHTMLHF(ctx, loader, font, own.st, hfVal.HTMLURL, log)
 					if err != nil {
-						line.Emit(log, line.Warn, "object %d: header/footer html: %v", own.st.idx, err)
+						result.warn(own.st.idx, pVal, band, fmt.Errorf("html load: %w", err))
 
 						return
 					}
@@ -685,7 +727,7 @@ func drawHeadersFooters(ctx context.Context, loader *load.Loader, font *pdf.Font
 				}
 
 				if err := drawHTMLHF(ctx, page, lst, hfVal, own.st.geom, parms, isHeader, links); err != nil {
-					line.Emit(log, line.Warn, "object %d: header/footer html draw: %v", own.st.idx, err)
+					result.warn(own.st.idx, pVal, band, fmt.Errorf("html draw: %w", err))
 				}
 
 				return
@@ -696,6 +738,8 @@ func drawHeadersFooters(ctx context.Context, loader *load.Loader, font *pdf.Font
 		draw(own.st.header, true)
 		draw(own.st.footer, false)
 	}
+
+	return result
 }
 
 // planBodyStates returns unique body objectStates from a page plan (for id index).

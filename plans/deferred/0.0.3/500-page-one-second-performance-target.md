@@ -2,8 +2,10 @@
 
 **Status:** Deferred investigation  
 **Created:** 2026-08-07  
-**Current branch:** `feature/performance-improvements`  
-**Baseline implementation commit:** `c103141`
+**Current branch:** `feature/optimization`
+
+**Original benchmark snapshot:** `2a0f18b`
+**Current optimization commit:** `aa8d446`
 
 ## Objective
 
@@ -15,30 +17,35 @@ the completed incremental optimization checklist.
 
 ## Current position
 
-The final count-3 benchmark medians are:
+The latest locked count-3 benchmark median for the PDF path is:
 
 | Workload | Current median | Target | Further reduction required |
 |---|---:|---:|---:|
-| PDF, 500 pages | 6.93 s | 1.00 s | **85.6%** |
-| Template PDF, 500 pages | 5.82 s | 1.00 s | **82.8%** |
+| PDF, 500 pages | **1.628 s** | 1.00 s | **38.6%** |
+| Template PDF, 500 pages | 1.693 s* | 1.00 s | **40.9%*** |
 
-The completed optimization work reduced the original PDF baseline from 14.14 s
-to 6.93 s, approximately **51% faster**. The current implementation is better,
-but the one-second target requires a materially different level of optimization.
+The same one-iteration comparison in the benchmark snapshot reduced the
+original PDF baseline from 14.135 s to 1.903 s, approximately **86.5% faster**;
+the current count-3 median is 1.628 s. The one-second target still requires a
+materially different level of optimization.
+
+\* The current template value is the recorded one-iteration matrix result; a
+separate count-3 template gate has not been recorded in this wave.
 
 ## Why incremental fixes are insufficient
 
 The final PDF profile still contains several substantial costs:
 
-- `shiftFlowY`: **15.88% flat CPU**
-- Indexed operation movement: **10.06% flat CPU**
-- Indexed box movement: **9.30% flat CPU**
-- Garbage collection via `runtime.scanObject`: **16.26% flat CPU**
-- Pagination overall: approximately **45% cumulative CPU**
+- style application (`resolveElementStyle` / `resolveStylesCtx`)
+- forced-break placement (`beforeAlways`)
+- map operations, text measurement, and zlib compression
+- allocation traffic from the style arena, HTML tokenization, display-list
+  growth, crossing-rectangle splitting, and table-cell construction
 
-These percentages overlap by call path. Removing one hotspot completely would
-not be enough to reach one second. The target requires reducing or restructuring
-multiple serial stages.
+The current profile measured approximately 391 MiB peak RSS for the benchmark
+process. These costs remain serial and retained-state heavy; removing one
+hotspot completely would not be enough to reach one second or the aspirational
+sub-100-MB process target.
 
 ## Candidate architecture directions
 
@@ -82,3 +89,12 @@ multiple serial stages.
 - The implementation does not silently change compression, output, or layout
   semantics to claim the target.
 
+## wkhtmltopdf reference
+
+The earlier process-level reference on the same fixture recorded wkhtmltopdf
+0.12.6.1 at **2.05 s / approximately 114 MB peak RSS / approximately 2.0 MB
+PDF** for 500 pages. The current Go benchmark records **1.903 s / 678.6 MB
+B/op / 1.103 M allocs** in-process, with a profiled process RSS of about
+**391 MiB**. `B/op` is cumulative allocation traffic, not RSS, so these are
+not interchangeable memory figures. The full page matrix and caveat are in
+[`testdata/golden/benchmarks/README.md`](../../../testdata/golden/benchmarks/README.md).

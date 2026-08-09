@@ -25,7 +25,9 @@ func TestStickyOverflowScrollportNoPageClone(t *testing.T) { //nolint:cyclop,fun
 `)
 
 	for i := range 40 {
-		body.WriteString(`<p>row ` + strconv.Itoa(i) + ` filler text for pagination</p>`)
+		body.WriteString(`<p>row `)
+		body.WriteString(strconv.Itoa(i))
+		body.WriteString(` filler text for pagination</p>`)
 	}
 
 	body.WriteString(`</div></body></html>`)

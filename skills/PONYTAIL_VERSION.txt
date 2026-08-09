@@ -1,1 +1,1 @@
-ponytail skills installed from @dietrichgebert/ponytail@4.8.4 (2026-08-06T18:26Z)
+ponytail skills installed from @dietrichgebert/ponytail@4.9.0 (2026-08-09T08:53Z)

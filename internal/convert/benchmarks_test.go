@@ -41,21 +41,9 @@ var errTVMazeBadStatus = errors.New("TVmaze API returned non-200 status")
 // errTVMazeNoShows reports an empty TVmaze show list.
 var errTVMazeNoShows = errors.New("TVmaze API returned no shows")
 
-// Baseline snapshot from benchmark-results.txt, recorded with
-// go1.26.4 linux/amd64 on WSL2 (24 CPUs), -benchtime=1x -count=1. The
-// report template uses 20 realistic rows per physical page:
-// PDF pages:     2=9.20ms, 5=15.89ms, 10=31.61ms, 20=78.63ms,
-//                50=185.99ms, 100=455.05ms, 200=1.27s, 250=1.61s,
-//                500=6.89s.  (refreshed 2026-08-08)
-// Template+PDF:  2=8.13ms, 5=18.42ms, 10=35.76ms, 20=71.28ms,
-//                50=184.69ms, 100=407.52ms, 200=1.15s, 250=1.64s,
-//                500=6.74s.  (refreshed 2026-08-08)
-// Web images:    2=257.33ms, 5=258.05ms, 10=281.10ms, 20=310.47ms,
-//                50=356.66ms, 100=413.68ms, 200=506.42ms, 250=564.00ms,
-//                500=970.72ms.
-// Inline images: 2=209.50ms, 5=220.61ms, 10=255.35ms, 20=282.33ms,
-//                50=303.54ms, 100=340.31ms, 200=439.46ms, 250=491.22ms,
-//                500=788.43ms.
+// Benchmark baselines are maintained in the checked-in benchmark artifact.
+// Keep this source file focused on workload construction and benchmark logic;
+// a benchmark run must not require updating duplicated timing comments here.
 
 type benchmarkPage struct {
 	Number int
@@ -694,9 +682,7 @@ func BenchmarkLiveMovieData(b *testing.B) {
 
 	var showCount int
 
-	b.ResetTimer()
-
-	for range b.N {
+	for b.Loop() {
 		shows, size, err := fetchTVMazeShows(b.Context(), client)
 		if err != nil {
 			b.Fatalf("fetch live TVmaze data: %v", err)
@@ -787,41 +773,6 @@ func BenchmarkWebFetchImage(b *testing.B) {
 
 				if err := imageout.RunRequest(b.Context(), req, io.Discard); err != nil {
 					b.Fatalf("run web-fetch image benchmark: %v", err)
-				}
-			}
-
-			b.StopTimer()
-			b.SetBytes(int64(output.Len()))
-		})
-	}
-}
-
-// BenchmarkImageAssets measures image-mode conversion with an inline image
-// source. It is separate from BenchmarkWebFetchImage so network fetching and
-// rasterization/encoding costs can be compared directly.
-func BenchmarkImageAssets(b *testing.B) {
-	tpl := loadBenchmarkTemplate(b, "image-grid.html.tmpl")
-	imageURL := benchmarkDataURL(benchmarkPNG())
-	sources := make(map[int][]byte, len(benchmarkPageSizes))
-
-	for _, images := range benchmarkPageSizes {
-		sources[images] = executeBenchmarkTemplate(b, tpl, benchmarkTemplateData{ //nolint:exhaustruct,lll // intentional zero-value fields
-			Images: benchmarkImages(images, imageURL),
-		})
-	}
-
-	for _, images := range benchmarkPageSizes {
-		b.Run(fmt.Sprintf("%dImages", images), func(b *testing.B) {
-			var output bytes.Buffer
-			req := benchmarkImageRequest(sources[images], &output)
-			b.ReportMetric(float64(images), "images")
-			b.ResetTimer()
-
-			for range b.N {
-				output.Reset()
-
-				if err := imageout.RunRequest(b.Context(), req, io.Discard); err != nil {
-					b.Fatalf("run image benchmark: %v", err)
 				}
 			}
 

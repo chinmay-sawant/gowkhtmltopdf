@@ -8,9 +8,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
+	"time"
 
 	"gowkhtmltopdf/internal/convert"
+	"gowkhtmltopdf/internal/errs"
 	"gowkhtmltopdf/internal/imageout"
 	"gowkhtmltopdf/internal/line"
 	"gowkhtmltopdf/internal/settings"
@@ -22,9 +25,25 @@ const LibraryVersion = "0.12.7-dev"
 
 // Static conversion errors; callers can match with errors.Is.
 var (
-	errNoPageObjectsAdded = errors.New("gowkhtmltopdf: no page objects added")
-	errEmptyHTML          = errors.New("gowkhtmltopdf: empty HTML")
-	errNoInputPageAdded   = errors.New("gowkhtmltopdf: no input page added")
+	// ErrNoPageObjectsAdded reports a PDF conversion without any page objects.
+	ErrNoPageObjectsAdded = errors.New("gowkhtmltopdf: no page objects added")
+	// ErrEmptyHTML reports an empty document passed to ConvertHTML.
+	ErrEmptyHTML = errors.New("gowkhtmltopdf: empty HTML")
+	// ErrNoInputPageAdded reports an image conversion without an input page.
+	ErrNoInputPageAdded = errors.New("gowkhtmltopdf: no input page added")
+	// ErrNilImageConverter reports a conversion attempted through a nil
+	// ImageConverter receiver.
+	ErrNilImageConverter = errors.New("gowkhtmltopdf: nil image converter")
+	// ErrNilConverter reports a conversion attempted through a nil Converter.
+	ErrNilConverter = errors.New("gowkhtmltopdf: nil converter")
+	// ErrNilGlobalSettings reports a method call on nil global settings.
+	ErrNilGlobalSettings = errors.New("gowkhtmltopdf: nil global settings")
+	// ErrNilObjectSettings reports a method call on nil object settings.
+	ErrNilObjectSettings = errors.New("gowkhtmltopdf: nil object settings")
+	// ErrNilImageSettings reports a method call on nil image settings.
+	ErrNilImageSettings = errors.New("gowkhtmltopdf: nil image settings")
+	// ErrNilContext reports a cancellation-aware operation without a context.
+	ErrNilContext = errs.ErrNilContext
 )
 
 // Version returns the library version banner.
@@ -43,6 +62,100 @@ type GlobalSettings struct {
 	g settings.PdfGlobal
 }
 
+// PdfGlobalOptions is the typed builder for common PDF global settings. It is
+// an alternative to GlobalSettings.Set for library callers; CLI-compatible
+// string settings remain available through GlobalSettings.
+type PdfGlobalOptions struct {
+	options settings.PdfGlobalOptions
+}
+
+// NewPdfGlobalOptions returns a typed builder initialized with PDF defaults.
+func NewPdfGlobalOptions() *PdfGlobalOptions {
+	return &PdfGlobalOptions{options: settings.NewPdfGlobalOptions()}
+}
+
+func (o *PdfGlobalOptions) WithPageSize(pageSize string) *PdfGlobalOptions {
+	if o != nil {
+		o.options = o.options.WithPageSize(pageSize)
+	}
+
+	return o
+}
+
+func (o *PdfGlobalOptions) WithMargins(top, right, bottom, left float64) *PdfGlobalOptions {
+	if o != nil {
+		o.options = o.options.WithMargins(top, right, bottom, left)
+	}
+
+	return o
+}
+
+func (o *PdfGlobalOptions) WithTitle(title string) *PdfGlobalOptions {
+	if o != nil {
+		o.options = o.options.WithTitle(title)
+	}
+
+	return o
+}
+
+func (o *PdfGlobalOptions) WithCopies(copies int, collate bool) *PdfGlobalOptions {
+	if o != nil {
+		o.options = o.options.WithCopies(copies, collate)
+	}
+
+	return o
+}
+
+func (o *PdfGlobalOptions) WithOutline(enabled bool, depth int) *PdfGlobalOptions {
+	if o != nil {
+		o.options = o.options.WithOutline(enabled, depth)
+	}
+
+	return o
+}
+
+func (o *PdfGlobalOptions) WithSmartShrinking(enabled bool) *PdfGlobalOptions {
+	if o != nil {
+		o.options = o.options.WithSmartShrinking(enabled)
+	}
+
+	return o
+}
+
+func (o *PdfGlobalOptions) WithBackground(enabled bool) *PdfGlobalOptions {
+	if o != nil {
+		o.options = o.options.WithBackground(enabled)
+	}
+
+	return o
+}
+
+func (o *PdfGlobalOptions) WithCompression(enabled bool) *PdfGlobalOptions {
+	if o != nil {
+		o.options = o.options.WithCompression(enabled)
+	}
+
+	return o
+}
+
+func (o *PdfGlobalOptions) WithResolveRelativeLinks(enabled bool) *PdfGlobalOptions {
+	if o != nil {
+		o.options = o.options.WithResolveRelativeLinks(enabled)
+	}
+
+	return o
+}
+
+// Build returns independent public settings that can be passed to a typed
+// PDFRequest or copied into a Converter's GlobalSettings.
+func (o *PdfGlobalOptions) Build() *GlobalSettings {
+	if o == nil {
+		return nil
+	}
+
+	return &GlobalSettings{g: o.options.Build()}
+}
+
 // NewGlobalSettings returns the wkhtmltopdf-compatible default global
 // settings (A4 portrait, 10 mm margins, background on, …).
 func NewGlobalSettings() *GlobalSettings {
@@ -53,6 +166,10 @@ func NewGlobalSettings() *GlobalSettings {
 // "orientation", "web.background", "load.timeout", …). Unknown names return
 // an error.
 func (s *GlobalSettings) Set(name, value string) error {
+	if s == nil {
+		return ErrNilGlobalSettings
+	}
+
 	if err := s.g.Set(name, value); err != nil {
 		return fmt.Errorf("global set %q: %w", name, err)
 	}
@@ -66,6 +183,10 @@ func (s *GlobalSettings) Set(name, value string) error {
 // name ("Portrait", "print", "abort", …), floats with the shortest round-trip
 // representation.
 func (s *GlobalSettings) Get(name string) (string, bool) {
+	if s == nil {
+		return "", false
+	}
+
 	return s.g.Get(name)
 }
 
@@ -88,6 +209,10 @@ func NewObjectSettings() *ObjectSettings {
 // "web.images", "header.left", "footer.right", …). Unknown names return an
 // error.
 func (s *ObjectSettings) Set(name, value string) error {
+	if s == nil {
+		return ErrNilObjectSettings
+	}
+
 	if err := s.o.Set(name, value); err != nil {
 		return fmt.Errorf("object set %q: %w", name, err)
 	}
@@ -97,12 +222,20 @@ func (s *ObjectSettings) Set(name, value string) error {
 
 // Get reads a dotted object settings key via the same key table as Set.
 func (s *ObjectSettings) Get(name string) (string, bool) {
+	if s == nil {
+		return "", false
+	}
+
 	return s.o.Get(name)
 }
 
 // SetPage sets the input page (a path, URL or "inline:…" / "data:…" source)
 // and returns s so calls can be chained.
 func (s *ObjectSettings) SetPage(page string) *ObjectSettings {
+	if s == nil {
+		return nil
+	}
+
 	s.o.Page = page
 
 	return s
@@ -113,6 +246,10 @@ func (s *ObjectSettings) SetPage(page string) *ObjectSettings {
 // <img>, <a>); an empty base leaves them unresolvable. No URL guessing is
 // involved: the bytes are always treated as a document.
 func (s *ObjectSettings) SetBody(html []byte, base string) *ObjectSettings {
+	if s == nil {
+		return nil
+	}
+
 	s.o.Page = ""
 	s.o.Load.InlineHTML = cloneBytes(html)
 	s.o.Load.InlineBase = base
@@ -156,13 +293,26 @@ func NewConverter() *Converter {
 
 // Global returns the converter's global settings, for Set/Get.
 func (c *Converter) Global() *GlobalSettings {
+	if c == nil {
+		return nil
+	}
+
+	if c.global == nil {
+		c.global = NewGlobalSettings()
+	}
+
 	return c.global
 }
 
 // AddObject appends a page object and returns c for chaining. The object's
 // settings are copied, so later mutations of s do not affect the converter.
-// A converter needs at least one object to convert.
+// A converter needs at least one object to convert. A nil settings pointer is
+// ignored so an optional object cannot panic the conversion setup.
 func (c *Converter) AddObject(s *ObjectSettings) *Converter {
+	if c == nil || s == nil {
+		return c
+	}
+
 	cp := &ObjectSettings{o: clonePdfObject(s.o)}
 	c.objects = append(c.objects, cp)
 
@@ -186,6 +336,26 @@ func clonePdfObject(src settings.PdfObject) settings.PdfObject {
 	return dst
 }
 
+func clonePdfGlobal(src settings.PdfGlobal) settings.PdfGlobal {
+	dst := src
+	dst.Header = cloneHeaderFooter(src.Header)
+	dst.Footer = cloneHeaderFooter(src.Footer)
+	dst.Load.Allow = cloneStrings(src.Load.Allow)
+	dst.ExcludeFromOutline = cloneStrings(src.ExcludeFromOutline)
+	dst.FontPaths = cloneStrings(src.FontPaths)
+	dst.Ignored = cloneStringMap(src.Ignored)
+
+	return dst
+}
+
+func cloneImageGlobal(src settings.ImageGlobal) settings.ImageGlobal {
+	dst := src
+	dst.Load.Allow = cloneStrings(src.Load.Allow)
+	dst.Ignored = cloneStringMap(src.Ignored)
+
+	return dst
+}
+
 func cloneHeaderFooter(src settings.HeaderFooter) settings.HeaderFooter {
 	dst := src
 	dst.Replace = cloneStringMap(src.Replace)
@@ -199,6 +369,17 @@ func clonePostItems(src []settings.PostItem) []settings.PostItem {
 	}
 
 	dst := make([]settings.PostItem, len(src))
+	copy(dst, src)
+
+	return dst
+}
+
+func cloneStrings(src []string) []string {
+	if src == nil {
+		return nil
+	}
+
+	dst := make([]string, len(src))
 	copy(dst, src)
 
 	return dst
@@ -243,8 +424,16 @@ func (c *Converter) AddHTML(page []byte, baseURL string) *Converter {
 // also reported to OnError when set. Output is captured via an in-memory
 // writer (no temp file).
 func (c *Converter) Convert(ctx context.Context) error {
+	if c == nil {
+		return ErrNilConverter
+	}
+
+	if c.global == nil {
+		c.global = NewGlobalSettings()
+	}
+
 	if len(c.objects) == 0 {
-		return errNoPageObjectsAdded
+		return ErrNoPageObjectsAdded
 	}
 
 	objects := make([]settings.PdfObject, len(c.objects))
@@ -272,6 +461,10 @@ func (c *Converter) Convert(ctx context.Context) error {
 // nil if none ran yet. The returned slice is a copy; it stays valid across
 // later conversions.
 func (c *Converter) Output() []byte {
+	if c == nil {
+		return nil
+	}
+
 	return append([]byte(nil), c.output...)
 }
 
@@ -280,19 +473,19 @@ func (c *Converter) Output() []byte {
 // apply). Local file / subresource ACL is unchanged — linked local assets
 // still need enablelocalfileaccess + load.blocklocalfileaccess=false.
 //
-//nolint:contextcheck // defensive nil-context contract
+
 func ConvertHTML(ctx context.Context, html []byte, global *GlobalSettings) ([]byte, error) {
 	if ctx == nil {
-		ctx = context.Background()
+		return nil, ErrNilContext
 	}
 
 	if len(html) == 0 {
-		return nil, errEmptyHTML
+		return nil, ErrEmptyHTML
 	}
 
 	conv := NewConverter()
 	if global != nil {
-		conv.global = global
+		conv.global = &GlobalSettings{g: clonePdfGlobal(global.g)}
 	}
 
 	conv.AddObject(NewObjectSettings().SetBody(html, ""))
@@ -313,10 +506,11 @@ func ConvertHTML(ctx context.Context, html []byte, global *GlobalSettings) ([]by
 // JPEG. Configure with Set/AddObject, then Convert produces the encoded
 // bytes via Output(). Not safe for concurrent Convert calls.
 type ImageConverter struct {
-	global *GlobalSettings
-	image  settings.ImageGlobal
-	object *ObjectSettings
-	output []byte
+	global      *GlobalSettings
+	image       settings.ImageGlobal
+	object      *ObjectSettings
+	output      []byte
+	initialized bool
 
 	// OnInfo, OnWarn and OnError receive the conversion's log lines,
 	// classified like Converter's. They may be nil.
@@ -330,9 +524,10 @@ type ImageConverter struct {
 // immediately; its page is empty until AddObject.
 func NewImageConverter() *ImageConverter {
 	return &ImageConverter{ //nolint:exhaustruct // intentional zero/partial fields
-		global: NewGlobalSettings(),
-		image:  settings.DefaultImageGlobal(),
-		object: NewObjectSettings(),
+		global:      NewGlobalSettings(),
+		image:       settings.DefaultImageGlobal(),
+		object:      NewObjectSettings(),
+		initialized: true,
 	}
 }
 
@@ -342,6 +537,12 @@ func NewImageConverter() *ImageConverter {
 // an error. "web.background" also updates the shared Global.Background paint
 // switch so image and PDF share one background field.
 func (c *ImageConverter) Set(name, value string) error {
+	if c == nil {
+		return ErrNilImageConverter
+	}
+
+	c.ensureDefaults()
+
 	if err := settings.ApplyImageKey(&c.global.g, &c.image, name, value); err != nil {
 		return fmt.Errorf("image set %q: %w", name, err)
 	}
@@ -352,6 +553,12 @@ func (c *ImageConverter) Set(name, value string) error {
 // Global returns the shared global settings (only "enablelocalfileaccess"
 // and "allow" influence image conversion, via the loader ACL).
 func (c *ImageConverter) Global() *GlobalSettings {
+	if c == nil {
+		return nil
+	}
+
+	c.ensureDefaults()
+
 	return c.global
 }
 
@@ -359,6 +566,12 @@ func (c *ImageConverter) Global() *GlobalSettings {
 // source) and returns c for chaining. Image conversion renders the first
 // added page only. The page's load settings can be adjusted through Object.
 func (c *ImageConverter) AddObject(page string) *ImageConverter {
+	if c == nil {
+		return nil
+	}
+
+	c.ensureDefaults()
+
 	o := NewObjectSettings()
 	o.SetPage(page)
 	c.object = o
@@ -371,7 +584,28 @@ func (c *ImageConverter) AddObject(page string) *ImageConverter {
 // "load.blocklocalfileaccess" = "false" to allow local inputs. Object is
 // always valid; its page is empty until AddObject is called.
 func (c *ImageConverter) Object() *ObjectSettings {
+	if c == nil {
+		return nil
+	}
+
+	c.ensureDefaults()
+
 	return c.object
+}
+
+func (c *ImageConverter) ensureDefaults() {
+	if !c.initialized {
+		c.image = settings.DefaultImageGlobal()
+		c.initialized = true
+	}
+
+	if c.global == nil {
+		c.global = NewGlobalSettings()
+	}
+
+	if c.object == nil {
+		c.object = NewObjectSettings()
+	}
 }
 
 // Convert runs the conversion, replacing the previous Output. ctx is threaded
@@ -381,12 +615,19 @@ func (c *ImageConverter) Object() *ObjectSettings {
 // The page may be a path/URL via AddObject/SetPage, or in-memory HTML via
 // Object().SetBody (P2-04 InlineHTML source kind).
 func (c *ImageConverter) Convert(ctx context.Context) error {
+	if c == nil {
+		return ErrNilImageConverter
+	}
+
+	c.ensureDefaults()
+
 	if strings.TrimSpace(c.object.o.Page) == "" && len(c.object.o.Load.InlineHTML) == 0 {
-		return errNoInputPageAdded
+		return ErrNoInputPageAdded
 	}
 
 	img := c.image
-	req := convert.NewImageRequest(c.global.g, img, []settings.PdfObject{c.object.o}, nil)
+	obj := clonePdfObject(c.object.o)
+	req := convert.NewImageRequest(c.global.g, img, []settings.PdfObject{obj}, nil)
 	h := convertHooks{ //nolint:exhaustruct // intentional zero/partial fields
 		OnInfo: c.OnInfo, OnWarn: c.OnWarn, OnError: c.OnError,
 	}
@@ -405,6 +646,10 @@ func (c *ImageConverter) Convert(ctx context.Context) error {
 // to "jpg") from the last successful Convert, or nil if none ran yet. The
 // returned slice is a copy.
 func (c *ImageConverter) Output() []byte {
+	if c == nil {
+		return nil
+	}
+
 	return append([]byte(nil), c.output...)
 }
 
@@ -448,10 +693,10 @@ func (h convertHooks) progress() func(string, int) {
 // executePDF runs the PDF pipeline into an in-memory buffer and reports
 // failures to OnError.
 //
-//nolint:contextcheck // defensive nil-context contract
+
 func (h convertHooks) executePDF(ctx context.Context, req *convert.Request) ([]byte, error) {
 	if ctx == nil {
-		ctx = context.Background()
+		return nil, ErrNilContext
 	}
 
 	var buf bytes.Buffer
@@ -471,10 +716,10 @@ func (h convertHooks) executePDF(ctx context.Context, req *convert.Request) ([]b
 // executeImage runs the image pipeline into an in-memory buffer and reports
 // failures to OnError.
 //
-//nolint:contextcheck // defensive nil-context contract
+
 func (h convertHooks) executeImage(ctx context.Context, req *convert.Request) ([]byte, error) {
 	if ctx == nil {
-		ctx = context.Background()
+		return nil, ErrNilContext
 	}
 
 	var buf bytes.Buffer
@@ -489,6 +734,177 @@ func (h convertHooks) executeImage(ctx context.Context, req *convert.Request) ([
 	}
 
 	return buf.Bytes(), nil
+}
+
+// ---------------------------------------------------------------------------
+// Typed request API (Phase 2)
+// ---------------------------------------------------------------------------
+
+// PDFRequest is the type-safe public API for PDF-only conversions. Public
+// wrapper types keep internal/settings out of the library interface while the
+// conversion engine retains its internal request representation.
+type PDFRequest struct {
+	Global        *GlobalSettings
+	Objects       []*ObjectSettings
+	Now           func() time.Time
+	Output        io.Writer
+	OutlineOutput io.Writer
+}
+
+// ImageSettings is the type-safe image-mode settings surface for ImageRequest.
+type ImageSettings struct {
+	i             settings.ImageGlobal
+	background    bool
+	backgroundSet bool
+}
+
+// NewImageSettings returns the default wkhtmltoimage settings.
+func NewImageSettings() *ImageSettings {
+	return &ImageSettings{
+		i:             settings.DefaultImageGlobal(),
+		background:    true,
+		backgroundSet: false,
+	}
+}
+
+// Set applies an image-mode settings key such as "width", "quality", or
+// "format".
+func (s *ImageSettings) Set(name, value string) error {
+	if s == nil {
+		return ErrNilImageSettings
+	}
+
+	global := settings.DefaultPdfGlobal()
+	if err := settings.ApplyImageKey(&global, &s.i, name, value); err != nil {
+		return fmt.Errorf("image set %q: %w", name, err)
+	}
+
+	if name == "background" || name == "web.background" {
+		s.background = global.Background
+		s.backgroundSet = true
+	}
+
+	return nil
+}
+
+// Get reads an image-mode setting by its dotted key.
+func (s *ImageSettings) Get(name string) (string, bool) {
+	if s == nil {
+		return "", false
+	}
+
+	return s.i.Get(name)
+}
+
+// ImageRequest is the type-safe public API for image-only conversions. It
+// accepts one object because image mode renders one input document.
+type ImageRequest struct {
+	Global *GlobalSettings
+	Image  *ImageSettings
+	Object *ObjectSettings
+	Now    func() time.Time
+	Output io.Writer
+}
+
+func (r *PDFRequest) toRequest() *convert.PDFRequest {
+	if r == nil {
+		return nil
+	}
+
+	global := settings.DefaultPdfGlobal()
+	if r.Global != nil {
+		global = clonePdfGlobal(r.Global.g)
+	}
+
+	objects := make([]settings.PdfObject, len(r.Objects))
+
+	for idx, object := range r.Objects {
+		if object != nil {
+			objects[idx] = clonePdfObject(object.o)
+		}
+	}
+
+	return &convert.PDFRequest{
+		Global:        global,
+		Objects:       objects,
+		Now:           r.Now,
+		Output:        r.Output,
+		OutlineOutput: r.OutlineOutput,
+	}
+}
+
+func (r *ImageRequest) toRequest() *convert.ImageRequest {
+	if r == nil {
+		return nil
+	}
+
+	global := settings.DefaultPdfGlobal()
+	if r.Global != nil {
+		global = clonePdfGlobal(r.Global.g)
+	}
+
+	imageSettings := settings.DefaultImageGlobal()
+
+	if r.Image != nil {
+		imageSettings = cloneImageGlobal(r.Image.i)
+
+		if r.Image.backgroundSet {
+			global.Background = r.Image.background
+		}
+	}
+
+	var object settings.PdfObject
+	if r.Object != nil {
+		object = clonePdfObject(r.Object.o)
+	}
+
+	return &convert.ImageRequest{
+		Global: global,
+		Image:  imageSettings,
+		Object: object,
+		Now:    r.Now,
+		Output: r.Output,
+	}
+}
+
+// RunPDF is a one-shot typed PDF conversion. It accepts a PDFRequest that
+// cannot carry image-mode settings, providing compile-time safety. The
+// conversion runs synchronously; cancel ctx to abort. Output bytes are
+// written to req.Output.
+func RunPDF(ctx context.Context, req *PDFRequest) error {
+	if ctx == nil {
+		return ErrNilContext
+	}
+
+	if req == nil {
+		return ErrNilConverter
+	}
+
+	if err := convert.RunTypedPDF(ctx, req.toRequest(), nil, nil); err != nil {
+		return fmt.Errorf("pdf: %w", err)
+	}
+
+	return nil
+}
+
+// RunImage is a one-shot typed image conversion. It accepts an ImageRequest
+// that cannot carry PDF-specific multi-object or outline settings, providing
+// compile-time safety. The conversion runs synchronously; cancel ctx to abort.
+// Output bytes (PNG or JPEG) are written to req.Output.
+func RunImage(ctx context.Context, req *ImageRequest) error {
+	if ctx == nil {
+		return ErrNilContext
+	}
+
+	if req == nil {
+		return ErrNilImageConverter
+	}
+
+	if err := imageout.RunRequest(ctx, req.toRequest().ToRequest(), nil); err != nil {
+		return fmt.Errorf("image: %w", err)
+	}
+
+	return nil
 }
 
 // ---------------------------------------------------------------------------

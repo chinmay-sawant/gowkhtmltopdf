@@ -4,9 +4,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 
 	"gowkhtmltopdf/internal/cli"
+	"gowkhtmltopdf/internal/convert"
 	"gowkhtmltopdf/internal/imageout"
+	"gowkhtmltopdf/internal/settings"
 )
 
 // RunImage is the command-facing image adapter. It keeps command parsing and
@@ -14,7 +17,23 @@ import (
 // through its compatibility adapter and library request seam.
 func RunImage(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 	if cmd == nil {
-		return errNilCommand
+		return ErrNilCommand
+	}
+
+	if ctx == nil {
+		return ErrNilContext
+	}
+
+	// Validate the request before imageout opens the command's output sink.
+	// The discard writer preserves the same explicit output invariant without
+	// starting the rendering pipeline twice.
+	request := convert.NewImageRequest(cmd.Global, cmd.Image, cmd.Objects, io.Discard)
+	if err := request.ValidateImage(); err != nil {
+		return fmt.Errorf("app: validate image: %w", err)
+	}
+
+	if !hasImageInput(cmd.Objects) {
+		return fmt.Errorf("app: validate image: %w", ErrNoPageObjects)
 	}
 
 	if err := imageout.Run(ctx, cmd, log); err != nil {
@@ -22,4 +41,16 @@ func RunImage(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 	}
 
 	return nil
+}
+
+func hasImageInput(objects []settings.PdfObject) bool {
+	for _, object := range objects {
+		if object.IsTableOfContent {
+			continue
+		}
+
+		return strings.TrimSpace(object.Page) != "" || len(object.Load.InlineHTML) > 0
+	}
+
+	return false
 }

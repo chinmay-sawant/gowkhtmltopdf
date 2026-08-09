@@ -3,16 +3,41 @@
 // without requiring system fonts at runtime.
 package assets
 
-import _ "embed"
+import (
+	"bytes"
+	_ "embed"
+)
 
 //go:embed LiberationSans-Regular.ttf
-var LiberationSansRegularTTF []byte
+var liberationSansRegularTTF []byte
 
 //go:embed LiberationSans-Bold.ttf
-var LiberationSansBoldTTF []byte
+var liberationSansBoldTTF []byte
 
 //go:embed LiberationSans-Italic.ttf
-var LiberationSansItalicTTF []byte
+var liberationSansItalicTTF []byte
 
 //go:embed LiberationSans-BoldItalic.ttf
-var LiberationSansBoldItalicTTF []byte
+var liberationSansBoldItalicTTF []byte
+
+// LiberationSansRegular returns an isolated copy of the embedded regular
+// face, so callers cannot mutate the package-owned asset.
+func LiberationSansRegular() []byte {
+	return bytes.Clone(liberationSansRegularTTF)
+}
+
+// LiberationSansBold returns an immutable copy of the embedded bold face.
+func LiberationSansBold() []byte {
+	return bytes.Clone(liberationSansBoldTTF)
+}
+
+// LiberationSansItalic returns an immutable copy of the embedded italic face.
+func LiberationSansItalic() []byte {
+	return bytes.Clone(liberationSansItalicTTF)
+}
+
+// LiberationSansBoldItalic returns an immutable copy of the embedded bold
+// italic face.
+func LiberationSansBoldItalic() []byte {
+	return bytes.Clone(liberationSansBoldItalicTTF)
+}

@@ -101,10 +101,20 @@ func (a *glyphAtlas) get(key glyphKey, makeEnt func() *glyphCacheEntry) *glyphCa
 	}
 
 	a.mu.Lock()
+	if ent, ok := a.m[key]; ok {
+		a.mu.Unlock()
+
+		return ent
+	}
+	a.mu.Unlock()
+
+	ent := makeEnt()
+
+	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	if ent, ok := a.m[key]; ok {
-		return ent
+	if existing, ok := a.m[key]; ok {
+		return existing
 	}
 
 	if len(a.m) >= maxGlyphCache {
@@ -121,7 +131,6 @@ func (a *glyphAtlas) get(key glyphKey, makeEnt func() *glyphCacheEntry) *glyphCa
 		}
 	}
 
-	ent := makeEnt()
 	a.m[key] = ent
 
 	return ent

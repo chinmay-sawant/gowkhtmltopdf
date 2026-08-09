@@ -1,7 +1,7 @@
 # Performance - Profiling and Improvement Checklist
 
 > **Parent:** `skills/phase-wise-checklist/SKILLS.md` - canonical phase-wise execution ledger
-> **Status:** all phase-wise performance rows implemented and validated; changes remain uncommitted by request
+> **Status:** all phase-wise performance rows implemented and validated; the current optimization wave is committed and pushed as `aa8d446`
 > **Date:** 2026-08-07
 > **Baseline commit:** `93f32e7cf8c6` (`master`, merged benchmark work)
 > **Target:** 10/10 performance after the implementation and validation gates below
@@ -544,7 +544,218 @@ decision requiring visual comparison, not as a free optimization.
 
 ## Validation Boundary
 
-All performance checklist rows are implemented in the working tree but have not
-been committed, as requested. `go test ./...`, `make lint`, the focused CPU/
-heap profiles, the complete count-3 benchmark matrix, and `git diff --check`
-passed on 2026-08-07. The final score is 10.0/10, with no partial or open rows.
+All performance checklist rows are implemented and validated. The current
+optimization wave is committed as `aa8d446` on `feature/optimization` and
+pushed to `origin`. `go test ./...`, the focused CPU/heap profiles, the
+complete PDF/template matrix, and `git diff --check` passed; no correctness
+regression is recorded.
+
+---
+
+## Addendum: 500-page profile and wkhtmltopdf comparison (2026-08-08)
+
+> **Status:** measurement-only addendum; no code changes in this pass  
+> **Branch:** `feature/optimization`  
+> **Host:** go1.26.4 linux/amd64 · WSL2 · 24 CPUs · 13th Gen Intel Core i7-13700HX  
+> **Goal of next work:** lower milliseconds and fewer allocations on the 500-page report matrix
+
+This section is appended to the canonical performance ledger. Prior phase rows
+above remain historical evidence from 2026-08-07; they are not re-closed here.
+
+### Commands (release-style, one iteration)
+
+```sh
+cd internal/convert
+GOCACHE=/tmp/gowkhtmltopdf-profile-cache go test -c -o /tmp/gowk-profile/convert.test .
+/tmp/gowk-profile/convert.test \
+  -test.run='^$' \
+  -test.bench='^BenchmarkPDFPages/500Pages$' \
+  -test.benchmem -test.benchtime=1x -test.count=1 \
+  -test.cpuprofile=/tmp/gowk-profile/pdf-500.cpu.pprof \
+  -test.memprofile=/tmp/gowk-profile/pdf-500.mem.pprof
+```
+
+Profiles live under `/tmp/gowk-profile/` (not committed).
+
+### Measured 500-page Go benchmark (in-process)
+
+| Metric | Value |
+|---|---:|
+| Wall (`ns/op`) | **7.907 s** (7,906,999,204 ns/op) |
+| Throughput | 0.32 MB/s |
+| Heap traffic (`B/op`) | **4,044,429,544** (~3.77 GiB) |
+| Allocations (`allocs/op`) | **13,228,117** |
+
+Earlier 2026-08-08 CLI one-shot (same HTML matrix, process RSS via `/usr/bin/time`):
+
+| Tool | Wall | Peak RSS | PDF size |
+|---|---:|---:|---:|
+| gowkhtmltopdf CLI | **8.40 s** | **~777 MB** | ~2.5 MB |
+| wkhtmltopdf 0.12.6.1 | **2.05 s** | **~114 MB** | ~2.0 MB |
+
+**Note:** `B/op` is cumulative heap traffic, not peak RSS. Peak RSS (~777 MB)
+is still ~7× higher than wkhtmltopdf on this fixture.
+
+### Full matrix process-level comparison (same HTML, 2026-08-08)
+
+HTML emitted from `report.html.tmpl` with the same row/page construction as
+`BenchmarkPDFPages`. Wall + peak RSS from `/usr/bin/time -f '%e %M'`.
+
+| Pages | wkhtmltopdf time | wk peak RSS | gowkhtmltopdf time | gowk peak RSS | Faster | Lower RSS |
+|------:|-----------------:|------------:|-------------------:|--------------:|:------:|:---------:|
+| 2 | 0.39 s* | 34 MB | **0.01 s** | **21 MB** | **gowk** | **gowk** |
+| 5 | 0.23 s | 35 MB | **0.03 s** | **25 MB** | **gowk** | **gowk** |
+| 10 | 0.25 s | 35 MB | **0.05 s** | **32 MB** | **gowk** | **gowk** |
+| 20 | 0.28 s | **37 MB** | **0.09 s** | 43 MB | **gowk** | **wk** |
+| 50 | 0.37 s | **42 MB** | **0.21 s** | 83 MB | **gowk** | **wk** |
+| 100 | 0.60 s | **50 MB** | **0.46 s** | 149 MB | **gowk** | **wk** |
+| 200 | **0.89 s** | **66 MB** | 1.82 s | 320 MB | **wk** | **wk** |
+| 250 | **0.99 s** | **74 MB** | 2.06 s | 407 MB | **wk** | **wk** |
+| 500 | **2.05 s** | **114 MB** | 8.40 s | 777 MB | **wk** | **wk** |
+
+\*First wkhtmltopdf invocation is colder (Qt startup).
+
+**Where each tool wins (this fixture):**
+
+- **gowkhtmltopdf is faster** for **2–100 pages** (no WebKit process overhead).
+- **wkhtmltopdf is faster and leaner** for **200–500 pages**.
+- **gowk peak RSS grows steeply** with page count; **wk RSS stays roughly linear and low**.
+
+### CPU profile hotspots (500 pages, flat)
+
+Total samples ≈ 12.83 s wall samples during 7.95 s clock (multi-core GC).
+
+| Flat | Flat % | Node | Interpretation |
+|---:|---:|---|---|
+| 2.62 s | 20.4% | `runtime.scanObject` | GC cost driven by allocation volume |
+| 2.17 s | 16.9% | `layout.prefixMaxOfOps` | Rebuilding full Y-prefix after every forced break |
+| 0.72 s | 5.6% | `layout.shiftOpsBucket` | Pagination shift bucket walks |
+| 0.68 s | 5.3% | `layout.shiftIndexedBox` | Box Y/page index updates |
+| 0.27 s | 2.1% | `layout.shiftIndexedOp` | Op Y/page index updates |
+| 0.23 s | 1.8% | `layout.(*engine).faceForRune` | Font face selection |
+
+**Cumulative (call-path):**
+
+| Cum | Cum % | Node |
+|---:|---:|---|
+| 7.90 s | 61.6% | `convert.Run` / `renderObject` |
+| 4.48 s | 34.9% | `layout.PaintContext` |
+| 4.26 s | 33.2% | `layout.paginateOps` |
+| 4.21 s | 32.8% | `layout.beforeAlways` (+ walk) |
+| 1.95 s | 15.2% | `layout.shiftFlowY` / `shiftForcedBreak` |
+| 1.52 s | 11.9% | `layout.resolveStylesCtx` |
+
+**Own finding (correctness of current `beforeAlways`):** after each successful
+`page-break-before:always` shift, the code rebuilds `prefixMaxOfOps` over the
+**entire** op list. For ~500 forced sections that is roughly
+**O(breaks × ops)** CPU and allocates a full `[]float64` per rebuild
+(~677 MB flat in the mem profile for `prefixMaxOfOps` alone). The 2026-08-07
+“rebuild prefix after mutation” design is **correct** but **not scalable**.
+
+### Heap profile hotspots (500 pages)
+
+**alloc_space (≈ 3.93 GiB accounted in profile):**
+
+| Flat space | Flat % | Node |
+|---:|---:|---|
+| 742 MB | 18.9% | `resolveStylesCtx.func1` (cascade walk) |
+| 677 MB | 17.2% | `prefixMaxOfOps` |
+| 297 MB | 7.6% | `newEngine` |
+| 281 MB | 7.1% | `css.namedColors` |
+| 264 MB | 6.7% | `inheritableProps` |
+| 181 MB | 4.6% | `resolveElementStyle` (cum 1.06 GB) |
+| 172 MB | 4.4% | `(*engine).buildCell` |
+
+**alloc_objects (≈ 14.2 M objects):**
+
+| Flat objects | Flat % | Node |
+|---:|---:|---|
+| 5.64 M | **39.8%** | `inheritableProps` |
+| 1.32 M | 9.3% | `(*styleContext).ruleSelectorHits` |
+| 0.55 M | 3.9% | `(*engine).pushBFCFloats` |
+| 0.54 M | 3.8% | `resolveStylesCtx.func1` (cum 71.6%) |
+| 0.45 M | 3.2% | `css.namedColors` |
+
+**Own finding:** style/cascade is the dominant **object** factory; pagination
+prefix rebuilds are the dominant **byte** factory after style. GC
+(`scanObject` ~20% flat) is a consequence, not a root cause.
+
+### Gap to targets
+
+| Goal | Current (500 PDF) | Gap |
+|---|---:|---|
+| ~1 s wall (deferred 0.0.3 one-second target) | ~7.9–8.4 s | **~7–8× too slow** |
+| Fewer allocs (vs 2026-08-07 reported final 5.61 M) | **13.2 M** | **~2.4× more allocs** |
+| Lower B/op (vs 2026-08-07 reported final 1.91 GB) | **~4.04 GB** | **~2.1× more heap traffic** |
+| Peak RSS vs wkhtmltopdf 500 | 777 MB vs 114 MB | **~6.8× higher RSS** |
+
+The 2026-08-07 “final” 6.93 s / 1.91 GB / 5.61 M numbers are **not reproduced**
+on this 2026-08-08 tip measurement. Treat this addendum as the new 500-page
+baseline for optimization work; re-run count-3 before claiming regressions or
+wins.
+
+### Optimization priorities (evidence-ordered)
+
+1. **Stop full `prefixMaxOfOps` rebuilds per forced break** — incremental max
+   maintenance or single-pass forced-break placement without O(n²) rescans.
+2. **Collapse style/cascade allocations** — especially `inheritableProps` and
+   per-node cascade maps; reuse tables; avoid re-walking sheets per node.
+3. **Reduce shift work for multi-break reports** — place sections by arithmetic
+   when input is a repeated `page-break-before:always` template pattern.
+4. **Only then** parallel paint/compress (deferred one-second plan item).
+
+Canonical next checklist:
+[`plans/deferred/0.0.3/500-page-allocation-and-latency-optimization-plan.md`](../../deferred/0.0.3/500-page-allocation-and-latency-optimization-plan.md)
+
+Parent one-second vision (unchanged file):
+[`plans/deferred/0.0.3/500-page-one-second-performance-target.md`](../../deferred/0.0.3/500-page-one-second-performance-target.md)
+
+## Current publication addendum (2026-08-09)
+
+The profile-guided residual wave is now committed as `aa8d446` and pushed on
+`feature/optimization`. The authoritative one-iteration matrix is
+`testdata/golden/benchmarks/benchmark-results.txt`; the locked 500-page gate
+uses the separate count-3 median.
+
+### Current versus first committed snapshot
+
+The first benchmark file on this branch is `2a0f18b`. Using the same
+one-iteration command for both snapshots, the 500-page PDF changed from
+**14.135s / 3.80GB / 14.35M allocs** to **1.903s / 678.6MB / 1.103M allocs**:
+
+| Metric | Original `2a0f18b` | Current `aa8d446` | Change |
+|---|---:|---:|---:|
+| PDF time | 14.135s | 1.903s | **−86.5%** |
+| PDF B/op | 3.80GB | 678.6MB | **−82.1%** |
+| PDF allocs/op | 14.35M | 1.103M | **−92.3%** |
+| Template + PDF time | 13.670s | 1.693s | **−87.6%** |
+| Template + PDF B/op | 3.80GB | 683.5MB | **−82.0%** |
+| Template + PDF allocs/op | 14.40M | 1.154M | **−92.0%** |
+
+### wkhtmltopdf reference comparison
+
+The earlier process-level reference used wkhtmltopdf 0.12.6.1 on the same
+generated report matrix. It measured **2.05s / approximately 114MB peak RSS /
+approximately 2.0MB PDF** at 500 pages. The current Go values below are
+in-process benchmark values, so the table is directional rather than a strict
+process-to-process comparison:
+
+| Pages | wk wall | wk peak RSS | Current Go wall | Current Go B/op | Current Go allocs/op |
+|---:|---:|---:|---:|---:|---:|
+| 2 | 0.39s* | 34MB | 6.7ms | 3.8MB | 5,075 |
+| 5 | 0.23s | 35MB | 11.6ms | 6.1MB | 10,928 |
+| 10 | 0.25s | 35MB | 22.2ms | 11.3MB | 20,970 |
+| 20 | 0.28s | 37MB | 41.1ms | 21.8MB | 40,768 |
+| 50 | 0.37s | 42MB | 114.6ms | 52.8MB | 98,585 |
+| 100 | 0.60s | 50MB | 249.0ms | 100.9MB | 188,179 |
+| 200 | 0.89s | 66MB | 481.4ms | 200.1MB | 370,373 |
+| 250 | 0.99s | 74MB | 590.2ms | 248.9MB | 461,490 |
+| 500 | 2.05s | 114MB | 1.903s | 678.6MB | 1,102,840 |
+
+`B/op` is cumulative allocation traffic, not RSS. The current profiled Go
+benchmark process reached approximately **391MiB RSS** at 500 pages; a fresh
+current CLI process-level matrix has not been recorded after `aa8d446`. The
+earlier CLI comparison remains **8.40s / ~777MB** for gowkhtmltopdf versus
+**2.05s / ~114MB** for wkhtmltopdf and must remain labeled historical.
+
+\* The first wkhtmltopdf invocation was colder because of Qt startup.

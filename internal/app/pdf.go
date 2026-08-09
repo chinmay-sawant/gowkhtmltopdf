@@ -8,21 +8,25 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 
 	"gowkhtmltopdf/internal/cli"
 	"gowkhtmltopdf/internal/convert"
+	"gowkhtmltopdf/internal/errs"
 )
 
-// errNilCommand guards the command-facing adapters against nil dereferences.
-var errNilCommand = errors.New("app: nil command")
+// Shared app-level sentinel errors; exported so callers can match with errors.Is.
+var (
+	ErrNilCommand    = errors.New("app: nil command")
+	ErrNoPageObjects = errors.New("app: no page objects")
+	ErrNilContext    = errs.ErrNilContext
+)
 
 // BuildPDFRequest translates a parsed CLI command into the stable engine
 // request. The caller owns output-sink creation and supplies both document
 // and optional outline sinks explicitly.
 func BuildPDFRequest(cmd *cli.Command, output, outline io.Writer) (*convert.Request, error) {
 	if cmd == nil {
-		return nil, errNilCommand
+		return nil, ErrNilCommand
 	}
 
 	req := convert.NewPDFRequest(cmd.Global, cmd.Objects, output, outline)
@@ -37,12 +41,35 @@ func BuildPDFRequest(cmd *cli.Command, output, outline io.Writer) (*convert.Requ
 	return req, nil
 }
 
-// RunPDF is the command-facing adapter. It owns opening the document sink and
-// selecting stdout for --dump-outline; convert.Run only receives explicit
-// writers and never reaches into process-global stdout.
-func RunPDF(ctx context.Context, cmd *cli.Command, log io.Writer, progress func(string, int)) error {
+// RunPDF is the command-facing adapter. It validates the request before
+// opening the document sink and receives the optional outline sink explicitly.
+// convert.Run only receives explicit writers and never reaches into
+// process-global stdout.
+func RunPDF(
+	ctx context.Context,
+	cmd *cli.Command,
+	log io.Writer,
+	progress func(string, int),
+	outline io.Writer,
+) (err error) {
 	if cmd == nil {
-		return errNilCommand
+		return ErrNilCommand
+	}
+
+	if ctx == nil {
+		return ErrNilContext
+	}
+
+	// Validate the complete command before creating or truncating a file. The
+	// discard sink satisfies the request's explicit output contract while
+	// keeping validation side-effect free.
+	req, err := BuildPDFRequest(cmd, io.Discard, outline)
+	if err != nil {
+		return err
+	}
+
+	if len(cmd.Objects) == 0 {
+		return ErrNoPageObjects
 	}
 
 	out, closeOut, err := cmd.OpenOutput()
@@ -50,19 +77,17 @@ func RunPDF(ctx context.Context, cmd *cli.Command, log io.Writer, progress func(
 		return fmt.Errorf("app: open output: %w", err)
 	}
 
-	outline := io.Writer(nil)
-	if cmd.DumpOutline || cmd.Global.DumpOutline {
-		outline = os.Stdout
+	defer func() {
+		if closeErr := closeOut(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
+
+	req.Output = out
+
+	if err := convert.Run(ctx, req, log, progress); err != nil {
+		return fmt.Errorf("app: pdf conversion: %w", err)
 	}
 
-	req, err := BuildPDFRequest(cmd, out, outline)
-	if err == nil {
-		err = convert.Run(ctx, req, log, progress)
-	}
-
-	if closeErr := closeOut(); closeErr != nil && err == nil {
-		err = closeErr
-	}
-
-	return err
+	return nil
 }

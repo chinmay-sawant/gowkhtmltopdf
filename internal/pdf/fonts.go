@@ -670,6 +670,20 @@ func (f *Font) AdvanceInPoints(r rune, size float64) float64 {
 	return f.Advance(r) / float64(f.unitsPerEm) * size
 }
 
+// GlyphAdvancePoints returns the advance width in points for r at size with
+// a single cmap lookup: the same glyph table and out-of-range fallback that
+// Advance uses, so the result equals AdvanceInPoints(r, size).
+func (f *Font) GlyphAdvancePoints(r rune, size float64) float64 {
+	g := f.GlyphID(r)
+
+	adv := float64(f.advance[0])
+	if int(g) < len(f.advance) {
+		adv = float64(f.advance[g])
+	}
+
+	return adv / float64(f.unitsPerEm) * size
+}
+
 // glyphOutline returns the glyf bytes for a glyph id (raw, incl. header).
 func (f *Font) glyphOutline(glob uint16) []byte {
 	found, okVal := f.tables["glyf"]

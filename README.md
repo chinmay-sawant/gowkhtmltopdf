@@ -237,18 +237,66 @@ benchmarks use 2, 5, 10, 20, 50, 100, 200, 250, and 500 image tiles because
 image mode renders one raster canvas rather than paginated PDF pages.
 
 The Phase 9.3 gate above is a separate 10-section × 40-row invoice fixture;
-the matrix below uses the checked-in benchmark templates (20 realistic rows per
-page), so those timings are not directly comparable.
+the historical in-process snapshot below uses the checked-in benchmark
+templates (20 realistic rows per page), so those timings are not directly
+comparable with the current direct CLI comparison further below.
 
 | Workload | 2 | 5 | 10 | 20 | 50 | 100 | 200 | 250 | 500 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| PDF pages | 9.20ms | 15.89ms | 31.61ms | 78.63ms | 185.99ms | 455.05ms | 1.27s | 1.61s | 6.89s |
-| Template + PDF pages | 8.13ms | 18.42ms | 35.76ms | 71.28ms | 184.69ms | 407.52ms | 1.15s | 1.64s | 6.74s |
-| Web-fetch image tiles | 257.33ms | 258.05ms | 281.10ms | 310.47ms | 356.66ms | 413.68ms | 506.42ms | 564.00ms | 970.72ms |
-| Inline image tiles | 209.50ms | 220.61ms | 255.35ms | 282.33ms | 303.54ms | 340.31ms | 439.46ms | 491.22ms | 788.43ms |
+| PDF pages | 5.2ms | 7.1ms | 16.3ms | 32.0ms | 72.2ms | 168ms | 316ms | 430ms | 0.87s |
+| Template + PDF pages | 3.9ms | 6.1ms | 12.5ms | 23.6ms | 73.2ms | 165ms | 346ms | 422ms | 0.94s |
+| Web-fetch image tiles | 18.53ms | 22.89ms | 22.95ms | 22.50ms | 32.36ms | 51.08ms | 89.32ms | 110.31ms | 200.89ms |
+| Inline image tiles | 16.97ms | 20.29ms | 21.04ms | 24.24ms | 32.20ms | 49.67ms | 83.27ms | 101.90ms | 192.13ms |
 
-PDF / Template rows refreshed 2026-08-08 (`-benchtime=1x -count=1`). Image-tile
-rows are still the prior full-matrix snapshot.
+PDF / Template: historical in-process perf-review snapshot (2026-08-09, see
+`skills/perf-review/SKILLS.md`). The current direct process comparison is
+documented in the `wkhtmltopdf` section below.
+
+Against the pre-wave snapshot taken earlier the same day, the same
+one-iteration 500-page measurements changed as follows:
+
+| Metric | Pre-wave | Perf-wave | Change |
+|---|---:|---:|---:|
+| PDF time | 1.013s | 0.873s | **−13.8%** |
+| PDF B/op | 392.2MB | 335.8MB | **−14.4%** |
+| PDF allocs/op | 535,064 | 517,875 | **−3.2%** |
+| Template + PDF time | 1.047s | 0.942s | **−10.1%** |
+| Template + PDF B/op | 397.6MB | 340.2MB | **−14.4%** |
+| Template + PDF allocs/op | 586,355 | 569,123 | **−2.9%** |
+
+B/op and allocs are deterministic for identical code paths, so the −14.4%
+B/op cut is a real wave win (wall time on one-shot laptop runs is noisier).
+Main drivers: single cmap lookup per rune (`GlyphAdvancePoints`), no
+duplicate min-content re-measure, in-place inline-item compaction, ASCII
+fast paths in `TextShow`/HTML scanning, rune-union dedup in font subsetting,
+pointer-compare op sorts, zero-crossing split fast path.
+
+### Direct CLI comparison: gowkhtmltopdf vs wkhtmltopdf
+
+Fresh process-level measurements on 2026-08-09 used identical report fixtures,
+three runs per size, and `/usr/bin/time` for wall time and peak RSS. The Go
+binary was built from the current source; wkhtmltopdf was 0.12.6.1. All output
+files passed the expected page-count check.
+
+| Pages | Gowk time | wkhtmltopdf time | Gowk RSS | wkhtmltopdf RSS |
+|---:|---:|---:|---:|---:|
+| 2 | 10 ms | 220 ms | 18,432 KiB | 35,268 KiB |
+| 5 | 10 ms | 230 ms | 17,208 KiB | 35,528 KiB |
+| 10 | 20 ms | 250 ms | 17,832 KiB | 36,408 KiB |
+| 20 | 30 ms | 270 ms | 18,052 KiB | 38,080 KiB |
+| 50 | 70 ms | 360 ms | 20,644 KiB | 43,052 KiB |
+| 100 | 140 ms | 500 ms | 23,340 KiB | 51,092 KiB |
+| 200 | 300 ms | 800 ms | 30,256 KiB | 67,576 KiB |
+| 250 | 380 ms | 940 ms | 34,200 KiB | 75,948 KiB |
+| 500 | 890 ms | 1,720 ms | 50,888 KiB | 116,512 KiB |
+
+Gowkhtmltopdf was faster and used less RSS at every tested size. At 500 pages
+it was approximately 1.9x faster and used 56.3% less RSS. Use wkhtmltopdf when
+legacy Qt/WebKit rendering compatibility is the primary requirement; otherwise
+prefer gowkhtmltopdf for speed, memory, and smaller PDFs from 5 pages onward.
+
+The full matrix, including PDF bytes, commands, and measurement caveats, is in
+the [benchmark documentation](testdata/golden/benchmarks/README.md).
 
 - [Benchmark implementation](internal/convert/benchmarks_test.go)
 - [Benchmark templates and recorded results](testdata/golden/benchmarks/README.md)

@@ -14,6 +14,8 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"gowkhtmltopdf/internal/html"
 )
@@ -32,6 +34,7 @@ const (
 	rgbaChannelCount  = 4
 	hexLetterBase     = 10 // 'a'/'A' → 10 in hex
 	roundHalfUp       = 0.5
+	nonASCIIStart     = 0x80
 )
 
 // Pseudo-class and pseudo-element names shared across selector parsing.
@@ -39,6 +42,7 @@ const (
 	pseudoClassHas   = "has"
 	pseudoElemBefore = "before"
 	pseudoElemAfter  = "after"
+	nthChildPseudo   = "nth-child"
 )
 
 // Stylesheet is a parsed stylesheet. Rules keep their source order.
@@ -68,6 +72,11 @@ type Rule struct {
 // Selector is a chain of compound parts linked by combinators.
 type Selector struct {
 	Parts []SelectorPart
+	// spec caches the specificity of parsed selectors (see Specificity).
+	// The zero value means "not yet computed": Specificity falls back to a
+	// walk so hand-built selectors keep working unchanged.
+	spec      [3]int `exhaustruct:"optional"`
+	specValid bool   `exhaustruct:"optional"`
 }
 
 // SelectorPart is one compound selector. Combinator describes how it links to
@@ -106,6 +115,9 @@ type PseudoClass struct {
 	Arg  string // nth-child argument, lower-case, trimmed
 	Has  []RelativeSelector
 	Not  []Selector
+	// nth caches the parsed :nth-child argument (see nthForm) so matching is
+	// pure integer arithmetic; kind zero (unparseable) never matches.
+	nth nthForm `exhaustruct:"optional"`
 }
 
 // Declaration is one property: value pair.
@@ -341,15 +353,21 @@ func parseFontFace(block string) FontFace {
 func FontFaceURLs(src string) []string {
 	var out []string
 
+	// Search the lowercased copy for "url(" but extract from the original
+	// case: the URL itself must keep its case (file paths are case-sensitive).
+	// ToLower is 1:1 in byte length for the ASCII "url(" marker, so both
+	// remainders advance by the same offsets.
 	low := src
+	search := strings.ToLower(src)
 
 	for {
-		i := strings.Index(strings.ToLower(low), "url(")
-		if i < 0 {
+		urlIdx := strings.Index(search, "url(")
+		if urlIdx < 0 {
 			break
 		}
 
-		rest := low[i+4:]
+		rest := low[urlIdx+4:]
+		search = search[urlIdx+4:]
 
 		end := strings.IndexByte(rest, ')')
 		if end < 0 {
@@ -364,6 +382,7 @@ func FontFaceURLs(src string) []string {
 		}
 
 		low = rest[end+1:]
+		search = search[end+1:]
 	}
 
 	return out
@@ -477,6 +496,10 @@ func (e *parseError) Error() string { return "css: " + e.msg }
 // stripComments removes /* ... */ comments, preserving newlines so line
 // numbers stay roughly stable.
 func stripComments(src string) string {
+	if !strings.Contains(src, "/*") {
+		return src
+	}
+
 	var buf strings.Builder
 
 	for {
@@ -591,6 +614,10 @@ func parseSelectorList(s string) ([]Selector, bool) {
 		if !ok {
 			continue
 		}
+
+		a, b, c := computeSpecificity(sel)
+		sel.spec = [3]int{a, b, c}
+		sel.specValid = true
 
 		out = append(out, sel)
 	}
@@ -1019,7 +1046,7 @@ func appendFunctionalPseudo(part SelectorPart, name, argRaw string, hasParen, in
 // CSS2 single-colon pseudo-elements.
 func appendSimplePseudo(part SelectorPart, name, arg string) (SelectorPart, bool) {
 	switch name {
-	case "first-child", "last-child", "nth-child":
+	case "first-child", "last-child", nthChildPseudo:
 		part.Pseudos = append(part.Pseudos, pseudoClass(name, arg, nil, nil))
 	case "link", "visited":
 		// Print semantics: both mean "a[href]" (no browsing history).
@@ -1047,7 +1074,13 @@ func appendSimplePseudo(part SelectorPart, name, arg string) (SelectorPart, bool
 // pseudoClass builds a PseudoClass with explicit zero Has/Not slices so the
 // literal stays exhaustive without per-use nolint comments.
 func pseudoClass(name, arg string, has []RelativeSelector, not []Selector) PseudoClass {
-	return PseudoClass{Name: name, Arg: arg, Has: has, Not: not}
+	pseudo := PseudoClass{Name: name, Arg: arg, Has: has, Not: not}
+
+	if name == nthChildPseudo {
+		pseudo.nth = parseNthArg(arg)
+	}
+
+	return pseudo
 }
 
 func parseAttrSelector(sel string) (AttrSelector, bool) {
@@ -1152,16 +1185,42 @@ func MatchPseudo(sel Selector, count *html.Node, pseudo string) bool {
 		return false
 	}
 
-	last := sel.Parts[len(sel.Parts)-1]
-	if last.PseudoElement != pseudo {
+	if sel.Parts[len(sel.Parts)-1].PseudoElement != pseudo {
 		return false
 	}
 
-	parts := make([]SelectorPart, len(sel.Parts))
-	copy(parts, sel.Parts)
-	parts[len(parts)-1].PseudoElement = ""
+	return matchPseudoWalk(sel, count)
+}
 
-	return Match(Selector{Parts: parts}, count)
+// matchPseudoWalk mirrors leftmostMatch with the final part's PseudoElement
+// treated as cleared, without copying the parts slice (the host element must
+// match the pseudo's compound, not the pseudo itself).
+func matchPseudoWalk(sel Selector, node *html.Node) bool {
+	if node == nil || node.Type != html.ElementNode || len(sel.Parts) == 0 {
+		return false
+	}
+
+	last := sel.Parts[len(sel.Parts)-1]
+	last.PseudoElement = ""
+
+	if !matchPart(last, node) {
+		return false
+	}
+
+	cur := node
+
+	const prevPartOffset = 2 // walk left: last part is host, start at len-2
+
+	for i := len(sel.Parts) - prevPartOffset; i >= 0; i-- {
+		next := leftmostStep(sel.Parts[i+1].Combinator, sel.Parts[i], cur)
+		if next == nil {
+			return false
+		}
+
+		cur = next
+	}
+
+	return true
 }
 
 // matchPart matches one compound against an element.
@@ -1211,9 +1270,8 @@ func hasClasses(part SelectorPart, node *html.Node) bool {
 		return true
 	}
 
-	classes := classSet(node)
 	for _, c := range part.Classes {
-		if !classes[c] {
+		if !hasClassToken(node.Attribute("class"), c) {
 			return false
 		}
 	}
@@ -1277,16 +1335,34 @@ func attrValueMatches(oper, val, want string) bool {
 }
 
 // containsWord reports whether want (a single space-free word) is one of the
-// space-separated words of val.
+// space-separated words of val. Tokenizes val without allocating a fields
+// slice (same whitespace definition and Unicode fallback as hasClassToken).
+//
+//nolint:cyclop // two-zone token walk (ASCII, then Unicode fallback) stays linear
 func containsWord(val, want string) bool {
 	if want == "" || strings.Contains(want, " ") {
 		return false
 	}
 
-	for _, w := range strings.Fields(val) {
-		if w == want {
+	for start := 0; start < len(val); {
+		for start < len(val) && isClassSpace(val[start]) {
+			start++
+		}
+
+		end := start
+		for end < len(val) && !isClassSpace(val[end]) {
+			if val[end] >= nonASCIIStart {
+				return hasUnicodeClassToken(val, want)
+			}
+
+			end++
+		}
+
+		if start < end && val[start:end] == want {
 			return true
 		}
+
+		start = end
 	}
 
 	return false
@@ -1298,10 +1374,10 @@ func matchPseudo(pseudo PseudoClass, node *html.Node) bool {
 		return previousElementSibling(node) == nil
 	case "last-child":
 		return nextElementSibling(node) == nil
-	case "nth-child":
+	case nthChildPseudo:
 		idx := elementIndex(node)
 
-		return matchNth(pseudo.Arg, idx)
+		return matchNth(pseudo.nth, idx)
 	case pseudoClassHas:
 		return matchAnyRelative(pseudo.Has, node)
 	case condKindNot:
@@ -1435,45 +1511,86 @@ func elementIndex(count *html.Node) int {
 	return 0
 }
 
-// matchNth implements :nth-child(an+b) / odd / even for 1-based index.
-func matchNth(arg string, index int) bool {
+// nthKind discriminates the pre-parsed :nth-child() argument forms.
+type nthKind int
+
+const (
+	nthInvalid nthKind = iota // unparseable, or not a :nth-child pseudo
+	nthOdd
+	nthEven
+	nthInt
+	nthAnB
+)
+
+// nthForm is a :nth-child() argument parsed at selector-parse time so that
+// matching is pure integer arithmetic (see matchNth).
+type nthForm struct {
+	kind nthKind `exhaustruct:"optional"` // nthInt: exact index; nthAnB: coefficient
+	a    int     `exhaustruct:"optional"` // nthAnB: the constant
+	b    int     `exhaustruct:"optional"`
+}
+
+// parseNthArg pre-parses a :nth-child() argument into the form matchNth
+// evaluates. The argument is already lower-cased and trimmed at parse time;
+// normalizing again here keeps the acceptance rules identical to the former
+// string-based parser, including the never-match fallback.
+func parseNthArg(arg string) nthForm {
 	arg = strings.TrimSpace(strings.ToLower(arg))
 	if arg == "" {
-		return false
+		return nthForm{}
 	}
 
 	if arg == "odd" {
-		return index%2 == 1
+		return nthForm{kind: nthOdd}
 	}
 
 	if arg == "even" {
-		return index%2 == 0
+		return nthForm{kind: nthEven}
 	}
 	// plain integer
 	if n, err := strconv.Atoi(arg); err == nil {
-		return index == n
+		return nthForm{kind: nthInt, a: n}
 	}
 	// an+b / n+b / -n+b / an
 	if !strings.Contains(arg, "n") {
-		return false
+		return nthForm{}
 	}
 
-	specA, buf, ok := parseAnPlusB(arg)
+	a, b, ok := parseAnPlusB(arg)
 	if !ok {
+		return nthForm{}
+	}
+
+	return nthForm{kind: nthAnB, a: a, b: b}
+}
+
+// matchNth implements :nth-child(an+b) / odd / even for 1-based index,
+// evaluating the pre-parsed argument form.
+func matchNth(nth nthForm, index int) bool {
+	switch nth.kind {
+	case nthOdd:
+		return index%2 == 1
+	case nthEven:
+		return index%2 == 0
+	case nthInt:
+		return index == nth.a
+	case nthAnB:
+		if nth.a == 0 {
+			return index == nth.b
+		}
+
+		if (index-nth.b)%nth.a != 0 {
+			return false
+		}
+
+		k := (index - nth.b) / nth.a
+
+		return k >= 0
+	case nthInvalid:
 		return false
 	}
 
-	if specA == 0 {
-		return index == buf
-	}
-	// index = a*k + b for integer k >= 0
-	if (index-buf)%specA != 0 {
-		return false
-	}
-
-	k := (index - buf) / specA
-
-	return k >= 0
+	return false
 }
 
 // parseAnPlusB parses the "an+b" form of a nth-child argument: "an", "n+b",
@@ -1506,19 +1623,89 @@ func parseAnPlusB(arg string) (int, int, bool) {
 	return specA, specB, true
 }
 
-func classSet(n *html.Node) map[string]bool {
-	set := map[string]bool{}
-	for _, c := range strings.Fields(n.Attribute("class")) {
-		set[c] = true
+// hasClassToken reports whether want is one whitespace-separated class token.
+// The ASCII path covers HTML/CSS's normal class syntax without allocating a
+// token slice or map. Non-ASCII whitespace falls back to the same Unicode
+// whitespace behavior previously provided by strings.Fields.
+func hasClassToken(value, want string) bool {
+	if want == "" {
+		return false
 	}
 
-	return set
+	for start := 0; start < len(value); {
+		for start < len(value) && isClassSpace(value[start]) {
+			start++
+		}
+
+		end := start
+		for end < len(value) && !isClassSpace(value[end]) {
+			if value[end] >= nonASCIIStart {
+				return hasUnicodeClassToken(value, want)
+			}
+
+			end++
+		}
+
+		if start < end && value[start:end] == want {
+			return true
+		}
+
+		start = end
+	}
+
+	return false
+}
+
+func hasUnicodeClassToken(value, want string) bool {
+	for start := 0; start < len(value); {
+		for start < len(value) {
+			runeValue, size := utf8.DecodeRuneInString(value[start:])
+			if !unicode.IsSpace(runeValue) {
+				break
+			}
+
+			start += size
+		}
+
+		end := start
+		for end < len(value) {
+			runeValue, size := utf8.DecodeRuneInString(value[end:])
+			if unicode.IsSpace(runeValue) {
+				break
+			}
+
+			end += size
+		}
+
+		if start < end && value[start:end] == want {
+			return true
+		}
+
+		start = end
+	}
+
+	return false
+}
+
+func isClassSpace(value byte) bool {
+	return value == ' ' || value == '\t' || value == '\n' || value == '\v' || value == '\f' || value == '\r'
 }
 
 // Specificity returns (a, b, c): ID count, class/attribute/pseudo count, type count.
 // :has() / :not() contribute the specificity of their most specific argument
-// (Selectors 4), not a flat class-level count for the pseudo itself.
+// (Selectors 4), not a flat class-level count for the pseudo itself. Parsed
+// selectors return their cached triple; selectors built by hand (or by
+// wrappers that recombine parts) compute it on the fly.
 func Specificity(s Selector) (int, int, int) {
+	if s.specValid {
+		return s.spec[0], s.spec[1], s.spec[2]
+	}
+
+	return computeSpecificity(s)
+}
+
+// computeSpecificity walks the selector parts; see Specificity.
+func computeSpecificity(s Selector) (int, int, int) {
 	idCount, classCount, typeCount := 0, 0, 0
 
 	for _, page := range s.Parts {
@@ -1555,572 +1742,4 @@ func Specificity(s Selector) (int, int, int) {
 	}
 
 	return idCount, classCount, typeCount
-}
-
-// ParseInline parses a style="" attribute value into declarations.
-func ParseInline(style string) []Declaration {
-	return parseDeclarations(style)
-}
-
-// parseDeclarations splits a declaration block on top-level ';' and parses
-// each "prop: value" pair. Garbage pairs are skipped.
-func parseDeclarations(block string) []Declaration {
-	parts := splitTopLevel(block, ';')
-	decls := make([]Declaration, 0, len(parts))
-
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
-		}
-
-		colon := strings.IndexByte(part, ':')
-		if colon < 0 {
-			continue
-		}
-
-		prop := strings.ToLower(strings.TrimSpace(part[:colon]))
-		value := strings.TrimSpace(part[colon+1:])
-
-		if prop == "" || value == "" {
-			continue
-		}
-
-		important := isImportant(value)
-		if important {
-			value = stripImportant(value)
-		}
-
-		if !validPropName(prop) {
-			continue
-		}
-
-		decls = append(decls, Declaration{Prop: prop, Value: value, Important: important})
-	}
-
-	return decls
-}
-
-func validPropName(page string) bool {
-	if page == "" {
-		return false
-	}
-
-	for i := range len(page) {
-		c := page[i]
-		if !(c == '-' || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) {
-			return false
-		}
-	}
-
-	return true
-}
-
-// isImportant reports whether a declaration value carries !important
-// (whitespace between ! and important is allowed).
-func isImportant(val string) bool {
-	val = strings.TrimSpace(val)
-
-	const word = "important"
-
-	if len(val) < len(word)+1 {
-		return false
-	}
-
-	if !strings.EqualFold(val[len(val)-len(word):], word) {
-		return false
-	}
-
-	rest := strings.TrimRight(val[:len(val)-len(word)], " \t")
-
-	return strings.HasSuffix(rest, "!")
-}
-
-// stripImportant removes a trailing !important (any case, optional space)
-// from a declaration value.
-func stripImportant(val string) string {
-	if !isImportant(val) {
-		return val
-	}
-
-	val = strings.TrimRight(val, " \t")
-	val = val[:len(val)-len("important")]
-	val = strings.TrimRight(val, " \t")
-	val = strings.TrimSuffix(val, "!")
-
-	return strings.TrimSpace(val)
-}
-
-// ParseLength parses a CSS length: number + unit, where bare numbers are
-// pixels. Units: px, pt, pc, in, cm, mm, em, rem, ex, ch, %, vw, vh.
-func ParseLength(val string) (float64, string, bool) {
-	val = strings.TrimSpace(val)
-	if val == "" {
-		return 0, "", false
-	}
-
-	idx := scanLengthNumber(val)
-	if idx == 0 {
-		return 0, "", false
-	}
-
-	num, err := strconv.ParseFloat(val[:idx], 64)
-	if err != nil {
-		return 0, "", false
-	}
-
-	unit := strings.ToLower(strings.TrimSpace(val[idx:]))
-	if unit == "" {
-		unit = "px"
-	}
-
-	if !isLengthUnit(unit) {
-		return 0, "", false
-	}
-
-	return num, unit, true
-}
-
-// scanLengthNumber returns the index of the end of the numeric prefix of val
-// (optional sign, digits and one '.', per CSS lengths).
-func scanLengthNumber(val string) int {
-	idx := 0
-	if val[0] == '+' || val[0] == '-' {
-		idx++
-	}
-
-	for idx < len(val) && (val[idx] >= '0' && val[idx] <= '9' || val[idx] == '.') {
-		idx++
-	}
-
-	return idx
-}
-
-// isLengthUnit reports whether unit is one of the CSS units ParseLength
-// accepts.
-func isLengthUnit(unit string) bool {
-	switch unit {
-	case "px", "pt", "pc", "in", "cm", "mm", "em", "rem", "ex", "ch", "%", "vw", "vh":
-		return true
-	}
-
-	return false
-}
-
-// ParseNumber parses a bare number, e.g. line-height or font-weight.
-func ParseNumber(val string) (float64, bool) {
-	val = strings.TrimSpace(val)
-	if val == "" {
-		return 0, false
-	}
-
-	f, err := strconv.ParseFloat(val, 64)
-	if err != nil {
-		return 0, false
-	}
-
-	return f, true
-}
-
-// ParseColor parses #rgb, #rrggbb, #rrggbbaa, rgb()/rgba() with integer,
-// float or percentage channels, and a named-color subset. It returns RGB in
-// 0..255 and alpha in 0..1; ok=false for anything unrecognized.
-func ParseColor(val string) (int, int, int, float64, bool) {
-	val = strings.TrimSpace(val)
-	if val == "" {
-		return 0, 0, 0, 0, false
-	}
-	// CSS variables: var(--name, fallback) — resolve fallback only (no custom props).
-	// ponytail: ParseColor accepts bare var() without a prop map (API is color-
-	// string only). Layout resolves custom props via ResolveCustomProps before
-	// color parse; upgrade if ParseColor gains a props argument.
-	if strings.HasPrefix(strings.ToLower(val), "var(") {
-		if fb, okFB := cssVarFallback(val); okFB {
-			return ParseColor(fb)
-		}
-
-		return 0, 0, 0, 0, false
-	}
-
-	if val[0] == '#' {
-		return parseHexColor(val[1:])
-	}
-
-	low := strings.ToLower(val)
-	if low == "transparent" {
-		return 0, 0, 0, 0, true
-	}
-
-	if name, found := namedColors()[low]; found {
-		return name[0], name[1], name[2], 1, true
-	}
-
-	if strings.HasPrefix(low, "rgb") {
-		return parseRGBColor(val, low)
-	}
-
-	return 0, 0, 0, 0, false
-}
-
-// parseHexColor parses #rgb, #rgba, #rrggbb and #rrggbbaa forms (hex is the
-// content after '#').
-func parseHexColor(hex string) (int, int, int, float64, bool) {
-	switch len(hex) {
-	case hexRGBLen:
-		if !isHex(hex) {
-			return 0, 0, 0, 0, false
-		}
-
-		return hexNibble(hex[0]), hexNibble(hex[1]), hexNibble(hex[2]), 1, true
-	case hexRGBALen:
-		if !isHex(hex) {
-			return 0, 0, 0, 0, false
-		}
-
-		return hexNibble(hex[0]), hexNibble(hex[1]), hexNibble(hex[2]), float64(hexNibble(hex[3])) / maxRGBChannel, true
-	case hexRRGGBBLen:
-		if !isHex(hex) {
-			return 0, 0, 0, 0, false
-		}
-
-		return hexByte(hex[0:2]), hexByte(hex[2:4]), hexByte(hex[4:6]), 1, true
-	case hexRRGGBBAALen:
-		if !isHex(hex) {
-			return 0, 0, 0, 0, false
-		}
-
-		return hexByte(hex[0:2]), hexByte(hex[2:4]), hexByte(hex[4:6]), float64(hexByte(hex[6:8])) / maxRGBChannel, true
-	}
-
-	return 0, 0, 0, 0, false
-}
-
-// parseRGBColor parses rgb()/rgba() with integer, float or percentage
-// channels (low is the lower-cased original).
-func parseRGBColor(val, low string) (int, int, int, float64, bool) {
-	open := strings.IndexByte(val, '(')
-	closeIdx := strings.LastIndexByte(val, ')')
-
-	if open < 0 || closeIdx < open {
-		return 0, 0, 0, 0, false
-	}
-
-	args := strings.Split(val[open+1:closeIdx], ",")
-
-	channels := hexRGBLen
-	if strings.HasPrefix(low, "rgba") {
-		channels = rgbaChannelCount
-	}
-
-	if len(args) != channels {
-		return 0, 0, 0, 0, false
-	}
-
-	vals, valid := parseColorChannels(args)
-	if !valid {
-		return 0, 0, 0, 0, false
-	}
-
-	red := clampByte(vals[0])
-	green := clampByte(vals[1])
-	blue := clampByte(vals[2])
-
-	if channels != rgbaChannelCount {
-		return red, green, blue, 1, true
-	}
-
-	alpha := vals[3]
-	if strings.HasSuffix(strings.TrimSpace(args[3]), "%") {
-		alpha /= maxRGBChannel
-	}
-
-	return red, green, blue, clampAlpha(alpha), true
-}
-
-// parseColorChannels parses comma-separated rgb()/rgba() channels, where
-// percentages scale to 0..255.
-func parseColorChannels(args []string) ([]float64, bool) {
-	vals := make([]float64, 0, len(args))
-
-	for _, arg := range args {
-		arg = strings.TrimSpace(arg)
-		if strings.HasSuffix(arg, "%") {
-			f, err := strconv.ParseFloat(strings.TrimSuffix(arg, "%"), 64)
-			if err != nil {
-				return nil, false
-			}
-
-			vals = append(vals, f*maxRGBChannel/percentScale)
-
-			continue
-		}
-
-		f, err := strconv.ParseFloat(arg, 64)
-		if err != nil {
-			return nil, false
-		}
-
-		vals = append(vals, f)
-	}
-
-	return vals, true
-}
-
-// clampAlpha clamps an alpha value to 0..1.
-func clampAlpha(alpha float64) float64 {
-	if alpha > 1 {
-		return 1
-	}
-
-	if alpha < 0 {
-		return 0
-	}
-
-	return alpha
-}
-
-// cssVarFallback extracts the fallback from var(--name, fallback). Nested
-// var() in the fallback is not expanded further here.
-func cssVarFallback(v string) (string, bool) {
-	_, fb, ok := parseVarFn(v)
-
-	return fb, ok && fb != ""
-}
-
-// parseVarFn parses a top-level var(--name) or var(--name, fallback).
-// ok is false when v is not a var() function.
-func parseVarFn(val string) (string, string, bool) {
-	val = strings.TrimSpace(val)
-	if len(val) < 6 || !strings.EqualFold(val[:4], "var(") {
-		return "", "", false
-	}
-
-	inner := val[4:]
-	if !strings.HasSuffix(inner, ")") {
-		return "", "", false
-	}
-
-	inner = strings.TrimSpace(inner[:len(inner)-1])
-	depth := 0
-
-	for idx := range len(inner) {
-		switch inner[idx] {
-		case '(':
-			depth++
-		case ')':
-			if depth > 0 {
-				depth--
-			}
-		case ',':
-			if depth == 0 {
-				name := strings.ToLower(strings.TrimSpace(inner[:idx]))
-				fallback := strings.TrimSpace(inner[idx+1:])
-
-				return name, fallback, name != ""
-			}
-		}
-	}
-
-	name := strings.ToLower(strings.TrimSpace(inner))
-
-	return name, "", name != ""
-}
-
-// ResolveVar expands CSS var() references in v using lookup(--name).
-// Unresolved var() uses the CSS fallback when present; otherwise the empty
-// string (caller treats as invalid / keeps the prior cascaded value).
-// Nested var() expands up to a small depth.
-func ResolveVar(val2 string, lookup func(name string) (string, bool)) string {
-	val2 = strings.TrimSpace(val2)
-	for range 16 {
-		if !strings.HasPrefix(strings.ToLower(val2), "var(") {
-			return val2
-		}
-
-		name, fallback, ok := parseVarFn(val2)
-		if !ok {
-			return val2
-		}
-
-		if lookup != nil {
-			if val, found := lookup(name); found && strings.TrimSpace(val) != "" {
-				val2 = strings.TrimSpace(val)
-
-				continue
-			}
-		}
-
-		if fallback != "" {
-			val2 = fallback
-
-			continue
-		}
-
-		return ""
-	}
-
-	return val2
-}
-
-// ResolveCustomProps walks a custom-property graph: the inherited overlay
-// plus declared --* values, with var() chains expanded once using a memo and
-// a cycle stack (cycles resolve to invalid → empty). The single place
-// custom-property policy lives.
-func ResolveCustomProps(declared, inherited map[string]string) map[string]string {
-	work := make(map[string]string, len(inherited)+len(declared))
-	for k, v := range inherited {
-		work[k] = v
-	}
-
-	for k, v := range declared {
-		work[k] = v
-	}
-
-	memo := map[string]string{}
-
-	var eval func(name string, stack map[string]bool) string
-
-	eval = func(name string, stack map[string]bool) string {
-		if v, ok := memo[name]; ok {
-			return v
-		}
-
-		raw, ok := work[name]
-		if !ok || !strings.Contains(strings.ToLower(raw), "var(") {
-			memo[name] = raw
-
-			return raw
-		}
-
-		if stack[name] {
-			return ""
-		}
-
-		stack[name] = true
-		val := ResolveVar(raw, func(n string) (string, bool) {
-			s := eval(n, stack)
-			_, exists := work[n]
-
-			return s, exists && strings.TrimSpace(s) != ""
-		})
-
-		delete(stack, name)
-
-		memo[name] = val
-
-		return val
-	}
-	for name := range work {
-		eval(name, map[string]bool{})
-	}
-
-	return memo
-}
-
-func isHex(s string) bool {
-	for i := range len(s) {
-		c := s[i]
-		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F') {
-			return false
-		}
-	}
-
-	return true
-}
-
-func hexNibble(buf byte) int {
-	switch {
-	case buf >= '0' && buf <= '9':
-		n := int(buf - '0')
-
-		return n*16 + n
-	case buf >= 'a' && buf <= 'f':
-		n := int(buf-'a') + hexLetterBase
-
-		return n*16 + n
-	case buf >= 'A' && buf <= 'F':
-		n := int(buf-'A') + hexLetterBase
-
-		return n*16 + n
-	}
-
-	return 0
-}
-
-func hexByte(s string) int {
-	hi := hexVal(s[0])
-	lo := hexVal(s[1])
-
-	return hi*16 + lo
-}
-
-func hexVal(buf byte) int {
-	switch {
-	case buf >= '0' && buf <= '9':
-		return int(buf - '0')
-	case buf >= 'a' && buf <= 'f':
-		return int(buf-'a') + hexLetterBase
-	case buf >= 'A' && buf <= 'F':
-		return int(buf-'A') + hexLetterBase
-	}
-
-	return 0
-}
-
-func clampByte(fVal float64) int {
-	if fVal < 0 {
-		return 0
-	}
-
-	if fVal > maxRGBChannel {
-		return maxRGBChannel
-	}
-
-	return int(fVal + roundHalfUp)
-}
-
-// ParseFontFamily splits a font-family value on commas and trims quotes.
-func ParseFontFamily(v string) []string {
-	var out []string
-
-	for _, part := range strings.Split(v, ",") {
-		part = strings.TrimSpace(part)
-		part = strings.Trim(part, "\"'")
-
-		if part != "" {
-			out = append(out, part)
-		}
-	}
-
-	return out
-}
-
-// namedColors returns the CSS2 system colors plus greys/orange and common web
-// names used by fixtures and layout tests (ponytail: not the full CSS Color 4
-// list). Function-scoped to keep the table out of package globals; the map is
-// small enough that the per-call allocation is negligible.
-func namedColors() map[string][3]int {
-	return map[string][3]int{
-		// CSS2 core
-		"black": {0, 0, 0}, "silver": {192, 192, 192}, "gray": {128, 128, 128},
-		"grey": {128, 128, 128}, "white": {255, 255, 255}, "maroon": {128, 0, 0},
-		"red": {255, 0, 0}, "purple": {128, 0, 128}, "fuchsia": {255, 0, 255},
-		"green": {0, 128, 0}, "lime": {0, 255, 0}, "olive": {128, 128, 0},
-		"yellow": {255, 255, 0}, "navy": {0, 0, 128}, "blue": {0, 0, 255},
-		"teal": {0, 128, 128}, "aqua": {0, 255, 255},
-		// Common aliases / CSS3 extras used in sheets
-		"cyan": {0, 255, 255}, "magenta": {255, 0, 255}, "orange": {255, 165, 0},
-		"brown": {165, 42, 42}, "pink": {255, 192, 203}, "gold": {255, 215, 0},
-		"darkgray": {169, 169, 169}, "darkgrey": {169, 169, 169},
-		"lightgray": {211, 211, 211}, "lightgrey": {211, 211, 211},
-		"darkgreen": {0, 100, 0}, "darkblue": {0, 0, 139}, "darkred": {139, 0, 0},
-		"darkorange": {255, 140, 0}, "lightblue": {173, 216, 230},
-		"lightgreen": {144, 238, 144}, "lightyellow": {255, 255, 224},
-		"coral": {255, 127, 80}, "crimson": {220, 20, 60}, "indigo": {75, 0, 130},
-		"khaki": {240, 230, 140}, "lavender": {230, 230, 250}, "violet": {238, 130, 238},
-		"tan": {210, 180, 140}, "salmon": {250, 128, 114}, "seagreen": {46, 139, 87},
-		"steelblue": {70, 130, 180}, "turquoise": {64, 224, 208}, "wheat": {245, 222, 179},
-		"orangered": {255, 69, 0}, "tomato": {255, 99, 71}, "whitesmoke": {245, 245, 245},
-		"gainsboro": {220, 220, 220}, "rebeccapurple": {102, 51, 153},
-	}
 }

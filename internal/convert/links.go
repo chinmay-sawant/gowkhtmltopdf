@@ -9,6 +9,67 @@ import (
 	"gowkhtmltopdf/internal/pdf"
 )
 
+// bodyLinkIntent is the information from a same-document link operation that
+// later needs document-wide destinations. It deliberately omits the display
+// operation and any source DOM pointer.
+type bodyLinkIntent struct {
+	uri string
+	loc layout.ElementLocation
+}
+
+// bodyNavigation is the compact post-paint projection of a body Result used
+// by local-link and header/footer passes. Keeping it on objectState lets the
+// complete display list, box tree, locations, and DOM be collected once paint
+// and heading collection have finished.
+type bodyNavigation struct {
+	ids   map[string]layout.ElementLocation
+	links []bodyLinkIntent
+}
+
+// collectBodyNavigation copies the body navigation metadata that later
+// document-wide passes need. Later duplicate ids overwrite earlier ones,
+// matching the historical scan of Result.Locations. The copied locations have
+// nil Node pointers so they do not keep the parsed document alive.
+func collectBodyNavigation(res *layout.Result) bodyNavigation {
+	if res == nil {
+		return bodyNavigation{} //nolint:exhaustruct // intentional zero-value projection
+	}
+
+	nav := bodyNavigation{ //nolint:exhaustruct // intentional zero-value projection
+		ids: make(map[string]layout.ElementLocation),
+	}
+
+	for _, loc := range res.Locations {
+		if loc.Node == nil {
+			continue
+		}
+
+		if id := loc.Node.Attribute("id"); id != "" {
+			loc.Node = nil
+			nav.ids[id] = loc
+		}
+	}
+
+	for _, oper := range res.Ops {
+		if oper.Kind != layout.OpLinkURI || !strings.HasPrefix(oper.URI, "#") {
+			continue
+		}
+
+		nav.links = append(nav.links, bodyLinkIntent{
+			uri: oper.URI,
+			loc: layout.ElementLocation{ //nolint:exhaustruct // intentional zero-value fields
+				Page: -1,
+				X:    oper.X,
+				Y:    oper.Y,
+				W:    oper.W,
+				H:    oper.H,
+			},
+		})
+	}
+
+	return nav
+}
+
 // stripLinkURIs neutralizes external (http/https/mailto) link ops in place.
 // Same-document fragment links (#id) are left for applyInternalLinks.
 // Neutralization uses layout.DeactivateOp so every painter skips the op
@@ -142,18 +203,12 @@ func buildBodyIDIndex(bodies []*objectState) map[string]bodyIDDest {
 	idLoc := map[string]bodyIDDest{}
 
 	for _, state := range bodies {
-		if state == nil || state.res == nil {
+		if state == nil {
 			continue
 		}
 
-		for _, loc := range state.res.Locations {
-			if loc.Node == nil {
-				continue
-			}
-
-			if id := loc.Node.Attribute("id"); id != "" {
-				idLoc[id] = bodyIDDest{state, loc}
-			}
+		for id, loc := range state.navigation.ids {
+			idLoc[id] = bodyIDDest{state, loc}
 		}
 	}
 
@@ -192,20 +247,14 @@ func applyInternalLinks(doc *pdf.Document, bodies []*objectState, tocTotal int) 
 	idLoc := buildBodyIDIndex(bodies)
 
 	for _, state := range bodies {
-		if state == nil || state.res == nil || state.geom.contentH <= 0 {
+		if state == nil || state.geom.contentH <= 0 {
 			continue
 		}
 
 		useLocal := state.obj.LocalLinks
 
-		for i := range state.res.Ops {
-			oper := &state.res.Ops[i]
-			if oper.Kind != layout.OpLinkURI || !strings.HasPrefix(oper.URI, "#") {
-				continue
-			}
-
-			frag := strings.TrimPrefix(oper.URI, "#")
-			layout.DeactivateOp(oper)
+		for _, link := range state.navigation.links {
+			frag := strings.TrimPrefix(link.uri, "#")
 
 			if !useLocal || frag == "" {
 				continue
@@ -216,17 +265,16 @@ func applyInternalLinks(doc *pdf.Document, bodies []*objectState, tocTotal int) 
 				continue
 			}
 
-			srcPageIdx := tocTotal + state.offset + int(oper.Y/state.geom.contentH)
+			srcPageIdx := tocTotal + state.offset + int(link.loc.Y/state.geom.contentH)
 
 			srcPage := doc.PageAt(srcPageIdx)
 			if srcPage == nil {
 				continue
 			}
 
-			srcLoc := layout.ElementLocation{ //nolint:exhaustruct // intentional zero-value fields
-				Page: int(oper.Y / state.geom.contentH),
-				X:    oper.X, Y: oper.Y, W: oper.W, H: oper.H,
-			}
+			srcLoc := link.loc
+			srcLoc.Page = int(link.loc.Y / state.geom.contentH)
+
 			if srcLoc.H <= 0 {
 				srcLoc.H = 10
 			}

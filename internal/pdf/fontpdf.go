@@ -1,9 +1,10 @@
 package pdf
 
 import (
-	"bytes"
 	"fmt"
+	"slices"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -139,24 +140,46 @@ func (d *Document) ensureToUnicode(sub *subsetResult, codeBytes int) objRef {
 	return ref
 }
 
-// runesKey builds a stable cache key for a rune set.
+// runesKey builds a stable cache key for a rune set. It sorts used in place;
+// callers pass the content-owned set only after all text emission is complete.
 func runesKey(used []rune) string {
-	runVal := append([]rune(nil), used...)
-	sort.Slice(runVal, func(i, j int) bool { return runVal[i] < runVal[j] })
+	if !slices.IsSorted(used) {
+		slices.Sort(used)
+	}
 
-	seen := map[rune]bool{}
+	unique := 0
 
-	var strB bytes.Buffer
+	var previous rune
 
-	for _, posX := range runVal {
-		if seen[posX] {
+	for _, posX := range used {
+		if unique > 0 && posX == previous {
 			continue
 		}
 
-		seen[posX] = true
-
-		fmt.Fprintf(&strB, "%x,", posX)
+		previous = posX
+		unique++
 	}
 
-	return strB.String()
+	const (
+		hexDigitsPerRune = 4
+		hexBase          = 16
+	)
+
+	out := make([]byte, 0, unique*hexDigitsPerRune)
+
+	previous = 0
+	havePrevious := false
+
+	for _, posX := range used {
+		if havePrevious && posX == previous {
+			continue
+		}
+
+		out = strconv.AppendUint(out, uint64(posX), hexBase)
+		out = append(out, ',')
+		previous = posX
+		havePrevious = true
+	}
+
+	return string(out)
 }

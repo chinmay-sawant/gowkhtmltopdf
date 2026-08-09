@@ -13,12 +13,39 @@ import (
 
 	"gowkhtmltopdf/internal/css"
 	"gowkhtmltopdf/internal/html"
-	"gowkhtmltopdf/internal/layout"
 )
+
+// Location is the small neutral projection of layout geometry needed by the
+// outline builder. Keeping this value type here avoids making outline depend
+// on the layout package's Result and ElementLocation implementation types.
+type Location struct {
+	Node       *html.Node
+	Page       int
+	X, Y, W, H float64
+}
+
+// locationReader is implemented by layout metadata and by tests or other
+// callers that already have a compatible location value.
+type locationReader interface {
+	NodeRef() *html.Node
+	PageIndex() int
+	Bounds() (float64, float64, float64, float64)
+}
+
+// NodeRef returns the associated HTML node.
+func (l Location) NodeRef() *html.Node { return l.Node }
+
+// PageIndex returns the location's zero-based page.
+func (l Location) PageIndex() int { return l.Page }
+
+// Bounds returns the canvas rectangle.
+func (l Location) Bounds() (float64, float64, float64, float64) {
+	return l.X, l.Y, l.W, l.H
+}
 
 // Heading is one outline entry: an h1..h6 element plus its layout location.
 // X/Y/W/H are canvas coordinates (y grows downward from the top of the page
-// content area) filled from an ElementLocation. Page stays object-local
+// content area) filled from a Location projection. Page stays object-local
 // forever; DocPage is set exactly once during assembly and never mutated
 // afterwards.
 type Heading struct {
@@ -115,10 +142,15 @@ func CollectHeadings(root *html.Node) []*Heading {
 // (matched by node pointer) and returns the headings that have a location.
 // Headings without a location are skipped: they were laid out as display:none
 // or never emitted a box.
-func Lookup(headings []*Heading, locs []layout.ElementLocation) []*Heading {
-	byNode := make(map[*html.Node]layout.ElementLocation, len(locs))
+func Lookup[T locationReader](headings []*Heading, locs []T) []*Heading {
+	byNode := make(map[*html.Node]Location, len(locs))
+
 	for _, l := range locs {
-		byNode[l.Node] = l
+		x, y, w, h := l.Bounds()
+		node := l.NodeRef()
+		byNode[node] = Location{
+			Node: node, Page: l.PageIndex(), X: x, Y: y, W: w, H: h,
+		}
 	}
 
 	out := make([]*Heading, 0, len(headings))

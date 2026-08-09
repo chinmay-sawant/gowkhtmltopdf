@@ -79,6 +79,7 @@ proves. Page envelopes are pinned in `internal/convert/golden_test.go`
 | 40 | Static 2D CSS `transform` badge (rotate) + abspos CB under transform (tier-2-pending-3) | 1 |
 | 41 | `:has()` relational selector: article footnote border, `tr:has(td.neg)` row highlight (tier-2-pending-3) | 1 |
 | 42 | `@container` size lite: named `inline-size` + unnamed `width` queries (tier-2-pending-3) | 1 |
+| 43 | Self-contained five-page dossier: embedded images, flex/grid cards, floats, multicol prose, anchors, `:has()`, repeating tables, code, positioning, forms, and print styling | 5 |
 
 ## Pass criteria (MVP)
 

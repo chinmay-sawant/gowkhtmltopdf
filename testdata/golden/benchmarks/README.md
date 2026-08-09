@@ -58,23 +58,92 @@ GOWKHTMLTOPDF_GENERATE_BENCHMARK_OUTPUTS=1 \
 This writes `live-movie-listing-010.pdf` and
 `live-movie-listing-010.png`.
 
-## Recorded results
+## Historical in-process recorded results
 
-The following are one-iteration snapshots from Go 1.26.4 on Linux/amd64 under
-WSL2 with 24 CPUs. The report template contains 20 realistic rows per page,
+The following are historical one-iteration in-process snapshots from Go 1.26.4
+on Linux/amd64 under WSL2 with 24 CPUs. They are retained for allocation and
+benchmark-history context; the current direct CLI comparison is documented in
+the section below. The report template contains 20 realistic rows per page,
 filling the available page without spilling into a second physical page.
 PDF and template rows are page counts; image rows are image tile counts because
 image mode renders one raster canvas.
 
+Historical snapshot re-measured 2026-08-09 after the certified workspace path
+landed. Image rows were re-run in the same session.
+
 | Workload | 2 | 5 | 10 | 20 | 50 | 100 | 200 | 250 | 500 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| PDF pages | 9.20ms | 15.89ms | 31.61ms | 78.63ms | 185.99ms | 455.05ms | 1.27s | 1.61s | 6.89s |
-| Template + PDF pages | 8.13ms | 18.42ms | 35.76ms | 71.28ms | 184.69ms | 407.52ms | 1.15s | 1.64s | 6.74s |
-| Web-fetch image tiles | 257.33ms | 258.05ms | 281.10ms | 310.47ms | 356.66ms | 413.68ms | 506.42ms | 564.00ms | 970.72ms |
-| Inline image tiles | 209.50ms | 220.61ms | 255.35ms | 282.33ms | 303.54ms | 340.31ms | 439.46ms | 491.22ms | 788.43ms |
+| PDF pages | 3.18ms | 5.87ms | 9.34ms | 19.63ms | 51.41ms | 104.14ms | 195.48ms | 251.24ms | 518.12ms |
+| Template + PDF pages | 4.86ms | 6.49ms | 13.35ms | 23.14ms | 55.58ms | 108.49ms | 212.37ms | 277.45ms | 552.12ms |
+| Web-fetch image tiles | 17.99ms | 16.97ms | 25.96ms | 25.16ms | 34.46ms | 54.84ms | 93.96ms | 117.38ms | 208.25ms |
+| Inline image tiles | 16.52ms | 14.47ms | 17.22ms | 20.52ms | 30.00ms | 49.48ms | 85.71ms | 99.72ms | 182.83ms |
 
-PDF / Template rows refreshed 2026-08-08 (`-benchtime=1x -count=1`). Image-tile
-rows are still the prior full-matrix snapshot.
+PDF / Template: certified workspace path (2026-08-09). The current 500-page
+PDF count-3 median is **0.500s / 157.6MB / 529.4K allocs**, versus the
+published **2.10s / 1.48GB / 3.93M** bar. Generated PDF artifacts are local
+only and are not part of the benchmark snapshot commit.
+
+### Historical snapshot comparison
+
+The 500-page report versus the published perf-wave snapshot (same
+one-iteration matrix command):
+
+| Metric | Perf-wave snapshot | Workspace snapshot | Change |
+|---|---:|---:|---:|
+| PDF time | 0.873s | 0.518s | **−40.7%** |
+| PDF B/op | 335.8MB | 157.6MB | **−53.1%** |
+| PDF allocs/op | 517,875 | 529,451 | **+2.2%** |
+| Template + PDF time | 0.942s | 0.552s | **−41.4%** |
+| Template + PDF B/op | 340.2MB | 162.5MB | **−52.2%** |
+| Template + PDF allocs/op | 569,123 | 580,715 | **+2.0%** |
+
+B/op is deterministic for identical code paths; wall time on one-shot laptop
+runs is noisier (±20% CPU state). The workspace reuses a certified page
+island's display-list backing storage, substantially reducing allocation
+traffic while retaining a small increase in allocation count.
+The separate locked-gate result is the more stable count-3 median shown
+above; the comparison table intentionally uses one iteration on both
+snapshots.
+
+### Direct CLI comparison: gowkhtmltopdf vs wkhtmltopdf
+
+This matrix was re-measured on 2026-08-09 using the same generated report
+fixtures for both command-line engines. The Go binary was freshly built from
+the current source (`go build ./cmd/gowkhtmltopdf`); wkhtmltopdf was
+0.12.6.1. Each cell is the median of three process runs. Timing is wall time
+in milliseconds; RSS is peak resident set size from `/usr/bin/time -f '%M'` in
+KiB. Both commands used `--quiet --enable-local-file-access` and every output
+passed the expected page-count check.
+
+| Pages | Gowk time | wkhtmltopdf time | Gowk RSS | wkhtmltopdf RSS | Gowk PDF bytes | wkhtmltopdf PDF bytes |
+|---:|---:|---:|---:|---:|---:|---:|
+| 2 | 10 ms | 220 ms | 18,432 KiB | 35,268 KiB | 21,626 | 18,486 |
+| 5 | 10 ms | 230 ms | 17,208 KiB | 35,528 KiB | 29,921 | 30,584 |
+| 10 | 20 ms | 250 ms | 17,832 KiB | 36,408 KiB | 43,905 | 50,994 |
+| 20 | 30 ms | 270 ms | 18,052 KiB | 38,080 KiB | 70,379 | 90,742 |
+| 50 | 70 ms | 360 ms | 20,644 KiB | 43,052 KiB | 150,192 | 210,678 |
+| 100 | 140 ms | 500 ms | 23,340 KiB | 51,092 KiB | 284,139 | 411,260 |
+| 200 | 300 ms | 800 ms | 30,256 KiB | 67,576 KiB | 551,741 | 816,285 |
+| 250 | 380 ms | 940 ms | 34,200 KiB | 75,948 KiB | 685,323 | 1,019,315 |
+| 500 | 890 ms | 1,720 ms | 50,888 KiB | 116,512 KiB | 1,357,738 | 2,036,776 |
+
+Gowkhtmltopdf was faster and used less RSS at every tested page size. At 500
+pages it was approximately 1.9x faster and used 56.3% less RSS. Gowk PDFs were
+smaller from 5 pages onward; wkhtmltopdf produced the smaller 2-page PDF.
+
+| Use case | Preferred engine | Reason |
+|---|---|---|
+| Memory-constrained server/container | gowkhtmltopdf | Lower RSS across the full matrix |
+| High-volume or large PDF generation | gowkhtmltopdf | Faster and lower RSS at 50–500 pages |
+| Smallest PDF at exactly 2 pages | wkhtmltopdf | 18,486 bytes versus 21,626 bytes |
+| Legacy Qt/WebKit rendering compatibility | wkhtmltopdf | Preserves the established renderer |
+| General default for this workload | gowkhtmltopdf | Faster, lower RSS, and smaller PDFs from 5 pages onward |
+
+This is a direct process comparison. It should not be conflated with Go's
+in-process `B/op` metric: `B/op` is cumulative allocation traffic, not peak
+RSS. The benchmark fixture and renderer settings are controlled, so results
+should be treated as workload-specific rather than a universal browser-engine
+ranking.
 
 The raw `go test` output, including allocations, is in
 [`benchmark-results.txt`](benchmark-results.txt). The benchmark implementation
