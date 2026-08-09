@@ -1,0 +1,139 @@
+{
+ "id": "about",
+ "nav": "About",
+ "content": [
+  {
+   "type": "hero",
+   "kicker": "About gowkhtmltopdf",
+   "title": "A pure-Go HTML to PDF converter",
+   "lede": "gowkhtmltopdf is a clean-room, stdlib-only work-alike for wkhtmltopdf that turns server-generated HTML into multi-page PDFs and images. It is built for controlled reports: invoices, statements, tables, and documents with headers, footers, TOCs, and PDF outlines."
+  },
+  {
+   "type": "cards",
+   "heading": "Status at a glance",
+   "items": [
+    {
+     "title": "MVP v0.1.0",
+     "body": "Phases 0-9 of the canonical plan are implemented: load, parse, style, layout, paginate, paint, and PDF 1.4 write, plus PNG/JPEG image mode. The `VERSION` file is the single source of truth; an unstamped build reports the `0.1.0-dev` fallback via `--version`."
+    },
+    {
+     "title": "Deterministic output",
+     "body": "Identical input bytes produce identical PDF bytes on every run. The 10-page invoice gate (10 sections by 40 rows, repeated `<thead>`) outputs 96,341 bytes byte-identical each run, with a generous CI budget of under 5 s."
+    },
+    {
+     "title": "Two static binaries",
+     "body": "`gowkhtmltopdf` (PDF) and `gowkhtmltoimage` (PNG/JPEG) build with `CGO_ENABLED=0` into statically linked ELF/Mach-O executables with no runtime library requirements. Builds are fully offline: no modules are downloaded."
+    },
+    {
+     "title": "MIT licensed",
+     "body": "MIT License, Copyright (c) 2026 Chinmay Sawant. This is an independent reimplementation: the project does not link to or redistribute wkhtmltopdf, Qt, or WebKit (wkhtmltopdf itself is LGPL)."
+    }
+   ]
+  },
+  {
+   "type": "table",
+   "heading": "Deferred and planned",
+   "headers": [
+    "Deferred or planned",
+    "Status",
+    "Next gate"
+   ],
+   "rows": [
+    [
+     "JavaScript / WebKit flags (`--enable-javascript`, `--run-script`, `--window-status`)",
+     "Flags accepted with warnings; `<script>` stripped at load; no JS engine in stdlib",
+     "Phase 22 staged (post-MVP roadmap)"
+    ],
+    [
+     "Floats / positioned layout (`float`, `clear`, `position`)",
+     "Float lite plus relative/absolute/fixed shipped; sticky still deferred",
+     "Sticky pixel parity is a non-goal"
+    ],
+    [
+     "Flexbox / Grid (`display: flex|grid`)",
+     "Partial: flex subset, grid lite, no full subgrid or masonry",
+     "Full L3 masonry and Chrome parity out of scope"
+    ],
+    [
+     "CJK / complex-script shaping",
+     "Type0/CID plus `--font-path`; Arabic joining via `go-text/typesetting` (GSUB); no HarfBuzz",
+     "Indic partial; Hangul needs a Hangul face"
+    ],
+    [
+     "AcroForm forms (`--enable-forms`)",
+     "No form model in the PDF writer",
+     "Intermediate roadmap (forms)"
+    ],
+    [
+     "XSLT TOC stylesheets (`--xsl-style-sheet`)",
+     "No XSLT in stdlib; flag warns and ignores; Go-template TOC used",
+     "Not planned"
+    ],
+    [
+     "SVG / BMP image output (`--format svg`)",
+     "No stdlib SVG encoder; PNG/JPEG only",
+     "Not planned"
+    ],
+    [
+     "SOCKS5 proxy",
+     "stdlib `net/http` has no SOCKS5; HTTP(S) proxy only",
+     "Not planned"
+    ],
+    [
+     "PDF encryption / PDF/A / ICC",
+     "Absent, out of original scope",
+     "Not planned"
+    ],
+    [
+     "C ABI (`wkhtmltopdf_*` cgo exports)",
+     "Stdlib mandate forbids cgo",
+     "Only if consumer demand"
+    ],
+    [
+     "URL to decent print (Phase 21)",
+     "In progress: product contract and docs honesty landed; acceptance not met",
+     "Vendored Wikipedia-class fixture for CI"
+    ],
+    [
+     "Tier 3 open-web competition (Phase 23)",
+     "Explicitly deferred",
+     "Amend the pure-stdlib constraint or accept an external engine"
+    ]
+   ]
+  },
+  {
+   "type": "prose",
+   "heading": "How it was built",
+   "sections": [
+    {
+     "heading": "Clean-room rewrite",
+     "body": "This codebase is not a binding to wkhtmltopdf/Qt/WebKit and not a wrapper around any commercial HTML-to-PDF API. The full pipeline (load, parse, CSS, layout, paginate, paint, PDF write) is implemented in this repository."
+    },
+    {
+     "heading": "Stdlib-only constraint",
+     "body": "Runtime dependencies are the Go standard library plus one narrow, documented exception: OpenType shaping via `github.com/go-text/typesetting` (amendment `plans/amendments/2026-08-05-gotext-typesetting.md`, landed in `go.mod`). No third-party PDF/HTML/CSS APIs, no Chrome/WebKit embedding, no cgo."
+    },
+    {
+     "heading": "AI-assisted development",
+     "body": "Plans and architecture came from Grok 4.5: phase ledgers under `plans/`, the scope freeze, feasibility, and the execution map. DeepSeek drove roughly 90% of the bulk implementation (settings/CLI, loader, PDF writer, HTML/CSS/layout, pagination, header/footer and TOC, image mode, library API, hardening).",
+     "bullets": [
+      "Last-mile correctness (roughly 10%) was handed to Grok 4.5 with a concrete gate: run `make samples`, fix whatever fails, and open the generated PDFs.",
+      "Early DeepSeek output could emit PDF files, but they were not reliably workable in real viewers: empty or malformed catalogs, wrong stream compression, broken font advances.",
+      "The final pass closed that gap: Flate/zlib streams, Catalog outlines, CLI page-scoped flags, glyph `/Widths` on a 1000-unit em, and Latin-1 text encoding.",
+      "Letter-spacing is fixed for Latin text; complex pages such as full Wikipedia articles still need follow-up for Unicode/CID fonts and richer CSS."
+     ]
+    },
+    {
+     "heading": "The OSS story",
+     "body": "gowkhtmltopdf is MIT licensed under Chinmay Sawant and requires Go 1.26+. It is an independent clean-room reimplementation of the wkhtmltopdf CLI and behavior, so it shares none of wkhtmltopdf's LGPL obligations and does not ship Qt or WebKit. A direct CLI comparison against wkhtmltopdf 0.12.6.1 (2026-08-09) shows gowkhtmltopdf faster and lower-RSS at every tested size from 2 to 500 pages."
+    }
+   ]
+  },
+  {
+   "type": "callout",
+   "variant": "info",
+   "title": "Scope boundary: a report engine, not a browser",
+   "body": "gowkhtmltopdf converts server-generated HTML into multi-page PDFs without a browser process. There is no JavaScript, CSS support is a documented subset (flex, grid, and positioning are partial), and pixel parity with Chrome or WebKit is not a goal. Use it for invoices, statements, tables, and multi-page documents with headers, footers, TOCs, and PDF outlines."
+  }
+ ]
+}

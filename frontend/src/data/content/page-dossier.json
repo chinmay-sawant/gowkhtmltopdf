@@ -1,0 +1,115 @@
+{
+ "id": "dossier",
+ "nav": "Issue Dossier",
+ "content": [
+  {
+   "type": "hero",
+   "kicker": "Issue Dossier",
+   "title": "All 1,329 open wkhtmltopdf issues, classified",
+   "lede": "Every open issue in the wkhtmltopdf/wkhtmltopdf repository, mapped against what gowkhtmltopdf can do. The first 100 are analyzed in depth; the other 1,229 are raw metadata awaiting the same treatment."
+  },
+  {
+   "type": "prose",
+   "heading": "What the dossier tracks",
+   "sections": [
+    {
+     "heading": "A full scrape, a deep subset",
+     "body": "The dossier starts from all 1,329 open issues scraped from the upstream wkhtmltopdf issue tracker, including title, body, labels, and dates. Of those, 100 issues were read end to end and classified against the gowkhtmltopdf codebase; the remaining 1,229 rows keep their raw metadata only."
+    },
+    {
+     "heading": "Every verdict cites evidence",
+     "body": "Analyzed rows record a summary, a category, a severity (High/Medium/Low from the tracker), a workaround when one exists, and a codebase-status note that names the concrete code path: a package such as `internal/load/load.go`, a test such as `TestFlexSpaceEvenly`, or a row in the compatibility matrix. The dashboard renders that evidence verbatim next to each issue card.",
+     "bullets": [
+      "Categories follow the tracker's own labels: CSS/layout, JavaScript/interactive, Images, Fonts/encoding/text, and the rest",
+      "Every row links back to the upstream issue via its `#number` on github.com/wkhtmltopdf/wkhtmltopdf"
+     ]
+    }
+   ]
+  },
+  {
+   "type": "stats",
+   "items": [
+    {
+     "value": "1,329",
+     "label": "open wkhtmltopdf issues tracked"
+    },
+    {
+     "value": "100",
+     "label": "deeply analyzed against the codebase"
+    },
+    {
+     "value": "34/29/37",
+     "label": "implemented / partial / not implemented"
+    },
+    {
+     "value": "1,229",
+     "label": "unassessed, raw metadata only"
+    }
+   ]
+  },
+  {
+   "type": "cards",
+   "heading": "Coverage verdicts",
+   "items": [
+    {
+     "title": "Implemented",
+     "body": "gowkhtmltopdf reproduces the reported behavior, and the evidence points to the code path that does it, for example `internal/load/load.go`, `internal/layout/flex.go`, or a matrix row with its tests. Most of the 34 implemented issues are ones where the pure-Go design sidesteps the bug: no double percent-encoding, no fd exhaustion, no Qt crash class."
+    },
+    {
+     "title": "Partial",
+     "body": "The behavior is covered but not fully replicated. Typical residual edges: `--header-html`/`--footer-html` clipped to the margin band, `@font-face` restricted to local TTF/OTF/WOFF1 with WOFF2 and data: sources skipped, tables without `rowspan`, and complex-script shaping such as Thai or Arabic."
+    },
+    {
+     "title": "Not implemented",
+     "body": "Deliberately out of scope or absent, and the evidence names the missing piece. Common reasons: the behavior needs a JavaScript engine, MHTML parsing, PDF/X or PDF/A output, or a Qt/WebKit-specific failure that a static pure-Go binary cannot exhibit."
+    },
+    {
+     "title": "Unassessed",
+     "body": "Raw metadata only: title, body, labels, and dates pulled from GitHub. No summary, severity, or verdict yet. These 1,229 rows are sorted and filterable in the dashboard and will move into one of the three verdicts as they are analyzed."
+    }
+   ]
+  },
+  {
+   "type": "prose",
+   "heading": "Why JavaScript-heavy issues are not implemented",
+   "sections": [
+    {
+     "heading": "JavaScript is stripped at load",
+     "body": "gowkhtmltopdf removes `<script>` elements when a document is loaded, and the JS flags such as `--enable-javascript` and `--javascript-delay` are accepted only with a warning (compatibility matrix, section 5; fidelity.md). The Go standard library has no JavaScript engine, so there is nothing to execute the page's code."
+    },
+    {
+     "heading": "What that means for the analyzed issues",
+     "body": "Ten of the 37 not-implemented verdicts are JavaScript/interactive reports. MathJax equations (#5240), mermaid.js diagrams (#5239), and CanvasJS charts (#5252) all need a running JS engine. Angular and React pages (#5293, #5215) come out blank because their DOM is built by scripts at runtime.",
+     "bullets": [
+      "JS-heavy issues are not silent regressions: the analyzer checked each one against the no-JS subset and marked the capability as absent",
+      "A JavaScript engine is on the roadmap as staged phase 22, so this verdict class may shrink later"
+     ]
+    },
+    {
+     "heading": "Arbitrary-website parity is a non-goal",
+     "body": "The README and fidelity.md are explicit: pixel-fidelity for arbitrary modern websites is not a goal (fidelity.md, phase 21). Issues that demand Chrome-level rendering of a live site, such as the service-public.fr CSS case (#5237), are marked not implemented for that reason, not because of a specific missing flag."
+    }
+   ]
+  },
+  {
+   "type": "prose",
+   "heading": "Security tradeoff",
+   "sections": [
+    {
+     "heading": "No scripts means a smaller attack surface",
+     "body": "A converter that never runs scripts cannot be hijacked through them, and the loader enforces that posture: local files are blocked by default and require `--enable-local-file-access` or an explicit `--allow` path, POST bodies go out only via `--post`, and fetches run under timeouts plus a redirect cap (compatibility matrix, section 6; integration-security.md). The analyzer maps the SSRF advisory CVE-2022-35583 (#5249) to implemented because this posture is documented and enforced."
+    },
+    {
+     "heading": "Pure Go removes the Qt crash class",
+     "body": "Many analyzed crashes are Qt/C++ problems: segfaults on Ubuntu (#5259), QSslSocket symbol failures (#5255), and IronPdf memory corruption (#5276). The single static `CGO_ENABLED=0` binary uses `net/http` and `crypto/tls` instead of Qt WebKit and OpenSSL bindings, so those failure classes are structurally impossible rather than merely rare."
+    }
+   ]
+  },
+  {
+   "type": "callout",
+   "variant": "info",
+   "title": "Using the dashboard: row filters and pagination",
+   "body": "The dashboard below is the same dataset as rows. Use the status and category chips to filter (for example, Not implemented + JavaScript/interactive to see the JS gap), and the sidebar shows counts per status, category, and severity. The 1,329-row list is paginated, and each row is a card with its verdict evidence, workaround, and a link to the upstream issue."
+  }
+ ]
+}

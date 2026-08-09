@@ -1,0 +1,104 @@
+{
+ "id": "getting-started",
+ "nav": "Getting Started",
+ "content": [
+  {
+   "type": "hero",
+   "kicker": "Getting started",
+   "title": "Your first PDF in five minutes",
+   "lede": "Build two static, stdlib-only binaries offline, then turn a local HTML file into a PDF with a single opt-in flag."
+  },
+  {
+   "type": "bullets",
+   "heading": "Requirements",
+   "items": [
+    "Go 1.26 or newer. The build is fully offline: no modules are downloaded.",
+    "No cgo and no native libraries. Build with CGO_ENABLED=0 to get statically linked ELF/Mach-O binaries with no runtime library requirements.",
+    "No browser, WebKit, or third-party HTML-to-PDF service. The whole pipeline (load, parse, style, layout, paint, PDF write) is implemented in this repository.",
+    "The only direct third-party dependency is github.com/go-text/typesetting for OpenType shaping; everything else is the Go standard library."
+   ]
+  },
+  {
+   "type": "code",
+   "heading": "Build",
+   "language": "sh",
+   "code": "# both static binaries, no cgo anywhere in the graph\nCGO_ENABLED=0 go build -o bin/gowkhtmltopdf ./cmd/gowkhtmltopdf\nCGO_ENABLED=0 go build -o bin/gowkhtmltoimage ./cmd/gowkhtmltoimage\n\n# or with the Makefile (builds both into bin/)\nmake build\n\n# version stamp: VERSION (currently 0.1.0) is the single source of truth.\n# An unstamped build reports the 0.1.0-dev fallback.\nCGO_ENABLED=0 go build -ldflags \"-X gowkhtmltopdf/internal/cli.Version=$(cat VERSION)\" \\\n  -o bin/gowkhtmltopdf ./cmd/gowkhtmltopdf\n\n./bin/gowkhtmltopdf --version   # Name: gowkhtmltopdf / Version: 0.1.0"
+  },
+  {
+   "type": "code",
+   "heading": "First local PDF",
+   "language": "sh",
+   "code": "./bin/gowkhtmltopdf --enable-local-file-access \\\n  testdata/golden/fixture-01-simple-invoice.html \\\n  /tmp/invoice.pdf"
+  },
+  {
+   "type": "callout",
+   "variant": "warn",
+   "title": "Local files are blocked by default",
+   "body": "Every local file read goes through a security ACL, so you must opt in with --enable-local-file-access on the CLI (or load.blocklocalfileaccess=false with the global enablelocalfileaccess=true in the library API). Remote URLs are fetched with timeouts, redirect limits, and size caps, but never hand untrusted user URLs straight to the converter: that is the classic SSRF pattern here and in upstream wkhtmltopdf."
+  },
+  {
+   "type": "prose",
+   "heading": "After the conversion",
+   "sections": [
+    {
+     "heading": "Open the result",
+     "body": "Open /tmp/invoice.pdf in any PDF viewer. Committed sample outputs live in output/ and are regenerated with make samples."
+    },
+    {
+     "heading": "PDF bytes to stdout",
+     "body": "Pass - as the output path to write the raw PDF bytes to stdout instead of a file. Pair it with --quiet so progress messages do not pollute the stream.",
+     "bullets": [
+      "gowkhtmltopdf --enable-local-file-access --quiet report.html report.pdf -",
+      "The clean byte stream pipes directly into an HTTP response or a downstream tool."
+     ]
+    },
+    {
+     "heading": "Deterministic output",
+     "body": "The pipeline is deterministic: identical input bytes produce identical PDF bytes, so outputs can be diffed in tests and cached by content hash."
+    }
+   ]
+  },
+  {
+   "type": "table",
+   "heading": "Makefile targets",
+   "headers": [
+    "Target",
+    "What it runs"
+   ],
+   "rows": [
+    [
+     "test",
+     "go test ./... - the full test suite"
+    ],
+    [
+     "build",
+     "Builds both static binaries (gowkhtmltopdf, gowkhtmltoimage) into bin/"
+    ],
+    [
+     "lint",
+     "golangci-lint run ./... with the pinned version (default v1.64.8); installs the pinned binary when missing"
+    ],
+    [
+     "fmt",
+     "gofmt -w ."
+    ],
+    [
+     "golden",
+     "go test ./internal/convert/ -run 'TestGoldenCorpus' -v - walks every testdata/golden/*.html fixture and asserts PDF structure, embedded font, page envelope, and feature expectations"
+    ],
+    [
+     "golden-update",
+     "Reserved for the PDF writer phase; currently a placeholder target"
+    ],
+    [
+     "samples",
+     "Regenerates output/: one PDF per golden fixture, a showcase TOC/header/footer/outline PDF, image PNGs, and a soft-fail live Wikipedia smoke"
+    ],
+    [
+     "clean",
+     "rm -rf testdata/golden/out"
+    ]
+   ]
+  }
+ ]
+}

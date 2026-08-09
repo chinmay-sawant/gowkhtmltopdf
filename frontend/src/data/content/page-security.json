@@ -1,0 +1,103 @@
+{
+ "id": "security",
+ "nav": "Security",
+ "content": [
+  {
+   "type": "hero",
+   "kicker": "Security",
+   "title": "Local reads denied, fetches bounded, no code execution",
+   "lede": "The document is the attack surface: it can name network resources and, only when the operator opts in, local files. Nothing in the pipeline executes document code. This page maps the controls and how to embed the converter safely."
+  },
+  {
+   "type": "bullets",
+   "heading": "Frozen defaults",
+   "items": [
+    "Local file access is blocked by default: `PdfGlobal.EnableLocalFileAccess` defaults to `false` and per-object `LoadPage.BlockLocalFileAccess` defaults to `true` (`settings.DefaultPdfGlobal`, `settings.DefaultLoadPage`), so no document-reachable path reads a local file out of the box.",
+    "`--enable-local-file-access` is the explicit opt-in (global flag); `--disable-local-file-access` is the per-object override, and a blocked object always wins over an enabled global: the only open cell in the matrix is global `true` plus object block `false`.",
+    "`--allow <path>` adds allow prefixes instead of a global enable: a path is readable only when its real, symlink-free location equals a prefix or sits below it, with the boundary check at the directory separator (`filepath.EvalSymlinks` before comparison), so `prefix-evil` does not match `prefix` and a symlink planted inside an allowed directory cannot escape it.",
+    "`file://` hosts other than the empty host and `localhost` are refused outright, and `..` or percent-encoded (`%2e%2e`) forms resolve to the same real path the read would follow before the check.",
+    "The primary page, subresources (CSS/images via `FetchSub`) and header/footer HTML all pass through the same ACL and the same body cap, implemented in `internal/load/load.go` (`AccessController.Allowed`, `resolvePath`, `fileAccessAllowed`)."
+   ]
+  },
+  {
+   "type": "table",
+   "heading": "Security controls and defaults",
+   "headers": [
+    "Control",
+    "Default"
+   ],
+   "rows": [
+    [
+     "Local file reads",
+     "Denied; `--enable-local-file-access` (global) and `--allow` prefixes (per-operator) are explicit opt-ins; `--disable-local-file-access` on an object overrides a global enable"
+    ],
+    [
+     "`--allow` allowlist",
+     "Empty; a path is readable only when its real, symlink-free path equals or sits below a prefix, never via a partial-segment match"
+    ],
+    [
+     "`file://` hosts",
+     "Only the empty host and `localhost`; all other hosts are refused in primary loads and subresource resolution"
+    ],
+    [
+     "Connect timeout",
+     "30 seconds (`DefaultConnectTimeout`, `net.Dialer.Timeout`)"
+    ],
+    [
+     "Response timeout",
+     "60 seconds per page by default (`--timeout`; `0` selects the default), enforced via `http.Client.Timeout` over TLS handshake, headers and body"
+    ],
+    [
+     "Redirects",
+     "Hard cap of 10 (`Loader.MaxRedirects`); exceeding it fails the load, and `net/http` strips `Authorization` and `Cookie` headers on cross-host redirects"
+    ],
+    [
+     "Body size",
+     "100 MiB cap (`Loader.MaxBodySize`) on HTTP and file reads; a declared `Content-Length` over the cap is rejected before any body bytes, chunked bodies are capped on the read side, and oversized bodies error rather than truncate"
+    ],
+    [
+     "TLS verification",
+     "On by default; `--insecure` is an explicit opt-in (`InsecureSkipVerify`)"
+    ],
+    [
+     "JavaScript / process execution",
+     "No JS engine and no `os/exec` anywhere in the tree; `--enable-javascript`, `--javascript-delay`, `--run-script`, `--window-status` and `--debug-javascript` are accepted for CLI compatibility, stored in settings, and ignored (`load.WaitJSDelay` is a pure sleep; `load.WarnJSStubs` logs the rest)"
+    ]
+   ]
+  },
+  {
+   "type": "cards",
+   "heading": "SSRF posture for embedders",
+   "items": [
+    {
+     "title": "No automatic form submission",
+     "body": "There is no JavaScript engine, so a document cannot script form submissions or trigger requests on its own beyond the fetches the loader performs: the primary page plus the `img` and `link` subresources it references."
+    },
+    {
+     "title": "POST only via --post",
+     "body": "The only code path that issues a POST body is the operator-supplied `--post <name> <value>` pair list (`settings.PostItem` appended to `Load.Post`); documents cannot select the method. The server never becomes a form-submission proxy for attacker HTML."
+    },
+    {
+     "title": "Redirects and timeouts bound every hop",
+     "body": "A hard redirect cap of 10 fails the load instead of looping, the connect timeout is 30 seconds, the per-page response default is 60 seconds, and `Load(ctx, ...)` / `FetchSub(ctx, ...)` thread the caller's context into every request, aborting even mid-body-read."
+    },
+    {
+     "title": "No cookies auto-forwarded",
+     "body": "Cookies exist only via the operator-supplied `--cookie` pairs and basic auth / custom headers are operator configuration; nothing browser-like is preserved across conversions, and cross-host `Cookie` / `Authorization` headers are stripped by `net/http` on redirects (custom headers do follow)."
+    }
+   ]
+  },
+  {
+   "type": "code",
+   "heading": "Embedding in a Gin API (preferred pattern)",
+   "language": "go",
+   "code": "// Preferred pattern from documentation/integration-security.md:\n// generate trusted HTML server-side, convert it, return the PDF.\nfunc invoicePDF(c *gin.Context) {\n    data := loadInvoice(c) // authz checked\n    html := renderTemplate(\"invoice.html\", data) // YOU control markup\n\n    path := writeTempHTML(html) // under e.g. /tmp/gowk-invoices/...\n    defer os.Remove(path)\n\n    conv := gowkhtmltopdf.NewConverter()\n    _ = conv.Global().Set(\"enablelocalfileaccess\", \"true\")\n    // Prefer an --allow style prefix for the temp dir only when exposed as a setting\n    obj := gowkhtmltopdf.NewObjectSettings().SetPage(path)\n    _ = obj.Set(\"load.blocklocalfileaccess\", \"false\")\n    conv.AddObject(obj)\n\n    ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)\n    defer cancel()\n    if err := conv.Convert(ctx); err != nil {\n        c.AbortWithError(500, err)\n        return\n    }\n    c.Data(200, \"application/pdf\", conv.Output())\n}"
+  },
+  {
+   "type": "callout",
+   "variant": "warn",
+   "title": "Untrusted HTML is not supported",
+   "body": "Treat any HTML you did not author as able to drive egress: every URL it references becomes a fetch from your process, including `http://localhost` and RFC1918 addresses, and hostile markup can consume CPU and memory up to the loader caps. Convert only HTML you generate, or run untrusted jobs in an isolated container with no host credentials, no `--cookie` / `--custom-header` / `--username` / `--proxy` credentials, and local file access left off. The full matrix is in `documentation/THREAT-MODEL.md`; the same problem class applies to upstream wkhtmltopdf."
+  }
+ ]
+}

@@ -1,0 +1,104 @@
+{
+ "id": "cli",
+ "nav": "CLI",
+ "content": [
+  {
+   "type": "hero",
+   "kicker": "Command line",
+   "title": "One grammar, three object kinds",
+   "lede": "gowkhtmltopdf accepts wkhtmltopdf-style multi-object command lines: page, cover, and toc objects, each with their own flag scope, ending in a single output path."
+  },
+  {
+   "type": "code",
+   "heading": "Usage grammar",
+   "language": "text",
+   "code": "gowkhtmltopdf [GLOBAL OPTIONS] [OBJECT]... <output>\n  OBJECT:\n    [PAGE OPTIONS]  page <input>\n    [TOC OPTIONS]   toc\n    [COVER OPTIONS] cover <input>\n\n  <output> is required; use \"-\" to write the PDF to stdout.\n  <input> may be a file path, a URL, or \"-\" to read HTML from stdin.\n  Local file reads are denied by default: pass --enable-local-file-access.\n\n  Doc flags: -h/--help, -V/--version, -L/--license, -E/--extended-help.\n  Short flags: -q (quiet), -g (grayscale), -O (orientation), -s (page-size),\n               -T/-B/-L/-R (margins), -c (copies), -t (title).\n  Exit codes: 0 success, 1 error, 2 HTTP 404, 3 HTTP 401.\n\n  Example:\n  gowkhtmltopdf --page-size A4 --margin-top 15mm report.html out.pdf"
+  },
+  {
+   "type": "prose",
+   "heading": "Global vs page-scoped flags",
+   "sections": [
+    {
+     "heading": "Two scopes, one grammar",
+     "body": "Global flags (parsed into `settings.PdfGlobal` in `internal/cli/flags.go`) apply to the whole document: `--page-size`, `--orientation`, `--margin-top/bottom/left/right`, `--page-width`, `--page-height`, `--grayscale`, `--copies`, `--collate`, `--title`, `--outline`, `--font-path`, `--quiet`. Page-scoped flags apply to one object only: `--zoom`, `--username`, `--password`, `--timeout`, `--external-links`, `--internal-links` are page-only flags routed through `pageOnlyFlag` in `internal/cli/flags.go`.",
+     "bullets": [
+      "A page-scoped flag placed before any object keyword is parked as \"pending\" and promoted into the first real page or cover object, never into a `toc` object (`pending` in `objectCtx`, `internal/cli/cli.go`).",
+      "Header/footer flags before any object keyword stay global so every object inherits them (`hfFlag` in `internal/cli/flags.go`).",
+      "`--enable-local-file-access` is dual-home: it writes global `enablelocalfileaccess=true` and object `load.blocklocalfileaccess=false` through the `applyPage` router."
+     ]
+    },
+    {
+     "heading": "Concrete example",
+     "body": "In this invocation `--page-size` and `--orientation` land on the global settings, `--zoom 1.25` is collected as pending page settings, and `--enable-local-file-access` after the `page` keyword opens that page object:",
+     "bullets": [
+      "`gowkhtmltopdf --page-size A4 --orientation Landscape --zoom 1.25 page --enable-local-file-access chapter.html book.pdf`",
+      "Because `toc` does not consume pending settings, `gowkhtmltopdf --enable-local-file-access toc page in.html out.pdf` applies the access flag to the first real page, not the TOC (see `newFreshObject` in `internal/cli/cli.go`)."
+     ]
+    }
+   ]
+  },
+  {
+   "type": "code",
+   "heading": "Cover + TOC + pages",
+   "language": "sh",
+   "code": "gowkhtmltopdf \\\n  --header-left \"gowkhtmltopdf\" --header-right \"[title]\" --header-line \\\n  --footer-center \"[page] / [topage]\" --footer-line \\\n  --toc-header-text \"Report contents\" --disable-dotted-lines \\\n  --outline --outline-depth 4 --title \"Invoice Report\" \\\n  cover --enable-local-file-access cover.html \\\n  toc \\\n  page --enable-local-file-access chapter1.html \\\n  page --enable-local-file-access chapter2.html \\\n  book.pdf"
+  },
+  {
+   "type": "bullets",
+   "heading": "Placeholder tokens for text headers and footers",
+   "items": [
+    "`[page]` - current page number",
+    "`[topage]` - total number of pages",
+    "`[frompage]` - first page number of the document",
+    "`[date]` and `[time]` - current date and time",
+    "`[title]` - the PDF title set by `--title`",
+    "`[doctitle]` - the document title from the HTML `<title>` element",
+    "`[webpage]` - the source URL of the current page",
+    "`[section]` and `[subsection]` - the current TOC section and subsection heading",
+    "Custom tokens: `--replace name value` substitutes `[name]` with `value` in header and footer text (pair flag in `internal/cli/flags.go`)"
+   ]
+  },
+  {
+   "type": "table",
+   "heading": "Flag categories",
+   "headers": [
+    "Category",
+    "Flags",
+    "Scope"
+   ],
+   "rows": [
+    [
+     "Page",
+     "`--page-size`, `--orientation`, `--page-width`, `--page-height`, `--margin-top/bottom/left/right`, `--zoom`, `--grayscale`, `--copies`, `--collate`, `--title`",
+     "Global; `--zoom`, `--timeout`, `--username`, `--password` are page-scoped"
+    ],
+    [
+     "Header/Footer",
+     "`--header-left/center/right`, `--footer-left/center/right`, `--header-html`, `--footer-html`, `--header-font-name`, `--header-font-size`, `--header-spacing`, `--header-line`, `--replace`",
+     "Object after a keyword; global before any keyword"
+    ],
+    [
+     "Outline",
+     "`--outline`, `--outline-depth`, `--dump-outline`, `--dump-default-toc-xsl`",
+     "Global"
+    ],
+    [
+     "TOC",
+     "`--toc-header-text`, `--toc-text-size-shrink`, `--disable-toc-links`, `--disable-dotted-lines`, `--toc-level-indentation`, `--toc-forward-links`, `--toc-back-links`",
+     "Current `toc` object; otherwise global for all TOC objects"
+    ],
+    [
+     "Image (gowkhtmltoimage)",
+     "`--width`, `--height`, `--format`, `--quality`, `--transparent`, `--crop-x/y/w/h`, `--smart-width`",
+     "Image global; PDF mode rejects them"
+    ]
+   ]
+  },
+  {
+   "type": "callout",
+   "variant": "tip",
+   "title": "Stdin and stdout",
+   "body": "An output path of \"-\" writes the PDF bytes to stdout (`OpenOutput` in `internal/cli/cli.go`), and an input of \"-\" reads the HTML from stdin, so `cat report.html | gowkhtmltopdf --enable-local-file-access - - > report.pdf` works. Progress phases print to stderr unless `--quiet`, keeping stdout clean for the PDF bytes."
+  }
+ ]
+}

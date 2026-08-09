@@ -1,0 +1,166 @@
+{
+ "id": "architecture",
+ "nav": "Architecture",
+ "content": [
+  {
+   "type": "hero",
+   "kicker": "Under the hood",
+   "title": "A pipeline of small stdlib-only packages",
+   "lede": "gowkhtmltopdf is a clean-room work-alike of wkhtmltopdf: HTML is loaded, parsed, laid out, paginated, and painted into a PDF 1.4 document (or a PNG/JPEG bitmap) using only the Go standard library plus a small tdewolff/canvas helper for SVG rasterization."
+  },
+  {
+   "type": "table",
+   "heading": "Package map",
+   "headers": [
+    "Package",
+    "Responsibility"
+   ],
+   "rows": [
+    [
+     "`gowkhtmltopdf` (root)",
+     "Public library API: `Converter`, `ImageConverter`"
+    ],
+    [
+     "`cmd/gowkhtmltopdf`",
+     "PDF CLI entrypoint"
+    ],
+    [
+     "`cmd/gowkhtmltoimage`",
+     "Image CLI entrypoint"
+    ],
+    [
+     "`internal/cli`",
+     "Argv parse, multi-object grammar (`page` / `cover` / `toc`), help"
+    ],
+    [
+     "`internal/app`",
+     "Command-to-engine adapters that keep `internal/convert` CLI-independent for library callers"
+    ],
+    [
+     "`internal/settings`",
+     "wkhtmltopdf-style settings, `UnitReal` values, dotted `Get` / `Set`"
+    ],
+    [
+     "`internal/load`",
+     "URL guess, HTTP(S)/file/`data:` loading, ACL, cookies, auth, POST"
+    ],
+    [
+     "`internal/html`",
+     "Allowlisted HTML tokenizer and element tree"
+    ],
+    [
+     "`internal/css`",
+     "CSS subset parse, selectors, cascade"
+    ],
+    [
+     "`internal/layout`",
+     "Style resolve, block/inline/table layout, display list, paint"
+    ],
+    [
+     "`internal/outline`",
+     "Headings to outline tree and dump XML"
+    ],
+    [
+     "`internal/convert`",
+     "PDF job orchestration: header/footer, TOC, links, copies"
+    ],
+    [
+     "`internal/pdf`",
+     "PDF 1.4 writer, TTF subset, images, annotations"
+    ],
+    [
+     "`internal/imageout`",
+     "Raster path for PNG/JPEG"
+    ],
+    [
+     "`internal/svg`",
+     "SVG-as-image rasterization for `<img src=\"*.svg\">` via tdewolff/canvas"
+    ]
+   ]
+  },
+  {
+   "type": "prose",
+   "heading": "Conversion pipeline",
+   "sections": [
+    {
+     "heading": "1. Parse CLI or library settings",
+     "body": "`internal/cli` turns argv into a `Command` (or the root package builds converter state directly). Every option lands in `internal/settings` as a dotted name such as `page.size` or `margin.left`, readable with the same `Get` / `Set` API the library exposes."
+    },
+    {
+     "heading": "2. Load each body object",
+     "body": "`internal/load.Loader` guesses the URL scheme, fetches HTML from HTTP(S), a local file, or a `data:` URL, and applies the ACL, cookies, auth, and POST settings. Each object in the multi-document grammar (`page`, `cover`, `toc`) is loaded independently."
+    },
+    {
+     "heading": "3. Parse HTML and CSS",
+     "body": "`internal/html` tokenizes into an allowlisted element tree. `internal/css` parses the supported CSS subset, runs selectors against the tree, and produces the cascade used in the next stage.",
+     "bullets": [
+      "Inline and linked style sheets are merged when the content policy allows them."
+     ]
+    },
+    {
+     "heading": "4. Layout",
+     "body": "`internal/layout` resolves computed styles, lays out blocks, inline content, and tables, and emits a display list of ops (text runs, rects, images, links). SVG images are rasterized by `internal/svg` before they enter the display list."
+    },
+    {
+     "heading": "5. Paginate",
+     "body": "The display list is split into pages using `page.size`, the four margins, and `page-break-*` CSS hints."
+    },
+    {
+     "heading": "6. Paint",
+     "body": "`internal/convert` feeds the paginated ops into `internal/pdf`, which paints them onto `pdf.Document` pages with the embedded font subset and image xobjects."
+    },
+    {
+     "heading": "7. TOC",
+     "body": "When a TOC object is present, `internal/outline` builds the heading tree and `internal/convert` runs the two-iteration page-count fixpoint so TOC page numbers settle before final placement."
+    },
+    {
+     "heading": "8. Reorder",
+     "body": "TOC pages are moved ahead of the body pages when a TOC is requested, matching wkhtmltopdf output ordering."
+    },
+    {
+     "heading": "9. Annotations and final pass",
+     "body": "`internal/outline` and `internal/pdf` attach the document outline, link annotations, and header/footer content in a final pass, then the Catalog references the outline root."
+    },
+    {
+     "heading": "10. Write",
+     "body": "`internal/pdf` writes the file: zlib Flate streams, the TTF font subset, and a correct xref table, producing a PDF 1.4 document."
+    }
+   ]
+  },
+  {
+   "type": "bullets",
+   "heading": "PDF writer notes",
+   "items": [
+    "Targets PDF 1.4, written in pure Go with no native dependencies.",
+    "Content streams use `/Filter /FlateDecode` via zlib (RFC 1950).",
+    "Fonts are an embedded Liberation Sans subset: a simple font with WinAnsi-style Latin-1 codes, `/Widths` expressed in 1000 units per em.",
+    "Outlines get the Catalog `/Outlines N 0 R` entry assigned only after the outline object references exist.",
+    "CJK and complex-script output uses the Type0/CID path with `--font-path`, without HarfBuzz shaping."
+   ]
+  },
+  {
+   "type": "callout",
+   "variant": "info",
+   "title": "Image mode reuses the same front end",
+   "body": "`ImageConverter` shares stages 1 through 4 (load, parse, layout). Instead of painting into `internal/pdf`, `internal/imageout` rasterizes the display list with a bitmap font and encodes PNG or JPEG, so the two binaries stay behaviorally aligned on parsing and layout."
+  },
+  {
+   "type": "prose",
+   "heading": "Security defaults",
+   "sections": [
+    {
+     "heading": "Local access is denied by default",
+     "body": "The loader refuses local file access unless `--enable-local-file-access` (or the equivalent setting) is passed. `--allow` prefixes opt in selective local paths.",
+     "bullets": [
+      "HTTP loading enforces connect and response timeouts, a maximum redirect count, and a maximum body size.",
+      "The full threat model is documented in THREAT-MODEL.md."
+     ]
+    },
+    {
+     "heading": "Extension points are intentionally small",
+     "body": "The public API is settings-driven (dotted names), not a plugin framework. New CSS properties or elements require changes inside `internal/css` and `internal/layout` plus an update to the compatibility matrix."
+    }
+   ]
+  }
+ ]
+}
