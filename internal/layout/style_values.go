@@ -1,0 +1,1009 @@
+package layout
+
+import (
+	"gowkhtmltopdf/internal/css"
+	"strconv"
+	"strings"
+)
+
+func parseColumnsShorthand(sty *ResolvedStyle, value string, fsize, viewportW float64) {
+	sty.ColumnCount = 0
+	sty.ColumnWidth = -1
+
+	for _, tok := range strings.Fields(value) {
+		tok = strings.TrimSpace(tok)
+		if tok == "" || tok == overflowAuto {
+			continue
+		}
+
+		if n, err := strconv.Atoi(tok); err == nil && n >= 1 {
+			sty.ColumnCount = n
+
+			continue
+		}
+
+		if v, ok := lengthBox(tok, fsize, viewportW, overflowAuto); ok && v >= 0 {
+			sty.ColumnWidth = v
+		}
+	}
+}
+
+// isMulticol reports whether st establishes a multi-column container
+// (column-count or column-width is not auto).
+func isMulticol(st ResolvedStyle) bool {
+	return st.ColumnCount > 0 || st.ColumnWidth >= 0
+}
+
+// parseFontShorthand handles "font: italic bold 12px/1.4 Arial, sans-serif".
+func parseFontShorthand(style *ResolvedStyle, value string, remBase float64) {
+	parts := strings.Fields(value)
+	for idx, page := range parts {
+		if applyFontStyleKeyword(style, page) {
+			continue
+		}
+
+		if n, ok := css.ParseNumber(page); ok && n >= 100 && n <= 900 {
+			style.FontWeight = int(n)
+
+			continue
+		}
+		// first size token
+		rest, lineH := fontSizeToken(page, style.FontSize)
+		if lineH >= 0 {
+			style.LineHeight = lineH
+		}
+
+		style.FontSize = fontSize(rest, style.FontSize, remBase)
+
+		if idx+1 < len(parts) {
+			if fam := css.ParseFontFamily(strings.Join(parts[idx+1:], " ")); len(fam) > 0 {
+				style.FontFamily = fam
+			}
+		}
+
+		return
+	}
+}
+
+// applyFontStyleKeyword handles the italic/oblique/bold style keywords; false
+// when the token is not a font style keyword.
+func applyFontStyleKeyword(style *ResolvedStyle, page string) bool {
+	switch page {
+	case "italic", "oblique":
+		style.FontItalic = true
+	case "bold":
+		style.FontWeight = fontWeightBold
+	default:
+		return false
+	}
+
+	return true
+}
+
+// fontSizeToken splits "12px/1.4" into the size part and line-height (or -1).
+func fontSizeToken(page string, fsize float64) (string, float64) {
+	if j := strings.IndexByte(page, '/'); j >= 0 {
+		return page[:j], lineHeight(page[j+1:], fsize)
+	}
+
+	return page, -1
+}
+
+// parseFlexShorthand handles flex: none | auto | <grow> | <grow> <shrink> | <grow> <shrink> <basis>.
+func parseFlexShorthand(style *ResolvedStyle, value string, fontSize, pctBase float64) {
+	value = strings.TrimSpace(value)
+	switch value {
+	case cssDisplayNone:
+		style.FlexGrow, style.FlexShrink = 0, 0
+		style.FlexBasis, style.FlexBasisPercent = -1, -1
+
+		return
+	case overflowAuto:
+		style.FlexGrow, style.FlexShrink = 1, 1
+		style.FlexBasis, style.FlexBasisPercent = -1, -1
+
+		return
+	}
+
+	parts := strings.Fields(value)
+	switch len(parts) {
+	case 0:
+		return
+	case 1:
+		parseFlexOne(style, parts[0], fontSize, pctBase)
+	case two:
+		parseFlexTwo(style, parts, fontSize, pctBase)
+	default:
+		parseFlexThree(style, parts, fontSize, pctBase)
+	}
+}
+
+// flexIsBasis reports whether a token can be a flex-basis value.
+func flexIsBasis(tok string) bool {
+	if tok == overflowAuto || tok == "content" {
+		return true
+	}
+
+	_, _, ok := css.ParseLength(tok)
+
+	return ok
+}
+
+// flexSetBasis writes the basis longhands from a token.
+func flexSetBasis(style *ResolvedStyle, tok string, fontSize, pctBase float64) {
+	if tok == overflowAuto || tok == "content" {
+		style.FlexBasis = -1
+		style.FlexBasisPercent = -1
+
+		return
+	}
+
+	if v, unit, ok := css.ParseLength(tok); ok && unit == "%" {
+		style.FlexBasisPercent = v
+		style.FlexBasis = -1
+
+		return
+	}
+
+	if v, ok := lengthBox(tok, fontSize, pctBase, overflowAuto); ok {
+		style.FlexBasis = v
+		style.FlexBasisPercent = -1
+	}
+}
+
+func parseFlexOne(style *ResolvedStyle, part string, fontSize, pctBase float64) {
+	if g, err := strconv.ParseFloat(part, 64); err == nil {
+		// flex: <number> → grow <number>, shrink 1, basis 0%
+		style.FlexGrow = g
+		style.FlexShrink = 1
+		style.FlexBasis = -1
+		style.FlexBasisPercent = 0
+
+		return
+	}
+
+	if flexIsBasis(part) {
+		style.FlexGrow, style.FlexShrink = 1, 1
+
+		flexSetBasis(style, part, fontSize, pctBase)
+	}
+}
+
+func parseFlexTwo(style *ResolvedStyle, parts []string, fontSize, pctBase float64) {
+	g, errG := strconv.ParseFloat(parts[0], 64)
+	if errG != nil {
+		return
+	}
+
+	style.FlexGrow = g
+	if sh, err := strconv.ParseFloat(parts[1], 64); err == nil {
+		style.FlexShrink = sh
+		style.FlexBasis = -1
+		style.FlexBasisPercent = 0
+
+		return
+	}
+
+	style.FlexShrink = 1
+
+	if flexIsBasis(parts[1]) {
+		flexSetBasis(style, parts[1], fontSize, pctBase)
+	}
+}
+
+func parseFlexThree(style *ResolvedStyle, parts []string, fontSize, pctBase float64) {
+	gap, errG := strconv.ParseFloat(parts[0], 64)
+	shval, errS := strconv.ParseFloat(parts[1], 64)
+
+	if errG != nil || errS != nil {
+		return
+	}
+
+	style.FlexGrow, style.FlexShrink = gap, shval
+
+	flexSetBasis(style, parts[2], fontSize, pctBase)
+}
+
+// setFourMargin applies a margin shorthand and tracks horizontal auto.
+func setFourMargin(sty *ResolvedStyle, value string, fsize, ctxW float64) {
+	var val [4]string
+	count := splitSpaceTokens(value, val[:])
+	sty.MarginLeftAuto, sty.MarginRightAuto = false, false
+
+	switch count {
+	case 0:
+		return
+	case 1:
+		sty.MarginTop = marginLen(val[0], fsize, ctxW)
+		sty.MarginRight, sty.MarginRightAuto = marginLenAuto(val[0], fsize, ctxW)
+		sty.MarginBottom = marginLen(val[0], fsize, ctxW)
+		sty.MarginLeft, sty.MarginLeftAuto = marginLenAuto(val[0], fsize, ctxW)
+	case two:
+		sty.MarginTop = marginLen(val[0], fsize, ctxW)
+		sty.MarginRight, sty.MarginRightAuto = marginLenAuto(val[1], fsize, ctxW)
+		sty.MarginBottom = marginLen(val[0], fsize, ctxW)
+		sty.MarginLeft, sty.MarginLeftAuto = marginLenAuto(val[1], fsize, ctxW)
+	case three:
+		sty.MarginTop = marginLen(val[0], fsize, ctxW)
+		sty.MarginRight, sty.MarginRightAuto = marginLenAuto(val[1], fsize, ctxW)
+		sty.MarginBottom = marginLen(val[2], fsize, ctxW)
+		sty.MarginLeft, sty.MarginLeftAuto = marginLenAuto(val[1], fsize, ctxW)
+	default:
+		sty.MarginTop = marginLen(val[0], fsize, ctxW)
+		sty.MarginRight, sty.MarginRightAuto = marginLenAuto(val[1], fsize, ctxW)
+		sty.MarginBottom = marginLen(val[2], fsize, ctxW)
+		sty.MarginLeft, sty.MarginLeftAuto = marginLenAuto(val[3], fsize, ctxW)
+	}
+}
+
+func setFour(_ *ResolvedStyle, value string, top, right, bottom, left *float64, fsVal, ctxW float64) {
+	var val [4]string
+
+	count := splitSpaceTokens(value, val[:])
+	if count == 0 {
+		return
+	}
+
+	if count == 1 {
+		*top = marginLen(val[0], fsVal, ctxW)
+		*right, *bottom, *left = *top, *top, *top
+
+		return
+	}
+
+	if count == two {
+		*top = marginLen(val[0], fsVal, ctxW)
+		*right = marginLen(val[1], fsVal, ctxW)
+		*bottom, *left = *top, *right
+
+		return
+	}
+
+	if count == three {
+		*top = marginLen(val[0], fsVal, ctxW)
+		*right = marginLen(val[1], fsVal, ctxW)
+		*bottom = marginLen(val[2], fsVal, ctxW)
+		*left = *right
+
+		return
+	}
+
+	*top = marginLen(val[0], fsVal, ctxW)
+	*right = marginLen(val[1], fsVal, ctxW)
+	*bottom = marginLen(val[2], fsVal, ctxW)
+	*left = marginLen(val[3], fsVal, ctxW)
+}
+
+func parseBorder(value string, _ float64) (border, bool) {
+	var boxNode border
+
+	for start := 0; ; {
+		face, next, ok := nextSpaceToken(value, start)
+		if !ok {
+			break
+		}
+
+		switch face {
+		case "solid", "dashed", "dotted":
+			boxNode.Style = face
+		case cssDisplayNone, overflowHidden:
+			boxNode.Style = cssDisplayNone
+		default:
+			if r, g, bb, _, ok := css.ParseColor(face); ok {
+				boxNode.Color = [3]float64{float64(r) / 255, float64(g) / 255, float64(bb) / 255}
+			} else if v, _, ok := css.ParseLength(face); ok {
+				boxNode.Width = v
+			}
+		}
+
+		start = next
+	}
+
+	if boxNode.Style == "" {
+		boxNode.Style = "solid"
+	}
+
+	if boxNode.Width == 0 {
+		boxNode.Width = 1
+	}
+
+	return boxNode, boxNode.Style != cssDisplayNone
+}
+
+// splitSpaceTokens writes up to len(tokens) CSS whitespace-separated tokens
+// into tokens and returns the actual token count. Counts above the capacity
+// preserve strings.Fields' len>4 behavior without allocating a larger slice.
+func splitSpaceTokens(value string, tokens []string) int {
+	count := 0
+
+	for start := 0; ; {
+		token, next, ok := nextSpaceToken(value, start)
+		if !ok {
+			return count
+		}
+
+		if count < len(tokens) {
+			tokens[count] = token
+		}
+
+		count++
+		start = next
+	}
+}
+
+func nextSpaceToken(value string, start int) (string, int, bool) {
+	for start < len(value) && isCSSSpace(value[start]) {
+		start++
+	}
+
+	if start == len(value) {
+		return "", start, false
+	}
+
+	end := start
+	for end < len(value) && !isCSSSpace(value[end]) {
+		end++
+	}
+
+	return value[start:end], end, true
+}
+
+func isCSSSpace(value byte) bool {
+	return value == ' ' || value == '\t' || value == '\n' || value == '\v' || value == '\f' || value == '\r'
+}
+
+func borderWidth(value string, _ float64) float64 {
+	switch value {
+	case "thin":
+		return pxToPt(1)
+	case "medium":
+		return pxToPt(three)
+	case "thick":
+		return pxToPt(borderWidthMediumPx)
+	}
+
+	if v, _, ok := css.ParseLength(value); ok {
+		return v
+	}
+
+	return 0
+}
+
+func fontSize(value string, parent, remBase float64) float64 {
+	if remBase <= 0 {
+		remBase = pxToPt(cssPxRoot)
+	}
+
+	if pt, ok := fontSizeKeyword(value, parent); ok {
+		return pt
+	}
+
+	if val, unit, ok := css.ParseLength(value); ok {
+		switch unit {
+		case "%":
+			return parent * val / cssPercent
+		case remUnit:
+			return remBase * val
+		default:
+			if pt, ok := css.LengthToPt(val, unit, parent); ok {
+				return pt
+			}
+		}
+	}
+
+	return parent
+}
+
+// fontSizeKeyword resolves the named font-size keywords relative to parent.
+func fontSizeKeyword(value string, parent float64) (float64, bool) {
+	switch value {
+	case "xx-small":
+		return pxToPt(fontSizeXSmallPx), true
+	case "x-small":
+		return pxToPt(fontSizeSmallPx), true
+	case "small":
+		return pxToPt(fontSizeMediumPx), true
+	case "medium":
+		return pxToPt(cssPxRoot), true
+	case "large":
+		return pxToPt(fontSizeLargePx), true
+	case "x-large":
+		return pxToPt(twoLineRoomPt), true
+	case "xx-large":
+		return pxToPt(fontSizeXXXLargePx), true
+	case "smaller":
+		return parent * smallerFontRatio, true
+	case "larger":
+		return parent * defaultLineHeightRatio, true
+	}
+
+	return 0, false
+}
+
+func lineHeight(value string, fsize float64) float64 {
+	if value == contentNormal {
+		return 0
+	}
+
+	if v, ok := css.ParseNumber(value); ok {
+		return v * fsize
+	}
+
+	if v, unit, ok := css.ParseLength(value); ok {
+		if unit == "%" {
+			return fsize * v / cssPercent
+		}
+
+		if pt, ok := css.LengthToPt(v, unit, fsize); ok {
+			return pt
+		}
+	}
+
+	return 0
+}
+
+// parseOverflowKeyword accepts CSS overflow keywords used for sticky scrollport
+// detection. clip is treated like hidden (scroll container, no user scroll).
+func parseOverflowKeyword(value string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "visible", overflowHidden, "scroll", overflowAuto, "clip":
+		return strings.ToLower(strings.TrimSpace(value)), true
+	}
+
+	return "", false
+}
+
+// parseListStyleType returns a known list-style-type keyword, or "" if unknown.
+func parseListStyleType(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "disc", "circle", "square", "decimal", "decimal-leading-zero",
+		"lower-roman", "upper-roman", "lower-alpha", "lower-latin",
+		"upper-alpha", "upper-latin", cssDisplayNone:
+		return strings.ToLower(strings.TrimSpace(value))
+	}
+
+	return ""
+}
+
+// overflowCreatesStickyScrollport reports whether overflow establishes a sticky
+// scrollport (CSS Position 3 / Overflow 3). PDF has no user scroll, so sticky
+// inside these boxes clamps at scroll offset 0 against the box edges.
+func overflowCreatesStickyScrollport(overflow string) bool {
+	switch overflow {
+	case overflowAuto, "scroll", overflowHidden, "clip":
+		return true
+	}
+
+	return false
+}
+
+// lengthBox parses a length for box-sizing properties. "auto" maps to -1,
+// "none" to -1 as well (max-*). Percentages resolve against the containing
+// block dimension (approximated by viewport at this phase).
+func lengthBox(value string, fsize, containing float64, autoValue string) (float64, bool) {
+	if value == autoValue || value == "inherit" || value == "initial" {
+		return -1, true
+	}
+
+	val, unit, ok := css.ParseLength(value)
+	if !ok {
+		return 0, false
+	}
+
+	switch unit {
+	case "%", "vw", "vh":
+		return containing * val / cssPercent, true
+	default:
+		if point, ok := css.LengthToPt(val, unit, fsize); ok {
+			// rem uses LengthToPt's 16px root; keep remBase-independent path
+			// matching prior lengthBox (rem → 12pt * v via pxToPt(16)).
+			if unit == remUnit {
+				return pxToPt(cssPxRoot) * val, true
+			}
+
+			return point, true
+		}
+	}
+
+	return 0, false
+}
+
+// marginLenAuto parses a horizontal margin; auto yields (0, true).
+func marginLenAuto(value string, fs, ctxW float64) (float64, bool) {
+	if value == overflowAuto {
+		return 0, true
+	}
+
+	return marginLen(value, fs, ctxW), false
+}
+
+// marginLen parses a margin/padding/letter-spacing length in points; 0 when
+// unparseable. Percentages resolve against the containing width.
+func marginLen(value string, fsize, ctxW float64) float64 {
+	if value == overflowAuto || value == "inherit" || value == "initial" {
+		return 0
+	}
+
+	val, unit, ok := css.ParseLength(value)
+	if !ok {
+		return 0
+	}
+
+	if unit == "%" {
+		return ctxW * val / cssPercent
+	}
+
+	if unit == "rem" {
+		return pxToPt(cssPxRoot) * val
+	}
+
+	if pt, ok := css.LengthToPt(val, unit, fsize); ok {
+		return pt
+	}
+
+	return 0
+}
+
+func pxToPt(px float64) float64 { return px * pxToPtFactor }
+
+// parseGridAutoFlowValue normalizes grid-auto-flow to one of:
+// "row", "column", "dense", "row dense", "column dense".
+func parseGridAutoFlowValue(value string) string {
+	toks := strings.Fields(strings.ToLower(strings.TrimSpace(value)))
+	row, col, dense := false, false, false
+
+	for _, t := range toks {
+		switch t {
+		case fxRow:
+			row = true
+		case fxCol:
+			col = true
+		case gridFlowDense:
+			dense = true
+		}
+	}
+
+	return gridAutoFlowName(row, col, dense)
+}
+
+// gridAutoFlowName maps the parsed tokens onto the canonical keyword.
+func gridAutoFlowName(row, col, dense bool) string {
+	switch {
+	case col && dense:
+		return gridFlowColumnDense
+	case row && dense:
+		return gridFlowRowDense
+	case dense:
+		return gridFlowDense
+	case col:
+		return fxCol
+	default:
+		return fxRow
+	}
+}
+
+// parseGridArea handles grid-area: <custom-ident> or the lite line form
+// row-start / column-start / row-end / column-end (and 1–2 slash forms).
+func parseGridArea(sty *ResolvedStyle, value string) {
+	value = strings.TrimSpace(value)
+	if value == "" || strings.EqualFold(value, overflowAuto) {
+		sty.GridArea = ""
+
+		return
+	}
+
+	parts := strings.Split(value, "/")
+	for i := range parts {
+		parts[i] = strings.TrimSpace(parts[i])
+	}
+
+	if len(parts) == 1 {
+		tok := parts[0]
+		if _, err := strconv.Atoi(tok); err == nil {
+			// Single line index → row-start (CSS shorthand lite).
+			parseGridRow(sty, tok)
+			sty.GridArea = ""
+
+			return
+		}
+
+		if strings.HasPrefix(tok, "span ") {
+			parseGridRow(sty, tok)
+			sty.GridArea = ""
+
+			return
+		}
+		// Named area.
+		sty.GridArea = tok
+
+		return
+	}
+
+	sty.GridArea = ""
+
+	switch len(parts) {
+	case two:
+		// CSS: row-start / column-start (omitted ends copy starts → span 1).
+		parseGridRow(sty, parts[0])
+		parseGridColumn(sty, parts[1])
+	case three:
+		// row-start / column-start / row-end
+		parseGridRow(sty, parts[0])
+		parseGridColumn(sty, parts[1])
+		applyGridLineEnd(sty, true, parts[2])
+	default:
+		// row-start / column-start / row-end / column-end
+		parseGridRow(sty, parts[0])
+		parseGridColumn(sty, parts[1])
+		applyGridLineEnd(sty, true, parts[2])
+		applyGridLineEnd(sty, false, parts[3])
+	}
+}
+
+// applyGridLineEnd sets span from an end line or "span N" on row (isRow) or column.
+func applyGridLineEnd(style *ResolvedStyle, isRow bool, end string) {
+	target := gridTarget(style, isRow)
+
+	end = strings.TrimSpace(end)
+	if strings.HasPrefix(end, "span ") {
+		node, err := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(end, "span ")))
+		if err != nil || node < 1 {
+			return
+		}
+
+		*target.span = node
+
+		return
+	}
+
+	val, err := strconv.Atoi(end)
+	if err != nil {
+		return
+	}
+
+	if *target.start > 0 {
+		sp := val - *target.start
+		if sp < 1 {
+			sp = 1
+		}
+
+		*target.span = sp
+	}
+}
+
+func parseGridColumn(st *ResolvedStyle, value string) { parseGridLineAt(colGridTarget(st), value) }
+
+func parseGridRow(st *ResolvedStyle, value string) { parseGridLineAt(rowGridTarget(st), value) }
+
+// gridLineTarget points at the start/span fields of one grid axis.
+type gridLineTarget struct {
+	start *int
+	span  *int
+}
+
+func rowGridTarget(st *ResolvedStyle) gridLineTarget {
+	return gridLineTarget{start: &st.GridRowStart, span: &st.GridRowSpan}
+}
+
+func colGridTarget(st *ResolvedStyle) gridLineTarget {
+	return gridLineTarget{start: &st.GridColumnStart, span: &st.GridColumnSpan}
+}
+
+func gridTarget(st *ResolvedStyle, isRow bool) gridLineTarget {
+	if isRow {
+		return rowGridTarget(st)
+	}
+
+	return colGridTarget(st)
+}
+
+// parseGridLineAt handles "N", "span N", "N / M" and "N / span M" for one
+// grid axis.
+func parseGridLineAt(target gridLineTarget, value string) {
+	value = strings.TrimSpace(value)
+	if strings.HasPrefix(value, "span ") {
+		applyGridSpanToken(target, strings.TrimSpace(strings.TrimPrefix(value, "span ")))
+
+		return
+	}
+
+	// "1 / 3" or "1 / span 2"
+	parts := strings.Split(value, "/")
+	if len(parts) == 1 {
+		if v, err := strconv.Atoi(strings.TrimSpace(parts[0])); err == nil && v > 0 {
+			*target.start = v
+			*target.span = 1
+		}
+
+		return
+	}
+
+	setGridStartToken(target, parts[0])
+	applyGridEndToken(target, parts[1])
+}
+
+// setGridStartToken applies a positive start line index.
+func setGridStartToken(target gridLineTarget, token string) {
+	if v, err := strconv.Atoi(strings.TrimSpace(token)); err == nil && v > 0 {
+		*target.start = v
+	}
+}
+
+// applyGridEndToken applies a "span N" or absolute end line; absolute ends
+// become spans relative to the start line.
+func applyGridEndToken(target gridLineTarget, end string) {
+	end = strings.TrimSpace(end)
+	if strings.HasPrefix(end, "span ") {
+		applyGridSpanToken(target, strings.TrimSpace(strings.TrimPrefix(end, "span ")))
+
+		return
+	}
+
+	if v, err := strconv.Atoi(end); err == nil && *target.start > 0 {
+		sp := v - *target.start
+		if sp < 1 {
+			sp = 1
+		}
+
+		*target.span = sp
+	}
+}
+
+// applyGridSpanToken sets the span when token is a positive integer.
+func applyGridSpanToken(target gridLineTarget, token string) {
+	if n, err := strconv.Atoi(token); err == nil && n > 0 {
+		*target.span = n
+	}
+}
+
+// uaDecls is the user-agent declaration table for element names. Lookup is
+// per element; unknown names get the initial values.
+var uaDecls = map[string][]css.Declaration{ //nolint:gochecknoglobals // static UA table
+	"html": {{Prop: "display", Value: "block"}}, //nolint:exhaustruct // intentional zero fields
+	"body": {
+		{Prop: "display", Value: "block"}, //nolint:exhaustruct // intentional zero fields
+		{Prop: "margin", Value: "8px"},    //nolint:exhaustruct // intentional zero fields
+	},
+	divElementName: {
+		{Prop: "display", Value: "block"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"section": {
+		{Prop: "display", Value: "block"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"article": {
+		{Prop: "display", Value: "block"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"header": {
+		{Prop: "display", Value: "block"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"footer": {
+		{Prop: "display", Value: "block"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"main": {
+		{Prop: "display", Value: "block"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"aside": {
+		{Prop: "display", Value: "block"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"nav": {
+		{Prop: "display", Value: "block"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"form": {
+		{Prop: "display", Value: "block"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"fieldset": {
+		{Prop: "display", Value: "block"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"figure": {
+		{Prop: "display", Value: "block"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"figcaption": {
+		{Prop: "display", Value: "block"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"blockquote": {
+		{Prop: "display", Value: "block"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"address": {
+		{Prop: "display", Value: "block"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"dl": {
+		{Prop: "display", Value: "block"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"dd": {
+		{Prop: "display", Value: "block"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"details": {
+		{Prop: "display", Value: "block"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"summary": {
+		{Prop: "display", Value: "block"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"p": {
+		{Prop: "display", Value: "block"}, //nolint:exhaustruct // intentional zero fields
+		{Prop: "margin", Value: "1em 0"},  //nolint:exhaustruct // intentional zero fields
+	},
+	"pre": {
+		// Match browser UA: preserve newlines/spaces; monospace is a
+		// soft preference (we fall back to Liberation Sans metrics).
+		{Prop: "display", Value: "block"},         //nolint:exhaustruct // intentional zero fields
+		{Prop: "margin", Value: "1em 0"},          //nolint:exhaustruct // intentional zero fields
+		{Prop: "white-space", Value: "pre"},       //nolint:exhaustruct // intentional zero fields
+		{Prop: "font-family", Value: "monospace"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"code": {
+		{Prop: "font-family", Value: "monospace"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"kbd": {
+		{Prop: "font-family", Value: "monospace"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"samp": {
+		{Prop: "font-family", Value: "monospace"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"h1": {
+		{Prop: "display", Value: "block"},    //nolint:exhaustruct // intentional zero fields
+		{Prop: "font-size", Value: "2em"},    //nolint:exhaustruct // intentional zero fields
+		{Prop: "margin", Value: "0.67em 0"},  //nolint:exhaustruct // intentional zero fields
+		{Prop: "font-weight", Value: "bold"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"h2": {
+		{Prop: "display", Value: "block"},    //nolint:exhaustruct // intentional zero fields
+		{Prop: "font-size", Value: "1.5em"},  //nolint:exhaustruct // intentional zero fields
+		{Prop: "margin", Value: "0.83em 0"},  //nolint:exhaustruct // intentional zero fields
+		{Prop: "font-weight", Value: "bold"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"h3": {
+		{Prop: "display", Value: "block"},    //nolint:exhaustruct // intentional zero fields
+		{Prop: "font-size", Value: "1.17em"}, //nolint:exhaustruct // intentional zero fields
+		{Prop: "margin", Value: "1em 0"},     //nolint:exhaustruct // intentional zero fields
+		{Prop: "font-weight", Value: "bold"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"h4": {
+		{Prop: "display", Value: "block"},    //nolint:exhaustruct // intentional zero fields
+		{Prop: "font-weight", Value: "bold"}, //nolint:exhaustruct // intentional zero fields
+		{Prop: "font-size", Value: "1em"},    //nolint:exhaustruct // intentional zero fields
+		{Prop: "margin", Value: "1.33em 0"},  //nolint:exhaustruct // intentional zero fields
+	},
+	"h5": {
+		{Prop: "display", Value: "block"},    //nolint:exhaustruct // intentional zero fields
+		{Prop: "font-weight", Value: "bold"}, //nolint:exhaustruct // intentional zero fields
+		{Prop: "font-size", Value: "1em"},    //nolint:exhaustruct // intentional zero fields
+		{Prop: "margin", Value: "1.33em 0"},  //nolint:exhaustruct // intentional zero fields
+	},
+	"h6": {
+		{Prop: "display", Value: "block"},    //nolint:exhaustruct // intentional zero fields
+		{Prop: "font-weight", Value: "bold"}, //nolint:exhaustruct // intentional zero fields
+		{Prop: "font-size", Value: "1em"},    //nolint:exhaustruct // intentional zero fields
+		{Prop: "margin", Value: "1.33em 0"},  //nolint:exhaustruct // intentional zero fields
+	},
+	"ul": {
+		{Prop: "display", Value: "block"},        //nolint:exhaustruct // intentional zero fields
+		{Prop: "margin", Value: "1em 0"},         //nolint:exhaustruct // intentional zero fields
+		{Prop: "padding-left", Value: "40px"},    //nolint:exhaustruct // intentional zero fields
+		{Prop: "list-style-type", Value: "disc"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"menu": {
+		{Prop: "display", Value: "block"},        //nolint:exhaustruct // intentional zero fields
+		{Prop: "margin", Value: "1em 0"},         //nolint:exhaustruct // intentional zero fields
+		{Prop: "padding-left", Value: "40px"},    //nolint:exhaustruct // intentional zero fields
+		{Prop: "list-style-type", Value: "disc"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"ol": {
+		{Prop: "display", Value: "block"},           //nolint:exhaustruct // intentional zero fields
+		{Prop: "margin", Value: "1em 0"},            //nolint:exhaustruct // intentional zero fields
+		{Prop: "padding-left", Value: "40px"},       //nolint:exhaustruct // intentional zero fields
+		{Prop: "list-style-type", Value: "decimal"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"li": {
+		{Prop: "display", Value: "list-item"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"table": {
+		{Prop: "display", Value: "table"},      //nolint:exhaustruct // intentional zero fields
+		{Prop: "border-spacing", Value: "2px"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"thead": {
+		{Prop: "display", Value: "table-header-group"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"tfoot": {
+		{Prop: "display", Value: "table-footer-group"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"tbody": {
+		{Prop: "display", Value: "table-row-group"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"tr": {
+		{Prop: "display", Value: "table-row"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"td": {
+		{Prop: "display", Value: "table-cell"}, //nolint:exhaustruct // intentional zero fields
+		{Prop: "padding", Value: "1px"},        //nolint:exhaustruct // intentional zero fields
+	},
+	"th": {
+		{Prop: "display", Value: "table-cell"}, //nolint:exhaustruct // intentional zero fields
+		{Prop: "padding", Value: "1px"},        //nolint:exhaustruct // intentional zero fields
+		{Prop: "text-align", Value: "center"},  //nolint:exhaustruct // intentional zero fields
+		{Prop: "font-weight", Value: "bold"},   //nolint:exhaustruct // intentional zero fields
+	},
+	"img": {
+		{Prop: "display", Value: "inline-block"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"hr": {
+		{Prop: "display", Value: "block"},     //nolint:exhaustruct // intentional zero fields
+		{Prop: "border", Value: "1px inset"},  //nolint:exhaustruct // intentional zero fields
+		{Prop: "margin", Value: "0.5em auto"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"a": {
+		{Prop: "color", Value: "#0000ee"},             //nolint:exhaustruct // intentional zero fields
+		{Prop: "text-decoration", Value: "underline"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"b": {
+		{Prop: "font-weight", Value: "bold"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"strong": {
+		{Prop: "font-weight", Value: "bold"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"i": {
+		{Prop: "font-style", Value: "italic"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"em": {
+		{Prop: "font-style", Value: "italic"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"cite": {
+		{Prop: "font-style", Value: "italic"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"dfn": {
+		{Prop: "font-style", Value: "italic"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"var": {
+		{Prop: "font-style", Value: "italic"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"u": {
+		{Prop: "text-decoration", Value: "underline"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"s": {
+		{Prop: "text-decoration", Value: "line-through"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"strike": {
+		{Prop: "text-decoration", Value: "line-through"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"del": {
+		{Prop: "text-decoration", Value: "line-through"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"small": {
+		{Prop: "font-size", Value: "smaller"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"big": {
+		{Prop: "font-size", Value: "larger"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"center": {
+		{Prop: "text-align", Value: "center"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"title": {
+		{Prop: "display", Value: cssDisplayNone}, //nolint:exhaustruct // intentional zero fields
+	},
+	styleElement: {
+		{Prop: "display", Value: cssDisplayNone}, //nolint:exhaustruct // intentional zero fields
+	},
+	"script": {
+		{Prop: "display", Value: cssDisplayNone}, //nolint:exhaustruct // intentional zero fields
+	},
+	"meta": {
+		{Prop: "display", Value: cssDisplayNone}, //nolint:exhaustruct // intentional zero fields
+	},
+	"link": {
+		{Prop: "display", Value: cssDisplayNone}, //nolint:exhaustruct // intentional zero fields
+	},
+	"head": {
+		{Prop: "display", Value: cssDisplayNone}, //nolint:exhaustruct // intentional zero fields
+	},
+	"textarea": {
+		{Prop: "white-space", Value: "pre"},       //nolint:exhaustruct // intentional zero fields
+		{Prop: "font-family", Value: "monospace"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"br": {
+		{Prop: "display", Value: "block"}, //nolint:exhaustruct // intentional zero fields
+	},
+}
+
+// uaRules returns the user-agent declarations for an element name.
+func uaRules(name string) []css.Declaration {
+	return uaDecls[name]
+}
