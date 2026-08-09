@@ -70,7 +70,6 @@ full document (default, unchanged)
 certified page islands (new, fail closed)
   PrepareDocument -> preflight -> per-island style/layout/paint workspace
                   -> navigation projection + workspace release
-                  -> release island workspace
   any unsupported dependency -> existing full-document path
 ```
 
