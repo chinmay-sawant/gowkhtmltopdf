@@ -312,11 +312,14 @@ func maxHeight(res *layout.Result, opts RenderOptions) float64 {
 // then box-filters down to the final CSS-pixel size. Glyph bitmaps for this
 // run live on a per-rasterize atlas (P5-05) so concurrent Renders do not share
 // mutable cache state.
-//
+type pixBuffer struct {
+	b []byte
+}
+
 //nolint:gochecknoglobals // supersample pixel buffer recycling
 var supersamplePixPool = sync.Pool{
 	New: func() any {
-		return make([]byte, 0, 16<<20) //nolint:mnd // 16 MiB default capacity
+		return &pixBuffer{b: make([]byte, 0, 16<<20)} //nolint:mnd // 16 MiB default capacity
 	},
 }
 
@@ -339,21 +342,27 @@ func rasterizeContext(ctx context.Context, res *layout.Result, height float64, t
 	}
 
 	neededBytes := widthPx * heightPx * 4
-	bufPtr, ok := supersamplePixPool.Get().(*[]byte)
+	pBuf, ok := supersamplePixPool.Get().(*pixBuffer)
 
-	var bufBytes []byte
-
-	if ok && bufPtr != nil && cap(*bufPtr) >= neededBytes {
-		bufBytes = (*bufPtr)[:neededBytes]
-		clear(bufBytes)
-	} else {
-		bufBytes = make([]byte, neededBytes)
-		bufPtr = &bufBytes
+	if !ok || pBuf == nil {
+		pBuf = &pixBuffer{b: make([]byte, 0, neededBytes)}
 	}
 
-	defer supersamplePixPool.Put(bufPtr)
+	if cap(pBuf.b) < neededBytes {
+		pBuf.b = make([]byte, neededBytes)
+	} else {
+		pBuf.b = pBuf.b[:neededBytes]
+		clear(pBuf.b)
+	}
 
-	img := image.NewNRGBA(image.Rect(0, 0, widthPx, heightPx))
+	defer supersamplePixPool.Put(pBuf)
+
+	img := &image.NRGBA{
+		Pix:    pBuf.b,
+		Stride: widthPx * 4,
+		Rect:   image.Rect(0, 0, widthPx, heightPx),
+	}
+
 	if !transparent {
 		fillNRGBAOpaque(img, img.Bounds(), color.NRGBA{R: channelMax, G: channelMax, B: channelMax, A: opaqueAlpha})
 	}
@@ -370,7 +379,10 @@ func rasterizeContext(ctx context.Context, res *layout.Result, height float64, t
 	}
 
 	if rasterSS <= 1 {
-		return img, nil
+		outImg := image.NewNRGBA(image.Rect(0, 0, widthPx, heightPx))
+		copy(outImg.Pix, img.Pix)
+
+		return outImg, nil
 	}
 
 	if err := ctx.Err(); err != nil {
