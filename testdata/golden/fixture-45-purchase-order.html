@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<!--
+  fixture-45-purchase-order
+  Proves: a purchase order with supplier and delivery addresses, line-item
+  quantities, commercial terms, and an approval block.
+  Expected: 1 page.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Purchase Order PO-2025-0045 - Northstar Labs</title>
+  <style>
+    body { font-family: sans-serif; font-size: 9.5pt; margin: 0; color: #202b36; }
+    h1 { color: #174a73; font-size: 19pt; margin: 0; }
+    .top { border-bottom: 3px solid #174a73; padding-bottom: 10px; margin-bottom: 14px; }
+    .meta { color: #526170; margin: 4px 0; }
+    .cols { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+    .cols td { width: 50%; vertical-align: top; padding: 8px; border: 1px solid #b9c5cf; }
+    .label { color: #174a73; font-size: 8pt; font-weight: bold; text-transform: uppercase; }
+    table.items { width: 100%; border-collapse: collapse; }
+    .items th, .items td { border: 1px solid #aebbc6; padding: 6px; }
+    .items th { background: #e8f0f6; text-align: left; }
+    .num { text-align: right; }
+    .terms { margin-top: 12px; padding: 8px; background: #f3f6f8; }
+    .approval { margin-top: 18px; width: 100%; border-collapse: collapse; }
+    .approval td { width: 50%; padding-top: 18px; border-bottom: 1px solid #777; }
+  </style>
+</head>
+<body>
+  <div class="top"><h1>Purchase Order PO-2025-0045</h1><p class="meta">Northstar Labs GmbH · Issued 2025-03-05 · Currency EUR</p></div>
+  <table class="cols"><tr>
+    <td><div class="label">Supplier</div><strong>Meridian Components AG</strong><br>Industriestrasse 18<br>70173 Stuttgart, Germany<br>supplier@example.test</td>
+    <td><div class="label">Ship to</div><strong>Northstar Labs · Receiving</strong><br>Research Park 4<br>69120 Heidelberg, Germany<br>Reference: LAB-DOCK-02</td>
+  </tr></table>
+  <table class="items">
+    <thead><tr><th>SKU</th><th>Description</th><th class="num">Qty</th><th class="num">Unit</th><th class="num">Line total</th></tr></thead>
+    <tbody>
+      <tr><td>MC-110</td><td>Shielded sensor cable, 5m</td><td class="num">40</td><td class="num">18.00</td><td class="num">720.00</td></tr>
+      <tr><td>MC-204</td><td>Calibration adapter kit</td><td class="num">6</td><td class="num">145.00</td><td class="num">870.00</td></tr>
+      <tr><td>MC-330</td><td>Weatherproof enclosure</td><td class="num">12</td><td class="num">62.50</td><td class="num">750.00</td></tr>
+      <tr><td>MC-901</td><td>Documentation and inspection pack</td><td class="num">1</td><td class="num">180.00</td><td class="num">180.00</td></tr>
+    </tbody>
+    <tfoot><tr><td colspan="4" class="num"><strong>Order total</strong></td><td class="num"><strong>2,520.00 EUR</strong></td></tr></tfoot>
+  </table>
+  <div class="terms"><strong>Terms:</strong> Net 30 days · Delivery requested by 2025-03-21 · Include PO-2025-0045 on all packing slips and invoices.</div>
+  <table class="approval"><tr><td>Requested by: Priya Nair</td><td>Approved by: Daniel Weber</td></tr></table>
+</body>
+</html>

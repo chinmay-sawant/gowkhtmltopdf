@@ -356,6 +356,21 @@ var fixturePageBounds = map[string]fixtureBounds{ //nolint:gochecknoglobals // i
 	"fixture-43-complex-dossier.html": { //nolint:exhaustruct // intentional zero-value fields
 		minPages: 5, maxPages: 5, images: true,
 	},
+	"fixture-44-receipt.html": { //nolint:exhaustruct // intentional zero-value fields
+		minPages: 1, maxPages: 1,
+	},
+	"fixture-45-purchase-order.html": { //nolint:exhaustruct // intentional zero-value fields
+		minPages: 1, maxPages: 1,
+	},
+	"fixture-46-contract.html": { //nolint:exhaustruct // intentional zero-value fields
+		minPages: 1, maxPages: 1,
+	},
+	"fixture-47-certificate.html": { //nolint:exhaustruct // intentional zero-value fields
+		minPages: 1, maxPages: 1, images: true,
+	},
+	"fixture-48-shipping-document.html": { //nolint:exhaustruct // intentional zero-value fields
+		minPages: 1, maxPages: 1,
+	},
 }
 
 // fixtureHeaderOK enforces the corpus hygiene rule: every fixture starts
@@ -416,7 +431,6 @@ func TestGoldenCorpusAllFixtures(t *testing.T) { //nolint:gocognit,cyclop,funlen
 
 			cmd := commandForFixture(t, file)
 			data := runPDF(t, cmd)
-
 			n := pageCount(data)
 			buf := fixturePageBounds[file]
 

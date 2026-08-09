@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<!--
+  fixture-47-certificate
+  Proves: a certificate-style one-page composition with a local background
+  image, centered typography, a medallion, metadata, and signatures.
+  Expected: 1 page.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Certificate of Completion CERT-2025-0047</title>
+  <style>
+    @page { margin: 0; }
+    body { font-family: sans-serif; margin: 0; color: #243447; text-align: center; background: transparent; }
+    .certificate { position: relative; height: 1123px; box-sizing: border-box; padding: 115px 90px 50px; }
+    /* A4 is 793px by 1123px at the renderer's CSS scale. The transform
+       compensates for the padded absolute-position containing block. */
+    .certificate-bg { display: block; position: absolute; z-index: -1; top: 0; left: 0; width: 793px; height: 1123px; transform-origin: top left; transform: translate(-111px, -132px) scale(1.23); }
+    .content { position: relative; z-index: 1; width: 100%; text-align: center; }
+    .eyebrow { color: #8a601a; font-size: 18pt; font-weight: bold; letter-spacing: 3px; text-transform: uppercase; transform: translateX(34px); }
+    .medallion { width: 70px; height: 70px; margin: 22px auto 16px; border: 2px solid #b88935; border-radius: 50%; color: #8a601a; line-height: 70px; font-size: 25pt; font-weight: bold; }
+    h1 { font-size: 38pt; letter-spacing: 1px; margin: 0 0 14px; color: #243447; }
+    .rule { width: 160px; margin: 0 auto 20px; border-top: 2px solid #b88935; }
+    .award { font-size: 22pt; margin: 0 0 18px; color: #4c5d6c; }
+    .recipient { border-bottom: 2px solid #243447; display: inline-block; font-size: 32pt; min-width: 330px; padding: 8px 24px 10px; }
+    .details { line-height: 1.55; width: 360px; margin: 26px auto 0; font-size: 17.5pt; }
+    .programme { color: #8a601a; font-weight: bold; }
+    .issued { color: #4c5d6c; font-size: 9pt; }
+    .signatures { width: 530px; margin: 46px auto 0; border-collapse: collapse; font-size: 16.5pt; transform: translateX(71px); }
+    .signatures td { width: 50%; padding-top: 10px; border-top: 1px solid #555; }
+    .signatures td:first-child { text-align: left; padding-left: 24px; }
+    .signatures td:last-child { text-align: right; padding-right: 24px; }
+    .signature-name { color: #4c5d6c; font-size: 15.5pt; }
+  </style>
+</head>
+<body>
+  <section class="certificate">
+    <img class="certificate-bg" src="certificate-background.jpg" width="1055" height="1491" alt="">
+    <div class="content">
+      <div class="eyebrow">Northstar Learning Institute</div>
+      <div class="medallion">NL</div>
+      <h1>Certificate of Completion</h1>
+      <div class="rule"></div>
+      <p class="award">This certificate is proudly awarded to</p>
+      <div class="recipient">Amara Okafor</div>
+      <p class="details">for successfully completing the<br><span class="programme">Production Document Engineering</span><br>programme, including pagination, accessible PDF structure, and release validation.<br><br><span class="issued">Issued 2025-05-12 · Certificate ID CERT-2025-0047</span></p>
+      <table class="signatures"><tr><td>Programme Director<br><span class="signature-name">Elena Rossi</span></td><td>Technical Chair<br><span class="signature-name">Jon Bell</span></td></tr></table>
+    </div>
+  </section>
+</body>
+</html>

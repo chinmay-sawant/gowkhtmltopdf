@@ -9,11 +9,12 @@
 testdata/golden/
   README.md
   logo.png                       # relative asset for fixture-07 (160x48 PNG)
+  certificate-background.jpg    # print-safe ornamental background for fixture-47
   style-05.css                   # relative stylesheet for fixtures 05/06
   fixture-01-simple-invoice.html       # single page, minimal CSS
   fixture-02-table-heavy-invoice.html  # wide table, borders, many rows
   fixture-03-multi-page-invoice.html   # >1 page, page-break usage
-  fixture-04-*.html .. fixture-42-*.html   # phase-9.1+ corpus (skip *-header/footer companions)
+  fixture-04-*.html .. fixture-48-*.html   # phase-9.1+ corpus (skip *-header/footer companions)
   fixture-36-header.html / fixture-36-footer.html  # nested HF companions for fixture-36
   out/                  # generated PDFs (gitignored)
 ```
@@ -80,6 +81,11 @@ proves. Page envelopes are pinned in `internal/convert/golden_test.go`
 | 41 | `:has()` relational selector: article footnote border, `tr:has(td.neg)` row highlight (tier-2-pending-3) | 1 |
 | 42 | `@container` size lite: named `inline-size` + unnamed `width` queries (tier-2-pending-3) | 1 |
 | 43 | Self-contained five-page dossier: embedded images, flex/grid cards, floats, multicol prose, anchors, `:has()`, repeating tables, code, positioning, forms, and print styling | 5 |
+| 44 | Receipt: compact paid transaction with line items, tax, and total | 1 |
+| 45 | Purchase order: supplier/delivery blocks, item table, terms, and approvals | 1 |
+| 46 | Contract: numbered clauses, obligations, commercial terms, and signatures | 1 |
+| 47 | Certificate: ornamental background image, centered award composition, and signatures | 1 |
+| 48 | Shipping document: addresses, package table, tracking, and handling instructions | 1 |
 
 ## Pass criteria (MVP)
 
