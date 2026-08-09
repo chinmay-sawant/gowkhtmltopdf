@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"sort"
 	"strconv"
 
 	"gowkhtmltopdf/internal/pdf"
@@ -356,50 +355,6 @@ func drawPageOp(
 		}
 	case OpLinkURI, opKindNoop:
 	}
-}
-
-func sortPaintIndices(ops []Op, idxs []int) {
-	sort.SliceStable(idxs, func(idx, jdx int) bool {
-		acc, boxN := &ops[idxs[idx]], &ops[idxs[jdx]]
-		absZ, boxZ := 0, 0
-
-		if acc.ZIndexSet {
-			absZ = acc.ZIndex
-		}
-
-		if boxN.ZIndexSet {
-			boxZ = boxN.ZIndex
-		}
-
-		if absZ != boxZ {
-			return absZ < boxZ
-		}
-
-		if acc.Positioned != boxN.Positioned {
-			return !acc.Positioned
-		}
-		// Same stacking context: backgrounds/borders under text & images so
-		// page-split fill remnants cannot cover continuation-row ink
-		// (fixture-31 Row 28 vs next-row white fill).
-		la, lb := paintLayer(acc.Kind), paintLayer(boxN.Kind)
-		if la != lb {
-			return la < lb
-		}
-
-		return idxs[idx] < idxs[jdx]
-	})
-}
-
-// paintLayer orders ops within a z-index band: chrome under content.
-func paintLayer(k OpKind) int {
-	switch k {
-	case OpFillRect, OpStrokeRect, OpLine:
-		return 0
-	case OpText, OpImage, OpLinkURI, OpBullet, opKindNoop:
-		return 1
-	}
-
-	return 1
 }
 
 // PaintStyle is the resolved per-op appearance that PDF and image adapters

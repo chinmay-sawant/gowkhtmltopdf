@@ -13,7 +13,6 @@ import (
 	"io"
 	"math"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"gowkhtmltopdf/internal/cli"
@@ -327,57 +326,15 @@ func rasterizeContext(ctx context.Context, res *layout.Result, height float64, t
 	return downscaleBox(img, rasterSS), nil
 }
 
-// rasterPaintOrder mirrors layout's PDF display-list policy: z-index first,
-// then chrome (backgrounds/borders/lines) below content (text/images), with
-// stable source order as the final tie breaker. Raster output used to walk
-// Result.Ops directly, so a list produced by layout could render differently
-// from the PDF page even though both consumed the same display list.
+// rasterPaintOrder delegates to layout's canonical display-list policy:
+// z-index first, then chrome below content, with stable source order last.
+// Keeping this adapter as a wrapper preserves the package-local test seam
+// without maintaining a second comparator.
 // FIX-REVIEW: PAINT-01 PDF body/header/footer traversal remains owned by
 // internal/layout.Paint and PaintBand; this package consumes the same ordering
 // and StyleOf policy without duplicating pagination or annotation semantics.
 func rasterPaintOrder(ops []layout.Op) []int {
-	idx := make([]int, len(ops))
-	for i := range ops {
-		idx[i] = i
-	}
-
-	sort.SliceStable(idx, func(i, j int) bool {
-		entryA, bucket := &ops[idx[i]], &ops[idx[j]]
-		sortKey, zIndexB := 0, 0
-
-		if entryA.ZIndexSet {
-			sortKey = entryA.ZIndex
-		}
-
-		if bucket.ZIndexSet {
-			zIndexB = bucket.ZIndex
-		}
-
-		if sortKey != zIndexB {
-			return sortKey < zIndexB
-		}
-
-		if entryA.Positioned != bucket.Positioned {
-			return !entryA.Positioned
-		}
-
-		la, lb := rasterPaintLayer(entryA.Kind), rasterPaintLayer(bucket.Kind)
-
-		return la < lb
-	})
-
-	return idx
-}
-
-func rasterPaintLayer(k layout.OpKind) int {
-	switch k {
-	case layout.OpFillRect, layout.OpStrokeRect, layout.OpLine:
-		return 0
-	case layout.OpText, layout.OpImage, layout.OpLinkURI, layout.OpBullet:
-		return 1
-	}
-
-	return 1
+	return layout.PaintOrder(ops)
 }
 
 type decodedRasterImage struct {
