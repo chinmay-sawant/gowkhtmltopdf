@@ -1,4 +1,4 @@
-# Generated benchmark snapshot
+# Historical perf-wave benchmark snapshot
 # Command (post perf-review wave, 2026-08-09, working tree after lint wave + perf wave):
 #   go test ./internal/convert -run '^$' -bench 'Benchmark(PDFPages|TemplatePages|WebFetchImage|ImageAssets)$' -benchmem -benchtime=1x -count=1
 # Locked 500 PDF bar: 2.10s / 1.48GB / 3.93M allocs
@@ -14,6 +14,14 @@
 # Earlier wkhtmltopdf 0.12.6.1 process reference: 2.05s / ~114MB peak RSS / ~2.0MB PDF.
 # The wkhtmltopdf reference is process-level; Go B/op is cumulative allocation
 # traffic, so it must not be presented as a direct RSS comparison.
+
+# Latest certified-workspace snapshot (2026-08-09; feature/optimization):
+#   go test ./internal/convert -run '^$' -bench 'Benchmark(PDFPages|TemplatePages|WebFetchImage|ImageAssets)$' -benchmem -benchtime=1x -count=1
+# PDF 500: 518,117,894 ns/op / 157,636,704 B/op / 529,451 allocs/op.
+# Template 500: 552,115,316 ns/op / 162,493,632 B/op / 580,715 allocs/op.
+# Full current matrix is summarized in testdata/golden/benchmarks/README.md.
+# Generated PDF artifacts were refreshed locally but intentionally are not
+# included in the benchmark snapshot commit.
 
 goos: linux
 goarch: amd64
