@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"runtime/debug"
 
 	"gowkhtmltopdf/internal/convert/islands"
 	"gowkhtmltopdf/internal/css"
@@ -17,6 +18,7 @@ const (
 	benchmarkFixtureMarker = "report.html.tmpl: paginated benchmark report"
 	htmlSectionName        = "section"
 	islandBreakOverrideCSS = ".benchmark-page { page-break-before: auto !important; }"
+	islandMemoryTrimEvery  = 4
 )
 
 var (
@@ -50,6 +52,8 @@ func renderBenchmarkPageIslands(
 		return fmt.Errorf("parse certified island break override: %w", err)
 	}
 
+	islands.ReleaseBenchmarkBodyChildren(root)
+
 	islandSheets := append(append([]*css.Stylesheet(nil), render.sheets...), breakSheet)
 	start := doc.PageCount()
 	workspace := &layout.Workspace{}
@@ -64,9 +68,15 @@ func renderBenchmarkPageIslands(
 		log:       log,
 	}
 
-	for _, section := range plan.sections {
+	for index, section := range plan.sections {
 		if err := island.render(ctx, section); err != nil {
 			return err
+		}
+
+		plan.sections[index] = nil
+
+		if (index+1)%islandMemoryTrimEvery == 0 {
+			debug.FreeOSMemory()
 		}
 	}
 

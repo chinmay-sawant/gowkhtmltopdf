@@ -122,6 +122,7 @@ type Document struct {
 	pages          []*Page
 	outlineRoot    *Outline
 	fontCache      map[string]objRef // subset key -> font dict ref
+	fontRuneSet    map[string]map[rune]struct{}
 	fontRunes      map[string][]rune // font resource name -> document-wide rune union (finalize-time)
 	fontKeys       map[string]string // font resource name -> precomputed subset cache key
 	fontKeyFonts   map[string]*Font  // font resource name -> the face the precomputed key belongs to
@@ -137,6 +138,7 @@ func NewDocument() *Document {
 		info:           map[string]string{},
 		useCompression: true,
 		fontCache:      map[string]objRef{},
+		fontRuneSet:    map[string]map[rune]struct{}{},
 	}
 }
 
@@ -549,47 +551,23 @@ func (d *Document) finalize() error {
 	return nil
 }
 
-// unionFontRunes merges every page's used-rune set per font resource name
-// into one document-wide set. Page numbers make per-page rune sets differ
-// (each page subsets the same font), so without this each font is subset and
-// embedded ~once per page instead of once per document. The union order is
-// sorted and the subset cache key and Type0 decision are precomputed here
-// (they are identical for every page) so ensureFont per page is a map lookup.
-//
-//nolint:cyclop // two-pass union: per-page rune dedupe, then sort/key per font
+// unionFontRunes materializes the document-wide rune sets collected while
+// content streams were painted. Keeping one set on Document avoids retaining
+// a duplicate rune slice on every page until finalization.
 func (d *Document) unionFontRunes() {
-	union := map[string]map[rune]struct{}{}
-	fonts := map[string]*Font{}
-
-	for _, page := range d.pages {
-		for name, runes := range page.content.used {
-			used := union[name]
-			if used == nil {
-				used = make(map[rune]struct{}, len(runes))
-				union[name] = used
-			}
-
-			for _, rVal := range runes {
-				used[rVal] = struct{}{}
-			}
-
-			if fonts[name] == nil {
-				fonts[name] = page.content.fontFiles[name]
-			}
-		}
-	}
-
-	if len(union) == 0 {
+	if len(d.fontRuneSet) == 0 {
 		return
 	}
 
-	d.fontRunes = make(map[string][]rune, len(union))
-	d.fontKeys = make(map[string]string, len(union))
-	d.fontKeyFonts = make(map[string]*Font, len(union))
-	d.fontType0 = make(map[string]bool, len(union))
+	d.fontRunes = make(map[string][]rune, len(d.fontRuneSet))
+	d.fontKeys = make(map[string]string, len(d.fontRuneSet))
+	d.fontKeyFonts = make(map[string]*Font, len(d.fontRuneSet))
+	d.fontType0 = make(map[string]bool, len(d.fontRuneSet))
 
-	for name, used := range union {
+	for _, name := range sortedStringKeys(d.fontRuneSet) {
+		used := d.fontRuneSet[name]
 		runes := make([]rune, 0, len(used))
+
 		for rVal := range used {
 			runes = append(runes, rVal)
 		}
@@ -597,7 +575,13 @@ func (d *Document) unionFontRunes() {
 		sort.Slice(runes, func(i, j int) bool { return runes[i] < runes[j] })
 		d.fontRunes[name] = runes
 
-		fnt := fonts[name]
+		var fnt *Font
+		for _, page := range d.pages {
+			if fnt = page.content.fontFiles[name]; fnt != nil {
+				break
+			}
+		}
+
 		if fnt == nil {
 			continue
 		}
@@ -618,6 +602,17 @@ func (d *Document) unionFontRunes() {
 		d.fontKeyFonts[name] = fnt
 		d.fontKeys[name] = fmt.Sprintf("v%d|%x|%s|%s", mode, fnt.fingerprint, baseName, runesKey(runes))
 	}
+}
+
+func sortedStringKeys[V any](values map[string]V) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+
+	sort.Strings(keys)
+
+	return keys
 }
 
 // catalogDict builds the /Catalog dictionary, wiring /Outlines when set.
@@ -709,7 +704,8 @@ func buildPageResources(content *Content) (string, error) {
 	if len(fonts) > 0 {
 		res.WriteString(" /Font <<")
 
-		for name, ref := range fonts {
+		for _, name := range sortedStringKeys(fonts) {
+			ref := fonts[name]
 			res.WriteString(" /" + name + " " + ref)
 		}
 
@@ -719,7 +715,8 @@ func buildPageResources(content *Content) (string, error) {
 	if len(imgResources) > 0 {
 		res.WriteString(" /XObject <<")
 
-		for name, ref := range imgResources {
+		for _, name := range sortedStringKeys(imgResources) {
+			ref := imgResources[name]
 			res.WriteString(" /" + name + " " + ref)
 		}
 

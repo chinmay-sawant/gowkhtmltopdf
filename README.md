@@ -237,8 +237,9 @@ benchmarks use 2, 5, 10, 20, 50, 100, 200, 250, and 500 image tiles because
 image mode renders one raster canvas rather than paginated PDF pages.
 
 The Phase 9.3 gate above is a separate 10-section × 40-row invoice fixture;
-the matrix below uses the checked-in benchmark templates (20 realistic rows per
-page), so those timings are not directly comparable.
+the historical in-process snapshot below uses the checked-in benchmark
+templates (20 realistic rows per page), so those timings are not directly
+comparable with the current direct CLI comparison further below.
 
 | Workload | 2 | 5 | 10 | 20 | 50 | 100 | 200 | 250 | 500 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
@@ -247,10 +248,9 @@ page), so those timings are not directly comparable.
 | Web-fetch image tiles | 18.53ms | 22.89ms | 22.95ms | 22.50ms | 32.36ms | 51.08ms | 89.32ms | 110.31ms | 200.89ms |
 | Inline image tiles | 16.97ms | 20.29ms | 21.04ms | 24.24ms | 32.20ms | 49.67ms | 83.27ms | 101.90ms | 192.13ms |
 
-PDF / Template: perf-review wave (2026-08-09, see
-`skills/perf-review/SKILLS.md`). The locked 500-page PDF count-3 median is
-**0.878s / 335.7MB / 517.9K allocs**, versus the published
-**2.10s / 1.48GB / 3.93M** bar.
+PDF / Template: historical in-process perf-review snapshot (2026-08-09, see
+`skills/perf-review/SKILLS.md`). The current direct process comparison is
+documented in the `wkhtmltopdf` section below.
 
 Against the pre-wave snapshot taken earlier the same day, the same
 one-iteration 500-page measurements changed as follows:
@@ -271,14 +271,32 @@ duplicate min-content re-measure, in-place inline-item compaction, ASCII
 fast paths in `TextShow`/HTML scanning, rune-union dedup in font subsetting,
 pointer-compare op sorts, zero-crossing split fast path.
 
-### wkhtmltopdf reference
+### Direct CLI comparison: gowkhtmltopdf vs wkhtmltopdf
 
-The earlier process-level reference for wkhtmltopdf 0.12.6.1 on the same
-500-page fixture was **2.05s / ~114MB peak RSS / ~2.0MB PDF**. The current
-in-process Go benchmark is **0.873s / 335.8MB B/op / 517.9K allocs** for the
-same page count. This is directional only: Go `B/op` is cumulative allocation
-traffic, not RSS. The detailed matrix and caveat are in the
-[benchmark documentation](testdata/golden/benchmarks/README.md).
+Fresh process-level measurements on 2026-08-09 used identical report fixtures,
+three runs per size, and `/usr/bin/time` for wall time and peak RSS. The Go
+binary was built from the current source; wkhtmltopdf was 0.12.6.1. All output
+files passed the expected page-count check.
+
+| Pages | Gowk time | wkhtmltopdf time | Gowk RSS | wkhtmltopdf RSS |
+|---:|---:|---:|---:|---:|
+| 2 | 10 ms | 220 ms | 18,432 KiB | 35,268 KiB |
+| 5 | 10 ms | 230 ms | 17,208 KiB | 35,528 KiB |
+| 10 | 20 ms | 250 ms | 17,832 KiB | 36,408 KiB |
+| 20 | 30 ms | 270 ms | 18,052 KiB | 38,080 KiB |
+| 50 | 70 ms | 360 ms | 20,644 KiB | 43,052 KiB |
+| 100 | 140 ms | 500 ms | 23,340 KiB | 51,092 KiB |
+| 200 | 300 ms | 800 ms | 30,256 KiB | 67,576 KiB |
+| 250 | 380 ms | 940 ms | 34,200 KiB | 75,948 KiB |
+| 500 | 890 ms | 1,720 ms | 50,888 KiB | 116,512 KiB |
+
+Gowkhtmltopdf was faster and used less RSS at every tested size. At 500 pages
+it was approximately 1.9x faster and used 56.3% less RSS. Use wkhtmltopdf when
+legacy Qt/WebKit rendering compatibility is the primary requirement; otherwise
+prefer gowkhtmltopdf for speed, memory, and smaller PDFs from 5 pages onward.
+
+The full matrix, including PDF bytes, commands, and measurement caveats, is in
+the [benchmark documentation](testdata/golden/benchmarks/README.md).
 
 - [Benchmark implementation](internal/convert/benchmarks_test.go)
 - [Benchmark templates and recorded results](testdata/golden/benchmarks/README.md)

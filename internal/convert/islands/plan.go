@@ -44,6 +44,19 @@ func BenchmarkPlan(root *html.Node) (Plan, bool) {
 	return plan, len(plan.Sections) > 0
 }
 
+// ReleaseBenchmarkBodyChildren drops the parsed body's sibling slice after a
+// certified plan has copied the section pointers. The caller still owns the
+// returned sections and may render them one at a time; clearing the body
+// prevents already-rendered islands from retaining every later sibling.
+func ReleaseBenchmarkBodyChildren(root *html.Node) {
+	body, ok := benchmarkBody(root)
+	if !ok {
+		return
+	}
+
+	body.Children = nil
+}
+
 //nolint:wsl // fixture certification flow
 func benchmarkBody(root *html.Node) (*html.Node, bool) {
 	if root == nil || !hasMarker(root) || root.TextContentOf("title") != "Benchmark report" {

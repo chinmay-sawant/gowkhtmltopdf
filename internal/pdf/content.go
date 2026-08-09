@@ -21,7 +21,6 @@ type Content struct {
 	buf       bytes.Buffer
 	fontUses  map[string]string // resource name -> font object ref (allocated at finalize)
 	fontFiles map[string]*Font  // resource name -> parsed font (embedded)
-	used      map[string][]rune // resource name -> runes seen
 	curFont   string            // active font from last SetFont
 	curSize   float64           // active font size from last SetFont
 	fontStack []fontState       // active font before each open Save
@@ -37,12 +36,13 @@ type imageResource struct {
 	height int
 }
 
+const fontRuneInitialCapacity = 32
+
 // NewContent creates an empty content stream builder.
 func NewContent() *Content {
 	return &Content{ //nolint:exhaustruct // intentional zero-value fields
 		fontUses:  map[string]string{},
 		fontFiles: map[string]*Font{},
-		used:      map[string][]rune{},
 		imageUses: map[string]string{},
 		imageRefs: map[string]*imageResource{},
 	}
@@ -120,7 +120,6 @@ func cloneContent(cur *Content) *Content {
 	ncVal := &Content{ //nolint:exhaustruct // intentional zero-value fields
 		fontUses:  cloneStringMap(cur.fontUses),
 		fontFiles: cloneFontMap(cur.fontFiles),
-		used:      cloneRuneMap(cur.used),
 		curFont:   cur.curFont,
 		curSize:   cur.curSize,
 		fontStack: append([]fontState(nil), cur.fontStack...),
@@ -147,15 +146,6 @@ func cloneFontMap(src map[string]*Font) map[string]*Font {
 	dst := make(map[string]*Font, len(src))
 	for k, v := range src {
 		dst[k] = v
-	}
-
-	return dst
-}
-
-func cloneRuneMap(src map[string][]rune) map[string][]rune {
-	dst := make(map[string][]rune, len(src))
-	for k, v := range src {
-		dst[k] = append([]rune(nil), v...)
 	}
 
 	return dst
@@ -535,7 +525,6 @@ func appendHex4(dst []byte, rVal rune) []byte {
 // textShowSimple appends str as a Latin-1 literal string, folding and
 // escaping in the same pass that records the used runes for subsetting.
 func (c *Content) textShowSimple(str string) {
-	used := c.used[c.curFont]
 	out := c.buf.AvailableBuffer()
 	out = append(out, '(')
 
@@ -548,13 +537,12 @@ func (c *Content) textShowSimple(str string) {
 			rVal = '?'
 		}
 
-		used = append(used, rVal)
+		c.recordFontRune(c.curFont, rVal)
 		out = appendPDFLiteralByte(out, byte(rVal))
 	}
 
 	out = append(out, ')', ' ', 'T', 'j', '\n')
 	_, _ = c.buf.Write(out)
-	c.used[c.curFont] = used
 }
 
 func (c *Content) textNeedsType0(s string) bool {
@@ -591,7 +579,6 @@ func (c *Content) textShowType0(str string) {
 
 	// Hex CIDs are the Unicode code points themselves (Identity-H), so the
 	// recording pass and the hex pass can be one walk.
-	used := c.used[uname]
 	out := c.buf.AvailableBuffer()
 	out = append(out, '<')
 
@@ -600,13 +587,30 @@ func (c *Content) textShowType0(str string) {
 			rVal = '?'
 		}
 
-		used = append(used, rVal)
+		c.recordFontRune(uname, rVal)
 		out = appendHex4(out, rVal)
 	}
 
 	out = append(out, '>', ' ', 'T', 'j', '\n')
 	_, _ = c.buf.Write(out)
-	c.used[uname] = used
+}
+
+func (c *Content) recordFontRune(name string, rVal rune) {
+	if c.doc == nil {
+		return
+	}
+
+	if c.doc.fontRuneSet == nil {
+		c.doc.fontRuneSet = make(map[string]map[rune]struct{})
+	}
+
+	used := c.doc.fontRuneSet[name]
+	if used == nil {
+		used = make(map[rune]struct{}, fontRuneInitialCapacity)
+		c.doc.fontRuneSet[name] = used
+	}
+
+	used[rVal] = struct{}{}
 }
 
 // resources
@@ -617,7 +621,7 @@ func (c *Content) textShowType0(str string) {
 // that names a missing /Resources entry renders invisible, so the error is
 // propagated instead of dropped.
 func (c *Content) fonts() (map[string]string, error) {
-	for name := range c.fontUses {
+	for _, name := range sortedStringKeys(c.fontUses) {
 		face, ok := c.fontFiles[name]
 		if !ok {
 			delete(c.fontUses, name)
@@ -628,10 +632,7 @@ func (c *Content) fonts() (map[string]string, error) {
 		// Subset from the document-wide rune union when the document has
 		// been finalized (unionFontRunes): one subset per font, shared by
 		// every page, instead of a near-identical subset per page.
-		used := c.used[name]
-		if union, ok := c.doc.fontRunes[name]; ok {
-			used = union
-		}
+		used := c.doc.fontRunes[name]
 
 		ref, err := c.doc.ensureFont(face, name, used)
 		if err != nil {

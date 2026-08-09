@@ -439,6 +439,7 @@ func renderObject(ctx context.Context, run *runContext, obj *settings.PdfObject,
 
 	root := prep.Root
 	registry := prep.Registry
+	resources := prep.Resources
 	sheets := prep.Sheets
 
 	imagesFn := func(src string) ([]byte, error) {
@@ -446,7 +447,7 @@ func renderObject(ctx context.Context, run *runContext, obj *settings.PdfObject,
 			return nil, errImagesDisabled
 		}
 
-		r, err := prep.Resources.Fetch(ctx, src)
+		r, err := resources.Fetch(ctx, src)
 		if err != nil {
 			return nil, fmt.Errorf("fetch image resource %q: %w", src, err)
 		}
@@ -464,7 +465,7 @@ func renderObject(ctx context.Context, run *runContext, obj *settings.PdfObject,
 		base:          prep.Resources.Base,
 		lp:            obj.Load,
 		registry:      registry,
-		resources:     prep.Resources,
+		resources:     resources,
 		imagesEnabled: run.req.Global.Web.Images,
 		media:         media,
 		geom:          geom,
