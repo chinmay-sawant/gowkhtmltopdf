@@ -1563,6 +1563,10 @@ func cloneHeaderOps(res *Result, hdrFirst, hdrLast int, hdrTop, pageTop float64)
 		op.Y = pageTop + (op.Y - hdrTop)
 		res.Ops[start+k-hdrFirst] = op
 	}
+
+	// Header clones extend the display list after the page index was built.
+	// Drop the cached buckets so later pagination shifts see the new ops.
+	invalidateFlowIndex(res)
 }
 
 func rowOpRange(row []*box) (int, int) {

@@ -26,6 +26,7 @@ testdata/golden/
   fixture-55-lantern-cooperative-report.html # self-contained pure HTML/CSS operations brief
   fixture-56-architecture-diagram.html      # 13-page architecture diagram, linked CSS
   fixture-56-architecture-diagram.css       # linked stylesheet for fixture-56
+  font-examples.html                        # 13 Google Fonts showcase (inline style; fonts not bundled; --font-path driven)
   out/                  # generated PDFs (gitignored)
 ```
 
@@ -103,6 +104,7 @@ proves. Page envelopes are pinned in `internal/convert/golden_test.go`
 | 53 | Asteria poster variant: shared theme with a different illustration and copy | 1 |
 | 55 | Self-contained operations brief: inline CSS, status cards, route table, action plan, and page breaks | 3 |
 | 56 | Architecture diagram: hero, pipeline strip, TOC, 10 domain sections (modern semantic tags: `dialog`, `details/summary`, `mark`, `meter`, `progress`, `output`, `time`, `data`, `kbd`, `samp`, `var`, `dfn`, `cite`, `ruby`, `rt`, `rp`, `bdi`, `bdo`, `wbr`, `ins`, `del`, `sub`, `sup`, `aside`, `address`, `fieldset`, `legend`, `picture`, `search`; modern CSS: `oklch()`/`color-mix()`/`clamp()`/logical properties with graceful-degrade fallbacks), linked `fixture-56-architecture-diagram.css`, dependency DAG, PDF-vs-image, security; derived from `documentation/architecture/` (commit ef526f9) | 13 |
+| font-examples | Font showcase: 15 fancy free Google Fonts from the fonts.google.com Feeling/Calligraphy filters — Fancy: Fascinate, Monoton, Rubik Glitch; Futuristic: Audiowide, Press Start 2P, Black Ops One; Active: Bebas Neue, Permanent Marker, Luckiest Guy; Script/Formal: Great Vibes, Parisienne, Tangerine; Awkward: Henny Penny, Rubik Beastly, Ewert — each with regular/bold/italic/bold-italic/underline/strikethrough/letter-spaced/uppercase/colored lines; inline `<style>`; fonts intentionally NOT bundled — render with `--font-path <dir>` or `Global().Set("fontpath", dir)`; falls back to Liberation Sans without font flags | 6 (with fonts) |
 
 ## Pass criteria (MVP)
 

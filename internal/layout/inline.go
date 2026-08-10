@@ -32,6 +32,7 @@ type inlineItem struct {
 	marginL    float64 // leading horizontal margin (e.g. span margin-left)
 	marginR    float64 // trailing horizontal margin
 	img        bool
+	chrome     bool // text belongs to an inline element with its own decoration
 	imgRef     *imageRef
 	href       string
 	forceBreak bool
@@ -474,7 +475,7 @@ func (e *engine) chunkParts(item inlineItem, chunks []string) []inlineItem {
 	for idx, chunk := range chunks {
 		part := item
 		part.text = chunk
-		part.w = e.measureTextFace(chunk, *item.style)
+		part.w = e.inlineTextWidth(chunk, item.style, item.chrome)
 
 		if idx > 0 {
 			part.marginL = 0
@@ -596,7 +597,7 @@ func separateAdjacentCites(items []inlineItem, eng *engine) []inlineItem {
 
 			cur.text = gap + cur.text
 			if eng != nil {
-				cur.w = eng.measureTextFace(cur.text, *cur.style)
+				cur.w = eng.inlineTextWidth(cur.text, cur.style, cur.chrome)
 			}
 		}
 	}
@@ -838,12 +839,18 @@ func (e *engine) lineMetrics(line []inlineItem, lineY float64) (float64, float64
 		lh := lineHeightOf(item.style) * e.scale
 
 		extra := (lh - ascent - descent) / two
-		if ascent+extra > maxAscent {
-			maxAscent = ascent + extra
+		itemAscent := ascent + extra
+		itemDescent := descent + extra
+		if item.chrome {
+			itemAscent += e.inlineChromeTop(item.style)
+			itemDescent += e.inlineChromeBottom(item.style)
+		}
+		if itemAscent > maxAscent {
+			maxAscent = itemAscent
 		}
 
-		if descent+extra > maxDescent {
-			maxDescent = descent + extra
+		if itemDescent > maxDescent {
+			maxDescent = itemDescent
 		}
 	}
 

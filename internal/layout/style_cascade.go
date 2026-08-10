@@ -76,7 +76,7 @@ func resolveRawVars(raw map[string]string, customProps map[string]string) map[st
 		}
 
 		if containsVarFunc(val) {
-			out[prop] = css.ResolveVar(val, lookup)
+			out[prop] = css.ResolveVars(val, lookup)
 		} else {
 			out[prop] = val
 		}
@@ -327,6 +327,10 @@ func cascadeRaw(ctx *styleContext, node *html.Node) map[string]string {
 		for _, hit := range ctx.matchedRules(node, "") {
 			r := hit.r
 			for _, d := range r.Decls {
+				if !supportedDeclaration(d.Value) {
+					continue
+				}
+
 				applyCascadeWin(wins, d.Prop, d.Value, hit.a, hit.b, hit.c, r.Order, d.Important)
 			}
 		}
@@ -335,6 +339,10 @@ func cascadeRaw(ctx *styleContext, node *html.Node) map[string]string {
 	// inline style attribute: outranks all normal declarations and all sheet
 	// important declarations (spec 1<<maxIntShift).
 	for _, d := range css.ParseInline(node.Attribute("style")) {
+		if !supportedDeclaration(d.Value) {
+			continue
+		}
+
 		applyCascadeWin(wins, d.Prop, d.Value, 1<<maxIntShift, 0, 0, 1<<maxIntShift, d.Important)
 	}
 
@@ -364,6 +372,21 @@ func cascadeRaw(ctx *styleContext, node *html.Node) map[string]string {
 	}
 
 	return out
+}
+
+// supportedDeclaration rejects modern value functions that this lite renderer
+// cannot compute. Excluding them from the cascade preserves an earlier valid
+// fallback declaration, matching the fixture's fallback-first contract.
+func supportedDeclaration(value string) bool {
+	value = strings.ToLower(value)
+
+	for _, unsupported := range []string{"clamp(", "color-mix(", "light-dark(", "oklch("} {
+		if strings.Contains(value, unsupported) {
+			return false
+		}
+	}
+
+	return true
 }
 
 // applyCascadeWin folds one declaration into the winner map when its layer,
@@ -491,7 +514,8 @@ func resolveFontWeight(current int, val string) int {
 // longhand (e.g. margin-bottom) always overrides its shorthand (margin).
 // Package-level to avoid per-node slice/array rebuilds.
 var restShorthandProps = [...]string{ //nolint:gochecknoglobals // static apply order
-	"margin", "padding", "border", borderWidthKeyword, borderStyleKeyword,
+	"margin", "padding", "border", "border-top", "border-right", "border-bottom", "border-left",
+	borderWidthKeyword, borderStyleKeyword,
 	borderColorKeyword, gapKeyword, flexKeyword, containerKeyword,
 }
 
@@ -523,7 +547,8 @@ func applyRestProps(
 
 	for prop, value := range raw {
 		switch prop {
-		case "margin", "padding", "border", borderWidthKeyword, borderStyleKeyword,
+		case "margin", "padding", "border", "border-top", "border-right", "border-bottom", "border-left",
+			borderWidthKeyword, borderStyleKeyword,
 			borderColorKeyword, gapKeyword, flexKeyword, containerKeyword:
 			continue
 		}

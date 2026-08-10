@@ -115,6 +115,20 @@ func (e *engine) emitInlineText(
 		descent = size * descentRatio
 	}
 
+	chromeLeft, chromeRight := 0.0, 0.0
+	if item.chrome {
+		chromeLeft = e.inlineChromeLeft(item.style)
+		chromeRight = e.inlineChromeRight(item.style)
+	}
+	contentWidth := item.w - chromeLeft - chromeRight
+	if contentWidth < 0 {
+		contentWidth = 0
+	}
+	if item.chrome {
+		e.paintInlineChrome(item.style, leftX, baseline, ascent, descent, contentWidth)
+	}
+	leftX += chromeLeft
+
 	runStart := leftX
 
 	var runSpan float64
@@ -156,12 +170,61 @@ func (e *engine) emitInlineText(
 	// ref lists were a forest of rules; titles/prose links still underline.
 	e.paintDecoration(item, runStart, runSpan, size, ascent, descent, baseline, child, und)
 
-	leftX += item.marginR
+	leftX += chromeRight + item.marginR
 	if gapAfter && isJustifyGapAfter(*item) {
 		leftX += justifyGap
 	}
 
 	return leftX
+}
+
+func (e *engine) paintInlineChrome(st *ResolvedStyle, leftX, baseline, ascent, descent, contentWidth float64) {
+	top := e.inlineChromeTop(st)
+	bottom := e.inlineChromeBottom(st)
+	lh := lineHeightOf(st) * e.scale
+	extra := (lh - ascent - descent) / two
+	boxY := baseline - ascent - extra - top
+	boxH := ascent + extra + top + descent + extra + bottom
+	boxW := contentWidth + e.inlineChromeLeft(st) + e.inlineChromeRight(st)
+	if boxW <= 0 || boxH <= 0 {
+		return
+	}
+
+	if st.BGColor[3] > 0 && e.opts.Background {
+		e.add(Op{ //nolint:exhaustruct // intentional zero fields
+			Kind: OpFillRect, X: leftX, Y: boxY, W: boxW, H: boxH,
+			R: st.BGColor[0], G: st.BGColor[1], B: st.BGColor[2], Alpha: st.BGColor[3],
+			Radius: usedBorderRadius(*st, boxW, boxH),
+		})
+	}
+
+	if !inlineHasBorder(*st) {
+		return
+	}
+
+	radius := usedBorderRadius(*st, boxW, boxH)
+	if radius > 0 && uniformRoundedBorder(*st) {
+		b := st.BorderTop
+		e.add(Op{ //nolint:exhaustruct // intentional zero fields
+			Kind: OpStrokeRect, X: leftX, Y: boxY, W: boxW, H: boxH,
+			R: b.Color[0], G: b.Color[1], B: b.Color[2], Width: e.scalePt(b.Width), Radius: radius,
+		})
+
+		return
+	}
+
+	for _, op := range e.borderOps(*st, leftX, boxY, boxW, boxH) {
+		e.add(op)
+	}
+}
+
+func inlineHasBorder(st ResolvedStyle) bool {
+	return inlineBorderVisible(st.BorderTop) || inlineBorderVisible(st.BorderRight) ||
+		inlineBorderVisible(st.BorderBottom) || inlineBorderVisible(st.BorderLeft)
+}
+
+func inlineBorderVisible(side border) bool {
+	return side.Width > 0 && side.Style != cssDisplayNone
 }
 
 //nolint:wsl,mnd // transform width and alignment are one geometry decision

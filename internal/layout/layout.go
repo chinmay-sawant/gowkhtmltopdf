@@ -17,6 +17,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"gowkhtmltopdf/internal/css"
 	"gowkhtmltopdf/internal/html"
@@ -1132,7 +1133,21 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 
 	curY := e.scalePt(style.PaddingTop) + e.scalePt(style.BorderTop.Width)
 	enclose := e.pushBFCFloats(style, contentX, contentW)
-	curY = e.flowChildren(boxNode, node.Children, style, contentW, contentX, posY, curY)
+	children := node.Children
+	widget := node.Name == "meter" || node.Name == "progress"
+	if widget {
+		children = nil // fallback text is replaced by the native-style bar
+	}
+	if node.Name == "details" {
+		_, open := node.Attrs["open"]
+		if !open {
+			children = closedDetailsChildren(node)
+		}
+	}
+	curY = e.flowChildren(boxNode, children, style, contentW, contentX, posY, curY)
+	if widget && style.Height < 0 {
+		curY += lineHeightOf(&style) * e.scale
+	}
 
 	if enclose && e.bfcFloats != nil {
 		curY = e.bfcFloats.extentCy(posY, curY)
@@ -1149,9 +1164,75 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 	}
 
 	boxNode.height = e.applyHeightConstraints(style, curY)
+	if widget {
+		e.paintValueWidget(node, style, boxNode.x, posY, boxNode.w, boxNode.height)
+	}
 	e.prependChrome(contentStart, boxNode, style, boxNode.x, posY, boxNode.w, boxNode.height)
 
 	return boxNode
+}
+
+func (e *engine) paintValueWidget(node *html.Node, style ResolvedStyle, x, y, w, h float64) {
+	minValue, maxValue := 0.0, 1.0
+	if node.Name == "meter" {
+		minValue = widgetNumber(node.Attribute("min"), 0)
+		maxValue = widgetNumber(node.Attribute("max"), 1)
+	}
+	if maxValue <= minValue {
+		return
+	}
+
+	value := widgetNumber(node.Attribute("value"), minValue)
+	ratio := (value - minValue) / (maxValue - minValue)
+	if ratio < 0 {
+		ratio = 0
+	} else if ratio > 1 {
+		ratio = 1
+	}
+
+	contentX, contentW := e.contentBox(x, w, style)
+	contentY := y + e.scalePt(style.BorderTop.Width) + e.scalePt(style.PaddingTop)
+	contentH := h - e.scalePt(style.BorderTop.Width+style.BorderBottom.Width) -
+		e.scalePt(style.PaddingTop+style.PaddingBottom)
+	if contentW <= 0 || contentH <= 0 || ratio <= 0 {
+		return
+	}
+
+	color := style.Color
+	for _, name := range []string{"--d03-bar", "--accent2"} {
+		if raw, ok := style.CustomProps[name]; ok {
+			if r, g, b, _, parsed := css.ParseColor(raw); parsed {
+				color = [3]float64{float64(r) / 255, float64(g) / 255, float64(b) / 255}
+				break
+			}
+		}
+	}
+
+	e.add(Op{ //nolint:exhaustruct // intentional zero fields
+		Kind: OpFillRect, X: contentX, Y: contentY, W: contentW * ratio, H: contentH,
+		R: color[0], G: color[1], B: color[2], Alpha: 1,
+		Radius: usedBorderRadius(style, contentW, contentH),
+	})
+}
+
+func widgetNumber(raw string, fallback float64) float64 {
+	if value, err := strconv.ParseFloat(raw, 64); err == nil {
+		return value
+	}
+
+	return fallback
+}
+
+// closedDetailsChildren implements the print-time disclosure rule: a closed
+// details element paints its summary but does not lay out the hidden payload.
+func closedDetailsChildren(node *html.Node) []*html.Node {
+	for _, child := range node.Children {
+		if child.Type == html.ElementNode && child.Name == "summary" {
+			return []*html.Node{child}
+		}
+	}
+
+	return nil
 }
 
 // applyHeightConstraints enforces the used/min/max-height constraints on the

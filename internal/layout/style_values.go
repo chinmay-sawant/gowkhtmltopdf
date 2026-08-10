@@ -486,6 +486,10 @@ func lengthBox(value string, fsize, containing float64, autoValue string) (float
 		return -1, true
 	}
 
+	if point, ok := calcLength(value, fsize, containing); ok {
+		return point, true
+	}
+
 	val, unit, ok := css.ParseLength(value)
 	if !ok {
 		return 0, false
@@ -525,6 +529,10 @@ func marginLen(value string, fsize, ctxW float64) float64 {
 		return 0
 	}
 
+	if point, ok := calcLength(value, fsize, ctxW); ok {
+		return point
+	}
+
 	val, unit, ok := css.ParseLength(value)
 	if !ok {
 		return 0
@@ -543,6 +551,64 @@ func marginLen(value string, fsize, ctxW float64) float64 {
 	}
 
 	return 0
+}
+
+// calcLength evaluates the small arithmetic subset needed by the report CSS:
+// one length plus/minus another length, or one length multiplied by a number.
+// Unsupported calc expressions remain invalid and keep the existing fallback.
+func calcLength(value string, fsize, containing float64) (float64, bool) {
+	value = strings.TrimSpace(value)
+	if len(value) < len("calc()") || !strings.EqualFold(value[:5], "calc(") || value[len(value)-1] != ')' {
+		return 0, false
+	}
+
+	parts := strings.Fields(value[5 : len(value)-1])
+	if len(parts) != 3 {
+		return 0, false
+	}
+
+	left, ok := plainLength(parts[0], fsize, containing)
+	if !ok {
+		return 0, false
+	}
+
+	switch parts[1] {
+	case "*":
+		factor, err := strconv.ParseFloat(parts[2], 64)
+		if err != nil {
+			return 0, false
+		}
+
+		return left * factor, true
+	case "+", "-":
+		right, rightOK := plainLength(parts[2], fsize, containing)
+		if !rightOK {
+			return 0, false
+		}
+		if parts[1] == "-" {
+			return left - right, true
+		}
+
+		return left + right, true
+	default:
+		return 0, false
+	}
+}
+
+func plainLength(value string, fsize, containing float64) (float64, bool) {
+	val, unit, ok := css.ParseLength(value)
+	if !ok {
+		return 0, false
+	}
+
+	if unit == "%" {
+		return containing * val / cssPercent, true
+	}
+	if unit == remUnit {
+		return pxToPt(cssPxRoot) * val, true
+	}
+
+	return css.LengthToPt(val, unit, fsize)
 }
 
 func pxToPt(px float64) float64 { return px * pxToPtFactor }

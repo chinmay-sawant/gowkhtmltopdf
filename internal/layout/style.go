@@ -115,6 +115,7 @@ type ResolvedStyle struct {
 	HeightPercent       float64 // >=0 means height is that % of the CB; indefinite CB → auto (cyclic honesty)
 	MinWidth            float64 // absolute pt when MinWidthPercent < 0; 0 = auto (content min for flex)
 	MinWidthPercent     float64 // >=0 means % of containing block (deferred like WidthPercent)
+	MinWidthSet         bool    // true when min-width was explicitly declared, including 0
 	MaxWidth            float64
 	MaxWidthPercent     float64 // >=0 means % of containing block / img clamp context
 	MinHeight           float64
@@ -519,6 +520,7 @@ type comparableResolvedStyle struct {
 	GridColumnSpan, GridColumnStart, GridRowSpan, GridRowStart                   int
 	Width, WidthPercent, Height, HeightPercent                                   float64
 	MinWidth, MinWidthPercent, MaxWidth, MaxWidthPercent                         float64
+	MinWidthSet                                                                  bool
 	MinHeight, MinHeightPercent, MaxHeight                                       float64
 	Overflow                                                                     string
 	MarginTop, MarginRight, MarginBottom, MarginLeft                             float64
@@ -568,6 +570,7 @@ func comparableResolvedStyleFor(style ResolvedStyle) comparableResolvedStyle {
 		WidthPercent: style.WidthPercent, Height: style.Height, HeightPercent: style.HeightPercent,
 		MinWidth: style.MinWidth, MinWidthPercent: style.MinWidthPercent, MaxWidth: style.MaxWidth,
 		MaxWidthPercent: style.MaxWidthPercent, MinHeight: style.MinHeight,
+		MinWidthSet:      style.MinWidthSet,
 		MinHeightPercent: style.MinHeightPercent, MaxHeight: style.MaxHeight, Overflow: style.Overflow,
 		MarginTop: style.MarginTop, MarginRight: style.MarginRight, MarginBottom: style.MarginBottom,
 		MarginLeft: style.MarginLeft, MarginLeftAuto: style.MarginLeftAuto, MarginRightAuto: style.MarginRightAuto,

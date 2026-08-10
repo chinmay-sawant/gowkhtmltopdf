@@ -920,6 +920,21 @@ func TestResolveCustomPropsDeepChain(t *testing.T) {
 	}
 }
 
+func TestResolveVarsEmbeddedInCompoundValue(t *testing.T) {
+	t.Parallel()
+
+	got := ResolveVars("1px solid var(--line, #000)", func(name string) (string, bool) {
+		if name == "--line" {
+			return "#2563eb", true
+		}
+
+		return "", false
+	})
+	if got != "1px solid #2563eb" {
+		t.Fatalf("ResolveVars compound value = %q, want %q", got, "1px solid #2563eb")
+	}
+}
+
 func TestResolveCustomPropsSelfReferenceWithFallback(t *testing.T) {
 	t.Parallel()
 	// Self-reference (cycle) but with a fallback: spec says the fallback is

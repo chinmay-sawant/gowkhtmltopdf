@@ -443,6 +443,13 @@ func (e *engine) flexBoxSized(style ResolvedStyle, size, pad float64) float64 {
 func (e *engine) flexMinMainSize(item flexMeas, mainSize float64) float64 {
 	cstate := e.styles[item.n]
 	floor := 0.0
+	if cstate.MinWidthSet {
+		if cstate.MinWidthPercent >= 0 && mainSize >= 0 {
+			return mainSize * cstate.MinWidthPercent / cssPercent
+		}
+
+		return e.scalePt(cstate.MinWidth)
+	}
 
 	if cstate.MinWidthPercent >= 0 && mainSize >= 0 {
 		floor = mainSize * cstate.MinWidthPercent / cssPercent

@@ -73,6 +73,9 @@ func sealBorderGap(
 		Width: borderW, R: red, G: green, B: blue,
 	}
 	res.Ops = append(res.Ops, op)
+	// This generated op is appended after flow pagination may have indexed the
+	// display list. Rebuild the index before any later movement consults it.
+	invalidateFlowIndex(res)
 	sealed := hseg{minX, maxX, gVal, borderW, red, green, blue}
 	*horiz = append(*horiz, sealed)
 	horizByY[roundY(gVal)] = append(horizByY[roundY(gVal)], sealed)
@@ -1228,6 +1231,8 @@ func sealStickySectionBottom(res *Result, target stickySectionChromeTarget, page
 			Width: target.borderBottomWidth,
 			R:     target.borderBottom[0], G: target.borderBottom[1], B: target.borderBottom[2],
 		})
+		// The generated closing rule changes the indexed display-list length.
+		invalidateFlowIndex(res)
 	}
 }
 

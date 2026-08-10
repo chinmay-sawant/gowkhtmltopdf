@@ -586,6 +586,8 @@ func applyBoxMinExtentProps(style *ResolvedStyle, prop, value string, fsize floa
 }
 
 func setMinWidthValue(style *ResolvedStyle, value string, fsize, viewportW float64) bool {
+	style.MinWidthSet = true
+
 	if value == overflowAuto || value == cssDisplayNone {
 		style.MinWidth = 0
 		style.MinWidthPercent = -1
@@ -717,7 +719,8 @@ func applyBorderGroup(
 		return applyBorderOneSide(style, prop, value, fsize)
 	case borderWidthKeyword, "border-top-width", "border-right-width", "border-bottom-width", "border-left-width":
 		return applyBorderWidthProps(style, prop, value, fsize)
-	case borderStyleKeyword, borderColorKeyword:
+	case borderStyleKeyword, borderColorKeyword,
+		"border-top-color", "border-right-color", "border-bottom-color", "border-left-color":
 		return applyBorderStyleColorProps(style, prop, value)
 	case "border-radius":
 		return setBorderRadius(style, value, fsize)
@@ -746,6 +749,12 @@ func setBorderRadius(style *ResolvedStyle, value string, fsize float64) bool {
 }
 
 func applyBorderAllSides(style *ResolvedStyle, value string, fsize float64) bool {
+	if strings.EqualFold(strings.TrimSpace(value), cssDisplayNone) || strings.TrimSpace(value) == "0" {
+		style.BorderTop, style.BorderRight, style.BorderBottom, style.BorderLeft = border{}, border{}, border{}, border{}
+
+		return true
+	}
+
 	if b, ok := parseBorder(value, fsize); ok {
 		style.BorderTop, style.BorderRight, style.BorderBottom, style.BorderLeft = b, b, b, b
 	}
@@ -771,6 +780,12 @@ func applyBorderOneSide(style *ResolvedStyle, prop, value string, fsize float64)
 }
 
 func setBorderSide(_ *ResolvedStyle, side *border, value string, fsize float64) {
+	if strings.EqualFold(strings.TrimSpace(value), cssDisplayNone) || strings.TrimSpace(value) == "0" {
+		*side = border{}
+
+		return
+	}
+
 	if b, ok := parseBorder(value, fsize); ok {
 		*side = b
 	}
@@ -810,11 +825,25 @@ func applyBorderStyleColorProps(style *ResolvedStyle, prop, value string) bool {
 			c := [3]float64{float64(r) / 255, float64(g) / 255, float64(b) / 255}
 			style.BorderTop.Color, style.BorderRight.Color, style.BorderBottom.Color, style.BorderLeft.Color = c, c, c, c
 		}
+	case "border-top-color":
+		setBorderColor(&style.BorderTop, value)
+	case "border-right-color":
+		setBorderColor(&style.BorderRight, value)
+	case "border-bottom-color":
+		setBorderColor(&style.BorderBottom, value)
+	case "border-left-color":
+		setBorderColor(&style.BorderLeft, value)
 	default:
 		return false
 	}
 
 	return true
+}
+
+func setBorderColor(side *border, value string) {
+	if r, g, b, _, ok := css.ParseColor(value); ok {
+		side.Color = [3]float64{float64(r) / 255, float64(g) / 255, float64(b) / 255}
+	}
 }
 
 // applyColorGroup handles foreground and background colors.

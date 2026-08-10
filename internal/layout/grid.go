@@ -1596,7 +1596,26 @@ func resolveGridTrackSizes(
 	}
 
 	if free < 0 {
-		free = 0
+		// A bare fr track is flexible when the definite grid container is
+		// narrower than its intrinsic contributions. Let the fr tracks absorb
+		// the available space instead of allowing an auto minimum to make the
+		// whole grid overflow and trigger document-wide smart shrinking.
+		if plan.frSum > 0 {
+			fixedSum = 0
+			for idx, coef := range plan.frCoef {
+				if coef == 0 {
+					fixedSum += plan.base[idx]
+					continue
+				}
+
+				plan.base[idx] = 0
+			}
+			free = contentSize - gapTotal - fixedSum
+		}
+
+		if free < 0 {
+			free = 0
+		}
 	}
 
 	out := distributeGridTracks(defs, plan.base, plan.limit, plan.frCoef, plan.frSum, free)

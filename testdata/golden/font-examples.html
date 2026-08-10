@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<!--
+  font-examples
+  Font showcase fixture: 15 fancy free Google Fonts families drawn from the
+  fonts.google.com Feeling / Calligraphy filters (Expressive: Fancy,
+  Futuristic, Active, Awkward; Calligraphy: Script/Formal). Each face is
+  rendered with regular, bold, italic, bold-italic, underline, strikethrough
+  and extra text styles, styled via <style> in this same file.
+  Fonts are NOT bundled: install them locally and pass the directory via
+  --font-path (CLI) or Global().Set("fontpath", dir) (library). Point
+  --font-path at the folder where you installed the TTFs (e.g. a folder
+  under ~/.local/share/fonts, which --use-system-fonts also scans). Without
+  font flags the engine falls back to bundled Liberation Sans.
+  Run:
+    gowkhtmltopdf --font-path <your-fonts-folder> font-examples.html out.pdf
+  Notes: static TrueType TTFs only (variable fonts and CFF/OTTO are not
+  supported); most of these are single-weight display/script faces, so bold
+  is synthesized for Latin and italic falls back to regular (no synthesis);
+  Tangerine has a real Bold face. Expected: 7-10 pages with fonts.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Font Examples - 15 Fancy Google Fonts</title>
+  <style>
+    /* ---------- base ---------- */
+    :root {
+      --ink: #20262f;
+      --muted: #5c6470;
+      --accent: #b4532a;
+      --accent2: #2e6b5a;
+      --line: #d8d1c2;
+      --paper: #f6f2e9;
+    }
+    * { box-sizing: border-box; }
+    @page { size: A4; margin: 12mm; }
+    body {
+      font-family: "Liberation Sans", sans-serif;
+      font-size: 10pt;
+      line-height: 1.5;
+      color: var(--ink);
+      background: var(--paper);
+      margin: 0;
+      padding: 0;
+    }
+    h1 { font-size: 19pt; margin: 0 0 4px; }
+    h2 {
+      font-size: 13pt;
+      border-bottom: 2px solid var(--line);
+      padding-bottom: 4px;
+      margin: 18px 0 8px;
+      page-break-after: avoid;
+    }
+    h2 .fname { font-weight: bold; }
+    p { margin: 2px 0; }
+    .tag {
+      font-size: 8pt;
+      font-family: "Liberation Sans", sans-serif;
+      background: #efe9dc;
+      border-radius: 999px;
+      padding: 1px 10px;
+      color: var(--muted);
+      vertical-align: middle;
+    }
+    code {
+      font-family: "Liberation Mono", monospace;
+      font-size: 0.88em;
+      background: #efe9dc;
+      border-radius: 4px;
+      padding: 0.05em 0.3em;
+    }
+
+    /* ---------- the 15 fancy faces ---------- */
+    /* Feeling: Expressive / Fancy */
+    .fascinate  { font-family: "Fascinate", "Liberation Sans", sans-serif; font-size: 13pt; }
+    .monoton    { font-family: "Monoton", "Liberation Sans", sans-serif; font-size: 13pt; }
+    .rubikglitch{ font-family: "Rubik Glitch", "Liberation Sans", sans-serif; font-size: 14pt; }
+    /* Feeling: Expressive / Futuristic */
+    .audiowide  { font-family: "Audiowide", "Liberation Sans", sans-serif; font-size: 13pt; }
+    .pressstart { font-family: "Press Start 2P", "Liberation Mono", monospace; font-size: 9pt; line-height: 1.8; }
+    .blackops   { font-family: "Black Ops One", "Liberation Sans", sans-serif; font-size: 13pt; }
+    /* Feeling: Expressive / Active */
+    .bebas      { font-family: "Bebas Neue", "Liberation Sans", sans-serif; font-size: 14pt; letter-spacing: 0.03em; }
+    .permanent  { font-family: "Permanent Marker", "Liberation Sans", sans-serif; font-size: 13pt; }
+    .luckiest   { font-family: "Luckiest Guy", "Liberation Sans", sans-serif; font-size: 13pt; }
+    /* Calligraphy: Script / Formal */
+    .greatvibes { font-family: "Great Vibes", "Liberation Sans", cursive; font-size: 17pt; }
+    .parisienne { font-family: "Parisienne", "Liberation Sans", cursive; font-size: 17pt; }
+    .tangerine  { font-family: "Tangerine", "Liberation Sans", cursive; font-size: 17pt; }
+    /* Feeling: Expressive / Awkward */
+    .henny      { font-family: "Henny Penny", "Liberation Sans", sans-serif; font-size: 13pt; }
+    .beastly    { font-family: "Rubik Beastly", "Liberation Sans", sans-serif; font-size: 14pt; }
+    .ewert      { font-family: "Ewert", "Liberation Sans", sans-serif; font-size: 14pt; }
+
+    /* ---------- text style helpers ---------- */
+    .b  { font-weight: bold; }
+    .i  { font-style: italic; }
+    .bi { font-weight: bold; font-style: italic; }
+    .u  { text-decoration: underline; }
+    .s  { text-decoration: line-through; }
+    .us { text-decoration: underline line-through; }
+    .ls { letter-spacing: 0.12em; }
+    .up { text-transform: uppercase; }
+    .cap{ text-transform: capitalize; }
+    .c  { color: var(--accent2); }
+    .hl { background: #f3dcb0; }
+    .sm { font-size: 8.5pt; color: var(--muted); }
+
+    /* ---------- intro ---------- */
+    .intro { background: #efe9dc; border-left: 4px solid var(--accent); border-radius: 0 8px 8px 0; padding: 10px 14px; }
+    .intro p { margin: 3px 0; }
+    .legend { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+    .legend span { font-size: 8.5pt; background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 2px 8px; }
+    .note { font-size: 8.8pt; color: var(--muted); }
+    .cathead {
+      font-size: 11pt; font-weight: bold; color: var(--accent);
+      margin: 22px 0 2px; padding: 4px 10px; background: #f6e8dc; border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Font Examples &mdash; 15 Fancy Google Fonts</h1>
+  <div class="intro">
+    <p>Fifteen free display/script families picked from the fonts.google.com
+    <strong>Feeling</strong> filters (Expressive: Fancy, Futuristic, Active, Awkward) and
+    <strong>Calligraphy</strong> filter (Script: Formal). Each block renders in its own font:
+    regular, bold, italic, bold-italic, underline, strikethrough and extra styles.</p>
+    <p>Fonts are <strong>not stored in this repository</strong> &mdash; install them on your
+    machine and point the converter at them:
+    <strong>CLI:</strong> <code>gowkhtmltopdf --font-path <your-fonts-folder> font-examples.html out.pdf</code>
+    &middot; <strong>Library:</strong> <code>conv.Global().Set("fontpath", "<your-fonts-folder>")</code>
+    (both <code>Converter</code> and <code>ImageConverter</code>). On this dev machine the fonts
+    are installed in a standard user font folder (<code>~/.local/share/fonts</code>), so
+    <code>--use-system-fonts</code> also finds them.</p>
+    <p class="note">Engine limits: static TrueType TTFs only (variable fonts and CFF/OTTO are
+    rejected); most of these faces are single-weight, so bold is synthesized for Latin text and
+    italic falls back to the regular face (no italic synthesis); <code>overline</code> is
+    unsupported (underline/strikethrough are fine). Tangerine ships a real Bold face.</p>
+  </div>
+
+  <div class="legend">
+    <span>Regular</span><span>Bold</span><span>Italic</span><span>Bold Italic</span>
+    <span>Underline</span><span>Strikethrough</span><span>Under+Strike</span>
+    <span>Letter-spaced</span><span>Uppercase</span><span>Colored</span><span>Highlight</span>
+  </div>
+
+  <!-- ============================================================
+       Feeling: Expressive / Fancy
+       ============================================================ -->
+  <h2 class="cathead">Feeling &middot; Expressive / Fancy</h2>
+
+  <!-- 1 · Fascinate -->
+  <section class="fascinate">
+    <h2>1 &middot; <span class="fname">Fascinate</span> <span class="tag">ornate display</span></h2>
+    <p>Regular &mdash; The quick brown fox jumps over the lazy dog. 0123456789</p>
+    <p class="b">Bold &mdash; synthesized stroke for Latin (single-weight face).</p>
+    <p class="i">Italic &mdash; falls back to the regular face (no italic synthesis).</p>
+    <p class="bi">Bold Italic &mdash; same fallbacks combined.</p>
+    <p class="u">Underline &mdash; an engraved rule under the fancy face.</p>
+    <p class="s">Strikethrough &mdash; crossed-out pricing.</p>
+    <p class="us">Underline + Strikethrough &mdash; combined decorations.</p>
+    <p class="ls">Letter-spaced &mdash; S P R E A D &nbsp; O U T &nbsp; T I T L E</p>
+    <p class="up">Uppercase &mdash; ALL-CAPS RUN-IN LABELS</p>
+    <p class="c lg">Colored &mdash; a pop of teal.</p>
+    <p class="hl">Highlighted &mdash; key figures flagged.</p>
+  </section>
+
+  <!-- 2 · Monoton -->
+  <section class="monoton">
+    <h2>2 &middot; <span class="fname">Monoton</span> <span class="tag">wireframe techno</span></h2>
+    <p>Regular &mdash; The quick brown fox jumps over the lazy dog. 0123456789</p>
+    <p class="b">Bold &mdash; synthesized stroke for Latin (single-weight face).</p>
+    <p class="i">Italic &mdash; falls back to the regular face (no italic synthesis).</p>
+    <p class="bi">Bold Italic &mdash; same fallbacks combined.</p>
+    <p class="u">Underline &mdash; a crisp rule under the wireframe.</p>
+    <p class="s">Strikethrough &mdash; crossed-out pricing.</p>
+    <p class="us">Underline + Strikethrough &mdash; combined decorations.</p>
+    <p class="ls">Letter-spaced &mdash; S P R E A D &nbsp; O U T &nbsp; T I T L E</p>
+    <p class="up">Uppercase &mdash; ALL-CAPS RUN-IN LABELS</p>
+    <p class="c lg">Colored &mdash; a pop of teal.</p>
+    <p class="hl">Highlighted &mdash; key figures flagged.</p>
+  </section>
+
+  <!-- 3 · Rubik Glitch -->
+  <section class="rubikglitch">
+    <h2>3 &middot; <span class="fname">Rubik Glitch</span> <span class="tag">glitch effect</span></h2>
+    <p>Regular &mdash; The quick brown fox jumps over the lazy dog. 0123456789</p>
+    <p class="b">Bold &mdash; synthesized stroke for Latin (single-weight face).</p>
+    <p class="i">Italic &mdash; falls back to the regular face (no italic synthesis).</p>
+    <p class="bi">Bold Italic &mdash; same fallbacks combined.</p>
+    <p class="u">Underline &mdash; a crisp rule under the glitch.</p>
+    <p class="s">Strikethrough &mdash; crossed-out pricing.</p>
+    <p class="us">Underline + Strikethrough &mdash; combined decorations.</p>
+    <p class="ls">Letter-spaced &mdash; S P R E A D &nbsp; O U T &nbsp; T I T L E</p>
+    <p class="up">Uppercase &mdash; ALL-CAPS RUN-IN LABELS</p>
+    <p class="c lg">Colored &mdash; a pop of teal.</p>
+    <p class="hl">Highlighted &mdash; key figures flagged.</p>
+  </section>
+
+  <!-- ============================================================
+       Feeling: Expressive / Futuristic
+       ============================================================ -->
+  <h2 class="cathead">Feeling &middot; Expressive / Futuristic</h2>
+
+  <!-- 4 · Audiowide -->
+  <section class="audiowide">
+    <h2>4 &middot; <span class="fname">Audiowide</span> <span class="tag">techno sans</span></h2>
+    <p>Regular &mdash; The quick brown fox jumps over the lazy dog. 0123456789</p>
+    <p class="b">Bold &mdash; synthesized stroke for Latin (single-weight face).</p>
+    <p class="i">Italic &mdash; falls back to the regular face (no italic synthesis).</p>
+    <p class="bi">Bold Italic &mdash; same fallbacks combined.</p>
+    <p class="u">Underline &mdash; a crisp rule under the tech face.</p>
+    <p class="s">Strikethrough &mdash; crossed-out pricing.</p>
+    <p class="us">Underline + Strikethrough &mdash; combined decorations.</p>
+    <p class="ls">Letter-spaced &mdash; S P R E A D &nbsp; O U T &nbsp; T I T L E</p>
+    <p class="up">Uppercase &mdash; ALL-CAPS RUN-IN LABELS</p>
+    <p class="c lg">Colored &mdash; a pop of teal.</p>
+    <p class="hl">Highlighted &mdash; key figures flagged.</p>
+  </section>
+
+  <!-- 5 · Press Start 2P -->
+  <section class="pressstart">
+    <h2>5 &middot; <span class="fname">Press Start 2P</span> <span class="tag">pixel / retro</span></h2>
+    <p>Regular &mdash; The quick brown fox jumps over the lazy dog. 0123456789</p>
+    <p class="b">Bold &mdash; synthesized stroke for Latin (single-weight face).</p>
+    <p class="i">Italic &mdash; falls back to the regular face (no italic synthesis).</p>
+    <p class="bi">Bold Italic &mdash; same fallbacks combined.</p>
+    <p class="u">Underline &mdash; a crisp rule under the pixels.</p>
+    <p class="s">Strikethrough &mdash; crossed-out pricing.</p>
+    <p class="us">Underline + Strikethrough &mdash; combined decorations.</p>
+    <p class="ls">Letter-spaced &mdash; S P R E A D &nbsp; O U T &nbsp; T I T L E</p>
+    <p class="up">Uppercase &mdash; ALL-CAPS RUN-IN LABELS</p>
+    <p class="c lg">Colored &mdash; a pop of teal.</p>
+    <p class="hl">Highlighted &mdash; key figures flagged.</p>
+  </section>
+
+  <!-- 6 · Black Ops One -->
+  <section class="blackops">
+    <h2>6 &middot; <span class="fname">Black Ops One</span> <span class="tag">military stencil</span></h2>
+    <p>Regular &mdash; The quick brown fox jumps over the lazy dog. 0123456789</p>
+    <p class="b">Bold &mdash; synthesized stroke for Latin (single-weight face).</p>
+    <p class="i">Italic &mdash; falls back to the regular face (no italic synthesis).</p>
+    <p class="bi">Bold Italic &mdash; same fallbacks combined.</p>
+    <p class="u">Underline &mdash; a crisp rule under the stencil.</p>
+    <p class="s">Strikethrough &mdash; crossed-out pricing.</p>
+    <p class="us">Underline + Strikethrough &mdash; combined decorations.</p>
+    <p class="ls">Letter-spaced &mdash; S P R E A D &nbsp; O U T &nbsp; T I T L E</p>
+    <p class="up">Uppercase &mdash; ALL-CAPS RUN-IN LABELS</p>
+    <p class="c lg">Colored &mdash; a pop of teal.</p>
+    <p class="hl">Highlighted &mdash; key figures flagged.</p>
+  </section>
+
+  <!-- ============================================================
+       Feeling: Expressive / Active
+       ============================================================ -->
+  <h2 class="cathead">Feeling &middot; Expressive / Active</h2>
+
+  <!-- 7 · Bebas Neue -->
+  <section class="bebas">
+    <h2>7 &middot; <span class="fname">Bebas Neue</span> <span class="tag">condensed display</span></h2>
+    <p>Regular &mdash; The quick brown fox jumps over the lazy dog. 0123456789</p>
+    <p class="b">Bold &mdash; synthesized stroke for Latin (single-weight face).</p>
+    <p class="i">Italic &mdash; falls back to the regular face (no italic synthesis).</p>
+    <p class="bi">Bold Italic &mdash; same fallbacks combined.</p>
+    <p class="u">Underline &mdash; a crisp rule under the condensed caps.</p>
+    <p class="s">Strikethrough &mdash; crossed-out pricing.</p>
+    <p class="us">Underline + Strikethrough &mdash; combined decorations.</p>
+    <p class="ls">Letter-spaced &mdash; S P R E A D &nbsp; O U T &nbsp; T I T L E</p>
+    <p class="up">Uppercase &mdash; ALL-CAPS RUN-IN LABELS</p>
+    <p class="c lg">Colored &mdash; a pop of teal.</p>
+    <p class="hl">Highlighted &mdash; key figures flagged.</p>
+  </section>
+
+  <!-- 8 · Permanent Marker -->
+  <section class="permanent">
+    <h2>8 &middot; <span class="fname">Permanent Marker</span> <span class="tag">marker handwriting</span></h2>
+    <p>Regular &mdash; The quick brown fox jumps over the lazy dog. 0123456789</p>
+    <p class="b">Bold &mdash; synthesized stroke for Latin (single-weight face).</p>
+    <p class="i">Italic &mdash; falls back to the regular face (no italic synthesis).</p>
+    <p class="bi">Bold Italic &mdash; same fallbacks combined.</p>
+    <p class="u">Underline &mdash; a sharp rule under the marker.</p>
+    <p class="s">Strikethrough &mdash; crossed-out pricing.</p>
+    <p class="us">Underline + Strikethrough &mdash; combined decorations.</p>
+    <p class="ls">Letter-spaced &mdash; S P R E A D &nbsp; O U T &nbsp; T I T L E</p>
+    <p class="up">Uppercase &mdash; ALL-CAPS RUN-IN LABELS</p>
+    <p class="c lg">Colored &mdash; a pop of teal.</p>
+    <p class="hl">Highlighted &mdash; key figures flagged.</p>
+  </section>
+
+  <!-- 9 · Luckiest Guy -->
+  <section class="luckiest">
+    <h2>9 &middot; <span class="fname">Luckiest Guy</span> <span class="tag">cartoon display</span></h2>
+    <p>Regular &mdash; The quick brown fox jumps over the lazy dog. 0123456789</p>
+    <p class="b">Bold &mdash; synthesized stroke for Latin (single-weight face).</p>
+    <p class="i">Italic &mdash; falls back to the regular face (no italic synthesis).</p>
+    <p class="bi">Bold Italic &mdash; same fallbacks combined.</p>
+    <p class="u">Underline &mdash; a crisp rule under the cartoon caps.</p>
+    <p class="s">Strikethrough &mdash; crossed-out pricing.</p>
+    <p class="us">Underline + Strikethrough &mdash; combined decorations.</p>
+    <p class="ls">Letter-spaced &mdash; S P R E A D &nbsp; O U T &nbsp; T I T L E</p>
+    <p class="up">Uppercase &mdash; ALL-CAPS RUN-IN LABELS</p>
+    <p class="c lg">Colored &mdash; a pop of teal.</p>
+    <p class="hl">Highlighted &mdash; key figures flagged.</p>
+  </section>
+
+  <!-- ============================================================
+       Calligraphy: Script / Formal
+       ============================================================ -->
+  <h2 class="cathead">Calligraphy &middot; Script / Formal</h2>
+
+  <!-- 10 · Great Vibes -->
+  <section class="greatvibes">
+    <h2>10 &middot; <span class="fname">Great Vibes</span> <span class="tag">formal script</span></h2>
+    <p class="lg">Invitation &mdash; The quick brown fox jumps over the lazy dog.</p>
+    <p class="b lg">Bold &mdash; synthesized stroke for Latin (single-weight face).</p>
+    <p class="i lg">Italic &mdash; falls back to the regular face (no italic synthesis).</p>
+    <p class="bi lg">Bold Italic &mdash; same fallbacks combined.</p>
+    <p class="u lg">Underline &mdash; a fine rule under the calligraphy.</p>
+    <p class="s lg">Strikethrough &mdash; crossed-out pricing.</p>
+    <p class="us lg">Underline + Strikethrough &mdash; combined decorations.</p>
+    <p class="c lg">Colored &mdash; a pop of teal on the script.</p>
+    <p class="sm">Small muted &mdash; captions and footnotes stay quiet.</p>
+  </section>
+
+  <!-- 11 · Parisienne -->
+  <section class="parisienne">
+    <h2>11 &middot; <span class="fname">Parisienne</span> <span class="tag">elegant script</span></h2>
+    <p class="lg">Invitation &mdash; The quick brown fox jumps over the lazy dog.</p>
+    <p class="b lg">Bold &mdash; synthesized stroke for Latin (single-weight face).</p>
+    <p class="i lg">Italic &mdash; falls back to the regular face (no italic synthesis).</p>
+    <p class="bi lg">Bold Italic &mdash; same fallbacks combined.</p>
+    <p class="u lg">Underline &mdash; a fine rule under the calligraphy.</p>
+    <p class="s lg">Strikethrough &mdash; crossed-out pricing.</p>
+    <p class="us lg">Underline + Strikethrough &mdash; combined decorations.</p>
+    <p class="c lg">Colored &mdash; a pop of teal on the script.</p>
+    <p class="sm">Small muted &mdash; captions and footnotes stay quiet.</p>
+  </section>
+
+  <!-- 12 · Tangerine (real Bold face) -->
+  <section class="tangerine">
+    <h2>12 &middot; <span class="fname">Tangerine</span> <span class="tag">formal script · real Bold</span></h2>
+    <p class="lg">Invitation &mdash; The quick brown fox jumps over the lazy dog.</p>
+    <p class="b lg">Bold &mdash; matched from the real Tangerine-Bold face.</p>
+    <p class="i lg">Italic &mdash; falls back to the regular face (no italic synthesis).</p>
+    <p class="bi lg">Bold Italic &mdash; bold face + italic fallback combined.</p>
+    <p class="u lg">Underline &mdash; a fine rule under the calligraphy.</p>
+    <p class="s lg">Strikethrough &mdash; crossed-out pricing.</p>
+    <p class="us lg">Underline + Strikethrough &mdash; combined decorations.</p>
+    <p class="c lg">Colored &mdash; a pop of teal on the script.</p>
+    <p class="sm">Small muted &mdash; captions and footnotes stay quiet.</p>
+  </section>
+
+  <!-- ============================================================
+       Feeling: Expressive / Awkward
+       ============================================================ -->
+  <h2 class="cathead">Feeling &middot; Expressive / Awkward</h2>
+
+  <!-- 13 · Henny Penny -->
+  <section class="henny">
+    <h2>13 &middot; <span class="fname">Henny Penny</span> <span class="tag">quirky display</span></h2>
+    <p>Regular &mdash; The quick brown fox jumps over the lazy dog. 0123456789</p>
+    <p class="b">Bold &mdash; synthesized stroke for Latin (single-weight face).</p>
+    <p class="i">Italic &mdash; falls back to the regular face (no italic synthesis).</p>
+    <p class="bi">Bold Italic &mdash; same fallbacks combined.</p>
+    <p class="u">Underline &mdash; a crisp rule under the quirky face.</p>
+    <p class="s">Strikethrough &mdash; crossed-out pricing.</p>
+    <p class="us">Underline + Strikethrough &mdash; combined decorations.</p>
+    <p class="ls">Letter-spaced &mdash; S P R E A D &nbsp; O U T &nbsp; T I T L E</p>
+    <p class="up">Uppercase &mdash; ALL-CAPS RUN-IN LABELS</p>
+    <p class="c lg">Colored &mdash; a pop of teal.</p>
+    <p class="hl">Highlighted &mdash; key figures flagged.</p>
+  </section>
+
+  <!-- 14 · Rubik Beastly -->
+  <section class="beastly">
+    <h2>14 &middot; <span class="fname">Rubik Beastly</span> <span class="tag">beastly effect</span></h2>
+    <p>Regular &mdash; The quick brown fox jumps over the lazy dog. 0123456789</p>
+    <p class="b">Bold &mdash; synthesized stroke for Latin (single-weight face).</p>
+    <p class="i">Italic &mdash; falls back to the regular face (no italic synthesis).</p>
+    <p class="bi">Bold Italic &mdash; same fallbacks combined.</p>
+    <p class="u">Underline &mdash; a crisp rule under the beast.</p>
+    <p class="s">Strikethrough &mdash; crossed-out pricing.</p>
+    <p class="us">Underline + Strikethrough &mdash; combined decorations.</p>
+    <p class="ls">Letter-spaced &mdash; S P R E A D &nbsp; O U T &nbsp; T I T L E</p>
+    <p class="up">Uppercase &mdash; ALL-CAPS RUN-IN LABELS</p>
+    <p class="c lg">Colored &mdash; a pop of teal.</p>
+    <p class="hl">Highlighted &mdash; key figures flagged.</p>
+  </section>
+
+  <!-- 15 · Ewert -->
+  <section class="ewert">
+    <h2>15 &middot; <span class="fname">Ewert</span> <span class="tag">engraved western</span></h2>
+    <p>Regular &mdash; The quick brown fox jumps over the lazy dog. 0123456789</p>
+    <p class="b">Bold &mdash; synthesized stroke for Latin (single-weight face).</p>
+    <p class="i">Italic &mdash; falls back to the regular face (no italic synthesis).</p>
+    <p class="bi">Bold Italic &mdash; same fallbacks combined.</p>
+    <p class="u">Underline &mdash; a crisp rule under the engraving.</p>
+    <p class="s">Strikethrough &mdash; crossed-out pricing.</p>
+    <p class="us">Underline + Strikethrough &mdash; combined decorations.</p>
+    <p class="ls">Letter-spaced &mdash; S P R E A D &nbsp; O U T &nbsp; T I T L E</p>
+    <p class="up">Uppercase &mdash; ALL-CAPS RUN-IN LABELS</p>
+    <p class="c lg">Colored &mdash; a pop of teal.</p>
+    <p class="hl">Highlighted &mdash; key figures flagged.</p>
+  </section>
+
+  <hr>
+  <p class="note">How to get these fonts: fonts.google.com &rarr; Feeling / Calligraphy filters,
+  download each family, unzip, and pass the folder to <code>--font-path</code> (repeatable) or
+  <code>--use-system-fonts</code>. In Go code: <code>conv.Global().Set("fontpath", "/abs/path")</code>
+  on either <code>Converter</code> or <code>ImageConverter</code>. The engine embeds only the glyphs
+  used (font subsetting), so output stays small. Licenses: 13 families under SIL Open Font License
+  1.1; Permanent Marker and Luckiest Guy under Apache 2.0.</p>
+
+</body>
+</html>

@@ -270,6 +270,8 @@ func (m *cellMeasure) measureText(text string, cstate ResolvedStyle, nowrap bool
 
 		m.lineOnlyNowrap = false
 		m.lineHasInk = true
+		chromeW := inlineMeasurementChromeWidth(eng, cstate)
+		m.lineW += chromeW
 
 		spaceW := m.spaceWidth(cstate)
 
@@ -304,7 +306,7 @@ func (m *cellMeasure) measureText(text string, cstate ResolvedStyle, nowrap bool
 			first = false
 			wordW := eng.measureTextFace(word, cstate)
 			m.lineW += wordW
-			m.noteWord(eng.minContentWidth(word, cstate, wordW))
+			m.noteWord(eng.minContentWidth(word, cstate, wordW+chromeW))
 
 			wStart = wEnd
 		}
@@ -312,13 +314,26 @@ func (m *cellMeasure) measureText(text string, cstate ResolvedStyle, nowrap bool
 		return
 	}
 
-	full := eng.measureTextFace(text, cstate)
+	full := eng.measureTextFace(text, cstate) + inlineMeasurementChromeWidth(eng, cstate)
 	m.lineW += full
 	m.noteWord(eng.minContentWidth(text, cstate, full))
 
 	if hasNonHTMLSpace(text) {
 		m.lineHasInk = true
 	}
+}
+
+// inlineMeasurementChromeWidth keeps intrinsic flex/grid measurements in
+// lockstep with inline paint. Without the padding and border contribution,
+// flex items containing code/mark spans receive a box that is just narrower
+// than their painted inline chrome and wrap unexpectedly.
+func inlineMeasurementChromeWidth(eng *engine, st ResolvedStyle) float64 {
+	if eng == nil || st.Display != cssDisplayInline {
+		return 0
+	}
+
+	return eng.scalePt(st.PaddingLeft) + eng.scalePt(st.PaddingRight) +
+		eng.scalePt(st.BorderLeft.Width) + eng.scalePt(st.BorderRight.Width)
 }
 
 // noteWord records a token's min-content width.

@@ -441,6 +441,67 @@ func ResolveVar(val2 string, lookup func(name string) (string, bool)) string {
 	return val2
 }
 
+// ResolveVars expands every var() function embedded in a CSS value. ResolveVar
+// handles a value whose complete input is one var() function; declarations such
+// as "1px solid var(--line)" need the same substitution while preserving their
+// surrounding tokens.
+func ResolveVars(value string, lookup func(name string) (string, bool)) string {
+	if !strings.Contains(strings.ToLower(value), "var(") {
+		return value
+	}
+
+	var out strings.Builder
+	start := 0
+	for start < len(value) {
+		idx := indexVarFunction(value, start)
+		if idx < 0 {
+			out.WriteString(value[start:])
+
+			break
+		}
+
+		out.WriteString(value[start:idx])
+		end := matchingVarParen(value, idx+3)
+		if end < 0 {
+			out.WriteString(value[idx:])
+
+			break
+		}
+
+		out.WriteString(ResolveVar(value[idx:end+1], lookup))
+		start = end + 1
+	}
+
+	return out.String()
+}
+
+func indexVarFunction(value string, start int) int {
+	for idx := start; idx+4 <= len(value); idx++ {
+		if strings.EqualFold(value[idx:idx+4], "var(") {
+			return idx
+		}
+	}
+
+	return -1
+}
+
+func matchingVarParen(value string, open int) int {
+	depth := 0
+	for idx := open; idx < len(value); idx++ {
+		switch value[idx] {
+		case '(':
+			depth++
+		case ')':
+			depth--
+			if depth == 0 {
+				return idx
+			}
+		}
+	}
+
+	return -1
+}
+
 // ResolveCustomProps walks a custom-property graph: the inherited overlay
 // plus declared --* values, with var() chains expanded once using a memo and
 // a cycle stack (cycles resolve to invalid → empty). The single place

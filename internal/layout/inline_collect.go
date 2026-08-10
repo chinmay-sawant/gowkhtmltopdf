@@ -32,12 +32,22 @@ func (e *engine) collectInlineText(node *html.Node, sty ResolvedStyle, out *[]in
 	if sty.Display == cssDisplayNone {
 		return
 	}
+	start := len(*out)
 
 	switch sty.WhiteSpace {
 	case cssWhiteSpacePre:
 		e.collectPreText(node, sty, out)
 	default:
 		e.collectWrappedText(node, sty, out)
+	}
+
+	parent := node.Parent
+	if parent == nil || parent.Type != html.ElementNode || e.styleVal(parent).Display != cssDisplayInline {
+		return
+	}
+
+	for idx := start; idx < len(*out); idx++ {
+		e.enableInlineChrome(&(*out)[idx])
 	}
 }
 
@@ -189,7 +199,7 @@ func (e *engine) preserveTrailingGap(node *html.Node, sty ResolvedStyle, out *[]
 	}
 
 	item.text += " "
-	item.w = e.measureTextFace(item.text, sty)
+	item.w = e.inlineTextWidth(item.text, e.stylePtr(node), item.chrome)
 }
 
 // collectInlineElement flattens one element node into inline items.
@@ -276,7 +286,9 @@ func (e *engine) collectInlineSpan(node *html.Node, sty ResolvedStyle, out *[]in
 	before := len(*out)
 
 	if txt := e.pseudoContent(node, "before"); txt != "" {
-		*out = append(*out, e.textItem(txt, e.stylePtr(node)))
+		item := e.textItem(txt, e.stylePtr(node))
+		e.enableInlineChrome(&item)
+		*out = append(*out, item)
 	}
 
 	for _, c := range node.Children {
@@ -284,7 +296,9 @@ func (e *engine) collectInlineSpan(node *html.Node, sty ResolvedStyle, out *[]in
 	}
 
 	if txt := e.pseudoContent(node, "after"); txt != "" {
-		*out = append(*out, e.textItem(txt, e.stylePtr(node)))
+		item := e.textItem(txt, e.stylePtr(node))
+		e.enableInlineChrome(&item)
+		*out = append(*out, item)
 	}
 	// Horizontal margins on inline elements (e.g. .co { margin-left: 10px }
 	// after a logo) apply to the first/last generated items.
@@ -360,6 +374,45 @@ func (e *engine) textItem(text string, st *ResolvedStyle) inlineItem {
 	return inlineItem{ //nolint:exhaustruct // intentional zero fields
 		text: text, style: st, w: w, h: lineHeightOf(st) * e.scale,
 	}
+}
+
+func (e *engine) enableInlineChrome(item *inlineItem) {
+	if item == nil || item.style == nil || item.forceBreak || item.chrome {
+		return
+	}
+
+	item.chrome = true
+	item.w += e.inlineChromeLeft(item.style) + e.inlineChromeRight(item.style)
+	item.h += e.inlineChromeTop(item.style) + e.inlineChromeBottom(item.style)
+}
+
+func (e *engine) inlineTextWidth(text string, st *ResolvedStyle, chrome bool) float64 {
+	w := e.measureTextFace(text, *st)
+	if chrome {
+		w += e.inlineChromeLeft(st) + e.inlineChromeRight(st)
+	}
+
+	return w
+}
+
+func (e *engine) inlineTextHeight(st *ResolvedStyle) float64 {
+	return lineHeightOf(st)*e.scale + e.inlineChromeTop(st) + e.inlineChromeBottom(st)
+}
+
+func (e *engine) inlineChromeLeft(st *ResolvedStyle) float64 {
+	return e.scalePt(st.PaddingLeft) + e.scalePt(st.BorderLeft.Width)
+}
+
+func (e *engine) inlineChromeRight(st *ResolvedStyle) float64 {
+	return e.scalePt(st.PaddingRight) + e.scalePt(st.BorderRight.Width)
+}
+
+func (e *engine) inlineChromeTop(st *ResolvedStyle) float64 {
+	return e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)
+}
+
+func (e *engine) inlineChromeBottom(st *ResolvedStyle) float64 {
+	return e.scalePt(st.PaddingBottom) + e.scalePt(st.BorderBottom.Width)
 }
 
 func transformInlineText(text, transform string) string {
