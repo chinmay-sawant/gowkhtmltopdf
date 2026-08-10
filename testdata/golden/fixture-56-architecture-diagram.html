@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<!--
+  fixture-56-architecture-diagram
+  Pure HTML+CSS architecture diagram for gowkhtmltopdf (pure-Go, no-cgo
+  HTML→PDF/PNG converter), derived from the deep-dive documents in
+  documentation/architecture/ (commit ef526f9). All styling lives in the
+  linked stylesheet fixture-56-architecture-diagram.css.
+  Proves: modern semantic HTML tags (dialog, details/summary, mark, meter,
+  progress, output, time, data, kbd, samp, var, dfn, cite, ruby, rt, rp,
+  bdi, bdo, wbr, ins, del, sub, sup, aside, address, fieldset, legend,
+  picture, search) and modern CSS (oklch/color-mix/clamp, logical
+  properties, aspect-ratio, :target, ::marker ...) with graceful-degrade
+  fallbacks, rendered by the lite engine; linked relative stylesheet
+  resolution; internal fragment links → PDF GoTo annotations.
+  Expected: 13 pages.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>gowkhtmltopdf — Architecture Diagram</title>
+  <meta name="description" content="Architecture diagram of the pure-Go HTML→PDF/PNG converter: pipeline, package map, dependency DAG, security.">
+  <link rel="stylesheet" href="fixture-56-architecture-diagram.css">
+</head>
+<body>
+
+  <header class="hero" id="top">
+    <div class="hero-badge">pure Go · no cgo · no browser · MIT</div>
+    <h1 class="hero-title">gowkhtmltopdf <span class="hero-amp">&mdash;</span> Architecture</h1>
+    <p class="hero-sub">A work-alike for <dfn title="wkhtmltopdf">wkhtmltopdf</dfn> built for controlled
+    reports: invoices, statements, tables, multi-page documents with headers/footers, TOCs and PDF
+    outlines. Everything from <mark>load</mark> to <mark>write</mark> runs inside the Go binary.</p>
+    <dl class="hero-meta">
+      <div><dt>docs</dt><dd><output>11</output> deep-dives in documentation/architecture/</dd></div>
+      <div><dt>domains</dt><dd><output>10</output> sections on this page</dd></div>
+      <div><dt>scale</dt><dd>~<output>71&thinsp;600</output> lines of Go</dd></div>
+      <div><dt>commit</dt><dd><code>ef526f9</code> <time datetime="2026-08-11">2026-08-11</time></dd></div>
+    </dl>
+  </header>
+
+  <section class="pipeline" id="pipeline" aria-label="conversion pipeline">
+    <h2 class="pipe-title">Conversion pipeline <small>one document, seven stages</small></h2>
+    <ol class="pipe-steps">
+      <li class="pipe-step"><span class="pipe-num">1</span><span class="pipe-name">load</span><span class="pipe-note">URLs, ACL, HTTP</span></li>
+      <li class="pipe-arrow" aria-hidden="true">&rarr;</li>
+      <li class="pipe-step"><span class="pipe-num">2</span><span class="pipe-name">parse</span><span class="pipe-note">allowlisted HTML</span></li>
+      <li class="pipe-arrow" aria-hidden="true">&rarr;</li>
+      <li class="pipe-step"><span class="pipe-num">3</span><span class="pipe-name">style</span><span class="pipe-note">CSS subset</span></li>
+      <li class="pipe-arrow" aria-hidden="true">&rarr;</li>
+      <li class="pipe-step"><span class="pipe-num">4</span><span class="pipe-name">layout</span><span class="pipe-note">boxes → display list</span></li>
+      <li class="pipe-arrow" aria-hidden="true">&rarr;</li>
+      <li class="pipe-step"><span class="pipe-num">5</span><span class="pipe-name">paginate</span><span class="pipe-note">page breaks, HF</span></li>
+      <li class="pipe-arrow" aria-hidden="true">&rarr;</li>
+      <li class="pipe-step"><span class="pipe-num">6</span><span class="pipe-name">paint</span><span class="pipe-note">ops → stream</span></li>
+      <li class="pipe-arrow" aria-hidden="true">&rarr;</li>
+      <li class="pipe-step"><span class="pipe-num">7</span><span class="pipe-name">write</span><span class="pipe-note">PDF 1.4 or PNG/JPEG</span></li>
+    </ol>
+  </section>
+
+  <nav class="toc" aria-label="reading order">
+    <h2 class="toc-title">Reading order <small>jump to any domain</small></h2>
+    <ol class="toc-list">
+      <li><a href="#domain-01">01 · Entrypoints &amp; CLI</a></li>
+      <li><a href="#domain-02">02 · Public library API</a></li>
+      <li><a href="#domain-03">03 · Settings system</a></li>
+      <li><a href="#domain-04">04 · Load layer</a></li>
+      <li><a href="#domain-05">05 · HTML parser</a></li>
+      <li><a href="#domain-06">06 · CSS subsystem</a></li>
+      <li><a href="#domain-07">07 · Layout engine</a></li>
+      <li><a href="#domain-08">08 · Convert pipeline</a></li>
+      <li><a href="#domain-09">09 · PDF writer</a></li>
+      <li><a href="#domain-10">10 · Image output &amp; SVG</a></li>
+      <li><a href="#dependency-dag">Dependency DAG</a></li>
+      <li><a href="#divergence">PDF vs image</a></li>
+      <li><a href="#security">Security</a></li>
+    </ol>
+  </nav>
+
+  <main class="domains">
+
+  <!-- ===== section 01 (author: subagent s01) ===== -->
+<!-- Section 01 - Entrypoints, CLI & multi-object grammar. -->
+<!-- New tags used: kbd, samp, var, output, wbr (never used in earlier fixtures). -->
+<!-- Engine note: kbd/samp/var/output/wbr default to generic boxes; CSS forces display:inline. -->
+<section class="d01" id="domain-01">
+  <header class="dom-head">
+    <span class="dom-index">01</span>
+    <h2 class="dom-title">Entrypoints &amp; CLI</h2>
+    <p class="dom-role">Three entry points: two CLIs and the library; every flag funnels through dotted settings into the convert.Request seam.</p>
+  </header>
+
+  <div class="dom-body">
+    <p class="dom-lead">The outermost shell turns raw process arguments into a
+    settings-shaped <code>cli.Command</code> and hands it to the application adapters that
+    build engine requests. One parser serves both binaries through a
+    <code>Mode</code> bitmask, and the parser is the only place that understands the
+    wkhtmltopdf-compatible multi-object grammar: <code>page</code>, <code>cover</code> and
+    <code>toc</code> objects plus free positionals.</p>
+
+    <!-- New tag: figure/figcaption were used before; the terminal mock below showcases samp + kbd. -->
+    <figure class="d01-term">
+      <figcaption class="d01-term-cap">One parser, two binaries &mdash; argv in, Request out</figcaption>
+      <!-- New tag: kbd = user input keys/commands; forced inline by CSS. -->
+      <!-- New tag: samp = program output sample; forced inline by CSS. -->
+      <pre class="d01-pre"><samp class="d01-prompt">$ </samp><kbd class="d01-cmd">gowkhtmltopdf --page-size A4 cover cover.html toc page ch1.html out.pdf</kbd>
+<samp class="d01-out">write PDF: 3 pages &middot; outline depth 2 &middot; exit 0</samp></pre>
+    </figure>
+
+    <!-- New tag: output = inline result/exit-code element; forced inline by CSS. -->
+    <table class="d01-exit">
+      <caption class="d01-cap">Exit-code contract (wkhtmltopdf compatible)</caption>
+      <thead>
+        <tr><th>Code</th><th>Meaning</th><th>Source</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><output class="d01-code">0</output></td><td>ok</td><td>success</td></tr>
+        <tr><td><output class="d01-code">1</output></td><td>error</td><td>parse or engine failure</td></tr>
+        <tr><td><output class="d01-code">2</output></td><td>HTTP 404</td><td>settings.HttpStatusError</td></tr>
+        <tr><td><output class="d01-code">3</output></td><td>HTTP 401</td><td>settings.HttpStatusError</td></tr>
+      </tbody>
+    </table>
+
+    <!-- New tag: var = variable name; wbr = line-break opportunity (void element, safe here). -->
+    <p class="d01-inline">Flags land in settings through dotted names: <kbd>--page-size</kbd>
+    writes <var>size.pagesize</var>; free positionals become <var>Command.Objects</var> and the last
+    one becomes <var>Output</var>. Errors surface as <samp>gowkhtmltopdf: unknown option --dpi</samp>
+    on stderr with exit code 1, while HTTP failures report <output>2</output> or <output>3</output>.
+    Long option names may split at <wbr /> word boundaries when printed.</p>
+
+    <div class="d01-flow" role="presentation">
+      <span class="d01-flowstep">argv</span><span class="d01-arrow">&rarr;</span>
+      <span class="d01-flowstep">cli.Parse</span><span class="d01-arrow">&rarr;</span>
+      <span class="d01-flowstep">Command</span><span class="d01-arrow">&rarr;</span>
+      <span class="d01-flowstep">app adapter</span><span class="d01-arrow">&rarr;</span>
+      <span class="d01-flowstep">convert.Request</span>
+    </div>
+
+    <dl class="dom-pkgs">
+      <dt>cmd/gowkhtmltopdf</dt>
+      <dd>PDF binary main &mdash; parse (ModePDF), doc-flag dispatch, signals, exit code; 83 thin lines</dd>
+      <dt>cmd/gowkhtmltoimage</dt>
+      <dd>Image binary main &mdash; parse (ModeImage), no TOC-XSL dump, exit code; 53 thin lines</dd>
+      <dt>internal/cli</dt>
+      <dd>Parser core: Command, Parse, Mode bitmask, ~71 registered flags, ExitCode mapping</dd>
+      <dt>internal/app</dt>
+      <dd>Adapters BuildPDFRequest / RunImage turn Command into engine requests</dd>
+    </dl>
+
+    <ul class="dom-syms">
+      <li><code>cli.Command</code> &mdash; parse result: Global/Image settings, Objects, Output / OutputWriter</li>
+      <li><code>cli.Parse(argv, Mode)</code> &mdash; token loop, object grammar, pending remapping</li>
+      <li><code>cli.ExitCode(err)</code> &mdash; 0/1/2/3 via HttpErrorCode</li>
+      <li><code>settings.Set("size.pagesize", ...)</code> &mdash; the dotted settings home appliers write</li>
+      <li><code>newFreshObject()</code> &mdash; TOC objects never consume pending &mdash; no ghost page</li>
+    </ul>
+
+    <aside class="dom-notes">
+      Security: local-file ACL is opt-in (<kbd>--enable-local-file-access</kbd> dual-writes
+      <var>load.blocklocalfileaccess</var>); Policy A rejects inert wkhtmltopdf stubs
+      (<samp>--dpi</samp>, <samp>--javascript-delay</samp>) as unknown rather than no-ops;
+      validation precedes output truncation; the CLI spawns no subprocess and cancels cleanly on
+      SIGINT/SIGTERM via a context.
+    </aside>
+  </div>
+
+  <footer class="dom-foot">Position: argv &rarr; settings &rarr; Request (left edge of the pipeline) &middot; see documentation/architecture/01-entrypoints-cli.md</footer>
+</section>
+
+  <!-- ===== section 02 (author: subagent s02) ===== -->
+<section class="d02" id="domain-02">
+  <!-- vertical side tab: absolute + writing-mode:vertical-rl, a genuinely engine-supported modern CSS feature -->
+  <span class="d02-tab" aria-hidden="true">Root package</span>
+  <header class="dom-head">
+    <span class="dom-index">02</span>
+    <h2 class="dom-title">Public library API</h2>
+    <p class="dom-role">Converter / ImageConverter public API: typed and dotted dialects, deep-copy ownership, in-memory output.</p>
+  </header>
+  <div class="dom-body">
+    <p class="dom-lead">The root package <code>gowkhtmltopdf</code> is the idiomatic,
+    stdlib-only Go surface for the engine. It <dfn>configures</dfn> a conversion with
+    either wkhtmltopdf-compatible dotted strings or compile-time-discoverable typed
+    builders, and it <dfn>drives</dfn> the pipeline: <code>Converter.Convert(ctx)</code>
+    reduces to an internal <code>convert.Request</code> handed to
+    <code>convert.Run</code> (PDF) or <code>imageout.RunRequest</code> (image), with all
+    output captured in memory. This package is also the module boundary that enforces
+    the product rule — <mark>pure Go, no cgo, stdlib + internal only</mark> —
+    so any new external dependency would have to cross its import list first.</p>
+
+    <!-- mark, dfn, abbr, cite, data, time: inline typography forced inline by d02.css (lite engine defaults them to generic boxes). -->
+    <figure class="d02-fig">
+      <div class="d02-srcs">
+        <div class="d02-src"><code>GlobalSettings.Set("size.pagesize","A4")</code><br>dotted dialect</div>
+        <div class="d02-src"><code>PdfGlobalOptions</code> / <code>PDFRequest</code><br>typed dialect</div>
+        <div class="d02-src"><code>ImageConverter</code> / <code>RunImage</code><br>image mode</div>
+      </div>
+      <div class="d02-arrow" aria-hidden="true">&#9660;</div>
+      <div class="d02-seam">
+        <span class="d02-seamname">convert.Request</span>
+        <span class="d02-seamsub">one neutral seam &mdash; the engine never parses argv</span>
+      </div>
+      <div class="d02-arrow" aria-hidden="true">&#9660;</div>
+      <div class="d02-engines">
+        <span class="d02-engine">render.Run &rarr; PDF</span>
+        <span class="d02-engine">imageout.RunRequest &rarr; PNG / JPEG</span>
+      </div>
+      <figcaption>fig. 2 &mdash; two dialects, one seam. <cite>api.go</cite> (960 lines)
+      never imports <code>internal/cli</code>; both frontends meet at the shared
+      request union (<time datetime="2026-08-11">2026-08-11</time>, commit ef526f9).</figcaption>
+    </figure>
+
+    <dl class="dom-pkgs">
+      <dt>api.go</dt><dd>all exported types: settings wrappers, converters, typed requests, hooks, sentinels</dd>
+      <dt>api_test.go</dt><dd>round trips, deep-copy mutation isolation, cancellation, callbacks, PNG/JPEG decode</dd>
+      <dt>doc.go</dt><dd>quick start, dotted settings, ACL pair, in-memory source kind, thread-safety contract</dd>
+      <dt>internal/convert, settings, imageout, line, errs</dt><dd>the five internal dependencies the root package adapts</dd>
+    </dl>
+
+    <ul class="dom-syms">
+      <li><code>Converter</code> + <code>ImageConverter</code> &mdash; lifecycle: <code>New</code>, <code>AddObject</code>, <code>Convert(ctx)</code>, <code>Output()</code></li>
+      <li><code>GlobalSettings</code> / <code>ObjectSettings</code> &mdash; dotted <code>Set</code>/<code>Get</code> via the reflect key tables</li>
+      <li><code>PDFRequest</code> / <code>ImageRequest</code> + <code>RunPDF</code> / <code>RunImage</code> &mdash; typed one-shot; <code>Now func() time.Time</code> gives byte-stable output</li>
+      <li><code>ConvertHTML</code> &mdash; one-shot helper: clone global, <code>SetBody(html, base)</code>, convert, output</li>
+      <li><code>Version()</code> &mdash; banner <code>0.12.7-dev (gowkhtmltopdf pure-go)</code>, tracking <data value="0.12.7-dev">LibraryVersion 0.12.7-dev</data></li>
+      <li>Sentinels &mdash; <code>ErrNoPageObjectsAdded</code>, <code>ErrEmptyHTML</code>, <code>ErrNilContext</code>, matchable with <code>errors.Is</code></li>
+      <li><code>convertHooks</code> + <code>lineLog</code> &mdash; engine log lines classified by <code>line.SeverityOf</code> into <code>OnInfo</code>/<code>OnWarn</code>/<code>OnError</code></li>
+    </ul>
+
+    <table class="d02-table">
+      <thead><tr><th>Surface</th><th>Contract</th></tr></thead>
+      <tbody>
+        <tr><td><code>Converter</code></td><td>PDF, multi-object, <code>OnPhase</code>/<code>OnProgress</code> (final 100); no <code>Now</code> hook</td></tr>
+        <tr><td><code>ImageConverter</code></td><td>PNG/JPEG, single most-recent page, lazy zero-value init, no phase callbacks</td></tr>
+        <tr><td><code>RunPDF</code> / <code>RunImage</code></td><td>typed path &mdash; <code>Now</code> injectable for reproducible metadata</td></tr>
+      </tbody>
+    </table>
+
+    <aside class="dom-notes">
+      <strong>Security posture:</strong> local-file ACL is default-deny and needs the
+      same two-step opt-in as the CLI (<code>enablelocalfileaccess=true</code> +
+      <code>load.blocklocalfileaccess=false</code>); <code>SetBody</code>/<code>ConvertHTML</code>
+      bypass URL guessing so in-memory HTML cannot be coerced into SSRF; context
+      cancellation threads through every load. <abbr title="Known limitations">Limits</abbr>:
+      no <code>HttpErrorCode()</code> on <code>Converter</code> (CLI-only today), no TOC as a
+      first-class object, one image page only. Every boundary copies: <code>SetBody</code>,
+      <code>AddObject</code>, <code>Output</code>.
+    </aside>
+  </div>
+  <footer class="dom-foot">Same seam as the CLIs: <code>api.go &rarr; convertHooks &rarr; Request &rarr; render.Run</code> &mdash; deep-dive: <code>documentation/architecture/02-library-api.md</code></footer>
+</section>
+
+  <!-- ===== section 03 (author: subagent s03) ===== -->
+<!-- Section 03: Settings system & errors. Pure fragment for the architecture-diagram fixture.
+     Assigned modern tags: mark, meter, progress, output (+ abbr, kbd, samp, data, time, cite from the unused pool).
+     Lite-engine notes: mark/output/abbr/kbd/samp/time/data/cite are forced inline by section.d03 rules;
+     meter and progress are generic boxes here (no native widget painting) - styled as labelled chips. -->
+<section class="d03" id="domain-03">
+  <header class="dom-head">
+    <span class="dom-index">03</span>
+    <h2 class="dom-title">Settings system &amp; errors</h2>
+    <p class="dom-role">wkhtmltopdf-style settings model with reflection key tables; settings and errs are leaf packages.</p>
+  </header>
+
+  <div class="dom-body">
+    <p class="dom-lead">
+      <code>internal/settings</code> is the single source of truth for every user-facing knob —
+      page geometry, margins, headers/footers, TOC behaviour, load policy, image output — and the
+      only package that speaks the <abbr title="WebKit HTML-to-PDF converter">wkhtmltopdf</abbr>
+      dotted-name vocabulary (<code>margin.top</code>, <code>load.jsdelay</code>,
+      <code>web.background</code>). It sits <mark>upstream of everything</mark>: argv and library
+      calls funnel through <samp>Set("margin.top", "25mm")</samp>, and every engine package reads
+      the typed structs it default-initialises. Its companion leaf <code>internal/errs</code>
+      owns the shared sentinel errors across the library boundary.
+    </p>
+
+    <!-- figure/figcaption: semantic diagram block (reused from fixture corpus, still valid HTML5). -->
+    <figure class="d03-flow">
+      <figcaption>Dotted-key path — one knob, typed all the way down</figcaption>
+      <p class="d03-steps">
+        <kbd>--margin-top 25mm</kbd>
+        <span class="d03-arrow" aria-hidden="true">→</span>
+        <samp>Set("margin.top", "25mm")</samp>
+        <span class="d03-arrow" aria-hidden="true">→</span>
+        <code>Margin.Top = 25 mm</code>
+        <span class="d03-arrow" aria-hidden="true">→</span>
+        <span class="d03-result"><output>10&nbsp;mm → 28.346&nbsp;pt</output></span>
+      </p>
+      <p class="d03-caption">Booleans coerce liberally (<samp>"" / true / 1 / yes / on</samp>);
+      unknown keys fail loudly — a typo like <samp>margin.topx</samp> errors instead of degrading.</p>
+    </figure>
+
+    <div class="d03-policy">
+      <h3 class="d03-h">Policy A — <mark>settings honesty</mark></h3>
+      <p>Only options with an engine consumer get typed fields. Inert wkhtml keys
+      (<code>dpi</code>, <code>javascript</code>, <code>js-delay</code>, <code>produce-forms</code>,
+      <code>default-encoding</code>, …) sink into an <code>Ignored</code> map: <em>accepted</em> so
+      existing invocations do not hard-fail, <em>inert</em> so they are never silently promoted to
+      typed stubs. Origin: the 2026-08-06 ponytail review, phase 1.</p>
+
+      <!-- meter/progress: parsed as generic boxes by the lite engine; styled as labelled chips by section.d03 CSS. -->
+      <p class="d03-gauges">
+        <span class="d03-gauge">
+          <meter id="d03-meter" min="0" max="40" value="20">20+ inert keys</meter>
+          <output>accepted-inert wkhtml keys, round-trippable via Get</output>
+        </span>
+        <span class="d03-gauge">
+          <progress id="d03-progress" max="23" value="23">23 page sizes</progress>
+          <output>ISO/ANSI page sizes — A4 = 595.28 × 841.89 pt</output>
+        </span>
+      </p>
+    </div>
+
+    <dl class="dom-pkgs">
+      <dt><code>internal/settings/settings.go</code></dt>
+      <dd>Typed model: <code>PdfGlobal</code>, <code>PdfObject</code>, <code>ImageGlobal</code> plus
+      <code>Web</code>, <code>LoadGlobal</code>, <code>LoadPage</code>, <code>HeaderFooter</code>,
+      <code>TableOfContent</code> — wkhtmltopdf-compatible defaults (A4 portrait, 10 mm margins, depth-4 outline).</dd>
+      <dt><code>internal/settings/reflect.go</code></dt>
+      <dd>Descriptor engine: dotted <code>Set</code>/<code>Get</code>, type-coercing setters,
+      ignored-key tables — built once at init, zero per-call reflection cost.</dd>
+      <dt><code>internal/settings/unitreal.go · pagesize.go · httperror.go</code></dt>
+      <dd><code>UnitReal</code> (<code>10mm</code>, <code>1.5in</code>, <code>12pt</code>, <code>96px</code>, <code>100%</code>),
+      the 23-entry page-size table, and <code>HttpStatusError</code> (404→2, 401→3, else 1).</dd>
+      <dt><code>internal/errs/errs.go</code></dt>
+      <dd>Shared sentinels: <code>ErrNilContext</code>, <code>ErrNilLoader</code>, <code>ErrNilCommand</code>,
+      <code>ErrNilRequest</code> — re-exported by <code>api.go</code> and <code>internal/app</code>.</dd>
+    </dl>
+
+    <ul class="dom-syms">
+      <li><code>PdfGlobal / PdfObject / ImageGlobal</code> — the three settings payloads carried by
+      <code>cli.Command</code> and <code>convert.Request</code>.</li>
+      <li><code>Set / Get</code> — dotted-key surface; accepted inert keys round-trip, unknown keys error.</li>
+      <li><code>UnitReal</code> — unit-suffix scalar; <code>Points()</code> / <code>Mm()</code> conversion.</li>
+      <li><code>ParsePageSize</code> — case-insensitive ISO/ANSI names to points; empty string → A4.</li>
+      <li><code>HttpErrorCode</code> — 404→2, 401→3, else 1; consumed by <code>cli.ExitCode</code> via an interface check.</li>
+    </ul>
+
+    <aside class="dom-notes">
+      <h3 class="d03-h">Security &amp; limits</h3>
+      <p><mark>Local file access is denied by default</mark> (<code>BlockLocalFileAccess: true</code>);
+      <code>--allow</code> prefixes are the only ACL widening; proxies must be absolute
+      <code>http(s)</code> URLs. Inert-key acceptance is a compat surface, not an attack surface —
+      the engine never executes scripts or creates forms.</p>
+      <p>Known gaps: <code>default-encoding</code> is accepted-ignored; <code>size.pagesize</code>
+      dual-write is transitional; object-level <code>web.background</code> is inert; the typed
+      builder covers global PDF options only.</p>
+    </aside>
+  </div>
+
+  <footer class="dom-foot">
+    Position: upstream of every entry point — dotted Set/Get → UnitReal → page sizes → convert pageGeometry.
+    Source: <cite>documentation/architecture/03-settings.md</cite> (commit <data value="ef526f9">ef526f9</data>,
+    <time datetime="2026-08-11">2026-08-11</time>).
+  </footer>
+</section>
+
+  <!-- ===== section 04 (author: subagent s04) ===== -->
+<!--
+  Section 04 of the gowkhtmltopdf architecture diagram (fixture-56).
+  Domain: Load layer - URLs, I/O & ACL. Grounded in documentation/architecture/04-load.md.
+  New tags showcased: address, bdi, bdo, time, wbr.
+  Lite-engine notes:
+    - time/bdi/bdo/wbr/code render as generic boxes by default; forced inline in 04.css.
+    - bdo dir is parsed but the lite engine does not reorder text direction;
+      content stays ASCII-safe so it renders inline regardless.
+    - address renders as a block; styled as the trust-boundary owner strip.
+-->
+<section class="d04" id="domain-04">
+  <header class="dom-head">
+    <span class="dom-index">04</span>
+    <h2 class="dom-title">Load layer - URLs, I/O &amp; ACL</h2>
+    <p class="dom-role">Resource-fetching seam and trust boundary: URL guessing, local-file ACL, HTTP hardening, size caps.</p>
+  </header>
+  <div class="dom-body">
+    <p class="dom-lead">
+      <code>internal/load</code> owns the first pipeline stage and the two
+      resource seams the engine depends on: the <strong>primary load</strong>
+      (one <code>Loader.Load</code> per body object, cover, TOC, or
+      header/footer) and the <strong>subresource seam</strong>
+      (<code>ResourceContext.Fetch</code> for linked CSS, images and
+      <code>@font-face</code> URLs). It is the lowest internal package - only
+      <code>internal/settings</code> and the Go standard library sit beneath
+      it - and it carries the product security posture: default-deny local-file
+      ACL, connect/response timeouts, a 10-redirect cap, a 100&nbsp;MiB body
+      cap, and a strict UTF-8/ASCII charset gate.
+    </p>
+
+    <figure class="d04-flow" role="img" aria-label="primary load flow">
+      <div class="d04-flowbox">input string<small>path / URL / data: / inline</small></div>
+      <span class="d04-arrow" aria-hidden="true">→</span>
+      <div class="d04-flowbox"><code>GuessURL</code><small>Kind: HTTP | File | Inline</small></div>
+      <span class="d04-arrow" aria-hidden="true">→</span>
+      <div class="d04-flowbox"><code>Load</code><small>ACL + caps + charset gate</small></div>
+      <span class="d04-arrow" aria-hidden="true">→</span>
+      <div class="d04-flowbox"><code>Resource</code><small>Body / Base / Skip</small></div>
+      <span class="d04-arrow" aria-hidden="true">→</span>
+      <div class="d04-flowbox"><code>html.ParseDocument</code><small>bytes never interpreted here</small></div>
+      <figcaption class="d04-cap">Primary load flow: an input string crosses the trust boundary into raw bytes.</figcaption>
+    </figure>
+
+    <div class="d04-seams">
+      <div class="d04-seam">
+        <h3 class="d04-seam-t">Primary load</h3>
+        <p><code>Loader.Load(ctx, input, pageLoad)</code> resolves pages, covers,
+        TOCs and header/footer HTML like top-level documents. Budgets:
+        <time datetime="PT30S">30 s</time> connect,
+        <time datetime="PT60S">60 s</time> response default, 100&nbsp;MiB cap,
+        max 10 redirects, per-page <code>--timeout</code> override.</p>
+      </div>
+      <div class="d04-seam">
+        <h3 class="d04-seam-t">Subresource seam</h3>
+        <p><code>ResourceContext.Fetch(ref)</code> binds a document base plus the
+        per-page policy, so CSS, images and fonts inherit the same ACL and caps -
+        e.g. <code>internal/convert/<wbr>prepare/<wbr>styles.go</code> collects
+        linked stylesheets through this one narrow seam.</p>
+      </div>
+    </div>
+
+    <dl class="dom-pkgs">
+      <dt>internal/load/load.go</dt>
+      <dd>URL guessing, HTTP/file/data: fetching, cookie jar, proxy, auth, POST, ACL, caps, charset gate (1,322 lines)</dd>
+      <dt>internal/load/load_test.go</dt>
+      <dd>30 behavioural tests: ACL matrix, body caps, timeouts, redirects, subresources, concurrency</dd>
+      <dt>internal/load/doc.go</dt>
+      <dd>Package doc: "reimplements the MultiPageLoader orchestration layer"</dd>
+    </dl>
+
+    <ul class="dom-syms">
+      <li><code>Kind</code> - resolved input class: HTTP | File | Inline</li>
+      <li><code>Resource</code> - fetched document: URL, Base, Body, Skip</li>
+      <li><code>ResourceContext</code> - the one sanctioned subresource seam</li>
+      <li><code>AccessController</code> - default-deny ACL, symlink-resolved prefixes</li>
+      <li><code>NewLoaderWithError</code> - fail-fast constructor used at the request boundary</li>
+    </ul>
+
+    <table class="d04-matrix">
+      <caption>Local-file ACL decision matrix (THREAT-MODEL §3)</caption>
+      <thead>
+        <tr><th>Global enable</th><th>Object block</th><th>Read allowed</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>off</td><td>on (default)</td><td>no</td></tr>
+        <tr><td>off</td><td>off</td><td>no</td></tr>
+        <tr><td>on</td><td>on</td><td>no</td></tr>
+        <tr><td>on</td><td>off</td><td>yes</td></tr>
+      </tbody>
+    </table>
+
+    <p class="d04-urls">
+      URL shapes handled: <code>http://<bdi>host</bdi>/path</code>,
+      <code>file://localhost/<bdo dir="ltr">tmp</bdo>/report.html</code>
+      (remote file hosts refused), <code>data:</code> URIs, and bare input
+      defaulting to <code>http://&lt;input&gt;</code> - a direct port of
+      wkhtmltopdf's <code>guessUrlFromString</code>.
+    </p>
+
+    <address class="d04-owner">
+      Trust boundary owner: every input string crosses here into raw bytes;
+      nothing below <code>internal/load</code> touches the network or filesystem.
+    </address>
+
+    <aside class="dom-notes">
+      <p><strong>Security:</strong> default-deny ACL with <code>--allow</code>
+      prefix expansion; no JavaScript ever; oversized bodies are rejected, never
+      truncated; the TOCTOU window between ACL check and read is accepted
+      residual risk; HTTP egress to localhost/RFC1918 is intentionally
+      unrestricted (input-trust model). Full model:
+      <code>documentation/THREAT-MODEL.md</code>.</p>
+    </aside>
+  </div>
+  <footer class="dom-foot">First pipeline stage feeding <code>internal/html</code> + the <code>prepare</code> subresource seam · deep-dive: documentation/architecture/04-load.md</footer>
+</section>
+
+  <!-- ===== section 05 (author: subagent s05) ===== -->
+<!--
+  Fragment 05 of the architecture-diagram fixture (shell composed by orchestrator).
+  Section: HTML parser - tokenizer & tree. Grounded in documentation/architecture/05-html-parser.md.
+  New elements showcased: ruby/rt/rp, ins/del, mark, time, data, kbd, samp, var, wbr.
+  Lite-engine notes: unknown elements default to display:inline (initialStyle, internal/layout/style.go:193);
+  script/style/title/head/meta/link get UA display:none (uaDecls, style_values.go:986-1005), which is how
+  script content is "stripped at layout".
+-->
+<section class="d05" id="domain-05">
+  <header class="dom-head">
+    <span class="dom-index">05</span>
+    <h2 class="dom-title">HTML parser: tokenizer &amp; tree</h2>
+    <p class="dom-role">Generic tokenizer and tree builder: entities, tolerant parsing, script content stripped at layout.</p>
+  </header>
+  <div class="dom-body">
+    <p class="dom-lead"><mark>internal/html</mark> is the parse stage of the pipeline: a hand-rolled,
+    <dfn>stdlib-only</dfn> leaf that owns the <mark>only DOM in the repo</mark> — every downstream stage
+    walks its <var>Node</var> tree. Scanning is streaming: <code>scanTokens</code> emits tokens through a
+    sink callback while the tree is built incrementally in the same pass, so a whole-token slice is never
+    materialized.</p>
+
+    <figure class="d05-fig">
+      <figcaption>Token constructs the scanner recognizes</figcaption>
+      <ul class="d05-chips">
+        <li><kbd>text run</kbd></li>
+        <li><samp>&lt;!-- comment --&gt;</samp></li>
+        <li><samp>&lt;!doctype&gt;</samp></li>
+        <li><samp>&lt;?PI?&gt;</samp><span class="d05-note">skipped</span></li>
+        <li><samp>&lt;/end&gt;</samp></li>
+        <li><samp>&lt;start&gt;</samp></li>
+        <li><samp>&lt;raw&gt;</samp><span class="d05-note">verbatim</span></li>
+      </ul>
+    </figure>
+
+    <p class="d05-lead2">Raw-text elements — <kbd>script</kbd>, <kbd>style</kbd>, <kbd>textarea</kbd>,
+    <kbd>title</kbd> — are captured verbatim up to their real closing tag, then hidden by the UA sheet
+    (<code>display:none</code>, <code>style_values.go:986</code>): script content is stripped at
+    <em>layout</em>, not at parse. Entities decode once, at text-append and attribute application, via
+    <code>UnescapeEntities</code> over stdlib <code>html.UnescapeString</code>.</p>
+
+    <p class="d05-lead3">A ruby annotation parses as one inline run — base, <rp>parens</rp> and
+    <rt>reading</rt> are ordinary inline nodes (CJK ruby needs <code>--font-path</code> for glyphs):</p>
+    <p class="d05-ruby"><ruby>XML<rp>(</rp><rt>Extensible Markup Language</rt><rp>)</rp></ruby>
+    <time datetime="2026-08-11">2026-08-11</time> · <data value="832">html.go ≈ 832 lines</data> ·
+    <wbr>allowlisted<wbr>by<wbr>construction</p>
+
+    <p class="d05-lead4">Tolerance is a feature: <del cite="#domain-05">browser-grade recovery</del> is
+    deliberately out of scope, while <ins datetime="2026-08-11">malformed input degrades to a usable
+    tree</ins> — six sentinel errors, never a panic.</p>
+
+    <dl class="dom-pkgs">
+      <dt>internal/html/html.go</dt><dd>Tokenizer, tree builder, Node model, walkers, element vocabularies (≈832 lines)</dd>
+      <dt>internal/html/entities.go</dt><dd>UnescapeEntities — &amp;-gated stdlib entity decoding</dd>
+      <dt>internal/html/html_test.go</dt><dd>Same-package tests: tokenizer, tree, malformed-input table (≈901 lines)</dd>
+      <dt>Consumers</dt><dd>css.Match, layout style resolution, outline heading collection, convert HF/TOC/islands</dd>
+    </dl>
+
+    <ul class="dom-syms">
+      <li><code>Parse</code> / <code>ParseDocument</code> — string vs bytes (+BOM) entry points</li>
+      <li><code>Node.Walk</code> — pre-order traversal used by every consumer</li>
+      <li><code>scanTokens</code> — streaming scanner with sink callback</li>
+      <li><code>autoClose</code> — implicit-close vocabulary (li, p, tr, td, th…)</li>
+      <li><code>mergeRootElement</code> — html/head/body merge instead of nesting</li>
+      <li><code>uaDecls</code> — UA sheet hiding script/style/title/head/meta/link</li>
+    </ul>
+
+    <aside class="dom-notes">Security: no script execution by construction — event-handler attributes are
+    inert data; charset is enforced (UTF-8/ASCII only) at the load seam before parsing; hostile input
+    cannot panic.</aside>
+  </div>
+  <footer class="dom-foot">Position: load - <strong>html</strong> - (css matching, layout) · deep-dive:
+  documentation/architecture/05-html-parser.md</footer>
+</section>
+
+  <!-- ===== section 06 (author: subagent s06) ===== -->
+<!--
+  Fragment 06 of the architecture-diagram fixture (shell composed by orchestrator).
+  Section: CSS subsystem - parse, selectors, cascade. Grounded in documentation/architecture/06-css.md.
+  New elements showcased: details/summary, sub/sup, mark, kbd, samp, var, dfn, abbr, cite, time, data, ins, del.
+  Lite-engine notes: unknown elements default to display:inline (internal/layout/style.go:193), so inline
+  tags are forced inline and details/summary are forced block; a <details> has no JS toggle in print so its
+  content just flows (open attribute renders it open); :is()/:where() never match (css.go:123) and
+  interactive pseudos incl. :target never match in print (css.go:1410) - showcased as dead CSS below.
+-->
+<section class="d06" id="domain-06">
+  <header class="dom-head">
+    <span class="dom-index">06</span>
+    <h2 class="dom-title">CSS subsystem: parse, selectors &amp; cascade</h2>
+    <p class="dom-role">CSS subset: selectors, cascade, media and container queries; unknown rules degrade; :has and :target supported.</p>
+  </header>
+  <div class="dom-body">
+    <p class="dom-lead"><mark>internal/css</mark> is a pure parsing, matching and value library that sits
+    between the HTML tree and the layout engine. It owns the <dfn title="allowlist over completeness">CSS
+    subset</dfn> the converter accepts and reports matches and specificity to
+    <code>internal/layout</code>, which performs the cascade. It never fetches resources, never resolves
+    page size, and never decides layout — the contract is quoted in its package doc
+    (<cite>css.go:1–18</cite>).</p>
+
+    <ul class="d06-chips">
+      <li><kbd>parse-time</kbd></li>
+      <li><kbd>match-time</kbd></li>
+      <li><kbd>value helpers</kbd></li>
+      <li><kbd>never panics</kbd></li>
+    </ul>
+
+    <div class="d06-flow" role="img" aria-label="css sits between html and layout">
+      <span class="d06-flowstep">html</span>
+      <span class="d06-arrow" aria-hidden="true"></span>
+      <span class="d06-flowstep d06-here">css</span>
+      <span class="d06-arrow" aria-hidden="true"></span>
+      <span class="d06-flowstep">layout</span>
+      <span class="d06-arrow" aria-hidden="true"></span>
+      <span class="d06-flowstep">pdf / image</span>
+    </div>
+
+    <p class="d06-para">Supported surface: <var>type</var>, <var>.class</var>, <var>#id</var>, attribute
+    selectors, <code>:first-child</code>/<code>:last-child</code>/<code>:nth-child</code>,
+    <code>:has()</code>, <code>:not()</code>, descendant/child/sibling combinators, <code>@media</code>,
+    <code>@container</code>, <code>!important</code>, and inline <code>style=""</code>. Everything else
+    <mark>degrades without panicking</mark> — and unsupported selectors never silently degrade to the host
+    element (<code>writePseudoLiteral</code> keeps unknown pseudos on the compound, so
+    <code>li:target</code> can never paint every list item).</p>
+
+    <details class="d06-details" open>
+      <summary>Degrade rules — how the subset stays honest</summary>
+      <ul class="d06-list">
+        <li><kbd>garbage</kbd> is dropped: only unbalanced braces error, and <code>ParseNeverPanics</code> pins the no-panic property on adversarial input.</li>
+        <li><kbd>never-match</kbd> pseudos (<code>hover</code>, <code>active</code>, <code>focus</code>, <code>target</code>) stay on the compound and match <samp>false</samp> — a static PDF has no pointer state.</li>
+        <li><kbd>skip</kbd> at-rules: <code>@import</code>, <code>@supports</code>, <code>@layer</code>, <code>@keyframes</code>, nesting are silently skipped.</li>
+        <li><kbd>parse-early</kbd>: media preludes stay raw strings (the viewport is only known at conversion); <code>:nth-child</code> arguments compile to integer form so matching is pure arithmetic.</li>
+      </ul>
+    </details>
+
+    <details class="d06-details">
+      <summary>Known gaps — what degrades today</summary>
+      <ul class="d06-list">
+        <li><del cite="#domain-06">full Selectors 4</del> <ins datetime="2026-08">report subset</ins>: no <code>:is()</code>/<code>:where()</code>; <code>:first-line</code>/<code>:first-letter</code> rejected.</li>
+        <li><del cite="#domain-06">CSS Color 4</del> <ins datetime="2026-08">curated named-color table</ins>: <code>#rgb</code>, <code>#rrggbb</code>, <code>#rrggbbaa</code>, <code>rgb()/rgba()</code>, <code>transparent</code>.</li>
+        <li><del cite="#domain-06">viewport units</del> <ins datetime="2026-08">physical + font units</ins>: <code>px pt pc in cm mm em rem ex ch %</code>; <code>%</code> and <code>vw/vh</code> return <samp>false</samp> from <code>LengthToPt</code>.</li>
+        <li><del cite="#domain-06">style container queries</del> <ins datetime="2026-08">size-only</ins>: <code>@container</code> evaluates <code>width</code>/<code>inline-size</code> against a container's used size.</li>
+      </ul>
+    </details>
+
+    <div class="d06-wire">
+      <p class="d06-wirecap">Wire format — one declaration block</p>
+      <p class="d06-wirebody">
+        <var>--accent</var>: <code>#b4532a</code>; <span class="d06-comment">custom property</span><br>
+        <var>color</var>: <code>var(--accent, <samp>#b4532a</samp>)</code>; <span class="d06-comment">var() with fallback</span><br>
+        <var>font-size</var>: <code>1.1rem</code>; <kbd>!important</kbd> <span class="d06-comment">single global tier</span>
+      </p>
+    </div>
+
+    <p class="d06-para d06-unit">Unit math is tuned for IEEE float cancellation: <code>25.4mm</code> is
+    computed as <code>val × 72 ÷ 25.4</code> so it cancels cleanly to <code>72pt</code> instead of
+    <code>71.999…</code>; <code>px</code> maps at <code>0.75</code> (<code>96<sub>css px</sub>/in →
+    72<sub>pt</sub>/in</code>); the media em base is <code>12<sub>pt</sub></code>. Specificity is
+    Selectors-4: <code>:has()</code>/<code>:not()</code> contribute the max of their arguments — a triple
+    <code>(a, b, c)<sup>1</sup></code> with <var>a</var> = ids, <var>b</var> = classes/attrs/pseudos,
+    <var>c</var> = types.</p>
+    <p class="d06-fn"><sup>1</sup> Functional pseudos contribute the specificity of their most specific
+    argument, not a flat class-level count.</p>
+
+    <dl class="dom-pkgs">
+      <dt>internal/css/css.go</dt><dd>Sheet/rule/selector model, parser, at-rules, right-to-left matching, specificity (≈1784 lines)</dd>
+      <dt>internal/css/values.go</dt><dd>Inline style, <code>!important</code>, length/color/font parsing, custom-property resolution</dd>
+      <dt>internal/css/container.go</dt><dd><code>@container</code> prelude, boolean condition tree, <code>LengthToPt</code></dd>
+      <dt>internal/css/has.go · media.go</dt><dd><code>:has()</code>/<code>:not()</code> combinator walk; <code>@media</code> evaluation</dd>
+    </dl>
+
+    <ul class="dom-syms">
+      <li><code>css.Parse</code> — whole-sheet parse; only unbalanced braces error</li>
+      <li><code>css.Match / MatchPseudo</code> — selector vs node, right-to-left; <code>::before/::after</code> shapes</li>
+      <li><code>css.Specificity</code> — <code>(a,b,c)</code> triple; <code>:has()/:not()</code> max-of-arguments</li>
+      <li><code>css.MediaMatches</code> — raw <code>@media</code> prelude vs conversion viewport</li>
+      <li><code>css.ResolveCustomProps</code> — the single place custom-property policy lives</li>
+      <li><code>css.HasContainerRules</code> — fast gate; layout skips its second style pass when false</li>
+      <li><code>css.ParseSelectors</code> — strict list parse for <code>--exclude-from-outline</code></li>
+    </ul>
+
+    <aside class="dom-notes"><strong>Import rule:</strong> <code>internal/css → internal/html → stdlib
+    only</code>; css never imports layout, convert, pdf, load, or settings — viewport/media/container
+    context is always passed as arguments. <strong>Security:</strong> css executes no code and fetches
+    nothing; <code>url()</code> is honored only in <code>@font-face src</code> via the loader's ACL, and
+    stylesheet rule budgets are capped in preparation (soft warn <data value="25000">25 000</data>, hard
+    cap <data value="1000000">1 000 000</data>).</aside>
+  </div>
+  <footer class="dom-foot">Position: html - <strong>css</strong> - layout style resolution · measured
+  <time datetime="2026-08">2026-08</time> · deep-dive: documentation/architecture/06-css.md</footer>
+</section>
+
+  <!-- ===== section 07 (author: subagent s07) ===== -->
+<section class="d07" id="domain-07">
+  <header class="dom-head">
+    <span class="dom-index">07</span>
+    <h2 class="dom-title">Layout engine &amp; line breaking</h2>
+    <p class="dom-role">Style cascade plus all formatting contexts, line breaking, pagination, emitting the display list.</p>
+  </header>
+  <div class="dom-body">
+    <p class="dom-lead d07-lead">internal/layout is the largest domain in the repo: it runs the cascade and builds an absolute-positioned <dfn>display list</dfn> of drawing ops on a continuous y-down canvas. Layout also owns <mark>pagination</mark> - page-break policies, thead repetition, sticky clamps, and the op-split machinery. One engine feeds three painters: PDF, header/footer bands, and the PNG/JPEG rasterizer.</p>
+
+    <!-- picture: new element; the lite engine renders it as a plain block box, children styled with flex below -->
+    <figure class="d07-flow">
+      <picture class="d07-flowrow">
+        <span class="d07-step">load</span><span class="d07-arrow">→</span>
+        <span class="d07-step">parse</span><span class="d07-arrow">→</span>
+        <span class="d07-step">css</span><span class="d07-arrow">→</span>
+        <span class="d07-step d07-here">layout</span><span class="d07-arrow">→</span>
+        <span class="d07-step d07-here">paginate</span><span class="d07-arrow">→</span>
+        <span class="d07-step">paint</span><span class="d07-arrow">→</span>
+        <span class="d07-step">write</span>
+      </picture>
+      <figcaption>layout and paginate both live in internal/layout; the same ops feed pdf.Paint, PaintBand (HTML header/footer) and the imageout rasterizer.</figcaption>
+    </figure>
+
+    <!-- dialog: new element; no modal/backdrop behaviour in the lite engine - renders as a styled block card -->
+    <dialog open class="d07-op">
+      <h3 class="d07-ophead">One display-list <code>Op</code> <span class="d07-badge">op kinds</span></h3>
+      <p class="d07-opbody">Every op carries a stable <code>ID</code>. Kinds: <samp>OpFillRect</samp>, <samp>OpStrokeRect</samp>, <samp>OpLine</samp>, <samp>OpText</samp>, <samp>OpImage</samp>, <samp>OpLinkURI</samp>, <samp>OpBullet</samp>. Rects that split across a page boundary keep the source ID, so element-to-op ownership survives fragmentation.</p>
+      <p class="d07-opfoot">Final z-order is resolved once by <code>PaintOrder</code> and shared by all three backends.</p>
+    </dialog>
+
+    <!-- fieldset + legend: new elements; generic block rendering here, grid list inside -->
+    <fieldset class="d07-contexts">
+      <legend class="d07-contexts-legend">Formatting contexts <span class="d07-lite">(report-lite subset)</span></legend>
+      <ul class="d07-contextlist">
+        <li>block &amp; inline flow</li>
+        <li>tables: colspan, rowspan, thead repeat</li>
+        <li>flex lite (row / column)</li>
+        <li>grid lite + subgrid-inherit</li>
+        <li>multicol lite</li>
+        <li>float lite + clear</li>
+        <li>relative / absolute / fixed lite</li>
+        <li>print sticky, 2D transforms</li>
+      </ul>
+    </fieldset>
+
+    <!-- search: new element; generic block, no interactive behaviour in print -->
+    <search class="d07-search">
+      <p class="d07-searchlabel">Key entry points (<abbr title="internal/layout">layout</abbr>)</p>
+      <ul class="d07-searchlist">
+        <li><code>LayoutContext</code> / <code>WithWorkspace</code> - the layout passes</li>
+        <li><code>PaintContext</code> - paginate and paint into a <code>pdf.Document</code></li>
+        <li><code>PaintBandContext</code> - single clipped band for HTML header/footer</li>
+        <li><code>CloneResult</code> - deep copy for the TOC page-count fixpoint</li>
+      </ul>
+    </search>
+
+    <p class="d07-stats">Scale: <data value="33650">~33.6k</data> lines incl. tests, <data value="27">27</data> production files, <data value="62">62</data> test files, <data value="244">244</data> test functions.</p>
+
+    <dl class="dom-pkgs">
+      <dt>internal/layout</dt><dd>cascade, boxes, ops, pagination, paint; entry points LayoutContext / PaintContext</dd>
+      <dt>internal/line</dt><dd>naming note: log-line severity protocol (line.Emit), NOT text breaking - line breaking lives in layout inline.go / inline_collect.go</dd>
+      <dt>internal/svg</dt><dd>Rasterize is used for inline SVG images; layout stays one layer below convert and never imports convert/load/settings</dd>
+    </dl>
+
+    <ul class="dom-syms">
+      <li><code>Result</code> - Ops, Pages [][]int, Locations []ElementLocation</li>
+      <li><code>ResolvedStyle</code> - ~1.3 KB per style, interned per run via styleStore</li>
+      <li><code>ElementLocation</code> - feeds outline.Lookup and #frag link assembly</li>
+      <li><code>Options</code> - Images func(src) callback keeps the ACL-gated loader injected</li>
+      <li><code>Workspace.Release</code> - display-list storage reuse for the page-islands path</li>
+    </ul>
+
+    <aside class="dom-notes">
+      <p>Images arrive only through the injected Images callback (ACL-gated); layout never opens URLs and never runs JS. Work is bounded: the pagination fixpoint caps at 10 iterations, and SVG rasterizes at a 1024&nbsp;px cap. Lite limits: positioning, sticky, float, flex/grid/multicol are report subsets; overflow is not general clipping; no vertical writing modes; HTML header/footer bands clip rather than paginate.</p>
+    </aside>
+  </div>
+  <footer class="dom-foot">style - boxes - paginate - display list (consumed by pdf OR imageout) · deep-dive: <cite>documentation/architecture/07-layout.md</cite></footer>
+</section>
+
+  <!-- ===== section 08 (author: subagent s08) ===== -->
+<!--
+  domain-08 fragment: Convert pipeline (job orchestration).
+  Engine-render notes for the new tags below (lite engine, no browser):
+  - <mark>, <output>, <kbd> degrade to generic boxes -> forced inline in 08.css.
+  - <aside>, <figure>/<figcaption>, <progress> render as blocks; the progress
+    element is styled as a stat bar via width/height/background since the
+    engine has no native widget painting.
+  - CSS colour-mix()/clamp()/aspect-ratio/text-wrap lines are unsupported by
+    the lite engine and are written fallback-first (the engine keeps the
+    fallback declaration and drops the modern one).
+-->
+<section class="d08" id="domain-08">
+  <header class="dom-head">
+    <span class="dom-index">08</span>
+    <h2 class="dom-title">Convert pipeline — job orchestration</h2>
+    <p class="dom-role">Orchestration hub: the Request union, 3-stage render.Pipeline, headers/footers, TOC fixpoint, outline, page islands.</p>
+  </header>
+
+  <div class="dom-body">
+    <p class="dom-lead">internal/convert is the only package that coordinates a complete conversion. It owns the neutral <code>Request</code> union (convert.go:51), runs the per-object render loop, and drives every document-wide pass — TOC, outline, links, headers/footers, copies — before writing a single PDF. The lifecycle is delegated to a three-stage <code>render.Pipeline</code>, keeping PDF specifics out of the stage driver.</p>
+
+    <figure class="d0n-fig">
+      <div class="d0n-row">
+        <div class="d0n-stage">
+          <span class="d0n-stage-n" aria-hidden="true">1</span>
+          <output class="d0n-stage-name">RenderObjects</output>
+          <span class="d0n-stage-d">per object: prepare → layout → paint</span>
+        </div>
+        <span class="d0n-arrow" aria-hidden="true">→</span>
+        <div class="d0n-stage">
+          <span class="d0n-stage-n" aria-hidden="true">2</span>
+          <output class="d0n-stage-name">Assemble</output>
+          <span class="d0n-stage-d">TOC → outline → links → doc → copies → HF</span>
+        </div>
+        <span class="d0n-arrow" aria-hidden="true">→</span>
+        <div class="d0n-stage">
+          <span class="d0n-stage-n" aria-hidden="true">3</span>
+          <output class="d0n-stage-name">Finalize</output>
+          <span class="d0n-stage-d">doc.Write(output sink)</span>
+        </div>
+      </div>
+      <figcaption class="d0n-cap">Lifecycle adapter: render.Pipeline (render/pipeline.go) owns stage order and cancellation; pdfPipeline (pdf_pipeline.go) owns the PDF detail. Cancellation is checked at every object boundary and between stages.</figcaption>
+    </figure>
+
+    <h3 class="d0n-sub">Assemble, in order</h3>
+    <ol class="d0n-assemble">
+      <li><code>assembleTOC</code> — two-pass fixed point (<code>renderTOCObjects</code>, toc.go:221): <kbd>iteration 1</kbd> measures with tocGuess 0, <kbd>iteration 2</kbd> renumbers with the measured total and keeps the final layouts; pages reorder so the TOC comes first.</li>
+      <li><code>assembleOutline</code> — pure heading tree (<code>internal/outline</code>, no PDF types) → <code>emitOutline</code> → <code>pdf.Outline</code> with final page refs.</li>
+      <li><code>assembleLinks</code> — TOC forward/back links plus <code>#id</code> GoTo annotations (<code>applyInternalLinks</code>).</li>
+      <li><code>assembleDocument</code> — page plan, title, compression, grayscale, creation time.</li>
+      <li><code>assembleCopies</code> — collate / non-collate materialization via <code>render.Plan</code>.</li>
+      <li><code>assembleHeadersFooters</code> — final pass; needs <mark>[topage]</mark> and section/subsection, which only exist once the whole document is final.</li>
+    </ol>
+
+    <aside class="d0n-fact">
+      <p>Fact: headers/footers are painted once at the very end — after copies — because <code>[topage]</code> and section/subsection are only known when the whole document exists. Auto margins reserve the bands at layout time (<code>effectiveMargins</code>, hf.go:596); the draw pass clips ink into those same bands.</p>
+    </aside>
+
+    <dl class="dom-pkgs">
+      <dt>internal/convert</dt><dd>job model, per-object loop, document-wide passes</dd>
+      <dt>internal/convert/prepare</dt><dd>shared load → parse → sheets → fonts phase (same seam used by image mode)</dd>
+      <dt>internal/convert/render</dt><dd>Pipeline lifecycle driver + Plan page-index model</dd>
+      <dt>internal/outline</dt><dd>pure heading tree, dump XML, section lookup (no layout/PDF result types)</dd>
+    </dl>
+
+    <ul class="dom-syms">
+      <li><code>Request</code> — neutral pipeline input: Global, Image, Objects, Now, Output, OutlineOutput (convert.go:51)</li>
+      <li><code>render.Pipeline</code> — RenderObjects / Assemble / Finalize (render/pipeline.go:12)</li>
+      <li><code>runContext</code> — one conversion lifecycle: loader, fonts, single pdf.Document</li>
+      <li><code>objectState</code> — per-object geometry, HF, headings, navigation projection</li>
+      <li><code>pagePlan</code> — owner map + Remap after TOC reorder / copies (page_plan.go)</li>
+      <li><code>drawHeadersFootersResult</code> — final HF pass with real page numbers (hf.go:637)</li>
+    </ul>
+
+    <aside class="dom-notes">
+      <p><strong>Security:</strong> the loader (proxy/ACL boundary) is built at the top of <code>Run</code> before fonts or layout state; every subresource fetch inherits its ACL, timeouts and body caps. Header/footer values that look like HTML are treated as raw markup, never as URLs — blocking a local-path injection vector. Output sinks are caller-supplied writers; convert never opens paths. Budgets: <output>10 000</output> objects, <output>1 000</output> copies, <output>100 000</output> pages.</p>
+      <p><strong>Limits:</strong> <code>--xsl-style-sheet</code> is not implemented (built-in TOC template, warning + fallback); the TOC fixed point is bounded to two iterations; HTML headers/footers are single-band clamps.</p>
+    </aside>
+
+    <p class="d0n-progress-note">Progress is a (phase, percent) callback: <progress class="d0n-progress" value="100" max="100"></progress> <output>100</output> = progressComplete at Finalize; the CLI prints phase lines unless <code>--quiet</code>.</p>
+  </div>
+
+  <footer class="dom-foot">Position: Request → RenderObjects → Assemble → Finalize (drives every stage) · deep-dive: 08-convert-pipeline.md</footer>
+</section>
+
+  <!-- ===== section 09 (author: subagent s09) ===== -->
+<section class="d09" id="domain-09">
+  <header class="dom-head">
+    <span class="dom-index">09</span>
+    <h2 class="dom-title">PDF 1.4 writer</h2>
+    <p class="dom-role">PDF 1.4 sink: Flate streams, font subsetting, Type0/CID, xref, outlines, byte-stable output.</p>
+  </header>
+  <div class="dom-body">
+    <p class="dom-lead">internal/pdf is the lowermost writer layer: it turns the layout display list into a
+    viewer-openable PDF 1.4 file using only the Go standard library plus one allowlisted shaping module
+    (go-text/typesetting). It owns the document object model and serialization, the content-stream operator
+    language, the font pipeline (parse → subset → simple or Type0/CID embed), image embedding under hard caps,
+    and outline/annotation wiring. Image mode reuses its fonts, shaping and glyph outlines but rasterizes
+    instead of writing PDF bytes.</p>
+
+    <!-- pipeline tail: this section sits at the right edge of the PDF-mode branch -->
+    <div class="d09-tail" role="img" aria-label="pipeline tail in PDF mode">
+      <span class="d09-tail-step">display list</span><span class="d09-arrow">→</span>
+      <span class="d09-tail-step">paint</span><span class="d09-arrow">→</span>
+      <span class="d09-tail-step">content streams</span><span class="d09-arrow">→</span>
+      <span class="d09-tail-step">xref</span>
+    </div>
+
+    <!-- <figure>/<figcaption> already used by earlier fixtures; reused here for the font pipeline -->
+    <figure class="d09-figure">
+      <figcaption>Font pipeline: untrusted TTF / WOFF1 in, one subset per font per document out</figcaption>
+      <div class="d09-flow">
+        <div class="d09-flowbox">ParseTTF<small>sfnt magic, cmap 0/4/6/12</small></div><span class="d09-arrow">→</span>
+        <div class="d09-flowbox">subsetFont<small>hint strip, cmap4 rebuild, long loca</small></div><span class="d09-arrow">→</span>
+        <div class="d09-flowbox">simple / Type0<small>WinAnsi Latin-1 · Identity-H CID</small></div><span class="d09-arrow">→</span>
+        <div class="d09-flowbox">FontFile2<small>Flate + /Widths in 1000-em</small></div>
+      </div>
+    </figure>
+
+    <h3 class="d09-sub">Content-stream language</h3>
+    <!-- <kbd> (new): PDF operators are key-like tokens; forced inline below so the lite engine does not box them -->
+    <p>Every operator is emitted by the <code>Content</code> builder: graphics state <kbd>q</kbd>/<kbd>Q</kbd>,
+    paths <kbd>m</kbd>/<kbd>l</kbd>/<kbd>re</kbd>/<kbd>f</kbd>/<kbd>S</kbd>, transforms <kbd>cm</kbd>, and text
+    <kbd>BT</kbd>/<kbd>ET</kbd>/<kbd>Tf</kbd>/<kbd>Tj</kbd>, with fonts and images registered into per-page
+    /Resources at finalize. Text emits through TextShow: pure ASCII fast path, otherwise shape then split
+    mixed Latin / CJK runs.</p>
+
+    <h3 class="d09-sub">Serialization</h3>
+    <!-- <samp> (new): sample-output element fits an xref excerpt; white-space preserved by <pre> -->
+    <p>writeTo streams objects through a countingWriter so every xref offset is exact; all /FlateDecode
+    streams use RFC 1950 zlib (raw DEFLATE made pages render empty). A typical tail:</p>
+    <pre class="d09-samp"><samp>0000000000 65535 f
+0000000015 00000 n
+0000000091 00000 n
+trailer &lt;&lt; /Size 3 /Root 1 0 R &gt;&gt;</samp></pre>
+    <!-- <var> (new): the subset cache-key placeholders are variable-shaped tokens -->
+    <p>Subsets are keyed by <code>fontCache[<var>v{0|1}</var>|<var>{fingerprint}</var>|<var>{baseName}</var>|<var>{runes}</var>]</code>
+    so one deterministic subset per font per document is guaranteed, and hard caps bound untrusted input:
+    <!-- <data> (new): machine-readable values for the numeric caps -->
+    <data value="33554432">32 MiB</data> reconstructed WOFF, <data value="16384">16 384 px</data> image
+    dimension, <data value="16777216">16 Mpix</data> pixel budget.</p>
+
+    <dl class="dom-pkgs">
+      <dt>internal/pdf</dt><dd>Document model, operators, fonts, subsets, images, outlines (≈ 9.1k lines)</dd>
+      <dt>internal/pdf/assets</dt><dd>//go:embed Liberation + DejaVu faces; every accessor returns an isolated bytes.Clone</dd>
+      <dt>internal/convert</dt><dd>Caller: paints into Document, assembles TOC/outline/links/copies, then doc.Write</dd>
+      <dt>internal/imageout</dt><dd>Reuses fonts + shaping + glyph outlines; rasterizes instead of writing PDF bytes</dd>
+    </dl>
+
+    <ul class="dom-syms">
+      <li><code>Document</code> - object model; AddPage, ReorderPages, DuplicatePage, SetOutline, Write</li>
+      <li><code>Content.TextShow</code> - ASCII fast path, else shape + split mixed runs; records runes for the subsetter</li>
+      <li><code>ParseTTF</code> - sfnt validation; rejects CFF/OTTO and WOFF2 (Brotli not allowlisted)</li>
+      <li><code>ensureFont</code> - dispatch simple vs Type0; one subset per font per document (cache key above)</li>
+      <li><code>emitType0</code> - Identity-H CIDFontType2; CIDToGIDMap kept uncompressed for viewer safety</li>
+      <li><code>finalize</code> - ordered wiring: outlines before catalog, pages tree, then xref + trailer</li>
+    </ul>
+
+    <aside class="dom-notes">
+      <strong>Security:</strong> fonts are untrusted parse input — WOFF1 caps (tables ≤ 1024, per-table ≤ 16 MiB,
+      overlap rejection), bounds-checked tables, no remote https @font-face fetch, system fonts opt-in only.
+      <strong>Determinism:</strong> byte-identical output for identical input; CreationDate is injectable via
+      Request.now() and otherwise pins a fixed date.
+    </aside>
+  </div>
+  <footer class="dom-foot">display list → paint → content streams → xref (right edge, PDF mode) · deep-dive: documentation/architecture/09-pdf-writer.md</footer>
+</section>
+
+  <!-- ===== section 10 (author: subagent s10) ===== -->
+<!--
+  Section 10 of the architecture diagram fixture (fixture-56-architecture-diagram).
+  Domain: image output (PNG/JPEG) & SVG raster - the image-mode tail.
+  Grounded in documentation/architecture/10-imageout-svg.md.
+-->
+<section class="d10" id="domain-10">
+  <header class="dom-head">
+    <span class="dom-index">10</span>
+    <h2 class="dom-title">Image output &amp; SVG raster</h2>
+    <p class="dom-role">Image-mode tail: rasterize the shared display list to PNG/JPEG; bitmap fonts; SVG via tdewolff/canvas.</p>
+  </header>
+  <div class="dom-body">
+    <p class="dom-lead">Image mode shares the whole <em>load → parse → style → layout</em> front half with PDF mode, then diverges at the paint/write tail: <code>internal/imageout</code> paints the layout <dfn>display list</dfn> into an in-memory <code>image.NRGBA</code> canvas and encodes a single PNG or JPEG. <code>internal/svg</code> rasterizes <code>&lt;img src="*.svg"&gt;</code> into PNG bytes through the allowlisted <code>tdewolff/canvas</code> path — the project's only third-party raster call.</p>
+    <!-- <dfn> is unknown to the lite engine: forced inline via section.d10 dfn { display:inline; } -->
+
+    <figure class="d10-tail">
+      <div class="d10-strip" role="img" aria-label="image-mode tail: display list, supersampled raster, box-filter downscale, PNG/JPEG encode">
+        <span class="d10-pill">display list</span><span class="d10-arrow" aria-hidden="true">→</span>
+        <span class="d10-pill">rasterize 2× NRGBA</span><span class="d10-arrow" aria-hidden="true">→</span>
+        <span class="d10-pill">box-filter</span><span class="d10-arrow" aria-hidden="true">→</span>
+        <span class="d10-pill">encode PNG/JPEG</span>
+      </div>
+      <!-- <time> is unknown to the lite engine: forced inline via section.d10 time { display:inline; } -->
+      <figcaption>Shared upstream, divergent sink — the <time datetime="2026-08">Aug 2026</time> consolidation keeps text metrics, glyph forms and paint order on one table with PDF mode.</figcaption>
+    </figure>
+
+    <div class="d10-modes">
+      <!-- <output> is unknown to the lite engine: renders as a generic inline box forced by section.d10 output { display:inline; } -->
+      <div class="d10-mode d10-mode-pdf"><span class="d10-mode-tag">PDF mode</span><output class="d10-mode-out">internal/pdf — Flate streams, font subsetting, xref</output></div>
+      <div class="d10-mode d10-mode-img"><span class="d10-mode-tag">Image mode</span><output class="d10-mode-out">internal/imageout — 2× supersample, no hinting, single page</output></div>
+    </div>
+
+    <dl class="dom-pkgs">
+      <dt>internal/imageout</dt><dd>~3,000 lines: render options, supersampled rasterization, paint dispatch, decode/scale caches, PNG/JPEG encode</dd>
+      <dt>internal/svg</dt><dd>450 lines: <code>svg.Rasterize</code> via tdewolff/canvas only; viewBox/width/height sizing, panic containment</dd>
+      <dt>internal/convert/render</dt><dd>Shared <code>RenderObjects → Assemble → Finalize</code> lifecycle; <code>Assemble</code> is a no-op for image mode</dd>
+      <dt>internal/pdf</dt><dd>Consumed, not owned: <code>ShapeRun</code> text shaping, <code>GlyphContours</code>, <code>DefaultFont</code>, <code>ScanFontDirs</code></dd>
+    </dl>
+
+    <ul class="dom-syms">
+      <li><code>RenderContext(ctx, root, opts)</code> — the core library render: layout result → rasterize → crop</li>
+      <li><code>RunRequest(ctx, req, log)</code> — engine seam shared by the <code>gowkhtmltoimage</code> CLI and <code>ImageConverter</code></li>
+      <li><code>rasterizeContext</code> — paints <code>layout.Op</code> ops in <code>PaintOrder</code>, box-filters <code>rasterSS</code> supersample down</li>
+      <li><code>ttfDrawString</code> — TTF outline → bitmap glyphs (no FreeType, no hinting); fractional baseline, fake-bold pass</li>
+      <li><code>svg.Rasterize(data, maxSide)</code> — SVG → PNG bytes at intrinsic size; failure is a clean "no image"</li>
+    </ul>
+
+    <!-- <abbr>/<cite> are unknown to the lite engine: forced inline via section.d10 abbr/cite { display:inline; } -->
+    <p class="d10-gloss">Raster text uses <dfn>TTF outline AA</dfn> — <abbr title="anti-aliasing">AA</abbr> via <abbr title="supersampling factor">2× supersampling</abbr> with a box-filter downscale; <abbr title="no hinting — glyph edges rely on supersampled coverage">no hinting</abbr>. Fidelity claims are pinned in <cite>10-imageout-svg.md</cite> and <cite>fidelity.md</cite>; the shape was consolidated <time datetime="2026-08-11">2026-08-11</time>.</p>
+
+    <aside class="dom-notes">
+      <strong>Security &amp; limits</strong>
+      <ul>
+        <li>ACL merged (<code>Image.Load</code> ⊕ <code>Global.Load</code>); subresource fetches capped (64 fetches / 32 MiB)</li>
+        <li>Decode hardening: ≤32 MiB encoded, dims ≤16,384, ≤16M pixels; canvas ≤64M px / ≤256 MiB</li>
+        <li><code>--transparent</code> honored for PNG only; JPEG composites onto white with a warning</li>
+        <li>Malformed SVG → clean error, never a crash (<code>defer recover()</code> in <code>rasterizeCanvas</code>)</li>
+        <li>Single-page only: extra page objects and TOC are ignored with a warning</li>
+        <li>Nearest-neighbour <code>&lt;img&gt;</code> scaling (Go 1.26 removed <code>image/draw</code> scalers)</li>
+      </ul>
+    </aside>
+  </div>
+  <footer class="dom-foot">Position: display list → raster → PNG/JPEG (right edge, image mode) · deep-dive: documentation/architecture/10-imageout-svg.md</footer>
+</section>
+
+  </main>
+
+  <section class="dag" id="dependency-dag">
+    <h2 class="dag-title">Dependency DAG <small>a strict downward graph toward the trust boundary</small></h2>
+    <p class="dag-intro">Nothing points back up. <code>internal/cli</code> is a leaf; the engine never
+    parses argv. Library, image binary and PDF binary funnel into one neutral seam:
+    <code>convert.Request</code>. <code>internal/load</code> sits at the bottom as the trust boundary —
+    every subresource crosses the same two seams and inherits the same ACL, timeout and size caps.</p>
+
+    <div class="dag-stage" aria-label="entry points">
+      <span class="dag-box">cmd/gowkhtmltopdf</span>
+      <span class="dag-arrow" aria-hidden="true">&rarr;</span>
+      <span class="dag-box">internal/cli</span>
+      <span class="dag-arrow" aria-hidden="true">&rarr;</span>
+      <span class="dag-box dag-leaf">internal/settings</span>
+      <span class="dag-arrow" aria-hidden="true">&darr;</span>
+      <span class="dag-box">api.go (library)</span>
+      <span class="dag-arrow" aria-hidden="true">&darr;</span>
+      <span class="dag-box dag-hub">convert.Request</span>
+    </div>
+
+    <div class="dag-stage" aria-label="front half">
+      <span class="dag-box">internal/html</span>
+      <span class="dag-arrow" aria-hidden="true">&rarr;</span>
+      <span class="dag-box">internal/css</span>
+      <span class="dag-arrow" aria-hidden="true">&rarr;</span>
+      <span class="dag-box">internal/layout + internal/line</span>
+      <span class="dag-arrow" aria-hidden="true">&rarr;</span>
+      <span class="dag-box">internal/outline</span>
+    </div>
+
+    <div class="dag-stage" aria-label="sinks">
+      <span class="dag-box dag-sink">internal/pdf</span>
+      <span class="dag-arrow" aria-hidden="true">&harr;</span>
+      <span class="dag-box dag-sink">internal/imageout (+ internal/svg)</span>
+    </div>
+
+    <p class="dag-boundary">internal/load &mdash; <strong>trust boundary</strong>: ACL, timeouts, redirects, size caps baked into control flow</p>
+
+    <ul class="dag-rules">
+      <li><span class="dag-rule-n">1</span> The engine never parses argv &mdash; the parser only writes dotted settings.</li>
+      <li><span class="dag-rule-n">2</span> One neutral seam: <code>convert.Request</code> + <code>render.Pipeline</code> (RenderObjects &rarr; Assemble &rarr; Finalize).</li>
+      <li><span class="dag-rule-n">3</span> <code>cli.Command</code> <em>is</em> the settings payload; layout/pdf never import settings.</li>
+      <li><span class="dag-rule-n">4</span> Subresources cross <code>load.Loader.Load</code> / <code>load.ResourceContext.Fetch</code> only.</li>
+      <li><span class="dag-rule-n">5</span> Image mode is not a parallel engine &mdash; same front half, divergent paint tail.</li>
+    </ul>
+  </section>
+
+  <section class="divergence" id="divergence">
+    <h2 class="div-title">PDF vs image mode <small>same front half, different tail</small></h2>
+    <div class="div-grid">
+      <div class="div-card">
+        <h3 class="div-card-title">internal/pdf &mdash; PDF 1.4</h3>
+        <ul class="div-list">
+          <li>content streams + zlib <mark>Flate</mark>, xref/trailer</li>
+          <li>embedded <mark>Liberation Sans</mark> subsets, /Widths 1000-unit em</li>
+          <li>Type0/CID for CJK, WOFF handling</li>
+          <li>Catalog outlines, link annotations, metadata</li>
+          <li>byte-stable output when <code>Now</code> is injected</li>
+        </ul>
+      </div>
+      <div class="div-card div-card-alt">
+        <h3 class="div-card-title">internal/imageout &mdash; PNG/JPEG</h3>
+        <ul class="div-list">
+          <li>rasterize the shared display list &mdash; <mark>Assemble</mark> is a no-op</li>
+          <li>bitmap font rasterizer (2&times; supersample, no hinting)</li>
+          <li>single page; <code>--transparent</code> fill-alpha divergence</li>
+          <li>SVG-as-image via <code>tdewolff/canvas</code> (only third-party raster call)</li>
+          <li>reuses pdf shaping + outline data</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="security" id="security">
+    <h2 class="sec-title">Security architecture <small>default-deny, enforced at the seams</small></h2>
+    <ul class="sec-grid">
+      <li class="sec-card"><span class="sec-k">ACL</span>Local file access <strong>denied by default</strong>; opt-in via <code>--enable-local-file-access</code> / <code>--allow</code> prefixes, symlinks resolved.</li>
+      <li class="sec-card"><span class="sec-k">HTTP</span>30&thinsp;s connect / 60&thinsp;s response timeouts, max 10 redirects, 100&thinsp;MiB body cap on both sides.</li>
+      <li class="sec-card"><span class="sec-k">JS</span>No JavaScript, ever &mdash; script content stripped at the layout stage.</li>
+      <li class="sec-card"><span class="sec-k">Budgets</span>Rule and resource budgets enforced at the convert layer, not scattered in callers.</li>
+      <li class="sec-card"><span class="sec-k">HF</span>Header/footer raw-markup rejected at the convert layer.</li>
+    </ul>
+    <p class="sec-ref">Full model: <code>documentation/THREAT-MODEL.md</code> &middot; embedding guidance: <code>documentation/integration-security.md</code>.</p>
+  </section>
+
+  <footer class="colophon">
+    <p>Generated from <code>documentation/architecture/</code> &mdash; commit <code>ef526f9</code>
+    (<time datetime="2026-08-11">2026-08-11</time>). Ten domain sections authored by ten parallel
+    subagents; shell composed by the orchestrator. Pure HTML + CSS, no scripts.</p>
+    <p>MIT License &middot; Copyright &copy; 2026 Chinmay Sawant &middot; <a href="#top">back to top &uarr;</a></p>
+  </footer>
+
+</body>
+</html>

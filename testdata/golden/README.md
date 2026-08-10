@@ -24,6 +24,8 @@ testdata/golden/
   fixture-52-airline-boarding-pass.html    # one-page e-ticket + four boarding stubs
   fixture-53-asteria-observatory-poster.html # second poster variant
   fixture-55-lantern-cooperative-report.html # self-contained pure HTML/CSS operations brief
+  fixture-56-architecture-diagram.html      # 13-page architecture diagram, linked CSS
+  fixture-56-architecture-diagram.css       # linked stylesheet for fixture-56
   out/                  # generated PDFs (gitignored)
 ```
 
@@ -100,6 +102,7 @@ proves. Page envelopes are pinned in `internal/convert/golden_test.go`
 | 52 | Airline boarding pass: e-ticket itinerary, multi-column stubs, mono barcodes | 1 |
 | 53 | Asteria poster variant: shared theme with a different illustration and copy | 1 |
 | 55 | Self-contained operations brief: inline CSS, status cards, route table, action plan, and page breaks | 3 |
+| 56 | Architecture diagram: hero, pipeline strip, TOC, 10 domain sections (modern semantic tags: `dialog`, `details/summary`, `mark`, `meter`, `progress`, `output`, `time`, `data`, `kbd`, `samp`, `var`, `dfn`, `cite`, `ruby`, `rt`, `rp`, `bdi`, `bdo`, `wbr`, `ins`, `del`, `sub`, `sup`, `aside`, `address`, `fieldset`, `legend`, `picture`, `search`; modern CSS: `oklch()`/`color-mix()`/`clamp()`/logical properties with graceful-degrade fallbacks), linked `fixture-56-architecture-diagram.css`, dependency DAG, PDF-vs-image, security; derived from `documentation/architecture/` (commit ef526f9) | 13 |
 
 ## Pass criteria (MVP)
 

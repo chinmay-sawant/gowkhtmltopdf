@@ -411,6 +411,9 @@ var fixturePageBounds = map[string]fixtureBounds{ //nolint:gochecknoglobals // i
 	"fixture-55-lantern-cooperative-report.html": { //nolint:exhaustruct // intentional zero-value fields
 		minPages: 3, maxPages: 3,
 	},
+	"fixture-56-architecture-diagram.html": { //nolint:exhaustruct // intentional zero-value fields
+		minPages: 12, maxPages: 14,
+	},
 }
 
 // fixtureHeaderOK enforces the corpus hygiene rule: every fixture starts
