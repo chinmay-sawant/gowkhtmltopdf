@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<!--
+  fixture-49-night-train-poster
+  Proves: a print poster with a linked stylesheet, free generic fonts
+  (engine defaults), a full-width generated image, layered color, and a
+  controlled one-page composition. All poster copy remains live HTML text.
+  Expected: 1 page with at least one embedded image.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>The Night Line poster</title>
+  <link rel="stylesheet" href="theme-print-stories.css">
+</head>
+<body>
+  <div class="print-page poster poster-night">
+    <div class="poster-art">
+      <img src="assets/asteria-observatory-poster-print.png" alt="Coastal night scene for The Night Line poster study">
+    </div>
+    <div class="poster-copy">
+      <div class="small-caps">A quiet route through the blue hour</div>
+      <h1>The Night Line</h1>
+      <p>A print study in warm windows, long tracks, and the cities that keep a little light on after midnight.</p>
+      <div class="poster-meta">
+        <span>Edition 01</span>
+        <span>Coastal service</span>
+        <span>2026</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

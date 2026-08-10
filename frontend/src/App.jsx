@@ -1,4 +1,5 @@
-import { HashRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
+import { useEffect } from 'react'
+import { HashRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom'
 import SiteNav from './components/SiteNav'
 import Footer from './components/Footer'
 import ContentPage from './pages/ContentPage'
@@ -16,6 +17,14 @@ const DOC_REDIRECTS = [
   ['security', 'security'],
 ]
 
+function ScrollToTop() {
+  const { pathname } = useLocation()
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+  }, [pathname])
+  return null
+}
+
 function WrapLayout() {
   return (
     <div className="wrap">
@@ -30,6 +39,7 @@ function WrapLayout() {
 export default function App() {
   return (
     <HashRouter>
+      <ScrollToTop />
       <a className="skip-link" href="#main-content">Skip to content</a>
       <SiteNav />
       <Routes>

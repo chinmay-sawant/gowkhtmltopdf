@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<!--
+  fixture-50-letter-template
+  Proves: a stationery template with a local image mark, free generic fonts
+  (engine defaults), aligned sender details, readable body copy, a quote
+  treatment, and a signature block. The template stays useful as a reusable
+  business letter.
+  Expected: 1 page with at least one embedded image.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Asteria letter template</title>
+  <link rel="stylesheet" href="theme-print-stories.css">
+</head>
+<body>
+  <div class="print-page letter">
+    <header class="letter-header">
+      <table class="letter-header-table">
+        <tr>
+          <td class="letter-header-copy">
+            <h1>Northstar Studio</h1>
+            <p>Stories, routes, and careful things made for print</p>
+          </td>
+          <td class="letter-mark-cell">
+            <img class="letter-mark" src="assets/asteria-village-page.png" alt="Northstar Studio mark">
+          </td>
+        </tr>
+      </table>
+    </header>
+
+    <div class="letter-details">
+      <span>12 Lantern Street<br>Harbor Quarter</span>
+      <span>10 August 2026<br>hello@northstar.example</span>
+    </div>
+
+    <main class="letter-content">
+      <h2>A note about the next edition</h2>
+      <p>Dear Mira,</p>
+      <p>Thank you for making room for a slower kind of document. We have prepared the next edition with generous margins, clear hierarchy, and a small set of illustrations that can carry their meaning without competing with the page.</p>
+      <p class="letter-quote"><img class="letter-quote-rule" src="assets/letter-quote-rule.svg" alt="">The best printed pages give the reader somewhere to pause.</p>
+      <p>The enclosed materials include the poster proof, the ticket sheet, and a short story from Asteria. Each file is designed to remain legible when printed in a quiet office or shared across a table.</p>
+      <p>Please send any notes by Friday afternoon. We will make the final pass and prepare the press-ready bundle after that review.</p>
+      <div class="signature">
+        <p>With care,</p>
+        <strong>Ren Ito</strong>
+        <span>Editorial director</span>
+      </div>
+    </main>
+
+  </div>
+</body>
+</html>

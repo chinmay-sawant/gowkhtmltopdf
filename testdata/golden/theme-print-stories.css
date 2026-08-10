@@ -1,0 +1,479 @@
+/* Print-story theme for golden fixtures 49–53.
+ * Uses CSS generic font families only. The converter embeds its built-in
+ * free default faces (Liberation Sans family) for sans-serif text; serif
+ * and monospace fall through to the engine defaults. No third-party font
+ * files are bundled in testdata/golden/assets.
+ */
+
+:root {
+  --navy: #102b43;
+  --navy-deep: #0b1e30;
+  --teal: #2f7180;
+  --teal-soft: #dcecef;
+  --coral: #d9784d;
+  --gold: #e6af4f;
+  --paper: #fbf4e6;
+  --paper-deep: #eadcc3;
+  --ink: #24333b;
+  --muted: #607078;
+  --line: #c6b89f;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: sans-serif;
+  color: var(--ink);
+  background: var(--paper);
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  font-size: 10.5pt;
+  line-height: 1.45;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.1;
+}
+
+.print-page {
+  min-height: 277mm;
+  padding: 12mm 13mm;
+  position: relative;
+}
+
+.small-caps {
+  color: var(--teal);
+  font-size: 8pt;
+  font-weight: 700;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+}
+
+.rule {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 7mm 0;
+}
+
+.footer-line {
+  border-top: 1px solid var(--line);
+  bottom: 10mm;
+  color: var(--muted);
+  font-size: 8pt;
+  left: 13mm;
+  padding-top: 3mm;
+  position: absolute;
+  right: 13mm;
+}
+
+.poster {
+  background: var(--navy-deep);
+  color: var(--paper);
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.poster,
+.poster h1,
+.poster p {
+  font-family: serif;
+}
+
+.poster .small-caps,
+.poster-meta {
+  font-family: monospace;
+}
+
+.poster-sky,
+.poster-sky h1 {
+  font-family: sans-serif;
+}
+
+.poster-art {
+  height: auto;
+  overflow: hidden;
+  position: relative;
+}
+
+.poster-art img {
+  height: auto;
+  position: static;
+  width: 100%;
+}
+
+.poster-art::after {
+  background: rgba(11, 30, 48, .42);
+  bottom: 0;
+  content: "";
+  height: 36%;
+  left: 0;
+  position: absolute;
+  right: 0;
+  top: auto;
+}
+
+.poster-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding: 10mm 13mm 9mm;
+}
+
+.poster-copy .small-caps {
+  color: var(--gold);
+}
+
+.poster-copy h1 {
+  font-size: 32pt;
+  letter-spacing: -.8px;
+  margin: 3mm 0 2mm;
+  max-width: 120mm;
+}
+
+.poster-copy p {
+  color: #d8e3e2;
+  font-size: 11pt;
+  margin-bottom: 0;
+  max-width: 112mm;
+}
+
+.poster-meta {
+  border-top: 1px solid rgba(230, 175, 79, .65);
+  color: #b7c8ca;
+  display: flex;
+  font-size: 8pt;
+  justify-content: space-between;
+  letter-spacing: .8px;
+  margin-top: auto;
+  padding-top: 3mm;
+  text-transform: uppercase;
+}
+
+.letter {
+  background: #fffdf8;
+  display: flex;
+  flex-direction: column;
+  min-height: 277mm;
+  padding: 14mm 16mm;
+  position: relative;
+}
+
+.letter-header {
+  border-bottom: 2px solid #102b43;
+  display: block;
+  margin-bottom: 8mm;
+  min-height: 32mm;
+  padding-bottom: 7mm;
+}
+
+.letter-header-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.letter-header-table td {
+  padding: 0;
+  vertical-align: middle;
+}
+
+.letter-header-copy {
+  width: 70%;
+}
+
+.letter-mark-cell {
+  text-align: right;
+  width: 30%;
+}
+
+.letter-mark {
+  height: 28mm;
+  margin-left: auto;
+  object-fit: cover;
+  width: 28mm;
+}
+
+.letter-header h1 {
+  color: var(--navy);
+  font-size: 20pt;
+  font-family: sans-serif;
+  margin: 0 0 1mm;
+}
+
+.letter-header p {
+  color: var(--muted);
+  font-size: 9pt;
+  font-family: sans-serif;
+  margin: 0;
+}
+
+.letter-details {
+  color: var(--muted);
+  display: flex;
+  font-size: 9pt;
+  justify-content: space-between;
+  margin: 0 0 13mm;
+}
+
+.letter-content {
+  max-width: 144mm;
+}
+
+.letter-content h2 {
+  color: var(--navy);
+  font-size: 14pt;
+  font-family: serif;
+  margin-bottom: 7mm;
+}
+
+.letter-content p {
+  margin-bottom: 6mm;
+}
+
+.letter-quote {
+  color: var(--navy);
+  display: block;
+  font-size: 13pt;
+  font-style: italic;
+  margin: 9mm 0;
+}
+
+.letter-quote-rule {
+  display: inline-block;
+  height: 6mm;
+  margin-right: 5mm;
+  vertical-align: middle;
+  width: 3px;
+}
+
+.signature {
+  margin-top: 14mm;
+}
+
+.signature strong {
+  color: var(--navy);
+  display: block;
+  margin-top: 2mm;
+}
+
+.storybook {
+  background: var(--paper);
+  color: #453a35;
+  font-family: serif;
+}
+
+.storybook .small-caps,
+.story-number,
+.story-colophon {
+  font-family: sans-serif;
+}
+
+.story-page {
+  page-break-before: always;
+}
+
+.story-cover {
+  background: var(--navy-deep);
+  color: var(--paper);
+  padding: 0;
+}
+
+.story-cover-art {
+  height: auto;
+  overflow: hidden;
+  position: relative;
+}
+
+.story-cover-art img {
+  height: auto;
+  position: static;
+  width: 100%;
+}
+
+.story-cover-copy {
+  padding: 8mm 14mm 10mm;
+}
+
+.story-cover-copy h1 {
+  color: #f3c66b;
+  font-size: 28pt;
+  font-family: serif;
+  letter-spacing: -.5px;
+  margin: 2mm 0;
+}
+
+.story-cover-copy p {
+  color: #dce6e4;
+  font-size: 11pt;
+  margin: 0;
+}
+
+.story-page {
+  height: 240mm;
+  min-height: 0;
+  padding: 12mm 14mm 17mm;
+}
+
+.story-illustration {
+  height: auto;
+  margin: 5mm 0 8mm;
+  overflow: hidden;
+  position: relative;
+  width: 160mm;
+}
+
+.story-illustration img {
+  height: auto;
+  position: static;
+  width: 160mm;
+}
+
+.story-page h2 {
+  color: var(--navy);
+  font-size: 18pt;
+  font-family: serif;
+  margin: 0 0 4mm;
+}
+
+.story-page p {
+  font-size: 10.5pt;
+  margin-bottom: 4mm;
+}
+
+.story-number {
+  color: var(--coral);
+  font-size: 8pt;
+  font-weight: 700;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+}
+
+.story-colophon {
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 8.5pt;
+  margin-top: 10mm;
+  padding-top: 4mm;
+}
+
+.ticket-sheet {
+  background: #e7dec9;
+  font-family: sans-serif;
+  min-height: 0;
+  padding: 11mm 10mm;
+}
+
+.ticket-intro {
+  align-items: end;
+  border-bottom: 2px solid var(--navy);
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8mm;
+  padding-bottom: 5mm;
+}
+
+.ticket-intro h1 {
+  color: var(--navy);
+  font-family: sans-serif;
+  font-size: 21pt;
+  margin: 2mm 0 0;
+  white-space: nowrap;
+}
+
+.ticket-intro p {
+  color: var(--muted);
+  font-size: 8.5pt;
+  margin: 0;
+  text-align: right;
+}
+
+.ticket {
+  align-items: stretch;
+  background: #fffaf0;
+  border: 1px solid #c2ae8b;
+  display: flex;
+  height: 44mm;
+  margin-bottom: 3mm;
+  overflow: hidden;
+  page-break-inside: avoid;
+  width: 100%;
+}
+
+.ticket-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 6mm 7mm;
+}
+
+.ticket-copy h2 {
+  color: var(--navy);
+  font-family: sans-serif;
+  font-size: 16pt;
+  margin: 2mm 0 5mm;
+}
+
+.ticket-copy p {
+  color: var(--muted);
+  font-size: 8.5pt;
+  margin: 0 0 2mm;
+}
+
+.ticket-code {
+  color: var(--coral);
+  font-family: monospace;
+  font-size: 8pt;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  margin-top: 6mm;
+  text-transform: uppercase;
+}
+
+.ticket-art-frame {
+  border-left: 1px dashed #c2ae8b;
+  flex: 0 0 57mm;
+  height: 44mm;
+  overflow: hidden;
+  width: 57mm;
+}
+
+.ticket-art {
+  display: block;
+  height: 44mm;
+  object-fit: cover;
+  transform: scale(1.12);
+  transform-origin: center center;
+  width: 57mm;
+}
+
+.ticket-perforation {
+  border-left: 1px dashed #c2ae8b;
+  flex: 0 0 1px;
+  height: 44mm;
+  width: 1px;
+}
+
+.ticket-foot {
+  color: var(--muted);
+  font-size: 8pt;
+  margin-top: 5mm;
+  text-align: center;
+}
