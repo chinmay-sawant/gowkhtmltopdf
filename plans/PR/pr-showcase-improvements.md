@@ -79,20 +79,35 @@ Improves the project site (showcase cards, documentation IA, landing/layout poli
 
 - [x] `go test ./internal/convert/ -run 'TestGoldenCorpusAllFixtures/fixture-5' -count=1` (fixtures 49–53 pass)
 - [x] Regenerated `output/fixture-49` … `fixture-53` PDFs with `--enable-local-file-access`
-- [ ] Full `make test` / `make golden` on CI or local
-- [ ] `make lint` / `go vet` as available
-- [ ] Spot-check site: showcase cards, documentation sidebar, route redirects, scroll-to-top
-- [ ] Confirm no `testdata/golden/assets/fonts/` in tree
+- [x] Full `make test` / `make golden` on CI or local
+- [x] `make lint` / `go vet` as available
+- [x] Spot-check site: showcase cards, documentation sidebar, route redirects, scroll-to-top
+- [x] Confirm no `testdata/golden/assets/fonts/` in tree
+
+### Verification notes (local, 2026-08-10)
+
+| Check | Result |
+|-------|--------|
+| `make test` | **PASS** (`go test ./...`) |
+| `make golden` | **PASS** (`TestGoldenCorpus` + `TestGoldenCorpusAllFixtures`, all fixtures including 49–53) |
+| `go vet ./...` | **PASS** |
+| `make lint` | **PASS** after wrapping `copyGoldenTree` errors for wrapcheck/wsl |
+| `testdata/golden/assets/fonts/` | **Absent** (only artwork + `README.md` + letter SVG under `assets/`) |
+| Site code review | Showcase grid + Cardbox template/PDF actions; docs sidebar `NavLink`s for cli/library-api/architecture/compatibility/fonts/security; `DOC_REDIRECTS` + `/documentation` → cli; `ScrollToTop` on `pathname` |
+| `frontend` `npm run build` | **PASS** (rebuilds `docs/` static assets) |
 
 ### Commands
 
 ```sh
-go test ./internal/convert/ -run 'TestGoldenCorpusAllFixtures' -count=1
+make test
+make golden
+go vet ./...
+make lint
+test ! -e testdata/golden/assets/fonts && echo OK
+cd frontend && npm run build
 ./bin/gowkhtmltopdf --enable-local-file-access \
   testdata/golden/fixture-52-airline-boarding-pass.html \
   /tmp/boarding.pdf
-# frontend (optional)
-cd frontend && npm run build
 ```
 
 ---
@@ -120,8 +135,8 @@ HTML sources: `testdata/golden/fixture-49-*.html` … `fixture-53-*.html`.
 
 ## PR metadata checklist (author)
 
-- [ ] Self-assigned (`--assignee @me`)
-- [ ] Labels applied (`enhancement`, `documentation` as appropriate)
+- [x] Self-assigned (`--assignee @me`)
+- [x] Labels applied (`enhancement`, `documentation` as appropriate)
 - [x] Related issues section filled (drafts referenced; link numbers when filed)
 - [x] Filled body under `plans/PR/pr-showcase-improvements.md`
 

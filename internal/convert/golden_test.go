@@ -2,6 +2,7 @@ package convert //nolint:testpackage // white-box tests need unexported access
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -142,28 +143,32 @@ func commandForFixture(t *testing.T, file string) *cli.Command {
 func copyGoldenTree(src, dst string) error {
 	entries, err := os.ReadDir(src)
 	if err != nil {
-		return err
+		return fmt.Errorf("read golden dir %s: %w", src, err)
 	}
 
 	for _, entry := range entries {
 		sourcePath := filepath.Join(src, entry.Name())
 		destinationPath := filepath.Join(dst, entry.Name())
+
 		if entry.IsDir() {
 			if err := os.MkdirAll(destinationPath, 0o700); err != nil {
-				return err
+				return fmt.Errorf("mkdir %s: %w", destinationPath, err)
 			}
+
 			if err := copyGoldenTree(sourcePath, destinationPath); err != nil {
 				return err
 			}
+
 			continue
 		}
 
 		content, err := os.ReadFile(sourcePath)
 		if err != nil {
-			return err
+			return fmt.Errorf("read %s: %w", sourcePath, err)
 		}
+
 		if err := os.WriteFile(destinationPath, content, 0o600); err != nil {
-			return err
+			return fmt.Errorf("write %s: %w", destinationPath, err)
 		}
 	}
 
