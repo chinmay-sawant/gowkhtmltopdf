@@ -197,6 +197,13 @@ func validatePaintPageIndices(ops []Op, contentH float64) error {
 // pageBuckets maps every op to its canvas page in one pass, with per-page
 // non-fixed op counts for exact-capacity buckets. Fixed ops leave pageOf at
 // its zero value; callers decide whether their fill pass includes them.
+//
+// The Y+layoutEpsilon bump matches appendOpFragments: a rect fragment ends
+// exactly at the next page top (Y = k*contentH), and float division of that
+// exact product can round just below k (e.g. (21*785.197)/785.197 =
+// 20.9999…). Without the bump the fragment is bucketed to the previous page,
+// which then paints two background bands while the intended page paints
+// none. The epsilon keeps a boundary-aligned op on the page it starts.
 func pageBuckets(ops []Op, contentH float64) ([]int, []int) {
 	// Page numbers are dense from 0..maxP, so counts index directly instead
 	// of a per-page map (page buckets below are exact-capacity, no growth).
@@ -207,7 +214,7 @@ func pageBuckets(ops []Op, contentH float64) ([]int, []int) {
 			continue
 		}
 
-		pageVal, ok := checkedFlowPageOfY(ops[idx].Y, contentH)
+		pageVal, ok := checkedFlowPageOfY(ops[idx].Y+layoutEpsilon, contentH)
 		if !ok {
 			return nil, nil
 		}
@@ -225,7 +232,7 @@ func pageBuckets(ops []Op, contentH float64) ([]int, []int) {
 			continue
 		}
 
-		pageVal, ok := checkedFlowPageOfY(ops[idx].Y, contentH)
+		pageVal, ok := checkedFlowPageOfY(ops[idx].Y+layoutEpsilon, contentH)
 		if !ok {
 			return nil, nil
 		}
