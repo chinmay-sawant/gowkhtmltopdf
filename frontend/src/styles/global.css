@@ -325,6 +325,96 @@ html[data-theme='dark'] .page-btn.active {
   }
 }
 
+.docs-page {
+  width: 100%;
+  padding: 0 32px 120px;
+}
+
+.docs-layout {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: 48px;
+  align-items: start;
+  padding-top: 40px;
+}
+
+.docs-sidebar {
+  position: sticky;
+  top: 88px;
+}
+
+.docs-sidebar-head {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0 10px 12px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 10px;
+}
+
+.docs-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.docs-link {
+  font-family: var(--sans);
+  font-size: 14px;
+  color: var(--muted);
+  text-decoration: none;
+  padding: 7px 10px;
+  border-radius: 6px;
+  transition: color 0.2s, background 0.2s;
+}
+
+.docs-link:hover {
+  color: var(--ink);
+  background: var(--soft);
+}
+
+.docs-link.active {
+  color: var(--ink);
+  background: var(--soft);
+  font-weight: 600;
+}
+
+.docs-main {
+  min-width: 0;
+}
+
+.docs-main .prose,
+.docs-main .callout {
+  max-width: 90%;
+}
+
+@media (max-width: 900px) {
+  .docs-layout {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .docs-sidebar {
+    position: static;
+  }
+  .docs-sidebar-head {
+    display: none;
+  }
+  .docs-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .docs-link {
+    border: 1px solid var(--line);
+    background: var(--surface);
+  }
+  .docs-link.active {
+    border-color: var(--sep);
+  }
+}
+
 .issues {
   display: grid;
   gap: 14px;

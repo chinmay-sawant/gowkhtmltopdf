@@ -5,12 +5,7 @@ import GitHubStars from './GitHubStars'
 const LINKS = [
   { to: '/', label: 'Overview' },
   { to: '/getting-started', label: 'Getting Started' },
-  { to: '/cli', label: 'CLI' },
-  { to: '/library-api', label: 'Library API' },
-  { to: '/architecture', label: 'Architecture' },
-  { to: '/compatibility', label: 'Compatibility' },
-  { to: '/fonts', label: 'Fonts' },
-  { to: '/security', label: 'Security' },
+  { to: '/documentation', label: 'Documentation' },
   { to: '/dossier', label: 'Issue Dossier' },
   { to: '/showcase', label: 'Showcase' },
   { to: '/about', label: 'About' },

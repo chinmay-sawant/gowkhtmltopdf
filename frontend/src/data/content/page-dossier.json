@@ -5,7 +5,7 @@
   {
    "type": "hero",
    "title": "All 1,329 open wkhtmltopdf issues, classified",
-   "lede": "Every open issue in the wkhtmltopdf/wkhtmltopdf repository, mapped against what gowkhtmltopdf can do. All 1,329 issues carry a verdict with evidence: 450 implemented, 278 partial, 601 not implemented."
+   "lede": "Every open issue in the wkhtmltopdf/wkhtmltopdf repository, mapped against what gowkhtmltopdf can do. All 1,329 issues carry a verdict with evidence: 451 implemented, 285 partial, 593 not implemented."
   },
   {
    "type": "callout",
@@ -19,7 +19,7 @@
    "sections": [
     {
      "heading": "A full scrape, fully classified",
-     "body": "The dossier starts from all 1,329 open issues scraped from the upstream wkhtmltopdf issue tracker, including title, body, labels, and dates. Every issue was read and classified against the gowkhtmltopdf codebase; there are no unassessed rows left. The first 100 were analyzed in depth with a full summary and category; the remaining 1,229 received a verdict plus evidence, with their raw metadata retained."
+     "body": "The dossier starts from all 1,329 open issues scraped from the upstream wkhtmltopdf issue tracker, including title, body, labels, and dates. Every issue was read and classified against the gowkhtmltopdf codebase; there are no unassessed rows left. The first 100 were analyzed in depth with a full summary and category; the remaining 1,229 received a verdict plus evidence, with their raw metadata retained. The 601 rows originally marked not implemented were re-validated by subagents against the codebase; 8 moved: 1 to implemented (rowspan) and 7 to partial (CJK/Type0 glyph coverage, IPA registry fallback, nested-table pagination, textarea text)."
     },
     {
      "heading": "Every verdict cites evidence",
@@ -40,17 +40,17 @@
      "label": "open wkhtmltopdf issues tracked"
     },
     {
-     "value": "450",
+     "value": "451",
      "percent": "34%",
      "label": "implemented"
     },
     {
-     "value": "278",
+     "value": "285",
      "percent": "21%",
      "label": "partial"
     },
     {
-     "value": "601",
+     "value": "593",
      "percent": "45%",
      "label": "not implemented"
     }
