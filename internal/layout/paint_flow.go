@@ -781,6 +781,8 @@ func afterBreaks(res *Result, contentH float64) bool {
 }
 
 // nextFlowSibling returns the first box after i that emitted ops.
+//
+//nolint:varnamelen,wsl // sibling scan uses conventional index names
 func nextFlowSibling(boxes []*box, i int) *box {
 	if i < 0 || i >= len(boxes) {
 		return nil

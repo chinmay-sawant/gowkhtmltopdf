@@ -689,6 +689,8 @@ func (d *Document) finalizePage(page *Page, pagesRef objRef) error {
 
 // buildPageResources assembles the /Resources dict from the content's fonts
 // and images.
+//
+//nolint:wsl // resource dictionary assembly is a linear PDF serialization block
 func buildPageResources(content *Content) (string, error) {
 	fonts, err := content.fonts()
 	if err != nil {

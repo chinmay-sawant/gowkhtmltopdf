@@ -445,7 +445,7 @@ type faceRun struct {
 // splitTextByFace splits s into contiguous runs that share the same face
 // under CSS font-family fallback.
 //
-//nolint:cyclop,funlen // hot path: per-rune face-fallback run splitting
+//nolint:cyclop,funlen,wsl // hot path: per-rune face-fallback run splitting
 func (e *engine) splitTextByFace(cssSheet string, sty ResolvedStyle) []faceRun {
 	if cssSheet == "" {
 		return nil
@@ -515,6 +515,7 @@ func (e *engine) splitTextByFace(cssSheet string, sty ResolvedStyle) []faceRun {
 	return runs
 }
 
+//nolint:wsl // hot path keeps the primary-face fast path compact
 func (e *engine) primaryFaceRun(cssSheet string, sty ResolvedStyle) (faceRun, bool) {
 	if cssSheet == "" {
 		return faceRun{}, false //nolint:exhaustruct // intentional zero fields

@@ -136,6 +136,7 @@ func TestFlexRowLayout(t *testing.T) {
 	}
 }
 
+//nolint:lll,varnamelen,wsl // fixture-oriented flex test uses compact HTML
 func TestFlexIntrinsicWidthIncludesNestedBlockContent(t *testing.T) {
 	t.Parallel()
 
@@ -210,6 +211,7 @@ body { margin:0 }
 	t.Fatal("absolute child background was not painted")
 }
 
+//nolint:wsl // fixture-oriented paint test keeps setup and assertions together
 func TestBorderRadiusReachesRoundedPaintOps(t *testing.T) {
 	t.Parallel()
 
@@ -614,6 +616,7 @@ func TestFlexContentMinSizeDefiniteRow(t *testing.T) {
 	}
 }
 
+//nolint:lll,wsl // fixture-oriented flex test uses compact HTML and setup blocks
 func TestFlexAutoMinUsesMinContentForWrappingText(t *testing.T) {
 	t.Parallel()
 
@@ -649,6 +652,7 @@ h3 { color:#173f45; font-size:10pt; letter-spacing:.05em; text-transform:upperca
 	}
 }
 
+//nolint:lll,wsl,varnamelen // fixture-oriented masthead test uses compact HTML
 func TestMastheadKeepsBrandAndMetadataOnTheirIntendedLines(t *testing.T) {
 	t.Parallel()
 

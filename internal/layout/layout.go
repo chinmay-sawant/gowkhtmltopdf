@@ -586,6 +586,8 @@ func (e *engine) registryFamilyWithGlyph(style ResolvedStyle, runeValue rune) *p
 
 // facesWithGlyph resolves the default faces and returns the first that has a
 // glyph for runeValue.
+//
+//nolint:cyclop,lll // ordered fallback search is intentionally explicit
 func (e *engine) facesWithGlyph(style ResolvedStyle, runeValue rune) *pdf.Font {
 	if e.faces == nil {
 		return nil
@@ -1333,6 +1335,8 @@ func (e *engine) buildOutOfFlow(node *html.Node, sty ResolvedStyle, availW, x, y
 // resolveAbsY places the out-of-flow box vertically: top wins, then bottom
 // (fixed resolves against the viewport bottom; absolute uses the containing
 // block's bottom when its deferred height is known).
+//
+//nolint:wsl // ordered absolute-positioning cases mirror CSS precedence
 func (e *engine) resolveAbsY(sty ResolvedStyle, boxNode *box, cbY float64, viewportFixed bool, cbH float64) float64 {
 	if !sty.TopAuto {
 		return cbY + e.scalePt(sty.Top)

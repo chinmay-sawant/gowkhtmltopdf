@@ -797,6 +797,7 @@ func canvasToPDF(opX, opY float64, pageIdx int, contentH float64, opts PaintOpti
 	return x, y
 }
 
+//nolint:varnamelen,wsl // PDF path helpers use compact graphics-state names
 func drawFill(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintOptions, pageH float64) {
 	x, y := canvasToPDF(op.X, op.Y+op.H, pageIdx, contentH, opts, pageH)
 	ps := StyleOf(op)
@@ -809,6 +810,7 @@ func drawFill(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintO
 	c.Fill()
 }
 
+//nolint:varnamelen,wsl // PDF path helpers use compact graphics-state names
 func drawStroke(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintOptions, pageH float64) {
 	x, y := canvasToPDF(op.X, op.Y+op.H, pageIdx, contentH, opts, pageH)
 	c.SetStrokeColor(op.R, op.G, op.B)
@@ -825,6 +827,7 @@ func drawStroke(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts Pain
 	c.Stroke()
 }
 
+//nolint:varnamelen,mnd // PDF path helper mirrors the standard Bezier approximation
 func roundedRectPath(c *pdf.Content, x, y, width, height, radius float64) {
 	const kappa = 0.5522847498
 

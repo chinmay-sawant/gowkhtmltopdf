@@ -202,7 +202,7 @@ func parsePageRule(src string, str *Stylesheet) (string, error) {
 
 	page := str.Page
 	if page == nil {
-		page = &PageStyle{}
+		page = &PageStyle{} //nolint:exhaustruct // zero values represent omitted @page properties
 		str.Page = page
 	}
 

@@ -37,6 +37,8 @@ var (
 
 // LoadDefaultFaces returns the embedded Liberation families and Unicode
 // fallback faces. The result is cached.
+//
+//nolint:cyclop,lll,funlen // face loading is an explicit fail-fast initialization sequence
 func LoadDefaultFaces() (*FaceSet, error) {
 	defaultFacesOnce.Do(func() {
 		faces := &FaceSet{} //nolint:exhaustruct // intentional zero-value fields
@@ -166,6 +168,7 @@ func (fs *FaceSet) ResolveFamily(families []string, weight int, italic bool) *Fo
 	return nil
 }
 
+//nolint:cyclop // fallback precedence is intentionally explicit
 func resolveFamilyFaces(regular, boldFace, italicFace, boldItalic *Font, weight int, italic bool) *Font {
 	if regular == nil && boldFace == nil && italicFace == nil && boldItalic == nil {
 		return nil

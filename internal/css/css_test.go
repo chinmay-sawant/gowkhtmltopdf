@@ -146,6 +146,7 @@ func TestParseAtRulesSkipped(t *testing.T) {
 	}
 }
 
+//nolint:varnamelen // short local mirrors the stylesheet vocabulary
 func TestParsePageStyle(t *testing.T) {
 	t.Parallel()
 

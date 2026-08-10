@@ -352,6 +352,8 @@ func (e *engine) flexItemBaseWidth(node *html.Node, style ResolvedStyle, mainSiz
 // block formatting contexts, which is correct for table-cell line collection
 // but makes a wrapper such as a section header measure only its eyebrow and
 // collapse the heading into a narrow column.
+//
+//nolint:cyclop,wsl // intrinsic flex measurement keeps the CSS cases together
 func (e *engine) measureFlexItemMaxContent(node *html.Node, style ResolvedStyle) float64 {
 	_, maxW := e.measureCellMinMax(node, style)
 	chrome := e.scalePt(style.PaddingLeft) + e.scalePt(style.PaddingRight) +
@@ -586,6 +588,7 @@ func (e *engine) cutFlexWidths(items []flexMeas, widths []float64, mainSize, ste
 	}
 }
 
+//nolint:wsl // flex placement keeps its measured state updates together
 func (e *engine) placeFlexLineMeasured(
 	parent *box, style ResolvedStyle, items []flexMeas,
 	contentW, contentX, topY, curY, gap, lineCross float64,

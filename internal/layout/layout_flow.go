@@ -119,6 +119,8 @@ func onlyCollapsibleWS(nodes []*html.Node) bool {
 // Returns the advanced content height (cy end − cy start contribution is
 // encoded as the final cy relative to start; callers pass starting cy).
 // Float enclosure (extentCy) is the caller's job when it owns a BFC.
+//
+//nolint:cyclop,wsl,varnamelen,funlen // document-order flow keeps its state machine explicit
 func (e *engine) flowChildren(
 	parent *box, children []*html.Node, sty ResolvedStyle,
 	contentW, contentX, posY, curY float64,

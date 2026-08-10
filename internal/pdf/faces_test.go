@@ -6,6 +6,7 @@ import (
 	"testing"
 )
 
+//nolint:cyclop // validates every bundled family in one table-free assertion
 func TestLoadDefaultFaces(t *testing.T) {
 	t.Parallel()
 

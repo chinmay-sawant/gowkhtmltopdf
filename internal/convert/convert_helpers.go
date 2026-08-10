@@ -17,6 +17,8 @@ import (
 // viewport after stylesheets have been loaded. CSS page margins describe the
 // printable page box, so they must be resolved before body layout rather than
 // cascaded as ordinary element padding.
+//
+//nolint:cyclop,wsl,varnamelen,mnd // compact CSS shorthand expansion
 func applyCSSPageMargins(geom hfGeom, sheets []*css.Stylesheet) hfGeom {
 	var raw string
 

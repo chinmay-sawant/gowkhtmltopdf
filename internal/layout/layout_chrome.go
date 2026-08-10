@@ -147,6 +147,8 @@ func chromeMustSpliceImmediately(st ResolvedStyle) bool {
 // Common path defers the splice until finalizeChrome (one linear merge).
 // Sticky/fixed/transform keep an immediate splice so mid-build StickyID/Fixed
 // stamps and transform exclusive ranges stay correct without re-derivation.
+//
+//nolint:cyclop,wsl // paint ordering and border geometry stay together
 func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, posX, posY, width, height float64) {
 	if e.noEmit {
 		return
@@ -200,6 +202,7 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 	}
 }
 
+//nolint:wsl,mnd // border radius rules are direct CSS geometry
 func usedBorderRadius(sty ResolvedStyle, width, height float64) float64 {
 	radius := sty.BorderRadius
 	if sty.BorderRadiusPercent >= 0 {
@@ -221,8 +224,10 @@ func usedBorderRadius(sty ResolvedStyle, width, height float64) float64 {
 	return radius
 }
 
+//nolint:goconst // border style is a direct CSS keyword comparison
 func uniformRoundedBorder(sty ResolvedStyle) bool {
 	top := sty.BorderTop
+
 	return top.Width > 0 && top.Style == "solid" &&
 		top == sty.BorderRight && top == sty.BorderBottom && top == sty.BorderLeft
 }
