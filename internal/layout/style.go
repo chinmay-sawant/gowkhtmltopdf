@@ -149,6 +149,7 @@ type ResolvedStyle struct {
 	FontItalic    bool
 	LineHeight    float64 // pts; 0 = "normal"
 	TextAlign     string  // floatLeft | floatRight | "center" | "justify"
+	TextTransform string  // "none" | "uppercase" | "lowercase" | "capitalize"
 	VerticalAlign string  // "baseline" | "top" | "middle" | cssVerticalAlignBottom
 	WhiteSpace    string  // "normal" | "nowrap" | "pre"
 	// OverflowWrap is CSS overflow-wrap / word-wrap: "normal" | "break-word" | "anywhere".
@@ -187,7 +188,7 @@ type border struct {
 }
 
 // initialStyle returns the CSS initial values.
-func initialStyle() ResolvedStyle {
+func initialStyle() ResolvedStyle { //nolint:funlen // complete CSS initial-value record
 	return ResolvedStyle{ //nolint:exhaustruct // intentional zero fields
 		Display:          "inline",
 		Position:         "static",
@@ -234,6 +235,7 @@ func initialStyle() ResolvedStyle {
 		famHash:         hashFontFamily(nil),
 		FontSize:        defaultFontSizePt, // 16px at 96dpi
 		FontWeight:      fontWeightNormal,
+		TextTransform:   textTransformNone,
 		VerticalAlign:   "baseline",
 		WhiteSpace:      "normal",
 		OverflowWrap:    "normal",
@@ -531,7 +533,7 @@ type comparableResolvedStyle struct {
 	FontWeight                                                                   int
 	FontItalic                                                                   bool
 	LineHeight                                                                   float64
-	TextAlign, VerticalAlign, WhiteSpace, OverflowWrap, WordBreak                string
+	TextAlign, TextTransform, VerticalAlign, WhiteSpace, OverflowWrap, WordBreak string
 	TextDecoration                                                               string
 	LetterSpacing, TextIndent                                                    float64
 	ListStyleType, BorderCollapse                                                string
@@ -575,8 +577,9 @@ func comparableResolvedStyleFor(style ResolvedStyle) comparableResolvedStyle {
 		BorderRadius: style.BorderRadius, BorderRadiusPercent: style.BorderRadiusPercent,
 		Color: style.Color, BGColor: style.BGColor,
 		famHash: style.famHash, FontSize: style.FontSize, FontWeight: style.FontWeight, FontItalic: style.FontItalic,
-		LineHeight: style.LineHeight, TextAlign: style.TextAlign, VerticalAlign: style.VerticalAlign,
-		WhiteSpace: style.WhiteSpace, OverflowWrap: style.OverflowWrap, WordBreak: style.WordBreak,
+		LineHeight: style.LineHeight, TextAlign: style.TextAlign, TextTransform: style.TextTransform,
+		VerticalAlign: style.VerticalAlign,
+		WhiteSpace:    style.WhiteSpace, OverflowWrap: style.OverflowWrap, WordBreak: style.WordBreak,
 		TextDecoration: style.TextDecoration, LetterSpacing: style.LetterSpacing, TextIndent: style.TextIndent,
 		ListStyleType: style.ListStyleType, BorderCollapse: style.BorderCollapse, BorderSpacing: style.BorderSpacing,
 		TableLayout: style.TableLayout, IsReplaced: style.IsReplaced, PageBreakBefore: style.PageBreakBefore,

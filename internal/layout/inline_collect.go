@@ -362,6 +362,44 @@ func (e *engine) textItem(text string, st *ResolvedStyle) inlineItem {
 	}
 }
 
+func transformInlineText(text, transform string) string {
+	switch transform {
+	case textTransformUppercase:
+		return strings.ToUpper(text)
+	case textTransformLowercase:
+		return strings.ToLower(text)
+	case textTransformCapitalize:
+		return capitalizeInlineText(text)
+	default:
+		return text
+	}
+}
+
+//nolint:wsl,varnamelen // small Unicode word-start transform helper
+func capitalizeInlineText(text string) string {
+	var out strings.Builder
+	out.Grow(len(text))
+	upperNext := true
+
+	for _, r := range text {
+		if unicode.IsLetter(r) {
+			if upperNext {
+				out.WriteString(strings.ToUpper(string(r)))
+			} else {
+				out.WriteRune(r)
+			}
+			upperNext = false
+
+			continue
+		}
+
+		out.WriteRune(r)
+		upperNext = unicode.IsSpace(r)
+	}
+
+	return out.String()
+}
+
 // squeezeInlineSpaces drops artificial space items that sit immediately before
 // attaching punctuation (pretty-printed "</a>\n," → "Award ,") or that are
 // redundant after a trailing space already on the previous item. Survivors
@@ -608,6 +646,7 @@ func sameInlineStyle(acc, boxN *ResolvedStyle) bool {
 	return acc.FontSize == boxN.FontSize &&
 		acc.FontWeight == boxN.FontWeight &&
 		acc.FontItalic == boxN.FontItalic &&
+		acc.TextTransform == boxN.TextTransform &&
 		acc.LetterSpacing == boxN.LetterSpacing &&
 		acc.Color == boxN.Color &&
 		acc.TextDecoration == boxN.TextDecoration &&

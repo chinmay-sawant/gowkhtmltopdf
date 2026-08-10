@@ -164,21 +164,40 @@ func (e *engine) emitInlineText(
 	return leftX
 }
 
+//nolint:wsl,mnd // transform width and alignment are one geometry decision
 func (e *engine) emitInlineTextRun(
 	item *inlineItem,
 	run faceRun,
 	leftX, baseline, size, ascent, descent float64,
 ) {
 	child := item.style.Color
+	text := transformInlineText(run.text, item.style.TextTransform)
+	textWidth := run.w
+	if text != run.text {
+		textWidth = e.measureTextFace(text, *item.style)
+	}
+
+	textX := leftX
+	textDelta := textWidth - run.w
+	switch item.style.TextAlign {
+	case floatRight:
+		textX -= textDelta
+	case fxCenter:
+		textX -= textDelta / 2
+	}
+
 	e.add(Op{ //nolint:exhaustruct // intentional zero fields
-		Kind: OpText, X: leftX, Y: baseline, W: run.w, H: item.h,
-		Text: run.text, Font: run.face, Size: size, Bold: item.style.FontWeight >= fontWeightBold,
-		R: child[0], G: child[1], B: child[2],
+		Kind: OpText, X: textX, Y: baseline, W: textWidth, H: item.h,
+		Text: run.text, Font: run.face, Size: size,
+		LetterSpacing: item.style.LetterSpacing * e.scale,
+		TextTransform: item.style.TextTransform,
+		Bold:          item.style.FontWeight >= fontWeightBold,
+		R:             child[0], G: child[1], B: child[2],
 	})
 
 	if item.href != "" {
 		e.add(Op{ //nolint:exhaustruct // intentional zero fields
-			Kind: OpLinkURI, X: leftX, Y: baseline - ascent, W: run.w,
+			Kind: OpLinkURI, X: textX, Y: baseline - ascent, W: textWidth,
 			H: ascent + descent, URI: item.href,
 		})
 	}

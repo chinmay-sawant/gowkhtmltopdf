@@ -311,6 +311,11 @@ func (c *Content) TextLeading(leading float64) {
 	c.writePDFNums(" TL\n", 1, leading, 0, 0, 0, 0, 0)
 }
 
+// SetCharSpacing sets the character spacing for the active text object.
+func (c *Content) SetCharSpacing(spacing float64) {
+	c.writePDFNums(" Tc\n", 1, spacing, 0, 0, 0, 0, 0)
+}
+
 // TextNextLine moves to the next line (TL).
 func (c *Content) TextNextLine() { c.buf.WriteString("T*\n") }
 

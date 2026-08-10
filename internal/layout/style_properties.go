@@ -933,6 +933,8 @@ func applyTextLayoutProps(style *ResolvedStyle, prop, value string) bool {
 		style.LineHeight = lineHeight(value, style.FontSize)
 	case "text-align":
 		setTextAlignValue(style, value)
+	case "text-transform":
+		setTextTransformValue(style, value)
 	case "vertical-align":
 		setVerticalAlignValue(style, value)
 	case "white-space":
@@ -942,6 +944,13 @@ func applyTextLayoutProps(style *ResolvedStyle, prop, value string) bool {
 	}
 
 	return true
+}
+
+func setTextTransformValue(style *ResolvedStyle, value string) {
+	switch value {
+	case textTransformNone, textTransformUppercase, textTransformLowercase, textTransformCapitalize:
+		style.TextTransform = value
+	}
 }
 
 func setTextAlignValue(style *ResolvedStyle, value string) {

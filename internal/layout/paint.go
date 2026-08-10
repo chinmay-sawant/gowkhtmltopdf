@@ -707,13 +707,14 @@ func bandText(chld *pdf.Content, opts BandOptions, paintOp *Op, posX float64, fo
 	chld.SetFont(fontName, paintOp.Size)
 	chld.BeginText()
 	chld.TextAt(posX, posY)
+	chld.SetCharSpacing(paintOp.LetterSpacing)
 
 	if FakeBoldFor(paintOp) {
 		chld.SetLineWidth(paintOp.Size * outlineStrokeRatio)
 		chld.TextRenderMode(two)
 	}
 
-	chld.TextShow(paintOp.Text)
+	chld.TextShow(transformInlineText(paintOp.Text, paintOp.TextTransform))
 
 	if FakeBoldFor(paintOp) {
 		chld.TextRenderMode(0)
@@ -886,6 +887,8 @@ func drawText(
 	} else {
 		chld.TextAt(posX, posY)
 	}
+
+	chld.SetCharSpacing(paintOp.LetterSpacing)
 	// Fake bold only for Latin when CSS wants bold but the face is not bold.
 	// Stroking CJK/Type0 outlines creates horizontal streak artifacts.
 	fakeBold := FakeBoldFor(paintOp)
@@ -894,7 +897,7 @@ func drawText(
 		chld.TextRenderMode(two) // fill + stroke
 	}
 
-	chld.TextShow(paintOp.Text)
+	chld.TextShow(transformInlineText(paintOp.Text, paintOp.TextTransform))
 
 	if fakeBold {
 		chld.TextRenderMode(0)

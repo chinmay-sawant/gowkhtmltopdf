@@ -131,6 +131,7 @@ var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inheri
 	{[]string{"font-style"}, func(dst, src *ResolvedStyle) { dst.FontItalic = src.FontItalic }},
 	{[]string{"line-height"}, func(dst, src *ResolvedStyle) { dst.LineHeight = src.LineHeight }},
 	{[]string{"text-align"}, func(dst, src *ResolvedStyle) { dst.TextAlign = src.TextAlign }},
+	{[]string{"text-transform"}, func(dst, src *ResolvedStyle) { dst.TextTransform = src.TextTransform }},
 	{[]string{"white-space"}, func(dst, src *ResolvedStyle) { dst.WhiteSpace = src.WhiteSpace }},
 	// overflow-wrap / word-wrap and word-break are inherited (CSS Text).
 	{

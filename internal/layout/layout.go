@@ -26,32 +26,36 @@ import (
 // CSS keyword constants shared by the layout engine. Kept here so repeated
 // string literals resolve through one named value (goconst).
 const (
-	positionAbsolute      = "absolute"
-	positionFixed         = "fixed"
-	positionRelative      = "relative"
-	positionSticky        = "sticky"
-	displayBlock          = "block"
-	displayFlex           = "flex"
-	displayGrid           = "grid"
-	displayInlineFlex     = "inline-flex"
-	displayInlineGrid     = "inline-grid"
-	displaySubgrid        = "subgrid"
-	displayFlowRoot       = "flow-root"
-	displayTable          = "table"
-	displayTableCell      = "table-cell"
-	displayTableCaption   = "table-caption"
-	displayTableRow       = "table-row"
-	displayRowGroup       = "table-row-group"
-	displayHeaderGroup    = "table-header-group"
-	displayFooterGroup    = "table-footer-group"
-	displayListItem       = "list-item"
-	listStyleDisc         = "disc"
-	bulletDisc            = "\u2022"
-	borderCollapseValue   = "collapse"
-	overflowWrapAnywhere  = "anywhere"
-	overflowWrapBreakWord = "break-word"
-	borderStyleDashed     = "dashed"
-	borderStyleDotted     = "dotted"
+	positionAbsolute        = "absolute"
+	positionFixed           = "fixed"
+	positionRelative        = "relative"
+	positionSticky          = "sticky"
+	displayBlock            = "block"
+	displayFlex             = "flex"
+	displayGrid             = "grid"
+	displayInlineFlex       = "inline-flex"
+	displayInlineGrid       = "inline-grid"
+	displaySubgrid          = "subgrid"
+	displayFlowRoot         = "flow-root"
+	displayTable            = "table"
+	displayTableCell        = "table-cell"
+	displayTableCaption     = "table-caption"
+	displayTableRow         = "table-row"
+	displayRowGroup         = "table-row-group"
+	displayHeaderGroup      = "table-header-group"
+	displayFooterGroup      = "table-footer-group"
+	displayListItem         = "list-item"
+	listStyleDisc           = "disc"
+	bulletDisc              = "\u2022"
+	borderCollapseValue     = "collapse"
+	overflowWrapAnywhere    = "anywhere"
+	overflowWrapBreakWord   = "break-word"
+	borderStyleDashed       = "dashed"
+	borderStyleDotted       = "dotted"
+	textTransformNone       = "none"
+	textTransformUppercase  = "uppercase"
+	textTransformLowercase  = "lowercase"
+	textTransformCapitalize = "capitalize"
 )
 
 // Options controls a Layout run.
@@ -281,7 +285,11 @@ type Op struct {
 	Text string
 	Font *pdf.Font
 	Size float64
-	Bold bool
+	// LetterSpacing is the CSS letter-spacing value in points for text paint.
+	LetterSpacing float64
+	// TextTransform is applied when the text operation is painted.
+	TextTransform string
+	Bold          bool
 
 	URI string
 
