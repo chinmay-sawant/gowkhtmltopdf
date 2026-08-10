@@ -153,14 +153,23 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 	}
 
 	var chrome []Op
+	radius := usedBorderRadius(sty, width, height)
 	if sty.BGColor[3] > 0 && e.opts.Background {
 		chrome = append(chrome, Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpFillRect, X: posX, Y: posY, W: width, H: height,
-			R: sty.BGColor[0], G: sty.BGColor[1], B: sty.BGColor[2], Alpha: sty.BGColor[3],
+			R: sty.BGColor[0], G: sty.BGColor[1], B: sty.BGColor[2], Alpha: sty.BGColor[3], Radius: radius,
 		})
 	}
 
-	chrome = append(chrome, e.borderOps(sty, posX, posY, width, height)...)
+	if radius > 0 && uniformRoundedBorder(sty) {
+		border := sty.BorderTop
+		chrome = append(chrome, Op{ //nolint:exhaustruct // intentional zero fields
+			Kind: OpStrokeRect, X: posX, Y: posY, W: width, H: height,
+			R: border.Color[0], G: border.Color[1], B: border.Color[2], Width: e.scalePt(border.Width), Radius: radius,
+		})
+	} else {
+		chrome = append(chrome, e.borderOps(sty, posX, posY, width, height)...)
+	}
 	if len(chrome) == 0 {
 		return
 	}
@@ -189,6 +198,33 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 			e.deferredChrome[i].at += n
 		}
 	}
+}
+
+func usedBorderRadius(sty ResolvedStyle, width, height float64) float64 {
+	radius := sty.BorderRadius
+	if sty.BorderRadiusPercent >= 0 {
+		short := width
+		if height < short {
+			short = height
+		}
+		radius = short * sty.BorderRadiusPercent / 100
+	}
+
+	if radius < 0 {
+		return 0
+	}
+
+	if maxRadius := math.Min(width, height) / 2; radius > maxRadius {
+		return maxRadius
+	}
+
+	return radius
+}
+
+func uniformRoundedBorder(sty ResolvedStyle) bool {
+	top := sty.BorderTop
+	return top.Width > 0 && top.Style == "solid" &&
+		top == sty.BorderRight && top == sty.BorderBottom && top == sty.BorderLeft
 }
 
 // finalizeChrome merges deferred background/border ops into e.ops in one

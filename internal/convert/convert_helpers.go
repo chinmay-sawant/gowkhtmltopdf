@@ -6,11 +6,71 @@ import (
 	"net/url"
 	"strings"
 
+	"gowkhtmltopdf/internal/css"
 	"gowkhtmltopdf/internal/layout"
 	"gowkhtmltopdf/internal/line"
 	"gowkhtmltopdf/internal/pdf"
 	"gowkhtmltopdf/internal/settings"
 )
+
+// applyCSSPageMargins applies the unnamed @page margin shorthand to the PDF
+// viewport after stylesheets have been loaded. CSS page margins describe the
+// printable page box, so they must be resolved before body layout rather than
+// cascaded as ordinary element padding.
+func applyCSSPageMargins(geom hfGeom, sheets []*css.Stylesheet) hfGeom {
+	var raw string
+
+	for _, sheet := range sheets {
+		if sheet != nil && sheet.Page != nil && strings.TrimSpace(sheet.Page.Margin) != "" {
+			raw = sheet.Page.Margin
+		}
+	}
+
+	if raw == "" {
+		return geom
+	}
+
+	parts := strings.Fields(raw)
+	if len(parts) < 1 || len(parts) > 4 {
+		return geom
+	}
+
+	vals := make([]float64, len(parts))
+	for idx, part := range parts {
+		value, unit, ok := css.ParseLength(part)
+		if !ok {
+			return geom
+		}
+
+		pt, ok := css.LengthToPt(value, unit, 12)
+		if !ok || pt < 0 {
+			return geom
+		}
+
+		vals[idx] = pt
+	}
+
+	var top, right, bottom, left float64
+	switch len(vals) {
+	case 1:
+		top, right, bottom, left = vals[0], vals[0], vals[0], vals[0]
+	case 2:
+		top, bottom = vals[0], vals[0]
+		right, left = vals[1], vals[1]
+	case 3:
+		top, right, left, bottom = vals[0], vals[1], vals[1], vals[2]
+	case 4:
+		top, right, bottom, left = vals[0], vals[1], vals[2], vals[3]
+	}
+
+	geom.marginTop = top
+	geom.marginRight = right
+	geom.marginBottom = bottom
+	geom.marginLeft = left
+	geom.recomputeContent()
+
+	return geom
+}
 
 // measuredWidth returns the effective content width of a layout result: the
 // reported Result.Width, raised to the widest visual op extent when the

@@ -319,6 +319,7 @@ type Op struct {
 	// PaintOpacity is element opacity (CSS opacity / filter:opacity), 0..1.
 	// 0 or unset (≥1) means fully opaque. Nested opacities are multiplied.
 	PaintOpacity float64
+	Radius       float64 // uniform border radius for rounded fill/stroke rectangles
 }
 
 type engine struct {
@@ -364,6 +365,9 @@ type engine struct {
 	bfcStack []*floatState
 	// bfcPool recycles floatState values for pushBFCFloats.
 	bfcPool []*floatState
+	// absCBHeights carries the containing-block height to deferred absolute
+	// children after their in-flow parent has finished determining its size.
+	absCBHeights map[*html.Node]float64
 	// inlineItemPool recycles temporary inline-item backing arrays. The pool is
 	// engine-local because layout is single-threaded and nested inline layout
 	// must retain each active caller's slice.
@@ -453,6 +457,10 @@ func (e *engine) lookupFaceFor(sty ResolvedStyle) *pdf.Font {
 	}
 
 	if e.faces != nil {
+		if f := e.faces.ResolveFamily(sty.FontFamily, sty.FontWeight, sty.FontItalic); f != nil {
+			return f
+		}
+
 		if f := e.faces.Resolve(sty.FontWeight, sty.FontItalic); f != nil {
 			return f
 		}
@@ -575,8 +583,20 @@ func (e *engine) facesWithGlyph(style ResolvedStyle, runeValue rune) *pdf.Font {
 		return nil
 	}
 
+	if f := e.faces.ResolveFamily(style.FontFamily, style.FontWeight, style.FontItalic); f != nil && f.GlyphID(runeValue) != 0 {
+		return f
+	}
+
 	if f := e.faces.Resolve(style.FontWeight, style.FontItalic); f != nil && f.GlyphID(runeValue) != 0 {
 		return f
+	}
+
+	if style.FontWeight >= fontWeightBold && e.faces.UnicodeFallbackBold != nil && e.faces.UnicodeFallbackBold.GlyphID(runeValue) != 0 {
+		return e.faces.UnicodeFallbackBold
+	}
+
+	if e.faces.UnicodeFallback != nil && e.faces.UnicodeFallback.GlyphID(runeValue) != 0 {
+		return e.faces.UnicodeFallback
 	}
 
 	return nil
@@ -1119,7 +1139,6 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 	}
 
 	boxNode.height = e.applyHeightConstraints(style, curY)
-
 	e.prependChrome(contentStart, boxNode, style, boxNode.x, posY, boxNode.w, boxNode.height)
 
 	return boxNode
@@ -1293,7 +1312,8 @@ func (e *engine) buildOutOfFlow(node *html.Node, sty ResolvedStyle, availW, x, y
 		absX = cbX + cbW - boxNode.w - e.scalePt(sty.Right)
 	}
 
-	absY := e.resolveAbsY(sty, boxNode, cbY, viewportFixed)
+	cbH := e.absCBHeights[node]
+	absY := e.resolveAbsY(sty, boxNode, cbY, viewportFixed, cbH)
 
 	dx, dy := absX-boxNode.x, absY-boxNode.y
 	boxNode.x, boxNode.y = absX, absY
@@ -1303,8 +1323,9 @@ func (e *engine) buildOutOfFlow(node *html.Node, sty ResolvedStyle, availW, x, y
 }
 
 // resolveAbsY places the out-of-flow box vertically: top wins, then bottom
-// (fixed resolves against the viewport bottom; absolute against the CB top).
-func (e *engine) resolveAbsY(sty ResolvedStyle, boxNode *box, cbY float64, viewportFixed bool) float64 {
+// (fixed resolves against the viewport bottom; absolute uses the containing
+// block's bottom when its deferred height is known).
+func (e *engine) resolveAbsY(sty ResolvedStyle, boxNode *box, cbY float64, viewportFixed bool, cbH float64) float64 {
 	if !sty.TopAuto {
 		return cbY + e.scalePt(sty.Top)
 	}
@@ -1321,7 +1342,10 @@ func (e *engine) resolveAbsY(sty ResolvedStyle, boxNode *box, cbY float64, viewp
 
 		return absY
 	}
-	// Absolute bottom: offset from CB top (lite; not height−bottom).
+	if cbH > 0 {
+		return cbY + cbH - boxNode.height - e.scalePt(sty.Bottom)
+	}
+
 	return cbY + e.scalePt(sty.Bottom)
 }
 

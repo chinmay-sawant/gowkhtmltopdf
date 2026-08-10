@@ -3,6 +3,8 @@ package layout
 import (
 	"math"
 	"sort"
+
+	"gowkhtmltopdf/internal/html"
 )
 
 // maxFlowPageIndex is the exclusive upper bound for the outer pagination-index
@@ -780,13 +782,36 @@ func afterBreaks(res *Result, contentH float64) bool {
 
 // nextFlowSibling returns the first box after i that emitted ops.
 func nextFlowSibling(boxes []*box, i int) *box {
+	if i < 0 || i >= len(boxes) {
+		return nil
+	}
+
+	current := boxes[i]
 	for j := i + 1; j < len(boxes); j++ {
-		if boxes[j].opStart <= boxes[j].opEnd {
-			return boxes[j]
+		candidate := boxes[j]
+		if current.node != nil && candidate.node != nil && isDescendantNode(candidate.node, current.node) {
+			continue
+		}
+
+		if candidate.opStart <= candidate.opEnd {
+			return candidate
 		}
 	}
 
 	return nil
+}
+
+// isDescendantNode reports whether candidate is below ancestor in the DOM.
+// The flattened box list is preorder, so page-break-after must skip every
+// descendant before it can reach the following flow sibling.
+func isDescendantNode(candidate, ancestor *html.Node) bool {
+	for node := candidate.Parent; node != nil; node = node.Parent {
+		if node == ancestor {
+			return true
+		}
+	}
+
+	return false
 }
 
 // boxMaxOpY returns the lowest Y of any op in the box's range.

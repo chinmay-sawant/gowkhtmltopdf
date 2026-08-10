@@ -452,6 +452,7 @@ func (e *engine) splitTextByFace(cssSheet string, sty ResolvedStyle) []faceRun {
 	var current *pdf.Font
 
 	var width float64
+	runeCount := 0
 
 	for idx, runic := range cssSheet {
 		face := primary
@@ -468,10 +469,11 @@ func (e *engine) splitTextByFace(cssSheet string, sty ResolvedStyle) []faceRun {
 			runs = append(runs, faceRun{
 				text: cssSheet[start:idx],
 				face: current,
-				w:    width,
+				w:    width + sty.LetterSpacing*e.scale*float64(runeCount),
 			})
 			start = idx
 			width = 0
+			runeCount = 0
 		}
 
 		if current == nil {
@@ -480,13 +482,14 @@ func (e *engine) splitTextByFace(cssSheet string, sty ResolvedStyle) []faceRun {
 
 		current = face
 		width += face.AdvanceInPoints(runic, size)
+		runeCount++
 	}
 
 	if current != nil {
 		runs = append(runs, faceRun{
 			text: cssSheet[start:],
 			face: current,
-			w:    width,
+			w:    width + sty.LetterSpacing*e.scale*float64(runeCount),
 		})
 	}
 
@@ -510,12 +513,18 @@ func (e *engine) primaryFaceRun(cssSheet string, sty ResolvedStyle) (faceRun, bo
 	size := sty.FontSize * e.scale
 
 	var width float64
+	runeCount := 0
 
 	for _, runic := range cssSheet {
 		width += primary.AdvanceInPoints(runic, size)
+		runeCount++
 	}
 
-	return faceRun{text: cssSheet, face: primary, w: width}, true
+	return faceRun{
+		text: cssSheet,
+		face: primary,
+		w:    width + sty.LetterSpacing*e.scale*float64(runeCount),
+	}, true
 }
 
 // faceRunAllPrimary reports that every non-whitespace rune in s is covered by

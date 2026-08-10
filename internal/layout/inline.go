@@ -193,7 +193,7 @@ func (e *engine) packInlineLine(
 		// that already has content and overflow into a float (wiki .IPA).
 		// Exception: never break before attaching punctuation / mid-cite
 		// (")[37]" → ")\n[" or "[\n37]" or "saying.[\n7]").
-		if lineAdv > 0 && lineAdv+adv > lineW {
+		if lineAdv > 0 && lineAdv+adv > lineW+layoutEpsilon {
 			idx, _ = e.glueStickyTail(*items, idx, start, adv)
 
 			break
@@ -814,7 +814,6 @@ func (e *engine) trimTrailingSpace(line []inlineItem) {
 
 	if trimmed != last.text {
 		spaceCount := len(last.text) - len(trimmed)
-
 		last.text = trimmed
 		last.w -= float64(spaceCount) * e.measureRuneFace(' ', *last.style)
 	}

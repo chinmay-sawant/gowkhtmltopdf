@@ -334,7 +334,7 @@ func (e *engine) flexItemBaseWidth(node *html.Node, style ResolvedStyle, mainSiz
 		capW = 1e9
 	}
 
-	intr := e.measureCellContent(node, style) + pad +
+	intr := e.measureFlexItemMaxContent(node, style) + pad +
 		e.scalePt(style.MarginLeft) + e.scalePt(style.MarginRight)
 	if intr <= 0 {
 		intr = pad + e.scalePt(style.FontSize)*two
@@ -345,6 +345,62 @@ func (e *engine) flexItemBaseWidth(node *html.Node, style ResolvedStyle, mainSiz
 	}
 
 	return intr
+}
+
+// measureFlexItemMaxContent includes block descendants in a flex item's
+// intrinsic width. The generic cell measure intentionally stops at nested
+// block formatting contexts, which is correct for table-cell line collection
+// but makes a wrapper such as a section header measure only its eyebrow and
+// collapse the heading into a narrow column.
+func (e *engine) measureFlexItemMaxContent(node *html.Node, style ResolvedStyle) float64 {
+	_, maxW := e.measureCellMinMax(node, style)
+	chrome := e.scalePt(style.PaddingLeft) + e.scalePt(style.PaddingRight) +
+		e.scalePt(style.BorderLeft.Width) + e.scalePt(style.BorderRight.Width)
+	contentW := maxW - chrome
+	if contentW < 0 {
+		contentW = 0
+	}
+	if style.Width >= 0 {
+		specified := e.flexBoxSized(style, e.scalePt(style.Width), chrome)
+		if specified > contentW+chrome {
+			contentW = specified - chrome
+		}
+	}
+	rowFlex := style.Display == displayFlex && style.FlexDirection != fxCol && style.FlexDirection != fxColRev
+	rowContentW := 0.0
+	rowChildCount := 0
+
+	for _, child := range node.Children {
+		if child.Type != html.ElementNode {
+			continue
+		}
+
+		childStyle := e.styles[child]
+		if childStyle == nil || childStyle.Display == cssDisplayNone {
+			continue
+		}
+
+		childW := e.measureFlexItemMaxContent(child, *childStyle)
+		if rowFlex {
+			rowContentW += childW
+			rowChildCount++
+		} else if childW > contentW {
+			contentW = childW
+		}
+	}
+
+	if rowFlex {
+		_, columnGap := e.styleGaps(style)
+		if rowChildCount > 1 {
+			rowContentW += columnGap * float64(rowChildCount-1)
+		}
+
+		if rowContentW > contentW {
+			contentW = rowContentW
+		}
+	}
+
+	return contentW + chrome
 }
 
 // flexSpecifiedBaseWidth resolves a definite flex base size (flex-basis then
@@ -375,10 +431,13 @@ func (e *engine) flexBoxSized(style ResolvedStyle, size, pad float64) float64 {
 }
 
 // flexMinMainSize is the content-based minimum main size (Flexbox §4.5 lite /
-// css-sizing-3): max(specified min-width, min(content suggestion, specified
-// size suggestion when definite)). Used as the shrink floor so text does not
-// crush to 0. mainSize is the definite flex container content main size, or
-// <0 when indefinite (then % min-width is ignored — cyclic honesty).
+// css-sizing-3): max(specified min-width, min(min-content suggestion,
+// specified size suggestion when definite)). Used as the shrink floor so text
+// does not crush to 0 while ordinary wrapping text can still share a flex row.
+// measureCellMinMax already returns border-box widths, so padding and borders
+// must not be added a second time here. mainSize is the definite flex
+// container content main size, or <0 when indefinite (then % min-width is
+// ignored — cyclic honesty).
 func (e *engine) flexMinMainSize(item flexMeas, mainSize float64) float64 {
 	cstate := e.styles[item.n]
 	floor := 0.0
@@ -388,11 +447,11 @@ func (e *engine) flexMinMainSize(item flexMeas, mainSize float64) float64 {
 	} else if cstate.MinWidth > 0 {
 		floor = e.scalePt(cstate.MinWidth)
 	}
-	// Automatic minimum (min-width:auto): content size suggestion.
-	intr := e.measureCellContent(item.n, *cstate)
+	// Automatic minimum (min-width:auto): min-content size suggestion. The
+	// returned width already includes the item's horizontal chrome.
+	contentSug, _ := e.measureCellMinMax(item.n, *cstate)
 	pad := e.scalePt(cstate.PaddingLeft) + e.scalePt(cstate.PaddingRight) +
 		e.scalePt(cstate.BorderLeft.Width) + e.scalePt(cstate.BorderRight.Width)
-	contentSug := intr + pad
 	// Specified size suggestion when width/% is definite against mainSize.
 	specSug := e.flexSpecifiedWidthSuggestion(*cstate, item.baseW, mainSize, pad)
 
@@ -532,7 +591,6 @@ func (e *engine) placeFlexLineMeasured(
 	contentW, contentX, topY, curY, gap, lineCross float64,
 ) float64 {
 	widths := e.flexLineWidths(items, contentW, gap)
-
 	gaps := gap * float64(len(items)-1)
 	if gaps < 0 {
 		gaps = 0

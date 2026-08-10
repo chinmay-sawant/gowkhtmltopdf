@@ -136,6 +136,105 @@ func TestFlexRowLayout(t *testing.T) {
 	}
 }
 
+func TestFlexIntrinsicWidthIncludesNestedBlockContent(t *testing.T) {
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+.header { display:flex; justify-content:space-between; width:300pt }
+.copy h2 { margin:0; font-size:20pt; line-height:1.15 }
+.mark { width:30pt; height:30pt }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="header"><div class="copy"><div>01 / Route performance</div><h2>Where the week is moving</h2></div><div class="mark">02</div></div>
+</body></html>`, cssSheet)
+
+	var headingRuns []string
+	for _, op := range res.Ops {
+		if op.Kind != OpText {
+			continue
+		}
+
+		if strings.Contains(op.Text, "Where") || strings.Contains(op.Text, "week") || strings.Contains(op.Text, "moving") {
+			headingRuns = append(headingRuns, op.Text)
+		}
+	}
+
+	if len(headingRuns) != 1 || !strings.Contains(headingRuns[0], "Where the week is moving") {
+		t.Fatalf("nested flex heading wrapped into %q; want one intrinsic line", headingRuns)
+	}
+}
+
+func TestAbsoluteBottomUsesContainingBlockHeight(t *testing.T) {
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+body { margin:0 }
+.wrap { position:relative; width:100pt; height:100pt }
+.abs { position:absolute; bottom:10pt; width:50pt; height:20pt; background:#f00 }
+`)
+	res := layoutHTML(t, `<html><body><div class="wrap"><div class="abs">bottom</div></div></body></html>`, cssSheet)
+
+	for _, op := range res.Ops {
+		if op.Kind == OpFillRect && op.R > 0.9 && op.W == 50 && op.H == 20 {
+			if op.Y < 69 || op.Y > 71 {
+				t.Fatalf("absolute bottom y=%.1f, want 70pt", op.Y)
+			}
+
+			return
+		}
+	}
+
+	t.Fatal("absolute bottom background was not painted")
+}
+
+func TestAbsoluteChildUsesRelativePaddingBox(t *testing.T) {
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+body { margin:0 }
+.wrap { position:relative; width:100pt; height:100pt; padding:10pt 12pt; background:#eee }
+.abs { position:absolute; left:12pt; bottom:10pt; width:100pt; height:10pt; background:#f00 }
+`)
+	res := layoutHTML(t, `<html><body><div class="wrap"><div class="abs"></div></div></body></html>`, cssSheet)
+
+	for _, op := range res.Ops {
+		if op.Kind == OpFillRect && op.R > 0.9 && op.W > 70 && op.H == 10 {
+			if op.X < 11 || op.X > 13 || op.W < 99 || op.W > 101 {
+				t.Fatalf("absolute child rect=(%.1f, %.1f, %.1f, %.1f), want x=12 width=100", op.X, op.Y, op.W, op.H)
+			}
+
+			return
+		}
+	}
+
+	t.Fatal("absolute child background was not painted")
+}
+
+func TestBorderRadiusReachesRoundedPaintOps(t *testing.T) {
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+body { margin:0 }
+.dot { width:8pt; height:8pt; background:#f00; border-radius:50% }
+.pill { width:50pt; height:12pt; border:1pt solid #00f; border-radius:6pt }
+`)
+	res := layoutHTML(t, `<html><body><div class="dot"></div><div class="pill"></div></body></html>`, cssSheet)
+
+	var fillRadius, strokeRadius float64
+	for _, op := range res.Ops {
+		if op.Kind == OpFillRect && op.R > 0.9 {
+			fillRadius = op.Radius
+		}
+		if op.Kind == OpStrokeRect && op.B > 0.9 {
+			strokeRadius = op.Radius
+		}
+	}
+
+	if fillRadius != 4 || strokeRadius != 6 {
+		t.Fatalf("rounded radii fill=%.1f stroke=%.1f, want 4/6", fillRadius, strokeRadius)
+	}
+}
+
 func TestFlexRowReverse(t *testing.T) {
 	t.Parallel()
 
@@ -512,6 +611,89 @@ func TestFlexContentMinSizeDefiniteRow(t *testing.T) {
 	// A should keep more than equal half when content min exceeds shrink share.
 	if availW <= 60 {
 		t.Fatalf("A width=%.1f; content min should prefer A over equal 60pt split", availW)
+	}
+}
+
+func TestFlexAutoMinUsesMinContentForWrappingText(t *testing.T) {
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+body { margin:0; font-size:10pt; line-height:1.45 }
+* { box-sizing:border-box }
+.row { display:flex; width:504.6pt; gap:9pt; align-items:stretch }
+.two-col > .panel { flex:1; padding:16px; border:1px solid #d8ddd7; background:#fffefa }
+h3 { color:#173f45; font-size:10pt; letter-spacing:.05em; text-transform:uppercase }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="row two-col">
+  <section class="panel"><h3>Readout</h3><ul><li>Early loading is protecting the first two departures.</li><li>Canal-side delays cluster around the handoff.</li></ul></section>
+  <section class="panel"><h3>Measure twice</h3><p>Use the return scan as the source of truth for completed stops. Driver notes remain useful context, but should not replace the scan.</p></section>
+</div>
+</body></html>`, cssSheet)
+
+	maxRight := 0.0
+	for _, op := range res.Ops {
+		if op.Kind != OpFillRect || op.W < 5 || op.H < 5 {
+			continue
+		}
+
+		if right := op.X + op.W; right > maxRight {
+			maxRight = right
+		}
+	}
+
+	// The row is 504.6pt wide and must not expand to the second panel's
+	// max-content width.
+	if maxRight > 520 {
+		t.Fatalf("flex row overflowed to %.1fpt; ordinary text should use min-content auto minimum", maxRight)
+	}
+}
+
+func TestMastheadKeepsBrandAndMetadataOnTheirIntendedLines(t *testing.T) {
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+body { margin:0; font-family:Arial, Helvetica, sans-serif; font-size:10pt; line-height:1.45 }
+* { box-sizing:border-box }
+.masthead, .brand-line { display:flex; align-items:center }
+.masthead { width:504.6pt; justify-content:space-between; border-bottom:1px solid #d8ddd7; padding-bottom:10px }
+.brand-line { gap:6.75pt }
+.brand-mark { width:21pt; height:21pt; border:2px solid #173f45; border-radius:50%; font-size:9pt; font-weight:700; line-height:18pt; text-align:center }
+.brand-name { font-size:11pt; font-weight:700; letter-spacing:.08em; text-transform:uppercase }
+.eyebrow { font-size:7.5pt; font-weight:700; letter-spacing:.13em; text-transform:uppercase; text-align:right }
+`)
+	res := layoutHTML(t, `<html><body><header class="masthead">
+<div class="brand-line"><span class="brand-mark">N</span><span class="brand-name">Northline Cooperative</span></div>
+<div class="eyebrow">Field operations brief<br>06–12 August 2026</div>
+</header></body></html>`, cssSheet)
+	var brandY float64
+	var brandRuns int
+	var metadataLine bool
+
+	for _, op := range res.Ops {
+		if op.Kind != OpText {
+			continue
+		}
+		switch {
+		case strings.Contains(op.Text, "Northline"), strings.Contains(op.Text, "Cooperative"):
+			if brandRuns == 0 {
+				brandY = op.Y
+			} else if op.Y != brandY {
+				t.Fatalf("brand wrapped across baselines %.1f and %.1f: %q", brandY, op.Y, op.Text)
+			}
+
+			brandRuns++
+		case strings.Contains(op.Text, "Field operations brief"):
+			metadataLine = true
+		}
+	}
+
+	if brandRuns == 0 {
+		t.Fatal("brand name text was not painted")
+	}
+
+	if !metadataLine {
+		t.Fatal("right-side metadata wrapped before its explicit line break")
 	}
 }
 

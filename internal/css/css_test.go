@@ -146,6 +146,19 @@ func TestParseAtRulesSkipped(t *testing.T) {
 	}
 }
 
+func TestParsePageStyle(t *testing.T) {
+	t.Parallel()
+
+	s := mustSheet(t, `@page { size: A4; margin: 0 2cm 4mm 6pt }`)
+	if s.Page == nil {
+		t.Fatal("page style = nil")
+	}
+
+	if s.Page.Size != "A4" || s.Page.Margin != "0 2cm 4mm 6pt" {
+		t.Fatalf("page style = %+v", *s.Page)
+	}
+}
+
 func TestParseOrderAndNestedMediaOrder(t *testing.T) {
 	t.Parallel()
 

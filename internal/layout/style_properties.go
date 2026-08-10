@@ -719,9 +719,30 @@ func applyBorderGroup(
 		return applyBorderWidthProps(style, prop, value, fsize)
 	case borderStyleKeyword, borderColorKeyword:
 		return applyBorderStyleColorProps(style, prop, value)
+	case "border-radius":
+		return setBorderRadius(style, value, fsize)
 	default:
 		return false
 	}
+}
+
+func setBorderRadius(style *ResolvedStyle, value string, fsize float64) bool {
+	parts := strings.Fields(value)
+	if len(parts) == 0 {
+		return true
+	}
+
+	if v, unit, ok := css.ParseLength(parts[0]); ok {
+		if unit == "%" {
+			style.BorderRadius = 0
+			style.BorderRadiusPercent = v
+		} else if radius, ok := lengthBox(parts[0], fsize, 0, cssDisplayNone); ok && radius >= 0 {
+			style.BorderRadius = radius
+			style.BorderRadiusPercent = -1
+		}
+	}
+
+	return true
 }
 
 func applyBorderAllSides(style *ResolvedStyle, value string, fsize float64) bool {

@@ -135,6 +135,8 @@ type ResolvedStyle struct {
 	BorderRight         border
 	BorderBottom        border
 	BorderLeft          border
+	BorderRadius        float64
+	BorderRadiusPercent float64
 	Color               [3]float64
 	BGColor             [4]float64 // rgba, 0..1
 	FontFamily          []string
@@ -437,6 +439,7 @@ type styleStoreKey struct {
 	bgColor                                    [4]float64
 	width, widthPercent                        float64
 	height, heightPercent                      float64
+	borderRadius, borderRadiusPercent          float64
 	transform                                  Matrix2D
 	hasTransform                               bool
 }
@@ -448,6 +451,7 @@ func styleStoreKeyFor(style ResolvedStyle) styleStoreKey {
 		lineHeight: style.LineHeight, fontWeight: style.FontWeight, fontItalic: style.FontItalic,
 		color: style.Color, bgColor: style.BGColor, width: style.Width, widthPercent: style.WidthPercent,
 		height: style.Height, heightPercent: style.HeightPercent, transform: style.Transform,
+		borderRadius: style.BorderRadius, borderRadiusPercent: style.BorderRadiusPercent,
 		hasTransform: style.HasTransform,
 	}
 }
@@ -519,6 +523,7 @@ type comparableResolvedStyle struct {
 	MarginLeftAuto, MarginRightAuto                                              bool
 	PaddingTop, PaddingRight, PaddingBottom, PaddingLeft                         float64
 	BorderTop, BorderRight, BorderBottom, BorderLeft                             border
+	BorderRadius, BorderRadiusPercent                                            float64
 	Color                                                                        [3]float64
 	BGColor                                                                      [4]float64
 	famHash                                                                      uint64
@@ -566,7 +571,9 @@ func comparableResolvedStyleFor(style ResolvedStyle) comparableResolvedStyle {
 		MarginLeft: style.MarginLeft, MarginLeftAuto: style.MarginLeftAuto, MarginRightAuto: style.MarginRightAuto,
 		PaddingTop: style.PaddingTop, PaddingRight: style.PaddingRight, PaddingBottom: style.PaddingBottom,
 		PaddingLeft: style.PaddingLeft, BorderTop: style.BorderTop, BorderRight: style.BorderRight,
-		BorderBottom: style.BorderBottom, BorderLeft: style.BorderLeft, Color: style.Color, BGColor: style.BGColor,
+		BorderBottom: style.BorderBottom, BorderLeft: style.BorderLeft,
+		BorderRadius: style.BorderRadius, BorderRadiusPercent: style.BorderRadiusPercent,
+		Color: style.Color, BGColor: style.BGColor,
 		famHash: style.famHash, FontSize: style.FontSize, FontWeight: style.FontWeight, FontItalic: style.FontItalic,
 		LineHeight: style.LineHeight, TextAlign: style.TextAlign, VerticalAlign: style.VerticalAlign,
 		WhiteSpace: style.WhiteSpace, OverflowWrap: style.OverflowWrap, WordBreak: style.WordBreak,

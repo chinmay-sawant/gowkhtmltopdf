@@ -239,6 +239,11 @@ func (c *Content) LineTo(x, y float64) {
 	c.writePDFNums(" l\n", pointComponents, x, y, 0, 0, 0, 0)
 }
 
+// CurveTo appends a cubic Bézier segment to the current path.
+func (c *Content) CurveTo(x1, y1, x2, y2, x3, y3 float64) {
+	c.writePDFNums(" c\n", curveComponents, x1, y1, x2, y2, x3, y3)
+}
+
 // Rect appends a rectangle to the current path.
 func (c *Content) Rect(x, y, w, h float64) {
 	c.writePDFNums(" re\n", rectComponents, x, y, w, h, 0, 0)

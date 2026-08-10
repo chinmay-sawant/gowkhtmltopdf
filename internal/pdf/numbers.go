@@ -80,6 +80,7 @@ const (
 	rgbComponents    = 3
 	pointComponents  = 2
 	rectComponents   = 4
+	curveComponents  = 6
 	matrixComponents = 6
 	numArgsMin3      = 3
 	numArgsMin4      = 4

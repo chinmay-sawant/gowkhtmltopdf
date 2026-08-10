@@ -2,20 +2,30 @@ package pdf
 
 import (
 	"bytes"
+	"strings"
 	"sync"
 
 	"gowkhtmltopdf/internal/pdf/assets"
 )
 
-// FaceSet holds the four Liberation Sans faces used for CSS
-// font-weight / font-style selection.
+// FaceSet holds the bundled Liberation CSS families and Unicode fallback faces.
 //
 // ponytail: Liberation faces bundled in-tree (assets/); system fonts opt-in only.
 type FaceSet struct {
-	Regular    *Font
-	Bold       *Font
-	Italic     *Font
-	BoldItalic *Font
+	Regular             *Font
+	Bold                *Font
+	Italic              *Font
+	BoldItalic          *Font
+	Serif               *Font
+	SerifBold           *Font
+	SerifItalic         *Font
+	SerifBoldItalic     *Font
+	Mono                *Font
+	MonoBold            *Font
+	MonoItalic          *Font
+	MonoBoldItalic      *Font
+	UnicodeFallback     *Font
+	UnicodeFallbackBold *Font
 }
 
 //nolint:gochecknoglobals // lazy init of the embedded-family cache
@@ -25,8 +35,8 @@ var (
 	errDefaultFaces  error
 )
 
-// LoadDefaultFaces returns the embedded Liberation Sans family
-// (Regular, Bold, Italic, BoldItalic). The result is cached.
+// LoadDefaultFaces returns the embedded Liberation families and Unicode
+// fallback faces. The result is cached.
 func LoadDefaultFaces() (*FaceSet, error) {
 	defaultFacesOnce.Do(func() {
 		faces := &FaceSet{} //nolint:exhaustruct // intentional zero-value fields
@@ -56,6 +66,66 @@ func LoadDefaultFaces() (*FaceSet, error) {
 			return
 		}
 
+		if faces.Serif, err = parseNamed("LiberationSerif", assets.LiberationSerifRegular()); err != nil {
+			errDefaultFaces = err
+
+			return
+		}
+
+		if faces.SerifBold, err = parseNamed("LiberationSerif-Bold", assets.LiberationSerifBold()); err != nil {
+			errDefaultFaces = err
+
+			return
+		}
+
+		if faces.SerifItalic, err = parseNamed("LiberationSerif-Italic", assets.LiberationSerifItalic()); err != nil {
+			errDefaultFaces = err
+
+			return
+		}
+
+		if faces.SerifBoldItalic, err = parseNamed("LiberationSerif-BoldItalic", assets.LiberationSerifBoldItalic()); err != nil {
+			errDefaultFaces = err
+
+			return
+		}
+
+		if faces.Mono, err = parseNamed("LiberationMono", assets.LiberationMonoRegular()); err != nil {
+			errDefaultFaces = err
+
+			return
+		}
+
+		if faces.MonoBold, err = parseNamed("LiberationMono-Bold", assets.LiberationMonoBold()); err != nil {
+			errDefaultFaces = err
+
+			return
+		}
+
+		if faces.MonoItalic, err = parseNamed("LiberationMono-Italic", assets.LiberationMonoItalic()); err != nil {
+			errDefaultFaces = err
+
+			return
+		}
+
+		if faces.MonoBoldItalic, err = parseNamed("LiberationMono-BoldItalic", assets.LiberationMonoBoldItalic()); err != nil {
+			errDefaultFaces = err
+
+			return
+		}
+
+		if faces.UnicodeFallback, err = parseNamed("DejaVuSans-UnicodeFallback", assets.UnicodeFallbackRegular()); err != nil {
+			errDefaultFaces = err
+
+			return
+		}
+
+		if faces.UnicodeFallbackBold, err = parseNamed("DejaVuSans-UnicodeFallback-Bold", assets.UnicodeFallbackBold()); err != nil {
+			errDefaultFaces = err
+
+			return
+		}
+
 		defaultFaces = faces
 	})
 
@@ -76,35 +146,56 @@ func parseNamed(name string, data []byte) (*Font, error) {
 // Resolve picks a face for the given CSS weight and italic flag.
 // Falls back toward Regular when a style is missing.
 func (fs *FaceSet) Resolve(weight int, italic bool) *Font {
-	if fs == nil {
+	return resolveFamilyFaces(fs.Regular, fs.Bold, fs.Italic, fs.BoldItalic, weight, italic)
+}
+
+// ResolveFamily selects the bundled family corresponding to CSS named and
+// generic families while preserving the first supported family in the list.
+func (fs *FaceSet) ResolveFamily(families []string, weight int, italic bool) *Font {
+	for _, family := range families {
+		switch strings.ToLower(strings.Trim(strings.TrimSpace(family), `"'`)) {
+		case "serif", "georgia", "times", "times new roman", "liberation serif":
+			return resolveFamilyFaces(fs.Serif, fs.SerifBold, fs.SerifItalic, fs.SerifBoldItalic, weight, italic)
+		case "monospace", "courier", "courier new", "consolas", "monaco", "liberation mono":
+			return resolveFamilyFaces(fs.Mono, fs.MonoBold, fs.MonoItalic, fs.MonoBoldItalic, weight, italic)
+		case "sans-serif", "arial", "helvetica", "tahoma", "verdana", "calibri", "liberation sans":
+			return fs.Resolve(weight, italic)
+		}
+	}
+
+	return nil
+}
+
+func resolveFamilyFaces(regular, boldFace, italicFace, boldItalic *Font, weight int, italic bool) *Font {
+	if regular == nil && boldFace == nil && italicFace == nil && boldItalic == nil {
 		return nil
 	}
 
 	bold := weight >= fontWeightBoldMin
 
 	if bold {
-		if italic && fs.BoldItalic != nil {
-			return fs.BoldItalic
+		if italic && boldItalic != nil {
+			return boldItalic
 		}
 
-		if fs.Bold != nil {
-			return fs.Bold
+		if boldFace != nil {
+			return boldFace
 		}
 	}
 
-	if italic && fs.Italic != nil {
-		return fs.Italic
+	if italic && italicFace != nil {
+		return italicFace
 	}
 
-	if fs.Regular != nil {
-		return fs.Regular
+	if regular != nil {
+		return regular
 	}
 
-	if fs.Bold != nil {
-		return fs.Bold
+	if boldFace != nil {
+		return boldFace
 	}
 
-	return fs.Italic
+	return italicFace
 }
 
 // DefaultFont returns the embedded Liberation Sans regular face.

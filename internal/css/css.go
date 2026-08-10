@@ -49,6 +49,16 @@ const (
 type Stylesheet struct {
 	Rules     []Rule
 	FontFaces []FontFace
+	Page      *PageStyle
+}
+
+// PageStyle stores the unnamed @page declarations that affect the print
+// viewport. The converter currently consumes the margin shorthand; keeping
+// the raw values here lets page geometry resolve physical units at the PDF
+// boundary instead of pretending they are element styles.
+type PageStyle struct {
+	Margin string
+	Size   string
 }
 
 // FontFace is one @font-face rule (local src subset).
@@ -168,7 +178,7 @@ func parseAtRule(src string, str *Stylesheet, order *int) (string, error) {
 	case strings.HasPrefix(low, "@container"):
 		return parseContainerRule(src, str, order)
 	case strings.HasPrefix(low, "@page"):
-		return skipAtRule(src)
+		return parsePageRule(src, str)
 	case strings.HasPrefix(low, "@keyframes"), strings.HasPrefix(low, "@-webkit-keyframes"):
 		// Animations are parse-ignored (static cascaded values only).
 		return skipAtRule(src)
@@ -177,6 +187,35 @@ func parseAtRule(src string, str *Stylesheet, order *int) (string, error) {
 	default:
 		return skipAtRule(src)
 	}
+}
+
+func parsePageRule(src string, str *Stylesheet) (string, error) {
+	open := strings.IndexByte(src, '{')
+	if open < 0 {
+		return skipAtRule(src)
+	}
+
+	block, rest, err := takeBlock(src, open)
+	if err != nil {
+		return "", err
+	}
+
+	page := str.Page
+	if page == nil {
+		page = &PageStyle{}
+		str.Page = page
+	}
+
+	for _, decl := range parseDeclarations(block) {
+		switch strings.ToLower(decl.Prop) {
+		case "margin":
+			page.Margin = decl.Value
+		case "size":
+			page.Size = decl.Value
+		}
+	}
+
+	return rest, nil
 }
 
 func parseMediaRule(src string, str *Stylesheet, order *int) (string, error) {

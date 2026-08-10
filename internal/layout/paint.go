@@ -151,7 +151,6 @@ func fixedOpIndices(res *Result) []int {
 // positions after rect splits and sticky shifts added or moved ops.
 func buildPagesAfterSplits(res *Result, contentH float64, _ []int) []int {
 	opPage, counts := pageBuckets(res.Ops, contentH)
-
 	res.Pages = make([][]int, len(counts))
 
 	for p := range counts {
@@ -801,16 +800,56 @@ func drawFill(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintO
 	x, y := canvasToPDF(op.X, op.Y+op.H, pageIdx, contentH, opts, pageH)
 	ps := StyleOf(op)
 	c.SetFillColor(ps.FillR, ps.FillG, ps.FillB)
-	c.Rect(x, y, op.W, op.H)
+	if op.Radius > 0 {
+		roundedRectPath(c, x, y, op.W, op.H, op.Radius)
+	} else {
+		c.Rect(x, y, op.W, op.H)
+	}
 	c.Fill()
 }
 
 func drawStroke(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintOptions, pageH float64) {
 	x, y := canvasToPDF(op.X, op.Y+op.H, pageIdx, contentH, opts, pageH)
 	c.SetStrokeColor(op.R, op.G, op.B)
-	c.SetLineWidth(1)
-	c.Rect(x, y, op.W, op.H)
+	width := op.Width
+	if width <= 0 {
+		width = 1
+	}
+	c.SetLineWidth(width)
+	if op.Radius > 0 {
+		roundedRectPath(c, x, y, op.W, op.H, op.Radius)
+	} else {
+		c.Rect(x, y, op.W, op.H)
+	}
 	c.Stroke()
+}
+
+func roundedRectPath(c *pdf.Content, x, y, width, height, radius float64) {
+	const kappa = 0.5522847498
+
+	if radius <= 0 {
+		c.Rect(x, y, width, height)
+
+		return
+	}
+
+	if radius > width/2 {
+		radius = width / 2
+	}
+
+	if radius > height/2 {
+		radius = height / 2
+	}
+
+	c.MoveTo(x+radius, y)
+	c.LineTo(x+width-radius, y)
+	c.CurveTo(x+width-radius+kappa*radius, y, x+width, y+radius-kappa*radius, x+width, y+radius)
+	c.LineTo(x+width, y+height-radius)
+	c.CurveTo(x+width, y+height-radius+kappa*radius, x+width-radius+kappa*radius, y+height, x+width-radius, y+height)
+	c.LineTo(x+radius, y+height)
+	c.CurveTo(x+radius-kappa*radius, y+height, x, y+height-radius+kappa*radius, x, y+height-radius)
+	c.LineTo(x, y+radius)
+	c.CurveTo(x, y+radius-kappa*radius, x+radius-kappa*radius, y, x+radius, y)
 }
 
 func drawLine(chld *pdf.Content, paintOp *Op, pageIdx int, contentH float64, opts PaintOptions, pageH float64) {

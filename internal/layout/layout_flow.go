@@ -141,8 +141,21 @@ func (e *engine) flowChildren(
 	absOriginY := posY + curY
 
 	absCBX, absCBW := contentX, contentW
-	if sty.HasTransform {
-		// Transformed element: padding box is the CB for abs/fixed descendants.
+	paddingBoxCB := sty.HasTransform
+	if sty.Position == positionRelative {
+		for _, child := range children {
+			childStyle := e.stylePtr(child)
+			if childStyle.Position == positionAbsolute && !childStyle.BottomAuto {
+				paddingBoxCB = true
+
+				break
+			}
+		}
+	}
+
+	if paddingBoxCB {
+		// A positioned or transformed element uses its padding box as the
+		// containing block for absolute descendants.
 		absCBX = contentX - e.scalePt(sty.PaddingLeft)
 		absOriginY -= e.scalePt(sty.PaddingTop)
 		absCBW = contentW + e.scalePt(sty.PaddingLeft) + e.scalePt(sty.PaddingRight)
@@ -158,8 +171,19 @@ func (e *engine) flowChildren(
 			contentW, contentX, posY, curY, prevBottom, floats, deferred)
 	}
 
+	parentHeight := e.applyHeightConstraints(sty, curY+e.scalePt(sty.PaddingBottom))
+	cbHeight := parentHeight - (absOriginY - posY)
+	if cbHeight < 0 {
+		cbHeight = 0
+	}
+
 	for _, n := range deferred {
+		if e.absCBHeights == nil {
+			e.absCBHeights = make(map[*html.Node]float64, len(deferred))
+		}
+		e.absCBHeights[n] = cbHeight
 		ab := e.build(n, absCBW, absCBX, absOriginY)
+		delete(e.absCBHeights, n)
 		if ab != nil && parent != nil {
 			parent.children = append(parent.children, ab)
 		}
