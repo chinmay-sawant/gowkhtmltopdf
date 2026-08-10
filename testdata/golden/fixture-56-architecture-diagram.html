@@ -35,25 +35,32 @@
       <div><dt>scale</dt><dd>~<output>71&thinsp;600</output> lines of Go</dd></div>
       <div><dt>commit</dt><dd><code>ef526f9</code> <time datetime="2026-08-11">2026-08-11</time></dd></div>
     </dl>
+    <div class="hero-legend" aria-label="architecture flow legend">
+      <span class="hero-legend-item hero-legend-input">inputs</span>
+      <span class="hero-legend-wire" aria-hidden="true">······</span>
+      <span class="hero-legend-item hero-legend-core">shared engine</span>
+      <span class="hero-legend-wire" aria-hidden="true">······</span>
+      <span class="hero-legend-item hero-legend-output">outputs</span>
+    </div>
   </header>
 
   <section class="pipeline" id="pipeline" aria-label="conversion pipeline">
     <h2 class="pipe-title">Conversion pipeline <small>one document, seven stages</small></h2>
-    <ol class="pipe-steps">
-      <li class="pipe-step"><span class="pipe-num">1</span><span class="pipe-name">load</span><span class="pipe-note">URLs, ACL, HTTP</span></li>
-      <li class="pipe-arrow" aria-hidden="true">&rarr;</li>
-      <li class="pipe-step"><span class="pipe-num">2</span><span class="pipe-name">parse</span><span class="pipe-note">allowlisted HTML</span></li>
-      <li class="pipe-arrow" aria-hidden="true">&rarr;</li>
-      <li class="pipe-step"><span class="pipe-num">3</span><span class="pipe-name">style</span><span class="pipe-note">CSS subset</span></li>
-      <li class="pipe-arrow" aria-hidden="true">&rarr;</li>
-      <li class="pipe-step"><span class="pipe-num">4</span><span class="pipe-name">layout</span><span class="pipe-note">boxes → display list</span></li>
-      <li class="pipe-arrow" aria-hidden="true">&rarr;</li>
-      <li class="pipe-step"><span class="pipe-num">5</span><span class="pipe-name">paginate</span><span class="pipe-note">page breaks, HF</span></li>
-      <li class="pipe-arrow" aria-hidden="true">&rarr;</li>
-      <li class="pipe-step"><span class="pipe-num">6</span><span class="pipe-name">paint</span><span class="pipe-note">ops → stream</span></li>
-      <li class="pipe-arrow" aria-hidden="true">&rarr;</li>
-      <li class="pipe-step"><span class="pipe-num">7</span><span class="pipe-name">write</span><span class="pipe-note">PDF 1.4 or PNG/JPEG</span></li>
-    </ol>
+    <div class="pipe-steps" role="list">
+      <div class="pipe-step pipe-input" role="listitem"><span class="pipe-num">01</span><span class="pipe-name">load</span><span class="pipe-note">URLs, ACL, HTTP</span></div>
+      <span class="pipe-arrow" aria-hidden="true">··›</span>
+      <div class="pipe-step pipe-input" role="listitem"><span class="pipe-num">02</span><span class="pipe-name">parse</span><span class="pipe-note">allowlisted HTML</span></div>
+      <span class="pipe-arrow" aria-hidden="true">··›</span>
+      <div class="pipe-step pipe-core" role="listitem"><span class="pipe-num">03</span><span class="pipe-name">style</span><span class="pipe-note">CSS subset</span></div>
+      <span class="pipe-arrow" aria-hidden="true">··›</span>
+      <div class="pipe-step pipe-core" role="listitem"><span class="pipe-num">04</span><span class="pipe-name">layout</span><span class="pipe-note">boxes → display list</span></div>
+      <span class="pipe-arrow" aria-hidden="true">··›</span>
+      <div class="pipe-step pipe-core" role="listitem"><span class="pipe-num">05</span><span class="pipe-name">paginate</span><span class="pipe-note">page breaks, HF</span></div>
+      <span class="pipe-arrow" aria-hidden="true">··›</span>
+      <div class="pipe-step pipe-output" role="listitem"><span class="pipe-num">06</span><span class="pipe-name">paint</span><span class="pipe-note">ops → stream</span></div>
+      <span class="pipe-arrow" aria-hidden="true">··›</span>
+      <div class="pipe-step pipe-output" role="listitem"><span class="pipe-num">07</span><span class="pipe-name">write</span><span class="pipe-note">PDF 1.4 or PNG/JPEG</span></div>
+    </div>
   </section>
 
   <nav class="toc" aria-label="reading order">

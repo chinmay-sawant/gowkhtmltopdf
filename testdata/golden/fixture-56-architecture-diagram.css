@@ -2127,3 +2127,376 @@ section.d10 .dom-notes ul {
   margin: 0.4em 0 0;
   padding-left: 1.2em;
 }
+
+/* ============================================================
+   Blueprint refresh — print-first architecture system
+   The existing fixture intentionally exercises a broad CSS subset. This
+   final layer tightens the visual language without making newer syntax a
+   requirement for the lite renderer: classic declarations come first and
+   print-aware properties remain progressive enhancements.
+   ============================================================ */
+
+:root {
+  --paper: #eef2f4;
+  --ink: #14202b;
+  --muted: #52606d;
+  --card: #ffffff;
+  --line: #cbd5e1;
+  --wire: #8ea2b2;
+  --accent: #0f766e;
+  --accent2: #2563eb;
+  --accent-warm: #d97706;
+  --danger: #b42318;
+  --sans: "Liberation Sans", Arial, Helvetica, sans-serif;
+  --serif: "Liberation Serif", Georgia, "Times New Roman", serif;
+  --mono: "Liberation Mono", "Courier New", monospace;
+}
+
+html,
+body {
+  background: #eef2f4;
+  color: #14202b;
+}
+
+body {
+  font-family: "Liberation Sans", Arial, Helvetica, sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4,
+.hero-title,
+.dom-title,
+.dag-title,
+.div-title,
+.sec-title {
+  font-family: "Liberation Serif", Georgia, "Times New Roman", serif;
+}
+
+code,
+kbd,
+samp,
+var,
+.hero-badge,
+.hero-meta dt,
+.pipe-num,
+.dag-box,
+.dag-rule-n,
+.sec-k {
+  font-family: "Liberation Mono", "Courier New", monospace;
+}
+
+.hero {
+  background: #14202b;
+  border: 1px solid #263b49;
+  border-radius: 5px;
+  border-bottom: 2px dotted #d97706;
+  padding: 22px 25px 17px;
+}
+
+.hero-title {
+  font-size: 24pt;
+  letter-spacing: -0.02em;
+}
+
+.hero-amp {
+  color: #f59e0b;
+}
+
+.hero-sub {
+  color: #d7e0e6;
+  max-width: 56em;
+}
+
+.hero-meta {
+  flex-wrap: nowrap;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.hero-meta > div {
+  display: block;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.hero-meta dt {
+  display: block;
+  margin-bottom: 2px;
+  color: #8ea2b2;
+  font-variant-numeric: tabular-nums;
+}
+
+.hero-meta dd {
+  font-size: 8.6pt;
+  line-height: 1.25;
+  color: #f1f5f7;
+  overflow-wrap: break-word;
+}
+
+.hero-legend {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 14px;
+  color: #d7e0e6;
+  font-family: "Liberation Mono", "Courier New", monospace;
+  font-size: 7.7pt;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hero-legend-item {
+  border: 1px solid #526b7b;
+  border-radius: 3px;
+  padding: 3px 7px;
+}
+
+.hero-legend-input {
+  color: #f4b860;
+}
+
+.hero-legend-core {
+  color: #73d2c8;
+}
+
+.hero-legend-output {
+  color: #8db5ff;
+}
+
+.hero-legend-wire {
+  color: #8ea2b2;
+  letter-spacing: 0.16em;
+}
+
+.pipe-title,
+.toc-title {
+  border-bottom: 1px solid #8ea2b2;
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+}
+
+.pipe-steps {
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 0;
+  margin: 12px 0 8px;
+}
+
+.pipe-step {
+  flex: 1 1 0;
+  min-width: 0;
+  border: 1px solid #b7c5ce;
+  border-top: 3px solid #0f766e;
+  border-radius: 4px;
+  padding: 7px 4px 6px;
+  background: #ffffff;
+}
+
+.pipe-input {
+  border-top-color: #d97706;
+}
+
+.pipe-core {
+  border-top-color: #0f766e;
+}
+
+.pipe-output {
+  border-top-color: #2563eb;
+}
+
+.pipe-num {
+  color: #52606d;
+  font-size: 7.5pt;
+  font-variant-numeric: tabular-nums;
+}
+
+.pipe-name {
+  font-size: 9pt;
+  color: #14202b;
+}
+
+.pipe-note {
+  font-size: 6.8pt;
+  line-height: 1.2;
+  color: #52606d;
+}
+
+.pipe-arrow {
+  display: block;
+  flex: 0 0 17px;
+  align-self: center;
+  height: auto;
+  margin: 0 2px;
+  color: #0f766e;
+  font-family: "Liberation Mono", "Courier New", monospace;
+  font-size: 6.5pt;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.toc-list {
+  column-gap: 34px;
+}
+
+.toc-list li {
+  border-bottom: 1px dotted #b7c5ce;
+  padding-bottom: 2px;
+}
+
+.domains > section {
+  border: 1px solid #cbd5e1;
+  border-left: 4px solid #0f766e;
+  border-radius: 4px;
+  padding: 14px 17px 12px;
+  background: #ffffff;
+}
+
+.dom-head {
+  border-bottom: 1px dotted #8ea2b2;
+  margin-bottom: 11px;
+  break-after: avoid;
+  page-break-after: avoid;
+}
+
+.dom-index {
+  border-radius: 3px;
+  background: #14202b;
+  color: #f4b860;
+  font-variant-numeric: tabular-nums;
+}
+
+.dom-title {
+  color: #14202b;
+  letter-spacing: -0.01em;
+}
+
+.dom-role {
+  color: #52606d;
+}
+
+.dom-notes {
+  background: #fff8eb;
+  border-left-color: #d97706;
+  color: #55432b;
+}
+
+.dom-foot {
+  border-top: 1px dotted #b7c5ce;
+}
+
+.dag,
+.divergence,
+.security {
+  border: 1px solid #cbd5e1;
+  border-left: 4px solid #2563eb;
+  border-radius: 4px;
+  padding: 14px 17px 12px;
+  background: #ffffff;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.dag-stage {
+  flex-wrap: nowrap;
+  gap: 5px;
+  padding: 8px 0;
+  border-bottom: 1px dotted #b7c5ce;
+}
+
+.dag-stage + .dag-stage {
+  margin-top: 3px;
+}
+
+.dag-box {
+  min-width: 0;
+  padding: 5px 7px;
+  border: 1px solid #9fb0bb;
+  border-radius: 3px;
+  background: #f8fafb;
+  font-size: 7.9pt;
+  overflow-wrap: break-word;
+}
+
+.dag-leaf {
+  background: #e5f3ef;
+  border-color: #0f766e;
+}
+
+.dag-hub {
+  background: #14202b;
+  border-color: #14202b;
+  color: #ffffff;
+}
+
+.dag-sink {
+  background: #eef4ff;
+  border-color: #2563eb;
+}
+
+.dag-arrow {
+  color: #0f766e;
+  font-family: "Liberation Mono", "Courier New", monospace;
+}
+
+.dag-boundary {
+  border: 1px dashed #d97706;
+  background: #fff8eb;
+  color: #7a4b0b;
+}
+
+.divergence {
+  border-left-color: #0f766e;
+}
+
+.div-card {
+  border: 1px dotted #9fb0bb;
+  border-top: 3px solid #0f766e;
+  border-radius: 4px;
+  background: #f8fafb;
+}
+
+.div-card-alt {
+  border-top-color: #2563eb;
+}
+
+.security {
+  border-left-color: #b42318;
+}
+
+.sec-card {
+  border: 1px dotted #9fb0bb;
+  border-radius: 4px;
+  background: #f8fafb;
+}
+
+.sec-k {
+  color: #b42318;
+  font-variant-numeric: tabular-nums;
+}
+
+.colophon {
+  border-top: 1px dotted #8ea2b2;
+}
+
+/* Modern print enhancements: the fallbacks above carry the PDF layout. */
+@media print {
+  .hero,
+  .domains > section,
+  .dag,
+  .divergence,
+  .security {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .hero-title,
+  .dom-title,
+  .dag-title,
+  .div-title,
+  .sec-title {
+    text-wrap: balance;
+  }
+}
