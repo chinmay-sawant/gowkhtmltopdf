@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<!--
+  fixture-52-airline-boarding-pass
+  Proves: a one-page airline e-ticket / boarding-pass sheet with letterhead,
+  flight segment tables, compact multi-column stubs, barcode-style mono codes,
+  and repeated passenger blocks suitable for transactional PDF generation.
+  Expected: exactly 1 page.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Boarding Pass UA-2048 - Atlas Airways</title>
+  <style>
+    body { font-family: sans-serif; font-size: 9pt; margin: 0; color: #1a2430; }
+    h1 { font-size: 17pt; color: #0b3d91; margin: 0; letter-spacing: 0.3px; }
+    h2 { font-size: 11pt; color: #0b3d91; margin: 0 0 6px; text-transform: uppercase; letter-spacing: 0.8px; }
+    .head {
+      border-bottom: 3px solid #0b3d91;
+      padding-bottom: 10px;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+    .brand-sub { color: #5a6a7a; margin: 3px 0 0; font-size: 8.5pt; }
+    .pnr-box {
+      text-align: right;
+      border: 1px solid #0b3d91;
+      padding: 6px 10px;
+      min-width: 120px;
+    }
+    .pnr-box .label { font-size: 7.5pt; color: #5a6a7a; text-transform: uppercase; }
+    .pnr-box .value { font-size: 14pt; font-weight: bold; color: #0b3d91; letter-spacing: 2px; }
+    .meta { color: #5a6a7a; margin: 0 0 10px; }
+    table.segments { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+    .segments th, .segments td { border: 1px solid #b8c4d0; padding: 6px 7px; }
+    .segments th { background: #e8eef8; text-align: left; color: #0b3d91; font-size: 8pt; }
+    .num { text-align: right; }
+    .center { text-align: center; }
+    .passes { width: 100%; border-collapse: collapse; }
+    .passes > tbody > tr > td {
+      width: 50%;
+      vertical-align: top;
+      padding: 0 6px 0 0;
+    }
+    .passes > tbody > tr > td + td { padding: 0 0 0 6px; }
+    .pass {
+      border: 1px solid #9aa8b8;
+      background: #fafbfd;
+      page-break-inside: avoid;
+    }
+    .pass-top {
+      background: #0b3d91;
+      color: #fff;
+      padding: 7px 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .pass-top .airline { font-weight: bold; font-size: 10pt; letter-spacing: 0.6px; }
+    .pass-top .kind { font-size: 8pt; opacity: 0.9; text-transform: uppercase; }
+    .pass-body { padding: 9px 10px 8px; }
+    .passenger { font-size: 12pt; font-weight: bold; margin: 0 0 8px; }
+    .route {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      border-bottom: 1px dashed #c5ced8;
+      padding-bottom: 8px;
+    }
+    .airport .code { font-size: 18pt; font-weight: bold; color: #0b3d91; line-height: 1; }
+    .airport .city { font-size: 7.5pt; color: #5a6a7a; margin-top: 2px; }
+    .arrow { color: #8a97a6; font-size: 14pt; padding: 0 6px; }
+    .grid { width: 100%; border-collapse: collapse; }
+    .grid td { padding: 3px 4px 3px 0; vertical-align: top; width: 33%; }
+    .grid .label { display: block; font-size: 7pt; color: #5a6a7a; text-transform: uppercase; }
+    .grid .value { display: block; font-size: 10pt; font-weight: bold; margin-top: 1px; }
+    .barcode {
+      margin-top: 8px;
+      border-top: 1px solid #d0d7e0;
+      padding-top: 6px;
+      font-family: monospace;
+      font-size: 8pt;
+      letter-spacing: 1.4px;
+      color: #243140;
+      text-align: center;
+    }
+    .notes {
+      margin-top: 12px;
+      padding: 8px 10px;
+      background: #f0f4f9;
+      border-left: 3px solid #0b3d91;
+      color: #3a4a5a;
+      font-size: 8.5pt;
+    }
+    .footer {
+      margin-top: 12px;
+      border-top: 1px solid #ccd5df;
+      padding-top: 6px;
+      font-size: 7.5pt;
+      color: #7a8794;
+    }
+  </style>
+</head>
+<body>
+  <div class="head">
+    <div>
+      <h1>Atlas Airways</h1>
+      <p class="brand-sub">Electronic ticket and boarding pass · Star Alliance partner style sample</p>
+    </div>
+    <div class="pnr-box">
+      <div class="label">Confirmation</div>
+      <div class="value">XZ9K4M</div>
+    </div>
+  </div>
+
+  <p class="meta">
+    <strong>E-ticket:</strong> 016-2849103745
+    · Issued 2025-06-12
+    · Booking class Y
+    · Status: Confirmed
+  </p>
+
+  <h2>Itinerary</h2>
+  <table class="segments">
+    <thead>
+      <tr>
+        <th>Flight</th>
+        <th>Date</th>
+        <th>From</th>
+        <th>To</th>
+        <th class="center">Dep</th>
+        <th class="center">Arr</th>
+        <th class="center">Cabin</th>
+        <th class="num">Duration</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>AA 1842</strong></td>
+        <td>2025-07-18</td>
+        <td>SFO San Francisco</td>
+        <td>ORD Chicago O&apos;Hare</td>
+        <td class="center">08:15</td>
+        <td class="center">14:32</td>
+        <td class="center">Economy</td>
+        <td class="num">4h 17m</td>
+      </tr>
+      <tr>
+        <td><strong>AA 2207</strong></td>
+        <td>2025-07-25</td>
+        <td>ORD Chicago O&apos;Hare</td>
+        <td>SFO San Francisco</td>
+        <td class="center">16:40</td>
+        <td class="center">19:05</td>
+        <td class="center">Economy</td>
+        <td class="num">4h 25m</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Boarding passes</h2>
+  <table class="passes">
+    <tr>
+      <td>
+        <div class="pass">
+          <div class="pass-top">
+            <span class="airline">Atlas Airways</span>
+            <span class="kind">Boarding pass · Outbound</span>
+          </div>
+          <div class="pass-body">
+            <p class="passenger">CHEN / MAYA MS</p>
+            <div class="route">
+              <div class="airport">
+                <div class="code">SFO</div>
+                <div class="city">San Francisco</div>
+              </div>
+              <div class="arrow">→</div>
+              <div class="airport" style="text-align:right">
+                <div class="code">ORD</div>
+                <div class="city">Chicago O&apos;Hare</div>
+              </div>
+            </div>
+            <table class="grid">
+              <tr>
+                <td><span class="label">Flight</span><span class="value">AA 1842</span></td>
+                <td><span class="label">Date</span><span class="value">18 JUL</span></td>
+                <td><span class="label">Seat</span><span class="value">14A</span></td>
+              </tr>
+              <tr>
+                <td><span class="label">Boarding</span><span class="value">07:35</span></td>
+                <td><span class="label">Gate</span><span class="value">B42</span></td>
+                <td><span class="label">Zone</span><span class="value">3</span></td>
+              </tr>
+              <tr>
+                <td><span class="label">Departs</span><span class="value">08:15</span></td>
+                <td><span class="label">Class</span><span class="value">Y</span></td>
+                <td><span class="label">Seq</span><span class="value">048</span></td>
+              </tr>
+            </table>
+            <div class="barcode">M1CHEN/MAYA       XZ9K4M SFORD AA 1842 199Y014A0048 148&gt;1180  0161BAA1842</div>
+          </div>
+        </div>
+      </td>
+      <td>
+        <div class="pass">
+          <div class="pass-top">
+            <span class="airline">Atlas Airways</span>
+            <span class="kind">Boarding pass · Outbound</span>
+          </div>
+          <div class="pass-body">
+            <p class="passenger">ROSSI / LUCA MR</p>
+            <div class="route">
+              <div class="airport">
+                <div class="code">SFO</div>
+                <div class="city">San Francisco</div>
+              </div>
+              <div class="arrow">→</div>
+              <div class="airport" style="text-align:right">
+                <div class="code">ORD</div>
+                <div class="city">Chicago O&apos;Hare</div>
+              </div>
+            </div>
+            <table class="grid">
+              <tr>
+                <td><span class="label">Flight</span><span class="value">AA 1842</span></td>
+                <td><span class="label">Date</span><span class="value">18 JUL</span></td>
+                <td><span class="label">Seat</span><span class="value">14B</span></td>
+              </tr>
+              <tr>
+                <td><span class="label">Boarding</span><span class="value">07:35</span></td>
+                <td><span class="label">Gate</span><span class="value">B42</span></td>
+                <td><span class="label">Zone</span><span class="value">3</span></td>
+              </tr>
+              <tr>
+                <td><span class="label">Departs</span><span class="value">08:15</span></td>
+                <td><span class="label">Class</span><span class="value">Y</span></td>
+                <td><span class="label">Seq</span><span class="value">049</span></td>
+              </tr>
+            </table>
+            <div class="barcode">M1ROSSI/LUCA      XZ9K4M SFORD AA 1842 199Y014B0049 149&gt;1180  0161BAA1842</div>
+          </div>
+        </div>
+      </td>
+    </tr>
+  </table>
+
+  <table class="passes" style="margin-top:10px">
+    <tr>
+      <td>
+        <div class="pass">
+          <div class="pass-top">
+            <span class="airline">Atlas Airways</span>
+            <span class="kind">Boarding pass · Return</span>
+          </div>
+          <div class="pass-body">
+            <p class="passenger">CHEN / MAYA MS</p>
+            <div class="route">
+              <div class="airport">
+                <div class="code">ORD</div>
+                <div class="city">Chicago O&apos;Hare</div>
+              </div>
+              <div class="arrow">→</div>
+              <div class="airport" style="text-align:right">
+                <div class="code">SFO</div>
+                <div class="city">San Francisco</div>
+              </div>
+            </div>
+            <table class="grid">
+              <tr>
+                <td><span class="label">Flight</span><span class="value">AA 2207</span></td>
+                <td><span class="label">Date</span><span class="value">25 JUL</span></td>
+                <td><span class="label">Seat</span><span class="value">22C</span></td>
+              </tr>
+              <tr>
+                <td><span class="label">Boarding</span><span class="value">16:00</span></td>
+                <td><span class="label">Gate</span><span class="value">C18</span></td>
+                <td><span class="label">Zone</span><span class="value">4</span></td>
+              </tr>
+              <tr>
+                <td><span class="label">Departs</span><span class="value">16:40</span></td>
+                <td><span class="label">Class</span><span class="value">Y</span></td>
+                <td><span class="label">Seq</span><span class="value">071</span></td>
+              </tr>
+            </table>
+            <div class="barcode">M1CHEN/MAYA       XZ9K4M ORDSF AA 2207 206Y022C0071 171&gt;1180  0161BAA2207</div>
+          </div>
+        </div>
+      </td>
+      <td>
+        <div class="pass">
+          <div class="pass-top">
+            <span class="airline">Atlas Airways</span>
+            <span class="kind">Boarding pass · Return</span>
+          </div>
+          <div class="pass-body">
+            <p class="passenger">ROSSI / LUCA MR</p>
+            <div class="route">
+              <div class="airport">
+                <div class="code">ORD</div>
+                <div class="city">Chicago O&apos;Hare</div>
+              </div>
+              <div class="arrow">→</div>
+              <div class="airport" style="text-align:right">
+                <div class="code">SFO</div>
+                <div class="city">San Francisco</div>
+              </div>
+            </div>
+            <table class="grid">
+              <tr>
+                <td><span class="label">Flight</span><span class="value">AA 2207</span></td>
+                <td><span class="label">Date</span><span class="value">25 JUL</span></td>
+                <td><span class="label">Seat</span><span class="value">22D</span></td>
+              </tr>
+              <tr>
+                <td><span class="label">Boarding</span><span class="value">16:00</span></td>
+                <td><span class="label">Gate</span><span class="value">C18</span></td>
+                <td><span class="label">Zone</span><span class="value">4</span></td>
+              </tr>
+              <tr>
+                <td><span class="label">Departs</span><span class="value">16:40</span></td>
+                <td><span class="label">Class</span><span class="value">Y</span></td>
+                <td><span class="label">Seq</span><span class="value">072</span></td>
+              </tr>
+            </table>
+            <div class="barcode">M1ROSSI/LUCA      XZ9K4M ORDSF AA 2207 206Y022D0072 172&gt;1180  0161BAA2207</div>
+          </div>
+        </div>
+      </td>
+    </tr>
+  </table>
+
+  <div class="notes">
+    <strong>Check-in notes:</strong> Arrive at the gate no later than 30 minutes before departure.
+    Photo ID required. Gate and seat assignments may change; verify on airport monitors.
+    Baggage allowance: 1 carry-on + 1 personal item per passenger. Confirmation XZ9K4M.
+  </div>
+
+  <div class="footer">
+    Generated by gowkhtmltopdf golden fixture 52 — airline boarding pass sample (not a real ticket).
+  </div>
+</body>
+</html>

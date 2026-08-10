@@ -1,7 +1,8 @@
 # gowkhtmltopdf: Documentation site (React)
 
 A minimal editorial product-site for the **gowkhtmltopdf** project: a pure-Go,
-stdlib-only HTML-to-PDF/PNG converter that is a clean-room work-alike of
+no-cgo HTML-to-PDF/PNG renderer with no browser or external converter process,
+and a clean-room work-alike of
 [wkhtmltopdf](https://github.com/wkhtmltopdf/wkhtmltopdf).
 
 The site tells two stories:

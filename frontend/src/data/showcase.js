@@ -1,4 +1,5 @@
-const BASE = 'https://github.com/chinmay-sawant/gowkhtmltopdf/tree/feature/wkhtmltopdf-open-issues-comparison/output'
+const BASE = 'https://github.com/chinmay-sawant/gowkhtmltopdf/tree/master/output'
+const GOLDEN_BASE = 'https://github.com/chinmay-sawant/gowkhtmltopdf/tree/master/testdata/golden'
 
 export const SHOWCASE = [
   {
@@ -365,4 +366,9 @@ export const SHOWCASE_SPECIAL = [
 
 export function githubPdfUrl(file) {
   return `${BASE}/${file}`
+}
+
+export function githubTemplateUrl(name) {
+  if (!name.startsWith('fixture-')) return null
+  return `${GOLDEN_BASE}/${name}.html`
 }

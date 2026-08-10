@@ -1,6 +1,6 @@
 # gowkhtmltopdf documentation
 
-User and design docs for the pure-Go, stdlib-only HTML→PDF / HTML→image engine.
+User and design docs for the pure-Go, no-cgo HTML→PDF / HTML→image engine.
 
 | Document | Purpose |
 |----------|---------|

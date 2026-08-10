@@ -16,7 +16,7 @@ function ShowcaseCard({ item, index, onOpen, page, onPageChange }) {
   const src = pageUrl(item, page)
 
   return (
-    <div className="showcase-card" style={{ '--index': index }}>
+    <article className="showcase-card" style={{ '--index': index }}>
       <div className="showcase-thumb">
         {src ? <img src={src} alt={`${item.title} page ${page}`} loading="lazy" /> : null}
         {multi && (
@@ -48,23 +48,21 @@ function ShowcaseCard({ item, index, onOpen, page, onPageChange }) {
             </button>
           </div>
         )}
-        {multi && (
-          <button
-            type="button"
-            className="showcase-expand"
-            aria-label="Open viewer"
-            onClick={() => onOpen(item)}
-          >
-            open viewer
-          </button>
-        )}
       </div>
-      <button type="button" className="showcase-body" onClick={() => onOpen(item)}>
+      <div className="showcase-body">
         <h3>{item.title}</h3>
         <p>{item.desc}</p>
         <span className="showcase-file">{item.file}</span>
-      </button>
-    </div>
+        <button
+          type="button"
+          className="showcase-open"
+          onClick={() => onOpen(item)}
+          aria-label={`Open ${item.title} sample`}
+        >
+          Open sample <span aria-hidden="true">→</span>
+        </button>
+      </div>
+    </article>
   )
 }
 
@@ -77,21 +75,18 @@ export default function ShowcasePage() {
   return (
     <>
       <PageTitle title="Showcase" />
-      <div className="hero">
-        <h1>Showcase</h1>
+      <section className="showcase-hero" aria-labelledby="showcase-title">
+        <h1 id="showcase-title">Showcase</h1>
         <p className="lede">
-          First-page screenshots of the committed sample PDFs under <code>output/</code>, generated
-          by <code>make samples</code> from the golden HTML fixtures. Multi-page samples flip inline
-          on the card; click the body to open the full viewer.
+          Explore committed PDFs generated from golden HTML fixtures. Multi-page samples can be stepped
+          through in place, then opened in the full viewer.
         </p>
-        <div className="hero-meta">
+        <div className="showcase-meta">
           <span>{SHOWCASE.length + SHOWCASE_SPECIAL.length} samples</span>
-          <span className="sep">·</span>
-          <span>fixture-48 (newest) to fixture-01</span>
-          <span className="sep">·</span>
-          <span>flip pages inline, or open the viewer</span>
+          <span>business documents and CSS fixtures</span>
+          <span>PDF output you can inspect</span>
         </div>
-      </div>
+      </section>
 
       <div className="showcase-grid">
         {[...SHOWCASE, ...SHOWCASE_SPECIAL].map((item, i) => (

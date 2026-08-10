@@ -2,6 +2,7 @@ package convert //nolint:testpackage // white-box tests need unexported access
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -101,24 +102,8 @@ func commandForFixture(t *testing.T, file string) *cli.Command {
 	t.Helper()
 	dir := t.TempDir()
 
-	entries, err := os.ReadDir(goldenDir())
-	if err != nil {
-		t.Fatalf("read golden dir: %v", err)
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-
-		content, err := os.ReadFile(goldenPath(entry.Name()))
-		if err != nil {
-			t.Fatalf("read %s: %v", entry.Name(), err)
-		}
-
-		if err := os.WriteFile(filepath.Join(dir, entry.Name()), content, 0o600); err != nil {
-			t.Fatalf("write %s: %v", entry.Name(), err)
-		}
+	if err := copyGoldenTree(goldenDir(), dir); err != nil {
+		t.Fatalf("copy golden directory: %v", err)
 	}
 
 	obj := settings.DefaultPdfObject()
@@ -151,6 +136,43 @@ func commandForFixture(t *testing.T, file string) *cli.Command {
 	cmd.Global.FontPaths = fontDirs
 
 	return cmd
+}
+
+// copyGoldenTree copies the fixture corpus into the isolated conversion
+// directory while preserving nested stylesheet, font, and image assets.
+func copyGoldenTree(src, dst string) error {
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return fmt.Errorf("read golden dir %s: %w", src, err)
+	}
+
+	for _, entry := range entries {
+		sourcePath := filepath.Join(src, entry.Name())
+		destinationPath := filepath.Join(dst, entry.Name())
+
+		if entry.IsDir() {
+			if err := os.MkdirAll(destinationPath, 0o700); err != nil {
+				return fmt.Errorf("mkdir %s: %w", destinationPath, err)
+			}
+
+			if err := copyGoldenTree(sourcePath, destinationPath); err != nil {
+				return err
+			}
+
+			continue
+		}
+
+		content, err := os.ReadFile(sourcePath)
+		if err != nil {
+			return fmt.Errorf("read %s: %w", sourcePath, err)
+		}
+
+		if err := os.WriteFile(destinationPath, content, 0o600); err != nil {
+			return fmt.Errorf("write %s: %w", destinationPath, err)
+		}
+	}
+
+	return nil
 }
 
 // assertPDFStructure runs the pdf.ReadAll-style sanity checks on the raw
@@ -370,6 +392,21 @@ var fixturePageBounds = map[string]fixtureBounds{ //nolint:gochecknoglobals // i
 	},
 	"fixture-48-shipping-document.html": { //nolint:exhaustruct // intentional zero-value fields
 		minPages: 1, maxPages: 1,
+	},
+	"fixture-49-night-train-poster.html": { //nolint:exhaustruct // intentional zero-value fields
+		minPages: 1, maxPages: 1, images: true,
+	},
+	"fixture-50-letter-template.html": { //nolint:exhaustruct // intentional zero-value fields
+		minPages: 1, maxPages: 1, images: true,
+	},
+	"fixture-51-asteria-storybook.html": { //nolint:exhaustruct // intentional zero-value fields
+		minPages: 4, maxPages: 4, images: true,
+	},
+	"fixture-52-airline-boarding-pass.html": { //nolint:exhaustruct // intentional zero-value fields
+		minPages: 1, maxPages: 1,
+	},
+	"fixture-53-asteria-observatory-poster.html": { //nolint:exhaustruct // intentional zero-value fields
+		minPages: 1, maxPages: 1, images: true,
 	},
 }
 
