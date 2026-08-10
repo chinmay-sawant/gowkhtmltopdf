@@ -16,7 +16,7 @@ function ShowcaseCard({ item, index, onOpen, page, onPageChange }) {
   const src = pageUrl(item, page)
 
   return (
-    <div className="showcase-card" style={{ '--index': index }}>
+    <div className="showcase-card" style={{ '--index': index }} onClick={() => onOpen(item)}>
       <div className="showcase-thumb">
         {src ? <img src={src} alt={`${item.title} page ${page}`} loading="lazy" /> : null}
         {multi && (
@@ -53,17 +53,20 @@ function ShowcaseCard({ item, index, onOpen, page, onPageChange }) {
             type="button"
             className="showcase-expand"
             aria-label="Open viewer"
-            onClick={() => onOpen(item)}
+            onClick={(e) => {
+              e.stopPropagation()
+              onOpen(item)
+            }}
           >
             open viewer
           </button>
         )}
       </div>
-      <button type="button" className="showcase-body" onClick={() => onOpen(item)}>
+      <div className="showcase-body">
         <h3>{item.title}</h3>
         <p>{item.desc}</p>
         <span className="showcase-file">{item.file}</span>
-      </button>
+      </div>
     </div>
   )
 }

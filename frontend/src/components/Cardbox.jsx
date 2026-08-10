@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { githubPdfUrl } from '../data/showcase'
+import { githubPdfUrl, githubTemplateUrl } from '../data/showcase'
 
 const IMAGES = import.meta.glob('../assets/showcase/*.png', { eager: true, query: '?url', import: 'default' })
 
@@ -71,16 +71,17 @@ export default function Cardbox({ item, onClose }) {
                 </button>
               ))}
           </div>
-          <div className="cardbox-meta">
-            {total > 1 ? (
-              <span>
-                page {page} of {total}
-              </span>
-            ) : (
-              <span>single page</span>
+          <div className="cardbox-actions">
+            <span className="cardbox-pagestate">
+              {total > 1 ? `page ${page} of ${total}` : 'single page'}
+            </span>
+            {githubTemplateUrl(item.name) && (
+              <a className="cardbox-btn" href={githubTemplateUrl(item.name)} target="_blank" rel="noopener noreferrer">
+                View template ↗
+              </a>
             )}
-            <a href={githubPdfUrl(item.file)} target="_blank" rel="noopener noreferrer">
-              Open PDF on GitHub
+            <a className="cardbox-btn primary" href={githubPdfUrl(item.file)} target="_blank" rel="noopener noreferrer">
+              Open PDF ↗
             </a>
           </div>
         </div>

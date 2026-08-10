@@ -970,6 +970,7 @@ footer {
   border: 1px solid var(--line);
   border-radius: 10px;
   overflow: hidden;
+  cursor: pointer;
   transition: box-shadow 0.2s, transform 0.2s;
 }
 
@@ -1277,22 +1278,61 @@ html[data-theme='dark'] .pager-dot.active {
   color: #17181a;
 }
 
-.cardbox-meta {
+.cardbox-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   font-family: var(--mono);
+}
+
+.cardbox-pagestate {
   font-size: 11px;
   color: var(--muted);
+  margin-right: 4px;
 }
 
-.cardbox-meta a {
+.cardbox-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.02em;
   color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 7px 12px;
   text-decoration: none;
+  white-space: nowrap;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
 }
 
-.cardbox-meta a:hover {
-  text-decoration: underline;
+.cardbox-btn:hover {
+  border-color: var(--sep);
+  box-shadow: var(--shadow);
+}
+
+.cardbox-btn.primary {
+  background: #2f3437;
+  border-color: #2f3437;
+  color: #fbfbfa;
+}
+
+.cardbox-btn.primary:hover {
+  background: #26292b;
+  border-color: #26292b;
+}
+
+html[data-theme='dark'] .cardbox-btn.primary {
+  background: #e8e6e0;
+  border-color: #e8e6e0;
+  color: #17181a;
+}
+
+html[data-theme='dark'] .cardbox-btn.primary:hover {
+  background: #d6d4cd;
+  border-color: #d6d4cd;
 }
 
 @media (prefers-reduced-motion: reduce) {
