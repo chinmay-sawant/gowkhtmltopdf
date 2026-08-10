@@ -322,7 +322,8 @@ func (c *Content) TextNextLine() { c.buf.WriteString("T*\n") }
 // TextRenderMode sets the text rendering mode (0 = fill, 2 = fill + stroke).
 // Mode 2 with a small line width yields a fake bold.
 func (c *Content) TextRenderMode(mode int) {
-	c.buf.WriteString(strconv.Itoa(mode) + " Tr\n")
+	c.buf.WriteString(strconv.Itoa(mode))
+	c.buf.WriteString(" Tr\n")
 }
 
 // textRun is one contiguous simple-or-Type0 segment of a shown string.

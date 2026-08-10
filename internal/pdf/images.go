@@ -198,7 +198,9 @@ func (c *Content) AddJPEGImage(name string, posX, posY, drawW, drawH float64, da
 	c.imageUses[name] = ref.String()
 	c.Save()
 	c.Transform(drawW, 0, 0, drawH, posX, posY)
-	c.buf.WriteString("/" + name + " Do\n")
+	c.buf.WriteString("/")
+	c.buf.WriteString(name)
+	c.buf.WriteString(" Do\n")
 	c.Restore()
 
 	return nil
@@ -323,7 +325,9 @@ func (c *Content) AddPNGImage(name string, posX, posY, drawWidth, drawHeight flo
 
 	c.Save()
 	c.Transform(drawWidth, 0, 0, drawHeight, posX, posY)
-	c.buf.WriteString("/" + name + " Do\n")
+	c.buf.WriteString("/")
+	c.buf.WriteString(name)
+	c.buf.WriteString(" Do\n")
 	c.Restore()
 
 	return nil

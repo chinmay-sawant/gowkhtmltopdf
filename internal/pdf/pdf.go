@@ -706,7 +706,10 @@ func buildPageResources(content *Content) (string, error) {
 
 		for _, name := range sortedStringKeys(fonts) {
 			ref := fonts[name]
-			res.WriteString(" /" + name + " " + ref)
+			res.WriteString(" /")
+			res.WriteString(name)
+			res.WriteString(" ")
+			res.WriteString(ref)
 		}
 
 		res.WriteString(" >>")
@@ -717,14 +720,18 @@ func buildPageResources(content *Content) (string, error) {
 
 		for _, name := range sortedStringKeys(imgResources) {
 			ref := imgResources[name]
-			res.WriteString(" /" + name + " " + ref)
+			res.WriteString(" /")
+			res.WriteString(name)
+			res.WriteString(" ")
+			res.WriteString(ref)
 		}
 
 		res.WriteString(" >>")
 	}
 
 	if gs := content.extGState(); gs != "" {
-		res.WriteString(" " + gs)
+		res.WriteString(" ")
+		res.WriteString(gs)
 	}
 
 	res.WriteString(" >>")
