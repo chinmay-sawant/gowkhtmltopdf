@@ -10,6 +10,7 @@ import (
 
 	"gowkhtmltopdf/internal/css"
 	"gowkhtmltopdf/internal/html"
+	"gowkhtmltopdf/internal/pdf"
 )
 
 func loadFixture56(t *testing.T) (*html.Node, *css.Stylesheet) {
@@ -111,6 +112,73 @@ func fixture56HasFill(res *Result, target *box, predicate func(Op) bool) bool {
 	return false
 }
 
+func fixture56RoundedStrokes(res *Result, target *box) int {
+	if target == nil || target.opStart < 0 || target.opEnd >= len(res.Ops) {
+		return 0
+	}
+
+	count := 0
+	for _, op := range res.Ops[target.opStart : target.opEnd+1] {
+		if op.Kind == OpStrokeRect && op.Radius > 0 {
+			count++
+		}
+	}
+
+	return count
+}
+
+func fixture56TextOps(res *Result, target *box) int {
+	if target == nil || target.opStart < 0 || target.opEnd >= len(res.Ops) {
+		return 0
+	}
+
+	count := 0
+	for _, op := range res.Ops[target.opStart : target.opEnd+1] {
+		if op.Kind == OpText {
+			count++
+		}
+	}
+
+	return count
+}
+
+func fixture56Location(res *Result, target *html.Node) (ElementLocation, bool) {
+	for _, location := range res.Locations {
+		if location.Node == target {
+			return location, true
+		}
+	}
+
+	return ElementLocation{}, false
+}
+
+func fixture56TextPage(res *Result, text string) (int, bool) {
+	for page, opIndexes := range res.Pages {
+		for _, opIndex := range opIndexes {
+			if opIndex >= 0 && opIndex < len(res.Ops) && res.Ops[opIndex].Kind == OpText &&
+				strings.TrimSpace(res.Ops[opIndex].Text) == text {
+				return page, true
+			}
+		}
+	}
+
+	return 0, false
+}
+
+func fixture56PaintOptions() PaintOptions {
+	const (
+		pageWidth  = 595.28
+		pageHeight = 841.89
+		margin     = 28.35
+	)
+
+	return PaintOptions{ //nolint:exhaustruct // fixture uses the standard print margins
+		PageWidth: pageWidth, PageHeight: pageHeight,
+		MarginTop: margin, MarginBottom: margin,
+		MarginLeft: margin, MarginRight: margin,
+	}
+}
+
 func TestFixture56RendererSeams(t *testing.T) {
 	root, sheet := loadFixture56(t)
 	opts := Options{ //nolint:exhaustruct // fixture uses the standard print layout path
@@ -197,5 +265,85 @@ func TestFixture56RendererSeams(t *testing.T) {
 	}
 	if !codeFill || !markFill {
 		t.Fatalf("inline chrome fills missing: code=%v mark=%v", codeFill, markFill)
+	}
+
+	for _, node := range fixture56Nodes(root, func(node *html.Node) bool {
+		return strings.Contains(" "+fixture56Class(node)+" ", " hero-legend-item ")
+	}) {
+		if got := fixture56RoundedStrokes(res, fixture56BoxByNode(res.root, node)); got != 1 {
+			t.Fatalf("hero legend item %q has %d rounded strokes, want one", node.Text, got)
+		}
+	}
+
+	tab := fixture56Node(root, func(node *html.Node) bool { return fixture56Class(node) == "d02-tab" })
+	tabBox := fixture56BoxByNode(res.root, tab)
+	if got := fixture56TextOps(res, tabBox); got != 1 {
+		t.Fatalf("vertical D02 rail has %d text ops, want one unwrapped run", got)
+	}
+}
+
+func TestFixture56PageComposition(t *testing.T) {
+	root, sheet := loadFixture56(t)
+	const contentHeight = 841.89 - 2*28.35
+
+	res, err := Layout(root, Options{ //nolint:exhaustruct // fixture uses the standard print layout path
+		Width: 595.28 - 2*28.35, Height: contentHeight,
+		Background: true, Sheets: []*css.Stylesheet{sheet}, Media: "print", Zoom: 0.98,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Paint(pdf.NewDocument(), res, fixture56PaintOptions()); err != nil {
+		t.Fatal(err)
+	}
+
+	d01Exit := fixture56Node(root, func(node *html.Node) bool {
+		return fixture56Class(node) == "d01-exit"
+	})
+	bodyRows := fixture56Nodes(root, func(node *html.Node) bool {
+		return node.Name == "tr" && node.Parent != nil && node.Parent.Name == "tbody" &&
+			node.Parent.Parent == d01Exit
+	})
+	if len(bodyRows) != 4 {
+		t.Fatalf("D01 exit body rows = %d, want 4", len(bodyRows))
+	}
+	tableBox := fixture56BoxByNode(res.root, d01Exit)
+	if tableBox == nil || len(tableBox.rows) != 5 {
+		t.Fatalf("D01 exit painted table rows = %d, want 5 including header", len(tableBox.rows))
+	}
+	firstGap := rowYBounds(tableBox.rows[1], res) - rowYBounds(tableBox.rows[0], res)
+	for rowIndex := 2; rowIndex < len(tableBox.rows); rowIndex++ {
+		gap := rowYBounds(tableBox.rows[rowIndex], res) - rowYBounds(tableBox.rows[rowIndex-1], res)
+		if gap > firstGap*1.5 {
+			t.Fatalf("D01 exit row gap before row %d = %.2fpt, first gap = %.2fpt", rowIndex, gap, firstGap)
+		}
+	}
+
+	rowTexts := []string{"ok", "error", "HTTP 404", "HTTP 401"}
+	firstRowPage, ok := fixture56TextPage(res, rowTexts[0])
+	if !ok {
+		t.Fatalf("D01 exit first body row text %q has no painted location", rowTexts[0])
+	}
+
+	for _, text := range rowTexts[1:] {
+		page, found := fixture56TextPage(res, text)
+		if !found {
+			t.Fatalf("D01 exit row text %q has no painted location", text)
+		}
+
+		if page != firstRowPage {
+			t.Fatalf("D01 exit rows split across pages: first=%d current=%d", firstRowPage, page)
+		}
+	}
+
+	d02 := fixture56Node(root, func(node *html.Node) bool { return node.Attribute("id") == "domain-02" })
+	d02Location, ok := fixture56Location(res, d02)
+	if !ok {
+		t.Fatal("D02 section has no painted location")
+	}
+	pageOffset := math.Mod(d02Location.Y, contentHeight)
+	if math.Min(pageOffset, contentHeight-pageOffset) > 2 {
+		t.Fatalf("D02 section starts %.2fpt into page, want forced page start", pageOffset)
 	}
 }

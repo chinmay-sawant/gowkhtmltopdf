@@ -473,17 +473,21 @@ func shiftOpsOnly(res *Result, from, tOrigin int, deltaY float64) {
 // avoidInside walks post-order and moves page-break-inside: avoid boxes wholly
 // to the next page when they span multiple pages but fit one content height.
 func avoidInside(res *Result, contentH float64) bool {
-	var walk func(b *box) bool
-	walk = func(boxNode *box) bool {
+	var walk func(b *box, inTable bool) bool
+	walk = func(boxNode *box, inTable bool) bool {
 		changed := false
+		childInTable := inTable || boxNode.kind == displayTable
 
 		for _, c := range boxNode.children {
-			if walk(c) {
+			if walk(c, childInTable) {
 				changed = true
 			}
 		}
 
-		if boxNode.style.PageBreakInside == pageBreakAvoid && boxNode.height > 0 {
+		// Table cells inherit the avoid policy from table-row pagination, but
+		// moving cells independently splits the collapsed grid. rowsIntact
+		// owns the row-level move and keeps the cell borders/text together.
+		if !inTable && !boxInsideTable(boxNode) && boxNode.style.PageBreakInside == pageBreakAvoid && boxNode.height > 0 {
 			if keepTogetherForAvoid(res, boxNode, contentH) {
 				changed = true
 			}
@@ -492,7 +496,33 @@ func avoidInside(res *Result, contentH float64) bool {
 		return changed
 	}
 
-	return walk(res.root)
+	return walk(res.root, false)
+}
+
+// boxInsideTable reports whether a box belongs to a table subtree. Some table
+// descendants are kept in row metadata instead of the normal child tree, so
+// the DOM ancestry is the reliable guard for avoiding independent cell moves.
+func boxInsideTable(boxNode *box) bool {
+	if boxNode == nil || boxNode.node == nil {
+		return false
+	}
+
+	for node := boxNode.node.Parent; node != nil; node = node.Parent {
+		if isTableElement(node.Name) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func isTableElement(name string) bool {
+	switch name {
+	case "table", "caption", "colgroup", "thead", "tbody", "tfoot", "tr", "td", "th":
+		return true
+	default:
+		return false
+	}
 }
 
 // keepTogetherForAvoid shifts one page-break-inside:avoid box wholly to the
@@ -653,6 +683,28 @@ func beforeAlways( //nolint:gocognit,cyclop,funlen // break-difference bookkeepi
 		lastPage := int(maxEff / contentH)
 
 		if loPage > lastPage {
+			// A prior page-break-after can leave an empty landing band before
+			// this forced-break target. Align the target back to the top of its
+			// already-selected page; otherwise page-break-before:always keeps
+			// the section's natural offset and emits a visibly blank band.
+			pageTop := float64(loPage) * contentH
+			if boxY > pageTop+layoutSlack {
+				deltaY := pageTop - boxY
+				if start < opCount {
+					suffixDy[start] += deltaY
+				}
+
+				for _, b := range boxes {
+					if b == boxNode || b.y > boxY ||
+						(b.y == boxY && b.opStart >= start) {
+						b.y += deltaY
+					}
+				}
+
+				events = append(events, breakEvent{start: start, dy: deltaY})
+				changed = true
+			}
+
 			continue
 		}
 
@@ -830,7 +882,13 @@ func boxMaxOpY(res *Result, boxNode *box) float64 {
 
 // shiftAfterAlways pushes the next box to the page after this box's last op.
 func shiftAfterAlways(res *Result, next *box, lastPage int, contentH float64) bool {
-	dy := float64(lastPage+1)*contentH - next.y
+	// Keep the first flow op a fraction below the page boundary. A table
+	// beginning at exactly contentH is classified as a continuation by the
+	// border/header repair pass, which can leave an open vertical band at the
+	// top of the next page.
+	const pageStartInset = 0.5
+
+	dy := float64(lastPage+1)*contentH + pageStartInset - next.y
 	if dy <= 0 {
 		return false
 	}

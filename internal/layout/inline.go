@@ -33,6 +33,7 @@ type inlineItem struct {
 	marginR    float64 // trailing horizontal margin
 	img        bool
 	chrome     bool // text belongs to an inline element with its own decoration
+	noSplit    bool // vertical writing-mode run must remain one rotated line
 	imgRef     *imageRef
 	href       string
 	forceBreak bool
@@ -255,6 +256,9 @@ func (e *engine) preferClearForTail(
 // current line; returns the replacement items, or nil when no split applies.
 func (e *engine) maybeSplitOverflow(item inlineItem, lineW, lineAdv, contentW float64) []inlineItem {
 	if item.img || item.blockBox != nil || item.text == "" {
+		return nil
+	}
+	if item.noSplit {
 		return nil
 	}
 

@@ -29,6 +29,13 @@ const mmToPt = 72.0 / 25.4
 // a whole document for an invisible hair costs a second full layout pass.
 const smartShrinkMinOverflow = 0.1
 
+// smartShrinkSafetyZoom leaves a small vertical-density allowance when a
+// document barely exceeds the content width. Width-only shrinking can land
+// on a different pagination boundary because font metrics and rounded box
+// edges consume fractional points; the safety floor keeps near-fit reports
+// stable while preserving the full shrink for genuinely wide documents.
+const smartShrinkSafetyZoom = 0.98
+
 // progressComplete is the final progress percentage reported to the CLI.
 const progressComplete = 100
 
@@ -515,6 +522,10 @@ func renderObject(ctx context.Context, run *runContext, obj *settings.PdfObject,
 			// zoom factor composes multiplicatively.
 			zoom := contentW / contentW2
 			if zoom > 0 && zoom < 1 {
+				if zoom > smartShrinkSafetyZoom {
+					zoom = smartShrinkSafetyZoom
+				}
+
 				line.Emit(run.log, line.Info,
 					"object %d (%s): content width %.1fpt exceeds the %.1fpt content area; smart shrinking with zoom %.3f",
 					idx+1, obj.Page, contentW2, contentW, zoom)

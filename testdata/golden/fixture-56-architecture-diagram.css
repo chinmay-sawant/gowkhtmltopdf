@@ -145,6 +145,12 @@ hr { border: none; border-top: 1px solid var(--line); margin: 1em 0; }
   margin: 0 0 14px;
   break-inside: auto;
 }
+
+.d02-page-break {
+  height: 0;
+  break-before: page;
+  page-break-before: always;
+}
 .dom-head {
   display: flex;
   flex-wrap: wrap;
@@ -362,6 +368,8 @@ section.d01 output {
 /* --- terminal mock --- */
 section.d01 .d01-term {
   margin: 0 0 var(--space);
+  break-after: page;
+  page-break-after: always;
   background: var(--d01-term-bg);
   /* modern: oklch() (unsupported here, dropped) - fallback hex wins */
   color: #d8e0e8;

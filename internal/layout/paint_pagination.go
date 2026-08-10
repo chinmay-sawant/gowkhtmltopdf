@@ -522,9 +522,11 @@ func paginationFixpoint(res *Result, contentH float64) {
 // snapCrossingTextOps moves text/image/link ops that cross a page boundary to
 // the next page (taking following flow with them so row spacing is preserved).
 func snapCrossingTextOps(res *Result, contentH float64) {
+	tableRanges := tablePaintRanges(res)
+
 	for idx := range len(res.Ops) {
 		paintOp := &res.Ops[idx]
-		if paintOp.Fixed {
+		if paintOp.Fixed || opInPaintRange(idx, tableRanges) {
 			continue
 		}
 
@@ -547,6 +549,35 @@ func snapCrossingTextOps(res *Result, contentH float64) {
 		case OpFillRect, OpStrokeRect, OpLine, opKindNoop:
 		}
 	}
+}
+
+type paintRange struct{ first, last int }
+
+func tablePaintRanges(res *Result) []paintRange {
+	if res == nil || res.root == nil {
+		return nil
+	}
+
+	ranges := make([]paintRange, 0)
+	for _, boxNode := range flowBoxList(res) {
+		if boxNode.kind != displayTable || boxNode.opStart > boxNode.opEnd {
+			continue
+		}
+
+		ranges = append(ranges, paintRange{first: boxNode.opStart, last: boxNode.opEnd})
+	}
+
+	return ranges
+}
+
+func opInPaintRange(index int, ranges []paintRange) bool {
+	for _, span := range ranges {
+		if index >= span.first && index <= span.last {
+			return true
+		}
+	}
+
+	return false
 }
 
 // snapOpToBoundary shifts one crossing op (and the row chrome under it) onto

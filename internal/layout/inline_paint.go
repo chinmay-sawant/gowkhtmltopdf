@@ -223,6 +223,14 @@ func inlineHasBorder(st ResolvedStyle) bool {
 		inlineBorderVisible(st.BorderBottom) || inlineBorderVisible(st.BorderLeft)
 }
 
+func writingModeRotate(mode string) float64 {
+	if isVerticalWritingMode(mode) {
+		return -90
+	}
+
+	return 0
+}
+
 func inlineBorderVisible(side border) bool {
 	return side.Width > 0 && side.Style != cssDisplayNone
 }
@@ -256,6 +264,7 @@ func (e *engine) emitInlineTextRun(
 		TextTransform: item.style.TextTransform,
 		Bold:          item.style.FontWeight >= fontWeightBold,
 		R:             child[0], G: child[1], B: child[2],
+		RotateDeg: writingModeRotate(item.style.WritingMode),
 	})
 
 	if item.href != "" {

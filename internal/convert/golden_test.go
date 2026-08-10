@@ -412,7 +412,7 @@ var fixturePageBounds = map[string]fixtureBounds{ //nolint:gochecknoglobals // i
 		minPages: 3, maxPages: 3,
 	},
 	"fixture-56-architecture-diagram.html": { //nolint:exhaustruct // intentional zero-value fields
-		minPages: 12, maxPages: 14,
+		minPages: 14, maxPages: 14,
 	},
 }
 

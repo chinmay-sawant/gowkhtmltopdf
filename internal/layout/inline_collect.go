@@ -33,21 +33,64 @@ func (e *engine) collectInlineText(node *html.Node, sty ResolvedStyle, out *[]in
 		return
 	}
 	start := len(*out)
+	parent := node.Parent
+	vertical := parent != nil && parent.Type == html.ElementNode && isVerticalWritingMode(e.styleVal(parent).WritingMode)
 
-	switch sty.WhiteSpace {
-	case cssWhiteSpacePre:
-		e.collectPreText(node, sty, out)
-	default:
-		e.collectWrappedText(node, sty, out)
+	if vertical {
+		verticalStyle := sty
+		verticalStyle.WhiteSpace = cssWhiteSpaceNowrap
+		e.collectWrappedText(node, verticalStyle, out)
+		for idx := start; idx < len(*out); idx++ {
+			(*out)[idx].style = &verticalStyle
+			(*out)[idx].noSplit = true
+		}
+	} else {
+		switch sty.WhiteSpace {
+		case cssWhiteSpacePre:
+			e.collectPreText(node, sty, out)
+		default:
+			e.collectWrappedText(node, sty, out)
+		}
 	}
 
-	parent := node.Parent
-	if parent == nil || parent.Type != html.ElementNode || e.styleVal(parent).Display != cssDisplayInline {
+	if !e.inlineChromeApplies(node) {
 		return
 	}
 
 	for idx := start; idx < len(*out); idx++ {
 		e.enableInlineChrome(&(*out)[idx])
+	}
+}
+
+func isVerticalWritingMode(mode string) bool {
+	return mode == "vertical-rl" || mode == "vertical-lr"
+}
+
+// inlineChromeApplies reports whether text belongs to an inline formatting
+// context whose decoration must be painted by the inline text emitter. A
+// flex/grid item is laid out as a blockified box even when its authored
+// display value is inline; that box already owns its padding, background, and
+// border. Painting inline chrome for its text would emit a second rounded
+// frame and inflate the item's measured size.
+func (e *engine) inlineChromeApplies(node *html.Node) bool {
+	parent := node.Parent
+	if parent == nil || parent.Type != html.ElementNode || e.styleVal(parent).Display != cssDisplayInline {
+		return false
+	}
+	if e.styleVal(parent).Position != "static" || isVerticalWritingMode(e.styleVal(parent).WritingMode) {
+		return false
+	}
+
+	container := parent.Parent
+	if container == nil || container.Type != html.ElementNode {
+		return true
+	}
+
+	switch e.styleVal(container).Display {
+	case displayFlex, displayInlineFlex, displayGrid, displayInlineGrid, displaySubgrid:
+		return false
+	default:
+		return true
 	}
 }
 

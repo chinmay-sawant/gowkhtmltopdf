@@ -1157,6 +1157,9 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 	// padding-bottom is inside the border box (space above border-bottom /
 	// letterhead rules — fixture-07/16).
 	curY += e.scalePt(style.PaddingBottom)
+	if isVerticalWritingMode(style.WritingMode) {
+		curY = e.verticalWritingHeight(contentStart, curY, style)
+	}
 
 	// list marker (outside the principal box content — in the marker area)
 	if node.Name == "li" && boxNode.firstBaseline > 0 {
@@ -1170,6 +1173,28 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 	e.prependChrome(contentStart, boxNode, style, boxNode.x, posY, boxNode.w, boxNode.height)
 
 	return boxNode
+}
+
+func (e *engine) verticalWritingHeight(contentStart int, current float64, style ResolvedStyle) float64 {
+	textWidth := 0.0
+	for _, op := range e.ops[contentStart:] {
+		if op.Kind == OpText && op.RotateDeg != 0 && op.W > textWidth {
+			textWidth = op.W
+		}
+	}
+
+	if textWidth == 0 {
+		return current
+	}
+
+	verticalChrome := e.scalePt(style.PaddingTop) + e.scalePt(style.PaddingBottom) +
+		e.scalePt(style.BorderTop.Width) + e.scalePt(style.BorderBottom.Width)
+	needed := textWidth + verticalChrome
+	if needed > current {
+		return needed
+	}
+
+	return current
 }
 
 func (e *engine) paintValueWidget(node *html.Node, style ResolvedStyle, x, y, w, h float64) {
