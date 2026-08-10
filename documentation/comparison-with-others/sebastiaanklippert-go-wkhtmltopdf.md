@@ -15,7 +15,7 @@ Their own README describes the package as a "Golang commandline wrapper for
 wkhtmltopdf" and notes that **wkhtmltopdf is unmaintained / archived**, and that
 new projects should consider alternatives.
 
-**gowkhtmltopdf** is a different product category: a pure-Go, stdlib-only
+**gowkhtmltopdf** is a different product category: a pure-Go, no-cgo
 work-alike engine (load, parse, CSS subset, layout, paginate, paint, PDF/image
 write) that does not shell out to `wkhtmltopdf` at all.
 
@@ -36,7 +36,8 @@ of the installed `wkhtmltopdf` binary and the time to fetch remote HTML.
 
 - Implements the full pipeline in-process (see [architecture.md](../architecture.md))
 - Ships as static binaries (`gowkhtmltopdf`, `gowkhtmltoimage`) and a Go library API
-- Uses **only the Go standard library** (`go.mod` has zero third-party modules)
+- Uses a Go-native in-repo pipeline with `CGO_ENABLED=0` (Go modules provide
+  shaping and raster support)
 - Requires **no cgo**, no Qt, no WebKit, no Chrome, no external converter binary
 - Targets **controlled server-generated reports** (invoices, tables, multi-page
   docs with headers/footers, TOC, outlines), not full browser print parity
@@ -47,7 +48,7 @@ of the installed `wkhtmltopdf` binary and the time to fetch remote HTML.
 |-----------|-------------------------------------|---------------|
 | **What it is** | Process wrapper around `wkhtmltopdf` | Clean-room HTML to layout to PDF/image engine in pure Go |
 | **Runtime deps** | Must install `wkhtmltopdf` (and its Qt stack) | None: static binary, `CGO_ENABLED=0` |
-| **Go modules** | Thin library; still needs the native binary | Zero third-party modules at runtime |
+| **Go modules** | Thin library; still needs the native binary | Go-native dependencies; no browser or native converter process |
 | **Rendering** | Full (legacy) WebKit via wkhtmltopdf | In-repo pipeline: load, HTML, CSS subset, layout, paginate, paint, PDF 1.4 |
 | **Deployment** | OS package or static wkhtmltopdf binary plus PATH setup | Single self-contained Go binary |
 | **Security surface** | Spawned process and full browser engine; harder to bound | Explicit ACL, local files off by default, HTTP timeouts and body limits, documented threat model |

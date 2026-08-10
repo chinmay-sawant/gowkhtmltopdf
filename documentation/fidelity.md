@@ -2,7 +2,7 @@
 
 **gowkhtmltopdf** converts **controlled, server-generated report HTML** to PDF
 and raster images. It is **not** a browser and does **not** target full WebKit
-or Chrome print parity under a pure-stdlib, no-cgo design.
+or Chrome print parity under a pure-Go, no-cgo design.
 
 This guide is the product-facing fidelity story. The normative per-feature
 contract is the [compatibility matrix](compatibility-matrix.md). Post-MVP work
@@ -16,7 +16,7 @@ is tracked in
 | You need… | Expectation |
 |-----------|-------------|
 | Invoices, statements, multi-page tables, headers/footers, TOC, outlines | **In scope** (report engine) |
-| Deterministic PDF bytes, static binary, zero third-party modules | **In scope** |
+| Repeatable layout, static binary, no browser process | **In scope** |
 | Pixel-perfect clone of an arbitrary website | **Out of scope** |
 | Wikipedia / marketing “decent print” (readable title + body) | **Progressive goal** (Phase 21) — not MVP acceptance yet |
 | Full CSS (flex/grid as layout, absolute/fixed/sticky positioning) | **Partial** — flex (grow/shrink/basis/order/wrap), grid lite, relative/absolute/fixed; sticky print-scoped (page = scrollport); static 2D transforms (paint CTM); not full CSS3 |
@@ -40,7 +40,7 @@ primary content, not a browser clone.
 |------|------|--------------|-------------|
 | **Tier 1** | Solid report engine | 10–16 | Controlled HTML templates look correct in PDF/PNG; bold/italic/spacing usable; image mode not blocky 5×7 text |
 | **Tier 2** | Leave wkhtmltopdf for most jobs | 17–20 | Broader CSS, pagination polish, multi-font/Unicode, HF/link edges |
-| **Tier 3** | Compete on the open web | 23 deferred | Not planned as pure-stdlib product; Chrome/Playwright territory |
+| **Tier 3** | Compete on the open web | 23 deferred | Not planned as a pure-Go report engine; Chrome/Playwright territory |
 
 **As of 2026-08-05:** Tier 1 closed; **Tier 2 phases 17–20 core shipped** (#16/#17). See the post-MVP roadmap status index and shared doc-honesty pass.
 

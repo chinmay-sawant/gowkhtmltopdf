@@ -5,6 +5,7 @@ import ContentPage from './pages/ContentPage'
 import DocumentationPage from './pages/DocumentationPage'
 import DossierPage from './pages/DossierPage'
 import ShowcasePage from './pages/ShowcasePage'
+import LandingPage from './pages/LandingPage'
 
 const DOC_REDIRECTS = [
   ['cli', 'cli'],
@@ -18,7 +19,9 @@ const DOC_REDIRECTS = [
 function WrapLayout() {
   return (
     <div className="wrap">
-      <Outlet />
+      <main id="main-content">
+        <Outlet />
+      </main>
       <Footer />
     </div>
   )
@@ -27,10 +30,11 @@ function WrapLayout() {
 export default function App() {
   return (
     <HashRouter>
+      <a className="skip-link" href="#main-content">Skip to content</a>
       <SiteNav />
       <Routes>
         <Route element={<WrapLayout />}>
-          <Route path="/" element={<ContentPage />} />
+          <Route path="/" element={<LandingPage />} />
           <Route path="/getting-started" element={<ContentPage />} />
           <Route path="/about" element={<ContentPage />} />
           <Route path="/dossier" element={<DossierPage />} />

@@ -8,7 +8,6 @@ const LINKS = [
   { to: '/documentation', label: 'Documentation' },
   { to: '/dossier', label: 'Issue Dossier' },
   { to: '/showcase', label: 'Showcase' },
-  { to: '/about', label: 'About' },
 ]
 
 function useTheme() {
@@ -32,7 +31,7 @@ export default function SiteNav() {
 
   return (
     <nav className="site-nav" aria-label="Primary">
-      <NavLink to="/" className="brand">
+      <NavLink to="/" end className="brand">
         gowkhtmltopdf
       </NavLink>
       <div className="site-nav-right">
@@ -40,22 +39,28 @@ export default function SiteNav() {
           {LINKS.map((l) => (
             <NavLink
               key={l.to}
+              end={l.to === '/'}
               to={l.to}
-              className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}
+              className={({ isActive }) => {
+                const classes = ['nav-link']
+                if (isActive) classes.push('active')
+                if (l.to === '/getting-started') classes.push('nav-link-cta')
+                return classes.join(' ')
+              }}
             >
               {l.label}
             </NavLink>
           ))}
         </div>
-          <GitHubStars />
-          <button
-            type="button"
-            className="theme-toggle"
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-          >
-            {theme === 'dark' ? 'Light' : 'Dark'}
-          </button>
+        <GitHubStars />
+        <button
+          type="button"
+          className="theme-toggle"
+          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+        >
+          {theme === 'dark' ? 'Light' : 'Dark'}
+        </button>
       </div>
     </nav>
   )

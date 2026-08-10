@@ -66,9 +66,9 @@ export default function GitHubStars() {
 
   return (
     <a className="gh-stars" href={REPO_URL} target="_blank" rel="noopener noreferrer">
-      <span className="gh-stars-emoji" aria-hidden="true">
-        ⭐
-      </span>
+      <svg className="gh-stars-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <path d="M8 1.1a6.9 6.9 0 0 0-2.18 13.45c.35.06.47-.15.47-.34v-1.2c-1.92.42-2.33-.82-2.33-.82-.32-.82-.78-1.04-.78-1.04-.63-.43.05-.42.05-.42.7.05 1.07.72 1.07.72.62 1.06 1.63.75 2.03.57.06-.45.24-.75.44-.92-1.54-.18-3.16-.77-3.16-3.44 0-.76.27-1.38.72-1.87-.07-.18-.31-.88.07-1.84 0 0 .59-.19 1.9.71A6.6 6.6 0 0 1 8 4.45a6.6 6.6 0 0 1 1.73.23c1.31-.9 1.9-.71 1.9-.71.38.96.14 1.66.07 1.84.45.49.72 1.11.72 1.87 0 2.68-1.63 3.26-3.18 3.43.25.22.47.64.47 1.29v1.92c0 .19.13.41.48.34A6.9 6.9 0 0 0 8 1.1Z" />
+      </svg>
       <span className="gh-stars-count">{stars === null ? 'Star' : formatStars(stars)}</span>
     </a>
   )

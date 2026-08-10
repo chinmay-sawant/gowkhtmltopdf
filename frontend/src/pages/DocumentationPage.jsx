@@ -29,7 +29,7 @@ export default function DocumentationPage() {
   if (!page) return <Navigate to="/documentation/cli" replace />
 
   return (
-    <div className="docs-page">
+    <div className="docs-page" id="main-content">
       <PageTitle title={page.nav} />
       <div className="docs-layout">
         <aside className="docs-sidebar">
@@ -46,9 +46,14 @@ export default function DocumentationPage() {
             ))}
           </nav>
         </aside>
-        <main className="docs-main">
+        <div className="docs-main">
+          <div className="docs-context" aria-label="Current documentation section">
+            <span>Documentation</span>
+            <span aria-hidden="true">/</span>
+            <strong>{page.nav}</strong>
+          </div>
           <ContentBlocks content={page.content} />
-        </main>
+        </div>
       </div>
       <Footer />
     </div>

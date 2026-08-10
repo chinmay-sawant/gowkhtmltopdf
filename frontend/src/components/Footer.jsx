@@ -1,8 +1,8 @@
 export default function Footer() {
   return (
     <footer>
-      <span>Source: wkhtmltopdf/wkhtmltopdf · GitHub Issues API</span>
-      <span>All 1,329 open issues, each with a coverage verdict</span>
+      <span>gowkhtmltopdf · pure-Go HTML document rendering</span>
+      <span>MIT licensed · <a href="https://github.com/chinmay-sawant/gowkhtmltopdf">View source</a></span>
     </footer>
   )
 }

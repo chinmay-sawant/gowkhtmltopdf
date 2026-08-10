@@ -1,6 +1,6 @@
 # gowkhtmltopdf
 
-Pure-Go, stdlib-only HTML→PDF (and HTML→image) converter - a work-alike for
+Pure-Go, no-cgo HTML→PDF (and HTML→image) converter - a work-alike for
 [wkhtmltopdf](https://wkhtmltopdf.org/) built for **controlled reports**:
 invoices, statements, tables, multi-page documents with headers/footers,
 TOCs and PDF outlines.
@@ -12,11 +12,13 @@ standard library **plus** a narrow exception for OpenType shaping via
 [`go-text/typesetting`](plans/amendments/2026-08-05-gotext-typesetting.md)
 (landed in `go.mod`).
 
-- **Go standard library by default** - the only direct third-party require is
-  `github.com/go-text/typesetting` (OpenType shaping; `CGO_ENABLED=0`)
+- **No browser or native converter process** - the in-repo pipeline runs as a
+  Go binary with `CGO_ENABLED=0`; Go modules provide OpenType shaping and
+  raster/SVG support where needed
 - Two static binaries: `gowkhtmltopdf` (PDF) and `gowkhtmltoimage` (PNG/JPEG)
 - Idiomatic Go library API (`gowkhtmltopdf` root package)
-- Deterministic output: identical input bytes → identical PDF bytes
+- Repeatable layout for fixed input, settings, and metadata time; typed PDF
+  requests can inject `Now` when byte-stable output is required
 - **License:** [MIT](LICENSE) - Copyright (c) 2026 Chinmay Sawant
 
 **Status:** MVP (v0.1.0). Phases 0–9 of the [canonical plan](plans/00-canonical-pure-go-rewrite.md)
@@ -75,7 +77,7 @@ make build
 
 ---
 
-## How this project was built (AI-assisted, stdlib-only)
+## How this project was built (AI-assisted, pure Go)
 
 This codebase is a **clean-room pure-Go rewrite**, not a binding to
 wkhtmltopdf/Qt/WebKit and not a wrapper around any commercial HTML→PDF API.
@@ -356,7 +358,7 @@ These are **goals**, not MVP feature claims, until their phase acceptance gates 
 | Broader CSS / pagination / fonts / HF edges (Tier 2 core) | 17–20 | Shipped core; see fidelity + matrix |
 | **URL → decent print** (readable title + body on wiki/marketing-class HTML; not pixel parity) | **21** | Product contract + docs in progress; acceptance **not** met — do not list as a shipped feature |
 | Staged JavaScript | 22 | Not started |
-| Open-web / browser competition | 23 | Deferred (not planned under pure-stdlib) |
+| Open-web / browser competition | 23 | Deferred (not planned for this report-oriented engine) |
 
 “Decent print” criteria and explicit non-claims (no Wikipedia visual parity, no
 marketing pixel match): **[documentation/fidelity.md](documentation/fidelity.md#arbitrary-websites-phase-21)**.
