@@ -113,13 +113,15 @@ func (e *engine) borderOps(sty ResolvedStyle, posX, posY, wid, height float64) [
 
 	ops := make([]Op, 0, borderSideCount)
 
-	ops = appendBorderLineOps(ops, posX, posY, wid, 0, e.scalePt(sty.BorderTop.Width), sty.BorderTop.Style,
+	ops = appendBorderLineOps(ops, posX, posY, wid, 0, e.scalePt(borderPaint(sty.BorderTop)), sty.BorderTop.Style,
 		sty.BorderTop.Color[0], sty.BorderTop.Color[1], sty.BorderTop.Color[2])
-	ops = appendBorderLineOps(ops, posX+wid, posY, 0, height, e.scalePt(sty.BorderRight.Width), sty.BorderRight.Style,
+	ops = appendBorderLineOps(ops, posX+wid, posY, 0, height,
+		e.scalePt(borderPaint(sty.BorderRight)), sty.BorderRight.Style,
 		sty.BorderRight.Color[0], sty.BorderRight.Color[1], sty.BorderRight.Color[2])
-	ops = appendBorderLineOps(ops, posX, posY+height, wid, 0, e.scalePt(sty.BorderBottom.Width), sty.BorderBottom.Style,
+	ops = appendBorderLineOps(ops, posX, posY+height, wid, 0,
+		e.scalePt(borderPaint(sty.BorderBottom)), sty.BorderBottom.Style,
 		sty.BorderBottom.Color[0], sty.BorderBottom.Color[1], sty.BorderBottom.Color[2])
-	ops = appendBorderLineOps(ops, posX, posY, 0, height, e.scalePt(sty.BorderLeft.Width), sty.BorderLeft.Style,
+	ops = appendBorderLineOps(ops, posX, posY, 0, height, e.scalePt(borderPaint(sty.BorderLeft)), sty.BorderLeft.Style,
 		sty.BorderLeft.Color[0], sty.BorderLeft.Color[1], sty.BorderLeft.Color[2])
 
 	return ops
@@ -167,7 +169,7 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 		border := sty.BorderTop
 		chrome = append(chrome, Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpStrokeRect, X: posX, Y: posY, W: width, H: height,
-			R: border.Color[0], G: border.Color[1], B: border.Color[2], Width: e.scalePt(border.Width), Radius: radius,
+			R: border.Color[0], G: border.Color[1], B: border.Color[2], Width: e.scalePt(borderPaint(border)), Radius: radius,
 		})
 	} else {
 		chrome = append(chrome, e.borderOps(sty, posX, posY, width, height)...)

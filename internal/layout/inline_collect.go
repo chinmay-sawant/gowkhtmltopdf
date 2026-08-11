@@ -136,7 +136,7 @@ func (e *engine) collectWrappedText(node *html.Node, sty ResolvedStyle, out *[]i
 	// a space on top of the margin (TestLogoTitleGap).
 	if !hasNonHTMLSpace(node.Text) {
 		if node.Text != "" {
-			if len(*out) == 0 || !(*out)[len(*out)-1].img {
+			if len(*out) == 0 || !(*out)[len(*out)-1].img || (*out)[len(*out)-1].blockBox != nil {
 				*out = append(*out, e.textItem(" ", e.stylePtr(node)))
 			}
 		}
@@ -332,7 +332,7 @@ func (e *engine) collectInlineSpan(node *html.Node, sty ResolvedStyle, out *[]in
 	before := len(*out)
 
 	if txt := e.pseudoContent(node, "before"); txt != "" {
-		item := e.textItem(txt, e.stylePtr(node))
+		item := e.textItem(txt, e.pseudoStyle(node, "before", sty))
 		e.enableInlineChrome(&item)
 		*out = append(*out, item)
 	}
@@ -342,7 +342,7 @@ func (e *engine) collectInlineSpan(node *html.Node, sty ResolvedStyle, out *[]in
 	}
 
 	if txt := e.pseudoContent(node, "after"); txt != "" {
-		item := e.textItem(txt, e.stylePtr(node))
+		item := e.textItem(txt, e.pseudoStyle(node, "after", sty))
 		e.enableInlineChrome(&item)
 		*out = append(*out, item)
 	}
@@ -399,9 +399,11 @@ func (e *engine) inlineBlockAvail(nodeN *html.Node, sty ResolvedStyle, cbW float
 		return intr
 	}
 
-	intr := e.measureCellContent(nodeN, sty)
-	intr += e.scalePt(sty.PaddingLeft) + e.scalePt(sty.PaddingRight) +
-		e.scalePt(sty.BorderLeft.Width) + e.scalePt(sty.BorderRight.Width) +
+	// measureCellContent already returns the max-content border-box width,
+	// including horizontal padding and borders. Add only the outer margins;
+	// adding the chrome again makes inline-block pills grow by a second set of
+	// padding/border widths and leaves misleading empty space on the right.
+	intr := e.measureCellContent(nodeN, sty) +
 		e.scalePt(sty.MarginLeft) + e.scalePt(sty.MarginRight)
 
 	if intr < 1 {
@@ -733,7 +735,7 @@ func coalesceTextItems(line []inlineItem) []inlineItem {
 	return line[:writeIdx]
 }
 
-func sameInlineStyle(acc, boxN *ResolvedStyle) bool {
+func sameInlineStyle(acc, boxN *ResolvedStyle) bool { //nolint:cyclop
 	if acc == nil || boxN == nil {
 		return acc == boxN
 	}
@@ -741,9 +743,16 @@ func sameInlineStyle(acc, boxN *ResolvedStyle) bool {
 	return acc.FontSize == boxN.FontSize &&
 		acc.FontWeight == boxN.FontWeight &&
 		acc.FontItalic == boxN.FontItalic &&
+		acc.famHash == boxN.famHash &&
+		acc.LineHeight == boxN.LineHeight &&
 		acc.TextTransform == boxN.TextTransform &&
 		acc.LetterSpacing == boxN.LetterSpacing &&
 		acc.Color == boxN.Color &&
+		acc.BGColor == boxN.BGColor &&
+		acc.PaddingTop == boxN.PaddingTop && acc.PaddingRight == boxN.PaddingRight &&
+		acc.PaddingBottom == boxN.PaddingBottom && acc.PaddingLeft == boxN.PaddingLeft &&
+		acc.BorderTop == boxN.BorderTop && acc.BorderRight == boxN.BorderRight &&
+		acc.BorderBottom == boxN.BorderBottom && acc.BorderLeft == boxN.BorderLeft &&
 		acc.TextDecoration == boxN.TextDecoration &&
 		acc.WhiteSpace == boxN.WhiteSpace
 }
@@ -754,6 +763,14 @@ func lineHeightOf(st *ResolvedStyle) float64 {
 	}
 
 	return defaultLineHeightRatio * st.FontSize
+}
+
+func borderPaint(side border) float64 {
+	if side.PaintWidth > 0 {
+		return side.PaintWidth
+	}
+
+	return side.Width
 }
 
 func collapseWS(src string) string { //nolint:cyclop // hot path: byte-wise whitespace collapsing

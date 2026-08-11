@@ -46,6 +46,41 @@ func (e *engine) pseudoContent(node *html.Node, pseudoEl string) string {
 	return parseContentValue(best.value, node)
 }
 
+// pseudoStyle resolves the used style of generated content against the host
+// style. Generated content inherits from its host, then applies declarations
+// from the matching pseudo-element rules.
+func (e *engine) pseudoStyle(node *html.Node, pseudoEl string, host ResolvedStyle) *ResolvedStyle {
+	if e == nil || node == nil {
+		return &host
+	}
+
+	media := e.opts.Media
+	if media == "" {
+		media = "print"
+	}
+
+	ctx := &styleContext{ //nolint:exhaustruct // generated-content cascade context
+		sheets:     e.opts.Sheets,
+		media:      media,
+		viewportW:  e.opts.Width,
+		viewportH:  e.opts.Height,
+		containers: e.containers,
+	}
+
+	raw := cascadePseudoRaw(ctx, node, pseudoEl)
+
+	if len(raw) == 0 {
+		return e.stylePtr(node)
+	}
+
+	sty := host
+	applyFontProps(&sty, raw, host.FontSize, ctx)
+	applyRestProps(&sty, raw, ctx, &host)
+	sty.famHash = hashFontFamily(sty.FontFamily)
+
+	return &sty
+}
+
 // contentHit is one content: declaration with its cascade priority.
 type contentHit struct {
 	value          string

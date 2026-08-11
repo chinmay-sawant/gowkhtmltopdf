@@ -520,7 +520,7 @@ func applyBoxSpacingProps(style *ResolvedStyle, prop, value string, fsize, viewp
 		return applyMarginVerticalProps(style, prop, value, fsize, viewportW)
 	case "margin-right", "margin-left":
 		return applyMarginHorizontalProps(style, prop, value, fsize, viewportW)
-	case "padding":
+	case paddingProperty:
 		return applyPaddingShorthandProps(style, value, fsize, viewportW)
 	case "padding-top", "padding-right", "padding-bottom", "padding-left":
 		return applyPaddingSideProps(style, prop, value, fsize, viewportW)
@@ -750,7 +750,7 @@ func setBorderRadius(style *ResolvedStyle, value string, fsize float64) bool {
 
 func applyBorderAllSides(style *ResolvedStyle, value string, fsize float64) bool {
 	if strings.EqualFold(strings.TrimSpace(value), cssDisplayNone) || strings.TrimSpace(value) == "0" {
-		zero := border{Width: 0, Style: "", Color: [3]float64{0, 0, 0}}
+		zero := border{Width: 0, PaintWidth: 0, Style: "", Color: [3]float64{0, 0, 0}}
 		style.BorderTop, style.BorderRight, style.BorderBottom, style.BorderLeft = zero, zero, zero, zero
 
 		return true
@@ -782,7 +782,7 @@ func applyBorderOneSide(style *ResolvedStyle, prop, value string, fsize float64)
 
 func setBorderSide(_ *ResolvedStyle, side *border, value string, fsize float64) {
 	if strings.EqualFold(strings.TrimSpace(value), cssDisplayNone) || strings.TrimSpace(value) == "0" {
-		*side = border{Width: 0, Style: "", Color: [3]float64{0, 0, 0}}
+		*side = border{Width: 0, PaintWidth: 0, Style: "", Color: [3]float64{0, 0, 0}}
 
 		return
 	}
@@ -796,15 +796,24 @@ func applyBorderWidthProps(style *ResolvedStyle, prop, value string, fsize float
 	switch prop {
 	case borderWidthKeyword:
 		w := borderWidth(value, fsize)
+		pw := borderPaintWidth(value, fsize)
 		style.BorderTop.Width, style.BorderRight.Width, style.BorderBottom.Width, style.BorderLeft.Width = w, w, w, w
+		style.BorderTop.PaintWidth = pw
+		style.BorderRight.PaintWidth = pw
+		style.BorderBottom.PaintWidth = pw
+		style.BorderLeft.PaintWidth = pw
 	case "border-top-width":
 		style.BorderTop.Width = borderWidth(value, fsize)
+		style.BorderTop.PaintWidth = borderPaintWidth(value, fsize)
 	case "border-right-width":
 		style.BorderRight.Width = borderWidth(value, fsize)
+		style.BorderRight.PaintWidth = borderPaintWidth(value, fsize)
 	case "border-bottom-width":
 		style.BorderBottom.Width = borderWidth(value, fsize)
+		style.BorderBottom.PaintWidth = borderPaintWidth(value, fsize)
 	case "border-left-width":
 		style.BorderLeft.Width = borderWidth(value, fsize)
+		style.BorderLeft.PaintWidth = borderPaintWidth(value, fsize)
 	default:
 		return false
 	}
@@ -961,6 +970,11 @@ func applyTextGroup(
 func applyTextLayoutProps(style *ResolvedStyle, prop, value string) bool {
 	switch prop {
 	case "line-height":
+		style.LineHeightUnitless = 0
+		if ratio, ok := css.ParseNumber(value); ok {
+			style.LineHeightUnitless = ratio
+		}
+
 		style.LineHeight = lineHeight(value, style.FontSize)
 	case "text-align":
 		setTextAlignValue(style, value)

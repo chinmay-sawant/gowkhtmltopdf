@@ -7,7 +7,10 @@ import (
 	"gowkhtmltopdf/internal/css"
 )
 
-const calcParts = 3
+const (
+	calcParts     = 3
+	mediumKeyword = "medium"
+)
 
 func parseColumnsShorthand(sty *ResolvedStyle, value string, fsize, viewportW float64) {
 	sty.ColumnCount = 0
@@ -53,7 +56,7 @@ func parseFontShorthand(style *ResolvedStyle, value string, remBase float64) {
 		// first size token
 		rest, lineH := fontSizeToken(page, style.FontSize)
 		if lineH >= 0 {
-			style.LineHeight = lineH
+			setFontLineHeight(style, page, lineH)
 		}
 
 		style.FontSize = fontSize(rest, style.FontSize, remBase)
@@ -85,8 +88,8 @@ func applyFontStyleKeyword(style *ResolvedStyle, page string) bool {
 
 // fontSizeToken splits "12px/1.4" into the size part and line-height (or -1).
 func fontSizeToken(page string, fsize float64) (string, float64) {
-	if j := strings.IndexByte(page, '/'); j >= 0 {
-		return page[:j], lineHeight(page[j+1:], fsize)
+	if before, after, ok := strings.Cut(page, "/"); ok {
+		return before, lineHeight(after, fsize)
 	}
 
 	return page, -1
@@ -277,7 +280,7 @@ func setFour(_ *ResolvedStyle, value string, top, right, bottom, left *float64, 
 	*left = marginLen(val[3], fsVal, ctxW)
 }
 
-func parseBorder(value string, _ float64) (border, bool) {
+func parseBorder(value string, fsize float64) (border, bool) { //nolint:cyclop
 	var boxNode border
 
 	for start := 0; ; {
@@ -294,8 +297,11 @@ func parseBorder(value string, _ float64) (border, bool) {
 		default:
 			if r, g, bb, _, ok := css.ParseColor(face); ok {
 				boxNode.Color = [3]float64{float64(r) / 255, float64(g) / 255, float64(bb) / 255}
-			} else if v, _, ok := css.ParseLength(face); ok {
+			} else if v, unit, ok := css.ParseLength(face); ok {
 				boxNode.Width = v
+				if pt, converted := css.LengthToPt(v, unit, fsize); converted {
+					boxNode.PaintWidth = pt
+				}
 			}
 		}
 
@@ -308,6 +314,7 @@ func parseBorder(value string, _ float64) (border, bool) {
 
 	if boxNode.Width == 0 {
 		boxNode.Width = 1
+		boxNode.PaintWidth = 1
 	}
 
 	return boxNode, boxNode.Style != cssDisplayNone
@@ -359,7 +366,7 @@ func borderWidth(value string, _ float64) float64 {
 	switch value {
 	case "thin":
 		return pxToPt(1)
-	case "medium":
+	case mediumKeyword:
 		return pxToPt(three)
 	case "thick":
 		return pxToPt(borderWidthMediumPx)
@@ -370,6 +377,33 @@ func borderWidth(value string, _ float64) float64 {
 	}
 
 	return 0
+}
+
+func borderPaintWidth(value string, fsize float64) float64 {
+	switch value {
+	case "thin", mediumKeyword, "thick":
+		return borderWidth(value, fsize)
+	}
+
+	if v, unit, ok := css.ParseLength(value); ok {
+		if pt, converted := css.LengthToPt(v, unit, fsize); converted {
+			return pt
+		}
+	}
+
+	return 0
+}
+
+func setFontLineHeight(style *ResolvedStyle, page string, lineH float64) {
+	style.LineHeightUnitless = 0
+
+	if _, after, ok := strings.Cut(page, "/"); ok {
+		if ratio, numeric := css.ParseNumber(after); numeric {
+			style.LineHeightUnitless = ratio
+		}
+	}
+
+	style.LineHeight = lineH
 }
 
 func fontSize(value string, parent, remBase float64) float64 {
@@ -406,7 +440,7 @@ func fontSizeKeyword(value string, parent float64) (float64, bool) {
 		return pxToPt(fontSizeSmallPx), true
 	case "small":
 		return pxToPt(fontSizeMediumPx), true
-	case "medium":
+	case mediumKeyword:
 		return pxToPt(cssPxRoot), true
 	case "large":
 		return pxToPt(fontSizeLargePx), true

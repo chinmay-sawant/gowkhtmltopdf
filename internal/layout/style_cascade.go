@@ -136,7 +136,10 @@ var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inheri
 	{[]string{"font-size"}, func(dst, src *ResolvedStyle) { dst.FontSize = src.FontSize }},
 	{[]string{"font-weight"}, func(dst, src *ResolvedStyle) { dst.FontWeight = src.FontWeight }},
 	{[]string{"font-style"}, func(dst, src *ResolvedStyle) { dst.FontItalic = src.FontItalic }},
-	{[]string{"line-height"}, func(dst, src *ResolvedStyle) { dst.LineHeight = src.LineHeight }},
+	{[]string{"line-height"}, func(dst, src *ResolvedStyle) {
+		dst.LineHeight = src.LineHeight
+		dst.LineHeightUnitless = src.LineHeightUnitless
+	}},
 	{[]string{"text-align"}, func(dst, src *ResolvedStyle) { dst.TextAlign = src.TextAlign }},
 	{[]string{"text-transform"}, func(dst, src *ResolvedStyle) { dst.TextTransform = src.TextTransform }},
 	{[]string{"white-space"}, func(dst, src *ResolvedStyle) { dst.WhiteSpace = src.WhiteSpace }},
@@ -340,7 +343,7 @@ func cascadeRaw( //nolint:funlen // cascade tiers are deliberately visible in on
 					continue
 				}
 
-				applyCascadeWin(wins, d.Prop, d.Value, hit.a, hit.b, hit.c, rule.Order, d.Important)
+				applyCascadeDeclaration(wins, d.Prop, d.Value, hit.a, hit.b, hit.c, rule.Order, d.Important)
 			}
 		}
 	}
@@ -352,7 +355,7 @@ func cascadeRaw( //nolint:funlen // cascade tiers are deliberately visible in on
 			continue
 		}
 
-		applyCascadeWin(wins, d.Prop, d.Value, 1<<maxIntShift, 0, 0, 1<<maxIntShift, d.Important)
+		applyCascadeDeclaration(wins, d.Prop, d.Value, 1<<maxIntShift, 0, 0, 1<<maxIntShift, d.Important)
 	}
 
 	if len(wins) == 0 {
@@ -381,6 +384,95 @@ func cascadeRaw( //nolint:funlen // cascade tiers are deliberately visible in on
 	}
 
 	return out
+}
+
+// cascadePseudoRaw returns the winning declarations for a generated
+// ::before/::after box. Pseudo-elements have no inline attribute or UA rule of
+// their own; their declarations come from the author rules that matched the
+// host and pseudo shape.
+func cascadePseudoRaw(ctx *styleContext, node *html.Node, pseudoElem string) map[string]string {
+	if ctx == nil || node == nil {
+		return nil
+	}
+
+	wins := ctx.cascadeWins
+	if wins == nil {
+		wins = make(map[string]cascadeWin, cascadeWinHint)
+		ctx.cascadeWins = wins
+	} else {
+		clear(wins)
+	}
+
+	for _, hit := range ctx.matchedRules(node, pseudoElem) {
+		for _, d := range hit.r.Decls {
+			if !supportedDeclaration(d.Value) {
+				continue
+			}
+
+			applyCascadeDeclaration(wins, d.Prop, d.Value, hit.a, hit.b, hit.c, hit.r.Order, d.Important)
+		}
+	}
+
+	if len(wins) == 0 {
+		return nil
+	}
+
+	out := make(map[string]string, len(wins))
+	for prop, win := range wins {
+		out[prop] = win.value
+	}
+
+	return out
+}
+
+// applyCascadeDeclaration expands box shorthands before selecting winners.
+// A shorthand and a longhand compete per physical property: the declaration
+// that wins by specificity and source order must win that side, regardless of
+// which form it used. Keeping the shorthand intact until after the cascade
+// made an earlier margin-top declaration override a later margin shorthand.
+func applyCascadeDeclaration(
+	wins map[string]cascadeWin,
+	prop, value string,
+	ids, classes, types, order int,
+	important bool,
+) {
+	values, ok := expandBoxShorthand(prop, value)
+	if !ok {
+		applyCascadeWin(wins, prop, value, ids, classes, types, order, important)
+
+		return
+	}
+
+	for idx, side := range [...]string{"top", "right", "bottom", "left"} {
+		applyCascadeWin(wins, prop+"-"+side, values[idx], ids, classes, types, order, important)
+	}
+}
+
+func expandBoxShorthand(prop, value string) ([4]string, bool) {
+	var values [4]string
+	if prop != marginProperty && prop != paddingProperty {
+		return values, false
+	}
+
+	var tokens [4]string
+	count := splitSpaceTokens(value, tokens[:])
+
+	if count < 1 || count > len(tokens) {
+		return values, false
+	}
+
+	switch count {
+	case 1:
+		values = [4]string{tokens[0], tokens[0], tokens[0], tokens[0]}
+	case two:
+		values = [4]string{tokens[0], tokens[1], tokens[0], tokens[1]}
+	case three:
+		values = [4]string{tokens[0], tokens[1], tokens[2], tokens[1]}
+	default:
+		values = tokens
+	}
+
+	return values, true
 }
 
 // supportedDeclaration rejects modern value functions that this lite renderer

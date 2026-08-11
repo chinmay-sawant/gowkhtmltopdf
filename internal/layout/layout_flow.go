@@ -190,6 +190,12 @@ func (e *engine) flowChildren(
 			parent.children = append(parent.children, ab)
 		}
 	}
+	// A final child margin is inside a parent that has bottom padding or a
+	// bottom border. Without this, the margin disappears from the parent's
+	// used height, making padded cards and diagram boxes shorter than HTML.
+	if sty.PaddingBottom > 0 || sty.BorderBottom.Width > 0 {
+		curY += prevBottom
+	}
 
 	return curY
 }

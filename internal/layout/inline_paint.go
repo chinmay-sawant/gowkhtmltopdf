@@ -211,7 +211,7 @@ func (e *engine) paintInlineChrome(style *ResolvedStyle, leftX, baseline, ascent
 		b := style.BorderTop
 		e.add(Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpStrokeRect, X: leftX, Y: boxY, W: boxW, H: boxH,
-			R: b.Color[0], G: b.Color[1], B: b.Color[2], Width: e.scalePt(b.Width), Radius: radius,
+			R: b.Color[0], G: b.Color[1], B: b.Color[2], Width: e.scalePt(borderPaint(b)), Radius: radius,
 		})
 
 		return

@@ -144,15 +144,16 @@ type ResolvedStyle struct {
 	// famHash is the FNV-1a fingerprint of FontFamily, computed once during
 	// style resolution. Text measurement reuses
 	// it instead of re-hashing the family list per run.
-	famHash       uint64
-	FontSize      float64 // pts
-	FontWeight    int
-	FontItalic    bool
-	LineHeight    float64 // pts; 0 = "normal"
-	TextAlign     string  // floatLeft | floatRight | "center" | "justify"
-	TextTransform string  // "none" | "uppercase" | "lowercase" | "capitalize"
-	VerticalAlign string  // "baseline" | "top" | "middle" | cssVerticalAlignBottom
-	WhiteSpace    string  // "normal" | "nowrap" | "pre"
+	famHash            uint64
+	FontSize           float64 // pts
+	FontWeight         int
+	FontItalic         bool
+	LineHeight         float64 // pts; 0 = "normal"
+	LineHeightUnitless float64 // multiplier when line-height was unitless; 0 otherwise
+	TextAlign          string  // floatLeft | floatRight | "center" | "justify"
+	TextTransform      string  // "none" | "uppercase" | "lowercase" | "capitalize"
+	VerticalAlign      string  // "baseline" | "top" | "middle" | cssVerticalAlignBottom
+	WhiteSpace         string  // "normal" | "nowrap" | "pre"
 	// OverflowWrap is CSS overflow-wrap / word-wrap: "normal" | "break-word" | "anywhere".
 	OverflowWrap string
 	// WordBreak is CSS word-break: "normal" | "break-all" | "keep-all".
@@ -183,9 +184,10 @@ type ResolvedStyle struct {
 }
 
 type border struct {
-	Width float64
-	Style string // cssDisplayNone | "solid" | "dashed" | "dotted"
-	Color [3]float64
+	Width      float64 // layout width in CSS points, retained for pagination geometry
+	PaintWidth float64 // device paint width; zero means use Width
+	Style      string  // cssDisplayNone | "solid" | "dashed" | "dotted"
+	Color      [3]float64
 }
 
 // initialStyle returns the CSS initial values.
@@ -435,7 +437,7 @@ type styleStore struct {
 type styleStoreKey struct {
 	display, position, float, clear, boxSizing string
 	fontHash                                   uint64
-	fontSize, lineHeight                       float64
+	fontSize, lineHeight, lineHeightUnitless   float64
 	fontWeight                                 int
 	fontItalic                                 bool
 	color                                      [3]float64
@@ -451,7 +453,8 @@ func styleStoreKeyFor(style ResolvedStyle) styleStoreKey {
 	return styleStoreKey{
 		display: style.Display, position: style.Position, float: style.Float, clear: style.Clear,
 		boxSizing: style.BoxSizing, fontHash: hashFontFamily(style.FontFamily), fontSize: style.FontSize,
-		lineHeight: style.LineHeight, fontWeight: style.FontWeight, fontItalic: style.FontItalic,
+		lineHeight: style.LineHeight, lineHeightUnitless: style.LineHeightUnitless,
+		fontWeight: style.FontWeight, fontItalic: style.FontItalic,
 		color: style.Color, bgColor: style.BGColor, width: style.Width, widthPercent: style.WidthPercent,
 		height: style.Height, heightPercent: style.HeightPercent, transform: style.Transform,
 		borderRadius: style.BorderRadius, borderRadiusPercent: style.BorderRadiusPercent,
@@ -534,7 +537,7 @@ type comparableResolvedStyle struct {
 	FontSize                                                                     float64
 	FontWeight                                                                   int
 	FontItalic                                                                   bool
-	LineHeight                                                                   float64
+	LineHeight, LineHeightUnitless                                               float64
 	TextAlign, TextTransform, VerticalAlign, WhiteSpace, OverflowWrap, WordBreak string
 	TextDecoration                                                               string
 	LetterSpacing, TextIndent                                                    float64
@@ -580,7 +583,8 @@ func comparableResolvedStyleFor(style ResolvedStyle) comparableResolvedStyle {
 		BorderRadius: style.BorderRadius, BorderRadiusPercent: style.BorderRadiusPercent,
 		Color: style.Color, BGColor: style.BGColor,
 		famHash: style.famHash, FontSize: style.FontSize, FontWeight: style.FontWeight, FontItalic: style.FontItalic,
-		LineHeight: style.LineHeight, TextAlign: style.TextAlign, TextTransform: style.TextTransform,
+		LineHeight: style.LineHeight, LineHeightUnitless: style.LineHeightUnitless,
+		TextAlign: style.TextAlign, TextTransform: style.TextTransform,
 		VerticalAlign: style.VerticalAlign,
 		WhiteSpace:    style.WhiteSpace, OverflowWrap: style.OverflowWrap, WordBreak: style.WordBreak,
 		TextDecoration: style.TextDecoration, LetterSpacing: style.LetterSpacing, TextIndent: style.TextIndent,
@@ -644,6 +648,7 @@ func resolveElementStyle(
 	}
 
 	applyRestProps(sty, raw, ctx, parent)
+	inheritUnitlessLineHeight(sty, parent, raw)
 	// Opt-in operator policy (--print-link-underline): underline
 	// anchors with href after the cascade. Default off — author CSS
 	// (including text-decoration: inherit → parent) wins otherwise.
@@ -660,4 +665,25 @@ func resolveElementStyle(
 	// parseFontShorthand); fingerprint it once so inline text measurement
 	// does not re-hash the family list per run.
 	sty.famHash = hashFontFamily(sty.FontFamily)
+}
+
+// hasExplicitLineHeight reports whether a declaration sets line-height either
+// directly or through a font shorthand containing a slash value.
+func hasExplicitLineHeight(raw map[string]string) bool {
+	if _, ok := raw["line-height"]; ok {
+		return true
+	}
+
+	font, ok := raw["font"]
+
+	return ok && strings.Contains(font, "/")
+}
+
+func inheritUnitlessLineHeight(sty, parent *ResolvedStyle, raw map[string]string) {
+	if parent == nil || hasExplicitLineHeight(raw) || parent.LineHeightUnitless <= 0 {
+		return
+	}
+
+	sty.LineHeightUnitless = parent.LineHeightUnitless
+	sty.LineHeight = sty.FontSize * sty.LineHeightUnitless
 }

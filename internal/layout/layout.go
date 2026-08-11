@@ -1178,9 +1178,63 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 		e.paintValueWidget(node, style, boxNode.x, posY, boxNode.w, boxNode.height)
 	}
 
+	e.paintPositionedPseudo(node, style, boxNode, "before")
+	e.paintPositionedPseudo(node, style, boxNode, "after")
+
 	e.prependChrome(contentStart, boxNode, style, boxNode.x, posY, boxNode.w, boxNode.height)
 
 	return boxNode
+}
+
+// paintPositionedPseudo paints generated content whose used position takes it
+// out of the host's normal inline flow. This covers block and flex-item hosts
+// such as diagram cards; inline hosts continue through collectInlineSpan.
+func (e *engine) paintPositionedPseudo( //nolint:cyclop
+	node *html.Node, host ResolvedStyle, boxNode *box, pseudoElem string,
+) {
+	text := e.pseudoContent(node, pseudoElem)
+	if text == "" || boxNode == nil {
+		return
+	}
+
+	style := e.pseudoStyle(node, pseudoElem, host)
+	if style.Position != positionAbsolute && style.Position != positionFixed {
+		return
+	}
+
+	face := e.faceFor(*style)
+	size := style.FontSize * e.scale
+
+	if face == nil || size <= 0 {
+		return
+	}
+
+	contentX, contentW := e.contentBox(boxNode.x, boxNode.w, host)
+	pseudoX := contentX + e.scalePt(style.MarginLeft)
+
+	if !style.LeftAuto {
+		pseudoX = contentX + e.scalePt(style.Left)
+	} else if !style.RightAuto {
+		pseudoX = contentX + contentW - e.measureTextFace(text, *style) - e.scalePt(style.Right)
+	}
+
+	pseudoY := boxNode.y + e.scalePt(host.PaddingTop) + e.scalePt(host.BorderTop.Width) +
+		e.scalePt(style.MarginTop)
+	if !style.TopAuto {
+		pseudoY = boxNode.y + e.scalePt(style.Top)
+	} else if !style.BottomAuto {
+		pseudoY = boxNode.y + boxNode.height - e.scalePt(style.Bottom)
+	}
+
+	baseline := pseudoY + e.fontAscent(size)
+	prevZ, prevSet, prevPositioned := e.pushZ(*style)
+	e.add(Op{ //nolint:exhaustruct // generated pseudo text has no DOM box
+		Kind: OpText, X: pseudoX, Y: baseline, W: e.measureTextFace(text, *style),
+		H: style.LineHeight * e.scale, Text: text, Font: face, Size: size,
+		R: style.Color[0], G: style.Color[1], B: style.Color[2],
+		Bold: style.FontWeight >= fontWeightBold,
+	})
+	e.popZ(prevZ, prevSet, prevPositioned)
 }
 
 func (e *engine) verticalWritingHeight(contentStart int, current float64, style ResolvedStyle) float64 {
