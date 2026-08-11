@@ -304,7 +304,7 @@ func (m *cellMeasure) measureText(text string, cstate ResolvedStyle, nowrap bool
 			}
 
 			first = false
-			wordW := eng.measureTextFace(word, cstate)
+			wordW := eng.measureTextFace(transformInlineText(word, cstate.TextTransform), cstate)
 			m.lineW += wordW
 			m.noteWord(eng.minContentWidth(word, cstate, wordW+chromeW))
 
@@ -314,7 +314,8 @@ func (m *cellMeasure) measureText(text string, cstate ResolvedStyle, nowrap bool
 		return
 	}
 
-	full := eng.measureTextFace(text, cstate) + inlineMeasurementChromeWidth(eng, cstate)
+	full := eng.measureTextFace(transformInlineText(text, cstate.TextTransform), cstate) +
+		inlineMeasurementChromeWidth(eng, cstate)
 	m.lineW += full
 	m.noteWord(eng.minContentWidth(text, cstate, full))
 

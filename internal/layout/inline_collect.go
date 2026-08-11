@@ -28,6 +28,8 @@ func (e *engine) collectInlineNode(node *html.Node, out *[]inlineItem) {
 }
 
 // collectInlineText flattens one text node under its white-space mode.
+//
+//nolint:cyclop // whitespace, writing-mode, and inline decoration are one collection pass
 func (e *engine) collectInlineText(node *html.Node, sty ResolvedStyle, out *[]inlineItem) {
 	if sty.Display == cssDisplayNone {
 		return
@@ -47,8 +49,18 @@ func (e *engine) collectInlineText(node *html.Node, sty ResolvedStyle, out *[]in
 			(*out)[idx].noSplit = true
 		}
 	} else {
-		switch sty.WhiteSpace {
-		case cssWhiteSpacePre:
+		atomicChrome := e.inlineChromeIsAtomic(node)
+
+		switch {
+		case atomicChrome:
+			// Keep padded/outlined inline labels together when they fit on
+			// the next line. Splitting each word into a separate decorated
+			// item produces a sequence of tiny pills and can strand the last
+			// word on a new line even though the complete label fits.
+			atomicStyle := sty
+			atomicStyle.WhiteSpace = cssWhiteSpaceNowrap
+			e.collectWrappedText(node, atomicStyle, out)
+		case sty.WhiteSpace == cssWhiteSpacePre:
 			e.collectPreText(node, sty, out)
 		default:
 			e.collectWrappedText(node, sty, out)
@@ -95,6 +107,25 @@ func (e *engine) inlineChromeApplies(node *html.Node) bool {
 	default:
 		return true
 	}
+}
+
+func (e *engine) inlineChromeIsAtomic(node *html.Node) bool {
+	if !e.inlineChromeApplies(node) {
+		return false
+	}
+
+	parent := node.Parent
+	if parent == nil {
+		return false
+	}
+
+	if parent.Name != "mark" {
+		return false
+	}
+
+	style := e.styleVal(parent)
+
+	return style.PaddingLeft > 0 || style.PaddingRight > 0 || inlineHasBorder(style)
 }
 
 // collectPreText splits a white-space:pre node on newlines.
@@ -416,11 +447,20 @@ func (e *engine) inlineBlockAvail(nodeN *html.Node, sty ResolvedStyle, cbW float
 // availWForInline is a generous width for block-in-inline measurement.
 func availWForInline() float64 { return 1 << maxIntShift }
 
-func (e *engine) textItem(text string, st *ResolvedStyle) inlineItem {
-	w := e.measureTextFace(text, *st)
+func (e *engine) textItem(text string, style *ResolvedStyle) inlineItem {
+	textWidth := e.measureTextFace(transformInlineText(text, style.TextTransform), *style)
+	lineHeight := lineHeightOf(style) * e.scale
+
+	if isVerticalWritingMode(style.WritingMode) {
+		// In a vertical writing context the text advance runs along the
+		// block axis. The inline line still occupies only one glyph-width
+		// column; using the full measured string width here makes centered
+		// labels shift left by half their length.
+		textWidth = lineHeight
+	}
 
 	return inlineItem{ //nolint:exhaustruct // intentional zero fields
-		text: text, style: st, w: w, h: lineHeightOf(st) * e.scale,
+		text: text, style: style, w: textWidth, h: lineHeight,
 	}
 }
 

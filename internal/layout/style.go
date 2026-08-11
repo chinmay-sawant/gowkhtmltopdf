@@ -126,6 +126,8 @@ type ResolvedStyle struct {
 	MarginRight         float64
 	MarginBottom        float64
 	MarginLeft          float64
+	MarginTopAuto       bool // margin-top: auto in a flex column
+	MarginBottomAuto    bool // margin-bottom: auto in a flex column
 	MarginLeftAuto      bool // margin-left: auto (horizontal centering with right auto)
 	MarginRightAuto     bool // margin-right: auto
 	PaddingTop          float64
@@ -527,7 +529,7 @@ type comparableResolvedStyle struct {
 	MinHeight, MinHeightPercent, MaxHeight                                       float64
 	Overflow                                                                     string
 	MarginTop, MarginRight, MarginBottom, MarginLeft                             float64
-	MarginLeftAuto, MarginRightAuto                                              bool
+	MarginTopAuto, MarginBottomAuto, MarginLeftAuto, MarginRightAuto             bool
 	PaddingTop, PaddingRight, PaddingBottom, PaddingLeft                         float64
 	BorderTop, BorderRight, BorderBottom, BorderLeft                             border
 	BorderRadius, BorderRadiusPercent                                            float64
@@ -576,7 +578,8 @@ func comparableResolvedStyleFor(style ResolvedStyle) comparableResolvedStyle {
 		MinWidthSet:      style.MinWidthSet,
 		MinHeightPercent: style.MinHeightPercent, MaxHeight: style.MaxHeight, Overflow: style.Overflow,
 		MarginTop: style.MarginTop, MarginRight: style.MarginRight, MarginBottom: style.MarginBottom,
-		MarginLeft: style.MarginLeft, MarginLeftAuto: style.MarginLeftAuto, MarginRightAuto: style.MarginRightAuto,
+		MarginLeft: style.MarginLeft, MarginTopAuto: style.MarginTopAuto, MarginBottomAuto: style.MarginBottomAuto,
+		MarginLeftAuto: style.MarginLeftAuto, MarginRightAuto: style.MarginRightAuto,
 		PaddingTop: style.PaddingTop, PaddingRight: style.PaddingRight, PaddingBottom: style.PaddingBottom,
 		PaddingLeft: style.PaddingLeft, BorderTop: style.BorderTop, BorderRight: style.BorderRight,
 		BorderBottom: style.BorderBottom, BorderLeft: style.BorderLeft,

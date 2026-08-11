@@ -210,34 +210,35 @@ func parseFlexThree(style *ResolvedStyle, parts []string, fontSize, pctBase floa
 	flexSetBasis(style, parts[2], fontSize, pctBase)
 }
 
-// setFourMargin applies a margin shorthand and tracks horizontal auto.
+// setFourMargin applies a margin shorthand and tracks auto margins on all axes.
 func setFourMargin(sty *ResolvedStyle, value string, fsize, ctxW float64) {
 	var val [4]string
 	count := splitSpaceTokens(value, val[:])
+	sty.MarginTopAuto, sty.MarginBottomAuto = false, false
 	sty.MarginLeftAuto, sty.MarginRightAuto = false, false
 
 	switch count {
 	case 0:
 		return
 	case 1:
-		sty.MarginTop = marginLen(val[0], fsize, ctxW)
+		sty.MarginTop, sty.MarginTopAuto = marginLenAuto(val[0], fsize, ctxW)
 		sty.MarginRight, sty.MarginRightAuto = marginLenAuto(val[0], fsize, ctxW)
-		sty.MarginBottom = marginLen(val[0], fsize, ctxW)
+		sty.MarginBottom, sty.MarginBottomAuto = marginLenAuto(val[0], fsize, ctxW)
 		sty.MarginLeft, sty.MarginLeftAuto = marginLenAuto(val[0], fsize, ctxW)
 	case two:
-		sty.MarginTop = marginLen(val[0], fsize, ctxW)
+		sty.MarginTop, sty.MarginTopAuto = marginLenAuto(val[0], fsize, ctxW)
 		sty.MarginRight, sty.MarginRightAuto = marginLenAuto(val[1], fsize, ctxW)
-		sty.MarginBottom = marginLen(val[0], fsize, ctxW)
+		sty.MarginBottom, sty.MarginBottomAuto = marginLenAuto(val[0], fsize, ctxW)
 		sty.MarginLeft, sty.MarginLeftAuto = marginLenAuto(val[1], fsize, ctxW)
 	case three:
-		sty.MarginTop = marginLen(val[0], fsize, ctxW)
+		sty.MarginTop, sty.MarginTopAuto = marginLenAuto(val[0], fsize, ctxW)
 		sty.MarginRight, sty.MarginRightAuto = marginLenAuto(val[1], fsize, ctxW)
-		sty.MarginBottom = marginLen(val[2], fsize, ctxW)
+		sty.MarginBottom, sty.MarginBottomAuto = marginLenAuto(val[2], fsize, ctxW)
 		sty.MarginLeft, sty.MarginLeftAuto = marginLenAuto(val[1], fsize, ctxW)
 	default:
-		sty.MarginTop = marginLen(val[0], fsize, ctxW)
+		sty.MarginTop, sty.MarginTopAuto = marginLenAuto(val[0], fsize, ctxW)
 		sty.MarginRight, sty.MarginRightAuto = marginLenAuto(val[1], fsize, ctxW)
-		sty.MarginBottom = marginLen(val[2], fsize, ctxW)
+		sty.MarginBottom, sty.MarginBottomAuto = marginLenAuto(val[2], fsize, ctxW)
 		sty.MarginLeft, sty.MarginLeftAuto = marginLenAuto(val[3], fsize, ctxW)
 	}
 }

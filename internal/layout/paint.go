@@ -893,7 +893,14 @@ func drawText(
 	chld.BeginText()
 
 	if paintOp.RotateDeg == 90 || paintOp.RotateDeg == -90 {
-		chld.TextMatrix(0, 1, -1, 0, posX, posY)
+		if paintOp.RotateDeg < 0 {
+			// PDF's y-up text space reverses the screen-space direction.
+			// A CSS -90deg vertical run must therefore advance toward
+			// increasing canvas Y, not above its containing box.
+			chld.TextMatrix(0, -1, 1, 0, posX, posY)
+		} else {
+			chld.TextMatrix(0, 1, -1, 0, posX, posY)
+		}
 	} else {
 		chld.TextAt(posX, posY)
 	}

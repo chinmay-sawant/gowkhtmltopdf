@@ -896,6 +896,14 @@ func shiftAfterAlways(res *Result, next *box, lastPage int, contentH float64) bo
 // across page boundaries: it clears the landing band, then sits the box just
 // above the (possibly pushed) sibling. Returns whether it moved.
 func keepAfterAvoid(res *Result, boxNode, next *box, lastPage int, contentH float64) bool {
+	// A following forced break is stronger than page-break-after:avoid on the
+	// preceding box. Keeping the two boxes together would move the preceding
+	// content onto the forced-break page, and the next fixpoint would then move
+	// that page again, producing one extra page per iteration (fixture-03).
+	if next.style.PageBreakBefore == pageBreakAlways {
+		return false
+	}
+
 	// Do NOT collapse natural flow spacing when they already share a
 	// page (that pulled .keep boxes up onto paragraph baselines —
 	// fixture-08 Forms index overlap).

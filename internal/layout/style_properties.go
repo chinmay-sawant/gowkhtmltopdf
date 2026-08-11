@@ -660,9 +660,9 @@ func applyMarginShorthandProps(style *ResolvedStyle, value string, fsize, viewpo
 func applyMarginVerticalProps(style *ResolvedStyle, prop, value string, fsize, viewportW float64) bool {
 	switch prop {
 	case "margin-top":
-		style.MarginTop = marginLen(value, fsize, viewportW)
+		style.MarginTop, style.MarginTopAuto = marginLenAuto(value, fsize, viewportW)
 	case "margin-bottom":
-		style.MarginBottom = marginLen(value, fsize, viewportW)
+		style.MarginBottom, style.MarginBottomAuto = marginLenAuto(value, fsize, viewportW)
 	default:
 		return false
 	}

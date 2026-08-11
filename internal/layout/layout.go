@@ -25,6 +25,7 @@ import (
 )
 
 const htmlTbody = "tbody"
+const htmlCaption = "caption"
 
 // CSS keyword constants shared by the layout engine. Kept here so repeated
 // string literals resolve through one named value (goconst).
@@ -59,6 +60,7 @@ const (
 	textTransformUppercase  = "uppercase"
 	textTransformLowercase  = "lowercase"
 	textTransformCapitalize = "capitalize"
+	tableCellKind           = "cell"
 )
 
 // Options controls a Layout run.
@@ -1109,7 +1111,7 @@ func useBlockForTableDisplay(node *html.Node) bool {
 		}
 
 		switch c.Name {
-		case "tr", htmlTbody, "thead", "tfoot", "colgroup", "col", "caption":
+		case "tr", htmlTbody, "thead", "tfoot", "colgroup", "col", htmlCaption:
 			return false
 		}
 	}
@@ -1352,12 +1354,28 @@ func (e *engine) applyHeightConstraints(style ResolvedStyle, curY float64) float
 		}
 	}
 
-	if style.MinHeight > 0 && curY < e.scalePt(style.MinHeight) {
-		curY = e.scalePt(style.MinHeight)
+	minHeight := e.scalePt(style.MinHeight)
+	if style.BoxSizing != borderBox {
+		minHeight += e.scalePt(style.PaddingTop) + e.scalePt(style.PaddingBottom) +
+			e.scalePt(style.BorderTop.Width) + e.scalePt(style.BorderBottom.Width)
 	}
 
-	if style.MaxHeight >= 0 && curY > e.scalePt(style.MaxHeight) {
-		curY = e.scalePt(style.MaxHeight)
+	if minHeight < 0 {
+		minHeight = 0
+	}
+
+	if minHeight > 0 && curY < minHeight {
+		curY = minHeight
+	}
+
+	maxHeight := e.scalePt(style.MaxHeight)
+	if style.BoxSizing != borderBox {
+		maxHeight += e.scalePt(style.PaddingTop) + e.scalePt(style.PaddingBottom) +
+			e.scalePt(style.BorderTop.Width) + e.scalePt(style.BorderBottom.Width)
+	}
+
+	if style.MaxHeight >= 0 && curY > maxHeight {
+		curY = maxHeight
 	}
 
 	return curY

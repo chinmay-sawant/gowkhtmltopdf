@@ -607,11 +607,12 @@ func (e *engine) primaryFaceRun(cssSheet string, sty ResolvedStyle) (faceRun, bo
 	}
 
 	size := sty.FontSize * e.scale
+	paintText := transformInlineText(cssSheet, sty.TextTransform)
 
 	var width float64
 	runeCount := 0
 
-	for _, runic := range cssSheet {
+	for _, runic := range paintText {
 		width += primary.AdvanceInPoints(runic, size)
 		runeCount++
 	}
