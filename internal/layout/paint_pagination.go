@@ -469,11 +469,13 @@ func paginateOps(res *Result, contentH float64) []int {
 	snapCrossingTextOps(res, contentH)
 
 	paginationFixpoint(res, contentH)
-
 	// After flow has settled, clone <thead> onto continuation pages.
 	// Blank avoid-list bands are controlled by preferSplitOverBlank during
 	// the fixpoint above (former packAvoidGaps sibling packing was a no-op).
 	repeatTableHeaders(res, contentH)
+	// Header continuation shifts can reintroduce a small leading band above a
+	// rounded security callout. Normalize after all flow shifts are complete.
+	normalizeLeadingRoundedCallouts(res, contentH)
 	// Sticky is applied in Paint after rect splitting (see splitCrossingRects).
 	opPage := make([]int, len(res.Ops))
 

@@ -463,6 +463,27 @@ func TestFixture56PaginationChromeAndWidgetGeometry(t *testing.T) { //nolint:par
 		if !foundFill {
 			t.Fatalf("widget %s has no thin value fill", id)
 		}
+
+		if id == "d03-meter" || id == "d03-progress" {
+			wantHeight := boxNode.style.FontSize * 0.98 // fixture layout uses Zoom .98
+			if math.Abs(boxNode.height-wantHeight) > 0.5 {
+				t.Fatalf("widget %s auto height = %.2f, want native font-sized %.2f", id, boxNode.height, wantHeight)
+			}
+		}
+	}
+
+	gauges := fixture56Node(root, func(node *html.Node) bool { return fixture56Class(node) == "d03-gauges" })
+	gaugeBox := fixture56BoxByNode(res.root, gauges)
+	if gaugeBox == nil || len(gaugeBox.children) != 2 {
+		t.Fatalf("D03 gauge row = box=%+v children=%d, want two flex items", gaugeBox, len(gaugeBox.children))
+	}
+
+	for _, child := range gaugeBox.children {
+		const authoredGaugeWidthPercent = 46.0
+		wantWidth := gaugeBox.w * authoredGaugeWidthPercent / cssPercent
+		if math.Abs(child.w-wantWidth) > 0.01 {
+			t.Fatalf("D03 gauge width = %.2f, want authored %.2f%% of row %.2f", child.w, authoredGaugeWidthPercent, gaugeBox.w)
+		}
 	}
 
 	var noteBox *box

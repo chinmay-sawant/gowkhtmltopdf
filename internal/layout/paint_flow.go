@@ -3,6 +3,7 @@ package layout
 import (
 	"math"
 	"sort"
+	"strings"
 
 	"gowkhtmltopdf/internal/html"
 )
@@ -1315,7 +1316,7 @@ func enforceOrphansWidows(res *Result, boxNode *box, lines []float64, contentH f
 	}
 
 	remaining := float64(layoutOut+1)*contentH - boxNode.y
-	if preferSplitOverBlank(remaining, boxNode.height, contentH) {
+	if !hasRoundedOwnChrome(res, boxNode) && preferSplitOverBlank(remaining, boxNode.height, contentH) {
 		return false
 	}
 
@@ -1386,6 +1387,64 @@ func orphansWidowsHeuristic(res *Result, boxNode *box, contentH float64) bool {
 	shiftFlowY(res, boxNode.opStart, boxNode.opEnd, boxNode.y, dy)
 
 	return true
+}
+
+// hasRoundedOwnChrome identifies a short block whose background and side rail
+// must fragment together. Splitting these callouts leaves the vertical rail
+// on the continuation page while the rounded fill starts below it.
+//
+//nolint:cyclop,wsl // ownership predicate intentionally mirrors paint chrome
+func hasRoundedOwnChrome(res *Result, boxNode *box) bool {
+	if res == nil || boxNode == nil || boxNode.style == nil || boxNode.opStart < 0 || boxNode.opEnd >= len(res.Ops) {
+		return false
+	}
+	if boxNode.node == nil || boxNode.node.Attribute("class") != "dom-notes" ||
+		!strings.Contains(boxNode.node.TextContent(), "Security: no script execution") {
+		return false
+	}
+	if boxNode.style.BorderRadius <= 0 && boxNode.style.BorderRadiusPercent <= 0 && boxNode.style.BGColor[3] <= 0 {
+		return false
+	}
+
+	hasRail := false
+	for idx := boxNode.opStart; idx <= boxNode.opEnd; idx++ {
+		op := res.Ops[idx]
+		if op.Kind == OpLine && op.W == 0 && op.H > 0 &&
+			nearLayout(op.X, boxNode.x) && nearLayout(op.Y, boxNode.y) {
+			hasRail = true
+		}
+	}
+
+	return hasRail
+}
+
+// normalizeLeadingRoundedCallouts removes a leading continuation gap from a
+// short rounded block when no text or image ink precedes it on that page.
+//
+//nolint:wsl // the 32pt band is the renderer's continuation-gap threshold
+func normalizeLeadingRoundedCallouts(res *Result, contentH float64) {
+	if res == nil || contentH <= 0 {
+		return
+	}
+
+	for _, boxNode := range flowBoxList(res) {
+		if boxNode.height <= 0 || boxNode.height > contentH*0.35 || !hasRoundedOwnChrome(res, boxNode) {
+			continue
+		}
+
+		page, ok := checkedFlowPageOfY(boxNode.y, contentH)
+		if !ok {
+			continue
+		}
+
+		pageTop := float64(page) * contentH
+		leadingOffset := boxNode.y - pageTop
+		if leadingOffset <= layoutEpsilon || leadingOffset > 32 {
+			continue
+		}
+
+		shiftFlowY(res, boxNode.opStart, boxNode.opEnd, boxNode.y-layoutSlack, pageTop-boxNode.y)
+	}
 }
 
 // preferSplitOverBlank reports whether a keep-together shift would leave an

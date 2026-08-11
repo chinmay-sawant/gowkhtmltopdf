@@ -878,17 +878,42 @@ func (e *engine) forceFlexItemCrossSize(style ResolvedStyle, forceH float64) Res
 	return style
 }
 
+// forceFlexItemMainSize preserves the used row-axis size selected by flexbox
+// through the child build. Without the override, a percentage-sized item is
+// resolved a second time against its already-assigned flex width (46% of 46%
+// in fixture-56's gauge row).
+func (e *engine) forceFlexItemMainSize(style ResolvedStyle, forceW float64) ResolvedStyle {
+	if e.scale <= 0 {
+		return style
+	}
+
+	if style.BoxSizing == borderBox {
+		style.Width = forceW / e.scale
+	} else {
+		inner := forceW - e.scalePt(style.PaddingLeft) - e.scalePt(style.PaddingRight) -
+			e.scalePt(style.BorderLeft.Width) - e.scalePt(style.BorderRight.Width)
+		if inner < 0 {
+			inner = 0
+		}
+
+		style.Width = inner / e.scale
+	}
+
+	style.WidthPercent = -1
+	style.FlexBasis = -1
+	style.FlexBasisPercent = -1
+
+	return style
+}
+
 func (e *engine) buildFlexRowItem(
 	node *html.Node, style *ResolvedStyle, forceStretch bool,
 	targetCross, availW, posX, posY float64,
 ) *box {
-	if !forceStretch {
-		return e.build(node, availW, posX, posY)
+	override := e.forceFlexItemMainSize(*style, availW)
+	if forceStretch {
+		override = e.forceFlexItemCrossSize(override, targetCross)
 	}
-
-	// Used cross size = line cross size (border box), matching column
-	// main-size forcing so backgrounds fill the flex line (fixture-33).
-	override := e.forceFlexItemCrossSize(*style, targetCross)
 
 	return e.buildWithStyle(node, &override, availW, posX, posY)
 }

@@ -2,11 +2,13 @@
 package layout
 
 import (
+	"math"
 	"strings"
 	"testing"
 
 	"gowkhtmltopdf/internal/css"
 	"gowkhtmltopdf/internal/html"
+	"gowkhtmltopdf/internal/pdf"
 )
 
 func TestPositionedBlockPseudoAfterIsPaintedWithPseudoStyle(t *testing.T) {
@@ -143,6 +145,55 @@ body { margin: 0; font-family: Arial, sans-serif; font-size: 10pt; }
 
 	if borderOps == 0 {
 		t.Fatal("missing border paint operations")
+	}
+}
+
+//nolint:cyclop,wsl // regression keeps the complete page-fragment assertion together
+func TestRoundedCalloutMovesTogetherAtPageBoundary(t *testing.T) {
+	t.Parallel()
+
+	root := mustParse(t, `<html><body><div class="lead">lead</div>`+
+		`<aside class="dom-notes note">Security: no script execution by construction</aside></body></html>`)
+	cssSheet := sheet(t, `
+body { margin: 0; font-size: 10pt; }
+.lead { height: 80pt; }
+.note {
+ display: block; height: 30pt; padding: 4pt; background: #f2ecdf;
+ border-left: 4pt solid #d97706; border-radius: 0 8pt 8pt 0;
+}
+`)
+	res, err := Layout(root, Options{ //nolint:exhaustruct
+		Width: 220, Height: 100, Sheets: []*css.Stylesheet{cssSheet}, Media: "print",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Paint(pdf.NewDocument(), res, PaintOptions{ //nolint:exhaustruct
+		PageWidth: 220, PageHeight: 100,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	note := findElementByClass(root, "note")
+	noteBox := fixture56BoxByNode(res.root, note)
+	if noteBox == nil {
+		t.Fatal("rounded callout has no box")
+	}
+	pageTop := math.Floor(noteBox.y/100+0.5) * 100
+	if math.Abs(noteBox.y-pageTop) > 0.01 {
+		t.Fatalf("rounded callout straddles page: box=%+v", noteBox)
+	}
+
+	railY := math.MaxFloat64
+	for i := noteBox.opStart; i <= noteBox.opEnd && i < len(res.Ops); i++ {
+		op := res.Ops[i]
+		if op.Kind == OpLine && op.W == 0 && op.H > 0 && op.R > 0.7 && op.G > 0.3 && op.B < 0.1 {
+			railY = math.Min(railY, op.Y)
+		}
+	}
+	if math.Abs(railY-noteBox.y) > 0.01 {
+		t.Fatalf("rounded callout rail detached at page boundary: boxY=%.2f railY=%.2f", noteBox.y, railY)
 	}
 }
 

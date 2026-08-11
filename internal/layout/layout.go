@@ -1157,7 +1157,11 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 
 	curY = e.flowChildren(boxNode, children, style, contentW, contentX, posY, curY)
 	if widget && style.Height < 0 {
-		curY += lineHeightOf(&style) * e.scale
+		// Native value controls use their intrinsic font-sized control height
+		// when auto-sized. Treating them as ordinary text blocks adds the
+		// line-height and authored padding a second time, producing the
+		// oversized meter/progress tracks in fixture-56.
+		curY = e.nativeWidgetAutoContentBottom(style)
 	}
 
 	if enclose && e.bfcFloats != nil {
@@ -1188,6 +1192,22 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 	e.prependChrome(contentStart, boxNode, style, boxNode.x, posY, boxNode.w, boxNode.height)
 
 	return boxNode
+}
+
+// nativeWidgetAutoContentBottom returns the content-flow endpoint for an
+// auto-sized native value control whose border-box height is one scaled font
+// size. Padding and the top border are already part of the flow coordinate;
+// the caller adds bottom padding after this endpoint.
+func (e *engine) nativeWidgetAutoContentBottom(style ResolvedStyle) float64 {
+	targetHeight := e.scalePt(style.FontSize)
+	topChrome := e.scalePt(style.BorderTop.Width + style.PaddingTop)
+	contentHeight := targetHeight - topChrome - e.scalePt(style.PaddingBottom)
+
+	if contentHeight < 0 {
+		contentHeight = 0
+	}
+
+	return topChrome + contentHeight
 }
 
 // paintPositionedPseudo paints generated content whose used position takes it
