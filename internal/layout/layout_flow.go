@@ -147,7 +147,8 @@ func (e *engine) flowChildren(
 	if sty.Position == positionRelative {
 		for _, child := range children {
 			childStyle := e.stylePtr(child)
-			if childStyle.Position == positionAbsolute && !childStyle.BottomAuto {
+			if childStyle.Position == positionAbsolute &&
+				(!childStyle.BottomAuto || (childStyle.Height < 0 && childStyle.HeightPercent < 0)) {
 				paddingBoxCB = true
 
 				break

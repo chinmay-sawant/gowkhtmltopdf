@@ -618,6 +618,7 @@ func snapOpForward(res *Result, idx int, paintOp *Op, boundary float64) {
 
 	deltaY := boundary + lead - minY
 	shiftFlowY(res, idx, idx, oldY-layoutSlack, deltaY)
+	shiftNearestOwnedChrome(res, idx, oldY, deltaY)
 
 	for _, j := range chrome {
 		o := &res.Ops[j]
@@ -625,6 +626,57 @@ func snapOpForward(res *Result, idx int, paintOp *Op, boundary float64) {
 			o.Y += deltaY
 		}
 	}
+}
+
+// shiftNearestOwnedChrome moves the nearest block's background/side rail with
+// a text line that was snapped to the next page. Row-sized chrome is handled
+// separately by rowChromeAbove; this covers callout rails and other block
+// chrome that can span more than one row.
+//
+//nolint:cyclop,wsl,mnd // chrome ownership walk
+func shiftNearestOwnedChrome(res *Result, opIndex int, oldY, deltaY float64) {
+	if res == nil || res.root == nil || deltaY == 0 {
+		return
+	}
+
+	path := make([]*box, 0, 8)
+	if !findBoxPathForOp(res.root, opIndex, &path) {
+		return
+	}
+
+	for pathIndex := len(path) - 1; pathIndex >= 0; pathIndex-- {
+		boxNode := path[pathIndex]
+		moved := false
+		for idx := boxNode.opStart; idx <= boxNode.opEnd && idx < len(res.Ops); idx++ {
+			op := &res.Ops[idx]
+			if idx == opIndex || !isOwnBoxChrome(*op, boxNode, boxNode.y+boxNode.height) || op.Y >= oldY-0.01 {
+				continue
+			}
+
+			op.Y += deltaY
+			moved = true
+		}
+		if moved {
+			return
+		}
+	}
+}
+
+//nolint:wsl // recursive ownership walk keeps path mutation adjacent
+func findBoxPathForOp(boxNode *box, opIndex int, path *[]*box) bool {
+	if boxNode == nil || opIndex < boxNode.opStart || opIndex > boxNode.opEnd {
+		return false
+	}
+
+	*path = append(*path, boxNode)
+	for _, child := range boxNode.children {
+		if findBoxPathForOp(child, opIndex, path) {
+			return true
+		}
+	}
+	*path = (*path)[:len(*path)-1]
+
+	return true
 }
 
 // rowChromeAbove collects fill/stroke rects whose band touches oldY, with
@@ -860,6 +912,142 @@ func remapBoxOpRanges(boxNode *box, spans []opSpan) {
 		remapBoxOpRanges(child, spans)
 	}
 }
+
+// stretchPaginatedChrome repairs block chrome after pagination has shifted a
+// descendant past the block's original bottom. The layout box is built before
+// page-break fixups, so its background and side rails otherwise stop at the
+// stale natural height while the moved footer/text continues below it.
+//
+//nolint:cyclop,wsl // post-pagination ownership walk
+func stretchPaginatedChrome(res *Result) {
+	if res == nil || res.root == nil {
+		return
+	}
+
+	var walk func(*box)
+	walk = func(boxNode *box) {
+		for _, child := range boxNode.children {
+			walk(child)
+		}
+
+		if boxNode.opStart < 0 || boxNode.opStart > boxNode.opEnd || boxNode.opEnd >= len(res.Ops) || boxNode.height <= 0 {
+			return
+		}
+		if boxInsideTable(boxNode) || !hasOwnVerticalChrome(res.Ops, boxNode) {
+			return
+		}
+
+		oldBottom := boxNode.y + boxNode.height
+		contentBottom := oldBottom
+		for idx := boxNode.opStart; idx <= boxNode.opEnd; idx++ {
+			op := res.Ops[idx]
+			if isOwnBoxChrome(op, boxNode, oldBottom) {
+				continue
+			}
+
+			if bottom := opInkBottom(op); bottom > contentBottom {
+				contentBottom = bottom
+			}
+		}
+
+		if contentBottom <= oldBottom+1e-6 {
+			return
+		}
+
+		boxNode.height = contentBottom - boxNode.y
+		for idx := boxNode.opStart; idx <= boxNode.opEnd; idx++ {
+			stretchOwnBoxChrome(&res.Ops[idx], boxNode, oldBottom, contentBottom)
+		}
+	}
+
+	walk(res.root)
+}
+
+func hasOwnVerticalChrome(ops []Op, boxNode *box) bool {
+	for idx := boxNode.opStart; idx <= boxNode.opEnd && idx < len(ops); idx++ {
+		op := ops[idx]
+		if op.Kind == OpLine && op.W == 0 && op.H > 0 &&
+			(nearLayout(op.X, boxNode.x) || nearLayout(op.X, boxNode.x+boxNode.w)) &&
+			nearLayout(op.Y, boxNode.y) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func opInkBottom(operation Op) float64 {
+	if operation.Kind == OpText || operation.Kind == OpBullet {
+		return operation.Y + operation.H
+	}
+
+	if operation.H > 0 {
+		return operation.Y + operation.H
+	}
+
+	if operation.Kind == OpLine && operation.W > 0 {
+		return operation.Y + math.Max(operation.Width, 1)
+	}
+
+	return operation.Y
+}
+
+//nolint:cyclop // classify box-owned paint
+func isOwnBoxChrome(operation Op, boxNode *box, oldBottom float64) bool {
+	if boxNode == nil {
+		return false
+	}
+
+	if (operation.Kind == OpFillRect || operation.Kind == OpStrokeRect) &&
+		nearLayout(operation.X, boxNode.x) && nearLayout(operation.Y, boxNode.y) &&
+		nearLayout(operation.W, boxNode.w) && nearLayout(operation.H, boxNode.height) {
+		return true
+	}
+
+	if operation.Kind != OpLine {
+		return false
+	}
+
+	vertical := operation.W == 0 && operation.H > 0 &&
+		(nearLayout(operation.X, boxNode.x) || nearLayout(operation.X, boxNode.x+boxNode.w)) &&
+		nearLayout(operation.Y, boxNode.y)
+	horizontal := operation.H == 0 && operation.W > 0 && nearLayout(operation.X, boxNode.x) &&
+		nearLayout(operation.W, boxNode.w) &&
+		(nearLayout(operation.Y, boxNode.y) || nearLayout(operation.Y, oldBottom))
+
+	return vertical || horizontal
+}
+
+//nolint:cyclop // mutate owned paint
+func stretchOwnBoxChrome(operation *Op, boxNode *box, oldBottom, newBottom float64) {
+	if operation == nil || boxNode == nil {
+		return
+	}
+
+	if (operation.Kind == OpFillRect || operation.Kind == OpStrokeRect) &&
+		nearLayout(operation.X, boxNode.x) && nearLayout(operation.Y, boxNode.y) &&
+		nearLayout(operation.W, boxNode.w) && nearLayout(operation.H, oldBottom-boxNode.y) {
+		operation.H = newBottom - boxNode.y
+
+		return
+	}
+
+	if operation.Kind == OpLine && operation.W == 0 && operation.H > 0 &&
+		(nearLayout(operation.X, boxNode.x) || nearLayout(operation.X, boxNode.x+boxNode.w)) &&
+		nearLayout(operation.Y, boxNode.y) {
+		operation.H = newBottom - boxNode.y
+
+		return
+	}
+
+	if operation.Kind == OpLine && operation.H == 0 && operation.W > 0 &&
+		nearLayout(operation.X, boxNode.x) && nearLayout(operation.W, boxNode.w) &&
+		nearLayout(operation.Y, oldBottom) {
+		operation.Y = newBottom
+	}
+}
+
+func nearLayout(a, b float64) bool { return math.Abs(a-b) < 0.01 } //nolint:mnd // layout epsilon
 
 // stripOrphanRowChrome removes row-sized fills and horizontal rules that sit
 // on a page with no overlapping text/bullet/image ink. Page-break snaps move

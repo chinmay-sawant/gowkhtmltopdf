@@ -159,6 +159,14 @@ func (e *engine) measureCellMinMax(node *html.Node, style ResolvedStyle) (float6
 
 	chrome := e.scalePt(style.PaddingLeft) + e.scalePt(style.PaddingRight) +
 		e.scalePt(style.BorderLeft.Width) + e.scalePt(style.BorderRight.Width)
+	// Inline flex items measure their own padding/border while walking their
+	// text (inlineMeasurementChromeWidth). Do not add that chrome a second
+	// time as the outer cell contribution; this keeps intrinsic pill widths
+	// symmetric with the painted box.
+	if style.Display == cssDisplayInline {
+		chrome = 0
+	}
+
 	minW := cellMeas.longestWord + chrome
 	maxW := cellMeas.maxW + chrome
 

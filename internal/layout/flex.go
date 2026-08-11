@@ -2,6 +2,7 @@ package layout
 
 import (
 	"sort"
+	"strings"
 
 	"gowkhtmltopdf/internal/html"
 )
@@ -64,20 +65,7 @@ func (e *engine) buildFlex(node *html.Node, sty ResolvedStyle, availW, x, posY f
 	contentStart := len(e.ops)
 	curY := e.scalePt(sty.PaddingTop) + e.scalePt(sty.BorderTop.Width)
 
-	kids := make([]*html.Node, 0, len(node.Children))
-
-	for _, child := range node.Children {
-		if child.Type != html.ElementNode {
-			continue
-		}
-
-		cs := e.styles[child]
-		if cs.Display == cssDisplayNone {
-			continue
-		}
-
-		kids = append(kids, child)
-	}
+	kids := e.flexChildren(node, sty)
 
 	rowGap, colGap := e.styleGaps(sty)
 
@@ -100,6 +88,106 @@ func (e *engine) buildFlex(node *html.Node, sty ResolvedStyle, availW, x, posY f
 	e.prependChrome(contentStart, boxNode, sty, boxNode.x, posY, boxNode.w, boxNode.height)
 
 	return boxNode
+}
+
+// flexChildren returns the element flex items plus anonymous flex items for
+// direct text runs. CSS turns non-whitespace text directly under a flex
+// container into anonymous block-level flex items; dropping those nodes makes
+// prose after an inline marker disappear from the display list.
+func (e *engine) flexChildren(node *html.Node, parentStyle ResolvedStyle) []*html.Node {
+	kids := make([]*html.Node, 0, len(node.Children))
+
+	for idx := 0; idx < len(node.Children); idx++ {
+		child := node.Children[idx]
+		if child.Type == html.ElementNode {
+			cs := e.styles[child]
+			if cs != nil && cs.Display != cssDisplayNone {
+				kids = append(kids, child)
+			}
+
+			continue
+		}
+
+		if child.Type != html.TextNode || strings.TrimSpace(child.Text) == "" {
+			continue
+		}
+
+		textNodes := []*html.Node{child}
+
+		for idx+1 < len(node.Children) && node.Children[idx+1].Type == html.TextNode {
+			idx++
+			if strings.TrimSpace(node.Children[idx].Text) != "" {
+				textNodes = append(textNodes, node.Children[idx])
+			}
+		}
+
+		anonymous := &html.Node{ //nolint:exhaustruct // synthetic anonymous flex item
+			Type: html.ElementNode, Name: "span", Parent: node, Children: textNodes,
+		}
+		anonymousStyle := anonymousFlexItemStyle(parentStyle)
+		e.styles[anonymous] = &anonymousStyle
+
+		kids = append(kids, anonymous)
+	}
+
+	return kids
+}
+
+// anonymousFlexItemStyle preserves inherited text properties while removing
+// the flex container's own box and layout properties from the anonymous item.
+//
+//nolint:funlen // resets the complete anonymous box model
+func anonymousFlexItemStyle(parent ResolvedStyle) ResolvedStyle {
+	style := parent
+	style.Display = displayBlock
+	style.Position = positionStatic
+	style.Float = cssDisplayNone
+	style.Clear = cssDisplayNone
+	style.FlexDirection = fxRow
+	style.FlexWrap = cssWhiteSpaceNowrap
+	style.FlexGrow = 0
+	style.FlexShrink = 1
+	style.FlexBasis = -1
+	style.FlexBasisPercent = -1
+	style.FlexOrder = 0
+	style.Width = -1
+	style.WidthPercent = -1
+	style.Height = -1
+	style.HeightPercent = -1
+	style.MinWidth = 0
+	style.MinWidthPercent = -1
+	style.MinWidthSet = false
+	style.MaxWidth = -1
+	style.MaxWidthPercent = -1
+	style.MinHeight = 0
+	style.MinHeightPercent = -1
+	style.MaxHeight = -1
+	style.MarginTop = 0
+	style.MarginRight = 0
+	style.MarginBottom = 0
+	style.MarginLeft = 0
+	style.MarginTopAuto = false
+	style.MarginRightAuto = false
+	style.MarginBottomAuto = false
+	style.MarginLeftAuto = false
+	style.PaddingTop = 0
+	style.PaddingRight = 0
+	style.PaddingBottom = 0
+	style.PaddingLeft = 0
+	style.BorderTop = border{}    //nolint:exhaustruct // zero border
+	style.BorderRight = border{}  //nolint:exhaustruct // zero border
+	style.BorderBottom = border{} //nolint:exhaustruct // zero border
+	style.BorderLeft = border{}   //nolint:exhaustruct // zero border
+	style.BorderRadius = 0
+	style.BorderRadiusPercent = 0
+	style.BGColor = [4]float64{}
+	style.ListStyleType = cssDisplayNone
+	style.PageBreakBefore = ""
+	style.PageBreakAfter = ""
+	style.PageBreakInside = ""
+	style.HasTransform = false
+
+	return style
 }
 
 func (e *engine) flowFlexRow(

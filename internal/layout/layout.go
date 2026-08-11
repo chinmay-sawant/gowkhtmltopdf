@@ -33,7 +33,9 @@ const (
 	positionAbsolute        = "absolute"
 	positionFixed           = "fixed"
 	positionRelative        = "relative"
+	positionStatic          = "static"
 	positionSticky          = "sticky"
+	htmlMeter               = "meter"
 	displayBlock            = "block"
 	displayFlex             = "flex"
 	displayGrid             = "grid"
@@ -1140,7 +1142,7 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 	curY := e.scalePt(style.PaddingTop) + e.scalePt(style.BorderTop.Width)
 	enclose := e.pushBFCFloats(style, contentX, contentW)
 	children := node.Children
-	widget := node.Name == "meter" || node.Name == "progress"
+	widget := node.Name == htmlMeter || node.Name == "progress"
 
 	if widget {
 		children = nil // fallback text is replaced by the native-style bar
@@ -1279,7 +1281,7 @@ func (e *engine) verticalWritingHeight(contentStart int, current float64, style 
 //nolint:cyclop // native widget value normalization and paint
 func (e *engine) paintValueWidget(node *html.Node, style ResolvedStyle, leftX, topY, width, height float64) {
 	minValue, maxValue := 0.0, 1.0
-	if node.Name == "meter" {
+	if node.Name == htmlMeter {
 		minValue = widgetNumber(node.Attribute("min"), 0)
 		maxValue = widgetNumber(node.Attribute("max"), 1)
 	}
@@ -1306,9 +1308,15 @@ func (e *engine) paintValueWidget(node *html.Node, style ResolvedStyle, leftX, t
 		return
 	}
 
-	color := style.Color
+	// Native progress indicators use a thin green value bar when no authored
+	// component token provides one. Keep that default independent of an
+	// unrelated late document-wide --accent2 override (fixture 56).
+	color := [3]float64{0, 0.5, 0}
+	if node.Name == htmlMeter {
+		color = style.Color
+	}
 
-	for _, name := range []string{"--d03-bar", "--accent2"} {
+	for _, name := range []string{"--d03-bar"} {
 		if raw, ok := style.CustomProps[name]; ok {
 			if r, g, b, _, parsed := css.ParseColor(raw); parsed {
 				color = [3]float64{float64(r) / 255, float64(g) / 255, float64(b) / 255}
@@ -1318,10 +1326,19 @@ func (e *engine) paintValueWidget(node *html.Node, style ResolvedStyle, leftX, t
 		}
 	}
 
+	const indicatorRatio = 0.3
+
+	indicatorH := e.scalePt(style.FontSize) * indicatorRatio
+	if indicatorH <= 0 || indicatorH > contentH {
+		indicatorH = contentH
+	}
+
+	indicatorY := contentY + (contentH-indicatorH)/two
+
 	e.add(Op{ //nolint:exhaustruct // intentional zero fields
-		Kind: OpFillRect, X: contentX, Y: contentY, W: contentW * ratio, H: contentH,
+		Kind: OpFillRect, X: contentX, Y: indicatorY, W: contentW * ratio, H: indicatorH,
 		R: color[0], G: color[1], B: color[2], Alpha: 1,
-		Radius: usedBorderRadius(style, contentW, contentH),
+		Radius: usedBorderRadius(style, contentW*ratio, indicatorH),
 	})
 }
 

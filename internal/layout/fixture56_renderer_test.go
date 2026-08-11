@@ -1,4 +1,4 @@
-//nolint:testpackage // fixture diagnostics and regression checks inspect layout internals
+//nolint:testpackage,wsl,nlreturn,varnamelen,lll // fixture diagnostics inspect layout internals
 package layout
 
 import (
@@ -365,5 +365,187 @@ func TestFixture56PageComposition(t *testing.T) { //nolint:paralleltest // rende
 	pageOffset := math.Mod(d02Location.Y, contentHeight)
 	if math.Min(pageOffset, contentHeight-pageOffset) > 2 {
 		t.Fatalf("D02 section starts %.2fpt into page, want forced page start", pageOffset)
+	}
+}
+
+//nolint:gocognit,gocyclo,cyclop,funlen,maintidx // fixture seam assertions intentionally remain together
+func TestFixture56PaginationChromeAndWidgetGeometry(t *testing.T) { //nolint:paralleltest // fixture uses shared font state
+	root, sheet := loadFixture56(t)
+	const contentHeight = 841.89 - 2*28.35
+
+	res, err := Layout(root, Options{ //nolint:exhaustruct // fixture uses the standard print layout path
+		Width: 595.28 - 2*28.35, Height: contentHeight,
+		Background: true, Sheets: []*css.Stylesheet{sheet}, Media: "print", Zoom: 0.98,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Paint(pdf.NewDocument(), res, fixture56PaintOptions()); err != nil {
+		t.Fatal(err)
+	}
+
+	d01 := fixture56Node(root, func(node *html.Node) bool { return node.Attribute("id") == "domain-01" })
+	d01Box := fixture56BoxByNode(res.root, d01)
+	footerText := "Position: argv → settings → Request (left edge of the pipeline) · " +
+		"see documentation/architecture/01-entrypoints-cli.md"
+	var footer Op
+	foundFooter := false
+	for _, op := range res.Ops {
+		if op.Kind == OpText && strings.TrimSpace(op.Text) == footerText {
+			footer = op
+			foundFooter = true
+			break
+		}
+	}
+	if !foundFooter || d01Box == nil {
+		t.Fatalf("D01 footer/box missing: footer=%v box=%+v", foundFooter, d01Box)
+	}
+
+	railBottom := 0.0
+	for i := d01Box.opStart; i <= d01Box.opEnd && i < len(res.Ops); i++ {
+		op := res.Ops[i]
+		if op.Kind == OpLine && math.Abs(op.X-d01Box.x) < 0.01 && op.H > 0 &&
+			op.G > 0.3 && op.B < 0.6 && op.Y+op.H > railBottom {
+			railBottom = op.Y + op.H
+		}
+	}
+	if railBottom < footer.Y+footer.H-1 {
+		t.Fatalf("D01 left rail ends at %.2f, before footer bottom %.2f", railBottom, footer.Y+footer.H)
+	}
+
+	for _, node := range fixture56Nodes(root, func(node *html.Node) bool { return fixture56Class(node) == "d02-engine" }) {
+		boxNode := fixture56BoxByNode(res.root, node)
+		if boxNode == nil {
+			t.Fatalf("D02 engine has no box: %q", node.Text)
+		}
+		var text Op
+		foundText := false
+		for i := boxNode.opStart; i <= boxNode.opEnd && i < len(res.Ops); i++ {
+			if res.Ops[i].Kind == OpText {
+				text = res.Ops[i]
+				foundText = true
+				break
+			}
+		}
+		if !foundText {
+			t.Fatalf("D02 engine has no text op: %q", node.Text)
+		}
+		leftGap := text.X - boxNode.x
+		rightGap := boxNode.x + boxNode.w - (text.X + text.W)
+		if math.Abs(leftGap-rightGap) > 1 {
+			t.Fatalf("D02 engine padding is asymmetric: box=%+v text=%+v left=%.2f right=%.2f", boxNode, text, leftGap, rightGap)
+		}
+	}
+
+	for _, id := range []string{"d03-meter", "d03-progress", "d0n-progress"} {
+		node := fixture56Node(root, func(node *html.Node) bool {
+			return node.Attribute("id") == id || node.Attribute("class") == id
+		})
+		boxNode := fixture56BoxByNode(res.root, node)
+		if boxNode == nil {
+			t.Fatalf("widget %s has no box", id)
+		}
+		foundFill := false
+		for i := boxNode.opStart; i <= boxNode.opEnd && i < len(res.Ops); i++ {
+			op := res.Ops[i]
+			if op.Kind != OpFillRect || op.W <= 0 || op.H <= 0 || op.W >= boxNode.w-1 {
+				continue
+			}
+			if id == "d0n-progress" && !(op.G > 0.35 && op.G > op.R*1.5 && op.G > op.B*1.5) {
+				continue
+			}
+			if op.H > 4.5 {
+				t.Fatalf("widget %s value fill is too thick: op=%+v", id, op)
+			}
+			foundFill = true
+		}
+		if !foundFill {
+			t.Fatalf("widget %s has no thin value fill", id)
+		}
+	}
+
+	var noteBox *box
+	for _, node := range fixture56Nodes(root, func(node *html.Node) bool { return fixture56Class(node) == "dom-notes" }) {
+		candidate := fixture56BoxByNode(res.root, node)
+		if candidate == nil {
+			continue
+		}
+		for i := candidate.opStart; i <= candidate.opEnd && i < len(res.Ops); i++ {
+			if res.Ops[i].Kind == OpText && strings.Contains(res.Ops[i].Text, "Security: no script execution") {
+				noteBox = candidate
+				break
+			}
+		}
+		if noteBox != nil {
+			break
+		}
+	}
+	if noteBox == nil {
+		t.Fatal("security note has no box")
+	}
+	securityTextY := -1.0
+	for i := noteBox.opStart; i <= noteBox.opEnd && i < len(res.Ops); i++ {
+		if res.Ops[i].Kind == OpText && strings.Contains(res.Ops[i].Text, "Security: no script execution") {
+			securityTextY = res.Ops[i].Y
+			break
+		}
+	}
+	if securityTextY < 0 {
+		t.Fatal("security note text has no paint op")
+	}
+	borderBottom := 0.0
+	borderTop := math.MaxFloat64
+	for i := noteBox.opStart; i <= noteBox.opEnd && i < len(res.Ops); i++ {
+		op := res.Ops[i]
+		if op.Kind == OpLine && math.Abs(op.X-noteBox.x) < 0.01 && op.H > 0 && op.R > 0.7 && op.G > 0.3 && op.B < 0.1 {
+			if op.Y < borderTop {
+				borderTop = op.Y
+			}
+			if op.Y+op.H > borderBottom {
+				borderBottom = op.Y + op.H
+			}
+		}
+	}
+	if borderTop > securityTextY+1 || borderBottom < securityTextY+1 {
+		t.Fatalf("security note rail is not aligned with text: top=%.2f bottom=%.2f "+
+			"textY=%.2f", borderTop, borderBottom, securityTextY)
+	}
+
+	dag := fixture56Node(root, func(node *html.Node) bool { return node.Attribute("id") == "dependency-dag" })
+	dagBox := fixture56BoxByNode(res.root, dag)
+	if dagBox == nil {
+		t.Fatal("dependency DAG has no box")
+	}
+	// Text paint is word-oriented, so use stable words from each rule rather
+	// than requiring a whole sentence in one OpText record.
+	ruleNeedles := []string{"parses", "neutral", "cli.Command", "Subresources", "parallel"}
+	rulePages := make([]int, 0, len(ruleNeedles))
+	for _, needle := range ruleNeedles {
+		page := -1
+		for i := dagBox.opStart; i <= dagBox.opEnd && i < len(res.Ops); i++ {
+			if res.Ops[i].Kind != OpText || !strings.Contains(res.Ops[i].Text, needle) {
+				continue
+			}
+			for candidatePage, indexes := range res.Pages {
+				for _, index := range indexes {
+					if index == i {
+						page = candidatePage
+					}
+				}
+			}
+			if page >= 0 {
+				break
+			}
+		}
+		if page < 0 {
+			t.Fatalf("dependency DAG rule %q has no painted page", needle)
+		}
+		rulePages = append(rulePages, page)
+	}
+	for i := 1; i < len(rulePages); i++ {
+		if rulePages[i] != rulePages[0] {
+			t.Fatalf("dependency DAG rules split across pages: pages=%v", rulePages)
+		}
 	}
 }

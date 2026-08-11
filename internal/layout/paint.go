@@ -99,6 +99,10 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 	}
 
 	opPage := paginateOps(res, contentH)
+	// Page-break shifts can move a descendant below its original block
+	// geometry. Reconcile owned chrome before rects are split into page
+	// fragments so section rails and callout borders follow the final flow.
+	stretchPaginatedChrome(res)
 
 	if err := validatePaintPageIndices(res.Ops, contentH); err != nil {
 		return err
