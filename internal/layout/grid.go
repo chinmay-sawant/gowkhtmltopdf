@@ -1565,7 +1565,7 @@ func sanitizeGridTrackSizes(out []float64) {
 
 // resolveGridTrackSizes distributes free space with fr, honoring minmax floors.
 // Percent mins/maxes require a definite contentSize (>=0); otherwise % → auto.
-func resolveGridTrackSizes(
+func resolveGridTrackSizes( //nolint:cyclop // grid track sizing has independent definite/negative/fr branches
 	defs []gridTrackDef,
 	contentSize, gap float64,
 	eng *engine,
@@ -1602,14 +1602,17 @@ func resolveGridTrackSizes(
 		// whole grid overflow and trigger document-wide smart shrinking.
 		if plan.frSum > 0 {
 			fixedSum = 0
+
 			for idx, coef := range plan.frCoef {
 				if coef == 0 {
 					fixedSum += plan.base[idx]
+
 					continue
 				}
 
 				plan.base[idx] = 0
 			}
+
 			free = contentSize - gapTotal - fixedSum
 		}
 

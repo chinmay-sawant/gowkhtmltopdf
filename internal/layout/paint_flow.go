@@ -605,7 +605,7 @@ func boxInkExtent(res *Result, boxNode *box) float64 {
 // break). Flow indexes are rebuilt once at the end.
 //
 //nolint:wsl // break-difference bookkeeping
-func beforeAlways( //nolint:gocognit,cyclop,funlen // break-difference bookkeeping
+func beforeAlways( //nolint:gocognit,gocyclo,cyclop,funlen // break-difference bookkeeping
 	res *Result, contentH float64,
 ) bool {
 	if res == nil || res.root == nil || contentH <= 0 {
@@ -682,7 +682,7 @@ func beforeAlways( //nolint:gocognit,cyclop,funlen // break-difference bookkeepi
 		loPage := int(boxY / contentH)
 		lastPage := int(maxEff / contentH)
 
-		if loPage > lastPage {
+		if loPage > lastPage { //nolint:nestif // forced-break correction has four independent guards
 			// A prior page-break-after can leave an empty landing band before
 			// this forced-break target. Align the target back to the top of its
 			// already-selected page; otherwise page-break-before:always keeps
@@ -882,13 +882,7 @@ func boxMaxOpY(res *Result, boxNode *box) float64 {
 
 // shiftAfterAlways pushes the next box to the page after this box's last op.
 func shiftAfterAlways(res *Result, next *box, lastPage int, contentH float64) bool {
-	// Keep the first flow op a fraction below the page boundary. A table
-	// beginning at exactly contentH is classified as a continuation by the
-	// border/header repair pass, which can leave an open vertical band at the
-	// top of the next page.
-	const pageStartInset = 0.5
-
-	dy := float64(lastPage+1)*contentH + pageStartInset - next.y
+	dy := float64(lastPage+1)*contentH - next.y
 	if dy <= 0 {
 		return false
 	}

@@ -24,6 +24,8 @@ import (
 	"gowkhtmltopdf/internal/pdf"
 )
 
+const htmlTbody = "tbody"
+
 // CSS keyword constants shared by the layout engine. Kept here so repeated
 // string literals resolve through one named value (goconst).
 const (
@@ -1107,7 +1109,7 @@ func useBlockForTableDisplay(node *html.Node) bool {
 		}
 
 		switch c.Name {
-		case "tr", "tbody", "thead", "tfoot", "colgroup", "col", "caption":
+		case "tr", htmlTbody, "thead", "tfoot", "colgroup", "col", "caption":
 			return false
 		}
 	}
@@ -1116,6 +1118,8 @@ func useBlockForTableDisplay(node *html.Node) bool {
 }
 
 // buildBlock lays out a block-level box.
+//
+//nolint:cyclop // block layout owns ordered CSS flow phases
 func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, posY float64) *box {
 	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
 		node: node, style: e.stylePtr(node), kind: displayBlock, x: posX, y: posY,
@@ -1135,15 +1139,18 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 	enclose := e.pushBFCFloats(style, contentX, contentW)
 	children := node.Children
 	widget := node.Name == "meter" || node.Name == "progress"
+
 	if widget {
 		children = nil // fallback text is replaced by the native-style bar
 	}
+
 	if node.Name == "details" {
 		_, open := node.Attrs["open"]
 		if !open {
 			children = closedDetailsChildren(node)
 		}
 	}
+
 	curY = e.flowChildren(boxNode, children, style, contentW, contentX, posY, curY)
 	if widget && style.Height < 0 {
 		curY += lineHeightOf(&style) * e.scale
@@ -1170,6 +1177,7 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 	if widget {
 		e.paintValueWidget(node, style, boxNode.x, posY, boxNode.w, boxNode.height)
 	}
+
 	e.prependChrome(contentStart, boxNode, style, boxNode.x, posY, boxNode.w, boxNode.height)
 
 	return boxNode
@@ -1189,6 +1197,7 @@ func (e *engine) verticalWritingHeight(contentStart int, current float64, style 
 
 	verticalChrome := e.scalePt(style.PaddingTop) + e.scalePt(style.PaddingBottom) +
 		e.scalePt(style.BorderTop.Width) + e.scalePt(style.BorderBottom.Width)
+
 	needed := textWidth + verticalChrome
 	if needed > current {
 		return needed
@@ -1197,17 +1206,20 @@ func (e *engine) verticalWritingHeight(contentStart int, current float64, style 
 	return current
 }
 
-func (e *engine) paintValueWidget(node *html.Node, style ResolvedStyle, x, y, w, h float64) {
+//nolint:cyclop // native widget value normalization and paint
+func (e *engine) paintValueWidget(node *html.Node, style ResolvedStyle, leftX, topY, width, height float64) {
 	minValue, maxValue := 0.0, 1.0
 	if node.Name == "meter" {
 		minValue = widgetNumber(node.Attribute("min"), 0)
 		maxValue = widgetNumber(node.Attribute("max"), 1)
 	}
+
 	if maxValue <= minValue {
 		return
 	}
 
 	value := widgetNumber(node.Attribute("value"), minValue)
+
 	ratio := (value - minValue) / (maxValue - minValue)
 	if ratio < 0 {
 		ratio = 0
@@ -1215,19 +1227,22 @@ func (e *engine) paintValueWidget(node *html.Node, style ResolvedStyle, x, y, w,
 		ratio = 1
 	}
 
-	contentX, contentW := e.contentBox(x, w, style)
-	contentY := y + e.scalePt(style.BorderTop.Width) + e.scalePt(style.PaddingTop)
-	contentH := h - e.scalePt(style.BorderTop.Width+style.BorderBottom.Width) -
+	contentX, contentW := e.contentBox(leftX, width, style)
+	contentY := topY + e.scalePt(style.BorderTop.Width) + e.scalePt(style.PaddingTop)
+
+	contentH := height - e.scalePt(style.BorderTop.Width+style.BorderBottom.Width) -
 		e.scalePt(style.PaddingTop+style.PaddingBottom)
 	if contentW <= 0 || contentH <= 0 || ratio <= 0 {
 		return
 	}
 
 	color := style.Color
+
 	for _, name := range []string{"--d03-bar", "--accent2"} {
 		if raw, ok := style.CustomProps[name]; ok {
 			if r, g, b, _, parsed := css.ParseColor(raw); parsed {
 				color = [3]float64{float64(r) / 255, float64(g) / 255, float64(b) / 255}
+
 				break
 			}
 		}

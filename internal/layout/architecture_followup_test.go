@@ -226,6 +226,7 @@ func TestGeneratedPaginationOpsInvalidateFlowIndex(t *testing.T) {
 	}
 
 	cloneHeaderOps(res, 0, 0, 10, 100)
+
 	if res.flowPageOf != nil || res.flowPages != nil || res.flowPos != nil {
 		t.Fatal("header cloning must invalidate cached flow indexes")
 	}

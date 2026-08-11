@@ -327,13 +327,13 @@ func (m *cellMeasure) measureText(text string, cstate ResolvedStyle, nowrap bool
 // lockstep with inline paint. Without the padding and border contribution,
 // flex items containing code/mark spans receive a box that is just narrower
 // than their painted inline chrome and wrap unexpectedly.
-func inlineMeasurementChromeWidth(eng *engine, st ResolvedStyle) float64 {
-	if eng == nil || st.Display != cssDisplayInline {
+func inlineMeasurementChromeWidth(eng *engine, style ResolvedStyle) float64 {
+	if eng == nil || style.Display != cssDisplayInline {
 		return 0
 	}
 
-	return eng.scalePt(st.PaddingLeft) + eng.scalePt(st.PaddingRight) +
-		eng.scalePt(st.BorderLeft.Width) + eng.scalePt(st.BorderRight.Width)
+	return eng.scalePt(style.PaddingLeft) + eng.scalePt(style.PaddingRight) +
+		eng.scalePt(style.BorderLeft.Width) + eng.scalePt(style.BorderRight.Width)
 }
 
 // noteWord records a token's min-content width.

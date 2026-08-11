@@ -100,7 +100,7 @@ func (e *engine) emitInlineImage(
 
 // emitInlineText paints the face runs of one text item and returns the
 // updated x cursor.
-func (e *engine) emitInlineText(
+func (e *engine) emitInlineText( //nolint:funlen // text measurement, face-run emission, and decoration share one cursor
 	item *inlineItem, leftX, baseline, justifyGap float64,
 	gapAfter bool, und *undRun,
 ) float64 {
@@ -120,13 +120,16 @@ func (e *engine) emitInlineText(
 		chromeLeft = e.inlineChromeLeft(item.style)
 		chromeRight = e.inlineChromeRight(item.style)
 	}
+
 	contentWidth := item.w - chromeLeft - chromeRight
 	if contentWidth < 0 {
 		contentWidth = 0
 	}
+
 	if item.chrome {
 		e.paintInlineChrome(item.style, leftX, baseline, ascent, descent, contentWidth)
 	}
+
 	leftX += chromeLeft
 
 	runStart := leftX
@@ -178,33 +181,34 @@ func (e *engine) emitInlineText(
 	return leftX
 }
 
-func (e *engine) paintInlineChrome(st *ResolvedStyle, leftX, baseline, ascent, descent, contentWidth float64) {
-	top := e.inlineChromeTop(st)
-	bottom := e.inlineChromeBottom(st)
-	lh := lineHeightOf(st) * e.scale
+func (e *engine) paintInlineChrome(style *ResolvedStyle, leftX, baseline, ascent, descent, contentWidth float64) {
+	top := e.inlineChromeTop(style)
+	bottom := e.inlineChromeBottom(style)
+	lh := lineHeightOf(style) * e.scale
 	extra := (lh - ascent - descent) / two
 	boxY := baseline - ascent - extra - top
 	boxH := ascent + extra + top + descent + extra + bottom
-	boxW := contentWidth + e.inlineChromeLeft(st) + e.inlineChromeRight(st)
+	boxW := contentWidth + e.inlineChromeLeft(style) + e.inlineChromeRight(style)
+
 	if boxW <= 0 || boxH <= 0 {
 		return
 	}
 
-	if st.BGColor[3] > 0 && e.opts.Background {
+	if style.BGColor[3] > 0 && e.opts.Background {
 		e.add(Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpFillRect, X: leftX, Y: boxY, W: boxW, H: boxH,
-			R: st.BGColor[0], G: st.BGColor[1], B: st.BGColor[2], Alpha: st.BGColor[3],
-			Radius: usedBorderRadius(*st, boxW, boxH),
+			R: style.BGColor[0], G: style.BGColor[1], B: style.BGColor[2], Alpha: style.BGColor[3],
+			Radius: usedBorderRadius(*style, boxW, boxH),
 		})
 	}
 
-	if !inlineHasBorder(*st) {
+	if !inlineHasBorder(*style) {
 		return
 	}
 
-	radius := usedBorderRadius(*st, boxW, boxH)
-	if radius > 0 && uniformRoundedBorder(*st) {
-		b := st.BorderTop
+	radius := usedBorderRadius(*style, boxW, boxH)
+	if radius > 0 && uniformRoundedBorder(*style) {
+		b := style.BorderTop
 		e.add(Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpStrokeRect, X: leftX, Y: boxY, W: boxW, H: boxH,
 			R: b.Color[0], G: b.Color[1], B: b.Color[2], Width: e.scalePt(b.Width), Radius: radius,
@@ -213,7 +217,7 @@ func (e *engine) paintInlineChrome(st *ResolvedStyle, leftX, baseline, ascent, d
 		return
 	}
 
-	for _, op := range e.borderOps(*st, leftX, boxY, boxW, boxH) {
+	for _, op := range e.borderOps(*style, leftX, boxY, boxW, boxH) {
 		e.add(op)
 	}
 }

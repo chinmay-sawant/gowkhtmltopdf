@@ -440,9 +440,12 @@ func (e *engine) flexBoxSized(style ResolvedStyle, size, pad float64) float64 {
 // must not be added a second time here. mainSize is the definite flex
 // container content main size, or <0 when indefinite (then % min-width is
 // ignored — cyclic honesty).
+//
+//nolint:cyclop // CSS min-size decision tree
 func (e *engine) flexMinMainSize(item flexMeas, mainSize float64) float64 {
 	cstate := e.styles[item.n]
 	floor := 0.0
+
 	if cstate.MinWidthSet {
 		if cstate.MinWidthPercent >= 0 && mainSize >= 0 {
 			return mainSize * cstate.MinWidthPercent / cssPercent

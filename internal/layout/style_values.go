@@ -7,6 +7,8 @@ import (
 	"gowkhtmltopdf/internal/css"
 )
 
+const calcParts = 3
+
 func parseColumnsShorthand(sty *ResolvedStyle, value string, fsize, viewportW float64) {
 	sty.ColumnCount = 0
 	sty.ColumnWidth = -1
@@ -556,6 +558,8 @@ func marginLen(value string, fsize, ctxW float64) float64 {
 // calcLength evaluates the small arithmetic subset needed by the report CSS:
 // one length plus/minus another length, or one length multiplied by a number.
 // Unsupported calc expressions remain invalid and keep the existing fallback.
+//
+//nolint:cyclop // compact calc operator grammar
 func calcLength(value string, fsize, containing float64) (float64, bool) {
 	value = strings.TrimSpace(value)
 	if len(value) < len("calc()") || !strings.EqualFold(value[:5], "calc(") || value[len(value)-1] != ')' {
@@ -563,7 +567,7 @@ func calcLength(value string, fsize, containing float64) (float64, bool) {
 	}
 
 	parts := strings.Fields(value[5 : len(value)-1])
-	if len(parts) != 3 {
+	if len(parts) != calcParts {
 		return 0, false
 	}
 
@@ -585,6 +589,7 @@ func calcLength(value string, fsize, containing float64) (float64, bool) {
 		if !rightOK {
 			return 0, false
 		}
+
 		if parts[1] == "-" {
 			return left - right, true
 		}
@@ -604,6 +609,7 @@ func plainLength(value string, fsize, containing float64) (float64, bool) {
 	if unit == "%" {
 		return containing * val / cssPercent, true
 	}
+
 	if unit == remUnit {
 		return pxToPt(cssPxRoot) * val, true
 	}

@@ -32,6 +32,7 @@ func (e *engine) collectInlineText(node *html.Node, sty ResolvedStyle, out *[]in
 	if sty.Display == cssDisplayNone {
 		return
 	}
+
 	start := len(*out)
 	parent := node.Parent
 	vertical := parent != nil && parent.Type == html.ElementNode && isVerticalWritingMode(e.styleVal(parent).WritingMode)
@@ -40,6 +41,7 @@ func (e *engine) collectInlineText(node *html.Node, sty ResolvedStyle, out *[]in
 		verticalStyle := sty
 		verticalStyle.WhiteSpace = cssWhiteSpaceNowrap
 		e.collectWrappedText(node, verticalStyle, out)
+
 		for idx := start; idx < len(*out); idx++ {
 			(*out)[idx].style = &verticalStyle
 			(*out)[idx].noSplit = true
@@ -77,6 +79,7 @@ func (e *engine) inlineChromeApplies(node *html.Node) bool {
 	if parent == nil || parent.Type != html.ElementNode || e.styleVal(parent).Display != cssDisplayInline {
 		return false
 	}
+
 	if e.styleVal(parent).Position != "static" || isVerticalWritingMode(e.styleVal(parent).WritingMode) {
 		return false
 	}
@@ -210,7 +213,7 @@ func (e *engine) collectWrappedText(node *html.Node, sty ResolvedStyle, out *[]i
 	// Preserve a trailing word-separator when the source text node
 	// ended with whitespace (so "foo <b>bar</b>" keeps the gap).
 	if len(*out) > startOut {
-		e.preserveTrailingGap(node, sty, out)
+		e.preserveTrailingGap(node, out)
 	}
 }
 
@@ -226,7 +229,7 @@ func isWSSpaceByte(b byte) bool {
 
 // preserveTrailingGap keeps a trailing word separator when the source text
 // node ended with whitespace.
-func (e *engine) preserveTrailingGap(node *html.Node, sty ResolvedStyle, out *[]inlineItem) {
+func (e *engine) preserveTrailingGap(node *html.Node, out *[]inlineItem) {
 	if len(*out) == 0 || len(node.Text) == 0 {
 		return
 	}
@@ -436,10 +439,6 @@ func (e *engine) inlineTextWidth(text string, st *ResolvedStyle, chrome bool) fl
 	}
 
 	return w
-}
-
-func (e *engine) inlineTextHeight(st *ResolvedStyle) float64 {
-	return lineHeightOf(st)*e.scale + e.inlineChromeTop(st) + e.inlineChromeBottom(st)
 }
 
 func (e *engine) inlineChromeLeft(st *ResolvedStyle) float64 {

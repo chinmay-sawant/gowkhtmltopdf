@@ -750,7 +750,8 @@ func setBorderRadius(style *ResolvedStyle, value string, fsize float64) bool {
 
 func applyBorderAllSides(style *ResolvedStyle, value string, fsize float64) bool {
 	if strings.EqualFold(strings.TrimSpace(value), cssDisplayNone) || strings.TrimSpace(value) == "0" {
-		style.BorderTop, style.BorderRight, style.BorderBottom, style.BorderLeft = border{}, border{}, border{}, border{}
+		zero := border{Width: 0, Style: "", Color: [3]float64{0, 0, 0}}
+		style.BorderTop, style.BorderRight, style.BorderBottom, style.BorderLeft = zero, zero, zero, zero
 
 		return true
 	}
@@ -781,7 +782,7 @@ func applyBorderOneSide(style *ResolvedStyle, prop, value string, fsize float64)
 
 func setBorderSide(_ *ResolvedStyle, side *border, value string, fsize float64) {
 	if strings.EqualFold(strings.TrimSpace(value), cssDisplayNone) || strings.TrimSpace(value) == "0" {
-		*side = border{}
+		*side = border{Width: 0, Style: "", Color: [3]float64{0, 0, 0}}
 
 		return
 	}
@@ -811,6 +812,7 @@ func applyBorderWidthProps(style *ResolvedStyle, prop, value string, fsize float
 	return true
 }
 
+//nolint:cyclop // border shorthand/property dispatch
 func applyBorderStyleColorProps(style *ResolvedStyle, prop, value string) bool {
 	switch prop {
 	case borderStyleKeyword:

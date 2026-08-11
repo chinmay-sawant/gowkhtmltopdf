@@ -451,6 +451,7 @@ func ResolveVars(value string, lookup func(name string) (string, bool)) string {
 	}
 
 	var out strings.Builder
+
 	start := 0
 	for start < len(value) {
 		idx := indexVarFunction(value, start)
@@ -461,7 +462,8 @@ func ResolveVars(value string, lookup func(name string) (string, bool)) string {
 		}
 
 		out.WriteString(value[start:idx])
-		end := matchingVarParen(value, idx+3)
+
+		end := matchingVarParen(value, idx+varFunctionPrefixLen)
 		if end < 0 {
 			out.WriteString(value[idx:])
 
@@ -475,6 +477,8 @@ func ResolveVars(value string, lookup func(name string) (string, bool)) string {
 	return out.String()
 }
 
+const varFunctionPrefixLen = len("var")
+
 func indexVarFunction(value string, start int) int {
 	for idx := start; idx+4 <= len(value); idx++ {
 		if strings.EqualFold(value[idx:idx+4], "var(") {
@@ -487,6 +491,7 @@ func indexVarFunction(value string, start int) int {
 
 func matchingVarParen(value string, open int) int {
 	depth := 0
+
 	for idx := open; idx < len(value); idx++ {
 		switch value[idx] {
 		case '(':

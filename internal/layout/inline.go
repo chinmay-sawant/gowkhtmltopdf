@@ -258,6 +258,7 @@ func (e *engine) maybeSplitOverflow(item inlineItem, lineW, lineAdv, contentW fl
 	if item.img || item.blockBox != nil || item.text == "" {
 		return nil
 	}
+
 	if item.noSplit {
 		return nil
 	}
@@ -825,6 +826,8 @@ func (e *engine) trimTrailingSpace(line []inlineItem) {
 }
 
 // lineMetrics returns the height of a line and the Y of its baseline.
+//
+//nolint:cyclop // line metrics combine inline item classes and chrome
 func (e *engine) lineMetrics(line []inlineItem, lineY float64) (float64, float64) {
 	maxAscent, maxDescent := 0.0, 0.0
 
@@ -845,10 +848,12 @@ func (e *engine) lineMetrics(line []inlineItem, lineY float64) (float64, float64
 		extra := (lh - ascent - descent) / two
 		itemAscent := ascent + extra
 		itemDescent := descent + extra
+
 		if item.chrome {
 			itemAscent += e.inlineChromeTop(item.style)
 			itemDescent += e.inlineChromeBottom(item.style)
 		}
+
 		if itemAscent > maxAscent {
 			maxAscent = itemAscent
 		}

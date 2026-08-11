@@ -17,6 +17,7 @@ func loadFixture56(t *testing.T) (*html.Node, *css.Stylesheet) {
 	t.Helper()
 
 	base := filepath.Join("..", "..", "testdata", "golden")
+
 	htmlData, err := os.ReadFile(filepath.Join(base, "fixture-56-architecture-diagram.html"))
 	if err != nil {
 		t.Fatal(err)
@@ -118,6 +119,7 @@ func fixture56RoundedStrokes(res *Result, target *box) int {
 	}
 
 	count := 0
+
 	for _, op := range res.Ops[target.opStart : target.opEnd+1] {
 		if op.Kind == OpStrokeRect && op.Radius > 0 {
 			count++
@@ -133,6 +135,7 @@ func fixture56TextOps(res *Result, target *box) int {
 	}
 
 	count := 0
+
 	for _, op := range res.Ops[target.opStart : target.opEnd+1] {
 		if op.Kind == OpText {
 			count++
@@ -149,7 +152,7 @@ func fixture56Location(res *Result, target *html.Node) (ElementLocation, bool) {
 		}
 	}
 
-	return ElementLocation{}, false
+	return ElementLocation{Node: nil, Page: 0, X: 0, Y: 0, W: 0, H: 0}, false
 }
 
 func fixture56TextPage(res *Result, text string) (int, bool) {
@@ -172,14 +175,15 @@ func fixture56PaintOptions() PaintOptions {
 		margin     = 28.35
 	)
 
-	return PaintOptions{ //nolint:exhaustruct // fixture uses the standard print margins
+	return PaintOptions{
 		PageWidth: pageWidth, PageHeight: pageHeight,
 		MarginTop: margin, MarginBottom: margin,
 		MarginLeft: margin, MarginRight: margin,
 	}
 }
 
-func TestFixture56RendererSeams(t *testing.T) {
+//nolint:gocognit,gocyclo,cyclop,funlen // fixture seam assertions intentionally remain together
+func TestFixture56RendererSeams(t *testing.T) { //nolint:paralleltest // renderer fixture uses shared font state
 	root, sheet := loadFixture56(t)
 	opts := Options{ //nolint:exhaustruct // fixture uses the standard print layout path
 		Width: 595.28 - 2*28.35, Height: 841.89 - 2*28.35,
@@ -187,6 +191,7 @@ func TestFixture56RendererSeams(t *testing.T) {
 	}
 
 	styles, _ := resolveStylesForLayout(root, opts)
+
 	res, err := Layout(root, opts)
 	if err != nil {
 		t.Fatal(err)
@@ -198,12 +203,15 @@ func TestFixture56RendererSeams(t *testing.T) {
 			maxExtent = op.X + op.W
 		}
 	}
+
 	if maxExtent > res.Width+0.01 {
 		t.Fatalf("fixture paints outside its definite width: extent %.2f > %.2f", maxExtent, res.Width)
 	}
 
 	heroLegend := fixture56Node(root, func(node *html.Node) bool { return fixture56Class(node) == "hero-legend" })
-	if boxNode := fixture56BoxByNode(res.root, heroLegend); boxNode == nil || boxNode.height > 2*styles[heroLegend].LineHeight {
+	boxNode := fixture56BoxByNode(res.root, heroLegend)
+
+	if boxNode == nil || boxNode.height > 2*styles[heroLegend].LineHeight {
 		t.Fatalf("hero legend wrapped unexpectedly: box=%+v", boxNode)
 	}
 
@@ -238,6 +246,7 @@ func TestFixture56RendererSeams(t *testing.T) {
 	if len(details) != 2 {
 		t.Fatalf("details count = %d, want 2", len(details))
 	}
+
 	for _, node := range details {
 		boxNode := fixture56BoxByNode(res.root, node)
 		if _, open := node.Attrs["open"]; open {
@@ -263,6 +272,7 @@ func TestFixture56RendererSeams(t *testing.T) {
 		codeFill = codeFill || (op.Kind == OpFillRect && fixture56HasRGB(op, 0.9373, 0.9137, 0.8627))
 		markFill = markFill || (op.Kind == OpFillRect && fixture56HasRGB(op, 0.9529, 0.8627, 0.6902))
 	}
+
 	if !codeFill || !markFill {
 		t.Fatalf("inline chrome fills missing: code=%v mark=%v", codeFill, markFill)
 	}
@@ -276,14 +286,17 @@ func TestFixture56RendererSeams(t *testing.T) {
 	}
 
 	tab := fixture56Node(root, func(node *html.Node) bool { return fixture56Class(node) == "d02-tab" })
+
 	tabBox := fixture56BoxByNode(res.root, tab)
 	if got := fixture56TextOps(res, tabBox); got != 1 {
 		t.Fatalf("vertical D02 rail has %d text ops, want one unwrapped run", got)
 	}
 }
 
-func TestFixture56PageComposition(t *testing.T) {
+//nolint:cyclop,funlen // fixture composition assertions intentionally remain together
+func TestFixture56PageComposition(t *testing.T) { //nolint:paralleltest // renderer fixture uses shared font state
 	root, sheet := loadFixture56(t)
+
 	const contentHeight = 841.89 - 2*28.35
 
 	res, err := Layout(root, Options{ //nolint:exhaustruct // fixture uses the standard print layout path
@@ -301,6 +314,7 @@ func TestFixture56PageComposition(t *testing.T) {
 	d01Exit := fixture56Node(root, func(node *html.Node) bool {
 		return fixture56Class(node) == "d01-exit"
 	})
+
 	bodyRows := fixture56Nodes(root, func(node *html.Node) bool {
 		return node.Name == "tr" && node.Parent != nil && node.Parent.Name == "tbody" &&
 			node.Parent.Parent == d01Exit
@@ -308,11 +322,14 @@ func TestFixture56PageComposition(t *testing.T) {
 	if len(bodyRows) != 4 {
 		t.Fatalf("D01 exit body rows = %d, want 4", len(bodyRows))
 	}
+
 	tableBox := fixture56BoxByNode(res.root, d01Exit)
 	if tableBox == nil || len(tableBox.rows) != 5 {
 		t.Fatalf("D01 exit painted table rows = %d, want 5 including header", len(tableBox.rows))
 	}
+
 	firstGap := rowYBounds(tableBox.rows[1], res) - rowYBounds(tableBox.rows[0], res)
+
 	for rowIndex := 2; rowIndex < len(tableBox.rows); rowIndex++ {
 		gap := rowYBounds(tableBox.rows[rowIndex], res) - rowYBounds(tableBox.rows[rowIndex-1], res)
 		if gap > firstGap*1.5 {
@@ -321,8 +338,9 @@ func TestFixture56PageComposition(t *testing.T) {
 	}
 
 	rowTexts := []string{"ok", "error", "HTTP 404", "HTTP 401"}
-	firstRowPage, ok := fixture56TextPage(res, rowTexts[0])
-	if !ok {
+	firstRowPage, foundFirst := fixture56TextPage(res, rowTexts[0])
+
+	if !foundFirst {
 		t.Fatalf("D01 exit first body row text %q has no painted location", rowTexts[0])
 	}
 
@@ -338,10 +356,12 @@ func TestFixture56PageComposition(t *testing.T) {
 	}
 
 	d02 := fixture56Node(root, func(node *html.Node) bool { return node.Attribute("id") == "domain-02" })
-	d02Location, ok := fixture56Location(res, d02)
-	if !ok {
+
+	d02Location, foundD02 := fixture56Location(res, d02)
+	if !foundD02 {
 		t.Fatal("D02 section has no painted location")
 	}
+
 	pageOffset := math.Mod(d02Location.Y, contentHeight)
 	if math.Min(pageOffset, contentHeight-pageOffset) > 2 {
 		t.Fatalf("D02 section starts %.2fpt into page, want forced page start", pageOffset)

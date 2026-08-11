@@ -76,6 +76,7 @@ func sealBorderGap(
 	// This generated op is appended after flow pagination may have indexed the
 	// display list. Rebuild the index before any later movement consults it.
 	invalidateFlowIndex(res)
+
 	sealed := hseg{minX, maxX, gVal, borderW, red, green, blue}
 	*horiz = append(*horiz, sealed)
 	horizByY[roundY(gVal)] = append(horizByY[roundY(gVal)], sealed)
@@ -559,6 +560,7 @@ func tablePaintRanges(res *Result) []paintRange {
 	}
 
 	ranges := make([]paintRange, 0)
+
 	for _, boxNode := range flowBoxList(res) {
 		if boxNode.kind != displayTable || boxNode.opStart > boxNode.opEnd {
 			continue

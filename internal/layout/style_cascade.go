@@ -7,6 +7,13 @@ import (
 	"gowkhtmltopdf/internal/html"
 )
 
+const (
+	borderTopProperty    = "border-top"
+	borderBottomProperty = "border-bottom"
+	borderLeftProperty   = "border-left"
+	borderRightProperty  = "border-right"
+)
+
 // mergeCustomProps inherits parent custom properties and overlays any --*
 // declarations from raw, resolving var() chains via css.ResolveCustomProps.
 func mergeCustomProps(parentProps map[string]string, raw map[string]string) map[string]string {
@@ -303,7 +310,9 @@ type cascadeWin struct {
 // Uses one winner map (value+spec+order+important) instead of six maps.
 //
 //nolint:cyclop // hot path; three fixed cascade tiers read clearer than one loop
-func cascadeRaw(ctx *styleContext, node *html.Node) map[string]string {
+func cascadeRaw( //nolint:funlen // cascade tiers are deliberately visible in one hot-path function
+	ctx *styleContext, node *html.Node,
+) map[string]string {
 	var wins map[string]cascadeWin
 	if ctx == nil {
 		wins = make(map[string]cascadeWin, cascadeWinHint)
@@ -325,13 +334,13 @@ func cascadeRaw(ctx *styleContext, node *html.Node) map[string]string {
 	// author sheets in source order (shared matchedRules walk)
 	if ctx != nil {
 		for _, hit := range ctx.matchedRules(node, "") {
-			r := hit.r
-			for _, d := range r.Decls {
+			rule := hit.r
+			for _, d := range rule.Decls {
 				if !supportedDeclaration(d.Value) {
 					continue
 				}
 
-				applyCascadeWin(wins, d.Prop, d.Value, hit.a, hit.b, hit.c, r.Order, d.Important)
+				applyCascadeWin(wins, d.Prop, d.Value, hit.a, hit.b, hit.c, rule.Order, d.Important)
 			}
 		}
 	}
@@ -514,7 +523,7 @@ func resolveFontWeight(current int, val string) int {
 // longhand (e.g. margin-bottom) always overrides its shorthand (margin).
 // Package-level to avoid per-node slice/array rebuilds.
 var restShorthandProps = [...]string{ //nolint:gochecknoglobals // static apply order
-	"margin", "padding", "border", "border-top", "border-right", "border-bottom", "border-left",
+	"margin", "padding", "border", borderTopProperty, borderRightProperty, borderBottomProperty, borderLeftProperty,
 	borderWidthKeyword, borderStyleKeyword,
 	borderColorKeyword, gapKeyword, flexKeyword, containerKeyword,
 }
@@ -547,7 +556,7 @@ func applyRestProps(
 
 	for prop, value := range raw {
 		switch prop {
-		case "margin", "padding", "border", "border-top", "border-right", "border-bottom", "border-left",
+		case "margin", "padding", "border", borderTopProperty, borderRightProperty, borderBottomProperty, borderLeftProperty,
 			borderWidthKeyword, borderStyleKeyword,
 			borderColorKeyword, gapKeyword, flexKeyword, containerKeyword:
 			continue
