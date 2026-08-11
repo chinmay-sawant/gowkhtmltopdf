@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<!--
+  library-api architecture diagram
+  Proves: a public Go library caller can render a self-contained five-page
+  architecture document from a local HTML template.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Gowkhtmltopdf Library API Architecture</title>
+  <style>
+    @page { size: A4; margin: 0; }
+
+    * { box-sizing: border-box; }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      background: #e8edf2;
+      color: #1d2a36;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 10pt;
+      line-height: 1.35;
+    }
+
+    .page {
+      width: 210mm;
+      min-height: 297mm;
+      padding: 14mm 15mm 13mm;
+      background: #f8fafc;
+      page-break-after: always;
+      position: relative;
+    }
+
+    .page:last-child { page-break-after: auto; }
+
+    .masthead,
+    .meta-row,
+    .flow,
+    .legend,
+    .footer-row,
+    .two-column,
+    .three-column {
+      display: flex;
+    }
+
+    .masthead {
+      align-items: flex-start;
+      justify-content: space-between;
+      border-bottom: 2px solid #274c67;
+      padding-bottom: 7px;
+    }
+
+    .brand {
+      color: #163b56;
+      font-size: 10pt;
+      font-weight: 700;
+      letter-spacing: .13em;
+      text-transform: uppercase;
+    }
+
+    .kicker,
+    .eyebrow,
+    .page-number,
+    .label {
+      color: #587080;
+      font-size: 7.5pt;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+
+    .page-number { text-align: right; }
+
+    h1,
+    h2,
+    h3,
+    p { margin-top: 0; }
+
+    h1 {
+      max-width: 170mm;
+      margin: 25mm 0 7mm;
+      color: #163b56;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 31pt;
+      font-weight: 400;
+      line-height: 1.05;
+    }
+
+    h2 {
+      margin: 9mm 0 4mm;
+      color: #163b56;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 20pt;
+      font-weight: 400;
+    }
+
+    h3 {
+      margin: 0 0 2mm;
+      color: #274c67;
+      font-size: 11pt;
+    }
+
+    p { margin-bottom: 4mm; }
+
+    .lede {
+      max-width: 145mm;
+      color: #536672;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 14pt;
+      line-height: 1.45;
+    }
+
+    .summary {
+      margin-top: 16mm;
+      padding: 7mm;
+      border-left: 5px solid #e07848;
+      background: #eaf1f5;
+    }
+
+    .summary strong { color: #163b56; }
+
+    .flow {
+      align-items: stretch;
+      gap: 3mm;
+      margin: 9mm 0;
+    }
+
+    .flow .node {
+      flex: 1;
+      min-height: 31mm;
+      padding: 4mm;
+      border: 1px solid #9ab0bf;
+      border-top: 4px solid #3c7899;
+      background: #ffffff;
+    }
+
+    .flow .node:not(:last-child)::after {
+      content: "→";
+      position: absolute;
+      margin-left: 27mm;
+      margin-top: 9mm;
+      color: #e07848;
+      font-size: 16pt;
+      font-weight: 700;
+    }
+
+    .node { position: relative; }
+    .node p { margin: 0; color: #536672; font-size: 8.5pt; }
+
+    .meta-row {
+      justify-content: space-between;
+      gap: 5mm;
+      margin-top: 11mm;
+    }
+
+    .metric {
+      flex: 1;
+      padding: 5mm;
+      background: #163b56;
+      color: #ffffff;
+    }
+
+    .metric strong {
+      display: block;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 22pt;
+      font-weight: 400;
+    }
+
+    .metric span { color: #cfe2ed; font-size: 8pt; }
+
+    .two-column,
+    .three-column {
+      align-items: stretch;
+      gap: 5mm;
+      margin: 5mm 0;
+    }
+
+    .two-column > * { flex: 1; }
+    .three-column > * { flex: 1; }
+
+    .panel {
+      padding: 5mm;
+      border: 1px solid #b9c8d2;
+      background: #ffffff;
+    }
+
+    .panel p,
+    .panel li {
+      color: #536672;
+      font-size: 8.5pt;
+    }
+
+    .panel ul,
+    .panel ol { margin: 2mm 0 0; padding-left: 5mm; }
+
+    .tag {
+      display: inline-block;
+      padding: 1mm 2mm;
+      border: 1px solid #89aabd;
+      border-radius: 2mm;
+      color: #274c67;
+      font-size: 7.5pt;
+      font-weight: 700;
+    }
+
+    .diagram {
+      margin: 6mm 0;
+      padding: 5mm;
+      border: 1px solid #9ab0bf;
+      background: #eef4f7;
+    }
+
+    .diagram-row {
+      display: flex;
+      align-items: center;
+      gap: 4mm;
+      margin-bottom: 4mm;
+    }
+
+    .diagram-row:last-child { margin-bottom: 0; }
+
+    .diagram-box {
+      flex: 1;
+      min-height: 21mm;
+      padding: 3mm;
+      border: 2px solid #3c7899;
+      background: #ffffff;
+      text-align: center;
+    }
+
+    .diagram-box.accent {
+      border-color: #e07848;
+      background: #fff5ee;
+    }
+
+    .arrow {
+      color: #e07848;
+      font-size: 15pt;
+      font-weight: 700;
+    }
+
+    .code {
+      padding: 4mm;
+      background: #18252e;
+      color: #d9edf5;
+      font-family: "Courier New", monospace;
+      font-size: 8pt;
+      line-height: 1.5;
+    }
+
+    .code .accent-text { color: #f0aa76; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 5mm 0;
+      background: #ffffff;
+      font-size: 8.5pt;
+    }
+
+    th,
+    td {
+      padding: 3mm;
+      border: 1px solid #b9c8d2;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th { background: #eaf1f5; color: #274c67; }
+    td { color: #536672; }
+
+    .callout {
+      margin: 5mm 0;
+      padding: 4mm 5mm;
+      border-left: 4px solid #e07848;
+      background: #fff5ee;
+    }
+
+    .callout p { margin: 0; color: #5b4b42; font-size: 8.5pt; }
+
+    .footer-row {
+      position: absolute;
+      right: 15mm;
+      bottom: 8mm;
+      left: 15mm;
+      justify-content: space-between;
+      padding-top: 3mm;
+      border-top: 1px solid #b9c8d2;
+      color: #71838e;
+      font-size: 7.5pt;
+    }
+
+    .legend { gap: 5mm; margin-top: 4mm; }
+    .legend span { color: #536672; font-size: 8pt; }
+    .swatch { display: inline-block; width: 4mm; height: 4mm; margin-right: 1mm; vertical-align: -1mm; }
+    .swatch.blue { background: #3c7899; }
+    .swatch.orange { background: #e07848; }
+    .swatch.dark { background: #163b56; }
+
+  </style>
+</head>
+<body>
+  <section class="page">
+    <header class="masthead">
+      <div class="brand">Gowkhtmltopdf · Library API</div>
+      <div class="page-number">Architecture brief · 01 / 05</div>
+    </header>
+
+    <div class="kicker">Public Go surface / pure-Go document rendering</div>
+    <h1>From a Go converter to a composed architecture document.</h1>
+    <p class="lede">A library caller supplies HTML, chooses the document contract, and receives deterministic PDF bytes without shelling out to a browser or a system binary.</p>
+
+    <div class="summary">
+      <p><strong>Core idea.</strong> The public API is a narrow ownership boundary around settings, page objects, conversion context, and output bytes. Internal layout and PDF stages remain replaceable behind that boundary.</p>
+      <span class="tag">server-generated HTML</span>
+      <span class="tag">context-aware</span>
+      <span class="tag">PDF bytes in memory</span>
+    </div>
+
+    <div class="flow">
+      <div class="node"><h3>1 · Configure</h3><p>Global page geometry, margins, background, and local-file policy.</p></div>
+      <div class="node"><h3>2 · Add object</h3><p>Attach one or more HTML pages with object-level overrides.</p></div>
+      <div class="node"><h3>3 · Convert</h3><p>Thread context through load, parse, style, layout, paint, and write.</p></div>
+      <div class="node"><h3>4 · Consume</h3><p>Read stable PDF bytes and store or stream them from the host service.</p></div>
+    </div>
+
+    <div class="meta-row">
+      <div class="metric"><strong>5</strong><span>architecture pages in this example</span></div>
+      <div class="metric"><strong>0</strong><span>external browser processes</span></div>
+      <div class="metric"><strong>1</strong><span>explicit output ownership boundary</span></div>
+    </div>
+
+    <footer class="footer-row"><span>Generated through the public Go API</span><span>Northline Systems · internal architecture</span></footer>
+  </section>
+
+  <section class="page">
+    <header class="masthead">
+      <div class="brand">Gowkhtmltopdf · Library API</div>
+      <div class="page-number">Request path · 02 / 05</div>
+    </header>
+
+    <h2>The request path is explicit at every seam.</h2>
+    <p class="lede">The converter owns configuration and output. Each page object owns its source and local overrides. The context gives callers a cancellation and deadline boundary.</p>
+
+    <div class="diagram">
+      <div class="diagram-row">
+        <div class="diagram-box accent"><h3>Host service</h3><p>HTTP handler, job worker, or CLI wrapper</p></div>
+        <div class="arrow">→</div>
+        <div class="diagram-box"><h3>Converter</h3><p>Global settings + ordered objects</p></div>
+        <div class="arrow">→</div>
+        <div class="diagram-box"><h3>Run context</h3><p>ctx, hooks, resource policy</p></div>
+      </div>
+      <div class="diagram-row">
+        <div class="diagram-box"><h3>Load</h3><p>HTML source, ACL, fonts, assets</p></div>
+        <div class="arrow">→</div>
+        <div class="diagram-box"><h3>Prepare</h3><p>parse, stylesheet, document metadata</p></div>
+        <div class="arrow">→</div>
+        <div class="diagram-box"><h3>Render</h3><p>layout, paginate, paint, assemble</p></div>
+      </div>
+      <div class="diagram-row">
+        <div class="diagram-box"><h3>Output bytes</h3><p>%PDF header, pages, xref, EOF</p></div>
+        <div class="arrow">→</div>
+        <div class="diagram-box accent"><h3>Host storage</h3><p>file, object store, response stream</p></div>
+      </div>
+    </div>
+
+    <div class="two-column">
+      <section class="panel">
+        <h3>Ownership rules</h3>
+        <ul>
+          <li><code>AddObject</code> copies public settings before conversion.</li>
+          <li><code>Output</code> returns a copy of the completed bytes.</li>
+          <li>A converter is used by one conversion flow at a time.</li>
+          <li>Failures return as errors before partial output is published.</li>
+        </ul>
+      </section>
+      <section class="panel">
+        <h3>Signals exposed to callers</h3>
+        <ul>
+          <li>Context cancellation and deadlines.</li>
+          <li>Phase names and integer progress callbacks.</li>
+          <li>Info, warning, and error conversion hooks.</li>
+          <li>Typed sentinel errors for invalid boundaries.</li>
+        </ul>
+      </section>
+    </div>
+
+    <div class="callout"><p><strong>Design note.</strong> A library caller never needs to know which internal package performs a stage. The public contract stays useful even as layout and PDF implementation details evolve.</p></div>
+
+    <footer class="footer-row"><span>Request flow and ownership</span><span>02 / 05</span></footer>
+  </section>
+
+  <section class="page">
+    <header class="masthead">
+      <div class="brand">Gowkhtmltopdf · Library API</div>
+      <div class="page-number">Rendering core · 03 / 05</div>
+    </header>
+
+    <h2>Rendering is a staged document pipeline.</h2>
+    <p class="lede">The renderer turns one source document into an ordered display model. Each stage contributes a stronger invariant and keeps its work visible to the next stage.</p>
+
+    <table>
+      <thead><tr><th>Stage</th><th>Input → output</th><th>Invariant carried forward</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Load</strong></td><td>URL/path/inline bytes → source tree</td><td>ACL checks and resource policy are applied before fetches.</td></tr>
+        <tr><td><strong>Parse</strong></td><td>HTML/CSS text → nodes and rules</td><td>Malformed but recoverable markup remains traversable.</td></tr>
+        <tr><td><strong>Style</strong></td><td>rules + ancestry → resolved styles</td><td>Inherited values, custom properties, and media are resolved once.</td></tr>
+        <tr><td><strong>Layout</strong></td><td>styled tree → boxes and flow positions</td><td>Widths, heights, text runs, tables, flex, and grid have geometry.</td></tr>
+        <tr><td><strong>Paint</strong></td><td>boxes → display operations</td><td>Operations preserve order, links, backgrounds, and text metadata.</td></tr>
+        <tr><td><strong>Write</strong></td><td>operations → PDF bytes</td><td>Pages, resources, xref, and EOF form a readable PDF artifact.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Display-list handoff</h3>
+    <div class="diagram">
+      <div class="diagram-row">
+        <div class="diagram-box"><span class="label">box tree</span><h3>Document geometry</h3><p>x, y, width, height, page ownership</p></div>
+        <div class="arrow">→</div>
+        <div class="diagram-box accent"><span class="label">display list</span><h3>Paint operations</h3><p>fill, stroke, image, text, link, transform</p></div>
+        <div class="arrow">→</div>
+        <div class="diagram-box"><span class="label">pdf writer</span><h3>Serialized pages</h3><p>fonts, resources, content streams</p></div>
+      </div>
+    </div>
+
+    <div class="two-column">
+      <section class="panel">
+        <h3>Why a display list?</h3>
+        <p>Pagination can move a group of operations without rebuilding source nodes. Tests can inspect paint order and page ownership before serialization.</p>
+      </section>
+      <section class="panel">
+        <h3>Why keep the API above it?</h3>
+        <p>Callers need a document result, not a renderer vocabulary. The public surface can remain small while internal contracts stay testable.</p>
+      </section>
+    </div>
+
+    <footer class="footer-row"><span>Load → parse → style → layout → paint → write</span><span>03 / 05</span></footer>
+  </section>
+
+  <section class="page">
+    <header class="masthead">
+      <div class="brand">Gowkhtmltopdf · Library API</div>
+      <div class="page-number">Security and reliability · 04 / 05</div>
+    </header>
+
+    <h2>Safe defaults make the library embeddable.</h2>
+    <p class="lede">A service embedding the converter must be able to decide which inputs can read local files, which resources can be fetched, and when a request should stop.</p>
+
+    <div class="three-column">
+      <section class="panel">
+        <span class="tag">ACL</span>
+        <h3>Local resources</h3>
+        <p>Local-file access is blocked by default. The global enable flag and object-level unblock form an explicit pair.</p>
+      </section>
+      <section class="panel">
+        <span class="tag">CTX</span>
+        <h3>Cancellation</h3>
+        <p>The caller supplies a context. Load, conversion, and output stages can stop without leaving a published partial PDF.</p>
+      </section>
+      <section class="panel">
+        <span class="tag">LIMITS</span>
+        <h3>Resource bounds</h3>
+        <p>Object, copy, page, stylesheet, and source limits prevent accidental amplification from untrusted inputs.</p>
+      </section>
+    </div>
+
+    <div class="code"><span class="accent-text">converter</span> := gowkhtmltopdf.NewConverter()<br>
+      converter.Global().Set("enablelocalfileaccess", "true")<br>
+      <span class="accent-text">page</span> := gowkhtmltopdf.NewObjectSettings().SetPage(inputPath)<br>
+      page.Set("load.blocklocalfileaccess", "false")<br>
+      converter.AddObject(page)<br>
+      <span class="accent-text">err</span> := converter.Convert(ctx)</div>
+
+    <h3>Failure boundaries</h3>
+    <table>
+      <thead><tr><th>Condition</th><th>Observed by host</th><th>Recommended host action</th></tr></thead>
+      <tbody>
+        <tr><td>Missing page object</td><td>typed no-page error</td><td>return a 4xx configuration response</td></tr>
+        <tr><td>Blocked local file</td><td>load/resource error</td><td>keep ACL blocked and report the source</td></tr>
+        <tr><td>Context cancellation</td><td>context error</td><td>stop work and do not publish output</td></tr>
+        <tr><td>Invalid setting</td><td>setting validation error</td><td>reject the request before conversion</td></tr>
+      </tbody>
+    </table>
+
+    <div class="legend"><span><i class="swatch blue"></i>internal stage</span><span><i class="swatch orange"></i>caller decision</span><span><i class="swatch dark"></i>published contract</span></div>
+
+    <footer class="footer-row"><span>Security, cancellation, and error boundaries</span><span>04 / 05</span></footer>
+  </section>
+
+  <section class="page">
+    <header class="masthead">
+      <div class="brand">Gowkhtmltopdf · Library API</div>
+      <div class="page-number">Integration contract · 05 / 05</div>
+    </header>
+
+    <h2>One small example can carry a complete document contract.</h2>
+    <p class="lede">The generator beside this template is intentionally ordinary Go: configure, add a local page, convert with a context, validate the page count, and write the bytes.</p>
+
+    <div class="diagram">
+      <div class="diagram-row">
+        <div class="diagram-box accent"><h3>HTML template</h3><p>architecture-diagram.html</p></div>
+        <div class="arrow">+</div>
+        <div class="diagram-box"><h3>Go program</h3><p>generate.go / public API</p></div>
+        <div class="arrow">=</div>
+        <div class="diagram-box accent"><h3>Golden artifact</h3><p>architecture-diagram.pdf</p></div>
+      </div>
+    </div>
+
+    <div class="two-column">
+      <section class="panel">
+        <h3>Integration checklist</h3>
+        <ol>
+          <li>Choose whether input is a path or in-memory body.</li>
+          <li>Set page geometry and rendering policy explicitly.</li>
+          <li>Pair local-file settings when local resources are intended.</li>
+          <li>Pass the host request context to <code>Convert</code>.</li>
+          <li>Write or stream <code>Output</code> only after success.</li>
+        </ol>
+      </section>
+      <section class="panel">
+        <h3>What this artifact demonstrates</h3>
+        <ul>
+          <li>Five stable, explicit document pages.</li>
+          <li>Architecture diagrams built from print-safe CSS boxes.</li>
+          <li>Text, tables, code, metadata, and page breaks.</li>
+          <li>A reproducible output path beside its source template.</li>
+        </ul>
+      </section>
+    </div>
+
+    <div class="summary">
+      <p><strong>Closing contract.</strong> The HTML remains understandable as a document, the Go program remains understandable as an integration example, and the PDF is a reviewable artifact produced by the same public API that an embedding service would call.</p>
+      <span class="tag">HTML in</span>
+      <span class="tag">Go API</span>
+      <span class="tag">PDF out</span>
+    </div>
+
+    <footer class="footer-row"><span>Library API architecture example</span><span>05 / 05 · end</span></footer>
+  </section>
+</body>
+</html>
