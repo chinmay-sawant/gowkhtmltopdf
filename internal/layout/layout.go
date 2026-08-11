@@ -1218,8 +1218,17 @@ func (e *engine) paintPositionedPseudo( //nolint:cyclop
 		pseudoX = contentX + contentW - e.measureTextFace(text, *style) - e.scalePt(style.Right)
 	}
 
+	staticAfter := pseudoElem == "after" && style.TopAuto && style.BottomAuto
 	pseudoY := boxNode.y + e.scalePt(host.PaddingTop) + e.scalePt(host.BorderTop.Width) +
 		e.scalePt(style.MarginTop)
+
+	if staticAfter {
+		// An absolutely positioned ::after without an inset uses the static
+		// position after its block host, not the host's content origin. This is
+		// the baseline position used by diagram connectors between stacked cards.
+		pseudoY = boxNode.y + boxNode.height + e.scalePt(style.MarginTop)
+	}
+
 	if !style.TopAuto {
 		pseudoY = boxNode.y + e.scalePt(style.Top)
 	} else if !style.BottomAuto {
@@ -1227,6 +1236,11 @@ func (e *engine) paintPositionedPseudo( //nolint:cyclop
 	}
 
 	baseline := pseudoY + e.fontAscent(size)
+
+	if staticAfter {
+		baseline = pseudoY
+	}
+
 	prevZ, prevSet, prevPositioned := e.pushZ(*style)
 	e.add(Op{ //nolint:exhaustruct // generated pseudo text has no DOM box
 		Kind: OpText, X: pseudoX, Y: baseline, W: e.measureTextFace(text, *style),
@@ -1483,7 +1497,9 @@ func (e *engine) buildOutOfFlow(node *html.Node, sty ResolvedStyle, availW, x, y
 
 	start := len(e.ops)
 
-	boxNode := e.buildInFlowDisplay(node, sty, cbW, cbX, cbY)
+	buildW := e.absoluteBuildWidth(sty, cbW)
+
+	boxNode := e.buildInFlowDisplay(node, sty, buildW, cbX, cbY)
 	if boxNode == nil {
 		return nil
 	}
@@ -1505,6 +1521,19 @@ func (e *engine) buildOutOfFlow(node *html.Node, sty ResolvedStyle, availW, x, y
 	e.shiftBoxOps(boxNode, dx, dy)
 
 	return boxNode
+}
+
+func (e *engine) absoluteBuildWidth(sty ResolvedStyle, cbW float64) float64 {
+	if sty.Width >= 0 || sty.WidthPercent >= 0 || sty.LeftAuto || sty.RightAuto {
+		return cbW
+	}
+
+	buildW := cbW - e.scalePt(sty.Left+sty.Right)
+	if buildW < 0 {
+		return 0
+	}
+
+	return buildW
 }
 
 // resolveAbsY places the out-of-flow box vertically: top wins, then bottom

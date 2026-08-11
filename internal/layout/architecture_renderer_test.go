@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"gowkhtmltopdf/internal/css"
+	"gowkhtmltopdf/internal/html"
 )
 
 func TestPositionedBlockPseudoAfterIsPaintedWithPseudoStyle(t *testing.T) {
@@ -143,4 +144,89 @@ body { margin: 0; font-family: Arial, sans-serif; font-size: 10pt; }
 	if borderOps == 0 {
 		t.Fatal("missing border paint operations")
 	}
+}
+
+func TestAbsoluteLeftRightBoxUsesBothInsets(t *testing.T) {
+	t.Parallel()
+
+	root := mustParse(t, `<html><body><div class="page"><div class="footer">right footer</div></div></body></html>`)
+	cssSheet := sheet(t, `
+body { margin: 0; }
+.page { position: relative; width: 200pt; height: 100pt; }
+.footer { position: absolute; left: 10pt; right: 10pt; bottom: 0; height: 10pt; }
+`)
+	res, err := Layout(root, Options{ //nolint:exhaustruct
+		Width: 300, Height: 200, Sheets: []*css.Stylesheet{cssSheet}, Media: "print",
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	page := findElementByClass(root, "page")
+	footer := findElementByClass(root, "footer")
+	pageBox := fixture56BoxByNode(res.root, page)
+	footerBox := fixture56BoxByNode(res.root, footer)
+
+	if pageBox == nil || footerBox == nil {
+		t.Fatalf("missing positioned boxes: page=%+v footer=%+v", pageBox, footerBox)
+	}
+
+	if footerBox.x+footerBox.w > pageBox.x+pageBox.w+0.01 {
+		t.Fatalf("left/right absolute box clipped right edge: page=%+v footer=%+v", pageBox, footerBox)
+	}
+}
+
+func TestAfterPseudoStaticPositionFollowsBlockHost(t *testing.T) {
+	t.Parallel()
+
+	root := mustParse(t, `<html><body><div class="node">1 · Configure</div></body></html>`)
+	cssSheet := sheet(t, `
+body { margin: 0; }
+.node { position: relative; width: 100pt; height: 30pt; }
+.node::after { content: "→"; position: absolute; margin-top: 10pt; font-size: 16pt; font-weight: 700; }
+`)
+	res, err := Layout(root, Options{ //nolint:exhaustruct
+		Width: 300, Height: 200, Sheets: []*css.Stylesheet{cssSheet}, Media: "print",
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	node := findElementByClass(root, "node")
+	nodeBox := fixture56BoxByNode(res.root, node)
+
+	if nodeBox == nil {
+		t.Fatal("missing node box")
+	}
+
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind == OpText && strings.TrimSpace(paintOp.Text) == "→" {
+			if paintOp.Y <= nodeBox.y+nodeBox.height {
+				t.Fatalf("after pseudo stayed inside block host: op=%+v node=%+v", paintOp, nodeBox)
+			}
+
+			return
+		}
+	}
+
+	t.Fatal("missing generated arrow")
+}
+
+func findElementByClass(root *html.Node, className string) *html.Node {
+	var found *html.Node
+
+	root.Walk(func(node *html.Node) {
+		if found != nil || node.Type != html.ElementNode {
+			return
+		}
+
+		classes := " " + node.Attribute("class") + " "
+		if strings.Contains(classes, " "+className+" ") {
+			found = node
+		}
+	})
+
+	return found
 }
