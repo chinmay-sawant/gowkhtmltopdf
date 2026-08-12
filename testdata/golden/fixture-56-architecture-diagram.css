@@ -548,7 +548,7 @@ section.d02 cite {
 /* vertical side tab - writing-mode:vertical-rl IS engine-supported (real effect) */
 section.d02 .d02-tab {
   position: absolute;
-  right: 8px;
+  right: 0;
   top: 12px;
   width: 20px;
   padding: 8px 3px;
