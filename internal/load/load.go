@@ -145,6 +145,39 @@ func cloneNetworkPolicy(src NetworkPolicy) NetworkPolicy {
 	return dst
 }
 
+// ResolveEffectiveLoadGlobal returns the load settings for one conversion
+// mode. global is the shared PDF/global policy; mode contains settings owned
+// by a mode-specific request, such as image-mode proxy and ACL values.
+//
+// Mode-specific proxy settings override the shared proxy when present. ACL
+// prefixes are additive and local-file access is enabled when either source
+// enables it. Network policy remains shared-policy first: an explicit global
+// NetworkPolicySet cannot be weakened by mode defaults, while a mode policy is
+// used when no shared policy was configured. All slices are copied so the
+// result is an owned effective snapshot for loader construction.
+func ResolveEffectiveLoadGlobal(global, mode settings.LoadGlobal) settings.LoadGlobal {
+	effective := global
+	effective.Allow = append(cloneStrings(mode.Allow), global.Allow...)
+	effective.NetworkAllowedSchemes = cloneStrings(global.NetworkAllowedSchemes)
+	effective.NetworkAllowedHosts = cloneStrings(global.NetworkAllowedHosts)
+
+	if mode.Proxy != "" {
+		effective.Proxy = mode.Proxy
+	}
+
+	effective.EnableLocalFileAccess = global.EnableLocalFileAccess || mode.EnableLocalFileAccess
+
+	if !global.NetworkPolicySet && mode.NetworkPolicySet {
+		effective.NetworkPolicySet = true
+		effective.NetworkAllowedSchemes = cloneStrings(mode.NetworkAllowedSchemes)
+		effective.NetworkAllowedHosts = cloneStrings(mode.NetworkAllowedHosts)
+		effective.NetworkBlockPrivate = mode.NetworkBlockPrivate
+		effective.NetworkBlockCrossHost = mode.NetworkBlockCrossHost
+	}
+
+	return effective
+}
+
 // ForResource returns a context for resources relative to res. A nil
 // resource is allowed for callers that only need absolute references; those
 // references still go through the same loader policy.
@@ -345,8 +378,7 @@ func NewLoader(global settings.LoadGlobal) *Loader {
 	// Preserve the historical constructor shape for existing callers. New
 	// callers should use NewLoaderWithError so initialization failures are
 	// handled at their request boundary instead of on the first load.
-	policy := global
-	policy.Allow = cloneStrings(global.Allow)
+	policy := ResolveEffectiveLoadGlobal(global, settings.LoadGlobal{}) //nolint:exhaustruct // empty mode override
 
 	return &Loader{ //nolint:exhaustruct // intentional zero/partial fields
 		Global:                policy,
@@ -364,7 +396,9 @@ func NewLoader(global settings.LoadGlobal) *Loader {
 // proxy configuration before installing the HTTP transport. It is the
 // fail-fast constructor; NewLoader remains available for existing callers.
 func NewLoaderWithError(global settings.LoadGlobal) (*Loader, error) {
-	return NewLoaderWithNetworkPolicy(global, networkPolicyFromGlobal(global))
+	effective := ResolveEffectiveLoadGlobal(global, settings.LoadGlobal{}) //nolint:exhaustruct // empty mode override
+
+	return NewLoaderWithNetworkPolicy(effective, networkPolicyFromGlobal(effective))
 }
 
 func networkPolicyFromGlobal(global settings.LoadGlobal) NetworkPolicy {
@@ -384,8 +418,7 @@ func networkPolicyFromGlobal(global settings.LoadGlobal) NetworkPolicy {
 // NewLoader and NewLoaderWithError remain compatibility constructors for
 // callers that rely on the historical permissive HTTP behavior.
 func NewLoaderWithNetworkPolicy(global settings.LoadGlobal, network NetworkPolicy) (*Loader, error) {
-	policy := global
-	policy.Allow = cloneStrings(global.Allow)
+	policy := ResolveEffectiveLoadGlobal(global, settings.LoadGlobal{}) //nolint:exhaustruct // empty mode override
 
 	loader := &Loader{ //nolint:exhaustruct // intentional zero/partial fields
 		Global:                policy,

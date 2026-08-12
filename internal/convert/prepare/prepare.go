@@ -23,25 +23,46 @@ var (
 	errNilContext       = errs.ErrNilContext
 )
 
-// ResourceContext binds one loader, base URL, and per-page policy for a
-// prepared document. All subresources use this same resource seam.
+// ResourceContext is the preparation-side behaviour around one load
+// ResourceContext. The load package owns the loader, resolved base URL, and
+// cloned per-page policy; preparation must not reconstruct or mutate those
+// values while fetching stylesheets, fonts, or images.
+//
+// Loader, Base, and Load remain as deprecated compatibility snapshots for
+// callers that have not yet migrated to the load seam. They are deliberately
+// not consulted by any method in this type. In particular, mutating one of
+// these snapshots cannot change the policy used by Fetch, CollectSheets, or
+// MergeFontFaces. New code should pass the load.ResourceContext directly to
+// preparation helpers as those callers are migrated.
 type ResourceContext struct {
 	resource load.ResourceContext
-	Loader   *load.Loader
-	Base     string
-	Load     settings.LoadPage
+	ready    bool
+
+	// Deprecated: compatibility snapshot; use the context's resource methods.
+	Loader *load.Loader
+	// Deprecated: compatibility snapshot; use the context's resource methods.
+	Base string
+	// Deprecated: compatibility snapshot; use the context's resource methods.
+	Load settings.LoadPage
 }
 
 // NewResourceContext creates the resource seam shared by PDF and image
 // preparation.
 //
 //nolint:wsl // extracted preparation flow
-func NewResourceContext(loader *load.Loader, base string, lp settings.LoadPage) ResourceContext {
-	resources := ResourceContext{Loader: loader, Base: base, Load: lp} //nolint:exhaustruct
+func NewResourceContext(loader *load.Loader, base string, loadPage settings.LoadPage) ResourceContext {
+	resources := ResourceContext{ //nolint:exhaustruct // compatibility snapshots are populated below
+		Loader: loader,
+		Base:   base,
+		Load:   loadPage,
+		ready:  loader != nil,
+	}
 	if loader != nil {
 		resource := &load.Resource{Base: base} //nolint:exhaustruct // base-only resource reference
 
-		resources.resource = loader.ForResource(resource, lp)
+		// ForResource clones loadPage. Keep this private value as the sole authority
+		// for all subsequent subresource resolution and policy checks.
+		resources.resource = loader.ForResource(resource, loadPage)
 	}
 
 	return resources
@@ -51,7 +72,7 @@ func NewResourceContext(loader *load.Loader, base string, lp settings.LoadPage) 
 //
 //nolint:wsl // resource validation flow
 func (r ResourceContext) Fetch(ctx context.Context, ref string) (*load.Resource, error) {
-	if r.Loader == nil {
+	if !r.ready {
 		return nil, errNoResourceLoader
 	}
 	if ctx == nil {
@@ -70,7 +91,7 @@ func (r ResourceContext) Fetch(ctx context.Context, ref string) (*load.Resource,
 //
 //nolint:wsl,lll // resource validation flow
 func (r ResourceContext) CollectSheets(ctx context.Context, root *html.Node, opts SheetOptions, log io.Writer) []*css.Stylesheet {
-	if r.Loader == nil {
+	if !r.ready {
 		return nil
 	}
 	if ctx == nil {
@@ -93,7 +114,7 @@ func (r ResourceContext) CollectSheets(ctx context.Context, root *html.Node, opt
 //
 //nolint:wsl,lll // resource validation flow
 func (r ResourceContext) MergeFontFaces(ctx context.Context, registry *pdf.Registry, sheets []*css.Stylesheet, idx int, log io.Writer) *pdf.Registry {
-	if r.Loader == nil {
+	if !r.ready {
 		return registry
 	}
 	if ctx == nil {
@@ -174,7 +195,7 @@ func Document(ctx context.Context, loader *load.Loader, page string, loadPage se
 
 //nolint:wsl,lll // resource validation flow
 func (r ResourceContext) collectSheets(ctx context.Context, root *html.Node, opts SheetOptions, log io.Writer) ([]*css.Stylesheet, error) {
-	if r.Loader == nil {
+	if !r.ready {
 		return nil, errNoResourceLoader
 	}
 	if ctx == nil {
@@ -186,7 +207,7 @@ func (r ResourceContext) collectSheets(ctx context.Context, root *html.Node, opt
 
 //nolint:wsl,lll // resource validation flow
 func (r ResourceContext) mergeFontFaces(ctx context.Context, registry *pdf.Registry, sheets []*css.Stylesheet, idx int, log io.Writer) *pdf.Registry {
-	if r.Loader == nil {
+	if !r.ready {
 		return registry
 	}
 	if ctx == nil {

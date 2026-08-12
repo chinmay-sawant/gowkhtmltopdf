@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -23,6 +24,104 @@ import (
 
 func defaultLP() settings.LoadPage {
 	return settings.DefaultLoadPage()
+}
+
+const (
+	mutatedShared = "mutated-shared"
+	mutatedImage  = "mutated-image"
+)
+
+func TestResolveEffectiveLoadGlobalSharedPolicyWins(t *testing.T) {
+	t.Parallel()
+
+	global := settings.LoadGlobal{
+		Proxy:                 "http://shared-proxy.example",
+		Allow:                 []string{"/shared"},
+		EnableLocalFileAccess: true,
+		NetworkPolicySet:      true,
+		NetworkAllowedSchemes: []string{"https"},
+		NetworkAllowedHosts:   []string{"shared.example"},
+		NetworkBlockPrivate:   true,
+		NetworkBlockCrossHost: true,
+	}
+	mode := settings.LoadGlobal{ //nolint:exhaustruct // focused mode policy override
+		Proxy:                 "http://image-proxy.example",
+		Allow:                 []string{"/image"},
+		NetworkPolicySet:      true,
+		NetworkAllowedSchemes: []string{"http"},
+		NetworkAllowedHosts:   []string{"image.example"},
+	}
+
+	got := load.ResolveEffectiveLoadGlobal(global, mode)
+	want := settings.LoadGlobal{
+		Proxy:                 "http://image-proxy.example",
+		Allow:                 []string{"/image", "/shared"},
+		EnableLocalFileAccess: true,
+		NetworkPolicySet:      true,
+		NetworkAllowedSchemes: []string{"https"},
+		NetworkAllowedHosts:   []string{"shared.example"},
+		NetworkBlockPrivate:   true,
+		NetworkBlockCrossHost: true,
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("effective load global = %+v, want %+v", got, want)
+	}
+}
+
+func TestResolveEffectiveLoadGlobalModePolicyFallback(t *testing.T) {
+	t.Parallel()
+
+	global := settings.LoadGlobal{Proxy: "http://shared-proxy.example"} //nolint:exhaustruct // focused shared policy
+	mode := settings.LoadGlobal{                                        //nolint:exhaustruct // mode policy
+		NetworkPolicySet:      true,
+		NetworkAllowedSchemes: []string{"https"},
+		NetworkAllowedHosts:   []string{"image.example"},
+		NetworkBlockPrivate:   true,
+		NetworkBlockCrossHost: true,
+	}
+
+	got := load.ResolveEffectiveLoadGlobal(global, mode)
+	if !got.NetworkPolicySet || !got.NetworkBlockPrivate || !got.NetworkBlockCrossHost {
+		t.Fatalf("mode network policy was not carried into effective settings: %+v", got)
+	}
+
+	if !reflect.DeepEqual(got.NetworkAllowedSchemes, mode.NetworkAllowedSchemes) ||
+		!reflect.DeepEqual(got.NetworkAllowedHosts, mode.NetworkAllowedHosts) {
+		t.Fatalf("mode network allowlists = schemes %v hosts %v", got.NetworkAllowedSchemes, got.NetworkAllowedHosts)
+	}
+}
+
+func TestResolveEffectiveLoadGlobalOwnsPolicySlices(t *testing.T) {
+	t.Parallel()
+
+	global := settings.LoadGlobal{ //nolint:exhaustruct // focused shared policy
+		Allow:                 []string{"/shared"},
+		NetworkAllowedSchemes: []string{"https"},
+		NetworkAllowedHosts:   []string{"shared.example"},
+	}
+	mode := settings.LoadGlobal{ //nolint:exhaustruct // focused mode policy override
+		Allow:                 []string{"/image"},
+		NetworkAllowedSchemes: []string{"http"},
+		NetworkAllowedHosts:   []string{"image.example"},
+	}
+
+	got := load.ResolveEffectiveLoadGlobal(global, mode)
+	global.Allow[0] = mutatedShared
+	global.NetworkAllowedSchemes[0] = mutatedShared
+	global.NetworkAllowedHosts[0] = mutatedShared
+	mode.Allow[0] = mutatedImage
+	mode.NetworkAllowedSchemes[0] = mutatedImage
+	mode.NetworkAllowedHosts[0] = mutatedImage
+
+	if got.Allow[0] != "/image" || got.Allow[1] != "/shared" {
+		t.Fatalf("effective ACL aliases source slices: %v", got.Allow)
+	}
+
+	if got.NetworkAllowedSchemes[0] != "https" || got.NetworkAllowedHosts[0] != "shared.example" {
+		t.Fatalf("effective network policy aliases source slices: schemes=%v hosts=%v",
+			got.NetworkAllowedSchemes, got.NetworkAllowedHosts)
+	}
 }
 
 func TestGuessURL(t *testing.T) {

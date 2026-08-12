@@ -672,9 +672,9 @@ func ConvertHTML(ctx context.Context, html []byte, global *GlobalSettings) ([]by
 // ---------------------------------------------------------------------------
 
 // ImageConverter drives one HTML-to-image conversion (the wkhtmltoimage
-// counterpart): it renders the first added page and encodes it as PNG or
-// JPEG. Configure with Set/AddObject, then Convert produces the encoded
-// bytes via Output(). Not safe for concurrent Convert calls.
+// counterpart): it renders the current page and encodes it as PNG or JPEG.
+// Configure with Set/AddObject, then Convert produces the encoded bytes via
+// Output(). Not safe for concurrent Convert calls.
 type ImageConverter struct {
 	global      *GlobalSettings
 	image       settings.ImageGlobal
@@ -732,9 +732,10 @@ func (c *ImageConverter) Global() *GlobalSettings {
 	return c.global
 }
 
-// AddObject sets the page to convert (a path, URL, or "inline:"/"data:"
-// source) and returns c for chaining. Image conversion renders the first
-// added page only. The page's load settings can be adjusted through Object.
+// AddObject replaces the current page to convert (a path, URL, or
+// "inline:"/"data:" source) and returns c for chaining. Image conversion
+// renders the most recently added page. The page's load settings can be
+// adjusted through Object.
 func (c *ImageConverter) AddObject(page string) *ImageConverter {
 	if c == nil {
 		return nil

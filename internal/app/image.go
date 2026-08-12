@@ -11,6 +11,10 @@ import (
 	"gowkhtmltopdf/internal/imageout"
 )
 
+// ErrMultipleImageObjects reports an image command with more than one input
+// object. Image mode owns one source and one output canvas.
+var ErrMultipleImageObjects = errors.New("app: multiple image objects")
+
 // RunImage is the command-facing image adapter. It keeps command parsing and
 // output ownership at the application boundary while imageout remains a
 // CLI-independent request engine.
@@ -36,6 +40,10 @@ func RunImage(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 	if err := request.Validate(); err != nil {
 		if errors.Is(err, convert.ErrNoRenderableObjects) {
 			return ErrNoPageObjects
+		}
+
+		if errors.Is(err, imageout.ErrMultipleInputs) {
+			return ErrMultipleImageObjects
 		}
 
 		return fmt.Errorf("app: validate image: %w", err)

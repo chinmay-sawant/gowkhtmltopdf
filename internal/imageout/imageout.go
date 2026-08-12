@@ -1577,20 +1577,13 @@ func fontRegistry(global settings.PdfGlobal, log io.Writer) *pdf.Registry {
 	return pdf.ScanFontDirs(scan)
 }
 
-// imageLoadGlobal builds the LoadGlobal for image mode: Proxy from Image.Load
-// plus ACL (Allow / EnableLocalFileAccess) from Global.Load, where CLI and
-// ImageConverter.Global set them. NewLoader applies the full policy.
+// imageLoadGlobal resolves the shared and image-owned load settings before
+// constructing the loader. The shared policy remains authoritative for
+// explicit network restrictions; image settings can supply an image proxy or
+// additive local-file ACL values. NewLoader then receives one complete policy
+// snapshot for primary and subresource loads.
 func imageLoadGlobal(global settings.PdfGlobal, image settings.ImageGlobal) settings.LoadGlobal {
-	loadGlobal := image.Load
-	// Global.Load is the ACL home (enablelocalfileaccess / allow keys).
-	// Prefer Global when set; keep any Image.Load ACL already present (OR).
-	if len(global.Load.Allow) > 0 {
-		loadGlobal.Allow = append(append([]string(nil), loadGlobal.Allow...), global.Load.Allow...)
-	}
-
-	loadGlobal.EnableLocalFileAccess = loadGlobal.EnableLocalFileAccess || global.Load.EnableLocalFileAccess
-
-	return loadGlobal
+	return load.ResolveEffectiveLoadGlobal(global.Load, image.Load)
 }
 
 // firstObject returns the first page-like object. Image mode renders a

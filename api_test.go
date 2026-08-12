@@ -1451,6 +1451,23 @@ func TestImageConverterNeedsPage(t *testing.T) {
 	}
 }
 
+func TestImageConverterAddObjectReplacesInput(t *testing.T) {
+	t.Parallel()
+
+	conv := NewImageConverter()
+	conv.AddObject("first.html")
+	conv.AddObject("second.html")
+
+	got, ok := conv.Object().Get("page")
+	if !ok {
+		t.Fatal("Object().Get(page) did not return the configured input")
+	}
+
+	if got != "second.html" {
+		t.Fatalf("Object().Get(page) = %q, want most recently added page", got)
+	}
+}
+
 // TestImageConverterSetBody: P2-04 InlineHTML source kind works for image mode
 // via Object().SetBody (no temp file, no URL guessing).
 func TestImageConverterSetBody(t *testing.T) {
