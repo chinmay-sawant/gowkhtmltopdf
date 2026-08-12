@@ -10,11 +10,10 @@ func BenchmarkFontNameLoadingCached(b *testing.B) {
 	}
 
 	font := faces.Regular
+
 	b.ReportAllocs()
 
-	b.ResetTimer()
-
-	for range b.N {
+	for b.Loop() {
 		if len(font.LoadNames()) == 0 {
 			b.Fatal("font has no cached names")
 		}
@@ -37,9 +36,8 @@ func BenchmarkRegistryFindWithGlyph(b *testing.B) {
 	}
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		if registry.FindWithGlyph('★', 400, false) == nil {
 			b.Fatal("registry did not find a fallback glyph")
 		}

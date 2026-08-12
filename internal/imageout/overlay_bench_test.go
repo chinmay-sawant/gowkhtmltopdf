@@ -74,11 +74,13 @@ func BenchmarkRoundedBorderLineOverlay(b *testing.B) {
 	for _, cards := range []int{32, 128, 512} {
 		b.Run(fmt.Sprintf("%dCards", cards), func(b *testing.B) {
 			ops := borderHeavyOverlayOps(cards)
+
 			b.ReportAllocs()
 
 			b.ResetTimer()
 
 			matches := 0
+
 			for range b.N {
 				for index := range ops {
 					if _, ok := roundedBorderLineOverlay(ops, index); ok {

@@ -18,7 +18,10 @@ func headerFooterBenchmarkHTML(pages int) []byte {
 	var source strings.Builder
 
 	const prefix = `<html><body style="font-family: sans-serif; font-size: 12pt">`
-	const section = `<section style="height: 650pt; page-break-after: always"><h1>Body page %d</h1><p>Stable header/footer benchmark content.</p></section>`
+
+	const section = `<section style="height: 650pt; page-break-after: always">` +
+		`<h1>Body page %d</h1><p>Stable header/footer benchmark content.</p></section>`
+
 	source.WriteString(prefix)
 
 	for page := 1; page <= pages; page++ {

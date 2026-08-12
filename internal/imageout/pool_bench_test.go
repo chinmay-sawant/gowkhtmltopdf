@@ -21,6 +21,7 @@ func BenchmarkSupersamplePool(b *testing.B) {
 				Width:  size.width,
 				Height: size.height,
 			}
+
 			b.ReportAllocs()
 
 			b.ResetTimer()
