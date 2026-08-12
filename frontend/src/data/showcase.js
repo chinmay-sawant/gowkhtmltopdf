@@ -439,6 +439,6 @@ export function githubPdfUrl(file) {
 }
 
 export function githubTemplateUrl(name) {
-  if (!name.startsWith('fixture-')) return null
+  if (!name.startsWith('fixture-') && !['font-examples', 'architecture-diagram'].includes(name)) return null
   return `${GOLDEN_BASE}/${name}.html`
 }

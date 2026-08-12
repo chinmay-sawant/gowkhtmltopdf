@@ -1530,8 +1530,29 @@ html[data-theme='dark'] .cardbox {
 
 .cardbox-pager {
   display: flex;
+  align-items: center;
   gap: 5px;
   flex-wrap: wrap;
+}
+
+.cardbox-page-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.cardbox-page-picker select {
+  min-height: 32px;
+  padding: 5px 28px 5px 9px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font: inherit;
+  cursor: pointer;
 }
 
 .pager-dot {
@@ -1568,6 +1589,7 @@ html[data-theme='dark'] .pager-dot.active {
   align-items: center;
   gap: 8px;
   font-family: var(--mono);
+  flex: 0 0 auto;
 }
 
 .cardbox-pagestate {
