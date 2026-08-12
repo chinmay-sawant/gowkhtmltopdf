@@ -147,6 +147,10 @@ type ResolvedStyle struct {
 	BorderRadiusTopLeft, BorderRadiusTopRight, BorderRadiusBottomRight, BorderRadiusBottomLeft float64
 	Color                                                                                      [3]float64
 	BGColor                                                                                    [4]float64 // rgba, 0..1
+	// AccentColor is CSS accent-color when authored; AccentColorSet is false
+	// when the property is absent so widgets can keep their default fill.
+	AccentColor    [3]float64
+	AccentColorSet bool
 	FontFamily                                                                                 []string
 	// famHash is the FNV-1a fingerprint of FontFamily, computed once during
 	// style resolution. Text measurement reuses
@@ -610,6 +614,8 @@ type comparableResolvedStyle struct {
 	BorderRadiusTopLeft, BorderRadiusTopRight, BorderRadiusBottomRight, BorderRadiusBottomLeft float64
 	Color                                                                                      [3]float64
 	BGColor                                                                                    [4]float64
+	AccentColor                                                                                [3]float64
+	AccentColorSet                                                                             bool
 	famHash                                                                                    uint64
 	FontSize                                                                                   float64
 	FontWeight                                                                                 int
@@ -662,6 +668,7 @@ func comparableResolvedStyleFor(style ResolvedStyle) comparableResolvedStyle {
 		BorderRadiusTopLeft: style.BorderRadiusTopLeft, BorderRadiusTopRight: style.BorderRadiusTopRight,
 		BorderRadiusBottomRight: style.BorderRadiusBottomRight, BorderRadiusBottomLeft: style.BorderRadiusBottomLeft,
 		Color: style.Color, BGColor: style.BGColor,
+		AccentColor: style.AccentColor, AccentColorSet: style.AccentColorSet,
 		famHash: style.famHash, FontSize: style.FontSize, FontWeight: style.FontWeight, FontItalic: style.FontItalic,
 		LineHeight: style.LineHeight, LineHeightUnitless: style.LineHeightUnitless,
 		TextAlign: style.TextAlign, TextTransform: style.TextTransform,

@@ -188,6 +188,28 @@ func addLocalAccessFlags(add flagAdder) {
 	add("allow", ModePDF, flagValue, func(c *Command, _ *objectCtx, vals []string) error {
 		return c.Global.Set("allow", vals[0])
 	})
+	// Restricted network policy: private destinations and cross-host
+	// redirects are denied; HTTP(S) remain the only allowed schemes.
+	add("restrict-network", ModeBoth, flagBool, func(cmd *Command, _ *objectCtx, vals []string) error {
+		if vals[0] != canonicalTrue {
+			return nil
+		}
+
+		cmd.Global.Load.NetworkPolicySet = true
+		cmd.Global.Load.NetworkBlockPrivate = true
+		cmd.Global.Load.NetworkBlockCrossHost = true
+		cmd.Global.Load.NetworkAllowedSchemes = []string{"http", "https"}
+
+		return nil
+	})
+	// Exact or wildcard host allowlist entry. Sets NetworkPolicySet so
+	// NewLoader does not fall back to CompatibleNetworkPolicy.
+	add("allow-host", ModeBoth, flagValue, func(cmd *Command, _ *objectCtx, vals []string) error {
+		cmd.Global.Load.NetworkPolicySet = true
+		cmd.Global.Load.NetworkAllowedHosts = append(cmd.Global.Load.NetworkAllowedHosts, vals[0])
+
+		return nil
+	})
 	// PDF convert and imageout both read Global.Background (Policy A single field).
 	add("background", ModeBoth, flagBool, func(c *Command, _ *objectCtx, vals []string) error {
 		return c.Global.Set("background", vals[0])

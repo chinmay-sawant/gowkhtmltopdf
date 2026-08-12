@@ -20,8 +20,9 @@ import (
 	"gowkhtmltopdf/internal/settings"
 )
 
-// LibraryVersion is the wkhtmltopdf release this library tracks; upstream
-// 0.12.x compatibility surface.
+// LibraryVersion is the upstream wkhtmltopdf compatibility identifier
+// (0.12.x settings surface). It is not the project release number; that
+// lives in the VERSION file and is stamped into cli.Version at build time.
 const LibraryVersion = "0.12.7-dev"
 
 // Static conversion errors; callers can match with errors.Is.
@@ -51,11 +52,13 @@ var (
 	// ErrNilImageSettings reports a method call on nil image settings.
 	ErrNilImageSettings = errors.New("gowkhtmltopdf: nil image settings")
 	// ErrNilPDFRequest reports a conversion attempted through a nil typed PDF
-	// request. It aliases the historical nil-converter error for compatibility.
-	ErrNilPDFRequest = ErrNilConverter
+	// request. It is distinct from ErrNilConverter so callers can tell a
+	// missing PDFRequest from a nil Converter receiver.
+	ErrNilPDFRequest = errors.New("gowkhtmltopdf: nil pdf request")
 	// ErrNilImageRequest reports a conversion attempted through a nil typed
-	// image request. It aliases the historical nil-image-converter error.
-	ErrNilImageRequest = ErrNilImageConverter
+	// image request. It is distinct from ErrNilImageConverter so callers can
+	// tell a missing ImageRequest from a nil ImageConverter receiver.
+	ErrNilImageRequest = errors.New("gowkhtmltopdf: nil image request")
 	// ErrMissingPDFOutput reports a typed PDF request without a document sink.
 	// It aliases the engine sentinel so errors.Is remains stable across the
 	// public preflight and direct internal request seams.
@@ -410,6 +413,38 @@ func (s *ObjectSettings) SetBody(html []byte, base string) *ObjectSettings {
 	return s
 }
 
+// NewTOCObject returns object settings with the registered dotted key
+// istableofcontents=true, matching a CLI `toc` object. The keys stay
+// registered on the settings table; this constructor is the documented
+// library way to build a TOC object.
+func NewTOCObject() *ObjectSettings {
+	obj := NewObjectSettings()
+	if err := obj.Set("istableofcontent", "true"); err != nil {
+		// Registered key; a failure here is a settings-table bug.
+		panic(err)
+	}
+
+	obj.o.UseOutline = false
+
+	return obj
+}
+
+// NewCoverObject returns object settings with the registered dotted key
+// iscover=true, matching a CLI `cover` object (no header/footer, excluded
+// from the outline).
+func NewCoverObject() *ObjectSettings {
+	obj := NewObjectSettings()
+	if err := obj.Set("iscover", "true"); err != nil {
+		panic(err)
+	}
+
+	obj.o.IncludeInOutline = false
+	obj.o.HeaderSet, obj.o.FooterSet = true, true
+	obj.o.Header, obj.o.Footer = settings.HeaderFooter{}, settings.HeaderFooter{} //nolint:exhaustruct
+
+	return obj
+}
+
 // ---------------------------------------------------------------------------
 // PDF conversion
 // ---------------------------------------------------------------------------
@@ -465,7 +500,7 @@ func (c *Converter) WithGlobal(s *GlobalSettings) *Converter {
 		return c
 	}
 
-	c.global = &GlobalSettings{g: clonePdfGlobal(s.g)}
+	c.global = &GlobalSettings{g: settings.ClonePdfGlobal(s.g)}
 
 	return c
 }
@@ -479,69 +514,25 @@ func (c *Converter) AddObject(s *ObjectSettings) *Converter {
 		return c
 	}
 
-	cp := &ObjectSettings{o: clonePdfObject(s.o)}
+	cp := &ObjectSettings{o: settings.ClonePdfObject(s.o)}
 	c.objects = append(c.objects, cp)
 
 	return c
 }
 
-// clonePdfObject creates an ownership boundary at the public API. PdfObject
-// contains maps and slices in load, header/footer, ignored-setting, and
-// inline-document fields; a struct assignment alone would let callers mutate
-// a converter after AddObject returned.
+// clonePdfObject / clonePdfGlobal / cloneImageGlobal are thin wrappers
+// around the settings package clones so the public API has a single
+// ownership-boundary helper name.
 func clonePdfObject(src settings.PdfObject) settings.PdfObject {
-	dst := src
-	dst.Header = cloneHeaderFooter(src.Header)
-	dst.Footer = cloneHeaderFooter(src.Footer)
-	dst.Load.CustomHeaders = cloneStringMap(src.Load.CustomHeaders)
-	dst.Load.Cookies = cloneStringMap(src.Load.Cookies)
-	dst.Load.Post = clonePostItems(src.Load.Post)
-	dst.Load.InlineHTML = cloneBytes(src.Load.InlineHTML)
-	dst.Ignored = cloneStringMap(src.Ignored)
-
-	return dst
+	return settings.ClonePdfObject(src)
 }
 
 func clonePdfGlobal(src settings.PdfGlobal) settings.PdfGlobal {
-	dst := src
-	dst.Header = cloneHeaderFooter(src.Header)
-	dst.Footer = cloneHeaderFooter(src.Footer)
-	dst.Load.Allow = cloneStrings(src.Load.Allow)
-	dst.Load.NetworkAllowedSchemes = cloneStrings(src.Load.NetworkAllowedSchemes)
-	dst.Load.NetworkAllowedHosts = cloneStrings(src.Load.NetworkAllowedHosts)
-	dst.ExcludeFromOutline = cloneStrings(src.ExcludeFromOutline)
-	dst.FontPaths = cloneStrings(src.FontPaths)
-	dst.Ignored = cloneStringMap(src.Ignored)
-
-	return dst
+	return settings.ClonePdfGlobal(src)
 }
 
 func cloneImageGlobal(src settings.ImageGlobal) settings.ImageGlobal {
-	dst := src
-	dst.Load.Allow = cloneStrings(src.Load.Allow)
-	dst.Load.NetworkAllowedSchemes = cloneStrings(src.Load.NetworkAllowedSchemes)
-	dst.Load.NetworkAllowedHosts = cloneStrings(src.Load.NetworkAllowedHosts)
-	dst.Ignored = cloneStringMap(src.Ignored)
-
-	return dst
-}
-
-func cloneHeaderFooter(src settings.HeaderFooter) settings.HeaderFooter {
-	dst := src
-	dst.Replace = cloneStringMap(src.Replace)
-
-	return dst
-}
-
-func clonePostItems(src []settings.PostItem) []settings.PostItem {
-	if src == nil {
-		return nil
-	}
-
-	dst := make([]settings.PostItem, len(src))
-	copy(dst, src)
-
-	return dst
+	return settings.CloneImageGlobal(src)
 }
 
 func cloneStrings(src []string) []string {
@@ -551,19 +542,6 @@ func cloneStrings(src []string) []string {
 
 	dst := make([]string, len(src))
 	copy(dst, src)
-
-	return dst
-}
-
-func cloneStringMap(src map[string]string) map[string]string {
-	if src == nil {
-		return nil
-	}
-
-	dst := make(map[string]string, len(src))
-	for key, value := range src {
-		dst[key] = value
-	}
 
 	return dst
 }
@@ -592,19 +570,46 @@ func (c *Converter) AddHTML(page []byte, baseURL string) *Converter {
 // Convert runs the conversion. The produced bytes replace the previous
 // Output. ctx is threaded into every load; cancel it to abort. Engine and
 // preflight validation errors are also reported to OnError when set. Output
-// is captured via an in-memory writer (no temp file).
+// is captured via an in-memory writer (no temp file). Prefer ConvertTo when
+// the caller already has an io.Writer; RunPDF is the canonical writer-first
+// typed path.
 func (c *Converter) Convert(ctx context.Context) error {
 	if c == nil {
 		return ErrNilConverter
+	}
+
+	var buf bytes.Buffer
+	if err := c.ConvertTo(ctx, &buf); err != nil {
+		return err
+	}
+
+	c.output = buf.Bytes()
+
+	return nil
+}
+
+// ConvertTo writes the PDF directly to w. It snapshots global and object
+// settings so later mutations of Global() / objects cannot change the
+// in-flight request. Callers do not need to call Output(); Convert() still
+// buffers for Output() compatibility.
+func (c *Converter) ConvertTo(ctx context.Context, writer io.Writer) error {
+	if c == nil {
+		return ErrNilConverter
+	}
+
+	if writer == nil {
+		return ErrMissingPDFOutput
 	}
 
 	if c.global == nil {
 		c.global = NewGlobalSettings()
 	}
 
+	global := settings.ClonePdfGlobal(c.global.g)
 	objects := make([]settings.PdfObject, len(c.objects))
+
 	for i, o := range c.objects {
-		objects[i] = o.o
+		objects[i] = settings.ClonePdfObject(o.o)
 	}
 
 	if err := validatePDFObjects(objects); err != nil {
@@ -615,20 +620,13 @@ func (c *Converter) Convert(ctx context.Context) error {
 		return err
 	}
 
-	req := convert.NewPDFRequest(c.global.g, objects, nil, nil)
+	req := convert.NewPDFRequest(global, objects, writer, nil)
 	h := convertHooks{
 		OnInfo: c.OnInfo, OnWarn: c.OnWarn, OnError: c.OnError,
 		OnPhase: c.OnPhase, OnProgress: c.OnProgress,
 	}
 
-	out, err := h.executePDF(ctx, req)
-	if err != nil {
-		return err
-	}
-
-	c.output = out
-
-	return nil
+	return h.executePDFTo(ctx, req)
 }
 
 // Output returns the PDF bytes produced by the last successful Convert, or
@@ -783,7 +781,8 @@ func (c *ImageConverter) ensureDefaults() {
 // Convert runs the conversion, replacing the previous Output. ctx is threaded
 // into the load; cancel it to abort. Engine and preflight validation errors
 // are also reported to OnError when set.
-// Output is captured via an in-memory writer (no temp file).
+// Output is captured via an in-memory writer (no temp file). Prefer ConvertTo
+// when the caller already has an io.Writer.
 //
 // The page may be a path/URL via AddObject/SetPage, or in-memory HTML via
 // Object().SetBody (P2-04 InlineHTML source kind).
@@ -792,10 +791,33 @@ func (c *ImageConverter) Convert(ctx context.Context) error {
 		return ErrNilImageConverter
 	}
 
+	var buf bytes.Buffer
+	if err := c.ConvertTo(ctx, &buf); err != nil {
+		return err
+	}
+
+	c.output = buf.Bytes()
+
+	return nil
+}
+
+// ConvertTo writes the encoded image directly to w. It snapshots global,
+// image, and object settings so later mutations cannot change the in-flight
+// request. Callers do not need to call Output().
+func (c *ImageConverter) ConvertTo(ctx context.Context, writer io.Writer) error {
+	if c == nil {
+		return ErrNilImageConverter
+	}
+
+	if writer == nil {
+		return ErrMissingImageOutput
+	}
+
 	c.ensureDefaults()
 
-	img := c.image
-	obj := clonePdfObject(c.object.o)
+	global := settings.ClonePdfGlobal(c.global.g)
+	img := settings.CloneImageGlobal(c.image)
+	obj := settings.ClonePdfObject(c.object.o)
 
 	if err := validateImageObjects([]settings.PdfObject{obj}); err != nil {
 		if c.OnError != nil {
@@ -805,19 +827,12 @@ func (c *ImageConverter) Convert(ctx context.Context) error {
 		return err
 	}
 
-	req := convert.NewImageRequest(c.global.g, img, []settings.PdfObject{obj}, nil)
+	req := imageout.NewRequest(global, img, []settings.PdfObject{obj}, writer)
 	h := convertHooks{ //nolint:exhaustruct // intentional zero/partial fields
 		OnInfo: c.OnInfo, OnWarn: c.OnWarn, OnError: c.OnError,
 	}
 
-	out, err := h.executeImage(ctx, req)
-	if err != nil {
-		return err
-	}
-
-	c.output = out
-
-	return nil
+	return h.executeImageTo(ctx, req)
 }
 
 // Output returns the encoded image bytes (PNG, or JPEG when format was set
@@ -868,50 +883,41 @@ func (h convertHooks) progress() func(string, int) {
 	}
 }
 
-// executePDF runs the PDF pipeline into an in-memory buffer and reports
-// failures to OnError.
-//
-
-func (h convertHooks) executePDF(ctx context.Context, req *convert.Request) ([]byte, error) {
+// executePDFTo runs the PDF pipeline into req.Output and reports failures
+// to OnError. The caller owns the writer; this path does not buffer a copy
+// for Output().
+func (h convertHooks) executePDFTo(ctx context.Context, req *convert.Request) error {
 	if ctx == nil {
-		return nil, ErrNilContext
+		return ErrNilContext
 	}
 
-	var buf bytes.Buffer
-
-	req.Output = &buf
 	if err := convert.Run(ctx, req, h.lineLog(), h.progress()); err != nil {
 		if h.OnError != nil {
 			h.OnError(err.Error())
 		}
 
-		return nil, fmt.Errorf("convert: %w", err)
+		return fmt.Errorf("convert: %w", err)
 	}
 
-	return buf.Bytes(), nil
+	return nil
 }
 
-// executeImage runs the image pipeline into an in-memory buffer and reports
+// executeImageTo runs the image pipeline into req.Output and reports
 // failures to OnError.
-//
-
-func (h convertHooks) executeImage(ctx context.Context, req *convert.Request) ([]byte, error) {
+func (h convertHooks) executeImageTo(ctx context.Context, req *imageout.Request) error {
 	if ctx == nil {
-		return nil, ErrNilContext
+		return ErrNilContext
 	}
 
-	var buf bytes.Buffer
-
-	req.Output = &buf
 	if err := imageout.RunRequest(ctx, req, h.lineLog()); err != nil {
 		if h.OnError != nil {
 			h.OnError(err.Error())
 		}
 
-		return nil, fmt.Errorf("image convert: %w", err)
+		return fmt.Errorf("image convert: %w", err)
 	}
 
-	return buf.Bytes(), nil
+	return nil
 }
 
 // ---------------------------------------------------------------------------
@@ -1161,7 +1167,7 @@ func RunImage(ctx context.Context, req *ImageRequest) error {
 		return err
 	}
 
-	if err := imageout.RunRequest(ctx, req.toRequest().ToRequest(), nil); err != nil {
+	if err := imageout.RunRequest(ctx, imageout.FromConvertImage(req.toRequest()), nil); err != nil {
 		return fmt.Errorf("image: %w", err)
 	}
 

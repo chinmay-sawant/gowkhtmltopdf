@@ -2,7 +2,7 @@
 
 > **Parent:** [`../README.md`](../README.md) - architecture review index and canonical-ledger policy.
 > **Related baseline:** [`../critical-go-review-2026-08-12/phase-wise-checklist.md`](../critical-go-review-2026-08-12/phase-wise-checklist.md) - CR-01 through CR-08 remediation, closed on 2026-08-12.
-> **Status:** open; baseline audit complete and first implementation wave validated; P0/P1 gaps remain.
+> **Status:** superseded as the active scorecard. Remaining work and the current **7.0 / 10** rating live in [`../codebase-review-2026-08-12/phase-wise-checklist.md`](../codebase-review-2026-08-12/phase-wise-checklist.md). Keep this file as the earlier same-day 7.4/10 baseline; do not check new rows here.
 > **Created:** 2026-08-12
 > **Target:** 10/10 as a controlled, server-generated report renderer. Browser/JavaScript parity remains a separate product scope, not a hidden acceptance criterion.
 > **Estimated effort:** 4-8 focused engineering weeks, excluding large browser-parity work.

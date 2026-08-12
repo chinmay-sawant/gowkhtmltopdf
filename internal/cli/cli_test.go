@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"os"
 	"strings"
 	"testing"
 
@@ -934,5 +935,64 @@ func TestOpenOutputWriterPrecedence(t *testing.T) {
 
 	if buf.String() != "x" {
 		t.Fatalf("buf=%q", buf.String())
+	}
+}
+
+func TestRestrictNetworkAndAllowHostFlags(t *testing.T) { //nolint:cyclop // table of flag combinations
+	t.Parallel()
+
+	cmd := parse(t, "--restrict-network", "page.html", outPDF)
+	if !cmd.Global.Load.NetworkPolicySet {
+		t.Fatal("--restrict-network must set NetworkPolicySet")
+	}
+
+	if !cmd.Global.Load.NetworkBlockPrivate || !cmd.Global.Load.NetworkBlockCrossHost {
+		t.Fatal("--restrict-network must set BlockPrivate and BlockCrossHost")
+	}
+
+	if got := cmd.Global.Load.NetworkAllowedSchemes; len(got) != 2 ||
+		got[0] != "http" || got[1] != "https" {
+		t.Fatalf("AllowedSchemes = %v, want [http https]", got)
+	}
+
+	cmd = parse(t, "--allow-host", "reports.example.test", "page.html", outPDF)
+	if !cmd.Global.Load.NetworkPolicySet {
+		t.Fatal("--allow-host must set NetworkPolicySet")
+	}
+
+	if got := cmd.Global.Load.NetworkAllowedHosts; len(got) != 1 || got[0] != "reports.example.test" {
+		t.Fatalf("AllowedHosts = %v", got)
+	}
+
+	cmd = parse(t,
+		"--restrict-network",
+		"--allow-host", "a.example.test",
+		"--allow-host", "b.example.test",
+		"page.html", outPDF,
+	)
+	if !cmd.Global.Load.NetworkBlockPrivate || len(cmd.Global.Load.NetworkAllowedHosts) != 2 {
+		t.Fatalf("combined flags: %+v", cmd.Global.Load)
+	}
+
+	if _, ok := flagTable["restrict-network"]; !ok {
+		t.Fatal("restrict-network missing from flag table")
+	}
+
+	if spec, ok := flagTable["allow-host"]; !ok || spec.mod != ModeBoth {
+		t.Fatal("allow-host must be registered on ModeBoth")
+	}
+}
+
+func TestCLIVersionMatchesVERSIONFile(t *testing.T) {
+	t.Parallel()
+
+	raw, err := os.ReadFile("../../VERSION")
+	if err != nil {
+		t.Fatalf("read VERSION: %v", err)
+	}
+
+	want := strings.TrimSpace(string(raw))
+	if Version != want && !strings.HasPrefix(Version, want+"-") {
+		t.Fatalf("cli.Version = %q, want VERSION %q or a suffix-stamped form", Version, want)
 	}
 }

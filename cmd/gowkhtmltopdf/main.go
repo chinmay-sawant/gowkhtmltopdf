@@ -12,7 +12,6 @@ import (
 
 	"gowkhtmltopdf/internal/app"
 	"gowkhtmltopdf/internal/cli"
-	"gowkhtmltopdf/internal/convert"
 )
 
 func main() {
@@ -46,7 +45,7 @@ func run(argv []string) int {
 	// Sole dump home for --dump-default-toc-xsl: Global.DumpDefaultTOCXSL
 	// (CLI appliers write Global now). --dump-outline is convert's job.
 	if cmd.Global.DumpDefaultTOCXSL {
-		fmt.Fprint(os.Stdout, convert.DefaultTOCXSL())
+		fmt.Fprint(os.Stdout, app.DefaultTOCXSL())
 
 		return cli.ExitOK
 	}

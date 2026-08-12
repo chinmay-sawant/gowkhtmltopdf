@@ -52,8 +52,8 @@
      ]
     },
     {
-     "heading": "Deterministic output",
-     "body": "The pipeline is deterministic: identical input bytes produce identical PDF bytes, so outputs can be diffed in tests and cached by content hash."
+     "heading": "Repeatable output",
+     "body": "The same HTML, settings, and metadata time produce a repeatable PDF structure. Default CLI conversions use the wall clock for PDF dates and [date]/[time] placeholders, so bytes are not hash-stable unless you inject Now on the typed library API."
     }
    ]
   },

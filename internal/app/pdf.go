@@ -14,6 +14,13 @@ import (
 	"gowkhtmltopdf/internal/errs"
 )
 
+// DefaultTOCXSL returns the built-in TOC stylesheet description used by
+// --dump-default-toc-xsl. Command mains import only app and cli; the
+// convert package stays behind this adapter.
+func DefaultTOCXSL() string {
+	return convert.DefaultTOCXSL()
+}
+
 // Shared app-level sentinel errors; exported so callers can match with errors.Is.
 var (
 	ErrNilCommand    = errs.ErrNilCommand

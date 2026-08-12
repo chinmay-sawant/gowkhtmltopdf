@@ -1453,48 +1453,84 @@ func clipSectionTrailingBand(res *Result, idxs []int, pageTop, pageBot, contentB
 			continue
 		}
 
-		clipTrailingBandOp(paintOp, pageTop, pageBot, contentBot)
+		clipTrailingBandOp(res, paintOp, pageTop, pageBot, contentBot)
 	}
 }
 
-// clipTrailingBandOp trims one trailing section wash or border to contentBot.
-func clipTrailingBandOp(paintOp *Op, pageTop, pageBot, contentBot float64) {
+// clipTrailingBandOp trims one trailing continuation-fragment wash or border
+// to contentBot. Identity is the op ID plus page-top / overflow geometry, not
+// a fixture-named RGB range.
+func clipTrailingBandOp(res *Result, paintOp *Op, pageTop, pageBot, contentBot float64) {
 	switch paintOp.Kind {
 	case OpFillRect:
-		if isTrailingSectionWash(paintOp, pageTop, contentBot) {
+		if isTrailingContinuationWash(res, paintOp, pageTop, pageBot, contentBot) {
 			paintOp.H = contentBot - paintOp.Y
 		}
 	case OpLine:
-		if isTrailingSectionBorder(paintOp, pageTop, contentBot) {
+		if isTrailingContinuationBorder(res, paintOp, pageTop, pageBot, contentBot) {
 			paintOp.H = contentBot - paintOp.Y
-		} else if isTrailingPageRule(paintOp, pageBot, contentBot) {
+		} else if isTrailingContinuationRule(res, paintOp, pageBot, contentBot) {
 			paintOp.Y = contentBot
 		}
 	case OpStrokeRect, OpText, OpImage, OpLinkURI, OpBullet, opKindNoop:
 	}
 }
 
-// isTrailingSectionWash reports a continuation-fragment wash that begins at
-// the page top and runs past the content bottom. A normal block fill (for
-// example a <pre> with bottom padding) must retain its full box height
-// through its bottom border, so only the section color matches.
-func isTrailingSectionWash(paintOp *Op, pageTop, contentBot float64) bool {
-	return paintOp.Y <= pageTop+1 && paintOp.H > 40 && isSectionWashRGB(paintOp.R, paintOp.G, paintOp.B) &&
-		paintOp.Y+paintOp.H > contentBot+1 && paintOp.Y < contentBot
+// isTrailingContinuationWash reports a continuation-fragment wash that begins
+// at the page top and runs past the content bottom. A complete one-page
+// block fill keeps its authored height even when the fill color is a cool
+// grey and the page has unused space below.
+func isTrailingContinuationWash(
+	res *Result, paintOp *Op, pageTop, pageBot, contentBot float64,
+) bool {
+	return paintOp.Y <= pageTop+1 && paintOp.H > 40 &&
+		paintOp.Y+paintOp.H > contentBot+1 && paintOp.Y < contentBot &&
+		isContinuingBlockFragment(res, paintOp, pageBot)
 }
 
-// isTrailingSectionBorder reports a page-top section side border that runs
-// past the content bottom.
-func isTrailingSectionBorder(paintOp *Op, pageTop, contentBot float64) bool {
-	return paintOp.Y <= pageTop+1 && paintOp.H > 40 && nearSectionBorderRGB(paintOp.R, paintOp.G, paintOp.B) &&
-		paintOp.Y+paintOp.H > contentBot+1 && paintOp.Y < contentBot
+// isTrailingContinuationBorder reports a page-top side border that belongs
+// to a block continuing onto a later page and runs past the content bottom.
+func isTrailingContinuationBorder(
+	res *Result, paintOp *Op, pageTop, pageBot, contentBot float64,
+) bool {
+	return paintOp.Y <= pageTop+1 && paintOp.H > 40 &&
+		paintOp.Y+paintOp.H > contentBot+1 && paintOp.Y < contentBot &&
+		isContinuingBlockFragment(res, paintOp, pageBot)
 }
 
-// isTrailingPageRule reports a thin section-colored rule stranded near the
-// page bottom, below the last content.
-func isTrailingPageRule(paintOp *Op, pageBot, contentBot float64) bool {
-	return paintOp.H < 1 && paintOp.Width > 0 && nearSectionBorderRGB(paintOp.R, paintOp.G, paintOp.B) &&
-		paintOp.Y > contentBot+1 && paintOp.Y > pageBot-30
+// isTrailingContinuationRule reports a thin closing rule stranded near the
+// page bottom, below the last content, that belongs to a continuing block.
+func isTrailingContinuationRule(res *Result, paintOp *Op, pageBot, contentBot float64) bool {
+	return paintOp.H < 1 && paintOp.Width > 0 &&
+		paintOp.Y > contentBot+1 && paintOp.Y > pageBot-30 &&
+		isContinuingBlockFragment(res, paintOp, pageBot)
+}
+
+// isContinuingBlockFragment reports that paintOp is a page fragment of a
+// block that continues after pageBot. Split fragments share Op.ID; a remnant
+// that still sits on the page edge is treated as continuing when no ID is
+// assigned (legacy/test-constructed ops).
+func isContinuingBlockFragment(res *Result, paintOp *Op, pageBot float64) bool {
+	if paintOp == nil {
+		return false
+	}
+
+	if paintOp.ID != 0 && res != nil {
+		for i := range res.Ops {
+			other := &res.Ops[i]
+			if other.ID != paintOp.ID || other == paintOp {
+				continue
+			}
+
+			if other.Y >= pageBot-1 {
+				return true
+			}
+		}
+
+		return false
+	}
+
+	return paintOp.Y+paintOp.H > pageBot-1
 }
 
 // clipStickySectionChrome ends sticky-section chrome at the last real row and
@@ -1805,15 +1841,4 @@ func (target stickySectionChromeTarget) sideMatches(paintOp *Op) bool {
 
 func sameRGB(op *Op, rgb [3]float64) bool {
 	return math.Abs(op.R-rgb[0]) < 0.01 && math.Abs(op.G-rgb[1]) < 0.01 && math.Abs(op.B-rgb[2]) < 0.01
-}
-
-// isSectionWashRGB reports near-neutral cool greys like fixture-31 .section
-// (#eceff1). Chromatic washes (e.g. fixture-32 grid #f3e5f5) must not match
-// or page-trailing clip steals their height.
-func isSectionWashRGB(r, g, b float64) bool {
-	if math.Abs(r-g) > 0.035 || math.Abs(g-b) > 0.035 || math.Abs(r-b) > 0.035 {
-		return false
-	}
-
-	return r > 0.88 && g > 0.88 && b > 0.88 && r < 0.97 && g < 0.97 && b < 0.97
 }

@@ -360,7 +360,7 @@ func benchmarkPDFMetadata(tb testing.TB, mode benchmarkPDFMode) {
 	tb.Logf("request_mode=%s fixture=%s", mode, benchmarkTemplatePath("report.html.tmpl"))
 }
 
-func benchmarkImageRequest(html []byte, output io.Writer) *convert.Request {
+func benchmarkImageRequest(html []byte, output io.Writer) *imageout.Request {
 	global := settings.DefaultPdfGlobal()
 	global.Quiet = true
 	imageSettings := settings.DefaultImageGlobal()
@@ -368,7 +368,7 @@ func benchmarkImageRequest(html []byte, output io.Writer) *convert.Request {
 	object.Page = ""
 	object.Load.InlineHTML = html
 
-	return convert.NewImageRequest(global, imageSettings, []settings.PdfObject{object}, output)
+	return imageout.NewRequest(global, imageSettings, []settings.PdfObject{object}, output)
 }
 
 func benchmarkPDFPageCount(data []byte) int {
@@ -798,7 +798,7 @@ func BenchmarkWebFetchImage(b *testing.B) {
 			imageSettings := settings.DefaultImageGlobal()
 			object := settings.DefaultPdfObject()
 			object.Page = fmt.Sprintf("%s/document-%d.html", server.URL, images)
-			req := convert.NewImageRequest(
+			req := imageout.NewRequest(
 				global,
 				imageSettings,
 				[]settings.PdfObject{object},

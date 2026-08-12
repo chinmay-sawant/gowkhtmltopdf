@@ -5,12 +5,14 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"gowkhtmltopdf/internal/app"
 	"gowkhtmltopdf/internal/cli"
 	"gowkhtmltopdf/internal/convert"
 	"gowkhtmltopdf/internal/errs"
+	"gowkhtmltopdf/internal/load"
 	"gowkhtmltopdf/internal/settings"
 )
 
@@ -139,5 +141,43 @@ func TestRunPDFKeepsPDFFileAndOutlineXMLSeparate(t *testing.T) {
 	}
 	if !bytes.HasPrefix(outline.Bytes(), []byte("<?xml")) || !bytes.Contains(outline.Bytes(), []byte("<outline")) {
 		t.Fatalf("outline output = %q, want standalone XML outline", outline.String())
+	}
+}
+
+func TestRunPDFRestrictNetworkBlocksLoopback(t *testing.T) {
+	t.Parallel()
+
+	cmd, err := cli.Parse([]string{
+		"--restrict-network",
+		"--quiet",
+		"http://127.0.0.1/",
+		filepath.Join(t.TempDir(), "out.pdf"),
+	}, cli.ModePDF)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+
+	if !cmd.Global.Load.NetworkPolicySet || !cmd.Global.Load.NetworkBlockPrivate {
+		t.Fatalf("parsed restrict-network fields = %+v", cmd.Global.Load)
+	}
+
+	runErr := app.RunPDF(t.Context(), cmd, nil, nil, nil)
+	if !errors.Is(runErr, load.ErrNetworkPolicy) {
+		t.Fatalf("RunPDF = %v, want errors.Is(..., load.ErrNetworkPolicy)", runErr)
+	}
+}
+
+func TestDefaultTOCXSLDelegatesToConvert(t *testing.T) {
+	t.Parallel()
+
+	got := app.DefaultTOCXSL()
+	want := convert.DefaultTOCXSL()
+
+	if got != want {
+		t.Fatalf("DefaultTOCXSL mismatch")
+	}
+
+	if !strings.Contains(got, "<xsl:stylesheet") {
+		t.Fatalf("DefaultTOCXSL = %q, want stylesheet", got)
 	}
 }

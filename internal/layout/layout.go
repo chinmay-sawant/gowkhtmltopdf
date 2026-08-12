@@ -1379,23 +1379,11 @@ func (e *engine) paintValueWidget(node *html.Node, style ResolvedStyle, leftX, t
 		return
 	}
 
-	// Native progress indicators use a thin green value bar when no authored
-	// component token provides one. Keep that default independent of an
-	// unrelated late document-wide --accent2 override (fixture 56).
-	color := [3]float64{0, 0.5, 0}
-	if node.Name == htmlMeter {
-		color = style.Color
-	}
-
-	for _, name := range []string{"--d03-bar"} {
-		if raw, ok := style.CustomProps[name]; ok {
-			if r, g, b, _, parsed := css.ParseColor(raw); parsed {
-				color = [3]float64{float64(r) / 255, float64(g) / 255, float64(b) / 255}
-
-				break
-			}
-		}
-	}
+	// Native progress/meter fill: CSS accent-color, then an authored
+	// background, then the widget default. Custom properties participate
+	// only after they resolve into those properties (e.g. accent-color:
+	// var(--token)); inherited document tokens are not scanned here.
+	color := widgetValueColor(node.Name, style)
 
 	const indicatorRatio = 0.3
 
@@ -1411,6 +1399,18 @@ func (e *engine) paintValueWidget(node *html.Node, style ResolvedStyle, leftX, t
 		R: color[0], G: color[1], B: color[2], Alpha: 1,
 		Radius: usedBorderRadius(style, contentW*ratio, indicatorH),
 	})
+}
+
+func widgetValueColor(tag string, style ResolvedStyle) [3]float64 {
+	if style.AccentColorSet {
+		return style.AccentColor
+	}
+
+	if tag == htmlMeter {
+		return style.Color
+	}
+
+	return [3]float64{0, 0.5, 0}
 }
 
 func widgetNumber(raw string, fallback float64) float64 {

@@ -31,9 +31,9 @@ func RunImage(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 	}
 
 	img.Format = format
-	request := convert.NewImageRequest(cmd.Global, img, cmd.Objects, io.Discard)
+	request := imageout.NewRequest(cmd.Global, img, cmd.Objects, io.Discard)
 
-	if err := request.ValidateImage(); err != nil {
+	if err := request.Validate(); err != nil {
 		if errors.Is(err, convert.ErrNoRenderableObjects) {
 			return ErrNoPageObjects
 		}

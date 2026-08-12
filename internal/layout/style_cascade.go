@@ -132,6 +132,10 @@ type inheritCopy struct {
 // and closures on every styled node (was ~40% of alloc_objects on 500-page PDF).
 var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inherit table
 	{[]string{"color"}, func(dst, src *ResolvedStyle) { dst.Color = src.Color }},
+	{[]string{"accent-color"}, func(dst, src *ResolvedStyle) {
+		dst.AccentColor = src.AccentColor
+		dst.AccentColorSet = src.AccentColorSet
+	}},
 	{[]string{"font-family"}, func(dst, src *ResolvedStyle) { dst.FontFamily = src.FontFamily }},
 	{[]string{"font-size"}, func(dst, src *ResolvedStyle) { dst.FontSize = src.FontSize }},
 	{[]string{"font-weight"}, func(dst, src *ResolvedStyle) { dst.FontWeight = src.FontWeight }},

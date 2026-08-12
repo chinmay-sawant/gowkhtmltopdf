@@ -17,9 +17,8 @@ attack surface:
   The JS-related flags (`--enable-javascript`, `--javascript-delay`,
   `--run-script`, `--window-status`, `--debug-javascript`) are accepted for
   CLI compatibility and stored in settings (`settings.Web.JavaScript`), but
-  no code path ever evaluates a document's scripts. `load.WaitJSDelay`
-  implements `--javascript-delay` as a pure sleep; `load.WarnJSStubs` logs
-  that the remaining flags are ignored.
+  no code path ever evaluates a document's scripts. The remaining JS flags
+  are ignored.
 
 **Stance: HTML is semi-trusted.** It may cause network egress (matching
 upstream wkhtmltopdf) and may read local files only where the operator
@@ -97,17 +96,24 @@ processes. The trust envelope of any local reader applies.
   before any body bytes are read; chunked/unknown-length bodies are capped
   on the read side. `data:` URLs are bounded by the size of the document
   that embeds them.
-- **TLS**: certificate verification on by default; `--insecure` is an
-  explicit opt-in (`InsecureSkipVerify`). Proxy, client certificates,
-  cookies and POST bodies are operator-supplied configuration.
+- **TLS**: certificate verification on by default. There is no `--insecure`
+  / `InsecureSkipVerify` switch. Proxy, client certificates, cookies and
+  POST bodies are operator-supplied configuration.
+- **NetworkPolicy**: `CompatibleNetworkPolicy` is the default when no
+  policy is set (CLI without `--restrict-network`). `RestrictedNetworkPolicy`
+  / `--restrict-network` blocks private destinations and cross-host
+  redirects. Restricted dials pin the resolved IP (no second DNS lookup).
+  Exact `--allow-host` entries may skip the private-IP check; wildcards do
+  not. `GlobalSettings.SetNetworkPolicy` is the library seam.
 
 ## 5. Data exfiltration channels
 
 - Every URL referenced in the HTML - images, stylesheets, the primary page
   itself - can be fetched. A document can cause fetches to any reachable
-  host, **including `http://localhost` and RFC1918 addresses**; this is
-  upstream wkhtmltopdf/Qt behaviour and is intentionally not restricted.
-  The mitigation is input trust, not network filtering.
+  host, **including `http://localhost` and RFC1918 addresses** unless
+  Restricted network policy is enabled. Compatible mode matches historical
+  wkhtmltopdf URL behavior. Restricted mode is the recommended default for
+  untrusted HTML in a service.
 - Local file reads are the only sensitive channel and are gated by the ACL
   (section 3). With default flags, no document-reachable path reads any
   local file.
@@ -183,4 +189,5 @@ substitute for not letting strangers drive server-side fetches.
 | Connect timeout | `internal/load/load.go` - `DefaultConnectTimeout`, `net.Dialer` |
 | Response timeout | `internal/load/load.go` - `loadHTTP` `client.Timeout`, `DefaultResponseTimeout` |
 | Context cancellation | `internal/load/load.go` - `http.NewRequestWithContext` in `loadHTTP` |
-| No JS / no exec | whole repo - no `os/exec`; flags accepted and ignored, `WarnJSStubs`, `WaitJSDelay` |
+| No JS / no exec | whole repo - no `os/exec`; JS flags accepted and ignored |
+| NetworkPolicy | `internal/load` + `GlobalSettings.SetNetworkPolicy`; CLI `--restrict-network` / `--allow-host` |

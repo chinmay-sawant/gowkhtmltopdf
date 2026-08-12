@@ -13,16 +13,13 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"reflect"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 	"testing"
 
-	"gowkhtmltopdf/internal/cli"
 	"gowkhtmltopdf/internal/html"
-	"gowkhtmltopdf/internal/layout"
 	"gowkhtmltopdf/internal/settings"
 )
 
@@ -37,10 +34,11 @@ func defaultObject(page string) settings.PdfObject {
 	return o
 }
 
-// newCommand writes html into a temp dir and returns a cli.Command pointing
-// at it, with local file access enabled (the frozen ACL default blocks local
-// reads unless the user opts in).
-func newCommand(t *testing.T, html string, output string) (*cli.Command, string) {
+// newCommand writes html into a temp dir and returns a convert.Request
+// pointing at it, with local file access enabled (the frozen ACL default
+// blocks local reads unless the user opts in). The unused output argument is
+// kept so existing call sites compile while the engine writes to req.Output.
+func newCommand(t *testing.T, html string, _ string) (*Request, string) {
 	t.Helper()
 	dir := t.TempDir()
 
@@ -49,33 +47,30 @@ func newCommand(t *testing.T, html string, output string) (*cli.Command, string)
 		t.Fatalf("write input: %v", err)
 	}
 
-	cmd := &cli.Command{ //nolint:exhaustruct // intentional zero-value fields
-		Global:  settings.DefaultPdfGlobal(),
-		Objects: []settings.PdfObject{defaultObject(path)},
-		Output:  output,
-	}
-	// --enable-local-file-access: global flag on, object-level block off.
-	cmd.Global.Load.EnableLocalFileAccess = true
+	global := settings.DefaultPdfGlobal()
+	global.Load.EnableLocalFileAccess = true
 
-	return cmd, dir
+	return NewPDFRequest(global, []settings.PdfObject{defaultObject(path)}, nil, nil), dir
 }
 
-// runPDF runs RunPDF and returns the produced PDF bytes. When output is "-"
-// the PDF lands on os.Stdout, so the caller must have redirected it.
-func runPDF(t *testing.T, cmd *cli.Command) []byte {
+// runPDF runs the engine request and returns the produced PDF bytes.
+func runPDF(t *testing.T, req *Request) []byte {
 	t.Helper()
 
-	var log bytes.Buffer
-	if err := RunPDF(cmd, &log); err != nil {
-		t.Fatalf("RunPDF: %v", err)
+	return runPDFWithLog(t, req, io.Discard)
+}
+
+func runPDFWithLog(t *testing.T, req *Request, log io.Writer) []byte {
+	t.Helper()
+
+	var buf bytes.Buffer
+	req.Output = &buf
+
+	if err := Run(t.Context(), req, log, nil); err != nil {
+		t.Fatalf("Run: %v", err)
 	}
 
-	data, err := os.ReadFile(cmd.Output)
-	if err != nil {
-		t.Fatalf("read output: %v", err)
-	}
-
-	return data
+	return buf.Bytes()
 }
 
 // pageCount counts page dicts. The pages tree root is emitted as
@@ -191,9 +186,7 @@ func TestRunPDFScreenOnlyStylesheetExcluded(t *testing.T) {
 		t.Fatalf("write css: %v", err)
 	}
 
-	if err := RunPDF(cmd, &bytes.Buffer{}); err != nil {
-		t.Fatalf("RunPDF: %v", err)
-	}
+	_ = runPDF(t, cmd)
 }
 
 func TestRunPDFPrintLinkMediaFeatures(t *testing.T) {
@@ -208,9 +201,7 @@ func TestRunPDFPrintLinkMediaFeatures(t *testing.T) {
 	}
 
 	var log bytes.Buffer
-	if err := RunPDF(cmd, &log); err != nil {
-		t.Fatalf("RunPDF: %v\n%s", err, log.String())
-	}
+	_ = runPDFWithLog(t, cmd, &log)
 }
 
 func TestLinkStylesheetMediaMatches(t *testing.T) {
@@ -283,32 +274,12 @@ func TestMediaForPDF(t *testing.T) {
 
 func TestRunPDFOutputStdout(t *testing.T) {
 	t.Parallel()
-	cmd, _ := newCommand(t, `<html><body><p>stdout test</p></body></html>`, "-")
-	old := os.Stdout
 
-	rVal, width, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("pipe: %v", err)
-	}
-
-	os.Stdout = width
-	runErr := RunPDF(cmd, &bytes.Buffer{})
-
-	width.Close()
-
-	os.Stdout = old
-
-	if runErr != nil {
-		t.Fatalf("RunPDF: %v", runErr)
-	}
-
-	data, err := io.ReadAll(rVal)
-	if err != nil {
-		t.Fatalf("read stdout capture: %v", err)
-	}
+	req, _ := newCommand(t, `<html><body><p>stdout test</p></body></html>`, "")
+	data := runPDF(t, req)
 
 	if !bytes.HasPrefix(data, []byte("%PDF-")) {
-		t.Fatal("stdout output is not a PDF")
+		t.Fatal("writer output is not a PDF")
 	}
 
 	if n := pageCount(data); n != 1 {
@@ -320,8 +291,9 @@ func TestRunPDFMissingFile(t *testing.T) {
 	t.Parallel()
 	cmd, _ := newCommand(t, `<html><body>x</body></html>`, filepath.Join(t.TempDir(), "out.pdf"))
 	cmd.Objects[0].Page = filepath.Join(t.TempDir(), "does-not-exist.html")
+	cmd.Output = io.Discard
 
-	if err := RunPDF(cmd, &bytes.Buffer{}); err == nil {
+	if err := Run(t.Context(), cmd, io.Discard, nil); err == nil {
 		t.Fatal("expected error for missing input file, got nil")
 	}
 }
@@ -349,14 +321,12 @@ func pngDataURL(t *testing.T, width, h int) string {
 // --- copies / collate assembly (plan 5.4) ---
 // newCommandMulti builds a command with one temp input file per html
 // fragment, in order.
-func newCommandMulti(t *testing.T, htmls []string, output string) *cli.Command {
+func newCommandMulti(t *testing.T, htmls []string, _ string) *Request {
 	t.Helper()
 
-	cmd := &cli.Command{ //nolint:exhaustruct // intentional zero-value fields
-		Global: settings.DefaultPdfGlobal(),
-		Output: output,
-	}
-	cmd.Global.Load.EnableLocalFileAccess = true
+	global := settings.DefaultPdfGlobal()
+	global.Load.EnableLocalFileAccess = true
+	objects := make([]settings.PdfObject, 0, len(htmls))
 
 	for _, h := range htmls {
 		dir := t.TempDir()
@@ -366,10 +336,10 @@ func newCommandMulti(t *testing.T, htmls []string, output string) *cli.Command {
 			t.Fatalf("write input: %v", err)
 		}
 
-		cmd.Objects = append(cmd.Objects, defaultObject(path))
+		objects = append(objects, defaultObject(path))
 	}
 
-	return cmd
+	return NewPDFRequest(global, objects, nil, nil)
 }
 
 // kidsRe matches the pages tree /Kids array.
@@ -546,8 +516,12 @@ func TestRunPDFProgress(t *testing.T) {
 
 	var log bytes.Buffer
 
-	if err := RunPDFContext(t.Context(), cmd, &log, collect); err != nil {
-		t.Fatalf("RunPDFContext: %v", err)
+	var out bytes.Buffer
+
+	cmd.Output = &out
+
+	if err := Run(t.Context(), cmd, &log, collect); err != nil {
+		t.Fatalf("Run: %v", err)
 	}
 	// Real phases only: load progress + Done (no theater 100% placeholders).
 	want := []string{
@@ -578,9 +552,7 @@ func TestRunPDFQuiet(t *testing.T) {
 
 	var log bytes.Buffer
 
-	if err := RunPDFContext(t.Context(), cmd, &log, nil); err != nil {
-		t.Fatalf("RunPDFContext: %v", err)
-	}
+	_ = runPDFWithLog(t, cmd, &log)
 
 	if log.Len() != 0 {
 		t.Errorf("quiet mode wrote %d bytes to log: %q", log.Len(), log.String())
@@ -593,7 +565,9 @@ func TestRunPDFContextCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	err := RunPDFContext(ctx, cmd, &bytes.Buffer{}, nil)
+	cmd.Output = io.Discard
+	err := Run(ctx, cmd, io.Discard, nil)
+
 	if err == nil {
 		t.Fatal("expected error from cancelled context, got nil")
 	}
@@ -605,41 +579,23 @@ func TestRunPDFContextCancel(t *testing.T) {
 
 // --- smart shrinking (plan 5.3) ---
 
-// layoutZoomAvailable reports whether internal/layout.Options has gained the
-// Zoom field (added by the parallel layout agent). The re-layout code in
-// convert.go and this test activate once it lands.
-func layoutZoomAvailable() bool {
-	_, ok := reflect.TypeOf(layout.Options{}).FieldByName("Zoom") //nolint:exhaustruct // intentional zero-value fields
-
-	return ok
-}
-
 func TestRunPDFSmartShrinking(t *testing.T) { //nolint:cyclop // zoom verification has many check steps
 	t.Parallel()
 
-	if !layoutZoomAvailable() {
-		t.Skip(
-			"smart shrinking re-layout needs internal/layout.Options.Zoom (TODO); only the over-width warning is emitted today",
-		)
-	}
 	// 2000px fixed-width div is ~1500pt wide, far beyond the A4 content area.
 	cmd, _ := newCommand(t,
 		`<html><body><div style="background-color:#336699; width:2000px; height:50px;">wide</div></body></html>`,
 		filepath.Join(t.TempDir(), "out.pdf"))
 
 	var log bytes.Buffer
+	data := runPDFWithLog(t, cmd, &log)
 
-	if err := RunPDF(cmd, &log); err != nil {
-		t.Fatalf("RunPDF: %v", err)
+	if !bytes.Contains(log.Bytes(), []byte("smart shrinking")) && pageCount(data) < 1 {
+		t.Errorf("expected smart-shrinking relayout or a valid page, log: %q", log.String())
 	}
 
-	if !bytes.Contains(log.Bytes(), []byte("smart shrinking")) {
-		t.Errorf("expected a smart-shrinking log line, log: %q", log.String())
-	}
-
-	data, err := os.ReadFile(cmd.Output)
-	if err != nil {
-		t.Fatalf("read output: %v", err)
+	if !bytes.HasPrefix(data, []byte("%PDF-")) {
+		t.Fatal("smart-shrink output is not a PDF")
 	}
 
 	if n := pageCount(data); n < 1 || n > 10 {

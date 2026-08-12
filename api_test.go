@@ -14,14 +14,16 @@ import (
 	"sync"
 	"testing"
 
+	"gowkhtmltopdf/internal/cli"
 	"gowkhtmltopdf/internal/settings"
 )
 
 // Shared literal values asserted across several tests.
 const (
-	htmlOriginal = "<p>original</p>"
-	valueBefore  = "before"
-	valueAfter   = "after"
+	htmlOriginal       = "<p>original</p>"
+	valueBefore        = "before"
+	valueAfter         = "after"
+	mutatedNetworkHost = "mutated.example.test"
 	valueMutated = "mutated"
 )
 
@@ -837,7 +839,7 @@ func TestGlobalNetworkPolicyIsCopied(t *testing.T) {
 	}
 
 	policy.AllowedSchemes[0] = "ftp"
-	policy.AllowedHosts[0] = "mutated.example.test"
+	policy.AllowedHosts[0] = mutatedNetworkHost
 
 	if !global.g.Load.NetworkPolicySet {
 		t.Fatal("explicit network policy was not recorded")
@@ -1184,6 +1186,228 @@ func TestVersion(t *testing.T) {
 	v := Version()
 	if !strings.Contains(v, LibraryVersion) {
 		t.Errorf("Version() = %q, want it to contain LibraryVersion %q", v, LibraryVersion)
+	}
+}
+
+func TestCLIVersionMatchesVERSIONFile(t *testing.T) {
+	t.Parallel()
+
+	raw, err := os.ReadFile("VERSION")
+	if err != nil {
+		t.Fatalf("read VERSION: %v", err)
+	}
+
+	want := strings.TrimSpace(string(raw))
+	if want == "" {
+		t.Fatal("VERSION file is empty")
+	}
+
+	if cli.Version != want && !strings.HasPrefix(cli.Version, want+"-") {
+		t.Fatalf("cli.Version = %q, want VERSION %q or a suffix-stamped form", cli.Version, want)
+	}
+
+	// LibraryVersion is the upstream wkhtmltopdf compatibility id, not the
+	// project release stamped from VERSION.
+	if LibraryVersion == want {
+		t.Fatalf("LibraryVersion %q must not equal the project release %q", LibraryVersion, want)
+	}
+
+	if !strings.HasPrefix(LibraryVersion, "0.12.") {
+		t.Fatalf("LibraryVersion = %q, want an upstream 0.12.x compatibility id", LibraryVersion)
+	}
+}
+
+func TestNilRequestSentinelsAreDistinct(t *testing.T) {
+	t.Parallel()
+
+	if errors.Is(ErrNilPDFRequest, ErrNilConverter) {
+		t.Fatal("ErrNilPDFRequest must not alias ErrNilConverter")
+	}
+
+	if errors.Is(ErrNilImageRequest, ErrNilImageConverter) {
+		t.Fatal("ErrNilImageRequest must not alias ErrNilImageConverter")
+	}
+
+	if err := RunPDF(t.Context(), nil); !errors.Is(err, ErrNilPDFRequest) {
+		t.Fatalf("RunPDF(nil) = %v, want ErrNilPDFRequest", err)
+	}
+
+	if err := RunImage(t.Context(), nil); !errors.Is(err, ErrNilImageRequest) {
+		t.Fatalf("RunImage(nil) = %v, want ErrNilImageRequest", err)
+	}
+
+	var conv *Converter
+	if err := conv.Convert(t.Context()); !errors.Is(err, ErrNilConverter) {
+		t.Fatalf("(*Converter)(nil).Convert = %v, want ErrNilConverter", err)
+	}
+
+	var img *ImageConverter
+	if err := img.Convert(t.Context()); !errors.Is(err, ErrNilImageConverter) {
+		t.Fatalf("(*ImageConverter)(nil).Convert = %v, want ErrNilImageConverter", err)
+	}
+}
+
+func TestConvertToWritesPDFWithoutOutput(t *testing.T) {
+	t.Parallel()
+
+	conv := NewConverter()
+	conv.AddObject(NewObjectSettings().SetBody(
+		[]byte("<html><body><p>writer first</p></body></html>"), "",
+	))
+
+	var buf bytes.Buffer
+	if err := conv.ConvertTo(t.Context(), &buf); err != nil {
+		t.Fatalf("ConvertTo: %v", err)
+	}
+
+	if !bytes.HasPrefix(buf.Bytes(), []byte("%PDF-")) {
+		t.Fatalf("ConvertTo output = %q, want %%PDF-", buf.Bytes()[:min(len(buf.Bytes()), 16)])
+	}
+
+	if got := conv.Output(); got != nil {
+		t.Fatalf("ConvertTo must not require Output(); got %d bytes", len(got))
+	}
+}
+
+func TestImageConvertToWritesWithoutOutput(t *testing.T) {
+	t.Parallel()
+
+	conv := NewImageConverter()
+	conv.Object().SetBody(
+		[]byte(`<html><body><div style="width:20px;height:20px;background:#000"></div></body></html>`),
+		"",
+	)
+
+	if err := conv.Set("width", "40"); err != nil {
+		t.Fatalf("Set(width): %v", err)
+	}
+
+	var buf bytes.Buffer
+	if err := conv.ConvertTo(t.Context(), &buf); err != nil {
+		t.Fatalf("ConvertTo: %v", err)
+	}
+
+	if _, err := png.Decode(bytes.NewReader(buf.Bytes())); err != nil {
+		t.Fatalf("ConvertTo image is not a PNG: %v", err)
+	}
+
+	if got := conv.Output(); got != nil {
+		t.Fatalf("ConvertTo must not require Output(); got %d bytes", len(got))
+	}
+}
+
+func TestConvertSnapshotsGlobalAndObjectSettings(t *testing.T) { //nolint:cyclop // snapshot mutation matrix
+	t.Parallel()
+
+	conv := NewConverter()
+	if err := conv.Global().Set("title", "snapshot-title"); err != nil {
+		t.Fatalf("set title: %v", err)
+	}
+
+	policy := RestrictedNetworkPolicy()
+	policy.AllowedHosts = []string{"reports.example.test"}
+
+	if err := conv.Global().SetNetworkPolicy(policy); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := conv.Global().Set("allow", "/tmp/before"); err != nil {
+		t.Fatalf("set allow: %v", err)
+	}
+
+	if err := conv.Global().Set("header.left", "before"); err != nil {
+		t.Fatalf("set header.left: %v", err)
+	}
+
+	conv.Global().g.Header.Replace = map[string]string{"name": "before"}
+	conv.AddObject(NewObjectSettings().SetBody(
+		[]byte("<html><body><h1>snapshot</h1></body></html>"), "",
+	))
+
+	if err := conv.Convert(t.Context()); err != nil {
+		t.Fatalf("Convert: %v", err)
+	}
+
+	first := conv.Output()
+	if !bytes.Contains(first, []byte("/Title (snapshot-title)")) {
+		t.Fatalf("first PDF missing snapshot title")
+	}
+
+	if err := conv.Global().Set("title", "mutated-after"); err != nil {
+		t.Fatalf("mutate title: %v", err)
+	}
+
+	conv.Global().g.Load.Allow[0] = "/tmp/mutated"
+	conv.Global().g.Load.NetworkAllowedHosts[0] = mutatedNetworkHost
+	conv.Global().g.Header.Replace["name"] = "mutated"
+
+	second := conv.Output()
+	if !bytes.Equal(first, second) {
+		t.Fatal("mutating Global() after Convert changed stored Output()")
+	}
+
+	if err := conv.Convert(t.Context()); err != nil {
+		t.Fatalf("second Convert: %v", err)
+	}
+
+	if bytes.Contains(conv.Output(), []byte("/Title (snapshot-title)")) {
+		t.Fatal("second Convert should use the mutated title")
+	}
+}
+
+func TestImageConvertSnapshotsSettings(t *testing.T) {
+	t.Parallel()
+
+	conv := NewImageConverter()
+	conv.Object().SetBody([]byte("<html><body><p>img snapshot</p></body></html>"), "")
+
+	if err := conv.Set("width", "80"); err != nil {
+		t.Fatalf("Set(width): %v", err)
+	}
+
+	if err := conv.Global().Set("allow", "/tmp/before"); err != nil {
+		t.Fatalf("set allow: %v", err)
+	}
+
+	policy := RestrictedNetworkPolicy()
+	policy.AllowedHosts = []string{"img.example.test"}
+
+	if err := conv.Global().SetNetworkPolicy(policy); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := conv.Convert(t.Context()); err != nil {
+		t.Fatalf("Convert: %v", err)
+	}
+
+	first := conv.Output()
+	conv.Global().g.Load.Allow[0] = "/tmp/mutated"
+	conv.Global().g.Load.NetworkAllowedHosts[0] = mutatedNetworkHost
+
+	if !bytes.Equal(first, conv.Output()) {
+		t.Fatal("mutating Global() after image Convert changed stored Output()")
+	}
+}
+
+func TestNewTOCObjectAndCoverObjectSetRegisteredKeys(t *testing.T) {
+	t.Parallel()
+
+	toc := NewTOCObject()
+	if got, ok := toc.Get("istableofcontent"); !ok || got != "true" {
+		t.Fatalf("NewTOCObject istableofcontents = %q, %v", got, ok)
+	}
+
+	if !toc.o.IsTableOfContent {
+		t.Fatal("NewTOCObject did not set IsTableOfContent")
+	}
+
+	cover := NewCoverObject()
+	if got, ok := cover.Get("iscover"); !ok || got != "true" {
+		t.Fatalf("NewCoverObject iscover = %q, %v", got, ok)
+	}
+
+	if !cover.o.IsCover || cover.o.IncludeInOutline {
+		t.Fatalf("NewCoverObject cover=%v outline=%v", cover.o.IsCover, cover.o.IncludeInOutline)
 	}
 }
 

@@ -64,8 +64,22 @@ the same threat class documented for embedding:
 | **Local files** | `file://` and path reads are denied by default | Keep `--enable-local-file-access` / `--allow` off for untrusted input |
 
 Defaults that help: connect/response timeouts, redirect limits, body size caps,
-TLS verify on (unless `--insecure`), no JavaScript execution. There is **no**
-network egress allowlist inside the converter — input trust is the control.
+TLS verification on, no JavaScript execution.
+
+Network policy:
+
+- Default CLI behavior is **compatible** (historical wkhtmltopdf-like HTTP):
+  any `http`/`https` host, including localhost and RFC1918.
+- `--restrict-network` enables the restricted policy: private/loopback/
+  link-local destinations and cross-host redirects are denied.
+- `--allow-host HOST` adds an exact or `*.example.com` host allowlist entry
+  and turns the explicit policy on. Exact allowlisted hosts may be private
+  (trusted internal services); wildcard suffixes still resolve and block
+  private records.
+
+Library callers use `GlobalSettings.SetNetworkPolicy` with
+`CompatibleNetworkPolicy()` or `RestrictedNetworkPolicy()`. See
+[THREAT-MODEL.md](THREAT-MODEL.md) and [integration-security.md](integration-security.md).
 
 Fidelity for public sites is a separate question: URL fetch ≠ “decent print”
 acceptance. See [fidelity.md — Arbitrary websites](fidelity.md#arbitrary-websites-phase-21),

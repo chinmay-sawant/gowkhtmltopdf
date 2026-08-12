@@ -8,7 +8,7 @@ import (
 	"io"
 
 	"gowkhtmltopdf/internal/cli"
-	"gowkhtmltopdf/internal/convert"
+	"gowkhtmltopdf/internal/errs"
 	"gowkhtmltopdf/internal/settings"
 )
 
@@ -22,7 +22,7 @@ func imageLoadGlobalCmd(cmd *cli.Command) settings.LoadGlobal {
 // use app.RunImage, which owns command parsing and output lifecycle.
 func Run(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 	if cmd == nil {
-		return errNilCommand
+		return errs.ErrNilCommand
 	}
 
 	if ctx == nil {
@@ -37,9 +37,9 @@ func Run(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 	}
 
 	img.Format = format
-	req := convert.NewImageRequest(cmd.Global, img, cmd.Objects, io.Discard)
+	req := NewRequest(cmd.Global, img, cmd.Objects, io.Discard)
 
-	if err := req.ValidateImage(); err != nil {
+	if err := req.Validate(); err != nil {
 		return fmt.Errorf("imageout: validate: %w", err)
 	}
 

@@ -901,7 +901,7 @@ func TestRestrictedNetworkPolicyBlocksPrivateAddress(t *testing.T) {
 	}
 }
 
-func TestRestrictedNetworkPolicyAllowsExplicitHostException(t *testing.T) {
+func TestRestrictedNetworkPolicyAllowsExplicitHostException(t *testing.T) { //nolint:dupl // explicit-host counterpart
 	t.Parallel()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(respWriter http.ResponseWriter, _ *http.Request) {
@@ -1209,5 +1209,239 @@ func TestLoadCharsetMetaDecl(t *testing.T) {
 				t.Errorf("%s: err = %v, want contains %q", testCase.name, err, testCase.want)
 			}
 		}
+	}
+}
+
+type fakeResolver struct {
+	ips   map[string][]net.IP
+	calls []string
+}
+
+func (f *fakeResolver) LookupIP(_ context.Context, _, host string) ([]net.IP, error) {
+	f.calls = append(f.calls, host)
+	if ips, ok := f.ips[strings.ToLower(host)]; ok {
+		return ips, nil
+	}
+
+	return nil, &net.DNSError{Err: "no such host", Name: host, IsNotFound: true}
+}
+
+func newRestrictedLoader(t *testing.T, resolver load.IPResolver) *load.Loader {
+	t.Helper()
+
+	loader, err := load.NewLoaderWithNetworkPolicy(
+		settings.LoadGlobal{}, //nolint:exhaustruct
+		load.RestrictedNetworkPolicy(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	loader.Resolver = resolver
+
+	return loader
+}
+
+func TestRestrictedPinnedDialNeverRedialsHostname(t *testing.T) { //nolint:exhaustruct,err113,lll,wsl // fake resolver
+	t.Parallel()
+
+	const publicHost = "public.example.test"
+
+	resolver := &fakeResolver{ips: map[string][]net.IP{
+		publicHost: {net.ParseIP("93.184.216.34")},
+	}}
+	loader := newRestrictedLoader(t, resolver)
+
+	var dialed []string
+
+	loader.SetTestDial(func(_ context.Context, _, address string) (net.Conn, error) {
+		dialed = append(dialed, address)
+
+		return nil, errors.New("dial blocked in test")
+	})
+
+	_, err := loader.Load(t.Context(), "http://"+publicHost+"/", defaultLP())
+	if err == nil {
+		t.Fatal("expected dial failure")
+	}
+
+	if len(dialed) == 0 {
+		t.Fatal("Restricted path never dialed")
+	}
+
+	for _, address := range dialed {
+		host, _, splitErr := net.SplitHostPort(address)
+		if splitErr != nil {
+			t.Fatalf("dialed %q: %v", address, splitErr)
+		}
+
+		if host == publicHost {
+			t.Fatalf("pinned dial re-used hostname %q", address)
+		}
+
+		if host == "127.0.0.1" || host == "::1" {
+			t.Fatalf("pinned dial saw loopback %q", address)
+		}
+
+		if ip := net.ParseIP(host); ip == nil || !ip.Equal(net.ParseIP("93.184.216.34")) {
+			t.Fatalf("pinned dial address = %q, want 93.184.216.34", address)
+		}
+	}
+}
+
+func TestRestrictedBlocksPrivateResolvedRecords(t *testing.T) { //nolint:exhaustruct,wsl // fake resolver
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		ip   string
+	}{
+		{name: "loopback", ip: "127.0.0.1"},
+		{name: "rfc1918", ip: "10.1.2.3"},
+		{name: "link-local", ip: "169.254.1.1"},
+		{name: "metadata", ip: "169.254.169.254"},
+		{name: "cgnat", ip: "100.64.0.1"},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			host := testCase.name + ".private.test"
+			resolver := &fakeResolver{ips: map[string][]net.IP{
+				host: {net.ParseIP(testCase.ip)},
+			}}
+			loader := newRestrictedLoader(t, resolver)
+
+			_, err := loader.Load(t.Context(), "http://"+host+"/", defaultLP())
+			if !errors.Is(err, load.ErrNetworkPolicy) {
+				t.Fatalf("error = %v, want ErrNetworkPolicy", err)
+			}
+		})
+	}
+}
+
+func TestRestrictedBlocksMixedPublicAndLoopbackRecords(t *testing.T) { //nolint:exhaustruct,lll,wsl // fake resolver
+	t.Parallel()
+
+	resolver := &fakeResolver{ips: map[string][]net.IP{
+		"mixed.example.test": {net.ParseIP("93.184.216.34"), net.ParseIP("127.0.0.1")},
+	}}
+	loader := newRestrictedLoader(t, resolver)
+
+	if _, err := loader.Load(t.Context(), "http://mixed.example.test/", defaultLP()); !errors.Is(err, load.ErrNetworkPolicy) {
+		t.Fatalf("error = %v, want ErrNetworkPolicy", err)
+	}
+}
+
+func TestRestrictedProxyToPrivateTargetDenied(t *testing.T) { //nolint:wsl // focused denial
+	t.Parallel()
+
+	global := settings.LoadGlobal{ //nolint:exhaustruct
+		Proxy: "http://127.0.0.1:9",
+	}
+	loader, err := load.NewLoaderWithNetworkPolicy(global, load.RestrictedNetworkPolicy())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = loader.Load(t.Context(), "http://169.254.169.254/latest/meta-data/", defaultLP())
+	if !errors.Is(err, load.ErrNetworkPolicy) {
+		t.Fatalf("error = %v, want ErrNetworkPolicy for private target via proxy", err)
+	}
+}
+
+func TestRestrictedWildcardAllowlistStillBlocksPrivateIP(t *testing.T) { //nolint:exhaustruct,wsl // fake resolver
+	t.Parallel()
+
+	resolver := &fakeResolver{ips: map[string][]net.IP{
+		"evil.com": {net.ParseIP("127.0.0.1")},
+	}}
+	policy := load.RestrictedNetworkPolicy()
+	policy.AllowedHosts = []string{"*.com"}
+	loader, err := load.NewLoaderWithNetworkPolicy(
+		settings.LoadGlobal{}, //nolint:exhaustruct
+		policy,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	loader.Resolver = resolver
+
+	if _, err := loader.Load(t.Context(), "http://evil.com/", defaultLP()); !errors.Is(err, load.ErrNetworkPolicy) {
+		t.Fatalf("error = %v, want ErrNetworkPolicy (wildcard must not skip IP check)", err)
+	}
+}
+
+func TestRestrictedExactAllowlistPermitsPrivateLiteral(t *testing.T) { //nolint:dupl // counterpart of explicit-host test
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(respWriter http.ResponseWriter, _ *http.Request) {
+		_, _ = respWriter.Write([]byte("trusted private"))
+	}))
+	defer srv.Close()
+
+	parsed, err := url.Parse(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	policy := load.RestrictedNetworkPolicy()
+	policy.AllowedHosts = []string{parsed.Hostname()}
+	loader, err := load.NewLoaderWithNetworkPolicy(
+		settings.LoadGlobal{}, //nolint:exhaustruct
+		policy,
+	)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := loader.Load(t.Context(), srv.URL, defaultLP())
+
+	if err != nil {
+		t.Fatalf("exact allowlist should permit private literal: %v", err)
+	}
+
+	if string(res.Body) != "trusted private" {
+		t.Fatalf("body = %q", res.Body)
+	}
+}
+
+func TestRestrictedSecondHopPrivateURLDenied(t *testing.T) {
+	t.Parallel()
+
+	loader := newRestrictedLoader(t, nil)
+
+	_, err := loader.FetchSub(t.Context(), "https://example.com/page", "http://127.0.0.1/secret.png", defaultLP())
+	if !errors.Is(err, load.ErrNetworkPolicy) {
+		t.Fatalf("FetchSub error = %v, want ErrNetworkPolicy", err)
+	}
+
+	meta := "http://169.254.169.254/latest/meta-data/"
+	_, err = loader.FetchSub(t.Context(), "https://example.com/page", meta, defaultLP())
+
+	if !errors.Is(err, load.ErrNetworkPolicy) {
+		t.Fatalf("metadata FetchSub error = %v, want ErrNetworkPolicy", err)
+	}
+}
+
+func TestWildcardAllowlistIsLabelBoundary(t *testing.T) {
+	t.Parallel()
+
+	policy := load.RestrictedNetworkPolicy()
+	policy.AllowedHosts = []string{"*.example.com"}
+	loader, err := load.NewLoaderWithNetworkPolicy(
+		settings.LoadGlobal{}, //nolint:exhaustruct
+		policy,
+	)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := loader.Load(t.Context(), "http://notexample.com/", defaultLP()); !errors.Is(err, load.ErrNetworkPolicy) {
+		t.Fatalf("notexample.com should not match *.example.com: %v", err)
 	}
 }

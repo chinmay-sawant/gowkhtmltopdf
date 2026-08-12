@@ -88,14 +88,11 @@ func (o PdfGlobalOptions) WithSetting(name, value string) (PdfGlobalOptions, err
 	return o, nil
 }
 
-// Build returns an independent settings snapshot.
+// Build returns an independent settings snapshot. Slices and maps on the
+// builder (Allow, Network*, Header/Footer.Replace, FontPaths, Ignored, …)
+// are cloned so later WithSetting / field mutations do not change the result.
 func (o PdfGlobalOptions) Build() PdfGlobal {
-	result := o.global
-	result.ExcludeFromOutline = append([]string(nil), o.global.ExcludeFromOutline...)
-	result.FontPaths = append([]string(nil), o.global.FontPaths...)
-	result.Ignored = cloneStringMap(o.global.Ignored)
-
-	return result
+	return ClonePdfGlobal(o.global)
 }
 
 func cloneStringMap(source map[string]string) map[string]string {

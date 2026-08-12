@@ -1,4 +1,4 @@
-.PHONY: test lint build fmt golden golden-update samples clean
+.PHONY: test lint build fmt golden golden-update samples clean claim-scan
 
 # Pure-Go runtime: the standard library plus the allowlisted direct modules
 # below. No cgo, browser, or native converter process is required.
@@ -27,10 +27,26 @@ lint:
 	golangci-lint version
 	golangci-lint run ./...
 
+CLI_VERSION_LDFLAGS := -X gowkhtmltopdf/internal/cli.Version=$(shell cat VERSION)
+
 build:
 	mkdir -p bin
-	go build -o bin/gowkhtmltopdf ./cmd/gowkhtmltopdf
-	go build -o bin/gowkhtmltoimage ./cmd/gowkhtmltoimage
+	go build -ldflags "$(CLI_VERSION_LDFLAGS)" -o bin/gowkhtmltopdf ./cmd/gowkhtmltopdf
+	go build -ldflags "$(CLI_VERSION_LDFLAGS)" -o bin/gowkhtmltoimage ./cmd/gowkhtmltoimage
+
+# Scan live user-facing surfaces for stale product claims.
+claim-scan:
+	@if rg -n -S \
+		-e 'using only the standard library' \
+		-e 'pure-Go, stdlib-only' \
+		-e 'zero third-party' \
+		-e 'Qt WebKit engine' \
+		-e 'identical input bytes produce identical PDF bytes' \
+		doc.go README.md documentation/*.md \
+		frontend/src/data/content internal/cli/help.go; then \
+		echo "claim-scan: forbidden phrase found" >&2; exit 1; \
+	fi
+	@echo "claim-scan: clean"
 
 fmt:
 	gofmt -w .

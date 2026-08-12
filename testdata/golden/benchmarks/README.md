@@ -58,6 +58,27 @@ GOWKHTMLTOPDF_GENERATE_BENCHMARK_OUTPUTS=1 \
 This writes `live-movie-listing-010.pdf` and
 `live-movie-listing-010.png`.
 
+## Current generic snapshot (2026-08-12 post-remediation)
+
+Host: Linux amd64, 13th Gen Intel Core i7-13700HX. Command:
+
+```sh
+GOCACHE=/tmp/gowk-go-cache go test ./internal/convert -run '^$' \
+  -bench 'BenchmarkPDFPages/generic/(10Pages|500Pages)$' \
+  -benchmem -benchtime=1x -count=1
+```
+
+Request mode: **generic** (not certified-islands). Cache: warm GOCACHE.
+
+| Workload | Wall | B/op | allocs/op |
+|---|---:|---:|---:|
+| generic 10 pages | 19.92 ms | 12.8 MB | 20,589 |
+| generic 500 pages | 1.073 s | 226.6 MB | 939,257 |
+
+These are in-process Go allocation numbers, not process RSS. Snapshot D
+CLI RSS (54,632 KiB / 960 ms at 500 pages) remains the last `/usr/bin/time`
+process measurement and is historical vs CR-02 CLI island removal.
+
 ## Stored 2026-08-12 Snapshot D benchmark
 
 This is the stored one-iteration process/code capture used as the Snapshot D

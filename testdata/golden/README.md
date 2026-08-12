@@ -106,18 +106,30 @@ proves. Page envelopes are pinned in `internal/convert/golden_test.go`
 | 56 | Architecture diagram: hero, pipeline strip, TOC, 10 domain sections (modern semantic tags: `dialog`, `details/summary`, `mark`, `meter`, `progress`, `output`, `time`, `data`, `kbd`, `samp`, `var`, `dfn`, `cite`, `ruby`, `rt`, `rp`, `bdi`, `bdo`, `wbr`, `ins`, `del`, `sub`, `sup`, `aside`, `address`, `fieldset`, `legend`, `picture`, `search`; modern CSS: `oklch()`/`color-mix()`/`clamp()`/logical properties with graceful-degrade fallbacks), linked `fixture-56-architecture-diagram.css`, dependency DAG, PDF-vs-image, security; derived from `documentation/architecture/` (commit ef526f9) | 20 |
 | font-examples | Font showcase: 1,125 free Google Fonts (fonts.google.com Feeling/Calligraphy filters + top-trending modern/display/script/handwriting) — randomized sampler: every font appears exactly once, each line in a random text style (regular, bold, italic, bold-italic, underline, strikethrough, underline+strikethrough, bold+underline, bold-italic+underline+strikethrough, letter-spaced, uppercase), rows span 100% width in a single column; inline `<style>`; fonts intentionally NOT bundled — render with `--font-path <dir>` or `Global().Set("fontpath", dir)`; falls back to Liberation Sans without font flags | 25 (with fonts, single column, number+name inline, overflow-wrap) |
 
-## Pass criteria (MVP)
+## Pass criteria
 
-A fixture passes when the generated PDF:
+A fixture passes `TestGoldenCorpusAllFixtures` when the generated PDF:
 
-1. **Structure:** page count matches the expected envelope per fixture
-   (table above; verified via `TestGoldenCorpusAllFixtures`).
-2. **Content:** all fixture text strings present in extracted text, in order
-   (text extraction from content streams, Phase 3/9).
-3. **Geometry:** key box positions within tolerance of expected layout
-   (Phase 4 golden tests; tolerance ±1 px @ 96 dpi initially).
-4. **No regression:** output is byte-deterministic for identical input and
-   settings (PDF writer determinism gate, Phase 3).
+1. **Structure:** `%PDF-` / `%%EOF` / xref, embedded `/FontFile2`, and the
+   per-fixture page envelope in `fixturePageBounds` (missing key = fail).
+2. **Needles:** listed fixtures assert ordered extracted text via
+   `pdf.ParseSemantic` (01 Invoice/total, 06 Partner Handbook, 07 Nordwind,
+   24 Internal link report, 55 Northline, 54 Ember Harbor).
+3. **Features:** `images` / `uris` flags require `/Subtype /Image` or `/S /URI`.
+4. **Geometry / visual:** layout unit tests and crop checks — not byte-identical
+   PDFs and not a ±1 px golden for every box.
+
+Fixture-16 is 1–2 pages (not 3).
+
+### Visual inspection (2026-08-12)
+
+| Fixture | Proof | Verdict |
+|---|---|---|
+| 21 | `TestFixture21ParagraphAfterForcedBreakStaysContiguous` | contiguous paragraph |
+| 23 | `TestFixture23RepeatedHeaderHasNoVisualGap` | thead band, no gap |
+| 28 | `TestFixture28FlexWrapGridItemsStayInFirstPageLayout` | labels on page 1 |
+| 43 | `TestFixture43CardsAndTheadDoNotOverlap` | cards + thead |
+| 55 | semantic needle `Northline` + crop test | masthead text present |
 
 ## How to run
 

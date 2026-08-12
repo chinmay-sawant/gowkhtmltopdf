@@ -7,8 +7,12 @@ import (
 	"strings"
 )
 
-// Version is stamped by the build (ldflags -X) and defaults to 0.1.0-dev.
-var Version = "0.1.0-dev" //nolint:gochecknoglobals // ldflags-stamped build variable
+// Version is the project release stamped by the build
+// (ldflags -X gowkhtmltopdf/internal/cli.Version=$(cat VERSION)).
+// The unstamped default matches the VERSION file so tests and local
+// `go test`/`go run` agree with the release number. It is not
+// LibraryVersion, which is the upstream wkhtmltopdf compatibility id.
+var Version = "0.1.0" //nolint:gochecknoglobals // ldflags-stamped build variable
 
 // PrintHelp writes usage text for the given Mode.
 func PrintHelp(writer io.Writer, mode Mode) {

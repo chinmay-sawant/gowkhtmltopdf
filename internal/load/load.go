@@ -305,6 +305,13 @@ func isLocalPath(s string) bool {
 		len(s) == 2 && s[1] == ':' // windows drive
 }
 
+// IPResolver looks up host addresses. *net.Resolver implements it;
+// tests inject a fake so Restricted pinning can be asserted without
+// touching the system resolver.
+type IPResolver interface {
+	LookupIP(ctx context.Context, network, host string) ([]net.IP, error)
+}
+
 // Loader fetches resources with the configured network and local-file policy.
 type Loader struct {
 	Client       *http.Client
@@ -313,6 +320,9 @@ type Loader struct {
 	Log          io.Writer
 	MaxBodySize  int64
 	MaxRedirects int
+	// Resolver looks up host addresses for Restricted private-IP checks
+	// and pinned dials. Nil uses net.DefaultResolver.
+	Resolver IPResolver
 
 	// Global is an owned snapshot of the caller's load policy. Allow and
 	// EnableLocalFileAccess remain exported compatibility fields for existing
@@ -321,6 +331,7 @@ type Loader struct {
 	Allow                 []string
 	EnableLocalFileAccess bool
 	initErr               error
+	testDial              func(ctx context.Context, network, address string) (net.Conn, error)
 }
 
 // NewLoader builds a Loader from global load settings, applying the full
@@ -421,7 +432,7 @@ func (l *Loader) initClient() error {
 		Transport: transport,
 		Jar:       jar,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if err := l.checkNetworkURL(req.URL); err != nil {
+			if err := l.checkNetworkURL(req.Context(), req.URL); err != nil {
 				return err
 			}
 
@@ -447,37 +458,96 @@ func (l *Loader) initClient() error {
 	return nil
 }
 
-func (l *Loader) policyDialContext(dialer *net.Dialer) func(context.Context, string, string) (net.Conn, error) {
+func (l *Loader) policyDialContext( //nolint:cyclop // hostname vs IP vs proxy policy
+	dialer *net.Dialer,
+) func(context.Context, string, string) (net.Conn, error) {
 	return func(ctx context.Context, network, address string) (net.Conn, error) {
 		if !l.Network.BlockPrivateNetworks {
-			return dialer.DialContext(ctx, network, address)
+			return l.dialRaw(ctx, dialer, network, address)
 		}
 
-		host, _, err := net.SplitHostPort(address)
+		// A configured proxy is operator-supplied; DialContext talks to the
+		// proxy hop, not the target. The target's private-IP policy is
+		// applied in checkNetworkURL before the request is issued.
+		if l.Global.Proxy != "" {
+			return l.dialRaw(ctx, dialer, network, address)
+		}
+
+		host, port, err := net.SplitHostPort(address)
 		if err != nil {
 			return nil, fmt.Errorf("%w: invalid dial address %q: %w", ErrNetworkPolicy, address, err)
 		}
 
-		if l.networkHostAllowlisted(host) {
-			return dialer.DialContext(ctx, network, address)
+		if l.networkHostExactAllowlisted(host) {
+			return l.dialRaw(ctx, dialer, network, address)
 		}
 
-		ips, err := net.DefaultResolver.LookupIP(ctx, "ip", host)
+		if ip := net.ParseIP(host); ip != nil {
+			if isPrivateNetworkIP(ip) {
+				return nil, fmt.Errorf("%w: private address %s", ErrNetworkPolicy, ip)
+			}
+
+			return l.dialRaw(ctx, dialer, network, address)
+		}
+
+		ips, err := l.lookupIPs(ctx, host)
 		if err != nil {
 			return nil, fmt.Errorf("resolve %s: %w", host, err)
 		}
 
-		for _, ip := range ips {
-			if isPrivateNetworkIP(ip) {
-				return nil, fmt.Errorf("%w: %s resolves to private address %s", ErrNetworkPolicy, host, ip)
-			}
+		if err := rejectPrivateResolvedIPs(host, ips); err != nil {
+			return nil, err
 		}
 
-		return dialer.DialContext(ctx, network, address)
+		var first error
+
+		for _, ip := range ips {
+			conn, dialErr := l.dialRaw(ctx, dialer, network, net.JoinHostPort(ip.String(), port))
+			if dialErr == nil {
+				return conn, nil
+			}
+
+			first = dialErr
+		}
+
+		if first == nil {
+			return nil, fmt.Errorf("%w: %s resolved to no addresses", ErrNetworkPolicy, host)
+		}
+
+		return nil, first
 	}
 }
 
-func (l *Loader) checkNetworkURL(target *url.URL) error {
+func (l *Loader) dialRaw(
+	ctx context.Context, dialer *net.Dialer, network, address string,
+) (net.Conn, error) {
+	if l.testDial != nil {
+		return l.testDial(ctx, network, address)
+	}
+
+	conn, err := dialer.DialContext(ctx, network, address)
+	if err != nil {
+		return nil, fmt.Errorf("dial %s: %w", address, err)
+	}
+
+	return conn, nil
+}
+
+func (l *Loader) lookupIPs(ctx context.Context, host string) ([]net.IP, error) {
+	resolver := l.Resolver
+	if resolver == nil {
+		resolver = net.DefaultResolver
+	}
+
+	ips, err := resolver.LookupIP(ctx, "ip", host)
+	if err != nil {
+		return nil, fmt.Errorf("lookup %s: %w", host, err)
+	}
+
+	return ips, nil
+}
+
+func (l *Loader) checkNetworkURL(ctx context.Context, target *url.URL) error {
 	if target == nil {
 		return fmt.Errorf("%w: nil URL", ErrNetworkPolicy)
 	}
@@ -496,24 +566,98 @@ func (l *Loader) checkNetworkURL(target *url.URL) error {
 		return fmt.Errorf("%w: host %q is not allowlisted", ErrNetworkPolicy, host)
 	}
 
+	if !l.Network.BlockPrivateNetworks {
+		return nil
+	}
+
+	// Exact allowlisted hosts may skip the private-IP check (trusted
+	// internal services). Wildcard suffixes still resolve and block
+	// private records.
+	if l.networkHostExactAllowlisted(host) {
+		return nil
+	}
+
+	return l.rejectPrivateTarget(ctx, host)
+}
+
+func (l *Loader) rejectPrivateTarget(ctx context.Context, host string) error {
+	if ip := net.ParseIP(host); ip != nil {
+		if isPrivateNetworkIP(ip) {
+			return fmt.Errorf("%w: private address %s", ErrNetworkPolicy, ip)
+		}
+
+		return nil
+	}
+
+	ips, err := l.lookupIPs(ctx, host)
+	if err != nil {
+		return fmt.Errorf("resolve %s: %w", host, err)
+	}
+
+	return rejectPrivateResolvedIPs(host, ips)
+}
+
+func rejectPrivateResolvedIPs(host string, ips []net.IP) error {
+	if len(ips) == 0 {
+		return fmt.Errorf("%w: %s resolved to no addresses", ErrNetworkPolicy, host)
+	}
+
+	for _, ip := range ips {
+		if isPrivateNetworkIP(ip) {
+			return fmt.Errorf("%w: %s resolves to private address %s", ErrNetworkPolicy, host, ip)
+		}
+	}
+
 	return nil
 }
 
+func normalizeNetworkHost(host string) string {
+	return strings.ToLower(strings.TrimSpace(strings.TrimSuffix(host, ".")))
+}
+
 func (l *Loader) networkHostAllowlisted(host string) bool {
-	host = strings.ToLower(strings.TrimSuffix(host, "."))
+	host = normalizeNetworkHost(host)
 
 	if len(l.Network.AllowedHosts) == 0 {
 		return false
 	}
 
 	for _, allowed := range l.Network.AllowedHosts {
-		allowed = strings.ToLower(strings.TrimSpace(strings.TrimSuffix(allowed, ".")))
-		if allowed == host || strings.HasPrefix(allowed, "*.") && strings.HasSuffix(host, allowed[1:]) {
+		if hostMatchesAllowlist(host, allowed) {
 			return true
 		}
 	}
 
 	return false
+}
+
+func (l *Loader) networkHostExactAllowlisted(host string) bool {
+	host = normalizeNetworkHost(host)
+	for _, allowed := range l.Network.AllowedHosts {
+		if normalizeNetworkHost(allowed) == host {
+			return true
+		}
+	}
+
+	return false
+}
+
+// hostMatchesAllowlist reports an exact host match or a label-boundary
+// wildcard match. `*.example.com` matches `a.example.com`, not
+// `notexample.com`. The bare apex (`example.com`) does not match `*.example.com`.
+func hostMatchesAllowlist(host, allowed string) bool {
+	allowed = normalizeNetworkHost(allowed)
+	if allowed == host {
+		return true
+	}
+
+	if !strings.HasPrefix(allowed, "*.") {
+		return false
+	}
+
+	suffix := allowed[1:] // ".example.com"
+
+	return len(host) > len(suffix) && strings.HasSuffix(host, suffix)
 }
 
 func containsFold(values []string, want string) bool {
@@ -530,8 +674,33 @@ func sameNetworkHost(left, right *url.URL) bool {
 	return strings.EqualFold(left.Host, right.Host)
 }
 
-func isPrivateNetworkIP(ip net.IP) bool {
-	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsUnspecified()
+func mustCIDR(cidr string) *net.IPNet {
+	_, network, err := net.ParseCIDR(cidr)
+	if err != nil {
+		panic(err)
+	}
+
+	return network
+}
+
+func isPrivateNetworkIP(addr net.IP) bool {
+	if addr == nil {
+		return true
+	}
+
+	if addr.IsLoopback() || addr.IsPrivate() || addr.IsLinkLocalUnicast() || addr.IsUnspecified() {
+		return true
+	}
+
+	if mustCIDR("100.64.0.0/10").Contains(addr) {
+		return true
+	}
+
+	if mustCIDR("169.254.169.0/24").Contains(addr) || addr.Equal(net.ParseIP("169.254.169.254")) {
+		return true
+	}
+
+	return false
 }
 
 func parseProxy(raw string) (*url.URL, error) {
@@ -995,7 +1164,7 @@ func (l *Loader) loadHTTP(ctx context.Context, target string, pageLoad settings.
 		return nil, fmt.Errorf("parse %s: %w", target, err)
 	}
 
-	if err := l.checkNetworkURL(parsed); err != nil {
+	if err := l.checkNetworkURL(ctx, parsed); err != nil {
 		return nil, err
 	}
 

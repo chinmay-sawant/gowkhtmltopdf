@@ -34,8 +34,10 @@ binaries at build time (see README "Versioning").
 
 ## 0.1.0 (2026-08-03)
 
-First MVP release: a pure-Go, stdlib-only HTML-to-PDF engine with a
-wkhtmltopdf-compatible CLI and library API.
+First MVP release: a pure-Go HTML-to-PDF engine (no cgo, no browser) with a
+wkhtmltopdf-compatible CLI and library API. Direct module dependencies are
+the allowlisted `github.com/go-text/typesetting` and `github.com/tdewolff/canvas`
+modules recorded in `go.mod`.
 
 ### Added
 

@@ -4,10 +4,13 @@
 
 | Package | Responsibility |
 |---------|----------------|
-| `gowkhtmltopdf` (root) | Public library API (`Converter`, `ImageConverter`) |
-| `cmd/gowkhtmltopdf` | PDF CLI entrypoint |
+| `gowkhtmltopdf` (root) | Public library API: typed `PDFRequest`/`RunPDF` and compatibility `Converter` |
+| `cmd/gowkhtmltopdf` | PDF CLI entrypoint (`app` + `cli` only) |
 | `cmd/gowkhtmltoimage` | Image CLI entrypoint |
+| `internal/app` | Command → engine adapter (sinks, TOC dump, image/PDF Run*) |
 | `internal/cli` | Argv parse, multi-object grammar (`page` / `cover` / `toc`), help |
+| `internal/convert/prepare` | Shared document prep (load, parse, sheets) |
+| `internal/convert/render` | Mode-neutral lifecycle: RenderObjects → Assemble → Finalize |
 | `internal/settings` | wkhtmltopdf-style settings, UnitReal, dotted `Get`/`Set` |
 | `internal/load` | URL guess, HTTP(S)/file/`data:`, ACL, cookies, auth, POST |
 | `internal/html` | Allowlisted HTML tokenizer + tree |
@@ -52,6 +55,7 @@ Details: [THREAT-MODEL.md](THREAT-MODEL.md).
 
 ## Extension points (intentionally small)
 
-The public API is settings-driven (dotted names), not a plugin framework.
+The public API is settings-driven (dotted names) **or** the typed
+`PDFRequest` / `ImageRequest` path. It is not a plugin framework.
 New CSS properties or elements require changes inside `internal/css` and
 `internal/layout` and an update to the compatibility matrix.

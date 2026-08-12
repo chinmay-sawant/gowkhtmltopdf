@@ -100,3 +100,55 @@ func TestFixture28FlexWrapGridItemsStayInFirstPageLayout(t *testing.T) {
 		t.Fatalf("fixture-28 wrapped/grid labels are vertically separated: positions=%v", positions)
 	}
 }
+
+func TestFixture43CardsAndTheadDoNotOverlap(t *testing.T) {
+	t.Parallel()
+
+	res, contentH := paintGoldenFixture(t, "fixture-43-complex-dossier.html")
+	needles := []string{"Northstar Atlas", "Product Launch Dossier"}
+	var found []string
+	for _, op := range res.Ops {
+		if op.Kind != OpText {
+			continue
+		}
+		for _, needle := range needles {
+			if strings.Contains(op.Text, needle) {
+				found = append(found, needle)
+				if op.Y < 0 {
+					t.Fatalf("fixture-43 %q painted at negative y=%.2f", needle, op.Y)
+				}
+			}
+		}
+	}
+	if len(found) == 0 {
+		t.Fatal("fixture-43 missing dossier title text")
+	}
+
+	var table *box
+	var find func(*box)
+	find = func(b *box) {
+		if b == nil {
+			return
+		}
+		if b.kind == displayTable && table == nil && len(b.rows) > 4 {
+			table = b
+		}
+		for _, child := range b.children {
+			find(child)
+		}
+	}
+	find(res.root)
+	if table == nil {
+		return
+	}
+	headerBottom := table.rows[0][0].y + table.rows[0][0].height
+	for _, row := range table.rows[1:] {
+		if len(row) == 0 {
+			continue
+		}
+		if row[0].y+0.5 < headerBottom && row[0].y < contentH {
+			t.Fatalf("fixture-43 body row overlaps thead: y=%.2f headerBottom=%.2f", row[0].y, headerBottom)
+		}
+		break
+	}
+}

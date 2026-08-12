@@ -24,7 +24,47 @@ bundled fonts when preparing a redistribution archive.
 Pin a tagged release once the module is published to a reachable path; until
 then use `replace` against a checkout.
 
-## PDF converter
+## Canonical API (typed, writer-first)
+
+Prefer `PDFRequest` + `RunPDF` (and `ImageRequest` + `RunImage`) when embedding.
+`Converter` / `ImageConverter` remain the wkhtmltopdf-shaped compatibility
+drivers that buffer `Output()`.
+
+```go
+global := gowkhtmltopdf.NewGlobalSettings()
+_ = global.Set("size.pagesize", "A4")
+
+var out bytes.Buffer
+err := gowkhtmltopdf.RunPDF(ctx, &gowkhtmltopdf.PDFRequest{
+    Global: global,
+    Objects: []*gowkhtmltopdf.ObjectSettings{
+        gowkhtmltopdf.NewObjectSettings().SetPage("invoice.html"),
+    },
+    Now:    func() time.Time { return time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC) },
+    Output: &out,
+})
+```
+
+`Now` pins PDF metadata and `[date]`/`[time]` placeholders. Without it the
+writer uses the wall clock, so default CLI bytes are **not** hash-stable.
+
+Network policy:
+
+```go
+_ = global.SetNetworkPolicy(gowkhtmltopdf.RestrictedNetworkPolicy())
+// or CompatibleNetworkPolicy() for historical any-host HTTP
+```
+
+TOC / cover objects: `NewTOCObject()` and `NewCoverObject()` set the
+registered dotted keys (`istableofcontent`, `iscover`).
+
+`LibraryVersion` is the upstream wkhtmltopdf 0.12.x compatibility id, not
+the project release in `VERSION`.
+
+Writer-first helpers on the compatibility driver: `Converter.ConvertTo` and
+`ImageConverter.ConvertTo`.
+
+## PDF converter (compatibility driver)
 
 ```go
 c := gowkhtmltopdf.NewConverter()

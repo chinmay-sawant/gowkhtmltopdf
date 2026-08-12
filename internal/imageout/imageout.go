@@ -59,7 +59,6 @@ var (
 	errNilRoot          = errors.New("imageout: nil root")
 	errNilContext       = errs.ErrNilContext
 	errCropNoIntersect  = errors.New("imageout: crop rectangle does not intersect the canvas")
-	errNilCommand       = errs.ErrNilCommand
 	errNilRequest       = errs.ErrNilRequest
 	errNothingToRender  = errors.New("load-error policy is skip; nothing to render")
 	errImagesDisabled   = errors.New("images disabled")
@@ -1332,10 +1331,9 @@ func scaleNearestGeneric(src image.Image, width, height int) *image.NRGBA {
 	return dst
 }
 
-// RunRequest drives image conversion from a CLI-independent convert.Request
-// (P1-1). req.Image must be non-nil; req.Output receives encoded PNG/JPEG
-// bytes (nil → os.Stdout is not auto-selected; callers must supply a writer).
-func RunRequest(ctx context.Context, req *convert.Request, log io.Writer) error {
+// RunRequest drives image conversion from an image-only request. req.Output
+// receives encoded PNG/JPEG bytes; callers must supply a writer.
+func RunRequest(ctx context.Context, req *Request, log io.Writer) error {
 	if req == nil {
 		return errNilRequest
 	}
@@ -1344,7 +1342,7 @@ func RunRequest(ctx context.Context, req *convert.Request, log io.Writer) error 
 		return errNilContext
 	}
 
-	if err := req.ValidateImage(); err != nil {
+	if err := req.Validate(); err != nil {
 		return fmt.Errorf("imageout: validate: %w", err)
 	}
 
@@ -1365,7 +1363,7 @@ func RunRequest(ctx context.Context, req *convert.Request, log io.Writer) error 
 	// Proxy; CLI/library ACL (--allow / --enable-local-file-access) lives on
 	// Global.Load. Merge so NewLoader applies everything; no post-construction
 	// field pokes on Loader.
-	loader := load.NewLoader(imageLoadGlobal(req.Global, *req.Image))
+	loader := load.NewLoader(imageLoadGlobal(req.Global, req.Image))
 	loader.Log = log
 
 	font, err := pdf.DefaultFont()
@@ -1394,7 +1392,7 @@ func RunRequest(ctx context.Context, req *convert.Request, log io.Writer) error 
 // Rendering and encoding stay private to imageout; render owns sequencing and
 // cancellation checks shared with the PDF pipeline.
 type imagePipeline struct {
-	req      *convert.Request
+	req      *Request
 	obj      *settings.PdfObject
 	loader   *load.Loader
 	font     *pdf.Font
@@ -1404,7 +1402,7 @@ type imagePipeline struct {
 }
 
 func (p *imagePipeline) RenderObjects(ctx context.Context) error {
-	imgSet := p.req.Image
+	imgSet := &p.req.Image
 
 	prep, media, err := prepareImageDocument(ctx, p.loader, p.obj, p.req.Global, imgSet, p.registry, p.log)
 	if err != nil {
@@ -1456,8 +1454,8 @@ func (p *imagePipeline) Finalize(context.Context) error {
 
 // writeEncodedOutput resolves the format, composites onto white for
 // transparent JPEG, and writes the encoded bytes to req.Output.
-func writeEncodedOutput(req *convert.Request, img image.Image, log io.Writer) error {
-	imgSet := req.Image
+func writeEncodedOutput(req *Request, img image.Image, log io.Writer) error {
+	imgSet := &req.Image
 
 	if req.Output == nil {
 		return errNilOutput

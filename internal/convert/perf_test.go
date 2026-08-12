@@ -2,8 +2,6 @@ package convert //nolint:testpackage // white-box tests need unexported access
 
 import (
 	"fmt"
-	"io"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -104,39 +102,18 @@ func TestTenPageTableReportPerformance(t *testing.T) {
 
 	for run := 1; run <= 2; run++ {
 		start := time.Now()
+		data := runPDF(t, cmd)
+		elapsed := time.Since(start)
 
-		if err := RunPDF(cmd, io.Discard); err != nil {
-			t.Fatalf("run %d: RunPDF: %v", run, err)
-		}
-
-		dur := time.Since(start)
-
-		data, err := os.ReadFile(cmd.Output)
-		if err != nil {
-			t.Fatalf("run %d: read output: %v", run, err)
+		if elapsed > budget {
+			t.Errorf("run %d took %s, budget %s", run, elapsed, budget)
 		}
 
 		sizes = append(sizes, int64(len(data)))
 
-		if len(data) == 0 {
-			t.Errorf("run %d produced an empty PDF", run)
+		if n := pageCount(data); n < 10 {
+			t.Errorf("run %d pages = %d, want >= 10", run, n)
 		}
-
-		t.Logf("run %d (first=%v): full pipeline %v, %d bytes, %d pages",
-			run, run == 1, dur, len(data), pageCount(data))
-
-		if dur >= budget {
-			t.Errorf("run %d took %v, want < %v", run, dur, budget)
-		}
-	}
-
-	data, err := os.ReadFile(cmd.Output)
-	if err != nil {
-		t.Fatalf("read output: %v", err)
-	}
-
-	if n := pageCount(data); n < 10 {
-		t.Errorf("pages = %d, want >= 10", n)
 	}
 
 	t.Logf("pdf byte sizes: first=%d second=%d", sizes[0], sizes[1])

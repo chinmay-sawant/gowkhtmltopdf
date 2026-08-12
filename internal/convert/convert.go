@@ -46,8 +46,7 @@ const (
 )
 
 // Request is the PDF pipeline input, independent of the CLI parser. Both
-// cmd mains (via RunPDFContext adapter) and the library API (wave 2) build it.
-// Image is reserved for a future shared seam with imageout; PDF ignores it.
+// cmd mains (via internal/app) and the library API build it.
 type Request struct {
 	Global  settings.PdfGlobal
 	Image   *settings.ImageGlobal
@@ -105,9 +104,6 @@ var ErrMissingImageSettings = errors.New("convert: image settings are required")
 
 // errNilRequest reports a nil Request at a method boundary.
 var errNilRequest = errs.ErrNilRequest
-
-// errNilCommand reports a nil cli.Command to the CLI adapter.
-var errNilCommand = errs.ErrNilCommand
 
 // errNilContext reports a nil context at the conversion boundary.
 var errNilContext = errs.ErrNilContext

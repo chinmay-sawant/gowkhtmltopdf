@@ -894,6 +894,7 @@ section.d03 .d03-gauge progress {
   font-family: var(--sans);
   font-size: 0.8rem;
   color: var(--ink);
+  accent-color: var(--d03-bar);
 }
 
 section.d03 .d03-gauge progress {

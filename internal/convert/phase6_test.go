@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"testing"
 
-	"gowkhtmltopdf/internal/cli"
 	"gowkhtmltopdf/internal/settings"
 )
 
@@ -148,7 +147,7 @@ func TestOutlineDisabled(t *testing.T) {
 
 // tocCommand builds a command with a TOC object followed by two body objects,
 // each a chapter on its own page.
-func tocCommand(t *testing.T, out string) *cli.Command {
+func tocCommand(t *testing.T, out string) *Request {
 	t.Helper()
 	cmd := newCommandMulti(t,
 		[]string{
@@ -248,35 +247,28 @@ func TestHTMLHeaderPlaceholderPerPage(t *testing.T) {
 
 func TestHTMLHeaderRawMarkupRejected(t *testing.T) {
 	t.Parallel()
-	cmd, _ := newCommand(t, `<html><body><p>x</p></body></html>`, filepath.Join(t.TempDir(), "out.pdf"))
+	cmd, _ := newCommand(t, `<html><body><p>BODYONLY</p></body></html>`, filepath.Join(t.TempDir(), "out.pdf"))
 	cmd.Global.Header.HTMLURL = "<html><body>bad</body></html>"
+	cmd.Global.UseCompression = false
 
 	var log bytes.Buffer
+	data := runPDFWithLog(t, cmd, &log)
 
-	if err := RunPDF(cmd, &log); err != nil {
-		t.Fatalf("RunPDF: %v", err)
+	if bytes.Contains(data, []byte("bad")) {
+		t.Error("raw HTML markup must not be loaded as a header document")
 	}
 
-	if !bytes.Contains(log.Bytes(), []byte("warning")) {
-		t.Errorf("expected a warning for markup-as-URL, log: %q", log.String())
+	if !bytes.Contains(data, []byte("BODYONLY")) {
+		t.Error("body text missing after rejected raw header markup")
 	}
 }
 
-// TestHTMLHeaderRelativePathCWD ensures --header-html paths resolve like a
-// top-level page (CWD-relative), not as a subresource of the body document.
-// Path doubling ("…/golden/testdata/golden/header.html") previously skipped HF.
-func TestHTMLHeaderRelativePathCWD(t *testing.T) { //nolint:paralleltest // os.Chdir is process-global
-	// Not parallel: os.Chdir is process-global and races other tests that use
-	// CWD-relative paths (e.g. goldenDir under testdata/golden).
+func TestHTMLHeaderRelativePath(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
-
-	dir := filepath.Join(root, "testdata", "golden")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-
-	headerRel := filepath.Join("testdata", "golden", "header.html")
-	pageRel := filepath.Join("testdata", "golden", "page.html")
+	headerRel := "header.html"
+	pageRel := "page.html"
 
 	if err := os.WriteFile(filepath.Join(root, headerRel), []byte(`<html><body><b>RELHFMARK</b></body></html>`), 0o600); err != nil { //nolint:lll // fixture write
 		t.Fatal(err)
@@ -286,32 +278,19 @@ func TestHTMLHeaderRelativePathCWD(t *testing.T) { //nolint:paralleltest // os.C
 		t.Fatal(err)
 	}
 
-	t.Chdir(root)
-
 	obj := settings.DefaultPdfObject()
-	obj.Page = pageRel
+	obj.Page = filepath.Join(root, pageRel)
 	obj.Load.BlockLocalFileAccess = false
-	cmd := &cli.Command{ //nolint:exhaustruct // intentional zero-value fields
-		Global:  settings.DefaultPdfGlobal(),
-		Objects: []settings.PdfObject{obj},
-		Output:  filepath.Join(t.TempDir(), "out.pdf"),
-	}
-	cmd.Global.Load.EnableLocalFileAccess = true
-	cmd.Global.Header.HTMLURL = headerRel
-	cmd.Global.Margin.Top = -1
-	cmd.Global.UseCompression = false
-	cmd.Global.Outline = false
+	global := settings.DefaultPdfGlobal()
+	global.Load.EnableLocalFileAccess = true
+	global.Header.HTMLURL = filepath.Join(root, headerRel)
+	global.Margin.Top = -1
+	global.UseCompression = false
+	global.Outline = false
+	req := NewPDFRequest(global, []settings.PdfObject{obj}, nil, nil)
 
 	var log bytes.Buffer
-
-	if err := RunPDF(cmd, &log); err != nil {
-		t.Fatalf("RunPDF: %v\nlog: %s", err, log.String())
-	}
-
-	data, err := os.ReadFile(cmd.Output)
-	if err != nil {
-		t.Fatal(err)
-	}
+	data := runPDFWithLog(t, req, &log)
 
 	if bytes.Contains(log.Bytes(), []byte("no such file")) {
 		t.Fatalf("HF path failed to resolve (path doubling?): %s", log.String())

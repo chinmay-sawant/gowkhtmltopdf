@@ -198,8 +198,23 @@ both tools.
 
 ---
 
+## Isolated worker profile (untrusted HTML)
+
+If you convert HTML you did not author, do not treat an in-process
+`Converter` as a complete SSRF/DoS boundary. Run each job in an isolated
+worker:
+
+| Control | Recommendation |
+|---|---|
+| Network | No host network. Egress deny-by-default; allow only the asset hosts you need |
+| Policy | `RestrictedNetworkPolicy()` or CLI `--restrict-network`; add `--allow-host` only for trusted internals |
+| Filesystem | Read-only root; no secrets mounts; local-file ACL left off |
+| Time | Per-job context timeout (30–60s typical) |
+| Size | Keep loader body cap (100 MiB default); add page/output budgets at the service layer |
+| Concurrency | Bound workers (e.g. 2–4 per container). `pdf.Document` is single-goroutine |
+
 ## See also
 
-- [THREAT-MODEL.md](THREAT-MODEL.md) - ACL matrix, timeouts, controls inventory  
-- [library-api.md](library-api.md) - `NewConverter` settings  
+- [THREAT-MODEL.md](THREAT-MODEL.md) - ACL matrix, timeouts, `NetworkPolicy`  
+- [library-api.md](library-api.md) - typed `RunPDF` / `SetNetworkPolicy`  
 - [getting-started.md](getting-started.md) - local file opt-in  

@@ -278,10 +278,16 @@ pointer-compare op sorts, zero-crossing split fast path.
 
 ### Direct CLI comparison: gowkhtmltopdf vs wkhtmltopdf
 
-Fresh process-level measurements on 2026-08-09 used identical report fixtures,
-three runs per size, and `/usr/bin/time` for wall time and peak RSS. The Go
-binary was built from the current source; wkhtmltopdf was 0.12.6.1. All output
-files passed the expected page-count check.
+The 2026-08-09 table below is **historical pre-CR-02 / island-era CLI**.
+Ordinary CLI documents no longer take the page-island path. Current generic
+vs certified-islands numbers live in
+[testdata/golden/benchmarks/README.md](testdata/golden/benchmarks/README.md)
+(Snapshot D and later snapshots). Snapshot D generic 500-page process RSS
+was 54,632 KiB / 960 ms on that host.
+
+Historical 2026-08-09 process-level measurements used identical report fixtures,
+three runs per size, and `/usr/bin/time` for wall time and peak RSS. wkhtmltopdf
+was 0.12.6.1. All output files passed the expected page-count check.
 
 | Pages | Gowk time | wkhtmltopdf time | Gowk RSS | wkhtmltopdf RSS |
 |---:|---:|---:|---:|---:|
@@ -340,9 +346,10 @@ go tool pprof -top /tmp/cpu.pprof
 
 `VERSION` (currently `0.1.0`) is the single source of truth for this project's
 release number. The CLI `--version` output is stamped at build time with `-X`;
-an unstamped build reports the `0.1.0-dev` fallback. The library's
-`LibraryVersion` is a separate compatibility identifier for the upstream
-wkhtmltopdf 0.12.x settings surface; it is not the project release number.
+`make build` stamps `VERSION` into `--version`. An unstamped `go test` /
+`go run` also reports `0.1.0`. The library's `LibraryVersion` is a separate
+compatibility identifier for the upstream wkhtmltopdf 0.12.x settings
+surface; it is not the project release number.
 
 ```sh
 go build -ldflags "-X gowkhtmltopdf/internal/cli.Version=$(cat VERSION)" ./cmd/gowkhtmltopdf ./cmd/gowkhtmltoimage
@@ -436,6 +443,10 @@ parity remains **not planned**.
 ## License
 
 [MIT License](LICENSE) - Copyright (c) 2026 **Chinmay Sawant**.
+
+Bundled Liberation and DejaVu fonts are SIL OFL / Bitstream Vera; see
+[internal/pdf/assets/NOTICE](internal/pdf/assets/NOTICE). The Noto KR test
+subset ships `testdata/fonts/OFL.txt`.
 
 Independent clean-room reimplementation of the wkhtmltopdf CLI/behavior
 (wkhtmltopdf itself is LGPL; see the license note in
