@@ -1349,7 +1349,6 @@ func (e *engine) verticalWritingHeight(contentStart int, current float64, style 
 	return current
 }
 
-//nolint:cyclop // native widget value normalization and paint
 func (e *engine) paintValueWidget(node *html.Node, style ResolvedStyle, leftX, topY, width, height float64) {
 	minValue, maxValue := 0.0, 1.0
 	if node.Name == htmlMeter {

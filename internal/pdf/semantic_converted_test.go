@@ -2,6 +2,7 @@ package pdf_test
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"gowkhtmltopdf/internal/settings"
 )
 
+//nolint:cyclop,funlen // table-driven oracle fixtures share assertion logic
 func TestSemanticPDFOracleConvertedFixtures(t *testing.T) {
 	t.Parallel()
 
@@ -23,30 +25,30 @@ func TestSemanticPDFOracleConvertedFixtures(t *testing.T) {
 		image    bool
 		dest     bool
 	}{
-		{
+		{ //nolint:exhaustruct // zero-value fields not exercised by this case
 			file:     "fixture-01-simple-invoice.html",
 			minPages: 1,
 			needles:  []string{"Invoice", "234.40"},
 		},
-		{
+		{ //nolint:exhaustruct // zero-value fields not exercised by this case
 			file:     "fixture-06-external-link.html",
 			minPages: 1,
 			needles:  []string{"Partner Handbook"},
 			uri:      true,
 		},
-		{
+		{ //nolint:exhaustruct // zero-value fields not exercised by this case
 			file:     "fixture-07-image-logo.html",
 			minPages: 1,
 			needles:  []string{"Nordwind"},
 			image:    true,
 		},
-		{
+		{ //nolint:exhaustruct // zero-value fields not exercised by this case
 			file:     "fixture-24-internal-anchors.html",
 			minPages: 2,
 			needles:  []string{"Internal link report", "Appendix"},
 			dest:     true,
 		},
-		{
+		{ //nolint:exhaustruct // zero-value fields not exercised by this case
 			file:     "fixture-55-lantern-cooperative-report.html",
 			minPages: 3,
 			needles:  []string{"NORTHLINE"},
@@ -58,6 +60,7 @@ func TestSemanticPDFOracleConvertedFixtures(t *testing.T) {
 			t.Parallel()
 
 			data := convertGoldenFixture(t, testCase.file)
+
 			doc, err := pdf.ParseSemantic(data)
 			if err != nil {
 				t.Fatalf("ParseSemantic: %v", err)
@@ -68,6 +71,7 @@ func TestSemanticPDFOracleConvertedFixtures(t *testing.T) {
 			}
 
 			text := doc.DocumentText()
+
 			pos := 0
 			for _, needle := range testCase.needles {
 				idx := strings.Index(text[pos:], needle)
@@ -99,6 +103,7 @@ func convertGoldenFixture(t *testing.T, file string) []byte {
 	t.Helper()
 
 	golden := filepath.Join("..", "..", "testdata", "golden")
+
 	dir := t.TempDir()
 	if err := copyTree(golden, dir); err != nil {
 		t.Fatalf("copy golden tree: %v", err)
@@ -115,6 +120,7 @@ func convertGoldenFixture(t *testing.T, file string) []byte {
 	global.Background = true
 
 	var out bytes.Buffer
+
 	req := convert.NewPDFRequest(global, []settings.PdfObject{obj}, &out, nil)
 	if err := convert.Run(t.Context(), req, discardWriter{}, nil); err != nil {
 		t.Fatalf("convert.Run(%s): %v", file, err)
@@ -130,7 +136,7 @@ func (discardWriter) Write(p []byte) (int, error) { return len(p), nil }
 func copyTree(src, dst string) error {
 	entries, err := os.ReadDir(src)
 	if err != nil {
-		return err
+		return fmt.Errorf("read golden dir %s: %w", src, err)
 	}
 
 	for _, entry := range entries {
@@ -139,7 +145,7 @@ func copyTree(src, dst string) error {
 
 		if entry.IsDir() {
 			if err := os.MkdirAll(destinationPath, 0o700); err != nil {
-				return err
+				return fmt.Errorf("mkdir %s: %w", destinationPath, err)
 			}
 
 			if err := copyTree(sourcePath, destinationPath); err != nil {
@@ -151,11 +157,11 @@ func copyTree(src, dst string) error {
 
 		content, err := os.ReadFile(sourcePath)
 		if err != nil {
-			return err
+			return fmt.Errorf("read %s: %w", sourcePath, err)
 		}
 
 		if err := os.WriteFile(destinationPath, content, 0o600); err != nil {
-			return err
+			return fmt.Errorf("write %s: %w", destinationPath, err)
 		}
 	}
 

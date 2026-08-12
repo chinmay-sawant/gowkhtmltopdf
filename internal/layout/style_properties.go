@@ -914,6 +914,7 @@ func applyColorGroup(
 	return applyColorBackgroundProps(style, prop, value)
 }
 
+//nolint:cyclop // foreground props are a flat mapping over color candidates
 func applyColorForegroundProps(style *ResolvedStyle, prop, value string, parent *ResolvedStyle, hasParent bool) bool {
 	switch prop {
 	case "color":

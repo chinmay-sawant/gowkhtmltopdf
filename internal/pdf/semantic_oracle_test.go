@@ -1,4 +1,4 @@
-//nolint:testpackage,cyclop,err113,exhaustruct,varnamelen,wsl,funlen,perfsprint,nlreturn // test-only parser
+//nolint:testpackage,cyclop,varnamelen,wsl // test-only parser
 package pdf
 
 import (

@@ -1223,7 +1223,9 @@ func (f *fakeResolver) LookupIP(_ context.Context, _, host string) ([]net.IP, er
 		return ips, nil
 	}
 
-	return nil, &net.DNSError{Err: "no such host", Name: host, IsNotFound: true}
+	return nil, &net.DNSError{ //nolint:exhaustruct // stdlib error type with many optional fields
+		Err: "no such host", Name: host, IsNotFound: true,
+	}
 }
 
 func newRestrictedLoader(t *testing.T, resolver load.IPResolver) *load.Loader {
@@ -1242,12 +1244,12 @@ func newRestrictedLoader(t *testing.T, resolver load.IPResolver) *load.Loader {
 	return loader
 }
 
-func TestRestrictedPinnedDialNeverRedialsHostname(t *testing.T) { //nolint:exhaustruct,err113,lll,wsl // fake resolver
+func TestRestrictedPinnedDialNeverRedialsHostname(t *testing.T) {
 	t.Parallel()
 
 	const publicHost = "public.example.test"
 
-	resolver := &fakeResolver{ips: map[string][]net.IP{
+	resolver := &fakeResolver{ips: map[string][]net.IP{ //nolint:exhaustruct // calls field filled by LookupIP under test
 		publicHost: {net.ParseIP("93.184.216.34")},
 	}}
 	loader := newRestrictedLoader(t, resolver)
@@ -1257,7 +1259,7 @@ func TestRestrictedPinnedDialNeverRedialsHostname(t *testing.T) { //nolint:exhau
 	loader.SetTestDial(func(_ context.Context, _, address string) (net.Conn, error) {
 		dialed = append(dialed, address)
 
-		return nil, errors.New("dial blocked in test")
+		return nil, errors.New("dial blocked in test") //nolint:err113 // test-local sentinel with dynamic context
 	})
 
 	_, err := loader.Load(t.Context(), "http://"+publicHost+"/", defaultLP())
@@ -1289,7 +1291,7 @@ func TestRestrictedPinnedDialNeverRedialsHostname(t *testing.T) { //nolint:exhau
 	}
 }
 
-func TestRestrictedBlocksPrivateResolvedRecords(t *testing.T) { //nolint:exhaustruct,wsl // fake resolver
+func TestRestrictedBlocksPrivateResolvedRecords(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
@@ -1308,7 +1310,7 @@ func TestRestrictedBlocksPrivateResolvedRecords(t *testing.T) { //nolint:exhaust
 			t.Parallel()
 
 			host := testCase.name + ".private.test"
-			resolver := &fakeResolver{ips: map[string][]net.IP{
+			resolver := &fakeResolver{ips: map[string][]net.IP{ //nolint:exhaustruct // calls field filled by LookupIP under test
 				host: {net.ParseIP(testCase.ip)},
 			}}
 			loader := newRestrictedLoader(t, resolver)
@@ -1321,25 +1323,27 @@ func TestRestrictedBlocksPrivateResolvedRecords(t *testing.T) { //nolint:exhaust
 	}
 }
 
-func TestRestrictedBlocksMixedPublicAndLoopbackRecords(t *testing.T) { //nolint:exhaustruct,lll,wsl // fake resolver
+func TestRestrictedBlocksMixedPublicAndLoopbackRecords(t *testing.T) {
 	t.Parallel()
 
-	resolver := &fakeResolver{ips: map[string][]net.IP{
+	resolver := &fakeResolver{ips: map[string][]net.IP{ //nolint:exhaustruct // calls field filled by LookupIP under test
 		"mixed.example.test": {net.ParseIP("93.184.216.34"), net.ParseIP("127.0.0.1")},
 	}}
 	loader := newRestrictedLoader(t, resolver)
 
-	if _, err := loader.Load(t.Context(), "http://mixed.example.test/", defaultLP()); !errors.Is(err, load.ErrNetworkPolicy) {
+	_, err := loader.Load(t.Context(), "http://mixed.example.test/", defaultLP())
+	if !errors.Is(err, load.ErrNetworkPolicy) {
 		t.Fatalf("error = %v, want ErrNetworkPolicy", err)
 	}
 }
 
-func TestRestrictedProxyToPrivateTargetDenied(t *testing.T) { //nolint:wsl // focused denial
+func TestRestrictedProxyToPrivateTargetDenied(t *testing.T) {
 	t.Parallel()
 
 	global := settings.LoadGlobal{ //nolint:exhaustruct
 		Proxy: "http://127.0.0.1:9",
 	}
+
 	loader, err := load.NewLoaderWithNetworkPolicy(global, load.RestrictedNetworkPolicy())
 	if err != nil {
 		t.Fatal(err)
@@ -1351,14 +1355,15 @@ func TestRestrictedProxyToPrivateTargetDenied(t *testing.T) { //nolint:wsl // fo
 	}
 }
 
-func TestRestrictedWildcardAllowlistStillBlocksPrivateIP(t *testing.T) { //nolint:exhaustruct,wsl // fake resolver
+func TestRestrictedWildcardAllowlistStillBlocksPrivateIP(t *testing.T) {
 	t.Parallel()
 
-	resolver := &fakeResolver{ips: map[string][]net.IP{
+	resolver := &fakeResolver{ips: map[string][]net.IP{ //nolint:exhaustruct // calls field filled by LookupIP under test
 		"evil.com": {net.ParseIP("127.0.0.1")},
 	}}
 	policy := load.RestrictedNetworkPolicy()
 	policy.AllowedHosts = []string{"*.com"}
+
 	loader, err := load.NewLoaderWithNetworkPolicy(
 		settings.LoadGlobal{}, //nolint:exhaustruct
 		policy,
@@ -1374,7 +1379,7 @@ func TestRestrictedWildcardAllowlistStillBlocksPrivateIP(t *testing.T) { //nolin
 	}
 }
 
-func TestRestrictedExactAllowlistPermitsPrivateLiteral(t *testing.T) { //nolint:dupl // counterpart of explicit-host test
+func TestRestrictedExactAllowlistPermitsPrivateLiteral(t *testing.T) { //nolint:dupl // mirrors explicit-host test
 	t.Parallel()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(respWriter http.ResponseWriter, _ *http.Request) {

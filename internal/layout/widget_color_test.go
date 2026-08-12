@@ -1,3 +1,4 @@
+//nolint:testpackage // layoutHTML/sheet test helpers and Result.Ops internals are tested from the same package
 package layout
 
 import (
@@ -13,15 +14,19 @@ func TestProgressUsesAccentColorNotD03Token(t *testing.T) {
 	)
 
 	var saw bool
+
 	for _, op := range res.Ops {
 		if op.Kind != OpFillRect {
 			continue
 		}
+
 		if approx(op.R, 204.0/255) && approx(op.G, 51.0/255) && approx(op.B, 102.0/255) {
 			saw = true
+
 			break
 		}
 	}
+
 	if !saw {
 		t.Fatal("progress fill did not use authored accent-color #cc3366")
 	}
@@ -32,5 +37,6 @@ func approx(got, want float64) bool {
 	if d < 0 {
 		d = -d
 	}
+
 	return d < 0.02
 }

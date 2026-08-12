@@ -24,7 +24,7 @@ const (
 	valueBefore        = "before"
 	valueAfter         = "after"
 	mutatedNetworkHost = "mutated.example.test"
-	valueMutated = "mutated"
+	valueMutated       = "mutated"
 )
 
 // writeHTML writes a temp HTML file and returns its path.

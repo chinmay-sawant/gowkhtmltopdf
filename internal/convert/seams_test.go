@@ -2,7 +2,6 @@ package convert //nolint:testpackage // white-box tests need unexported access
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -34,7 +33,7 @@ func TestRunValidatesRenderableObjectsBeforeContext(t *testing.T) {
 		Output: &bytes.Buffer{},
 	}
 
-	err := Run(context.Background(), req, io.Discard, nil) //nolint:staticcheck // nil-context behavior is the assertion
+	err := Run(t.Context(), req, io.Discard, nil)
 	if !errors.Is(err, ErrNoRenderableObjects) {
 		t.Fatalf("Run error = %v, want errors.Is(..., %v)", err, ErrNoRenderableObjects)
 	}

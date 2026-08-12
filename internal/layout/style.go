@@ -151,7 +151,7 @@ type ResolvedStyle struct {
 	// when the property is absent so widgets can keep their default fill.
 	AccentColor    [3]float64
 	AccentColorSet bool
-	FontFamily                                                                                 []string
+	FontFamily     []string
 	// famHash is the FNV-1a fingerprint of FontFamily, computed once during
 	// style resolution. Text measurement reuses
 	// it instead of re-hashing the family list per run.

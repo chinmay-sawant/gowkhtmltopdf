@@ -101,6 +101,7 @@ func TestFixture28FlexWrapGridItemsStayInFirstPageLayout(t *testing.T) {
 	}
 }
 
+//nolint:cyclop // fixture assertions follow the fixture's request order
 func TestFixture43CardsAndTheadDoNotOverlap(t *testing.T) {
 	t.Parallel()
 
