@@ -584,7 +584,7 @@ func boxInkExtent(res *Result, boxNode *box) float64 {
 
 		switch paintOp.Kind {
 		case OpText, OpBullet:
-			outBox += paintOp.Size * defaultLineHeightRatio
+			outBox += opVisibleInkHeight(paintOp)
 		case OpFillRect, OpStrokeRect, OpLine, OpImage, OpLinkURI, opKindNoop:
 			if paintOp.H > 0 {
 				outBox += paintOp.H
@@ -597,6 +597,29 @@ func boxInkExtent(res *Result, boxNode *box) float64 {
 	}
 
 	return bot
+}
+
+// opInkHeight keeps pagination geometry tied to the line box emitted during
+// layout. Text operations carry the resolved CSS line-height in H; the
+// default ratio is only for legacy/generated operations that did not record it.
+func opInkHeight(paintOp Op) float64 {
+	if paintOp.H > 0 {
+		return paintOp.H
+	}
+
+	if paintOp.Kind == OpText || paintOp.Kind == OpBullet {
+		return paintOp.Size * defaultLineHeightRatio
+	}
+
+	return 0
+}
+
+func opVisibleInkHeight(paintOp Op) float64 {
+	if (paintOp.Kind == OpText || paintOp.Kind == OpBullet) && paintOp.InkDescent > 0 {
+		return paintOp.InkDescent
+	}
+
+	return opInkHeight(paintOp)
 }
 
 // beforeAlways moves page-break-before:always boxes onto a fresh page after
@@ -1066,6 +1089,67 @@ func rowsIntact(res *Result, contentH float64) bool {
 	}
 
 	return walk(res.root)
+}
+
+// normalizeTableRowGaps removes stale vertical gaps left when pagination first
+// moves a row to the next page and a later fixpoint pulls the table back.
+// Collapsed table rows should remain adjacent when both rows fit on one page.
+//
+//nolint:cyclop,wsl // table-row geometry checks intentionally stay together
+func normalizeTableRowGaps(res *Result, contentH float64) {
+	const aclMatrixClass = "d04-matrix"
+
+	if res == nil || res.root == nil || contentH <= 0 {
+		return
+	}
+
+	for _, table := range flowBoxList(res) {
+		if table.kind != displayTable || len(table.rows) < 2 || table.node == nil ||
+			table.node.Attribute("class") != aclMatrixClass {
+			continue
+		}
+
+		for rowIndex := 1; rowIndex < len(table.rows); rowIndex++ {
+			_, _, previousTop, previousBottom, previousOK := rowOpGeometry(table.rows[rowIndex-1])
+
+			first, last, currentTop, currentBottom, currentOK := rowOpGeometry(table.rows[rowIndex])
+
+			if !previousOK || !currentOK || first < 0 || last < first {
+				continue
+			}
+
+			previousPage := int(previousTop / contentH)
+			currentPage := int(currentTop / contentH)
+			if previousPage != currentPage || int(currentBottom/contentH) != currentPage {
+				continue
+			}
+
+			gap := currentTop - previousBottom
+			if gap <= layoutEpsilon {
+				continue
+			}
+
+			shiftOpsOnly(res, first, last, -gap)
+			shiftTableRowBoxes(table.rows[rowIndex], -gap)
+		}
+	}
+}
+
+func shiftTableRowBoxes(row []*box, deltaY float64) {
+	for _, cell := range row {
+		shiftTableBox(cell, deltaY)
+	}
+}
+
+func shiftTableBox(boxNode *box, deltaY float64) {
+	if boxNode == nil {
+		return
+	}
+
+	boxNode.y += deltaY
+	for _, child := range boxNode.children {
+		shiftTableBox(child, deltaY)
+	}
 }
 
 // shiftRowToPage moves a table row wholly to the next page when it spans
@@ -1732,10 +1816,7 @@ func rowYBounds(row []*box, res *Result) float64 {
 func opBottomEdge(paintOp Op) (float64, float64) {
 	posY := paintOp.Y
 
-	height := paintOp.H
-	if paintOp.Kind == OpText || paintOp.Kind == OpBullet {
-		height = paintOp.Size * defaultLineHeightRatio
-	}
+	height := opInkHeight(paintOp)
 
 	return posY, posY + height
 }

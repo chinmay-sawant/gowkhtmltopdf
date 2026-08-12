@@ -841,8 +841,7 @@ func (e *engine) lineMetrics(line []inlineItem, lineY float64) (float64, float64
 			continue
 		}
 
-		ascent := e.fontAscent(item.style.FontSize * e.scale)
-		descent := e.fontDescent(item.style.FontSize * e.scale)
+		ascent, descent := e.inlineFontMetrics(item.text, *item.style)
 		lh := lineHeightOf(item.style) * e.scale
 
 		extra := (lh - ascent - descent) / two

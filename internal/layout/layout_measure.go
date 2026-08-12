@@ -396,8 +396,18 @@ func (m *cellMeasure) walkBlockChildren(nodeN *html.Node, childCS ResolvedStyle,
 	}
 
 	childNowrap := nowrap || childCS.WhiteSpace == cssWhiteSpaceNowrap || childCS.WhiteSpace == cssWhiteSpacePre
+
 	for _, child := range nodeN.Children {
-		m.walk(child, childCS, childNowrap)
+		childStyle := childCS
+
+		if child.Type == html.ElementNode {
+			if resolved := m.engine.styles[child]; resolved != nil {
+				childStyle = *resolved
+			}
+		}
+
+		m.walk(child, childStyle, childNowrap || childStyle.WhiteSpace == cssWhiteSpaceNowrap ||
+			childStyle.WhiteSpace == cssWhiteSpacePre)
 	}
 
 	if blockish {

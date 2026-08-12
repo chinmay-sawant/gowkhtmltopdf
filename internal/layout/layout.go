@@ -273,6 +273,14 @@ const (
 	OpBullet
 )
 
+// Stroke masks are used only by rounded border display-list operations.
+const (
+	StrokeMaskTop uint8 = 1 << iota
+	StrokeMaskRight
+	StrokeMaskBottom
+	StrokeMaskLeft
+)
+
 // Op is one display-list operation. Coordinates are in canvas points; for
 // OpText and OpBullet, Y is the baseline.
 type Op struct {
@@ -288,6 +296,10 @@ type Op struct {
 	R, G, B float64 // 0..1
 	Alpha   float64
 	Width   float64 // stroke width for OpLine
+	// StrokeMask selects sides for a rounded OpStrokeRect. Zero means the
+	// complete rounded rectangle; non-zero masks are used for mixed CSS
+	// borders whose accented side must retain its corner arcs.
+	StrokeMask uint8
 
 	Text string
 	Font *pdf.Font
@@ -325,6 +337,10 @@ type Op struct {
 	// RotateDeg rotates the glyph around its baseline origin (PDF text matrix).
 	// Independent of CSS transform CTM (which wraps the whole op via Xform).
 	RotateDeg float64
+	// InkDescent is the glyph descent below the baseline. H remains the line
+	// box height; pagination uses this narrower metric for generated text so a
+	// line is not moved merely because its leading crosses a page boundary.
+	InkDescent float64
 
 	// Xform is a baked canvas-space CSS 2D transform (identity if unset).
 	// Applied at paint via PDF cm (see pdfCTMFromCSS). Sibling flow unaffected.
@@ -334,7 +350,9 @@ type Op struct {
 	// PaintOpacity is element opacity (CSS opacity / filter:opacity), 0..1.
 	// 0 or unset (≥1) means fully opaque. Nested opacities are multiplied.
 	PaintOpacity float64
-	Radius       float64 // uniform border radius for rounded fill/stroke rectangles
+	// Radius is the uniform border radius for rounded fill/stroke rectangles.
+	Radius                                                             float64
+	RadiusTopLeft, RadiusTopRight, RadiusBottomRight, RadiusBottomLeft float64
 }
 
 type engine struct {
@@ -1269,7 +1287,8 @@ func (e *engine) paintPositionedPseudo( //nolint:cyclop
 	e.add(Op{ //nolint:exhaustruct // generated pseudo text has no DOM box
 		Kind: OpText, X: pseudoX, Y: baseline, W: e.measureTextFace(text, *style),
 		H: style.LineHeight * e.scale, Text: text, Font: face, Size: size,
-		R: style.Color[0], G: style.Color[1], B: style.Color[2],
+		InkDescent: e.fontDescentFace(face, size),
+		R:          style.Color[0], G: style.Color[1], B: style.Color[2],
 		Bold: style.FontWeight >= fontWeightBold,
 	})
 	e.popZ(prevZ, prevSet, prevPositioned)

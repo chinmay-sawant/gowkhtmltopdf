@@ -9,6 +9,12 @@ import (
 	"gowkhtmltopdf/internal/css"
 )
 
+const (
+	borderRadiusValueCount  = 4
+	borderRadiusPairCount   = 2
+	borderRadiusTripleCount = 3
+)
+
 func applyDisplayGroup(
 	style *ResolvedStyle, prop, value string, _ float64, _ *styleContext, _ *ResolvedStyle, _ bool,
 ) bool {
@@ -729,20 +735,60 @@ func applyBorderGroup(
 	}
 }
 
+//nolint:cyclop // CSS shorthand parsing and expansion are one atomic property operation
 func setBorderRadius(style *ResolvedStyle, value string, fsize float64) bool {
 	parts := strings.Fields(value)
 	if len(parts) == 0 {
 		return true
 	}
 
-	if v, unit, ok := css.ParseLength(parts[0]); ok {
-		if unit == "%" {
-			style.BorderRadius = 0
-			style.BorderRadiusPercent = v
-		} else if radius, ok := lengthBox(parts[0], fsize, 0, cssDisplayNone); ok && radius >= 0 {
-			style.BorderRadius = radius
-			style.BorderRadiusPercent = -1
+	values := make([]float64, 0, len(parts))
+
+	for _, part := range parts {
+		if _, unit, ok := css.ParseLength(part); ok && unit == "%" {
+			// Percentage corner radii retain the existing uniform fallback;
+			// absolute asymmetric radii are represented independently below.
+			if v, _, ok := css.ParseLength(part); ok && v >= 0 {
+				style.BorderRadius = 0
+				style.BorderRadiusPercent = v
+			}
+
+			return true
 		}
+
+		radius, ok := lengthBox(part, fsize, 0, cssDisplayNone)
+		if !ok || radius < 0 {
+			return true
+		}
+
+		values = append(values, radius)
+	}
+
+	if len(values) == 0 {
+		return true
+	}
+
+	for len(values) < borderRadiusValueCount {
+		switch len(values) {
+		case 1:
+			values = append(values, values[0], values[0], values[0])
+		case borderRadiusPairCount:
+			values = append(values, values[0], values[1])
+		case borderRadiusTripleCount:
+			values = append(values, values[1])
+		}
+	}
+
+	style.BorderRadiusTopLeft = values[0]
+	style.BorderRadiusTopRight = values[1]
+	style.BorderRadiusBottomRight = values[2]
+	style.BorderRadiusBottomLeft = values[3]
+	style.BorderRadiusPercent = -1
+
+	if values[0] == values[1] && values[1] == values[2] && values[2] == values[3] {
+		style.BorderRadius = values[0]
+	} else {
+		style.BorderRadius = 0
 	}
 
 	return true

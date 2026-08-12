@@ -99,9 +99,6 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 	}
 
 	opPage := paginateOps(res, contentH)
-	// Page-break shifts can move a descendant below its original block
-	// geometry. Reconcile owned chrome before rects are split into page
-	// fragments so section rails and callout borders follow the final flow.
 	stretchPaginatedChrome(res)
 
 	if err := validatePaintPageIndices(res.Ops, contentH); err != nil {
@@ -117,6 +114,7 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 	// Drop row shells left behind when text snapped to the next page
 	// (fixture-31: empty white rows after Row 27 on page 1).
 	stripOrphanRowChrome(res, contentH)
+	stretchPaginatedChrome(res)
 
 	// Close open tops on table continuations after rowspan/vertical splits.
 	capTablePageBreaks(res, contentH)
@@ -124,6 +122,7 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 	// Print-scoped sticky: clamp the natural fragment without fixed-style
 	// continuation clones.
 	applyStickyPrint(res, contentH)
+	stretchPaginatedChrome(res)
 
 	if err := validatePaintPageIndices(res.Ops, contentH); err != nil {
 		return err
@@ -813,8 +812,8 @@ func drawFill(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintO
 	x, y := canvasToPDF(op.X, op.Y+op.H, pageIdx, contentH, opts, pageH)
 	ps := StyleOf(op)
 	c.SetFillColor(ps.FillR, ps.FillG, ps.FillB)
-	if op.Radius > 0 {
-		roundedRectPath(c, x, y, op.W, op.H, op.Radius)
+	if op.Radius > 0 || opHasRoundedCorners(op) {
+		roundedRectPathCorners(c, x, y, op.W, op.H, opRadii(op))
 	} else {
 		c.Rect(x, y, op.W, op.H)
 	}
@@ -830,41 +829,204 @@ func drawStroke(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts Pain
 		width = 1
 	}
 	c.SetLineWidth(width)
-	if op.Radius > 0 {
-		roundedRectPath(c, x, y, op.W, op.H, op.Radius)
+	if op.StrokeMask == StrokeMaskTop {
+		c.SetLineCap(1)
+		roundedTopPath(c, x, y, op.W, op.H, width, opRadii(op))
+		c.Stroke()
+		c.SetLineCap(0)
+
+		return
+	}
+	if op.StrokeMask == StrokeMaskLeft {
+		if opHasRoundedCorners(op) {
+			c.SetLineCap(1)
+		}
+		roundedLeftPath(c, x, y, op.H, width, opRadii(op))
+		c.Stroke()
+		c.SetLineCap(0)
+
+		return
+	}
+	if op.Radius > 0 || opHasRoundedCorners(op) {
+		roundedRectPathCorners(c, x, y, op.W, op.H, opRadii(op))
 	} else {
 		c.Rect(x, y, op.W, op.H)
 	}
 	c.Stroke()
 }
 
-//nolint:varnamelen,mnd // PDF path helper mirrors the standard Bezier approximation
-func roundedRectPath(c *pdf.Content, x, y, width, height, radius float64) {
+// roundedTopPath emits the top edge and its two corner arcs in PDF
+// coordinates. It is an open path because the remaining edges may use a
+// different CSS border style.
+//
+//nolint:varnamelen // PDF path builder uses conventional short receiver names
+func roundedTopPath(
+	c *pdf.Content,
+	originX, originY, boxWidth, boxHeight, strokeWidth float64,
+	radii [4]float64,
+) {
 	const kappa = 0.5522847498
 
-	if radius <= 0 {
-		c.Rect(x, y, width, height)
+	strokeInset := strokeWidth / 2 //nolint:mnd // half the stroke width insets the centerline radius
+	leftRadius := math.Max(radii[0]-strokeInset, 0)
+	rightRadius := math.Max(radii[1]-strokeInset, 0)
+	topY := originY + boxHeight
+	rightX := originX + boxWidth
+
+	if leftRadius <= 0 {
+		c.MoveTo(originX, topY)
+	} else {
+		c.MoveTo(originX, topY-leftRadius)
+		c.CurveTo(
+			originX, topY-leftRadius+kappa*leftRadius,
+			originX+leftRadius-kappa*leftRadius, topY,
+			originX+leftRadius, topY,
+		)
+	}
+
+	c.LineTo(rightX-rightRadius, topY)
+
+	if rightRadius > 0 {
+		c.CurveTo(
+			rightX-rightRadius+kappa*rightRadius, topY,
+			rightX, topY-rightRadius+kappa*rightRadius,
+			rightX, topY-rightRadius,
+		)
+	} else {
+		c.LineTo(rightX, topY)
+	}
+}
+
+// roundedLeftPath emits the left edge and its two corner arcs in PDF
+// coordinates. It is open because the remaining edges may use other paint.
+//
+//nolint:varnamelen // PDF path builder uses conventional geometry names
+func roundedLeftPath(
+	c *pdf.Content,
+	originX, originY, boxHeight, strokeWidth float64,
+	radii [4]float64,
+) {
+	const kappa = 0.5522847498
+
+	strokeInset := strokeWidth / 2 //nolint:mnd // half the stroke width insets the centerline radius
+	originX += strokeInset
+	topRadius := math.Max(radii[0]-strokeInset, 0)
+	bottomRadius := math.Max(radii[3]-strokeInset, 0)
+	topY := originY + boxHeight
+
+	if bottomRadius > 0 {
+		c.MoveTo(originX+bottomRadius, originY)
+		c.CurveTo(
+			originX+bottomRadius-kappa*bottomRadius, originY,
+			originX, originY+bottomRadius-kappa*bottomRadius,
+			originX, originY+bottomRadius,
+		)
+	} else {
+		c.MoveTo(originX, originY)
+	}
+
+	c.LineTo(originX, topY-topRadius)
+
+	if topRadius > 0 {
+		c.CurveTo(
+			originX, topY-topRadius+kappa*topRadius,
+			originX+topRadius-kappa*topRadius, topY,
+			originX+topRadius, topY,
+		)
+	} else {
+		c.LineTo(originX, topY)
+	}
+}
+
+func opRadii(op *Op) [4]float64 {
+	if op.RadiusTopLeft == 0 && op.RadiusTopRight == 0 && op.RadiusBottomRight == 0 && op.RadiusBottomLeft == 0 {
+		return [4]float64{op.Radius, op.Radius, op.Radius, op.Radius}
+	}
+
+	return [4]float64{op.RadiusTopLeft, op.RadiusTopRight, op.RadiusBottomRight, op.RadiusBottomLeft}
+}
+
+func opHasRoundedCorners(op *Op) bool {
+	for _, radius := range opRadii(op) {
+		if radius > 0 {
+			return true
+		}
+	}
+
+	return false
+}
+
+// roundedRectPathCorners emits a PDF path for CSS order: top-left,
+// top-right, bottom-right, bottom-left. PDF's origin is bottom-left here.
+//
+//nolint:varnamelen // PDF path helper mirrors the standard Bezier approximation
+func roundedRectPathCorners(c *pdf.Content, originX, originY, width, height float64, radii [4]float64) {
+	const (
+		kappa = 0.5522847498
+		half  = 2.0
+	)
+
+	if !opRadiiPositive(radii) {
+		c.Rect(originX, originY, width, height)
 
 		return
 	}
 
-	if radius > width/2 {
-		radius = width / 2
+	for i := range radii {
+		if radii[i] < 0 {
+			radii[i] = 0
+		}
 	}
 
-	if radius > height/2 {
-		radius = height / 2
+	// Clamp each corner to the local box dimensions. Layout already applies
+	// CSS's adjacent-radii scaling; this protects hand-built ops as well.
+	for i := range radii {
+		if radii[i] > width/half {
+			radii[i] = width / half
+		}
+
+		if radii[i] > height/half {
+			radii[i] = height / half
+		}
 	}
 
-	c.MoveTo(x+radius, y)
-	c.LineTo(x+width-radius, y)
-	c.CurveTo(x+width-radius+kappa*radius, y, x+width, y+radius-kappa*radius, x+width, y+radius)
-	c.LineTo(x+width, y+height-radius)
-	c.CurveTo(x+width, y+height-radius+kappa*radius, x+width-radius+kappa*radius, y+height, x+width-radius, y+height)
-	c.LineTo(x+radius, y+height)
-	c.CurveTo(x+radius-kappa*radius, y+height, x, y+height-radius+kappa*radius, x, y+height-radius)
-	c.LineTo(x, y+radius)
-	c.CurveTo(x, y+radius-kappa*radius, x+radius-kappa*radius, y, x+radius, y)
+	topLeft, topRight := radii[0], radii[1]
+	bottomRight, bottomLeft := radii[2], radii[3]
+	c.MoveTo(originX+bottomLeft, originY)
+	c.LineTo(originX+width-bottomRight, originY)
+	c.CurveTo(
+		originX+width-bottomRight+kappa*bottomRight, originY,
+		originX+width, originY+bottomRight-kappa*bottomRight,
+		originX+width, originY+bottomRight,
+	)
+	c.LineTo(originX+width, originY+height-topRight)
+	c.CurveTo(
+		originX+width, originY+height-topRight+kappa*topRight,
+		originX+width-topRight+kappa*topRight, originY+height,
+		originX+width-topRight, originY+height,
+	)
+	c.LineTo(originX+topLeft, originY+height)
+	c.CurveTo(
+		originX+topLeft-kappa*topLeft, originY+height,
+		originX, originY+height-topLeft+kappa*topLeft,
+		originX, originY+height-topLeft,
+	)
+	c.LineTo(originX, originY+bottomLeft)
+	c.CurveTo(
+		originX, originY+bottomLeft-kappa*bottomLeft,
+		originX+bottomLeft-kappa*bottomLeft, originY,
+		originX+bottomLeft, originY,
+	)
+}
+
+func opRadiiPositive(radii [4]float64) bool {
+	for _, radius := range radii {
+		if radius > 0 {
+			return true
+		}
+	}
+
+	return false
 }
 
 func drawLine(chld *pdf.Content, paintOp *Op, pageIdx int, contentH float64, opts PaintOptions, pageH float64) {

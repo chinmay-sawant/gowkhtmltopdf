@@ -148,6 +148,59 @@ body { margin: 0; font-family: Arial, sans-serif; font-size: 10pt; }
 	}
 }
 
+func TestMixedRoundedBorderKeepsRoundedPaintGeometry(t *testing.T) {
+	t.Parallel()
+
+	res := layoutHTML(t, `<html><body><div class="card">card</div></body></html>`, sheet(t, `
+body { margin: 0; }
+.card {
+ width: 120pt;
+ height: 40pt;
+ border: 1pt solid #cbd5e1;
+ border-left: 4pt solid #2563eb;
+ border-radius: 6pt;
+}
+`))
+
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind == OpStrokeRect && paintOp.Radius > 0 {
+			return
+		}
+	}
+
+	t.Fatal("mixed rounded border fell back to square edge lines")
+}
+
+//nolint:cyclop // regression accepts either the legacy line or rounded overlay representation
+func TestMixedRoundedBorderKeepsTopAccentOnTopEdge(t *testing.T) {
+	t.Parallel()
+
+	res := layoutHTML(t, `<html><body><div class="card">card</div></body></html>`, sheet(t, `
+body { margin: 0; }
+.card {
+ width: 120pt;
+ height: 40pt;
+ border: 1pt solid #cbd5e1;
+ border-top: 4pt solid #b4532a;
+ border-radius: 6pt;
+}
+`))
+
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind == OpStrokeRect && paintOp.StrokeMask == StrokeMaskTop &&
+			paintOp.Radius > 0 && paintOp.R > 0.5 && paintOp.G < 0.5 && paintOp.B < 0.3 && paintOp.Width > 2 {
+			return
+		}
+
+		if paintOp.Kind == OpLine && paintOp.H == 0 && paintOp.W > 50 &&
+			paintOp.R > 0.5 && paintOp.G < 0.5 && paintOp.B < 0.3 && paintOp.Width > 2 {
+			return
+		}
+	}
+
+	t.Fatal("mixed rounded border lost the accented top edge")
+}
+
 //nolint:cyclop,wsl // regression keeps the complete page-fragment assertion together
 func TestRoundedCalloutMovesTogetherAtPageBoundary(t *testing.T) {
 	t.Parallel()

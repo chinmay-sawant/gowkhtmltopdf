@@ -25,11 +25,12 @@ const (
 )
 
 type flexMeas struct {
-	n      *html.Node
-	baseW  float64
-	grow   float64
-	shrink float64
-	order  int
+	n             *html.Node
+	baseW         float64
+	hypotheticalW float64
+	grow          float64
+	shrink        float64
+	order         int
 }
 
 type flexColMeas struct {
@@ -180,6 +181,10 @@ func anonymousFlexItemStyle(parent ResolvedStyle) ResolvedStyle {
 	style.BorderLeft = border{}   //nolint:exhaustruct // zero border
 	style.BorderRadius = 0
 	style.BorderRadiusPercent = 0
+	style.BorderRadiusTopLeft = 0
+	style.BorderRadiusTopRight = 0
+	style.BorderRadiusBottomRight = 0
+	style.BorderRadiusBottomLeft = 0
 	style.BGColor = [4]float64{}
 	style.ListStyleType = cssDisplayNone
 	style.PageBreakBefore = ""
@@ -201,7 +206,7 @@ func (e *engine) flowFlexRow(
 	wrap := style.FlexWrap == "wrap" || style.FlexWrap == fxWrapRev
 	reverse := style.FlexDirection == "row-reverse"
 	items := e.flexRowItems(kids, contentW)
-	lines := flexWrapLines(items, wrap, reverse, style.FlexWrap == fxWrapRev, colGap, contentW)
+	lines := e.flexWrapLines(items, wrap, reverse, style.FlexWrap == fxWrapRev, colGap, contentW)
 
 	lineCross := -1.0
 	if !wrap {
@@ -250,10 +255,12 @@ func (e *engine) flexRowItems(kids []*html.Node, contentW float64) []flexMeas {
 			shrink = 1
 		}
 
-		items = append(items, flexMeas{
+		item := flexMeas{
 			n: kid, baseW: e.flexItemBaseWidth(kid, *cstate, contentW),
-			grow: grow, shrink: shrink, order: cstate.FlexOrder,
-		})
+			hypotheticalW: 0, grow: grow, shrink: shrink, order: cstate.FlexOrder,
+		}
+		item.hypotheticalW = e.flexHypotheticalMainSize(item, contentW)
+		items = append(items, item)
 	}
 
 	sort.SliceStable(items, func(i, j int) bool { return items[i].order < items[j].order })
@@ -262,8 +269,12 @@ func (e *engine) flexRowItems(kids []*html.Node, contentW float64) []flexMeas {
 }
 
 // flexWrapLines packs measured items into flex lines, honoring wrap mode and
-// reverse direction (item order within each line, then line order).
-func flexWrapLines(items []flexMeas, wrap, reverse, wrapReverse bool, colGap, contentW float64) [][]flexMeas {
+// reverse direction (item order within each line, then line order). The trial
+// line is checked after flex grow/shrink and min/max clamping, because a
+// content-based minimum can make a line overflow even when raw flex bases fit.
+func (e *engine) flexWrapLines(
+	items []flexMeas, wrap, reverse, wrapReverse bool, colGap, contentW float64,
+) [][]flexMeas {
 	if !wrap {
 		if reverse {
 			reverseFlexMeas(items)
@@ -278,16 +289,17 @@ func flexWrapLines(items []flexMeas, wrap, reverse, wrapReverse bool, colGap, co
 	used := 0.0
 
 	for _, item := range items {
-		need := item.baseW
+		need := item.hypotheticalW
 		if len(line) > 0 {
 			need += colGap
 		}
 
-		if len(line) > 0 && used+need > contentW+1e-6 {
+		trial := append(append([]flexMeas(nil), line...), item)
+		if len(line) > 0 && !e.flexLineFits(trial, contentW, colGap) {
 			lines = append(lines, finalizeFlexLine(line, reverse))
 			line = nil
 			used = 0
-			need = item.baseW
+			need = item.hypotheticalW
 		}
 
 		line = append(line, item)
@@ -305,6 +317,63 @@ func flexWrapLines(items []flexMeas, wrap, reverse, wrapReverse bool, colGap, co
 	}
 
 	return lines
+}
+
+func (e *engine) flexLineFits(items []flexMeas, contentW, gap float64) bool {
+	widths := e.flexLineWidths(items, contentW, gap)
+	total := gap * float64(len(widths)-1)
+
+	for _, width := range widths {
+		total += width
+	}
+
+	if total > contentW+1e-6 {
+		return false
+	}
+
+	// A wrapped line may be a few points over its raw hypothetical sizes when
+	// flex-shrink resolves font-metric rounding. Do not use a large shrink to
+	// defeat wrapping: that collapses later items into unreadable slivers and
+	// also pulls full-width captions into the row. A candidate is therefore
+	// accepted only when every positive-base item remains within ten percent of
+	// its hypothetical size.
+	const maxLineShrink = 0.10
+
+	for idx, item := range items {
+		if item.baseW <= layoutEpsilon || item.shrink <= 0 {
+			continue
+		}
+
+		if widths[idx] < item.baseW*(1-maxLineShrink) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// flexHypotheticalMainSize is the size used when deciding whether an item
+// belongs on the current flex line. Wrapping is based on the hypothetical
+// main size, not the raw flex base size: min-width:auto contributes the
+// content-based minimum before line packing (CSS Flexbox §9.2). Without this
+// clamp, cards with long inline tokens incorrectly remain on a single line;
+// fixture-56's D02 source cards are the concrete regression.
+func (e *engine) flexHypotheticalMainSize(item flexMeas, mainSize float64) float64 {
+	size := item.baseW
+	minSize := e.flexMinMainSize(item, mainSize)
+
+	if size < minSize {
+		size = minSize
+	}
+
+	if style := e.styles[item.n]; style != nil && style.MaxWidth >= 0 {
+		maxSize := e.scalePt(style.MaxWidth)
+		if size > maxSize {
+			size = maxSize
+		}
+	}
+
+	return size
 }
 
 func finalizeFlexLine(line []flexMeas, reverse bool) []flexMeas {
@@ -547,7 +616,7 @@ func (e *engine) flexMinMainSize(item flexMeas, mainSize float64) float64 {
 	pad := e.scalePt(cstate.PaddingLeft) + e.scalePt(cstate.PaddingRight) +
 		e.scalePt(cstate.BorderLeft.Width) + e.scalePt(cstate.BorderRight.Width)
 	// Specified size suggestion when width/% is definite against mainSize.
-	specSug := e.flexSpecifiedWidthSuggestion(*cstate, item.baseW, mainSize, pad)
+	specSug := e.flexSpecifiedWidthSuggestion(*cstate, mainSize, pad)
 
 	autoMin := contentSug
 	if specSug >= 0 && specSug < autoMin {
@@ -565,14 +634,12 @@ func (e *engine) flexMinMainSize(item flexMeas, mainSize float64) float64 {
 	return floor
 }
 
-func (e *engine) flexSpecifiedWidthSuggestion(style ResolvedStyle, baseW, mainSize, pad float64) float64 {
+func (e *engine) flexSpecifiedWidthSuggestion(style ResolvedStyle, mainSize, pad float64) float64 {
 	switch {
 	case style.WidthPercent >= 0 && mainSize >= 0:
 		return e.flexBoxSized(style, mainSize*style.WidthPercent/cssPercent, pad)
 	case style.Width >= 0:
 		return e.flexBoxSized(style, e.scalePt(style.Width), pad)
-	case baseW > 0:
-		return baseW
 	}
 
 	return -1

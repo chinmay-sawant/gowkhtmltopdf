@@ -106,8 +106,7 @@ func (e *engine) emitInlineText( //nolint:funlen // text measurement, face-run e
 ) float64 {
 	child := item.style.Color
 	size := item.style.FontSize * e.scale
-	ascent := e.fontAscent(size)
-	descent := e.fontDescent(size)
+	ascent, descent := e.inlineFontMetrics(item.text, *item.style)
 
 	if ascent+descent < size*0.5 {
 		// Fallback when font metrics are missing — keep hit targets usable.
@@ -133,6 +132,14 @@ func (e *engine) emitInlineText( //nolint:funlen // text measurement, face-run e
 	leftX += chromeLeft
 
 	runStart := leftX
+	textBaseline := baseline
+
+	if isVerticalWritingMode(item.style.WritingMode) {
+		// A rotated run uses the baseline as its vertical start. The normal
+		// horizontal baseline already includes ascent, which would otherwise
+		// push vertical labels down by one ascent before rotation.
+		textBaseline -= ascent
+	}
 
 	var runSpan float64
 
@@ -141,7 +148,7 @@ func (e *engine) emitInlineText( //nolint:funlen // text measurement, face-run e
 			item,
 			run,
 			leftX,
-			baseline,
+			textBaseline,
 			size,
 			ascent,
 			descent,
@@ -155,7 +162,7 @@ func (e *engine) emitInlineText( //nolint:funlen // text measurement, face-run e
 				item,
 				run,
 				leftX,
-				baseline,
+				textBaseline,
 				size,
 				ascent,
 				descent,
@@ -195,10 +202,12 @@ func (e *engine) paintInlineChrome(style *ResolvedStyle, leftX, baseline, ascent
 	}
 
 	if style.BGColor[3] > 0 && e.opts.Background {
+		radii := usedBorderRadii(*style, boxW, boxH)
 		e.add(Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpFillRect, X: leftX, Y: boxY, W: boxW, H: boxH,
 			R: style.BGColor[0], G: style.BGColor[1], B: style.BGColor[2], Alpha: style.BGColor[3],
-			Radius: usedBorderRadius(*style, boxW, boxH),
+			Radius: uniformRadius(radii), RadiusTopLeft: radii[0], RadiusTopRight: radii[1],
+			RadiusBottomRight: radii[2], RadiusBottomLeft: radii[3],
 		})
 	}
 
@@ -206,12 +215,15 @@ func (e *engine) paintInlineChrome(style *ResolvedStyle, leftX, baseline, ascent
 		return
 	}
 
-	radius := usedBorderRadius(*style, boxW, boxH)
-	if radius > 0 && uniformRoundedBorder(*style) {
+	radii := usedBorderRadii(*style, boxW, boxH)
+	radius := uniformRadius(radii)
+
+	if hasRoundedRadii(radii) && uniformRoundedBorder(*style) {
 		b := style.BorderTop
 		e.add(Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpStrokeRect, X: leftX, Y: boxY, W: boxW, H: boxH,
 			R: b.Color[0], G: b.Color[1], B: b.Color[2], Width: e.scalePt(borderPaint(b)), Radius: radius,
+			RadiusTopLeft: radii[0], RadiusTopRight: radii[1], RadiusBottomRight: radii[2], RadiusBottomLeft: radii[3],
 		})
 
 		return
@@ -264,6 +276,7 @@ func (e *engine) emitInlineTextRun(
 	e.add(Op{ //nolint:exhaustruct // intentional zero fields
 		Kind: OpText, X: textX, Y: baseline, W: textWidth, H: item.h,
 		Text: run.text, Font: run.face, Size: size,
+		InkDescent:    descent,
 		LetterSpacing: item.style.LetterSpacing * e.scale,
 		TextTransform: item.style.TextTransform,
 		Bold:          item.style.FontWeight >= fontWeightBold,
@@ -645,11 +658,53 @@ func faceRunAllPrimary(s string, primary *pdf.Font) bool {
 }
 
 func (e *engine) fontAscent(size float64) float64 {
-	return float64(e.font.Ascent()) * size / float64(e.font.UnitsPerEm())
+	return e.fontAscentFace(e.font, size)
 }
 
-func (e *engine) fontDescent(size float64) float64 {
-	return float64(-e.font.Descent()) * size / float64(e.font.UnitsPerEm())
+func (e *engine) fontAscentFace(face *pdf.Font, size float64) float64 {
+	if face == nil || face.UnitsPerEm() <= 0 {
+		return size * ascentRatio
+	}
+
+	return float64(face.Ascent()) * size / float64(face.UnitsPerEm())
+}
+
+func (e *engine) fontDescentFace(face *pdf.Font, size float64) float64 {
+	if face == nil || face.UnitsPerEm() <= 0 {
+		return size * descentRatio
+	}
+
+	return float64(-face.Descent()) * size / float64(face.UnitsPerEm())
+}
+
+// inlineFontMetrics returns the largest ascent/descent pair used by an inline
+// item. A line can contain a mix of sans, serif, mono, and fallback faces;
+// using the engine default face for all of them shifts baselines and gives
+// inline chrome the wrong height.
+func (e *engine) inlineFontMetrics(text string, style ResolvedStyle) (float64, float64) {
+	size := style.FontSize * e.scale
+	runs := e.splitTextByFace(text, style)
+
+	if len(runs) == 0 {
+		runs = []faceRun{{face: e.faceFor(style)}} //nolint:exhaustruct // text and width are filled by shaping
+	}
+
+	maxAscent, maxDescent := 0.0, 0.0
+
+	for _, run := range runs {
+		ascent := e.fontAscentFace(run.face, size)
+		descent := e.fontDescentFace(run.face, size)
+
+		if ascent > maxAscent {
+			maxAscent = ascent
+		}
+
+		if descent > maxDescent {
+			maxDescent = descent
+		}
+	}
+
+	return maxAscent, maxDescent
 }
 
 // isExternalHref reports whether a link target should become a URI

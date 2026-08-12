@@ -162,6 +162,8 @@ func (fs *FaceSet) ResolveFamily(families []string, weight int, italic bool) *Fo
 			return resolveFamilyFaces(fs.Mono, fs.MonoBold, fs.MonoItalic, fs.MonoBoldItalic, weight, italic)
 		case "sans-serif", "arial", "helvetica", "tahoma", "verdana", "calibri", "liberation sans":
 			return fs.Resolve(weight, italic)
+		case "system-ui":
+			return resolveFamilyFaces(fs.UnicodeFallback, fs.UnicodeFallbackBold, nil, fs.UnicodeFallbackBold, weight, italic)
 		}
 	}
 

@@ -503,7 +503,8 @@ func (e *engine) emitListMarker(node *html.Node, style ResolvedStyle, contentX, 
 
 	e.add(Op{ //nolint:exhaustruct // intentional zero fields
 		Kind: OpBullet, X: posX, Y: baseline, Text: text, Font: face, Size: size,
-		R: style.Color[0], G: style.Color[1], B: style.Color[2],
+		InkDescent: e.fontDescentFace(face, size),
+		R:          style.Color[0], G: style.Color[1], B: style.Color[2],
 	})
 }
 

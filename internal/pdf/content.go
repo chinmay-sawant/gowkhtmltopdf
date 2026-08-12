@@ -215,6 +215,11 @@ func (c *Content) SetLineWidth(w float64) {
 	c.writePDFNums(" w\n", 1, w, 0, 0, 0, 0, 0)
 }
 
+// SetLineCap selects the PDF stroke cap style (0 butt, 1 round, 2 square).
+func (c *Content) SetLineCap(style int) {
+	c.writePDFNums(" J\n", 1, float64(style), 0, 0, 0, 0, 0)
+}
+
 // SetOpacity sets the fill/stroke opacity (0..1); 0 resets to opaque.
 func (c *Content) SetOpacity(opacity float64) {
 	if opacity >= 1 || opacity <= 0 {
@@ -501,14 +506,13 @@ func appendPDFLiteralByte(dst []byte, cur byte) []byte {
 }
 
 // appendPDFString appends s as a PDF literal string, folding code points
-// above U+00FF via winAnsiFold (with '?' fallback) so every emitted byte
-// matches the subset cmap and /Widths indices.
+// above U+00FF via PDFDocEncoding (with '?' fallback).
 func appendPDFString(dst []byte, s string) []byte {
 	dst = append(dst, '(')
 
 	for _, rVal := range s {
 		if rVal > maxLatin1Code {
-			rVal = winAnsiFold(rVal)
+			rVal = pdfDocEncodingFold(rVal)
 		}
 
 		if rVal > maxLatin1Code {

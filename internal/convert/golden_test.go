@@ -413,8 +413,8 @@ var fixturePageBounds = map[string]fixtureBounds{ //nolint:gochecknoglobals // i
 	},
 	"fixture-56-architecture-diagram.html": { //nolint:exhaustruct // intentional zero-value fields
 		// Unitless line-height now scales with each descendant's font size;
-		// the documented architecture composition is consequently 13 pages.
-		minPages: 13, maxPages: 13,
+		// The explicit section page breaks make the architecture composition 20 pages.
+		minPages: 20, maxPages: 20,
 	},
 }
 

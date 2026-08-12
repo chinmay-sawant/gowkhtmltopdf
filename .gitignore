@@ -16,3 +16,4 @@ testdata/golden/out/
 .DS_Store
 *.swp
 .pi-subagents
+.pi*
