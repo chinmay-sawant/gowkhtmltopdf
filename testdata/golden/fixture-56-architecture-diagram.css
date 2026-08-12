@@ -2411,6 +2411,16 @@ var,
   page-break-inside: avoid;
 }
 
+.dag-title,
+.div-title,
+.sec-title {
+  margin-top: 0;
+}
+
+section.d02 .dom-notes {
+  border-left-color: #0f766e;
+}
+
 .dag-stage {
   flex-wrap: nowrap;
   gap: 5px;
