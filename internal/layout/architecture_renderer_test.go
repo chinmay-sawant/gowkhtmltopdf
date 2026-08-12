@@ -320,6 +320,7 @@ body { margin: 0; }
 	t.Fatal("missing generated arrow")
 }
 
+//nolint:cyclop,funlen,wsl // regression keeps the complete fixture flow assertion together
 func TestAPIFixtureFlowMetricsDoNotOverlapPreviousFlexItems(t *testing.T) {
 	t.Parallel()
 
@@ -332,7 +333,7 @@ func TestAPIFixtureFlowMetricsDoNotOverlapPreviousFlexItems(t *testing.T) {
 	root := mustParse(t, string(source))
 	var cssText strings.Builder
 	root.Walk(func(node *html.Node) {
-		if node.Type != html.ElementNode || node.Name != "style" {
+		if node.Type != html.ElementNode || node.Name != styleElement {
 			return
 		}
 

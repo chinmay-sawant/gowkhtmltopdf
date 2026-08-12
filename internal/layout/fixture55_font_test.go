@@ -14,7 +14,7 @@ import (
 	"gowkhtmltopdf/internal/pdf"
 )
 
-//nolint:gocognit,cyclop,funlen,wsl,goconst,exhaustruct,varnamelen,nlreturn
+//nolint:gocognit,cyclop,funlen,wsl,exhaustruct,varnamelen,nlreturn
 func TestFixture55MastheadPreservesLetterSpacing(t *testing.T) {
 	t.Parallel()
 
@@ -31,7 +31,7 @@ func TestFixture55MastheadPreservesLetterSpacing(t *testing.T) {
 	var sheets []*css.Stylesheet
 	var walk func(*html.Node)
 	walk = func(node *html.Node) {
-		if node.Type == html.ElementNode && node.Name == "style" {
+		if node.Type == html.ElementNode && node.Name == styleElement {
 			var source strings.Builder
 			for _, child := range node.Children {
 				if child.Type == html.TextNode {
