@@ -146,8 +146,14 @@ hr { border: none; border-top: 1px solid var(--line); margin: 1em 0; }
   break-inside: auto;
 }
 
-.d02-page-break {
-  height: 0;
+.domains > section ~ section {
+  break-before: page;
+  page-break-before: always;
+}
+
+.dag,
+.divergence,
+.security {
   break-before: page;
   page-break-before: always;
 }
@@ -1869,8 +1875,6 @@ section.d09 {
   --d09-tint: rgba(180, 83, 42, 0.08);
   --d09-ink: #20262f;
   --d09-muted: #5c6470;
-  /* the writer is the right-edge sink of the PDF branch */
-  border-right: 4px solid var(--d09-accent);
 }
 
 section.d09 .dom-title {
