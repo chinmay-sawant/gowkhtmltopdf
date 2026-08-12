@@ -2,6 +2,7 @@ package pdf
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"image"
@@ -276,7 +277,13 @@ func (b *limitedImageBuffer) Write(data []byte) (int, error) {
 
 // AddPNGImage decodes PNG with image/png and embeds as a Flate RGB
 // XObject (alpha channel becomes a soft-mask when present).
-func (c *Content) AddPNGImage(name string, posX, posY, drawWidth, drawHeight float64, data []byte) error {
+//
+//nolint:cyclop,funlen // decode, validate, deduplicate, and emit one image resource.
+func (c *Content) AddPNGImage(
+	name string,
+	posX, posY, drawWidth, drawHeight float64,
+	data []byte,
+) error {
 	if len(data) > maxEmbeddedEncodedBytes {
 		return fmt.Errorf(
 			"%w: %d bytes, limit %d",
@@ -312,6 +319,17 @@ func (c *Content) AddPNGImage(name string, posX, posY, drawWidth, drawHeight flo
 	}
 
 	grayscale := c.doc != nil && c.doc.grayscale
+	key := imageDedupKey{digest: sha256.Sum256(data), grayscale: grayscale}
+
+	if resource, ok := c.imageDedup[key]; ok {
+		name = c.uniqueImageName(name)
+		c.imageRefs[name] = resource
+		c.imageUses[name] = resource.ref.String()
+		c.drawImageResource(name, posX, posY, drawWidth, drawHeight)
+
+		return nil
+	}
+
 	rgba, hasAlpha := renderImagePixels(img, bounds, grayscale)
 
 	var mask []byte // 8-bit alpha, 0 = transparent
@@ -323,14 +341,23 @@ func (c *Content) AddPNGImage(name string, posX, posY, drawWidth, drawHeight flo
 	name = c.uniqueImageName(name)
 	c.emitPNGXObject(name, width, height, rgba, mask, hasAlpha)
 
+	if c.imageDedup == nil {
+		c.imageDedup = map[imageDedupKey]*imageResource{}
+	}
+
+	c.imageDedup[key] = c.imageRefs[name]
+	c.drawImageResource(name, posX, posY, drawWidth, drawHeight)
+
+	return nil
+}
+
+func (c *Content) drawImageResource(name string, posX, posY, drawWidth, drawHeight float64) {
 	c.Save()
 	c.Transform(drawWidth, 0, 0, drawHeight, posX, posY)
 	c.buf.WriteString("/")
 	c.buf.WriteString(name)
 	c.buf.WriteString(" Do\n")
 	c.Restore()
-
-	return nil
 }
 
 // emitPNGXObject builds the Flate RGB XObject (plus alpha soft-mask) and

@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"gowkhtmltopdf/internal/errs"
 	"gowkhtmltopdf/internal/settings"
 )
 
@@ -57,8 +58,8 @@ var ErrInvalidProxy = errors.New("invalid proxy configuration")
 // Package-level sentinels for the loader's internal failure modes, so
 // dynamic messages wrap a static error and stay matchable with errors.Is.
 var (
-	errNilLoader           = errors.New("nil resource loader")
-	errNilContext          = errors.New("nil load context")
+	errNilLoader           = errs.ErrNilLoader
+	errNilContext          = errs.ErrNilContext
 	errCannotLoad          = errors.New("cannot load")
 	errUnsupportedCharset  = errors.New("unsupported charset")
 	errBlockedFileAccess   = errors.New("blocked file access")

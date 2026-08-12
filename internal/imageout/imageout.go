@@ -16,10 +16,10 @@ import (
 	"strings"
 	"sync"
 
-	"gowkhtmltopdf/internal/cli"
 	"gowkhtmltopdf/internal/convert"
 	renderpipeline "gowkhtmltopdf/internal/convert/render"
 	"gowkhtmltopdf/internal/css"
+	"gowkhtmltopdf/internal/errs"
 	"gowkhtmltopdf/internal/html"
 	"gowkhtmltopdf/internal/layout"
 	"gowkhtmltopdf/internal/line"
@@ -57,10 +57,10 @@ const (
 
 var (
 	errNilRoot          = errors.New("imageout: nil root")
-	errNilContext       = errors.New("imageout: nil context")
+	errNilContext       = errs.ErrNilContext
 	errCropNoIntersect  = errors.New("imageout: crop rectangle does not intersect the canvas")
-	errNilCommand       = errors.New("imageout: nil command")
-	errNilRequest       = errors.New("imageout: nil request")
+	errNilCommand       = errs.ErrNilCommand
+	errNilRequest       = errs.ErrNilRequest
 	errNothingToRender  = errors.New("load-error policy is skip; nothing to render")
 	errImagesDisabled   = errors.New("images disabled")
 	errNilOutput        = errors.New("imageout: nil Output writer")
@@ -318,11 +318,7 @@ type pixBuffer struct {
 }
 
 //nolint:gochecknoglobals // supersample pixel buffer recycling
-var supersamplePixPool = sync.Pool{
-	New: func() any {
-		return &pixBuffer{b: make([]byte, 0, 16<<20)} //nolint:mnd // 16 MiB default capacity
-	},
-}
+var supersamplePixPool sync.Pool
 
 //nolint:cyclop,funlen,mnd // supersampled rasterization pipeline
 func rasterizeContext(ctx context.Context, res *layout.Result, height float64, transparent bool) (*image.NRGBA, error) {
@@ -405,40 +401,34 @@ func rasterizeContext(ctx context.Context, res *layout.Result, height float64, t
 }
 
 // roundedBorderLineOverlay identifies a side-specific OpLine emitted beside
-// a rounded base OpStrokeRect. Layout uses that representation for borders
-// whose sides differ in color or width: the base operation owns the corner
-// arcs and the line owns the side's paint. Replaying a top line as a masked
-// rounded stroke keeps the side color through both corner arcs instead of
-// leaving the base stroke visible as a colored cap.
-func roundedBorderLineOverlay(ops []layout.Op, index int) (layout.Op, bool) { //nolint:cyclop
-	if index < 0 || index >= len(ops) || ops[index].Kind != layout.OpLine || ops[index].W <= 0 || ops[index].H != 0 {
+// a rounded base OpStrokeRect. Layout emits the base stroke immediately before
+// its horizontal side line, so checking that predecessor preserves the paint
+// operation contract without scanning the entire operation prefix.
+func roundedBorderLineOverlay(ops []layout.Op, index int) (layout.Op, bool) {
+	if index <= 0 || index >= len(ops) || ops[index].Kind != layout.OpLine || ops[index].W <= 0 || ops[index].H != 0 {
 		return layout.Op{}, false //nolint:exhaustruct // sentinel operation
 	}
 
 	line := ops[index]
+	stroke := ops[index-1]
 
-	for strokeIndex := index - 1; strokeIndex >= 0; strokeIndex-- {
-		stroke := ops[strokeIndex]
-		if stroke.Kind != layout.OpStrokeRect || stroke.StrokeMask != 0 || !hasRoundedStroke(&stroke) {
-			continue
-		}
-
-		radii := scaledRadii(&stroke, 1)
-		if !sameRoundedTopGeometry(line, stroke, radii) {
-			continue
-		}
-
-		overlay := stroke
-		overlay.R, overlay.G, overlay.B = line.R, line.G, line.B
-		overlay.Width = line.Width
-		overlay.Alpha = line.Alpha
-		overlay.PaintOpacity = line.PaintOpacity
-		overlay.StrokeMask = layout.StrokeMaskTop
-
-		return overlay, true
+	if stroke.Kind != layout.OpStrokeRect || stroke.StrokeMask != 0 || !hasRoundedStroke(&stroke) {
+		return layout.Op{}, false //nolint:exhaustruct // sentinel operation
 	}
 
-	return layout.Op{}, false //nolint:exhaustruct // sentinel operation
+	radii := scaledRadii(&stroke, 1)
+	if !sameRoundedTopGeometry(line, stroke, radii) {
+		return layout.Op{}, false //nolint:exhaustruct // sentinel operation
+	}
+
+	overlay := stroke
+	overlay.R, overlay.G, overlay.B = line.R, line.G, line.B
+	overlay.Width = line.Width
+	overlay.Alpha = line.Alpha
+	overlay.PaintOpacity = line.PaintOpacity
+	overlay.StrokeMask = layout.StrokeMaskTop
+
+	return overlay, true
 }
 
 func hasRoundedStroke(op *layout.Op) bool {
@@ -1342,47 +1332,6 @@ func scaleNearestGeneric(src image.Image, width, height int) *image.NRGBA {
 	return dst
 }
 
-// Run is the CLI-facing adapter (P1-1): validates the format/request, opens
-// the output sink, builds a convert.Request, and delegates to RunRequest.
-// Existing cmd/tests keep this signature; the engine no longer depends on
-// *cli.Command internals beyond OpenOutput and output-path format sniffing.
-func Run(ctx context.Context, cmd *cli.Command, log io.Writer) error {
-	if cmd == nil {
-		return errNilCommand
-	}
-
-	if ctx == nil {
-		return errNilContext
-	}
-
-	img := cmd.Image
-	// Resolve --format / extension before the engine so Request only needs
-	// Image.Format (library callers set Format explicitly or get PNG).
-	format, err := resolveFormat(img.Format, cmd.Output)
-	if err != nil {
-		return err
-	}
-
-	img.Format = format
-	// Validate with a discard sink so invalid requests fail before opening or
-	// truncating the user-selected output path.
-	req := convert.NewImageRequest(cmd.Global, img, cmd.Objects, io.Discard)
-	if err := req.ValidateImage(); err != nil {
-		return fmt.Errorf("imageout: validate: %w", err)
-	}
-
-	out, closeOut, err := cmd.OpenOutput()
-	if err != nil {
-		return fmt.Errorf("imageout: open output: %w", err)
-	}
-
-	req.Output = out
-
-	runErr := RunRequest(ctx, req, log)
-
-	return errors.Join(runErr, closeOut())
-}
-
 // RunRequest drives image conversion from a CLI-independent convert.Request
 // (P1-1). req.Image must be non-nil; req.Output receives encoded PNG/JPEG
 // bytes (nil → os.Stdout is not auto-selected; callers must supply a writer).
@@ -1646,11 +1595,6 @@ func imageLoadGlobal(global settings.PdfGlobal, image settings.ImageGlobal) sett
 	return loadGlobal
 }
 
-// imageLoadGlobalCmd is a test helper: ACL merge from a parsed Command.
-func imageLoadGlobalCmd(cmd *cli.Command) settings.LoadGlobal {
-	return imageLoadGlobal(cmd.Global, cmd.Image)
-}
-
 // firstObject returns the first page-like object. Image mode renders a
 // single page; extra page objects and TOC objects are ignored with warnings.
 // An empty Page is accepted when Load.InlineHTML is set (P2-04 in-memory
@@ -1746,6 +1690,12 @@ func resolveFormat(flag, output string) (string, error) {
 	}
 
 	return "", fmt.Errorf("%w %q (supported: png, jpg)", errUnsupportedFmt, flag)
+}
+
+// ResolveFormat exposes the format policy to the application adapter without
+// coupling the image engine to the CLI command type.
+func ResolveFormat(flag, output string) (string, error) {
+	return resolveFormat(flag, output)
 }
 
 // encode serializes img as PNG or JPEG. quality applies to JPEG only

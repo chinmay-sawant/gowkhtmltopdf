@@ -211,6 +211,8 @@ func (s *parseState) step(arg string) error {
 		return s.parseLongFlag(arg)
 	case isShortFlag(arg):
 		return s.parseShortFlag(arg)
+	case strings.HasPrefix(arg, "-") && arg != "-":
+		return fmt.Errorf("%w %s", errUnknownOption, arg)
 	default:
 		s.cmd.positional(arg, s.cur, &s.free)
 
@@ -523,12 +525,26 @@ func lookupFlag(name string) (flagSpec, bool, bool) {
 	}
 
 	if strings.HasPrefix(name, "no-") {
-		if spec, ok := flagTable[name[3:]]; ok && spec.kind == flagBool {
+		base := name[3:]
+		if isDocFlagName(base) {
+			return flagSpec{}, false, false //nolint:exhaustruct // terminal flags are not negatable
+		}
+
+		if spec, ok := flagTable[base]; ok && spec.kind == flagBool {
 			return spec, true, true
 		}
 	}
 
 	return flagSpec{}, false, false //nolint:exhaustruct // intentional zero/partial fields
+}
+
+func isDocFlagName(name string) bool {
+	switch name {
+	case "help", "version", "license", "extended-help":
+		return true
+	default:
+		return false
+	}
 }
 
 // ExitCode converts an error into a process exit code: errors carrying an

@@ -105,6 +105,377 @@ func TestConvertHTMLHelper(t *testing.T) {
 	}
 }
 
+func TestPdfGlobalOptionsBuildSnapshot(t *testing.T) {
+	t.Parallel()
+
+	builder := NewPdfGlobalOptions().
+		WithPageSize("Letter").
+		WithMargins(1, 2, 3, 4).
+		WithTitle(valueBefore).
+		WithCopies(2, false).
+		WithOutline(false, 6).
+		WithSmartShrinking(false).
+		WithBackground(false).
+		WithCompression(false).
+		WithResolveRelativeLinks(false)
+	if _, err := builder.WithSetting("fontpath", "font-before"); err != nil {
+		t.Fatalf("WithSetting(fontpath): %v", err)
+	}
+	if _, err := builder.WithSetting("dpi", valueBefore); err != nil {
+		t.Fatalf("WithSetting(dpi): %v", err)
+	}
+
+	snapshot := builder.Build()
+	if snapshot == nil {
+		t.Fatal("Build() returned nil")
+	}
+
+	builder.WithPageSize("A4").WithTitle(valueAfter)
+
+	if got, _ := snapshot.Get("size.pagesize"); got != "Letter" {
+		t.Fatalf("snapshot page size = %q, want Letter", got)
+	}
+	if got, _ := snapshot.Get("title"); got != valueBefore {
+		t.Fatalf("snapshot title = %q, want %q", got, valueBefore)
+	}
+	if got, _ := snapshot.Get("margin.top"); got != "1" {
+		t.Fatalf("snapshot top margin = %q, want 1", got)
+	}
+	for _, testCase := range []struct {
+		name, want string
+	}{
+		{name: "copies", want: "2"},
+		{name: "collate", want: "false"},
+		{name: "outline", want: "false"},
+		{name: "outlinedepth", want: "6"},
+		{name: "smartshrinking", want: "false"},
+		{name: "background", want: "false"},
+		{name: "usecompression", want: "false"},
+		{name: "resolverelativelinks", want: "false"},
+		{name: "fontpath", want: "font-before"},
+		{name: "dpi", want: valueBefore},
+	} {
+		if got, ok := snapshot.Get(testCase.name); !ok || got != testCase.want {
+			t.Errorf("snapshot Get(%q) = %q, %v; want %q, true", testCase.name, got, ok, testCase.want)
+		}
+	}
+	if err := snapshot.Set("title", valueAfter); err != nil {
+		t.Fatalf("mutate snapshot title: %v", err)
+	}
+	if _, err := builder.WithSetting("fontpath", "font-after"); err != nil {
+		t.Fatalf("mutate builder fontpath: %v", err)
+	}
+	if _, err := builder.WithSetting("dpi", valueAfter); err != nil {
+		t.Fatalf("mutate builder dpi: %v", err)
+	}
+	if got, _ := builder.Build().Get("title"); got != valueAfter {
+		t.Fatalf("builder title = %q, want %q after fluent mutation", got, valueAfter)
+	}
+	if got, _ := builder.Build().Get("size.pagesize"); got != "A4" {
+		t.Fatalf("builder page size = %q, want A4 after fluent mutation", got)
+	}
+	if got, _ := snapshot.Get("fontpath"); got != "font-before" {
+		t.Fatalf("snapshot fontpath = %q, want font-before after builder mutation", got)
+	}
+	if got, _ := snapshot.Get("dpi"); got != valueBefore {
+		t.Fatalf("snapshot dpi = %q, want %q after builder mutation", got, valueBefore)
+	}
+}
+
+func TestPdfGlobalOptionsBuildsConverter(t *testing.T) {
+	t.Parallel()
+
+	global := NewPdfGlobalOptions().
+		WithPageSize("Letter").
+		WithTitle("builder integration").
+		Build()
+	if err := global.Set("fontpath", "font-before"); err != nil {
+		t.Fatalf("set source fontpath: %v", err)
+	}
+	if err := global.Set("dpi", valueBefore); err != nil {
+		t.Fatalf("set source ignored setting: %v", err)
+	}
+	conv := NewConverter().
+		WithGlobal(global).
+		AddObject(NewObjectSettings().SetBody(
+			[]byte("<html><body><p>builder integration</p></body></html>"), "",
+		))
+
+	if err := global.Set("size.pagesize", "A4"); err != nil {
+		t.Fatalf("mutate source page size: %v", err)
+	}
+	if err := global.Set("title", "mutated source"); err != nil {
+		t.Fatalf("mutate source title: %v", err)
+	}
+	if err := global.Set("fontpath", "font-after"); err != nil {
+		t.Fatalf("mutate source fontpath: %v", err)
+	}
+	if err := global.Set("dpi", valueAfter); err != nil {
+		t.Fatalf("mutate source ignored setting: %v", err)
+	}
+
+	if got, _ := conv.Global().Get("size.pagesize"); got != "Letter" {
+		t.Fatalf("converter page size = %q, want Letter", got)
+	}
+	if got, _ := conv.Global().Get("title"); got != "builder integration" {
+		t.Fatalf("converter title = %q, want builder integration", got)
+	}
+	if got, _ := conv.Global().Get("fontpath"); got != "font-before" {
+		t.Fatalf("converter fontpath = %q, want font-before", got)
+	}
+	if got, _ := conv.Global().Get("dpi"); got != valueBefore {
+		t.Fatalf("converter dpi = %q, want %q", got, valueBefore)
+	}
+
+	if err := conv.Convert(t.Context()); err != nil {
+		t.Fatalf("Convert: %v", err)
+	}
+
+	data := conv.Output()
+	if !bytes.Contains(data, []byte("/MediaBox [0 0 612 792]")) {
+		t.Fatalf("converter output did not use Letter geometry")
+	}
+	if !bytes.Contains(data, []byte("/Title (builder integration)")) {
+		t.Fatalf("converter output did not use builder title")
+	}
+}
+
+func TestConverterWithGlobalNilPolicy(t *testing.T) {
+	t.Parallel()
+
+	conv := NewConverter()
+	original := conv.Global()
+	if got := conv.WithGlobal(nil); got != conv {
+		t.Fatalf("WithGlobal(nil) returned %p, want converter %p", got, conv)
+	}
+	if conv.Global() != original {
+		t.Fatal("WithGlobal(nil) replaced converter settings")
+	}
+
+	var nilConverter *Converter
+	if got := nilConverter.WithGlobal(NewGlobalSettings()); got != nil {
+		t.Fatalf("nil converter WithGlobal returned %p, want nil", got)
+	}
+}
+
+func TestPdfGlobalOptionsNilReceiverPanics(t *testing.T) {
+	t.Parallel()
+
+	var options *PdfGlobalOptions
+	for _, testCase := range []struct {
+		name string
+		call func()
+	}{
+		{name: "page size", call: func() { options.WithPageSize("A4") }},
+		{name: "margins", call: func() { options.WithMargins(1, 2, 3, 4) }},
+		{name: "title", call: func() { options.WithTitle("invalid") }},
+		{name: "copies", call: func() { options.WithCopies(1, true) }},
+		{name: "outline", call: func() { options.WithOutline(true, 4) }},
+		{name: "smart shrinking", call: func() { options.WithSmartShrinking(true) }},
+		{name: "background", call: func() { options.WithBackground(true) }},
+		{name: "compression", call: func() { options.WithCompression(true) }},
+		{name: "relative links", call: func() { options.WithResolveRelativeLinks(true) }},
+		{name: "setting", call: func() { _, _ = options.WithSetting("title", "invalid") }},
+		{name: "build", call: func() { _ = options.Build() }},
+	} {
+		testCase := testCase
+		t.Run(testCase.name, func(t *testing.T) {
+			defer func() {
+				if recover() == nil {
+					t.Fatal("nil builder call did not panic")
+				}
+			}()
+			testCase.call()
+		})
+	}
+}
+
+func TestPdfGlobalOptionsRejectsUnknownPageSize(t *testing.T) {
+	t.Parallel()
+
+	defer func() {
+		if recovered, ok := recover().(error); !ok || !errors.Is(recovered, ErrInvalidPageSize) {
+			t.Fatal("invalid page size did not panic")
+		}
+	}()
+
+	NewPdfGlobalOptions().WithPageSize("not-a-page-size")
+}
+
+func TestPdfGlobalOptionsValidationPaths(t *testing.T) {
+	t.Parallel()
+
+	if _, err := NewPdfGlobalOptions().WithSetting("size.pagesize", "not-a-page-size"); !errors.Is(err, ErrInvalidPageSize) {
+		t.Fatalf("WithSetting invalid page size = %v, want errors.Is(..., %v)", err, ErrInvalidPageSize)
+	}
+	if _, err := NewPdfGlobalOptions().WithSetting("copies", "0"); !errors.Is(err, ErrInvalidPDFCopies) {
+		t.Fatalf("WithSetting invalid copies = %v, want errors.Is(..., %v)", err, ErrInvalidPDFCopies)
+	}
+
+	global := NewGlobalSettings()
+	if err := global.Set("size.pagesize", ""); err != nil {
+		t.Fatalf("empty page size: %v", err)
+	}
+	if got, ok := global.Get("size.pagesize"); !ok || got != "A4" {
+		t.Fatalf("empty page size Get = %q, %v; want A4, true", got, ok)
+	}
+	if err := global.Set("copies", "0"); !errors.Is(err, ErrInvalidPDFCopies) {
+		t.Fatalf("GlobalSettings.Set invalid copies = %v, want errors.Is(..., %v)", err, ErrInvalidPDFCopies)
+	}
+	if err := global.Set("margin.top", "-1"); err != nil {
+		t.Fatalf("negative header/footer margin: %v", err)
+	}
+	if got, ok := global.Get("margin.top"); !ok || !strings.HasPrefix(got, "-") {
+		t.Fatalf("negative margin Get = %q, %v; want a negative value", got, ok)
+	}
+
+	assertPanicsWith(t, ErrInvalidPDFCopies, func() {
+		NewPdfGlobalOptions().WithCopies(0, true)
+	})
+}
+
+func assertPanicsWith(t *testing.T, want error, call func()) {
+	t.Helper()
+
+	defer func() {
+		recovered, ok := recover().(error)
+		if !ok || !errors.Is(recovered, want) {
+			t.Fatalf("panic = %v, want errors.Is(..., %v)", recovered, want)
+		}
+	}()
+	call()
+}
+
+func TestConverterValidationErrorsReachOnError(t *testing.T) {
+	t.Parallel()
+
+	var got string
+	conv := NewConverter()
+	conv.OnError = func(message string) { got = message }
+
+	if err := conv.Convert(t.Context()); !errors.Is(err, ErrNoRenderablePDFObjects) {
+		t.Fatalf("Convert() = %v, want %v", err, ErrNoRenderablePDFObjects)
+	}
+	if got != ErrNoRenderablePDFObjects.Error() {
+		t.Fatalf("validation callback = %q, want %q", got, ErrNoRenderablePDFObjects)
+	}
+
+	var imageError string
+	imageConv := NewImageConverter()
+	imageConv.OnError = func(message string) { imageError = message }
+	if err := imageConv.Convert(t.Context()); !errors.Is(err, ErrNoInputPageAdded) {
+		t.Fatalf("image Convert() = %v, want %v", err, ErrNoInputPageAdded)
+	}
+	if imageError != ErrNoInputPageAdded.Error() {
+		t.Fatalf("image validation callback = %q, want %q", imageError, ErrNoInputPageAdded)
+	}
+}
+
+func TestGlobalSettingsDottedKeyParity(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		key, value, want string
+	}{
+		{"orientation", "Landscape", "Landscape"},
+		{"colormode", "grayscale", "grayscale"},
+		{"grayscale", "true", "true"},
+		{"pageoffset", "2", "2"},
+		{"copies", "2", "2"},
+		{"collate", "false", "false"},
+		{"outline", "false", "false"},
+		{"outlinedepth", "6", "6"},
+		{"dumpoutline", "true", "true"},
+		{"dumpoutlinewithdefaulttocxsl", "true", "true"},
+		{"usecompression", "false", "false"},
+		{"title", "parity", "parity"},
+		{"smartshrinking", "false", "false"},
+		{"background", "false", "false"},
+		{"web.background", "false", "false"},
+		{"enablelocalfileaccess", "true", "true"},
+		{"excludefromoutline", "h1", "h1"},
+		{"quiet", "true", "true"},
+		{"proxy", "http://proxy.example.test:8080", "http://proxy.example.test:8080"},
+		{"usesystemfonts", "true", "true"},
+		{"resolverelativelinks", "false", "false"},
+		{"fontpath", "/fonts", "/fonts"},
+		{"allow", "/srv/html", "/srv/html"},
+		{"margin.top", "12mm", "12"},
+		{"margin.bottom", "12mm", "12"},
+		{"margin.left", "12mm", "12"},
+		{"margin.right", "12mm", "12"},
+		{"size.pagesize", "Letter", "Letter"},
+		{"size.width", "210mm", "210"},
+		{"size.height", "297mm", "297"},
+		{"header.fontsize", "14", "14"},
+		{"header.fontname", "Arial", "Arial"},
+		{"header.left", "header-left", "header-left"},
+		{"header.right", "header-right", "header-right"},
+		{"header.center", "header-center", "header-center"},
+		{"header.line", "true", "true"},
+		{"header.spacing", "2", "2"},
+		{"header.htmlurl", "/header.html", "/header.html"},
+		{"footer.fontsize", "14", "14"},
+		{"footer.fontname", "Arial", "Arial"},
+		{"footer.left", "footer-left", "footer-left"},
+		{"footer.right", "footer-right", "footer-right"},
+		{"footer.center", "footer-center", "footer-center"},
+		{"footer.line", "true", "true"},
+		{"footer.spacing", "2", "2"},
+		{"footer.htmlurl", "/footer.html", "/footer.html"},
+		{"toc.fontscale", "0.9", "0.9"},
+		{"toc.indentation", " 2 ", "2"},
+		{"toc.dottedlines", "false", "false"},
+		{"toc.captiontext", "Contents", "Contents"},
+		{"toc.forwardlinks", "true", "true"},
+		{"toc.backlinks", "true", "true"},
+		{"toc.xslstylesheet", "/toc.xsl", "/toc.xsl"},
+		{"web.images", "false", "false"},
+		{"web.printmediatype", "true", "true"},
+		{"web.mediatype", "print", "print"},
+		{"web.simplifydom", "true", "true"},
+		{"web.simplifydomprofile", "safe", "safe"},
+		{"web.printlinkunderline", "false", "false"},
+		{"dpi", "96", "96"},
+		{"resolution", "96", "96"},
+		{"imagedpi", "96", "96"},
+		{"imagequality", "90", "90"},
+		{"lowquality", "true", "true"},
+		{"usexserver", "true", "true"},
+		{"readargsfromstdin", "true", "true"},
+		{"log-level", "info", "info"},
+		{"loglevel", "info", "info"},
+		{"cookiejar", "cookies.txt", "cookies.txt"},
+		{"defaultencoding", "utf-8", "utf-8"},
+		{"produceforms", "true", "true"},
+		{"loaderrorhandling", "skip", "skip"},
+		{"web.javascript", "true", "true"},
+		{"web.java", "true", "true"},
+		{"web.plugins", "true", "true"},
+		{"web.minimumfontsize", "8", "8"},
+		{"web.defaultencoding", "utf-8", "utf-8"},
+		{"web.userstylesheet", "/style.css", "/style.css"},
+		{"web.loadimages", "true", "true"},
+	}
+
+	for _, testCase := range cases {
+		testCase := testCase
+		t.Run(testCase.key, func(t *testing.T) {
+			t.Parallel()
+
+			global := NewGlobalSettings()
+			if err := global.Set(testCase.key, testCase.value); err != nil {
+				t.Fatalf("Set(%q): %v", testCase.key, err)
+			}
+
+			got, ok := global.Get(testCase.key)
+			if !ok || got != testCase.want {
+				t.Fatalf("Get(%q) = %q, %v; want %q, true", testCase.key, got, ok, testCase.want)
+			}
+		})
+	}
+}
+
 func TestRunPDFTypedRequest(t *testing.T) {
 	t.Parallel()
 
@@ -231,7 +602,6 @@ func TestTypedImageBackgroundAliasAffectsPixels(t *testing.T) {
 	}
 }
 
-//nolint:funlen // matrix cases are intentionally explicit
 func TestTypedPDFRequestPreflight(t *testing.T) {
 	t.Parallel()
 
@@ -406,7 +776,6 @@ func TestGlobalSettingsGetSetRoundTrip(t *testing.T) {
 	assertGlobalDefaults(t)
 }
 
-//nolint:wsl // this test intentionally groups copied-state assertions.
 func TestGlobalNetworkPolicyIsCopied(t *testing.T) {
 	t.Parallel()
 

@@ -56,7 +56,6 @@ func newCommand(t *testing.T, html string, output string) (*cli.Command, string)
 	}
 	// --enable-local-file-access: global flag on, object-level block off.
 	cmd.Global.Load.EnableLocalFileAccess = true
-	cmd.Global.Size = settings.Size{PageSize: cmd.Global.PageSize} //nolint:exhaustruct // intentional zero-value fields
 
 	return cmd, dir
 }
@@ -358,7 +357,6 @@ func newCommandMulti(t *testing.T, htmls []string, output string) *cli.Command {
 		Output: output,
 	}
 	cmd.Global.Load.EnableLocalFileAccess = true
-	cmd.Global.Size = settings.Size{PageSize: cmd.Global.PageSize} //nolint:exhaustruct // intentional zero-value fields
 
 	for _, h := range htmls {
 		dir := t.TempDir()

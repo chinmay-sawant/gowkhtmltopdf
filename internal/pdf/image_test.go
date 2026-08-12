@@ -159,6 +159,31 @@ func TestImageResourceNamesDoNotCollideAcrossBands(t *testing.T) {
 	}
 }
 
+func TestRepeatedPNGImageReusesXObject(t *testing.T) {
+	t.Parallel()
+	data := fixedDoc(t)
+	data.SetCompression(false)
+	p := data.AddPage(100, 100)
+	cur := p.Content()
+	imageData := makePNG(t, false)
+
+	if err := cur.AddPNGImage("I0", 0, 0, 10, 10, imageData); err != nil {
+		t.Fatalf("first image: %v", err)
+	}
+
+	if err := cur.AddPNGImage("I1", 20, 20, 10, 10, imageData); err != nil {
+		t.Fatalf("repeated image: %v", err)
+	}
+
+	if cur.imageRefs["I0"].ref != cur.imageRefs["I1"].ref {
+		t.Fatalf("repeated PNG refs = %v/%v, want one XObject", cur.imageRefs["I0"].ref, cur.imageRefs["I1"].ref)
+	}
+
+	if got := len(cur.imageDedup); got != 1 {
+		t.Fatalf("dedup entries = %d, want 1", got)
+	}
+}
+
 func TestAddPNGNoAlpha(t *testing.T) {
 	t.Parallel()
 	data := fixedDoc(t)

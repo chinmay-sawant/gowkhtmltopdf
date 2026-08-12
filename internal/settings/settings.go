@@ -170,14 +170,9 @@ func DefaultMargins() Margin {
 }
 
 // Size holds optional custom page dimensions in millimetres (0 = unset).
-// Named sizes live on PdfGlobal.PageSize; Size.PageSize is dual-written by
-// Set for convert.pageGeometry until that path collapses to one field.
-//
-// ponytail: PageSize name is mirrored on PdfGlobal.PageSize and Size.PageSize.
 type Size struct {
-	PageSize string  // "A4", "Letter", …; empty = default
-	Width    float64 // mm; 0 = unset
-	Height   float64 // mm; 0 = unset
+	Width  float64 // mm; 0 = unset
+	Height float64 // mm; 0 = unset
 }
 
 // Web holds web-behaviour settings that the engine actually consults.
@@ -291,9 +286,8 @@ func DefaultTableOfContent() TableOfContent {
 // Policy A: only fields with convert/load/imageout consumers (or CLI homes that
 // convert still reads) are typed. Inert wkhtml keys may land in Ignored.
 type PdfGlobal struct {
-	// Page geometry: named size + optional custom Size width/height (mm).
-	// pageGeometry prefers PageSize, then Size.PageSize; custom Size.Width/Height
-	// override the named size when both are > 0.
+	// Page geometry: named size plus optional custom Size width/height (mm).
+	// Custom Size.Width/Height overrides the named size when both are > 0.
 	PageSize    string
 	Size        Size
 	Orientation Orientation
@@ -336,7 +330,6 @@ type PdfGlobal struct {
 func DefaultPdfGlobal() PdfGlobal {
 	return PdfGlobal{ //nolint:exhaustruct // intentional zero/partial fields
 		PageSize:       "A4",
-		Size:           Size{PageSize: "A4"}, //nolint:exhaustruct // intentional zero/partial fields
 		Orientation:    OrientationPortrait,
 		Copies:         1,
 		Collate:        true,

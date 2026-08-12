@@ -43,6 +43,9 @@ var (
 	ErrNilConverter = errors.New("gowkhtmltopdf: nil converter")
 	// ErrNilGlobalSettings reports a method call on nil global settings.
 	ErrNilGlobalSettings = errors.New("gowkhtmltopdf: nil global settings")
+	// ErrInvalidPageSize reports a named page size that is not in the canonical
+	// page-size table.
+	ErrInvalidPageSize = errors.New("gowkhtmltopdf: invalid page size")
 	// ErrNilObjectSettings reports a method call on nil object settings.
 	ErrNilObjectSettings = errors.New("gowkhtmltopdf: nil object settings")
 	// ErrNilImageSettings reports a method call on nil image settings.
@@ -54,10 +57,14 @@ var (
 	// image request. It aliases the historical nil-image-converter error.
 	ErrNilImageRequest = ErrNilImageConverter
 	// ErrMissingPDFOutput reports a typed PDF request without a document sink.
-	ErrMissingPDFOutput = errors.New("gowkhtmltopdf: PDF output sink is required")
+	// It aliases the engine sentinel so errors.Is remains stable across the
+	// public preflight and direct internal request seams.
+	ErrMissingPDFOutput = convert.ErrMissingOutput
+	// ErrInvalidPDFCopies reports a typed PDF request with a non-positive copy count.
+	ErrInvalidPDFCopies = convert.ErrInvalidCopies
 	// ErrMissingPDFOutlineOutput reports a dump-outline request without a
-	// dedicated metadata sink.
-	ErrMissingPDFOutlineOutput = errors.New("gowkhtmltopdf: PDF outline output sink is required")
+	// dedicated metadata sink. It aliases the engine sentinel.
+	ErrMissingPDFOutlineOutput = convert.ErrMissingOutlineOutput
 	// ErrMissingImageOutput reports a typed image request without an output
 	// sink.
 	ErrMissingImageOutput = errors.New("gowkhtmltopdf: image output sink is required")
@@ -111,7 +118,9 @@ func RestrictedNetworkPolicy() NetworkPolicy {
 
 // PdfGlobalOptions is the typed builder for common PDF global settings. It is
 // an alternative to GlobalSettings.Set for library callers; CLI-compatible
-// string settings remain available through GlobalSettings.
+// string settings remain available through GlobalSettings. Existing fluent
+// methods panic on a nil receiver because a nil builder is a programmer error;
+// WithSetting is the error-returning escape hatch for validated input.
 type PdfGlobalOptions struct {
 	options settings.PdfGlobalOptions
 }
@@ -121,86 +130,147 @@ func NewPdfGlobalOptions() *PdfGlobalOptions {
 	return &PdfGlobalOptions{options: settings.NewPdfGlobalOptions()}
 }
 
-func (o *PdfGlobalOptions) WithPageSize(pageSize string) *PdfGlobalOptions {
-	if o != nil {
-		o.options = o.options.WithPageSize(pageSize)
+func (o *PdfGlobalOptions) require() *PdfGlobalOptions {
+	if o == nil {
+		panic("gowkhtmltopdf: nil PdfGlobalOptions")
 	}
+
+	return o
+}
+
+// WithPageSize validates a named page size through the canonical page-size
+// table before storing it. Invalid input panics; use WithSetting when an
+// error-returning configuration path is preferred.
+func (o *PdfGlobalOptions) WithPageSize(pageSize string) *PdfGlobalOptions {
+	o = o.require()
+
+	pageSize, err := normalizePageSize(pageSize)
+	if err != nil {
+		panic(err)
+	}
+
+	o.options = o.options.WithPageSize(pageSize)
 
 	return o
 }
 
 func (o *PdfGlobalOptions) WithMargins(top, right, bottom, left float64) *PdfGlobalOptions {
-	if o != nil {
-		o.options = o.options.WithMargins(top, right, bottom, left)
-	}
+	o = o.require()
+	o.options = o.options.WithMargins(top, right, bottom, left)
 
 	return o
 }
 
 func (o *PdfGlobalOptions) WithTitle(title string) *PdfGlobalOptions {
-	if o != nil {
-		o.options = o.options.WithTitle(title)
-	}
+	o = o.require()
+	o.options = o.options.WithTitle(title)
 
 	return o
 }
 
+// WithCopies rejects non-positive counts at the typed-builder seam. The same
+// invariant is enforced again by public PDF request validation.
 func (o *PdfGlobalOptions) WithCopies(copies int, collate bool) *PdfGlobalOptions {
-	if o != nil {
-		o.options = o.options.WithCopies(copies, collate)
+	o = o.require()
+
+	if copies < 1 {
+		panic(ErrInvalidPDFCopies)
 	}
+
+	o.options = o.options.WithCopies(copies, collate)
 
 	return o
 }
 
 func (o *PdfGlobalOptions) WithOutline(enabled bool, depth int) *PdfGlobalOptions {
-	if o != nil {
-		o.options = o.options.WithOutline(enabled, depth)
-	}
+	o = o.require()
+	o.options = o.options.WithOutline(enabled, depth)
 
 	return o
 }
 
 func (o *PdfGlobalOptions) WithSmartShrinking(enabled bool) *PdfGlobalOptions {
-	if o != nil {
-		o.options = o.options.WithSmartShrinking(enabled)
-	}
+	o = o.require()
+	o.options = o.options.WithSmartShrinking(enabled)
 
 	return o
 }
 
 func (o *PdfGlobalOptions) WithBackground(enabled bool) *PdfGlobalOptions {
-	if o != nil {
-		o.options = o.options.WithBackground(enabled)
-	}
+	o = o.require()
+	o.options = o.options.WithBackground(enabled)
 
 	return o
 }
 
 func (o *PdfGlobalOptions) WithCompression(enabled bool) *PdfGlobalOptions {
-	if o != nil {
-		o.options = o.options.WithCompression(enabled)
-	}
+	o = o.require()
+	o.options = o.options.WithCompression(enabled)
 
 	return o
 }
 
 func (o *PdfGlobalOptions) WithResolveRelativeLinks(enabled bool) *PdfGlobalOptions {
-	if o != nil {
-		o.options = o.options.WithResolveRelativeLinks(enabled)
-	}
+	o = o.require()
+	o.options = o.options.WithResolveRelativeLinks(enabled)
 
 	return o
 }
 
-// Build returns independent public settings that can be passed to a typed
-// PDFRequest or copied into a Converter's GlobalSettings.
-func (o *PdfGlobalOptions) Build() *GlobalSettings {
-	if o == nil {
-		return nil
+// WithSetting applies any supported dotted key and returns an error for an
+// unknown or invalid value. Prefer the typed With* methods for common options.
+func (o *PdfGlobalOptions) WithSetting(name, value string) (*PdfGlobalOptions, error) {
+	o = o.require()
+	key := strings.ToLower(strings.TrimSpace(name))
+
+	if key == "size.pagesize" {
+		normalized, err := normalizePageSize(value)
+		if err != nil {
+			return o, err
+		}
+
+		value = normalized
 	}
 
+	if key == "copies" {
+		copies, err := strconv.Atoi(strings.TrimSpace(value))
+		if err == nil && copies < 1 {
+			return o, fmt.Errorf("%w: got %d", ErrInvalidPDFCopies, copies)
+		}
+	}
+
+	options, err := o.options.WithSetting(name, value)
+	if err != nil {
+		return o, fmt.Errorf("settings builder: %w", err)
+	}
+
+	o.options = options
+
+	return o, nil
+}
+
+// Build returns an independent public settings snapshot. Pass it as
+// PDFRequest.Global, to ConvertHTML, or to Converter.WithGlobal. Those
+// conversion entry points copy the settings at their ownership boundary, so
+// the builder and the built settings can be reused independently. Nil-builder
+// and invalid-input behavior follows the fluent policy documented above.
+func (o *PdfGlobalOptions) Build() *GlobalSettings {
+	o = o.require()
+
 	return &GlobalSettings{g: o.options.Build()}
+}
+
+func normalizePageSize(pageSize string) (string, error) {
+	pageSize = strings.TrimSpace(pageSize)
+	if pageSize == "" {
+		pageSize = "A4"
+	}
+
+	if _, _, err := settings.ParsePageSize(pageSize); err != nil {
+		return "", fmt.Errorf("%w: %q", ErrInvalidPageSize, pageSize)
+	}
+
+	return pageSize, nil
 }
 
 // NewGlobalSettings returns the wkhtmltopdf-compatible default global
@@ -227,11 +297,30 @@ func (s *GlobalSettings) SetNetworkPolicy(policy NetworkPolicy) error {
 }
 
 // Set applies a dotted settings key ("size.pagesize", "margin.top",
-// "orientation", "web.background", "load.timeout", …). Unknown names return
-// an error.
+// "orientation", "web.background", "load.timeout", …). Named page sizes and
+// copy counts are validated at this public settings seam; non-positive copies
+// are rejected. Negative margins remain valid for header/footer layout.
+// Unknown names return an error.
 func (s *GlobalSettings) Set(name, value string) error {
 	if s == nil {
 		return ErrNilGlobalSettings
+	}
+
+	key := strings.ToLower(strings.TrimSpace(name))
+	if key == "size.pagesize" {
+		pageSize, err := normalizePageSize(value)
+		if err != nil {
+			return fmt.Errorf("global set %q: %w", name, err)
+		}
+
+		value = pageSize
+	}
+
+	if key == "copies" {
+		copies, err := strconv.Atoi(strings.TrimSpace(value))
+		if err == nil && copies < 1 {
+			return fmt.Errorf("global set %q: %w: got %d", name, ErrInvalidPDFCopies, copies)
+		}
 	}
 
 	if err := s.g.Set(name, value); err != nil {
@@ -368,6 +457,19 @@ func (c *Converter) Global() *GlobalSettings {
 	return c.global
 }
 
+// WithGlobal replaces the converter's global settings with an owned copy of
+// s and returns c for chaining. A nil receiver or nil settings pointer is
+// returned unchanged.
+func (c *Converter) WithGlobal(s *GlobalSettings) *Converter {
+	if c == nil || s == nil {
+		return c
+	}
+
+	c.global = &GlobalSettings{g: clonePdfGlobal(s.g)}
+
+	return c
+}
+
 // AddObject appends a page object and returns c for chaining. The object's
 // settings are copied, so later mutations of s do not affect the converter.
 // A converter needs at least one object to convert. A nil settings pointer is
@@ -488,9 +590,9 @@ func (c *Converter) AddHTML(page []byte, baseURL string) *Converter {
 }
 
 // Convert runs the conversion. The produced bytes replace the previous
-// Output. ctx is threaded into every load; cancel it to abort. Errors are
-// also reported to OnError when set. Output is captured via an in-memory
-// writer (no temp file).
+// Output. ctx is threaded into every load; cancel it to abort. Engine and
+// preflight validation errors are also reported to OnError when set. Output
+// is captured via an in-memory writer (no temp file).
 func (c *Converter) Convert(ctx context.Context) error {
 	if c == nil {
 		return ErrNilConverter
@@ -506,6 +608,10 @@ func (c *Converter) Convert(ctx context.Context) error {
 	}
 
 	if err := validatePDFObjects(objects); err != nil {
+		if c.OnError != nil {
+			c.OnError(err.Error())
+		}
+
 		return err
 	}
 
@@ -552,9 +658,7 @@ func ConvertHTML(ctx context.Context, html []byte, global *GlobalSettings) ([]by
 	}
 
 	conv := NewConverter()
-	if global != nil {
-		conv.global = &GlobalSettings{g: clonePdfGlobal(global.g)}
-	}
+	conv.WithGlobal(global)
 
 	conv.AddObject(NewObjectSettings().SetBody(html, ""))
 
@@ -677,7 +781,8 @@ func (c *ImageConverter) ensureDefaults() {
 }
 
 // Convert runs the conversion, replacing the previous Output. ctx is threaded
-// into the load; cancel it to abort. Errors are also reported to OnError.
+// into the load; cancel it to abort. Engine and preflight validation errors
+// are also reported to OnError when set.
 // Output is captured via an in-memory writer (no temp file).
 //
 // The page may be a path/URL via AddObject/SetPage, or in-memory HTML via
@@ -693,6 +798,10 @@ func (c *ImageConverter) Convert(ctx context.Context) error {
 	obj := clonePdfObject(c.object.o)
 
 	if err := validateImageObjects([]settings.PdfObject{obj}); err != nil {
+		if c.OnError != nil {
+			c.OnError(err.Error())
+		}
+
 		return err
 	}
 
@@ -844,9 +953,10 @@ func (s *ImageSettings) Set(name, value string) error {
 	}
 
 	key := normalizeImageSettingKey(name)
-	global := settings.DefaultPdfGlobal()
 
-	if err := settings.ApplyImageKey(&global, &s.i, key, value); err != nil {
+	var global settings.PdfGlobal
+
+	if err := settings.ApplyImageKeyNormalized(&global, &s.i, key, value); err != nil {
 		return fmt.Errorf("image set %q: %w", name, err)
 	}
 
@@ -899,8 +1009,9 @@ type ImageRequest struct {
 
 // ValidatePDF checks the public typed PDF request contract without starting
 // the renderer. It is safe to call before output files or other resources are
-// opened. The request must have a document sink and at least one body object;
-// TOC-only and empty objects are rejected.
+// opened. The request must have a document sink, copies must be positive, and
+// at least one body object must be present; TOC-only and empty objects are
+// rejected.
 func (r *PDFRequest) ValidatePDF() error {
 	if r == nil {
 		return ErrNilPDFRequest
@@ -917,6 +1028,10 @@ func (r *PDFRequest) ValidatePDF() error {
 
 	if global.DumpOutline && r.OutlineOutput == nil {
 		return ErrMissingPDFOutlineOutput
+	}
+
+	if global.Copies < 1 {
+		return ErrInvalidPDFCopies
 	}
 
 	objects := r.toRequest().Objects

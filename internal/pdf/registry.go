@@ -147,8 +147,7 @@ func (r *Registry) FindWithGlyph(codePoint rune, weight int, italic bool) *Font 
 	}
 
 	r.mu.RLock()
-	faces := append([]*Font(nil), r.faces...)
-	r.mu.RUnlock()
+	defer r.mu.RUnlock()
 
 	bold := weight >= fontWeightBoldMin
 
@@ -156,7 +155,7 @@ func (r *Registry) FindWithGlyph(codePoint rune, weight int, italic bool) *Font 
 
 	bestScore := -1
 
-	for _, fnt := range faces {
+	for _, fnt := range r.faces {
 		score := glyphFaceScore(fnt, codePoint, bold, italic)
 		if score < 0 {
 			continue

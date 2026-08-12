@@ -116,7 +116,6 @@ func commandForFixture(t *testing.T, file string) *cli.Command {
 	}
 	// --enable-local-file-access: global flag on, object-level block off.
 	cmd.Global.Load.EnableLocalFileAccess = true
-	cmd.Global.Size = settings.Size{PageSize: cmd.Global.PageSize} //nolint:exhaustruct // intentional zero-value fields
 	// A4, 10 mm margins, backgrounds on (already the defaults; set explicitly).
 	cmd.Global.PageSize = "A4"
 	cmd.Global.Margin = settings.DefaultMargins()

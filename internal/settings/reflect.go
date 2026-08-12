@@ -1,10 +1,13 @@
 package settings
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 )
+
+var errImageBackgroundNeedsGlobal = errors.New("image: background requires global settings")
 
 // errInvalid is a small error helper for enum parse failures.
 type invalidError struct {
@@ -544,17 +547,16 @@ func registerGlobalGeometryKeys(keys keyTable[PdfGlobal]) {
 	regGlobal("size.pagesize",
 		func(dst *PdfGlobal, raw string) error {
 			val := strings.TrimSpace(raw)
+			if _, _, err := ParsePageSize(val); err != nil {
+				return err
+			}
+
 			dst.PageSize = val
-			dst.Size.PageSize = val
 
 			return nil
 		},
 		func(dst *PdfGlobal) (string, bool) {
-			if dst.PageSize != "" {
-				return dst.PageSize, true
-			}
-
-			return dst.Size.PageSize, true
+			return dst.PageSize, true
 		},
 	)
 	regGlobal("size.width",
@@ -872,8 +874,19 @@ func (g *ImageGlobal) Set(name, value string) error {
 // Web.Background); everything else goes to ImageGlobal.Set. ImageConverter.Set
 // delegates here.
 func ApplyImageKey(global *PdfGlobal, img *ImageGlobal, name, value string) error {
-	switch normalizeDots(name) {
+	return ApplyImageKeyNormalized(global, img, normalizeDots(name), value)
+}
+
+// ApplyImageKeyNormalized routes an already normalized image-mode key. It is
+// kept separate so public wrappers can normalize once for alias handling
+// without paying a second trim/lowercase pass.
+func ApplyImageKeyNormalized(global *PdfGlobal, img *ImageGlobal, name, value string) error {
+	switch name {
 	case "background", "web.background":
+		if global == nil {
+			return errImageBackgroundNeedsGlobal
+		}
+
 		return global.Set("background", value)
 	default:
 		return img.Set(name, value)

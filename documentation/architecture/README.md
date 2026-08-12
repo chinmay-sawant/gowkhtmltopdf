@@ -113,10 +113,10 @@ Key rules that keep the architecture sound:
 1. **The engine never parses argv.** `internal/cli` is a leaf that writes
    through the dotted settings `Set` API; the parser knows nothing about
    rendering.
-2. **One neutral seam.** Library (`api.go`), image binary (`internal/app`),
-   and PDF binary all funnel into `internal/convert.Request` /
-   `convert.RunPDFContext` / `imageout.RunRequest`. Nothing else invokes the
-   pipeline directly.
+2. **One neutral seam.** Library (`api.go`) and both binaries (`internal/app`)
+   funnel into `internal/convert.Request` and `convert.Run` /
+   `imageout.RunRequest`. Command translation stays at the application edge;
+   nothing else invokes the pipeline directly.
 3. **`cli.Command` *is* the settings payload** — no separate DTO; settings
    flow down and are never imported by `layout` or `pdf`.
 4. **Everything crosses the trust boundary through two seams:**
@@ -133,8 +133,8 @@ Key rules that keep the architecture sound:
 
 | Surface | Entry | What it produces | How |
 |---------|-------|------------------|-----|
-| `gowkhtmltopdf` | `cmd/gowkhtmltopdf/main.go` | PDF | `internal/cli` → settings → `convert.RunPDFContext` |
-| `gowkhtmltoimage` | `cmd/gowkhtmltoimage/main.go` | PNG/JPEG | `internal/cli` → settings → `imageout.Run` (via `internal/app`) |
+| `gowkhtmltopdf` | `cmd/gowkhtmltopdf/main.go` | PDF | `internal/cli` → `internal/app.RunPDF` → settings/request engine |
+| `gowkhtmltoimage` | `cmd/gowkhtmltoimage/main.go` | PNG/JPEG | `internal/cli` → `internal/app.RunImage` → settings/request engine |
 | Library | `api.go` | PDF or image in memory | `Converter`/`ImageConverter` → `convertHooks` → `convert.Request` with a caller-supplied `Output` writer |
 
 The library never imports `internal/cli`; `cmd/` never imports the root
@@ -232,5 +232,7 @@ Known upstream gaps worth reconciling (from the domain reviews):
   `[subject]` expands empty; HTML header/footer is single-band clamped.
 - The typed settings builder covers global PDF options only; object/image
   options still require dotted `Set` (no compile-time discoverability).
-- `Size.PageSize` dual-writes with `PdfGlobal.PageSize` — explicitly
-  transitional state.
+- `PdfGlobal.PageSize` is the canonical page-size name; `Size` stores only
+  custom width/height measurements. The former duplicate `Size.PageSize`
+  field was removed and settings parity tests protect the single source of
+  truth.

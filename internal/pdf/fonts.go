@@ -69,10 +69,12 @@ type Font struct {
 	// Derived, immutable caches live on the Font next to the data they
 	// derive from (locality) and disappear with it (bounds): the go-text
 	// face and the reverse cmap are built at most once each.
-	gotOnce sync.Once
-	gotFace *gtfont.Face // parsed go-text face (nil on failure)
-	revOnce sync.Once
-	rev     map[uint16]rune
+	gotOnce  sync.Once
+	gotFace  *gtfont.Face // parsed go-text face (nil on failure)
+	revOnce  sync.Once
+	rev      map[uint16]rune
+	nameOnce sync.Once
+	names    []string
 }
 
 // ParseTTF parses a TrueType (or OpenType with TrueType outlines) font file.
@@ -548,6 +550,18 @@ func (f *Font) FamilyNames() []string {
 // mutation can call this once up front. Returns family names (NameIDs 1 and
 // 16), or nil when the name table is missing.
 func (f *Font) LoadNames() []string {
+	if f == nil {
+		return nil
+	}
+
+	f.nameOnce.Do(func() {
+		f.names = f.loadNames()
+	})
+
+	return f.names
+}
+
+func (f *Font) loadNames() []string {
 	tbl, ok := f.tables["name"]
 	if !ok || len(tbl) < 6 {
 		return nil

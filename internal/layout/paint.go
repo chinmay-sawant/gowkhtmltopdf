@@ -7,10 +7,11 @@ import (
 	"math"
 	"strconv"
 
+	"gowkhtmltopdf/internal/errs"
 	"gowkhtmltopdf/internal/pdf"
 )
 
-var errNilContext = errors.New("layout: nil context")
+var errNilContext = errs.ErrNilContext
 
 // Page-break keyword constants shared by the pagination passes.
 const (

@@ -6,6 +6,10 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"runtime"
+	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -84,12 +88,50 @@ func BenchmarkRepeatedResourcePDF(b *testing.B) {
 				}
 			}
 			b.StopTimer()
+			peakRSS := processPeakRSSBytes()
 			b.ReportMetric(float64(resources.fetches.Load()), "fetches/op")
 			b.ReportMetric(float64(resources.bytes.Load()), "fetched_bytes/op")
 			b.ReportMetric(float64(output.Len()), "pdf_bytes/op")
 			b.SetBytes(int64(output.Len()))
+			if peakRSS > 0 {
+				b.ReportMetric(float64(peakRSS), "peak_rss_bytes")
+			}
 		})
 	}
+}
+
+// processPeakRSSBytes reads Linux's process high-water RSS without conflating
+// resident memory with Go's cumulative B/op benchmark metric. Other platforms
+// leave the metric absent because they do not expose /proc/self/status.
+func processPeakRSSBytes() int64 {
+	if runtime.GOOS != "linux" {
+		return 0
+	}
+
+	data, err := os.ReadFile("/proc/self/status")
+	if err != nil {
+		return 0
+	}
+
+	for _, line := range strings.Split(string(data), "\n") {
+		if !strings.HasPrefix(line, "VmHWM:") {
+			continue
+		}
+
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			return 0
+		}
+
+		kib, err := strconv.ParseInt(fields[1], 10, 64)
+		if err != nil {
+			return 0
+		}
+
+		return kib * 1024
+	}
+
+	return 0
 }
 
 //nolint:wsl // evidence assertions intentionally follow the conversion call.

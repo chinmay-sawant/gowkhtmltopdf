@@ -20,6 +20,7 @@ import (
 	"strconv"
 
 	"gowkhtmltopdf/internal/css"
+	"gowkhtmltopdf/internal/errs"
 	"gowkhtmltopdf/internal/html"
 	"gowkhtmltopdf/internal/pdf"
 )
@@ -748,7 +749,7 @@ func layoutContext(
 	}
 
 	if ctx == nil {
-		return nil, errors.New("layout: nil context") //nolint:err113 // stable internal boundary error
+		return nil, errs.ErrNilContext
 	}
 
 	if err := ctx.Err(); err != nil {

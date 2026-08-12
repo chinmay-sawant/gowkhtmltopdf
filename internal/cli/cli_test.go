@@ -628,6 +628,42 @@ func TestDocFlags(t *testing.T) {
 	}
 }
 
+func TestDocFlagBoundaryBehavior(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		args []string
+		want error
+	}{
+		{name: "help value remains invalid", args: []string{"--help=x"}, want: errInvalidBoolValue},
+		{name: "help cannot be negated", args: []string{"--no-help", "in.html", outPDF}, want: errUnknownOption},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			if _, err := Parse(testCase.args); !errors.Is(err, testCase.want) {
+				t.Fatalf("Parse(%v) = %v, want errors.Is(..., %v)", testCase.args, err, testCase.want)
+			}
+		})
+	}
+}
+
+func TestShortFlagClusterIsRejected(t *testing.T) {
+	t.Parallel()
+
+	_, err := Parse([]string{"-xyz", "in.html", outPDF})
+	if !errors.Is(err, errUnknownOption) {
+		t.Fatalf("Parse(-xyz ...) = %v, want errors.Is(..., %v)", err, errUnknownOption)
+	}
+
+	if !strings.Contains(err.Error(), "-xyz") {
+		t.Fatalf("Parse(-xyz ...) = %v, want offending token", err)
+	}
+}
+
 func TestPrintHelpUsesProductTruth(t *testing.T) {
 	t.Parallel()
 

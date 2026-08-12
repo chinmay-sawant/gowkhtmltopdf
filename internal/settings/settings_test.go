@@ -130,7 +130,7 @@ func globalDottedGeometryChecks(global *PdfGlobal) []dottedCheck {
 		},
 		{
 			key: "size.pagesize", val: "Letter", desc: "pagesize must be Letter on both homes",
-			check: func() bool { return global.PageSize == "Letter" && global.Size.PageSize == "Letter" },
+			check: func() bool { return global.PageSize == "Letter" },
 		},
 		{
 			key: "size.width", val: "210mm", desc: "size.width must be 210mm",

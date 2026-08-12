@@ -9,6 +9,7 @@ import (
 	"io"
 
 	"gowkhtmltopdf/internal/css"
+	"gowkhtmltopdf/internal/errs"
 	"gowkhtmltopdf/internal/html"
 	"gowkhtmltopdf/internal/line"
 	"gowkhtmltopdf/internal/load"
@@ -18,8 +19,8 @@ import (
 
 var (
 	errNoResourceLoader = errors.New("convert: resource context has no loader")
-	errNilLoader        = errors.New("convert: nil loader")
-	errNilContext       = errors.New("convert: nil context")
+	errNilLoader        = errs.ErrNilLoader
+	errNilContext       = errs.ErrNilContext
 )
 
 // ResourceContext binds one loader, base URL, and per-page policy for a

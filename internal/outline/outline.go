@@ -229,22 +229,17 @@ func SectionOf(hs []*Heading, page int) (string, string) {
 // SectionOfBy returns the section/subsection for page using the supplied
 // explicit ordering accessor. The input must already be sorted with the same
 // accessor.
-func SectionOfBy(hs []*Heading, page int, pageOf PageOf) (string, string) {
+func SectionOfBy(headings []*Heading, page int, pageOf PageOf) (string, string) {
 	pageOf = normalizePageOf(pageOf)
 
-	var first, last *Heading
-
-	for _, heading := range hs {
-		if pageOf(heading) > page {
-			break
-		}
-
-		if first == nil {
-			first = heading
-		}
-
-		last = heading
+	lastIndex := sort.Search(len(headings), func(index int) bool {
+		return pageOf(headings[index]) > page
+	})
+	if lastIndex == 0 {
+		return "", ""
 	}
+
+	first, last := headings[0], headings[lastIndex-1]
 
 	if first != nil && last != nil {
 		return first.Title, last.Title

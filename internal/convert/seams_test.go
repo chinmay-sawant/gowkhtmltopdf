@@ -25,6 +25,20 @@ func TestRunRequiresExplicitOutputSink(t *testing.T) {
 	}
 }
 
+func TestRunValidatesRenderableObjectsBeforeContext(t *testing.T) {
+	t.Parallel()
+
+	req := &Request{ //nolint:exhaustruct // focused invalid request
+		Global: settings.DefaultPdfGlobal(),
+		Output: &bytes.Buffer{},
+	}
+
+	err := Run(nil, req, io.Discard, nil) //nolint:staticcheck // nil-context behavior is the assertion
+	if !errors.Is(err, ErrNoRenderableObjects) {
+		t.Fatalf("Run error = %v, want errors.Is(..., %v)", err, ErrNoRenderableObjects)
+	}
+}
+
 func TestRunRequiresDedicatedOutlineSink(t *testing.T) {
 	t.Parallel()
 

@@ -99,7 +99,7 @@ func measuredWidth(res *layout.Result) float64 {
 }
 
 // pageGeometry resolves the page size in points from the single size model:
-// Size.Width/Height (mm) override a named PageSize / Size.PageSize.
+// Size.Width/Height (mm) override a named PageSize.
 // Landscape swaps the pair. Legacy PageWidth/PageHeight fields are gone.
 func pageGeometry(glob settings.PdfGlobal) (float64, float64, error) {
 	var width, height float64
@@ -108,9 +108,6 @@ func pageGeometry(glob settings.PdfGlobal) (float64, float64, error) {
 		width, height = glob.Size.Width*mmToPt, glob.Size.Height*mmToPt
 	} else {
 		name := glob.PageSize
-		if name == "" {
-			name = glob.Size.PageSize
-		}
 
 		var err error
 

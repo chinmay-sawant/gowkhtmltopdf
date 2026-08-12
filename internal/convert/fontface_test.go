@@ -106,7 +106,6 @@ func TestFontFaceACLDeny(t *testing.T) {
 	}
 	cmd.Global.Load.EnableLocalFileAccess = false
 	cmd.Global.Load.Allow = []string{pageDir}
-	cmd.Global.Size = settings.Size{PageSize: cmd.Global.PageSize} //nolint:exhaustruct // intentional zero-value fields
 
 	var log bytes.Buffer
 	if err := RunPDF(cmd, &log); err != nil {

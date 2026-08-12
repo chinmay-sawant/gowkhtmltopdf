@@ -10,6 +10,7 @@ import (
 	"gowkhtmltopdf/internal/app"
 	"gowkhtmltopdf/internal/cli"
 	"gowkhtmltopdf/internal/convert"
+	"gowkhtmltopdf/internal/errs"
 	"gowkhtmltopdf/internal/settings"
 )
 
@@ -51,6 +52,37 @@ func TestBuildPDFRequestRejectsMissingOutput(t *testing.T) {
 
 	if !errors.Is(err, convert.ErrMissingOutput) {
 		t.Fatalf("error = %v, want %v", err, convert.ErrMissingOutput)
+	}
+}
+
+func TestRunPDFValidatesBeforeOpeningOutput(t *testing.T) {
+	t.Parallel()
+
+	output := filepath.Join(t.TempDir(), "out.pdf")
+	cmd := &cli.Command{ //nolint:exhaustruct // focused invalid command
+		Global: settings.DefaultPdfGlobal(),
+		Output: output,
+	}
+
+	err := app.RunPDF(t.Context(), cmd, nil, nil, nil)
+	if !errors.Is(err, convert.ErrNoRenderableObjects) {
+		t.Fatalf("RunPDF() = %v, want errors.Is(..., %v)", err, convert.ErrNoRenderableObjects)
+	}
+
+	if _, statErr := os.Stat(output); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("output stat error = %v, want os.ErrNotExist", statErr)
+	}
+}
+
+func TestNilCommandUsesCanonicalSentinel(t *testing.T) {
+	t.Parallel()
+
+	if _, err := app.BuildPDFRequest(nil, nil, nil); !errors.Is(err, errs.ErrNilCommand) {
+		t.Fatalf("BuildPDFRequest(nil) = %v, want errors.Is(..., %v)", err, errs.ErrNilCommand)
+	}
+
+	if err := app.RunPDF(t.Context(), nil, nil, nil, nil); !errors.Is(err, errs.ErrNilCommand) {
+		t.Fatalf("RunPDF(nil command) = %v, want errors.Is(..., %v)", err, errs.ErrNilCommand)
 	}
 }
 

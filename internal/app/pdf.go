@@ -16,7 +16,7 @@ import (
 
 // Shared app-level sentinel errors; exported so callers can match with errors.Is.
 var (
-	ErrNilCommand    = errors.New("app: nil command")
+	ErrNilCommand    = errs.ErrNilCommand
 	ErrNoPageObjects = errors.New("app: no page objects")
 	ErrNilContext    = errs.ErrNilContext
 	// ErrConflictingOutputSinks reports a CLI stdout request that would append

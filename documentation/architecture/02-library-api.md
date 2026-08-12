@@ -253,7 +253,7 @@ RunImage(ctx, req) (api.go:894)
 `convert.PDFRequest`, which in turn has a `ToRequest()` producing the shared
 `convert.Request` union — the public surface is thus two thin adapters deep,
 and the engine stays CLI-independent (the CLI builds the same `Request`
-through `convert.RunPDFContext`).
+through `internal/app.RunPDF`).
 
 ### 4.4 Cross-domain interfaces
 
@@ -286,7 +286,7 @@ touch the root package; everything else is unreachable by design.
 ### What depends on the root package
 
 - `cmd/gowkhtmltopdf` and `cmd/gowkhtmltoimage` (CLI binaries) — the CLI path
-  is independent: it goes through `internal/cli` → `convert.RunPDFContext`,
+  is independent: it goes through `internal/cli` → `internal/app.RunPDF`,
   so **nothing in `cmd/` imports the root package**. The root package is a
   parallel consumer of the same engine seam.
 - `examples/pdf` and `examples/image` — demonstration programs.
@@ -484,7 +484,7 @@ programs build and run as smoke tests (`go run ./examples/pdf`,
 - [../../plans/00-canonical-pure-go-rewrite.md](../../plans/00-canonical-pure-go-rewrite.md) phase 8 (line 60) and [phase-08-library-api.md](../../plans/phases/phase-08-library-api.md) — the plan this surface implements
 - [CHANGELOG.md](../../CHANGELOG.md) — release notes (library API entry, line 63)
 - Sibling architecture deep-dives in this directory:
-  - [01-entrypoints-cli.md](01-entrypoints-cli.md) — CLI path; note it uses `convert.RunPDFContext`, the sibling seam to this library
+  - [01-entrypoints-cli.md](01-entrypoints-cli.md) — CLI path and the `internal/app` command adapters alongside this library
   - [03-settings.md](03-settings.md) — the settings model and dotted-key tables both CLI and library wrap
   - [08-convert-pipeline.md](08-convert-pipeline.md) — the `convert.Request`/`Run` engine both frontends share
   - [10-imageout-svg.md](10-imageout-svg.md) — the `imageout.RunRequest` sink used by `RunImage`/`ImageConverter`

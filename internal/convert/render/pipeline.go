@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
+	"gowkhtmltopdf/internal/errs"
 )
 
 // Pipeline is the narrow lifecycle seam for document rendering. The adapter
@@ -17,7 +19,7 @@ type Pipeline interface {
 
 var (
 	ErrNilPipeline = errors.New("render: nil pipeline")
-	ErrNilContext  = errors.New("render: nil context")
+	ErrNilContext  = errs.ErrNilContext
 )
 
 // Run executes the rendering lifecycle in a fixed order. Checking the context

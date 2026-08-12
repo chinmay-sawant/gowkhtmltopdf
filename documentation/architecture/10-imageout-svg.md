@@ -24,7 +24,7 @@ HTML (file | URL | stdin | inline SetBody)
   ├─ cmd/gowkhtmltopdf ──► internal/convert ──► internal/pdf   (PDF 1.4 output)
   │
   └─ cmd/gowkhtmltoimage ──► internal/app.RunImage
-                              └─► internal/imageout.Run / RunRequest   (PNG/JPEG output)
+                              └─► internal/imageout.RunRequest         (PNG/JPEG output)
                                     │  shared phases: load → parse (html) → style (css) → layout
                                     ▼
                               layout.Result (display list of Op)
@@ -170,14 +170,13 @@ resolution), `internal/layout/mnd_const.go:62` (`svgRasterMax = 1024`),
    context (`os.Interrupt`, `SIGTERM`).
 2. `internal/app/image.go` `RunImage` validates first:
    `convert.NewImageRequest(cmd.Global, cmd.Image, cmd.Objects, io.Discard)` +
-   `ValidateImage()` (no output truncation on bad input), checks at least one
-   non-TOC page object, then calls `imageout.Run`.
-3. `imageout.Run` (`imageout.go:1054`):
-   - resolves format (`resolveFormat`), stamps `cmd.Image.Format`;
-   - validates against a **discard sink** (so invalid requests fail before the
-     user's output file is opened/truncated);
-   - `cmd.OpenOutput()` (path / `-` → stdout; writer preferred);
-   - `RunRequest(ctx, req, log)`.
+   `ValidateImage()` (no output truncation on bad input), then owns output
+   opening and calls the request engine.
+3. `imageout.RunRequest`:
+   - receives the already-normalized format and explicit output writer from
+     `app.RunImage`;
+   - validates the request again at the engine seam;
+   - loads, lays out, rasterizes, and encodes into `req.Output`.
 4. `RunRequest` (`imageout.go:1094`):
    - `req.ValidateImage()` again (seam contract);
    - `firstObject` — warns and ignores additional page objects and TOC

@@ -4,6 +4,7 @@ package imageout
 import (
 	"bytes"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -17,7 +18,9 @@ import (
 	"testing"
 
 	"gowkhtmltopdf/internal/cli"
+	"gowkhtmltopdf/internal/convert"
 	"gowkhtmltopdf/internal/html"
+	"gowkhtmltopdf/internal/settings"
 )
 
 // renderHTML parses src and renders it with defaults: 200 px viewport,
@@ -48,6 +51,26 @@ func renderHTMLOpts(src string, opts RenderOptions) (image.Image, error) {
 	opts.Background = true
 
 	return Render(root, opts)
+}
+
+func TestRunValidatesBeforeOpeningOutput(t *testing.T) {
+	t.Parallel()
+
+	output := filepath.Join(t.TempDir(), "out.png")
+	cmd := &cli.Command{ //nolint:exhaustruct // focused invalid command
+		Global: settings.DefaultPdfGlobal(),
+		Image:  settings.DefaultImageGlobal(),
+		Output: output,
+	}
+
+	err := Run(t.Context(), cmd, nil)
+	if !errors.Is(err, convert.ErrNoRenderableObjects) {
+		t.Fatalf("Run() = %v, want errors.Is(..., %v)", err, convert.ErrNoRenderableObjects)
+	}
+
+	if _, statErr := os.Stat(output); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("output stat error = %v, want os.ErrNotExist", statErr)
+	}
 }
 
 // asNRGBA converts any color to color.NRGBA. The NRGBA model always yields
