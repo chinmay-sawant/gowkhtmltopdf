@@ -28,17 +28,104 @@ func (e *engine) collectInlineNode(node *html.Node, out *[]inlineItem) {
 }
 
 // collectInlineText flattens one text node under its white-space mode.
+//
+//nolint:cyclop // whitespace, writing-mode, and inline decoration are one collection pass
 func (e *engine) collectInlineText(node *html.Node, sty ResolvedStyle, out *[]inlineItem) {
 	if sty.Display == cssDisplayNone {
 		return
 	}
 
-	switch sty.WhiteSpace {
-	case cssWhiteSpacePre:
-		e.collectPreText(node, sty, out)
-	default:
-		e.collectWrappedText(node, sty, out)
+	start := len(*out)
+	parent := node.Parent
+	vertical := parent != nil && parent.Type == html.ElementNode && isVerticalWritingMode(e.styleVal(parent).WritingMode)
+
+	if vertical {
+		verticalStyle := sty
+		verticalStyle.WhiteSpace = cssWhiteSpaceNowrap
+		e.collectWrappedText(node, verticalStyle, out)
+
+		for idx := start; idx < len(*out); idx++ {
+			(*out)[idx].style = &verticalStyle
+			(*out)[idx].noSplit = true
+		}
+	} else {
+		atomicChrome := e.inlineChromeIsAtomic(node)
+
+		switch {
+		case atomicChrome:
+			// Keep padded/outlined inline labels together when they fit on
+			// the next line. Splitting each word into a separate decorated
+			// item produces a sequence of tiny pills and can strand the last
+			// word on a new line even though the complete label fits.
+			atomicStyle := sty
+			atomicStyle.WhiteSpace = cssWhiteSpaceNowrap
+			e.collectWrappedText(node, atomicStyle, out)
+		case sty.WhiteSpace == cssWhiteSpacePre:
+			e.collectPreText(node, sty, out)
+		default:
+			e.collectWrappedText(node, sty, out)
+		}
 	}
+
+	if !e.inlineChromeApplies(node) {
+		return
+	}
+
+	for idx := start; idx < len(*out); idx++ {
+		e.enableInlineChrome(&(*out)[idx])
+	}
+}
+
+func isVerticalWritingMode(mode string) bool {
+	return mode == "vertical-rl" || mode == "vertical-lr"
+}
+
+// inlineChromeApplies reports whether text belongs to an inline formatting
+// context whose decoration must be painted by the inline text emitter. A
+// flex/grid item is laid out as a blockified box even when its authored
+// display value is inline; that box already owns its padding, background, and
+// border. Painting inline chrome for its text would emit a second rounded
+// frame and inflate the item's measured size.
+func (e *engine) inlineChromeApplies(node *html.Node) bool {
+	parent := node.Parent
+	if parent == nil || parent.Type != html.ElementNode || e.styleVal(parent).Display != cssDisplayInline {
+		return false
+	}
+
+	if e.styleVal(parent).Position != "static" || isVerticalWritingMode(e.styleVal(parent).WritingMode) {
+		return false
+	}
+
+	container := parent.Parent
+	if container == nil || container.Type != html.ElementNode {
+		return true
+	}
+
+	switch e.styleVal(container).Display {
+	case displayFlex, displayInlineFlex, displayGrid, displayInlineGrid, displaySubgrid:
+		return false
+	default:
+		return true
+	}
+}
+
+func (e *engine) inlineChromeIsAtomic(node *html.Node) bool {
+	if !e.inlineChromeApplies(node) {
+		return false
+	}
+
+	parent := node.Parent
+	if parent == nil {
+		return false
+	}
+
+	if parent.Name != "mark" {
+		return false
+	}
+
+	style := e.styleVal(parent)
+
+	return style.PaddingLeft > 0 || style.PaddingRight > 0 || inlineHasBorder(style)
 }
 
 // collectPreText splits a white-space:pre node on newlines.
@@ -80,7 +167,7 @@ func (e *engine) collectWrappedText(node *html.Node, sty ResolvedStyle, out *[]i
 	// a space on top of the margin (TestLogoTitleGap).
 	if !hasNonHTMLSpace(node.Text) {
 		if node.Text != "" {
-			if len(*out) == 0 || !(*out)[len(*out)-1].img {
+			if len(*out) == 0 || !(*out)[len(*out)-1].img || (*out)[len(*out)-1].blockBox != nil {
 				*out = append(*out, e.textItem(" ", e.stylePtr(node)))
 			}
 		}
@@ -157,7 +244,7 @@ func (e *engine) collectWrappedText(node *html.Node, sty ResolvedStyle, out *[]i
 	// Preserve a trailing word-separator when the source text node
 	// ended with whitespace (so "foo <b>bar</b>" keeps the gap).
 	if len(*out) > startOut {
-		e.preserveTrailingGap(node, sty, out)
+		e.preserveTrailingGap(node, out)
 	}
 }
 
@@ -173,7 +260,7 @@ func isWSSpaceByte(b byte) bool {
 
 // preserveTrailingGap keeps a trailing word separator when the source text
 // node ended with whitespace.
-func (e *engine) preserveTrailingGap(node *html.Node, sty ResolvedStyle, out *[]inlineItem) {
+func (e *engine) preserveTrailingGap(node *html.Node, out *[]inlineItem) {
 	if len(*out) == 0 || len(node.Text) == 0 {
 		return
 	}
@@ -189,7 +276,7 @@ func (e *engine) preserveTrailingGap(node *html.Node, sty ResolvedStyle, out *[]
 	}
 
 	item.text += " "
-	item.w = e.measureTextFace(item.text, sty)
+	item.w = e.inlineTextWidth(item.text, e.stylePtr(node), item.chrome)
 }
 
 // collectInlineElement flattens one element node into inline items.
@@ -276,7 +363,9 @@ func (e *engine) collectInlineSpan(node *html.Node, sty ResolvedStyle, out *[]in
 	before := len(*out)
 
 	if txt := e.pseudoContent(node, "before"); txt != "" {
-		*out = append(*out, e.textItem(txt, e.stylePtr(node)))
+		item := e.textItem(txt, e.pseudoStyle(node, "before", sty))
+		e.enableInlineChrome(&item)
+		*out = append(*out, item)
 	}
 
 	for _, c := range node.Children {
@@ -284,7 +373,9 @@ func (e *engine) collectInlineSpan(node *html.Node, sty ResolvedStyle, out *[]in
 	}
 
 	if txt := e.pseudoContent(node, "after"); txt != "" {
-		*out = append(*out, e.textItem(txt, e.stylePtr(node)))
+		item := e.textItem(txt, e.pseudoStyle(node, "after", sty))
+		e.enableInlineChrome(&item)
+		*out = append(*out, item)
 	}
 	// Horizontal margins on inline elements (e.g. .co { margin-left: 10px }
 	// after a logo) apply to the first/last generated items.
@@ -339,9 +430,11 @@ func (e *engine) inlineBlockAvail(nodeN *html.Node, sty ResolvedStyle, cbW float
 		return intr
 	}
 
-	intr := e.measureCellContent(nodeN, sty)
-	intr += e.scalePt(sty.PaddingLeft) + e.scalePt(sty.PaddingRight) +
-		e.scalePt(sty.BorderLeft.Width) + e.scalePt(sty.BorderRight.Width) +
+	// measureCellContent already returns the max-content border-box width,
+	// including horizontal padding and borders. Add only the outer margins;
+	// adding the chrome again makes inline-block pills grow by a second set of
+	// padding/border widths and leaves misleading empty space on the right.
+	intr := e.measureCellContent(nodeN, sty) +
 		e.scalePt(sty.MarginLeft) + e.scalePt(sty.MarginRight)
 
 	if intr < 1 {
@@ -354,12 +447,94 @@ func (e *engine) inlineBlockAvail(nodeN *html.Node, sty ResolvedStyle, cbW float
 // availWForInline is a generous width for block-in-inline measurement.
 func availWForInline() float64 { return 1 << maxIntShift }
 
-func (e *engine) textItem(text string, st *ResolvedStyle) inlineItem {
-	w := e.measureTextFace(text, *st)
+func (e *engine) textItem(text string, style *ResolvedStyle) inlineItem {
+	textWidth := e.measureTextFace(transformInlineText(text, style.TextTransform), *style)
+	lineHeight := lineHeightOf(style) * e.scale
+
+	if isVerticalWritingMode(style.WritingMode) {
+		// In a vertical writing context the text advance runs along the
+		// block axis. The inline line still occupies only one glyph-width
+		// column; using the full measured string width here makes centered
+		// labels shift left by half their length.
+		textWidth = lineHeight
+	}
 
 	return inlineItem{ //nolint:exhaustruct // intentional zero fields
-		text: text, style: st, w: w, h: lineHeightOf(st) * e.scale,
+		text: text, style: style, w: textWidth, h: lineHeight,
 	}
+}
+
+func (e *engine) enableInlineChrome(item *inlineItem) {
+	if item == nil || item.style == nil || item.forceBreak || item.chrome {
+		return
+	}
+
+	item.chrome = true
+	item.w += e.inlineChromeLeft(item.style) + e.inlineChromeRight(item.style)
+	item.h += e.inlineChromeTop(item.style) + e.inlineChromeBottom(item.style)
+}
+
+func (e *engine) inlineTextWidth(text string, st *ResolvedStyle, chrome bool) float64 {
+	w := e.measureTextFace(text, *st)
+	if chrome {
+		w += e.inlineChromeLeft(st) + e.inlineChromeRight(st)
+	}
+
+	return w
+}
+
+func (e *engine) inlineChromeLeft(st *ResolvedStyle) float64 {
+	return e.scalePt(st.PaddingLeft) + e.scalePt(st.BorderLeft.Width)
+}
+
+func (e *engine) inlineChromeRight(st *ResolvedStyle) float64 {
+	return e.scalePt(st.PaddingRight) + e.scalePt(st.BorderRight.Width)
+}
+
+func (e *engine) inlineChromeTop(st *ResolvedStyle) float64 {
+	return e.scalePt(st.PaddingTop) + e.scalePt(st.BorderTop.Width)
+}
+
+func (e *engine) inlineChromeBottom(st *ResolvedStyle) float64 {
+	return e.scalePt(st.PaddingBottom) + e.scalePt(st.BorderBottom.Width)
+}
+
+func transformInlineText(text, transform string) string {
+	switch transform {
+	case textTransformUppercase:
+		return strings.ToUpper(text)
+	case textTransformLowercase:
+		return strings.ToLower(text)
+	case textTransformCapitalize:
+		return capitalizeInlineText(text)
+	default:
+		return text
+	}
+}
+
+//nolint:wsl,varnamelen // small Unicode word-start transform helper
+func capitalizeInlineText(text string) string {
+	var out strings.Builder
+	out.Grow(len(text))
+	upperNext := true
+
+	for _, r := range text {
+		if unicode.IsLetter(r) {
+			if upperNext {
+				out.WriteString(strings.ToUpper(string(r)))
+			} else {
+				out.WriteRune(r)
+			}
+			upperNext = false
+
+			continue
+		}
+
+		out.WriteRune(r)
+		upperNext = unicode.IsSpace(r)
+	}
+
+	return out.String()
 }
 
 // squeezeInlineSpaces drops artificial space items that sit immediately before
@@ -600,7 +775,7 @@ func coalesceTextItems(line []inlineItem) []inlineItem {
 	return line[:writeIdx]
 }
 
-func sameInlineStyle(acc, boxN *ResolvedStyle) bool {
+func sameInlineStyle(acc, boxN *ResolvedStyle) bool { //nolint:cyclop
 	if acc == nil || boxN == nil {
 		return acc == boxN
 	}
@@ -608,8 +783,16 @@ func sameInlineStyle(acc, boxN *ResolvedStyle) bool {
 	return acc.FontSize == boxN.FontSize &&
 		acc.FontWeight == boxN.FontWeight &&
 		acc.FontItalic == boxN.FontItalic &&
+		acc.famHash == boxN.famHash &&
+		acc.LineHeight == boxN.LineHeight &&
+		acc.TextTransform == boxN.TextTransform &&
 		acc.LetterSpacing == boxN.LetterSpacing &&
 		acc.Color == boxN.Color &&
+		acc.BGColor == boxN.BGColor &&
+		acc.PaddingTop == boxN.PaddingTop && acc.PaddingRight == boxN.PaddingRight &&
+		acc.PaddingBottom == boxN.PaddingBottom && acc.PaddingLeft == boxN.PaddingLeft &&
+		acc.BorderTop == boxN.BorderTop && acc.BorderRight == boxN.BorderRight &&
+		acc.BorderBottom == boxN.BorderBottom && acc.BorderLeft == boxN.BorderLeft &&
 		acc.TextDecoration == boxN.TextDecoration &&
 		acc.WhiteSpace == boxN.WhiteSpace
 }
@@ -620,6 +803,14 @@ func lineHeightOf(st *ResolvedStyle) float64 {
 	}
 
 	return defaultLineHeightRatio * st.FontSize
+}
+
+func borderPaint(side border) float64 {
+	if side.PaintWidth > 0 {
+		return side.PaintWidth
+	}
+
+	return side.Width
 }
 
 func collapseWS(src string) string { //nolint:cyclop // hot path: byte-wise whitespace collapsing

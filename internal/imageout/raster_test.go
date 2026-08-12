@@ -6,8 +6,11 @@ import (
 	"errors"
 	"image"
 	"image/color"
+	"os"
+	"path/filepath"
 	"testing"
 
+	"gowkhtmltopdf/internal/css"
 	"gowkhtmltopdf/internal/html"
 	"gowkhtmltopdf/internal/layout"
 	"gowkhtmltopdf/internal/pdf"
@@ -29,6 +32,147 @@ func TestRasterPaintOrderMatchesPDFLayerPolicy(t *testing.T) {
 		if order[i] != want[i] {
 			t.Fatalf("paint order = %v, want %v", order, want)
 		}
+	}
+}
+
+func TestRoundedBorderTopOverlayKeepsAccentThroughCorners(t *testing.T) {
+	t.Parallel()
+
+	const (
+		boxX   = 12.0
+		boxY   = 12.0
+		boxW   = 80.0
+		boxH   = 32.0
+		radius = 8.0
+	)
+
+	res := &layout.Result{ //nolint:exhaustruct // synthetic raster result
+		Width:  110,
+		Height: 70,
+		Ops: []layout.Op{
+			{ //nolint:exhaustruct // synthetic rounded stroke
+				Kind: layout.OpStrokeRect, X: boxX, Y: boxY, W: boxW, H: boxH,
+				R: 0.7, G: 0.8, B: 0.85, Width: 1.5, Radius: radius,
+			},
+			{ //nolint:exhaustruct // synthetic accent line
+				Kind: layout.OpLine, X: boxX + radius, Y: boxY, W: boxW - 2*radius,
+				R: 0.1, G: 0.7, B: 0.4, Width: 4,
+			},
+		},
+	}
+
+	img, err := rasterizeContext(t.Context(), res, res.Height, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The accent must cover pixels on the top-left arc. A straight overlay
+	// leaves that arc in the base border color and produces a visible cap gap.
+	accentPixels := 0
+	startX, startY := boxX*ptToPx, boxY*ptToPx
+	endX, endY := (boxX+radius)*ptToPx, (boxY+radius)*ptToPx
+
+	for y := int(endY); y >= int(startY); y-- {
+		for x := int(startX); x < int(endX); x++ {
+			pixel := img.NRGBAAt(x, y)
+			if pixel.G > pixel.R+30 && pixel.G > pixel.B+10 {
+				accentPixels++
+			}
+		}
+	}
+
+	if accentPixels == 0 {
+		t.Fatal("rounded top overlay did not paint the accent through the top-left corner")
+	}
+}
+
+func TestRoundedTopStrokeLeavesOutsideCornerUnpainted(t *testing.T) {
+	t.Parallel()
+
+	const (
+		boxX   = 12.0
+		boxY   = 12.0
+		boxW   = 80.0
+		boxH   = 32.0
+		radius = 8.0
+	)
+
+	res := &layout.Result{ //nolint:exhaustruct // synthetic rounded raster result
+		Width:  110,
+		Height: 70,
+		Ops: []layout.Op{{ //nolint:exhaustruct // focused rounded-border operation
+			Kind: layout.OpStrokeRect, X: boxX, Y: boxY, W: boxW, H: boxH,
+			R: 0.1, G: 0.7, B: 0.4, Width: 4, Radius: radius,
+			StrokeMask: layout.StrokeMaskTop,
+		}},
+	}
+
+	img, err := rasterizeContext(t.Context(), res, res.Height, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	corner := img.NRGBAAt(int(boxX*ptToPx)-2, int(boxY*ptToPx)-2)
+	if int(corner.G) > int(corner.R)+20 {
+		t.Fatalf("rounded top stroke painted the outside corner: pixel=%+v", corner)
+	}
+}
+
+//nolint:cyclop // fixture setup and display-list probe intentionally stay together
+func TestFixture56UsesRoundedTopOverlayGeometry(t *testing.T) {
+	t.Parallel()
+
+	base := filepath.Join("..", "..", "testdata", "golden")
+
+	htmlData, err := os.ReadFile(filepath.Join(base, "fixture-56-architecture-diagram.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cssData, err := os.ReadFile(filepath.Join(base, "fixture-56-architecture-diagram.css"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	root, err := html.Parse(string(htmlData))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sheet, err := css.Parse(string(cssData))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	font, err := pdf.DefaultFont()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := layout.Layout(root, layout.Options{ //nolint:exhaustruct // fixture image-mode geometry
+		Width: 1024 * cssPxToPt, Height: 1024 * cssPxToPt,
+		Font: font, Sheets: []*css.Stylesheet{sheet}, Media: "screen", Background: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	overlays := 0
+
+	for index, op := range res.Ops {
+		if op.Kind == layout.OpStrokeRect && op.StrokeMask == layout.StrokeMaskTop && op.Radius > 0 {
+			overlays++
+
+			continue
+		}
+
+		if _, ok := roundedBorderLineOverlay(res.Ops, index); ok {
+			overlays++
+		}
+	}
+
+	if overlays == 0 {
+		t.Fatal("fixture 56 emitted no rounded top border overlays")
 	}
 }
 

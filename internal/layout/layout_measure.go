@@ -159,6 +159,14 @@ func (e *engine) measureCellMinMax(node *html.Node, style ResolvedStyle) (float6
 
 	chrome := e.scalePt(style.PaddingLeft) + e.scalePt(style.PaddingRight) +
 		e.scalePt(style.BorderLeft.Width) + e.scalePt(style.BorderRight.Width)
+	// Inline flex items measure their own padding/border while walking their
+	// text (inlineMeasurementChromeWidth). Do not add that chrome a second
+	// time as the outer cell contribution; this keeps intrinsic pill widths
+	// symmetric with the painted box.
+	if style.Display == cssDisplayInline {
+		chrome = 0
+	}
+
 	minW := cellMeas.longestWord + chrome
 	maxW := cellMeas.maxW + chrome
 
@@ -270,6 +278,8 @@ func (m *cellMeasure) measureText(text string, cstate ResolvedStyle, nowrap bool
 
 		m.lineOnlyNowrap = false
 		m.lineHasInk = true
+		chromeW := inlineMeasurementChromeWidth(eng, cstate)
+		m.lineW += chromeW
 
 		spaceW := m.spaceWidth(cstate)
 
@@ -302,9 +312,9 @@ func (m *cellMeasure) measureText(text string, cstate ResolvedStyle, nowrap bool
 			}
 
 			first = false
-			wordW := eng.measureTextFace(word, cstate)
+			wordW := eng.measureTextFace(transformInlineText(word, cstate.TextTransform), cstate)
 			m.lineW += wordW
-			m.noteWord(eng.minContentWidth(word, cstate, wordW))
+			m.noteWord(eng.minContentWidth(word, cstate, wordW+chromeW))
 
 			wStart = wEnd
 		}
@@ -312,13 +322,27 @@ func (m *cellMeasure) measureText(text string, cstate ResolvedStyle, nowrap bool
 		return
 	}
 
-	full := eng.measureTextFace(text, cstate)
+	full := eng.measureTextFace(transformInlineText(text, cstate.TextTransform), cstate) +
+		inlineMeasurementChromeWidth(eng, cstate)
 	m.lineW += full
 	m.noteWord(eng.minContentWidth(text, cstate, full))
 
 	if hasNonHTMLSpace(text) {
 		m.lineHasInk = true
 	}
+}
+
+// inlineMeasurementChromeWidth keeps intrinsic flex/grid measurements in
+// lockstep with inline paint. Without the padding and border contribution,
+// flex items containing code/mark spans receive a box that is just narrower
+// than their painted inline chrome and wrap unexpectedly.
+func inlineMeasurementChromeWidth(eng *engine, style ResolvedStyle) float64 {
+	if eng == nil || style.Display != cssDisplayInline {
+		return 0
+	}
+
+	return eng.scalePt(style.PaddingLeft) + eng.scalePt(style.PaddingRight) +
+		eng.scalePt(style.BorderLeft.Width) + eng.scalePt(style.BorderRight.Width)
 }
 
 // noteWord records a token's min-content width.
@@ -372,8 +396,18 @@ func (m *cellMeasure) walkBlockChildren(nodeN *html.Node, childCS ResolvedStyle,
 	}
 
 	childNowrap := nowrap || childCS.WhiteSpace == cssWhiteSpaceNowrap || childCS.WhiteSpace == cssWhiteSpacePre
+
 	for _, child := range nodeN.Children {
-		m.walk(child, childCS, childNowrap)
+		childStyle := childCS
+
+		if child.Type == html.ElementNode {
+			if resolved := m.engine.styles[child]; resolved != nil {
+				childStyle = *resolved
+			}
+		}
+
+		m.walk(child, childStyle, childNowrap || childStyle.WhiteSpace == cssWhiteSpaceNowrap ||
+			childStyle.WhiteSpace == cssWhiteSpacePre)
 	}
 
 	if blockish {

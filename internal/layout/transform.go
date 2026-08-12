@@ -730,6 +730,28 @@ func stampBoxTransforms(boxNode *box, parentAccum Matrix2D, ops []Op) {
 	stampBoxTransformsRec(boxNode, parentAccum, ops, covered)
 }
 
+// restampBoxTransforms rebases already-stamped transforms after pagination or
+// another flow pass has moved the owning boxes. The transform origin is stored
+// in document coordinates, so retaining the old matrix would move transformed
+// inline chrome away from its box when that box crosses a page boundary.
+func restampBoxTransforms(boxNode *box, ops []Op) {
+	needsStamp := false
+
+	for idx := range ops {
+		if !ops[idx].XformSet {
+			continue
+		}
+
+		needsStamp = true
+		ops[idx].Xform = IdentityMatrix()
+		ops[idx].XformSet = false
+	}
+
+	if needsStamp {
+		stampBoxTransforms(boxNode, IdentityMatrix(), ops)
+	}
+}
+
 func stampBoxTransformsRec(boxNode *box, parentAccum Matrix2D, ops []Op, covered []bool) {
 	if boxNode == nil {
 		return

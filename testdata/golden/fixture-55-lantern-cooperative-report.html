@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<!--
+  fixture-55-lantern-cooperative-report
+  Proves: a self-contained operations brief with inline CSS, structured tables,
+  status cards, explicit page breaks, and print-friendly typography.
+  Expected: 3 pages with no external assets.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Northline Field Operations Brief</title>
+  <style>
+    @page { size: A4; margin: 0; }
+
+    * { box-sizing: border-box; }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      background: #e9ece8;
+      color: #243039;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 10pt;
+      line-height: 1.45;
+    }
+
+    body { padding: 0; }
+
+    .page {
+      position: relative;
+      width: 210mm;
+      min-height: 297mm;
+      margin: 0 auto;
+      padding: 15mm 16mm 18mm;
+      background: #fffefa;
+      page-break-after: always;
+    }
+
+    .page:last-child { page-break-after: auto; }
+
+    .masthead,
+    .section-header,
+    .brand-line,
+    .page-footer,
+    .metric-row,
+    .signal-row,
+    .plan-item,
+    .signoff-row {
+      display: flex;
+      align-items: center;
+    }
+
+    .masthead {
+      justify-content: space-between;
+      border-bottom: 1px solid #d8ddd7;
+      padding-bottom: 10px;
+    }
+
+    .brand-line { gap: 9px; }
+
+    .brand-mark {
+      width: 28px;
+      height: 28px;
+      border: 2px solid #173f45;
+      border-radius: 50%;
+      color: #173f45;
+      font-size: 9pt;
+      font-weight: 700;
+      line-height: 24px;
+      text-align: center;
+    }
+
+    .brand-name {
+      color: #173f45;
+      font-size: 11pt;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow,
+    .micro-label,
+    .page-mark,
+    .table-label {
+      color: #718078;
+      font-size: 7.5pt;
+      font-weight: 700;
+      letter-spacing: .13em;
+      text-transform: uppercase;
+    }
+
+    .masthead .eyebrow { text-align: right; }
+
+    .cover-hero {
+      padding: 35mm 0 22mm;
+      border-bottom: 7px solid #d6e3d7;
+    }
+
+    h1,
+    h2,
+    h3,
+    p { margin-top: 0; }
+
+    h1 {
+      max-width: 150mm;
+      margin-bottom: 9px;
+      color: #173f45;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 34pt;
+      font-weight: 400;
+      letter-spacing: -.03em;
+      line-height: 1.08;
+    }
+
+    .dek {
+      max-width: 126mm;
+      margin-bottom: 0;
+      color: #63716d;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 14pt;
+      line-height: 1.45;
+    }
+
+    .cover-meta {
+      margin-top: 15mm;
+      color: #52625d;
+      font-size: 8.5pt;
+      letter-spacing: .04em;
+    }
+
+    .metric-row {
+      gap: 10px;
+      margin: 14mm 0 12mm;
+      align-items: stretch;
+    }
+
+    .metric {
+      flex: 1;
+      min-height: 30mm;
+      padding: 13px;
+      border: 1px solid #d8ddd7;
+      background: #f5f6f1;
+    }
+
+    .metric-value {
+      display: block;
+      margin-bottom: 4px;
+      color: #173f45;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 23pt;
+      line-height: 1;
+    }
+
+    .metric-name {
+      color: #687872;
+      font-size: 8.5pt;
+    }
+
+    .panel {
+      padding: 16px;
+      border: 1px solid #d8ddd7;
+      background: #fffefa;
+    }
+
+    .panel h2,
+    .panel h3 { margin-bottom: 8px; }
+
+    h2 {
+      color: #173f45;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 23pt;
+      font-weight: 400;
+      letter-spacing: -.02em;
+      line-height: 1.15;
+    }
+
+    h3 {
+      color: #173f45;
+      font-size: 10pt;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+    }
+
+    .signal-row {
+      min-height: 25px;
+      border-top: 1px solid #e3e6e1;
+      gap: 9px;
+    }
+
+    .signal-row:first-of-type { border-top: 0; }
+
+    .signal-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #4d8874;
+    }
+
+    .signal-dot.watch { background: #d48a45; }
+    .signal-dot.action { background: #b9564d; }
+
+    .signal-name { flex: 1; color: #36453f; }
+    .signal-value { color: #687872; font-size: 8.5pt; }
+
+    .cover-note {
+      margin-top: 11mm;
+      color: #718078;
+      font-size: 8.5pt;
+    }
+
+    .page-footer {
+      position: absolute;
+      right: 16mm;
+      bottom: 9mm;
+      left: 16mm;
+      justify-content: space-between;
+      border-top: 1px solid #d8ddd7;
+      padding-top: 7px;
+      color: #87928d;
+      font-size: 7.5pt;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+    }
+
+    .section-header {
+      justify-content: space-between;
+      margin-bottom: 12mm;
+      border-bottom: 1px solid #d8ddd7;
+      padding-bottom: 8px;
+    }
+
+    .section-header h2 { margin: 4px 0 0; }
+
+    .page-mark {
+      width: 31px;
+      height: 31px;
+      border: 1px solid #9db2a8;
+      color: #173f45;
+      line-height: 29px;
+      text-align: center;
+    }
+
+    .route-table,
+    .signoff-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .route-table th,
+    .route-table td {
+      border-bottom: 1px solid #dfe3de;
+      padding: 11px 9px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .route-table th {
+      background: #173f45;
+      color: #fffefa;
+      font-size: 7.5pt;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+
+    .route-table tbody tr:nth-child(even) { background: #f5f6f1; }
+
+    .route-name {
+      color: #173f45;
+      font-weight: 700;
+    }
+
+    .route-code {
+      display: block;
+      margin-top: 3px;
+      color: #87928d;
+      font-family: "Courier New", monospace;
+      font-size: 7.5pt;
+    }
+
+    .status {
+      display: inline-block;
+      border: 1px solid #b7cdbd;
+      border-radius: 12px;
+      padding: 3px 8px;
+      color: #356a59;
+      font-size: 7.5pt;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .status.watch {
+      border-color: #e2c39c;
+      color: #9b642d;
+    }
+
+    .status.action {
+      border-color: #e2aaa5;
+      color: #a14640;
+    }
+
+    .two-col {
+      display: flex;
+      gap: 12px;
+      margin-top: 13mm;
+      align-items: stretch;
+    }
+
+    .two-col > .panel { flex: 1; }
+
+    .panel p:last-child { margin-bottom: 0; }
+
+    .reading-list {
+      margin: 0;
+      padding-left: 17px;
+      color: #52625d;
+    }
+
+    .reading-list li { margin-bottom: 7px; }
+
+    .callout {
+      margin-top: 12mm;
+      border-left: 5px solid #d48a45;
+      padding: 13px 15px;
+      background: #fbf2e7;
+    }
+
+    .callout strong { color: #8f5b2a; }
+
+    .plan-list {
+      border-top: 1px solid #d8ddd7;
+    }
+
+    .plan-item {
+      gap: 14px;
+      align-items: flex-start;
+      border-bottom: 1px solid #d8ddd7;
+      padding: 17px 0;
+    }
+
+    .plan-index {
+      flex: 0 0 29px;
+      height: 29px;
+      border-radius: 50%;
+      background: #d6e3d7;
+      color: #173f45;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 12pt;
+      line-height: 29px;
+      text-align: center;
+    }
+
+    .plan-copy { flex: 1; }
+    .plan-copy h3 { margin: 1px 0 5px; }
+    .plan-copy p { margin-bottom: 0; color: #63716d; }
+
+    .plan-item .status { margin-top: 2px; }
+
+    .next-window {
+      margin-top: 13mm;
+      padding: 15px;
+      border: 1px solid #173f45;
+      background: #edf3ee;
+    }
+
+    .next-window p { margin-bottom: 0; color: #52625d; }
+
+    .signoff-table {
+      margin-top: 13mm;
+      border-top: 1px solid #d8ddd7;
+    }
+
+    .signoff-table td {
+      width: 33.33%;
+      border-bottom: 1px solid #d8ddd7;
+      padding: 12px 9px 9px 0;
+      color: #687872;
+      font-size: 8.5pt;
+      vertical-align: bottom;
+    }
+
+    .signoff-table strong {
+      display: block;
+      margin-top: 4px;
+      color: #243039;
+      font-size: 9.5pt;
+      font-weight: 400;
+    }
+  </style>
+</head>
+<body>
+  <section class="page">
+    <header class="masthead">
+      <div class="brand-line">
+        <span class="brand-mark">N</span>
+        <span class="brand-name">Northline Cooperative</span>
+      </div>
+      <div class="eyebrow">Field operations brief<br>06–12 August 2026</div>
+    </header>
+
+    <div class="cover-hero">
+      <div class="eyebrow">Weekly dispatch / district 04</div>
+      <h1>Keeping the last mile visible.</h1>
+      <p class="dek">A calm, practical readout for the teams moving essential supplies through the north corridor.</p>
+      <p class="cover-meta">Prepared for the morning stand-up · Revision 1.2 · Internal circulation</p>
+    </div>
+
+    <div class="metric-row">
+      <div class="metric">
+        <span class="metric-value">84%</span>
+        <span class="metric-name">Routes on schedule</span>
+      </div>
+      <div class="metric">
+        <span class="metric-value">318</span>
+        <span class="metric-name">Stops completed</span>
+      </div>
+      <div class="metric">
+        <span class="metric-value">06:40</span>
+        <span class="metric-name">First dispatch</span>
+      </div>
+    </div>
+
+    <section class="panel">
+      <h2>Signal summary</h2>
+      <div class="signal-row">
+        <span class="signal-dot"></span>
+        <span class="signal-name">Cold-chain handoffs</span>
+        <span class="signal-value">Stable</span>
+      </div>
+      <div class="signal-row">
+        <span class="signal-dot watch"></span>
+        <span class="signal-name">North bridge access</span>
+        <span class="signal-value">Watch</span>
+      </div>
+      <div class="signal-row">
+        <span class="signal-dot action"></span>
+        <span class="signal-name">Late return scans</span>
+        <span class="signal-value">Action needed</span>
+      </div>
+    </section>
+
+    <p class="cover-note">This brief is designed to be read in under five minutes: the next two pages hold the route detail and the actions for the week ahead.</p>
+
+    <footer class="page-footer">
+      <span>Northline / Operations desk</span>
+      <span>01 / 03</span>
+    </footer>
+  </section>
+
+  <section class="page">
+    <header class="section-header">
+      <div>
+        <div class="eyebrow">01 / Route performance</div>
+        <h2>Where the week is moving</h2>
+      </div>
+      <div class="page-mark">02</div>
+    </header>
+
+    <table class="route-table">
+      <thead>
+        <tr>
+          <th>Route</th>
+          <th>Stops</th>
+          <th>On time</th>
+          <th>Next departure</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="route-name">Ridge market loop</span><span class="route-code">NL-04A</span></td>
+          <td>68</td>
+          <td>92%</td>
+          <td>06:40</td>
+          <td><span class="status">On track</span></td>
+        </tr>
+        <tr>
+          <td><span class="route-name">Canal-side kitchens</span><span class="route-code">NL-04B</span></td>
+          <td>54</td>
+          <td>81%</td>
+          <td>07:05</td>
+          <td><span class="status watch">Watch</span></td>
+        </tr>
+        <tr>
+          <td><span class="route-name">Orchard school run</span><span class="route-code">NL-04C</span></td>
+          <td>73</td>
+          <td>88%</td>
+          <td>07:20</td>
+          <td><span class="status">On track</span></td>
+        </tr>
+        <tr>
+          <td><span class="route-name">Old station relay</span><span class="route-code">NL-04D</span></td>
+          <td>41</td>
+          <td>67%</td>
+          <td>08:10</td>
+          <td><span class="status action">Intervene</span></td>
+        </tr>
+        <tr>
+          <td><span class="route-name">West allotment spur</span><span class="route-code">NL-04E</span></td>
+          <td>82</td>
+          <td>86%</td>
+          <td>08:35</td>
+          <td><span class="status">On track</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="two-col">
+      <section class="panel">
+        <h3>Readout</h3>
+        <ul class="reading-list">
+          <li>Early loading is protecting the first two departures.</li>
+          <li>Canal-side delays cluster around the 10:00 handoff.</li>
+          <li>Old station needs a second scan point this week.</li>
+        </ul>
+      </section>
+      <section class="panel">
+        <h3>Measure twice</h3>
+        <p>Use the return scan as the source of truth for completed stops. Driver notes remain useful context, but should not replace the scan.</p>
+      </section>
+    </div>
+
+    <div class="callout"><strong>Decision for Monday:</strong> keep the Old station relay on the standard route, but assign a floating coordinator until the second scan point is live.</div>
+
+    <footer class="page-footer">
+      <span>Northline / Operations desk</span>
+      <span>02 / 03</span>
+    </footer>
+  </section>
+
+  <section class="page">
+    <header class="section-header">
+      <div>
+        <div class="eyebrow">02 / Dispatch plan</div>
+        <h2>Small actions, clear owners</h2>
+      </div>
+      <div class="page-mark">03</div>
+    </header>
+
+    <div class="plan-list">
+      <div class="plan-item">
+        <span class="plan-index">1</span>
+        <div class="plan-copy">
+          <h3>Install the second scan point</h3>
+          <p>Place a paired scanner at Old station before the Tuesday departure and test it against the dispatch ledger.</p>
+        </div>
+        <span class="status action">Today</span>
+      </div>
+      <div class="plan-item">
+        <span class="plan-index">2</span>
+        <div class="plan-copy">
+          <h3>Shift the canal-side handoff</h3>
+          <p>Move the kitchen handoff 20 minutes earlier while the bridge access window remains unpredictable.</p>
+        </div>
+        <span class="status watch">Tuesday</span>
+      </div>
+      <div class="plan-item">
+        <span class="plan-index">3</span>
+        <div class="plan-copy">
+          <h3>Close the return-scan gap</h3>
+          <p>Review every missing return scan at the afternoon stand-up and record one reason code per exception.</p>
+        </div>
+        <span class="status">Daily</span>
+      </div>
+      <div class="plan-item">
+        <span class="plan-index">4</span>
+        <div class="plan-copy">
+          <h3>Publish the next route sheet</h3>
+          <p>Release the revised sheet with the bridge note, the new scan point, and the named floating coordinator.</p>
+        </div>
+        <span class="status">Friday</span>
+      </div>
+    </div>
+
+    <section class="next-window">
+      <div class="table-label">Next review window</div>
+      <h3>Monday, 17 August · 08:15</h3>
+      <p>Bring route exceptions, scanner uptime, and the first two days of Old station return scans.</p>
+    </section>
+
+    <table class="signoff-table">
+      <tbody>
+        <tr>
+          <td><span class="table-label">Prepared by</span><strong>Operations desk</strong></td>
+          <td><span class="table-label">Reviewed by</span><strong>Area coordinators</strong></td>
+          <td><span class="table-label">Distribution</span><strong>Route leads · Dispatch</strong></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <footer class="page-footer">
+      <span>Northline / Operations desk</span>
+      <span>03 / 03</span>
+    </footer>
+  </section>
+</body>
+</html>

@@ -371,12 +371,18 @@ func rasterizeContext(ctx context.Context, res *layout.Result, height float64, t
 	atlas := newGlyphAtlas()
 	imageCache := newRasterImageCache()
 
-	for _, i := range rasterPaintOrder(res.Ops) {
+	for _, opIndex := range rasterPaintOrder(res.Ops) {
 		if err := ctx.Err(); err != nil {
 			return nil, fmt.Errorf("imageout: context: %w", err)
 		}
 
-		paint(img, &res.Ops[i], pxPerPt, atlas, imageCache)
+		if overlay, ok := roundedBorderLineOverlay(res.Ops, opIndex); ok {
+			paintStrokeRect(img, &overlay, layout.StyleOf(&overlay), pxPerPt)
+
+			continue
+		}
+
+		paint(img, &res.Ops[opIndex], pxPerPt, atlas, imageCache)
 	}
 
 	if rasterSS <= 1 {
@@ -396,6 +402,59 @@ func rasterizeContext(ctx context.Context, res *layout.Result, height float64, t
 	}
 
 	return downscaled, nil
+}
+
+// roundedBorderLineOverlay identifies a side-specific OpLine emitted beside
+// a rounded base OpStrokeRect. Layout uses that representation for borders
+// whose sides differ in color or width: the base operation owns the corner
+// arcs and the line owns the side's paint. Replaying a top line as a masked
+// rounded stroke keeps the side color through both corner arcs instead of
+// leaving the base stroke visible as a colored cap.
+func roundedBorderLineOverlay(ops []layout.Op, index int) (layout.Op, bool) { //nolint:cyclop
+	if index < 0 || index >= len(ops) || ops[index].Kind != layout.OpLine || ops[index].W <= 0 || ops[index].H != 0 {
+		return layout.Op{}, false //nolint:exhaustruct // sentinel operation
+	}
+
+	line := ops[index]
+
+	for strokeIndex := index - 1; strokeIndex >= 0; strokeIndex-- {
+		stroke := ops[strokeIndex]
+		if stroke.Kind != layout.OpStrokeRect || stroke.StrokeMask != 0 || !hasRoundedStroke(&stroke) {
+			continue
+		}
+
+		radii := scaledRadii(&stroke, 1)
+		if !sameRoundedTopGeometry(line, stroke, radii) {
+			continue
+		}
+
+		overlay := stroke
+		overlay.R, overlay.G, overlay.B = line.R, line.G, line.B
+		overlay.Width = line.Width
+		overlay.Alpha = line.Alpha
+		overlay.PaintOpacity = line.PaintOpacity
+		overlay.StrokeMask = layout.StrokeMaskTop
+
+		return overlay, true
+	}
+
+	return layout.Op{}, false //nolint:exhaustruct // sentinel operation
+}
+
+func hasRoundedStroke(op *layout.Op) bool {
+	return op.Radius > 0 || op.RadiusTopLeft > 0 || op.RadiusTopRight > 0 ||
+		op.RadiusBottomRight > 0 || op.RadiusBottomLeft > 0
+}
+
+func sameRoundedTopGeometry(line, stroke layout.Op, radii [4]float64) bool {
+	const geometryEpsilon = 0.01
+
+	wantX := stroke.X + radii[0]
+	wantW := stroke.W - radii[0] - radii[1]
+
+	return math.Abs(line.X-wantX) <= geometryEpsilon &&
+		math.Abs(line.Y-stroke.Y) <= geometryEpsilon &&
+		math.Abs(line.W-wantW) <= geometryEpsilon
 }
 
 func rasterDimension(value float64, maxVal int) (int, error) {
@@ -785,6 +844,13 @@ func paintFillRect(img *image.NRGBA, paintOp *layout.Op, pxPerPt float64) {
 	rect := ptRectScale(paintOp.X, paintOp.Y, paintOp.W, paintOp.H, pxPerPt).Intersect(img.Bounds())
 
 	if !rect.Empty() {
+		if paintOp.Radius > 0 || paintOp.RadiusTopLeft > 0 || paintOp.RadiusTopRight > 0 ||
+			paintOp.RadiusBottomRight > 0 || paintOp.RadiusBottomLeft > 0 {
+			paintRoundedFill(img, rect, paintOp, pxPerPt, col)
+
+			return
+		}
+
 		if col.A == opaqueAlpha {
 			fillNRGBAOpaque(img, rect, col)
 		} else {
@@ -805,6 +871,26 @@ func paintStrokeRect(img *image.NRGBA, paintOp *layout.Op, paintStyle layout.Pai
 		R: uint8(paintOp.R * channelMax), G: uint8(paintOp.G * channelMax), B: uint8(paintOp.B * channelMax), A: opaqueAlpha,
 	}
 	lineWidth := strokeWidthScale(paintStyle.StrokeWidth, pxPerPt)
+
+	if paintOp.StrokeMask == layout.StrokeMaskTop {
+		paintRoundedTopStroke(img, paintOp, col, lineWidth, pxPerPt)
+
+		return
+	}
+
+	if paintOp.StrokeMask == layout.StrokeMaskLeft {
+		paintRoundedLeftStroke(img, paintOp, col, lineWidth, pxPerPt)
+
+		return
+	}
+
+	if paintOp.Radius > 0 || paintOp.RadiusTopLeft > 0 || paintOp.RadiusTopRight > 0 ||
+		paintOp.RadiusBottomRight > 0 || paintOp.RadiusBottomLeft > 0 {
+		paintRoundedStroke(img, paintOp, col, lineWidth, pxPerPt)
+
+		return
+	}
+
 	rect := ptRectScale(paintOp.X, paintOp.Y, paintOp.W, paintOp.H, pxPerPt)
 
 	rects := [4]image.Rectangle{
@@ -818,6 +904,215 @@ func paintStrokeRect(img *image.NRGBA, paintOp *layout.Op, paintStyle layout.Pai
 			fillNRGBAOpaque(img, rr, col)
 		}
 	}
+}
+
+func paintRoundedFill(
+	img *image.NRGBA,
+	rect image.Rectangle,
+	paintOp *layout.Op,
+	pxPerPt float64,
+	col color.NRGBA,
+) {
+	radii := scaledRadii(paintOp, pxPerPt)
+	mask := image.NewAlpha(rect)
+
+	for y := rect.Min.Y; y < rect.Max.Y; y++ {
+		for x := rect.Min.X; x < rect.Max.X; x++ {
+			if roundedContains(float64(x)+pixelCenter, float64(y)+pixelCenter, float64(rect.Min.X),
+				float64(rect.Min.Y), float64(rect.Dx()), float64(rect.Dy()), radii) {
+				mask.SetAlpha(x, y, color.Alpha{A: opaqueAlpha})
+			}
+		}
+	}
+
+	draw.DrawMask(img, rect, image.NewUniform(col), image.Point{X: 0, Y: 0}, mask, rect.Min, draw.Over)
+}
+
+//nolint:varnamelen,mnd // raster geometry mirrors the compact PDF path
+func paintRoundedTopStroke(
+	img *image.NRGBA,
+	paintOp *layout.Op,
+	col color.NRGBA,
+	lineWidth int,
+	pxPerPt float64,
+) {
+	radii := scaledRadii(paintOp, pxPerPt)
+	x := paintOp.X * pxPerPt
+	y := paintOp.Y * pxPerPt
+	w := paintOp.W * pxPerPt
+	leftRadius, rightRadius := radii[0], radii[1]
+	strokeInset := float64(lineWidth) / boxFilterFactor2
+	leftRadius = max(leftRadius-strokeInset, 0)
+	rightRadius = max(rightRadius-strokeInset, 0)
+
+	points := make([]rasterPoint, 0, roundedArcSteps*2+3) //nolint:mnd // two arcs plus their joins
+	points = append(points, rasterPoint{X: x, Y: y + leftRadius})
+	points = appendArc(points, x+leftRadius, y+leftRadius, leftRadius, math.Pi, 1.5*math.Pi)
+	points = append(points, rasterPoint{X: x + w - rightRadius, Y: y})
+	points = appendArc(points, x+w-rightRadius, y+rightRadius, rightRadius, 1.5*math.Pi, 2*math.Pi)
+	points = append(points, rasterPoint{X: x + w, Y: y + rightRadius})
+
+	paintPolyline(img, points, col, lineWidth)
+}
+
+//nolint:varnamelen,mnd // raster geometry mirrors the compact PDF path
+func paintRoundedLeftStroke(
+	img *image.NRGBA,
+	paintOp *layout.Op,
+	col color.NRGBA,
+	lineWidth int,
+	pxPerPt float64,
+) {
+	radii := scaledRadii(paintOp, pxPerPt)
+	x := paintOp.X * pxPerPt
+	y := paintOp.Y * pxPerPt
+	h := paintOp.H * pxPerPt
+	strokeInset := float64(lineWidth) / boxFilterFactor2
+	x += strokeInset
+	topRadius := max(radii[0]-strokeInset, 0)
+	bottomRadius := max(radii[3]-strokeInset, 0)
+
+	points := make([]rasterPoint, 0, roundedArcSteps*2+3) //nolint:mnd // two arcs plus their joins
+	points = append(points, rasterPoint{X: x + bottomRadius, Y: y + h})
+	points = appendArc(points, x+bottomRadius, y+h-bottomRadius, bottomRadius, 0.5*math.Pi, math.Pi)
+	points = append(points, rasterPoint{X: x, Y: y + topRadius})
+	points = appendArc(points, x+topRadius, y+topRadius, topRadius, math.Pi, 1.5*math.Pi)
+
+	paintPolyline(img, points, col, lineWidth)
+}
+
+//nolint:varnamelen,mnd // raster geometry mirrors the compact PDF path
+func paintRoundedStroke(
+	img *image.NRGBA,
+	paintOp *layout.Op,
+	col color.NRGBA,
+	lineWidth int,
+	pxPerPt float64,
+) {
+	radii := scaledRadii(paintOp, pxPerPt)
+	x := paintOp.X * pxPerPt
+	y := paintOp.Y * pxPerPt
+	w := paintOp.W * pxPerPt
+	h := paintOp.H * pxPerPt
+	strokeInset := float64(lineWidth) / boxFilterFactor2
+
+	for i := range radii {
+		radii[i] = max(radii[i]-strokeInset, 0)
+	}
+
+	points := make([]rasterPoint, 0, roundedArcSteps*4+4) //nolint:mnd // four arcs plus their joins
+	points = append(points, rasterPoint{X: x + radii[0], Y: y})
+	points = append(points, rasterPoint{X: x + w - radii[1], Y: y})
+	points = appendArc(points, x+w-radii[1], y+radii[1], radii[1], 1.5*math.Pi, 2*math.Pi)
+	points = append(points, rasterPoint{X: x + w, Y: y + h - radii[2]})
+	points = appendArc(points, x+w-radii[2], y+h-radii[2], radii[2], 0, 0.5*math.Pi)
+	points = append(points, rasterPoint{X: x + radii[3], Y: y + h})
+	points = appendArc(points, x+radii[3], y+h-radii[3], radii[3], 0.5*math.Pi, math.Pi)
+	points = append(points, rasterPoint{X: x, Y: y + radii[0]})
+	points = appendArc(points, x+radii[0], y+radii[0], radii[0], math.Pi, 1.5*math.Pi)
+
+	paintPolyline(img, points, col, lineWidth)
+}
+
+const roundedArcSteps = 8
+
+type rasterPoint struct {
+	X, Y float64
+}
+
+func appendArc(points []rasterPoint, centerX, centerY, radius, start, end float64) []rasterPoint {
+	if radius <= 0 {
+		return points
+	}
+
+	for step := 1; step <= roundedArcSteps; step++ {
+		angle := start + (end-start)*float64(step)/roundedArcSteps
+		points = append(points, rasterPoint{
+			X: centerX + radius*math.Cos(angle),
+			Y: centerY + radius*math.Sin(angle),
+		})
+	}
+
+	return points
+}
+
+func paintPolyline(img *image.NRGBA, points []rasterPoint, col color.NRGBA, lineWidth int) {
+	for i := 1; i < len(points); i++ {
+		paintStrokeSegment(img, points[i-1], points[i], col, lineWidth)
+	}
+}
+
+func paintStrokeSegment(img *image.NRGBA, start, end rasterPoint, col color.NRGBA, lineWidth int) {
+	half := float64(lineWidth) / boxFilterFactor2
+	minX := max(int(math.Floor(math.Min(start.X, end.X)-half))-1, img.Bounds().Min.X)
+	maxX := min(int(math.Ceil(math.Max(start.X, end.X)+half))+1, img.Bounds().Max.X)
+	minY := max(int(math.Floor(math.Min(start.Y, end.Y)-half))-1, img.Bounds().Min.Y)
+	maxY := min(int(math.Ceil(math.Max(start.Y, end.Y)+half))+1, img.Bounds().Max.Y)
+
+	for y := minY; y < maxY; y++ {
+		for x := minX; x < maxX; x++ {
+			if pointSegmentDistance(float64(x)+pixelCenter, float64(y)+pixelCenter, start, end) <= half {
+				img.SetNRGBA(x, y, col)
+			}
+		}
+	}
+}
+
+//nolint:varnamelen,wsl // segment math uses conventional compact names
+func pointSegmentDistance(x, y float64, start, end rasterPoint) float64 {
+	dx := end.X - start.X
+	dy := end.Y - start.Y
+	lengthSquared := dx*dx + dy*dy
+	if lengthSquared == 0 {
+		return math.Hypot(x-start.X, y-start.Y)
+	}
+
+	t := ((x-start.X)*dx + (y-start.Y)*dy) / lengthSquared
+	if t < 0 {
+		t = 0
+	} else if t > 1 {
+		t = 1
+	}
+
+	return math.Hypot(x-(start.X+t*dx), y-(start.Y+t*dy))
+}
+
+func scaledRadii(paintOp *layout.Op, pxPerPt float64) [4]float64 {
+	radii := [4]float64{paintOp.RadiusTopLeft, paintOp.RadiusTopRight, paintOp.RadiusBottomRight, paintOp.RadiusBottomLeft}
+	if radii == [4]float64{} {
+		radii = [4]float64{paintOp.Radius, paintOp.Radius, paintOp.Radius, paintOp.Radius}
+	}
+
+	for i := range radii {
+		radii[i] *= pxPerPt
+	}
+
+	return radii
+}
+
+//nolint:cyclop,varnamelen,wsl // four corner regions are explicit
+func roundedContains(
+	x, y, originX, originY, width, height float64,
+	radii [4]float64,
+) bool {
+	if x < originX || x >= originX+width || y < originY || y >= originY+height {
+		return false
+	}
+
+	if x < originX+radii[0] && y < originY+radii[0] {
+		return math.Hypot(x-(originX+radii[0]), y-(originY+radii[0])) <= radii[0]
+	}
+	if x >= originX+width-radii[1] && y < originY+radii[1] {
+		return math.Hypot(x-(originX+width-radii[1]), y-(originY+radii[1])) <= radii[1]
+	}
+	if x >= originX+width-radii[2] && y >= originY+height-radii[2] {
+		return math.Hypot(x-(originX+width-radii[2]), y-(originY+height-radii[2])) <= radii[2]
+	}
+	if x < originX+radii[3] && y >= originY+height-radii[3] {
+		return math.Hypot(x-(originX+radii[3]), y-(originY+height-radii[3])) <= radii[3]
+	}
+
+	return true
 }
 
 // paintLine paints a horizontal or vertical stroke centred on the paintOp.

@@ -9,13 +9,13 @@ import (
 )
 
 func (e *engine) emitBorders(sty ResolvedStyle, posX, posY, boxW, boxH float64) {
-	e.emitBorderLine(posX, posY, boxW, 0, e.scalePt(sty.BorderTop.Width), sty.BorderTop.Style,
+	e.emitBorderLine(posX, posY, boxW, 0, e.scalePt(borderPaint(sty.BorderTop)), sty.BorderTop.Style,
 		sty.BorderTop.Color[0], sty.BorderTop.Color[1], sty.BorderTop.Color[2])
-	e.emitBorderLine(posX+boxW, posY, 0, boxH, e.scalePt(sty.BorderRight.Width), sty.BorderRight.Style,
+	e.emitBorderLine(posX+boxW, posY, 0, boxH, e.scalePt(borderPaint(sty.BorderRight)), sty.BorderRight.Style,
 		sty.BorderRight.Color[0], sty.BorderRight.Color[1], sty.BorderRight.Color[2])
-	e.emitBorderLine(posX, posY+boxH, boxW, 0, e.scalePt(sty.BorderBottom.Width), sty.BorderBottom.Style,
+	e.emitBorderLine(posX, posY+boxH, boxW, 0, e.scalePt(borderPaint(sty.BorderBottom)), sty.BorderBottom.Style,
 		sty.BorderBottom.Color[0], sty.BorderBottom.Color[1], sty.BorderBottom.Color[2])
-	e.emitBorderLine(posX, posY, 0, boxH, e.scalePt(sty.BorderLeft.Width), sty.BorderLeft.Style,
+	e.emitBorderLine(posX, posY, 0, boxH, e.scalePt(borderPaint(sty.BorderLeft)), sty.BorderLeft.Style,
 		sty.BorderLeft.Color[0], sty.BorderLeft.Color[1], sty.BorderLeft.Color[2])
 }
 

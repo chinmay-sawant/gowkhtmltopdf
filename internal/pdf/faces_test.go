@@ -6,6 +6,7 @@ import (
 	"testing"
 )
 
+//nolint:cyclop // validates every bundled family in one table-free assertion
 func TestLoadDefaultFaces(t *testing.T) {
 	t.Parallel()
 
@@ -14,7 +15,9 @@ func TestLoadDefaultFaces(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if faces.Regular == nil || faces.Bold == nil || faces.Italic == nil || faces.BoldItalic == nil {
+	if faces.Regular == nil || faces.Bold == nil || faces.Italic == nil || faces.BoldItalic == nil ||
+		faces.Serif == nil || faces.SerifBold == nil || faces.Mono == nil || faces.MonoBold == nil ||
+		faces.UnicodeFallback == nil || faces.UnicodeFallbackBold == nil {
 		t.Fatal("missing face")
 	}
 
@@ -53,6 +56,40 @@ func TestFaceResolve(t *testing.T) {
 
 	if faces.Resolve(700, true) != faces.BoldItalic {
 		t.Error("bold italic")
+	}
+}
+
+func TestFaceResolveFamilyAliases(t *testing.T) {
+	t.Parallel()
+
+	faces, err := LoadDefaultFaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got := faces.ResolveFamily([]string{"Georgia", "serif"}, 400, false); got != faces.Serif {
+		t.Error("Georgia should select the bundled serif face")
+	}
+
+	if got := faces.ResolveFamily([]string{"Courier New", "monospace"}, 700, false); got != faces.MonoBold {
+		t.Error("Courier New should select the bundled mono bold face")
+	}
+
+	if got := faces.ResolveFamily([]string{"Arial", "sans-serif"}, 700, false); got != faces.Bold {
+		t.Error("Arial should select the bundled sans bold face")
+	}
+}
+
+func TestUnicodeFallbackCoversStar(t *testing.T) {
+	t.Parallel()
+
+	faces, err := LoadDefaultFaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if faces.UnicodeFallback.GlyphID('★') == 0 || faces.UnicodeFallbackBold.GlyphID('★') == 0 {
+		t.Fatal("Unicode fallback faces do not cover star")
 	}
 }
 

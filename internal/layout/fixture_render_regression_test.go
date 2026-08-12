@@ -53,9 +53,9 @@ func TestStickySectionChromeRepairUsesContainingBlock(t *testing.T) { //nolint:f
 		x: 10, y: 0, w: 100,
 		style: &ResolvedStyle{ //nolint:exhaustruct // intentional zero fields
 			BGColor:      background,
-			BorderLeft:   border{Width: 1, Style: "solid", Color: borderRGB},
-			BorderRight:  border{Width: 1, Style: "solid", Color: borderRGB},
-			BorderBottom: border{Width: 1, Style: "solid", Color: borderRGB},
+			BorderLeft:   border{Width: 1, PaintWidth: 1, Style: "solid", Color: borderRGB},
+			BorderRight:  border{Width: 1, PaintWidth: 1, Style: "solid", Color: borderRGB},
+			BorderBottom: border{Width: 1, PaintWidth: 1, Style: "solid", Color: borderRGB},
 		},
 	}
 	section.children = []*box{{sticky: true}}

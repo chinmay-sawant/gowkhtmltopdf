@@ -689,6 +689,8 @@ func (d *Document) finalizePage(page *Page, pagesRef objRef) error {
 
 // buildPageResources assembles the /Resources dict from the content's fonts
 // and images.
+//
+//nolint:wsl // resource dictionary assembly is a linear PDF serialization block
 func buildPageResources(content *Content) (string, error) {
 	fonts, err := content.fonts()
 	if err != nil {
@@ -706,7 +708,10 @@ func buildPageResources(content *Content) (string, error) {
 
 		for _, name := range sortedStringKeys(fonts) {
 			ref := fonts[name]
-			res.WriteString(" /" + name + " " + ref)
+			res.WriteString(" /")
+			res.WriteString(name)
+			res.WriteString(" ")
+			res.WriteString(ref)
 		}
 
 		res.WriteString(" >>")
@@ -717,14 +722,18 @@ func buildPageResources(content *Content) (string, error) {
 
 		for _, name := range sortedStringKeys(imgResources) {
 			ref := imgResources[name]
-			res.WriteString(" /" + name + " " + ref)
+			res.WriteString(" /")
+			res.WriteString(name)
+			res.WriteString(" ")
+			res.WriteString(ref)
 		}
 
 		res.WriteString(" >>")
 	}
 
 	if gs := content.extGState(); gs != "" {
-		res.WriteString(" " + gs)
+		res.WriteString(" ")
+		res.WriteString(gs)
 	}
 
 	res.WriteString(" >>")
@@ -895,12 +904,10 @@ func pdfString(s string) string {
 }
 
 // winAnsiFold maps common Unicode punctuation that appears in HTML/CSS to a
-// single-byte Latin-1/WinAnsi stand-in. Unmapped runes are returned unchanged
-// (caller substitutes '?').
+// simple-font stand-in. Dashes outside Latin-1 remain unchanged so visible
+// text uses the Type0 path and retains the actual em/en dash glyph.
 func winAnsiFold(rVal rune) rune {
 	switch rVal {
-	case '\u2013', '\u2014': // en/em dash
-		return '-'
 	case '\u2018', '\u2019': // curly single quotes
 		return '\''
 	case '\u201C', '\u201D': // curly double quotes
@@ -918,6 +925,25 @@ func winAnsiFold(rVal rune) rune {
 	}
 
 	return rVal
+}
+
+// pdfDocEncodingFold maps punctuation to PDF document-string bytes. Unlike
+// visible page text, metadata and outline strings do not have a font subset,
+// so their standard PDFDocEncoding dash bytes are the lossless representation.
+func pdfDocEncodingFold(rVal rune) rune {
+	const (
+		pdfDocEnDash = 0x96
+		pdfDocEmDash = 0x97
+	)
+
+	switch rVal {
+	case '\u2013':
+		return pdfDocEnDash
+	case '\u2014':
+		return pdfDocEmDash
+	}
+
+	return winAnsiFold(rVal)
 }
 
 func pdfDate(t time.Time) string {

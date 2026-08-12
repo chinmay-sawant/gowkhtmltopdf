@@ -73,6 +73,10 @@ func sealBorderGap(
 		Width: borderW, R: red, G: green, B: blue,
 	}
 	res.Ops = append(res.Ops, op)
+	// This generated op is appended after flow pagination may have indexed the
+	// display list. Rebuild the index before any later movement consults it.
+	invalidateFlowIndex(res)
+
 	sealed := hseg{minX, maxX, gVal, borderW, red, green, blue}
 	*horiz = append(*horiz, sealed)
 	horizByY[roundY(gVal)] = append(horizByY[roundY(gVal)], sealed)
@@ -465,11 +469,17 @@ func paginateOps(res *Result, contentH float64) []int {
 	snapCrossingTextOps(res, contentH)
 
 	paginationFixpoint(res, contentH)
-
 	// After flow has settled, clone <thead> onto continuation pages.
 	// Blank avoid-list bands are controlled by preferSplitOverBlank during
 	// the fixpoint above (former packAvoidGaps sibling packing was a no-op).
 	repeatTableHeaders(res, contentH)
+	// Page-break fixups can temporarily move a final row across a boundary and
+	// later pull the table back, leaving that row's chrome at the old position.
+	// Collapse those stale inter-row gaps before painting the table.
+	normalizeTableRowGaps(res, contentH)
+	// Header continuation shifts can reintroduce a small leading band above a
+	// rounded security callout. Normalize after all flow shifts are complete.
+	normalizeLeadingRoundedCallouts(res, contentH)
 	// Sticky is applied in Paint after rect splitting (see splitCrossingRects).
 	opPage := make([]int, len(res.Ops))
 
@@ -519,18 +529,17 @@ func paginationFixpoint(res *Result, contentH float64) {
 // snapCrossingTextOps moves text/image/link ops that cross a page boundary to
 // the next page (taking following flow with them so row spacing is preserved).
 func snapCrossingTextOps(res *Result, contentH float64) {
+	tableRanges := tablePaintRanges(res)
+
 	for idx := range len(res.Ops) {
 		paintOp := &res.Ops[idx]
-		if paintOp.Fixed {
+		if paintOp.Fixed || opInPaintRange(idx, tableRanges) {
 			continue
 		}
 
 		switch paintOp.Kind {
 		case OpText, OpBullet, OpImage, OpLinkURI:
-			opH := paintOp.H
-			if paintOp.Kind == OpText || paintOp.Kind == OpBullet {
-				opH = paintOp.Size * defaultLineHeightRatio
-			}
+			opH := opInkHeight(*paintOp)
 
 			page, ok := checkedFlowPageOfY(paintOp.Y, contentH)
 			if !ok {
@@ -544,6 +553,36 @@ func snapCrossingTextOps(res *Result, contentH float64) {
 		case OpFillRect, OpStrokeRect, OpLine, opKindNoop:
 		}
 	}
+}
+
+type paintRange struct{ first, last int }
+
+func tablePaintRanges(res *Result) []paintRange {
+	if res == nil || res.root == nil {
+		return nil
+	}
+
+	ranges := make([]paintRange, 0)
+
+	for _, boxNode := range flowBoxList(res) {
+		if boxNode.kind != displayTable || boxNode.opStart > boxNode.opEnd {
+			continue
+		}
+
+		ranges = append(ranges, paintRange{first: boxNode.opStart, last: boxNode.opEnd})
+	}
+
+	return ranges
+}
+
+func opInPaintRange(index int, ranges []paintRange) bool {
+	for _, span := range ranges {
+		if index >= span.first && index <= span.last {
+			return true
+		}
+	}
+
+	return false
 }
 
 // snapOpToBoundary shifts one crossing op (and the row chrome under it) onto
@@ -582,6 +621,7 @@ func snapOpForward(res *Result, idx int, paintOp *Op, boundary float64) {
 
 	deltaY := boundary + lead - minY
 	shiftFlowY(res, idx, idx, oldY-layoutSlack, deltaY)
+	shiftNearestOwnedChrome(res, idx, oldY, deltaY)
 
 	for _, j := range chrome {
 		o := &res.Ops[j]
@@ -589,6 +629,59 @@ func snapOpForward(res *Result, idx int, paintOp *Op, boundary float64) {
 			o.Y += deltaY
 		}
 	}
+}
+
+// shiftNearestOwnedChrome moves the nearest block's background/side rail with
+// a text line that was snapped to the next page. Row-sized chrome is handled
+// separately by rowChromeAbove; this covers callout rails and other block
+// chrome that can span more than one row.
+//
+//nolint:cyclop,wsl,mnd // chrome ownership walk
+func shiftNearestOwnedChrome(res *Result, opIndex int, oldY, deltaY float64) {
+	if res == nil || res.root == nil || deltaY == 0 {
+		return
+	}
+
+	path := make([]*box, 0, 8)
+	if !findBoxPathForOp(res.root, opIndex, &path) {
+		return
+	}
+
+	for pathIndex := len(path) - 1; pathIndex >= 0; pathIndex-- {
+		boxNode := path[pathIndex]
+		moved := false
+		for idx := boxNode.opStart; idx <= boxNode.opEnd && idx < len(res.Ops); idx++ {
+			chromeOp := &res.Ops[idx]
+			if idx == opIndex || !isOwnBoxChrome(*chromeOp, boxNode, boxNode.y+boxNode.height) ||
+				chromeOp.Y >= oldY-0.01 ||
+				(oldY-chromeOp.Y > rowChromeBandTolerance && chromeOp.Kind != OpLine) {
+				continue
+			}
+
+			chromeOp.Y += deltaY
+			moved = true
+		}
+		if moved {
+			return
+		}
+	}
+}
+
+//nolint:wsl // recursive ownership walk keeps path mutation adjacent
+func findBoxPathForOp(boxNode *box, opIndex int, path *[]*box) bool {
+	if boxNode == nil || opIndex < boxNode.opStart || opIndex > boxNode.opEnd {
+		return false
+	}
+
+	*path = append(*path, boxNode)
+	for _, child := range boxNode.children {
+		if findBoxPathForOp(child, opIndex, path) {
+			return true
+		}
+	}
+	*path = (*path)[:len(*path)-1]
+
+	return true
 }
 
 // rowChromeAbove collects fill/stroke rects whose band touches oldY, with
@@ -800,6 +893,18 @@ func appendOpFragments(dst []Op, paintOp Op, contentH float64) []Op {
 		dst = append(dst, frag)
 		paintOp.Y = boundary
 		paintOp.H -= firstH
+
+		if paintOp.Kind == OpStrokeRect && paintOp.StrokeMask == StrokeMaskTop {
+			// A masked top border belongs only to the section's first
+			// fragment. Re-emitting the continuation as a stroke paints a
+			// false top rail at the next page boundary; retain a no-op marker
+			// so operation ownership and box ranges still include the source.
+			dst = append(dst, Op{ //nolint:exhaustruct // intentional no-op fragment
+				ID: paintOp.ID, Kind: opKindNoop, Y: paintOp.Y, H: paintOp.H,
+			})
+
+			return dst
+		}
 	}
 
 	return dst
@@ -824,6 +929,219 @@ func remapBoxOpRanges(boxNode *box, spans []opSpan) {
 		remapBoxOpRanges(child, spans)
 	}
 }
+
+// stretchPaginatedChrome repairs block chrome after pagination has shifted a
+// descendant past the block's original bottom. The layout box is built before
+// page-break fixups, so its background and side rails otherwise stop at the
+// stale natural height while the moved footer/text continues below it.
+//
+//nolint:cyclop,wsl // post-pagination ownership walk
+func stretchPaginatedChrome(res *Result) {
+	if res == nil || res.root == nil {
+		return
+	}
+
+	var walk func(*box)
+	walk = func(boxNode *box) {
+		for _, child := range boxNode.children {
+			walk(child)
+		}
+
+		if boxNode.opStart < 0 || boxNode.opStart > boxNode.opEnd || boxNode.opEnd >= len(res.Ops) || boxNode.height <= 0 {
+			return
+		}
+		if boxInsideTable(boxNode) || !hasOwnVerticalChrome(res.Ops, boxNode) {
+			return
+		}
+
+		oldBottom := boxNode.y + boxNode.height
+		contentBottom := oldBottom
+		normalizeOwnVerticalChrome(res.Ops, boxNode)
+		for idx := boxNode.opStart; idx <= boxNode.opEnd; idx++ {
+			operation := res.Ops[idx]
+			if isOwnBoxChrome(operation, boxNode, oldBottom) {
+				continue
+			}
+			// Absolutely positioned descendants are painted in the host's
+			// operation range but do not contribute to its used height. A
+			// generated ::after connector below a flex item must remain in the
+			// gap after that item; treating its ink as flowing content stretches
+			// the item's border during pagination.
+			if operation.Positioned {
+				continue
+			}
+
+			bottom := opInkBottom(operation)
+			if operation.Kind == OpText || operation.Kind == OpBullet {
+				bottom = operation.Y + operation.H
+			}
+			if bottom > contentBottom {
+				contentBottom = bottom
+			}
+		}
+
+		if contentBottom > oldBottom+1e-6 {
+			boxNode.height = contentBottom - boxNode.y
+		}
+		normalizeOwnVerticalChrome(res.Ops, boxNode)
+
+		for idx := boxNode.opStart; idx <= boxNode.opEnd; idx++ {
+			stretchOwnBoxChrome(&res.Ops[idx], boxNode, oldBottom, contentBottom)
+		}
+	}
+
+	walk(res.root)
+}
+
+//nolint:wsl // border ownership checks are intentionally explicit
+func hasOwnVerticalChrome(ops []Op, boxNode *box) bool {
+	if boxNode == nil || boxNode.style == nil {
+		return false
+	}
+	leftBorder := boxNode.style.BorderLeft.Width > 0 && boxNode.style.BorderLeft.Style != cssDisplayNone
+	rightBorder := boxNode.style.BorderRight.Width > 0 && boxNode.style.BorderRight.Style != cssDisplayNone
+	if !leftBorder && !rightBorder {
+		return false
+	}
+
+	for idx := boxNode.opStart; idx <= boxNode.opEnd && idx < len(ops); idx++ {
+		op := ops[idx]
+		if isVerticalChromeForBox(op, boxNode, leftBorder, rightBorder) {
+			return true
+		}
+	}
+
+	return false
+}
+
+//nolint:cyclop,wsl // fragment collection deliberately mirrors paint ownership
+func normalizeOwnVerticalChrome(ops []Op, boxNode *box) {
+	if boxNode == nil || boxNode.style == nil {
+		return
+	}
+
+	leftBorder := boxNode.style.BorderLeft.Width > 0 && boxNode.style.BorderLeft.Style != cssDisplayNone
+	rightBorder := boxNode.style.BorderRight.Width > 0 && boxNode.style.BorderRight.Style != cssDisplayNone
+	minY := math.Inf(1)
+	verticalIndexes := make([]int, 0)
+	for idx := boxNode.opStart; idx <= boxNode.opEnd && idx < len(ops); idx++ {
+		if isVerticalChromeForBox(ops[idx], boxNode, leftBorder, rightBorder) {
+			verticalIndexes = append(verticalIndexes, idx)
+			if ops[idx].Y < minY {
+				minY = ops[idx].Y
+			}
+		}
+	}
+	if math.IsInf(minY, 1) {
+		return
+	}
+
+	delta := boxNode.y - minY
+	if math.Abs(delta) <= layoutEpsilon {
+		return
+	}
+	for _, idx := range verticalIndexes {
+		ops[idx].Y += delta
+	}
+
+	last := verticalIndexes[len(verticalIndexes)-1]
+	lastBottom := ops[last].Y + ops[last].H
+	if lastBottom < boxNode.y+boxNode.height {
+		ops[last].H += boxNode.y + boxNode.height - lastBottom
+	}
+}
+
+//nolint:cyclop // chrome classification keeps line and masked-side geometry explicit
+func isVerticalChromeForBox(operation Op, boxNode *box, leftBorder, rightBorder bool) bool {
+	line := operation.Kind == OpLine && operation.W == 0
+	maskedLeft := operation.Kind == OpStrokeRect && operation.StrokeMask == StrokeMaskLeft
+	maskedRight := operation.Kind == OpStrokeRect && operation.StrokeMask == StrokeMaskRight
+
+	if !line && !maskedLeft && !maskedRight {
+		return false
+	}
+
+	return operation.H > 0 &&
+		operation.H <= boxNode.height+layoutEpsilon &&
+		((leftBorder && nearLayout(operation.X, boxNode.x) && (line || maskedLeft)) ||
+			(rightBorder && nearLayout(operation.X, boxNode.x+boxNode.w) && (line || maskedRight))) &&
+		operation.Y >= boxNode.y-layoutEpsilon && operation.Y <= boxNode.y+boxNode.height+layoutEpsilon
+}
+
+func opInkBottom(operation Op) float64 {
+	if operation.Kind == OpText || operation.Kind == OpBullet {
+		return operation.Y + opVisibleInkHeight(operation)
+	}
+
+	if operation.H > 0 {
+		return operation.Y + operation.H
+	}
+
+	if operation.Kind == OpLine && operation.W > 0 {
+		return operation.Y + math.Max(operation.Width, 1)
+	}
+
+	return operation.Y
+}
+
+//nolint:cyclop // classify box-owned paint
+func isOwnBoxChrome(operation Op, boxNode *box, oldBottom float64) bool {
+	if boxNode == nil {
+		return false
+	}
+
+	if (operation.Kind == OpFillRect || operation.Kind == OpStrokeRect) &&
+		nearLayout(operation.X, boxNode.x) && nearLayout(operation.Y, boxNode.y) &&
+		nearLayout(operation.W, boxNode.w) && nearLayout(operation.H, boxNode.height) {
+		return true
+	}
+
+	if operation.Kind != OpLine {
+		return false
+	}
+
+	vertical := isVerticalChromeForBox(operation, boxNode,
+		boxNode.style.BorderLeft.Width > 0 && boxNode.style.BorderLeft.Style != cssDisplayNone,
+		boxNode.style.BorderRight.Width > 0 && boxNode.style.BorderRight.Style != cssDisplayNone)
+	horizontal := operation.H == 0 && operation.W > 0 && nearLayout(operation.X, boxNode.x) &&
+		nearLayout(operation.W, boxNode.w) &&
+		(nearLayout(operation.Y, boxNode.y) || nearLayout(operation.Y, oldBottom))
+
+	return vertical || horizontal
+}
+
+//nolint:cyclop // mutate owned paint
+func stretchOwnBoxChrome(operation *Op, boxNode *box, oldBottom, newBottom float64) {
+	if operation == nil || boxNode == nil {
+		return
+	}
+
+	if (operation.Kind == OpFillRect || operation.Kind == OpStrokeRect) &&
+		nearLayout(operation.X, boxNode.x) && nearLayout(operation.Y, boxNode.y) &&
+		nearLayout(operation.W, boxNode.w) && nearLayout(operation.H, oldBottom-boxNode.y) {
+		operation.H = newBottom - boxNode.y
+
+		return
+	}
+
+	if operation.Kind == OpLine && operation.W == 0 && operation.H > 0 &&
+		((boxNode.style.BorderLeft.Width > 0 && nearLayout(operation.X, boxNode.x)) ||
+			(boxNode.style.BorderRight.Width > 0 && nearLayout(operation.X, boxNode.x+boxNode.w))) &&
+		operation.Y >= boxNode.y-layoutEpsilon && operation.Y <= boxNode.y+boxNode.height+layoutEpsilon &&
+		nearLayout(operation.Y+operation.H, oldBottom) {
+		operation.H = newBottom - operation.Y
+
+		return
+	}
+
+	if operation.Kind == OpLine && operation.H == 0 && operation.W > 0 &&
+		nearLayout(operation.X, boxNode.x) && nearLayout(operation.W, boxNode.w) &&
+		nearLayout(operation.Y, oldBottom) {
+		operation.Y = newBottom
+	}
+}
+
+func nearLayout(a, b float64) bool { return math.Abs(a-b) < 0.01 } //nolint:mnd // layout epsilon
 
 // stripOrphanRowChrome removes row-sized fills and horizontal rules that sit
 // on a page with no overlapping text/bullet/image ink. Page-break snaps move
@@ -974,10 +1292,7 @@ func lastInkBottom(res *Result, idxs []int, pageTop, pageBot float64) (float64, 
 
 		switch paintOp.Kind {
 		case OpText, OpBullet:
-			height := paintOp.Size * defaultLineHeightRatio
-			if paintOp.H > height {
-				height = paintOp.H
-			}
+			height := opInkHeight(*paintOp)
 
 			if height < minBoxPt {
 				height = 4
@@ -1228,6 +1543,8 @@ func sealStickySectionBottom(res *Result, target stickySectionChromeTarget, page
 			Width: target.borderBottomWidth,
 			R:     target.borderBottom[0], G: target.borderBottom[1], B: target.borderBottom[2],
 		})
+		// The generated closing rule changes the indexed display-list length.
+		invalidateFlowIndex(res)
 	}
 }
 

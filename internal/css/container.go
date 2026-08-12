@@ -200,7 +200,7 @@ func ParseContainerShorthand(value string) (string, string) {
 	if hasSlash {
 		t := strings.ToLower(strings.TrimSpace(typePart))
 		switch t {
-		case "normal", "size", featInlineSize:
+		case "normal", "size", featInlineSize: //nolint:goconst // CSS keyword is documented here
 			ctype = t
 		}
 	}

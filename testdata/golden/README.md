@@ -16,13 +16,17 @@ testdata/golden/
   fixture-01-simple-invoice.html       # single page, minimal CSS
   fixture-02-table-heavy-invoice.html  # wide table, borders, many rows
   fixture-03-multi-page-invoice.html   # >1 page, page-break usage
-  fixture-04-*.html .. fixture-53-*.html   # phase-9.1+ corpus (skip *-header/footer companions)
+  fixture-04-*.html .. fixture-55-*.html   # phase-9.1+ corpus (skip *-header/footer companions)
   fixture-36-header.html / fixture-36-footer.html  # nested HF companions for fixture-36
   fixture-49-night-train-poster.html       # one-page illustrated poster
   fixture-50-letter-template.html           # one-page stationery template
   fixture-51-asteria-storybook.html        # four-page original anime-inspired story
   fixture-52-airline-boarding-pass.html    # one-page e-ticket + four boarding stubs
   fixture-53-asteria-observatory-poster.html # second poster variant
+  fixture-55-lantern-cooperative-report.html # self-contained pure HTML/CSS operations brief
+  fixture-56-architecture-diagram.html      # 20-page architecture diagram, linked CSS
+  fixture-56-architecture-diagram.css       # linked stylesheet for fixture-56
+  font-examples.html                        # 13 Google Fonts showcase (inline style; fonts not bundled; --font-path driven)
   out/                  # generated PDFs (gitignored)
 ```
 
@@ -98,6 +102,9 @@ proves. Page envelopes are pinned in `internal/convert/golden_test.go`
 | 51 | Original Asteria storybook: page illustrations, live text, and page breaks | 4 |
 | 52 | Airline boarding pass: e-ticket itinerary, multi-column stubs, mono barcodes | 1 |
 | 53 | Asteria poster variant: shared theme with a different illustration and copy | 1 |
+| 55 | Self-contained operations brief: inline CSS, status cards, route table, action plan, and page breaks | 3 |
+| 56 | Architecture diagram: hero, pipeline strip, TOC, 10 domain sections (modern semantic tags: `dialog`, `details/summary`, `mark`, `meter`, `progress`, `output`, `time`, `data`, `kbd`, `samp`, `var`, `dfn`, `cite`, `ruby`, `rt`, `rp`, `bdi`, `bdo`, `wbr`, `ins`, `del`, `sub`, `sup`, `aside`, `address`, `fieldset`, `legend`, `picture`, `search`; modern CSS: `oklch()`/`color-mix()`/`clamp()`/logical properties with graceful-degrade fallbacks), linked `fixture-56-architecture-diagram.css`, dependency DAG, PDF-vs-image, security; derived from `documentation/architecture/` (commit ef526f9) | 20 |
+| font-examples | Font showcase: 1,125 free Google Fonts (fonts.google.com Feeling/Calligraphy filters + top-trending modern/display/script/handwriting) — randomized sampler: every font appears exactly once, each line in a random text style (regular, bold, italic, bold-italic, underline, strikethrough, underline+strikethrough, bold+underline, bold-italic+underline+strikethrough, letter-spaced, uppercase), rows span 100% width in a single column; inline `<style>`; fonts intentionally NOT bundled — render with `--font-path <dir>` or `Global().Set("fontpath", dir)`; falls back to Liberation Sans without font flags | 25 (with fonts, single column, number+name inline, overflow-wrap) |
 
 ## Pass criteria (MVP)
 

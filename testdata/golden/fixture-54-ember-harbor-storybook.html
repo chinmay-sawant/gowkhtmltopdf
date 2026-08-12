@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<!--
+  fixture-54-ember-harbor-storybook
+  Proves: an original print storybook in the same structure as fixture-51
+  (cover + chapter pages, shared theme-print-stories.css, explicit page
+  breaks) while loading illustrations from remote HTTP image URLs.
+  Expected: 4 pages with at least three embedded images.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Ember Harbor · The Tide Cartographer</title>
+  <link rel="stylesheet" href="theme-print-stories.css">
+</head>
+<body class="storybook">
+  <section class="print-page story-cover">
+    <div class="story-cover-art">
+      <img src="https://picsum.photos/id/1015/1200/720" alt="Rocky coastal cliffs overlooking a quiet harbor at dusk">
+    </div>
+    <div class="story-cover-copy">
+      <div class="small-caps">An original story in three tides</div>
+      <h1>Ember Harbor</h1>
+      <p>Written for the mapmakers who listen when the water redraws the shore.</p>
+    </div>
+  </section>
+
+  <section class="print-page story-page">
+    <div class="story-number">Chapter one</div>
+    <div class="story-illustration">
+      <img src="https://picsum.photos/id/1018/1100/620" alt="Wide hills under soft cloud light near the harbor approach">
+    </div>
+    <h2>The pier that moved at night</h2>
+    <p>Every chart in Ember Harbor began with a tide. Mira Solen carried hers in a brass chain and a pocket sextant, with Pip the fox padding at her side, though no one could explain why the southern pier stood six feet farther into the bay than the survey stakes allowed.</p>
+    <p>At dawn she measured twice. The water had edited the map. Pip sat in the center of her chalk spiral as if he had been waiting for the shape to finish.</p>
+  </section>
+
+  <section class="print-page story-page">
+    <div class="story-number">Chapter two</div>
+    <div class="story-illustration">
+      <img src="https://picsum.photos/id/1043/1100/620" alt="A mountain path through forest used as a stand-in for the ridge above the light">
+    </div>
+    <h2>The chart that breathed</h2>
+    <p>In her loft above the canal, Mira pinned fresh vellum over the spiral and waited. The indigo lines thickened at dusk, as if the paper were absorbing a tide that never reached the floor. Pip knocked over a jar of gold leaf, and the leaf stuck to the wet ink in a perfect arc no surveyor had ever recorded.</p>
+    <p>From the lighthouse gallery, Keeper Arden pointed to a dark seam in the water. Mira traced it onto silk. When the seam met the pier's spiral, salt crystallized on the chart and closed the gold arc into a ring. Inside it she saw a second light, small and patient, waiting under the waves.</p>
+  </section>
+
+  <section class="print-page story-page">
+    <div class="story-number">The last tide</div>
+    <h2>A map for coming home</h2>
+    <p>The chart did not point north. It pointed to the light the harbor had forgotten to name. Mira sealed the vellum with wax, hung it in the chandler's window, and let every sailor see the second light. Pip added one paw print in the corner.</p>
+    <p>That evening the equinox glow returned for a fourth night — something the old songs never promised. The copper roofs caught the last light, and for once the maps remembered with the sea.</p>
+    <p>Mira walked the pier again before breakfast. The stakes matched. The spiral was gone. Home was still home, only honest.</p>
+    <div class="story-colophon">Ember Harbor is an original, royalty-free print story created for this fixture. Story copy is embedded HTML text. Illustrations are remote images from picsum.photos (ids 1015, 1018, 1043), loaded at convert time.</div>
+  </section>
+</body>
+</html>

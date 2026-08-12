@@ -38,9 +38,7 @@ func BenchmarkWrite50Pages(b *testing.B) {
 		return doc
 	}
 
-	b.ResetTimer()
-
-	for range b.N {
+	for b.Loop() {
 		d := build()
 
 		var buf bytes.Buffer
@@ -63,9 +61,7 @@ func BenchmarkShapeRun(b *testing.B) {
 
 	const text = "The quick brown fox jumps over the lazy dog"
 
-	b.ResetTimer()
-
-	for range b.N {
+	for b.Loop() {
 		run := ShapeRun(text, fnt, 11)
 		if len(run.Runes) != len(run.Advances) {
 			b.Fatal("shaped run has unpaired advances")

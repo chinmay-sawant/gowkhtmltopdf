@@ -119,6 +119,8 @@ func onlyCollapsibleWS(nodes []*html.Node) bool {
 // Returns the advanced content height (cy end − cy start contribution is
 // encoded as the final cy relative to start; callers pass starting cy).
 // Float enclosure (extentCy) is the caller's job when it owns a BFC.
+//
+//nolint:cyclop,wsl,varnamelen,funlen // document-order flow keeps its state machine explicit
 func (e *engine) flowChildren(
 	parent *box, children []*html.Node, sty ResolvedStyle,
 	contentW, contentX, posY, curY float64,
@@ -141,8 +143,22 @@ func (e *engine) flowChildren(
 	absOriginY := posY + curY
 
 	absCBX, absCBW := contentX, contentW
-	if sty.HasTransform {
-		// Transformed element: padding box is the CB for abs/fixed descendants.
+	paddingBoxCB := sty.HasTransform
+	if sty.Position == positionRelative {
+		for _, child := range children {
+			childStyle := e.stylePtr(child)
+			if childStyle.Position == positionAbsolute &&
+				(!childStyle.BottomAuto || (childStyle.Height < 0 && childStyle.HeightPercent < 0)) {
+				paddingBoxCB = true
+
+				break
+			}
+		}
+	}
+
+	if paddingBoxCB {
+		// A positioned or transformed element uses its padding box as the
+		// containing block for absolute descendants.
 		absCBX = contentX - e.scalePt(sty.PaddingLeft)
 		absOriginY -= e.scalePt(sty.PaddingTop)
 		absCBW = contentW + e.scalePt(sty.PaddingLeft) + e.scalePt(sty.PaddingRight)
@@ -158,11 +174,28 @@ func (e *engine) flowChildren(
 			contentW, contentX, posY, curY, prevBottom, floats, deferred)
 	}
 
+	parentHeight := e.applyHeightConstraints(sty, curY+e.scalePt(sty.PaddingBottom))
+	cbHeight := parentHeight - (absOriginY - posY)
+	if cbHeight < 0 {
+		cbHeight = 0
+	}
+
 	for _, n := range deferred {
+		if e.absCBHeights == nil {
+			e.absCBHeights = make(map[*html.Node]float64, len(deferred))
+		}
+		e.absCBHeights[n] = cbHeight
 		ab := e.build(n, absCBW, absCBX, absOriginY)
+		delete(e.absCBHeights, n)
 		if ab != nil && parent != nil {
 			parent.children = append(parent.children, ab)
 		}
+	}
+	// A final child margin is inside a parent that has bottom padding or a
+	// bottom border. Without this, the margin disappears from the parent's
+	// used height, making padded cards and diagram boxes shorter than HTML.
+	if sty.PaddingBottom > 0 || sty.BorderBottom.Width > 0 {
+		curY += prevBottom
 	}
 
 	return curY
@@ -470,7 +503,8 @@ func (e *engine) emitListMarker(node *html.Node, style ResolvedStyle, contentX, 
 
 	e.add(Op{ //nolint:exhaustruct // intentional zero fields
 		Kind: OpBullet, X: posX, Y: baseline, Text: text, Font: face, Size: size,
-		R: style.Color[0], G: style.Color[1], B: style.Color[2],
+		InkDescent: e.fontDescentFace(face, size),
+		R:          style.Color[0], G: style.Color[1], B: style.Color[2],
 	})
 }
 

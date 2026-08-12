@@ -214,6 +214,24 @@ func TestShiftFlowYNegativeMaintainsFlowIndex(t *testing.T) {
 	}
 }
 
+func TestGeneratedPaginationOpsInvalidateFlowIndex(t *testing.T) {
+	t.Parallel()
+
+	res := &Result{ //nolint:exhaustruct // intentional zero fields
+		Ops:          []Op{{Kind: OpLine, Y: 10}}, //nolint:exhaustruct // intentional zero fields
+		flowPageOf:   []int{0},
+		flowPages:    [][]int{{0}},
+		flowPos:      []int{0},
+		flowPageSize: 100,
+	}
+
+	cloneHeaderOps(res, 0, 0, 10, 100)
+
+	if res.flowPageOf != nil || res.flowPages != nil || res.flowPos != nil {
+		t.Fatal("header cloning must invalidate cached flow indexes")
+	}
+}
+
 func BenchmarkUsedImageSize(b *testing.B) {
 	eng := &engine{opts: Options{Width: 640}, scale: 1, imgMaxW: 320} //nolint:exhaustruct // intentional zero fields
 

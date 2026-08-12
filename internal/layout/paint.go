@@ -99,6 +99,7 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 	}
 
 	opPage := paginateOps(res, contentH)
+	stretchPaginatedChrome(res)
 
 	if err := validatePaintPageIndices(res.Ops, contentH); err != nil {
 		return err
@@ -113,6 +114,7 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 	// Drop row shells left behind when text snapped to the next page
 	// (fixture-31: empty white rows after Row 27 on page 1).
 	stripOrphanRowChrome(res, contentH)
+	stretchPaginatedChrome(res)
 
 	// Close open tops on table continuations after rowspan/vertical splits.
 	capTablePageBreaks(res, contentH)
@@ -120,6 +122,7 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 	// Print-scoped sticky: clamp the natural fragment without fixed-style
 	// continuation clones.
 	applyStickyPrint(res, contentH)
+	stretchPaginatedChrome(res)
 
 	if err := validatePaintPageIndices(res.Ops, contentH); err != nil {
 		return err
@@ -151,7 +154,6 @@ func fixedOpIndices(res *Result) []int {
 // positions after rect splits and sticky shifts added or moved ops.
 func buildPagesAfterSplits(res *Result, contentH float64, _ []int) []int {
 	opPage, counts := pageBuckets(res.Ops, contentH)
-
 	res.Pages = make([][]int, len(counts))
 
 	for p := range counts {
@@ -198,6 +200,13 @@ func validatePaintPageIndices(ops []Op, contentH float64) error {
 // pageBuckets maps every op to its canvas page in one pass, with per-page
 // non-fixed op counts for exact-capacity buckets. Fixed ops leave pageOf at
 // its zero value; callers decide whether their fill pass includes them.
+//
+// The Y+layoutEpsilon bump matches appendOpFragments: a rect fragment ends
+// exactly at the next page top (Y = k*contentH), and float division of that
+// exact product can round just below k (e.g. (21*785.197)/785.197 =
+// 20.9999…). Without the bump the fragment is bucketed to the previous page,
+// which then paints two background bands while the intended page paints
+// none. The epsilon keeps a boundary-aligned op on the page it starts.
 func pageBuckets(ops []Op, contentH float64) ([]int, []int) {
 	// Page numbers are dense from 0..maxP, so counts index directly instead
 	// of a per-page map (page buckets below are exact-capacity, no growth).
@@ -208,7 +217,7 @@ func pageBuckets(ops []Op, contentH float64) ([]int, []int) {
 			continue
 		}
 
-		pageVal, ok := checkedFlowPageOfY(ops[idx].Y, contentH)
+		pageVal, ok := checkedFlowPageOfY(ops[idx].Y+layoutEpsilon, contentH)
 		if !ok {
 			return nil, nil
 		}
@@ -226,7 +235,7 @@ func pageBuckets(ops []Op, contentH float64) ([]int, []int) {
 			continue
 		}
 
-		pageVal, ok := checkedFlowPageOfY(ops[idx].Y, contentH)
+		pageVal, ok := checkedFlowPageOfY(ops[idx].Y+layoutEpsilon, contentH)
 		if !ok {
 			return nil, nil
 		}
@@ -708,13 +717,14 @@ func bandText(chld *pdf.Content, opts BandOptions, paintOp *Op, posX float64, fo
 	chld.SetFont(fontName, paintOp.Size)
 	chld.BeginText()
 	chld.TextAt(posX, posY)
+	chld.SetCharSpacing(paintOp.LetterSpacing)
 
 	if FakeBoldFor(paintOp) {
 		chld.SetLineWidth(paintOp.Size * outlineStrokeRatio)
 		chld.TextRenderMode(two)
 	}
 
-	chld.TextShow(paintOp.Text)
+	chld.TextShow(transformInlineText(paintOp.Text, paintOp.TextTransform))
 
 	if FakeBoldFor(paintOp) {
 		chld.TextRenderMode(0)
@@ -797,20 +807,226 @@ func canvasToPDF(opX, opY float64, pageIdx int, contentH float64, opts PaintOpti
 	return x, y
 }
 
+//nolint:varnamelen,wsl // PDF path helpers use compact graphics-state names
 func drawFill(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintOptions, pageH float64) {
 	x, y := canvasToPDF(op.X, op.Y+op.H, pageIdx, contentH, opts, pageH)
 	ps := StyleOf(op)
 	c.SetFillColor(ps.FillR, ps.FillG, ps.FillB)
-	c.Rect(x, y, op.W, op.H)
+	if op.Radius > 0 || opHasRoundedCorners(op) {
+		roundedRectPathCorners(c, x, y, op.W, op.H, opRadii(op))
+	} else {
+		c.Rect(x, y, op.W, op.H)
+	}
 	c.Fill()
 }
 
+//nolint:varnamelen,wsl // PDF path helpers use compact graphics-state names
 func drawStroke(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintOptions, pageH float64) {
 	x, y := canvasToPDF(op.X, op.Y+op.H, pageIdx, contentH, opts, pageH)
 	c.SetStrokeColor(op.R, op.G, op.B)
-	c.SetLineWidth(1)
-	c.Rect(x, y, op.W, op.H)
+	width := op.Width
+	if width <= 0 {
+		width = 1
+	}
+	c.SetLineWidth(width)
+	if op.StrokeMask == StrokeMaskTop {
+		c.SetLineCap(1)
+		roundedTopPath(c, x, y, op.W, op.H, width, opRadii(op))
+		c.Stroke()
+		c.SetLineCap(0)
+
+		return
+	}
+	if op.StrokeMask == StrokeMaskLeft {
+		if opHasRoundedCorners(op) {
+			c.SetLineCap(1)
+		}
+		roundedLeftPath(c, x, y, op.H, width, opRadii(op))
+		c.Stroke()
+		c.SetLineCap(0)
+
+		return
+	}
+	if op.Radius > 0 || opHasRoundedCorners(op) {
+		roundedRectPathCorners(c, x, y, op.W, op.H, opRadii(op))
+	} else {
+		c.Rect(x, y, op.W, op.H)
+	}
 	c.Stroke()
+}
+
+// roundedTopPath emits the top edge and its two corner arcs in PDF
+// coordinates. It is an open path because the remaining edges may use a
+// different CSS border style.
+//
+//nolint:varnamelen // PDF path builder uses conventional short receiver names
+func roundedTopPath(
+	c *pdf.Content,
+	originX, originY, boxWidth, boxHeight, strokeWidth float64,
+	radii [4]float64,
+) {
+	const kappa = 0.5522847498
+
+	strokeInset := strokeWidth / 2 //nolint:mnd // half the stroke width insets the centerline radius
+	leftRadius := math.Max(radii[0]-strokeInset, 0)
+	rightRadius := math.Max(radii[1]-strokeInset, 0)
+	topY := originY + boxHeight
+	rightX := originX + boxWidth
+
+	if leftRadius <= 0 {
+		c.MoveTo(originX, topY)
+	} else {
+		c.MoveTo(originX, topY-leftRadius)
+		c.CurveTo(
+			originX, topY-leftRadius+kappa*leftRadius,
+			originX+leftRadius-kappa*leftRadius, topY,
+			originX+leftRadius, topY,
+		)
+	}
+
+	c.LineTo(rightX-rightRadius, topY)
+
+	if rightRadius > 0 {
+		c.CurveTo(
+			rightX-rightRadius+kappa*rightRadius, topY,
+			rightX, topY-rightRadius+kappa*rightRadius,
+			rightX, topY-rightRadius,
+		)
+	} else {
+		c.LineTo(rightX, topY)
+	}
+}
+
+// roundedLeftPath emits the left edge and its two corner arcs in PDF
+// coordinates. It is open because the remaining edges may use other paint.
+//
+//nolint:varnamelen // PDF path builder uses conventional geometry names
+func roundedLeftPath(
+	c *pdf.Content,
+	originX, originY, boxHeight, strokeWidth float64,
+	radii [4]float64,
+) {
+	const kappa = 0.5522847498
+
+	strokeInset := strokeWidth / 2 //nolint:mnd // half the stroke width insets the centerline radius
+	originX += strokeInset
+	topRadius := math.Max(radii[0]-strokeInset, 0)
+	bottomRadius := math.Max(radii[3]-strokeInset, 0)
+	topY := originY + boxHeight
+
+	if bottomRadius > 0 {
+		c.MoveTo(originX+bottomRadius, originY)
+		c.CurveTo(
+			originX+bottomRadius-kappa*bottomRadius, originY,
+			originX, originY+bottomRadius-kappa*bottomRadius,
+			originX, originY+bottomRadius,
+		)
+	} else {
+		c.MoveTo(originX, originY)
+	}
+
+	c.LineTo(originX, topY-topRadius)
+
+	if topRadius > 0 {
+		c.CurveTo(
+			originX, topY-topRadius+kappa*topRadius,
+			originX+topRadius-kappa*topRadius, topY,
+			originX+topRadius, topY,
+		)
+	} else {
+		c.LineTo(originX, topY)
+	}
+}
+
+func opRadii(op *Op) [4]float64 {
+	if op.RadiusTopLeft == 0 && op.RadiusTopRight == 0 && op.RadiusBottomRight == 0 && op.RadiusBottomLeft == 0 {
+		return [4]float64{op.Radius, op.Radius, op.Radius, op.Radius}
+	}
+
+	return [4]float64{op.RadiusTopLeft, op.RadiusTopRight, op.RadiusBottomRight, op.RadiusBottomLeft}
+}
+
+func opHasRoundedCorners(op *Op) bool {
+	for _, radius := range opRadii(op) {
+		if radius > 0 {
+			return true
+		}
+	}
+
+	return false
+}
+
+// roundedRectPathCorners emits a PDF path for CSS order: top-left,
+// top-right, bottom-right, bottom-left. PDF's origin is bottom-left here.
+//
+//nolint:varnamelen // PDF path helper mirrors the standard Bezier approximation
+func roundedRectPathCorners(c *pdf.Content, originX, originY, width, height float64, radii [4]float64) {
+	const (
+		kappa = 0.5522847498
+		half  = 2.0
+	)
+
+	if !opRadiiPositive(radii) {
+		c.Rect(originX, originY, width, height)
+
+		return
+	}
+
+	for i := range radii {
+		if radii[i] < 0 {
+			radii[i] = 0
+		}
+	}
+
+	// Clamp each corner to the local box dimensions. Layout already applies
+	// CSS's adjacent-radii scaling; this protects hand-built ops as well.
+	for i := range radii {
+		if radii[i] > width/half {
+			radii[i] = width / half
+		}
+
+		if radii[i] > height/half {
+			radii[i] = height / half
+		}
+	}
+
+	topLeft, topRight := radii[0], radii[1]
+	bottomRight, bottomLeft := radii[2], radii[3]
+	c.MoveTo(originX+bottomLeft, originY)
+	c.LineTo(originX+width-bottomRight, originY)
+	c.CurveTo(
+		originX+width-bottomRight+kappa*bottomRight, originY,
+		originX+width, originY+bottomRight-kappa*bottomRight,
+		originX+width, originY+bottomRight,
+	)
+	c.LineTo(originX+width, originY+height-topRight)
+	c.CurveTo(
+		originX+width, originY+height-topRight+kappa*topRight,
+		originX+width-topRight+kappa*topRight, originY+height,
+		originX+width-topRight, originY+height,
+	)
+	c.LineTo(originX+topLeft, originY+height)
+	c.CurveTo(
+		originX+topLeft-kappa*topLeft, originY+height,
+		originX, originY+height-topLeft+kappa*topLeft,
+		originX, originY+height-topLeft,
+	)
+	c.LineTo(originX, originY+bottomLeft)
+	c.CurveTo(
+		originX, originY+bottomLeft-kappa*bottomLeft,
+		originX+bottomLeft-kappa*bottomLeft, originY,
+		originX+bottomLeft, originY,
+	)
+}
+
+func opRadiiPositive(radii [4]float64) bool {
+	for _, radius := range radii {
+		if radius > 0 {
+			return true
+		}
+	}
+
+	return false
 }
 
 func drawLine(chld *pdf.Content, paintOp *Op, pageIdx int, contentH float64, opts PaintOptions, pageH float64) {
@@ -843,10 +1059,19 @@ func drawText(
 	chld.BeginText()
 
 	if paintOp.RotateDeg == 90 || paintOp.RotateDeg == -90 {
-		chld.TextMatrix(0, 1, -1, 0, posX, posY)
+		if paintOp.RotateDeg < 0 {
+			// PDF's y-up text space reverses the screen-space direction.
+			// A CSS -90deg vertical run must therefore advance toward
+			// increasing canvas Y, not above its containing box.
+			chld.TextMatrix(0, -1, 1, 0, posX, posY)
+		} else {
+			chld.TextMatrix(0, 1, -1, 0, posX, posY)
+		}
 	} else {
 		chld.TextAt(posX, posY)
 	}
+
+	chld.SetCharSpacing(paintOp.LetterSpacing)
 	// Fake bold only for Latin when CSS wants bold but the face is not bold.
 	// Stroking CJK/Type0 outlines creates horizontal streak artifacts.
 	fakeBold := FakeBoldFor(paintOp)
@@ -855,7 +1080,7 @@ func drawText(
 		chld.TextRenderMode(two) // fill + stroke
 	}
 
-	chld.TextShow(paintOp.Text)
+	chld.TextShow(transformInlineText(paintOp.Text, paintOp.TextTransform))
 
 	if fakeBold {
 		chld.TextRenderMode(0)

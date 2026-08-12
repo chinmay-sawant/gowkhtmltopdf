@@ -9,6 +9,12 @@ import (
 	"gowkhtmltopdf/internal/css"
 )
 
+const (
+	borderRadiusValueCount  = 4
+	borderRadiusPairCount   = 2
+	borderRadiusTripleCount = 3
+)
+
 func applyDisplayGroup(
 	style *ResolvedStyle, prop, value string, _ float64, _ *styleContext, _ *ResolvedStyle, _ bool,
 ) bool {
@@ -520,7 +526,7 @@ func applyBoxSpacingProps(style *ResolvedStyle, prop, value string, fsize, viewp
 		return applyMarginVerticalProps(style, prop, value, fsize, viewportW)
 	case "margin-right", "margin-left":
 		return applyMarginHorizontalProps(style, prop, value, fsize, viewportW)
-	case "padding":
+	case paddingProperty:
 		return applyPaddingShorthandProps(style, value, fsize, viewportW)
 	case "padding-top", "padding-right", "padding-bottom", "padding-left":
 		return applyPaddingSideProps(style, prop, value, fsize, viewportW)
@@ -586,6 +592,8 @@ func applyBoxMinExtentProps(style *ResolvedStyle, prop, value string, fsize floa
 }
 
 func setMinWidthValue(style *ResolvedStyle, value string, fsize, viewportW float64) bool {
+	style.MinWidthSet = true
+
 	if value == overflowAuto || value == cssDisplayNone {
 		style.MinWidth = 0
 		style.MinWidthPercent = -1
@@ -658,9 +666,9 @@ func applyMarginShorthandProps(style *ResolvedStyle, value string, fsize, viewpo
 func applyMarginVerticalProps(style *ResolvedStyle, prop, value string, fsize, viewportW float64) bool {
 	switch prop {
 	case "margin-top":
-		style.MarginTop = marginLen(value, fsize, viewportW)
+		style.MarginTop, style.MarginTopAuto = marginLenAuto(value, fsize, viewportW)
 	case "margin-bottom":
-		style.MarginBottom = marginLen(value, fsize, viewportW)
+		style.MarginBottom, style.MarginBottomAuto = marginLenAuto(value, fsize, viewportW)
 	default:
 		return false
 	}
@@ -717,14 +725,83 @@ func applyBorderGroup(
 		return applyBorderOneSide(style, prop, value, fsize)
 	case borderWidthKeyword, "border-top-width", "border-right-width", "border-bottom-width", "border-left-width":
 		return applyBorderWidthProps(style, prop, value, fsize)
-	case borderStyleKeyword, borderColorKeyword:
+	case borderStyleKeyword, borderColorKeyword,
+		"border-top-color", "border-right-color", "border-bottom-color", "border-left-color":
 		return applyBorderStyleColorProps(style, prop, value)
+	case "border-radius":
+		return setBorderRadius(style, value, fsize)
 	default:
 		return false
 	}
 }
 
+//nolint:cyclop // CSS shorthand parsing and expansion are one atomic property operation
+func setBorderRadius(style *ResolvedStyle, value string, fsize float64) bool {
+	parts := strings.Fields(value)
+	if len(parts) == 0 {
+		return true
+	}
+
+	values := make([]float64, 0, len(parts))
+
+	for _, part := range parts {
+		if _, unit, ok := css.ParseLength(part); ok && unit == "%" {
+			// Percentage corner radii retain the existing uniform fallback;
+			// absolute asymmetric radii are represented independently below.
+			if v, _, ok := css.ParseLength(part); ok && v >= 0 {
+				style.BorderRadius = 0
+				style.BorderRadiusPercent = v
+			}
+
+			return true
+		}
+
+		radius, ok := lengthBox(part, fsize, 0, cssDisplayNone)
+		if !ok || radius < 0 {
+			return true
+		}
+
+		values = append(values, radius)
+	}
+
+	if len(values) == 0 {
+		return true
+	}
+
+	for len(values) < borderRadiusValueCount {
+		switch len(values) {
+		case 1:
+			values = append(values, values[0], values[0], values[0])
+		case borderRadiusPairCount:
+			values = append(values, values[0], values[1])
+		case borderRadiusTripleCount:
+			values = append(values, values[1])
+		}
+	}
+
+	style.BorderRadiusTopLeft = values[0]
+	style.BorderRadiusTopRight = values[1]
+	style.BorderRadiusBottomRight = values[2]
+	style.BorderRadiusBottomLeft = values[3]
+	style.BorderRadiusPercent = -1
+
+	if values[0] == values[1] && values[1] == values[2] && values[2] == values[3] {
+		style.BorderRadius = values[0]
+	} else {
+		style.BorderRadius = 0
+	}
+
+	return true
+}
+
 func applyBorderAllSides(style *ResolvedStyle, value string, fsize float64) bool {
+	if strings.EqualFold(strings.TrimSpace(value), cssDisplayNone) || strings.TrimSpace(value) == "0" {
+		zero := border{Width: 0, PaintWidth: 0, Style: "", Color: [3]float64{0, 0, 0}}
+		style.BorderTop, style.BorderRight, style.BorderBottom, style.BorderLeft = zero, zero, zero, zero
+
+		return true
+	}
+
 	if b, ok := parseBorder(value, fsize); ok {
 		style.BorderTop, style.BorderRight, style.BorderBottom, style.BorderLeft = b, b, b, b
 	}
@@ -750,6 +827,12 @@ func applyBorderOneSide(style *ResolvedStyle, prop, value string, fsize float64)
 }
 
 func setBorderSide(_ *ResolvedStyle, side *border, value string, fsize float64) {
+	if strings.EqualFold(strings.TrimSpace(value), cssDisplayNone) || strings.TrimSpace(value) == "0" {
+		*side = border{Width: 0, PaintWidth: 0, Style: "", Color: [3]float64{0, 0, 0}}
+
+		return
+	}
+
 	if b, ok := parseBorder(value, fsize); ok {
 		*side = b
 	}
@@ -759,15 +842,24 @@ func applyBorderWidthProps(style *ResolvedStyle, prop, value string, fsize float
 	switch prop {
 	case borderWidthKeyword:
 		w := borderWidth(value, fsize)
+		pw := borderPaintWidth(value, fsize)
 		style.BorderTop.Width, style.BorderRight.Width, style.BorderBottom.Width, style.BorderLeft.Width = w, w, w, w
+		style.BorderTop.PaintWidth = pw
+		style.BorderRight.PaintWidth = pw
+		style.BorderBottom.PaintWidth = pw
+		style.BorderLeft.PaintWidth = pw
 	case "border-top-width":
 		style.BorderTop.Width = borderWidth(value, fsize)
+		style.BorderTop.PaintWidth = borderPaintWidth(value, fsize)
 	case "border-right-width":
 		style.BorderRight.Width = borderWidth(value, fsize)
+		style.BorderRight.PaintWidth = borderPaintWidth(value, fsize)
 	case "border-bottom-width":
 		style.BorderBottom.Width = borderWidth(value, fsize)
+		style.BorderBottom.PaintWidth = borderPaintWidth(value, fsize)
 	case "border-left-width":
 		style.BorderLeft.Width = borderWidth(value, fsize)
+		style.BorderLeft.PaintWidth = borderPaintWidth(value, fsize)
 	default:
 		return false
 	}
@@ -775,6 +867,7 @@ func applyBorderWidthProps(style *ResolvedStyle, prop, value string, fsize float
 	return true
 }
 
+//nolint:cyclop // border shorthand/property dispatch
 func applyBorderStyleColorProps(style *ResolvedStyle, prop, value string) bool {
 	switch prop {
 	case borderStyleKeyword:
@@ -789,11 +882,25 @@ func applyBorderStyleColorProps(style *ResolvedStyle, prop, value string) bool {
 			c := [3]float64{float64(r) / 255, float64(g) / 255, float64(b) / 255}
 			style.BorderTop.Color, style.BorderRight.Color, style.BorderBottom.Color, style.BorderLeft.Color = c, c, c, c
 		}
+	case "border-top-color":
+		setBorderColor(&style.BorderTop, value)
+	case "border-right-color":
+		setBorderColor(&style.BorderRight, value)
+	case "border-bottom-color":
+		setBorderColor(&style.BorderBottom, value)
+	case "border-left-color":
+		setBorderColor(&style.BorderLeft, value)
 	default:
 		return false
 	}
 
 	return true
+}
+
+func setBorderColor(side *border, value string) {
+	if r, g, b, _, ok := css.ParseColor(value); ok {
+		side.Color = [3]float64{float64(r) / 255, float64(g) / 255, float64(b) / 255}
+	}
 }
 
 // applyColorGroup handles foreground and background colors.
@@ -909,9 +1016,16 @@ func applyTextGroup(
 func applyTextLayoutProps(style *ResolvedStyle, prop, value string) bool {
 	switch prop {
 	case "line-height":
+		style.LineHeightUnitless = 0
+		if ratio, ok := css.ParseNumber(value); ok {
+			style.LineHeightUnitless = ratio
+		}
+
 		style.LineHeight = lineHeight(value, style.FontSize)
 	case "text-align":
 		setTextAlignValue(style, value)
+	case "text-transform":
+		setTextTransformValue(style, value)
 	case "vertical-align":
 		setVerticalAlignValue(style, value)
 	case "white-space":
@@ -921,6 +1035,13 @@ func applyTextLayoutProps(style *ResolvedStyle, prop, value string) bool {
 	}
 
 	return true
+}
+
+func setTextTransformValue(style *ResolvedStyle, value string) {
+	switch value {
+	case textTransformNone, textTransformUppercase, textTransformLowercase, textTransformCapitalize:
+		style.TextTransform = value
+	}
 }
 
 func setTextAlignValue(style *ResolvedStyle, value string) {

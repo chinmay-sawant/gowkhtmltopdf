@@ -32,6 +32,8 @@ type inlineItem struct {
 	marginL    float64 // leading horizontal margin (e.g. span margin-left)
 	marginR    float64 // trailing horizontal margin
 	img        bool
+	chrome     bool // text belongs to an inline element with its own decoration
+	noSplit    bool // vertical writing-mode run must remain one rotated line
 	imgRef     *imageRef
 	href       string
 	forceBreak bool
@@ -193,7 +195,7 @@ func (e *engine) packInlineLine(
 		// that already has content and overflow into a float (wiki .IPA).
 		// Exception: never break before attaching punctuation / mid-cite
 		// (")[37]" → ")\n[" or "[\n37]" or "saying.[\n7]").
-		if lineAdv > 0 && lineAdv+adv > lineW {
+		if lineAdv > 0 && lineAdv+adv > lineW+layoutEpsilon {
 			idx, _ = e.glueStickyTail(*items, idx, start, adv)
 
 			break
@@ -254,6 +256,10 @@ func (e *engine) preferClearForTail(
 // current line; returns the replacement items, or nil when no split applies.
 func (e *engine) maybeSplitOverflow(item inlineItem, lineW, lineAdv, contentW float64) []inlineItem {
 	if item.img || item.blockBox != nil || item.text == "" {
+		return nil
+	}
+
+	if item.noSplit {
 		return nil
 	}
 
@@ -474,7 +480,7 @@ func (e *engine) chunkParts(item inlineItem, chunks []string) []inlineItem {
 	for idx, chunk := range chunks {
 		part := item
 		part.text = chunk
-		part.w = e.measureTextFace(chunk, *item.style)
+		part.w = e.inlineTextWidth(chunk, item.style, item.chrome)
 
 		if idx > 0 {
 			part.marginL = 0
@@ -596,7 +602,7 @@ func separateAdjacentCites(items []inlineItem, eng *engine) []inlineItem {
 
 			cur.text = gap + cur.text
 			if eng != nil {
-				cur.w = eng.measureTextFace(cur.text, *cur.style)
+				cur.w = eng.inlineTextWidth(cur.text, cur.style, cur.chrome)
 			}
 		}
 	}
@@ -814,13 +820,14 @@ func (e *engine) trimTrailingSpace(line []inlineItem) {
 
 	if trimmed != last.text {
 		spaceCount := len(last.text) - len(trimmed)
-
 		last.text = trimmed
 		last.w -= float64(spaceCount) * e.measureRuneFace(' ', *last.style)
 	}
 }
 
 // lineMetrics returns the height of a line and the Y of its baseline.
+//
+//nolint:cyclop // line metrics combine inline item classes and chrome
 func (e *engine) lineMetrics(line []inlineItem, lineY float64) (float64, float64) {
 	maxAscent, maxDescent := 0.0, 0.0
 
@@ -834,17 +841,24 @@ func (e *engine) lineMetrics(line []inlineItem, lineY float64) (float64, float64
 			continue
 		}
 
-		ascent := e.fontAscent(item.style.FontSize * e.scale)
-		descent := e.fontDescent(item.style.FontSize * e.scale)
+		ascent, descent := e.inlineFontMetrics(item.text, *item.style)
 		lh := lineHeightOf(item.style) * e.scale
 
 		extra := (lh - ascent - descent) / two
-		if ascent+extra > maxAscent {
-			maxAscent = ascent + extra
+		itemAscent := ascent + extra
+		itemDescent := descent + extra
+
+		if item.chrome {
+			itemAscent += e.inlineChromeTop(item.style)
+			itemDescent += e.inlineChromeBottom(item.style)
 		}
 
-		if descent+extra > maxDescent {
-			maxDescent = descent + extra
+		if itemAscent > maxAscent {
+			maxAscent = itemAscent
+		}
+
+		if itemDescent > maxDescent {
+			maxDescent = itemDescent
 		}
 	}
 

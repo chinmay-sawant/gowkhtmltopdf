@@ -146,6 +146,20 @@ func TestParseAtRulesSkipped(t *testing.T) {
 	}
 }
 
+//nolint:varnamelen // short local mirrors the stylesheet vocabulary
+func TestParsePageStyle(t *testing.T) {
+	t.Parallel()
+
+	s := mustSheet(t, `@page { size: A4; margin: 0 2cm 4mm 6pt }`)
+	if s.Page == nil {
+		t.Fatal("page style = nil")
+	}
+
+	if s.Page.Size != "A4" || s.Page.Margin != "0 2cm 4mm 6pt" {
+		t.Fatalf("page style = %+v", *s.Page)
+	}
+}
+
 func TestParseOrderAndNestedMediaOrder(t *testing.T) {
 	t.Parallel()
 
@@ -903,6 +917,21 @@ func TestResolveCustomPropsDeepChain(t *testing.T) {
 	got := ResolveCustomProps(declared, nil)
 	if got["--v20"] != "final" {
 		t.Errorf("deep chain --v20 = %q, want final", got["--v20"])
+	}
+}
+
+func TestResolveVarsEmbeddedInCompoundValue(t *testing.T) {
+	t.Parallel()
+
+	got := ResolveVars("1px solid var(--line, #000)", func(name string) (string, bool) {
+		if name == "--line" {
+			return "#2563eb", true
+		}
+
+		return "", false
+	})
+	if got != "1px solid #2563eb" {
+		t.Fatalf("ResolveVars compound value = %q, want %q", got, "1px solid #2563eb")
 	}
 }
 

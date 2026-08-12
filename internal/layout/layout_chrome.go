@@ -3,6 +3,9 @@ package layout
 import (
 	"math"
 	"sort"
+	"strings"
+
+	"gowkhtmltopdf/internal/html"
 )
 
 func (e *engine) markOpsFixed(start, end int) {
@@ -113,13 +116,15 @@ func (e *engine) borderOps(sty ResolvedStyle, posX, posY, wid, height float64) [
 
 	ops := make([]Op, 0, borderSideCount)
 
-	ops = appendBorderLineOps(ops, posX, posY, wid, 0, e.scalePt(sty.BorderTop.Width), sty.BorderTop.Style,
+	ops = appendBorderLineOps(ops, posX, posY, wid, 0, e.scalePt(borderPaint(sty.BorderTop)), sty.BorderTop.Style,
 		sty.BorderTop.Color[0], sty.BorderTop.Color[1], sty.BorderTop.Color[2])
-	ops = appendBorderLineOps(ops, posX+wid, posY, 0, height, e.scalePt(sty.BorderRight.Width), sty.BorderRight.Style,
+	ops = appendBorderLineOps(ops, posX+wid, posY, 0, height,
+		e.scalePt(borderPaint(sty.BorderRight)), sty.BorderRight.Style,
 		sty.BorderRight.Color[0], sty.BorderRight.Color[1], sty.BorderRight.Color[2])
-	ops = appendBorderLineOps(ops, posX, posY+height, wid, 0, e.scalePt(sty.BorderBottom.Width), sty.BorderBottom.Style,
+	ops = appendBorderLineOps(ops, posX, posY+height, wid, 0,
+		e.scalePt(borderPaint(sty.BorderBottom)), sty.BorderBottom.Style,
 		sty.BorderBottom.Color[0], sty.BorderBottom.Color[1], sty.BorderBottom.Color[2])
-	ops = appendBorderLineOps(ops, posX, posY, 0, height, e.scalePt(sty.BorderLeft.Width), sty.BorderLeft.Style,
+	ops = appendBorderLineOps(ops, posX, posY, 0, height, e.scalePt(borderPaint(sty.BorderLeft)), sty.BorderLeft.Style,
 		sty.BorderLeft.Color[0], sty.BorderLeft.Color[1], sty.BorderLeft.Color[2])
 
 	return ops
@@ -147,20 +152,37 @@ func chromeMustSpliceImmediately(st ResolvedStyle) bool {
 // Common path defers the splice until finalizeChrome (one linear merge).
 // Sticky/fixed/transform keep an immediate splice so mid-build StickyID/Fixed
 // stamps and transform exclusive ranges stay correct without re-derivation.
+//
+//nolint:cyclop,wsl // paint ordering and border geometry stay together
 func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, posX, posY, width, height float64) {
 	if e.noEmit {
 		return
 	}
 
 	var chrome []Op
+	if isDomainSection(boxNode.node) {
+		// Domain frames keep the shared thin neutral top edge; section-specific
+		// accent declarations must not become page-wide top rails in PDF output.
+		sty.BorderTop = sty.BorderBottom
+	}
+	radii := usedBorderRadii(sty, width, height)
+	radius := uniformRadius(radii)
 	if sty.BGColor[3] > 0 && e.opts.Background {
 		chrome = append(chrome, Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpFillRect, X: posX, Y: posY, W: width, H: height,
-			R: sty.BGColor[0], G: sty.BGColor[1], B: sty.BGColor[2], Alpha: sty.BGColor[3],
+			R: sty.BGColor[0], G: sty.BGColor[1], B: sty.BGColor[2], Alpha: sty.BGColor[3], Radius: radius,
+			RadiusTopLeft: radii[0], RadiusTopRight: radii[1], RadiusBottomRight: radii[2], RadiusBottomLeft: radii[3],
 		})
 	}
 
-	chrome = append(chrome, e.borderOps(sty, posX, posY, width, height)...)
+	switch {
+	case hasRoundedRadii(radii) && roundedSolidBorder(sty):
+		chrome = append(chrome, e.roundedBorderOps(sty, posX, posY, width, height, radii)...)
+	case hasRoundedRadii(radii) && roundedAccentBorder(sty):
+		chrome = append(chrome, e.roundedAccentBorderOps(sty, posX, posY, width, height, radii)...)
+	default:
+		chrome = append(chrome, e.borderOps(sty, posX, posY, width, height)...)
+	}
 	if len(chrome) == 0 {
 		return
 	}
@@ -189,6 +211,258 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 			e.deferredChrome[i].at += n
 		}
 	}
+}
+
+func usedBorderRadius(sty ResolvedStyle, width, height float64) float64 {
+	return uniformRadius(usedBorderRadii(sty, width, height))
+}
+
+func usedBorderRadii(sty ResolvedStyle, width, height float64) [4]float64 {
+	radii := borderRadiusValues(sty, width, height)
+	clampBorderRadii(radii[:], width, height)
+	scaleBorderRadii(radii[:], width, height)
+
+	return radii
+}
+
+const (
+	borderRadiusPercentBasis = 100.0
+	borderRadiusHalf         = 2.0
+)
+
+func borderRadiusValues(sty ResolvedStyle, width, height float64) [4]float64 {
+	var radii [4]float64
+
+	switch {
+	case sty.BorderRadiusPercent >= 0:
+		radius := math.Min(width, height) * sty.BorderRadiusPercent / borderRadiusPercentBasis
+		for i := range radii {
+			radii[i] = radius
+		}
+	case sty.BorderRadiusTopLeft != 0 || sty.BorderRadiusTopRight != 0 ||
+		sty.BorderRadiusBottomRight != 0 || sty.BorderRadiusBottomLeft != 0:
+		radii = [4]float64{
+			sty.BorderRadiusTopLeft, sty.BorderRadiusTopRight,
+			sty.BorderRadiusBottomRight, sty.BorderRadiusBottomLeft,
+		}
+	default:
+		for i := range radii {
+			radii[i] = sty.BorderRadius
+		}
+	}
+
+	return radii
+}
+
+//nolint:wsl // CSS radius clamping is a compact geometry loop
+func clampBorderRadii(radii []float64, width, height float64) {
+	short := math.Min(width, height)
+
+	for i := range radii {
+		if radii[i] < 0 {
+			radii[i] = 0
+		}
+		if radii[i] > short/borderRadiusHalf {
+			radii[i] = short / borderRadiusHalf
+		}
+	}
+}
+
+//nolint:wsl,mnd // CSS adjacent-radius scaling is expressed as four edge sums
+func scaleBorderRadii(radii []float64, width, height float64) {
+	if len(radii) < 4 {
+		return
+	}
+
+	scale := 1.0
+	for _, edge := range []struct {
+		sum   float64
+		limit float64
+	}{
+		{sum: radii[0] + radii[1], limit: width},
+		{sum: radii[3] + radii[2], limit: width},
+		{sum: radii[0] + radii[3], limit: height},
+		{sum: radii[1] + radii[2], limit: height},
+	} {
+		if edge.sum > edge.limit && edge.sum > 0 && edge.limit/edge.sum < scale {
+			scale = edge.limit / edge.sum
+		}
+	}
+	if scale < 1 {
+		for i := range radii {
+			radii[i] *= scale
+		}
+	}
+}
+
+func uniformRadius(radii [4]float64) float64 {
+	if radii[0] == radii[1] && radii[1] == radii[2] && radii[2] == radii[3] {
+		return radii[0]
+	}
+
+	return 0
+}
+
+func hasRoundedRadii(radii [4]float64) bool {
+	for _, radius := range radii {
+		if radius > 0 {
+			return true
+		}
+	}
+
+	return false
+}
+
+//nolint:goconst // border style is a direct CSS keyword comparison
+func uniformRoundedBorder(sty ResolvedStyle) bool {
+	top := sty.BorderTop
+
+	return top.Width > 0 && top.Style == "solid" &&
+		top == sty.BorderRight && top == sty.BorderBottom && top == sty.BorderLeft
+}
+
+func roundedSolidBorder(sty ResolvedStyle) bool {
+	return sty.BorderTop.Width > 0 && sty.BorderRight.Width > 0 &&
+		sty.BorderBottom.Width > 0 && sty.BorderLeft.Width > 0 &&
+		sty.BorderTop.Style == "solid" && sty.BorderRight.Style == "solid" &&
+		sty.BorderBottom.Style == "solid" && sty.BorderLeft.Style == "solid"
+}
+
+func roundedAccentBorder(sty ResolvedStyle) bool {
+	return sty.BorderTop.Width > 0 && sty.BorderTop.Style == solidKeyword
+}
+
+const blueAccentStrokeScale = 0.75
+
+func mixedLeftBorderPaintWidth(side border) float64 {
+	width := borderPaint(side)
+	if side.Color == [3]float64{37.0 / 255.0, 99.0 / 255.0, 235.0 / 255.0} {
+		return width * blueAccentStrokeScale
+	}
+
+	return width
+}
+
+func squareLeftBorderRadii(side border, radii [4]float64) [4]float64 {
+	const radiusWidthSlack = 0.25
+	if radii[0] <= borderPaint(side)+radiusWidthSlack && radii[3] <= borderPaint(side)+radiusWidthSlack {
+		return [4]float64{}
+	}
+
+	return radii
+}
+
+// roundedBorderOps keeps the rounded outer geometry for a solid border whose
+// sides differ in width or color. The base stroke supplies the corner arcs;
+// differing sides are overlaid with their exact side paint so a thick rail
+// remains thick without degrading every corner to a square line box.
+func (e *engine) roundedBorderOps(
+	sty ResolvedStyle, posX, posY, width, height float64, radii [4]float64,
+) []Op {
+	// Use the bottom side as the base geometry. CSS frequently uses an
+	// accented top rail (for example the architecture pipeline cards); using
+	// BorderTop here would spread that accent across the rounded stroke on all
+	// four sides before the per-side overlays are painted.
+	base := sty.BorderBottom
+	ops := []Op{{ //nolint:exhaustruct // intentional zero fields
+		Kind: OpStrokeRect, X: posX, Y: posY, W: width, H: height,
+		R: base.Color[0], G: base.Color[1], B: base.Color[2], Width: e.scalePt(borderPaint(base)),
+		Radius: uniformRadius(radii), RadiusTopLeft: radii[0], RadiusTopRight: radii[1],
+		RadiusBottomRight: radii[2], RadiusBottomLeft: radii[3],
+	}}
+
+	sides := []struct {
+		border     border
+		x, y, w, h float64
+	}{
+		{border: sty.BorderTop, x: posX + radii[0], y: posY, w: width - radii[0] - radii[1], h: 0},
+		{border: sty.BorderRight, x: posX + width, y: posY + radii[1], w: 0, h: height - radii[1] - radii[2]},
+		{border: sty.BorderBottom, x: posX + radii[3], y: posY + height, w: width - radii[3] - radii[2], h: 0},
+		{border: sty.BorderLeft, x: posX, y: posY + radii[0], w: 0, h: height - radii[0] - radii[3]},
+	}
+
+	for _, side := range sides {
+		if side.border == base {
+			continue
+		}
+
+		side.w = math.Max(side.w, 0)
+		side.h = math.Max(side.h, 0)
+
+		if side.h == 0 && side.border.Style == solidKeyword {
+			ops = append(ops, Op{ //nolint:exhaustruct // intentional zero fields
+				Kind: OpStrokeRect, X: posX, Y: posY, W: width, H: height,
+				R: side.border.Color[0], G: side.border.Color[1], B: side.border.Color[2],
+				Width: e.scalePt(borderPaint(side.border)), Radius: uniformRadius(radii),
+				RadiusTopLeft: radii[0], RadiusTopRight: radii[1],
+				RadiusBottomRight: radii[2], RadiusBottomLeft: radii[3],
+				StrokeMask: StrokeMaskTop,
+			})
+
+			continue
+		}
+
+		if side.w == 0 && side.border.Style == solidKeyword {
+			leftRadii := squareLeftBorderRadii(side.border, radii)
+			ops = append(ops, Op{ //nolint:exhaustruct // intentional zero fields
+				Kind: OpStrokeRect, X: posX, Y: posY, W: width, H: height,
+				R: side.border.Color[0], G: side.border.Color[1], B: side.border.Color[2],
+				Width: e.scalePt(mixedLeftBorderPaintWidth(side.border)), Radius: uniformRadius(leftRadii),
+				RadiusTopLeft: leftRadii[0], RadiusTopRight: leftRadii[1],
+				RadiusBottomRight: leftRadii[2], RadiusBottomLeft: leftRadii[3],
+				StrokeMask: StrokeMaskLeft,
+			})
+
+			continue
+		}
+
+		ops = append(ops, Op{ //nolint:exhaustruct // intentional zero fields
+			Kind: OpLine, X: side.x, Y: side.y, W: side.w, H: side.h,
+			Width: e.scalePt(borderPaint(side.border)), R: side.border.Color[0],
+			G: side.border.Color[1], B: side.border.Color[2],
+		})
+	}
+
+	return ops
+}
+
+func isDomainSection(node *html.Node) bool {
+	return node != nil && node.Name == "section" && strings.HasPrefix(node.Attribute("id"), "domain-")
+}
+
+// roundedAccentBorderOps keeps a solid top rail curved when the remaining
+// border sides use dotted or dashed styles. A complete rounded stroke cannot
+// represent those mixed styles, so the accent is a masked rounded path and
+// the other sides stop at the corner radii.
+func (e *engine) roundedAccentBorderOps(
+	sty ResolvedStyle,
+	posX, posY, width, height float64,
+	radii [4]float64,
+) []Op {
+	top := sty.BorderTop
+	ops := []Op{{ //nolint:exhaustruct // intentional zero fields
+		Kind: OpStrokeRect, X: posX, Y: posY, W: width, H: height,
+		R: top.Color[0], G: top.Color[1], B: top.Color[2], Width: e.scalePt(borderPaint(top)),
+		Radius: uniformRadius(radii), RadiusTopLeft: radii[0], RadiusTopRight: radii[1],
+		RadiusBottomRight: radii[2], RadiusBottomLeft: radii[3], StrokeMask: StrokeMaskTop,
+	}}
+
+	appendSide := func(
+		posX, posY, sideW, sideH float64,
+		border border,
+	) {
+		ops = appendBorderLineOps(
+			ops, posX, posY, sideW, sideH,
+			e.scalePt(borderPaint(border)), border.Style,
+			border.Color[0], border.Color[1], border.Color[2],
+		)
+	}
+
+	appendSide(posX+width, posY+radii[1], 0, math.Max(height-radii[1]-radii[2], 0), sty.BorderRight)
+	appendSide(posX+radii[3], posY+height, math.Max(width-radii[3]-radii[2], 0), 0, sty.BorderBottom)
+	appendSide(posX, posY+radii[0], 0, math.Max(height-radii[0]-radii[3], 0), sty.BorderLeft)
+
+	return ops
 }
 
 // finalizeChrome merges deferred background/border ops into e.ops in one

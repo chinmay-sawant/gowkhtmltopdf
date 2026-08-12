@@ -10,10 +10,22 @@ function pageUrl(item, page) {
 
 export default function Cardbox({ item, onClose }) {
   const total = item.pages ?? 1
+  const compactPager = total > 10
   const [page, setPage] = useState(1)
 
   const prev = useCallback(() => setPage((p) => (p > 1 ? p - 1 : total)), [total])
   const next = useCallback(() => setPage((p) => (p < total ? p + 1 : 1)), [total])
+  const pageButtons = Array.from({ length: total }, (_, i) => i + 1).map((n) => (
+    <button
+      type="button"
+      key={n}
+      className={n === page ? 'pager-dot active' : 'pager-dot'}
+      onClick={() => setPage(n)}
+      aria-label={`Page ${n}`}
+    >
+      {n}
+    </button>
+  ))
 
   useEffect(() => {
     function onKey(e) {
@@ -58,18 +70,20 @@ export default function Cardbox({ item, onClose }) {
 
         <div className="cardbox-foot">
           <div className="cardbox-pager">
-            {total > 1 &&
-              Array.from({ length: total }, (_, i) => i + 1).map((n) => (
-                <button
-                  type="button"
-                  key={n}
-                  className={n === page ? 'pager-dot active' : 'pager-dot'}
-                  onClick={() => setPage(n)}
-                  aria-label={`Page ${n}`}
-                >
-                  {n}
-                </button>
-              ))}
+            {compactPager ? (
+              <label className="cardbox-page-picker">
+                <span>Page</span>
+                <select value={page} onChange={(e) => setPage(Number(e.target.value))} aria-label={`Go to page of ${total}`}>
+                  {Array.from({ length: total }, (_, i) => i + 1).map((n) => (
+                    <option key={n} value={n}>
+                      {n} of {total}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              total > 1 ? pageButtons : null
+            )}
           </div>
           <div className="cardbox-actions">
             <span className="cardbox-pagestate">

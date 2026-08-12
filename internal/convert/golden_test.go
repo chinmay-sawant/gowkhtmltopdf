@@ -408,6 +408,14 @@ var fixturePageBounds = map[string]fixtureBounds{ //nolint:gochecknoglobals // i
 	"fixture-53-asteria-observatory-poster.html": { //nolint:exhaustruct // intentional zero-value fields
 		minPages: 1, maxPages: 1, images: true,
 	},
+	"fixture-55-lantern-cooperative-report.html": { //nolint:exhaustruct // intentional zero-value fields
+		minPages: 3, maxPages: 3,
+	},
+	"fixture-56-architecture-diagram.html": { //nolint:exhaustruct // intentional zero-value fields
+		// Unitless line-height now scales with each descendant's font size;
+		// The explicit section page breaks make the architecture composition 20 pages.
+		minPages: 20, maxPages: 20,
+	},
 }
 
 // fixtureHeaderOK enforces the corpus hygiene rule: every fixture starts

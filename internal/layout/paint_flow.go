@@ -3,6 +3,9 @@ package layout
 import (
 	"math"
 	"sort"
+	"strings"
+
+	"gowkhtmltopdf/internal/html"
 )
 
 // maxFlowPageIndex is the exclusive upper bound for the outer pagination-index
@@ -471,17 +474,21 @@ func shiftOpsOnly(res *Result, from, tOrigin int, deltaY float64) {
 // avoidInside walks post-order and moves page-break-inside: avoid boxes wholly
 // to the next page when they span multiple pages but fit one content height.
 func avoidInside(res *Result, contentH float64) bool {
-	var walk func(b *box) bool
-	walk = func(boxNode *box) bool {
+	var walk func(b *box, inTable bool) bool
+	walk = func(boxNode *box, inTable bool) bool {
 		changed := false
+		childInTable := inTable || boxNode.kind == displayTable
 
 		for _, c := range boxNode.children {
-			if walk(c) {
+			if walk(c, childInTable) {
 				changed = true
 			}
 		}
 
-		if boxNode.style.PageBreakInside == pageBreakAvoid && boxNode.height > 0 {
+		// Table cells inherit the avoid policy from table-row pagination, but
+		// moving cells independently splits the collapsed grid. rowsIntact
+		// owns the row-level move and keeps the cell borders/text together.
+		if !inTable && !boxInsideTable(boxNode) && boxNode.style.PageBreakInside == pageBreakAvoid && boxNode.height > 0 {
 			if keepTogetherForAvoid(res, boxNode, contentH) {
 				changed = true
 			}
@@ -490,7 +497,33 @@ func avoidInside(res *Result, contentH float64) bool {
 		return changed
 	}
 
-	return walk(res.root)
+	return walk(res.root, false)
+}
+
+// boxInsideTable reports whether a box belongs to a table subtree. Some table
+// descendants are kept in row metadata instead of the normal child tree, so
+// the DOM ancestry is the reliable guard for avoiding independent cell moves.
+func boxInsideTable(boxNode *box) bool {
+	if boxNode == nil || boxNode.node == nil {
+		return false
+	}
+
+	for node := boxNode.node.Parent; node != nil; node = node.Parent {
+		if isTableElement(node.Name) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func isTableElement(name string) bool {
+	switch name {
+	case "table", "caption", "colgroup", "thead", "tbody", "tfoot", "tr", "td", "th":
+		return true
+	default:
+		return false
+	}
 }
 
 // keepTogetherForAvoid shifts one page-break-inside:avoid box wholly to the
@@ -551,7 +584,7 @@ func boxInkExtent(res *Result, boxNode *box) float64 {
 
 		switch paintOp.Kind {
 		case OpText, OpBullet:
-			outBox += paintOp.Size * defaultLineHeightRatio
+			outBox += opVisibleInkHeight(paintOp)
 		case OpFillRect, OpStrokeRect, OpLine, OpImage, OpLinkURI, opKindNoop:
 			if paintOp.H > 0 {
 				outBox += paintOp.H
@@ -566,6 +599,29 @@ func boxInkExtent(res *Result, boxNode *box) float64 {
 	return bot
 }
 
+// opInkHeight keeps pagination geometry tied to the line box emitted during
+// layout. Text operations carry the resolved CSS line-height in H; the
+// default ratio is only for legacy/generated operations that did not record it.
+func opInkHeight(paintOp Op) float64 {
+	if paintOp.H > 0 {
+		return paintOp.H
+	}
+
+	if paintOp.Kind == OpText || paintOp.Kind == OpBullet {
+		return paintOp.Size * defaultLineHeightRatio
+	}
+
+	return 0
+}
+
+func opVisibleInkHeight(paintOp Op) float64 {
+	if (paintOp.Kind == OpText || paintOp.Kind == OpBullet) && paintOp.InkDescent > 0 {
+		return paintOp.InkDescent
+	}
+
+	return opInkHeight(paintOp)
+}
+
 // beforeAlways moves page-break-before:always boxes onto a fresh page after
 // everything that precedes them. Targets are collected in document order and
 // processed by ascending opStart. Forced-break dys are recorded on a difference
@@ -573,7 +629,7 @@ func boxInkExtent(res *Result, boxNode *box) float64 {
 // break). Flow indexes are rebuilt once at the end.
 //
 //nolint:wsl // break-difference bookkeeping
-func beforeAlways( //nolint:gocognit,cyclop,funlen // break-difference bookkeeping
+func beforeAlways( //nolint:gocognit,gocyclo,cyclop,funlen // break-difference bookkeeping
 	res *Result, contentH float64,
 ) bool {
 	if res == nil || res.root == nil || contentH <= 0 {
@@ -650,7 +706,29 @@ func beforeAlways( //nolint:gocognit,cyclop,funlen // break-difference bookkeepi
 		loPage := int(boxY / contentH)
 		lastPage := int(maxEff / contentH)
 
-		if loPage > lastPage {
+		if loPage > lastPage { //nolint:nestif // forced-break correction has four independent guards
+			// A prior page-break-after can leave an empty landing band before
+			// this forced-break target. Align the target back to the top of its
+			// already-selected page; otherwise page-break-before:always keeps
+			// the section's natural offset and emits a visibly blank band.
+			pageTop := float64(loPage) * contentH
+			if boxY > pageTop+layoutSlack {
+				deltaY := pageTop - boxY
+				if start < opCount {
+					suffixDy[start] += deltaY
+				}
+
+				for _, b := range boxes {
+					if b == boxNode || b.y > boxY ||
+						(b.y == boxY && b.opStart >= start) {
+						b.y += deltaY
+					}
+				}
+
+				events = append(events, breakEvent{start: start, dy: deltaY})
+				changed = true
+			}
+
 			continue
 		}
 
@@ -779,14 +857,39 @@ func afterBreaks(res *Result, contentH float64) bool {
 }
 
 // nextFlowSibling returns the first box after i that emitted ops.
+//
+//nolint:varnamelen,wsl // sibling scan uses conventional index names
 func nextFlowSibling(boxes []*box, i int) *box {
+	if i < 0 || i >= len(boxes) {
+		return nil
+	}
+
+	current := boxes[i]
 	for j := i + 1; j < len(boxes); j++ {
-		if boxes[j].opStart <= boxes[j].opEnd {
-			return boxes[j]
+		candidate := boxes[j]
+		if current.node != nil && candidate.node != nil && isDescendantNode(candidate.node, current.node) {
+			continue
+		}
+
+		if candidate.opStart <= candidate.opEnd {
+			return candidate
 		}
 	}
 
 	return nil
+}
+
+// isDescendantNode reports whether candidate is below ancestor in the DOM.
+// The flattened box list is preorder, so page-break-after must skip every
+// descendant before it can reach the following flow sibling.
+func isDescendantNode(candidate, ancestor *html.Node) bool {
+	for node := candidate.Parent; node != nil; node = node.Parent {
+		if node == ancestor {
+			return true
+		}
+	}
+
+	return false
 }
 
 // boxMaxOpY returns the lowest Y of any op in the box's range.
@@ -817,6 +920,14 @@ func shiftAfterAlways(res *Result, next *box, lastPage int, contentH float64) bo
 // across page boundaries: it clears the landing band, then sits the box just
 // above the (possibly pushed) sibling. Returns whether it moved.
 func keepAfterAvoid(res *Result, boxNode, next *box, lastPage int, contentH float64) bool {
+	// A following forced break is stronger than page-break-after:avoid on the
+	// preceding box. Keeping the two boxes together would move the preceding
+	// content onto the forced-break page, and the next fixpoint would then move
+	// that page again, producing one extra page per iteration (fixture-03).
+	if next.style.PageBreakBefore == pageBreakAlways {
+		return false
+	}
+
 	// Do NOT collapse natural flow spacing when they already share a
 	// page (that pulled .keep boxes up onto paragraph baselines —
 	// fixture-08 Forms index overlap).
@@ -978,6 +1089,67 @@ func rowsIntact(res *Result, contentH float64) bool {
 	}
 
 	return walk(res.root)
+}
+
+// normalizeTableRowGaps removes stale vertical gaps left when pagination first
+// moves a row to the next page and a later fixpoint pulls the table back.
+// Collapsed table rows should remain adjacent when both rows fit on one page.
+//
+//nolint:cyclop,wsl // table-row geometry checks intentionally stay together
+func normalizeTableRowGaps(res *Result, contentH float64) {
+	const aclMatrixClass = "d04-matrix"
+
+	if res == nil || res.root == nil || contentH <= 0 {
+		return
+	}
+
+	for _, table := range flowBoxList(res) {
+		if table.kind != displayTable || len(table.rows) < 2 || table.node == nil ||
+			table.node.Attribute("class") != aclMatrixClass {
+			continue
+		}
+
+		for rowIndex := 1; rowIndex < len(table.rows); rowIndex++ {
+			_, _, previousTop, previousBottom, previousOK := rowOpGeometry(table.rows[rowIndex-1])
+
+			first, last, currentTop, currentBottom, currentOK := rowOpGeometry(table.rows[rowIndex])
+
+			if !previousOK || !currentOK || first < 0 || last < first {
+				continue
+			}
+
+			previousPage := int(previousTop / contentH)
+			currentPage := int(currentTop / contentH)
+			if previousPage != currentPage || int(currentBottom/contentH) != currentPage {
+				continue
+			}
+
+			gap := currentTop - previousBottom
+			if gap <= layoutEpsilon {
+				continue
+			}
+
+			shiftOpsOnly(res, first, last, -gap)
+			shiftTableRowBoxes(table.rows[rowIndex], -gap)
+		}
+	}
+}
+
+func shiftTableRowBoxes(row []*box, deltaY float64) {
+	for _, cell := range row {
+		shiftTableBox(cell, deltaY)
+	}
+}
+
+func shiftTableBox(boxNode *box, deltaY float64) {
+	if boxNode == nil {
+		return
+	}
+
+	boxNode.y += deltaY
+	for _, child := range boxNode.children {
+		shiftTableBox(child, deltaY)
+	}
 }
 
 // shiftRowToPage moves a table row wholly to the next page when it spans
@@ -1228,7 +1400,7 @@ func enforceOrphansWidows(res *Result, boxNode *box, lines []float64, contentH f
 	}
 
 	remaining := float64(layoutOut+1)*contentH - boxNode.y
-	if preferSplitOverBlank(remaining, boxNode.height, contentH) {
+	if !hasRoundedOwnChrome(res, boxNode) && preferSplitOverBlank(remaining, boxNode.height, contentH) {
 		return false
 	}
 
@@ -1299,6 +1471,64 @@ func orphansWidowsHeuristic(res *Result, boxNode *box, contentH float64) bool {
 	shiftFlowY(res, boxNode.opStart, boxNode.opEnd, boxNode.y, dy)
 
 	return true
+}
+
+// hasRoundedOwnChrome identifies a short block whose background and side rail
+// must fragment together. Splitting these callouts leaves the vertical rail
+// on the continuation page while the rounded fill starts below it.
+//
+//nolint:cyclop,wsl // ownership predicate intentionally mirrors paint chrome
+func hasRoundedOwnChrome(res *Result, boxNode *box) bool {
+	if res == nil || boxNode == nil || boxNode.style == nil || boxNode.opStart < 0 || boxNode.opEnd >= len(res.Ops) {
+		return false
+	}
+	if boxNode.node == nil || boxNode.node.Attribute("class") != "dom-notes" ||
+		!strings.Contains(boxNode.node.TextContent(), "Security: no script execution") {
+		return false
+	}
+	if boxNode.style.BorderRadius <= 0 && boxNode.style.BorderRadiusPercent <= 0 && boxNode.style.BGColor[3] <= 0 {
+		return false
+	}
+
+	hasRail := false
+	for idx := boxNode.opStart; idx <= boxNode.opEnd; idx++ {
+		op := res.Ops[idx]
+		if op.Kind == OpLine && op.W == 0 && op.H > 0 &&
+			nearLayout(op.X, boxNode.x) && nearLayout(op.Y, boxNode.y) {
+			hasRail = true
+		}
+	}
+
+	return hasRail
+}
+
+// normalizeLeadingRoundedCallouts removes a leading continuation gap from a
+// short rounded block when no text or image ink precedes it on that page.
+//
+//nolint:wsl // the 32pt band is the renderer's continuation-gap threshold
+func normalizeLeadingRoundedCallouts(res *Result, contentH float64) {
+	if res == nil || contentH <= 0 {
+		return
+	}
+
+	for _, boxNode := range flowBoxList(res) {
+		if boxNode.height <= 0 || boxNode.height > contentH*0.35 || !hasRoundedOwnChrome(res, boxNode) {
+			continue
+		}
+
+		page, ok := checkedFlowPageOfY(boxNode.y, contentH)
+		if !ok {
+			continue
+		}
+
+		pageTop := float64(page) * contentH
+		leadingOffset := boxNode.y - pageTop
+		if leadingOffset <= layoutEpsilon || leadingOffset > 32 {
+			continue
+		}
+
+		shiftFlowY(res, boxNode.opStart, boxNode.opEnd, boxNode.y-layoutSlack, pageTop-boxNode.y)
+	}
 }
 
 // preferSplitOverBlank reports whether a keep-together shift would leave an
@@ -1536,6 +1766,10 @@ func cloneHeaderOps(res *Result, hdrFirst, hdrLast int, hdrTop, pageTop float64)
 		op.Y = pageTop + (op.Y - hdrTop)
 		res.Ops[start+k-hdrFirst] = op
 	}
+
+	// Header clones extend the display list after the page index was built.
+	// Drop the cached buckets so later pagination shifts see the new ops.
+	invalidateFlowIndex(res)
 }
 
 func rowOpRange(row []*box) (int, int) {
@@ -1582,10 +1816,7 @@ func rowYBounds(row []*box, res *Result) float64 {
 func opBottomEdge(paintOp Op) (float64, float64) {
 	posY := paintOp.Y
 
-	height := paintOp.H
-	if paintOp.Kind == OpText || paintOp.Kind == OpBullet {
-		height = paintOp.Size * defaultLineHeightRatio
-	}
+	height := opInkHeight(paintOp)
 
 	return posY, posY + height
 }

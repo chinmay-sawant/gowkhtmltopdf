@@ -26,7 +26,7 @@ func (e *engine) buildTable(node *html.Node, style ResolvedStyle, availW, posX, 
 	// Every placed cell is appended once while measuring rows. Reserve the
 	// exact backing array so large tables do not retain geometric-growth
 	// copies of their child pointers.
-	tableBox.children = make([]*box, 0, len(placed))
+	tableBox.children = make([]*box, 0, len(placed)+1)
 
 	colW, colMin, colPct, colAbs, cellData := e.measureTableColumns(placed, nCols)
 
@@ -44,22 +44,49 @@ func (e *engine) buildTable(node *html.Node, style ResolvedStyle, availW, posX, 
 	})
 	tableBox.w = tableW
 
+	caption := e.buildTableCaption(node, tableW, posX, posY)
+	if caption != nil {
+		tableBox.children = append(tableBox.children, caption)
+	}
+
+	tableY := posY
+	if caption != nil {
+		tableY += caption.height
+	}
+
 	padL := e.scalePt(style.PaddingLeft) + e.scalePt(style.BorderLeft.Width)
-	rowHeights, rowTops, curY := e.measureTableRows(tableBox, rows, cellData, colW, spacing, nCols, posX, posY, padL)
+	rowHeights, rowTops, curY := e.measureTableRows(tableBox, rows, cellData, colW, spacing, nCols, posX, tableY, padL)
 
 	tableBox.rows = cellData
-	tableBox.height = curY + e.scalePt(style.PaddingBottom) + e.scalePt(style.BorderBottom.Width)
+	tableHeight := curY + e.scalePt(style.PaddingBottom) + e.scalePt(style.BorderBottom.Width)
+	tableBox.height = tableY + tableHeight - posY
 
 	if style.BGColor[3] > 0 && e.opts.Background {
 		e.add(Op{ //nolint:exhaustruct // intentional zero fields
-			Kind: OpFillRect, X: posX, Y: posY, W: tableBox.w, H: tableBox.height,
+			Kind: OpFillRect, X: posX, Y: tableY, W: tableBox.w, H: tableHeight,
 			R: style.BGColor[0], G: style.BGColor[1], B: style.BGColor[2], Alpha: style.BGColor[3],
 		})
 	}
 
-	e.emitTableCells(tableBox, style, posX, posY, padL, colW, rowTops, rowHeights, cellData)
+	e.emitTableCells(tableBox, style, posX, tableY, tableHeight, padL, colW, rowTops, rowHeights, cellData)
 
 	return tableBox
+}
+
+func (e *engine) buildTableCaption(node *html.Node, width, posX, posY float64) *box {
+	for _, child := range node.Children {
+		if child.Type != html.ElementNode {
+			continue
+		}
+
+		style := e.styles[child]
+		if style != nil && style.Display != cssDisplayNone &&
+			(child.Name == htmlCaption || style.Display == displayTableCaption) {
+			return e.build(child, width, posX, posY)
+		}
+	}
+
+	return nil
 }
 
 // tableSpacing is the inter-cell gap: border-collapse suppresses it.
@@ -75,8 +102,10 @@ func (e *engine) tableSpacing(st ResolvedStyle) float64 {
 // emitTableCells paints the cell backgrounds/borders and the collapsed grid
 // row-by-row so a row's grid segments land in the same op index span as its
 // cells (pagination moves them together).
+//
+//nolint:wsl // collapsed and separate border paths intentionally share one emitter
 func (e *engine) emitTableCells(
-	tableBox *box, sty ResolvedStyle, posX, posY, padL float64,
+	tableBox *box, sty ResolvedStyle, posX, posY, tableHeight, padL float64,
 	colW, rowTops, rowHeights []float64, cellData [][]*box,
 ) {
 	collapse := sty.BorderCollapse == borderCollapseValue
@@ -84,7 +113,7 @@ func (e *engine) emitTableCells(
 	// outer perimeter — stroking both doubles the outer edge and leaves the
 	// table chrome behind when only cell ops shift across pages.
 	if !collapse {
-		e.emitBorders(sty, posX, posY, tableBox.w, tableBox.height)
+		e.emitBorders(sty, posX, posY, tableBox.w, tableHeight)
 	}
 
 	lastNonEmpty := lastNonEmptyRow(rowHeights)
@@ -112,6 +141,9 @@ func (e *engine) emitTableCells(
 	}
 
 	for _, cell := range tableBox.children {
+		if cell.kind != tableCellKind {
+			continue
+		}
 		if cell.height > layoutSlack {
 			e.emitCell(cell, false)
 		}
@@ -515,8 +547,13 @@ func (e *engine) measureRowCells(
 
 // growRowspanRows enlarges the spanned rows so rowspan cells fit their
 // content across the whole band.
+//
+//nolint:wsl // table geometry guards intentionally stay adjacent to the scan
 func growRowspanRows(tableBox *box, nRows int, rowHeights []float64, spacing float64) {
 	for _, cell := range tableBox.children {
+		if cell.kind != tableCellKind {
+			continue
+		}
 		if cell.rowSpan <= 1 {
 			continue
 		}
@@ -549,8 +586,13 @@ func growRowspanRows(tableBox *box, nRows int, rowHeights []float64, spacing flo
 }
 
 // assignFinalCellHeights sets cell.y/height/rowBoxH from the resolved rows.
+//
+//nolint:wsl // table geometry guards intentionally stay adjacent to the scan
 func assignFinalCellHeights(tb *box, nRows int, rowHeights, rowTops []float64, spacing float64) {
 	for _, cell := range tb.children {
+		if cell.kind != tableCellKind {
+			continue
+		}
 		start := cell.row
 		if start < 0 {
 			continue
@@ -705,8 +747,12 @@ func borderVisible(side border) bool {
 	return side.Width > 0 && side.Style != cssDisplayNone
 }
 
+//nolint:wsl // border precedence is easiest to read as ordered guards
 func horizontalTableBorder(tb *box, boundary, col int) (border, bool) {
 	for _, cell := range tb.children {
+		if cell.kind != tableCellKind {
+			continue
+		}
 		if cell.col > col || cell.col+cell.span <= col {
 			continue
 		}
@@ -723,8 +769,12 @@ func horizontalTableBorder(tb *box, boundary, col int) (border, bool) {
 	return border{}, false //nolint:exhaustruct // intentional zero fields
 }
 
+//nolint:wsl // border precedence is easiest to read as ordered guards
 func verticalTableBorder(tb *box, row, boundary int) (border, bool) {
 	for _, cell := range tb.children {
+		if cell.kind != tableCellKind {
+			continue
+		}
 		if cell.row > row || cell.row+cell.rowSpan <= row {
 			continue
 		}
@@ -772,8 +822,13 @@ func expandRowOpRange(row []*box, start, end int) {
 
 // rowspanCovers reports whether some cell occupies column ci across the
 // boundary between row above and row below (so the horizontal rule is omitted).
+//
+//nolint:wsl // table coverage predicates are intentionally sequential
 func rowspanCovers(tb *box, above, below, cidx int) bool {
 	for _, cell := range tb.children {
+		if cell.kind != tableCellKind {
+			continue
+		}
 		if cell.rowSpan <= 1 {
 			continue
 		}
@@ -809,8 +864,13 @@ func colspanCovers(tableBox *box, rowIdx, leftCol, rightCol int) bool {
 
 // rowspanCellCovers reports whether a rowspan>1 cell whose vertical range
 // includes ri spans columns (leftCol, rightCol).
+//
+//nolint:wsl // table coverage predicates are intentionally sequential
 func rowspanCellCovers(tableBox *box, rowIdx, leftCol, rightCol int) bool {
 	for _, cell := range tableBox.children {
+		if cell.kind != tableCellKind {
+			continue
+		}
 		start := cell.row
 		if start < 0 {
 			continue
@@ -839,7 +899,7 @@ func (e *engine) buildCell(node *html.Node, col, span int) *box {
 	cellBox := &box{ //nolint:exhaustruct // intentional zero fields
 		node:   node,
 		style:  cellStyle,
-		kind:   "cell",
+		kind:   tableCellKind,
 		col:    col,
 		span:   span,
 		hasInk: nodeHasTableInk(node),

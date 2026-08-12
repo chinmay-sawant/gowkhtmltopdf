@@ -215,6 +215,11 @@ func (c *Content) SetLineWidth(w float64) {
 	c.writePDFNums(" w\n", 1, w, 0, 0, 0, 0, 0)
 }
 
+// SetLineCap selects the PDF stroke cap style (0 butt, 1 round, 2 square).
+func (c *Content) SetLineCap(style int) {
+	c.writePDFNums(" J\n", 1, float64(style), 0, 0, 0, 0, 0)
+}
+
 // SetOpacity sets the fill/stroke opacity (0..1); 0 resets to opaque.
 func (c *Content) SetOpacity(opacity float64) {
 	if opacity >= 1 || opacity <= 0 {
@@ -237,6 +242,11 @@ func (c *Content) MoveTo(x, y float64) {
 // LineTo appends a line segment to (x, y).
 func (c *Content) LineTo(x, y float64) {
 	c.writePDFNums(" l\n", pointComponents, x, y, 0, 0, 0, 0)
+}
+
+// CurveTo appends a cubic Bézier segment to the current path.
+func (c *Content) CurveTo(x1, y1, x2, y2, x3, y3 float64) {
+	c.writePDFNums(" c\n", curveComponents, x1, y1, x2, y2, x3, y3)
 }
 
 // Rect appends a rectangle to the current path.
@@ -306,13 +316,19 @@ func (c *Content) TextLeading(leading float64) {
 	c.writePDFNums(" TL\n", 1, leading, 0, 0, 0, 0, 0)
 }
 
+// SetCharSpacing sets the character spacing for the active text object.
+func (c *Content) SetCharSpacing(spacing float64) {
+	c.writePDFNums(" Tc\n", 1, spacing, 0, 0, 0, 0, 0)
+}
+
 // TextNextLine moves to the next line (TL).
 func (c *Content) TextNextLine() { c.buf.WriteString("T*\n") }
 
 // TextRenderMode sets the text rendering mode (0 = fill, 2 = fill + stroke).
 // Mode 2 with a small line width yields a fake bold.
 func (c *Content) TextRenderMode(mode int) {
-	c.buf.WriteString(strconv.Itoa(mode) + " Tr\n")
+	c.buf.WriteString(strconv.Itoa(mode))
+	c.buf.WriteString(" Tr\n")
 }
 
 // textRun is one contiguous simple-or-Type0 segment of a shown string.
@@ -490,14 +506,13 @@ func appendPDFLiteralByte(dst []byte, cur byte) []byte {
 }
 
 // appendPDFString appends s as a PDF literal string, folding code points
-// above U+00FF via winAnsiFold (with '?' fallback) so every emitted byte
-// matches the subset cmap and /Widths indices.
+// above U+00FF via PDFDocEncoding (with '?' fallback).
 func appendPDFString(dst []byte, s string) []byte {
 	dst = append(dst, '(')
 
 	for _, rVal := range s {
 		if rVal > maxLatin1Code {
-			rVal = winAnsiFold(rVal)
+			rVal = pdfDocEncodingFold(rVal)
 		}
 
 		if rVal > maxLatin1Code {

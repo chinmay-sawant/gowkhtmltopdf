@@ -100,14 +100,13 @@ func (e *engine) emitInlineImage(
 
 // emitInlineText paints the face runs of one text item and returns the
 // updated x cursor.
-func (e *engine) emitInlineText(
+func (e *engine) emitInlineText( //nolint:funlen // text measurement, face-run emission, and decoration share one cursor
 	item *inlineItem, leftX, baseline, justifyGap float64,
 	gapAfter bool, und *undRun,
 ) float64 {
 	child := item.style.Color
 	size := item.style.FontSize * e.scale
-	ascent := e.fontAscent(size)
-	descent := e.fontDescent(size)
+	ascent, descent := e.inlineFontMetrics(item.text, *item.style)
 
 	if ascent+descent < size*0.5 {
 		// Fallback when font metrics are missing — keep hit targets usable.
@@ -115,7 +114,32 @@ func (e *engine) emitInlineText(
 		descent = size * descentRatio
 	}
 
+	chromeLeft, chromeRight := 0.0, 0.0
+	if item.chrome {
+		chromeLeft = e.inlineChromeLeft(item.style)
+		chromeRight = e.inlineChromeRight(item.style)
+	}
+
+	contentWidth := item.w - chromeLeft - chromeRight
+	if contentWidth < 0 {
+		contentWidth = 0
+	}
+
+	if item.chrome {
+		e.paintInlineChrome(item.style, leftX, baseline, ascent, descent, contentWidth)
+	}
+
+	leftX += chromeLeft
+
 	runStart := leftX
+	textBaseline := baseline
+
+	if isVerticalWritingMode(item.style.WritingMode) {
+		// A rotated run uses the baseline as its vertical start. The normal
+		// horizontal baseline already includes ascent, which would otherwise
+		// push vertical labels down by one ascent before rotation.
+		textBaseline -= ascent
+	}
 
 	var runSpan float64
 
@@ -124,7 +148,7 @@ func (e *engine) emitInlineText(
 			item,
 			run,
 			leftX,
-			baseline,
+			textBaseline,
 			size,
 			ascent,
 			descent,
@@ -138,7 +162,7 @@ func (e *engine) emitInlineText(
 				item,
 				run,
 				leftX,
-				baseline,
+				textBaseline,
 				size,
 				ascent,
 				descent,
@@ -156,7 +180,7 @@ func (e *engine) emitInlineText(
 	// ref lists were a forest of rules; titles/prose links still underline.
 	e.paintDecoration(item, runStart, runSpan, size, ascent, descent, baseline, child, und)
 
-	leftX += item.marginR
+	leftX += chromeRight + item.marginR
 	if gapAfter && isJustifyGapAfter(*item) {
 		leftX += justifyGap
 	}
@@ -164,21 +188,105 @@ func (e *engine) emitInlineText(
 	return leftX
 }
 
+func (e *engine) paintInlineChrome(style *ResolvedStyle, leftX, baseline, ascent, descent, contentWidth float64) {
+	top := e.inlineChromeTop(style)
+	bottom := e.inlineChromeBottom(style)
+	lh := lineHeightOf(style) * e.scale
+	extra := (lh - ascent - descent) / two
+	boxY := baseline - ascent - extra - top
+	boxH := ascent + extra + top + descent + extra + bottom
+	boxW := contentWidth + e.inlineChromeLeft(style) + e.inlineChromeRight(style)
+
+	if boxW <= 0 || boxH <= 0 {
+		return
+	}
+
+	if style.BGColor[3] > 0 && e.opts.Background {
+		radii := usedBorderRadii(*style, boxW, boxH)
+		e.add(Op{ //nolint:exhaustruct // intentional zero fields
+			Kind: OpFillRect, X: leftX, Y: boxY, W: boxW, H: boxH,
+			R: style.BGColor[0], G: style.BGColor[1], B: style.BGColor[2], Alpha: style.BGColor[3],
+			Radius: uniformRadius(radii), RadiusTopLeft: radii[0], RadiusTopRight: radii[1],
+			RadiusBottomRight: radii[2], RadiusBottomLeft: radii[3],
+		})
+	}
+
+	if !inlineHasBorder(*style) {
+		return
+	}
+
+	radii := usedBorderRadii(*style, boxW, boxH)
+	radius := uniformRadius(radii)
+
+	if hasRoundedRadii(radii) && uniformRoundedBorder(*style) {
+		b := style.BorderTop
+		e.add(Op{ //nolint:exhaustruct // intentional zero fields
+			Kind: OpStrokeRect, X: leftX, Y: boxY, W: boxW, H: boxH,
+			R: b.Color[0], G: b.Color[1], B: b.Color[2], Width: e.scalePt(borderPaint(b)), Radius: radius,
+			RadiusTopLeft: radii[0], RadiusTopRight: radii[1], RadiusBottomRight: radii[2], RadiusBottomLeft: radii[3],
+		})
+
+		return
+	}
+
+	for _, op := range e.borderOps(*style, leftX, boxY, boxW, boxH) {
+		e.add(op)
+	}
+}
+
+func inlineHasBorder(st ResolvedStyle) bool {
+	return inlineBorderVisible(st.BorderTop) || inlineBorderVisible(st.BorderRight) ||
+		inlineBorderVisible(st.BorderBottom) || inlineBorderVisible(st.BorderLeft)
+}
+
+func writingModeRotate(mode string) float64 {
+	if isVerticalWritingMode(mode) {
+		return -90
+	}
+
+	return 0
+}
+
+func inlineBorderVisible(side border) bool {
+	return side.Width > 0 && side.Style != cssDisplayNone
+}
+
+//nolint:wsl,mnd // transform width and alignment are one geometry decision
 func (e *engine) emitInlineTextRun(
 	item *inlineItem,
 	run faceRun,
 	leftX, baseline, size, ascent, descent float64,
 ) {
 	child := item.style.Color
+	text := transformInlineText(run.text, item.style.TextTransform)
+	textWidth := run.w
+	if text != run.text {
+		textWidth = e.measureTextFace(text, *item.style)
+	}
+
+	textX := leftX
+	textDelta := textWidth - run.w
+	switch item.style.TextAlign {
+	case floatRight:
+		textX -= textDelta
+	case fxCenter:
+		textX -= textDelta / 2
+	}
+
 	e.add(Op{ //nolint:exhaustruct // intentional zero fields
-		Kind: OpText, X: leftX, Y: baseline, W: run.w, H: item.h,
-		Text: run.text, Font: run.face, Size: size, Bold: item.style.FontWeight >= fontWeightBold,
-		R: child[0], G: child[1], B: child[2],
+		Kind: OpText, X: textX, Y: baseline, W: textWidth, H: item.h,
+		Text: run.text, Font: run.face, Size: size,
+		InkDescent:    descent,
+		LetterSpacing: item.style.LetterSpacing * e.scale,
+		TextTransform: item.style.TextTransform,
+		Bold:          item.style.FontWeight >= fontWeightBold,
+		R:             child[0], G: child[1], B: child[2],
+		RotateDeg: writingModeRotate(item.style.WritingMode),
 	})
 
 	if item.href != "" {
 		e.add(Op{ //nolint:exhaustruct // intentional zero fields
-			Kind: OpLinkURI, X: leftX, Y: baseline - ascent, W: run.w,
+			Kind: OpLinkURI, X: textX, Y: baseline - ascent, W: textWidth,
 			H: ascent + descent, URI: item.href,
 		})
 	}
@@ -426,7 +534,7 @@ type faceRun struct {
 // splitTextByFace splits s into contiguous runs that share the same face
 // under CSS font-family fallback.
 //
-//nolint:cyclop,funlen // hot path: per-rune face-fallback run splitting
+//nolint:cyclop,funlen,wsl // hot path: per-rune face-fallback run splitting
 func (e *engine) splitTextByFace(cssSheet string, sty ResolvedStyle) []faceRun {
 	if cssSheet == "" {
 		return nil
@@ -452,6 +560,7 @@ func (e *engine) splitTextByFace(cssSheet string, sty ResolvedStyle) []faceRun {
 	var current *pdf.Font
 
 	var width float64
+	runeCount := 0
 
 	for idx, runic := range cssSheet {
 		face := primary
@@ -468,10 +577,11 @@ func (e *engine) splitTextByFace(cssSheet string, sty ResolvedStyle) []faceRun {
 			runs = append(runs, faceRun{
 				text: cssSheet[start:idx],
 				face: current,
-				w:    width,
+				w:    width + sty.LetterSpacing*e.scale*float64(runeCount),
 			})
 			start = idx
 			width = 0
+			runeCount = 0
 		}
 
 		if current == nil {
@@ -480,19 +590,21 @@ func (e *engine) splitTextByFace(cssSheet string, sty ResolvedStyle) []faceRun {
 
 		current = face
 		width += face.AdvanceInPoints(runic, size)
+		runeCount++
 	}
 
 	if current != nil {
 		runs = append(runs, faceRun{
 			text: cssSheet[start:],
 			face: current,
-			w:    width,
+			w:    width + sty.LetterSpacing*e.scale*float64(runeCount),
 		})
 	}
 
 	return runs
 }
 
+//nolint:wsl // hot path keeps the primary-face fast path compact
 func (e *engine) primaryFaceRun(cssSheet string, sty ResolvedStyle) (faceRun, bool) {
 	if cssSheet == "" {
 		return faceRun{}, false //nolint:exhaustruct // intentional zero fields
@@ -508,14 +620,21 @@ func (e *engine) primaryFaceRun(cssSheet string, sty ResolvedStyle) (faceRun, bo
 	}
 
 	size := sty.FontSize * e.scale
+	paintText := transformInlineText(cssSheet, sty.TextTransform)
 
 	var width float64
+	runeCount := 0
 
-	for _, runic := range cssSheet {
+	for _, runic := range paintText {
 		width += primary.AdvanceInPoints(runic, size)
+		runeCount++
 	}
 
-	return faceRun{text: cssSheet, face: primary, w: width}, true
+	return faceRun{
+		text: cssSheet,
+		face: primary,
+		w:    width + sty.LetterSpacing*e.scale*float64(runeCount),
+	}, true
 }
 
 // faceRunAllPrimary reports that every non-whitespace rune in s is covered by
@@ -539,11 +658,53 @@ func faceRunAllPrimary(s string, primary *pdf.Font) bool {
 }
 
 func (e *engine) fontAscent(size float64) float64 {
-	return float64(e.font.Ascent()) * size / float64(e.font.UnitsPerEm())
+	return e.fontAscentFace(e.font, size)
 }
 
-func (e *engine) fontDescent(size float64) float64 {
-	return float64(-e.font.Descent()) * size / float64(e.font.UnitsPerEm())
+func (e *engine) fontAscentFace(face *pdf.Font, size float64) float64 {
+	if face == nil || face.UnitsPerEm() <= 0 {
+		return size * ascentRatio
+	}
+
+	return float64(face.Ascent()) * size / float64(face.UnitsPerEm())
+}
+
+func (e *engine) fontDescentFace(face *pdf.Font, size float64) float64 {
+	if face == nil || face.UnitsPerEm() <= 0 {
+		return size * descentRatio
+	}
+
+	return float64(-face.Descent()) * size / float64(face.UnitsPerEm())
+}
+
+// inlineFontMetrics returns the largest ascent/descent pair used by an inline
+// item. A line can contain a mix of sans, serif, mono, and fallback faces;
+// using the engine default face for all of them shifts baselines and gives
+// inline chrome the wrong height.
+func (e *engine) inlineFontMetrics(text string, style ResolvedStyle) (float64, float64) {
+	size := style.FontSize * e.scale
+	runs := e.splitTextByFace(text, style)
+
+	if len(runs) == 0 {
+		runs = []faceRun{{face: e.faceFor(style)}} //nolint:exhaustruct // text and width are filled by shaping
+	}
+
+	maxAscent, maxDescent := 0.0, 0.0
+
+	for _, run := range runs {
+		ascent := e.fontAscentFace(run.face, size)
+		descent := e.fontDescentFace(run.face, size)
+
+		if ascent > maxAscent {
+			maxAscent = ascent
+		}
+
+		if descent > maxDescent {
+			maxDescent = descent
+		}
+	}
+
+	return maxAscent, maxDescent
 }
 
 // isExternalHref reports whether a link target should become a URI

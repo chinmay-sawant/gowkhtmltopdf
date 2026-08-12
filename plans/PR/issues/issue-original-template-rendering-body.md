@@ -107,6 +107,22 @@ These paths need shared geometry tests so that the same used rectangle is used f
 - [ ] `TestGoldenCorpusAllFixtures` continues to enforce the existing page envelopes and embedded-image expectations.
 - [ ] Documentation states what is supported for controlled print templates and what remains intentionally below browser fidelity.
 
+### Fixture 55 rendering follow-up
+
+- [x] Capture the regenerated PDF pages and compare the first-page masthead,
+  second-page status pills, and footer geometry against the source CSS.
+- [x] Resolve the fixture's Arial, Georgia, and Courier New declarations to
+  deterministic bundled Liberation Sans, Serif, and Mono faces with matching
+  regular/bold/italic selection.
+- [x] Carry `border-radius` through resolved styles and display-list paint so
+  circles, pills, and rounded status borders are rendered as curved paths.
+- [x] Position the absolute `.page-footer` against the final containing-block
+  bottom instead of the containing-block top.
+- [x] Preserve nested flex max-content widths, flex gaps, and letter-spacing so
+  the first-page masthead brand and right metadata keep their intended lines
+  and right alignment.
+- [ ] Add a fixed-resolution HTML-versus-PDF visual-diff gate for fixture 55.
+
 ## Plan
 
 1. Capture the current failures as minimal layout tests before changing implementation code.

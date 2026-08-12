@@ -1,0 +1,2524 @@
+/* ============================================================
+   fixture-56-architecture-diagram — shell stylesheet
+   Shared design tokens + base typography + shell sections
+   (hero, pipeline, toc, dag, divergence, security, colophon)
+   + the dom-* skeleton classes used by all ten domain sections.
+   The ten domain CSS fragments are appended after this block.
+   ============================================================ */
+
+:root {
+  --paper: #f6f2e9;
+  --ink: #20262f;
+  --muted: #5c6470;
+  --accent: #b4532a;
+  --accent2: #2e6b5a;
+  --line: #d8d1c2;
+  --card: #ffffff;
+  --radius: 10px;
+  --space: 1.1rem;
+  --sans: system-ui, Segoe UI, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+@page {
+  size: A4;
+  margin: 12mm;
+}
+
+* { box-sizing: border-box; }
+
+html { color: var(--ink); background: var(--paper); }
+
+body {
+  font-family: var(--sans);
+  font-size: 10.5pt;
+  line-height: 1.45;
+  margin: 0;
+  padding: 0;
+  color: var(--ink);
+  background: var(--paper);
+}
+
+h1, h2, h3, h4 { line-height: 1.2; margin: 0 0 0.5em; color: var(--ink); }
+h1 { font-size: 20pt; }
+h2 { font-size: 14pt; border-bottom: 2px solid var(--line); padding-bottom: 0.25em; margin-top: 1.2em; }
+h3 { font-size: 11.5pt; }
+p { margin: 0.4em 0; }
+code, kbd, samp, var {
+  font-family: var(--mono);
+  font-size: 0.92em;
+  background: #efe9dc;
+  border-radius: 4px;
+  padding: 0.05em 0.3em;
+}
+a { color: var(--accent2); text-decoration: none; border-bottom: 1px dotted var(--accent2); }
+small { color: var(--muted); font-weight: normal; }
+mark { background: #f3dcb0; color: var(--ink); padding: 0 0.15em; }
+hr { border: none; border-top: 1px solid var(--line); margin: 1em 0; }
+
+/* ---------- hero ---------- */
+.hero {
+  background: var(--ink);
+  color: #f2ede0;
+  border-radius: var(--radius);
+  padding: 22px 26px 16px;
+  margin: 0 0 18px;
+}
+.hero-badge {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 8.5pt;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: #f0c98f;
+  border-radius: 999px;
+  padding: 2px 12px;
+  margin-bottom: 10px;
+}
+.hero-title { color: #f7f3ea; font-size: 22pt; margin-bottom: 6px; border: none; }
+.hero-amp { color: #d9a05b; font-weight: normal; }
+.hero-sub { color: #d8d2c4; max-width: 60em; }
+.hero-sub mark { background: #3a4250; color: #f7e7c8; }
+.hero-meta { display: flex; flex-wrap: wrap; gap: 8px 26px; margin: 12px 0 0; }
+.hero-meta > div { display: flex; align-items: baseline; gap: 8px; }
+.hero-meta dt {
+  font-family: var(--mono);
+  font-size: 8pt;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #9aa3b2;
+}
+.hero-meta dd { margin: 0; color: #e9e2d3; font-size: 10pt; }
+.hero-meta output { background: #3a4250; color: #f7e7c8; }
+.hero-meta code { background: #3a4250; color: #e9e2d3; }
+
+/* ---------- pipeline ---------- */
+.pipeline { margin: 0 0 6px; }
+.pipe-title { font-size: 13pt; }
+.pipe-steps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 4px;
+  list-style: none;
+  margin: 10px 0 4px;
+  padding: 0;
+}
+.pipe-step {
+  flex: 1 1 90px;
+  min-width: 88px;
+  background: var(--card);
+  border: 1.5px solid var(--line);
+  border-top: 4px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 8px 8px 6px;
+  text-align: center;
+}
+.pipe-num {
+  display: block;
+  font-family: var(--mono);
+  font-size: 8pt;
+  color: var(--muted);
+}
+.pipe-name { display: block; font-weight: 700; font-size: 10.5pt; }
+.pipe-note { display: block; font-size: 7.5pt; color: var(--muted); margin-top: 2px; }
+.pipe-arrow { align-self: center; color: var(--accent); font-size: 13pt; padding: 0 2px; }
+
+/* ---------- toc ---------- */
+.toc { margin: 14px 0 4px; }
+.toc-title { font-size: 12pt; }
+.toc-list {
+  columns: 2;
+  column-gap: 30px;
+  margin: 8px 0;
+  padding-left: 1.4em;
+}
+.toc-list li { margin: 2px 0; break-inside: avoid; }
+
+/* ---------- domain sections (shared skeleton) ---------- */
+.domains > section {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 18px 12px;
+  margin: 0 0 14px;
+  break-inside: auto;
+}
+
+.domains > section ~ section {
+  break-before: page;
+  page-break-before: always;
+}
+
+.dag,
+.divergence,
+.security {
+  break-before: page;
+  page-break-before: always;
+}
+.dom-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  border-bottom: 2px solid var(--line);
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+}
+.dom-index {
+  font-family: var(--mono);
+  font-size: 10pt;
+  font-weight: 700;
+  color: #f7f3ea;
+  background: var(--accent);
+  border-radius: 8px;
+  padding: 2px 10px;
+}
+.dom-title { font-size: 13.5pt; margin: 0; border: none; padding: 0; flex: 1 1 auto; min-width: 220px; }
+.dom-role { flex: 0 1 100%; color: var(--muted); font-size: 9.5pt; margin: 0; }
+.dom-body { padding: 2px 0; }
+.dom-lead { font-size: 10pt; margin: 0 0 10px; }
+.dom-pkgs { margin: 10px 0; display: grid; grid-template-columns: 1fr 2.4fr; row-gap: 3px; }
+.dom-pkgs dt { font-family: var(--mono); font-size: 8.6pt; font-weight: 700; color: var(--accent2); padding-right: 8px; }
+.dom-pkgs dd { margin: 0; font-size: 9pt; color: var(--ink); }
+.dom-syms { margin: 8px 0; padding-left: 1.3em; }
+.dom-syms li { font-size: 9.2pt; margin: 2px 0; }
+.dom-notes {
+  background: #f2ecdf;
+  border-left: 4px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  padding: 8px 12px;
+  font-size: 8.8pt;
+  color: #4a4034;
+  margin-top: 10px;
+}
+.dom-foot {
+  font-size: 8pt;
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+  padding-top: 6px;
+  margin-top: 10px;
+}
+.dom-foot strong { color: var(--accent2); }
+
+/* ---------- dependency DAG ---------- */
+.dag { margin-top: 6px; }
+.dag-intro { font-size: 9.5pt; max-width: 62em; }
+.dag-stage {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0;
+}
+.dag-box {
+  background: var(--card);
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 8.8pt;
+  padding: 5px 10px;
+}
+.dag-leaf { background: #e8f0ea; border-color: var(--accent2); }
+.dag-hub { background: var(--ink); color: #f2ede0; border-color: var(--ink); font-weight: 700; }
+.dag-sink { background: #f6e8dc; border-color: var(--accent); }
+.dag-arrow { color: var(--accent); font-size: 12pt; padding: 0 2px; }
+.dag-boundary {
+  display: inline-block;
+  background: #f9e3d3;
+  border: 1.5px dashed var(--accent);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 9pt;
+  margin: 6px 0;
+}
+.dag-rules { margin: 8px 0 0; padding: 0; list-style: none; }
+.dag-rules li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 9.2pt;
+  margin: 3px 0;
+}
+.dag-rule-n {
+  font-family: var(--mono);
+  font-weight: 700;
+  color: var(--accent);
+  min-width: 1.2em;
+}
+
+/* ---------- divergence ---------- */
+.div-grid { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
+.div-card {
+  flex: 1 1 44%;
+  min-width: 250px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-top: 4px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+}
+.div-card-alt { border-top-color: var(--accent2); }
+.div-card-title { font-size: 10.5pt; margin-bottom: 4px; }
+.div-list { margin: 4px 0; padding-left: 1.3em; }
+.div-list li { font-size: 9.2pt; margin: 2px 0; }
+
+/* ---------- security ---------- */
+.sec-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+}
+.sec-card {
+  flex: 1 1 30%;
+  min-width: 210px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 9px 12px;
+  font-size: 8.8pt;
+}
+.sec-k {
+  display: block;
+  font-family: var(--mono);
+  font-size: 8pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  margin-bottom: 3px;
+}
+.sec-ref { font-size: 8.4pt; color: var(--muted); }
+
+/* ---------- colophon ---------- */
+.colophon {
+  margin-top: 16px;
+  padding-top: 8px;
+  border-top: 2px solid var(--line);
+  font-size: 8.4pt;
+  color: var(--muted);
+}
+.colophon a { color: var(--accent2); }
+
+/* ============ domain 01 fragment ============ */
+/* ============================================================
+   Section 01 - Entrypoints, CLI & multi-object grammar
+   All rules scoped to section.d01 / #domain-01 / .d01-* classes.
+   Skeleton classes (dom-*) are styled by the shell - not redefined.
+   Modern CSS showcase: oklch(), clamp(), logical properties,
+   aspect-ratio, ::selection, scroll-margin - every one in the
+   graceful-degrade pattern (unsupported declarations are dropped
+   by the lite engine, the fallback before them wins).
+   ============================================================ */
+
+section.d01 {
+  /* local design tokens (shell tokens stay untouched) */
+  --d01-term-bg: #14181f;
+  --d01-term-fg: #d8e0e8;
+  --d01-term-dim: #7d8794;
+  --d01-ok: #3f9d7d;
+
+  /* additive frame: coloured spine per domain section */
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius);
+
+  /* modern: scroll-margin for same-document anchor jumps (dropped by engine, harmless) */
+  scroll-margin-top: 2rem;
+}
+
+/* --- new HTML5 tags forced inline (engine default: generic box) --- */
+section.d01 kbd,
+section.d01 samp,
+section.d01 var,
+section.d01 output,
+section.d01 wbr {
+  display: inline;
+}
+
+section.d01 kbd {
+  font-family: var(--mono);
+  font-size: 0.82em;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 0 0.25em;
+}
+
+section.d01 samp {
+  font-family: var(--mono);
+  font-size: 0.82em;
+  color: var(--accent2);
+}
+
+section.d01 var {
+  font-style: italic;
+  font-family: var(--mono);
+  color: var(--accent);
+}
+
+section.d01 output {
+  font-family: var(--mono);
+  font-weight: bold;
+  background: var(--paper);
+  border-radius: 4px;
+  padding: 0 0.3em;
+  /* modern: logical property (unsupported here, dropped) - padding fallback above wins */
+  padding-inline: 0.45em;
+}
+
+/* --- terminal mock --- */
+section.d01 .d01-term {
+  margin: 0 0 var(--space);
+  break-after: page;
+  page-break-after: always;
+  background: var(--d01-term-bg);
+  /* modern: oklch() (unsupported here, dropped) - fallback hex wins */
+  color: #d8e0e8;
+  color: oklch(88% 0.02 230);
+  border: 1px solid #2a3340;
+  border-radius: var(--radius);
+  padding: 0.6em 0.8em;
+}
+
+section.d01 .d01-term-cap {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--d01-term-dim);
+  margin-bottom: 0.35em;
+}
+
+section.d01 .d01-pre {
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  white-space: pre;
+  margin: 0;
+  color: inherit;
+}
+
+section.d01 .d01-prompt {
+  color: var(--accent);
+}
+
+section.d01 .d01-cmd {
+  background: transparent;
+  border: none;
+  color: #e9eff5;
+}
+
+section.d01 .d01-out {
+  color: var(--d01-ok);
+}
+
+/* --- exit-code table --- */
+section.d01 .d01-exit {
+  /* modern: clamp() (unsupported here, dropped) - width fallback wins */
+  width: 100%;
+  width: clamp(24rem, 70%, 46rem);
+  border-collapse: collapse;
+  margin: 0 0 var(--space);
+}
+
+section.d01 .d01-exit caption {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: left;
+  margin-bottom: 0.35em;
+}
+
+section.d01 .d01-exit th,
+section.d01 .d01-exit td {
+  border: 1px solid var(--line);
+  padding: 0.3em 0.55em;
+  font-size: 0.82rem;
+  text-align: left;
+}
+
+section.d01 .d01-exit th {
+  background: var(--paper);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+section.d01 .d01-code {
+  display: inline-block;
+  min-height: 1.2em;
+  /* modern: aspect-ratio (unsupported here, dropped) - min-height fallback wins */
+  aspect-ratio: 2 / 1;
+}
+
+/* --- inline vocabulary paragraph --- */
+section.d01 .d01-inline {
+  font-size: 0.88rem;
+  line-height: 1.55;
+  margin: 0 0 var(--space);
+}
+
+/* --- argv flow strip --- */
+section.d01 .d01-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4em;
+  margin: 0 0 var(--space);
+}
+
+section.d01 .d01-flowstep {
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.2em 0.7em;
+  /* modern: logical property (unsupported here, dropped) - padding fallback above wins */
+  padding-inline: 0.9em;
+  color: var(--ink);
+}
+
+section.d01 .d01-arrow {
+  color: var(--accent);
+  font-weight: bold;
+}
+
+/* --- modern: ::selection rule (unsupported pseudo, whole rule dropped by engine) --- */
+section.d01 .d01-term ::selection {
+  background: rgba(180, 83, 42, 0.35);
+}
+
+/* ============ domain 02 fragment ============ */
+/* d02 - Public library API section styles.
+   Scoped strictly to section.d0n / #domain-02 / .d02-* .
+   Shell tokens (do not redefine): --paper --ink --muted --accent --accent2
+   --line --card --radius --space --sans --mono.
+   Modern CSS is showcased with the graceful-degrade pattern:
+   fallback declaration first; the lite engine drops the unsupported second one. */
+
+/* local custom props for this section */
+section.d02 {
+  --d02-tint: #fdfaf3;
+  position: relative;
+}
+
+/* lite engine renders inline typography elements as generic boxes: force inline */
+section.d02 mark,
+section.d02 time,
+section.d02 abbr,
+section.d02 dfn,
+section.d02 cite,
+section.d02 data {
+  display: inline;
+}
+
+/* highlight <mark>: inline highlight chip */
+section.d02 mark {
+  background: #20262f;
+  background: color-mix(in srgb, var(--ink) 88%, var(--accent)); /* modern; ignored by lite engine, #20262f wins */
+  color: #f6f2e9;
+  padding: 0 0.35em;
+  border-radius: 3px;
+  font-family: var(--mono);
+  font-size: 0.86em;
+}
+
+/* <dfn>: dotted-underline definition term */
+section.d02 dfn {
+  border-bottom: 1px dotted var(--muted);
+  text-decoration: none;
+  font-style: normal;
+}
+
+/* <cite>: doc/source citation, muted italic */
+section.d02 cite {
+  font-style: italic;
+  color: var(--muted);
+}
+
+/* vertical side tab - writing-mode:vertical-rl IS engine-supported (real effect) */
+section.d02 .d02-tab {
+  position: absolute;
+  right: 0;
+  top: 12px;
+  width: 20px;
+  padding: 8px 3px;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 0 8px 8px 0;
+  font-family: var(--mono);
+  font-size: 8.5px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+/* figure: two dialects -> one seam */
+section.d02 .d02-fig {
+  margin: calc(var(--space) * 0.8) 0;
+  padding: var(--space);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+section.d02 .d02-srcs {
+  display: flex;
+  gap: calc(var(--space) * 0.6);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+section.d02 .d02-src {
+  flex: 1 1 30%;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--accent2);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 11px;
+  line-height: 1.45;
+  text-align: center;
+  color: var(--muted);
+}
+
+section.d02 .d02-src code {
+  color: var(--ink);
+  font-size: 10.5px;
+}
+
+section.d02 .d02-arrow {
+  text-align: center;
+  color: var(--accent);
+  font-size: 13px;
+  line-height: 1.3;
+  padding: 2px 0;
+}
+
+section.d02 .d02-seam {
+  margin: 0 auto;
+  width: 100%;
+  height: 46px;
+  aspect-ratio: 6 / 1; /* modern; ignored by lite engine, fixed height wins */
+  max-width: 460px;
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  text-align: center;
+  padding: 4px 10px;
+}
+
+section.d02 .d02-seamname {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+section.d02 .d02-seamsub {
+  font-size: 9.5px;
+  color: #c8c1b2;
+  color: oklch(82% 0.02 90); /* modern; ignored by lite engine, #c8c1b2 wins */
+}
+
+section.d02 .d02-engines {
+  display: flex;
+  gap: calc(var(--space) * 0.6);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+section.d02 .d02-engine {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 3px 12px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink);
+}
+
+section.d02 .d02-fig figcaption {
+  margin-top: calc(var(--space) * 0.6);
+  font-size: 9.5px;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.5;
+}
+
+section.d02 .d02-fig figcaption code,
+section.d02 .d02-fig figcaption cite {
+  font-size: 9px;
+}
+
+/* symbol list: mono chips with clamp()-style sizing (fallback first) */
+section.d02 .dom-syms {
+  font-size: 11.5px;
+  font-size: clamp(0.7rem, 0.62rem + 0.4vw, 0.82rem); /* modern; ignored by lite engine */
+  line-height: 1.6;
+  padding-left: 1.2em;
+}
+
+section.d02 .dom-syms code {
+  background: #f0ece2;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0 0.3em;
+  font-size: 0.92em;
+  white-space: nowrap;
+}
+
+/* compact surface contract table */
+section.d02 .d02-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: calc(var(--space) * 0.8) 0;
+  font-size: 10.5px;
+}
+
+section.d02 .d02-table th,
+section.d02 .d02-table td {
+  border: 1px solid var(--line);
+  padding: 5px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+section.d02 .d02-table th {
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.6px;
+}
+
+section.d02 .d02-table code {
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+/* notes aside: security + limits with underline-offset showcase (fallback first) */
+section.d02 .dom-notes {
+  font-size: 10px;
+  line-height: 1.55;
+  color: var(--muted);
+  background: #fdf3ec;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 6px 6px 0;
+  padding: 8px 10px;
+  margin-top: var(--space);
+}
+
+section.d02 .dom-notes strong {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-thickness: 2px; /* modern; ignored by lite engine, plain underline stays */
+  text-underline-offset: 2px;     /* modern; ignored by lite engine */
+}
+
+/* :target fragment highlight (matching is engine-supported; harmless if never hit) */
+section.d02:target {
+  outline: 2px dashed var(--accent);
+  outline-offset: 3px;
+}
+
+/* ============ domain 03 fragment ============ */
+/* Section 03 CSS fragment - scoped strictly to section.d03 / .d03-*.
+   Uses shell tokens (--paper --ink --muted --accent --accent2 --line --card --radius --space --sans --mono).
+   Modern-CSS showcase uses the graceful-degrade pattern: supported fallback first,
+   the lite engine drops the second declaration when unsupported. */
+
+section.d03 {
+  /* own accent for the card top edge: fallback then modern color function */
+  border-top: 3px solid var(--accent2);
+  border-top-color: oklch(52% 0.06 165); /* ignored by the lite engine - fallback wins */
+}
+
+section.d03 {
+  --d03-tint: #f2e4c8;   /* warm highlight tint for marks */
+  --d03-bar:  #2e6b5a;   /* gauge chip fill */
+  --d03-track:#d8d1c2;   /* gauge chip track */
+}
+
+/* Inline typography tags must be forced inline: the lite engine renders unknown
+   elements as generic boxes. */
+section.d03 mark,
+section.d03 output,
+section.d03 abbr,
+section.d03 kbd,
+section.d03 samp,
+section.d03 time,
+section.d03 data,
+section.d03 cite {
+  display: inline;
+}
+
+section.d03 code {
+  font-family: var(--mono);
+  font-size: 0.82em;
+}
+
+/* mark: highlighted invariant chips */
+section.d03 mark {
+  background-color: var(--d03-tint);
+  background-color: oklch(93% 0.05 85); /* ignored fallback - first declaration wins */
+  color: var(--ink);
+  padding: 0 0.15em;
+  border-radius: 3px;
+}
+
+/* kbd: flag styling */
+section.d03 kbd {
+  font-family: var(--mono);
+  font-size: 0.82em;
+  padding: 0.1em 0.35em;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background-color: var(--card);
+  color: var(--ink);
+}
+
+/* flow strip: the dotted-key path */
+section.d03 .d03-flow {
+  margin-block: var(--space); /* logical property - ignored by lite engine; margin-top/bottom below are the fallback */
+  margin-top: var(--space);
+  margin-bottom: var(--space);
+  padding: 0.7em 0.9em;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background-color: var(--card);
+}
+
+section.d03 .d03-flow figcaption {
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 0.5em;
+}
+
+section.d03 .d03-steps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5em;
+  margin: 0;
+}
+
+section.d03 .d03-arrow {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+section.d03 .d03-result {
+  display: inline-block;
+  padding: 0.15em 0.5em;
+  border-radius: var(--radius);
+  background-color: var(--d03-tint);
+}
+
+section.d03 .d03-result output {
+  font-family: var(--mono);
+  font-size: 0.82em;
+  color: var(--ink);
+}
+
+section.d03 .d03-caption {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 0.6em;
+  margin-bottom: 0;
+  text-decoration: underline;
+  text-decoration-thickness: 1px; /* ignored fallback - underline still renders */
+  text-underline-offset: 3px;     /* ignored fallback */
+}
+
+/* Policy A block */
+section.d03 .d03-policy {
+  margin-top: var(--space);
+}
+
+section.d03 .d03-h {
+  font-size: 0.95rem;
+  font-size: clamp(0.85rem, 0.7rem + 0.4vw, 1.05rem); /* ignored fallback - first declaration wins */
+  margin-top: 0;
+  margin-bottom: 0.35em;
+  color: var(--accent2);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* meter/progress render as generic boxes here - styled as labelled chips.
+   Value attributes parse but do not drive native widget painting. */
+section.d03 .d03-gauges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space);
+  margin: 0.6em 0 0;
+}
+
+section.d03 .d03-gauge {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.25em;
+  width: 46%;
+  box-sizing: border-box;
+}
+
+section.d03 .d03-gauge meter,
+section.d03 .d03-gauge progress {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0.3em 0.6em;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background-color: var(--card);
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  color: var(--ink);
+}
+
+section.d03 .d03-gauge progress {
+  background-color: var(--d03-track);
+  color: var(--paper);
+}
+
+section.d03 .d03-gauge output {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+/* square chip proving aspect-ratio degrades safely (fallback size first) */
+section.d03 .dom-index {
+  width: 2.2em;
+  height: 2.2em;
+  aspect-ratio: 1; /* ignored fallback - width/height win */
+}
+
+/* decorative: selection tint (no text selection exists in static PDF; harmless) */
+section.d03 ::selection {
+  background-color: var(--accent);
+  color: var(--paper);
+}
+
+/* ============ domain 04 fragment ============ */
+/* ==========================================================================
+   Section 04 - Load layer: URLs, I/O & ACL
+   Scoped strictly to section.d04 / #domain-04 / .d04-* classes.
+   Shared shell tokens used: --paper, --ink, --muted, --accent, --accent2,
+   --line, --card, --radius, --space, --sans, --mono (do not redefine).
+   ========================================================================== */
+
+/* Card accent: modern color-mix() with a graceful fallback first.
+   The lite engine drops the color-mix() declaration and keeps var(--accent). */
+section.d04 {
+  border-top-color: var(--accent);
+  border-top-color: color-mix(in srgb, var(--accent) 65%, var(--accent2));
+}
+
+/* New inline tags render as generic boxes in the lite engine unless forced. */
+section.d04 time,
+section.d04 bdi,
+section.d04 bdo,
+section.d04 wbr,
+section.d04 code {
+  display: inline;
+}
+
+/* ---------------- flow figure ---------------- */
+.d04-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 0.4rem;
+  margin: 0.6rem 0;
+  padding: 0.6rem 0.7rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.d04-flowbox {
+  padding: 0.35rem 0.5rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.d04-flowbox code {
+  font-size: 0.82rem;
+}
+
+.d04-flowbox small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.d04-arrow {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.d04-cap {
+  width: 100%;
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-top: 0.25rem;
+}
+
+/* ---------------- two seams ---------------- */
+.d04-seams {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  margin: 0.7rem 0;
+}
+
+.d04-seam {
+  flex-grow: 1;
+  flex-basis: 0;
+  min-width: 14rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent2);
+  border-radius: var(--radius);
+  padding: 0.55rem 0.7rem;
+}
+
+.d04-seam-t {
+  font-size: 0.9rem;
+  margin-top: 0;
+  margin-block-start: 0; /* logical property showcase: dropped by lite engine, margin-top wins */
+  margin-bottom: 0.3rem;
+  color: var(--ink);
+}
+
+/* clamp() with fallback: lite engine keeps 0.85rem, drops clamp(). */
+.d04-seam p {
+  font-size: 0.85rem;
+  font-size: clamp(0.8rem, 1.2vw, 0.9rem);
+}
+
+/* ---------------- ACL decision matrix ---------------- */
+.d04-matrix {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.6rem 0;
+  font-size: 0.82rem;
+}
+
+.d04-matrix caption {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-align: left;
+  margin-bottom: 0.25rem;
+}
+
+.d04-matrix th,
+.d04-matrix td {
+  border: 1px solid var(--line);
+  padding: 0.28rem 0.5rem;
+  text-align: center;
+}
+
+.d04-matrix th {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/* The one "yes" row highlighted: oklch() showcase with hex fallback first. */
+.d04-matrix tbody tr:last-child td {
+  background: #eaf2ea;
+  background: oklch(95% 0.02 160);
+}
+
+/* ---------------- URL shapes + owner address ---------------- */
+.d04-urls {
+  font-size: 0.82rem;
+  color: var(--ink);
+}
+
+.d04-owner {
+  display: block;
+  font-style: normal;
+  margin-top: 0.6rem;
+  padding: 0.4rem 0.6rem;
+  background: var(--paper);
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+/* ---------------- future-proof rules ---------------- */
+/* ::selection never matches in static print (no selection state in a PDF);
+   parsePseudoElement rejects non-before/after pseudo-elements safely, so
+   these rules simply never apply. */
+section.d04 ::selection {
+  background: var(--accent);
+  color: var(--paper);
+}
+
+/* :focus-visible is parsed but never matches (static PDF has no focus state). */
+section.d04 :focus-visible {
+  outline: 2px solid var(--accent2);
+  outline-offset: 2px; /* dropped by lite engine, harmless */
+}
+
+/* ============ domain 05 fragment ============ */
+/* Fragment 05 CSS — scoped strictly to section.d05 (no global selectors).
+   Uses the shell design tokens; adds --d05-* custom properties.
+   Modern CSS is showcased with the graceful-degrade pattern:
+   fallback declaration FIRST, modern declaration SECOND — the lite engine
+   drops the second when unsupported, so the fallback wins. */
+
+section.d05 {
+  --d05-chip-bg: #efe9db;
+  --d05-chip-ink: #20262f;
+  --d05-mark-bg: #ffe9a8;
+  --d05-ins-bg: #e6f2ec;
+}
+
+/* Inline-forcing: the engine's initial display is inline (internal/layout/style.go:193);
+   make it explicit for every semantic tag used in this section. */
+section.d05 mark,
+section.d05 time,
+section.d05 data,
+section.d05 kbd,
+section.d05 samp,
+section.d05 var,
+section.d05 ruby,
+section.d05 rt,
+section.d05 rp,
+section.d05 ins,
+section.d05 del,
+section.d05 wbr {
+  display: inline;
+}
+
+section.d05 mark {
+  /* modern: light-dark() — dropped by the lite engine, fallback keeps the highlight */
+  background: var(--d05-mark-bg);
+  background: light-dark(var(--d05-mark-bg), #3a3420);
+  border-radius: 3px;
+  padding: 0 0.15em;
+  padding-inline: 0.15em; /* logical property: dropped if unsupported */
+}
+
+section.d05 time,
+section.d05 data {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums; /* dropped if unsupported — harmless */
+}
+
+section.d05 kbd,
+section.d05 samp {
+  font-family: var(--mono);
+  font-size: 0.78rem;                /* fallback */
+  font-size: clamp(0.68rem, 0.6rem + 0.5vw, 0.82rem); /* modern: dropped -> fallback wins */
+  background: var(--d05-chip-bg);
+  color: var(--d05-chip-ink);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.08em 0.35em;
+  white-space: nowrap;
+}
+
+section.d05 var {
+  color: var(--accent2);
+  font-style: italic; /* UA already italicizes var; keep it explicit */
+}
+
+section.d05 ruby {
+  font-size: 1.05em;
+}
+
+section.d05 rt {
+  font-size: 0.6em;
+  color: var(--accent2);
+  ruby-position: over; /* unsupported: dropped, rt simply renders inline smaller */
+}
+
+section.d05 rp {
+  color: var(--muted);
+}
+
+section.d05 del {
+  text-decoration: line-through;     /* UA sets this too; fallback */
+  text-decoration-thickness: 2px;    /* modern: dropped if unsupported */
+  color: var(--muted);
+}
+
+section.d05 ins {
+  text-decoration: underline;        /* fallback */
+  text-decoration-thickness: 2px;    /* modern: dropped if unsupported */
+  background: var(--d05-ins-bg);
+  background: color-mix(in srgb, var(--accent2) 14%, #ffffff); /* modern: dropped -> fallback */
+}
+
+section.d05 .d05-note {
+  font-size: 0.68rem;
+  color: var(--accent);
+  margin-left: 0.25em;
+}
+
+section.d05 .d05-chips {
+  list-style: none;
+  margin: 0.5em 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45em;
+}
+
+section.d05 .d05-fig {
+  margin: 0.5em 0;
+  margin-inline: 1em; /* logical property: dropped if unsupported */
+}
+
+section.d05 figcaption {
+  font-size: 0.75rem;
+  color: var(--muted);
+  letter-spacing: 0.03em;
+  margin-bottom: 0.2em;
+  margin-block-end: 0.2em; /* logical property: dropped if unsupported */
+}
+
+section.d05 .d05-ruby {
+  margin: 0.2em 0;
+  text-wrap: balance; /* modern: dropped if unsupported — harmless */
+}
+
+section.d05 .dom-lead {
+  /* modern color function with a plain fallback first */
+  color: #20262f;
+  color: oklch(30% 0.04 260);
+}
+
+/* Never-match in the lite engine (unknown pseudo-element): graceful showcase of ::selection */
+section.d05 mark::selection {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+/* ============ domain 06 fragment ============ */
+/* Fragment 06 CSS — scoped strictly to section.d06 (no global selectors).
+   Uses the shell design tokens; adds --d06-* custom properties.
+   Modern CSS is showcased with the graceful-degrade pattern:
+   fallback declaration FIRST, modern declaration SECOND — the lite engine
+   drops the second when unsupported, so the fallback wins.
+   Verified against internal/css (css.go, values.go) and
+   internal/layout/style_properties.go: oklch(), color-mix(), clamp(),
+   light-dark(), logical properties, text-wrap, accent-color, backdrop-filter,
+   ::selection and :target are unsupported -> dropped or never-match. */
+
+section.d06 {
+  --d06-chip-bg: #efe9db;
+  --d06-chip-ink: #20262f;
+  --d06-mark-bg: #f6e7c9;
+  --d06-wire-bg: #fbf8f1;
+  --d06-here-ink: #b4532a;
+}
+
+/* Semantic tags default to display:inline (style.go:193); force it explicitly.
+   details/summary are forced block so they behave like the section cards. */
+section.d06 mark,
+section.d06 kbd,
+section.d06 samp,
+section.d06 var,
+section.d06 dfn,
+section.d06 abbr,
+section.d06 cite,
+section.d06 time,
+section.d06 data,
+section.d06 ins,
+section.d06 del,
+section.d06 sub,
+section.d06 sup {
+  display: inline;
+}
+
+section.d06 details,
+section.d06 summary {
+  display: block;
+}
+
+section.d06 mark {
+  /* modern: color-mix() — dropped by the lite engine, fallback keeps the highlight */
+  background: var(--d06-mark-bg);
+  background: color-mix(in srgb, var(--d06-mark-bg) 82%, var(--accent));
+  color: var(--ink);
+  border-radius: 3px;
+  padding: 0 0.15em;
+  padding-inline: 0.15em; /* logical property: dropped if unsupported */
+}
+
+section.d06 kbd,
+section.d06 samp {
+  font-family: var(--mono);
+  font-size: 0.78rem;                /* fallback */
+  font-size: clamp(0.68rem, 0.6rem + 0.5vw, 0.82rem); /* modern: dropped -> fallback wins */
+  background: var(--d06-chip-bg);
+  color: var(--d06-chip-ink);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.08em 0.35em;
+  white-space: nowrap;
+}
+
+section.d06 var {
+  color: var(--accent2);
+  font-style: italic;
+  font-family: var(--mono);
+}
+
+section.d06 dfn {
+  font-style: italic;
+  font-weight: 600;
+  text-decoration: underline;          /* fallback (supported) */
+  text-decoration-thickness: 1px;      /* modern: dropped if unsupported */
+  text-underline-offset: 2px;          /* modern: dropped if unsupported */
+}
+
+section.d06 abbr {
+  text-decoration: underline dotted;   /* dotted keyword may drop; underline fallback */
+  text-decoration: underline;
+  text-underline-offset: 2px;          /* modern: dropped if unsupported */
+}
+
+section.d06 cite {
+  font-style: italic;
+  color: var(--muted);
+}
+
+section.d06 time,
+section.d06 data {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;  /* modern: dropped if unsupported - harmless */
+}
+
+section.d06 ins {
+  text-decoration: underline;          /* fallback */
+  text-decoration-thickness: 2px;      /* modern: dropped if unsupported */
+  background: #e6f2ec;
+  background: color-mix(in srgb, var(--accent2) 14%, #ffffff); /* modern: dropped -> fallback */
+}
+
+section.d06 del {
+  text-decoration: line-through;       /* fallback */
+  text-decoration-thickness: 2px;      /* modern: dropped if unsupported */
+  color: var(--muted);
+}
+
+section.d06 sub,
+section.d06 sup {
+  font-size: 0.7em;
+  color: var(--accent2);
+  vertical-align: sub;                 /* engine keyword may drop; sizing still reads */
+}
+
+section.d06 sup {
+  vertical-align: super;               /* engine keyword may drop; sizing still reads */
+}
+
+section.d06 .d06-chips {
+  list-style: none;
+  margin: 0.5em 0 0;
+  margin-block: 0.5em 0;               /* logical property: dropped if unsupported */
+  padding: 0;
+  padding-inline: 0;                   /* logical property: dropped if unsupported */
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45em;
+}
+
+section.d06 .d06-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55em;
+  margin: 0.8em 0;
+  padding: 0.55em 0.75em;
+  border: 1px dashed var(--line);
+  border-left: 4px solid var(--accent);        /* fallback (supported) */
+  border-inline-start: 4px solid var(--accent); /* modern: logical property, dropped */
+  background: var(--card);
+}
+
+section.d06 .d06-flowstep {
+  display: inline-block;
+  padding: 0.22em 0.55em;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--ink);
+}
+
+section.d06 .d06-here {
+  border-color: var(--accent);
+  border-width: 2px;
+  color: var(--d06-here-ink);
+  font-weight: 700;
+}
+
+/* Chevron drawn with borders + transform rotate (no unicode glyph needed).
+   If transform is dropped the element degrades to a small square - acceptable. */
+section.d06 .d06-arrow {
+  display: inline-block;
+  width: 0.5em;
+  height: 0.5em;
+  border-top: 2px solid var(--muted);
+  border-right: 2px solid var(--muted);
+  transform: rotate(45deg);
+  margin: 0 0.1em;
+}
+
+section.d06 .d06-para {
+  margin: 0.5em 0;
+  margin-block: 0.5em;                 /* logical property: dropped if unsupported */
+  line-height: 1.45;
+}
+
+section.d06 .d06-unit {
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+
+section.d06 .d06-fn {
+  margin: 0.2em 0 0.6em;
+  font-size: 0.72rem;
+  color: var(--muted);
+  border-left: 3px solid var(--line);
+  border-inline-start: 3px solid var(--line); /* modern: dropped if unsupported */
+  padding-left: 0.5em;
+  padding-inline-start: 0.5em;         /* modern: dropped if unsupported */
+}
+
+section.d06 .d06-details {
+  margin: 0.6em 0;
+  padding: 0.35em 0.7em;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+}
+
+section.d06 summary {
+  font-weight: 700;
+  color: var(--ink);
+  cursor: default;                     /* no JS toggle in print; content flows */
+  text-wrap: balance;                  /* modern: dropped if unsupported - harmless */
+}
+
+section.d06 .d06-list {
+  margin: 0.4em 0 0.2em 1.1em;
+  padding: 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+section.d06 .d06-wire {
+  margin: 0.7em 0;
+  padding: 0.6em 0.8em;
+  background: var(--d06-wire-bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+section.d06 .d06-wirecap {
+  margin: 0 0 0.3em;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #5c6470;                      /* fallback */
+  color: oklch(48% 0.03 250);          /* modern: dropped -> fallback wins */
+}
+
+section.d06 .d06-comment {
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 0.72rem;
+  font-style: italic;
+}
+
+section.d06 .dom-notes {
+  font-size: 0.83rem;
+  line-height: 1.4;
+}
+
+/* Legend swatches: pure-CSS tokens, square via explicit height + aspect-ratio
+   (aspect-ratio dropped by the engine, height fallback keeps them square). */
+section.d06 .d06-legend {
+  margin: 0.3em 0 0;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+section.d06 .d06-swatch {
+  display: inline-block;
+  width: 0.85em;
+  height: 0.85em;                      /* fallback */
+  aspect-ratio: 1;                     /* modern: dropped if unsupported */
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  margin: 0 0.2em 0 0.6em;
+}
+
+/* Dead-CSS showcases (never apply, kept honest with comments):
+   - :target is an interactive pseudo: kept on the compound but matches false
+     in a static PDF (css.go:1410), so this rule can never fire.
+   - ::selection is not ::before/::after: the selector is rejected (css.go:978).
+   - ::marker pseudo-element is unsupported: rule dropped.
+   - accent-color and backdrop-filter are unknown properties: declarations dropped. */
+section.d06:target {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+section.d06 mark::selection {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+section.d06 li::marker {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+section.d06 .d06-chip {
+  accent-color: var(--accent);
+  backdrop-filter: blur(2px);
+}
+
+/* ============ domain 07 fragment ============ */
+/* d07 - layout engine & line breaking (scoped to section.d07 only) */
+section.d07 {
+  --d07-accent: var(--accent2); /* teal accent, distinct from other sections */
+}
+
+/* Inline typography tags: the lite engine defaults unknown boxes to block,
+   so force the text-level semantics explicitly. */
+section.d07 mark,
+section.d07 abbr,
+section.d07 cite,
+section.d07 dfn,
+section.d07 samp,
+section.d07 data,
+section.d07 sub,
+section.d07 sup {
+  display: inline;
+}
+
+section.d07 mark {
+  background: #f0dfb8; /* fallback highlight */
+  background: color-mix(in srgb, var(--accent) 26%, var(--paper)); /* modern; ignored by lite engine */
+  padding: 0 0.12em;
+}
+
+section.d07 dfn {
+  font-style: italic;
+  border-bottom: 1px dotted var(--line);
+}
+
+section.d07 samp {
+  font-family: var(--mono);
+  font-size: 0.82em;
+  color: var(--ink);
+  background: var(--paper);
+  padding: 0 0.25em;
+  border-radius: 4px;
+}
+
+section.d07 abbr {
+  text-decoration: none;
+  border-bottom: 1px dotted var(--muted);
+  cursor: help; /* ignored by lite engine; harmless */
+}
+
+/* Pipeline mini-flow: flex row with wrap + gap (flex lite, supported). */
+figure.d07-flow {
+  width: 100%;
+  width: clamp(11rem, 45%, 34rem); /* modern clamp; ignored - fallback width wins */
+  margin: 0 0 var(--space);
+  aspect-ratio: 16 / 7; /* modern; ignored (future-proofing only) */
+}
+
+.d07-flowrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35em 0.45em;
+  align-items: center;
+}
+
+.d07-step {
+  padding: 0.22em 0.55em;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  font-family: var(--mono);
+  font-size: 0.78em;
+  color: var(--ink);
+}
+
+.d07-step.d07-here {
+  background: var(--d07-accent);
+  color: #ffffff;
+  border-color: var(--d07-accent);
+}
+
+.d07-arrow {
+  color: var(--muted);
+}
+
+figure.d07-flow figcaption {
+  margin-top: 0.4em;
+  font-size: 0.78em;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* dialog: styled block card (generic block in the lite engine). */
+dialog.d07-op {
+  display: block;
+  margin: 0 0 var(--space);
+  padding: 0.7em 0.9em 0.8em;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+h3.d07-ophead {
+  margin: 0 0 0.4em;
+  font-size: 0.95em;
+  color: var(--ink);
+  color: oklch(28% 0.04 250); /* modern color space; ignored - fallback ink wins */
+}
+
+.d07-badge {
+  font-size: 0.5em;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #ffffff;
+  background: var(--accent); /* fallback */
+  background: color-mix(in srgb, var(--accent) 85%, var(--paper)); /* modern; ignored */
+  border-radius: 999px;
+  padding: 0.2em 0.65em;
+  vertical-align: 0.3em;
+}
+
+.d07-opbody,
+.d07-opfoot {
+  margin: 0.25em 0;
+  font-size: 0.88em;
+}
+
+.d07-opfoot {
+  color: var(--muted);
+}
+
+/* fieldset / legend: generic block rendering, grid list inside. */
+fieldset.d07-contexts {
+  margin: 0 0 var(--space);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.65em 0.8em 0.8em;
+}
+
+legend.d07-contexts-legend {
+  padding: 0.15em 0.55em;
+  color: #ffffff;
+  background: var(--accent); /* fallback */
+  background: color-mix(in srgb, var(--accent) 82%, var(--paper)); /* modern; ignored */
+  border-radius: 999px;
+  font-size: 0.8em;
+  letter-spacing: 0.03em;
+}
+
+.d07-lite {
+  color: var(--muted);
+  font-style: italic;
+  font-size: 0.88em;
+}
+
+ul.d07-contextlist {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.15em 1.1em;
+  margin: 0.45em 0 0;
+  padding-left: 1.2em;
+  font-size: 0.85em;
+}
+
+/* search: generic block, no interactive behaviour in print. */
+search.d07-search {
+  display: block;
+  margin: 0 0 var(--space);
+  padding: 0.5em 0.85em 0.6em;
+  border-left: 3px solid var(--d07-accent);
+  background: var(--paper);
+}
+
+.d07-searchlabel {
+  margin: 0 0 0.3em;
+  font-weight: 600;
+  font-size: 0.85em;
+}
+
+ul.d07-searchlist {
+  margin: 0;
+  padding-left: 1.2em;
+}
+
+.d07-searchlist li {
+  margin: 0.15em 0;
+  font-size: 0.85em;
+}
+
+/* Stats strip: logical-property pair (modern margin-block-end is ignored,
+   the plain margin fallback wins) plus modern text-wrap on the lead. */
+p.d07-stats {
+  margin: 0 0 var(--space);
+  margin-block-end: var(--space); /* modern logical property; ignored by lite engine */
+  font-size: 0.78em;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+p.d07-stats data {
+  font-family: var(--mono);
+  color: var(--ink);
+}
+
+p.d07-lead {
+  text-wrap: balance; /* modern; ignored by lite engine (no effect, harmless) */
+}
+
+/* :target highlight - a real, supported pseudo-class for the shell TOC links. */
+section.d07:target {
+  border-color: var(--d07-accent);
+}
+
+/* ============ domain 08 fragment ============ */
+/* domain-08 (convert pipeline, job orchestration) — scoped rules.
+   The shell owns the design tokens and the dom-* skeleton classes; every
+   rule here is scoped to section.d08 / #domain-08 / d0n- prefixed classes. */
+
+section.d08 { scroll-margin-top: 2em; } /* modern, inert in lite engine */
+
+/* Inline typography tags degrade to generic boxes in the lite engine —
+   force them inline. */
+section.d08 mark,
+section.d08 output,
+section.d08 kbd { display: inline; }
+
+section.d08 mark {
+  background: #f6d9c2;                                  /* fallback */
+  background: color-mix(in srgb, var(--accent) 22%, var(--paper)); /* modern, dropped by lite engine */
+  color: var(--ink);
+  padding: 0 0.15em;
+  border-radius: 3px;
+}
+
+section.d08 kbd {
+  font-family: var(--mono);
+  font-size: 0.82em;
+  background: #efe9db;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.05em 0.3em;
+  white-space: nowrap;
+}
+
+/* --- three-stage lifecycle diagram --- */
+.d0n-fig {
+  margin: var(--space) 0;
+}
+.d0n-row {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space);          /* flex gap: used by earlier fixtures, supported */
+  flex-wrap: wrap;            /* flex-wrap: supported (fixture-28) */
+}
+.d0n-stage {
+  flex: 1 1 0;
+  min-width: 150px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.6em 0.8em;
+  background: var(--card);
+  text-align: center;
+}
+.d0n-stage-n {
+  display: inline-block;
+  width: 1.5em;
+  height: 1.5em;
+  line-height: 1.5em;
+  border-radius: 50%;
+  background: var(--accent2);
+  color: #ffffff;
+  font-weight: 700;
+}
+.d0n-stage-name {
+  display: block;
+  font-weight: 700;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 0.95em;                                      /* fallback */
+  font-size: clamp(0.85em, 1vw + 0.7em, 1.05em);          /* modern, ignored */
+  margin-top: 0.3em;
+}
+.d0n-stage-d {
+  display: block;
+  font-size: 0.82em;
+  color: var(--muted);
+  margin-top: 0.3em;
+}
+.d0n-arrow {
+  align-self: center;
+  font-size: 1.4em;
+  font-weight: 700;
+  color: var(--accent);
+}
+.d0n-cap {
+  margin-top: 0.3em;
+  font-size: 0.78em;
+  color: var(--muted);
+  text-align: center;
+  text-wrap: balance; /* modern, inert in lite engine */
+}
+
+/* --- assemble pass list --- */
+.d0n-sub {
+  margin: 0.6em 0 0.2em;
+  font-size: 1rem;
+  color: var(--accent2);
+}
+.d0n-assemble {
+  margin: 0.4em 0 var(--space);
+  padding-left: 1.3em;
+}
+.d0n-assemble li {
+  margin-bottom: 0.35em;
+}
+.d0n-assemble code {
+  font-family: var(--mono);
+  font-size: 0.88em;
+}
+
+/* --- fact callout (extra aside) --- */
+.d0n-fact {
+  margin: var(--space) 0;
+  padding: 0.6em 0.8em;
+  border-left: 4px solid var(--accent2);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  background: #f1f7f3;                                   /* fallback */
+  background: color-mix(in srgb, var(--accent2) 8%, var(--paper)); /* modern, ignored */
+}
+.d0n-fact p {
+  margin: 0;
+  font-size: 0.88em;
+}
+
+/* --- progress reporting bar (widget tag styled as a stat bar) --- */
+.d0n-progress-note {
+  margin-top: var(--space);
+  font-size: 0.82em;
+  color: var(--muted);
+}
+.d0n-progress {
+  display: inline-block;
+  width: 8em;
+  height: 0.7em;
+  aspect-ratio: 80 / 7; /* modern, inert (width/height already fix the box) */
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  vertical-align: middle;
+  background: linear-gradient(90deg, var(--accent2) 0%, var(--accent2) 80%, #f1ecdf 80%);
+}
+
+/* ============ domain 09 fragment ============ */
+/* ===== Section 09 - PDF 1.4 writer (internal/pdf) =====
+   All rules scoped under section.d09; skeleton classes (dom-*) are owned by the shell.
+   Modern-CSS showcases use the graceful-degrade pattern: fallback declaration first,
+   the modern one second - the lite engine drops the second when unsupported. */
+
+section.d09 {
+  /* domain-local design tokens (inherited by descendants via custom properties) */
+  --d09-accent: #b4532a;  /* rust - matches shell --accent */
+  --d09-cjk: #2e6b5a;     /* teal - Type0 / CID accent */
+  --d09-tint: rgba(180, 83, 42, 0.08);
+  --d09-ink: #20262f;
+  --d09-muted: #5c6470;
+}
+
+section.d09 .dom-title {
+  text-wrap: normal;
+  text-wrap: balance; /* modern: dropped by lite engine; fallback (normal) applies */
+}
+
+section.d09 .dom-lead {
+  font-size: 10.5pt;
+  font-size: clamp(10pt, 1.7vw, 12pt); /* modern: dropped by lite engine; 10.5pt applies */
+}
+
+/* pipeline tail strip */
+section.d09 .d09-tail {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding: 6px 10px;
+  padding-inline: 14px; /* modern logical property: dropped; padding applies */
+  background: var(--d09-tint);
+  background: color-mix(in oklab, var(--d09-accent) 8%, var(--card)); /* modern: dropped; rgba applies */
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+section.d09 .d09-tail-step {
+  font-weight: 600;
+  color: var(--d09-ink);
+  font-size: 9.5pt;
+}
+
+section.d09 .d09-arrow {
+  color: var(--d09-accent);
+  font-weight: 700;
+  font-size: 9.5pt;
+}
+
+/* font pipeline figure */
+section.d09 .d09-figure {
+  margin: 0 0 12px;
+  page-break-inside: avoid;
+}
+
+section.d09 .d09-figure figcaption {
+  font-size: 8.5pt;
+  color: var(--d09-muted);
+  margin-bottom: 6px;
+}
+
+section.d09 .d09-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 6px;
+}
+
+section.d09 .d09-flowbox {
+  flex-grow: 1;
+  flex-basis: 150px;
+  padding: 8px 10px;
+  padding-block: 10px; /* modern logical property: dropped; padding applies */
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-family: var(--mono);
+  font-size: 9pt;
+  color: var(--d09-ink);
+  text-align: center;
+}
+
+section.d09 .d09-flowbox small {
+  display: block;
+  margin-top: 3px;
+  font-family: var(--sans);
+  font-size: 7.5pt;
+  color: var(--d09-muted);
+}
+
+section.d09 .d09-sub {
+  margin-top: 12px;
+  margin-bottom: 4px;
+  margin-block: 12px 4px; /* modern logical shorthand: dropped by lite engine; fallbacks above apply */
+  font-size: 11pt;
+  color: var(--d09-cjk);
+}
+
+section.d09 .d09-samp {
+  margin: 6px 0 10px;
+  padding: 8px 10px;
+  background: #f3efe4;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 8pt;
+  line-height: 1.5;
+  color: var(--d09-ink);
+}
+
+/* inline typography tags: the lite engine boxes unknown elements unless forced inline */
+section.d09 kbd,
+section.d09 samp,
+section.d09 var,
+section.d09 data {
+  display: inline;
+  font-family: var(--mono);
+}
+
+section.d09 kbd {
+  padding: 0 3px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fffdf7;
+  font-size: 8.5pt;
+  color: var(--d09-ink);
+}
+
+section.d09 var {
+  font-style: normal;
+  color: var(--d09-cjk);
+  font-weight: 600;
+}
+
+section.d09 data {
+  color: var(--d09-accent);
+  font-weight: 600;
+}
+
+section.d09 .dom-notes {
+  color: var(--d09-muted);
+  color: oklch(52% 0.02 260); /* modern: dropped by lite engine; var(--d09-muted) applies */
+}
+
+section.d09 .dom-notes strong {
+  color: var(--d09-ink);
+}
+
+/* ============ domain 10 fragment ============ */
+/* Section 10 - image output & SVG raster. Scoped to #domain-10 only.
+   Modern CSS showcases use the graceful-degrade pattern: fallback
+   declaration first, modern function second (the lite engine drops the
+   second declaration when unsupported). */
+
+section.d10 {
+  --d10-arrow: var(--accent);
+  --d10-img: var(--accent2);
+  --d10-tag-bg: #eef3ef;
+}
+
+/* Inline typography tags the lite engine would otherwise render as generic
+   block boxes: force them back to inline (display:inline is supported). */
+section.d10 abbr,
+section.d10 cite,
+section.d10 dfn,
+section.d10 time,
+section.d10 output {
+  display: inline;
+}
+
+section.d10 dfn {
+  font-weight: bold;
+}
+
+section.d10 abbr {
+  text-decoration: underline;
+}
+
+section.d10 .d10-tail {
+  margin: 0.6em 0;
+}
+
+section.d10 .d10-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4em;
+  font-size: 0.85rem;
+  /* modern: clamp() - the lite engine keeps the 0.85rem fallback */
+  font-size: clamp(0.8rem, 1vw + 0.5rem, 0.95rem);
+}
+
+section.d10 .d10-pill {
+  display: inline-block;
+  margin-left: 0;
+  margin-right: 0;
+  /* modern: logical property (unsupported here, so margin-inline is ignored) */
+  margin-inline: 0;
+  padding-left: 0.6em;
+  padding-right: 0.6em;
+  padding-inline: 0.6em;
+  padding-top: 0.25em;
+  padding-bottom: 0.25em;
+  background: var(--card);
+  border: 1px solid #d8d1c2;
+  /* modern: color-mix() - fallback hex wins in the lite engine */
+  border: 1px solid color-mix(in srgb, var(--line) 55%, var(--accent));
+  border-radius: var(--radius);
+  font-family: var(--mono);
+  color: #20262f;
+  /* modern: oklch() - fallback hex wins */
+  color: oklch(35% 0.03 260);
+}
+
+section.d10 .d10-arrow {
+  color: var(--d10-arrow);
+  font-weight: bold;
+}
+
+section.d10 figcaption {
+  margin-top: 0.4em;
+  font-size: 0.8rem;
+  color: #5c6470;
+  /* modern: light-dark() - fallback grey wins */
+  color: light-dark(#5c6470, #c9cfd8);
+  /* modern: text-wrap: balance (ignored by the lite engine) */
+  text-wrap: balance;
+}
+
+section.d10 .d10-modes {
+  display: flex;
+  gap: var(--space);
+  margin: 0.6em 0;
+}
+
+section.d10 .d10-mode {
+  flex: 1;
+  padding: 0.7em 0.8em;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-top-width: 4px;
+  border-radius: var(--radius);
+}
+
+section.d10 .d10-mode-pdf {
+  border-top-color: var(--accent);
+}
+
+section.d10 .d10-mode-img {
+  border-top-color: var(--accent2);
+}
+
+section.d10 .d10-mode-tag {
+  display: block;
+  font-weight: bold;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+}
+
+section.d10 .d10-mode-out {
+  display: block;
+  margin-top: 0.3em;
+  font-size: 0.82rem;
+  color: #5c6470;
+  color: oklch(45% 0.02 260);
+}
+
+section.d10 .d10-gloss {
+  font-size: 0.85rem;
+}
+
+section.d10 .dom-notes ul {
+  margin: 0.4em 0 0;
+  padding-left: 1.2em;
+}
+
+/* ============================================================
+   Blueprint refresh — print-first architecture system
+   The existing fixture intentionally exercises a broad CSS subset. This
+   final layer tightens the visual language without making newer syntax a
+   requirement for the lite renderer: classic declarations come first and
+   print-aware properties remain progressive enhancements.
+   ============================================================ */
+
+:root {
+  --paper: #eef2f4;
+  --ink: #14202b;
+  --muted: #52606d;
+  --card: #ffffff;
+  --line: #cbd5e1;
+  --wire: #8ea2b2;
+  --accent: #0f766e;
+  --accent2: #2563eb;
+  --accent-warm: #d97706;
+  --danger: #b42318;
+  --sans: "Liberation Sans", Arial, Helvetica, sans-serif;
+  --serif: "Liberation Serif", Georgia, "Times New Roman", serif;
+  --mono: "Liberation Mono", "Courier New", monospace;
+}
+
+html,
+body {
+  background: #eef2f4;
+  color: #14202b;
+}
+
+body {
+  font-family: "Liberation Sans", Arial, Helvetica, sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4,
+.hero-title,
+.dom-title,
+.dag-title,
+.div-title,
+.sec-title {
+  font-family: "Liberation Serif", Georgia, "Times New Roman", serif;
+}
+
+code,
+kbd,
+samp,
+var,
+.hero-badge,
+.hero-meta dt,
+.pipe-num,
+.dag-box,
+.dag-rule-n,
+.sec-k {
+  font-family: "Liberation Mono", "Courier New", monospace;
+}
+
+.hero {
+  background: #14202b;
+  border: 1px solid #263b49;
+  border-radius: 5px;
+  border-bottom: 2px dotted #d97706;
+  padding: 22px 25px 17px;
+}
+
+.hero-title {
+  font-size: 24pt;
+  letter-spacing: -0.02em;
+}
+
+.hero-amp {
+  color: #f59e0b;
+}
+
+.hero-sub {
+  color: #d7e0e6;
+  max-width: 56em;
+}
+
+.hero-meta {
+  flex-wrap: nowrap;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.hero-meta > div {
+  display: block;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.hero-meta dt {
+  display: block;
+  margin-bottom: 2px;
+  color: #8ea2b2;
+  font-variant-numeric: tabular-nums;
+}
+
+.hero-meta dd {
+  font-size: 8.6pt;
+  line-height: 1.25;
+  color: #f1f5f7;
+  overflow-wrap: break-word;
+}
+
+.hero-legend {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 14px;
+  color: #d7e0e6;
+  font-family: "Liberation Mono", "Courier New", monospace;
+  font-size: 7.7pt;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hero-legend-item {
+  border: 1px solid #526b7b;
+  border-radius: 3px;
+  padding: 3px 7px;
+}
+
+.hero-legend-input {
+  color: #f4b860;
+}
+
+.hero-legend-core {
+  color: #73d2c8;
+}
+
+.hero-legend-output {
+  color: #8db5ff;
+}
+
+.hero-legend-wire {
+  color: #8ea2b2;
+  letter-spacing: 0.16em;
+}
+
+.pipe-title,
+.toc-title {
+  border-bottom: 1px solid #8ea2b2;
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+}
+
+.pipe-steps {
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 0;
+  margin: 12px 0 8px;
+}
+
+.pipe-step {
+  flex: 1 1 0;
+  min-width: 0;
+  border: 1px solid #b7c5ce;
+  border-top: 3px solid #0f766e;
+  border-radius: 4px;
+  padding: 7px 4px 6px;
+  background: #ffffff;
+}
+
+.pipe-input {
+  border-top-color: #d97706;
+}
+
+.pipe-core {
+  border-top-color: #0f766e;
+}
+
+.pipe-output {
+  border-top-color: #2563eb;
+}
+
+.pipe-num {
+  color: #52606d;
+  font-size: 7.5pt;
+  font-variant-numeric: tabular-nums;
+}
+
+.pipe-name {
+  font-size: 9pt;
+  color: #14202b;
+}
+
+.pipe-note {
+  font-size: 6.8pt;
+  line-height: 1.2;
+  color: #52606d;
+}
+
+.pipe-arrow {
+  display: block;
+  flex: 0 0 17px;
+  align-self: center;
+  height: auto;
+  margin: 0 2px;
+  color: #0f766e;
+  font-family: "Liberation Mono", "Courier New", monospace;
+  font-size: 6.5pt;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.toc-list {
+  column-gap: 34px;
+}
+
+.toc-list li {
+  border-bottom: 1px dotted #b7c5ce;
+  padding-bottom: 2px;
+}
+
+.domains > section {
+  border: 1px solid #cbd5e1;
+  border-left: 4px solid #0f766e;
+  border-radius: 4px;
+  padding: 14px 17px 12px;
+  background: #ffffff;
+}
+
+.dom-head {
+  border-bottom: 1px dotted #8ea2b2;
+  margin-bottom: 11px;
+  break-after: avoid;
+  page-break-after: avoid;
+}
+
+.dom-index {
+  border-radius: 3px;
+  background: #14202b;
+  color: #f4b860;
+  font-variant-numeric: tabular-nums;
+}
+
+.dom-title {
+  color: #14202b;
+  letter-spacing: -0.01em;
+}
+
+.dom-role {
+  color: #52606d;
+}
+
+.dom-notes {
+  background: #fff8eb;
+  border-left-color: #d97706;
+  color: #55432b;
+}
+
+.dom-foot {
+  border-top: 1px dotted #b7c5ce;
+}
+
+.dag,
+.divergence,
+.security {
+  border: 1px solid #cbd5e1;
+  border-left: 4px solid #2563eb;
+  border-radius: 4px;
+  padding: 14px 17px 12px;
+  background: #ffffff;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.dag-title,
+.div-title,
+.sec-title {
+  margin-top: 0;
+}
+
+section.d02 .dom-notes {
+  border-left-color: #0f766e;
+}
+
+.dag-stage {
+  flex-wrap: nowrap;
+  gap: 5px;
+  padding: 8px 0;
+  border-bottom: 1px dotted #b7c5ce;
+}
+
+.dag-stage + .dag-stage {
+  margin-top: 3px;
+}
+
+.dag-box {
+  min-width: 0;
+  padding: 5px 7px;
+  border: 1px solid #9fb0bb;
+  border-radius: 3px;
+  background: #f8fafb;
+  font-size: 7.9pt;
+  overflow-wrap: break-word;
+}
+
+.dag-leaf {
+  background: #e5f3ef;
+  border-color: #0f766e;
+}
+
+.dag-hub {
+  background: #14202b;
+  border-color: #14202b;
+  color: #ffffff;
+}
+
+.dag-sink {
+  background: #eef4ff;
+  border-color: #2563eb;
+}
+
+.dag-arrow {
+  color: #0f766e;
+  font-family: "Liberation Mono", "Courier New", monospace;
+}
+
+.dag-boundary {
+  border: 1px dashed #d97706;
+  background: #fff8eb;
+  color: #7a4b0b;
+}
+
+.divergence {
+  border-left-color: #0f766e;
+}
+
+.div-card {
+  border: 1px dotted #9fb0bb;
+  border-top: 3px solid #0f766e;
+  border-radius: 4px;
+  background: #f8fafb;
+}
+
+.div-card-alt {
+  border-top-color: #2563eb;
+}
+
+.security {
+  border-left-color: #b42318;
+}
+
+.sec-card {
+  border: 1px dotted #9fb0bb;
+  border-radius: 4px;
+  background: #f8fafb;
+}
+
+.sec-k {
+  color: #b42318;
+  font-variant-numeric: tabular-nums;
+}
+
+.colophon {
+  border-top: 1px dotted #8ea2b2;
+}
+
+/* Modern print enhancements: the fallbacks above carry the PDF layout. */
+@media print {
+  .hero,
+  .domains > section,
+  .dag,
+  .divergence,
+  .security {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .hero-title,
+  .dom-title,
+  .dag-title,
+  .div-title,
+  .sec-title {
+    text-wrap: balance;
+  }
+}

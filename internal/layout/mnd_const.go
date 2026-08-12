@@ -55,6 +55,8 @@ const (
 	outlineStrokeRatio     = 0.06
 	paginationGuardMax     = 10000
 	pairLen                = 2
+	marginProperty         = "margin"
+	paddingProperty        = "padding"
 	pxToPtFactor           = 0.75
 	smallSliceCap          = 8
 	smallerFontRatio       = 0.833

@@ -441,6 +441,7 @@ func renderObject(ctx context.Context, run *runContext, obj *settings.PdfObject,
 	registry := prep.Registry
 	resources := prep.Resources
 	sheets := prep.Sheets
+	geom = applyCSSPageMargins(geom, sheets)
 
 	imagesFn := func(src string) ([]byte, error) {
 		if !run.req.Global.Web.Images {

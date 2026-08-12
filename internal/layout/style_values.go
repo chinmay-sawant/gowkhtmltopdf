@@ -7,6 +7,11 @@ import (
 	"gowkhtmltopdf/internal/css"
 )
 
+const (
+	calcParts     = 3
+	mediumKeyword = "medium"
+)
+
 func parseColumnsShorthand(sty *ResolvedStyle, value string, fsize, viewportW float64) {
 	sty.ColumnCount = 0
 	sty.ColumnWidth = -1
@@ -51,7 +56,7 @@ func parseFontShorthand(style *ResolvedStyle, value string, remBase float64) {
 		// first size token
 		rest, lineH := fontSizeToken(page, style.FontSize)
 		if lineH >= 0 {
-			style.LineHeight = lineH
+			setFontLineHeight(style, page, lineH)
 		}
 
 		style.FontSize = fontSize(rest, style.FontSize, remBase)
@@ -83,8 +88,8 @@ func applyFontStyleKeyword(style *ResolvedStyle, page string) bool {
 
 // fontSizeToken splits "12px/1.4" into the size part and line-height (or -1).
 func fontSizeToken(page string, fsize float64) (string, float64) {
-	if j := strings.IndexByte(page, '/'); j >= 0 {
-		return page[:j], lineHeight(page[j+1:], fsize)
+	if before, after, ok := strings.Cut(page, "/"); ok {
+		return before, lineHeight(after, fsize)
 	}
 
 	return page, -1
@@ -205,34 +210,35 @@ func parseFlexThree(style *ResolvedStyle, parts []string, fontSize, pctBase floa
 	flexSetBasis(style, parts[2], fontSize, pctBase)
 }
 
-// setFourMargin applies a margin shorthand and tracks horizontal auto.
+// setFourMargin applies a margin shorthand and tracks auto margins on all axes.
 func setFourMargin(sty *ResolvedStyle, value string, fsize, ctxW float64) {
 	var val [4]string
 	count := splitSpaceTokens(value, val[:])
+	sty.MarginTopAuto, sty.MarginBottomAuto = false, false
 	sty.MarginLeftAuto, sty.MarginRightAuto = false, false
 
 	switch count {
 	case 0:
 		return
 	case 1:
-		sty.MarginTop = marginLen(val[0], fsize, ctxW)
+		sty.MarginTop, sty.MarginTopAuto = marginLenAuto(val[0], fsize, ctxW)
 		sty.MarginRight, sty.MarginRightAuto = marginLenAuto(val[0], fsize, ctxW)
-		sty.MarginBottom = marginLen(val[0], fsize, ctxW)
+		sty.MarginBottom, sty.MarginBottomAuto = marginLenAuto(val[0], fsize, ctxW)
 		sty.MarginLeft, sty.MarginLeftAuto = marginLenAuto(val[0], fsize, ctxW)
 	case two:
-		sty.MarginTop = marginLen(val[0], fsize, ctxW)
+		sty.MarginTop, sty.MarginTopAuto = marginLenAuto(val[0], fsize, ctxW)
 		sty.MarginRight, sty.MarginRightAuto = marginLenAuto(val[1], fsize, ctxW)
-		sty.MarginBottom = marginLen(val[0], fsize, ctxW)
+		sty.MarginBottom, sty.MarginBottomAuto = marginLenAuto(val[0], fsize, ctxW)
 		sty.MarginLeft, sty.MarginLeftAuto = marginLenAuto(val[1], fsize, ctxW)
 	case three:
-		sty.MarginTop = marginLen(val[0], fsize, ctxW)
+		sty.MarginTop, sty.MarginTopAuto = marginLenAuto(val[0], fsize, ctxW)
 		sty.MarginRight, sty.MarginRightAuto = marginLenAuto(val[1], fsize, ctxW)
-		sty.MarginBottom = marginLen(val[2], fsize, ctxW)
+		sty.MarginBottom, sty.MarginBottomAuto = marginLenAuto(val[2], fsize, ctxW)
 		sty.MarginLeft, sty.MarginLeftAuto = marginLenAuto(val[1], fsize, ctxW)
 	default:
-		sty.MarginTop = marginLen(val[0], fsize, ctxW)
+		sty.MarginTop, sty.MarginTopAuto = marginLenAuto(val[0], fsize, ctxW)
 		sty.MarginRight, sty.MarginRightAuto = marginLenAuto(val[1], fsize, ctxW)
-		sty.MarginBottom = marginLen(val[2], fsize, ctxW)
+		sty.MarginBottom, sty.MarginBottomAuto = marginLenAuto(val[2], fsize, ctxW)
 		sty.MarginLeft, sty.MarginLeftAuto = marginLenAuto(val[3], fsize, ctxW)
 	}
 }
@@ -275,7 +281,7 @@ func setFour(_ *ResolvedStyle, value string, top, right, bottom, left *float64, 
 	*left = marginLen(val[3], fsVal, ctxW)
 }
 
-func parseBorder(value string, _ float64) (border, bool) {
+func parseBorder(value string, fsize float64) (border, bool) { //nolint:cyclop
 	var boxNode border
 
 	for start := 0; ; {
@@ -292,8 +298,11 @@ func parseBorder(value string, _ float64) (border, bool) {
 		default:
 			if r, g, bb, _, ok := css.ParseColor(face); ok {
 				boxNode.Color = [3]float64{float64(r) / 255, float64(g) / 255, float64(bb) / 255}
-			} else if v, _, ok := css.ParseLength(face); ok {
+			} else if v, unit, ok := css.ParseLength(face); ok {
 				boxNode.Width = v
+				if pt, converted := css.LengthToPt(v, unit, fsize); converted {
+					boxNode.PaintWidth = pt
+				}
 			}
 		}
 
@@ -306,6 +315,7 @@ func parseBorder(value string, _ float64) (border, bool) {
 
 	if boxNode.Width == 0 {
 		boxNode.Width = 1
+		boxNode.PaintWidth = 1
 	}
 
 	return boxNode, boxNode.Style != cssDisplayNone
@@ -357,7 +367,7 @@ func borderWidth(value string, _ float64) float64 {
 	switch value {
 	case "thin":
 		return pxToPt(1)
-	case "medium":
+	case mediumKeyword:
 		return pxToPt(three)
 	case "thick":
 		return pxToPt(borderWidthMediumPx)
@@ -368,6 +378,33 @@ func borderWidth(value string, _ float64) float64 {
 	}
 
 	return 0
+}
+
+func borderPaintWidth(value string, fsize float64) float64 {
+	switch value {
+	case "thin", mediumKeyword, "thick":
+		return borderWidth(value, fsize)
+	}
+
+	if v, unit, ok := css.ParseLength(value); ok {
+		if pt, converted := css.LengthToPt(v, unit, fsize); converted {
+			return pt
+		}
+	}
+
+	return 0
+}
+
+func setFontLineHeight(style *ResolvedStyle, page string, lineH float64) {
+	style.LineHeightUnitless = 0
+
+	if _, after, ok := strings.Cut(page, "/"); ok {
+		if ratio, numeric := css.ParseNumber(after); numeric {
+			style.LineHeightUnitless = ratio
+		}
+	}
+
+	style.LineHeight = lineH
 }
 
 func fontSize(value string, parent, remBase float64) float64 {
@@ -404,7 +441,7 @@ func fontSizeKeyword(value string, parent float64) (float64, bool) {
 		return pxToPt(fontSizeSmallPx), true
 	case "small":
 		return pxToPt(fontSizeMediumPx), true
-	case "medium":
+	case mediumKeyword:
 		return pxToPt(cssPxRoot), true
 	case "large":
 		return pxToPt(fontSizeLargePx), true
@@ -486,6 +523,10 @@ func lengthBox(value string, fsize, containing float64, autoValue string) (float
 		return -1, true
 	}
 
+	if point, ok := calcLength(value, fsize, containing); ok {
+		return point, true
+	}
+
 	val, unit, ok := css.ParseLength(value)
 	if !ok {
 		return 0, false
@@ -525,6 +566,10 @@ func marginLen(value string, fsize, ctxW float64) float64 {
 		return 0
 	}
 
+	if point, ok := calcLength(value, fsize, ctxW); ok {
+		return point
+	}
+
 	val, unit, ok := css.ParseLength(value)
 	if !ok {
 		return 0
@@ -543,6 +588,68 @@ func marginLen(value string, fsize, ctxW float64) float64 {
 	}
 
 	return 0
+}
+
+// calcLength evaluates the small arithmetic subset needed by the report CSS:
+// one length plus/minus another length, or one length multiplied by a number.
+// Unsupported calc expressions remain invalid and keep the existing fallback.
+//
+//nolint:cyclop // compact calc operator grammar
+func calcLength(value string, fsize, containing float64) (float64, bool) {
+	value = strings.TrimSpace(value)
+	if len(value) < len("calc()") || !strings.EqualFold(value[:5], "calc(") || value[len(value)-1] != ')' {
+		return 0, false
+	}
+
+	parts := strings.Fields(value[5 : len(value)-1])
+	if len(parts) != calcParts {
+		return 0, false
+	}
+
+	left, ok := plainLength(parts[0], fsize, containing)
+	if !ok {
+		return 0, false
+	}
+
+	switch parts[1] {
+	case "*":
+		factor, err := strconv.ParseFloat(parts[2], 64)
+		if err != nil {
+			return 0, false
+		}
+
+		return left * factor, true
+	case "+", "-":
+		right, rightOK := plainLength(parts[2], fsize, containing)
+		if !rightOK {
+			return 0, false
+		}
+
+		if parts[1] == "-" {
+			return left - right, true
+		}
+
+		return left + right, true
+	default:
+		return 0, false
+	}
+}
+
+func plainLength(value string, fsize, containing float64) (float64, bool) {
+	val, unit, ok := css.ParseLength(value)
+	if !ok {
+		return 0, false
+	}
+
+	if unit == "%" {
+		return containing * val / cssPercent, true
+	}
+
+	if unit == remUnit {
+		return pxToPt(cssPxRoot) * val, true
+	}
+
+	return css.LengthToPt(val, unit, fsize)
 }
 
 func pxToPt(px float64) float64 { return px * pxToPtFactor }

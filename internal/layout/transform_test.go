@@ -25,6 +25,80 @@ func TestParseTransformTranslateRotateScale(t *testing.T) {
 	}
 }
 
+func TestTransformedInlineBorderArrowIsRebasedAfterFlowShift(t *testing.T) {
+	t.Parallel()
+
+	res := layoutHTML(t,
+		`<html><body><div class="flow"><span class="step">html</span>`+
+			`<span class="arrow"></span><span class="step">css</span></div></body></html>`, sheet(t, `
+body { margin: 0; }
+.flow { display: block; }
+
+.step {
+ display: inline-block;
+ padding: 0.22em 0.55em;
+ border-radius: 6px;
+ border: 1px solid #d8d1c2;
+ background: #fff;
+ font-family: monospace;
+ font-size: 0.72rem;
+}
+
+.arrow {
+ display: inline-block;
+ width: 0.5em;
+ height: 0.5em;
+ border-top: 2px solid #5c6470;
+ border-right: 2px solid #5c6470;
+ transform: rotate(45deg);
+ margin: 0 0.1em;
+}
+`))
+
+	arrow := transformedLineOp(res)
+	if arrow == nil {
+		t.Fatal("missing transformed arrow stroke")
+	}
+
+	transformed := transformedBox(res.root)
+	if transformed == nil {
+		t.Fatal("missing transformed arrow box")
+	}
+
+	before := arrow.Xform
+	transformed.y += 100
+	arrow.Y += 100
+
+	restampBoxTransforms(res.root, res.Ops)
+
+	if math.Abs(arrow.Xform.F-before.F) < 20 {
+		t.Fatalf("transformed arrow kept stale origin after flow shift: before=%+v after=%+v", before, arrow.Xform)
+	}
+}
+
+func transformedLineOp(res *Result) *Op {
+	for idx := range res.Ops {
+		if res.Ops[idx].Kind == OpLine && res.Ops[idx].XformSet {
+			return &res.Ops[idx]
+		}
+	}
+
+	return nil
+}
+
+func transformedBox(root *box) *box {
+	boxes := make([]*box, 0)
+	flattenBoxes(root, &boxes)
+
+	for _, candidate := range boxes {
+		if candidate.style != nil && candidate.style.HasTransform {
+			return candidate
+		}
+	}
+
+	return nil
+}
+
 func TestParseTransformMatrixAndSkew(t *testing.T) {
 	t.Parallel()
 

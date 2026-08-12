@@ -3,6 +3,76 @@ const GOLDEN_BASE = 'https://github.com/chinmay-sawant/gowkhtmltopdf/tree/master
 
 export const SHOWCASE = [
   {
+    name: 'font-examples',
+    file: 'font-examples.pdf',
+    pages: 25,
+    title: 'Font examples — 1,125 Google Fonts',
+    desc: 'Randomized single-column sampler: every font exactly once, one line per style (bold, italic, underline, strikethrough, combinations). Fonts are not bundled — render with --font-path.',
+  },
+  {
+    name: 'architecture-diagram',
+    file: 'architecture-diagram.pdf',
+    pages: 5,
+    title: 'Library API architecture diagram',
+    desc: 'Five-page architecture document for the public Go library API: rendering pipeline, layout domains, dependencies, output modes, and security boundaries.',
+  },
+  {
+    name: 'fixture-56-architecture-diagram',
+    file: 'fixture-56-architecture-diagram.pdf',
+    pages: 20,
+    title: 'Architecture diagram',
+    desc: 'Pure HTML+CSS architecture diagram: pipeline strip, 10 domain sections, dependency DAG, PDF-vs-image, and security summary.',
+  },
+  {
+    name: 'fixture-55-lantern-cooperative-report',
+    file: 'fixture-55-lantern-cooperative-report.pdf',
+    pages: 3,
+    title: 'Lantern Cooperative report',
+    desc: 'Self-contained operations brief: status cards, route table, action plan, and page breaks.',
+  },
+  {
+    name: 'fixture-54-ember-harbor-storybook',
+    file: 'fixture-54-ember-harbor-storybook.pdf',
+    pages: 4,
+    title: 'Ember Harbor storybook',
+    desc: 'Original print storybook — cover and chapter pages with remote illustrations and explicit page breaks.',
+  },
+  {
+    name: 'fixture-53-asteria-observatory-poster',
+    file: 'fixture-53-asteria-observatory-poster.pdf',
+    pages: 1,
+    title: 'Asteria observatory poster',
+    desc: 'Second poster variant sharing the print theme with a different illustration and copy.',
+  },
+  {
+    name: 'fixture-52-airline-boarding-pass',
+    file: 'fixture-52-airline-boarding-pass.pdf',
+    pages: 1,
+    title: 'Airline boarding pass',
+    desc: 'E-ticket itinerary with multi-column stubs and monospace barcodes.',
+  },
+  {
+    name: 'fixture-51-asteria-storybook',
+    file: 'fixture-51-asteria-storybook.pdf',
+    pages: 4,
+    title: 'Asteria storybook',
+    desc: 'Original four-page anime-inspired story with page illustrations, live text, and page breaks.',
+  },
+  {
+    name: 'fixture-50-letter-template',
+    file: 'fixture-50-letter-template.pdf',
+    pages: 1,
+    title: 'Letter template',
+    desc: 'Local mark, stationery hierarchy, quote, and signature block.',
+  },
+  {
+    name: 'fixture-49-night-train-poster',
+    file: 'fixture-49-night-train-poster.pdf',
+    pages: 1,
+    title: 'Night train poster',
+    desc: 'One-page illustrated poster with generated art and layered composition.',
+  },
+  {
     name: 'fixture-48-shipping-document',
     file: 'fixture-48-shipping-document.pdf',
     pages: 1,
@@ -351,7 +421,7 @@ export const SHOWCASE_SPECIAL = [
   {
     name: 'wiki-ana-de-armas',
     file: 'wiki-ana-de-armas.pdf',
-    pages: 12,
+    pages: 11,
     title: 'Wikipedia live smoke',
     desc: 'Live Wikipedia raw conversion with system fonts (needs network).',
   },
@@ -369,6 +439,6 @@ export function githubPdfUrl(file) {
 }
 
 export function githubTemplateUrl(name) {
-  if (!name.startsWith('fixture-')) return null
+  if (!name.startsWith('fixture-') && !['font-examples', 'architecture-diagram'].includes(name)) return null
   return `${GOLDEN_BASE}/${name}.html`
 }

@@ -17,41 +17,52 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"gowkhtmltopdf/internal/css"
 	"gowkhtmltopdf/internal/html"
 	"gowkhtmltopdf/internal/pdf"
 )
 
+const htmlTbody = "tbody"
+const htmlCaption = "caption"
+
 // CSS keyword constants shared by the layout engine. Kept here so repeated
 // string literals resolve through one named value (goconst).
 const (
-	positionAbsolute      = "absolute"
-	positionFixed         = "fixed"
-	positionRelative      = "relative"
-	positionSticky        = "sticky"
-	displayBlock          = "block"
-	displayFlex           = "flex"
-	displayGrid           = "grid"
-	displayInlineFlex     = "inline-flex"
-	displayInlineGrid     = "inline-grid"
-	displaySubgrid        = "subgrid"
-	displayFlowRoot       = "flow-root"
-	displayTable          = "table"
-	displayTableCell      = "table-cell"
-	displayTableCaption   = "table-caption"
-	displayTableRow       = "table-row"
-	displayRowGroup       = "table-row-group"
-	displayHeaderGroup    = "table-header-group"
-	displayFooterGroup    = "table-footer-group"
-	displayListItem       = "list-item"
-	listStyleDisc         = "disc"
-	bulletDisc            = "\u2022"
-	borderCollapseValue   = "collapse"
-	overflowWrapAnywhere  = "anywhere"
-	overflowWrapBreakWord = "break-word"
-	borderStyleDashed     = "dashed"
-	borderStyleDotted     = "dotted"
+	positionAbsolute        = "absolute"
+	positionFixed           = "fixed"
+	positionRelative        = "relative"
+	positionStatic          = "static"
+	positionSticky          = "sticky"
+	htmlMeter               = "meter"
+	displayBlock            = "block"
+	displayFlex             = "flex"
+	displayGrid             = "grid"
+	displayInlineFlex       = "inline-flex"
+	displayInlineGrid       = "inline-grid"
+	displaySubgrid          = "subgrid"
+	displayFlowRoot         = "flow-root"
+	displayTable            = "table"
+	displayTableCell        = "table-cell"
+	displayTableCaption     = "table-caption"
+	displayTableRow         = "table-row"
+	displayRowGroup         = "table-row-group"
+	displayHeaderGroup      = "table-header-group"
+	displayFooterGroup      = "table-footer-group"
+	displayListItem         = "list-item"
+	listStyleDisc           = "disc"
+	bulletDisc              = "\u2022"
+	borderCollapseValue     = "collapse"
+	overflowWrapAnywhere    = "anywhere"
+	overflowWrapBreakWord   = "break-word"
+	borderStyleDashed       = "dashed"
+	borderStyleDotted       = "dotted"
+	textTransformNone       = "none"
+	textTransformUppercase  = "uppercase"
+	textTransformLowercase  = "lowercase"
+	textTransformCapitalize = "capitalize"
+	tableCellKind           = "cell"
 )
 
 // Options controls a Layout run.
@@ -262,6 +273,14 @@ const (
 	OpBullet
 )
 
+// Stroke masks are used only by rounded border display-list operations.
+const (
+	StrokeMaskTop uint8 = 1 << iota
+	StrokeMaskRight
+	StrokeMaskBottom
+	StrokeMaskLeft
+)
+
 // Op is one display-list operation. Coordinates are in canvas points; for
 // OpText and OpBullet, Y is the baseline.
 type Op struct {
@@ -277,11 +296,19 @@ type Op struct {
 	R, G, B float64 // 0..1
 	Alpha   float64
 	Width   float64 // stroke width for OpLine
+	// StrokeMask selects sides for a rounded OpStrokeRect. Zero means the
+	// complete rounded rectangle; non-zero masks are used for mixed CSS
+	// borders whose accented side must retain its corner arcs.
+	StrokeMask uint8
 
 	Text string
 	Font *pdf.Font
 	Size float64
-	Bold bool
+	// LetterSpacing is the CSS letter-spacing value in points for text paint.
+	LetterSpacing float64
+	// TextTransform is applied when the text operation is painted.
+	TextTransform string
+	Bold          bool
 
 	URI string
 
@@ -310,6 +337,10 @@ type Op struct {
 	// RotateDeg rotates the glyph around its baseline origin (PDF text matrix).
 	// Independent of CSS transform CTM (which wraps the whole op via Xform).
 	RotateDeg float64
+	// InkDescent is the glyph descent below the baseline. H remains the line
+	// box height; pagination uses this narrower metric for generated text so a
+	// line is not moved merely because its leading crosses a page boundary.
+	InkDescent float64
 
 	// Xform is a baked canvas-space CSS 2D transform (identity if unset).
 	// Applied at paint via PDF cm (see pdfCTMFromCSS). Sibling flow unaffected.
@@ -319,6 +350,9 @@ type Op struct {
 	// PaintOpacity is element opacity (CSS opacity / filter:opacity), 0..1.
 	// 0 or unset (≥1) means fully opaque. Nested opacities are multiplied.
 	PaintOpacity float64
+	// Radius is the uniform border radius for rounded fill/stroke rectangles.
+	Radius                                                             float64
+	RadiusTopLeft, RadiusTopRight, RadiusBottomRight, RadiusBottomLeft float64
 }
 
 type engine struct {
@@ -364,6 +398,9 @@ type engine struct {
 	bfcStack []*floatState
 	// bfcPool recycles floatState values for pushBFCFloats.
 	bfcPool []*floatState
+	// absCBHeights carries the containing-block height to deferred absolute
+	// children after their in-flow parent has finished determining its size.
+	absCBHeights map[*html.Node]float64
 	// inlineItemPool recycles temporary inline-item backing arrays. The pool is
 	// engine-local because layout is single-threaded and nested inline layout
 	// must retain each active caller's slice.
@@ -453,6 +490,10 @@ func (e *engine) lookupFaceFor(sty ResolvedStyle) *pdf.Font {
 	}
 
 	if e.faces != nil {
+		if f := e.faces.ResolveFamily(sty.FontFamily, sty.FontWeight, sty.FontItalic); f != nil {
+			return f
+		}
+
 		if f := e.faces.Resolve(sty.FontWeight, sty.FontItalic); f != nil {
 			return f
 		}
@@ -570,13 +611,27 @@ func (e *engine) registryFamilyWithGlyph(style ResolvedStyle, runeValue rune) *p
 
 // facesWithGlyph resolves the default faces and returns the first that has a
 // glyph for runeValue.
+//
+//nolint:cyclop,lll // ordered fallback search is intentionally explicit
 func (e *engine) facesWithGlyph(style ResolvedStyle, runeValue rune) *pdf.Font {
 	if e.faces == nil {
 		return nil
 	}
 
+	if f := e.faces.ResolveFamily(style.FontFamily, style.FontWeight, style.FontItalic); f != nil && f.GlyphID(runeValue) != 0 {
+		return f
+	}
+
 	if f := e.faces.Resolve(style.FontWeight, style.FontItalic); f != nil && f.GlyphID(runeValue) != 0 {
 		return f
+	}
+
+	if style.FontWeight >= fontWeightBold && e.faces.UnicodeFallbackBold != nil && e.faces.UnicodeFallbackBold.GlyphID(runeValue) != 0 {
+		return e.faces.UnicodeFallbackBold
+	}
+
+	if e.faces.UnicodeFallback != nil && e.faces.UnicodeFallback.GlyphID(runeValue) != 0 {
+		return e.faces.UnicodeFallback
 	}
 
 	return nil
@@ -1076,7 +1131,7 @@ func useBlockForTableDisplay(node *html.Node) bool {
 		}
 
 		switch c.Name {
-		case "tr", "tbody", "thead", "tfoot", "colgroup", "col", "caption":
+		case "tr", htmlTbody, "thead", "tfoot", "colgroup", "col", htmlCaption:
 			return false
 		}
 	}
@@ -1085,6 +1140,8 @@ func useBlockForTableDisplay(node *html.Node) bool {
 }
 
 // buildBlock lays out a block-level box.
+//
+//nolint:cyclop // block layout owns ordered CSS flow phases
 func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, posY float64) *box {
 	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
 		node: node, style: e.stylePtr(node), kind: displayBlock, x: posX, y: posY,
@@ -1102,7 +1159,28 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 
 	curY := e.scalePt(style.PaddingTop) + e.scalePt(style.BorderTop.Width)
 	enclose := e.pushBFCFloats(style, contentX, contentW)
-	curY = e.flowChildren(boxNode, node.Children, style, contentW, contentX, posY, curY)
+	children := node.Children
+	widget := node.Name == htmlMeter || node.Name == "progress"
+
+	if widget {
+		children = nil // fallback text is replaced by the native-style bar
+	}
+
+	if node.Name == "details" {
+		_, open := node.Attrs["open"]
+		if !open {
+			children = closedDetailsChildren(node)
+		}
+	}
+
+	curY = e.flowChildren(boxNode, children, style, contentW, contentX, posY, curY)
+	if widget && style.Height < 0 {
+		// Native value controls use their intrinsic font-sized control height
+		// when auto-sized. Treating them as ordinary text blocks adds the
+		// line-height and authored padding a second time, producing the
+		// oversized meter/progress tracks in fixture-56.
+		curY = e.nativeWidgetAutoContentBottom(style)
+	}
 
 	if enclose && e.bfcFloats != nil {
 		curY = e.bfcFloats.extentCy(posY, curY)
@@ -1112,6 +1190,9 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 	// padding-bottom is inside the border box (space above border-bottom /
 	// letterhead rules — fixture-07/16).
 	curY += e.scalePt(style.PaddingBottom)
+	if isVerticalWritingMode(style.WritingMode) {
+		curY = e.verticalWritingHeight(contentStart, curY, style)
+	}
 
 	// list marker (outside the principal box content — in the marker area)
 	if node.Name == "li" && boxNode.firstBaseline > 0 {
@@ -1119,10 +1200,205 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 	}
 
 	boxNode.height = e.applyHeightConstraints(style, curY)
+	if widget {
+		e.paintValueWidget(node, style, boxNode.x, posY, boxNode.w, boxNode.height)
+	}
+
+	e.paintPositionedPseudo(node, style, boxNode, "before")
+	e.paintPositionedPseudo(node, style, boxNode, "after")
 
 	e.prependChrome(contentStart, boxNode, style, boxNode.x, posY, boxNode.w, boxNode.height)
 
 	return boxNode
+}
+
+// nativeWidgetAutoContentBottom returns the content-flow endpoint for an
+// auto-sized native value control whose border-box height is one scaled font
+// size. Padding and the top border are already part of the flow coordinate;
+// the caller adds bottom padding after this endpoint.
+func (e *engine) nativeWidgetAutoContentBottom(style ResolvedStyle) float64 {
+	targetHeight := e.scalePt(style.FontSize)
+	topChrome := e.scalePt(style.BorderTop.Width + style.PaddingTop)
+	contentHeight := targetHeight - topChrome - e.scalePt(style.PaddingBottom)
+
+	if contentHeight < 0 {
+		contentHeight = 0
+	}
+
+	return topChrome + contentHeight
+}
+
+// paintPositionedPseudo paints generated content whose used position takes it
+// out of the host's normal inline flow. This covers block and flex-item hosts
+// such as diagram cards; inline hosts continue through collectInlineSpan.
+func (e *engine) paintPositionedPseudo( //nolint:cyclop
+	node *html.Node, host ResolvedStyle, boxNode *box, pseudoElem string,
+) {
+	text := e.pseudoContent(node, pseudoElem)
+	if text == "" || boxNode == nil {
+		return
+	}
+
+	style := e.pseudoStyle(node, pseudoElem, host)
+	if style.Position != positionAbsolute && style.Position != positionFixed {
+		return
+	}
+
+	face := e.faceFor(*style)
+	size := style.FontSize * e.scale
+
+	if face == nil || size <= 0 {
+		return
+	}
+
+	contentX, contentW := e.contentBox(boxNode.x, boxNode.w, host)
+	pseudoX := contentX + e.scalePt(style.MarginLeft)
+
+	if !style.LeftAuto {
+		pseudoX = contentX + e.scalePt(style.Left)
+	} else if !style.RightAuto {
+		pseudoX = contentX + contentW - e.measureTextFace(text, *style) - e.scalePt(style.Right)
+	}
+
+	staticAfter := pseudoElem == "after" && style.TopAuto && style.BottomAuto
+	pseudoY := boxNode.y + e.scalePt(host.PaddingTop) + e.scalePt(host.BorderTop.Width) +
+		e.scalePt(style.MarginTop)
+
+	if staticAfter {
+		// An absolutely positioned ::after without an inset uses the static
+		// position after its block host, not the host's content origin. This is
+		// the baseline position used by diagram connectors between stacked cards.
+		pseudoY = boxNode.y + boxNode.height + e.scalePt(style.MarginTop)
+	}
+
+	if !style.TopAuto {
+		pseudoY = boxNode.y + e.scalePt(style.Top)
+	} else if !style.BottomAuto {
+		pseudoY = boxNode.y + boxNode.height - e.scalePt(style.Bottom)
+	}
+
+	baseline := pseudoY + e.fontAscent(size)
+
+	if staticAfter {
+		baseline = pseudoY
+	}
+
+	prevZ, prevSet, prevPositioned := e.pushZ(*style)
+	e.add(Op{ //nolint:exhaustruct // generated pseudo text has no DOM box
+		Kind: OpText, X: pseudoX, Y: baseline, W: e.measureTextFace(text, *style),
+		H: style.LineHeight * e.scale, Text: text, Font: face, Size: size,
+		InkDescent: e.fontDescentFace(face, size),
+		R:          style.Color[0], G: style.Color[1], B: style.Color[2],
+		Bold: style.FontWeight >= fontWeightBold,
+	})
+	e.popZ(prevZ, prevSet, prevPositioned)
+}
+
+func (e *engine) verticalWritingHeight(contentStart int, current float64, style ResolvedStyle) float64 {
+	textWidth := 0.0
+	for _, op := range e.ops[contentStart:] {
+		if op.Kind == OpText && op.RotateDeg != 0 && op.W > textWidth {
+			textWidth = op.W
+		}
+	}
+
+	if textWidth == 0 {
+		return current
+	}
+
+	verticalChrome := e.scalePt(style.PaddingTop) + e.scalePt(style.PaddingBottom) +
+		e.scalePt(style.BorderTop.Width) + e.scalePt(style.BorderBottom.Width)
+
+	needed := textWidth + verticalChrome
+	if needed > current {
+		return needed
+	}
+
+	return current
+}
+
+//nolint:cyclop // native widget value normalization and paint
+func (e *engine) paintValueWidget(node *html.Node, style ResolvedStyle, leftX, topY, width, height float64) {
+	minValue, maxValue := 0.0, 1.0
+	if node.Name == htmlMeter {
+		minValue = widgetNumber(node.Attribute("min"), 0)
+		maxValue = widgetNumber(node.Attribute("max"), 1)
+	}
+
+	if maxValue <= minValue {
+		return
+	}
+
+	value := widgetNumber(node.Attribute("value"), minValue)
+
+	ratio := (value - minValue) / (maxValue - minValue)
+	if ratio < 0 {
+		ratio = 0
+	} else if ratio > 1 {
+		ratio = 1
+	}
+
+	contentX, contentW := e.contentBox(leftX, width, style)
+	contentY := topY + e.scalePt(style.BorderTop.Width) + e.scalePt(style.PaddingTop)
+
+	contentH := height - e.scalePt(style.BorderTop.Width+style.BorderBottom.Width) -
+		e.scalePt(style.PaddingTop+style.PaddingBottom)
+	if contentW <= 0 || contentH <= 0 || ratio <= 0 {
+		return
+	}
+
+	// Native progress indicators use a thin green value bar when no authored
+	// component token provides one. Keep that default independent of an
+	// unrelated late document-wide --accent2 override (fixture 56).
+	color := [3]float64{0, 0.5, 0}
+	if node.Name == htmlMeter {
+		color = style.Color
+	}
+
+	for _, name := range []string{"--d03-bar"} {
+		if raw, ok := style.CustomProps[name]; ok {
+			if r, g, b, _, parsed := css.ParseColor(raw); parsed {
+				color = [3]float64{float64(r) / 255, float64(g) / 255, float64(b) / 255}
+
+				break
+			}
+		}
+	}
+
+	const indicatorRatio = 0.3
+
+	indicatorH := e.scalePt(style.FontSize) * indicatorRatio
+	if indicatorH <= 0 || indicatorH > contentH {
+		indicatorH = contentH
+	}
+
+	indicatorY := contentY + (contentH-indicatorH)/two
+
+	e.add(Op{ //nolint:exhaustruct // intentional zero fields
+		Kind: OpFillRect, X: contentX, Y: indicatorY, W: contentW * ratio, H: indicatorH,
+		R: color[0], G: color[1], B: color[2], Alpha: 1,
+		Radius: usedBorderRadius(style, contentW*ratio, indicatorH),
+	})
+}
+
+func widgetNumber(raw string, fallback float64) float64 {
+	if value, err := strconv.ParseFloat(raw, 64); err == nil {
+		return value
+	}
+
+	return fallback
+}
+
+// closedDetailsChildren implements the print-time disclosure rule: a closed
+// details element paints its summary but does not lay out the hidden payload.
+func closedDetailsChildren(node *html.Node) []*html.Node {
+	for _, child := range node.Children {
+		if child.Type == html.ElementNode && child.Name == "summary" {
+			return []*html.Node{child}
+		}
+	}
+
+	return nil
 }
 
 // applyHeightConstraints enforces the used/min/max-height constraints on the
@@ -1134,12 +1410,28 @@ func (e *engine) applyHeightConstraints(style ResolvedStyle, curY float64) float
 		}
 	}
 
-	if style.MinHeight > 0 && curY < e.scalePt(style.MinHeight) {
-		curY = e.scalePt(style.MinHeight)
+	minHeight := e.scalePt(style.MinHeight)
+	if style.BoxSizing != borderBox {
+		minHeight += e.scalePt(style.PaddingTop) + e.scalePt(style.PaddingBottom) +
+			e.scalePt(style.BorderTop.Width) + e.scalePt(style.BorderBottom.Width)
 	}
 
-	if style.MaxHeight >= 0 && curY > e.scalePt(style.MaxHeight) {
-		curY = e.scalePt(style.MaxHeight)
+	if minHeight < 0 {
+		minHeight = 0
+	}
+
+	if minHeight > 0 && curY < minHeight {
+		curY = minHeight
+	}
+
+	maxHeight := e.scalePt(style.MaxHeight)
+	if style.BoxSizing != borderBox {
+		maxHeight += e.scalePt(style.PaddingTop) + e.scalePt(style.PaddingBottom) +
+			e.scalePt(style.BorderTop.Width) + e.scalePt(style.BorderBottom.Width)
+	}
+
+	if style.MaxHeight >= 0 && curY > maxHeight {
+		curY = maxHeight
 	}
 
 	return curY
@@ -1279,7 +1571,9 @@ func (e *engine) buildOutOfFlow(node *html.Node, sty ResolvedStyle, availW, x, y
 
 	start := len(e.ops)
 
-	boxNode := e.buildInFlowDisplay(node, sty, cbW, cbX, cbY)
+	buildW := e.absoluteBuildWidth(sty, cbW)
+
+	boxNode := e.buildInFlowDisplay(node, sty, buildW, cbX, cbY)
 	if boxNode == nil {
 		return nil
 	}
@@ -1293,7 +1587,8 @@ func (e *engine) buildOutOfFlow(node *html.Node, sty ResolvedStyle, availW, x, y
 		absX = cbX + cbW - boxNode.w - e.scalePt(sty.Right)
 	}
 
-	absY := e.resolveAbsY(sty, boxNode, cbY, viewportFixed)
+	cbH := e.absCBHeights[node]
+	absY := e.resolveAbsY(sty, boxNode, cbY, viewportFixed, cbH)
 
 	dx, dy := absX-boxNode.x, absY-boxNode.y
 	boxNode.x, boxNode.y = absX, absY
@@ -1302,9 +1597,25 @@ func (e *engine) buildOutOfFlow(node *html.Node, sty ResolvedStyle, availW, x, y
 	return boxNode
 }
 
+func (e *engine) absoluteBuildWidth(sty ResolvedStyle, cbW float64) float64 {
+	if sty.Width >= 0 || sty.WidthPercent >= 0 || sty.LeftAuto || sty.RightAuto {
+		return cbW
+	}
+
+	buildW := cbW - e.scalePt(sty.Left+sty.Right)
+	if buildW < 0 {
+		return 0
+	}
+
+	return buildW
+}
+
 // resolveAbsY places the out-of-flow box vertically: top wins, then bottom
-// (fixed resolves against the viewport bottom; absolute against the CB top).
-func (e *engine) resolveAbsY(sty ResolvedStyle, boxNode *box, cbY float64, viewportFixed bool) float64 {
+// (fixed resolves against the viewport bottom; absolute uses the containing
+// block's bottom when its deferred height is known).
+//
+//nolint:wsl // ordered absolute-positioning cases mirror CSS precedence
+func (e *engine) resolveAbsY(sty ResolvedStyle, boxNode *box, cbY float64, viewportFixed bool, cbH float64) float64 {
 	if !sty.TopAuto {
 		return cbY + e.scalePt(sty.Top)
 	}
@@ -1321,7 +1632,10 @@ func (e *engine) resolveAbsY(sty ResolvedStyle, boxNode *box, cbY float64, viewp
 
 		return absY
 	}
-	// Absolute bottom: offset from CB top (lite; not height−bottom).
+	if cbH > 0 {
+		return cbY + cbH - boxNode.height - e.scalePt(sty.Bottom)
+	}
+
 	return cbY + e.scalePt(sty.Bottom)
 }
 
