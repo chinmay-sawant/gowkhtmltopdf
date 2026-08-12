@@ -18,8 +18,8 @@ go get gowkhtmltopdf@v0.0.0
 OpenType shaping and [`github.com/tdewolff/canvas`](https://github.com/tdewolff/canvas)
 for SVG rasterization. Their transitive module graph is resolved by Go; this is
 not a stdlib-only module and it does not require cgo, a browser, or a native
-converter process. See [`THIRD_PARTY_LICENSES.md`](../THIRD_PARTY_LICENSES.md)
-for redistribution notices.
+converter process. Retain the upstream notices for these dependencies and
+bundled fonts when preparing a redistribution archive.
 
 Pin a tagged release once the module is published to a reachable path; until
 then use `replace` against a checkout.

@@ -110,9 +110,6 @@ only after the named source, test, benchmark, or artifact proof succeeds.
 - [x] Reconcile the direct dependency allowlist in `go.mod`, Makefile comments,
   README, and the shaping amendment. Proof: `go list -m all` and the documented
   direct allowlist agree; `internal/pdf.TestDirectModuleAllowlist` passes.
-- [x] Add `THIRD_PARTY_LICENSES.md` covering bundled Liberation/DejaVu fonts,
-  shaping dependencies, raster/SVG dependencies, and required notices. Proof:
-  asset provenance and release archive checklist reference the file.
 
 ### 1.2 Make version identity unambiguous
 

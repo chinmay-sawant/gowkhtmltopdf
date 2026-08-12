@@ -24,7 +24,8 @@ finished bytes. It never touches parsing, layout, or PDF writing itself.
 The module boundary is the enforcement point of the project's core product
 rule — *pure Go, no cgo, no third-party PDF/HTML/CSS API*: `api.go` imports
 only the Go standard library plus internal packages, while the module's direct
-dependency allowlist is documented in `go.mod` and `THIRD_PARTY_LICENSES.md`.
+dependency allowlist is documented in `go.mod`; redistribution archives should
+retain the upstream notices for those dependencies and bundled fonts.
 
 ## 2. Package / file map
 
