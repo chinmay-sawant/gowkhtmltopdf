@@ -3,6 +3,7 @@ package gowkhtmltopdf //nolint:testpackage // tests inspect unexported Converter
 import (
 	"bytes"
 	"context"
+	"errors"
 	"image"
 	"image/color"
 	"image/jpeg"
@@ -156,6 +157,229 @@ func TestRunImageTypedRequest(t *testing.T) {
 	if !bytes.HasPrefix(output.Bytes(), []byte("\x89PNG\r\n\x1a\n")) {
 		t.Fatalf("typed image output does not start with PNG signature")
 	}
+}
+
+func TestImageSettingsBackgroundAliasesRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	for _, name := range []string{"background", "WEB.BACKGROUND", " web.background "} {
+		for _, value := range []string{"false", "true"} {
+			t.Run(name+"/"+value, func(t *testing.T) {
+				t.Parallel()
+
+				settings := NewImageSettings()
+				if err := settings.Set(name, value); err != nil {
+					t.Fatalf("Set(%q): %v", name, err)
+				}
+
+				for _, alias := range []string{"background", "web.background", " WEB.BACKGROUND "} {
+					got, ok := settings.Get(alias)
+					if !ok || got != value {
+						t.Errorf("Get(%q) = %q, %v; want %q, true", alias, got, ok, value)
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestTypedImageBackgroundAliasAffectsPixels(t *testing.T) {
+	t.Parallel()
+
+	const html = `<html><body style="margin:0;background-color:#336699;width:100px;height:100px"></body></html>`
+
+	render := func(background string) color.NRGBA {
+		var output bytes.Buffer
+
+		imageSettings := NewImageSettings()
+
+		if err := imageSettings.Set(" WEB.BACKGROUND ", background); err != nil {
+			t.Fatalf("Set background: %v", err)
+		}
+
+		if err := imageSettings.Set("width", "100"); err != nil {
+			t.Fatalf("Set width: %v", err)
+		}
+
+		if err := imageSettings.Set("height", "100"); err != nil {
+			t.Fatalf("Set height: %v", err)
+		}
+
+		request := &ImageRequest{ //nolint:exhaustruct // focused typed request
+			Image:  imageSettings,
+			Object: NewObjectSettings().SetBody([]byte(html), ""),
+			Output: &output,
+		}
+		if err := RunImage(t.Context(), request); err != nil {
+			t.Fatalf("RunImage(%s): %v", background, err)
+		}
+
+		decoded, err := png.Decode(bytes.NewReader(output.Bytes()))
+		if err != nil {
+			t.Fatalf("decode PNG: %v", err)
+		}
+
+		return pixelAt(decoded, 50, 50)
+	}
+
+	if got := render("true"); got != (color.NRGBA{R: 0x33, G: 0x66, B: 0x99, A: 0xff}) {
+		t.Fatalf("background=true center pixel = %v, want #336699", got)
+	}
+
+	if got := render("false"); got == (color.NRGBA{R: 0x33, G: 0x66, B: 0x99, A: 0xff}) {
+		t.Fatalf("background=false retained body background pixel %v", got)
+	}
+}
+
+//nolint:funlen // matrix cases are intentionally explicit
+func TestTypedPDFRequestPreflight(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		make func(*countingTestWriter) *PDFRequest
+		want error
+	}{
+		{
+			name: "no objects",
+			make: func(output *countingTestWriter) *PDFRequest {
+				return &PDFRequest{Output: output} //nolint:exhaustruct // focused invalid request
+			},
+			want: ErrNoRenderablePDFObjects,
+		},
+		{
+			name: "toc only",
+			make: func(output *countingTestWriter) *PDFRequest {
+				return &PDFRequest{ //nolint:exhaustruct // focused invalid request
+					Objects: []*ObjectSettings{{o: settings.PdfObject{IsTableOfContent: true}}}, //nolint:exhaustruct
+					Output:  output,
+				}
+			},
+			want: ErrNoRenderablePDFObjects,
+		},
+		{
+			name: "empty object",
+			make: func(output *countingTestWriter) *PDFRequest {
+				return &PDFRequest{Objects: []*ObjectSettings{NewObjectSettings()}, Output: output} //nolint:exhaustruct
+			},
+			want: ErrNoRenderablePDFObjects,
+		},
+		{
+			name: "missing output",
+			make: func(*countingTestWriter) *PDFRequest {
+				object := NewObjectSettings().SetBody([]byte("<p>body</p>"), "")
+
+				return &PDFRequest{Objects: []*ObjectSettings{object}} //nolint:exhaustruct
+			},
+			want: ErrMissingPDFOutput,
+		},
+		{
+			name: "missing outline output",
+			make: func(output *countingTestWriter) *PDFRequest {
+				global := NewGlobalSettings()
+				global.g.DumpOutline = true
+
+				return &PDFRequest{ //nolint:exhaustruct // focused invalid request
+					Global:  global,
+					Objects: []*ObjectSettings{NewObjectSettings().SetBody([]byte("<p>body</p>"), "")},
+					Output:  output,
+				}
+			},
+			want: ErrMissingPDFOutlineOutput,
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			var output countingTestWriter
+			req := testCase.make(&output)
+
+			if err := req.ValidatePDF(); !errors.Is(err, testCase.want) {
+				t.Fatalf("ValidatePDF() = %v, want errors.Is(..., %v)", err, testCase.want)
+			}
+
+			if err := RunPDF(t.Context(), req); !errors.Is(err, testCase.want) {
+				t.Fatalf("RunPDF() = %v, want errors.Is(..., %v)", err, testCase.want)
+			}
+
+			if output.Writes != 0 {
+				t.Fatalf("invalid request wrote %d times", output.Writes)
+			}
+		})
+	}
+}
+
+func TestTypedImageRequestPreflight(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		make func(*countingTestWriter) *ImageRequest
+		want error
+	}{
+		{
+			name: "no object",
+			make: func(output *countingTestWriter) *ImageRequest {
+				return &ImageRequest{Image: NewImageSettings(), Output: output} //nolint:exhaustruct
+			},
+			want: ErrNoInputPageAdded,
+		},
+		{
+			name: "toc only",
+			make: func(output *countingTestWriter) *ImageRequest {
+				return &ImageRequest{ //nolint:exhaustruct // focused invalid request
+					Image:  NewImageSettings(),
+					Object: &ObjectSettings{o: settings.PdfObject{IsTableOfContent: true}}, //nolint:exhaustruct
+					Output: output,
+				}
+			},
+			want: ErrNoInputPageAdded,
+		},
+		{
+			name: "missing output",
+			make: func(*countingTestWriter) *ImageRequest {
+				return &ImageRequest{ //nolint:exhaustruct // focused invalid request
+					Image:  NewImageSettings(),
+					Object: NewObjectSettings().SetBody([]byte("<p>body</p>"), ""),
+				}
+			},
+			want: ErrMissingImageOutput,
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			var output countingTestWriter
+			req := testCase.make(&output)
+
+			if err := req.ValidateImage(); !errors.Is(err, testCase.want) {
+				t.Fatalf("ValidateImage() = %v, want errors.Is(..., %v)", err, testCase.want)
+			}
+
+			if err := RunImage(t.Context(), req); !errors.Is(err, testCase.want) {
+				t.Fatalf("RunImage() = %v, want errors.Is(..., %v)", err, testCase.want)
+			}
+
+			if output.Writes != 0 {
+				t.Fatalf("invalid request wrote %d times", output.Writes)
+			}
+		})
+	}
+}
+
+type countingTestWriter struct {
+	bytes.Buffer
+	Writes int
+}
+
+func (w *countingTestWriter) Write(payload []byte) (int, error) {
+	w.Writes++
+
+	return w.Buffer.Write(payload) //nolint:wrapcheck // counting writer is test-only
 }
 
 func TestGlobalSettingsGetSetRoundTrip(t *testing.T) {

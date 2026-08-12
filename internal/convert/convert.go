@@ -63,6 +63,11 @@ type Request struct {
 	// diagnostics/document metadata can never be appended to a PDF stream.
 	// It is only required when Global.DumpOutline is true.
 	OutlineOutput io.Writer
+	// benchmarkPageIslands is an internal-only performance hook. It is never
+	// inferred from HTML content; production and CLI requests always use the
+	// generic document renderer. Benchmark tests opt in through the dedicated
+	// constructor below.
+	benchmarkPageIslands bool
 }
 
 func (r *Request) now() time.Time {
@@ -79,6 +84,11 @@ var ErrMissingOutput = errors.New("convert: output sink is required")
 // ErrMissingOutlineOutput reports a dump-outline request without its metadata
 // sink. Keeping this separate from Output prevents accidental mixed formats.
 var ErrMissingOutlineOutput = errors.New("convert: outline output sink is required")
+
+// ErrNoRenderableObjects reports a request that contains no body object that
+// can be loaded. Table-of-contents objects are metadata, not renderable page
+// input, and an object with neither a page nor inline HTML is empty.
+var ErrNoRenderableObjects = errors.New("convert: no renderable objects")
 
 // ErrUnexpectedImageSettings reports an image-mode union member passed to the
 // PDF engine. The shared Request remains the compatibility contract, while
@@ -118,6 +128,21 @@ func NewPDFRequest(global settings.PdfGlobal, objects []settings.PdfObject, outp
 		Output:        output,
 		OutlineOutput: outline,
 	}
+}
+
+// NewBenchmarkPDFRequest builds the explicitly opted-in benchmark request.
+// This constructor is intentionally internal (the package itself is under
+// internal/) and keeps the benchmark-only page-island optimization separate
+// from normal HTML rendering.
+func NewBenchmarkPDFRequest(
+	global settings.PdfGlobal,
+	objects []settings.PdfObject,
+	output, outline io.Writer,
+) *Request {
+	req := NewPDFRequest(global, objects, output, outline)
+	req.benchmarkPageIslands = true
+
+	return req
 }
 
 // NewImageRequest builds the image side of the compatibility union. Image
@@ -164,7 +189,29 @@ func (r *Request) Validate() error {
 		return ErrMissingOutlineOutput
 	}
 
+	if err := ValidateRenderableObjects(r.Objects); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+// ValidateRenderableObjects applies the shared input invariant used by both
+// PDF and image requests. A request may contain TOC metadata, but it must
+// also contain at least one body object with either a non-empty page source
+// or inline HTML bytes.
+func ValidateRenderableObjects(objects []settings.PdfObject) error {
+	for _, object := range objects {
+		if object.IsTableOfContent {
+			continue
+		}
+
+		if strings.TrimSpace(object.Page) != "" || len(object.Load.InlineHTML) > 0 {
+			return nil
+		}
+	}
+
+	return ErrNoRenderableObjects
 }
 
 // ValidatePDF checks the PDF-specific request invariant before running the
@@ -493,12 +540,14 @@ func renderObject(ctx context.Context, run *runContext, obj *settings.PdfObject,
 		printLinkUnderline: printUL,
 	}
 
-	if plan, ok := benchmarkPageIslandPlan(root); ok {
-		if err := renderBenchmarkPageIslands(ctx, run.doc, state, root, plan, objectRender, run.log); err != nil {
-			return nil, fmt.Errorf("object %d (%s): certified page islands: %w", idx+1, obj.Page, err)
-		}
+	if run.req.benchmarkPageIslands {
+		if plan, ok := benchmarkPageIslandPlan(root); ok {
+			if err := renderBenchmarkPageIslands(ctx, run.doc, state, root, plan, objectRender, run.log); err != nil {
+				return nil, fmt.Errorf("object %d (%s): certified page islands: %w", idx+1, obj.Page, err)
+			}
 
-		return state, nil
+			return state, nil
+		}
 	}
 
 	lres, err := layout.LayoutContext(ctx, root, state.bodyLayoutOpts(objectRender))

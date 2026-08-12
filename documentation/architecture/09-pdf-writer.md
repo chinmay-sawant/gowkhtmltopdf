@@ -87,7 +87,7 @@ writer component).
 
 | Symbol | Location | Purpose |
 |--------|----------|---------|
-| `Document` | `pdf.go:114` | Document under construction: `objects []*object`, `pages []*Page`, `info map[string]string`, `outlineRoot *Outline`, `fontCache` (subset key → font dict ref), document-wide rune sets, `catalogRef`/`infoRef` (set at finalize), `finalized` flag, `sync.RWMutex` |
+| `Document` | `pdf.go:114` | Document under construction: `objects []*object`, `pages []*Page`, `info map[string]string`, `outlineRoot *Outline`, `fontCache` (subset key → font dict ref), document-wide rune sets, `catalogRef`/`infoRef` (set at finalize), `finalized` flag |
 | `NewDocument` | `pdf.go:136` | Empty document; compression on by default |
 | `(d) SetCompression / SetGrayscale / SetCreationTime / SetInfo` | `pdf.go:146-158` | Hooks used by the convert pipeline before painting |
 | `(d) AddPage(w, h)` | `pdf.go:221` | Allocates the page object **and its content-stream object** up front; page refs are stable from here on |
@@ -103,6 +103,11 @@ writer component).
 | `(d) writeTo` | `pdf.go:465` | Header, object loop (skips never-materialized objects so xref can't point at the wrong object), xref + trailer |
 
 ### Content builder (`content.go`)
+
+`Document`, `Page`, and `Content` have single-goroutine ownership during
+assembly and finalization. Callers must not mutate or serialize one document
+concurrently; parallel conversions should use separate documents. The PDF
+writer does not expose a partially synchronized concurrency contract.
 
 | Symbol | Location | Purpose |
 |--------|----------|---------|

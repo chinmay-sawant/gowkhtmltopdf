@@ -387,12 +387,14 @@ Who depends on `convert` (i.e. the callers above the seam):
    convert/prepare.go for compatibility) is the seam that keeps fidelity
    consistent.
 
-8. **Certified island rendering is a deliberate, narrow optimization.** Only
-   the repository's generated benchmark report fixture (comment marker +
-   title + `section.benchmark-page` body, islands/plan.go:27) takes the
-   per-section path. Everything else fails closed onto the complete-document
-   layout path. `debug.FreeOSMemory()` every 4 islands and a shared
-   `layout.Workspace` bound peak memory for the 500-page report.
+8. **Certified island rendering is an explicit, narrow benchmark optimization.**
+   Ordinary requests never select the per-section path from document prose.
+   Only the internal `NewBenchmarkPDFRequest` opts into recognition of the
+   generated report fixture (comment marker + title + `section.benchmark-page`
+   body, `islands/plan.go`). Everything else stays on the complete-document
+   layout path. The benchmark path clones a parent-consistent virtual tree;
+   `debug.FreeOSMemory()` every 4 islands and a shared `layout.Workspace` bound
+   peak memory for that explicitly owned workload.
 
 9. **`internal/outline` stays pure.** It computes trees/XML/lookups but never
    touches PDF coordinates or page refs; `emitOutline` and `hfGeom.pdfXY`

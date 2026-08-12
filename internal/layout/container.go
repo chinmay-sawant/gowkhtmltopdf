@@ -1,6 +1,8 @@
 package layout
 
 import (
+	"context"
+	"fmt"
 	"strings"
 
 	"gowkhtmltopdf/internal/html"
@@ -42,20 +44,39 @@ func findSizeContainer(n *html.Node, name string, containers map[*html.Node]size
 // inline sizes for elements with container-type: inline-size|size. Widths are
 // computed without children (size containment / as-if-empty for intrinsic
 // contribution), matching buildBlock's definite-width rules.
+//
+//nolint:unparam // production callers pass the viewport; tests use a fixed fixture viewport.
 func measureSizeContainers(
 	root *html.Node, styles map[*html.Node]*ResolvedStyle, viewportW float64,
 ) map[*html.Node]sizeContainer {
-	out := map[*html.Node]sizeContainer{}
+	containers, _ := measureSizeContainersContext(context.Background(), root, styles, viewportW)
 
-	var walk func(n *html.Node, availW float64)
-	walk = func(node *html.Node, availW float64) {
+	return containers
+}
+
+//nolint:cyclop,wsl // recursive container measurement keeps the cancellation gate local.
+func measureSizeContainersContext(
+	ctx context.Context, root *html.Node, styles map[*html.Node]*ResolvedStyle, viewportW float64,
+) (map[*html.Node]sizeContainer, error) {
+	out := map[*html.Node]sizeContainer{}
+	visited := 0
+
+	var walk func(n *html.Node, availW float64) error
+	walk = func(node *html.Node, availW float64) error {
+		visited++
+		if visited&63 == 0 && ctx != nil {
+			if err := ctx.Err(); err != nil {
+				return fmt.Errorf("layout: container measurement: %w", err)
+			}
+		}
+
 		if node.Type != html.ElementNode {
-			return
+			return nil
 		}
 
 		sty := styles[node]
 		if sty == nil || sty.Display == displayNone {
-			return
+			return nil
 		}
 
 		borderW := contentInlineSize(*sty, availW)
@@ -69,12 +90,21 @@ func measureSizeContainers(
 
 		childAvail := borderW
 		for _, c := range node.Children {
-			walk(c, childAvail)
+			if err := walk(c, childAvail); err != nil {
+				return err
+			}
 		}
-	}
-	walk(root, viewportW)
 
-	return out
+		return nil
+	}
+	if root == nil {
+		return out, nil
+	}
+	if err := walk(root, viewportW); err != nil {
+		return nil, err
+	}
+
+	return out, nil
 }
 
 // contentInlineSize returns the used content-box inline size (pt) for a block

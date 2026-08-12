@@ -33,6 +33,13 @@ func CollectSheets(ctx context.Context, loader *load.Loader, root *html.Node, ba
 	if loader == nil {
 		return nil
 	}
+	if ctx == nil { //nolint:wsl // nil-context warning is a separate preflight branch.
+		if log != nil {
+			line.Emit(log, line.Warn, "stylesheet collection: nil context")
+		}
+
+		return nil
+	}
 
 	resources := loader.ForResource(&load.Resource{Base: base}, loadPage) //nolint:exhaustruct,lll // base-only resource reference
 	sheets, err := collectSheets(ctx, resources, root, opts, log)
@@ -50,6 +57,7 @@ type sheetCollector struct {
 	log       io.Writer
 	sheets    []*css.Stylesheet
 	rules     int
+	visits    uint32
 	err       error
 }
 
@@ -73,8 +81,17 @@ func collectSheets(ctx context.Context, resources load.ResourceContext, root *ht
 }
 
 func (collector *sheetCollector) visit(ctx context.Context, node *html.Node) {
-	if collector.err != nil || node.Type != html.ElementNode {
+	if collector.err != nil || node == nil || node.Type != html.ElementNode {
 		return
+	}
+
+	collector.visits++
+	if collector.visits&63 == 0 {
+		if err := ctx.Err(); err != nil {
+			collector.err = err
+
+			return
+		}
 	}
 
 	switch node.Name {
@@ -87,6 +104,10 @@ func (collector *sheetCollector) visit(ctx context.Context, node *html.Node) {
 
 //nolint:wsl,nlreturn // collector traversal flow
 func (collector *sheetCollector) collectStyle(node *html.Node) {
+	if collector.err != nil {
+		return
+	}
+
 	sheet, err := css.Parse(styleText(node))
 	if err != nil {
 		collector.warn("skipping <style>: %v", err)
@@ -97,6 +118,15 @@ func (collector *sheetCollector) collectStyle(node *html.Node) {
 
 //nolint:wsl,nlreturn // collector traversal flow
 func (collector *sheetCollector) collectLink(ctx context.Context, node *html.Node) {
+	if collector.err != nil {
+		return
+	}
+	if err := ctx.Err(); err != nil {
+		collector.err = err
+
+		return
+	}
+
 	if !linkStylesheet(node, collector.opts.ViewportW, collector.opts.ViewportH, collector.opts.MediaType) {
 		return
 	}
@@ -185,10 +215,16 @@ func MergeFontFaces(ctx context.Context, loader *load.Loader, registry *pdf.Regi
 //nolint:wsl,nlreturn,lll // font-face collection flow
 func mergeFontFaces(ctx context.Context, resources load.ResourceContext, registry *pdf.Registry, sheets []*css.Stylesheet, idx int, log io.Writer) *pdf.Registry {
 	for _, sheet := range sheets {
+		if ctx != nil && ctx.Err() != nil {
+			return registry
+		}
 		if sheet == nil {
 			continue
 		}
 		for _, face := range sheet.FontFaces {
+			if ctx != nil && ctx.Err() != nil {
+				return registry
+			}
 			registry = mergeFontFace(ctx, resources, registry, face, idx, log)
 		}
 	}

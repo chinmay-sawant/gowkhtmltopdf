@@ -477,7 +477,7 @@ func TestDumpOutlineGlobalHome(t *testing.T) {
 		t.Error("--no-dump-outline must clear Global.DumpOutline")
 	}
 
-	cmd = parse(t, "--dump-default-toc-xsl", "in.html", outPDF)
+	cmd = parse(t, "--dump-default-toc-xsl")
 	if !cmd.Global.DumpDefaultTOCXSL {
 		t.Error("--dump-default-toc-xsl must set Global.DumpDefaultTOCXSL")
 	}
@@ -485,6 +485,34 @@ func TestDumpOutlineGlobalHome(t *testing.T) {
 	cmd = parse(t, "--dump-default-toc-xsl=false", "in.html", outPDF)
 	if cmd.Global.DumpDefaultTOCXSL {
 		t.Error("--dump-default-toc-xsl=false must clear Global.DumpDefaultTOCXSL")
+	}
+}
+
+func TestDumpDefaultTOCXSLTerminalValidation(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{name: "input", args: []string{"--dump-default-toc-xsl", "in.html"}},
+		{name: "output", args: []string{"--dump-default-toc-xsl", "in.html", outPDF}},
+		{name: "outline", args: []string{"--dump-default-toc-xsl", "--dump-outline"}},
+		{name: "malformed boolean", args: []string{"--dump-default-toc-xsl=maybe"}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if _, err := Parse(tc.args); err == nil {
+				t.Fatalf("Parse(%v) succeeded; want terminal validation error", tc.args)
+			}
+		})
+	}
+
+	if _, err := Parse([]string{"--dump-default-toc-xsl"}, ModeImage); err == nil {
+		t.Fatal("--dump-default-toc-xsl accepted in image mode")
 	}
 }
 

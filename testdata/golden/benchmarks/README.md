@@ -58,12 +58,13 @@ GOWKHTMLTOPDF_GENERATE_BENCHMARK_OUTPUTS=1 \
 This writes `live-movie-listing-010.pdf` and
 `live-movie-listing-010.png`.
 
-## Current 2026-08-12 benchmark snapshot
+## Stored 2026-08-12 Snapshot D benchmark
 
-This is a fresh one-iteration capture from the current worktree. It is kept
-separate from the historical/count-3 comparisons below: wall time is sensitive
-to host state, while Go `B/op` is cumulative allocation traffic rather than
-process RSS. The complete raw Go rows are in
+This is the stored one-iteration process/code capture used as the Snapshot D
+baseline, captured before the CR-02 explicit-island remediation. It is kept
+separate from the historical/count-3 comparisons below:
+wall time is sensitive to host state, while Go `B/op` is cumulative allocation
+traffic rather than process RSS. The complete raw Go rows are in
 [`benchmark-results.txt`](benchmark-results.txt), Snapshot D.
 
 ```sh
@@ -80,9 +81,9 @@ GOCACHE=/tmp/gowk-go-cache \
 | Web-fetch image tiles | 23.61ms / 54.0MB / 7.8K | 21.00ms / 63.3MB / 9.3K | 61.98ms / 67.5MB / 13.1K | **254.81ms / 148.8MB / 29.7K** |
 | Inline image tiles | 23.23ms / 55.1MB / 6.8K | 16.56ms / 57.4MB / 7.5K | 55.15ms / 61.7MB / 11.3K | **240.74ms / 143.4MB / 28.0K** |
 
-### Current direct CLI process measurement
+### Stored direct CLI process measurement (Snapshot D)
 
-The PDF binary was freshly built from the current checkout and run once per
+The PDF binary was freshly built for the Snapshot D baseline and run once per
 size under `/usr/bin/time -f '%e %M'`, with `--quiet
 --enable-local-file-access`. The generated report used the benchmark report
 CSS, marker, and 20 rows per requested page; Ghostscript verified every output
@@ -104,10 +105,73 @@ coarse.
 | 250 / 250 | 460 ms | 38,896 KiB | 708,125 |
 | 500 / 500 | **960 ms** | **54,632 KiB** | **1,385,450** |
 
-The report marker activates the current certified page-island path. Therefore
-this direct matrix measures that workload only; it is not a generic-HTML
-fidelity or RSS guarantee. See the critical review's CR-02 before broadening
-its performance claim.
+This matrix is retained as the Snapshot D process baseline for the generated
+report workload. The CR-02 remediation subsequently made page-island rendering
+an explicit internal benchmark request, so ordinary CLI documents no longer
+opt into it from the report marker. Treat these rows as historical process
+evidence for that fixture, not as a current generic-HTML fidelity or RSS
+guarantee.
+
+## Remediation evidence — 2026-08-12
+
+These focused one-iteration measurements close the evidence-gated review rows.
+They are development baselines, not release regressions; the host is Linux/
+amd64 on the i7-13700HX workstation.
+
+### Repeated-resource corpus
+
+`BenchmarkRepeatedResourcePDF` serves one identical 142-byte PNG from a local
+HTTP server. Each page references it eight times. The per-layout image cache
+deduplicates those eight references, while separate document objects still
+fetch once per object. The output is a valid PDF in the companion test, and
+the rendered bytes are retained for semantic/page checks.
+
+| Pages | Time | Go B/op | Allocs/op | Fetches/op | Fetched bytes/op | PDF bytes/op |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 13.26 ms | 8.85 MB | 20,303 | 1 | 142 | 44,239 |
+| 10 | 25.36 ms | 13.15 MB | 191,727 | 10 | 1,420 | 388,773 |
+| 500 | 802.70 ms | 522.98 MB | 9,567,947 | 500 | 71,000 | 19,105,376 |
+
+The evidence supports keeping the existing per-layout cache. It does not yet
+justify a cross-object global cache or aggregate byte cap: the repeated asset
+is tiny, fetches are bounded by object count, and the dominant 500-page cost is
+conversion allocation traffic. These are in-process Go allocation measurements;
+they are not a process-RSS measurement. The separate direct-CLI matrix above
+contains process RSS for its benchmark workload, but no RSS claim is inferred
+for this repeated-resource corpus. Any future request-scoped cache should be
+introduced with eviction and freshness semantics plus a larger asset corpus.
+
+### Deep chrome / forced-break corpus
+
+`BenchmarkDeepChromeAndForcedBreaks` renders generated transform, sticky, and
+forced-page-break items at 10/100/1,000 scale. `TestDeepChromeOutputStable`
+renders the 10- and 100-item cases twice and compares complete PDF bytes.
+
+| Items | Time | Go B/op | Allocs/op |
+|---:|---:|---:|---:|
+| 10 | 9.19 ms | 7.21 MB | 969 |
+| 100 | 1.93 ms | 1.10 MB | 2,073 |
+| 1,000 | 24.06 ms | 9.85 MB | 20,101 |
+
+The one-iteration CPU profile was captured with `-cpuprofile` and inspected
+with `go tool pprof -top`; samples were in normal tree construction/style work,
+with no demonstrated quadratic chrome hotspot in this corpus. The indexed
+pagination path is retained pending broader production-shaped workloads.
+
+### Cold glyph raster corpus
+
+`BenchmarkColdGlyphRaster` covers Latin and bundled Unicode-fallback CJK at
+12/24/72px. Raster scanline scratch is reused per glyph instead of allocating
+an active-edge slice for every supersample row; the benchmark remains the
+regression baseline for exact raster output and allocation growth.
+
+| Sample | 12px | 24px | 72px |
+|---|---:|---:|---:|
+| Latin | 2.04 ms / 1.27 MB / 332 allocs | 1.22 ms / 0.81 MB / 306 | 7.02 ms / 1.41 MB / 307 |
+| CJK fallback | 4.88 ms / 3.39 MB / 29,368 allocs | 0.20 ms / 0.10 MB / 302 | 0.24 ms / 0.69 MB / 302 |
+
+The CJK spread reflects glyph-outline complexity and fallback coverage; no
+visual golden drift was observed in the existing image tests.
 
 ## Historical in-process recorded results
 

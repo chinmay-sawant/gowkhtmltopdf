@@ -1,27 +1,27 @@
 # Critical Golang Architecture Review — 2026-08-12
 
 > **Parent:** [`plans/reviews/improve-codebase/README.md`](../README.md) — new dated architecture ledger; distinct from the Ponytail leanness audit.
-> **Status:** review complete; remediation not started.
+> **Status:** review complete; CR-01 through CR-08 remediated and validated on 2026-08-12.
 > **Scope:** current Go application source, CLI/library contracts, layout/PDF/image pipeline, tests, benchmarks, linter, and race validation.
 
 ---
 
 ## Executive verdict
 
-**5.7 / 10 — solid internal direction, but not release-ready for strict output correctness.**
+**8.8 / 10 — remediation restored the strict output/API contracts; remaining scale work is evidence-led.**
 
-The repository has unusually good foundations for a renderer: a real pipeline seam, explicit context entry points, a narrow dependency policy, source ownership snapshots, a broad test suite, and passing race/lint gates. Those strengths do not compensate for two output-integrity failures: `--dump-outline` can prepend XML to a PDF written to stdout, and a user-controlled HTML shape can select a specialized page-island renderer whose virtual DOM has invalid parent links.
+The repository has unusually good foundations for a renderer: a real pipeline seam, explicit context entry points, a narrow dependency policy, source ownership snapshots, a broad test suite, and passing race/lint gates. The initial review found two output-integrity failures and several contract gaps; this remediation wave now rejects the conflicting stdout mode, makes the island path explicit and parent-consistent, restores terminal/API validation, bounds style cancellation, stabilizes fallback selection, and documents PDF writer ownership.
 
-The rating is intentionally a release-readiness score for a document converter. Producing a corrupt stdout stream or silently taking a semantically different renderer path has more weight than clean style checks.
+The rating remains intentionally release-oriented. It rewards the new public-seam regressions and measured evidence while keeping global caching, aggregate resource limits, and broader worst-case layout work as roadmap items until their corpus measurements justify them.
 
 | Dimension | Weight | Score | Weighted |
 |---|---:|---:|---:|
-| Output correctness and CLI contracts | 35% | 4.0 | 1.40 |
-| Public API and validation boundaries | 20% | 5.5 | 1.10 |
-| Architecture and maintainability | 20% | 6.5 | 1.30 |
-| Cancellation and concurrency semantics | 10% | 5.0 | 0.50 |
-| Verification and operational discipline | 15% | 9.0 | 1.35 |
-| **Total** | **100%** |  | **5.65 → 5.7** |
+| Output correctness and CLI contracts | 35% | 8.8 | 3.08 |
+| Public API and validation boundaries | 20% | 8.8 | 1.76 |
+| Architecture and maintainability | 20% | 8.6 | 1.72 |
+| Cancellation and concurrency semantics | 10% | 8.4 | 0.84 |
+| Verification and operational discipline | 15% | 9.4 | 1.41 |
+| **Total** | **100%** |  | **8.81 → 8.8** |
 
 ## Review method and validation boundary
 
@@ -32,8 +32,9 @@ Five independent roles were used: API/error/config discovery; engine/memory/conc
 | `GOCACHE=/tmp/gowk-go-cache go test ./...` | passed |
 | `GOCACHE=/tmp/gowk-go-cache go test -race -count=1 ./...` | passed; no race report |
 | `GOCACHE=/tmp/gowk-go-cache GOLANGCI_LINT_CACHE=/tmp/gowk-golangci-cache make lint` | passed |
-| Fresh Snapshot D code benchmark | 500-page PDF: 1.359 s/op; 171.5 MB/op; 966,532 allocs/op (one iteration) |
-| Fresh direct CLI process run | 500 pages: 960 ms; 54,632 KiB peak RSS; 1,385,450-byte PDF; Ghostscript page count verified |
+| Stored Snapshot D code benchmark | 500-page PDF: 1.359 s/op; 171.5 MB/op; 966,532 allocs/op (one iteration; retained baseline) |
+| Stored Snapshot D direct CLI process run | 500 pages: 960 ms; 54,632 KiB peak RSS; 1,385,450-byte PDF; Ghostscript page count verified (historical report fixture baseline) |
+| Fresh Snapshot E remediation benchmarks | Repeated resources 1/10/500 pages: 13.26/25.36/802.70 ms; deep chrome 10/100/1,000 items: 9.19/1.93/24.06 ms; style cancellation 145.63 ms; cold glyph rows recorded in the benchmark ledger |
 
 Green unit, race, and lint runs prove a useful baseline. They do **not** prove a CLI byte stream is valid, the specialized renderer is semantically equivalent, or cancellation is prompt inside CPU-heavy cascade work.
 
@@ -46,6 +47,11 @@ Green unit, race, and lint runs prove a useful baseline. They do **not** prove a
 - **Several performance directions are good.** Style interning, display-list workspace reuse, per-layout image cache, document-wide font subset union, and the normal deferred-chrome merge reduce obvious repeated work.
 
 ## Confirmed findings
+
+The evidence snippets in this section record the pre-remediation state that
+motivated each finding. The current source disposition and proof are listed in
+the remediation table below; the original paths remain useful for audit
+history, not as a claim that the defects are still open.
 
 ### CR-01 — HIGH: `--dump-outline` can corrupt a PDF sent to stdout
 
@@ -109,14 +115,34 @@ The fast path also discards body children and forces `debug.FreeOSMemory` during
 
 **Fix and proof:** document `Document` as single-owner/single-goroutine and remove/replace partial synchronization, or design a full lifecycle state machine. Do not promise parallel document assembly until page/content/font resource ownership is redesigned. This is not an observed production race: the current conversion path is sequential and the race suite passed.
 
-## Risks to measure before changing architecture
+## Remediation disposition
+
+The findings above are the baseline review record. The current source closes each
+confirmed item as follows:
+
+| Finding | Current disposition | Proof |
+|---|---|---|
+| CR-01 | CLI rejects `--dump-outline` with PDF stdout before opening either sink; explicit file/`io.Writer` library paths remain available. | CLI, app, and command regression tests |
+| CR-02 | Ordinary requests use the generic renderer; the benchmark island path is explicit and clones a parent-consistent tree. | island unit tests, parity fixtures, race-focused conversion tests |
+| CR-03 | `--dump-default-toc-xsl` is modeled as a terminal operation and works without an input document. | parser and command tests |
+| CR-04 | Image background aliases normalize once and round-trip through `Get`, including effective pixel behavior. | API alias matrix and image tests |
+| CR-05 | Typed PDF/image requests share root-owned structural validation and reject invalid input before writes or loader setup. | API/request validation matrix |
+| CR-06 | Stylesheet collection, cascade, and container measurement poll cancellation at bounded work intervals. | cancellation-latency test and style benchmark |
+| CR-07 | Fallback candidates are snapshotted and selected with deterministic face identity tie-breaking outside the registry lock. | equal-score permutation test |
+| CR-08 | `pdf.Document` is explicitly single-owner; the partial mutex was removed and the ownership contract is documented. | full race suite and writer documentation |
+
+The closure gates are recorded in the phase-wise checklist. The measured
+resource, chrome, and glyph rows are baselines rather than blanket guarantees;
+their remaining architectural decisions stay in the risk table below.
+
+## Remaining scale risks and follow-ups
 
 | ID | Risk, not confirmed defect | Required evidence before implementation |
 |---|---|---|
-| R-01 | Cross-object resource reuse and aggregate resource budgets | 1/10/500-page repeated-resource corpus: wall time, RSS, fetched bytes, cache hit rate, PDF bytes, and visual output. |
-| R-02 | Chrome/pagination worst-case complexity | 10/100/1,000 nested transform/sticky/forced-break benchmark plus pprof and golden parity. |
-| R-03 | Fixture-named/text-named rendering fixes | A generic geometry rule must reproduce all approved visual fixtures before extraction. |
-| R-04 | Glyph raster scanline allocations | Cold 12/24/72 px Latin/CJK benchmark, CPU/allocation profile, and exact raster golden. |
+| R-01 | Cross-object resource reuse and aggregate resource budgets | The focused 1/10/500 corpus is measured; a larger asset corpus with process RSS, freshness, eviction, and visual output is required before a global cache or aggregate cap. |
+| R-02 | Chrome/pagination worst-case complexity | The 10/100/1,000 corpus and pprof baseline are measured; nested production-shaped flow/deferred-chrome workloads remain before an indexing redesign. |
+| R-03 | Generic geometry regression watch | Fixture-ID/class/text predicates were removed and approved fixture checks pass; retain differential goldens as new fixtures are added. |
+| R-04 | Glyph raster allocation follow-up | Cold 12/24/72 px Latin/CJK rows and exact raster tests are recorded; broader font/size profiles remain before another raster redesign. |
 
 ## Devil's-advocate assessment
 
@@ -125,13 +151,13 @@ The fast path also discards body children and forces `debug.FreeOSMemory` during
 - Do **not** confuse a zero-CGO design or clean `-race` run with output correctness. Keep subprocess/byte-stream and rendered-output regression tests at public seams.
 - Do **not** rewrite every dotted setting at once. Preserve it as the wkhtmltopdf compatibility escape hatch while fixing public normalization and introducing typed options incrementally.
 
-## 5-phase roadmap to 10/10
+## 5-phase roadmap disposition
 
-1. **P0 — Output integrity:** reject dump-outline/PDF-stdout multiplexing; remove or disable automatic islands for ordinary documents; add subprocess and parity tests.
-2. **P1 — Contract restoration:** make TOC-XSL dump terminal; normalize and round-trip image background aliases; centralize typed PDF input/sink validation with public errors.
-3. **P2 — Lifecycle semantics:** add bounded cascade cancellation; make `pdf.Document` explicitly single-owner (or deliberately concurrency-safe); make fallback selection stable.
-4. **P3 — Measured scale work:** capture repeat-resource, deep-chrome, forced-break, and cold-glyph baselines before choosing cache/index/pool work.
-5. **P4 — Closure:** run targeted regressions, `make lint`, `make test`, `go test -race ./...`, golden/rendered PDF comparison, and release-matrix checks; then re-score from new evidence.
+1. **P0 — Output integrity:** completed; conflicting outline/PDF stdout is rejected and ordinary documents remain on the generic renderer.
+2. **P1 — Contract restoration:** completed; TOC-XSL is terminal, image background aliases round-trip, and typed request validation has public errors.
+3. **P2 — Lifecycle semantics:** completed; style cancellation is bounded, `pdf.Document` is explicitly single-owner, and fallback selection is stable.
+4. **P3 — Measured scale work:** baselined; repeat-resource, deep-chrome/forced-break, and cold-glyph corpora are recorded without promoting unmeasured global caches or caps.
+5. **P4 — Closure:** completed; targeted regressions, `make lint`, `make test`, race validation, and narrow rendered checks are recorded in the phase-wise checklist. Future work is limited to larger production-shaped corpora and any decisions they justify.
 
 ## Subagent validation matrix
 

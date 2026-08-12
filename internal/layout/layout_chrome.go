@@ -3,7 +3,6 @@ package layout
 import (
 	"math"
 	"sort"
-	"strings"
 
 	"gowkhtmltopdf/internal/html"
 )
@@ -158,13 +157,11 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 	if e.noEmit {
 		return
 	}
-
-	var chrome []Op
-	if isDomainSection(boxNode.node) {
-		// Domain frames keep the shared thin neutral top edge; section-specific
-		// accent declarations must not become page-wide top rails in PDF output.
+	if isNeutralFrameSection(boxNode.node, sty) {
 		sty.BorderTop = sty.BorderBottom
 	}
+
+	var chrome []Op
 	radii := usedBorderRadii(sty, width, height)
 	radius := uniformRadius(radii)
 	if sty.BGColor[3] > 0 && e.opts.Background {
@@ -211,6 +208,22 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 			e.deferredChrome[i].at += n
 		}
 	}
+}
+
+// isNeutralFrameSection recognizes a generic frame pattern rather than a
+// fixture ID or literal text: a section with a solid, neutral outer border
+// keeps its top edge consistent with its bottom edge across page fragments.
+//
+//nolint:wsl // generic frame checks remain adjacent to their border gates.
+func isNeutralFrameSection(node *html.Node, sty ResolvedStyle) bool {
+	if node == nil || node.Name != "section" {
+		return false
+	}
+	if sty.BorderTop.Style != solidKeyword || sty.BorderBottom.Style != solidKeyword {
+		return false
+	}
+
+	return nearlyEqual(sty.BorderTop.Width, sty.BorderBottom.Width)
 }
 
 func usedBorderRadius(sty ResolvedStyle, width, height float64) float64 {
@@ -313,19 +326,18 @@ func hasRoundedRadii(radii [4]float64) bool {
 	return false
 }
 
-//nolint:goconst // border style is a direct CSS keyword comparison
 func uniformRoundedBorder(sty ResolvedStyle) bool {
 	top := sty.BorderTop
 
-	return top.Width > 0 && top.Style == "solid" &&
+	return top.Width > 0 && top.Style == solidKeyword &&
 		top == sty.BorderRight && top == sty.BorderBottom && top == sty.BorderLeft
 }
 
 func roundedSolidBorder(sty ResolvedStyle) bool {
 	return sty.BorderTop.Width > 0 && sty.BorderRight.Width > 0 &&
 		sty.BorderBottom.Width > 0 && sty.BorderLeft.Width > 0 &&
-		sty.BorderTop.Style == "solid" && sty.BorderRight.Style == "solid" &&
-		sty.BorderBottom.Style == "solid" && sty.BorderLeft.Style == "solid"
+		sty.BorderTop.Style == solidKeyword && sty.BorderRight.Style == solidKeyword &&
+		sty.BorderBottom.Style == solidKeyword && sty.BorderLeft.Style == solidKeyword
 }
 
 func roundedAccentBorder(sty ResolvedStyle) bool {
@@ -424,10 +436,6 @@ func (e *engine) roundedBorderOps(
 	}
 
 	return ops
-}
-
-func isDomainSection(node *html.Node) bool {
-	return node != nil && node.Name == "section" && strings.HasPrefix(node.Attribute("id"), "domain-")
 }
 
 // roundedAccentBorderOps keeps a solid top rail curved when the remaining

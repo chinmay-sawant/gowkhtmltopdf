@@ -18,6 +18,9 @@ var (
 	ErrVersion = errors.New("version requested")
 	ErrLicense = errors.New("license requested")
 	ErrExtHelp = errors.New("extended help requested")
+	// ErrTerminalConflict reports conversion arguments combined with a
+	// terminal-only action such as --dump-default-toc-xsl.
+	ErrTerminalConflict = errors.New("cli: terminal action conflicts with conversion arguments")
 )
 
 // Static parse-stage errors, wrapped with the offending token so callers can
@@ -348,7 +351,21 @@ func (c *Command) positional(arg string, cur *objectCtx, free *[]string) {
 // resolveFree assigns queued positionals: last → output, others → implicit
 // page objects. Pending page-scoped settings (from flags before any object
 // keyword) are applied to the first free page URL.
+//
+//nolint:cyclop // compatibility positional resolution has distinct mode cases.
 func (c *Command) resolveFree(cur *objectCtx, free []string) error {
+	if c.Global.DumpDefaultTOCXSL {
+		if len(free) != 0 || len(c.Objects) != 0 {
+			return fmt.Errorf("%w: --dump-default-toc-xsl cannot be combined with input/output arguments", ErrTerminalConflict)
+		}
+
+		if c.Global.DumpOutline {
+			return fmt.Errorf("%w: --dump-default-toc-xsl cannot be combined with --dump-outline", ErrTerminalConflict)
+		}
+
+		return nil
+	}
+
 	if len(free) == 0 {
 		return c.validate()
 	}

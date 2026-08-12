@@ -1,6 +1,7 @@
 package pdf
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +13,7 @@ import (
 type Registry struct {
 	mu       sync.RWMutex
 	byFamily map[string][]*Font // family → faces (any weight/style)
+	faces    []*Font            // stable registration order for fallback scans
 }
 
 // NewRegistry returns an empty font registry.
@@ -21,7 +23,19 @@ func NewRegistry() *Registry {
 	}
 }
 
+func (r *Registry) registerFaceLocked(fnt *Font) {
+	for _, existing := range r.faces {
+		if existing == fnt {
+			return
+		}
+	}
+
+	r.faces = append(r.faces, fnt)
+}
+
 // AddFont registers a parsed face under its family name (and PostScript name).
+//
+//nolint:wsl // lock initialization and registration must remain one critical section.
 func (r *Registry) AddFont(fnt *Font) {
 	if r == nil || fnt == nil {
 		return
@@ -29,6 +43,10 @@ func (r *Registry) AddFont(fnt *Font) {
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.byFamily == nil {
+		r.byFamily = map[string][]*Font{}
+	}
+	r.registerFaceLocked(fnt)
 
 	names := fnt.LoadNames()
 	if len(names) == 0 && fnt.PostScriptName != "" {
@@ -46,6 +64,8 @@ func (r *Registry) AddFont(fnt *Font) {
 }
 
 // AddFamilyAlias registers f under an explicit CSS family name.
+//
+//nolint:wsl // lock initialization and registration must remain one critical section.
 func (r *Registry) AddFamilyAlias(family string, font *Font) {
 	if r == nil || font == nil {
 		return
@@ -53,6 +73,10 @@ func (r *Registry) AddFamilyAlias(family string, font *Font) {
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.byFamily == nil {
+		r.byFamily = map[string][]*Font{}
+	}
+	r.registerFaceLocked(font)
 
 	key := strings.ToLower(strings.TrimSpace(family))
 	key = strings.Trim(key, `"'`)
@@ -123,7 +147,8 @@ func (r *Registry) FindWithGlyph(codePoint rune, weight int, italic bool) *Font 
 	}
 
 	r.mu.RLock()
-	defer r.mu.RUnlock()
+	faces := append([]*Font(nil), r.faces...)
+	r.mu.RUnlock()
 
 	bold := weight >= fontWeightBoldMin
 
@@ -131,45 +156,39 @@ func (r *Registry) FindWithGlyph(codePoint rune, weight int, italic bool) *Font 
 
 	bestScore := -1
 
-	// Fast stack array for deduplication without heap map allocation
-	var seenBuf [32]*Font
+	for _, fnt := range faces {
+		score := glyphFaceScore(fnt, codePoint, bold, italic)
+		if score < 0 {
+			continue
+		}
 
-	seenCount := 0
-
-	for _, faces := range r.byFamily {
-		for _, fnt := range faces {
-			isSeen := false
-
-			for i := range seenCount {
-				if seenBuf[i] == fnt {
-					isSeen = true
-
-					break
-				}
-			}
-
-			if isSeen {
-				continue
-			}
-
-			if seenCount < len(seenBuf) {
-				seenBuf[seenCount] = fnt
-				seenCount++
-			}
-
-			score := glyphFaceScore(fnt, codePoint, bold, italic)
-			if score < 0 {
-				continue
-			}
-
-			if score > bestScore {
-				bestScore = score
-				best = fnt
-			}
+		if score > bestScore || (score == bestScore && fontIdentityLess(fnt, best)) {
+			bestScore = score
+			best = fnt
 		}
 	}
 
 	return best
+}
+
+// fontIdentityLess provides a stable tie-breaker independent of map iteration
+// or alias registration order. The parsed fingerprint distinguishes different
+// files that happen to share a PostScript name; the name is a readable
+// fallback for synthetic/test faces without a fingerprint.
+//
+//nolint:wsl // tie-break fields are intentionally checked in priority order.
+func fontIdentityLess(left, right *Font) bool {
+	if left == nil {
+		return false
+	}
+	if right == nil {
+		return true
+	}
+	if cmp := bytes.Compare(left.fingerprint[:], right.fingerprint[:]); cmp != 0 {
+		return cmp < 0
+	}
+
+	return strings.ToLower(left.PostScriptName) < strings.ToLower(right.PostScriptName)
 }
 
 // glyphFaceScore scores a face for ch: -1 when it lacks the glyph, plus

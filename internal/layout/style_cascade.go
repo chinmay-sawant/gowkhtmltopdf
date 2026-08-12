@@ -212,8 +212,13 @@ type ruleHit struct {
 // matchedRules walks sheets with the cascade's gates (media, @container,
 // selector match, specificity). pseudoElem != "" matches ::before/::after
 // shapes instead of the element (pseudo-content path).
+//
+//nolint:wsl // cascade gates are intentionally evaluated in source order.
 func (ctx *styleContext) matchedRules(node *html.Node, pseudoElem string) []ruleHit {
 	if ctx == nil {
+		return nil
+	}
+	if ctx.pollContext() {
 		return nil
 	}
 
@@ -221,6 +226,9 @@ func (ctx *styleContext) matchedRules(node *html.Node, pseudoElem string) []rule
 	// consumes the returned slice before resolving the next element.
 	hits := ctx.ruleHits[:0]
 	for _, sheet := range ctx.sheets {
+		if ctx.pollContext() {
+			return nil
+		}
 		hits = ctx.appendSheetRuleHits(hits, sheet, node, pseudoElem)
 	}
 
@@ -230,6 +238,8 @@ func (ctx *styleContext) matchedRules(node *html.Node, pseudoElem string) []rule
 }
 
 // appendSheetRuleHits appends matches from one stylesheet into hits.
+//
+//nolint:wsl // cascade gates are intentionally evaluated in source order.
 func (ctx *styleContext) appendSheetRuleHits(
 	hits []ruleHit, sheet *css.Stylesheet, node *html.Node, pseudoElem string,
 ) []ruleHit {
@@ -238,6 +248,9 @@ func (ctx *styleContext) appendSheetRuleHits(
 	}
 
 	for _, rule := range sheet.Rules {
+		if ctx.pollContext() {
+			return hits
+		}
 		if !css.MediaMatches(rule.Media, ctx.media, ctx.viewportW, ctx.viewportH) {
 			continue
 		}
@@ -253,10 +266,15 @@ func (ctx *styleContext) appendSheetRuleHits(
 }
 
 // appendRuleSelectorHits appends matching selectors of one rule into hits.
+//
+//nolint:wsl // selector gates are intentionally evaluated in source order.
 func (ctx *styleContext) appendRuleSelectorHits(
 	hits []ruleHit, rule css.Rule, node *html.Node, pseudoElem string,
 ) []ruleHit {
 	for _, sel := range rule.Selectors {
+		if ctx.pollContext() {
+			return hits
+		}
 		if !selectorMatches(sel, node, pseudoElem) {
 			continue
 		}

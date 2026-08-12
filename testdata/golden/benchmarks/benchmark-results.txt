@@ -79,15 +79,17 @@ ok  	gowkhtmltopdf/internal/convert	5.4s
 # Snapshot C Template 500 raw: 0.925s / 0.848s / 0.944s (median 0.925s / 340.4MB / 569.1K allocs).
 # As above, B/op is cumulative allocation traffic and is not RSS.
 
-# Snapshot D: current full in-process workload matrix, one iteration per
-# workload (-count=1), captured 2026-08-12 from the current worktree.
+# Snapshot D: stored full in-process workload matrix, one iteration per
+# workload (-count=1), captured 2026-08-12 before the CR-02 explicit-island
+# remediation. It remains a historical benchmark baseline.
 # Command:
 #   GOCACHE=/tmp/gowk-go-cache go test ./internal/convert -run '^$' \
 #     -bench 'Benchmark(PDFPages|TemplatePages|WebFetchImage|ImageAssets)$' \
 #     -benchmem -benchtime=1x -count=1
 # Toolchain/host: go1.26.4 linux/amd64 · 24 CPUs · 13th Gen Intel i7-13700HX.
-# This is current allocation evidence, not peak process RSS. The separately
-# captured direct CLI RSS/time matrix is in testdata/golden/benchmarks/README.md.
+# This is historical allocation evidence, not peak process RSS. The separately
+# captured direct CLI RSS/time matrix is the same historical Snapshot D
+# workload and is documented in testdata/golden/benchmarks/README.md.
 
 goos: linux
 goarch: amd64
@@ -132,7 +134,7 @@ BenchmarkWebFetchImage/500Images-24             1   254810392 ns/op    1.00 MB/s
 PASS
 ok      gowkhtmltopdf/internal/convert  7.141s
 
-# Snapshot D direct CLI process rows: one freshly built current-worktree binary
+# Snapshot D direct CLI process rows: one freshly built pre-CR-02 binary
 # run per generated report (2, 5, 10, 20, 50, 100, 200, 250, and 500 pages).
 # Command pattern:
 #   /usr/bin/time -f 'TIME elapsed_s=%e peak_rss_kib=%M' \
@@ -150,3 +152,19 @@ CLIReport/100Pages    elapsed=170ms  peak_rss_kib=28648  pdf_bytes=305592  rende
 CLIReport/200Pages    elapsed=340ms  peak_rss_kib=35404  pdf_bytes=573416  rendered_pages=200
 CLIReport/250Pages    elapsed=460ms  peak_rss_kib=38896  pdf_bytes=708125  rendered_pages=250
 CLIReport/500Pages    elapsed=960ms  peak_rss_kib=54632  pdf_bytes=1385450 rendered_pages=500
+
+# Snapshot E: remediation evidence, one iteration per focused benchmark (fresh run 2026-08-12).
+# Repeated resources (local HTTP; one 142-byte PNG referenced eight times/page):
+#   BenchmarkRepeatedResourcePDF/1Pages:   13258966 ns/op  8846192 B/op      1 fetch  142 fetched bytes 44239 PDF bytes
+#   BenchmarkRepeatedResourcePDF/10Pages:  25356003 ns/op 13148120 B/op     10 fetches 1420 fetched bytes 388773 PDF bytes
+#   BenchmarkRepeatedResourcePDF/500Pages:802704415 ns/op 522978064 B/op    500 fetches 71000 fetched bytes 19105376 PDF bytes
+# Deep transform/sticky/forced-break layout corpus:
+#   10 items: 9193533 ns/op 7208016 B/op 969 allocs/op
+#   100 items: 1925354 ns/op 1101208 B/op 2073 allocs/op
+#   1000 items: 24057391 ns/op 9847976 B/op 20101 allocs/op
+# Cold glyph raster corpus (Latin and bundled Unicode fallback CJK):
+#   Latin 12/24/72px: 2039980/1217545/7017571 ns/op; 1271208/807048/1412200 B/op
+#   CJK 12/24/72px: 4883425/196722/242463 ns/op; 3385504/99960/689784 B/op
+# Style cancellation benchmark:
+#   BenchmarkStyleResolutionContext: 145628281 ns/op 176088 B/op 25 allocs/op
+# Exact commands and interpretation are recorded in testdata/golden/benchmarks/README.md.

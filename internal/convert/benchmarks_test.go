@@ -331,7 +331,7 @@ func benchmarkPDFRequest(html []byte, output io.Writer) *convert.Request {
 	object.Page = ""
 	object.Load.InlineHTML = html
 
-	return convert.NewPDFRequest(global, []settings.PdfObject{object}, output, nil)
+	return convert.NewBenchmarkPDFRequest(global, []settings.PdfObject{object}, output, nil)
 }
 
 func benchmarkImageRequest(html []byte, output io.Writer) *convert.Request {

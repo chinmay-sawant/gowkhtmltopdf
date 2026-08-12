@@ -3,6 +3,8 @@ package app_test
 import (
 	"bytes"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"gowkhtmltopdf/internal/app"
@@ -49,5 +51,61 @@ func TestBuildPDFRequestRejectsMissingOutput(t *testing.T) {
 
 	if !errors.Is(err, convert.ErrMissingOutput) {
 		t.Fatalf("error = %v, want %v", err, convert.ErrMissingOutput)
+	}
+}
+
+//nolint:wsl // assertions intentionally follow the side-effect checks.
+func TestRunPDFRejectsOutlineAndPDFOnStdout(t *testing.T) {
+	t.Parallel()
+
+	global := settings.DefaultPdfGlobal()
+	global.DumpOutline = true
+	cmd := &cli.Command{ //nolint:exhaustruct // intentional zero/partial fields
+		Global: global,
+		Objects: []settings.PdfObject{{ //nolint:exhaustruct // intentional zero/partial fields
+			Page: "inline:<html><body>stdout conflict</body></html>",
+		}},
+		Output: "-",
+	}
+
+	var outline bytes.Buffer
+	err := app.RunPDF(t.Context(), cmd, nil, nil, &outline)
+	if !errors.Is(err, app.ErrConflictingOutputSinks) {
+		t.Fatalf("RunPDF error = %v, want %v", err, app.ErrConflictingOutputSinks)
+	}
+	if outline.Len() != 0 {
+		t.Fatalf("outline bytes = %d, want zero on rejected request", outline.Len())
+	}
+}
+
+//nolint:wsl // assertions intentionally follow the side-effect checks.
+func TestRunPDFKeepsPDFFileAndOutlineXMLSeparate(t *testing.T) {
+	t.Parallel()
+
+	global := settings.DefaultPdfGlobal()
+	global.DumpOutline = true
+	output := filepath.Join(t.TempDir(), "out.pdf")
+	cmd := &cli.Command{ //nolint:exhaustruct // intentional zero/partial fields
+		Global: global,
+		Objects: []settings.PdfObject{{ //nolint:exhaustruct // intentional zero/partial fields
+			Page: "inline:<html><body><h1>Separate outputs</h1></body></html>",
+		}},
+		Output: output,
+	}
+
+	var outline bytes.Buffer
+	if err := app.RunPDF(t.Context(), cmd, nil, nil, &outline); err != nil {
+		t.Fatalf("RunPDF: %v", err)
+	}
+
+	pdf, err := os.ReadFile(output)
+	if err != nil {
+		t.Fatalf("ReadFile(%q): %v", output, err)
+	}
+	if !bytes.HasPrefix(pdf, []byte("%PDF-")) {
+		t.Fatalf("PDF prefix = %q, want %%PDF-", pdf[:min(len(pdf), 16)])
+	}
+	if !bytes.HasPrefix(outline.Bytes(), []byte("<?xml")) || !bytes.Contains(outline.Bytes(), []byte("<outline")) {
+		t.Fatalf("outline output = %q, want standalone XML outline", outline.String())
 	}
 }

@@ -14,8 +14,9 @@ const (
 )
 
 // Plan is a certified sequence of independently paintable body sections.
-// Callers receive only the read-only section view; certification fails closed
-// for documents with unsupported siblings or missing fixture identity.
+// Sections refer to the parsed source tree; callers must pass them through
+// Root before rendering so the source remains immutable. Certification fails
+// closed for documents with unsupported siblings or missing fixture identity.
 type Plan struct {
 	Sections []*html.Node
 }
@@ -42,19 +43,6 @@ func BenchmarkPlan(root *html.Node) (Plan, bool) {
 	}
 
 	return plan, len(plan.Sections) > 0
-}
-
-// ReleaseBenchmarkBodyChildren drops the parsed body's sibling slice after a
-// certified plan has copied the section pointers. The caller still owns the
-// returned sections and may render them one at a time; clearing the body
-// prevents already-rendered islands from retaining every later sibling.
-func ReleaseBenchmarkBodyChildren(root *html.Node) {
-	body, ok := benchmarkBody(root)
-	if !ok {
-		return
-	}
-
-	body.Children = nil
 }
 
 //nolint:wsl // fixture certification flow
@@ -93,9 +81,9 @@ func hasClass(node *html.Node, class string) bool {
 	return false
 }
 
-// Root creates the shallow virtual document view for one certified section.
-// The layout engine reads children without mutating their parent links, so
-// sharing the section's child slice is safe and avoids recursive cloning.
+// Root creates an independent virtual document view for one certified section.
+// Every node is cloned so child.Parent always points into the virtual tree;
+// the parsed source tree is never mutated or aliased by an island render.
 //
 //nolint:wsl // virtual view construction flow
 func Root(root, section *html.Node) *html.Node {
@@ -114,8 +102,8 @@ func Root(root, section *html.Node) *html.Node {
 	copyRoot := cloneShell(root, nil)
 	copyDocument := cloneShell(document, copyRoot)
 	copyBody := cloneShell(body, copyDocument)
-	copySection := cloneShell(section, nil)
-	copySection.Children = section.Children
+	copySection := cloneTree(section, nil)
+	copySection.Parent = copyBody
 	copyBody.Children = []*html.Node{copySection}
 	copyDocument.Children = []*html.Node{copyBody}
 	copyRoot.Children = []*html.Node{copyDocument}
@@ -134,6 +122,19 @@ func cloneShell(node, parent *html.Node) *html.Node {
 	}
 	if parent != nil {
 		parent.Children = append(parent.Children, clone)
+	}
+
+	return clone
+}
+
+func cloneTree(node, parent *html.Node) *html.Node {
+	clone := cloneShell(node, parent)
+	if clone == nil {
+		return nil
+	}
+
+	for _, child := range node.Children {
+		cloneTree(child, clone)
 	}
 
 	return clone

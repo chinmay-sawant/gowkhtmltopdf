@@ -7,13 +7,14 @@ import (
 	"gowkhtmltopdf/internal/html"
 )
 
-func TestReleaseBenchmarkBodyChildrenKeepsCertifiedSectionsUsable(t *testing.T) {
+//nolint:wsl // source and virtual-tree invariants are checked together.
+func TestRootClonesSectionWithOwnedParentPointers(t *testing.T) {
 	t.Parallel()
 
 	root, err := html.Parse(`<!-- report.html.tmpl: paginated benchmark report -->
 <html><head><title>Benchmark report</title></head><body>
-  <section class="benchmark-page first">one</section>
-  <section class="benchmark-page">two</section>
+  <section class="benchmark-page first"><div><span>one</span></div></section>
+  <section class="benchmark-page"><div><span>two</span></div></section>
 </body></html>`)
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
@@ -24,18 +25,23 @@ func TestReleaseBenchmarkBodyChildrenKeepsCertifiedSectionsUsable(t *testing.T) 
 		t.Fatal("benchmark fixture shape was not certified")
 	}
 
-	islands.ReleaseBenchmarkBodyChildren(root)
-
-	body := root.FirstChild("html").FirstChild("body")
-	if len(body.Children) != 0 {
-		t.Fatalf("body children = %d, want 0 after release", len(body.Children))
+	virtual := islands.Root(root, plan.Sections[1])
+	if got := virtual.TextContent(); got != "two" {
+		t.Fatalf("virtual section text = %q, want two", got)
 	}
 
-	if got := plan.Sections[0].TextContent(); got != "one" {
-		t.Fatalf("first released section text = %q, want one", got)
-	}
+	virtual.Walk(func(node *html.Node) {
+		for _, child := range node.Children {
+			if child.Parent != node {
+				t.Errorf("child %q parent = %p, want owner %p", child.Name, child.Parent, node)
+			}
+		}
+	})
 
-	if got := islands.Root(root, plan.Sections[1]).TextContent(); got != "two" {
-		t.Fatalf("virtual second section text = %q, want two", got)
+	if got := plan.Sections[1].TextContent(); got != "two" {
+		t.Fatalf("source section text = %q, want two", got)
+	}
+	if sourceChild := plan.Sections[1].Children[0]; sourceChild.Parent != plan.Sections[1] {
+		t.Fatalf("source child parent changed to %p, want original section %p", sourceChild.Parent, plan.Sections[1])
 	}
 }

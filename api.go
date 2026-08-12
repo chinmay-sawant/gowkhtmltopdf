@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"time"
 
@@ -27,6 +28,10 @@ const LibraryVersion = "0.12.7-dev"
 var (
 	// ErrNoPageObjectsAdded reports a PDF conversion without any page objects.
 	ErrNoPageObjectsAdded = errors.New("gowkhtmltopdf: no page objects added")
+	// ErrNoRenderablePDFObjects reports a typed or legacy PDF request that has
+	// no body object with a page source or inline HTML. TOC-only requests do not
+	// satisfy this invariant.
+	ErrNoRenderablePDFObjects = ErrNoPageObjectsAdded
 	// ErrEmptyHTML reports an empty document passed to ConvertHTML.
 	ErrEmptyHTML = errors.New("gowkhtmltopdf: empty HTML")
 	// ErrNoInputPageAdded reports an image conversion without an input page.
@@ -42,6 +47,20 @@ var (
 	ErrNilObjectSettings = errors.New("gowkhtmltopdf: nil object settings")
 	// ErrNilImageSettings reports a method call on nil image settings.
 	ErrNilImageSettings = errors.New("gowkhtmltopdf: nil image settings")
+	// ErrNilPDFRequest reports a conversion attempted through a nil typed PDF
+	// request. It aliases the historical nil-converter error for compatibility.
+	ErrNilPDFRequest = ErrNilConverter
+	// ErrNilImageRequest reports a conversion attempted through a nil typed
+	// image request. It aliases the historical nil-image-converter error.
+	ErrNilImageRequest = ErrNilImageConverter
+	// ErrMissingPDFOutput reports a typed PDF request without a document sink.
+	ErrMissingPDFOutput = errors.New("gowkhtmltopdf: PDF output sink is required")
+	// ErrMissingPDFOutlineOutput reports a dump-outline request without a
+	// dedicated metadata sink.
+	ErrMissingPDFOutlineOutput = errors.New("gowkhtmltopdf: PDF outline output sink is required")
+	// ErrMissingImageOutput reports a typed image request without an output
+	// sink.
+	ErrMissingImageOutput = errors.New("gowkhtmltopdf: image output sink is required")
 	// ErrNilContext reports a cancellation-aware operation without a context.
 	ErrNilContext = errs.ErrNilContext
 )
@@ -432,13 +451,13 @@ func (c *Converter) Convert(ctx context.Context) error {
 		c.global = NewGlobalSettings()
 	}
 
-	if len(c.objects) == 0 {
-		return ErrNoPageObjectsAdded
-	}
-
 	objects := make([]settings.PdfObject, len(c.objects))
 	for i, o := range c.objects {
 		objects[i] = o.o
+	}
+
+	if err := validatePDFObjects(objects); err != nil {
+		return err
 	}
 
 	req := convert.NewPDFRequest(c.global.g, objects, nil, nil)
@@ -621,12 +640,13 @@ func (c *ImageConverter) Convert(ctx context.Context) error {
 
 	c.ensureDefaults()
 
-	if strings.TrimSpace(c.object.o.Page) == "" && len(c.object.o.Load.InlineHTML) == 0 {
-		return ErrNoInputPageAdded
-	}
-
 	img := c.image
 	obj := clonePdfObject(c.object.o)
+
+	if err := validateImageObjects([]settings.PdfObject{obj}); err != nil {
+		return err
+	}
+
 	req := convert.NewImageRequest(c.global.g, img, []settings.PdfObject{obj}, nil)
 	h := convertHooks{ //nolint:exhaustruct // intentional zero/partial fields
 		OnInfo: c.OnInfo, OnWarn: c.OnWarn, OnError: c.OnError,
@@ -774,12 +794,14 @@ func (s *ImageSettings) Set(name, value string) error {
 		return ErrNilImageSettings
 	}
 
+	key := normalizeImageSettingKey(name)
 	global := settings.DefaultPdfGlobal()
-	if err := settings.ApplyImageKey(&global, &s.i, name, value); err != nil {
+
+	if err := settings.ApplyImageKey(&global, &s.i, key, value); err != nil {
 		return fmt.Errorf("image set %q: %w", name, err)
 	}
 
-	if name == "background" || name == "web.background" {
+	if key == "background" || key == "web.background" {
 		s.background = global.Background
 		s.backgroundSet = true
 	}
@@ -793,7 +815,27 @@ func (s *ImageSettings) Get(name string) (string, bool) {
 		return "", false
 	}
 
-	return s.i.Get(name)
+	key := normalizeImageSettingKey(name)
+	if key == "background" || key == "web.background" {
+		return strconv.FormatBool(s.effectiveBackground()), true
+	}
+
+	return s.i.Get(key)
+}
+
+// effectiveBackground returns the shared body-paint switch represented by
+// either accepted image setting alias. ImageGlobal intentionally does not own
+// this PDF/image shared setting, so ImageSettings keeps it explicitly.
+func (s *ImageSettings) effectiveBackground() bool {
+	if s == nil || !s.backgroundSet {
+		return true
+	}
+
+	return s.background
+}
+
+func normalizeImageSettingKey(name string) string {
+	return strings.ToLower(strings.TrimSpace(name))
 }
 
 // ImageRequest is the type-safe public API for image-only conversions. It
@@ -804,6 +846,53 @@ type ImageRequest struct {
 	Object *ObjectSettings
 	Now    func() time.Time
 	Output io.Writer
+}
+
+// ValidatePDF checks the public typed PDF request contract without starting
+// the renderer. It is safe to call before output files or other resources are
+// opened. The request must have a document sink and at least one body object;
+// TOC-only and empty objects are rejected.
+func (r *PDFRequest) ValidatePDF() error {
+	if r == nil {
+		return ErrNilPDFRequest
+	}
+
+	if r.Output == nil {
+		return ErrMissingPDFOutput
+	}
+
+	global := settings.DefaultPdfGlobal()
+	if r.Global != nil {
+		global = r.Global.g
+	}
+
+	if global.DumpOutline && r.OutlineOutput == nil {
+		return ErrMissingPDFOutlineOutput
+	}
+
+	objects := r.toRequest().Objects
+
+	return validatePDFObjects(objects)
+}
+
+// ValidateImage checks the public typed image request contract without
+// starting the renderer. ImageSettings and Global are optional and receive
+// defaults, but an image request needs one renderable body object and a sink.
+func (r *ImageRequest) ValidateImage() error {
+	if r == nil {
+		return ErrNilImageRequest
+	}
+
+	if r.Output == nil {
+		return ErrMissingImageOutput
+	}
+
+	object := settings.PdfObject{} //nolint:exhaustruct // zero object is the invalid-input sentinel
+	if r.Object != nil {
+		object = r.Object.o
+	}
+
+	return validateImageObjects([]settings.PdfObject{object})
 }
 
 func (r *PDFRequest) toRequest() *convert.PDFRequest {
@@ -877,7 +966,11 @@ func RunPDF(ctx context.Context, req *PDFRequest) error {
 	}
 
 	if req == nil {
-		return ErrNilConverter
+		return ErrNilPDFRequest
+	}
+
+	if err := req.ValidatePDF(); err != nil {
+		return err
 	}
 
 	if err := convert.RunTypedPDF(ctx, req.toRequest(), nil, nil); err != nil {
@@ -897,11 +990,34 @@ func RunImage(ctx context.Context, req *ImageRequest) error {
 	}
 
 	if req == nil {
-		return ErrNilImageConverter
+		return ErrNilImageRequest
+	}
+
+	if err := req.ValidateImage(); err != nil {
+		return err
 	}
 
 	if err := imageout.RunRequest(ctx, req.toRequest().ToRequest(), nil); err != nil {
 		return fmt.Errorf("image: %w", err)
+	}
+
+	return nil
+}
+
+// validatePDFObjects adapts the engine's shared object invariant to the
+// root-package error vocabulary. The engine remains independent of this
+// package, while every public entry point exposes errors.Is-compatible errors.
+func validatePDFObjects(objects []settings.PdfObject) error {
+	if err := convert.ValidateRenderableObjects(objects); err != nil {
+		return ErrNoRenderablePDFObjects
+	}
+
+	return nil
+}
+
+func validateImageObjects(objects []settings.PdfObject) error {
+	if err := convert.ValidateRenderableObjects(objects); err != nil {
+		return ErrNoInputPageAdded
 	}
 
 	return nil

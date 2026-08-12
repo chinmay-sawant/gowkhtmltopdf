@@ -3,7 +3,6 @@ package layout
 import (
 	"math"
 	"sort"
-	"strings"
 
 	"gowkhtmltopdf/internal/html"
 )
@@ -1097,19 +1096,19 @@ func rowsIntact(res *Result, contentH float64) bool {
 //
 //nolint:cyclop,wsl // table-row geometry checks intentionally stay together
 func normalizeTableRowGaps(res *Result, contentH float64) {
-	const aclMatrixClass = "d04-matrix"
-
 	if res == nil || res.root == nil || contentH <= 0 {
 		return
 	}
 
 	for _, table := range flowBoxList(res) {
-		if table.kind != displayTable || len(table.rows) < 2 || table.node == nil ||
-			table.node.Attribute("class") != aclMatrixClass {
+		if table.kind != displayTable || len(table.rows) < 2 {
 			continue
 		}
 
 		for rowIndex := 1; rowIndex < len(table.rows); rowIndex++ {
+			if !rowWasPaginationShifted(table.rows[rowIndex]) {
+				continue
+			}
 			_, _, previousTop, previousBottom, previousOK := rowOpGeometry(table.rows[rowIndex-1])
 
 			first, last, currentTop, currentBottom, currentOK := rowOpGeometry(table.rows[rowIndex])
@@ -1141,6 +1140,16 @@ func shiftTableRowBoxes(row []*box, deltaY float64) {
 	}
 }
 
+func rowWasPaginationShifted(row []*box) bool {
+	for _, cell := range row {
+		if cell != nil && cell.paginationShifted {
+			return true
+		}
+	}
+
+	return false
+}
+
 func shiftTableBox(boxNode *box, deltaY float64) {
 	if boxNode == nil {
 		return
@@ -1154,6 +1163,8 @@ func shiftTableBox(boxNode *box, deltaY float64) {
 
 // shiftRowToPage moves a table row wholly to the next page when it spans
 // multiple pages. Returns whether it moved.
+//
+//nolint:wsl // row shifting and marker updates must stay adjacent.
 func shiftRowToPage(res *Result, row []*box, contentH float64) bool {
 	if len(row) == 0 {
 		return false
@@ -1182,6 +1193,11 @@ func shiftRowToPage(res *Result, row []*box, contentH float64) bool {
 	// content moves and the grid stays behind (gapped /
 	// misaligned music-video tables across page breaks).
 	shiftFlowY(res, first, last, rowTop-layoutSlack, deltaY)
+	for _, cell := range row {
+		if cell != nil {
+			cell.paginationShifted = true
+		}
+	}
 
 	return true
 }
@@ -1482,11 +1498,10 @@ func hasRoundedOwnChrome(res *Result, boxNode *box) bool {
 	if res == nil || boxNode == nil || boxNode.style == nil || boxNode.opStart < 0 || boxNode.opEnd >= len(res.Ops) {
 		return false
 	}
-	if boxNode.node == nil || boxNode.node.Attribute("class") != "dom-notes" ||
-		!strings.Contains(boxNode.node.TextContent(), "Security: no script execution") {
+	if boxNode.style.BorderRadius <= 0 && boxNode.style.BorderRadiusPercent <= 0 && boxNode.style.BGColor[3] <= 0 {
 		return false
 	}
-	if boxNode.style.BorderRadius <= 0 && boxNode.style.BorderRadiusPercent <= 0 && boxNode.style.BGColor[3] <= 0 {
+	if boxNode.style.BorderLeft.Style != solidKeyword || boxNode.style.BorderLeft.Width <= 2 {
 		return false
 	}
 

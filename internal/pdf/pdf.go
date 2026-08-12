@@ -111,8 +111,11 @@ func (d dict) add(k string, v ...string) dict {
 func (d dict) String() string { return "<< " + strings.Join(d, " ") + " >>" }
 
 // Document is a PDF under construction.
+//
+// Document and its Page/Content values have single-goroutine ownership during
+// assembly and finalization. Callers must not mutate or write a document
+// concurrently; use one document per conversion when parallelism is needed.
 type Document struct {
-	mu             sync.RWMutex
 	objects        []*object
 	info           map[string]string
 	useCompression bool
@@ -159,9 +162,6 @@ func (d *Document) SetInfo(key, value string) { d.info[key] = value }
 
 // newObject allocates an indirect object and returns its typed reference.
 func (d *Document) newObject() objRef {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
 	d.nextID++
 	id := d.nextID
 	d.objects = append(d.objects, &object{id: id}) //nolint:exhaustruct // intentional zero-value fields
@@ -171,9 +171,6 @@ func (d *Document) newObject() objRef {
 
 // setDict replaces the object's dict body.
 func (d *Document) setDict(r objRef, dict string) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
 	idx := int(r) - 1
 	if idx < 0 || idx >= len(d.objects) {
 		return
@@ -184,9 +181,6 @@ func (d *Document) setDict(r objRef, dict string) {
 
 // setStream attaches a raw stream (compressed later at write time).
 func (d *Document) setStream(r objRef, raw []byte) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
 	idx := int(r) - 1
 	if idx < 0 || idx >= len(d.objects) {
 		return
@@ -226,9 +220,7 @@ func (d *Document) AddPage(width, height float64) *Page {
 	page.content = NewContent()
 	page.content.doc = d
 
-	d.mu.Lock()
 	d.pages = append(d.pages, page)
-	d.mu.Unlock()
 
 	return page
 }

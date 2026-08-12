@@ -738,6 +738,7 @@ func WithWorkspace(ctx context.Context, root *html.Node, opts Options, workspace
 	return layoutContext(ctx, root, opts, workspace)
 }
 
+//nolint:cyclop // layout preflight and staged style/container passes are explicit lifecycle gates.
 func layoutContext(
 	ctx context.Context,
 	root *html.Node, opts Options, workspace *Workspace,
@@ -772,7 +773,10 @@ func layoutContext(
 		font = faces.Regular
 	}
 
-	styles, containers := resolveStylesForLayout(root, opts)
+	styles, containers, err := resolveStylesForLayoutContext(ctx, root, opts)
+	if err != nil {
+		return nil, fmt.Errorf("layout: style resolution: %w", err)
+	}
 
 	var ops []Op
 
@@ -850,28 +854,54 @@ func finalizeResult(eng *engine, root *html.Node, opts Options) (*Result, error)
 func resolveStylesForLayout(
 	root *html.Node, opts Options,
 ) (map[*html.Node]*ResolvedStyle, map[*html.Node]sizeContainer) {
+	styles, containers, _ := resolveStylesForLayoutContext(context.Background(), root, opts)
+
+	return styles, containers
+}
+
+//nolint:wsl // container remount gates are intentionally kept in lifecycle order.
+func resolveStylesForLayoutContext(
+	ctx context.Context, root *html.Node, opts Options,
+) (map[*html.Node]*ResolvedStyle, map[*html.Node]sizeContainer, error) {
 	// Pass 1: cascade without @container (used sizes unknown).
-	styles := resolveStylesWith(root, opts, nil)
+	styles, err := resolveStylesWithContext(ctx, root, opts, nil)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	if !css.HasContainerRules(opts.Sheets) {
-		return styles, nil
+		return styles, nil, nil
 	}
 	// After definite inline sizes of size containers are known, re-cascade so
 	// matching @container rules apply, then lay out once with final styles.
-	cinfo := measureSizeContainers(root, styles, opts.Width)
+	cinfo, err := measureSizeContainersContext(ctx, root, styles, opts.Width)
+	if err != nil {
+		return nil, nil, err
+	}
 	if len(cinfo) == 0 {
-		return styles, nil
+		return styles, nil, nil
 	}
 
-	styles = resolveStylesWith(root, opts, cinfo)
+	styles, err = resolveStylesWithContext(ctx, root, opts, cinfo)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	// One nested remount: @container may change nested container-type.
-	cinfo2 := measureSizeContainers(root, styles, opts.Width)
+	cinfo2, err := measureSizeContainersContext(ctx, root, styles, opts.Width)
+	if err != nil {
+		return nil, nil, err
+	}
 	if len(cinfo2) != len(cinfo) || !sameSizeContainers(cinfo, cinfo2) {
-		return resolveStylesWith(root, opts, cinfo2), cinfo2
+		styles, err = resolveStylesWithContext(ctx, root, opts, cinfo2)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		return styles, cinfo2, nil
 	}
 
-	return styles, cinfo
+	return styles, cinfo, nil
 }
 
 // sameSizeContainers reports whether two container measurements agree for
@@ -981,9 +1011,10 @@ type box struct {
 	flowIndex      int // transient index in Result.boxes during pagination
 	firstBaseline  float64
 	// table cells
-	col, span int
-	row       int // owning table row index, set once at placement
-	rowSpan   int // vertical span (default 1) for <td rowspan>
+	col, span         int
+	row               int  // owning table row index, set once at placement
+	rowSpan           int  // vertical span (default 1) for <td rowspan>
+	paginationShifted bool // row was moved by a table pagination fixpoint
 	// hasInk is set at cell build time from nodeHasTableInk (any
 	// non-whitespace text, br, img, svg, video or canvas in the subtree);
 	// row collapse uses the flag instead of re-walking each cell's tree.
