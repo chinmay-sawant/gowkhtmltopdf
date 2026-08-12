@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Critical Go Review — gowkhtmltopdf</title>
+  <style>
+    :root { color-scheme:dark; --bg:hsl(225 23% 8%); --panel:hsl(225 20% 12%); --panel2:hsl(225 17% 16%); --line:hsl(220 14% 29%); --text:hsl(210 30% 94%); --muted:hsl(215 16% 67%); --cyan:hsl(188 82% 62%); --amber:hsl(39 92% 62%); --red:hsl(3 82% 65%); --green:hsl(147 55% 59%); }
+    * { box-sizing:border-box; } body { margin:0; background:radial-gradient(circle at 20% 0%,hsl(212 38% 15%),transparent 38rem),var(--bg); color:var(--text); font:16px/1.55 Inter,Outfit,ui-sans-serif,system-ui,sans-serif; }
+    main { max-width:1180px; margin:auto; padding:48px 24px 80px; } header { display:grid; grid-template-columns:1fr auto; gap:28px; align-items:start; border-bottom:1px solid var(--line); padding-bottom:32px; }
+    h1,h2,h3 { font-family:Outfit,Inter,ui-sans-serif,system-ui,sans-serif; line-height:1.12; margin:0 0 12px; } h1 { font-size:clamp(2.2rem,5vw,4.5rem); letter-spacing:-.055em; max-width:760px; } h2 { font-size:1.55rem; } h3 { font-size:1.05rem; } p { margin:0 0 14px; }
+    .eyebrow { color:var(--cyan); font-size:.78rem; font-weight:750; letter-spacing:.14em; text-transform:uppercase; } .lede { max-width:740px; color:var(--muted); font-size:1.08rem; }
+    .score { min-width:154px; border:1px solid hsl(3 82% 65% / .55); background:hsl(3 60% 18% / .45); border-radius:20px; padding:18px 20px; text-align:center; } .score b { display:block; color:var(--red); font:800 2.45rem/1 Outfit,Inter,sans-serif; letter-spacing:-.06em; } .score span { color:var(--muted); font-size:.8rem; }
+    .tabs { display:flex; flex-wrap:wrap; gap:8px; margin:28px 0 18px; } button { cursor:pointer; border:1px solid var(--line); color:var(--muted); background:var(--panel); border-radius:999px; padding:9px 13px; font:650 .82rem Inter,Outfit,sans-serif; } button[aria-selected="true"] { color:var(--bg); background:var(--cyan); border-color:var(--cyan); }
+    .tab { display:none; } .tab.active { display:block; animation:in .18s ease-out; } @keyframes in { from{opacity:.2;transform:translateY(4px)} to{opacity:1;transform:none} } .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+    .card { border:1px solid var(--line); background:linear-gradient(140deg,hsl(225 20% 14%),var(--panel)); border-radius:15px; padding:20px; } .card p { color:var(--muted); } .good { border-top:3px solid var(--green); } .bad { border-top:3px solid var(--red); }
+    .pill { display:inline-block; border-radius:99px; padding:3px 8px; font-size:.72rem; font-weight:750; letter-spacing:.04em; } .high { background:hsl(3 62% 22%); color:var(--red); } .medium { background:hsl(39 58% 19%); color:var(--amber); } .risk { background:hsl(188 46% 17%); color:var(--cyan); }
+    table { width:100%; border-collapse:collapse; margin:12px 0 22px; font-size:.92rem; } th,td { padding:10px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; } th { color:var(--muted); font-size:.75rem; letter-spacing:.08em; text-transform:uppercase; }
+    code { color:hsl(185 65% 72%); font:.82em ui-monospace,SFMono-Regular,Menlo,monospace; } pre { overflow:auto; margin:12px 0; padding:14px; border-radius:10px; background:hsl(225 26% 7%); border:1px solid var(--line); font-size:.83rem; } .badcode { color:hsl(3 85% 78%); } .goodcode { color:hsl(147 62% 72%); } .metric { color:var(--muted); font-size:.88rem; } ol { padding-left:1.3rem; } li { margin:8px 0; }
+    @media(max-width:720px){ header,.grid{grid-template-columns:1fr}.score{width:max-content} main{padding:32px 16px 60px} }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <div class="eyebrow">gowkhtmltopdf · critical Go architecture review · 12 Aug 2026</div>
+      <h1>Strong foundations, unacceptable output-integrity gaps.</h1>
+      <p class="lede">The current repository has a good renderer architecture and disciplined test tooling. It still permits a corrupt PDF stdout stream and auto-selects a semantically unsafe optimized renderer from user HTML content.</p>
+    </div>
+    <div class="score"><b>5.7</b><span>strict release-readiness / 10</span></div>
+  </header>
+  <nav class="tabs" aria-label="Review sections">
+    <button aria-selected="true" data-tab="scorecard">Executive scorecard</button>
+    <button aria-selected="false" data-tab="goodbad">Good vs bad</button>
+    <button aria-selected="false" data-tab="audit">Five-audit evidence</button>
+    <button aria-selected="false" data-tab="critic">Devil's advocate</button>
+    <button aria-selected="false" data-tab="roadmap">5-phase roadmap</button>
+  </nav>
+  <section id="scorecard" class="tab active">
+    <h2>Weighted score</h2>
+    <table><thead><tr><th>Dimension</th><th>Weight</th><th>Score</th><th>Contribution</th></tr></thead><tbody>
+      <tr><td>Output correctness and CLI contracts</td><td>35%</td><td>4.0</td><td>1.40</td></tr><tr><td>Public API and validation boundaries</td><td>20%</td><td>5.5</td><td>1.10</td></tr><tr><td>Architecture and maintainability</td><td>20%</td><td>6.5</td><td>1.30</td></tr><tr><td>Cancellation and concurrency semantics</td><td>10%</td><td>5.0</td><td>0.50</td></tr><tr><td>Verification and operational discipline</td><td>15%</td><td>9.0</td><td>1.35</td></tr><tr><th>Total</th><th>100%</th><th></th><th>5.65 → <strong>5.7</strong></th></tr>
+    </tbody></table>
+    <div class="grid"><article class="card bad"><h3>Why the score is harsh</h3><p>A document converter's first contract is correct output. XML prepended to PDF bytes and automatic routing to a non-equivalent renderer outweigh clean lint and race output.</p></article><article class="card good"><h3>Validation floor</h3><p><code>go test ./...</code>, <code>go test -race -count=1 ./...</code>, and <code>make lint</code> passed. Fresh 500-page evidence: code benchmark 1.359s / 171.5MB / 966.5K allocs; binary 960ms / 54,632 KiB peak RSS / 1,385,450 bytes, with page count verified.</p></article></div>
+  </section>
+  <section id="goodbad" class="tab">
+    <div class="grid"><article class="card good"><h2>Keep these choices</h2><ul><li>CLI-independent conversion request and shared render lifecycle.</li><li>Public ownership snapshots of maps, slices, input, and output.</li><li>Default-deny local access with loader-owned ACL/time/size policy.</li><li>Enable-all lint, golden corpus, race testing, and useful conversion benchmarks.</li><li>Per-layout image reuse, font subset union, and normal deferred-chrome merge.</li></ul></article><article class="card bad"><h2>Repair before calling it robust</h2><ul><li>stdout multiplexes outline XML and PDF.</li><li>HTML marker/title can select a broken virtual-DOM page-island path.</li><li>Terminal CLI action requires normal input anyway.</li><li>Typed image settings lose accepted aliases; typed PDF validates too late.</li><li>Cancellation/determinism/Document ownership contracts are incomplete.</li></ul></article></div>
+    <h2 style="margin-top:28px">Representative contract mismatch</h2>
+    <pre class="badcode">--dump-outline &amp;&amp; output == "-" → outline = stdout; PDF = stdout; XML is emitted first.</pre>
+    <pre class="goodcode">Reject the incompatible CLI pair, or require independently chosen document and outline sinks.</pre>
+  </section>
+  <section id="audit" class="tab">
+    <h2>Five-audit evidence</h2>
+    <table><thead><tr><th>Finding</th><th>Disposition</th><th>Evidence</th></tr></thead><tbody>
+      <tr><td><span class="pill high">HIGH</span> XML + PDF stdout corruption</td><td>Runtime-confirmed</td><td><code>main.go:70-75</code>; XML observed at byte 0, PDF follows later.</td></tr><tr><td><span class="pill high">HIGH</span> Spoofable page-island path / invalid parents</td><td>Source-confirmed</td><td><code>islands/plan.go:27-44,114-123</code>; CSS/layout use parent topology.</td></tr><tr><td><span class="pill medium">MEDIUM</span> TOC-XSL shortcut unreachable</td><td>Runtime-confirmed</td><td><code>cli.go:188-195,382-395</code>; standalone command exits 1.</td></tr><tr><td><span class="pill medium">MEDIUM</span> Image background aliases / Get wrong</td><td>Source-confirmed</td><td><code>api.go:772-797</code> disagrees with normalized settings routing.</td></tr><tr><td><span class="pill medium">MEDIUM</span> Typed PDF input validated late</td><td>Source-confirmed</td><td><code>ValidatePDF</code> has no renderable-input check.</td></tr><tr><td><span class="pill medium">MEDIUM</span> Cascade cancellation delay</td><td>Source-confirmed</td><td>DOM/rule/selector loops lack bounded context checks.</td></tr><tr><td><span class="pill medium">MEDIUM</span> Fallback font tie nondeterminism</td><td>Source-confirmed</td><td><code>Registry.FindWithGlyph</code> keeps first equal score from map iteration.</td></tr><tr><td><span class="pill medium">MEDIUM</span> Partial Document mutex</td><td>Architecture-confirmed</td><td>Locks a subset of mutable lifecycle state; do not infer concurrency support.</td></tr>
+    </tbody></table>
+    <p class="metric">Risks held out of defect scoring: cross-object resource cache/budgets, deep chrome/pagination scaling, fixture-specific render predicates, and cold glyph scanline allocations. Each needs corpus benchmarks before a redesign.</p>
+  </section>
+  <section id="critic" class="tab"><h2>Devil's-advocate conclusion</h2><div class="grid"><article class="card"><h3>Necessary now</h3><p>Reject incompatible stdout sinks. Disable or strictly isolate automatic page islands. Restore terminal command/API behavior. These are concrete correctness problems.</p></article><article class="card"><h3>Do not overreact</h3><p>Do not introduce global caches, a global resource budget, or a full concurrent PDF writer from static suspicion. Measure 1/10/500-page corpora, RSS, fetch bytes, PDF bytes, and visual parity first.</p></article></div><p style="margin-top:22px">The optimization idea behind page islands is defensible only for an explicitly owned immutable workload with a generic-renderer parity oracle. It is not defensible as hidden behavior selected by document prose, title, and CSS class shape.</p></section>
+  <section id="roadmap" class="tab"><h2>Roadmap</h2><ol><li><strong>P0 Output integrity:</strong> isolate stdout formats; remove automatic island selection; add CLI byte-stream and renderer parity tests.</li><li><strong>P1 Contract restoration:</strong> model TOC-XSL as terminal; repair image settings normalization; preflight typed PDF requests with root errors.</li><li><strong>P2 Lifecycle semantics:</strong> bounded cancellation in cascade; single-owner or fully synchronized Document decision; deterministic fallback ordering.</li><li><strong>P3 Measure scale:</strong> repeated-resource, deep chrome, forced-break, and cold-glyph benchmark/corpus evidence before optimization.</li><li><strong>P4 Closure:</strong> target regressions, lint, tests, race, golden/rendered PDFs, release matrix, then re-score.</li></ol><p>See the adjacent <code>phase-wise-checklist.md</code> for atomic implementation and validation rows.</p></section>
+</main>
+<script>
+  const buttons=[...document.querySelectorAll('[data-tab]')];
+  buttons.forEach(button=>button.addEventListener('click',()=>{buttons.forEach(b=>b.setAttribute('aria-selected','false'));document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));button.setAttribute('aria-selected','true');document.getElementById(button.dataset.tab).classList.add('active');}));
+</script>
+</body>
+</html>
