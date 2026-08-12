@@ -10,9 +10,16 @@ export const SHOWCASE = [
     desc: 'Randomized single-column sampler: every font exactly once, one line per style (bold, italic, underline, strikethrough, combinations). Fonts are not bundled — render with --font-path.',
   },
   {
+    name: 'architecture-diagram',
+    file: 'architecture-diagram.pdf',
+    pages: 5,
+    title: 'Library API architecture diagram',
+    desc: 'Five-page architecture document for the public Go library API: rendering pipeline, layout domains, dependencies, output modes, and security boundaries.',
+  },
+  {
     name: 'fixture-56-architecture-diagram',
     file: 'fixture-56-architecture-diagram.pdf',
-    pages: 14,
+    pages: 20,
     title: 'Architecture diagram',
     desc: 'Pure HTML+CSS architecture diagram: pipeline strip, 10 domain sections, dependency DAG, PDF-vs-image, and security summary.',
   },
