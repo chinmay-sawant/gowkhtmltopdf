@@ -3,6 +3,8 @@ package layout
 
 import (
 	"math"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -316,6 +318,77 @@ body { margin: 0; }
 	}
 
 	t.Fatal("missing generated arrow")
+}
+
+func TestAPIFixtureFlowMetricsDoNotOverlapPreviousFlexItems(t *testing.T) {
+	t.Parallel()
+
+	base := filepath.Join("..", "..", "testdata", "golden", "api")
+	source, err := os.ReadFile(filepath.Join(base, "architecture-diagram.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	root := mustParse(t, string(source))
+	var cssText strings.Builder
+	root.Walk(func(node *html.Node) {
+		if node.Type != html.ElementNode || node.Name != "style" {
+			return
+		}
+
+		for _, child := range node.Children {
+			if child.Type == html.TextNode {
+				cssText.WriteString(child.Text)
+			}
+		}
+	})
+
+	cssSheet := sheet(t, cssText.String())
+	res, err := Layout(root, Options{ //nolint:exhaustruct // focused fixture regression
+		Width: 595.28, Height: 841.89, Sheets: []*css.Stylesheet{cssSheet}, Media: "print",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Paint(pdf.NewDocument(), res, PaintOptions{ //nolint:exhaustruct // exercise pagination chrome repair
+		PageWidth: 595.28, PageHeight: 841.89,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	flow := findElementByClass(root, "flow")
+	meta := findElementByClass(root, "meta-row")
+	flowBox := fixture56BoxByNode(res.root, flow)
+	metaBox := fixture56BoxByNode(res.root, meta)
+	if flowBox == nil || metaBox == nil {
+		t.Fatalf("missing flow boxes: flow=%+v meta=%+v", flowBox, metaBox)
+	}
+
+	const minClearGap = 11 * 2.834645669 // 11mm in CSS points
+	if gap := metaBox.y - (flowBox.y + flowBox.height); gap < minClearGap-0.01 {
+		t.Fatalf("metrics gap = %.2fpt, want at least %.2fpt: flow=%+v meta=%+v", gap, minClearGap, flowBox, metaBox)
+	}
+
+	var flowNodeHeight float64
+	for nodeIndex, node := range fixture56Nodes(root, func(node *html.Node) bool {
+		return node.Type == html.ElementNode && node.Attribute("class") == "node"
+	}) {
+		boxNode := fixture56BoxByNode(res.root, node)
+		if boxNode == nil {
+			t.Fatalf("missing flow node box")
+		}
+
+		if nodeIndex == 0 {
+			flowNodeHeight = boxNode.height
+		} else if math.Abs(boxNode.height-flowNodeHeight) > 0.01 {
+			t.Fatalf("flex item height changed after paint: first=%.2f current=%.2f", flowNodeHeight, boxNode.height)
+		}
+
+		if metaBox.y < boxNode.y+boxNode.height-0.01 {
+			t.Fatalf("metrics overlap flow node: node=%+v meta=%+v", boxNode, metaBox)
+		}
+	}
 }
 
 func findElementByClass(root *html.Node, className string) *html.Node {

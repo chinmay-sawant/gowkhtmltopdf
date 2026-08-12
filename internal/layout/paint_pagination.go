@@ -962,6 +962,14 @@ func stretchPaginatedChrome(res *Result) {
 			if isOwnBoxChrome(operation, boxNode, oldBottom) {
 				continue
 			}
+			// Absolutely positioned descendants are painted in the host's
+			// operation range but do not contribute to its used height. A
+			// generated ::after connector below a flex item must remain in the
+			// gap after that item; treating its ink as flowing content stretches
+			// the item's border during pagination.
+			if operation.Positioned {
+				continue
+			}
 
 			bottom := opInkBottom(operation)
 			if operation.Kind == OpText || operation.Kind == OpBullet {
