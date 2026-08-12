@@ -5,16 +5,16 @@
   {
    "type": "hero",
    "title": "Your first PDF in five minutes",
-   "lede": "Build two static, stdlib-only binaries offline, then turn a local HTML file into a PDF with a single opt-in flag."
+   "lede": "Build two static, pure-Go binaries with no cgo or browser process, then turn a local HTML file into a PDF with a single opt-in flag."
   },
   {
    "type": "bullets",
    "heading": "Requirements",
    "items": [
-    "Go 1.26 or newer. The build is fully offline: no modules are downloaded.",
+    "Go 1.26 or newer. The first build may download the two allowlisted direct modules and their transitive Go module graph; later builds can run offline with the cache populated.",
     "No cgo and no native libraries. Build with CGO_ENABLED=0 to get statically linked ELF/Mach-O binaries with no runtime library requirements.",
     "No browser, WebKit, or third-party HTML-to-PDF service. The whole pipeline (load, parse, style, layout, paint, PDF write) is implemented in this repository.",
-    "The only direct third-party dependency is github.com/go-text/typesetting for OpenType shaping; everything else is the Go standard library."
+    "The two allowlisted direct pure-Go modules are github.com/go-text/typesetting for OpenType shaping and github.com/tdewolff/canvas for SVG rasterization; there is no browser or native converter dependency."
    ]
   },
   {
@@ -86,8 +86,8 @@
      "go test ./internal/convert/ -run 'TestGoldenCorpus' -v - walks every testdata/golden/*.html fixture and asserts PDF structure, embedded font, page envelope, and feature expectations"
     ],
     [
-     "golden-update",
-     "Reserved for the PDF writer phase; currently a placeholder target"
+     "golden-update GOLDEN_FIXTURE=... GOLDEN_APPROVE=1",
+     "Generates one explicitly approved fixture PDF under ignored testdata/golden/out/; never rewrites fixture sources"
     ],
     [
      "samples",

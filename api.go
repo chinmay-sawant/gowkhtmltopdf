@@ -1,6 +1,6 @@
 // Library API: wkhtmltopdf-compatible HTML-to-PDF and HTML-to-image
 // conversion, exposing the internal convert/imageout pipelines through an
-// idiomatic, stdlib-only Go surface.
+// idiomatic pure-Go surface with an allowlisted module graph.
 package gowkhtmltopdf
 
 import (
@@ -79,6 +79,34 @@ func Version() string {
 // NewGlobalSettings, which starts from the wkhtmltopdf defaults.
 type GlobalSettings struct {
 	g settings.PdfGlobal
+}
+
+// NetworkPolicy controls HTTP(S) document and subresource loading. An empty
+// AllowedHosts list permits any host allowed by the scheme policy; a non-empty
+// list is an exact or wildcard host allowlist. Explicitly allowlisted hosts
+// may be private, which is useful for trusted internal services and tests.
+type NetworkPolicy struct {
+	AllowedSchemes          []string
+	AllowedHosts            []string
+	BlockPrivateNetworks    bool
+	BlockCrossHostRedirects bool
+}
+
+// CompatibleNetworkPolicy preserves the historical permissive URL behavior.
+func CompatibleNetworkPolicy() NetworkPolicy {
+	return NetworkPolicy{ //nolint:exhaustruct // compatibility defaults
+		AllowedSchemes: []string{"http", "https"},
+	}
+}
+
+// RestrictedNetworkPolicy is intended for untrusted HTML in an isolated
+// service: private destinations are blocked and redirects stay same-origin.
+func RestrictedNetworkPolicy() NetworkPolicy {
+	return NetworkPolicy{ //nolint:exhaustruct // explicit safety defaults
+		AllowedSchemes:          []string{"http", "https"},
+		BlockPrivateNetworks:    true,
+		BlockCrossHostRedirects: true,
+	}
 }
 
 // PdfGlobalOptions is the typed builder for common PDF global settings. It is
@@ -179,6 +207,23 @@ func (o *PdfGlobalOptions) Build() *GlobalSettings {
 // settings (A4 portrait, 10 mm margins, background on, …).
 func NewGlobalSettings() *GlobalSettings {
 	return &GlobalSettings{g: settings.DefaultPdfGlobal()}
+}
+
+// SetNetworkPolicy installs an explicit URL-loading policy on these global
+// settings. Existing callers that do not call this method retain compatible
+// loader behavior.
+func (s *GlobalSettings) SetNetworkPolicy(policy NetworkPolicy) error {
+	if s == nil {
+		return ErrNilGlobalSettings
+	}
+
+	s.g.Load.NetworkPolicySet = true
+	s.g.Load.NetworkAllowedSchemes = cloneStrings(policy.AllowedSchemes)
+	s.g.Load.NetworkAllowedHosts = cloneStrings(policy.AllowedHosts)
+	s.g.Load.NetworkBlockPrivate = policy.BlockPrivateNetworks
+	s.g.Load.NetworkBlockCrossHost = policy.BlockCrossHostRedirects
+
+	return nil
 }
 
 // Set applies a dotted settings key ("size.pagesize", "margin.top",
@@ -360,6 +405,8 @@ func clonePdfGlobal(src settings.PdfGlobal) settings.PdfGlobal {
 	dst.Header = cloneHeaderFooter(src.Header)
 	dst.Footer = cloneHeaderFooter(src.Footer)
 	dst.Load.Allow = cloneStrings(src.Load.Allow)
+	dst.Load.NetworkAllowedSchemes = cloneStrings(src.Load.NetworkAllowedSchemes)
+	dst.Load.NetworkAllowedHosts = cloneStrings(src.Load.NetworkAllowedHosts)
 	dst.ExcludeFromOutline = cloneStrings(src.ExcludeFromOutline)
 	dst.FontPaths = cloneStrings(src.FontPaths)
 	dst.Ignored = cloneStringMap(src.Ignored)
@@ -370,6 +417,8 @@ func clonePdfGlobal(src settings.PdfGlobal) settings.PdfGlobal {
 func cloneImageGlobal(src settings.ImageGlobal) settings.ImageGlobal {
 	dst := src
 	dst.Load.Allow = cloneStrings(src.Load.Allow)
+	dst.Load.NetworkAllowedSchemes = cloneStrings(src.Load.NetworkAllowedSchemes)
+	dst.Load.NetworkAllowedHosts = cloneStrings(src.Load.NetworkAllowedHosts)
 	dst.Ignored = cloneStringMap(src.Ignored)
 
 	return dst

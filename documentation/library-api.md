@@ -13,9 +13,16 @@ go mod edit -replace gowkhtmltopdf=/path/to/gowkhtmltopdf
 go get gowkhtmltopdf@v0.0.0
 ```
 
-`go.mod` has **zero** third-party `require` entries (stdlib only). Pin a
-tagged release once the module is published to a reachable path; until then
-use `replace` against a checkout.
+`go.mod` has two allowlisted direct pure-Go module dependencies:
+[`github.com/go-text/typesetting`](https://github.com/go-text/typesetting) for
+OpenType shaping and [`github.com/tdewolff/canvas`](https://github.com/tdewolff/canvas)
+for SVG rasterization. Their transitive module graph is resolved by Go; this is
+not a stdlib-only module and it does not require cgo, a browser, or a native
+converter process. See [`THIRD_PARTY_LICENSES.md`](../THIRD_PARTY_LICENSES.md)
+for redistribution notices.
+
+Pin a tagged release once the module is published to a reachable path; until
+then use `replace` against a checkout.
 
 ## PDF converter
 

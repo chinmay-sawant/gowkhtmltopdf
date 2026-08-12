@@ -1,6 +1,7 @@
 .PHONY: test lint build fmt golden golden-update samples clean
 
-# Phase 00 scaffold: stdlib + allowlisted direct modules only.
+# Pure-Go runtime: the standard library plus the allowlisted direct modules
+# below. No cgo, browser, or native converter process is required.
 # Direct third-party requires must stay ⊆ {
 #   github.com/go-text/typesetting,  # OpenType shaping
 #   github.com/tdewolff/canvas,      # SVG-as-image rasterization
@@ -45,7 +46,31 @@ golden:
 	go test ./internal/convert/ -run 'TestGoldenCorpus' -v
 
 golden-update:
-	@echo "golden-update: implemented in Phase 3 (PDF writer)"; true
+	@set -eu; \
+	if [ "$(GOLDEN_APPROVE)" != "1" ]; then \
+		echo "Refusing golden-update: set GOLDEN_APPROVE=1 after reviewing the fixture" >&2; \
+		exit 2; \
+	fi; \
+	fixture="$(GOLDEN_FIXTURE)"; \
+	case "$$fixture" in \
+		""|*/*|*-header.html|*-footer.html|*.html.html) \
+			echo "Usage: make golden-update GOLDEN_FIXTURE=fixture-NN-name.html GOLDEN_APPROVE=1" >&2; \
+			exit 2;; \
+		*.html) ;; \
+		*) \
+			echo "GOLDEN_FIXTURE must be a body .html fixture basename" >&2; \
+			exit 2;; \
+	esac; \
+	if [ ! -f "testdata/golden/$$fixture" ]; then \
+		echo "Golden fixture not found: testdata/golden/$$fixture" >&2; \
+		exit 2; \
+	fi; \
+	mkdir -p testdata/golden/out; \
+	output="testdata/golden/out/$${fixture%.html}.pdf"; \
+	echo "Generating $$output from testdata/golden/$$fixture"; \
+	go run ./cmd/gowkhtmltopdf --enable-local-file-access \
+		"testdata/golden/$$fixture" "$$output"; \
+	echo "Review $$output manually; this target never rewrites committed fixtures."
 
 # Regenerate the sample outputs in output/: one PDF per golden fixture, a
 # showcase PDF (TOC + headers/footers + outline), image PNGs, and the optional

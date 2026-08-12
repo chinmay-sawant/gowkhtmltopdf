@@ -13,7 +13,7 @@ standard library **plus** a narrow exception for OpenType shaping via
 (landed in `go.mod`).
 
 - **No browser or native converter process** - the in-repo pipeline runs as a
-  Go binary with `CGO_ENABLED=0`; Go modules provide OpenType shaping and
+  Go binary with `CGO_ENABLED=0`; pure-Go modules provide OpenType shaping and
   raster/SVG support where needed
 - Two static binaries: `gowkhtmltopdf` (PDF) and `gowkhtmltoimage` (PNG/JPEG)
 - Idiomatic Go library API (`gowkhtmltopdf` root package)
@@ -45,7 +45,7 @@ clones of arbitrary websites.
 | Headers, footers, TOC, PDF bookmarks | Yes |
 | Zero native deps / offline static binary | Yes |
 | Full CSS (flex, grid, absolute/fixed) or JavaScript | **Partial** flex/grid lite + position lite; **No** JS (see deferred) |
-| CJK / complex Unicode fonts | **Partial** — Type0/CID + `--font-path`; Arabic joining; no HarfBuzz |
+| CJK / complex Unicode fonts | **Partial** — Type0/CID + `--font-path`; Arabic joining; no CGO HarfBuzz |
 
 ```text
 HTML (file | URL | stdin)
@@ -96,10 +96,11 @@ fix whatever fails, and open generated PDFs - closed that last gap. Font
 letter-spacing is fixed for Latin text; complex pages (e.g. full Wikipedia
 articles) still need follow-up for Unicode/CID fonts and richer CSS.
 
-None of that changes the product rule: **no third-party PDF/HTML/CSS APIs** and
-**no cgo** — only the Go stdlib, in-tree assets (Liberation Sans), and the
-documented shaping exception ([`go-text/typesetting`](plans/amendments/2026-08-05-gotext-typesetting.md))
-already in `go.mod`.
+None of that changes the product rule: **no third-party PDF/HTML/CSS APIs**,
+**no browser process**, and **no cgo**. The implementation uses the Go
+standard library, in-tree font assets, and the two documented pure-Go direct
+modules: [`go-text/typesetting`](plans/amendments/2026-08-05-gotext-typesetting.md)
+for shaping and `github.com/tdewolff/canvas` for SVG rasterization.
 
 ---
 
@@ -121,16 +122,18 @@ embedding in Gin/APIs: **[documentation/integration-security.md](documentation/i
 
 ## Install & build
 
-Requires Go 1.26+. Build is fully offline - no modules are downloaded.
+Requires Go 1.26+. The first build may download the allowlisted Go modules;
+subsequent builds can run offline with the module cache populated.
 
 ```sh
 # both binaries, static (no cgo anywhere in the graph):
 CGO_ENABLED=0 go build ./cmd/gowkhtmltopdf ./cmd/gowkhtmltoimage
 ```
 
-Reproducible build - always build with `CGO_ENABLED=0` (the default here
-anyway, since there is no cgo); the resulting binaries are statically
-linked ELF/Mach-O executables with no runtime library requirements.
+The first build may download the two direct modules and their transitive Go
+module graph. Once that graph is cached, builds can run offline. Always build
+with `CGO_ENABLED=0`; the resulting binaries are statically linked ELF/Mach-O
+executables with no native runtime library requirements.
 
 Version stamping (see [Versioning](#versioning)):
 
@@ -335,9 +338,11 @@ go tool pprof -top /tmp/cpu.pprof
 
 ## Versioning
 
-`VERSION` (currently `0.1.0`) is the single source of truth for the
-release number. The CLI `--version` output is stamped at build time with
-`-X`; an unstamped build reports the `0.1.0-dev` fallback:
+`VERSION` (currently `0.1.0`) is the single source of truth for this project's
+release number. The CLI `--version` output is stamped at build time with `-X`;
+an unstamped build reports the `0.1.0-dev` fallback. The library's
+`LibraryVersion` is a separate compatibility identifier for the upstream
+wkhtmltopdf 0.12.x settings surface; it is not the project release number.
 
 ```sh
 go build -ldflags "-X gowkhtmltopdf/internal/cli.Version=$(cat VERSION)" ./cmd/gowkhtmltopdf ./cmd/gowkhtmltoimage

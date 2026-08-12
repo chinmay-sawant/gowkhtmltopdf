@@ -207,6 +207,13 @@ type LoadGlobal struct {
 	Proxy                 string
 	Allow                 []string // local ACL prefixes (--allow)
 	EnableLocalFileAccess bool
+	// NetworkPolicySet distinguishes the explicit network policy from the
+	// compatibility default used by existing CLI and library callers.
+	NetworkPolicySet      bool
+	NetworkAllowedSchemes []string
+	NetworkAllowedHosts   []string
+	NetworkBlockPrivate   bool
+	NetworkBlockCrossHost bool
 }
 
 // LoadPage holds per-page load settings with engine consumers in load/convert.

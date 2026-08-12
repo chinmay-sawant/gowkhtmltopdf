@@ -94,6 +94,7 @@ Contributor setup and PR expectations: [CONTRIBUTIONS.md](../CONTRIBUTIONS.md).
 | `make lint` | `golangci-lint run` (all linters via `.golangci.yml`) |
 | `make build` | `bin/gowkhtmltopdf`, `bin/gowkhtmltoimage` |
 | `make golden` | Golden corpus tests |
+| `make golden-update GOLDEN_FIXTURE=fixture-NN-name.html GOLDEN_APPROVE=1` | Generate one explicitly approved fixture PDF under ignored `testdata/golden/out/`; never rewrites fixture sources |
 | `make samples` | Refresh `output/` |
 | `make clean` | Remove `testdata/golden/out` |
 

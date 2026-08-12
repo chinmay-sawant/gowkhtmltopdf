@@ -5,7 +5,7 @@
   {
    "type": "hero",
    "title": "A pure-Go HTML to PDF converter",
-   "lede": "gowkhtmltopdf is a clean-room, stdlib-only work-alike for wkhtmltopdf that turns server-generated HTML into multi-page PDFs and images. It is built for controlled reports: invoices, statements, tables, and documents with headers, footers, TOCs, and PDF outlines."
+   "lede": "gowkhtmltopdf is a clean-room, pure-Go work-alike for wkhtmltopdf that turns server-generated HTML into multi-page PDFs and images. It is built for controlled reports: invoices, statements, tables, and documents with headers, footers, TOCs, and PDF outlines."
   },
   {
    "type": "cards",
@@ -21,7 +21,7 @@
     },
     {
      "title": "Two static binaries",
-     "body": "`gowkhtmltopdf` (PDF) and `gowkhtmltoimage` (PNG/JPEG) build with `CGO_ENABLED=0` into statically linked ELF/Mach-O executables with no runtime library requirements. Builds are fully offline: no modules are downloaded."
+     "body": "`gowkhtmltopdf` (PDF) and `gowkhtmltoimage` (PNG/JPEG) build with `CGO_ENABLED=0` into statically linked ELF/Mach-O executables with no native runtime library requirements. The first build may download the allowlisted pure-Go module graph; later builds can run offline with the cache populated."
     },
     {
      "title": "MIT licensed",
@@ -55,7 +55,7 @@
     ],
     [
      "CJK / complex-script shaping",
-     "Type0/CID plus `--font-path`; Arabic joining via `go-text/typesetting` (GSUB); no HarfBuzz",
+     "Type0/CID plus `--font-path`; Arabic joining via `go-text/typesetting` (GSUB); no CGO HarfBuzz",
      "Indic partial; Hangul needs a Hangul face"
     ],
     [
@@ -109,8 +109,8 @@
      "body": "This codebase is not a binding to wkhtmltopdf/Qt/WebKit and not a wrapper around any commercial HTML-to-PDF API. The full pipeline (load, parse, CSS, layout, paginate, paint, PDF write) is implemented in this repository."
     },
     {
-     "heading": "Stdlib-only constraint",
-     "body": "Runtime dependencies are the Go standard library plus one narrow, documented exception: OpenType shaping via `github.com/go-text/typesetting` (amendment `plans/amendments/2026-08-05-gotext-typesetting.md`, landed in `go.mod`). No third-party PDF/HTML/CSS APIs, no Chrome/WebKit embedding, no cgo."
+     "heading": "Pure-Go runtime boundary",
+     "body": "Runtime code uses the Go standard library plus two allowlisted pure-Go direct modules: `github.com/go-text/typesetting` for OpenType shaping and `github.com/tdewolff/canvas` for SVG rasterization. There are no third-party PDF/HTML/CSS APIs, no Chrome/WebKit embedding, and no cgo. See `THIRD_PARTY_LICENSES.md` for redistribution notices."
     },
     {
      "heading": "AI-assisted development",

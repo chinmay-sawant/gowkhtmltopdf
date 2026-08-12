@@ -406,6 +406,34 @@ func TestGlobalSettingsGetSetRoundTrip(t *testing.T) {
 	assertGlobalDefaults(t)
 }
 
+//nolint:wsl // this test intentionally groups copied-state assertions.
+func TestGlobalNetworkPolicyIsCopied(t *testing.T) {
+	t.Parallel()
+
+	policy := RestrictedNetworkPolicy()
+	policy.AllowedHosts = []string{"reports.example.test"}
+	global := NewGlobalSettings()
+	if err := global.SetNetworkPolicy(policy); err != nil {
+		t.Fatal(err)
+	}
+
+	policy.AllowedSchemes[0] = "ftp"
+	policy.AllowedHosts[0] = "mutated.example.test"
+
+	if !global.g.Load.NetworkPolicySet {
+		t.Fatal("explicit network policy was not recorded")
+	}
+	if got := global.g.Load.NetworkAllowedSchemes[0]; got != "http" {
+		t.Errorf("allowed scheme = %q, want copied http value", got)
+	}
+	if got := global.g.Load.NetworkAllowedHosts[0]; got != "reports.example.test" {
+		t.Errorf("allowed host = %q, want copied host value", got)
+	}
+	if !global.g.Load.NetworkBlockPrivate || !global.g.Load.NetworkBlockCrossHost {
+		t.Error("restricted network policy flags were not copied")
+	}
+}
+
 // assertGlobalSetGetRoundTrip pins one Set/Get round trip for a global key.
 func assertGlobalSetGetRoundTrip(t *testing.T, name, value string) {
 	t.Helper()

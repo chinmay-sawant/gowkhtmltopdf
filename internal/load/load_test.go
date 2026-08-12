@@ -879,6 +879,102 @@ func TestHTTPLocalhostAllowedByDesign(t *testing.T) {
 	}
 }
 
+func TestRestrictedNetworkPolicyBlocksPrivateAddress(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Error("restricted policy must reject the private address before serving")
+	}))
+	defer srv.Close()
+
+	loader, err := load.NewLoaderWithNetworkPolicy(
+		settings.LoadGlobal{}, //nolint:exhaustruct // compatibility global settings are intentionally empty
+		load.RestrictedNetworkPolicy(),
+	)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := loader.Load(t.Context(), srv.URL, defaultLP()); !errors.Is(err, load.ErrNetworkPolicy) {
+		t.Fatalf("error = %v, want load.ErrNetworkPolicy", err)
+	}
+}
+
+func TestRestrictedNetworkPolicyAllowsExplicitHostException(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(respWriter http.ResponseWriter, _ *http.Request) {
+		_, _ = respWriter.Write([]byte("explicitly trusted"))
+	}))
+	defer srv.Close()
+
+	parsed, err := url.Parse(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	policy := load.RestrictedNetworkPolicy()
+	policy.AllowedHosts = []string{parsed.Hostname()}
+	loader, err := load.NewLoaderWithNetworkPolicy(
+		settings.LoadGlobal{}, //nolint:exhaustruct // compatibility global settings are intentionally empty
+		policy,
+	)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := loader.Load(t.Context(), srv.URL, defaultLP())
+	if err != nil {
+		t.Fatalf("explicit host exception: %v", err)
+	}
+
+	if string(res.Body) != "explicitly trusted" {
+		t.Errorf("body = %q", res.Body)
+	}
+}
+
+func TestRestrictedNetworkPolicyBlocksCrossHostRedirect(t *testing.T) {
+	t.Parallel()
+
+	target := httptest.NewServer(http.HandlerFunc(func(respWriter http.ResponseWriter, _ *http.Request) {
+		_, _ = respWriter.Write([]byte("redirect target"))
+	}))
+	defer target.Close()
+
+	origin := httptest.NewServer(http.HandlerFunc(func(respWriter http.ResponseWriter, req *http.Request) {
+		http.Redirect(respWriter, req, target.URL, http.StatusFound)
+	}))
+	defer origin.Close()
+
+	originURL, err := url.Parse(origin.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetURL, err := url.Parse(target.URL)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	policy := load.RestrictedNetworkPolicy()
+	policy.AllowedHosts = []string{originURL.Hostname(), targetURL.Hostname()}
+	loader, err := load.NewLoaderWithNetworkPolicy(
+		settings.LoadGlobal{}, //nolint:exhaustruct // compatibility global settings are intentionally empty
+		policy,
+	)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := loader.Load(t.Context(), origin.URL, defaultLP()); !errors.Is(err, load.ErrNetworkPolicy) {
+		t.Fatalf("error = %v, want cross-host network policy rejection", err)
+	}
+}
+
 // TestLoadInlineHTML: an explicit in-memory HTML source is returned as-is
 // and skips GuessURL entirely; subresources resolve against InlineBase.
 func TestLoadInlineHTML(t *testing.T) {

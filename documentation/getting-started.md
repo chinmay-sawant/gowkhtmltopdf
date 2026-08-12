@@ -3,12 +3,13 @@
 ## Requirements
 
 - Go **1.26+**
-- No network required to build (stdlib only)
+- The first build may download the allowlisted pure-Go modules in `go.mod`; no
+  browser, native converter, or cgo toolchain is required.
 
 ## Build
 
 ```sh
-# static binaries (recommended)
+# static binaries (recommended; module downloads happen on the first build)
 CGO_ENABLED=0 go build -o bin/gowkhtmltopdf ./cmd/gowkhtmltopdf
 CGO_ENABLED=0 go build -o bin/gowkhtmltoimage ./cmd/gowkhtmltoimage
 

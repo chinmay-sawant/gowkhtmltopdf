@@ -44,6 +44,10 @@ const (
 // ErrAccessDenied is returned when the local-file ACL blocks a path.
 var ErrAccessDenied = errors.New("local file access denied")
 
+// ErrNetworkPolicy is returned when a URL, redirect, or resolved network
+// address is outside the loader's explicit network policy.
+var ErrNetworkPolicy = errors.New("network policy denied request")
+
 // ErrInvalidProxy is returned when a configured proxy is not an absolute URL
 // with a scheme and host. NewLoader preserves its historical return shape and
 // records this error for the first Load call; NewLoaderWithError exposes the
@@ -98,6 +102,46 @@ type ResourceContext struct {
 	loader   *Loader
 	base     string
 	pageLoad settings.LoadPage
+}
+
+// NetworkPolicy controls network URL loading independently from the legacy
+// local-file ACL. An empty AllowedHosts list permits any host that satisfies
+// the scheme policy; a non-empty list is an exact or wildcard host allowlist.
+// An explicitly allowlisted host may be private, which makes local test and
+// trusted-service integrations possible without making that exception global.
+type NetworkPolicy struct {
+	AllowedSchemes          []string
+	AllowedHosts            []string
+	BlockPrivateNetworks    bool
+	BlockCrossHostRedirects bool
+}
+
+// CompatibleNetworkPolicy preserves the historical loader behavior: HTTP(S)
+// URLs are allowed, including localhost and private addresses, and redirects
+// may cross hosts. It is the default for existing constructors.
+func CompatibleNetworkPolicy() NetworkPolicy {
+	return NetworkPolicy{ //nolint:exhaustruct // compatibility defaults
+		AllowedSchemes: []string{"http", "https"},
+	}
+}
+
+// RestrictedNetworkPolicy is suitable for untrusted HTML in an isolated
+// service. Private/link-local destinations are blocked unless explicitly
+// allowlisted, and redirects stay on the original host.
+func RestrictedNetworkPolicy() NetworkPolicy {
+	return NetworkPolicy{ //nolint:exhaustruct // explicit safety defaults
+		AllowedSchemes:          []string{"http", "https"},
+		BlockPrivateNetworks:    true,
+		BlockCrossHostRedirects: true,
+	}
+}
+
+func cloneNetworkPolicy(src NetworkPolicy) NetworkPolicy {
+	dst := src
+	dst.AllowedSchemes = cloneStrings(src.AllowedSchemes)
+	dst.AllowedHosts = cloneStrings(src.AllowedHosts)
+
+	return dst
 }
 
 // ForResource returns a context for resources relative to res. A nil
@@ -264,6 +308,7 @@ func isLocalPath(s string) bool {
 type Loader struct {
 	Client       *http.Client
 	Global       settings.LoadGlobal
+	Network      NetworkPolicy
 	Log          io.Writer
 	MaxBodySize  int64
 	MaxRedirects int
@@ -293,6 +338,7 @@ func NewLoader(global settings.LoadGlobal) *Loader {
 
 	return &Loader{ //nolint:exhaustruct // intentional zero/partial fields
 		Global:                policy,
+		Network:               networkPolicyFromGlobal(global),
 		Log:                   io.Discard,
 		MaxBodySize:           DefaultMaxBodySize,
 		MaxRedirects:          DefaultMaxRedirects,
@@ -306,11 +352,32 @@ func NewLoader(global settings.LoadGlobal) *Loader {
 // proxy configuration before installing the HTTP transport. It is the
 // fail-fast constructor; NewLoader remains available for existing callers.
 func NewLoaderWithError(global settings.LoadGlobal) (*Loader, error) {
+	return NewLoaderWithNetworkPolicy(global, networkPolicyFromGlobal(global))
+}
+
+func networkPolicyFromGlobal(global settings.LoadGlobal) NetworkPolicy {
+	if !global.NetworkPolicySet {
+		return CompatibleNetworkPolicy()
+	}
+
+	return NetworkPolicy{
+		AllowedSchemes:          cloneStrings(global.NetworkAllowedSchemes),
+		AllowedHosts:            cloneStrings(global.NetworkAllowedHosts),
+		BlockPrivateNetworks:    global.NetworkBlockPrivate,
+		BlockCrossHostRedirects: global.NetworkBlockCrossHost,
+	}
+}
+
+// NewLoaderWithNetworkPolicy builds a Loader with an explicit network policy.
+// NewLoader and NewLoaderWithError remain compatibility constructors for
+// callers that rely on the historical permissive HTTP behavior.
+func NewLoaderWithNetworkPolicy(global settings.LoadGlobal, network NetworkPolicy) (*Loader, error) {
 	policy := global
 	policy.Allow = cloneStrings(global.Allow)
 
 	loader := &Loader{ //nolint:exhaustruct // intentional zero/partial fields
 		Global:                policy,
+		Network:               cloneNetworkPolicy(network),
 		Log:                   io.Discard,
 		MaxBodySize:           DefaultMaxBodySize,
 		MaxRedirects:          DefaultMaxRedirects,
@@ -331,12 +398,13 @@ func (l *Loader) initClient() error {
 	}
 
 	// Default TLS verification stays on (http.Transport system roots).
+	dialer := &net.Dialer{ //nolint:exhaustruct // intentional zero/partial fields
+		Timeout:   DefaultConnectTimeout,
+		KeepAlive: defaultKeepAliveSec * time.Second,
+	}
 	transport := &http.Transport{ //nolint:exhaustruct // intentional zero/partial fields
 		ForceAttemptHTTP2: true,
-		DialContext: (&net.Dialer{ //nolint:exhaustruct // intentional zero/partial fields
-			Timeout:   DefaultConnectTimeout,
-			KeepAlive: defaultKeepAliveSec * time.Second,
-		}).DialContext,
+		DialContext:       l.policyDialContext(dialer),
 	}
 
 	if l.Global.Proxy != "" {
@@ -351,7 +419,19 @@ func (l *Loader) initClient() error {
 	l.Client = &http.Client{ //nolint:exhaustruct // intentional zero/partial fields
 		Transport: transport,
 		Jar:       jar,
-		CheckRedirect: func(_ *http.Request, via []*http.Request) error {
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if err := l.checkNetworkURL(req.URL); err != nil {
+				return err
+			}
+
+			if l.Network.BlockCrossHostRedirects && len(via) > 0 {
+				origin := via[0].URL
+				if !sameNetworkHost(origin, req.URL) {
+					return fmt.Errorf("%w: cross-host redirect %s -> %s", ErrNetworkPolicy,
+						origin.Host, req.URL.Host)
+				}
+			}
+
 			// Go's client counts the requests made so far in via, so the
 			// MaxRedirects-th redirect (len(via) == MaxRedirects) is the
 			// last one allowed to complete.
@@ -364,6 +444,93 @@ func (l *Loader) initClient() error {
 	}
 
 	return nil
+}
+
+func (l *Loader) policyDialContext(dialer *net.Dialer) func(context.Context, string, string) (net.Conn, error) {
+	return func(ctx context.Context, network, address string) (net.Conn, error) {
+		if !l.Network.BlockPrivateNetworks {
+			return dialer.DialContext(ctx, network, address)
+		}
+
+		host, _, err := net.SplitHostPort(address)
+		if err != nil {
+			return nil, fmt.Errorf("%w: invalid dial address %q: %w", ErrNetworkPolicy, address, err)
+		}
+
+		if l.networkHostAllowlisted(host) {
+			return dialer.DialContext(ctx, network, address)
+		}
+
+		ips, err := net.DefaultResolver.LookupIP(ctx, "ip", host)
+		if err != nil {
+			return nil, fmt.Errorf("resolve %s: %w", host, err)
+		}
+
+		for _, ip := range ips {
+			if isPrivateNetworkIP(ip) {
+				return nil, fmt.Errorf("%w: %s resolves to private address %s", ErrNetworkPolicy, host, ip)
+			}
+		}
+
+		return dialer.DialContext(ctx, network, address)
+	}
+}
+
+func (l *Loader) checkNetworkURL(target *url.URL) error {
+	if target == nil {
+		return fmt.Errorf("%w: nil URL", ErrNetworkPolicy)
+	}
+
+	scheme := strings.ToLower(target.Scheme)
+	if !containsFold(l.Network.AllowedSchemes, scheme) {
+		return fmt.Errorf("%w: scheme %q is not allowed", ErrNetworkPolicy, target.Scheme)
+	}
+
+	host := target.Hostname()
+	if host == "" {
+		return fmt.Errorf("%w: URL host is empty", ErrNetworkPolicy)
+	}
+
+	if len(l.Network.AllowedHosts) > 0 && !l.networkHostAllowlisted(host) {
+		return fmt.Errorf("%w: host %q is not allowlisted", ErrNetworkPolicy, host)
+	}
+
+	return nil
+}
+
+func (l *Loader) networkHostAllowlisted(host string) bool {
+	host = strings.ToLower(strings.TrimSuffix(host, "."))
+
+	if len(l.Network.AllowedHosts) == 0 {
+		return false
+	}
+
+	for _, allowed := range l.Network.AllowedHosts {
+		allowed = strings.ToLower(strings.TrimSpace(strings.TrimSuffix(allowed, ".")))
+		if allowed == host || strings.HasPrefix(allowed, "*.") && strings.HasSuffix(host, allowed[1:]) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func containsFold(values []string, want string) bool {
+	for _, value := range values {
+		if strings.EqualFold(strings.TrimSpace(value), want) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func sameNetworkHost(left, right *url.URL) bool {
+	return strings.EqualFold(left.Host, right.Host)
+}
+
+func isPrivateNetworkIP(ip net.IP) bool {
+	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsUnspecified()
 }
 
 func parseProxy(raw string) (*url.URL, error) {
@@ -825,6 +992,10 @@ func (l *Loader) loadHTTP(ctx context.Context, target string, pageLoad settings.
 	parsed, err := url.Parse(target)
 	if err != nil {
 		return nil, fmt.Errorf("parse %s: %w", target, err)
+	}
+
+	if err := l.checkNetworkURL(parsed); err != nil {
+		return nil, err
 	}
 
 	req, err := buildHTTPRequest(ctx, parsed, pageLoad)

@@ -628,6 +628,42 @@ func TestDocFlags(t *testing.T) {
 	}
 }
 
+func TestPrintHelpUsesProductTruth(t *testing.T) {
+	t.Parallel()
+
+	for _, testCase := range []struct {
+		name string
+		mode Mode
+		want string
+	}{
+		{name: "pdf", mode: ModePDF, want: "Convert HTML to PDF"},
+		{name: "image", mode: ModeImage, want: "Convert HTML to PNG/JPEG image"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			var help bytes.Buffer
+
+			PrintHelp(&help, testCase.mode)
+
+			got := help.String()
+			if !strings.Contains(got, testCase.want) {
+				t.Errorf("help missing %q:\n%s", testCase.want, got)
+			}
+
+			for _, forbidden := range []string{"Qt WebKit engine", "using the Qt WebKit"} {
+				if strings.Contains(got, forbidden) {
+					t.Errorf("help contains stale implementation claim %q", forbidden)
+				}
+			}
+
+			if !strings.Contains(got, "No JavaScript, browser process") {
+				t.Errorf("help missing browser/JavaScript boundary:\n%s", got)
+			}
+		})
+	}
+}
+
 func TestEndOfOptions(t *testing.T) {
 	t.Parallel()
 

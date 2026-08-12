@@ -132,8 +132,8 @@ func tryShapeOpenType(str string, fnt *Font, features []shaping.FontFeature) (sh
 
 	defer shaperPool.Put(shaper)
 
-	// Size left at zero so we do not import golang.org/x/image (keep
-	// typesetting as the only direct third-party require). Glyph IDs are
+	// Size left at zero so we do not import golang.org/x/image. Keep
+	// typesetting within the allowlisted direct modules. Glyph IDs are
 	// still correct; advances come from our Font hmtx below.
 	inputs := seg.Split(shaping.Input{ //nolint:exhaustruct // intentional zero-value fields
 		Text:         text,

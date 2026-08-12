@@ -123,8 +123,14 @@ A fixture passes when the generated PDF:
 
 ```sh
 make golden    # runs TestGoldenCorpus + TestGoldenCorpusAllFixtures
-make golden-update   # writes testdata/golden/out/*.pdf from fixtures (stub)
+make golden-update GOLDEN_FIXTURE=fixture-01-simple-invoice.html GOLDEN_APPROVE=1
+# writes one reviewed PDF to testdata/golden/out/; never rewrites fixtures
 ```
+
+`golden-update` is deliberately narrow: it accepts one body-fixture basename,
+requires the explicit `GOLDEN_APPROVE=1` acknowledgement, and writes only to
+the ignored `testdata/golden/out/` directory. It does not update committed
+HTML/CSS fixtures or silently replace any checked-in artifact.
 
 Golden *source* (HTML/CSS/PNG) is committed; golden *output* (PDF) is
 generated and reviewed at each phase gate, then archived on release only.
