@@ -130,14 +130,22 @@ These existed before the branch but were substantially updated in the docs rewri
 
 ## Test plan
 
-- [ ] `make lint` / golangci-lint suite used by CI
-- [ ] `make test` (or `go test ./... -count=1`)
-- [ ] `CGO_ENABLED=0 go build -o bin/gowkhtmltopdf ./cmd/gowkhtmltopdf`
-- [ ] `CGO_ENABLED=0 go build -o bin/gowkhtmltoimage ./cmd/gowkhtmltoimage`
-- [ ] `go test ./internal/convert/ -run 'TestGoldenCorpus' -count=1`
-- [ ] Spot-check layout regressions: fixtures 18, 21, 31, 40, 48, 56; wiki smoke PDF if network available
-- [ ] `python3 scripts/screenshot_showcase.py` regenerates white-background showcase PNGs
-- [ ] Optional: `cd frontend && npm run build` to refresh `docs/` hashed assets for GitHub Pages
+Verified on branch `chore/release-prep` (host: local Linux, 2026-08-14).
+
+- [x] `make lint` / golangci-lint suite used by CI — **pass** (`golangci-lint` v1.64.8, `golangci-lint run ./...` clean)
+- [x] `make test` (or `go test ./... -count=1`) — **pass** after fixing golden header on `architecture-diagram.html` (see note below)
+- [x] `CGO_ENABLED=0 go build -o bin/gowkhtmltopdf ./cmd/gowkhtmltopdf` — **pass** (`bin/gowkhtmltopdf` ~21.8 MB)
+- [x] `CGO_ENABLED=0 go build -o bin/gowkhtmltoimage ./cmd/gowkhtmltoimage` — **pass** (`bin/gowkhtmltoimage` ~21.1 MB)
+- [x] `go test ./internal/convert/ -run 'TestGoldenCorpus' -count=1` — **pass** (`ok gowkhtmltopdf/internal/convert ~2s`)
+- [x] Spot-check layout regressions: fixtures 18, 21, 31, 40, 48, 56; wiki smoke PDF if network available — **pass**
+  - Regenerated pages: 18→1, 21→4, 31→2, 40→1, 48→1, 56→20 (all with `/FontFile2`)
+  - Live wiki smoke: `https://en.wikipedia.org/wiki/Ana_de_Armas` → 12 pages, ~849 KB
+- [x] `python3 scripts/screenshot_showcase.py` regenerates white-background showcase PNGs — **pass** (167 PNGs → `frontend/src/assets/showcase/`)
+- [x] Optional: `cd frontend && npm run build` to refresh `docs/` hashed assets for GitHub Pages — **pass** (copied to `docs/` with `.nojekyll`)
+
+### Golden fix during verification
+
+Initial `TestGoldenCorpusAllFixtures/architecture-diagram.html` failed because the opening HTML comment did not contain the basename `architecture-diagram`. Header was corrected in `testdata/golden/architecture-diagram.html`; corpus then green.
 
 ### Commands
 
@@ -145,7 +153,10 @@ These existed before the branch but were substantially updated in the docs rewri
 make lint
 make test
 CGO_ENABLED=0 go build -o bin/gowkhtmltopdf ./cmd/gowkhtmltopdf
+CGO_ENABLED=0 go build -o bin/gowkhtmltoimage ./cmd/gowkhtmltoimage
+go test ./internal/convert/ -run 'TestGoldenCorpus' -count=1
 python3 scripts/screenshot_showcase.py
+cd frontend && npm run build
 ```
 
 ---
@@ -153,13 +164,35 @@ python3 scripts/screenshot_showcase.py
 ## Screenshots / sample output
 
 ```
+# Builds
+CGO_ENABLED=0 go build -o bin/gowkhtmltopdf ./cmd/gowkhtmltopdf   # ok
+CGO_ENABLED=0 go build -o bin/gowkhtmltoimage ./cmd/gowkhtmltoimage # ok
+
+# Lint + tests
+make lint   # golangci-lint v1.64.8 clean
+make test   # all packages ok
+go test ./internal/convert/ -run 'TestGoldenCorpus' -count=1  # ok
+
+# Spot-check page envelopes
+fixture-18-typography: pages=1
+fixture-21-detailed-report: pages=4
+fixture-31-sticky-top: pages=2
+fixture-40-transform-badge: pages=1
+fixture-48-shipping-document: pages=1
+fixture-56-architecture-diagram: pages=20
+wiki-ana-de-armas (live): pages=12
+
+# Showcase thumbs
 python3 scripts/screenshot_showcase.py
-# architecture-diagram.pdf … wiki-ana-de-armas.pdf
 # wrote 167 PNG(s) to frontend/src/assets/showcase
-# all RGB, 794×1123 (A4 @ 96 dpi), white page canvas
+# RGB, 794×1123 (A4 @ 96 dpi), white page canvas
+
+# GitHub Pages bundle
+cd frontend && npm run build
+# copied build output → docs/ (.nojekyll, assets, index.html)
 ```
 
-Showcase thumbs under `frontend/src/assets/showcase/` now match current `output/*.pdf` pages (including `wiki-ana-de-armas-12.png`).
+Showcase thumbs under `frontend/src/assets/showcase/` match current `output/*.pdf` pages (including `wiki-ana-de-armas-12.png`). `docs/` hashed assets refreshed for Pages deploy.
 
 ---
 
@@ -184,7 +217,6 @@ No `Closes` keywords: this is an integration release-prep branch rather than a s
 
 ## Follow-ups (out of scope)
 
-- Rebuild and commit `docs/` Vite bundle after showcase PNG refresh (`cd frontend && npm run build`)
 - PDF 1.7 / 2.0 / UA-2 / A-4 compliance work (#29–#33)
 - Python c-shared / PyPI bindings (#35)
 - Further tightening of experimental aside keep-together heuristics
