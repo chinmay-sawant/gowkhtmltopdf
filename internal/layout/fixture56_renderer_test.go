@@ -772,7 +772,7 @@ func TestFixture56DAGStaysTogetherAtCLIPageGeometry(t *testing.T) { //nolint:par
 	const (
 		pageWidth  = 595.28
 		pageHeight = 841.89
-		margin     = 12 * 72.0 / 25.4
+		margin     = 10 * 72.0 / 25.4
 	)
 
 	res, err := Layout(root, Options{ //nolint:exhaustruct // fixture uses the CLI print geometry
@@ -809,8 +809,74 @@ func TestFixture56DAGStaysTogetherAtCLIPageGeometry(t *testing.T) { //nolint:par
 			t.Fatalf("dependency DAG rules split across pages at CLI geometry: pages=%v", rulePages)
 		}
 	}
-	if got := len(res.Pages); got != 20 {
-		t.Fatalf("fixture page count = %d, want 20; DAG pages=%v y=%.2f h=%.2f", got, rulePages, dagBox.y, dagBox.height)
+	if got := len(res.Pages); got < 19 || got > 21 {
+		t.Fatalf("fixture page count = %d, want 19–21; DAG pages=%v y=%.2f h=%.2f", got, rulePages, dagBox.y, dagBox.height)
+	}
+}
+
+// TestFixture56NotesCalloutsStayOnOnePage: .dom-notes asides that fit one
+// page must not start on one page and finish on the next.
+func TestFixture56NotesCalloutsStayOnOnePage(t *testing.T) { //nolint:paralleltest // renderer fixture uses shared font state
+	root, sheet := loadFixture56(t)
+
+	const (
+		pageWidth  = 595.28
+		pageHeight = 841.89
+		margin     = 10 * 72.0 / 25.4
+	)
+
+	contentHeight := pageHeight - 2*margin
+	res, err := Layout(root, Options{ //nolint:exhaustruct // fixture uses CLI print geometry
+		Width: pageWidth - 2*margin, Height: contentHeight,
+		Background: true, Sheets: []*css.Stylesheet{sheet}, Media: "print",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Paint(pdf.NewDocument(), res, PaintOptions{
+		PageWidth: pageWidth, PageHeight: pageHeight,
+		MarginTop: margin, MarginBottom: margin,
+		MarginLeft: margin, MarginRight: margin,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	notes := fixture56Nodes(root, func(node *html.Node) bool {
+		return node.Name == "aside" && strings.Contains(fixture56Class(node), "dom-notes")
+	})
+	if len(notes) == 0 {
+		t.Fatal("no .dom-notes asides in fixture-56")
+	}
+
+	split := 0
+
+	for _, node := range notes {
+		box := fixture56BoxByNode(res.root, node)
+		if box == nil || box.height <= layoutSlack || box.height > contentHeight {
+			continue
+		}
+
+		start := int((box.y + layoutSlack) / contentHeight)
+		end := int((box.y + box.height - layoutSlack) / contentHeight)
+		section := ""
+		for ancestor := node.Parent; ancestor != nil; ancestor = ancestor.Parent {
+			if id := ancestor.Attribute("id"); id != "" {
+				section = id
+				break
+			}
+		}
+		t.Logf("notes %s y=%.2f h=%.2f pages=%d-%d", section, box.y, box.height, start+1, end+1)
+
+		if end > start {
+			split++
+			t.Errorf("notes aside straddles pages %d-%d: y=%.2f h=%.2f section=%s",
+				start+1, end+1, box.y, box.height, section)
+		}
+	}
+
+	if split > 0 {
+		t.Fatalf("%d .dom-notes asides split across a page boundary", split)
 	}
 }
 

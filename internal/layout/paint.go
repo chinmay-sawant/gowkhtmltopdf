@@ -48,7 +48,8 @@ type PaintOptions struct {
 // their top edge; rect-type ops that cross a page boundary are split at the
 // boundary; text, images and links move wholly (text ops are already
 // line-level). Page-break policies are honored: page-break-before/after:
-// always, page-break-inside: avoid (best-effort, box must fit one page), and
+// always, page-break-inside: avoid (best-effort, box must fit one page),
+// aside callouts that overflow remaining Y are lifted to the next page, and
 // table rows never split.
 //
 // After pagination Paint fills res.Pages (page → op indices) and res.Locations

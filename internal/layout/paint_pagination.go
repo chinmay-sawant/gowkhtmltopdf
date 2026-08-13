@@ -466,6 +466,15 @@ func paginateOps(res *Result, contentH float64) []int {
 		}
 	}
 
+	// Lift aside callouts that do not fit the remaining Y on this page
+	// before snapCrossingTextOps splits their last lines off to the next
+	// page top (that snap-then-shift left an internal gap in the card).
+	for range 10 {
+		if !keepImplicitAsides(res, contentH) {
+			break
+		}
+	}
+
 	snapCrossingTextOps(res, contentH)
 
 	paginationFixpoint(res, contentH)
