@@ -480,6 +480,13 @@ func paginateOps(res *Result, contentH float64) []int {
 	// Header continuation shifts can reintroduce a small leading band above a
 	// rounded security callout. Normalize after all flow shifts are complete.
 	normalizeLeadingRoundedCallouts(res, contentH)
+	// Forced breaks win over the callout pack: a same-page snap must not
+	// leave page-break-before:always parked on the previous page.
+	for range 10 {
+		if !beforeAlways(res, contentH) {
+			break
+		}
+	}
 	// Sticky is applied in Paint after rect splitting (see splitCrossingRects).
 	opPage := make([]int, len(res.Ops))
 

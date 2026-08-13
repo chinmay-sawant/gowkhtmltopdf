@@ -150,6 +150,25 @@ func fixture56TextOps(res *Result, target *box) int {
 	return count
 }
 
+// fixture56PageLead is the offset from the current page top. A float
+// remainder just below a page multiple is treated as 0, not as ~contentH.
+func fixture56PageLead(y, contentH float64) float64 {
+	if contentH <= 0 {
+		return y
+	}
+
+	offset := math.Mod(y, contentH)
+	if offset < 0 {
+		offset += contentH
+	}
+
+	if contentH-offset <= layoutSlack {
+		return 0
+	}
+
+	return offset
+}
+
 func fixture56Location(res *Result, target *html.Node) (ElementLocation, bool) {
 	for _, location := range res.Locations {
 		if location.Node == target {
@@ -635,9 +654,9 @@ func TestFixture56ArchitectureSectionsStartOnFreshPages(t *testing.T) { //nolint
 		if !ok {
 			t.Fatalf("section %s has no painted location", id)
 		}
-		pageOffset := math.Mod(location.Y, contentHeight)
-		if math.Min(pageOffset, contentHeight-pageOffset) > 2 {
-			t.Fatalf("section %s starts %.2fpt into page, want fresh page", id, pageOffset)
+		pageOffset := fixture56PageLead(location.Y, contentHeight)
+		if pageOffset > 24 {
+			t.Fatalf("section %s starts %.2fpt into page, want page top", id, pageOffset)
 		}
 	}
 }

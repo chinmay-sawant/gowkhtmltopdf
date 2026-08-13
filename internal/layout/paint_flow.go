@@ -701,38 +701,16 @@ func beforeAlways( //nolint:gocognit,gocyclo,cyclop,funlen // break-difference b
 		}
 
 		// Box Y has been kept live (updated when earlier breaks applied).
+		// lastPage comes from every preceding op so the previous section's
+		// tail stays put; only this box and later flow move.
 		boxY := boxNode.y
-		loPage := int(boxY / contentH)
-		lastPage := int(maxEff / contentH)
-
-		if loPage > lastPage { //nolint:nestif // forced-break correction has four independent guards
-			// A prior page-break-after can leave an empty landing band before
-			// this forced-break target. Align the target back to the top of its
-			// already-selected page; otherwise page-break-before:always keeps
-			// the section's natural offset and emits a visibly blank band.
-			pageTop := float64(loPage) * contentH
-			if boxY > pageTop+layoutSlack {
-				deltaY := pageTop - boxY
-				if start < opCount {
-					suffixDy[start] += deltaY
-				}
-
-				for _, b := range boxes {
-					if b == boxNode || b.y > boxY ||
-						(b.y == boxY && b.opStart >= start) {
-						b.y += deltaY
-					}
-				}
-
-				events = append(events, breakEvent{start: start, dy: deltaY})
-				changed = true
-			}
-
+		targetY, alreadyFresh := forcedBreakTargetY(boxY, maxEff, contentH)
+		if alreadyFresh {
 			continue
 		}
 
-		deltaY := float64(lastPage+1)*contentH - boxY
-		if deltaY <= 0 {
+		deltaY := targetY - boxY
+		if math.Abs(deltaY) <= layoutSlack {
 			continue
 		}
 
@@ -778,6 +756,43 @@ func beforeAlways( //nolint:gocognit,gocyclo,cyclop,funlen // break-difference b
 type beforeAlwaysTarget struct {
 	box   *box
 	start int
+}
+
+// forcedBreakTargetY is the canvas Y of the first page top after preceding
+// ink. A coordinate epsilon below a page multiple is that next page's top;
+// a real sliver still on the previous page is not.
+func forcedBreakTargetY(boxY, maxEff, contentH float64) (float64, bool) {
+	if contentH <= 0 {
+		return boxY, true
+	}
+
+	lastPage := int(maxEff / contentH)
+	if lastPage < 0 {
+		lastPage = 0
+	}
+
+	pageOff := math.Mod(boxY, contentH)
+	if pageOff < 0 {
+		pageOff += contentH
+	}
+
+	loPage := int(boxY / contentH)
+	if contentH-pageOff <= layoutSlack {
+		loPage++
+		pageOff = 0
+	}
+
+	onLaterPage := loPage > lastPage
+	atPageTop := pageOff <= layoutSlack
+	if onLaterPage && atPageTop {
+		return boxY, true
+	}
+
+	if onLaterPage {
+		return float64(loPage) * contentH, false
+	}
+
+	return float64(lastPage+1) * contentH, false
 }
 
 // beforeAlwaysOpStart returns the first operation after a forced-break box.
@@ -1542,8 +1557,46 @@ func normalizeLeadingRoundedCallouts(res *Result, contentH float64) {
 			continue
 		}
 
-		shiftFlowY(res, boxNode.opStart, boxNode.opEnd, boxNode.y-layoutSlack, pageTop-boxNode.y)
+		// Same-page only. shiftFlowY would also pull later pages backward
+		// and can undo page-break-before:always (fixture-56 domain-05).
+		shiftSamePageFromY(res, boxNode.y-layoutSlack, page, contentH, pageTop-boxNode.y)
 	}
+}
+
+// shiftSamePageFromY applies deltaY to ops and boxes at or below fromY that
+// still sit on page. Later pages are left alone.
+func shiftSamePageFromY(res *Result, fromY float64, page int, contentH, deltaY float64) {
+	if res == nil || deltaY == 0 || contentH <= 0 {
+		return
+	}
+
+	for idx := range res.Ops {
+		if res.Ops[idx].Fixed || res.Ops[idx].Y < fromY {
+			continue
+		}
+
+		opPage, ok := checkedFlowPageOfY(res.Ops[idx].Y, contentH)
+		if !ok || opPage != page {
+			continue
+		}
+
+		res.Ops[idx].Y += deltaY
+	}
+
+	for _, boxNode := range flowBoxList(res) {
+		if boxNode.y < fromY {
+			continue
+		}
+
+		boxPage, ok := checkedFlowPageOfY(boxNode.y, contentH)
+		if !ok || boxPage != page {
+			continue
+		}
+
+		boxNode.y += deltaY
+	}
+
+	invalidateFlowIndex(res)
 }
 
 // preferSplitOverBlank reports whether a keep-together shift would leave an
