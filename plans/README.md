@@ -9,6 +9,7 @@
 | [exploration/](exploration/) | Multi-agent analysis snapshots (read-only evidence) |
 | [reviews/ponytail/](reviews/ponytail/) | Ponytail leanness audits + remediation (**5.7 → 9.5/10** weighted, phases 0–5 + partials closed) |
 | [reviews/improve-codebase/](reviews/improve-codebase/) | Architecture deepening reviews (reserved) |
+| [frontend-improves/](frontend-improves/) | Docs-site UI/UX ledger (2026-08-14, **7.0 / 10** baseline) |
 | [PR/](PR/) | PR/issue body archives |
 
 Workflow: [../skills/phase-wise-checklist/SKILLS.md](../skills/phase-wise-checklist/SKILLS.md)

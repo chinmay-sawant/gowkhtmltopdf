@@ -1,0 +1,533 @@
+# Frontend Improves - Phase-Wise UI/UX Ledger
+
+> **Parent:** [`README.md`](README.md) - frontend-improves index.
+> **Status:** open; implementation not started.
+> **Created:** 2026-08-14
+> **Review base:** live `frontend/` on `master` (Vite 6 + React 18 + React Router 6 HashRouter site that deploys to `docs/`).
+> **Score:** **7.0 / 10** blended. Target after this ledger: **8.5 / 10**.
+> **Estimated effort:** 8-12 focused engineering days. Phases 1-3 are the P0 user-visible cut.
+> **Method:** UI/UX + frontend review of current source, `dist/` sizes, and Chrome screenshots at 1440 / 768 / 390. Plan prose is a claim; rows close only on current proof.
+
+---
+
+## Overview
+
+This is the canonical execution ledger for making the documentation site
+match the craft of the landing hero. Every row is one code change or one
+validation result. A row may be checked only after the named source,
+build, or visual proof succeeds.
+
+This ledger does **not** change the Go converter. Engine work stays in
+[`../10-canonical-post-mvp-roadmap.md`](../10-canonical-post-mvp-roadmap.md).
+
+**Validation rule for this folder:** frontend rows close on
+`npm --prefix frontend run build` plus the named visual or runtime proof.
+`make lint` and `make test` are the Phase 8 closure gate so a site change
+does not regress the engine. Do not mark a phase complete if either class
+of proof is missing.
+
+## Executive Summary
+
+The site already has a point of view: Newsreader + IBM Plex + JetBrains
+Mono, honest product copy, a JSON content-block schema, light/dark tokens,
+lazy routes, and a real showcase/benchmarks/dossier. Desktop landing and
+benchmarks are the high points. The score is held down by a phone nav that
+overflows, a landing headline that clips, inline `code` chips that drown
+docs prose, a dossier that is an essay sitting on top of a 1,329-row tool,
+and a 945 kB dossier JS chunk.
+
+| Surface | Now | Target | Why it is not higher |
+|---|---:|---:|---|
+| Landing (desktop) | 8.5 | 8.5 | Keep. Do not restyle. |
+| Benchmarks | 8.0 | 8.5 | Quiet inline code in the aside. |
+| Showcase (desktop) | 7.5 | 8.5 | Filters + real thumbnails. |
+| Documentation (desktop) | 7.0 | 8.5 | Inline code is unreadable. |
+| Getting Started / About | 6.5 | 8.0 | Marketing type scale on a tutorial. |
+| Dossier | 6.0 | 8.5 | Essay-first, no search, no URL state. |
+| Mobile (all pages) | 5.0 | 8.0 | Nav, overflow, tap targets. |
+| Frontend engineering | 6.0 | 8.0 | Payload, types, one test flow. |
+| **Blended** | **7.0** | **8.5** | Equal weight on the eight rows. |
+
+### Finding IDs
+
+| ID | Phase | Priority | One-line |
+|---|---|---|---|
+| FE-01 | 1 | P0 | Skip link fights HashRouter. |
+| FE-02 | 1 | P0 | Landing never resets `document.title`. |
+| FE-03 | 1 | P0 | Lightbox has no focus trap or scroll lock. |
+| FE-04 | 1 | P0 | Filter chips and pager lack pressed/current semantics. |
+| FE-05 | 1 | P1 | Status/severity badges are light-only hex. |
+| FE-06 | 1 | P1 | No `color-scheme` / `theme-color`. |
+| FE-07 | 2 | P0 | Phone/tablet primary nav overflows and collides. |
+| FE-08 | 2 | P0 | Landing headline clips on a 390 px phone. |
+| FE-09 | 2 | P0 | Inline `code` uses the terminal chip style. |
+| FE-10 | 2 | P0 | Getting Started uses marketing display type. |
+| FE-11 | 3 | P0 | Dossier interaction starts below the first viewport. |
+| FE-12 | 3 | P0 | Dossier has no text search. |
+| FE-13 | 3 | P0 | Dossier filters/page are not in the URL. |
+| FE-14 | 3 | P1 | Dossier has no empty-filter state. |
+| FE-15 | 4 | P1 | Showcase is an unfiltered 61-card dump. |
+| FE-16 | 4 | P1 | Showcase ships 30 MB of full-page PNGs as thumbs. |
+| FE-17 | 5 | P1 | Dossier route chunk is 945 kB (`issues.json` inlined). |
+| FE-18 | 6 | P1 | Footer brand, About, 404, and ContentPage fallback. |
+| FE-19 | 6 | P1 | No favicon / Open Graph. |
+| FE-20 | 7 | P2 | No heading ids, no TOC, empty `hooks/`, no types or UI tests. |
+| FE-21 | 7 | P2 | `global.css` is a 2,806-line monolith. |
+
+Out of scope (do not invent work in this ledger):
+
+- Rewriting the landing story or replacing the type pairing.
+- A design-system library (no Tailwind/shadcn migration).
+- JavaScript execution, Chrome parity, or engine docs truth.
+- Leaving GitHub Pages. HashRouter stays unless FE-01 needs a
+  documented `404.html` fallback; prefer a non-hash skip control first.
+
+## Evidence baseline
+
+- [x] Review date 2026-08-14. Proof: this ledger.
+- [x] Stack is Vite 6 + React 18.3 + React Router 6 HashRouter, base
+      `/gowkhtmltopdf/`. Paths: `frontend/package.json`,
+      `frontend/vite.config.js`, `frontend/src/App.jsx`.
+- [x] `dist/assets/DossierPage-*.js` is 945 kB. `src/data/issues.json` is
+      1.1 MB / 1,329 issues, imported from `src/data/issues.js`.
+- [x] `src/assets/showcase/` is 167 PNGs / 30 MB. `src/data/showcase.js`
+      is 444 lines.
+- [x] `src/styles/global.css` is 2,806 lines. Source under `src/` is
+      5,180 lines including that file.
+- [x] Chrome 1440 / 768 / 390 screenshots taken against
+      `npm --prefix frontend run preview` on 2026-08-14. Proven defects:
+      phone nav overlap, landing italic clip, tablet "Benchm" clip,
+      docs inline-code ransom note, dossier first viewport is essay-only.
+- [x] `frontend/src/hooks/` exists and is empty.
+- [x] README claims a `toc` block and `slugify.js`. Neither file exists
+      under `frontend/src/components/blocks/`. Path: `frontend/README.md`.
+- [ ] Fresh `npm --prefix frontend run build` was not re-run as a
+      closure measurement in this documentation-only wave.
+- [ ] Fresh `make lint` / `make test` were not run in this wave.
+
+## Phase 0: Freeze scope - P0
+
+> **Status:** baseline recorded; no code yet.
+
+### 0.1 Product boundary
+
+- [x] 8.5/10 means a docs site whose phone chrome, docs measure, and
+      dossier tool feel as considered as the desktop landing. Not a
+      marketing redesign. Proof: this ledger.
+- [x] Do not restyle the landing hero copy, terminal card, or type
+      pairing unless a later row names the file and the reason.
+- [x] Keep the JSON content-block schema. New pages stay
+      `src/data/content/page-*.json` plus a route.
+
+### 0.2 Proof classes used below
+
+- [x] **Visual:** Chrome screenshot at the named width (390 / 768 / 1440).
+- [x] **Build:** `npm --prefix frontend run build` exits 0 and
+      `docs/` matches `frontend/dist/` (existing copy script).
+- [x] **Runtime:** keyboard or URL behavior that can be repeated without
+      a screenshot.
+- [x] **Size:** `ls -lh frontend/dist/assets/*.js` and
+      `du -sh frontend/src/assets/showcase`.
+
+## Phase 1: Accessibility and document identity - P0
+
+> **Status:** open. Keyboard and document semantics are incomplete even
+> where the visuals look finished.
+
+### 1.1 FE-01 - Skip link must not change the hash route
+
+`App.jsx` uses `HashRouter` and `<a className="skip-link" href="#main-content">`.
+On GitHub Pages the live URL is `/gowkhtmltopdf/#/dossier`. The skip
+href becomes `#main-content` and the router can leave the page.
+
+- [ ] Replace the skip control with a button or in-page handler that
+      focuses `#main-content` and calls `scrollIntoView` without writing
+      `window.location.hash`. Path: `frontend/src/App.jsx`.
+- [ ] Keep `#main-content` on both `WrapLayout` and
+      `DocumentationPage` (docs is outside the wrap). Paths:
+      `frontend/src/App.jsx`, `frontend/src/pages/DocumentationPage.jsx`.
+- [ ] Proof: from `#/dossier`, activate Skip to content; URL stays
+      `#/dossier` and focus lands in `<main>`.
+
+### 1.2 FE-02 - Every route sets a document title
+
+`LandingPage.jsx` does not render `PageTitle`. Navigating Dossier then
+Home leaves "Issue Dossier - wkhtmltopdf / gowkhtmltopdf". `PageTitle`
+base string also disagrees with `index.html`.
+
+- [ ] Render `PageTitle` on the landing route. Path:
+      `frontend/src/pages/LandingPage.jsx`. Expected title matches the
+      `index.html` product title, not a leftover inner-page title.
+- [ ] One base string for `PageTitle`. Path:
+      `frontend/src/components/PageTitle.jsx`. Pick
+      `gowkhtmltopdf` (nav brand), not `wkhtmltopdf / gowkhtmltopdf`.
+- [ ] Proof: Home -> Dossier -> Home; `document.title` returns to the
+      landing title.
+
+### 1.3 FE-03 - Lightbox is a real dialog
+
+`Cardbox.jsx` has Escape and backdrop click, no focus trap, no body
+scroll lock, and a 28x28 close control (`.cardbox-close` in
+`global.css`).
+
+- [ ] On open: move focus to the close button, trap Tab inside
+      `.cardbox-inner`, restore focus to the opener on close, set
+      `document.body.style.overflow = 'hidden'` and clear it on unmount.
+      Path: `frontend/src/components/Cardbox.jsx`.
+- [ ] Close and arrow hit areas >= 44x44 CSS px. Path:
+      `frontend/src/styles/global.css` (`.cardbox-close`, `.cardbox-arrow`).
+- [ ] Proof: open a multi-page sample, Tab cycles only inside the
+      dialog, Escape returns focus to "Open sample", background does
+      not scroll.
+
+### 1.4 FE-04 - Pressed and current states
+
+- [ ] Filter chips expose `aria-pressed`. Path:
+      `frontend/src/components/FilterChips.jsx`.
+- [ ] Stats sidebar rows expose `aria-pressed`. Path:
+      `frontend/src/components/StatsSidebar.jsx`.
+- [ ] Current page control uses `aria-current="page"`. Path:
+      `frontend/src/components/Pagination.jsx`.
+- [ ] GitHub control accessible name is "gowkhtmltopdf on GitHub"
+      (plus star count when known). Path:
+      `frontend/src/components/GitHubStars.jsx`.
+- [ ] Proof: inspect the named attributes in the dossier and nav.
+
+### 1.5 FE-05 / FE-06 - Theme tokens reach badges and the browser chrome
+
+`STATUS_META` / `SEVERITY_META` in `constants.js` use light-only hex
+applied as inline styles. `index.html` has no `theme-color`.
+`document.documentElement` never sets `color-scheme`.
+
+- [ ] Drive badge colors from CSS variables (`--ok-ink` and friends
+      already exist in `global.css`), not from light hex in JS. Paths:
+      `frontend/src/data/constants.js`,
+      `frontend/src/components/IssueCard.jsx`,
+      `frontend/src/styles/global.css`.
+- [ ] Set `document.documentElement.style.colorScheme` (or
+      `color-scheme` on `html`) when the theme changes. Path:
+      `frontend/src/components/SiteNav.jsx`.
+- [ ] Add `<meta name="theme-color">` and keep it in sync with
+      `--bg`. Paths: `frontend/index.html`, `SiteNav.jsx`.
+- [ ] Proof: dark-mode dossier badges use the dark `--ok-ink` /
+      `--warn-ink` / `--bad-ink` pair; OS scrollbar/form controls follow
+      the theme.
+
+## Phase 2: Mobile chrome and visual type - P0
+
+> **Status:** open. These are the defects a visitor sees first on a phone.
+
+### 2.1 FE-07 - Primary nav fits 390 and 768
+
+At 390 the GitHub button sits on the link row and "Documentation" /
+theme toggle clip. At 768 "Benchm" clips. Current rule is only
+`.site-nav-links { overflow-x: auto }` under 900 px
+(`global.css`).
+
+- [ ] Below 900 px: brand + Getting Started + overflow menu (or
+      equivalent) that lists Overview, Documentation, Issue Dossier,
+      Showcase, Benchmarks, theme, and GitHub. Do not keep six text
+      links in one wrapping row. Paths: `frontend/src/components/SiteNav.jsx`,
+      `frontend/src/styles/global.css`.
+- [ ] Menu button has `aria-expanded` / `aria-controls`. Escape and
+      outside click close it. Path: `SiteNav.jsx`.
+- [ ] Chip / page-btn / theme-toggle min-height 44 px on the phone
+      breakpoint. Path: `global.css`.
+- [ ] Proof: 390 and 768 screenshots of Home, Docs, Dossier. No
+      clipped label, no overlapping control, no horizontal page scroll
+      caused by the nav.
+
+### 2.2 FE-08 - Landing headline stays inside the viewport
+
+`h1` is `clamp(52px, 6vw, 88px)` then `clamp(44px, 13vw, 60px)` under
+640 px. The italic second line clips at 390.
+
+- [ ] The landing `h1` (including the italic break) fits 390 without
+      overflow or mid-word clip. Prefer a smaller clamp and
+      `text-wrap: balance` over `overflow-wrap: anywhere`. Paths:
+      `frontend/src/pages/LandingPage.jsx`, `frontend/src/styles/global.css`.
+- [ ] `.landing-lede` and `.landing-note` do not clip. Same
+      screenshot.
+- [ ] Proof: 390 screenshot of `#/`. Full words "from HTML you
+      control." are visible.
+
+### 2.3 FE-09 - Inline code is quiet; blocks stay loud
+
+`:not(pre) > code` uses `--code-bg` / `--code-ink` (near-black chip).
+CLI and library pages mention a flag every sentence.
+
+- [ ] Inline code: `--accent-soft` (or equivalent) background,
+      `--ink` text, 1 px `--line` border, no terminal inverse. Path:
+      `frontend/src/styles/global.css`.
+- [ ] `pre code` / `.code-block` / `.terminal-card` keep the dark
+      treatment. Do not flatten those.
+- [ ] Proof: 1440 screenshot of `#/documentation/cli` "Global vs
+      page-scoped flags" is readable as a paragraph. Benchmarks
+      methodology `<code>` is quiet. Terminal card on Home is unchanged.
+
+### 2.4 FE-10 - Tutorial pages use the docs type scale
+
+Getting Started is a `ContentPage` inside `.wrap`, so it inherits the
+marketing `h1 { clamp(44px, 7vw, 76px) }`. Docs already have
+`.docs-page h1 { clamp(26px, 3vw, 34px) }`.
+
+- [ ] Getting Started and About use the docs heading scale (26-34 px
+      h1, 16 px lede), not the landing display scale. Paths:
+      `frontend/src/pages/ContentPage.jsx` and/or `global.css`.
+- [ ] Do not shrink the landing or dossier marketing heroes.
+- [ ] Proof: 1440 screenshot of `#/getting-started` h1 is in the docs
+      range; `#/` hero is unchanged.
+
+## Phase 3: Dossier as a tool - P0
+
+> **Status:** open. 1,329 classified issues are hidden under an essay.
+
+### 3.1 FE-11 - First viewport is the tool
+
+`DossierPage.jsx` renders the full `page-dossier.json` content blocks
+before chips, pager, cards, and sidebar.
+
+- [ ] First viewport at 1440 shows: short title or one-line count,
+      the AI-verdict caveat as a one-line banner, status/area chips,
+      and at least one issue card. Path:
+      `frontend/src/pages/DossierPage.jsx`.
+- [ ] Move "What the dossier tracks" and the long lede below the
+      list, or behind a collapsed "How this was classified" block.
+      Path: `frontend/src/data/content/page-dossier.json` and/or the
+      page component.
+- [ ] Proof: 1440 screenshot of `#/dossier` includes chips and a
+      card without scrolling.
+
+### 3.2 FE-12 - Text search
+
+- [ ] A labeled search input filters title, number, summary, and
+      evidence. Path: `frontend/src/pages/DossierPage.jsx` (new field
+      next to the chips).
+- [ ] `autocomplete="off"` and `spellCheck={false}` on that input.
+- [ ] Proof: type `rowspan`; the visible set is only matching rows.
+      Clear restores the previous status/area filter.
+
+### 3.3 FE-13 - URL is the source of filter state
+
+Filters live in `useState` only. Shared links always open "all / all / 25".
+
+- [ ] Read and write `status`, `category`, `severity`, `q`, `page`,
+      `pageSize` from the HashRouter search string
+      (`useSearchParams`). Path: `frontend/src/pages/DossierPage.jsx`.
+- [ ] Changing a chip or the search resets `page` to 1 and updates
+      the URL. Back button restores the previous filter.
+- [ ] Proof: open `#/dossier?status=implemented&category=CSS%2Flayout&page=2`;
+      chips, note, and cards match. Change status; URL updates.
+
+### 3.4 FE-14 - Empty filter state
+
+- [ ] When `filtered.length === 0`, render a short empty state with
+      a control that clears filters. Do not render a blank `.issues`
+      column. Path: `frontend/src/pages/DossierPage.jsx`.
+- [ ] Proof: a search that matches nothing shows the empty state.
+
+## Phase 4: Showcase as a library - P1
+
+> **Status:** open. The grid is good; it is not operable.
+
+### 4.1 FE-15 - Category chips
+
+`SHOWCASE` / `SHOWCASE_SPECIAL` in `showcase.js` have titles and
+filenames but no category the UI can filter on.
+
+- [ ] Add a small category field (invoice, report, CSS fixture,
+      poster/other, or the existing special vs golden split) on each
+      item. Path: `frontend/src/data/showcase.js`.
+- [ ] Chip row above the grid filters the list. Path:
+      `frontend/src/pages/ShowcasePage.jsx`.
+- [ ] Optional: put `cat` in the URL the same way as the dossier.
+      Only required if Phase 3's search-param helper is reused.
+- [ ] Proof: 1440 screenshot of `#/showcase` with one chip active
+      shows a shorter grid and no empty cards.
+
+### 4.2 FE-16 - Thumbs are thumbs
+
+`import.meta.glob('../assets/showcase/*.png', { eager: true })` points
+the grid at full-page PNGs (30 MB source tree). Cards already set
+`loading="lazy"` but the files themselves are print-page sized.
+
+- [ ] Generate a ~400 px wide WebP (or JPEG) thumb per first page
+      for the grid. Keep full-page PNGs for the lightbox and
+      GitHub PDF links. Paths: `scripts/screenshot_showcase.py` or a
+      sibling script, `frontend/src/assets/showcase/`,
+      `frontend/src/pages/ShowcasePage.jsx`,
+      `frontend/src/components/Cardbox.jsx`.
+- [ ] Grid `<img>` has explicit width/height (or aspect-ratio, already
+      present) and `loading="lazy"`. Above-fold first row may keep
+      default eager.
+- [ ] Proof: `du -sh frontend/src/assets/showcase` drops materially
+      or thumbs live in a smaller sibling dir; grid still renders;
+      lightbox still shows a readable page.
+
+## Phase 5: Payload and data contracts - P1
+
+> **Status:** open. The dossier route downloads the whole corpus as JS.
+
+### 5.1 FE-17 - Do not inline 1,329 issues into the route chunk
+
+`issues.js` does `import issues from './issues.json'`, so Vite emits
+them inside `DossierPage-*.js` (945 kB measured).
+
+- [ ] Load issue data with `fetch` of a static JSON asset (or a slim
+      index plus detail). Keep `sortIssues` / `countBy` as functions
+      over the loaded array. Path: `frontend/src/data/issues.js`,
+      `frontend/src/pages/DossierPage.jsx`.
+- [ ] Show a short loading state and an error state with retry.
+      Do not hang on a blank list.
+- [ ] Proof: `ls -lh frontend/dist/assets/DossierPage-*.js` is well
+      under the 500 kB `chunkSizeWarningLimit` in `vite.config.js`.
+      The JSON is a separate cacheable asset. Dossier still lists
+      1,329 rows after load.
+
+### 5.2 Landing and benchmarks stay static
+
+- [ ] Do not eagerly import `issues.json` from `LandingPage.jsx` or
+      `App.jsx`. Proof: `rg issues.json frontend/src` only hits the
+      dossier data module and any fetch URL.
+
+## Phase 6: Identity and dead ends - P1
+
+> **Status:** open. Small honesty bugs that make the site feel unfinished.
+
+### 6.1 FE-18 - Brand, About, unknown routes
+
+- [ ] Footer wordmark matches the nav: `gowkhtmltopdf`, not
+      `gowkhtmltoPDF`. Path: `frontend/src/components/Footer.jsx`.
+- [ ] Link About from the footer (not the primary nav). Paths:
+      `Footer.jsx`, existing route `/about` in `App.jsx`.
+- [ ] Unknown in-app paths render a small Not Found with links home
+      and to Getting Started, instead of a silent `<Navigate to="/" />`.
+      Path: `frontend/src/App.jsx`.
+- [ ] `ContentPage` must not fall back to `overview` on a bad id.
+      Unknown content renders the same Not Found. Path:
+      `frontend/src/pages/ContentPage.jsx`.
+- [ ] Proof: `#/about` is reachable from the footer. `#/nope` does
+      not look like the landing hero.
+
+### 6.2 FE-19 - Tab icon and unfurl
+
+- [ ] Add a favicon (SVG or 32 PNG) referenced from `index.html`.
+- [ ] Add `og:title`, `og:description`, `og:image` (one still of the
+      landing or a fixture). Path: `frontend/index.html`.
+- [ ] Proof: built `docs/index.html` contains the tags; the tab shows
+      the icon on `npm run preview`.
+
+## Phase 7: Maintainability - P2
+
+> **Status:** open. Do not start this phase until Phases 1-3 are checked.
+
+### 7.1 FE-20 - Deep links, types, one smoke flow
+
+- [ ] Headings in content blocks get stable ids (restore the README
+      `slugify` behavior). Path: new
+      `frontend/src/components/blocks/slugify.js` used by
+      `ProseBlock` / `HeroBlock` / `CalloutBlock`.
+- [ ] Optional `toc` block renderer, or drop the claim from
+      `frontend/README.md`. Do not leave the README lying.
+- [ ] Either add JSDoc typedefs for `{ id, nav, content[] }` and the
+      issue record, or introduce TypeScript for `src/data/` only.
+      Do not convert the whole app unless the first data types pay off
+      in the same PR.
+- [ ] One Playwright (or equivalent) smoke: nav menu on 390, dossier
+      search + query string, showcase lightbox focus restore. Add the
+      script to `frontend/package.json`.
+- [ ] Delete or use `frontend/src/hooks/`. An empty directory is not
+      a home for future code.
+
+### 7.2 FE-21 - Split the stylesheet by surface
+
+- [ ] Move landing, dossier, showcase, bench, and docs rules out of
+      `global.css` into imported partials (or per-page CSS files).
+      Keep tokens, reset, nav, and footer in the shared file.
+- [ ] Proof: `wc -l frontend/src/styles/global.css` drops below
+      ~800; `npm --prefix frontend run build` still emits one CSS
+      asset (or a justified split); visual spot-check of Home / Docs /
+      Dossier / Showcase / Benchmarks at 1440.
+
+### 7.3 HashRouter stay-or-go (deferred unless FE-01 fails)
+
+- [~] BrowserRouter + GitHub Pages `404.html` redirect is **out of
+      this wave** unless the FE-01 skip-link fix is proven impossible
+      under HashRouter. Reason: deploy contract. Next gate: a dedicated
+      Pages routing note, not a drive-by in a visual PR.
+
+## Phase 8: Closure gates
+
+> **Status:** blocked on Phases 1-3. Phases 4-7 may ship later and still
+> close this phase for the P0 cut.
+
+### 8.1 Frontend proof
+
+- [ ] `npm --prefix frontend run build` exits 0. Record the command
+      output and the new `ls -lh frontend/dist/assets/*.js` listing
+      beside this row.
+- [ ] Preview smoke at 1440 and 390 for `#/`, `#/getting-started`,
+      `#/documentation/cli`, `#/dossier`, `#/showcase`, `#/benchmarks`.
+      Attach or date the screenshots in this folder
+      (`plans/frontend-improves/evidence/`) when the P0 cut lands.
+- [ ] `docs/` is produced only by the existing
+      `frontend/scripts/copy-to-docs.mjs`. No hand-edits.
+
+### 8.2 Engine proof (do not skip)
+
+- [ ] `make lint` exits 0. Record the outcome here.
+- [ ] `make test` exits 0. Record the outcome here.
+- [ ] Leave the row unchecked if either command fails. A docs-site
+      PR that breaks the engine is not closed.
+
+### 8.3 Re-rate
+
+- [ ] Fill the after column. Close this ledger only if mobile >= 8.0
+      and blended >= 8.5, or record an honest miss with the remaining
+      unchecked IDs.
+
+| Surface | Before | After | Evidence |
+|---|---:|---:|---|
+| Landing (desktop) | 8.5 |  | |
+| Benchmarks | 8.0 |  | |
+| Showcase (desktop) | 7.5 |  | |
+| Documentation (desktop) | 7.0 |  | |
+| Getting Started / About | 6.5 |  | |
+| Dossier | 6.0 |  | |
+| Mobile (all pages) | 5.0 |  | |
+| Frontend engineering | 6.0 |  | |
+| **Blended** | **7.0** |  | |
+
+## Dependencies
+
+```
+Phase 0 (scope)
+  -> Phase 1 (a11y / title / dialog / tokens)
+       -> Phase 2 (nav, headline, inline code, type scale)
+            -> Phase 3 (dossier tool + URL)
+                 -> Phase 4 (showcase filters; thumbs may start in parallel with 5)
+                 -> Phase 5 (issues.json fetch; do not start before 3.3 URL shape is known)
+            -> Phase 6 (identity; can overlap 4-5)
+                 -> Phase 7 (types / CSS split / smoke; after 1-3)
+                      -> Phase 8 (build + make lint/test + re-rate)
+```
+
+Suggested PR cuts (keep diffs reviewable):
+
+1. Phase 1 + 2.3 + 2.4 (a11y and type, no nav rewrite).
+2. Phase 2.1 + 2.2 (phone chrome + headline).
+3. Phase 3 (dossier as a tool).
+4. Phase 5 then 4 (payload, then thumbs).
+5. Phase 6 + leftover Phase 7.
+6. Phase 8 evidence commit.
+
+## Implementation notes
+
+- ASCII in `src/data/content/*.json` stays ASCII (existing generator
+  rule). UI chrome copy may use `…` where the interface guidelines ask.
+- Do not add a UI framework. Tokens in `global.css` are the system.
+- `VITE_BASE_PATH` / `base: '/gowkhtmltopdf/'` stays. New fetches must
+  honor `import.meta.env.BASE_URL`.
+- Showcase PNG regeneration is owned by `scripts/screenshot_showcase.py`.
+  Do not hand-export thumbs.
+- Unrelated worktree files stay untouched.
