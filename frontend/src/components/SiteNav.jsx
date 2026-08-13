@@ -8,6 +8,7 @@ const LINKS = [
   { to: '/documentation', label: 'Documentation' },
   { to: '/dossier', label: 'Issue Dossier' },
   { to: '/showcase', label: 'Showcase' },
+  { to: '/benchmarks', label: 'Benchmarks' },
 ]
 
 function useTheme() {

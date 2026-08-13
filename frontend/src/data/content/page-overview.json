@@ -76,16 +76,16 @@
    "type": "stats",
    "items": [
     {
-     "value": "890 ms",
-     "label": "500-page PDF, direct CLI run"
+     "value": "16x",
+     "label": "faster than wkhtmltopdf at 2 pages"
     },
     {
-     "value": "1.9x",
+     "value": "1.6x",
      "label": "faster than wkhtmltopdf at 500 pages"
     },
     {
-     "value": "56%",
-     "label": "less peak RSS than wkhtmltopdf at 500 pages"
+     "value": "16 ms",
+     "label": "2-page report, current generic CLI"
     },
     {
      "value": "0",

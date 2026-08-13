@@ -1,4 +1,4 @@
-.PHONY: test lint build fmt golden golden-update samples clean claim-scan
+.PHONY: test lint build fmt golden golden-update samples clean claim-scan bench bench-cli-compare
 
 # Pure-Go runtime: the standard library plus the allowlisted direct modules
 # below. No cgo, browser, or native converter process is required.
@@ -126,6 +126,18 @@ samples:
 		output/wiki-ana-de-armas.pdf \
 		|| echo "warning: wiki-ana-de-armas.pdf live smoke skipped (network/fetch failed)"
 	ls -la output/ | awk '{print $$5, $$9}' | tail -30
+
+# In-process Go benchmark matrix (generic + certified-islands, images).
+bench:
+	go test ./internal/convert -run '^$$' \
+		-bench 'Benchmark(PDFPages|TemplatePages|WebFetchImage|ImageAssets)$$' \
+		-benchmem -benchtime=1x -count=1
+
+# Process-level CLI comparison against installed wkhtmltopdf. Requires
+# `make build` and wkhtmltopdf on PATH. Writes testdata/golden/benchmarks/cli-compare*.
+bench-cli-compare: build
+	GOWKHTMLTOPDF_CLI_COMPARE=1 go test ./internal/convert \
+		-run '^TestCompareWithWkhtmltopdfBinary$$' -count=1 -timeout 20m -v
 
 clean:
 	rm -rf testdata/golden/out

@@ -58,7 +58,88 @@ GOWKHTMLTOPDF_GENERATE_BENCHMARK_OUTPUTS=1 \
 This writes `live-movie-listing-010.pdf` and
 `live-movie-listing-010.png`.
 
-## Current generic snapshot (2026-08-12 post-remediation)
+## Current snapshot (2026-08-14)
+
+Host: Linux amd64, 13th Gen Intel Core i7-13700HX (WSL2, 24 CPUs).
+Toolchain: go1.26.4. Freshly built `gowkhtmltopdf` **0.2.0** on the
+**generic** convert path. wkhtmltopdf **0.12.6.1 (with patched qt)** at
+`/usr/local/bin/wkhtmltopdf`.
+
+This snapshot replaces the 2026-08-12 generic rows and the 2026-08-09
+island-era CLI-vs-wkhtml table as the current product claim. Older
+snapshots below stay for history.
+
+### Direct CLI vs wkhtmltopdf
+
+Same generated report fixture (`report.html.tmpl`, 20 invoice rows per
+requested page). Both binaries: `--quiet --enable-local-file-access`.
+Each cell is the **median of three timed process runs after one warmup**.
+Wall time is Go `time.Since` around `/usr/bin/time`; peak RSS is `%M` in
+KiB. Requested page counts matched rendered page counts.
+
+```sh
+make bench-cli-compare
+```
+
+| Pages | Gowk time | wkhtmltopdf time | Speedup | Gowk RSS | wkhtmltopdf RSS | Gowk PDF bytes | wkhtmltopdf PDF bytes |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 2 | 16 ms | 254 ms | 15.95x | 24,192 KiB | 44,852 KiB | 42,501 | 18,486 |
+| 5 | 22 ms | 265 ms | 12.23x | 24,768 KiB | 45,396 KiB | 50,919 | 30,584 |
+| 10 | 30 ms | 278 ms | 9.41x | 26,496 KiB | 46,200 KiB | 65,072 | 50,994 |
+| 20 | 44 ms | 304 ms | 6.84x | 29,760 KiB | 47,156 KiB | 91,899 | 90,742 |
+| 50 | 88 ms | 387 ms | 4.40x | 41,472 KiB | 51,824 KiB | 172,926 | 210,678 |
+| 100 | 184 ms | 530 ms | 2.89x | 58,752 KiB | 58,976 KiB | 308,714 | 411,260 |
+| 200 | 353 ms | 812 ms | 2.30x | 90,048 KiB | 74,336 KiB | 579,862 | 816,285 |
+| 250 | 433 ms | 942 ms | 2.18x | 112,704 KiB | 81,636 KiB | 715,476 | 1,019,315 |
+| 500 | **1.045 s** | **1.641 s** | **1.57x** | **199,872 KiB** | **123,264 KiB** | **1,398,479** | **2,036,776** |
+
+gowkhtmltopdf was **faster at every tested size**. The largest gap is on
+short documents (about **16x** at 2 pages) because wkhtmltopdf pays a
+~250 ms WebKit/process start. At 500 pages it is still about **1.6x**
+faster.
+
+Peak RSS is **lower through 100 pages** and **higher from 200 pages** on
+this generic path. PDF bytes are larger at 2–20 pages and smaller from
+50 pages onward (about 31% smaller at 500 pages).
+
+| Use case | Preferred engine | Reason |
+|---|---|---|
+| High-volume short reports (2–50 pages) | gowkhtmltopdf | 4–16x faster and lower RSS |
+| Large reports where wall time matters | gowkhtmltopdf | Still faster at 100–500 pages |
+| Lowest peak RSS at 200–500 pages | wkhtmltopdf | Lower RSS on this fixture at those sizes |
+| Legacy Qt/WebKit print compatibility | wkhtmltopdf | Preserves the established renderer |
+| General default for this workload | gowkhtmltopdf | Faster at every size; smaller PDFs from 50 pages |
+
+This is a process comparison of the **generic CLI**. It is not the
+benchmark-only page-island path. Do not conflate peak RSS with Go
+`B/op`. Treat the table as workload-specific, not a universal
+browser-engine ranking.
+
+Raw rows: [`cli-compare-results.csv`](cli-compare-results.csv),
+[`cli-compare.md`](cli-compare.md).
+
+### In-process Go matrix (generic)
+
+```sh
+make bench
+```
+
+Request mode: **generic** (not certified-islands). One iteration
+(`-benchtime=1x -count=1`). These are in-process allocation numbers, not
+process RSS.
+
+| Workload | 2 | 10 | 100 | 500 |
+|---|---:|---:|---:|---:|
+| PDF pages | 3.66ms / 2.3MB / 5.8K | 15.0ms / 5.9MB / 24.1K | 149ms / 46.1MB / 230K | **966ms / 224.3MB / 1.15M** |
+| Template + PDF pages | 3.63ms / 2.3MB / 6.0K | 15.4ms / 6.1MB / 25.1K | 165ms / 47.3MB / 240K | **948ms / 228.9MB / 1.20M** |
+| Web-fetch image tiles | 10.7ms / 7.5MB / 2.0K | 13.8ms / 8.3MB / 2.6K | 42.6ms / 23.7MB / 6.9K | **166ms / 91.8MB / 25.5K** |
+| Inline image tiles | 14.6ms / 14.0MB / 2.1K | 10.1ms / 7.9MB / 2.1K | 38.6ms / 23.3MB / 6.3K | **178ms / 91.7MB / 25.0K** |
+
+Full one-iteration rows for every matrix size, including
+certified-islands, are Snapshot F in
+[`benchmark-results.txt`](benchmark-results.txt).
+
+## Historical generic snapshot (2026-08-12 post-remediation)
 
 Host: Linux amd64, 13th Gen Intel Core i7-13700HX. Command:
 
@@ -76,8 +157,9 @@ Request mode: **generic** (not certified-islands). Cache: warm GOCACHE.
 | generic 500 pages | 1.073 s | 226.6 MB | 939,257 |
 
 These are in-process Go allocation numbers, not process RSS. Snapshot D
-CLI RSS (54,632 KiB / 960 ms at 500 pages) remains the last `/usr/bin/time`
-process measurement and is historical vs CR-02 CLI island removal.
+CLI RSS (54,632 KiB / 960 ms at 500 pages) is historical vs CR-02 CLI
+island removal. The current generic-CLI process matrix is the 2026-08-14
+table above.
 
 ## Stored 2026-08-12 Snapshot D benchmark
 
@@ -241,11 +323,15 @@ The separate locked-gate result is the more stable count-3 median shown
 above; the comparison table intentionally uses one iteration on both
 snapshots.
 
-### Direct CLI comparison: gowkhtmltopdf vs wkhtmltopdf
+### Historical direct CLI comparison: gowkhtmltopdf vs wkhtmltopdf (2026-08-09, island-era)
+
+This matrix is **historical pre-CR-02 / island-era CLI**. Ordinary CLI
+documents no longer take the page-island path. Use the 2026-08-14 table
+above for current generic-CLI claims.
 
 This matrix was re-measured on 2026-08-09 using the same generated report
 fixtures for both command-line engines. The Go binary was freshly built from
-the current source (`go build ./cmd/gowkhtmltopdf`); wkhtmltopdf was
+the then-current source (`go build ./cmd/gowkhtmltopdf`); wkhtmltopdf was
 0.12.6.1. Each cell is the median of three process runs. Timing is wall time
 in milliseconds; RSS is peak resident set size from `/usr/bin/time -f '%M'` in
 KiB. Both commands used `--quiet --enable-local-file-access` and every output
@@ -310,8 +396,19 @@ generation intentionally hits the public CDN so samples match real-world fetch.
 Run the focused benchmarks with:
 
 ```sh
-go test ./internal/convert -run '^$' -bench 'Benchmark(PDFPages|TemplatePages|WebFetchImage|ImageAssets)$' -benchmem -count=1
+make bench
 ```
 
-To reproduce the checked-in one-iteration snapshot exactly, add
-`-benchtime=1x` to the command above.
+equivalent:
+
+```sh
+go test ./internal/convert -run '^$' \
+  -bench 'Benchmark(PDFPages|TemplatePages|WebFetchImage|ImageAssets)$' \
+  -benchmem -benchtime=1x -count=1
+```
+
+Process-level comparison against installed wkhtmltopdf:
+
+```sh
+make bench-cli-compare
+```

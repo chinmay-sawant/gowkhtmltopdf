@@ -21,7 +21,7 @@ and **[fidelity.md](fidelity.md)**.
 | Understand the pipeline and packages | [architecture.md](architecture.md), [architecture/](architecture/) |
 | Compare with wkhtmltopdf wrappers / browsers | [comparison-with-others/](comparison-with-others/) |
 | See what is deferred or out of scope | [deferred.md](deferred.md) |
-| Read performance numbers | [performance.md](performance.md) |
+| Read performance numbers | [performance.md](performance.md), [`../testdata/golden/benchmarks/README.md`](../testdata/golden/benchmarks/README.md) |
 
 ## Guides
 

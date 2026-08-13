@@ -8,6 +8,7 @@ import LandingPage from './pages/LandingPage'
 const DocumentationPage = lazy(() => import('./pages/DocumentationPage'))
 const DossierPage = lazy(() => import('./pages/DossierPage'))
 const ShowcasePage = lazy(() => import('./pages/ShowcasePage'))
+const BenchmarksPage = lazy(() => import('./pages/BenchmarksPage'))
 
 const DOC_REDIRECTS = [
   ['cli', 'cli'],
@@ -16,6 +17,7 @@ const DOC_REDIRECTS = [
   ['compatibility', 'compatibility'],
   ['fonts', 'fonts'],
   ['security', 'security'],
+  ['performance', 'performance'],
 ]
 
 function ScrollToTop() {
@@ -51,6 +53,7 @@ export default function App() {
           <Route path="/about" element={<ContentPage />} />
           <Route path="/dossier" element={<DossierPage />} />
           <Route path="/showcase" element={<ShowcasePage />} />
+          <Route path="/benchmarks" element={<BenchmarksPage />} />
         </Route>
         <Route path="/documentation" element={<Navigate to="/documentation/cli" replace />} />
         <Route path="/documentation/:docId" element={<DocumentationPage />} />

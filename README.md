@@ -54,6 +54,7 @@ Install, flags, and HTTP URLs: [getting-started.md](documentation/getting-starte
 | [documentation/fonts.md](documentation/fonts.md) | Bundled faces, `--font-path`, `@font-face` |
 | [documentation/samples.md](documentation/samples.md) | Golden fixtures and `output/` |
 | [documentation/performance.md](documentation/performance.md) | Benchmarks and how to measure |
+| [testdata/golden/benchmarks/README.md](testdata/golden/benchmarks/README.md) | Current CLI vs wkhtmltopdf snapshot |
 | [documentation/deferred.md](documentation/deferred.md) | Deferred features and next gates |
 | [documentation/THREAT-MODEL.md](documentation/THREAT-MODEL.md) | Security / ACL / network policy |
 | [documentation/integration-security.md](documentation/integration-security.md) | Embedding in HTTP apps (SSRF) |
@@ -81,6 +82,34 @@ err := gowkhtmltopdf.RunPDF(ctx, &gowkhtmltopdf.PDFRequest{
 
 Local files, `Converter`, TOC objects, and network policy:
 [documentation/library-api.md](documentation/library-api.md).
+
+## Performance
+
+**Current snapshot (2026-08-14):** freshly built generic `gowkhtmltopdf`
+0.2.0 versus installed **wkhtmltopdf 0.12.6.1 (patched Qt)** on Linux
+amd64, 13th Gen Intel Core i7-13700HX. Same report fixture, median of
+three process runs after one warmup.
+
+| Pages | gowkhtmltopdf | wkhtmltopdf | Faster by |
+|------:|--------------:|------------:|----------:|
+| 2 | 16 ms | 254 ms | **16x** |
+| 10 | 30 ms | 278 ms | **9.4x** |
+| 100 | 184 ms | 530 ms | **2.9x** |
+| 500 | 1.045 s | 1.641 s | **1.6x** |
+
+Faster at every tested size. Peak RSS is lower through 100 pages and
+higher from 200 pages on the generic path. Full matrix, RSS, PDF sizes,
+in-process `go test -bench` rows, and historical snapshots:
+
+- [testdata/golden/benchmarks/README.md](testdata/golden/benchmarks/README.md)
+- [documentation/performance.md](documentation/performance.md)
+
+Reproduce:
+
+```sh
+make bench-cli-compare
+make bench
+```
 
 ## License
 

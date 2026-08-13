@@ -442,6 +442,35 @@ html[data-theme='dark'] .page-btn.active {
   max-width: min(100%, 1120px);
 }
 
+.docs-page .hero {
+  padding: 4px 0 0;
+  max-width: none;
+}
+
+.docs-page h1 {
+  font-size: clamp(26px, 3vw, 34px);
+  line-height: 1.22;
+  letter-spacing: -0.02em;
+  margin-bottom: 12px;
+}
+
+.docs-page .lede {
+  font-size: 16px;
+  line-height: 1.55;
+  margin-bottom: 22px;
+}
+
+.docs-page .content-blocks h2 {
+  font-size: 22px;
+  margin-bottom: 14px;
+}
+
+.docs-page .prose h3,
+.docs-page .table-block-heading,
+.docs-page .code-block-heading {
+  font-size: 17px;
+}
+
 @media (max-width: 900px) {
   .docs-layout {
     grid-template-columns: 1fr;
@@ -2076,7 +2105,7 @@ html[data-theme='dark'] .boundary-symbol {
 
 .next-links {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   margin-top: 34px;
   border-top: 1px solid var(--line);
 }
@@ -2092,7 +2121,7 @@ html[data-theme='dark'] .boundary-symbol {
   text-decoration: none;
 }
 
-.next-links a + a {
+.next-links a:nth-child(even) {
   padding-left: 18px;
   border-left: 1px solid var(--line);
 }
@@ -2299,7 +2328,7 @@ html[data-theme='dark'] .boundary-symbol {
   }
 
   .next-links a,
-  .next-links a + a {
+  .next-links a:nth-child(even) {
     padding: 18px 0;
     border-left: 0;
   }
@@ -2309,6 +2338,210 @@ html[data-theme='dark'] .cardbox-btn.primary {
   background: #e8e6e0;
   border-color: #e8e6e0;
   color: #17181a;
+}
+
+.bench-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(260px, 0.85fr);
+  gap: clamp(32px, 5vw, 80px);
+  align-items: end;
+  padding: 82px 0 36px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 36px;
+}
+
+.bench-kicker {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 16px;
+}
+
+.bench-hero h1 {
+  margin-bottom: 22px;
+}
+
+.bench-hero h1 em {
+  color: var(--accent);
+  font-style: italic;
+  font-weight: 400;
+}
+
+.bench-hero .lede {
+  margin-bottom: 0;
+}
+
+.bench-hero-stats {
+  display: grid;
+  gap: 18px;
+  padding-bottom: 8px;
+}
+
+.bench-hero-stats strong {
+  display: block;
+  font-family: var(--serif);
+  font-size: clamp(28px, 4vw, 40px);
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+
+.bench-hero-stats span {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.bench-section {
+  margin-top: 64px;
+}
+
+.bench-section h2 {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: clamp(28px, 4vw, 40px);
+  letter-spacing: -0.03em;
+  margin-bottom: 14px;
+}
+
+.bench-section .lede {
+  margin-bottom: 22px;
+}
+
+.bench-section + .callout {
+  margin-top: 36px;
+}
+
+.bench-chart {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.bench-pair {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 18px 18px 16px;
+}
+
+.bench-pair h3 {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 500;
+  margin-bottom: 14px;
+}
+
+.bench-bars {
+  display: grid;
+  gap: 10px;
+}
+
+.bench-bar-row {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.bench-engine,
+.bench-bar-time {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-2);
+}
+
+.bench-bar-track {
+  height: 10px;
+  background: var(--soft);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.bench-bar {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.bench-bar-gowk {
+  background: var(--accent);
+}
+
+.bench-bar-wk {
+  background: color-mix(in srgb, var(--sep) 80%, var(--ink));
+}
+
+.bench-pair-note {
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.bench-pair-note strong {
+  font-family: var(--mono);
+  color: var(--accent-strong);
+}
+
+.bench-method ul {
+  margin: 0 0 22px;
+  padding-left: 18px;
+  color: var(--ink-2);
+}
+
+.bench-method li + li {
+  margin-top: 8px;
+}
+
+.bench-method pre {
+  background: var(--code-bg);
+  color: var(--code-ink);
+  border: 1px solid var(--code-border);
+  border-radius: 10px;
+  padding: 18px 20px;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-x: auto;
+  margin-bottom: 18px;
+}
+
+.bench-method p {
+  color: var(--ink-2);
+  max-width: 72ch;
+}
+
+.bench-method a {
+  color: var(--accent);
+}
+
+@media (max-width: 900px) {
+  .bench-hero {
+    grid-template-columns: 1fr;
+    gap: 28px;
+    padding-top: 64px;
+  }
+}
+
+@media (max-width: 640px) {
+  .bench-hero {
+    padding-top: 52px;
+  }
+
+  .bench-bar-row {
+    grid-template-columns: 52px minmax(0, 1fr) auto;
+  }
+
+  .bench-section {
+    margin-top: 48px;
+  }
 }
 
 html[data-theme='dark'] .cardbox-btn.primary:hover {

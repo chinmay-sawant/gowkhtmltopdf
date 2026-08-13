@@ -53,7 +53,7 @@ export default function LandingPage() {
           </p>
           <div className="landing-actions">
             <Link className="button button-primary" to="/getting-started">Get started <span aria-hidden="true">→</span></Link>
-            <Link className="button button-secondary" to="/showcase">Browse the showcase</Link>
+            <Link className="button button-secondary" to="/benchmarks">See the benchmarks</Link>
           </div>
           <p className="landing-note">Best for invoices, statements, tables, and multi-page reports. JavaScript is not executed.</p>
         </div>
@@ -128,7 +128,8 @@ export default function LandingPage() {
         <div className="next-links">
           <Link to="/getting-started"><span>01</span><strong>First conversion</strong><small>Build, run, and make your first PDF</small><b aria-hidden="true">→</b></Link>
           <Link to="/documentation/library-api"><span>02</span><strong>Go library</strong><small>Context-aware conversion and typed settings</small><b aria-hidden="true">→</b></Link>
-          <Link to="/dossier"><span>03</span><strong>Issue dossier</strong><small>1329 upstream issues mapped to coverage</small><b aria-hidden="true">→</b></Link>
+          <Link to="/benchmarks"><span>03</span><strong>Benchmarks</strong><small>How much faster than wkhtmltopdf</small><b aria-hidden="true">→</b></Link>
+          <Link to="/dossier"><span>04</span><strong>Issue dossier</strong><small>1329 upstream issues mapped to coverage</small><b aria-hidden="true">→</b></Link>
         </div>
       </section>
     </div>

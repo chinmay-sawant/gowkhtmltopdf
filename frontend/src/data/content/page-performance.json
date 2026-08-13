@@ -1,0 +1,59 @@
+{
+  "id": "performance",
+  "nav": "Performance",
+  "content": [
+    {
+      "type": "hero",
+      "title": "Labeled snapshots, not an SLA",
+      "lede": "The current generic CLI is faster than wkhtmltopdf 0.12.6.1 at every tested report size. The largest gap is on short documents. Peak RSS is lower through 100 pages and higher from 200 pages. Open the Benchmarks page for the visual comparison."
+    },
+    {
+      "type": "stats",
+      "items": [
+        { "value": "16x", "label": "faster at 2 pages (16 ms vs 254 ms)" },
+        { "value": "9.4x", "label": "faster at 10 pages (30 ms vs 278 ms)" },
+        { "value": "2.9x", "label": "faster at 100 pages (184 ms vs 530 ms)" },
+        { "value": "1.6x", "label": "faster at 500 pages (1.045 s vs 1.641 s)" }
+      ]
+    },
+    {
+      "type": "table",
+      "heading": "Direct CLI vs wkhtmltopdf (2026-08-14)",
+      "headers": ["Pages", "gowk time", "wkhtml time", "Speedup", "gowk RSS", "wkhtml RSS"],
+      "rows": [
+        ["2", "16 ms", "254 ms", "15.95x", "24,192 KiB", "44,852 KiB"],
+        ["5", "22 ms", "265 ms", "12.23x", "24,768 KiB", "45,396 KiB"],
+        ["10", "30 ms", "278 ms", "9.41x", "26,496 KiB", "46,200 KiB"],
+        ["20", "44 ms", "304 ms", "6.84x", "29,760 KiB", "47,156 KiB"],
+        ["50", "88 ms", "387 ms", "4.40x", "41,472 KiB", "51,824 KiB"],
+        ["100", "184 ms", "530 ms", "2.89x", "58,752 KiB", "58,976 KiB"],
+        ["200", "353 ms", "812 ms", "2.30x", "90,048 KiB", "74,336 KiB"],
+        ["250", "433 ms", "942 ms", "2.18x", "112,704 KiB", "81,636 KiB"],
+        ["500", "1.045 s", "1.641 s", "1.57x", "199,872 KiB", "123,264 KiB"]
+      ]
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "Generic CLI, not the island-era path",
+      "body": "These rows are the current generic convert path against wkhtmltopdf 0.12.6.1 with patched Qt. Median of three timed process runs after one warmup. Peak RSS is /usr/bin/time %M. Do not compare these RSS numbers to older island-era CLI snapshots, and do not treat Go B/op as process RSS."
+    },
+    {
+      "type": "code",
+      "heading": "Reproduce",
+      "language": "sh",
+      "code": "make bench-cli-compare\nmake bench"
+    },
+    {
+      "type": "bullets",
+      "heading": "What the numbers mean",
+      "items": [
+        "CLI comparison is process wall time plus peak RSS for freshly built gowkhtmltopdf versus the installed wkhtmltopdf binary.",
+        "In-process go test -bench rows measure conversion inside the test process. B/op is cumulative allocation traffic.",
+        "The report fixture is testdata/golden/benchmarks/templates/report.html.tmpl with 20 invoice rows per requested page.",
+        "Page islands (convert.NewBenchmarkPDFRequest) are a benchmark-only opt-in. Ordinary CLI and library requests stay on the generic path.",
+        "Full matrices, historical snapshots, and raw go test rows live in testdata/golden/benchmarks/ and documentation/performance.md."
+      ]
+    }
+  ]
+}

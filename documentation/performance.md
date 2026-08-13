@@ -4,20 +4,19 @@ Numbers on this page are **labeled snapshots**, not a live SLA. Host, GOCACHE
 state, and whether a run used the **generic** convert path or the
 **benchmark-only page-island** path all change wall time and RSS.
 
-**Current process and in-process matrices** live in
-[`testdata/golden/benchmarks/README.md`](../testdata/golden/benchmarks/README.md)
-(Snapshot D and later). The tables below keep the historical README
-measurements so older reviews stay comparable.
-
-Do **not** read the 2026-08-09 CLI-vs-wkhtmltopdf table as a current product
-claim. That run is **historical pre-CR-02 / island-era CLI**. Ordinary CLI
-documents no longer take the page-island path.
+**Current snapshot: 2026-08-14.** Freshly built generic CLI versus installed
+wkhtmltopdf 0.12.6.1 (patched Qt) on Linux amd64, 13th Gen Intel Core
+i7-13700HX. Full matrices live in
+[`testdata/golden/benchmarks/README.md`](../testdata/golden/benchmarks/README.md).
+The tables further down keep older snapshots so reviews stay comparable.
 
 Related:
 
 - Benchmark implementation: [`internal/convert/benchmarks_test.go`](../internal/convert/benchmarks_test.go)
+- CLI comparison: [`internal/convert/wk_compare_test.go`](../internal/convert/wk_compare_test.go)
 - Recorded results and templates: [`testdata/golden/benchmarks/README.md`](../testdata/golden/benchmarks/README.md)
 - Raw Go rows: [`testdata/golden/benchmarks/benchmark-results.txt`](../testdata/golden/benchmarks/benchmark-results.txt)
+- Process comparison CSV: [`testdata/golden/benchmarks/cli-compare-results.csv`](../testdata/golden/benchmarks/cli-compare-results.csv)
 - Phase 9.3 gate: `TestTenPageTableReportPerformance` in `internal/convert/perf_test.go`
 
 ---
@@ -26,14 +25,69 @@ Related:
 
 | Kind | What it measures | Where |
 |------|------------------|-------|
+| Direct CLI `/usr/bin/time` | Process elapsed time and peak RSS vs wkhtmltopdf | **Current 2026-08-14 table below** |
+| In-process `go test -bench` | Go wall time, `B/op`, `allocs/op` inside the test process | **Current 2026-08-14 generic matrix below** |
 | Phase 9.3 gate | Two full-pipeline runs of a 10-section invoice fixture; CI budget only | Historical timings below; CI still asserts **< 5 s** per run |
-| In-process `go test -bench` | Go wall time, `B/op`, `allocs/op` inside the test process | Historical 2026-08-09 matrix below; later snapshots in the benchmarks README |
-| Direct CLI `/usr/bin/time` | Process elapsed time and peak RSS | Historical 2026-08-09 island-era table **and** Snapshot D (500 pages: **54,632 KiB / 960 ms**) |
 
 Page islands (`convert.NewBenchmarkPDFRequest`) are an **internal benchmark
 opt-in**. They are not a user-facing CLI or library mode. Comparing an
 island-era CLI number to today’s generic CLI is not a like-for-like fidelity
 or RSS guarantee.
+
+---
+
+## Current CLI comparison vs wkhtmltopdf (2026-08-14)
+
+Generic `gowkhtmltopdf` 0.2.0 versus `wkhtmltopdf 0.12.6.1 (with patched qt)`.
+Same report fixture (20 invoice rows per requested page). Both binaries used
+`--quiet --enable-local-file-access`. Each cell is the median of three timed
+process runs after one warmup.
+
+```sh
+make bench-cli-compare
+```
+
+| Pages | Gowk time | wkhtmltopdf time | Speedup | Gowk RSS | wkhtmltopdf RSS |
+|------:|----------:|-----------------:|--------:|---------:|----------------:|
+| 2 | 16 ms | 254 ms | 15.95x | 24,192 KiB | 44,852 KiB |
+| 5 | 22 ms | 265 ms | 12.23x | 24,768 KiB | 45,396 KiB |
+| 10 | 30 ms | 278 ms | 9.41x | 26,496 KiB | 46,200 KiB |
+| 20 | 44 ms | 304 ms | 6.84x | 29,760 KiB | 47,156 KiB |
+| 50 | 88 ms | 387 ms | 4.40x | 41,472 KiB | 51,824 KiB |
+| 100 | 184 ms | 530 ms | 2.89x | 58,752 KiB | 58,976 KiB |
+| 200 | 353 ms | 812 ms | 2.30x | 90,048 KiB | 74,336 KiB |
+| 250 | 433 ms | 942 ms | 2.18x | 112,704 KiB | 81,636 KiB |
+| 500 | **1.045 s** | **1.641 s** | **1.57x** | **199,872 KiB** | **123,264 KiB** |
+
+gowkhtmltopdf was **faster at every tested size**. Short documents show the
+largest gap (about **16x** at 2 pages) because wkhtmltopdf pays a ~250 ms
+WebKit/process start. At 500 pages it is still about **1.6x** faster.
+
+Peak RSS is **lower through 100 pages** and **higher from 200 pages** on
+this generic path. PDF output is smaller from 50 pages onward. The
+2026-08-09 island-era table later on this page is **not** a current
+memory claim.
+
+---
+
+## Current in-process matrix (2026-08-14, generic)
+
+One iteration (`-benchtime=1x -count=1`). `B/op` is cumulative allocation
+traffic, not process RSS.
+
+```sh
+make bench
+```
+
+| Workload | 2 | 10 | 100 | 500 |
+|----------|--:|---:|----:|----:|
+| PDF pages | 3.66ms | 15.0ms | 149ms | **966ms / 224.3MB / 1.15M allocs** |
+| Template + PDF pages | 3.63ms | 15.4ms | 165ms | **948ms / 228.9MB / 1.20M allocs** |
+| Web-fetch image tiles | 10.7ms | 13.8ms | 42.6ms | 166ms |
+| Inline image tiles | 14.6ms | 10.1ms | 38.6ms | 178ms |
+
+Full size matrix and certified-islands rows: Snapshot F in
+[`benchmark-results.txt`](../testdata/golden/benchmarks/benchmark-results.txt).
 
 ---
 
@@ -162,7 +216,14 @@ fidelity review without saying so.
 
 ## How to measure
 
-Snapshot command (in-process matrix):
+Current snapshot commands:
+
+```sh
+make bench-cli-compare
+make bench
+```
+
+In-process matrix (same as `make bench`):
 
 ```sh
 go test ./internal/convert -run '^$' \
