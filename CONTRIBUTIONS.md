@@ -139,6 +139,37 @@ See [`documentation/samples.md`](documentation/samples.md).
 
 ---
 
+## Cutting a release (multi-platform binaries)
+
+CI on PRs and ordinary branch pushes does **not** publish binaries. Cross-platform
+artifacts are built only when a **`v*` git tag** is pushed (workflow
+[`.github/workflows/release.yml`](.github/workflows/release.yml)).
+
+1. Bump [`VERSION`](VERSION) to the new semver (for example `0.2.0`).
+2. Move notes under `## Unreleased` in [`CHANGELOG.md`](CHANGELOG.md) into a
+   dated section for that version.
+3. Merge the release prep to the default branch.
+4. Tag and push (must match `VERSION` exactly, with a `v` prefix):
+
+```sh
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+The release workflow then:
+
+- Refuses to publish if `VERSION` ≠ tag without the `v` (guards accidental tags)
+- Cross-compiles `gowkhtmltopdf` and `gowkhtmltoimage` with `CGO_ENABLED=0` for
+  **linux / windows / darwin** × **amd64 / arm64**
+- Stamps `internal/cli.Version` from the tag
+- Creates or updates the GitHub Release for that tag and attaches the binaries
+  plus `SHA256SUMS`
+
+Creating a GitHub Release in the UI with a **new** `v*` tag also pushes the tag
+and runs the same workflow. The workflow does **not** invent tags on its own.
+
+---
+
 ## Documentation updates
 
 When your change affects user-visible behavior:

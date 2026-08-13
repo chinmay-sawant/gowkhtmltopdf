@@ -13,6 +13,17 @@ Related: [CLI reference](cli.md) · [Library API](library-api.md) ·
   transitive graph. After that, builds can run offline from the module cache.
 - No browser, native converter, Qt, or cgo toolchain is required.
 
+## Install prebuilt binaries
+
+Tagged releases publish static `gowkhtmltopdf` and `gowkhtmltoimage` builds for
+Linux, Windows, and macOS (amd64 and arm64) as GitHub Release assets, with a
+`SHA256SUMS` file. Download from the project's
+[Releases](https://github.com/chinmay-sawant/gowkhtmltopdf/releases) page.
+
+Assets are produced only when a `v*` tag is pushed (see
+[CONTRIBUTIONS.md](../CONTRIBUTIONS.md#cutting-a-release-multi-platform-binaries));
+ordinary CI on pull requests does not upload platform archives.
+
 ## Build
 
 ```sh

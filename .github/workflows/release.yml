@@ -1,0 +1,117 @@
+# Multi-platform CLI binaries for GitHub Releases.
+#
+# Trigger: push of a v* tag only (never PR / ordinary branch push).
+#   git tag v0.2.0 && git push origin v0.2.0
+#
+# Builds CGO_ENABLED=0 static binaries for Linux / Windows / macOS
+# (amd64 + arm64), stamps Version from the tag, creates/updates the
+# GitHub Release for that tag, and attaches binaries + SHA256SUMS.
+name: release
+
+on:
+  # Intentional releases only. Ordinary branch/PR pushes never build assets.
+  # Cutting a release: bump VERSION + CHANGELOG, commit, then:
+  #   git tag v0.2.0 && git push origin v0.2.0
+  # Creating a GitHub Release in the UI with a new v* tag also pushes the tag
+  # and runs this workflow once.
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: build + attach binaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache: true
+
+      - name: Resolve version from tag
+        id: ver
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          case "${tag}" in
+            v*) ver="${tag#v}" ;;
+            *)
+              echo "tag must look like v0.2.0 (got ${tag})" >&2
+              exit 1
+              ;;
+          esac
+          if ! printf '%s' "${ver}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([.-].*)?$'; then
+            echo "refusing non-semver-ish version: ${ver}" >&2
+            exit 1
+          fi
+          file_ver=$(tr -d '[:space:]' < VERSION)
+          if [ "${file_ver}" != "${ver}" ]; then
+            echo "VERSION file (${file_ver}) does not match tag version (${ver})" >&2
+            echo "Update VERSION (and CHANGELOG) before tagging." >&2
+            exit 1
+          fi
+          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+          echo "version=${ver}" >> "${GITHUB_OUTPUT}"
+          echo "Building release ${tag} (version ${ver})"
+
+      - name: Cross-compile matrix
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          ldflags="-s -w -X gowkhtmltopdf/internal/cli.Version=${VERSION}"
+          targets=(
+            "linux amd64"
+            "linux arm64"
+            "darwin amd64"
+            "darwin arm64"
+            "windows amd64"
+            "windows arm64"
+          )
+          cmds=(gowkhtmltopdf gowkhtmltoimage)
+          for t in "${targets[@]}"; do
+            set -- ${t}
+            goos="$1"
+            goarch="$2"
+            ext=""
+            if [ "${goos}" = "windows" ]; then
+              ext=".exe"
+            fi
+            for cmd in "${cmds[@]}"; do
+              out="dist/${cmd}_${VERSION}_${goos}_${goarch}${ext}"
+              echo "→ ${out}"
+              CGO_ENABLED=0 GOOS="${goos}" GOARCH="${goarch}" \
+                go build -trimpath -ldflags "${ldflags}" \
+                -o "${out}" "./cmd/${cmd}"
+            done
+          done
+          (
+            cd dist
+            sha256sum * > SHA256SUMS
+          )
+          ls -la dist
+          # Smoke the host binary stamp (linux/amd64 on the runner).
+          bin="dist/gowkhtmltopdf_${VERSION}_linux_amd64"
+          got=$("${bin}" --version | sed -n 's/^Version:[[:space:]]*//p' | tr -d '[:space:]')
+          echo "linux/amd64 --version → ${got}"
+          test "${got}" = "${VERSION}"
+
+      - name: Upload artifacts to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: ${{ steps.ver.outputs.tag }}
+          # Create the release when triggered by a tag push; update when
+          # the release already exists (published event or re-run).
+          draft: false
+          prerelease: ${{ contains(steps.ver.outputs.version, '-') }}
+          generate_release_notes: true
+          files: dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
