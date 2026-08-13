@@ -73,10 +73,12 @@ happen to share a `fixture-*` name.
 |------|------|----------|
 | [`font-examples.html`](../testdata/golden/font-examples.html) | Font-path showcase (faces not bundled; `--font-path` / `fontpath`) | 1–30 pages |
 | [`complex-css.html`](../testdata/golden/complex-css.html) | Large CSS surface / catalog stress (needle `Alexandria`) | 1–40 pages |
-| [`architecture-diagram.html`](../testdata/golden/architecture-diagram.html) | Library-API architecture template (needle `Architecture`) | 1–12 pages |
+| [`architecture-diagram.html`](../testdata/golden/architecture-diagram.html) | Library-API architecture template (needle `Architecture`); mirrored from `testdata/golden/api/` by `make samples` / `go run ./testdata/golden/api` | 1–12 pages |
 
-`testdata/golden/api/` holds a separate library-API generator; it is not part
-of the `*.html` walk at the corpus root.
+`testdata/golden/api/` holds the library-API architecture generator
+(`go run ./testdata/golden/api`). It is not part of the `*.html` walk at the
+corpus root, but `make samples` runs it to refresh the sample PDF, the
+golden PDF beside the template, and the HTML mirror above.
 
 ### Fixture groups
 
@@ -201,15 +203,19 @@ make samples
 4. Writes two PNGs:
    - `output/fixture-01-simple-invoice.png` via `gowkhtmltoimage`
    - `output/fixture-21-detailed-report.png` via `examples/image`
-5. Optionally refreshes `output/wiki-ana-de-armas.pdf` from the live
+5. Runs `go run ./testdata/golden/api` to refresh the library-API architecture
+   diagram: `output/architecture-diagram.pdf`,
+   `testdata/golden/api/architecture-diagram.pdf`, and the HTML mirror
+   `testdata/golden/architecture-diagram.html` (overwrites if present).
+6. Optionally refreshes `output/wiki-ana-de-armas.pdf` from the live
    Wikipedia URL **without** `--simplify-dom`, with `--use-system-fonts` and
    `--zoom 0.666667`. Network is required; **soft-fail** if the fetch fails
    so offline hosts still get fixture samples.
 
-`font-examples.html`, `complex-css.html`, and `architecture-diagram.html`
-are **not** part of this loop. Leftover or manual PDFs that may sit in
-`output/` (`font-examples.pdf`, `architecture-diagram.pdf`, `chrome_ana.pdf`,
-`wkhtmltopdf/`) are documented in [`output/README.md`](../output/README.md).
+`font-examples.html` and `complex-css.html` are **not** part of the fixture
+loop. Leftover or manual PDFs that may sit in `output/`
+(`font-examples.pdf`, `chrome_ana.pdf`, `wkhtmltopdf/`) are documented in
+[`output/README.md`](../output/README.md).
 
 These files are **viewer smoke artifacts**, not golden byte masters. CI
 asserts structure through `make golden`, not binary equality against
