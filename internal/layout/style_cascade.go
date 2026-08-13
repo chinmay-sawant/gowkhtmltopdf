@@ -155,7 +155,10 @@ var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inheri
 	{[]string{"word-break"}, func(dst, src *ResolvedStyle) { dst.WordBreak = src.WordBreak }},
 	{
 		[]string{"vertical-align"},
-		func(dst, src *ResolvedStyle) { dst.VerticalAlign = src.VerticalAlign },
+		func(dst, src *ResolvedStyle) {
+			dst.VerticalAlign = src.VerticalAlign
+			dst.VerticalAlignShift = src.VerticalAlignShift
+		},
 	},
 	{
 		[]string{"text-decoration"},

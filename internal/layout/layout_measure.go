@@ -373,9 +373,40 @@ func (m *cellMeasure) measureElement(nodeN *html.Node, childCS ResolvedStyle, no
 
 		return
 	}
+
+	if m.measureSpecifiedInlineBlock(childCS) {
+		return
+	}
 	// Block-level in-cell boxes start a new line (simplified).
 	blockish := isCellBlockish(childCS.Display)
 	m.walkBlockChildren(nodeN, childCS, nowrap, blockish)
+}
+
+// measureSpecifiedInlineBlock treats a definite-width inline-block as one
+// atomic advance (specified width, content-box chrome, and margins).
+// Percentage widths stay auto: intrinsic measure has no definite CB.
+func (m *cellMeasure) measureSpecifiedInlineBlock(style ResolvedStyle) bool {
+	if style.Display != cssDisplayInlineBlock || style.WidthPercent >= 0 || style.Width < 0 {
+		return false
+	}
+
+	width := specifiedInlineBlockOuterWidth(m.engine, style)
+	m.noteWord(width)
+	m.lineOnlyNowrap = false
+	m.lineHasInk = true
+	m.lineW += width
+
+	return true
+}
+
+func specifiedInlineBlockOuterWidth(eng *engine, style ResolvedStyle) float64 {
+	width := eng.scalePt(style.Width)
+	if style.BoxSizing != borderBox {
+		width += eng.scalePt(style.PaddingLeft) + eng.scalePt(style.PaddingRight) +
+			eng.scalePt(style.BorderLeft.Width) + eng.scalePt(style.BorderRight.Width)
+	}
+
+	return width + eng.scalePt(style.MarginLeft) + eng.scalePt(style.MarginRight)
 }
 
 // isCellBlockish reports displays that break the current measured line.

@@ -164,6 +164,7 @@ type ResolvedStyle struct {
 	TextAlign          string  // floatLeft | floatRight | "center" | "justify"
 	TextTransform      string  // "none" | "uppercase" | "lowercase" | "capitalize"
 	VerticalAlign      string  // "baseline" | "top" | "middle" | cssVerticalAlignBottom
+	VerticalAlignShift float64 // pt; CSS length vertical-align (positive raises)
 	WhiteSpace         string  // "normal" | "nowrap" | "pre"
 	// OverflowWrap is CSS overflow-wrap / word-wrap: "normal" | "break-word" | "anywhere".
 	OverflowWrap string
@@ -622,6 +623,7 @@ type comparableResolvedStyle struct {
 	FontItalic                                                                                 bool
 	LineHeight, LineHeightUnitless                                                             float64
 	TextAlign, TextTransform, VerticalAlign, WhiteSpace, OverflowWrap, WordBreak               string
+	VerticalAlignShift                                                                         float64
 	TextDecoration                                                                             string
 	LetterSpacing, TextIndent                                                                  float64
 	ListStyleType, BorderCollapse                                                              string
@@ -672,8 +674,8 @@ func comparableResolvedStyleFor(style ResolvedStyle) comparableResolvedStyle {
 		famHash: style.famHash, FontSize: style.FontSize, FontWeight: style.FontWeight, FontItalic: style.FontItalic,
 		LineHeight: style.LineHeight, LineHeightUnitless: style.LineHeightUnitless,
 		TextAlign: style.TextAlign, TextTransform: style.TextTransform,
-		VerticalAlign: style.VerticalAlign,
-		WhiteSpace:    style.WhiteSpace, OverflowWrap: style.OverflowWrap, WordBreak: style.WordBreak,
+		VerticalAlign: style.VerticalAlign, VerticalAlignShift: style.VerticalAlignShift,
+		WhiteSpace: style.WhiteSpace, OverflowWrap: style.OverflowWrap, WordBreak: style.WordBreak,
 		TextDecoration: style.TextDecoration, LetterSpacing: style.LetterSpacing, TextIndent: style.TextIndent,
 		ListStyleType: style.ListStyleType, BorderCollapse: style.BorderCollapse, BorderSpacing: style.BorderSpacing,
 		TableLayout: style.TableLayout, IsReplaced: style.IsReplaced, PageBreakBefore: style.PageBreakBefore,

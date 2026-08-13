@@ -35,13 +35,13 @@ func (u *undRun) flush(e *engine) {
 // emitInlineBlock relocates a block-in-inline box onto the current line and
 // returns the updated x cursor.
 func (e *engine) emitInlineBlock(
-	boxNode *box, item *inlineItem, leftX, baseline, justifyGap float64,
+	boxNode *box, item *inlineItem, leftX, lineY, lineH, baseline, justifyGap float64,
 	gapAfter bool, und *undRun,
 ) float64 {
 	und.flush(e)
 
 	dx := leftX - item.blockBox.x
-	dy := baseline - item.h - item.blockBox.y
+	dy := e.alignedInlineTop(item, lineY, lineH, baseline) - item.blockBox.y
 	e.shiftBoxOps(item.blockBox, dx, dy)
 	item.blockBox.x += dx
 	item.blockBox.y += dy
@@ -66,16 +66,7 @@ func (e *engine) emitInlineImage(
 ) float64 {
 	und.flush(e)
 
-	top := baseline - item.h
-
-	switch item.style.VerticalAlign {
-	case cssVerticalAlignTop:
-		top = lineY
-	case cssVerticalAlignMiddle:
-		top = lineY + (lineH-item.h)/two
-	case cssVerticalAlignBottom:
-		top = lineY + lineH - item.h
-	}
+	top := e.alignedInlineTop(item, lineY, lineH, baseline)
 
 	if item.imgRef != nil && item.imgRef.data != nil {
 		e.add(Op{ //nolint:exhaustruct // intentional zero fields
@@ -245,6 +236,26 @@ func writingModeRotate(mode string) float64 {
 	}
 
 	return 0
+}
+
+// alignedInlineTop is the canvas Y of an atomic inline box (image or
+// inline-block). Keywords match CSS vertical-align; a length shift raises
+// (positive) or lowers (negative) a baseline-aligned box.
+func (e *engine) alignedInlineTop(item *inlineItem, lineY, lineH, baseline float64) float64 {
+	if item.style == nil {
+		return baseline - item.h
+	}
+
+	switch item.style.VerticalAlign {
+	case cssVerticalAlignTop:
+		return lineY
+	case cssVerticalAlignMiddle:
+		return lineY + (lineH-item.h)/two
+	case cssVerticalAlignBottom:
+		return lineY + lineH - item.h
+	default:
+		return baseline - item.h - e.scalePt(item.style.VerticalAlignShift)
+	}
 }
 
 func inlineBorderVisible(side border) bool {

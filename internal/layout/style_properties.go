@@ -1074,6 +1074,12 @@ func setVerticalAlignValue(style *ResolvedStyle, value string) {
 	switch value {
 	case "baseline", cssVerticalAlignTop, "middle", cssVerticalAlignBottom:
 		style.VerticalAlign = value
+		style.VerticalAlignShift = 0
+	default:
+		if shift, ok := plainLength(value, style.FontSize, 0); ok {
+			style.VerticalAlign = "baseline"
+			style.VerticalAlignShift = shift
+		}
 	}
 }
 

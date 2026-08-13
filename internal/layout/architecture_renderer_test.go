@@ -61,6 +61,98 @@ body { margin: 0; font-size: 10pt; }
 	}
 }
 
+func TestFlexLegendKeepsSpecifiedWidthSwatchOnTheLabelLine(t *testing.T) {
+	t.Parallel()
+
+	res := layoutHTML(t, `<html><body>
+<div class="legend">
+<span><i class="swatch blue"></i>internal stage</span>
+<span><i class="swatch orange"></i>caller decision</span>
+<span><i class="swatch dark"></i>published contract</span>
+</div>
+</body></html>`, sheet(t, `
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Arial, Helvetica, sans-serif; font-size: 10pt; }
+.legend { display: flex; gap: 5mm; }
+.legend span { color: #536672; font-size: 8pt; }
+.swatch { display: inline-block; width: 4mm; height: 4mm; margin-right: 1mm; }
+.swatch.blue { background: #3c7899; }
+.swatch.orange { background: #e07848; }
+.swatch.dark { background: #163b56; }
+`))
+
+	byText := map[string]Op{}
+
+	for _, op := range res.Ops {
+		if op.Kind == OpText {
+			byText[strings.TrimSpace(op.Text)] = op
+		}
+	}
+
+	for _, pair := range [][2]string{
+		{"internal", "stage"},
+		{"caller", "decision"},
+		{"published", "contract"},
+	} {
+		if joined, ok := byText[pair[0]+" "+pair[1]]; ok && joined.W > 0 {
+			continue
+		}
+
+		first, okFirst := byText[pair[0]]
+		second, okSecond := byText[pair[1]]
+
+		if !okFirst || !okSecond {
+			t.Fatalf("missing %q / %q in %#v", pair[0], pair[1], byText)
+		}
+
+		if math.Abs(first.Y-second.Y) > 0.01 {
+			t.Fatalf("%q wrapped under %q: first=%+v second=%+v", pair[1], pair[0], first, second)
+		}
+
+		if second.X <= first.X {
+			t.Fatalf("%q did not continue after %q: first=%+v second=%+v", pair[1], pair[0], first, second)
+		}
+	}
+}
+
+func TestInlineBlockHonorsLengthVerticalAlign(t *testing.T) {
+	t.Parallel()
+
+	res := layoutHTML(t, `<html><body>
+<div class="legend"><span><i class="swatch"></i>internal stage</span></div>
+</body></html>`, sheet(t, `
+body { margin: 0; font-family: Arial, Helvetica, sans-serif; font-size: 10pt; }
+.legend { display: flex; }
+.legend span { font-size: 8pt; }
+.swatch { display: inline-block; width: 4mm; height: 4mm; margin-right: 1mm; vertical-align: -1mm; background: #3c7899; }
+`))
+
+	var swatch, label Op
+
+	for _, op := range res.Ops {
+		switch {
+		case op.Kind == OpFillRect && op.W > 5 && op.W < 20 && op.H > 5 && op.H < 20:
+			swatch = op
+		case op.Kind == OpText && strings.Contains(op.Text, "internal"):
+			label = op
+		}
+	}
+
+	if swatch.H == 0 || label.W == 0 {
+		t.Fatalf("missing swatch or label: swatch=%+v label=%+v", swatch, label)
+	}
+
+	// vertical-align:-1mm lowers the empty 4mm box from the text baseline
+	// so the swatch sits optically with the 8pt label.
+	const mm = 72.0 / 25.4
+
+	got := (swatch.Y + swatch.H) - label.Y
+	if got < 0.75*mm || got > 1.25*mm {
+		t.Fatalf("swatch bottom-to-baseline = %.2fpt, want ~1mm (%.2fpt): swatch=%+v label=%+v",
+			got, mm, swatch, label)
+	}
+}
+
 func TestUnitlessLineHeightRecomputesForChildFontSize(t *testing.T) {
 	t.Parallel()
 
