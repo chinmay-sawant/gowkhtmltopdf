@@ -1257,7 +1257,15 @@ func normalizeOwnVerticalChrome(ops []Op, boxNode *box) {
 		ops[idx].Y += delta
 	}
 
+	// Solid rails are one continuous OpLine: extend the last segment to the
+	// box bottom after a Y realign. Dashed/dotted sides are many short
+	// segments — growing the last one paints a solid stub past the dashes
+	// (fixture-40 abs-host, fixture-48 tracking).
 	last := verticalIndexes[len(verticalIndexes)-1]
+	if isDashLikeVerticalRail(ops[last], boxNode) {
+		return
+	}
+
 	lastBottom := ops[last].Y + ops[last].H
 	if lastBottom < boxNode.y+boxNode.height {
 		ops[last].H += boxNode.y + boxNode.height - lastBottom
@@ -1279,6 +1287,90 @@ func isVerticalChromeForBox(operation Op, boxNode *box, leftBorder, rightBorder 
 		((leftBorder && nearLayout(operation.X, boxNode.x) && (line || maskedLeft)) ||
 			(rightBorder && nearLayout(operation.X, boxNode.x+boxNode.w) && (line || maskedRight))) &&
 		operation.Y >= boxNode.y-layoutEpsilon && operation.Y <= boxNode.y+boxNode.height+layoutEpsilon
+}
+
+// isDashedOrDottedStyle reports border styles expanded into multi-segment OpLines.
+func isDashedOrDottedStyle(style string) bool {
+	return style == borderStyleDashed || style == borderStyleDotted
+}
+
+// looksLikeDashSegmentLength is true for edge pieces sized like appendDashedLineSegments
+// (drawLen = width*3 dashed, width dotted), not a continuous solid rail.
+func looksLikeDashSegmentLength(segLen, strokeWidth float64) bool {
+	if segLen <= 0 {
+		return false
+	}
+
+	maxSeg := math.Max(strokeWidth*three, minDashPt) + halfRatio
+	if strokeWidth <= 0 {
+		maxSeg = three + halfRatio
+	}
+
+	return segLen <= maxSeg
+}
+
+// isDashLikeVerticalRail is true when a vertical side stroke must not be H-stretched:
+// dashed/dotted CSS on that side, or a short segment that is already a dash piece.
+func isDashLikeVerticalRail(operation Op, boxNode *box) bool {
+	if operation.Kind != OpLine || operation.W != 0 || operation.H <= 0 || boxNode == nil || boxNode.style == nil {
+		return false
+	}
+
+	if looksLikeDashSegmentLength(operation.H, operation.Width) {
+		return true
+	}
+
+	if nearLayout(operation.X, boxNode.x) && isDashedOrDottedStyle(boxNode.style.BorderLeft.Style) {
+		return true
+	}
+
+	if nearLayout(operation.X, boxNode.x+boxNode.w) && isDashedOrDottedStyle(boxNode.style.BorderRight.Style) {
+		return true
+	}
+
+	return false
+}
+
+// isHorizontalChromeForBox reports top/bottom edge strokes owned by the box,
+// including short dashed/dotted segments (full-width nearLayout alone misses those).
+//
+//nolint:cyclop // edge membership mirrors vertical chrome checks
+func isHorizontalChromeForBox(operation Op, boxNode *box, oldBottom float64) bool {
+	if operation.Kind != OpLine || operation.H != 0 || operation.W <= 0 || boxNode == nil {
+		return false
+	}
+
+	onTop := nearLayout(operation.Y, boxNode.y)
+	onBottom := nearLayout(operation.Y, oldBottom)
+	if !onTop && !onBottom {
+		return false
+	}
+
+	// Solid (or single) full-width edge.
+	if nearLayout(operation.X, boxNode.x) && nearLayout(operation.W, boxNode.w) {
+		return true
+	}
+
+	if boxNode.style == nil {
+		return false
+	}
+
+	// Dashed/dotted fragments sit on the edge with dash-sized W.
+	inside := operation.X >= boxNode.x-layoutEpsilon &&
+		operation.X+operation.W <= boxNode.x+boxNode.w+layoutEpsilon
+	if !inside {
+		return false
+	}
+
+	if onTop && isDashedOrDottedStyle(boxNode.style.BorderTop.Style) {
+		return true
+	}
+
+	if onBottom && isDashedOrDottedStyle(boxNode.style.BorderBottom.Style) {
+		return true
+	}
+
+	return looksLikeDashSegmentLength(operation.W, operation.Width)
 }
 
 func opInkBottom(operation Op) float64 {
@@ -1313,12 +1405,14 @@ func isOwnBoxChrome(operation Op, boxNode *box, oldBottom float64) bool {
 		return false
 	}
 
+	if boxNode.style == nil {
+		return false
+	}
+
 	vertical := isVerticalChromeForBox(operation, boxNode,
 		boxNode.style.BorderLeft.Width > 0 && boxNode.style.BorderLeft.Style != cssDisplayNone,
 		boxNode.style.BorderRight.Width > 0 && boxNode.style.BorderRight.Style != cssDisplayNone)
-	horizontal := operation.H == 0 && operation.W > 0 && nearLayout(operation.X, boxNode.x) &&
-		nearLayout(operation.W, boxNode.w) &&
-		(nearLayout(operation.Y, boxNode.y) || nearLayout(operation.Y, oldBottom))
+	horizontal := isHorizontalChromeForBox(operation, boxNode, oldBottom)
 
 	return vertical || horizontal
 }
@@ -1336,6 +1430,10 @@ func isOwnBoxChromeFragment(operation Op, boxNode *box, oldBottom float64) bool 
 		nearLayout(operation.X, boxNode.x) && nearLayout(operation.W, boxNode.w) &&
 		operation.Y >= boxNode.y-layoutEpsilon &&
 		operation.Y+operation.H <= oldBottom+1 {
+		return true
+	}
+
+	if isHorizontalChromeForBox(operation, boxNode, oldBottom) {
 		return true
 	}
 
@@ -1368,17 +1466,24 @@ func stretchOwnBoxChrome(operation *Op, boxNode *box, oldBottom, newBottom float
 	}
 
 	if operation.Kind == OpLine && operation.W == 0 && operation.H > 0 &&
-		((boxNode.style.BorderLeft.Width > 0 && nearLayout(operation.X, boxNode.x)) ||
-			(boxNode.style.BorderRight.Width > 0 && nearLayout(operation.X, boxNode.x+boxNode.w))) &&
+		((boxNode.style != nil && boxNode.style.BorderLeft.Width > 0 && nearLayout(operation.X, boxNode.x)) ||
+			(boxNode.style != nil && boxNode.style.BorderRight.Width > 0 && nearLayout(operation.X, boxNode.x+boxNode.w))) &&
 		operation.Y >= boxNode.y-layoutEpsilon && operation.Y <= boxNode.y+boxNode.height+layoutEpsilon &&
 		nearLayout(operation.Y+operation.H, oldBottom) {
+		// Never elongate a dash/dot segment into a solid stub.
+		if isDashLikeVerticalRail(*operation, boxNode) {
+			return
+		}
+
 		operation.H = newBottom - operation.Y
 
 		return
 	}
 
+	// Bottom edge: solid full-width line, or every dashed/dotted fragment on
+	// that edge (short W would miss nearLayout(W, box.w)).
 	if operation.Kind == OpLine && operation.H == 0 && operation.W > 0 &&
-		nearLayout(operation.X, boxNode.x) && nearLayout(operation.W, boxNode.w) &&
+		isHorizontalChromeForBox(*operation, boxNode, oldBottom) &&
 		nearLayout(operation.Y, oldBottom) {
 		operation.Y = newBottom
 	}
