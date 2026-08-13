@@ -2,10 +2,13 @@
 package layout
 
 import (
+	"math"
+	"strings"
 	"testing"
 
 	"gowkhtmltopdf/internal/css"
 	"gowkhtmltopdf/internal/html"
+	"gowkhtmltopdf/internal/pdf"
 )
 
 func TestParseGridTracksSubtractsGap(t *testing.T) {
@@ -422,6 +425,211 @@ func TestGridRowGapVsColumnGap(t *testing.T) { //nolint:cyclop
 	// A and C share the same column (similar X) and C is below A.
 	if curY <= absY {
 		t.Fatalf("C should be below A: ay=%.1f cy=%.1f", absY, curY)
+	}
+}
+
+func TestGridGapSurvivesPaint(t *testing.T) {
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+.dense {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-auto-flow: dense;
+  width: 240pt;
+  gap: 4pt;
+  padding: 4pt;
+  border: 1pt solid #6a1b9a;
+  box-sizing: border-box;
+}
+.dense > div {
+  padding: 4pt;
+  background: #fff;
+  border: 1pt solid #ce93d8;
+  box-sizing: border-box;
+}
+.wide { grid-column: 2 / span 2; background: #e1bee7; }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="dense">
+  <div class="wide">Wide</div>
+  <div>B</div>
+  <div>C</div>
+  <div>D</div>
+</div>
+</body></html>`, cssSheet)
+
+	if err := Paint(pdf.NewDocument(), res, PaintOptions{ //nolint:exhaustruct
+		PageWidth: 400, PageHeight: 400,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	var hole, nextRow *Op
+
+	for i := range res.Ops {
+		op := &res.Ops[i]
+		if op.Kind != OpFillRect || op.W < 70 || op.H < 10 || op.H > 40 || op.R < 0.99 {
+			continue
+		}
+
+		if hole == nil || op.Y < hole.Y {
+			nextRow = hole
+			hole = op
+
+			continue
+		}
+
+		if op.Y > hole.Y+1 && (nextRow == nil || op.Y < nextRow.Y) {
+			nextRow = op
+		}
+	}
+
+	if hole == nil || nextRow == nil {
+		t.Fatalf("missing dense row fills hole=%v next=%v", hole, nextRow)
+	}
+
+	gap := nextRow.Y - (hole.Y + hole.H)
+	if gap < 3.5 || gap > 5 {
+		t.Fatalf("dense row-gap after paint = %.2fpt, want 4pt: first=%+v second=%+v", gap, hole, nextRow)
+	}
+}
+
+func TestSubgridCopiesParentColumnsAndKeepsGap(t *testing.T) {
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+.parent {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  width: 280pt;
+  gap: 4pt;
+  border: 1pt solid #6a1b9a;
+  padding: 4pt;
+}
+.sub {
+  display: subgrid;
+  grid-column: span 3;
+  background: #e1bee7;
+  padding: 2pt;
+}
+.sub > div {
+  background: #fff;
+  border: 1pt solid #ce93d8;
+  padding: 3pt;
+  box-sizing: border-box;
+}
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="parent"><div class="sub"><div>S1</div><div>S2</div><div>S3</div></div></div>
+</body></html>`, cssSheet)
+
+	if err := Paint(pdf.NewDocument(), res, PaintOptions{ //nolint:exhaustruct
+		PageWidth: 400, PageHeight: 400,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	pos := map[string]Op{}
+
+	for _, op := range res.Ops {
+		if op.Kind == OpText {
+			pos[strings.TrimSpace(op.Text)] = op
+		}
+	}
+
+	s1, s2, s3 := pos["S1"], pos["S2"], pos["S3"]
+	if s1.W == 0 || s2.W == 0 || s3.W == 0 {
+		t.Fatalf("missing subgrid labels: %#v", pos)
+	}
+
+	if math.Abs(s1.Y-s2.Y) > 1 || math.Abs(s2.Y-s3.Y) > 1 {
+		t.Fatalf("S1/S2/S3 should share one row: S1=%+v S2=%+v S3=%+v", s1, s2, s3)
+	}
+
+	if s2.X <= s1.X+s1.W || s3.X <= s2.X+s2.W {
+		t.Fatalf("S1/S2/S3 should sit in three columns: S1.x=%.1f S2.x=%.1f S3.x=%.1f", s1.X, s2.X, s3.X)
+	}
+
+	var whites []Op
+
+	for _, op := range res.Ops {
+		if op.Kind == OpFillRect && op.R > 0.99 && op.W > 40 && op.W < 120 && op.H > 8 && op.H < 40 {
+			whites = append(whites, op)
+		}
+	}
+
+	if len(whites) < 2 {
+		t.Fatalf("subgrid item fills = %d, want ≥2", len(whites))
+	}
+
+	gap := whites[1].X - (whites[0].X + whites[0].W)
+	if gap < 3.5 || gap > 5 {
+		t.Fatalf("subgrid column-gap after paint = %.2fpt, want 4pt", gap)
+	}
+}
+
+func TestMasonryPacksShortestColumn(t *testing.T) {
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+body { font-size: 9pt; }
+.masonry {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: masonry;
+  width: 280pt;
+  column-gap: 6pt;
+  row-gap: 4pt;
+  padding: 4pt;
+}
+.masonry > div { padding: 4pt; border: 1pt solid #ffb74d; background: #ffe0b2; box-sizing: border-box; }
+.tall { min-height: 36pt; }
+.mid { min-height: 22pt; }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="masonry">
+  <div class="tall">Tall A</div>
+  <div class="mid">Mid B</div>
+  <div>Short C</div>
+  <div>D</div>
+  <div class="mid">E</div>
+</div>
+</body></html>`, cssSheet)
+
+	if err := Paint(pdf.NewDocument(), res, PaintOptions{ //nolint:exhaustruct
+		PageWidth: 400, PageHeight: 400,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	loc := map[string]Op{}
+
+	for _, op := range res.Ops {
+		if op.Kind == OpText {
+			loc[strings.TrimSpace(op.Text)] = op
+		}
+	}
+
+	a, b, c, d, eItem := loc["Tall A"], loc["Mid B"], loc["Short C"], loc["D"], loc["E"]
+	if a.W == 0 || b.W == 0 || c.W == 0 || d.W == 0 || eItem.W == 0 {
+		t.Fatalf("missing masonry labels: %#v", loc)
+	}
+
+	if math.Abs(a.Y-c.Y) > 1 {
+		t.Fatalf("A and C should start on the first band: A=%+v C=%+v", a, c)
+	}
+
+	if c.Y+c.H > a.Y+20 {
+		t.Fatalf("Short C stretched to Tall A height: A=%+v C=%+v", a, c)
+	}
+
+	if math.Abs(d.X-c.X) > 8 {
+		t.Fatalf("D should pack under Short C (shortest column): C.x=%.1f D.x=%.1f", c.X, d.X)
+	}
+
+	if math.Abs(eItem.X-b.X) > 8 {
+		t.Fatalf("E should pack under Mid B: B.x=%.1f E.x=%.1f", b.X, eItem.X)
 	}
 }
 

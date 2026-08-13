@@ -957,7 +957,7 @@ func stretchPaginatedChrome(res *Result) {
 		oldBottom := boxNode.y + boxNode.height
 		contentBottom := oldBottom
 		normalizeOwnVerticalChrome(res.Ops, boxNode)
-		flexItem := parentIsFlex(parent)
+		trackItem := parentIsFlexOrGrid(parent)
 		for idx := boxNode.opStart; idx <= boxNode.opEnd; idx++ {
 			operation := res.Ops[idx]
 			if isOwnBoxChrome(operation, boxNode, oldBottom) {
@@ -974,10 +974,11 @@ func stretchPaginatedChrome(res *Result) {
 
 			bottom := opInkBottom(operation)
 			// Text Y is the baseline. Y+H is the line box hanging below it.
-			// Flex items must not use that, or their chrome eats the following
-			// row-gap (fixture-32 wrap). Other blocks still use the line box
-			// so paginated section rails reach the last line.
-			if !flexItem && (operation.Kind == OpText || operation.Kind == OpBullet) {
+			// Flex/grid items must not use that, or their chrome eats the
+			// following gap (fixture-32 wrap, fixture-34 dense). Other
+			// blocks still use the line box so paginated section rails
+			// reach the last line.
+			if !trackItem && (operation.Kind == OpText || operation.Kind == OpBullet) {
 				bottom = operation.Y + operation.H
 			}
 			if bottom > contentBottom {
@@ -998,12 +999,17 @@ func stretchPaginatedChrome(res *Result) {
 	walk(res.root, nil)
 }
 
-func parentIsFlex(parent *box) bool {
+func parentIsFlexOrGrid(parent *box) bool {
 	if parent == nil || parent.style == nil {
 		return false
 	}
 
-	return parent.style.Display == displayFlex || parent.style.Display == displayInlineFlex
+	switch parent.style.Display {
+	case displayFlex, displayInlineFlex, displayGrid, displayInlineGrid, displaySubgrid:
+		return true
+	default:
+		return false
+	}
 }
 
 //nolint:wsl // border ownership checks are intentionally explicit
