@@ -36,11 +36,26 @@ jobs:
           go-version: '1.26'
           cache: true
       - name: Build gowkhtmltopdf
-        run: CGO_ENABLED=0 go build -ldflags "-X gowkhtmltopdf/internal/cli.Version=$(cat VERSION)" ./cmd/gowkhtmltopdf
+        run: |
+          ver=$(tr -d '[:space:]' < VERSION)
+          CGO_ENABLED=0 go build -ldflags "-X gowkhtmltopdf/internal/cli.Version=${ver}" \
+            -o gowkhtmltopdf ./cmd/gowkhtmltopdf
       - name: Build gowkhtmltoimage
-        run: CGO_ENABLED=0 go build -ldflags "-X gowkhtmltopdf/internal/cli.Version=$(cat VERSION)" ./cmd/gowkhtmltoimage
+        run: |
+          ver=$(tr -d '[:space:]' < VERSION)
+          CGO_ENABLED=0 go build -ldflags "-X gowkhtmltopdf/internal/cli.Version=${ver}" \
+            -o gowkhtmltoimage ./cmd/gowkhtmltoimage
       - name: Version stamp
-        run: test "$(./gowkhtmltopdf --version | awk '/Version:/{print $$2}')" = "$(cat VERSION)"
+        # Avoid awk $N / $$ escaping pitfalls in Actions; compare the Version:
+        # banner line to the trimmed VERSION file.
+        run: |
+          set -euo pipefail
+          want=$(tr -d '[:space:]' < VERSION)
+          got=$(./gowkhtmltopdf --version | sed -n 's/^Version:[[:space:]]*//p' | tr -d '[:space:]')
+          echo "VERSION file: ${want}"
+          echo "binary:       ${got}"
+          test -n "${got}"
+          test "${got}" = "${want}"
 
   race:
     name: race (hot packages)
