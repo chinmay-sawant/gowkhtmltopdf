@@ -21,13 +21,25 @@
    "type": "code",
    "heading": "Build",
    "language": "sh",
-   "code": "# both static binaries, no cgo anywhere in the graph\nCGO_ENABLED=0 go build -o bin/gowkhtmltopdf ./cmd/gowkhtmltopdf\nCGO_ENABLED=0 go build -o bin/gowkhtmltoimage ./cmd/gowkhtmltoimage\n\n# or with the Makefile (builds both into bin/)\nmake build\n\n# version stamp: VERSION (currently 0.1.0) is the single source of truth.\n# An unstamped build reports the 0.1.0-dev fallback.\nCGO_ENABLED=0 go build -ldflags \"-X gowkhtmltopdf/internal/cli.Version=$(cat VERSION)\" \\\n  -o bin/gowkhtmltopdf ./cmd/gowkhtmltopdf\n\n./bin/gowkhtmltopdf --version   # Name: gowkhtmltopdf / Version: 0.1.0"
+   "code": "# recommended: static binaries, version stamped from VERSION\nmake build\n# writes bin/gowkhtmltopdf and bin/gowkhtmltoimage\n\n# equivalent, explicit:\nCGO_ENABLED=0 go build -ldflags \"-X gowkhtmltopdf/internal/cli.Version=$(cat VERSION)\" \\\n  -o bin/gowkhtmltopdf ./cmd/gowkhtmltopdf\nCGO_ENABLED=0 go build -ldflags \"-X gowkhtmltopdf/internal/cli.Version=$(cat VERSION)\" \\\n  -o bin/gowkhtmltoimage ./cmd/gowkhtmltoimage\n\n./bin/gowkhtmltopdf --version   # Name: gowkhtmltopdf / Version: 0.2.0\n# VERSION is the project release. LibraryVersion (0.12.7-dev) is the\n# wkhtmltopdf settings-surface id, not the release number."
+  },
+  {
+   "type": "callout",
+   "variant": "tip",
+   "title": "Prebuilt binaries",
+   "body": "Tagged releases publish static gowkhtmltopdf and gowkhtmltoimage builds for Linux, Windows, and macOS (amd64 and arm64) plus SHA256SUMS. Download from the GitHub Releases page. Ordinary CI on pull requests does not upload platform archives."
   },
   {
    "type": "code",
    "heading": "First local PDF",
    "language": "sh",
    "code": "./bin/gowkhtmltopdf --enable-local-file-access \\\n  testdata/golden/fixture-01-simple-invoice.html \\\n  /tmp/invoice.pdf"
+  },
+  {
+   "type": "code",
+   "heading": "First image",
+   "language": "sh",
+   "code": "./bin/gowkhtmltoimage --enable-local-file-access \\\n  --width 1024 \\\n  testdata/golden/fixture-01-simple-invoice.html \\\n  /tmp/invoice.png"
   },
   {
    "type": "callout",
@@ -47,7 +59,7 @@
      "heading": "PDF bytes to stdout",
      "body": "Pass - as the output path to write the raw PDF bytes to stdout instead of a file. Pair it with --quiet so progress messages do not pollute the stream.",
      "bullets": [
-      "gowkhtmltopdf --enable-local-file-access --quiet report.html report.pdf -",
+      "gowkhtmltopdf --enable-local-file-access --quiet report.html - > report.pdf",
       "The clean byte stream pipes directly into an HTTP response or a downstream tool."
      ]
     },
@@ -92,6 +104,18 @@
     [
      "samples",
      "Regenerates output/: one PDF per golden fixture, a showcase TOC/header/footer/outline PDF, image PNGs, and a soft-fail live Wikipedia smoke"
+    ],
+    [
+     "bench",
+     "In-process Go benchmark matrix (PDF, template, image tiles)"
+    ],
+    [
+     "bench-cli-compare",
+     "Process-level CLI comparison against installed wkhtmltopdf"
+    ],
+    [
+     "claim-scan",
+     "Fail on forbidden over-claim phrases in user-facing docs"
     ],
     [
      "clean",

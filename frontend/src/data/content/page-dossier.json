@@ -80,7 +80,7 @@
    "sections": [
     {
      "heading": "JavaScript is stripped at load",
-     "body": "gowkhtmltopdf removes `<script>` elements when a document is loaded, and the JS flags such as `--enable-javascript` and `--javascript-delay` are accepted only with a warning (compatibility matrix, section 5; fidelity.md). The Go standard library has no JavaScript engine, so there is nothing to execute the page's code."
+     "body": "gowkhtmltopdf removes `<script>` elements when a document is loaded, and the JS flags such as `--enable-javascript` and `--javascript-delay` are unknown options and are rejected (compatibility matrix, section 5; fidelity.md). The Go standard library has no JavaScript engine, so there is nothing to execute the page's code."
     },
     {
      "heading": "What that means for the classified issues",

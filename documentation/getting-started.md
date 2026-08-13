@@ -46,10 +46,10 @@ Check the stamp:
 ```sh
 ./bin/gowkhtmltopdf --version
 # Name: gowkhtmltopdf
-# Version: 0.1.0
+# Version: 0.2.0
 ```
 
-`VERSION` (currently `0.1.0`) is the project release. The library constant
+`VERSION` (currently `0.2.0`) is the project release. The library constant
 `LibraryVersion` (`0.12.7-dev`) is a **wkhtmltopdf settings-surface**
 compatibility id, not the release number. See [library-api.md](library-api.md#versioning).
 
@@ -225,5 +225,7 @@ See [samples.md](samples.md) and [CONTRIBUTIONS.md](../CONTRIBUTIONS.md).
 | `make golden-update GOLDEN_FIXTURE=fixture-NN-name.html GOLDEN_APPROVE=1` | One reviewed PDF under ignored `testdata/golden/out/` |
 | `make samples` | Refresh [`output/`](../output/) |
 | `make fmt` | `gofmt -w .` |
+| `make bench` | In-process Go benchmark matrix |
+| `make bench-cli-compare` | Process-level CLI comparison vs installed wkhtmltopdf |
 | `make claim-scan` | Fail on forbidden over-claim phrases in user-facing docs |
 | `make clean` | Remove `testdata/golden/out` |

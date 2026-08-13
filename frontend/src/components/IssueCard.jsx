@@ -1,4 +1,5 @@
 import { SEVERITY_META, STATUS_META } from '../data/constants'
+import RichText from './RichText'
 
 function SeverityBadge({ severity }) {
   const meta = SEVERITY_META[severity]
@@ -35,23 +36,25 @@ export default function IssueCard({ issue }) {
         <SeverityBadge severity={issue.severity} />
         <StatusBadge status={issue.status} />
       </div>
-      <p className="summary">{issue.summary}</p>
+      <p className="summary">
+        <RichText>{issue.summary}</RichText>
+      </p>
       {issue.evidence && (
         <p className="ev">
           <span className="ev-label">Codebase status</span>
-          {issue.evidence}
+          <RichText>{issue.evidence}</RichText>
         </p>
       )}
       {issue.workaround && (
         <p className="wa">
           <span className="wa-label">Workaround</span>
-          {issue.workaround}
+          <RichText>{issue.workaround}</RichText>
         </p>
       )}
       {issue.key_detail && (
         <p className="kd">
           <span className="kd-label">Detail</span>
-          <code>{issue.key_detail}</code>
+          <RichText>{issue.key_detail}</RichText>
         </p>
       )}
       {issue.author && (

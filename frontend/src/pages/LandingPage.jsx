@@ -1,4 +1,13 @@
 import { Link } from 'react-router-dom'
+import { CLI_ROWS, HEADLINE, formatMs, speedup } from '../data/benchmarks'
+
+const HOME_BENCH_PAGES = [2, 10, 100, 500]
+const HOME_BENCH = CLI_ROWS.filter((row) => HOME_BENCH_PAGES.includes(row.pages))
+
+function homeSpeedup(n) {
+  if (n >= 10) return `${n.toFixed(0)}x`
+  return `${n.toFixed(1)}x`
+}
 
 const CAPABILITIES = [
   {
@@ -48,6 +57,9 @@ export default function LandingPage() {
       <section className="landing-hero" aria-labelledby="landing-title">
         <div className="landing-hero-copy">
           <h1 id="landing-title">Print-ready documents,<br /><em>from HTML you control.</em></h1>
+          <p className="landing-claim">
+            Up to {HEADLINE.smallSpeedup.toFixed(0)}x faster than wkhtmltopdf.
+          </p>
           <p className="landing-lede">
             gowkhtmltopdf turns controlled, server-generated HTML into dependable PDF and image output without starting a browser process.
           </p>
@@ -80,6 +92,36 @@ export default function LandingPage() {
               <strong>{value}</strong>
               <span>{label}</span>
             </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="landing-bench" aria-labelledby="landing-bench-heading">
+        <div className="landing-bench-copy">
+          <p className="landing-bench-kicker">Measured against wkhtmltopdf 0.12.6.1</p>
+          <h2 id="landing-bench-heading">
+            Up to {HEADLINE.smallSpeedup.toFixed(0)}x faster
+            <br />
+            on the same report.
+          </h2>
+          <p>
+            Generic CLI, identical HTML, median of three process runs. A 2-page invoice is{' '}
+            {formatMs(HEADLINE.smallGowk)} versus {formatMs(HEADLINE.smallWk)}; 500 pages still
+            finish first.
+          </p>
+          <Link className="text-link" to="/benchmarks">
+            Full benchmark comparison <span aria-hidden="true">→</span>
+          </Link>
+        </div>
+        <div className="landing-bench-grid">
+          {HOME_BENCH.map((row) => (
+            <article className="landing-bench-card" key={row.pages}>
+              <small>{row.pages} pages</small>
+              <strong>{homeSpeedup(speedup(row))}</strong>
+              <span>
+                {formatMs(row.gowkMs)} vs {formatMs(row.wkMs)}
+              </span>
+            </article>
           ))}
         </div>
       </section>

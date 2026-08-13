@@ -14,7 +14,7 @@ standard library plus
 shaping) and [`tdewolff/canvas`](https://github.com/tdewolff/canvas) (SVG
 rasterization). Builds are intended to run with `CGO_ENABLED=0`.
 
-**Status:** MVP **v0.1.0**. Phases 0–9 of the
+**Status:** **v0.2.0**. Phases 0–9 of the
 [canonical plan](../plans/00-canonical-pure-go-rewrite.md) are implemented.
 Tier 1 and Tier 2 core (phases 10–20) are shipped as a report CSS subset.
 Remaining gaps live in [deferred.md](deferred.md). Progressive post-MVP goals

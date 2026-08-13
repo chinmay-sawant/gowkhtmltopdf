@@ -12,12 +12,12 @@
    "heading": "Status at a glance",
    "items": [
     {
-     "title": "MVP v0.1.0",
-     "body": "Phases 0-9 of the canonical plan are implemented: load, parse, style, layout, paginate, paint, and PDF 1.4 write, plus PNG/JPEG image mode. The `VERSION` file is the single source of truth; an unstamped build reports the `0.1.0-dev` fallback via `--version`."
+     "title": "v0.2.0",
+     "body": "Phases 0-9 plus the report CSS subset (tiers 1-2) are implemented: load, parse, style, layout, paginate, paint, and PDF 1.4 write, plus PNG/JPEG image mode. The `VERSION` file is the single source of truth and is stamped into the CLI at build time."
     },
     {
-     "title": "Deterministic output",
-     "body": "Identical input bytes produce identical PDF bytes on every run. The 10-page invoice gate (10 sections by 40 rows, repeated `<thead>`) outputs 96,341 bytes byte-identical each run, with a generous CI budget of under 5 s."
+     "title": "Repeatable layout",
+     "body": "The same HTML, settings, and fonts produce the same layout. Default CLI PDF bytes are not hash-stable: `/CreationDate` and `[date]`/`[time]` use the wall clock unless the library caller injects `Now`. The 10-page invoice gate still asserts page count and a generous CI budget of under 5 s."
     },
     {
      "title": "Two static binaries",
@@ -40,12 +40,12 @@
    "rows": [
     [
      "JavaScript / WebKit flags (`--enable-javascript`, `--run-script`, `--window-status`)",
-     "Flags accepted with warnings; `<script>` stripped at load; no JS engine in stdlib",
+     "Flags are unknown options and rejected; `<script>` stripped at load; no JS engine",
      "Phase 22 staged (post-MVP roadmap)"
     ],
     [
      "Floats / positioned layout (`float`, `clear`, `position`)",
-     "Float lite plus relative/absolute/fixed shipped; sticky still deferred",
+     "Float lite plus relative/absolute/fixed shipped; sticky is print-scoped (page content box is the scrollport)",
      "Sticky pixel parity is a non-goal"
     ],
     [
@@ -124,7 +124,7 @@
     },
     {
      "heading": "The OSS story",
-     "body": "gowkhtmltopdf is MIT licensed under Chinmay Sawant and requires Go 1.26+. It is an independent clean-room reimplementation of the wkhtmltopdf CLI and behavior, so it shares none of wkhtmltopdf's LGPL obligations and does not ship Qt or WebKit. A direct CLI comparison against wkhtmltopdf 0.12.6.1 (2026-08-09) shows gowkhtmltopdf faster and lower-RSS at every tested size from 2 to 500 pages."
+     "body": "gowkhtmltopdf is MIT licensed under Chinmay Sawant and requires Go 1.26+. It is an independent clean-room reimplementation of the wkhtmltopdf CLI and behavior, so it shares none of wkhtmltopdf's LGPL obligations and does not ship Qt or WebKit. The current generic CLI (2026-08-14) is faster than wkhtmltopdf 0.12.6.1 at every tested size (16x at 2 pages, 1.6x at 500 pages). Peak RSS is lower through 100 pages and higher from 200 pages."
     }
    ]
   },

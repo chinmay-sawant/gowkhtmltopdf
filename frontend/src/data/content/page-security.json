@@ -60,7 +60,7 @@
     ],
     [
      "JavaScript / process execution",
-     "No JS engine and no `os/exec` anywhere in the tree; `--enable-javascript`, `--javascript-delay`, `--run-script`, `--window-status` and `--debug-javascript` are accepted for CLI compatibility and ignored. Use `--restrict-network` / SetNetworkPolicy for untrusted HTML."
+     "No JS engine and no `os/exec` anywhere in the tree. `--enable-javascript`, `--javascript-delay`, `--run-script`, `--window-status` and `--debug-javascript` are unknown options and are rejected. Use `--restrict-network` / SetNetworkPolicy for untrusted HTML."
     ]
    ]
   },

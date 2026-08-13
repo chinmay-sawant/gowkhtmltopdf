@@ -43,6 +43,7 @@ frontend/
     ├── main.jsx               # React bootstrap
     ├── App.jsx                # router + route table
     ├── components/
+    │   ├── RichText.jsx       # turn `backticks` into themed inline code
     │   ├── SiteNav.jsx        # sticky nav + theme toggle
     │   ├── Footer.jsx
     │   ├── PageTitle.jsx      # per-route document title
