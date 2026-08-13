@@ -421,7 +421,7 @@ export const SHOWCASE_SPECIAL = [
   {
     name: 'wiki-ana-de-armas',
     file: 'wiki-ana-de-armas.pdf',
-    pages: 11,
+    pages: 12,
     title: 'Wikipedia live smoke',
     desc: 'Live Wikipedia raw conversion with system fonts (needs network).',
   },
