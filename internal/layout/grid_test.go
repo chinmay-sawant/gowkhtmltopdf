@@ -428,7 +428,7 @@ func TestGridRowGapVsColumnGap(t *testing.T) { //nolint:cyclop
 	}
 }
 
-func TestGridGapSurvivesPaint(t *testing.T) {
+func TestGridGapSurvivesPaint(t *testing.T) { //nolint:cyclop,funlen
 	t.Parallel()
 
 	cssSheet := sheet(t, `
@@ -468,20 +468,20 @@ func TestGridGapSurvivesPaint(t *testing.T) {
 	var hole, nextRow *Op
 
 	for i := range res.Ops {
-		op := &res.Ops[i]
-		if op.Kind != OpFillRect || op.W < 70 || op.H < 10 || op.H > 40 || op.R < 0.99 {
+		paintOp := &res.Ops[i]
+		if paintOp.Kind != OpFillRect || paintOp.W < 70 || paintOp.H < 10 || paintOp.H > 40 || paintOp.R < 0.99 {
 			continue
 		}
 
-		if hole == nil || op.Y < hole.Y {
+		if hole == nil || paintOp.Y < hole.Y {
 			nextRow = hole
-			hole = op
+			hole = paintOp
 
 			continue
 		}
 
-		if op.Y > hole.Y+1 && (nextRow == nil || op.Y < nextRow.Y) {
-			nextRow = op
+		if paintOp.Y > hole.Y+1 && (nextRow == nil || paintOp.Y < nextRow.Y) {
+			nextRow = paintOp
 		}
 	}
 
@@ -495,7 +495,7 @@ func TestGridGapSurvivesPaint(t *testing.T) {
 	}
 }
 
-func TestSubgridCopiesParentColumnsAndKeepsGap(t *testing.T) {
+func TestSubgridCopiesParentColumnsAndKeepsGap(t *testing.T) { //nolint:cyclop,funlen
 	t.Parallel()
 
 	cssSheet := sheet(t, `
@@ -538,17 +538,17 @@ func TestSubgridCopiesParentColumnsAndKeepsGap(t *testing.T) {
 		}
 	}
 
-	s1, s2, s3 := pos["S1"], pos["S2"], pos["S3"]
-	if s1.W == 0 || s2.W == 0 || s3.W == 0 {
+	sub1, sub2, sub3 := pos["S1"], pos["S2"], pos["S3"]
+	if sub1.W == 0 || sub2.W == 0 || sub3.W == 0 {
 		t.Fatalf("missing subgrid labels: %#v", pos)
 	}
 
-	if math.Abs(s1.Y-s2.Y) > 1 || math.Abs(s2.Y-s3.Y) > 1 {
-		t.Fatalf("S1/S2/S3 should share one row: S1=%+v S2=%+v S3=%+v", s1, s2, s3)
+	if math.Abs(sub1.Y-sub2.Y) > 1 || math.Abs(sub2.Y-sub3.Y) > 1 {
+		t.Fatalf("S1/S2/S3 should share one row: S1=%+v S2=%+v S3=%+v", sub1, sub2, sub3)
 	}
 
-	if s2.X <= s1.X+s1.W || s3.X <= s2.X+s2.W {
-		t.Fatalf("S1/S2/S3 should sit in three columns: S1.x=%.1f S2.x=%.1f S3.x=%.1f", s1.X, s2.X, s3.X)
+	if sub2.X <= sub1.X+sub1.W || sub3.X <= sub2.X+sub2.W {
+		t.Fatalf("S1/S2/S3 should sit in three columns: S1.x=%.1f S2.x=%.1f S3.x=%.1f", sub1.X, sub2.X, sub3.X)
 	}
 
 	var whites []Op
@@ -569,7 +569,7 @@ func TestSubgridCopiesParentColumnsAndKeepsGap(t *testing.T) {
 	}
 }
 
-func TestMasonryPacksShortestColumn(t *testing.T) {
+func TestMasonryPacksShortestColumn(t *testing.T) { //nolint:cyclop
 	t.Parallel()
 
 	cssSheet := sheet(t, `
@@ -611,25 +611,25 @@ body { font-size: 9pt; }
 		}
 	}
 
-	a, b, c, d, eItem := loc["Tall A"], loc["Mid B"], loc["Short C"], loc["D"], loc["E"]
-	if a.W == 0 || b.W == 0 || c.W == 0 || d.W == 0 || eItem.W == 0 {
+	itemA, itemB, itemC, itemD, itemE := loc["Tall A"], loc["Mid B"], loc["Short C"], loc["D"], loc["E"]
+	if itemA.W == 0 || itemB.W == 0 || itemC.W == 0 || itemD.W == 0 || itemE.W == 0 {
 		t.Fatalf("missing masonry labels: %#v", loc)
 	}
 
-	if math.Abs(a.Y-c.Y) > 1 {
-		t.Fatalf("A and C should start on the first band: A=%+v C=%+v", a, c)
+	if math.Abs(itemA.Y-itemC.Y) > 1 {
+		t.Fatalf("A and C should start on the first band: A=%+v C=%+v", itemA, itemC)
 	}
 
-	if c.Y+c.H > a.Y+20 {
-		t.Fatalf("Short C stretched to Tall A height: A=%+v C=%+v", a, c)
+	if itemC.Y+itemC.H > itemA.Y+20 {
+		t.Fatalf("Short C stretched to Tall A height: A=%+v C=%+v", itemA, itemC)
 	}
 
-	if math.Abs(d.X-c.X) > 8 {
-		t.Fatalf("D should pack under Short C (shortest column): C.x=%.1f D.x=%.1f", c.X, d.X)
+	if math.Abs(itemD.X-itemC.X) > 8 {
+		t.Fatalf("D should pack under Short C (shortest column): C.x=%.1f D.x=%.1f", itemC.X, itemD.X)
 	}
 
-	if math.Abs(eItem.X-b.X) > 8 {
-		t.Fatalf("E should pack under Mid B: B.x=%.1f E.x=%.1f", b.X, eItem.X)
+	if math.Abs(itemE.X-itemB.X) > 8 {
+		t.Fatalf("E should pack under Mid B: B.x=%.1f E.x=%.1f", itemB.X, itemE.X)
 	}
 }
 

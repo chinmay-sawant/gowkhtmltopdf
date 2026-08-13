@@ -103,7 +103,7 @@ func setOverflowKeyword(style *ResolvedStyle, prop, value string) {
 
 func setWritingModeKeyword(style *ResolvedStyle, value string) {
 	switch value {
-	case "horizontal-tb", "vertical-rl", "vertical-lr":
+	case "horizontal-tb", writingModeVerticalRL, writingModeVerticalLR:
 		style.WritingMode = value
 	}
 }

@@ -58,6 +58,28 @@ func (e *engine) emitInlineBlock(
 	return leftX
 }
 
+func (e *engine) applyInlineImageBorders(item *inlineItem, leftX, top float64) (float64, float64, float64, float64) {
+	imgX, imgY, imgW, imgH := leftX, top, item.w, item.h
+	if item.style == nil || !inlineHasBorder(*item.style) || item.thumbImg {
+		return imgX, imgY, imgW, imgH
+	}
+
+	insetL := e.inlineChromeLeft(item.style)
+	insetT := e.inlineChromeTop(item.style)
+	insetR := e.inlineChromeRight(item.style)
+	insetB := e.inlineChromeBottom(item.style)
+	imgX += insetL
+	imgY += insetT
+	imgW -= insetL + insetR
+	imgH -= insetT + insetB
+
+	for _, op := range e.borderOps(*item.style, leftX, top, item.w, item.h) {
+		e.add(op)
+	}
+
+	return imgX, imgY, imgW, imgH
+}
+
 // emitInlineImage places an image (or inline-block) item on the line and
 // returns the updated x cursor.
 func (e *engine) emitInlineImage(
@@ -67,20 +89,7 @@ func (e *engine) emitInlineImage(
 	und.flush(e)
 
 	top := e.alignedInlineTop(item, lineY, lineH, baseline)
-	imgX, imgY, imgW, imgH := leftX, top, item.w, item.h
-	if item.style != nil && inlineHasBorder(*item.style) && !item.thumbImg {
-		insetL := e.inlineChromeLeft(item.style)
-		insetT := e.inlineChromeTop(item.style)
-		insetR := e.inlineChromeRight(item.style)
-		insetB := e.inlineChromeBottom(item.style)
-		imgX += insetL
-		imgY += insetT
-		imgW -= insetL + insetR
-		imgH -= insetT + insetB
-		for _, op := range e.borderOps(*item.style, leftX, top, item.w, item.h) {
-			e.add(op)
-		}
-	}
+	imgX, imgY, imgW, imgH := e.applyInlineImageBorders(item, leftX, top)
 
 	if item.imgRef != nil && item.imgRef.data != nil && imgW > 0 && imgH > 0 {
 		e.add(Op{ //nolint:exhaustruct // intentional zero fields

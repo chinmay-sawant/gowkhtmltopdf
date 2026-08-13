@@ -21,6 +21,8 @@ const (
 	cssVerticalAlignTop          = "top"
 	cssTextDecorationLineThrough = "line-through"
 	cssTextDecorationUnderline   = "underline"
+	writingModeVerticalRL        = "vertical-rl"
+	writingModeVerticalLR        = "vertical-lr"
 	nonASCIIStart                = 0x80
 )
 
@@ -45,16 +47,7 @@ type inlineItem struct {
 	opEnd    int
 }
 
-// layoutInlineFloats lays out inline content into line boxes and emits
-// text/image ops. It returns the consumed height and records the first line's
-// baseline on the box. When floats is non-nil, each line re-queries exclusion
-// at its canvas Y so text widens again after a float ends mid-paragraph.
-//
-//nolint:cyclop // hot path: per-line wrap against float exclusion zones
-func (e *engine) layoutInlineFloats(
-	boxNode *box, nodes []*html.Node, contentW, contentX, lineY float64,
-	floats *floatState,
-) float64 {
+func (e *engine) collectAndPrepareInlineItems(nodes []*html.Node, contentW float64) []inlineItem {
 	items := e.acquireInlineItems()
 
 	oldMax := e.imgMaxW
@@ -77,6 +70,20 @@ func (e *engine) layoutInlineFloats(
 		items = separateAdjacentCites(items, e)
 	}
 
+	return items
+}
+
+// layoutInlineFloats lays out inline content into line boxes and emits
+// text/image ops. It returns the consumed height and records the first line's
+// baseline on the box. When floats is non-nil, each line re-queries exclusion
+// at its canvas Y so text widens again after a float ends mid-paragraph.
+//
+//nolint:cyclop // hot path: per-line wrap against float exclusion zones
+func (e *engine) layoutInlineFloats(
+	boxNode *box, nodes []*html.Node, contentW, contentX, lineY float64,
+	floats *floatState,
+) float64 {
+	items := e.collectAndPrepareInlineItems(nodes, contentW)
 	defer e.releaseInlineItems(items)
 
 	if len(items) == 0 {
@@ -88,6 +95,7 @@ func (e *engine) layoutInlineFloats(
 	idx := 0
 	for idx < len(items) {
 		lineX, lineW := e.lineBounds(floats, contentX, contentW, leftY)
+
 		if idx == 0 && boxNode != nil && boxNode.style != nil && boxNode.style.TextIndent != 0 {
 			indent := e.scalePt(boxNode.style.TextIndent)
 			lineX += indent

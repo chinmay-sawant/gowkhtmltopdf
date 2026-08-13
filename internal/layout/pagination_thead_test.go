@@ -101,7 +101,7 @@ func TestTheadUADisplay(t *testing.T) {
 	}
 }
 
-func TestContinuationHeaderNotOverlappedByBodyRow(t *testing.T) { //nolint:cyclop
+func TestContinuationHeaderNotOverlappedByBodyRow(t *testing.T) { //nolint:cyclop,funlen
 	t.Parallel()
 
 	src := `<html><body><table>
@@ -144,16 +144,17 @@ func TestContinuationHeaderNotOverlappedByBodyRow(t *testing.T) { //nolint:cyclo
 	}
 
 	marks := []mark{}
-	for _, op := range res.Ops {
-		if op.Kind != OpText {
+
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpText {
 			continue
 		}
 
 		switch {
-		case strings.Contains(op.Text, "Year") && !strings.Contains(op.Text, "Actress"):
-			marks = append(marks, mark{op.Y, "header"})
-		case strings.Contains(op.Text, "Blonde"):
-			marks = append(marks, mark{op.Y, "blonde"})
+		case strings.Contains(paintOp.Text, "Year") && !strings.Contains(paintOp.Text, "Actress"):
+			marks = append(marks, mark{paintOp.Y, "header"})
+		case strings.Contains(paintOp.Text, "Blonde"):
+			marks = append(marks, mark{paintOp.Y, "blonde"})
 		}
 	}
 

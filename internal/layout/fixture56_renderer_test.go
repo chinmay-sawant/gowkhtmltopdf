@@ -814,6 +814,42 @@ func TestFixture56DAGStaysTogetherAtCLIPageGeometry(t *testing.T) { //nolint:par
 	}
 }
 
+func findAncestorSectionID(node *html.Node) string {
+	for ancestor := node.Parent; ancestor != nil; ancestor = ancestor.Parent {
+		if id := ancestor.Attribute("id"); id != "" {
+			return id
+		}
+	}
+
+	return ""
+}
+
+func countSplitNotes(t *testing.T, res *Result, notes []*html.Node, contentHeight float64) int {
+	t.Helper()
+
+	split := 0
+
+	for _, node := range notes {
+		box := fixture56BoxByNode(res.root, node)
+		if box == nil || box.height <= layoutSlack || box.height > contentHeight {
+			continue
+		}
+
+		start := int((box.y + layoutSlack) / contentHeight)
+		end := int((box.y + box.height - layoutSlack) / contentHeight)
+		section := findAncestorSectionID(node)
+		t.Logf("notes %s y=%.2f h=%.2f pages=%d-%d", section, box.y, box.height, start+1, end+1)
+
+		if end > start {
+			split++
+			t.Errorf("notes aside straddles pages %d-%d: y=%.2f h=%.2f section=%s",
+				start+1, end+1, box.y, box.height, section)
+		}
+	}
+
+	return split
+}
+
 // TestFixture56NotesCalloutsStayOnOnePage: .dom-notes asides that fit one
 // page must not start on one page and finish on the next.
 func TestFixture56NotesCalloutsStayOnOnePage(t *testing.T) { //nolint:paralleltest // renderer fixture uses shared font state
@@ -849,33 +885,7 @@ func TestFixture56NotesCalloutsStayOnOnePage(t *testing.T) { //nolint:parallelte
 		t.Fatal("no .dom-notes asides in fixture-56")
 	}
 
-	split := 0
-
-	for _, node := range notes {
-		box := fixture56BoxByNode(res.root, node)
-		if box == nil || box.height <= layoutSlack || box.height > contentHeight {
-			continue
-		}
-
-		start := int((box.y + layoutSlack) / contentHeight)
-		end := int((box.y + box.height - layoutSlack) / contentHeight)
-		section := ""
-		for ancestor := node.Parent; ancestor != nil; ancestor = ancestor.Parent {
-			if id := ancestor.Attribute("id"); id != "" {
-				section = id
-				break
-			}
-		}
-		t.Logf("notes %s y=%.2f h=%.2f pages=%d-%d", section, box.y, box.height, start+1, end+1)
-
-		if end > start {
-			split++
-			t.Errorf("notes aside straddles pages %d-%d: y=%.2f h=%.2f section=%s",
-				start+1, end+1, box.y, box.height, section)
-		}
-	}
-
-	if split > 0 {
+	if split := countSplitNotes(t, res, notes, contentHeight); split > 0 {
 		t.Fatalf("%d .dom-notes asides split across a page boundary", split)
 	}
 }

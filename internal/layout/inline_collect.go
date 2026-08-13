@@ -77,7 +77,7 @@ func (e *engine) collectInlineText(node *html.Node, sty ResolvedStyle, out *[]in
 }
 
 func isVerticalWritingMode(mode string) bool {
-	return mode == "vertical-rl" || mode == "vertical-lr"
+	return mode == writingModeVerticalRL || mode == writingModeVerticalLR
 }
 
 // inlineChromeApplies reports whether text belongs to an inline formatting

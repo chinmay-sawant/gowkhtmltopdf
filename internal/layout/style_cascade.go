@@ -687,7 +687,8 @@ func applyRestProps(
 
 	for prop, value := range raw {
 		switch prop {
-		case "margin", "padding", borderProperty, borderTopProperty, borderRightProperty, borderBottomProperty, borderLeftProperty,
+		case "margin", "padding", borderProperty, borderTopProperty,
+			borderRightProperty, borderBottomProperty, borderLeftProperty,
 			borderWidthKeyword, borderStyleKeyword,
 			borderColorKeyword, gapKeyword, flexKeyword, containerKeyword:
 			continue

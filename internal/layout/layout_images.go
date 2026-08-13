@@ -193,13 +193,13 @@ func (e *engine) imageMaxWidth(style ResolvedStyle, cssW bool) float64 {
 	return maxW
 }
 
-func (e *engine) buildImage(n *html.Node, sty ResolvedStyle, posX, posY float64) *box {
+func (e *engine) buildImage(node *html.Node, sty ResolvedStyle, posX, posY float64) *box {
 	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
-		node: n, style: e.stylePtr(n), kind: "replaced", x: posX, y: posY,
+		node: node, style: e.stylePtr(node), kind: "replaced", x: posX, y: posY,
 	}
-	boxNode.img = e.resolveImage(n.Attribute("src"))
-	size := e.usedImageSize(n, sty, boxNode.img)
-	thumbImg := e.thumbImageInsideFigure(n)
+	boxNode.img = e.resolveImage(node.Attribute("src"))
+	size := e.usedImageSize(node, sty, boxNode.img)
+	thumbImg := e.thumbImageInsideFigure(node)
 	padL := e.scalePt(sty.PaddingLeft)
 	padR := e.scalePt(sty.PaddingRight)
 	padT := e.scalePt(sty.PaddingTop)
@@ -208,6 +208,7 @@ func (e *engine) buildImage(n *html.Node, sty ResolvedStyle, posX, posY float64)
 	borderR := e.scalePt(borderPaint(sty.BorderRight))
 	borderT := e.scalePt(borderPaint(sty.BorderTop))
 	borderB := e.scalePt(borderPaint(sty.BorderBottom))
+
 	if thumbImg {
 		// Figure already owns the outer rails; keep the bitmap flush so a
 		// second inset frame does not double the thumb edge.
@@ -216,35 +217,49 @@ func (e *engine) buildImage(n *html.Node, sty ResolvedStyle, posX, posY float64)
 		boxNode.w = size.w + padL + padR + borderL + borderR
 		boxNode.height = size.h + padT + padB + borderT + borderB
 	}
+
 	// Paint replaced images that are not deferred to the inline line box.
 	// Inline/inline-block <img> is collected by collectInline and painted in
 	// emitLine; block-level and floated images paint here (wiki logo tagline
 	// uses display:block and must stack under the wordmark).
-	if boxNode.img != nil && boxNode.img.data != nil {
-		inlineLevel := sty.Display == cssDisplayInline || sty.Display == cssDisplayInlineBlock ||
-			sty.Display == displayInlineFlex || sty.Display == ""
-		if sty.Float != cssDisplayNone || !inlineLevel {
-			imgX, imgY, imgW, imgH := posX, posY, size.w, size.h
-			if !thumbImg {
-				imgX += borderL + padL
-				imgY += borderT + padT
-			}
-
-			e.add(Op{ //nolint:exhaustruct // intentional zero fields
-				Kind:  OpImage,
-				X:     imgX,
-				Y:     imgY,
-				W:     imgW,
-				H:     imgH,
-				Image: boxNode.img.data, ImgW: boxNode.img.w, ImgH: boxNode.img.h, IsJPEG: boxNode.img.isJPEG,
-			})
-			if !thumbImg {
-				e.prependChrome(len(e.ops)-1, boxNode, sty, posX, posY, boxNode.w, boxNode.height)
-			}
-		}
-	}
+	e.paintReplacedImage(boxNode, sty, posX, posY, size, thumbImg, borderL, padL, borderT, padT)
 
 	return boxNode
+}
+
+func (e *engine) paintReplacedImage(
+	boxNode *box, sty ResolvedStyle, posX, posY float64,
+	size imageUsedSize, thumbImg bool,
+	borderL, padL, borderT, padT float64,
+) {
+	if boxNode.img == nil || boxNode.img.data == nil {
+		return
+	}
+
+	inlineLevel := sty.Display == cssDisplayInline || sty.Display == cssDisplayInlineBlock ||
+		sty.Display == displayInlineFlex || sty.Display == ""
+	if sty.Float == cssDisplayNone && inlineLevel {
+		return
+	}
+
+	imgX, imgY, imgW, imgH := posX, posY, size.w, size.h
+	if !thumbImg {
+		imgX += borderL + padL
+		imgY += borderT + padT
+	}
+
+	e.add(Op{ //nolint:exhaustruct // intentional zero fields
+		Kind:  OpImage,
+		X:     imgX,
+		Y:     imgY,
+		W:     imgW,
+		H:     imgH,
+		Image: boxNode.img.data, ImgW: boxNode.img.w, ImgH: boxNode.img.h, IsJPEG: boxNode.img.isJPEG,
+	})
+
+	if !thumbImg {
+		e.prependChrome(len(e.ops)-1, boxNode, sty, posX, posY, boxNode.w, boxNode.height)
+	}
 }
 
 func (e *engine) buildHR(n *html.Node, sty ResolvedStyle, availW, posX, posY float64) *box {

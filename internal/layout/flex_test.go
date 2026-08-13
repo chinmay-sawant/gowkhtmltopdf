@@ -344,6 +344,10 @@ func TestFlexColumnGapVsRowGap(t *testing.T) {
 	}
 }
 
+func isWrapItemFill(op Op) bool {
+	return op.Kind == OpFillRect && op.W > 60 && op.W < 80 && op.H > 10 && op.H < 40
+}
+
 func TestFlexWrapRowGapSurvivesPaint(t *testing.T) {
 	t.Parallel()
 
@@ -380,7 +384,7 @@ func TestFlexWrapRowGapSurvivesPaint(t *testing.T) {
 	var fills []Op
 
 	for _, op := range res.Ops {
-		if op.Kind == OpFillRect && op.W > 60 && op.W < 80 && op.H > 10 && op.H < 40 {
+		if isWrapItemFill(op) {
 			fills = append(fills, op)
 		}
 	}

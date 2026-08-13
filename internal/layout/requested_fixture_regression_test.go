@@ -41,7 +41,7 @@ func TestFixture21ParagraphAfterForcedBreakStaysContiguous(t *testing.T) {
 
 // Work-package table continues past page 1; thead must repeat on page 2 top,
 // not get suffix-shifted back onto page 1 bottom by a later page-break-before.
-func TestFixture21WorkPackageHeaderRepeatsOnContinuationPage(t *testing.T) {
+func TestFixture21WorkPackageHeaderRepeatsOnContinuationPage(t *testing.T) { //nolint:cyclop
 	t.Parallel()
 
 	res, contentH := paintGoldenFixture(t, "fixture-21-detailed-report.html")

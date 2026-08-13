@@ -208,16 +208,16 @@ func skipBoxShift(res *Result, boxIndex, from, toIdx int, fromY, beforeY float64
 		return res.boxes[boxIndex].y >= beforeY
 	}
 
-	b := res.boxes[boxIndex]
-	if b.y >= beforeY {
+	targetBox := res.boxes[boxIndex]
+	if targetBox.y >= beforeY {
 		return true
 	}
 
-	if b.y > fromY {
+	if targetBox.y > fromY {
 		return false
 	}
 
-	if b.y == fromY && b.opStart >= from && b.opEnd <= toIdx {
+	if targetBox.y == fromY && targetBox.opStart >= from && targetBox.opEnd <= toIdx {
 		return false
 	}
 
@@ -513,6 +513,10 @@ func avoidInside(res *Result, contentH float64) bool {
 	return walk(res.root, false)
 }
 
+func shouldKeepImplicitAside(boxNode *box, inTable bool) bool {
+	return !inTable && !boxInsideTable(boxNode) && boxNode.height > 0 && implicitAtomicBox(boxNode)
+}
+
 // keepImplicitAsides is the pre-snap pass: move aside callouts that overflow
 // the remaining page height while their ops are still a rigid unit.
 func keepImplicitAsides(res *Result, contentH float64) bool {
@@ -531,10 +535,8 @@ func keepImplicitAsides(res *Result, contentH float64) bool {
 			}
 		}
 
-		if !inTable && !boxInsideTable(boxNode) && boxNode.height > 0 && implicitAtomicBox(boxNode) {
-			if keepTogetherForAvoid(res, boxNode, contentH) {
-				changed = true
-			}
+		if shouldKeepImplicitAside(boxNode, inTable) && keepTogetherForAvoid(res, boxNode, contentH) {
+			changed = true
 		}
 
 		return changed
@@ -610,23 +612,54 @@ func keepTogetherForAvoid(res *Result, boxNode *box, contentH float64) bool {
 		return false
 	}
 
-	dy := float64(layoutOut+1)*contentH - boxNode.y
-	if dy <= layoutSlack {
+	deltaY := float64(layoutOut+1)*contentH - boxNode.y
+	if deltaY <= layoutSlack {
 		return false
 	}
 
 	if implicitAtomicBox(boxNode) {
 		beforeY := nextForcedBreakY(res, boxNode.y)
-		if boxNode.y+height+dy > beforeY-layoutSlack {
+		if boxNode.y+height+deltaY > beforeY-layoutSlack {
 			return false
 		}
 
-		shiftImplicitUnit(res, boxNode, dy, beforeY)
+		shiftImplicitUnit(res, boxNode, deltaY, beforeY)
 	} else {
-		shiftFlowY(res, boxNode.opStart, boxNode.opEnd, boxNode.y, dy)
+		shiftFlowY(res, boxNode.opStart, boxNode.opEnd, boxNode.y, deltaY)
 	}
 
 	return true
+}
+
+const initialShiftedRootsCap = 8
+
+func isCandidateDescendant(candidate, boxNode *box) bool {
+	return boxNode.node != nil && candidate.node != nil && isDescendantNode(candidate.node, boxNode.node)
+}
+
+func isCandidateOutOfImplicitScope(candidate *box, fromY, beforeY float64) bool {
+	if math.IsInf(beforeY, 1) || candidate.y <= fromY || candidate.y >= beforeY {
+		return true
+	}
+
+	return candidate.style != nil && candidate.style.PageBreakBefore == pageBreakAlways
+}
+
+func shiftImplicitCandidate(res *Result, candidate *box, deltaY float64, shiftedRoots []*box) []*box {
+	if ancestor := shiftedAncestor(candidate, shiftedRoots); ancestor != nil {
+		// Ops already moved with the ancestor's opStart–opEnd range.
+		candidate.y += deltaY
+
+		return shiftedRoots
+	}
+
+	if candidate.opStart <= candidate.opEnd {
+		shiftOpsOnly(res, candidate.opStart, candidate.opEnd, deltaY)
+	}
+
+	candidate.y += deltaY
+
+	return append(shiftedRoots, candidate)
 }
 
 // shiftImplicitUnit moves one aside and the in-section siblings after it
@@ -634,50 +667,34 @@ func keepTogetherForAvoid(res *Result, boxNode *box, contentH float64) bool {
 // Nested boxes under an already-shifted sibling only update box.y — their ops
 // were shifted with the ancestor's op range (avoids double-shifting a progress
 // bar inside a following paragraph, which collapsed its height to 0).
-func shiftImplicitUnit(res *Result, boxNode *box, dy, beforeY float64) {
-	if res == nil || boxNode == nil || dy == 0 {
+func shiftImplicitUnit(res *Result, boxNode *box, deltaY, beforeY float64) {
+	if res == nil || boxNode == nil || deltaY == 0 {
 		return
 	}
 
-	shiftOpsOnly(res, boxNode.opStart, boxNode.opEnd, dy)
+	shiftOpsOnly(res, boxNode.opStart, boxNode.opEnd, deltaY)
 
 	fromY := boxNode.y
-	boxNode.y += dy
+	boxNode.y += deltaY
 
-	shiftedRoots := make([]*box, 0, 8)
+	shiftedRoots := make([]*box, 0, initialShiftedRootsCap)
 
 	for _, candidate := range flowBoxList(res) {
 		if candidate == nil || candidate == boxNode {
 			continue
 		}
 
-		if boxNode.node != nil && candidate.node != nil && isDescendantNode(candidate.node, boxNode.node) {
-			candidate.y += dy
+		if isCandidateDescendant(candidate, boxNode) {
+			candidate.y += deltaY
 
 			continue
 		}
 
-		if math.IsInf(beforeY, 1) || candidate.y <= fromY || candidate.y >= beforeY {
+		if isCandidateOutOfImplicitScope(candidate, fromY, beforeY) {
 			continue
 		}
 
-		if candidate.style != nil && candidate.style.PageBreakBefore == pageBreakAlways {
-			continue
-		}
-
-		if ancestor := shiftedAncestor(candidate, shiftedRoots); ancestor != nil {
-			// Ops already moved with the ancestor's opStart–opEnd range.
-			candidate.y += dy
-
-			continue
-		}
-
-		if candidate.opStart <= candidate.opEnd {
-			shiftOpsOnly(res, candidate.opStart, candidate.opEnd, dy)
-		}
-
-		candidate.y += dy
-		shiftedRoots = append(shiftedRoots, candidate)
+		shiftedRoots = shiftImplicitCandidate(res, candidate, deltaY, shiftedRoots)
 	}
 }
 
@@ -802,7 +819,7 @@ func opVisibleInkHeight(paintOp Op) float64 {
 // break). Flow indexes are rebuilt once at the end.
 //
 //nolint:wsl // break-difference bookkeeping
-func beforeAlways( //nolint:gocognit,gocyclo,cyclop,funlen // break-difference bookkeeping
+func beforeAlways( //nolint:gocognit,cyclop,funlen // break-difference bookkeeping
 	res *Result, contentH float64,
 ) bool {
 	if res == nil || res.root == nil || contentH <= 0 {
@@ -959,8 +976,7 @@ func forcedBreakTargetY(boxY, maxEff, contentH float64) (float64, bool) {
 	}
 
 	onLaterPage := loPage > lastPage
-	atPageTop := pageOff <= layoutSlack
-	if onLaterPage && atPageTop {
+	if onLaterPage && pageOff <= layoutSlack {
 		return boxY, true
 	}
 
@@ -1741,6 +1757,36 @@ func normalizeLeadingRoundedCallouts(res *Result, contentH float64) {
 	}
 }
 
+func shiftSamePageOps(res *Result, fromY float64, page int, contentH, deltaY float64) {
+	for idx := range res.Ops {
+		if res.Ops[idx].Fixed || res.Ops[idx].Y < fromY {
+			continue
+		}
+
+		opPage, ok := checkedFlowPageOfY(res.Ops[idx].Y+layoutEpsilon, contentH)
+		if !ok || opPage != page {
+			continue
+		}
+
+		res.Ops[idx].Y += deltaY
+	}
+}
+
+func shiftSamePageBoxes(res *Result, fromY float64, page int, contentH, deltaY float64) {
+	for _, boxNode := range flowBoxList(res) {
+		if boxNode.y < fromY {
+			continue
+		}
+
+		boxPage, ok := checkedFlowPageOfY(boxNode.y+layoutEpsilon, contentH)
+		if !ok || boxPage != page {
+			continue
+		}
+
+		boxNode.y += deltaY
+	}
+}
+
 // shiftSamePageFromY applies deltaY to ops and boxes at or below fromY that
 // still sit on page. Later pages are left alone.
 //
@@ -1754,32 +1800,8 @@ func shiftSamePageFromY(res *Result, fromY float64, page int, contentH, deltaY f
 		return
 	}
 
-	for idx := range res.Ops {
-		if res.Ops[idx].Fixed || res.Ops[idx].Y < fromY {
-			continue
-		}
-
-		opPage, ok := checkedFlowPageOfY(res.Ops[idx].Y+layoutEpsilon, contentH)
-		if !ok || opPage != page {
-			continue
-		}
-
-		res.Ops[idx].Y += deltaY
-	}
-
-	for _, boxNode := range flowBoxList(res) {
-		if boxNode.y < fromY {
-			continue
-		}
-
-		boxPage, ok := checkedFlowPageOfY(boxNode.y+layoutEpsilon, contentH)
-		if !ok || boxPage != page {
-			continue
-		}
-
-		boxNode.y += deltaY
-	}
-
+	shiftSamePageOps(res, fromY, page, contentH, deltaY)
+	shiftSamePageBoxes(res, fromY, page, contentH, deltaY)
 	invalidateFlowIndex(res)
 }
 
@@ -1946,22 +1968,30 @@ func repeatTableHeaderOnPages(res *Result, tblBox *box, contentH float64) {
 	}
 }
 
+const (
+	tableSliverOffsetGap      = 6.0
+	tableSliverFallbackHeight = 12.0
+	tableSliverLookback       = 8.0
+	tableSliverInspectHeight  = 20.0
+)
+
 // placeSliverBodyBelowHeader pulls a body row that sits in the sliver just
 // above a continuation page (or under the repeated thead) down below the
 // header without moving rows that are already clear of the band.
 func placeSliverBodyBelowHeader(res *Result, tblBox *box, pageTop, hdrH float64) {
-	from, to, top, bottom := sliverBodyOps(tblBox, pageTop, hdrH, res)
-	if from < 0 || top < 0 {
+	fromIdx, toIdx, top, bottom := sliverBodyOps(tblBox, pageTop, hdrH, res)
+	if fromIdx < 0 || top < 0 {
 		return
 	}
 
-	target := pageTop + hdrH + 6
+	target := pageTop + hdrH + tableSliverOffsetGap
 	sliverH := bottom - top
+
 	if sliverH < 1 {
-		sliverH = 12
+		sliverH = tableSliverFallbackHeight
 	}
 
-	offFrom, officialTop := nextBodyAfterSliver(tblBox, pageTop, from, to, res)
+	offFrom, officialTop := nextBodyAfterSliver(tblBox, pageTop, fromIdx, toIdx, res)
 	if offFrom >= 0 && officialTop >= 0 && officialTop < target+sliverH-0.5 {
 		push := target + sliverH - officialTop
 		if push > 0 {
@@ -1971,17 +2001,40 @@ func placeSliverBodyBelowHeader(res *Result, tblBox *box, pageTop, hdrH float64)
 
 	dy := target - top
 	if math.Abs(dy) > layoutSlack {
-		shiftOpsOnly(res, from, to, dy)
-		shiftTableBoxesInOpRange(tblBox, from, to, dy)
+		shiftOpsOnly(res, fromIdx, toIdx, dy)
+		shiftTableBoxesInOpRange(tblBox, fromIdx, toIdx, dy)
+	}
+}
+
+func accumulateSliverOp(paintOp Op, idx int, loBound, hiBound float64, fromIdx, toIdx *int, top, bottom *float64) {
+	posY := paintOp.Y
+	if posY < loBound || posY >= hiBound {
+		return
+	}
+
+	if *fromIdx < 0 || idx < *fromIdx {
+		*fromIdx = idx
+	}
+
+	if idx > *toIdx {
+		*toIdx = idx
+	}
+
+	if *top < 0 || posY < *top {
+		*top = posY
+	}
+
+	if bot := posY + opInkHeight(paintOp); bot > *bottom {
+		*bottom = bot
 	}
 }
 
 // sliverBodyOps is the body-row paint sitting in [pageTop-8, pageTop+hdrH).
 func sliverBodyOps(tblBox *box, pageTop, hdrH float64, res *Result) (int, int, float64, float64) {
-	from, to := -1, -1
+	fromIdx, toIdx := -1, -1
 	top, bottom := -1.0, -1.0
-	lo := pageTop - 8
-	hi := pageTop + hdrH
+	loBound := pageTop - tableSliverLookback
+	hiBound := pageTop + hdrH
 
 	for _, row := range tblBox.rows[tblBox.headerRows:] {
 		first, last := rowOpRange(row)
@@ -1990,35 +2043,30 @@ func sliverBodyOps(tblBox *box, pageTop, hdrH float64, res *Result) (int, int, f
 		}
 
 		for idx := first; idx <= last && idx < len(res.Ops); idx++ {
-			posY := res.Ops[idx].Y
-			if posY < lo || posY >= hi {
-				continue
-			}
-
-			if from < 0 || idx < from {
-				from = idx
-			}
-
-			if idx > to {
-				to = idx
-			}
-
-			if top < 0 || posY < top {
-				top = posY
-			}
-
-			if bot := posY + opInkHeight(res.Ops[idx]); bot > bottom {
-				bottom = bot
-			}
+			accumulateSliverOp(res.Ops[idx], idx, loBound, hiBound, &fromIdx, &toIdx, &top, &bottom)
 		}
 	}
 
-	return from, to, top, bottom
+	return fromIdx, toIdx, top, bottom
+}
+
+func accumulateNextBodyOp(posY float64, idx int, pageTop float64, fromIdx *int, top *float64) {
+	if posY < pageTop-0.5 {
+		return
+	}
+
+	if *fromIdx < 0 || idx < *fromIdx {
+		*fromIdx = idx
+	}
+
+	if *top < 0 || posY < *top {
+		*top = posY
+	}
 }
 
 // nextBodyAfterSliver is the first body op on this page that is not in the sliver.
 func nextBodyAfterSliver(tblBox *box, pageTop float64, sliverFrom, sliverTo int, res *Result) (int, float64) {
-	from := -1
+	fromIdx := -1
 	top := -1.0
 
 	for _, row := range tblBox.rows[tblBox.headerRows:] {
@@ -2028,29 +2076,16 @@ func nextBodyAfterSliver(tblBox *box, pageTop float64, sliverFrom, sliverTo int,
 		}
 
 		for idx := first; idx <= last && idx < len(res.Ops); idx++ {
-			if idx >= sliverFrom && idx <= sliverTo {
-				continue
-			}
-
-			posY := res.Ops[idx].Y
-			if posY < pageTop-0.5 {
-				continue
-			}
-
-			if from < 0 || idx < from {
-				from = idx
-			}
-
-			if top < 0 || posY < top {
-				top = posY
+			if idx < sliverFrom || idx > sliverTo {
+				accumulateNextBodyOp(res.Ops[idx].Y, idx, pageTop, &fromIdx, &top)
 			}
 		}
 	}
 
-	return from, top
+	return fromIdx, top
 }
 
-func shiftTableBoxesInOpRange(tblBox *box, from, to int, deltaY float64) {
+func shiftTableBoxesInOpRange(tblBox *box, fromIdx, toIdx int, deltaY float64) {
 	if tblBox == nil || deltaY == 0 {
 		return
 	}
@@ -2061,7 +2096,7 @@ func shiftTableBoxesInOpRange(tblBox *box, from, to int, deltaY float64) {
 			return
 		}
 
-		if boxNode.opStart <= boxNode.opEnd && boxNode.opStart >= from && boxNode.opEnd <= to {
+		if boxNode.opStart <= boxNode.opEnd && boxNode.opStart >= fromIdx && boxNode.opEnd <= toIdx {
 			boxNode.y += deltaY
 		}
 
@@ -2090,14 +2125,17 @@ func headerContinuationPages(tblBox *box, _ int, res *Result, contentH float64) 
 		page, ok := checkedFlowPageOfY(top, contentH)
 		if ok {
 			pages[page] = true
+
 			off := math.Mod(top, contentH)
 			if off < 0 {
 				off += contentH
 			}
 
-			if off > contentH-8 {
+			if off > contentH-tableSliverLookback {
 				nextTop := float64(page+1) * contentH
-				if sliverFrom, _, sliverTop, _ := sliverBodyOps(tblBox, nextTop, 20, res); sliverFrom >= 0 && sliverTop >= 0 {
+
+				sliverFrom, _, sliverTop, _ := sliverBodyOps(tblBox, nextTop, tableSliverInspectHeight, res)
+				if sliverFrom >= 0 && sliverTop >= 0 {
 					pages[page+1] = true
 				}
 			}
@@ -2158,13 +2196,13 @@ func cloneHeaderOps(res *Result, hdrFirst, hdrLast int, hdrTop, pageTop float64)
 	start := len(res.Ops)
 	res.Ops = append(res.Ops, make([]Op, hdrLast-hdrFirst+1)...)
 
-	for k := hdrFirst; k <= hdrLast; k++ {
-		op := res.Ops[k]
+	for hdrIndex := hdrFirst; hdrIndex <= hdrLast; hdrIndex++ {
+		op := res.Ops[hdrIndex]
 		op.Y = pageTop + (op.Y - hdrTop)
 		op.Pinned = true
 		// Clones are in-flow page furniture, not position:fixed stamps.
 		op.Fixed = false
-		res.Ops[start+k-hdrFirst] = op
+		res.Ops[start+hdrIndex-hdrFirst] = op
 	}
 
 	// Header clones extend the display list after the page index was built.

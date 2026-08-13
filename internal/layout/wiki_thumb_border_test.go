@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -52,6 +53,7 @@ func layoutWikiThumb(t *testing.T, extraLeading string, height float64) *Result 
 
 	png := wikiThumbPNG()
 	cssSheet := sheet(t, wikiThumbCSS())
+
 	root, err := html.Parse(`<html><body>` + extraLeading + `
 <figure typeof="mw:File/Thumb">
 <a href="/wiki/File:x.jpg"><img class="mw-file-element" width="125" height="88" src="thumb.png"></a>
@@ -78,7 +80,7 @@ func layoutWikiThumb(t *testing.T, extraLeading string, height float64) *Result 
 		t.Fatal(err)
 	}
 
-	if err := Paint(pdf.NewDocument(), res, PaintOptions{ //nolint:exhaustruct // page geometry matches layout height
+	if err := Paint(pdf.NewDocument(), res, PaintOptions{
 		PageWidth: 595.28, PageHeight: height + 2*28.35,
 		MarginTop: 28.35, MarginBottom: 28.35, MarginLeft: 28.35, MarginRight: 28.35,
 	}); err != nil {
@@ -111,10 +113,12 @@ func isVerticalRail(op Op) bool {
 		(op.Kind == OpStrokeRect && (op.StrokeMask == StrokeMaskLeft || op.StrokeMask == StrokeMaskRight) && op.H > 8)
 }
 
-func TestWikiThumbCollapsedFrameHasOneSideRail(t *testing.T) { //nolint:paralleltest // renderer fixture uses shared font state
+//nolint:cyclop,gocognit,paralleltest // renderer fixture uses shared font state
+func TestWikiThumbCollapsedFrameHasOneSideRail(t *testing.T) {
 	res := layoutWikiThumb(t, `<p>`+strings.Repeat("word ", 20)+`</p>`, 785.19)
 	figure := findNamedBox(res.root, "figure")
 	caption := findNamedBox(res.root, "figcaption")
+
 	if figure == nil || caption == nil {
 		t.Fatal("missing figure or figcaption box")
 	}
@@ -125,24 +129,25 @@ func TestWikiThumbCollapsedFrameHasOneSideRail(t *testing.T) { //nolint:parallel
 	rightRails := 0
 	figureRailBottom := 0.0
 
-	for _, op := range res.Ops {
-		if !isVerticalRail(op) {
+	for _, paintOp := range res.Ops {
+		if !isVerticalRail(paintOp) {
 			continue
 		}
 
-		opBot := op.Y + op.H
-		if opBot < captionTop+1 || op.Y > captionBot+1 {
+		opBot := paintOp.Y + paintOp.H
+		if opBot < captionTop+1 || paintOp.Y > captionBot+1 {
 			continue
 		}
 
-		if math.Abs(op.X-figure.x) < 1.5 {
+		if math.Abs(paintOp.X-figure.x) < 1.5 {
 			leftRails++
+
 			if opBot > figureRailBottom {
 				figureRailBottom = opBot
 			}
 		}
 
-		if math.Abs(op.X-(figure.x+figure.w)) < 1.5 {
+		if math.Abs(paintOp.X-(figure.x+figure.w)) < 1.5 {
 			rightRails++
 		}
 	}
@@ -155,8 +160,8 @@ func TestWikiThumbCollapsedFrameHasOneSideRail(t *testing.T) { //nolint:parallel
 		t.Fatalf("figure side rail ends at %.2f, caption box ends at %.2f", figureRailBottom, captionBot)
 	}
 
-	for _, op := range res.Ops {
-		if op.Kind != OpImage {
+	for _, imageOp := range res.Ops {
+		if imageOp.Kind != OpImage {
 			continue
 		}
 
@@ -165,14 +170,15 @@ func TestWikiThumbCollapsedFrameHasOneSideRail(t *testing.T) { //nolint:parallel
 				continue
 			}
 
-			if math.Abs(line.Y-(op.Y+op.H)) < 1 && math.Abs(line.X-op.X) < 2 && math.Abs(line.W-op.W) < 4 {
+			if math.Abs(line.Y-(imageOp.Y+imageOp.H)) < 1 && math.Abs(line.X-imageOp.X) < 2 && math.Abs(line.W-imageOp.W) < 4 {
 				t.Fatalf("stray hairline under thumb image at y=%.2f w=%.2f", line.Y, line.W)
 			}
 		}
 	}
 }
 
-func TestWikiThumbChromeDoesNotCloneOntoNextPage(t *testing.T) { //nolint:paralleltest // renderer fixture uses shared font state
+//nolint:paralleltest // renderer fixture uses shared font state
+func TestWikiThumbChromeDoesNotCloneOntoNextPage(t *testing.T) {
 	// Page short enough that a line-box stretch would cross, but the
 	// caption border box still fits on page 0.
 	const contentH = 155.0
@@ -180,6 +186,7 @@ func TestWikiThumbChromeDoesNotCloneOntoNextPage(t *testing.T) { //nolint:parall
 	res := layoutWikiThumb(t, "", contentH)
 	figure := findNamedBox(res.root, "figure")
 	caption := findNamedBox(res.root, "figcaption")
+
 	if figure == nil || caption == nil {
 		t.Fatal("missing figure or figcaption box")
 	}
@@ -188,17 +195,17 @@ func TestWikiThumbChromeDoesNotCloneOntoNextPage(t *testing.T) { //nolint:parall
 		t.Fatalf("caption bottom %.2f already past page 0; test geometry is wrong", caption.y+caption.height)
 	}
 
-	for _, op := range res.Ops {
-		if !isVerticalRail(op) {
+	for _, paintOp := range res.Ops {
+		if !isVerticalRail(paintOp) {
 			continue
 		}
 
-		if math.Abs(op.X-figure.x) > 1.5 && math.Abs(op.X-(figure.x+figure.w)) > 1.5 {
+		if math.Abs(paintOp.X-figure.x) > 1.5 && math.Abs(paintOp.X-(figure.x+figure.w)) > 1.5 {
 			continue
 		}
 
-		if op.Y >= contentH-1 {
-			t.Fatalf("thumb side rail cloned onto next page: x=%.2f y=%.2f h=%.2f", op.X, op.Y, op.H)
+		if paintOp.Y >= contentH-1 {
+			t.Fatalf("thumb side rail cloned onto next page: x=%.2f y=%.2f h=%.2f", paintOp.X, paintOp.Y, paintOp.H)
 		}
 	}
 }

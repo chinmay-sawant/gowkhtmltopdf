@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -27,6 +28,7 @@ func TestForcedBreakTargetYLandsAtNextPageTop(t *testing.T) {
 		t.Parallel()
 
 		boxY := 4*contentH - 4.5e-13
+
 		target, skip := forcedBreakTargetY(boxY, contentH, contentH)
 		if !skip {
 			t.Fatalf("epsilon below page top must already be fresh, target=%.12f", target)
@@ -67,14 +69,14 @@ func TestShiftSamePageFromYLeavesLaterPages(t *testing.T) {
 
 	res := &Result{ //nolint:exhaustruct // index-only fixture
 		Ops: []Op{
-			{Y: 12},
-			{Y: 110},
+			{Y: 12},  //nolint:exhaustruct // index-only fixture
+			{Y: 110}, //nolint:exhaustruct // index-only fixture
 		},
 		root: &box{ //nolint:exhaustruct // index-only fixture
 			y: 10,
 			children: []*box{
-				{y: 12},  //nolint:exhaustruct // index-only fixture
-				{y: 110}, //nolint:exhaustruct // index-only fixture
+				{y: 12},
+				{y: 110},
 			},
 		},
 	}

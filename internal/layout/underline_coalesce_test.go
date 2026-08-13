@@ -258,7 +258,7 @@ func TestUnderlineWrappedURLOnePerLine(t *testing.T) {
 
 // Wiki print CSS uses border-bottom on body links and text-decoration:none.
 // The href force-underline must not stack a second stroke on that border.
-func TestLinkBorderBottomNotDoubleUnderlined(t *testing.T) {
+func TestLinkBorderBottomNotDoubleUnderlined(t *testing.T) { //nolint:cyclop,funlen,gocognit
 	t.Parallel()
 
 	cssSheet := sheet(t, `
@@ -266,6 +266,7 @@ body { margin: 0; font-size: 10pt; }
 a { color: #36c; text-decoration: none; }
 .mw-body a:not(.image) { border-bottom: 1px solid #aaa; }
 `)
+
 	root, err := html.Parse(`<html><body class="mw-body"><p>See the ` +
 		`<a href="https://en.wikipedia.org/wiki/Toronto_International_Film_Festival">` +
 		`Toronto International Film Festival</a> in 2024</p></body></html>`)
@@ -283,20 +284,22 @@ a { color: #36c; text-decoration: none; }
 	type band struct{ y, x0, x1 float64 }
 
 	bands := []band{}
-	for _, op := range res.Ops {
-		if op.Kind != OpLine || op.H != 0 || op.W < 4 {
+
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpLine || paintOp.H != 0 || paintOp.W < 4 {
 			continue
 		}
 
 		merged := false
-		for i := range bands {
-			if math.Abs(bands[i].y-op.Y) < 1 && op.X <= bands[i].x1+2 && op.X+op.W >= bands[i].x0-2 {
-				if op.X < bands[i].x0 {
-					bands[i].x0 = op.X
+
+		for idx := range bands {
+			if math.Abs(bands[idx].y-paintOp.Y) < 1 && paintOp.X <= bands[idx].x1+2 && paintOp.X+paintOp.W >= bands[idx].x0-2 {
+				if paintOp.X < bands[idx].x0 {
+					bands[idx].x0 = paintOp.X
 				}
 
-				if op.X+op.W > bands[i].x1 {
-					bands[i].x1 = op.X + op.W
+				if paintOp.X+paintOp.W > bands[idx].x1 {
+					bands[idx].x1 = paintOp.X + paintOp.W
 				}
 
 				merged = true
@@ -306,11 +309,11 @@ a { color: #36c; text-decoration: none; }
 		}
 
 		if !merged {
-			bands = append(bands, band{y: op.Y, x0: op.X, x1: op.X + op.W})
+			bands = append(bands, band{y: paintOp.Y, x0: paintOp.X, x1: paintOp.X + paintOp.W})
 		}
 	}
 
-	for i := 0; i < len(bands); i++ {
+	for i := range bands {
 		for j := i + 1; j < len(bands); j++ {
 			overlap := bands[i].x0 < bands[j].x1 && bands[j].x0 < bands[i].x1
 			if overlap && math.Abs(bands[i].y-bands[j].y) < 1.5 {

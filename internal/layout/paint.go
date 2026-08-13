@@ -823,7 +823,39 @@ func drawFill(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintO
 	c.Fill()
 }
 
-//nolint:varnamelen,wsl,cyclop // PDF path helpers use compact graphics-state names
+//nolint:varnamelen,wsl // PDF path helpers use compact graphics-state names
+func drawMaskedStroke(c *pdf.Content, op *Op, x, y, width float64) {
+	if op.StrokeMask&StrokeMaskTop != 0 {
+		c.SetLineCap(1)
+		roundedTopPath(c, x, y, op.W, op.H, width, opRadii(op))
+		c.Stroke()
+		c.SetLineCap(0)
+	}
+	if op.StrokeMask&StrokeMaskBottom != 0 {
+		c.SetLineCap(1)
+		roundedBottomPath(c, x, y, op.W, width, opRadii(op))
+		c.Stroke()
+		c.SetLineCap(0)
+	}
+	if op.StrokeMask&StrokeMaskLeft != 0 {
+		if opHasRoundedCorners(op) {
+			c.SetLineCap(1)
+		}
+		roundedLeftPath(c, x, y, op.H, width, opRadii(op))
+		c.Stroke()
+		c.SetLineCap(0)
+	}
+	if op.StrokeMask&StrokeMaskRight != 0 {
+		if opHasRoundedCorners(op) {
+			c.SetLineCap(1)
+		}
+		roundedRightPath(c, x, y, op.W, op.H, width, opRadii(op))
+		c.Stroke()
+		c.SetLineCap(0)
+	}
+}
+
+//nolint:varnamelen,wsl // PDF path helpers use compact graphics-state names
 func drawStroke(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintOptions, pageH float64) {
 	x, y := canvasToPDF(op.X, op.Y+op.H, pageIdx, contentH, opts, pageH)
 	c.SetStrokeColor(op.R, op.G, op.B)
@@ -834,34 +866,7 @@ func drawStroke(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts Pain
 	c.SetLineWidth(width)
 	if op.StrokeMask != 0 {
 		// Partial / open multi-page frames: paint each selected side.
-		if op.StrokeMask&StrokeMaskTop != 0 {
-			c.SetLineCap(1)
-			roundedTopPath(c, x, y, op.W, op.H, width, opRadii(op))
-			c.Stroke()
-			c.SetLineCap(0)
-		}
-		if op.StrokeMask&StrokeMaskBottom != 0 {
-			c.SetLineCap(1)
-			roundedBottomPath(c, x, y, op.W, width, opRadii(op))
-			c.Stroke()
-			c.SetLineCap(0)
-		}
-		if op.StrokeMask&StrokeMaskLeft != 0 {
-			if opHasRoundedCorners(op) {
-				c.SetLineCap(1)
-			}
-			roundedLeftPath(c, x, y, op.H, width, opRadii(op))
-			c.Stroke()
-			c.SetLineCap(0)
-		}
-		if op.StrokeMask&StrokeMaskRight != 0 {
-			if opHasRoundedCorners(op) {
-				c.SetLineCap(1)
-			}
-			roundedRightPath(c, x, y, op.W, op.H, width, opRadii(op))
-			c.Stroke()
-			c.SetLineCap(0)
-		}
+		drawMaskedStroke(c, op, x, y, width)
 
 		return
 	}

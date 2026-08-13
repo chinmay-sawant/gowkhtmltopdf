@@ -115,6 +115,10 @@ body { margin: 0; font-family: Arial, Helvetica, sans-serif; font-size: 10pt; }
 	}
 }
 
+func isInlineBlockSwatch(op Op) bool {
+	return op.Kind == OpFillRect && op.W > 5 && op.W < 20 && op.H > 5 && op.H < 20
+}
+
 func TestInlineBlockHonorsLengthVerticalAlign(t *testing.T) {
 	t.Parallel()
 
@@ -124,14 +128,17 @@ func TestInlineBlockHonorsLengthVerticalAlign(t *testing.T) {
 body { margin: 0; font-family: Arial, Helvetica, sans-serif; font-size: 10pt; }
 .legend { display: flex; }
 .legend span { font-size: 8pt; }
-.swatch { display: inline-block; width: 4mm; height: 4mm; margin-right: 1mm; vertical-align: -1mm; background: #3c7899; }
+.swatch {
+	display: inline-block; width: 4mm; height: 4mm; margin-right: 1mm;
+	vertical-align: -1mm; background: #3c7899;
+}
 `))
 
 	var swatch, label Op
 
 	for _, op := range res.Ops {
 		switch {
-		case op.Kind == OpFillRect && op.W > 5 && op.W < 20 && op.H > 5 && op.H < 20:
+		case isInlineBlockSwatch(op):
 			swatch = op
 		case op.Kind == OpText && strings.Contains(op.Text, "internal"):
 			label = op

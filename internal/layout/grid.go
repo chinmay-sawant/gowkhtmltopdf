@@ -25,16 +25,23 @@ const (
 // content box — not shared parent sizing.
 // grid-template-rows: masonry packs items into the shortest column and
 // keeps intrinsic heights (no shared row stretch).
-func (e *engine) buildGrid(node *html.Node, sty ResolvedStyle, availW, posX, posY float64) *box {
-	inheritSubgridFromParent(e, node, &sty)
-
+func prepareGridTemplateStyles(sty *ResolvedStyle) bool {
 	masonryRows := isMasonryTrackList(sty.GridTemplateRows)
 	sty.GridTemplateColumns = stripMasonryKeyword(sty.GridTemplateColumns)
+
 	if masonryRows {
 		sty.GridTemplateRows = ""
 	} else {
 		sty.GridTemplateRows = stripMasonryKeyword(sty.GridTemplateRows)
 	}
+
+	return masonryRows
+}
+
+func (e *engine) buildGrid(node *html.Node, sty ResolvedStyle, availW, posX, posY float64) *box {
+	inheritSubgridFromParent(e, node, &sty)
+
+	masonryRows := prepareGridTemplateStyles(&sty)
 
 	ml := e.scalePt(sty.MarginLeft)
 	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
@@ -71,6 +78,16 @@ func (e *engine) buildGrid(node *html.Node, sty ResolvedStyle, availW, posX, pos
 		return boxNode
 	}
 
+	return e.layoutStandardGrid(
+		boxNode, sty, kids, areas, cols, columnGap, rowGap, contentX, curY, posY, contentH, contentStart,
+	)
+}
+
+func (e *engine) layoutStandardGrid(
+	boxNode *box, sty ResolvedStyle, kids []*html.Node, areas gridTemplateAreasMap,
+	cols []float64, columnGap, rowGap, contentX, curY, posY, contentH float64,
+	contentStart int,
+) *box {
 	columnMajor, densePack := gridAutoFlowMode(sty.GridAutoFlow)
 	placed := placeGridItems(e, kids, areas, newGridOccupation(len(cols)), len(cols), columnMajor, densePack)
 
@@ -98,22 +115,7 @@ func (e *engine) buildGrid(node *html.Node, sty ResolvedStyle, availW, posX, pos
 	return boxNode
 }
 
-func inheritSubgridFromParent(e *engine, node *html.Node, sty *ResolvedStyle) {
-	if e == nil || node == nil || sty == nil || sty.Display != displaySubgrid {
-		return
-	}
-
-	sty.Display = displayGrid
-
-	if node.Parent == nil {
-		return
-	}
-
-	parentStyle := e.styles[node.Parent]
-	if parentStyle == nil {
-		return
-	}
-
+func inheritSubgridTracksAndGaps(sty, parentStyle *ResolvedStyle) {
 	if strings.TrimSpace(sty.GridTemplateColumns) == "" &&
 		strings.TrimSpace(parentStyle.GridTemplateColumns) != "" {
 		sty.GridTemplateColumns = parentStyle.GridTemplateColumns
@@ -124,6 +126,25 @@ func inheritSubgridFromParent(e *engine, node *html.Node, sty *ResolvedStyle) {
 		sty.ColumnGap = parentStyle.ColumnGap
 		sty.Gap = parentStyle.Gap
 	}
+}
+
+func inheritSubgridFromParent(eng *engine, node *html.Node, sty *ResolvedStyle) {
+	if eng == nil || node == nil || sty == nil || sty.Display != displaySubgrid {
+		return
+	}
+
+	sty.Display = displayGrid
+
+	if node.Parent == nil {
+		return
+	}
+
+	parentStyle := eng.styles[node.Parent]
+	if parentStyle == nil {
+		return
+	}
+
+	inheritSubgridTracksAndGaps(sty, parentStyle)
 }
 
 // gridColumnDefs expands the column track list, padding with flexible tracks
@@ -768,6 +789,32 @@ func stripMasonryKeyword(raw string) string {
 	return raw
 }
 
+func shiftMasonryBox(e *engine, cblock *box, targetX, targetY float64) {
+	dx := targetX - cblock.x
+	dy := targetY - cblock.y
+
+	if dx != 0 || dy != 0 {
+		e.shiftBoxOps(cblock, dx, dy)
+		cblock.x += dx
+		cblock.y += dy
+	}
+}
+
+func masonryMaxBottom(colBot []float64, rowGap float64) float64 {
+	maxBot := 0.0
+	for _, height := range colBot {
+		if height > maxBot {
+			maxBot = height
+		}
+	}
+
+	if maxBot > rowGap {
+		maxBot -= rowGap
+	}
+
+	return maxBot
+}
+
 // emitMasonryItems packs each item into the shortest column and keeps
 // content-sized heights (CSS Grid L3 masonry lite).
 func (e *engine) emitMasonryItems(
@@ -798,14 +845,7 @@ func (e *engine) emitMasonryItems(
 			continue
 		}
 
-		dx := colX[col] - cblock.x
-		dy := targetY - cblock.y
-		if dx != 0 || dy != 0 {
-			e.shiftBoxOps(cblock, dx, dy)
-			cblock.x += dx
-			cblock.y += dy
-		}
-
+		shiftMasonryBox(e, cblock, colX[col], targetY)
 		boxNode.children = append(boxNode.children, cblock)
 
 		next := masonrySpanStart(colBot, col, span) + cblock.height + rowGap
@@ -814,21 +854,12 @@ func (e *engine) emitMasonryItems(
 		}
 	}
 
-	maxBot := 0.0
-	for _, height := range colBot {
-		if height > maxBot {
-			maxBot = height
-		}
-	}
-
-	if maxBot > rowGap {
-		maxBot -= rowGap
-	}
-
-	return curY + maxBot
+	return curY + masonryMaxBottom(colBot, rowGap)
 }
 
-func masonryPlacement(stylePtr *ResolvedStyle, cols []float64, columnGap float64, colBot []float64) (int, int, float64) {
+func masonryPlacement(
+	stylePtr *ResolvedStyle, cols []float64, columnGap float64, colBot []float64,
+) (int, int, float64) {
 	nCols := len(cols)
 	span := 1
 
@@ -840,7 +871,7 @@ func masonryPlacement(stylePtr *ResolvedStyle, cols []float64, columnGap float64
 		span = nCols
 	}
 
-	col := 0
+	var col int
 	if stylePtr != nil && stylePtr.GridColumnStart > 0 {
 		col = stylePtr.GridColumnStart - 1
 		if col < 0 {

@@ -402,22 +402,23 @@ func (e *engine) layoutBlockChild(
 	// §9.5 / BFC: flow-root, overflow≠visible, flex, etc. must not
 	// overlap float margin boxes — otherwise heading border-bottom
 	// paints through the infobox (wiki .mw-heading{display:flow-root}).
-	bx, bw := contentX, contentW
+	boxX, boxW := contentX, contentW
 	if establishesBFC(cstate) {
-		bx, bw = floats.exclusion(contentX, contentW, posY, curY)
+		boxX, boxW = floats.exclusion(contentX, contentW, posY, curY)
 	}
 
 	if node.Name == cssTagImg {
 		marginL := e.scalePt(cstate.MarginLeft)
 		marginR := e.scalePt(cstate.MarginRight)
-		bx += marginL
-		bw -= marginL + marginR
-		if bw < 0 {
-			bw = 0
+		boxX += marginL
+		boxW -= marginL + marginR
+
+		if boxW < 0 {
+			boxW = 0
 		}
 	}
 
-	cblock := e.build(node, bw, bx, posY+curY)
+	cblock := e.build(node, boxW, boxX, posY+curY)
 	if cblock == nil {
 		return curY, 0, nil
 	}

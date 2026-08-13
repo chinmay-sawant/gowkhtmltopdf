@@ -153,16 +153,38 @@ func hasVerticalBorder(sty ResolvedStyle) bool {
 	return left || right
 }
 
+const htmlFigure = "figure"
+
+func isCaptionBox(caption *box) bool {
+	if caption == nil || caption.node == nil || caption.style == nil {
+		return false
+	}
+
+	return caption.node.Name == "figcaption" || caption.style.Display == displayTableCaption
+}
+
+func isCollapsedThumbPair(parent *html.Node, parentStyle, captionStyle *ResolvedStyle) bool {
+	if parent == nil || parentStyle == nil || captionStyle == nil {
+		return false
+	}
+
+	isFigure := parent.Name == htmlFigure || parentStyle.Display == displayTable
+	if !isFigure || !hasVerticalBorder(*parentStyle) || !hasVerticalBorder(*captionStyle) {
+		return false
+	}
+
+	if parentStyle.BorderCollapse == borderCollapseValue {
+		return true
+	}
+
+	return borderPaint(parentStyle.BorderBottom) <= 0 && borderPaint(captionStyle.BorderTop) <= 0
+}
+
 // collapsedThumbCaption reports a MediaWiki-style figure/figcaption pair
 // whose CSS is display:table + border-collapse (or matching open sides).
 // Those sides must paint as one frame, not a second caption box.
 func (e *engine) collapsedThumbCaption(caption *box) (*ResolvedStyle, bool) {
-	if e == nil || caption == nil || caption.node == nil || caption.style == nil {
-		return nil, false
-	}
-
-	isCaption := caption.node.Name == "figcaption" || caption.style.Display == displayTableCaption
-	if !isCaption {
+	if e == nil || !isCaptionBox(caption) {
 		return nil, false
 	}
 
@@ -172,18 +194,7 @@ func (e *engine) collapsedThumbCaption(caption *box) (*ResolvedStyle, bool) {
 	}
 
 	parentStyle := e.styles[parent]
-	if parentStyle == nil {
-		return nil, false
-	}
-
-	isFigure := parent.Name == "figure" || parentStyle.Display == displayTable
-	if !isFigure || !hasVerticalBorder(*parentStyle) || !hasVerticalBorder(*caption.style) {
-		return nil, false
-	}
-
-	collapse := parentStyle.BorderCollapse == borderCollapseValue ||
-		(borderPaint(parentStyle.BorderBottom) <= 0 && borderPaint(caption.style.BorderTop) <= 0)
-	if !collapse {
+	if !isCollapsedThumbPair(parent, parentStyle, caption.style) {
 		return nil, false
 	}
 
@@ -199,14 +210,14 @@ func (e *engine) thumbImageInsideFigure(node *html.Node) bool {
 	}
 
 	for parent := node.Parent; parent != nil; parent = parent.Parent {
-		if parent.Name != "figure" {
+		if parent.Name != htmlFigure {
 			continue
 		}
 
 		for _, child := range parent.Children {
 			if child != nil && child.Name == "figcaption" {
-				cap := &box{node: child, style: e.styles[child]} //nolint:exhaustruct // style probe only
-				_, ok := e.collapsedThumbCaption(cap)
+				captionBox := &box{node: child, style: e.styles[child]} //nolint:exhaustruct // style probe only
+				_, ok := e.collapsedThumbCaption(captionBox)
 
 				return ok
 			}

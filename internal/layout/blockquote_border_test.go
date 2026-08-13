@@ -1,3 +1,4 @@
+//nolint:testpackage // tests inspect unexported box tree geometry
 package layout
 
 import (
@@ -10,6 +11,110 @@ import (
 	"gowkhtmltopdf/internal/html"
 	"gowkhtmltopdf/internal/pdf"
 )
+
+func extractStyleContent(root *html.Node) string {
+	var styleText strings.Builder
+
+	var walkStyle func(*html.Node)
+	walkStyle = func(node *html.Node) {
+		if node.Type == html.ElementNode && node.Name == styleElement {
+			for _, child := range node.Children {
+				if child.Type == html.TextNode {
+					styleText.WriteString(child.Text)
+				}
+			}
+		}
+
+		for _, child := range node.Children {
+			walkStyle(child)
+		}
+	}
+	walkStyle(root)
+
+	return styleText.String()
+}
+
+func findBlockquoteBox(root *box) *box {
+	var blockquoteBox *box
+
+	var findBQ func(*box)
+	findBQ = func(currentBox *box) {
+		if currentBox == nil {
+			return
+		}
+
+		if currentBox.node != nil && currentBox.node.Name == "blockquote" {
+			blockquoteBox = currentBox
+		}
+
+		for _, child := range currentBox.children {
+			findBQ(child)
+		}
+	}
+	findBQ(root)
+
+	return blockquoteBox
+}
+
+func findBorderLeftRail(ops []Op, boxX float64) (float64, float64) {
+	for _, operation := range ops {
+		if operation.Kind == OpLine && operation.W < 1 && operation.H > 10 && nearLayout(operation.X, boxX) {
+			return operation.H, operation.Y
+		}
+	}
+
+	return 0, 0
+}
+
+func findLastBlockquoteTextBottom(ops []Op) float64 {
+	var lastTextBot float64
+
+	for _, operation := range ops {
+		if operation.Kind != OpText {
+			continue
+		}
+
+		if !strings.Contains(operation.Text, "Blockquote") && !strings.Contains(operation.Text, "segment") &&
+			!strings.Contains(operation.Text, "CEO") {
+			continue
+		}
+
+		bot := operation.Y + opVisibleInkHeight(operation)
+		if bot > lastTextBot {
+			lastTextBot = bot
+		}
+	}
+
+	return lastTextBot
+}
+
+func verifyPostPaintBlockquote(t *testing.T, res *Result, blockquoteBox *box, preH float64) {
+	t.Helper()
+
+	postH, postY := findBorderLeftRail(res.Ops, blockquoteBox.x)
+	if postH <= 0 {
+		t.Fatal("blockquote border-left missing after Paint")
+	}
+
+	// Must stay at layout height — not stretched by baseline+line-height.
+	if postH > blockquoteBox.height+1 {
+		t.Fatalf("border stretched after Paint: h=%.2f, box h=%.2f (pre=%.2f)", postH, blockquoteBox.height, preH)
+	}
+
+	if math.Abs(postH-preH) > 1 {
+		t.Fatalf("border height changed in Paint: pre=%.2f post=%.2f", preH, postH)
+	}
+
+	lastTextBot := findLastBlockquoteTextBottom(res.Ops)
+	if lastTextBot <= 0 {
+		t.Fatal("blockquote text not found")
+	}
+
+	railBot := postY + postH
+	if lastTextBot > railBot+1 {
+		t.Fatalf("rail ends above text: railBot=%.2f textBot=%.2f", railBot, lastTextBot)
+	}
+}
 
 // TestBlockquoteBorderLeftMatchesContentHeight guards fixture-18: after Paint,
 // border-left on a blockquote must not stretch past the block's used height
@@ -28,25 +133,7 @@ func TestBlockquoteBorderLeftMatchesContentHeight(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var styleText strings.Builder
-
-	var walkStyle func(*html.Node)
-	walkStyle = func(n *html.Node) {
-		if n.Type == html.ElementNode && n.Name == "style" {
-			for _, c := range n.Children {
-				if c.Type == html.TextNode {
-					styleText.WriteString(c.Text)
-				}
-			}
-		}
-
-		for _, c := range n.Children {
-			walkStyle(c)
-		}
-	}
-	walkStyle(root)
-
-	sheet, err := css.Parse(styleText.String())
+	sheet, err := css.Parse(extractStyleContent(root))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,103 +157,26 @@ func TestBlockquoteBorderLeftMatchesContentHeight(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var bq *box
-
-	var findBQ func(*box)
-	findBQ = func(b *box) {
-		if b == nil {
-			return
-		}
-
-		if b.node != nil && b.node.Name == "blockquote" {
-			bq = b
-		}
-
-		for _, c := range b.children {
-			findBQ(c)
-		}
-	}
-	findBQ(res.root)
-
-	if bq == nil {
+	blockquoteBox := findBlockquoteBox(res.root)
+	if blockquoteBox == nil {
 		t.Fatal("blockquote box missing")
 	}
 
-	preH := 0.0
-
-	for _, op := range res.Ops {
-		if op.Kind == OpLine && op.W < 1 && op.H > 10 && nearLayout(op.X, bq.x) {
-			preH = op.H
-
-			break
-		}
-	}
-
+	preH, _ := findBorderLeftRail(res.Ops, blockquoteBox.x)
 	if preH <= 0 {
 		t.Fatal("blockquote border-left missing before Paint")
 	}
 
-	if math.Abs(preH-bq.height) > 0.5 {
-		t.Fatalf("pre-paint border h=%.2f, box h=%.2f", preH, bq.height)
+	if math.Abs(preH-blockquoteBox.height) > 0.5 {
+		t.Fatalf("pre-paint border h=%.2f, box h=%.2f", preH, blockquoteBox.height)
 	}
 
-	if err := Paint(pdf.NewDocument(), res, PaintOptions{ //nolint:exhaustruct // intentional zero fields
+	if err := Paint(pdf.NewDocument(), res, PaintOptions{
 		PageWidth: pageW, PageHeight: pageH,
 		MarginTop: margin, MarginBottom: margin, MarginLeft: margin, MarginRight: margin,
 	}); err != nil {
 		t.Fatal(err)
 	}
 
-	postH := 0.0
-	postY := 0.0
-
-	for _, op := range res.Ops {
-		if op.Kind == OpLine && op.W < 1 && op.H > 10 && nearLayout(op.X, bq.x) {
-			postH = op.H
-			postY = op.Y
-
-			break
-		}
-	}
-
-	if postH <= 0 {
-		t.Fatal("blockquote border-left missing after Paint")
-	}
-
-	// Must stay at layout height — not stretched by baseline+line-height.
-	if postH > bq.height+1 {
-		t.Fatalf("border stretched after Paint: h=%.2f, box h=%.2f (pre=%.2f)", postH, bq.height, preH)
-	}
-
-	if math.Abs(postH-preH) > 1 {
-		t.Fatalf("border height changed in Paint: pre=%.2f post=%.2f", preH, postH)
-	}
-
-	// Last blockquote text must sit inside the rail.
-	var lastTextBot float64
-
-	for _, op := range res.Ops {
-		if op.Kind != OpText {
-			continue
-		}
-
-		if !strings.Contains(op.Text, "Blockquote") && !strings.Contains(op.Text, "segment") &&
-			!strings.Contains(op.Text, "CEO") {
-			continue
-		}
-
-		bot := op.Y + opVisibleInkHeight(op)
-		if bot > lastTextBot {
-			lastTextBot = bot
-		}
-	}
-
-	if lastTextBot <= 0 {
-		t.Fatal("blockquote text not found")
-	}
-
-	railBot := postY + postH
-	if lastTextBot > railBot+1 {
-		t.Fatalf("rail ends above text: railBot=%.2f textBot=%.2f", railBot, lastTextBot)
-	}
+	verifyPostPaintBlockquote(t, res, blockquoteBox, preH)
 }
