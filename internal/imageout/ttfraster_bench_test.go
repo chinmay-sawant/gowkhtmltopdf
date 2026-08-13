@@ -30,7 +30,10 @@ func BenchmarkColdGlyphRaster(b *testing.B) {
 				for range b.N {
 					atlas := newGlyphAtlas()
 					img := image.NewNRGBA(image.Rect(0, 0, size*16, size*2))
-					ttfDrawString(img, 0, float64(size), text, float64(size), face, color.NRGBA{R: 0, G: 0, B: 0, A: 255}, 1, atlas)
+					ttfDrawString(
+						img, 0, float64(size), text, float64(size),
+						0, 0, face, color.NRGBA{R: 0, G: 0, B: 0, A: 255}, 1, atlas,
+					)
 				}
 			})
 		}

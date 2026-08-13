@@ -318,6 +318,24 @@ func ScanFontDirs(dirs []string) *Registry {
 	return out
 }
 
+// RegistryFromPaths builds an opt-in font registry from explicit font paths
+// and optional system font directories. Returns nil when nothing was configured.
+func RegistryFromPaths(fontPaths []string, useSystemFonts bool) *Registry {
+	var dirs []string
+
+	dirs = append(dirs, fontPaths...)
+
+	if useSystemFonts {
+		dirs = append(dirs, DefaultSystemFontDirs()...)
+	}
+
+	if len(dirs) == 0 {
+		return nil
+	}
+
+	return ScanFontDirs(dirs)
+}
+
 // scanFontFile parses a font file into the registry, skipping anything that
 // is not a TTF/OTF or fails to parse.
 func scanFontFile(out *Registry, path string, entry os.DirEntry) {

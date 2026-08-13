@@ -16,7 +16,7 @@ import (
 	"strings"
 	"sync"
 
-	"gowkhtmltopdf/internal/convert"
+	"gowkhtmltopdf/internal/convert/prepare"
 	renderpipeline "gowkhtmltopdf/internal/convert/render"
 	"gowkhtmltopdf/internal/css"
 	"gowkhtmltopdf/internal/errs"
@@ -56,18 +56,17 @@ const (
 )
 
 var (
-	errNilRoot          = errors.New("imageout: nil root")
-	errNilContext       = errs.ErrNilContext
-	errCropNoIntersect  = errors.New("imageout: crop rectangle does not intersect the canvas")
-	errNilRequest       = errs.ErrNilRequest
-	errNothingToRender  = errors.New("load-error policy is skip; nothing to render")
-	errImagesDisabled   = errors.New("images disabled")
-	errNilOutput        = errors.New("imageout: nil Output writer")
-	errNoInputToConvert = errors.New("no input to convert")
-	errUnsupportedFmt   = errors.New("unsupported format")
-	errRasterTooLarge   = errors.New("imageout: raster exceeds resource budget")
-	errImageTooLarge    = errors.New("imageout: image exceeds resource budget")
-	errEncodedTooLarge  = errors.New("imageout: encoded image exceeds resource budget")
+	errNilRoot         = errors.New("imageout: nil root")
+	errNilContext      = errs.ErrNilContext
+	errCropNoIntersect = errors.New("imageout: crop rectangle does not intersect the canvas")
+	errNilRequest      = errs.ErrNilRequest
+	errNothingToRender = errors.New("load-error policy is skip; nothing to render")
+	errImagesDisabled  = errs.ErrImagesDisabled
+	errNilOutput       = ErrMissingOutput
+	errUnsupportedFmt  = errors.New("unsupported format")
+	errRasterTooLarge  = errors.New("imageout: raster exceeds resource budget")
+	errImageTooLarge   = errors.New("imageout: image exceeds resource budget")
+	errEncodedTooLarge = errors.New("imageout: encoded image exceeds resource budget")
 )
 
 // ptToPx maps layout canvas points to output pixels. The layout engine works
@@ -800,35 +799,170 @@ func downscaleBox2(src *image.NRGBA) *image.NRGBA {
 //
 // Page assembly: prologue already shares convert.CollectSheets +
 // MergeFontFaces; multi-page PDF assembly remains convert-specific (P5-02).
+//
+//nolint:cyclop // raster op paint dispatcher
 func paint(img *image.NRGBA, paintOp *layout.Op, pxPerPt float64, atlas *glyphAtlas, imageCache *rasterImageCache) {
-	paintStyle := layout.StyleOf(paintOp)
+	if paintOp == nil || paintOp.Kind == layout.OpLinkURI {
+		return
+	}
 
-	switch paintOp.Kind {
+	if paintOp.XformSet && !paintOp.Xform.IsIdentity() {
+		paintTransformedOp(img, paintOp, pxPerPt, atlas, imageCache)
+
+		return
+	}
+
+	opCopy := *paintOp
+	if opCopy.TextTransform != "" {
+		opCopy.Text = layout.TransformInlineText(opCopy.Text, opCopy.TextTransform)
+	}
+
+	if opCopy.PaintOpacity > 0 && opCopy.PaintOpacity < 1 {
+		alpha := opCopy.Alpha
+		if alpha <= 0 || alpha > 1 {
+			alpha = 1
+		}
+
+		opCopy.Alpha = alpha * opCopy.PaintOpacity
+	}
+
+	paintStyle := layout.StyleOf(&opCopy)
+
+	switch opCopy.Kind {
 	case layout.OpFillRect:
-		paintFillRect(img, paintOp, pxPerPt)
+		paintFillRect(img, &opCopy, pxPerPt)
 
 	case layout.OpStrokeRect:
-		paintStrokeRect(img, paintOp, paintStyle, pxPerPt)
+		paintStrokeRect(img, &opCopy, paintStyle, pxPerPt)
 
 	case layout.OpLine:
-		paintLine(img, paintOp, paintStyle, pxPerPt)
+		paintLine(img, &opCopy, paintStyle, pxPerPt)
 
 	case layout.OpText, layout.OpBullet:
-		paintText(img, paintOp, pxPerPt, atlas)
+		paintText(img, &opCopy, pxPerPt, atlas)
 
 	case layout.OpImage:
-		paintImage(img, paintOp, pxPerPt, imageCache)
+		paintImage(img, &opCopy, pxPerPt, imageCache)
 
 	case layout.OpLinkURI: // annotations do not paint
+	}
+}
+
+// paintTransformedOp renders an op with CSS 2D affine transform onto img.
+//
+//nolint:cyclop,varnamelen,mnd,wsl,gosec,funlen // affine raster op transform and pixel compositing
+func paintTransformedOp(
+	img *image.NRGBA, op *layout.Op, pxPerPt float64, atlas *glyphAtlas, imageCache *rasterImageCache,
+) {
+	opX, opY, opW, opH := op.X, op.Y, op.W, op.H
+	if op.Kind == layout.OpText || op.Kind == layout.OpBullet {
+		opY -= op.Size
+		opH = op.Size * 1.5
+		if opW <= 0 {
+			opW = op.Size * float64(len(op.Text))
+		}
+	}
+
+	if opW <= 0 {
+		opW = 1
+	}
+
+	if opH <= 0 {
+		opH = 1
+	}
+
+	corners := [4][2]float64{
+		{opX, opY},
+		{opX + opW, opY},
+		{opX + opW, opY + opH},
+		{opX, opY + opH},
+	}
+	minX, minY := math.MaxFloat64, math.MaxFloat64
+	maxX, maxY := -math.MaxFloat64, -math.MaxFloat64
+
+	for _, c := range corners {
+		tx, ty := op.Xform.Apply(c[0], c[1])
+		minX = math.Min(minX, tx)
+		minY = math.Min(minY, ty)
+		maxX = math.Max(maxX, tx)
+		maxY = math.Max(maxY, ty)
+	}
+
+	dstRect := ptRectScale(minX-2, minY-2, (maxX-minX)+4, (maxY-minY)+4, pxPerPt).Intersect(img.Bounds())
+	if dstRect.Empty() {
+		return
+	}
+
+	srcRect := ptRectScale(opX-2, opY-2, opW+4, opH+4, pxPerPt)
+	if srcRect.Dx() <= 0 || srcRect.Dy() <= 0 {
+		return
+	}
+
+	subImg := image.NewNRGBA(srcRect)
+
+	untransformed := *op
+	untransformed.XformSet = false
+	paint(subImg, &untransformed, pxPerPt, atlas, imageCache)
+
+	det := op.Xform.A*op.Xform.D - op.Xform.B*op.Xform.C
+	if math.Abs(det) < 1e-12 {
+		return
+	}
+
+	invA := op.Xform.D / det
+	invB := -op.Xform.B / det
+	invC := -op.Xform.C / det
+	invD := op.Xform.A / det
+	invE := (op.Xform.C*op.Xform.F - op.Xform.D*op.Xform.E) / det
+	invF := (op.Xform.B*op.Xform.E - op.Xform.A*op.Xform.F) / det
+
+	for dstY := dstRect.Min.Y; dstY < dstRect.Max.Y; dstY++ {
+		ptY := float64(dstY) / pxPerPt
+
+		for dstX := dstRect.Min.X; dstX < dstRect.Max.X; dstX++ {
+			ptX := float64(dstX) / pxPerPt
+
+			srcPtX := invA*ptX + invC*ptY + invE
+			srcPtY := invB*ptX + invD*ptY + invF
+
+			srcX := int(math.Round(srcPtX * pxPerPt))
+			srcY := int(math.Round(srcPtY * pxPerPt))
+
+			if image.Pt(srcX, srcY).In(subImg.Bounds()) {
+				srcPixOff := subImg.PixOffset(srcX, srcY)
+				srcA := uint32(subImg.Pix[srcPixOff+3])
+
+				if srcA == 0 {
+					continue
+				}
+
+				dstPixOff := img.PixOffset(dstX, dstY)
+				dstR := uint32(img.Pix[dstPixOff+0])
+				dstG := uint32(img.Pix[dstPixOff+1])
+				dstB := uint32(img.Pix[dstPixOff+2])
+				dstA := uint32(img.Pix[dstPixOff+3])
+
+				invAlpha := channelMax - srcA
+				img.Pix[dstPixOff+0] = uint8((uint32(subImg.Pix[srcPixOff+0])*srcA + dstR*invAlpha) / channelMax)
+				img.Pix[dstPixOff+1] = uint8((uint32(subImg.Pix[srcPixOff+1])*srcA + dstG*invAlpha) / channelMax)
+				img.Pix[dstPixOff+2] = uint8((uint32(subImg.Pix[srcPixOff+2])*srcA + dstB*invAlpha) / channelMax)
+				img.Pix[dstPixOff+3] = uint8((srcA*channelMax + dstA*invAlpha) / channelMax)
+			}
+		}
 	}
 }
 
 // paintFillRect fills rect with the paintOp color, over-composited unless opaque.
 func paintFillRect(img *image.NRGBA, paintOp *layout.Op, pxPerPt float64) {
 	// Raw alpha for Over compositing — see paint comment (PDF vs raster).
+	alpha := paintOp.Alpha
+	if alpha <= 0 && paintOp.PaintOpacity == 0 {
+		alpha = 1
+	}
+
 	col := color.NRGBA{
 		R: uint8(paintOp.R * channelMax), G: uint8(paintOp.G * channelMax), B: uint8(paintOp.B * channelMax),
-		A: uint8(paintOp.Alpha * channelMax),
+		A: uint8(math.Round(alpha * channelMax)),
 	}
 	rect := ptRectScale(paintOp.X, paintOp.Y, paintOp.W, paintOp.H, pxPerPt).Intersect(img.Bounds())
 
@@ -850,56 +984,6 @@ func paintFillRect(img *image.NRGBA, paintOp *layout.Op, pxPerPt float64) {
 				image.Point{}, //nolint:exhaustruct // intentional zero/partial fields
 				draw.Over,
 			)
-		}
-	}
-}
-
-// paintStrokeRect paints the four border strips of a stroked rectangle.
-func paintStrokeRect(img *image.NRGBA, paintOp *layout.Op, paintStyle layout.PaintStyle, pxPerPt float64) {
-	col := color.NRGBA{
-		R: uint8(paintOp.R * channelMax), G: uint8(paintOp.G * channelMax), B: uint8(paintOp.B * channelMax), A: opaqueAlpha,
-	}
-	lineWidth := strokeWidthScale(paintStyle.StrokeWidth, pxPerPt)
-
-	if paintOp.StrokeMask != 0 {
-		// Partial multi-page frames: paint only the selected sides.
-		if paintOp.StrokeMask&layout.StrokeMaskTop != 0 {
-			paintRoundedTopStroke(img, paintOp, col, lineWidth, pxPerPt)
-		}
-
-		if paintOp.StrokeMask&layout.StrokeMaskBottom != 0 {
-			paintRoundedBottomStroke(img, paintOp, col, lineWidth, pxPerPt)
-		}
-
-		if paintOp.StrokeMask&layout.StrokeMaskLeft != 0 {
-			paintRoundedLeftStroke(img, paintOp, col, lineWidth, pxPerPt)
-		}
-
-		if paintOp.StrokeMask&layout.StrokeMaskRight != 0 {
-			paintRoundedRightStroke(img, paintOp, col, lineWidth, pxPerPt)
-		}
-
-		return
-	}
-
-	if paintOp.Radius > 0 || paintOp.RadiusTopLeft > 0 || paintOp.RadiusTopRight > 0 ||
-		paintOp.RadiusBottomRight > 0 || paintOp.RadiusBottomLeft > 0 {
-		paintRoundedStroke(img, paintOp, col, lineWidth, pxPerPt)
-
-		return
-	}
-
-	rect := ptRectScale(paintOp.X, paintOp.Y, paintOp.W, paintOp.H, pxPerPt)
-
-	rects := [4]image.Rectangle{
-		image.Rect(rect.Min.X, rect.Min.Y, rect.Max.X, rect.Min.Y+lineWidth),
-		image.Rect(rect.Min.X, rect.Max.Y-lineWidth, rect.Max.X, rect.Max.Y),
-		image.Rect(rect.Min.X, rect.Min.Y, rect.Min.X+lineWidth, rect.Max.Y),
-		image.Rect(rect.Max.X-lineWidth, rect.Min.Y, rect.Max.X, rect.Max.Y),
-	}
-	for _, rr := range rects {
-		if rr = rr.Intersect(img.Bounds()); !rr.Empty() {
-			fillNRGBAOpaque(img, rr, col)
 		}
 	}
 }
@@ -1168,10 +1252,76 @@ func roundedContains(
 	return true
 }
 
-// paintLine paints a horizontal or vertical stroke centred on the paintOp.
-func paintLine(img *image.NRGBA, paintOp *layout.Op, paintStyle layout.PaintStyle, pxPerPt float64) {
+//nolint:cyclop // rounded and rectangular stroke painting
+func paintStrokeRect(img *image.NRGBA, paintOp *layout.Op, paintStyle layout.PaintStyle, pxPerPt float64) {
+	alpha := 1.0
+	if paintOp.Alpha > 0 && paintOp.Alpha < 1 {
+		alpha = paintOp.Alpha
+	}
+
 	col := color.NRGBA{
-		R: uint8(paintOp.R * channelMax), G: uint8(paintOp.G * channelMax), B: uint8(paintOp.B * channelMax), A: opaqueAlpha,
+		R: uint8(paintOp.R * channelMax), G: uint8(paintOp.G * channelMax), B: uint8(paintOp.B * channelMax),
+		A: uint8(math.Round(alpha * channelMax)),
+	}
+	lineWidth := strokeWidthScale(paintStyle.StrokeWidth, pxPerPt)
+
+	if paintOp.StrokeMask != 0 {
+		// Partial multi-page frames: paint only the selected sides.
+		if paintOp.StrokeMask&layout.StrokeMaskTop != 0 {
+			paintRoundedTopStroke(img, paintOp, col, lineWidth, pxPerPt)
+		}
+
+		if paintOp.StrokeMask&layout.StrokeMaskBottom != 0 {
+			paintRoundedBottomStroke(img, paintOp, col, lineWidth, pxPerPt)
+		}
+
+		if paintOp.StrokeMask&layout.StrokeMaskLeft != 0 {
+			paintRoundedLeftStroke(img, paintOp, col, lineWidth, pxPerPt)
+		}
+
+		if paintOp.StrokeMask&layout.StrokeMaskRight != 0 {
+			paintRoundedRightStroke(img, paintOp, col, lineWidth, pxPerPt)
+		}
+
+		return
+	}
+
+	if paintOp.Radius > 0 || paintOp.RadiusTopLeft > 0 || paintOp.RadiusTopRight > 0 ||
+		paintOp.RadiusBottomRight > 0 || paintOp.RadiusBottomLeft > 0 {
+		paintRoundedStroke(img, paintOp, col, lineWidth, pxPerPt)
+
+		return
+	}
+
+	rect := ptRectScale(paintOp.X, paintOp.Y, paintOp.W, paintOp.H, pxPerPt)
+
+	rects := [4]image.Rectangle{
+		image.Rect(rect.Min.X, rect.Min.Y, rect.Max.X, rect.Min.Y+lineWidth),
+		image.Rect(rect.Min.X, rect.Max.Y-lineWidth, rect.Max.X, rect.Max.Y),
+		image.Rect(rect.Min.X, rect.Min.Y, rect.Min.X+lineWidth, rect.Max.Y),
+		image.Rect(rect.Max.X-lineWidth, rect.Min.Y, rect.Max.X, rect.Max.Y),
+	}
+	for _, rr := range rects {
+		if r := rr.Intersect(img.Bounds()); !r.Empty() {
+			if col.A == opaqueAlpha {
+				fillNRGBAOpaque(img, r, col)
+			} else {
+				//nolint:exhaustruct // intentional zero/partial fields
+				draw.Draw(img, r, image.NewUniform(col), image.Point{}, draw.Over)
+			}
+		}
+	}
+}
+
+func paintLine(img *image.NRGBA, paintOp *layout.Op, paintStyle layout.PaintStyle, pxPerPt float64) {
+	alpha := 1.0
+	if paintOp.Alpha > 0 && paintOp.Alpha < 1 {
+		alpha = paintOp.Alpha
+	}
+
+	col := color.NRGBA{
+		R: uint8(paintOp.R * channelMax), G: uint8(paintOp.G * channelMax), B: uint8(paintOp.B * channelMax),
+		A: uint8(math.Round(alpha * channelMax)),
 	}
 	lineWidth := strokeWidthScale(paintStyle.StrokeWidth, pxPerPt)
 	// centre the stroke on the line: half its width, in points
@@ -1186,14 +1336,25 @@ func paintLine(img *image.NRGBA, paintOp *layout.Op, paintStyle layout.PaintStyl
 	}
 
 	if rect = rect.Intersect(img.Bounds()); !rect.Empty() {
-		fillNRGBAOpaque(img, rect, col)
+		if col.A == opaqueAlpha {
+			fillNRGBAOpaque(img, rect, col)
+		} else {
+			//nolint:exhaustruct // intentional zero/partial fields
+			draw.Draw(img, rect, image.NewUniform(col), image.Point{}, draw.Over)
+		}
 	}
 }
 
 // paintText draws the run (and fake-bold pass) at fractional baselines.
 func paintText(img *image.NRGBA, paintOp *layout.Op, pxPerPt float64, atlas *glyphAtlas) {
+	alpha := 1.0
+	if paintOp.Alpha > 0 && paintOp.Alpha < 1 {
+		alpha = paintOp.Alpha
+	}
+
 	col := color.NRGBA{
-		R: uint8(paintOp.R * channelMax), G: uint8(paintOp.G * channelMax), B: uint8(paintOp.B * channelMax), A: opaqueAlpha,
+		R: uint8(paintOp.R * channelMax), G: uint8(paintOp.G * channelMax), B: uint8(paintOp.B * channelMax),
+		A: uint8(math.Round(alpha * channelMax)),
 	}
 	// Keep fractional baselines so glyphs share one stable baseline
 	// instead of independently rounded Y positions (bobbing text).
@@ -1212,10 +1373,16 @@ func paintText(img *image.NRGBA, paintOp *layout.Op, pxPerPt float64, atlas *gly
 		}
 	}
 
-	ttfDrawString(img, baseX, baseY, paintOp.Text, paintOp.Size, face, col, pxPerPt, atlas)
+	ttfDrawString(
+		img, baseX, baseY, paintOp.Text, paintOp.Size,
+		paintOp.LetterSpacing, paintOp.RotateDeg, face, col, pxPerPt, atlas,
+	)
 	// Latin-only fake-bold (CJK gate lives in layout.FakeBoldFor).
 	if layout.FakeBoldFor(paintOp) {
-		ttfDrawString(img, baseX+float64(rasterSS), baseY, paintOp.Text, paintOp.Size, face, col, pxPerPt, atlas)
+		ttfDrawString(
+			img, baseX+float64(rasterSS), baseY, paintOp.Text, paintOp.Size,
+			paintOp.LetterSpacing, paintOp.RotateDeg, face, col, pxPerPt, atlas,
+		)
 	}
 }
 
@@ -1418,10 +1585,7 @@ func RunRequest(ctx context.Context, req *Request, log io.Writer) error {
 		log = io.Discard
 	}
 
-	obj, err := firstObject(req.Objects, log)
-	if err != nil {
-		return err
-	}
+	obj := &req.Objects[0]
 
 	// P2-07: full load policy at construction. Image.Load holds image-mode
 	// Proxy; CLI/library ACL (--allow / --enable-local-file-access) lives on
@@ -1558,21 +1722,36 @@ func prepareImageDocument(
 	imgSet *settings.ImageGlobal,
 	registry *pdf.Registry,
 	log io.Writer,
-) (*convert.PreparedDocument, string, error) {
-	media := mediaFor(global, *imgSet, obj)
-	enabled := convert.SimplifyDOMEnabled(imgSet.Web, obj.Web) || global.Web.SimplifyDOM
+) (*prepare.Prepared, string, error) {
+	var imageSet settings.ImageGlobal
+	if imgSet != nil {
+		imageSet = *imgSet
+	}
 
-	profile := convert.SimplifyDOMProfile(imgSet.Web, obj.Web)
+	media := mediaFor(global, imageSet, obj)
+	enabled := prepare.SimplifyDOMEnabled(imageSet.Web, obj.Web) || global.Web.SimplifyDOM
+
+	profile := prepare.SimplifyDOMProfile(imageSet.Web, obj.Web)
 	if profile == "" {
-		profile = convert.SimplifyDOMProfile(
+		profile = prepare.SimplifyDOMProfile(
 			global.Web,
 			settings.Web{}, //nolint:exhaustruct // intentional zero/partial fields
 		)
 	}
 
-	prep, err := convert.PrepareDocument(ctx, loader, obj.Page, obj.Load, registry, convert.PrepareOptions{
-		ViewportW:       defaultViewportW,
-		ViewportH:       defaultViewportH,
+	viewportW := defaultViewportW
+	if imageSet.Width > 0 {
+		viewportW = float64(imageSet.Width)
+	}
+
+	viewportH := defaultViewportH
+	if imageSet.Height > 0 {
+		viewportH = float64(imageSet.Height)
+	}
+
+	prep, err := prepare.Document(ctx, loader, obj.Page, obj.Load, registry, prepare.Options{
+		ViewportW:       viewportW,
+		ViewportH:       viewportH,
 		MediaType:       media,
 		SimplifyDOM:     enabled,
 		SimplifyProfile: profile,
@@ -1594,7 +1773,7 @@ func prepareImageDocument(
 func makeImageFetcher(
 	ctx context.Context,
 	imgSet *settings.ImageGlobal,
-	prep *convert.PreparedDocument,
+	prep *prepare.Prepared,
 	cache map[string][]byte,
 ) func(string) ([]byte, error) {
 	var cacheBytes int
@@ -1629,16 +1808,16 @@ func fontRegistry(global settings.PdfGlobal, log io.Writer) *pdf.Registry {
 		return nil
 	}
 
-	scan := append([]string{}, global.FontPaths...)
-	if global.UseSystemFonts {
-		scan = append(scan, pdf.DefaultSystemFontDirs()...)
+	if log != nil && log != io.Discard && !global.Quiet {
+		count := len(global.FontPaths)
+		if global.UseSystemFonts {
+			count += len(pdf.DefaultSystemFontDirs())
+		}
+
+		line.Emit(log, line.Info, "scanned %d font path(s)", count)
 	}
 
-	if log != io.Discard && len(scan) > 0 {
-		line.Emit(log, line.Info, "scanned %d font path(s)", len(scan))
-	}
-
-	return pdf.ScanFontDirs(scan)
+	return pdf.RegistryFromPaths(global.FontPaths, global.UseSystemFonts)
 }
 
 // imageLoadGlobal resolves the shared and image-owned load settings before
@@ -1650,68 +1829,9 @@ func imageLoadGlobal(global settings.PdfGlobal, image settings.ImageGlobal) sett
 	return load.ResolveEffectiveLoadGlobal(global.Load, image.Load)
 }
 
-// firstObject returns the first page-like object. Image mode renders a
-// single page; extra page objects and TOC objects are ignored with warnings.
-// An empty Page is accepted when Load.InlineHTML is set (P2-04 in-memory
-// source kind via ObjectSettings.SetBody).
-func firstObject(objects []settings.PdfObject, log io.Writer) (*settings.PdfObject, error) {
-	var first *settings.PdfObject
-
-	for idx := range objects {
-		obj := &objects[idx]
-		if obj.IsTableOfContent {
-			continue
-		}
-
-		if obj.Page == "" && len(obj.Load.InlineHTML) == 0 {
-			continue
-		}
-
-		if first == nil {
-			first = obj
-
-			continue
-		}
-
-		line.Emit(log, line.Warn, "image mode renders the first page only; ignoring object %d", idx+1)
-	}
-
-	if first == nil {
-		return nil, errNoInputToConvert
-	}
-
-	return first, nil
-}
-
-// mediaFor resolves the layout media via settings.ResolveMedia (P1-4).
-// Image mode defaults to "screen". CLI --print-media-type lands on
-// Global.Web; object overrides live on LoadPage and are mapped into a
-// temporary Web view. Image.Web is merged so library Set paths still apply.
+// mediaFor resolves the layout media via settings.ResolveImageMedia (P1-4).
 func mediaFor(global settings.PdfGlobal, image settings.ImageGlobal, obj *settings.PdfObject) string {
-	web := image.Web
-	if global.Web.PrintMediaType {
-		web.PrintMediaType = true
-	}
-
-	if web.MediaType == settings.MediaIgnore {
-		web.MediaType = global.Web.MediaType
-	}
-
-	var objWeb *settings.Web
-
-	if obj != nil {
-		web := settings.Web{ //nolint:exhaustruct // intentional zero/partial fields
-			PrintMediaType: obj.Load.PrintMediaType || obj.Web.PrintMediaType,
-			MediaType:      obj.Load.MediaType,
-		}
-		if obj.Web.MediaType != settings.MediaIgnore {
-			web.MediaType = obj.Web.MediaType
-		}
-
-		objWeb = &web
-	}
-
-	return settings.ResolveMedia("screen", web, objWeb)
+	return settings.ResolveImageMedia(global, image, obj)
 }
 
 // cropRect converts image settings into a pixel rectangle; returns the zero

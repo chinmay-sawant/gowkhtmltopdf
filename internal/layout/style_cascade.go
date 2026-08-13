@@ -8,6 +8,7 @@ import (
 )
 
 const (
+	borderProperty       = "border"
 	borderTopProperty    = "border-top"
 	borderBottomProperty = "border-bottom"
 	borderLeftProperty   = "border-left"
@@ -182,6 +183,8 @@ var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inheri
 	},
 	{[]string{"orphans"}, func(dst, src *ResolvedStyle) { dst.Orphans = src.Orphans }},
 	{[]string{"widows"}, func(dst, src *ResolvedStyle) { dst.Widows = src.Widows }},
+	{[]string{"writing-mode"}, func(dst, src *ResolvedStyle) { dst.WritingMode = src.WritingMode }},
+	{[]string{"text-indent"}, func(dst, src *ResolvedStyle) { dst.TextIndent = src.TextIndent }},
 }
 
 // inheritProps copies inheritable properties from the parent, unless the
@@ -479,7 +482,7 @@ func expandBoxShorthand(prop, value string) ([4]string, bool) {
 	switch prop {
 	case marginProperty, paddingProperty:
 		// 1–4 space-separated sides (CSS box shorthand).
-	case "border":
+	case borderProperty:
 		// border: <width> <style> <color> applies the same value to every side.
 		// Expand so it competes with border-top/right/bottom/left longhands
 		// (otherwise an earlier border-top can paint after a later border).
@@ -651,7 +654,7 @@ func resolveFontWeight(current int, val string) int {
 // longhand (e.g. margin-bottom) always overrides its shorthand (margin).
 // Package-level to avoid per-node slice/array rebuilds.
 var restShorthandProps = [...]string{ //nolint:gochecknoglobals // static apply order
-	"margin", "padding", "border", borderTopProperty, borderRightProperty, borderBottomProperty, borderLeftProperty,
+	"margin", "padding", borderProperty, borderTopProperty, borderRightProperty, borderBottomProperty, borderLeftProperty,
 	borderWidthKeyword, borderStyleKeyword,
 	borderColorKeyword, gapKeyword, flexKeyword, containerKeyword,
 }
@@ -684,7 +687,7 @@ func applyRestProps(
 
 	for prop, value := range raw {
 		switch prop {
-		case "margin", "padding", "border", borderTopProperty, borderRightProperty, borderBottomProperty, borderLeftProperty,
+		case "margin", "padding", borderProperty, borderTopProperty, borderRightProperty, borderBottomProperty, borderLeftProperty,
 			borderWidthKeyword, borderStyleKeyword,
 			borderColorKeyword, gapKeyword, flexKeyword, containerKeyword:
 			continue

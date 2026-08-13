@@ -2,6 +2,7 @@
 package layout
 
 import (
+	"strings"
 	"testing"
 
 	"gowkhtmltopdf/internal/css"
@@ -70,6 +71,114 @@ section.d03 { border-top: 3px solid #2563eb }
 
 	if sty.BorderLeft.Width < 2.5 {
 		t.Fatalf("border-left width = %.2f, want accent rail ≥2.5", sty.BorderLeft.Width)
+	}
+}
+
+func TestWritingModeInherits(t *testing.T) {
+	t.Parallel()
+
+	root, err := html.Parse(`<html><body><div style="writing-mode: vertical-rl"><p>child text</p></div></body></html>`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	styles := resolveStyles(root, nil, "print", testViewport, 800)
+	pElem := findElementByName(root, "p")
+
+	if styles[pElem].WritingMode != "vertical-rl" {
+		t.Fatalf("p WritingMode = %q, want %q", styles[pElem].WritingMode, "vertical-rl")
+	}
+
+	doc, err := html.Parse(`<html><body><div style="writing-mode: vertical-rl"><p>vertical</p></div></body></html>`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := Layout(doc, Options{Width: 800, Height: 600}) //nolint:exhaustruct // test options
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var textOp *Op
+
+	for i := range res.Ops {
+		if res.Ops[i].Kind == OpText && res.Ops[i].Text == "vertical" {
+			textOp = &res.Ops[i]
+
+			break
+		}
+	}
+
+	if textOp == nil {
+		t.Fatal("no OpText found for 'vertical'")
+	}
+
+	if textOp.RotateDeg != -90 {
+		t.Fatalf("textOp.RotateDeg = %v, want -90", textOp.RotateDeg)
+	}
+}
+
+//nolint:cyclop // test assertion helper
+func TestTextIndentInheritsAndShiftsFirstLine(t *testing.T) {
+	t.Parallel()
+
+	root, err := html.Parse(`<html><body><div style="text-indent: 2em"><p><span>indented</span></p></div></body></html>`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	styles := resolveStyles(root, nil, "print", testViewport, 800)
+	pNode := findElementByName(root, "p")
+	spanNode := findElementByName(root, "span")
+
+	if styles[pNode].TextIndent <= 0 {
+		t.Fatalf("p TextIndent = %v, want > 0", styles[pNode].TextIndent)
+	}
+
+	if styles[spanNode].TextIndent != styles[pNode].TextIndent {
+		t.Fatalf("span TextIndent = %v, want %v (inherited)", styles[spanNode].TextIndent, styles[pNode].TextIndent)
+	}
+
+	docPlain, err := html.Parse(`<html><body><p style="margin:0;font-size:16px">hello</p></body></html>`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resPlain, err := Layout(docPlain, Options{Width: 800, Height: 600}) //nolint:exhaustruct
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	docIndent, err := html.Parse(`<html><body><p style="margin:0;font-size:16px;text-indent:2em">hello</p></body></html>`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resIndent, err := Layout(docIndent, Options{Width: 800, Height: 600}) //nolint:exhaustruct
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var xPlain, xIndent float64
+
+	for _, op := range resPlain.Ops {
+		if op.Kind == OpText && strings.Contains(op.Text, "hello") {
+			xPlain = op.X
+
+			break
+		}
+	}
+
+	for _, op := range resIndent.Ops {
+		if op.Kind == OpText && strings.Contains(op.Text, "hello") {
+			xIndent = op.X
+
+			break
+		}
+	}
+
+	if xIndent <= xPlain {
+		t.Fatalf("xIndent (%v) must be greater than xPlain (%v)", xIndent, xPlain)
 	}
 }
 

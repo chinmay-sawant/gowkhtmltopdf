@@ -996,3 +996,27 @@ func TestCLIVersionMatchesVERSIONFile(t *testing.T) {
 		t.Fatalf("cli.Version = %q, want VERSION %q or a suffix-stamped form", Version, want)
 	}
 }
+
+func TestExcludeFromOutlineFlag(t *testing.T) {
+	t.Parallel()
+
+	cmd := parse(t, "--exclude-from-outline", ".no-outline", "--exclude-from-outline", "#skip", "in.html", outPDF)
+	if len(cmd.Global.ExcludeFromOutline) != 2 ||
+		cmd.Global.ExcludeFromOutline[0] != ".no-outline" ||
+		cmd.Global.ExcludeFromOutline[1] != "#skip" {
+		t.Errorf("ExcludeFromOutline = %v, want [.no-outline, #skip]", cmd.Global.ExcludeFromOutline)
+	}
+}
+
+func TestAllowFlagInImageMode(t *testing.T) {
+	t.Parallel()
+
+	cmd, err := Parse([]string{"--allow", "/tmp/assets", "in.html", "out.png"}, ModeImage)
+	if err != nil {
+		t.Fatalf("Parse with --allow in ModeImage failed: %v", err)
+	}
+
+	if len(cmd.Global.Load.Allow) == 0 || cmd.Global.Load.Allow[0] != "/tmp/assets" {
+		t.Errorf("Allow = %v, want [/tmp/assets]", cmd.Global.Load.Allow)
+	}
+}

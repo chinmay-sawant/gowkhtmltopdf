@@ -1,6 +1,9 @@
 package settings
 
-import "strings"
+import (
+	"errors"
+	"strings"
+)
 
 const (
 	defaultMarginMM       = 10
@@ -154,6 +157,55 @@ func ResolveMedia(base string, global Web, obj *Web) string {
 	}
 
 	return base
+}
+
+// ResolvePDFMedia resolves layout CSS media for PDF mode via ResolveMedia.
+// PDF default is "print".
+func ResolvePDFMedia(glob PdfGlobal, obj *PdfObject) string {
+	var objWeb *Web
+
+	if obj != nil {
+		objView := Web{ //nolint:exhaustruct // intentional zero-value fields
+			PrintMediaType: obj.Load.PrintMediaType || obj.Web.PrintMediaType,
+			MediaType:      obj.Load.MediaType,
+		}
+		if obj.Web.MediaType != MediaIgnore {
+			objView.MediaType = obj.Web.MediaType
+		}
+
+		objWeb = &objView
+	}
+
+	return ResolveMedia(sPrint, glob.Web, objWeb)
+}
+
+// ResolveImageMedia resolves layout CSS media for Image mode via ResolveMedia.
+// Image default is "screen".
+func ResolveImageMedia(global PdfGlobal, image ImageGlobal, obj *PdfObject) string {
+	web := image.Web
+	if global.Web.PrintMediaType {
+		web.PrintMediaType = true
+	}
+
+	if web.MediaType == MediaIgnore {
+		web.MediaType = global.Web.MediaType
+	}
+
+	var objWeb *Web
+
+	if obj != nil {
+		objView := Web{ //nolint:exhaustruct // intentional zero/partial fields
+			PrintMediaType: obj.Load.PrintMediaType || obj.Web.PrintMediaType,
+			MediaType:      obj.Load.MediaType,
+		}
+		if obj.Web.MediaType != MediaIgnore {
+			objView.MediaType = obj.Web.MediaType
+		}
+
+		objWeb = &objView
+	}
+
+	return ResolveMedia(sScreen, web, objWeb)
 }
 
 // Margin holds the four page margins in millimetres.
@@ -385,6 +437,26 @@ func (o *PdfObject) FooterFor(g PdfGlobal) HeaderFooter {
 	}
 
 	return g.Footer
+}
+
+// ErrNoRenderableObjects reports a conversion job whose object list has no
+// renderable page source (all empty pages or only TOC objects).
+var ErrNoRenderableObjects = errors.New("settings: no renderable page objects")
+
+// ValidateRenderableObjects checks that objects contains at least one non-TOC
+// object with a non-empty page source or inline HTML.
+func ValidateRenderableObjects(objects []PdfObject) error {
+	for _, object := range objects {
+		if object.IsTableOfContent {
+			continue
+		}
+
+		if strings.TrimSpace(object.Page) != "" || len(object.Load.InlineHTML) > 0 {
+			return nil
+		}
+	}
+
+	return ErrNoRenderableObjects
 }
 
 // DefaultPdfObject matches pdfsettings.cc defaults for engine-consumed fields.

@@ -18,8 +18,8 @@ import (
 	"testing"
 
 	"gowkhtmltopdf/internal/cli"
-	"gowkhtmltopdf/internal/convert"
 	"gowkhtmltopdf/internal/html"
+	"gowkhtmltopdf/internal/load"
 	"gowkhtmltopdf/internal/settings"
 )
 
@@ -64,8 +64,8 @@ func TestRunValidatesBeforeOpeningOutput(t *testing.T) {
 	}
 
 	err := Run(t.Context(), cmd, nil)
-	if !errors.Is(err, convert.ErrNoRenderableObjects) {
-		t.Fatalf("Run() = %v, want errors.Is(..., %v)", err, convert.ErrNoRenderableObjects)
+	if !errors.Is(err, settings.ErrNoRenderableObjects) {
+		t.Fatalf("Run() = %v, want errors.Is(..., %v)", err, settings.ErrNoRenderableObjects)
 	}
 
 	if _, statErr := os.Stat(output); !errors.Is(statErr, os.ErrNotExist) {
@@ -531,5 +531,30 @@ func TestSmartWidth(t *testing.T) {
 
 	if got := def.Bounds().Dx(); got != 1024 {
 		t.Errorf("default canvas = %d, want 1024", got)
+	}
+}
+
+//nolint:exhaustruct // test settings struct
+func TestPrepareImageDocumentUsesImageWidthViewport(t *testing.T) {
+	t.Parallel()
+
+	imgSet := &settings.ImageGlobal{
+		Width: 1400, Height: 900,
+	}
+	obj := &settings.PdfObject{
+		Page: `inline:<!DOCTYPE html><html><head><style>
+		@media (min-width: 1200px) { body { background-color: red; } }
+		</style></head><body>Hello</body></html>`,
+	}
+
+	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // default loader
+
+	prep, _, err := prepareImageDocument(t.Context(), loader, obj, settings.PdfGlobal{}, imgSet, nil, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(prep.Sheets) == 0 {
+		t.Fatal("expected at least 1 stylesheet prepared")
 	}
 }

@@ -26,7 +26,7 @@ func TestBuildPDFRequestPreservesEngineContract(t *testing.T) {
 
 	var out, outline bytes.Buffer
 
-	cmd.DumpOutline = true
+	cmd.Global.DumpOutline = true
 
 	req, err := app.BuildPDFRequest(cmd, &out, &outline)
 	if err != nil {
@@ -38,7 +38,7 @@ func TestBuildPDFRequestPreservesEngineContract(t *testing.T) {
 	}
 
 	if !req.Global.DumpOutline {
-		t.Fatal("legacy command dump flag was not projected to global settings")
+		t.Fatal("dump outline flag was not retained on global settings")
 	}
 }
 

@@ -88,6 +88,16 @@ func (e *engine) layoutInlineFloats(
 	idx := 0
 	for idx < len(items) {
 		lineX, lineW := e.lineBounds(floats, contentX, contentW, leftY)
+		if idx == 0 && boxNode != nil && boxNode.style != nil && boxNode.style.TextIndent != 0 {
+			indent := e.scalePt(boxNode.style.TextIndent)
+			lineX += indent
+			lineW -= indent
+
+			if lineW < 0 {
+				lineW = 0
+			}
+		}
+
 		// Short remaining tail beside a float: if it fits as one full-width
 		// line under the float, drop there instead of leaving an orphan in
 		// the narrow column (e.g. wiki "big time."[71] left of a thumb).

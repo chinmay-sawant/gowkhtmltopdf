@@ -7,8 +7,8 @@ import (
 	"io"
 
 	"gowkhtmltopdf/internal/cli"
-	"gowkhtmltopdf/internal/convert"
 	"gowkhtmltopdf/internal/imageout"
+	"gowkhtmltopdf/internal/settings"
 )
 
 // ErrMultipleImageObjects reports an image command with more than one input
@@ -38,7 +38,7 @@ func RunImage(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 	request := imageout.NewRequest(cmd.Global, img, cmd.Objects, io.Discard)
 
 	if err := request.Validate(); err != nil {
-		if errors.Is(err, convert.ErrNoRenderableObjects) {
+		if errors.Is(err, settings.ErrNoRenderableObjects) {
 			return ErrNoPageObjects
 		}
 

@@ -35,6 +35,17 @@ raster image mode (`internal/imageout`) depend on it — image mode reuses the
 font parsing, glyph metrics, and shaping pipeline while *rasterizing* instead
 of writing PDF bytes.
 
+### Output coordinate space and canvas mapping
+
+PDF uses a bottom-left origin with positive y-coordinates extending upward (y-up
+in typographical points, 72 pt/inch), whereas HTML/CSS layout operates from a
+top-left origin with positive y extending downward (y-down in points). The conversion
+layer translates canvas positions to PDF coordinates via
+`hfGeom.pdfY(page, y) = pageH - marginTop - (y - page * contentH)`. Header and
+footer bands are painted into their respective top and bottom margin strips
+(`[pageH - marginTop, pageH]` for headers, `[0, marginBottom]` for footers) with
+origins and baselines clamped to the margin box.
+
 Two invariants shape everything in this package:
 
 1. **Workable output is the bar.** The repo history records that earlier

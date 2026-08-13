@@ -59,7 +59,6 @@ type Command struct {
 	OutlineWriter io.Writer
 
 	DumpDefaultTOCXSL bool
-	DumpOutline       bool
 }
 
 // OpenOutput returns the writer for this command: OutputWriter (library bytes
@@ -399,16 +398,7 @@ func (c *Command) resolveFree(cur *objectCtx, free []string) error {
 }
 
 func (c *Command) validate() error {
-	// At least one page-like object with a URL must exist.
-	hasInput := false
-
-	for _, o := range c.Objects {
-		if !o.IsTableOfContent && o.Page != "" {
-			hasInput = true
-		}
-	}
-
-	if !hasInput {
+	if err := settings.ValidateRenderableObjects(c.Objects); err != nil {
 		return errNeedInputFile
 	}
 

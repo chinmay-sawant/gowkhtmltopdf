@@ -12,6 +12,7 @@ import (
 	"gowkhtmltopdf/internal/cli"
 	"gowkhtmltopdf/internal/convert"
 	"gowkhtmltopdf/internal/errs"
+	"gowkhtmltopdf/internal/settings"
 )
 
 // DefaultTOCXSL returns the built-in TOC stylesheet description used by
@@ -24,7 +25,7 @@ func DefaultTOCXSL() string {
 // Shared app-level sentinel errors; exported so callers can match with errors.Is.
 var (
 	ErrNilCommand    = errs.ErrNilCommand
-	ErrNoPageObjects = errors.New("app: no page objects")
+	ErrNoPageObjects = settings.ErrNoRenderableObjects
 	ErrNilContext    = errs.ErrNilContext
 	// ErrConflictingOutputSinks reports a CLI stdout request that would append
 	// outline XML to the PDF byte stream. Library callers with independently
@@ -41,9 +42,6 @@ func BuildPDFRequest(cmd *cli.Command, output, outline io.Writer) (*convert.Requ
 	}
 
 	req := convert.NewPDFRequest(cmd.Global, cmd.Objects, output, outline)
-	if cmd.DumpOutline {
-		req.Global.DumpOutline = true
-	}
 
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("app: validate: %w", err)

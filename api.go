@@ -70,7 +70,7 @@ var (
 	ErrMissingPDFOutlineOutput = convert.ErrMissingOutlineOutput
 	// ErrMissingImageOutput reports a typed image request without an output
 	// sink.
-	ErrMissingImageOutput = errors.New("gowkhtmltopdf: image output sink is required")
+	ErrMissingImageOutput = errs.ErrMissingImageOutput
 	// ErrNilContext reports a cancellation-aware operation without a context.
 	ErrNilContext = errs.ErrNilContext
 )
@@ -598,7 +598,7 @@ func (c *Converter) ConvertTo(ctx context.Context, writer io.Writer) error {
 	}
 
 	if writer == nil {
-		return ErrMissingPDFOutput
+		return reportPreflight(c.OnError, ErrMissingPDFOutput)
 	}
 
 	if c.global == nil {
@@ -613,11 +613,7 @@ func (c *Converter) ConvertTo(ctx context.Context, writer io.Writer) error {
 	}
 
 	if err := validatePDFObjects(objects); err != nil {
-		if c.OnError != nil {
-			c.OnError(err.Error())
-		}
-
-		return err
+		return reportPreflight(c.OnError, err)
 	}
 
 	req := convert.NewPDFRequest(global, objects, writer, nil)
@@ -720,8 +716,8 @@ func (c *ImageConverter) Set(name, value string) error {
 	return nil
 }
 
-// Global returns the shared global settings (only "enablelocalfileaccess"
-// and "allow" influence image conversion, via the loader ACL).
+// Global returns the shared global settings (merged with image load settings
+// via load.ResolveEffectiveLoadGlobal for ACL, proxy, and network restrictions).
 func (c *ImageConverter) Global() *GlobalSettings {
 	if c == nil {
 		return nil
@@ -811,7 +807,7 @@ func (c *ImageConverter) ConvertTo(ctx context.Context, writer io.Writer) error 
 	}
 
 	if writer == nil {
-		return ErrMissingImageOutput
+		return reportPreflight(c.OnError, ErrMissingImageOutput)
 	}
 
 	c.ensureDefaults()
@@ -821,11 +817,7 @@ func (c *ImageConverter) ConvertTo(ctx context.Context, writer io.Writer) error 
 	obj := settings.ClonePdfObject(c.object.o)
 
 	if err := validateImageObjects([]settings.PdfObject{obj}); err != nil {
-		if c.OnError != nil {
-			c.OnError(err.Error())
-		}
-
-		return err
+		return reportPreflight(c.OnError, err)
 	}
 
 	req := imageout.NewRequest(global, img, []settings.PdfObject{obj}, writer)
@@ -850,6 +842,15 @@ func (c *ImageConverter) Output() []byte {
 // ---------------------------------------------------------------------------
 // Shared executor (P1-8)
 // ---------------------------------------------------------------------------
+
+// reportPreflight dispatches err to onError if non-nil and returns err.
+func reportPreflight(onError func(string), err error) error {
+	if err != nil && onError != nil {
+		onError(err.Error())
+	}
+
+	return err
+}
 
 // convertHooks holds the optional log/progress callbacks shared by PDF and
 // image Convert drivers. Both Converter and ImageConverter reduce to building
@@ -889,7 +890,7 @@ func (h convertHooks) progress() func(string, int) {
 // for Output().
 func (h convertHooks) executePDFTo(ctx context.Context, req *convert.Request) error {
 	if ctx == nil {
-		return ErrNilContext
+		return reportPreflight(h.OnError, ErrNilContext)
 	}
 
 	if err := convert.Run(ctx, req, h.lineLog(), h.progress()); err != nil {
@@ -907,7 +908,7 @@ func (h convertHooks) executePDFTo(ctx context.Context, req *convert.Request) er
 // failures to OnError.
 func (h convertHooks) executeImageTo(ctx context.Context, req *imageout.Request) error {
 	if ctx == nil {
-		return ErrNilContext
+		return reportPreflight(h.OnError, ErrNilContext)
 	}
 
 	if err := imageout.RunRequest(ctx, req, h.lineLog()); err != nil {
@@ -1093,7 +1094,7 @@ func (r *PDFRequest) toRequest() *convert.PDFRequest {
 	}
 }
 
-func (r *ImageRequest) toRequest() *convert.ImageRequest {
+func (r *ImageRequest) toRequest() *imageout.Request {
 	if r == nil {
 		return nil
 	}
@@ -1118,12 +1119,12 @@ func (r *ImageRequest) toRequest() *convert.ImageRequest {
 		object = clonePdfObject(r.Object.o)
 	}
 
-	return &convert.ImageRequest{
-		Global: global,
-		Image:  imageSettings,
-		Object: object,
-		Now:    r.Now,
-		Output: r.Output,
+	return &imageout.Request{
+		Global:  global,
+		Image:   imageSettings,
+		Objects: []settings.PdfObject{object},
+		Now:     r.Now,
+		Output:  r.Output,
 	}
 }
 
@@ -1168,7 +1169,7 @@ func RunImage(ctx context.Context, req *ImageRequest) error {
 		return err
 	}
 
-	if err := imageout.RunRequest(ctx, imageout.FromConvertImage(req.toRequest()), nil); err != nil {
+	if err := imageout.RunRequest(ctx, req.toRequest(), nil); err != nil {
 		return fmt.Errorf("image: %w", err)
 	}
 

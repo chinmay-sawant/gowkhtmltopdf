@@ -17,6 +17,8 @@ func percent(i, n int) int {
 	return int(math.Round(float64(i) * float64(progressComplete) / float64(n)))
 }
 
+const maxCopies = 1_000
+
 type pageRange = render.Range
 
 // pageOwner is one logical (pre-copy) page and the object that owns it.
@@ -179,8 +181,31 @@ func tocFirstOrder(tocs, bodies []*objectState) []int {
 }
 
 func materializeCopies(doc *pdf.Document, ranges []pageRange, copies int) error {
-	if err := render.MaterializeCopies(doc, ranges, copies); err != nil {
-		return fmt.Errorf("materialize copies: %w", err)
+	if copies < 1 {
+		return nil
+	}
+
+	if copies > maxCopies {
+		return fmt.Errorf("%w: got %d, limit %d", errTooManyCopies, copies, maxCopies)
+	}
+
+	original := 0
+	for _, span := range ranges {
+		original += span.Count
+	}
+
+	if original == 0 {
+		return nil
+	}
+
+	for copyIndex := 1; copyIndex < copies; copyIndex++ {
+		for _, span := range ranges {
+			for page := span.Start; page < span.Start+span.Count; page++ {
+				if _, err := doc.DuplicatePage(page); err != nil {
+					return fmt.Errorf("assemble copies: %w", err)
+				}
+			}
+		}
 	}
 
 	return nil

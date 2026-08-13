@@ -580,6 +580,27 @@ func TestWriteToMemoryBuffer(t *testing.T) {
 	}
 }
 
+func TestMultipleWritesDeterministic(t *testing.T) {
+	t.Parallel()
+
+	data := fixedDoc(t)
+	p := data.AddPage(200, 200)
+	p.Content().TextShow("repeat write")
+
+	var buf1, buf2 bytes.Buffer
+	if err := data.Write(&buf1); err != nil {
+		t.Fatalf("Write 1: %v", err)
+	}
+
+	if err := data.Write(&buf2); err != nil {
+		t.Fatalf("Write 2: %v", err)
+	}
+
+	if !bytes.Equal(buf1.Bytes(), buf2.Bytes()) {
+		t.Error("consecutive Write calls produced non-deterministic output")
+	}
+}
+
 // kidsRefs extracts the page refs listed in the pages tree /Kids array.
 func kidsRefs(t *testing.T, out string) []string {
 	t.Helper()

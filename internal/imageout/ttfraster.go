@@ -25,11 +25,15 @@ const (
 //
 // Text is run through pdf.ShapeTextFont first so Arabic/RTL/OT forms match
 // PDF emission (Phase 2.4 image shaping parity).
+//
+//nolint:cyclop,mnd // glyph drawing with rotation and spacing
 func ttfDrawString(
 	img *image.NRGBA,
 	basex, basey float64,
 	text string,
 	sizePt float64,
+	letterSpacing float64,
+	rotateDeg float64,
 	face *pdf.Font,
 	col color.NRGBA,
 	pxPerPt float64,
@@ -57,12 +61,21 @@ func ttfDrawString(
 
 	scale := pxSize / upm
 	cursorX := basex
+	cursorY := basey
 
 	for i, r := range run.Runes {
-		adv := run.Advances[i] * pxPerPt
+		adv := run.Advances[i]*pxPerPt + letterSpacing*pxPerPt
 
-		drawGlyphAA(img, cursorX, basey, r, face, scale, col, atlas)
-		cursorX += adv
+		drawGlyphAA(img, cursorX, cursorY, r, face, scale, col, atlas)
+
+		switch rotateDeg {
+		case -90:
+			cursorY += adv
+		case 90:
+			cursorY -= adv
+		default:
+			cursorX += adv
+		}
 	}
 }
 

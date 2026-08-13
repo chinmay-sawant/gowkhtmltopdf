@@ -1033,6 +1033,16 @@ var uaDecls = map[string][]css.Declaration{ //nolint:gochecknoglobals // static 
 	"img": {
 		{Prop: "display", Value: "inline-block"}, //nolint:exhaustruct // intentional zero fields
 	},
+	"meter": {
+		{Prop: "display", Value: "inline-block"}, //nolint:exhaustruct // intentional zero fields
+		{Prop: "width", Value: "10em"},           //nolint:exhaustruct // intentional zero fields
+		{Prop: "height", Value: "1em"},           //nolint:exhaustruct // intentional zero fields
+	},
+	"progress": {
+		{Prop: "display", Value: "inline-block"}, //nolint:exhaustruct // intentional zero fields
+		{Prop: "width", Value: "10em"},           //nolint:exhaustruct // intentional zero fields
+		{Prop: "height", Value: "1em"},           //nolint:exhaustruct // intentional zero fields
+	},
 	"hr": {
 		{Prop: "display", Value: "block"},     //nolint:exhaustruct // intentional zero fields
 		{Prop: "border", Value: "1px inset"},  //nolint:exhaustruct // intentional zero fields

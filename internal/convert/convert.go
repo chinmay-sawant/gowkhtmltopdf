@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 	"time"
 
 	"gowkhtmltopdf/internal/convert/render"
@@ -90,7 +89,7 @@ var ErrInvalidCopies = errors.New("convert: copies must be at least one")
 // ErrNoRenderableObjects reports a request that contains no body object that
 // can be loaded. Table-of-contents objects are metadata, not renderable page
 // input, and an object with neither a page nor inline HTML is empty.
-var ErrNoRenderableObjects = errors.New("convert: no renderable objects")
+var ErrNoRenderableObjects = settings.ErrNoRenderableObjects
 
 // ErrUnexpectedImageSettings reports an image-mode union member passed to the
 // PDF engine. The shared Request remains the compatibility contract, while
@@ -109,7 +108,7 @@ var errNilRequest = errs.ErrNilRequest
 var errNilContext = errs.ErrNilContext
 
 // errImagesDisabled reports an image request made while images are disabled.
-var errImagesDisabled = errors.New("images disabled")
+var errImagesDisabled = errs.ErrImagesDisabled
 
 var (
 	errTooManyObjects = errors.New("convert: object limit exceeded")
@@ -142,17 +141,6 @@ func NewBenchmarkPDFRequest(
 	req.benchmarkPageIslands = true
 
 	return req
-}
-
-// NewImageRequest builds the image side of the compatibility union. Image
-// settings are copied so the request owns its mode configuration snapshot.
-func NewImageRequest(global settings.PdfGlobal, image settings.ImageGlobal, objects []settings.PdfObject, output io.Writer) *Request { //nolint:lll // constructor signature
-	return &Request{ //nolint:exhaustruct // intentional zero-value fields
-		Global:  global,
-		Image:   &image,
-		Objects: objects,
-		Output:  output,
-	}
 }
 
 // Validate checks the explicit output contract before any loading or font
@@ -194,18 +182,10 @@ func (r *Request) Validate() error {
 // PDF and image requests. A request may contain TOC metadata, but it must
 // also contain at least one body object with either a non-empty page source
 // or inline HTML bytes.
+//
+//nolint:wrapcheck // delegating alias to shared settings package
 func ValidateRenderableObjects(objects []settings.PdfObject) error {
-	for _, object := range objects {
-		if object.IsTableOfContent {
-			continue
-		}
-
-		if strings.TrimSpace(object.Page) != "" || len(object.Load.InlineHTML) > 0 {
-			return nil
-		}
-	}
-
-	return ErrNoRenderableObjects
+	return settings.ValidateRenderableObjects(objects)
 }
 
 // ValidatePDF checks the PDF-specific request invariant before running the

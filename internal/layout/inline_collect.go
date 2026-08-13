@@ -499,6 +499,11 @@ func (e *engine) inlineChromeBottom(st *ResolvedStyle) float64 {
 	return e.scalePt(st.PaddingBottom) + e.scalePt(st.BorderBottom.Width)
 }
 
+// TransformInlineText applies CSS text-transform (uppercase, lowercase, capitalize).
+func TransformInlineText(text, transform string) string {
+	return transformInlineText(text, transform)
+}
+
 func transformInlineText(text, transform string) string {
 	switch transform {
 	case textTransformUppercase:

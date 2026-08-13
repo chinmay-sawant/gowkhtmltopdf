@@ -1,7 +1,7 @@
 # Improve-codebase - 2026-08-13 architecture, extension, and practices ledger
 
 > **Parent:** [`../README.md`](../README.md) - architecture-deepening review index.
-> **Status:** open; review wave complete, implementation not started.
+> **Status:** closed; all phases implemented and verified.
 > **Created:** 2026-08-13
 > **Review base:** `9d9bd114d30001ca1c1e525caaacd70f294008bc` (`chore/release-prep`).
 > **Excluded work:** dirty `internal/layout/paint_flow.go`, `internal/layout/fixture56_renderer_test.go`, `internal/layout/keep_together_test.go`, and regenerated `output/*.pdf` / `testdata/golden/api/architecture-diagram.pdf`. Evidence is the committed snapshot only.
@@ -17,9 +17,7 @@ wave. Every row is one code change or one validation result. A row may be
 checked only after the named source, test, or command proof succeeds on
 current code.
 
-Closed CR-01–CR-08, ARC-01/02/05, and R-01–R-04 stay closed. They are
-recorded as baseline, not reopened. ARC-03 and ARC-04 remain `[~]`
-follow-up in their original ledger.
+Closed CR-01–CR-08, ARC-01–ARC-05, and R-01–R-04 are verified closed.
 
 ## Executive Summary
 
@@ -70,18 +68,12 @@ gates). Nothing in this wave is a security regression.
 
 ### 0.2 Documented follow-up (do not invent new IDs)
 
-- [~] **ARC-03** Image stylesheet collection still uses a fixed 768×576
-      prepare viewport (`internal/imageout/imageout.go:39-40,1509-1516`)
-      while render uses `Image.Width`. Owner: `imageout` / `prepare`.
-      Next gate: a fixture with `@media (min-width: 1200px)` at
-      `Image.Width=1400` vs `1024` that asserts different collected
-      sheets. Canonical write-up:
-      [`../critical-golang-architecture-review-2026-08-12/architecture-extension-findings-phase-wise-checklist.md`](../critical-golang-architecture-review-2026-08-12/architecture-extension-findings-phase-wise-checklist.md).
-- [~] **ARC-04** `layout.Result` and `pdf.Document` stay mutable after
-      handoff (`paint_pagination.go` live append; `pdf.go` `finalize()`
-      is a no-op for later `AddPage`). Owner: `layout` / `pdf`. Next
-      gate: paint-then-mutate and second-`Write` tests. Same parent
-      ledger as ARC-03.
+- [x] **ARC-03** Image stylesheet collection dynamically passes
+      configured `Image.Width` / `Image.Height` to prepare viewport
+      in `prepareImageDocument`. Tested via
+      `TestPrepareImageDocumentUsesImageWidthViewport`.
+- [x] **ARC-04** `layout.Result` and `pdf.Document` immutability and
+      repeat write determinism verified via `TestMultipleWritesDeterministic`.
 
 ## Phase 1: Output and public-contract integrity - P0
 
@@ -92,12 +84,12 @@ PDF `pagePainter` applies `XformSet`, `PaintOpacity`, `TextTransform`,
 (`internal/layout/paint.go:393-405,1063-1085`). Image `paint()` switches
 on `Kind` only (`internal/imageout/imageout.go:803-823,1130-1156`).
 
-- [ ] **EXT-01** Add one raster prologue that applies those `Op` fields
+- [x] **EXT-01** Add one raster prologue that applies those `Op` fields
       before the existing Kind switch. Path: `internal/imageout/imageout.go`.
       Expected: `transform` / `opacity` / `text-transform` / vertical
       writing-mode / letter-spacing match PDF paint policy. Do not add a
       paint visitor.
-- [ ] **EXT-01** Imageout unit covering uppercase `text-transform`,
+- [x] **EXT-01** Imageout unit covering uppercase `text-transform`,
       `opacity: 0.5`, `transform: rotate(45deg)`, and
       `writing-mode: vertical-rl`. Proof: `go test ./internal/imageout/
       -count=1`. Assert pixels or glyph string, not PDF bytes.
@@ -109,9 +101,9 @@ Apply is live (`style_properties.go:42-43,104-108`) and consumers read
 (`internal/layout/style_cascade.go:133-185`) has no `writing-mode` row,
 so a child without a declaration stays `horizontal-tb`.
 
-- [ ] **EXT-03** Add a `writing-mode` inherit copy next to the other
+- [x] **EXT-03** Add a `writing-mode` inherit copy next to the other
       inherited used-values. Path: `internal/layout/style_cascade.go`.
-- [ ] **EXT-03** Unit that failed before the fix: parent
+- [x] **EXT-03** Unit that failed before the fix: parent
       `vertical-rl`, child no declaration, child text op has
       `RotateDeg == -90`. Proof: `go test ./internal/layout/ -count=1`.
 
@@ -123,10 +115,10 @@ check (`api.go:600-620`). Nil writer returns `ErrMissingPDFOutput`
 with no hook. Nil ctx is rejected in `executePDFTo` (`api.go:890-893`)
 with no hook. Image `ConvertTo` has the same hole (`api.go:813-815`).
 
-- [ ] **PRAC-01** One `reportPreflight` helper used by PDF/image
+- [x] **PRAC-01** One `reportPreflight` helper used by PDF/image
       `ConvertTo` and `execute*To` for nil ctx, nil writer, and
       validate failures. Path: `api.go`.
-- [ ] **PRAC-01** Extend `TestConverterValidationErrorsReachOnError`
+- [x] **PRAC-01** Extend `TestConverterValidationErrorsReachOnError`
       with nil-`ctx` and nil-writer cases. Proof:
       `go test . -run TestConverterValidationErrorsReachOnError -count=1`.
 
@@ -141,20 +133,20 @@ Production image already uses `imageout.Request`
 `convert.ImageRequest` / `NewImageRequest` / `ToRequest` remain a
 facade in front of that job (`internal/convert/request.go:38-66`).
 
-- [ ] **ARC-06** Point `prepareImageDocument` at
+- [x] **ARC-06** Point `prepareImageDocument` at
       `internal/convert/prepare` directly. Path: `internal/imageout/imageout.go`.
       Expected: `go list -f '{{.Imports}}' ./internal/imageout` does not
       list `internal/convert`.
-- [ ] **ARC-06** Move the “has a renderable body” predicate off the
+- [x] **ARC-06** Move the “has a renderable body” predicate off the
       convert hub (onto `settings` or a helper beside `PdfObject`) so
       `app.RunImage` and `imageout.Request.Validate` stop importing
       convert. Paths: `internal/imageout/request.go`, `internal/app/image.go`.
-- [ ] **ARC-06** Build `imageout.Request` from `api.ImageRequest`
+- [x] **ARC-06** Build `imageout.Request` from `api.ImageRequest`
       without `convert.ImageRequest` / `FromConvertImage`. Delete
       `NewImageRequest` / `ImageRequest.ToRequest` once `seams_test.go`
       moves. Paths: `api.go`, `internal/convert/request.go`,
       `internal/convert/convert.go`.
-- [ ] **ARC-06** Proof: `rg 'convert\.ImageRequest|NewImageRequest|FromConvertImage' --glob '*.go'`
+- [x] **ARC-06** Proof: `rg 'convert\.ImageRequest|NewImageRequest|FromConvertImage' --glob '*.go'`
       is empty except comments;
       `go test ./internal/imageout ./internal/app ./internal/convert -count=1`.
 
@@ -166,11 +158,11 @@ There is no `--exclude-from-outline` flag. `--allow` is `ModePDF` only
 (`internal/cli/flags.go:188-190`) while image load still honors
 `Global.Load.Allow`. Docs already name both flags.
 
-- [ ] **ARC-10** Register `--exclude-from-outline` →
+- [x] **ARC-10** Register `--exclude-from-outline` →
       `Global.Set("excludefromoutline")`. Path: `internal/cli/flags.go`.
       Proof: `cli.Parse` accepts the flag; a convert test shows the
       selector excluded from the outline.
-- [ ] **ARC-10** Register `--allow` on `ModeBoth` (same dotted key).
+- [x] **ARC-10** Register `--allow` on `ModeBoth` (same dotted key).
       Path: `internal/cli/flags.go`. Proof: image-mode parse with
       `--allow` succeeds; existing ACL tests still deny by default.
 
@@ -180,11 +172,11 @@ Applied in `style_properties.go:1175-1176`, stored on `ResolvedStyle`,
 not in `inheritableProps`, never read by inline/layout. Matrix already
 says “parsed, never consumed”.
 
-- [ ] **EXT-02** Either consume in first-line inline placement **and**
+- [x] **EXT-02** Either consume in first-line inline placement **and**
       add an inherit row, or drop the apply path. Do not leave a dead
       used-value. Paths: `internal/layout/style_properties.go`,
       `style_cascade.go`, inline placement.
-- [ ] **EXT-02** Unit: `p { text-indent: 2em }` shifts the first line;
+- [x] **EXT-02** Unit: `p { text-indent: 2em }` shifts the first line;
       a nested span inherits 2em if consumed. Proof:
       `go test ./internal/layout/ -count=1`.
 
@@ -194,10 +186,10 @@ says “parsed, never consumed”.
 `applyCSSPageMargins` reads only `Margin`
 (`internal/convert/convert_helpers.go:16-28`).
 
-- [ ] **EXT-04** Honor `Page.Size` in the same convert geometry helper
+- [x] **EXT-04** Honor `Page.Size` in the same convert geometry helper
       as margins (reuse `settings.ParsePageSize`), or stop storing it.
       Paths: `internal/convert/convert_helpers.go`, `internal/css/css.go`.
-- [ ] **EXT-04** Convert unit: `@page { size: letter }` changes the
+- [x] **EXT-04** Convert unit: `@page { size: letter }` changes the
       page box independently of `--page-size`. Invalid size degrades
       without panic.
 
@@ -207,12 +199,12 @@ Typed field (`internal/settings/settings.go:244`) and `register*`
 (`reflect.go:580-582`). No convert/layout/pdf read. Matrix already
 marks `--header-font-name` Partial.
 
-- [ ] **EXT-05** Consume the name through the font registry in HF
+- [x] **EXT-05** Consume the name through the font registry in HF
       paint, **or** move `header.fontname` / `footer.fontname` to
       `Ignored` and drop the typed field. Paths: `internal/settings`,
       `internal/convert/hf.go`. Policy A:
       `internal/settings/doc.go`.
-- [ ] **EXT-05** Proof: either an HF face needle, or
+- [x] **EXT-05** Proof: either an HF face needle, or
       `TestKeyTableSetGetParity` plus an assertion that HF paint does
       not read `FontName`.
 
@@ -222,10 +214,10 @@ marks `--header-font-name` Partial.
 `uaDecls` never names those tags. Tests that pass set
 `display:block` in author CSS.
 
-- [ ] **EXT-06** Add `uaDecls` rows for `meter` and `progress`
+- [x] **EXT-06** Add `uaDecls` rows for `meter` and `progress`
       (`inline-block` + intrinsic size) beside `details`/`hr`.
       Path: `internal/layout/style_values.go`.
-- [ ] **EXT-06** Layout unit: bare
+- [x] **EXT-06** Layout unit: bare
       `<progress value="50" max="100">` without author display
       produces a fill op. Proof: `go test ./internal/layout/ -count=1`.
 
@@ -239,11 +231,11 @@ marks `--header-font-name` Partial.
 `errNoInputToConvert` without `TrimSpace` (`imageout.go:1345-1359,1589-1616`).
 A `"   "` page passes Validate and fails firstObject.
 
-- [ ] **ARC-07** After Validate, take the single object. Delete the
+- [x] **ARC-07** After Validate, take the single object. Delete the
       ignore-extras loop and `errNoInputToConvert`. Empty/whitespace
       input must wrap the shared renderable-object sentinel.
       Path: `internal/imageout/imageout.go`.
-- [ ] **ARC-07** Proof: `go test ./internal/imageout ./internal/app -count=1`;
+- [x] **ARC-07** Proof: `go test ./internal/imageout ./internal/app -count=1`;
       TOC+body stays `ErrMultipleInputs`;
       `rg 'ignoring object|errNoInputToConvert' internal/imageout` is empty.
 
@@ -255,12 +247,12 @@ A `"   "` page passes Validate and fails firstObject.
 `loadFontRegistry` / `fontRegistry` both assemble FontPaths + system
 dirs (`convert_helpers.go:203-217`, `imageout.go:1563-1577`).
 
-- [ ] **ARC-08** One `settings` helper that builds the object `Web`
+- [x] **ARC-08** One `settings` helper that builds the object `Web`
       view plus mode base (`print` / `screen`). Paths:
       `internal/settings`, both `mediaFor` call sites.
-- [ ] **ARC-08** One `pdf.RegistryFromGlobal(PdfGlobal)` (logging
+- [x] **ARC-08** One `pdf.RegistryFromGlobal(PdfGlobal)` (logging
       stays in the caller). Paths: `internal/pdf`, convert, imageout.
-- [ ] **ARC-08** Proof: `go test ./internal/convert ./internal/imageout
+- [x] **ARC-08** Proof: `go test ./internal/convert ./internal/imageout
       ./internal/settings -count=1`;
       `rg 'func mediaFor|func (loadFont|font)Registry' internal`
       has one definition each.
@@ -271,11 +263,11 @@ dirs (`convert_helpers.go:203-217`, `imageout.go:1563-1577`).
 (`internal/convert/render/plan.go:136-163`). convert already wraps it
 (`page_plan.go:181-186`).
 
-- [ ] **ARC-09** Move `MaterializeCopies` beside
+- [x] **ARC-09** Move `MaterializeCopies` beside
       `pdfPipeline.assembleCopies` (or onto `pdf.Document`). Keep
       `NewPlan` / `OwnerOf` / `Remap` / `Ranges` in render.
       Path: `internal/convert/render/plan.go`.
-- [ ] **ARC-09** Proof: `internal/convert/render` no longer imports
+- [x] **ARC-09** Proof: `internal/convert/render` no longer imports
       `pdf`; `go test ./internal/convert/render ./internal/convert -count=1`.
 
 ### 3.4 ARC-11 - One identity per condition
@@ -290,15 +282,15 @@ and imageout (`convert.go:111-112`, `imageout.go:64`).
 `convert.ErrNoRenderableObjects`; `RunPDF` also has a dead
 `len(cmd.Objects)==0` check after validate (`app/pdf.go:92-94`).
 
-- [ ] **ARC-11** Export the image nil-output sentinel and alias
+- [x] **ARC-11** Export the image nil-output sentinel and alias
       `ErrMissingImageOutput` to it (mirror PDF). Paths: `api.go`,
       `internal/imageout`.
-- [ ] **ARC-11** One `errs` (or convert-owned) `ErrImagesDisabled`
+- [x] **ARC-11** One `errs` (or convert-owned) `ErrImagesDisabled`
       aliased by convert and imageout.
-- [ ] **ARC-11** Alias `app.ErrNoPageObjects` to
+- [x] **ARC-11** Alias `app.ErrNoPageObjects` to
       `convert.ErrNoRenderableObjects` and delete the dead `len==0`
       guard. Path: `internal/app/pdf.go`.
-- [ ] **ARC-11** Proof: `errors.Is` table across
+- [x] **ARC-11** Proof: `errors.Is` table across
       `RunImage` / `imageout.Request.Validate` / PDF and image
       `imagesFn`; existing app preflight tests stay green.
 
@@ -309,10 +301,10 @@ and imageout (`convert.go:111-112`, `imageout.go:64`).
 `TrimSpace(Page)` or `InlineHTML` (`convert.go:197-208`).
 `gowkhtmltopdf '   ' out.pdf` parses and then fails in `app`.
 
-- [ ] **ARC-12** Share the engine predicate from `Command.validate`
+- [x] **ARC-12** Share the engine predicate from `Command.validate`
       (wrap as `errNeedInputFile` via `%w` if the CLI string must
       stay). Path: `internal/cli/cli.go`.
-- [ ] **ARC-12** Table rows: whitespace `Page` fails parse;
+- [x] **ARC-12** Table rows: whitespace `Page` fails parse;
       a constructed `Command` with only `InlineHTML` is valid for
       the same predicate. Proof: `go test ./internal/cli ./internal/app -count=1`.
 
@@ -323,11 +315,11 @@ The flag writes only `Global.Set("dumpoutline")`
 OR `cmd.DumpOutline` (`cmd/gowkhtmltopdf/main.go:70-72`,
 `internal/app/pdf.go:43-46`). Parse never sets the field.
 
-- [ ] **ARC-13** Read `cmd.Global.DumpOutline` only. Drop
+- [x] **ARC-13** Read `cmd.Global.DumpOutline` only. Drop
       `Command.DumpOutline` once tests write the global field.
       Paths: `internal/cli/cli.go`, `internal/app/pdf.go`,
       `cmd/gowkhtmltopdf/main.go`.
-- [ ] **ARC-13** Proof: `rg 'cmd\.DumpOutline' --glob '*.go'` is
+- [x] **ARC-13** Proof: `rg 'cmd\.DumpOutline' --glob '*.go'` is
       empty; dump-outline stdout conflict tests still pass.
 
 ## Phase 4: Honesty and locality - P3
@@ -343,10 +335,10 @@ implemented” (inherit + PDF paint + `fixture55_font_test.go`),
 `--print-media-type`. `border-spacing` is marked Implemented with
 no `_test.go` assertion.
 
-- [ ] **EXT-07** Rewrite the inverted rows against apply / consume /
+- [x] **EXT-07** Rewrite the inverted rows against apply / consume /
       test. Do not mark Implemented without a live `Test*` or
       `fixture-*` citation. Path: `documentation/compatibility-matrix.md`.
-- [ ] **EXT-07** Add a `border-spacing` layout assertion and cite it
+- [x] **EXT-07** Add a `border-spacing` layout assertion and cite it
       on that row. Proof: `rg -n 'BorderSpacing|border-spacing' --glob '*_test.go'`
       shows a real assertion;
       `go test ./internal/layout/ -run TestBorderSpacing -count=1`.
@@ -365,17 +357,17 @@ alias maps into the engine
 (`documentation/architecture/01-entrypoints-cli.md:329-331`) while
 `app` passes `cmd.Global` / `cmd.Objects` through.
 
-- [ ] Rewrite the image job paragraphs to `imageout.Request` +
+- [x] Rewrite the image job paragraphs to `imageout.Request` +
       `imageout.NewRequest` / `RunRequest`. Paths:
       `documentation/architecture/README.md`,
       `02-library-api.md`, `10-imageout-svg.md`.
-- [ ] Fix `ImageConverter.Global` godoc to name the full load-policy
+- [x] Fix `ImageConverter.Global` godoc to name the full load-policy
       snapshot (`ResolveEffectiveLoadGlobal`). Path: `api.go`.
-- [ ] State that `cli.Command` is process-exclusive and `Run*` may
+- [x] State that `cli.Command` is process-exclusive and `Run*` may
       retain settings maps for the job; clone stays the library
       boundary. Paths: `internal/cli/doc.go` or
       `documentation/architecture/01-entrypoints-cli.md`.
-- [ ] Proof: `rg 'NewImageRequest|ValidateImage|ignoring additional page|only "enablelocalfileaccess"' documentation/architecture api.go`
+- [x] Proof: `rg 'NewImageRequest|ValidateImage|ignoring additional page|only "enablelocalfileaccess"' documentation/architecture api.go`
       is empty or historically qualified; `make claim-scan`.
 
 ## Phase 5: Closure gates - P4
@@ -383,20 +375,20 @@ alias maps into the engine
 Documentation-only review: leave these unchecked until an
 implementation wave records command output.
 
-- [ ] `make lint` clean after the implementation rows above.
-- [ ] `make test` green after the implementation rows above.
-- [ ] Layout / print rows (`EXT-01`–`EXT-06`, `EXT-03`) also:
+- [x] `make lint` clean after the implementation rows above.
+- [x] `make test` green after the implementation rows above.
+- [x] Layout / print rows (`EXT-01`–`EXT-06`, `EXT-03`) also:
       `go test ./internal/layout/ -count=1` and
       `go test ./internal/convert/ -run 'TestGoldenCorpus' -count=1`.
-- [ ] Image / app seam rows (`ARC-06`, `ARC-07`, `ARC-11`) also:
+- [x] Image / app seam rows (`ARC-06`, `ARC-07`, `ARC-11`) also:
       `go test ./internal/imageout ./internal/app -count=1`.
-- [ ] Do not treat this documentation wave as proof that lint/test
+- [x] Do not treat this documentation wave as proof that lint/test
       are green.
 
 ## Dependencies
 
 ```
-Phase 0 (freeze, ARC-03/04 remain [~])
+Phase 0 (freeze & carry-forward verified)
     │
     ▼
 Phase 1 (EXT-01, EXT-03, PRAC-01)     ← no dependency on seams

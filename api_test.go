@@ -393,6 +393,7 @@ func assertPanicsWith(t *testing.T, want error, call func()) {
 	call()
 }
 
+//nolint:cyclop,wsl,lll,funlen // validation error error-reporting assertions
 func TestConverterValidationErrorsReachOnError(t *testing.T) {
 	t.Parallel()
 
@@ -409,6 +410,26 @@ func TestConverterValidationErrorsReachOnError(t *testing.T) {
 		t.Fatalf("validation callback = %q, want %q", got, ErrNoRenderablePDFObjects)
 	}
 
+	got = ""
+	if err := conv.ConvertTo(t.Context(), nil); !errors.Is(err, ErrMissingPDFOutput) {
+		t.Fatalf("ConvertTo(nil writer) = %v, want %v", err, ErrMissingPDFOutput)
+	}
+
+	if got != ErrMissingPDFOutput.Error() {
+		t.Fatalf("nil writer callback = %q, want %q", got, ErrMissingPDFOutput)
+	}
+
+	got = ""
+	conv.AddHTML([]byte("<h1>test</h1>"), "")
+	var buf bytes.Buffer
+	if err := conv.ConvertTo(nil, &buf); !errors.Is(err, ErrNilContext) { //nolint:staticcheck // testing nil context preflight
+		t.Fatalf("ConvertTo(nil ctx) = %v, want %v", err, ErrNilContext)
+	}
+
+	if got != ErrNilContext.Error() {
+		t.Fatalf("nil ctx callback = %q, want %q", got, ErrNilContext)
+	}
+
 	var imageError string
 
 	imageConv := NewImageConverter()
@@ -420,6 +441,27 @@ func TestConverterValidationErrorsReachOnError(t *testing.T) {
 
 	if imageError != ErrNoInputPageAdded.Error() {
 		t.Fatalf("image validation callback = %q, want %q", imageError, ErrNoInputPageAdded)
+	}
+
+	imageError = ""
+	if err := imageConv.ConvertTo(t.Context(), nil); !errors.Is(err, ErrMissingImageOutput) {
+		t.Fatalf("image ConvertTo(nil writer) = %v, want %v", err, ErrMissingImageOutput)
+	}
+
+	if imageError != ErrMissingImageOutput.Error() {
+		t.Fatalf("image nil writer callback = %q, want %q", imageError, ErrMissingImageOutput)
+	}
+
+	imageError = ""
+	imageConv.AddObject("test.html")
+	var imgBuf bytes.Buffer
+
+	if err := imageConv.ConvertTo(nil, &imgBuf); !errors.Is(err, ErrNilContext) { //nolint:staticcheck // testing nil context preflight
+		t.Fatalf("image ConvertTo(nil ctx) = %v, want %v", err, ErrNilContext)
+	}
+
+	if imageError != ErrNilContext.Error() {
+		t.Fatalf("image nil ctx callback = %q, want %q", imageError, ErrNilContext)
 	}
 }
 

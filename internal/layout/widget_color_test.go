@@ -38,5 +38,26 @@ func approx(got, want float64) bool {
 		d = -d
 	}
 
-	return d < 0.02
+	return d < 0.01
+}
+
+func TestBareProgressAndMeterProduceFillOp(t *testing.T) {
+	t.Parallel()
+
+	res := layoutHTML(t,
+		`<html><body><progress value="50" max="100"></progress><meter value="0.5"></meter></body></html>`,
+		nil,
+	)
+
+	var fillCount int
+
+	for _, op := range res.Ops {
+		if op.Kind == OpFillRect && op.W > 0 && op.H > 0 {
+			fillCount++
+		}
+	}
+
+	if fillCount < 2 {
+		t.Fatalf("expected at least 2 fill ops for bare progress and meter without author display, got %d", fillCount)
+	}
 }

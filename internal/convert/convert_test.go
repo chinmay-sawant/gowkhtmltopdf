@@ -19,7 +19,9 @@ import (
 	"strings"
 	"testing"
 
+	"gowkhtmltopdf/internal/css"
 	"gowkhtmltopdf/internal/html"
+	"gowkhtmltopdf/internal/pdf"
 	"gowkhtmltopdf/internal/settings"
 )
 
@@ -655,4 +657,71 @@ func decodeStreams(data []byte) []byte {
 	}
 
 	return out
+}
+
+//nolint:exhaustruct // test initial geometry and stylesheets
+func TestCSSPageSizeAndMargins(t *testing.T) {
+	t.Parallel()
+
+	initGeom := hfGeom{
+		pageW: 595.28, pageH: 841.89,
+		marginTop: 28.35, marginBottom: 28.35,
+		marginLeft: 28.35, marginRight: 28.35,
+	}
+
+	// 1. @page { size: letter; margin: 1in }
+	sheetLetter := &css.Stylesheet{
+		Page: &css.PageStyle{Size: "letter", Margin: "1in"},
+	}
+	geom := applyCSSPageMargins(initGeom, []*css.Stylesheet{sheetLetter})
+
+	if geom.pageW != 612 || geom.pageH != 792 {
+		t.Errorf("geom size = %vx%v, want 612x792 (letter)", geom.pageW, geom.pageH)
+	}
+
+	if geom.marginTop != 72 || geom.marginLeft != 72 {
+		t.Errorf("geom margins = top %v, left %v, want 72 (1in)", geom.marginTop, geom.marginLeft)
+	}
+
+	// 2. @page { size: invalid } degrades without panic or corrupting size
+	sheetInvalid := &css.Stylesheet{
+		Page: &css.PageStyle{Size: "not-a-valid-size-name-xyz"},
+	}
+	geom2 := applyCSSPageMargins(initGeom, []*css.Stylesheet{sheetInvalid})
+
+	if geom2.pageW != initGeom.pageW || geom2.pageH != initGeom.pageH {
+		t.Errorf("invalid size modified geometry: %vx%v", geom2.pageW, geom2.pageH)
+	}
+
+	// 3. @page { size: 4in 6in }
+	sheetCustom := &css.Stylesheet{
+		Page: &css.PageStyle{Size: "4in 6in"},
+	}
+	geom3 := applyCSSPageMargins(initGeom, []*css.Stylesheet{sheetCustom})
+
+	if geom3.pageW != 288 || geom3.pageH != 432 {
+		t.Errorf("custom size = %vx%v, want 288x432", geom3.pageW, geom3.pageH)
+	}
+}
+
+func TestHeaderFooterFontNameResolution(t *testing.T) {
+	t.Parallel()
+
+	defFont, err := pdf.DefaultFont()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	reg := pdf.NewRegistry()
+	reg.AddFont(defFont)
+
+	resolved := resolveHFFont("Liberation Sans", reg, defFont)
+	if resolved == nil {
+		t.Fatal("expected font to resolve for 'Liberation Sans'")
+	}
+
+	fallback := resolveHFFont("NonExistentFontXYZ", reg, defFont)
+	if fallback != defFont {
+		t.Errorf("expected fallback font, got %v", fallback)
+	}
 }

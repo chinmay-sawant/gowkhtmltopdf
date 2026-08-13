@@ -6,7 +6,7 @@ import (
 	"io"
 	"time"
 
-	"gowkhtmltopdf/internal/convert"
+	"gowkhtmltopdf/internal/errs"
 	"gowkhtmltopdf/internal/settings"
 )
 
@@ -14,6 +14,9 @@ import (
 // object. Image conversion has one output canvas and therefore owns exactly
 // one input object; callers must choose the source before running the job.
 var ErrMultipleInputs = errors.New("imageout: exactly one input object is required")
+
+// ErrMissingOutput reports an image request with a nil output writer.
+var ErrMissingOutput = errs.ErrMissingImageOutput
 
 // Request is the image-mode job. It does not share convert.Request so the
 // PDF union never carries image settings.
@@ -43,21 +46,6 @@ func NewRequest(
 	}
 }
 
-// FromConvertImage adapts the typed convert.ImageRequest builder.
-func FromConvertImage(req *convert.ImageRequest) *Request {
-	if req == nil {
-		return nil
-	}
-
-	return &Request{
-		Global:  req.Global,
-		Image:   req.Image,
-		Objects: []settings.PdfObject{req.Object},
-		Now:     req.Now,
-		Output:  req.Output,
-	}
-}
-
 func (r *Request) Validate() error {
 	if r == nil {
 		return errNilRequest
@@ -71,7 +59,7 @@ func (r *Request) Validate() error {
 		return fmt.Errorf("%w: got %d", ErrMultipleInputs, len(r.Objects))
 	}
 
-	if err := convert.ValidateRenderableObjects(r.Objects); err != nil {
+	if err := settings.ValidateRenderableObjects(r.Objects); err != nil {
 		return fmt.Errorf("imageout: %w", err)
 	}
 

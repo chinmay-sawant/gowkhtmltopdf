@@ -92,15 +92,6 @@ func TestModeSpecificRequestConstructors(t *testing.T) {
 	if err := pdfReq.ValidateImage(); !errors.Is(err, ErrMissingImageSettings) {
 		t.Fatalf("PDF request as image = %v, want %v", err, ErrMissingImageSettings)
 	}
-
-	imageReq := NewImageRequest(global, settings.DefaultImageGlobal(), objects, &bytes.Buffer{})
-	if err := imageReq.ValidateImage(); err != nil {
-		t.Fatalf("image request validation: %v", err)
-	}
-
-	if err := imageReq.ValidatePDF(); !errors.Is(err, ErrUnexpectedImageSettings) {
-		t.Fatalf("image request as PDF = %v, want %v", err, ErrUnexpectedImageSettings)
-	}
 }
 
 func TestPrepareDocumentBindsSharedResourceContext(t *testing.T) { //nolint:cyclop // seam binding checks many fields

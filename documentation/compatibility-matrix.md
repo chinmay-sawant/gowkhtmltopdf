@@ -108,7 +108,7 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 | Property | Status | Notes / verified by |
 |----------|--------|---------------------|
 | `border-collapse` (`collapse\|separate`) | Partial | `collapse` ≈ `border-spacing: 0` plus a collapsed grid emitter (`emitCollapsedRowGrid`); not a full CSS collapse engine |
-| `border-spacing` | Implemented | `style.go`; used by `tableSpacing` (suppressed when collapse) |
+| `border-spacing` | Implemented | `style.go`; used by `tableSpacing` (suppressed when collapse); test `TestBorderSpacing` |
 | `caption-side` | Not implemented | not consumed; captions always paint above the table |
 | `table-layout` (`auto\|fixed`) | Not implemented (auto only) | parsed (`style.go:452-455`), never consumed |
 
@@ -232,11 +232,11 @@ Status legend as in §2; evidence in `internal/css/css.go`.
 | `::before` / `::after` | Partial / Implemented | `MatchPseudo` plus generated content (`pseudo_content.go`): quoted strings and `attr()`. Host-element rules do not apply to the host |
 | `!important` | Implemented | `css.go:664-688`; separate cascade layer `style.go:221-247`; test `css_test.go::TestParseImportant` |
 | Specificity (ID > class > element), inline `style` wins, `!important` overrides | Implemented | `Specificity` `css.go:578`; inline style priority `style.go:233-239`; test `css_test.go::TestSpecificity` |
-| `@media print` / `screen` filtering | Implemented | `MediaMatches` (`css/media.go`); cascade `style.go`; convert `Media: "print"`; tests `TestParseMedia`, `TestMediaMatches*` |
+| `@media print` / `screen` filtering | Implemented | `MediaMatches` (`css/media.go`); cascade `style.go`; convert `Media: "print"` (PDF) or `"screen"` (Image); only `print` and `screen` are evaluated (all other media types and unsupported feature queries evaluate to false); tests `TestParseMedia`, `TestMediaMatches*` |
 | `@media` feature queries (`(min-width: …)`) | Partial | size features + orientation vs viewport; unknown features → false; `TestMediaMatchesSizeFeatures` |
 | `:has()` | Partial | Relative selectors inside `:has(...)`; descendant/child/sibling + simple compounds; no forgiving-selector list / complex chrome edge cases. `has.go`; fixture-41 |
 | `@container` / `container-type` | Partial | Size queries only (`inline-size`/`width` + `and`/`or`/`not`); named containers; two-pass style after used inline size. No style/scroll-state queries; no `cq*` units. `container.go`; fixture-42 |
-| `@page` | Partial | `@page { margin }` applied to page geometry (`applyCSSPageMargins`); `size` is parsed and unused |
+| `@page` | Implemented | `@page { margin }` and `@page { size }` applied to page geometry (`applyCSSPageMargins`) |
 | `@font-face` | Partial | Parsed; `MergeFontFaces` loads TTF/OTF/WOFF1 via `FetchSub` (local **and** `https://`) under the same ACL + `NetworkPolicy` on PDF and image paths. `.woff2` / `.eot` / `data:` skipped. See §5 |
 
 ## 5. Explicitly unsupported (MVP)
