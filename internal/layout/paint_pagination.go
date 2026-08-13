@@ -948,10 +948,10 @@ func stretchPaginatedChrome(res *Result) {
 		return
 	}
 
-	var walk func(*box, *box)
-	walk = func(boxNode, parent *box) {
+	var walk func(*box)
+	walk = func(boxNode *box) {
 		for _, child := range boxNode.children {
-			walk(child, boxNode)
+			walk(child)
 		}
 
 		if boxNode.opStart < 0 || boxNode.opStart > boxNode.opEnd || boxNode.opEnd >= len(res.Ops) || boxNode.height <= 0 {
@@ -964,7 +964,6 @@ func stretchPaginatedChrome(res *Result) {
 		oldBottom := boxNode.y + boxNode.height
 		contentBottom := oldBottom
 		normalizeOwnVerticalChrome(res.Ops, boxNode)
-		trackItem := parentIsFlexOrGrid(parent)
 		capAtChildBox := boxIsFloatOrFigure(boxNode)
 		for idx := boxNode.opStart; idx <= boxNode.opEnd; idx++ {
 			operation := res.Ops[idx]
@@ -980,17 +979,11 @@ func stretchPaginatedChrome(res *Result) {
 				continue
 			}
 
+			// Text/bullet Y is the baseline; H is the full line-box height.
+			// opInkBottom uses InkDescent (glyph bottom), not Y+H. Using Y+H
+			// overshoots by ~ascent and stretches side rails into the following
+			// margin (fixture-18 blockquote border-left).
 			bottom := opInkBottom(operation)
-			// Text Y is the baseline. Y+H is the line box hanging below it.
-			// Flex/grid items must not use that, or their chrome eats the
-			// following gap (fixture-32 wrap, fixture-34 dense). Other
-			// blocks still use the line box so paginated section rails
-			// reach the last line. Floated figures keep the caption
-			// border box — stretching to the line box clones side rails
-			// past the thumb and onto the next page.
-			if !trackItem && !capAtChildBox && (operation.Kind == OpText || operation.Kind == OpBullet) {
-				bottom = operation.Y + operation.H
-			}
 			if bottom > contentBottom {
 				contentBottom = bottom
 			}
@@ -1016,7 +1009,7 @@ func stretchPaginatedChrome(res *Result) {
 		}
 	}
 
-	walk(res.root, nil)
+	walk(res.root)
 }
 
 func boxIsFloatOrFigure(boxNode *box) bool {
@@ -1090,19 +1083,6 @@ func stripThumbImageHairlines(res *Result) {
 
 			break
 		}
-	}
-}
-
-func parentIsFlexOrGrid(parent *box) bool {
-	if parent == nil || parent.style == nil {
-		return false
-	}
-
-	switch parent.style.Display {
-	case displayFlex, displayInlineFlex, displayGrid, displayInlineGrid, displaySubgrid:
-		return true
-	default:
-		return false
 	}
 }
 

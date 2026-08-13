@@ -1026,8 +1026,11 @@ func TestFixture56PaginationChromeAndWidgetGeometry(t *testing.T) { //nolint:par
 			railBottom = op.Y + op.H
 		}
 	}
-	if railBottom < footer.Y+footer.H-1 {
-		t.Fatalf("D01 left rail ends at %.2f, before footer bottom %.2f", railBottom, footer.Y+footer.H)
+	// Footer Y is the baseline; visible ink ends at Y+InkDescent (not Y+H,
+	// which is baseline + full line-height and overshoots the line box).
+	footerBottom := footer.Y + opVisibleInkHeight(footer)
+	if railBottom < footerBottom-1 {
+		t.Fatalf("D01 left rail ends at %.2f, before footer ink bottom %.2f", railBottom, footerBottom)
 	}
 
 	for _, node := range fixture56Nodes(root, func(node *html.Node) bool { return fixture56Class(node) == "d02-engine" }) {
