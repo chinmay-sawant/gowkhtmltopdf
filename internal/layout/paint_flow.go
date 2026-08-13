@@ -631,6 +631,9 @@ func keepTogetherForAvoid(res *Result, boxNode *box, contentH float64) bool {
 
 // shiftImplicitUnit moves one aside and the in-section siblings after it
 // (footer, trailing copy), stopping before the next page-break-before:always.
+// Nested boxes under an already-shifted sibling only update box.y — their ops
+// were shifted with the ancestor's op range (avoids double-shifting a progress
+// bar inside a following paragraph, which collapsed its height to 0).
 func shiftImplicitUnit(res *Result, boxNode *box, dy, beforeY float64) {
 	if res == nil || boxNode == nil || dy == 0 {
 		return
@@ -640,6 +643,8 @@ func shiftImplicitUnit(res *Result, boxNode *box, dy, beforeY float64) {
 
 	fromY := boxNode.y
 	boxNode.y += dy
+
+	shiftedRoots := make([]*box, 0, 8)
 
 	for _, candidate := range flowBoxList(res) {
 		if candidate == nil || candidate == boxNode {
@@ -660,12 +665,39 @@ func shiftImplicitUnit(res *Result, boxNode *box, dy, beforeY float64) {
 			continue
 		}
 
+		if ancestor := shiftedAncestor(candidate, shiftedRoots); ancestor != nil {
+			// Ops already moved with the ancestor's opStart–opEnd range.
+			candidate.y += dy
+
+			continue
+		}
+
 		if candidate.opStart <= candidate.opEnd {
 			shiftOpsOnly(res, candidate.opStart, candidate.opEnd, dy)
 		}
 
 		candidate.y += dy
+		shiftedRoots = append(shiftedRoots, candidate)
 	}
+}
+
+// shiftedAncestor returns a previously shifted root that contains candidate.
+func shiftedAncestor(candidate *box, roots []*box) *box {
+	if candidate == nil || candidate.node == nil {
+		return nil
+	}
+
+	for _, root := range roots {
+		if root == nil || root.node == nil {
+			continue
+		}
+
+		if isDescendantNode(candidate.node, root.node) {
+			return root
+		}
+	}
+
+	return nil
 }
 
 // nextForcedBreakY is the canvas Y of the next page-break-before:always box
@@ -1690,7 +1722,9 @@ func normalizeLeadingRoundedCallouts(res *Result, contentH float64) {
 			continue
 		}
 
-		page, ok := checkedFlowPageOfY(boxNode.y, contentH)
+		// Match pageBuckets / shiftSamePageFromY: boundary-aligned Y must not
+		// fall into the previous page via float truncation.
+		page, ok := checkedFlowPageOfY(boxNode.y+layoutEpsilon, contentH)
 		if !ok {
 			continue
 		}
@@ -1709,6 +1743,12 @@ func normalizeLeadingRoundedCallouts(res *Result, contentH float64) {
 
 // shiftSamePageFromY applies deltaY to ops and boxes at or below fromY that
 // still sit on page. Later pages are left alone.
+//
+// Page membership uses Y+layoutEpsilon so a coordinate that is exactly
+// k*contentH (a forced page-break target) is not classified as the previous
+// page via float truncation. Without the bump, normalizeLeadingRoundedCallouts
+// can pull the next section's ops backward while leaving its box.y on the
+// intended page (fixture-56 domain-09 / page-14 underline).
 func shiftSamePageFromY(res *Result, fromY float64, page int, contentH, deltaY float64) {
 	if res == nil || deltaY == 0 || contentH <= 0 {
 		return
@@ -1719,7 +1759,7 @@ func shiftSamePageFromY(res *Result, fromY float64, page int, contentH, deltaY f
 			continue
 		}
 
-		opPage, ok := checkedFlowPageOfY(res.Ops[idx].Y, contentH)
+		opPage, ok := checkedFlowPageOfY(res.Ops[idx].Y+layoutEpsilon, contentH)
 		if !ok || opPage != page {
 			continue
 		}
@@ -1732,7 +1772,7 @@ func shiftSamePageFromY(res *Result, fromY float64, page int, contentH, deltaY f
 			continue
 		}
 
-		boxPage, ok := checkedFlowPageOfY(boxNode.y, contentH)
+		boxPage, ok := checkedFlowPageOfY(boxNode.y+layoutEpsilon, contentH)
 		if !ok || boxPage != page {
 			continue
 		}

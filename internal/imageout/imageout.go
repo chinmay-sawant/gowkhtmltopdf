@@ -861,14 +861,23 @@ func paintStrokeRect(img *image.NRGBA, paintOp *layout.Op, paintStyle layout.Pai
 	}
 	lineWidth := strokeWidthScale(paintStyle.StrokeWidth, pxPerPt)
 
-	if paintOp.StrokeMask == layout.StrokeMaskTop {
-		paintRoundedTopStroke(img, paintOp, col, lineWidth, pxPerPt)
+	if paintOp.StrokeMask != 0 {
+		// Partial multi-page frames: paint only the selected sides.
+		if paintOp.StrokeMask&layout.StrokeMaskTop != 0 {
+			paintRoundedTopStroke(img, paintOp, col, lineWidth, pxPerPt)
+		}
 
-		return
-	}
+		if paintOp.StrokeMask&layout.StrokeMaskBottom != 0 {
+			paintRoundedBottomStroke(img, paintOp, col, lineWidth, pxPerPt)
+		}
 
-	if paintOp.StrokeMask == layout.StrokeMaskLeft {
-		paintRoundedLeftStroke(img, paintOp, col, lineWidth, pxPerPt)
+		if paintOp.StrokeMask&layout.StrokeMaskLeft != 0 {
+			paintRoundedLeftStroke(img, paintOp, col, lineWidth, pxPerPt)
+		}
+
+		if paintOp.StrokeMask&layout.StrokeMaskRight != 0 {
+			paintRoundedRightStroke(img, paintOp, col, lineWidth, pxPerPt)
+		}
 
 		return
 	}
@@ -966,6 +975,61 @@ func paintRoundedLeftStroke(
 	points = appendArc(points, x+bottomRadius, y+h-bottomRadius, bottomRadius, 0.5*math.Pi, math.Pi)
 	points = append(points, rasterPoint{X: x, Y: y + topRadius})
 	points = appendArc(points, x+topRadius, y+topRadius, topRadius, math.Pi, 1.5*math.Pi)
+
+	paintPolyline(img, points, col, lineWidth)
+}
+
+//nolint:varnamelen,mnd // raster geometry mirrors the compact PDF path
+func paintRoundedBottomStroke(
+	img *image.NRGBA,
+	paintOp *layout.Op,
+	col color.NRGBA,
+	lineWidth int,
+	pxPerPt float64,
+) {
+	radii := scaledRadii(paintOp, pxPerPt)
+	x := paintOp.X * pxPerPt
+	y := paintOp.Y * pxPerPt
+	w := paintOp.W * pxPerPt
+	h := paintOp.H * pxPerPt
+	strokeInset := float64(lineWidth) / boxFilterFactor2
+	leftRadius := max(radii[3]-strokeInset, 0)
+	rightRadius := max(radii[2]-strokeInset, 0)
+	bottomY := y + h
+
+	points := make([]rasterPoint, 0, roundedArcSteps*2+3) //nolint:mnd // two arcs plus their joins
+	points = append(points, rasterPoint{X: x, Y: bottomY - leftRadius})
+	points = appendArc(points, x+leftRadius, bottomY-leftRadius, leftRadius, math.Pi, 0.5*math.Pi)
+	points = append(points, rasterPoint{X: x + w - rightRadius, Y: bottomY})
+	points = appendArc(points, x+w-rightRadius, bottomY-rightRadius, rightRadius, 0.5*math.Pi, 0)
+	points = append(points, rasterPoint{X: x + w, Y: bottomY - rightRadius})
+
+	paintPolyline(img, points, col, lineWidth)
+}
+
+//nolint:varnamelen,mnd // raster geometry mirrors the compact PDF path
+func paintRoundedRightStroke(
+	img *image.NRGBA,
+	paintOp *layout.Op,
+	col color.NRGBA,
+	lineWidth int,
+	pxPerPt float64,
+) {
+	radii := scaledRadii(paintOp, pxPerPt)
+	x := paintOp.X * pxPerPt
+	y := paintOp.Y * pxPerPt
+	w := paintOp.W * pxPerPt
+	h := paintOp.H * pxPerPt
+	strokeInset := float64(lineWidth) / boxFilterFactor2
+	rightX := x + w - strokeInset
+	topRadius := max(radii[1]-strokeInset, 0)
+	bottomRadius := max(radii[2]-strokeInset, 0)
+
+	points := make([]rasterPoint, 0, roundedArcSteps*2+3) //nolint:mnd // two arcs plus their joins
+	points = append(points, rasterPoint{X: rightX - topRadius, Y: y})
+	points = appendArc(points, rightX-topRadius, y+topRadius, topRadius, 1.5*math.Pi, 2*math.Pi)
+	points = append(points, rasterPoint{X: rightX, Y: y + h - bottomRadius})
+	points = appendArc(points, rightX-bottomRadius, y+h-bottomRadius, bottomRadius, 0, 0.5*math.Pi)
 
 	paintPolyline(img, points, col, lineWidth)
 }

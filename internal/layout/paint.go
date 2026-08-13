@@ -823,7 +823,7 @@ func drawFill(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintO
 	c.Fill()
 }
 
-//nolint:varnamelen,wsl // PDF path helpers use compact graphics-state names
+//nolint:varnamelen,wsl,cyclop // PDF path helpers use compact graphics-state names
 func drawStroke(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintOptions, pageH float64) {
 	x, y := canvasToPDF(op.X, op.Y+op.H, pageIdx, contentH, opts, pageH)
 	c.SetStrokeColor(op.R, op.G, op.B)
@@ -832,21 +832,36 @@ func drawStroke(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts Pain
 		width = 1
 	}
 	c.SetLineWidth(width)
-	if op.StrokeMask == StrokeMaskTop {
-		c.SetLineCap(1)
-		roundedTopPath(c, x, y, op.W, op.H, width, opRadii(op))
-		c.Stroke()
-		c.SetLineCap(0)
-
-		return
-	}
-	if op.StrokeMask == StrokeMaskLeft {
-		if opHasRoundedCorners(op) {
+	if op.StrokeMask != 0 {
+		// Partial / open multi-page frames: paint each selected side.
+		if op.StrokeMask&StrokeMaskTop != 0 {
 			c.SetLineCap(1)
+			roundedTopPath(c, x, y, op.W, op.H, width, opRadii(op))
+			c.Stroke()
+			c.SetLineCap(0)
 		}
-		roundedLeftPath(c, x, y, op.H, width, opRadii(op))
-		c.Stroke()
-		c.SetLineCap(0)
+		if op.StrokeMask&StrokeMaskBottom != 0 {
+			c.SetLineCap(1)
+			roundedBottomPath(c, x, y, op.W, width, opRadii(op))
+			c.Stroke()
+			c.SetLineCap(0)
+		}
+		if op.StrokeMask&StrokeMaskLeft != 0 {
+			if opHasRoundedCorners(op) {
+				c.SetLineCap(1)
+			}
+			roundedLeftPath(c, x, y, op.H, width, opRadii(op))
+			c.Stroke()
+			c.SetLineCap(0)
+		}
+		if op.StrokeMask&StrokeMaskRight != 0 {
+			if opHasRoundedCorners(op) {
+				c.SetLineCap(1)
+			}
+			roundedRightPath(c, x, y, op.W, op.H, width, opRadii(op))
+			c.Stroke()
+			c.SetLineCap(0)
+		}
 
 		return
 	}
@@ -938,6 +953,85 @@ func roundedLeftPath(
 		)
 	} else {
 		c.LineTo(originX, topY)
+	}
+}
+
+// roundedBottomPath emits the bottom edge and its two corner arcs (PDF coords).
+//
+//nolint:varnamelen // PDF path builder uses conventional short receiver names
+func roundedBottomPath(
+	c *pdf.Content,
+	originX, originY, boxWidth, strokeWidth float64,
+	radii [4]float64,
+) {
+	const kappa = 0.5522847498
+
+	strokeInset := strokeWidth / 2 //nolint:mnd // half the stroke width insets the centerline radius
+	leftRadius := math.Max(radii[3]-strokeInset, 0)
+	rightRadius := math.Max(radii[2]-strokeInset, 0)
+	rightX := originX + boxWidth
+
+	if leftRadius <= 0 {
+		c.MoveTo(originX, originY)
+	} else {
+		c.MoveTo(originX, originY+leftRadius)
+		c.CurveTo(
+			originX, originY+leftRadius-kappa*leftRadius,
+			originX+leftRadius-kappa*leftRadius, originY,
+			originX+leftRadius, originY,
+		)
+	}
+
+	c.LineTo(rightX-rightRadius, originY)
+
+	if rightRadius > 0 {
+		c.CurveTo(
+			rightX-rightRadius+kappa*rightRadius, originY,
+			rightX, originY+rightRadius-kappa*rightRadius,
+			rightX, originY+rightRadius,
+		)
+	} else {
+		c.LineTo(rightX, originY)
+	}
+}
+
+// roundedRightPath emits the right edge and its two corner arcs (PDF coords).
+//
+//nolint:varnamelen // PDF path builder uses conventional geometry names
+func roundedRightPath(
+	c *pdf.Content,
+	originX, originY, boxWidth, boxHeight, strokeWidth float64,
+	radii [4]float64,
+) {
+	const kappa = 0.5522847498
+
+	strokeInset := strokeWidth / 2 //nolint:mnd // half the stroke width insets the centerline radius
+	rightX := originX + boxWidth - strokeInset
+	topRadius := math.Max(radii[1]-strokeInset, 0)
+	bottomRadius := math.Max(radii[2]-strokeInset, 0)
+	topY := originY + boxHeight
+
+	if topRadius > 0 {
+		c.MoveTo(rightX-topRadius, topY)
+		c.CurveTo(
+			rightX-topRadius+kappa*topRadius, topY,
+			rightX, topY-topRadius+kappa*topRadius,
+			rightX, topY-topRadius,
+		)
+	} else {
+		c.MoveTo(rightX, topY)
+	}
+
+	c.LineTo(rightX, originY+bottomRadius)
+
+	if bottomRadius > 0 {
+		c.CurveTo(
+			rightX, originY+bottomRadius-kappa*bottomRadius,
+			rightX-bottomRadius+kappa*bottomRadius, originY,
+			rightX-bottomRadius, originY,
+		)
+	} else {
+		c.LineTo(rightX, originY)
 	}
 }
 

@@ -475,7 +475,18 @@ func applyCascadeDeclaration(
 
 func expandBoxShorthand(prop, value string) ([4]string, bool) {
 	var values [4]string
-	if prop != marginProperty && prop != paddingProperty {
+
+	switch prop {
+	case marginProperty, paddingProperty:
+		// 1–4 space-separated sides (CSS box shorthand).
+	case "border":
+		// border: <width> <style> <color> applies the same value to every side.
+		// Expand so it competes with border-top/right/bottom/left longhands
+		// (otherwise an earlier border-top can paint after a later border).
+		values = [4]string{value, value, value, value}
+
+		return values, true
+	default:
 		return values, false
 	}
 

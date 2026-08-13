@@ -38,6 +38,41 @@ func TestCascadeShorthandRespectsSourceOrder(t *testing.T) {
 	}
 }
 
+// TestCascadeBorderShorthandOverridesEarlierBorderTop: a later border
+// shorthand must beat an earlier border-top longhand (fixture-56 domain-03
+// accent top vs .domains > section frame).
+func TestCascadeBorderShorthandOverridesEarlierBorderTop(t *testing.T) {
+	t.Parallel()
+
+	// Equal specificity (type+class): later border shorthand must win.
+	root, err := html.Parse(`<html><body><div class="domains"><section class="d03">x</section></div></body></html>`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cssSheet := sheet(t, `
+section.d03 { border-top: 3px solid #2563eb }
+.domains > section { border: 1px solid #cbd5e1; border-left: 4px solid #0f766e }
+`)
+	styles := resolveStyles(root, []*css.Stylesheet{cssSheet}, "print", testViewport, 800)
+	sec := findElementByName(root, "section")
+	sty := styles[sec]
+
+	if sty.BorderTop.Width > 1.5 {
+		t.Fatalf("border-top width = %.2f, want ≤1.5 after later border shorthand", sty.BorderTop.Width)
+	}
+
+	// #2563eb accent must not survive; #cbd5e1 frame is ~ (0.80, 0.84, 0.88).
+	if sty.BorderTop.Color[0] < 0.5 && sty.BorderTop.Color[2] > 0.85 {
+		t.Fatalf("border-top still accent blue (%.2f,%.2f,%.2f), want neutral frame",
+			sty.BorderTop.Color[0], sty.BorderTop.Color[1], sty.BorderTop.Color[2])
+	}
+
+	if sty.BorderLeft.Width < 2.5 {
+		t.Fatalf("border-left width = %.2f, want accent rail ≥2.5", sty.BorderLeft.Width)
+	}
+}
+
 func findElementByName(root *html.Node, name string) *html.Node {
 	if root.Type == html.ElementNode && root.Name == name {
 		return root
