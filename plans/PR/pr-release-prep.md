@@ -13,6 +13,55 @@ Prepares the project for release by closing the 2026-08-12/13 architecture and a
 
 ---
 
+## Markdown artifacts created on this branch
+
+Links point at the PR head (`chore/release-prep`). Short notes are what each new file is for, not a full changelog of every later edit.
+
+### Skills (agent playbooks)
+
+| File | What we did |
+|------|-------------|
+| [skills/improve-codebase/README.md](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/chore/release-prep/skills/improve-codebase/README.md) | Index for the improve-codebase pack: three lenses, slash commands, shared finding schema |
+| [skills/improve-codebase/SKILL.md](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/chore/release-prep/skills/improve-codebase/SKILL.md) | Orchestrator skill: run architecture + extension + practices, emit one phase-wise ledger, no implement unless asked |
+| [skills/improve-codebase/architecture-deepening/SKILL.md](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/chore/release-prep/skills/improve-codebase/architecture-deepening/SKILL.md) | Lens: deep modules, package DAG, ownership, shallow/leaky interfaces |
+| [skills/improve-codebase/extension-seams/SKILL.md](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/chore/release-prep/skills/improve-codebase/extension-seams/SKILL.md) | Lens: where the next honest feature goes (tables/dispatch, half-wired adapters, missing proof) |
+| [skills/improve-codebase/go-practices/SKILL.md](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/chore/release-prep/skills/improve-codebase/go-practices/SKILL.md) | Lens: errors, context, ownership cloning, tests, concurrency, public-API honesty |
+| [skills/improve-codebase/references/finding-schema.md](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/chore/release-prep/skills/improve-codebase/references/finding-schema.md) | Single finding record shape (title, location, evidence, cost, change, proof) for all three lenses |
+| [skills/improve-codebase/references/gowkhtmltopdf.md](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/chore/release-prep/skills/improve-codebase/references/gowkhtmltopdf.md) | Repo calibration: product ceiling, engine seams, closed CR/ARC rows not to re-file without regression |
+| [skills/debug-html-template/SKILL.md](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/chore/release-prep/skills/debug-html-template/SKILL.md) | Visual HTML→PDF debug: diagnose CSS/measure vs paint, table fixes, prefer template CSS for look-only gaps |
+
+### Review ledgers and reports (2026-08-12 / 2026-08-13)
+
+| File | What we did |
+|------|-------------|
+| [reports/critical-golang-architecture-review.md](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/chore/release-prep/reports/critical-golang-architecture-review.md) | Published critical Go architecture report (weighted matrix, score **8.6/10**, remediation summary) |
+| [plans/reviews/improve-codebase/critical-go-review-2026-08-12/critical-golang-architecture-review.md](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/chore/release-prep/plans/reviews/improve-codebase/critical-go-review-2026-08-12/critical-golang-architecture-review.md) | Dated critical-go narrative for CR wave (**8.8/10** after remediation; output/API contracts restored) |
+| [plans/reviews/improve-codebase/critical-go-review-2026-08-12/phase-wise-checklist.md](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/chore/release-prep/plans/reviews/improve-codebase/critical-go-review-2026-08-12/phase-wise-checklist.md) | **CR-01…CR-08** closed execution ledger (stdout multiplex, islands, validation, cancellation, fonts, writer ownership, …) |
+| [plans/reviews/improve-codebase/critical-golang-architecture-review-2026-08-12/phase-wise-checklist.md](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/chore/release-prep/plans/reviews/improve-codebase/critical-golang-architecture-review-2026-08-12/phase-wise-checklist.md) | Completed architecture checklist tied to the published report (API builders, typed options, all rows closed with proof) |
+| [plans/reviews/improve-codebase/critical-golang-architecture-review-2026-08-12/architecture-extension-findings-phase-wise-checklist.md](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/chore/release-prep/plans/reviews/improve-codebase/critical-golang-architecture-review-2026-08-12/architecture-extension-findings-phase-wise-checklist.md) | Architecture/extension findings checklist from the same wave (seams, ownership, extension honesty) |
+| [plans/reviews/improve-codebase/application-review-2026-08-12/app-review.md](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/chore/release-prep/plans/reviews/improve-codebase/application-review-2026-08-12/app-review.md) | Application 10/10 phase checklist (same-day baseline ~**7.4/10**; later superseded for rating) |
+| [plans/reviews/improve-codebase/codebase-review-2026-08-12/README.md](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/chore/release-prep/plans/reviews/improve-codebase/codebase-review-2026-08-12/README.md) | Index for the independent 3-lens codebase-health review (score after wave **8.8/10**) |
+| [plans/reviews/improve-codebase/codebase-review-2026-08-12/phase-wise-checklist.md](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/chore/release-prep/plans/reviews/improve-codebase/codebase-review-2026-08-12/phase-wise-checklist.md) | Codebase-health ledger closed 2026-08-12 (API/seams, render, security/release; ConvertTo, Restricted dial, oracles, …) |
+| [plans/reviews/improve-codebase/codebase-2026-08-13/phase-wise-checklist.md](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/chore/release-prep/plans/reviews/improve-codebase/codebase-2026-08-13/phase-wise-checklist.md) | **2026-08-13** improve-codebase wave ledger (architecture + extension + practices); **closed** with verification on this branch |
+| [plans/PR/pr-release-prep.md](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/chore/release-prep/plans/PR/pr-release-prep.md) | This PR description (template-filled body for `#36`) |
+
+### User documentation (new file)
+
+| File | What we did |
+|------|-------------|
+| [documentation/performance.md](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/chore/release-prep/documentation/performance.md) | New performance guide: historical tables labeled as snapshots; points operators at current Snapshot D benchmarks under `testdata/golden/benchmarks/` |
+
+### Also heavily rewritten (not new files)
+
+These existed before the branch but were substantially updated in the docs rewrite and should be read with the new set above:
+
+- [README.md](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/chore/release-prep/README.md) — slim landing + quick start + doc index  
+- [documentation/README.md](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/chore/release-prep/documentation/README.md), [overview.md](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/chore/release-prep/documentation/overview.md), [getting-started.md](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/chore/release-prep/documentation/getting-started.md), [cli.md](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/chore/release-prep/documentation/cli.md), [library-api.md](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/chore/release-prep/documentation/library-api.md), [architecture.md](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/chore/release-prep/documentation/architecture.md), [fonts.md](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/chore/release-prep/documentation/fonts.md), [samples.md](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/chore/release-prep/documentation/samples.md), [compatibility-matrix.md](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/chore/release-prep/documentation/compatibility-matrix.md), [THREAT-MODEL.md](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/chore/release-prep/documentation/THREAT-MODEL.md), [fidelity.md](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/chore/release-prep/documentation/fidelity.md), [deferred.md](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/chore/release-prep/documentation/deferred.md), [integration-security.md](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/chore/release-prep/documentation/integration-security.md)  
+- Architecture deep-dives under [documentation/architecture/](https://github.com/chinmay-sawant/gowkhtmltopdf/tree/chore/release-prep/documentation/architecture)  
+- [plans/reviews/improve-codebase/README.md](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/chore/release-prep/plans/reviews/improve-codebase/README.md) — review index / canonical-ledger policy  
+
+---
+
 ## Changes
 
 ### Critical contracts and conversion architecture
