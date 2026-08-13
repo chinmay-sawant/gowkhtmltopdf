@@ -791,8 +791,39 @@ footer {
   color: var(--muted);
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 16px;
   flex-wrap: wrap;
+}
+
+.footer-name {
+  color: var(--ink-2);
+}
+
+.footer-built {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.footer-built a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ink-2);
+  text-decoration: none;
+}
+
+.footer-built a:hover {
+  color: var(--accent);
+}
+
+.footer-built svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  fill: currentColor;
 }
 
 .site-nav {
@@ -2524,6 +2555,107 @@ html[data-theme='dark'] .cardbox-btn.primary {
 
 .bench-section .lede {
   margin-bottom: 22px;
+}
+
+.bench-matrix {
+  border-radius: 12px;
+}
+
+.bench-matrix table {
+  width: 100%;
+  min-width: 860px;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--surface);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.bench-matrix th,
+.bench-matrix td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.bench-matrix thead th {
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.bench-matrix thead tr:first-child th[colspan] {
+  text-align: center;
+  border-bottom: 0;
+  padding-bottom: 2px;
+}
+
+.bench-matrix thead tr:last-child th {
+  padding-top: 2px;
+}
+
+.bench-matrix thead tr:first-child th:not(:first-child),
+.bench-matrix thead tr:last-child th:not(:first-child),
+.bench-matrix td {
+  border-left: 1px solid var(--line);
+}
+
+.bench-matrix th[scope='col']:first-child,
+.bench-matrix th[scope='row'] {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  text-align: left;
+  background: var(--surface-2);
+  border-left: 0;
+}
+
+.bench-matrix th[scope='row'] {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.bench-matrix tbody tr:last-child th,
+.bench-matrix tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.bench-matrix tbody tr:hover th,
+.bench-matrix tbody tr:hover td {
+  background: var(--surface-2);
+}
+
+.bench-speedup {
+  display: inline-block;
+  min-width: 4.4em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-weight: 600;
+  text-align: center;
+}
+
+.bench-rss {
+  font-size: 11px;
+}
+
+.bench-rss-better {
+  color: var(--accent-strong);
+}
+
+.bench-rss-worse {
+  color: var(--muted);
+}
+
+.bench-rss-even {
+  color: var(--muted);
 }
 
 .bench-section + .callout {

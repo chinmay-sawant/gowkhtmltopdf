@@ -9,11 +9,11 @@ import {
   INPROC_TEMPLATE_GENERIC,
   INPROC_WEB_FETCH,
   SNAPSHOT,
-  formatBytes,
   formatKiB,
   formatMs,
   formatRssDelta,
   formatSpeedup,
+  rssDelta,
   speedup,
 } from '../data/benchmarks'
 
@@ -55,37 +55,63 @@ function CompareChart() {
   )
 }
 
+function formatPdfSize(n) {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)} MB`
+  return `${(n / 1000).toFixed(1)} KB`
+}
+
+function rssTone(row) {
+  const delta = rssDelta(row)
+  if (Math.abs(delta) < 0.02) return 'even'
+  return delta > 0 ? 'better' : 'worse'
+}
+
 function CompareTable() {
   return (
-    <div className="table-scroll">
+    <div className="table-scroll bench-matrix">
       <table>
         <thead>
           <tr>
-            <th>Pages</th>
-            <th>gowk time</th>
-            <th>wkhtml time</th>
-            <th>Speedup</th>
-            <th>gowk RSS</th>
-            <th>wkhtml RSS</th>
-            <th>Memory</th>
-            <th>gowk PDF</th>
-            <th>wkhtml PDF</th>
+            <th rowSpan={2} scope="col">
+              Pages
+            </th>
+            <th colSpan={3} scope="colgroup">
+              Wall time
+            </th>
+            <th colSpan={3} scope="colgroup">
+              Peak RSS
+            </th>
+            <th colSpan={2} scope="colgroup">
+              PDF size
+            </th>
+          </tr>
+          <tr>
+            <th scope="col">gowk</th>
+            <th scope="col">wkhtml</th>
+            <th scope="col">Speedup</th>
+            <th scope="col">gowk</th>
+            <th scope="col">wkhtml</th>
+            <th scope="col">vs wkhtml</th>
+            <th scope="col">gowk</th>
+            <th scope="col">wkhtml</th>
           </tr>
         </thead>
         <tbody>
           {CLI_ROWS.map((row) => (
             <tr key={row.pages}>
-              <td>{row.pages}</td>
+              <th scope="row">{row.pages}</th>
               <td>{formatMs(row.gowkMs)}</td>
               <td>{formatMs(row.wkMs)}</td>
               <td>
-                <strong>{formatSpeedup(speedup(row))}</strong>
+                <span className="bench-speedup">{formatSpeedup(speedup(row))}</span>
               </td>
               <td>{formatKiB(row.gowkRss)}</td>
               <td>{formatKiB(row.wkRss)}</td>
-              <td>{formatRssDelta(row)}</td>
-              <td>{formatBytes(row.gowkBytes)}</td>
-              <td>{formatBytes(row.wkBytes)}</td>
+              <td>
+                <span className={`bench-rss bench-rss-${rssTone(row)}`}>{formatRssDelta(row)}</span>
+              </td>
+              <td>{formatPdfSize(row.gowkBytes)}</td>
+              <td>{formatPdfSize(row.wkBytes)}</td>
             </tr>
           ))}
         </tbody>
