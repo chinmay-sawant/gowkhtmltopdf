@@ -19,8 +19,8 @@ func TestPdfGlobalOptionsBuildsIndependentTypedSnapshot(t *testing.T) {
 		WithCopies(2, false)
 
 	got := options.Build()
-	if got.PageSize != pageSize || got.Size.PageSize != pageSize {
-		t.Fatalf("page size = %q/%q, want Letter/Letter", got.PageSize, got.Size.PageSize)
+	if got.PageSize != pageSize {
+		t.Fatalf("page size = %q, want Letter", got.PageSize)
 	}
 	if got.Margin.Top != 1 || got.Margin.Right != 2 ||
 		got.Margin.Bottom != 3 || got.Margin.Left != 4 {
@@ -28,5 +28,24 @@ func TestPdfGlobalOptionsBuildsIndependentTypedSnapshot(t *testing.T) {
 	}
 	if got.Title != "typed" || got.Copies != 2 || got.Collate {
 		t.Fatalf("options = %#v", got)
+	}
+}
+
+func TestPdfGlobalOptionsWithSettingCoversCompatibilityKeys(t *testing.T) {
+	t.Parallel()
+
+	options, err := settings.NewPdfGlobalOptions().
+		WithSetting("size.width", "210mm")
+	if err != nil {
+		t.Fatalf("WithSetting(size.width): %v", err)
+	}
+
+	got := options.Build()
+	if got.Size.Width != 210 {
+		t.Fatalf("size.width = %v, want 210mm", got.Size.Width)
+	}
+
+	if _, err := options.WithSetting("not-a-setting", "value"); err == nil {
+		t.Fatal("unknown WithSetting key unexpectedly succeeded")
 	}
 }

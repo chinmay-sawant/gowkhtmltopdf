@@ -13,62 +13,105 @@ import (
 	"gowkhtmltopdf/internal/settings"
 )
 
-// applyCSSPageMargins applies the unnamed @page margin shorthand to the PDF
-// viewport after stylesheets have been loaded. CSS page margins describe the
-// printable page box, so they must be resolved before body layout rather than
-// cascaded as ordinary element padding.
+// applyCSSPageMargins applies the unnamed @page margin shorthand and size to
+// the PDF viewport after stylesheets have been loaded. CSS page box properties
+// describe the printable page box, so they must be resolved before body layout
+// rather than cascaded as ordinary element padding.
 //
-//nolint:cyclop,wsl,varnamelen,mnd // compact CSS shorthand expansion
+//nolint:cyclop,wsl,varnamelen,mnd,gocognit,nestif,gocyclo,funlen // compact CSS shorthand expansion
 func applyCSSPageMargins(geom hfGeom, sheets []*css.Stylesheet) hfGeom {
-	var raw string
+	var rawMargin, rawSize string
 
 	for _, sheet := range sheets {
-		if sheet != nil && sheet.Page != nil && strings.TrimSpace(sheet.Page.Margin) != "" {
-			raw = sheet.Page.Margin
+		if sheet != nil && sheet.Page != nil {
+			if strings.TrimSpace(sheet.Page.Margin) != "" {
+				rawMargin = sheet.Page.Margin
+			}
+
+			if strings.TrimSpace(sheet.Page.Size) != "" {
+				rawSize = sheet.Page.Size
+			}
 		}
 	}
 
-	if raw == "" {
-		return geom
-	}
-
-	parts := strings.Fields(raw)
-	if len(parts) < 1 || len(parts) > 4 {
-		return geom
-	}
-
-	vals := make([]float64, len(parts))
-	for idx, part := range parts {
-		value, unit, ok := css.ParseLength(part)
-		if !ok {
-			return geom
+	if rawSize != "" {
+		parts := strings.Fields(rawSize)
+		switch len(parts) {
+		case 1:
+			if w, h, err := settings.ParsePageSize(parts[0]); err == nil && w > 0 && h > 0 {
+				geom.pageW = w
+				geom.pageH = h
+			}
+		case 2:
+			if w, h, err := settings.ParsePageSize(parts[0]); err == nil && w > 0 && h > 0 {
+				if strings.EqualFold(parts[1], "landscape") {
+					geom.pageW = h
+					geom.pageH = w
+				} else {
+					geom.pageW = w
+					geom.pageH = h
+				}
+			} else {
+				v1, u1, ok1 := css.ParseLength(parts[0])
+				v2, u2, ok2 := css.ParseLength(parts[1])
+				if ok1 && ok2 {
+					pt1, okPt1 := css.LengthToPt(v1, u1, 12)
+					pt2, okPt2 := css.LengthToPt(v2, u2, 12)
+					if okPt1 && okPt2 && pt1 > 0 && pt2 > 0 {
+						geom.pageW = pt1
+						geom.pageH = pt2
+					}
+				}
+			}
 		}
+	}
 
-		pt, ok := css.LengthToPt(value, unit, 12)
-		if !ok || pt < 0 {
-			return geom
+	if rawMargin != "" {
+		parts := strings.Fields(rawMargin)
+		if len(parts) >= 1 && len(parts) <= 4 {
+			vals := make([]float64, len(parts))
+			valid := true
+
+			for idx, part := range parts {
+				value, unit, ok := css.ParseLength(part)
+				if !ok {
+					valid = false
+
+					break
+				}
+
+				pt, ok := css.LengthToPt(value, unit, 12)
+				if !ok || pt < 0 {
+					valid = false
+
+					break
+				}
+
+				vals[idx] = pt
+			}
+
+			if valid {
+				var top, right, bottom, left float64
+				switch len(vals) {
+				case 1:
+					top, right, bottom, left = vals[0], vals[0], vals[0], vals[0]
+				case 2:
+					top, bottom = vals[0], vals[0]
+					right, left = vals[1], vals[1]
+				case 3:
+					top, right, left, bottom = vals[0], vals[1], vals[1], vals[2]
+				case 4:
+					top, right, left, bottom = vals[0], vals[1], vals[2], vals[3]
+				}
+
+				geom.marginTop = top
+				geom.marginRight = right
+				geom.marginBottom = bottom
+				geom.marginLeft = left
+			}
 		}
-
-		vals[idx] = pt
 	}
 
-	var top, right, bottom, left float64
-	switch len(vals) {
-	case 1:
-		top, right, bottom, left = vals[0], vals[0], vals[0], vals[0]
-	case 2:
-		top, bottom = vals[0], vals[0]
-		right, left = vals[1], vals[1]
-	case 3:
-		top, right, left, bottom = vals[0], vals[1], vals[1], vals[2]
-	case 4:
-		top, right, bottom, left = vals[0], vals[1], vals[2], vals[3]
-	}
-
-	geom.marginTop = top
-	geom.marginRight = right
-	geom.marginBottom = bottom
-	geom.marginLeft = left
 	geom.recomputeContent()
 
 	return geom
@@ -99,7 +142,7 @@ func measuredWidth(res *layout.Result) float64 {
 }
 
 // pageGeometry resolves the page size in points from the single size model:
-// Size.Width/Height (mm) override a named PageSize / Size.PageSize.
+// Size.Width/Height (mm) override a named PageSize.
 // Landscape swaps the pair. Legacy PageWidth/PageHeight fields are gone.
 func pageGeometry(glob settings.PdfGlobal) (float64, float64, error) {
 	var width, height float64
@@ -108,9 +151,6 @@ func pageGeometry(glob settings.PdfGlobal) (float64, float64, error) {
 		width, height = glob.Size.Width*mmToPt, glob.Size.Height*mmToPt
 	} else {
 		name := glob.PageSize
-		if name == "" {
-			name = glob.Size.PageSize
-		}
 
 		var err error
 
@@ -127,21 +167,9 @@ func pageGeometry(glob settings.PdfGlobal) (float64, float64, error) {
 	return width, height, nil
 }
 
-// mediaFor resolves layout CSS media for PDF mode via settings.ResolveMedia.
-// Object media lives on Load (CLI --media-type / print-media-type object flags);
-// it is projected onto a temporary Web for the shared resolver. PDF default is "print".
+// mediaFor resolves layout CSS media for PDF mode via settings.ResolvePDFMedia.
 func mediaFor(glob settings.PdfGlobal, obj *settings.PdfObject) string {
-	var objWeb *settings.Web
-
-	if obj != nil {
-		w := settings.Web{ //nolint:exhaustruct // intentional zero-value fields
-			PrintMediaType: obj.Load.PrintMediaType,
-			MediaType:      obj.Load.MediaType,
-		}
-		objWeb = &w
-	}
-
-	return settings.ResolveMedia(mediaPrint, glob.Web, objWeb)
+	return settings.ResolvePDFMedia(glob, obj)
 }
 
 // DefaultTOCXSL returns the default TOC stylesheet. In pure Go the default
@@ -206,21 +234,19 @@ func resolveRelativeLinkURI(op layout.Op, base *url.URL) (string, bool) {
 // loadFontRegistry builds the opt-in font registry from --font-path and
 // optional --use-system-fonts. Returns nil when nothing was configured.
 func loadFontRegistry(glob settings.PdfGlobal, log io.Writer) *pdf.Registry {
-	var dirs []string
-
-	dirs = append(dirs, glob.FontPaths...)
-	if glob.UseSystemFonts {
-		dirs = append(dirs, pdf.DefaultSystemFontDirs()...)
-	}
-
-	if len(dirs) == 0 {
+	if len(glob.FontPaths) == 0 && !glob.UseSystemFonts {
 		return nil
 	}
 
-	reg := pdf.ScanFontDirs(dirs)
+	reg := pdf.RegistryFromPaths(glob.FontPaths, glob.UseSystemFonts)
 
 	if log != nil && log != io.Discard && !glob.Quiet {
-		line.Emit(log, line.Info, "scanned %d font path(s)", len(dirs))
+		count := len(glob.FontPaths)
+		if glob.UseSystemFonts {
+			count += len(pdf.DefaultSystemFontDirs())
+		}
+
+		line.Emit(log, line.Info, "scanned %d font path(s)", count)
 	}
 
 	return reg

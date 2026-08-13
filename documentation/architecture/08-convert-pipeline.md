@@ -25,10 +25,9 @@ internal/load (fetch) → internal/html (parse) → internal/css (style)
 Position in the module graph:
 
 - **Above it:** `api.go` (library `Converter`) and `internal/app` (CLI
-  adapter) call `convert.Run` / `convert.RunTypedPDF` /
-  `convert.RunPDFContext` with a fully-built `Request`. The CLI parser
-  (`internal/cli`) produces a `cli.Command`; `convert` adapts it via
-  `RunPDFContext` (convert.go:203).
+  adapters) call `convert.Run` / `convert.RunTypedPDF` with a fully-built
+  `Request`. The CLI parser (`internal/cli`) produces a `cli.Command`; app
+  adapters perform the translation.
 - **Below it:** `internal/layout`, `internal/css`, `internal/html`,
   `internal/load`, `internal/pdf`, `internal/line`, `internal/outline`,
   `internal/settings` — all leaf/support packages that `convert` composes.
@@ -63,7 +62,7 @@ test files where listed.
 | File | Responsibility | Lines |
 |------|----------------|-------|
 | `request.go` | Type-safe `PDFRequest` / `ImageRequest` API, `ToRequest` adapters, `RunTypedPDF` | 76 |
-| `convert.go` | `Request` union type, limits, `Validate[PDF|Image]`, `Run`, `RunPDFContext`, `renderObject`, `runContext`, smart-shrink | 616 |
+| `convert.go` | `Request` union type, limits, `Validate[PDF|Image]`, `Run`, `renderObject`, `runContext`, smart-shrink | 616 |
 | `convert_helpers.go` | Page geometry (`pageGeometry`), CSS @page margin override, media resolve, link URI resolution, `loadFontRegistry`, `DefaultTOCXSL` | 227 |
 | `prepare.go` | Thin aliases re-exporting the `internal/convert/prepare` seam (`PrepareDocument`, `CollectSheets`, `MergeFontFaces`) | 57 |
 | `simplify.go` | Aliases for the DOM-simplification profiles (`AppendSimplifySheet`, `SimplifyDOMEnabled/Profile`) | 26 |
@@ -136,11 +135,10 @@ small `Location` projection).
 | `type Request struct` | convert.go:51 | The neutral pipeline input: `Global settings.PdfGlobal`, optional `Image *settings.ImageGlobal`, `Objects []settings.PdfObject`, `Now func() time.Time`, `Output io.Writer`, `OutlineOutput io.Writer`. Independent of the CLI parser; both `api.go` and `internal/app` build it. |
 | `type PDFRequest` / `type ImageRequest` | request.go:10 / request.go:37 | Type-safe, compile-time-checked mode-specific API. `ToRequest()` projects into the shared `Request` union. |
 | `func NewPDFRequest(...)` / `func NewImageRequest(...)` | convert.go:114 / convert.go:125 | Constructors for the union; image settings are copied so the request owns its snapshot. |
-| `func (r *Request) Validate()` | convert.go:137 | Explicit output-sink contract before any loading; canonical PageSize mirror (`PageSize` ↔ `Size.PageSize`); object/copies limits; DumpOutline requires `OutlineOutput`. |
+| `func (r *Request) Validate()` | convert.go:137 | Explicit output-sink contract before any loading; canonical `PageSize`; object/copies limits; DumpOutline requires `OutlineOutput`. |
 | `func (r *Request) ValidatePDF()` / `ValidateImage()` | convert.go:172 / 182 | Mode invariants: PDF rejects non-nil `Image` (`ErrUnexpectedImageSettings`); image requires a non-nil `Image`. |
 | `func Run(ctx, req, log, progress)` | convert.go:310 | Full pipeline entry for callers with a writer: validate → loader → font/registry → `runContext` → `render.Run(ctx, &pdfPipeline{run})`. |
-| `func RunPDFContext(ctx, cmd, log, progress)` | convert.go:203 | CLI adapter: builds `Request` from `cli.Command`, opens/closes the output path (or stdout), ORs legacy `cmd.DumpOutline`. |
-| `func RunPDF(cmd, log)` | convert.go:196 | Background-context convenience wrapper around `RunPDFContext`. |
+| `func app.RunPDF(ctx, cmd, log, progress, outline)` | app/pdf.go | Application-boundary CLI adapter: validates before opening output, builds `Request`, owns document/outline sinks, and calls `convert.Run`. |
 | `func RunTypedPDF(ctx, req, log, progress)` | request.go:74 | Library entry from `api.go` for `PDFRequest`. |
 
 ### 3.2 Execution state
@@ -266,8 +264,9 @@ cmd/gowkhtmltopdf/main.go
      └─ convert.Run(ctx, req, log, progress)
 ```
 
-`RunPDFContext` (convert.go:203) exists for callers that still hold a
-`cli.Command` and want the open/close handling inside `convert`.
+`app.RunPDF` (internal/app/pdf.go) is the command adapter for callers that
+hold a `cli.Command`; it owns validation and open/close handling before calling
+the CLI-independent `convert.Run` seam.
 
 ### 4.3 Image-mode divergence
 
@@ -296,8 +295,9 @@ this boundary.
 Import graph observed in the package (excluding tests):
 
 ```text
-internal/convert ─┬─ internal/cli        (RunPDFContext adapter: cli.Command → Request)
-                  ├─ internal/convert/prepare   (load/parse/style/font phase)
+internal/app ─────┬─ internal/cli        (Command → Request adapters)
+                  └─ internal/convert
+internal/convert ─┬─ internal/convert/prepare   (load/parse/style/font phase)
                   ├─ internal/convert/render    (lifecycle driver + page-index model)
                   ├─ internal/convert/islands   (certified benchmark islands)
                   ├─ internal/css      (stylesheets, @page margins, selectors for outline Exclude)
@@ -387,12 +387,14 @@ Who depends on `convert` (i.e. the callers above the seam):
    convert/prepare.go for compatibility) is the seam that keeps fidelity
    consistent.
 
-8. **Certified island rendering is a deliberate, narrow optimization.** Only
-   the repository's generated benchmark report fixture (comment marker +
-   title + `section.benchmark-page` body, islands/plan.go:27) takes the
-   per-section path. Everything else fails closed onto the complete-document
-   layout path. `debug.FreeOSMemory()` every 4 islands and a shared
-   `layout.Workspace` bound peak memory for the 500-page report.
+8. **Certified island rendering is an explicit, narrow benchmark optimization.**
+   Ordinary requests never select the per-section path from document prose.
+   Only the internal `NewBenchmarkPDFRequest` opts into recognition of the
+   generated report fixture (comment marker + title + `section.benchmark-page`
+   body, `islands/plan.go`). Everything else stays on the complete-document
+   layout path. The benchmark path clones a parent-consistent virtual tree;
+   `debug.FreeOSMemory()` every 4 islands and a shared `layout.Workspace` bound
+   peak memory for that explicitly owned workload.
 
 9. **`internal/outline` stays pure.** It computes trees/XML/lookups but never
    touches PDF coordinates or page refs; `emitOutline` and `hfGeom.pdfXY`
@@ -461,7 +463,7 @@ constructs, but it is the enforcement point for several security rules:
   `fetchFontFace`; HF images via `state.imagesFn` gated by
   `req.Global.Web.Images`, returning `errImagesDisabled`).
 - **Output sinks are caller-supplied writers.** `convert` never opens paths;
-  open/close stays in `internal/app` or `RunPDFContext`. This keeps the
+  open/close stays in `internal/app`. This keeps the
   engine testable and prevents path injection from settings.
 - **Dump-outline gets its own sink.** `OutlineOutput` is separate from
   `Output` so XML diagnostics cannot be interleaved into a PDF byte stream

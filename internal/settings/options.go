@@ -13,8 +13,11 @@ func NewPdfGlobalOptions() PdfGlobalOptions {
 }
 
 func (o PdfGlobalOptions) WithPageSize(pageSize string) PdfGlobalOptions {
+	if _, _, err := ParsePageSize(pageSize); err != nil {
+		panic(err)
+	}
+
 	o.global.PageSize = pageSize
-	o.global.Size.PageSize = pageSize
 
 	return o
 }
@@ -32,6 +35,10 @@ func (o PdfGlobalOptions) WithTitle(title string) PdfGlobalOptions {
 }
 
 func (o PdfGlobalOptions) WithCopies(copies int, collate bool) PdfGlobalOptions {
+	if copies < 1 {
+		panic("settings: copies must be at least one")
+	}
+
 	o.global.Copies = copies
 	o.global.Collate = collate
 
@@ -69,14 +76,23 @@ func (o PdfGlobalOptions) WithResolveRelativeLinks(enabled bool) PdfGlobalOption
 	return o
 }
 
-// Build returns an independent settings snapshot.
-func (o PdfGlobalOptions) Build() PdfGlobal {
-	result := o.global
-	result.ExcludeFromOutline = append([]string(nil), o.global.ExcludeFromOutline...)
-	result.FontPaths = append([]string(nil), o.global.FontPaths...)
-	result.Ignored = cloneStringMap(o.global.Ignored)
+// WithSetting applies any supported dotted setting while retaining the value
+// builder's independent-snapshot semantics. Common settings should use the
+// typed With* methods; this escape hatch keeps the full wkhtmltopdf-compatible
+// key surface available without requiring a second builder type.
+func (o PdfGlobalOptions) WithSetting(name, value string) (PdfGlobalOptions, error) {
+	if err := o.global.Set(name, value); err != nil {
+		return o, err
+	}
 
-	return result
+	return o, nil
+}
+
+// Build returns an independent settings snapshot. Slices and maps on the
+// builder (Allow, Network*, Header/Footer.Replace, FontPaths, Ignored, …)
+// are cloned so later WithSetting / field mutations do not change the result.
+func (o PdfGlobalOptions) Build() PdfGlobal {
+	return ClonePdfGlobal(o.global)
 }
 
 func cloneStringMap(source map[string]string) map[string]string {

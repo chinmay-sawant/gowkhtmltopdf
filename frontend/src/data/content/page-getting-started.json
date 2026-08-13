@@ -5,29 +5,41 @@
   {
    "type": "hero",
    "title": "Your first PDF in five minutes",
-   "lede": "Build two static, stdlib-only binaries offline, then turn a local HTML file into a PDF with a single opt-in flag."
+   "lede": "Build two static, pure-Go binaries with no cgo or browser process, then turn a local HTML file into a PDF with a single opt-in flag."
   },
   {
    "type": "bullets",
    "heading": "Requirements",
    "items": [
-    "Go 1.26 or newer. The build is fully offline: no modules are downloaded.",
+    "Go 1.26 or newer. The first build may download the two allowlisted direct modules and their transitive Go module graph; later builds can run offline with the cache populated.",
     "No cgo and no native libraries. Build with CGO_ENABLED=0 to get statically linked ELF/Mach-O binaries with no runtime library requirements.",
     "No browser, WebKit, or third-party HTML-to-PDF service. The whole pipeline (load, parse, style, layout, paint, PDF write) is implemented in this repository.",
-    "The only direct third-party dependency is github.com/go-text/typesetting for OpenType shaping; everything else is the Go standard library."
+    "The two allowlisted direct pure-Go modules are github.com/go-text/typesetting for OpenType shaping and github.com/tdewolff/canvas for SVG rasterization; there is no browser or native converter dependency."
    ]
   },
   {
    "type": "code",
    "heading": "Build",
    "language": "sh",
-   "code": "# both static binaries, no cgo anywhere in the graph\nCGO_ENABLED=0 go build -o bin/gowkhtmltopdf ./cmd/gowkhtmltopdf\nCGO_ENABLED=0 go build -o bin/gowkhtmltoimage ./cmd/gowkhtmltoimage\n\n# or with the Makefile (builds both into bin/)\nmake build\n\n# version stamp: VERSION (currently 0.1.0) is the single source of truth.\n# An unstamped build reports the 0.1.0-dev fallback.\nCGO_ENABLED=0 go build -ldflags \"-X gowkhtmltopdf/internal/cli.Version=$(cat VERSION)\" \\\n  -o bin/gowkhtmltopdf ./cmd/gowkhtmltopdf\n\n./bin/gowkhtmltopdf --version   # Name: gowkhtmltopdf / Version: 0.1.0"
+   "code": "# recommended: static binaries, version stamped from VERSION\nmake build\n# writes bin/gowkhtmltopdf and bin/gowkhtmltoimage\n\n# equivalent, explicit:\nCGO_ENABLED=0 go build -ldflags \"-X gowkhtmltopdf/internal/cli.Version=$(cat VERSION)\" \\\n  -o bin/gowkhtmltopdf ./cmd/gowkhtmltopdf\nCGO_ENABLED=0 go build -ldflags \"-X gowkhtmltopdf/internal/cli.Version=$(cat VERSION)\" \\\n  -o bin/gowkhtmltoimage ./cmd/gowkhtmltoimage\n\n./bin/gowkhtmltopdf --version   # Name: gowkhtmltopdf / Version: 0.2.0\n# VERSION is the project release. LibraryVersion (0.12.7-dev) is the\n# wkhtmltopdf settings-surface id, not the release number."
+  },
+  {
+   "type": "callout",
+   "variant": "tip",
+   "title": "Prebuilt binaries",
+   "body": "Tagged releases publish static gowkhtmltopdf and gowkhtmltoimage builds for Linux, Windows, and macOS (amd64 and arm64) plus SHA256SUMS. Download from the GitHub Releases page. Ordinary CI on pull requests does not upload platform archives."
   },
   {
    "type": "code",
    "heading": "First local PDF",
    "language": "sh",
    "code": "./bin/gowkhtmltopdf --enable-local-file-access \\\n  testdata/golden/fixture-01-simple-invoice.html \\\n  /tmp/invoice.pdf"
+  },
+  {
+   "type": "code",
+   "heading": "First image",
+   "language": "sh",
+   "code": "./bin/gowkhtmltoimage --enable-local-file-access \\\n  --width 1024 \\\n  testdata/golden/fixture-01-simple-invoice.html \\\n  /tmp/invoice.png"
   },
   {
    "type": "callout",
@@ -47,13 +59,13 @@
      "heading": "PDF bytes to stdout",
      "body": "Pass - as the output path to write the raw PDF bytes to stdout instead of a file. Pair it with --quiet so progress messages do not pollute the stream.",
      "bullets": [
-      "gowkhtmltopdf --enable-local-file-access --quiet report.html report.pdf -",
+      "gowkhtmltopdf --enable-local-file-access --quiet report.html - > report.pdf",
       "The clean byte stream pipes directly into an HTTP response or a downstream tool."
      ]
     },
     {
-     "heading": "Deterministic output",
-     "body": "The pipeline is deterministic: identical input bytes produce identical PDF bytes, so outputs can be diffed in tests and cached by content hash."
+     "heading": "Repeatable output",
+     "body": "The same HTML, settings, and metadata time produce a repeatable PDF structure. Default CLI conversions use the wall clock for PDF dates and [date]/[time] placeholders, so bytes are not hash-stable unless you inject Now on the typed library API."
     }
    ]
   },
@@ -86,12 +98,24 @@
      "go test ./internal/convert/ -run 'TestGoldenCorpus' -v - walks every testdata/golden/*.html fixture and asserts PDF structure, embedded font, page envelope, and feature expectations"
     ],
     [
-     "golden-update",
-     "Reserved for the PDF writer phase; currently a placeholder target"
+     "golden-update GOLDEN_FIXTURE=... GOLDEN_APPROVE=1",
+     "Generates one explicitly approved fixture PDF under ignored testdata/golden/out/; never rewrites fixture sources"
     ],
     [
      "samples",
      "Regenerates output/: one PDF per golden fixture, a showcase TOC/header/footer/outline PDF, image PNGs, and a soft-fail live Wikipedia smoke"
+    ],
+    [
+     "bench",
+     "In-process Go benchmark matrix (PDF, template, image tiles)"
+    ],
+    [
+     "bench-cli-compare",
+     "Process-level CLI comparison against installed wkhtmltopdf"
+    ],
+    [
+     "claim-scan",
+     "Fail on forbidden over-claim phrases in user-facing docs"
     ],
     [
      "clean",

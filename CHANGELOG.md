@@ -6,6 +6,15 @@ binaries at build time (see README "Versioning").
 
 ## Unreleased
 
+### Added
+
+- **Benchmarks vs wkhtmltopdf:** re-measured the generic CLI against
+  installed wkhtmltopdf 0.12.6.1 (2026-08-14). Faster at every size
+  (16x at 2 pages, 1.6x at 500 pages). `make bench` and
+  `make bench-cli-compare` reproduce the snapshot.
+- **Site Benchmarks tab:** process-level comparison, speedup chart, and
+  in-process matrix on the documentation site.
+
 ### Fixed (print / layout)
 
 - **Long tokens / URLs:** honor `overflow-wrap` / `word-break` (with inheritance);
@@ -34,8 +43,10 @@ binaries at build time (see README "Versioning").
 
 ## 0.1.0 (2026-08-03)
 
-First MVP release: a pure-Go, stdlib-only HTML-to-PDF engine with a
-wkhtmltopdf-compatible CLI and library API.
+First MVP release: a pure-Go HTML-to-PDF engine (no cgo, no browser) with a
+wkhtmltopdf-compatible CLI and library API. Direct module dependencies are
+the allowlisted `github.com/go-text/typesetting` and `github.com/tdewolff/canvas`
+modules recorded in `go.mod`.
 
 ### Added
 

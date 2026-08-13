@@ -67,7 +67,7 @@ func TestGlyphBaselineStable(t *testing.T) {
 
 	const baseY = 55.0
 
-	ttfDrawString(img, 10, baseY, sample, sizePt, face, color.NRGBA{0, 0, 0, 255}, ptToPx, nil)
+	ttfDrawString(img, 10, baseY, sample, sizePt, 0, 0, face, color.NRGBA{0, 0, 0, 255}, ptToPx, nil)
 
 	penX := 10.0
 

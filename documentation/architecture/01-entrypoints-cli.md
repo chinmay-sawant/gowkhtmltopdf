@@ -153,7 +153,7 @@ specific-decision logic (format sniffing, crop, quality) lives in
 
 | Symbol | Location | Purpose |
 |--------|----------|---------|
-| `Version` | help.go:11 | `"0.1.0-dev"` default, intended to be stamped by `ldflags -X` |
+| `Version` | help.go:15 | Default `"0.1.0"` (matches `VERSION`). `make build` stamps `-X gowkhtmltopdf/internal/cli.Version=$(cat VERSION)` |
 | `PrintHelp` | help.go:14 | Name/synopsis/object-grammar/description + mode-filtered `--flag` list + cross-link to the compatibility matrix |
 | `PrintVersion` / `PrintLicense` | help.go:41 / 46 | Version banner; MIT + wkhtmltopdf attribution banner |
 | `flagList(mode)` | help.go:60 | Sorts `flagTable` names, filters by `Mode`, renders `<value>` suffix for non-bools |
@@ -208,10 +208,11 @@ $ gowkhtmltoimage --width 800 --crop-x 0 page.html out.png
 (`--width`, `crop-x` …) into `Command.Image`. `app.RunImage`
 (internal/app/image.go:24) validates a discard-sink
 `convert.NewImageRequest(cmd.Global, cmd.Image, cmd.Objects, io.Discard)`,
-checks `hasImageInput`, then delegates to `imageout.Run(ctx, cmd, log)`
+then owns output opening and delegates to `imageout.RunRequest`
 (10-imageout-svg.md), which sniffs the format from `--format`/output
-extension (`resolveFormat`, imageout.go:1435), re-validates, opens the
-sink, and executes.
+extension (`imageout.ResolveFormat`), re-validates, opens the sink, and
+executes `imageout.RunRequest`. The command adapter owns this translation;
+the image engine does not import `internal/cli`.
 
 ### 4.3 Page-scoped flag routing (address remapping)
 
@@ -277,7 +278,7 @@ root api.go ──► convert, imageout, line, settings, errs   (library path, 0
 | `internal/app` → `internal/cli` + `internal/convert` | app/pdf.go:12-13, app/image.go:9-10 | Command → Request translation lives here, keeping `internal/convert` CLI-adjacent but engine-first |
 | `internal/app` → `internal/imageout` | app/image.go:11 | Image adapter delegates to imageout (which takes `*cli.Command` for the compatibility seam) |
 | `internal/cli` → `internal/settings` only | cli.go + flags.go imports | **Leaf discipline**: the parser is engine-independent and re-usable by any settings consumer |
-| `internal/convert` → `internal/cli` | convert.go:11 | Only for the `RunPDFContext(cmd *cli.Command, …)` adapter; the core `Run(ctx, req, …)` takes no CLI types |
+| `internal/app` → `internal/cli` | app/pdf.go, app/image.go | Application adapters translate `cli.Command` into request structs; the core engines take no CLI types |
 | `internal/imageout` → `internal/cli` | imageout.go import | `Run(ctx, cmd *cli.Command, …)` CLI seam; `RunRequest` is the CLI-free core |
 | `root api.go` → convert/imageout | api.go imports | CLI never imports the library root (keeps `internal` self-contained) |
 
@@ -397,13 +398,13 @@ table-driven and `t.Parallel()`:
 
 | Test | Verifies |
 |------|----------|
-| `TestGlobalFlagsToSettings` | Exact settings fields written per flag (page-size → `PageSize`/`Size.PageSize`, orientation enum, mm margins → mm numbers, outline-depth, grayscale, quiet) |
-| `TestShortFlags` | `-q -g -O -s -T -B -L -R -c -t` map to long-form specs |
+| `TestGlobalFlagsToSettings` | Exact settings fields written per flag (page-size → canonical `PageSize`, orientation enum, mm margins → mm numbers, outline-depth, grayscale, quiet) |
+| `TestShortFlags` | `-s -O -q -T -c -t` map to long-form specs. `-L` is **license**, not `--margin-left` |
 | `TestFlagEqualsSyntax` | `--flag=value` inline values |
 | `TestBoolFlagValues` | `true/1/yes/on` + `false/0/no/off` + `--no-` negation + invalid values |
 | `TestMultiObjectGrammar` | `cover … toc page … page …` object composition and order |
 | `TestImplicitFirstPageObject` | First bare positional becomes the first page |
-| `TestStdinOutputAndInput` | `-` for stdin input and stdout output |
+| `TestStdinOutputAndInput` | `-` as **output** is stdout; `-` as input is **not** stdin HTML (`GuessURL("-")` → `http://-` unless a file named `-` exists) |
 | `TestPairFlags` / `TestHeaderFooterFlags` / `TestTOCFlags` / `TestLoadFlags` | cookie/header/post/replace maps; header/footer keys; toc.* keys; zoom/auth/timeout/proxy/links |
 | `TestPageOnlyFlagPreObjectPending` | Address-remapping accumulation and promotion |
 | `TestGrayscaleSetsConvertField` / `TestSmartShrinkingEnableDisable` / `TestBackgroundPDFAndImage` / `TestDumpOutlineGlobalHome` | “One home” routing invariants |
@@ -443,10 +444,8 @@ settings that survive Request assembly.
   parser**: `convert` caps objects at 10,000, copies at 1,000, pages at
   100,000 (`internal/convert/convert.go` consts) — the CLI can parse
   absurdly large jobs that only fail later.
-- **`Version` defaults to `0.1.0-dev`**; the Makefile `build` target does
-  not currently stamp it via ldflags, so shipped binaries report the dev
-  string unless an external build passes `-ldflags "-X
-  internal/cli.Version=…"`.
+- **`Version` defaults to `0.1.0`** (same as the `VERSION` file).
+  `make build` stamps `gowkhtmltopdf/internal/cli.Version` from that file.
 - **No shell completion, no `--read-args-from-stdin`**, no interactive
   prompts — all aligned with the controlled-report scope.
 - **Open question**: whether a dedicated `-E` extended help listing (and

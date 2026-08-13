@@ -18,16 +18,17 @@ type fontState struct {
 // Content builds a page content stream. Every emitted operator is recorded
 // as a string; fonts and images used are registered for the page /Resources.
 type Content struct {
-	buf       bytes.Buffer
-	fontUses  map[string]string // resource name -> font object ref (allocated at finalize)
-	fontFiles map[string]*Font  // resource name -> parsed font (embedded)
-	curFont   string            // active font from last SetFont
-	curSize   float64           // active font size from last SetFont
-	fontStack []fontState       // active font before each open Save
-	imageUses map[string]string // resource name -> image object ref
-	imageRefs map[string]*imageResource
-	opacity   float64 // 0 disables
-	doc       *Document
+	buf        bytes.Buffer
+	fontUses   map[string]string // resource name -> font object ref (allocated at finalize)
+	fontFiles  map[string]*Font  // resource name -> parsed font (embedded)
+	curFont    string            // active font from last SetFont
+	curSize    float64           // active font size from last SetFont
+	fontStack  []fontState       // active font before each open Save
+	imageUses  map[string]string // resource name -> image object ref
+	imageRefs  map[string]*imageResource
+	imageDedup map[imageDedupKey]*imageResource
+	opacity    float64 // 0 disables
+	doc        *Document
 }
 
 type imageResource struct {
@@ -36,15 +37,21 @@ type imageResource struct {
 	height int
 }
 
+type imageDedupKey struct {
+	digest    [32]byte
+	grayscale bool
+}
+
 const fontRuneInitialCapacity = 32
 
 // NewContent creates an empty content stream builder.
 func NewContent() *Content {
 	return &Content{ //nolint:exhaustruct // intentional zero-value fields
-		fontUses:  map[string]string{},
-		fontFiles: map[string]*Font{},
-		imageUses: map[string]string{},
-		imageRefs: map[string]*imageResource{},
+		fontUses:   map[string]string{},
+		fontFiles:  map[string]*Font{},
+		imageUses:  map[string]string{},
+		imageRefs:  map[string]*imageResource{},
+		imageDedup: map[imageDedupKey]*imageResource{},
 	}
 }
 
@@ -117,16 +124,18 @@ func (c *Content) writePDFNums(suffix string, count int, num1, num2, num3, num4,
 // A fresh bytes.Buffer is used because Buffer values must not be copied after
 // use.
 func cloneContent(cur *Content) *Content {
+	imageRefs := cloneImageMap(cur.imageRefs)
 	ncVal := &Content{ //nolint:exhaustruct // intentional zero-value fields
-		fontUses:  cloneStringMap(cur.fontUses),
-		fontFiles: cloneFontMap(cur.fontFiles),
-		curFont:   cur.curFont,
-		curSize:   cur.curSize,
-		fontStack: append([]fontState(nil), cur.fontStack...),
-		imageUses: cloneStringMap(cur.imageUses),
-		imageRefs: cloneImageMap(cur.imageRefs),
-		opacity:   cur.opacity,
-		doc:       cur.doc,
+		fontUses:   cloneStringMap(cur.fontUses),
+		fontFiles:  cloneFontMap(cur.fontFiles),
+		curFont:    cur.curFont,
+		curSize:    cur.curSize,
+		fontStack:  append([]fontState(nil), cur.fontStack...),
+		imageUses:  cloneStringMap(cur.imageUses),
+		imageRefs:  imageRefs,
+		imageDedup: cloneImageDedupMap(cur.imageDedup, imageRefs),
+		opacity:    cur.opacity,
+		doc:        cur.doc,
 	}
 	ncVal.buf.Write(cur.buf.Bytes())
 
@@ -163,6 +172,27 @@ func cloneImageMap(src map[string]*imageResource) map[string]*imageResource {
 
 		cloned := *res
 		dst[name] = &cloned
+	}
+
+	return dst
+}
+
+func cloneImageDedupMap(
+	src map[imageDedupKey]*imageResource,
+	refs map[string]*imageResource,
+) map[imageDedupKey]*imageResource {
+	dst := make(map[imageDedupKey]*imageResource, len(src))
+
+	for key, resource := range src {
+		for _, cloned := range refs {
+			if resource != nil && cloned != nil && resource.ref == cloned.ref {
+				resource = cloned
+
+				break
+			}
+		}
+
+		dst[key] = resource
 	}
 
 	return dst

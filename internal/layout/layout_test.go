@@ -799,6 +799,32 @@ func TestTableLayout(t *testing.T) {
 	}
 }
 
+func TestBorderSpacing(t *testing.T) {
+	t.Parallel()
+
+	res0 := layoutHTML(t, `<html><body><table style="border-spacing: 0px;">
+		<tr><td>A</td><td>B</td></tr>
+	</table></body></html>`)
+
+	res10 := layoutHTML(t, `<html><body><table style="border-spacing: 10px;">
+		<tr><td>A</td><td>B</td></tr>
+	</table></body></html>`)
+
+	texts0 := opsOfKind(res0, OpText)
+	texts10 := opsOfKind(res10, OpText)
+
+	if len(texts0) < 2 || len(texts10) < 2 {
+		t.Fatalf("expected 2 text ops, got %d and %d", len(texts0), len(texts10))
+	}
+
+	gap0 := texts0[1].X - texts0[0].X
+	gap10 := texts10[1].X - texts10[0].X
+
+	if gap10 <= gap0 {
+		t.Errorf("expected gap10 (%v) > gap0 (%v) with border-spacing", gap10, gap0)
+	}
+}
+
 func TestTableColspan(t *testing.T) {
 	t.Parallel()
 

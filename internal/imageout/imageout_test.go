@@ -4,6 +4,7 @@ package imageout
 import (
 	"bytes"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -18,6 +19,8 @@ import (
 
 	"gowkhtmltopdf/internal/cli"
 	"gowkhtmltopdf/internal/html"
+	"gowkhtmltopdf/internal/load"
+	"gowkhtmltopdf/internal/settings"
 )
 
 // renderHTML parses src and renders it with defaults: 200 px viewport,
@@ -48,6 +51,26 @@ func renderHTMLOpts(src string, opts RenderOptions) (image.Image, error) {
 	opts.Background = true
 
 	return Render(root, opts)
+}
+
+func TestRunValidatesBeforeOpeningOutput(t *testing.T) {
+	t.Parallel()
+
+	output := filepath.Join(t.TempDir(), "out.png")
+	cmd := &cli.Command{ //nolint:exhaustruct // focused invalid command
+		Global: settings.DefaultPdfGlobal(),
+		Image:  settings.DefaultImageGlobal(),
+		Output: output,
+	}
+
+	err := Run(t.Context(), cmd, nil)
+	if !errors.Is(err, settings.ErrNoRenderableObjects) {
+		t.Fatalf("Run() = %v, want errors.Is(..., %v)", err, settings.ErrNoRenderableObjects)
+	}
+
+	if _, statErr := os.Stat(output); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("output stat error = %v, want os.ErrNotExist", statErr)
+	}
 }
 
 // asNRGBA converts any color to color.NRGBA. The NRGBA model always yields
@@ -508,5 +531,30 @@ func TestSmartWidth(t *testing.T) {
 
 	if got := def.Bounds().Dx(); got != 1024 {
 		t.Errorf("default canvas = %d, want 1024", got)
+	}
+}
+
+//nolint:exhaustruct // test settings struct
+func TestPrepareImageDocumentUsesImageWidthViewport(t *testing.T) {
+	t.Parallel()
+
+	imgSet := &settings.ImageGlobal{
+		Width: 1400, Height: 900,
+	}
+	obj := &settings.PdfObject{
+		Page: `inline:<!DOCTYPE html><html><head><style>
+		@media (min-width: 1200px) { body { background-color: red; } }
+		</style></head><body>Hello</body></html>`,
+	}
+
+	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // default loader
+
+	prep, _, err := prepareImageDocument(t.Context(), loader, obj, settings.PdfGlobal{}, imgSet, nil, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(prep.Sheets) == 0 {
+		t.Fatal("expected at least 1 stylesheet prepared")
 	}
 }

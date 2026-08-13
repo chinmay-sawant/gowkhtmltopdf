@@ -8,6 +8,7 @@ import (
 )
 
 const (
+	borderProperty       = "border"
 	borderTopProperty    = "border-top"
 	borderBottomProperty = "border-bottom"
 	borderLeftProperty   = "border-left"
@@ -132,6 +133,10 @@ type inheritCopy struct {
 // and closures on every styled node (was ~40% of alloc_objects on 500-page PDF).
 var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inherit table
 	{[]string{"color"}, func(dst, src *ResolvedStyle) { dst.Color = src.Color }},
+	{[]string{"accent-color"}, func(dst, src *ResolvedStyle) {
+		dst.AccentColor = src.AccentColor
+		dst.AccentColorSet = src.AccentColorSet
+	}},
 	{[]string{"font-family"}, func(dst, src *ResolvedStyle) { dst.FontFamily = src.FontFamily }},
 	{[]string{"font-size"}, func(dst, src *ResolvedStyle) { dst.FontSize = src.FontSize }},
 	{[]string{"font-weight"}, func(dst, src *ResolvedStyle) { dst.FontWeight = src.FontWeight }},
@@ -151,7 +156,10 @@ var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inheri
 	{[]string{"word-break"}, func(dst, src *ResolvedStyle) { dst.WordBreak = src.WordBreak }},
 	{
 		[]string{"vertical-align"},
-		func(dst, src *ResolvedStyle) { dst.VerticalAlign = src.VerticalAlign },
+		func(dst, src *ResolvedStyle) {
+			dst.VerticalAlign = src.VerticalAlign
+			dst.VerticalAlignShift = src.VerticalAlignShift
+		},
 	},
 	{
 		[]string{"text-decoration"},
@@ -175,6 +183,8 @@ var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inheri
 	},
 	{[]string{"orphans"}, func(dst, src *ResolvedStyle) { dst.Orphans = src.Orphans }},
 	{[]string{"widows"}, func(dst, src *ResolvedStyle) { dst.Widows = src.Widows }},
+	{[]string{"writing-mode"}, func(dst, src *ResolvedStyle) { dst.WritingMode = src.WritingMode }},
+	{[]string{"text-indent"}, func(dst, src *ResolvedStyle) { dst.TextIndent = src.TextIndent }},
 }
 
 // inheritProps copies inheritable properties from the parent, unless the
@@ -212,8 +222,13 @@ type ruleHit struct {
 // matchedRules walks sheets with the cascade's gates (media, @container,
 // selector match, specificity). pseudoElem != "" matches ::before/::after
 // shapes instead of the element (pseudo-content path).
+//
+//nolint:wsl // cascade gates are intentionally evaluated in source order.
 func (ctx *styleContext) matchedRules(node *html.Node, pseudoElem string) []ruleHit {
 	if ctx == nil {
+		return nil
+	}
+	if ctx.pollContext() {
 		return nil
 	}
 
@@ -221,6 +236,9 @@ func (ctx *styleContext) matchedRules(node *html.Node, pseudoElem string) []rule
 	// consumes the returned slice before resolving the next element.
 	hits := ctx.ruleHits[:0]
 	for _, sheet := range ctx.sheets {
+		if ctx.pollContext() {
+			return nil
+		}
 		hits = ctx.appendSheetRuleHits(hits, sheet, node, pseudoElem)
 	}
 
@@ -230,6 +248,8 @@ func (ctx *styleContext) matchedRules(node *html.Node, pseudoElem string) []rule
 }
 
 // appendSheetRuleHits appends matches from one stylesheet into hits.
+//
+//nolint:wsl // cascade gates are intentionally evaluated in source order.
 func (ctx *styleContext) appendSheetRuleHits(
 	hits []ruleHit, sheet *css.Stylesheet, node *html.Node, pseudoElem string,
 ) []ruleHit {
@@ -238,6 +258,9 @@ func (ctx *styleContext) appendSheetRuleHits(
 	}
 
 	for _, rule := range sheet.Rules {
+		if ctx.pollContext() {
+			return hits
+		}
 		if !css.MediaMatches(rule.Media, ctx.media, ctx.viewportW, ctx.viewportH) {
 			continue
 		}
@@ -253,10 +276,15 @@ func (ctx *styleContext) appendSheetRuleHits(
 }
 
 // appendRuleSelectorHits appends matching selectors of one rule into hits.
+//
+//nolint:wsl // selector gates are intentionally evaluated in source order.
 func (ctx *styleContext) appendRuleSelectorHits(
 	hits []ruleHit, rule css.Rule, node *html.Node, pseudoElem string,
 ) []ruleHit {
 	for _, sel := range rule.Selectors {
+		if ctx.pollContext() {
+			return hits
+		}
 		if !selectorMatches(sel, node, pseudoElem) {
 			continue
 		}
@@ -450,7 +478,18 @@ func applyCascadeDeclaration(
 
 func expandBoxShorthand(prop, value string) ([4]string, bool) {
 	var values [4]string
-	if prop != marginProperty && prop != paddingProperty {
+
+	switch prop {
+	case marginProperty, paddingProperty:
+		// 1–4 space-separated sides (CSS box shorthand).
+	case borderProperty:
+		// border: <width> <style> <color> applies the same value to every side.
+		// Expand so it competes with border-top/right/bottom/left longhands
+		// (otherwise an earlier border-top can paint after a later border).
+		values = [4]string{value, value, value, value}
+
+		return values, true
+	default:
 		return values, false
 	}
 
@@ -615,7 +654,7 @@ func resolveFontWeight(current int, val string) int {
 // longhand (e.g. margin-bottom) always overrides its shorthand (margin).
 // Package-level to avoid per-node slice/array rebuilds.
 var restShorthandProps = [...]string{ //nolint:gochecknoglobals // static apply order
-	"margin", "padding", "border", borderTopProperty, borderRightProperty, borderBottomProperty, borderLeftProperty,
+	"margin", "padding", borderProperty, borderTopProperty, borderRightProperty, borderBottomProperty, borderLeftProperty,
 	borderWidthKeyword, borderStyleKeyword,
 	borderColorKeyword, gapKeyword, flexKeyword, containerKeyword,
 }
@@ -648,7 +687,8 @@ func applyRestProps(
 
 	for prop, value := range raw {
 		switch prop {
-		case "margin", "padding", "border", borderTopProperty, borderRightProperty, borderBottomProperty, borderLeftProperty,
+		case "margin", "padding", borderProperty, borderTopProperty,
+			borderRightProperty, borderBottomProperty, borderLeftProperty,
 			borderWidthKeyword, borderStyleKeyword,
 			borderColorKeyword, gapKeyword, flexKeyword, containerKeyword:
 			continue

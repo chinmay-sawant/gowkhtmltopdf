@@ -3,7 +3,6 @@ package layout
 import (
 	"math"
 	"sort"
-	"strings"
 
 	"gowkhtmltopdf/internal/html"
 )
@@ -20,6 +19,14 @@ const maxFlowPageIndex = 16384
 // iteration. Box.y is kept in sync for boxes whose top moved.
 
 func shiftFlowY(res *Result, from, toIdx int, fromY, deltaY float64) {
+	shiftFlowBounded(res, from, toIdx, fromY, math.Inf(1), deltaY)
+}
+
+// shiftFlowBounded is shiftFlowY that leaves ops and boxes at or below
+// beforeY unmoved (except the target range). Implicit keep-together uses
+// the next page-break-before:always as beforeY so later sections do not
+// cascade extra pages.
+func shiftFlowBounded(res *Result, from, toIdx int, fromY, beforeY, deltaY float64) {
 	if res == nil || len(res.Ops) == 0 || deltaY == 0 {
 		return
 	}
@@ -35,7 +42,7 @@ func shiftFlowY(res *Result, from, toIdx int, fromY, deltaY float64) {
 
 	shiftOpsRange(res, from, toIdx, deltaY)
 
-	shiftFlowOps(res, from, toIdx, fromY, deltaY, startPage)
+	shiftFlowOps(res, from, toIdx, fromY, beforeY, deltaY, startPage)
 
 	if res.root == nil {
 		return
@@ -45,7 +52,7 @@ func shiftFlowY(res *Result, from, toIdx int, fromY, deltaY float64) {
 		ensureFlowBoxIndex(res, flowBoxList(res))
 	}
 
-	shiftFlowBoxes(res, from, toIdx, fromY, startPage, deltaY)
+	shiftFlowBoxes(res, from, toIdx, fromY, beforeY, startPage, deltaY)
 }
 
 // invalidateFlowIndex drops cached page buckets so the next ensureFlowIndex
@@ -90,17 +97,17 @@ func flowBoxList(res *Result) []*box {
 // shift: positive shifts process buckets from the end so an operation moved
 // to another bucket is never visited twice; negative shifts go ascending so
 // an operation moved backward is not revisited.
-func shiftFlowOps(res *Result, from, toIdx int, fromY, deltaY float64, startPage int) {
+func shiftFlowOps(res *Result, from, toIdx int, fromY, beforeY, deltaY float64, startPage int) {
 	if deltaY > 0 {
 		for p := len(res.flowPages) - 1; p >= startPage; p-- {
-			shiftOpsBucket(res, p, from, toIdx, fromY, deltaY)
+			shiftOpsBucket(res, p, from, toIdx, fromY, beforeY, deltaY)
 		}
 
 		return
 	}
 
 	for p := startPage; p < len(res.flowPages); p++ {
-		shiftOpsBucket(res, p, from, toIdx, fromY, deltaY)
+		shiftOpsBucket(res, p, from, toIdx, fromY, beforeY, deltaY)
 	}
 }
 
@@ -111,7 +118,7 @@ func shiftFlowOps(res *Result, from, toIdx int, fromY, deltaY float64, startPage
 // double negative shifts and infinite positive-shift loops).
 //
 //nolint:cyclop // page-bucket shift algorithm
-func shiftOpsBucket(res *Result, page, from, toIdx int, fromY, deltaY float64) {
+func shiftOpsBucket(res *Result, page, from, toIdx int, fromY, beforeY, deltaY float64) {
 	if page < 0 || page >= len(res.flowPages) {
 		return
 	}
@@ -129,7 +136,7 @@ func shiftOpsBucket(res *Result, page, from, toIdx int, fromY, deltaY float64) {
 			continue
 		}
 
-		if (idx >= from && idx <= toIdx) || res.Ops[idx].Y <= fromY {
+		if (idx >= from && idx <= toIdx) || res.Ops[idx].Y <= fromY || res.Ops[idx].Y >= beforeY {
 			jdx++
 
 			continue
@@ -145,23 +152,23 @@ func shiftOpsBucket(res *Result, page, from, toIdx int, fromY, deltaY float64) {
 }
 
 // shiftFlowBoxes moves the box buckets in the direction of the shift.
-func shiftFlowBoxes(res *Result, from, toIdx int, fromY float64, startPage int, deltaY float64) {
+func shiftFlowBoxes(res *Result, from, toIdx int, fromY, beforeY float64, startPage int, deltaY float64) {
 	if deltaY > 0 {
 		for p := len(res.flowBoxes) - 1; p >= startPage; p-- {
-			shiftBoxesBucket(res, p, from, toIdx, fromY, startPage, deltaY)
+			shiftBoxesBucket(res, p, from, toIdx, fromY, beforeY, startPage, deltaY)
 		}
 
 		return
 	}
 
 	for p := startPage; p < len(res.flowBoxes); p++ {
-		shiftBoxesBucket(res, p, from, toIdx, fromY, startPage, deltaY)
+		shiftBoxesBucket(res, p, from, toIdx, fromY, beforeY, startPage, deltaY)
 	}
 }
 
 // shiftBoxesBucket shifts the boxes of one page bucket whose top moved.
 // Re-reads res.flowBoxes[page] each step (same swap-remove hazard as ops).
-func shiftBoxesBucket(res *Result, page, from, toIdx int, fromY float64, startPage int, deltaY float64) {
+func shiftBoxesBucket(res *Result, page, from, toIdx int, fromY, beforeY float64, startPage int, deltaY float64) {
 	if page < 0 || page >= len(res.flowBoxes) {
 		return
 	}
@@ -179,7 +186,7 @@ func shiftBoxesBucket(res *Result, page, from, toIdx int, fromY float64, startPa
 			continue
 		}
 
-		if skipBoxShift(res, boxIndex, from, toIdx, fromY, startPage) {
+		if skipBoxShift(res, boxIndex, from, toIdx, fromY, beforeY, startPage) {
 			jdx++
 
 			continue
@@ -196,17 +203,21 @@ func shiftBoxesBucket(res *Result, page, from, toIdx int, fromY float64, startPa
 
 // skipBoxShift reports whether a box on startPage should stay put during a
 // flow shift (top at/above fromY, except the target op range sitting on fromY).
-func skipBoxShift(res *Result, boxIndex, from, toIdx int, fromY float64, startPage int) bool {
+func skipBoxShift(res *Result, boxIndex, from, toIdx int, fromY, beforeY float64, startPage int) bool {
 	if startPage != res.flowBoxPage[boxIndex] {
+		return res.boxes[boxIndex].y >= beforeY
+	}
+
+	targetBox := res.boxes[boxIndex]
+	if targetBox.y >= beforeY {
+		return true
+	}
+
+	if targetBox.y > fromY {
 		return false
 	}
 
-	b := res.boxes[boxIndex]
-	if b.y > fromY {
-		return false
-	}
-
-	if b.y == fromY && b.opStart >= from && b.opEnd <= toIdx {
+	if targetBox.y == fromY && targetBox.opStart >= from && targetBox.opEnd <= toIdx {
 		return false
 	}
 
@@ -471,8 +482,9 @@ func shiftOpsOnly(res *Result, from, tOrigin int, deltaY float64) {
 	}
 }
 
-// avoidInside walks post-order and moves page-break-inside: avoid boxes wholly
+// avoidInside walks post-order and moves page-break-inside:avoid boxes wholly
 // to the next page when they span multiple pages but fit one content height.
+// Aside callouts are lifted earlier by keepImplicitAsides (before text snap).
 func avoidInside(res *Result, contentH float64) bool {
 	var walk func(b *box, inTable bool) bool
 	walk = func(boxNode *box, inTable bool) bool {
@@ -488,7 +500,8 @@ func avoidInside(res *Result, contentH float64) bool {
 		// Table cells inherit the avoid policy from table-row pagination, but
 		// moving cells independently splits the collapsed grid. rowsIntact
 		// owns the row-level move and keeps the cell borders/text together.
-		if !inTable && !boxInsideTable(boxNode) && boxNode.style.PageBreakInside == pageBreakAvoid && boxNode.height > 0 {
+		if !inTable && !boxInsideTable(boxNode) && boxNode.height > 0 &&
+			boxNode.style != nil && boxNode.style.PageBreakInside == pageBreakAvoid {
 			if keepTogetherForAvoid(res, boxNode, contentH) {
 				changed = true
 			}
@@ -498,6 +511,54 @@ func avoidInside(res *Result, contentH float64) bool {
 	}
 
 	return walk(res.root, false)
+}
+
+func shouldKeepImplicitAside(boxNode *box, inTable bool) bool {
+	return !inTable && !boxInsideTable(boxNode) && boxNode.height > 0 && implicitAtomicBox(boxNode)
+}
+
+// keepImplicitAsides is the pre-snap pass: move aside callouts that overflow
+// the remaining page height while their ops are still a rigid unit.
+func keepImplicitAsides(res *Result, contentH float64) bool {
+	if res == nil || res.root == nil || contentH <= 0 {
+		return false
+	}
+
+	var walk func(b *box, inTable bool) bool
+	walk = func(boxNode *box, inTable bool) bool {
+		changed := false
+		childInTable := inTable || boxNode.kind == displayTable
+
+		for _, child := range boxNode.children {
+			if walk(child, childInTable) {
+				changed = true
+			}
+		}
+
+		if shouldKeepImplicitAside(boxNode, inTable) && keepTogetherForAvoid(res, boxNode, contentH) {
+			changed = true
+		}
+
+		return changed
+	}
+
+	return walk(res.root, false)
+}
+
+// implicitAtomicBox is an aside callout that should not start on one page
+// and finish on the next when it fits a single content height. Sections,
+// lists, and tables stay fragmentable so dense avoid-lists do not cascade.
+func implicitAtomicBox(boxNode *box) bool {
+	if boxNode == nil || boxNode.node == nil {
+		return false
+	}
+
+	switch boxNode.node.Name {
+	case "aside":
+		return true
+	default:
+		return false
+	}
 }
 
 // boxInsideTable reports whether a box belongs to a table subtree. Some table
@@ -526,47 +587,176 @@ func isTableElement(name string) bool {
 	}
 }
 
-// keepTogetherForAvoid shifts one page-break-inside:avoid box wholly to the
-// next page when it straddles the boundary but fits a full page. Returns
-// whether a shift happened.
+// keepTogetherForAvoid shifts one unbreakable box wholly to the next page
+// when it straddles the boundary but fits a full page. Remaining-Y is the
+// space left on the current page; if height > remaining the box moves.
+// Returns whether a shift happened.
 func keepTogetherForAvoid(res *Result, boxNode *box, contentH float64) bool {
-	height := boxNode.height
-	// Prefer ink extent when taller than the border box (rowspan /
-	// deferred paint can make ops protrude past b.h — wiki awards).
-	if ink := boxInkExtent(res, boxNode); ink > height {
-		height = ink
+	// Ink bottom is a canvas Y. Compare it to the border-box bottom so a
+	// card low on the page is not treated as taller than the page.
+	bottom := boxNode.y + boxNode.height
+	if ink := boxInkExtent(res, boxNode); ink > bottom {
+		bottom = ink
 	}
 
+	height := bottom - boxNode.y
 	layoutOut := int(boxNode.y / contentH)
-	hi := int((boxNode.y + height) / contentH)
+	hi := int(bottom / contentH)
 
 	if hi <= layoutOut || height > contentH+0.01 {
 		return false
 	}
 
 	remaining := float64(layoutOut+1)*contentH - boxNode.y
-	// Prefer splitting over large empty bands. Use border-box
-	// height (b.h), not ink: after line-snap, ink can span a
-	// page gap while the box is still a short list item —
-	// classifying by ink disabled the short-box guard and
-	// cascaded 100–150pt gaps (wiki references).
-	if preferSplitOverBlank(remaining, boxNode.height, contentH) {
-		return false
-	}
-	// Large boxes: also prefer split when less than half the box
-	// fits (rowspan tables / tall avoid blocks).
-	if remaining < boxNode.height*0.5 && boxNode.height > contentH*0.35 {
+	if rejectKeepTogetherShift(boxNode, remaining, contentH) {
 		return false
 	}
 
-	dy := float64(layoutOut+1)*contentH - boxNode.y
-	if dy <= layoutSlack {
+	deltaY := float64(layoutOut+1)*contentH - boxNode.y
+	if deltaY <= layoutSlack {
 		return false
 	}
 
-	shiftFlowY(res, boxNode.opStart, boxNode.opEnd, boxNode.y, dy)
+	if implicitAtomicBox(boxNode) {
+		beforeY := nextForcedBreakY(res, boxNode.y)
+		if boxNode.y+height+deltaY > beforeY-layoutSlack {
+			return false
+		}
+
+		shiftImplicitUnit(res, boxNode, deltaY, beforeY)
+	} else {
+		shiftFlowY(res, boxNode.opStart, boxNode.opEnd, boxNode.y, deltaY)
+	}
 
 	return true
+}
+
+const initialShiftedRootsCap = 8
+
+func isCandidateDescendant(candidate, boxNode *box) bool {
+	return boxNode.node != nil && candidate.node != nil && isDescendantNode(candidate.node, boxNode.node)
+}
+
+func isCandidateOutOfImplicitScope(candidate *box, fromY, beforeY float64) bool {
+	if math.IsInf(beforeY, 1) || candidate.y <= fromY || candidate.y >= beforeY {
+		return true
+	}
+
+	return candidate.style != nil && candidate.style.PageBreakBefore == pageBreakAlways
+}
+
+func shiftImplicitCandidate(res *Result, candidate *box, deltaY float64, shiftedRoots []*box) []*box {
+	if ancestor := shiftedAncestor(candidate, shiftedRoots); ancestor != nil {
+		// Ops already moved with the ancestor's opStart–opEnd range.
+		candidate.y += deltaY
+
+		return shiftedRoots
+	}
+
+	if candidate.opStart <= candidate.opEnd {
+		shiftOpsOnly(res, candidate.opStart, candidate.opEnd, deltaY)
+	}
+
+	candidate.y += deltaY
+
+	return append(shiftedRoots, candidate)
+}
+
+// shiftImplicitUnit moves one aside and the in-section siblings after it
+// (footer, trailing copy), stopping before the next page-break-before:always.
+// Nested boxes under an already-shifted sibling only update box.y — their ops
+// were shifted with the ancestor's op range (avoids double-shifting a progress
+// bar inside a following paragraph, which collapsed its height to 0).
+func shiftImplicitUnit(res *Result, boxNode *box, deltaY, beforeY float64) {
+	if res == nil || boxNode == nil || deltaY == 0 {
+		return
+	}
+
+	shiftOpsOnly(res, boxNode.opStart, boxNode.opEnd, deltaY)
+
+	fromY := boxNode.y
+	boxNode.y += deltaY
+
+	shiftedRoots := make([]*box, 0, initialShiftedRootsCap)
+
+	for _, candidate := range flowBoxList(res) {
+		if candidate == nil || candidate == boxNode {
+			continue
+		}
+
+		if isCandidateDescendant(candidate, boxNode) {
+			candidate.y += deltaY
+
+			continue
+		}
+
+		if isCandidateOutOfImplicitScope(candidate, fromY, beforeY) {
+			continue
+		}
+
+		shiftedRoots = shiftImplicitCandidate(res, candidate, deltaY, shiftedRoots)
+	}
+}
+
+// shiftedAncestor returns a previously shifted root that contains candidate.
+func shiftedAncestor(candidate *box, roots []*box) *box {
+	if candidate == nil || candidate.node == nil {
+		return nil
+	}
+
+	for _, root := range roots {
+		if root == nil || root.node == nil {
+			continue
+		}
+
+		if isDescendantNode(candidate.node, root.node) {
+			return root
+		}
+	}
+
+	return nil
+}
+
+// nextForcedBreakY is the canvas Y of the next page-break-before:always box
+// after afterY, or +Inf if none follows.
+func nextForcedBreakY(res *Result, afterY float64) float64 {
+	next := math.Inf(1)
+	if res == nil {
+		return next
+	}
+
+	for _, candidate := range flowBoxList(res) {
+		if candidate == nil || candidate.style == nil || candidate.style.PageBreakBefore != pageBreakAlways {
+			continue
+		}
+
+		if candidate.y > afterY && candidate.y < next {
+			next = candidate.y
+		}
+	}
+
+	return next
+}
+
+// rejectKeepTogetherShift reports that moving the box would leave too much
+// empty space on the current page. Atomic cards only lift when they start
+// in the last keepTogetherMaxBlankRatio of the page; short avoid list items
+// keep preferSplitOverBlank so wiki-style reference lists do not cascade.
+func rejectKeepTogetherShift(boxNode *box, remaining, contentH float64) bool {
+	if implicitAtomicBox(boxNode) {
+		// Only lift a card that starts in the last band of the page.
+		// Mid-page cards that barely overflow would blank too much and
+		// shove following in-section content onto an extra page.
+		return remaining > contentH*keepTogetherMaxBlankRatio
+	}
+
+	if preferSplitOverBlank(remaining, boxNode.height, contentH) {
+		return true
+	}
+
+	// Large explicit-avoid boxes: prefer split when less than half the box
+	// fits (rowspan tables / tall avoid blocks).
+	return remaining < boxNode.height*halfRatio && boxNode.height > contentH*0.35
 }
 
 // boxInkExtent returns the bottom edge of the box's ink ops (boxNode.y when
@@ -629,7 +819,7 @@ func opVisibleInkHeight(paintOp Op) float64 {
 // break). Flow indexes are rebuilt once at the end.
 //
 //nolint:wsl // break-difference bookkeeping
-func beforeAlways( //nolint:gocognit,gocyclo,cyclop,funlen // break-difference bookkeeping
+func beforeAlways( //nolint:gocognit,cyclop,funlen // break-difference bookkeeping
 	res *Result, contentH float64,
 ) bool {
 	if res == nil || res.root == nil || contentH <= 0 {
@@ -702,38 +892,16 @@ func beforeAlways( //nolint:gocognit,gocyclo,cyclop,funlen // break-difference b
 		}
 
 		// Box Y has been kept live (updated when earlier breaks applied).
+		// lastPage comes from every preceding op so the previous section's
+		// tail stays put; only this box and later flow move.
 		boxY := boxNode.y
-		loPage := int(boxY / contentH)
-		lastPage := int(maxEff / contentH)
-
-		if loPage > lastPage { //nolint:nestif // forced-break correction has four independent guards
-			// A prior page-break-after can leave an empty landing band before
-			// this forced-break target. Align the target back to the top of its
-			// already-selected page; otherwise page-break-before:always keeps
-			// the section's natural offset and emits a visibly blank band.
-			pageTop := float64(loPage) * contentH
-			if boxY > pageTop+layoutSlack {
-				deltaY := pageTop - boxY
-				if start < opCount {
-					suffixDy[start] += deltaY
-				}
-
-				for _, b := range boxes {
-					if b == boxNode || b.y > boxY ||
-						(b.y == boxY && b.opStart >= start) {
-						b.y += deltaY
-					}
-				}
-
-				events = append(events, breakEvent{start: start, dy: deltaY})
-				changed = true
-			}
-
+		targetY, alreadyFresh := forcedBreakTargetY(boxY, maxEff, contentH)
+		if alreadyFresh {
 			continue
 		}
 
-		deltaY := float64(lastPage+1)*contentH - boxY
-		if deltaY <= 0 {
+		deltaY := targetY - boxY
+		if math.Abs(deltaY) <= layoutSlack {
 			continue
 		}
 
@@ -763,7 +931,9 @@ func beforeAlways( //nolint:gocognit,gocyclo,cyclop,funlen // break-difference b
 
 	for idx := range opCount {
 		cum += suffixDy[idx]
-		if cum == 0 || ops[idx].Fixed {
+		// Pinned: thead clones sit at the end of the display list but belong
+		// mid-document; suffix shifts must not drag them across page edges.
+		if cum == 0 || ops[idx].Fixed || ops[idx].Pinned {
 			continue
 		}
 
@@ -779,6 +949,42 @@ func beforeAlways( //nolint:gocognit,gocyclo,cyclop,funlen // break-difference b
 type beforeAlwaysTarget struct {
 	box   *box
 	start int
+}
+
+// forcedBreakTargetY is the canvas Y of the first page top after preceding
+// ink. A coordinate epsilon below a page multiple is that next page's top;
+// a real sliver still on the previous page is not.
+func forcedBreakTargetY(boxY, maxEff, contentH float64) (float64, bool) {
+	if contentH <= 0 {
+		return boxY, true
+	}
+
+	lastPage := int(maxEff / contentH)
+	if lastPage < 0 {
+		lastPage = 0
+	}
+
+	pageOff := math.Mod(boxY, contentH)
+	if pageOff < 0 {
+		pageOff += contentH
+	}
+
+	loPage := int(boxY / contentH)
+	if contentH-pageOff <= layoutSlack {
+		loPage++
+		pageOff = 0
+	}
+
+	onLaterPage := loPage > lastPage
+	if onLaterPage && pageOff <= layoutSlack {
+		return boxY, true
+	}
+
+	if onLaterPage {
+		return float64(loPage) * contentH, false
+	}
+
+	return float64(lastPage+1) * contentH, false
 }
 
 // beforeAlwaysOpStart returns the first operation after a forced-break box.
@@ -1097,19 +1303,19 @@ func rowsIntact(res *Result, contentH float64) bool {
 //
 //nolint:cyclop,wsl // table-row geometry checks intentionally stay together
 func normalizeTableRowGaps(res *Result, contentH float64) {
-	const aclMatrixClass = "d04-matrix"
-
 	if res == nil || res.root == nil || contentH <= 0 {
 		return
 	}
 
 	for _, table := range flowBoxList(res) {
-		if table.kind != displayTable || len(table.rows) < 2 || table.node == nil ||
-			table.node.Attribute("class") != aclMatrixClass {
+		if table.kind != displayTable || len(table.rows) < 2 {
 			continue
 		}
 
 		for rowIndex := 1; rowIndex < len(table.rows); rowIndex++ {
+			if !rowWasPaginationShifted(table.rows[rowIndex]) {
+				continue
+			}
 			_, _, previousTop, previousBottom, previousOK := rowOpGeometry(table.rows[rowIndex-1])
 
 			first, last, currentTop, currentBottom, currentOK := rowOpGeometry(table.rows[rowIndex])
@@ -1141,6 +1347,16 @@ func shiftTableRowBoxes(row []*box, deltaY float64) {
 	}
 }
 
+func rowWasPaginationShifted(row []*box) bool {
+	for _, cell := range row {
+		if cell != nil && cell.paginationShifted {
+			return true
+		}
+	}
+
+	return false
+}
+
 func shiftTableBox(boxNode *box, deltaY float64) {
 	if boxNode == nil {
 		return
@@ -1154,6 +1370,8 @@ func shiftTableBox(boxNode *box, deltaY float64) {
 
 // shiftRowToPage moves a table row wholly to the next page when it spans
 // multiple pages. Returns whether it moved.
+//
+//nolint:wsl // row shifting and marker updates must stay adjacent.
 func shiftRowToPage(res *Result, row []*box, contentH float64) bool {
 	if len(row) == 0 {
 		return false
@@ -1182,6 +1400,11 @@ func shiftRowToPage(res *Result, row []*box, contentH float64) bool {
 	// content moves and the grid stays behind (gapped /
 	// misaligned music-video tables across page breaks).
 	shiftFlowY(res, first, last, rowTop-layoutSlack, deltaY)
+	for _, cell := range row {
+		if cell != nil {
+			cell.paginationShifted = true
+		}
+	}
 
 	return true
 }
@@ -1482,11 +1705,10 @@ func hasRoundedOwnChrome(res *Result, boxNode *box) bool {
 	if res == nil || boxNode == nil || boxNode.style == nil || boxNode.opStart < 0 || boxNode.opEnd >= len(res.Ops) {
 		return false
 	}
-	if boxNode.node == nil || boxNode.node.Attribute("class") != "dom-notes" ||
-		!strings.Contains(boxNode.node.TextContent(), "Security: no script execution") {
+	if boxNode.style.BorderRadius <= 0 && boxNode.style.BorderRadiusPercent <= 0 && boxNode.style.BGColor[3] <= 0 {
 		return false
 	}
-	if boxNode.style.BorderRadius <= 0 && boxNode.style.BorderRadiusPercent <= 0 && boxNode.style.BGColor[3] <= 0 {
+	if boxNode.style.BorderLeft.Style != solidKeyword || boxNode.style.BorderLeft.Width <= 2 {
 		return false
 	}
 
@@ -1516,7 +1738,9 @@ func normalizeLeadingRoundedCallouts(res *Result, contentH float64) {
 			continue
 		}
 
-		page, ok := checkedFlowPageOfY(boxNode.y, contentH)
+		// Match pageBuckets / shiftSamePageFromY: boundary-aligned Y must not
+		// fall into the previous page via float truncation.
+		page, ok := checkedFlowPageOfY(boxNode.y+layoutEpsilon, contentH)
 		if !ok {
 			continue
 		}
@@ -1527,8 +1751,58 @@ func normalizeLeadingRoundedCallouts(res *Result, contentH float64) {
 			continue
 		}
 
-		shiftFlowY(res, boxNode.opStart, boxNode.opEnd, boxNode.y-layoutSlack, pageTop-boxNode.y)
+		// Same-page only. shiftFlowY would also pull later pages backward
+		// and can undo page-break-before:always (fixture-56 domain-05).
+		shiftSamePageFromY(res, boxNode.y-layoutSlack, page, contentH, pageTop-boxNode.y)
 	}
+}
+
+func shiftSamePageOps(res *Result, fromY float64, page int, contentH, deltaY float64) {
+	for idx := range res.Ops {
+		if res.Ops[idx].Fixed || res.Ops[idx].Y < fromY {
+			continue
+		}
+
+		opPage, ok := checkedFlowPageOfY(res.Ops[idx].Y+layoutEpsilon, contentH)
+		if !ok || opPage != page {
+			continue
+		}
+
+		res.Ops[idx].Y += deltaY
+	}
+}
+
+func shiftSamePageBoxes(res *Result, fromY float64, page int, contentH, deltaY float64) {
+	for _, boxNode := range flowBoxList(res) {
+		if boxNode.y < fromY {
+			continue
+		}
+
+		boxPage, ok := checkedFlowPageOfY(boxNode.y+layoutEpsilon, contentH)
+		if !ok || boxPage != page {
+			continue
+		}
+
+		boxNode.y += deltaY
+	}
+}
+
+// shiftSamePageFromY applies deltaY to ops and boxes at or below fromY that
+// still sit on page. Later pages are left alone.
+//
+// Page membership uses Y+layoutEpsilon so a coordinate that is exactly
+// k*contentH (a forced page-break target) is not classified as the previous
+// page via float truncation. Without the bump, normalizeLeadingRoundedCallouts
+// can pull the next section's ops backward while leaving its box.y on the
+// intended page (fixture-56 domain-09 / page-14 underline).
+func shiftSamePageFromY(res *Result, fromY float64, page int, contentH, deltaY float64) {
+	if res == nil || deltaY == 0 || contentH <= 0 {
+		return
+	}
+
+	shiftSamePageOps(res, fromY, page, contentH, deltaY)
+	shiftSamePageBoxes(res, fromY, page, contentH, deltaY)
+	invalidateFlowIndex(res)
 }
 
 // preferSplitOverBlank reports whether a keep-together shift would leave an
@@ -1689,7 +1963,152 @@ func repeatTableHeaderOnPages(res *Result, tblBox *box, contentH float64) {
 			}
 		}
 
+		placeSliverBodyBelowHeader(res, tblBox, pageTop, hdrH)
 		cloneHeaderOps(res, hdrFirst, hdrLast, hdrTop, pageTop)
+	}
+}
+
+const (
+	tableSliverOffsetGap      = 6.0
+	tableSliverFallbackHeight = 12.0
+	tableSliverLookback       = 8.0
+	tableSliverInspectHeight  = 20.0
+)
+
+// placeSliverBodyBelowHeader pulls a body row that sits in the sliver just
+// above a continuation page (or under the repeated thead) down below the
+// header without moving rows that are already clear of the band.
+func placeSliverBodyBelowHeader(res *Result, tblBox *box, pageTop, hdrH float64) {
+	fromIdx, toIdx, top, bottom := sliverBodyOps(tblBox, pageTop, hdrH, res)
+	if fromIdx < 0 || top < 0 {
+		return
+	}
+
+	target := pageTop + hdrH + tableSliverOffsetGap
+	sliverH := bottom - top
+
+	if sliverH < 1 {
+		sliverH = tableSliverFallbackHeight
+	}
+
+	offFrom, officialTop := nextBodyAfterSliver(tblBox, pageTop, fromIdx, toIdx, res)
+	if offFrom >= 0 && officialTop >= 0 && officialTop < target+sliverH-0.5 {
+		push := target + sliverH - officialTop
+		if push > 0 {
+			shiftFlowY(res, offFrom, offFrom, officialTop-layoutSlack, push)
+		}
+	}
+
+	dy := target - top
+	if math.Abs(dy) > layoutSlack {
+		shiftOpsOnly(res, fromIdx, toIdx, dy)
+		shiftTableBoxesInOpRange(tblBox, fromIdx, toIdx, dy)
+	}
+}
+
+func accumulateSliverOp(paintOp Op, idx int, loBound, hiBound float64, fromIdx, toIdx *int, top, bottom *float64) {
+	posY := paintOp.Y
+	if posY < loBound || posY >= hiBound {
+		return
+	}
+
+	if *fromIdx < 0 || idx < *fromIdx {
+		*fromIdx = idx
+	}
+
+	if idx > *toIdx {
+		*toIdx = idx
+	}
+
+	if *top < 0 || posY < *top {
+		*top = posY
+	}
+
+	if bot := posY + opInkHeight(paintOp); bot > *bottom {
+		*bottom = bot
+	}
+}
+
+// sliverBodyOps is the body-row paint sitting in [pageTop-8, pageTop+hdrH).
+func sliverBodyOps(tblBox *box, pageTop, hdrH float64, res *Result) (int, int, float64, float64) {
+	fromIdx, toIdx := -1, -1
+	top, bottom := -1.0, -1.0
+	loBound := pageTop - tableSliverLookback
+	hiBound := pageTop + hdrH
+
+	for _, row := range tblBox.rows[tblBox.headerRows:] {
+		first, last := rowOpRange(row)
+		if first < 0 {
+			continue
+		}
+
+		for idx := first; idx <= last && idx < len(res.Ops); idx++ {
+			accumulateSliverOp(res.Ops[idx], idx, loBound, hiBound, &fromIdx, &toIdx, &top, &bottom)
+		}
+	}
+
+	return fromIdx, toIdx, top, bottom
+}
+
+func accumulateNextBodyOp(posY float64, idx int, pageTop float64, fromIdx *int, top *float64) {
+	if posY < pageTop-0.5 {
+		return
+	}
+
+	if *fromIdx < 0 || idx < *fromIdx {
+		*fromIdx = idx
+	}
+
+	if *top < 0 || posY < *top {
+		*top = posY
+	}
+}
+
+// nextBodyAfterSliver is the first body op on this page that is not in the sliver.
+func nextBodyAfterSliver(tblBox *box, pageTop float64, sliverFrom, sliverTo int, res *Result) (int, float64) {
+	fromIdx := -1
+	top := -1.0
+
+	for _, row := range tblBox.rows[tblBox.headerRows:] {
+		first, last := rowOpRange(row)
+		if first < 0 {
+			continue
+		}
+
+		for idx := first; idx <= last && idx < len(res.Ops); idx++ {
+			if idx < sliverFrom || idx > sliverTo {
+				accumulateNextBodyOp(res.Ops[idx].Y, idx, pageTop, &fromIdx, &top)
+			}
+		}
+	}
+
+	return fromIdx, top
+}
+
+func shiftTableBoxesInOpRange(tblBox *box, fromIdx, toIdx int, deltaY float64) {
+	if tblBox == nil || deltaY == 0 {
+		return
+	}
+
+	var walk func(*box)
+	walk = func(boxNode *box) {
+		if boxNode == nil {
+			return
+		}
+
+		if boxNode.opStart <= boxNode.opEnd && boxNode.opStart >= fromIdx && boxNode.opEnd <= toIdx {
+			boxNode.y += deltaY
+		}
+
+		for _, child := range boxNode.children {
+			walk(child)
+		}
+	}
+
+	for _, row := range tblBox.rows {
+		for _, cell := range row {
+			walk(cell)
+		}
 	}
 }
 
@@ -1706,6 +2125,20 @@ func headerContinuationPages(tblBox *box, _ int, res *Result, contentH float64) 
 		page, ok := checkedFlowPageOfY(top, contentH)
 		if ok {
 			pages[page] = true
+
+			off := math.Mod(top, contentH)
+			if off < 0 {
+				off += contentH
+			}
+
+			if off > contentH-tableSliverLookback {
+				nextTop := float64(page+1) * contentH
+
+				sliverFrom, _, sliverTop, _ := sliverBodyOps(tblBox, nextTop, tableSliverInspectHeight, res)
+				if sliverFrom >= 0 && sliverTop >= 0 {
+					pages[page+1] = true
+				}
+			}
 		}
 	}
 
@@ -1749,6 +2182,8 @@ func tableBodyRange(tblBox *box, page int, res *Result, contentH float64) (int, 
 
 // cloneHeaderOps copies the thead op range to the page top. The clone count
 // is known up front, so the display list grows once instead of per op.
+// Clones are Pinned so later page-break-before suffix shifts (by op index)
+// cannot pull them back onto the previous page.
 func cloneHeaderOps(res *Result, hdrFirst, hdrLast int, hdrTop, pageTop float64) {
 	if hdrFirst < 0 || hdrFirst > hdrLast || hdrFirst >= len(res.Ops) {
 		return
@@ -1761,10 +2196,13 @@ func cloneHeaderOps(res *Result, hdrFirst, hdrLast int, hdrTop, pageTop float64)
 	start := len(res.Ops)
 	res.Ops = append(res.Ops, make([]Op, hdrLast-hdrFirst+1)...)
 
-	for k := hdrFirst; k <= hdrLast; k++ {
-		op := res.Ops[k]
+	for hdrIndex := hdrFirst; hdrIndex <= hdrLast; hdrIndex++ {
+		op := res.Ops[hdrIndex]
 		op.Y = pageTop + (op.Y - hdrTop)
-		res.Ops[start+k-hdrFirst] = op
+		op.Pinned = true
+		// Clones are in-flow page furniture, not position:fixed stamps.
+		op.Fixed = false
+		res.Ops[start+hdrIndex-hdrFirst] = op
 	}
 
 	// Header clones extend the display list after the page index was built.

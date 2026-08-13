@@ -3,7 +3,6 @@ package layout
 import (
 	"math"
 	"sort"
-	"strings"
 
 	"gowkhtmltopdf/internal/html"
 )
@@ -112,22 +111,122 @@ func (e *engine) emitBorderLine(posX, posY, boxW, boxH, width float64, style str
 
 // borderOps returns the four border line ops for the given border box.
 func (e *engine) borderOps(sty ResolvedStyle, posX, posY, wid, height float64) []Op {
+	return e.borderOpsSides(sty, posX, posY, wid, height, true, true, true, true)
+}
+
+// borderOpsSides emits the requested sides of a border box.
+func (e *engine) borderOpsSides(
+	sty ResolvedStyle, posX, posY, wid, height float64, top, right, bottom, left bool,
+) []Op {
 	const borderSideCount = 4
 
 	ops := make([]Op, 0, borderSideCount)
+	if top {
+		ops = appendBorderLineOps(ops, posX, posY, wid, 0, e.scalePt(borderPaint(sty.BorderTop)), sty.BorderTop.Style,
+			sty.BorderTop.Color[0], sty.BorderTop.Color[1], sty.BorderTop.Color[2])
+	}
 
-	ops = appendBorderLineOps(ops, posX, posY, wid, 0, e.scalePt(borderPaint(sty.BorderTop)), sty.BorderTop.Style,
-		sty.BorderTop.Color[0], sty.BorderTop.Color[1], sty.BorderTop.Color[2])
-	ops = appendBorderLineOps(ops, posX+wid, posY, 0, height,
-		e.scalePt(borderPaint(sty.BorderRight)), sty.BorderRight.Style,
-		sty.BorderRight.Color[0], sty.BorderRight.Color[1], sty.BorderRight.Color[2])
-	ops = appendBorderLineOps(ops, posX, posY+height, wid, 0,
-		e.scalePt(borderPaint(sty.BorderBottom)), sty.BorderBottom.Style,
-		sty.BorderBottom.Color[0], sty.BorderBottom.Color[1], sty.BorderBottom.Color[2])
-	ops = appendBorderLineOps(ops, posX, posY, 0, height, e.scalePt(borderPaint(sty.BorderLeft)), sty.BorderLeft.Style,
-		sty.BorderLeft.Color[0], sty.BorderLeft.Color[1], sty.BorderLeft.Color[2])
+	if right {
+		ops = appendBorderLineOps(ops, posX+wid, posY, 0, height,
+			e.scalePt(borderPaint(sty.BorderRight)), sty.BorderRight.Style,
+			sty.BorderRight.Color[0], sty.BorderRight.Color[1], sty.BorderRight.Color[2])
+	}
+
+	if bottom {
+		ops = appendBorderLineOps(ops, posX, posY+height, wid, 0,
+			e.scalePt(borderPaint(sty.BorderBottom)), sty.BorderBottom.Style,
+			sty.BorderBottom.Color[0], sty.BorderBottom.Color[1], sty.BorderBottom.Color[2])
+	}
+
+	if left {
+		ops = appendBorderLineOps(ops, posX, posY, 0, height, e.scalePt(borderPaint(sty.BorderLeft)), sty.BorderLeft.Style,
+			sty.BorderLeft.Color[0], sty.BorderLeft.Color[1], sty.BorderLeft.Color[2])
+	}
 
 	return ops
+}
+
+func hasVerticalBorder(sty ResolvedStyle) bool {
+	left := borderPaint(sty.BorderLeft) > 0 && sty.BorderLeft.Style != cssDisplayNone
+	right := borderPaint(sty.BorderRight) > 0 && sty.BorderRight.Style != cssDisplayNone
+
+	return left || right
+}
+
+const htmlFigure = "figure"
+
+func isCaptionBox(caption *box) bool {
+	if caption == nil || caption.node == nil || caption.style == nil {
+		return false
+	}
+
+	return caption.node.Name == "figcaption" || caption.style.Display == displayTableCaption
+}
+
+func isCollapsedThumbPair(parent *html.Node, parentStyle, captionStyle *ResolvedStyle) bool {
+	if parent == nil || parentStyle == nil || captionStyle == nil {
+		return false
+	}
+
+	isFigure := parent.Name == htmlFigure || parentStyle.Display == displayTable
+	if !isFigure || !hasVerticalBorder(*parentStyle) || !hasVerticalBorder(*captionStyle) {
+		return false
+	}
+
+	if parentStyle.BorderCollapse == borderCollapseValue {
+		return true
+	}
+
+	return borderPaint(parentStyle.BorderBottom) <= 0 && borderPaint(captionStyle.BorderTop) <= 0
+}
+
+// collapsedThumbCaption reports a MediaWiki-style figure/figcaption pair
+// whose CSS is display:table + border-collapse (or matching open sides).
+// Those sides must paint as one frame, not a second caption box.
+func (e *engine) collapsedThumbCaption(caption *box) (*ResolvedStyle, bool) {
+	if e == nil || !isCaptionBox(caption) {
+		return nil, false
+	}
+
+	parent := caption.node.Parent
+	if parent == nil {
+		return nil, false
+	}
+
+	parentStyle := e.styles[parent]
+	if !isCollapsedThumbPair(parent, parentStyle, caption.style) {
+		return nil, false
+	}
+
+	return parentStyle, true
+}
+
+// thumbImageInsideFigure reports an <img> whose nearest figure uses the
+// collapsed thumb frame. Its left/right/top sit on the figure rails; only
+// the bottom separator should paint.
+func (e *engine) thumbImageInsideFigure(node *html.Node) bool {
+	if e == nil || node == nil || node.Name != cssTagImg {
+		return false
+	}
+
+	for parent := node.Parent; parent != nil; parent = parent.Parent {
+		if parent.Name != htmlFigure {
+			continue
+		}
+
+		for _, child := range parent.Children {
+			if child != nil && child.Name == "figcaption" {
+				captionBox := &box{node: child, style: e.styles[child]} //nolint:exhaustruct // style probe only
+				_, ok := e.collapsedThumbCaption(captionBox)
+
+				return ok
+			}
+		}
+
+		return false
+	}
+
+	return false
 }
 
 // chromeMustSpliceImmediately reports boxes whose chrome must land in e.ops
@@ -158,13 +257,11 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 	if e.noEmit {
 		return
 	}
-
-	var chrome []Op
-	if isDomainSection(boxNode.node) {
-		// Domain frames keep the shared thin neutral top edge; section-specific
-		// accent declarations must not become page-wide top rails in PDF output.
+	if isNeutralFrameSection(boxNode.node, sty) {
 		sty.BorderTop = sty.BorderBottom
 	}
+
+	var chrome []Op
 	radii := usedBorderRadii(sty, width, height)
 	radius := uniformRadius(radii)
 	if sty.BGColor[3] > 0 && e.opts.Background {
@@ -181,7 +278,7 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 	case hasRoundedRadii(radii) && roundedAccentBorder(sty):
 		chrome = append(chrome, e.roundedAccentBorderOps(sty, posX, posY, width, height, radii)...)
 	default:
-		chrome = append(chrome, e.borderOps(sty, posX, posY, width, height)...)
+		chrome = append(chrome, e.collapsedOrFullBorderOps(boxNode, sty, posX, posY, width, height)...)
 	}
 	if len(chrome) == 0 {
 		return
@@ -211,6 +308,39 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 			e.deferredChrome[i].at += n
 		}
 	}
+}
+
+// collapsedOrFullBorderOps paints a single joined frame for a collapsed
+// figure/figcaption thumb: the figure already owns the vertical rails, so the
+// caption emits only the closing bottom edge at the figure's border-box width.
+func (e *engine) collapsedOrFullBorderOps(
+	boxNode *box, sty ResolvedStyle, posX, posY, width, height float64,
+) []Op {
+	parentStyle, ok := e.collapsedThumbCaption(boxNode)
+	if !ok {
+		return e.borderOps(sty, posX, posY, width, height)
+	}
+
+	padL := e.scalePt(parentStyle.PaddingLeft + parentStyle.BorderLeft.Width)
+	padR := e.scalePt(parentStyle.PaddingRight + parentStyle.BorderRight.Width)
+
+	return e.borderOpsSides(sty, posX-padL, posY, width+padL+padR, height, false, false, true, false)
+}
+
+// isNeutralFrameSection recognizes a generic frame pattern rather than a
+// fixture ID or literal text: a section with a solid, neutral outer border
+// keeps its top edge consistent with its bottom edge across page fragments.
+//
+//nolint:wsl // generic frame checks remain adjacent to their border gates.
+func isNeutralFrameSection(node *html.Node, sty ResolvedStyle) bool {
+	if node == nil || node.Name != "section" {
+		return false
+	}
+	if sty.BorderTop.Style != solidKeyword || sty.BorderBottom.Style != solidKeyword {
+		return false
+	}
+
+	return nearlyEqual(sty.BorderTop.Width, sty.BorderBottom.Width)
 }
 
 func usedBorderRadius(sty ResolvedStyle, width, height float64) float64 {
@@ -313,19 +443,18 @@ func hasRoundedRadii(radii [4]float64) bool {
 	return false
 }
 
-//nolint:goconst // border style is a direct CSS keyword comparison
 func uniformRoundedBorder(sty ResolvedStyle) bool {
 	top := sty.BorderTop
 
-	return top.Width > 0 && top.Style == "solid" &&
+	return top.Width > 0 && top.Style == solidKeyword &&
 		top == sty.BorderRight && top == sty.BorderBottom && top == sty.BorderLeft
 }
 
 func roundedSolidBorder(sty ResolvedStyle) bool {
 	return sty.BorderTop.Width > 0 && sty.BorderRight.Width > 0 &&
 		sty.BorderBottom.Width > 0 && sty.BorderLeft.Width > 0 &&
-		sty.BorderTop.Style == "solid" && sty.BorderRight.Style == "solid" &&
-		sty.BorderBottom.Style == "solid" && sty.BorderLeft.Style == "solid"
+		sty.BorderTop.Style == solidKeyword && sty.BorderRight.Style == solidKeyword &&
+		sty.BorderBottom.Style == solidKeyword && sty.BorderLeft.Style == solidKeyword
 }
 
 func roundedAccentBorder(sty ResolvedStyle) bool {
@@ -424,10 +553,6 @@ func (e *engine) roundedBorderOps(
 	}
 
 	return ops
-}
-
-func isDomainSection(node *html.Node) bool {
-	return node != nil && node.Name == "section" && strings.HasPrefix(node.Attribute("id"), "domain-")
 }
 
 // roundedAccentBorderOps keeps a solid top rail curved when the remaining

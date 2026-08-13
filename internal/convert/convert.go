@@ -5,12 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 	"time"
 
-	"gowkhtmltopdf/internal/cli"
 	"gowkhtmltopdf/internal/convert/render"
 	"gowkhtmltopdf/internal/css"
+	"gowkhtmltopdf/internal/errs"
 	"gowkhtmltopdf/internal/layout"
 	"gowkhtmltopdf/internal/line"
 	"gowkhtmltopdf/internal/load"
@@ -46,8 +45,7 @@ const (
 )
 
 // Request is the PDF pipeline input, independent of the CLI parser. Both
-// cmd mains (via RunPDFContext adapter) and the library API (wave 2) build it.
-// Image is reserved for a future shared seam with imageout; PDF ignores it.
+// cmd mains (via internal/app) and the library API build it.
 type Request struct {
 	Global  settings.PdfGlobal
 	Image   *settings.ImageGlobal
@@ -63,6 +61,11 @@ type Request struct {
 	// diagnostics/document metadata can never be appended to a PDF stream.
 	// It is only required when Global.DumpOutline is true.
 	OutlineOutput io.Writer
+	// benchmarkPageIslands is an internal-only performance hook. It is never
+	// inferred from HTML content; production and CLI requests always use the
+	// generic document renderer. Benchmark tests opt in through the dedicated
+	// constructor below.
+	benchmarkPageIslands bool
 }
 
 func (r *Request) now() time.Time {
@@ -80,6 +83,14 @@ var ErrMissingOutput = errors.New("convert: output sink is required")
 // sink. Keeping this separate from Output prevents accidental mixed formats.
 var ErrMissingOutlineOutput = errors.New("convert: outline output sink is required")
 
+// ErrInvalidCopies reports a request with a non-positive copy count.
+var ErrInvalidCopies = errors.New("convert: copies must be at least one")
+
+// ErrNoRenderableObjects reports a request that contains no body object that
+// can be loaded. Table-of-contents objects are metadata, not renderable page
+// input, and an object with neither a page nor inline HTML is empty.
+var ErrNoRenderableObjects = settings.ErrNoRenderableObjects
+
 // ErrUnexpectedImageSettings reports an image-mode union member passed to the
 // PDF engine. The shared Request remains the compatibility contract, while
 // these constructors and validators make each mode's invariant explicit at
@@ -91,16 +102,13 @@ var ErrUnexpectedImageSettings = errors.New("convert: image settings are not val
 var ErrMissingImageSettings = errors.New("convert: image settings are required")
 
 // errNilRequest reports a nil Request at a method boundary.
-var errNilRequest = errors.New("convert: nil request")
-
-// errNilCommand reports a nil cli.Command to the CLI adapter.
-var errNilCommand = errors.New("convert: nil command")
+var errNilRequest = errs.ErrNilRequest
 
 // errNilContext reports a nil context at the conversion boundary.
-var errNilContext = errors.New("convert: nil context")
+var errNilContext = errs.ErrNilContext
 
 // errImagesDisabled reports an image request made while images are disabled.
-var errImagesDisabled = errors.New("images disabled")
+var errImagesDisabled = errs.ErrImagesDisabled
 
 var (
 	errTooManyObjects = errors.New("convert: object limit exceeded")
@@ -120,15 +128,19 @@ func NewPDFRequest(global settings.PdfGlobal, objects []settings.PdfObject, outp
 	}
 }
 
-// NewImageRequest builds the image side of the compatibility union. Image
-// settings are copied so the request owns its mode configuration snapshot.
-func NewImageRequest(global settings.PdfGlobal, image settings.ImageGlobal, objects []settings.PdfObject, output io.Writer) *Request { //nolint:lll // constructor signature
-	return &Request{ //nolint:exhaustruct // intentional zero-value fields
-		Global:  global,
-		Image:   &image,
-		Objects: objects,
-		Output:  output,
-	}
+// NewBenchmarkPDFRequest builds the explicitly opted-in benchmark request.
+// This constructor is intentionally internal (the package itself is under
+// internal/) and keeps the benchmark-only page-island optimization separate
+// from normal HTML rendering.
+func NewBenchmarkPDFRequest(
+	global settings.PdfGlobal,
+	objects []settings.PdfObject,
+	output, outline io.Writer,
+) *Request {
+	req := NewPDFRequest(global, objects, output, outline)
+	req.benchmarkPageIslands = true
+
+	return req
 }
 
 // Validate checks the explicit output contract before any loading or font
@@ -139,21 +151,16 @@ func (r *Request) Validate() error {
 		return errNilRequest
 	}
 
-	// PageSize is the canonical geometry key. Keep the legacy Size.PageSize
-	// mirror synchronized at the request boundary so direct settings literals
-	// cannot make page geometry depend on which consumer reads first.
-	if strings.TrimSpace(r.Global.PageSize) == "" {
-		r.Global.PageSize = r.Global.Size.PageSize
-	}
-
-	r.Global.Size.PageSize = r.Global.PageSize
-
 	if r.Output == nil {
 		return ErrMissingOutput
 	}
 
 	if len(r.Objects) > maxConversionObjects {
 		return fmt.Errorf("%w: got %d, limit %d", errTooManyObjects, len(r.Objects), maxConversionObjects)
+	}
+
+	if r.Global.Copies < 1 {
+		return fmt.Errorf("%w: got %d", ErrInvalidCopies, r.Global.Copies)
 	}
 
 	if r.Global.Copies > maxConversionCopies {
@@ -164,7 +171,21 @@ func (r *Request) Validate() error {
 		return ErrMissingOutlineOutput
 	}
 
+	if err := ValidateRenderableObjects(r.Objects); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+// ValidateRenderableObjects applies the shared input invariant used by both
+// PDF and image requests. A request may contain TOC metadata, but it must
+// also contain at least one body object with either a non-empty page source
+// or inline HTML bytes.
+//
+//nolint:wrapcheck // delegating alias to shared settings package
+func ValidateRenderableObjects(objects []settings.PdfObject) error {
+	return settings.ValidateRenderableObjects(objects)
 }
 
 // ValidatePDF checks the PDF-specific request invariant before running the
@@ -189,55 +210,6 @@ func (r *Request) ValidateImage() error {
 	}
 
 	return r.Validate()
-}
-
-// RunPDF executes the full pdf conversion with a background context and no
-// progress callback. Thin adapter over RunPDFContext for existing callers.
-func RunPDF(cmd *cli.Command, log io.Writer) error {
-	return RunPDFContext(context.Background(), cmd, log, nil)
-}
-
-// RunPDFContext adapts a CLI parse result into a Request and runs the
-// pipeline. Opening/closing the output path (or stdout) stays here so Run
-// only sees an io.Writer. Prefer Run when the caller already has a writer.
-func RunPDFContext(ctx context.Context, cmd *cli.Command, log io.Writer, progress func(phase string, percent int)) (err error) { //nolint:lll // CLI adapter signature
-	if cmd == nil {
-		return errNilCommand
-	}
-
-	if ctx == nil {
-		return errNilContext
-	}
-
-	outline := cmd.OutlineWriter
-	if outline == nil {
-		outline = io.Discard
-	}
-
-	req := NewPDFRequest(cmd.Global, cmd.Objects, io.Discard, outline)
-	// CLI may still set the legacy Command.DumpOutline bit; OR into Global.
-	if cmd.DumpOutline {
-		req.Global.DumpOutline = true
-	}
-
-	if err := req.ValidatePDF(); err != nil {
-		return err
-	}
-
-	out, closeOut, err := cmd.OpenOutput()
-	if err != nil {
-		return fmt.Errorf("open output: %w", err)
-	}
-
-	defer func() {
-		if closeErr := closeOut(); closeErr != nil && err == nil {
-			err = closeErr
-		}
-	}()
-
-	req.Output = out
-
-	return Run(ctx, req, log, progress)
 }
 
 // runContext owns the dependencies for one conversion lifecycle.
@@ -493,12 +465,14 @@ func renderObject(ctx context.Context, run *runContext, obj *settings.PdfObject,
 		printLinkUnderline: printUL,
 	}
 
-	if plan, ok := benchmarkPageIslandPlan(root); ok {
-		if err := renderBenchmarkPageIslands(ctx, run.doc, state, root, plan, objectRender, run.log); err != nil {
-			return nil, fmt.Errorf("object %d (%s): certified page islands: %w", idx+1, obj.Page, err)
-		}
+	if run.req.benchmarkPageIslands {
+		if plan, ok := benchmarkPageIslandPlan(root); ok {
+			if err := renderBenchmarkPageIslands(ctx, run.doc, state, root, plan, objectRender, run.log); err != nil {
+				return nil, fmt.Errorf("object %d (%s): certified page islands: %w", idx+1, obj.Page, err)
+			}
 
-		return state, nil
+			return state, nil
+		}
 	}
 
 	lres, err := layout.LayoutContext(ctx, root, state.bodyLayoutOpts(objectRender))

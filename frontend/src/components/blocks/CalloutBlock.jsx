@@ -1,3 +1,5 @@
+import RichText from '../RichText'
+
 const ICON = {
   info: 'i',
   warn: '!',
@@ -20,8 +22,16 @@ export default function CalloutBlock({ block }) {
       </div>
       <div className="callout-body">
         <span className="callout-kicker">{LABEL[variant] || LABEL.info}</span>
-        {block.title && <h3 className="callout-title">{block.title}</h3>}
-        {block.body && <p>{block.body}</p>}
+        {block.title && (
+          <h3 className="callout-title">
+            <RichText>{block.title}</RichText>
+          </h3>
+        )}
+        {block.body && (
+          <p>
+            <RichText>{block.body}</RichText>
+          </p>
+        )}
       </div>
     </aside>
   )

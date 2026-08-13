@@ -466,6 +466,15 @@ func paginateOps(res *Result, contentH float64) []int {
 		}
 	}
 
+	// Lift aside callouts that do not fit the remaining Y on this page
+	// before snapCrossingTextOps splits their last lines off to the next
+	// page top (that snap-then-shift left an internal gap in the card).
+	for range 10 {
+		if !keepImplicitAsides(res, contentH) {
+			break
+		}
+	}
+
 	snapCrossingTextOps(res, contentH)
 
 	paginationFixpoint(res, contentH)
@@ -480,6 +489,13 @@ func paginateOps(res *Result, contentH float64) []int {
 	// Header continuation shifts can reintroduce a small leading band above a
 	// rounded security callout. Normalize after all flow shifts are complete.
 	normalizeLeadingRoundedCallouts(res, contentH)
+	// Forced breaks win over the callout pack: a same-page snap must not
+	// leave page-break-before:always parked on the previous page.
+	for range 10 {
+		if !beforeAlways(res, contentH) {
+			break
+		}
+	}
 	// Sticky is applied in Paint after rect splitting (see splitCrossingRects).
 	opPage := make([]int, len(res.Ops))
 
@@ -860,54 +876,159 @@ func assignOpIDs(res *Result) {
 // appendOpFragments truncates one splittable rect at each page boundary and
 // appends the fragments in document paint order. Keeping the destination
 // owned by splitCrossingRects avoids one temporary slice allocation per op.
-func appendOpFragments(dst []Op, paintOp Op, contentH float64) []Op {
+type opFragment struct{ y, h float64 }
+
+func collectOpFragments(paintOp Op, contentH float64) []opFragment {
+	frags := make([]opFragment, 0, splitSlackPerCrossing+1)
+	rest := paintOp
 	guard := 0
-	for paintOp.H > 1e-9 {
+
+	for rest.H > 1e-9 {
 		guard++
 		if guard > paginationGuardMax {
-			// Defensive: never hang the paint pipeline.
-			return append(dst, paintOp)
+			frags = append(frags, opFragment{y: rest.Y, h: rest.H})
+
+			break
 		}
-		// Epsilon bump so Y exactly on a page top maps to that page, not
-		// the previous one (int truncates 52.0-ε down to 51).
-		page, ok := checkedFlowPageOfY(paintOp.Y+layoutEpsilon, contentH)
+
+		page, ok := checkedFlowPageOfY(rest.Y+layoutEpsilon, contentH)
 		if !ok {
-			return append(dst, paintOp)
+			frags = append(frags, opFragment{y: rest.Y, h: rest.H})
+
+			break
 		}
 
 		boundary := float64(page+1) * contentH
-		if paintOp.Y+paintOp.H <= boundary+1e-9 {
-			return append(dst, paintOp)
+		if rest.Y+rest.H <= boundary+1e-9 {
+			frags = append(frags, opFragment{y: rest.Y, h: rest.H})
+
+			break
 		}
 
-		firstH := boundary - paintOp.Y
+		firstH := boundary - rest.Y
 		if firstH <= layoutEpsilon {
-			// Start is at/past boundary; advance to next page top via p++.
-			paintOp.Y = float64(page+1) * contentH
+			rest.Y = float64(page+1) * contentH
 
 			continue
 		}
 
-		frag := paintOp
-		frag.H = firstH
-		dst = append(dst, frag)
-		paintOp.Y = boundary
-		paintOp.H -= firstH
+		frags = append(frags, opFragment{y: rest.Y, h: firstH})
+		rest.Y = boundary
+		rest.H -= firstH
+	}
 
-		if paintOp.Kind == OpStrokeRect && paintOp.StrokeMask == StrokeMaskTop {
-			// A masked top border belongs only to the section's first
-			// fragment. Re-emitting the continuation as a stroke paints a
-			// false top rail at the next page boundary; retain a no-op marker
-			// so operation ownership and box ranges still include the source.
+	return frags
+}
+
+// Multi-page stroke frames open at intermediate page edges: only the first
+// fragment keeps a top border and only the last keeps a bottom border, so a
+// domain card is not falsely closed at a page break and reopened below.
+func appendOpFragments(dst []Op, paintOp Op, contentH float64) []Op {
+	frags := collectOpFragments(paintOp, contentH)
+
+	if len(frags) == 0 {
+		return dst
+	}
+
+	if len(frags) == 1 {
+		return append(dst, paintOp)
+	}
+
+	for i, piece := range frags {
+		isFirst := i == 0
+		isLast := i == len(frags)-1
+
+		if paintOp.Kind == OpStrokeRect && paintOp.StrokeMask == StrokeMaskTop && !isFirst {
+			// Top accent belongs only on the first page of the section.
 			dst = append(dst, Op{ //nolint:exhaustruct // intentional no-op fragment
-				ID: paintOp.ID, Kind: opKindNoop, Y: paintOp.Y, H: paintOp.H,
+				ID: paintOp.ID, Kind: opKindNoop, Y: piece.y, H: piece.h,
 			})
 
-			return dst
+			continue
 		}
+
+		fragOp := paintOp
+		fragOp.Y = piece.y
+		fragOp.H = piece.h
+
+		if paintOp.Kind == OpStrokeRect {
+			fragOp = openStrokeFragment(fragOp, isFirst, isLast)
+		}
+
+		dst = append(dst, fragOp)
 	}
 
 	return dst
+}
+
+func openLeftStrokeFragment(paintOp Op, isFirst, isLast bool) Op {
+	if !isFirst {
+		paintOp.RadiusTopLeft = 0
+	}
+
+	if !isLast {
+		paintOp.RadiusBottomLeft = 0
+	}
+
+	if paintOp.RadiusTopLeft == 0 && paintOp.RadiusBottomLeft == 0 {
+		paintOp.Radius = 0
+	}
+
+	return paintOp
+}
+
+func openRightStrokeFragment(paintOp Op, isFirst, isLast bool) Op {
+	if !isFirst {
+		paintOp.RadiusTopRight = 0
+	}
+
+	if !isLast {
+		paintOp.RadiusBottomRight = 0
+	}
+
+	if paintOp.RadiusTopRight == 0 && paintOp.RadiusBottomRight == 0 {
+		paintOp.Radius = 0
+	}
+
+	return paintOp
+}
+
+func openFullFrameStrokeFragment(paintOp Op, isFirst, isLast bool) Op {
+	// Full frame: open the edges that continue across the page break.
+	mask := StrokeMaskLeft | StrokeMaskRight
+	if isFirst {
+		mask |= StrokeMaskTop
+	} else {
+		paintOp.RadiusTopLeft, paintOp.RadiusTopRight = 0, 0
+	}
+
+	if isLast {
+		mask |= StrokeMaskBottom
+	} else {
+		paintOp.RadiusBottomLeft, paintOp.RadiusBottomRight = 0, 0
+	}
+
+	paintOp.StrokeMask = mask
+	paintOp.Radius = 0
+
+	return paintOp
+}
+
+// openStrokeFragment clears borders that would falsely close a multi-page
+// frame at an intermediate page edge.
+func openStrokeFragment(paintOp Op, isFirst, isLast bool) Op {
+	switch paintOp.StrokeMask {
+	case StrokeMaskTop:
+		return paintOp
+	case StrokeMaskLeft:
+		return openLeftStrokeFragment(paintOp, isFirst, isLast)
+	case StrokeMaskRight:
+		return openRightStrokeFragment(paintOp, isFirst, isLast)
+	case 0:
+		return openFullFrameStrokeFragment(paintOp, isFirst, isLast)
+	default:
+		return paintOp
+	}
 }
 
 // remapBoxOpRanges updates the layout-owned operation ranges after a display
@@ -930,12 +1051,96 @@ func remapBoxOpRanges(boxNode *box, spans []opSpan) {
 	}
 }
 
+func calculateChromeInkBottom(res *Result, boxNode *box, oldBottom float64) (float64, bool) {
+	inkBottom := boxNode.y
+	hasInk := false
+
+	for idx := boxNode.opStart; idx <= boxNode.opEnd; idx++ {
+		operation := res.Ops[idx]
+		if isOwnBoxChrome(operation, boxNode, oldBottom) ||
+			isOwnBoxChromeFragment(operation, boxNode, oldBottom) ||
+			operation.Positioned {
+			continue
+		}
+
+		bottom := opInkBottom(operation)
+		if bottom > inkBottom {
+			inkBottom = bottom
+			hasInk = true
+		}
+	}
+
+	if boxIsFloatOrFigure(boxNode) {
+		if childBottom := lastInFlowChildBottom(boxNode); childBottom > oldBottom {
+			return childBottom, true
+		}
+
+		return inkBottom, false
+	}
+
+	if childBottom := lastInFlowChildBottom(boxNode); childBottom > inkBottom {
+		return childBottom, true
+	}
+
+	return inkBottom, hasInk
+}
+
+func isBoxChromeEligible(res *Result, boxNode *box) bool {
+	if boxNode.opStart < 0 || boxNode.opStart > boxNode.opEnd || boxNode.opEnd >= len(res.Ops) || boxNode.height <= 0 {
+		return false
+	}
+
+	if boxInsideTable(boxNode) || !hasOwnVerticalChrome(res.Ops, boxNode) {
+		return false
+	}
+
+	return true
+}
+
+func calculateChromeContentBottom(boxNode *box, oldBottom, inkBottom float64, hasInk bool) float64 {
+	if !hasInk {
+		return oldBottom
+	}
+
+	padB := 0.0
+	if boxNode.style != nil {
+		padB = boxNode.style.PaddingBottom
+	}
+
+	desiredBottom := inkBottom + padB
+	if desiredBottom > oldBottom {
+		return desiredBottom
+	}
+
+	return oldBottom
+}
+
+func stretchBoxChrome(res *Result, boxNode *box) {
+	if !isBoxChromeEligible(res, boxNode) {
+		return
+	}
+
+	oldBottom := boxNode.y + boxNode.height
+	normalizeOwnVerticalChrome(res.Ops, boxNode)
+
+	inkBottom, hasInk := calculateChromeInkBottom(res, boxNode, oldBottom)
+	contentBottom := calculateChromeContentBottom(boxNode, oldBottom, inkBottom, hasInk)
+
+	if contentBottom > oldBottom+1e-6 {
+		boxNode.height = contentBottom - boxNode.y
+	}
+
+	normalizeOwnVerticalChrome(res.Ops, boxNode)
+
+	for idx := boxNode.opStart; idx <= boxNode.opEnd; idx++ {
+		stretchOwnBoxChrome(&res.Ops[idx], boxNode, oldBottom, contentBottom)
+	}
+}
+
 // stretchPaginatedChrome repairs block chrome after pagination has shifted a
 // descendant past the block's original bottom. The layout box is built before
 // page-break fixups, so its background and side rails otherwise stop at the
 // stale natural height while the moved footer/text continues below it.
-//
-//nolint:cyclop,wsl // post-pagination ownership walk
 func stretchPaginatedChrome(res *Result) {
 	if res == nil || res.root == nil {
 		return
@@ -947,50 +1152,96 @@ func stretchPaginatedChrome(res *Result) {
 			walk(child)
 		}
 
-		if boxNode.opStart < 0 || boxNode.opStart > boxNode.opEnd || boxNode.opEnd >= len(res.Ops) || boxNode.height <= 0 {
-			return
-		}
-		if boxInsideTable(boxNode) || !hasOwnVerticalChrome(res.Ops, boxNode) {
-			return
-		}
-
-		oldBottom := boxNode.y + boxNode.height
-		contentBottom := oldBottom
-		normalizeOwnVerticalChrome(res.Ops, boxNode)
-		for idx := boxNode.opStart; idx <= boxNode.opEnd; idx++ {
-			operation := res.Ops[idx]
-			if isOwnBoxChrome(operation, boxNode, oldBottom) {
-				continue
-			}
-			// Absolutely positioned descendants are painted in the host's
-			// operation range but do not contribute to its used height. A
-			// generated ::after connector below a flex item must remain in the
-			// gap after that item; treating its ink as flowing content stretches
-			// the item's border during pagination.
-			if operation.Positioned {
-				continue
-			}
-
-			bottom := opInkBottom(operation)
-			if operation.Kind == OpText || operation.Kind == OpBullet {
-				bottom = operation.Y + operation.H
-			}
-			if bottom > contentBottom {
-				contentBottom = bottom
-			}
-		}
-
-		if contentBottom > oldBottom+1e-6 {
-			boxNode.height = contentBottom - boxNode.y
-		}
-		normalizeOwnVerticalChrome(res.Ops, boxNode)
-
-		for idx := boxNode.opStart; idx <= boxNode.opEnd; idx++ {
-			stretchOwnBoxChrome(&res.Ops[idx], boxNode, oldBottom, contentBottom)
-		}
+		stretchBoxChrome(res, boxNode)
 	}
 
 	walk(res.root)
+}
+
+func boxIsFloatOrFigure(boxNode *box) bool {
+	if boxNode == nil {
+		return false
+	}
+
+	if boxNode.node != nil && boxNode.node.Name == "figure" {
+		return true
+	}
+
+	if boxNode.style == nil {
+		return false
+	}
+
+	return boxNode.style.Float == floatLeft || boxNode.style.Float == floatRight
+}
+
+func lastInFlowChildBottom(boxNode *box) float64 {
+	if boxNode == nil {
+		return 0
+	}
+
+	bottom := 0.0
+
+	for _, child := range boxNode.children {
+		if child == nil {
+			continue
+		}
+
+		if child.style != nil && (child.style.Position == positionAbsolute || child.style.Position == positionFixed) {
+			continue
+		}
+
+		if childBottom := child.y + child.height; childBottom > bottom {
+			bottom = childBottom
+		}
+	}
+
+	return bottom
+}
+
+type thumbImgRect struct{ x, y, w, h float64 }
+
+func collectThumbImages(ops []Op) []thumbImgRect {
+	images := make([]thumbImgRect, 0)
+
+	for _, operation := range ops {
+		if operation.Kind == OpImage && operation.W > 8 && operation.H > 8 {
+			images = append(images, thumbImgRect{operation.X, operation.Y, operation.W, operation.H})
+		}
+	}
+
+	return images
+}
+
+func isHairlineUnderImage(paintOp *Op, images []thumbImgRect) bool {
+	if paintOp.Kind != OpLine || paintOp.H != 0 || paintOp.W < 8 || paintOp.Width > 0.55 {
+		return false
+	}
+
+	for _, img := range images {
+		bottom := img.y + img.h
+		if math.Abs(paintOp.Y-bottom) <= 1 && math.Abs(paintOp.X-img.x) <= 2 && math.Abs(paintOp.W-img.w) <= 4 {
+			return true
+		}
+	}
+
+	return false
+}
+
+// stripThumbImageHairlines drops the stray underline-weight rule that lands
+// on the bottom edge of a wiki thumb image (the wrapping file <a> is a link).
+func stripThumbImageHairlines(res *Result) {
+	if res == nil || res.root == nil {
+		return
+	}
+
+	images := collectThumbImages(res.Ops)
+
+	for i := range res.Ops {
+		paintOp := &res.Ops[i]
+		if isHairlineUnderImage(paintOp, images) {
+			paintOp.Kind = opKindNoop
+		}
+	}
 }
 
 //nolint:wsl // border ownership checks are intentionally explicit
@@ -1044,7 +1295,15 @@ func normalizeOwnVerticalChrome(ops []Op, boxNode *box) {
 		ops[idx].Y += delta
 	}
 
+	// Solid rails are one continuous OpLine: extend the last segment to the
+	// box bottom after a Y realign. Dashed/dotted sides are many short
+	// segments — growing the last one paints a solid stub past the dashes
+	// (fixture-40 abs-host, fixture-48 tracking).
 	last := verticalIndexes[len(verticalIndexes)-1]
+	if isDashLikeVerticalRail(ops[last], boxNode) {
+		return
+	}
+
 	lastBottom := ops[last].Y + ops[last].H
 	if lastBottom < boxNode.y+boxNode.height {
 		ops[last].H += boxNode.y + boxNode.height - lastBottom
@@ -1066,6 +1325,90 @@ func isVerticalChromeForBox(operation Op, boxNode *box, leftBorder, rightBorder 
 		((leftBorder && nearLayout(operation.X, boxNode.x) && (line || maskedLeft)) ||
 			(rightBorder && nearLayout(operation.X, boxNode.x+boxNode.w) && (line || maskedRight))) &&
 		operation.Y >= boxNode.y-layoutEpsilon && operation.Y <= boxNode.y+boxNode.height+layoutEpsilon
+}
+
+// isDashedOrDottedStyle reports border styles expanded into multi-segment OpLines.
+func isDashedOrDottedStyle(style string) bool {
+	return style == borderStyleDashed || style == borderStyleDotted
+}
+
+// looksLikeDashSegmentLength is true for edge pieces sized like appendDashedLineSegments
+// (drawLen = width*3 dashed, width dotted), not a continuous solid rail.
+func looksLikeDashSegmentLength(segLen, strokeWidth float64) bool {
+	if segLen <= 0 {
+		return false
+	}
+
+	maxSeg := math.Max(strokeWidth*three, minDashPt) + halfRatio
+	if strokeWidth <= 0 {
+		maxSeg = three + halfRatio
+	}
+
+	return segLen <= maxSeg
+}
+
+func isVerticalLineOp(operation Op) bool {
+	return operation.Kind == OpLine && operation.W == 0 && operation.H > 0
+}
+
+// isDashLikeVerticalRail is true when a vertical side stroke must not be H-stretched:
+// dashed/dotted CSS on that side, or a short segment that is already a dash piece.
+func isDashLikeVerticalRail(operation Op, boxNode *box) bool {
+	if !isVerticalLineOp(operation) || boxNode == nil || boxNode.style == nil {
+		return false
+	}
+
+	if looksLikeDashSegmentLength(operation.H, operation.Width) {
+		return true
+	}
+
+	onLeft := nearLayout(operation.X, boxNode.x) && isDashedOrDottedStyle(boxNode.style.BorderLeft.Style)
+	onRight := nearLayout(operation.X, boxNode.x+boxNode.w) && isDashedOrDottedStyle(boxNode.style.BorderRight.Style)
+
+	return onLeft || onRight
+}
+
+// isHorizontalChromeForBox reports top/bottom edge strokes owned by the box,
+// including short dashed/dotted segments (full-width nearLayout alone misses those).
+//
+//nolint:cyclop // edge membership mirrors vertical chrome checks
+func isHorizontalChromeForBox(operation Op, boxNode *box, oldBottom float64) bool {
+	if operation.Kind != OpLine || operation.H != 0 || operation.W <= 0 || boxNode == nil {
+		return false
+	}
+
+	onTop := nearLayout(operation.Y, boxNode.y)
+	onBottom := nearLayout(operation.Y, oldBottom)
+
+	if !onTop && !onBottom {
+		return false
+	}
+
+	// Solid (or single) full-width edge.
+	if nearLayout(operation.X, boxNode.x) && nearLayout(operation.W, boxNode.w) {
+		return true
+	}
+
+	if boxNode.style == nil {
+		return false
+	}
+
+	// Dashed/dotted fragments sit on the edge with dash-sized W.
+	inside := operation.X >= boxNode.x-layoutEpsilon &&
+		operation.X+operation.W <= boxNode.x+boxNode.w+layoutEpsilon
+	if !inside {
+		return false
+	}
+
+	if onTop && isDashedOrDottedStyle(boxNode.style.BorderTop.Style) {
+		return true
+	}
+
+	if onBottom && isDashedOrDottedStyle(boxNode.style.BorderBottom.Style) {
+		return true
+	}
+
+	return looksLikeDashSegmentLength(operation.W, operation.Width)
 }
 
 func opInkBottom(operation Op) float64 {
@@ -1100,15 +1443,47 @@ func isOwnBoxChrome(operation Op, boxNode *box, oldBottom float64) bool {
 		return false
 	}
 
+	if boxNode.style == nil {
+		return false
+	}
+
 	vertical := isVerticalChromeForBox(operation, boxNode,
 		boxNode.style.BorderLeft.Width > 0 && boxNode.style.BorderLeft.Style != cssDisplayNone,
 		boxNode.style.BorderRight.Width > 0 && boxNode.style.BorderRight.Style != cssDisplayNone)
-	horizontal := operation.H == 0 && operation.W > 0 && nearLayout(operation.X, boxNode.x) &&
-		nearLayout(operation.W, boxNode.w) &&
-		(nearLayout(operation.Y, boxNode.y) || nearLayout(operation.Y, oldBottom))
+	horizontal := isHorizontalChromeForBox(operation, boxNode, oldBottom)
 
 	return vertical || horizontal
 }
+
+func isOwnBoxRectFragment(operation Op, boxNode *box, oldBottom float64) bool {
+	isRectKind := operation.Kind == OpFillRect || operation.Kind == OpStrokeRect
+	if !isRectKind || !nearLayout(operation.X, boxNode.x) || !nearLayout(operation.W, boxNode.w) {
+		return false
+	}
+
+	return operation.Y >= boxNode.y-layoutEpsilon && operation.Y+operation.H <= oldBottom+1
+}
+
+// isOwnBoxChromeFragment reports page-split fill/stroke/rail pieces of the
+// box's own frame. After openStrokeFragment these no longer match the full
+// border-box height, so isOwnBoxChrome alone would treat them as content ink
+// and re-add padding-bottom on every stretch pass.
+func isOwnBoxChromeFragment(operation Op, boxNode *box, oldBottom float64) bool {
+	if boxNode == nil || boxNode.style == nil {
+		return false
+	}
+
+	if isOwnBoxRectFragment(operation, boxNode, oldBottom) || isHorizontalChromeForBox(operation, boxNode, oldBottom) {
+		return true
+	}
+
+	hasLeft := boxNode.style.BorderLeft.Width > 0 && boxNode.style.BorderLeft.Style != cssDisplayNone
+	hasRight := boxNode.style.BorderRight.Width > 0 && boxNode.style.BorderRight.Style != cssDisplayNone
+
+	return isVerticalChromeForBox(operation, boxNode, hasLeft, hasRight)
+}
+
+const boxBottomMatchSlack = 1.5
 
 //nolint:cyclop // mutate owned paint
 func stretchOwnBoxChrome(operation *Op, boxNode *box, oldBottom, newBottom float64) {
@@ -1117,25 +1492,42 @@ func stretchOwnBoxChrome(operation *Op, boxNode *box, oldBottom, newBottom float
 	}
 
 	if (operation.Kind == OpFillRect || operation.Kind == OpStrokeRect) &&
-		nearLayout(operation.X, boxNode.x) && nearLayout(operation.Y, boxNode.y) &&
-		nearLayout(operation.W, boxNode.w) && nearLayout(operation.H, oldBottom-boxNode.y) {
-		operation.H = newBottom - boxNode.y
+		nearLayout(operation.X, boxNode.x) && nearLayout(operation.W, boxNode.w) {
+		// Only stretch chrome that currently owns the box bottom. Earlier
+		// multi-page fragments end at a page boundary and must stay open;
+		// stretching them to newBottom refilled whole pages (fixture-31).
+		fullMatch := nearLayout(operation.Y, boxNode.y) && nearLayout(operation.H, oldBottom-boxNode.y)
+		ownsBottom := math.Abs(operation.Y+operation.H-oldBottom) < boxBottomMatchSlack
 
-		return
+		if fullMatch || ownsBottom {
+			operation.H = newBottom - operation.Y
+			if operation.H < 0 {
+				operation.H = 0
+			}
+
+			return
+		}
 	}
 
 	if operation.Kind == OpLine && operation.W == 0 && operation.H > 0 &&
-		((boxNode.style.BorderLeft.Width > 0 && nearLayout(operation.X, boxNode.x)) ||
-			(boxNode.style.BorderRight.Width > 0 && nearLayout(operation.X, boxNode.x+boxNode.w))) &&
+		((boxNode.style != nil && boxNode.style.BorderLeft.Width > 0 && nearLayout(operation.X, boxNode.x)) ||
+			(boxNode.style != nil && boxNode.style.BorderRight.Width > 0 && nearLayout(operation.X, boxNode.x+boxNode.w))) &&
 		operation.Y >= boxNode.y-layoutEpsilon && operation.Y <= boxNode.y+boxNode.height+layoutEpsilon &&
 		nearLayout(operation.Y+operation.H, oldBottom) {
+		// Never elongate a dash/dot segment into a solid stub.
+		if isDashLikeVerticalRail(*operation, boxNode) {
+			return
+		}
+
 		operation.H = newBottom - operation.Y
 
 		return
 	}
 
+	// Bottom edge: solid full-width line, or every dashed/dotted fragment on
+	// that edge (short W would miss nearLayout(W, box.w)).
 	if operation.Kind == OpLine && operation.H == 0 && operation.W > 0 &&
-		nearLayout(operation.X, boxNode.x) && nearLayout(operation.W, boxNode.w) &&
+		isHorizontalChromeForBox(*operation, boxNode, oldBottom) &&
 		nearLayout(operation.Y, oldBottom) {
 		operation.Y = newBottom
 	}
@@ -1339,6 +1731,13 @@ func stripOrphanRows(res *Result, idxs []int, pageTop, pageBot, lastInkBot float
 func stripOrphanRowOp(paintOp *Op, lastInkBot float64) bool {
 	switch paintOp.Kind {
 	case OpFillRect, OpStrokeRect:
+		// Multi-page frame fragments keep a StrokeMask (open top/bottom).
+		// Zeroing their height still leaves a masked top stroke that paints as
+		// a full-width hairline on the previous page (fixture-56 page 14).
+		if paintOp.StrokeMask != 0 {
+			return false
+		}
+
 		// Row-sized shells whose center sits below the last ink are
 		// empty trailing row backgrounds (not the cell that holds the
 		// last text, whose center is at/above the baseline band).
@@ -1453,48 +1852,131 @@ func clipSectionTrailingBand(res *Result, idxs []int, pageTop, pageBot, contentB
 			continue
 		}
 
-		clipTrailingBandOp(paintOp, pageTop, pageBot, contentBot)
+		clipTrailingBandOp(res, paintOp, pageTop, pageBot, contentBot)
 	}
 }
 
-// clipTrailingBandOp trims one trailing section wash or border to contentBot.
-func clipTrailingBandOp(paintOp *Op, pageTop, pageBot, contentBot float64) {
+// clipTrailingBandOp trims one trailing continuation-fragment wash or border
+// to contentBot. Identity is the op ID plus page-top / overflow geometry, not
+// a fixture-named RGB range.
+func clipTrailingBandOp(res *Result, paintOp *Op, pageTop, pageBot, contentBot float64) {
 	switch paintOp.Kind {
 	case OpFillRect:
-		if isTrailingSectionWash(paintOp, pageTop, contentBot) {
+		if isTrailingContinuationWash(res, paintOp, pageTop, pageBot, contentBot) {
 			paintOp.H = contentBot - paintOp.Y
 		}
 	case OpLine:
-		if isTrailingSectionBorder(paintOp, pageTop, contentBot) {
+		if isTrailingContinuationBorder(res, paintOp, pageTop, pageBot, contentBot) {
 			paintOp.H = contentBot - paintOp.Y
-		} else if isTrailingPageRule(paintOp, pageBot, contentBot) {
+		} else if isTrailingContinuationRule(res, paintOp, pageBot, contentBot) {
 			paintOp.Y = contentBot
 		}
 	case OpStrokeRect, OpText, OpImage, OpLinkURI, OpBullet, opKindNoop:
 	}
 }
 
-// isTrailingSectionWash reports a continuation-fragment wash that begins at
-// the page top and runs past the content bottom. A normal block fill (for
-// example a <pre> with bottom padding) must retain its full box height
-// through its bottom border, so only the section color matches.
-func isTrailingSectionWash(paintOp *Op, pageTop, contentBot float64) bool {
-	return paintOp.Y <= pageTop+1 && paintOp.H > 40 && isSectionWashRGB(paintOp.R, paintOp.G, paintOp.B) &&
-		paintOp.Y+paintOp.H > contentBot+1 && paintOp.Y < contentBot
+// isTrailingContinuationWash reports a continuation-fragment wash that begins
+// at the page top and runs past the content bottom. A complete one-page
+// block fill keeps its authored height even when the fill color is a cool
+// grey and the page has unused space below.
+//
+// Page paper (html/body background) is not clipped: it has no side rail and
+// must fill the unused page tail (fixture-56 page 2 after a short section).
+// Section frames with co-located side rails still clip (fixture-31).
+func isTrailingContinuationWash(
+	res *Result, paintOp *Op, pageTop, pageBot, contentBot float64,
+) bool {
+	if paintOp.Y > pageTop+1 || paintOp.H <= 40 ||
+		paintOp.Y+paintOp.H <= contentBot+1 || paintOp.Y >= contentBot ||
+		!isContinuingBlockFragment(res, paintOp, pageBot) {
+		return false
+	}
+
+	// Paper wash: full-page fill without a matching vertical rail.
+	if !hasCoLocatedSideRail(res, paintOp, pageTop, pageBot) {
+		return false
+	}
+
+	return true
 }
 
-// isTrailingSectionBorder reports a page-top section side border that runs
-// past the content bottom.
-func isTrailingSectionBorder(paintOp *Op, pageTop, contentBot float64) bool {
-	return paintOp.Y <= pageTop+1 && paintOp.H > 40 && nearSectionBorderRGB(paintOp.R, paintOp.G, paintOp.B) &&
-		paintOp.Y+paintOp.H > contentBot+1 && paintOp.Y < contentBot
+const minSideRailHeight = 40.0
+
+func isSideRailOnPage(rail *Op, left, right, pageTop, pageBot float64) bool {
+	if rail.Kind != OpLine || rail.W > 1 || rail.H <= minSideRailHeight {
+		return false
+	}
+
+	if rail.Y+rail.H <= pageTop+1 || rail.Y >= pageBot-1 {
+		return false
+	}
+
+	return nearLayout(rail.X, left) || nearLayout(rail.X, right)
 }
 
-// isTrailingPageRule reports a thin section-colored rule stranded near the
-// page bottom, below the last content.
-func isTrailingPageRule(paintOp *Op, pageBot, contentBot float64) bool {
-	return paintOp.H < 1 && paintOp.Width > 0 && nearSectionBorderRGB(paintOp.R, paintOp.G, paintOp.B) &&
-		paintOp.Y > contentBot+1 && paintOp.Y > pageBot-30
+// hasCoLocatedSideRail reports a vertical border near paintOp's left or right
+// edge on the same page band — the signature of a framed section card, not
+// plain page paper.
+func hasCoLocatedSideRail(res *Result, paintOp *Op, pageTop, pageBot float64) bool {
+	if res == nil || paintOp == nil {
+		return false
+	}
+
+	left := paintOp.X
+	right := paintOp.X + paintOp.W
+
+	for i := range res.Ops {
+		if isSideRailOnPage(&res.Ops[i], left, right, pageTop, pageBot) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// isTrailingContinuationBorder reports a page-top side border that belongs
+// to a block continuing onto a later page and runs past the content bottom.
+func isTrailingContinuationBorder(
+	res *Result, paintOp *Op, pageTop, pageBot, contentBot float64,
+) bool {
+	return paintOp.Y <= pageTop+1 && paintOp.H > 40 &&
+		paintOp.Y+paintOp.H > contentBot+1 && paintOp.Y < contentBot &&
+		isContinuingBlockFragment(res, paintOp, pageBot)
+}
+
+// isTrailingContinuationRule reports a thin closing rule stranded near the
+// page bottom, below the last content, that belongs to a continuing block.
+func isTrailingContinuationRule(res *Result, paintOp *Op, pageBot, contentBot float64) bool {
+	return paintOp.H < 1 && paintOp.Width > 0 &&
+		paintOp.Y > contentBot+1 && paintOp.Y > pageBot-30 &&
+		isContinuingBlockFragment(res, paintOp, pageBot)
+}
+
+// isContinuingBlockFragment reports that paintOp is a page fragment of a
+// block that continues after pageBot. Split fragments share Op.ID; a remnant
+// that still sits on the page edge is treated as continuing when no ID is
+// assigned (legacy/test-constructed ops).
+func isContinuingBlockFragment(res *Result, paintOp *Op, pageBot float64) bool {
+	if paintOp == nil {
+		return false
+	}
+
+	if paintOp.ID != 0 && res != nil {
+		for i := range res.Ops {
+			other := &res.Ops[i]
+			if other.ID != paintOp.ID || other == paintOp {
+				continue
+			}
+
+			if other.Y >= pageBot-1 {
+				return true
+			}
+		}
+
+		return false
+	}
+
+	return paintOp.Y+paintOp.H > pageBot-1
 }
 
 // clipStickySectionChrome ends sticky-section chrome at the last real row and
@@ -1805,15 +2287,4 @@ func (target stickySectionChromeTarget) sideMatches(paintOp *Op) bool {
 
 func sameRGB(op *Op, rgb [3]float64) bool {
 	return math.Abs(op.R-rgb[0]) < 0.01 && math.Abs(op.G-rgb[1]) < 0.01 && math.Abs(op.B-rgb[2]) < 0.01
-}
-
-// isSectionWashRGB reports near-neutral cool greys like fixture-31 .section
-// (#eceff1). Chromatic washes (e.g. fixture-32 grid #f3e5f5) must not match
-// or page-trailing clip steals their height.
-func isSectionWashRGB(r, g, b float64) bool {
-	if math.Abs(r-g) > 0.035 || math.Abs(g-b) > 0.035 || math.Abs(r-b) > 0.035 {
-		return false
-	}
-
-	return r > 0.88 && g > 0.88 && b > 0.88 && r < 0.97 && g < 0.97 && b < 0.97
 }

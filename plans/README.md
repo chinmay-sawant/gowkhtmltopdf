@@ -13,7 +13,10 @@
 
 Workflow: [../skills/phase-wise-checklist/SKILLS.md](../skills/phase-wise-checklist/SKILLS.md)
 
-Estimates and product framing: [../README.md](../README.md)
+Product framing: [../documentation/overview.md](../documentation/overview.md),
+[../documentation/fidelity.md](../documentation/fidelity.md),
+[../documentation/deferred.md](../documentation/deferred.md).
+Performance snapshots: [../documentation/performance.md](../documentation/performance.md).
 
 ---
 

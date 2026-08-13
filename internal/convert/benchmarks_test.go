@@ -70,6 +70,18 @@ type benchmarkTemplateData struct {
 	ImageSrc string
 }
 
+type benchmarkPDFMode string
+
+const (
+	benchmarkPDFGeneric          benchmarkPDFMode = "generic"
+	benchmarkPDFCertifiedIslands benchmarkPDFMode = "certified-islands"
+)
+
+var benchmarkPDFModes = []benchmarkPDFMode{ //nolint:gochecknoglobals // fixed comparison matrix
+	benchmarkPDFGeneric,
+	benchmarkPDFCertifiedIslands,
+}
+
 type tvMazeImage struct {
 	Medium   string `json:"medium"`
 	Original string `json:"original"`
@@ -324,17 +336,31 @@ func executeBenchmarkTemplate(tb testing.TB, tpl *template.Template, data any) [
 	return append([]byte(nil), rendered.Bytes()...)
 }
 
-func benchmarkPDFRequest(html []byte, output io.Writer) *convert.Request {
+func benchmarkPDFRequest(html []byte, output io.Writer, mode benchmarkPDFMode) *convert.Request {
 	global := settings.DefaultPdfGlobal()
 	global.Quiet = true
 	object := settings.DefaultPdfObject()
 	object.Page = ""
 	object.Load.InlineHTML = html
 
-	return convert.NewPDFRequest(global, []settings.PdfObject{object}, output, nil)
+	objects := []settings.PdfObject{object}
+
+	switch mode {
+	case benchmarkPDFGeneric:
+		return convert.NewPDFRequest(global, objects, output, nil)
+	case benchmarkPDFCertifiedIslands:
+		return convert.NewBenchmarkPDFRequest(global, objects, output, nil)
+	default:
+		panic(fmt.Sprintf("unsupported benchmark PDF mode %q", mode))
+	}
 }
 
-func benchmarkImageRequest(html []byte, output io.Writer) *convert.Request {
+func benchmarkPDFMetadata(tb testing.TB, mode benchmarkPDFMode) {
+	tb.Helper()
+	tb.Logf("request_mode=%s fixture=%s", mode, benchmarkTemplatePath("report.html.tmpl"))
+}
+
+func benchmarkImageRequest(html []byte, output io.Writer) *imageout.Request {
 	global := settings.DefaultPdfGlobal()
 	global.Quiet = true
 	imageSettings := settings.DefaultImageGlobal()
@@ -342,7 +368,7 @@ func benchmarkImageRequest(html []byte, output io.Writer) *convert.Request {
 	object.Page = ""
 	object.Load.InlineHTML = html
 
-	return convert.NewImageRequest(global, imageSettings, []settings.PdfObject{object}, output)
+	return imageout.NewRequest(global, imageSettings, []settings.PdfObject{object}, output)
 }
 
 func benchmarkPDFPageCount(data []byte) int {
@@ -377,8 +403,9 @@ func benchmarkDataURL(data []byte) string {
 }
 
 // BenchmarkPDFPages measures the full inline-HTML to PDF pipeline for the
-// fixed page-size matrix. Template execution is intentionally outside this
-// benchmark so it isolates conversion cost for already-materialized HTML.
+// fixed page-size matrix in both generic and explicitly certified-island
+// request modes. Template execution is intentionally outside this benchmark
+// so it isolates conversion cost for already-materialized HTML.
 func BenchmarkPDFPages(b *testing.B) {
 	tpl := loadBenchmarkTemplate(b, "report.html.tmpl")
 	sources := make(map[int][]byte, len(benchmarkPageSizes))
@@ -389,68 +416,81 @@ func BenchmarkPDFPages(b *testing.B) {
 		})
 	}
 
-	for _, pages := range benchmarkPageSizes {
-		b.Run(fmt.Sprintf("%dPages", pages), func(b *testing.B) {
-			var output bytes.Buffer
-			req := benchmarkPDFRequest(sources[pages], &output)
-			b.ReportMetric(float64(pages), "pages")
-			b.ResetTimer()
+	for _, mode := range benchmarkPDFModes {
+		b.Run(string(mode), func(b *testing.B) {
+			benchmarkPDFMetadata(b, mode)
 
-			for range b.N {
-				output.Reset()
+			for _, pages := range benchmarkPageSizes {
+				b.Run(fmt.Sprintf("%dPages", pages), func(b *testing.B) {
+					var output bytes.Buffer
+					req := benchmarkPDFRequest(sources[pages], &output, mode)
+					b.ReportMetric(float64(pages), "pages")
+					b.ResetTimer()
 
-				if err := convert.Run(b.Context(), req, io.Discard, nil); err != nil {
-					b.Fatalf("run PDF benchmark: %v", err)
-				}
+					for range b.N {
+						output.Reset()
+
+						if err := convert.Run(b.Context(), req, io.Discard, nil); err != nil {
+							b.Fatalf("run PDF benchmark: %v", err)
+						}
+					}
+
+					b.StopTimer()
+
+					if got := benchmarkPDFPageCount(output.Bytes()); got != pages {
+						b.Fatalf("rendered pages = %d, want %d", got, pages)
+					}
+
+					b.SetBytes(int64(output.Len()))
+				})
 			}
-
-			b.StopTimer()
-
-			if got := benchmarkPDFPageCount(output.Bytes()); got != pages {
-				b.Fatalf("rendered pages = %d, want %d", got, pages)
-			}
-
-			b.SetBytes(int64(output.Len()))
 		})
 	}
 }
 
 // BenchmarkTemplatePages measures template execution plus the full PDF
-// pipeline. It uses the same page-size matrix as BenchmarkPDFPages.
+// pipeline in both request modes. It uses the same page-size matrix as
+// BenchmarkPDFPages.
 func BenchmarkTemplatePages(b *testing.B) {
 	tpl := loadBenchmarkTemplate(b, "report.html.tmpl")
 
-	for _, pages := range benchmarkPageSizes {
-		data := benchmarkTemplateData{Pages: benchmarkPages(pages)} //nolint:exhaustruct // intentional zero-value fields
-		b.Run(fmt.Sprintf("%dPages", pages), func(b *testing.B) {
-			var output bytes.Buffer
-			req := benchmarkPDFRequest(nil, &output)
+	for _, mode := range benchmarkPDFModes {
+		b.Run(string(mode), func(b *testing.B) {
+			benchmarkPDFMetadata(b, mode)
 
-			b.ReportMetric(float64(pages), "pages")
-			b.ResetTimer()
+			for _, pages := range benchmarkPageSizes {
+				data := benchmarkTemplateData{Pages: benchmarkPages(pages)} //nolint:exhaustruct // intentional zero-value fields
+				b.Run(fmt.Sprintf("%dPages", pages), func(b *testing.B) {
+					var output bytes.Buffer
+					req := benchmarkPDFRequest(nil, &output, mode)
 
-			for range b.N {
-				var rendered bytes.Buffer
-				if err := tpl.Execute(&rendered, data); err != nil {
-					b.Fatalf("execute report template: %v", err)
-				}
+					b.ReportMetric(float64(pages), "pages")
+					b.ResetTimer()
 
-				req.Objects[0].Load.InlineHTML = rendered.Bytes()
+					for range b.N {
+						var rendered bytes.Buffer
+						if err := tpl.Execute(&rendered, data); err != nil {
+							b.Fatalf("execute report template: %v", err)
+						}
 
-				output.Reset()
+						req.Objects[0].Load.InlineHTML = rendered.Bytes()
 
-				if err := convert.Run(b.Context(), req, io.Discard, nil); err != nil {
-					b.Fatalf("run templated PDF benchmark: %v", err)
-				}
+						output.Reset()
+
+						if err := convert.Run(b.Context(), req, io.Discard, nil); err != nil {
+							b.Fatalf("run templated PDF benchmark: %v", err)
+						}
+					}
+
+					b.StopTimer()
+
+					if got := benchmarkPDFPageCount(output.Bytes()); got != pages {
+						b.Fatalf("rendered pages = %d, want %d", got, pages)
+					}
+
+					b.SetBytes(int64(output.Len()))
+				})
 			}
-
-			b.StopTimer()
-
-			if got := benchmarkPDFPageCount(output.Bytes()); got != pages {
-				b.Fatalf("rendered pages = %d, want %d", got, pages)
-			}
-
-			b.SetBytes(int64(output.Len()))
 		})
 	}
 }
@@ -540,7 +580,7 @@ func TestGenerateBenchmarkOutputs(t *testing.T) { //nolint:cyclop,funlen // mate
 
 		var output bytes.Buffer
 
-		req := benchmarkPDFRequest(source, &output)
+		req := benchmarkPDFRequest(source, &output, benchmarkPDFCertifiedIslands)
 		if err := convert.Run(t.Context(), req, io.Discard, nil); err != nil {
 			t.Fatalf("generate PDF output for %d pages: %v", pages, err)
 		}
@@ -552,7 +592,7 @@ func TestGenerateBenchmarkOutputs(t *testing.T) { //nolint:cyclop,funlen // mate
 		writeBenchmarkOutput(t, fmt.Sprintf("pdf-pages-%03d.pdf", pages), output.Bytes())
 
 		output.Reset()
-		templateRequest := benchmarkPDFRequest(nil, &output)
+		templateRequest := benchmarkPDFRequest(nil, &output, benchmarkPDFCertifiedIslands)
 
 		if err := reportTemplate.Execute(&output, benchmarkTemplateData{ //nolint:exhaustruct,lll // intentional zero-value fields
 			Pages: benchmarkPages(pages),
@@ -661,7 +701,7 @@ func TestGenerateLiveMovieOutput(t *testing.T) {
 	var pdfOutput bytes.Buffer
 	if err := convert.Run(
 		t.Context(),
-		benchmarkPDFRequest(source, &pdfOutput),
+		benchmarkPDFRequest(source, &pdfOutput, benchmarkPDFGeneric),
 		io.Discard,
 		nil,
 	); err != nil {
@@ -758,7 +798,7 @@ func BenchmarkWebFetchImage(b *testing.B) {
 			imageSettings := settings.DefaultImageGlobal()
 			object := settings.DefaultPdfObject()
 			object.Page = fmt.Sprintf("%s/document-%d.html", server.URL, images)
-			req := convert.NewImageRequest(
+			req := imageout.NewRequest(
 				global,
 				imageSettings,
 				[]settings.PdfObject{object},

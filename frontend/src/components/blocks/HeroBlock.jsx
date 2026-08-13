@@ -1,8 +1,16 @@
+import RichText from '../RichText'
+
 export default function HeroBlock({ block }) {
   return (
     <div className="hero">
-      <h1>{block.title}</h1>
-      {block.lede && <p className="lede">{block.lede}</p>}
+      <h1>
+        <RichText>{block.title}</RichText>
+      </h1>
+      {block.lede && (
+        <p className="lede">
+          <RichText>{block.lede}</RichText>
+        </p>
+      )}
     </div>
   )
 }

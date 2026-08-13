@@ -20,6 +20,7 @@ import (
 	"strconv"
 
 	"gowkhtmltopdf/internal/css"
+	"gowkhtmltopdf/internal/errs"
 	"gowkhtmltopdf/internal/html"
 	"gowkhtmltopdf/internal/pdf"
 )
@@ -320,6 +321,11 @@ type Op struct {
 	// Fixed marks ops from position:fixed boxes; Paint stamps them on every
 	// page at viewport-relative coordinates.
 	Fixed bool
+
+	// Pinned keeps canvas Y stable under later index-suffix flow shifts
+	// (repeated thead clones appended after document ops). Unlike Fixed,
+	// pinned ops paint only on their natural page.
+	Pinned bool
 
 	// StickyID links display-list ops to a position:sticky box after parent
 	// prependChrome shifts op indices (0 = not sticky).
@@ -738,6 +744,7 @@ func WithWorkspace(ctx context.Context, root *html.Node, opts Options, workspace
 	return layoutContext(ctx, root, opts, workspace)
 }
 
+//nolint:cyclop // layout preflight and staged style/container passes are explicit lifecycle gates.
 func layoutContext(
 	ctx context.Context,
 	root *html.Node, opts Options, workspace *Workspace,
@@ -747,7 +754,7 @@ func layoutContext(
 	}
 
 	if ctx == nil {
-		return nil, errors.New("layout: nil context") //nolint:err113 // stable internal boundary error
+		return nil, errs.ErrNilContext
 	}
 
 	if err := ctx.Err(); err != nil {
@@ -772,7 +779,10 @@ func layoutContext(
 		font = faces.Regular
 	}
 
-	styles, containers := resolveStylesForLayout(root, opts)
+	styles, containers, err := resolveStylesForLayoutContext(ctx, root, opts)
+	if err != nil {
+		return nil, fmt.Errorf("layout: style resolution: %w", err)
+	}
 
 	var ops []Op
 
@@ -850,28 +860,54 @@ func finalizeResult(eng *engine, root *html.Node, opts Options) (*Result, error)
 func resolveStylesForLayout(
 	root *html.Node, opts Options,
 ) (map[*html.Node]*ResolvedStyle, map[*html.Node]sizeContainer) {
+	styles, containers, _ := resolveStylesForLayoutContext(context.Background(), root, opts)
+
+	return styles, containers
+}
+
+//nolint:wsl // container remount gates are intentionally kept in lifecycle order.
+func resolveStylesForLayoutContext(
+	ctx context.Context, root *html.Node, opts Options,
+) (map[*html.Node]*ResolvedStyle, map[*html.Node]sizeContainer, error) {
 	// Pass 1: cascade without @container (used sizes unknown).
-	styles := resolveStylesWith(root, opts, nil)
+	styles, err := resolveStylesWithContext(ctx, root, opts, nil)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	if !css.HasContainerRules(opts.Sheets) {
-		return styles, nil
+		return styles, nil, nil
 	}
 	// After definite inline sizes of size containers are known, re-cascade so
 	// matching @container rules apply, then lay out once with final styles.
-	cinfo := measureSizeContainers(root, styles, opts.Width)
+	cinfo, err := measureSizeContainersContext(ctx, root, styles, opts.Width)
+	if err != nil {
+		return nil, nil, err
+	}
 	if len(cinfo) == 0 {
-		return styles, nil
+		return styles, nil, nil
 	}
 
-	styles = resolveStylesWith(root, opts, cinfo)
+	styles, err = resolveStylesWithContext(ctx, root, opts, cinfo)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	// One nested remount: @container may change nested container-type.
-	cinfo2 := measureSizeContainers(root, styles, opts.Width)
+	cinfo2, err := measureSizeContainersContext(ctx, root, styles, opts.Width)
+	if err != nil {
+		return nil, nil, err
+	}
 	if len(cinfo2) != len(cinfo) || !sameSizeContainers(cinfo, cinfo2) {
-		return resolveStylesWith(root, opts, cinfo2), cinfo2
+		styles, err = resolveStylesWithContext(ctx, root, opts, cinfo2)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		return styles, cinfo2, nil
 	}
 
-	return styles, cinfo
+	return styles, cinfo, nil
 }
 
 // sameSizeContainers reports whether two container measurements agree for
@@ -981,9 +1017,10 @@ type box struct {
 	flowIndex      int // transient index in Result.boxes during pagination
 	firstBaseline  float64
 	// table cells
-	col, span int
-	row       int // owning table row index, set once at placement
-	rowSpan   int // vertical span (default 1) for <td rowspan>
+	col, span         int
+	row               int  // owning table row index, set once at placement
+	rowSpan           int  // vertical span (default 1) for <td rowspan>
+	paginationShifted bool // row was moved by a table pagination fixpoint
 	// hasInk is set at cell build time from nodeHasTableInk (any
 	// non-whitespace text, br, img, svg, video or canvas in the subtree);
 	// row collapse uses the flag instead of re-walking each cell's tree.
@@ -1317,7 +1354,6 @@ func (e *engine) verticalWritingHeight(contentStart int, current float64, style 
 	return current
 }
 
-//nolint:cyclop // native widget value normalization and paint
 func (e *engine) paintValueWidget(node *html.Node, style ResolvedStyle, leftX, topY, width, height float64) {
 	minValue, maxValue := 0.0, 1.0
 	if node.Name == htmlMeter {
@@ -1347,23 +1383,11 @@ func (e *engine) paintValueWidget(node *html.Node, style ResolvedStyle, leftX, t
 		return
 	}
 
-	// Native progress indicators use a thin green value bar when no authored
-	// component token provides one. Keep that default independent of an
-	// unrelated late document-wide --accent2 override (fixture 56).
-	color := [3]float64{0, 0.5, 0}
-	if node.Name == htmlMeter {
-		color = style.Color
-	}
-
-	for _, name := range []string{"--d03-bar"} {
-		if raw, ok := style.CustomProps[name]; ok {
-			if r, g, b, _, parsed := css.ParseColor(raw); parsed {
-				color = [3]float64{float64(r) / 255, float64(g) / 255, float64(b) / 255}
-
-				break
-			}
-		}
-	}
+	// Native progress/meter fill: CSS accent-color, then an authored
+	// background, then the widget default. Custom properties participate
+	// only after they resolve into those properties (e.g. accent-color:
+	// var(--token)); inherited document tokens are not scanned here.
+	color := widgetValueColor(node.Name, style)
 
 	const indicatorRatio = 0.3
 
@@ -1379,6 +1403,18 @@ func (e *engine) paintValueWidget(node *html.Node, style ResolvedStyle, leftX, t
 		R: color[0], G: color[1], B: color[2], Alpha: 1,
 		Radius: usedBorderRadius(style, contentW*ratio, indicatorH),
 	})
+}
+
+func widgetValueColor(tag string, style ResolvedStyle) [3]float64 {
+	if style.AccentColorSet {
+		return style.AccentColor
+	}
+
+	if tag == htmlMeter {
+		return style.Color
+	}
+
+	return [3]float64{0, 0.5, 0}
 }
 
 func widgetNumber(raw string, fallback float64) float64 {

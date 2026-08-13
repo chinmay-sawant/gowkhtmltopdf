@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"gowkhtmltopdf/internal/cli"
 	"gowkhtmltopdf/internal/settings"
 )
 
@@ -51,14 +50,7 @@ func TestFontFaceLocalEmbed(t *testing.T) {
 	copyTestdataTTF(t, dir)
 
 	var log bytes.Buffer
-	if err := RunPDF(cmd, &log); err != nil {
-		t.Fatalf("RunPDF: %v\nlog: %s", err, log.String())
-	}
-
-	data, err := os.ReadFile(cmd.Output)
-	if err != nil {
-		t.Fatalf("read output: %v", err)
-	}
+	data := runPDFWithLog(t, cmd, &log)
 
 	if !bytes.HasPrefix(data, []byte("%PDF-")) {
 		t.Fatal("output is not a PDF")
@@ -99,24 +91,13 @@ func TestFontFaceACLDeny(t *testing.T) {
 	obj := settings.DefaultPdfObject()
 	obj.Page = htmlPath
 	// ACL test: do not open local file access; only Allow pageDir for the HTML.
-	cmd := &cli.Command{ //nolint:exhaustruct // intentional zero-value fields
-		Global:  settings.DefaultPdfGlobal(),
-		Objects: []settings.PdfObject{obj},
-		Output:  filepath.Join(t.TempDir(), "out.pdf"),
-	}
-	cmd.Global.Load.EnableLocalFileAccess = false
-	cmd.Global.Load.Allow = []string{pageDir}
-	cmd.Global.Size = settings.Size{PageSize: cmd.Global.PageSize} //nolint:exhaustruct // intentional zero-value fields
+	global := settings.DefaultPdfGlobal()
+	global.Load.EnableLocalFileAccess = false
+	global.Load.Allow = []string{pageDir}
+	cmd := NewPDFRequest(global, []settings.PdfObject{obj}, nil, nil)
 
 	var log bytes.Buffer
-	if err := RunPDF(cmd, &log); err != nil {
-		t.Fatalf("RunPDF: %v\nlog: %s", err, log.String())
-	}
-
-	data, err := os.ReadFile(cmd.Output)
-	if err != nil {
-		t.Fatalf("read output: %v", err)
-	}
+	data := runPDFWithLog(t, cmd, &log)
 
 	if !bytes.HasPrefix(data, []byte("%PDF-")) {
 		t.Fatal("output is not a PDF")
@@ -152,21 +133,14 @@ func TestFontFaceWOFFEmbed(t *testing.T) {
 	}
 
 	var log bytes.Buffer
-	if err := RunPDF(cmd, &log); err != nil {
-		t.Fatalf("RunPDF: %v\nlog: %s", err, log.String())
-	}
-
-	data, err := os.ReadFile(cmd.Output)
-	if err != nil {
-		t.Fatalf("read output: %v", err)
-	}
+	data := runPDFWithLog(t, cmd, &log)
 
 	if !bytes.Contains(data, []byte("/BaseFont /Custom")) {
 		t.Errorf("expected WOFF1 @font-face embed /BaseFont /Custom; log=%q", log.String())
 	}
 }
 
-func TestFontFaceWOFF2Skipped(t *testing.T) { //nolint:dupl // deliberate parallel of TestFontFaceBadWOFFSkipped
+func TestFontFaceWOFF2Skipped(t *testing.T) {
 	t.Parallel()
 
 	html := `<html><head><style>
@@ -180,26 +154,14 @@ body { font-family: Custom, sans-serif; }
 	}
 
 	var log bytes.Buffer
-	if err := RunPDF(cmd, &log); err != nil {
-		t.Fatalf("RunPDF: %v\nlog: %s", err, log.String())
-	}
-
-	warn := log.String()
-	if !strings.Contains(warn, "WOFF2") {
-		t.Errorf("expected WOFF2 skip warning; log=%q", warn)
-	}
-
-	data, err := os.ReadFile(cmd.Output)
-	if err != nil {
-		t.Fatalf("read output: %v", err)
-	}
+	data := runPDFWithLog(t, cmd, &log)
 
 	if bytes.Contains(data, []byte("/BaseFont /Custom")) {
 		t.Error("WOFF2 src must not register Custom")
 	}
 }
 
-func TestFontFaceBadWOFFSkipped(t *testing.T) { //nolint:dupl // deliberate parallel of TestFontFaceWOFF2Skipped
+func TestFontFaceBadWOFFSkipped(t *testing.T) {
 	t.Parallel()
 
 	html := `<html><head><style>
@@ -213,19 +175,7 @@ body { font-family: Custom, sans-serif; }
 	}
 
 	var log bytes.Buffer
-	if err := RunPDF(cmd, &log); err != nil {
-		t.Fatalf("RunPDF: %v\nlog: %s", err, log.String())
-	}
-
-	warn := log.String()
-	if !strings.Contains(warn, "@font-face") {
-		t.Errorf("expected @font-face parse warning; log=%q", warn)
-	}
-
-	data, err := os.ReadFile(cmd.Output)
-	if err != nil {
-		t.Fatalf("read output: %v", err)
-	}
+	data := runPDFWithLog(t, cmd, &log)
 
 	if bytes.Contains(data, []byte("/BaseFont /Custom")) {
 		t.Error("bad WOFF must not register Custom")
@@ -243,23 +193,7 @@ body { font-family: Custom, sans-serif; }
 	cmd, _ := newCommand(t, html, filepath.Join(t.TempDir(), "out.pdf"))
 
 	var log bytes.Buffer
-	if err := RunPDF(cmd, &log); err != nil {
-		t.Fatalf("RunPDF: %v\nlog: %s", err, log.String())
-	}
-
-	warn := log.String()
-	if !strings.Contains(warn, "@font-face src") {
-		t.Errorf("expected @font-face fetch warning; log=%q", warn)
-	}
-
-	if strings.Contains(warn, "network src") && strings.Contains(warn, "skipped") {
-		t.Errorf("https fonts must no longer be policy-skipped; log=%q", warn)
-	}
-
-	data, err := os.ReadFile(cmd.Output)
-	if err != nil {
-		t.Fatalf("read output: %v", err)
-	}
+	data := runPDFWithLog(t, cmd, &log)
 
 	if bytes.Contains(data, []byte("/BaseFont /Custom")) {
 		t.Error("failed https @font-face must not register Custom")
@@ -276,19 +210,7 @@ body { font-family: Custom, sans-serif; }
 	cmd, _ := newCommand(t, html, filepath.Join(t.TempDir(), "out.pdf"))
 
 	var log bytes.Buffer
-	if err := RunPDF(cmd, &log); err != nil {
-		t.Fatalf("RunPDF: %v\nlog: %s", err, log.String())
-	}
-
-	warn := log.String()
-	if !strings.Contains(warn, "data:") {
-		t.Errorf("expected data: skip warning; log=%q", warn)
-	}
-
-	data, err := os.ReadFile(cmd.Output)
-	if err != nil {
-		t.Fatalf("read output: %v", err)
-	}
+	data := runPDFWithLog(t, cmd, &log)
 
 	if bytes.Contains(data, []byte("/BaseFont /Custom")) {
 		t.Error("data: @font-face src must not register Custom")

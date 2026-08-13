@@ -5,16 +5,16 @@
   {
    "type": "hero",
    "title": "Pure-Go HTML to PDF, no browser",
-   "lede": "A clean-room, stdlib-first work-alike of the wkhtmltopdf CLI that turns server-generated HTML into multi-page PDFs (or PNG/JPEG) entirely in-process. MVP v0.1.0: phases 0-9 of the canonical plan are implemented, with committed samples under output/."
+   "lede": "A clean-room, no-cgo work-alike of the wkhtmltopdf CLI that turns server-generated HTML into multi-page PDFs (or PNG/JPEG) entirely in-process. Current release v0.2.0: phases 0-9 plus the report CSS subset (tiers 1-2) are implemented, with committed samples under output/."
   },
   {
    "type": "bullets",
    "heading": "Design principles",
    "items": [
     "From scratch: the whole pipeline, load to PDF write, lives in this repository. No binding to wkhtmltopdf, Qt, or WebKit, and no third-party PDF/HTML/CSS API or SaaS service.",
-    "Stdlib by default: runtime deps are the Go standard library plus one documented exception, github.com/go-text/typesetting, for OpenType shaping.",
+    "Stdlib by default: runtime deps are the Go standard library plus two allowlisted modules, github.com/go-text/typesetting for OpenType shaping and github.com/tdewolff/canvas for SVG rasterization.",
     "No browser, no cgo: no Chrome or WebKit process is spawned, and CGO_ENABLED=0 builds produce statically linked binaries with no runtime library requirements.",
-    "Deterministic output: identical input bytes and settings produce identical PDF bytes, so builds are cacheable and output diffs are trustworthy.",
+    "Repeatable layout: the same HTML, settings, and fonts produce the same layout. Default CLI PDF bytes are not hash-stable because CreationDate and [date]/[time] use the wall clock unless you inject Now.",
     "Report-grade scope: an allowlisted HTML model and a documented CSS subset, with the compatibility matrix as the normative per-property contract.",
     "Two surfaces: the gowkhtmltopdf and gowkhtmltoimage CLI binaries, plus an idiomatic Go library API in the root gowkhtmltopdf package (NewConverter, NewImageConverter)."
    ]
@@ -25,7 +25,7 @@
    "items": [
     {
      "title": "Invoices and statements",
-     "body": "Server-generated report templates: multi-section documents, tables with colspan, repeated table headers, and page-break-* control."
+     "body": "Server-generated report templates: multi-section documents, tables with colspan and rowspan, repeated table headers, and page-break-* control."
     },
     {
      "title": "Structured PDFs",
@@ -37,7 +37,7 @@
     },
     {
      "title": "Not: JavaScript or pixel parity",
-     "body": "<script> content is stripped at load and JS flags such as --enable-javascript are accepted with warnings. Output is not a pixel-identical WebKit or wkhtmltopdf clone."
+     "body": "<script> content is stripped at load. JS flags such as --enable-javascript are unknown options and are rejected. Output is not a pixel-identical WebKit or wkhtmltopdf clone."
     }
    ]
   },
@@ -60,7 +60,7 @@
     },
     {
      "heading": "3. Layout: internal/layout",
-     "body": "Resolves styles and runs block, inline, and table layout to produce a display list of text, rectangles, images, and links, ready for painting."
+     "body": "Resolves styles and runs block, inline, table, flex/grid subset, float lite, and print-scoped sticky layout to produce a display list of text, rectangles, images, and links, ready for painting."
     },
     {
      "heading": "4. Paginate, TOC, outline: internal/convert",
@@ -76,16 +76,16 @@
    "type": "stats",
    "items": [
     {
-     "value": "890 ms",
-     "label": "500-page PDF, direct CLI run"
+     "value": "16x",
+     "label": "faster than wkhtmltopdf at 2 pages"
     },
     {
-     "value": "1.9x",
+     "value": "1.6x",
      "label": "faster than wkhtmltopdf at 500 pages"
     },
     {
-     "value": "56%",
-     "label": "less peak RSS than wkhtmltopdf at 500 pages"
+     "value": "16 ms",
+     "label": "2-page report, current generic CLI"
     },
     {
      "value": "0",
@@ -97,7 +97,7 @@
    "type": "callout",
    "variant": "info",
    "title": "A kvetch: this is not a browser",
-   "body": "gowkhtmltopdf implements a report-grade subset of HTML and CSS and deliberately has no JavaScript runtime. If you need full flexbox parity, interactive scripts, or pixel-identical WebKit output, use a real browser engine. This project is the fast, deterministic, static-binary choice for controlled documents such as invoices and statements."
+   "body": "gowkhtmltopdf implements a report-grade subset of HTML and CSS and deliberately has no JavaScript runtime. If you need full flexbox parity, interactive scripts, or pixel-identical WebKit output, use a real browser engine. This project is the fast, static-binary choice for controlled documents such as invoices and statements."
   }
  ]
 }

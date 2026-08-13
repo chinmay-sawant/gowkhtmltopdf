@@ -77,7 +77,7 @@ func (e *engine) collectInlineText(node *html.Node, sty ResolvedStyle, out *[]in
 }
 
 func isVerticalWritingMode(mode string) bool {
-	return mode == "vertical-rl" || mode == "vertical-lr"
+	return mode == writingModeVerticalRL || mode == writingModeVerticalLR
 }
 
 // inlineChromeApplies reports whether text belongs to an inline formatting
@@ -326,7 +326,7 @@ func (e *engine) collectInlineElement(node *html.Node, sty ResolvedStyle, out *[
 func (e *engine) collectImageItem(node *html.Node, sty ResolvedStyle, out *[]inlineItem) {
 	ib := e.buildImage(node, sty, 0, 0)
 	*out = append(*out, inlineItem{ //nolint:exhaustruct // intentional zero fields
-		img: true, imgRef: ib.img, w: ib.w, h: ib.height, style: e.stylePtr(node),
+		img: true, thumbImg: e.thumbImageInsideFigure(node), imgRef: ib.img, w: ib.w, h: ib.height, style: e.stylePtr(node),
 		marginL: e.scalePt(sty.MarginLeft), marginR: e.scalePt(sty.MarginRight),
 	})
 }
@@ -497,6 +497,11 @@ func (e *engine) inlineChromeTop(st *ResolvedStyle) float64 {
 
 func (e *engine) inlineChromeBottom(st *ResolvedStyle) float64 {
 	return e.scalePt(st.PaddingBottom) + e.scalePt(st.BorderBottom.Width)
+}
+
+// TransformInlineText applies CSS text-transform (uppercase, lowercase, capitalize).
+func TransformInlineText(text, transform string) string {
+	return transformInlineText(text, transform)
 }
 
 func transformInlineText(text, transform string) string {

@@ -255,3 +255,74 @@ func TestUnderlineWrappedURLOnePerLine(t *testing.T) {
 
 	t.Logf("wrapped URL: textLines=%d underlines=%d", nTextLines, nUnder)
 }
+
+// Wiki print CSS uses border-bottom on body links and text-decoration:none.
+// The href force-underline must not stack a second stroke on that border.
+func TestLinkBorderBottomNotDoubleUnderlined(t *testing.T) { //nolint:cyclop,funlen,gocognit
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+body { margin: 0; font-size: 10pt; }
+a { color: #36c; text-decoration: none; }
+.mw-body a:not(.image) { border-bottom: 1px solid #aaa; }
+`)
+
+	root, err := html.Parse(`<html><body class="mw-body"><p>See the ` +
+		`<a href="https://en.wikipedia.org/wiki/Toronto_International_Film_Festival">` +
+		`Toronto International Film Festival</a> in 2024</p></body></html>`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := Layout(root, Options{ //nolint:exhaustruct // print link chrome
+		Width: 200, Height: 400, Sheets: []*css.Stylesheet{cssSheet}, Media: "print",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	type band struct{ y, x0, x1 float64 }
+
+	bands := []band{}
+
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpLine || paintOp.H != 0 || paintOp.W < 4 {
+			continue
+		}
+
+		merged := false
+
+		for idx := range bands {
+			if math.Abs(bands[idx].y-paintOp.Y) < 1 && paintOp.X <= bands[idx].x1+2 && paintOp.X+paintOp.W >= bands[idx].x0-2 {
+				if paintOp.X < bands[idx].x0 {
+					bands[idx].x0 = paintOp.X
+				}
+
+				if paintOp.X+paintOp.W > bands[idx].x1 {
+					bands[idx].x1 = paintOp.X + paintOp.W
+				}
+
+				merged = true
+
+				break
+			}
+		}
+
+		if !merged {
+			bands = append(bands, band{y: paintOp.Y, x0: paintOp.X, x1: paintOp.X + paintOp.W})
+		}
+	}
+
+	for i := range bands {
+		for j := i + 1; j < len(bands); j++ {
+			overlap := bands[i].x0 < bands[j].x1 && bands[j].x0 < bands[i].x1
+			if overlap && math.Abs(bands[i].y-bands[j].y) < 1.5 {
+				t.Fatalf("double underline at y=%.2f and y=%.2f", bands[i].y, bands[j].y)
+			}
+		}
+	}
+
+	if len(bands) == 0 {
+		t.Fatal("expected a border-bottom link rule")
+	}
+}

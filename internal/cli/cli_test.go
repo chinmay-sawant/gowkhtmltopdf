@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"os"
 	"strings"
 	"testing"
 
@@ -477,7 +478,7 @@ func TestDumpOutlineGlobalHome(t *testing.T) {
 		t.Error("--no-dump-outline must clear Global.DumpOutline")
 	}
 
-	cmd = parse(t, "--dump-default-toc-xsl", "in.html", outPDF)
+	cmd = parse(t, "--dump-default-toc-xsl")
 	if !cmd.Global.DumpDefaultTOCXSL {
 		t.Error("--dump-default-toc-xsl must set Global.DumpDefaultTOCXSL")
 	}
@@ -485,6 +486,34 @@ func TestDumpOutlineGlobalHome(t *testing.T) {
 	cmd = parse(t, "--dump-default-toc-xsl=false", "in.html", outPDF)
 	if cmd.Global.DumpDefaultTOCXSL {
 		t.Error("--dump-default-toc-xsl=false must clear Global.DumpDefaultTOCXSL")
+	}
+}
+
+func TestDumpDefaultTOCXSLTerminalValidation(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{name: "input", args: []string{"--dump-default-toc-xsl", "in.html"}},
+		{name: "output", args: []string{"--dump-default-toc-xsl", "in.html", outPDF}},
+		{name: "outline", args: []string{"--dump-default-toc-xsl", "--dump-outline"}},
+		{name: "malformed boolean", args: []string{"--dump-default-toc-xsl=maybe"}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if _, err := Parse(tc.args); err == nil {
+				t.Fatalf("Parse(%v) succeeded; want terminal validation error", tc.args)
+			}
+		})
+	}
+
+	if _, err := Parse([]string{"--dump-default-toc-xsl"}, ModeImage); err == nil {
+		t.Fatal("--dump-default-toc-xsl accepted in image mode")
 	}
 }
 
@@ -597,6 +626,78 @@ func TestDocFlags(t *testing.T) {
 	_, err := Parse([]string{"--license"})
 	if !errors.Is(err, ErrLicense) {
 		t.Errorf("license = %v", err)
+	}
+}
+
+func TestDocFlagBoundaryBehavior(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		args []string
+		want error
+	}{
+		{name: "help value remains invalid", args: []string{"--help=x"}, want: errInvalidBoolValue},
+		{name: "help cannot be negated", args: []string{"--no-help", "in.html", outPDF}, want: errUnknownOption},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			if _, err := Parse(testCase.args); !errors.Is(err, testCase.want) {
+				t.Fatalf("Parse(%v) = %v, want errors.Is(..., %v)", testCase.args, err, testCase.want)
+			}
+		})
+	}
+}
+
+func TestShortFlagClusterIsRejected(t *testing.T) {
+	t.Parallel()
+
+	_, err := Parse([]string{"-xyz", "in.html", outPDF})
+	if !errors.Is(err, errUnknownOption) {
+		t.Fatalf("Parse(-xyz ...) = %v, want errors.Is(..., %v)", err, errUnknownOption)
+	}
+
+	if !strings.Contains(err.Error(), "-xyz") {
+		t.Fatalf("Parse(-xyz ...) = %v, want offending token", err)
+	}
+}
+
+func TestPrintHelpUsesProductTruth(t *testing.T) {
+	t.Parallel()
+
+	for _, testCase := range []struct {
+		name string
+		mode Mode
+		want string
+	}{
+		{name: "pdf", mode: ModePDF, want: "Convert HTML to PDF"},
+		{name: "image", mode: ModeImage, want: "Convert HTML to PNG/JPEG image"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			var help bytes.Buffer
+
+			PrintHelp(&help, testCase.mode)
+
+			got := help.String()
+			if !strings.Contains(got, testCase.want) {
+				t.Errorf("help missing %q:\n%s", testCase.want, got)
+			}
+
+			for _, forbidden := range []string{"Qt WebKit engine", "using the Qt WebKit"} {
+				if strings.Contains(got, forbidden) {
+					t.Errorf("help contains stale implementation claim %q", forbidden)
+				}
+			}
+
+			if !strings.Contains(got, "No JavaScript, browser process") {
+				t.Errorf("help missing browser/JavaScript boundary:\n%s", got)
+			}
+		})
 	}
 }
 
@@ -834,5 +935,88 @@ func TestOpenOutputWriterPrecedence(t *testing.T) {
 
 	if buf.String() != "x" {
 		t.Fatalf("buf=%q", buf.String())
+	}
+}
+
+func TestRestrictNetworkAndAllowHostFlags(t *testing.T) { //nolint:cyclop // table of flag combinations
+	t.Parallel()
+
+	cmd := parse(t, "--restrict-network", "page.html", outPDF)
+	if !cmd.Global.Load.NetworkPolicySet {
+		t.Fatal("--restrict-network must set NetworkPolicySet")
+	}
+
+	if !cmd.Global.Load.NetworkBlockPrivate || !cmd.Global.Load.NetworkBlockCrossHost {
+		t.Fatal("--restrict-network must set BlockPrivate and BlockCrossHost")
+	}
+
+	if got := cmd.Global.Load.NetworkAllowedSchemes; len(got) != 2 ||
+		got[0] != "http" || got[1] != "https" {
+		t.Fatalf("AllowedSchemes = %v, want [http https]", got)
+	}
+
+	cmd = parse(t, "--allow-host", "reports.example.test", "page.html", outPDF)
+	if !cmd.Global.Load.NetworkPolicySet {
+		t.Fatal("--allow-host must set NetworkPolicySet")
+	}
+
+	if got := cmd.Global.Load.NetworkAllowedHosts; len(got) != 1 || got[0] != "reports.example.test" {
+		t.Fatalf("AllowedHosts = %v", got)
+	}
+
+	cmd = parse(t,
+		"--restrict-network",
+		"--allow-host", "a.example.test",
+		"--allow-host", "b.example.test",
+		"page.html", outPDF,
+	)
+	if !cmd.Global.Load.NetworkBlockPrivate || len(cmd.Global.Load.NetworkAllowedHosts) != 2 {
+		t.Fatalf("combined flags: %+v", cmd.Global.Load)
+	}
+
+	if _, ok := flagTable["restrict-network"]; !ok {
+		t.Fatal("restrict-network missing from flag table")
+	}
+
+	if spec, ok := flagTable["allow-host"]; !ok || spec.mod != ModeBoth {
+		t.Fatal("allow-host must be registered on ModeBoth")
+	}
+}
+
+func TestCLIVersionMatchesVERSIONFile(t *testing.T) {
+	t.Parallel()
+
+	raw, err := os.ReadFile("../../VERSION")
+	if err != nil {
+		t.Fatalf("read VERSION: %v", err)
+	}
+
+	want := strings.TrimSpace(string(raw))
+	if Version != want && !strings.HasPrefix(Version, want+"-") {
+		t.Fatalf("cli.Version = %q, want VERSION %q or a suffix-stamped form", Version, want)
+	}
+}
+
+func TestExcludeFromOutlineFlag(t *testing.T) {
+	t.Parallel()
+
+	cmd := parse(t, "--exclude-from-outline", ".no-outline", "--exclude-from-outline", "#skip", "in.html", outPDF)
+	if len(cmd.Global.ExcludeFromOutline) != 2 ||
+		cmd.Global.ExcludeFromOutline[0] != ".no-outline" ||
+		cmd.Global.ExcludeFromOutline[1] != "#skip" {
+		t.Errorf("ExcludeFromOutline = %v, want [.no-outline, #skip]", cmd.Global.ExcludeFromOutline)
+	}
+}
+
+func TestAllowFlagInImageMode(t *testing.T) {
+	t.Parallel()
+
+	cmd, err := Parse([]string{"--allow", "/tmp/assets", "in.html", "out.png"}, ModeImage)
+	if err != nil {
+		t.Fatalf("Parse with --allow in ModeImage failed: %v", err)
+	}
+
+	if len(cmd.Global.Load.Allow) == 0 || cmd.Global.Load.Allow[0] != "/tmp/assets" {
+		t.Errorf("Allow = %v, want [/tmp/assets]", cmd.Global.Load.Allow)
 	}
 }

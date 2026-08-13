@@ -18,6 +18,9 @@ var (
 	ErrVersion = errors.New("version requested")
 	ErrLicense = errors.New("license requested")
 	ErrExtHelp = errors.New("extended help requested")
+	// ErrTerminalConflict reports conversion arguments combined with a
+	// terminal-only action such as --dump-default-toc-xsl.
+	ErrTerminalConflict = errors.New("cli: terminal action conflicts with conversion arguments")
 )
 
 // Static parse-stage errors, wrapped with the offending token so callers can
@@ -56,7 +59,6 @@ type Command struct {
 	OutlineWriter io.Writer
 
 	DumpDefaultTOCXSL bool
-	DumpOutline       bool
 }
 
 // OpenOutput returns the writer for this command: OutputWriter (library bytes
@@ -208,6 +210,8 @@ func (s *parseState) step(arg string) error {
 		return s.parseLongFlag(arg)
 	case isShortFlag(arg):
 		return s.parseShortFlag(arg)
+	case strings.HasPrefix(arg, "-") && arg != "-":
+		return fmt.Errorf("%w %s", errUnknownOption, arg)
 	default:
 		s.cmd.positional(arg, s.cur, &s.free)
 
@@ -348,7 +352,21 @@ func (c *Command) positional(arg string, cur *objectCtx, free *[]string) {
 // resolveFree assigns queued positionals: last → output, others → implicit
 // page objects. Pending page-scoped settings (from flags before any object
 // keyword) are applied to the first free page URL.
+//
+//nolint:cyclop // compatibility positional resolution has distinct mode cases.
 func (c *Command) resolveFree(cur *objectCtx, free []string) error {
+	if c.Global.DumpDefaultTOCXSL {
+		if len(free) != 0 || len(c.Objects) != 0 {
+			return fmt.Errorf("%w: --dump-default-toc-xsl cannot be combined with input/output arguments", ErrTerminalConflict)
+		}
+
+		if c.Global.DumpOutline {
+			return fmt.Errorf("%w: --dump-default-toc-xsl cannot be combined with --dump-outline", ErrTerminalConflict)
+		}
+
+		return nil
+	}
+
 	if len(free) == 0 {
 		return c.validate()
 	}
@@ -380,16 +398,7 @@ func (c *Command) resolveFree(cur *objectCtx, free []string) error {
 }
 
 func (c *Command) validate() error {
-	// At least one page-like object with a URL must exist.
-	hasInput := false
-
-	for _, o := range c.Objects {
-		if !o.IsTableOfContent && o.Page != "" {
-			hasInput = true
-		}
-	}
-
-	if !hasInput {
+	if err := settings.ValidateRenderableObjects(c.Objects); err != nil {
 		return errNeedInputFile
 	}
 
@@ -506,12 +515,26 @@ func lookupFlag(name string) (flagSpec, bool, bool) {
 	}
 
 	if strings.HasPrefix(name, "no-") {
-		if spec, ok := flagTable[name[3:]]; ok && spec.kind == flagBool {
+		base := name[3:]
+		if isDocFlagName(base) {
+			return flagSpec{}, false, false //nolint:exhaustruct // terminal flags are not negatable
+		}
+
+		if spec, ok := flagTable[base]; ok && spec.kind == flagBool {
 			return spec, true, true
 		}
 	}
 
 	return flagSpec{}, false, false //nolint:exhaustruct // intentional zero/partial fields
+}
+
+func isDocFlagName(name string) bool {
+	switch name {
+	case "help", "version", "license", "extended-help":
+		return true
+	default:
+		return false
+	}
 }
 
 // ExitCode converts an error into a process exit code: errors carrying an

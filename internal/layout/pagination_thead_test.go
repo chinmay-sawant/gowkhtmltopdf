@@ -100,3 +100,91 @@ func TestTheadUADisplay(t *testing.T) {
 		t.Errorf("headerRows = %d, want 1", tblBox.headerRows)
 	}
 }
+
+func TestContinuationHeaderNotOverlappedByBodyRow(t *testing.T) { //nolint:cyclop,funlen
+	t.Parallel()
+
+	src := `<html><body><table>
+<tr><th>Year</th><th>Organization</th><th>Category</th><th>Work</th><th>Result</th></tr>`
+	for i := range 18 {
+		src += `<tr><td>` + strconv.Itoa(2000+i) + `</td><td>Org ` + strconv.Itoa(i) +
+			`</td><td>Category ` + strconv.Itoa(i) + `</td><td>Work</td><td>Nominated</td></tr>`
+	}
+
+	src += `<tr><td>2023</td><td>Golden Globe Awards</td>` +
+		`<td>Best Actress in a Motion Picture Drama</td><td>Blonde</td><td>Nominated</td></tr>`
+	src += `<tr><td>2023</td><td>London Film Critics Circle Awards</td>` +
+		`<td>Actress of the Year</td><td></td><td>Nominated</td></tr>`
+	src += `</table></body></html>`
+
+	root, err := html.Parse(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const contentH = 220.0
+
+	res, err := Layout(root, Options{ //nolint:exhaustruct // continuation header geometry
+		Width: 500, Height: contentH, Background: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Paint(pdf.NewDocument(), res, PaintOptions{
+		PageWidth: 540, PageHeight: contentH + 40,
+		MarginTop: 20, MarginBottom: 20, MarginLeft: 20, MarginRight: 20,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	type mark struct {
+		y    float64
+		kind string
+	}
+
+	marks := []mark{}
+
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpText {
+			continue
+		}
+
+		switch {
+		case strings.Contains(paintOp.Text, "Year") && !strings.Contains(paintOp.Text, "Actress"):
+			marks = append(marks, mark{paintOp.Y, "header"})
+		case strings.Contains(paintOp.Text, "Blonde"):
+			marks = append(marks, mark{paintOp.Y, "blonde"})
+		}
+	}
+
+	for _, body := range marks {
+		if body.kind != "blonde" {
+			continue
+		}
+
+		page := int(body.y / contentH)
+		if page <= 0 {
+			continue
+		}
+
+		pageTop := float64(page) * contentH
+		if body.y < pageTop+2 {
+			t.Fatalf("Blonde row y=%.2f sits in the page-%d margin, want below thead", body.y, page+1)
+		}
+
+		for _, hdr := range marks {
+			if hdr.kind != "header" {
+				continue
+			}
+
+			if int(hdr.y/contentH) != page {
+				continue
+			}
+
+			if body.y < hdr.y+4 {
+				t.Fatalf("Blonde y=%.2f overlaps header y=%.2f on page %d", body.y, hdr.y, page+1)
+			}
+		}
+	}
+}

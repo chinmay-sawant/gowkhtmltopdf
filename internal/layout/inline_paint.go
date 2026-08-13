@@ -35,13 +35,13 @@ func (u *undRun) flush(e *engine) {
 // emitInlineBlock relocates a block-in-inline box onto the current line and
 // returns the updated x cursor.
 func (e *engine) emitInlineBlock(
-	boxNode *box, item *inlineItem, leftX, baseline, justifyGap float64,
+	boxNode *box, item *inlineItem, leftX, lineY, lineH, baseline, justifyGap float64,
 	gapAfter bool, und *undRun,
 ) float64 {
 	und.flush(e)
 
 	dx := leftX - item.blockBox.x
-	dy := baseline - item.h - item.blockBox.y
+	dy := e.alignedInlineTop(item, lineY, lineH, baseline) - item.blockBox.y
 	e.shiftBoxOps(item.blockBox, dx, dy)
 	item.blockBox.x += dx
 	item.blockBox.y += dy
@@ -58,6 +58,28 @@ func (e *engine) emitInlineBlock(
 	return leftX
 }
 
+func (e *engine) applyInlineImageBorders(item *inlineItem, leftX, top float64) (float64, float64, float64, float64) {
+	imgX, imgY, imgW, imgH := leftX, top, item.w, item.h
+	if item.style == nil || !inlineHasBorder(*item.style) || item.thumbImg {
+		return imgX, imgY, imgW, imgH
+	}
+
+	insetL := e.inlineChromeLeft(item.style)
+	insetT := e.inlineChromeTop(item.style)
+	insetR := e.inlineChromeRight(item.style)
+	insetB := e.inlineChromeBottom(item.style)
+	imgX += insetL
+	imgY += insetT
+	imgW -= insetL + insetR
+	imgH -= insetT + insetB
+
+	for _, op := range e.borderOps(*item.style, leftX, top, item.w, item.h) {
+		e.add(op)
+	}
+
+	return imgX, imgY, imgW, imgH
+}
+
 // emitInlineImage places an image (or inline-block) item on the line and
 // returns the updated x cursor.
 func (e *engine) emitInlineImage(
@@ -66,20 +88,12 @@ func (e *engine) emitInlineImage(
 ) float64 {
 	und.flush(e)
 
-	top := baseline - item.h
+	top := e.alignedInlineTop(item, lineY, lineH, baseline)
+	imgX, imgY, imgW, imgH := e.applyInlineImageBorders(item, leftX, top)
 
-	switch item.style.VerticalAlign {
-	case cssVerticalAlignTop:
-		top = lineY
-	case cssVerticalAlignMiddle:
-		top = lineY + (lineH-item.h)/two
-	case cssVerticalAlignBottom:
-		top = lineY + lineH - item.h
-	}
-
-	if item.imgRef != nil && item.imgRef.data != nil {
+	if item.imgRef != nil && item.imgRef.data != nil && imgW > 0 && imgH > 0 {
 		e.add(Op{ //nolint:exhaustruct // intentional zero fields
-			Kind: OpImage, X: leftX, Y: top, W: item.w, H: item.h,
+			Kind: OpImage, X: imgX, Y: imgY, W: imgW, H: imgH,
 			Image: item.imgRef.data, ImgW: item.imgRef.w, ImgH: item.imgRef.h, IsJPEG: item.imgRef.isJPEG,
 		})
 	}
@@ -247,6 +261,26 @@ func writingModeRotate(mode string) float64 {
 	return 0
 }
 
+// alignedInlineTop is the canvas Y of an atomic inline box (image or
+// inline-block). Keywords match CSS vertical-align; a length shift raises
+// (positive) or lowers (negative) a baseline-aligned box.
+func (e *engine) alignedInlineTop(item *inlineItem, lineY, lineH, baseline float64) float64 {
+	if item.style == nil {
+		return baseline - item.h
+	}
+
+	switch item.style.VerticalAlign {
+	case cssVerticalAlignTop:
+		return lineY
+	case cssVerticalAlignMiddle:
+		return lineY + (lineH-item.h)/two
+	case cssVerticalAlignBottom:
+		return lineY + lineH - item.h
+	default:
+		return baseline - item.h - e.scalePt(item.style.VerticalAlignShift)
+	}
+}
+
 func inlineBorderVisible(side border) bool {
 	return side.Width > 0 && side.Style != cssDisplayNone
 }
@@ -299,8 +333,13 @@ func (e *engine) paintDecoration(
 	child [3]float64, und *undRun,
 ) {
 	bareURL := isBareURLText(item.text)
-	wantUnderline := !bareURL && (item.style.TextDecoration == cssTextDecorationUnderline ||
-		(item.href != "" && item.style.TextDecoration != cssTextDecorationLineThrough))
+	// A visible border-bottom is already the link affordance (wiki
+	// `.mw-body a:not(.image){border-bottom:1px solid #aaa}`). Painting the
+	// forced href underline on top makes every link look double.
+	hasBottomBorder := inlineBorderVisible(item.style.BorderBottom)
+	wantUnderline := !bareURL && !hasBottomBorder &&
+		(item.style.TextDecoration == cssTextDecorationUnderline ||
+			(item.href != "" && item.style.TextDecoration != cssTextDecorationLineThrough))
 	wsOnly := strings.TrimSpace(item.text) == ""
 
 	if runSpan <= layoutSlack {

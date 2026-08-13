@@ -56,11 +56,11 @@
     ],
     [
      "TLS verification",
-     "On by default; `--insecure` is an explicit opt-in (`InsecureSkipVerify`)"
+     "On by default. There is no `--insecure` switch; certificate verification is not optional."
     ],
     [
      "JavaScript / process execution",
-     "No JS engine and no `os/exec` anywhere in the tree; `--enable-javascript`, `--javascript-delay`, `--run-script`, `--window-status` and `--debug-javascript` are accepted for CLI compatibility, stored in settings, and ignored (`load.WaitJSDelay` is a pure sleep; `load.WarnJSStubs` logs the rest)"
+     "No JS engine and no `os/exec` anywhere in the tree. `--enable-javascript`, `--javascript-delay`, `--run-script`, `--window-status` and `--debug-javascript` are unknown options and are rejected. Use `--restrict-network` / SetNetworkPolicy for untrusted HTML."
     ]
    ]
   },

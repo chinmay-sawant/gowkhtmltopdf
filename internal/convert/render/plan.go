@@ -7,8 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-
-	"gowkhtmltopdf/internal/pdf"
 )
 
 const maxCopies = 1_000
@@ -110,9 +108,9 @@ func (p *Plan) LogicalN() int {
 	return len(p.owners)
 }
 
-// Ranges returns contiguous per-object page spans in logical order.
+// Ranges returns the contiguous index spans for each distinct object.
 //
-//nolint:wsl,nlreturn // contiguous range scan
+//nolint:wsl,nlreturn // slice building loops are intentionally local
 func (p *Plan) Ranges() []Range {
 	if p == nil || len(p.owners) == 0 {
 		return nil
@@ -131,40 +129,6 @@ func (p *Plan) Ranges() []Range {
 	}
 	ranges = append(ranges, Range{Start: start, Count: len(p.owners) - start})
 	return ranges
-}
-
-// MaterializeCopies appends fresh page objects for each copy run.
-func MaterializeCopies(
-	doc *pdf.Document, ranges []Range, copies int,
-) error {
-	if copies < 1 {
-		return nil
-	}
-
-	if copies > maxCopies {
-		return fmt.Errorf("%w: got %d, limit %d", errCopyLimit, copies, maxCopies)
-	}
-
-	original := 0
-	for _, span := range ranges {
-		original += span.Count
-	}
-
-	if original == 0 {
-		return nil
-	}
-
-	for copyIndex := 1; copyIndex < copies; copyIndex++ {
-		for _, span := range ranges {
-			for page := span.Start; page < span.Start+span.Count; page++ {
-				if _, err := doc.DuplicatePage(page); err != nil {
-					return fmt.Errorf("assemble copies: %w", err)
-				}
-			}
-		}
-	}
-
-	return nil
 }
 
 // NonCollateOrder builds the page permutation for non-collated copies.

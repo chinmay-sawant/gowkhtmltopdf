@@ -149,11 +149,6 @@ func applyStickyOverflowClamp(res *Result, boxNode *box) {
 	}
 }
 
-func nearSectionBorderRGB(r, g, b float64) bool {
-	// fixture-31 .section border #455a64 ≈ (0.271, 0.353, 0.392)
-	return r > 0.2 && r < 0.35 && g > 0.28 && g < 0.42 && b > 0.32 && b < 0.48
-}
-
 func shiftStickyOps(res *Result, stickyID int, dxVal, deltaY float64) {
 	if (dxVal == 0 && deltaY == 0) || stickyID == 0 {
 		return

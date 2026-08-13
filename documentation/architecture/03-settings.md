@@ -424,7 +424,7 @@ The package is validated by table-driven unit tests in
 | Test | What it verifies |
 |------|------------------|
 | `TestDefaultPdfGlobalSnapshot` / `TestDefaultPdfObjectSnapshot` / `TestDefaultLoadPageSnapshot` / `TestDefaultImageGlobalNoQuietLogLevel` | wkhtmltopdf-compatible defaults (A4, 10 mm margins, Arial 12 header, depth-4 outline, block-local-file-access true, load-error abort, image 1024×94) |
-| `TestGlobalSetDottedKeys` (+ `globalDottedGeometryChecks` / `globalDottedTextChecks`) | End-to-end dotted key application: `margin.top=25mm`, `margin.left=1in`→25.4 mm, `size.pagesize` dual-write, `colormode`/`grayscale` aliasing, `web.background`→`Background`, `allow` append |
+| `TestGlobalSetDottedKeys` (+ `globalDottedGeometryChecks` / `globalDottedTextChecks`) | End-to-end dotted key application: `margin.top=25mm`, `margin.left=1in`→25.4 mm, canonical `size.pagesize`, `colormode`/`grayscale` aliasing, `web.background`→`Background`, `allow` append |
 | `TestGlobalSetIgnoredKeys` / `TestObjectSetIgnoredKeys` | Policy A: inert keys accepted into `Ignored` and round-tripped |
 | `TestGlobalSetUnknownKey` | Unknown keys error |
 | `TestObjectSetDottedKeys` | Object keys incl. `load.*`, header/footer override bits (`HeaderSet`/`FooterSet`), `web.*` |
@@ -464,10 +464,9 @@ added.
   overrides are not honored.
 - **`load.proxy` is object-ignored** — only `LoadGlobal.Proxy` is wired;
   per-object proxies silently do nothing (`reflect.go:160`).
-- **`size.pagesize` dual-write is a transitional state.** The source comment
-  (`settings.go:173-180`) notes `Size.PageSize` is dual-written for
-  `convert.pageGeometry` "until that path collapses to one field"; the
-  `PageSize` name lives in two places today.
+- **`size.pagesize` uses one canonical field.** `PdfGlobal.PageSize` stores the
+  named page geometry and `Size` stores only width/height measurements. The
+  settings parity tests protect this single source of truth.
 - **`PdfGlobalOptions` builder covers only global PDF settings.** Object
   options and image options have no typed builder; callers must use dotted
   `Set` (`options.go`).

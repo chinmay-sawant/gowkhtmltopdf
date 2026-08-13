@@ -1,6 +1,9 @@
 package settings
 
-import "strings"
+import (
+	"errors"
+	"strings"
+)
 
 const (
 	defaultMarginMM       = 10
@@ -156,6 +159,55 @@ func ResolveMedia(base string, global Web, obj *Web) string {
 	return base
 }
 
+// ResolvePDFMedia resolves layout CSS media for PDF mode via ResolveMedia.
+// PDF default is "print".
+func ResolvePDFMedia(glob PdfGlobal, obj *PdfObject) string {
+	var objWeb *Web
+
+	if obj != nil {
+		objView := Web{ //nolint:exhaustruct // intentional zero-value fields
+			PrintMediaType: obj.Load.PrintMediaType || obj.Web.PrintMediaType,
+			MediaType:      obj.Load.MediaType,
+		}
+		if obj.Web.MediaType != MediaIgnore {
+			objView.MediaType = obj.Web.MediaType
+		}
+
+		objWeb = &objView
+	}
+
+	return ResolveMedia(sPrint, glob.Web, objWeb)
+}
+
+// ResolveImageMedia resolves layout CSS media for Image mode via ResolveMedia.
+// Image default is "screen".
+func ResolveImageMedia(global PdfGlobal, image ImageGlobal, obj *PdfObject) string {
+	web := image.Web
+	if global.Web.PrintMediaType {
+		web.PrintMediaType = true
+	}
+
+	if web.MediaType == MediaIgnore {
+		web.MediaType = global.Web.MediaType
+	}
+
+	var objWeb *Web
+
+	if obj != nil {
+		objView := Web{ //nolint:exhaustruct // intentional zero/partial fields
+			PrintMediaType: obj.Load.PrintMediaType || obj.Web.PrintMediaType,
+			MediaType:      obj.Load.MediaType,
+		}
+		if obj.Web.MediaType != MediaIgnore {
+			objView.MediaType = obj.Web.MediaType
+		}
+
+		objWeb = &objView
+	}
+
+	return ResolveMedia(sScreen, web, objWeb)
+}
+
 // Margin holds the four page margins in millimetres.
 type Margin struct {
 	Top    float64
@@ -170,14 +222,9 @@ func DefaultMargins() Margin {
 }
 
 // Size holds optional custom page dimensions in millimetres (0 = unset).
-// Named sizes live on PdfGlobal.PageSize; Size.PageSize is dual-written by
-// Set for convert.pageGeometry until that path collapses to one field.
-//
-// ponytail: PageSize name is mirrored on PdfGlobal.PageSize and Size.PageSize.
 type Size struct {
-	PageSize string  // "A4", "Letter", …; empty = default
-	Width    float64 // mm; 0 = unset
-	Height   float64 // mm; 0 = unset
+	Width  float64 // mm; 0 = unset
+	Height float64 // mm; 0 = unset
 }
 
 // Web holds web-behaviour settings that the engine actually consults.
@@ -207,6 +254,13 @@ type LoadGlobal struct {
 	Proxy                 string
 	Allow                 []string // local ACL prefixes (--allow)
 	EnableLocalFileAccess bool
+	// NetworkPolicySet distinguishes the explicit network policy from the
+	// compatibility default used by existing CLI and library callers.
+	NetworkPolicySet      bool
+	NetworkAllowedSchemes []string
+	NetworkAllowedHosts   []string
+	NetworkBlockPrivate   bool
+	NetworkBlockCrossHost bool
 }
 
 // LoadPage holds per-page load settings with engine consumers in load/convert.
@@ -284,9 +338,8 @@ func DefaultTableOfContent() TableOfContent {
 // Policy A: only fields with convert/load/imageout consumers (or CLI homes that
 // convert still reads) are typed. Inert wkhtml keys may land in Ignored.
 type PdfGlobal struct {
-	// Page geometry: named size + optional custom Size width/height (mm).
-	// pageGeometry prefers PageSize, then Size.PageSize; custom Size.Width/Height
-	// override the named size when both are > 0.
+	// Page geometry: named size plus optional custom Size width/height (mm).
+	// Custom Size.Width/Height overrides the named size when both are > 0.
 	PageSize    string
 	Size        Size
 	Orientation Orientation
@@ -329,7 +382,6 @@ type PdfGlobal struct {
 func DefaultPdfGlobal() PdfGlobal {
 	return PdfGlobal{ //nolint:exhaustruct // intentional zero/partial fields
 		PageSize:       "A4",
-		Size:           Size{PageSize: "A4"}, //nolint:exhaustruct // intentional zero/partial fields
 		Orientation:    OrientationPortrait,
 		Copies:         1,
 		Collate:        true,
@@ -385,6 +437,26 @@ func (o *PdfObject) FooterFor(g PdfGlobal) HeaderFooter {
 	}
 
 	return g.Footer
+}
+
+// ErrNoRenderableObjects reports a conversion job whose object list has no
+// renderable page source (all empty pages or only TOC objects).
+var ErrNoRenderableObjects = errors.New("settings: no renderable page objects")
+
+// ValidateRenderableObjects checks that objects contains at least one non-TOC
+// object with a non-empty page source or inline HTML.
+func ValidateRenderableObjects(objects []PdfObject) error {
+	for _, object := range objects {
+		if object.IsTableOfContent {
+			continue
+		}
+
+		if strings.TrimSpace(object.Page) != "" || len(object.Load.InlineHTML) > 0 {
+			return nil
+		}
+	}
+
+	return ErrNoRenderableObjects
 }
 
 // DefaultPdfObject matches pdfsettings.cc defaults for engine-consumed fields.

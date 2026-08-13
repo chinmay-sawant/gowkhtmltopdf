@@ -1,10 +1,14 @@
-// Command generate renders the library API architecture template to PDF.
+// Command generate renders the library API architecture template to PDF and
+// keeps the sample / golden mirrors in sync.
 //
-// Run from the repository root:
+// Run from the repository root (also invoked by `make samples`):
 //
 //	go run ./testdata/golden/api
 //
-// The output is written beside the template as architecture-diagram.pdf.
+// Writes (overwriting if present):
+//  1. testdata/golden/api/architecture-diagram.pdf — beside the source template
+//  2. output/architecture-diagram.pdf — sample viewer artifact
+//  3. testdata/golden/architecture-diagram.html — golden corpus HTML mirror
 package main
 
 import (
@@ -22,11 +26,14 @@ import (
 )
 
 const (
-	apiDirectory = "testdata/golden/api"
-	inputName    = "architecture-diagram.html"
-	outputName   = "architecture-diagram.pdf"
-	pdfFileMode  = 0o600
-	wantPages    = 5
+	apiDirectory    = "testdata/golden/api"
+	goldenDirectory = "testdata/golden"
+	sampleDirectory = "output"
+	inputName       = "architecture-diagram.html"
+	outputName      = "architecture-diagram.pdf"
+	pdfFileMode     = 0o600
+	htmlFileMode    = 0o600
+	wantPages       = 5
 )
 
 var (
@@ -45,7 +52,7 @@ func main() {
 
 func run(args []string) error { //nolint:cyclop,funlen // generator phases
 	flags := flag.NewFlagSet("generate", flag.ContinueOnError)
-	output := flags.String("output", "", "PDF output path")
+	output := flags.String("output", "", "primary PDF output path (default: beside the template)")
 
 	if err := flags.Parse(args); err != nil {
 		return fmt.Errorf("parse flags: %w", err)
@@ -55,7 +62,7 @@ func run(args []string) error { //nolint:cyclop,funlen // generator phases
 		return fmt.Errorf("%w: %v", errUnexpectedArguments, flags.Args())
 	}
 
-	input, defaultOutput, err := resolveTemplatePaths()
+	input, defaultOutput, repoRoot, err := resolveTemplatePaths()
 	if err != nil {
 		return err
 	}
@@ -103,12 +110,33 @@ func run(args []string) error { //nolint:cyclop,funlen // generator phases
 		return fmt.Errorf("%w: %s pages = %d, want %d", errUnexpectedPageCount, input, got, wantPages)
 	}
 
-	if err := os.WriteFile(*output, pdf, pdfFileMode); err != nil {
-		return fmt.Errorf("write PDF: %w", err)
+	pdfTargets := uniquePaths(*output, filepath.Join(repoRoot, sampleDirectory, outputName))
+	for _, target := range pdfTargets {
+		if err := writeFile(target, pdf, pdfFileMode); err != nil {
+			return fmt.Errorf("write PDF %s: %w", target, err)
+		}
+
+		if _, err := fmt.Fprintf(os.Stdout, "generated %s (%d pages, %d bytes)\n", target, wantPages, len(pdf)); err != nil {
+			return fmt.Errorf("report generation: %w", err)
+		}
 	}
 
-	if _, err := fmt.Fprintf(os.Stdout, "generated %s (%d pages, %d bytes)\n", *output, wantPages, len(pdf)); err != nil {
-		return fmt.Errorf("report generation: %w", err)
+	templateBytes, err := os.ReadFile(input)
+	if err != nil {
+		return fmt.Errorf("read template for golden mirror: %w", err)
+	}
+
+	goldenTemplate := filepath.Join(repoRoot, goldenDirectory, inputName)
+	if samePath(input, goldenTemplate) {
+		return nil
+	}
+
+	if err := writeFile(goldenTemplate, templateBytes, htmlFileMode); err != nil {
+		return fmt.Errorf("write golden template %s: %w", goldenTemplate, err)
+	}
+
+	if _, err := fmt.Fprintf(os.Stdout, "mirrored template %s -> %s\n", input, goldenTemplate); err != nil {
+		return fmt.Errorf("report template mirror: %w", err)
 	}
 
 	return nil
@@ -118,14 +146,63 @@ func pageCount(pdf []byte) int {
 	return bytes.Count(pdf, []byte("/Type /Page\n"))
 }
 
+func writeFile(path string, data []byte, mode os.FileMode) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("create parent directory: %w", err)
+	}
+
+	if err := os.WriteFile(path, data, mode); err != nil {
+		return fmt.Errorf("write file: %w", err)
+	}
+
+	return nil
+}
+
+func uniquePaths(paths ...string) []string {
+	out := make([]string, 0, len(paths))
+	seen := make(map[string]struct{}, len(paths))
+
+	for _, path := range paths {
+		if path == "" {
+			continue
+		}
+
+		absolute, err := filepath.Abs(path)
+		if err != nil {
+			// Fall back to the raw path; writeFile will surface any real error.
+			absolute = path
+		}
+
+		if _, exists := seen[absolute]; exists {
+			continue
+		}
+
+		seen[absolute] = struct{}{}
+		out = append(out, absolute)
+	}
+
+	return out
+}
+
+func samePath(a, b string) bool {
+	absA, errA := filepath.Abs(a)
+	absB, errB := filepath.Abs(b)
+	if errA != nil || errB != nil {
+		return a == b
+	}
+
+	return absA == absB
+}
+
 // resolveTemplatePaths accepts invocation from the repository root, the api
 // directory itself, or a compiled copy whose source directory is available.
 // The returned input is absolute so the loader cannot reinterpret it as an
-// HTTP host when the caller's working directory differs.
-func resolveTemplatePaths() (string, string, error) {
+// HTTP host when the caller's working directory differs. repoRoot is the
+// directory that contains testdata/ and output/.
+func resolveTemplatePaths() (input, defaultOutput, repoRoot string, err error) {
 	workingDir, err := os.Getwd()
 	if err != nil {
-		return "", "", fmt.Errorf("resolve working directory: %w", err)
+		return "", "", "", fmt.Errorf("resolve working directory: %w", err)
 	}
 
 	_, sourceFile, _, sourceOK := runtime.Caller(0)
@@ -146,7 +223,7 @@ func resolveTemplatePaths() (string, string, error) {
 	for _, candidate := range candidates {
 		absolute, err := filepath.Abs(candidate)
 		if err != nil {
-			return "", "", fmt.Errorf("resolve template path %q: %w", candidate, err)
+			return "", "", "", fmt.Errorf("resolve template path %q: %w", candidate, err)
 		}
 
 		if _, exists := seen[absolute]; exists {
@@ -163,15 +240,19 @@ func resolveTemplatePaths() (string, string, error) {
 		}
 
 		if err != nil {
-			return "", "", fmt.Errorf("inspect template %q: %w", absolute, err)
+			return "", "", "", fmt.Errorf("inspect template %q: %w", absolute, err)
 		}
 
 		if info.IsDir() {
-			return "", "", fmt.Errorf("%w: %s", errTemplateDirectory, absolute)
+			return "", "", "", fmt.Errorf("%w: %s", errTemplateDirectory, absolute)
 		}
 
-		return absolute, filepath.Join(filepath.Dir(absolute), outputName), nil
+		apiDir := filepath.Dir(absolute)
+		// template lives at <repo>/testdata/golden/api/<file>
+		root := filepath.Dir(filepath.Dir(filepath.Dir(apiDir)))
+
+		return absolute, filepath.Join(apiDir, outputName), root, nil
 	}
 
-	return "", "", fmt.Errorf("%w %q; checked %s", errTemplateNotFound, inputName, strings.Join(checked, ", "))
+	return "", "", "", fmt.Errorf("%w %q; checked %s", errTemplateNotFound, inputName, strings.Join(checked, ", "))
 }

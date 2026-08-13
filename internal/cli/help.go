@@ -7,13 +7,22 @@ import (
 	"strings"
 )
 
-// Version is stamped by the build (ldflags -X) and defaults to 0.1.0-dev.
-var Version = "0.1.0-dev" //nolint:gochecknoglobals // ldflags-stamped build variable
+// Version is the project release stamped by the build
+// (ldflags -X gowkhtmltopdf/internal/cli.Version=$(cat VERSION)).
+// The unstamped default matches the VERSION file so tests and local
+// `go test`/`go run` agree with the release number. It is not
+// LibraryVersion, which is the upstream wkhtmltopdf compatibility id.
+var Version = "0.2.0" //nolint:gochecknoglobals // ldflags-stamped build variable
 
 // PrintHelp writes usage text for the given Mode.
-func PrintHelp(w io.Writer, mode Mode) {
-	fmt.Fprintf(w, `Name:
-  gowkhtmltopdf - Convert HTML to PDF using the Qt WebKit engine (pure-Go reimplementation)
+func PrintHelp(writer io.Writer, mode Mode) {
+	output := "PDF"
+	if mode == ModeImage {
+		output = "PNG/JPEG image"
+	}
+
+	fmt.Fprintf(writer, `Name:
+  gowkhtmltopdf - Convert HTML to %s with the pure-Go report renderer
 
 Synopsis:
   gowkhtmltopdf [GLOBAL OPTIONS] [OBJECT]... <output file>
@@ -30,11 +39,12 @@ Examples:
   gowkhtmltopdf cover cover.html toc page chapter1.html page chapter2.html book.pdf
 
 Description:
-  Controlled HTML to PDF conversion with a documented CSS subset
-  (see documentation/compatibility-matrix.md). No JavaScript.
+  Controlled HTML to %s conversion with a documented CSS subset
+  (see documentation/compatibility-matrix.md). No JavaScript, browser process,
+  or Qt/WebKit engine is used.
 
 %s
-`, flagList(mode))
+`, output, output, flagList(mode))
 }
 
 // PrintVersion writes the version banner.

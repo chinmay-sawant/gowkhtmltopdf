@@ -25,8 +25,8 @@ load → parse → CSS → layout → paginate → paint → write
 
 The conversion package (`internal/convert`) drives the pipeline; for each
 body object it calls `layout.LayoutContext` (or `layout.WithWorkspace` for the
-certified page-island path) and then `layout.PaintContext` to paginate and
-emit PDF content streams. `internal/imageout` reuses the *same* layout entry
+explicit internal benchmark page-island path) and then `layout.PaintContext`
+to paginate and emit PDF content streams. `internal/imageout` reuses the *same* layout entry
 points but rasterizes the display list instead of painting PDF. Headers and
 footers are themselves laid out as small nested documents with the same
 engine (`internal/convert/hf.go:319,426`), then painted as a single clipped

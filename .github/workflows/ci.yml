@@ -17,6 +17,8 @@ jobs:
           cache: true
       - name: Test
         run: make test
+      - name: Claim scan
+        run: make claim-scan
       - name: Install golangci-lint
         # Build with the job's Go (1.26+): v1.64 refuses to lint when the binary
         # was compiled with an older Go than go.mod targets.
@@ -34,6 +36,56 @@ jobs:
           go-version: '1.26'
           cache: true
       - name: Build gowkhtmltopdf
-        run: CGO_ENABLED=0 go build ./cmd/gowkhtmltopdf
+        run: |
+          ver=$(tr -d '[:space:]' < VERSION)
+          CGO_ENABLED=0 go build -ldflags "-X gowkhtmltopdf/internal/cli.Version=${ver}" \
+            -o gowkhtmltopdf ./cmd/gowkhtmltopdf
       - name: Build gowkhtmltoimage
-        run: CGO_ENABLED=0 go build ./cmd/gowkhtmltoimage
+        run: |
+          ver=$(tr -d '[:space:]' < VERSION)
+          CGO_ENABLED=0 go build -ldflags "-X gowkhtmltopdf/internal/cli.Version=${ver}" \
+            -o gowkhtmltoimage ./cmd/gowkhtmltoimage
+      - name: Version stamp
+        # Avoid awk $N / $$ escaping pitfalls in Actions; compare the Version:
+        # banner line to the trimmed VERSION file.
+        run: |
+          set -euo pipefail
+          want=$(tr -d '[:space:]' < VERSION)
+          got=$(./gowkhtmltopdf --version | sed -n 's/^Version:[[:space:]]*//p' | tr -d '[:space:]')
+          echo "VERSION file: ${want}"
+          echo "binary:       ${got}"
+          test -n "${got}"
+          test "${got}" = "${want}"
+
+  race:
+    name: race (hot packages)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache: true
+      - name: Race
+        run: go test -race -count=1 ./internal/convert ./internal/layout ./internal/pdf ./internal/imageout ./internal/load
+
+  frontend:
+    name: frontend production build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build docs site
+        working-directory: frontend
+        run: npm ci && npm run build
+      - name: Fail if generated docs are dirty
+        run: |
+          if [ -n "$(git status --porcelain -- docs frontend/dist)" ]; then
+            echo "generated docs/dist are dirty" >&2
+            git status --porcelain -- docs frontend/dist
+            exit 1
+          fi

@@ -25,11 +25,15 @@ const (
 //
 // Text is run through pdf.ShapeTextFont first so Arabic/RTL/OT forms match
 // PDF emission (Phase 2.4 image shaping parity).
+//
+//nolint:cyclop,mnd // glyph drawing with rotation and spacing
 func ttfDrawString(
 	img *image.NRGBA,
 	basex, basey float64,
 	text string,
 	sizePt float64,
+	letterSpacing float64,
+	rotateDeg float64,
 	face *pdf.Font,
 	col color.NRGBA,
 	pxPerPt float64,
@@ -57,12 +61,21 @@ func ttfDrawString(
 
 	scale := pxSize / upm
 	cursorX := basex
+	cursorY := basey
 
 	for i, r := range run.Runes {
-		adv := run.Advances[i] * pxPerPt
+		adv := run.Advances[i]*pxPerPt + letterSpacing*pxPerPt
 
-		drawGlyphAA(img, cursorX, basey, r, face, scale, col, atlas)
-		cursorX += adv
+		drawGlyphAA(img, cursorX, cursorY, r, face, scale, col, atlas)
+
+		switch rotateDeg {
+		case -90:
+			cursorY += adv
+		case 90:
+			cursorY -= adv
+		default:
+			cursorX += adv
+		}
 	}
 }
 
@@ -276,19 +289,23 @@ func makeGlyphEdgeList(flat [][]pdf.GlyphPoint) []glyphEdge {
 // rasterGlyphAlpha supersamples every pixel and writes the coverage into an
 // alpha mask (the pixel loop of rasterGlyph, kept separate for scanline
 // locality between the active-edge and sampling passes).
+//
+//nolint:wsl // scanline scratch setup precedes the supersampling loops.
 func rasterGlyphAlpha(
 	flatEdges []glyphEdge,
 	width, height, subsample, ss2 int,
 	originX, originY, scale float64,
 ) *image.Alpha {
 	alpha := image.NewAlpha(image.Rect(0, 0, width, height))
+	var activeRows [8][]glyphEdge
+	for sampleY := range subsample {
+		activeRows[sampleY] = make([]glyphEdge, 0, len(flatEdges))
+	}
 
 	for pixelY := range height {
-		var activeRows [8][]glyphEdge
-
 		for sampleY := range subsample {
 			fontY := -((float64(pixelY) + (float64(sampleY)+pixelCenter)/float64(subsample) + originY) / scale)
-			activeRows[sampleY] = activeEdges(flatEdges, fontY)
+			activeRows[sampleY] = activeEdgesInto(activeRows[sampleY][:0], flatEdges, fontY)
 		}
 
 		for pixelX := range width {
@@ -351,12 +368,9 @@ func flattenGlyphContours(
 	return flat, minX, minY, maxX, maxY
 }
 
-// activeEdges returns the edges crossing fontY. The previous stack-buffered
-// variant spilled to a heap slice when a sample row exceeded its capacity;
-// a single heap-backed active list keeps the coverage semantics identical.
-func activeEdges(flatEdges []glyphEdge, fontY float64) []glyphEdge {
-	active := make([]glyphEdge, 0, len(flatEdges))
-
+// activeEdgesInto fills a reusable list with edges crossing fontY. Reusing the
+// backing array avoids one allocation for every supersampled scanline.
+func activeEdgesInto(active, flatEdges []glyphEdge, fontY float64) []glyphEdge {
 	for _, edge := range flatEdges {
 		if fontY >= edge.yMin && fontY < edge.yMax {
 			active = append(active, edge)

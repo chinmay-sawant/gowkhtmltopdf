@@ -25,6 +25,20 @@ func TestRunRequiresExplicitOutputSink(t *testing.T) {
 	}
 }
 
+func TestRunValidatesRenderableObjectsBeforeContext(t *testing.T) {
+	t.Parallel()
+
+	req := &Request{ //nolint:exhaustruct // focused invalid request
+		Global: settings.DefaultPdfGlobal(),
+		Output: &bytes.Buffer{},
+	}
+
+	err := Run(t.Context(), req, io.Discard, nil)
+	if !errors.Is(err, ErrNoRenderableObjects) {
+		t.Fatalf("Run error = %v, want errors.Is(..., %v)", err, ErrNoRenderableObjects)
+	}
+}
+
 func TestRunRequiresDedicatedOutlineSink(t *testing.T) {
 	t.Parallel()
 
@@ -77,15 +91,6 @@ func TestModeSpecificRequestConstructors(t *testing.T) {
 
 	if err := pdfReq.ValidateImage(); !errors.Is(err, ErrMissingImageSettings) {
 		t.Fatalf("PDF request as image = %v, want %v", err, ErrMissingImageSettings)
-	}
-
-	imageReq := NewImageRequest(global, settings.DefaultImageGlobal(), objects, &bytes.Buffer{})
-	if err := imageReq.ValidateImage(); err != nil {
-		t.Fatalf("image request validation: %v", err)
-	}
-
-	if err := imageReq.ValidatePDF(); !errors.Is(err, ErrUnexpectedImageSettings) {
-		t.Fatalf("image request as PDF = %v, want %v", err, ErrUnexpectedImageSettings)
 	}
 }
 

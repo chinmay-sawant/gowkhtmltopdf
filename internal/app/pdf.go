@@ -12,13 +12,25 @@ import (
 	"gowkhtmltopdf/internal/cli"
 	"gowkhtmltopdf/internal/convert"
 	"gowkhtmltopdf/internal/errs"
+	"gowkhtmltopdf/internal/settings"
 )
+
+// DefaultTOCXSL returns the built-in TOC stylesheet description used by
+// --dump-default-toc-xsl. Command mains import only app and cli; the
+// convert package stays behind this adapter.
+func DefaultTOCXSL() string {
+	return convert.DefaultTOCXSL()
+}
 
 // Shared app-level sentinel errors; exported so callers can match with errors.Is.
 var (
-	ErrNilCommand    = errors.New("app: nil command")
-	ErrNoPageObjects = errors.New("app: no page objects")
+	ErrNilCommand    = errs.ErrNilCommand
+	ErrNoPageObjects = settings.ErrNoRenderableObjects
 	ErrNilContext    = errs.ErrNilContext
+	// ErrConflictingOutputSinks reports a CLI stdout request that would append
+	// outline XML to the PDF byte stream. Library callers with independently
+	// supplied writers remain valid.
+	ErrConflictingOutputSinks = errors.New("app: pdf stdout conflicts with outline XML stdout")
 )
 
 // BuildPDFRequest translates a parsed CLI command into the stable engine
@@ -30,9 +42,6 @@ func BuildPDFRequest(cmd *cli.Command, output, outline io.Writer) (*convert.Requ
 	}
 
 	req := convert.NewPDFRequest(cmd.Global, cmd.Objects, output, outline)
-	if cmd.DumpOutline {
-		req.Global.DumpOutline = true
-	}
 
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("app: validate: %w", err)
@@ -45,6 +54,8 @@ func BuildPDFRequest(cmd *cli.Command, output, outline io.Writer) (*convert.Requ
 // opening the document sink and receives the optional outline sink explicitly.
 // convert.Run only receives explicit writers and never reaches into
 // process-global stdout.
+//
+//nolint:cyclop // command preflight must remain before sink creation.
 func RunPDF(
 	ctx context.Context,
 	cmd *cli.Command,
@@ -66,6 +77,14 @@ func RunPDF(
 	req, err := BuildPDFRequest(cmd, io.Discard, outline)
 	if err != nil {
 		return err
+	}
+
+	// OpenOutput maps an empty path and "-" to os.Stdout. Reject both forms
+	// when dump-outline also targets stdout; a single stream cannot be both a
+	// standalone XML document and a valid PDF. OutputWriter is an explicit
+	// library sink and therefore bypasses this CLI-path guard.
+	if req.Global.DumpOutline && cmd.OutputWriter == nil && (cmd.Output == "" || cmd.Output == "-") {
+		return ErrConflictingOutputSinks
 	}
 
 	if len(cmd.Objects) == 0 {

@@ -306,3 +306,109 @@ func TestTTFAdvanceMatchesLayoutWidth(t *testing.T) {
 		t.Errorf("ink span %v vs advance-based %v", span, imgW)
 	}
 }
+
+//nolint:funlen,wsl,exhaustruct // subtest table for raster op policies
+func TestRasterOpPolicyParity(t *testing.T) {
+	t.Parallel()
+
+	// 1. TextTransform uppercase
+	t.Run("TextTransform", func(t *testing.T) {
+		t.Parallel()
+
+		res := &layout.Result{
+			Width: 100, Height: 50,
+			Ops: []layout.Op{
+				{Kind: layout.OpText, X: 10, Y: 20, Text: "abc", Size: 12, TextTransform: "uppercase"},
+			},
+		}
+
+		img, err := rasterizeContext(t.Context(), res, 50, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		minX, maxX := inkSpan(img)
+		if maxX <= minX {
+			t.Fatal("no text ink rendered for uppercase transform")
+		}
+	})
+
+	// 2. Opacity 0.5
+	t.Run("Opacity", func(t *testing.T) {
+		t.Parallel()
+
+		resOpaque := &layout.Result{
+			Width: 50, Height: 50,
+			Ops: []layout.Op{
+				{Kind: layout.OpFillRect, X: 10, Y: 10, W: 30, H: 30, R: 1, G: 0, B: 0, Alpha: 1},
+			},
+		}
+		imgOpaque, err := rasterizeContext(t.Context(), resOpaque, 50, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		resTrans := &layout.Result{
+			Width: 50, Height: 50,
+			Ops: []layout.Op{
+				{Kind: layout.OpFillRect, X: 10, Y: 10, W: 30, H: 30, R: 1, G: 0, B: 0, Alpha: 1, PaintOpacity: 0.5},
+			},
+		}
+		imgTrans, err := rasterizeContext(t.Context(), resTrans, 50, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		colOpaque := imgOpaque.NRGBAAt(20, 20)
+		colTrans := imgTrans.NRGBAAt(20, 20)
+
+		if colTrans.G <= colOpaque.G {
+			t.Fatalf("expected translucent blend over white, got %v vs opaque %v", colTrans, colOpaque)
+		}
+	})
+
+	// 3. Transform rotate(45deg)
+	t.Run("TransformRotate45", func(t *testing.T) {
+		t.Parallel()
+
+		resRot := &layout.Result{
+			Width: 100, Height: 100,
+			Ops: []layout.Op{
+				{
+					Kind: layout.OpFillRect, X: 40, Y: 40, W: 20, H: 20, R: 1, G: 0, B: 0, Alpha: 1,
+					Xform: layout.RotateDeg(45), XformSet: true,
+				},
+			},
+		}
+		imgRot, err := rasterizeContext(t.Context(), resRot, 100, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		minX, maxX := inkSpan(imgRot)
+		if maxX <= minX {
+			t.Fatal("no ink found for rotate(45deg)")
+		}
+	})
+
+	// 4. WritingMode vertical-rl
+	t.Run("WritingModeVertical", func(t *testing.T) {
+		t.Parallel()
+
+		resVert := &layout.Result{
+			Width: 100, Height: 100,
+			Ops: []layout.Op{
+				{Kind: layout.OpText, X: 50, Y: 20, Text: "Vertical", Size: 12, RotateDeg: -90},
+			},
+		}
+		imgVert, err := rasterizeContext(t.Context(), resVert, 100, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		minX, maxX := inkSpan(imgVert)
+		if maxX <= minX {
+			t.Fatal("no ink found for vertical text")
+		}
+	})
+}

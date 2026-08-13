@@ -1,6 +1,8 @@
 package layout
 
 import (
+	"context"
+	"fmt"
 	"math"
 	"strings"
 
@@ -145,7 +147,11 @@ type ResolvedStyle struct {
 	BorderRadiusTopLeft, BorderRadiusTopRight, BorderRadiusBottomRight, BorderRadiusBottomLeft float64
 	Color                                                                                      [3]float64
 	BGColor                                                                                    [4]float64 // rgba, 0..1
-	FontFamily                                                                                 []string
+	// AccentColor is CSS accent-color when authored; AccentColorSet is false
+	// when the property is absent so widgets can keep their default fill.
+	AccentColor    [3]float64
+	AccentColorSet bool
+	FontFamily     []string
 	// famHash is the FNV-1a fingerprint of FontFamily, computed once during
 	// style resolution. Text measurement reuses
 	// it instead of re-hashing the family list per run.
@@ -158,6 +164,7 @@ type ResolvedStyle struct {
 	TextAlign          string  // floatLeft | floatRight | "center" | "justify"
 	TextTransform      string  // "none" | "uppercase" | "lowercase" | "capitalize"
 	VerticalAlign      string  // "baseline" | "top" | "middle" | cssVerticalAlignBottom
+	VerticalAlignShift float64 // pt; CSS length vertical-align (positive raises)
 	WhiteSpace         string  // "normal" | "nowrap" | "pre"
 	// OverflowWrap is CSS overflow-wrap / word-wrap: "normal" | "break-word" | "anywhere".
 	OverflowWrap string
@@ -271,6 +278,9 @@ var defaultTextStyle = initialStyle() //nolint:gochecknoglobals // immutable tex
 
 // styleContext carries per-element resolution inputs.
 type styleContext struct {
+	ctx       context.Context //nolint:containedctx // resolver owns one bounded cancellation source.
+	err       error
+	work      uint32
 	sheets    []*css.Stylesheet
 	media     string
 	viewportW float64 // containing-block width for % of margins/padding/width
@@ -290,6 +300,29 @@ type styleContext struct {
 	// are consumed before the next element is resolved.
 	cascadeWins  map[string]cascadeWin
 	cascadeProps map[string]string
+}
+
+// pollContext checks cancellation at bounded work intervals. Style matching is
+// intentionally hot, so the interval avoids a context lookup for every CSS
+// declaration while keeping cancellation latency proportional to a small
+// amount of cascade work rather than the complete document.
+func (ctx *styleContext) pollContext() bool {
+	if ctx == nil || ctx.err != nil || ctx.ctx == nil {
+		return ctx != nil && ctx.err != nil
+	}
+
+	ctx.work++
+	if ctx.work&63 != 0 {
+		return false
+	}
+
+	if err := ctx.ctx.Err(); err != nil {
+		ctx.err = err
+
+		return true
+	}
+
+	return false
 }
 
 // sizeContainer is one element that establishes a size query container.
@@ -320,7 +353,16 @@ func nearlyEqual(a, b float64) bool {
 func resolveStylesWith(
 	root *html.Node, opts Options, containers map[*html.Node]sizeContainer,
 ) map[*html.Node]*ResolvedStyle {
+	styles, _ := resolveStylesWithContext(context.Background(), root, opts, containers)
+
+	return styles
+}
+
+func resolveStylesWithContext(
+	ctx context.Context, root *html.Node, opts Options, containers map[*html.Node]sizeContainer,
+) (map[*html.Node]*ResolvedStyle, error) {
 	return resolveStylesCtx(root, &styleContext{ //nolint:exhaustruct // intentional zero fields
+		ctx:                ctx,
 		sheets:             opts.Sheets,
 		media:              opts.Media,
 		viewportW:          opts.Width,
@@ -355,13 +397,21 @@ func resolveStylesWithContainers(
 	}, containers)
 }
 
-func resolveStylesCtx(root *html.Node, ctx *styleContext) map[*html.Node]*ResolvedStyle {
-	nodeCount := countStyleNodes(root)
+func resolveStylesCtx(root *html.Node, ctx *styleContext) (map[*html.Node]*ResolvedStyle, error) {
+	nodeCount, err := countStyleNodesContext(ctx.ctx, root)
+	if err != nil {
+		return nil, err
+	}
+
 	out := make(map[*html.Node]*ResolvedStyle, nodeCount)
 	store := styleStore{} //nolint:exhaustruct // intentional zero-value store
 
 	var walk func(n *html.Node, parent *ResolvedStyle)
 	walk = func(node *html.Node, parent *ResolvedStyle) {
+		if ctx.pollContext() {
+			return
+		}
+
 		var sty *ResolvedStyle
 
 		switch node.Type {
@@ -395,17 +445,31 @@ func resolveStylesCtx(root *html.Node, ctx *styleContext) map[*html.Node]*Resolv
 	}
 	walk(root, nil)
 
-	return out
+	if ctx.err != nil {
+		return nil, ctx.err
+	}
+
+	return out, nil
 }
 
 // countStyleNodes counts the nodes needed for the result map. ResolvedStyle
 // values are allocated lazily by styleStore, so an element count is no longer
 // needed to reserve one full style record per element.
-func countStyleNodes(root *html.Node) int {
+//
+//nolint:wsl // nil-root and recursive walk checks are explicit traversal gates.
+func countStyleNodesContext(ctx context.Context, root *html.Node) (int, error) {
 	nodeCount := 0
+	visited := 0
 
-	var walk func(*html.Node)
-	walk = func(node *html.Node) {
+	var walk func(*html.Node) error
+	walk = func(node *html.Node) error {
+		visited++
+		if visited&63 == 0 && ctx != nil {
+			if err := ctx.Err(); err != nil {
+				return fmt.Errorf("layout: style node count: %w", err)
+			}
+		}
+
 		nodeCount++
 
 		for _, child := range node.Children {
@@ -415,13 +479,22 @@ func countStyleNodes(root *html.Node) int {
 				continue
 			}
 
-			walk(child)
+			if err := walk(child); err != nil {
+				return err
+			}
 		}
+
+		return nil
 	}
 
-	walk(root)
+	if root == nil {
+		return 0, nil
+	}
+	if err := walk(root); err != nil {
+		return 0, err
+	}
 
-	return nodeCount
+	return nodeCount, nil
 }
 
 // styleStoreChunkSize keeps canonical styles in small stable backing arrays.
@@ -542,12 +615,15 @@ type comparableResolvedStyle struct {
 	BorderRadiusTopLeft, BorderRadiusTopRight, BorderRadiusBottomRight, BorderRadiusBottomLeft float64
 	Color                                                                                      [3]float64
 	BGColor                                                                                    [4]float64
+	AccentColor                                                                                [3]float64
+	AccentColorSet                                                                             bool
 	famHash                                                                                    uint64
 	FontSize                                                                                   float64
 	FontWeight                                                                                 int
 	FontItalic                                                                                 bool
 	LineHeight, LineHeightUnitless                                                             float64
 	TextAlign, TextTransform, VerticalAlign, WhiteSpace, OverflowWrap, WordBreak               string
+	VerticalAlignShift                                                                         float64
 	TextDecoration                                                                             string
 	LetterSpacing, TextIndent                                                                  float64
 	ListStyleType, BorderCollapse                                                              string
@@ -594,11 +670,12 @@ func comparableResolvedStyleFor(style ResolvedStyle) comparableResolvedStyle {
 		BorderRadiusTopLeft: style.BorderRadiusTopLeft, BorderRadiusTopRight: style.BorderRadiusTopRight,
 		BorderRadiusBottomRight: style.BorderRadiusBottomRight, BorderRadiusBottomLeft: style.BorderRadiusBottomLeft,
 		Color: style.Color, BGColor: style.BGColor,
+		AccentColor: style.AccentColor, AccentColorSet: style.AccentColorSet,
 		famHash: style.famHash, FontSize: style.FontSize, FontWeight: style.FontWeight, FontItalic: style.FontItalic,
 		LineHeight: style.LineHeight, LineHeightUnitless: style.LineHeightUnitless,
 		TextAlign: style.TextAlign, TextTransform: style.TextTransform,
-		VerticalAlign: style.VerticalAlign,
-		WhiteSpace:    style.WhiteSpace, OverflowWrap: style.OverflowWrap, WordBreak: style.WordBreak,
+		VerticalAlign: style.VerticalAlign, VerticalAlignShift: style.VerticalAlignShift,
+		WhiteSpace: style.WhiteSpace, OverflowWrap: style.OverflowWrap, WordBreak: style.WordBreak,
 		TextDecoration: style.TextDecoration, LetterSpacing: style.LetterSpacing, TextIndent: style.TextIndent,
 		ListStyleType: style.ListStyleType, BorderCollapse: style.BorderCollapse, BorderSpacing: style.BorderSpacing,
 		TableLayout: style.TableLayout, IsReplaced: style.IsReplaced, PageBreakBefore: style.PageBreakBefore,

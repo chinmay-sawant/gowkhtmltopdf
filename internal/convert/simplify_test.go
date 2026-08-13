@@ -2,7 +2,6 @@ package convert //nolint:testpackage // white-box tests need unexported access
 
 import (
 	"bytes"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -240,14 +239,7 @@ func TestSubresourceFailureIsolation(t *testing.T) {
 
 	var log bytes.Buffer
 
-	if err := RunPDF(cmd, &log); err != nil {
-		t.Fatalf("RunPDF should succeed with missing subresources: %v", err)
-	}
-
-	data, err := os.ReadFile(cmd.Output)
-	if err != nil {
-		t.Fatal(err)
-	}
+	data := runPDFWithLog(t, cmd, &log)
 
 	if !bytes.Contains(data, []byte("ISOLATIONBODY")) {
 		t.Error("body text missing after CSS/image failures")

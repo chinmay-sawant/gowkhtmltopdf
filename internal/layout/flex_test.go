@@ -344,6 +344,61 @@ func TestFlexColumnGapVsRowGap(t *testing.T) {
 	}
 }
 
+func isWrapItemFill(op Op) bool {
+	return op.Kind == OpFillRect && op.W > 60 && op.W < 80 && op.H > 10 && op.H < 40
+}
+
+func TestFlexWrapRowGapSurvivesPaint(t *testing.T) {
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+.wrap {
+  display: flex;
+  flex-direction: row-reverse;
+  flex-wrap: wrap;
+  justify-content: space-evenly;
+  column-gap: 12pt;
+  row-gap: 4pt;
+  width: 240pt;
+  border: 1pt solid #1565c0;
+  padding: 4pt;
+}
+.wrap > div {
+  width: 70pt;
+  padding: 4pt;
+  border: 1pt solid #90caf9;
+  background: #fff;
+  box-sizing: border-box;
+}
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="wrap"><div>A</div><div>B</div><div>C</div><div>D</div></div>
+</body></html>`, cssSheet)
+
+	if err := Paint(pdf.NewDocument(), res, PaintOptions{ //nolint:exhaustruct
+		PageWidth: 400, PageHeight: 400,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	var fills []Op
+
+	for _, op := range res.Ops {
+		if isWrapItemFill(op) {
+			fills = append(fills, op)
+		}
+	}
+
+	if len(fills) < 4 {
+		t.Fatalf("wrap item fills = %d, want 4", len(fills))
+	}
+
+	gap := fills[3].Y - (fills[0].Y + fills[0].H)
+	if gap < 3.5 || gap > 5 {
+		t.Fatalf("row-gap after paint = %.2fpt, want 4pt: first=%+v second=%+v", gap, fills[0], fills[3])
+	}
+}
+
 func TestFlexAlignSelf(t *testing.T) {
 	t.Parallel()
 

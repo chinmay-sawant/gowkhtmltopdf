@@ -103,7 +103,7 @@ func setOverflowKeyword(style *ResolvedStyle, prop, value string) {
 
 func setWritingModeKeyword(style *ResolvedStyle, value string) {
 	switch value {
-	case "horizontal-tb", "vertical-rl", "vertical-lr":
+	case "horizontal-tb", writingModeVerticalRL, writingModeVerticalLR:
 		style.WritingMode = value
 	}
 }
@@ -914,6 +914,7 @@ func applyColorGroup(
 	return applyColorBackgroundProps(style, prop, value)
 }
 
+//nolint:cyclop // foreground props are a flat mapping over color candidates
 func applyColorForegroundProps(style *ResolvedStyle, prop, value string, parent *ResolvedStyle, hasParent bool) bool {
 	switch prop {
 	case "color":
@@ -923,6 +924,20 @@ func applyColorForegroundProps(style *ResolvedStyle, prop, value string, parent 
 			}
 		} else if r, g, b, _, ok := css.ParseColor(value); ok {
 			style.Color = [3]float64{float64(r) / 255, float64(g) / 255, float64(b) / 255}
+		}
+	case "accent-color":
+		if value == inheritKeyword {
+			if hasParent && parent != nil && parent.AccentColorSet {
+				style.AccentColor = parent.AccentColor
+				style.AccentColorSet = true
+			}
+
+			return true
+		}
+
+		if r, g, b, _, ok := css.ParseColor(value); ok {
+			style.AccentColor = [3]float64{float64(r) / 255, float64(g) / 255, float64(b) / 255}
+			style.AccentColorSet = true
 		}
 	default:
 		return false
@@ -1059,6 +1074,12 @@ func setVerticalAlignValue(style *ResolvedStyle, value string) {
 	switch value {
 	case "baseline", cssVerticalAlignTop, "middle", cssVerticalAlignBottom:
 		style.VerticalAlign = value
+		style.VerticalAlignShift = 0
+	default:
+		if shift, ok := plainLength(value, style.FontSize, 0); ok {
+			style.VerticalAlign = "baseline"
+			style.VerticalAlignShift = shift
+		}
 	}
 }
 

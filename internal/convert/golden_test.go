@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"gowkhtmltopdf/internal/cli"
 	"gowkhtmltopdf/internal/css"
 	"gowkhtmltopdf/internal/html"
 	"gowkhtmltopdf/internal/layout"
@@ -72,7 +71,7 @@ func fixtureIDPrefix(file string) string {
 // attachHFCompanions sets Header.HTMLURL / Footer.HTMLURL when
 // fixture-NN-header.html and/or fixture-NN-footer.html exist beside the
 // body fixture in dir. Auto (-1) margins reserve the measured HF bands.
-func attachHFCompanions(cmd *cli.Command, dir, file string) {
+func attachHFCompanions(req *Request, dir, file string) {
 	prefix := fixtureIDPrefix(file)
 	if prefix == "" || isHFCompanionHTML(file) {
 		return
@@ -80,25 +79,21 @@ func attachHFCompanions(cmd *cli.Command, dir, file string) {
 
 	header := filepath.Join(dir, prefix+"-header.html")
 	if _, err := os.Stat(header); err == nil {
-		cmd.Global.Header.HTMLURL = header
-		cmd.Global.Margin.Top = -1
+		req.Global.Header.HTMLURL = header
+		req.Global.Margin.Top = -1
 	}
 
 	footer := filepath.Join(dir, prefix+"-footer.html")
 	if _, err := os.Stat(footer); err == nil {
-		cmd.Global.Footer.HTMLURL = footer
-		cmd.Global.Margin.Bottom = -1
+		req.Global.Footer.HTMLURL = footer
+		req.Global.Margin.Bottom = -1
 	}
 }
 
-// commandForFixture builds a cli.Command that converts a golden fixture:
+// requestForFixture builds a convert.Request that converts a golden fixture:
 // A4 page, 10 mm margins, backgrounds on, local file access enabled so the
-// fixture's relative links and images resolve (same ACL shape as newCommand).
-// The whole corpus directory is copied next to the fixture (html, css, png),
-// so relative references in the fixture keep working after the copy.
-// If fixture-NN-header.html / fixture-NN-footer.html exist beside the body
-// fixture, they are wired as nested HTML HF URLs (auto top/bottom margins).
-func commandForFixture(t *testing.T, file string) *cli.Command {
+// fixture's relative links and images resolve.
+func requestForFixture(t *testing.T, file string) *Request {
 	t.Helper()
 	dir := t.TempDir()
 
@@ -109,20 +104,12 @@ func commandForFixture(t *testing.T, file string) *cli.Command {
 	obj := settings.DefaultPdfObject()
 	obj.Page = filepath.Join(dir, file)
 	obj.Load.BlockLocalFileAccess = false
-	cmd := &cli.Command{ //nolint:exhaustruct // intentional zero-value fields
-		Global:  settings.DefaultPdfGlobal(),
-		Objects: []settings.PdfObject{obj},
-		Output:  filepath.Join(t.TempDir(), "out.pdf"),
-	}
-	// --enable-local-file-access: global flag on, object-level block off.
-	cmd.Global.Load.EnableLocalFileAccess = true
-	cmd.Global.Size = settings.Size{PageSize: cmd.Global.PageSize} //nolint:exhaustruct // intentional zero-value fields
-	// A4, 10 mm margins, backgrounds on (already the defaults; set explicitly).
-	cmd.Global.PageSize = "A4"
-	cmd.Global.Margin = settings.DefaultMargins()
-	cmd.Global.Background = true
-	attachHFCompanions(cmd, dir, file)
-	// Opt-in CJK/Hangul faces for fixture-27 (and any CSS that names them).
+	global := settings.DefaultPdfGlobal()
+	global.Load.EnableLocalFileAccess = true
+	global.PageSize = "A4"
+	global.Margin = settings.DefaultMargins()
+	global.Background = true
+
 	fontDirs := []string{}
 	if _, err := os.Stat("/usr/share/fonts/truetype/droid"); err == nil {
 		fontDirs = append(fontDirs, "/usr/share/fonts/truetype/droid")
@@ -133,9 +120,11 @@ func commandForFixture(t *testing.T, file string) *cli.Command {
 		fontDirs = append(fontDirs, testFonts)
 	}
 
-	cmd.Global.FontPaths = fontDirs
+	global.FontPaths = fontDirs
+	req := NewPDFRequest(global, []settings.PdfObject{obj}, nil, nil)
+	attachHFCompanions(req, dir, file)
 
-	return cmd
+	return req
 }
 
 // copyGoldenTree copies the fixture corpus into the isolated conversion
@@ -221,8 +210,7 @@ func TestGoldenCorpus(t *testing.T) {
 	for _, testCase := range goldenFixtures {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
-			cmd := commandForFixture(t, testCase.file)
-			data := runPDF(t, cmd)
+			data := runPDF(t, requestForFixture(t, testCase.file))
 
 			if n := pageCount(data); n < testCase.minPages {
 				t.Errorf("pages = %d, want >= %d", n, testCase.minPages)
@@ -243,14 +231,15 @@ func TestGoldenCorpus(t *testing.T) {
 type fixtureBounds struct {
 	minPages int
 	maxPages int
-	images   bool // expect >= 1 embedded /Subtype /Image xobject
-	uris     bool // expect >= 1 URI link annotation (/S /URI)
+	images   bool     // expect >= 1 embedded /Subtype /Image xobject
+	uris     bool     // expect >= 1 URI link annotation (/S /URI)
+	needles  []string // ordered extracted-text needles
 }
 
 // pagination behaviour across releases: a change to wrapping, table layout.
 var fixturePageBounds = map[string]fixtureBounds{ //nolint:gochecknoglobals // immutable test corpus
 	"fixture-01-simple-invoice.html": { //nolint:exhaustruct // intentional zero-value fields
-		minPages: 1, maxPages: 1,
+		minPages: 1, maxPages: 1, needles: []string{"Invoice", "234.40"},
 	},
 	"fixture-02-table-heavy-invoice.html": { //nolint:exhaustruct // intentional zero-value fields
 		minPages: 1, maxPages: 2,
@@ -265,10 +254,10 @@ var fixturePageBounds = map[string]fixtureBounds{ //nolint:gochecknoglobals // i
 		minPages: 1, maxPages: 1,
 	},
 	"fixture-06-external-link.html": { //nolint:exhaustruct // intentional zero-value fields
-		minPages: 1, maxPages: 1, uris: true,
+		minPages: 1, maxPages: 1, uris: true, needles: []string{"Partner Handbook"},
 	},
 	"fixture-07-image-logo.html": { //nolint:exhaustruct // intentional zero-value fields
-		minPages: 1, maxPages: 1, images: true,
+		minPages: 1, maxPages: 1, images: true, needles: []string{"Nordwind"},
 	},
 	"fixture-08-forced-page-breaks.html": { //nolint:exhaustruct // intentional zero-value fields
 		minPages: 5, maxPages: 5,
@@ -319,7 +308,7 @@ var fixturePageBounds = map[string]fixtureBounds{ //nolint:gochecknoglobals // i
 		minPages: 2, maxPages: 0,
 	},
 	"fixture-24-internal-anchors.html": { //nolint:exhaustruct // intentional zero-value fields
-		minPages: 2, maxPages: 2,
+		minPages: 2, maxPages: 2, needles: []string{"Internal link report", "Appendix"},
 	},
 	"fixture-25-flex-row.html": { //nolint:exhaustruct // intentional zero-value fields
 		minPages: 1, maxPages: 1,
@@ -408,8 +397,20 @@ var fixturePageBounds = map[string]fixtureBounds{ //nolint:gochecknoglobals // i
 	"fixture-53-asteria-observatory-poster.html": { //nolint:exhaustruct // intentional zero-value fields
 		minPages: 1, maxPages: 1, images: true,
 	},
+	"fixture-54-ember-harbor-storybook.html": { //nolint:exhaustruct // intentional zero-value fields
+		minPages: 4, maxPages: 4, images: true, needles: []string{"Ember Harbor"},
+	},
 	"fixture-55-lantern-cooperative-report.html": { //nolint:exhaustruct // intentional zero-value fields
-		minPages: 3, maxPages: 3,
+		minPages: 3, maxPages: 3, needles: []string{"NORTHLINE"},
+	},
+	"font-examples.html": { //nolint:exhaustruct // fallback Liberation; page count varies with wrap
+		minPages: 1, maxPages: 30,
+	},
+	"complex-css.html": { //nolint:exhaustruct // catalog stress fixture
+		minPages: 1, maxPages: 40, needles: []string{"Alexandria"},
+	},
+	"architecture-diagram.html": { //nolint:exhaustruct // library architecture template
+		minPages: 1, maxPages: 12, needles: []string{"Architecture"},
 	},
 	"fixture-56-architecture-diagram.html": { //nolint:exhaustruct // intentional zero-value fields
 		// Unitless line-height now scales with each descendant's font size;
@@ -474,13 +475,16 @@ func TestGoldenCorpusAllFixtures(t *testing.T) { //nolint:gocognit,cyclop,funlen
 
 			fixtureHeaderOK(t, file, content)
 
-			cmd := commandForFixture(t, file)
-			data := runPDF(t, cmd)
-			n := pageCount(data)
-			buf := fixturePageBounds[file]
+			data := runPDF(t, requestForFixture(t, file))
+			pages := pageCount(data)
+			buf, ok := fixturePageBounds[file]
 
-			if n < buf.minPages || (buf.maxPages > 0 && n > buf.maxPages) {
-				t.Errorf("pages = %d, want [%d, %d]", n, buf.minPages, buf.maxPages)
+			if !ok {
+				t.Fatalf("missing fixturePageBounds for %s", file)
+			}
+
+			if pages < buf.minPages || (buf.maxPages > 0 && pages > buf.maxPages) {
+				t.Errorf("pages = %d, want [%d, %d]", pages, buf.minPages, buf.maxPages)
 			}
 
 			if !bytes.Contains(data, []byte("/FontFile2")) {
@@ -493,6 +497,27 @@ func TestGoldenCorpusAllFixtures(t *testing.T) { //nolint:gocognit,cyclop,funlen
 
 			if buf.uris && !bytes.Contains(data, []byte("/S /URI")) {
 				t.Error("expected a URI link annotation (/S /URI)")
+			}
+
+			if len(buf.needles) > 0 {
+				doc, err := pdf.ParseSemantic(data)
+				if err != nil {
+					t.Fatalf("ParseSemantic: %v", err)
+				}
+
+				text := doc.DocumentText()
+				pos := 0
+
+				for _, needle := range buf.needles {
+					idx := strings.Index(text[pos:], needle)
+					if idx < 0 {
+						t.Errorf("extracted text missing %q after offset %d; text=%q", needle, pos, text)
+
+						continue
+					}
+
+					pos += idx + len(needle)
+				}
 			}
 
 			if file == "fixture-27-cjk-fontpath.html" && bytes.Contains(data, []byte("NotoSansKR")) {
@@ -521,7 +546,7 @@ func TestGoldenFixture03Performance(t *testing.T) { //nolint:funlen // perf harn
 		t.Skip("perf budget test skipped in -short mode")
 	}
 
-	cmd := commandForFixture(t, "fixture-03-multi-page-invoice.html")
+	cmd := requestForFixture(t, "fixture-03-multi-page-invoice.html")
 
 	ctx := t.Context()
 	loader := load.NewLoader(cmd.Global.Load)

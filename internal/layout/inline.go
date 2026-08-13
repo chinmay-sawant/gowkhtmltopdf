@@ -21,6 +21,8 @@ const (
 	cssVerticalAlignTop          = "top"
 	cssTextDecorationLineThrough = "line-through"
 	cssTextDecorationUnderline   = "underline"
+	writingModeVerticalRL        = "vertical-rl"
+	writingModeVerticalLR        = "vertical-lr"
 	nonASCIIStart                = 0x80
 )
 
@@ -32,6 +34,7 @@ type inlineItem struct {
 	marginL    float64 // leading horizontal margin (e.g. span margin-left)
 	marginR    float64 // trailing horizontal margin
 	img        bool
+	thumbImg   bool // img inside a collapsed wiki figure; outer frame owns L/R/T
 	chrome     bool // text belongs to an inline element with its own decoration
 	noSplit    bool // vertical writing-mode run must remain one rotated line
 	imgRef     *imageRef
@@ -44,16 +47,7 @@ type inlineItem struct {
 	opEnd    int
 }
 
-// layoutInlineFloats lays out inline content into line boxes and emits
-// text/image ops. It returns the consumed height and records the first line's
-// baseline on the box. When floats is non-nil, each line re-queries exclusion
-// at its canvas Y so text widens again after a float ends mid-paragraph.
-//
-//nolint:cyclop // hot path: per-line wrap against float exclusion zones
-func (e *engine) layoutInlineFloats(
-	boxNode *box, nodes []*html.Node, contentW, contentX, lineY float64,
-	floats *floatState,
-) float64 {
+func (e *engine) collectAndPrepareInlineItems(nodes []*html.Node, contentW float64) []inlineItem {
 	items := e.acquireInlineItems()
 
 	oldMax := e.imgMaxW
@@ -76,6 +70,20 @@ func (e *engine) layoutInlineFloats(
 		items = separateAdjacentCites(items, e)
 	}
 
+	return items
+}
+
+// layoutInlineFloats lays out inline content into line boxes and emits
+// text/image ops. It returns the consumed height and records the first line's
+// baseline on the box. When floats is non-nil, each line re-queries exclusion
+// at its canvas Y so text widens again after a float ends mid-paragraph.
+//
+//nolint:cyclop // hot path: per-line wrap against float exclusion zones
+func (e *engine) layoutInlineFloats(
+	boxNode *box, nodes []*html.Node, contentW, contentX, lineY float64,
+	floats *floatState,
+) float64 {
+	items := e.collectAndPrepareInlineItems(nodes, contentW)
 	defer e.releaseInlineItems(items)
 
 	if len(items) == 0 {
@@ -87,6 +95,17 @@ func (e *engine) layoutInlineFloats(
 	idx := 0
 	for idx < len(items) {
 		lineX, lineW := e.lineBounds(floats, contentX, contentW, leftY)
+
+		if idx == 0 && boxNode != nil && boxNode.style != nil && boxNode.style.TextIndent != 0 {
+			indent := e.scalePt(boxNode.style.TextIndent)
+			lineX += indent
+			lineW -= indent
+
+			if lineW < 0 {
+				lineW = 0
+			}
+		}
+
 		// Short remaining tail beside a float: if it fits as one full-width
 		// line under the float, drop there instead of leaving an orphan in
 		// the narrow column (e.g. wiki "big time."[71] left of a thumb).
@@ -795,7 +814,9 @@ func (e *engine) emitLineItems(boxNode *box, line []inlineItem, leftX, baseline,
 
 		switch {
 		case item.blockBox != nil:
-			leftX = e.emitInlineBlock(boxNode, item, leftX, baseline, justifyGap, idx < len(line)-1, &und)
+			leftX = e.emitInlineBlock(
+				boxNode, item, leftX, lineY, lineH, baseline, justifyGap, idx < len(line)-1, &und,
+			)
 		case item.img:
 			leftX = e.emitInlineImage(item, leftX, lineY, lineH, baseline, justifyGap, idx < len(line)-1, &und)
 		default:
@@ -833,9 +854,18 @@ func (e *engine) lineMetrics(line []inlineItem, lineY float64) (float64, float64
 
 	for i := range line {
 		item := &line[i]
-		if item.forceBreak || item.style == nil || item.img || item.blockBox != nil {
-			if item.h > maxAscent {
-				maxAscent = item.h
+		if item.forceBreak || item.style == nil {
+			continue
+		}
+
+		if item.img || item.blockBox != nil {
+			ascent, descent := e.atomicInlineAlign(item)
+			if ascent > maxAscent {
+				maxAscent = ascent
+			}
+
+			if descent > maxDescent {
+				maxDescent = descent
 			}
 
 			continue
@@ -868,6 +898,38 @@ func (e *engine) lineMetrics(line []inlineItem, lineY float64) (float64, float64
 	}
 
 	return lineH, lineY + maxAscent
+}
+
+// atomicInlineAlign is the ascent/descent a replaced or inline-block item
+// contributes to the line. A length vertical-align raises (positive) or
+// lowers (negative) the box relative to the baseline.
+func (e *engine) atomicInlineAlign(item *inlineItem) (float64, float64) {
+	if item.style != nil {
+		switch item.style.VerticalAlign {
+		case cssVerticalAlignTop, cssVerticalAlignMiddle, cssVerticalAlignBottom:
+			return item.h, 0
+		}
+	}
+
+	shift := 0.0
+	if item.style != nil {
+		shift = e.scalePt(item.style.VerticalAlignShift)
+	}
+
+	ascent := item.h + shift
+	descent := -shift
+
+	if ascent < 0 {
+		descent -= ascent
+		ascent = 0
+	}
+
+	if descent < 0 {
+		ascent -= descent
+		descent = 0
+	}
+
+	return ascent, descent
 }
 
 // lineOriginAndGap returns the x where the line content starts and the extra

@@ -12,7 +12,7 @@ function loadContent(id) {
   return null
 }
 
-const DOCS = ['cli', 'library-api', 'architecture', 'compatibility', 'fonts', 'security']
+const DOCS = ['cli', 'library-api', 'architecture', 'compatibility', 'fonts', 'security', 'performance']
 
 export default function DocumentationPage() {
   const { docId } = useParams()

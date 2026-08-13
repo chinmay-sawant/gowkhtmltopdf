@@ -22,8 +22,8 @@ Conversion does more than one GET:
 
 1. Load the primary page (URL, path, or bytes you supply).
 2. Parse HTML/CSS.
-3. Fetch **subresources** named by the document (`img`, `link` stylesheets, etc.)
-   via the same loader (`FetchSub`).
+3. Fetch **subresources** named by the document (`img`, `link` stylesheets,
+   `@font-face` `https://` sources, etc.) via the same loader (`FetchSub`).
 4. Optionally read **local files** if local-file access is enabled.
 
 So the attack surface is: **primary input + every URL the document references**.
@@ -103,7 +103,10 @@ Even if the main page is “https://example.com/ok.html”, the HTML may contain
 ```
 
 The loader will attempt those fetches from **your** process. Treat any HTML
-you did not author as able to **drive egress**.
+you did not author as able to **drive egress**. `@font-face` `https://` is
+the same subresource hop as `img` / `link` (same ACL + `NetworkPolicy`)
+unless Restricted policy is set; `.woff2`, `.eot`, and `data:` font src are
+skipped.
 
 ### D - Local files enabled + user input (high risk: file read)
 
@@ -198,8 +201,23 @@ both tools.
 
 ---
 
+## Isolated worker profile (untrusted HTML)
+
+If you convert HTML you did not author, do not treat an in-process
+`Converter` as a complete SSRF/DoS boundary. Run each job in an isolated
+worker:
+
+| Control | Recommendation |
+|---|---|
+| Network | No host network. Egress deny-by-default; allow only the asset hosts you need |
+| Policy | `RestrictedNetworkPolicy()` or CLI `--restrict-network`; add `--allow-host` only for trusted internals |
+| Filesystem | Read-only root; no secrets mounts; local-file ACL left off |
+| Time | Per-job context timeout (30–60s typical) |
+| Size | Keep loader body cap (100 MiB default); add page/output budgets at the service layer |
+| Concurrency | Bound workers (e.g. 2–4 per container). `pdf.Document` is single-goroutine |
+
 ## See also
 
-- [THREAT-MODEL.md](THREAT-MODEL.md) - ACL matrix, timeouts, controls inventory  
-- [library-api.md](library-api.md) - `NewConverter` settings  
+- [THREAT-MODEL.md](THREAT-MODEL.md) - ACL matrix, timeouts, `NetworkPolicy`  
+- [library-api.md](library-api.md) - typed `RunPDF` / `SetNetworkPolicy`  
 - [getting-started.md](getting-started.md) - local file opt-in  

@@ -894,6 +894,7 @@ section.d03 .d03-gauge progress {
   font-family: var(--sans);
   font-size: 0.8rem;
   color: var(--ink);
+  accent-color: var(--d03-bar);
 }
 
 section.d03 .d03-gauge progress {
@@ -930,8 +931,9 @@ section.d03 ::selection {
 /* Card accent: modern color-mix() with a graceful fallback first.
    The lite engine drops the color-mix() declaration and keeps var(--accent). */
 section.d04 {
-  border-top-color: var(--accent);
-  border-top-color: color-mix(in srgb, var(--accent) 65%, var(--accent2));
+  /* The neutral outer frame is intentional; the accent belongs to the
+     section's interior components, not the page-fragment top edge. */
+  border-top-color: var(--line);
 }
 
 /* New inline tags render as generic boxes in the lite engine unless forced. */

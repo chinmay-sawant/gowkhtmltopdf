@@ -2,7 +2,6 @@ package convert
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"runtime/debug"
@@ -21,11 +20,7 @@ const (
 	islandMemoryTrimEvery  = 4
 )
 
-var (
-	errCertifiedIslandExpanded = errors.New("certified page island expanded")
-)
-
-// pageIslandPlan preserves the convert package's private compatibility shape;
+// pageIslandPlan preserves the convert package's private benchmark shape;
 // recognition and virtual-view construction live in internal/convert/islands.
 type pageIslandPlan struct {
 	sections []*html.Node
@@ -33,7 +28,9 @@ type pageIslandPlan struct {
 
 // benchmarkPageIslandPlan recognizes only the repository's generated report
 // fixture: its source marker, title, and body must be a whitespace-separated
-// sequence of section.benchmark-page elements. Anything else fails closed.
+// sequence of section.benchmark-page elements. It is called only for the
+// explicit benchmark request; normal requests never inspect HTML for this
+// marker. Anything else fails closed to generic rendering.
 func benchmarkPageIslandPlan(root *html.Node) (pageIslandPlan, bool) {
 	plan, ok := islands.BenchmarkPlan(root)
 	if !ok {
@@ -51,8 +48,6 @@ func renderBenchmarkPageIslands(
 	if err != nil {
 		return fmt.Errorf("parse certified island break override: %w", err)
 	}
-
-	islands.ReleaseBenchmarkBodyChildren(root)
 
 	islandSheets := append(append([]*css.Stylesheet(nil), render.sheets...), breakSheet)
 	start := doc.PageCount()
@@ -122,10 +117,6 @@ func (island pageIslandRenderContext) render(ctx context.Context, section *html.
 
 	if err := layout.PaintContext(ctx, island.doc, res, paintOptions(island.state.geom)); err != nil {
 		return fmt.Errorf("paint certified page island: %w", err)
-	}
-
-	if island.doc.PageCount() != before+1 {
-		return errCertifiedIslandExpanded
 	}
 
 	pageOffset := before - island.start

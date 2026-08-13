@@ -113,15 +113,29 @@ func headerHasContent(hf settings.HeaderFooter) bool {
 	return hf.Left != "" || hf.Center != "" || hf.Right != "" || hf.Line || hf.HTMLURL != ""
 }
 
+//nolint:mnd // 400 is default normal font weight
+func resolveHFFont(name string, reg *pdf.Registry, fallback *pdf.Font) *pdf.Font {
+	if strings.TrimSpace(name) == "" || reg == nil {
+		return fallback
+	}
+
+	if f := reg.Lookup([]string{strings.TrimSpace(name)}, 400, false); f != nil {
+		return f
+	}
+
+	return fallback
+}
+
 // drawTextHF paints the text header (isHeader) or footer into the page's
 // margin band: left/center/right sides at the band's vertical middle and the
-// separator line at the content edge. The embedded Liberation Sans is used
-// for every requested font name (the engine embeds a single font; font-size
-// and spacing are honored).
-func drawTextHF(page *pdf.Page, hfVal settings.HeaderFooter, geom hfGeom, parms hfParms, font *pdf.Font, isHeader bool) { //nolint:funlen,lll // left/center/right bands with line flag
+// separator line at the content edge. HeaderFooter.FontName is resolved
+// through the font registry with fallback to the default base font.
+func drawTextHF(page *pdf.Page, hfVal settings.HeaderFooter, geom hfGeom, parms hfParms, font *pdf.Font, reg *pdf.Registry, isHeader bool) { //nolint:funlen,lll // left/center/right bands with line flag
 	if !headerHasContent(hfVal) {
 		return
 	}
+
+	font = resolveHFFont(hfVal.FontName, reg, font)
 
 	cur := page.Content()
 	cur.UseEmbeddedFont("F0", font)
@@ -581,6 +595,10 @@ func hfHeightFor(ctx context.Context, loader *load.Loader, font *pdf.Font, state
 		size = 12
 	}
 
+	if state != nil {
+		font = resolveHFFont(hfVal.FontName, state.registry, font)
+	}
+
 	h := (float64(font.Ascent()) - float64(font.Descent())) / float64(font.UnitsPerEm()) * size
 
 	return h, nil
@@ -733,7 +751,7 @@ func drawHeadersFootersResult(ctx context.Context, loader *load.Loader, font *pd
 				return
 			}
 
-			drawTextHF(page, hfVal, own.st.geom, parms, font, isHeader)
+			drawTextHF(page, hfVal, own.st.geom, parms, font, own.st.registry, isHeader)
 		}
 		draw(own.st.header, true)
 		draw(own.st.footer, false)

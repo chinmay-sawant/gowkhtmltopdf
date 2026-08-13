@@ -1,5 +1,5 @@
-# Checked-in benchmark evidence; no new measurements are claimed by this change.
-# All rows below are historical samples and retain their original units.
+# Checked-in benchmark evidence. Each dated snapshot retains its original units
+# and command; only its own heading defines whether it is historical or current.
 # Snapshot A: perf-wave workload matrix, one iteration per workload (-count=1).
 # Command (2026-08-09, working tree after lint wave + perf wave):
 #   go test ./internal/convert -run '^$' -bench 'Benchmark(PDFPages|TemplatePages|WebFetchImage|ImageAssets)$' -benchmem -benchtime=1x -count=1
@@ -78,3 +78,183 @@ ok  	gowkhtmltopdf/internal/convert	5.4s
 # Snapshot C PDF 500 raw: 0.992s / 0.864s / 0.878s (median 0.878s / 335.7MB / 517.9K allocs).
 # Snapshot C Template 500 raw: 0.925s / 0.848s / 0.944s (median 0.925s / 340.4MB / 569.1K allocs).
 # As above, B/op is cumulative allocation traffic and is not RSS.
+
+# Snapshot D: stored full in-process workload matrix, one iteration per
+# workload (-count=1), captured 2026-08-12 before the CR-02 explicit-island
+# remediation. It remains a historical benchmark baseline.
+# Command:
+#   GOCACHE=/tmp/gowk-go-cache go test ./internal/convert -run '^$' \
+#     -bench 'Benchmark(PDFPages|TemplatePages|WebFetchImage|ImageAssets)$' \
+#     -benchmem -benchtime=1x -count=1
+# Toolchain/host: go1.26.4 linux/amd64 · 24 CPUs · 13th Gen Intel i7-13700HX.
+# This is historical allocation evidence, not peak process RSS. The separately
+# captured direct CLI RSS/time matrix is the same historical Snapshot D
+# workload and is documented in testdata/golden/benchmarks/README.md.
+
+goos: linux
+goarch: amd64
+pkg: gowkhtmltopdf/internal/convert
+cpu: 13th Gen Intel(R) Core(TM) i7-13700HX
+BenchmarkImageAssets/2Images-24                 1    23234509 ns/op    0.39 MB/s  55123728 B/op    6756 allocs/op
+BenchmarkImageAssets/5Images-24                 1    26868592 ns/op    0.38 MB/s  51101768 B/op    6648 allocs/op
+BenchmarkImageAssets/10Images-24                1    16562332 ns/op    0.73 MB/s  57414584 B/op    7534 allocs/op
+BenchmarkImageAssets/20Images-24                1    25941635 ns/op    0.65 MB/s  57887976 B/op    7958 allocs/op
+BenchmarkImageAssets/50Images-24                1    36965095 ns/op    0.86 MB/s  59265352 B/op    9212 allocs/op
+BenchmarkImageAssets/100Images-24               1    55148280 ns/op    1.03 MB/s  61652568 B/op   11302 allocs/op
+BenchmarkImageAssets/200Images-24               1    96563837 ns/op    1.09 MB/s  92534720 B/op   15469 allocs/op
+BenchmarkImageAssets/250Images-24               1   129886069 ns/op    1.00 MB/s 100890544 B/op   17554 allocs/op
+BenchmarkImageAssets/500Images-24               1   240737018 ns/op    1.05 MB/s 143369552 B/op   27964 allocs/op
+BenchmarkPDFPages/2Pages-24                     1     4467058 ns/op    9.51 MB/s   2069360 B/op    4865 allocs/op
+BenchmarkPDFPages/5Pages-24                     1    11654543 ns/op    4.37 MB/s   3184792 B/op   10641 allocs/op
+BenchmarkPDFPages/10Pages-24                    1    16672686 ns/op    3.90 MB/s   4893848 B/op   20244 allocs/op
+BenchmarkPDFPages/20Pages-24                    1    37960096 ns/op    2.42 MB/s   8232632 B/op   39403 allocs/op
+BenchmarkPDFPages/50Pages-24                    1    88924331 ns/op    1.95 MB/s  18445616 B/op   97248 allocs/op
+BenchmarkPDFPages/100Pages-24                   1   193470179 ns/op    1.60 MB/s  35548512 B/op  193693 allocs/op
+BenchmarkPDFPages/200Pages-24                   1   428187724 ns/op    1.36 MB/s  69738088 B/op  386885 allocs/op
+BenchmarkPDFPages/250Pages-24                   1   553509921 ns/op    1.29 MB/s  86415360 B/op  483480 allocs/op
+BenchmarkPDFPages/500Pages-24                   1  1359328717 ns/op    1.03 MB/s 171526648 B/op  966532 allocs/op
+BenchmarkTemplatePages/2Pages-24                1     6682756 ns/op    6.36 MB/s   2087136 B/op    5069 allocs/op
+BenchmarkTemplatePages/5Pages-24                1    12952891 ns/op    3.93 MB/s   3256200 B/op   11163 allocs/op
+BenchmarkTemplatePages/10Pages-24               1    23116731 ns/op    2.82 MB/s   5037400 B/op   21277 allocs/op
+BenchmarkTemplatePages/20Pages-24               1    42674221 ns/op    2.15 MB/s   8520456 B/op   41457 allocs/op
+BenchmarkTemplatePages/50Pages-24               1   111825999 ns/op    1.55 MB/s  19034912 B/op  102356 allocs/op
+BenchmarkTemplatePages/100Pages-24              1   206148034 ns/op    1.50 MB/s  36717568 B/op  203899 allocs/op
+BenchmarkTemplatePages/200Pages-24              1   472127611 ns/op    1.23 MB/s  72082256 B/op  407282 allocs/op
+BenchmarkTemplatePages/250Pages-24              1   598331028 ns/op    1.20 MB/s  88830848 B/op  508985 allocs/op
+BenchmarkTemplatePages/500Pages-24              1  1484450636 ns/op    0.94 MB/s 176358984 B/op 1017757 allocs/op
+BenchmarkWebFetchImage/2Images-24               1    23609579 ns/op    0.44 MB/s  54024648 B/op    7817 allocs/op
+BenchmarkWebFetchImage/5Images-24               1    17377475 ns/op    0.66 MB/s  40220424 B/op    8416 allocs/op
+BenchmarkWebFetchImage/10Images-24              1    21003245 ns/op    0.63 MB/s  63302008 B/op    9284 allocs/op
+BenchmarkWebFetchImage/20Images-24              1    22218081 ns/op    0.82 MB/s  46987632 B/op    9719 allocs/op
+BenchmarkWebFetchImage/50Images-24              1    35872671 ns/op    0.92 MB/s  48352248 B/op   10973 allocs/op
+BenchmarkWebFetchImage/100Images-24             1    61975662 ns/op    0.94 MB/s  67453928 B/op   13052 allocs/op
+BenchmarkWebFetchImage/200Images-24             1   115461983 ns/op    0.93 MB/s  98242936 B/op   17229 allocs/op
+BenchmarkWebFetchImage/250Images-24             1   149016083 ns/op    0.88 MB/s 106528488 B/op   19309 allocs/op
+BenchmarkWebFetchImage/500Images-24             1   254810392 ns/op    1.00 MB/s 148807336 B/op   29736 allocs/op
+PASS
+ok      gowkhtmltopdf/internal/convert  7.141s
+
+# Snapshot D direct CLI process rows: one freshly built pre-CR-02 binary
+# run per generated report (2, 5, 10, 20, 50, 100, 200, 250, and 500 pages).
+# Command pattern:
+#   /usr/bin/time -f 'TIME elapsed_s=%e peak_rss_kib=%M' \
+#     <fresh-binary> --quiet --enable-local-file-access <report-N.html> <report-N.pdf>
+# Every output was verified with Ghostscript's pdfpagecount. Elapsed time is
+# rounded by the centisecond timer; RSS is peak KiB. This is process evidence,
+# not Go allocation evidence, and the full command/workload description is in
+# testdata/golden/benchmarks/README.md.
+CLIReport/2Pages      elapsed=10ms   peak_rss_kib=22464  pdf_bytes=43145   rendered_pages=2
+CLIReport/5Pages      elapsed=20ms   peak_rss_kib=23040  pdf_bytes=51460   rendered_pages=5
+CLIReport/10Pages     elapsed=20ms   peak_rss_kib=23616  pdf_bytes=65358   rendered_pages=10
+CLIReport/20Pages     elapsed=40ms   peak_rss_kib=23808  pdf_bytes=91863   rendered_pages=20
+CLIReport/50Pages     elapsed=80ms   peak_rss_kib=26264  pdf_bytes=172078  rendered_pages=50
+CLIReport/100Pages    elapsed=170ms  peak_rss_kib=28648  pdf_bytes=305592  rendered_pages=100
+CLIReport/200Pages    elapsed=340ms  peak_rss_kib=35404  pdf_bytes=573416  rendered_pages=200
+CLIReport/250Pages    elapsed=460ms  peak_rss_kib=38896  pdf_bytes=708125  rendered_pages=250
+CLIReport/500Pages    elapsed=960ms  peak_rss_kib=54632  pdf_bytes=1385450 rendered_pages=500
+
+# Snapshot E: remediation evidence, one iteration per focused benchmark (fresh run 2026-08-12).
+# Repeated resources (local HTTP; one 142-byte PNG referenced eight times/page):
+#   BenchmarkRepeatedResourcePDF/1Pages:   13258966 ns/op  8846192 B/op      1 fetch  142 fetched bytes 44239 PDF bytes
+#   BenchmarkRepeatedResourcePDF/10Pages:  25356003 ns/op 13148120 B/op     10 fetches 1420 fetched bytes 388773 PDF bytes
+#   BenchmarkRepeatedResourcePDF/500Pages:802704415 ns/op 522978064 B/op    500 fetches 71000 fetched bytes 19105376 PDF bytes
+# Deep transform/sticky/forced-break layout corpus:
+#   10 items: 9193533 ns/op 7208016 B/op 969 allocs/op
+#   100 items: 1925354 ns/op 1101208 B/op 2073 allocs/op
+#   1000 items: 24057391 ns/op 9847976 B/op 20101 allocs/op
+# Cold glyph raster corpus (Latin and bundled Unicode fallback CJK):
+#   Latin 12/24/72px: 2039980/1217545/7017571 ns/op; 1271208/807048/1412200 B/op
+#   CJK 12/24/72px: 4883425/196722/242463 ns/op; 3385504/99960/689784 B/op
+# Style cancellation benchmark:
+#   BenchmarkStyleResolutionContext: 145628281 ns/op 176088 B/op 25 allocs/op
+# Exact commands and interpretation are recorded in testdata/golden/benchmarks/README.md.
+
+# Snapshot F: current generic CLI + in-process matrix, captured 2026-08-14
+# after release-prep on the generic convert path (no CLI page islands).
+# Host: Linux amd64 · WSL2 24 CPUs · 13th Gen Intel Core i7-13700HX
+# Toolchain: go1.26.4 linux/amd64 · gowkhtmltopdf 0.2.0 freshly built
+# In-process command:
+#   go test ./internal/convert -run '^$' \
+#     -bench 'Benchmark(PDFPages|TemplatePages|WebFetchImage|ImageAssets)$' \
+#     -benchmem -benchtime=1x -count=1
+# CLI comparison command:
+#   make bench-cli-compare
+#   (GOWKHTMLTOPDF_CLI_COMPARE=1 go test ./internal/convert \
+#     -run '^TestCompareWithWkhtmltopdfBinary$' -count=1)
+# wkhtmltopdf 0.12.6.1 (with patched qt) at /usr/local/bin/wkhtmltopdf.
+# Process comparison is documented in cli-compare.md / cli-compare-results.csv.
+# These in-process rows are allocation traffic (B/op), not peak RSS.
+
+goos: linux
+goarch: amd64
+pkg: gowkhtmltopdf/internal/convert
+cpu: 13th Gen Intel(R) Core(TM) i7-13700HX
+BenchmarkImageAssets/2Images-24         	       1	  14609998 ns/op	   0.63 MB/s	13949496 B/op	    2120 allocs/op
+BenchmarkImageAssets/5Images-24         	       1	  10186560 ns/op	   1.00 MB/s	 7246216 B/op	    1661 allocs/op
+BenchmarkImageAssets/10Images-24        	       1	  10068973 ns/op	   1.19 MB/s	 7857704 B/op	    2067 allocs/op
+BenchmarkImageAssets/20Images-24        	       1	  13161742 ns/op	   1.29 MB/s	 9579120 B/op	    2543 allocs/op
+BenchmarkImageAssets/50Images-24        	       1	  21563609 ns/op	   1.47 MB/s	14674376 B/op	    3946 allocs/op
+BenchmarkImageAssets/100Images-24       	       1	  38630682 ns/op	   1.47 MB/s	23269008 B/op	    6284 allocs/op
+BenchmarkImageAssets/200Images-24       	       1	  67746093 ns/op	   1.56 MB/s	40434264 B/op	   10954 allocs/op
+BenchmarkImageAssets/250Images-24       	       1	  87119406 ns/op	   1.49 MB/s	48869936 B/op	   13286 allocs/op
+BenchmarkImageAssets/500Images-24       	       1	 178331134 ns/op	   1.42 MB/s	91749112 B/op	   24950 allocs/op
+BenchmarkPDFPages/generic/2Pages-24     	       1	   3664572 ns/op	  11.60 MB/s	 2258056 B/op	    5755 allocs/op
+BenchmarkPDFPages/generic/5Pages-24     	       1	   7058264 ns/op	   7.21 MB/s	 3686392 B/op	   12650 allocs/op
+BenchmarkPDFPages/generic/10Pages-24    	       1	  14978485 ns/op	   4.34 MB/s	 5923720 B/op	   24085 allocs/op
+BenchmarkPDFPages/generic/20Pages-24    	       1	  28300390 ns/op	   3.25 MB/s	10299776 B/op	   46885 allocs/op
+BenchmarkPDFPages/generic/50Pages-24    	       1	  77061612 ns/op	   2.24 MB/s	23716480 B/op	  115640 allocs/op
+BenchmarkPDFPages/generic/100Pages-24   	       1	 149026058 ns/op	   2.07 MB/s	46085744 B/op	  230244 allocs/op
+BenchmarkPDFPages/generic/200Pages-24   	       1	 335828782 ns/op	   1.73 MB/s	90974048 B/op	  459790 allocs/op
+BenchmarkPDFPages/generic/250Pages-24   	       1	 416991027 ns/op	   1.72 MB/s	112714928 B/op	  574587 allocs/op
+BenchmarkPDFPages/generic/500Pages-24   	       1	 965808601 ns/op	   1.45 MB/s	224305648 B/op	 1148496 allocs/op
+BenchmarkPDFPages/certified-islands/2Pages-24 	       1	   3810750 ns/op	  11.15 MB/s	 2148616 B/op	    6732 allocs/op
+BenchmarkPDFPages/certified-islands/5Pages-24 	       1	  10804138 ns/op	   4.71 MB/s	 3384752 B/op	   15335 allocs/op
+BenchmarkPDFPages/certified-islands/10Pages-24	       1	  15716633 ns/op	   4.14 MB/s	 5293200 B/op	   29626 allocs/op
+BenchmarkPDFPages/certified-islands/20Pages-24	       1	  32637188 ns/op	   2.82 MB/s	 9031024 B/op	   58165 allocs/op
+BenchmarkPDFPages/certified-islands/50Pages-24	       1	  82164838 ns/op	   2.11 MB/s	20441368 B/op	  144149 allocs/op
+BenchmarkPDFPages/certified-islands/100Pages-24	       1	 171035707 ns/op	   1.81 MB/s	39527656 B/op	  287477 allocs/op
+BenchmarkPDFPages/certified-islands/200Pages-24	       1	 360927116 ns/op	   1.61 MB/s	77702776 B/op	  574467 allocs/op
+BenchmarkPDFPages/certified-islands/250Pages-24	       1	 485069344 ns/op	   1.48 MB/s	96391560 B/op	  717981 allocs/op
+BenchmarkPDFPages/certified-islands/500Pages-24	       1	1118364342 ns/op	   1.25 MB/s	191477856 B/op	 1435523 allocs/op
+BenchmarkTemplatePages/generic/2Pages-24	       1	   3628024 ns/op	  11.71 MB/s	 2275608 B/op	    5956 allocs/op
+BenchmarkTemplatePages/generic/5Pages-24	       1	   7561530 ns/op	   6.73 MB/s	 2927016 B/op	   13138 allocs/op
+BenchmarkTemplatePages/generic/10Pages-24	       1	  15377433 ns/op	   4.23 MB/s	 6074096 B/op	   25124 allocs/op
+BenchmarkTemplatePages/generic/20Pages-24	       1	  31137705 ns/op	   2.95 MB/s	10587328 B/op	   48939 allocs/op
+BenchmarkTemplatePages/generic/50Pages-24	       1	  77562665 ns/op	   2.23 MB/s	24305440 B/op	  120748 allocs/op
+BenchmarkTemplatePages/generic/100Pages-24	       1	 164624661 ns/op	   1.88 MB/s	47309784 B/op	  240476 allocs/op
+BenchmarkTemplatePages/generic/200Pages-24	       1	 336356246 ns/op	   1.72 MB/s	93248336 B/op	  480183 allocs/op
+BenchmarkTemplatePages/generic/250Pages-24	       1	 420759379 ns/op	   1.70 MB/s	114999136 B/op	  600087 allocs/op
+BenchmarkTemplatePages/generic/500Pages-24	       1	 947767589 ns/op	   1.48 MB/s	228876464 B/op	 1199719 allocs/op
+BenchmarkTemplatePages/certified-islands/2Pages-24	       1	   3782119 ns/op	  11.24 MB/s	 2167144 B/op	    6946 allocs/op
+BenchmarkTemplatePages/certified-islands/5Pages-24	       1	  12014287 ns/op	   4.24 MB/s	 3455920 B/op	   15854 allocs/op
+BenchmarkTemplatePages/certified-islands/10Pages-24	       1	  16806535 ns/op	   3.87 MB/s	 5436752 B/op	   30659 allocs/op
+BenchmarkTemplatePages/certified-islands/20Pages-24	       1	  32252277 ns/op	   2.85 MB/s	 9318960 B/op	   60220 allocs/op
+BenchmarkTemplatePages/certified-islands/50Pages-24	       1	  83393179 ns/op	   2.07 MB/s	21030600 B/op	  149261 allocs/op
+BenchmarkTemplatePages/certified-islands/100Pages-24	       1	 172243922 ns/op	   1.79 MB/s	40707640 B/op	  297694 allocs/op
+BenchmarkTemplatePages/certified-islands/200Pages-24	       1	 363208458 ns/op	   1.60 MB/s	80062968 B/op	  594882 allocs/op
+BenchmarkTemplatePages/certified-islands/250Pages-24	       1	 472658918 ns/op	   1.51 MB/s	98806664 B/op	  743481 allocs/op
+BenchmarkTemplatePages/certified-islands/500Pages-24	       1	1169349926 ns/op	   1.20 MB/s	196305272 B/op	 1486748 allocs/op
+BenchmarkWebFetchImage/2Images-24       	       1	  10730223 ns/op	   0.97 MB/s	 7450400 B/op	    2017 allocs/op
+BenchmarkWebFetchImage/5Images-24       	       1	  12451495 ns/op	   0.92 MB/s	 7731128 B/op	    2246 allocs/op
+BenchmarkWebFetchImage/10Images-24      	       1	  13774677 ns/op	   0.96 MB/s	 8338824 B/op	    2648 allocs/op
+BenchmarkWebFetchImage/20Images-24      	       1	  15983344 ns/op	   1.14 MB/s	10045792 B/op	    3130 allocs/op
+BenchmarkWebFetchImage/50Images-24      	       1	  26023500 ns/op	   1.27 MB/s	15130360 B/op	    4534 allocs/op
+BenchmarkWebFetchImage/100Images-24     	       1	  42617384 ns/op	   1.37 MB/s	23664520 B/op	    6875 allocs/op
+BenchmarkWebFetchImage/200Images-24     	       1	  73192404 ns/op	   1.46 MB/s	40733784 B/op	   11549 allocs/op
+BenchmarkWebFetchImage/250Images-24     	       1	  84810968 ns/op	   1.54 MB/s	49103312 B/op	   13885 allocs/op
+BenchmarkWebFetchImage/500Images-24     	       1	 166029016 ns/op	   1.53 MB/s	91775656 B/op	   25544 allocs/op
+PASS
+ok  	gowkhtmltopdf/internal/convert	9.638s
+
+# Snapshot F direct CLI process rows: median of 3 timed runs after 1 warmup.
+# Both binaries: --quiet --enable-local-file-access. RSS is /usr/bin/time %M.
+CLICompare/2Pages     gowk=16ms    wkhtml=254ms   speedup=15.95  gowk_rss_kib=24192  wk_rss_kib=44852  gowk_pdf=42501   wk_pdf=18486
+CLICompare/5Pages     gowk=22ms    wkhtml=265ms   speedup=12.23  gowk_rss_kib=24768  wk_rss_kib=45396  gowk_pdf=50919   wk_pdf=30584
+CLICompare/10Pages    gowk=30ms    wkhtml=278ms   speedup=9.41   gowk_rss_kib=26496  wk_rss_kib=46200  gowk_pdf=65072   wk_pdf=50994
+CLICompare/20Pages    gowk=44ms    wkhtml=304ms   speedup=6.84   gowk_rss_kib=29760  wk_rss_kib=47156  gowk_pdf=91899   wk_pdf=90742
+CLICompare/50Pages    gowk=88ms    wkhtml=387ms   speedup=4.40   gowk_rss_kib=41472  wk_rss_kib=51824  gowk_pdf=172926  wk_pdf=210678
+CLICompare/100Pages   gowk=184ms   wkhtml=530ms   speedup=2.89   gowk_rss_kib=58752  wk_rss_kib=58976  gowk_pdf=308714  wk_pdf=411260
+CLICompare/200Pages   gowk=353ms   wkhtml=812ms   speedup=2.30   gowk_rss_kib=90048  wk_rss_kib=74336  gowk_pdf=579862  wk_pdf=816285
+CLICompare/250Pages   gowk=433ms   wkhtml=942ms   speedup=2.18   gowk_rss_kib=112704 wk_rss_kib=81636  gowk_pdf=715476  wk_pdf=1019315
+CLICompare/500Pages   gowk=1045ms  wkhtml=1641ms  speedup=1.57   gowk_rss_kib=199872 wk_rss_kib=123264 gowk_pdf=1398479 wk_pdf=2036776
+

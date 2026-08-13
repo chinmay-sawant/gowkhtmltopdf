@@ -1,12 +1,14 @@
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { HashRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom'
 import SiteNav from './components/SiteNav'
 import Footer from './components/Footer'
 import ContentPage from './pages/ContentPage'
-import DocumentationPage from './pages/DocumentationPage'
-import DossierPage from './pages/DossierPage'
-import ShowcasePage from './pages/ShowcasePage'
 import LandingPage from './pages/LandingPage'
+
+const DocumentationPage = lazy(() => import('./pages/DocumentationPage'))
+const DossierPage = lazy(() => import('./pages/DossierPage'))
+const ShowcasePage = lazy(() => import('./pages/ShowcasePage'))
+const BenchmarksPage = lazy(() => import('./pages/BenchmarksPage'))
 
 const DOC_REDIRECTS = [
   ['cli', 'cli'],
@@ -15,6 +17,7 @@ const DOC_REDIRECTS = [
   ['compatibility', 'compatibility'],
   ['fonts', 'fonts'],
   ['security', 'security'],
+  ['performance', 'performance'],
 ]
 
 function ScrollToTop() {
@@ -42,6 +45,7 @@ export default function App() {
       <ScrollToTop />
       <a className="skip-link" href="#main-content">Skip to content</a>
       <SiteNav />
+      <Suspense fallback={<div className="wrap">Loading…</div>}>
       <Routes>
         <Route element={<WrapLayout />}>
           <Route path="/" element={<LandingPage />} />
@@ -49,6 +53,7 @@ export default function App() {
           <Route path="/about" element={<ContentPage />} />
           <Route path="/dossier" element={<DossierPage />} />
           <Route path="/showcase" element={<ShowcasePage />} />
+          <Route path="/benchmarks" element={<BenchmarksPage />} />
         </Route>
         <Route path="/documentation" element={<Navigate to="/documentation/cli" replace />} />
         <Route path="/documentation/:docId" element={<DocumentationPage />} />
@@ -61,6 +66,7 @@ export default function App() {
         ))}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </Suspense>
     </HashRouter>
   )
 }
