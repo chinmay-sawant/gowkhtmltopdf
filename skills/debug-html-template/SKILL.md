@@ -4,8 +4,9 @@ description: >
   Debug an HTML-to-PDF template when the rendered page wraps, misaligns,
   overlaps, or ignores CSS. Diagnose only: walk the symptom to the CSS,
   split measure vs paint and parse vs apply, then table the possible
-  fixes and wait for the user to pick one. Engine fixes are the default;
-  alert if a template change is required. Use when the user says a
+  fixes and wait for the user to pick one. Engine only when measure or
+  parse/apply actually lied; look-only gaps belong in the template.
+  Alert if a template change is required. Use when the user says a
   template "looks wrong", "wrapped", "not aligned", "CSS not applied",
   "debug this HTML/PDF", or runs /debug-html-template. Do not use for
   API, CLI, or non-visual converter failures.
@@ -16,9 +17,9 @@ description: >
 Visual PDF bug. **Diagnose, then stop.** Do not implement until the user
 picks a row from the solutions table.
 
-The template CSS is valid until a dump proves otherwise. Almost every
-fix belongs in the layout/convert **engine**. Do not start by rewriting
-the HTML.
+The template CSS is valid until a dump proves otherwise. Do not start
+by rewriting the HTML. Engine work is for a lied measure/parse/apply
+path — not to invent spacing a browser would not draw.
 
 ## 1. Pin the fragment
 
@@ -89,17 +90,37 @@ This skill ends at the table. No patches, no HTML edits, no PDF regen.
 
 Lead with: used CSS, which path lied (measure, parse, or apply).
 
-Then a table. Engine rows first. Mark the recommended row.
+Then a table. Mark the recommended row using the rules below.
 
 | Where | Change | Why | Risk |
 |---|---|---|---|
-| Engine | … | closes the gap for every template | … |
-| Template (only if needed) | … | … | local only |
+| Engine | … | closes a real measure/parse/apply gap | … |
+| Template (only if needed) | … | document-local look | local only |
+
+## Recommendations
+
+Put these in the table. Do not skip the side-effect column.
+
+- **Engine** when a browser would honor the CSS and we do not (measure
+  ignored a width, parse dropped a length, emit skipped a keyword).
+  That fix should help every template.
+- **Template** when the CSS is already honored and the user wants a
+  *look* (gutter under a header, extra air, page-1 matching page-2).
+  Write it as margin/padding/gap in that document.
+- Do **not** recommend a global engine convention that invents space
+  CSS does not ask for. Side effect: every other document with the
+  same pattern grows, pagination can shift a row, print drifts from
+  the browser.
+- Do **not** treat a page-edge lead (keep ink out of the page margin)
+  as the same problem as an in-flow sibling packed against the
+  previous box. Keep the lead; do not copy it into normal flow.
+- If you still list an invented-engine row, say the side effect in
+  **Risk** and do not mark it recommended.
 
 **Template alert.** If any row requires changing the HTML/CSS template,
 say it in a standalone line the user cannot miss:
 
-`ALERT: this needs a template modification — the engine cannot honor the current CSS as written.` / or `ALERT: a template change is optional (workaround only); engine fix is preferred.`
+`ALERT: this needs a template modification — the engine cannot honor the current CSS as written.` / or `ALERT: a template change is the recommended fix; the engine already honors this CSS.`
 
 If the CSS is invalid, that alert is mandatory and the template row is
 the only honest fix.
