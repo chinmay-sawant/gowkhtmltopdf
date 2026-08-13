@@ -740,7 +740,9 @@ func beforeAlways( //nolint:gocognit,gocyclo,cyclop,funlen // break-difference b
 
 	for idx := range opCount {
 		cum += suffixDy[idx]
-		if cum == 0 || ops[idx].Fixed {
+		// Pinned: thead clones sit at the end of the display list but belong
+		// mid-document; suffix shifts must not drag them across page edges.
+		if cum == 0 || ops[idx].Fixed || ops[idx].Pinned {
 			continue
 		}
 
@@ -1960,6 +1962,8 @@ func tableBodyRange(tblBox *box, page int, res *Result, contentH float64) (int, 
 
 // cloneHeaderOps copies the thead op range to the page top. The clone count
 // is known up front, so the display list grows once instead of per op.
+// Clones are Pinned so later page-break-before suffix shifts (by op index)
+// cannot pull them back onto the previous page.
 func cloneHeaderOps(res *Result, hdrFirst, hdrLast int, hdrTop, pageTop float64) {
 	if hdrFirst < 0 || hdrFirst > hdrLast || hdrFirst >= len(res.Ops) {
 		return
@@ -1975,6 +1979,9 @@ func cloneHeaderOps(res *Result, hdrFirst, hdrLast int, hdrTop, pageTop float64)
 	for k := hdrFirst; k <= hdrLast; k++ {
 		op := res.Ops[k]
 		op.Y = pageTop + (op.Y - hdrTop)
+		op.Pinned = true
+		// Clones are in-flow page furniture, not position:fixed stamps.
+		op.Fixed = false
 		res.Ops[start+k-hdrFirst] = op
 	}
 

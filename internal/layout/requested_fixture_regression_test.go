@@ -39,6 +39,64 @@ func TestFixture21ParagraphAfterForcedBreakStaysContiguous(t *testing.T) {
 	}
 }
 
+// Work-package table continues past page 1; thead must repeat on page 2 top,
+// not get suffix-shifted back onto page 1 bottom by a later page-break-before.
+func TestFixture21WorkPackageHeaderRepeatsOnContinuationPage(t *testing.T) {
+	t.Parallel()
+
+	res, contentH := paintGoldenFixture(t, "fixture-21-detailed-report.html")
+
+	var titleYs []float64
+	var wp09Y float64
+	var foundWP09 bool
+	for _, op := range res.Ops {
+		if op.Kind != OpText {
+			continue
+		}
+		switch {
+		case op.Text == "Title":
+			titleYs = append(titleYs, op.Y)
+		case op.Text == "WP-09":
+			wp09Y = op.Y
+			foundWP09 = true
+		}
+	}
+	if !foundWP09 {
+		t.Fatal("missing WP-09 body row")
+	}
+	if len(titleYs) < 2 {
+		t.Fatalf("WP Title header occurrences = %d, want ≥2 (original + continuation)", len(titleYs))
+	}
+
+	wp09Page := int(wp09Y / contentH)
+	if wp09Page < 1 {
+		t.Fatalf("WP-09 on page %d, want continuation page ≥1 (y=%.2f)", wp09Page, wp09Y)
+	}
+
+	var contTitleY float64
+	var foundCont bool
+	for _, y := range titleYs {
+		page := int(y / contentH)
+		local := y - float64(page)*contentH
+		// Bogus regression: clone dragged to page-0 bottom under body rows.
+		if page == 0 && local > contentH-40 {
+			t.Fatalf("thead clone landed on page-1 bottom at y=%.2f (local=%.2f); want continuation page top", y, local)
+		}
+		if page == wp09Page && local < 40 {
+			if !foundCont || y < contTitleY {
+				contTitleY = y
+				foundCont = true
+			}
+		}
+	}
+	if !foundCont {
+		t.Fatalf("no Title header near top of WP-09 page %d; titleYs=%v wp09Y=%.2f", wp09Page, titleYs, wp09Y)
+	}
+	if wp09Y < contTitleY+4 {
+		t.Fatalf("WP-09 y=%.2f overlaps continuation header y=%.2f", wp09Y, contTitleY)
+	}
+}
+
 func TestFixture23RepeatedHeaderHasNoVisualGap(t *testing.T) {
 	t.Parallel()
 

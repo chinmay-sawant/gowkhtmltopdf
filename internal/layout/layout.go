@@ -322,6 +322,11 @@ type Op struct {
 	// page at viewport-relative coordinates.
 	Fixed bool
 
+	// Pinned keeps canvas Y stable under later index-suffix flow shifts
+	// (repeated thead clones appended after document ops). Unlike Fixed,
+	// pinned ops paint only on their natural page.
+	Pinned bool
+
 	// StickyID links display-list ops to a position:sticky box after parent
 	// prependChrome shifts op indices (0 = not sticky).
 	StickyID int
