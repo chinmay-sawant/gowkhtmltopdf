@@ -407,6 +407,16 @@ func (e *engine) layoutBlockChild(
 		bx, bw = floats.exclusion(contentX, contentW, posY, curY)
 	}
 
+	if node.Name == cssTagImg {
+		marginL := e.scalePt(cstate.MarginLeft)
+		marginR := e.scalePt(cstate.MarginRight)
+		bx += marginL
+		bw -= marginL + marginR
+		if bw < 0 {
+			bw = 0
+		}
+	}
+
 	cblock := e.build(node, bw, bx, posY+curY)
 	if cblock == nil {
 		return curY, 0, nil

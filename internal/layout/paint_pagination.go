@@ -965,6 +965,7 @@ func stretchPaginatedChrome(res *Result) {
 		contentBottom := oldBottom
 		normalizeOwnVerticalChrome(res.Ops, boxNode)
 		trackItem := parentIsFlexOrGrid(parent)
+		capAtChildBox := boxIsFloatOrFigure(boxNode)
 		for idx := boxNode.opStart; idx <= boxNode.opEnd; idx++ {
 			operation := res.Ops[idx]
 			if isOwnBoxChrome(operation, boxNode, oldBottom) {
@@ -984,12 +985,24 @@ func stretchPaginatedChrome(res *Result) {
 			// Flex/grid items must not use that, or their chrome eats the
 			// following gap (fixture-32 wrap, fixture-34 dense). Other
 			// blocks still use the line box so paginated section rails
-			// reach the last line.
-			if !trackItem && (operation.Kind == OpText || operation.Kind == OpBullet) {
+			// reach the last line. Floated figures keep the caption
+			// border box — stretching to the line box clones side rails
+			// past the thumb and onto the next page.
+			if !trackItem && !capAtChildBox && (operation.Kind == OpText || operation.Kind == OpBullet) {
 				bottom = operation.Y + operation.H
 			}
 			if bottom > contentBottom {
 				contentBottom = bottom
+			}
+		}
+
+		if capAtChildBox && contentBottom > oldBottom {
+			// Stretch only when a descendant box moved for pagination, not
+			// when caption text's line box hangs below the caption border box.
+			if childBottom := lastInFlowChildBottom(boxNode); childBottom > oldBottom {
+				contentBottom = childBottom
+			} else {
+				contentBottom = oldBottom
 			}
 		}
 
@@ -1004,6 +1017,80 @@ func stretchPaginatedChrome(res *Result) {
 	}
 
 	walk(res.root, nil)
+}
+
+func boxIsFloatOrFigure(boxNode *box) bool {
+	if boxNode == nil {
+		return false
+	}
+
+	if boxNode.node != nil && boxNode.node.Name == "figure" {
+		return true
+	}
+
+	if boxNode.style == nil {
+		return false
+	}
+
+	return boxNode.style.Float == floatLeft || boxNode.style.Float == floatRight
+}
+
+func lastInFlowChildBottom(boxNode *box) float64 {
+	if boxNode == nil {
+		return 0
+	}
+
+	bottom := 0.0
+	for _, child := range boxNode.children {
+		if child == nil {
+			continue
+		}
+
+		if child.style != nil && (child.style.Position == positionAbsolute || child.style.Position == positionFixed) {
+			continue
+		}
+
+		if childBottom := child.y + child.height; childBottom > bottom {
+			bottom = childBottom
+		}
+	}
+
+	return bottom
+}
+
+// stripThumbImageHairlines drops the stray underline-weight rule that lands
+// on the bottom edge of a wiki thumb image (the wrapping file <a> is a link).
+func stripThumbImageHairlines(res *Result) {
+	if res == nil || res.root == nil {
+		return
+	}
+
+	type imgRect struct{ x, y, w, h float64 }
+
+	images := make([]imgRect, 0)
+	for _, operation := range res.Ops {
+		if operation.Kind == OpImage && operation.W > 8 && operation.H > 8 {
+			images = append(images, imgRect{operation.X, operation.Y, operation.W, operation.H})
+		}
+	}
+
+	for i := range res.Ops {
+		op := &res.Ops[i]
+		if op.Kind != OpLine || op.H != 0 || op.W < 8 || op.Width > 0.55 {
+			continue
+		}
+
+		for _, img := range images {
+			bottom := img.y + img.h
+			if math.Abs(op.Y-bottom) > 1 || math.Abs(op.X-img.x) > 2 || math.Abs(op.W-img.w) > 4 {
+				continue
+			}
+
+			op.Kind = opKindNoop
+
+			break
+		}
+	}
 }
 
 func parentIsFlexOrGrid(parent *box) bool {

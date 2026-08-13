@@ -32,6 +32,7 @@ type inlineItem struct {
 	marginL    float64 // leading horizontal margin (e.g. span margin-left)
 	marginR    float64 // trailing horizontal margin
 	img        bool
+	thumbImg   bool // img inside a collapsed wiki figure; outer frame owns L/R/T
 	chrome     bool // text belongs to an inline element with its own decoration
 	noSplit    bool // vertical writing-mode run must remain one rotated line
 	imgRef     *imageRef

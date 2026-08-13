@@ -326,7 +326,7 @@ func (e *engine) collectInlineElement(node *html.Node, sty ResolvedStyle, out *[
 func (e *engine) collectImageItem(node *html.Node, sty ResolvedStyle, out *[]inlineItem) {
 	ib := e.buildImage(node, sty, 0, 0)
 	*out = append(*out, inlineItem{ //nolint:exhaustruct // intentional zero fields
-		img: true, imgRef: ib.img, w: ib.w, h: ib.height, style: e.stylePtr(node),
+		img: true, thumbImg: e.thumbImageInsideFigure(node), imgRef: ib.img, w: ib.w, h: ib.height, style: e.stylePtr(node),
 		marginL: e.scalePt(sty.MarginLeft), marginR: e.scalePt(sty.MarginRight),
 	})
 }

@@ -124,6 +124,7 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 	// continuation clones.
 	applyStickyPrint(res, contentH)
 	stretchPaginatedChrome(res)
+	stripThumbImageHairlines(res)
 
 	if err := validatePaintPageIndices(res.Ops, contentH); err != nil {
 		return err

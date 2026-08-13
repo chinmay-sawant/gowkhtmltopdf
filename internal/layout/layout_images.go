@@ -199,7 +199,23 @@ func (e *engine) buildImage(n *html.Node, sty ResolvedStyle, posX, posY float64)
 	}
 	boxNode.img = e.resolveImage(n.Attribute("src"))
 	size := e.usedImageSize(n, sty, boxNode.img)
-	boxNode.w, boxNode.height = size.w, size.h
+	thumbImg := e.thumbImageInsideFigure(n)
+	padL := e.scalePt(sty.PaddingLeft)
+	padR := e.scalePt(sty.PaddingRight)
+	padT := e.scalePt(sty.PaddingTop)
+	padB := e.scalePt(sty.PaddingBottom)
+	borderL := e.scalePt(borderPaint(sty.BorderLeft))
+	borderR := e.scalePt(borderPaint(sty.BorderRight))
+	borderT := e.scalePt(borderPaint(sty.BorderTop))
+	borderB := e.scalePt(borderPaint(sty.BorderBottom))
+	if thumbImg {
+		// Figure already owns the outer rails; keep the bitmap flush so a
+		// second inset frame does not double the thumb edge.
+		boxNode.w, boxNode.height = size.w, size.h
+	} else {
+		boxNode.w = size.w + padL + padR + borderL + borderR
+		boxNode.height = size.h + padT + padB + borderT + borderB
+	}
 	// Paint replaced images that are not deferred to the inline line box.
 	// Inline/inline-block <img> is collected by collectInline and painted in
 	// emitLine; block-level and floated images paint here (wiki logo tagline
@@ -208,14 +224,23 @@ func (e *engine) buildImage(n *html.Node, sty ResolvedStyle, posX, posY float64)
 		inlineLevel := sty.Display == cssDisplayInline || sty.Display == cssDisplayInlineBlock ||
 			sty.Display == displayInlineFlex || sty.Display == ""
 		if sty.Float != cssDisplayNone || !inlineLevel {
+			imgX, imgY, imgW, imgH := posX, posY, size.w, size.h
+			if !thumbImg {
+				imgX += borderL + padL
+				imgY += borderT + padT
+			}
+
 			e.add(Op{ //nolint:exhaustruct // intentional zero fields
 				Kind:  OpImage,
-				X:     posX,
-				Y:     posY,
-				W:     boxNode.w,
-				H:     boxNode.height,
+				X:     imgX,
+				Y:     imgY,
+				W:     imgW,
+				H:     imgH,
 				Image: boxNode.img.data, ImgW: boxNode.img.w, ImgH: boxNode.img.h, IsJPEG: boxNode.img.isJPEG,
 			})
+			if !thumbImg {
+				e.prependChrome(len(e.ops)-1, boxNode, sty, posX, posY, boxNode.w, boxNode.height)
+			}
 		}
 	}
 

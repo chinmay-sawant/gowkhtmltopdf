@@ -1757,7 +1757,139 @@ func repeatTableHeaderOnPages(res *Result, tblBox *box, contentH float64) {
 			}
 		}
 
+		placeSliverBodyBelowHeader(res, tblBox, pageTop, hdrH)
 		cloneHeaderOps(res, hdrFirst, hdrLast, hdrTop, pageTop)
+	}
+}
+
+// placeSliverBodyBelowHeader pulls a body row that sits in the sliver just
+// above a continuation page (or under the repeated thead) down below the
+// header without moving rows that are already clear of the band.
+func placeSliverBodyBelowHeader(res *Result, tblBox *box, pageTop, hdrH float64) {
+	from, to, top, bottom := sliverBodyOps(tblBox, pageTop, hdrH, res)
+	if from < 0 || top < 0 {
+		return
+	}
+
+	target := pageTop + hdrH + 6
+	sliverH := bottom - top
+	if sliverH < 1 {
+		sliverH = 12
+	}
+
+	offFrom, officialTop := nextBodyAfterSliver(tblBox, pageTop, from, to, res)
+	if offFrom >= 0 && officialTop >= 0 && officialTop < target+sliverH-0.5 {
+		push := target + sliverH - officialTop
+		if push > 0 {
+			shiftFlowY(res, offFrom, offFrom, officialTop-layoutSlack, push)
+		}
+	}
+
+	dy := target - top
+	if math.Abs(dy) > layoutSlack {
+		shiftOpsOnly(res, from, to, dy)
+		shiftTableBoxesInOpRange(tblBox, from, to, dy)
+	}
+}
+
+// sliverBodyOps is the body-row paint sitting in [pageTop-8, pageTop+hdrH).
+func sliverBodyOps(tblBox *box, pageTop, hdrH float64, res *Result) (int, int, float64, float64) {
+	from, to := -1, -1
+	top, bottom := -1.0, -1.0
+	lo := pageTop - 8
+	hi := pageTop + hdrH
+
+	for _, row := range tblBox.rows[tblBox.headerRows:] {
+		first, last := rowOpRange(row)
+		if first < 0 {
+			continue
+		}
+
+		for idx := first; idx <= last && idx < len(res.Ops); idx++ {
+			posY := res.Ops[idx].Y
+			if posY < lo || posY >= hi {
+				continue
+			}
+
+			if from < 0 || idx < from {
+				from = idx
+			}
+
+			if idx > to {
+				to = idx
+			}
+
+			if top < 0 || posY < top {
+				top = posY
+			}
+
+			if bot := posY + opInkHeight(res.Ops[idx]); bot > bottom {
+				bottom = bot
+			}
+		}
+	}
+
+	return from, to, top, bottom
+}
+
+// nextBodyAfterSliver is the first body op on this page that is not in the sliver.
+func nextBodyAfterSliver(tblBox *box, pageTop float64, sliverFrom, sliverTo int, res *Result) (int, float64) {
+	from := -1
+	top := -1.0
+
+	for _, row := range tblBox.rows[tblBox.headerRows:] {
+		first, last := rowOpRange(row)
+		if first < 0 {
+			continue
+		}
+
+		for idx := first; idx <= last && idx < len(res.Ops); idx++ {
+			if idx >= sliverFrom && idx <= sliverTo {
+				continue
+			}
+
+			posY := res.Ops[idx].Y
+			if posY < pageTop-0.5 {
+				continue
+			}
+
+			if from < 0 || idx < from {
+				from = idx
+			}
+
+			if top < 0 || posY < top {
+				top = posY
+			}
+		}
+	}
+
+	return from, top
+}
+
+func shiftTableBoxesInOpRange(tblBox *box, from, to int, deltaY float64) {
+	if tblBox == nil || deltaY == 0 {
+		return
+	}
+
+	var walk func(*box)
+	walk = func(boxNode *box) {
+		if boxNode == nil {
+			return
+		}
+
+		if boxNode.opStart <= boxNode.opEnd && boxNode.opStart >= from && boxNode.opEnd <= to {
+			boxNode.y += deltaY
+		}
+
+		for _, child := range boxNode.children {
+			walk(child)
+		}
+	}
+
+	for _, row := range tblBox.rows {
+		for _, cell := range row {
+			walk(cell)
+		}
 	}
 }
 
@@ -1774,6 +1906,17 @@ func headerContinuationPages(tblBox *box, _ int, res *Result, contentH float64) 
 		page, ok := checkedFlowPageOfY(top, contentH)
 		if ok {
 			pages[page] = true
+			off := math.Mod(top, contentH)
+			if off < 0 {
+				off += contentH
+			}
+
+			if off > contentH-8 {
+				nextTop := float64(page+1) * contentH
+				if sliverFrom, _, sliverTop, _ := sliverBodyOps(tblBox, nextTop, 20, res); sliverFrom >= 0 && sliverTop >= 0 {
+					pages[page+1] = true
+				}
+			}
 		}
 	}
 

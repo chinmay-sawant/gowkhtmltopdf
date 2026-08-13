@@ -255,3 +255,71 @@ func TestUnderlineWrappedURLOnePerLine(t *testing.T) {
 
 	t.Logf("wrapped URL: textLines=%d underlines=%d", nTextLines, nUnder)
 }
+
+// Wiki print CSS uses border-bottom on body links and text-decoration:none.
+// The href force-underline must not stack a second stroke on that border.
+func TestLinkBorderBottomNotDoubleUnderlined(t *testing.T) {
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+body { margin: 0; font-size: 10pt; }
+a { color: #36c; text-decoration: none; }
+.mw-body a:not(.image) { border-bottom: 1px solid #aaa; }
+`)
+	root, err := html.Parse(`<html><body class="mw-body"><p>See the ` +
+		`<a href="https://en.wikipedia.org/wiki/Toronto_International_Film_Festival">` +
+		`Toronto International Film Festival</a> in 2024</p></body></html>`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := Layout(root, Options{ //nolint:exhaustruct // print link chrome
+		Width: 200, Height: 400, Sheets: []*css.Stylesheet{cssSheet}, Media: "print",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	type band struct{ y, x0, x1 float64 }
+
+	bands := []band{}
+	for _, op := range res.Ops {
+		if op.Kind != OpLine || op.H != 0 || op.W < 4 {
+			continue
+		}
+
+		merged := false
+		for i := range bands {
+			if math.Abs(bands[i].y-op.Y) < 1 && op.X <= bands[i].x1+2 && op.X+op.W >= bands[i].x0-2 {
+				if op.X < bands[i].x0 {
+					bands[i].x0 = op.X
+				}
+
+				if op.X+op.W > bands[i].x1 {
+					bands[i].x1 = op.X + op.W
+				}
+
+				merged = true
+
+				break
+			}
+		}
+
+		if !merged {
+			bands = append(bands, band{y: op.Y, x0: op.X, x1: op.X + op.W})
+		}
+	}
+
+	for i := 0; i < len(bands); i++ {
+		for j := i + 1; j < len(bands); j++ {
+			overlap := bands[i].x0 < bands[j].x1 && bands[j].x0 < bands[i].x1
+			if overlap && math.Abs(bands[i].y-bands[j].y) < 1.5 {
+				t.Fatalf("double underline at y=%.2f and y=%.2f", bands[i].y, bands[j].y)
+			}
+		}
+	}
+
+	if len(bands) == 0 {
+		t.Fatal("expected a border-bottom link rule")
+	}
+}
