@@ -22,8 +22,8 @@ Conversion does more than one GET:
 
 1. Load the primary page (URL, path, or bytes you supply).
 2. Parse HTML/CSS.
-3. Fetch **subresources** named by the document (`img`, `link` stylesheets, etc.)
-   via the same loader (`FetchSub`).
+3. Fetch **subresources** named by the document (`img`, `link` stylesheets,
+   `@font-face` `https://` sources, etc.) via the same loader (`FetchSub`).
 4. Optionally read **local files** if local-file access is enabled.
 
 So the attack surface is: **primary input + every URL the document references**.
@@ -103,7 +103,10 @@ Even if the main page is “https://example.com/ok.html”, the HTML may contain
 ```
 
 The loader will attempt those fetches from **your** process. Treat any HTML
-you did not author as able to **drive egress**.
+you did not author as able to **drive egress**. `@font-face` `https://` is
+the same subresource hop as `img` / `link` (same ACL + `NetworkPolicy`)
+unless Restricted policy is set; `.woff2`, `.eot`, and `data:` font src are
+skipped.
 
 ### D - Local files enabled + user input (high risk: file read)
 

@@ -1,20 +1,107 @@
 # Sample outputs
 
-Committed samples produced by `make samples` (and optional URL smoke tests).
-Regenerate anytime:
+Committed viewer-smoke artifacts produced by `make samples` (and optional URL
+smoke). Regenerate anytime:
 
 ```sh
 make samples
 ```
 
+These are **not** golden byte baselines. CI uses `make golden` / structure
+assertions, not binary PDF equality against this folder. See
+[`documentation/samples.md`](../documentation/samples.md).
+
+`make samples` rewrites `fixture-*.pdf`, `fixture-*.png`,
+`showcase-*.pdf`, and (when the network works) `wiki-ana-de-armas.pdf`.
+
+## Fixture PDFs (`fixture-01` … `fixture-56`)
+
+Each file is `testdata/golden/<same-basename>.html` converted with
+`--enable-local-file-access`. Companion `*-header.html` / `*-footer.html`
+files are skipped as bodies; fixture-36 attaches them as HTML header/footer.
+
+| File | Source fixture |
+|------|----------------|
+| `fixture-01-simple-invoice.pdf` | Simple invoice |
+| `fixture-02-table-heavy-invoice.pdf` | Table-heavy invoice |
+| `fixture-03-multi-page-invoice.pdf` | Multi-page statement |
+| `fixture-04-two-column-layout.pdf` | Two-column table layout |
+| `fixture-05-linked-stylesheet.pdf` | Linked `style-05.css` |
+| `fixture-06-external-link.pdf` | External URI annotations |
+| `fixture-07-image-logo.pdf` | Relative + data: URI images |
+| `fixture-08-forced-page-breaks.pdf` | Forced page breaks (5 pages) |
+| `fixture-09-multi-section-doc.pdf` | Long multi-section report |
+| `fixture-10-table-colspan.pdf` | Nested tables / colspan |
+| `fixture-11-long-text-wrap.pdf` | Justified prose wrap |
+| `fixture-12-lists.pdf` | Nested lists |
+| `fixture-13-pre-code-block.pdf` | `pre` / `code` |
+| `fixture-14-colorful-report.pdf` | Backgrounds, rgba, borders |
+| `fixture-15-bulleted-requirements.pdf` | Requirements list |
+| `fixture-16-invoice-with-css.pdf` | Full CSS invoice (1–2 pages) |
+| `fixture-17-cover-and-content.pdf` | Cover + content |
+| `fixture-18-typography.pdf` | Heading / inline styles |
+| `fixture-19-margin-and-sizing.pdf` | Box model |
+| `fixture-20-image-grid.pdf` | Data-URI image grid |
+| `fixture-21-detailed-report.pdf` | Detailed ops report |
+| `fixture-22-float-invoice-chrome.pdf` | Float lite chrome |
+| `fixture-23-thead-repeat.pdf` | Repeating `<thead>` |
+| `fixture-24-internal-anchors.pdf` | Same-document GoTo |
+| `fixture-25-flex-row.pdf` | Flex row lite |
+| `fixture-26-position-lite.pdf` | Relative / absolute lite |
+| `fixture-27-cjk-fontpath.pdf` | CJK / `--font-path` |
+| `fixture-28-flex-wrap-grid-fixed.pdf` | Flex-wrap + grid + fixed stamp |
+| `fixture-29-float-beside-table.pdf` | Float beside table |
+| `fixture-30-orphans-heuristic.pdf` | Orphans heuristic |
+| `fixture-31-sticky-top.pdf` | Print-scoped sticky |
+| `fixture-32-flex-grid-full.pdf` | Flex/grid stage sample |
+| `fixture-33-flex-cyclic-basis.pdf` | Flex `%` cyclic basis |
+| `fixture-34-grid-areas-dense.pdf` | Grid areas + dense |
+| `fixture-35-grid-minmax-intrinsic.pdf` | Grid minmax / subgrid / masonry lite |
+| `fixture-36-hf-nested-flex.pdf` | Nested HTML header/footer |
+| `fixture-37-orphans-css.pdf` | CSS orphans / widows |
+| `fixture-38-float-inside-td.pdf` | Float inside `td` |
+| `fixture-39-multicol-article.pdf` | Multicol lite |
+| `fixture-40-transform-badge.pdf` | Static 2D transform |
+| `fixture-41-has-selector.pdf` | `:has()` |
+| `fixture-42-container-inline-size.pdf` | `@container` size lite |
+| `fixture-43-complex-dossier.pdf` | Five-page dossier |
+| `fixture-44-receipt.pdf` | Receipt |
+| `fixture-45-purchase-order.pdf` | Purchase order |
+| `fixture-46-contract.pdf` | Contract |
+| `fixture-47-certificate.pdf` | Certificate |
+| `fixture-48-shipping-document.pdf` | Shipping document |
+| `fixture-49-night-train-poster.pdf` | Illustrated poster |
+| `fixture-50-letter-template.pdf` | Stationery letter |
+| `fixture-51-asteria-storybook.pdf` | Asteria storybook (4 pages) |
+| `fixture-52-airline-boarding-pass.pdf` | Boarding pass |
+| `fixture-53-asteria-observatory-poster.pdf` | Observatory poster |
+| `fixture-54-ember-harbor-storybook.pdf` | Ember Harbor storybook (4 pages) |
+| `fixture-55-lantern-cooperative-report.pdf` | Northline operations brief |
+| `fixture-56-architecture-diagram.pdf` | Architecture diagram (20 pages) |
+
+## Image smokes
+
+| File | How it is produced |
+|------|--------------------|
+| `fixture-01-simple-invoice.png` | `gowkhtmltoimage` on fixture-01 |
+| `fixture-21-detailed-report.png` | `examples/image` on fixture-21 (`--width 1024`) |
+
+## Showcase and live URL
+
 | File | Description |
 |------|-------------|
-| `fixture-01` … `fixture-21-*.pdf` | Golden HTML fixtures under `testdata/golden/` converted to PDF |
-| `fixture-01-simple-invoice.png` | Same fixture via `gowkhtmltoimage` |
-| `fixture-21-detailed-report.png` | Detailed report fixture via library image converter |
-| `showcase-toc-hf-outline.pdf` | TOC + headers/footers + outline on `fixture-16` |
-| `wiki-ana-de-armas.pdf` | Live Wikipedia **raw** smoke from `make samples` (no `--simplify-dom`; `--use-system-fonts`; needs network; soft-fail if offline). Not a chrome-stripped “pretty” print — see `documentation/cli.md` URL recipes. |
+| `showcase-toc-hf-outline.pdf` | TOC + text headers/footers + outline on fixture-16 |
+| `wiki-ana-de-armas.pdf` | Live Wikipedia **raw** smoke from `make samples` (no `--simplify-dom`; `--use-system-fonts --zoom 0.666667`; needs network; **soft-fail** if offline). Not a chrome-stripped “pretty” print — see [`documentation/cli.md`](../documentation/cli.md#url-mode--chrome-strip---simplify-dom). |
 
+## Extra artifacts (not `make samples`)
 
-These are **viewer smoke artifacts**, not golden byte baselines. CI uses
-`make golden` / structure assertions, not binary PDF equality against this folder.
+These may be present from earlier manual or comparison runs. `make samples`
+does **not** regenerate them (it only converts `fixture-*.html` plus the
+showcase and wiki smoke):
+
+| File / dir | Note |
+|------------|------|
+| `font-examples.pdf` | Manual leftover from `testdata/golden/font-examples.html` (fonts not bundled; `--font-path` driven). Not a `make samples` output. |
+| `architecture-diagram.pdf` | Manual leftover from `testdata/golden/architecture-diagram.html` (distinct from `fixture-56-architecture-diagram.pdf`). |
+| `chrome_ana.pdf` | Manual Chrome comparison artifact, if present. |
+| `wkhtmltopdf/` | Side-by-side wkhtmltopdf fixture PDFs and benchmark notes; not overwritten by `make samples`. |

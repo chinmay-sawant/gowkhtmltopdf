@@ -22,12 +22,12 @@ grounded in the actual source (types, functions and `file:line` references).
                      │        ▼                    ▼                   ▼        │
                      │   internal/cli ──► internal/settings (dotted Set/Get)    │
                      └───────────────────────────┬──────────────────────────────┘
-                                                 │  one neutral seam:
+                                                 │  job seam:
                                                  ▼
-                                    internal/convert.Request
+                         convert.Request (PDF) / imageout.Request (image)
                                                  │
                      ┌───────────────────────────▼──────────────────────────────┐
-                     │              internal/convert (orchestration)            │
+                     │     convert.Run  or  imageout.RunRequest                 │
                      │  render.Pipeline: RenderObjects → Assemble → Finalize     │
                      └───────────────────────────┬──────────────────────────────┘
                                                  │
@@ -39,12 +39,12 @@ grounded in the actual source (types, functions and `file:line` references).
                                       internal/css (parse / selectors / cascade)
                                                  │
                                                  ▼
-                         internal/layout + internal/line  (style → boxes → display list)
+                         internal/layout  (style → boxes → display list)
                                                  │
                      ┌───────────────────────────┴──────────────────────────────┐
                      ▼                                                          ▼
          internal/pdf  (PDF 1.4 writer)                      internal/imageout  (PNG/JPEG)
-         fonts, subsetting, outlines, annotations            bitmap rasterizer; SVG via
+         fonts, subsetting, outlines, annotations            TTF outline AA (2× SS); SVG via
                                                             internal/svg (tdewolff/canvas)
 ```
 
@@ -59,10 +59,10 @@ grounded in the actual source (types, functions and `file:line` references).
 - **Controlled-report scope** — not a pixel-perfect clone of arbitrary
   websites. Flex/grid and positioning are "lite"; JavaScript is not executed.
 
-Scale: ~71,600 lines of Go across 208 files in `internal/` plus the public
-`api.go`, two `cmd/` binaries, a React documentation site (`frontend/`, deploys
-to `docs/`), golden fixtures (`testdata/`), committed samples (`output/`), and
-phase ledgers (`plans/`).
+Scale: ~240 Go files in `internal/` (layout is the largest domain) plus the
+public `api.go`, two `cmd/` binaries, a React documentation site (`frontend/`,
+deploys to `docs/`), golden fixtures (`testdata/`), committed samples
+(`output/`), and phase ledgers (`plans/`).
 
 ---
 
@@ -73,13 +73,13 @@ phase ledgers (`plans/`).
 | Entrypoints & CLI | `cmd/gowkhtmltopdf`, `cmd/gowkhtmltoimage`, `internal/cli` | argv → `cli.Command` → settings; multi-object grammar (`page`/`cover`/`toc`) | [01-entrypoints-cli.md](01-entrypoints-cli.md) |
 | Public library API | root `api.go` | `Converter` / `ImageConverter`, dotted `Set`/`Get`, typed builders, `Convert(ctx)` | [02-library-api.md](02-library-api.md) |
 | Settings & errors | `internal/settings`, `internal/errs` | wkhtmltopdf-style dotted settings, `UnitReal`, page sizes, reflection-based key tables | [03-settings.md](03-settings.md) |
-| Load layer | `internal/load` | URL guessing, HTTP/file/`data:`/stdin, ACL, cookies, auth, POST, timeouts/caps | [04-load.md](04-load.md) |
-| HTML parser | `internal/html` | Allowlisted tokenizer + tree, entities, tolerant parsing | [05-html-parser.md](05-html-parser.md) |
-| CSS subsystem | `internal/css` | CSS subset parse, selectors, cascade, media queries, `:has`, `:target`, container rules | [06-css.md](06-css.md) |
-| Layout engine | `internal/layout`, `internal/line` | Style cascade, block/inline/table/flex/grid/float/multicol, pagination, paint ops | [07-layout.md](07-layout.md) |
-| Convert pipeline | `internal/convert` (+ `prepare/`, `render/`, `islands/`), `internal/outline` | Job orchestration: HF, TOC, outline, links, page islands, copies/collate | [08-convert-pipeline.md](08-convert-pipeline.md) |
+| Load layer | `internal/load` | URL guessing, HTTP/file/`data:`/inline HTML, ACL, cookies, auth, POST, timeouts/caps. No stdin HTML | [04-load.md](04-load.md) |
+| HTML parser | `internal/html` | Tolerant tokenizer + tree (any tag accepted), entities, no JS | [05-html-parser.md](05-html-parser.md) |
+| CSS subsystem | `internal/css` | CSS subset parse, selectors, cascade, media queries, `:has`, container rules (`:target` never matches) | [06-css.md](06-css.md) |
+| Layout engine | `internal/layout` | Style cascade, block/inline/table/flex/grid/float/multicol, pagination, paint ops. `internal/line` is log severity, not wrapping | [07-layout.md](07-layout.md) |
+| Convert pipeline | `internal/convert` (+ `prepare/`, `render/`, `islands/`), `internal/outline` | Job orchestration: HF, TOC, outline, links, copies/collate; islands are benchmark-only | [08-convert-pipeline.md](08-convert-pipeline.md) |
 | PDF writer | `internal/pdf` (+ `assets/`) | PDF 1.4, font subsetting, Type0/CID, images, annotations, outlines | [09-pdf-writer.md](09-pdf-writer.md) |
-| Image output & SVG | `internal/imageout`, `internal/svg` | PNG/JPEG raster path, bitmap font rasterizer, SVG→raster | [10-imageout-svg.md](10-imageout-svg.md) |
+| Image output & SVG | `internal/imageout`, `internal/svg` | PNG/JPEG raster path, TTF outline AA (2× supersample), SVG→raster | [10-imageout-svg.md](10-imageout-svg.md) |
 
 ---
 
@@ -93,18 +93,19 @@ api.go (root) ──────────────────────
 cmd/* ─► internal/cli ─► internal/settings    │
         (cli never imports cmd or api.go)     │
                                              ▼
-   internal/settings  ◄── imported by 31 files (leaf, stdlib-only)
-   internal/errs      ◄── leaf, stdlib-only; consumed by api.go and internal/app
+   internal/settings  ◄── leaf settings model (dotted Set/Get)
+   internal/errs      ◄── leaf sentinels; consumed by api.go and internal/app
    internal/load      ◄── LOWEST internal package (imports settings + stdlib);
                           it is the trust boundary: ACL/timeouts/caps live here
    internal/html      ◄── feeds css matching + layout; no DOM beyond what layout needs
    internal/css       ◄── feeds layout style resolution
-   internal/layout (+internal/line)  ◄── produces the display list for pdf OR imageout
+   internal/layout    ◄── produces the display list for pdf OR imageout
+   internal/line      ◄── log severity protocol only (not line wrapping)
    internal/outline   ◄── pure headings→outline; no layout/pdf types (locationReader seam)
-   internal/convert   ◄── imports every internal package (the hub); its subpackages
-                          prepare/, render/, islands/ never import convert (cycle rule)
-   internal/pdf       ◄── sink; never imported by settings/layout
-   internal/imageout  ◄── sink; reuses pdf shaping/outline data, layout paint semantics
+   internal/convert   ◄── the hub; its subpackages prepare/, render/, islands/
+                          never import convert (cycle rule)
+   internal/pdf       ◄── writer sink; layout/imageout reuse faces + shaping
+   internal/imageout  ◄── image sink; Assemble is a no-op; one canvas
    internal/svg       ◄── leaf consumed by layout (SVG-as-image)
 ```
 
@@ -113,10 +114,10 @@ Key rules that keep the architecture sound:
 1. **The engine never parses argv.** `internal/cli` is a leaf that writes
    through the dotted settings `Set` API; the parser knows nothing about
    rendering.
-2. **One neutral seam.** Library (`api.go`) and both binaries (`internal/app`)
-   funnel into `internal/convert.Request` and `convert.Run` /
-   `imageout.RunRequest`. Command translation stays at the application edge;
-   nothing else invokes the pipeline directly.
+2. **One job seam.** Library (`api.go`) and both binaries (`internal/app`)
+   funnel into `convert.Request` + `convert.Run` (PDF) or `imageout.Request` +
+   `imageout.RunRequest` (image). Command translation stays at the application
+   edge; nothing else invokes the pipeline directly.
 3. **`cli.Command` *is* the settings payload** — no separate DTO; settings
    flow down and are never imported by `layout` or `pdf`.
 4. **Everything crosses the trust boundary through two seams:**
@@ -152,20 +153,22 @@ under mutation races (validated with `-race`).
              │                                                   │
    ┌─────────▼─────────┐                           ┌─────────────▼─────────────┐
    │  internal/pdf     │                           │  internal/imageout        │
-   │  content streams, │                           │  bitmap font rasterizer   │
-   │  Flate, xref,     │                           │  (2× supersample, no       │
-   │  font subsetting  │                           │  hinting), PNG/JPEG encode │
+   │  content streams, │                           │  TTF outline AA           │
+   │  Flate, xref,     │                           │  (2× supersample canvas,  │
+   │  font subsetting  │                           │  not 5×7 bitmap), encode  │
    │  Type0/CID, WOFF  │                           │  SVG via internal/svg      │
    └───────────────────┘                           └───────────────────────────┘
 ```
 
-- PDF mode: PDF **1.4**, zlib Flate streams, embedded **Liberation Sans**
-  subsets, `/Widths` in 1000-unit em, WinAnsi-style Latin-1 codes,
-  Type0/CID for CJK, Catalog outlines, link annotations, byte-stable output
-  when metadata time is injected.
-- Image mode: single page, `--transparent` support (only fill-alpha diverges
-  from PDF paint semantics), no temp files; the only third-party raster call
-  in the project is the allowlisted `tdewolff/canvas` SVG path.
+- PDF mode: PDF **1.4**, zlib Flate streams, subset TTF (Liberation
+  Sans/Serif/Mono + DejaVu fallback), `/Widths` in 1000-unit em,
+  WinAnsi-style Latin-1 codes, Type0/CID + Identity-H for runes above U+00FF,
+  Catalog outlines, URI + GoTo annotations. Info `/Title` comes from
+  `--title`, not `<title>`.
+- Image mode: one canvas (`Assemble` is a no-op), `--transparent` support
+  (only fill-alpha diverges from PDF paint semantics), no temp files; the
+  only third-party raster call in the project is the allowlisted
+  `tdewolff/canvas` SVG path.
 
 ---
 
@@ -199,9 +202,9 @@ Full model: [../THREAT-MODEL.md](../THREAT-MODEL.md) and
 | [05-html-parser.md](05-html-parser.md) | HTML parser | allowlisted tokenizer, tree model, entities, tolerance, no-JS policy |
 | [06-css.md](06-css.md) | CSS subsystem | selector support, cascade, media/container queries, value parsing, degrade rules |
 | [07-layout.md](07-layout.md) | Layout engine | style cascade, all formatting contexts, line breaking/shaping, pagination, display list |
-| [08-convert-pipeline.md](08-convert-pipeline.md) | Convert pipeline | `Request` union, 3-stage lifecycle, HF/TOC two-pass fixpoint, outline, page islands |
+| [08-convert-pipeline.md](08-convert-pipeline.md) | Convert pipeline | `Request`, 3-stage lifecycle, HF/TOC two-pass fixpoint, outline; page islands are **benchmark-only** |
 | [09-pdf-writer.md](09-pdf-writer.md) | PDF writer | PDF 1.4 model, font subsetting, Type0/CID, outlines, byte stability |
-| [10-imageout-svg.md](10-imageout-svg.md) | Image output & SVG | raster path, bitmap fonts, SVG rasterization, fidelity limits vs PDF |
+| [10-imageout-svg.md](10-imageout-svg.md) | Image output & SVG | raster path, TTF outline AA, SVG rasterization, fidelity limits vs PDF |
 
 ---
 
@@ -226,8 +229,10 @@ change materially, and update the affected sections rather than appending.
 
 Known upstream gaps worth reconciling (from the domain reviews):
 
-- `THREAT-MODEL.md` references `load.WaitJSDelay` / `load.WarnJSStubs` which no
-  longer exist in source (the no-JS claim still holds; symbol list is stale).
+- JS-related **CLI** flags (`--enable-javascript`, `--javascript-delay`, …)
+  are **unknown options**. `load.WaitJSDelay` / `load.WarnJSStubs` do not
+  exist. [THREAT-MODEL.md](../THREAT-MODEL.md) §1 matches this. `04-load.md`
+  §6.1 may still mention the old names — treat that paragraph as historical.
 - `--xsl-style-sheet` is unimplemented (built-in TOC template fallback);
   `[subject]` expands empty; HTML header/footer is single-band clamped.
 - The typed settings builder covers global PDF options only; object/image
@@ -236,3 +241,5 @@ Known upstream gaps worth reconciling (from the domain reviews):
   custom width/height measurements. The former duplicate `Size.PageSize`
   field was removed and settings parity tests protect the single source of
   truth.
+- Page islands (`internal/convert/islands`) are a benchmark-only
+  optimization, not a user feature. Production/CLI requests never opt in.

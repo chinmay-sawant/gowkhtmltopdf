@@ -1,7 +1,18 @@
-# Deferred: workload prioritisation (temporary response)
+# Deferred features and workload priority
 
-> Temporary note captured from the workload discussion; replace this with a
-> sourced roadmap decision after the product-scope review.
+This page is the product-facing inventory of work that is **partial**,
+**not implemented**, or **not planned**. The live post-MVP ledger is
+[`plans/10-canonical-post-mvp-roadmap.md`](../plans/10-canonical-post-mvp-roadmap.md).
+Fidelity language and degrade rules: [fidelity.md](fidelity.md). The
+normative per-property contract is [compatibility-matrix.md](compatibility-matrix.md).
+
+Status here is checked against current code (CLI flag registration, load,
+layout, and PDF write). Stale “accepted + warning” wording elsewhere loses
+to this table when they disagree.
+
+---
+
+## Workload priority
 
 The dominant practical workload for an HTML-to-PDF tool is backend-generated
 business documents, not arbitrary public websites:
@@ -14,28 +25,76 @@ application data
 ```
 
 Typical documents are invoices, receipts, reports, statements, purchase
-orders, contracts, certificates, and shipping documents. Python, PHP, Ruby,
-and other integrations commonly expose both HTML/string/file input and URL
-input. The template path is usually the primary path because it avoids an
-HTTP loopback, authentication and cookie problems, and makes assets and
+orders, contracts, certificates, and shipping documents. Integrations in
+Python, PHP, Ruby, and Go commonly expose both HTML/string/file input and
+URL input. The template path is usually the primary path because it avoids
+an HTTP loopback, authentication and cookie problems, and makes assets and
 testing more predictable.
 
-URL input is still valuable when it points to a server-rendered internal page,
-such as `/orders/123/print`: it reuses an existing web view, CSS, data loading,
-and localisation. It should not be conflated with a client-rendered SPA URL.
-The dossier URL is an SPA: its initial HTML is an empty root element and
-React constructs the document in JavaScript. That is a lower-frequency,
-browser-rendering workload and is not representative of the core invoice or
-report path.
+URL input is still valuable when it points to a server-rendered internal
+page, such as `/orders/123/print`: it reuses an existing web view, CSS,
+data loading, and localisation. It should not be conflated with a
+client-rendered SPA URL. A dossier URL whose initial HTML is an empty root
+element, with React constructing the document in JavaScript, is a
+lower-frequency browser-rendering workload and is not representative of the
+core invoice or report path.
 
-For gowkhtmltopdf, the highest-impact order is therefore:
+Highest-impact order for gowkhtmltopdf:
 
-1. rendered HTML strings and stdin;
-2. local HTML template files;
-3. server-rendered internal URLs;
-4. modern JavaScript-heavy SPA URLs.
+1. **HTML strings** (in-memory / library `InlineHTML` and similar)
+2. **Local HTML template files**
+3. **Server-rendered internal URLs**
+4. **JavaScript-heavy SPA URLs**
 
 The core product should prioritise tables, pagination, headers and footers,
 images, fonts, CSS layout, page breaks, and repeated sections. SPA execution
 should remain a separate capability rather than the definition of the main
 HTML-to-PDF workload.
+
+String input via the library is the first-class path for (1). CLI stdin
+HTML (`-` as the page input) is **not** implemented today — see the table.
+Do not treat a public SPA URL as the acceptance bar for report work.
+
+---
+
+## Deferred inventory
+
+| Item | Status / reason | Next gate |
+|------|-----------------|-----------|
+| JavaScript / `--enable-javascript` | Flags **not registered** (unknown option). `<script>` is stripped at load; scripts are **not** executed. Related stubs (`--javascript-delay`, `--run-script`, `--window-status`, `--debug-javascript`, `--enable-plugins`) are also unknown. | Phase 22 |
+| Full CSS / Chrome print parity | Not a product goal for this report engine. | Phase 23 deferred |
+| Full flex / grid / subgrid / masonry | **Partial** report subset (fixtures 25/28/32–35). Joint subgrid intrinsic sizing and CSS Grid L3 masonry are out. | — |
+| Chrome sticky scroll parity | Print-scoped sticky: page content box is the scrollport; overflow boxes are scrollports at **offset 0**. No continuous scroll, no Chrome pixel match. | Non-goal |
+| CJK / complex scripts | Type0/CID + `--font-path`; Arabic OpenType (GSUB) with presentation-form fallback; Indic **Partial**. `writing-mode: vertical-rl` / `vertical-lr` are parsed but **not** implemented (horizontal layout only). | No CGO HarfBuzz |
+| AcroForm / `--enable-forms` | No form model in the PDF writer. `--produce-forms` is not a working forms path. | Intermediate roadmap |
+| XSLT TOC (`--xsl-style-sheet`) | Flag is accepted and **warns**; the built-in Go-template TOC is used. | Not planned |
+| SVG image **output** (`--format svg`) | Image mode encodes PNG/JPEG only. | Not planned |
+| BMP output | No demand; PNG/JPEG cover `image/*`. | Not planned |
+| SOCKS5 proxy | `parseProxy` accepts `http` / `https` only. | Not planned |
+| PDF encryption / PDF/A / ICC | No writer support. | Not planned |
+| C ABI (`wkhtmltopdf_*` cgo exports) | CGO is forbidden on the main path. | Only if consumer demand |
+| `--read-args-from-stdin` | **Not implemented.** The flag is not a working batch loop (rejected / unused). | Not planned |
+| Stdin HTML input (`-`) | **Not implemented.** CLI parse stores `Page: "-"`, but `load.GuessURL("-")` falls through to **`http://-`**. Library callers should pass inline HTML; do not document CLI `-` as stdin. | Document honestly; not a hidden feature |
+| WOFF2 / `data:` `@font-face` | Skipped (WOFF2 needs Brotli, not allowlisted; `data:` src rejected). Local TTF/OTF/WOFF1 under ACL works. | No Brotli module |
+| `[subject]` placeholder | Expands **empty** (no subject setting field). | Not planned |
+| HTML header / footer | **Partial** nested child layout (body CSS subset, flex/grid/images, local `@font-face`), clipped to the reserved margin band. Not a browser nested browsing context; no CSS running elements. | Browser HF out |
+| `:hover` / `:focus` / `:active` | Parsed onto the compound; `matchPseudo` **never matches** (print has no pointer/focus). | — |
+| `table-layout: fixed` | Parsed; unused (auto table layout only). | — |
+| `@page size` | Parsed onto `PageStyle.Size`; **unused**. Unnamed `@page margin` **is** applied (`applyCSSPageMargins`). | — |
+| `background-image` / gradients | Ignored (`background-color` is painted). | — |
+| Overflow clip | `overflow` is parsed for sticky scrollport selection. **Not** a general paint clip. | — |
+
+---
+
+## How to use this list
+
+- A row marked **Phase 22** or **Phase 23** is a ledger item, not a shipped
+  date. Phase 23 (open-web / browser competition) stays deferred unless the
+  roadmap is amended.
+- **Not planned** means there is no active design; a future amendment would
+  be required.
+- **Partial** means a report-shaped subset exists; Chrome/layout-test
+  parity is still out.
+
+When behavior claims change, update this table together with
+[fidelity.md](fidelity.md) and [compatibility-matrix.md](compatibility-matrix.md).

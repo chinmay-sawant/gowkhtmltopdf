@@ -150,6 +150,8 @@ When your change affects user-visible behavior:
 | CLI flags | `documentation/cli.md` + README if featured |
 | Library API | `documentation/library-api.md` |
 | Samples / smoke | `documentation/samples.md` |
+| Performance numbers / benches | `documentation/performance.md` |
+| Deferred / not-planned features | `documentation/deferred.md` |
 | Security / ACL | `documentation/THREAT-MODEL.md` |
 | User-facing release notes | `CHANGELOG.md` (Unreleased or next version) |
 

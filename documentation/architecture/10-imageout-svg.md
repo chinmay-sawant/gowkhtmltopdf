@@ -19,7 +19,7 @@ the one place the project calls into a third-party rasterizer
 Positioning:
 
 ```
-HTML (file | URL | stdin | inline SetBody)
+HTML (file | URL | inline SetBody)
   │
   ├─ cmd/gowkhtmltopdf ──► internal/convert ──► internal/pdf   (PDF 1.4 output)
   │

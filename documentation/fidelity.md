@@ -20,10 +20,10 @@ is tracked in
 | Pixel-perfect clone of an arbitrary website | **Out of scope** |
 | Wikipedia / marketing “decent print” (readable title + body) | **Progressive goal** (Phase 21) — not MVP acceptance yet |
 | Full CSS (flex/grid as layout, absolute/fixed/sticky positioning) | **Partial** — flex (grow/shrink/basis/order/wrap), grid lite, relative/absolute/fixed; sticky print-scoped (page = scrollport); static 2D transforms (paint CTM); not full CSS3 |
-| JavaScript-driven pages | **Out of scope** (`<script>` stripped; flags warn only) |
-| Full Unicode / CJK typesetting | **Partial** — Type0/CID + `--font-path`; Arabic OT via `go-text/typesetting` (GSUB) + presentation-form fallback; Indic Partial; no CGO HarfBuzz |
+| JavaScript-driven pages | **Out of scope** (`<script>` stripped; JS CLI flags are unknown options) |
+| Full Unicode / CJK typesetting | **Partial** — Type0/CID + `--font-path`; Arabic OT via `go-text/typesetting` (GSUB) + presentation-form fallback; Indic Partial; no CGO HarfBuzz; `writing-mode` vertical is parsed but lays out horizontal |
 
-**Explicit non-milestone:** full WebKit parity under pure Go stdlib only is
+**Explicit non-milestone:** full WebKit parity under this no-cgo design is
 **not** a dated goal. For open-web screenshot quality, use a headless browser
 pipeline instead of claiming this engine matches it.
 
@@ -42,7 +42,10 @@ primary content, not a browser clone.
 | **Tier 2** | Leave wkhtmltopdf for most jobs | 17–20 | Broader CSS, pagination polish, multi-font/Unicode, HF/link edges |
 | **Tier 3** | Compete on the open web | 23 deferred | Not planned as a pure-Go report engine; Chrome/Playwright territory |
 
-**As of 2026-08-05:** Tier 1 closed; **Tier 2 phases 17–20 core shipped** (#16/#17). See the post-MVP roadmap status index and shared doc-honesty pass.
+**As of 2026-08-13:** Tier 1 closed; **Tier 2 phases 17–20 core shipped**.
+Phase 21 (arbitrary URL / “decent print”) is a product contract, **not** an
+acceptance pass. See [deferred.md](deferred.md) and
+[performance.md](performance.md).
 
 ### CSS invoices use (phase 16)
 
@@ -147,19 +150,27 @@ or converting untrusted HTML: [cli.md](cli.md#remote-url-security),
 
 ## Feature fidelity map (goals → status → phase)
 
-| User-facing goal | Status (2026-08-05) | Primary phase(s) |
+| User-facing goal | Status (2026-08-13) | Primary phase(s) |
 |------------------|---------------------|------------------|
-| Typography bold/italic | **Shipped** (Liberation R/B/I/BI) | 12 |
+| Typography bold/italic | **Shipped** (Liberation Sans/Serif/Mono R/B/I/BI + DejaVu fallback) | 12, 19 |
 | Typography spacing | **Shipped** (coalesce + shared advances) | 13 |
-| Image mode text quality | **Shipped** (TTF outline AA, 2× supersample) | 15 |
+| `text-transform` | **Shipped** (`uppercase` / `lowercase` / `capitalize`) | 16+ |
+| Image mode text quality | **Shipped** (TTF outline AA, 2× supersample — **not** 5×7 as the primary path) | 15 |
 | Invoice CSS (boxes/tables) | Implemented subset | 4, 16 expands |
+| Lists (`ol` / `ul`) | **Shipped** — `decimal` / alpha / roman markers (not always `•`) | 4, 16 |
+| Table `rowspan` | **Shipped** | 16+ |
+| Table `<caption>` | **Shipped** | 16+ |
+| `border-collapse` | **Shipped (lite)** — collapse sets spacing 0 and uses the grid emitter | 16+ |
+| `::before` / `::after` | **Shipped** (string / `attr()` generated content) | 16+ |
 | Selectors (`:nth-child`, attr, siblings) | **Shipped** | 16.1 |
 | Floats / flex / position / grid | **Partial** — float lite; flex subset; grid lite; relative/absolute/fixed lite; sticky print scrollport (page content box) | 16–17 |
 | PDF images (logos/grids) | PNG/JPEG path + golden fixtures solid | 14 (docs polish remain) |
+| SVG-as-`<img>` | **Shipped** — rasterized via `internal/svg` then painted as PNG | 14+ |
 | Pagination / thead repeat | **Shipped** breaks + thead repeat; CSS `orphans`/`widows` parsed + Rule 3 (heuristic fallback) | 5, 18 |
-| Fonts / CJK / discovery | **Partial** — Type0/CID + `--font-path` / registry; Arabic OT (`go-text/typesetting`); local `@font-face` PDF+image | 12, 19 |
+| Fonts / CJK / discovery | **Partial** — Type0/CID + `--font-path` / registry; Arabic OT (`go-text/typesetting`); `@font-face` **https** TTF/OTF/WOFF1 fetched via `FetchSub` (same ACL as other subresources). `.woff2` / `.eot` / `data:` skipped | 12, 19 |
+| `writing-mode` vertical | **Not implemented** — `vertical-rl` / `vertical-lr` parsed but lay out **horizontal** only | 19 |
 | HF / links edges | Body GoTo + HF URI + HF fragment GoTo (copies-aware) | 6, 20 |
-| Arbitrary URL / “decent print” | **In progress** — product contract + docs; acceptance not met | 21 |
+| Arbitrary URL / “decent print” | **In progress** — product contract + docs; **acceptance not met** | 21 |
 | JavaScript | Stripped | 22 staged |
 | Open-web competition | Not planned | 23 |
 
@@ -173,8 +184,8 @@ The engine should **not crash** on unsupported input:
 |-------|----------|
 | Unknown CSS property / value | Declaration ignored |
 | Unsupported display (full Grid / unknown values) | Unknown/`display` values ignored; report-subset flex/grid are Partial (see matrix) |
-| `<script>` | Stripped at load; JS flags warn only |
-| Missing font family name | Falls back to embedded Liberation Sans |
+| `<script>` | Stripped at load; JS CLI flags are unknown options |
+| Missing font family name | Falls back through the author’s stack, then Liberation Sans (DejaVu for uncovered glyphs) |
 | Missing bold face | Fake stroke bold only if face missing |
 | Missing/corrupt image | Skip paint; no process crash |
 | Local file without ACL opt-in | Load denied (secure default) |
@@ -203,8 +214,11 @@ after Phase 21 acceptance against vendored fixtures.
 | Doc | Role |
 |-----|------|
 | [compatibility-matrix.md](compatibility-matrix.md) | Normative support contract |
+| [fonts.md](fonts.md) | Bundled faces, discovery, `@font-face`, shaping limits |
 | [samples.md](samples.md) | Fixtures and sample outputs |
 | [overview.md](overview.md) | Product overview |
 | [architecture.md](architecture.md) | Pipeline packages |
+| [deferred.md](deferred.md) | Deferred features and workload priority |
+| [performance.md](performance.md) | Benchmarks and how to measure |
 | [../plans/10-canonical-post-mvp-roadmap.md](../plans/10-canonical-post-mvp-roadmap.md) | Active post-MVP ledger |
 | [../README.md](../README.md#deferred--not-planned) | Deferred table |

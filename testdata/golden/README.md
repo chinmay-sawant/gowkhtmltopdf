@@ -16,13 +16,14 @@ testdata/golden/
   fixture-01-simple-invoice.html       # single page, minimal CSS
   fixture-02-table-heavy-invoice.html  # wide table, borders, many rows
   fixture-03-multi-page-invoice.html   # >1 page, page-break usage
-  fixture-04-*.html .. fixture-55-*.html   # phase-9.1+ corpus (skip *-header/footer companions)
+  fixture-04-*.html .. fixture-56-*.html   # phase-9.1+ corpus (skip *-header/footer companions)
   fixture-36-header.html / fixture-36-footer.html  # nested HF companions for fixture-36
   fixture-49-night-train-poster.html       # one-page illustrated poster
   fixture-50-letter-template.html           # one-page stationery template
   fixture-51-asteria-storybook.html        # four-page original anime-inspired story
   fixture-52-airline-boarding-pass.html    # one-page e-ticket + four boarding stubs
   fixture-53-asteria-observatory-poster.html # second poster variant
+  fixture-54-ember-harbor-storybook.html   # four-page Ember Harbor storybook
   fixture-55-lantern-cooperative-report.html # self-contained pure HTML/CSS operations brief
   fixture-56-architecture-diagram.html      # 20-page architecture diagram, linked CSS
   fixture-56-architecture-diagram.css       # linked stylesheet for fixture-56
@@ -34,7 +35,7 @@ Golden comparison is **structural + content**, not pixel-diff (Phase 0.3
 decision; revisit image diffing in Phase 4 closure if cheap).
 
 When `fixture-NN-header.html` and/or `fixture-NN-footer.html` exist beside a
-body fixture, `commandForFixture` sets `Header.HTMLURL` / `Footer.HTMLURL`
+body fixture, `attachHFCompanions` sets `Header.HTMLURL` / `Footer.HTMLURL`
 (auto margins). Companion files are not converted as body fixtures.
 
 ## Fixture inventory
@@ -61,7 +62,7 @@ proves. Page envelopes are pinned in `internal/convert/golden_test.go`
 | 13 | `pre` white-space preservation, `code` runs, log excerpts | 1 |
 | 14 | Background colors, rgba() alpha, colored borders, hr | 1 |
 | 15 | Markdown-ish bulleted requirements, nested lists, anchors | 1–2 |
-| 16 | Full invoice: letterhead, bill-to, 24 line items, tfoot totals | 3 |
+| 16 | Full invoice: letterhead, bill-to, 24 line items, tfoot totals | 1–2 |
 | 17 | Cover-style first page + `page-break-before` content page | 2 |
 | 18 | Typography: h1–h6, strong/em/u/s/small, blockquote, code | 1 |
 | 19 | Box model: fixed/min/max widths, margins, padding, borders | 1 |
@@ -82,9 +83,6 @@ proves. Page envelopes are pinned in `internal/convert/golden_test.go`
 | 34 | Grid `template-areas` / `grid-area` names + `grid-auto-flow: dense` | 1 |
 | 35 | Grid `minmax` / intrinsic measure lite + subgrid copy-inherit + masonry pack | 1 |
 | 36 | Nested HTML HF: flex header + image + `#target` GoTo; placeholder footer (companions `fixture-36-header.html` / `fixture-36-footer.html`) | 1 |
-| 33 | Flex % basis: definite resolve + indefinite/cyclic → auto (`flex-grid-full.md` §2.2) | 1 |
-| 34 | Grid Stage B areas + dense (`flex-grid-full.md`): `grid-template-areas` / `grid-area`, implied tracks, `grid-auto-flow: dense` | 1 |
-| 35 | Grid Stage B/C: `minmax()`+`fr` floors, cyclic height %, `display:subgrid` inherit, `grid-template-rows:masonry` packing | 1 |
 | 37 | CSS `orphans`/`widows` parse + Rule 3 keep-together (tier-2-pending-3) | ≥2 |
 | 38 | Float inside `td`: icon float + wrap + clear; table after float clears below (tier-2-pending-3) | 1 |
 | 39 | CSS multicol lite: `column-count`/`gap`/`span`/`fill`; column boxes stay on one page (tier-2-pending-3) | ≥2 |
@@ -102,6 +100,7 @@ proves. Page envelopes are pinned in `internal/convert/golden_test.go`
 | 51 | Original Asteria storybook: page illustrations, live text, and page breaks | 4 |
 | 52 | Airline boarding pass: e-ticket itinerary, multi-column stubs, mono barcodes | 1 |
 | 53 | Asteria poster variant: shared theme with a different illustration and copy | 1 |
+| 54 | Ember Harbor storybook: cover + three chapter pages, shared `theme-print-stories.css`, local illustrations (needle `Ember Harbor`) | 4 |
 | 55 | Self-contained operations brief: inline CSS, status cards, route table, action plan, and page breaks | 3 |
 | 56 | Architecture diagram: hero, pipeline strip, TOC, 10 domain sections (modern semantic tags: `dialog`, `details/summary`, `mark`, `meter`, `progress`, `output`, `time`, `data`, `kbd`, `samp`, `var`, `dfn`, `cite`, `ruby`, `rt`, `rp`, `bdi`, `bdo`, `wbr`, `ins`, `del`, `sub`, `sup`, `aside`, `address`, `fieldset`, `legend`, `picture`, `search`; modern CSS: `oklch()`/`color-mix()`/`clamp()`/logical properties with graceful-degrade fallbacks), linked `fixture-56-architecture-diagram.css`, dependency DAG, PDF-vs-image, security; derived from `documentation/architecture/` (commit ef526f9) | 20 |
 | font-examples | Font showcase: 1,125 free Google Fonts (fonts.google.com Feeling/Calligraphy filters + top-trending modern/display/script/handwriting) — randomized sampler: every font appears exactly once, each line in a random text style (regular, bold, italic, bold-italic, underline, strikethrough, underline+strikethrough, bold+underline, bold-italic+underline+strikethrough, letter-spaced, uppercase), rows span 100% width in a single column; inline `<style>`; fonts intentionally NOT bundled — render with `--font-path <dir>` or `Global().Set("fontpath", dir)`; falls back to Liberation Sans without font flags | 25 (with fonts, single column, number+name inline, overflow-wrap) |
@@ -114,12 +113,10 @@ A fixture passes `TestGoldenCorpusAllFixtures` when the generated PDF:
    per-fixture page envelope in `fixturePageBounds` (missing key = fail).
 2. **Needles:** listed fixtures assert ordered extracted text via
    `pdf.ParseSemantic` (01 Invoice/total, 06 Partner Handbook, 07 Nordwind,
-   24 Internal link report, 55 Northline, 54 Ember Harbor).
+   24 Internal link report, 54 Ember Harbor, 55 Northline).
 3. **Features:** `images` / `uris` flags require `/Subtype /Image` or `/S /URI`.
 4. **Geometry / visual:** layout unit tests and crop checks — not byte-identical
    PDFs and not a ±1 px golden for every box.
-
-Fixture-16 is 1–2 pages (not 3).
 
 ### Visual inspection (2026-08-12)
 

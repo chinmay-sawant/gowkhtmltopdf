@@ -14,11 +14,10 @@ attack surface:
 - A document **cannot execute code**. There is no JavaScript engine and no
   process execution anywhere in the tree (no `os/exec` usage; grepping for
   `exec.Command` returns nothing outside test helpers that parse the CLI).
-  The JS-related flags (`--enable-javascript`, `--javascript-delay`,
-  `--run-script`, `--window-status`, `--debug-javascript`) are accepted for
-  CLI compatibility and stored in settings (`settings.Web.JavaScript`), but
-  no code path ever evaluates a document's scripts. The remaining JS flags
-  are ignored.
+  JavaScript-related CLI flags (`--enable-javascript`, `--javascript-delay`,
+  `--run-script`, `--window-status`, `--debug-javascript`) are **unknown
+  options** (Policy A). `<script>` is stripped at load. No code path
+  evaluates a document's scripts.
 
 **Stance: HTML is semi-trusted.** It may cause network egress (matching
 upstream wkhtmltopdf) and may read local files only where the operator
@@ -122,8 +121,9 @@ processes. The trust envelope of any local reader applies.
   decompress uses size caps (table count, per-table / reconstructed SFNT
   limits, overlap rejection) before `ParseTTF`. `--font-path` /
   `--use-system-fonts` are operator-controlled discovery (not HTML ACL).
-  Remote `https://` `@font-face` is not fetched (product policy). WOFF2 is
-  rejected (Brotli not allowlisted).
+  Remote `https://` `@font-face` **is fetched** via `FetchSub` (same ACL
+  and `NetworkPolicy` as `img` / `link`). `.woff2`, `.eot`, and `data:`
+  src are skipped. WOFF2 is rejected (Brotli not allowlisted).
 - Operator credentials (custom headers, basic auth, cookies) are attached
   to the requests the operator configured them for. Cross-host auth and
   cookie headers are stripped by `net/http` on redirects, but custom
@@ -132,12 +132,14 @@ processes. The trust envelope of any local reader applies.
 
 ## 6. Explicitly out of scope
 
-- **No JavaScript**: `--enable-javascript` is a no-op (section 1).
+- **No JavaScript**: there is no JS engine (section 1). JS-related CLI
+  flags are unknown options.
 - **No sandbox for rendering**: the document cannot execute code, but HTML
   parsing, CSS processing and layout run in-process; parser bugs are the
   residual risk. A crafted document can consume CPU/memory up to the body
   cap.
-- **No network egress restrictions** (SSRF posture, section 5).
+- **Compatible mode allows localhost / RFC1918 HTTP**; Restricted mode
+  (`--restrict-network`) does not (SSRF posture, section 5).
 - **TOCTOU** between the ACL check and the file open (section 3).
 
 ## 7. Recommendations for untrusted HTML
@@ -189,5 +191,5 @@ substitute for not letting strangers drive server-side fetches.
 | Connect timeout | `internal/load/load.go` - `DefaultConnectTimeout`, `net.Dialer` |
 | Response timeout | `internal/load/load.go` - `loadHTTP` `client.Timeout`, `DefaultResponseTimeout` |
 | Context cancellation | `internal/load/load.go` - `http.NewRequestWithContext` in `loadHTTP` |
-| No JS / no exec | whole repo - no `os/exec`; JS flags accepted and ignored |
+| No JS / no exec | whole repo - no `os/exec`; JS-related CLI flags are unknown options |
 | NetworkPolicy | `internal/load` + `GlobalSettings.SetNetworkPolicy`; CLI `--restrict-network` / `--allow-host` |
