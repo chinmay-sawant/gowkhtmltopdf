@@ -37,13 +37,13 @@
   gap: 1px;
   background: var(--line);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 12px;
   overflow: hidden;
 }
 
 .statband-item {
   background: var(--surface);
-  padding: 24px;
+  padding: 24px 28px;
 }
 
 .statband-value {
@@ -51,7 +51,7 @@
   font-weight: 500;
   font-size: 34px;
   line-height: 1.1;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
   margin-bottom: 8px;
 }
 
@@ -80,33 +80,40 @@
 
 .bento {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 18px;
 }
 
 .bento-card {
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 24px;
-  transition: box-shadow 0.2s;
+  border-radius: 12px;
+  padding: 24px 26px;
+  transition: box-shadow 0.2s, border-color 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .bento-card:hover {
   box-shadow: var(--shadow);
+  border-color: var(--sep);
 }
 
 .bento-card h3 {
   font-family: var(--serif);
   font-weight: 500;
-  font-size: 18px;
-  letter-spacing: -0.01em;
-  margin-bottom: 10px;
+  font-size: 19px;
+  letter-spacing: -0.015em;
+  margin-bottom: 4px;
+  line-height: 1.3;
 }
 
 .bento-card p {
   font-size: 14px;
+  line-height: 1.6;
   color: var(--muted);
+  letter-spacing: -0.005em;
 }
 
 .prose {
@@ -117,12 +124,12 @@
   font-family: var(--serif);
   font-weight: 500;
   font-size: 28px;
-  letter-spacing: -0.01em;
-  margin-bottom: 20px;
+  letter-spacing: -0.02em;
+  margin-bottom: 22px;
 }
 
 .prose-item {
-  margin-bottom: 28px;
+  margin-bottom: 32px;
 }
 
 .prose-item:last-child {
@@ -133,19 +140,21 @@
   font-family: var(--serif);
   font-weight: 500;
   font-size: 20px;
-  letter-spacing: -0.01em;
-  margin-bottom: 10px;
+  letter-spacing: -0.015em;
+  margin-bottom: 12px;
+  line-height: 1.3;
 }
 
 .bullets {
-  margin: 12px 0 0 20px;
+  margin: 14px 0 0 22px;
   list-style: disc;
   color: var(--ink-2);
   font-size: 15px;
+  line-height: 1.65;
 }
 
 .bullets li {
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .callout {
@@ -153,13 +162,14 @@
   position: relative;
   display: grid;
   grid-template-columns: 38px minmax(0, 1fr);
-  gap: 16px;
+  gap: 18px;
   max-width: min(82vw, 1120px);
   border: 1px solid color-mix(in srgb, var(--callout-accent) 26%, var(--line));
-  border-radius: 14px;
-  padding: 22px 24px 24px;
+  border-radius: 12px;
+  padding: 22px 26px 24px;
   background: var(--surface);
   box-shadow: var(--shadow);
+  margin: 28px 0;
 }
 
 .callout::before {

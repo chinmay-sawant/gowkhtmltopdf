@@ -640,51 +640,111 @@ export default function CommandPalette() {
                     onMouseEnter={() => setSelectedIndex(index)}
                   >
                     <div className="palette-item-icon" aria-hidden="true">
-                      {item.icon === 'cli' && (
+                      {item.flag ? (
+                        <span className="palette-flag-symbol">--</span>
+                      ) : item.icon === 'cli' ? (
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
                           <polyline points="4 17 10 11 4 5" />
                           <line x1="12" y1="19" x2="20" y2="19" />
                         </svg>
-                      )}
-                      {item.icon === 'api' && (
+                      ) : item.icon === 'api' ? (
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
                           <polyline points="16 18 22 12 16 6" />
                           <polyline points="8 6 2 12 8 18" />
                         </svg>
-                      )}
-                      {item.icon === 'arch' && (
+                      ) : item.icon === 'arch' ? (
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
                           <rect x="3" y="3" width="7" height="7" rx="1" />
                           <rect x="14" y="3" width="7" height="7" rx="1" />
                           <rect x="14" y="14" width="7" height="7" rx="1" />
                           <rect x="3" y="14" width="7" height="7" rx="1" />
                         </svg>
-                      )}
-                      {item.icon === 'compat' && (
+                      ) : item.icon === 'compat' ? (
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
                           <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
                           <polyline points="14 2 14 8 20 8" />
                         </svg>
-                      )}
-                      {item.icon === 'font' && (
+                      ) : item.icon === 'font' ? (
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
                           <polyline points="4 7 4 4 20 4 20 7" />
                           <line x1="9" y1="20" x2="15" y2="20" />
                           <line x1="12" y1="4" x2="12" y2="20" />
                         </svg>
-                      )}
-                      {item.icon === 'sec' && (
+                      ) : item.icon === 'sec' ? (
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
                           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                         </svg>
-                      )}
-                      {item.icon === 'perf' && (
+                      ) : item.icon === 'perf' ? (
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
                           <circle cx="12" cy="12" r="10" />
                           <polyline points="12 6 12 12 16 14" />
                         </svg>
-                      )}
-                      {item.icon === 'theme' && (
+                      ) : item.icon === 'start' ? (
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polygon points="5 3 19 12 5 21 5 3" />
+                        </svg>
+                      ) : item.icon === 'about' ? (
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                          <circle cx="12" cy="12" r="10" />
+                          <line x1="12" y1="16" x2="12" y2="12" />
+                          <line x1="12" y1="8" x2="12.01" y2="8" />
+                        </svg>
+                      ) : item.icon === 'home' ? (
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                          <polyline points="9 22 9 12 15 12 15 22" />
+                        </svg>
+                      ) : item.icon === 'bench' ? (
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                          <line x1="18" y1="20" x2="18" y2="10" />
+                          <line x1="12" y1="20" x2="12" y2="4" />
+                          <line x1="6" y1="20" x2="6" y2="14" />
+                        </svg>
+                      ) : item.icon === 'dossier' ? (
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M9 11l3 3L22 4" />
+                          <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+                        </svg>
+                      ) : item.icon === 'sample' ? (
+                        item.subcategory === 'Invoices & receipts' ? (
+                          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M14 2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2V8z" />
+                            <line x1="9" y1="9" x2="15" y2="9" />
+                            <line x1="9" y1="13" x2="13" y2="13" />
+                          </svg>
+                        ) : item.subcategory === 'Reports & tables' ? (
+                          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" />
+                            <line x1="3" y1="9" x2="21" y2="9" />
+                            <line x1="9" y1="21" x2="9" y2="9" />
+                          </svg>
+                        ) : item.subcategory === 'Storybooks & posters' ? (
+                          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" />
+                            <circle cx="8.5" cy="8.5" r="1.5" />
+                            <polyline points="21 15 16 10 5 21" />
+                          </svg>
+                        ) : item.subcategory === 'CSS & layout fixtures' ? (
+                          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                            <polyline points="2 17 12 22 22 17" />
+                            <polyline points="2 12 12 17 22 12" />
+                          </svg>
+                        ) : item.subcategory === 'Architecture & API' ? (
+                          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                            <rect x="2" y="2" width="8" height="8" rx="1" />
+                            <rect x="14" y="2" width="8" height="8" rx="1" />
+                            <rect x="8" y="14" width="8" height="8" rx="1" />
+                            <line x1="6" y1="10" x2="12" y2="14" />
+                            <line x1="18" y1="10" x2="12" y2="14" />
+                          </svg>
+                        ) : (
+                          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z" />
+                            <polyline points="13 2 13 9 20 9" />
+                          </svg>
+                        )
+                      ) : item.icon === 'theme' ? (
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
                           <circle cx="12" cy="12" r="5" />
                           <line x1="12" y1="1" x2="12" y2="3" />
@@ -696,22 +756,16 @@ export default function CommandPalette() {
                           <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
                           <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
                         </svg>
-                      )}
-                      {item.icon === 'github' && (
+                      ) : item.icon === 'github' ? (
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                           <path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.1-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.11.38-2 1.03-2.71-.1-.25-.45-1.29.1-2.64 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.35.2 2.39.1 2.64.65.71 1.03 1.6 1.03 2.71 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0012 2z" />
                         </svg>
-                      )}
-                      {item.icon === 'copy' && (
+                      ) : item.icon === 'copy' ? (
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
                           <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
                           <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
                         </svg>
-                      )}
-                      {!item.icon && item.flag && (
-                        <span className="palette-flag-symbol">--</span>
-                      )}
-                      {!item.icon && !item.flag && (
+                      ) : (
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
                           <path d="M9 18l6-6-6-6" />
                         </svg>

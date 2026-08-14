@@ -1,11 +1,11 @@
 .bench-hero {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(260px, 0.85fr);
-  gap: clamp(32px, 5vw, 80px);
+  gap: clamp(32px, 5vw, 64px);
   align-items: end;
-  padding: 82px 0 36px;
+  padding: 64px 0 32px;
   border-bottom: 1px solid var(--line);
-  margin-bottom: 36px;
+  margin-bottom: 32px;
 }
 
 .bench-kicker {
@@ -14,11 +14,14 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
 .bench-hero h1 {
-  margin-bottom: 22px;
+  font-size: clamp(36px, 5vw, 56px);
+  line-height: 1.12;
+  letter-spacing: -0.035em;
+  margin-bottom: 18px;
 }
 
 .bench-hero h1 em {
@@ -28,12 +31,14 @@
 }
 
 .bench-hero .lede {
+  font-size: 17px;
+  line-height: 1.6;
   margin-bottom: 0;
 }
 
 .bench-hero-stats {
   display: grid;
-  gap: 18px;
+  gap: 20px;
   padding-bottom: 8px;
 }
 
@@ -51,8 +56,8 @@
   margin-top: 6px;
   color: var(--muted);
   font-family: var(--mono);
-  font-size: 11px;
-  line-height: 1.45;
+  font-size: 11.5px;
+  line-height: 1.5;
 }
 
 /* Collapsible Hardware & Test Environment Card */
@@ -235,7 +240,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 14px 18px;
+  padding: 16px 20px;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -247,14 +252,14 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 12px;
 }
 
 .bench-control-label {
   font-family: var(--mono);
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.08em;
   color: var(--muted);
   font-weight: 600;
 }
@@ -265,7 +270,7 @@
   padding: 3px;
   border-radius: 8px;
   border: 1px solid var(--line);
-  gap: 2px;
+  gap: 3px;
 }
 
 .bench-tab-btn {
@@ -274,7 +279,7 @@
   padding: 6px 12px;
   border-radius: 6px;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--muted);
   cursor: pointer;
   transition: all 0.15s ease-in-out;
@@ -305,6 +310,9 @@ html[data-theme='dark'] .bench-tab-btn.active {
 /* CLI Matrix Table */
 .bench-matrix {
   border-radius: 12px;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  background: var(--surface);
 }
 
 .bench-matrix table {
@@ -314,12 +322,12 @@ html[data-theme='dark'] .bench-tab-btn.active {
   border-spacing: 0;
   background: var(--surface);
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 12.5px;
 }
 
 .bench-matrix th,
 .bench-matrix td {
-  padding: 10px 12px;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--line);
   text-align: right;
   white-space: nowrap;
@@ -327,6 +335,7 @@ html[data-theme='dark'] .bench-tab-btn.active {
   transition: background 0.15s;
 }
 
+/* Base thead headers */
 .bench-matrix thead th {
   background: var(--surface-2);
   color: var(--muted);
@@ -336,36 +345,54 @@ html[data-theme='dark'] .bench-tab-btn.active {
   text-transform: uppercase;
 }
 
+/* Row 1: Group headers (Wall time, Peak RSS, PDF size) */
 .bench-matrix thead tr:first-child th[colspan] {
   text-align: center;
-  border-bottom: 0;
-  padding-bottom: 2px;
-}
-
-.bench-matrix thead tr:last-child th {
-  padding-top: 2px;
-}
-
-.bench-matrix thead tr:first-child th:not(:first-child),
-.bench-matrix thead tr:last-child th:not(:first-child),
-.bench-matrix td {
+  border-bottom: 1px solid var(--line);
   border-left: 1px solid var(--line);
+  padding: 8px 14px;
 }
 
-.bench-matrix th[scope='col']:first-child,
-.bench-matrix th[scope='row'] {
+/* Row 2: Sub-column headers (gowk, wkhtml, Speedup, etc.) */
+.bench-matrix thead tr:last-child th {
+  text-align: right;
+  border-left: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 8px 14px;
+  position: static;
+}
+
+/* Data cells */
+.bench-matrix tbody td {
+  border-left: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+}
+
+/* Sticky first column (Pages header & Pages data cells) */
+.bench-matrix thead tr:first-child > th:first-child {
   position: sticky;
   left: 0;
-  z-index: 1;
+  z-index: 3;
   text-align: left;
+  vertical-align: middle;
   background: var(--surface-2);
   border-left: 0;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
 }
 
-.bench-matrix th[scope='row'] {
+.bench-matrix tbody th {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  text-align: left;
   background: var(--surface);
   color: var(--ink);
   font-weight: 600;
+  border-left: 0;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
 }
 
 .bench-matrix tbody tr:last-child th,

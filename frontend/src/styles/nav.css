@@ -2,7 +2,7 @@
   position: sticky;
   top: 0;
   z-index: 40;
-  padding: 12px 6vw;
+  padding: 12px clamp(20px, 5vw, 64px);
   background: color-mix(in srgb, var(--nav-tint) 96%, transparent);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--line);
@@ -12,46 +12,51 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
+  gap: 24px;
   width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
 }
 
 .site-nav .brand {
   font-family: var(--sans);
   font-size: 16px;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
   color: var(--ink);
   text-decoration: none;
   display: inline-flex;
   align-items: center;
   min-height: 44px;
+  padding: 0 4px;
 }
 
 .site-nav-desktop {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .site-nav-links {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
-  gap: 2px;
+  gap: 4px;
 }
 
 .nav-link {
   font-family: var(--sans);
   font-size: 14px;
-  letter-spacing: 0;
+  font-weight: 500;
+  letter-spacing: -0.005em;
   color: var(--muted);
   text-decoration: none;
-  padding: 6px 10px;
+  padding: 6px 12px;
   border-radius: 6px;
   display: inline-flex;
   align-items: center;
   min-height: 36px;
-  transition: color 0.2s, background 0.2s;
+  transition: color 0.15s, background 0.15s;
 }
 
 .nav-link:hover {
@@ -78,17 +83,17 @@
 .nav-search-trigger {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   font-family: var(--sans);
   font-size: 13px;
   color: var(--muted);
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 6px 10px;
+  padding: 6px 12px;
   min-height: 36px;
   cursor: pointer;
-  transition: background 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
 }
 
 .nav-search-trigger:hover {
@@ -269,8 +274,8 @@
 .mobile-nav-dropdown {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 16px 0 8px;
+  gap: 16px;
+  padding: 18px 4px 12px;
   margin-top: 10px;
   border-top: 1px solid var(--line);
   animation: navDropdownFade 0.2s ease-out;
@@ -290,18 +295,19 @@
 .mobile-nav-links {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .mobile-nav-link {
   display: flex;
   align-items: center;
   min-height: 44px;
-  padding: 10px 14px;
-  border-radius: 6px;
+  padding: 10px 16px;
+  border-radius: 8px;
   font-family: var(--sans);
   font-size: 15px;
   font-weight: 500;
+  letter-spacing: -0.005em;
   color: var(--muted);
   text-decoration: none;
   transition: color 0.15s, background 0.15s;
@@ -328,8 +334,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding-top: 12px;
+  gap: 14px;
+  padding-top: 14px;
   border-top: 1px solid var(--line);
 }
 

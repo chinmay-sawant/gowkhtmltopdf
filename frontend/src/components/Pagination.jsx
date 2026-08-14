@@ -24,10 +24,10 @@ export default function Pagination({ page, pageCount, onPageChange, pageSize }) 
         Prev
       </button>
       {list.map((p, i) => {
-        const prev = i > 0 ? list[i - 1] : 0
+        const hasGap = i > 0 && p - list[i - 1] > 1
         return (
           <span className="page-group" key={p}>
-            {prev && p - prev > 1 && <span className="page-ellipsis">/</span>}
+            {hasGap && <span className="page-ellipsis">…</span>}
             <button
               type="button"
               className={p === page ? 'page-btn active' : 'page-btn'}

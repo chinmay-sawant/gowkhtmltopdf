@@ -1,6 +1,6 @@
 footer {
-  margin-top: 72px;
-  padding-top: 24px;
+  margin-top: 88px;
+  padding: 32px 0 16px;
   border-top: 1px solid var(--line);
   font-family: var(--mono);
   font-size: 12px;
@@ -8,27 +8,31 @@ footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
+  gap: 20px;
   flex-wrap: wrap;
 }
 
 .footer-name {
   color: var(--ink-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .footer-built {
   display: inline-flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 14px;
 }
 
 .footer-built a {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   color: var(--ink-2);
   text-decoration: none;
+  transition: color 0.15s;
 }
 
 .footer-built a:hover {
@@ -36,8 +40,8 @@ footer {
 }
 
 .footer-built svg {
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
   flex: none;
   fill: currentColor;
 }

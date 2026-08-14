@@ -1,13 +1,13 @@
 .docs-page {
-  width: min(92vw, 1800px);
+  width: min(92vw, 1480px);
   margin: 0 auto;
-  padding: 0 0 128px;
+  padding: 0 0 112px;
 }
 
 .docs-layout {
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr) 240px;
-  gap: clamp(24px, 3vw, 48px);
+  gap: clamp(28px, 3.5vw, 56px);
   align-items: start;
   padding-top: 32px;
 }
@@ -18,7 +18,7 @@
   top: 84px;
   max-height: calc(100vh - 100px);
   overflow-y: auto;
-  padding: 14px;
+  padding: 16px 14px;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--surface);
@@ -39,7 +39,7 @@
 .docs-nav {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
 }
 
 .docs-link {
@@ -47,9 +47,9 @@
   font-size: 13.5px;
   color: var(--muted);
   text-decoration: none;
-  padding: 8px 10px;
+  padding: 8px 12px;
   border-radius: 6px;
-  transition: color 0.2s, background 0.2s;
+  transition: color 0.15s, background 0.15s;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -76,9 +76,9 @@
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 24px;
-  padding-bottom: 12px;
+  gap: 14px;
+  margin-bottom: 28px;
+  padding-bottom: 14px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -105,7 +105,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 10px;
+  padding: 4px 10px;
   border-radius: 999px;
   background: var(--surface-2);
   border: 1px solid var(--line);
@@ -134,23 +134,25 @@
 
 .docs-page h1,
 .content-page h1 {
-  font-size: clamp(26px, 3vw, 34px);
-  line-height: 1.22;
-  letter-spacing: -0.02em;
-  margin-bottom: 12px;
+  font-size: clamp(26px, 3vw, 36px);
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+  margin-bottom: 14px;
 }
 
 .docs-page .lede,
 .content-page .lede {
   font-size: 16px;
-  line-height: 1.55;
-  margin-bottom: 22px;
+  line-height: 1.6;
+  margin-bottom: 24px;
 }
 
 .docs-page .content-blocks h2,
 .content-page .content-blocks h2 {
   font-size: 22px;
-  margin-bottom: 14px;
+  letter-spacing: -0.015em;
+  margin-bottom: 16px;
+  margin-top: 40px;
 }
 
 .docs-page .prose h3,
@@ -159,7 +161,9 @@
 .content-page .prose h3,
 .content-page .table-block-heading,
 .content-page .code-block-heading {
-  font-size: 17px;
+  font-size: 17.5px;
+  letter-spacing: -0.01em;
+  margin-bottom: 12px;
 }
 
 .content-page {
