@@ -317,6 +317,7 @@ type Op struct {
 	ImgW   int
 	ImgH   int
 	IsJPEG bool
+	Alt    string // Alt text for Figure elements under PDF/UA-1
 
 	// Fixed marks ops from position:fixed boxes; Paint stamps them on every
 	// page at viewport-relative coordinates.

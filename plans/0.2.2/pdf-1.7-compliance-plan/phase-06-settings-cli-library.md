@@ -1,7 +1,7 @@
 # Phase 6 — Settings, CLI, and Library
 
 > **Parent:** `plans/0.2.2/pdf-1.7-compliance-plan/00-canonical-pdf-17-compliance-plan.md`
-> **Status:** not started
+> **Status:** completed
 > **Estimated effort:** 2–3 days
 > **Depends on:** Phase 1 names; user path waits on phases 2–5
 > **Unblocks:** phase 7 convert goldens from the CLI
@@ -31,26 +31,26 @@ Suggested spellings (bikeshed in implementation):
 
 ### 6.1 Settings
 
-- [ ] Field on `settings.PdfGlobal` — `internal/settings/settings.go`
-- [ ] Default empty
-- [ ] Dotted key (e.g. `pdfprofile`) in `reflect.go` + clone
-- [ ] Parser accepts only the names phase 1 allowlisted
-- [ ] Dual / A-3a / UA-1 forces `PdfVersion` to 1.7 if it was default 1.4; explicit `--pdf-version 1.4` + profile is an error
-- [ ] Test: descriptor parity; good/bad table
+- [x] Field on `settings.PdfGlobal` — `internal/settings/settings.go`
+- [x] Default empty
+- [x] Dotted key (e.g. `pdfprofile`) in `reflect.go` + clone
+- [x] Parser accepts only the names phase 1 allowlisted
+- [x] Dual / A-3a / UA-1 forces `PdfVersion` to 1.7 if it was default 1.4; explicit `--pdf-version 1.4` + profile is an error
+- [x] Test: descriptor parity; good/bad table
 
 ### 6.2 CLI
 
-- [ ] `--pdf-profile` (name bikeshed) in `addGlobalFlags`, `ModePDF` only
-- [ ] `--help` lists accepted values
-- [ ] Test: `--pdf-profile a3a-ua1` + HTML writes a claiming 1.7 file (needs phases 2–5)
-- [ ] Test: image binary rejects the flag
-- [ ] Test: unknown profile is a user error
+- [x] `--pdf-profile` (name bikeshed) in `addGlobalFlags`, `ModePDF` only
+- [x] `--help` lists accepted values
+- [x] Test: `--pdf-profile a3a-ua1` + HTML writes a claiming 1.7 file (needs phases 2–5)
+- [x] Test: image binary rejects the flag
+- [x] Test: unknown profile is a user error
 
 ### 6.3 Library
 
-- [ ] `PdfGlobalOptions.WithPDFProfile` (or similar); invalid values error at `RunPDF` / `WithSetting`, no panic
-- [ ] Documented on the preferred `PDFRequest` path
-- [ ] Test: omitted profile → unclaimed; dual → 1.7 + profile
+- [x] `PdfGlobalOptions.WithPDFProfile` (or similar); invalid values error at `RunPDF` / `WithSetting`, no panic
+- [x] Documented on the preferred `PDFRequest` path
+- [x] Test: omitted profile → unclaimed; dual → 1.7 + profile
 
 ---
 

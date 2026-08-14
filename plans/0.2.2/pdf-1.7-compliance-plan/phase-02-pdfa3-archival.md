@@ -1,7 +1,7 @@
 # Phase 2 — PDF/A-3 Archival Objects
 
 > **Parent:** `plans/0.2.2/pdf-1.7-compliance-plan/00-canonical-pdf-17-compliance-plan.md`
-> **Status:** not started
+> **Status:** completed
 > **Estimated effort:** 4–6 days
 > **Depends on:** Phase 1
 > **Unblocks:** phases 3, 7 (A-3 half)
@@ -36,29 +36,29 @@ Do not add structure tags here (that is A-3a’s UA half, phase 4).
 
 ### 2.1 Claiming XMP
 
-- [ ] When the profile includes PDF/A-3, the Metadata stream contains `pdfaid:part` = 3 and `pdfaid:conformance` = A
-- [ ] Unclaimed 1.7 XMP still has **no** `pdfaid`
-- [ ] Keep `dc:format`, `pdf:Producer`, create/modify dates from `SetCreationTime`
-- [ ] Test: byte / XML parse of the Metadata stream
+- [x] When the profile includes PDF/A-3, the Metadata stream contains `pdfaid:part` = 3 and `pdfaid:conformance` = A
+- [x] Unclaimed 1.7 XMP still has **no** `pdfaid`
+- [x] Keep `dc:format`, `pdf:Producer`, create/modify dates from `SetCreationTime`
+- [x] Test: byte / XML parse of the Metadata stream
 
 ### 2.2 OutputIntent + ICC
 
-- [ ] Embed a compact sRGB ICC (process-once, not per page)
-- [ ] Catalog `/OutputIntents` array with `/Type /OutputIntent`, `/S /GTS_PDFA1`, `/DestOutputProfile`
-- [ ] Object IDs reserved before catalog write (same finalize discipline as outlines)
-- [ ] Unclaimed 1.7 still has no `/OutputIntents`
-- [ ] Test: catalog references a real ICC stream (`/N 3`)
+- [x] Embed a compact sRGB ICC (process-once, not per page)
+- [x] Catalog `/OutputIntents` array with `/Type /OutputIntent`, `/S /GTS_PDFA1`, `/DestOutputProfile`
+- [x] Object IDs reserved before catalog write (same finalize discipline as outlines)
+- [x] Unclaimed 1.7 still has no `/OutputIntents`
+- [x] Test: catalog references a real ICC stream (`/N 3`)
 
 ### 2.3 Info vs XMP
 
-- [ ] Info `ModDate` / `CreationDate` match the XMP dates
-- [ ] Producer in Info matches `pdf:Producer`
-- [ ] Title, if set, appears in both Info `/Title` and `dc:title`
+- [x] Info `ModDate` / `CreationDate` match the XMP dates
+- [x] Producer in Info matches `pdf:Producer`
+- [x] Title, if set, appears in both Info `/Title` and `dc:title`
 
 ### 2.4 Negative
 
-- [ ] Profile set but finalize cannot build ICC → error, no claiming file
-- [ ] Test: unclaimed 1.7 goldens unchanged
+- [x] Profile set but finalize cannot build ICC → error, no claiming file
+- [x] Test: unclaimed 1.7 goldens unchanged
 
 ---
 

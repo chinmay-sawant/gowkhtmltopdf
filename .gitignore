@@ -17,3 +17,8 @@ testdata/golden/out/
 *.swp
 .pi-subagents
 .pi*
+
+# compliance tools
+compliance/
+verapdf/
+.pdf-validators/

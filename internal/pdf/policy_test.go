@@ -72,14 +72,44 @@ func TestPolicyValidation(t *testing.T) {
 			wantErr: ErrObjectStreamsUnsupported,
 		},
 		{
-			name:    "conformance profile PDF/A requested returns ErrConformanceProfilesUnsupported",
+			name:    "conformance profile PDF/A-1b requested returns ErrPDFA1Unsupported",
 			policy:  WriterPolicy{Version: PDF17, ConformanceProfile: "PDF/A-1b"},
+			wantErr: ErrPDFA1Unsupported,
+		},
+		{
+			name:    "conformance profile unknown string returns ErrUnknownConformanceProfile",
+			policy:  WriterPolicy{Version: PDF17, ConformanceProfile: "PDF/X-3"},
+			wantErr: ErrUnknownConformanceProfile,
+		},
+		{
+			name:    "conformance profile PDF/A-4 requested returns ErrConformanceProfilesUnsupported",
+			policy:  WriterPolicy{Version: PDF17, ConformanceProfile: "PDF/A-4"},
 			wantErr: ErrConformanceProfilesUnsupported,
 		},
 		{
-			name:    "conformance profile PDF/UA requested returns ErrConformanceProfilesUnsupported",
-			policy:  WriterPolicy{Version: PDF17, ConformanceProfile: "PDF/UA-1"},
+			name:    "conformance profile PDF/UA-2 requested returns ErrConformanceProfilesUnsupported",
+			policy:  WriterPolicy{Version: PDF17, ConformanceProfile: "PDF/UA-2"},
 			wantErr: ErrConformanceProfilesUnsupported,
+		},
+		{
+			name:    "conformance profile PDF/UA-1 on PDF17 is valid",
+			policy:  WriterPolicy{Version: PDF17, ConformanceProfile: ProfilePDFUA1},
+			wantErr: nil,
+		},
+		{
+			name:    "conformance profile PDF/A-3a on PDF17 is valid",
+			policy:  WriterPolicy{Version: PDF17, ConformanceProfile: ProfilePDFA3a},
+			wantErr: nil,
+		},
+		{
+			name:    "conformance profile Dual on PDF17 is valid",
+			policy:  WriterPolicy{Version: PDF17, ConformanceProfile: ProfileDualA3aUA1},
+			wantErr: nil,
+		},
+		{
+			name:    "conformance profile PDF/UA-1 on PDF14 returns ErrProfileRequiresPDF17",
+			policy:  WriterPolicy{Version: PDF14, ConformanceProfile: ProfilePDFUA1},
+			wantErr: ErrProfileRequiresPDF17,
 		},
 	}
 
@@ -521,14 +551,24 @@ func TestFeatureGatesFailClosed(t *testing.T) {
 			wantErr: ErrObjectStreamsUnsupported,
 		},
 		{
-			name:    "conformance PDF/A fails closed",
+			name:    "conformance PDF/A-1b fails closed",
 			policy:  WriterPolicy{Version: PDF17, ConformanceProfile: "PDF/A-1b"},
+			wantErr: ErrPDFA1Unsupported,
+		},
+		{
+			name:    "conformance PDF/A-4 fails closed",
+			policy:  WriterPolicy{Version: PDF17, ConformanceProfile: "PDF/A-4"},
 			wantErr: ErrConformanceProfilesUnsupported,
 		},
 		{
-			name:    "conformance PDF/UA fails closed",
-			policy:  WriterPolicy{Version: PDF17, ConformanceProfile: "PDF/UA-1"},
+			name:    "conformance PDF/UA-2 fails closed",
+			policy:  WriterPolicy{Version: PDF17, ConformanceProfile: "PDF/UA-2"},
 			wantErr: ErrConformanceProfilesUnsupported,
+		},
+		{
+			name:    "conformance profile on PDF14 fails closed",
+			policy:  WriterPolicy{Version: PDF14, ConformanceProfile: ProfilePDFUA1},
+			wantErr: ErrProfileRequiresPDF17,
 		},
 		{
 			name:    "PDF 2.0 reserved fails closed",

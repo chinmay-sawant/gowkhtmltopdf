@@ -1794,3 +1794,127 @@ func TestPDFVersionAPI(t *testing.T) {
 		t.Errorf("expected Converter output to start with %%PDF-1.7, got %q", conv.Output()[:min(10, len(conv.Output()))])
 	}
 }
+
+//nolint:cyclop,exhaustruct,funlen // comprehensive API test for PDF compliance profiles
+func TestPDFProfileAPI(t *testing.T) {
+	t.Parallel()
+
+	// 1. Fluent builder and WithSetting
+	builder := NewPdfGlobalOptions().WithPDFProfile("a3a-ua1")
+	snap := builder.Build()
+
+	if got, ok := snap.Get("pdfprofile"); !ok || got != "a3a-ua1" {
+		t.Fatalf("snap.Get(pdfprofile) = %q, %v; want a3a-ua1, true", got, ok)
+	}
+
+	builderSetting, err := NewPdfGlobalOptions().WithSetting("pdfprofile", "a3a-ua1")
+	if err != nil {
+		t.Fatalf("WithSetting(pdfprofile, a3a-ua1): %v", err)
+	}
+
+	if got, ok := builderSetting.Build().Get("pdfprofile"); !ok || got != "PDF/A-3a+PDF/UA-1" {
+		t.Fatalf("builderSetting Get(pdfprofile) = %q, %v; want PDF/A-3a+PDF/UA-1, true", got, ok)
+	}
+
+	_, errBadSetting := NewPdfGlobalOptions().WithSetting("pdfprofile", "invalid")
+	if errBadSetting == nil {
+		t.Fatal("expected error from WithSetting(pdfprofile, invalid), got nil")
+	}
+
+	if !errors.Is(errBadSetting, ErrInvalidPDFProfile) {
+		t.Errorf("expected ErrInvalidPDFProfile, got %v", errBadSetting)
+	}
+
+	// 2. ValidatePDF with invalid, unsupported, and conflict
+	reqBad := &PDFRequest{
+		Global:  NewPdfGlobalOptions().WithPDFProfile("invalid").Build(),
+		Objects: []*ObjectSettings{NewObjectSettings().SetBody([]byte("<title>T</title><p>hi</p>"), "")},
+		Output:  &bytes.Buffer{},
+	}
+	if err := reqBad.ValidatePDF(); !errors.Is(err, ErrInvalidPDFProfile) {
+		t.Errorf("ValidatePDF with invalid: got %v, want ErrInvalidPDFProfile", err)
+	}
+
+	reqA4 := &PDFRequest{
+		Global:  NewPdfGlobalOptions().WithPDFProfile("a4").Build(),
+		Objects: []*ObjectSettings{NewObjectSettings().SetBody([]byte("<title>T</title><p>hi</p>"), "")},
+		Output:  &bytes.Buffer{},
+	}
+	if err := reqA4.ValidatePDF(); !errors.Is(err, ErrProfilePDF20Unsupported) {
+		t.Errorf("ValidatePDF with a4: got %v, want ErrProfilePDF20Unsupported", err)
+	}
+
+	reqPDFA1 := &PDFRequest{
+		Global:  NewPdfGlobalOptions().WithPDFProfile("pdfa-1b").Build(),
+		Objects: []*ObjectSettings{NewObjectSettings().SetBody([]byte("<title>T</title><p>hi</p>"), "")},
+		Output:  &bytes.Buffer{},
+	}
+	if err := reqPDFA1.ValidatePDF(); !errors.Is(err, ErrProfilePDFA1Unsupported) {
+		t.Errorf("ValidatePDF with pdfa-1b: got %v, want ErrProfilePDFA1Unsupported", err)
+	}
+
+	// Explicit 1.4 + profile conflict
+	reqConflict := &PDFRequest{
+		Global:  NewPdfGlobalOptions().WithPDFVersion("1.4").WithPDFProfile("a3a-ua1").Build(),
+		Objects: []*ObjectSettings{NewObjectSettings().SetBody([]byte("<title>T</title><p>hi</p>"), "")},
+		Output:  &bytes.Buffer{},
+	}
+	if err := reqConflict.ValidatePDF(); !errors.Is(err, ErrConformanceRequiresPDF17) {
+		t.Errorf("ValidatePDF with 1.4 + profile: got %v, want ErrConformanceRequiresPDF17", err)
+	}
+
+	// 3. RunPDF with invalid and conflict
+	if err := RunPDF(t.Context(), reqBad); !errors.Is(err, ErrInvalidPDFProfile) {
+		t.Errorf("RunPDF with invalid: got %v, want ErrInvalidPDFProfile", err)
+	}
+
+	if err := RunPDF(t.Context(), reqConflict); !errors.Is(err, ErrConformanceRequiresPDF17) {
+		t.Errorf("RunPDF with 1.4 + profile: got %v, want ErrConformanceRequiresPDF17", err)
+	}
+
+	// 4. Dual profile -> produces PDF 1.7
+	var outDual bytes.Buffer
+
+	htmlDual := "<html><head><title>Compliance Document</title></head>" +
+		"<body><p>dual</p></body></html>"
+	reqDual := &PDFRequest{
+		Global: NewPdfGlobalOptions().
+			WithTitle("Compliance Document").
+			WithPDFProfile("a3a-ua1").
+			Build(),
+		Objects: []*ObjectSettings{
+			NewObjectSettings().SetBody([]byte(htmlDual), ""),
+		},
+		Output: &outDual,
+	}
+
+	if err := RunPDF(t.Context(), reqDual); err != nil {
+		t.Fatalf("RunPDF dual: %v", err)
+	}
+
+	if !bytes.HasPrefix(outDual.Bytes(), []byte("%PDF-1.7")) {
+		t.Errorf("expected PDF dual to start with %%PDF-1.7, got %q", outDual.Bytes()[:min(10, outDual.Len())])
+	}
+
+	// 5. Converter with pdfprofile
+	conv := NewConverter()
+	if err := conv.Global().Set("title", "Converter Title"); err != nil {
+		t.Fatalf("conv.Global().Set(title, ...): %v", err)
+	}
+
+	if err := conv.Global().Set("pdfprofile", "a3a-ua1"); err != nil {
+		t.Fatalf("conv.Global().Set(pdfprofile, a3a-ua1): %v", err)
+	}
+
+	htmlConv := "<html><head><title>Converter Title</title></head>" +
+		"<body><p>conv a3a-ua1</p></body></html>"
+	conv.AddObject(NewObjectSettings().SetBody([]byte(htmlConv), ""))
+
+	if err := conv.Convert(t.Context()); err != nil {
+		t.Fatalf("conv.Convert: %v", err)
+	}
+
+	if !bytes.HasPrefix(conv.Output(), []byte("%PDF-1.7")) {
+		t.Errorf("expected Converter output to start with %%PDF-1.7, got %q", conv.Output()[:min(10, len(conv.Output()))])
+	}
+}

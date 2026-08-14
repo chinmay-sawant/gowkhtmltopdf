@@ -2,7 +2,7 @@
 
 > **Parent:** `plans/0.2.2/README.md` — epic [#29](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/29)
 > **Highest 1.7 profile:** PDF 1.7 + **PDF/A-3a** + **PDF/UA-1**
-> **Status:** not started
+> **Status:** completed
 > **Estimated effort:** 4–7 weeks across phases 1–8
 > **Constraint:** pure Go, no CGO, no new direct modules. veraPDF is an **optional** test binary, not a Go require.
 > **Depends on:** #31 version path (`WriterPolicy`, `%PDF-1.7`, `/ID`, Info, non-claiming XMP) — **completed**
@@ -146,12 +146,12 @@ Phases 2 and 4 may overlap after phase 1 if they do not fight over `finalize`. P
 
 ## Success criteria
 
-- [ ] Highest 1.7 profile is documented as PDF/A-3a + PDF/UA-1 (not A-4 / UA-2)
-- [ ] Dual-mode fixture PASSes veraPDF `-f 3a` and `-f ua1` (or skip is recorded)
-- [ ] Unclaimed 1.4 and 1.7 version tests stay green
-- [ ] A-4 / UA-2 profile strings still error
-- [ ] Missing title, missing `alt`, or unembeddable font fails the profile **before** a claiming file is written
-- [ ] Docs do not call default output PDF/A or PDF/UA
+- [x] Highest 1.7 profile is documented as PDF/A-3a + PDF/UA-1 (not A-4 / UA-2)
+- [x] Dual-mode fixture PASSes veraPDF `-f 3a` and `-f ua1` (or skip is recorded)
+- [x] Unclaimed 1.4 and 1.7 version tests stay green
+- [x] A-4 / UA-2 profile strings still error
+- [x] Missing title, missing `alt`, or unembeddable font fails the profile **before** a claiming file is written
+- [x] Docs do not call default output PDF/A or PDF/UA
 
 ---
 

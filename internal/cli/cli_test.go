@@ -1084,3 +1084,79 @@ func TestPDFVersionFlag(t *testing.T) {
 		t.Errorf("Image help should NOT list --pdf-version, got:\n%s", imgHelpBuf.String())
 	}
 }
+
+//nolint:cyclop,funlen // comprehensive CLI test for pdf-profile flag
+func TestPDFProfileFlag(t *testing.T) {
+	t.Parallel()
+
+	// Valid profile a3a-ua1
+	cmdDual := parse(t, "--pdf-profile", "a3a-ua1", "in.html", outPDF)
+	if cmdDual.Global.PdfProfile != settings.ProfilePDFA3aPDFUA1 {
+		t.Errorf("Global.PdfProfile = %q, want %q", cmdDual.Global.PdfProfile, settings.ProfilePDFA3aPDFUA1)
+	}
+
+	// Valid profile a3a
+	cmdA3a := parse(t, "--pdf-profile", "a3a", "in.html", outPDF)
+	if cmdA3a.Global.PdfProfile != settings.ProfilePDFA3a {
+		t.Errorf("Global.PdfProfile = %q, want %q", cmdA3a.Global.PdfProfile, settings.ProfilePDFA3a)
+	}
+
+	// Valid profile ua1
+	cmdUA1 := parse(t, "--pdf-profile", "ua1", "in.html", outPDF)
+	if cmdUA1.Global.PdfProfile != settings.ProfilePDFUA1 {
+		t.Errorf("Global.PdfProfile = %q, want %q", cmdUA1.Global.PdfProfile, settings.ProfilePDFUA1)
+	}
+
+	// Invalid profile
+	_, errInvalid := Parse([]string{"--pdf-profile", "invalid", "in.html", outPDF}, ModePDF)
+	if errInvalid == nil {
+		t.Fatal("expected error for --pdf-profile invalid, got nil")
+	}
+
+	if !errors.Is(errInvalid, settings.ErrInvalidPDFProfile) {
+		t.Errorf("expected ErrInvalidPDFProfile, got %v", errInvalid)
+	}
+
+	// Unsupported PDF 2.0 profile a4
+	_, errA4 := Parse([]string{"--pdf-profile", "a4", "in.html", outPDF}, ModePDF)
+	if errA4 == nil {
+		t.Fatal("expected error for --pdf-profile a4, got nil")
+	}
+
+	if !errors.Is(errA4, settings.ErrProfilePDF20Unsupported) {
+		t.Errorf("expected ErrProfilePDF20Unsupported, got %v", errA4)
+	}
+
+	// Unsupported PDF/A-1 profile pdfa-1b
+	_, errA1 := Parse([]string{"--pdf-profile", "pdfa-1b", "in.html", outPDF}, ModePDF)
+	if errA1 == nil {
+		t.Fatal("expected error for --pdf-profile pdfa-1b, got nil")
+	}
+
+	if !errors.Is(errA1, settings.ErrProfilePDFA1Unsupported) {
+		t.Errorf("expected ErrProfilePDFA1Unsupported, got %v", errA1)
+	}
+
+	// Image mode rejects --pdf-profile
+	_, errImage := Parse([]string{"--pdf-profile", "a3a-ua1", "in.html", "out.png"}, ModeImage)
+	if errImage == nil {
+		t.Fatal("expected error for --pdf-profile in ModeImage, got nil")
+	}
+
+	// Help text check
+	var pdfHelpBuf bytes.Buffer
+
+	PrintHelp(&pdfHelpBuf, ModePDF)
+
+	if !strings.Contains(pdfHelpBuf.String(), "--pdf-profile <value>") {
+		t.Errorf("PDF help should list --pdf-profile, got:\n%s", pdfHelpBuf.String())
+	}
+
+	var imgHelpBuf bytes.Buffer
+
+	PrintHelp(&imgHelpBuf, ModeImage)
+
+	if strings.Contains(imgHelpBuf.String(), "--pdf-profile") {
+		t.Errorf("Image help should NOT list --pdf-profile, got:\n%s", imgHelpBuf.String())
+	}
+}

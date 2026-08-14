@@ -273,6 +273,7 @@ smart-shrinking on, background on, outline on (depth 4).
 | `--grayscale` | `-g` | PDF | Whole-document grayscale |
 | `--title` | `-t` | PDF | PDF `/Title` **and** `[title]`. HTML `<title>` is `[doctitle]` only |
 | `--pdf-version` | | PDF | PDF output version: `1.4` (default) or `1.7`. Opt-in `1.7` emits `%PDF-1.7`, trailer `/ID`, Info with UTF-16BE + BOM strings, and non-claiming XMP Metadata stream. `2.0` is deferred to #32 |
+| `--pdf-profile` | | PDF | PDF conformance profile: `a3a-ua1` / `PDF/A-3a+PDF/UA-1` (dual archival + accessible profile), `a3a` / `PDF/A-3a`, `ua1` / `PDF/UA-1`. Implies PDF 1.7. Emits claiming XMP metadata, sRGB OutputIntent, `/DefaultRGB`, and full logical structure tree |
 | `--no-pdf-compression` | | PDF | Uncompressed streams |
 | `--page-offset` | | PDF | Added to `[page]` and TOC numbers |
 | `--enable-smart-shrinking` | | PDF | Default is already on |

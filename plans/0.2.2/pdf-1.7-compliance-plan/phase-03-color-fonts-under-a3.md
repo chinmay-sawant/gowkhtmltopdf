@@ -1,7 +1,7 @@
 # Phase 3 — Color and Fonts under PDF/A-3
 
 > **Parent:** `plans/0.2.2/pdf-1.7-compliance-plan/00-canonical-pdf-17-compliance-plan.md`
-> **Status:** not started
+> **Status:** completed
 > **Estimated effort:** 3–5 days
 > **Depends on:** Phase 2 (ICC object exists)
 > **Unblocks:** phase 7 A-3 color/font gates
@@ -23,24 +23,24 @@ Do not add a second subsetter.
 
 ### 3.1 Images and page color
 
-- [ ] Under A-3 / dual, image XObjects use ICCBased (or DefaultRGB on the page) tied to the phase-2 sRGB profile — `images.go`
-- [ ] JPEG `/DCTDecode` and PNG Flate + SMask still work (A-3 allows transparency)
-- [ ] Grayscale path uses ICC gray or DefaultGray
-- [ ] Unclaimed 1.4 / 1.7 images stay DeviceRGB
-- [ ] Test: existing JPEG/PNG tests pass unclaimed; new A-3 cases assert ICCBased / DefaultRGB
+- [x] Under A-3 / dual, image XObjects use ICCBased (or DefaultRGB on the page) tied to the phase-2 sRGB profile — `images.go`
+- [x] JPEG `/DCTDecode` and PNG Flate + SMask still work (A-3 allows transparency)
+- [x] Grayscale path uses ICC gray or DefaultGray
+- [x] Unclaimed 1.4 / 1.7 images stay DeviceRGB
+- [x] Test: existing JPEG/PNG tests pass unclaimed; new A-3 cases assert ICCBased / DefaultRGB
 
 ### 3.2 Fonts
 
-- [ ] A-3 / UA-1 / dual: every text font used on a page is embedded (`FontFile2`)
-- [ ] Every text font has `ToUnicode` (needed for A-3u/A-3a and UA-1)
-- [ ] If a face cannot be subset/embedded, `Write` / convert returns a typed error **before** a claiming PDF exists
-- [ ] Test: existing Type0 tests pass under `PDF17` + A-3a policy
-- [ ] Test: negative — force an unembeddable condition if one exists; otherwise document that all shipped faces embed
+- [x] A-3 / UA-1 / dual: every text font used on a page is embedded (`FontFile2`)
+- [x] Every text font has `ToUnicode` (needed for A-3u/A-3a and UA-1)
+- [x] If a face cannot be subset/embedded, `Write` / convert returns a typed error **before** a claiming PDF exists
+- [x] Test: existing Type0 tests pass under `PDF17` + A-3a policy
+- [x] Test: negative — force an unembeddable condition if one exists; otherwise document that all shipped faces embed
 
 ### 3.3 ExtGState / opacity
 
-- [ ] Soft-mask + `/ca` remain allowed (A-3 ≠ A-1)
-- [ ] Test: PNG-with-alpha fixture under A-3 still produces `/SMask`
+- [x] Soft-mask + `/ca` remain allowed (A-3 ≠ A-1)
+- [x] Test: PNG-with-alpha fixture under A-3 still produces `/SMask`
 
 ---
 

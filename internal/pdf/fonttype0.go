@@ -31,7 +31,13 @@ func needsType0(used []rune) bool {
 // dict tails differ.
 //
 // ponytail: Type0+simple dual embed — both product-real (Latin-1 vs CJK/BMP).
+//
+//nolint:cyclop // ensureFont switches between simple and Type0 embedding
 func (d *Document) ensureFont(fnt *Font, name string, used []rune) (objRef, error) {
+	if fnt == nil {
+		return 0, errNilFont
+	}
+
 	if len(used) == 0 {
 		used = []rune{' '}
 	}

@@ -248,8 +248,11 @@ Notes on that seam:
    `/First /Last /Prev /Next /Parent /Title /Dest`; only after `refStr` is
    set can `catalogDict` safely write `/Outlines` — a malformed empty value
    made viewers show nothing/fail to open.
-6. **Catalog** (`/Type`, `/Pages`, optional `/Outlines`, `/PageMode /UseOutlines`, optional `/Metadata` on 1.7) and **Info** (Title/Subject/Author/Keywords when set + forced `Creator`, `Producer` per policy e.g. `"gowkhtmltopdf 1.4"` or `"gowkhtmltopdf 1.7"`, `CreationDate`, `ModDate`). On 1.7, non-PDFDocEncoding Info and outline strings use UTF-16BE + BOM (`FE FF`), and a non-claiming XMP Metadata stream object is attached to `/Metadata`.
-7. **Per page**: flate the content stream (`/Filter /FlateDecode` when
+6. **Catalog** (`/Type`, `/Pages`, optional `/Outlines`, `/PageMode /UseOutlines`, optional `/Metadata` on 1.7) and **Info** (Title/Subject/Author/Keywords when set + forced `Creator`, `Producer` per policy e.g. `"gowkhtmltopdf 1.4"` or `"gowkhtmltopdf 1.7"`, `CreationDate`, `ModDate`). On 1.7, non-PDFDocEncoding Info and outline strings use UTF-16BE + BOM (`FE FF`), and an XMP Metadata stream object is attached to `/Metadata` (non-claiming by default, or with `pdfaid:part=3` / `pdfuaid:part=1` schemas when compliance profiles are active).
+7. **Compliance Objects** (under `ProfilePDFA3a` / `ProfilePDFUA1` / `ProfilePDFA3aPDFUA1`):
+   - **PDF/A-3a**: Allocates embedded sRGB v2.1 ICC profile stream and `/OutputIntents [ << /Type /OutputIntent /S /GTS_PDFA1 ... >> ]` in the Catalog. Injects `/DefaultRGB [/ICCBased <iccRef>]` into per-page `/ColorSpace` resources.
+   - **PDF/UA-1**: Constructs `StructTreeRoot`, `StructElem` hierarchy (`Document`, `H1`..`H6`, `P`, `Table` > `TR` > `TH`/`TD`, `L` > `LI`, `Figure` + `Alt`, `Link` + `OBJR`), `ParentTree` number tree mapping per-page MCIDs to owning StructElems, Catalog `/MarkInfo << /Marked true >>`, `/ViewerPreferences << /DisplayDocTitle true >>`, `/Lang`, and page `/Tabs /S`.
+8. **Per page**: flate the content stream (`/Filter /FlateDecode` when
    compression on), attach stream, build `/Resources` from `content.fonts()`
    (may allocate + subset font objects) + image XObjects + optional
    ExtGState, emit `/Annots` for link annotations.

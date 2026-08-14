@@ -18,7 +18,8 @@ func TestDefaultPdfGlobalSnapshot(t *testing.T) {
 	}{
 		{"PageSize", global.PageSize, "A4"},
 		{"Orientation", global.Orientation, OrientationPortrait},
-		{"PdfVersion", global.PdfVersion, "1.4"},
+		{"PdfVersion", global.PdfVersion, ""},
+		{"PdfProfile", global.PdfProfile, ""},
 		{"Grayscale", global.Grayscale, false},
 		{"Collate", global.Collate, true},
 		{"Outline", global.Outline, true},
@@ -727,5 +728,73 @@ func TestGlobalPdfVersionSetting(t *testing.T) {
 	// Set invalid returns ErrInvalidPDFVersion.
 	if err := global.Set("pdfversion", "9.9"); !errors.Is(err, ErrInvalidPDFVersion) {
 		t.Fatalf("Set(pdfversion, 9.9) error = %v, want ErrInvalidPDFVersion", err)
+	}
+}
+
+//nolint:cyclop,funlen // comprehensive test matrix for PDF profile settings
+func TestGlobalPdfProfileSetting(t *testing.T) {
+	t.Parallel()
+
+	global := DefaultPdfGlobal()
+
+	// Default Get returns "".
+	if got, ok := global.Get("pdfprofile"); !ok || got != "" {
+		t.Fatalf("initial Get(pdfprofile) = %q, %v; want %q, true", got, ok, "")
+	}
+
+	validCases := []struct {
+		input         string
+		wantCanonical string
+	}{
+		{"a3a-ua1", ProfilePDFA3aPDFUA1},
+		{"PDF/A-3a+PDF/UA-1", ProfilePDFA3aPDFUA1},
+		{"pdf/a-3a+pdf/ua-1", ProfilePDFA3aPDFUA1},
+		{"a3a", ProfilePDFA3a},
+		{"pdf/a-3a", ProfilePDFA3a},
+		{"PDF/A-3a", ProfilePDFA3a},
+		{"ua1", ProfilePDFUA1},
+		{"pdf/ua-1", ProfilePDFUA1},
+		{"PDF/UA-1", ProfilePDFUA1},
+		{"", ProfileNone},
+	}
+
+	for _, testCase := range validCases {
+		if err := global.Set("pdfprofile", testCase.input); err != nil {
+			t.Fatalf("Set(pdfprofile, %q): %v", testCase.input, err)
+		}
+
+		if global.PdfProfile != testCase.wantCanonical {
+			t.Fatalf("global.PdfProfile after Set(%q) = %q, want %q", testCase.input, global.PdfProfile, testCase.wantCanonical)
+		}
+
+		if got, ok := global.Get("pdfprofile"); !ok || got != testCase.wantCanonical {
+			t.Fatalf("Get(pdfprofile) after Set(%q) = %q, %v; want %q, true", testCase.input, got, ok, testCase.wantCanonical)
+		}
+	}
+
+	invalidCases := []struct {
+		input   string
+		wantErr error
+	}{
+		{"a4", ErrProfilePDF20Unsupported},
+		{"ua2", ErrProfilePDF20Unsupported},
+		{"pdf/a-4", ErrProfilePDF20Unsupported},
+		{"pdf/ua-2", ErrProfilePDF20Unsupported},
+		{"pdfa-1b", ErrProfilePDFA1Unsupported},
+		{"a1", ErrProfilePDFA1Unsupported},
+		{"pdf/a-1", ErrProfilePDFA1Unsupported},
+		{"unknown", ErrInvalidPDFProfile},
+		{"garbage", ErrInvalidPDFProfile},
+	}
+
+	for _, testCase := range invalidCases {
+		err := global.Set("pdfprofile", testCase.input)
+		if err == nil {
+			t.Fatalf("Set(pdfprofile, %q) succeeded, want error wrapping %v", testCase.input, testCase.wantErr)
+		}
+
+		if !errors.Is(err, testCase.wantErr) {
+			t.Fatalf("Set(pdfprofile, %q) error = %v, want error wrapping %v", testCase.input, err, testCase.wantErr)
+		}
 	}
 }

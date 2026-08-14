@@ -119,25 +119,31 @@ func (d dict) String() string { return "<< " + strings.Join(d, " ") + " >>" }
 // assembly and finalization. Callers must not mutate or write a document
 // concurrently; use one document per conversion when parallelism is needed.
 type Document struct {
-	policy         WriterPolicy
-	objects        []*object
-	info           map[string]string
-	useCompression bool
-	grayscale      bool
-	creationTime   time.Time // zero value → deterministic fixed date
-	nextID         int
-	pages          []*Page
-	outlineRoot    *Outline
-	fontCache      map[string]objRef // subset key -> font dict ref
-	fontRuneSet    map[string]map[rune]struct{}
-	fontRunes      map[string][]rune // font resource name -> document-wide rune union (finalize-time)
-	fontKeys       map[string]string // font resource name -> precomputed subset cache key
-	fontKeyFonts   map[string]*Font  // font resource name -> the face the precomputed key belongs to
-	fontType0      map[string]bool   // font resource name -> precomputed needsType0(union)
-	catalogRef     objRef            // set by finalize
-	infoRef        objRef            // set by finalize
-	metadataRef    objRef            // set by finalize
-	finalized      bool
+	policy            WriterPolicy
+	objects           []*object
+	info              map[string]string
+	useCompression    bool
+	grayscale         bool
+	creationTime      time.Time // zero value → deterministic fixed date
+	nextID            int
+	pages             []*Page
+	outlineRoot       *Outline
+	fontCache         map[string]objRef // subset key -> font dict ref
+	fontRuneSet       map[string]map[rune]struct{}
+	fontRunes         map[string][]rune // font resource name -> document-wide rune union (finalize-time)
+	fontKeys          map[string]string // font resource name -> precomputed subset cache key
+	fontKeyFonts      map[string]*Font  // font resource name -> the face the precomputed key belongs to
+	fontType0         map[string]bool   // font resource name -> precomputed needsType0(union)
+	catalogRef        objRef            // set by finalize
+	infoRef           objRef            // set by finalize
+	metadataRef       objRef            // set by finalize
+	iccRef            objRef            // set by finalize (PDF/A-3)
+	outputIntentRef   objRef            // set by finalize (PDF/A-3)
+	structTreeRootRef objRef            // set by finalizeStructure
+	parentTreeRef     objRef            // set by finalizeStructure
+	structTreeRoot    *StructTreeRoot
+	lang              string // document language (default "en-US")
+	finalized         bool
 }
 
 // NewDocument creates an empty PDF document with the default PDF 1.4 policy.
@@ -172,6 +178,15 @@ func (d *Document) Policy() WriterPolicy {
 func (d *Document) Validate() error {
 	return d.policy.Validate()
 }
+
+// SetLang sets the document natural language (e.g. "en-US").
+func (d *Document) SetLang(lang string) { d.lang = lang }
+
+// SetLanguage is an alias for SetLang.
+func (d *Document) SetLanguage(lang string) { d.lang = lang }
+
+// Lang returns the document natural language.
+func (d *Document) Lang() string { return d.lang }
 
 // SetCompression toggles Flate compression of content/image streams.
 func (d *Document) SetCompression(on bool) { d.useCompression = on }
@@ -219,13 +234,16 @@ func (d *Document) setStream(r objRef, raw []byte) {
 
 // Page is one page of the document.
 type Page struct {
-	doc        *Document
-	ref        objRef
-	width      float64
-	height     float64
-	content    *Content
-	contentRef objRef
-	annots     []annotation
+	doc              *Document
+	ref              objRef
+	width            float64
+	height           float64
+	content          *Content
+	contentRef       objRef
+	annots           []annotation
+	mcids            []*StructElem
+	structParents    int
+	hasStructParents bool
 }
 
 // annotation is a link annotation.
@@ -334,11 +352,15 @@ func (d *Document) DuplicatePage(idx int) (*Page, error) {
 	}
 
 	src := d.pages[idx]
-	p := d.AddPage(src.width, src.height)
-	p.content = cloneContent(src.content)
-	p.annots = append([]annotation(nil), src.annots...)
+	clonedPage := d.AddPage(src.width, src.height)
+	clonedPage.content = cloneContent(src.content)
+	clonedPage.annots = append([]annotation(nil), src.annots...)
 
-	return p, nil
+	for i := range clonedPage.annots {
+		clonedPage.annots[i].annotRef = 0
+	}
+
+	return clonedPage, nil
 }
 
 // Width returns the page width in points.
@@ -350,20 +372,43 @@ func (p *Page) Height() float64 { return p.height }
 // Content returns the page content stream builder.
 func (p *Page) Content() *Content { return p.content }
 
+// Doc returns the parent document of this page.
+func (p *Page) Doc() *Document { return p.doc }
+
 // AddLinkURI adds an external URI annotation.
-func (p *Page) AddLinkURI(rect [4]float64, uri string) {
-	p.annots = append(p.annots, annotation{rect: rect, uri: uri}) //nolint:exhaustruct // intentional zero-value fields
+//
+//nolint:revive // returning unexported objRef is required for StructElem link references
+func (p *Page) AddLinkURI(rect [4]float64, uri string) objRef {
+	ref := p.doc.newObject()
+	p.annots = append(p.annots, annotation{
+		rect:     rect,
+		uri:      uri,
+		destPage: 0,
+		destX:    0,
+		destY:    0,
+		hasDest:  false,
+		annotRef: ref,
+	})
+
+	return ref
 }
 
 // AddLinkDest adds an internal GoTo annotation to a page (0-based index).
-func (p *Page) AddLinkDest(rect [4]float64, page int, x, y float64) {
-	p.annots = append(p.annots, annotation{ //nolint:exhaustruct // intentional zero-value fields
+//
+//nolint:revive // returning unexported objRef is required for StructElem link references
+func (p *Page) AddLinkDest(rect [4]float64, page int, destX, destY float64) objRef {
+	ref := p.doc.newObject()
+	p.annots = append(p.annots, annotation{
 		rect:     rect,
+		uri:      "",
 		destPage: page,
-		destX:    x,
-		destY:    y,
+		destX:    destX,
+		destY:    destY,
 		hasDest:  true,
+		annotRef: ref,
 	})
+
+	return ref
 }
 
 // Outline is a PDF outline (bookmark) node.
@@ -561,6 +606,8 @@ func (d *Document) writeTo(width io.Writer) (int64, error) {
 
 // finalize builds catalog, pages tree, fonts, images, annots, outlines and
 // page objects once.
+//
+//nolint:cyclop,funlen // finalize coordinates entire document serialization pipeline
 func (d *Document) finalize() error {
 	if d.finalized {
 		return nil
@@ -574,6 +621,13 @@ func (d *Document) finalize() error {
 		return errPDFNoPages
 	}
 
+	if d.policy.IsPDFUA1() {
+		title := strings.TrimSpace(d.info["Title"])
+		if title == "" {
+			return ErrTitleRequired
+		}
+	}
+
 	catalogRef := d.newObject()
 	infoRef := d.newObject()
 	pagesRef := d.newObject()
@@ -584,6 +638,18 @@ func (d *Document) finalize() error {
 		xmpBytes := d.buildXMPMetadata()
 		d.setDict(metadataRef, fmt.Sprintf("<< /Type /Metadata /Subtype /XML /Length %d >>", len(xmpBytes)))
 		d.setStream(metadataRef, xmpBytes)
+	}
+
+	if d.policy.IsPDFA3() {
+		iccRef := d.newObject()
+		iccData := flateBytes(sRGBICCProfile())
+		d.setDict(iccRef, fmt.Sprintf("<< /N 3 /Filter /FlateDecode /Length %d >>", len(iccData)))
+		d.setStream(iccRef, iccData)
+		d.iccRef = iccRef
+
+		outputIntentRef := d.newObject()
+		d.setDict(outputIntentRef, outputIntentDict(iccRef))
+		d.outputIntentRef = outputIntentRef
 	}
 
 	d.unionFontRunes()
@@ -608,7 +674,11 @@ func (d *Document) finalize() error {
 		}
 	}
 
-	d.setDict(catalogRef, catalogDict(d.outlineRoot, pagesRef, metadataRef))
+	if err := d.finalizeStructure(); err != nil {
+		return err
+	}
+
+	d.setDict(catalogRef, d.catalogDict(pagesRef, metadataRef))
 	d.setDict(infoRef, d.infoDict())
 
 	// per-page objects
@@ -690,16 +760,37 @@ func sortedStringKeys[V any](values map[string]V) []string {
 	return keys
 }
 
-// catalogDict builds the /Catalog dictionary, wiring /Metadata when present and /Outlines when set.
-func catalogDict(outlineRoot *Outline, pagesRef, metadataRef objRef) string {
+// catalogDict builds the /Catalog dictionary, wiring /Metadata when present,
+// /Outlines when set, /OutputIntents when present, and PDF/UA-1 keys when enabled.
+func (d *Document) catalogDict(pagesRef, metadataRef objRef) string {
 	cat := dict{}.add("/Type", "/Catalog")
 	if metadataRef != 0 {
 		cat = cat.add("/Metadata", metadataRef.String())
 	}
 
 	cat = cat.add("/Pages", pagesRef.String())
-	if outlineRoot != nil {
-		cat = cat.add("/Outlines", outlineRoot.refStr.String()).add("/PageMode", "/UseOutlines")
+	if d.outlineRoot != nil {
+		cat = cat.add("/Outlines", d.outlineRoot.refStr.String()).add("/PageMode", "/UseOutlines")
+	}
+
+	if d.outputIntentRef != 0 {
+		cat = cat.add("/OutputIntents", "["+d.outputIntentRef.String()+"]")
+	}
+
+	if d.policy.IsPDFUA1() {
+		cat = cat.add("/MarkInfo", "<< /Marked true >>")
+
+		lang := d.lang
+		if lang == "" {
+			lang = "en-US"
+		}
+
+		cat = cat.add("/Lang", pdfString(lang))
+		cat = cat.add("/ViewerPreferences", "<< /DisplayDocTitle true >>")
+
+		if d.structTreeRootRef != 0 {
+			cat = cat.add("/StructTreeRoot", d.structTreeRootRef.String())
+		}
 	}
 
 	return cat.String()
@@ -737,7 +828,7 @@ func (d *Document) finalizePage(page *Page, pagesRef objRef) error {
 
 	d.setStream(page.contentRef, raw)
 
-	res, err := buildPageResources(page.content)
+	res, err := buildPageResources(page.content, d.iccRef)
 	if err != nil {
 		return err
 	}
@@ -750,6 +841,10 @@ func (d *Document) finalizePage(page *Page, pagesRef objRef) error {
 		"/Contents " + page.contentRef.String(),
 	}
 
+	if d.policy.IsPDFUA1() && page.hasStructParents {
+		parts = append(parts, fmt.Sprintf("/StructParents %d", page.structParents))
+	}
+
 	if len(page.annots) > 0 {
 		d.buildAnnots(page)
 
@@ -759,6 +854,10 @@ func (d *Document) finalizePage(page *Page, pagesRef objRef) error {
 		}
 
 		parts = append(parts, "/Annots ["+strings.Join(refs, " ")+"]")
+
+		if d.policy.IsPDFUA1() {
+			parts = append(parts, "/Tabs /S")
+		}
 	}
 
 	parts = append(parts, ">>")
@@ -767,11 +866,11 @@ func (d *Document) finalizePage(page *Page, pagesRef objRef) error {
 	return nil
 }
 
-// buildPageResources assembles the /Resources dict from the content's fonts
-// and images.
+// buildPageResources assembles the /Resources dict from the content's fonts,
+// images, and color spaces.
 //
 //nolint:wsl // resource dictionary assembly is a linear PDF serialization block
-func buildPageResources(content *Content) (string, error) {
+func buildPageResources(content *Content, iccRef objRef) (string, error) {
 	fonts, err := content.fonts()
 	if err != nil {
 		return "", err
@@ -782,6 +881,10 @@ func buildPageResources(content *Content) (string, error) {
 	var res strings.Builder
 
 	res.WriteString("<< /ProcSet [/PDF /Text /ImageB /ImageC /ImageI]")
+
+	if iccRef != 0 {
+		res.WriteString(" /ColorSpace << /DefaultRGB [/ICCBased " + iccRef.String() + "] >>")
+	}
 
 	if len(fonts) > 0 {
 		res.WriteString(" /Font <<")
@@ -824,7 +927,10 @@ func buildPageResources(content *Content) (string, error) {
 func (d *Document) buildAnnots(p *Page) {
 	for i := range p.annots {
 		arg := &p.annots[i]
-		arg.annotRef = d.newObject()
+		if arg.annotRef == 0 {
+			arg.annotRef = d.newObject()
+		}
+
 		r := arg.rect
 
 		var buf strings.Builder
@@ -1077,67 +1183,6 @@ func encodeUTF16BEHex(text string) string {
 
 func (d *Document) encodeTextString(text string) string {
 	return encodeTextString(text, d.policy.Version)
-}
-
-func xmlEscape(text string) string {
-	var buf strings.Builder
-
-	for _, rVal := range text {
-		switch rVal {
-		case '&':
-			buf.WriteString("&amp;")
-		case '<':
-			buf.WriteString("&lt;")
-		case '>':
-			buf.WriteString("&gt;")
-		case '"':
-			buf.WriteString("&quot;")
-		case '\'':
-			buf.WriteString("&apos;")
-		default:
-			buf.WriteRune(rVal)
-		}
-	}
-
-	return buf.String()
-}
-
-func (d *Document) buildXMPMetadata() []byte {
-	now := d.creationTime
-	if now.IsZero() {
-		now = time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
-	}
-
-	dateStr := now.UTC().Format("2006-01-02T15:04:05Z")
-
-	var buf bytes.Buffer
-
-	buf.WriteString("<?xpacket begin=\"\xef\xbb\xbf\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?>\n")
-	buf.WriteString("<x:xmpmeta xmlns:x=\"adobe:ns:meta/\">\n")
-	buf.WriteString(" <rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n")
-	buf.WriteString("  <rdf:Description rdf:about=\"\"\n")
-	buf.WriteString("    xmlns:dc=\"http://purl.org/dc/elements/1.1/\"\n")
-	buf.WriteString("    xmlns:pdf=\"http://ns.adobe.com/pdf/1.3/\"\n")
-	buf.WriteString("    xmlns:xmp=\"http://ns.adobe.com/xap/1.0/\">\n")
-	buf.WriteString("   <dc:format>application/pdf</dc:format>\n")
-	fmt.Fprintf(&buf, "   <pdf:Producer>%s</pdf:Producer>\n", xmlEscape(d.policy.ProducerVersion()))
-	fmt.Fprintf(&buf, "   <xmp:CreateDate>%s</xmp:CreateDate>\n", dateStr)
-	fmt.Fprintf(&buf, "   <xmp:ModifyDate>%s</xmp:ModifyDate>\n", dateStr)
-
-	if title, ok := d.info["Title"]; ok && title != "" {
-		buf.WriteString("   <dc:title>\n")
-		buf.WriteString("    <rdf:Alt>\n")
-		fmt.Fprintf(&buf, "     <rdf:li xml:lang=\"x-default\">%s</rdf:li>\n", xmlEscape(title))
-		buf.WriteString("    </rdf:Alt>\n")
-		buf.WriteString("   </dc:title>\n")
-	}
-
-	buf.WriteString("  </rdf:Description>\n")
-	buf.WriteString(" </rdf:RDF>\n")
-	buf.WriteString("</x:xmpmeta>\n")
-	buf.WriteString("<?xpacket end=\"w\"?>")
-
-	return buf.Bytes()
 }
 
 func num(v float64) string {

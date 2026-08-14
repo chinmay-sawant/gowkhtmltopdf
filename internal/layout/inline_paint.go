@@ -95,6 +95,7 @@ func (e *engine) emitInlineImage(
 		e.add(Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpImage, X: imgX, Y: imgY, W: imgW, H: imgH,
 			Image: item.imgRef.data, ImgW: item.imgRef.w, ImgH: item.imgRef.h, IsJPEG: item.imgRef.isJPEG,
+			Alt: item.alt,
 		})
 	}
 

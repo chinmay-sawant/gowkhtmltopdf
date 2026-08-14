@@ -1,7 +1,7 @@
 # Phase 4 — PDF/UA-1 Structure (Writer)
 
 > **Parent:** `plans/0.2.2/pdf-1.7-compliance-plan/00-canonical-pdf-17-compliance-plan.md`
-> **Status:** not started
+> **Status:** completed
 > **Estimated effort:** 1–2 weeks
 > **Depends on:** Phase 1; phase 2 if dual XMP is already there
 > **Unblocks:** phase 5
@@ -39,40 +39,40 @@ layout marked it or finalize fails.
 
 ### 4.1 XMP UA claim
 
-- [ ] UA-1 / dual: `pdfuaid:part` = 1
-- [ ] Dual: PDF/A extension schema registers `pdfuaid`
-- [ ] Unclaimed 1.7: still no `pdfuaid`
-- [ ] Test: negative — no `pdfuaid:part` = 2
+- [x] UA-1 / dual: `pdfuaid:part` = 1
+- [x] Dual: PDF/A extension schema registers `pdfuaid`
+- [x] Unclaimed 1.7: still no `pdfuaid`
+- [x] Test: negative — no `pdfuaid:part` = 2
 
 ### 4.2 Catalog UA keys
 
-- [ ] `/Lang` from document language (default `en-US` until phase 5 reads HTML `lang`)
-- [ ] `/MarkInfo << /Marked true >>`
-- [ ] `/ViewerPreferences << /DisplayDocTitle true >>`
-- [ ] Dual / UA-1 with empty title → error (UA-1 requires a display title)
-- [ ] Test: catalog keys present only when the profile needs them
+- [x] `/Lang` from document language (default `en-US` until phase 5 reads HTML `lang`)
+- [x] `/MarkInfo << /Marked true >>`
+- [x] `/ViewerPreferences << /DisplayDocTitle true >>`
+- [x] Dual / UA-1 with empty title → error (UA-1 requires a display title)
+- [x] Test: catalog keys present only when the profile needs them
 
 ### 4.3 Structure API
 
-- [ ] Types for StructElem, MCID allocation, ParentTree — one module, small exported surface for layout
-- [ ] Standard types at minimum: `Document`, `H1`, `P`, `Table`, `TR`, `TH`, `TD`, `Figure`, `Link`, `L`, `LI`
-- [ ] `RoleMap` only if we emit a non-standard name
-- [ ] No PDF 2.0 Namespace object
-- [ ] Structure methods no-op when the profile is unclaimed
+- [x] Types for StructElem, MCID allocation, ParentTree — one module, small exported surface for layout
+- [x] Standard types at minimum: `Document`, `H1`, `P`, `Table`, `TR`, `TH`, `TD`, `Figure`, `Link`, `L`, `LI`
+- [x] `RoleMap` only if we emit a non-standard name
+- [x] No PDF 2.0 Namespace object
+- [x] Structure methods no-op when the profile is unclaimed
 
 ### 4.4 Marked content + ParentTree
 
-- [ ] `Content` helpers for BDC/EMC with MCID
-- [ ] Per-page MCID from 0
-- [ ] ParentTree leaf is the element that owns the MCID (TD/TH, not TR)
-- [ ] Page `/StructParents` only when MCIDs exist
-- [ ] Link StructElem + `/OBJR` + page `/Tabs /S` for a writer-level link fixture
-- [ ] Test: one hand-built page (H1 + P + Figure+Alt + table + link) serializes a consistent tree
+- [x] `Content` helpers for BDC/EMC with MCID
+- [x] Per-page MCID from 0
+- [x] ParentTree leaf is the element that owns the MCID (TD/TH, not TR)
+- [x] Page `/StructParents` only when MCIDs exist
+- [x] Link StructElem + `/OBJR` + page `/Tabs /S` for a writer-level link fixture
+- [x] Test: one hand-built page (H1 + P + Figure+Alt + table + link) serializes a consistent tree
 
 ### 4.5 Finalize order
 
-- [ ] Reserve StructTreeRoot before catalog (same rule as outlines)
-- [ ] Emit Namespace-free tree: StructElems → ParentTree → StructTreeRoot → catalog
+- [x] Reserve StructTreeRoot before catalog (same rule as outlines)
+- [x] Emit Namespace-free tree: StructElems → ParentTree → StructTreeRoot → catalog
 
 ---
 

@@ -650,6 +650,7 @@ func main() {
 	opts := gowkhtmltopdf.NewPdfGlobalOptions().
 		WithPageSize("Letter").
 		WithPDFVersion("1.7"). // optional: "1.4" (default) or "1.7"
+		WithPDFProfile("a3a-ua1"). // optional: "a3a-ua1", "a3a", "ua1" (implies PDF 1.7)
 		WithMargins(15, 15, 20, 15). // top, right, bottom, left (mm)
 		WithTitle("Quarterly report").
 		WithCopies(1, true).

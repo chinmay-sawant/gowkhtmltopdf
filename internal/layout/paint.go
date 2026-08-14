@@ -68,6 +68,8 @@ func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 // PaintContext is the cancellation-aware form of Paint. The legacy Paint
 // entrypoint remains a background-context adapter for package callers that do
 // not have a request context.
+//
+//nolint:cyclop,funlen // paint initialization and pagination coordination
 func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts PaintOptions) error {
 	if ctx == nil {
 		return errNilContext
@@ -136,7 +138,12 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 
 	populateLocations(res, contentH, opPage)
 
-	return paintPages(ctx, doc, res, opts, contentH, fixedIdx)
+	opMap, err := buildStructureTree(doc, res)
+	if err != nil {
+		return err
+	}
+
+	return paintPages(ctx, doc, res, opts, contentH, fixedIdx, opMap)
 }
 
 // fixedOpIndices collects the indices of viewport-fixed ops, which are
@@ -281,7 +288,8 @@ func contentSizeHint(ops []Op, groups ...[]int) int {
 //
 //nolint:funlen // one pass per page; shared paint/resName closures cover content and fixed layers
 func paintPages(
-	ctx context.Context, doc *pdf.Document, res *Result, opts PaintOptions, contentH float64, fixedIdx []int,
+	ctx context.Context, doc *pdf.Document, res *Result, opts PaintOptions,
+	contentH float64, fixedIdx []int, opMap map[int]*opTagInfo,
 ) error {
 	var paintErr error
 
@@ -342,6 +350,7 @@ func paintPages(
 			resName:  resName,
 			nextImg:  0,
 			err:      paintErr,
+			opMap:    opMap,
 		}
 
 		for _, idx := range pageOrder {
@@ -349,7 +358,7 @@ func paintPages(
 				return fmt.Errorf("layout: paint context: %w", err)
 			}
 
-			painter.paintOp(&res.Ops[idx])
+			painter.paintOp(idx, &res.Ops[idx])
 		}
 		// Fixed layer: page-local coords (pageIdx 0 math on every page).
 		painter.pageN = 0
@@ -359,7 +368,7 @@ func paintPages(
 				return fmt.Errorf("layout: paint context: %w", err)
 			}
 
-			painter.paintOp(&res.Ops[idx])
+			painter.paintOp(idx, &res.Ops[idx])
 		}
 
 		paintErr = painter.err
@@ -378,9 +387,11 @@ type pagePainter struct {
 	resName  func(*pdf.Font) string
 	nextImg  int
 	err      error
+	opMap    map[int]*opTagInfo
 }
 
-func (p *pagePainter) paintOp(paintOp *Op) {
+//nolint:cyclop // marked content and opacity/transform wrapping for ops
+func (p *pagePainter) paintOp(opIdx int, paintOp *Op) {
 	if paintOp.Kind == opKindNoop {
 		return
 	}
@@ -405,7 +416,22 @@ func (p *pagePainter) paintOp(paintOp *Op) {
 		p.child.SetOpacity(paintOp.PaintOpacity)
 	}
 
-	p.drawPageOp(paintOp)
+	isUA1 := p.page != nil && p.page.Doc() != nil && p.page.Doc().Policy().IsPDFUA1()
+	tagInfo := p.opMap[opIdx]
+
+	switch {
+	case isUA1 && tagInfo != nil:
+		mcid := p.page.AllocMCID(tagInfo.elem)
+		p.child.BeginMarkedContent(string(tagInfo.tag), mcid)
+		p.drawPageOp(paintOp)
+		p.child.EndMarkedContent()
+	case isUA1 && (paintOp.Kind == OpFillRect || paintOp.Kind == OpStrokeRect || paintOp.Kind == OpLine):
+		p.child.BeginArtifact("Background")
+		p.drawPageOp(paintOp)
+		p.child.EndArtifact()
+	default:
+		p.drawPageOp(paintOp)
+	}
 
 	if needGS {
 		p.child.Restore()

@@ -1,7 +1,7 @@
 # Phase 7 — veraPDF and Goldens
 
 > **Parent:** `plans/0.2.2/pdf-1.7-compliance-plan/00-canonical-pdf-17-compliance-plan.md`
-> **Status:** not started
+> **Status:** completed
 > **Estimated effort:** 3–5 days
 > **Depends on:** Phases 2–6
 > **Unblocks:** phase 8 docs
@@ -42,28 +42,28 @@ Keep 1.4 / unclaimed 1.7 goldens. Add a small dual HTML fixture.
 
 ### 7.1 Harness
 
-- [ ] Document install (`VERAPDF_BIN` or `PATH`)
-- [ ] Helper script or Go test that invokes `-f 3a` and `-f ua1`
-- [ ] Skip when the binary is absent; do not fail CI
-- [ ] Record the veraPDF version when the test runs
+- [x] Document install (`VERAPDF_BIN` or `PATH`)
+- [x] Helper script or Go test that invokes `-f 3a` and `-f ua1`
+- [x] Skip when the binary is absent; do not fail CI
+- [x] Record the veraPDF version when the test runs
 
 ### 7.2 Positive
 
-- [ ] Generate each matrix row through `convert` / `RunPDF` with the dual profile
-- [ ] Needles: `%PDF-1.7`, `pdfaid:part`, `pdfaid:conformance`, `pdfuaid:part`, `/OutputIntents`, `/StructTreeRoot`
-- [ ] veraPDF both flavours PASS when the binary exists
+- [x] Generate each matrix row through `convert` / `RunPDF` with the dual profile
+- [x] Needles: `%PDF-1.7`, `pdfaid:part`, `pdfaid:conformance`, `pdfuaid:part`, `/OutputIntents`, `/StructTreeRoot`
+- [x] veraPDF both flavours PASS when the binary exists
 
 ### 7.3 Negative / isolation
 
-- [ ] Unclaimed 1.7 fixture does **not** contain `pdfaid` / `pdfuaid`
-- [ ] Default 1.4 goldens unchanged
-- [ ] Dual fixture bytes do not contain `pdfaid:part>4` or `pdfuaid:part>2` wait — assert part is `3` and `1`
-- [ ] Do not treat veraPDF `-f 4` PASS as a #31/#this-plan success
+- [x] Unclaimed 1.7 fixture does **not** contain `pdfaid` / `pdfuaid`
+- [x] Default 1.4 goldens unchanged
+- [x] Dual fixture bytes do not contain `pdfaid:part>4` or `pdfuaid:part>2` wait — assert part is `3` and `1`
+- [x] Do not treat veraPDF `-f 4` PASS as a #31/#this-plan success
 
 ### 7.4 Structure check (optional)
 
-- [ ] If easy: assert ParentTree cell ownership in-process (no Python required)
-- [ ] Table MCID owned by TD/TH, not TR
+- [x] If easy: assert ParentTree cell ownership in-process (no Python required)
+- [x] Table MCID owned by TD/TH, not TR
 
 ---
 

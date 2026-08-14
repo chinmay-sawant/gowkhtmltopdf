@@ -12,12 +12,38 @@ const (
 	sPDFVersion20 = "2.0"
 )
 
+const (
+	// ProfileNone indicates no conformance profile (standard unconstrained PDF).
+	ProfileNone = ""
+	// ProfilePDFA3a indicates PDF/A-3a archival conformance (ISO 19005-3 Level A).
+	ProfilePDFA3a = "PDF/A-3a"
+	// ProfilePDFUA1 indicates PDF/UA-1 accessibility conformance (ISO 14289-1).
+	ProfilePDFUA1 = "PDF/UA-1"
+	// ProfilePDFA3aPDFUA1 indicates combined PDF/A-3a and PDF/UA-1 conformance.
+	ProfilePDFA3aPDFUA1 = "PDF/A-3a+PDF/UA-1"
+	// ProfileDualA3aUA1 is an alias for ProfilePDFA3aPDFUA1.
+	ProfileDualA3aUA1 = ProfilePDFA3aPDFUA1
+)
+
 var (
 	// ErrInvalidPDFVersion reports an invalid or unsupported PDF version.
 	ErrInvalidPDFVersion = errors.New("settings: invalid pdf version (allowed: 1.4|1.7)")
 
 	// ErrPDF20Unsupported indicates PDF 2.0 is not supported (see issue #32).
 	ErrPDF20Unsupported = errors.New("settings: PDF 2.0 is not supported (see issue #32)")
+
+	// ErrInvalidPDFProfile reports an invalid or unsupported PDF conformance profile.
+	ErrInvalidPDFProfile = errors.New(
+		"settings: invalid pdf profile (allowed: a3a-ua1, a3a, ua1, PDF/A-3a+PDF/UA-1, PDF/A-3a, PDF/UA-1)",
+	)
+
+	// ErrProfilePDF20Unsupported indicates PDF 2.0 profiles (PDF/A-4, PDF/UA-2) are unsupported (see issue #33).
+	ErrProfilePDF20Unsupported = errors.New(
+		"settings: PDF 2.0 conformance profiles (PDF/A-4, PDF/UA-2) are unsupported (see issue #33)",
+	)
+
+	// ErrProfilePDFA1Unsupported indicates PDF/A-1 is unsupported.
+	ErrProfilePDFA1Unsupported = errors.New("settings: PDF/A-1 is unsupported")
 )
 
 // ParsePDFVersion validates and normalizes a PDF version string.
@@ -34,6 +60,67 @@ func ParsePDFVersion(value string) (string, error) {
 	default:
 		return "", fmt.Errorf("%w: %q", ErrInvalidPDFVersion, value)
 	}
+}
+
+// ParsePDFProfile validates and normalizes a PDF conformance profile string.
+// Accepted values map to canonical constants: ProfilePDFA3aPDFUA1, ProfilePDFA3a, ProfilePDFUA1, or ProfileNone ("").
+// Invalid or unsupported values return an error wrapping the respective sentinel.
+func ParsePDFProfile(value string) (string, error) {
+	raw := strings.TrimSpace(strings.ToLower(value))
+	if raw == "" {
+		return ProfileNone, nil
+	}
+
+	cleaned := strings.ReplaceAll(raw, " ", "")
+	cleaned = strings.ReplaceAll(cleaned, "_", "")
+
+	switch cleaned {
+	case "pdf/a-3a+pdf/ua-1", "pdf/a-3a-pdf/ua-1", "pdf/a-3a+ua-1", "pdf/a-3a-ua-1",
+		"pdfa-3a+pdfua-1", "pdfa-3a-pdfua-1", "pdfa3a+pdfua1", "pdfa3a-pdfua1",
+		"a3a+ua1", "a3a-ua1", "a3a,ua1", "a3a+pdf/ua-1", "a3a-pdf/ua-1",
+		"pdf/ua-1+pdf/a-3a", "pdf/ua-1-pdf/a-3a", "pdfua-1+pdfa-3a", "pdfua1+pdfa3a",
+		"ua1+a3a", "ua1-a3a", "ua1,a3a", "ua1+pdf/a-3a", "ua1-pdf/a-3a",
+		"a3+ua1", "a3-ua1", "ua1+a3", "ua1-a3", "pdf/a-3+pdf/ua-1", "pdf/a-3-pdf/ua-1":
+		return ProfilePDFA3aPDFUA1, nil
+	case "pdf/a-3a", "pdf/a-3", "pdfa-3a", "pdfa-3", "pdf-a-3a", "pdf-a-3",
+		"a-3a", "a-3", "a3a", "a3", "pdfa3a", "pdfa3":
+		return ProfilePDFA3a, nil
+	case "pdf/ua-1", "pdf/ua", "pdfua-1", "pdfua", "pdf-ua-1", "pdf-ua",
+		"ua-1", "ua1", "ua", "pdfua1":
+		return ProfilePDFUA1, nil
+	}
+
+	if isUnsupportedProfilePDF20(cleaned) {
+		return "", ErrProfilePDF20Unsupported
+	}
+
+	if isUnsupportedProfilePDFA1(cleaned) {
+		return "", ErrProfilePDFA1Unsupported
+	}
+
+	return "", fmt.Errorf("%w: %q", ErrInvalidPDFProfile, value)
+}
+
+func isUnsupportedProfilePDF20(profileStr string) bool {
+	switch profileStr {
+	case "pdf/a-4", "pdf/a-4e", "pdf/a-4f", "pdfa-4", "pdfa4", "a4", "a-4",
+		"pdf/ua-2", "pdfua-2", "pdfua2", "ua2", "ua-2",
+		"pdf/a-4+pdf/ua-2", "a4-ua2", "a4+ua2", "ua2+a4":
+		return true
+	}
+
+	return strings.Contains(profileStr, "a-4") || strings.Contains(profileStr, "a4") ||
+		strings.Contains(profileStr, "ua-2") || strings.Contains(profileStr, "ua2")
+}
+
+func isUnsupportedProfilePDFA1(profileStr string) bool {
+	switch profileStr {
+	case "pdf/a-1", "pdf/a-1a", "pdf/a-1b", "pdfa-1", "pdfa-1a", "pdfa-1b",
+		"pdfa1", "pdfa1a", "pdfa1b", "a1", "a1a", "a1b", "a-1", "a-1a", "a-1b":
+		return true
+	}
+
+	return strings.Contains(profileStr, "a-1") || strings.Contains(profileStr, "a1")
 }
 
 const (
@@ -376,6 +463,9 @@ type PdfGlobal struct {
 	Orientation Orientation
 	// PdfVersion is the PDF version to emit: "1.4" (default) or "1.7" (--pdf-version).
 	PdfVersion string
+	// PdfProfile is the PDF conformance profile to emit (e.g. "a3a-ua1", "PDF/A-3a+PDF/UA-1", "a3a", "ua1").
+	// Empty string indicates standard unconstrained (unclaimed) PDF.
+	PdfProfile string
 	// Grayscale is the sole color control convert reads (doc.SetGrayscale).
 	// Set("colormode") / Set("grayscale") both write this field.
 	Grayscale    bool
@@ -416,7 +506,8 @@ func DefaultPdfGlobal() PdfGlobal {
 	return PdfGlobal{ //nolint:exhaustruct // intentional zero/partial fields
 		PageSize:       "A4",
 		Orientation:    OrientationPortrait,
-		PdfVersion:     sPDFVersion14,
+		PdfVersion:     "",
+		PdfProfile:     "",
 		Copies:         1,
 		Collate:        true,
 		Outline:        true,
