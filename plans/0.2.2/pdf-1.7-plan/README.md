@@ -1,11 +1,19 @@
 # gowkhtmltopdf — PDF 1.7 Plan
 
-> **Issue:** [#31](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/31) — pdf: PDF 1.7 support
+> **Highest 1.7 compliance (not this ledger):** **PDF/A-3a + PDF/UA-1** — [../pdf-1.7-compliance-plan/](../pdf-1.7-compliance-plan/)
+> **Issue:** [#31](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/31) — pdf: PDF 1.7 **version** support
 > **Parent epic:** [#29](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/29)
-> **Sibling:** [#32](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/32) / [../pdf-2.0-plan/](../pdf-2.0-plan/) — extends this policy with PDF 2.0
-> **Not this plan:** [#33](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/33) — PDF/A-4 and PDF/UA-2
+> **Sibling:** [#32](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/32) / [../pdf-2.0-plan/](../pdf-2.0-plan/) — PDF 2.0 version
+> **Not this plan:** PDF/A-3a + PDF/UA-1 (compliance ledger); [#33](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/33) PDF/A-4 + PDF/UA-2
 > **Status:** completed
 > **Workflow:** [`skills/phase-wise-checklist/SKILLS.md`](../../../skills/phase-wise-checklist/SKILLS.md)
+
+This version plan only makes a legal `%PDF-1.7` file. It does **not** claim PDF/A or PDF/UA.
+
+| Base | Highest archival | Highest accessibility |
+|------|------------------|------------------------|
+| **PDF 1.7** | PDF/A-3a (ISO 19005-3) | PDF/UA-1 (ISO 14289-1) |
+| PDF 2.0 | PDF/A-4 (ISO 19005-4) | PDF/UA-2 (ISO 14289-2) |
 
 Canonical ledger: [00-canonical-pdf-17-plan.md](00-canonical-pdf-17-plan.md)
 
@@ -30,4 +38,4 @@ Each phase is a checklist you can execute independently. Complete them in order 
 
 **Default output stays PDF 1.4** until a later, explicit compatibility transition.
 
-**Out of scope here:** HTML/CSS/layout, image mode, PDF 2.0 emit (sibling), PDF/A-4, PDF/UA-2, encryption, signatures, AcroForm, object streams, xref streams, linearization, JPEG 2000, CFF/OTTO, a second writer package.
+**Out of scope here:** HTML/CSS/layout, image mode, PDF 2.0 emit (sibling), **PDF/A-3 / PDF/UA-1** ([compliance plan](../pdf-1.7-compliance-plan/)), PDF/A-4, PDF/UA-2, encryption, signatures, AcroForm, object streams, xref streams, linearization, JPEG 2000, CFF/OTTO, a second writer package.

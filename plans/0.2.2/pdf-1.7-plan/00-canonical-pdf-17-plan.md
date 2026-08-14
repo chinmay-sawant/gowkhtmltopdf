@@ -8,6 +8,7 @@
 > **Ordering principle:** version policy and serialization first, then call-site selection, then proof, then docs.
 > **Workflow:** [`skills/phase-wise-checklist/SKILLS.md`](../../../skills/phase-wise-checklist/SKILLS.md)
 > **Spec notes:** [SPEC-NOTES.md](SPEC-NOTES.md) (ISO 32000-1:2008)
+> **Highest 1.7 compliance:** PDF/A-3a + PDF/UA-1 — [../pdf-1.7-compliance-plan/](../pdf-1.7-compliance-plan/) (not this ledger)
 
 ---
 

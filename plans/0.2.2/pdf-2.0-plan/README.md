@@ -3,6 +3,8 @@
 > **Issue:** [#32](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/32) — pdf: PDF 2.0 support
 > **Parent epic:** [#29](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/29)
 > **Sibling:** [#31](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/31) / [../pdf-1.7-plan/](../pdf-1.7-plan/) — shared version policy
+> **Highest 2.0 compliance (not this ledger):** **PDF/A-4 + PDF/UA-2** — [#33](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/33)
+> **1.7 equivalent:** [../pdf-1.7-compliance-plan/](../pdf-1.7-compliance-plan/) — PDF/A-3a + PDF/UA-1
 > **Not this plan:** [#33](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/33) — PDF/A-4 and PDF/UA-2
 > **Status:** not started
 > **Workflow:** [`skills/phase-wise-checklist/SKILLS.md`](../../../skills/phase-wise-checklist/SKILLS.md)
