@@ -39,8 +39,9 @@ of the installed `wkhtmltopdf` binary and the time to fetch remote HTML.
 - Uses a Go-native in-repo pipeline with `CGO_ENABLED=0` (Go modules provide
   shaping and raster support)
 - Requires **no cgo**, no Qt, no WebKit, no Chrome, no external converter binary
-- Targets **controlled server-generated reports** (invoices, tables, multi-page
-  docs with headers/footers, TOC, outlines), not full browser print parity
+- Targets **authored HTML templates and documents** (invoices, certificates,
+  storybooks, posters, tables, multi-page docs with headers/footers, TOC,
+  outlines), not full browser print parity
 
 ## Head-to-head
 
@@ -91,7 +92,7 @@ of the installed `wkhtmltopdf` binary and the time to fetch remote HTML.
 
 Be honest about trade-offs:
 
-- **Complex website fidelity today:** real WebKit still beats a report CSS
+- **Complex website fidelity today:** real WebKit still beats a print CSS
   subset for arbitrary pages, JavaScript-heavy sites, flex, grid, and similar
   layout models.
 - **Maturity and mindshare:** long-lived package with a simple API many
@@ -104,7 +105,7 @@ Be honest about trade-offs:
 | | |
 |--|--|
 | **Their package** | A good ergonomic shell around an external, unmaintained converter |
-| **gowkhtmltopdf** | A pure-Go replacement for controlled report HTML, not "make calling the binary nicer" |
+| **gowkhtmltopdf** | A pure-Go HTML template engine, not "make calling the binary nicer" |
 
 Use **SebastiaanKlippert/go-wkhtmltopdf** only if you need WebKit-level print
 fidelity and accept carrying a dead native toolchain.

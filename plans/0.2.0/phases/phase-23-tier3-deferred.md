@@ -53,7 +53,7 @@ This file is the **sole deferred ledger** for Tier 3 so active phases do not sil
 
 | User phrase | Active phase |
 |-------------|--------------|
-| Solid report engine | 10–16 |
+| Solid HTML template engine | 10–16 |
 | Leave wkhtmltopdf for most jobs | 17–20 |
 | Paste URL decent print | 21 |
 | Bold/italic + CJK | 12, 19 |

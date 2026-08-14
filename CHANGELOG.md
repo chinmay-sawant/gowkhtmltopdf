@@ -9,9 +9,11 @@ binaries at build time (see README "Versioning").
 ## 0.2.0 (2026-08-14)
 
 Post-MVP release after [0.1.0](#010-2026-08-03). Still a **no-cgo, no-browser**
-HTML→PDF / HTML→image engine for **controlled templates** (invoices, tables,
-headers/footers, TOC, outlines). **Tier 1** (report quality) and **Tier 2**
-(leave wkhtmltopdf for most report jobs) are closed. This is **not** Chrome
+HTML template engine (HTML→PDF / HTML→image) for **structured templates and
+documents**: invoices, receipts, certificates, storybooks, posters, boarding
+passes, letters, statements, tables, and multi-page documents with headers,
+footers, TOC, and PDF outlines. **Tier 1** (template quality) and **Tier 2**
+(leave wkhtmltopdf for most template jobs) are closed. This is **not** Chrome
 print parity.
 
 PRs: [#7](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/7)–[#34](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/34)
@@ -32,7 +34,7 @@ PRs: [#7](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/7)–[#34](https:
   (PDF and image). OpenType GSUB via allowlisted `go-text/typesetting` when
   the face has it; Arabic presentation-form + Lam-Alef fallback. No bundled
   Noto CJK — pass a capable face or you still get tofu.
-- **CSS for reports:** attribute / `:nth-child` / sibling selectors; float
+- **Print CSS for templates:** attribute / `:nth-child` / sibling selectors; float
   lite; real `inline-block`; `box-sizing`; `text-align: justify`; cell
   `vertical-align`; flex Stage A; grid Stage B + Stage C lite (named areas,
   dense, copy-inherit subgrid, one-axis masonry); `position`
@@ -99,7 +101,7 @@ PRs: [#7](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/7)–[#34](https:
 
 - **Not a browser.** No JavaScript (`<script>` stripped; JS flags are
   unknown options). No Chrome / Wikipedia visual parity.
-- Flex/grid/float/sticky are a **report subset**, not full CSS3.
+- Flex/grid/float/sticky are a **print CSS subset**, not full CSS3.
 - CJK/Arabic **Partial** (operator-supplied faces + OT when present).
   `writing-mode: vertical-*` is parsed but lays out horizontal. No WOFF2.
 - No AcroForm, no PDF encryption / PDF/A / 1.7 / 2.0 / UA (tickets

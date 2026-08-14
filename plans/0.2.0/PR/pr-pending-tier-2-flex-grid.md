@@ -1,6 +1,6 @@
 ## Summary
 
-Closes the Tier 2 flex-grid-full workstream on a stdlib-only report engine:
+Closes the Tier 2 flex-grid-full workstream on a stdlib-only HTML template engine:
 Stage A flex deepen, Stage B grid (rows/`fr`/areas/dense/`minmax`), Stage C
 lite (cyclic `%`, subgrid copy-inherit, masonry pack), plus pagination fixes
 so CI no longer hangs and fixture-31/33 match HTML.

@@ -9,9 +9,9 @@ like-for-like measurements.
 
 ## Score card
 
-**gowkhtmltopdf: 7.5/10 overall** — a strong fit for trusted, controlled reports,
+**gowkhtmltopdf: 7.5/10 overall** — a strong fit for authored HTML templates,
 held back by partial CSS, no JavaScript, no PDF/A, and the current default
-creation-time metadata. **8.5/10 for controlled reports** and **5.5–6/10 as a
+creation-time metadata. **8.5/10 for HTML templates** and **5.5–6/10 as a
 general converter** are more useful role-specific scores. A 9/10 niche score
 depends on making normal CLI output byte-stable.
 
@@ -42,7 +42,7 @@ depends on making normal CLI output byte-stable.
 
 | Tool | Choose when… |
 |---|---|
-| **gowkhtmltopdf** | Trusted server-generated reports (invoices, tables, statements) needing a small offline Go binary, predictable layout, no JavaScript, and controlled resource access — or migrating off wkhtmltopdf |
+| **gowkhtmltopdf** | Authored HTML templates (invoices, certificates, storybooks, posters, tables, statements) needing a small offline Go binary, predictable layout, no JavaScript, and controlled resource access — or migrating off wkhtmltopdf |
 | **Puppeteer / Chromium** | Templates need **modern CSS/JS** (charts, SPAs, arbitrary sites) and you can afford browser operations plus a materially larger resource budget |
 | **wkhtmltopdf** | Avoid for new deployments; it is archived and has a documented unpatched 9.8 SSRF vulnerability. Migrate legacy uses when practical |
 | **WeasyPrint** | **PDF/A, PDF/UA, e-invoice (Factur-X)** compliance on a free budget |

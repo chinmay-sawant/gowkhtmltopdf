@@ -1,6 +1,6 @@
 # Fidelity guide
 
-**gowkhtmltopdf** converts **controlled, server-generated report HTML** to PDF
+**gowkhtmltopdf** is an HTML template engine that converts **authored HTML** to PDF
 and raster images. It is **not** a browser and does **not** target full WebKit
 or Chrome print parity under a pure-Go, no-cgo design.
 
@@ -15,7 +15,7 @@ is tracked in
 
 | You need… | Expectation |
 |-----------|-------------|
-| Invoices, statements, multi-page tables, headers/footers, TOC, outlines | **In scope** (report engine) |
+| Invoices, certificates, storybooks, posters, statements, tables, headers/footers, TOC, outlines | **In scope** (HTML template engine) |
 | Repeatable layout, static binary, no browser process | **In scope** |
 | Pixel-perfect clone of an arbitrary website | **Out of scope** |
 | Wikipedia / marketing “decent print” (readable title + body) | **Progressive goal** (Phase 21) — not MVP acceptance yet |
@@ -38,9 +38,9 @@ primary content, not a browser clone.
 
 | Tier | Goal | Rough phases | Good means… |
 |------|------|--------------|-------------|
-| **Tier 1** | Solid report engine | 10–16 | Controlled HTML templates look correct in PDF/PNG; bold/italic/spacing usable; image mode not blocky 5×7 text |
+| **Tier 1** | Solid HTML template engine | 10–16 | Controlled HTML templates look correct in PDF/PNG; bold/italic/spacing usable; image mode not blocky 5×7 text |
 | **Tier 2** | Leave wkhtmltopdf for most jobs | 17–20 | Broader CSS, pagination polish, multi-font/Unicode, HF/link edges |
-| **Tier 3** | Compete on the open web | 23 deferred | Not planned as a pure-Go report engine; Chrome/Playwright territory |
+| **Tier 3** | Compete on the open web | 23 deferred | Not planned as a pure-Go HTML engine; Chrome/Playwright territory |
 
 **As of 2026-08-13:** Tier 1 closed; **Tier 2 phases 17–20 core shipped**.
 Phase 21 (arbitrary URL / “decent print”) is a product contract, **not** an
@@ -125,7 +125,7 @@ CI; live Wikipedia remains optional manual smoke):
 2. **Main body text** is readable across pages (multi-page OK).
 3. **Reduced useless chrome** (search, appearance menus, site chrome) when
    print/simplify heuristics are enabled — heuristics are **opt-in** and
-   default **off** for controlled report HTML (not shipped as of this docs
+   default **off** for authored HTML templates (not shipped as of this docs
    contract).
 4. **Non-Latin text:** tofu/boxes only when the configured font set is missing
    glyphs (Phase 19 fonts); missing fonts are not a layout failure by themselves.
@@ -183,7 +183,7 @@ The engine should **not crash** on unsupported input:
 | Input | Behavior |
 |-------|----------|
 | Unknown CSS property / value | Declaration ignored |
-| Unsupported display (full Grid / unknown values) | Unknown/`display` values ignored; report-subset flex/grid are Partial (see matrix) |
+| Unsupported display (full Grid / unknown values) | Unknown/`display` values ignored; print-CSS-subset flex/grid are Partial (see matrix) |
 | `<script>` | Stripped at load; JS CLI flags are unknown options |
 | Missing font family name | Falls back through the author’s stack, then Liberation Sans (DejaVu for uncovered glyphs) |
 | Missing bold face | Fake stroke bold only if face missing |

@@ -301,7 +301,7 @@ Contributor setup and PR expectations: [`CONTRIBUTING.md`](../CONTRIBUTING.md).
 
 - Latin report HTML: readable text, sane letter-spacing, multi-page tables
 - TOC/outline showcase: navigable bookmarks, page headers/footers
-- Tier 2 report subset: float/flex/grid lite, thead repeat, Type0/CJK with a
+- Tier 2 print CSS subset: float/flex/grid lite, thead repeat, Type0/CJK with a
   capable face via `--font-path`
 - Wikipedia-class pages: may open as multi-page PDFs but **open-web layout
   parity is not a pass criterion** — Phase 21 / fidelity smoke only

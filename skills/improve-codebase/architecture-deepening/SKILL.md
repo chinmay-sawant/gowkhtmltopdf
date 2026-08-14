@@ -26,7 +26,7 @@ also read `../references/gowkhtmltopdf.md`.
 - Scan `plans/reviews/` for open or closed rows on the same paths.
   Closed + unregressed → `refuse`, not a new defect.
 - Product ceiling (this repo, and any report renderer like it):
-  controlled reports, not a browser. A finding that demands JS, CGO,
+  authored HTML templates, not a browser. A finding that demands JS, CGO,
   or Chrome parity is out of scope.
 
 ## 2. Discover the DAG and the intended seam

@@ -1,7 +1,7 @@
 # Command-line interface
 
-gowkhtmltopdf is a pure-Go, no-cgo HTML→PDF / HTML→image engine for
-**controlled reports**. It is **not a browser**. There is **no JavaScript**
+gowkhtmltopdf is a pure-Go, no-cgo HTML template engine (HTML→PDF / HTML→image)
+for **authored HTML templates**. It is **not a browser**. There is **no JavaScript**
 (`<script>` is stripped at load). Unknown wkhtmltopdf flags are **errors**,
 not silent no-ops.
 

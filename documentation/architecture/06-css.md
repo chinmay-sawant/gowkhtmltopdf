@@ -283,7 +283,7 @@ imports layout, convert, pdf, load, or settings. All viewport/media/container
    (documentation/compatibility-matrix.md §2) is the normative contract, and
    `documentation/fidelity.md` frames it: this is Tier 1–2 "leave wkhtmltopdf
    for most jobs", explicitly **not** Chrome-quality arbitrary-web print
-   (`fidelity.md` Tier 3 stays banned for a pure-Go report engine).
+   (`fidelity.md` Tier 3 stays banned for a pure-Go HTML template engine).
 
 3. **Degrade, never panic, never misapply.** Two distinct softenings:
    - *Garbage is dropped*: recoverable parse debris is skipped; only
@@ -492,7 +492,7 @@ Open questions an architect should keep an eye on:
 - `../compatibility-matrix.md` — normative allowlist: supported properties
   (§2), selectors, media, flex/grid stages, pagination evidence fixtures.
 - `../fidelity.md` — tiers (Tier 1/2 shipped; Tier 3 arbitrary-web banned),
-  "report subset" framing, `:nth-child`/attr/siblings shipped note (16.1).
+  "print CSS subset" framing, `:nth-child`/attr/siblings shipped note (16.1).
 - `../THREAT-MODEL.md` — ACL and network-request policy around stylesheet and
   font-face fetching.
 - `../deferred.md` — deferred CSS/JS/SPA items to keep the matrix honest.

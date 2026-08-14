@@ -1,10 +1,12 @@
-## gowkhtmltopdf v0.2.0 - print CSS subset, multi-font, and a faster report engine
+## gowkhtmltopdf v0.2.0 - HTML template engine: print CSS, multi-font, faster PDF
 
-Second public release of **gowkhtmltopdf**: still a **no-cgo**, **no Qt/WebKit**, **no browser** clean-room work-alike of the [wkhtmltopdf](https://wkhtmltopdf.org/) CLI, aimed at **controlled server-generated documents** (invoices, tables, multi-page reports, headers/footers, TOC, PDF outlines).
+Second public release of **gowkhtmltopdf**: a **no-cgo**, **no Qt/WebKit**, **no browser** HTML template engine that turns HTML you control into PDF and PNG/JPEG. It is a clean-room work-alike of the [wkhtmltopdf](https://wkhtmltopdf.org/) CLI surface.
 
-Since [v0.1.0](https://github.com/chinmay-sawant/gowkhtmltopdf/releases/tag/v0.1.0) the engine closed **Tier 1** (report quality) and **Tier 2** (leave wkhtmltopdf for most report jobs): real multi-face fonts, Type0/CJK/Arabic paths, flex/grid/float/sticky as a **print subset**, repeating table headers, typed library requests, and a measured speedup versus wkhtmltopdf 0.12.6.1.
+The product is **structured HTML/CSS templates and documents**, not “a report generator.” The [Showcase](https://chinmay-sawant.github.io/gowkhtmltopdf/#/showcase) is the proof: invoices and receipts sit beside certificates, storybooks, posters, boarding passes, letters, contracts, shipping docs, architecture diagrams, and CSS layout fixtures. Headers, footers, TOC, and PDF outlines are engine features those templates can use — not the whole product.
 
-**Not** a full browser-print engine. Prefer this when you want a static Go binary and MIT licensing for **HTML you control**. Prefer Chrome headless / upstream wkhtmltopdf when you need arbitrary-page or JavaScript fidelity. This release does **not** claim Chrome or Wikipedia visual parity.
+Since [v0.1.0](https://github.com/chinmay-sawant/gowkhtmltopdf/releases/tag/v0.1.0) the engine closed **Tier 1** (template quality) and **Tier 2** (leave wkhtmltopdf for most template jobs): real multi-face fonts, Type0/CJK/Arabic paths, flex/grid/float/sticky as a **print CSS subset**, repeating table headers, typed library requests, and a measured speedup versus wkhtmltopdf 0.12.6.1.
+
+**Not** a browser. Prefer this when you want a static Go binary and MIT licensing for **HTML templates you author**. Prefer Chrome headless / upstream wkhtmltopdf when you need arbitrary-page or JavaScript fidelity. This release does **not** claim Chrome or Wikipedia visual parity.
 
 - **License:** [MIT](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/v0.2.0/LICENSE) - Copyright (c) 2026 Chinmay Sawant
 - **Version source:** [`VERSION`](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/v0.2.0/VERSION) (`0.2.0`)
@@ -21,7 +23,8 @@ Since [v0.1.0](https://github.com/chinmay-sawant/gowkhtmltopdf/releases/tag/v0.1
 |------|------------------------|
 | **CLI** | Same `gowkhtmltopdf` + `gowkhtmltoimage` grammar; mode-invalid flags now fail at parse; `--font-path` / `--use-system-fonts`; opt-in `--simplify-dom` |
 | **Library** | Prefer `RunPDF` / `PDFRequest` and `RunImage` / `ImageRequest`. `ConvertHTML` one-shot helper. Compatibility `Converter` kept. Settings cloned so later mutation cannot change an in-flight job |
-| **Layout** | Report-subset flex, grid, float, `inline-block`, `box-sizing`, print-scoped sticky, repeating `<thead>`, CSS orphans/widows, nested HTML headers/footers |
+| **Layout** | Print CSS subset: flex, grid, float, `inline-block`, `box-sizing`, print-scoped sticky, repeating `<thead>`, CSS orphans/widows, nested HTML headers/footers |
+| **Templates** | Showcase spans invoices, receipts, POs, contracts, letters, boarding passes, certificates, storybooks, posters, reports, architecture diagrams, and CSS fixtures |
 | **Fonts** | Liberation Sans/Serif/Mono (R/B/I/BI) + DejaVu fallback; Type0/CID for non-Latin; `@font-face` TTF/OTF/WOFF1; OpenType GSUB via allowlisted `go-text/typesetting` |
 | **Image mode** | TrueType outline raster with coverage AA (the 0.1.0 5×7 bitmap font is gone) |
 | **PDF** | Unique multi-image XObjects; JPEG DCT pass-through; PNG alpha soft-mask; SVG-as-`<img>` via allowlisted `tdewolff/canvas` |
@@ -29,6 +32,25 @@ Since [v0.1.0](https://github.com/chinmay-sawant/gowkhtmltopdf/releases/tag/v0.1
 | **Security defaults** | Local files still **blocked** unless opted in; `<script>` stripped; JS CLI flags are **unknown options** (not silent no-ops) |
 | **Ops** | `CGO_ENABLED=0` static builds; golangci-lint v1.64.8; `v*` tags publish 12 binaries + `SHA256SUMS` |
 | **Site** | Docs, Issue Dossier (1,329 upstream issues classified), Showcase, Benchmarks |
+
+---
+
+### Showcase — what the HTML engine actually prints
+
+Live gallery: https://chinmay-sawant.github.io/gowkhtmltopdf/#/showcase  
+Committed PDFs: [`output/`](https://github.com/chinmay-sawant/gowkhtmltopdf/tree/v0.2.0/output) · source HTML: [`testdata/golden/`](https://github.com/chinmay-sawant/gowkhtmltopdf/tree/v0.2.0/testdata/golden)
+
+These are HTML/CSS templates through the same pipeline. Reports are one category, not the definition of the engine.
+
+| Category | What you can open |
+|----------|-------------------|
+| **Invoices & receipts** | Simple / CSS invoices, receipts, purchase orders, contracts, letters, shipping documents, airline boarding passes |
+| **Reports & tables** | Detailed ops reports, multi-page tables with repeating `<thead>`, sticky print headers, colorful reports |
+| **Storybooks & posters** | Asteria and Ember Harbor storybooks, night-train and observatory posters, certificates |
+| **CSS & layout fixtures** | Flex, grid, float, sticky, multicol, `:has()`, `@container`, transforms, CJK + `--font-path`, nested HTML headers/footers |
+| **Architecture & API** | Library architecture diagram, 20-page HTML+CSS architecture doc, font-examples (1,125 Google Fonts via `--font-path`), complex dossier |
+
+TOC, text/HTML headers and footers, and PDF outlines are available on any of these templates (`showcase-toc-hf-outline.pdf` is the dedicated demo).
 
 ---
 
@@ -48,7 +70,7 @@ CGO_ENABLED=0 go build -ldflags "-X gowkhtmltopdf/internal/cli.Version=0.2.0" \
   -o bin/gowkhtmltoimage ./cmd/gowkhtmltoimage
 ```
 
-Or `make build`. Convert a committed invoice fixture:
+Or `make build`. Convert any committed template (invoice shown; storybooks, posters, and the rest live in `testdata/golden/`):
 
 ```sh
 ./bin/gowkhtmltopdf --enable-local-file-access \
@@ -83,16 +105,16 @@ Sample PDFs live under [`output/`](https://github.com/chinmay-sawant/gowkhtmltop
 - Shaping without cgo HarfBuzz: OpenType GSUB when the face has it (`go-text/typesetting`); Arabic presentation-form + Lam-Alef fallback; optional `halt` / `palt`. Indic remains Partial. `writing-mode: vertical-*` is parsed but lays out **horizontal**.
 - Without a capable face, CJK is still tofu. CI ships only a tiny OFL Hangul subset for smoke, not a full CJK family.
 
-#### CSS and invoice / report layout
+#### CSS for HTML templates
 
 - Selectors: `[attr]`, `[attr=value]`, `:first-child` / `:last-child` / `:nth-child(odd|even|an+b)`, sibling `+` / `~`, plus `:has()` (simple compounds).
 - **Float lite:** `float: left|right` + `clear` for logo/meta chrome. Real `display: inline-block`. Simple `text-align: justify`. Table-cell `vertical-align` top/middle/bottom.
 - `box-sizing: content-box` (now the default) and `border-box`. **Migration:** explicit `width` + padding without `box-sizing` grows vs 0.1.0; add `box-sizing: border-box` to keep the old visual size.
-- **Flex Stage A** (report subset): `flex` / `inline-flex`, direction including reverse, wrap, grow/shrink/basis/order, gap, justify including `space-around` / `space-evenly`, align-self, stretch, cyclic `%` → auto. Not Flexbox L1 / Chrome parity.
+- **Flex Stage A** (print CSS subset): `flex` / `inline-flex`, direction including reverse, wrap, grow/shrink/basis/order, gap, justify including `space-around` / `space-evenly`, align-self, stretch, cyclic `%` → auto. Not Flexbox L1 / Chrome parity.
 - **Grid Stage B + Stage C lite:** columns/rows, `fr`, `repeat`, `minmax`, span, named areas, dense packing, copy-inherit subgrid (no shared-track sizing), one-axis masonry. Not Grid L1/L3 complete.
 - `position: relative | absolute | fixed` lite. `position: sticky` is **print-scoped** (page content box is the scrollport; overflow boxes at offset 0). Not browser sticky scroll.
 - Repeating `<thead>` / `table-header-group` (and leading all-`<th>` rows). CSS `orphans` / `widows` plus a geometric fallback. Nested HTML headers/footers as child documents.
-- Report-lite extras: multicol (`column-count` / `width` / `gap` / `span` / `fill`), static 2D `transform` + `opacity`, size-only `@container`, print `@media` subset, HTML entity decoding, CSS `background` color token.
+- Also in the print CSS subset: multicol (`column-count` / `width` / `gap` / `span` / `fill`), static 2D `transform` + `opacity`, size-only `@container`, print `@media` subset, HTML entity decoding, CSS `background` color token.
 - `letter-spacing`, `text-transform`, and `border-radius` survive into the PDF so original static templates need fewer renderer-specific workarounds.
 
 #### Layout and paint correctness
@@ -103,7 +125,7 @@ Sample PDFs live under [`output/`](https://github.com/chinmay-sawant/gowkhtmltop
 - Tables: empty/padding-only rows collapsed; per-row border-collapse (no phantom empty bands); rowspan cite cells with `<br>` spread vertically; continuation-page fragments seal under repeated thead.
 - Long tokens / URLs honor `overflow-wrap` / `word-break` (with inheritance) and emergency wrap. Float tails that fit one full-width line clear below the float.
 - Link underlines coalesce on a line and skip bare URL strings in reference lists.
-- Pagination: `page-break-before: always` lands at next-page top; multi-section reports paginate 1:1 (50 sections are 50 pages, not 43); `preferSplitOverBlank` for short `page-break-inside: avoid` boxes; **document-global gap packing that interleaved body and reference text is gone**.
+- Pagination: `page-break-before: always` lands at next-page top; multi-section documents paginate 1:1 (50 sections are 50 pages, not 43); `preferSplitOverBlank` for short `page-break-inside: avoid` boxes; **document-global gap packing that interleaved body and reference text is gone**.
 - `display: flex` / `grid` restored after lint adoption. Sticky chrome no longer clones like `position: fixed`. Dashed and `border-left` segments no longer stretch into solid stubs.
 
 #### Library and CLI
@@ -119,7 +141,7 @@ Sample PDFs live under [`output/`](https://github.com/chinmay-sawant/gowkhtmltop
 
 #### Performance (snapshot, not an SLA)
 
-Fresh generic CLI **0.2.0** versus installed **wkhtmltopdf 0.12.6.1 (patched Qt)** on Linux amd64, 13th Gen Intel Core i7-13700HX. Same report fixture, `--quiet --enable-local-file-access`, median of three process runs after one warmup. Source: [`documentation/performance.md`](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/v0.2.0/documentation/performance.md).
+Fresh generic CLI **0.2.0** versus installed **wkhtmltopdf 0.12.6.1 (patched Qt)** on Linux amd64, 13th Gen Intel Core i7-13700HX. Same multi-page HTML fixture, `--quiet --enable-local-file-access`, median of three process runs after one warmup. Source: [`documentation/performance.md`](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/v0.2.0/documentation/performance.md).
 
 | Pages | gowkhtmltopdf | wkhtmltopdf | Faster by |
 |------:|--------------:|------------:|----------:|
@@ -136,8 +158,8 @@ Page islands (`convert.NewBenchmarkPDFRequest`) are an **internal benchmark opt-
 
 - Product site: https://chinmay-sawant.github.io/gowkhtmltopdf/ — Overview, Getting Started, sidebar docs (`/#/documentation/cli` and siblings), Issue Dossier, Showcase, Benchmarks. Light/dark theme, command palette (`⌘K` / `Ctrl+K`).
 - **Issue dossier:** all **1,329** open `wkhtmltopdf/wkhtmltopdf` issues classified against this engine (implemented / partial / not implemented) with filterable cards and cited code paths. Verdicts are a starting point, not a formal audit. Site copy at cut: **451 / 285 / 593**.
-- **Showcase:** page-flipping gallery of committed `output/` PDFs, Open PDF / View template links, keyboard lightbox.
-- New golden fixtures **21–56**, including the FY2024 detailed report, float-lite invoice chrome, thead / flex / CJK / sticky / nested-HF cases, business docs 44–48, print-story posters and storybooks 49–55, and the 20-page architecture diagram (56).
+- **Showcase:** page-flipping gallery of committed `output/` PDFs across all five template categories above, with Open PDF / View template links and a keyboard lightbox.
+- New golden fixtures **21–56** expand the corpus from invoices/tables into storybooks, posters, certificates, boarding passes, letters, and architecture diagrams — plus thead / flex / CJK / sticky / nested-HF CSS fixtures.
 - User docs rewritten from a source scan: fidelity guide, fonts guide, performance snapshots, comparison with [SebastiaanKlippert/go-wkhtmltopdf](https://github.com/chinmay-sawant/gowkhtmltopdf/blob/v0.2.0/documentation/comparison-with-others/sebastiaanklippert-go-wkhtmltopdf.md), 2026 landscape note, and package-level notes under `documentation/architecture/`.
 - Implementation ledgers split into [`plans/0.1.0/`](https://github.com/chinmay-sawant/gowkhtmltopdf/tree/v0.2.0/plans/0.1.0) (MVP) and [`plans/0.2.0/`](https://github.com/chinmay-sawant/gowkhtmltopdf/tree/v0.2.0/plans/0.2.0) (post-MVP).
 - `CONTRIBUTING.md` is now the GitHub-recognized contributing guide.
@@ -172,7 +194,7 @@ Page islands (`convert.NewBenchmarkPDFRequest`) are an **internal benchmark opt-
 
 ### Known limitations (honest 0.2.0)
 
-- **Not a browser.** Flex/grid/float/sticky are a **report subset**, not full CSS3. Arbitrary websites (Wikipedia chrome, marketing SPAs) are exploratory, not a pass criterion.
+- **Not a browser.** Flex/grid/float/sticky are a **print CSS subset** for authored HTML templates, not full CSS3. Arbitrary websites (Wikipedia chrome, marketing SPAs) are exploratory, not a pass criterion.
 - **No JavaScript.** `<script>` is stripped. `--enable-javascript` and related flags are **unknown options**.
 - **Fonts.** No bundled Noto CJK. WOFF2 unsupported. Indic is Partial. Vertical writing-mode is not implemented.
 - **PDF versions / compliance.** No PDF 1.7 / 2.0 / UA-2 / A-4 / encryption / AcroForm. Tickets [#29](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/29)–[#33](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/33) remain open.

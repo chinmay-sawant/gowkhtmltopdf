@@ -17,7 +17,7 @@ MVP ships a usable **report/invoice** pipeline (load → HTML/CSS subset → lay
 
 1. **Honest** about what it supports (fidelity docs + matrix)
 2. **Easy to embed** from other Go apps (library API)
-3. **Visually solid** for controlled reports (real bold/italic, spacing, image-mode quality, invoice CSS)
+3. **Visually solid** for authored HTML templates (real bold/italic, spacing, image-mode quality, invoice CSS)
 4. **Broader** for “most of my jobs” (flex/float lite, multi-font/Unicode, pagination polish)
 5. **Careful** about open-web / JS ambitions under stdlib-only (staged, evidence-gated, Tier 3 deferred)
 
@@ -25,7 +25,7 @@ MVP ships a usable **report/invoice** pipeline (load → HTML/CSS subset → lay
 
 | Tier | Goal | This ledger |
 |------|------|-------------|
-| **Tier 1** | Solid report engine - “better for our use” | Phases 10–16 (must) |
+| **Tier 1** | Solid HTML template engine - “better for our use” | Phases 10–16 (must) |
 | **Tier 2** | Leave wkhtmltopdf for most jobs | Phases 17–20 |
 | **Tier 3** | Compete on the open web | Phase 23 - **deferred**; Chrome/Playwright territory |
 
@@ -46,7 +46,7 @@ Tier 1 is **not closed** yet. Suggested order for the next sessions:
 2. **Phase 14** (complete): document JPEG/PNG alpha/DPI knobs; `web.images=false` test.
 3. **Phase 11** (complete): publish/install story + `ConvertHTML` helper.
 
-**Tier 1 is closed** (report engine solid). **Tier 2 phases 17–20 core shipped** on `master` (#16 / #17); shared matrix/fidelity honesty pass is under [`phases/subplans-tier-2/00-shared-doc-honesty.md`](phases/subplans-tier-2/00-shared-doc-honesty.md). Remaining code leftovers are tracked under [`phases/subplans-tier-2/`](phases/subplans-tier-2). **Phase 21** is **in progress (docs contract)** — §21.1 product bar + §21.7 docs honesty landed; vendored fixtures / heuristics / acceptance owned in parallel ([detail](phases/phase-21-arbitrary-websites.md)).
+**Tier 1 is closed** (HTML template engine solid). **Tier 2 phases 17–20 core shipped** on `master` (#16 / #17); shared matrix/fidelity honesty pass is under [`phases/subplans-tier-2/00-shared-doc-honesty.md`](phases/subplans-tier-2/00-shared-doc-honesty.md). Remaining code leftovers are tracked under [`phases/subplans-tier-2/`](phases/subplans-tier-2). **Phase 21** is **in progress (docs contract)** — §21.1 product bar + §21.7 docs honesty landed; vendored fixtures / heuristics / acceptance owned in parallel ([detail](phases/phase-21-arbitrary-websites.md)).
 
 **Already shipped post-MVP:** phases **10** (fidelity docs), **12** (real bold/italic faces), **13** (spacing/coalesce), **15** (image-mode TTF AA), **16** (selectors + float lite), **17–20** core (flex/grid lite, thead repeat, fonts/CJK/Arabic joining, HF/links edges).
 
@@ -125,7 +125,7 @@ Tier 1 is **not closed** yet. Suggested order for the next sessions:
 | Bold/italic families + CJK | **12** (bold/italic), **19** (CJK/Unicode) |
 | Image mode like a real screenshot (not 5×7) | **15** |
 | Years of edge-case print CSS | **16–18**, **20**; remainder in **23** |
-| Tier 1 solid report engine | **10–16** |
+| Tier 1 solid HTML template engine | **10–16** |
 | Tier 2 leave wkhtmltopdf for most jobs | **17–20** |
 | Tier 3 compete on open web | **23** deferred |
 

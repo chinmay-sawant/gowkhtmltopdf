@@ -126,7 +126,7 @@
      "Flow",
      "display",
      "Implemented / Partial",
-     "Core values implemented; `flex` and `grid` route to the report subset; `none` tested; `table-caption` and `table-column(-group)` not implemented"
+     "Core values implemented; `flex` and `grid` route to the print CSS subset; `none` tested; `table-caption` and `table-column(-group)` not implemented"
     ],
     [
      "Flow",
@@ -261,7 +261,7 @@
    "type": "callout",
    "id": "contract",
    "variant": "warn",
-   "title": "Flex and grid are a report subset",
+   "title": "Flex and grid are a print CSS subset",
    "body": "Stage A flex and Stage B/C grid lite cover grow/shrink/basis, order, wrap, `minmax()`, areas, dense packing, and `gap`. They are not Bootstrap or Tailwind parity and not Chrome layout-test parity. This page is a summary; the normative contract is `documentation/compatibility-matrix.md`, and any change to it goes through plan review as a plan amendment."
   }
  ]
