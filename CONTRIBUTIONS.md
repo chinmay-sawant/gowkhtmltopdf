@@ -57,7 +57,7 @@ Minimum: recent Go toolchain matching `go.mod`.
    - Self-assign (`--assignee @me`)
    - At least one label (`bug`, `enhancement`, `documentation`, …)
    - Body based on [`skills/PR/PR_TEMPLATE.md`](skills/PR/PR_TEMPLATE.md)
-   - Optional filled copy under `plans/PR/pr-<slug>.md`
+   - Optional filled copy under `plans/0.2.0/PR/pr-<slug>.md`
 4. Do **not** merge your own PR unless maintainers agree.
 
 ```sh
@@ -65,7 +65,7 @@ gh pr create \
   --base master \
   --head "$(git branch --show-current)" \
   --title "fix(layout): short imperative description" \
-  --body-file plans/PR/pr-<slug>.md \
+  --body-file plans/0.2.0/PR/pr-<slug>.md \
   --assignee "@me" \
   --label bug \
   --label enhancement

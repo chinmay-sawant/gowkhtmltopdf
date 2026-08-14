@@ -1,6 +1,6 @@
 # gowkhtmltopdf - HTML/CSS Compatibility Matrix (MVP Allowlist)
 
-> **Parent:** `plans/00-canonical-pure-go-rewrite.md` (Phase 0.1); post-MVP updates under `plans/10-canonical-post-mvp-roadmap.md`  
+> **Parent:** `plans/0.1.0/00-canonical-pure-go-rewrite.md` (Phase 0.1); post-MVP updates under `plans/0.2.0/10-canonical-post-mvp-roadmap.md`  
 > **Status:** living contract - amendments go through plan review  
 > **Target:** controlled report/invoice HTML → PDF. **Not** a browser.  
 > **Last honesty audit:** 2026-08-13 · fidelity guide: [fidelity.md](fidelity.md)  
@@ -129,7 +129,7 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 | `border-collapse` | Partial | see §2.5 |
 | Pagination | Fragment + whole-op + phase-18 polish | rect-type ops (fill/stroke/line) split at page boundaries; text/images/links move wholly (line-level) (`paint.go`); `page-break-before/after: always`, `page-break-inside: avoid`, table rows never split; **`<thead>` / `table-header-group` repeat** on continuation pages (`repeatTableHeaders`, fixture-23); CSS `orphans`/`widows` parsed + Rule 3 when line boxes exist (heuristic fallback; fixtures 30/37); `--zoom` forwarded; smart-shrinking re-layouts. `Result.Locations` for outlines/links. See "Pagination" note below. |
 | Floats / absolute positioning | Float lite + absolute/fixed/sticky lite | float/`clear` lite (§2.2); relative/absolute/fixed lite; sticky = print page scrollport + overflow@0 (§2.2; fixture-31) |
-| Flexbox / Grid | Partial | Stage A flex + Stage B grid (areas/dense/`minmax`) + Stage C lite — §2.7 / §2.8. Paths: `flex.go`, `grid.go`, `style.go`; fixtures 25/28/32–35; plan `plans/phases/subplans-tier-2/flex-grid-full.md`. **Not** Bootstrap/Tailwind / Chrome layout-test parity |
+| Flexbox / Grid | Partial | Stage A flex + Stage B grid (areas/dense/`minmax`) + Stage C lite — §2.7 / §2.8. Paths: `flex.go`, `grid.go`, `style.go`; fixtures 25/28/32–35; plan `plans/0.2.0/phases/subplans-tier-2/flex-grid-full.md`. **Not** Bootstrap/Tailwind / Chrome layout-test parity |
 | Multicol | Partial | Report lite: `column-count`/`column-width`/`columns`, `column-gap` (normal→1em), `column-span:none\|all`, `column-fill:balance\|auto`; column boxes do not straddle pages — §2.9; `multicol.go`; fixture-39 |
 | Transforms (static 2D) | Partial | `transform` + `transform-origin` paint CTM; stacking + abs/fixed CB; sibling flow unchanged. No animation timelines; no 3D; `filter` only `opacity()`. Fixture-40; `transform.go` |
 | JavaScript | No | `<script>` stripped at load; no engine. `--enable-javascript` is an **unknown option** (Policy A) |
@@ -194,7 +194,7 @@ Evidence: `internal/layout/multicol.go`, `style.go` (`applyRestProps`); fixture-
 | `column-fill` (`balance` \| `auto`) | [x] Implemented | Balance packs to equal stacks; auto fills to page/definite height |
 | Column box pagination | [x] Implemented | Column boxes do not cross page boundaries; new multicol line on next page — `TestMulticolLinesDoNotStraddlePages` |
 | `break-*: column \| avoid-column` | [~] Partial | Aliased to page `always`/`avoid` (starts new multicol line via page break) |
-| `column-rule*`, L2 integer spans, overflow columns | [ ] Missing | Deferred (see `plans/phases/tier-2-pending-3/multicol.md` out of scope) |
+| `column-rule*`, L2 integer spans, overflow columns | [ ] Missing | Deferred (see `plans/0.2.0/phases/tier-2-pending-3/multicol.md` out of scope) |
 
 ## 3. Supported units
 
@@ -421,5 +421,5 @@ not margin-left. `-h` help, `-V` version, `-E` extended-help.
 ## Amendment process
 
 Any change to this matrix = a plan amendment (Phase 0.5 review), recorded in
-`plans/00-canonical-pure-go-rewrite.md`. Phase 4 closure goldens must map to
+`plans/0.1.0/00-canonical-pure-go-rewrite.md`. Phase 4 closure goldens must map to
 this matrix row-by-row.

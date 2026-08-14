@@ -6,7 +6,7 @@
 painted output of the layout engine into a **well-formed, viewer-openable
 PDF 1.4 file**, entirely with the Go standard library plus a single narrow
 exception for OpenType shaping (`go-text/typesetting`, see §5 and
-[`plans/amendments/2026-08-05-gotext-typesetting.md`](../plans/amendments/2026-08-05-gotext-typesetting.md)).
+[`plans/0.2.0/amendments/2026-08-05-gotext-typesetting.md`](../../plans/0.2.0/amendments/2026-08-05-gotext-typesetting.md)).
 
 It owns everything that appears after the paint step of the canonical
 pipeline `load → parse → style → layout → paginate → paint → write`:
@@ -515,7 +515,7 @@ Cross-reference [`documentation/deferred.md`](../deferred.md),
   the clean rejection today; (c) whether `/Widths`-space compression
   (`/W` arrays with run-length `c [w1 … wn]` groups) is needed for large CJK
   documents (currently each CID emits a `cid [w]` pair, which grows linearly).
-- **Deferred roadmap context:** `plans/10-canonical-post-mvp-roadmap.md`
+- **Deferred roadmap context:** `plans/0.2.0/10-canonical-post-mvp-roadmap.md`
   phases 10–23 outline where Unicode/CID fonts and richer CSS /
   positioning land; this package is where those land first.
 
@@ -532,8 +532,8 @@ Cross-reference [`documentation/deferred.md`](../deferred.md),
 - [`../fidelity.md`](../fidelity.md) + [`../compatibility-matrix.md`](../compatibility-matrix.md)
   — what output features are claimed.
 - [`../deferred.md`](../deferred.md) — deferred capability list.
-- [`../plans/00-canonical-pure-go-rewrite.md`](../plans/00-canonical-pure-go-rewrite.md)
-  and [`../plans/amendments/2026-08-05-gotext-typesetting.md`](../plans/amendments/2026-08-05-gotext-typesetting.md)
+- [`../../plans/0.1.0/00-canonical-pure-go-rewrite.md`](../../plans/0.1.0/00-canonical-pure-go-rewrite.md)
+  and [`../../plans/0.2.0/amendments/2026-08-05-gotext-typesetting.md`](../../plans/0.2.0/amendments/2026-08-05-gotext-typesetting.md)
   — plan/amendment ledgers behind this package.
 - Architecture deep-dives in this directory: `01-entrypoints-cli.md`,
   `02-library-api.md`, `03-settings.md`, `04-load.md`, `05-html-parser.md`,

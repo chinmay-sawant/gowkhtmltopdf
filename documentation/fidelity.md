@@ -7,7 +7,7 @@ or Chrome print parity under a pure-Go, no-cgo design.
 This guide is the product-facing fidelity story. The normative per-feature
 contract is the [compatibility matrix](compatibility-matrix.md). Post-MVP work
 is tracked in
-[`plans/10-canonical-post-mvp-roadmap.md`](../plans/10-canonical-post-mvp-roadmap.md).
+[`plans/0.2.0/10-canonical-post-mvp-roadmap.md`](../plans/0.2.0/10-canonical-post-mvp-roadmap.md).
 
 ---
 
@@ -95,7 +95,7 @@ yet a product pass criterion. See [Arbitrary websites](#arbitrary-websites-phase
 
 Product goal: paste a URL (or feed static HTML from a public page) and get a
 **decent print** PDF — not Chrome/WebKit parity. Work is tracked in
-[`plans/phases/phase-21-arbitrary-websites.md`](../plans/phases/phase-21-arbitrary-websites.md).
+[`plans/0.2.0/phases/phase-21-arbitrary-websites.md`](../plans/0.2.0/phases/phase-21-arbitrary-websites.md).
 Until vendored-fixture acceptance lands, treat live URL output as exploratory.
 Vendored HTML and optional live smoke notes: [samples.md](samples.md).
 
@@ -113,7 +113,7 @@ hardwired style sources.
 | `--use-system-fonts` / `--font-path` | Rewriting named `font-family` entries before trying the author’s stack |
 | `--print-link-underline` (opt-in, default off) | Encoding `#mw-*` / `.infobox` / `.vector-body` into layout |
 
-Cleanup ledger: [`plans/phases/pending-phase-items/12-css-faithful-engine.md`](../plans/phases/pending-phase-items/12-css-faithful-engine.md).
+Cleanup ledger: [`plans/0.2.0/phases/pending-phase-items/12-css-faithful-engine.md`](../plans/0.2.0/phases/pending-phase-items/12-css-faithful-engine.md).
 
 ### “Decent print” criteria (acceptance bar)
 
@@ -220,5 +220,5 @@ after Phase 21 acceptance against vendored fixtures.
 | [architecture.md](architecture.md) | Pipeline packages |
 | [deferred.md](deferred.md) | Deferred features and workload priority |
 | [performance.md](performance.md) | Benchmarks and how to measure |
-| [../plans/10-canonical-post-mvp-roadmap.md](../plans/10-canonical-post-mvp-roadmap.md) | Active post-MVP ledger |
+| [../plans/0.2.0/10-canonical-post-mvp-roadmap.md](../plans/0.2.0/10-canonical-post-mvp-roadmap.md) | Active post-MVP ledger |
 | [../README.md](../README.md#deferred--not-planned) | Deferred table |

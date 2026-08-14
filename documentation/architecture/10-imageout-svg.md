@@ -469,7 +469,7 @@ contract (the P1-1 engine-seam goal).
 - **Per-run caches are not shared across renders** — a document with many
   repeated images pays re-decode per render; acceptable for single-shot CLI,
   a repeated-conversion library workload could reuse a cache (open question).
-- **History:** the review-plan chain (`plans/reviews/improve-codebase/
+- **History:** the review-plan chain (`plans/0.2.0/reviews/improve-codebase/
   architecture-review-2026-08-07/phases/phase-01-engine-seam-and-surface.md`
   P1-1/P1-4, `phase-05-output-fonts-raster.md` P5-01..P5-07) records the
   consolidation that produced the current shape (shared `Request` seam, shared
@@ -491,7 +491,7 @@ contract (the P1-1 engine-seam goal).
   `imageLoadGlobal` and the fetch/decode budgets enforce.
 - `documentation/deferred.md` — deferred URL→print items that keep the SVG
   posture.
-- `plans/00-canonical-pure-go-rewrite.md` and the review phase ledgers (P1-1,
+- `plans/0.1.0/00-canonical-pure-go-rewrite.md` and the review phase ledgers (P1-1,
   P1-4, P5-01..P5-07) — the engineering history behind this shape.
 - Sibling architecture docs in this directory: `01-entrypoints-cli.md`,
   `02-library-api.md`, `03-settings.md`, `04-load.md`, `05-html-parser.md`,

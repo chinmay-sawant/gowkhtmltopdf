@@ -13,5 +13,5 @@
 // convert reads; page geometry is PageSize name + Size width/height (mm);
 // DumpOutline / DumpDefaultTOCXSL live on PdfGlobal.
 //
-// See plans/reviews/ponytail/ponytail-ultra-2026-08-06.md Phase 1.
+// See plans/0.2.0/reviews/ponytail/ponytail-2026-08-06/ponytail-ultra-2026-08-06.md Phase 1.
 package settings

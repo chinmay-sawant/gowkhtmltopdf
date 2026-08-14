@@ -16,7 +16,7 @@ shaping) and [`tdewolff/canvas`](https://github.com/tdewolff/canvas) (SVG
 rasterization). Builds are intended to run with `CGO_ENABLED=0`.
 
 **Status:** **v0.2.0**. Phases 0–9 of the
-[canonical plan](../plans/00-canonical-pure-go-rewrite.md) are implemented.
+[canonical plan](../plans/0.1.0/00-canonical-pure-go-rewrite.md) are implemented.
 Tier 1 and Tier 2 core (phases 10–20) are shipped as a print CSS subset.
 Remaining gaps live in [deferred.md](deferred.md). Progressive post-MVP goals
 (including URL → decent print) are goals, not shipped feature claims — see
@@ -151,7 +151,7 @@ This is a clean-room rewrite, not a binding to wkhtmltopdf/Qt/WebKit.
 
 | Stage | Role |
 |-------|------|
-| Plans and architecture | Phase ledgers under [`plans/`](../plans/), scope freeze, execution map |
+| Plans and architecture | Phase ledgers under [`plans/`](../plans), scope freeze, execution map |
 | Bulk implementation | Settings/CLI, loader, PDF writer, HTML/CSS/layout, pagination, HF/TOC, image mode, library API |
 | Last-mile correctness | Viewer-valid PDFs: Flate/zlib, Catalog outlines, glyph `/Widths`, Latin-1 encoding, `make samples` |
 

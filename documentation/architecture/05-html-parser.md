@@ -508,7 +508,7 @@ samples regenerated via `make samples`; see
 - Deferred / not-planned items: [`../deferred.md`](../deferred.md)
 - Fonts & shaping (feeds text layout that consumes this tree): [`../fonts.md`](../fonts.md)
 - Library API (how callers supply HTML bytes): [`../library-api.md`](../library-api.md)
-- Canonical plan (why the parser was built this way): [`../../plans/00-canonical-pure-go-rewrite.md`](../../plans/00-canonical-pure-go-rewrite.md)
+- Canonical plan (why the parser was built this way): [`../../plans/0.1.0/00-canonical-pure-go-rewrite.md`](../../plans/0.1.0/00-canonical-pure-go-rewrite.md)
 
 Sibling architecture deep-dives (same directory):
 

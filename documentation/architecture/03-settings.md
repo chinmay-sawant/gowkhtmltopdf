@@ -286,7 +286,7 @@ Documented in `doc.go` and enforced by the code:
   `PageSize` name + `Size` width/height pair; `DumpOutline`/`DumpDefaultTOCXSL`
   live on `PdfGlobal`; `background`/`web.background` share one field; image
   mode has no `Web.Background` mirror.
-- Origin: `plans/reviews/ponytail/ponytail-2026-08-06/ponytail-ultra-2026-08-06.md`
+- Origin: `plans/0.2.0/reviews/ponytail/ponytail-2026-08-06/ponytail-ultra-2026-08-06.md`
   Phase 1 (per `doc.go`). This is the antidote to the classic wkhtmltopdf
   clone failure mode where hundreds of settings are stored but never wired.
 
@@ -479,7 +479,7 @@ added.
 - **Exit-code mapping is HTTP-status-only** — 404→2 / 401→3 / else 1;
   wkhtmltopdf has additional fine-grained codes that are not modeled.
 - Deferred feature context: `documentation/deferred.md` and
-  `plans/10-canonical-post-mvp-roadmap.md`; fidelity claims about which
+  `plans/0.2.0/10-canonical-post-mvp-roadmap.md`; fidelity claims about which
   settings are honored live in `documentation/fidelity.md` and
   `documentation/compatibility-matrix.md`.
 
@@ -514,6 +514,6 @@ added.
   - [documentation/compatibility-matrix.md](../compatibility-matrix.md) —
     per-feature support claims
   - [documentation/deferred.md](../deferred.md) — deferred features
-- **Plans:** [plans/00-canonical-pure-go-rewrite.md](../../plans/00-canonical-pure-go-rewrite.md),
-  [plans/reviews/ponytail/ponytail-2026-08-06/ponytail-ultra-2026-08-06.md](../../plans/reviews/ponytail/ponytail-2026-08-06/ponytail-ultra-2026-08-06.md)
+- **Plans:** [plans/0.1.0/00-canonical-pure-go-rewrite.md](../../plans/0.1.0/00-canonical-pure-go-rewrite.md),
+  [plans/0.2.0/reviews/ponytail/ponytail-2026-08-06/ponytail-ultra-2026-08-06.md](../../plans/0.2.0/reviews/ponytail/ponytail-2026-08-06/ponytail-ultra-2026-08-06.md)
   (Policy A origin, Phase 1)

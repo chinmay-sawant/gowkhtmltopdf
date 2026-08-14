@@ -450,7 +450,7 @@ settings that survive Request assembly.
   prompts — all aligned with the controlled-report scope.
 - **Open question**: whether a dedicated `-E` extended help listing (and
   deprecation warnings for wkhtmltopdf-only flags) will be added post-MVP
-  (see plans/10-canonical-post-mvp-roadmap.md).
+  (see plans/0.2.0/10-canonical-post-mvp-roadmap.md).
 
 ## 11. Related documents
 
@@ -474,4 +474,4 @@ settings that survive Request assembly.
   - documentation/THREAT-MODEL.md — local-file ACL and remote-input threats
   - documentation/deferred.md — explicitly unsupported wkhtmltopdf surface
   - documentation/README.md — full doc index
-  - plans/00-canonical-pure-go-rewrite.md — Phase 1 (CLI/settings) ledger
+  - plans/0.1.0/00-canonical-pure-go-rewrite.md — Phase 1 (CLI/settings) ledger

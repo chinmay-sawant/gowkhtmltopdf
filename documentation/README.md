@@ -70,8 +70,8 @@ and include `file:line` references. Prefer them when changing engine code.
 | [../CHANGELOG.md](../CHANGELOG.md) | User-facing release notes |
 | [../skills/PR/PR_TEMPLATE.md](../skills/PR/PR_TEMPLATE.md) | Pull request body template |
 | [../plans/README.md](../plans/README.md) | Implementation ledger index |
-| [../plans/00-canonical-pure-go-rewrite.md](../plans/00-canonical-pure-go-rewrite.md) | MVP phases 0–9 |
-| [../plans/10-canonical-post-mvp-roadmap.md](../plans/10-canonical-post-mvp-roadmap.md) | Post-MVP phases 10–23 |
+| [../plans/0.1.0/00-canonical-pure-go-rewrite.md](../plans/0.1.0/00-canonical-pure-go-rewrite.md) | MVP phases 0–9 |
+| [../plans/0.2.0/10-canonical-post-mvp-roadmap.md](../plans/0.2.0/10-canonical-post-mvp-roadmap.md) | Post-MVP phases 10–23 |
 
 ## License
 
