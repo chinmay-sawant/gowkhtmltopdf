@@ -61,7 +61,7 @@ Chrome-quality print. See [fidelity.md — Arbitrary websites](fidelity.md#arbit
 ## What it is not
 
 - A full CSS / browser layout engine. Flex, grid, float, and positioning are
-  a documented **report subset** (Partial), not CSS3 / Chrome parity. See the
+  a documented **print CSS subset** (Partial), not CSS3 / Chrome parity. See the
   [compatibility matrix](compatibility-matrix.md).
 - A JavaScript runtime. `<script>` is not executed; JS-related wkhtmltopdf
   flags are **not registered** (unknown option).

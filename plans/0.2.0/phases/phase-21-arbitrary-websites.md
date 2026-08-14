@@ -11,7 +11,7 @@
 
 ## Overview
 
-Target **Wikipedia and marketing sites** with a product bar of **“decent print”**, not pixel-perfect clone. Reuse invoice/report CSS expansions; add print heuristics (chrome reduction), vendored fixtures, and honest acceptance criteria. Full open-web competition remains Phase 23 deferred.
+Target **Wikipedia and marketing sites** with a product bar of **“decent print”**, not pixel-perfect clone. Reuse invoice/template CSS expansions; add print heuristics (chrome reduction), vendored fixtures, and honest acceptance criteria. Full open-web competition remains Phase 23 deferred.
 
 ## Executive Summary
 
@@ -60,7 +60,7 @@ Target **Wikipedia and marketing sites** with a product bar of **“decent print
 
 - [x] Design opt-in flag: `--simplify-dom` / `web.simplifydom` (default off); `--print-media-type` already exists and remains layout-print (no duplicate)
 - [x] Heuristics: inject synthetic `display:none !important` sheet (`convert.SimplifyChromeCSS`) — **landmarks only** (`nav`/`footer`/`aside` + ARIA roles + `nav.site-nav`). MediaWiki IDs via `--simplify-dom-profile=mediawiki`. Proof: `TestSimplifyDOMOnHidesChrome`, `TestSimplifyDOMMediaWikiProfile`
-- [x] Default **off** for controlled report HTML — `TestSimplifyDOMOffKeepsChrome`, `TestSimplifyDOMEnabled`
+- [x] Default **off** for authored HTML templates — `TestSimplifyDOMOffKeepsChrome`, `TestSimplifyDOMEnabled`
 - [x] Security: heuristics must not fetch extra origins — synthetic CSS only; no FetchSub (`simplify.go`)
 - [x] **CSS-faithful / site-agnostic cleanup** — remove skin-shaped cascade overrides; honor author CSS; operator flags only → [`pending-phase-items/12-css-faithful-engine.md`](pending-phase-items/12-css-faithful-engine.md) **done** 2026-08-05
 

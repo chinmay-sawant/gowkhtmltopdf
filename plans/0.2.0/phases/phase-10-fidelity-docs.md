@@ -11,7 +11,7 @@
 
 ## Overview
 
-Create a **detailed, phase-wise fidelity document set** so nobody expects Wikipedia or browser parity from a report engine. Treat the compatibility matrix as the contract; this phase makes the contract navigable, evidence-backed, and tiered.
+Create a **detailed, phase-wise fidelity document set** so nobody expects Wikipedia or browser parity from an HTML template engine. Treat the compatibility matrix as the contract; this phase makes the contract navigable, evidence-backed, and tiered.
 
 ## Executive Summary
 
@@ -29,7 +29,7 @@ Create a **detailed, phase-wise fidelity document set** so nobody expects Wikipe
 ### 10.1 Fidelity guide (new doc)
 
 - [x] Create `documentation/fidelity.md` with:
-  - Product positioning: **controlled report HTML**, not a browser
+  - Product positioning: **authored HTML templates**, not a browser
   - Tier 1 / Tier 2 / Tier 3 goals in plain language
   - What “good” means for invoices vs Wikipedia vs marketing sites
   - Explicit: full WebKit parity under pure stdlib is **not a milestone**

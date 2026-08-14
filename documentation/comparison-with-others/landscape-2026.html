@@ -60,9 +60,9 @@
 
   <h2>Score card</h2>
   <p class="score">
-    <strong>gowkhtmltopdf: 7.5/10 overall</strong> — a strong fit for trusted, controlled reports,
+    <strong>gowkhtmltopdf: 7.5/10 overall</strong> — a strong fit for authored HTML templates,
     held back by partial CSS, no JavaScript, no PDF/A, and the current default creation-time metadata.
-    <b>8.5/10 for controlled reports</b> and <b>5.5–6/10 as a general converter</b> are more useful
+    <b>8.5/10 for HTML templates</b> and <b>5.5–6/10 as a general converter</b> are more useful
     role-specific scores. A 9/10 niche score depends on making normal CLI output byte-stable.
   </p>
 
@@ -201,7 +201,7 @@
     <tbody>
       <tr class="us">
         <td><b>gowkhtmltopdf</b></td>
-        <td>Trusted server-generated reports (invoices, tables, statements) needing a small offline Go binary, predictable layout, no JavaScript, and controlled resource access — or migrating off wkhtmltopdf</td>
+        <td>Authored HTML templates (invoices, certificates, storybooks, posters, tables, statements) needing a small offline Go binary, predictable layout, no JavaScript, and controlled resource access — or migrating off wkhtmltopdf</td>
       </tr>
       <tr>
         <td><b>Puppeteer / Chromium</b></td>
@@ -228,7 +228,7 @@
     <ul>
       <li>The normal conversion path currently calls <code>SetCreationTime(time.Now())</code>, so byte-identical output is not guaranteed by default. The deterministic PDF-writer fallback is useful for tests, but it is not the same as a stable CLI contract.</li>
       <li>“No JavaScript” is a meaningful security reduction, not a zero-attack-surface claim. The loader can fetch HTTP(S) and data subresources, and local-file access is an explicit but real capability. Treat untrusted HTML as able to drive network egress and resource consumption.</li>
-      <li>The score is a judgment call, not a universal benchmark. Capability, deployment footprint, security posture, standards support, and maintenance should be scored separately when the target workload is not controlled reports.</li>
+      <li>The score is a judgment call, not a universal benchmark. Capability, deployment footprint, security posture, standards support, and maintenance should be scored separately when the target workload is not authored HTML templates.</li>
       <li>Performance values must be reproduced with the same fixture, tool version, OS, cold/warm mode, and concurrency. The cited PDF4 benchmark, for example, separates cold and warm browser runs and reports five-run medians on macOS arm64; those values should not be merged with unrelated concurrency figures.</li>
     </ul>
   </div>

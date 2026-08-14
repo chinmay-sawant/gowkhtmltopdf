@@ -23,7 +23,7 @@ rasterization). The product is HTML templates and documents, not Chrome visual p
 | Invoices, tables, page breaks from Go | Yes |
 | Headers, footers, TOC, PDF bookmarks | Yes |
 | Offline static binaries; no browser / no cgo | Yes |
-| Full CSS, JavaScript, or Chrome parity | No — report CSS subset; no JS |
+| Full CSS, JavaScript, or Chrome parity | No — print CSS subset; no JS |
 | CJK / complex Unicode | Partial — Type0/CID + `--font-path`; see [fonts.md](documentation/fonts.md) |
 
 ## Quick start

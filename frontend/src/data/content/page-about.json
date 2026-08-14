@@ -13,7 +13,7 @@
    "items": [
     {
      "title": "v0.2.0",
-     "body": "Phases 0-9 plus the report CSS subset (tiers 1-2) are implemented: load, parse, style, layout, paginate, paint, and PDF 1.4 write, plus PNG/JPEG image mode. The `VERSION` file is the single source of truth and is stamped into the CLI at build time."
+     "body": "Phases 0-9 plus the print CSS subset (tiers 1-2) are implemented: load, parse, style, layout, paginate, paint, and PDF 1.4 write, plus PNG/JPEG image mode. The `VERSION` file is the single source of truth and is stamped into the CLI at build time."
     },
     {
      "title": "Repeatable layout",
@@ -117,7 +117,7 @@
      "body": "gowkhtmltopdf was developed using modern AI-assisted software engineering practices, pairing human architectural guidance with advanced reasoning and coding models (including Grok, OpenAI Codex, OpenCode, and Cursor) across planning, implementation, and validation.",
      "bullets": [
       "Architecture & Planning: Comprehensive phase ledgers under `plans/`, API contracts, threat modeling, and scope boundaries were defined upfront to guide clean-room execution.",
-      "Core Engine Implementation: Tolerant HTML parsing, report CSS cascade, layout tree pagination, font shaping, and Flate/zlib PDF object serialization were developed with extensive AI-assisted pair programming.",
+      "Core Engine Implementation: Tolerant HTML parsing, print CSS cascade, layout tree pagination, font shaping, and Flate/zlib PDF object serialization were developed with extensive AI-assisted pair programming.",
       "Quality & Verification: All subsystems are verified against rigorous golden fixture visual tests (`make samples`), upstream bug dossiers, and benchmark regression suites."
      ]
     },

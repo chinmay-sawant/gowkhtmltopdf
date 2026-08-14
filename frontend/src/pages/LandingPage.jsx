@@ -14,8 +14,8 @@ function homeSpeedup(n) {
 const CAPABILITIES = [
   {
     index: '01',
-    title: 'Reports that paginate',
-    body: 'Tables, page breaks, headers, footers, TOCs, outlines, links, and multi-page documents are first-class output.',
+    title: 'HTML that paginates',
+    body: 'Templates, tables, page breaks, headers, footers, TOCs, outlines, links, and multi-page documents are first-class output.',
     link: '/documentation/compatibility',
     label: 'See compatibility',
   },
@@ -127,7 +127,7 @@ export default function LandingPage() {
             <Link className="button button-primary" to="/getting-started">Get started <span aria-hidden="true">→</span></Link>
             <Link className="button button-secondary" to="/benchmarks">See the benchmarks</Link>
           </div>
-          <p className="landing-note">Best for invoices, statements, tables, and multi-page reports. JavaScript is not executed.</p>
+          <p className="landing-note">An HTML template engine for invoices, certificates, storybooks, posters, statements, and tables. JavaScript is not executed.</p>
         </div>
 
         <div className="terminal-card" aria-label="Interactive CLI conversion sandbox">
@@ -247,7 +247,7 @@ export default function LandingPage() {
           <div className="terminal-footer">
             <span>HTML to PDF</span>
             <span className="terminal-footer-badge">interactive sandbox</span>
-            <span>controlled report workflow</span>
+            <span>HTML template workflow</span>
           </div>
         </div>
       </section>
@@ -274,7 +274,7 @@ export default function LandingPage() {
           <h2 id="landing-bench-heading">
             Up to {HEADLINE.smallSpeedup.toFixed(0)}x faster
             <br />
-            on the same report.
+            on the same HTML.
           </h2>
           <p>
             Generic CLI, identical HTML, median of three process runs. A 2-page invoice is{' '}
@@ -318,7 +318,7 @@ export default function LandingPage() {
       <section className="landing-section landing-showcase" aria-labelledby="showcase-heading">
         <div className="showcase-copy">
           <h2 id="showcase-heading">See the pages<br /><em>before you ship.</em></h2>
-          <p>Explore committed samples generated from golden HTML fixtures: invoices, contracts, reports, CSS layout cases, and a five-page dossier.</p>
+          <p>Explore committed samples generated from golden HTML fixtures: invoices, certificates, storybooks, posters, contracts, CSS layout cases, and architecture diagrams.</p>
           <Link className="text-link" to="/showcase">Open the sample library <span aria-hidden="true">→</span></Link>
         </div>
         <div className="paper-stack" aria-hidden="true">
@@ -332,7 +332,7 @@ export default function LandingPage() {
         <div className="boundary-symbol" aria-hidden="true">!</div>
         <div>
           <h2 id="boundary-heading">This is a document renderer,<br />not a browser replacement.</h2>
-          <p>There is no DOM-driven JavaScript runtime, CSSOM, or browser painting engine. For arbitrary SPA fidelity, use server-rendered HTML or a browser automation tool. For controlled reports, the smaller surface is the point.</p>
+          <p>There is no DOM-driven JavaScript runtime, CSSOM, or browser painting engine. For arbitrary SPA fidelity, use server-rendered HTML or a browser automation tool. For authored HTML templates, the smaller surface is the point.</p>
           <Link className="text-link" to="/documentation/compatibility">Read the compatibility guide <span aria-hidden="true">→</span></Link>
         </div>
       </section>

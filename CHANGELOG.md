@@ -101,7 +101,7 @@ PRs: [#7](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/7)–[#34](https:
 
 - **Not a browser.** No JavaScript (`<script>` stripped; JS flags are
   unknown options). No Chrome / Wikipedia visual parity.
-- Flex/grid/float/sticky are a **report subset**, not full CSS3.
+- Flex/grid/float/sticky are a **print CSS subset**, not full CSS3.
 - CJK/Arabic **Partial** (operator-supplied faces + OT when present).
   `writing-mode: vertical-*` is parsed but lays out horizontal. No WOFF2.
 - No AcroForm, no PDF encryption / PDF/A / 1.7 / 2.0 / UA (tickets

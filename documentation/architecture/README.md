@@ -3,8 +3,9 @@
 This directory holds the detailed architecture documentation for the
 **gowkhtmltopdf** codebase: a pure-Go, no-cgo HTML→PDF (and HTML→image)
 converter, a work-alike of [wkhtmltopdf](https://wkhtmltopdf.org/) built for
-**controlled reports** (invoices, statements, tables, multi-page documents
-with headers/footers, TOCs and PDF outlines).
+**authored HTML templates** (invoices, certificates, storybooks, posters,
+statements, tables, multi-page documents with headers/footers, TOCs and PDF
+outlines).
 
 The top-level overview lives at [../architecture.md](../architecture.md).
 Each document here is a self-contained deep-dive into one architecture domain,

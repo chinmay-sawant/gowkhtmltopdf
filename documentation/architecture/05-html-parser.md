@@ -284,7 +284,7 @@ i.e. replacing this tree with `x/net/html` would be a cross-cutting rewrite of
 - **Why:** the project rule is *pure Go, no cgo, no third-party HTML/PDF/CSS
   APIs* (README, `documentation/fidelity.md`). A hand-rolled allowlisted
   tokenizer keeps the dependency surface at zero and matches the
-  "controlled reports" product scope: invoices, statements, tables, TOC —
+  "authored HTML templates" product scope: invoices, certificates, storybooks, posters, tables, TOC —
   not arbitrary websites.
 - **Cost:** no full HTML5 error recovery, no foster parenting, no implied
   `tbody`/`colgroup` insertion, no template element, no character-reference
@@ -473,7 +473,7 @@ samples regenerated via `make samples`; see
 - **Not an HTML5 parser.** No full error recovery, no implied
   `tbody`/`colgroup`/`head`/`body` insertion beyond the merge logic, no
   foster-parenting, no template handling, no `<iframe>` semantics. This is
-  *by design* (report subset), not a regression.
+  *by design* (print CSS subset), not a regression.
 - **CDATA claim vs behavior.** The package doc (`html.go:2`) lists CDATA as
   accepted, but `scanBang` treats `<![CDATA[…]]>` as a *bogus declaration
   skipped to `>`* (`html.go:503-509`) — content is dropped, not kept. The doc

@@ -2,9 +2,9 @@
 
 > **Parent:** `plans/0.1.0/00-canonical-pure-go-rewrite.md` (Phase 0.1); post-MVP updates under `plans/0.2.0/10-canonical-post-mvp-roadmap.md`  
 > **Status:** living contract - amendments go through plan review  
-> **Target:** controlled report/invoice HTML → PDF. **Not** a browser.  
+> **Target:** authored HTML templates → PDF. **Not** a browser.  
 > **Last honesty audit:** 2026-08-13 · fidelity guide: [fidelity.md](fidelity.md)  
-> **Phase 21 note:** arbitrary-website / “decent print” work does **not** expand this matrix. CSS remains a **report subset** (Partial flex/grid/position; many properties Not implemented). No new Implemented rows until code + tests ship — see [fidelity.md § Arbitrary websites](fidelity.md#arbitrary-websites-phase-21).
+> **Phase 21 note:** arbitrary-website / “decent print” work does **not** expand this matrix. CSS remains a **print CSS subset** (Partial flex/grid/position; many properties Not implemented). No new Implemented rows until code + tests ship — see [fidelity.md § Arbitrary websites](fidelity.md#arbitrary-websites-phase-21).
 
 This document is the **contract** the layout engine is allowed to implement.
 Anything not listed here is *unsupported*; unsupported input must degrade
@@ -137,7 +137,7 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 
 **Pagination (phases 5 + 18).** Box-aware fragmentation: rect-type ops crossing a page boundary are split; text, images and links move wholly (line-level). `page-break-before/after: always` and `page-break-inside: avoid` via canvas-Y flow shifts; table rows never split. **Table headers repeat** across pages (`repeatTableHeaders` in `paint.go`; fixture-23). **`--zoom`** is forwarded to `layout.Options.Zoom` (`convert.go`; `TestZoom`). **Smart-shrinking** detects over-wide content and **re-layouts** with an effective zoom (`TestRunPDFSmartShrinking`). CSS `orphans`/`widows` are parsed (initial 2) and Fragmentation Rule 3 is applied when line boxes are available; the geometric short-block heuristic remains for edge cases (fixtures 30/37). `Result.Locations` carries element boxes for outlines/links.
 
-### 2.7 Flexbox (Stage A — report subset)
+### 2.7 Flexbox (Stage A — print CSS subset)
 
 Evidence: `internal/layout/flex.go`, `style.go` (`applyRestProps` + `parseFlexShorthand`); fixtures 25/28/32/33; `flex_test.go`. Status uses the §2 legend (Implemented / Partial / Not implemented). Checklist form: **[x]** Implemented · **[~]** Partial · **[ ]** Missing.
 
@@ -158,7 +158,7 @@ Evidence: `internal/layout/flex.go`, `style.go` (`applyRestProps` + `parseFlexSh
 | Percentage basis cyclic sizing | [x] Partial | Definite CB: `%` vs content main size; indefinite/cyclic → treat as `auto` (content) — fixture-33 / `TestFlexBasisPercent*` |
 | Nested percentage / intrinsic flex iterations | [x] Partial polish | Definite-item `%` children re-resolve against used main size; indefinite CB `%` → auto/content; not full Flexbox intrinsic passes |
 
-### 2.8 CSS Grid (Stage B + Stage C lite — report subset)
+### 2.8 CSS Grid (Stage B + Stage C lite — print CSS subset)
 
 Evidence: `internal/layout/grid.go`, `style.go`; fixtures 28/32/34/35; `grid_test.go`. **Not** full Grid L1 / L3 / Chrome parity.
 
@@ -244,7 +244,7 @@ Status legend as in §2; evidence in `internal/css/css.go`.
 | Feature | Handling |
 |---------|----------|
 | JavaScript / `<script>` / DOM APIs | **Stripped at load.** No JS engine. `--enable-javascript` and other JS flags are **unknown options** (Policy A) |
-| Full CSS Grid / full Flexbox | Stage A/B report subset **shipped** (§2.7 / §2.8); Stage C lite + flex min-size polish + Partial subgrid/masonry span (`tier-2-pending-3/flex-grid-remaining.md`). **Not** Bootstrap/Tailwind / Chrome layout-test parity |
+| Full CSS Grid / full Flexbox | Stage A/B print CSS subset **shipped** (§2.7 / §2.8); Stage C lite + flex min-size polish + Partial subgrid/masonry span (`tier-2-pending-3/flex-grid-remaining.md`). **Not** Bootstrap/Tailwind / Chrome layout-test parity |
 | `position: sticky` continuous scroll | Overflow boxes are sticky scrollports at **offset 0** only (PDF has no scroll). Page content box remains the print scrollport when no overflow ancestor. No scroll-offset > 0 animation |
 | `transform`, `filter`, `animation`, `transition` | Partial / out of scope | **Static 2D** `transform` + `transform-origin` Implemented (translate/scale/rotate/matrix/skew*; paint CTM; stacking + abs/fixed CB). Sibling flow unchanged. Overflow: no clip — ink may paint outside page box. **`filter`:** only `opacity()` (see `opacity` row); blur/drop-shadow/SVG filters = permanent print-engine non-goal. **`animation`/`transition`/`@keyframes`:** parse-ignored (static cascaded value only; no timelines). **3D / perspective:** permanent non-goal. Fixture-40; `transform.go` / `transform_test.go` |
 | `background-image` / gradients | Ignored (Phase 3+ candidate) |

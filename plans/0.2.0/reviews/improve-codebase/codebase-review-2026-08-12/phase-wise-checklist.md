@@ -6,7 +6,7 @@
 > [`../application-review-2026-08-12/app-review.md`](../application-review-2026-08-12/app-review.md) - earlier same-day 7.4/10 application ledger; overlapping rows below supersede that scorecard.
 > **Status:** closed; implementation wave complete on 2026-08-12. Recalculated score **8.8 / 10**.
 > **Created:** 2026-08-12
-> **Target:** 10/10 as a controlled, server-generated report renderer. Browser/JavaScript parity remains a separate product scope.
+> **Target:** 10/10 as a controlled HTML template engine. Browser/JavaScript parity remains a separate product scope.
 > **Estimated effort:** 5-9 focused engineering weeks, excluding large browser-parity work.
 > **Method:** three read-only explore agents (API/seams, render pipeline, security/release) plus orchestrator spot-checks of current source.
 
@@ -30,7 +30,7 @@ Treat earlier reviews as claims; this ledger is the current scorecard.
 
 ## Executive Summary
 
-gowkhtmltopdf is a **real report engine**, not a wkhtmltopdf wrapper. The
+gowkhtmltopdf is a **real HTML template engine**, not a wkhtmltopdf wrapper. The
 pipeline (load → parse → CSS → layout → paginate → paint → PDF 1.4 / PNG)
 is implemented in-tree, `CGO_ENABLED=0`, with an honest product boundary:
 controlled invoices, tables, HF/TOC/outlines. Production package seams are

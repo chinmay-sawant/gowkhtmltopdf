@@ -4,7 +4,7 @@
 > **Related baseline:** [`../critical-go-review-2026-08-12/phase-wise-checklist.md`](../critical-go-review-2026-08-12/phase-wise-checklist.md) - CR-01 through CR-08 remediation, closed on 2026-08-12.
 > **Status:** superseded as the active scorecard. Remaining work and the current **7.0 / 10** rating live in [`../codebase-review-2026-08-12/phase-wise-checklist.md`](../codebase-review-2026-08-12/phase-wise-checklist.md). Keep this file as the earlier same-day 7.4/10 baseline; do not check new rows here.
 > **Created:** 2026-08-12
-> **Target:** 10/10 as a controlled, server-generated report renderer. Browser/JavaScript parity remains a separate product scope, not a hidden acceptance criterion.
+> **Target:** 10/10 as a controlled HTML template engine. Browser/JavaScript parity remains a separate product scope, not a hidden acceptance criterion.
 > **Estimated effort:** 4-8 focused engineering weeks, excluding large browser-parity work.
 
 ---
@@ -163,7 +163,7 @@ only after the named source, test, benchmark, or artifact proof succeeds.
 - [ ] Record expected visual tolerances and classify failures as layout,
   pagination, paint, typography, image, or PDF serialization defects.
 - [ ] Add browser/reference comparison for a small controlled HTML subset. The
-  comparison must validate the declared report subset, not claim browser parity
+  comparison must validate the declared print CSS subset, not claim browser parity
   for arbitrary sites.
 
 ### 2.3 Close known visual-validation gaps

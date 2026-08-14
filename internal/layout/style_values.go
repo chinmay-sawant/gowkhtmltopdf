@@ -590,7 +590,7 @@ func marginLen(value string, fsize, ctxW float64) float64 {
 	return 0
 }
 
-// calcLength evaluates the small arithmetic subset needed by the report CSS:
+// calcLength evaluates the small arithmetic subset needed by the print CSS:
 // one length plus/minus another length, or one length multiplied by a number.
 // Unsupported calc expressions remain invalid and keep the existing fallback.
 //
