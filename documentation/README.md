@@ -66,7 +66,7 @@ and include `file:line` references. Prefer them when changing engine code.
 
 | Document | Purpose |
 |----------|---------|
-| [../CONTRIBUTIONS.md](../CONTRIBUTIONS.md) | Setup, tests, PR workflow, layout visual QA, doc update map |
+| [../CONTRIBUTING.md](../CONTRIBUTING.md) | Setup, tests, PR workflow, layout visual QA, doc update map |
 | [../CHANGELOG.md](../CHANGELOG.md) | User-facing release notes |
 | [../skills/PR/PR_TEMPLATE.md](../skills/PR/PR_TEMPLATE.md) | Pull request body template |
 | [../plans/README.md](../plans/README.md) | Implementation ledger index |

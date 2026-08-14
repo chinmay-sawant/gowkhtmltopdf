@@ -21,7 +21,7 @@ Linux, Windows, and macOS (amd64 and arm64) as GitHub Release assets, with a
 [Releases](https://github.com/chinmay-sawant/gowkhtmltopdf/releases) page.
 
 Assets are produced only when a `v*` tag is pushed (see
-[CONTRIBUTIONS.md](../CONTRIBUTIONS.md#cutting-a-release-multi-platform-binaries));
+[CONTRIBUTING.md](../CONTRIBUTING.md#cutting-a-release-multi-platform-binaries));
 ordinary CI on pull requests does not upload platform archives.
 
 ## Build
@@ -212,7 +212,7 @@ make samples   # regenerate output/*.pdf (network only for the wiki smoke)
 ```
 
 Layout / print changes should also open a regenerated PDF in a real viewer.
-See [samples.md](samples.md) and [CONTRIBUTIONS.md](../CONTRIBUTIONS.md).
+See [samples.md](samples.md) and [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ## Makefile targets
 

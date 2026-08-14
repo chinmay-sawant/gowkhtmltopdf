@@ -6,7 +6,7 @@ closed CR/ARC/P-rows from `plans/reviews/improve-codebase/` unless
 current source has regressed.
 
 Authoritative prose lives in `documentation/architecture/` and
-`CONTRIBUTIONS.md`. This file is the short map.
+`CONTRIBUTING.md`. This file is the short map.
 
 ## Product ceiling
 

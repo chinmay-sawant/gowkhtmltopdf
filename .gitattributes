@@ -42,6 +42,8 @@ makefile text eol=lf
 
 # Prefer Go in GitHub language stats: mark non-Go bulk as vendored
 *.js linguist-vendored
+*.mjs linguist-vendored
+*.cjs linguist-vendored
 *.jsx linguist-vendored
 *.ts linguist-vendored
 *.tsx linguist-vendored
