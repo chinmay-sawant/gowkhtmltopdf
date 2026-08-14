@@ -71,9 +71,9 @@ Do not treat a public SPA URL as the acceptance bar for report work.
 | SVG image **output** (`--format svg`) | Image mode encodes PNG/JPEG only. | Not planned |
 | BMP output | No demand; PNG/JPEG cover `image/*`. | Not planned |
 | SOCKS5 proxy | `parseProxy` accepts `http` / `https` only. | Not planned |
-| PDF 2.0 (ISO 32000-2) | Deferred to #32 (`PDF20` is reserved and rejected on the current writer). | #32 |
-| PDF/A-4 / PDF/UA-2 (PDF 2.0 conformance profiles) | Deferred to #33. PDF/A-3a and PDF/UA-1 under PDF 1.7 are supported via `--pdf-profile a3a-ua1`. | #33 |
-| PDF encryption / AcroForm / signatures | Out of scope; no writer support. | Not planned |
+| PDF 2.0 (ISO 32000-2) | **Shipped** (0.2.2, #32): opt-in version via `--pdf-version 2.0` / `WithPDFVersion("2.0")` — header, trailer `/ID`, UTF-8 document strings, non-claiming XMP. Version alone is **not** a PDF/A or PDF/UA claim. | #32 done |
+| PDF/A-4 / PDF/UA-2 (PDF 2.0 conformance profiles) | **Shipped** (0.2.2, #33): opt-in via `--pdf-profile a4-ua2` / `WithPDFProfile("a4-ua2")` (also `a4`, `ua2`). Implies PDF 2.0. Emits claiming XMP (`pdfaid:part=4`, `pdfuaid:part=2`), OutputIntent, structure namespaces, and full tagging. | #33 done |
+| PDF encryption / AcroForm / signatures | Out of scope; no writer support (rejected on every version, incl. 2.0). | Not planned |
 | C ABI (`wkhtmltopdf_*` cgo exports) | CGO is forbidden on the main path. | Only if consumer demand |
 | `--read-args-from-stdin` | **Not implemented.** The flag is not a working batch loop (rejected / unused). | Not planned |
 | Stdin HTML input (`-`) | **Not implemented.** CLI parse stores `Page: "-"`, but `load.GuessURL("-")` falls through to **`http://-`**. Library callers should pass inline HTML; do not document CLI `-` as stdin. | Document honestly; not a hidden feature |

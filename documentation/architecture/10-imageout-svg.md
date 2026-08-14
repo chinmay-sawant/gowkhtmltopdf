@@ -21,7 +21,7 @@ Positioning:
 ```
 HTML (file | URL | inline SetBody)
   │
-  ├─ cmd/gowkhtmltopdf ──► internal/convert ──► internal/pdf   (PDF 1.4 output)
+  ├─ cmd/gowkhtmltopdf ──► internal/convert ──► internal/pdf   (PDF output: 1.4 default / 1.7 & 2.0 opt-in)
   │
   └─ cmd/gowkhtmltoimage ──► internal/app.RunImage
                               └─► internal/imageout.RunRequest         (PNG/JPEG output)

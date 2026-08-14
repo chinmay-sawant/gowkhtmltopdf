@@ -50,7 +50,7 @@ of the installed `wkhtmltopdf` binary and the time to fetch remote HTML.
 | **What it is** | Process wrapper around `wkhtmltopdf` | Clean-room HTML to layout to PDF/image engine in pure Go |
 | **Runtime deps** | Must install `wkhtmltopdf` (and its Qt stack) | None: static binary, `CGO_ENABLED=0` |
 | **Go modules** | Thin library; still needs the native binary | Go-native dependencies; no browser or native converter process |
-| **Rendering** | Full (legacy) WebKit via wkhtmltopdf | In-repo pipeline: load, HTML, CSS subset, layout, paginate, paint, PDF 1.4 |
+| **Rendering** | Full (legacy) WebKit via wkhtmltopdf | In-repo pipeline: load, HTML, CSS subset, layout, paginate, paint, PDF write (1.4 default; 1.7 / 2.0 opt-in) |
 | **Deployment** | OS package or static wkhtmltopdf binary plus PATH setup | Single self-contained Go binary |
 | **Security surface** | Spawned process and full browser engine; harder to bound | Explicit ACL, local files off by default, HTTP timeouts and body limits, documented threat model |
 | **Determinism** | Depends on binary version, fonts, and OS | Same input and settings yield the same PDF bytes (fixed creation time) |

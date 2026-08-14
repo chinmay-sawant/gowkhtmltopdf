@@ -29,13 +29,13 @@ const (
 	scopeBoth   = "Both"
 )
 
-// buildStructureTree creates the PDF/UA-1 logical structure tree from the
+// buildStructureTree creates the PDF/UA logical structure tree from the
 // laid-out box tree and returns a map from op index to the owning StructElem.
 // Returns an error if a compliance rule is violated (e.g. <img> missing alt).
 //
-//nolint:cyclop,gocognit,varnamelen,wsl,nilnil,nlreturn,funlen,nestif // structure tree mapping over display list ops
+//nolint:cyclop,gocognit,varnamelen,wsl,nilnil,funlen,nestif // structure tree mapping over display list ops
 func buildStructureTree(doc *pdf.Document, res *Result) (map[int]*opTagInfo, error) {
-	if doc == nil || !doc.Policy().IsPDFUA1() || res == nil {
+	if doc == nil || (!doc.Policy().IsPDFUA1() && !doc.Policy().IsPDFUA2()) || res == nil {
 		return nil, nil
 	}
 
@@ -83,7 +83,7 @@ func buildStructureTree(doc *pdf.Document, res *Result) (map[int]*opTagInfo, err
 
 		if op.Kind == OpImage {
 			if _, exists := opMap[i]; !exists {
-				if op.Alt == "" && doc.Policy().IsPDFUA1() {
+				if op.Alt == "" && (doc.Policy().IsPDFUA1() || doc.Policy().IsPDFUA2()) {
 					return nil, pdf.ErrPDFUAMissingAlt
 				}
 				parent := currentP
@@ -330,10 +330,17 @@ func walkBoxForStructure(
 				parent = parent.NewChild(pdf.StructLI).NewChild(pdf.StructLBody)
 			}
 			createdElem = parent.NewChild(pdf.StructL)
+			// PDF/UA-2 requires /ListNumbering when LIs carry /Lbl children.
+			if name == "ol" {
+				createdElem.SetListNumbering("Decimal")
+			} else {
+				createdElem.SetListNumbering("Disc")
+			}
 			currentParent = createdElem
 		case "li":
 			if parent.Tag != pdf.StructL {
 				parent = parent.NewChild(pdf.StructL)
+				parent.SetListNumbering("Disc")
 			}
 			liElem := parent.NewChild(pdf.StructLI)
 			var lblElem *pdf.StructElem
@@ -374,7 +381,7 @@ func walkBoxForStructure(
 			return nil
 		case cssTagImg:
 			alt := b.node.Attribute("alt")
-			if alt == "" && doc.Policy().IsPDFUA1() {
+			if alt == "" && (doc.Policy().IsPDFUA1() || doc.Policy().IsPDFUA2()) {
 				return pdf.ErrPDFUAMissingAlt
 			}
 			createdElem = parent.NewChild(pdf.StructFigure)

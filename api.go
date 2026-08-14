@@ -76,8 +76,6 @@ var (
 	ErrNilContext = errs.ErrNilContext
 	// ErrInvalidPDFVersion reports an invalid or unsupported PDF version string.
 	ErrInvalidPDFVersion = settings.ErrInvalidPDFVersion
-	// ErrPDF20Unsupported reports PDF 2.0 requested before support is implemented.
-	ErrPDF20Unsupported = settings.ErrPDF20Unsupported
 	// ErrInvalidPDFProfile reports an invalid or unsupported PDF profile string.
 	ErrInvalidPDFProfile = settings.ErrInvalidPDFProfile
 	// ErrProfilePDF20Unsupported reports PDF 2.0 conformance profiles (PDF/A-4, PDF/UA-2) are unsupported.
@@ -88,6 +86,10 @@ var (
 	ErrConformanceRequiresPDF17 = convert.ErrProfileRequiresPDF17
 	// ErrProfileRequiresPDF17 is an alias for ErrConformanceRequiresPDF17.
 	ErrProfileRequiresPDF17 = convert.ErrProfileRequiresPDF17
+	// ErrConformanceRequiresPDF20 indicates a conformance profile was requested without PDF 2.0.
+	ErrConformanceRequiresPDF20 = convert.ErrProfileRequiresPDF20
+	// ErrProfileRequiresPDF20 is an alias for ErrConformanceRequiresPDF20.
+	ErrProfileRequiresPDF20 = convert.ErrProfileRequiresPDF20
 )
 
 // Version returns the library version banner.
@@ -221,9 +223,8 @@ func (o *PdfGlobalOptions) WithResolveRelativeLinks(enabled bool) *PdfGlobalOpti
 	return o
 }
 
-// WithPDFVersion sets the target PDF version ("1.4" or "1.7").
-// Invalid values fail during conversion / validation with ErrInvalidPDFVersion
-// or ErrPDF20Unsupported.
+// WithPDFVersion sets the target PDF version ("1.4", "1.7", or "2.0").
+// Invalid values fail during conversion / validation with ErrInvalidPDFVersion.
 func (o *PdfGlobalOptions) WithPDFVersion(version string) *PdfGlobalOptions {
 	o = o.require()
 	o.options = o.options.WithPDFVersion(version)
@@ -231,8 +232,8 @@ func (o *PdfGlobalOptions) WithPDFVersion(version string) *PdfGlobalOptions {
 	return o
 }
 
-// WithPDFProfile sets the target PDF conformance profile ("a3a-ua1", "PDF/A-3a+PDF/UA-1", "a3a", "ua1", etc.).
-// Invalid values fail during conversion / validation with ErrInvalidPDFProfile or ErrProfilePDF20Unsupported.
+// WithPDFProfile sets the target PDF conformance profile ("a3a-ua1", "a4-ua2", "PDF/A-4+PDF/UA-2", "PDF/A-3a", "a4", "ua2", etc.).
+// Invalid values fail during conversion / validation with ErrInvalidPDFProfile or ErrConformanceRequiresPDF17 / ErrConformanceRequiresPDF20.
 func (o *PdfGlobalOptions) WithPDFProfile(profile string) *PdfGlobalOptions {
 	o = o.require()
 	o.options = o.options.WithPDFProfile(profile)

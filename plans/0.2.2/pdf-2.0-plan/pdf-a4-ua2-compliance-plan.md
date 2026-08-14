@@ -2,11 +2,12 @@
 
 > **Issue:** [#33](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/33)
 > **Parent epic:** [#29](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/29)
-> **Depends on:** [#32](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/32) / [pdf-2.0-plan/](pdf-2.0-plan/) (PDF 2.0 version path)
-> **Reuses:** [pdf-1.7-compliance-plan/](pdf-1.7-compliance-plan/) (A-3a + UA-1 machinery: XMP, ICC, OutputIntent, structure tree)
-> **Status:** draft — not started
+> **Depends on:** [#32](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/32) / [pdf-2.0-plan/](.) (PDF 2.0 version path) — **completed**
+> **Reuses:** [../pdf-1.7-compliance-plan/](../pdf-1.7-compliance-plan/) (A-3a + UA-1 machinery: XMP, ICC, OutputIntent, structure tree)
+> **Status:** completed (2026-08-15) — opt-in PDF/A-4 + PDF/UA-2 on PDF 2.0 shipped; default remains unclaimed 1.4
 > **Constraint:** pure Go, no CGO, no new direct modules. veraPDF (`verapdf/`) is already in-tree as an external validator, not a Go dependency.
-> **Workflow:** [`skills/phase-wise-checklist/SKILLS.md`](../../skills/phase-wise-checklist/SKILLS.md)
+> **Workflow:** [`skills/phase-wise-checklist/SKILLS.md`](../../../skills/phase-wise-checklist/SKILLS.md)
+> **Sample outputs:** `output/pdf-2.0/` (unclaimed 2.0) and `output/pdf-2.0-compliance/` (`a4-ua2`)
 
 ---
 
@@ -385,9 +386,9 @@ Catalog
 
 ---
 
-## 11. Phase map
+## 11. Phase map (execution ledger)
 
-Mirrors the 1.7 compliance plan's shape. Phases 2 and 3 may overlap after phase 1.
+Mirrors the 1.7 compliance plan's shape. All phases complete as of 2026-08-15.
 
 ```text
 1 Profile policy + standards matrix
@@ -400,16 +401,67 @@ Mirrors the 1.7 compliance plan's shape. Phases 2 and 3 may overlap after phase 
                           → 8 Docs + closure
 ```
 
-| Phase | Goal | Gate |
-|------:|------|------|
-| 1 | Profile policy: accept A-4 / UA-2 / dual on PDF20; still error on 1.4/1.7 | Unit: `policy_test.go` matrix updated |
-| 2 | `pdfaid:part=4/rev=2020`, OutputIntent, sRGB+Gray ICC, omit trailer Info | Structure tests on 2.0 writer output; no veraPDF yet |
-| 3 | ICCBased images, A-4 font/embed gates | Existing font/image tests + A-4 cases |
-| 4 | `/Namespace`, StructTreeRoot `/Namespaces`, Document `/NS`, `pdfuaid:part=2/rev=2024` + `pdfaExtension` | Writer-level tagged 2.0 fixture |
-| 5 | HTML → UA-2 structure types on 2.0 (mostly reuse of the 1.7 bridge) | Convert fixture: headings/tables/figures/links |
-| 6 | Opt-in profile selection on the 2.0 base | CLI/library tests; default still unclaimed 1.4 |
-| 7 | Dual fixtures + veraPDF `-f 4` and `-f ua2` (skip if binary missing) | External validator green |
-| 8 | Honest docs: version ≠ conformance; A-4/UA-2 rows in matrix | `make lint` + `make test` + claim-scan |
+| Phase | Goal | Gate | Status |
+|------:|------|------|--------|
+| 1 | Profile policy: accept A-4 / UA-2 / dual on PDF20; still error on 1.4/1.7 | `policy_test.go` / `compliance_test.go` matrix | **done** |
+| 2 | `pdfaid:part=4/rev=2020`, OutputIntent, sRGB+Gray ICC, omit trailer Info | Writer structure tests | **done** |
+| 3 | ICCBased images, A-4 font/embed gates | Font/image + A-4 cases | **done** |
+| 4 | `/Namespace`, StructTreeRoot `/Namespaces`, Document `/NS`, `pdfuaid:part=2/rev=2024` + `pdfaExtension` | Tagged 2.0 writer fixture | **done** |
+| 5 | HTML → UA-2 structure; `ListNumbering` on `/L`; structure Dest on internal links | Convert + layout tagging | **done** |
+| 6 | Opt-in profile selection on the 2.0 base | CLI/library/`api_test` | **done** |
+| 7 | Dual fixtures + veraPDF `-f 4` and `-f ua2` | External validator green | **done** |
+| 8 | Honest docs: version ≠ conformance; A-4/UA-2 rows in matrix | `go test ./...` green | **done** |
+
+### Phase checklist (evidence)
+
+#### Phase 1 — profile policy
+- [x] `ProfilePDFA4`, `ProfilePDFUA2`, `ProfilePDFA4PDFUA2` / `ProfileDualA4UA2` in `internal/pdf/policy.go`
+- [x] `IsPDFA4()` / `IsPDFUA2()` helpers
+- [x] `CanonicalProfile` accepts `a4`, `ua2`, `a4-ua2` aliases
+- [x] A-4/UA-2 require `PDF20`; wrong base → `ErrConformanceRequiresPDF20`
+- [x] A-3a/UA-1 on PDF20 still rejected (require 1.7)
+
+#### Phase 2 — PDF/A-4 archival
+- [x] XMP `pdfaid:part=4`, `pdfaid:rev=2020` (`metadata.go`)
+- [x] OutputIntent + sRGB ICC under A-4
+- [x] Gray ICC (`/N 1`) + page `/DefaultGray`
+- [x] Trailer omits `/Info` under A-4 only
+
+#### Phase 3 — color / fonts under A-4
+- [x] Page `/DefaultRGB` + `/DefaultGray` → ICCBased
+- [x] Embedded Type0 path reused; no bare standard fonts under claim profiles
+- [x] Image color space under A-4 uses ICCBased where required by existing gates
+
+#### Phase 4 — PDF/UA-2 structure
+- [x] `/Type /Namespace` + `/NS (http://iso.org/pdf2/ssn)`
+- [x] StructTreeRoot `/Namespaces`
+- [x] Document StructElem `/NS`
+- [x] XMP `pdfuaid:part=2`, `pdfuaid:rev=2024` + `pdfaExtension` for dual claims
+
+#### Phase 5 — layout tagging bridge
+- [x] UA-1 structure types reused on UA-2 path
+- [x] `/L` emits `/A << /O /List /ListNumbering /Disc|Decimal >>` when LIs have `/Lbl` (UA-2 8.2.5.25)
+- [x] Internal link / outline destinations under UA-2 use dual named dests: `/D [page /XYZ …]` (Arlington/PDF/A page Dest) + `/SD [struct /XYZ …]` (UA-2 clause 8.8); no Document-without-`/Pg` fallback
+
+#### Phase 6 — settings / CLI / library
+- [x] `settings.ParsePDFProfile` accepts A-4 / UA-2 aliases; implies PDF 2.0
+- [x] CLI `--pdf-profile a4` / `ua2` / `a4-ua2` (`cli_test.go`)
+- [x] Library `WithPDFProfile("a4-ua2")` / `ValidatePDF` success path (`api_test.go`)
+- [x] Default unclaimed 1.4 unchanged
+
+#### Phase 7 — veraPDF + goldens
+- [x] `TestVeraPDFOptionalValidation` runs `-f 4` and `-f ua2` (skips if binary missing) — PASS
+- [x] Convert compliance goldens include 2.0 dual needles
+- [x] Sample fixtures regenerated:
+  - `output/pdf-2.0/{fixture-21,fixture-56}-*.pdf` — unclaimed `%PDF-2.0`
+  - `output/pdf-2.0-compliance/{fixture-21,fixture-56}-*.pdf` — `a4-ua2`
+- [x] `COMPLIANCE_FLAVOURS` / `./compliance/run_verapdf.sh --both` on both compliance samples: **PASS PDF/A-4 + PDF/UA-2** (veraPDF 1.30.2)
+
+#### Phase 8 — docs + closure
+- [x] `go test ./...` green (2026-08-15)
+- [x] User-facing matrix / deferred / CLI / README claim A-4+UA-2 as opt-in supported
+- [x] Version path still distinct from conformance (`--pdf-version 2.0` alone does not claim PDF/A or PDF/UA)
+- [x] `plans/0.2.2/README.md` status line updated
 
 ---
 
@@ -488,11 +540,11 @@ TestCompliance_StructureTree_ParentTreeOwnership
 
 ## 15. Recommended next actions
 
-1. Land #32 (or at least `PDF20` header + non-claiming XMP) as the base.
-2. Phase 1: extend `WriterPolicy` so `PDF20 + A-4/UA-2` validates; update `policy_test.go` matrix (A-4/UA-2 on PDF17 still errors).
-3. Phase 2: branch `buildXMPMetadata` on policy (part 4 / rev 2020), wire OutputIntent + Gray ICC, omit trailer Info under A-4.
-4. Phase 4: add `/Namespace` emit + `pdfuaid` XMP; verify structure serialization on a tagged 2.0 fixture.
-5. Phase 7: run `verapdf -f 4` and `-f ua2` on `minimal-text` first, then grow the fixture matrix.
+**Done for v1.** Optional follow-ups (not blocking #33):
+
+1. Prefer per-target structure Dest (heading/id StructElem) over Document fallback for richer AT navigation.
+2. Optional PAC / Matterhorn human checklist on large multi-page docs.
+3. A-4e / A-4f if product demand appears.
 
 ---
 

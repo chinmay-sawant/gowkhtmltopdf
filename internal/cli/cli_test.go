@@ -1021,7 +1021,6 @@ func TestAllowFlagInImageMode(t *testing.T) {
 	}
 }
 
-//nolint:cyclop // comprehensive CLI test for pdf-version flag
 func TestPDFVersionFlag(t *testing.T) {
 	t.Parallel()
 
@@ -1047,18 +1046,10 @@ func TestPDFVersionFlag(t *testing.T) {
 		t.Errorf("expected ErrInvalidPDFVersion, got %v", errInvalid)
 	}
 
-	// Version 2.0 returns issue #32 sentinel
-	_, err20 := Parse([]string{"--pdf-version", "2.0", "in.html", outPDF}, ModePDF)
-	if err20 == nil {
-		t.Fatal("expected error for --pdf-version 2.0, got nil")
-	}
-
-	if !errors.Is(err20, settings.ErrPDF20Unsupported) {
-		t.Errorf("expected ErrPDF20Unsupported, got %v", err20)
-	}
-
-	if !strings.Contains(err20.Error(), "issue #32") && !strings.Contains(err20.Error(), "#32") {
-		t.Errorf("error message should mention issue #32, got %q", err20.Error())
+	// Version 2.0 parses successfully (PDF 2.0 support)
+	cmd20 := parse(t, "--pdf-version", "2.0", "in.html", outPDF)
+	if cmd20.Global.PdfVersion != "2.0" {
+		t.Errorf("Global.PdfVersion = %q, want 2.0", cmd20.Global.PdfVersion)
 	}
 
 	// Image mode rejects --pdf-version
@@ -1107,6 +1098,22 @@ func TestPDFProfileFlag(t *testing.T) {
 		t.Errorf("Global.PdfProfile = %q, want %q", cmdUA1.Global.PdfProfile, settings.ProfilePDFUA1)
 	}
 
+	// Valid PDF 2.0 profiles
+	cmdA4 := parse(t, "--pdf-profile", "a4", "in.html", outPDF)
+	if cmdA4.Global.PdfProfile != settings.ProfilePDFA4 {
+		t.Errorf("Global.PdfProfile = %q, want %q", cmdA4.Global.PdfProfile, settings.ProfilePDFA4)
+	}
+
+	cmdUA2 := parse(t, "--pdf-profile", "ua2", "in.html", outPDF)
+	if cmdUA2.Global.PdfProfile != settings.ProfilePDFUA2 {
+		t.Errorf("Global.PdfProfile = %q, want %q", cmdUA2.Global.PdfProfile, settings.ProfilePDFUA2)
+	}
+
+	cmdDual20 := parse(t, "--pdf-profile", "a4-ua2", "in.html", outPDF)
+	if cmdDual20.Global.PdfProfile != settings.ProfilePDFA4PDFUA2 {
+		t.Errorf("Global.PdfProfile = %q, want %q", cmdDual20.Global.PdfProfile, settings.ProfilePDFA4PDFUA2)
+	}
+
 	// Invalid profile
 	_, errInvalid := Parse([]string{"--pdf-profile", "invalid", "in.html", outPDF}, ModePDF)
 	if errInvalid == nil {
@@ -1115,16 +1122,6 @@ func TestPDFProfileFlag(t *testing.T) {
 
 	if !errors.Is(errInvalid, settings.ErrInvalidPDFProfile) {
 		t.Errorf("expected ErrInvalidPDFProfile, got %v", errInvalid)
-	}
-
-	// Unsupported PDF 2.0 profile a4
-	_, errA4 := Parse([]string{"--pdf-profile", "a4", "in.html", outPDF}, ModePDF)
-	if errA4 == nil {
-		t.Fatal("expected error for --pdf-profile a4, got nil")
-	}
-
-	if !errors.Is(errA4, settings.ErrProfilePDF20Unsupported) {
-		t.Errorf("expected ErrProfilePDF20Unsupported, got %v", errA4)
 	}
 
 	// Unsupported PDF/A-1 profile pdfa-1b

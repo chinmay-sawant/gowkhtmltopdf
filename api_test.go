@@ -1717,14 +1717,14 @@ func TestPDFVersionAPI(t *testing.T) {
 		t.Errorf("expected ErrInvalidPDFVersion, got %v", errBadSetting)
 	}
 
-	// 2. ValidatePDF with 2.0 and invalid
+	// 2. ValidatePDF with 2.0 succeeds, invalid fails
 	req20 := &PDFRequest{
 		Global:  NewPdfGlobalOptions().WithPDFVersion("2.0").Build(),
 		Objects: []*ObjectSettings{NewObjectSettings().SetBody([]byte("<p>hi</p>"), "")},
 		Output:  &bytes.Buffer{},
 	}
-	if err := req20.ValidatePDF(); !errors.Is(err, ErrPDF20Unsupported) {
-		t.Errorf("ValidatePDF with 2.0: got %v, want ErrPDF20Unsupported", err)
+	if err := req20.ValidatePDF(); err != nil {
+		t.Errorf("ValidatePDF with 2.0: got %v, want success", err)
 	}
 
 	reqBad := &PDFRequest{
@@ -1736,9 +1736,16 @@ func TestPDFVersionAPI(t *testing.T) {
 		t.Errorf("ValidatePDF with invalid: got %v, want ErrInvalidPDFVersion", err)
 	}
 
-	// 3. RunPDF with 2.0 and invalid
-	if err := RunPDF(t.Context(), req20); !errors.Is(err, ErrPDF20Unsupported) {
-		t.Errorf("RunPDF with 2.0: got %v, want ErrPDF20Unsupported", err)
+	// 3. RunPDF with 2.0 produces a 2.0 file; invalid fails
+	var out20 bytes.Buffer
+	req20.Output = &out20
+
+	if err := RunPDF(t.Context(), req20); err != nil {
+		t.Errorf("RunPDF with 2.0: got %v, want success", err)
+	}
+
+	if !bytes.HasPrefix(out20.Bytes(), []byte("%PDF-2.0")) {
+		t.Errorf("expected PDF 2.0 to start with %%PDF-2.0, got %q", out20.Bytes()[:min(10, out20.Len())])
 	}
 
 	if err := RunPDF(t.Context(), reqBad); !errors.Is(err, ErrInvalidPDFVersion) {
@@ -1840,8 +1847,8 @@ func TestPDFProfileAPI(t *testing.T) {
 		Objects: []*ObjectSettings{NewObjectSettings().SetBody([]byte("<title>T</title><p>hi</p>"), "")},
 		Output:  &bytes.Buffer{},
 	}
-	if err := reqA4.ValidatePDF(); !errors.Is(err, ErrProfilePDF20Unsupported) {
-		t.Errorf("ValidatePDF with a4: got %v, want ErrProfilePDF20Unsupported", err)
+	if err := reqA4.ValidatePDF(); err != nil {
+		t.Errorf("ValidatePDF with a4: got %v, want nil (A-4 is supported on PDF 2.0)", err)
 	}
 
 	reqPDFA1 := &PDFRequest{

@@ -23,23 +23,28 @@ const (
 	ProfilePDFA3aPDFUA1 = "PDF/A-3a+PDF/UA-1"
 	// ProfileDualA3aUA1 is an alias for ProfilePDFA3aPDFUA1.
 	ProfileDualA3aUA1 = ProfilePDFA3aPDFUA1
+	// ProfilePDFA4 indicates PDF/A-4 archival conformance (ISO 19005-4).
+	ProfilePDFA4 = "PDF/A-4"
+	// ProfilePDFUA2 indicates PDF/UA-2 accessibility conformance (ISO 14289-2).
+	ProfilePDFUA2 = "PDF/UA-2"
+	// ProfilePDFA4PDFUA2 indicates combined PDF/A-4 and PDF/UA-2 conformance.
+	ProfilePDFA4PDFUA2 = "PDF/A-4+PDF/UA-2"
+	// ProfileDualA4UA2 is an alias for ProfilePDFA4PDFUA2.
+	ProfileDualA4UA2 = ProfilePDFA4PDFUA2
 )
 
 var (
 	// ErrInvalidPDFVersion reports an invalid or unsupported PDF version.
-	ErrInvalidPDFVersion = errors.New("settings: invalid pdf version (allowed: 1.4|1.7)")
-
-	// ErrPDF20Unsupported indicates PDF 2.0 is not supported (see issue #32).
-	ErrPDF20Unsupported = errors.New("settings: PDF 2.0 is not supported (see issue #32)")
+	ErrInvalidPDFVersion = errors.New("settings: invalid pdf version (allowed: 1.4|1.7|2.0)")
 
 	// ErrInvalidPDFProfile reports an invalid or unsupported PDF conformance profile.
 	ErrInvalidPDFProfile = errors.New(
-		"settings: invalid pdf profile (allowed: a3a-ua1, a3a, ua1, PDF/A-3a+PDF/UA-1, PDF/A-3a, PDF/UA-1)",
+		"settings: invalid pdf profile (allowed: a3a-ua1, a3a, ua1, a4-ua2, a4, ua2, PDF/A-3a+PDF/UA-1, PDF/A-3a, PDF/UA-1, PDF/A-4+PDF/UA-2, PDF/A-4, PDF/UA-2)",
 	)
 
-	// ErrProfilePDF20Unsupported indicates PDF 2.0 profiles (PDF/A-4, PDF/UA-2) are unsupported (see issue #33).
+	// ErrProfilePDF20Unsupported indicates PDF 2.0 profiles (PDF/A-4, PDF/UA-2) are unsupported (historical sentinel).
 	ErrProfilePDF20Unsupported = errors.New(
-		"settings: PDF 2.0 conformance profiles (PDF/A-4, PDF/UA-2) are unsupported (see issue #33)",
+		"settings: PDF 2.0 conformance profiles (PDF/A-4, PDF/UA-2) are unsupported",
 	)
 
 	// ErrProfilePDFA1Unsupported indicates PDF/A-1 is unsupported.
@@ -47,7 +52,7 @@ var (
 )
 
 // ParsePDFVersion validates and normalizes a PDF version string.
-// Accepted values: "", "1.4", "1.7". "2.0" returns ErrPDF20Unsupported.
+// Accepted values: "", "1.4", "1.7", "2.0". "" normalizes to "1.4".
 // Other values return an error wrapping ErrInvalidPDFVersion.
 func ParsePDFVersion(value string) (string, error) {
 	switch normalize(strings.TrimSpace(value)) {
@@ -56,15 +61,17 @@ func ParsePDFVersion(value string) (string, error) {
 	case sPDFVersion17:
 		return sPDFVersion17, nil
 	case sPDFVersion20:
-		return "", ErrPDF20Unsupported
+		return sPDFVersion20, nil
 	default:
 		return "", fmt.Errorf("%w: %q", ErrInvalidPDFVersion, value)
 	}
 }
 
 // ParsePDFProfile validates and normalizes a PDF conformance profile string.
-// Accepted values map to canonical constants: ProfilePDFA3aPDFUA1, ProfilePDFA3a, ProfilePDFUA1, or ProfileNone ("").
+// Accepted values map to canonical constants: ProfilePDFA3aPDFUA1, ProfilePDFA3a, ProfilePDFUA1, ProfilePDFA4PDFUA2, ProfilePDFA4, ProfilePDFUA2, or ProfileNone ("").
 // Invalid or unsupported values return an error wrapping the respective sentinel.
+//
+//nolint:cyclop // comprehensive mapping of profile aliases across PDF versions
 func ParsePDFProfile(value string) (string, error) {
 	raw := strings.TrimSpace(strings.ToLower(value))
 	if raw == "" {
@@ -88,10 +95,34 @@ func ParsePDFProfile(value string) (string, error) {
 	case "pdf/ua-1", "pdf/ua", "pdfua-1", "pdfua", "pdf-ua-1", "pdf-ua",
 		"ua-1", "ua1", "ua", "pdfua1":
 		return ProfilePDFUA1, nil
+	case "pdf/a-4+pdf/ua-2", "pdf/a-4-pdf/ua-2", "pdf/a-4+ua-2", "pdf/a-4-ua-2",
+		"pdfa-4+pdfua-2", "pdfa-4-pdfua-2", "pdfa4+pdfua2", "pdfa4-pdfua2",
+		"a4+ua2", "a4-ua2", "a4,ua2", "a4+pdf/ua-2", "a4-pdf/ua-2",
+		"pdf/ua-2+pdf/a-4", "pdf/ua-2-pdf/a-4", "pdfua-2+pdfa-4", "pdfua2+pdfa4",
+		"ua2+a4", "ua2-a4", "ua2,a4", "ua2+pdf/a-4", "ua2-pdf/a-4",
+		"a4+ua", "a4-ua", "ua2+a", "ua2-a",
+		"pdf/a-4+pdf/ua", "pdf/a-4-pdf/ua", "pdf/ua+pdf/a-4", "pdf/ua-pdf/a-4":
+		return ProfilePDFA4PDFUA2, nil
+	case "pdf/a-4", "pdf/a-4a", "pdf/a4", "pdfa-4", "pdfa-4a", "pdfa4", "pdfa4a",
+		"pdf-a-4", "pdf-a-4a", "pdf-a4", "a-4", "a-4a", "a4", "a4a":
+		return ProfilePDFA4, nil
+	case "pdf/ua-2", "pdf/ua2", "pdfua-2", "pdfua2", "pdf-ua-2", "pdf-ua2", "ua-2", "ua2":
+		return ProfilePDFUA2, nil
 	}
 
-	if isUnsupportedProfilePDF20(cleaned) {
-		return "", ErrProfilePDF20Unsupported
+	switch value {
+	case ProfilePDFA3a:
+		return ProfilePDFA3a, nil
+	case ProfilePDFUA1:
+		return ProfilePDFUA1, nil
+	case ProfilePDFA3aPDFUA1:
+		return ProfilePDFA3aPDFUA1, nil
+	case ProfilePDFA4:
+		return ProfilePDFA4, nil
+	case ProfilePDFUA2:
+		return ProfilePDFUA2, nil
+	case ProfilePDFA4PDFUA2:
+		return ProfilePDFA4PDFUA2, nil
 	}
 
 	if isUnsupportedProfilePDFA1(cleaned) {
@@ -101,26 +132,19 @@ func ParsePDFProfile(value string) (string, error) {
 	return "", fmt.Errorf("%w: %q", ErrInvalidPDFProfile, value)
 }
 
-func isUnsupportedProfilePDF20(profileStr string) bool {
-	switch profileStr {
-	case "pdf/a-4", "pdf/a-4e", "pdf/a-4f", "pdfa-4", "pdfa4", "a4", "a-4",
-		"pdf/ua-2", "pdfua-2", "pdfua2", "ua2", "ua-2",
-		"pdf/a-4+pdf/ua-2", "a4-ua2", "a4+ua2", "ua2+a4":
-		return true
-	}
-
-	return strings.Contains(profileStr, "a-4") || strings.Contains(profileStr, "a4") ||
-		strings.Contains(profileStr, "ua-2") || strings.Contains(profileStr, "ua2")
-}
-
 func isUnsupportedProfilePDFA1(profileStr string) bool {
 	switch profileStr {
 	case "pdf/a-1", "pdf/a-1a", "pdf/a-1b", "pdfa-1", "pdfa-1a", "pdfa-1b",
-		"pdfa1", "pdfa1a", "pdfa1b", "a1", "a1a", "a1b", "a-1", "a-1a", "a-1b":
+		"pdfa1", "pdfa1a", "pdfa1b", "a1", "a1a", "a1b", "a-1", "a-1a", "a-1b",
+		"pdf-a-1", "pdf-a-1a", "pdf-a-1b", "pdf-a1", "pdf-a1a", "pdf-a1b":
 		return true
 	}
 
-	return strings.Contains(profileStr, "a-1") || strings.Contains(profileStr, "a1")
+	return strings.HasPrefix(profileStr, "pdf/a-1") ||
+		strings.HasPrefix(profileStr, "pdfa-1") ||
+		strings.HasPrefix(profileStr, "pdfa1") ||
+		strings.HasPrefix(profileStr, "pdf-a-1") ||
+		strings.HasPrefix(profileStr, "pdf-a1")
 }
 
 const (
@@ -461,7 +485,7 @@ type PdfGlobal struct {
 	PageSize    string
 	Size        Size
 	Orientation Orientation
-	// PdfVersion is the PDF version to emit: "1.4" (default) or "1.7" (--pdf-version).
+	// PdfVersion is the PDF version to emit: "1.4" (default), "1.7", or "2.0" (--pdf-version).
 	PdfVersion string
 	// PdfProfile is the PDF conformance profile to emit (e.g. "a3a-ua1", "PDF/A-3a+PDF/UA-1", "a3a", "ua1").
 	// Empty string indicates standard unconstrained (unclaimed) PDF.

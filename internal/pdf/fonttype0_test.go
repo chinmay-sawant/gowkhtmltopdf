@@ -93,6 +93,7 @@ func TestType0FontDescriptorNameMatchesBaseFont(t *testing.T) {
 // /FontName equals that CIDFont's /BaseFont (Arlington FontDescriptorCIDType2.FontName).
 func assertCIDFontDescriptorNamesMatch(pdf []byte) error {
 	objs := map[int]string{}
+
 	reObj := regexp.MustCompile(`(?s)(\d+) 0 obj\s*(.*?)\s*endobj`)
 	for _, m := range reObj.FindAllSubmatch(pdf, -1) {
 		n, _ := strconv.Atoi(string(m[1]))
@@ -100,36 +101,53 @@ func assertCIDFontDescriptorNamesMatch(pdf []byte) error {
 	}
 
 	checked := 0
+
 	for _, body := range objs {
 		if !strings.Contains(body, "/Subtype /CIDFontType2") {
 			continue
 		}
+
 		base := regexp.MustCompile(`/BaseFont\s*/([^\s/]+)`).FindStringSubmatch(body)
+
 		desc := regexp.MustCompile(`/FontDescriptor\s+(\d+)\s+0\s+R`).FindStringSubmatch(body)
 		if base == nil || desc == nil {
-			return fmt.Errorf("CIDFontType2 missing BaseFont or FontDescriptor: %s", body[:min(120, len(body))])
+			return fmt.Errorf("%w: %s", errCIDFontType2MissingRefs, body[:min(120, len(body))])
 		}
+
 		descBody := objs[mustAtoi(desc[1])]
+
 		fname := regexp.MustCompile(`/FontName\s*/([^\s/]+)`).FindStringSubmatch(descBody)
 		if fname == nil {
-			return fmt.Errorf("FontDescriptor %s missing FontName", desc[1])
+			return fmt.Errorf("%w: %s", errFontDescriptorNoFontName, desc[1])
 		}
+
 		if fname[1] != base[1] {
-			return fmt.Errorf("CIDFontType2 BaseFont /%s != FontDescriptor FontName /%s", base[1], fname[1])
+			return fmt.Errorf("%w: %s != %s", errCIDFontDescriptorMismatch, base[1], fname[1])
 		}
+
 		checked++
 	}
+
 	if checked == 0 {
-		return fmt.Errorf("no CIDFontType2 objects found")
+		return fmt.Errorf("%w", errNoCIDFontType2Objects)
 	}
+
 	return nil
 }
+
+var (
+	errCIDFontType2MissingRefs   = errors.New("CIDFontType2 missing BaseFont or FontDescriptor")
+	errFontDescriptorNoFontName  = errors.New("FontDescriptor missing FontName")
+	errCIDFontDescriptorMismatch = errors.New("CIDFontType2 BaseFont != FontDescriptor FontName")
+	errNoCIDFontType2Objects     = errors.New("no CIDFontType2 objects found")
+)
 
 func mustAtoi(s string) int {
 	n, err := strconv.Atoi(s)
 	if err != nil {
 		panic(err)
 	}
+
 	return n
 }
 
@@ -255,6 +273,7 @@ func TestType0MixedLatinFallback(t *testing.T) {
 	}
 }
 
+//nolint:dupl // PDF17 Type0 twin of the PDF20 test; identical apart from version tokens
 func TestType0CJKEmbeddingPDF17(t *testing.T) {
 	t.Parallel()
 

@@ -49,15 +49,18 @@ func (d *Document) buildXMPMetadata() []byte {
 	buf.WriteString("    xmlns:pdf=\"http://ns.adobe.com/pdf/1.3/\"\n")
 	buf.WriteString("    xmlns:xmp=\"http://ns.adobe.com/xap/1.0/\"")
 
-	if d.policy.IsPDFA3() {
+	hasPDFA := d.policy.IsPDFA3() || d.policy.IsPDFA4()
+	hasPDFUA := d.policy.IsPDFUA1() || d.policy.IsPDFUA2()
+
+	if hasPDFA {
 		buf.WriteString("\n    xmlns:pdfaid=\"http://www.aiim.org/pdfa/ns/id/\"")
 	}
 
-	if d.policy.IsPDFUA1() {
+	if hasPDFUA {
 		buf.WriteString("\n    xmlns:pdfuaid=\"http://www.aiim.org/pdfua/ns/id/\"")
 	}
 
-	if d.policy.IsPDFA3() && d.policy.IsPDFUA1() {
+	if hasPDFA && hasPDFUA {
 		buf.WriteString("\n    xmlns:pdfaExtension=\"http://www.aiim.org/pdfa/ns/extension/\"")
 		buf.WriteString("\n    xmlns:pdfaSchema=\"http://www.aiim.org/pdfa/ns/schema#\"")
 		buf.WriteString("\n    xmlns:pdfaProperty=\"http://www.aiim.org/pdfa/ns/property#\"")
@@ -105,13 +108,19 @@ func (d *Document) buildXMPMetadata() []byte {
 	if d.policy.IsPDFA3() {
 		buf.WriteString("   <pdfaid:part>3</pdfaid:part>\n")
 		buf.WriteString("   <pdfaid:conformance>A</pdfaid:conformance>\n")
+	} else if d.policy.IsPDFA4() {
+		buf.WriteString("   <pdfaid:part>4</pdfaid:part>\n")
+		buf.WriteString("   <pdfaid:rev>2020</pdfaid:rev>\n")
 	}
 
 	if d.policy.IsPDFUA1() {
 		buf.WriteString("   <pdfuaid:part>1</pdfuaid:part>\n")
+	} else if d.policy.IsPDFUA2() {
+		buf.WriteString("   <pdfuaid:part>2</pdfuaid:part>\n")
+		buf.WriteString("   <pdfuaid:rev>2024</pdfuaid:rev>\n")
 	}
 
-	if d.policy.IsPDFA3() && d.policy.IsPDFUA1() {
+	if hasPDFA && hasPDFUA {
 		buf.WriteString("   <pdfaExtension:schemas>\n")
 		buf.WriteString("    <rdf:Bag>\n")
 		buf.WriteString("     <rdf:li rdf:parseType=\"Resource\">\n")
@@ -128,6 +137,18 @@ func (d *Document) buildXMPMetadata() []byte {
 			"Indicates, which part of ISO 14289 standard is followed" +
 			"</pdfaProperty:description>\n")
 		buf.WriteString("        </rdf:li>\n")
+
+		if d.policy.IsPDFUA2() {
+			buf.WriteString("        <rdf:li rdf:parseType=\"Resource\">\n")
+			buf.WriteString("         <pdfaProperty:name>rev</pdfaProperty:name>\n")
+			buf.WriteString("         <pdfaProperty:valueType>Integer</pdfaProperty:valueType>\n")
+			buf.WriteString("         <pdfaProperty:category>internal</pdfaProperty:category>\n")
+			buf.WriteString("         <pdfaProperty:description>" +
+				"Indicates, which revision of ISO 14289 standard is followed" +
+				"</pdfaProperty:description>\n")
+			buf.WriteString("        </rdf:li>\n")
+		}
+
 		buf.WriteString("       </rdf:Seq>\n")
 		buf.WriteString("      </pdfaSchema:property>\n")
 		buf.WriteString("     </rdf:li>\n")

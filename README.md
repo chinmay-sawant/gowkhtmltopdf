@@ -22,8 +22,9 @@ rasterization). The product is HTML templates and documents, not Chrome visual p
 |-----------|----------------|
 | Invoices, tables, page breaks from Go | Yes |
 | Headers, footers, TOC, PDF bookmarks | Yes |
-| PDF 1.4 / PDF 1.7 output | Yes — PDF 1.4 default, opt-in PDF 1.7 via `--pdf-version 1.7` / `WithPDFVersion` |
-| PDF/A-3a & PDF/UA-1 compliance | Yes — opt-in via `--pdf-profile a3a-ua1` / `WithPDFProfile` (tagged PDF/UA-1 + archival PDF/A-3a) |
+| PDF 1.4 / PDF 1.7 / PDF 2.0 output | Yes — PDF 1.4 default; opt-in 1.7 / 2.0 via `--pdf-version 1.7` / `--pdf-version 2.0` or `WithPDFVersion`. Version alone is **not** a PDF/A or PDF/UA claim |
+| PDF/A-3a & PDF/UA-1 compliance | Yes — opt-in via `--pdf-profile a3a-ua1` / `WithPDFProfile` (implies PDF 1.7; tagged PDF/UA-1 + archival PDF/A-3a) |
+| PDF/A-4 & PDF/UA-2 compliance | Yes — opt-in via `--pdf-profile a4-ua2` / `WithPDFProfile` (implies PDF 2.0; tagged PDF/UA-2 + archival PDF/A-4) |
 | Offline static binaries; no browser / no cgo | Yes |
 | Full CSS, JavaScript, or Chrome parity | No — print CSS subset; no JS |
 | CJK / complex Unicode | Partial — Type0/CID + `--font-path`; see [fonts.md](documentation/fonts.md) |

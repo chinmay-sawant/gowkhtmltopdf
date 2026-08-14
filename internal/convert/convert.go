@@ -187,38 +187,74 @@ const (
 	pdfVersion20 = "2.0"
 )
 
-// ErrProfileRequiresPDF17 indicates a compliance profile was requested with PDF 1.4.
+// ErrProfileRequiresPDF17 indicates a 1.7-era compliance profile was requested
+// with a PDF version other than 1.7 (1.4 or 2.0).
 var ErrProfileRequiresPDF17 = errors.New("settings: compliance profiles require PDF 1.7")
 
+// ErrProfileRequiresPDF20 indicates a 2.0-era compliance profile was requested
+// with a PDF version other than 2.0 (1.4 or 1.7).
+var ErrProfileRequiresPDF20 = errors.New("settings: compliance profiles require PDF 2.0")
+
 func policyForProfile(glob settings.PdfGlobal, canonicalProfile string) (pdf.WriterPolicy, error) {
-	if glob.PdfVersion == pdfVersion14 {
-		return pdf.WriterPolicy{}, ErrProfileRequiresPDF17
-	}
+	is17 := canonicalProfile == settings.ProfilePDFA3a ||
+		canonicalProfile == settings.ProfilePDFUA1 ||
+		canonicalProfile == settings.ProfilePDFA3aPDFUA1
 
-	if glob.PdfVersion == pdfVersion20 {
-		return pdf.WriterPolicy{}, settings.ErrPDF20Unsupported
-	}
+	is20 := canonicalProfile == settings.ProfilePDFA4 ||
+		canonicalProfile == settings.ProfilePDFUA2 ||
+		canonicalProfile == settings.ProfilePDFA4PDFUA2
 
-	if glob.PdfVersion != "" && glob.PdfVersion != pdfVersion17 {
-		if _, err := settings.ParsePDFVersion(glob.PdfVersion); err != nil {
-			return pdf.WriterPolicy{}, err //nolint:wrapcheck // sentinel error from settings
+	if is17 {
+		if glob.PdfVersion == pdfVersion14 || glob.PdfVersion == pdfVersion20 {
+			return pdf.WriterPolicy{}, ErrProfileRequiresPDF17
 		}
+
+		if glob.PdfVersion != "" && glob.PdfVersion != pdfVersion17 {
+			if _, err := settings.ParsePDFVersion(glob.PdfVersion); err != nil {
+				return pdf.WriterPolicy{}, err //nolint:wrapcheck // sentinel error from settings
+			}
+		}
+
+		policy := pdf.WriterPolicy{ //nolint:exhaustruct // default feature flags
+			Version:            pdf.PDF17,
+			ConformanceProfile: canonicalProfile,
+		}
+
+		if err := policy.Validate(); err != nil {
+			return pdf.WriterPolicy{}, err //nolint:wrapcheck // delegating policy validation
+		}
+
+		return policy, nil
 	}
 
-	policy := pdf.WriterPolicy{ //nolint:exhaustruct // default feature flags
-		Version:            pdf.PDF17,
-		ConformanceProfile: canonicalProfile,
+	if is20 {
+		if glob.PdfVersion == pdfVersion14 || glob.PdfVersion == pdfVersion17 {
+			return pdf.WriterPolicy{}, ErrProfileRequiresPDF20
+		}
+
+		if glob.PdfVersion != "" && glob.PdfVersion != pdfVersion20 {
+			if _, err := settings.ParsePDFVersion(glob.PdfVersion); err != nil {
+				return pdf.WriterPolicy{}, err //nolint:wrapcheck // sentinel error from settings
+			}
+		}
+
+		policy := pdf.WriterPolicy{ //nolint:exhaustruct // default feature flags
+			Version:            pdf.PDF20,
+			ConformanceProfile: canonicalProfile,
+		}
+
+		if err := policy.Validate(); err != nil {
+			return pdf.WriterPolicy{}, err //nolint:wrapcheck // delegating policy validation
+		}
+
+		return policy, nil
 	}
 
-	if err := policy.Validate(); err != nil {
-		return pdf.WriterPolicy{}, err //nolint:wrapcheck // delegating policy validation
-	}
-
-	return policy, nil
+	return pdf.WriterPolicy{}, settings.ErrInvalidPDFProfile
 }
 
 // PolicyForGlobal maps the requested PDF version and profile to a pdf.WriterPolicy.
-// When PdfProfile is set, PDF 1.7 is implied unless explicitly set to 1.4 (which errors).
+// When PdfProfile is set, PDF 1.7 or PDF 2.0 is implied based on the profile unless explicitly conflicting.
 // An empty version with no profile defaults to PDF 1.4.
 func PolicyForGlobal(glob settings.PdfGlobal) (pdf.WriterPolicy, error) {
 	if glob.PdfProfile != "" {
@@ -240,6 +276,8 @@ func PolicyForGlobal(glob settings.PdfGlobal) (pdf.WriterPolicy, error) {
 		return pdf.WriterPolicy{Version: pdf.PDF14}, nil //nolint:exhaustruct // default feature flags
 	case pdfVersion17:
 		return pdf.WriterPolicy{Version: pdf.PDF17}, nil //nolint:exhaustruct // default feature flags
+	case pdfVersion20:
+		return pdf.WriterPolicy{Version: pdf.PDF20}, nil //nolint:exhaustruct // default feature flags
 	default:
 		return pdf.WriterPolicy{},
 			fmt.Errorf("%w: %q", settings.ErrInvalidPDFVersion, version)
@@ -511,7 +549,7 @@ func renderObject(ctx context.Context, run *runContext, obj *settings.PdfObject,
 		doctitle:      docTitle(root),
 	}
 
-	if run.doc.Policy().IsPDFUA1() {
+	if run.doc.Policy().IsPDFUA1() || run.doc.Policy().IsPDFUA2() {
 		if l := docLang(root); l != "" {
 			run.doc.SetLanguage(l)
 		}

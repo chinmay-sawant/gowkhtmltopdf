@@ -48,6 +48,7 @@ Do not invent a second writer or version checks inside `Content`.
 - [x] Add `WriterPolicy` with a `Version` field; zero value is `PDF14` (`internal/pdf/policy.go:45-53`)
 - [x] Policy methods own header spelling (`"1.4"` / `"1.7"`). Callers do not format version strings (`internal/pdf/policy.go:88-98`)
 - [x] `PDF20` is rejected with a clear error that names issue #32 — do not silently emit `%PDF-2.0` (`internal/pdf/policy.go:27-29, 56-58`)
+  (superseded by PDF 2.0 support landing in 0.2.2 — see `plans/0.2.2/pdf-2.0-plan/`; PDF20 is now valid, and the temporary rejection path was removed with the deprecated `settings.ErrPDF20Unsupported` sentinel)
 - [x] Test: table of versions → header strings; unknown/unwired versions error (`internal/pdf/policy_test.go:18-93`)
 
 ### 1.2 Document construction

@@ -215,8 +215,14 @@ func bodyStateFor(bodies []*objectState, page int) *objectState {
 // nodes with final page refs and PDF (y-up) coordinates. The root is a
 // container for the top-level headings, as pdf.Document.SetOutline expects.
 // Tree headings retain object-local Page and carry document-global DocPage.
+// For PDF/UA-2, heading StructElems are matched in document order so outline
+// items can carry /SD (structure destination) references.
 func emitOutline(doc *pdf.Document, tree *outline.Node, bodies []*objectState, tocTotal int) *pdf.Outline {
 	root := &pdf.Outline{} //nolint:exhaustruct // intentional zero-value fields
+
+	// Collect heading StructElems for PDF/UA-2 structure destination binding.
+	headingElems := doc.HeadingStructElems()
+	headingIdx := 0
 
 	var conv func(n *outline.Node) *pdf.Outline
 
@@ -232,6 +238,12 @@ func emitOutline(doc *pdf.Document, tree *outline.Node, bodies []*objectState, t
 				Page: locPage, X: hVal.X, Y: hVal.Y, W: hVal.W, H: hVal.H,
 			}
 			obj.X, obj.Y = stVal.geom.pdfXY(loc)
+		}
+
+		// Match heading StructElem in document order for PDF/UA-2 /SD.
+		if headingIdx < len(headingElems) {
+			obj.StructElem = headingElems[headingIdx]
+			headingIdx++
 		}
 
 		for _, c := range num.Children {
