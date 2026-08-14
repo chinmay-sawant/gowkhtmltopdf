@@ -224,9 +224,9 @@ func TestTaggedPDFUA1Structure(t *testing.T) {
 	}
 
 	// --- 6. ParentTree (Number Tree) ---
-	// Check that ParentTree contains /Nums [ 0 [ ... ] ]
+	// Check that ParentTree contains /Nums [ 0 [ ... ] ... ]
 	// and that for table cells, TH and TD refs are in the array (not TR ref).
-	numsRe := regexp.MustCompile(`<< /Nums \[ 0 \[ ([^\]]+) \] \] >>`)
+	numsRe := regexp.MustCompile(`<< /Nums \[ 0 \[ ([^\]]+) \]`)
 	numsMatches := numsRe.FindStringSubmatch(outStr)
 
 	if len(numsMatches) != 2 {
@@ -564,6 +564,78 @@ func TestMultiPageParentTree(t *testing.T) {
 	}
 }
 
+// TestMultiPageStructElemUsesMCR ensures a StructElem with marked content on
+// more than one page serializes /K kids as MCR dictionaries (ISO 32000-1
+// §14.7.4.2). Bare MCID integers under a single /Pg are structurally invalid
+// when the same element appears on multiple pages.
+func TestMultiPageStructElemUsesMCR(t *testing.T) {
+	t.Parallel()
+
+	fnt, err := DefaultFont()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	doc, err := NewDocumentWithPolicy(WriterPolicy{
+		Version:            PDF17,
+		ConformanceProfile: ProfilePDFUA1,
+	})
+	if err != nil {
+		t.Fatalf("NewDocumentWithPolicy: %v", err)
+	}
+
+	doc.SetInfo("Title", "Multi-Page MCR Test")
+
+	page0 := doc.AddPage(300, 400)
+	page1 := doc.AddPage(300, 400)
+
+	root := doc.CreateStructTreeRoot()
+	docElem := root.NewChild(StructTypeDocument)
+	pElem := docElem.NewChild(StructTypeP)
+
+	mcid0 := page0.AllocMCID(pElem)
+	mcid1 := page1.AllocMCID(pElem)
+
+	for _, item := range []struct {
+		page *Page
+		mcid int
+		text string
+	}{
+		{page0, mcid0, "First page"},
+		{page1, mcid1, "Second page"},
+	} {
+		cur := item.page.Content()
+		cur.UseEmbeddedFont("F1", fnt)
+		cur.BeginMarkedContent("P", item.mcid)
+		cur.BeginText()
+		cur.SetFont("F1", 12)
+		cur.TextAt(20, 350)
+		cur.TextShow(item.text)
+		cur.EndText()
+		cur.EndMarkedContent()
+	}
+
+	var buf bytes.Buffer
+	if err := doc.Write(&buf); err != nil {
+		t.Fatalf("doc.Write: %v", err)
+	}
+
+	out := buf.String()
+	want0 := fmt.Sprintf("<< /Type /MCR /Pg %s /MCID %d >>", page0.ref.String(), mcid0)
+	want1 := fmt.Sprintf("<< /Type /MCR /Pg %s /MCID %d >>", page1.ref.String(), mcid1)
+
+	for _, want := range []string{want0, want1, "/Type /MCR"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing multi-page MCR kid %q", want)
+		}
+	}
+
+	// Bare duplicate MCIDs without MCR would look like "/K [ 0 0 ]" under one /Pg.
+	if strings.Contains(out, "/K [ 0 0 ]") {
+		t.Errorf("StructElem /K still uses bare multi-page MCIDs without MCR")
+	}
+}
+
 func TestMarkedContentHelpersAndBalancing(t *testing.T) {
 	t.Parallel()
 
@@ -607,5 +679,264 @@ func TestMarkedContentHelpersAndBalancing(t *testing.T) {
 
 	if !strings.Contains(raw, "/Artifact BDC\n") {
 		t.Errorf("missing bare /Artifact BDC")
+	}
+}
+
+func TestTableScopeAndListStructureElements(t *testing.T) {
+	t.Parallel()
+
+	fnt, err := DefaultFont()
+	if err != nil {
+		t.Fatalf("DefaultFont: %v", err)
+	}
+
+	doc, err := NewDocumentWithPolicy(WriterPolicy{
+		Version:            PDF17,
+		ConformanceProfile: ProfilePDFUA1,
+	})
+	if err != nil {
+		t.Fatalf("NewDocumentWithPolicy: %v", err)
+	}
+
+	doc.SetInfo("Title", "Table Scope and List Tagging Test")
+	page := doc.AddPage(600, 800)
+
+	root := doc.CreateStructTreeRoot()
+	docElem := root.NewChild(StructTypeDocument)
+
+	// Table with Caption, TR, TH (col, row, both scopes), TD
+	tbl := docElem.NewChild(StructTypeTable)
+	caption := tbl.NewChild(StructTypeCaption)
+	mcidCap := page.AllocMCID(caption)
+
+	tr := tbl.NewChild(StructTypeTR)
+
+	thCol := tr.NewChild(StructTypeTH) // default scope: Column
+	mcidTHCol := page.AllocMCID(thCol)
+
+	thRow := tr.NewChild(StructTypeTH)
+	thRow.SetTableScope("Row")
+	mcidTHRow := page.AllocMCID(thRow)
+
+	thBoth := tr.NewChild(StructTypeTH)
+	thBoth.SetTableScope("Both")
+	mcidTHBoth := page.AllocMCID(thBoth)
+
+	td := tr.NewChild(StructTypeTD)
+	mcidTD := page.AllocMCID(td)
+
+	// List > LI > Lbl + LBody (with nested L)
+	listElem := docElem.NewChild(StructTypeL)
+	liElem := listElem.NewChild(StructTypeLI)
+	lblElem := liElem.NewChild(StructTypeLbl)
+	mcidLbl := page.AllocMCID(lblElem)
+
+	lbodyElem := liElem.NewChild(StructTypeLBody)
+	pElem := lbodyElem.NewChild(StructTypeP)
+	mcidP := page.AllocMCID(pElem)
+
+	nestedList := lbodyElem.NewChild(StructTypeL)
+	nestedLI := nestedList.NewChild(StructTypeLI)
+	nestedLbl := nestedLI.NewChild(StructTypeLbl)
+	mcidNestedLbl := page.AllocMCID(nestedLbl)
+
+	nestedLBody := nestedLI.NewChild(StructTypeLBody)
+	nestedP := nestedLBody.NewChild(StructTypeP)
+	mcidNestedP := page.AllocMCID(nestedP)
+
+	content := page.Content()
+	content.UseEmbeddedFont("F1", fnt)
+
+	content.BeginMarkedContent(string(StructTypeCaption), mcidCap)
+	content.BeginText()
+	content.SetFont("F1", 12)
+	content.TextAt(50, 750)
+	content.TextShow("Table Caption")
+	content.EndText()
+	content.EndMarkedContent()
+
+	content.BeginMarkedContent(string(StructTypeTH), mcidTHCol)
+	content.BeginText()
+	content.SetFont("F1", 12)
+	content.TextAt(50, 700)
+	content.TextShow("Col Header")
+	content.EndText()
+	content.EndMarkedContent()
+
+	content.BeginMarkedContent(string(StructTypeTH), mcidTHRow)
+	content.BeginText()
+	content.SetFont("F1", 12)
+	content.TextAt(150, 700)
+	content.TextShow("Row Header")
+	content.EndText()
+	content.EndMarkedContent()
+
+	content.BeginMarkedContent(string(StructTypeTH), mcidTHBoth)
+	content.BeginText()
+	content.SetFont("F1", 12)
+	content.TextAt(250, 700)
+	content.TextShow("Both Header")
+	content.EndText()
+	content.EndMarkedContent()
+
+	content.BeginMarkedContent(string(StructTypeTD), mcidTD)
+	content.BeginText()
+	content.SetFont("F1", 12)
+	content.TextAt(350, 700)
+	content.TextShow("Data")
+	content.EndText()
+	content.EndMarkedContent()
+
+	content.BeginMarkedContent(string(StructTypeLbl), mcidLbl)
+	content.BeginText()
+	content.SetFont("F1", 12)
+	content.TextAt(50, 600)
+	content.TextShow("\u2022")
+	content.EndText()
+	content.EndMarkedContent()
+
+	content.BeginMarkedContent(string(StructTypeP), mcidP)
+	content.BeginText()
+	content.SetFont("F1", 12)
+	content.TextAt(70, 600)
+	content.TextShow("List item body text")
+	content.EndText()
+	content.EndMarkedContent()
+
+	content.BeginMarkedContent(string(StructTypeLbl), mcidNestedLbl)
+	content.BeginText()
+	content.SetFont("F1", 12)
+	content.TextAt(70, 550)
+	content.TextShow("-")
+	content.EndText()
+	content.EndMarkedContent()
+
+	content.BeginMarkedContent(string(StructTypeP), mcidNestedP)
+	content.BeginText()
+	content.SetFont("F1", 12)
+	content.TextAt(90, 550)
+	content.TextShow("Nested item text")
+	content.EndText()
+	content.EndMarkedContent()
+
+	var buf bytes.Buffer
+	if err := doc.Write(&buf); err != nil {
+		t.Fatalf("doc.Write: %v", err)
+	}
+
+	outStr := buf.String()
+
+	// Verify Structure Tags exist
+	expectedTags := []string{
+		"/S /Caption", "/S /Table", "/S /TR", "/S /TH", "/S /TD",
+		"/S /L", "/S /LI", "/S /Lbl", "/S /LBody", "/S /P",
+	}
+	for _, tag := range expectedTags {
+		if !strings.Contains(outStr, tag) {
+			t.Errorf("expected structure tag %s in output", tag)
+		}
+	}
+
+	// Verify /A Table Scope Attributes on TH StructElems
+	if !strings.Contains(outStr, "<< /O /Table /Scope /Column >>") {
+		t.Errorf("missing /Scope /Column attribute on TH StructElem")
+	}
+	if !strings.Contains(outStr, "<< /O /Table /Scope /Row >>") {
+		t.Errorf("missing /Scope /Row attribute on TH StructElem")
+	}
+	if !strings.Contains(outStr, "<< /O /Table /Scope /Both >>") {
+		t.Errorf("missing /Scope /Both attribute on TH StructElem")
+	}
+}
+
+func TestAnnotationComplianceFlagsAndOBJR(t *testing.T) {
+	t.Parallel()
+
+	fnt, err := DefaultFont()
+	if err != nil {
+		t.Fatalf("DefaultFont: %v", err)
+	}
+
+	doc, err := NewDocumentWithPolicy(WriterPolicy{
+		Version:            PDF17,
+		ConformanceProfile: ProfilePDFUA1,
+	})
+	if err != nil {
+		t.Fatalf("NewDocumentWithPolicy: %v", err)
+	}
+
+	doc.SetInfo("Title", "Annotation Compliance Document")
+	doc.SetLang("en-US")
+
+	page := doc.AddPage(600, 800)
+	root := doc.CreateStructTreeRoot()
+	docElem := root.NewChild(StructTypeDocument)
+
+	// Add link annotation and attach via SetObjRef
+	ref1 := page.AddLinkURI([4]float64{50, 400, 200, 420}, "https://example.com/objr1")
+	linkElem1 := docElem.NewChild(StructTypeLink)
+	linkElem1.SetObjRef(ref1, page)
+	mcid1 := page.AllocMCID(linkElem1)
+
+	// Add dest annotation and attach via AddAnnot
+	ref2 := page.AddLinkDest([4]float64{50, 300, 200, 320}, 0, 50, 700)
+	linkElem2 := docElem.NewChild(StructTypeLink)
+	linkElem2.AddAnnot(ref2, page)
+	mcid2 := page.AllocMCID(linkElem2)
+
+	c := page.Content()
+	c.UseEmbeddedFont("F1", fnt)
+
+	c.BeginMarkedContent(string(StructTypeLink), mcid1)
+	c.BeginText()
+	c.SetFont("F1", 12)
+	c.TextAt(50, 405)
+	c.TextShow("Link 1")
+	c.EndText()
+	c.EndMarkedContent()
+
+	c.BeginMarkedContent(string(StructTypeLink), mcid2)
+	c.BeginText()
+	c.SetFont("F1", 12)
+	c.TextAt(50, 305)
+	c.TextShow("Link 2")
+	c.EndText()
+	c.EndMarkedContent()
+
+	var buf bytes.Buffer
+	if err := doc.Write(&buf); err != nil {
+		t.Fatalf("doc.Write: %v", err)
+	}
+
+	outStr := buf.String()
+
+	// 1. Check /Border [0 0 0] /F 4 and /Contents on both annotations
+	if !strings.Contains(outStr, "/Type /Annot /Subtype /Link /Rect [50 400 200 420] /Border [0 0 0] /F 4") {
+		t.Errorf("URI annotation missing /Border [0 0 0] /F 4")
+	}
+
+	if !strings.Contains(outStr, "/Contents (https://example.com/objr1)") {
+		t.Errorf("URI annotation missing /Contents")
+	}
+
+	if !strings.Contains(outStr, "/Border [0 0 0] /F 4") || !strings.Contains(outStr, "/Dest [") {
+		t.Errorf("Dest annotation missing /Border [0 0 0] /F 4")
+	}
+
+	// 2. Check /Tabs /S on page
+	if !strings.Contains(outStr, "/Tabs /S") {
+		t.Errorf("Page missing /Tabs /S")
+	}
+
+	// 3. Check /OBJR references in StructElems
+	wantOBJR1 := fmt.Sprintf("<< /Type /OBJR /Obj %s /Pg %s >>", ref1.String(), page.ref.String())
+	wantOBJR2 := fmt.Sprintf("<< /Type /OBJR /Obj %s /Pg %s >>", ref2.String(), page.ref.String())
+
+	if !strings.Contains(outStr, wantOBJR1) {
+		t.Errorf("StructElem missing OBJR 1 %q", wantOBJR1)
+	}
+
+	if !strings.Contains(outStr, wantOBJR2) {
+		t.Errorf("StructElem missing OBJR 2 %q", wantOBJR2)
 	}
 }

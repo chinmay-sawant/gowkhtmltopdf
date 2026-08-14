@@ -158,6 +158,19 @@ func drawTextHF(page *pdf.Page, hfVal settings.HeaderFooter, geom hfGeom, parms 
 		baseY = spacing + descent
 	}
 
+	left := parms.substitute(hfVal.Left)
+	center := parms.substitute(hfVal.Center)
+	right := parms.substitute(hfVal.Right)
+
+	if !hfVal.Line && left == "" && center == "" && right == "" {
+		return
+	}
+
+	isUA1 := page.Doc() != nil && page.Doc().Policy().IsPDFUA1()
+	if isUA1 {
+		cur.BeginArtifact("Pagination")
+	}
+
 	cur.SetFillColor(0, 0, 0)
 
 	if hfVal.Line {
@@ -172,15 +185,6 @@ func drawTextHF(page *pdf.Page, hfVal settings.HeaderFooter, geom hfGeom, parms 
 		cur.LineTo(page.Width()-geom.marginRight, lyVal)
 		cur.Stroke()
 	}
-
-	isUA1 := page.Doc() != nil && page.Doc().Policy().IsPDFUA1()
-	if isUA1 {
-		cur.BeginArtifact("Pagination")
-	}
-
-	left := parms.substitute(hfVal.Left)
-	center := parms.substitute(hfVal.Center)
-	right := parms.substitute(hfVal.Right)
 
 	draw := func(text string, posX float64) {
 		if text == "" {
@@ -483,13 +487,14 @@ func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hfVal se
 
 	pageContent := page.Content()
 	pageContent.Save()
-	pageContent.Rect(0, bandTop, page.Width(), bandH)
-	pageContent.Clip()
 
 	isUA1 := page.Doc() != nil && page.Doc().Policy().IsPDFUA1()
 	if isUA1 {
 		pageContent.BeginArtifact("Pagination")
 	}
+
+	pageContent.Rect(0, bandTop, page.Width(), bandH)
+	pageContent.Clip()
 
 	err := paintLayoutOps(ctx, page, pageContent, res.Ops, geom.marginLeft, yTop, links)
 
@@ -563,7 +568,8 @@ func paintLayoutOps(ctx context.Context, page *pdf.Page, c *pdf.Content, ops []l
 			}
 
 			dx, dy := dest.st.geom.pdfXY(dest.loc)
-			page.AddLinkDest(rect, destPage, dx, dy)
+			annotRef := page.AddLinkDest(rect, destPage, dx, dy)
+			attachLinkStructElem(page.Doc(), page, oper.StructElem, annotRef)
 
 			continue
 		}
@@ -572,7 +578,8 @@ func paintLayoutOps(ctx context.Context, page *pdf.Page, c *pdf.Content, ops []l
 			continue
 		}
 
-		page.AddLinkURI(rect, uri)
+		annotRef := page.AddLinkURI(rect, uri)
+		attachLinkStructElem(page.Doc(), page, oper.StructElem, annotRef)
 	}
 
 	return nil

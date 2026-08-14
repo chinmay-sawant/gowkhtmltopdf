@@ -290,3 +290,145 @@ func TestVeraPDFOptionalValidation(t *testing.T) {
 		t.Logf("verapdf -f ua1 outcome: %s", strings.TrimSpace(string(outUA1)))
 	}
 }
+
+// TestPDFUA1ContentMarkedCompleteness validates that in PDF/UA-1 mode, 100% of all visual
+// marking operations in all content streams are properly enclosed in marked content sequences
+// or artifact sequences per ISO 14289-1 and Matterhorn Protocol 01-005.
+//
+//nolint:cyclop,gocyclo,funlen,gocognit,wsl,lll,nlreturn
+func TestPDFUA1ContentMarkedCompleteness(t *testing.T) {
+	t.Parallel()
+
+	dataURI := "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+	htmlDoc := `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Completeness Test</title>
+<style>
+  body { font-family: sans-serif; }
+  h1 { background-color: #f0f0f0; border-bottom: 2px solid #333; }
+  p { margin: 8px 0; }
+  table { border-collapse: collapse; width: 100%; background-color: #fafafa; }
+  th, td { border: 1px solid #aaa; padding: 6px; }
+  hr { border: 0; height: 1px; background: #666; }
+  ul { padding-left: 20px; }
+</style>
+</head>
+<body>
+<h1>Heading 1 with Background & Border</h1>
+<p>Paragraph with an <a href="https://example.com">inline link</a>.</p>
+<hr>
+<table>
+  <tr><th>Header Col 1</th><th>Header Col 2</th></tr>
+  <tr><td>Cell 1</td><td>Cell 2</td></tr>
+</table>
+<ul>
+  <li>List Item 1</li>
+  <li>List Item 2</li>
+</ul>
+<img src="` + dataURI + `" alt="Test image diagram">
+</body>
+</html>`
+
+	cmd, _ := newCommand(t, htmlDoc, "")
+	cmd.Global.PdfProfile = settings.ProfilePDFUA1
+	cmd.Global.Title = "Completeness Test"
+	cmd.Global.Header.Left = "Header Text"
+	cmd.Global.Header.Line = true
+	cmd.Global.Footer.Right = "Page [page]"
+	cmd.Global.Footer.Line = true
+	cmd.Global.UseCompression = false
+
+	data := runPDF(t, cmd)
+	str := string(data)
+
+	// Verify required structure tags and artifacts exist
+	for _, expected := range []string{
+		"/Artifact << /Type /Pagination >> BDC",
+		"/Artifact << /Type /Background >> BDC",
+		"/Artifact << /Type /Layout >> BDC",
+		"/MCID",
+		"/S /H1",
+		"/S /P",
+		"/S /Table",
+		"/S /TR",
+		"/S /TH",
+		"/S /TD",
+		"/S /L",
+		"/S /LI",
+		"/S /Figure",
+		"/S /Link",
+	} {
+		if !strings.Contains(str, expected) {
+			t.Errorf("missing expected structure or artifact token %q", expected)
+		}
+	}
+
+	// Verify that all content stream painting operations are enclosed in BDC...EMC
+	streamRe := regexp.MustCompile(`(?s)stream\r?\n(.*?)\r?\nendstream`)
+	matches := streamRe.FindAllStringSubmatch(str, -1)
+	if len(matches) == 0 {
+		t.Fatal("no streams found in uncompressed PDF")
+	}
+
+	checkedStreams := 0
+	for _, m := range matches {
+		streamContent := m[1]
+		// Skip non-content streams (ICC profiles, XMP metadata, embedded fonts, image streams)
+		if strings.Contains(streamContent, "<x:xmpmeta") ||
+			strings.Contains(streamContent, "FontFile") ||
+			strings.Contains(streamContent, "ICCBased") ||
+			len(streamContent) == 0 {
+			continue
+		}
+
+		lines := strings.Split(streamContent, "\n")
+		markedDepth := 0
+		hasDrawingOp := false
+
+		for lineIdx, rawLine := range lines {
+			trimmed := strings.TrimSpace(rawLine)
+			if trimmed == "" {
+				continue
+			}
+
+			if strings.HasSuffix(trimmed, "BDC") || strings.HasSuffix(trimmed, "BMC") {
+				markedDepth++
+				continue
+			}
+			if trimmed == "EMC" {
+				if markedDepth <= 0 {
+					t.Errorf("unmatched EMC at line %d in stream: %q", lineIdx, trimmed)
+				} else {
+					markedDepth--
+				}
+				continue
+			}
+
+			// Check visual drawing operators
+			isVisualOp := trimmed == "f" || trimmed == "f*" || trimmed == "F" ||
+				trimmed == "S" || trimmed == "s" ||
+				trimmed == "B" || trimmed == "B*" || trimmed == "b" || trimmed == "b*" ||
+				trimmed == "BT" || strings.HasSuffix(trimmed, " Do") || trimmed == "sh"
+
+			if isVisualOp {
+				hasDrawingOp = true
+				if markedDepth == 0 {
+					t.Errorf("Matterhorn 01-005 violation: visual op %q at line %d outside marked content (depth=0)", trimmed, lineIdx)
+				}
+			}
+		}
+
+		if hasDrawingOp {
+			checkedStreams++
+			if markedDepth != 0 {
+				t.Errorf("stream ended with unclosed marked content depth %d", markedDepth)
+			}
+		}
+	}
+
+	if checkedStreams == 0 {
+		t.Errorf("expected at least one checked page content stream, got %d", checkedStreams)
+	}
+}

@@ -38,6 +38,18 @@ const (
 	StructTypeL StructType = "L"
 	// StructTypeLI is a list item.
 	StructTypeLI StructType = "LI"
+	// StructTypeLbl is a list item label (bullet or item number).
+	StructTypeLbl StructType = "Lbl"
+	// StructTypeLBody is a list item body container.
+	StructTypeLBody StructType = "LBody"
+	// StructTypeCaption is a caption element for a table or figure.
+	StructTypeCaption StructType = "Caption"
+	// StructTypeTHead is a table head row group.
+	StructTypeTHead StructType = "THead"
+	// StructTypeTBody is a table body row group.
+	StructTypeTBody StructType = "TBody"
+	// StructTypeTFoot is a table foot row group.
+	StructTypeTFoot StructType = "TFoot"
 	// StructTypeFigure is an illustration or graphic image.
 	StructTypeFigure StructType = "Figure"
 	// StructTypeLink is an interactive hypertext or internal link.
@@ -66,6 +78,12 @@ const (
 	StructTD       = StructTypeTD
 	StructL        = StructTypeL
 	StructLI       = StructTypeLI
+	StructLbl      = StructTypeLbl
+	StructLBody    = StructTypeLBody
+	StructCaption  = StructTypeCaption
+	StructTHead    = StructTypeTHead
+	StructTBody    = StructTypeTBody
+	StructTFoot    = StructTypeTFoot
 	StructFigure   = StructTypeFigure
 	StructLink     = StructTypeLink
 	StructSpan     = StructTypeSpan
@@ -107,6 +125,14 @@ func (r *StructTreeRoot) Ref() string {
 	return r.ref.String()
 }
 
+// contentRef is one marked-content sequence owned by a StructElem on a page.
+// MCIDs are page-local; multi-page elements must serialize as MCR dictionaries
+// (ISO 32000-1 §14.7.4.2) rather than bare integers under a single /Pg.
+type contentRef struct {
+	page *Page
+	mcid int
+}
+
 // StructElem represents a single structure element in the ISO 32000-1 structure tree.
 type StructElem struct {
 	doc        *Document
@@ -115,12 +141,13 @@ type StructElem struct {
 	Tag        StructType
 	Page       *Page
 	Kids       []*StructElem
-	MCIDs      []int
+	content    []contentRef
 	Alt        string
 	Lang       string
 	Title      string
 	ActualText string
 	AnnotRef   objRef
+	TableScope string
 }
 
 // AddChild appends a child StructElem to this element.
@@ -186,9 +213,32 @@ func (e *StructElem) SetAnnotation(page *Page, annotIndex int) {
 	e.AnnotRef = page.annots[annotIndex].annotRef
 }
 
+// SetObjRef links an annotation indirect object and page to this StructElem.
+func (e *StructElem) SetObjRef(ref objRef, page *Page) {
+	e.AnnotRef = ref
+	if page != nil {
+		e.Page = page
+	}
+}
+
+// AddAnnot links an annotation indirect object and page to this StructElem.
+func (e *StructElem) AddAnnot(ref objRef, page *Page) {
+	e.AnnotRef = ref
+	if page != nil {
+		e.Page = page
+	}
+}
+
+// SetTableScope sets the table header cell scope (/Column, /Row, or /Both) for a TH element.
+func (e *StructElem) SetTableScope(scope string) {
+	e.TableScope = scope
+}
+
 // AddMCID appends a marked content identifier belonging to this element.
+// The MCID is associated with e.Page when set; prefer Page.AllocMCID so the
+// page is recorded correctly for multi-page elements.
 func (e *StructElem) AddMCID(mcid int) {
-	e.MCIDs = append(e.MCIDs, mcid)
+	e.content = append(e.content, contentRef{page: e.Page, mcid: mcid})
 }
 
 // Ref returns the indirect object reference string for this StructElem.
@@ -227,7 +277,7 @@ func (p *Page) AllocMCID(elem *StructElem) int {
 
 	mcid := len(p.mcids)
 	p.mcids = append(p.mcids, elem)
-	elem.MCIDs = append(elem.MCIDs, mcid)
+	elem.content = append(elem.content, contentRef{page: p, mcid: mcid})
 
 	if elem.Page == nil {
 		elem.Page = p
@@ -249,6 +299,29 @@ func assignStructElemRefs(doc *Document, elem *StructElem) {
 	}
 }
 
+// pruneEmptyStructElems removes any unnecessary empty structure element subtree,
+// while preserving required document, table, and list structural tags.
+func pruneEmptyStructElems(elem *StructElem) bool {
+	validKids := make([]*StructElem, 0, len(elem.Kids))
+
+	for _, kid := range elem.Kids {
+		if !pruneEmptyStructElems(kid) {
+			validKids = append(validKids, kid)
+		}
+	}
+
+	elem.Kids = validKids
+
+	//nolint:exhaustive // explicit preserve list for table, list, and doc structural elements
+	switch elem.Tag {
+	case StructTypeDocument, StructTypeTable, StructTypeTR, StructTypeTH, StructTypeTD,
+		StructTypeL, StructTypeLI, StructTypeLBody, StructTypeCaption:
+		return false
+	default:
+		return len(elem.Kids) == 0 && len(elem.content) == 0 && elem.AnnotRef == 0
+	}
+}
+
 // finalizeStructure creates and serializes StructTreeRoot, ParentTree, and all StructElems.
 func (d *Document) finalizeStructure() error {
 	if !d.policy.IsPDFUA1() {
@@ -259,6 +332,21 @@ func (d *Document) finalizeStructure() error {
 		d.structTreeRoot = &StructTreeRoot{doc: d} //nolint:exhaustruct // default structure root
 		_ = d.structTreeRoot.NewChild(StructTypeDocument)
 	}
+
+	validRootKids := make([]*StructElem, 0, len(d.structTreeRoot.Children))
+
+	for _, child := range d.structTreeRoot.Children {
+		if !pruneEmptyStructElems(child) {
+			validRootKids = append(validRootKids, child)
+		}
+	}
+
+	if len(validRootKids) == 0 {
+		docElem := d.structTreeRoot.NewChild(StructTypeDocument)
+		validRootKids = []*StructElem{docElem}
+	}
+
+	d.structTreeRoot.Children = validRootKids
 
 	d.structTreeRootRef = d.newObject()
 	d.structTreeRoot.ref = d.structTreeRootRef
@@ -280,28 +368,85 @@ func (d *Document) finalizeStructure() error {
 }
 
 // buildParentTree constructs the ParentTree number tree dictionary mapping
-// page StructParents indices to arrays of StructElem object references per MCID.
+// page StructParents indices to arrays of StructElem object references per MCID,
+// and annotation StructParent indices to owning StructElem references.
+//
+//nolint:cyclop,funlen,gocognit // ParentTree number tree construction over pages and annotations
 func (d *Document) buildParentTree() {
-	numsParts := make([]string, 0, len(d.pages))
+	for _, page := range d.pages {
+		for i := range page.annots {
+			if page.annots[i].annotRef == 0 {
+				page.annots[i].annotRef = d.newObject()
+			}
+		}
+	}
+
+	annotToElem := make(map[objRef]*StructElem)
+
+	var collectAnnotElems func(e *StructElem)
+	collectAnnotElems = func(e *StructElem) {
+		if e.AnnotRef != 0 {
+			annotToElem[e.AnnotRef] = e
+		}
+
+		for _, kid := range e.Kids {
+			collectAnnotElems(kid)
+		}
+	}
+
+	for _, child := range d.structTreeRoot.Children {
+		collectAnnotElems(child)
+	}
+
+	var fallbackDocElem *StructElem
+	if len(d.structTreeRoot.Children) > 0 {
+		fallbackDocElem = d.structTreeRoot.Children[0]
+	}
+
+	for _, page := range d.pages {
+		for i := range page.annots {
+			ref := page.annots[i].annotRef
+			if _, exists := annotToElem[ref]; !exists && fallbackDocElem != nil {
+				linkElem := fallbackDocElem.NewChild(StructTypeLink)
+				linkElem.SetObjRef(ref, page)
+				assignStructElemRefs(d, linkElem)
+				annotToElem[ref] = linkElem
+			}
+		}
+	}
+
+	numsParts := make([]string, 0, len(d.pages)+len(d.pages))
 	nextStructParents := 0
 
 	for _, page := range d.pages {
-		if len(page.mcids) == 0 {
-			continue
+		if len(page.mcids) > 0 {
+			structParents := nextStructParents
+			nextStructParents++
+			page.structParents = structParents
+			page.hasStructParents = true
+
+			elemRefs := make([]string, 0, len(page.mcids))
+			for _, elem := range page.mcids {
+				elemRefs = append(elemRefs, elem.ref.String())
+			}
+
+			numsParts = append(numsParts, fmt.Sprintf("%d [ %s ]", structParents, strings.Join(elemRefs, " ")))
 		}
 
-		structParents := nextStructParents
-		nextStructParents++
-		page.structParents = structParents
-		page.hasStructParents = true
+		for i := range page.annots {
+			a := &page.annots[i]
+			if elem, ok := annotToElem[a.annotRef]; ok {
+				annotStructParent := nextStructParents
+				nextStructParents++
+				a.structParent = annotStructParent
+				a.hasStructParent = true
 
-		elemRefs := make([]string, 0, len(page.mcids))
-		for _, elem := range page.mcids {
-			elemRefs = append(elemRefs, elem.ref.String())
+				numsParts = append(numsParts, fmt.Sprintf("%d %s", annotStructParent, elem.ref.String()))
+			}
 		}
-
-		numsParts = append(numsParts, fmt.Sprintf("%d [ %s ]", structParents, strings.Join(elemRefs, " ")))
 	}
+
+	d.parentTreeNextKey = nextStructParents
 
 	if len(numsParts) > 0 {
 		d.parentTreeRef = d.newObject()
@@ -326,35 +471,49 @@ func (d *Document) serializeStructTreeRoot() {
 	}
 
 	if d.parentTreeRef != 0 {
-		rootDict = rootDict.add("/ParentTree", d.parentTreeRef.String())
+		rootDict = rootDict.add("/ParentTree", d.parentTreeRef.String()).
+			add("/ParentTreeNextKey", strconv.Itoa(d.parentTreeNextKey))
 	}
 
 	d.setDict(d.structTreeRootRef, rootDict.String())
 }
 
 func (d *Document) formatStructKids(elem *StructElem) string {
-	if len(elem.Kids) > 0 {
-		kidRefs := make([]string, 0, len(elem.Kids))
-		for _, kid := range elem.Kids {
-			kidRefs = append(kidRefs, kid.ref.String())
-		}
-
-		if len(kidRefs) == 1 {
-			return kidRefs[0]
-		}
-
-		return "[" + strings.Join(kidRefs, " ") + "]"
+	kItems := make([]string, 0, len(elem.Kids)+len(elem.content)+1)
+	for _, kid := range elem.Kids {
+		kItems = append(kItems, kid.ref.String())
 	}
 
-	kItems := make([]string, 0, len(elem.MCIDs)+1)
-	for _, mcid := range elem.MCIDs {
-		kItems = append(kItems, strconv.Itoa(mcid))
+	// Bare MCID integers are only valid relative to the element's single /Pg.
+	// Content spanning multiple pages (or a page other than /Pg) must use MCR
+	// dictionaries so each MCID is bound to its owning page.
+	useMCR := contentNeedsMCR(elem)
+	for _, cr := range elem.content {
+		if cr.page == nil {
+			kItems = append(kItems, strconv.Itoa(cr.mcid))
+
+			continue
+		}
+
+		if useMCR || cr.page != elem.Page {
+			kItems = append(kItems, fmt.Sprintf(
+				"<< /Type /MCR /Pg %s /MCID %d >>", cr.page.ref.String(), cr.mcid,
+			))
+		} else {
+			kItems = append(kItems, strconv.Itoa(cr.mcid))
+		}
 	}
 
 	if elem.AnnotRef != 0 {
 		pgRef := ""
-		if elem.Page != nil {
-			pgRef = " /Pg " + elem.Page.ref.String()
+
+		targetPage := elem.Page
+		if targetPage == nil && elem.parent != nil {
+			targetPage = elem.parent.Page
+		}
+
+		if targetPage != nil {
+			pgRef = " /Pg " + targetPage.ref.String()
 		}
 
 		kItems = append(kItems, fmt.Sprintf("<< /Type /OBJR /Obj %s%s >>", elem.AnnotRef.String(), pgRef))
@@ -369,7 +528,36 @@ func (d *Document) formatStructKids(elem *StructElem) string {
 	return ""
 }
 
+// contentNeedsMCR reports whether elem's marked content spans more than one page.
+func contentNeedsMCR(elem *StructElem) bool {
+	if elem == nil || len(elem.content) == 0 {
+		return false
+	}
+
+	var first *Page
+
+	for _, cr := range elem.content {
+		if cr.page == nil {
+			continue
+		}
+
+		if first == nil {
+			first = cr.page
+
+			continue
+		}
+
+		if cr.page != first {
+			return true
+		}
+	}
+
+	return false
+}
+
 // serializeStructElem serializes a single StructElem dictionary and its children.
+//
+//nolint:cyclop // sequential structure element serialization
 func (d *Document) serializeStructElem(elem *StructElem, parentRef objRef) error {
 	var elemDict dict
 	elemDict = elemDict.add("/Type", "/StructElem").
@@ -380,9 +568,12 @@ func (d *Document) serializeStructElem(elem *StructElem, parentRef objRef) error
 		elemDict = elemDict.add("/Pg", elem.Page.ref.String())
 	}
 
-	if kidsStr := d.formatStructKids(elem); kidsStr != "" {
-		elemDict = elemDict.add("/K", kidsStr)
+	kidsStr := d.formatStructKids(elem)
+	if kidsStr == "" {
+		kidsStr = "[]"
 	}
+
+	elemDict = elemDict.add("/K", kidsStr)
 
 	if elem.Alt != "" {
 		elemDict = elemDict.add("/Alt", d.encodeTextString(elem.Alt))
@@ -398,6 +589,12 @@ func (d *Document) serializeStructElem(elem *StructElem, parentRef objRef) error
 
 	if elem.ActualText != "" {
 		elemDict = elemDict.add("/ActualText", d.encodeTextString(elem.ActualText))
+	}
+
+	if elem.TableScope != "" {
+		elemDict = elemDict.add("/A", fmt.Sprintf("<< /O /Table /Scope /%s >>", elem.TableScope))
+	} else if elem.Tag == StructTypeTH {
+		elemDict = elemDict.add("/A", "<< /O /Table /Scope /Column >>")
 	}
 
 	d.setDict(elem.ref, elemDict.String())

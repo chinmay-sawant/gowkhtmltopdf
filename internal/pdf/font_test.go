@@ -427,3 +427,121 @@ func TestFontCacheSharedAcrossPagesPDF17(t *testing.T) {
 		t.Errorf("expected 1 FontFile2 across pages in PDF 1.7, got %d", strings.Count(out, "/FontFile2"))
 	}
 }
+
+func testFontWithStyle(t *testing.T, macStyle uint16) *Font {
+	t.Helper()
+
+	fnt, err := DefaultFont()
+	if err != nil {
+		t.Fatalf("DefaultFont: %v", err)
+	}
+
+	fresh, err := ParseTTF(fnt.data)
+	if err != nil {
+		t.Fatalf("ParseTTF: %v", err)
+	}
+
+	fresh.macStyle = macStyle
+
+	return fresh
+}
+
+func TestSubsetPostTableFormat3(t *testing.T) {
+	t.Parallel()
+
+	fnt := testFont(t)
+
+	sub, err := subsetFont(fnt, []rune("Test Format 3 Post"), subsetSimple)
+	if err != nil {
+		t.Fatalf("subsetFont failed: %v", err)
+	}
+
+	tables, err := parseTableDirectory(sub.data)
+	if err != nil {
+		t.Fatalf("parseTableDirectory failed: %v", err)
+	}
+
+	post, ok := tables["post"]
+	if !ok {
+		t.Fatal("missing post table in subset")
+	}
+
+	if len(post) != postTableSize {
+		t.Errorf("post table size = %d, want exactly %d bytes (Format 3.0)", len(post), postTableSize)
+	}
+
+	version := binary.BigEndian.Uint32(post[0:4])
+	if version != postTableVersion3 {
+		t.Errorf("post table version = %#08x, want %#08x (Format 3.0)", version, postTableVersion3)
+	}
+}
+
+func TestFontDescriptorFlagsRegular(t *testing.T) {
+	t.Parallel()
+
+	fnt := testFont(t)
+	doc := fixedDoc(t)
+	doc.SetCompression(false)
+
+	page := doc.AddPage(200, 200)
+	stream := page.Content()
+	stream.UseEmbeddedFont("F1", fnt)
+	stream.BeginText()
+	stream.SetFont("F1", 12)
+	stream.TextAt(10, 10)
+	stream.TextShow("Regular")
+	stream.EndText()
+
+	out := string(writePDF(t, doc))
+	if !strings.Contains(out, "/Flags 32") {
+		t.Errorf("expected regular FontDescriptor /Flags 32, got:\n%s", out)
+	}
+}
+
+func TestFontDescriptorFlagsBold(t *testing.T) {
+	t.Parallel()
+
+	fnt := testFontWithStyle(t, 1) // bold
+	doc := fixedDoc(t)
+	doc.SetCompression(false)
+
+	page := doc.AddPage(200, 200)
+	stream := page.Content()
+	stream.UseEmbeddedFont("F2", fnt)
+	stream.BeginText()
+	stream.SetFont("F2", 12)
+	stream.TextAt(10, 10)
+	stream.TextShow("Bold")
+	stream.EndText()
+
+	out := string(writePDF(t, doc))
+	if strings.Contains(out, "/Flags 36") || strings.Contains(out, "/Flags 4") {
+		t.Errorf("bold FontDescriptor incorrectly set Symbolic flag bit 3: \n%s", out)
+	}
+
+	if !strings.Contains(out, "/Flags 32") {
+		t.Errorf("expected bold FontDescriptor /Flags 32, got:\n%s", out)
+	}
+}
+
+func TestFontDescriptorFlagsItalic(t *testing.T) {
+	t.Parallel()
+
+	fnt := testFontWithStyle(t, 2) // italic
+	doc := fixedDoc(t)
+	doc.SetCompression(false)
+
+	page := doc.AddPage(200, 200)
+	stream := page.Content()
+	stream.UseEmbeddedFont("F3", fnt)
+	stream.BeginText()
+	stream.SetFont("F3", 12)
+	stream.TextAt(10, 10)
+	stream.TextShow("Italic")
+	stream.EndText()
+
+	out := string(writePDF(t, doc))
+	if !strings.Contains(out, "/Flags 96") {
+		t.Errorf("expected italic FontDescriptor /Flags 96 (32 | 64), got:\n%s", out)
+	}
+}

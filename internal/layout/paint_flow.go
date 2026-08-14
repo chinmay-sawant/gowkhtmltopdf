@@ -580,7 +580,7 @@ func boxInsideTable(boxNode *box) bool {
 
 func isTableElement(name string) bool {
 	switch name {
-	case "table", "caption", "colgroup", "thead", "tbody", "tfoot", "tr", "td", "th":
+	case "table", htmlCaption, htmlColgroup, htmlThead, htmlTbody, htmlTfoot, "tr", "td", "th":
 		return true
 	default:
 		return false

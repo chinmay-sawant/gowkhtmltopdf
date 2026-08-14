@@ -4,7 +4,10 @@ package pdf
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -50,6 +53,84 @@ func TestType0CJKEmbedding(t *testing.T) {
 			t.Errorf("missing %q", want)
 		}
 	}
+}
+
+// TestType0FontDescriptorNameMatchesBaseFont locks the Arlington rule that
+// CIDFontType2 FontDescriptor /FontName equals the CIDFont /BaseFont
+// (and the parent Type0 /BaseFont).
+func TestType0FontDescriptorNameMatchesBaseFont(t *testing.T) {
+	t.Parallel()
+
+	data, err := os.ReadFile(droidSansFallbackPath)
+	if err != nil {
+		t.Skip("system CJK font not available:", err)
+	}
+
+	fVal, err := ParseTTF(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fVal.PostScriptName = droidSansFallbackPSName
+	dVal := fixedDoc(t)
+	dVal.SetCompression(false)
+	p := dVal.AddPage(400, 200)
+	cur := p.Content()
+	cur.UseEmbeddedFont("F1", fVal)
+	cur.BeginText()
+	cur.SetFont("F1", 14)
+	cur.TextAt(20, 100)
+	cur.TextShow("你好世界")
+	cur.EndText()
+
+	out := writePDF(t, dVal)
+	if err := assertCIDFontDescriptorNamesMatch(out); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// assertCIDFontDescriptorNamesMatch verifies every CIDFontType2 FontDescriptor
+// /FontName equals that CIDFont's /BaseFont (Arlington FontDescriptorCIDType2.FontName).
+func assertCIDFontDescriptorNamesMatch(pdf []byte) error {
+	objs := map[int]string{}
+	reObj := regexp.MustCompile(`(?s)(\d+) 0 obj\s*(.*?)\s*endobj`)
+	for _, m := range reObj.FindAllSubmatch(pdf, -1) {
+		n, _ := strconv.Atoi(string(m[1]))
+		objs[n] = string(m[2])
+	}
+
+	checked := 0
+	for _, body := range objs {
+		if !strings.Contains(body, "/Subtype /CIDFontType2") {
+			continue
+		}
+		base := regexp.MustCompile(`/BaseFont\s*/([^\s/]+)`).FindStringSubmatch(body)
+		desc := regexp.MustCompile(`/FontDescriptor\s+(\d+)\s+0\s+R`).FindStringSubmatch(body)
+		if base == nil || desc == nil {
+			return fmt.Errorf("CIDFontType2 missing BaseFont or FontDescriptor: %s", body[:min(120, len(body))])
+		}
+		descBody := objs[mustAtoi(desc[1])]
+		fname := regexp.MustCompile(`/FontName\s*/([^\s/]+)`).FindStringSubmatch(descBody)
+		if fname == nil {
+			return fmt.Errorf("FontDescriptor %s missing FontName", desc[1])
+		}
+		if fname[1] != base[1] {
+			return fmt.Errorf("CIDFontType2 BaseFont /%s != FontDescriptor FontName /%s", base[1], fname[1])
+		}
+		checked++
+	}
+	if checked == 0 {
+		return fmt.Errorf("no CIDFontType2 objects found")
+	}
+	return nil
+}
+
+func mustAtoi(s string) int {
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		panic(err)
+	}
+	return n
 }
 
 func TestRegistryScanDroid(t *testing.T) {

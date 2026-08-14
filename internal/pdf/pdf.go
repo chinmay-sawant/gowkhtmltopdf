@@ -79,6 +79,9 @@ func (w *countingWriter) WriteString(text string) (int, error) {
 // formatting concern, not a data type, and refs cannot be malformed.
 type objRef int
 
+// ObjRef is an alias for objRef for external package access.
+type ObjRef = objRef
+
 func (r objRef) String() string { return strconv.Itoa(int(r)) + " 0 R" }
 
 // parseRef parses an "N 0 R" reference string (the exported surface still
@@ -141,6 +144,7 @@ type Document struct {
 	outputIntentRef   objRef            // set by finalize (PDF/A-3)
 	structTreeRootRef objRef            // set by finalizeStructure
 	parentTreeRef     objRef            // set by finalizeStructure
+	parentTreeNextKey int               // set by finalizeStructure
 	structTreeRoot    *StructTreeRoot
 	lang              string // document language (default "en-US")
 	finalized         bool
@@ -248,13 +252,15 @@ type Page struct {
 
 // annotation is a link annotation.
 type annotation struct {
-	rect     [4]float64 // x1,y1,x2,y2 in PDF coords
-	uri      string     // external link
-	destPage int        // internal link target (0-based page index)
-	destX    float64
-	destY    float64
-	hasDest  bool
-	annotRef objRef
+	rect            [4]float64 // x1,y1,x2,y2 in PDF coords
+	uri             string     // external link
+	destPage        int        // internal link target (0-based page index)
+	destX           float64
+	destY           float64
+	hasDest         bool
+	annotRef        objRef
+	structParent    int
+	hasStructParent bool
 }
 
 // AddPage appends a page with the given size in points.
@@ -380,7 +386,7 @@ func (p *Page) Doc() *Document { return p.doc }
 //nolint:revive // returning unexported objRef is required for StructElem link references
 func (p *Page) AddLinkURI(rect [4]float64, uri string) objRef {
 	ref := p.doc.newObject()
-	p.annots = append(p.annots, annotation{
+	p.annots = append(p.annots, annotation{ //nolint:exhaustruct // intentional zero-value fields
 		rect:     rect,
 		uri:      uri,
 		destPage: 0,
@@ -398,7 +404,7 @@ func (p *Page) AddLinkURI(rect [4]float64, uri string) objRef {
 //nolint:revive // returning unexported objRef is required for StructElem link references
 func (p *Page) AddLinkDest(rect [4]float64, page int, destX, destY float64) objRef {
 	ref := p.doc.newObject()
-	p.annots = append(p.annots, annotation{
+	p.annots = append(p.annots, annotation{ //nolint:exhaustruct // intentional zero-value fields
 		rect:     rect,
 		uri:      "",
 		destPage: page,
@@ -804,14 +810,13 @@ func (d *Document) infoDict() string {
 	}
 
 	info := dict{}
-	for _, k := range []string{"Title", "Subject", "Author", "Keywords"} {
+	for _, k := range []string{"Title", "Subject", "Author", "Keywords", "Creator"} {
 		if v, ok := d.info[k]; ok && v != "" {
 			info = info.add("/"+k, d.encodeTextString(v))
 		}
 	}
 
-	return info.add("/Creator", d.encodeTextString(d.info["Creator"])).
-		add("/Producer", d.encodeTextString(d.policy.ProducerVersion())).
+	return info.add("/Producer", d.encodeTextString(d.policy.ProducerVersion())).
 		add("/CreationDate", pdfString(pdfDate(now))).
 		add("/ModDate", pdfString(pdfDate(now))).
 		String()
@@ -854,10 +859,7 @@ func (d *Document) finalizePage(page *Page, pagesRef objRef) error {
 		}
 
 		parts = append(parts, "/Annots ["+strings.Join(refs, " ")+"]")
-
-		if d.policy.IsPDFUA1() {
-			parts = append(parts, "/Tabs /S")
-		}
+		parts = append(parts, "/Tabs /S")
 	}
 
 	parts = append(parts, ">>")
@@ -924,6 +926,18 @@ func buildPageResources(content *Content, iccRef objRef) (string, error) {
 	return res.String(), nil
 }
 
+func annotDescription(arg *annotation) string {
+	if arg.uri != "" {
+		return arg.uri
+	}
+
+	if arg.hasDest {
+		return fmt.Sprintf("Link to page %d", arg.destPage+1)
+	}
+
+	return "Link"
+}
+
 func (d *Document) buildAnnots(p *Page) {
 	for i := range p.annots {
 		arg := &p.annots[i]
@@ -935,8 +949,16 @@ func (d *Document) buildAnnots(p *Page) {
 
 		var buf strings.Builder
 
-		fmt.Fprintf(&buf, "<< /Type /Annot /Subtype /Link /Rect [%s %s %s %s]",
+		fmt.Fprintf(&buf, "<< /Type /Annot /Subtype /Link /Rect [%s %s %s %s] /Border [0 0 0] /F 4",
 			num(r[0]), num(r[1]), num(r[2]), num(r[3]))
+
+		if d.policy.IsPDFUA1() {
+			fmt.Fprintf(&buf, " /Contents %s", d.encodeTextString(annotDescription(arg)))
+
+			if arg.hasStructParent {
+				fmt.Fprintf(&buf, " /StructParent %d", arg.structParent)
+			}
+		}
 
 		if arg.hasDest {
 			if arg.destPage >= 0 && arg.destPage < len(d.pages) {

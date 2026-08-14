@@ -934,7 +934,8 @@ func TestPDF17RichDocument(t *testing.T) {
 	}
 
 	// Verify Annotations
-	wantURIAnnot := "/Subtype /Link /Rect [50 600 250 620] /A << /S /URI /URI (https://example.com/pdf17) >>"
+	wantURIAnnot := "/Subtype /Link /Rect [50 600 250 620] /Border [0 0 0] /F 4 " +
+		"/A << /S /URI /URI (https://example.com/pdf17) >>"
 	if !strings.Contains(outStr, wantURIAnnot) {
 		t.Errorf("URI annotation missing or malformed")
 	}

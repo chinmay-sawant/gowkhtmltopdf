@@ -68,6 +68,11 @@ func (d *Document) buildXMPMetadata() []byte {
 	fmt.Fprintf(&buf, "   <pdf:Producer>%s</pdf:Producer>\n", xmlEscape(d.policy.ProducerVersion()))
 	fmt.Fprintf(&buf, "   <xmp:CreateDate>%s</xmp:CreateDate>\n", dateStr)
 	fmt.Fprintf(&buf, "   <xmp:ModifyDate>%s</xmp:ModifyDate>\n", dateStr)
+	fmt.Fprintf(&buf, "   <xmp:MetadataDate>%s</xmp:MetadataDate>\n", dateStr)
+
+	if creator, ok := d.info["Creator"]; ok && creator != "" {
+		fmt.Fprintf(&buf, "   <xmp:CreatorTool>%s</xmp:CreatorTool>\n", xmlEscape(creator))
+	}
 
 	if title, ok := d.info["Title"]; ok && title != "" {
 		buf.WriteString("   <dc:title>\n")
@@ -75,6 +80,26 @@ func (d *Document) buildXMPMetadata() []byte {
 		fmt.Fprintf(&buf, "     <rdf:li xml:lang=\"x-default\">%s</rdf:li>\n", xmlEscape(title))
 		buf.WriteString("    </rdf:Alt>\n")
 		buf.WriteString("   </dc:title>\n")
+	}
+
+	if author, ok := d.info["Author"]; ok && author != "" {
+		buf.WriteString("   <dc:creator>\n")
+		buf.WriteString("    <rdf:Seq>\n")
+		fmt.Fprintf(&buf, "     <rdf:li>%s</rdf:li>\n", xmlEscape(author))
+		buf.WriteString("    </rdf:Seq>\n")
+		buf.WriteString("   </dc:creator>\n")
+	}
+
+	if subject, ok := d.info["Subject"]; ok && subject != "" {
+		buf.WriteString("   <dc:description>\n")
+		buf.WriteString("    <rdf:Alt>\n")
+		fmt.Fprintf(&buf, "     <rdf:li xml:lang=\"x-default\">%s</rdf:li>\n", xmlEscape(subject))
+		buf.WriteString("    </rdf:Alt>\n")
+		buf.WriteString("   </dc:description>\n")
+	}
+
+	if keywords, ok := d.info["Keywords"]; ok && keywords != "" {
+		fmt.Fprintf(&buf, "   <pdf:Keywords>%s</pdf:Keywords>\n", xmlEscape(keywords))
 	}
 
 	if d.policy.IsPDFA3() {

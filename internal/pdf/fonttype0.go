@@ -82,13 +82,18 @@ func (d *Document) ensureFont(fnt *Font, name string, used []rune) (objRef, erro
 		return 0, err
 	}
 
+	// Arlington / ISO 32000: FontDescriptor /FontName must equal the
+	// owning font's /BaseFont (CIDFontType2 parent for Type0 descendants).
 	pdfName := pdfNameToken(baseName)
+	if type0 {
+		pdfName += "Identity"
+	}
 
 	fileRef, descRef := d.embedFontFile(fnt, sub, pdfName)
 
 	var ref objRef
 	if type0 {
-		ref = d.emitType0(fnt, sub, pdfName+"Identity", fileRef, descRef)
+		ref = d.emitType0(fnt, sub, pdfName, fileRef, descRef)
 	} else {
 		ref = d.emitSimple(fnt, sub, pdfName, descRef)
 	}
@@ -111,16 +116,16 @@ func (d *Document) embedFontFile(fnt *Font, sub *subsetResult, fontName string) 
 	d.setStream(fileRef, raw)
 
 	xMin, yMin, xMax, yMax := fnt.PDFBBox()
+	// ISO 19005-3 §6.2.11.6: Nonsymbolic TrueType fonts must set bit 6 (32) and clear bit 3 (4).
 	flags := 32
 
-	italicAngle := 0
-	if fnt.Italic() {
+	italicAngle := int(fnt.italicAngle)
+	if italicAngle == 0 && fnt.Italic() {
 		italicAngle = defaultItalicAngle
-		flags |= 64
 	}
 
-	if fnt.Bold() {
-		flags |= 4
+	if fnt.Italic() {
+		flags |= 64
 	}
 
 	d.setDict(descRef, fmt.Sprintf(

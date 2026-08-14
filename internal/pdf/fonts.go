@@ -266,10 +266,10 @@ func (f *Font) parseOS2() {
 	}
 
 	if f.italicAngle == 0 {
-		// italic angle comes from 'post' when present
-		if post, ok := f.tables["post"]; ok && len(post) >= 4 {
+		// italic angle comes from 'post' when present (Fixed 16.16 format)
+		if post, ok := f.tables["post"]; ok && len(post) >= 6 {
 			//nolint:gosec // italicAngle is int16 per post spec
-			f.italicAngle = int16(binary.BigEndian.Uint16(post[4:6]) / fixed14Divisor)
+			f.italicAngle = int16(binary.BigEndian.Uint16(post[4:6]))
 		}
 	}
 }
