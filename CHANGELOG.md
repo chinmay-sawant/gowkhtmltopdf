@@ -6,40 +6,105 @@ binaries at build time (see README "Versioning").
 
 ## Unreleased
 
+## 0.2.0 (2026-08-14)
+
+Post-MVP release after [0.1.0](#010-2026-08-03). Still a **no-cgo, no-browser**
+HTML→PDF / HTML→image engine for **controlled templates** (invoices, tables,
+headers/footers, TOC, outlines). **Tier 1** (report quality) and **Tier 2**
+(leave wkhtmltopdf for most report jobs) are closed. This is **not** Chrome
+print parity.
+
+PRs: [#7](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/7)–[#34](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/34)
+(engine, docs, samples), [#36](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/36)
+(release prep), [#37](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/37)
+(docs site), [#38](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/38)
+(CONTRIBUTING). Compare:
+[v0.1.0...v0.2.0](https://github.com/chinmay-sawant/gowkhtmltopdf/compare/v0.1.0...v0.2.0).
+
 ### Added
 
-- **Benchmarks vs wkhtmltopdf:** re-measured the generic CLI against
-  installed wkhtmltopdf 0.12.6.1 (2026-08-14). Faster at every size
-  (16x at 2 pages, 1.6x at 500 pages). `make bench` and
-  `make bench-cli-compare` reproduce the snapshot.
-- **Site Benchmarks tab:** process-level comparison, speedup chart, and
-  in-process matrix on the documentation site.
+- **Typography:** Liberation Sans/Serif/Mono Regular/Bold/Italic/BoldItalic
+  plus DejaVu Sans Unicode fallback. CSS `font-weight` / `font-style` select
+  real faces. Image mode rasterizes TTF outlines (coverage AA) instead of the
+  0.1.0 5×7 bitmap font.
+- **Fonts / Unicode:** `--font-path` / `--use-system-fonts`; Type0/CID
+  Identity-H for runes above U+00FF; local/HTTPS `@font-face` TTF/OTF/WOFF1
+  (PDF and image). OpenType GSUB via allowlisted `go-text/typesetting` when
+  the face has it; Arabic presentation-form + Lam-Alef fallback. No bundled
+  Noto CJK — pass a capable face or you still get tofu.
+- **CSS for reports:** attribute / `:nth-child` / sibling selectors; float
+  lite; real `inline-block`; `box-sizing`; `text-align: justify`; cell
+  `vertical-align`; flex Stage A; grid Stage B + Stage C lite (named areas,
+  dense, copy-inherit subgrid, one-axis masonry); `position`
+  relative/absolute/fixed lite; print-scoped sticky; repeating `<thead>`;
+  CSS `orphans`/`widows`; nested HTML headers/footers; multicol lite;
+  static 2D transforms + opacity; `:has()`; size-only `@container`; print
+  `@media` subset; HTML entity decoding; SVG-as-`<img>` via allowlisted
+  `tdewolff/canvas`.
+- **Library:** `ConvertHTML`; typed `PDFRequest` / `RunPDF` and
+  `ImageRequest` / `RunImage` (string `Converter` API kept); `GuessURL`
+  `inline:` prefix; `web.images=false` skips image XObjects; settings
+  cloned at ownership boundaries; context cancellation through layout,
+  HF paint, and raster.
+- **CLI / ops:** mode-invalid flags fail at parse; Restricted dial pinning;
+  opt-in `--simplify-dom` chrome-strip (default off); `v*` tag workflow
+  publishes linux/windows/darwin × amd64/arm64 binaries + `SHA256SUMS`.
+- **Documentation site:** https://chinmay-sawant.github.io/gowkhtmltopdf/
+  — Overview, Getting Started, sidebar docs, Issue Dossier (1,329 open
+  wkhtmltopdf issues classified), Showcase gallery, Benchmarks tab.
+- **Docs:** fidelity guide, fonts guide, performance snapshots,
+  comparison with SebastiaanKlippert/go-wkhtmltopdf, 2026 landscape note,
+  architecture deep-dives, `CONTRIBUTING.md`, versioned `plans/0.1.0/` and
+  `plans/0.2.0/`.
+- **Samples:** fixtures 21–56 (detailed report, float chrome, thead, flex,
+  CJK, sticky, nested HF, posters, storybooks, boarding pass, architecture
+  diagram). Regenerated `output/` PDFs and showcase thumbs.
+- **Benchmarks:** `make bench` / `make bench-cli-compare`. 2026-08-14
+  generic CLI vs wkhtmltopdf 0.12.6.1: **16x** at 2 pages, **1.6x** at
+  500 pages. Faster at every tested size. See
+  `documentation/performance.md`.
 
-### Fixed (print / layout)
+### Changed
 
-- **Long tokens / URLs:** honor `overflow-wrap` / `word-break` (with inheritance);
-  emergency wrap when a token exceeds the line so text does not paint past the
-  page edge; soft breaks at URL punctuation.
-- **Float tails:** short remaining text that fits one full-width line clears
-  below the float instead of orphaning beside it.
-- **Captions:** `overflow-wrap: break-word` no longer mid-breaks words that fit
-  the next full line.
-- **Tables:** per-row border-collapse grid bound to row op ranges (no phantom
-  empty bands across page breaks); empty/padding-only rows collapsed; leading
-  all-`<th>` rows repeat as headers; multi-cite nowrap min-content; rowspan
-  cells with `<br>` cites spread vertically across the cell height.
-- **Pagination:** `preferSplitOverBlank` for short `page-break-inside: avoid`
-  boxes (dense reference lists); **disabled** document-global gap packing that
-  crushed line spacing and interleaved body text.
-- **Links:** coalesce same-href underlines on a line; clamp stroke weight; skip
-  underlines on bare URL strings in reference lists.
-- **Sample:** regenerate `output/wiki-ana-de-armas.pdf` (live Wikipedia smoke).
+- `box-sizing: content-box` is now the default. Explicit `width` + padding
+  without `box-sizing` grows vs 0.1.0; add `box-sizing: border-box` to keep
+  the old visual size.
+- Direct modules are the allowlisted `go-text/typesetting` and
+  `tdewolff/canvas` (0.1.0 was stdlib-only). Still `CGO_ENABLED=0`.
+- User docs rewritten from source; root README slimmed to landing +
+  quick start + index.
+- `CONTRIBUTIONS.md` renamed to `CONTRIBUTING.md` so GitHub surfaces it.
 
-### Tests
+### Fixed
 
-- Layout regressions for overflow wrap, thead-from-th, ref gaps, table empty
-  rows / multi-cite / rowspan cites / continuation borders, underline coalesce,
-  and body-line packing (no overlap).
+- Backgrounds and borders paint **under** text; unique multi-image
+  XObjects; `tr` row backgrounds; `rgba()` composite; nested-table document
+  order and `%` widths vs the parent containing block.
+- Table cell height at final column width; empty-row collapse; per-row
+  border-collapse; rowspan cite alignment; continuation-page table chrome.
+- Long tokens / URLs honor `overflow-wrap` / `word-break`; emergency wrap;
+  float tails clear; caption wrap; link-underline coalesce (skip bare URLs
+  in ref lists).
+- Pagination: `page-break-before:always` lands at next-page top; multi-section
+  reports paginate 1:1; `preferSplitOverBlank` for short avoid-boxes;
+  **disabled** document-global gap packing that interleaved body and
+  reference text.
+- `display:flex` / `grid` restored after lint adoption; sticky chrome no
+  longer clones like `fixed`; dashed / left borders no longer stretch into
+  solid stubs.
+- Original-template typography: `letter-spacing`, `text-transform`, and
+  `border-radius` survive into the PDF.
+
+### Known limitations
+
+- **Not a browser.** No JavaScript (`<script>` stripped; JS flags are
+  unknown options). No Chrome / Wikipedia visual parity.
+- Flex/grid/float/sticky are a **report subset**, not full CSS3.
+- CJK/Arabic **Partial** (operator-supplied faces + OT when present).
+  `writing-mode: vertical-*` is parsed but lays out horizontal. No WOFF2.
+- No AcroForm, no PDF encryption / PDF/A / 1.7 / 2.0 / UA (tickets
+  #29–#33 remain open).
+- Full list: [`documentation/deferred.md`](documentation/deferred.md).
 
 ## 0.1.0 (2026-08-03)
 
