@@ -330,18 +330,23 @@ func TestPdfGlobalOptionsNilReceiverPanics(t *testing.T) {
 	}
 }
 
-func TestPdfGlobalOptionsRejectsUnknownPageSize(t *testing.T) {
+func TestPdfGlobalOptionsStoresPageSizeWithoutPanic(t *testing.T) {
 	t.Parallel()
 
-	defer func() {
-		if recovered, ok := recover().(error); !ok || !errors.Is(recovered, ErrInvalidPageSize) {
-			t.Fatal("invalid page size did not panic")
-		}
-	}()
+	opts := NewPdfGlobalOptions().WithPageSize("not-a-page-size")
+	global := opts.Build()
 
-	NewPdfGlobalOptions().WithPageSize("not-a-page-size")
+	req := &PDFRequest{ //nolint:exhaustruct // test minimal PDFRequest
+		Global:  global,
+		Objects: []*ObjectSettings{NewObjectSettings().SetBody([]byte("<p>test</p>"), "")},
+		Output:  &bytes.Buffer{},
+	}
+	if err := req.ValidatePDF(); !errors.Is(err, ErrInvalidPageSize) {
+		t.Fatalf("ValidatePDF() = %v, want ErrInvalidPageSize", err)
+	}
 }
 
+//nolint:cyclop // validation paths table test
 func TestPdfGlobalOptionsValidationPaths(t *testing.T) {
 	t.Parallel()
 
@@ -376,21 +381,17 @@ func TestPdfGlobalOptionsValidationPaths(t *testing.T) {
 		t.Fatalf("negative margin Get = %q, %v; want a negative value", got, ok)
 	}
 
-	assertPanicsWith(t, ErrInvalidPDFCopies, func() {
-		NewPdfGlobalOptions().WithCopies(0, true)
-	})
-}
+	// WithCopies(0, true) does not panic, but fails at ValidatePDF
+	opts := NewPdfGlobalOptions().WithCopies(0, true)
+	req := &PDFRequest{ //nolint:exhaustruct // test minimal PDFRequest
+		Global:  opts.Build(),
+		Objects: []*ObjectSettings{NewObjectSettings().SetBody([]byte("<p>test</p>"), "")},
+		Output:  &bytes.Buffer{},
+	}
 
-func assertPanicsWith(t *testing.T, want error, call func()) {
-	t.Helper()
-
-	defer func() {
-		recovered, ok := recover().(error)
-		if !ok || !errors.Is(recovered, want) {
-			t.Fatalf("panic = %v, want errors.Is(..., %v)", recovered, want)
-		}
-	}()
-	call()
+	if err := req.ValidatePDF(); !errors.Is(err, ErrInvalidPDFCopies) {
+		t.Fatalf("ValidatePDF() with 0 copies = %v, want ErrInvalidPDFCopies", err)
+	}
 }
 
 //nolint:cyclop,wsl,funlen // validation error error-reporting assertions
@@ -1557,4 +1558,131 @@ func pixelAt(img image.Image, x, y int) color.NRGBA {
 	}
 
 	return c
+}
+
+func TestAddHTMLNilReceiver(t *testing.T) {
+	t.Parallel()
+
+	var converter *Converter
+	if got := converter.AddHTML([]byte("<p>hello</p>"), ""); got != nil {
+		t.Fatalf("AddHTML on nil Converter returned %v, want nil", got)
+	}
+
+	if got := converter.AddObject(NewObjectSettings()); got != nil {
+		t.Fatalf("AddObject on nil Converter returned %v, want nil", got)
+	}
+
+	if got := converter.WithGlobal(NewGlobalSettings()); got != nil {
+		t.Fatalf("WithGlobal on nil Converter returned %v, want nil", got)
+	}
+}
+
+func TestPdfGlobalOptionsValidation(t *testing.T) {
+	t.Parallel()
+
+	t.Run("bad page size does not panic in builder", func(t *testing.T) {
+		t.Parallel()
+
+		opts := NewPdfGlobalOptions().WithPageSize("NonExistentPageSize")
+		global := opts.Build()
+
+		req := &PDFRequest{
+			Global:        global,
+			Objects:       []*ObjectSettings{NewObjectSettings().SetBody([]byte("<p>test</p>"), "")},
+			Now:           nil,
+			Output:        &bytes.Buffer{},
+			OutlineOutput: nil,
+		}
+
+		err := req.ValidatePDF()
+		if err == nil || !errors.Is(err, ErrInvalidPageSize) {
+			t.Fatalf("ValidatePDF() with bad page size error = %v, want ErrInvalidPageSize", err)
+		}
+	})
+
+	t.Run("non-positive copies does not panic in builder", func(t *testing.T) {
+		t.Parallel()
+
+		opts := NewPdfGlobalOptions().WithCopies(0, false)
+		global := opts.Build()
+
+		req := &PDFRequest{
+			Global:        global,
+			Objects:       []*ObjectSettings{NewObjectSettings().SetBody([]byte("<p>test</p>"), "")},
+			Now:           nil,
+			Output:        &bytes.Buffer{},
+			OutlineOutput: nil,
+		}
+
+		err := req.ValidatePDF()
+		if err == nil || !errors.Is(err, ErrInvalidPDFCopies) {
+			t.Fatalf("ValidatePDF() with 0 copies error = %v, want ErrInvalidPDFCopies", err)
+		}
+	})
+}
+
+func TestEnableLocalFileAccessHelper(t *testing.T) {
+	t.Parallel()
+
+	conv := NewConverter()
+	conv.EnableLocalFileAccess()
+
+	if !conv.Global().g.Load.EnableLocalFileAccess {
+		t.Fatal("Global Load.EnableLocalFileAccess was not enabled")
+	}
+
+	req := &PDFRequest{
+		Global:        NewGlobalSettings(),
+		Objects:       []*ObjectSettings{NewObjectSettings()},
+		Now:           nil,
+		Output:        &bytes.Buffer{},
+		OutlineOutput: nil,
+	}
+	req.EnableLocalFileAccess()
+
+	if !req.Global.g.Load.EnableLocalFileAccess {
+		t.Fatal("PDFRequest Global Load.EnableLocalFileAccess not properly enabled")
+	}
+
+	if req.Objects[0].o.Load.BlockLocalFileAccess {
+		t.Fatal("PDFRequest Object local file access not properly unblocked")
+	}
+}
+
+func TestMutatorsNilReceiverAudit(t *testing.T) {
+	t.Parallel()
+
+	var globalSettings *GlobalSettings
+	if err := globalSettings.Set("title", "abc"); !errors.Is(err, ErrNilGlobalSettings) {
+		t.Errorf("GlobalSettings.Set on nil = %v, want ErrNilGlobalSettings", err)
+	}
+
+	if err := globalSettings.SetNetworkPolicy(CompatibleNetworkPolicy()); !errors.Is(err, ErrNilGlobalSettings) {
+		t.Errorf("GlobalSettings.SetNetworkPolicy on nil = %v, want ErrNilGlobalSettings", err)
+	}
+
+	if globalSettings.EnableLocalFileAccess() != nil {
+		t.Error("GlobalSettings.EnableLocalFileAccess on nil did not return nil")
+	}
+
+	var objSettings *ObjectSettings
+	if err := objSettings.Set("page", "x"); !errors.Is(err, ErrNilObjectSettings) {
+		t.Errorf("ObjectSettings.Set on nil = %v, want ErrNilObjectSettings", err)
+	}
+
+	if objSettings.SetPage("x") != nil ||
+		objSettings.SetBody([]byte("x"), "") != nil ||
+		objSettings.EnableLocalFileAccess() != nil {
+		t.Error("ObjectSettings chained mutators on nil did not return nil")
+	}
+
+	var imageSettings *ImageSettings
+	if err := imageSettings.Set("width", "100"); !errors.Is(err, ErrNilImageSettings) {
+		t.Errorf("ImageSettings.Set on nil = %v, want ErrNilImageSettings", err)
+	}
+
+	var imageConv *ImageConverter
+	if err := imageConv.Set("width", "100"); !errors.Is(err, ErrNilImageConverter) {
+		t.Errorf("ImageConverter.Set on nil = %v, want ErrNilImageConverter", err)
+	}
 }

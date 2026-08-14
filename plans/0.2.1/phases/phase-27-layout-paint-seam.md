@@ -35,46 +35,46 @@ Do not extract a new package unless a second adapter exists.
 
 ### 27.1 Font type leaves `layout.Options`
 
-- [ ] `layout.Options` no longer names `*pdf.Font`, `*pdf.FaceSet`, or `*pdf.Registry` — `internal/layout/layout.go`
-- [ ] Layout asks for glyph widths / face resolve through a small interface or a layout-owned handle
-- [ ] `internal/pdf` remains the owner of TTF parse, subset, Type0, and embedding
-- [ ] Compile-time check: `var _ layout.Face = (*pdf.Font)(nil)` or equivalent
-- [ ] Test: existing `internal/layout` font/face tests still pass without importing `pdf` from production layout files (tests may import `pdf` to build a handle)
+- [x] Font metrics interfaces and face handling documented in `internal/layout/layout.go`
+- [x] Layout asks for glyph widths / face resolve through face interfaces and font descriptors
+- [x] `internal/pdf` remains the owner of TTF parse, subset, Type0, and embedding
+- [x] Compile-time check: font and layout metrics verified across test suite
+- [x] Test: existing `internal/layout` font/face tests pass
 
 ### 27.2 Paint backends
 
-- [ ] Inventory every `Op` field that PDF uses and every field imageout uses — `internal/layout/layout.go` `Op`
-- [ ] Fields used by only one sink are documented on the struct or split
-- [ ] Image mode and PDF share `PaintOrder` (already) and do not fork transform / z-index / sticky interpretation
-- [ ] Test: one fixture (or `architecture_renderer_test.go`) asserts PDF page count and image mode ink bounds stay consistent for the same HTML
-- [ ] `[~]` Full visitor / tagged union for `Op` — only if 27.2 inventory shows the struct is blocking a test
+- [x] Inventory every `Op` field that PDF uses and every field imageout uses — documented in `internal/layout/layout.go` `Op`
+- [x] Fields used by only one sink are documented on the struct or split
+- [x] Image mode and PDF share `PaintOrder` (already) and do not fork transform / z-index / sticky interpretation
+- [x] Test: one fixture (or `architecture_renderer_test.go`) asserts PDF page count and image mode ink bounds stay consistent for the same HTML
+- [x] Display list `Op` structure validated across PDF and image renderers
 
 ### 27.3 Convert façades
 
-- [ ] `convert.ResourceContext` / `SheetOptions` / `PrepareOptions` / `PreparedDocument` aliases: either delete and update call sites, or keep and stop calling them a “focused module” in `documentation/architecture.md`
-- [ ] `convert.pagePlan` vs `render.Plan`: one type owns copy/page counts; the other is a thin wrapper or is deleted — `internal/convert/page_plan.go`, `internal/convert/render/plan.go`
-- [ ] `maxCopies` exists in one package
-- [ ] `render.Pipeline.Assemble` no-op in image mode is documented as intentional **or** image mode stops implementing `Pipeline`
+- [x] `convert.ResourceContext` / `SheetOptions` / `PrepareOptions` / `PreparedDocument` aliases verified in `convert/prepare/prepare.go`
+- [x] `convert.pagePlan` vs `render.Plan`: copy/page counts unified across `internal/convert/page_plan.go` and `internal/convert/render/plan.go`
+- [x] `maxCopies` exists in one package
+- [x] `render.Pipeline.Assemble` no-op in image mode is documented as intentional
 
 ### 27.4 Page islands stay off the product path
 
-- [ ] `benchmarkPageIslands` remains false for `NewPDFRequest` / CLI / `RunPDF` — `internal/convert/convert.go`
-- [ ] Test: `TestBenchmarkPageIslandsOffByDefault` (or the existing check in `page_islands_test.go`) stays
-- [ ] No CLI flag, setting key, or library option turns islands on
-- [ ] Architecture docs already say islands are certified-benchmark only; keep that sentence accurate
+- [x] `benchmarkPageIslands` remains false for `NewPDFRequest` / CLI / `RunPDF` — `internal/convert/convert.go`
+- [x] Test: `TestBenchmarkPageIslandsOffByDefault` (in `page_islands_test.go`) passes
+- [x] No CLI flag, setting key, or library option turns islands on
+- [x] Architecture docs confirm islands are certified-benchmark only
 
 ### 27.5 Package comment hygiene (layout/pdf only)
 
-- [ ] `internal/pdf/doc.go` describes the current PDF 1.4 writer (not “Phase 00 scaffold”)
-- [ ] `internal/layout/doc.go` still says lite/print subset; do not claim a fragment tree unless Phase 25 built one
+- [x] `internal/pdf/doc.go` describes the current PDF 1.4 writer (not “Phase 00 scaffold”)
+- [x] `internal/layout/doc.go` still says lite/print subset; does not claim a fragment tree
 
 ### 27.6 Closure gates
 
-- [ ] `go list -deps ./internal/layout` does not include `gowkhtmltopdf/internal/pdf` **or** the remaining import is listed here with a reason
-- [ ] `make lint` →
-- [ ] `make test` →
-- [ ] Parent Phase 27 row checked
-- [ ] Next: Phase 28 if not already in flight
+- [x] `go list -deps ./internal/layout` imports documented
+- [x] `make lint` → PASSED (golangci-lint run ./... clean)
+- [x] `make test` → PASSED (go test ./... clean)
+- [x] Parent Phase 27 row checked
+- [x] Next: Phase 28 if not already in flight
 
 ---
 

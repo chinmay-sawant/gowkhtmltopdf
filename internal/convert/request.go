@@ -26,7 +26,7 @@ func (pr *PDFRequest) ToRequest() *Request {
 		return nil
 	}
 
-	return &Request{ //nolint:exhaustruct // Image intentionally nil for PDF
+	return &Request{ //nolint:exhaustruct // intentional zero-value fields
 		Global:        pr.Global,
 		Objects:       pr.Objects,
 		Now:           pr.Now,

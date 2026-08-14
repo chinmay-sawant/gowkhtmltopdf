@@ -17,6 +17,7 @@ import (
 	"gowkhtmltopdf/internal/errs"
 	"gowkhtmltopdf/internal/imageout"
 	"gowkhtmltopdf/internal/line"
+	"gowkhtmltopdf/internal/load"
 	"gowkhtmltopdf/internal/settings"
 )
 
@@ -95,28 +96,17 @@ type GlobalSettings struct {
 // AllowedHosts list permits any host allowed by the scheme policy; a non-empty
 // list is an exact or wildcard host allowlist. Explicitly allowlisted hosts
 // may be private, which is useful for trusted internal services and tests.
-type NetworkPolicy struct {
-	AllowedSchemes          []string
-	AllowedHosts            []string
-	BlockPrivateNetworks    bool
-	BlockCrossHostRedirects bool
-}
+type NetworkPolicy = load.NetworkPolicy
 
 // CompatibleNetworkPolicy preserves the historical permissive URL behavior.
 func CompatibleNetworkPolicy() NetworkPolicy {
-	return NetworkPolicy{ //nolint:exhaustruct // compatibility defaults
-		AllowedSchemes: []string{"http", "https"},
-	}
+	return load.CompatibleNetworkPolicy()
 }
 
 // RestrictedNetworkPolicy is intended for untrusted HTML in an isolated
 // service: private destinations are blocked and redirects stay same-origin.
 func RestrictedNetworkPolicy() NetworkPolicy {
-	return NetworkPolicy{ //nolint:exhaustruct // explicit safety defaults
-		AllowedSchemes:          []string{"http", "https"},
-		BlockPrivateNetworks:    true,
-		BlockCrossHostRedirects: true,
-	}
+	return load.RestrictedNetworkPolicy()
 }
 
 // PdfGlobalOptions is the typed builder for common PDF global settings. It is
@@ -143,20 +133,16 @@ func (o *PdfGlobalOptions) require() *PdfGlobalOptions {
 
 // WithPageSize validates a named page size through the canonical page-size
 // table before storing it. Invalid input panics; use WithSetting when an
-// error-returning configuration path is preferred.
+// WithPageSize sets the named page size ("A4", "Letter", "Legal", etc.).
+// Invalid values fail during conversion / validation with ErrInvalidPageSize.
 func (o *PdfGlobalOptions) WithPageSize(pageSize string) *PdfGlobalOptions {
 	o = o.require()
-
-	pageSize, err := normalizePageSize(pageSize)
-	if err != nil {
-		panic(err)
-	}
-
 	o.options = o.options.WithPageSize(pageSize)
 
 	return o
 }
 
+// WithMargins sets top, right, bottom, and left margins in millimetres.
 func (o *PdfGlobalOptions) WithMargins(top, right, bottom, left float64) *PdfGlobalOptions {
 	o = o.require()
 	o.options = o.options.WithMargins(top, right, bottom, left)
@@ -164,6 +150,7 @@ func (o *PdfGlobalOptions) WithMargins(top, right, bottom, left float64) *PdfGlo
 	return o
 }
 
+// WithTitle sets the document title metadata.
 func (o *PdfGlobalOptions) WithTitle(title string) *PdfGlobalOptions {
 	o = o.require()
 	o.options = o.options.WithTitle(title)
@@ -171,20 +158,16 @@ func (o *PdfGlobalOptions) WithTitle(title string) *PdfGlobalOptions {
 	return o
 }
 
-// WithCopies rejects non-positive counts at the typed-builder seam. The same
-// invariant is enforced again by public PDF request validation.
+// WithCopies sets the number of printed copies and collation. Non-positive
+// copy counts fail during conversion / validation with ErrInvalidPDFCopies.
 func (o *PdfGlobalOptions) WithCopies(copies int, collate bool) *PdfGlobalOptions {
 	o = o.require()
-
-	if copies < 1 {
-		panic(ErrInvalidPDFCopies)
-	}
-
 	o.options = o.options.WithCopies(copies, collate)
 
 	return o
 }
 
+// WithOutline enables or disables PDF outline generation and sets outline depth.
 func (o *PdfGlobalOptions) WithOutline(enabled bool, depth int) *PdfGlobalOptions {
 	o = o.require()
 	o.options = o.options.WithOutline(enabled, depth)
@@ -192,6 +175,7 @@ func (o *PdfGlobalOptions) WithOutline(enabled bool, depth int) *PdfGlobalOption
 	return o
 }
 
+// WithSmartShrinking enables or disables the smart shrinking algorithm.
 func (o *PdfGlobalOptions) WithSmartShrinking(enabled bool) *PdfGlobalOptions {
 	o = o.require()
 	o.options = o.options.WithSmartShrinking(enabled)
@@ -199,6 +183,7 @@ func (o *PdfGlobalOptions) WithSmartShrinking(enabled bool) *PdfGlobalOptions {
 	return o
 }
 
+// WithBackground enables or disables printing of CSS background images and colors.
 func (o *PdfGlobalOptions) WithBackground(enabled bool) *PdfGlobalOptions {
 	o = o.require()
 	o.options = o.options.WithBackground(enabled)
@@ -206,6 +191,7 @@ func (o *PdfGlobalOptions) WithBackground(enabled bool) *PdfGlobalOptions {
 	return o
 }
 
+// WithCompression enables or disables PDF stream compression.
 func (o *PdfGlobalOptions) WithCompression(enabled bool) *PdfGlobalOptions {
 	o = o.require()
 	o.options = o.options.WithCompression(enabled)
@@ -213,6 +199,7 @@ func (o *PdfGlobalOptions) WithCompression(enabled bool) *PdfGlobalOptions {
 	return o
 }
 
+// WithResolveRelativeLinks enables or disables resolving relative link targets.
 func (o *PdfGlobalOptions) WithResolveRelativeLinks(enabled bool) *PdfGlobalOptions {
 	o = o.require()
 	o.options = o.options.WithResolveRelativeLinks(enabled)
@@ -290,13 +277,21 @@ func (s *GlobalSettings) SetNetworkPolicy(policy NetworkPolicy) error {
 		return ErrNilGlobalSettings
 	}
 
-	s.g.Load.NetworkPolicySet = true
-	s.g.Load.NetworkAllowedSchemes = cloneStrings(policy.AllowedSchemes)
-	s.g.Load.NetworkAllowedHosts = cloneStrings(policy.AllowedHosts)
-	s.g.Load.NetworkBlockPrivate = policy.BlockPrivateNetworks
-	s.g.Load.NetworkBlockCrossHost = policy.BlockCrossHostRedirects
+	load.ApplyNetworkPolicy(&s.g.Load, policy)
 
 	return nil
+}
+
+// EnableLocalFileAccess configures global settings to permit local file reads
+// and unblocks local file access on the loader ACL.
+func (s *GlobalSettings) EnableLocalFileAccess() *GlobalSettings {
+	if s == nil {
+		return nil
+	}
+
+	s.g.Load.EnableLocalFileAccess = true
+
+	return s
 }
 
 // Set applies a dotted settings key ("size.pagesize", "margin.top",
@@ -383,6 +378,17 @@ func (s *ObjectSettings) Get(name string) (string, bool) {
 	}
 
 	return s.o.Get(name)
+}
+
+// EnableLocalFileAccess unblocks local file access for this page object.
+func (s *ObjectSettings) EnableLocalFileAccess() *ObjectSettings {
+	if s == nil {
+		return nil
+	}
+
+	s.o.Load.BlockLocalFileAccess = false
+
+	return s
 }
 
 // SetPage sets the input page (a path, URL or "inline:…" / "data:…" source)
@@ -535,17 +541,6 @@ func cloneImageGlobal(src settings.ImageGlobal) settings.ImageGlobal {
 	return settings.CloneImageGlobal(src)
 }
 
-func cloneStrings(src []string) []string {
-	if src == nil {
-		return nil
-	}
-
-	dst := make([]string, len(src))
-	copy(dst, src)
-
-	return dst
-}
-
 func cloneBytes(src []byte) []byte {
 	if src == nil {
 		return nil
@@ -557,11 +552,33 @@ func cloneBytes(src []byte) []byte {
 	return dst
 }
 
+// EnableLocalFileAccess sets enablelocalfileaccess on global settings and
+// unblocks local file access across all attached objects.
+func (c *Converter) EnableLocalFileAccess() *Converter {
+	if c == nil {
+		return nil
+	}
+
+	c.Global().EnableLocalFileAccess()
+
+	for _, obj := range c.objects {
+		if obj != nil {
+			obj.EnableLocalFileAccess()
+		}
+	}
+
+	return c
+}
+
 // AddHTML appends an in-memory HTML document as a page object and returns c
 // for chaining. baseURL resolves relative subresources; an empty baseURL
 // leaves them unresolvable. Unlike SetPage, the bytes are always treated as
 // a document - no URL guessing is applied.
 func (c *Converter) AddHTML(page []byte, baseURL string) *Converter {
+	if c == nil {
+		return nil
+	}
+
 	c.AddObject(NewObjectSettings().SetBody(page, baseURL))
 
 	return c
@@ -610,6 +627,16 @@ func (c *Converter) ConvertTo(ctx context.Context, writer io.Writer) error {
 
 	for i, o := range c.objects {
 		objects[i] = settings.ClonePdfObject(o.o)
+	}
+
+	if global.PageSize != "" {
+		if _, _, err := settings.ParsePageSize(global.PageSize); err != nil {
+			return reportPreflight(c.OnError, fmt.Errorf("%w: %q", ErrInvalidPageSize, global.PageSize))
+		}
+	}
+
+	if global.Copies < 1 {
+		return reportPreflight(c.OnError, ErrInvalidPDFCopies)
 	}
 
 	if err := validatePDFObjects(objects); err != nil {
@@ -1015,6 +1042,48 @@ type ImageRequest struct {
 	Output io.Writer
 }
 
+// EnableLocalFileAccess enables global local file access and unblocks local
+// access across all attached objects in the PDF request.
+func (r *PDFRequest) EnableLocalFileAccess() *PDFRequest {
+	if r == nil {
+		return nil
+	}
+
+	if r.Global == nil {
+		r.Global = NewGlobalSettings()
+	}
+
+	r.Global.EnableLocalFileAccess()
+
+	for _, obj := range r.Objects {
+		if obj != nil {
+			obj.EnableLocalFileAccess()
+		}
+	}
+
+	return r
+}
+
+// EnableLocalFileAccess enables global local file access and unblocks local
+// access on the attached image object.
+func (r *ImageRequest) EnableLocalFileAccess() *ImageRequest {
+	if r == nil {
+		return nil
+	}
+
+	if r.Global == nil {
+		r.Global = NewGlobalSettings()
+	}
+
+	r.Global.EnableLocalFileAccess()
+
+	if r.Object != nil {
+		r.Object.EnableLocalFileAccess()
+	}
+
+	return r
+}
+
 // ValidatePDF checks the public typed PDF request contract without starting
 // the renderer. It is safe to call before output files or other resources are
 // opened. The request must have a document sink, copies must be positive, and
@@ -1036,6 +1105,12 @@ func (r *PDFRequest) ValidatePDF() error {
 
 	if global.DumpOutline && r.OutlineOutput == nil {
 		return ErrMissingPDFOutlineOutput
+	}
+
+	if global.PageSize != "" {
+		if _, _, err := settings.ParsePageSize(global.PageSize); err != nil {
+			return fmt.Errorf("%w: %q", ErrInvalidPageSize, global.PageSize)
+		}
 	}
 
 	if global.Copies < 1 {

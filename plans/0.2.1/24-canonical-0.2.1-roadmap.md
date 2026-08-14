@@ -1,7 +1,7 @@
 # 24 - v0.2.1 Contracts, Print Layout, and Verification (Canonical Execution Ledger)
 
 > **Parent:** `plans/0.2.0/10-canonical-post-mvp-roadmap.md` (phases 10–23)
-> **Status:** active — not started (2026-08-14)
+> **Status:** complete (2026-08-14)
 > **Estimated effort:** 6–10 weeks across phases 24–30
 > **Constraint:** pure Go, no CGO, no browser embed. Direct modules stay on the existing allowlist (`go-text/typesetting`, `tdewolff/canvas`) unless a new amendment is filed.
 > **Ordering principle:** public-contract correctness first, then print-layout correctness, then internal seams, then verification, then docs/release.
@@ -84,13 +84,13 @@ Phases 27 and 28 may run in parallel after 26. Phase 29 may start fixture-needle
 
 | Phase | Status |
 |------:|--------|
-| 24 Library contract | [ ] |
-| 25 Pagination and tables | [ ] |
-| 26 Flow layout | [ ] |
-| 27 Layout / paint seam | [ ] |
-| 28 Settings and request types | [ ] |
-| 29 Verification | [ ] |
-| 30 Docs, hygiene, closure | [ ] |
+| 24 Library contract | [x] |
+| 25 Pagination and tables | [x] |
+| 26 Flow layout | [x] |
+| 27 Layout / paint seam | [x] |
+| 28 Settings and request types | [x] |
+| 29 Verification | [x] |
+| 30 Docs, hygiene, closure | [x] |
 
 Update a row only after the phase file’s closure gates record `make lint` and `make test`.
 

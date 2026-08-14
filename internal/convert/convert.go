@@ -48,7 +48,6 @@ const (
 // cmd mains (via internal/app) and the library API build it.
 type Request struct {
 	Global  settings.PdfGlobal
-	Image   *settings.ImageGlobal
 	Objects []settings.PdfObject
 	// Now supplies conversion metadata time. A nil function uses the
 	// production wall clock; tests and deterministic callers can inject a
@@ -191,24 +190,6 @@ func ValidateRenderableObjects(objects []settings.PdfObject) error {
 // ValidatePDF checks the PDF-specific request invariant before running the
 // document pipeline.
 func (r *Request) ValidatePDF() error {
-	if r != nil && r.Image != nil {
-		return ErrUnexpectedImageSettings
-	}
-
-	return r.Validate()
-}
-
-// ValidateImage checks the image-specific request invariant. Image output is
-// implemented by internal/imageout but shares this boundary contract.
-func (r *Request) ValidateImage() error {
-	if r == nil {
-		return errNilRequest
-	}
-
-	if r.Image == nil {
-		return ErrMissingImageSettings
-	}
-
 	return r.Validate()
 }
 

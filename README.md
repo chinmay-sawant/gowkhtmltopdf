@@ -14,7 +14,7 @@ paint → write). Direct modules are allowlisted:
 shaping) and [`tdewolff/canvas`](https://github.com/tdewolff/canvas) (SVG
 rasterization). The product is HTML templates and documents, not Chrome visual parity.
 
-**Status:** **v0.2.0**. **License:** [MIT](LICENSE).
+**Status:** **v0.2.1**. **License:** [MIT](LICENSE).
 
 ## What it is for
 

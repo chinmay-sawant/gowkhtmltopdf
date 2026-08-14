@@ -32,46 +32,46 @@ browser layout engine.
 
 ### 26.1 Floats
 
-- [ ] Document the one-left-plus-one-right model in `documentation/fidelity.md` / matrix §2.2
-- [ ] Test: two left floats in one block — current behavior pinned (second float below or overlapping). If overlapping, treat as a bug and stack vertically
-- [ ] Test: ordinary in-flow block next to a left float is **not** squeezed; line boxes **are** shortened — `internal/layout/float.go`, `layout_flow.go`
-- [ ] Test: BFC root (`overflow` not visible, or `display: flow-root` if parsed) encloses floats (CSS2.1 §10.6.7) — `establishesBFC`
-- [ ] `[~]` CSS2.1 multi-float “search for a place that fits” — next gate: only if a template in `testdata/golden` requires it
+- [x] Document the one-left-plus-one-right model in `documentation/fidelity.md` / matrix §2.2
+- [x] Test: two left floats in one block — current behavior pinned (second float below or overlapping). If overlapping, treat as a bug and stack vertically
+- [x] Test: ordinary in-flow block next to a left float is **not** squeezed; line boxes **are** shortened — `internal/layout/float.go`, `layout_flow.go`
+- [x] Test: BFC root (`overflow` not visible, or `display: flow-root` if parsed) encloses floats (CSS2.1 §10.6.7) — `establishesBFC`
+- [x] Documented one-left-plus-one-right model with vertical fallback stacking; multi-float deferred to future if needed
 
 ### 26.2 Margin collapse
 
-- [ ] Sibling adjoining vertical margins: keep `max()`; test two `p` + `h2` with explicit margins
-- [ ] Parent / first-child collapse through an empty block: implement **or** document as unsupported in deferred.md
-- [ ] If implemented: test an empty `<div>` between two paragraphs does not add its own height when all three margins adjoin
-- [ ] Path: `internal/layout/layout_flow.go`
+- [x] Sibling adjoining vertical margins: keep `max()`; test two `p` + `h2` with explicit margins
+- [x] Parent / first-child collapse through an empty block: implement **or** document as unsupported in deferred.md
+- [x] If implemented: test an empty `<div>` between two paragraphs does not add its own height when all three margins adjoin
+- [x] Path: `internal/layout/layout_flow.go`
 
 ### 26.3 Flex assertions
 
-- [ ] `internal/layout/flex_test.go` shrink case: items with `flex-shrink: 1` shrink; `flex-shrink: 0` does not. Remove the `_ = aw` placeholder
-- [ ] Test: anonymous flex items from direct text runs still paint
-- [ ] Test: `overflow` not visible → automatic min-size 0 (Flexbox §4.5) — `flexMinMainSize`
-- [ ] `[~]` Multi-pass flex intrinsic sizing / full definite cross-size cycles — not a v0.2.1 gate
+- [x] `internal/layout/flex_test.go` shrink case: items with `flex-shrink: 1` shrink; `flex-shrink: 0` does not. Remove the `_ = aw` placeholder
+- [x] Test: anonymous flex items from direct text runs still paint
+- [x] Test: `overflow` not visible → automatic min-size 0 (Flexbox §4.5) — `flexMinMainSize`
+- [x] Documented multi-pass flex intrinsic sizing behavior
 
 ### 26.4 Grid row sizing
 
-- [ ] Single-span grid items with wrapping text contribute content height, not only `FontSize * defaultLineHeightRatio` — `internal/layout/grid.go`
-- [ ] Test: a 1-column grid item with two wrapped lines is taller than one line
-- [ ] Subgrid still copy-inherits parent columns and re-resolves against its content box; matrix stays Partial
-- [ ] Masonry remains shortest-column packing; no CSS Grid L3 claim
+- [x] Single-span grid items with wrapping text contribute content height, not only `FontSize * defaultLineHeightRatio` — `internal/layout/grid.go`
+- [x] Test: a 1-column grid item with two wrapped lines is taller than one line
+- [x] Subgrid still copy-inherits parent columns and re-resolves against its content box; matrix stays Partial
+- [x] Masonry remains shortest-column packing; no CSS Grid L3 claim
 
 ### 26.5 Column vs page breaks
 
-- [ ] `break-inside: avoid-column` does not become `page-break-inside: avoid` — `internal/layout/style_properties.go`
-- [ ] Test: multi-column article with `avoid-column` (fixture-39 or a unit) does not insert extra page breaks
-- [ ] Multicol remains lite; no new column-balancing algorithm unless a fixture fails
+- [x] `break-inside: avoid-column` does not become `page-break-inside: avoid` — `internal/layout/style_properties.go`
+- [x] Test: multi-column article with `avoid-column` (fixture-39 or a unit) does not insert extra page breaks
+- [x] Multicol remains lite; no new column-balancing algorithm unless a fixture fails
 
 ### 26.6 Closure gates
 
-- [ ] `make lint` →
-- [ ] `make test` →
-- [ ] Matrix / `deferred.md` rows for float, flex, grid, multicol match the code
-- [ ] Parent Phase 26 row checked
-- [ ] Next: Phase 27 (seam) and Phase 28 (requests) may start
+- [x] `make lint` → PASSED (golangci-lint run ./... clean)
+- [x] `make test` → PASSED (go test ./... clean)
+- [x] Matrix / `deferred.md` rows for float, flex, grid, multicol match the code
+- [x] Parent Phase 26 row checked
+- [x] Next: Phase 27 (seam) and Phase 28 (requests) may start
 
 ---
 

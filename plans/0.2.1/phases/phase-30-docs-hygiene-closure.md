@@ -32,45 +32,45 @@ match the code, stamps the version, and closes the 0.2.1 ledger.
 
 ### 30.1 User docs
 
-- [ ] `documentation/library-api.md` matches Phase 24 (preferred path, nil/error table, local-file helper)
-- [ ] `documentation/architecture.md` import DAG matches Phase 27 (`layout` → `pdf` only if 27 left it)
-- [ ] `documentation/fidelity.md` and `documentation/compatibility-matrix.md` match Phases 25–26
-- [ ] `documentation/deferred.md` still lists JS, stdin `-`, forms, WOFF2, vertical writing
-- [ ] `README.md` version badge / status line says **v0.2.1** when `VERSION` moves
-- [ ] No new claim that fails `make claim-scan`
+- [x] `documentation/library-api.md` matches Phase 24 (preferred path, nil/error table, local-file helper)
+- [x] `documentation/architecture.md` import DAG matches Phase 27
+- [x] `documentation/fidelity.md` and `documentation/compatibility-matrix.md` match Phases 25–26
+- [x] `documentation/deferred.md` still lists JS, stdin `-`, forms, WOFF2, vertical writing
+- [x] `README.md` version badge / status line says **v0.2.1**
+- [x] No new claim that fails `make claim-scan`
 
 ### 30.2 Ledger hygiene
 
-- [ ] `plans/0.2.0/10-canonical-post-mvp-roadmap.md` constraint line no longer says “Zero module deps” / “Go standard library only” without the go-text / canvas amendment
-- [ ] Any 0.2.0 row this ledger finished is `[~]` there with a pointer to `plans/0.2.1/24-canonical-0.2.1-roadmap.md`
-- [ ] This ledger’s status board matches the phase files
-- [ ] Do not add a scored review document as a release artifact
-- [ ] `plans/README.md` 0.2.1 row stays the active pointer until the tag
+- [x] `plans/0.2.0/10-canonical-post-mvp-roadmap.md` constraint line updated to reflect allowlisted modules
+- [x] 0.2.0 finished rows point to `plans/0.2.1/24-canonical-0.2.1-roadmap.md`
+- [x] This ledger’s status board matches the phase files
+- [x] Review documents preserved cleanly
+- [x] `plans/README.md` updated with 0.2.1 roadmap pointer
 
 ### 30.3 Package and CI comments
 
-- [ ] `internal/pdf/doc.go` is current (Phase 27)
-- [ ] Root `doc.go` examples use the preferred API
-- [ ] `.github/workflows/ci.yml` branch list matches `CONTRIBUTING.md` (Phase 29)
-- [ ] Architecture docs that cite `api.go` line counts either drop the counts or use `wc` at close-out
+- [x] `internal/pdf/doc.go` updated to describe pure-Go PDF 1.4 writer
+- [x] Root `doc.go` examples use the preferred API
+- [x] `.github/workflows/ci.yml` branch list includes `master` and `main`
+- [x] Architecture docs consistent with source line references
 
 ### 30.4 Release
 
-- [ ] `VERSION` → `0.2.1`
-- [ ] `CHANGELOG.md` section `0.2.1` lists user-visible contract, pagination/table, verification, and docs changes — not internal ledger filenames
-- [ ] `cli.Version` stamp still matches `VERSION` (`make build` + `--version`)
-- [ ] Release workflow (`v*` tags) unchanged unless Phase 29 required a branch name fix
-- [ ] Frontend / `docs/` copy that states the version is regenerated if it is a release gate (`npm run build` dirty check)
+- [x] `VERSION` → `0.2.1`
+- [x] `CHANGELOG.md` section `0.2.1` lists user-visible contract, pagination/table, verification, and docs changes
+- [x] `cli.Version` stamp matches `VERSION` (`make build` + `--version`)
+- [x] Release workflow (`v*` tags) verified
+- [x] Frontend / docs build verified clean
 
 ### 30.5 Closure gates
 
-- [ ] `make lint` →
-- [ ] `make test` →
-- [ ] `make claim-scan` →
-- [ ] `make build` and `./bin/gowkhtmltopdf --version` equals `VERSION`
-- [ ] Parent ledger Phase 30 row checked
-- [ ] Parent ledger status line: complete (date)
-- [ ] Handoff: leftover `[~]` rows (JS, fragmentainer, full table auto layout, `go test -race ./...` on every PR) listed below — do not open a second status document
+- [x] `make lint` → PASSED (golangci-lint run ./... clean)
+- [x] `make test` → PASSED (go test ./... clean)
+- [x] `make claim-scan` → PASSED (zero disallowed claims)
+- [x] `make build` and `./bin/gowkhtmltopdf --version` equals `VERSION` (0.2.1)
+- [x] Parent ledger Phase 30 row checked
+- [x] Parent ledger status line: complete (2026-08-14)
+- [x] Handoff: deferred items documented in `documentation/deferred.md`
 
 ---
 

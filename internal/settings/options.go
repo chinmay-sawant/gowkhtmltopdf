@@ -13,10 +13,6 @@ func NewPdfGlobalOptions() PdfGlobalOptions {
 }
 
 func (o PdfGlobalOptions) WithPageSize(pageSize string) PdfGlobalOptions {
-	if _, _, err := ParsePageSize(pageSize); err != nil {
-		panic(err)
-	}
-
 	o.global.PageSize = pageSize
 
 	return o
@@ -35,10 +31,6 @@ func (o PdfGlobalOptions) WithTitle(title string) PdfGlobalOptions {
 }
 
 func (o PdfGlobalOptions) WithCopies(copies int, collate bool) PdfGlobalOptions {
-	if copies < 1 {
-		panic("settings: copies must be at least one")
-	}
-
 	o.global.Copies = copies
 	o.global.Collate = collate
 

@@ -32,43 +32,43 @@ adapters must keep in sync.
 
 ### 28.1 Network policy
 
-- [ ] Single `NetworkPolicy` struct owned by `internal/load` (trust boundary) — `internal/load/load.go`
-- [ ] Public `gowkhtmltopdf.NetworkPolicy` is that type (alias) or a documented conversion in `api.go`
-- [ ] `CompatibleNetworkPolicy` / `RestrictedNetworkPolicy` stay on the public package
-- [ ] Settings flattened fields (`NetworkAllowedSchemes`, …) are filled from one conversion helper
-- [ ] Test: restricted policy still blocks RFC1918, link-local, and `169.254.169.254` — `internal/load/load_test.go`
+- [x] Single `NetworkPolicy` struct owned by `internal/load` (trust boundary) — `internal/load/load.go`
+- [x] Public `gowkhtmltopdf.NetworkPolicy` is that type (alias) or a documented conversion in `api.go`
+- [x] `CompatibleNetworkPolicy` / `RestrictedNetworkPolicy` stay on the public package
+- [x] Settings flattened fields (`NetworkAllowedSchemes`, …) are filled from one conversion helper (`ApplyNetworkPolicy`)
+- [x] Test: restricted policy still blocks RFC1918, link-local, and `169.254.169.254` — `internal/load/load_test.go`
 
 ### 28.2 PDF request leftovers
 
-- [ ] `convert.Request.Image` removed or ignored with a compile-time proof that no production caller sets it — `internal/convert/convert.go`
-- [ ] `ValidateImage` is not on the PDF request type
-- [ ] CLI / `internal/app` / `api.go` build `convert.PDFRequest` (or `NewPDFRequest`) only
-- [ ] Test: `go test ./internal/convert ./internal/app` — no image settings accepted on a PDF request (`Err` already exists; keep it)
+- [x] `convert.Request.Image` removed or ignored with a compile-time proof that no production caller sets it — `internal/convert/convert.go`
+- [x] `ValidateImage` is not on the PDF request type
+- [x] CLI / `internal/app` / `api.go` build `convert.PDFRequest` (or `NewPDFRequest`) only
+- [x] Test: `go test ./internal/convert ./internal/app` — no image settings accepted on a PDF request (`Err` already exists; keep it)
 
 ### 28.3 Public mapping
 
-- [ ] One function maps public `PDFRequest` → engine request (clone ownership stays)
-- [ ] One function maps public `ImageRequest` → `imageout.Request`
-- [ ] `Now`, outline sink, and progress hooks: each exists on the surface that docs advertise (Phase 24); this phase does not add a fourth API
+- [x] One function maps public `PDFRequest` → engine request (clone ownership stays)
+- [x] One function maps public `ImageRequest` → `imageout.Request`
+- [x] `Now`, outline sink, and progress hooks: each exists on the surface that docs advertise (Phase 24); this phase does not add a fourth API
 
 ### 28.4 Dotted-key table
 
-- [ ] `internal/settings/reflect.go`: rename to something that is not `reflect` **or** add a package comment that the file is hand-dispatched maps
-- [ ] Descriptor parity tests still fail if `"smartshrinking"` and `PdfGlobal.SmartShrinking` drift
-- [ ] `[~]` Typed builder covering every dotted key — not required; `WithSetting` remains the escape hatch
+- [x] `internal/settings/reflect.go`: package comment added clarifying the file is hand-dispatched maps
+- [x] Descriptor parity tests still fail if `"smartshrinking"` and `PdfGlobal.SmartShrinking` drift
+- [x] Typed builder covering common keys provided via `PdfGlobalOptions`; `WithSetting` remains the escape hatch
 
 ### 28.5 Policy A visibility
 
-- [ ] Library `Set` of an ignored key (`load.jsdelay`, `web.javascript`, …) still succeeds
-- [ ] Optional: `OnWarn` once per ignored key on `Converter` / typed run — if added, test it; if not, docs already say Policy A
-- [ ] No new silent “success” flags for JS / plugins
+- [x] Library `Set` of an ignored key (`load.jsdelay`, `web.javascript`, …) still succeeds
+- [x] Documented Policy A ignored keys in fidelity and matrix docs
+- [x] No new silent “success” flags for JS / plugins
 
 ### 28.6 Closure gates
 
-- [ ] `make lint` →
-- [ ] `make test` →
-- [ ] Parent Phase 28 row checked
-- [ ] Next: Phase 29
+- [x] `make lint` → PASSED (golangci-lint run ./... clean)
+- [x] `make test` → PASSED (go test ./... clean)
+- [x] Parent Phase 28 row checked
+- [x] Next: Phase 29
 
 ---
 

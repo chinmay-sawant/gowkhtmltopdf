@@ -597,20 +597,27 @@ Public wrappers:
 
 | Type | Construct | Write | Read |
 |------|-----------|-------|------|
-| `GlobalSettings` | `NewGlobalSettings()` | `Set`, `SetNetworkPolicy` | `Get` |
-| `ObjectSettings` | `NewObjectSettings()`, `NewTOCObject()`, `NewCoverObject()` | `Set`, `SetPage`, `SetBody` | `Get` |
+| `GlobalSettings` | `NewGlobalSettings()` | `Set`, `SetNetworkPolicy`, `EnableLocalFileAccess` | `Get` |
+| `ObjectSettings` | `NewObjectSettings()`, `NewTOCObject()`, `NewCoverObject()` | `Set`, `SetPage`, `SetBody`, `EnableLocalFileAccess` | `Get` |
 | `ImageSettings` | `NewImageSettings()` | `Set` | `Get` |
 | `PdfGlobalOptions` | `NewPdfGlobalOptions()` | fluent `With*` / `WithSetting` | `Build()` → `*GlobalSettings` |
 
-Nil `Set` receivers return `ErrNilGlobalSettings`, `ErrNilObjectSettings`,
-or `ErrNilImageSettings`. Nil `Get` returns `("", false)`. `SetPage` /
-`SetBody` on a nil `*ObjectSettings` return nil (no panic).
+### Nil, Error, and Panic Policy
+
+| Condition | Behavior | Reason |
+|-----------|----------|--------|
+| Nil fluent builder receiver (`(*PdfGlobalOptions)(nil).With*`) | **panic** | Programmer-broken builder chain |
+| Nil mutator receiver (`(*GlobalSettings)(nil).Set`) | return `ErrNil*` | Typed sentinel for callers |
+| Nil chained mutator receiver (`(*ObjectSettings)(nil).SetPage`, `(*Converter)(nil).AddHTML`) | return `nil` | Safe chained mutator pattern |
+| Invalid configuration value (`pageSize`, `copies < 1`) | return error at `ValidatePDF` / `RunPDF` / `Convert` / `WithSetting` | Handled at validation boundaries with `errors.Is` |
+| Missing output sink (`PDFRequest.Output == nil`) | return `ErrMissingPDFOutput` | Validation failure |
+| Local file access denied | return `load.ErrAccessDenied` | Security ACL |
 
 `GlobalSettings.Set("size.pagesize", …)` and `PdfGlobalOptions.WithPageSize`
-validate against the named page-size table (A0–A6, B0–B6, C5E, Comm10E,
-DLE, Executive, Folio, Ledger, Legal, Letter, Tabloid). Invalid names are
-`ErrInvalidPageSize`. An empty `size.pagesize` at the public `Set` seam
-becomes `A4`. `copies < 1` is `ErrInvalidPDFCopies`. Negative margins are
+accept names from the canonical page-size table (A0–A6, B0–B6, C5E, Comm10E,
+DLE, Executive, Folio, Ledger, Legal, Letter, Tabloid). Invalid names fail
+validation with `ErrInvalidPageSize`. An empty `size.pagesize` at the public `Set` seam
+becomes `A4`. `copies < 1` fails validation with `ErrInvalidPDFCopies`. Negative margins are
 valid (header/footer band reservation).
 
 Length keys (`margin.*`, `size.width`, `size.height`) accept unit suffixes
@@ -620,9 +627,8 @@ Length keys (`margin.*`, `size.width`, `size.height`) accept unit suffixes
 
 Typed alternative to string `Set` for common PDF globals. A nil receiver
 **panics** (`gowkhtmltopdf: nil PdfGlobalOptions`) — that is a programmer
-error. `WithPageSize` panics on an invalid name; `WithCopies` panics on
-`copies < 1`. `WithSetting` is the error-returning escape hatch for any
-supported dotted key (including page size and copies).
+error. Setting methods store values without panicking; invalid values fail at
+`RunPDF` / `ValidatePDF` / `WithSetting` with typed sentinels.
 
 `Build()` returns an independent `*GlobalSettings` snapshot. Pass it as
 `PDFRequest.Global`, to `ConvertHTML`, or to `Converter.WithGlobal`. Those
