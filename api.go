@@ -232,8 +232,10 @@ func (o *PdfGlobalOptions) WithPDFVersion(version string) *PdfGlobalOptions {
 	return o
 }
 
-// WithPDFProfile sets the target PDF conformance profile ("a3a-ua1", "a4-ua2", "PDF/A-4+PDF/UA-2", "PDF/A-3a", "a4", "ua2", etc.).
-// Invalid values fail during conversion / validation with ErrInvalidPDFProfile or ErrConformanceRequiresPDF17 / ErrConformanceRequiresPDF20.
+// WithPDFProfile sets the target PDF conformance profile
+// ("a3a-ua1", "a4-ua2", "PDF/A-4+PDF/UA-2", "PDF/A-3a", "a4", "ua2", etc.).
+// Invalid values fail during conversion / validation with
+// ErrInvalidPDFProfile or ErrConformanceRequiresPDF17 / ErrConformanceRequiresPDF20.
 func (o *PdfGlobalOptions) WithPDFProfile(profile string) *PdfGlobalOptions {
 	o = o.require()
 	o.options = o.options.WithPDFProfile(profile)

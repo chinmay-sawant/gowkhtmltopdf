@@ -567,6 +567,7 @@ func computeTrailerID(doc *Document) string {
 	return fmt.Sprintf("%032X", sum)
 }
 
+//nolint:cyclop // xref subsection + trailer shape branches by version/profile
 func writePDFTrailer(out *countingWriter, doc *Document, offsets []int64) error {
 	xrefPos := out.n
 
@@ -588,7 +589,8 @@ func writePDFTrailer(out *countingWriter, doc *Document, offsets []int64) error 
 		return err
 	}
 
-	if doc.policy.IsPDFA4() {
+	switch {
+	case doc.policy.IsPDFA4():
 		idHex := computeTrailerID(doc)
 		if err := writePDFFormat(
 			out, "<< /Size %d /Root %s /ID [ <%s> <%s> ] >>\n",
@@ -596,7 +598,7 @@ func writePDFTrailer(out *countingWriter, doc *Document, offsets []int64) error 
 		); err != nil {
 			return err
 		}
-	} else if doc.policy.Version >= PDF17 {
+	case doc.policy.Version >= PDF17:
 		idHex := computeTrailerID(doc)
 		if err := writePDFFormat(
 			out, "<< /Size %d /Root %s /Info %s /ID [ <%s> <%s> ] >>\n",
@@ -604,7 +606,7 @@ func writePDFTrailer(out *countingWriter, doc *Document, offsets []int64) error 
 		); err != nil {
 			return err
 		}
-	} else {
+	default:
 		if err := writePDFFormat(
 			out, "<< /Size %d /Root %s /Info %s >>\n", len(doc.objects)+1, doc.catalogRef, doc.infoRef,
 		); err != nil {
@@ -675,13 +677,17 @@ func (d *Document) finalize() error {
 	}
 
 	catalogRef := d.newObject()
+
 	var infoRef objRef
+
 	if !d.policy.IsPDFA4() {
 		infoRef = d.newObject()
 	}
+
 	pagesRef := d.newObject()
 
 	var metadataRef objRef
+
 	if d.policy.Version >= PDF17 {
 		metadataRef = d.newObject()
 		xmpBytes := d.buildXMPMetadata()
@@ -751,6 +757,7 @@ func (d *Document) finalize() error {
 
 	namesRef := d.serializeNamedDests()
 	d.setDict(catalogRef, d.catalogDict(pagesRef, metadataRef, namesRef))
+
 	if infoRef != 0 {
 		d.setDict(infoRef, d.infoDict())
 	}
@@ -874,17 +881,19 @@ func (d *Document) catalogDict(pagesRef, metadataRef, namesRef objRef) string {
 
 // registerDualDest records a PDF 2.0 named destination with page /D and
 // optional structure /SD, returning the destination name for /Dest (name).
-func (d *Document) registerDualDest(page objRef, x, y float64, se *StructElem) string {
+func (d *Document) registerDualDest(page objRef, left, top float64, structElem *StructElem) string {
 	name := fmt.Sprintf("D%d", len(d.namedDests)+1)
 	entry := namedDestEntry{ //nolint:exhaustruct // intentional zero-value fields
 		name: name,
 		page: page,
-		x:    x,
-		y:    y,
+		x:    left,
+		y:    top,
 	}
-	if se != nil && se.ref != 0 {
-		entry.structR = se.ref
+
+	if structElem != nil && structElem.ref != 0 {
+		entry.structR = structElem.ref
 	}
+
 	d.namedDests = append(d.namedDests, entry)
 
 	return name
@@ -897,15 +906,20 @@ func (d *Document) serializeNamedDests() objRef {
 		return 0
 	}
 
-	nameParts := make([]string, 0, len(d.namedDests)*2)
+	const nameAndRefPair = 2
+
+	nameParts := make([]string, 0, len(d.namedDests)*nameAndRefPair)
+
 	for _, entry := range d.namedDests {
 		destObj := d.newObject()
 		destDict := fmt.Sprintf("<< /D [%s /XYZ %s %s null]",
 			entry.page, num(entry.x), num(entry.y))
+
 		if entry.structR != 0 {
 			destDict += fmt.Sprintf(" /SD [%s /XYZ %s %s null]",
 				entry.structR, num(entry.x), num(entry.y))
 		}
+
 		destDict += " >>"
 		d.setDict(destObj, destDict)
 		nameParts = append(nameParts, pdfString(entry.name), destObj.String())
@@ -991,7 +1005,7 @@ func (d *Document) finalizePage(page *Page, pagesRef objRef) error {
 // ISO 32000-2; already obsolete in ISO 32000-1 §14.2), so the dict lists
 // only the resources the content actually uses.
 //
-//nolint:wsl // resource dictionary assembly is a linear PDF serialization block
+//nolint:wsl,cyclop,funlen // resource dictionary assembly is a linear PDF serialization block
 func buildPageResources(content *Content, iccRef, grayIccRef objRef, version PDFVersion) (string, error) {
 	fonts, err := content.fonts()
 	if err != nil {
@@ -1073,32 +1087,57 @@ func annotDescription(arg *annotation) string {
 // explicit per-annot target; otherwise the first marked-content owner on the
 // destination page (has /Pg association). Never fall back to Document alone —
 // a structure destination without a page is an invalid page destination.
-func structureDestElem(arg *annotation, d *Document) *StructElem {
-	if arg != nil && arg.destStruct != nil && arg.destStruct.ref != 0 {
+func structureDestElem(arg *annotation, doc *Document) *StructElem {
+	if arg == nil {
+		return nil
+	}
+
+	if arg.destStruct != nil && arg.destStruct.ref != 0 {
 		return arg.destStruct
 	}
 
-	if d == nil || arg == nil || !arg.hasDest {
+	if doc == nil || !arg.hasDest || arg.destPage < 0 || arg.destPage >= len(doc.pages) {
 		return nil
 	}
 
-	if arg.destPage < 0 || arg.destPage >= len(d.pages) {
+	return firstPageStructElem(doc.pages[arg.destPage])
+}
+
+func firstPageStructElem(page *Page) *StructElem {
+	if page == nil {
 		return nil
 	}
 
-	page := d.pages[arg.destPage]
-	for _, se := range page.mcids {
-		if se != nil && se.ref != 0 {
-			return se
+	for _, owner := range page.mcids {
+		if owner != nil && owner.ref != 0 {
+			return owner
 		}
 	}
 
 	return nil
 }
 
-func (d *Document) buildAnnots(p *Page) {
-	for i := range p.annots {
-		arg := &p.annots[i]
+func writeAnnotDest(buf *strings.Builder, doc *Document, arg *annotation) {
+	if arg.destPage < 0 || arg.destPage >= len(doc.pages) {
+		return
+	}
+
+	pageRef := doc.pages[arg.destPage].ref
+	// PDF/UA-2: dual named dest — /D page (Arlington/PDF/A) + /SD struct (UA-2 8.8).
+	if doc.policy.IsPDFUA2() {
+		name := doc.registerDualDest(pageRef, arg.destX, arg.destY, structureDestElem(arg, doc))
+		fmt.Fprintf(buf, " /Dest %s", pdfString(name))
+
+		return
+	}
+
+	fmt.Fprintf(buf, " /Dest [%s /XYZ %s %s null]",
+		pageRef, num(arg.destX), num(arg.destY))
+}
+
+func (d *Document) buildAnnots(page *Page) {
+	for i := range page.annots {
+		arg := &page.annots[i]
 		if arg.annotRef == 0 {
 			arg.annotRef = d.newObject()
 		}
@@ -1119,18 +1158,7 @@ func (d *Document) buildAnnots(p *Page) {
 		}
 
 		if arg.hasDest {
-			if arg.destPage >= 0 && arg.destPage < len(d.pages) {
-				pageRef := d.pages[arg.destPage].ref
-				// PDF/UA-2: dual named dest — /D page (Arlington/PDF/A) + /SD struct (UA-2 8.8).
-				if d.policy.IsPDFUA2() {
-					se := structureDestElem(arg, d)
-					name := d.registerDualDest(pageRef, arg.destX, arg.destY, se)
-					fmt.Fprintf(&buf, " /Dest %s", pdfString(name))
-				} else {
-					fmt.Fprintf(&buf, " /Dest [%s /XYZ %s %s null]",
-						pageRef, num(arg.destX), num(arg.destY))
-				}
-			}
+			writeAnnotDest(&buf, d, arg)
 		} else {
 			fmt.Fprintf(&buf, " /A << /S /URI /URI %s >>", pdfString(arg.uri))
 		}
@@ -1233,6 +1261,7 @@ func outlineDest(child *Outline, doc *Document) (string, error) {
 	if doc.policy.IsPDFUA2() {
 		name := doc.registerDualDest(ref, child.X, child.Y, child.StructElem)
 		parts := "/Dest " + pdfString(name)
+
 		if child.StructElem != nil && child.StructElem.ref != 0 {
 			parts += " /SE " + child.StructElem.ref.String()
 		}

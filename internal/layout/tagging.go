@@ -33,7 +33,7 @@ const (
 // laid-out box tree and returns a map from op index to the owning StructElem.
 // Returns an error if a compliance rule is violated (e.g. <img> missing alt).
 //
-//nolint:cyclop,gocognit,varnamelen,wsl,nilnil,funlen,nestif // structure tree mapping over display list ops
+//nolint:cyclop,gocyclo,gocognit,varnamelen,wsl,nilnil,funlen,nestif // structure tree mapping over display list ops
 func buildStructureTree(doc *pdf.Document, res *Result) (map[int]*opTagInfo, error) {
 	if doc == nil || (!doc.Policy().IsPDFUA1() && !doc.Policy().IsPDFUA2()) || res == nil {
 		return nil, nil

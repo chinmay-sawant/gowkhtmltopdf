@@ -14,6 +14,8 @@ import (
 	"gowkhtmltopdf/internal/settings"
 )
 
+const complianceFooterPage = "Page [page]"
+
 //nolint:cyclop,funlen // comprehensive golden needle assertions for PDF/A-3a + PDF/UA-1 dual profile
 func TestConvertDualProfileGoldenNeedles(t *testing.T) {
 	t.Parallel()
@@ -44,7 +46,7 @@ func TestConvertDualProfileGoldenNeedles(t *testing.T) {
 	cmd.Global.PdfProfile = settings.ProfilePDFA3aPDFUA1
 	cmd.Global.Title = "Compliance Document — 2026"
 	cmd.Global.Header.Left = "Header [page]"
-	cmd.Global.Footer.Right = "Page [page]"
+	cmd.Global.Footer.Right = complianceFooterPage
 	cmd.Global.UseCompression = false
 
 	data := runPDF(t, cmd)
@@ -175,7 +177,7 @@ func TestConvertDualPDFA4PDFUA2GoldenNeedles(t *testing.T) {
 	cmd.Global.PdfProfile = settings.ProfilePDFA4PDFUA2
 	cmd.Global.Title = "PDF 2.0 Dual Compliance Document"
 	cmd.Global.Header.Left = "Header [page]"
-	cmd.Global.Footer.Right = "Page [page]"
+	cmd.Global.Footer.Right = complianceFooterPage
 	cmd.Global.UseCompression = false
 
 	data := runPDF(t, cmd)
@@ -369,27 +371,47 @@ func TestComplianceUnclaimedIsolation(t *testing.T) {
 	}
 }
 
+func resolveVeraPDFBinary(t *testing.T) string {
+	t.Helper()
+
+	if bin := os.Getenv("VERAPDF_BIN"); bin != "" {
+		return bin
+	}
+
+	if bin, err := exec.LookPath("verapdf"); err == nil {
+		return bin
+	}
+
+	const treeBin = "../../verapdf/verapdf"
+	if _, err := os.Stat(treeBin); err == nil {
+		return treeBin
+	}
+
+	t.Skip("optional validator verapdf not installed (set VERAPDF_BIN or PATH to enable)")
+
+	return ""
+}
+
+func runVeraPDFFlavour(t *testing.T, verapdfBin, flavour, pdfPath string) {
+	t.Helper()
+
+	out, err := exec.CommandContext(
+		t.Context(), verapdfBin, "-f", flavour, "--format", "text", pdfPath,
+	).CombinedOutput()
+	if err != nil {
+		t.Errorf("verapdf -f %s validation failed: %v\nOutput: %s", flavour, err, string(out))
+
+		return
+	}
+
+	t.Logf("verapdf -f %s outcome: %s", flavour, strings.TrimSpace(string(out)))
+}
+
 func TestVeraPDFOptionalValidation(t *testing.T) {
 	t.Parallel()
 
-	verapdfBin := os.Getenv("VERAPDF_BIN")
-	if verapdfBin == "" {
-		var err error
-
-		verapdfBin, err = exec.LookPath("verapdf")
-		if err != nil {
-			treeBin := "../../verapdf/verapdf"
-			if _, statErr := os.Stat(treeBin); statErr == nil {
-				verapdfBin = treeBin
-			} else {
-				t.Skip("optional validator verapdf not installed (set VERAPDF_BIN or PATH to enable)")
-			}
-		}
-	}
-
-	// Record verapdf version
-	verOut, err := exec.CommandContext(t.Context(), verapdfBin, "--version").CombinedOutput()
-	if err == nil {
+	verapdfBin := resolveVeraPDFBinary(t)
+	if verOut, err := exec.CommandContext(t.Context(), verapdfBin, "--version").CombinedOutput(); err == nil {
 		t.Logf("running with verapdf version: %s", strings.TrimSpace(string(verOut)))
 	}
 
@@ -416,23 +438,8 @@ func TestVeraPDFOptionalValidation(t *testing.T) {
 		t.Fatalf("write PDF 1.7 file: %v", err)
 	}
 
-	out3a, err3a := exec.CommandContext(
-		t.Context(), verapdfBin, "-f", "3a", "--format", "text", pdfFile17,
-	).CombinedOutput()
-	if err3a != nil {
-		t.Errorf("verapdf -f 3a validation failed: %v\nOutput: %s", err3a, string(out3a))
-	} else {
-		t.Logf("verapdf -f 3a outcome: %s", strings.TrimSpace(string(out3a)))
-	}
-
-	outUA1, errUA1 := exec.CommandContext(
-		t.Context(), verapdfBin, "-f", "ua1", "--format", "text", pdfFile17,
-	).CombinedOutput()
-	if errUA1 != nil {
-		t.Errorf("verapdf -f ua1 validation failed: %v\nOutput: %s", errUA1, string(outUA1))
-	} else {
-		t.Logf("verapdf -f ua1 outcome: %s", strings.TrimSpace(string(outUA1)))
-	}
+	runVeraPDFFlavour(t, verapdfBin, "3a", pdfFile17)
+	runVeraPDFFlavour(t, verapdfBin, "ua1", pdfFile17)
 
 	// 2. Validate PDF 2.0 (PDF/A-4 and PDF/UA-2)
 	cmd20, _ := newCommand(t, htmlContent, "")
@@ -445,23 +452,8 @@ func TestVeraPDFOptionalValidation(t *testing.T) {
 		t.Fatalf("write PDF 2.0 file: %v", err)
 	}
 
-	out4, err4 := exec.CommandContext(
-		t.Context(), verapdfBin, "-f", "4", "--format", "text", pdfFile20,
-	).CombinedOutput()
-	if err4 != nil {
-		t.Errorf("verapdf -f 4 validation failed: %v\nOutput: %s", err4, string(out4))
-	} else {
-		t.Logf("verapdf -f 4 outcome: %s", strings.TrimSpace(string(out4)))
-	}
-
-	outUA2, errUA2 := exec.CommandContext(
-		t.Context(), verapdfBin, "-f", "ua2", "--format", "text", pdfFile20,
-	).CombinedOutput()
-	if errUA2 != nil {
-		t.Errorf("verapdf -f ua2 validation failed: %v\nOutput: %s", errUA2, string(outUA2))
-	} else {
-		t.Logf("verapdf -f ua2 outcome: %s", strings.TrimSpace(string(outUA2)))
-	}
+	runVeraPDFFlavour(t, verapdfBin, "4", pdfFile20)
+	runVeraPDFFlavour(t, verapdfBin, "ua2", pdfFile20)
 }
 
 // TestPDFUA1ContentMarkedCompleteness validates that in PDF/UA-1 mode, 100% of all visual
@@ -509,7 +501,7 @@ func TestPDFUA1ContentMarkedCompleteness(t *testing.T) {
 	cmd.Global.Title = "Completeness Test"
 	cmd.Global.Header.Left = "Header Text"
 	cmd.Global.Header.Line = true
-	cmd.Global.Footer.Right = "Page [page]"
+	cmd.Global.Footer.Right = complianceFooterPage
 	cmd.Global.Footer.Line = true
 	cmd.Global.UseCompression = false
 

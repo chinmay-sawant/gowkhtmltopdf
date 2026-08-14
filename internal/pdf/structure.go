@@ -307,6 +307,7 @@ func (d *Document) HeadingStructElems() []*StructElem {
 
 // isHeadingTag reports whether tag is one of H1–H6.
 func isHeadingTag(tag StructType) bool {
+	//nolint:exhaustive // only H1–H6 matter; all other structure types return false
 	switch tag {
 	case StructTypeH1, StructTypeH2, StructTypeH3, StructTypeH4, StructTypeH5, StructTypeH6:
 		return true
@@ -371,6 +372,8 @@ func pruneEmptyStructElems(elem *StructElem) bool {
 }
 
 // finalizeStructure creates and serializes StructTreeRoot, ParentTree, and all StructElems.
+//
+//nolint:cyclop // structure root, namespace, prune, ParentTree, and serialize in one finalize pass
 func (d *Document) finalizeStructure() error {
 	if !d.policy.IsPDFUA1() && !d.policy.IsPDFUA2() {
 		return nil

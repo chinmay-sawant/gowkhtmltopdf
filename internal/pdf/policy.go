@@ -220,31 +220,47 @@ func (p WriterPolicy) Validate() error {
 	}
 
 	canonical := p.CanonicalProfile()
+	if err := validateCanonicalProfileVersion(canonical, p.Version); err != nil {
+		return err
+	}
+
 	if canonical != "" {
-		if isPDF17Profile(canonical) {
-			if p.Version == PDF17 {
-				return nil
-			}
-
-			return ErrConformanceRequiresPDF17
-		}
-
-		if isPDF20Profile(canonical) {
-			if p.Version == PDF20 {
-				return nil
-			}
-
-			return ErrConformanceRequiresPDF20
-		}
+		return nil
 	}
 
 	cleaned := normalizeProfileToken(p.ConformanceProfile)
-
 	if isPDFA1Profile(cleaned) {
 		return ErrPDFA1Unsupported
 	}
 
 	return ErrUnknownConformanceProfile
+}
+
+// validateCanonicalProfileVersion ensures a known profile is paired with the
+// required base PDF version. Empty canonical means "not a known alias".
+func validateCanonicalProfileVersion(canonical string, version PDFVersion) error {
+	if canonical == "" {
+		return nil
+	}
+
+	if isPDF17Profile(canonical) {
+		if version == PDF17 {
+			return nil
+		}
+
+		return ErrConformanceRequiresPDF17
+	}
+
+	if isPDF20Profile(canonical) {
+		if version == PDF20 {
+			return nil
+		}
+
+		return ErrConformanceRequiresPDF20
+	}
+
+	// Known tokens only; unknown aliases fall through to ErrUnknown… above.
+	return nil
 }
 
 // normalizeProfileToken lower-cases, trims, and strips spaces/underscores from

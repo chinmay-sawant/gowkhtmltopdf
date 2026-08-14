@@ -195,62 +195,67 @@ var ErrProfileRequiresPDF17 = errors.New("settings: compliance profiles require 
 // with a PDF version other than 2.0 (1.4 or 1.7).
 var ErrProfileRequiresPDF20 = errors.New("settings: compliance profiles require PDF 2.0")
 
+func isPDF17ComplianceProfile(canonical string) bool {
+	return canonical == settings.ProfilePDFA3a ||
+		canonical == settings.ProfilePDFUA1 ||
+		canonical == settings.ProfilePDFA3aPDFUA1
+}
+
+func isPDF20ComplianceProfile(canonical string) bool {
+	return canonical == settings.ProfilePDFA4 ||
+		canonical == settings.ProfilePDFUA2 ||
+		canonical == settings.ProfilePDFA4PDFUA2
+}
+
+// policyForProfile builds a WriterPolicy for a known compliance profile,
+// rejecting explicit version strings that conflict with the profile base.
 func policyForProfile(glob settings.PdfGlobal, canonicalProfile string) (pdf.WriterPolicy, error) {
-	is17 := canonicalProfile == settings.ProfilePDFA3a ||
-		canonicalProfile == settings.ProfilePDFUA1 ||
-		canonicalProfile == settings.ProfilePDFA3aPDFUA1
+	switch {
+	case isPDF17ComplianceProfile(canonicalProfile):
+		return compliancePolicy(
+			glob, canonicalProfile, pdf.PDF17, pdfVersion17, ErrProfileRequiresPDF17,
+			pdfVersion14, pdfVersion20,
+		)
+	case isPDF20ComplianceProfile(canonicalProfile):
+		return compliancePolicy(
+			glob, canonicalProfile, pdf.PDF20, pdfVersion20, ErrProfileRequiresPDF20,
+			pdfVersion14, pdfVersion17,
+		)
+	default:
+		return pdf.WriterPolicy{}, settings.ErrInvalidPDFProfile
+	}
+}
 
-	is20 := canonicalProfile == settings.ProfilePDFA4 ||
-		canonicalProfile == settings.ProfilePDFUA2 ||
-		canonicalProfile == settings.ProfilePDFA4PDFUA2
-
-	if is17 {
-		if glob.PdfVersion == pdfVersion14 || glob.PdfVersion == pdfVersion20 {
-			return pdf.WriterPolicy{}, ErrProfileRequiresPDF17
+// compliancePolicy validates version conflict, builds the policy, and runs Validate.
+func compliancePolicy(
+	glob settings.PdfGlobal,
+	canonicalProfile string,
+	version pdf.PDFVersion,
+	impliedVersion string,
+	conflictErr error,
+	forbiddenVersions ...string,
+) (pdf.WriterPolicy, error) {
+	for _, forbidden := range forbiddenVersions {
+		if glob.PdfVersion == forbidden {
+			return pdf.WriterPolicy{}, conflictErr
 		}
-
-		if glob.PdfVersion != "" && glob.PdfVersion != pdfVersion17 {
-			if _, err := settings.ParsePDFVersion(glob.PdfVersion); err != nil {
-				return pdf.WriterPolicy{}, err //nolint:wrapcheck // sentinel error from settings
-			}
-		}
-
-		policy := pdf.WriterPolicy{ //nolint:exhaustruct // default feature flags
-			Version:            pdf.PDF17,
-			ConformanceProfile: canonicalProfile,
-		}
-
-		if err := policy.Validate(); err != nil {
-			return pdf.WriterPolicy{}, err //nolint:wrapcheck // delegating policy validation
-		}
-
-		return policy, nil
 	}
 
-	if is20 {
-		if glob.PdfVersion == pdfVersion14 || glob.PdfVersion == pdfVersion17 {
-			return pdf.WriterPolicy{}, ErrProfileRequiresPDF20
+	if glob.PdfVersion != "" && glob.PdfVersion != impliedVersion {
+		if _, err := settings.ParsePDFVersion(glob.PdfVersion); err != nil {
+			return pdf.WriterPolicy{}, err //nolint:wrapcheck // sentinel error from settings
 		}
-
-		if glob.PdfVersion != "" && glob.PdfVersion != pdfVersion20 {
-			if _, err := settings.ParsePDFVersion(glob.PdfVersion); err != nil {
-				return pdf.WriterPolicy{}, err //nolint:wrapcheck // sentinel error from settings
-			}
-		}
-
-		policy := pdf.WriterPolicy{ //nolint:exhaustruct // default feature flags
-			Version:            pdf.PDF20,
-			ConformanceProfile: canonicalProfile,
-		}
-
-		if err := policy.Validate(); err != nil {
-			return pdf.WriterPolicy{}, err //nolint:wrapcheck // delegating policy validation
-		}
-
-		return policy, nil
 	}
 
-	return pdf.WriterPolicy{}, settings.ErrInvalidPDFProfile
+	policy := pdf.WriterPolicy{ //nolint:exhaustruct // default feature flags
+		Version:            version,
+		ConformanceProfile: canonicalProfile,
+	}
+	if err := policy.Validate(); err != nil {
+		return pdf.WriterPolicy{}, err //nolint:wrapcheck // delegating policy validation
+	}
+
+	return policy, nil
 }
 
 // PolicyForGlobal maps the requested PDF version and profile to a pdf.WriterPolicy.

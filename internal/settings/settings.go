@@ -39,7 +39,8 @@ var (
 
 	// ErrInvalidPDFProfile reports an invalid or unsupported PDF conformance profile.
 	ErrInvalidPDFProfile = errors.New(
-		"settings: invalid pdf profile (allowed: a3a-ua1, a3a, ua1, a4-ua2, a4, ua2, PDF/A-3a+PDF/UA-1, PDF/A-3a, PDF/UA-1, PDF/A-4+PDF/UA-2, PDF/A-4, PDF/UA-2)",
+		"settings: invalid pdf profile (allowed: a3a-ua1, a3a, ua1, a4-ua2, a4, ua2, " +
+			"PDF/A-3a+PDF/UA-1, PDF/A-3a, PDF/UA-1, PDF/A-4+PDF/UA-2, PDF/A-4, PDF/UA-2)",
 	)
 
 	// ErrProfilePDF20Unsupported indicates PDF 2.0 profiles (PDF/A-4, PDF/UA-2) are unsupported (historical sentinel).
@@ -68,7 +69,9 @@ func ParsePDFVersion(value string) (string, error) {
 }
 
 // ParsePDFProfile validates and normalizes a PDF conformance profile string.
-// Accepted values map to canonical constants: ProfilePDFA3aPDFUA1, ProfilePDFA3a, ProfilePDFUA1, ProfilePDFA4PDFUA2, ProfilePDFA4, ProfilePDFUA2, or ProfileNone ("").
+// Accepted values map to canonical constants: ProfilePDFA3aPDFUA1,
+// ProfilePDFA3a, ProfilePDFUA1, ProfilePDFA4PDFUA2, ProfilePDFA4,
+// ProfilePDFUA2, or ProfileNone ("").
 // Invalid or unsupported values return an error wrapping the respective sentinel.
 //
 //nolint:cyclop // comprehensive mapping of profile aliases across PDF versions
