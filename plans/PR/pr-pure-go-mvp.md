@@ -2,7 +2,7 @@
 
 Lands the full **phases 0–9 pure-Go, stdlib-only** HTML→PDF / HTML→image rewrite of a wkhtmltopdf work-alike (MVP v0.1.0): load → parse → CSS → layout → paginate → paint → PDF write, plus CLI, library API, golden corpus, CI, MIT license, and last-mile fixes so generated PDFs open correctly in real viewers.
 
-Built **from scratch** with **zero third-party Go modules or HTML→PDF APIs** (no Chrome/WebKit/Qt, no cgo). Plans and last-mile correctness via Grok 4.5; bulk phase implementation via DeepSeek; remaining Unicode/complex-page work is documented follow-up.
+Built **from scratch** with **zero third-party Go modules or HTML→PDF APIs** (no Chrome/WebKit/Qt, no cgo). Developed with modern AI-assisted engineering tools (including Grok, OpenAI Codex, OpenCode, and Cursor); remaining Unicode/complex-page work is documented follow-up.
 
 ---
 
@@ -42,7 +42,7 @@ Built **from scratch** with **zero third-party Go modules or HTML→PDF APIs** (
 ### Docs / license / tooling
 
 - **MIT License** - Copyright (c) 2026 Chinmay Sawant (`LICENSE`)
-- **README** - clean-room / no third-party APIs; AI build story (Grok plans + last-mile, DeepSeek ~90% phases); deferred list
+- **README** - clean-room / no third-party APIs; AI-assisted development story; deferred list
 - **`make samples`** - regenerate fixture PDFs, TOC/HF showcase, sample PNG
 - **`output/` gitignored**
 

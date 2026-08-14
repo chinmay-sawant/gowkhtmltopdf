@@ -1,10 +1,11 @@
 # Overview
 
-**gowkhtmltopdf** is a pure-Go, no-cgo converter that turns HTML into PDF
+**gowkhtmltopdf** is a pure-Go, no-cgo HTML template engine that turns HTML into PDF
 (and optionally PNG/JPEG). It is a clean-room work-alike of the
 [wkhtmltopdf](https://wkhtmltopdf.org/) CLI surface, aimed at **controlled
-server-generated reports** — invoices, statements, multi-page tables, headers
-and footers, table of contents, and PDF bookmarks — not full browser parity.
+server-generated templates and documents** — invoices, receipts, certificates,
+storybooks, posters, statements, multi-page tables, headers and footers,
+table of contents, and PDF bookmarks — not full browser parity.
 
 The entire pipeline (load → parse → style → layout → paginate → paint → write)
 is implemented in this repository. There is no Chrome/WebKit process, no Qt,
@@ -16,7 +17,7 @@ rasterization). Builds are intended to run with `CGO_ENABLED=0`.
 
 **Status:** **v0.2.0**. Phases 0–9 of the
 [canonical plan](../plans/00-canonical-pure-go-rewrite.md) are implemented.
-Tier 1 and Tier 2 core (phases 10–20) are shipped as a report CSS subset.
+Tier 1 and Tier 2 core (phases 10–20) are shipped as a print CSS subset.
 Remaining gaps live in [deferred.md](deferred.md). Progressive post-MVP goals
 (including URL → decent print) are goals, not shipped feature claims — see
 [fidelity.md](fidelity.md).
@@ -30,7 +31,7 @@ Remaining gaps live in [deferred.md](deferred.md). Progressive post-MVP goals
 | **No browser** | No Chrome, WebKit, Qt, or headless browser process |
 | **No cgo** | Static binaries; no native converter library |
 | **No SaaS APIs** | No remote HTML→PDF services or SDKs |
-| **Report-oriented** | Controlled templates first; arbitrary websites are a later, weaker goal |
+| **Template-oriented** | Controlled HTML/CSS templates first; arbitrary websites are a later, weaker goal |
 | **Honest degrade** | Unknown CSS is ignored; missing images are skipped; the process should not crash |
 | **Repeatable layout** | Same HTML + settings + fonts produce the same layout. CLI PDF **bytes** are not hash-stable unless you inject `Now` (CreationDate / `[date]` / `[time]` use the wall clock by default) |
 
