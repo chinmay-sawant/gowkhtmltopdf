@@ -1,10 +1,11 @@
 import RichText from '../RichText'
+import { slugify } from './slugify'
 
 export default function BulletsBlock({ block }) {
   return (
     <section className="prose">
       {block.heading && (
-        <h2>
+        <h2 id={slugify(block.heading)}>
           <RichText>{block.heading}</RichText>
         </h2>
       )}

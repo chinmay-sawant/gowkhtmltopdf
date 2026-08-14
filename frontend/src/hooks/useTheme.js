@@ -24,7 +24,33 @@ export function useTheme() {
     window.localStorage.setItem('gowk-theme', theme)
   }, [theme])
 
-  return [theme, setTheme]
+  useEffect(() => {
+    const handleStorage = (e) => {
+      if (e.key === 'gowk-theme' && (e.newValue === 'light' || e.newValue === 'dark')) {
+        setTheme(e.newValue)
+      }
+    }
+    const handleCustom = (e) => {
+      if (e.detail === 'light' || e.detail === 'dark') {
+        setTheme(e.detail)
+      }
+    }
+    window.addEventListener('storage', handleStorage)
+    window.addEventListener('gowk-theme-change', handleCustom)
+    return () => {
+      window.removeEventListener('storage', handleStorage)
+      window.removeEventListener('gowk-theme-change', handleCustom)
+    }
+  }, [])
+
+  const updateTheme = (newTheme) => {
+    const next = typeof newTheme === 'function' ? newTheme(theme) : newTheme
+    setTheme(next)
+    window.dispatchEvent(new CustomEvent('gowk-theme-change', { detail: next }))
+  }
+
+  return [theme, updateTheme]
 }
 
 export default useTheme
+

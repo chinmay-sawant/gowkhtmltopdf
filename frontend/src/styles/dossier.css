@@ -54,6 +54,166 @@
   line-height: 1.45;
 }
 
+/* Coverage Distribution Bar Card */
+.coverage-bar-card {
+  margin-bottom: 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 18px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.coverage-bar-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.coverage-bar-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.coverage-bar-label {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.coverage-bar-sub {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.coverage-bar-stats-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.coverage-stat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink-2);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.coverage-stat-pill:hover {
+  border-color: var(--sep);
+  background: var(--soft);
+}
+
+.coverage-stat-pill.active {
+  border-color: var(--ink);
+  background: var(--soft);
+  box-shadow: 0 0 0 1px var(--ink);
+}
+
+.coverage-stat-pill .stat-pill-count {
+  color: var(--muted);
+}
+
+.coverage-segmented-bar {
+  display: flex;
+  width: 100%;
+  height: 28px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--soft);
+  border: 1px solid var(--line);
+}
+
+.coverage-segment {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  padding: 0 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  transition: filter 0.15s ease, opacity 0.15s ease;
+  user-select: none;
+}
+
+.coverage-segment:not(:last-child) {
+  border-right: 1.5px solid var(--surface);
+}
+
+.coverage-segment:hover {
+  filter: brightness(1.08);
+  z-index: 2;
+}
+
+.coverage-segment:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+  z-index: 3;
+}
+
+.coverage-segment.segment-implemented {
+  background: #9bbf88;
+  color: #1e3a12;
+}
+
+.coverage-segment.segment-partial {
+  background: #e7cd80;
+  color: #4a3806;
+}
+
+.coverage-segment.segment-not-implemented {
+  background: #d89a8b;
+  color: #4d1d14;
+}
+
+html[data-theme='dark'] .coverage-segment.segment-implemented {
+  background: #62884f;
+  color: #f1f8ee;
+}
+
+html[data-theme='dark'] .coverage-segment.segment-partial {
+  background: #ab8e39;
+  color: #fcf8ec;
+}
+
+html[data-theme='dark'] .coverage-segment.segment-not-implemented {
+  background: #a45a4a;
+  color: #fdf3f1;
+}
+
+.coverage-segment.active {
+  box-shadow: inset 0 0 0 2px var(--ink);
+  filter: contrast(1.15) brightness(1.05);
+}
+
+.coverage-segment .segment-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .dossier-controls {
   display: flex;
   flex-direction: column;
@@ -142,6 +302,48 @@
 
 .dossier-toolbar .controls-note {
   margin: 0;
+}
+
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.sort-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.sort-label {
+  font-weight: 500;
+}
+
+.sort-select {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.sort-select:hover {
+  border-color: var(--sep);
+}
+
+.sort-select:focus {
+  border-color: var(--focus);
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent);
 }
 
 .dossier-toolbar .pager-top {
@@ -572,6 +774,108 @@ html[data-theme='dark'] .page-btn.active {
 
 .num:hover {
   color: var(--ink);
+}
+
+/* Direct Issue Deep-Linking */
+.issue-num-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  position: relative;
+}
+
+.issue-copy-link-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.issue-copy-link-btn:hover {
+  color: var(--ink);
+  background: var(--soft);
+  border-color: var(--line);
+}
+
+.issue-copy-link-btn.copied {
+  color: var(--ok-ink);
+  background: color-mix(in srgb, #9bbf88 20%, var(--mix-base));
+  border-color: color-mix(in srgb, #9bbf88 40%, var(--line));
+}
+
+.copy-tooltip {
+  position: absolute;
+  bottom: calc(100% + 5px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #17181a;
+  color: #fbfbfa;
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  animation: tooltip-fade 0.15s ease-out;
+  z-index: 10;
+}
+
+html[data-theme='dark'] .copy-tooltip {
+  background: #e8e6e0;
+  color: #17181a;
+}
+
+@keyframes tooltip-fade {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 4px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+/* Search Term Highlighting */
+mark.search-highlight {
+  background: color-mix(in srgb, #ffd54f 60%, var(--mix-base));
+  color: var(--ink);
+  padding: 1px 3px;
+  border-radius: 3px;
+  font-weight: 600;
+  box-shadow: 0 0 0 1px color-mix(in srgb, #f59e0b 40%, transparent);
+}
+
+html[data-theme='dark'] mark.search-highlight {
+  background: color-mix(in srgb, #b45309 60%, var(--mix-base));
+  color: #ffffff;
+  box-shadow: 0 0 0 1px color-mix(in srgb, #f59e0b 60%, transparent);
+}
+
+/* Issue Card Target Glow */
+.issue.is-target-issue {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent), 0 4px 24px color-mix(in srgb, var(--accent) 30%, transparent);
+  animation: issue-glow-pulse 2.5s ease-in-out infinite alternate;
+}
+
+@keyframes issue-glow-pulse {
+  0% {
+    box-shadow: 0 0 0 2px var(--accent), 0 4px 16px color-mix(in srgb, var(--accent) 25%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 3px var(--accent), 0 6px 28px color-mix(in srgb, var(--accent) 45%, transparent);
+  }
 }
 
 .cat-tag {

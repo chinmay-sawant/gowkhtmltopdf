@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from 'react'
+import { useMemo, useCallback, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import ContentBlocks from '../components/blocks/ContentBlocks'
 import FilterChips from '../components/FilterChips'
@@ -8,10 +8,11 @@ import Pagination from '../components/Pagination'
 import PageTitle from '../components/PageTitle'
 import { countBy } from '../data/issues'
 import { useIssues } from '../hooks/useIssues'
-import { CATEGORY_ORDER, STATUS_META } from '../data/constants'
+import { CATEGORY_ORDER, STATUS_META, STATUS_ORDER } from '../data/constants'
 import dossier from '../data/content/page-dossier.json'
 
 const PAGE_SIZES = [10, 25, 50, 100]
+const SEVERITY_WEIGHT = { High: 3, Medium: 2, Low: 1 }
 
 export default function DossierPage() {
   const { issues, loading, error, reload } = useIssues()
@@ -20,7 +21,10 @@ export default function DossierPage() {
   const status = searchParams.get('status') || 'all'
   const category = searchParams.get('category') || 'all'
   const severity = searchParams.get('severity') || 'all'
+  const sort = searchParams.get('sort') || 'number-desc'
   const q = searchParams.get('q') || ''
+  const targetIssueParam = searchParams.get('issue')
+  const targetIssueNum = targetIssueParam ? parseInt(targetIssueParam, 10) : null
   const rawPage = parseInt(searchParams.get('page') || '1', 10)
   const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1
   const rawPageSize = parseInt(searchParams.get('pageSize') || '25', 10)
@@ -39,6 +43,7 @@ export default function DossierPage() {
               (k === 'status' && v === 'all') ||
               (k === 'category' && v === 'all') ||
               (k === 'severity' && v === 'all') ||
+              (k === 'sort' && v === 'number-desc') ||
               (k === 'page' && Number(v) === 1) ||
               (k === 'pageSize' && Number(v) === 25)
             ) {
@@ -72,6 +77,13 @@ export default function DossierPage() {
   const handleSeverityChange = useCallback(
     (newSeverity) => {
       updateFilters({ severity: newSeverity, page: 1 })
+    },
+    [updateFilters],
+  )
+
+  const handleSortChange = useCallback(
+    (newSort) => {
+      updateFilters({ sort: newSort, page: 1 })
     },
     [updateFilters],
   )
@@ -110,7 +122,7 @@ export default function DossierPage() {
     const qLower = q.trim().toLowerCase()
     const cleanQ = qLower.startsWith('#') ? qLower.slice(1) : qLower
 
-    return issues.filter((it) => {
+    const result = issues.filter((it) => {
       if (status !== 'all' && it.status !== status) return false
       if (category !== 'all' && it.category !== category) return false
       if (severity !== 'all' && it.severity !== severity) return false
@@ -133,7 +145,25 @@ export default function DossierPage() {
         keyDetail.includes(qLower)
       )
     })
-  }, [issues, status, category, severity, q])
+
+    return result.sort((a, b) => {
+      if (sort === 'number-asc') {
+        return a.number - b.number
+      }
+      if (sort === 'severity-desc') {
+        const diff = (SEVERITY_WEIGHT[b.severity] || 0) - (SEVERITY_WEIGHT[a.severity] || 0)
+        if (diff !== 0) return diff
+        return b.number - a.number
+      }
+      if (sort === 'comments-desc') {
+        const diff = (b.comments || 0) - (a.comments || 0)
+        if (diff !== 0) return diff
+        return b.number - a.number
+      }
+      // Default: number-desc
+      return b.number - a.number
+    })
+  }, [issues, status, category, severity, q, sort])
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
   const safePage = Math.min(page, pageCount)
@@ -146,11 +176,33 @@ export default function DossierPage() {
   const statusCounts = useMemo(() => countBy(issues, 'status'), [issues])
   const sevCounts = useMemo(() => countBy(issues, 'severity'), [issues])
 
+  // Automatically scroll / paginate to target issue if deep-linked via URL
+  useEffect(() => {
+    if (targetIssueNum && !loading && filtered.length > 0) {
+      const targetIdx = filtered.findIndex((it) => it.number === targetIssueNum)
+      if (targetIdx >= 0) {
+        const targetPage = Math.floor(targetIdx / pageSize) + 1
+        if (targetPage !== safePage) {
+          updateFilters({ page: targetPage })
+        }
+      }
+    }
+  }, [targetIssueNum, loading, filtered, pageSize, safePage, updateFilters])
+
   const statusSave = useMemo(() => {
     const map = {}
     for (const [k, v] of Object.entries(STATUS_META)) map[k] = v.label
     return map
   }, [])
+
+  const totalIssues = issues.length
+  const implCount = statusCounts['implemented'] || 0
+  const partCount = statusCounts['partial'] || 0
+  const notImplCount = statusCounts['not-implemented'] || 0
+
+  const implPct = totalIssues > 0 ? ((implCount / totalIssues) * 100).toFixed(1) : '0.0'
+  const partPct = totalIssues > 0 ? ((partCount / totalIssues) * 100).toFixed(1) : '0.0'
+  const notImplPct = totalIssues > 0 ? ((notImplCount / totalIssues) * 100).toFixed(1) : '0.0'
 
   const selectionNote = useMemo(() => {
     if (loading) return 'Loading issue dataset…'
@@ -193,6 +245,86 @@ export default function DossierPage() {
             Statuses and evidence were assigned by AI subagents from issue metadata and codebase scans. Verify cited code paths before relying on them.
           </span>
         </aside>
+
+        {/* FE-25: Interactive Coverage Distribution Bar */}
+        <section className="coverage-bar-card" aria-label="gowkhtmltopdf Coverage Distribution">
+          <div className="coverage-bar-meta">
+            <div className="coverage-bar-title-group">
+              <span className="coverage-bar-label">Coverage Distribution</span>
+              <span className="coverage-bar-sub">Interactive status breakdown — click any segment to filter</span>
+            </div>
+            <div className="coverage-bar-stats-summary">
+              <button
+                type="button"
+                className={`coverage-stat-pill segment-implemented${status === 'implemented' ? ' active' : ''}`}
+                onClick={() => handleStatusChange(status === 'implemented' ? 'all' : 'implemented')}
+                title="Filter by Implemented"
+              >
+                <span className="dot" style={{ background: '#9BBF88' }} />
+                <span>Implemented:</span>
+                <strong>{implPct}%</strong>
+                <span className="stat-pill-count">({implCount})</span>
+              </button>
+              <button
+                type="button"
+                className={`coverage-stat-pill segment-partial${status === 'partial' ? ' active' : ''}`}
+                onClick={() => handleStatusChange(status === 'partial' ? 'all' : 'partial')}
+                title="Filter by Partial"
+              >
+                <span className="dot" style={{ background: '#E7CD80' }} />
+                <span>Partial:</span>
+                <strong>{partPct}%</strong>
+                <span className="stat-pill-count">({partCount})</span>
+              </button>
+              <button
+                type="button"
+                className={`coverage-stat-pill segment-not-implemented${status === 'not-implemented' ? ' active' : ''}`}
+                onClick={() => handleStatusChange(status === 'not-implemented' ? 'all' : 'not-implemented')}
+                title="Filter by Not Implemented"
+              >
+                <span className="dot" style={{ background: '#D89A8B' }} />
+                <span>Not Impl.:</span>
+                <strong>{notImplPct}%</strong>
+                <span className="stat-pill-count">({notImplCount})</span>
+              </button>
+            </div>
+          </div>
+          <div className="coverage-segmented-bar" role="group" aria-label="Filter by coverage status">
+            <button
+              type="button"
+              className={`coverage-segment segment-implemented${status === 'implemented' ? ' active' : ''}`}
+              style={{ width: `${implPct}%` }}
+              onClick={() => handleStatusChange(status === 'implemented' ? 'all' : 'implemented')}
+              aria-label={`Implemented: ${implCount} issues (${implPct}%). Click to ${status === 'implemented' ? 'clear filter' : 'filter'}`}
+              aria-pressed={status === 'implemented'}
+              title={`Implemented: ${implCount} issues (${implPct}%)`}
+            >
+              <span className="segment-text">{implPct}% Implemented</span>
+            </button>
+            <button
+              type="button"
+              className={`coverage-segment segment-partial${status === 'partial' ? ' active' : ''}`}
+              style={{ width: `${partPct}%` }}
+              onClick={() => handleStatusChange(status === 'partial' ? 'all' : 'partial')}
+              aria-label={`Partial: ${partCount} issues (${partPct}%). Click to ${status === 'partial' ? 'clear filter' : 'filter'}`}
+              aria-pressed={status === 'partial'}
+              title={`Partial: ${partCount} issues (${partPct}%)`}
+            >
+              <span className="segment-text">{partPct}% Partial</span>
+            </button>
+            <button
+              type="button"
+              className={`coverage-segment segment-not-implemented${status === 'not-implemented' ? ' active' : ''}`}
+              style={{ width: `${notImplPct}%` }}
+              onClick={() => handleStatusChange(status === 'not-implemented' ? 'all' : 'not-implemented')}
+              aria-label={`Not implemented: ${notImplCount} issues (${notImplPct}%). Click to ${status === 'not-implemented' ? 'clear filter' : 'filter'}`}
+              aria-pressed={status === 'not-implemented'}
+              title={`Not implemented: ${notImplCount} issues (${notImplPct}%)`}
+            >
+              <span className="segment-text">{notImplPct}% Not Impl.</span>
+            </button>
+          </div>
+        </section>
       </header>
 
       <section className="dossier-controls" aria-label="Issue filters and search">
@@ -242,18 +374,34 @@ export default function DossierPage() {
 
       <div className="dossier-toolbar">
         <p className="controls-note">{selectionNote}</p>
-        <div className="pager-top">
-          <Pagination page={safePage} pageCount={pageCount} onPageChange={handlePageChange} pageSize={pageSize} />
-          <label className="page-size">
-            Per page
-            <select value={pageSize} onChange={(e) => handlePageSizeChange(Number(e.target.value))}>
-              {PAGE_SIZES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
+        <div className="toolbar-actions">
+          <label className="sort-control">
+            <span className="sort-label">Sort</span>
+            <select
+              value={sort}
+              onChange={(e) => handleSortChange(e.target.value)}
+              className="sort-select"
+              aria-label="Sort issues by"
+            >
+              <option value="number-desc">Newest issue (#5283 → #1)</option>
+              <option value="number-asc">Oldest issue (#1 → #5283)</option>
+              <option value="severity-desc">Highest severity (High → Low)</option>
+              <option value="comments-desc">Most discussed (Comments)</option>
             </select>
           </label>
+          <div className="pager-top">
+            <Pagination page={safePage} pageCount={pageCount} onPageChange={handlePageChange} pageSize={pageSize} />
+            <label className="page-size">
+              Per page
+              <select value={pageSize} onChange={(e) => handlePageSizeChange(Number(e.target.value))}>
+                {PAGE_SIZES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
         </div>
       </div>
 
@@ -295,7 +443,12 @@ export default function DossierPage() {
             <>
               <div className="issues">
                 {pageItems.map((it) => (
-                  <IssueCard key={it.number} issue={it} />
+                  <IssueCard
+                    key={it.number}
+                    issue={it}
+                    query={q}
+                    isTarget={targetIssueNum === it.number}
+                  />
                 ))}
               </div>
               <Pagination page={safePage} pageCount={pageCount} onPageChange={handlePageChange} pageSize={pageSize} />
@@ -326,3 +479,4 @@ export default function DossierPage() {
     </div>
   )
 }
+

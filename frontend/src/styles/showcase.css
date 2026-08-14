@@ -2,6 +2,64 @@
   margin-top: 24px;
 }
 
+.showcase-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.showcase-chips .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9999px;
+  padding: 6px 12px 6px 14px;
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.showcase-chips .chip:hover {
+  border-color: var(--sep);
+  box-shadow: var(--shadow);
+}
+
+.showcase-chips .chip.active {
+  border-color: var(--cc);
+  background: color-mix(in srgb, var(--cc) 16%, var(--mix-base));
+}
+
+.showcase-chips .chip-n {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 9999px;
+  background: var(--soft);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.showcase-chips .chip.active .chip-n {
+  background: color-mix(in srgb, var(--cc) 28%, var(--mix-base));
+  color: var(--ink);
+}
+
+.showcase-chips .chip:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
 .showcase-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
@@ -16,12 +74,19 @@
   border: 1px solid var(--line);
   border-radius: 12px;
   overflow: hidden;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s ease;
+  cursor: pointer;
+  outline: none;
 }
 
 .showcase-card:hover {
   border-color: var(--sep);
   box-shadow: var(--shadow);
+}
+
+.showcase-card:focus-visible {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 25%, transparent);
 }
 
 .showcase-thumb {
@@ -229,8 +294,15 @@ html[data-theme='dark'] .cardbox {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 16px;
+  padding: 10px 16px;
   border-bottom: 1px solid var(--line);
+}
+
+.cardbox-title-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
 }
 
 .cardbox-head h2 {
@@ -239,13 +311,107 @@ html[data-theme='dark'] .cardbox {
   font-size: 17px;
   letter-spacing: -0.01em;
   margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .cardbox-file {
   font-family: var(--mono);
   font-size: 11px;
   color: var(--muted);
-  margin-left: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cardbox-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.cardbox-zoom-group {
+  display: inline-flex;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.cardbox-ctrl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.cardbox-ctrl-btn:hover:not(:disabled) {
+  background: var(--soft);
+}
+
+.cardbox-ctrl-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.cardbox-ctrl-btn.zoom-indicator {
+  min-width: 48px;
+  font-size: 11px;
+  font-weight: 600;
+  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+}
+
+.cardbox-ctrl-btn.zoom-indicator.active {
+  color: var(--accent);
+}
+
+.cardbox-fs-btn {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+}
+
+.cardbox-fs-btn:hover {
+  border-color: var(--sep);
+  background: var(--soft);
+}
+
+.cardbox-fs-btn.active {
+  background: var(--ink);
+  color: var(--surface);
+  border-color: var(--ink);
+}
+
+/* Lightbox Fullscreen mode */
+.cardbox.is-fullscreen {
+  padding: 0;
+}
+
+.cardbox.is-fullscreen .cardbox-inner {
+  max-width: 100vw;
+  max-height: 100vh;
+  height: 100vh;
+  border-radius: 0;
+  border: none;
+}
+
+.cardbox.is-fullscreen .cardbox-page img {
+  max-height: calc(100vh - 160px);
 }
 
 .cardbox-close {
@@ -256,10 +422,10 @@ html[data-theme='dark'] .cardbox {
   background: var(--soft);
   border: 1px solid var(--line);
   border-radius: 6px;
-  min-width: 44px;
-  min-height: 44px;
-  width: 44px;
-  height: 44px;
+  min-width: 32px;
+  min-height: 32px;
+  width: 32px;
+  height: 32px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -269,6 +435,7 @@ html[data-theme='dark'] .cardbox {
 
 .cardbox-close:hover {
   border-color: var(--sep);
+  background: var(--sep);
 }
 
 .cardbox-stage {
@@ -279,6 +446,7 @@ html[data-theme='dark'] .cardbox {
   padding: 14px 16px;
   background: var(--soft);
   border-bottom: 1px solid var(--line);
+  overflow: hidden;
 }
 
 .cardbox-page {
@@ -286,17 +454,62 @@ html[data-theme='dark'] .cardbox {
   min-width: 0;
   display: flex;
   justify-content: center;
+  align-items: center;
   overflow: hidden;
+  position: relative;
+  user-select: none;
+}
+
+.cardbox-page.is-zoomed {
+  touch-action: none;
 }
 
 .cardbox-page img {
   max-width: 100%;
-  max-height: calc(88vh - 150px);
+  max-height: calc(88vh - 170px);
   height: auto;
   object-fit: contain;
   border: 1px solid var(--line);
   border-radius: 3px;
   background: var(--surface);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.cardbox-hints {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 16px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  user-select: none;
+  flex-wrap: wrap;
+}
+
+.cardbox-hints kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  box-shadow: 0 1px 0 var(--line);
+}
+
+.hint-sep {
+  color: var(--sep);
+}
+
+.hint-pan {
+  color: var(--ok-ink);
+  font-weight: 500;
 }
 
 .cardbox-arrow {

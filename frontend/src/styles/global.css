@@ -30,3 +30,7 @@
 
 /* 404 / Unknown route page */
 @import './not-found.css';
+
+/* Global Command Palette */
+@import './command-palette.css';
+

@@ -66,4 +66,14 @@ assert.match(indexHtml, /<meta\s+property="og:description"/i, 'HTML missing og:d
 assert.match(indexHtml, /<meta\s+property="og:image"/i, 'HTML missing og:image')
 console.log('  ✓ HTML metadata and open graph tags verified.')
 
+// 6. Test benchmarks data configuration
+console.log('\n6. Validating benchmarks data configuration...')
+const { CLI_ROWS, CHART_PAGES } = await import('../src/data/benchmarks.js')
+assert.ok(CLI_ROWS.length > 0, 'CLI_ROWS should contain rows')
+assert.ok(CHART_PAGES.length > 0, 'CHART_PAGES should contain sample pages')
+for (const p of [2, 10, 100, 500]) {
+  assert.ok(CLI_ROWS.some((r) => r.pages === p), `CLI_ROWS should contain ${p} pages data`)
+}
+console.log('  ✓ Benchmarks dataset verified.')
+
 console.log('\n🎉 All frontend smoke tests passed successfully!\n')

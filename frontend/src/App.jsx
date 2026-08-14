@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect } from 'react'
 import { HashRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom'
 import SiteNav from './components/SiteNav'
 import Footer from './components/Footer'
+import CommandPalette from './components/CommandPalette'
 import ContentPage from './pages/ContentPage'
 import LandingPage from './pages/LandingPage'
 import NotFoundPage from './pages/NotFoundPage'
@@ -44,6 +45,7 @@ export default function App() {
   return (
     <HashRouter>
       <ScrollToTop />
+      <CommandPalette />
       <button
         type="button"
         className="skip-link"
@@ -59,6 +61,7 @@ export default function App() {
         Skip to content
       </button>
       <SiteNav />
+
       <Suspense fallback={<div className="wrap">Loading…</div>}>
         <Routes>
           <Route element={<WrapLayout />}>

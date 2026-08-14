@@ -18,6 +18,12 @@ export default function SiteNav() {
   const location = useLocation()
   const navRef = useRef(null)
 
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform)
+
+  const handleOpenPalette = () => {
+    window.dispatchEvent(new CustomEvent('open-command-palette'))
+  }
+
   useEffect(() => {
     setIsOpen(false)
   }, [location.pathname])
@@ -68,6 +74,30 @@ export default function SiteNav() {
               </NavLink>
             ))}
           </div>
+
+          <button
+            type="button"
+            className="nav-search-trigger"
+            onClick={handleOpenPalette}
+            aria-label="Search documentation, flags, and showcase (Cmd+K)"
+          >
+            <svg
+              viewBox="0 0 20 20"
+              width="15"
+              height="15"
+              aria-hidden="true"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            >
+              <circle cx="8.5" cy="8.5" r="5.5" />
+              <path d="M13 13l4 4" />
+            </svg>
+            <span className="nav-search-label">Search...</span>
+            <kbd className="nav-search-kbd">{isMac ? '⌘K' : 'Ctrl+K'}</kbd>
+          </button>
+
           <GitHubStars />
           <button
             type="button"
@@ -80,6 +110,26 @@ export default function SiteNav() {
         </div>
 
         <div className="site-nav-mobile-bar">
+          <button
+            type="button"
+            className="nav-search-trigger-mobile"
+            onClick={handleOpenPalette}
+            aria-label="Search documentation, flags, and showcase"
+          >
+            <svg
+              viewBox="0 0 20 20"
+              width="17"
+              height="17"
+              aria-hidden="true"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            >
+              <circle cx="8.5" cy="8.5" r="5.5" />
+              <path d="M13 13l4 4" />
+            </svg>
+          </button>
           <NavLink
             to="/getting-started"
             className={({ isActive }) =>
@@ -118,6 +168,31 @@ export default function SiteNav() {
 
       {isOpen && (
         <div id="mobile-nav-menu" className="mobile-nav-dropdown">
+          <button
+            type="button"
+            className="mobile-nav-search"
+            onClick={() => {
+              setIsOpen(false)
+              handleOpenPalette()
+            }}
+          >
+            <svg
+              viewBox="0 0 20 20"
+              width="16"
+              height="16"
+              aria-hidden="true"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            >
+              <circle cx="8.5" cy="8.5" r="5.5" />
+              <path d="M13 13l4 4" />
+            </svg>
+            <span>Search documentation & flags...</span>
+            <kbd>{isMac ? '⌘K' : 'Ctrl+K'}</kbd>
+          </button>
+
           <div className="mobile-nav-links">
             {LINKS.map((l) => (
               <NavLink
@@ -152,4 +227,5 @@ export default function SiteNav() {
     </nav>
   )
 }
+
 
