@@ -14,7 +14,7 @@ paint → write). Direct modules are allowlisted:
 shaping) and [`tdewolff/canvas`](https://github.com/tdewolff/canvas) (SVG
 rasterization). The product is HTML templates and documents, not Chrome visual parity.
 
-**Status:** **v0.2.0**. **License:** [MIT](LICENSE).
+**Status:** **v0.2.1**. **License:** [MIT](LICENSE).
 
 ## What it is for
 
@@ -87,7 +87,7 @@ Local files, `Converter`, TOC objects, and network policy:
 ## Performance
 
 **Current snapshot (2026-08-14):** freshly built generic `gowkhtmltopdf`
-0.2.0 versus installed **wkhtmltopdf 0.12.6.1 (patched Qt)** on Linux
+0.2.1 versus installed **wkhtmltopdf 0.12.6.1 (patched Qt)** on Linux
 amd64, 13th Gen Intel Core i7-13700HX. Same report fixture, median of
 three process runs after one warmup.
 

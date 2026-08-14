@@ -5,39 +5,51 @@
 // github.com/go-text/typesetting (OpenType shaping) and
 // github.com/tdewolff/canvas (SVG-as-image rasterization).
 //
-// # Quick start
+// # Quick start (Preferred typed API)
 //
-//	import gowkhtmltopdf "gowkhtmltopdf"
+//	import (
+//		"context"
+//		"os"
+//		gowkhtmltopdf "gowkhtmltopdf"
+//	)
 //
-//	c := gowkhtmltopdf.NewConverter()
-//	c.Global().Set("size.pagesize", "A4")
-//	c.Global().Set("orientation", "portrait")
-//	c.Global().Set("enablelocalfileaccess", "true")
-//
-//	obj := gowkhtmltopdf.NewObjectSettings().SetPage("report.html")
-//	obj.Set("load.blocklocalfileaccess", "false") // pair with the global flag
-//	c.AddObject(obj)
-//
-//	if err := c.Convert(context.Background()); err != nil {
+//	out, err := os.Create("report.pdf")
+//	if err != nil {
 //		log.Fatal(err)
 //	}
-//	os.WriteFile("report.pdf", c.Output(), 0o644)
+//	defer out.Close()
+//
+//	req := &gowkhtmltopdf.PDFRequest{
+//		Global: gowkhtmltopdf.NewPdfGlobalOptions().
+//			WithPageSize("A4").
+//			Build(),
+//		Objects: []*gowkhtmltopdf.ObjectSettings{
+//			gowkhtmltopdf.NewObjectSettings().SetPage("report.html"),
+//		},
+//		Output: out,
+//	}
+//	req.EnableLocalFileAccess() // allow reading local report.html and subresources
+//
+//	if err := gowkhtmltopdf.RunPDF(context.Background(), req); err != nil {
+//		log.Fatal(err)
+//	}
 //
 // # Settings
 //
-// Global and object settings are set and read by wkhtmltopdf-style dotted
-// names, e.g. "size.pagesize", "margin.top", "orientation", "web.background",
-// "header.left" or "load.jsdelay". Set returns an error for unknown names;
-// Get returns (value, false) for names that have no scalar representation.
-// The exact name list mirrors the CLI surface documented by
+// Global and object settings can be configured via typed builders (such as
+// PdfGlobalOptions) or wkhtmltopdf-style dotted names (e.g. "size.pagesize",
+// "margin.top", "orientation", "web.background", "header.left").
+// The exact dotted name list mirrors the CLI surface documented by
 // gowkhtmltopdf --help.
 //
 // # Local file access
 //
 // The security ACL blocks local file reads by default. To convert a local
-// file, enable access explicitly - both the global flag and the object-level
-// block must be toggled, mirroring the CLI's --enable-local-file-access and
-// --block-local-file-access pair:
+// file, call EnableLocalFileAccess() on the request, converter, or settings:
+//
+//	req.EnableLocalFileAccess()
+//
+// Or configure the dotted keys explicitly:
 //
 //	c.Global().Set("enablelocalfileaccess", "true")
 //	obj.Set("load.blocklocalfileaccess", "false")

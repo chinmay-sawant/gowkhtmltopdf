@@ -14,28 +14,27 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
 try:
     from PIL import Image
-except ImportError:
-    print("need Pillow: pip install Pillow", file=sys.stderr)
-    sys.exit(2)
+except Exception:
+    Image = None
 
 DEFAULT_WIDTH = 400
 DEFAULT_QUALITY = 82
 
 
-def generate_thumbnail(
+def generate_thumbnail_pil(
     src_path: Path,
     dest_path: Path,
     target_width: int = DEFAULT_WIDTH,
     quality: int = DEFAULT_QUALITY,
 ) -> tuple[int, int]:
-    """Generate a WebP thumbnail for a single image.
-    Returns (orig_size_bytes, thumb_size_bytes).
-    """
+    """Generate a WebP thumbnail using Pillow."""
     with Image.open(src_path) as img:
         orig_w, orig_h = img.size
         if orig_w > target_width:
@@ -61,6 +60,47 @@ def generate_thumbnail(
     orig_size = src_path.stat().st_size
     thumb_size = dest_path.stat().st_size
     return orig_size, thumb_size
+
+
+def generate_thumbnail_convert(
+    src_path: Path,
+    dest_path: Path,
+    target_width: int = DEFAULT_WIDTH,
+    quality: int = DEFAULT_QUALITY,
+) -> tuple[int, int]:
+    """Generate a WebP thumbnail using ImageMagick convert."""
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        "convert",
+        str(src_path),
+        "-resize",
+        f"{target_width}x",
+        "-quality",
+        str(quality),
+        str(dest_path),
+    ]
+    subprocess.run(cmd, check=True, capture_output=True)
+    orig_size = src_path.stat().st_size
+    thumb_size = dest_path.stat().st_size
+    return orig_size, thumb_size
+
+
+def generate_thumbnail(
+    src_path: Path,
+    dest_path: Path,
+    target_width: int = DEFAULT_WIDTH,
+    quality: int = DEFAULT_QUALITY,
+) -> tuple[int, int]:
+    """Generate a WebP thumbnail for a single image."""
+    if Image is not None:
+        try:
+            return generate_thumbnail_pil(src_path, dest_path, target_width, quality)
+        except Exception:
+            pass
+    if shutil.which("convert") is not None:
+        return generate_thumbnail_convert(src_path, dest_path, target_width, quality)
+    print("need Pillow or ImageMagick convert: pip install Pillow", file=sys.stderr)
+    sys.exit(2)
 
 
 def generate_all_thumbs(

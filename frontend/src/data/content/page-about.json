@@ -12,7 +12,7 @@
    "heading": "Status at a glance",
    "items": [
     {
-     "title": "v0.2.0",
+     "title": "v0.2.1",
      "body": "Phases 0-9 plus the print CSS subset (tiers 1-2) are implemented: load, parse, style, layout, paginate, paint, and PDF 1.4 write, plus PNG/JPEG image mode. The `VERSION` file is the single source of truth and is stamped into the CLI at build time."
     },
     {

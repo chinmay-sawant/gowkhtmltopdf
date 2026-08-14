@@ -1,3 +1,7 @@
+// Dotted-key settings dispatch: hand-dispatched map lookup tables and
+// closures mapping wkhtmltopdf-style dotted setting names to typed struct
+// fields. This file does NOT use runtime reflection (the reflect package);
+// the filename is historical.
 package settings
 
 import (

@@ -145,6 +145,19 @@ func cloneNetworkPolicy(src NetworkPolicy) NetworkPolicy {
 	return dst
 }
 
+// ApplyNetworkPolicy stores policy into dst with all slice fields cloned.
+func ApplyNetworkPolicy(dst *settings.LoadGlobal, policy NetworkPolicy) {
+	if dst == nil {
+		return
+	}
+
+	dst.NetworkPolicySet = true
+	dst.NetworkAllowedSchemes = cloneStrings(policy.AllowedSchemes)
+	dst.NetworkAllowedHosts = cloneStrings(policy.AllowedHosts)
+	dst.NetworkBlockPrivate = policy.BlockPrivateNetworks
+	dst.NetworkBlockCrossHost = policy.BlockCrossHostRedirects
+}
+
 // ResolveEffectiveLoadGlobal returns the load settings for one conversion
 // mode. global is the shared PDF/global policy; mode contains settings owned
 // by a mode-specific request, such as image-mode proxy and ACL values.

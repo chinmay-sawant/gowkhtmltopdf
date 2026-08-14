@@ -2,7 +2,7 @@
 
 | File / Folder | Role |
 |---------------|------|
-| [10-canonical-post-mvp-roadmap.md](10-canonical-post-mvp-roadmap.md) | **Active post-MVP execution ledger** (phases 10–23) |
+| [10-canonical-post-mvp-roadmap.md](10-canonical-post-mvp-roadmap.md) | Post-MVP execution ledger (phases 10–23). New work starts in [../0.2.1/](../0.2.1/) |
 | [phases/](phases) | Post-MVP atomic checklists (phases 10–23, tier-2 subplans, pending items) |
 | [performance/](performance) | Performance benchmarking, profiling, 500-page allocation architecture, and RSS reduction plans |
 | [reviews/](reviews) | Codebase & architecture audits (`ponytail/` leanness audits, `improve-codebase/` deep reviews) |

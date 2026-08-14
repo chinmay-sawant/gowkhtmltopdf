@@ -82,15 +82,27 @@ func TestModeSpecificRequestConstructors(t *testing.T) {
 	t.Parallel()
 
 	global := settings.DefaultPdfGlobal()
-	objects := []settings.PdfObject{{Page: "inline:<html></html>"}} //nolint:exhaustruct // intentional zero-value fields
+	//nolint:exhaustruct // intentional zero-value fields
+	objects := []settings.PdfObject{
+		{Page: "inline:<html><body>test</body></html>"},
+	}
 
 	pdfReq := NewPDFRequest(global, objects, &bytes.Buffer{}, &bytes.Buffer{})
 	if err := pdfReq.ValidatePDF(); err != nil {
 		t.Fatalf("PDF request validation: %v", err)
 	}
 
-	if err := pdfReq.ValidateImage(); !errors.Is(err, ErrMissingImageSettings) {
-		t.Fatalf("PDF request as image = %v, want %v", err, ErrMissingImageSettings)
+	var out bytes.Buffer
+	typedReq := &PDFRequest{
+		Global:        global,
+		Objects:       objects,
+		Now:           nil,
+		Output:        &out,
+		OutlineOutput: nil,
+	}
+
+	if err := RunTypedPDF(t.Context(), typedReq, io.Discard, nil); err != nil {
+		t.Fatalf("RunTypedPDF: %v", err)
 	}
 }
 

@@ -5,7 +5,8 @@ Implementation plans and roadmaps for `gowkhtmltopdf`, partitioned by release ve
 | Version Directory | Scope | Status |
 |-------------------|-------|--------|
 | [0.1.0/](0.1.0/README.md) | **v0.1.0 MVP Release** — pure-Go rewrite foundation, phases 00–09, exploration studies, and MVP PRs | Complete (Released 2026-08-03) |
-| [0.2.0/](0.2.0/README.md) | **v0.2.0 Post-MVP, Performance & Reviews** — phases 10–23, performance optimizations, architecture audits, and frontend improvements | Active / In Progress |
+| [0.2.0/](0.2.0/README.md) | **v0.2.0 Post-MVP, Performance & Reviews** — phases 10–23, performance optimizations, architecture audits, and frontend improvements | Shipped core; leftovers stay in 0.2.0 or move with a `[~]` pointer |
+| [0.2.1/](0.2.1/README.md) | **v0.2.1 Contracts, print layout, and verification** — phases 24–30 | Complete (Released 2026-08-14) |
 
 ---
 
@@ -28,3 +29,9 @@ Implementation plans and roadmaps for `gowkhtmltopdf`, partitioned by release ve
 - [amendments/](0.2.0/amendments) — Shaping and library amendments
 - [deferred/](0.2.0/deferred) — Deferred roadmap targets
 - [PR/](0.2.0/PR) — Post-MVP PR archives and issue dossiers
+
+## 0.2.1 (Contracts, print layout, and verification)
+
+- [0.2.1 README](0.2.1/README.md)
+- [24-canonical-0.2.1-roadmap.md](0.2.1/24-canonical-0.2.1-roadmap.md) — Canonical execution ledger for phases 24–30
+- [phases/](0.2.1/phases) — Atomic checklists for phases 24–30

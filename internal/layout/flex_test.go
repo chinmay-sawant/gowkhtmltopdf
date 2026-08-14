@@ -33,14 +33,16 @@ func TestFlexOrderAndShrink(t *testing.T) {
 	if !(pos["B"] < pos["A"] && pos["A"] < pos["C"]) {
 		t.Fatalf("order positions B/A/C = %.1f/%.1f/%.1f", pos["B"], pos["A"], pos["C"])
 	}
-	// Total intrinsic 240 > 200 → B and C shrink, A (shrink 0) stays ~80.
-	var aw float64
+	// Total intrinsic 240 > 200 → B and C shrink (to ~60pt each), A (shrink 0) stays 80pt.
+	bWidth := pos["A"] - pos["B"]
+	aWidth := pos["C"] - pos["A"]
 
-	for _, op := range res.Ops {
-		if op.Kind == OpText && op.Text == "A" {
-			// find containing? use next fills — simpler: A x then measure via text only
-			_ = aw
-		}
+	if bWidth < 55 || bWidth > 65 {
+		t.Errorf("B shrunk width = %.1f, want ~60pt", bWidth)
+	}
+
+	if aWidth < 75 || aWidth > 85 {
+		t.Errorf("A (non-shrunk) width = %.1f, want ~80pt", aWidth)
 	}
 }
 

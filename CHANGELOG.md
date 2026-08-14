@@ -6,6 +6,26 @@ binaries at build time (see README "Versioning").
 
 ## Unreleased
 
+## 0.2.1 (2026-08-14)
+
+Contracts, print layout, and verification release. Tightens embedder public
+APIs, unifies error/panic policies, enhances table and float layout handling,
+and adds parser fuzzing and CI integration.
+
+### Added
+
+- **Library & Settings:** Unified `NetworkPolicy` definition between root
+  `api` and `internal/load`. Added `EnableLocalFileAccess()` helpers on
+  `PDFRequest`, `ImageRequest`, `Converter`, `GlobalSettings`, and `ObjectSettings`.
+  Fluent builder `PdfGlobalOptions` stores options without panicking and validates
+  at request boundary (`ValidatePDF` / `RunPDF`). Safe nil-receiver handling on `AddHTML`.
+- **Flow & Tables:** Consecutive same-side float vertical stacking when
+  overlapping; margin collapse through empty block elements; `flex-shrink`
+  assertion testing; content-based grid row height calculations.
+  Deterministic table continuation edge rendering for multi-page collapsed tables.
+- **Verification & Fuzzing:** Continuous fuzz targets `FuzzParseHTML`,
+  `FuzzParseCSS`, and `FuzzConvertHTML`. Added `master` branch to GitHub Actions CI workflow.
+
 ## 0.2.0 (2026-08-14)
 
 Post-MVP release after [0.1.0](#010-2026-08-03). Still a **no-cgo, no-browser**

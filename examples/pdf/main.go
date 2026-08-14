@@ -81,12 +81,8 @@ func run(argv []string) error {
 
 	obj := gowkhtmltopdf.NewObjectSettings().SetPage(input)
 	if *localFiles {
-		if err := mustSet("enablelocalfileaccess", "true"); err != nil {
-			return err
-		}
-		if err := obj.Set("load.blocklocalfileaccess", "false"); err != nil {
-			return err
-		}
+		c.EnableLocalFileAccess()
+		obj.EnableLocalFileAccess()
 	}
 	c.AddObject(obj)
 

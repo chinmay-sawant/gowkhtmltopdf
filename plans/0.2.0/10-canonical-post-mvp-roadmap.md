@@ -4,8 +4,8 @@
 > **Status:** active - Tier 1 partially landed (12, 13, 15 complete; 10/11/14/16 partial) as of 2026-08-04  
 
 > **Estimated effort:** Tier 1 ~4–8 mo · Tier 2 ~6–12 mo additional · Tier 3 deferred (not planned as pure-stdlib goal)  
-> **Constraint:** pure Golang, **Go standard library only** by default (no Chrome/WebKit, no cgo, no plugins).  
-> **Narrow exception:** OpenType shaping may use **`github.com/go-text/typesetting` only** — see [`plans/amendments/2026-08-05-gotext-typesetting.md`](amendments/2026-08-05-gotext-typesetting.md). No other third-party modules without a new amendment.  
+> **Constraint:** pure Golang, no Chrome/WebKit, no cgo, no plugins. Direct modules on allowlist (`go-text/typesetting`, `tdewolff/canvas`).  
+> **Exceptions:** OpenType shaping via `github.com/go-text/typesetting` and SVG rasterization via `github.com/tdewolff/canvas`.  
 > **Ordering principle:** **quick wins first** (docs/API polish → typography → image mode → invoice CSS → broader CSS → fonts/i18n → web heuristics → JS research). Dependency edges still respected within each phase.  
 > **Workflow:** [`skills/phase-wise-checklist/SKILLS.md`](../../skills/phase-wise-checklist/SKILLS.md)
 

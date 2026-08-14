@@ -46,10 +46,10 @@ Check the stamp:
 ```sh
 ./bin/gowkhtmltopdf --version
 # Name: gowkhtmltopdf
-# Version: 0.2.0
+# Version: 0.2.1
 ```
 
-`VERSION` (currently `0.2.0`) is the project release. The library constant
+`VERSION` (currently `0.2.1`) is the project release. The library constant
 `LibraryVersion` (`0.12.7-dev`) is a **wkhtmltopdf settings-surface**
 compatibility id, not the release number. See [library-api.md](library-api.md#versioning).
 

@@ -25,14 +25,16 @@ Examples:
 from __future__ import annotations
 
 import argparse
+import shutil
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 try:
     import fitz  # PyMuPDF
 except ImportError:
-    print("need pymupdf: pip install pymupdf", file=sys.stderr)
-    sys.exit(2)
+    fitz = None
 
 # Match the committed showcase thumbs (A4 @ 96 dpi ≈ 794×1123).
 DEFAULT_DPI = 96.0
@@ -65,11 +67,10 @@ def remove_stale(out_dir: Path, stem: str, page_count: int) -> int:
     return removed
 
 
-def render_pdf(pdf: Path, out_dir: Path, dpi: float) -> int:
-    """Render every page of pdf into out_dir. Returns pages written."""
+def render_pdf_fitz(pdf: Path, out_dir: Path, dpi: float) -> int:
+    """Render every page of pdf using PyMuPDF into out_dir."""
     zoom = dpi / 72.0
     matrix = fitz.Matrix(zoom, zoom)
-    # alpha=False composites onto an opaque white RGB canvas.
     doc = fitz.open(pdf)
     try:
         stem = pdf.stem
@@ -88,6 +89,47 @@ def render_pdf(pdf: Path, out_dir: Path, dpi: float) -> int:
         return doc.page_count
     finally:
         doc.close()
+
+
+def render_pdf_gs(pdf: Path, out_dir: Path, dpi: float) -> int:
+    """Render every page of pdf using Ghostscript into out_dir."""
+    stem = pdf.stem
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmppath = Path(tmpdir)
+        cmd = [
+            "gs",
+            "-dNOPAUSE",
+            "-dBATCH",
+            "-dSAFER",
+            "-sDEVICE=png16m",
+            f"-r{int(round(dpi))}",
+            "-dTextAlphaBits=4",
+            "-dGraphicsAlphaBits=4",
+            f"-sOutputFile={tmppath / 'page-%d.png'}",
+            str(pdf),
+        ]
+        subprocess.run(cmd, capture_output=True, text=True, check=True)
+        rendered_pages = sorted(
+            tmppath.glob("page-*.png"),
+            key=lambda p: int(p.stem.split("-")[1]),
+        )
+        for i, page_file in enumerate(rendered_pages):
+            dest = page_path(out_dir, stem, i + 1)
+            shutil.copy2(page_file, dest)
+        removed = remove_stale(out_dir, stem, len(rendered_pages))
+        if removed:
+            print(f"  removed {removed} stale page(s) for {stem}")
+        return len(rendered_pages)
+
+
+def render_pdf(pdf: Path, out_dir: Path, dpi: float) -> int:
+    """Render every page of pdf into out_dir. Returns pages written."""
+    if fitz is not None:
+        return render_pdf_fitz(pdf, out_dir, dpi)
+    if shutil.which("gs") is not None:
+        return render_pdf_gs(pdf, out_dir, dpi)
+    print("need pymupdf or ghostscript (gs): pip install pymupdf", file=sys.stderr)
+    sys.exit(2)
 
 
 def collect_pdfs(root: Path, only: list[Path] | None) -> list[Path]:

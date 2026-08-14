@@ -12,7 +12,7 @@ import (
 // The unstamped default matches the VERSION file so tests and local
 // `go test`/`go run` agree with the release number. It is not
 // LibraryVersion, which is the upstream wkhtmltopdf compatibility id.
-var Version = "0.2.0" //nolint:gochecknoglobals // ldflags-stamped build variable
+var Version = "0.2.1" //nolint:gochecknoglobals // ldflags-stamped build variable
 
 // PrintHelp writes usage text for the given Mode.
 func PrintHelp(writer io.Writer, mode Mode) {

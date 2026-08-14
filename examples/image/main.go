@@ -75,16 +75,10 @@ func run(argv []string) error {
 	if err := mustSet("format", *format); err != nil {
 		return err
 	}
-	if *localFiles {
-		if err := c.Global().Set("enablelocalfileaccess", "true"); err != nil {
-			return err
-		}
-	}
 	c.AddObject(input)
 	if *localFiles {
-		if err := c.Object().Set("load.blocklocalfileaccess", "false"); err != nil {
-			return err
-		}
+		c.Global().EnableLocalFileAccess()
+		c.Object().EnableLocalFileAccess()
 	}
 
 	if err := c.Convert(context.Background()); err != nil {
