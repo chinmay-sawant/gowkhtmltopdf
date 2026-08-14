@@ -1,4 +1,4 @@
-## gowkhtmltopdf v0.2.1 - Production hardening: library contracts, layout fidelity, continuous fuzzing
+## v0.2.1
 
 Third public release of **gowkhtmltopdf**: a **pure-Go**, **no-cgo**, **no Qt/WebKit**, **no browser** HTML template engine that turns structured HTML and templates into multi-page PDFs and images.
 
