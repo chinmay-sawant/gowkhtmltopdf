@@ -87,7 +87,7 @@ Local files, `Converter`, TOC objects, and network policy:
 ## Performance
 
 **Current snapshot (2026-08-14):** freshly built generic `gowkhtmltopdf`
-0.2.0 versus installed **wkhtmltopdf 0.12.6.1 (patched Qt)** on Linux
+0.2.1 versus installed **wkhtmltopdf 0.12.6.1 (patched Qt)** on Linux
 amd64, 13th Gen Intel Core i7-13700HX. Same report fixture, median of
 three process runs after one warmup.
 

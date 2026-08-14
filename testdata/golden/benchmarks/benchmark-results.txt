@@ -172,7 +172,7 @@ CLIReport/500Pages    elapsed=960ms  peak_rss_kib=54632  pdf_bytes=1385450 rende
 # Snapshot F: current generic CLI + in-process matrix, captured 2026-08-14
 # after release-prep on the generic convert path (no CLI page islands).
 # Host: Linux amd64 · WSL2 24 CPUs · 13th Gen Intel Core i7-13700HX
-# Toolchain: go1.26.4 linux/amd64 · gowkhtmltopdf 0.2.0 freshly built
+# Toolchain: go1.26.4 linux/amd64 · gowkhtmltopdf 0.2.1 freshly built
 # In-process command:
 #   go test ./internal/convert -run '^$' \
 #     -bench 'Benchmark(PDFPages|TemplatePages|WebFetchImage|ImageAssets)$' \

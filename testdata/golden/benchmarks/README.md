@@ -61,7 +61,7 @@ This writes `live-movie-listing-010.pdf` and
 ## Current snapshot (2026-08-14)
 
 Host: Linux amd64, 13th Gen Intel Core i7-13700HX (WSL2, 24 CPUs).
-Toolchain: go1.26.4. Freshly built `gowkhtmltopdf` **0.2.0** on the
+Toolchain: go1.26.4. Freshly built `gowkhtmltopdf` **0.2.1** on the
 **generic** convert path. wkhtmltopdf **0.12.6.1 (with patched qt)** at
 `/usr/local/bin/wkhtmltopdf`.
 

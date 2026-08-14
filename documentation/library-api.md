@@ -21,7 +21,7 @@ Requires Go **1.26+** (the module pins `toolchain go1.26.4`). Build with
 
 ```sh
 # when published / tagged:
-go get gowkhtmltopdf@v0.2.0
+go get gowkhtmltopdf@v0.2.1
 
 # local checkout (this repo today):
 go mod edit -replace gowkhtmltopdf=/path/to/gowkhtmltopdf
@@ -46,7 +46,7 @@ Two version strings exist on purpose. Do not treat them as the same number.
 |--------|-------|---------|
 | `LibraryVersion` | `"0.12.7-dev"` | wkhtmltopdf **0.12.x settings-surface** compatibility id |
 | `Version()` | `"0.12.7-dev (gowkhtmltopdf pure-go)"` | library banner (`LibraryVersion` plus a suffix) |
-| `VERSION` file | `0.2.0` | **project release**, stamped into the CLI at build time |
+| `VERSION` file | `0.2.1` | **project release**, stamped into the CLI at build time |
 
 `LibraryVersion` is not the project release. The CLI `--version` line comes
 from `VERSION`, not from `LibraryVersion`.

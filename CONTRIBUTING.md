@@ -57,7 +57,7 @@ Minimum: recent Go toolchain matching `go.mod`.
    - Self-assign (`--assignee @me`)
    - At least one label (`bug`, `enhancement`, `documentation`, …)
    - Body based on [`skills/PR/PR_TEMPLATE.md`](skills/PR/PR_TEMPLATE.md)
-   - Optional filled copy under `plans/0.2.0/PR/pr-<slug>.md`
+   - Optional filled copy under `plans/0.2.1/PR/pr-<slug>.md`
 4. Do **not** merge your own PR unless maintainers agree.
 
 ```sh
@@ -65,7 +65,7 @@ gh pr create \
   --base master \
   --head "$(git branch --show-current)" \
   --title "fix(layout): short imperative description" \
-  --body-file plans/0.2.0/PR/pr-<slug>.md \
+  --body-file plans/0.2.1/PR/pr-<slug>.md \
   --assignee "@me" \
   --label bug \
   --label enhancement
@@ -145,15 +145,15 @@ CI on PRs and ordinary branch pushes does **not** publish binaries. Cross-platfo
 artifacts are built only when a **`v*` git tag** is pushed (workflow
 [`.github/workflows/release.yml`](.github/workflows/release.yml)).
 
-1. Bump [`VERSION`](VERSION) to the new semver (for example `0.2.0`).
+1. Bump [`VERSION`](VERSION) to the new semver (for example `0.2.1`).
 2. Move notes under `## Unreleased` in [`CHANGELOG.md`](CHANGELOG.md) into a
    dated section for that version.
 3. Merge the release prep to the default branch.
 4. Tag and push (must match `VERSION` exactly, with a `v` prefix):
 
 ```sh
-git tag v0.2.0
-git push origin v0.2.0
+git tag v0.2.1
+git push origin v0.2.1
 ```
 
 The release workflow then:

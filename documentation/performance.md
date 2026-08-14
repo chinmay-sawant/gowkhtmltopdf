@@ -38,7 +38,7 @@ or RSS guarantee.
 
 ## Current CLI comparison vs wkhtmltopdf (2026-08-14)
 
-Generic `gowkhtmltopdf` 0.2.0 versus `wkhtmltopdf 0.12.6.1 (with patched qt)`.
+Generic `gowkhtmltopdf` 0.2.1 versus `wkhtmltopdf 0.12.6.1 (with patched qt)`.
 Same report fixture (20 invoice rows per requested page). Both binaries used
 `--quiet --enable-local-file-access`. Each cell is the median of three timed
 process runs after one warmup.

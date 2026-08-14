@@ -1,7 +1,7 @@
 # Direct CLI comparison: gowkhtmltopdf vs wkhtmltopdf
 
 Snapshot F, **2026-08-14**. Host: Linux amd64, 13th Gen Intel Core i7-13700HX
-(WSL2, 24 CPUs). Freshly built generic `gowkhtmltopdf` 0.2.0.
+(WSL2, 24 CPUs). Freshly built generic `gowkhtmltopdf` 0.2.1.
 
 Process-level measurement. Each cell is the median of three timed runs after one warmup.
 Wall time is Go `time.Since` around `/usr/bin/time`; RSS is peak resident set from `%M` (KiB).
