@@ -393,7 +393,7 @@ func assertPanicsWith(t *testing.T, want error, call func()) {
 	call()
 }
 
-//nolint:cyclop,wsl,lll,funlen // validation error error-reporting assertions
+//nolint:cyclop,wsl,funlen // validation error error-reporting assertions
 func TestConverterValidationErrorsReachOnError(t *testing.T) {
 	t.Parallel()
 
@@ -422,7 +422,8 @@ func TestConverterValidationErrorsReachOnError(t *testing.T) {
 	got = ""
 	conv.AddHTML([]byte("<h1>test</h1>"), "")
 	var buf bytes.Buffer
-	if err := conv.ConvertTo(nil, &buf); !errors.Is(err, ErrNilContext) { //nolint:staticcheck // testing nil context preflight
+	var nilCtx context.Context
+	if err := conv.ConvertTo(nilCtx, &buf); !errors.Is(err, ErrNilContext) {
 		t.Fatalf("ConvertTo(nil ctx) = %v, want %v", err, ErrNilContext)
 	}
 
@@ -455,8 +456,9 @@ func TestConverterValidationErrorsReachOnError(t *testing.T) {
 	imageError = ""
 	imageConv.AddObject("test.html")
 	var imgBuf bytes.Buffer
+	var nilImageCtx context.Context
 
-	if err := imageConv.ConvertTo(nil, &imgBuf); !errors.Is(err, ErrNilContext) { //nolint:staticcheck // testing nil context preflight
+	if err := imageConv.ConvertTo(nilImageCtx, &imgBuf); !errors.Is(err, ErrNilContext) {
 		t.Fatalf("image ConvertTo(nil ctx) = %v, want %v", err, ErrNilContext)
 	}
 
