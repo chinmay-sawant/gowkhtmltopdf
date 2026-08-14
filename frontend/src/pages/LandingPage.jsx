@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import PageTitle from '../components/PageTitle'
 import { CLI_ROWS, HEADLINE, formatMs, speedup } from '../data/benchmarks'
 
 const HOME_BENCH_PAGES = [2, 10, 100, 500]
@@ -54,6 +55,7 @@ const COMMAND = [
 export default function LandingPage() {
   return (
     <div className="landing-page">
+      <PageTitle />
       <section className="landing-hero" aria-labelledby="landing-title">
         <div className="landing-hero-copy">
           <h1 id="landing-title">Print-ready documents,<br /><em>from HTML you control.</em></h1>

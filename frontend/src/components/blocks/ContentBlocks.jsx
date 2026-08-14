@@ -6,6 +6,7 @@ import CodeBlock from './CodeBlock'
 import TableBlock from './TableBlock'
 import BulletsBlock from './BulletsBlock'
 import CalloutBlock from './CalloutBlock'
+import TocBlock from './TocBlock'
 
 const RENDERERS = {
   hero: HeroBlock,
@@ -16,6 +17,7 @@ const RENDERERS = {
   table: TableBlock,
   bullets: BulletsBlock,
   callout: CalloutBlock,
+  toc: TocBlock,
 }
 
 export default function ContentBlocks({ content }) {

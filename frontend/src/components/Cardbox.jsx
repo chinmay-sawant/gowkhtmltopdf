@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { githubPdfUrl, githubTemplateUrl } from '../data/showcase'
 
 const IMAGES = import.meta.glob('../assets/showcase/*.png', { eager: true, query: '?url', import: 'default' })
@@ -12,9 +12,13 @@ export default function Cardbox({ item, onClose }) {
   const total = item.pages ?? 1
   const compactPager = total > 10
   const [page, setPage] = useState(1)
+  const closeRef = useRef(null)
+  const innerRef = useRef(null)
+  const openerRef = useRef(document.activeElement)
 
   const prev = useCallback(() => setPage((p) => (p > 1 ? p - 1 : total)), [total])
   const next = useCallback(() => setPage((p) => (p < total ? p + 1 : 1)), [total])
+
   const pageButtons = Array.from({ length: total }, (_, i) => i + 1).map((n) => (
     <button
       type="button"
@@ -22,16 +26,62 @@ export default function Cardbox({ item, onClose }) {
       className={n === page ? 'pager-dot active' : 'pager-dot'}
       onClick={() => setPage(n)}
       aria-label={`Page ${n}`}
+      aria-current={n === page ? 'page' : undefined}
     >
       {n}
     </button>
   ))
 
   useEffect(() => {
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    closeRef.current?.focus()
+
+    return () => {
+      document.body.style.overflow = prevOverflow
+      if (openerRef.current && typeof openerRef.current.focus === 'function') {
+        openerRef.current.focus()
+      }
+    }
+  }, [])
+
+  useEffect(() => {
     function onKey(e) {
-      if (e.key === 'Escape') onClose()
-      else if (e.key === 'ArrowLeft') prev()
-      else if (e.key === 'ArrowRight') next()
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onClose()
+      } else if (e.key === 'ArrowLeft') {
+        prev()
+      } else if (e.key === 'ArrowRight') {
+        next()
+      } else if (e.key === 'Tab') {
+        if (!innerRef.current) return
+        const focusable = Array.from(
+          innerRef.current.querySelectorAll(
+            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+          )
+        ).filter((el) => el.offsetParent !== null || el.offsetWidth > 0 || el.offsetHeight > 0)
+
+        if (focusable.length === 0) {
+          e.preventDefault()
+          return
+        }
+
+        const first = focusable[0]
+        const last = focusable[focusable.length - 1]
+
+        if (e.shiftKey) {
+          if (document.activeElement === first || !innerRef.current.contains(document.activeElement)) {
+            e.preventDefault()
+            last.focus()
+          }
+        } else {
+          if (document.activeElement === last || !innerRef.current.contains(document.activeElement)) {
+            e.preventDefault()
+            first.focus()
+          }
+        }
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -39,13 +89,13 @@ export default function Cardbox({ item, onClose }) {
 
   return (
     <div className="cardbox" role="dialog" aria-modal="true" aria-label={item.title} onClick={onClose}>
-      <div className="cardbox-inner" onClick={(e) => e.stopPropagation()}>
+      <div className="cardbox-inner" ref={innerRef} onClick={(e) => e.stopPropagation()}>
         <div className="cardbox-head">
           <div>
             <h2>{item.title}</h2>
             <span className="cardbox-file">{item.file}</span>
           </div>
-          <button type="button" className="cardbox-close" onClick={onClose} aria-label="Close">
+          <button ref={closeRef} type="button" className="cardbox-close" onClick={onClose} aria-label="Close">
             ×
           </button>
         </div>
@@ -103,3 +153,4 @@ export default function Cardbox({ item, onClose }) {
     </div>
   )
 }
+

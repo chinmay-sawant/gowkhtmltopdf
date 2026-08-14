@@ -1,0 +1,160 @@
+.docs-page {
+  width: min(88vw, 1800px);
+  margin: 0 auto;
+  padding: 0 0 128px;
+}
+
+.docs-layout {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  gap: clamp(32px, 4vw, 72px);
+  align-items: start;
+  padding-top: 32px;
+}
+
+.docs-sidebar {
+  position: sticky;
+  top: 84px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.docs-sidebar-head {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 2px 8px 12px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 10px;
+}
+
+.docs-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.docs-link {
+  font-family: var(--sans);
+  font-size: 14px;
+  color: var(--muted);
+  text-decoration: none;
+  padding: 9px 10px;
+  border-radius: 6px;
+  transition: color 0.2s, background 0.2s;
+}
+
+.docs-link:hover {
+  color: var(--ink);
+  background: var(--soft);
+}
+
+.docs-link.active {
+  color: var(--ink);
+  background: var(--soft);
+  font-weight: 600;
+}
+
+.docs-main {
+  min-width: 0;
+}
+
+.docs-context {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 22px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.docs-context strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.docs-main .prose,
+.docs-main .callout {
+  max-width: min(100%, 1120px);
+}
+
+.docs-page .hero,
+.content-page .hero {
+  padding: 4px 0 0;
+  max-width: none;
+}
+
+.docs-page h1,
+.content-page h1 {
+  font-size: clamp(26px, 3vw, 34px);
+  line-height: 1.22;
+  letter-spacing: -0.02em;
+  margin-bottom: 12px;
+}
+
+.docs-page .lede,
+.content-page .lede {
+  font-size: 16px;
+  line-height: 1.55;
+  margin-bottom: 22px;
+}
+
+.docs-page .content-blocks h2,
+.content-page .content-blocks h2 {
+  font-size: 22px;
+  margin-bottom: 14px;
+}
+
+.docs-page .prose h3,
+.docs-page .table-block-heading,
+.docs-page .code-block-heading,
+.content-page .prose h3,
+.content-page .table-block-heading,
+.content-page .code-block-heading {
+  font-size: 17px;
+}
+
+.content-page {
+  padding-top: 16px;
+}
+
+@media (max-width: 900px) {
+  .docs-layout {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .docs-sidebar {
+    position: static;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+  }
+  .docs-sidebar-head {
+    display: none;
+  }
+  .docs-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .docs-link {
+    border: 1px solid var(--line);
+    background: var(--surface);
+  }
+  .docs-link.active {
+    border-color: var(--sep);
+  }
+}
+
+@media (max-width: 640px) {
+  .docs-page {
+    width: calc(100% - 32px);
+    padding-bottom: 88px;
+  }
+}

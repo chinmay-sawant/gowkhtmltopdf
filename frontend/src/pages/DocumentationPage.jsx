@@ -29,7 +29,7 @@ export default function DocumentationPage() {
   if (!page) return <Navigate to="/documentation/cli" replace />
 
   return (
-    <div className="docs-page" id="main-content">
+    <div className="docs-page" id="main-content" tabIndex={-1}>
       <PageTitle title={page.nav} />
       <div className="docs-layout">
         <aside className="docs-sidebar">

@@ -1,0 +1,28 @@
+.not-found-page {
+  padding-top: 48px;
+  max-width: 680px;
+}
+
+.not-found-code {
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 12px;
+}
+
+.not-found-page h1 {
+  font-size: clamp(32px, 4.5vw, 48px);
+  line-height: 1.15;
+  margin-bottom: 16px;
+}
+
+.not-found-page .lede {
+  margin-bottom: 28px;
+}
+
+.not-found-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}

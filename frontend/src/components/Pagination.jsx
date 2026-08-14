@@ -32,6 +32,7 @@ export default function Pagination({ page, pageCount, onPageChange, pageSize }) 
               type="button"
               className={p === page ? 'page-btn active' : 'page-btn'}
               onClick={() => onPageChange(p)}
+              aria-current={p === page ? 'page' : undefined}
             >
               {p}
             </button>

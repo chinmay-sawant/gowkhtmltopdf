@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build && node scripts/copy-to-docs.mjs",
+    "test": "node scripts/smoke-test.mjs",
     "preview": "vite preview"
   },
   "devDependencies": {

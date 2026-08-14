@@ -3,6 +3,7 @@ import RichText from './RichText'
 
 function SeverityBadge({ severity }) {
   const meta = SEVERITY_META[severity]
+  if (!meta) return null
   return (
     <span className="badge" style={{ background: meta.bg, color: meta.text }}>
       {severity}
@@ -11,7 +12,7 @@ function SeverityBadge({ severity }) {
 }
 
 function StatusBadge({ status }) {
-  const meta = STATUS_META[status] ?? { label: status, accent: '#F0EFEA', text: '#787774' }
+  const meta = STATUS_META[status] ?? { label: status, accent: 'var(--surface-2)', text: 'var(--muted)' }
   return (
     <span className="status-badge" style={{ background: meta.accent, color: meta.text }}>
       {meta.label}

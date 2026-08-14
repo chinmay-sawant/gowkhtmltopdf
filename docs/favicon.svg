@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <rect width="32" height="32" rx="7" fill="#176b59"/>
+  <path d="M9 6h9l6 6v14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z" fill="#ffffff" fill-opacity="0.95"/>
+  <path d="M18 6v6h6" fill="#e0f0ea"/>
+  <text x="16" y="22" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="7.5" font-weight="700" text-anchor="middle" fill="#176b59" letter-spacing="-0.3">PDF</text>
+</svg>
