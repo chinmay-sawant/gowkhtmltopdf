@@ -1,46 +1,29 @@
-# gocorepdfengine — Phase Plans
+# gowkhtmltopdf — PDF 2.0 Plan
 
-Source: [baseplan/base-pdf-engine-pdfa4-pdfua2-plan.md](./baseplan/base-pdf-engine-pdfa4-pdfua2-plan.md)
+> **Issue:** [#32](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/32) — pdf: PDF 2.0 support
+> **Parent epic:** [#29](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/29)
+> **Sibling:** [#31](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/31) / [../pdf-1.7-plan/](../pdf-1.7-plan/) — shared version policy
+> **Not this plan:** [#33](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/33) — PDF/A-4 and PDF/UA-2
+> **Status:** not started
+> **Workflow:** [`skills/phase-wise-checklist/SKILLS.md`](../../../skills/phase-wise-checklist/SKILLS.md)
 
-Each phase is a **checklist plan** you can execute independently. Complete phases in order unless noted.
+Canonical ledger: [00-canonical-pdf-20-plan.md](00-canonical-pdf-20-plan.md)
+
+This is **not** a new PDF engine and **not** a layout rewrite. gowkhtmltopdf already converts authored HTML through `load → html → css → layout → convert → internal/pdf`. Issue #32 only adds an explicit PDF 2.0 emit path on that existing writer.
+
+Each phase is a checklist you can execute independently. Complete them in order unless the ledger says otherwise.
 
 | Phase | File | Goal | Gate |
-|-------|------|------|------|
-| 1 | [phase-01-core-pdf20-writer.md](./phase-01-core-pdf20-writer.md) | Minimal PDF 2.0 shell | Unit / open in viewer |
-| 2 | [phase-02-layout-primitives.md](./phase-02-layout-primitives.md) | Text, tables, multi-page, images | Visual fixtures |
-| 3 | [phase-03-font-embedding.md](./phase-03-font-embedding.md) | TTF subset + Type0 embed | Glyph/width tests |
-| 4 | [phase-04-pdfa4-compliance.md](./phase-04-pdfa4-compliance.md) | PDF/A-4 archival objects | **veraPDF `-f 4`** |
-| 5 | [phase-05-pdfua2-tagging.md](./phase-05-pdfua2-tagging.md) | PDF/UA-2 structure tree | **veraPDF `-f ua2`** |
-| 6 | [phase-06-performance-pooling.md](./phase-06-performance-pooling.md) | Speed / memory parity | Bench (after 4+5 green) |
-| 7 | [phase-07-optional-product-features.md](./phase-07-optional-product-features.md) | Sign, encrypt, forms | Separate product gates |
-| 8 | [phase-08-zerodha-benchmark.md](./phase-08-zerodha-benchmark.md) | Zerodha-style JSON→model→layout bench (cache on/off) | Local engine only |
+|------:|------|------|------|
+| 1 | [phase-01-version-policy-and-header.md](phase-01-version-policy-and-header.md) | Shared version policy + `%PDF-2.0` header | Unit: header/version, default still 1.4 |
+| 2 | [phase-02-catalog-trailer-metadata.md](phase-02-catalog-trailer-metadata.md) | Catalog, trailer `/ID`, Info + non-claiming XMP | Unit: trailer/catalog structure |
+| 3 | [phase-03-fonts-images-content-gates.md](phase-03-fonts-images-content-gates.md) | Version gates on existing fonts/images/content | Existing font/image tests + 2.0 fixtures |
+| 4 | [phase-04-settings-cli-library.md](phase-04-settings-cli-library.md) | Settings, CLI, library select PDF 2.0 | CLI/library tests; unknown values error |
+| 5 | [phase-05-convert-pipeline.md](phase-05-convert-pipeline.md) | `convert` constructs the document with the policy | End-to-end `%PDF-2.0` from HTML |
+| 6 | [phase-06-validation-and-goldens.md](phase-06-validation-and-goldens.md) | Structural fixtures, semantic parse, goldens | Parser + golden needles |
+| 7 | [phase-07-docs-and-honesty.md](phase-07-docs-and-honesty.md) | Docs distinguish version from conformance | `make claim-scan` |
+| 8 | [phase-08-closure.md](phase-08-closure.md) | Lint, test, 1.4 default proof, no #33 claims | `make lint` + `make test` |
 
-**Template field contract:** [guides/TEMPLATE_REFERENCE.md](../guides/TEMPLATE_REFERENCE.md) (full `config`/`elements` shape; phase 8 maps domain JSON → layout).
+**Default output stays PDF 1.4** until a later, explicit compatibility transition.
 
-**Default compliant profile (end of phase 5):** PDF 2.0 + PDF/A-4 + PDF/UA-2.
-
-**Out of scope:** HTTP API, frontend, bindings, **gopdfsuit as a dependency**, merge/redact product surface.
-
-## Architecture reviews
-
-| Date | File | Overall |
-|------|------|--------:|
-| 2026-07-25 | [reviews/improve-codebase-architecture/2026-07-25-architecture-review.md](./reviews/improve-codebase-architecture/2026-07-25-architecture-review.md) | **6.2 / 10** |
-
-## Ponytail reviews (leanness / over-engineering)
-
-| Date | File | Overall |
-|------|------|--------:|
-| 2026-07-25 | [pontail/ponytail-ultra-2026-07-25.md](./pontail/ponytail-ultra-2026-07-25.md) | **6.3 / 10** |
-
-## Compliance + Zerodha harness
-
-```bash
-make install-verapdf
-make test-verify-pdfs
-make bench-zerodha              # cache ON
-make bench-zerodha-uncached     # rebuild model each iter
-make bench-zerodha-nocomply
-```
-
-See [`../compliance/README.md`](../compliance/README.md) and [`../sampledata/zerodha/README.md`](../sampledata/zerodha/README.md).
+**Out of scope here:** HTML/CSS/layout changes, image mode, PDF/A-4, PDF/UA-2, encryption, signatures, AcroForm, object streams, xref streams, linearization, Zerodha/JSON templates, a second writer package.
