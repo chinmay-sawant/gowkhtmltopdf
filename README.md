@@ -61,7 +61,7 @@ Install, flags, and HTTP URLs: [getting-started.md](documentation/getting-starte
 | [documentation/integration-security.md](documentation/integration-security.md) | Embedding in HTTP apps (SSRF) |
 | [comparison: go-wkhtmltopdf](documentation/comparison-with-others/sebastiaanklippert-go-wkhtmltopdf.md) | Binary wrapper vs this in-process engine |
 | [comparison: 2026 landscape](documentation/comparison-with-others/landscape-2026.md) | Chromium, wkhtmltopdf, WeasyPrint, Prince |
-| [CONTRIBUTIONS.md](CONTRIBUTIONS.md) | Setup, tests, PR workflow |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Setup, tests, PR workflow |
 | [CHANGELOG.md](CHANGELOG.md) | Release history |
 | [examples/](examples/) | Library example programs |
 | [output/](output/) | Regenerable sample PDFs/PNG |

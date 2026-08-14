@@ -8,7 +8,7 @@ Related:
 - Fixture inventory and pass criteria: [`testdata/golden/README.md`](../testdata/golden/README.md)
 - Product claims and degrade rules: [fidelity.md](fidelity.md)
 - URL recipes (raw smoke vs chrome-strip): [cli.md — URL mode](cli.md#url-mode--chrome-strip---simplify-dom)
-- Contributor setup, visual QA, PR expectations: [`CONTRIBUTIONS.md`](../CONTRIBUTIONS.md)
+- Contributor setup, visual QA, PR expectations: [`CONTRIBUTING.md`](../CONTRIBUTING.md)
 
 ---
 
@@ -277,7 +277,7 @@ Focused visual proofs already in tests (2026-08-12):
 | 43 | `TestFixture43CardsAndTheadDoNotOverlap` | cards + thead |
 | 55 | semantic needle `Northline` + crop test | masthead text present |
 
-Contributor setup and PR expectations: [`CONTRIBUTIONS.md`](../CONTRIBUTIONS.md).
+Contributor setup and PR expectations: [`CONTRIBUTING.md`](../CONTRIBUTING.md).
 
 ---
 

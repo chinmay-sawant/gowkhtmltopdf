@@ -19,7 +19,7 @@ Adopts golangci-lint (enable-all) as the project lint gate, clears the bulk of a
 - Add `.golangci.yml` with enable-all (disable deprecated `tenv`; disable `gofumpt` on Go 1.26 false positives).
 - Point `Makefile` `lint` at golangci-lint v1.64.8 (install with `GOTOOLCHAIN=local` when missing).
 - Wire the same pin into GitHub Actions before `make lint`.
-- Document the target in `CONTRIBUTIONS.md` / samples docs.
+- Document the target in `CONTRIBUTING.md` / samples docs.
 
 ### Mechanical and priority lint cleanup
 

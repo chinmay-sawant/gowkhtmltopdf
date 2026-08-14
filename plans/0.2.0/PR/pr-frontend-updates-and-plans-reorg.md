@@ -28,7 +28,7 @@ Comprehensive documentation site UI/UX overhaul across all views (Overview, Gett
 ### 2. Plans Reorganization & Version Partitioning
 - **`plans/0.1.0/`:** Partitioned all 23 historical files present at tag `v0.1.0` (phases 00–09 checklists, pure-Go rewrite ledger, exploration notes, and initial PR/issue bodies).
 - **`plans/0.2.0/`:** Organized all post-MVP artifacts (phases 10–23, performance profiles, architecture reviews, frontend ledgers, amendments, deferred items, and post-MVP PR bodies).
-- **Index & Relative Links:** Created top-level [`plans/README.md`](plans/README.md), dedicated version READMEs, and resolved all relative markdown links across [`documentation/`](documentation/) and [`CONTRIBUTIONS.md`](CONTRIBUTIONS.md).
+- **Index & Relative Links:** Created top-level [`plans/README.md`](plans/README.md), dedicated version READMEs, and resolved all relative markdown links across [`documentation/`](documentation/) and [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ### 3. API & Test Maintenance
 - **`api_test.go`:** Converted `nil` context literals in `TestConverterValidationErrorsReachOnError` to typed `var nilCtx context.Context` variables, eliminating staticcheck SA1012 linter warnings while preserving nil-context preflight validation tests.

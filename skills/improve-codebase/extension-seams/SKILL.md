@@ -20,7 +20,7 @@ Do not implement. Do not add a framework so the next feature is "easier".
 
 Read first: `../references/finding-schema.md`. If the module path is
 `gowkhtmltopdf`, also read `../references/gowkhtmltopdf.md` and
-`CONTRIBUTIONS.md` § Where to change code.
+`CONTRIBUTING.md` § Where to change code.
 
 ## 1. Name the change classes this tree actually has
 
