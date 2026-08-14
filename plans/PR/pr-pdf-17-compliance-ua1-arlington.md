@@ -6,6 +6,7 @@ Implements opt-in PDF 1.7 compliance profiles (PDF/A-3a, PDF/UA-1, and dual `a3a
 
 - Plans: `plans/0.2.2/pdf-1.7-compliance-plan/`
 - Epic: PDF 1.7 / 2.0 support (#29)
+- PDF 1.7 support: #31
 - Validators: veraPDF, in-repo `structure_tree_check.py`, avalpdf; external octopdf (Arlington + PDF/UA-1)
 
 ## Changes
@@ -82,6 +83,7 @@ Structure: no document-wide mega-P with duplicate bare MCIDs
 
 ## Related issues
 
+- Closes #31
 - Relates to #29
 
 ## PR metadata checklist (author)
