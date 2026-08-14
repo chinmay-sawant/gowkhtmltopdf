@@ -1,4 +1,4 @@
-//nolint:testpackage // tests reach into unexported state
+//nolint:testpackage,exhaustruct // tests reach into unexported state
 package pdf
 
 import (
@@ -322,5 +322,188 @@ func TestGrayscalePNGAlphaKept(t *testing.T) {
 	out := string(writePDF(t, data))
 	if !strings.Contains(out, "/SMask") {
 		t.Error("grayscale PNG must keep its alpha soft-mask")
+	}
+}
+
+func TestAddJPEGImagePDF17(t *testing.T) {
+	t.Parallel()
+
+	doc, err := NewDocumentWithPolicy(WriterPolicy{Version: PDF17})
+	if err != nil {
+		t.Fatalf("NewDocumentWithPolicy(PDF17): %v", err)
+	}
+
+	doc.SetCompression(false)
+	p := doc.AddPage(100, 100)
+
+	err = p.Content().AddJPEGImage("J1", 10, 10, 50, 30, makeJPEG(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out := string(writePDF(t, doc))
+	for _, want := range []string{
+		"%PDF-1.7",
+		"/Subtype /Image",
+		"/Filter /DCTDecode",
+		"/Width 8 /Height 6",
+		"/ColorSpace /DeviceRGB",
+		"/J1 Do",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in PDF 1.7 JPEG output", want)
+		}
+	}
+}
+
+func TestAddPNGImagePDF17(t *testing.T) {
+	t.Parallel()
+
+	doc, err := NewDocumentWithPolicy(WriterPolicy{Version: PDF17})
+	if err != nil {
+		t.Fatalf("NewDocumentWithPolicy(PDF17): %v", err)
+	}
+
+	doc.SetCompression(false)
+	p := doc.AddPage(100, 100)
+
+	err = p.Content().AddPNGImage("P1", 10, 10, 50, 30, makePNG(t, true))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out := string(writePDF(t, doc))
+	for _, want := range []string{
+		"%PDF-1.7",
+		"/Subtype /Image",
+		"/Width 4 /Height 2",
+		"/ColorSpace /DeviceRGB",
+		"/SMask",
+		"/P1 Do",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in PDF 1.7 PNG output", want)
+		}
+	}
+}
+
+func TestAddPNGNoAlphaPDF17(t *testing.T) {
+	t.Parallel()
+
+	doc, err := NewDocumentWithPolicy(WriterPolicy{Version: PDF17})
+	if err != nil {
+		t.Fatalf("NewDocumentWithPolicy(PDF17): %v", err)
+	}
+
+	doc.SetCompression(false)
+	p := doc.AddPage(100, 100)
+
+	err = p.Content().AddPNGImage("P1", 10, 10, 50, 30, makePNG(t, false))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out := string(writePDF(t, doc))
+	if strings.Contains(out, "/SMask") {
+		t.Error("unexpected SMask for opaque PNG in PDF 1.7")
+	}
+
+	if !strings.Contains(out, "/ColorSpace /DeviceRGB") {
+		t.Error("missing DeviceRGB in opaque PNG output")
+	}
+}
+
+func TestRepeatedPNGImageReusesXObjectPDF17(t *testing.T) {
+	t.Parallel()
+
+	doc, err := NewDocumentWithPolicy(WriterPolicy{Version: PDF17})
+	if err != nil {
+		t.Fatalf("NewDocumentWithPolicy(PDF17): %v", err)
+	}
+
+	doc.SetCompression(false)
+	p := doc.AddPage(100, 100)
+	cur := p.Content()
+	imageData := makePNG(t, false)
+
+	if err := cur.AddPNGImage("I0", 0, 0, 10, 10, imageData); err != nil {
+		t.Fatalf("first image: %v", err)
+	}
+
+	if err := cur.AddPNGImage("I1", 20, 20, 10, 10, imageData); err != nil {
+		t.Fatalf("repeated image: %v", err)
+	}
+
+	if cur.imageRefs["I0"].ref != cur.imageRefs["I1"].ref {
+		t.Fatalf("repeated PNG refs = %v/%v, want one XObject in PDF 1.7", cur.imageRefs["I0"].ref, cur.imageRefs["I1"].ref)
+	}
+}
+
+func TestGrayscaleJPEGFoldPDF17(t *testing.T) {
+	t.Parallel()
+
+	doc, err := NewDocumentWithPolicy(WriterPolicy{Version: PDF17})
+	if err != nil {
+		t.Fatalf("NewDocumentWithPolicy(PDF17): %v", err)
+	}
+
+	doc.SetGrayscale(true)
+	doc.SetCompression(false)
+
+	p := doc.AddPage(100, 100)
+	if err := p.Content().AddJPEGImage("J1", 10, 10, 50, 30, makeJPEG(t)); err != nil {
+		t.Fatal(err)
+	}
+
+	out := string(writePDF(t, doc))
+	if !strings.Contains(out, "/ColorSpace /DeviceGray") {
+		t.Error("grayscale JPEG in PDF 1.7 must be embedded as /DeviceGray")
+	}
+
+	if strings.Contains(out, "/ColorSpace /DeviceRGB") {
+		t.Error("grayscale JPEG in PDF 1.7 must not stay /DeviceRGB")
+	}
+}
+
+func TestGrayscalePNGFoldPDF17(t *testing.T) {
+	t.Parallel()
+
+	doc, err := NewDocumentWithPolicy(WriterPolicy{Version: PDF17})
+	if err != nil {
+		t.Fatalf("NewDocumentWithPolicy(PDF17): %v", err)
+	}
+
+	doc.SetGrayscale(true)
+	doc.SetCompression(false)
+
+	p := doc.AddPage(100, 100)
+	if err := p.Content().AddPNGImage("P1", 10, 10, 50, 30, makePNG(t, true)); err != nil {
+		t.Fatal(err)
+	}
+
+	out := string(writePDF(t, doc))
+	if !strings.Contains(out, "/SMask") {
+		t.Error("grayscale PNG with alpha in PDF 1.7 must retain its SMask")
+	}
+}
+
+func TestValidateEmbeddedImageCapsPDF17(t *testing.T) {
+	t.Parallel()
+
+	// Ensure validation limits fail closed for oversized or bad dimensions.
+	if err := validateEmbeddedImage(maxEmbeddedEncodedBytes+1, 100, 100); err == nil {
+		t.Error("expected error for data exceeding maxEmbeddedEncodedBytes")
+	}
+
+	if err := validateEmbeddedImage(100, maxEmbeddedImageDimension+1, 100); err == nil {
+		t.Error("expected error for width exceeding maxEmbeddedImageDimension")
+	}
+
+	if err := validateEmbeddedImage(100, 100, maxEmbeddedImageDimension+1); err == nil {
+		t.Error("expected error for height exceeding maxEmbeddedImageDimension")
+	}
+
+	if err := validateEmbeddedImage(100, 0, 100); err == nil {
+		t.Error("expected error for non-positive width")
 	}
 }

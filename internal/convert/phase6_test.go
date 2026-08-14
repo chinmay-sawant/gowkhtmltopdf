@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 	"testing"
 
 	"gowkhtmltopdf/internal/settings"
@@ -390,4 +391,43 @@ func TestFromPagePlaceholder(t *testing.T) {
 
 func itoa(n int) string {
 	return strconv.Itoa(n)
+}
+
+func TestPDFUA1LinkAnnotationOBJRCompliance(t *testing.T) {
+	t.Parallel()
+
+	body := `<!DOCTYPE html><html><head><title>Accessible Links</title></head><body>
+		<h1>Heading 1</h1>
+		<p>Check out <a href="https://example.com/accessible">our website</a> for more details.</p>
+		<p>Jump to <a href="#target">section below</a>.</p>
+		<div style="height: 200px;"></div>
+		<p id="target">Target paragraph</p>
+	</body></html>`
+
+	cmd, _ := newCommand(t, body, filepath.Join(t.TempDir(), "out.pdf"))
+	cmd.Global.PdfProfile = settings.ProfilePDFUA1
+	cmd.Global.Title = "Accessible Links"
+	cmd.Global.UseCompression = false
+
+	data := runPDF(t, cmd)
+	outStr := string(data)
+
+	// Verify annotation flags and border
+	if !strings.Contains(outStr, "/Border [0 0 0] /F 4") {
+		t.Error("Link annotation missing /Border [0 0 0] /F 4")
+	}
+
+	// Verify Tabs /S
+	if !strings.Contains(outStr, "/Tabs /S") {
+		t.Error("Page with annotations missing /Tabs /S")
+	}
+
+	// Verify StructElem /Link with OBJR
+	if !strings.Contains(outStr, "/S /Link") {
+		t.Error("Missing /S /Link StructElem")
+	}
+
+	if !strings.Contains(outStr, "/Type /OBJR /Obj ") {
+		t.Error("Missing /Type /OBJR /Obj in structure tree for link annotation")
+	}
 }

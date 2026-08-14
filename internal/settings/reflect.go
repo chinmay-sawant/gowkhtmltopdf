@@ -486,6 +486,7 @@ func registerGlobalDocumentKeys(keys keyTable[PdfGlobal]) {
 		func(dst *PdfGlobal, raw string) error { return setString(&dst.Title)(raw) },
 		func(dst *PdfGlobal) (string, bool) { return dst.Title, true },
 	)
+	registerGlobalVersionProfileKeys(keys)
 	regGlobal("smartshrinking",
 		func(dst *PdfGlobal, raw string) error { return setBool(&dst.SmartShrinking)(raw) },
 		func(dst *PdfGlobal) (string, bool) { return fmtBool(dst.SmartShrinking), true },
@@ -495,6 +496,47 @@ func registerGlobalDocumentKeys(keys keyTable[PdfGlobal]) {
 	paintBGGet := func(dst *PdfGlobal) (string, bool) { return fmtBool(dst.Background), true }
 	regGlobal("background", paintBG, paintBGGet)
 	regGlobal("web.background", paintBG, paintBGGet)
+}
+
+// registerGlobalVersionProfileKeys wires pdfversion and pdfprofile keys.
+func registerGlobalVersionProfileKeys(keys keyTable[PdfGlobal]) {
+	regGlobal := func(name string, set func(*PdfGlobal, string) error, get func(*PdfGlobal) (string, bool)) {
+		keys[name] = field[PdfGlobal]{apply: set, get: get}
+	}
+	regGlobal("pdfversion",
+		func(dst *PdfGlobal, raw string) error {
+			v, err := ParsePDFVersion(raw)
+			if err != nil {
+				return err
+			}
+
+			dst.PdfVersion = v
+
+			return nil
+		},
+		func(dst *PdfGlobal) (string, bool) {
+			if dst.PdfVersion == "" {
+				return sPDFVersion14, true
+			}
+
+			return dst.PdfVersion, true
+		},
+	)
+	regGlobal("pdfprofile",
+		func(dst *PdfGlobal, raw string) error {
+			p, err := ParsePDFProfile(raw)
+			if err != nil {
+				return err
+			}
+
+			dst.PdfProfile = p
+
+			return nil
+		},
+		func(dst *PdfGlobal) (string, bool) {
+			return dst.PdfProfile, true
+		},
+	)
 }
 
 // registerGlobalLoadKeys wires the load-level keys of the global table.

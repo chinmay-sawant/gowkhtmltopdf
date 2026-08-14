@@ -94,6 +94,40 @@ func docTitle(root *html.Node) string {
 	return ""
 }
 
+// docLang extracts the lang attribute from the html root element, or "".
+func docLang(root *html.Node) string {
+	if root == nil {
+		return ""
+	}
+
+	var walk func(node *html.Node) string
+	walk = func(node *html.Node) string {
+		if node == nil {
+			return ""
+		}
+
+		if node.Type == html.ElementNode {
+			if l := node.Attribute("lang"); l != "" {
+				return l
+			}
+
+			if l := node.Attribute("xml:lang"); l != "" {
+				return l
+			}
+		}
+
+		for _, child := range node.Children {
+			if l := walk(child); l != "" {
+				return l
+			}
+		}
+
+		return ""
+	}
+
+	return walk(root)
+}
+
 // collectObjectHeadings gathers the h1..h6 elements of one painted object and
 // matches them against the layout locations. Page stays object-local (from
 // Lookup); DocPage is filled once in flatHeadings. Objects opted out of the

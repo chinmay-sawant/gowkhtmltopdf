@@ -42,7 +42,8 @@ The pipeline it drives (mirroring wkhtmltopdf's `PdfConverterPrivate`):
 3. load the default font + opt-in font registry;
 4. for each object: **prepare** (load → parse → stylesheets → @font-face)
    → **layout** (with smart-shrink retry) → paint ops into the shared
-   single `pdf.Document`;
+   single `pdf.Document` (constructed via `pdf.NewDocumentWithPolicy` with
+   the request's `WriterPolicy`);
 5. assemble: TOC (two-pass page-count fixpoint) → outline → links → document
    info → copies → headers/footers;
 6. write the finished PDF to the `io.Writer` sink.
@@ -228,7 +229,7 @@ api.go Converter.Convert(ctx)
     ├─ req.ValidatePDF()                                (sink + mode invariants first)
     ├─ load.NewLoaderWithError(req.Global.Load)          proxy policy fails fast
     ├─ pdf.DefaultFont() + loadFontRegistry(...)         embedded font + --font-path
-    ├─ runContext{ ... single pdf.NewDocument() ... }
+    ├─ runContext{ ... single pdf.NewDocumentWithPolicy(policy) ... }
     └─ render.Run(ctx, &pdfPipeline{run})                render/pipeline.go:26
        ├─ stage 1 RenderObjects → run.renderObjects      convert.go:270
        │    ├─ per TOC object:  initTOCState (geometry, HF, effective TOC, margins)
@@ -335,7 +336,8 @@ Who depends on `convert` (i.e. the callers above the seam):
 ## 6. Design decisions & trade-offs
 
 1. **One `pdf.Document` for the whole job** (doc.go). Every object paints
-   into the same document so page numbers, TOC, outline links, and
+   into the same document (constructed via `pdf.NewDocumentWithPolicy` with
+   the request's version policy) so page numbers, TOC, outline links, and
    headers/footers all see a single, final page set. wkhtmltopdf's
    `PdfConverterPrivate` mirrors this: one PDF, one page stream per object.
    Trade-off: intermediate layout results must be projected down to

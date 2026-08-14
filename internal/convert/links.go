@@ -13,8 +13,9 @@ import (
 // later needs document-wide destinations. It deliberately omits the display
 // operation and any source DOM pointer.
 type bodyLinkIntent struct {
-	uri string
-	loc layout.ElementLocation
+	uri  string
+	loc  layout.ElementLocation
+	elem *pdf.StructElem
 }
 
 // bodyNavigation is the compact post-paint projection of a body Result used
@@ -64,6 +65,7 @@ func collectBodyNavigation(res *layout.Result) bodyNavigation {
 				W:    oper.W,
 				H:    oper.H,
 			},
+			elem: oper.StructElem,
 		})
 	}
 
@@ -100,6 +102,34 @@ func tocAnchorLocations(_ *html.Node, res *layout.Result) map[string]layout.Elem
 	}
 
 	return out
+}
+
+// attachLinkStructElem ensures a link annotation is referenced in the PDF/UA-1 structure tree.
+func attachLinkStructElem(doc *pdf.Document, page *pdf.Page, elem *pdf.StructElem, annotRef pdf.ObjRef) {
+	if doc == nil || !doc.Policy().IsPDFUA1() || page == nil || annotRef == 0 {
+		return
+	}
+
+	if elem != nil {
+		elem.SetObjRef(annotRef, page)
+
+		return
+	}
+
+	root := doc.StructTreeRoot()
+	if root == nil {
+		return
+	}
+
+	var docElem *pdf.StructElem
+	if len(root.Children) > 0 {
+		docElem = root.Children[0]
+	} else {
+		docElem = root.NewChild(pdf.StructDocument)
+	}
+
+	linkElem := docElem.NewChild(pdf.StructLink)
+	linkElem.SetObjRef(annotRef, page)
 }
 
 // applyTOCLinks wires the TOC link annotations once every page exists, using
@@ -149,7 +179,8 @@ func applyTOCLinks(doc *pdf.Document, tocs []*objectState, bodies []*objectState
 			if trVal.toc.ForwardLinks {
 				// TOC entry → heading
 				destX, destY := headingDest(hVal, bodies)
-				srcPage.AddLinkDest(trVal.geom.pdfRect(eloc), tocTotal+docPage, destX, destY)
+				annotRef := srcPage.AddLinkDest(trVal.geom.pdfRect(eloc), tocTotal+docPage, destX, destY)
+				attachLinkStructElem(doc, srcPage, nil, annotRef)
 			}
 
 			if trVal.toc.BackLinks {
@@ -163,7 +194,8 @@ func applyTOCLinks(doc *pdf.Document, tocs []*objectState, bodies []*objectState
 						hLoc := layout.ElementLocation{ //nolint:exhaustruct // intentional zero-value fields
 							Page: locPage, X: hVal.X, Y: hVal.Y, W: hVal.W, H: hVal.H,
 						}
-						page.AddLinkDest(stVal.geom.pdfRect(hLoc), destPage, destX, destY)
+						annotRef := page.AddLinkDest(stVal.geom.pdfRect(hLoc), destPage, destX, destY)
+						attachLinkStructElem(doc, page, nil, annotRef)
 					}
 				}
 			}
@@ -285,7 +317,8 @@ func applyInternalLinks(doc *pdf.Document, bodies []*objectState, tocTotal int) 
 
 			destPage := logicalDestPage(dest, tocTotal)
 			dx, dy := dest.st.geom.pdfXY(dest.loc)
-			srcPage.AddLinkDest(state.geom.pdfRect(srcLoc), destPage, dx, dy)
+			annotRef := srcPage.AddLinkDest(state.geom.pdfRect(srcLoc), destPage, dx, dy)
+			attachLinkStructElem(doc, srcPage, link.elem, annotRef)
 		}
 	}
 }

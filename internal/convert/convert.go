@@ -174,7 +174,81 @@ func (r *Request) Validate() error {
 		return err
 	}
 
+	if _, err := policyForGlobal(r.Global); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+const (
+	pdfVersion14 = "1.4"
+	pdfVersion17 = "1.7"
+	pdfVersion20 = "2.0"
+)
+
+// ErrProfileRequiresPDF17 indicates a compliance profile was requested with PDF 1.4.
+var ErrProfileRequiresPDF17 = errors.New("settings: compliance profiles require PDF 1.7")
+
+func policyForProfile(glob settings.PdfGlobal, canonicalProfile string) (pdf.WriterPolicy, error) {
+	if glob.PdfVersion == pdfVersion14 {
+		return pdf.WriterPolicy{}, ErrProfileRequiresPDF17
+	}
+
+	if glob.PdfVersion == pdfVersion20 {
+		return pdf.WriterPolicy{}, settings.ErrPDF20Unsupported
+	}
+
+	if glob.PdfVersion != "" && glob.PdfVersion != pdfVersion17 {
+		if _, err := settings.ParsePDFVersion(glob.PdfVersion); err != nil {
+			return pdf.WriterPolicy{}, err //nolint:wrapcheck // sentinel error from settings
+		}
+	}
+
+	policy := pdf.WriterPolicy{ //nolint:exhaustruct // default feature flags
+		Version:            pdf.PDF17,
+		ConformanceProfile: canonicalProfile,
+	}
+
+	if err := policy.Validate(); err != nil {
+		return pdf.WriterPolicy{}, err //nolint:wrapcheck // delegating policy validation
+	}
+
+	return policy, nil
+}
+
+// PolicyForGlobal maps the requested PDF version and profile to a pdf.WriterPolicy.
+// When PdfProfile is set, PDF 1.7 is implied unless explicitly set to 1.4 (which errors).
+// An empty version with no profile defaults to PDF 1.4.
+func PolicyForGlobal(glob settings.PdfGlobal) (pdf.WriterPolicy, error) {
+	if glob.PdfProfile != "" {
+		canonicalProfile, err := settings.ParsePDFProfile(glob.PdfProfile)
+		if err != nil {
+			return pdf.WriterPolicy{}, err //nolint:wrapcheck // sentinel error from settings
+		}
+
+		return policyForProfile(glob, canonicalProfile)
+	}
+
+	version, err := settings.ParsePDFVersion(glob.PdfVersion)
+	if err != nil {
+		return pdf.WriterPolicy{}, err //nolint:wrapcheck // zero policy on error
+	}
+
+	switch version {
+	case pdfVersion14:
+		return pdf.WriterPolicy{Version: pdf.PDF14}, nil //nolint:exhaustruct // default feature flags
+	case pdfVersion17:
+		return pdf.WriterPolicy{Version: pdf.PDF17}, nil //nolint:exhaustruct // default feature flags
+	default:
+		return pdf.WriterPolicy{},
+			fmt.Errorf("%w: %q", settings.ErrInvalidPDFVersion, version)
+	}
+}
+
+// policyForGlobal maps the requested PDF version and profile to a pdf.WriterPolicy.
+func policyForGlobal(glob settings.PdfGlobal) (pdf.WriterPolicy, error) {
+	return PolicyForGlobal(glob)
 }
 
 // ValidateRenderableObjects applies the shared input invariant used by both
@@ -282,13 +356,23 @@ func Run(ctx context.Context, req *Request, log io.Writer, progress func(phase s
 		return fmt.Errorf("default font: %w", err)
 	}
 
+	policy, err := policyForGlobal(req.Global)
+	if err != nil {
+		return fmt.Errorf("pdf policy: %w", err)
+	}
+
+	doc, err := pdf.NewDocumentWithPolicy(policy)
+	if err != nil {
+		return fmt.Errorf("initialize document: %w", err)
+	}
+
 	registry := loadFontRegistry(req.Global, log)
 	run := &runContext{
 		req:      req,
 		loader:   loader,
 		font:     font,
 		registry: registry,
-		doc:      pdf.NewDocument(),
+		doc:      doc,
 		log:      log,
 		progress: progress,
 		tocs:     nil,
@@ -425,6 +509,12 @@ func renderObject(ctx context.Context, run *runContext, obj *settings.PdfObject,
 		geom:          geom,
 		imagesFn:      imagesFn,
 		doctitle:      docTitle(root),
+	}
+
+	if run.doc.Policy().IsPDFUA1() {
+		if l := docLang(root); l != "" {
+			run.doc.SetLanguage(l)
+		}
 	}
 
 	reg, err := effectiveMargins(ctx, run.loader, run.font, run.req.Global, state, run.log)

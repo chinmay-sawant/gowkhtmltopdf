@@ -79,7 +79,7 @@ deploys to `docs/`), golden fixtures (`testdata/`), committed samples
 | CSS subsystem | `internal/css` | CSS subset parse, selectors, cascade, media queries, `:has`, container rules (`:target` never matches) | [06-css.md](06-css.md) |
 | Layout engine | `internal/layout` | Style cascade, block/inline/table/flex/grid/float/multicol, pagination, paint ops. `internal/line` is log severity, not wrapping | [07-layout.md](07-layout.md) |
 | Convert pipeline | `internal/convert` (+ `prepare/`, `render/`, `islands/`), `internal/outline` | Job orchestration: HF, TOC, outline, links, copies/collate; islands are benchmark-only | [08-convert-pipeline.md](08-convert-pipeline.md) |
-| PDF writer | `internal/pdf` (+ `assets/`) | PDF 1.4, font subsetting, Type0/CID, images, annotations, outlines | [09-pdf-writer.md](09-pdf-writer.md) |
+| PDF writer | `internal/pdf` (+ `assets/`) | PDF writer (default 1.4, opt-in 1.7 via `WriterPolicy`), font subsetting, Type0/CID, images, annotations, outlines | [09-pdf-writer.md](09-pdf-writer.md) |
 | Image output & SVG | `internal/imageout`, `internal/svg` | PNG/JPEG raster path, TTF outline AA (2× supersample), SVG→raster | [10-imageout-svg.md](10-imageout-svg.md) |
 
 ---
@@ -161,10 +161,11 @@ under mutation races (validated with `-race`).
    └───────────────────┘                           └───────────────────────────┘
 ```
 
-- PDF mode: PDF **1.4**, zlib Flate streams, subset TTF (Liberation
-  Sans/Serif/Mono + DejaVu fallback), `/Widths` in 1000-unit em,
-  WinAnsi-style Latin-1 codes, Type0/CID + Identity-H for runes above U+00FF,
-  Catalog outlines, URI + GoTo annotations. Info `/Title` comes from
+- PDF mode: PDF **1.4** (default) or PDF **1.7** (opt-in via `WriterPolicy`),
+  zlib Flate streams, subset TTF (Liberation Sans/Serif/Mono + DejaVu fallback),
+  `/Widths` in 1000-unit em, WinAnsi-style Latin-1 codes (UTF-16BE + BOM for 1.7 Unicode Info),
+  Type0/CID + Identity-H for runes above U+00FF, Catalog outlines, URI + GoTo annotations,
+  deterministic trailer `/ID` and non-claiming XMP metadata stream on 1.7. Info `/Title` comes from
   `--title`, not `<title>`.
 - Image mode: one canvas (`Assemble` is a no-op), `--transparent` support
   (only fill-alpha diverges from PDF paint semantics), no temp files; the

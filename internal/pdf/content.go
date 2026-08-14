@@ -18,17 +18,18 @@ type fontState struct {
 // Content builds a page content stream. Every emitted operator is recorded
 // as a string; fonts and images used are registered for the page /Resources.
 type Content struct {
-	buf        bytes.Buffer
-	fontUses   map[string]string // resource name -> font object ref (allocated at finalize)
-	fontFiles  map[string]*Font  // resource name -> parsed font (embedded)
-	curFont    string            // active font from last SetFont
-	curSize    float64           // active font size from last SetFont
-	fontStack  []fontState       // active font before each open Save
-	imageUses  map[string]string // resource name -> image object ref
-	imageRefs  map[string]*imageResource
-	imageDedup map[imageDedupKey]*imageResource
-	opacity    float64 // 0 disables
-	doc        *Document
+	buf         bytes.Buffer
+	fontUses    map[string]string // resource name -> font object ref (allocated at finalize)
+	fontFiles   map[string]*Font  // resource name -> parsed font (embedded)
+	curFont     string            // active font from last SetFont
+	curSize     float64           // active font size from last SetFont
+	fontStack   []fontState       // active font before each open Save
+	imageUses   map[string]string // resource name -> image object ref
+	imageRefs   map[string]*imageResource
+	imageDedup  map[imageDedupKey]*imageResource
+	opacity     float64 // 0 disables
+	markedDepth int     // tracks nesting of BDC/EMC blocks
+	doc         *Document
 }
 
 type imageResource struct {
@@ -57,6 +58,9 @@ func NewContent() *Content {
 
 // Bytes returns the raw (uncompressed) content stream.
 func (c *Content) Bytes() []byte { return c.buf.Bytes() }
+
+// Doc returns the parent document of this content stream (nil when none).
+func (c *Content) Doc() *Document { return c.doc }
 
 // Grow reserves content-stream capacity up front so per-page buffers do not
 // reallocate geometrically while a dense op list is painted.
@@ -126,16 +130,17 @@ func (c *Content) writePDFNums(suffix string, count int, num1, num2, num3, num4,
 func cloneContent(cur *Content) *Content {
 	imageRefs := cloneImageMap(cur.imageRefs)
 	ncVal := &Content{ //nolint:exhaustruct // intentional zero-value fields
-		fontUses:   cloneStringMap(cur.fontUses),
-		fontFiles:  cloneFontMap(cur.fontFiles),
-		curFont:    cur.curFont,
-		curSize:    cur.curSize,
-		fontStack:  append([]fontState(nil), cur.fontStack...),
-		imageUses:  cloneStringMap(cur.imageUses),
-		imageRefs:  imageRefs,
-		imageDedup: cloneImageDedupMap(cur.imageDedup, imageRefs),
-		opacity:    cur.opacity,
-		doc:        cur.doc,
+		fontUses:    cloneStringMap(cur.fontUses),
+		fontFiles:   cloneFontMap(cur.fontFiles),
+		curFont:     cur.curFont,
+		curSize:     cur.curSize,
+		fontStack:   append([]fontState(nil), cur.fontStack...),
+		imageUses:   cloneStringMap(cur.imageUses),
+		imageRefs:   imageRefs,
+		imageDedup:  cloneImageDedupMap(cur.imageDedup, imageRefs),
+		opacity:     cur.opacity,
+		markedDepth: cur.markedDepth,
+		doc:         cur.doc,
 	}
 	ncVal.buf.Write(cur.buf.Bytes())
 
@@ -668,7 +673,11 @@ func (c *Content) recordFontRune(name string, rVal rune) {
 func (c *Content) fonts() (map[string]string, error) {
 	for _, name := range sortedStringKeys(c.fontUses) {
 		face, ok := c.fontFiles[name]
-		if !ok {
+		if !ok || face == nil {
+			if c.doc != nil && c.doc.policy.IsCompliant() {
+				return nil, fmt.Errorf("%w: %s (required by %s)", errFontNotEmbedded, name, c.doc.policy.CanonicalProfile())
+			}
+
 			delete(c.fontUses, name)
 
 			continue
@@ -703,4 +712,53 @@ func (c *Content) extGState() string {
 	}
 
 	return ""
+}
+
+// BeginMarkedContent begins a marked-content sequence with a structure tag and MCID.
+func (c *Content) BeginMarkedContent(tag string, mcid int) {
+	tag = strings.TrimPrefix(tag, "/")
+	c.markedDepth++
+	c.buf.WriteString("/")
+	c.buf.WriteString(tag)
+	c.buf.WriteString(" << /MCID ")
+	c.buf.WriteString(strconv.Itoa(mcid))
+	c.buf.WriteString(" >> BDC\n")
+}
+
+// EndMarkedContent ends the active marked-content sequence.
+func (c *Content) EndMarkedContent() {
+	if c.markedDepth > 0 {
+		c.markedDepth--
+	}
+
+	c.buf.WriteString("EMC\n")
+}
+
+// BeginArtifact begins an artifact marked-content sequence (e.g. "Pagination").
+// When artifactType is empty, a bare /Artifact BDC sequence is written.
+func (c *Content) BeginArtifact(artifactType string) {
+	artifactType = strings.TrimPrefix(artifactType, "/")
+	c.markedDepth++
+
+	if artifactType != "" {
+		c.buf.WriteString("/Artifact << /Type /")
+		c.buf.WriteString(artifactType)
+		c.buf.WriteString(" >> BDC\n")
+	} else {
+		c.buf.WriteString("/Artifact BDC\n")
+	}
+}
+
+// EndArtifact ends an artifact marked-content sequence.
+func (c *Content) EndArtifact() {
+	if c.markedDepth > 0 {
+		c.markedDepth--
+	}
+
+	c.buf.WriteString("EMC\n")
+}
+
+// MarkedDepth returns the current nesting depth of marked-content blocks.
+func (c *Content) MarkedDepth() int {
+	return c.markedDepth
 }

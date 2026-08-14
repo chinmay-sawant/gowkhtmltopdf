@@ -68,6 +68,8 @@ func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 // PaintContext is the cancellation-aware form of Paint. The legacy Paint
 // entrypoint remains a background-context adapter for package callers that do
 // not have a request context.
+//
+//nolint:cyclop,funlen // paint initialization and pagination coordination
 func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts PaintOptions) error {
 	if ctx == nil {
 		return errNilContext
@@ -136,7 +138,12 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 
 	populateLocations(res, contentH, opPage)
 
-	return paintPages(ctx, doc, res, opts, contentH, fixedIdx)
+	opMap, err := buildStructureTree(doc, res)
+	if err != nil {
+		return err
+	}
+
+	return paintPages(ctx, doc, res, opts, contentH, fixedIdx, opMap)
 }
 
 // fixedOpIndices collects the indices of viewport-fixed ops, which are
@@ -281,7 +288,8 @@ func contentSizeHint(ops []Op, groups ...[]int) int {
 //
 //nolint:funlen // one pass per page; shared paint/resName closures cover content and fixed layers
 func paintPages(
-	ctx context.Context, doc *pdf.Document, res *Result, opts PaintOptions, contentH float64, fixedIdx []int,
+	ctx context.Context, doc *pdf.Document, res *Result, opts PaintOptions,
+	contentH float64, fixedIdx []int, opMap map[int]*opTagInfo,
 ) error {
 	var paintErr error
 
@@ -342,6 +350,7 @@ func paintPages(
 			resName:  resName,
 			nextImg:  0,
 			err:      paintErr,
+			opMap:    opMap,
 		}
 
 		for _, idx := range pageOrder {
@@ -349,7 +358,7 @@ func paintPages(
 				return fmt.Errorf("layout: paint context: %w", err)
 			}
 
-			painter.paintOp(&res.Ops[idx])
+			painter.paintOp(idx, &res.Ops[idx])
 		}
 		// Fixed layer: page-local coords (pageIdx 0 math on every page).
 		painter.pageN = 0
@@ -359,7 +368,7 @@ func paintPages(
 				return fmt.Errorf("layout: paint context: %w", err)
 			}
 
-			painter.paintOp(&res.Ops[idx])
+			painter.paintOp(idx, &res.Ops[idx])
 		}
 
 		paintErr = painter.err
@@ -378,15 +387,28 @@ type pagePainter struct {
 	resName  func(*pdf.Font) string
 	nextImg  int
 	err      error
+	opMap    map[int]*opTagInfo
 }
 
-func (p *pagePainter) paintOp(paintOp *Op) {
+//nolint:cyclop,funlen,nestif,wsl // marked content and opacity/transform wrapping for ops
+func (p *pagePainter) paintOp(opIdx int, paintOp *Op) {
 	if paintOp.Kind == opKindNoop {
 		return
 	}
 
+	tagInfo := p.opMap[opIdx]
+
 	if paintOp.Kind == OpLinkURI {
-		drawLinkXform(p.page, paintOp, p.pageN, p.contentH, p.opts)
+		ref := drawLinkXform(p.page, paintOp, p.pageN, p.contentH, p.opts)
+		if ref != 0 {
+			elem := paintOp.StructElem
+			if elem == nil && tagInfo != nil {
+				elem = tagInfo.elem
+			}
+			if elem != nil {
+				elem.SetObjRef(ref, p.page)
+			}
+		}
 
 		return
 	}
@@ -405,7 +427,29 @@ func (p *pagePainter) paintOp(paintOp *Op) {
 		p.child.SetOpacity(paintOp.PaintOpacity)
 	}
 
-	p.drawPageOp(paintOp)
+	isUA1 := p.page != nil && p.page.Doc() != nil && p.page.Doc().Policy().IsPDFUA1()
+
+	switch {
+	case isUA1 && tagInfo != nil && paintOp.Kind != OpFillRect && paintOp.Kind != OpStrokeRect && paintOp.Kind != OpLine:
+		mcid := p.page.AllocMCID(tagInfo.elem)
+		p.child.BeginMarkedContent(string(tagInfo.tag), mcid)
+		p.drawPageOp(paintOp)
+		p.child.EndMarkedContent()
+	case isUA1 && paintOp.Kind == OpFillRect:
+		p.child.BeginArtifact("Background")
+		p.drawPageOp(paintOp)
+		p.child.EndArtifact()
+	case isUA1 && (paintOp.Kind == OpStrokeRect || paintOp.Kind == OpLine):
+		p.child.BeginArtifact("Layout")
+		p.drawPageOp(paintOp)
+		p.child.EndArtifact()
+	case isUA1:
+		p.child.BeginArtifact("Layout")
+		p.drawPageOp(paintOp)
+		p.child.EndArtifact()
+	default:
+		p.drawPageOp(paintOp)
+	}
 
 	if needGS {
 		p.child.Restore()
@@ -591,6 +635,8 @@ func paintBandOps(
 
 // paintBandOp paints one band op: graphics-state save, transform, opacity,
 // then the shared draw dispatch, and a final restore.
+//
+//nolint:cyclop,wsl // band op opacity, transform and artifact wrapping
 func paintBandOp(
 	chld *pdf.Content, page *pdf.Page, paintOp *Op, opts BandOptions, contentH, pageH float64,
 	useSimple bool, resName func(*pdf.Font) string, nextImg *int, firstErr *error,
@@ -609,7 +655,17 @@ func paintBandOp(
 		chld.SetOpacity(paintOp.PaintOpacity)
 	}
 
+	isUA1 := page != nil && page.Doc() != nil && page.Doc().Policy().IsPDFUA1()
+	needArtifact := isUA1 && chld.MarkedDepth() == 0
+	if needArtifact {
+		chld.BeginArtifact("Pagination")
+	}
+
 	drawBandOp(chld, page, paintOp, opts, contentH, pageH, useSimple, resName, nextImg, firstErr)
+
+	if needArtifact {
+		chld.EndArtifact()
+	}
 
 	if needGS {
 		chld.Restore()
@@ -1217,9 +1273,9 @@ func drawImage(
 
 // drawLinkXform places a URI annotation. Annotations are page-space (not under
 // content-stream CTM), so CSS transforms are applied to the canvas rect first.
-func drawLinkXform(page *pdf.Page, paintOp *Op, pageIdx int, contentH float64, opts PaintOptions) {
+func drawLinkXform(page *pdf.Page, paintOp *Op, pageIdx int, contentH float64, opts PaintOptions) pdf.ObjRef {
 	if len(paintOp.URI) > 0 && paintOp.URI[0] == '#' {
-		return
+		return 0
 	}
 
 	x1Val, yMin, xMax, y1Val := paintOp.X, paintOp.Y, paintOp.X+paintOp.W, paintOp.Y+paintOp.H
@@ -1238,7 +1294,7 @@ func drawLinkXform(page *pdf.Page, paintOp *Op, pageIdx int, contentH float64, o
 		lly, ury = ury, lly
 	}
 
-	page.AddLinkURI([4]float64{llx, lly, urx, ury}, paintOp.URI)
+	return page.AddLinkURI([4]float64{llx, lly, urx, ury}, paintOp.URI)
 }
 
 // linkXformBounds returns the axis-aligned canvas bounds of the op rect after

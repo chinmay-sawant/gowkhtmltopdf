@@ -443,10 +443,34 @@ func (s *subsetter) build() ([]byte, error) {
 		{"loca", encodeUint32Slice(loca)},
 		{"glyf", glyf.Bytes()},
 		{"OS/2", cloneTable(s.f, "OS/2")},
-		{"post", cloneTable(s.f, "post")},
+		{"post", s.buildPost()},
 	}
 
 	return buildFontFile(tables)
+}
+
+const (
+	postTableSize     = 32
+	postTableVersion3 = 0x00030000
+	postItalicShift   = 16
+)
+
+// buildPost creates a standard Format 3.0 TrueType 'post' table (32 bytes).
+// Format 3.0 has no glyph name array or numberOfGlyphs field, preventing
+// mismatches with maxp.numGlyphs in subset fonts.
+func (s *subsetter) buildPost() []byte {
+	post := make([]byte, postTableSize)
+	// Version 3.0: 0x00030000
+	binary.BigEndian.PutUint32(post[0:4], postTableVersion3)
+
+	if orig, ok := s.f.tables["post"]; ok && len(orig) >= postTableSize {
+		copy(post[4:32], orig[4:32])
+	} else if s.f.italicAngle != 0 {
+		//nolint:gosec // Fixed 16.16 signed format converted to uint32 for binary serialization
+		binary.BigEndian.PutUint32(post[4:8], uint32(int32(s.f.italicAngle)<<postItalicShift))
+	}
+
+	return post
 }
 
 // padOutlines aligns each outline to 4 bytes and records the running loca.

@@ -38,6 +38,7 @@ type inlineItem struct {
 	chrome     bool // text belongs to an inline element with its own decoration
 	noSplit    bool // vertical writing-mode run must remain one rotated line
 	imgRef     *imageRef
+	alt        string
 	href       string
 	forceBreak bool
 	// block-in-inline: a laid-out block box whose ops live in

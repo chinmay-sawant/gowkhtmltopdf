@@ -1,12 +1,14 @@
-// Package pdf implements a stdlib-only PDF 1.4 writer: indirect objects,
-// xref, catalog/pages tree, content streams (Flate), base-14 fonts, images,
-// link annotations, named destinations and outlines. Deterministic output
-// for golden tests (creation date is injectable).
+// Package pdf implements a stdlib-only version-aware PDF writer (PDF 1.4 default,
+// opt-in PDF 1.7): indirect objects, xref, catalog/pages tree, content streams
+// (Flate), base-14 fonts, images, link annotations, named destinations, outlines,
+// trailer /ID, and non-claiming XMP metadata. Deterministic output for golden
+// tests (creation date is injectable).
 package pdf
 
 import (
 	"bytes"
 	"compress/zlib"
+	"crypto/md5" //nolint:gosec // MD5 is standard for PDF trailer /ID generation
 	"errors"
 	"fmt"
 	"io"
@@ -15,6 +17,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf16"
 )
 
 var (
@@ -22,7 +25,7 @@ var (
 	errPDFNoPages   = errors.New("pdf: no pages")
 )
 
-// Version is the PDF header version emitted.
+// Version is the default PDF header version emitted for legacy compatibility.
 const Version = "1.4"
 
 // object is one indirect object (pre-serialized dict + optional stream).
@@ -76,6 +79,9 @@ func (w *countingWriter) WriteString(text string) (int, error) {
 // formatting concern, not a data type, and refs cannot be malformed.
 type objRef int
 
+// ObjRef is an alias for objRef for external package access.
+type ObjRef = objRef
+
 func (r objRef) String() string { return strconv.Itoa(int(r)) + " 0 R" }
 
 // parseRef parses an "N 0 R" reference string (the exported surface still
@@ -116,34 +122,75 @@ func (d dict) String() string { return "<< " + strings.Join(d, " ") + " >>" }
 // assembly and finalization. Callers must not mutate or write a document
 // concurrently; use one document per conversion when parallelism is needed.
 type Document struct {
-	objects        []*object
-	info           map[string]string
-	useCompression bool
-	grayscale      bool
-	creationTime   time.Time // zero value → deterministic fixed date
-	nextID         int
-	pages          []*Page
-	outlineRoot    *Outline
-	fontCache      map[string]objRef // subset key -> font dict ref
-	fontRuneSet    map[string]map[rune]struct{}
-	fontRunes      map[string][]rune // font resource name -> document-wide rune union (finalize-time)
-	fontKeys       map[string]string // font resource name -> precomputed subset cache key
-	fontKeyFonts   map[string]*Font  // font resource name -> the face the precomputed key belongs to
-	fontType0      map[string]bool   // font resource name -> precomputed needsType0(union)
-	catalogRef     objRef            // set by finalize
-	infoRef        objRef            // set by finalize
-	finalized      bool
+	policy            WriterPolicy
+	objects           []*object
+	info              map[string]string
+	useCompression    bool
+	grayscale         bool
+	creationTime      time.Time // zero value → deterministic fixed date
+	nextID            int
+	pages             []*Page
+	outlineRoot       *Outline
+	fontCache         map[string]objRef // subset key -> font dict ref
+	fontRuneSet       map[string]map[rune]struct{}
+	fontRunes         map[string][]rune // font resource name -> document-wide rune union (finalize-time)
+	fontKeys          map[string]string // font resource name -> precomputed subset cache key
+	fontKeyFonts      map[string]*Font  // font resource name -> the face the precomputed key belongs to
+	fontType0         map[string]bool   // font resource name -> precomputed needsType0(union)
+	catalogRef        objRef            // set by finalize
+	infoRef           objRef            // set by finalize
+	metadataRef       objRef            // set by finalize
+	iccRef            objRef            // set by finalize (PDF/A-3)
+	outputIntentRef   objRef            // set by finalize (PDF/A-3)
+	structTreeRootRef objRef            // set by finalizeStructure
+	parentTreeRef     objRef            // set by finalizeStructure
+	parentTreeNextKey int               // set by finalizeStructure
+	structTreeRoot    *StructTreeRoot
+	lang              string // document language (default "en-US")
+	finalized         bool
 }
 
-// NewDocument creates an empty PDF document.
+// NewDocument creates an empty PDF document with the default PDF 1.4 policy.
 func NewDocument() *Document {
 	return &Document{ //nolint:exhaustruct // intentional zero-value fields
+		policy:         WriterPolicy{Version: PDF14}, //nolint:exhaustruct // default policy
 		info:           map[string]string{},
 		useCompression: true,
 		fontCache:      map[string]objRef{},
 		fontRuneSet:    map[string]map[rune]struct{}{},
 	}
 }
+
+// NewDocumentWithPolicy creates an empty PDF document configured with the given writer policy.
+func NewDocumentWithPolicy(policy WriterPolicy) (*Document, error) {
+	if err := policy.Validate(); err != nil {
+		return nil, err
+	}
+
+	doc := NewDocument()
+	doc.policy = policy
+
+	return doc, nil
+}
+
+// Policy returns the document's writer policy.
+func (d *Document) Policy() WriterPolicy {
+	return d.policy
+}
+
+// Validate checks whether the document's writer policy is valid.
+func (d *Document) Validate() error {
+	return d.policy.Validate()
+}
+
+// SetLang sets the document natural language (e.g. "en-US").
+func (d *Document) SetLang(lang string) { d.lang = lang }
+
+// SetLanguage is an alias for SetLang.
+func (d *Document) SetLanguage(lang string) { d.lang = lang }
+
+// Lang returns the document natural language.
+func (d *Document) Lang() string { return d.lang }
 
 // SetCompression toggles Flate compression of content/image streams.
 func (d *Document) SetCompression(on bool) { d.useCompression = on }
@@ -191,24 +238,29 @@ func (d *Document) setStream(r objRef, raw []byte) {
 
 // Page is one page of the document.
 type Page struct {
-	doc        *Document
-	ref        objRef
-	width      float64
-	height     float64
-	content    *Content
-	contentRef objRef
-	annots     []annotation
+	doc              *Document
+	ref              objRef
+	width            float64
+	height           float64
+	content          *Content
+	contentRef       objRef
+	annots           []annotation
+	mcids            []*StructElem
+	structParents    int
+	hasStructParents bool
 }
 
 // annotation is a link annotation.
 type annotation struct {
-	rect     [4]float64 // x1,y1,x2,y2 in PDF coords
-	uri      string     // external link
-	destPage int        // internal link target (0-based page index)
-	destX    float64
-	destY    float64
-	hasDest  bool
-	annotRef objRef
+	rect            [4]float64 // x1,y1,x2,y2 in PDF coords
+	uri             string     // external link
+	destPage        int        // internal link target (0-based page index)
+	destX           float64
+	destY           float64
+	hasDest         bool
+	annotRef        objRef
+	structParent    int
+	hasStructParent bool
 }
 
 // AddPage appends a page with the given size in points.
@@ -306,11 +358,15 @@ func (d *Document) DuplicatePage(idx int) (*Page, error) {
 	}
 
 	src := d.pages[idx]
-	p := d.AddPage(src.width, src.height)
-	p.content = cloneContent(src.content)
-	p.annots = append([]annotation(nil), src.annots...)
+	clonedPage := d.AddPage(src.width, src.height)
+	clonedPage.content = cloneContent(src.content)
+	clonedPage.annots = append([]annotation(nil), src.annots...)
 
-	return p, nil
+	for i := range clonedPage.annots {
+		clonedPage.annots[i].annotRef = 0
+	}
+
+	return clonedPage, nil
 }
 
 // Width returns the page width in points.
@@ -322,20 +378,43 @@ func (p *Page) Height() float64 { return p.height }
 // Content returns the page content stream builder.
 func (p *Page) Content() *Content { return p.content }
 
+// Doc returns the parent document of this page.
+func (p *Page) Doc() *Document { return p.doc }
+
 // AddLinkURI adds an external URI annotation.
-func (p *Page) AddLinkURI(rect [4]float64, uri string) {
-	p.annots = append(p.annots, annotation{rect: rect, uri: uri}) //nolint:exhaustruct // intentional zero-value fields
+//
+//nolint:revive // returning unexported objRef is required for StructElem link references
+func (p *Page) AddLinkURI(rect [4]float64, uri string) objRef {
+	ref := p.doc.newObject()
+	p.annots = append(p.annots, annotation{ //nolint:exhaustruct // intentional zero-value fields
+		rect:     rect,
+		uri:      uri,
+		destPage: 0,
+		destX:    0,
+		destY:    0,
+		hasDest:  false,
+		annotRef: ref,
+	})
+
+	return ref
 }
 
 // AddLinkDest adds an internal GoTo annotation to a page (0-based index).
-func (p *Page) AddLinkDest(rect [4]float64, page int, x, y float64) {
+//
+//nolint:revive // returning unexported objRef is required for StructElem link references
+func (p *Page) AddLinkDest(rect [4]float64, page int, destX, destY float64) objRef {
+	ref := p.doc.newObject()
 	p.annots = append(p.annots, annotation{ //nolint:exhaustruct // intentional zero-value fields
 		rect:     rect,
+		uri:      "",
 		destPage: page,
-		destX:    x,
-		destY:    y,
+		destX:    destX,
+		destY:    destY,
 		hasDest:  true,
+		annotRef: ref,
 	})
+
+	return ref
 }
 
 // Outline is a PDF outline (bookmark) node.
@@ -384,8 +463,8 @@ func writePDFString(out *countingWriter, text string) error {
 	return nil
 }
 
-func writePDFHeader(out *countingWriter) error {
-	if err := writePDFFormat(out, "%%PDF-%s\n", Version); err != nil {
+func writePDFHeader(out *countingWriter, policy WriterPolicy) error {
+	if err := writePDFFormat(out, "%%PDF-%s\n", policy.HeaderVersion()); err != nil {
 		return err
 	}
 
@@ -424,6 +503,38 @@ func writePDFObject(out *countingWriter, obj *object) (int64, error) {
 	return offset, nil
 }
 
+func computeTrailerID(doc *Document) string {
+	hasher := md5.New() //nolint:gosec // MD5 is standard for PDF trailer /ID generation
+
+	_, _ = hasher.Write([]byte(doc.policy.HeaderVersion()))
+
+	now := doc.creationTime
+	if now.IsZero() {
+		now = time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+	}
+
+	_, _ = hasher.Write([]byte(pdfDate(now)))
+
+	for _, k := range sortedStringKeys(doc.info) {
+		_, _ = hasher.Write([]byte(k))
+		_, _ = hasher.Write([]byte(doc.info[k]))
+	}
+
+	_, _ = fmt.Fprintf(hasher, "pages:%d", len(doc.pages))
+
+	for _, p := range doc.pages {
+		_, _ = fmt.Fprintf(hasher, "page:%f,%f", p.width, p.height)
+	}
+
+	for _, obj := range doc.objects {
+		_, _ = fmt.Fprintf(hasher, "obj:%d:%s:%d", obj.id, obj.dict, len(obj.stream))
+	}
+
+	sum := hasher.Sum(nil)
+
+	return fmt.Sprintf("%032X", sum)
+}
+
 func writePDFTrailer(out *countingWriter, doc *Document, offsets []int64) error {
 	xrefPos := out.n
 
@@ -445,10 +556,20 @@ func writePDFTrailer(out *countingWriter, doc *Document, offsets []int64) error 
 		return err
 	}
 
-	if err := writePDFFormat(
-		out, "<< /Size %d /Root %s /Info %s >>\n", len(doc.objects)+1, doc.catalogRef, doc.infoRef,
-	); err != nil {
-		return err
+	if doc.policy.Version >= PDF17 {
+		idHex := computeTrailerID(doc)
+		if err := writePDFFormat(
+			out, "<< /Size %d /Root %s /Info %s /ID [ <%s> <%s> ] >>\n",
+			len(doc.objects)+1, doc.catalogRef, doc.infoRef, idHex, idHex,
+		); err != nil {
+			return err
+		}
+	} else {
+		if err := writePDFFormat(
+			out, "<< /Size %d /Root %s /Info %s >>\n", len(doc.objects)+1, doc.catalogRef, doc.infoRef,
+		); err != nil {
+			return err
+		}
 	}
 
 	return writePDFFormat(out, "startxref\n%d\n%%%%EOF\n", xrefPos)
@@ -460,7 +581,7 @@ func (d *Document) writeTo(width io.Writer) (int64, error) {
 	}
 
 	out := &countingWriter{w: width} //nolint:exhaustruct // count starts at zero
-	if err := writePDFHeader(out); err != nil {
+	if err := writePDFHeader(out, d.policy); err != nil {
 		return out.n, fmt.Errorf("pdf: write: %w", err)
 	}
 
@@ -491,18 +612,51 @@ func (d *Document) writeTo(width io.Writer) (int64, error) {
 
 // finalize builds catalog, pages tree, fonts, images, annots, outlines and
 // page objects once.
+//
+//nolint:cyclop,funlen // finalize coordinates entire document serialization pipeline
 func (d *Document) finalize() error {
 	if d.finalized {
 		return nil
+	}
+
+	if err := d.policy.Validate(); err != nil {
+		return err
 	}
 
 	if len(d.pages) == 0 {
 		return errPDFNoPages
 	}
 
+	if d.policy.IsPDFUA1() {
+		title := strings.TrimSpace(d.info["Title"])
+		if title == "" {
+			return ErrTitleRequired
+		}
+	}
+
 	catalogRef := d.newObject()
 	infoRef := d.newObject()
 	pagesRef := d.newObject()
+
+	var metadataRef objRef
+	if d.policy.Version >= PDF17 {
+		metadataRef = d.newObject()
+		xmpBytes := d.buildXMPMetadata()
+		d.setDict(metadataRef, fmt.Sprintf("<< /Type /Metadata /Subtype /XML /Length %d >>", len(xmpBytes)))
+		d.setStream(metadataRef, xmpBytes)
+	}
+
+	if d.policy.IsPDFA3() {
+		iccRef := d.newObject()
+		iccData := flateBytes(sRGBICCProfile())
+		d.setDict(iccRef, fmt.Sprintf("<< /N 3 /Filter /FlateDecode /Length %d >>", len(iccData)))
+		d.setStream(iccRef, iccData)
+		d.iccRef = iccRef
+
+		outputIntentRef := d.newObject()
+		d.setDict(outputIntentRef, outputIntentDict(iccRef))
+		d.outputIntentRef = outputIntentRef
+	}
 
 	d.unionFontRunes()
 
@@ -526,7 +680,11 @@ func (d *Document) finalize() error {
 		}
 	}
 
-	d.setDict(catalogRef, catalogDict(d.outlineRoot, pagesRef))
+	if err := d.finalizeStructure(); err != nil {
+		return err
+	}
+
+	d.setDict(catalogRef, d.catalogDict(pagesRef, metadataRef))
 	d.setDict(infoRef, d.infoDict())
 
 	// per-page objects
@@ -538,6 +696,7 @@ func (d *Document) finalize() error {
 
 	d.catalogRef = catalogRef
 	d.infoRef = infoRef
+	d.metadataRef = metadataRef
 	d.finalized = true
 
 	return nil
@@ -607,11 +766,37 @@ func sortedStringKeys[V any](values map[string]V) []string {
 	return keys
 }
 
-// catalogDict builds the /Catalog dictionary, wiring /Outlines when set.
-func catalogDict(outlineRoot *Outline, pagesRef objRef) string {
-	cat := dict{}.add("/Type", "/Catalog").add("/Pages", pagesRef.String())
-	if outlineRoot != nil {
-		cat = cat.add("/Outlines", outlineRoot.refStr.String()).add("/PageMode", "/UseOutlines")
+// catalogDict builds the /Catalog dictionary, wiring /Metadata when present,
+// /Outlines when set, /OutputIntents when present, and PDF/UA-1 keys when enabled.
+func (d *Document) catalogDict(pagesRef, metadataRef objRef) string {
+	cat := dict{}.add("/Type", "/Catalog")
+	if metadataRef != 0 {
+		cat = cat.add("/Metadata", metadataRef.String())
+	}
+
+	cat = cat.add("/Pages", pagesRef.String())
+	if d.outlineRoot != nil {
+		cat = cat.add("/Outlines", d.outlineRoot.refStr.String()).add("/PageMode", "/UseOutlines")
+	}
+
+	if d.outputIntentRef != 0 {
+		cat = cat.add("/OutputIntents", "["+d.outputIntentRef.String()+"]")
+	}
+
+	if d.policy.IsPDFUA1() {
+		cat = cat.add("/MarkInfo", "<< /Marked true >>")
+
+		lang := d.lang
+		if lang == "" {
+			lang = "en-US"
+		}
+
+		cat = cat.add("/Lang", pdfString(lang))
+		cat = cat.add("/ViewerPreferences", "<< /DisplayDocTitle true >>")
+
+		if d.structTreeRootRef != 0 {
+			cat = cat.add("/StructTreeRoot", d.structTreeRootRef.String())
+		}
 	}
 
 	return cat.String()
@@ -625,14 +810,13 @@ func (d *Document) infoDict() string {
 	}
 
 	info := dict{}
-	for _, k := range []string{"Title", "Subject", "Author", "Keywords"} {
+	for _, k := range []string{"Title", "Subject", "Author", "Keywords", "Creator"} {
 		if v, ok := d.info[k]; ok && v != "" {
-			info = info.add("/"+k, pdfString(v))
+			info = info.add("/"+k, d.encodeTextString(v))
 		}
 	}
 
-	return info.add("/Creator", pdfString(d.info["Creator"])).
-		add("/Producer", pdfString("gowkhtmltopdf "+Version)).
+	return info.add("/Producer", d.encodeTextString(d.policy.ProducerVersion())).
 		add("/CreationDate", pdfString(pdfDate(now))).
 		add("/ModDate", pdfString(pdfDate(now))).
 		String()
@@ -649,7 +833,7 @@ func (d *Document) finalizePage(page *Page, pagesRef objRef) error {
 
 	d.setStream(page.contentRef, raw)
 
-	res, err := buildPageResources(page.content)
+	res, err := buildPageResources(page.content, d.iccRef)
 	if err != nil {
 		return err
 	}
@@ -662,6 +846,10 @@ func (d *Document) finalizePage(page *Page, pagesRef objRef) error {
 		"/Contents " + page.contentRef.String(),
 	}
 
+	if d.policy.IsPDFUA1() && page.hasStructParents {
+		parts = append(parts, fmt.Sprintf("/StructParents %d", page.structParents))
+	}
+
 	if len(page.annots) > 0 {
 		d.buildAnnots(page)
 
@@ -671,6 +859,7 @@ func (d *Document) finalizePage(page *Page, pagesRef objRef) error {
 		}
 
 		parts = append(parts, "/Annots ["+strings.Join(refs, " ")+"]")
+		parts = append(parts, "/Tabs /S")
 	}
 
 	parts = append(parts, ">>")
@@ -679,11 +868,11 @@ func (d *Document) finalizePage(page *Page, pagesRef objRef) error {
 	return nil
 }
 
-// buildPageResources assembles the /Resources dict from the content's fonts
-// and images.
+// buildPageResources assembles the /Resources dict from the content's fonts,
+// images, and color spaces.
 //
 //nolint:wsl // resource dictionary assembly is a linear PDF serialization block
-func buildPageResources(content *Content) (string, error) {
+func buildPageResources(content *Content, iccRef objRef) (string, error) {
 	fonts, err := content.fonts()
 	if err != nil {
 		return "", err
@@ -694,6 +883,10 @@ func buildPageResources(content *Content) (string, error) {
 	var res strings.Builder
 
 	res.WriteString("<< /ProcSet [/PDF /Text /ImageB /ImageC /ImageI]")
+
+	if iccRef != 0 {
+		res.WriteString(" /ColorSpace << /DefaultRGB [/ICCBased " + iccRef.String() + "] >>")
+	}
 
 	if len(fonts) > 0 {
 		res.WriteString(" /Font <<")
@@ -733,16 +926,39 @@ func buildPageResources(content *Content) (string, error) {
 	return res.String(), nil
 }
 
+func annotDescription(arg *annotation) string {
+	if arg.uri != "" {
+		return arg.uri
+	}
+
+	if arg.hasDest {
+		return fmt.Sprintf("Link to page %d", arg.destPage+1)
+	}
+
+	return "Link"
+}
+
 func (d *Document) buildAnnots(p *Page) {
 	for i := range p.annots {
 		arg := &p.annots[i]
-		arg.annotRef = d.newObject()
+		if arg.annotRef == 0 {
+			arg.annotRef = d.newObject()
+		}
+
 		r := arg.rect
 
 		var buf strings.Builder
 
-		fmt.Fprintf(&buf, "<< /Type /Annot /Subtype /Link /Rect [%s %s %s %s]",
+		fmt.Fprintf(&buf, "<< /Type /Annot /Subtype /Link /Rect [%s %s %s %s] /Border [0 0 0] /F 4",
 			num(r[0]), num(r[1]), num(r[2]), num(r[3]))
+
+		if d.policy.IsPDFUA1() {
+			fmt.Fprintf(&buf, " /Contents %s", d.encodeTextString(annotDescription(arg)))
+
+			if arg.hasStructParent {
+				fmt.Fprintf(&buf, " /StructParent %d", arg.structParent)
+			}
+		}
 
 		if arg.hasDest {
 			if arg.destPage >= 0 && arg.destPage < len(d.pages) {
@@ -785,7 +1001,7 @@ func (d *Document) finalizeOutlines(root *Outline) error {
 func buildOutlineItems(parent *Outline, parentRef objRef, doc *Document) error {
 	for idx, child := range parent.Children {
 		var parts []string
-		parts = append(parts, "<< /Title "+pdfString(child.Title))
+		parts = append(parts, "<< /Title "+doc.encodeTextString(child.Title))
 
 		dest, err := outlineDest(child, doc)
 		if err != nil {
@@ -940,6 +1156,55 @@ func pdfDocEncodingFold(rVal rune) rune {
 
 func pdfDate(t time.Time) string {
 	return "D:" + t.UTC().Format("20060102150405") + "Z"
+}
+
+// encodeTextString encodes text as a PDF text string according to document version.
+// For PDF 1.4, it uses pdfString (Latin-1 / PDFDocEncoding fold).
+// For PDF 1.7+, if text contains any characters outside Latin-1 (> U+00FF),
+// it encodes text as UTF-16BE with a byte-order mark (BOM \xFE\xFF) formatted as a hex string <FEFF...>.
+func encodeTextString(text string, version PDFVersion) string {
+	if text == "" {
+		return "()"
+	}
+
+	if version < PDF17 {
+		return pdfString(text)
+	}
+
+	for _, rVal := range text {
+		if rVal > maxLatin1Code {
+			return encodeUTF16BEHex(text)
+		}
+	}
+
+	return pdfString(text)
+}
+
+func encodeUTF16BEHex(text string) string {
+	const (
+		bomLen       = 2
+		hexPerUnit   = 4
+		prefixBOMHex = "<FEFF"
+	)
+
+	u16 := utf16.Encode([]rune(text))
+
+	var buf strings.Builder
+
+	buf.Grow(bomLen + len(prefixBOMHex) + len(u16)*hexPerUnit)
+	buf.WriteString(prefixBOMHex)
+
+	for _, unit := range u16 {
+		fmt.Fprintf(&buf, "%04X", unit)
+	}
+
+	buf.WriteByte('>')
+
+	return buf.String()
+}
+
+func (d *Document) encodeTextString(text string) string {
+	return encodeTextString(text, d.policy.Version)
 }
 
 func num(v float64) string {

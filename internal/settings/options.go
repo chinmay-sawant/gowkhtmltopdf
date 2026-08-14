@@ -68,6 +68,18 @@ func (o PdfGlobalOptions) WithResolveRelativeLinks(enabled bool) PdfGlobalOption
 	return o
 }
 
+func (o PdfGlobalOptions) WithPDFVersion(version string) PdfGlobalOptions {
+	o.global.PdfVersion = version
+
+	return o
+}
+
+func (o PdfGlobalOptions) WithPDFProfile(profile string) PdfGlobalOptions {
+	o.global.PdfProfile = profile
+
+	return o
+}
+
 // WithSetting applies any supported dotted setting while retaining the value
 // builder's independent-snapshot semantics. Common settings should use the
 // typed With* methods; this escape hatch keeps the full wkhtmltopdf-compatible

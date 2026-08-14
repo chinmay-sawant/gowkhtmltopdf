@@ -25,8 +25,13 @@ import (
 	"gowkhtmltopdf/internal/pdf"
 )
 
-const htmlTbody = "tbody"
-const htmlCaption = "caption"
+const (
+	htmlTbody    = "tbody"
+	htmlThead    = "thead"
+	htmlCaption  = "caption"
+	htmlColgroup = "colgroup"
+	htmlTfoot    = "tfoot"
+)
 
 // CSS keyword constants shared by the layout engine. Kept here so repeated
 // string literals resolve through one named value (goconst).
@@ -317,6 +322,7 @@ type Op struct {
 	ImgW   int
 	ImgH   int
 	IsJPEG bool
+	Alt    string // Alt text for Figure elements under PDF/UA-1
 
 	// Fixed marks ops from position:fixed boxes; Paint stamps them on every
 	// page at viewport-relative coordinates.
@@ -359,6 +365,9 @@ type Op struct {
 	// Radius is the uniform border radius for rounded fill/stroke rectangles.
 	Radius                                                             float64
 	RadiusTopLeft, RadiusTopRight, RadiusBottomRight, RadiusBottomLeft float64
+
+	// StructElem is the PDF/UA-1 logical structure element associated with this op.
+	StructElem *pdf.StructElem
 }
 
 type engine struct {
@@ -1168,7 +1177,7 @@ func useBlockForTableDisplay(node *html.Node) bool {
 		}
 
 		switch c.Name {
-		case "tr", htmlTbody, "thead", "tfoot", "colgroup", "col", htmlCaption:
+		case "tr", htmlTbody, htmlThead, htmlTfoot, htmlColgroup, "col", htmlCaption:
 			return false
 		}
 	}

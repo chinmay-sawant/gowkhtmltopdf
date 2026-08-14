@@ -21,6 +21,7 @@ import (
 
 	"gowkhtmltopdf/internal/css"
 	"gowkhtmltopdf/internal/html"
+	"gowkhtmltopdf/internal/imageout"
 	"gowkhtmltopdf/internal/pdf"
 	"gowkhtmltopdf/internal/settings"
 )
@@ -723,5 +724,321 @@ func TestHeaderFooterFontNameResolution(t *testing.T) {
 	fallback := resolveHFFont("NonExistentFontXYZ", reg, defFont)
 	if fallback != defFont {
 		t.Errorf("expected fallback font, got %v", fallback)
+	}
+}
+
+func TestConvertPDFVersion(t *testing.T) {
+	t.Parallel()
+
+	// 1. Unset version -> %PDF-1.4
+	cmdUnset, _ := newCommand(t, `<html><body><p>Unset version</p></body></html>`, "")
+	dataUnset := runPDF(t, cmdUnset)
+
+	if !bytes.HasPrefix(dataUnset, []byte("%PDF-1.4\n")) {
+		t.Errorf("expected %%PDF-1.4, got %q", dataUnset[:min(10, len(dataUnset))])
+	}
+
+	// 2. Explicit 1.4 -> %PDF-1.4
+	cmd14, _ := newCommand(t, `<html><body><p>v1.4</p></body></html>`, "")
+	cmd14.Global.PdfVersion = "1.4"
+	data14 := runPDF(t, cmd14)
+
+	if !bytes.HasPrefix(data14, []byte("%PDF-1.4\n")) {
+		t.Errorf("expected %%PDF-1.4, got %q", data14[:min(10, len(data14))])
+	}
+
+	// 3. Explicit 1.7 -> %PDF-1.7
+	cmd17, _ := newCommand(t, `<html><body><p>v1.7</p></body></html>`, "")
+	cmd17.Global.PdfVersion = pdfVersion17
+	data17 := runPDF(t, cmd17)
+
+	if !bytes.HasPrefix(data17, []byte("%PDF-1.7\n")) {
+		t.Errorf("expected %%PDF-1.7, got %q", data17[:min(10, len(data17))])
+	}
+
+	// 4. Version 2.0 -> returns ErrPDF20Unsupported
+	cmd20, _ := newCommand(t, `<html><body><p>v2.0</p></body></html>`, "")
+	cmd20.Global.PdfVersion = "2.0"
+
+	var buf20 bytes.Buffer
+	cmd20.Output = &buf20
+	err20 := Run(t.Context(), cmd20, io.Discard, nil)
+
+	if !errors.Is(err20, settings.ErrPDF20Unsupported) {
+		t.Errorf("expected ErrPDF20Unsupported, got %v", err20)
+	}
+
+	// 5. Invalid version -> returns ErrInvalidPDFVersion
+	cmdBad, _ := newCommand(t, `<html><body><p>bad</p></body></html>`, "")
+	cmdBad.Global.PdfVersion = "invalid"
+
+	var bufBad bytes.Buffer
+	cmdBad.Output = &bufBad
+	errBad := Run(t.Context(), cmdBad, io.Discard, nil)
+
+	if !errors.Is(errBad, settings.ErrInvalidPDFVersion) {
+		t.Errorf("expected ErrInvalidPDFVersion, got %v", errBad)
+	}
+
+	// 6. With TOC and 1.7
+	cmdTOC, _ := newCommand(t, `<html><body><h1>Chapter 1</h1><p>Content</p></body></html>`, "")
+	cmdTOC.Global.PdfVersion = pdfVersion17
+	tocObj := settings.DefaultPdfObject()
+	tocObj.IsTableOfContent = true
+	cmdTOC.Objects = append([]settings.PdfObject{tocObj}, cmdTOC.Objects...)
+	dataTOC := runPDF(t, cmdTOC)
+
+	if !bytes.HasPrefix(dataTOC, []byte("%PDF-1.7\n")) {
+		t.Errorf("expected %%PDF-1.7 with TOC, got %q", dataTOC[:min(10, len(dataTOC))])
+	}
+}
+
+//nolint:cyclop,funlen // comprehensive negative tests for PDF version and unsupported combinations
+func TestPDFVersionNegativeValidation(t *testing.T) {
+	t.Parallel()
+
+	// 1. Unsupported version strings never produce a PDF or 1.7 file and return ErrInvalidPDFVersion
+	unsupportedVersions := []string{
+		"9.9", "invalid", "1.5", "1.6", "1.3", "1.0", "-1", "0.0", "abc", "1.7.0", "v1.7",
+	}
+
+	for _, badVer := range unsupportedVersions {
+		t.Run("unsupported_"+badVer, func(t *testing.T) {
+			t.Parallel()
+
+			cmd, _ := newCommand(t, `<html><body><p>bad version test</p></body></html>`, "")
+			cmd.Global.PdfVersion = badVer
+
+			var out bytes.Buffer
+
+			cmd.Output = &out
+
+			err := Run(t.Context(), cmd, io.Discard, nil)
+			if !errors.Is(err, settings.ErrInvalidPDFVersion) {
+				t.Fatalf("expected ErrInvalidPDFVersion for %q, got: %v", badVer, err)
+			}
+
+			if out.Len() != 0 {
+				t.Errorf("expected 0 bytes written on error for %q, got %d bytes: %q", badVer, out.Len(), out.String())
+			}
+		})
+	}
+
+	// 2. PDF 2.0 returns ErrPDF20Unsupported mentioning issue #32 sentinel
+	t.Run("pdf_20_sentinel", func(t *testing.T) {
+		t.Parallel()
+
+		cmd, _ := newCommand(t, `<html><body><p>pdf 2.0</p></body></html>`, "")
+		cmd.Global.PdfVersion = "2.0"
+
+		var out bytes.Buffer
+
+		cmd.Output = &out
+
+		err := Run(t.Context(), cmd, io.Discard, nil)
+		if !errors.Is(err, settings.ErrPDF20Unsupported) {
+			t.Fatalf("expected ErrPDF20Unsupported, got: %v", err)
+		}
+
+		if !strings.Contains(err.Error(), "32") {
+			t.Errorf("error message should mention issue 32, got: %v", err)
+		}
+
+		if out.Len() != 0 {
+			t.Errorf("expected 0 bytes written for PDF 2.0, got %d", out.Len())
+		}
+	})
+
+	// 3. 1.7 + unsupported combinations fail closed before Write
+	t.Run("unsupported_combinations_fail_closed", func(t *testing.T) {
+		t.Parallel()
+
+		combos := []struct {
+			name    string
+			policy  pdf.WriterPolicy
+			wantErr error
+		}{
+			{
+				"encryption",
+				pdf.WriterPolicy{Version: pdf.PDF17, Encryption: true}, //nolint:exhaustruct // test case
+				pdf.ErrEncryptionUnsupported,
+			},
+			{
+				"forms",
+				pdf.WriterPolicy{Version: pdf.PDF17, Forms: true}, //nolint:exhaustruct // test case
+				pdf.ErrFormsUnsupported,
+			},
+			{
+				"signatures",
+				pdf.WriterPolicy{Version: pdf.PDF17, Signatures: true}, //nolint:exhaustruct // test case
+				pdf.ErrSignaturesUnsupported,
+			},
+			{
+				"object_streams",
+				pdf.WriterPolicy{Version: pdf.PDF17, ObjectStreams: true}, //nolint:exhaustruct // test case
+				pdf.ErrObjectStreamsUnsupported,
+			},
+			{
+				"pdf_a",
+				pdf.WriterPolicy{Version: pdf.PDF17, ConformanceProfile: "PDF/A-4"}, //nolint:exhaustruct // test case
+				pdf.ErrConformanceProfilesUnsupported,
+			},
+			{
+				"pdf_ua",
+				pdf.WriterPolicy{Version: pdf.PDF17, ConformanceProfile: "PDF/UA-2"}, //nolint:exhaustruct // test case
+				pdf.ErrConformanceProfilesUnsupported,
+			},
+		}
+
+		for _, combination := range combos {
+			t.Run(combination.name, func(t *testing.T) {
+				t.Parallel()
+
+				if _, err := pdf.NewDocumentWithPolicy(combination.policy); !errors.Is(err, combination.wantErr) {
+					t.Fatalf("NewDocumentWithPolicy err = %v, want %v", err, combination.wantErr)
+				}
+
+				if err := combination.policy.Validate(); !errors.Is(err, combination.wantErr) {
+					t.Errorf("policy.Validate() err = %v, want %v", err, combination.wantErr)
+				}
+			})
+		}
+	})
+
+	// 4. Image mode has no version claim
+	t.Run("image_mode_no_version_claim", func(t *testing.T) {
+		t.Parallel()
+
+		imgGlobal := settings.DefaultImageGlobal()
+		imgGlobal.Format = "png"
+
+		obj := defaultObject("<html><body><h1>Image Title</h1><p>Image mode test</p></body></html>")
+
+		var out bytes.Buffer
+
+		req := imageout.NewRequest(settings.DefaultPdfGlobal(), imgGlobal, []settings.PdfObject{obj}, &out)
+
+		err := imageout.RunRequest(t.Context(), req, io.Discard)
+		if err != nil {
+			t.Fatalf("image conversion failed: %v", err)
+		}
+
+		data := out.Bytes()
+		// Must not contain any PDF header or version
+		if bytes.Contains(data, []byte("%PDF-")) {
+			t.Error("image output unexpectedly contains %PDF- header")
+		}
+
+		// Must start with PNG magic
+		if !bytes.HasPrefix(data, []byte("\x89PNG\r\n\x1a\n")) {
+			t.Errorf("image output missing PNG magic header, got: %q", data[:min(8, len(data))])
+		}
+	})
+}
+
+//nolint:cyclop,funlen // comprehensive test for compliance profile conversion integration
+func TestPDFProfileConvertIntegration(t *testing.T) {
+	t.Parallel()
+
+	const profileA3aUA1 = "a3a-ua1"
+
+	// 1. --pdf-profile a3a-ua1 implies PDF 1.7 and produces compliant PDF
+	htmlDual := "<html><head><title>Compliance Document</title></head>" +
+		"<body><h1>Compliance Document</h1><p>Dual Profile A-3a + UA-1</p></body></html>"
+	cmdDual, _ := newCommand(t, htmlDual, "")
+	cmdDual.Global.Title = "Compliance Document"
+	cmdDual.Global.PdfProfile = profileA3aUA1
+	dataDual := runPDF(t, cmdDual)
+
+	if !bytes.HasPrefix(dataDual, []byte("%PDF-1.7\n")) {
+		t.Errorf("expected %%PDF-1.7 header for a3a-ua1 profile, got %q", dataDual[:min(10, len(dataDual))])
+	}
+
+	// 2. --pdf-profile a3a produces PDF 1.7
+	cmdA3a, _ := newCommand(t, `<html><body><h1>Archival Document</h1><p>PDF/A-3a</p></body></html>`, "")
+	cmdA3a.Global.PdfProfile = "a3a"
+	dataA3a := runPDF(t, cmdA3a)
+
+	if !bytes.HasPrefix(dataA3a, []byte("%PDF-1.7\n")) {
+		t.Errorf("expected %%PDF-1.7 header for a3a profile, got %q", dataA3a[:min(10, len(dataA3a))])
+	}
+
+	// 3. --pdf-profile ua1 produces PDF 1.7
+	htmlUA1 := "<html><head><title>Accessible Document</title></head>" +
+		"<body><h1>Accessible Document</h1><p>PDF/UA-1</p></body></html>"
+	cmdUA1, _ := newCommand(t, htmlUA1, "")
+	cmdUA1.Global.Title = "Accessible Document"
+	cmdUA1.Global.PdfProfile = "ua1"
+	dataUA1 := runPDF(t, cmdUA1)
+
+	if !bytes.HasPrefix(dataUA1, []byte("%PDF-1.7\n")) {
+		t.Errorf("expected %%PDF-1.7 header for ua1 profile, got %q", dataUA1[:min(10, len(dataUA1))])
+	}
+
+	// 4. Explicit --pdf-version 1.4 + --pdf-profile a3a-ua1 fails with ErrProfileRequiresPDF17
+	cmdConflict, _ := newCommand(t, `<html><head><title>Title</title></head><body><p>conflict</p></body></html>`, "")
+	cmdConflict.Global.Title = "Title"
+	cmdConflict.Global.PdfVersion = "1.4"
+	cmdConflict.Global.PdfProfile = profileA3aUA1
+
+	var bufConflict bytes.Buffer
+
+	cmdConflict.Output = &bufConflict
+	errConflict := Run(t.Context(), cmdConflict, io.Discard, nil)
+
+	if errConflict == nil {
+		t.Fatal("expected error for PDF 1.4 + a3a-ua1, got nil")
+	}
+
+	if !errors.Is(errConflict, ErrProfileRequiresPDF17) {
+		t.Errorf("expected ErrProfileRequiresPDF17, got %v", errConflict)
+	}
+
+	// 5. Explicit --pdf-version 1.7 + --pdf-profile a3a-ua1 succeeds
+	htmlExplicit17 := "<html><head><title>Title</title></head><body><p>explicit 1.7 + profile</p></body></html>"
+	cmdExplicit17, _ := newCommand(t, htmlExplicit17, "")
+	cmdExplicit17.Global.Title = "Title"
+	cmdExplicit17.Global.PdfVersion = "1.7"
+	cmdExplicit17.Global.PdfProfile = profileA3aUA1
+	dataExplicit17 := runPDF(t, cmdExplicit17)
+
+	if !bytes.HasPrefix(dataExplicit17, []byte("%PDF-1.7\n")) {
+		t.Errorf("expected %%PDF-1.7 header, got %q", dataExplicit17[:min(10, len(dataExplicit17))])
+	}
+
+	// 6. PolicyForGlobal unit tests
+	policyDefaults, err := PolicyForGlobal(settings.DefaultPdfGlobal())
+	if err != nil {
+		t.Fatalf("PolicyForGlobal default: %v", err)
+	}
+
+	if policyDefaults.Version != pdf.PDF14 || policyDefaults.ConformanceProfile != "" {
+		t.Errorf("default policy = %+v, want PDF14 unclaimed", policyDefaults)
+	}
+
+	globA3aUA1 := settings.DefaultPdfGlobal()
+	globA3aUA1.PdfProfile = profileA3aUA1
+
+	policyA3aUA1, err := PolicyForGlobal(globA3aUA1)
+	if err != nil {
+		t.Fatalf("PolicyForGlobal(a3a-ua1): %v", err)
+	}
+
+	if policyA3aUA1.Version != pdf.PDF17 || policyA3aUA1.ConformanceProfile != pdf.ProfilePDFA3aPDFUA1 {
+		t.Errorf("a3a-ua1 policy = %+v, want PDF17 %s", policyA3aUA1, pdf.ProfilePDFA3aPDFUA1)
+	}
+
+	globBadProfile := settings.DefaultPdfGlobal()
+	globBadProfile.PdfProfile = "a4"
+
+	if _, err := PolicyForGlobal(globBadProfile); !errors.Is(err, settings.ErrProfilePDF20Unsupported) {
+		t.Errorf("PolicyForGlobal(a4) err = %v, want ErrProfilePDF20Unsupported", err)
+	}
+
+	globPDFA1 := settings.DefaultPdfGlobal()
+	globPDFA1.PdfProfile = "pdfa-1b"
+
+	if _, err := PolicyForGlobal(globPDFA1); !errors.Is(err, settings.ErrProfilePDFA1Unsupported) {
+		t.Errorf("PolicyForGlobal(pdfa-1b) err = %v, want ErrProfilePDFA1Unsupported", err)
 	}
 }

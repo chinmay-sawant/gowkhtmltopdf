@@ -227,6 +227,7 @@ func (e *engine) buildImage(node *html.Node, sty ResolvedStyle, posX, posY float
 	return boxNode
 }
 
+//nolint:cyclop // replaced image layout with border, padding and thumbnail handling
 func (e *engine) paintReplacedImage(
 	boxNode *box, sty ResolvedStyle, posX, posY float64,
 	size imageUsedSize, thumbImg bool,
@@ -248,13 +249,22 @@ func (e *engine) paintReplacedImage(
 		imgY += borderT + padT
 	}
 
+	alt := ""
+	if boxNode != nil && boxNode.node != nil {
+		alt = boxNode.node.Attribute("alt")
+	}
+
 	e.add(Op{ //nolint:exhaustruct // intentional zero fields
-		Kind:  OpImage,
-		X:     imgX,
-		Y:     imgY,
-		W:     imgW,
-		H:     imgH,
-		Image: boxNode.img.data, ImgW: boxNode.img.w, ImgH: boxNode.img.h, IsJPEG: boxNode.img.isJPEG,
+		Kind:   OpImage,
+		X:      imgX,
+		Y:      imgY,
+		W:      imgW,
+		H:      imgH,
+		Image:  boxNode.img.data,
+		ImgW:   boxNode.img.w,
+		ImgH:   boxNode.img.h,
+		IsJPEG: boxNode.img.isJPEG,
+		Alt:    alt,
 	})
 
 	if !thumbImg {

@@ -66,6 +66,100 @@ func TestSemanticPDFOracleConvertedFixtures(t *testing.T) {
 				t.Fatalf("ParseSemantic: %v", err)
 			}
 
+			if doc.Version != "1.4" {
+				t.Errorf("doc.Version = %q, want 1.4", doc.Version)
+			}
+
+			if doc.PageCount() < testCase.minPages {
+				t.Errorf("pages = %d, want >= %d", doc.PageCount(), testCase.minPages)
+			}
+
+			text := doc.DocumentText()
+
+			pos := 0
+			for _, needle := range testCase.needles {
+				idx := strings.Index(text[pos:], needle)
+				if idx < 0 {
+					t.Errorf("extracted text missing %q after offset %d; text=%q", needle, pos, text)
+
+					continue
+				}
+
+				pos += idx + len(needle)
+			}
+
+			if testCase.uri && !doc.HasURI() {
+				t.Error("expected a URI annotation")
+			}
+
+			if testCase.image && !doc.HasImageXObject() {
+				t.Error("expected an image XObject")
+			}
+
+			if testCase.dest && !doc.HasInternalDest() {
+				t.Error("expected an internal destination / GoTo annotation")
+			}
+		})
+	}
+}
+
+//nolint:cyclop,funlen // table-driven oracle fixtures share assertion logic for PDF 1.7
+func TestSemanticPDF17OracleConvertedFixtures(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		file     string
+		minPages int
+		needles  []string
+		uri      bool
+		image    bool
+		dest     bool
+	}{
+		{ //nolint:exhaustruct // zero-value fields not exercised by this case
+			file:     "fixture-01-simple-invoice.html",
+			minPages: 1,
+			needles:  []string{"Invoice", "234.40"},
+		},
+		{ //nolint:exhaustruct // zero-value fields not exercised by this case
+			file:     "fixture-06-external-link.html",
+			minPages: 1,
+			needles:  []string{"Partner Handbook"},
+			uri:      true,
+		},
+		{ //nolint:exhaustruct // zero-value fields not exercised by this case
+			file:     "fixture-07-image-logo.html",
+			minPages: 1,
+			needles:  []string{"Nordwind"},
+			image:    true,
+		},
+		{ //nolint:exhaustruct // zero-value fields not exercised by this case
+			file:     "fixture-24-internal-anchors.html",
+			minPages: 2,
+			needles:  []string{"Internal link report", "Appendix"},
+			dest:     true,
+		},
+		{ //nolint:exhaustruct // zero-value fields not exercised by this case
+			file:     "fixture-55-lantern-cooperative-report.html",
+			minPages: 3,
+			needles:  []string{"NORTHLINE"},
+		},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.file, func(t *testing.T) {
+			t.Parallel()
+
+			data := convertGoldenFixtureWithVersion(t, testCase.file, "1.7")
+
+			doc, err := pdf.ParseSemantic(data)
+			if err != nil {
+				t.Fatalf("ParseSemantic: %v", err)
+			}
+
+			if doc.Version != "1.7" {
+				t.Errorf("doc.Version = %q, want 1.7", doc.Version)
+			}
+
 			if doc.PageCount() < testCase.minPages {
 				t.Errorf("pages = %d, want >= %d", doc.PageCount(), testCase.minPages)
 			}
@@ -102,6 +196,12 @@ func TestSemanticPDFOracleConvertedFixtures(t *testing.T) {
 func convertGoldenFixture(t *testing.T, file string) []byte {
 	t.Helper()
 
+	return convertGoldenFixtureWithVersion(t, file, "")
+}
+
+func convertGoldenFixtureWithVersion(t *testing.T, file, version string) []byte {
+	t.Helper()
+
 	golden := filepath.Join("..", "..", "testdata", "golden")
 
 	dir := t.TempDir()
@@ -118,6 +218,10 @@ func convertGoldenFixture(t *testing.T, file string) []byte {
 	global.PageSize = "A4"
 	global.Margin = settings.DefaultMargins()
 	global.Background = true
+
+	if version != "" {
+		global.PdfVersion = version
+	}
 
 	var out bytes.Buffer
 
