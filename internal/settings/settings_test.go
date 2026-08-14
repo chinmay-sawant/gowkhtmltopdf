@@ -18,6 +18,7 @@ func TestDefaultPdfGlobalSnapshot(t *testing.T) {
 	}{
 		{"PageSize", global.PageSize, "A4"},
 		{"Orientation", global.Orientation, OrientationPortrait},
+		{"PdfVersion", global.PdfVersion, "1.4"},
 		{"Grayscale", global.Grayscale, false},
 		{"Collate", global.Collate, true},
 		{"Outline", global.Outline, true},
@@ -644,5 +645,87 @@ func TestApplyImageKeyBackgroundAlias(t *testing.T) {
 
 	if img.Width != 800 {
 		t.Errorf("width must route to ImageGlobal: %d", img.Width)
+	}
+}
+
+func TestParsePDFVersion(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		input   string
+		want    string
+		wantErr error
+	}{
+		{"", "1.4", nil},
+		{"1.4", "1.4", nil},
+		{"1.7", "1.7", nil},
+		{" 1.7 ", "1.7", nil},
+		{"2.0", "", ErrPDF20Unsupported},
+		{"9.9", "", ErrInvalidPDFVersion},
+		{"invalid", "", ErrInvalidPDFVersion},
+		{"1.5", "", ErrInvalidPDFVersion},
+	}
+
+	for _, testCase := range tests {
+		got, err := ParsePDFVersion(testCase.input)
+		if testCase.wantErr != nil {
+			if !errors.Is(err, testCase.wantErr) {
+				t.Errorf("ParsePDFVersion(%q) error = %v, wantErr %v", testCase.input, err, testCase.wantErr)
+			}
+
+			continue
+		}
+
+		if err != nil {
+			t.Errorf("ParsePDFVersion(%q) unexpected error: %v", testCase.input, err)
+		}
+
+		if got != testCase.want {
+			t.Errorf("ParsePDFVersion(%q) = %q, want %q", testCase.input, got, testCase.want)
+		}
+	}
+}
+
+//nolint:cyclop // sequential getter/setter checks for multiple versions
+func TestGlobalPdfVersionSetting(t *testing.T) {
+	t.Parallel()
+
+	global := DefaultPdfGlobal()
+
+	// Default Get returns 1.4.
+	if got, ok := global.Get("pdfversion"); !ok || got != "1.4" {
+		t.Fatalf("initial Get(pdfversion) = %q, %v; want %q, true", got, ok, "1.4")
+	}
+
+	// Set valid 1.7.
+	if err := global.Set("pdfversion", "1.7"); err != nil {
+		t.Fatalf("Set(pdfversion, 1.7): %v", err)
+	}
+
+	if global.PdfVersion != "1.7" {
+		t.Fatalf("global.PdfVersion = %q, want 1.7", global.PdfVersion)
+	}
+
+	if got, ok := global.Get("pdfversion"); !ok || got != "1.7" {
+		t.Fatalf("Get(pdfversion) = %q, %v; want %q, true", got, ok, "1.7")
+	}
+
+	// Set valid 1.4.
+	if err := global.Set("pdfversion", "1.4"); err != nil {
+		t.Fatalf("Set(pdfversion, 1.4): %v", err)
+	}
+
+	if global.PdfVersion != "1.4" {
+		t.Fatalf("global.PdfVersion = %q, want 1.4", global.PdfVersion)
+	}
+
+	// Set 2.0 returns ErrPDF20Unsupported.
+	if err := global.Set("pdfversion", "2.0"); !errors.Is(err, ErrPDF20Unsupported) {
+		t.Fatalf("Set(pdfversion, 2.0) error = %v, want ErrPDF20Unsupported", err)
+	}
+
+	// Set invalid returns ErrInvalidPDFVersion.
+	if err := global.Set("pdfversion", "9.9"); !errors.Is(err, ErrInvalidPDFVersion) {
+		t.Fatalf("Set(pdfversion, 9.9) error = %v, want ErrInvalidPDFVersion", err)
 	}
 }

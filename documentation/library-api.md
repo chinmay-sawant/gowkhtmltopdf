@@ -649,6 +649,7 @@ import (
 func main() {
 	opts := gowkhtmltopdf.NewPdfGlobalOptions().
 		WithPageSize("Letter").
+		WithPDFVersion("1.7"). // optional: "1.4" (default) or "1.7"
 		WithMargins(15, 15, 20, 15). // top, right, bottom, left (mm)
 		WithTitle("Quarterly report").
 		WithCopies(1, true).
@@ -706,6 +707,7 @@ on, images on, resolve-relative-links on.
 | Key | Notes |
 |-----|--------|
 | `title` | PDF `/Title` (HTML `<title>` feeds `[doctitle]` only) |
+| `pdfversion` | PDF output version: `"1.4"` (default) or `"1.7"`. Emits `%PDF-1.7`, trailer `/ID`, Info with UTF-16BE + BOM strings, and non-claiming XMP Metadata stream. `"2.0"` is deferred to #32 |
 | `copies`, `collate` | copies must be ≥ 1 |
 | `pageoffset` | integer page offset |
 | `grayscale`, `colormode` | both write the same grayscale bit (`color` / `grayscale`) |

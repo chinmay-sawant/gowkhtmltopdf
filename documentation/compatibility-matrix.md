@@ -254,7 +254,10 @@ Status legend as in §2; evidence in `internal/css/css.go`.
 | WebP, AVIF | Not implemented; broken-image placeholder or skip |
 | Fixed CSS headers/footers via `position: fixed` alone | Prefer CLI `--header-*` / `--footer-*` for repeating chrome; CSS `fixed` lite paints on every page but is not a full running-element model |
 | Complex-script shaping (Indic, Arabic, CJK) | **Type0/CID Identity-H** for BMP Unicode (CJK with a capable face); **Arabic OT** via `go-text/typesetting` when the face has GSUB (+ presentation-form `ShapeText` fallback); Hangul needs a Hangul face. `writing-mode` vertical keywords are parsed; **layout stays horizontal**. **Indic Partial** (OT when face/cmap allow; not production-claimed). Optional OT **`halt`/`palt`** for CJK punctuation via `ShapeTextFont` FontFeatures |
-| PDF encryption, PDF/A, duplex, AcroForm | Out of scope (not in original wkhtmltopdf either) |
+| PDF version (1.4 / 1.7) | **Supported:** PDF 1.4 is default, PDF 1.7 is opt-in via `--pdf-version 1.7` / library API `WithPDFVersion("1.7")`. Emits `%PDF-1.7`, trailer `/ID`, Info with UTF-16BE + BOM strings, and non-claiming XMP Metadata stream |
+| PDF 2.0 (ISO 32000-2) | **Deferred** to #32; `PDF20` is reserved and rejected |
+| PDF/A-4, PDF/UA-2, claiming XMP, OutputIntents | **Deferred** to #33; PDF 1.7 version support is **not** an archival or accessibility conformance claim |
+| PDF encryption, duplex, AcroForm | Out of scope (not in original wkhtmltopdf either) |
 
 ## 6. Security policy (frozen defaults)
 
@@ -308,6 +311,7 @@ They fail parse with `unknown option` (`TestStubFlagsRemoved`,
 | `--margin-top/bottom/left/right` | PDF | Supported (page geometry + golden runner) |
 | `--dpi` | PDF | **Rejected** (`unknown option`) |
 | `--page-width`, `--page-height` | PDF | Supported (`pageGeometry` override) |
+| `--pdf-version` | PDF | Supported (PDF 1.4 default, PDF 1.7 opt-in; rejects `2.0` / invalid) |
 | `--image-quality` | Both | **Rejected** (`unknown option`). Image mode uses `--quality` |
 | `--image-dpi` | PDF | **Rejected** (`unknown option`) |
 | `--no-pdf-compression` | PDF | Supported (uncompressed streams; used by tests) |

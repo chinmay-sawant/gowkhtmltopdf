@@ -209,3 +209,138 @@ func assertFloatArray(t *testing.T, got, want [4]float64) {
 		}
 	}
 }
+
+//nolint:funlen // oracle test with detailed assertions
+func TestSemanticPDF17Oracle(t *testing.T) {
+	t.Parallel()
+
+	data := buildSemanticPDF17(t)
+	doc, err := parseSemanticPDF(data)
+
+	if err != nil {
+		t.Fatalf("parse generated PDF 1.7: %v", err)
+	}
+
+	if doc.version != "1.7" {
+		t.Errorf("PDF version = %q, want %q", doc.version, "1.7")
+	}
+
+	if len(doc.pages) != 2 {
+		t.Fatalf("page count = %d, want 2", len(doc.pages))
+	}
+
+	assertFloatArray(t, doc.pages[0].mediaBox, [4]float64{0, 0, 612, 792})
+	assertFloatArray(t, doc.pages[1].mediaBox, [4]float64{0, 0, 300, 400})
+
+	if got, want := doc.pages[0].text, "alpha firstbeta second"; got != want {
+		t.Errorf("page 1 extracted text = %q, want %q", got, want)
+	}
+
+	if got, want := doc.pages[1].text, "second page"; got != want {
+		t.Errorf("page 2 extracted text = %q, want %q", got, want)
+	}
+
+	if got := doc.pages[0].fonts["F1"]; got == 0 {
+		t.Fatal("page 1 is missing its F1 font resource")
+	} else if !strings.Contains(doc.objects[got].dict, "/Subtype /TrueType") {
+		t.Errorf("F1 resource object = %q, want an embedded TrueType font", doc.objects[got].dict)
+	}
+
+	if imageRef := doc.pages[0].images["Im1"]; imageRef == 0 {
+		t.Fatal("page 1 is missing its Im1 image resource")
+	} else if !strings.Contains(doc.objects[imageRef].dict, "/Subtype /Image") {
+		t.Errorf("Im1 resource object = %q, want an image XObject", doc.objects[imageRef].dict)
+	}
+
+	if len(doc.pages[0].annots) != 2 {
+		t.Fatalf("page 1 annotations = %d, want 2", len(doc.pages[0].annots))
+	}
+
+	if got, want := doc.pages[0].annots[0].uri, "https://example.com/report17"; got != want {
+		t.Errorf("external link URI = %q, want %q", got, want)
+	}
+
+	if got, want := doc.pages[0].annots[1].destPage, pageObjectRef(t, doc, 1); got != want {
+		t.Errorf("internal link destination = %d, want page object %d", got, want)
+	}
+
+	// Verify public ParseSemantic API
+	semDoc, err := ParseSemantic(data)
+	if err != nil {
+		t.Fatalf("ParseSemantic: %v", err)
+	}
+
+	if semDoc.Version != "1.7" {
+		t.Errorf("semDoc.Version = %q, want %q", semDoc.Version, "1.7")
+	}
+
+	if semDoc.PageCount() != 2 {
+		t.Errorf("semDoc.PageCount() = %d, want 2", semDoc.PageCount())
+	}
+
+	if !semDoc.HasURI() {
+		t.Error("semDoc.HasURI() = false, want true")
+	}
+
+	if !semDoc.HasImageXObject() {
+		t.Error("semDoc.HasImageXObject() = false, want true")
+	}
+
+	if !semDoc.HasInternalDest() {
+		t.Error("semDoc.HasInternalDest() = false, want true")
+	}
+}
+
+func buildSemanticPDF17(t *testing.T) []byte {
+	t.Helper()
+
+	fnt, err := DefaultFont()
+	if err != nil {
+		t.Fatalf("DefaultFont: %v", err)
+	}
+
+	doc, err := NewDocumentWithPolicy(WriterPolicy{Version: PDF17}) //nolint:exhaustruct // test policy
+	if err != nil {
+		t.Fatalf("NewDocumentWithPolicy(PDF17): %v", err)
+	}
+
+	doc.SetInfo("Title", "Semantic oracle 1.7")
+
+	first := doc.AddPage(612, 792)
+	firstContent := first.Content()
+	firstContent.UseEmbeddedFont("F1", fnt)
+	firstContent.BeginText()
+	firstContent.SetFont("F1", 12)
+	firstContent.TextAt(40, 740)
+	firstContent.TextShow("alpha first")
+	firstContent.TextAt(40, 720)
+	firstContent.TextShow("beta second")
+	firstContent.EndText()
+
+	if err := firstContent.AddPNGImage("Im1", 40, 620, 32, 16, makePNG(t, false)); err != nil {
+		t.Fatalf("AddPNGImage: %v", err)
+	}
+
+	first.AddLinkURI([4]float64{40, 700, 160, 720}, "https://example.com/report17")
+	first.AddLinkDest([4]float64{40, 670, 160, 690}, 1, 20, 760)
+
+	second := doc.AddPage(300, 400)
+	secondContent := second.Content()
+	secondContent.UseEmbeddedFont("F1", fnt)
+	secondContent.BeginText()
+	secondContent.SetFont("F1", 12)
+	secondContent.TextAt(20, 360)
+	secondContent.TextShow("second page")
+	secondContent.EndText()
+
+	doc.SetOutline(&Outline{ //nolint:exhaustruct // test fixture intentionally omits the root title.
+		Children: []*Outline{{Title: "First page", PageRef: doc.PageRef(0), X: 40, Y: 740}},
+	})
+
+	var out bytes.Buffer
+	if err := doc.Write(&out); err != nil {
+		t.Fatalf("write semantic PDF 1.7: %v", err)
+	}
+
+	return out.Bytes()
+}

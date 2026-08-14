@@ -22,6 +22,7 @@ rasterization). The product is HTML templates and documents, not Chrome visual p
 |-----------|----------------|
 | Invoices, tables, page breaks from Go | Yes |
 | Headers, footers, TOC, PDF bookmarks | Yes |
+| PDF 1.4 / PDF 1.7 output | Yes — PDF 1.4 default, opt-in PDF 1.7 via `--pdf-version 1.7` / `WithPDFVersion` |
 | Offline static binaries; no browser / no cgo | Yes |
 | Full CSS, JavaScript, or Chrome parity | No — print CSS subset; no JS |
 | CJK / complex Unicode | Partial — Type0/CID + `--font-path`; see [fonts.md](documentation/fonts.md) |

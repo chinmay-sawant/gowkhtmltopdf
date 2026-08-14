@@ -486,6 +486,25 @@ func registerGlobalDocumentKeys(keys keyTable[PdfGlobal]) {
 		func(dst *PdfGlobal, raw string) error { return setString(&dst.Title)(raw) },
 		func(dst *PdfGlobal) (string, bool) { return dst.Title, true },
 	)
+	regGlobal("pdfversion",
+		func(dst *PdfGlobal, raw string) error {
+			v, err := ParsePDFVersion(raw)
+			if err != nil {
+				return err
+			}
+
+			dst.PdfVersion = v
+
+			return nil
+		},
+		func(dst *PdfGlobal) (string, bool) {
+			if dst.PdfVersion == "" {
+				return sPDFVersion14, true
+			}
+
+			return dst.PdfVersion, true
+		},
+	)
 	regGlobal("smartshrinking",
 		func(dst *PdfGlobal, raw string) error { return setBool(&dst.SmartShrinking)(raw) },
 		func(dst *PdfGlobal) (string, bool) { return fmtBool(dst.SmartShrinking), true },

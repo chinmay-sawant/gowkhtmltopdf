@@ -2,7 +2,7 @@
 
 > **Parent:** `plans/0.2.2/README.md` — epic [#29](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/29)
 > **Issue:** [#31](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/31)
-> **Status:** not started
+> **Status:** completed
 > **Estimated effort:** 3–5 weeks across phases 1–8
 > **Constraint:** pure Go, no CGO, no new direct modules. Do not add veraPDF, Brotli, or a second PDF writer.
 > **Ordering principle:** version policy and serialization first, then call-site selection, then proof, then docs.
@@ -244,13 +244,13 @@ can emit a real 1.7 file.
 
 ## Success criteria (issue #31)
 
-- [ ] Current PDF 1.4 behavior remains covered by baseline fixtures and tests
-- [ ] Feature matrix above is filled with emitted / accepted / validated states
-- [ ] PDF 1.7 output has an explicit version selection path and structural validation
-- [ ] Unsupported combinations fail before misleading output
-- [ ] Tests cover header, catalog, xref, fonts, images, links, and metadata in scope
-- [ ] Default PDF 1.4 output remains unchanged
-- [ ] Docs distinguish PDF 1.7 **version** support from PDF 2.0 and from PDF/A-4 / PDF/UA-2
+- [x] Current PDF 1.4 behavior remains covered by baseline fixtures and tests (`internal/convert/golden_test.go:737-754`, `internal/pdf/pdf_test.go:37-77`)
+- [x] Feature matrix above is filled with emitted / accepted / validated states (`00-canonical-pdf-17-plan.md`)
+- [x] PDF 1.7 output has an explicit version selection path and structural validation (`--pdf-version 1.7`, `WithPDFVersion("1.7")`, `internal/pdf/semantic_oracle_test.go:213-292`)
+- [x] Unsupported combinations fail before misleading output (`internal/pdf/policy.go:56-78`, `internal/convert/convert_test.go:853-905`)
+- [x] Tests cover header, catalog, xref, fonts, images, links, and metadata in scope (`internal/pdf/policy_test.go`, `internal/convert/golden_test.go:683-878`)
+- [x] Default PDF 1.4 output remains unchanged (`internal/convert/convert_test.go:733-748`)
+- [x] Docs distinguish PDF 1.7 **version** support from PDF 2.0 and from PDF/A-4 / PDF/UA-2 (`documentation/compatibility-matrix.md:257-261`, `documentation/deferred.md:74-76`, `documentation/architecture/09-pdf-writer.md:15-35, 490-502`)
 
 ---
 

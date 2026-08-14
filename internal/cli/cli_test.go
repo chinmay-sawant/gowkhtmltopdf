@@ -1020,3 +1020,67 @@ func TestAllowFlagInImageMode(t *testing.T) {
 		t.Errorf("Allow = %v, want [/tmp/assets]", cmd.Global.Load.Allow)
 	}
 }
+
+//nolint:cyclop // comprehensive CLI test for pdf-version flag
+func TestPDFVersionFlag(t *testing.T) {
+	t.Parallel()
+
+	// Valid 1.7
+	cmd17 := parse(t, "--pdf-version", "1.7", "in.html", outPDF)
+	if cmd17.Global.PdfVersion != "1.7" {
+		t.Errorf("Global.PdfVersion = %q, want 1.7", cmd17.Global.PdfVersion)
+	}
+
+	// Valid 1.4
+	cmd14 := parse(t, "--pdf-version", "1.4", "in.html", outPDF)
+	if cmd14.Global.PdfVersion != "1.4" {
+		t.Errorf("Global.PdfVersion = %q, want 1.4", cmd14.Global.PdfVersion)
+	}
+
+	// Invalid version 9.9
+	_, errInvalid := Parse([]string{"--pdf-version", "9.9", "in.html", outPDF}, ModePDF)
+	if errInvalid == nil {
+		t.Fatal("expected error for --pdf-version 9.9, got nil")
+	}
+
+	if !errors.Is(errInvalid, settings.ErrInvalidPDFVersion) {
+		t.Errorf("expected ErrInvalidPDFVersion, got %v", errInvalid)
+	}
+
+	// Version 2.0 returns issue #32 sentinel
+	_, err20 := Parse([]string{"--pdf-version", "2.0", "in.html", outPDF}, ModePDF)
+	if err20 == nil {
+		t.Fatal("expected error for --pdf-version 2.0, got nil")
+	}
+
+	if !errors.Is(err20, settings.ErrPDF20Unsupported) {
+		t.Errorf("expected ErrPDF20Unsupported, got %v", err20)
+	}
+
+	if !strings.Contains(err20.Error(), "issue #32") && !strings.Contains(err20.Error(), "#32") {
+		t.Errorf("error message should mention issue #32, got %q", err20.Error())
+	}
+
+	// Image mode rejects --pdf-version
+	_, errImage := Parse([]string{"--pdf-version", "1.7", "in.html", "out.png"}, ModeImage)
+	if errImage == nil {
+		t.Fatal("expected error for --pdf-version in ModeImage, got nil")
+	}
+
+	// Help text check
+	var pdfHelpBuf bytes.Buffer
+
+	PrintHelp(&pdfHelpBuf, ModePDF)
+
+	if !strings.Contains(pdfHelpBuf.String(), "--pdf-version <value>") {
+		t.Errorf("PDF help should list --pdf-version, got:\n%s", pdfHelpBuf.String())
+	}
+
+	var imgHelpBuf bytes.Buffer
+
+	PrintHelp(&imgHelpBuf, ModeImage)
+
+	if strings.Contains(imgHelpBuf.String(), "--pdf-version") {
+		t.Errorf("Image help should NOT list --pdf-version, got:\n%s", imgHelpBuf.String())
+	}
+}

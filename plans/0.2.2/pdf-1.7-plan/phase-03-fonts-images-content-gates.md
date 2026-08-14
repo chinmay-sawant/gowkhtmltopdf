@@ -1,7 +1,7 @@
 # Phase 3 — Fonts, Images, and Content Gates
 
 > **Parent:** `plans/0.2.2/pdf-1.7-plan/00-canonical-pdf-17-plan.md`
-> **Status:** not started
+> **Status:** completed
 > **Estimated effort:** 2–4 days
 > **Depends on:** Phase 1; phase 2 recommended so finalize is version-aware
 > **Unblocks:** phase 6 fixtures that include text and images
@@ -45,37 +45,37 @@ content. §2.1 does not require them.
 
 ### 3.1 Font emit under 1.7
 
-- [ ] `ensureFont` / `emitSimple` / `emitType0` take policy implicitly via `Document` — `fonttype0.go`
-- [ ] 1.7 documents still subset, still use Identity-H, still emit `ToUnicode`
-- [ ] No second subsetter; CFF/`OTTO` still errors
-- [ ] Test: existing Type0 / mixed-Latin tests pass when the document policy is `PDF17`
-- [ ] Test: 1.4 font cache keys do not collide with 1.7 keys if emit bytes diverge (include version in the cache key if they do)
+- [x] `ensureFont` / `emitSimple` / `emitType0` take policy implicitly via `Document` — `fonttype0.go`
+- [x] 1.7 documents still subset, still use Identity-H, still emit `ToUnicode`
+- [x] No second subsetter; CFF/`OTTO` still errors
+- [x] Test: existing Type0 / mixed-Latin tests pass when the document policy is `PDF17`
+- [x] Test: 1.4 font cache keys do not collide with 1.7 keys if emit bytes diverge (include version in the cache key if they do)
 
 ### 3.2 Image emit under 1.7
 
-- [ ] JPEG pass-through and PNG Flate + SMask work on a 1.7 document — `images.go`
-- [ ] Color space stays DeviceRGB / DeviceGray (no ICC rewrite; that is #33)
-- [ ] Size caps (`validateEmbeddedImage`) unchanged
-- [ ] Test: existing JPEG/PNG tests pass with `PDF17`
+- [x] JPEG pass-through and PNG Flate + SMask work on a 1.7 document — `images.go`
+- [x] Color space stays DeviceRGB / DeviceGray (no ICC rewrite; that is #33)
+- [x] Size caps (`validateEmbeddedImage`) unchanged
+- [x] Test: existing JPEG/PNG tests pass with `PDF17`
 
 ### 3.3 Content stream and resources
 
-- [ ] `Content` operators stay as they are — `content.go`
-- [ ] Page `/Resources` still built at finalize from used fonts/images/ExtGState
-- [ ] Do not start emitting `/ProcSet` (obsolete since 1.4, §14.2; not a 1.7 gate)
-- [ ] Test: `TestRichDocStructure` (or a 1.7 clone) covers graphics, text, link, outline, image on `%PDF-1.7`
+- [x] `Content` operators stay as they are — `content.go`
+- [x] Page `/Resources` still built at finalize from used fonts/images/ExtGState
+- [x] Do not start emitting `/ProcSet` (obsolete since 1.4, §14.2; not a 1.7 gate)
+- [x] Test: `TestRichDocStructure` (or a 1.7 clone) covers graphics, text, link, outline, image on `%PDF-1.7`
 
 ### 3.4 Feature gates
 
-- [ ] `WriterPolicy` (or `validatePolicy` on `Document`) lists combinations this writer will not emit
-- [ ] Asking for encryption, forms, signatures, object streams, or a standards profile on this path returns a typed error **before** `Write` produces bytes
-- [ ] Test: negative cases return `errors.Is` to a documented sentinel; no partial file on `WriteTo` when validation fails in `finalize`
+- [x] `WriterPolicy` (or `validatePolicy` on `Document`) lists combinations this writer will not emit
+- [x] Asking for encryption, forms, signatures, object streams, or a standards profile on this path returns a typed error **before** `Write` produces bytes
+- [x] Test: negative cases return `errors.Is` to a documented sentinel; no partial file on `WriteTo` when validation fails in `finalize`
 
 ### 3.5 Image mode untouched
 
-- [ ] `internal/imageout` still compiles against the font/shaping surface only
-- [ ] No image-mode setting for PDF version
-- [ ] Test: `go test ./internal/imageout` green
+- [x] `internal/imageout` still compiles against the font/shaping surface only
+- [x] No image-mode setting for PDF version
+- [x] Test: `go test ./internal/imageout` green
 
 ---
 

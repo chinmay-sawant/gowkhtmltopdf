@@ -4,7 +4,7 @@
 > **Parent epic:** [#29](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/29)
 > **Sibling:** [#32](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/32) / [../pdf-2.0-plan/](../pdf-2.0-plan/) — extends this policy with PDF 2.0
 > **Not this plan:** [#33](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/33) — PDF/A-4 and PDF/UA-2
-> **Status:** not started
+> **Status:** completed
 > **Workflow:** [`skills/phase-wise-checklist/SKILLS.md`](../../../skills/phase-wise-checklist/SKILLS.md)
 
 Canonical ledger: [00-canonical-pdf-17-plan.md](00-canonical-pdf-17-plan.md)

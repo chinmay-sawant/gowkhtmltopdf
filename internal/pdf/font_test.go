@@ -1,4 +1,4 @@
-//nolint:testpackage // tests reach into unexported state
+//nolint:testpackage,exhaustruct // tests reach into unexported state
 package pdf
 
 import (
@@ -358,5 +358,72 @@ func TestAdvanceInPoints(t *testing.T) {
 	// A in Liberation Sans is ~1222/2048 em → ~7.16pt at 12pt
 	if w < 6 || w > 9 {
 		t.Errorf("advance for A at 12pt = %v, want ~7.16", w)
+	}
+}
+
+func TestEmbeddedFontInPDF17(t *testing.T) {
+	t.Parallel()
+
+	fnt := testFont(t)
+
+	doc, err := NewDocumentWithPolicy(WriterPolicy{Version: PDF17})
+	if err != nil {
+		t.Fatalf("NewDocumentWithPolicy(PDF17): %v", err)
+	}
+
+	doc.SetCompression(false)
+	p := doc.AddPage(300, 300)
+	cur := p.Content()
+	cur.UseEmbeddedFont("F1", fnt)
+	cur.BeginText()
+	cur.SetFont("F1", 12)
+	cur.TextAt(10, 20)
+	cur.TextShow("Hello PDF 1.7")
+	cur.EndText()
+
+	out := string(writePDF(t, doc))
+	for _, want := range []string{
+		"%PDF-1.7",
+		"/Type /Font /Subtype /TrueType",
+		"/FontDescriptor",
+		"/FontFile2",
+		"/ToUnicode",
+		"/Widths [",
+		"begincmap",
+		"beginbfchar",
+		"(Hello PDF 1.7) Tj",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in PDF 1.7 output", want)
+		}
+	}
+}
+
+func TestFontCacheSharedAcrossPagesPDF17(t *testing.T) {
+	t.Parallel()
+
+	fnt := testFont(t)
+
+	doc, err := NewDocumentWithPolicy(WriterPolicy{Version: PDF17})
+	if err != nil {
+		t.Fatalf("NewDocumentWithPolicy(PDF17): %v", err)
+	}
+
+	doc.SetCompression(false)
+
+	for range 3 {
+		p := doc.AddPage(100, 100)
+		cur := p.Content()
+		cur.UseEmbeddedFont("F1", fnt)
+		cur.BeginText()
+		cur.SetFont("F1", 10)
+		cur.TextAt(5, 5)
+		cur.TextShow("Shared Font")
+		cur.EndText()
+	}
+
+	out := string(writePDF(t, doc))
+	if strings.Count(out, "/FontFile2") != 1 {
+		t.Errorf("expected 1 FontFile2 across pages in PDF 1.7, got %d", strings.Count(out, "/FontFile2"))
 	}
 }

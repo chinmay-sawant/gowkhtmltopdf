@@ -1,7 +1,7 @@
 # Phase 7 — Documentation and Honesty
 
 > **Parent:** `plans/0.2.2/pdf-1.7-plan/00-canonical-pdf-17-plan.md`
-> **Status:** not started
+> **Status:** completed
 > **Estimated effort:** 1–2 days
 > **Depends on:** Phase 6 (do not document unproven behavior)
 > **Unblocks:** phase 8
@@ -40,34 +40,34 @@ Update docs only where the claim is backed by phase-6 tests.
 
 ### 7.1 Architecture
 
-- [ ] `documentation/architecture.md` package map: writer is version-aware, default 1.4
-- [ ] Pipeline diagram still shows one `internal/pdf` sink (not a second engine)
-- [ ] `documentation/architecture/09-pdf-writer.md` records `WriterPolicy`, header, trailer `/ID`, Info+XMP, UTF-16BE, classic xref
-- [ ] `documentation/architecture/README.md` table row updated
-- [ ] `documentation/architecture/08-convert-pipeline.md` notes where the policy is applied (`NewDocument*`)
+- [x] `documentation/architecture.md` package map: writer is version-aware, default 1.4 (`documentation/architecture.md:38-42, 60-64, 116-126`)
+- [x] Pipeline diagram still shows one `internal/pdf` sink (not a second engine) (`documentation/architecture.md:60-64`)
+- [x] `documentation/architecture/09-pdf-writer.md` records `WriterPolicy`, header, trailer `/ID`, Info+XMP, UTF-16BE, classic xref (`documentation/architecture/09-pdf-writer.md:15-35, 78-86, 250-272, 355-360, 490-502`)
+- [x] `documentation/architecture/README.md` table row updated (`documentation/architecture/README.md:82, 164-170`)
+- [x] `documentation/architecture/08-convert-pipeline.md` notes where the policy is applied (`NewDocument*`) (`documentation/architecture/08-convert-pipeline.md:42-45, 230-232, 336-340`)
 
 ### 7.2 Compatibility and deferred
 
-- [ ] `documentation/compatibility-matrix.md`: PDF **version** (1.4 default, 1.7 opt-in) is a separate row from PDF 2.0, PDF/A, encryption, AcroForm
-- [ ] `documentation/deferred.md`: PDF/A, PDF/UA, encryption stay deferred / pointed at #33; PDF 2.0 pointed at #32
-- [ ] No sentence that "PDF 1.7" implies archival or accessibility conformance
+- [x] `documentation/compatibility-matrix.md`: PDF **version** (1.4 default, 1.7 opt-in) is a separate row from PDF 2.0, PDF/A, encryption, AcroForm (`documentation/compatibility-matrix.md:257-261, 314`)
+- [x] `documentation/deferred.md`: PDF/A, PDF/UA, encryption stay deferred / pointed at #33; PDF 2.0 pointed at #32 (`documentation/deferred.md:74-76`)
+- [x] No sentence that "PDF 1.7" implies archival or accessibility conformance (`documentation/compatibility-matrix.md:259-260`, `documentation/deferred.md:75`)
 
 ### 7.3 User surfaces
 
-- [ ] `README.md` output claim matches tests
-- [ ] `documentation/cli.md` documents `--pdf-version`
-- [ ] `documentation/library-api.md` documents the setting on the preferred `PDFRequest` path
-- [ ] `documentation/overview.md` pipeline line no longer says "PDF 1.4 write" as the only possibility
+- [x] `README.md` output claim matches tests (`README.md:24`)
+- [x] `documentation/cli.md` documents `--pdf-version` (`documentation/cli.md:89-91, 275`)
+- [x] `documentation/library-api.md` documents the setting on the preferred `PDFRequest` path (`documentation/library-api.md:652, 709`)
+- [x] `documentation/overview.md` pipeline line no longer says "PDF 1.4 write" as the only possibility (`documentation/overview.md:96, 113, 116`)
 
 ### 7.4 In-tree comments
 
-- [ ] `internal/pdf` package comment (`pdf.go` / `doc.go`) describes default 1.4 + opt-in 1.7
-- [ ] Producer / `Version` comments do not claim a single hard-coded 1.4 header
+- [x] `internal/pdf` package comment (`pdf.go` / `doc.go`) describes default 1.4 + opt-in 1.7 (`internal/pdf/doc.go:1-4`, `internal/pdf/pdf.go:1-5`)
+- [x] Producer / `Version` comments do not claim a single hard-coded 1.4 header (`internal/pdf/pdf.go:27-28`, `internal/pdf/policy.go:88-105`)
 
 ### 7.5 Claim scan
 
-- [ ] `make claim-scan` (or the repo's equivalent honesty check) passes
-- [ ] This plan's feature matrix in `00-canonical-pdf-17-plan.md` is updated to match shipped behavior
+- [x] `make claim-scan` (or the repo's equivalent honesty check) passes (clean zero claims violation)
+- [x] This plan's feature matrix in `00-canonical-pdf-17-plan.md` is updated to match shipped behavior (`00-canonical-pdf-17-plan.md`)
 
 ---
 

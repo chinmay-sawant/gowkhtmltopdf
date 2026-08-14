@@ -2,8 +2,39 @@ package settings
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 )
+
+const (
+	sPDFVersion14 = "1.4"
+	sPDFVersion17 = "1.7"
+	sPDFVersion20 = "2.0"
+)
+
+var (
+	// ErrInvalidPDFVersion reports an invalid or unsupported PDF version.
+	ErrInvalidPDFVersion = errors.New("settings: invalid pdf version (allowed: 1.4|1.7)")
+
+	// ErrPDF20Unsupported indicates PDF 2.0 is not supported (see issue #32).
+	ErrPDF20Unsupported = errors.New("settings: PDF 2.0 is not supported (see issue #32)")
+)
+
+// ParsePDFVersion validates and normalizes a PDF version string.
+// Accepted values: "", "1.4", "1.7". "2.0" returns ErrPDF20Unsupported.
+// Other values return an error wrapping ErrInvalidPDFVersion.
+func ParsePDFVersion(value string) (string, error) {
+	switch normalize(strings.TrimSpace(value)) {
+	case "", sPDFVersion14:
+		return sPDFVersion14, nil
+	case sPDFVersion17:
+		return sPDFVersion17, nil
+	case sPDFVersion20:
+		return "", ErrPDF20Unsupported
+	default:
+		return "", fmt.Errorf("%w: %q", ErrInvalidPDFVersion, value)
+	}
+}
 
 const (
 	defaultMarginMM       = 10
@@ -343,6 +374,8 @@ type PdfGlobal struct {
 	PageSize    string
 	Size        Size
 	Orientation Orientation
+	// PdfVersion is the PDF version to emit: "1.4" (default) or "1.7" (--pdf-version).
+	PdfVersion string
 	// Grayscale is the sole color control convert reads (doc.SetGrayscale).
 	// Set("colormode") / Set("grayscale") both write this field.
 	Grayscale    bool
@@ -383,6 +416,7 @@ func DefaultPdfGlobal() PdfGlobal {
 	return PdfGlobal{ //nolint:exhaustruct // intentional zero/partial fields
 		PageSize:       "A4",
 		Orientation:    OrientationPortrait,
+		PdfVersion:     sPDFVersion14,
 		Copies:         1,
 		Collate:        true,
 		Outline:        true,

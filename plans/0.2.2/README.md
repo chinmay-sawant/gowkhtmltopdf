@@ -3,7 +3,7 @@
 | File / Folder | Role |
 |---------------|------|
 | [pdf-2.0-plan/](pdf-2.0-plan/) | **[#32](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/32)** PDF 2.0 version support on the existing writer |
-| [pdf-1.7-plan/](pdf-1.7-plan/) | **[#31](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/31)** PDF 1.7 baseline and the shared version-policy type |
+| [pdf-1.7-plan/](pdf-1.7-plan/) | **[#31](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/31)** PDF 1.7 baseline and the shared version-policy type — **completed** |
 
 Workflow: [../../skills/phase-wise-checklist/SKILLS.md](../../skills/phase-wise-checklist/SKILLS.md)
 

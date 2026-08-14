@@ -16,9 +16,13 @@ func TestPdfGlobalOptionsBuildsIndependentTypedSnapshot(t *testing.T) {
 		WithPageSize(pageSize).
 		WithMargins(1, 2, 3, 4).
 		WithTitle("typed").
-		WithCopies(2, false)
+		WithCopies(2, false).
+		WithPDFVersion("1.7")
 
 	got := options.Build()
+	if got.PdfVersion != "1.7" {
+		t.Fatalf("pdf version = %q, want 1.7", got.PdfVersion)
+	}
 	if got.PageSize != pageSize {
 		t.Fatalf("page size = %q, want Letter", got.PageSize)
 	}

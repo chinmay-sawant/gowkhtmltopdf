@@ -1686,3 +1686,111 @@ func TestMutatorsNilReceiverAudit(t *testing.T) {
 		t.Errorf("ImageConverter.Set on nil = %v, want ErrNilImageConverter", err)
 	}
 }
+
+//nolint:cyclop,exhaustruct,funlen // comprehensive API test for PDF versioning
+func TestPDFVersionAPI(t *testing.T) {
+	t.Parallel()
+
+	// 1. Fluent builder and WithSetting
+	builder := NewPdfGlobalOptions().WithPDFVersion("1.7")
+	snap := builder.Build()
+
+	if got, ok := snap.Get("pdfversion"); !ok || got != "1.7" {
+		t.Fatalf("snap.Get(pdfversion) = %q, %v; want 1.7, true", got, ok)
+	}
+
+	builderSetting, err := NewPdfGlobalOptions().WithSetting("pdfversion", "1.7")
+	if err != nil {
+		t.Fatalf("WithSetting(pdfversion, 1.7): %v", err)
+	}
+
+	if got, ok := builderSetting.Build().Get("pdfversion"); !ok || got != "1.7" {
+		t.Fatalf("builderSetting Get(pdfversion) = %q, %v; want 1.7, true", got, ok)
+	}
+
+	_, errBadSetting := NewPdfGlobalOptions().WithSetting("pdfversion", "bad")
+	if errBadSetting == nil {
+		t.Fatal("expected error from WithSetting(pdfversion, bad), got nil")
+	}
+
+	if !errors.Is(errBadSetting, ErrInvalidPDFVersion) {
+		t.Errorf("expected ErrInvalidPDFVersion, got %v", errBadSetting)
+	}
+
+	// 2. ValidatePDF with 2.0 and invalid
+	req20 := &PDFRequest{
+		Global:  NewPdfGlobalOptions().WithPDFVersion("2.0").Build(),
+		Objects: []*ObjectSettings{NewObjectSettings().SetBody([]byte("<p>hi</p>"), "")},
+		Output:  &bytes.Buffer{},
+	}
+	if err := req20.ValidatePDF(); !errors.Is(err, ErrPDF20Unsupported) {
+		t.Errorf("ValidatePDF with 2.0: got %v, want ErrPDF20Unsupported", err)
+	}
+
+	reqBad := &PDFRequest{
+		Global:  NewPdfGlobalOptions().WithPDFVersion("invalid").Build(),
+		Objects: []*ObjectSettings{NewObjectSettings().SetBody([]byte("<p>hi</p>"), "")},
+		Output:  &bytes.Buffer{},
+	}
+	if err := reqBad.ValidatePDF(); !errors.Is(err, ErrInvalidPDFVersion) {
+		t.Errorf("ValidatePDF with invalid: got %v, want ErrInvalidPDFVersion", err)
+	}
+
+	// 3. RunPDF with 2.0 and invalid
+	if err := RunPDF(t.Context(), req20); !errors.Is(err, ErrPDF20Unsupported) {
+		t.Errorf("RunPDF with 2.0: got %v, want ErrPDF20Unsupported", err)
+	}
+
+	if err := RunPDF(t.Context(), reqBad); !errors.Is(err, ErrInvalidPDFVersion) {
+		t.Errorf("RunPDF with invalid: got %v, want ErrInvalidPDFVersion", err)
+	}
+
+	// 4. Default version omitted -> produces PDF 1.4 header
+	var outDefault bytes.Buffer
+
+	reqDefault := &PDFRequest{
+		Objects: []*ObjectSettings{NewObjectSettings().SetBody([]byte("<p>default</p>"), "")},
+		Output:  &outDefault,
+	}
+
+	if err := RunPDF(t.Context(), reqDefault); err != nil {
+		t.Fatalf("RunPDF default: %v", err)
+	}
+
+	if !bytes.HasPrefix(outDefault.Bytes(), []byte("%PDF-1.4")) {
+		t.Errorf("expected default PDF to start with %%PDF-1.4, got %q", outDefault.Bytes()[:min(10, outDefault.Len())])
+	}
+
+	// 5. Version 1.7 -> produces PDF 1.7 header
+	var out17 bytes.Buffer
+
+	req17 := &PDFRequest{
+		Global:  NewPdfGlobalOptions().WithPDFVersion("1.7").Build(),
+		Objects: []*ObjectSettings{NewObjectSettings().SetBody([]byte("<p>v1.7</p>"), "")},
+		Output:  &out17,
+	}
+
+	if err := RunPDF(t.Context(), req17); err != nil {
+		t.Fatalf("RunPDF 1.7: %v", err)
+	}
+
+	if !bytes.HasPrefix(out17.Bytes(), []byte("%PDF-1.7")) {
+		t.Errorf("expected PDF 1.7 to start with %%PDF-1.7, got %q", out17.Bytes()[:min(10, out17.Len())])
+	}
+
+	// 6. Converter with 1.7
+	conv := NewConverter()
+	if err := conv.Global().Set("pdfversion", "1.7"); err != nil {
+		t.Fatalf("conv.Global().Set(pdfversion, 1.7): %v", err)
+	}
+
+	conv.AddObject(NewObjectSettings().SetBody([]byte("<p>conv 1.7</p>"), ""))
+
+	if err := conv.Convert(t.Context()); err != nil {
+		t.Fatalf("conv.Convert: %v", err)
+	}
+
+	if !bytes.HasPrefix(conv.Output(), []byte("%PDF-1.7")) {
+		t.Errorf("expected Converter output to start with %%PDF-1.7, got %q", conv.Output()[:min(10, len(conv.Output()))])
+	}
+}

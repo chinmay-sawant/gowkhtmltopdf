@@ -71,7 +71,9 @@ Do not treat a public SPA URL as the acceptance bar for report work.
 | SVG image **output** (`--format svg`) | Image mode encodes PNG/JPEG only. | Not planned |
 | BMP output | No demand; PNG/JPEG cover `image/*`. | Not planned |
 | SOCKS5 proxy | `parseProxy` accepts `http` / `https` only. | Not planned |
-| PDF encryption / PDF/A / ICC | No writer support. | Not planned |
+| PDF 2.0 (ISO 32000-2) | Deferred to #32 (`PDF20` is reserved and rejected on the current writer). | #32 |
+| PDF/A-4 / PDF/UA-2 / ICC / OutputIntents | Deferred to #33. PDF 1.7 support is a version emit path and does **not** make conformance or archival claims. | #33 |
+| PDF encryption / AcroForm / signatures | Out of scope; no writer support. | Not planned |
 | C ABI (`wkhtmltopdf_*` cgo exports) | CGO is forbidden on the main path. | Only if consumer demand |
 | `--read-args-from-stdin` | **Not implemented.** The flag is not a working batch loop (rejected / unused). | Not planned |
 | Stdin HTML input (`-`) | **Not implemented.** CLI parse stores `Page: "-"`, but `load.GuessURL("-")` falls through to **`http://-`**. Library callers should pass inline HTML; do not document CLI `-` as stdin. | Document honestly; not a hidden feature |

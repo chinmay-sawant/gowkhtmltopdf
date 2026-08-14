@@ -74,6 +74,10 @@ var (
 	ErrMissingImageOutput = errs.ErrMissingImageOutput
 	// ErrNilContext reports a cancellation-aware operation without a context.
 	ErrNilContext = errs.ErrNilContext
+	// ErrInvalidPDFVersion reports an invalid or unsupported PDF version string.
+	ErrInvalidPDFVersion = settings.ErrInvalidPDFVersion
+	// ErrPDF20Unsupported reports PDF 2.0 requested before support is implemented.
+	ErrPDF20Unsupported = settings.ErrPDF20Unsupported
 )
 
 // Version returns the library version banner.
@@ -203,6 +207,16 @@ func (o *PdfGlobalOptions) WithCompression(enabled bool) *PdfGlobalOptions {
 func (o *PdfGlobalOptions) WithResolveRelativeLinks(enabled bool) *PdfGlobalOptions {
 	o = o.require()
 	o.options = o.options.WithResolveRelativeLinks(enabled)
+
+	return o
+}
+
+// WithPDFVersion sets the target PDF version ("1.4" or "1.7").
+// Invalid values fail during conversion / validation with ErrInvalidPDFVersion
+// or ErrPDF20Unsupported.
+func (o *PdfGlobalOptions) WithPDFVersion(version string) *PdfGlobalOptions {
+	o = o.require()
+	o.options = o.options.WithPDFVersion(version)
 
 	return o
 }
@@ -609,6 +623,8 @@ func (c *Converter) Convert(ctx context.Context) error {
 // settings so later mutations of Global() / objects cannot change the
 // in-flight request. Callers do not need to call Output(); Convert() still
 // buffers for Output() compatibility.
+//
+//nolint:cyclop // sequential validation and setup steps
 func (c *Converter) ConvertTo(ctx context.Context, writer io.Writer) error {
 	if c == nil {
 		return ErrNilConverter
@@ -632,6 +648,12 @@ func (c *Converter) ConvertTo(ctx context.Context, writer io.Writer) error {
 	if global.PageSize != "" {
 		if _, _, err := settings.ParsePageSize(global.PageSize); err != nil {
 			return reportPreflight(c.OnError, fmt.Errorf("%w: %q", ErrInvalidPageSize, global.PageSize))
+		}
+	}
+
+	if global.PdfVersion != "" {
+		if _, err := settings.ParsePDFVersion(global.PdfVersion); err != nil {
+			return reportPreflight(c.OnError, err)
 		}
 	}
 
@@ -1089,6 +1111,8 @@ func (r *ImageRequest) EnableLocalFileAccess() *ImageRequest {
 // opened. The request must have a document sink, copies must be positive, and
 // at least one body object must be present; TOC-only and empty objects are
 // rejected.
+//
+//nolint:cyclop // sequential validation checks
 func (r *PDFRequest) ValidatePDF() error {
 	if r == nil {
 		return ErrNilPDFRequest
@@ -1110,6 +1134,12 @@ func (r *PDFRequest) ValidatePDF() error {
 	if global.PageSize != "" {
 		if _, _, err := settings.ParsePageSize(global.PageSize); err != nil {
 			return fmt.Errorf("%w: %q", ErrInvalidPageSize, global.PageSize)
+		}
+	}
+
+	if global.PdfVersion != "" {
+		if _, err := settings.ParsePDFVersion(global.PdfVersion); err != nil {
+			return err //nolint:wrapcheck // sentinel error from settings package
 		}
 	}
 

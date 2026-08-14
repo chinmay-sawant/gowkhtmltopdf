@@ -174,7 +174,36 @@ func (r *Request) Validate() error {
 		return err
 	}
 
+	if _, err := policyForGlobal(r.Global); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+const (
+	pdfVersion14 = "1.4"
+	pdfVersion17 = "1.7"
+)
+
+// policyForGlobal maps the requested PDF version to a pdf.WriterPolicy.
+// An empty or "1.4" setting maps to PDF14; "1.7" maps to PDF17.
+// "2.0" returns an error citing issue #32.
+func policyForGlobal(glob settings.PdfGlobal) (pdf.WriterPolicy, error) {
+	version, err := settings.ParsePDFVersion(glob.PdfVersion)
+	if err != nil {
+		return pdf.WriterPolicy{}, err //nolint:wrapcheck // zero policy on error
+	}
+
+	switch version {
+	case pdfVersion14:
+		return pdf.WriterPolicy{Version: pdf.PDF14}, nil //nolint:exhaustruct // default feature flags
+	case pdfVersion17:
+		return pdf.WriterPolicy{Version: pdf.PDF17}, nil //nolint:exhaustruct // default feature flags
+	default:
+		return pdf.WriterPolicy{},
+			fmt.Errorf("%w: %q", settings.ErrInvalidPDFVersion, version)
+	}
 }
 
 // ValidateRenderableObjects applies the shared input invariant used by both
@@ -282,13 +311,23 @@ func Run(ctx context.Context, req *Request, log io.Writer, progress func(phase s
 		return fmt.Errorf("default font: %w", err)
 	}
 
+	policy, err := policyForGlobal(req.Global)
+	if err != nil {
+		return fmt.Errorf("pdf policy: %w", err)
+	}
+
+	doc, err := pdf.NewDocumentWithPolicy(policy)
+	if err != nil {
+		return fmt.Errorf("initialize document: %w", err)
+	}
+
 	registry := loadFontRegistry(req.Global, log)
 	run := &runContext{
 		req:      req,
 		loader:   loader,
 		font:     font,
 		registry: registry,
-		doc:      pdf.NewDocument(),
+		doc:      doc,
 		log:      log,
 		progress: progress,
 		tocs:     nil,

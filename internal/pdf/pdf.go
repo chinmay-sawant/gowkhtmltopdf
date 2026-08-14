@@ -1,12 +1,14 @@
-// Package pdf implements a stdlib-only PDF 1.4 writer: indirect objects,
-// xref, catalog/pages tree, content streams (Flate), base-14 fonts, images,
-// link annotations, named destinations and outlines. Deterministic output
-// for golden tests (creation date is injectable).
+// Package pdf implements a stdlib-only version-aware PDF writer (PDF 1.4 default,
+// opt-in PDF 1.7): indirect objects, xref, catalog/pages tree, content streams
+// (Flate), base-14 fonts, images, link annotations, named destinations, outlines,
+// trailer /ID, and non-claiming XMP metadata. Deterministic output for golden
+// tests (creation date is injectable).
 package pdf
 
 import (
 	"bytes"
 	"compress/zlib"
+	"crypto/md5" //nolint:gosec // MD5 is standard for PDF trailer /ID generation
 	"errors"
 	"fmt"
 	"io"
@@ -15,6 +17,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf16"
 )
 
 var (
@@ -22,7 +25,7 @@ var (
 	errPDFNoPages   = errors.New("pdf: no pages")
 )
 
-// Version is the PDF header version emitted.
+// Version is the default PDF header version emitted for legacy compatibility.
 const Version = "1.4"
 
 // object is one indirect object (pre-serialized dict + optional stream).
@@ -116,6 +119,7 @@ func (d dict) String() string { return "<< " + strings.Join(d, " ") + " >>" }
 // assembly and finalization. Callers must not mutate or write a document
 // concurrently; use one document per conversion when parallelism is needed.
 type Document struct {
+	policy         WriterPolicy
 	objects        []*object
 	info           map[string]string
 	useCompression bool
@@ -132,17 +136,41 @@ type Document struct {
 	fontType0      map[string]bool   // font resource name -> precomputed needsType0(union)
 	catalogRef     objRef            // set by finalize
 	infoRef        objRef            // set by finalize
+	metadataRef    objRef            // set by finalize
 	finalized      bool
 }
 
-// NewDocument creates an empty PDF document.
+// NewDocument creates an empty PDF document with the default PDF 1.4 policy.
 func NewDocument() *Document {
 	return &Document{ //nolint:exhaustruct // intentional zero-value fields
+		policy:         WriterPolicy{Version: PDF14}, //nolint:exhaustruct // default policy
 		info:           map[string]string{},
 		useCompression: true,
 		fontCache:      map[string]objRef{},
 		fontRuneSet:    map[string]map[rune]struct{}{},
 	}
+}
+
+// NewDocumentWithPolicy creates an empty PDF document configured with the given writer policy.
+func NewDocumentWithPolicy(policy WriterPolicy) (*Document, error) {
+	if err := policy.Validate(); err != nil {
+		return nil, err
+	}
+
+	doc := NewDocument()
+	doc.policy = policy
+
+	return doc, nil
+}
+
+// Policy returns the document's writer policy.
+func (d *Document) Policy() WriterPolicy {
+	return d.policy
+}
+
+// Validate checks whether the document's writer policy is valid.
+func (d *Document) Validate() error {
+	return d.policy.Validate()
 }
 
 // SetCompression toggles Flate compression of content/image streams.
@@ -384,8 +412,8 @@ func writePDFString(out *countingWriter, text string) error {
 	return nil
 }
 
-func writePDFHeader(out *countingWriter) error {
-	if err := writePDFFormat(out, "%%PDF-%s\n", Version); err != nil {
+func writePDFHeader(out *countingWriter, policy WriterPolicy) error {
+	if err := writePDFFormat(out, "%%PDF-%s\n", policy.HeaderVersion()); err != nil {
 		return err
 	}
 
@@ -424,6 +452,38 @@ func writePDFObject(out *countingWriter, obj *object) (int64, error) {
 	return offset, nil
 }
 
+func computeTrailerID(doc *Document) string {
+	hasher := md5.New() //nolint:gosec // MD5 is standard for PDF trailer /ID generation
+
+	_, _ = hasher.Write([]byte(doc.policy.HeaderVersion()))
+
+	now := doc.creationTime
+	if now.IsZero() {
+		now = time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+	}
+
+	_, _ = hasher.Write([]byte(pdfDate(now)))
+
+	for _, k := range sortedStringKeys(doc.info) {
+		_, _ = hasher.Write([]byte(k))
+		_, _ = hasher.Write([]byte(doc.info[k]))
+	}
+
+	_, _ = fmt.Fprintf(hasher, "pages:%d", len(doc.pages))
+
+	for _, p := range doc.pages {
+		_, _ = fmt.Fprintf(hasher, "page:%f,%f", p.width, p.height)
+	}
+
+	for _, obj := range doc.objects {
+		_, _ = fmt.Fprintf(hasher, "obj:%d:%s:%d", obj.id, obj.dict, len(obj.stream))
+	}
+
+	sum := hasher.Sum(nil)
+
+	return fmt.Sprintf("%032X", sum)
+}
+
 func writePDFTrailer(out *countingWriter, doc *Document, offsets []int64) error {
 	xrefPos := out.n
 
@@ -445,10 +505,20 @@ func writePDFTrailer(out *countingWriter, doc *Document, offsets []int64) error 
 		return err
 	}
 
-	if err := writePDFFormat(
-		out, "<< /Size %d /Root %s /Info %s >>\n", len(doc.objects)+1, doc.catalogRef, doc.infoRef,
-	); err != nil {
-		return err
+	if doc.policy.Version >= PDF17 {
+		idHex := computeTrailerID(doc)
+		if err := writePDFFormat(
+			out, "<< /Size %d /Root %s /Info %s /ID [ <%s> <%s> ] >>\n",
+			len(doc.objects)+1, doc.catalogRef, doc.infoRef, idHex, idHex,
+		); err != nil {
+			return err
+		}
+	} else {
+		if err := writePDFFormat(
+			out, "<< /Size %d /Root %s /Info %s >>\n", len(doc.objects)+1, doc.catalogRef, doc.infoRef,
+		); err != nil {
+			return err
+		}
 	}
 
 	return writePDFFormat(out, "startxref\n%d\n%%%%EOF\n", xrefPos)
@@ -460,7 +530,7 @@ func (d *Document) writeTo(width io.Writer) (int64, error) {
 	}
 
 	out := &countingWriter{w: width} //nolint:exhaustruct // count starts at zero
-	if err := writePDFHeader(out); err != nil {
+	if err := writePDFHeader(out, d.policy); err != nil {
 		return out.n, fmt.Errorf("pdf: write: %w", err)
 	}
 
@@ -496,6 +566,10 @@ func (d *Document) finalize() error {
 		return nil
 	}
 
+	if err := d.policy.Validate(); err != nil {
+		return err
+	}
+
 	if len(d.pages) == 0 {
 		return errPDFNoPages
 	}
@@ -503,6 +577,14 @@ func (d *Document) finalize() error {
 	catalogRef := d.newObject()
 	infoRef := d.newObject()
 	pagesRef := d.newObject()
+
+	var metadataRef objRef
+	if d.policy.Version >= PDF17 {
+		metadataRef = d.newObject()
+		xmpBytes := d.buildXMPMetadata()
+		d.setDict(metadataRef, fmt.Sprintf("<< /Type /Metadata /Subtype /XML /Length %d >>", len(xmpBytes)))
+		d.setStream(metadataRef, xmpBytes)
+	}
 
 	d.unionFontRunes()
 
@@ -526,7 +608,7 @@ func (d *Document) finalize() error {
 		}
 	}
 
-	d.setDict(catalogRef, catalogDict(d.outlineRoot, pagesRef))
+	d.setDict(catalogRef, catalogDict(d.outlineRoot, pagesRef, metadataRef))
 	d.setDict(infoRef, d.infoDict())
 
 	// per-page objects
@@ -538,6 +620,7 @@ func (d *Document) finalize() error {
 
 	d.catalogRef = catalogRef
 	d.infoRef = infoRef
+	d.metadataRef = metadataRef
 	d.finalized = true
 
 	return nil
@@ -607,9 +690,14 @@ func sortedStringKeys[V any](values map[string]V) []string {
 	return keys
 }
 
-// catalogDict builds the /Catalog dictionary, wiring /Outlines when set.
-func catalogDict(outlineRoot *Outline, pagesRef objRef) string {
-	cat := dict{}.add("/Type", "/Catalog").add("/Pages", pagesRef.String())
+// catalogDict builds the /Catalog dictionary, wiring /Metadata when present and /Outlines when set.
+func catalogDict(outlineRoot *Outline, pagesRef, metadataRef objRef) string {
+	cat := dict{}.add("/Type", "/Catalog")
+	if metadataRef != 0 {
+		cat = cat.add("/Metadata", metadataRef.String())
+	}
+
+	cat = cat.add("/Pages", pagesRef.String())
 	if outlineRoot != nil {
 		cat = cat.add("/Outlines", outlineRoot.refStr.String()).add("/PageMode", "/UseOutlines")
 	}
@@ -627,12 +715,12 @@ func (d *Document) infoDict() string {
 	info := dict{}
 	for _, k := range []string{"Title", "Subject", "Author", "Keywords"} {
 		if v, ok := d.info[k]; ok && v != "" {
-			info = info.add("/"+k, pdfString(v))
+			info = info.add("/"+k, d.encodeTextString(v))
 		}
 	}
 
-	return info.add("/Creator", pdfString(d.info["Creator"])).
-		add("/Producer", pdfString("gowkhtmltopdf "+Version)).
+	return info.add("/Creator", d.encodeTextString(d.info["Creator"])).
+		add("/Producer", d.encodeTextString(d.policy.ProducerVersion())).
 		add("/CreationDate", pdfString(pdfDate(now))).
 		add("/ModDate", pdfString(pdfDate(now))).
 		String()
@@ -785,7 +873,7 @@ func (d *Document) finalizeOutlines(root *Outline) error {
 func buildOutlineItems(parent *Outline, parentRef objRef, doc *Document) error {
 	for idx, child := range parent.Children {
 		var parts []string
-		parts = append(parts, "<< /Title "+pdfString(child.Title))
+		parts = append(parts, "<< /Title "+doc.encodeTextString(child.Title))
 
 		dest, err := outlineDest(child, doc)
 		if err != nil {
@@ -940,6 +1028,116 @@ func pdfDocEncodingFold(rVal rune) rune {
 
 func pdfDate(t time.Time) string {
 	return "D:" + t.UTC().Format("20060102150405") + "Z"
+}
+
+// encodeTextString encodes text as a PDF text string according to document version.
+// For PDF 1.4, it uses pdfString (Latin-1 / PDFDocEncoding fold).
+// For PDF 1.7+, if text contains any characters outside Latin-1 (> U+00FF),
+// it encodes text as UTF-16BE with a byte-order mark (BOM \xFE\xFF) formatted as a hex string <FEFF...>.
+func encodeTextString(text string, version PDFVersion) string {
+	if text == "" {
+		return "()"
+	}
+
+	if version < PDF17 {
+		return pdfString(text)
+	}
+
+	for _, rVal := range text {
+		if rVal > maxLatin1Code {
+			return encodeUTF16BEHex(text)
+		}
+	}
+
+	return pdfString(text)
+}
+
+func encodeUTF16BEHex(text string) string {
+	const (
+		bomLen       = 2
+		hexPerUnit   = 4
+		prefixBOMHex = "<FEFF"
+	)
+
+	u16 := utf16.Encode([]rune(text))
+
+	var buf strings.Builder
+
+	buf.Grow(bomLen + len(prefixBOMHex) + len(u16)*hexPerUnit)
+	buf.WriteString(prefixBOMHex)
+
+	for _, unit := range u16 {
+		fmt.Fprintf(&buf, "%04X", unit)
+	}
+
+	buf.WriteByte('>')
+
+	return buf.String()
+}
+
+func (d *Document) encodeTextString(text string) string {
+	return encodeTextString(text, d.policy.Version)
+}
+
+func xmlEscape(text string) string {
+	var buf strings.Builder
+
+	for _, rVal := range text {
+		switch rVal {
+		case '&':
+			buf.WriteString("&amp;")
+		case '<':
+			buf.WriteString("&lt;")
+		case '>':
+			buf.WriteString("&gt;")
+		case '"':
+			buf.WriteString("&quot;")
+		case '\'':
+			buf.WriteString("&apos;")
+		default:
+			buf.WriteRune(rVal)
+		}
+	}
+
+	return buf.String()
+}
+
+func (d *Document) buildXMPMetadata() []byte {
+	now := d.creationTime
+	if now.IsZero() {
+		now = time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+	}
+
+	dateStr := now.UTC().Format("2006-01-02T15:04:05Z")
+
+	var buf bytes.Buffer
+
+	buf.WriteString("<?xpacket begin=\"\xef\xbb\xbf\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?>\n")
+	buf.WriteString("<x:xmpmeta xmlns:x=\"adobe:ns:meta/\">\n")
+	buf.WriteString(" <rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n")
+	buf.WriteString("  <rdf:Description rdf:about=\"\"\n")
+	buf.WriteString("    xmlns:dc=\"http://purl.org/dc/elements/1.1/\"\n")
+	buf.WriteString("    xmlns:pdf=\"http://ns.adobe.com/pdf/1.3/\"\n")
+	buf.WriteString("    xmlns:xmp=\"http://ns.adobe.com/xap/1.0/\">\n")
+	buf.WriteString("   <dc:format>application/pdf</dc:format>\n")
+	fmt.Fprintf(&buf, "   <pdf:Producer>%s</pdf:Producer>\n", xmlEscape(d.policy.ProducerVersion()))
+	fmt.Fprintf(&buf, "   <xmp:CreateDate>%s</xmp:CreateDate>\n", dateStr)
+	fmt.Fprintf(&buf, "   <xmp:ModifyDate>%s</xmp:ModifyDate>\n", dateStr)
+
+	if title, ok := d.info["Title"]; ok && title != "" {
+		buf.WriteString("   <dc:title>\n")
+		buf.WriteString("    <rdf:Alt>\n")
+		fmt.Fprintf(&buf, "     <rdf:li xml:lang=\"x-default\">%s</rdf:li>\n", xmlEscape(title))
+		buf.WriteString("    </rdf:Alt>\n")
+		buf.WriteString("   </dc:title>\n")
+	}
+
+	buf.WriteString("  </rdf:Description>\n")
+	buf.WriteString(" </rdf:RDF>\n")
+	buf.WriteString("</x:xmpmeta>\n")
+	buf.WriteString("<?xpacket end=\"w\"?>")
+
+	return buf.Bytes()
 }
 
 func num(v float64) string {

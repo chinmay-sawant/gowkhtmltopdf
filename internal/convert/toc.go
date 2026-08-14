@@ -159,9 +159,13 @@ func paintOptions(geom hfGeom) layout.PaintOptions {
 
 // paintCount lays the result out into a scratch document and returns its
 // page count, leaving res untouched.
-func paintCount(ctx context.Context, res *layout.Result, g hfGeom) (int, error) {
-	scratch := pdf.NewDocument()
-	if err := layout.PaintContext(ctx, scratch, cloneResult(res), paintOptions(g)); err != nil {
+func paintCount(ctx context.Context, policy pdf.WriterPolicy, res *layout.Result, geom hfGeom) (int, error) {
+	scratch, err := pdf.NewDocumentWithPolicy(policy)
+	if err != nil {
+		return 0, fmt.Errorf("toc: paintCount: %w", err)
+	}
+
+	if err := layout.PaintContext(ctx, scratch, cloneResult(res), paintOptions(geom)); err != nil {
 		return 0, fmt.Errorf("toc: paintCount: %w", err)
 	}
 
@@ -235,7 +239,7 @@ func renderTOCObjects(ctx context.Context, font *pdf.Font, doc *pdf.Document, re
 
 		state.tocRoot, state.tocRes = root, res
 
-		n, err := paintCount(ctx, res, state.geom)
+		n, err := paintCount(ctx, doc.Policy(), res, state.geom)
 		if err != nil {
 			return 0, fmt.Errorf("object %d: toc: paintCount: %w", state.idx+1, err)
 		}
@@ -254,7 +258,7 @@ func renderTOCObjects(ctx context.Context, font *pdf.Font, doc *pdf.Document, re
 
 			state.tocRoot, state.tocRes = root, res
 
-			n, err := paintCount(ctx, res, state.geom)
+			n, err := paintCount(ctx, doc.Policy(), res, state.geom)
 			if err != nil {
 				return 0, fmt.Errorf("object %d: toc: paintCount: %w", state.idx+1, err)
 			}

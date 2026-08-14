@@ -31,7 +31,7 @@ Deep-dives with `file:line` references live under
 | `internal/convert/prepare` | Shared document prep: load, parse, sheets, `@font-face` |
 | `internal/convert/render` | Mode-neutral lifecycle: `RenderObjects` → `Assemble` → `Finalize` |
 | `internal/convert/islands` | Certified page-island recognition for the **benchmark fixture only** |
-| `internal/pdf` | PDF 1.4 writer, TTF subset, Type0/CID, images, annotations, outlines |
+| `internal/pdf` | PDF writer (default 1.4, opt-in 1.7 via `WriterPolicy`), TTF subset, Type0/CID, images, annotations, outlines |
 | `internal/imageout` | Raster path for one PNG/JPEG canvas |
 | `internal/svg` | SVG-as-`<img>` rasterization (`tdewolff/canvas`) |
 
@@ -59,7 +59,8 @@ input (file / URL / inline HTML)
         ├──────────────────────────────┐
         ▼                              ▼
   internal/pdf                   internal/imageout
-  multi-page PDF 1.4             one NRGBA canvas → PNG/JPEG
+  multi-page PDF                 one NRGBA canvas → PNG/JPEG
+  (1.4 default / 1.7 opt-in)
 ```
 
 `internal/convert/prepare` is the shared front-half seam for both sinks
@@ -80,7 +81,8 @@ lives in `internal/convert/render`:
    fonts or the document exist.
 3. **Fonts** — bundled default face (`pdf.DefaultFont`) plus an opt-in
    registry from `--font-path` / `--use-system-fonts`.
-4. **`pdf.NewDocument`** — one shared writer for the whole job.
+4. **`pdf.NewDocument` / `pdf.NewDocumentWithPolicy`** — one shared writer for
+   the whole job, configured with the requested `WriterPolicy`.
 5. **`render.Run`** on the PDF adapter (`pdfPipeline`):
    - **`RenderObjects`** — each `page`/`cover` object: prepare → layout
      (optional smart-shrink re-layout) → `layout.PaintContext` into the
@@ -120,12 +122,17 @@ Image jobs use `imageout.Request` (`imageout.RunRequest`), also driven by
 - SVG referenced by `<img>` is rasterized in `internal/svg` before layout
   treats it as PNG pixels.
 
-## PDF 1.4 writer
+## PDF writer
 
-`internal/pdf` emits PDF **1.4**:
+`internal/pdf` is version-aware and emits PDF **1.4** (default) or PDF **1.7**
+(opt-in via `WriterPolicy`):
 
 | Topic | Behavior |
 |-------|----------|
+| Header | `%PDF-1.4` (default) or `%PDF-1.7` (opt-in via `WriterPolicy`) |
+| Trailer `/ID` | Deterministic 16-byte hex identifiers on PDF 1.7 (`/ID [ <a> <b> ]`) |
+| Info & Metadata | Info dict (Latin-1 on 1.4, UTF-16BE + BOM on 1.7); non-claiming XMP Metadata stream on 1.7 (Dublin Core + Producer, no conformance claims) |
+| Classic xref | Standard counting xref table for both 1.4 and 1.7 (no xref streams) |
 | Streams | `/Filter /FlateDecode` via zlib (RFC 1950) |
 | Latin fonts | Subset TTF, simple font, WinAnsi-style codes, `/Widths` in 1000 units/em |
 | Unicode | Type0 / CIDFontType2 + Identity-H when a run has runes above U+00FF |
@@ -133,6 +140,9 @@ Image jobs use `imageout.Request` (`imageout.RunRequest`), also driven by
 | Links | URI annotations and GoTo destinations |
 | Outlines | Catalog `/Outlines` after outline object refs exist |
 | Info Title | `--title` / settings only — **not** `<title>` |
+
+Explicit out-of-scope boundaries: no PDF 2.0 / UTF-8 text strings (#32),
+and no PDF/A or PDF/UA conformance claims (#33).
 
 Bundled faces are Liberation Sans **and** Serif **and** Mono (R/B/I/BI), plus
 DejaVu Sans Regular+Bold as Unicode fallback. See [fonts.md](fonts.md).

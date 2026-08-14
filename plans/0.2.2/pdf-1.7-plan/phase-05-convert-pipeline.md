@@ -1,7 +1,7 @@
 # Phase 5 — Convert Pipeline Wiring
 
 > **Parent:** `plans/0.2.2/pdf-1.7-plan/00-canonical-pdf-17-plan.md`
-> **Status:** not started
+> **Status:** completed
 > **Estimated effort:** 2–3 days
 > **Depends on:** Phases 1–4
 > **Unblocks:** phases 6–7 end-to-end proof
@@ -38,31 +38,31 @@ Image jobs do not touch this path.
 
 ### 5.1 Document construction
 
-- [ ] Map `settings.PdfGlobal` version → `pdf.WriterPolicy` in **one** helper (convert or settings adapter). No `if global == "1.7"` in layout
-- [ ] `convert.Run` uses that helper when creating `runContext.doc` — `internal/convert/convert.go`
-- [ ] Invalid version never reaches `render.Run` (phase 4 sentinel is enough)
-- [ ] Default / empty setting → 1.4 document
-- [ ] Test: `Run` / `RunPDF` on a tiny HTML with version 1.7 writes `%PDF-1.7`
-- [ ] Test: same HTML without the setting writes `%PDF-1.4`
+- [x] Map `settings.PdfGlobal` version → `pdf.WriterPolicy` in **one** helper (convert or settings adapter). No `if global == "1.7"` in layout
+- [x] `convert.Run` uses that helper when creating `runContext.doc` — `internal/convert/convert.go`
+- [x] Invalid version never reaches `render.Run` (phase 4 sentinel is enough)
+- [x] Default / empty setting → 1.4 document
+- [x] Test: `Run` / `RunPDF` on a tiny HTML with version 1.7 writes `%PDF-1.7`
+- [x] Test: same HTML without the setting writes `%PDF-1.4`
 
 ### 5.2 Assemble
 
-- [ ] `assembleDocument` does not fight the writer on Producer/version — `pdf_pipeline.go`
-- [ ] Title, compression, grayscale, `SetCreationTime(run.req.now())` still applied
-- [ ] Copies / reorder / HF still operate on the same `*pdf.Document`
+- [x] `assembleDocument` does not fight the writer on Producer/version — `pdf_pipeline.go`
+- [x] Title, compression, grayscale, `SetCreationTime(run.req.now())` still applied
+- [x] Copies / reorder / HF still operate on the same `*pdf.Document`
 
 ### 5.3 Scratch documents
 
-- [ ] Inventory every `pdf.NewDocument()` outside tests (`convert.go`, `toc.go`, …)
-- [ ] User-visible PDFs honor the request version
-- [ ] Internal scratch docs are either the same policy or documented as non-emitted
-- [ ] Test: TOC + outline + links job with `--pdf-version 1.7` still opens (structural parse)
+- [x] Inventory every `pdf.NewDocument()` outside tests (`convert.go`, `toc.go`, …)
+- [x] User-visible PDFs honor the request version
+- [x] Internal scratch docs are either the same policy or documented as non-emitted
+- [x] Test: TOC + outline + links job with `--pdf-version 1.7` still opens (structural parse)
 
 ### 5.4 Layout isolation
 
-- [ ] `internal/layout` does not import version types
-- [ ] `PaintContext` is not branched on PDF version
-- [ ] Test: `go test ./internal/layout` green (no new layout fixtures required)
+- [x] `internal/layout` does not import version types
+- [x] `PaintContext` is not branched on PDF version
+- [x] Test: `go test ./internal/layout` green (no new layout fixtures required)
 
 ---
 

@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -653,4 +655,224 @@ func collectStyleSheets(root *html.Node) []*css.Stylesheet {
 	walk(root)
 
 	return sheets
+}
+
+//nolint:cyclop,funlen // golden needle assertions for PDF 1.7 vs 1.4 default
+func TestConvertPDF17GoldenNeedles(t *testing.T) {
+	t.Parallel()
+
+	htmlContent := `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Invoice — July 2026 🚀</title>
+</head>
+<body>
+<h1>Invoice — July 2026</h1>
+<p>Total amount: $1,250.00</p>
+</body>
+</html>`
+
+	// 1. Convert with --pdf-version 1.7
+	cmd17, _ := newCommand(t, htmlContent, "")
+	cmd17.Global.PdfVersion = pdfVersion17
+	cmd17.Global.Title = "Invoice — July 2026 🚀"
+	data17 := runPDF(t, cmd17)
+	str17 := string(data17)
+
+	// Needle assertions on 1.7 output:
+	// Starts with %PDF-1.7
+	if !bytes.HasPrefix(data17, []byte("%PDF-1.7\n%\xe2\xe3\xcf\xd3\n")) {
+		t.Errorf("PDF 1.7 output missing expected header prefix, got %q", data17[:min(25, len(data17))])
+	}
+
+	// Contains trailer /ID [ <HEX> <HEX> ]
+	idRe := regexp.MustCompile(`/ID\s*\[\s*<([0-9A-Fa-f]{32})>\s*<([0-9A-Fa-f]{32})>\s*\]`)
+	if !idRe.MatchString(str17) {
+		t.Errorf("PDF 1.7 output missing trailer /ID [ <hex> <hex> ]:\n%s", str17)
+	}
+
+	// Contains /Type /Metadata /Subtype /XML
+	if !strings.Contains(str17, "/Type /Metadata /Subtype /XML") {
+		t.Error("PDF 1.7 output missing metadata stream object /Type /Metadata /Subtype /XML")
+	}
+
+	// Producer contains 1.7
+	if !strings.Contains(str17, "/Producer (gowkhtmltopdf 1.7)") {
+		t.Errorf("PDF 1.7 Info dict missing /Producer (gowkhtmltopdf 1.7)")
+	}
+
+	if !strings.Contains(str17, "<pdf:Producer>gowkhtmltopdf 1.7</pdf:Producer>") {
+		t.Errorf("PDF 1.7 XMP metadata missing <pdf:Producer>gowkhtmltopdf 1.7</pdf:Producer>")
+	}
+
+	// Does NOT contain pdfaid, pdfuaid, or pdfaExtension
+	for _, forbidden := range []string{"pdfaid", "pdfuaid", "pdfaExtension"} {
+		if strings.Contains(str17, forbidden) {
+			t.Errorf("PDF 1.7 output contains forbidden claim token %q", forbidden)
+		}
+	}
+
+	// Title with Unicode is encoded with UTF-16BE (<FEFF...>), NOT raw UTF-8
+	if !strings.Contains(str17, "/Title <FEFF") {
+		t.Errorf("PDF 1.7 Unicode Title should be encoded as UTF-16BE hex string <FEFF...>")
+	}
+
+	if strings.Contains(str17, "/Title (Invoice — July 2026 🚀)") {
+		t.Errorf("PDF 1.7 Title was emitted as raw UTF-8 text string")
+	}
+
+	// 2. Convert the same HTML without version setting (default 1.4)
+	cmd14, _ := newCommand(t, htmlContent, "")
+	cmd14.Global.Title = "Invoice — July 2026 🚀"
+	data14 := runPDF(t, cmd14)
+	str14 := string(data14)
+
+	// Starts with %PDF-1.4
+	if !bytes.HasPrefix(data14, []byte("%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")) {
+		t.Errorf("PDF 1.4 output missing expected header prefix, got %q", data14[:min(25, len(data14))])
+	}
+
+	// No /Metadata in catalog
+	catRe := regexp.MustCompile(`<<\s*/Type\s*/Catalog[^>]*>>`)
+	catMatch14 := catRe.FindString(str14)
+
+	if strings.Contains(catMatch14, "/Metadata") {
+		t.Errorf("Default PDF 1.4 catalog contains /Metadata: %s", catMatch14)
+	}
+
+	// No trailer /ID
+	trailerIdx14 := strings.Index(str14, "trailer\n")
+	if trailerIdx14 >= 0 && strings.Contains(str14[trailerIdx14:], "/ID") {
+		t.Errorf("Default PDF 1.4 trailer contains /ID: %s", str14[trailerIdx14:])
+	}
+
+	// Producer contains 1.4
+	if !strings.Contains(str14, "/Producer (gowkhtmltopdf 1.4)") {
+		t.Errorf("Default PDF 1.4 Info dict missing /Producer (gowkhtmltopdf 1.4)")
+	}
+}
+
+//nolint:funlen // structural multi-page TOC + HF test on PDF 1.7
+func TestConvertPDF17MultiPageTOCHF(t *testing.T) {
+	t.Parallel()
+
+	htmlBody := `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Multi-Page Doc</title></head>
+<body>
+<h1>Chapter 1: Overview</h1>
+<p>` + strings.Repeat("This is section one content providing details about the system. ", 50) + `</p>
+<div style="page-break-before: always;"></div>
+<h1>Chapter 2: Architecture</h1>
+<p>` + strings.Repeat("This is section two describing architecture and pipelines in detail. ", 50) + `</p>
+<div style="page-break-before: always;"></div>
+<h1>Chapter 3: Verification</h1>
+<p>` + strings.Repeat("This is section three covering verification and quality assurance. ", 50) + `</p>
+</body>
+</html>`
+
+	cmd, _ := newCommand(t, htmlBody, "")
+	cmd.Global.PdfVersion = pdfVersion17
+	cmd.Global.Header.Left = "Document Header [page]"
+	cmd.Global.Footer.Right = "Page [page] of [topage]"
+	cmd.Global.UseCompression = false
+
+	tocObj := settings.DefaultPdfObject()
+	tocObj.IsTableOfContent = true
+	cmd.Objects = append([]settings.PdfObject{tocObj}, cmd.Objects...)
+
+	data := runPDF(t, cmd)
+
+	// Structural assertions:
+	// 1. Starts with %PDF-1.7
+	if !bytes.HasPrefix(data, []byte("%PDF-1.7\n")) {
+		t.Errorf("expected %%PDF-1.7 header, got %q", data[:min(15, len(data))])
+	}
+
+	// 2. Page count: TOC + 3 chapters = at least 4 pages
+	pages := pageCount(data)
+	if pages < 4 {
+		t.Errorf("page count = %d, want >= 4", pages)
+	}
+
+	// 3. Outlines in catalog
+	if !bytes.Contains(data, []byte("/Type /Outlines")) || !bytes.Contains(data, []byte("/PageMode /UseOutlines")) {
+		t.Error("expected outline bookmarks in PDF 1.7 output with TOC")
+	}
+
+	// 4. Header & Footer text present
+	if !bytes.Contains(data, []byte("Document Header")) {
+		t.Error("header text missing in PDF 1.7 output")
+	}
+
+	if !bytes.Contains(data, []byte("Page 1 of")) {
+		t.Error("footer text missing in PDF 1.7 output")
+	}
+
+	// 5. ParseSemantic reports 1.7 and page count
+	sem, err := pdf.ParseSemantic(data)
+	if err != nil {
+		t.Fatalf("ParseSemantic: %v", err)
+	}
+
+	if sem.Version != pdfVersion17 {
+		t.Errorf("sem.Version = %q, want 1.7", sem.Version)
+	}
+
+	if sem.PageCount() != pages {
+		t.Errorf("sem.PageCount = %d, want %d", sem.PageCount(), pages)
+	}
+}
+
+func TestOptionalPDFValidation(t *testing.T) {
+	t.Parallel()
+
+	// Check if qpdf or mutool is available
+	qpdfPath, errQpdf := exec.LookPath("qpdf")
+	mutoolPath, errMutool := exec.LookPath("mutool")
+
+	if errQpdf != nil && errMutool != nil {
+		t.Skip("optional validator qpdf/mutool not installed")
+	}
+
+	htmlContent := `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Validation — 2026</title></head>
+<body>
+<h1>Validation Document</h1>
+<p>Testing PDF 1.7 compliance with external validator.</p>
+</body>
+</html>`
+
+	cmd, _ := newCommand(t, htmlContent, "")
+	cmd.Global.PdfVersion = pdfVersion17
+	cmd.Global.Title = "Validation — 2026"
+	data := runPDF(t, cmd)
+
+	pdfFile := filepath.Join(t.TempDir(), "test_17.pdf")
+	if err := os.WriteFile(pdfFile, data, 0o600); err != nil {
+		t.Fatalf("write PDF file: %v", err)
+	}
+
+	if errQpdf == nil {
+		out, err := exec.CommandContext(t.Context(), qpdfPath, "--check", pdfFile).CombinedOutput()
+		if err != nil {
+			t.Errorf("qpdf --check failed: %v\nOutput: %s", err, string(out))
+		}
+	}
+
+	if errMutool == nil {
+		out, err := exec.CommandContext(t.Context(), mutoolPath, "info", pdfFile).CombinedOutput()
+		if err != nil {
+			t.Errorf("mutool info failed: %v\nOutput: %s", err, string(out))
+		}
+
+		cleanOut, errClean := exec.CommandContext(
+			t.Context(), mutoolPath, "clean", "-s", pdfFile, filepath.Join(t.TempDir(), "clean.pdf"),
+		).CombinedOutput()
+		if errClean != nil {
+			t.Errorf("mutool clean failed: %v\nOutput: %s", errClean, string(cleanOut))
+		}
+	}
 }

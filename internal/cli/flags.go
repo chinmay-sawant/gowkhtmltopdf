@@ -139,6 +139,9 @@ func addGlobalFlags(add flagAdder) {
 	add("page-offset", ModePDF, flagValue, func(c *Command, _ *objectCtx, vals []string) error {
 		return c.Global.Set("pageoffset", vals[0])
 	})
+	add("pdf-version", ModePDF, flagValue, func(c *Command, _ *objectCtx, vals []string) error {
+		return c.Global.Set("pdfversion", vals[0])
+	})
 	// Smart-shrinking: enable/disable pair only (no bare --smart-shrinking).
 	add("enable-smart-shrinking", ModePDF, flagBool, func(c *Command, _ *objectCtx, _ []string) error {
 		return c.Global.Set("smartshrinking", "true")

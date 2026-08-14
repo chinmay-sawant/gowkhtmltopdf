@@ -1,4 +1,4 @@
-//nolint:testpackage // tests reach into unexported state
+//nolint:testpackage,exhaustruct // tests reach into unexported state
 package pdf
 
 import (
@@ -767,5 +767,299 @@ func TestReorderPagesValidation(t *testing.T) {
 
 	if err := data.ReorderPages([]int{1, 0}); err == nil {
 		t.Error("ReorderPages after finalize: expected error, got nil")
+	}
+}
+
+//nolint:funlen,cyclop,maintidx // comprehensive integration test covering rich PDF 1.7 feature set
+func TestPDF17RichDocument(t *testing.T) {
+	t.Parallel()
+
+	fnt, err := DefaultFont()
+	if err != nil {
+		t.Fatalf("DefaultFont: %v", err)
+	}
+
+	doc, err := NewDocumentWithPolicy(WriterPolicy{Version: PDF17})
+	if err != nil {
+		t.Fatalf("NewDocumentWithPolicy(PDF17): %v", err)
+	}
+
+	fixedTime := time.Date(2026, 8, 14, 16, 0, 0, 0, time.UTC)
+	doc.SetCreationTime(fixedTime)
+	doc.SetInfo("Title", "Rich Document — PDF 1.7 Specification Test")
+	doc.SetInfo("Author", "Test Author")
+	doc.SetInfo("Subject", "Testing PDF 1.7 Features")
+	doc.SetInfo("Keywords", "PDF, 1.7, Graphics, Fonts, Images")
+	doc.SetInfo("Creator", "gowkhtmltopdf test suite")
+
+	// Page 1: Graphics, Text, Transparency, Images, Link Annotations
+	page1 := doc.AddPage(600, 800)
+	content1 := page1.Content()
+
+	// 1. Graphics & Paths
+	content1.Save()
+	content1.SetFillColor(0.2, 0.4, 0.8)
+	content1.SetStrokeColor(0.1, 0.1, 0.1)
+	content1.SetLineWidth(2.0)
+	content1.SetLineCap(1)
+	content1.Rect(50, 700, 200, 50)
+	content1.Fill()
+	content1.MoveTo(50, 680)
+	content1.LineTo(250, 680)
+	content1.CurveTo(270, 680, 290, 660, 300, 640)
+	content1.Stroke()
+	content1.Restore()
+
+	// 2. ExtGState Opacity
+	content1.Save()
+	content1.SetOpacity(0.65)
+	content1.SetFillColor(0.9, 0.2, 0.2)
+	content1.Rect(70, 710, 100, 30)
+	content1.Fill()
+	content1.Restore()
+
+	// 3. Text
+	content1.UseEmbeddedFont("F1", fnt)
+	content1.BeginText()
+	content1.SetFont("F1", 14)
+	content1.TextLeading(18)
+	content1.TextAt(50, 600)
+	content1.SetCharSpacing(0.5)
+	content1.TextShow("PDF 1.7 Text Heading")
+	content1.TextNextLine()
+	content1.TextShow("Secondary line with numbers: 1234567890")
+	content1.EndText()
+
+	// 4. Images (JPEG pass-through and PNG with SMask)
+	if err := content1.AddJPEGImage("J1", 50, 450, 100, 80, makeJPEG(t)); err != nil {
+		t.Fatalf("AddJPEGImage: %v", err)
+	}
+
+	if err := content1.AddPNGImage("P1", 200, 450, 100, 80, makePNG(t, true)); err != nil {
+		t.Fatalf("AddPNGImage: %v", err)
+	}
+
+	// 5. Link Annotations (URI + Page GoTo)
+	page1.AddLinkURI([4]float64{50, 600, 250, 620}, "https://example.com/pdf17")
+	page1.AddLinkDest([4]float64{50, 450, 150, 530}, 1, 50, 750)
+
+	// Page 2: Additional page content for internal linking
+	page2 := doc.AddPage(600, 800)
+	content2 := page2.Content()
+	content2.UseEmbeddedFont("F1", fnt)
+	content2.BeginText()
+	content2.SetFont("F1", 12)
+	content2.TextAt(50, 750)
+	content2.TextShow("Destination Page 2 Content")
+	content2.EndText()
+
+	// 6. Outline hierarchy
+	rootOutline := &Outline{ //nolint:exhaustruct // intentional zero-value fields
+		Title: "root",
+		Children: []*Outline{
+			{
+				Title:   "Chapter 1 — Introduction",
+				PageRef: page1.ref.String(),
+				X:       50,
+				Y:       750,
+			},
+			{
+				Title:   "Chapter 2 — Details",
+				PageRef: page2.ref.String(),
+				X:       50,
+				Y:       750,
+				Children: []*Outline{
+					{
+						Title:   "Section 2.1 — Sub-topic",
+						PageRef: page2.ref.String(),
+						X:       50,
+						Y:       600,
+					},
+				},
+			},
+		},
+	}
+	doc.SetOutline(rootOutline)
+
+	// Serialize
+	var buf bytes.Buffer
+
+	bytesWritten, err := doc.WriteTo(&buf)
+	if err != nil {
+		t.Fatalf("doc.WriteTo: %v", err)
+	}
+
+	if bytesWritten != int64(buf.Len()) {
+		t.Errorf("WriteTo count = %d, buf.Len() = %d", bytesWritten, buf.Len())
+	}
+
+	outBytes := buf.Bytes()
+	outStr := string(outBytes)
+
+	// Verify Header & Binary Comment
+	if !strings.HasPrefix(outStr, "%PDF-1.7\n%\xe2\xe3\xcf\xd3\n") {
+		t.Errorf("invalid header prefix in PDF 1.7 rich doc")
+	}
+
+	// Verify Trailer /ID and structure
+	if !strings.Contains(outStr, "trailer\n<< /Size ") || !strings.Contains(outStr, "/ID [ <") {
+		t.Errorf("PDF 1.7 rich doc trailer missing /ID or invalid structure")
+	}
+
+	// Verify Catalog & Metadata stream
+	if !strings.Contains(outStr, "/Type /Catalog") ||
+		!strings.Contains(outStr, "/Metadata ") ||
+		!strings.Contains(outStr, "/Outlines ") {
+		t.Errorf("Catalog missing /Metadata or /Outlines")
+	}
+
+	if !strings.Contains(outStr, "/Type /Metadata /Subtype /XML") {
+		t.Errorf("Metadata stream missing /Type /Metadata /Subtype /XML")
+	}
+
+	if !strings.Contains(outStr, "<pdf:Producer>gowkhtmltopdf 1.7</pdf:Producer>") {
+		t.Errorf("XMP metadata missing correct Producer")
+	}
+
+	// Verify Page Resources
+	for _, expectedRes := range []string{
+		"/ProcSet [/PDF /Text /ImageB /ImageC /ImageI]",
+		"/Font <<",
+		"/XObject <<",
+		"/ExtGState << /opacity << /CA 0.65 /ca 0.65 >> >>",
+	} {
+		if !strings.Contains(outStr, expectedRes) {
+			t.Errorf("missing page resource entry %q", expectedRes)
+		}
+	}
+
+	// Verify Annotations
+	wantURIAnnot := "/Subtype /Link /Rect [50 600 250 620] /A << /S /URI /URI (https://example.com/pdf17) >>"
+	if !strings.Contains(outStr, wantURIAnnot) {
+		t.Errorf("URI annotation missing or malformed")
+	}
+
+	if !strings.Contains(outStr, "/Dest ["+page2.ref.String()+" /XYZ 50 750 null]") {
+		t.Errorf("GoTo destination annotation missing or malformed")
+	}
+
+	// Verify Outlines
+	if !strings.Contains(outStr, "/Type /Outlines") || !strings.Contains(outStr, "/PageMode /UseOutlines") {
+		t.Errorf("Outlines or /PageMode /UseOutlines missing")
+	}
+
+	// Verify Semantic representation
+	sem, err := ParseSemantic(outBytes)
+	if err != nil {
+		t.Fatalf("ParseSemantic(richDoc): %v", err)
+	}
+
+	if sem.Version != versionToken17 {
+		t.Errorf("SemanticDoc.Version = %q, want 1.7", sem.Version)
+	}
+
+	if len(sem.Pages) != 2 {
+		t.Fatalf("SemanticDoc.Pages count = %d, want 2", len(sem.Pages))
+	}
+
+	if sem.Pages[0].MediaBox != [4]float64{0, 0, 600, 800} {
+		t.Errorf("Page 1 MediaBox = %v, want [0 0 600 800]", sem.Pages[0].MediaBox)
+	}
+
+	if len(sem.Pages[0].Annots) != 2 {
+		t.Errorf("Page 1 Annots count = %d, want 2", len(sem.Pages[0].Annots))
+	}
+
+	// Verify Determinism across multiple runs
+	doc2, err := NewDocumentWithPolicy(WriterPolicy{Version: PDF17})
+	if err != nil {
+		t.Fatalf("NewDocumentWithPolicy: %v", err)
+	}
+
+	doc2.SetCreationTime(fixedTime)
+	doc2.SetInfo("Title", "Rich Document — PDF 1.7 Specification Test")
+	doc2.SetInfo("Author", "Test Author")
+	doc2.SetInfo("Subject", "Testing PDF 1.7 Features")
+	doc2.SetInfo("Keywords", "PDF, 1.7, Graphics, Fonts, Images")
+	doc2.SetInfo("Creator", "gowkhtmltopdf test suite")
+
+	p2_1 := doc2.AddPage(600, 800)
+	c2_1 := p2_1.Content()
+	c2_1.Save()
+	c2_1.SetFillColor(0.2, 0.4, 0.8)
+	c2_1.SetStrokeColor(0.1, 0.1, 0.1)
+	c2_1.SetLineWidth(2.0)
+	c2_1.SetLineCap(1)
+	c2_1.Rect(50, 700, 200, 50)
+	c2_1.Fill()
+	c2_1.MoveTo(50, 680)
+	c2_1.LineTo(250, 680)
+	c2_1.CurveTo(270, 680, 290, 660, 300, 640)
+	c2_1.Stroke()
+	c2_1.Restore()
+	c2_1.Save()
+	c2_1.SetOpacity(0.65)
+	c2_1.SetFillColor(0.9, 0.2, 0.2)
+	c2_1.Rect(70, 710, 100, 30)
+	c2_1.Fill()
+	c2_1.Restore()
+	c2_1.UseEmbeddedFont("F1", fnt)
+	c2_1.BeginText()
+	c2_1.SetFont("F1", 14)
+	c2_1.TextLeading(18)
+	c2_1.TextAt(50, 600)
+	c2_1.SetCharSpacing(0.5)
+	c2_1.TextShow("PDF 1.7 Text Heading")
+	c2_1.TextNextLine()
+	c2_1.TextShow("Secondary line with numbers: 1234567890")
+	c2_1.EndText()
+	_ = c2_1.AddJPEGImage("J1", 50, 450, 100, 80, makeJPEG(t))
+	_ = c2_1.AddPNGImage("P1", 200, 450, 100, 80, makePNG(t, true))
+
+	p2_1.AddLinkURI([4]float64{50, 600, 250, 620}, "https://example.com/pdf17")
+	p2_1.AddLinkDest([4]float64{50, 450, 150, 530}, 1, 50, 750)
+
+	p2_2 := doc2.AddPage(600, 800)
+	c2_2 := p2_2.Content()
+	c2_2.UseEmbeddedFont("F1", fnt)
+	c2_2.BeginText()
+	c2_2.SetFont("F1", 12)
+	c2_2.TextAt(50, 750)
+	c2_2.TextShow("Destination Page 2 Content")
+	c2_2.EndText()
+
+	doc2.SetOutline(&Outline{ //nolint:exhaustruct // intentional zero-value fields
+		Title: "root",
+		Children: []*Outline{
+			{
+				Title:   "Chapter 1 — Introduction",
+				PageRef: p2_1.ref.String(),
+				X:       50,
+				Y:       750,
+			},
+			{
+				Title:   "Chapter 2 — Details",
+				PageRef: p2_2.ref.String(),
+				X:       50,
+				Y:       750,
+				Children: []*Outline{
+					{
+						Title:   "Section 2.1 — Sub-topic",
+						PageRef: p2_2.ref.String(),
+						X:       50,
+						Y:       600,
+					},
+				},
+			},
+		},
+	})
+
+	var buf2 bytes.Buffer
+	if err := doc2.Write(&buf2); err != nil {
+		t.Fatalf("doc2.Write: %v", err)
+	}
+
+	if !bytes.Equal(outBytes, buf2.Bytes()) {
+		t.Error("consecutive PDF 1.7 rich document writes are not byte-identical")
 	}
 }
