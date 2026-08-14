@@ -1,8 +1,11 @@
-// Package pdf implements a stdlib-only version-aware PDF writer (PDF 1.4 default,
-// opt-in PDF 1.7): indirect objects, xref, catalog/pages tree, content streams
-// (Flate), base-14 fonts, images, link annotations, named destinations, outlines,
-// trailer /ID, and non-claiming XMP metadata. Deterministic output for golden
-// tests (creation date is injectable).
+// Package pdf implements a pure-Go version-aware PDF writer (PDF 1.4 default,
+// opt-in PDF 1.7 and 2.0): indirect objects, xref, catalog/pages tree, content
+// streams (Flate), base-14 fonts, images, link annotations, named destinations,
+// outlines, trailer /ID, and non-claiming XMP metadata. The write path uses the
+// Go standard library plus one allowlisted exception for OpenType shaping
+// (go-text/typesetting). Deterministic output for golden tests (creation date
+// is injectable). PDF 2.0 is an opt-in version only — it is not PDF/A-4 or
+// PDF/UA-2 (issue #33).
 package pdf
 
 import (
@@ -140,14 +143,27 @@ type Document struct {
 	catalogRef        objRef            // set by finalize
 	infoRef           objRef            // set by finalize
 	metadataRef       objRef            // set by finalize
-	iccRef            objRef            // set by finalize (PDF/A-3)
-	outputIntentRef   objRef            // set by finalize (PDF/A-3)
+	iccRef            objRef            // set by finalize (PDF/A-3, PDF/A-4 sRGB)
+	grayIccRef        objRef            // set by finalize (PDF/A-4 Gray)
+	outputIntentRef   objRef            // set by finalize (PDF/A-3, PDF/A-4)
+	namespaceRef      objRef            // set by finalizeStructure (PDF/UA-2)
 	structTreeRootRef objRef            // set by finalizeStructure
 	parentTreeRef     objRef            // set by finalizeStructure
 	parentTreeNextKey int               // set by finalizeStructure
 	structTreeRoot    *StructTreeRoot
-	lang              string // document language (default "en-US")
+	namedDests        []namedDestEntry // dual page+/SD destinations for PDF/UA-2
+	lang              string           // document language (default "en-US")
 	finalized         bool
+}
+
+// namedDestEntry is one PDF 2.0 named destination with a classic page
+// destination (/D) and optional structure destination (/SD). Dual form keeps
+// Arlington / page-based checkers happy while satisfying PDF/UA-2 clause 8.8.
+type namedDestEntry struct {
+	name    string
+	page    objRef
+	x, y    float64
+	structR objRef // 0 when no structure destination
 }
 
 // NewDocument creates an empty PDF document with the default PDF 1.4 policy.
@@ -258,6 +274,7 @@ type annotation struct {
 	destX           float64
 	destY           float64
 	hasDest         bool
+	destStruct      *StructElem // optional PDF/UA-2 structure destination target
 	annotRef        objRef
 	structParent    int
 	hasStructParent bool
@@ -417,12 +434,27 @@ func (p *Page) AddLinkDest(rect [4]float64, page int, destX, destY float64) objR
 	return ref
 }
 
+// SetLinkDestStruct associates a structure element with the most recently
+// added internal link annotation on this page. Used for PDF/UA-2 structure
+// destinations (ISO 14289-2 clause 8.8). No-op when the page has no annots.
+func (p *Page) SetLinkDestStruct(elem *StructElem) {
+	if p == nil || elem == nil || len(p.annots) == 0 {
+		return
+	}
+
+	last := &p.annots[len(p.annots)-1]
+	if last.hasDest {
+		last.destStruct = elem
+	}
+}
+
 // Outline is a PDF outline (bookmark) node.
 type Outline struct {
-	Title    string
-	PageRef  string // page object ref, set by caller after layout
-	X, Y     float64
-	Children []*Outline
+	Title      string
+	PageRef    string // page object ref, set by caller after layout
+	X, Y       float64
+	Children   []*Outline
+	StructElem *StructElem // optional: associated heading StructElem for PDF/UA-2 /SD
 
 	refStr objRef // assigned during finalize
 }
@@ -535,6 +567,7 @@ func computeTrailerID(doc *Document) string {
 	return fmt.Sprintf("%032X", sum)
 }
 
+//nolint:cyclop // xref subsection + trailer shape branches by version/profile
 func writePDFTrailer(out *countingWriter, doc *Document, offsets []int64) error {
 	xrefPos := out.n
 
@@ -556,7 +589,16 @@ func writePDFTrailer(out *countingWriter, doc *Document, offsets []int64) error 
 		return err
 	}
 
-	if doc.policy.Version >= PDF17 {
+	switch {
+	case doc.policy.IsPDFA4():
+		idHex := computeTrailerID(doc)
+		if err := writePDFFormat(
+			out, "<< /Size %d /Root %s /ID [ <%s> <%s> ] >>\n",
+			len(doc.objects)+1, doc.catalogRef, idHex, idHex,
+		); err != nil {
+			return err
+		}
+	case doc.policy.Version >= PDF17:
 		idHex := computeTrailerID(doc)
 		if err := writePDFFormat(
 			out, "<< /Size %d /Root %s /Info %s /ID [ <%s> <%s> ] >>\n",
@@ -564,7 +606,7 @@ func writePDFTrailer(out *countingWriter, doc *Document, offsets []int64) error 
 		); err != nil {
 			return err
 		}
-	} else {
+	default:
 		if err := writePDFFormat(
 			out, "<< /Size %d /Root %s /Info %s >>\n", len(doc.objects)+1, doc.catalogRef, doc.infoRef,
 		); err != nil {
@@ -627,7 +669,7 @@ func (d *Document) finalize() error {
 		return errPDFNoPages
 	}
 
-	if d.policy.IsPDFUA1() {
+	if d.policy.IsPDFUA1() || d.policy.IsPDFUA2() {
 		title := strings.TrimSpace(d.info["Title"])
 		if title == "" {
 			return ErrTitleRequired
@@ -635,10 +677,17 @@ func (d *Document) finalize() error {
 	}
 
 	catalogRef := d.newObject()
-	infoRef := d.newObject()
+
+	var infoRef objRef
+
+	if !d.policy.IsPDFA4() {
+		infoRef = d.newObject()
+	}
+
 	pagesRef := d.newObject()
 
 	var metadataRef objRef
+
 	if d.policy.Version >= PDF17 {
 		metadataRef = d.newObject()
 		xmpBytes := d.buildXMPMetadata()
@@ -649,9 +698,25 @@ func (d *Document) finalize() error {
 	if d.policy.IsPDFA3() {
 		iccRef := d.newObject()
 		iccData := flateBytes(sRGBICCProfile())
-		d.setDict(iccRef, fmt.Sprintf("<< /N 3 /Filter /FlateDecode /Length %d >>", len(iccData)))
+		d.setDict(iccRef, fmt.Sprintf("<< /N 3 /Alternate /DeviceRGB /Filter /FlateDecode /Length %d >>", len(iccData)))
 		d.setStream(iccRef, iccData)
 		d.iccRef = iccRef
+
+		outputIntentRef := d.newObject()
+		d.setDict(outputIntentRef, outputIntentDict(iccRef))
+		d.outputIntentRef = outputIntentRef
+	} else if d.policy.IsPDFA4() {
+		iccRef := d.newObject()
+		iccData := flateBytes(sRGBICCProfile())
+		d.setDict(iccRef, fmt.Sprintf("<< /N 3 /Alternate /DeviceRGB /Filter /FlateDecode /Length %d >>", len(iccData)))
+		d.setStream(iccRef, iccData)
+		d.iccRef = iccRef
+
+		grayRef := d.newObject()
+		grayData := flateBytes(grayICCProfile())
+		d.setDict(grayRef, fmt.Sprintf("<< /N 1 /Alternate /DeviceGray /Filter /FlateDecode /Length %d >>", len(grayData)))
+		d.setStream(grayRef, grayData)
+		d.grayIccRef = grayRef
 
 		outputIntentRef := d.newObject()
 		d.setDict(outputIntentRef, outputIntentDict(iccRef))
@@ -670,28 +735,31 @@ func (d *Document) finalize() error {
 		"<< /Type /Pages\n/Kids [%s]\n/Count %d >>",
 		strings.Join(pageRefs, " "), len(pageRefs)))
 
-	// Outlines must be finalized before the catalog dict is written so
-	// outlineRoot.refStr is assigned; otherwise /Outlines is emitted with an
-	// empty value and the Catalog dictionary is malformed (viewers show no
-	// content / fail to open the file).
+	// Structure tree must be finalized before outlines/annots so StructElem
+	// refs are available for PDF/UA-2 structure destinations (/SD).
+	if err := d.finalizeStructure(); err != nil {
+		return err
+	}
+
+	// Outlines and page annots register dual named destinations under UA-2
+	// before the catalog is written (catalog needs /Names /Dests).
 	if d.outlineRoot != nil {
 		if err := d.finalizeOutlines(d.outlineRoot); err != nil {
 			return err
 		}
 	}
 
-	if err := d.finalizeStructure(); err != nil {
-		return err
-	}
-
-	d.setDict(catalogRef, d.catalogDict(pagesRef, metadataRef))
-	d.setDict(infoRef, d.infoDict())
-
-	// per-page objects
 	for _, p := range d.pages {
 		if err := d.finalizePage(p, pagesRef); err != nil {
 			return err
 		}
+	}
+
+	namesRef := d.serializeNamedDests()
+	d.setDict(catalogRef, d.catalogDict(pagesRef, metadataRef, namesRef))
+
+	if infoRef != 0 {
+		d.setDict(infoRef, d.infoDict())
 	}
 
 	d.catalogRef = catalogRef
@@ -767,8 +835,13 @@ func sortedStringKeys[V any](values map[string]V) []string {
 }
 
 // catalogDict builds the /Catalog dictionary, wiring /Metadata when present,
-// /Outlines when set, /OutputIntents when present, and PDF/UA-1 keys when enabled.
-func (d *Document) catalogDict(pagesRef, metadataRef objRef) string {
+// /Outlines when set, /OutputIntents when present, and PDF/UA-1 & PDF/UA-2 keys when enabled.
+//
+// Catalog /Version is deliberately not emitted: the file header is the single
+// version authority. This matches the PDF 1.7 sibling decision (#31) and keeps
+// the header and catalog from ever disagreeing. ISO 32000-2 keeps the header
+// authoritative; catalog /Version was deprecated in 1.4 and is optional there.
+func (d *Document) catalogDict(pagesRef, metadataRef, namesRef objRef) string {
 	cat := dict{}.add("/Type", "/Catalog")
 	if metadataRef != 0 {
 		cat = cat.add("/Metadata", metadataRef.String())
@@ -779,11 +852,15 @@ func (d *Document) catalogDict(pagesRef, metadataRef objRef) string {
 		cat = cat.add("/Outlines", d.outlineRoot.refStr.String()).add("/PageMode", "/UseOutlines")
 	}
 
+	if namesRef != 0 {
+		cat = cat.add("/Names", namesRef.String())
+	}
+
 	if d.outputIntentRef != 0 {
 		cat = cat.add("/OutputIntents", "["+d.outputIntentRef.String()+"]")
 	}
 
-	if d.policy.IsPDFUA1() {
+	if d.policy.IsPDFUA1() || d.policy.IsPDFUA2() {
 		cat = cat.add("/MarkInfo", "<< /Marked true >>")
 
 		lang := d.lang
@@ -800,6 +877,61 @@ func (d *Document) catalogDict(pagesRef, metadataRef objRef) string {
 	}
 
 	return cat.String()
+}
+
+// registerDualDest records a PDF 2.0 named destination with page /D and
+// optional structure /SD, returning the destination name for /Dest (name).
+func (d *Document) registerDualDest(page objRef, left, top float64, structElem *StructElem) string {
+	name := fmt.Sprintf("D%d", len(d.namedDests)+1)
+	entry := namedDestEntry{ //nolint:exhaustruct // intentional zero-value fields
+		name: name,
+		page: page,
+		x:    left,
+		y:    top,
+	}
+
+	if structElem != nil && structElem.ref != 0 {
+		entry.structR = structElem.ref
+	}
+
+	d.namedDests = append(d.namedDests, entry)
+
+	return name
+}
+
+// serializeNamedDests writes Catalog /Names /Dests as a name tree of dual
+// destinations. Returns 0 when no named destinations were registered.
+func (d *Document) serializeNamedDests() objRef {
+	if len(d.namedDests) == 0 {
+		return 0
+	}
+
+	const nameAndRefPair = 2
+
+	nameParts := make([]string, 0, len(d.namedDests)*nameAndRefPair)
+
+	for _, entry := range d.namedDests {
+		destObj := d.newObject()
+		destDict := fmt.Sprintf("<< /D [%s /XYZ %s %s null]",
+			entry.page, num(entry.x), num(entry.y))
+
+		if entry.structR != 0 {
+			destDict += fmt.Sprintf(" /SD [%s /XYZ %s %s null]",
+				entry.structR, num(entry.x), num(entry.y))
+		}
+
+		destDict += " >>"
+		d.setDict(destObj, destDict)
+		nameParts = append(nameParts, pdfString(entry.name), destObj.String())
+	}
+
+	treeRef := d.newObject()
+	d.setDict(treeRef, fmt.Sprintf("<< /Names [ %s ] >>", strings.Join(nameParts, " ")))
+
+	namesRef := d.newObject()
+	d.setDict(namesRef, fmt.Sprintf("<< /Dests %s >>", treeRef.String()))
+
+	return namesRef
 }
 
 // infoDict builds the /Info dictionary with the (injectable) timestamps.
@@ -833,7 +965,7 @@ func (d *Document) finalizePage(page *Page, pagesRef objRef) error {
 
 	d.setStream(page.contentRef, raw)
 
-	res, err := buildPageResources(page.content, d.iccRef)
+	res, err := buildPageResources(page.content, d.iccRef, d.grayIccRef, d.policy.Version)
 	if err != nil {
 		return err
 	}
@@ -846,7 +978,7 @@ func (d *Document) finalizePage(page *Page, pagesRef objRef) error {
 		"/Contents " + page.contentRef.String(),
 	}
 
-	if d.policy.IsPDFUA1() && page.hasStructParents {
+	if (d.policy.IsPDFUA1() || d.policy.IsPDFUA2()) && page.hasStructParents {
 		parts = append(parts, fmt.Sprintf("/StructParents %d", page.structParents))
 	}
 
@@ -869,10 +1001,12 @@ func (d *Document) finalizePage(page *Page, pagesRef objRef) error {
 }
 
 // buildPageResources assembles the /Resources dict from the content's fonts,
-// images, and color spaces.
+// images, and color spaces. PDF 2.0 pages omit /ProcSet (removed in
+// ISO 32000-2; already obsolete in ISO 32000-1 §14.2), so the dict lists
+// only the resources the content actually uses.
 //
-//nolint:wsl // resource dictionary assembly is a linear PDF serialization block
-func buildPageResources(content *Content, iccRef objRef) (string, error) {
+//nolint:wsl,cyclop,funlen // resource dictionary assembly is a linear PDF serialization block
+func buildPageResources(content *Content, iccRef, grayIccRef objRef, version PDFVersion) (string, error) {
 	fonts, err := content.fonts()
 	if err != nil {
 		return "", err
@@ -882,10 +1016,21 @@ func buildPageResources(content *Content, iccRef objRef) (string, error) {
 
 	var res strings.Builder
 
-	res.WriteString("<< /ProcSet [/PDF /Text /ImageB /ImageC /ImageI]")
+	if version < PDF20 {
+		res.WriteString("<< /ProcSet [/PDF /Text /ImageB /ImageC /ImageI]")
+	} else {
+		res.WriteString("<<")
+	}
 
-	if iccRef != 0 {
-		res.WriteString(" /ColorSpace << /DefaultRGB [/ICCBased " + iccRef.String() + "] >>")
+	if iccRef != 0 || grayIccRef != 0 {
+		res.WriteString(" /ColorSpace <<")
+		if iccRef != 0 {
+			res.WriteString(" /DefaultRGB [/ICCBased " + iccRef.String() + "]")
+		}
+		if grayIccRef != 0 {
+			res.WriteString(" /DefaultGray [/ICCBased " + grayIccRef.String() + "]")
+		}
+		res.WriteString(" >>")
 	}
 
 	if len(fonts) > 0 {
@@ -938,9 +1083,61 @@ func annotDescription(arg *annotation) string {
 	return "Link"
 }
 
-func (d *Document) buildAnnots(p *Page) {
-	for i := range p.annots {
-		arg := &p.annots[i]
+// structureDestElem picks the StructElem for a PDF/UA-2 /SD entry. Prefer an
+// explicit per-annot target; otherwise the first marked-content owner on the
+// destination page (has /Pg association). Never fall back to Document alone —
+// a structure destination without a page is an invalid page destination.
+func structureDestElem(arg *annotation, doc *Document) *StructElem {
+	if arg == nil {
+		return nil
+	}
+
+	if arg.destStruct != nil && arg.destStruct.ref != 0 {
+		return arg.destStruct
+	}
+
+	if doc == nil || !arg.hasDest || arg.destPage < 0 || arg.destPage >= len(doc.pages) {
+		return nil
+	}
+
+	return firstPageStructElem(doc.pages[arg.destPage])
+}
+
+func firstPageStructElem(page *Page) *StructElem {
+	if page == nil {
+		return nil
+	}
+
+	for _, owner := range page.mcids {
+		if owner != nil && owner.ref != 0 {
+			return owner
+		}
+	}
+
+	return nil
+}
+
+func writeAnnotDest(buf *strings.Builder, doc *Document, arg *annotation) {
+	if arg.destPage < 0 || arg.destPage >= len(doc.pages) {
+		return
+	}
+
+	pageRef := doc.pages[arg.destPage].ref
+	// PDF/UA-2: dual named dest — /D page (Arlington/PDF/A) + /SD struct (UA-2 8.8).
+	if doc.policy.IsPDFUA2() {
+		name := doc.registerDualDest(pageRef, arg.destX, arg.destY, structureDestElem(arg, doc))
+		fmt.Fprintf(buf, " /Dest %s", pdfString(name))
+
+		return
+	}
+
+	fmt.Fprintf(buf, " /Dest [%s /XYZ %s %s null]",
+		pageRef, num(arg.destX), num(arg.destY))
+}
+
+func (d *Document) buildAnnots(page *Page) {
+	for i := range page.annots {
+		arg := &page.annots[i]
 		if arg.annotRef == 0 {
 			arg.annotRef = d.newObject()
 		}
@@ -952,7 +1149,7 @@ func (d *Document) buildAnnots(p *Page) {
 		fmt.Fprintf(&buf, "<< /Type /Annot /Subtype /Link /Rect [%s %s %s %s] /Border [0 0 0] /F 4",
 			num(r[0]), num(r[1]), num(r[2]), num(r[3]))
 
-		if d.policy.IsPDFUA1() {
+		if d.policy.IsPDFUA1() || d.policy.IsPDFUA2() {
 			fmt.Fprintf(&buf, " /Contents %s", d.encodeTextString(annotDescription(arg)))
 
 			if arg.hasStructParent {
@@ -961,10 +1158,7 @@ func (d *Document) buildAnnots(p *Page) {
 		}
 
 		if arg.hasDest {
-			if arg.destPage >= 0 && arg.destPage < len(d.pages) {
-				fmt.Fprintf(&buf, " /Dest [%s /XYZ %s %s null]",
-					d.pages[arg.destPage].ref, num(arg.destX), num(arg.destY))
-			}
+			writeAnnotDest(&buf, d, arg)
 		} else {
 			fmt.Fprintf(&buf, " /A << /S /URI /URI %s >>", pdfString(arg.uri))
 		}
@@ -1043,6 +1237,11 @@ func buildOutlineItems(parent *Outline, parentRef objRef, doc *Document) error {
 // outlineDest renders the /Dest entry for an outline item, or "" when the
 // item has no destination. A malformed or out-of-range PageRef fails the
 // document instead of emitting a corrupt /Dest.
+//
+// Under PDF/UA-2, destinations are dual named destinations: /D is a page
+// XYZ dest (Arlington DestXYZ + PDF/A page validity) and /SD is a structure
+// destination (ISO 14289-2:2024 clause 8.8). The outline item may also carry
+// /SE pointing at the heading StructElem.
 func outlineDest(child *Outline, doc *Document) (string, error) {
 	if child.PageRef == "" {
 		return "", nil
@@ -1057,6 +1256,17 @@ func outlineDest(child *Outline, doc *Document) (string, error) {
 	if int(ref) < 1 || int(ref) > len(doc.objects) {
 		//nolint:err113 // dynamic values in message
 		return "", fmt.Errorf("pdf: outline %q: PageRef %q out of range", child.Title, child.PageRef)
+	}
+
+	if doc.policy.IsPDFUA2() {
+		name := doc.registerDualDest(ref, child.X, child.Y, child.StructElem)
+		parts := "/Dest " + pdfString(name)
+
+		if child.StructElem != nil && child.StructElem.ref != 0 {
+			parts += " /SE " + child.StructElem.ref.String()
+		}
+
+		return parts, nil
 	}
 
 	return fmt.Sprintf("/Dest [%s /XYZ %s %s null]", ref, num(child.X), num(child.Y)), nil
@@ -1160,8 +1370,10 @@ func pdfDate(t time.Time) string {
 
 // encodeTextString encodes text as a PDF text string according to document version.
 // For PDF 1.4, it uses pdfString (Latin-1 / PDFDocEncoding fold).
-// For PDF 1.7+, if text contains any characters outside Latin-1 (> U+00FF),
+// For PDF 1.7, if text contains any characters outside Latin-1 (> U+00FF),
 // it encodes text as UTF-16BE with a byte-order mark (BOM \xFE\xFF) formatted as a hex string <FEFF...>.
+// For PDF 2.0 (ISO 32000-2), if text contains any characters outside Latin-1,
+// it encodes text as a UTF-8 text string (BOM EF BB BF + UTF-8) as a hex string.
 func encodeTextString(text string, version PDFVersion) string {
 	if text == "" {
 		return "()"
@@ -1173,11 +1385,36 @@ func encodeTextString(text string, version PDFVersion) string {
 
 	for _, rVal := range text {
 		if rVal > maxLatin1Code {
+			if version >= PDF20 {
+				return encodeUTF8Hex(text)
+			}
+
 			return encodeUTF16BEHex(text)
 		}
 	}
 
 	return pdfString(text)
+}
+
+// encodeUTF8Hex renders text as a PDF 2.0 UTF-8 text string: ISO 32000-2
+// requires UTF-8 text strings to begin with U+FEFF (bytes EF BB BF), so the
+// hex string is the BOM followed by the UTF-8 encoding of text. Hex form
+// avoids literal-string escaping for bytes outside printable ASCII.
+func encodeUTF8Hex(text string) string {
+	utf8Bytes := []byte(text)
+
+	var buf strings.Builder
+
+	buf.Grow(len(utf8Bytes)*2 + len("<EFBBBF>"))
+	buf.WriteString("<EFBBBF")
+
+	for _, b := range utf8Bytes {
+		fmt.Fprintf(&buf, "%02X", b)
+	}
+
+	buf.WriteByte('>')
+
+	return buf.String()
 }
 
 func encodeUTF16BEHex(text string) string {

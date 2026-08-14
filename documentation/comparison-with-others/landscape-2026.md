@@ -10,8 +10,9 @@ like-for-like measurements.
 ## Score card
 
 **gowkhtmltopdf: 7.5/10 overall** — a strong fit for authored HTML templates,
-held back by partial CSS, no JavaScript, no PDF/A, and the current default
-creation-time metadata. **8.5/10 for HTML templates** and **5.5–6/10 as a
+held back by partial CSS, no JavaScript, and the current default
+creation-time metadata. PDF/A-3a+UA-1 and PDF/A-4+UA-2 are opt-in via
+`--pdf-profile`. **8.5/10 for HTML templates** and **5.5–6/10 as a
 general converter** are more useful role-specific scores. A 9/10 niche score
 depends on making normal CLI output byte-stable.
 

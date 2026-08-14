@@ -123,7 +123,7 @@ type PDFVersion int
 const (
     PDF14 PDFVersion = iota
     PDF17
-    PDF20            // reserved for #32; reject until that plan lands
+    PDF20            // reserved for #32 at the time this was written; shipped as opt-in since 0.2.2
 )
 
 type WriterPolicy struct {

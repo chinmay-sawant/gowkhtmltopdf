@@ -11,7 +11,7 @@ bytes to the HTML/CSS/layout pipeline."
 The conversion pipeline is
 
 ```text
-load → parse → style → layout → paginate → paint → write (PDF 1.4 or PNG/JPEG)
+load → parse → style → layout → paginate → paint → write (PDF 1.4 / 1.7 / 2.0 or PNG/JPEG)
 ```
 
 `internal/load` owns the **first stage** and the **two resource seams** the

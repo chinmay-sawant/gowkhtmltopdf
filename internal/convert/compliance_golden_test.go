@@ -14,6 +14,8 @@ import (
 	"gowkhtmltopdf/internal/settings"
 )
 
+const complianceFooterPage = "Page [page]"
+
 //nolint:cyclop,funlen // comprehensive golden needle assertions for PDF/A-3a + PDF/UA-1 dual profile
 func TestConvertDualProfileGoldenNeedles(t *testing.T) {
 	t.Parallel()
@@ -44,7 +46,7 @@ func TestConvertDualProfileGoldenNeedles(t *testing.T) {
 	cmd.Global.PdfProfile = settings.ProfilePDFA3aPDFUA1
 	cmd.Global.Title = "Compliance Document — 2026"
 	cmd.Global.Header.Left = "Header [page]"
-	cmd.Global.Footer.Right = "Page [page]"
+	cmd.Global.Footer.Right = complianceFooterPage
 	cmd.Global.UseCompression = false
 
 	data := runPDF(t, cmd)
@@ -145,6 +147,146 @@ func TestConvertDualProfileGoldenNeedles(t *testing.T) {
 	}
 }
 
+//nolint:cyclop,funlen // comprehensive golden needle assertions for PDF/A-4 + PDF/UA-2 dual profile
+func TestConvertDualPDFA4PDFUA2GoldenNeedles(t *testing.T) {
+	t.Parallel()
+
+	htmlContent := `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PDF 2.0 Dual Compliance Document</title>
+<style>
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border: 1px solid #ccc; padding: 4px; }
+</style>
+</head>
+<body>
+<h1>Chapter 1: PDF 2.0 Compliance Overview</h1>
+<p>This document demonstrates PDF/A-4 and PDF/UA-2 compliance.</p>
+<table>
+  <tr><th>Profile</th><th>Status</th></tr>
+  <tr><td>PDF/A-4</td><td>Pass</td></tr>
+  <tr><td>PDF/UA-2</td><td>Pass</td></tr>
+</table>
+<p><a href="https://example.com/spec2">PDF 2.0 Specification Link</a></p>
+</body>
+</html>`
+
+	cmd, _ := newCommand(t, htmlContent, "")
+	cmd.Global.PdfProfile = settings.ProfilePDFA4PDFUA2
+	cmd.Global.Title = "PDF 2.0 Dual Compliance Document"
+	cmd.Global.Header.Left = "Header [page]"
+	cmd.Global.Footer.Right = complianceFooterPage
+	cmd.Global.UseCompression = false
+
+	data := runPDF(t, cmd)
+	str := string(data)
+
+	// 1. Header is %PDF-2.0
+	if !bytes.HasPrefix(data, []byte("%PDF-2.0\n%\xe2\xe3\xcf\xd3\n")) {
+		t.Errorf("expected %%PDF-2.0 header, got %q", data[:min(25, len(data))])
+	}
+
+	// 2. Trailer /ID is present and /Info is omitted
+	idRe := regexp.MustCompile(`/ID\s*\[\s*<([0-9A-Fa-f]{32})>\s*<([0-9A-Fa-f]{32})>\s*\]`)
+	if !idRe.MatchString(str) {
+		t.Errorf("dual 2.0 profile output missing trailer /ID: %s", str)
+	}
+
+	trailerIdx := strings.LastIndex(str, "trailer\n")
+	if trailerIdx >= 0 {
+		trailerPart := str[trailerIdx:]
+		if strings.Contains(trailerPart, "/Info ") {
+			t.Errorf("PDF/A-4 trailer must omit /Info, found in: %s", trailerPart)
+		}
+	}
+
+	// 3. Claiming XMP Metadata stream contains pdfaid and pdfuaid
+	if !strings.Contains(str, "<pdfaid:part>4</pdfaid:part>") {
+		t.Errorf("XMP metadata missing <pdfaid:part>4</pdfaid:part>")
+	}
+
+	if !strings.Contains(str, "<pdfaid:rev>2020</pdfaid:rev>") {
+		t.Errorf("XMP metadata missing <pdfaid:rev>2020</pdfaid:rev>")
+	}
+
+	if strings.Contains(str, "<pdfaid:conformance>") {
+		t.Errorf("PDF/A-4 should not contain <pdfaid:conformance>")
+	}
+
+	if !strings.Contains(str, "<pdfuaid:part>2</pdfuaid:part>") {
+		t.Errorf("XMP metadata missing <pdfuaid:part>2</pdfuaid:part>")
+	}
+
+	if !strings.Contains(str, "<pdfuaid:rev>2024</pdfuaid:rev>") {
+		t.Errorf("XMP metadata missing <pdfuaid:rev>2024</pdfuaid:rev>")
+	}
+
+	if !strings.Contains(str, "pdfaExtension:schemas") {
+		t.Errorf("XMP metadata missing pdfaExtension:schemas for pdfuaid")
+	}
+
+	// 4. OutputIntent and ICC stream present (sRGB and Gray)
+	if !strings.Contains(str, "/Type /OutputIntent") {
+		t.Errorf("catalog missing /OutputIntent")
+	}
+
+	if !strings.Contains(str, "/S /GTS_PDFA1") {
+		t.Errorf("OutputIntent missing /S /GTS_PDFA1")
+	}
+
+	if !strings.Contains(str, "/OutputConditionIdentifier (sRGB IEC61966-2.1)") {
+		t.Errorf("OutputIntent missing sRGB condition identifier")
+	}
+
+	if !strings.Contains(str, "/DefaultRGB [/ICCBased ") {
+		t.Errorf("Page resources missing DefaultRGB")
+	}
+
+	if !strings.Contains(str, "/DefaultGray [/ICCBased ") {
+		t.Errorf("Page resources missing DefaultGray")
+	}
+
+	// 5. Structure tree keys and namespace object present
+	if !strings.Contains(str, "/MarkInfo << /Marked true >>") {
+		t.Errorf("catalog missing /MarkInfo << /Marked true >>")
+	}
+
+	if !strings.Contains(str, "/ViewerPreferences << /DisplayDocTitle true >>") {
+		t.Errorf("catalog missing /ViewerPreferences << /DisplayDocTitle true >>")
+	}
+
+	if !strings.Contains(str, "/Lang (en)") {
+		t.Errorf("catalog missing /Lang (en)")
+	}
+
+	if !strings.Contains(str, "/Type /Namespace") || !strings.Contains(str, "/NS (http://iso.org/pdf2/ssn)") {
+		t.Errorf("missing PDF 2.0 /Namespace object in output")
+	}
+
+	if !strings.Contains(str, "/Namespaces [") {
+		t.Errorf("StructTreeRoot missing /Namespaces array")
+	}
+
+	// 6. Standard Structure Elements present
+	for _, elem := range []string{"/S /H1", "/S /P", "/S /Table", "/S /TR", "/S /TH", "/S /TD", "/S /Link"} {
+		if !strings.Contains(str, elem) {
+			t.Errorf("missing expected structure element %s in tagged tree", elem)
+		}
+	}
+
+	// 7. Semantic Parse
+	sem, err := pdf.ParseSemantic(data)
+	if err != nil {
+		t.Fatalf("ParseSemantic: %v", err)
+	}
+
+	if sem.Version != pdfVersion20 {
+		t.Errorf("sem.Version = %q, want 2.0", sem.Version)
+	}
+}
+
 //nolint:lll // positive and negative figure alt assertions
 func TestComplianceFigureAltAndMissingAlt(t *testing.T) {
 	t.Parallel()
@@ -229,22 +371,47 @@ func TestComplianceUnclaimedIsolation(t *testing.T) {
 	}
 }
 
+func resolveVeraPDFBinary(t *testing.T) string {
+	t.Helper()
+
+	if bin := os.Getenv("VERAPDF_BIN"); bin != "" {
+		return bin
+	}
+
+	if bin, err := exec.LookPath("verapdf"); err == nil {
+		return bin
+	}
+
+	const treeBin = "../../verapdf/verapdf"
+	if _, err := os.Stat(treeBin); err == nil {
+		return treeBin
+	}
+
+	t.Skip("optional validator verapdf not installed (set VERAPDF_BIN or PATH to enable)")
+
+	return ""
+}
+
+func runVeraPDFFlavour(t *testing.T, verapdfBin, flavour, pdfPath string) {
+	t.Helper()
+
+	out, err := exec.CommandContext(
+		t.Context(), verapdfBin, "-f", flavour, "--format", "text", pdfPath,
+	).CombinedOutput()
+	if err != nil {
+		t.Errorf("verapdf -f %s validation failed: %v\nOutput: %s", flavour, err, string(out))
+
+		return
+	}
+
+	t.Logf("verapdf -f %s outcome: %s", flavour, strings.TrimSpace(string(out)))
+}
+
 func TestVeraPDFOptionalValidation(t *testing.T) {
 	t.Parallel()
 
-	verapdfBin := os.Getenv("VERAPDF_BIN")
-	if verapdfBin == "" {
-		var err error
-
-		verapdfBin, err = exec.LookPath("verapdf")
-		if err != nil {
-			t.Skip("optional validator verapdf not installed (set VERAPDF_BIN or PATH to enable)")
-		}
-	}
-
-	// Record verapdf version
-	verOut, err := exec.CommandContext(t.Context(), verapdfBin, "--version").CombinedOutput()
-	if err == nil {
+	verapdfBin := resolveVeraPDFBinary(t)
+	if verOut, err := exec.CommandContext(t.Context(), verapdfBin, "--version").CombinedOutput(); err == nil {
 		t.Logf("running with verapdf version: %s", strings.TrimSpace(string(verOut)))
 	}
 
@@ -256,39 +423,37 @@ func TestVeraPDFOptionalValidation(t *testing.T) {
 </head>
 <body>
 <h1>veraPDF Compliance Test</h1>
-<p>Testing PDF/A-3a and PDF/UA-1 dual profile compliance.</p>
+<p>Testing PDF/A and PDF/UA profile compliance.</p>
 </body>
 </html>`
 
-	cmd, _ := newCommand(t, htmlContent, "")
-	cmd.Global.PdfProfile = settings.ProfilePDFA3aPDFUA1
-	cmd.Global.Title = "veraPDF Test Document"
-	data := runPDF(t, cmd)
+	// 1. Validate PDF 1.7 (PDF/A-3a and PDF/UA-1)
+	cmd17, _ := newCommand(t, htmlContent, "")
+	cmd17.Global.PdfProfile = settings.ProfilePDFA3aPDFUA1
+	cmd17.Global.Title = "veraPDF Test Document"
+	data17 := runPDF(t, cmd17)
 
-	pdfFile := filepath.Join(t.TempDir(), "verapdf_test.pdf")
-	if err := os.WriteFile(pdfFile, data, 0o600); err != nil {
-		t.Fatalf("write PDF file: %v", err)
+	pdfFile17 := filepath.Join(t.TempDir(), "verapdf_test_17.pdf")
+	if err := os.WriteFile(pdfFile17, data17, 0o600); err != nil {
+		t.Fatalf("write PDF 1.7 file: %v", err)
 	}
 
-	// Test -f 3a
-	out3a, err3a := exec.CommandContext(
-		t.Context(), verapdfBin, "-f", "3a", "--format", "text", pdfFile,
-	).CombinedOutput()
-	if err3a != nil {
-		t.Errorf("verapdf -f 3a validation failed: %v\nOutput: %s", err3a, string(out3a))
-	} else {
-		t.Logf("verapdf -f 3a outcome: %s", strings.TrimSpace(string(out3a)))
+	runVeraPDFFlavour(t, verapdfBin, "3a", pdfFile17)
+	runVeraPDFFlavour(t, verapdfBin, "ua1", pdfFile17)
+
+	// 2. Validate PDF 2.0 (PDF/A-4 and PDF/UA-2)
+	cmd20, _ := newCommand(t, htmlContent, "")
+	cmd20.Global.PdfProfile = settings.ProfilePDFA4PDFUA2
+	cmd20.Global.Title = "veraPDF Test Document"
+	data20 := runPDF(t, cmd20)
+
+	pdfFile20 := filepath.Join(t.TempDir(), "verapdf_test_20.pdf")
+	if err := os.WriteFile(pdfFile20, data20, 0o600); err != nil {
+		t.Fatalf("write PDF 2.0 file: %v", err)
 	}
 
-	// Test -f ua1
-	outUA1, errUA1 := exec.CommandContext(
-		t.Context(), verapdfBin, "-f", "ua1", "--format", "text", pdfFile,
-	).CombinedOutput()
-	if errUA1 != nil {
-		t.Errorf("verapdf -f ua1 validation failed: %v\nOutput: %s", errUA1, string(outUA1))
-	} else {
-		t.Logf("verapdf -f ua1 outcome: %s", strings.TrimSpace(string(outUA1)))
-	}
+	runVeraPDFFlavour(t, verapdfBin, "4", pdfFile20)
+	runVeraPDFFlavour(t, verapdfBin, "ua2", pdfFile20)
 }
 
 // TestPDFUA1ContentMarkedCompleteness validates that in PDF/UA-1 mode, 100% of all visual
@@ -336,7 +501,7 @@ func TestPDFUA1ContentMarkedCompleteness(t *testing.T) {
 	cmd.Global.Title = "Completeness Test"
 	cmd.Global.Header.Left = "Header Text"
 	cmd.Global.Header.Line = true
-	cmd.Global.Footer.Right = "Page [page]"
+	cmd.Global.Footer.Right = complianceFooterPage
 	cmd.Global.Footer.Line = true
 	cmd.Global.UseCompression = false
 

@@ -104,9 +104,9 @@ func tocAnchorLocations(_ *html.Node, res *layout.Result) map[string]layout.Elem
 	return out
 }
 
-// attachLinkStructElem ensures a link annotation is referenced in the PDF/UA-1 structure tree.
+// attachLinkStructElem ensures a link annotation is referenced in the PDF/UA structure tree.
 func attachLinkStructElem(doc *pdf.Document, page *pdf.Page, elem *pdf.StructElem, annotRef pdf.ObjRef) {
-	if doc == nil || !doc.Policy().IsPDFUA1() || page == nil || annotRef == 0 {
+	if doc == nil || (!doc.Policy().IsPDFUA1() && !doc.Policy().IsPDFUA2()) || page == nil || annotRef == 0 {
 		return
 	}
 

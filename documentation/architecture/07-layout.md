@@ -549,5 +549,5 @@ Open questions worth a follow-up review:
 | [06-css.md](06-css.md) | CSS subsystem (parse, selectors, cascade) |
 | **07-layout.md** | **This document — layout engine & line breaking** |
 | [08-convert-pipeline.md](08-convert-pipeline.md) | PDF/Image job orchestration, HF/TOC/outline/links |
-| [09-pdf-writer.md](09-pdf-writer.md) | PDF 1.4 writer, fonts, subsets |
+| [09-pdf-writer.md](09-pdf-writer.md) | PDF writer (1.4 default / 1.7 & 2.0 opt-in), fonts, subsets |
 | [10-imageout-svg.md](10-imageout-svg.md) | PNG/JPEG raster path & SVG rasterization |

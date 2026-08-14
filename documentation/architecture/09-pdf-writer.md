@@ -4,7 +4,7 @@
 
 `internal/pdf` is the **lowermost writer layer** of gowkhtmltopdf: it turns the
 painted output of the layout engine into a **well-formed, viewer-openable
-PDF file** (PDF 1.4 by default, or PDF 1.7 opt-in via `WriterPolicy`), entirely
+PDF file** (PDF 1.4 by default, or PDF 1.7 / 2.0 opt-in via `WriterPolicy`), entirely
 with the Go standard library plus a single narrow exception for OpenType shaping
 (`go-text/typesetting`, see §5 and
 [`plans/0.2.0/amendments/2026-08-05-gotext-typesetting.md`](../../plans/0.2.0/amendments/2026-08-05-gotext-typesetting.md)).
@@ -13,11 +13,13 @@ It owns everything that appears after the paint step of the canonical
 pipeline `load → parse → style → layout → paginate → paint → write`:
 
 - the **version policy & serialization** (`WriterPolicy`, `PDF14` default,
-  `PDF17` opt-in, reserved `PDF20`; `%PDF-1.4` or `%PDF-1.7` header; classic
-  xref table; trailer with deterministic `/ID` on 1.7);
+  `PDF17` / `PDF20` opt-in; `%PDF-1.4`, `%PDF-1.7`, or `%PDF-2.0` header;
+  classic xref table on all versions; trailer with deterministic `/ID` on
+  1.7 and 2.0; catalog `/Version` deliberately **not** emitted — the header
+  is the sole version authority);
 - the **document object model** (indirect objects, pages tree, catalog,
-  info dictionary with Latin-1 or UTF-16BE + BOM strings, non-claiming XMP
-  metadata stream on 1.7, outline tree);
+  info dictionary with Latin-1, UTF-16BE + BOM, or UTF-8 text strings,
+  non-claiming XMP metadata stream on 1.7 and 2.0, outline tree);
 - the **page content-stream language** — every PDF operator emitted for text,
   vector graphics, images, and clipping, with fonts/images registered into
   per-page `/Resources`;
@@ -66,7 +68,7 @@ Two invariants shape everything in this package:
 
 | File | Lines | Responsibility |
 |------|------:|----------------|
-| `policy.go` | 134 | `WriterPolicy`, `PDFVersion` (`PDF14`, `PDF17`, reserved `PDF20`), policy validation, header/producer version resolution, feature gates |
+| `policy.go` | 134 | `WriterPolicy`, `PDFVersion` (`PDF14`, `PDF17`, `PDF20`), policy validation, header/producer version resolution, feature gates |
 | `pdf.go` | 1198 | Document object model, page objects, `finalize` (catalog/pages/info/outlines/XMP metadata), serialization with counting xref offsets, RFC 1950 flate pool, `ReorderPages`/`DuplicatePage`, outline tree finalization, `pdfString`/`utf16BEString`/`winAnsiFold` encoding, trailer `/ID` |
 | `semantic.go` | 275 | In-tree semantic PDF parser for structural testing and validation of emitted output |
 | `content.go` | 672 | Content-stream builder: every PDF operator (`q/Q`, `rg/RG`, `m/l/c/re/f/S/W n`, `cm`, `BT/ET/Td/Tm/TL/Tc/T*`, `Tj`, `Tr`), font rune recording for subsetting, mixed Latin/CJK run splitting, image-resource registration |
@@ -81,9 +83,9 @@ Two invariants shape everything in this package:
 | `faces.go` | 212 | `FaceSet` (Liberation Sans/Serif/Mono + DejaVu fallback), lazy `LoadDefaultFaces` via `sync.Once`, CSS family/weight/italic resolution |
 | `fontpdf.go` | 185 | PDF name tokens, 1000-em width conversion (`widthsInEm`, `subsetWidths`), `ToUnicode` CMap emission, rune-set cache keys |
 | `numbers.go` | 133 | Shared numeric constants (PDF metrics, sfnt/glyf/cmap geometry, JPEG markers, shaping feature helpers, Arabic tiers) |
-| `policy_test.go` | 170 | Tests for `WriterPolicy`, version validation, reserved `PDF20` rejection, feature gates |
+| `policy_test.go` | 170 | Tests for `WriterPolicy`, version validation (incl. `PDF20`), feature gates |
 | `pdf_test.go` | 980 | Header/xref/trailer `/ID`/determinism, content operators, links, outlines, info dict, UTF-16BE strings, XMP metadata stream, reorder/duplicate validation, rich-document structure, short-writer contract |
-| `semantic_test.go` | 120 | Tests for semantic parser against PDF 1.4 and 1.7 emitted files |
+| `semantic_test.go` | 120 | Tests for semantic parser against PDF 1.4, 1.7, and 2.0 emitted files |
 | `struct_test.go` | 283 | `TestRichDocStructure`, `TestWriteToContract`, `TestWriteRejectsShortWriter`, `TestSubsetGlyfFourByteAligned` |
 | `font_test.go` | 415 | Parse defaults, cmap formats, subsetting/checksum, font cache identity, mixed Latin/CJK, `TestDirectModuleAllowlist` |
 | `fonttype0_test.go` | 245 | Type0 CJK embedding, mixed Latin fallback, `ToUnicode` coverage |
@@ -106,7 +108,7 @@ writer component).
 
 | Symbol | Location | Purpose |
 |--------|----------|---------|
-| `PDFVersion` | `policy.go:19` | Version enum: `PDF14` (default), `PDF17` (opt-in), reserved `PDF20` |
+| `PDFVersion` | `policy.go:19` | Version enum: `PDF14` (default), `PDF17` (opt-in), `PDF20` (opt-in, ISO 32000-2) |
 | `WriterPolicy` | `policy.go:45` | Serialization policy: `Version`, validation, feature gates, header/producer version strings |
 | `Document` | `pdf.go:114` | Document under construction: `policy WriterPolicy`, `objects []*object`, `pages []*Page`, `info map[string]string`, `outlineRoot *Outline`, `fontCache` (subset key → font dict ref), document-wide rune sets, `catalogRef`/`infoRef`/`metadataRef` (set at finalize), `finalized` flag |
 | `NewDocument` | `pdf.go:142` | Empty document with default `PDF14` policy; compression on by default |
@@ -248,7 +250,7 @@ Notes on that seam:
    `/First /Last /Prev /Next /Parent /Title /Dest`; only after `refStr` is
    set can `catalogDict` safely write `/Outlines` — a malformed empty value
    made viewers show nothing/fail to open.
-6. **Catalog** (`/Type`, `/Pages`, optional `/Outlines`, `/PageMode /UseOutlines`, optional `/Metadata` on 1.7) and **Info** (Title/Subject/Author/Keywords when set + forced `Creator`, `Producer` per policy e.g. `"gowkhtmltopdf 1.4"` or `"gowkhtmltopdf 1.7"`, `CreationDate`, `ModDate`). On 1.7, non-PDFDocEncoding Info and outline strings use UTF-16BE + BOM (`FE FF`), and an XMP Metadata stream object is attached to `/Metadata` (non-claiming by default, or with `pdfaid:part=3` / `pdfuaid:part=1` schemas when compliance profiles are active).
+6. **Catalog** (`/Type`, `/Pages`, optional `/Outlines`, `/PageMode /UseOutlines`, optional `/Metadata` on 1.7 and 2.0; **no `/Version`** — the header is the sole version authority) and **Info** (Title/Subject/Author/Keywords when set + forced `Creator`, `Producer` per policy e.g. `"gowkhtmltopdf 1.4"`, `"gowkhtmltopdf 1.7"`, or `"gowkhtmltopdf 2.0"`, `CreationDate`, `ModDate`). On 1.7, non-PDFDocEncoding Info and outline strings use UTF-16BE + BOM (`FE FF`); on 2.0 they use UTF-8 text strings (ISO 32000-2). An XMP Metadata stream object is attached to `/Metadata` on 1.7 and 2.0 (non-claiming by default, or with `pdfaid:part=3` / `pdfuaid:part=1` schemas when compliance profiles are active).
 7. **Compliance Objects** (under `ProfilePDFA3a` / `ProfilePDFUA1` / `ProfilePDFA3aPDFUA1`):
    - **PDF/A-3a**: Allocates embedded sRGB v2.1 ICC profile stream and `/OutputIntents [ << /Type /OutputIntent /S /GTS_PDFA1 ... >> ]` in the Catalog. Injects `/DefaultRGB [/ICCBased <iccRef>]` into per-page `/ColorSpace` resources.
    - **PDF/UA-1**: Constructs `StructTreeRoot`, `StructElem` hierarchy (`Document`, `H1`..`H6`, `P`, `Table` > `TR` > `TH`/`TD`, `L` > `LI`, `Figure` + `Alt`, `Link` + `OBJR`), `ParentTree` number tree mapping per-page MCIDs to owning StructElems, Catalog `/MarkInfo << /Marked true >>`, `/ViewerPreferences << /DisplayDocTitle true >>`, `/Lang`, and page `/Tabs /S`.
@@ -262,13 +264,13 @@ Notes on that seam:
 `writeTo` never assembles a second full byte slice in memory:
 
 1. `finalize()`.
-2. Header: `%PDF-1.4` or `%PDF-1.7` (via `policy.HeaderVersion()`) + binary comment `%\xe2\xe3\xcf\xd3`.
+2. Header: `%PDF-1.4`, `%PDF-1.7`, or `%PDF-2.0` (via `policy.HeaderVersion()`) + binary comment `%\xe2\xe3\xcf\xd3`.
 3. Object loop through a `countingWriter` (records exact byte offsets;
    turns silent short writes into `io.ErrShortWrite`). Objects allocated but
    never materialized (`dict == ""`) are **skipped** and their xref entries
    left unrecorded so they cannot point at the next object.
 4. xref section: entry `0` is the free-list head (`0000000000 65535 f`), each
-   object entry `%010d 00000 n`; trailer `/Size /Root /Info`, plus deterministic `/ID [ <a> <b> ]` on PDF 1.7; `startxref`;
+   object entry `%010d 00000 n`; trailer `/Size /Root /Info`, plus deterministic `/ID [ <a> <b> ]` on PDF 1.7 and 2.0; `startxref`;
    `%%EOF`.
 
 ### 4.4 Text emission path (`TextShow`, `content.go:414`)
@@ -357,7 +359,7 @@ foundation.
 
 | Decision | Rationale / trade-off |
 |----------|------------------------|
-| **PDF 1.4 default, opt-in PDF 1.7 via `WriterPolicy`** | Minimal, deterministic, widely readable; xref/trailer written in one pass. Classic xref maintained on both versions (no object/xref streams). Trailer `/ID`, Info + UTF-16BE strings, and non-claiming XMP emitted on 1.7. PDF 2.0 (#32) and PDF/A / PDF/UA (#33) are explicit separate tracks. |
+| **PDF 1.4 default, opt-in PDF 1.7 / 2.0 via `WriterPolicy`** | Minimal, deterministic, widely readable; xref/trailer written in one pass. Classic xref maintained on all versions (no object/xref streams). Trailer `/ID` and non-claiming XMP emitted on 1.7 and 2.0; Info strings are Latin-1 on 1.4, UTF-16BE + BOM on 1.7, UTF-8 on 2.0. Catalog `/Version` is never emitted — the header is the sole version authority. PDF 2.0 is a **version**, not PDF/A-4 / PDF/UA-2 (#33). |
 | **One-time `finalize` with strict object-ordering constraints** | Catalog/outline wiring must be ordered (outlines → catalog); refs are allocated before dicts that reference them. The alternative (post-hoc patch refs) is rejected — it historically produced malformed catalogs. |
 | **`countingWriter` for xref offsets** | Streams output without a second in-memory copy; turns silent short writes into errors so a truncated stream never gets a "valid" xref. |
 | **RFC 1950 zlib for all `/FlateDecode`** | PDF spec requires zlib wrapper, not raw DEFLATE; raw streams made pages render empty. Compressors are pooled per page (`flatePool`). |
@@ -494,10 +496,13 @@ Cross-reference [`documentation/deferred.md`](../deferred.md),
 [`documentation/compatibility-matrix.md`](../compatibility-matrix.md),
 [`documentation/fonts.md`](../fonts.md).
 
-- **PDF 1.4 default, PDF 1.7 opt-in**: no PDF 1.5+ object streams, no compression of xref
+- **PDF 1.4 default, PDF 1.7 / 2.0 opt-in**: no PDF 1.5+ object streams, no compression of xref
   tables, no incremental update/append, no linearization. Every conversion
-  is a full regenerate. PDF 2.0 (ISO 32000-2 / UTF-8 strings) is tracked in #32;
-  PDF/A-4 and PDF/UA-2 (claiming XMP, OutputIntents, structure tree) are tracked in #33.
+  is a full regenerate. PDF 2.0 (ISO 32000-2) is shipped as an opt-in
+  **version** — UTF-8 document strings, trailer `/ID`, non-claiming XMP — and
+  is **not** a PDF/A-4 or PDF/UA-2 conformance claim; those (claiming XMP,
+  OutputIntents, structure tree) are tracked in #33. `/ProcSet` is omitted on
+  2.0 pages; fonts/images/content emission is unchanged from 1.4/1.7.
 - **CFF/PostScript-outline OpenType is rejected** (`errFontCFFNotSupported`);
   only TrueType outlines embed or subset. OTF-flavored fonts can only be
   used accidentally-fail today — a deliberate scope cut, documented in

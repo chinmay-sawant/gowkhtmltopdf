@@ -2,7 +2,7 @@
 
 > **Parent:** `plans/0.2.2/README.md` — epic [#29](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/29)
 > **Issue:** [#32](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/32)
-> **Status:** not started
+> **Status:** completed (2026-08-15) — all 8 phases done; PDF 2.0 opt-in shipped, default still 1.4
 > **Estimated effort:** 3–5 weeks across phases 1–8
 > **Constraint:** pure Go, no CGO, no new direct modules. Do not add veraPDF, Brotli, or a second PDF writer.
 > **Ordering principle:** version policy and serialization first, then call-site selection, then proof, then docs.
@@ -150,6 +150,14 @@ header. Producer metadata should follow the **document** version
 (`gowkhtmltopdf 1.4` vs `gowkhtmltopdf 2.0`), not a package constant
 alone.
 
+> **Shipped:** `WriterPolicy` (policy.go) carries `PDF14` / `PDF17` /
+> `PDF20`; `HeaderVersion()` and `ProducerVersion()` spell the header and
+> Producer tokens from the policy; `const Version = "1.4"` remains only as
+> the legacy default constant. Catalog `/Version` is **not emitted** on
+> any version — the file header is the sole version authority (decision
+> recorded in `internal/pdf/pdf.go` `catalogDict`, matching the #31 1.7
+> sibling).
+
 ---
 
 ## Feature matrix (emitted / accepted / validated)
@@ -164,9 +172,9 @@ Three states, as required by #32. Empty cells are out of this plan.
 | Trailer `/Root` `/Size` `/Info` | yes | yes | existing trailer tests |
 | Trailer `/ID` | no (today) | yes, two deterministic strings | new unit test |
 | Catalog `/Pages` `/Outlines` | yes | yes | existing catalog tests |
-| Catalog `/Version` | no | optional `/2.0` if header is 2.0 | unit test |
+| Catalog `/Version` | **not emitted** | **not emitted** — decision: the header is the sole version authority, matching the 1.7 sibling; `catalogDict` never adds `/Version` | `TestPDF20CatalogAndMetadataStream` regex pins the exact catalog shape and asserts no `/Version` |
 | Info Title/Producer/dates | yes | yes (UTF-8 values when needed) | `TestInfoDict` + 2.0 case |
-| XMP Metadata stream | no | yes, Dublin Core + `pdf:Producer` only | byte / parse test |
+| XMP Metadata stream | no | yes, Dublin Core + `pdf:Producer` only, **without** A-4 / UA-2 claims | byte / parse test |
 | `pdfaid` / `pdfuaid` | no | **no** | negative test |
 | OutputIntent / ICC | no | **no** | negative test |
 | Structure tree / BDC | no | **no** | negative test |
@@ -229,27 +237,51 @@ Phases 2 and 3 may overlap after phase 1 if they do not fight over
 exists, but convert (phase 5) must not ship a user path until 2 and 3
 can emit a real 2.0 file.
 
-| Phase | File | Goal |
-|------:|------|------|
-| 1 | [phase-01-version-policy-and-header.md](phase-01-version-policy-and-header.md) | Policy type; header; default 1.4 |
-| 2 | [phase-02-catalog-trailer-metadata.md](phase-02-catalog-trailer-metadata.md) | Catalog, `/ID`, Info + XMP |
-| 3 | [phase-03-fonts-images-content-gates.md](phase-03-fonts-images-content-gates.md) | Gates on existing emit paths |
-| 4 | [phase-04-settings-cli-library.md](phase-04-settings-cli-library.md) | User-visible selection |
-| 5 | [phase-05-convert-pipeline.md](phase-05-convert-pipeline.md) | HTML job uses the policy |
-| 6 | [phase-06-validation-and-goldens.md](phase-06-validation-and-goldens.md) | Proof |
-| 7 | [phase-07-docs-and-honesty.md](phase-07-docs-and-honesty.md) | Honest claims |
-| 8 | [phase-08-closure.md](phase-08-closure.md) | Lint, test, default-1.4 proof |
+| Phase | File | Goal | Status |
+|------:|------|------|--------|
+| 1 | [phase-01-version-policy-and-header.md](phase-01-version-policy-and-header.md) | Policy type; header; default 1.4 | completed (2026-08-15) |
+| 2 | [phase-02-catalog-trailer-metadata.md](phase-02-catalog-trailer-metadata.md) | Catalog, `/ID`, Info + XMP | completed (2026-08-15) |
+| 3 | [phase-03-fonts-images-content-gates.md](phase-03-fonts-images-content-gates.md) | Gates on existing emit paths | completed (2026-08-15) |
+| 4 | [phase-04-settings-cli-library.md](phase-04-settings-cli-library.md) | User-visible selection | completed (2026-08-15) |
+| 5 | [phase-05-convert-pipeline.md](phase-05-convert-pipeline.md) | HTML job uses the policy | completed (2026-08-15) |
+| 6 | [phase-06-validation-and-goldens.md](phase-06-validation-and-goldens.md) | Proof | completed (2026-08-15) |
+| 7 | [phase-07-docs-and-honesty.md](phase-07-docs-and-honesty.md) | Honest claims | completed (2026-08-15) |
+| 8 | [phase-08-closure.md](phase-08-closure.md) | Lint, test, default-1.4 proof | completed (2026-08-15) |
 
 ---
 
 ## Success criteria (issue #32)
 
-- [ ] Feature matrix above is filled with emitted / accepted / validated states
-- [ ] Callers can select PDF 2.0 without changing the 1.4 default
-- [ ] Generated 2.0 files pass structural parse and version fixtures
-- [ ] Unsupported combinations fail before misleading output
-- [ ] PDF 1.4 (and 1.7, if present) regression fixtures stay green
-- [ ] Docs distinguish PDF 2.0 **version** support from PDF/A-4 and PDF/UA-2
+- [x] Feature matrix above is filled with emitted / accepted / validated states
+  (matrix reconciled to shipped behavior on 2026-08-15: catalog `/Version`
+  row changed from "optional" to "not emitted" with the decision recorded
+  above; every row's "Validated by" names a real green test)
+- [x] Callers can select PDF 2.0 without changing the 1.4 default
+  (`--pdf-version 2.0` (PDF mode), `PdfGlobal.PdfVersion`,
+  `PdfGlobalOptions.WithPDFVersion("2.0")`, dotted `Set("pdfversion",
+  "2.0")`; default/empty stays 1.4 — `TestConvertPDFVersion`,
+  `TestPDFVersionAPI`, `TestPDFVersionFlag`,
+  `TestConvertPDF20GoldenNeedles` step 2, `TestDefaultNewDocumentAsserts14`)
+- [x] Generated 2.0 files pass structural parse and version fixtures
+  (`ParseSemantic(data).Version == "2.0"` with page text/images/annots —
+  `TestPDF20RichDocument`, `TestSemanticPDF20OracleConvertedFixtures`;
+  golden needles `TestConvertPDF20GoldenNeedles` +
+  `TestConvertPDF20MultiPageTOCHF`; qpdf/mutool optional check
+  `TestOptionalPDFValidation`)
+- [x] Unsupported combinations fail before misleading output
+  (`policy.Validate()` rejects encryption/forms/signatures/object streams
+  on 2.0; A-4/UA-2 profiles return
+  `pdf.ErrConformanceProfilesUnsupported` (deferred #33); garbage
+  versions fail before any bytes with `settings.ErrInvalidPDFVersion` —
+  `TestPDFVersionNegativeValidation`; short writers fail closed
+  `TestPDF20ShortWriterContract`)
+- [x] PDF 1.4 (and 1.7, if present) regression fixtures stay green
+  (`go test ./...` exit 0 on 2026-08-15: full golden corpus, 1.7 golden
+  needles, `TestDeterministicOutput`, and every 1.4/1.7 suite pass)
+- [x] Docs distinguish PDF 2.0 **version** support from PDF/A-4 and PDF/UA-2
+  (phase 7 closed: README, compatibility matrix, deferred, cli, library
+  API, architecture docs all state "2.0 = opt-in version, not a
+  conformance claim"; `make claim-scan` clean)
 
 ---
 

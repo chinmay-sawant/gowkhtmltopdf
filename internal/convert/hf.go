@@ -166,8 +166,8 @@ func drawTextHF(page *pdf.Page, hfVal settings.HeaderFooter, geom hfGeom, parms 
 		return
 	}
 
-	isUA1 := page.Doc() != nil && page.Doc().Policy().IsPDFUA1()
-	if isUA1 {
+	isUA := page.Doc() != nil && (page.Doc().Policy().IsPDFUA1() || page.Doc().Policy().IsPDFUA2())
+	if isUA {
 		cur.BeginArtifact("Pagination")
 	}
 
@@ -211,7 +211,7 @@ func drawTextHF(page *pdf.Page, hfVal settings.HeaderFooter, geom hfGeom, parms 
 		draw(right, page.Width()-geom.marginRight-measureHF(font, right, size))
 	}
 
-	if isUA1 {
+	if isUA {
 		cur.EndArtifact()
 	}
 }
@@ -488,8 +488,8 @@ func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hfVal se
 	pageContent := page.Content()
 	pageContent.Save()
 
-	isUA1 := page.Doc() != nil && page.Doc().Policy().IsPDFUA1()
-	if isUA1 {
+	isUA := page.Doc() != nil && (page.Doc().Policy().IsPDFUA1() || page.Doc().Policy().IsPDFUA2())
+	if isUA {
 		pageContent.BeginArtifact("Pagination")
 	}
 
@@ -498,7 +498,7 @@ func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hfVal se
 
 	err := paintLayoutOps(ctx, page, pageContent, res.Ops, geom.marginLeft, yTop, links)
 
-	if isUA1 {
+	if isUA {
 		pageContent.EndArtifact()
 	}
 

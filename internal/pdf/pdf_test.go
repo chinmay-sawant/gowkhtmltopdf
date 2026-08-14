@@ -111,7 +111,7 @@ func TestXrefOffsets(t *testing.T) {
 
 	// every n entry must point at the start of "N 0 obj"
 	lines := strings.Split(string(out), "\n")
-	xrefIdx := findLine(lines, "xref")
+	xrefIdx := findLine(lines)
 
 	if xrefIdx < 0 {
 		t.Fatal("no xref")
@@ -141,10 +141,10 @@ func TestXrefOffsets(t *testing.T) {
 	}
 }
 
-// findLine returns the index of the first exact line match, or -1.
-func findLine(lines []string, want string) int {
+// findLine returns the index of the first line that equals "xref", or -1.
+func findLine(lines []string) int {
 	for i, l := range lines {
-		if l == want {
+		if l == "xref" {
 			return i
 		}
 	}

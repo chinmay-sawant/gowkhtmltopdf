@@ -93,7 +93,7 @@ input (file / URL / inline HTML)
         ▼
    paginate + paint    multi-page geometry (layout-owned)
         │
-        ├──────────────► internal/pdf        PDF write (1.4 default / 1.7 opt-in)
+        ├──────────────► internal/pdf        PDF write (1.4 default / 1.7 & 2.0 opt-in)
         │
         └──────────────► internal/imageout   PNG/JPEG raster
 ```
@@ -110,9 +110,9 @@ Domain deep-dives: [architecture/](architecture/).
 
 | Surface | Entry | Output |
 |---------|--------|--------|
-| PDF CLI | `cmd/gowkhtmltopdf` → `gowkhtmltopdf` | PDF (1.4 default / 1.7 opt-in) |
+| PDF CLI | `cmd/gowkhtmltopdf` → `gowkhtmltopdf` | PDF (1.4 default / 1.7 & 2.0 opt-in) |
 | Image CLI | `cmd/gowkhtmltoimage` → `gowkhtmltoimage` | PNG or JPEG |
-| Go API | module root package `gowkhtmltopdf` | PDF (1.4 default / 1.7 opt-in) or image in memory / `io.Writer` |
+| Go API | module root package `gowkhtmltopdf` | PDF (1.4 default / 1.7 & 2.0 opt-in) or image in memory / `io.Writer` |
 
 Both CLIs share `internal/cli` and `internal/settings`. The library never
 imports `internal/cli`. `cmd/` never imports the root package.

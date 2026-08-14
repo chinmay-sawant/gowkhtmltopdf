@@ -37,9 +37,9 @@ func TestPolicyValidation(t *testing.T) {
 			wantErr: nil,
 		},
 		{
-			name:    "PDF20 returns reserved error mentioning issue 32",
+			name:    "PDF20 is valid",
 			policy:  WriterPolicy{Version: PDF20},
-			wantErr: ErrReservedPDF20,
+			wantErr: nil,
 		},
 		{
 			name:    "negative version returns unsupported",
@@ -72,6 +72,41 @@ func TestPolicyValidation(t *testing.T) {
 			wantErr: ErrObjectStreamsUnsupported,
 		},
 		{
+			name:    "encryption requested on PDF20 returns ErrEncryptionUnsupported",
+			policy:  WriterPolicy{Version: PDF20, Encryption: true},
+			wantErr: ErrEncryptionUnsupported,
+		},
+		{
+			name:    "forms requested on PDF20 returns ErrFormsUnsupported",
+			policy:  WriterPolicy{Version: PDF20, Forms: true},
+			wantErr: ErrFormsUnsupported,
+		},
+		{
+			name:    "signatures requested on PDF20 returns ErrSignaturesUnsupported",
+			policy:  WriterPolicy{Version: PDF20, Signatures: true},
+			wantErr: ErrSignaturesUnsupported,
+		},
+		{
+			name:    "object streams requested on PDF20 returns ErrObjectStreamsUnsupported",
+			policy:  WriterPolicy{Version: PDF20, ObjectStreams: true},
+			wantErr: ErrObjectStreamsUnsupported,
+		},
+		{
+			name:    "conformance profile PDF/A-4 on PDF20 is valid",
+			policy:  WriterPolicy{Version: PDF20, ConformanceProfile: ProfilePDFA4},
+			wantErr: nil,
+		},
+		{
+			name:    "conformance profile PDF/UA-2 on PDF20 is valid",
+			policy:  WriterPolicy{Version: PDF20, ConformanceProfile: ProfilePDFUA2},
+			wantErr: nil,
+		},
+		{
+			name:    "conformance profile Dual A4+UA2 on PDF20 is valid",
+			policy:  WriterPolicy{Version: PDF20, ConformanceProfile: ProfilePDFA4PDFUA2},
+			wantErr: nil,
+		},
+		{
 			name:    "conformance profile PDF/A-1b requested returns ErrPDFA1Unsupported",
 			policy:  WriterPolicy{Version: PDF17, ConformanceProfile: "PDF/A-1b"},
 			wantErr: ErrPDFA1Unsupported,
@@ -82,14 +117,14 @@ func TestPolicyValidation(t *testing.T) {
 			wantErr: ErrUnknownConformanceProfile,
 		},
 		{
-			name:    "conformance profile PDF/A-4 requested returns ErrConformanceProfilesUnsupported",
+			name:    "conformance profile PDF/A-4 on PDF17 returns ErrConformanceRequiresPDF20",
 			policy:  WriterPolicy{Version: PDF17, ConformanceProfile: "PDF/A-4"},
-			wantErr: ErrConformanceProfilesUnsupported,
+			wantErr: ErrConformanceRequiresPDF20,
 		},
 		{
-			name:    "conformance profile PDF/UA-2 requested returns ErrConformanceProfilesUnsupported",
+			name:    "conformance profile PDF/UA-2 on PDF17 returns ErrConformanceRequiresPDF20",
 			policy:  WriterPolicy{Version: PDF17, ConformanceProfile: "PDF/UA-2"},
-			wantErr: ErrConformanceProfilesUnsupported,
+			wantErr: ErrConformanceRequiresPDF20,
 		},
 		{
 			name:    "conformance profile PDF/UA-1 on PDF17 is valid",
@@ -110,6 +145,16 @@ func TestPolicyValidation(t *testing.T) {
 			name:    "conformance profile PDF/UA-1 on PDF14 returns ErrProfileRequiresPDF17",
 			policy:  WriterPolicy{Version: PDF14, ConformanceProfile: ProfilePDFUA1},
 			wantErr: ErrProfileRequiresPDF17,
+		},
+		{
+			name:    "conformance profile PDF/A-4 on PDF14 returns ErrConformanceRequiresPDF20",
+			policy:  WriterPolicy{Version: PDF14, ConformanceProfile: ProfilePDFA4},
+			wantErr: ErrConformanceRequiresPDF20,
+		},
+		{
+			name:    "conformance profile PDF/A-3a on PDF20 returns ErrConformanceRequiresPDF17",
+			policy:  WriterPolicy{Version: PDF20, ConformanceProfile: ProfilePDFA3a},
+			wantErr: ErrConformanceRequiresPDF17,
 		},
 	}
 
@@ -187,8 +232,13 @@ func TestNewDocumentWithPolicy(t *testing.T) {
 		t.Errorf("doc17.Policy().Version = %v, want %v", doc17.Policy().Version, PDF17)
 	}
 
-	if _, err := NewDocumentWithPolicy(WriterPolicy{Version: PDF20}); !errors.Is(err, ErrReservedPDF20) {
-		t.Fatalf("NewDocumentWithPolicy(PDF20) err = %v, want %v", err, ErrReservedPDF20)
+	doc20, err := NewDocumentWithPolicy(WriterPolicy{Version: PDF20})
+	if err != nil {
+		t.Fatalf("NewDocumentWithPolicy(PDF20) error: %v", err)
+	}
+
+	if doc20.Policy().Version != PDF20 {
+		t.Errorf("doc20.Policy().Version = %v, want %v", doc20.Policy().Version, PDF20)
 	}
 
 	if _, err := NewDocumentWithPolicy(WriterPolicy{Version: PDFVersion(-1)}); !errors.Is(err, ErrUnsupportedPDFVersion) {
@@ -231,6 +281,84 @@ func TestPDF17HeaderEmissionAndSemantic(t *testing.T) {
 
 	if sem.Version != versionToken17 {
 		t.Errorf("SemanticDoc.Version = %q, want %q", sem.Version, versionToken17)
+	}
+}
+
+//nolint:cyclop,funlen // header + semantic assertions over one 2.0 document
+func TestPDF20HeaderEmissionAndSemantic(t *testing.T) {
+	t.Parallel()
+
+	doc, err := NewDocumentWithPolicy(WriterPolicy{Version: PDF20})
+	if err != nil {
+		t.Fatalf("NewDocumentWithPolicy: %v", err)
+	}
+
+	doc.AddPage(200, 200)
+
+	var buf bytes.Buffer
+	if err := doc.Write(&buf); err != nil {
+		t.Fatalf("doc.Write: %v", err)
+	}
+
+	out := buf.Bytes()
+	wantPrefix := "%PDF-2.0\n%\xe2\xe3\xcf\xd3\n"
+
+	if !strings.HasPrefix(string(out), wantPrefix) {
+		t.Errorf("PDF 2.0 output prefix mismatch:\ngot:  %q\nwant: %q",
+			string(out[:min(len(out), len(wantPrefix)+10)]), wantPrefix)
+	}
+
+	// Every xref entry must point at the start of a real "N 0 obj" header.
+	lines := strings.Split(string(out), "\n")
+	xrefIdx := findLine(lines)
+
+	if xrefIdx < 0 {
+		t.Fatal("no xref")
+	}
+
+	startxref := -1
+
+	for i := xrefIdx + 1; i < len(lines); i++ {
+		if strings.HasPrefix(lines[i], "startxref") {
+			startxref = i
+
+			break
+		}
+	}
+
+	if startxref < 0 {
+		t.Fatal("no startxref")
+	}
+
+	offsets := parseXrefEntries(t, lines, xrefIdx, startxref)
+
+	for obj, off := range offsets {
+		want := strconv.Itoa(obj) + " 0 obj"
+		if !bytes.HasPrefix(out[off:], []byte(want)) {
+			t.Errorf("object %d offset %d does not start with %q", obj, off, want)
+		}
+	}
+
+	// Producer strings come from the policy in both the Info dict and XMP.
+	if !strings.Contains(buf.String(), "/Producer (gowkhtmltopdf 2.0)") {
+		t.Error("PDF 2.0 Info dictionary missing /Producer (gowkhtmltopdf 2.0)")
+	}
+
+	if !strings.Contains(buf.String(), "<pdf:Producer>gowkhtmltopdf 2.0</pdf:Producer>") {
+		t.Error("PDF 2.0 XMP metadata missing correct Producer")
+	}
+
+	sem, err := ParseSemantic(out)
+	if err != nil {
+		t.Fatalf("ParseSemantic: %v", err)
+	}
+
+	if sem.Version != versionToken20 {
+		t.Errorf("SemanticDoc.Version = %q, want %q", sem.Version, versionToken20)
+	}
+
+	if sem.PageCount() != 1 {
+		t.Errorf("SemanticDoc.PageCount() = %d, want 1", sem.PageCount())
 	}
 }
 
@@ -556,14 +684,14 @@ func TestFeatureGatesFailClosed(t *testing.T) {
 			wantErr: ErrPDFA1Unsupported,
 		},
 		{
-			name:    "conformance PDF/A-4 fails closed",
+			name:    "conformance PDF/A-4 on PDF17 requires 2.0",
 			policy:  WriterPolicy{Version: PDF17, ConformanceProfile: "PDF/A-4"},
-			wantErr: ErrConformanceProfilesUnsupported,
+			wantErr: ErrConformanceRequiresPDF20,
 		},
 		{
-			name:    "conformance PDF/UA-2 fails closed",
+			name:    "conformance PDF/UA-2 on PDF17 requires 2.0",
 			policy:  WriterPolicy{Version: PDF17, ConformanceProfile: "PDF/UA-2"},
-			wantErr: ErrConformanceProfilesUnsupported,
+			wantErr: ErrConformanceRequiresPDF20,
 		},
 		{
 			name:    "conformance profile on PDF14 fails closed",
@@ -571,9 +699,24 @@ func TestFeatureGatesFailClosed(t *testing.T) {
 			wantErr: ErrProfileRequiresPDF17,
 		},
 		{
-			name:    "PDF 2.0 reserved fails closed",
-			policy:  WriterPolicy{Version: PDF20},
-			wantErr: ErrReservedPDF20,
+			name:    "encryption on PDF20 fails closed",
+			policy:  WriterPolicy{Version: PDF20, Encryption: true},
+			wantErr: ErrEncryptionUnsupported,
+		},
+		{
+			name:    "forms on PDF20 fail closed",
+			policy:  WriterPolicy{Version: PDF20, Forms: true},
+			wantErr: ErrFormsUnsupported,
+		},
+		{
+			name:    "signatures on PDF20 fail closed",
+			policy:  WriterPolicy{Version: PDF20, Signatures: true},
+			wantErr: ErrSignaturesUnsupported,
+		},
+		{
+			name:    "object streams on PDF20 fail closed",
+			policy:  WriterPolicy{Version: PDF20, ObjectStreams: true},
+			wantErr: ErrObjectStreamsUnsupported,
 		},
 		{
 			name:    "invalid PDF version fails closed",
@@ -686,7 +829,7 @@ func TestPDF17XrefOffsets(t *testing.T) {
 
 	out := buf.Bytes()
 	lines := strings.Split(string(out), "\n")
-	xrefIdx := findLine(lines, "xref")
+	xrefIdx := findLine(lines)
 
 	if xrefIdx < 0 {
 		t.Fatal("no xref section found in PDF 1.7")
@@ -774,6 +917,7 @@ func TestPDF17ShortWriterContract(t *testing.T) {
 	}
 }
 
+//nolint:cyclop // default-1.4 envelope assertions (header, catalog, trailer, XMP absence)
 func TestDefaultNewDocumentAsserts14(t *testing.T) {
 	t.Parallel()
 
@@ -795,6 +939,11 @@ func TestDefaultNewDocumentAsserts14(t *testing.T) {
 	// 1. Must start with %PDF-1.4
 	if !strings.HasPrefix(outStr, "%PDF-1.4\n%\xe2\xe3\xcf\xd3\n") {
 		t.Errorf("Default PDF output header mismatch: %q", outStr[:min(len(outStr), 25)])
+	}
+
+	// Default output must never claim PDF 2.0.
+	if strings.Contains(outStr, "%PDF-2.0") {
+		t.Error("Default PDF 1.4 output must not contain %PDF-2.0")
 	}
 
 	// 2. Catalog must NOT contain /Metadata

@@ -230,6 +230,11 @@ api.go Converter.Convert(ctx)
     ├─ load.NewLoaderWithError(req.Global.Load)          proxy policy fails fast
     ├─ pdf.DefaultFont() + loadFontRegistry(...)         embedded font + --font-path
     ├─ runContext{ ... single pdf.NewDocumentWithPolicy(policy) ... }
+    │        policy := PolicyForGlobal(req.Global)        convert.go:229-260:
+    │                                                     "1.4"/"" → PDF14 (default),
+    │                                                     "1.7" → PDF17, "2.0" → PDF20;
+    │                                                     garbage → ErrInvalidPDFVersion
+    │                                                     before any document exists
     └─ render.Run(ctx, &pdfPipeline{run})                render/pipeline.go:26
        ├─ stage 1 RenderObjects → run.renderObjects      convert.go:270
        │    ├─ per TOC object:  initTOCState (geometry, HF, effective TOC, margins)

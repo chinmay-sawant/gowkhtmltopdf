@@ -15,15 +15,13 @@ const (
 	PDF14 PDFVersion = iota
 	// PDF17 is PDF version 1.7 (ISO 32000-1).
 	PDF17
-	// PDF20 is PDF version 2.0 (ISO 32000-2, reserved for issue #32).
+	// PDF20 is PDF version 2.0 (ISO 32000-2).
 	PDF20
 )
 
 var (
 	// ErrUnsupportedPDFVersion indicates an unknown or out-of-range PDF version.
 	ErrUnsupportedPDFVersion = errors.New("pdf: unsupported PDF version")
-	// ErrReservedPDF20 indicates PDF 2.0 is not yet implemented.
-	ErrReservedPDF20 = errors.New("pdf: PDF 2.0 support is planned for issue #32")
 	// ErrEncryptionUnsupported indicates PDF encryption is not supported.
 	ErrEncryptionUnsupported = errors.New("pdf: encryption is unsupported")
 	// ErrFormsUnsupported indicates AcroForms / interactive forms are not supported.
@@ -32,22 +30,26 @@ var (
 	ErrSignaturesUnsupported = errors.New("pdf: digital signatures are unsupported")
 	// ErrObjectStreamsUnsupported indicates object streams and compressed xref are not supported.
 	ErrObjectStreamsUnsupported = errors.New("pdf: object streams and compressed xref are unsupported")
-	// ErrConformanceProfilesUnsupported indicates PDF 2.0 conformance profiles (PDF/A-4, PDF/UA-2) are not supported.
+	// ErrConformanceProfilesUnsupported indicates unsupported PDF conformance profiles.
 	ErrConformanceProfilesUnsupported = errors.New(
-		"pdf: conformance profiles (PDF/A, PDF/UA) are unsupported (deferred to issue #33)",
+		"pdf: conformance profiles (PDF/A, PDF/UA) are unsupported",
 	)
-	// ErrConformanceRequiresPDF17 indicates a conformance profile was requested without PDF 1.7.
+	// ErrConformanceRequiresPDF17 indicates a 1.7 conformance profile was requested without PDF 1.7.
 	ErrConformanceRequiresPDF17 = errors.New("pdf: conformance profile requires PDF 1.7")
 	// ErrProfileRequiresPDF17 is an alias for ErrConformanceRequiresPDF17.
 	ErrProfileRequiresPDF17 = ErrConformanceRequiresPDF17
+	// ErrConformanceRequiresPDF20 indicates a 2.0 conformance profile was requested without PDF 2.0.
+	ErrConformanceRequiresPDF20 = errors.New("pdf: conformance profile requires PDF 2.0")
+	// ErrProfileRequiresPDF20 is an alias for ErrConformanceRequiresPDF20.
+	ErrProfileRequiresPDF20 = ErrConformanceRequiresPDF20
 	// ErrPDFA1Unsupported indicates PDF/A-1 is unsupported.
 	ErrPDFA1Unsupported = errors.New("pdf: PDF/A-1 is unsupported")
 	// ErrUnknownConformanceProfile indicates an unrecognized conformance profile string.
 	ErrUnknownConformanceProfile = errors.New("pdf: unknown conformance profile")
-	// ErrTitleRequired indicates that PDF/UA-1 requires a non-empty document title.
-	ErrTitleRequired = errors.New("pdf: PDF/UA-1 requires a non-empty document title")
-	// ErrPDFUAMissingAlt indicates that PDF/UA-1 requires non-empty alt text for figures (images).
-	ErrPDFUAMissingAlt = errors.New("pdf: PDF/UA-1 requires non-empty alt text for figures (images)")
+	// ErrTitleRequired indicates that PDF/UA requires a non-empty document title.
+	ErrTitleRequired = errors.New("pdf: PDF/UA requires a non-empty document title")
+	// ErrPDFUAMissingAlt indicates that PDF/UA requires non-empty alt text for figures (images).
+	ErrPDFUAMissingAlt = errors.New("pdf: PDF/UA requires non-empty alt text for figures (images)")
 	// ErrMissingImageAlt is an alias for ErrPDFUAMissingAlt.
 	ErrMissingImageAlt = ErrPDFUAMissingAlt
 	errNilFont         = errors.New("pdf: cannot embed nil font")
@@ -71,6 +73,14 @@ const (
 	ProfilePDFA3aPDFUA1 = "PDF/A-3a+PDF/UA-1"
 	// ProfileDualA3aUA1 is an alias for ProfilePDFA3aPDFUA1.
 	ProfileDualA3aUA1 = ProfilePDFA3aPDFUA1
+	// ProfilePDFA4 indicates PDF/A-4 archival conformance (ISO 19005-4).
+	ProfilePDFA4 = "PDF/A-4"
+	// ProfilePDFUA2 indicates PDF/UA-2 accessibility conformance (ISO 14289-2).
+	ProfilePDFUA2 = "PDF/UA-2"
+	// ProfilePDFA4PDFUA2 indicates combined PDF/A-4 and PDF/UA-2 conformance.
+	ProfilePDFA4PDFUA2 = "PDF/A-4+PDF/UA-2"
+	// ProfileDualA4UA2 is an alias for ProfilePDFA4PDFUA2.
+	ProfileDualA4UA2 = ProfilePDFA4PDFUA2
 )
 
 // WriterPolicy configures document-level serialization behavior.
@@ -85,6 +95,8 @@ type WriterPolicy struct {
 
 // CanonicalProfile normalizes profile strings (and common aliases) to canonical constants.
 // Returns an empty string if the profile is not recognized or is empty.
+//
+//nolint:cyclop // comprehensive mapping of profile aliases across PDF versions
 func (p WriterPolicy) CanonicalProfile() string {
 	raw := strings.TrimSpace(strings.ToLower(p.ConformanceProfile))
 	if raw == "" {
@@ -108,6 +120,19 @@ func (p WriterPolicy) CanonicalProfile() string {
 	case "pdf/ua-1", "pdf/ua", "pdfua-1", "pdfua", "pdf-ua-1", "pdf-ua",
 		"ua-1", "ua1", "ua", "pdfua1":
 		return ProfilePDFUA1
+	case "pdf/a-4+pdf/ua-2", "pdf/a-4-pdf/ua-2", "pdf/a-4+ua-2", "pdf/a-4-ua-2",
+		"pdfa-4+pdfua-2", "pdfa-4-pdfua-2", "pdfa4+pdfua2", "pdfa4-pdfua2",
+		"a4+ua2", "a4-ua2", "a4,ua2", "a4+pdf/ua-2", "a4-pdf/ua-2",
+		"pdf/ua-2+pdf/a-4", "pdf/ua-2-pdf/a-4", "pdfua-2+pdfa-4", "pdfua2+pdfa4",
+		"ua2+a4", "ua2-a4", "ua2,a4", "ua2+pdf/a-4", "ua2-pdf/a-4",
+		"a4+ua", "a4-ua", "ua2+a", "ua2-a",
+		"pdf/a-4+pdf/ua", "pdf/a-4-pdf/ua", "pdf/ua+pdf/a-4", "pdf/ua-pdf/a-4":
+		return ProfilePDFA4PDFUA2
+	case "pdf/a-4", "pdf/a-4a", "pdf/a4", "pdfa-4", "pdfa-4a", "pdfa4", "pdfa4a",
+		"pdf-a-4", "pdf-a-4a", "pdf-a4", "a-4", "a-4a", "a4", "a4a":
+		return ProfilePDFA4
+	case "pdf/ua-2", "pdf/ua2", "pdfua-2", "pdfua2", "pdf-ua-2", "pdf-ua2", "ua-2", "ua2":
+		return ProfilePDFUA2
 	}
 
 	switch p.ConformanceProfile {
@@ -117,6 +142,12 @@ func (p WriterPolicy) CanonicalProfile() string {
 		return ProfilePDFUA1
 	case ProfilePDFA3aPDFUA1:
 		return ProfilePDFA3aPDFUA1
+	case ProfilePDFA4:
+		return ProfilePDFA4
+	case ProfilePDFUA2:
+		return ProfilePDFUA2
+	case ProfilePDFA4PDFUA2:
+		return ProfilePDFA4PDFUA2
 	}
 
 	return ""
@@ -136,6 +167,20 @@ func (p WriterPolicy) IsPDFUA1() bool {
 	return c == ProfilePDFUA1 || c == ProfilePDFA3aPDFUA1
 }
 
+// IsPDFA4 reports whether the policy specifies PDF/A-4 archival conformance.
+func (p WriterPolicy) IsPDFA4() bool {
+	c := p.CanonicalProfile()
+
+	return c == ProfilePDFA4 || c == ProfilePDFA4PDFUA2
+}
+
+// IsPDFUA2 reports whether the policy specifies PDF/UA-2 accessibility conformance.
+func (p WriterPolicy) IsPDFUA2() bool {
+	c := p.CanonicalProfile()
+
+	return c == ProfilePDFUA2 || c == ProfilePDFA4PDFUA2
+}
+
 // IsCompliant reports whether any valid conformance profile is active.
 func (p WriterPolicy) IsCompliant() bool {
 	return p.CanonicalProfile() != ""
@@ -150,10 +195,6 @@ func (p WriterPolicy) HasConformanceProfile() bool {
 //
 //nolint:cyclop // comprehensive matrix validation across versions and profiles
 func (p WriterPolicy) Validate() error {
-	if p.Version == PDF20 {
-		return ErrReservedPDF20
-	}
-
 	if p.Version < PDF14 || p.Version > PDF20 {
 		return ErrUnsupportedPDFVersion
 	}
@@ -178,22 +219,16 @@ func (p WriterPolicy) Validate() error {
 		return nil
 	}
 
-	if p.Version != PDF17 {
-		return ErrConformanceRequiresPDF17
+	canonical := p.CanonicalProfile()
+	if err := validateCanonicalProfileVersion(canonical, p.Version); err != nil {
+		return err
 	}
 
-	if canonical := p.CanonicalProfile(); canonical != "" {
+	if canonical != "" {
 		return nil
 	}
 
-	raw := strings.TrimSpace(strings.ToLower(p.ConformanceProfile))
-	cleaned := strings.ReplaceAll(raw, " ", "")
-	cleaned = strings.ReplaceAll(cleaned, "_", "")
-
-	if isUnsupportedPDF20Profile(cleaned) {
-		return ErrConformanceProfilesUnsupported
-	}
-
+	cleaned := normalizeProfileToken(p.ConformanceProfile)
 	if isPDFA1Profile(cleaned) {
 		return ErrPDFA1Unsupported
 	}
@@ -201,29 +236,70 @@ func (p WriterPolicy) Validate() error {
 	return ErrUnknownConformanceProfile
 }
 
-func isUnsupportedPDF20Profile(profileStr string) bool {
-	switch profileStr {
-	case "pdf/a-4", "pdf/a-4e", "pdf/a-4f", "pdfa-4", "pdfa4", "a4", "a-4",
-		"pdf/ua-2", "pdfua-2", "pdfua2", "ua2", "ua-2",
-		"pdf/a-4+pdf/ua-2", "a4-ua2", "a4+ua2", "ua2+a4":
-		return true
+// validateCanonicalProfileVersion ensures a known profile is paired with the
+// required base PDF version. Empty canonical means "not a known alias".
+func validateCanonicalProfileVersion(canonical string, version PDFVersion) error {
+	if canonical == "" {
+		return nil
 	}
 
-	return strings.Contains(profileStr, "a-4") || strings.Contains(profileStr, "a4") ||
-		strings.Contains(profileStr, "ua-2") || strings.Contains(profileStr, "ua2")
+	if isPDF17Profile(canonical) {
+		if version == PDF17 {
+			return nil
+		}
+
+		return ErrConformanceRequiresPDF17
+	}
+
+	if isPDF20Profile(canonical) {
+		if version == PDF20 {
+			return nil
+		}
+
+		return ErrConformanceRequiresPDF20
+	}
+
+	// Known tokens only; unknown aliases fall through to ErrUnknown… above.
+	return nil
+}
+
+// normalizeProfileToken lower-cases, trims, and strips spaces/underscores from
+// a conformance profile string so matching can compare canonical tokens.
+func normalizeProfileToken(profileStr string) string {
+	raw := strings.TrimSpace(strings.ToLower(profileStr))
+	cleaned := strings.ReplaceAll(raw, " ", "")
+
+	return strings.ReplaceAll(cleaned, "_", "")
+}
+
+func isPDF17Profile(canonicalProfile string) bool {
+	return canonicalProfile == ProfilePDFA3a ||
+		canonicalProfile == ProfilePDFUA1 ||
+		canonicalProfile == ProfilePDFA3aPDFUA1
+}
+
+func isPDF20Profile(canonicalProfile string) bool {
+	return canonicalProfile == ProfilePDFA4 ||
+		canonicalProfile == ProfilePDFUA2 ||
+		canonicalProfile == ProfilePDFA4PDFUA2
 }
 
 func isPDFA1Profile(profileStr string) bool {
 	switch profileStr {
 	case "pdf/a-1", "pdf/a-1a", "pdf/a-1b", "pdfa-1", "pdfa-1a", "pdfa-1b",
-		"pdfa1", "pdfa1a", "pdfa1b", "a1", "a1a", "a1b", "a-1", "a-1a", "a-1b":
+		"pdfa1", "pdfa1a", "pdfa1b", "a1", "a1a", "a1b", "a-1", "a-1a", "a-1b",
+		"pdf-a-1", "pdf-a-1a", "pdf-a-1b", "pdf-a1", "pdf-a1a", "pdf-a1b":
 		return true
 	}
 
-	return strings.Contains(profileStr, "a-1") || strings.Contains(profileStr, "a1")
+	return strings.HasPrefix(profileStr, "pdf/a-1") ||
+		strings.HasPrefix(profileStr, "pdfa-1") ||
+		strings.HasPrefix(profileStr, "pdfa1") ||
+		strings.HasPrefix(profileStr, "pdf-a-1") ||
+		strings.HasPrefix(profileStr, "pdf-a1")
 }
 
-// HeaderVersion returns the version token for the PDF file header (e.g. "1.4" or "1.7").
+// HeaderVersion returns the version token for the PDF file header (e.g. "1.4", "1.7", or "2.0").
 func (p WriterPolicy) HeaderVersion() string {
 	switch p.Version {
 	case PDF14:
@@ -237,7 +313,7 @@ func (p WriterPolicy) HeaderVersion() string {
 	}
 }
 
-// ProducerVersion returns the producer string (e.g. "gowkhtmltopdf 1.4" or "gowkhtmltopdf 1.7").
+// ProducerVersion returns the producer string (e.g. "gowkhtmltopdf 1.4", "gowkhtmltopdf 1.7", or "gowkhtmltopdf 2.0").
 func (p WriterPolicy) ProducerVersion() string {
 	return "gowkhtmltopdf " + p.HeaderVersion()
 }

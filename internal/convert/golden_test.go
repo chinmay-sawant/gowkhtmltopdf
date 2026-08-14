@@ -753,7 +753,7 @@ func TestConvertPDF17GoldenNeedles(t *testing.T) {
 	}
 }
 
-//nolint:funlen // structural multi-page TOC + HF test on PDF 1.7
+//nolint:funlen,dupl // structural multi-page TOC + HF test on PDF 1.7 (PDF20 twin below)
 func TestConvertPDF17MultiPageTOCHF(t *testing.T) {
 	t.Parallel()
 
@@ -825,6 +825,131 @@ func TestConvertPDF17MultiPageTOCHF(t *testing.T) {
 	}
 }
 
+func TestConvertPDF20GoldenNeedles(t *testing.T) {
+	t.Parallel()
+
+	// 1. Convert a small committed fixture with version 2.0.
+	cmd20 := requestForFixture(t, "fixture-01-simple-invoice.html")
+	cmd20.Global.PdfVersion = pdfVersion20
+	data20 := runPDF(t, cmd20)
+	str20 := string(data20)
+
+	if !bytes.HasPrefix(data20, []byte("%PDF-2.0\n%\xe2\xe3\xcf\xd3\n")) {
+		t.Errorf("PDF 2.0 output missing expected header prefix, got %q", data20[:min(25, len(data20))])
+	}
+
+	// Trailer /ID [ <hex> <hex> ].
+	idRe := regexp.MustCompile(`/ID\s*\[\s*<([0-9A-Fa-f]{32})>\s*<([0-9A-Fa-f]{32})>\s*\]`)
+	if !idRe.MatchString(str20) {
+		t.Errorf("PDF 2.0 output missing trailer /ID [ <hex> <hex> ]:\n%s", str20)
+	}
+
+	// Catalog references /Metadata.
+	if !strings.Contains(str20, "/Type /Metadata /Subtype /XML") {
+		t.Error("PDF 2.0 output missing metadata stream object /Type /Metadata /Subtype /XML")
+	}
+
+	// Producer claims the 2.0 version.
+	if !strings.Contains(str20, "/Producer (gowkhtmltopdf 2.0)") {
+		t.Errorf("PDF 2.0 Info dict missing /Producer (gowkhtmltopdf 2.0)")
+	}
+
+	// No conformance claims (#33 boundary).
+	for _, forbidden := range []string{"pdfaid", "pdfuaid"} {
+		if strings.Contains(str20, forbidden) {
+			t.Errorf("PDF 2.0 output contains forbidden claim token %q", forbidden)
+		}
+	}
+
+	// 2. The same fixture without the setting keeps the 1.4 envelope.
+	cmd14 := requestForFixture(t, "fixture-01-simple-invoice.html")
+	data14 := runPDF(t, cmd14)
+
+	if !bytes.HasPrefix(data14, []byte("%PDF-1.4\n")) {
+		t.Errorf("default output missing %%PDF-1.4 header, got %q", data14[:min(10, len(data14))])
+	}
+
+	if bytes.Contains(data14, []byte("%PDF-2.0")) {
+		t.Error("default 1.4 output must not claim %PDF-2.0")
+	}
+}
+
+//nolint:funlen,dupl // structural multi-page TOC + HF test on PDF 2.0 (PDF17 twin above)
+func TestConvertPDF20MultiPageTOCHF(t *testing.T) {
+	t.Parallel()
+
+	htmlBody := `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Multi-Page Doc 2.0</title></head>
+<body>
+<h1>Chapter 1: Overview</h1>
+<p>` + strings.Repeat("This is section one content providing details about the system. ", 50) + `</p>
+<div style="page-break-before: always;"></div>
+<h1>Chapter 2: Architecture</h1>
+<p>` + strings.Repeat("This is section two describing architecture and pipelines in detail. ", 50) + `</p>
+<div style="page-break-before: always;"></div>
+<h1>Chapter 3: Verification</h1>
+<p>` + strings.Repeat("This is section three covering verification and quality assurance. ", 50) + `</p>
+</body>
+</html>`
+
+	cmd, _ := newCommand(t, htmlBody, "")
+	cmd.Global.PdfVersion = pdfVersion20
+	cmd.Global.Header.Left = "Document Header [page]"
+	cmd.Global.Footer.Right = "Page [page] of [topage]"
+	cmd.Global.UseCompression = false
+
+	tocObj := settings.DefaultPdfObject()
+	tocObj.IsTableOfContent = true
+	cmd.Objects = append([]settings.PdfObject{tocObj}, cmd.Objects...)
+
+	data := runPDF(t, cmd)
+
+	// 1. Starts with %PDF-2.0.
+	if !bytes.HasPrefix(data, []byte("%PDF-2.0\n")) {
+		t.Errorf("expected %%PDF-2.0 header, got %q", data[:min(15, len(data))])
+	}
+
+	// 2. Page count: TOC + 3 chapters = at least 4 pages.
+	pages := pageCount(data)
+	if pages < 4 {
+		t.Errorf("page count = %d, want >= 4", pages)
+	}
+
+	// 3. Outlines in catalog.
+	if !bytes.Contains(data, []byte("/Type /Outlines")) || !bytes.Contains(data, []byte("/PageMode /UseOutlines")) {
+		t.Error("expected outline bookmarks in PDF 2.0 output with TOC")
+	}
+
+	// 4. Header & Footer text present.
+	if !bytes.Contains(data, []byte("Document Header")) {
+		t.Error("header text missing in PDF 2.0 output")
+	}
+
+	if !bytes.Contains(data, []byte("Page 1 of")) {
+		t.Error("footer text missing in PDF 2.0 output")
+	}
+
+	// 5. ParseSemantic reports 2.0 and the page count.
+	sem, err := pdf.ParseSemantic(data)
+	if err != nil {
+		t.Fatalf("ParseSemantic: %v", err)
+	}
+
+	if sem.Version != pdfVersion20 {
+		t.Errorf("sem.Version = %q, want 2.0", sem.Version)
+	}
+
+	if sem.PageCount() != pages {
+		t.Errorf("sem.PageCount = %d, want %d", sem.PageCount(), pages)
+	}
+}
+
+// TestOptionalPDFValidation opens converted files with an independent parser
+// (qpdf --check and/or mutool info) when one is installed. This is the #32
+// optional external gate: it skips when neither binary exists and never fails
+// CI for a missing tool. veraPDF profile checks are deliberately absent here
+// (compliance profiles are #33).
 func TestOptionalPDFValidation(t *testing.T) {
 	t.Parallel()
 
@@ -841,38 +966,47 @@ func TestOptionalPDFValidation(t *testing.T) {
 <head><meta charset="utf-8"><title>Validation — 2026</title></head>
 <body>
 <h1>Validation Document</h1>
-<p>Testing PDF 1.7 compliance with external validator.</p>
+<p>Testing PDF compliance with external validator.</p>
 </body>
 </html>`
 
-	cmd, _ := newCommand(t, htmlContent, "")
-	cmd.Global.PdfVersion = pdfVersion17
-	cmd.Global.Title = "Validation — 2026"
-	data := runPDF(t, cmd)
+	validate := func(name, version string) {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 
-	pdfFile := filepath.Join(t.TempDir(), "test_17.pdf")
-	if err := os.WriteFile(pdfFile, data, 0o600); err != nil {
-		t.Fatalf("write PDF file: %v", err)
+			cmd, _ := newCommand(t, htmlContent, "")
+			cmd.Global.PdfVersion = version
+			cmd.Global.Title = "Validation — 2026"
+			data := runPDF(t, cmd)
+
+			pdfFile := filepath.Join(t.TempDir(), name+".pdf")
+			if err := os.WriteFile(pdfFile, data, 0o600); err != nil {
+				t.Fatalf("write PDF file: %v", err)
+			}
+
+			if errQpdf == nil {
+				out, err := exec.CommandContext(t.Context(), qpdfPath, "--check", pdfFile).CombinedOutput()
+				if err != nil {
+					t.Errorf("qpdf --check failed: %v\nOutput: %s", err, string(out))
+				}
+			}
+
+			if errMutool == nil {
+				out, err := exec.CommandContext(t.Context(), mutoolPath, "info", pdfFile).CombinedOutput()
+				if err != nil {
+					t.Errorf("mutool info failed: %v\nOutput: %s", err, string(out))
+				}
+
+				cleanOut, errClean := exec.CommandContext(
+					t.Context(), mutoolPath, "clean", "-s", pdfFile, filepath.Join(t.TempDir(), "clean.pdf"),
+				).CombinedOutput()
+				if errClean != nil {
+					t.Errorf("mutool clean failed: %v\nOutput: %s", errClean, string(cleanOut))
+				}
+			}
+		})
 	}
 
-	if errQpdf == nil {
-		out, err := exec.CommandContext(t.Context(), qpdfPath, "--check", pdfFile).CombinedOutput()
-		if err != nil {
-			t.Errorf("qpdf --check failed: %v\nOutput: %s", err, string(out))
-		}
-	}
-
-	if errMutool == nil {
-		out, err := exec.CommandContext(t.Context(), mutoolPath, "info", pdfFile).CombinedOutput()
-		if err != nil {
-			t.Errorf("mutool info failed: %v\nOutput: %s", err, string(out))
-		}
-
-		cleanOut, errClean := exec.CommandContext(
-			t.Context(), mutoolPath, "clean", "-s", pdfFile, filepath.Join(t.TempDir(), "clean.pdf"),
-		).CombinedOutput()
-		if errClean != nil {
-			t.Errorf("mutool clean failed: %v\nOutput: %s", errClean, string(cleanOut))
-		}
-	}
+	validate("test_17", pdfVersion17)
+	validate("test_20", pdfVersion20)
 }

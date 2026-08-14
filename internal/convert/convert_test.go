@@ -756,16 +756,13 @@ func TestConvertPDFVersion(t *testing.T) {
 		t.Errorf("expected %%PDF-1.7, got %q", data17[:min(10, len(data17))])
 	}
 
-	// 4. Version 2.0 -> returns ErrPDF20Unsupported
+	// 4. Version 2.0 -> %PDF-2.0
 	cmd20, _ := newCommand(t, `<html><body><p>v2.0</p></body></html>`, "")
-	cmd20.Global.PdfVersion = "2.0"
+	cmd20.Global.PdfVersion = pdfVersion20
+	data20 := runPDF(t, cmd20)
 
-	var buf20 bytes.Buffer
-	cmd20.Output = &buf20
-	err20 := Run(t.Context(), cmd20, io.Discard, nil)
-
-	if !errors.Is(err20, settings.ErrPDF20Unsupported) {
-		t.Errorf("expected ErrPDF20Unsupported, got %v", err20)
+	if !bytes.HasPrefix(data20, []byte("%PDF-2.0\n")) {
+		t.Errorf("expected %%PDF-2.0, got %q", data20[:min(10, len(data20))])
 	}
 
 	// 5. Invalid version -> returns ErrInvalidPDFVersion
@@ -793,7 +790,7 @@ func TestConvertPDFVersion(t *testing.T) {
 	}
 }
 
-//nolint:cyclop,funlen // comprehensive negative tests for PDF version and unsupported combinations
+//nolint:funlen // comprehensive negative tests for PDF version and unsupported combinations
 func TestPDFVersionNegativeValidation(t *testing.T) {
 	t.Parallel()
 
@@ -824,32 +821,7 @@ func TestPDFVersionNegativeValidation(t *testing.T) {
 		})
 	}
 
-	// 2. PDF 2.0 returns ErrPDF20Unsupported mentioning issue #32 sentinel
-	t.Run("pdf_20_sentinel", func(t *testing.T) {
-		t.Parallel()
-
-		cmd, _ := newCommand(t, `<html><body><p>pdf 2.0</p></body></html>`, "")
-		cmd.Global.PdfVersion = "2.0"
-
-		var out bytes.Buffer
-
-		cmd.Output = &out
-
-		err := Run(t.Context(), cmd, io.Discard, nil)
-		if !errors.Is(err, settings.ErrPDF20Unsupported) {
-			t.Fatalf("expected ErrPDF20Unsupported, got: %v", err)
-		}
-
-		if !strings.Contains(err.Error(), "32") {
-			t.Errorf("error message should mention issue 32, got: %v", err)
-		}
-
-		if out.Len() != 0 {
-			t.Errorf("expected 0 bytes written for PDF 2.0, got %d", out.Len())
-		}
-	})
-
-	// 3. 1.7 + unsupported combinations fail closed before Write
+	// 2. Unsupported combinations fail closed before Write on both 1.7 and 2.0
 	t.Run("unsupported_combinations_fail_closed", func(t *testing.T) {
 		t.Parallel()
 
@@ -881,12 +853,32 @@ func TestPDFVersionNegativeValidation(t *testing.T) {
 			{
 				"pdf_a",
 				pdf.WriterPolicy{Version: pdf.PDF17, ConformanceProfile: "PDF/A-4"}, //nolint:exhaustruct // test case
-				pdf.ErrConformanceProfilesUnsupported,
+				pdf.ErrConformanceRequiresPDF20,
 			},
 			{
 				"pdf_ua",
 				pdf.WriterPolicy{Version: pdf.PDF17, ConformanceProfile: "PDF/UA-2"}, //nolint:exhaustruct // test case
-				pdf.ErrConformanceProfilesUnsupported,
+				pdf.ErrConformanceRequiresPDF20,
+			},
+			{
+				"pdf20_encryption",
+				pdf.WriterPolicy{Version: pdf.PDF20, Encryption: true}, //nolint:exhaustruct // test case
+				pdf.ErrEncryptionUnsupported,
+			},
+			{
+				"pdf20_forms",
+				pdf.WriterPolicy{Version: pdf.PDF20, Forms: true}, //nolint:exhaustruct // test case
+				pdf.ErrFormsUnsupported,
+			},
+			{
+				"pdf20_signatures",
+				pdf.WriterPolicy{Version: pdf.PDF20, Signatures: true}, //nolint:exhaustruct // test case
+				pdf.ErrSignaturesUnsupported,
+			},
+			{
+				"pdf20_object_streams",
+				pdf.WriterPolicy{Version: pdf.PDF20, ObjectStreams: true}, //nolint:exhaustruct // test case
+				pdf.ErrObjectStreamsUnsupported,
 			},
 		}
 
@@ -905,7 +897,7 @@ func TestPDFVersionNegativeValidation(t *testing.T) {
 		}
 	})
 
-	// 4. Image mode has no version claim
+	// 3. Image mode has no version claim
 	t.Run("image_mode_no_version_claim", func(t *testing.T) {
 		t.Parallel()
 
@@ -1028,11 +1020,81 @@ func TestPDFProfileConvertIntegration(t *testing.T) {
 		t.Errorf("a3a-ua1 policy = %+v, want PDF17 %s", policyA3aUA1, pdf.ProfilePDFA3aPDFUA1)
 	}
 
-	globBadProfile := settings.DefaultPdfGlobal()
-	globBadProfile.PdfProfile = "a4"
+	globA4 := settings.DefaultPdfGlobal()
+	globA4.PdfProfile = "a4"
 
-	if _, err := PolicyForGlobal(globBadProfile); !errors.Is(err, settings.ErrProfilePDF20Unsupported) {
-		t.Errorf("PolicyForGlobal(a4) err = %v, want ErrProfilePDF20Unsupported", err)
+	policyA4, err := PolicyForGlobal(globA4)
+	if err != nil {
+		t.Fatalf("PolicyForGlobal(a4): %v", err)
+	}
+
+	if policyA4.Version != pdf.PDF20 || policyA4.ConformanceProfile != pdf.ProfilePDFA4 {
+		t.Errorf("a4 policy = %+v, want PDF20 %s", policyA4, pdf.ProfilePDFA4)
+	}
+
+	glob20A4 := settings.DefaultPdfGlobal()
+	glob20A4.PdfVersion = pdfVersion20
+	glob20A4.PdfProfile = "PDF/A-4"
+
+	policy20A4, err := PolicyForGlobal(glob20A4)
+	if err != nil {
+		t.Fatalf("PolicyForGlobal(2.0 + PDF/A-4): %v", err)
+	}
+
+	if policy20A4.Version != pdf.PDF20 || policy20A4.ConformanceProfile != pdf.ProfilePDFA4 {
+		t.Errorf("2.0 + PDF/A-4 policy = %+v, want PDF20 %s", policy20A4, pdf.ProfilePDFA4)
+	}
+
+	glob20UA2 := settings.DefaultPdfGlobal()
+	glob20UA2.PdfVersion = pdfVersion20
+	glob20UA2.PdfProfile = "ua2"
+
+	policy20UA2, err := PolicyForGlobal(glob20UA2)
+	if err != nil {
+		t.Fatalf("PolicyForGlobal(2.0 + ua2): %v", err)
+	}
+
+	if policy20UA2.Version != pdf.PDF20 || policy20UA2.ConformanceProfile != pdf.ProfilePDFUA2 {
+		t.Errorf("2.0 + ua2 policy = %+v, want PDF20 %s", policy20UA2, pdf.ProfilePDFUA2)
+	}
+
+	glob17A4 := settings.DefaultPdfGlobal()
+	glob17A4.PdfVersion = pdfVersion17
+	glob17A4.PdfProfile = "a4"
+
+	if _, err := PolicyForGlobal(glob17A4); !errors.Is(err, ErrProfileRequiresPDF20) {
+		t.Errorf("PolicyForGlobal(1.7 + a4) err = %v, want ErrProfileRequiresPDF20", err)
+	}
+
+	glob14A4 := settings.DefaultPdfGlobal()
+	glob14A4.PdfVersion = pdfVersion14
+	glob14A4.PdfProfile = "a4"
+
+	if _, err := PolicyForGlobal(glob14A4); !errors.Is(err, ErrProfileRequiresPDF20) {
+		t.Errorf("PolicyForGlobal(1.4 + a4) err = %v, want ErrProfileRequiresPDF20", err)
+	}
+
+	// A 1.7-era profile on a 2.0 document is still an error: those profiles
+	// require PDF 1.7.
+	glob20A3a := settings.DefaultPdfGlobal()
+	glob20A3a.PdfVersion = pdfVersion20
+	glob20A3a.PdfProfile = profileA3aUA1
+
+	if _, err := PolicyForGlobal(glob20A3a); !errors.Is(err, ErrProfileRequiresPDF17) {
+		t.Errorf("PolicyForGlobal(2.0 + a3a-ua1) err = %v, want ErrProfileRequiresPDF17", err)
+	}
+
+	// Version-only 2.0 mapping.
+	glob20 := settings.DefaultPdfGlobal()
+	glob20.PdfVersion = pdfVersion20
+
+	policy20, err := PolicyForGlobal(glob20)
+	if err != nil {
+		t.Fatalf("PolicyForGlobal(2.0): %v", err)
+	}
+
+	if policy20.Version != pdf.PDF20 {
+		t.Errorf("2.0 policy = %+v, want PDF20", policy20)
 	}
 
 	globPDFA1 := settings.DefaultPdfGlobal()

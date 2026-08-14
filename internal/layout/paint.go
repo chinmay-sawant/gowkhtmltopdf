@@ -427,23 +427,23 @@ func (p *pagePainter) paintOp(opIdx int, paintOp *Op) {
 		p.child.SetOpacity(paintOp.PaintOpacity)
 	}
 
-	isUA1 := p.page != nil && p.page.Doc() != nil && p.page.Doc().Policy().IsPDFUA1()
+	isUA := p.page != nil && p.page.Doc() != nil && (p.page.Doc().Policy().IsPDFUA1() || p.page.Doc().Policy().IsPDFUA2())
 
 	switch {
-	case isUA1 && tagInfo != nil && paintOp.Kind != OpFillRect && paintOp.Kind != OpStrokeRect && paintOp.Kind != OpLine:
+	case isUA && tagInfo != nil && paintOp.Kind != OpFillRect && paintOp.Kind != OpStrokeRect && paintOp.Kind != OpLine:
 		mcid := p.page.AllocMCID(tagInfo.elem)
 		p.child.BeginMarkedContent(string(tagInfo.tag), mcid)
 		p.drawPageOp(paintOp)
 		p.child.EndMarkedContent()
-	case isUA1 && paintOp.Kind == OpFillRect:
+	case isUA && paintOp.Kind == OpFillRect:
 		p.child.BeginArtifact("Background")
 		p.drawPageOp(paintOp)
 		p.child.EndArtifact()
-	case isUA1 && (paintOp.Kind == OpStrokeRect || paintOp.Kind == OpLine):
+	case isUA && (paintOp.Kind == OpStrokeRect || paintOp.Kind == OpLine):
 		p.child.BeginArtifact("Layout")
 		p.drawPageOp(paintOp)
 		p.child.EndArtifact()
-	case isUA1:
+	case isUA:
 		p.child.BeginArtifact("Layout")
 		p.drawPageOp(paintOp)
 		p.child.EndArtifact()
@@ -655,8 +655,8 @@ func paintBandOp(
 		chld.SetOpacity(paintOp.PaintOpacity)
 	}
 
-	isUA1 := page != nil && page.Doc() != nil && page.Doc().Policy().IsPDFUA1()
-	needArtifact := isUA1 && chld.MarkedDepth() == 0
+	isUA := page != nil && page.Doc() != nil && (page.Doc().Policy().IsPDFUA1() || page.Doc().Policy().IsPDFUA2())
+	needArtifact := isUA && chld.MarkedDepth() == 0
 	if needArtifact {
 		chld.BeginArtifact("Pagination")
 	}

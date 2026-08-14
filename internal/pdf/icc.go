@@ -116,3 +116,85 @@ func sRGBICCProfile() []byte {
 
 	return buf
 }
+
+const grayICCProfileSize = 352
+
+// grayICCProfile returns a minimal valid standard monochrome v2.1 ICC matrix/TRC profile.
+// It is 352 bytes uncompressed and adheres strictly to ICC.1:2001-04 (v2.1.0).
+//
+//nolint:mnd // ICC profile binary header constants and tag table layout
+func grayICCProfile() []byte {
+	buf := make([]byte, grayICCProfileSize)
+
+	// 1. Header (128 bytes)
+	binary.BigEndian.PutUint32(buf[0:4], grayICCProfileSize) // Profile size
+	copy(buf[4:8], "none")                                   // Preferred CMM type
+	buf[8] = 2                                               // Major version 2
+	buf[9] = 0x10                                            // Minor version 1.0 (v2.1.0)
+	copy(buf[12:16], "mntr")                                 // Display device profile
+	copy(buf[16:20], "GRAY")                                 // Color space of data
+	copy(buf[20:24], "XYZ ")                                 // PCS (Profile Connection Space)
+
+	// Creation date: 2026-08-14 00:00:00 UTC
+	binary.BigEndian.PutUint16(buf[24:26], 2026)
+	binary.BigEndian.PutUint16(buf[26:28], 8)
+	binary.BigEndian.PutUint16(buf[28:30], 14)
+	binary.BigEndian.PutUint16(buf[30:32], 0)
+	binary.BigEndian.PutUint16(buf[32:34], 0)
+	binary.BigEndian.PutUint16(buf[34:36], 0)
+
+	copy(buf[36:40], "acsp") // Profile file signature
+
+	// Illuminant: D50 (X=0.9642, Y=1.0, Z=0.8249 in s15Fixed16)
+	binary.BigEndian.PutUint32(buf[68:72], 0x0000F6D6)
+	binary.BigEndian.PutUint32(buf[72:76], 0x00010000)
+	binary.BigEndian.PutUint32(buf[76:80], 0x0000D32D)
+
+	// 2. Tag Table
+	binary.BigEndian.PutUint32(buf[128:132], 4) // Tag count: 4 tags
+
+	type tagEntry struct {
+		tag    string
+		offset uint32
+		size   uint32
+	}
+
+	tags := []tagEntry{
+		{"desc", 180, 108},
+		{"cprt", 288, 28},
+		{"wtpt", 316, 20},
+		{"kTRC", 336, 16},
+	}
+
+	pos := 132
+	for _, t := range tags {
+		copy(buf[pos:pos+4], t.tag)
+		binary.BigEndian.PutUint32(buf[pos+4:pos+8], t.offset)
+		binary.BigEndian.PutUint32(buf[pos+8:pos+12], t.size)
+		pos += 12
+	}
+
+	// 3. Tag Data
+
+	// 3.1 'desc' tag at offset 180 (108 bytes)
+	copy(buf[180:184], "desc")
+	binary.BigEndian.PutUint32(buf[188:192], 19)
+	copy(buf[192:211], "sGray IEC61966-2.1\x00")
+
+	// 3.2 'cprt' tag at offset 288 (28 bytes)
+	copy(buf[288:292], "text")
+	copy(buf[296:316], "Copyright (c) 2026\x00\x00")
+
+	// 3.3 'wtpt' tag at offset 316 (20 bytes)
+	copy(buf[316:320], "XYZ ")
+	binary.BigEndian.PutUint32(buf[324:328], 0x0000F6D6) // D50 X
+	binary.BigEndian.PutUint32(buf[328:332], 0x00010000) // D50 Y
+	binary.BigEndian.PutUint32(buf[332:336], 0x0000D32D) // D50 Z
+
+	// 3.4 'kTRC' tag at offset 336 (16 bytes)
+	copy(buf[336:340], "curv")
+	binary.BigEndian.PutUint32(buf[344:348], 1)      // 1 entry
+	binary.BigEndian.PutUint16(buf[348:350], 0x0233) // Gamma 2.2 in u8Fixed8
+
+	return buf
+}

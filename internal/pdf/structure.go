@@ -148,6 +148,10 @@ type StructElem struct {
 	ActualText string
 	AnnotRef   objRef
 	TableScope string
+	// ListNumbering is the PDF List attribute value for /L elements
+	// (Disc, Circle, Square, Decimal, UpperRoman, LowerRoman, UpperAlpha, LowerAlpha).
+	// Required by PDF/UA-2 when list items contain /Lbl children.
+	ListNumbering string
 }
 
 // AddChild appends a child StructElem to this element.
@@ -234,6 +238,12 @@ func (e *StructElem) SetTableScope(scope string) {
 	e.TableScope = scope
 }
 
+// SetListNumbering sets the List attribute /ListNumbering for an /L element
+// (e.g. "Disc", "Decimal"). Empty leaves the attribute unset.
+func (e *StructElem) SetListNumbering(value string) {
+	e.ListNumbering = value
+}
+
 // AddMCID appends a marked content identifier belonging to this element.
 // The MCID is associated with e.Page when set; prefer Page.AllocMCID so the
 // page is recorded correctly for multi-page elements.
@@ -247,9 +257,9 @@ func (e *StructElem) Ref() string {
 }
 
 // CreateStructTreeRoot creates (or returns) the document's structure tree root.
-// When the document policy does not specify PDF/UA-1, this returns nil.
+// When the document policy does not specify PDF/UA-1 or PDF/UA-2, this returns nil.
 func (d *Document) CreateStructTreeRoot() *StructTreeRoot {
-	if !d.policy.IsPDFUA1() {
+	if !d.policy.IsPDFUA1() && !d.policy.IsPDFUA2() {
 		return nil
 	}
 
@@ -267,11 +277,50 @@ func (d *Document) StructTreeRoot() *StructTreeRoot {
 	return d.structTreeRoot
 }
 
+// HeadingStructElems returns all H1–H6 structure elements in document order.
+// This is used by the outline builder to associate outline items with their
+// heading StructElem for PDF/UA-2 structure destinations.
+func (d *Document) HeadingStructElems() []*StructElem {
+	if d.structTreeRoot == nil {
+		return nil
+	}
+
+	var result []*StructElem
+
+	var walk func(e *StructElem)
+	walk = func(e *StructElem) {
+		if isHeadingTag(e.Tag) {
+			result = append(result, e)
+		}
+
+		for _, kid := range e.Kids {
+			walk(kid)
+		}
+	}
+
+	for _, child := range d.structTreeRoot.Children {
+		walk(child)
+	}
+
+	return result
+}
+
+// isHeadingTag reports whether tag is one of H1–H6.
+func isHeadingTag(tag StructType) bool {
+	//nolint:exhaustive // only H1–H6 matter; all other structure types return false
+	switch tag {
+	case StructTypeH1, StructTypeH2, StructTypeH3, StructTypeH4, StructTypeH5, StructTypeH6:
+		return true
+	default:
+		return false
+	}
+}
+
 // AllocMCID allocates the next sequential Marked Content ID on this page
 // and associates it with the owning StructElem for ParentTree resolution.
-// Returns -1 if the document policy does not enable PDF/UA-1 structure.
+// Returns -1 if the document policy does not enable PDF/UA structure.
 func (p *Page) AllocMCID(elem *StructElem) int {
-	if elem == nil || p.doc == nil || !p.doc.policy.IsPDFUA1() {
+	if elem == nil || p.doc == nil || (!p.doc.policy.IsPDFUA1() && !p.doc.policy.IsPDFUA2()) {
 		return -1
 	}
 
@@ -323,9 +372,16 @@ func pruneEmptyStructElems(elem *StructElem) bool {
 }
 
 // finalizeStructure creates and serializes StructTreeRoot, ParentTree, and all StructElems.
+//
+//nolint:cyclop // structure root, namespace, prune, ParentTree, and serialize in one finalize pass
 func (d *Document) finalizeStructure() error {
-	if !d.policy.IsPDFUA1() {
+	if !d.policy.IsPDFUA1() && !d.policy.IsPDFUA2() {
 		return nil
+	}
+
+	if d.policy.IsPDFUA2() {
+		d.namespaceRef = d.newObject()
+		d.setDict(d.namespaceRef, "<< /Type /Namespace /NS (http://iso.org/pdf2/ssn) >>")
 	}
 
 	if d.structTreeRoot == nil {
@@ -475,9 +531,14 @@ func (d *Document) serializeStructTreeRoot() {
 			add("/ParentTreeNextKey", strconv.Itoa(d.parentTreeNextKey))
 	}
 
+	if d.policy.IsPDFUA2() && d.namespaceRef != 0 {
+		rootDict = rootDict.add("/Namespaces", "["+d.namespaceRef.String()+"]")
+	}
+
 	d.setDict(d.structTreeRootRef, rootDict.String())
 }
 
+//nolint:cyclop // MCID vs MCR selection branches on elem content shape
 func (d *Document) formatStructKids(elem *StructElem) string {
 	kItems := make([]string, 0, len(elem.Kids)+len(elem.content)+1)
 	for _, kid := range elem.Kids {
@@ -488,19 +549,20 @@ func (d *Document) formatStructKids(elem *StructElem) string {
 	// Content spanning multiple pages (or a page other than /Pg) must use MCR
 	// dictionaries so each MCID is bound to its owning page.
 	useMCR := contentNeedsMCR(elem)
-	for _, cr := range elem.content {
-		if cr.page == nil {
-			kItems = append(kItems, strconv.Itoa(cr.mcid))
+
+	for _, contentRef := range elem.content {
+		if contentRef.page == nil {
+			kItems = append(kItems, strconv.Itoa(contentRef.mcid))
 
 			continue
 		}
 
-		if useMCR || cr.page != elem.Page {
+		if useMCR || contentRef.page != elem.Page {
 			kItems = append(kItems, fmt.Sprintf(
-				"<< /Type /MCR /Pg %s /MCID %d >>", cr.page.ref.String(), cr.mcid,
+				"<< /Type /MCR /Pg %s /MCID %d >>", contentRef.page.ref.String(), contentRef.mcid,
 			))
 		} else {
-			kItems = append(kItems, strconv.Itoa(cr.mcid))
+			kItems = append(kItems, strconv.Itoa(contentRef.mcid))
 		}
 	}
 
@@ -536,19 +598,64 @@ func contentNeedsMCR(elem *StructElem) bool {
 
 	var first *Page
 
-	for _, cr := range elem.content {
-		if cr.page == nil {
+	for _, contentRef := range elem.content {
+		if contentRef.page == nil {
 			continue
 		}
 
 		if first == nil {
-			first = cr.page
+			first = contentRef.page
 
 			continue
 		}
 
-		if cr.page != first {
+		if contentRef.page != first {
 			return true
+		}
+	}
+
+	return false
+}
+
+// resolveListNumbering returns the ListNumbering name to emit on an /L element.
+// Explicit values win; otherwise under PDF/UA-2, lists that have Lbl children
+// default to Disc so validators do not see an implicit None.
+func resolveListNumbering(elem *StructElem) string {
+	if elem == nil || elem.Tag != StructTypeL {
+		return ""
+	}
+
+	if elem.ListNumbering != "" {
+		return elem.ListNumbering
+	}
+
+	if elem.doc == nil || !elem.doc.policy.IsPDFUA2() {
+		return ""
+	}
+
+	if listHasLbl(elem) {
+		return "Disc"
+	}
+
+	return ""
+}
+
+func listHasLbl(elem *StructElem) bool {
+	if elem == nil {
+		return false
+	}
+
+	for _, kid := range elem.Kids {
+		if kid.Tag == StructTypeLbl {
+			return true
+		}
+
+		if kid.Tag == StructTypeLI {
+			for _, grand := range kid.Kids {
+				if grand.Tag == StructTypeLbl {
+					return true
+				}
+			}
 		}
 	}
 
@@ -575,6 +682,10 @@ func (d *Document) serializeStructElem(elem *StructElem, parentRef objRef) error
 
 	elemDict = elemDict.add("/K", kidsStr)
 
+	if d.policy.IsPDFUA2() && elem.Tag == StructTypeDocument && d.namespaceRef != 0 {
+		elemDict = elemDict.add("/NS", d.namespaceRef.String())
+	}
+
 	if elem.Alt != "" {
 		elemDict = elemDict.add("/Alt", d.encodeTextString(elem.Alt))
 	}
@@ -595,6 +706,9 @@ func (d *Document) serializeStructElem(elem *StructElem, parentRef objRef) error
 		elemDict = elemDict.add("/A", fmt.Sprintf("<< /O /Table /Scope /%s >>", elem.TableScope))
 	} else if elem.Tag == StructTypeTH {
 		elemDict = elemDict.add("/A", "<< /O /Table /Scope /Column >>")
+	} else if listNumbering := resolveListNumbering(elem); listNumbering != "" {
+		// PDF/UA-2 8.2.5.25: when LI contains Lbl, ListNumbering must be present and not None.
+		elemDict = elemDict.add("/A", fmt.Sprintf("<< /O /List /ListNumbering /%s >>", listNumbering))
 	}
 
 	d.setDict(elem.ref, elemDict.String())

@@ -661,7 +661,8 @@ func TestParsePDFVersion(t *testing.T) {
 		{"1.4", "1.4", nil},
 		{"1.7", "1.7", nil},
 		{" 1.7 ", "1.7", nil},
-		{"2.0", "", ErrPDF20Unsupported},
+		{"2.0", "2.0", nil},
+		{" 2.0 ", "2.0", nil},
 		{"9.9", "", ErrInvalidPDFVersion},
 		{"invalid", "", ErrInvalidPDFVersion},
 		{"1.5", "", ErrInvalidPDFVersion},
@@ -720,9 +721,17 @@ func TestGlobalPdfVersionSetting(t *testing.T) {
 		t.Fatalf("global.PdfVersion = %q, want 1.4", global.PdfVersion)
 	}
 
-	// Set 2.0 returns ErrPDF20Unsupported.
-	if err := global.Set("pdfversion", "2.0"); !errors.Is(err, ErrPDF20Unsupported) {
-		t.Fatalf("Set(pdfversion, 2.0) error = %v, want ErrPDF20Unsupported", err)
+	// Set 2.0 succeeds and stores the canonical value.
+	if err := global.Set("pdfversion", "2.0"); err != nil {
+		t.Fatalf("Set(pdfversion, 2.0): %v", err)
+	}
+
+	if global.PdfVersion != "2.0" {
+		t.Fatalf("global.PdfVersion = %q, want 2.0", global.PdfVersion)
+	}
+
+	if got, ok := global.Get("pdfversion"); !ok || got != "2.0" {
+		t.Fatalf("Get(pdfversion) = %q, %v; want %q, true", got, ok, "2.0")
 	}
 
 	// Set invalid returns ErrInvalidPDFVersion.
@@ -755,6 +764,15 @@ func TestGlobalPdfProfileSetting(t *testing.T) {
 		{"ua1", ProfilePDFUA1},
 		{"pdf/ua-1", ProfilePDFUA1},
 		{"PDF/UA-1", ProfilePDFUA1},
+		{"a4-ua2", ProfilePDFA4PDFUA2},
+		{"PDF/A-4+PDF/UA-2", ProfilePDFA4PDFUA2},
+		{"pdf/a-4+pdf/ua-2", ProfilePDFA4PDFUA2},
+		{"a4", ProfilePDFA4},
+		{"pdf/a-4", ProfilePDFA4},
+		{"PDF/A-4", ProfilePDFA4},
+		{"ua2", ProfilePDFUA2},
+		{"pdf/ua-2", ProfilePDFUA2},
+		{"PDF/UA-2", ProfilePDFUA2},
 		{"", ProfileNone},
 	}
 
@@ -776,10 +794,6 @@ func TestGlobalPdfProfileSetting(t *testing.T) {
 		input   string
 		wantErr error
 	}{
-		{"a4", ErrProfilePDF20Unsupported},
-		{"ua2", ErrProfilePDF20Unsupported},
-		{"pdf/a-4", ErrProfilePDF20Unsupported},
-		{"pdf/ua-2", ErrProfilePDF20Unsupported},
 		{"pdfa-1b", ErrProfilePDFA1Unsupported},
 		{"a1", ErrProfilePDFA1Unsupported},
 		{"pdf/a-1", ErrProfilePDFA1Unsupported},

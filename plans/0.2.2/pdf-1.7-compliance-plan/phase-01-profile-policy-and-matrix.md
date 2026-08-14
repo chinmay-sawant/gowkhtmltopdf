@@ -27,8 +27,16 @@ writes the in-repo matrix. It does **not** emit claiming XMP yet.
 | `PDF17` + empty profile | ok (unclaimed 1.7) | unchanged |
 | `PDF17` + A-3a / UA-1 / dual | error | `Validate()` succeeds; later phases emit |
 | `PDF14` + any profile | error | still error (A-3/UA-1 require 1.7) |
-| `PDF20` + anything | `ErrReservedPDF20` | unchanged |
+| `PDF20` + anything | `ErrReservedPDF20` (historical — sentinel removed in 0.2.2; see note below) | unchanged at the time; superseded by #32 |
 | A-4 / UA-2 strings | error (#33) | still error, message stays on #33 |
+
+> **Superseded:** the `PDF20` row describes the state before PDF 2.0
+> landed. Since 0.2.2 (issue #32, `plans/0.2.2/pdf-2.0-plan/`), `PDF20` is
+> a valid version and `ErrReservedPDF20` no longer exists in code; 1.7-era
+> profiles on a 2.0 document still error, but via the version gate
+> (`ErrConformanceRequiresPDF17`) or the #33 deferral sentinel
+> (`pdf.ErrConformanceProfilesUnsupported`), not via a reserved-version
+> sentinel.
 
 ---
 

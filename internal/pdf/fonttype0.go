@@ -32,7 +32,7 @@ func needsType0(used []rune) bool {
 //
 // ponytail: Type0+simple dual embed — both product-real (Latin-1 vs CJK/BMP).
 //
-//nolint:cyclop // ensureFont switches between simple and Type0 embedding
+//nolint:cyclop,funlen // ensureFont switches between simple and Type0 embedding with cache-key precompute
 func (d *Document) ensureFont(fnt *Font, name string, used []rune) (objRef, error) {
 	if fnt == nil {
 		return 0, errNilFont
