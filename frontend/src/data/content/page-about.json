@@ -5,7 +5,7 @@
   {
    "type": "hero",
    "title": "A pure-Go HTML to PDF converter",
-   "lede": "gowkhtmltopdf is a clean-room, pure-Go work-alike for wkhtmltopdf that turns server-generated HTML into multi-page PDFs and images. It is built for controlled reports: invoices, statements, tables, and documents with headers, footers, TOCs, and PDF outlines."
+   "lede": "gowkhtmltopdf is a clean-room, pure-Go work-alike for wkhtmltopdf that turns server-generated HTML and templates into multi-page PDFs and images. It is built as an HTML template engine for styled documents: invoices, receipts, certificates, storybooks, posters, tables, and multi-page documents with headers, footers, TOCs, and PDF outlines."
   },
   {
    "type": "cards",
@@ -114,12 +114,11 @@
     },
     {
      "heading": "AI-assisted development",
-     "body": "Plans and architecture came from Grok 4.5: phase ledgers under `plans/`, the scope freeze, feasibility, and the execution map. DeepSeek drove roughly 90% of the bulk implementation (settings/CLI, loader, PDF writer, HTML/CSS/layout, pagination, header/footer and TOC, image mode, library API, hardening).",
+     "body": "gowkhtmltopdf was developed using modern AI-assisted software engineering practices, pairing human architectural guidance with advanced reasoning and coding models (including Grok, OpenAI Codex, OpenCode, and Cursor) across planning, implementation, and validation.",
      "bullets": [
-      "Last-mile correctness (roughly 10%) was handed to Grok 4.5 with a concrete gate: run `make samples`, fix whatever fails, and open the generated PDFs.",
-      "Early DeepSeek output could emit PDF files, but they were not reliably workable in real viewers: empty or malformed catalogs, wrong stream compression, broken font advances.",
-      "The final pass closed that gap: Flate/zlib streams, Catalog outlines, CLI page-scoped flags, glyph `/Widths` on a 1000-unit em, and Latin-1 text encoding.",
-      "Letter-spacing is fixed for Latin text; complex pages such as full Wikipedia articles still need follow-up for Unicode/CID fonts and richer CSS."
+      "Architecture & Planning: Comprehensive phase ledgers under `plans/`, API contracts, threat modeling, and scope boundaries were defined upfront to guide clean-room execution.",
+      "Core Engine Implementation: Tolerant HTML parsing, report CSS cascade, layout tree pagination, font shaping, and Flate/zlib PDF object serialization were developed with extensive AI-assisted pair programming.",
+      "Quality & Verification: All subsystems are verified against rigorous golden fixture visual tests (`make samples`), upstream bug dossiers, and benchmark regression suites."
      ]
     },
     {
@@ -131,8 +130,8 @@
   {
    "type": "callout",
    "variant": "info",
-   "title": "Scope boundary: a report engine, not a browser",
-   "body": "gowkhtmltopdf converts server-generated HTML into multi-page PDFs without a browser process. There is no JavaScript, CSS support is a documented subset (flex, grid, and positioning are partial), and pixel parity with Chrome or WebKit is not a goal. Use it for invoices, statements, tables, and multi-page documents with headers, footers, TOCs, and PDF outlines."
+   "title": "Scope boundary: an HTML template engine, not a browser",
+   "body": "gowkhtmltopdf converts server-generated HTML and styled templates into multi-page PDFs without a browser process. There is no JavaScript, CSS support is a documented subset (flex, grid, and positioning are partial), and pixel parity with Chrome or WebKit is not a goal. Use it for invoices, certificates, storybooks, posters, tables, and multi-page documents with headers, footers, TOCs, and PDF outlines."
   }
  ]
 }

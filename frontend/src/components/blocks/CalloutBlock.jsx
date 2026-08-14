@@ -1,4 +1,5 @@
 import RichText from '../RichText'
+import { slugify } from './slugify'
 
 const ICON = {
   info: 'i',
@@ -23,7 +24,7 @@ export default function CalloutBlock({ block }) {
       <div className="callout-body">
         <span className="callout-kicker">{LABEL[variant] || LABEL.info}</span>
         {block.title && (
-          <h3 className="callout-title">
+          <h3 className="callout-title" id={slugify(block.title)}>
             <RichText>{block.title}</RichText>
           </h3>
         )}

@@ -8,6 +8,7 @@ function Chip({ label, count, color, active, onClick, dot = true, title }) {
       style={{ '--cc': color }}
       onClick={onClick}
       title={title}
+      aria-pressed={active}
     >
       {dot && <span className="dot" style={{ background: color }} />}
       {label}

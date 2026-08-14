@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 function XaiLogo() {
   return (
     <svg viewBox="0 0 466.04 516.93" aria-hidden="true" focusable="false">
@@ -38,7 +40,7 @@ const TOOLS = [
 export default function Footer() {
   return (
     <footer>
-      <span className="footer-name">gowkhtmltoPDF</span>
+      <span className="footer-name">gowkhtmltopdf</span>
       <span className="footer-built">
         Built with
         {TOOLS.map(({ name, href, Logo }) => (
@@ -49,9 +51,10 @@ export default function Footer() {
         ))}
       </span>
       <span>
-        MIT ·{' '}
-        <a href="https://github.com/chinmay-sawant/gowkhtmltopdf">source</a>
+        <Link to="/about" className="footer-link">About</Link> · MIT ·{' '}
+        <a href="https://github.com/chinmay-sawant/gowkhtmltopdf" target="_blank" rel="noopener noreferrer">source</a>
       </span>
     </footer>
   )
 }
+

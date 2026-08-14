@@ -4,7 +4,7 @@
 
 The root package `gowkhtmltopdf` is the **idiomatic pure-Go library surface**
 for the conversion engine. It is the "wave 2" library API described by
-[phase 08 of the canonical plan](../plans/00-canonical-pure-go-rewrite.md) and
+[phase 08 of the canonical plan](../../plans/0.1.0/00-canonical-pure-go-rewrite.md) and
 wraps the wkhtmltopdf lifecycle (`pdf.h` / `image.h`, without any C). It has
 two jobs:
 
@@ -460,7 +460,7 @@ programs build and run as smoke tests (`go run ./examples/pdf`,
 - **JavaScript / full-CSS input.** Out of scope by design (fidelity.md);
   `<script>` is stripped. Library callers passing JS-heavy SPA HTML get the
   server-rendered snapshot only — align expectations with
-  [documentation/deferred.md](../documentation/deferred.md) (SPA URLs are
+  [documentation/deferred.md](../deferred.md) (SPA URLs are
   explicitly the *last* priority workload).
 - **One image page only.** `ImageConverter` renders the single most-recent
   `AddObject` page; multi-page image output is not part of the surface.
@@ -481,7 +481,7 @@ programs build and run as smoke tests (`go run ./examples/pdf`,
 - [../compatibility-matrix.md](../compatibility-matrix.md) — normative per-feature contract
 - [../deferred.md](../deferred.md) — workload prioritisation (template-first, SPA-last)
 - [../fonts.md](../fonts.md) — font discovery relevant when adding font-path settings
-- [../../plans/00-canonical-pure-go-rewrite.md](../../plans/00-canonical-pure-go-rewrite.md) phase 8 (line 60) and [phase-08-library-api.md](../../plans/phases/phase-08-library-api.md) — the plan this surface implements
+- [../../plans/0.1.0/00-canonical-pure-go-rewrite.md](../../plans/0.1.0/00-canonical-pure-go-rewrite.md) phase 8 (line 60) and [phase-08-library-api.md](../../plans/0.1.0/phases/phase-08-library-api.md) — the plan this surface implements
 - [CHANGELOG.md](../../CHANGELOG.md) — release notes (library API entry, line 63)
 - Sibling architecture deep-dives in this directory:
   - [01-entrypoints-cli.md](01-entrypoints-cli.md) — CLI path and the `internal/app` command adapters alongside this library

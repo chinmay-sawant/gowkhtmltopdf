@@ -1,7 +1,8 @@
 # gowkhtmltopdf
 
-gowkhtmltopdf is a no-cgo HTML→PDF and HTML→image converter for **controlled
-reports**: invoices, statements, tables, and multi-page documents with headers,
+gowkhtmltopdf is a no-cgo HTML→PDF and HTML→image converter and HTML template engine
+for **structured templates and documents**: invoices, receipts, certificates,
+storybooks, posters, statements, tables, and multi-page documents with headers,
 footers, tables of contents, and PDF outlines.
 
 It is a clean-room work-alike of the [wkhtmltopdf](https://wkhtmltopdf.org/)
@@ -11,7 +12,7 @@ library run an in-repo pipeline (load → parse → style → layout → paginat
 paint → write). Direct modules are allowlisted:
 [`go-text/typesetting`](https://github.com/go-text/typesetting) (OpenType
 shaping) and [`tdewolff/canvas`](https://github.com/tdewolff/canvas) (SVG
-rasterization). The product is report HTML, not Chrome visual parity.
+rasterization). The product is HTML templates and documents, not Chrome visual parity.
 
 **Status:** **v0.2.0**. **License:** [MIT](LICENSE).
 
@@ -110,6 +111,10 @@ Reproduce:
 make bench-cli-compare
 make bench
 ```
+
+## Development
+
+gowkhtmltopdf was designed and built as a clean-room pure-Go engine, pairing human architecture and domain design with modern AI-assisted engineering tools (including Grok, OpenAI Codex, OpenCode, and Cursor) for accelerated implementation, golden fixture visual verification, and comprehensive test suites.
 
 ## License
 

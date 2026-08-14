@@ -1,24 +1,24 @@
 export const STATUS_ORDER = ['implemented', 'partial', 'not-implemented']
 
 export const STATUS_META = {
-  implemented: { label: 'Implemented', color: '#9BBF88', accent: '#EDF3EC', text: '#346538' },
-  partial: { label: 'Partial', color: '#E7CD80', accent: '#FBF3DB', text: '#956400' },
-  'not-implemented': { label: 'Not implemented', color: '#D89A8B', accent: '#FDEBEC', text: '#9F2F2D' },
+  implemented: { label: 'Implemented', color: 'var(--ok-ink)', accent: 'var(--ok-bg)', text: 'var(--ok-ink)', rawColor: '#9BBF88' },
+  partial: { label: 'Partial', color: 'var(--warn-ink)', accent: 'var(--warn-bg)', text: 'var(--warn-ink)', rawColor: '#E7CD80' },
+  'not-implemented': { label: 'Not implemented', color: 'var(--bad-ink)', accent: 'var(--bad-bg)', text: 'var(--bad-ink)', rawColor: '#D89A8B' },
 }
 
 export const STATUS_CARD = {
-  implemented: { stripe: '#9BBF88', bg: '#F6FAF5', title: '#346538', label: '#346538' },
-  partial: { stripe: '#E7CD80', bg: '#FCF9F1', title: '#7A5A05', label: '#956400' },
-  'not-implemented': { stripe: '#D89A8B', bg: '#FBF4F2', title: '#8A3A2E', label: '#9F2F2D' },
-  unknown: { stripe: '#EAEAEA', bg: '#FFFFFF', title: '#2F3437', label: '#787774' },
+  implemented: { stripe: 'var(--ok-ink)', bg: 'var(--ok-bg)', title: 'var(--ok-ink)', label: 'var(--ok-ink)' },
+  partial: { stripe: 'var(--warn-ink)', bg: 'var(--warn-bg)', title: 'var(--warn-ink)', label: 'var(--warn-ink)' },
+  'not-implemented': { stripe: 'var(--bad-ink)', bg: 'var(--bad-bg)', title: 'var(--bad-ink)', label: 'var(--bad-ink)' },
+  unknown: { stripe: 'var(--line)', bg: 'var(--surface)', title: 'var(--ink)', label: 'var(--muted)' },
 }
 
 export const SEVERITY_ORDER = ['High', 'Medium', 'Low']
 
 export const SEVERITY_META = {
-  High: { bg: '#FDEBEC', text: '#9F2F2D' },
-  Medium: { bg: '#FBF3DB', text: '#956400' },
-  Low: { bg: '#EDF3EC', text: '#346538' },
+  High: { bg: 'var(--bad-bg)', text: 'var(--bad-ink)', color: 'var(--bad-ink)' },
+  Medium: { bg: 'var(--warn-bg)', text: 'var(--warn-ink)', color: 'var(--warn-ink)' },
+  Low: { bg: 'var(--ok-bg)', text: 'var(--ok-ink)', color: 'var(--ok-ink)' },
 }
 
 export const CATEGORY_ORDER = [

@@ -1,6 +1,22 @@
 const BASE = 'https://github.com/chinmay-sawant/gowkhtmltopdf/tree/master/output'
 const GOLDEN_BASE = 'https://github.com/chinmay-sawant/gowkhtmltopdf/tree/master/testdata/golden'
 
+export const SHOWCASE_CATEGORIES = [
+  'Invoices & receipts',
+  'Reports & tables',
+  'Storybooks & posters',
+  'CSS & layout fixtures',
+  'Architecture & API',
+]
+
+export const SHOWCASE_CATEGORY_COLORS = {
+  'Invoices & receipts': '#7FA8C9',
+  'Reports & tables': '#9BBF88',
+  'Storybooks & posters': '#E7CD80',
+  'CSS & layout fixtures': '#B0A8D9',
+  'Architecture & API': '#D89A8B',
+}
+
 export const SHOWCASE = [
   {
     name: 'font-examples',
@@ -8,6 +24,7 @@ export const SHOWCASE = [
     pages: 25,
     title: 'Font examples — 1,125 Google Fonts',
     desc: 'Randomized single-column sampler: every font exactly once, one line per style (bold, italic, underline, strikethrough, combinations). Fonts are not bundled — render with --font-path.',
+    category: 'Architecture & API',
   },
   {
     name: 'architecture-diagram',
@@ -15,6 +32,7 @@ export const SHOWCASE = [
     pages: 5,
     title: 'Library API architecture diagram',
     desc: 'Five-page architecture document for the public Go library API: rendering pipeline, layout domains, dependencies, output modes, and security boundaries.',
+    category: 'Architecture & API',
   },
   {
     name: 'fixture-56-architecture-diagram',
@@ -22,6 +40,7 @@ export const SHOWCASE = [
     pages: 20,
     title: 'Architecture diagram',
     desc: 'Pure HTML+CSS architecture diagram: pipeline strip, 10 domain sections, dependency DAG, PDF-vs-image, and security summary.',
+    category: 'Architecture & API',
   },
   {
     name: 'fixture-55-lantern-cooperative-report',
@@ -29,6 +48,7 @@ export const SHOWCASE = [
     pages: 3,
     title: 'Lantern Cooperative report',
     desc: 'Self-contained operations brief: status cards, route table, action plan, and page breaks.',
+    category: 'Reports & tables',
   },
   {
     name: 'fixture-54-ember-harbor-storybook',
@@ -36,6 +56,7 @@ export const SHOWCASE = [
     pages: 4,
     title: 'Ember Harbor storybook',
     desc: 'Original print storybook — cover and chapter pages with remote illustrations and explicit page breaks.',
+    category: 'Storybooks & posters',
   },
   {
     name: 'fixture-53-asteria-observatory-poster',
@@ -43,6 +64,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'Asteria observatory poster',
     desc: 'Second poster variant sharing the print theme with a different illustration and copy.',
+    category: 'Storybooks & posters',
   },
   {
     name: 'fixture-52-airline-boarding-pass',
@@ -50,6 +72,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'Airline boarding pass',
     desc: 'E-ticket itinerary with multi-column stubs and monospace barcodes.',
+    category: 'Invoices & receipts',
   },
   {
     name: 'fixture-51-asteria-storybook',
@@ -57,6 +80,7 @@ export const SHOWCASE = [
     pages: 4,
     title: 'Asteria storybook',
     desc: 'Original four-page anime-inspired story with page illustrations, live text, and page breaks.',
+    category: 'Storybooks & posters',
   },
   {
     name: 'fixture-50-letter-template',
@@ -64,6 +88,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'Letter template',
     desc: 'Local mark, stationery hierarchy, quote, and signature block.',
+    category: 'Invoices & receipts',
   },
   {
     name: 'fixture-49-night-train-poster',
@@ -71,6 +96,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'Night train poster',
     desc: 'One-page illustrated poster with generated art and layered composition.',
+    category: 'Storybooks & posters',
   },
   {
     name: 'fixture-48-shipping-document',
@@ -78,6 +104,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'Shipping document',
     desc: 'Addresses, package table, tracking, and handling instructions.',
+    category: 'Invoices & receipts',
   },
   {
     name: 'fixture-47-certificate',
@@ -85,6 +112,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'Certificate',
     desc: 'Ornamental background image, centered award composition, and signatures.',
+    category: 'Storybooks & posters',
   },
   {
     name: 'fixture-46-contract',
@@ -92,6 +120,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'Contract',
     desc: 'Numbered clauses, obligations, commercial terms, and signatures.',
+    category: 'Invoices & receipts',
   },
   {
     name: 'fixture-45-purchase-order',
@@ -99,6 +128,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'Purchase order',
     desc: 'Supplier and delivery blocks, item table, terms, and approvals.',
+    category: 'Invoices & receipts',
   },
   {
     name: 'fixture-44-receipt',
@@ -106,6 +136,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'Receipt',
     desc: 'Compact paid transaction with line items, tax, and total.',
+    category: 'Invoices & receipts',
   },
   {
     name: 'fixture-43-complex-dossier',
@@ -113,6 +144,7 @@ export const SHOWCASE = [
     pages: 5,
     title: 'Complex dossier',
     desc: 'Five-page self-contained report: images, flex/grid cards, floats, multicol, anchors, repeating tables.',
+    category: 'Architecture & API',
   },
   {
     name: 'fixture-42-container-inline-size',
@@ -120,6 +152,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'Container queries',
     desc: 'Size-query containers: named inline-size and unnamed width queries.',
+    category: 'CSS & layout fixtures',
   },
   {
     name: 'fixture-41-has-selector',
@@ -127,6 +160,7 @@ export const SHOWCASE = [
     pages: 1,
     title: ':has() selector',
     desc: 'Relational selector: article footnote border and row highlights.',
+    category: 'CSS & layout fixtures',
   },
   {
     name: 'fixture-40-transform-badge',
@@ -134,6 +168,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'Transform badge',
     desc: 'Static 2D CSS transform with positioned containing block.',
+    category: 'CSS & layout fixtures',
   },
   {
     name: 'fixture-39-multicol-article',
@@ -141,6 +176,7 @@ export const SHOWCASE = [
     pages: 3,
     title: 'Multi-column article',
     desc: 'Column-count, gap, span, and fill with page-safe column boxes.',
+    category: 'CSS & layout fixtures',
   },
   {
     name: 'fixture-38-float-inside-td',
@@ -148,6 +184,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'Float inside table cell',
     desc: 'Icon float with wrap and clear inside a td.',
+    category: 'CSS & layout fixtures',
   },
   {
     name: 'fixture-37-orphans-css',
@@ -155,6 +192,7 @@ export const SHOWCASE = [
     pages: 3,
     title: 'Orphans and widows',
     desc: 'CSS orphans/widows parsing with keep-together rule.',
+    category: 'CSS & layout fixtures',
   },
   {
     name: 'fixture-36-hf-nested-flex',
@@ -162,6 +200,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'Nested header and footer',
     desc: 'Flex header with image and GoTo anchor, placeholder footer.',
+    category: 'CSS & layout fixtures',
   },
   {
     name: 'fixture-35-grid-minmax-intrinsic',
@@ -169,6 +208,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'Grid minmax and intrinsic',
     desc: 'Grid Stage B/C: minmax with fr floors, cyclic heights, subgrid inherit, masonry packing.',
+    category: 'CSS & layout fixtures',
   },
   {
     name: 'fixture-34-grid-areas-dense',
@@ -176,6 +216,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'Grid areas and dense flow',
     desc: 'Named grid areas plus grid-auto-flow dense hole filling.',
+    category: 'CSS & layout fixtures',
   },
   {
     name: 'fixture-33-flex-cyclic-basis',
@@ -183,6 +224,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'Flex cyclic basis',
     desc: 'Percentage flex basis: definite resolve versus indefinite cyclic to auto.',
+    category: 'CSS & layout fixtures',
   },
   {
     name: 'fixture-32-flex-grid-full',
@@ -190,6 +232,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'Flex and grid full',
     desc: 'Flex Stage A and Grid Stage B lite: reverse, space-evenly, gaps, column flex, row span.',
+    category: 'CSS & layout fixtures',
   },
   {
     name: 'fixture-31-sticky-top',
@@ -197,6 +240,7 @@ export const SHOWCASE = [
     pages: 2,
     title: 'Sticky header',
     desc: 'Print-scoped position sticky with page content box as scrollport.',
+    category: 'Reports & tables',
   },
   {
     name: 'fixture-30-orphans-heuristic',
@@ -204,6 +248,7 @@ export const SHOWCASE = [
     pages: 3,
     title: 'Orphans heuristic',
     desc: 'Geometric keep-with-next fallback for page breaks.',
+    category: 'CSS & layout fixtures',
   },
   {
     name: 'fixture-29-float-beside-table',
@@ -211,6 +256,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'Float beside table',
     desc: 'Float right infobox with wrapping prose and clear.',
+    category: 'CSS & layout fixtures',
   },
   {
     name: 'fixture-28-flex-wrap-grid-fixed',
@@ -218,6 +264,7 @@ export const SHOWCASE = [
     pages: 2,
     title: 'Flex wrap and grid fixed',
     desc: 'Flex wrap, CSS grid lite, and a position fixed stamp.',
+    category: 'CSS & layout fixtures',
   },
   {
     name: 'fixture-27-cjk-fontpath',
@@ -225,6 +272,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'CJK with font path',
     desc: 'CJK and Unicode sample, pairs with font-path for real glyphs.',
+    category: 'CSS & layout fixtures',
   },
   {
     name: 'fixture-26-position-lite',
@@ -232,6 +280,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'Position lite',
     desc: 'Relative offsets and an absolute overlay.',
+    category: 'CSS & layout fixtures',
   },
   {
     name: 'fixture-25-flex-row',
@@ -239,6 +288,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'Flex row',
     desc: 'Partial flex row with justify-content, gap, and flex-grow.',
+    category: 'CSS & layout fixtures',
   },
   {
     name: 'fixture-24-internal-anchors',
@@ -246,6 +296,7 @@ export const SHOWCASE = [
     pages: 2,
     title: 'Internal anchors',
     desc: 'Same-document fragment links as PDF GoTo annotations.',
+    category: 'CSS & layout fixtures',
   },
   {
     name: 'fixture-23-thead-repeat',
@@ -253,6 +304,7 @@ export const SHOWCASE = [
     pages: 2,
     title: 'Repeating table header',
     desc: 'Multi-page table with thead repeated on continuation pages.',
+    category: 'Reports & tables',
   },
   {
     name: 'fixture-22-float-invoice-chrome',
@@ -260,6 +312,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'Float invoice chrome',
     desc: 'Float left and right with clear, inline-block badge, border-box.',
+    category: 'CSS & layout fixtures',
   },
   {
     name: 'fixture-21-detailed-report',
@@ -267,6 +320,7 @@ export const SHOWCASE = [
     pages: 4,
     title: 'Detailed report',
     desc: 'Multi-section ops report: KPIs, work packages, invoice extract, requirements.',
+    category: 'Reports & tables',
   },
   {
     name: 'fixture-20-image-grid',
@@ -274,6 +328,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'Image grid',
     desc: 'Four data URI PNGs at intrinsic sizes.',
+    category: 'CSS & layout fixtures',
   },
   {
     name: 'fixture-19-margin-and-sizing',
@@ -281,6 +336,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'Margins and sizing',
     desc: 'Box model: fixed, min and max widths, margins, padding, borders.',
+    category: 'CSS & layout fixtures',
   },
   {
     name: 'fixture-18-typography',
@@ -288,6 +344,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'Typography',
     desc: 'Heading scale, strong/em/u/s/small, blockquote, and code.',
+    category: 'CSS & layout fixtures',
   },
   {
     name: 'fixture-17-cover-and-content',
@@ -295,6 +352,7 @@ export const SHOWCASE = [
     pages: 2,
     title: 'Cover and content',
     desc: 'Cover-style first page with a page-break-before content page.',
+    category: 'Reports & tables',
   },
   {
     name: 'fixture-16-invoice-with-css',
@@ -302,6 +360,7 @@ export const SHOWCASE = [
     pages: 2,
     title: 'Invoice with CSS',
     desc: 'Full invoice: letterhead, bill-to, 24 line items, tfoot totals.',
+    category: 'Invoices & receipts',
   },
   {
     name: 'fixture-15-bulleted-requirements',
@@ -309,6 +368,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'Bulleted requirements',
     desc: 'Markdown-style requirements with nested lists and anchors.',
+    category: 'Reports & tables',
   },
   {
     name: 'fixture-14-colorful-report',
@@ -316,6 +376,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'Colorful report',
     desc: 'Background colors, rgba alpha, colored borders, and rules.',
+    category: 'Reports & tables',
   },
   {
     name: 'fixture-13-pre-code-block',
@@ -323,6 +384,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'Pre and code block',
     desc: 'White-space preservation in pre with code runs and log excerpts.',
+    category: 'CSS & layout fixtures',
   },
   {
     name: 'fixture-12-lists',
@@ -330,6 +392,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'Lists',
     desc: 'Nested ul/ol/li with indentation and list-item styles.',
+    category: 'CSS & layout fixtures',
   },
   {
     name: 'fixture-11-long-text-wrap',
@@ -337,6 +400,7 @@ export const SHOWCASE = [
     pages: 3,
     title: 'Long text wrap',
     desc: 'Paragraph-heavy justified prose with line-level pagination.',
+    category: 'CSS & layout fixtures',
   },
   {
     name: 'fixture-10-table-colspan',
@@ -344,6 +408,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'Table colspan',
     desc: 'Nested tables, colspan 2 and 4, th, and tfoot totals.',
+    category: 'Reports & tables',
   },
   {
     name: 'fixture-09-multi-section-doc',
@@ -351,6 +416,7 @@ export const SHOWCASE = [
     pages: 2,
     title: 'Multi-section document',
     desc: 'Long report with natural pagination and outline fodder.',
+    category: 'Reports & tables',
   },
   {
     name: 'fixture-08-forced-page-breaks',
@@ -358,6 +424,7 @@ export const SHOWCASE = [
     pages: 5,
     title: 'Forced page breaks',
     desc: 'Page-break before, inside, and after with margin-gap convergence.',
+    category: 'CSS & layout fixtures',
   },
   {
     name: 'fixture-07-image-logo',
@@ -365,6 +432,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'Image logo',
     desc: 'Relative PNG and data URI PNG at intrinsic sizes.',
+    category: 'CSS & layout fixtures',
   },
   {
     name: 'fixture-06-external-link',
@@ -372,6 +440,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'External link',
     desc: 'External href as PDF URI annotation with linked stylesheet.',
+    category: 'CSS & layout fixtures',
   },
   {
     name: 'fixture-05-linked-stylesheet',
@@ -379,6 +448,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'Linked stylesheet',
     desc: 'Relative stylesheet driving all styling.',
+    category: 'CSS & layout fixtures',
   },
   {
     name: 'fixture-04-two-column-layout',
@@ -386,6 +456,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'Two-column layout',
     desc: 'Fixed table cells for a two-column page layout.',
+    category: 'CSS & layout fixtures',
   },
   {
     name: 'fixture-03-multi-page-invoice',
@@ -393,6 +464,7 @@ export const SHOWCASE = [
     pages: 4,
     title: 'Multi-page invoice',
     desc: 'Statement with page-break control and outline headings.',
+    category: 'Invoices & receipts',
   },
   {
     name: 'fixture-02-table-heavy-invoice',
@@ -400,6 +472,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'Table-heavy invoice',
     desc: 'Fifteen-row table with thead/tbody/tfoot, colspan subtotal.',
+    category: 'Invoices & receipts',
   },
   {
     name: 'fixture-01-simple-invoice',
@@ -407,6 +480,7 @@ export const SHOWCASE = [
     pages: 1,
     title: 'Simple invoice',
     desc: 'Minimal single-page invoice: headings, paragraphs, table, bold total.',
+    category: 'Invoices & receipts',
   },
 ]
 
@@ -417,6 +491,7 @@ export const SHOWCASE_SPECIAL = [
     pages: 3,
     title: 'TOC, headers, footers, outline',
     desc: 'Table of contents with headers, footers, and document outline.',
+    category: 'Architecture & API',
   },
   {
     name: 'wiki-ana-de-armas',
@@ -424,6 +499,7 @@ export const SHOWCASE_SPECIAL = [
     pages: 12,
     title: 'Wikipedia live smoke',
     desc: 'Live Wikipedia raw conversion with system fonts (needs network).',
+    category: 'Reports & tables',
   },
   {
     name: 'chrome_ana',
@@ -431,6 +507,7 @@ export const SHOWCASE_SPECIAL = [
     pages: 10,
     title: 'Chrome comparison',
     desc: 'Reference screenshot used for fidelity comparison.',
+    category: 'Architecture & API',
   },
 ]
 

@@ -1,5 +1,7 @@
+import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import PageTitle from '../components/PageTitle'
+import Footer from '../components/Footer'
 import {
   CHART_PAGES,
   CLI_ROWS,
@@ -17,43 +19,19 @@ import {
   speedup,
 } from '../data/benchmarks'
 
-const MAX_MS = Math.max(...CLI_ROWS.map((r) => r.wkMs))
-const CHART_ROWS = CLI_ROWS.filter((r) => CHART_PAGES.includes(r.pages))
+const WORKLOAD_FILTERS = [
+  { id: 'all', label: 'All Workloads' },
+  { id: '2', label: '2 Pages' },
+  { id: '10', label: '10 Pages' },
+  { id: '100', label: '100 Pages' },
+  { id: '500', label: '500 Pages' },
+]
 
-function barWidth(ms) {
-  return `${Math.max(3, (ms / MAX_MS) * 100)}%`
-}
-
-function CompareChart() {
-  return (
-    <div className="bench-chart" role="img" aria-label="Wall-time comparison of gowkhtmltopdf and wkhtmltopdf">
-      {CHART_ROWS.map((row) => (
-        <article className="bench-pair" key={row.pages}>
-          <h3>{row.pages} pages</h3>
-          <div className="bench-bars">
-            <div className="bench-bar-row">
-              <span className="bench-engine">gowk</span>
-              <div className="bench-bar-track">
-                <div className="bench-bar bench-bar-gowk" style={{ width: barWidth(row.gowkMs) }} />
-              </div>
-              <span className="bench-bar-time">{formatMs(row.gowkMs)}</span>
-            </div>
-            <div className="bench-bar-row">
-              <span className="bench-engine">wkhtml</span>
-              <div className="bench-bar-track">
-                <div className="bench-bar bench-bar-wk" style={{ width: barWidth(row.wkMs) }} />
-              </div>
-              <span className="bench-bar-time">{formatMs(row.wkMs)}</span>
-            </div>
-          </div>
-          <p className="bench-pair-note">
-            <strong>{formatSpeedup(speedup(row))}</strong> faster
-          </p>
-        </article>
-      ))}
-    </div>
-  )
-}
+const METRIC_VIEWS = [
+  { id: 'time', label: 'Execution Time (ms)', shortLabel: 'Time (ms)', desc: 'Median process wall time (lower is faster)' },
+  { id: 'speedup', label: 'Speedup Factor (X)', shortLabel: 'Speedup (X)', desc: 'gowk acceleration multiplier vs wkhtmltopdf baseline' },
+  { id: 'memory', label: 'Memory RSS (MB)', shortLabel: 'Memory (MB)', desc: 'Peak process memory footprint' },
+]
 
 function formatPdfSize(n) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)} MB`
@@ -66,7 +44,105 @@ function rssTone(row) {
   return delta > 0 ? 'better' : 'worse'
 }
 
-function CompareTable() {
+function formatMb(kib) {
+  return `${(kib / 1024).toFixed(1)} MB`
+}
+
+function CompareChart({ rows, metricView }) {
+  const maxMs = useMemo(() => Math.max(...rows.map((r) => r.wkMs), 1), [rows])
+  const maxSpeedup = useMemo(() => Math.max(...rows.map((r) => speedup(r)), 1), [rows])
+  const maxRss = useMemo(() => Math.max(...rows.map((r) => Math.max(r.gowkRss, r.wkRss)), 1), [rows])
+
+  return (
+    <div
+      className="bench-chart"
+      role="region"
+      aria-label={`Visual comparison of ${metricView} across workloads`}
+    >
+      {rows.map((row) => {
+        const speed = speedup(row)
+        const gowkRssMb = row.gowkRss / 1024
+        const wkRssMb = row.wkRss / 1024
+
+        let gowkWidth = '0%'
+        let wkWidth = '0%'
+        let gowkLabel = ''
+        let wkLabel = ''
+        let note = null
+
+        if (metricView === 'time') {
+          gowkWidth = `${Math.max(4, (row.gowkMs / maxMs) * 100)}%`
+          wkWidth = `${Math.max(4, (row.wkMs / maxMs) * 100)}%`
+          gowkLabel = formatMs(row.gowkMs)
+          wkLabel = formatMs(row.wkMs)
+          note = (
+            <p className="bench-pair-note">
+              <strong>{formatSpeedup(speed)}</strong> faster
+            </p>
+          )
+        } else if (metricView === 'speedup') {
+          gowkWidth = `${Math.max(6, (speed / maxSpeedup) * 100)}%`
+          wkWidth = `${Math.max(6, (1.0 / maxSpeedup) * 100)}%`
+          gowkLabel = `${formatSpeedup(speed)}`
+          wkLabel = '1.00x baseline'
+          note = (
+            <p className="bench-pair-note">
+              gowk renders in <strong>{(100 / speed).toFixed(0)}%</strong> of baseline time
+            </p>
+          )
+        } else if (metricView === 'memory') {
+          gowkWidth = `${Math.max(4, (row.gowkRss / maxRss) * 100)}%`
+          wkWidth = `${Math.max(4, (row.wkRss / maxRss) * 100)}%`
+          gowkLabel = `${gowkRssMb.toFixed(1)} MB`
+          wkLabel = `${wkRssMb.toFixed(1)} MB`
+          note = (
+            <p className="bench-pair-note">
+              <strong className={rssTone(row) === 'better' ? 'bench-text-better' : 'bench-text-worse'}>
+                {formatRssDelta(row)}
+              </strong>
+            </p>
+          )
+        }
+
+        return (
+          <article className="bench-pair" key={row.pages}>
+            <div className="bench-pair-head">
+              <h3>{row.pages} pages</h3>
+              <span className="bench-pair-badge">{formatPdfSize(row.gowkBytes)} PDF</span>
+            </div>
+            <div className="bench-bars">
+              <div className="bench-bar-row">
+                <span className="bench-engine">gowk</span>
+                <div className="bench-bar-track">
+                  <div
+                    className="bench-bar bench-bar-gowk"
+                    style={{ width: gowkWidth }}
+                    title={`gowkhtmltopdf: ${gowkLabel}`}
+                  />
+                </div>
+                <span className="bench-bar-time">{gowkLabel}</span>
+              </div>
+              <div className="bench-bar-row">
+                <span className="bench-engine">wkhtml</span>
+                <div className="bench-bar-track">
+                  <div
+                    className="bench-bar bench-bar-wk"
+                    style={{ width: wkWidth }}
+                    title={`wkhtmltopdf: ${wkLabel}`}
+                  />
+                </div>
+                <span className="bench-bar-time">{wkLabel}</span>
+              </div>
+            </div>
+            {note}
+          </article>
+        )
+      })}
+    </div>
+  )
+}
+
+function CompareTable({ activeFilter }) {
   return (
     <div className="table-scroll bench-matrix">
       <table>
@@ -97,23 +173,37 @@ function CompareTable() {
           </tr>
         </thead>
         <tbody>
-          {CLI_ROWS.map((row) => (
-            <tr key={row.pages}>
-              <th scope="row">{row.pages}</th>
-              <td>{formatMs(row.gowkMs)}</td>
-              <td>{formatMs(row.wkMs)}</td>
-              <td>
-                <span className="bench-speedup">{formatSpeedup(speedup(row))}</span>
-              </td>
-              <td>{formatKiB(row.gowkRss)}</td>
-              <td>{formatKiB(row.wkRss)}</td>
-              <td>
-                <span className={`bench-rss bench-rss-${rssTone(row)}`}>{formatRssDelta(row)}</span>
-              </td>
-              <td>{formatPdfSize(row.gowkBytes)}</td>
-              <td>{formatPdfSize(row.wkBytes)}</td>
-            </tr>
-          ))}
+          {CLI_ROWS.map((row) => {
+            const isMatch = activeFilter === 'all' || activeFilter === String(row.pages)
+            const isDimmed = activeFilter !== 'all' && activeFilter !== String(row.pages)
+            return (
+              <tr
+                key={row.pages}
+                className={`${isMatch && activeFilter !== 'all' ? 'bench-row-highlight' : ''} ${
+                  isDimmed ? 'bench-row-dimmed' : ''
+                }`}
+              >
+                <th scope="row">
+                  {row.pages}
+                  {activeFilter === String(row.pages) && <span className="bench-row-pin"> •</span>}
+                </th>
+                <td>{formatMs(row.gowkMs)}</td>
+                <td>{formatMs(row.wkMs)}</td>
+                <td>
+                  <span className="bench-speedup">{formatSpeedup(speedup(row))}</span>
+                </td>
+                <td>{formatMb(row.gowkRss)} ({formatKiB(row.gowkRss)})</td>
+                <td>{formatMb(row.wkRss)} ({formatKiB(row.wkRss)})</td>
+                <td>
+                  <span className={`bench-rss bench-rss-${rssTone(row)}`}>
+                    {formatRssDelta(row)}
+                  </span>
+                </td>
+                <td>{formatPdfSize(row.gowkBytes)}</td>
+                <td>{formatPdfSize(row.wkBytes)}</td>
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>
@@ -160,7 +250,135 @@ function InprocTable({ heading, rows, unit }) {
   )
 }
 
+function HardwareSpecCard() {
+  const [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <div className="bench-spec-card">
+      <button
+        type="button"
+        className="bench-spec-header"
+        onClick={() => setIsOpen(!isOpen)}
+        aria-expanded={isOpen}
+        aria-controls="bench-spec-details"
+      >
+        <div className="bench-spec-header-main">
+          <div className="bench-spec-icon-badge">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <rect x="2" y="2" width="20" height="8" rx="2" ry="2" />
+              <rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
+              <line x1="6" y1="6" x2="6.01" y2="6" />
+              <line x1="6" y1="18" x2="6.01" y2="18" />
+            </svg>
+          </div>
+          <div>
+            <div className="bench-spec-title">Hardware & Test Environment Specification</div>
+            <div className="bench-spec-subtitle">
+              AMD EPYC / x86_64 · Linux 6.x · cgo=0 (Pure Go) vs Qt WebKit 0.12.6.1
+            </div>
+          </div>
+        </div>
+        <div className="bench-spec-toggle">
+          <span className="bench-spec-toggle-text">{isOpen ? 'Hide Specs' : 'View Specs'}</span>
+          <svg
+            className={`bench-spec-chevron ${isOpen ? 'open' : ''}`}
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </div>
+      </button>
+
+      {isOpen && (
+        <div className="bench-spec-content" id="bench-spec-details">
+          <div className="bench-spec-grid">
+            <div className="bench-spec-item">
+              <span className="bench-spec-label">Host Processor</span>
+              <span className="bench-spec-value">AMD EPYC / x86_64 (24 dedicated CPU cores, AVX-512)</span>
+            </div>
+            <div className="bench-spec-item">
+              <span className="bench-spec-label">Operating System</span>
+              <span className="bench-spec-value">Linux 6.x Kernel (WSL2 / Debian GNU/Linux 12, glibc 2.36)</span>
+            </div>
+            <div className="bench-spec-item">
+              <span className="bench-spec-label">gowkhtmltopdf Engine</span>
+              <span className="bench-spec-value">
+                <code>CGO_ENABLED=0</code> Pure-Go generic binary (v0.2.0, go1.26.4), zero native C bindings
+              </span>
+            </div>
+            <div className="bench-spec-item">
+              <span className="bench-spec-label">wkhtmltopdf Baseline</span>
+              <span className="bench-spec-value">
+                <code>wkhtmltopdf 0.12.6.1</code> (patched Qt 4.8.7 WebKit, fontconfig, freetype2)
+              </span>
+            </div>
+            <div className="bench-spec-item">
+              <span className="bench-spec-label">Execution Flags</span>
+              <span className="bench-spec-value">
+                <code>{SNAPSHOT.flags}</code>
+              </span>
+            </div>
+            <div className="bench-spec-item">
+              <span className="bench-spec-label">Measurement Method</span>
+              <span className="bench-spec-value">
+                1 discard warmup run + median of 3 measured iterations via <code>/usr/bin/time %M</code>
+              </span>
+            </div>
+            <div className="bench-spec-item">
+              <span className="bench-spec-label">Benchmark Fixture</span>
+              <span className="bench-spec-value">
+                <code>{SNAPSHOT.fixture}</code>
+              </span>
+            </div>
+            <div className="bench-spec-item">
+              <span className="bench-spec-label">Memory Baseline</span>
+              <span className="bench-spec-value">Peak Resident Set Size (RSS) from OS process supervisor</span>
+            </div>
+          </div>
+          <div className="bench-spec-footnote">
+            <span>Snapshot Tag: {SNAPSHOT.date}</span>
+            <span>·</span>
+            <span>Reproduce locally with <code>make bench-cli-compare</code></span>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function BenchmarksPage() {
+  const [activeFilter, setActiveFilter] = useState('all')
+  const [metricView, setMetricView] = useState('time')
+
+  // Filtered rows for the chart
+  const displayedChartRows = useMemo(() => {
+    if (activeFilter === 'all') {
+      return CLI_ROWS.filter((r) => CHART_PAGES.includes(r.pages))
+    }
+    const match = CLI_ROWS.find((r) => String(r.pages) === activeFilter)
+    return match ? [match] : CLI_ROWS.filter((r) => CHART_PAGES.includes(r.pages))
+  }, [activeFilter])
+
+  const activeMetricObj = METRIC_VIEWS.find((m) => m.id === metricView) || METRIC_VIEWS[0]
+
   return (
     <>
       <PageTitle title="Benchmarks" />
@@ -199,6 +417,9 @@ export default function BenchmarksPage() {
         </div>
       </section>
 
+      {/* Hardware & Test Environment Specification Card */}
+      <HardwareSpecCard />
+
       <div className="statband">
         <div className="statband-item">
           <div className="statband-value">{formatMs(HEADLINE.smallGowk)}</div>
@@ -218,24 +439,85 @@ export default function BenchmarksPage() {
         </div>
       </div>
 
+      {/* Direct Process Comparison Section with Interactive Controls */}
       <section className="bench-section" aria-labelledby="bench-chart-heading">
         <div className="section-heading-row">
-          <h2 id="bench-chart-heading">Direct process comparison</h2>
-          <p className="section-aside">
-            Same HTML, same flags (<code>{SNAPSHOT.flags}</code>), median of three timed runs after
-            one warmup. Peak RSS is from <code>/usr/bin/time %M</code>.
-          </p>
+          <div>
+            <h2 id="bench-chart-heading">Direct process comparison</h2>
+            <p className="section-aside">
+              Same HTML, same flags (<code>{SNAPSHOT.flags}</code>), median of three timed runs after
+              one warmup. {activeMetricObj.desc}.
+            </p>
+          </div>
         </div>
-        <CompareChart />
+
+        {/* Interactive Filter & Metric Control Toolbar */}
+        <div className="bench-toolbar" role="toolbar" aria-label="Benchmark view controls">
+          {/* Workload Filter Tabs */}
+          <div className="bench-control-group">
+            <span className="bench-control-label" id="filter-workload-label">
+              Workload Filter:
+            </span>
+            <div
+              className="bench-tabs"
+              role="tablist"
+              aria-labelledby="filter-workload-label"
+            >
+              {WORKLOAD_FILTERS.map((wf) => (
+                <button
+                  key={wf.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeFilter === wf.id}
+                  className={`bench-tab-btn ${activeFilter === wf.id ? 'active' : ''}`}
+                  onClick={() => setActiveFilter(wf.id)}
+                >
+                  {wf.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Metric View Switcher */}
+          <div className="bench-control-group">
+            <span className="bench-control-label" id="metric-view-label">
+              Metric View:
+            </span>
+            <div
+              className="bench-tabs bench-metric-tabs"
+              role="radiogroup"
+              aria-labelledby="metric-view-label"
+            >
+              {METRIC_VIEWS.map((mv) => (
+                <button
+                  key={mv.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={metricView === mv.id}
+                  className={`bench-tab-btn ${metricView === mv.id ? 'active' : ''}`}
+                  onClick={() => setMetricView(mv.id)}
+                >
+                  {mv.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <CompareChart rows={displayedChartRows} metricView={metricView} />
       </section>
 
       <section className="bench-section" aria-labelledby="bench-table-heading">
-        <h2 id="bench-table-heading">Full CLI matrix</h2>
-        <p className="lede">
-          Requested page counts match rendered page counts. PDF byte counts are the last timed
-          output. Memory is peak RSS, not Go <code>B/op</code>.
-        </p>
-        <CompareTable />
+        <div className="section-heading-row">
+          <div>
+            <h2 id="bench-table-heading">Full CLI matrix</h2>
+            <p className="lede">
+              Requested page counts match rendered page counts. PDF byte counts are the last timed
+              output. Memory is peak RSS, not Go <code>B/op</code>.
+            </p>
+          </div>
+        </div>
+        <CompareTable activeFilter={activeFilter} />
       </section>
 
       <aside className="callout callout-info" role="note">

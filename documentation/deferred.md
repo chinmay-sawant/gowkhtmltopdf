@@ -2,7 +2,7 @@
 
 This page is the product-facing inventory of work that is **partial**,
 **not implemented**, or **not planned**. The live post-MVP ledger is
-[`plans/10-canonical-post-mvp-roadmap.md`](../plans/10-canonical-post-mvp-roadmap.md).
+[`plans/0.2.0/10-canonical-post-mvp-roadmap.md`](../plans/0.2.0/10-canonical-post-mvp-roadmap.md).
 Fidelity language and degrade rules: [fidelity.md](fidelity.md). The
 normative per-property contract is [compatibility-matrix.md](compatibility-matrix.md).
 

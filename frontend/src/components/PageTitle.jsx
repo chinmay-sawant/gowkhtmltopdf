@@ -2,8 +2,10 @@ import { useEffect } from 'react'
 
 export default function PageTitle({ title }) {
   useEffect(() => {
-    const base = 'wkhtmltopdf / gowkhtmltopdf'
-    document.title = title ? `${title} - ${base}` : base
+    document.title = title
+      ? `${title} — gowkhtmltopdf`
+      : 'gowkhtmltopdf: print-oriented HTML rendering in Go'
   }, [title])
   return null
 }
+

@@ -7,7 +7,7 @@ const frontend = join(here, '..')
 const dist = join(frontend, 'dist')
 const docs = join(frontend, '..', 'docs')
 
-rmSync(docs, { recursive: true, force: true })
+rmSync(docs, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
 cpSync(dist, docs, { recursive: true })
 
 // Tell GitHub Pages to skip Jekyll processing so filenames starting with _

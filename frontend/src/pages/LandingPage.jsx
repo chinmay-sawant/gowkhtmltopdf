@@ -1,4 +1,6 @@
+import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
+import PageTitle from '../components/PageTitle'
 import { CLI_ROWS, HEADLINE, formatMs, speedup } from '../data/benchmarks'
 
 const HOME_BENCH_PAGES = [2, 10, 100, 500]
@@ -40,20 +42,78 @@ const OUTPUTS = [
   ['CGO=0', 'Static, portable builds without a browser dependency'],
 ]
 
-const COMMAND = [
-  '$ gowkhtmltopdf \\',
-  '  --page-size A4 \\',
-  '  report.html report.pdf',
-  '',
-  'load -> parse -> style -> layout',
-  'paginate -> paint -> write PDF 1.4',
-  '',
-  'wrote report.pdf',
-].join('\n')
-
 export default function LandingPage() {
+  const [pageSize, setPageSize] = useState('A4')
+  const [margins, setMargins] = useState('default')
+  const [orientation, setOrientation] = useState('Portrait')
+  const [security, setSecurity] = useState('safe')
+  const [copied, setCopied] = useState(false)
+
+  const commandLines = useMemo(() => {
+    const lines = ['$ gowkhtmltopdf \\']
+    lines.push(`  --page-size ${pageSize} \\`)
+
+    if (orientation === 'Landscape') {
+      lines.push('  --orientation Landscape \\')
+    }
+
+    if (margins === 'zero') {
+      lines.push('  --margin-top 0mm --margin-bottom 0mm --margin-left 0mm --margin-right 0mm \\')
+    } else if (margins === 'custom') {
+      lines.push('  --margin-top 15mm --margin-bottom 15mm \\')
+    } else {
+      lines.push('  --margin-top 10mm \\')
+    }
+
+    if (security === 'local') {
+      lines.push('  --enable-local-file-access \\')
+    }
+
+    lines.push('  report.html report.pdf')
+    lines.push('')
+
+    const secNote = security === 'local' ? 'load [local fs permitted]' : 'load [safe sandbox]'
+    const marginNote =
+      margins === 'zero' ? '0mm margins' : margins === 'custom' ? '15mm margins' : '10mm margins'
+    lines.push(`${secNote} -> parse -> style -> layout`)
+    lines.push(`paginate [${pageSize} ${orientation}, ${marginNote}] -> paint -> write PDF 1.4`)
+    lines.push('')
+    lines.push('wrote report.pdf')
+
+    return lines.join('\n')
+  }, [pageSize, margins, orientation, security])
+
+  const rawCommand = useMemo(() => {
+    const parts = ['gowkhtmltopdf', `--page-size ${pageSize}`]
+    if (orientation === 'Landscape') {
+      parts.push('--orientation Landscape')
+    }
+    if (margins === 'zero') {
+      parts.push('--margin-top 0mm --margin-bottom 0mm --margin-left 0mm --margin-right 0mm')
+    } else if (margins === 'custom') {
+      parts.push('--margin-top 15mm --margin-bottom 15mm')
+    } else {
+      parts.push('--margin-top 10mm')
+    }
+    if (security === 'local') {
+      parts.push('--enable-local-file-access')
+    }
+    parts.push('report.html report.pdf')
+    return parts.join(' ')
+  }, [pageSize, margins, orientation, security])
+
+  const handleCopy = () => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(rawCommand).then(() => {
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+      })
+    }
+  }
+
   return (
     <div className="landing-page">
+      <PageTitle />
       <section className="landing-hero" aria-labelledby="landing-title">
         <div className="landing-hero-copy">
           <h1 id="landing-title">Print-ready documents,<br /><em>from HTML you control.</em></h1>
@@ -70,16 +130,128 @@ export default function LandingPage() {
           <p className="landing-note">Best for invoices, statements, tables, and multi-page reports. JavaScript is not executed.</p>
         </div>
 
-        <div className="terminal-card" aria-label="Example command line conversion">
+        <div className="terminal-card" aria-label="Interactive CLI conversion sandbox">
           <div className="terminal-topbar">
             <span className="terminal-lights" aria-hidden="true"><i /><i /><i /></span>
-            <span>terminal</span>
-            <span className="terminal-status"><span aria-hidden="true" /> ready</span>
+            <span className="terminal-title">CLI Sandbox</span>
+            <div className="terminal-actions">
+              <button
+                type="button"
+                className={`terminal-copy-btn ${copied ? 'copied' : ''}`}
+                onClick={handleCopy}
+                aria-label="Copy command line to clipboard"
+              >
+                {copied ? (
+                  <>
+                    <svg viewBox="0 0 20 20" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                      <polyline points="4 11 8 15 16 6" />
+                    </svg>
+                    <span>Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                      <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                    </svg>
+                    <span>Copy command</span>
+                  </>
+                )}
+              </button>
+              <span className="terminal-status"><span aria-hidden="true" /> ready</span>
+            </div>
           </div>
-          <pre><code>{COMMAND}</code></pre>
-          <div className="terminal-footer"><span>HTML to PDF</span><span>controlled report workflow</span></div>
+
+          <div className="terminal-sandbox-toolbar" aria-label="Interactive flag configuration">
+            <div className="sandbox-control-group">
+              <span className="sandbox-label">Page Size:</span>
+              <div className="sandbox-chips" role="radiogroup" aria-label="Page size selection">
+                {['A4', 'Letter', 'A3'].map((size) => (
+                  <button
+                    key={size}
+                    type="button"
+                    role="radio"
+                    aria-checked={pageSize === size}
+                    className={`sandbox-chip ${pageSize === size ? 'active' : ''}`}
+                    onClick={() => setPageSize(size)}
+                  >
+                    {size}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="sandbox-control-group">
+              <span className="sandbox-label">Margins:</span>
+              <div className="sandbox-chips" role="radiogroup" aria-label="Margins selection">
+                {[
+                  { id: 'default', label: 'Default (10mm)' },
+                  { id: 'zero', label: 'Zero (0mm)' },
+                  { id: 'custom', label: 'Custom (15mm)' },
+                ].map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={margins === m.id}
+                    className={`sandbox-chip ${margins === m.id ? 'active' : ''}`}
+                    onClick={() => setMargins(m.id)}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="sandbox-control-group">
+              <span className="sandbox-label">Orientation:</span>
+              <div className="sandbox-chips" role="radiogroup" aria-label="Orientation selection">
+                {['Portrait', 'Landscape'].map((ori) => (
+                  <button
+                    key={ori}
+                    type="button"
+                    role="radio"
+                    aria-checked={orientation === ori}
+                    className={`sandbox-chip ${orientation === ori ? 'active' : ''}`}
+                    onClick={() => setOrientation(ori)}
+                  >
+                    {ori}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="sandbox-control-group">
+              <span className="sandbox-label">Security:</span>
+              <div className="sandbox-chips" role="radiogroup" aria-label="Security selection">
+                {[
+                  { id: 'safe', label: 'Default (safe)' },
+                  { id: 'local', label: '--enable-local-file-access' },
+                ].map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={security === s.id}
+                    className={`sandbox-chip ${security === s.id ? 'active' : ''}`}
+                    onClick={() => setSecurity(s.id)}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <pre><code>{commandLines}</code></pre>
+          <div className="terminal-footer">
+            <span>HTML to PDF</span>
+            <span className="terminal-footer-badge">interactive sandbox</span>
+            <span>controlled report workflow</span>
+          </div>
         </div>
       </section>
+
 
       <section className="landing-proof" aria-label="Product highlights">
         <div className="proof-intro">

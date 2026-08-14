@@ -1,0 +1,654 @@
+.bench-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(260px, 0.85fr);
+  gap: clamp(32px, 5vw, 64px);
+  align-items: end;
+  padding: 64px 0 32px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 32px;
+}
+
+.bench-kicker {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 14px;
+}
+
+.bench-hero h1 {
+  font-size: clamp(36px, 5vw, 56px);
+  line-height: 1.12;
+  letter-spacing: -0.035em;
+  margin-bottom: 18px;
+}
+
+.bench-hero h1 em {
+  color: var(--accent);
+  font-style: italic;
+  font-weight: 400;
+}
+
+.bench-hero .lede {
+  font-size: 17px;
+  line-height: 1.6;
+  margin-bottom: 0;
+}
+
+.bench-hero-stats {
+  display: grid;
+  gap: 20px;
+  padding-bottom: 8px;
+}
+
+.bench-hero-stats strong {
+  display: block;
+  font-family: var(--serif);
+  font-size: clamp(28px, 4vw, 40px);
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+
+.bench-hero-stats span {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+/* Collapsible Hardware & Test Environment Card */
+.bench-spec-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  margin-bottom: 36px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  transition: border-color 0.2s;
+}
+
+.bench-spec-card:hover {
+  border-color: var(--sep);
+}
+
+.bench-spec-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 22px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.bench-spec-header:hover {
+  background: var(--surface-2);
+}
+
+.bench-spec-header-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.bench-spec-icon-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.bench-spec-title {
+  font-family: var(--serif);
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--ink);
+  line-height: 1.2;
+}
+
+.bench-spec-subtitle {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 3px;
+  line-height: 1.4;
+}
+
+.bench-spec-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--accent);
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.bench-spec-chevron {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  color: var(--muted);
+}
+
+.bench-spec-chevron.open {
+  transform: rotate(180deg);
+  color: var(--accent);
+}
+
+.bench-spec-content {
+  padding: 0 22px 20px;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.bench-spec-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.bench-spec-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+
+.bench-spec-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.bench-spec-value {
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--ink);
+  line-height: 1.45;
+}
+
+.bench-spec-value code {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  background: var(--soft);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.bench-spec-footnote {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+}
+
+.bench-spec-footnote code {
+  font-family: var(--mono);
+  color: var(--ink);
+}
+
+/* Sections & Headings */
+.bench-section {
+  margin-top: 64px;
+}
+
+.bench-section h2 {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: clamp(28px, 4vw, 40px);
+  letter-spacing: -0.03em;
+  margin-bottom: 14px;
+}
+
+.bench-section .lede {
+  margin-bottom: 22px;
+}
+
+/* Interactive Controls Toolbar */
+.bench-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  margin-bottom: 24px;
+  box-shadow: var(--shadow);
+}
+
+.bench-control-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.bench-control-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.bench-tabs {
+  display: inline-flex;
+  background: var(--surface-2);
+  padding: 3px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  gap: 3px;
+}
+
+.bench-tab-btn {
+  background: none;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  white-space: nowrap;
+}
+
+.bench-tab-btn:hover {
+  color: var(--ink);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+html[data-theme='dark'] .bench-tab-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.bench-tab-btn.active {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+html[data-theme='dark'] .bench-tab-btn.active {
+  background: var(--soft);
+  color: var(--accent-strong);
+}
+
+/* CLI Matrix Table */
+.bench-matrix {
+  border-radius: 12px;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.bench-matrix table {
+  width: 100%;
+  min-width: 860px;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--surface);
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+
+.bench-matrix th,
+.bench-matrix td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+  white-space: nowrap;
+  vertical-align: middle;
+  transition: background 0.15s;
+}
+
+/* Base thead headers */
+.bench-matrix thead th {
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Row 1: Group headers (Wall time, Peak RSS, PDF size) */
+.bench-matrix thead tr:first-child th[colspan] {
+  text-align: center;
+  border-bottom: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+  padding: 8px 14px;
+}
+
+/* Row 2: Sub-column headers (gowk, wkhtml, Speedup, etc.) */
+.bench-matrix thead tr:last-child th {
+  text-align: right;
+  border-left: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 8px 14px;
+  position: static;
+}
+
+/* Data cells */
+.bench-matrix tbody td {
+  border-left: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+}
+
+/* Sticky first column (Pages header & Pages data cells) */
+.bench-matrix thead tr:first-child > th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  text-align: left;
+  vertical-align: middle;
+  background: var(--surface-2);
+  border-left: 0;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.bench-matrix tbody th {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  text-align: left;
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 600;
+  border-left: 0;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.bench-matrix tbody tr:last-child th,
+.bench-matrix tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.bench-matrix tbody tr:hover th,
+.bench-matrix tbody tr:hover td {
+  background: var(--surface-2);
+}
+
+.bench-row-highlight {
+  background: var(--accent-soft) !important;
+}
+
+.bench-row-highlight th,
+.bench-row-highlight td {
+  background: var(--accent-soft) !important;
+}
+
+.bench-row-highlight th[scope='row'] {
+  color: var(--accent-strong) !important;
+  font-weight: 700;
+}
+
+.bench-row-pin {
+  color: var(--accent);
+  font-weight: bold;
+}
+
+.bench-row-dimmed {
+  opacity: 0.45;
+  transition: opacity 0.2s;
+}
+
+.bench-speedup {
+  display: inline-block;
+  min-width: 4.4em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-weight: 600;
+  text-align: center;
+}
+
+.bench-rss {
+  font-size: 11px;
+}
+
+.bench-rss-better {
+  color: var(--accent-strong);
+}
+
+.bench-rss-worse {
+  color: var(--muted);
+}
+
+.bench-rss-even {
+  color: var(--muted);
+}
+
+.bench-section + .callout {
+  margin-top: 36px;
+}
+
+/* Benchmark Comparison Cards & Charts */
+.bench-chart {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 14px;
+}
+
+.bench-pair {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 18px 18px 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.bench-pair:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+.bench-pair-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.bench-pair-head h3 {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+  margin: 0;
+}
+
+.bench-pair-badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  background: var(--surface-2);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  font-weight: 500;
+}
+
+.bench-bars {
+  display: grid;
+  gap: 10px;
+}
+
+.bench-bar-row {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.bench-engine,
+.bench-bar-time {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-2);
+}
+
+.bench-bar-track {
+  height: 10px;
+  background: var(--soft);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.bench-bar {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.bench-bar-gowk {
+  background: var(--accent);
+}
+
+.bench-bar-wk {
+  background: color-mix(in srgb, var(--sep) 80%, var(--ink));
+}
+
+.bench-pair-note {
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--ink-2);
+  line-height: 1.4;
+}
+
+.bench-pair-note strong {
+  font-family: var(--mono);
+  color: var(--accent-strong);
+}
+
+.bench-text-better {
+  color: var(--accent-strong);
+}
+
+.bench-text-worse {
+  color: var(--bad-ink, #8a3a2e);
+}
+
+/* Method Section */
+.bench-method ul {
+  margin: 0 0 22px;
+  padding-left: 18px;
+  color: var(--ink-2);
+}
+
+.bench-method li + li {
+  margin-top: 8px;
+}
+
+.bench-method pre {
+  background: var(--code-bg);
+  color: var(--code-ink);
+  border: 1px solid var(--code-border);
+  border-radius: 10px;
+  padding: 18px 20px;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-x: auto;
+  margin-bottom: 18px;
+}
+
+.bench-method p {
+  color: var(--ink-2);
+  max-width: 72ch;
+}
+
+.bench-method a {
+  color: var(--accent);
+}
+
+/* Responsive Breakpoints */
+@media (max-width: 900px) {
+  .bench-hero {
+    grid-template-columns: 1fr;
+    gap: 28px;
+    padding-top: 64px;
+  }
+
+  .bench-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
+
+  .bench-control-group {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .bench-tabs {
+    width: 100%;
+    overflow-x: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .bench-hero {
+    padding-top: 52px;
+  }
+
+  .bench-bar-row {
+    grid-template-columns: 52px minmax(0, 1fr) auto;
+  }
+
+  .bench-section {
+    margin-top: 48px;
+  }
+
+  .bench-spec-header {
+    padding: 14px 16px;
+  }
+
+  .bench-spec-content {
+    padding: 0 16px 16px;
+  }
+
+  .bench-spec-grid {
+    grid-template-columns: 1fr;
+  }
+}

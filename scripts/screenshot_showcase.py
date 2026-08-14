@@ -157,8 +157,26 @@ def main() -> int:
         print(f"{pdf.name}: {pages} page(s)")
 
     print(f"wrote {total_pages} PNG(s) to {out_dir.relative_to(root)}")
+
+    # Update WebP thumbnails if Pillow is installed
+    try:
+        from generate_showcase_thumbs import generate_all_thumbs
+        print("Generating WebP thumbnails...")
+        t_count, t_orig, t_thumb = generate_all_thumbs(out_dir)
+        print(f"Updated {t_count} thumbnail(s) in {out_dir / 'thumbs'}")
+    except ImportError:
+        # If running from another working directory or Pillow not available
+        try:
+            sys.path.insert(0, str(Path(__file__).resolve().parent))
+            from generate_showcase_thumbs import generate_all_thumbs
+            print("Generating WebP thumbnails...")
+            t_count, t_orig, t_thumb = generate_all_thumbs(out_dir)
+            print(f"Updated {t_count} thumbnail(s) in {out_dir / 'thumbs'}")
+        except Exception:
+            print("Tip: Run `python3 scripts/generate_showcase_thumbs.py` to regenerate WebP thumbnails.")
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

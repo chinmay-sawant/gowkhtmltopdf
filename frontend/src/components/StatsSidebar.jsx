@@ -16,6 +16,7 @@ function Row({ label, count, total, color, active, onClick, bar }) {
       style={{ '--cc': color }}
       onClick={onClick}
       title={`Filter by ${label}`}
+      aria-pressed={active}
     >
       {bar ? (
         <>
@@ -99,7 +100,7 @@ export default function StatsSidebar({
             label={s}
             count={sevCounts[s] ?? 0}
             total={total}
-            color={SEVERITY_META[s].bg}
+            color={SEVERITY_META[s].color || SEVERITY_META[s].text || SEVERITY_META[s].bg}
             active={severity === s}
             onClick={() => onSeverityChange(severity === s ? 'all' : s)}
           />

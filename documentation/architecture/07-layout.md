@@ -485,7 +485,7 @@ Cross-referenced with `documentation/compatibility-matrix.md` (normative),
   `subplans-tier-2/flex-grid-full.md`).
 - **Multicol**: report lite only — no column rules, no L2 integer spans,
   no overflow columns; `break-*:column` aliased to page breaks; column boxes
-  do not straddle pages (§2.9, `plans/phases/tier-2-pending-3/multicol.md`).
+  do not straddle pages (§2.9, `plans/0.2.0/phases/tier-2-pending-3/multicol.md`).
 - **Tables**: `border-collapse: collapse` not truly modeled (spacing
   suppression only); `table-layout: fixed` parsed but auto-only; `<caption>`
   and `table-column(-group)` not rendered; rowspan limited (`table_rowspan_test.go`
@@ -531,11 +531,11 @@ Open questions worth a follow-up review:
 - Deferred items and product priorities:
   [`../deferred.md`](../deferred.md)
 - Phase plans for layout/pagination:
-  [`../../plans/phases/phase-04-html-css-layout.md`](../../plans/phases/phase-04-html-css-layout.md),
-  [`../../plans/phases/phase-05-pagination-print.md`](../../plans/phases/phase-05-pagination-print.md),
-  [`../../plans/phases/phase-16-invoice-css.md`](../../plans/phases/phase-16-invoice-css.md),
-  [`../../plans/phases/phase-17-broader-css.md`](../../plans/phases/phase-17-broader-css.md),
-  [`../../plans/phases/phase-18-pagination-polish.md`](../../plans/phases/phase-18-pagination-polish.md)
+  [`../../plans/0.1.0/phases/phase-04-html-css-layout.md`](../../plans/0.1.0/phases/phase-04-html-css-layout.md),
+  [`../../plans/0.1.0/phases/phase-05-pagination-print.md`](../../plans/0.1.0/phases/phase-05-pagination-print.md),
+  [`../../plans/0.2.0/phases/phase-16-invoice-css.md`](../../plans/0.2.0/phases/phase-16-invoice-css.md),
+  [`../../plans/0.2.0/phases/phase-17-broader-css.md`](../../plans/0.2.0/phases/phase-17-broader-css.md),
+  [`../../plans/0.2.0/phases/phase-18-pagination-polish.md`](../../plans/0.2.0/phases/phase-18-pagination-polish.md)
 
 ### Sibling architecture deep-dives (this directory)
 
