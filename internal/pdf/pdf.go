@@ -449,9 +449,7 @@ func (p *Page) Content() *Content { return p.content }
 func (p *Page) Doc() *Document { return p.doc }
 
 // AddLinkURI adds an external URI annotation.
-//
-//nolint:revive // returning unexported objRef is required for StructElem link references
-func (p *Page) AddLinkURI(rect [4]float64, uri string) objRef {
+func (p *Page) AddLinkURI(rect [4]float64, uri string) ObjRef {
 	ref := p.doc.newObject()
 	p.annots = append(p.annots, annotation{ //nolint:exhaustruct // intentional zero-value fields
 		rect:     rect,
@@ -467,9 +465,7 @@ func (p *Page) AddLinkURI(rect [4]float64, uri string) objRef {
 }
 
 // AddLinkDest adds an internal GoTo annotation to a page (0-based index).
-//
-//nolint:revive // returning unexported objRef is required for StructElem link references
-func (p *Page) AddLinkDest(rect [4]float64, page int, destX, destY float64) objRef {
+func (p *Page) AddLinkDest(rect [4]float64, page int, destX, destY float64) ObjRef {
 	ref := p.doc.newObject()
 	p.annots = append(p.annots, annotation{ //nolint:exhaustruct // intentional zero-value fields
 		rect:     rect,
