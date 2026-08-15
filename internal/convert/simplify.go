@@ -1,9 +1,9 @@
 package convert
 
 import (
-	"gowkhtmltopdf/internal/convert/prepare"
-	"gowkhtmltopdf/internal/css"
-	"gowkhtmltopdf/internal/settings"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert/prepare"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 const profileMediaWiki = "mediawiki"

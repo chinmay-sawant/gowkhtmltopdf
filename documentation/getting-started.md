@@ -13,6 +13,19 @@ Related: [CLI reference](cli.md) · [Library API](library-api.md) ·
   transitive graph. After that, builds can run offline from the module cache.
 - No browser, native converter, Qt, or cgo toolchain is required.
 
+## Install with Go
+
+Pin the tagged release (Go 1.26+). Binaries land on `GOBIN` or
+`$(go env GOPATH)/bin`:
+
+```sh
+go install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltopdf@v0.2.2
+go install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltoimage@v0.2.2
+gowkhtmltopdf --version
+# Name: gowkhtmltopdf
+# Version: 0.2.2
+```
+
 ## Install prebuilt binaries
 
 Tagged releases publish static `gowkhtmltopdf` and `gowkhtmltoimage` builds for
@@ -32,9 +45,9 @@ make build
 # writes bin/gowkhtmltopdf and bin/gowkhtmltoimage
 
 # equivalent, explicit:
-CGO_ENABLED=0 go build -ldflags "-X gowkhtmltopdf/internal/cli.Version=$(cat VERSION)" \
+CGO_ENABLED=0 go build -ldflags "-X github.com/chinmay-sawant/gowkhtmltopdf/internal/cli.Version=$(cat VERSION)" \
   -o bin/gowkhtmltopdf ./cmd/gowkhtmltopdf
-CGO_ENABLED=0 go build -ldflags "-X gowkhtmltopdf/internal/cli.Version=$(cat VERSION)" \
+CGO_ENABLED=0 go build -ldflags "-X github.com/chinmay-sawant/gowkhtmltopdf/internal/cli.Version=$(cat VERSION)" \
   -o bin/gowkhtmltoimage ./cmd/gowkhtmltoimage
 ```
 
@@ -179,8 +192,7 @@ not from the HTML `<title>` (`<title>` feeds `[doctitle]` only).
 
 ## Library (minimal)
 
-Module path is `gowkhtmltopdf` (same as the module name). Until the module
-is published to a reachable path, use a `replace` against a checkout.
+Module path is `github.com/chinmay-sawant/gowkhtmltopdf`.
 
 ```go
 package main
@@ -189,7 +201,7 @@ import (
 	"context"
 	"os"
 
-	gowkhtmltopdf "gowkhtmltopdf"
+	gowkhtmltopdf "github.com/chinmay-sawant/gowkhtmltopdf"
 )
 
 func main() {

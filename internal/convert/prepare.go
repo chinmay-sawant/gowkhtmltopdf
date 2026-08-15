@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"io"
 
-	"gowkhtmltopdf/internal/convert/prepare"
-	"gowkhtmltopdf/internal/css"
-	"gowkhtmltopdf/internal/html"
-	"gowkhtmltopdf/internal/load"
-	"gowkhtmltopdf/internal/pdf"
-	"gowkhtmltopdf/internal/settings"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert/prepare"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/load"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 // These aliases preserve the existing convert package seam while the

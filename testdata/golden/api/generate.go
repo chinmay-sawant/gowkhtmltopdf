@@ -26,7 +26,7 @@ import (
 	"runtime"
 	"strings"
 
-	gowkhtmltopdf "gowkhtmltopdf"
+	gowkhtmltopdf "github.com/chinmay-sawant/gowkhtmltopdf"
 )
 
 const (

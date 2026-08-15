@@ -153,7 +153,7 @@ specific-decision logic (format sniffing, crop, quality) lives in
 
 | Symbol | Location | Purpose |
 |--------|----------|---------|
-| `Version` | help.go:15 | Default `"0.1.0"` (matches `VERSION`). `make build` stamps `-X gowkhtmltopdf/internal/cli.Version=$(cat VERSION)` |
+| `Version` | help.go:15 | Default matches `VERSION`. `make build` stamps `-X github.com/chinmay-sawant/gowkhtmltopdf/internal/cli.Version=$(cat VERSION)` |
 | `PrintHelp` | help.go:14 | Name/synopsis/object-grammar/description + mode-filtered `--flag` list + cross-link to the compatibility matrix |
 | `PrintVersion` / `PrintLicense` | help.go:41 / 46 | Version banner; MIT + wkhtmltopdf attribution banner |
 | `flagList(mode)` | help.go:60 | Sorts `flagTable` names, filters by `Mode`, renders `<value>` suffix for non-bools |
@@ -445,7 +445,7 @@ settings that survive Request assembly.
   100,000 (`internal/convert/convert.go` consts) — the CLI can parse
   absurdly large jobs that only fail later.
 - **`Version` defaults to `0.1.0`** (same as the `VERSION` file).
-  `make build` stamps `gowkhtmltopdf/internal/cli.Version` from that file.
+  `make build` stamps `github.com/chinmay-sawant/gowkhtmltopdf/internal/cli.Version` from that file.
 - **No shell completion, no `--read-args-from-stdin`**, no interactive
   prompts — all aligned with the controlled-report scope.
 - **Open question**: whether a dedicated `-E` extended help listing (and

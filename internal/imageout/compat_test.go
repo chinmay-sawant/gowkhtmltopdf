@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"io"
 
-	"gowkhtmltopdf/internal/cli"
-	"gowkhtmltopdf/internal/errs"
-	"gowkhtmltopdf/internal/settings"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/cli"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/errs"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 // imageLoadGlobalCmd preserves the white-box test helper while the production

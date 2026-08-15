@@ -12,12 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"gowkhtmltopdf/internal/css"
-	"gowkhtmltopdf/internal/html"
-	"gowkhtmltopdf/internal/layout"
-	"gowkhtmltopdf/internal/load"
-	"gowkhtmltopdf/internal/pdf"
-	"gowkhtmltopdf/internal/settings"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/layout"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/load"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 // goldenFixtures is the golden corpus: every fixture converts through

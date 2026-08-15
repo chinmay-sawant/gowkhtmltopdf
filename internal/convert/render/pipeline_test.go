@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"gowkhtmltopdf/internal/convert/render"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert/render"
 )
 
 type pipeline struct {

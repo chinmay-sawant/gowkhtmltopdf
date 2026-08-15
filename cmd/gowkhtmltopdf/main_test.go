@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"gowkhtmltopdf/internal/cli"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/cli"
 )
 
 //nolint:wsl // stdout swapping necessarily interleaves assignments and checks.

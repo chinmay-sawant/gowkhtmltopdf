@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"gowkhtmltopdf/internal/settings"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 // longBody builds an HTML body long enough to span at least two pages.

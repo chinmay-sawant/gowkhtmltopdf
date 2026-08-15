@@ -3,7 +3,7 @@ package line_test
 import (
 	"testing"
 
-	"gowkhtmltopdf/internal/line"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/line"
 )
 
 func TestSeverityOf(t *testing.T) {

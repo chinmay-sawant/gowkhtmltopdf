@@ -7,12 +7,12 @@ import (
 	"io"
 	"strings"
 
-	"gowkhtmltopdf/internal/css"
-	"gowkhtmltopdf/internal/html"
-	"gowkhtmltopdf/internal/line"
-	"gowkhtmltopdf/internal/load"
-	"gowkhtmltopdf/internal/pdf"
-	"gowkhtmltopdf/internal/settings"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/line"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/load"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 const maxStylesheetRules = 1_000_000

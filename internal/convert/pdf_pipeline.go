@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"gowkhtmltopdf/internal/outline"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/outline"
 )
 
 // pdfPipeline adapts the PDF-specific private state to render.Pipeline. The
@@ -142,7 +142,7 @@ func (p *pdfPipeline) assembleDocument() error {
 		}
 	}
 
-	run.doc.SetInfo("Producer", "gowkhtmltopdf")
+	run.doc.SetInfo("Producer", "github.com/chinmay-sawant/gowkhtmltopdf")
 	run.doc.SetCompression(run.req.Global.UseCompression)
 	run.doc.SetGrayscale(run.req.Global.Grayscale)
 	run.doc.SetCreationTime(run.req.now())

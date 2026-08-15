@@ -6,7 +6,7 @@ import (
 	"io"
 	"testing"
 
-	"gowkhtmltopdf/internal/imageout"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/imageout"
 )
 
 // BenchmarkImageAssets measures image-mode conversion with an inline image

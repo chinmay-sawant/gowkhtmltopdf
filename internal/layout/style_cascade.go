@@ -3,8 +3,8 @@ package layout
 import (
 	"strings"
 
-	"gowkhtmltopdf/internal/css"
-	"gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
 const (

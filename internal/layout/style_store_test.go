@@ -6,8 +6,8 @@ import (
 	"testing"
 	"text/template"
 
-	"gowkhtmltopdf/internal/css"
-	"gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
 type styleStoreBenchmarkRow struct {

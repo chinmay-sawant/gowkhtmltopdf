@@ -3,7 +3,7 @@ package css_test
 import (
 	"testing"
 
-	"gowkhtmltopdf/internal/css"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
 )
 
 func FuzzParseCSS(f *testing.F) {

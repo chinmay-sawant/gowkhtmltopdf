@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"io"
 
-	"gowkhtmltopdf/internal/cli"
-	"gowkhtmltopdf/internal/imageout"
-	"gowkhtmltopdf/internal/settings"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/cli"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/imageout"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 // ErrMultipleImageObjects reports an image command with more than one input

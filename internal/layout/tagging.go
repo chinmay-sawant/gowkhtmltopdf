@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"gowkhtmltopdf/internal/html"
-	"gowkhtmltopdf/internal/pdf"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 )
 
 // structureContext tracks sequential document structure state during layout box walking.

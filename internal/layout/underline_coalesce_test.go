@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"gowkhtmltopdf/internal/css"
-	"gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
 // countHorizUnderlines returns OpLine strokes that look like text underlines

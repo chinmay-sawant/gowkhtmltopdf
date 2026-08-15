@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"gowkhtmltopdf/internal/settings"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 // errBoom is a plain non-http error used by ExitCode tests.

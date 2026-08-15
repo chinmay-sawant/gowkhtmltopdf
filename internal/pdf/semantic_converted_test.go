@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"gowkhtmltopdf/internal/convert"
-	"gowkhtmltopdf/internal/pdf"
-	"gowkhtmltopdf/internal/settings"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 //nolint:cyclop,funlen // table-driven oracle fixtures share assertion logic

@@ -365,12 +365,12 @@ export default function CommandPalette() {
     {
       id: 'action-copy-install',
       title: 'Copy Go Install Command',
-      desc: 'go install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltopdf@latest',
+      desc: 'go install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltopdf@v0.2.2',
       category: 'Quick Actions',
-      keywords: 'install go binary cli copy command download build latest',
+      keywords: 'install go binary cli copy command download build latest v0.2.2',
       icon: 'copy',
       action: () => {
-        navigator.clipboard.writeText('go install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltopdf@latest')
+        navigator.clipboard.writeText('go install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltopdf@v0.2.2')
         showToast('Install command copied to clipboard!')
       },
     },

@@ -65,7 +65,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          ldflags="-s -w -X gowkhtmltopdf/internal/cli.Version=${VERSION}"
+          ldflags="-s -w -X github.com/chinmay-sawant/gowkhtmltopdf/internal/cli.Version=${VERSION}"
           targets=(
             "linux amd64"
             "linux arm64"

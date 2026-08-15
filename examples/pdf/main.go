@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"os"
 
-	gowkhtmltopdf "gowkhtmltopdf"
+	gowkhtmltopdf "github.com/chinmay-sawant/gowkhtmltopdf"
 )
 
 func usage() {

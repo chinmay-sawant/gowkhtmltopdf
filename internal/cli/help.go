@@ -8,7 +8,7 @@ import (
 )
 
 // Version is the project release stamped by the build
-// (ldflags -X gowkhtmltopdf/internal/cli.Version=$(cat VERSION)).
+// (ldflags -X github.com/chinmay-sawant/gowkhtmltopdf/internal/cli.Version=$(cat VERSION)).
 // The unstamped default matches the VERSION file so tests and local
 // `go test`/`go run` agree with the release number. It is not
 // LibraryVersion, which is the upstream wkhtmltopdf compatibility id.

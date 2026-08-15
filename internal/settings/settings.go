@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"gowkhtmltopdf/internal/pdfprofile"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdfprofile"
 )
 
 const (

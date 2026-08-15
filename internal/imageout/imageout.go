@@ -16,16 +16,16 @@ import (
 	"strings"
 	"sync"
 
-	"gowkhtmltopdf/internal/convert/prepare"
-	renderpipeline "gowkhtmltopdf/internal/convert/render"
-	"gowkhtmltopdf/internal/css"
-	"gowkhtmltopdf/internal/errs"
-	"gowkhtmltopdf/internal/html"
-	"gowkhtmltopdf/internal/layout"
-	"gowkhtmltopdf/internal/line"
-	"gowkhtmltopdf/internal/load"
-	"gowkhtmltopdf/internal/pdf"
-	"gowkhtmltopdf/internal/settings"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert/prepare"
+	renderpipeline "github.com/chinmay-sawant/gowkhtmltopdf/internal/convert/render"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/errs"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/layout"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/line"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/load"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 const (

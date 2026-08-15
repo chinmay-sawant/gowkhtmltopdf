@@ -3,8 +3,8 @@ package convert //nolint:testpackage // white-box tests need unexported access
 import (
 	"testing"
 
-	"gowkhtmltopdf/internal/html"
-	"gowkhtmltopdf/internal/layout"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/layout"
 )
 
 func TestCollectBodyNavigationCopiesOnlyPostPaintLinkData(t *testing.T) {

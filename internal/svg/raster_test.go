@@ -3,7 +3,7 @@ package svg_test
 import (
 	"testing"
 
-	"gowkhtmltopdf/internal/svg"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/svg"
 )
 
 // Tests exercise the canvas-only Rasterize path (tdewolff/canvas).

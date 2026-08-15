@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
 func (e *engine) emitBorders(sty ResolvedStyle, posX, posY, boxW, boxH float64) {

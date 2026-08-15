@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"gowkhtmltopdf/internal/css"
-	"gowkhtmltopdf/internal/html"
-	"gowkhtmltopdf/internal/pdf"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 )
 
 func TestPositionedBlockPseudoAfterIsPaintedWithPseudoStyle(t *testing.T) {

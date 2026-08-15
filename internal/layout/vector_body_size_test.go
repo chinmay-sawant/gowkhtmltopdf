@@ -4,8 +4,8 @@ package layout
 import (
 	"testing"
 
-	"gowkhtmltopdf/internal/css"
-	"gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
 // TestVectorBodyPrintSize: clientpref-1 circular token falls back to 1rem (12pt).

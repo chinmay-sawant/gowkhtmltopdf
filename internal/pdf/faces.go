@@ -5,7 +5,7 @@ import (
 	"strings"
 	"sync"
 
-	"gowkhtmltopdf/internal/pdf/assets"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf/assets"
 )
 
 // FaceSet holds the bundled Liberation CSS families and Unicode fallback faces.

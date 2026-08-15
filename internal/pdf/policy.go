@@ -3,7 +3,7 @@ package pdf
 import (
 	"errors"
 
-	"gowkhtmltopdf/internal/pdfprofile"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdfprofile"
 )
 
 // PDFVersion identifies a supported or reserved PDF version.

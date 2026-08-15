@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"gowkhtmltopdf/internal/load"
-	"gowkhtmltopdf/internal/settings"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/load"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 func TestRunRequiresExplicitOutputSink(t *testing.T) {

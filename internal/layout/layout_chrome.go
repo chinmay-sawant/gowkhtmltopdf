@@ -4,7 +4,7 @@ import (
 	"math"
 	"sort"
 
-	"gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
 func (e *engine) markOpsFixed(start, end int) {

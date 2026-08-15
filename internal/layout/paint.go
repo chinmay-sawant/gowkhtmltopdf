@@ -7,8 +7,8 @@ import (
 	"math"
 	"strconv"
 
-	"gowkhtmltopdf/internal/errs"
-	"gowkhtmltopdf/internal/pdf"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/errs"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 )
 
 var errNilContext = errs.ErrNilContext

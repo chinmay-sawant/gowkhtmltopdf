@@ -9,14 +9,14 @@ import (
 	"strconv"
 	"strings"
 
-	"gowkhtmltopdf/internal/css"
-	"gowkhtmltopdf/internal/html"
-	"gowkhtmltopdf/internal/layout"
-	"gowkhtmltopdf/internal/line"
-	"gowkhtmltopdf/internal/load"
-	"gowkhtmltopdf/internal/outline"
-	"gowkhtmltopdf/internal/pdf"
-	"gowkhtmltopdf/internal/settings"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/layout"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/line"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/load"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/outline"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 // hfParms is the per-page substitution state for header/footer text. page,

@@ -8,13 +8,13 @@ import (
 	"strconv"
 	"strings"
 
-	"gowkhtmltopdf/internal/css"
-	"gowkhtmltopdf/internal/html"
-	"gowkhtmltopdf/internal/layout"
-	"gowkhtmltopdf/internal/line"
-	"gowkhtmltopdf/internal/outline"
-	"gowkhtmltopdf/internal/pdf"
-	"gowkhtmltopdf/internal/settings"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/layout"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/line"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/outline"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 // effectiveTOC overlays the object-level TOC settings on the global ones.

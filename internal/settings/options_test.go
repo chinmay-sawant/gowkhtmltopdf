@@ -3,7 +3,7 @@ package settings_test
 import (
 	"testing"
 
-	"gowkhtmltopdf/internal/settings"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 //nolint:cyclop,wsl // typed builder assertions

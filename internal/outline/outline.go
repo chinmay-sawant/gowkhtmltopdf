@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"strings"
 
-	"gowkhtmltopdf/internal/css"
-	"gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
 // Location is the small neutral projection of layout geometry needed by the

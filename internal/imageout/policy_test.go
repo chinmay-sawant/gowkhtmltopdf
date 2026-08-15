@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"testing"
 
-	"gowkhtmltopdf/internal/load"
-	"gowkhtmltopdf/internal/settings"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/load"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 func TestImageLoadGlobalUsesOneEffectivePolicy(t *testing.T) {

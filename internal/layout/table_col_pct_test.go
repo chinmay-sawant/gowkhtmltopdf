@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"gowkhtmltopdf/internal/css"
-	"gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
 func TestTableColumnWidthPercent(t *testing.T) { //nolint:cyclop

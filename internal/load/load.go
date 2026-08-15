@@ -21,8 +21,8 @@ import (
 	"strings"
 	"time"
 
-	"gowkhtmltopdf/internal/errs"
-	"gowkhtmltopdf/internal/settings"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/errs"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 const (
@@ -1339,7 +1339,7 @@ func buildHTTPRequest(ctx context.Context, parsed *url.URL, pageLoad settings.Lo
 		return nil, fmt.Errorf("build request for %s: %w", parsed.String(), err)
 	}
 
-	req.Header.Set("User-Agent", "gowkhtmltopdf/0.1 (pure-Go wkhtmltopdf reimplementation)")
+	req.Header.Set("User-Agent", "github.com/chinmay-sawant/gowkhtmltopdf/0.1 (pure-Go wkhtmltopdf reimplementation)")
 
 	if method == http.MethodPost {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")

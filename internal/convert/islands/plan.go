@@ -5,7 +5,7 @@ package islands
 import (
 	"strings"
 
-	"gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
 const (

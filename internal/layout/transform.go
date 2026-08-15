@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"gowkhtmltopdf/internal/css"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
 )
 
 const (

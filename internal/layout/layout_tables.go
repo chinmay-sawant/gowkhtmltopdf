@@ -3,7 +3,7 @@ package layout
 import (
 	"strings"
 
-	"gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
 func (e *engine) buildTable(node *html.Node, style ResolvedStyle, availW, posX, posY float64) *box {

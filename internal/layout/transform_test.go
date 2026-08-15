@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"gowkhtmltopdf/internal/pdf"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 )
 
 func TestParseTransformTranslateRotateScale(t *testing.T) {

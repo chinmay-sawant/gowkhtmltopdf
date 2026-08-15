@@ -5,7 +5,7 @@ import (
 	"io"
 	"time"
 
-	"gowkhtmltopdf/internal/settings"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 // PDFRequest is the type-safe API for PDF-only conversions. Unlike the shared

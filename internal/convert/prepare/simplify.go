@@ -3,8 +3,8 @@ package prepare
 import (
 	"strings"
 
-	"gowkhtmltopdf/internal/css"
-	"gowkhtmltopdf/internal/settings"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 const profileMediaWiki = "mediawiki"

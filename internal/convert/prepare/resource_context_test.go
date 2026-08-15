@@ -5,9 +5,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"gowkhtmltopdf/internal/convert/prepare"
-	"gowkhtmltopdf/internal/load"
-	"gowkhtmltopdf/internal/settings"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert/prepare"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/load"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 func TestResourceContextFetchUsesPrivateLoadSeam(t *testing.T) {

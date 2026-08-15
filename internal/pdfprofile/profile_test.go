@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"gowkhtmltopdf/internal/pdfprofile"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdfprofile"
 )
 
 func TestParsePDFProfileValid(t *testing.T) {

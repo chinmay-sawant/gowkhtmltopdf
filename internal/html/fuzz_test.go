@@ -3,7 +3,7 @@ package html_test
 import (
 	"testing"
 
-	"gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
 func FuzzParseHTML(f *testing.F) {

@@ -20,16 +20,13 @@ Requires Go **1.26+** (the module pins `toolchain go1.26.4`). Build with
 `CGO_ENABLED=0`.
 
 ```sh
-# when published / tagged:
-go get gowkhtmltopdf@v0.2.2
+# tagged release:
+go get github.com/chinmay-sawant/gowkhtmltopdf@v0.2.2
 
-# local checkout (this repo today):
-go mod edit -replace gowkhtmltopdf=/path/to/gowkhtmltopdf
-go get gowkhtmltopdf@v0.0.0
+# local checkout:
+go mod edit -replace github.com/chinmay-sawant/gowkhtmltopdf=/path/to/gowkhtmltopdf
+go get github.com/chinmay-sawant/gowkhtmltopdf@v0.0.0
 ```
-
-Pin a tagged release once the module is published to a reachable path; until
-then use `replace` against a checkout.
 
 Worked programs that call only the public API:
 
@@ -57,7 +54,7 @@ package main
 import (
 	"fmt"
 
-	gowkhtmltopdf "gowkhtmltopdf"
+	gowkhtmltopdf "github.com/chinmay-sawant/gowkhtmltopdf"
 )
 
 func main() {
@@ -147,7 +144,7 @@ import (
 	"os"
 	"time"
 
-	gowkhtmltopdf "gowkhtmltopdf"
+	gowkhtmltopdf "github.com/chinmay-sawant/gowkhtmltopdf"
 )
 
 func main() {
@@ -269,7 +266,7 @@ import (
 	"fmt"
 	"os"
 
-	gowkhtmltopdf "gowkhtmltopdf"
+	gowkhtmltopdf "github.com/chinmay-sawant/gowkhtmltopdf"
 )
 
 func main() {
@@ -375,7 +372,7 @@ import (
 	"fmt"
 	"os"
 
-	gowkhtmltopdf "gowkhtmltopdf"
+	gowkhtmltopdf "github.com/chinmay-sawant/gowkhtmltopdf"
 )
 
 func main() {
@@ -416,7 +413,7 @@ import (
 	"fmt"
 	"os"
 
-	gowkhtmltopdf "gowkhtmltopdf"
+	gowkhtmltopdf "github.com/chinmay-sawant/gowkhtmltopdf"
 )
 
 func main() {
@@ -503,7 +500,7 @@ import (
 	"fmt"
 	"os"
 
-	gowkhtmltopdf "gowkhtmltopdf"
+	gowkhtmltopdf "github.com/chinmay-sawant/gowkhtmltopdf"
 )
 
 func main() {
@@ -545,7 +542,7 @@ import (
 	"fmt"
 	"os"
 
-	gowkhtmltopdf "gowkhtmltopdf"
+	gowkhtmltopdf "github.com/chinmay-sawant/gowkhtmltopdf"
 )
 
 func main() {
@@ -643,7 +640,7 @@ import (
 	"fmt"
 	"os"
 
-	gowkhtmltopdf "gowkhtmltopdf"
+	gowkhtmltopdf "github.com/chinmay-sawant/gowkhtmltopdf"
 )
 
 func main() {
@@ -883,7 +880,7 @@ import (
 	"fmt"
 	"os"
 
-	gowkhtmltopdf "gowkhtmltopdf"
+	gowkhtmltopdf "github.com/chinmay-sawant/gowkhtmltopdf"
 )
 
 func main() {
@@ -968,7 +965,7 @@ import (
 	"fmt"
 	"os"
 
-	gowkhtmltopdf "gowkhtmltopdf"
+	gowkhtmltopdf "github.com/chinmay-sawant/gowkhtmltopdf"
 )
 
 func main() {

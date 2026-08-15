@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"math"
 
-	"gowkhtmltopdf/internal/convert/render"
-	"gowkhtmltopdf/internal/pdf"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert/render"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 )
 
 // percent rounds i/n to a 0-100 percentage.

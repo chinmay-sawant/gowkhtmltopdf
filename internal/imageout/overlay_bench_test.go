@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"gowkhtmltopdf/internal/layout"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/layout"
 )
 
 // borderHeavyOverlayOps builds a display list shaped like a border-heavy report

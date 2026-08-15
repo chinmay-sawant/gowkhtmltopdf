@@ -11,7 +11,7 @@
 //	import (
 //		"context"
 //		"os"
-//		gowkhtmltopdf "gowkhtmltopdf"
+//		gowkhtmltopdf "github.com/chinmay-sawant/gowkhtmltopdf"
 //	)
 //
 //	out, err := os.Create("report.pdf")
