@@ -48,7 +48,7 @@ The product split after #45/#46 was already correct (`--pdf-version` is not a cl
 ### Phase 3 / 4 — isolation and cost
 
 - Default PDF 1.4 serialization stays unclaimed: no XMP, ICC, StructTree, ParentTree, named dests, `/Tabs /S`, or trailer `/ID`
-- `/Tabs /S` gated on `IsPDFUA1() \|\| IsPDFUA2()`
+- `/Tabs /S` gated on UA-1 or UA-2 only
 - UA / A policy flags hoisted to `Document` and `pagePainter` (no per-op `Policy()` on the paint loop)
 - Canonical profile stored as constants + boolean flags (no re-parse)
 - ICC Flate bytes precomputed with `sync.OnceValue` in `internal/pdf/icc.go`
