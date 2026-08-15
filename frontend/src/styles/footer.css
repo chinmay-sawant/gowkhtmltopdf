@@ -2,8 +2,8 @@ footer {
   margin-top: 88px;
   padding: 32px 0 16px;
   border-top: 1px solid var(--line);
-  font-family: var(--mono);
-  font-size: 12px;
+  font-family: var(--sans);
+  font-size: 13px;
   color: var(--muted);
   display: flex;
   justify-content: space-between;

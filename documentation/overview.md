@@ -15,12 +15,14 @@ standard library plus
 shaping) and [`tdewolff/canvas`](https://github.com/tdewolff/canvas) (SVG
 rasterization). Builds are intended to run with `CGO_ENABLED=0`.
 
-**Status:** **v0.2.1**. Phases 0–9 of the
+**Status:** **v0.2.1** is the current tagged release (`VERSION`). Phases 0–9 of the
 [canonical plan](../plans/0.1.0/00-canonical-pure-go-rewrite.md) are implemented.
 Tier 1 and Tier 2 core (phases 10–20) are shipped as a print CSS subset.
-Remaining gaps live in [deferred.md](deferred.md). Progressive post-MVP goals
-(including URL → decent print) are goals, not shipped feature claims — see
-[fidelity.md](fidelity.md).
+Unreleased **0.2.2** on `master` (PRs #45–#47) adds opt-in `--pdf-version`
+1.7 / 2.0 and `--pdf-profile` (PDF/A-3a, PDF/A-4, PDF/UA-1, PDF/UA-2). Those
+profiles are **not** in the 0.2.1 release. Remaining gaps live in
+[deferred.md](deferred.md). Progressive post-MVP goals (including URL → decent
+print) are goals, not shipped feature claims — see [fidelity.md](fidelity.md).
 
 ## Design principles
 
@@ -44,6 +46,7 @@ Remaining gaps live in [deferred.md](deferred.md). Progressive post-MVP goals
 - Text and nested HTML headers/footers with `[page]` / `[topage]` placeholders
 - TOC objects and PDF document outlines (bookmarks)
 - In-process embedding from Go (`RunPDF` / `Converter`)
+- Unreleased 0.2.2: opt-in PDF 1.7 / 2.0 (`--pdf-version` / `WithPDFVersion`) and opt-in PDF/A + PDF/UA profiles (`--pdf-profile` / `WithPDFProfile`). Default output is **unclaimed PDF 1.4**; a version flag is not a conformance claim. Not in the 0.2.1 release.
 
 Typical path:
 
@@ -69,6 +72,8 @@ Chrome-quality print. See [fidelity.md — Arbitrary websites](fidelity.md#arbit
   `go-text/typesetting` (GSUB) with a presentation-form fallback; Indic is
   Partial; CJK needs a capable face on `--font-path`. See [fonts.md](fonts.md).
 - Pixel-identical WebKit / wkhtmltopdf / Chrome output.
+- An archival or accessible PDF by default. PDF/A and PDF/UA are **opt-in
+  profiles**; `--pdf-version` / `WithPDFVersion` alone does not claim them.
 - A wrapper around the `wkhtmltopdf` binary. That is a different product
   category — see
   [comparison-with-others/sebastiaanklippert-go-wkhtmltopdf.md](comparison-with-others/sebastiaanklippert-go-wkhtmltopdf.md).
@@ -93,7 +98,7 @@ input (file / URL / inline HTML)
         ▼
    paginate + paint    multi-page geometry (layout-owned)
         │
-        ├──────────────► internal/pdf        PDF write (1.4 default / 1.7 & 2.0 opt-in)
+        ├──────────────► internal/pdf        PDF write (1.4 default; 1.7 / 2.0 opt-in; profiles opt-in)
         │
         └──────────────► internal/imageout   PNG/JPEG raster
 ```
@@ -110,9 +115,9 @@ Domain deep-dives: [architecture/](architecture/).
 
 | Surface | Entry | Output |
 |---------|--------|--------|
-| PDF CLI | `cmd/gowkhtmltopdf` → `gowkhtmltopdf` | PDF (1.4 default / 1.7 & 2.0 opt-in) |
+| PDF CLI | `cmd/gowkhtmltopdf` → `gowkhtmltopdf` | PDF (unclaimed 1.4 default; 1.7 / 2.0 and PDF/A+UA profiles opt-in) |
 | Image CLI | `cmd/gowkhtmltoimage` → `gowkhtmltoimage` | PNG or JPEG |
-| Go API | module root package `gowkhtmltopdf` | PDF (1.4 default / 1.7 & 2.0 opt-in) or image in memory / `io.Writer` |
+| Go API | module root package `gowkhtmltopdf` | PDF (same version/profile rules) or image in memory / `io.Writer` |
 
 Both CLIs share `internal/cli` and `internal/settings`. The library never
 imports `internal/cli`. `cmd/` never imports the root package.
@@ -130,6 +135,7 @@ Supported for report HTML:
 - Report-subset flex, grid, float, relative/absolute/fixed, print-scoped sticky
 - Multicol lite, `:has()`, `@container` size queries
 - Text / HTML headers and footers, TOC, PDF outlines, internal and external links
+- PDF 1.4 default (unclaimed). Unreleased 0.2.2: opt-in `--pdf-version 1.7` / `2.0` (version only) and `--pdf-profile a3a-ua1` / `a4-ua2` (claiming XMP, OutputIntent, tagged structure). Not in 0.2.1.
 - Local files (deny by default) and HTTP(S) with timeouts, body caps, optional restricted network policy
 
 Authoritative rows: [compatibility-matrix.md](compatibility-matrix.md).

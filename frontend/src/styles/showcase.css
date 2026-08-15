@@ -15,12 +15,13 @@
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 9999px;
-  padding: 6px 12px 6px 14px;
+  padding: 8px 14px 8px 16px;
+  min-height: 40px;
   font-family: var(--sans);
   font-size: 13px;
   color: var(--ink);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s, color 0.2s;
   user-select: none;
 }
 
@@ -47,7 +48,7 @@
   font-family: var(--mono);
   font-size: 10.5px;
   font-weight: 600;
-  transition: all 0.2s ease;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s, color 0.2s;
 }
 
 .showcase-chips .chip.active .chip-n {

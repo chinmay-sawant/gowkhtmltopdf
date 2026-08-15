@@ -13,7 +13,9 @@ assertions, not binary PDF equality against this folder. See
 
 `make samples` rewrites `fixture-*.pdf`, `fixture-*.png`,
 `showcase-*.pdf`, `architecture-diagram.pdf` (via
-`go run ./testdata/golden/api`), and (when the network works)
+`go run ./testdata/golden/api`), the four `pdf-1.7/` /
+`pdf-1.7-compliance/` / `pdf-2.0/` / `pdf-2.0-compliance/` smokes
+(fixture-21 and fixture-56), and (when the network works)
 `wiki-ana-de-armas.pdf`.
 
 ## Fixture PDFs (`fixture-01` … `fixture-56`)
@@ -103,8 +105,8 @@ files are skipped as bodies; fixture-36 attaches them as HTML header/footer.
 
 ## Version and compliance sample folders
 
-Not part of `make samples`. Regenerated manually when exercising PDF 1.7 / 2.0
-version or conformance profiles (same two fixtures as the 1.7 smoke set):
+Part of `make samples` (unreleased 0.2.2 flags). Same two fixtures as the
+1.7 / 2.0 smoke set:
 
 | Dir | How produced | Files |
 |-----|--------------|-------|
@@ -113,17 +115,8 @@ version or conformance profiles (same two fixtures as the 1.7 smoke set):
 | `pdf-2.0/` | `--pdf-version 2.0` (unclaimed) | same basenames |
 | `pdf-2.0-compliance/` | `--pdf-profile a4-ua2` | same basenames |
 
-```sh
-make build
-mkdir -p output/pdf-2.0 output/pdf-2.0-compliance
-./bin/gowkhtmltopdf --pdf-version 2.0 --enable-local-file-access \
-  testdata/golden/fixture-21-detailed-report.html \
-  output/pdf-2.0/fixture-21-detailed-report.pdf
-./bin/gowkhtmltopdf --pdf-profile a4-ua2 --enable-local-file-access \
-  testdata/golden/fixture-21-detailed-report.html \
-  output/pdf-2.0-compliance/fixture-21-detailed-report.pdf
-# …repeat for fixture-56-architecture-diagram.html
-```
+These are **artifacts**, not golden byte baselines. A version flag is not a
+conformance claim; only the `-compliance/` dirs use a profile.
 
 ## Extra artifacts (not `make samples`)
 

@@ -71,6 +71,14 @@
   min-width: 0;
 }
 
+.docs-main h1,
+.docs-main h2,
+.docs-main h3,
+.docs-main .code-block-heading,
+.docs-main .table-block-heading {
+  scroll-margin-top: 96px;
+}
+
 .docs-context {
   display: flex;
   align-items: center;
@@ -167,7 +175,7 @@
 }
 
 .content-page {
-  padding-top: 16px;
+  padding-top: 48px;
 }
 
 /* Footer Edit Action */
@@ -236,8 +244,8 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-family: var(--mono);
-  font-size: 10.5px;
+  font-family: var(--sans);
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--muted);
@@ -295,19 +303,19 @@
 .docs-toc-link {
   display: block;
   font-family: var(--sans);
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--muted);
   text-decoration: none;
-  padding: 5px 8px;
+  padding: 8px 8px;
   border-radius: 4px;
   border-left: 2px solid transparent;
   line-height: 1.35;
-  transition: all 0.15s ease-in-out;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
 }
 
 .docs-toc-link.docs-toc-h3 {
   padding-left: 18px;
-  font-size: 11.5px;
+  font-size: 13px;
   opacity: 0.9;
 }
 

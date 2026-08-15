@@ -19,7 +19,7 @@
    "sections": [
     {
      "heading": "Two scopes, one grammar",
-     "body": "Global flags (parsed into `settings.PdfGlobal` in `internal/cli/flags.go`) apply to the whole document: `--page-size`, `--orientation`, `--margin-top/bottom/left/right`, `--page-width`, `--page-height`, `--grayscale`, `--copies`, `--collate`, `--title`, `--outline`, `--font-path`, `--quiet`. Page-scoped flags apply to one object only: `--zoom`, `--username`, `--password`, `--timeout`, `--external-links`, `--internal-links` are page-only flags routed through `pageOnlyFlag` in `internal/cli/flags.go`.",
+     "body": "Global flags (parsed into `settings.PdfGlobal` in `internal/cli/flags.go`) apply to the whole document: `--page-size`, `--orientation`, `--margin-top/bottom/left/right`, `--page-width`, `--page-height`, `--grayscale`, `--copies`, `--collate`, `--title`, `--pdf-version`, `--pdf-profile`, `--outline`, `--font-path`, `--quiet`. `--pdf-version` and `--pdf-profile` are PDF-mode only. Page-scoped flags apply to one object only: `--zoom`, `--username`, `--password`, `--timeout`, `--external-links`, `--internal-links` are page-only flags routed through `pageOnlyFlag` in `internal/cli/flags.go`.",
      "bullets": [
       "A page-scoped flag placed before any object keyword is parked as \"pending\" and promoted into the first real page or cover object, never into a `toc` object (`pending` in `objectCtx`, `internal/cli/cli.go`).",
       "Header/footer flags before any object keyword stay global so every object inherits them (`hfFlag` in `internal/cli/flags.go`).",
@@ -35,6 +35,18 @@
      ]
     }
    ]
+  },
+  {
+   "type": "code",
+   "heading": "PDF version and profile (unreleased 0.2.2, not in 0.2.1)",
+   "language": "sh",
+   "code": "# Default is unclaimed PDF 1.4. --pdf-version is not a PDF/A or PDF/UA claim.\ngowkhtmltopdf --pdf-version 1.7 --enable-local-file-access report.html report.pdf\ngowkhtmltopdf --pdf-version 2.0 --enable-local-file-access report.html report.pdf\n\n# Opt-in conformance (implies the required version)\ngowkhtmltopdf --pdf-profile a3a-ua1 --enable-local-file-access report.html out.pdf\ngowkhtmltopdf --pdf-profile a4-ua2 --enable-local-file-access report.html out.pdf"
+  },
+  {
+   "type": "callout",
+   "variant": "info",
+   "title": "Version is not a claim",
+   "body": "These flags are unreleased 0.2.2, not in the 0.2.1 tag. `--pdf-version` (`1.4` default, `1.7`, `2.0`) only selects the file version. Claiming XMP, ICC OutputIntent, and tagging require `--pdf-profile` (`a3a-ua1` / `a3a` / `ua1` imply PDF 1.7; `a4-ua2` / `a4` / `ua2` imply PDF 2.0). Both flags are global and PDF-mode only."
   },
   {
    "type": "code",
@@ -70,6 +82,11 @@
      "Page",
      "`--page-size`, `--orientation`, `--page-width`, `--page-height`, `--margin-top/bottom/left/right`, `--zoom`, `--grayscale`, `--copies`, `--collate`, `--title`",
      "Global; `--zoom`, `--timeout`, `--username`, `--password` are page-scoped"
+    ],
+    [
+     "PDF version / profile",
+     "`--pdf-version` (`1.4`, `1.7`, `2.0`), `--pdf-profile` (`a3a-ua1`, `a3a`, `ua1`, `a4-ua2`, `a4`, `ua2`)",
+     "Global, PDF mode only. Version is not a claim; profile is"
     ],
     [
      "Header/Footer",

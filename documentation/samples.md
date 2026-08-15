@@ -208,7 +208,12 @@ make samples
    `output/architecture-diagram.pdf` only. It does **not** rewrite
    `testdata/golden/architecture-diagram.html` or write a PDF under
    `testdata/golden/api/`.
-6. Optionally refreshes `output/wiki-ana-de-armas.pdf` from the live
+6. Writes version / compliance smokes (unreleased 0.2.2) for
+   `fixture-21-detailed-report` and `fixture-56-architecture-diagram` into
+   `output/pdf-1.7/` (`--pdf-version 1.7`), `output/pdf-1.7-compliance/`
+   (`--pdf-profile a3a-ua1`), `output/pdf-2.0/` (`--pdf-version 2.0`), and
+   `output/pdf-2.0-compliance/` (`--pdf-profile a4-ua2`).
+7. Optionally refreshes `output/wiki-ana-de-armas.pdf` from the live
    Wikipedia URL **without** `--simplify-dom`, with `--use-system-fonts` and
    `--zoom 0.666667`. Network is required; **soft-fail** if the fetch fails
    so offline hosts still get fixture samples.
@@ -221,6 +226,22 @@ loop. Leftover or manual PDFs that may sit in `output/`
 These files are **viewer smoke artifacts**, not golden byte masters. CI
 asserts structure through `make golden`, not binary equality against
 `output/`.
+
+### Version and compliance folders
+
+Part of `make samples`. Opt-in PDF version and profile flags write four
+sibling dirs (same two fixtures: `fixture-21-detailed-report`,
+`fixture-56-architecture-diagram`). Inventory: [`output/README.md`](../output/README.md).
+
+| Dir | Produced with | Meaning |
+|-----|---------------|---------|
+| [`output/pdf-1.7/`](../output/pdf-1.7/) | `--pdf-version 1.7` | Unclaimed PDF 1.7 |
+| [`output/pdf-1.7-compliance/`](../output/pdf-1.7-compliance/) | `--pdf-profile a3a-ua1` | PDF/A-3a + PDF/UA-1 |
+| [`output/pdf-2.0/`](../output/pdf-2.0/) | `--pdf-version 2.0` | Unclaimed PDF 2.0 |
+| [`output/pdf-2.0-compliance/`](../output/pdf-2.0-compliance/) | `--pdf-profile a4-ua2` | PDF/A-4 + PDF/UA-2 |
+
+These are **artifacts**, not golden byte baselines. A version flag is not a
+conformance claim; only the `-compliance/` dirs were written with a profile.
 
 ### Optional live smoke (also via `make samples` — not `make test`)
 
@@ -292,7 +313,7 @@ Contributor setup and PR expectations: [`CONTRIBUTING.md`](../CONTRIBUTING.md).
 | `make fmt` | `gofmt -w .` |
 | `make golden` | `TestGoldenCorpus*` — structure, page envelopes, needles (not binary PDF equality) |
 | `make golden-update GOLDEN_FIXTURE=fixture-NN-name.html GOLDEN_APPROVE=1` | Generate one explicitly approved fixture PDF under ignored `testdata/golden/out/`; never rewrites fixture sources |
-| `make samples` | Refresh `output/fixture-*.pdf`, `showcase-toc-hf-outline.pdf`, the two PNGs, and the optional live wiki PDF |
+| `make samples` | Refresh `output/fixture-*.pdf`, `showcase-toc-hf-outline.pdf`, the two PNGs, `output/pdf-{1.7,2.0}{,-compliance}/` (fixture-21 and fixture-56), and the optional live wiki PDF |
 | `make clean` | Remove `testdata/golden/out` |
 | `make claim-scan` | Fail if forbidden over-claim phrases appear in user-facing docs |
 

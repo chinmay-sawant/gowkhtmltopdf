@@ -1,20 +1,35 @@
 # gowkhtmltopdf vs the HTML-to-PDF landscape (2026)
 
-Research-backed comparison (Aug 2026) of **gowkhtmltopdf** (this project) against
+Research-backed comparison (updated Aug 2026 after PRs [#45](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/45)–[#47](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/47)) of **gowkhtmltopdf** (this project) against
 the main HTML-to-PDF converters: Puppeteer / Playwright / Chromium,
 wkhtmltopdf, WeasyPrint, and Prince XML. Sources include official docs, GitHub
 issues, and published benchmarks. Vendor benchmarks are identified as
 self-interested, and the performance figures below are directional rather than
 like-for-like measurements.
 
+The tagged release is **v0.2.1**. Opt-in PDF 1.7 / 2.0 and PDF/A + PDF/UA
+profiles are **unreleased 0.2.2** on `master`. Scores below assume that
+0.2.2 tree (the product you get from current `master`), not the 0.2.1 tag.
+
 ## Score card
 
-**gowkhtmltopdf: 7.5/10 overall** — a strong fit for authored HTML templates,
-held back by partial CSS, no JavaScript, and the current default
-creation-time metadata. PDF/A-3a+UA-1 and PDF/A-4+UA-2 are opt-in via
-`--pdf-profile`. **8.5/10 for HTML templates** and **5.5–6/10 as a
-general converter** are more useful role-specific scores. A 9/10 niche score
-depends on making normal CLI output byte-stable.
+**gowkhtmltopdf: 8.0/10 overall** (was 7.5). The jump is standards support:
+opt-in PDF/A-3a, PDF/A-4, PDF/UA-1, and PDF/UA-2 via `--pdf-profile`, with
+veraPDF-passing fixtures. Still held back by a print CSS subset, no
+JavaScript, no forms/encryption, and CLI creation-time metadata.
+
+Role scores: **8.8/10 for authored HTML templates** (was 8.5) and **6.0/10
+as a general website converter** (was 5.5–6). A 9/10 template score still
+needs byte-stable default CLI output.
+
+| Axis (this project) | Score | Why it moved |
+|---------------------|------:|--------------|
+| Authored templates | 8.8 | Tagged/archival profiles on invoices and certificates |
+| Deployment / ops | 9.0 | Still a ~14 MB static `CGO_ENABLED=0` binary |
+| PDF standards | 8.0 | A-3a / A-4 / UA-1 / UA-2 opt-in; no A-1/A-2, forms, or Factur-X |
+| Security posture | 7.5 | No JS engine; loader/SSRF/DoS still real |
+| Open-web / JS | 3.5 | Unchanged: no V8, not Chrome print |
+| **Overall** | **8.0** | Weighted toward the template product, not the open web |
 
 ## Core comparison
 
@@ -22,7 +37,7 @@ depends on making normal CLI output byte-stable.
 |---|---|---|---|---|---|
 | **Architecture** | Pure Go, no CGO/browser; one allowlisted shaping module | Blink engine controlled through a browser process | Qt WebKit, frozen and archived | Own Python engine (Pango/HarfBuzz) | Proprietary C++ engine |
 | **JavaScript** | **None**; no JS or process execution | Full V8 — SPAs, charts | Old WebKit JS, unreliable | **None** | Sandboxed ES6, no network |
-| **CSS fidelity** | Flex/grid/position **lite**; many modern properties missing | Full modern CSS; print pagination still needs testing | No grid, broken flex | Full flex, partial/mostly grid, strong free Paged Media | Deepest Paged Media + grid |
+| **CSS fidelity** | Documented **print CSS subset**: flex/grid stages, float lite, `:has()`, `@container`, multicol, print sticky. Not Chrome | Full modern CSS; print pagination still needs testing | No grid, broken flex | Full flex, partial/mostly grid, strong free Paged Media | Deepest Paged Media + grid |
 | **TOC / outlines** | ✓ generated TOC + native PDF outlines | Outline support is experimental; **TOC not a native PDF option** | ✓ both (XSLT) | ✓ bookmarks | ✓✓ |
 | **Determinism** | **Not guaranteed by default**; CLI currently writes a varying creation time | Timestamps, OS fonts, browser version, and rendering environment vary | Mostly | Near, with explicit reproducibility controls | Depends on inputs and runtime |
 | **Security** | No JS/exec, but HTTP(S)/data subresource fetches, optional file reads, and in-process parser/layout DoS remain | Browser sandbox and deployment configuration matter; `--no-sandbox` materially increases impact | **CVE-2022-35583 (9.8 SSRF)**, archived | `<link>`/image fetch and resource-loading risks | Engine and deployment history require review |
@@ -34,20 +49,20 @@ depends on making normal CLI output byte-stable.
 | **Latency / PDF** | Repository fixtures: ms–low s; validate on target workload | Published figures vary: cold startup versus warm pooled rendering | Published figures vary by fixture and platform | Published figures vary by fixture and platform | Measure with the vendor's supported deployment |
 | **Memory** | Small process on repository fixtures; measure at target concurrency | Browser-plus-page memory varies substantially with browser version, pages, and concurrency | Published single-process figures are workload-dependent | Published figures are workload-dependent | Measure with the vendor's supported deployment |
 | **Footprint** | **~14 MB when released as a stripped `CGO_ENABLED=0` binary; no runtime shared libraries** | 100–450 MB + browser/system libs; Docker image size varies | ~15 MB plus aging Qt/runtime libraries | ~30–50 MB + system libs | Small executable plus commercial runtime/license model |
-| **PDF standards** | No PDF/A, forms, or encryption | No PDF/A/forms/encryption in the basic PDF API; tagged PDF and outlines are experimental | No | **PDF/A-1/2/3, PDF/UA, forms**; validity still needs validation | Strong standards/commercial extras; verify the required profile |
+| **PDF standards** | **Unreleased 0.2.2:** opt-in `--pdf-profile` for PDF/A-3a, PDF/UA-1, dual `a3a-ua1`; PDF/A-4, PDF/UA-2, dual `a4-ua2` (veraPDF on committed fixtures). No A-1/A-2, forms, encryption, or Factur-X. Version flags are not a claim | No PDF/A/forms/encryption in the basic PDF API; tagged PDF and outlines are experimental | No | **PDF/A-1/2/3, PDF/UA, forms, Factur-X**; validity still needs validation | Strong standards/commercial extras (PDF/A+X, forms, signatures); verify the required profile |
 | **Fonts / CJK** | Partial Type0/CID; pure-Go OpenType shaping where supported; Indic/CJK/vertical limits remain | Full + web fonts, OS-dependent | Poor | Good, fontconfig quirks | Best |
 | **License** | **MIT, free, active** | Apache-2.0, free | LGPL, **archived 2023** | BSD, free, active | Commercial site pricing is quoted; official FAQ says it starts around $2,000/year, while $3,800 is a separate per-server non-commercial tier |
-| **Score /10** | **7.5 overall** | 7.5 | 3.0 | 7.5 | 9.0 (at price) |
+| **Score /10** | **8.0 overall** | 7.5 | 3.0 | 7.5 | 9.0 (at price) |
 
 ## When to choose
 
 | Tool | Choose when… |
 |---|---|
-| **gowkhtmltopdf** | Authored HTML templates (invoices, certificates, storybooks, posters, tables, statements) needing a small offline Go binary, predictable layout, no JavaScript, and controlled resource access — or migrating off wkhtmltopdf |
+| **gowkhtmltopdf** | Authored HTML templates in Go (invoices, certificates, storybooks, posters, tables, statements) needing a small offline binary, no JavaScript, controlled file/HTTP access, and — on unreleased 0.2.2 — opt-in PDF/A-3a / A-4 and PDF/UA-1 / UA-2. Also the path off archived wkhtmltopdf |
 | **Puppeteer / Chromium** | Templates need **modern CSS/JS** (charts, SPAs, arbitrary sites) and you can afford browser operations plus a materially larger resource budget |
 | **wkhtmltopdf** | Avoid for new deployments; it is archived and has a documented unpatched 9.8 SSRF vulnerability. Migrate legacy uses when practical |
-| **WeasyPrint** | **PDF/A, PDF/UA, e-invoice (Factur-X)** compliance on a free budget |
-| **Prince XML** | Enterprise compliance (PDF/A+X, forms, signatures) with budget, keeping HTML/CSS input |
+| **WeasyPrint** | Free-budget **PDF/A-1/A-2**, AcroForm, or **Factur-X / e-invoice**. Overlap with this project on A-3 / UA; WeasyPrint still wider on older parts and forms |
+| **Prince XML** | Enterprise extras this engine does not claim: PDF/X, forms, signatures, deepest CSS paged media — with a commercial license |
 
 ## Evidence and interpretation
 
@@ -59,10 +74,11 @@ depends on making normal CLI output byte-stable.
   claim. The loader can fetch HTTP(S) and data subresources, and local-file
   access is an explicit but real capability. Treat untrusted HTML as able to
   drive network egress and resource consumption.
-- The score is a judgment call, not a universal benchmark. Capability,
-  deployment footprint, security posture, standards support, and maintenance
-  should be scored separately when the target workload is not controlled
-  reports.
+- The 8.0 overall is a judgment call, not a universal benchmark. The 0.5
+  lift from 7.5 is the 0.2.2 compliance slice (claiming XMP, OutputIntent,
+  tagged structure / MCR / UA list nesting), not a CSS or JS leap.
+  Capability, deployment, security, standards, and maintenance should still
+  be scored separately when the target is not controlled reports.
 - Performance values must be reproduced with the same fixture, tool version,
   OS, cold/warm mode, and concurrency. The cited PDF4 benchmark, for example,
   separates cold and warm browser runs and reports five-run medians on macOS

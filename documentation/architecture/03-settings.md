@@ -46,7 +46,8 @@ nil-guard error identity stable across the library boundary.
 
 | File | Responsibility | Approx. lines |
 |------|----------------|---------------|
-| `internal/settings/settings.go` | Typed settings model: `PdfGlobal`, `PdfObject`, `ImageGlobal`, sub-structs (`Web`, `LoadGlobal`, `LoadPage`, `HeaderFooter`, `TableOfContent`, `Margin`, `Size`, `CropSettings`, `PostItem`), enums (`Orientation`, `ColorMode`, `LoadErrorHandling`, `MediaType`), wkhtml-compatible defaults, `ResolveMedia` | 449 |
+| `internal/settings/settings.go` | Typed settings model: `PdfGlobal`, `PdfObject`, `ImageGlobal`, sub-structs (`Web`, `LoadGlobal`, `LoadPage`, `HeaderFooter`, `TableOfContent`, `Margin`, `Size`, `CropSettings`, `PostItem`), enums (`Orientation`, `ColorMode`, `LoadErrorHandling`, `MediaType`), `ParsePDFVersion` / `ParsePDFProfile` (profile parse delegates to `internal/pdfprofile`), wkhtml-compatible defaults, `ResolveMedia` | 449 |
+| `internal/pdfprofile/profile.go` | Leaf: canonical profile tokens (`PDF/A-3a`, `PDF/UA-1`, `PDF/A-3a+PDF/UA-1`, `PDF/A-4`, `PDF/UA-2`, `PDF/A-4+PDF/UA-2`), alias `Parse`, `IsPDFA*` / `IsPDFUA*` | 140 |
 | `internal/settings/reflect.go` | The descriptor engine: `keyTable`/`field` tables, dotted-key `Set`/`Get`, type-coercing setters (`setBool`, `setFloat`, `setInt`, `setUnitMm`, …), ignored-key tables (Policy A), `ApplyImageKey` | 881 |
 | `internal/settings/getters.go` | `Get` methods on the three settings types; canonical string formatting helpers (`fmtBool`, `fmtFloat`, `fmtInt`, `fmtStrings`) | 37 |
 | `internal/settings/options.go` | `PdfGlobalOptions` typed builder (`WithPageSize`, `WithMargins`, …) for the library API; independent-snapshot `Build()` | 93 |
@@ -66,9 +67,9 @@ Total package size: ~2,372 lines including tests.
 
 | Type | Purpose | File:line |
 |------|---------|-----------|
-| `PdfGlobal` | PDF-mode global settings: page geometry, orientation, grayscale, copies/collate, outline, title, margins, header/footer, TOC, background, load policy, font paths, `Ignored` sink | `settings.go:286` |
-| `PdfObject` | One page/cover/toc object: `Page`, link flags, outline inclusion, object-level header/footer overrides (`HeaderSet`/`FooterSet`), `LoadPage`, `Web`, `UseOutline`, `Ignored` | `settings.go:353` |
-| `ImageGlobal` | Image-mode (wkhtmltoimage) settings: width/height/quality, smart width, crop, format, transparency, `Web`, `LoadGlobal`, `Ignored` | `settings.go:413` |
+| `PdfGlobal` | PDF-mode global settings: page geometry, orientation, `PdfVersion` / `PdfProfile` (`settings.go:418`–`422`), grayscale, copies/collate, outline, title, margins, header/footer, TOC, background, load policy, font paths, `Ignored` sink | `settings.go:412` |
+| `PdfObject` | One page/cover/toc object: `Page`, link flags, outline inclusion, object-level header/footer overrides (`HeaderSet`/`FooterSet`), `LoadPage`, `Web`, `UseOutline`, `Ignored` | `settings.go:484` |
+| `ImageGlobal` | Image-mode (wkhtmltoimage) settings: width/height/quality, smart width, crop, format, transparency, `Web`, `LoadGlobal`, `Ignored` | `settings.go:564` |
 
 Supporting sub-structs (all in `settings.go`):
 
@@ -82,7 +83,7 @@ Supporting sub-structs (all in `settings.go`):
 | `HeaderFooter` | Text/HTML header & footer: font, left/right/center, line, spacing, `HTMLURL`, `Replace` map | `settings.go:240` |
 | `TableOfContent` | TOC object settings: font scale, indentation, dotted lines, caption, forward/back links, XSL | `settings.go:262` |
 | `PostItem` | One urlencoded form field for POST loads | `settings.go:239` (approx.) |
-| `CropSettings` | wkhtmltoimage crop box (Left/Top/Width/Height, -1 = unset) | `settings.go:424` (approx.) |
+| `CropSettings` | wkhtmltoimage crop box (Left/Top/Width/Height, -1 = unset) | `settings.go:579` |
 
 ### 3.2 Enums and parsers
 
@@ -92,6 +93,7 @@ Supporting sub-structs (all in `settings.go`):
 | `ColorMode` + `ParseColorMode` | `color`/`grayscale` parse helper; engine stores only `PdfGlobal.Grayscale` (ponytail note in source) | `settings.go:27` (approx.) / `settings.go:50` (approx.) |
 | `LoadErrorHandling` + `ParseLoadErrorHandling` | abort/skip/ignore | `settings.go:93` (approx.) / `settings.go:112` (approx.) |
 | `MediaType` + `ResolveMedia(base, global Web, obj *Web) string` | screen/print/ignore resolution; print-media-type override wins, then object media-type, then global, then base | `settings.go:126` (approx.) / `settings.go:137` |
+| `ParsePDFVersion` / `ParsePDFProfile` | Version: `""`/`1.4`/`1.7`/`2.0`. Profile: aliases (`a3a-ua1`, `a4-ua2`, …) → canonical tokens. Profile parse is `pdfprofile.Parse` | `settings.go:56` / `settings.go:76` |
 
 ### 3.3 Defaults (wkhtmltopdf `pdfsettings.cc` / `imagesettings.cc` compatible)
 
@@ -100,10 +102,10 @@ Supporting sub-structs (all in `settings.go`):
 | `DefaultMargins()` | 10 mm all sides (`defaultMarginMM = 10`) | `settings.go:166` (approx.) |
 | `DefaultHeaderFooter()` | Arial, font size 12, spacing 0 | `settings.go:257` (approx.) |
 | `DefaultTableOfContent()` | font scale 0.8, indentation `1em`, dotted lines true, caption "Table of Contents" | `settings.go:276` (approx.) |
-| `DefaultPdfGlobal()` | A4 portrait, 1 copy collated, outline depth 4, compression on, smart shrinking on, background on, images on, margins 10 mm, resolve-relative-links on | `settings.go:329` |
-| `DefaultPdfObject()` | external/local links on, include in outline on, use outline on, block-local-file-access true, load-error abort | `settings.go:389` (approx.) |
-| `DefaultLoadPage()` | `BlockLocalFileAccess: true`, `LoadErrorHandling: LoadErrorAbort` (mirrors `loadsettings.cc`) | `settings.go:401` (approx.) |
-| `DefaultImageGlobal()` | width 1024, quality 94, smart width on, crop = (-1,-1,-1,-1) | `settings.go:430` (approx.) |
+| `DefaultPdfGlobal()` | A4 portrait, 1 copy collated, outline depth 4, compression on, smart shrinking on, background on, images on, margins 10 mm, resolve-relative-links on | `settings.go:459` |
+| `DefaultPdfObject()` | external/local links on, include in outline on, use outline on, block-local-file-access true, load-error abort | `settings.go:542` |
+| `DefaultLoadPage()` | `BlockLocalFileAccess: true`, `LoadErrorHandling: LoadErrorAbort` (mirrors `loadsettings.cc`) | `settings.go:555` |
+| `DefaultImageGlobal()` | width 1024, quality 94, smart width on, crop = (-1,-1,-1,-1) | `settings.go:587` |
 
 ### 3.4 The descriptor engine (`reflect.go`)
 
@@ -117,6 +119,7 @@ Supporting sub-structs (all in `settings.go`):
 | `setBool` / `setFloat` / `setInt` / `setString(Default)` | Type-coercing setters; booleans accept `""/true/1/yes/on` and `false/0/no/off` | `reflect.go:209` (setBool), `reflect.go:226` (setFloat, approx.), `reflect.go:236` (setInt, approx.) |
 | `setUnitMm` / `marginSetter` | Parse a unit real, convert to mm, store; context-named conversion errors | `reflect.go:359` / `reflect.go:370` (approx.) |
 | `setGrayscaleFromColorMode` | Maps `colormode` strings onto the shared `Grayscale` bool | `reflect.go:289` (approx.) |
+| `registerGlobalVersionProfileKeys` | Wires `pdfversion` / `pdfprofile`. `Set("pdfprofile", "a3a-ua1")` stores `PDF/A-3a+PDF/UA-1`; `Get("pdfprofile")` returns that canonical token | `reflect.go:501` |
 | `registerGlobalKeys` … `registerImageKeys` | The eight table-wiring functions composing `buildKeyTables()` | `reflect.go:828` (`buildKeyTables`) |
 | `(g *PdfGlobal) Set` / `(o *PdfObject) Set` / `(g *ImageGlobal) Set` | Public dotted-key entry points; unknown keys error via `errUnknownSetting` | `reflect.go:855` / `reflect.go:861` / `reflect.go:866` |
 | `(g *PdfGlobal) Get` / `(o *PdfObject) Get` / `(g *ImageGlobal) Get` | Canonical string read-back; accepted ignored keys return last Set value | `getters.go:13` (and siblings) |
@@ -141,8 +144,9 @@ Supporting sub-structs (all in `settings.go`):
 |--------|---------|-----------|
 | `PdfGlobalOptions` | Value-type builder for the library API; immutable (each `With*` returns a copy) | `options.go:6` |
 | `NewPdfGlobalOptions()` | Starts from `DefaultPdfGlobal()` | `options.go:11` |
-| `WithPageSize/WithMargins/WithTitle/WithCopies/WithOutline/WithSmartShrinking/WithBackground/WithCompression/WithResolveRelativeLinks` | Compile-time-discoverable setters | `options.go:15`–`options.go:71` (approx.) |
-| `(o PdfGlobalOptions) Build()` | Independent snapshot (clones slices and `Ignored` map) | `options.go:73` |
+| `WithPageSize/WithMargins/WithTitle/WithCopies/WithOutline/WithSmartShrinking/WithBackground/WithCompression/WithResolveRelativeLinks` | Compile-time-discoverable setters | `options.go:15`–`options.go:68` (approx.) |
+| `WithPDFVersion` / `WithPDFProfile` | Normalize valid input to canonical tokens; invalid strings are stored as-is and fail later at `PolicyForGlobal` / `Validate` | `options.go:71` / `options.go:81` |
+| `(o PdfGlobalOptions) Build()` | Independent snapshot (clones slices and `Ignored` map) | `options.go:106` |
 
 ### 3.7 Sentinel errors (`internal/errs`)
 
@@ -203,6 +207,7 @@ Supporting sub-structs (all in `settings.go`):
 | `(*Loader).fileAccessAllowed(path, pageLoad)` | `EnableLocalFileAccess && !BlockLocalFileAccess` + `AccessController` prefix match | `load.go:811-817` |
 | `internal/load` HTTP failure path | Constructs `&settings.HttpStatusError{Status, URL}` → exit-code mapping at CLI | `load.go:1007-1010` |
 | `internal/convert/convert_helpers.go` | `settings.ParsePageSize` for page geometry (`pageGeometry`) | `convert_helpers.go:117` |
+| `internal/convert.PolicyForGlobal` | `PdfVersion` + `PdfProfile` → `pdf.WriterPolicy`. Empty profile + empty version → unclaimed PDF 1.4. Profile implies 1.7 or 2.0 unless the explicit version conflicts | `convert.go:254` |
 | `internal/imageout` | `mediaFor(global, img, obj)` → `settings.ResolveMedia("screen", …)`; `imageLoadGlobal` → `settings.LoadGlobal`; `fontRegistry` → `PdfGlobal.FontPaths/UseSystemFonts` | `imageout.go:1396`, `imageout.go:1341`, `imageout.go:1321` |
 | `internal/convert` (HF) | `obj.HeaderFor(g)` / `obj.FooterFor(g)` inheritance (object override wins) | `settings.go:374` / `settings.go:383` |
 | `internal/cli.ExitCode` | Interface check `interface{ HttpErrorCode() int }`; `settings.HttpStatusError` satisfies it | `cli.go:517-524` |
@@ -212,18 +217,22 @@ Supporting sub-structs (all in `settings.go`):
 `Get(name)` normalizes dots (lowercase + trim), consults the descriptor
 table (`getForKey`), and returns the canonical string form. Accepted ignored
 keys return the **last Set value** stored in `Ignored`; truly unknown keys
-return `ok=false` (`reflect.go:116-129`).
+return `ok=false` (`reflect.go:116-129`). After `Set("pdfprofile", "a3a-ua1")`,
+`Get("pdfprofile")` is `PDF/A-3a+PDF/UA-1` (the stored canonical token, not
+the alias).
 
 ## 5. Cross-package dependencies
 
 ### 5.1 What `internal/settings` imports
 
-Only the standard library: `strings` (`settings.go`), `fmt`/`strconv`/
-`strings` (`reflect.go`), `strconv`/`strings` (`getters.go`), `fmt`
-(`httperror.go`), `errors`/`fmt`/`strconv`/`strings` (`unitreal.go`),
-`errors`/`fmt`/`strings` (`pagesize.go`). `internal/errs` imports only
-`errors`. **Both packages are leaves** — they sit at the bottom of the
-dependency graph and are imported by everything above.
+Stdlib plus one internal leaf: `settings.go` imports `internal/pdfprofile`
+for profile `Parse` / canonical tokens (no new flavours). Remaining files
+stay stdlib-only (`fmt`/`strconv`/`strings` in `reflect.go`,
+`strconv`/`strings` in `getters.go`, `fmt` in `httperror.go`,
+`errors`/`fmt`/`strconv`/`strings` in `unitreal.go`,
+`errors`/`fmt`/`strings` in `pagesize.go`). `internal/pdfprofile` and
+`internal/errs` are leaves (`pdfprofile` has no engine imports; `errs`
+imports only `errors`).
 
 ### 5.2 Who depends on them
 

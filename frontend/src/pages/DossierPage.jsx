@@ -339,7 +339,7 @@ export default function DossierPage() {
             <input
               id="dossier-search-input"
               type="search"
-              placeholder="Search title, #number, summary, evidence..."
+              placeholder="Search title, #number, summary, evidence…"
               value={q}
               onChange={handleSearchChange}
               autoComplete="off"

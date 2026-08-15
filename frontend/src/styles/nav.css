@@ -27,8 +27,18 @@
   text-decoration: none;
   display: inline-flex;
   align-items: center;
+  gap: 10px;
   min-height: 44px;
   padding: 0 4px;
+}
+
+.brand-gopher {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  flex: none;
+  display: block;
+  background: #9fdeed;
 }
 
 .site-nav-desktop {
@@ -55,7 +65,7 @@
   border-radius: 6px;
   display: inline-flex;
   align-items: center;
-  min-height: 36px;
+  min-height: 44px;
   transition: color 0.15s, background 0.15s;
 }
 
@@ -91,7 +101,7 @@
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 6px 12px;
-  min-height: 36px;
+  min-height: 44px;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
 }
@@ -183,14 +193,15 @@
 }
 
 .theme-toggle {
-  font-family: var(--mono);
-  font-size: 12px;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
   color: var(--ink);
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 6px 11px;
-  min-height: 36px;
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -215,7 +226,7 @@
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 6px 11px;
-  min-height: 36px;
+  min-height: 44px;
   text-decoration: none;
   transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
 }
@@ -232,8 +243,9 @@
 }
 
 .gh-stars-count {
-  font-family: var(--mono);
-  font-size: 12px;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
 }
 
 .site-nav-mobile-bar {

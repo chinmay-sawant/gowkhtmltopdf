@@ -37,6 +37,12 @@
   },
   {
    "type": "code",
+   "heading": "Opt-in PDF version or profile (unreleased 0.2.2, not in 0.2.1)",
+   "language": "sh",
+   "code": "# Default is unclaimed PDF 1.4. --pdf-version is not a PDF/A or PDF/UA claim.\n./bin/gowkhtmltopdf --pdf-version 1.7 --enable-local-file-access \\\n  testdata/golden/fixture-01-simple-invoice.html \\\n  /tmp/invoice-1.7.pdf\n\n# Dual PDF/A-3a + PDF/UA-1 (implies PDF 1.7)\n./bin/gowkhtmltopdf --pdf-profile a3a-ua1 --enable-local-file-access \\\n  testdata/golden/fixture-01-simple-invoice.html \\\n  /tmp/invoice-a3a-ua1.pdf"
+  },
+  {
+   "type": "code",
    "heading": "First image",
    "language": "sh",
    "code": "./bin/gowkhtmltoimage --enable-local-file-access \\\n  --width 1024 \\\n  testdata/golden/fixture-01-simple-invoice.html \\\n  /tmp/invoice.png"

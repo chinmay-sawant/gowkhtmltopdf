@@ -132,7 +132,7 @@ specific-decision logic (format sniffing, crop, quality) lives in
 | `flagTable` / `shortFlags` | flags.go:27 / 31 | Static tables built once at package init, never mutated; `shortFlags` (`q g O s T B L R c t`) alias long-form specs |
 | `buildFlagTable` | flags.go:64 | Assembles the ~120-slot table via one `add*Flags` group per policy |
 | `addDocFlags` | flags.go:87 | `help/version/license/extended-help` as `nopFlag` (handled by `docFlagErr` before table lookup; present so `flagList` shows them) |
-| `addGlobalFlags` | flags.go:95 | `quiet`, `collate`, `copies`, `orientation`, `page-size`, `grayscale`, `title`, `margin-top/bottom/left/right`, `page-width/height`, `no-pdf-compression`, `page-offset`, `enable/disable-smart-shrinking` |
+| `addGlobalFlags` | flags.go:95 | `quiet`, `collate`, `copies`, `orientation`, `page-size`, `grayscale`, `title`, `margin-top/bottom/left/right`, `page-width/height`, `no-pdf-compression`, `page-offset`, `--pdf-version` (`pdfversion`, flags.go:142), `--pdf-profile` (`pdfprofile`, flags.go:145), `enable/disable-smart-shrinking`. Version is not a PDF/A/UA claim; `--pdf-profile` is (`a3a-ua1` / `a4-ua2` / …, ModePDF only) |
 | `addOutlineFlags` | flags.go:152 | `outline`, `outline-depth`, `dump-outline`, `dump-default-toc-xsl` — “one home: Global settings” |
 | `addLocalAccessFlags` | flags.go:173 | `enable/disable-local-file-access` (dual-write via `applyPage` with `load.blocklocalfileaccess` negation), `allow` (ACL prefix), `background`/`no-background` |
 | `addWebPageFlags` | flags.go:202 | `simplify-dom`, `simplify-dom-profile`, `print-link-underline`, `print-media-type`/`no-print-media-type`, `media-type` (all routed global+object) |

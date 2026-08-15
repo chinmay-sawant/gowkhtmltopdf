@@ -31,7 +31,8 @@ Deep-dives with `file:line` references live under
 | `internal/convert/prepare` | Shared document prep: load, parse, sheets, `@font-face` |
 | `internal/convert/render` | Mode-neutral lifecycle: `RenderObjects` → `Assemble` → `Finalize` |
 | `internal/convert/islands` | Certified page-island recognition for the **benchmark fixture only** |
-| `internal/pdf` | PDF writer (default 1.4, opt-in 1.7 / 2.0 via `WriterPolicy`), TTF subset, Type0/CID, images, annotations, outlines |
+| `internal/pdf` | PDF writer (default 1.4, opt-in 1.7 / 2.0 via `WriterPolicy`; opt-in `--pdf-profile` / `WithPDFProfile`), TTF subset, Type0/CID, images, annotations, outlines, tagged structure |
+| `internal/pdfprofile` | Leaf: canonical profile tokens, aliases, `Parse` / `IsPDFA*` / `IsPDFUA*` |
 | `internal/imageout` | Raster path for one PNG/JPEG canvas |
 | `internal/svg` | SVG-as-`<img>` rasterization (`tdewolff/canvas`) |
 
@@ -60,7 +61,7 @@ input (file / URL / inline HTML)
         ▼                              ▼
   internal/pdf                   internal/imageout
   multi-page PDF                 one NRGBA canvas → PNG/JPEG
-  (1.4 default / 1.7 & 2.0 opt-in)
+  (1.4 default / 1.7 & 2.0 opt-in; `--pdf-profile` for claims)
 ```
 
 `internal/convert/prepare` is the shared front-half seam for both sinks
@@ -138,14 +139,17 @@ Image jobs use `imageout.Request` (`imageout.RunRequest`), also driven by
 | Latin fonts | Subset TTF, simple font, WinAnsi-style codes, `/Widths` in 1000 units/em |
 | Unicode | Type0 / CIDFontType2 + Identity-H when a run has runes above U+00FF |
 | Images | JPEG bytes as DCTDecode; PNG → Flate RGB + `/SMask` for alpha |
-| Links | URI annotations and GoTo destinations |
-| Outlines | Catalog `/Outlines` after outline object refs exist |
+| Links | URI annotations and GoTo destinations; PDF/UA-2 also emits structure destinations (`/SD`) on internal named dests |
+| Outlines | Catalog `/Outlines` after outline object refs exist; UA-2 outline dests can carry `/SD` |
 | Info Title | `--title` / settings only — **not** `<title>` |
+| Profiles | Empty `--pdf-profile` is unclaimed PDF (default still 1.4). `--pdf-version` is **not** a PDF/A or PDF/UA claim. `--pdf-profile` is: `PDF/A-3a`, `PDF/UA-1`, `PDF/A-3a+PDF/UA-1` (imply 1.7); `PDF/A-4`, `PDF/UA-2`, `PDF/A-4+PDF/UA-2` (imply 2.0). `Get("pdfprofile")` returns those canonical tokens (alias `a3a-ua1` stores `PDF/A-3a+PDF/UA-1`) |
 
-Explicit out-of-scope boundaries: PDF 2.0 output is a **version** choice, not
-PDF/A-4 or PDF/UA-2 conformance; claiming XMP (`pdfaid`/`pdfuaid`),
-OutputIntent, ICC, `/MarkInfo`, and structure trees stay deferred to #33.
-Encryption, forms, signatures, and object/xref streams are rejected.
+Explicit out-of-scope boundaries: `--pdf-version` alone is a **version**
+choice, not a PDF/A or PDF/UA claim. Profiles (claiming XMP, OutputIntent +
+sRGB, `/MarkInfo`, structure tree, PDF 2.0 `/Namespace`) are opt-in via
+`--pdf-profile` / `WithPDFProfile`. Encryption, forms, signatures, and
+object/xref streams are rejected. Do not claim flavours beyond the tokens
+above.
 
 Bundled faces are Liberation Sans **and** Serif **and** Mono (R/B/I/BI), plus
 DejaVu Sans Regular+Bold as Unicode fallback. See [fonts.md](fonts.md).
@@ -163,12 +167,13 @@ cmd/*   ──► app, cli                                    (never imports the
 cli     ──► settings                                    (never imports cmd, api, convert)
 app     ──► cli, convert, imageout
 
-settings, errs, line, html, svg     leaves
+pdfprofile, errs, line, html, svg   leaves
+settings ──► pdfprofile               dotted Set/Get + profile Parse
 load     ──► settings                 trust boundary (ACL / timeouts / caps)
 css      ──► html
 outline  ──► html, css                headings only (locationReader seam)
 layout   ──► html, css, pdf, errs     display list + PaintContext
-pdf                                 sink (also used by imageout for faces/shaping)
+pdf      ──► pdfprofile             sink (also used by imageout for faces/shaping)
 imageout ──► convert, render, load, layout, pdf, settings
 convert  ──► load, html, css, layout, line, outline, pdf, settings, prepare, render, islands
                                       the hub
@@ -219,7 +224,7 @@ Start at [architecture/README.md](architecture/README.md), then:
 | [06-css.md](architecture/06-css.md) | Selectors, cascade, queries |
 | [07-layout.md](architecture/07-layout.md) | Formatting contexts, pagination |
 | [08-convert-pipeline.md](architecture/08-convert-pipeline.md) | `Run`, Assemble, HF/TOC/islands |
-| [09-pdf-writer.md](architecture/09-pdf-writer.md) | PDF 1.4 / 1.7 / 2.0 writer, fonts, images |
+| [09-pdf-writer.md](architecture/09-pdf-writer.md) | PDF 1.4 / 1.7 / 2.0 writer, `--pdf-profile` claims, fonts, images |
 | [10-imageout-svg.md](architecture/10-imageout-svg.md) | Raster path, SVG-as-img |
 
 Fidelity and font contracts: [fidelity.md](fidelity.md), [fonts.md](fonts.md).

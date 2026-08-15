@@ -21,7 +21,17 @@ is tracked in
 | Wikipedia / marketing “decent print” (readable title + body) | **Progressive goal** (Phase 21) — not MVP acceptance yet |
 | Full CSS (flex/grid as layout, absolute/fixed/sticky positioning) | **Partial** — flex (grow/shrink/basis/order/wrap), grid lite, relative/absolute/fixed; sticky print-scoped (page = scrollport); static 2D transforms (paint CTM); not full CSS3 |
 | JavaScript-driven pages | **Out of scope** (`<script>` stripped; JS CLI flags are unknown options) |
+| Archival / tagged PDF (PDF/A, PDF/UA) | **Unreleased 0.2.2** (not in 0.2.1). Opt-in via `--pdf-profile` / `WithPDFProfile`. Default is unclaimed PDF 1.4. `--pdf-version` / `WithPDFVersion` is a version, not a claim |
+| Encryption / AcroForm / signatures | **Out of scope** (rejected on every version) |
 | Full Unicode / CJK typesetting | **Partial** — Type0/CID + `--font-path`; Arabic OT via `go-text/typesetting` (GSUB) + presentation-form fallback; Indic Partial; no CGO HarfBuzz; `writing-mode` vertical is parsed but lays out horizontal |
+
+**PDF claims (unreleased 0.2.2, not in the 0.2.1 tag):** empty version + empty profile is still unclaimed PDF 1.4.
+`--pdf-version 1.7` / `2.0` sets the header (and related writer details);
+it does **not** claim PDF/A or PDF/UA. `--pdf-profile a3a-ua1` / `a3a` /
+`ua1` implies PDF 1.7 and emits claiming XMP, sRGB OutputIntent, and a
+tagged structure tree. `--pdf-profile a4-ua2` / `a4` / `ua2` implies PDF 2.0
+and does the same for PDF/A-4 / PDF/UA-2. Encryption and forms stay out of
+scope. Details: [cli.md](cli.md), [library-api.md](library-api.md).
 
 **Explicit non-milestone:** full WebKit parity under this no-cgo design is
 **not** a dated goal. For open-web screenshot quality, use a headless browser
@@ -170,6 +180,7 @@ or converting untrusted HTML: [cli.md](cli.md#remote-url-security),
 | Fonts / CJK / discovery | **Partial** — Type0/CID + `--font-path` / registry; Arabic OT (`go-text/typesetting`); `@font-face` **https** TTF/OTF/WOFF1 fetched via `FetchSub` (same ACL as other subresources). `.woff2` / `.eot` / `data:` skipped | 12, 19 |
 | `writing-mode` vertical | **Not implemented** — `vertical-rl` / `vertical-lr` parsed but lay out **horizontal** only | 19 |
 | HF / links edges | Body GoTo + HF URI + HF fragment GoTo (copies-aware) | 6, 20 |
+| PDF version / PDF/A / PDF/UA | **Shipped opt-in** — default unclaimed 1.4; version flags are not claims; profiles emit claiming XMP + tagging | — |
 | Arbitrary URL / “decent print” | **In progress** — product contract + docs; **acceptance not met** | 21 |
 | JavaScript | Stripped | 22 staged |
 | Open-web competition | Not planned | 23 |
@@ -199,12 +210,15 @@ Security defaults: [THREAT-MODEL.md](THREAT-MODEL.md),
 ## Claims language (allowed vs banned)
 
 **Allowed:** report-oriented, controlled HTML, wkhtmltopdf-compatible CLI
-surface, pure Go, deterministic PDF, print-quality raster (relative to 5×7).
+surface, pure Go, deterministic PDF, print-quality raster (relative to 5×7),
+opt-in `--pdf-version` as a **version**, opt-in `--pdf-profile` as a
+**claiming** PDF/A and/or PDF/UA profile.
 
 **Banned / over-claim:** pixel perfect, full CSS, browser replacement, WebKit
 parity, Wikipedia visual parity, marketing pixel match, “paste any URL and get
 Chrome-quality print” (until tier 3 is explicitly reopened with different
-constraints). “Decent print” is allowed only with the criteria above and only
+constraints), treating default PDF 1.4 or `--pdf-version` alone as PDF/A or
+PDF/UA. “Decent print” is allowed only with the criteria above and only
 after Phase 21 acceptance against vendored fixtures.
 
 ---

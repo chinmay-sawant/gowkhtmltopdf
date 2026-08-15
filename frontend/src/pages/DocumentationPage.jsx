@@ -1,5 +1,5 @@
-import { useMemo, useState, useEffect } from 'react'
-import { useParams, NavLink, Link, Navigate } from 'react-router-dom'
+import { useMemo, useState, useEffect, useRef } from 'react'
+import { useParams, useSearchParams, NavLink, Link, Navigate } from 'react-router-dom'
 import ContentBlocks from '../components/blocks/ContentBlocks'
 import { slugify } from '../components/blocks/slugify'
 import PageTitle from '../components/PageTitle'
@@ -43,10 +43,44 @@ function calculateReadingTime(content) {
   return Math.max(1, Math.ceil(words / 200))
 }
 
+const HEADING_OFFSET = 96
+const HEADING_SELECTOR =
+  '.docs-main .content-blocks h2, .docs-main .content-blocks h3, .docs-main .prose h2, .docs-main .prose h3, .docs-main .code-block-heading, .docs-main .table-block-heading'
+
+function collectHeadings() {
+  const headingEls = Array.from(document.querySelectorAll(HEADING_SELECTOR))
+  const items = []
+  headingEls.forEach((el) => {
+    if (!el.id) el.id = slugify(el.textContent)
+    if (el.id && el.textContent.trim()) {
+      items.push({
+        el,
+        id: el.id,
+        text: el.textContent.replace(/^[#\s]+/, '').trim(),
+        level: el.tagName.toLowerCase() === 'h3' || el.classList.contains('code-block-heading') ? 'h3' : 'h2',
+      })
+    }
+  })
+  return items
+}
+
+function headingFromScroll(items) {
+  let current = items[0]?.id || ''
+  for (const item of items) {
+    if (item.el.getBoundingClientRect().top - HEADING_OFFSET <= 1) {
+      current = item.id
+    }
+  }
+  return current
+}
+
 export default function DocumentationPage() {
   const { docId } = useParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [headings, setHeadings] = useState([])
   const [activeId, setActiveId] = useState('')
+  const lockRef = useRef(false)
+  const lockTimerRef = useRef(0)
 
   const docs = useMemo(
     () =>
@@ -70,64 +104,36 @@ export default function DocumentationPage() {
   const githubDocFile = DOC_FILE_MAP[docId] || `${docId}.md`
   const githubUrl = `https://github.com/chinmay-sawant/gowkhtmltopdf/blob/master/documentation/${githubDocFile}`
 
-  // Scrollspy & heading discovery
   useEffect(() => {
-    if (!page) return
+    if (!page) return undefined
 
-    // Small delay to ensure ContentBlocks DOM elements are mounted
-    const timer = setTimeout(() => {
-      const headingEls = Array.from(
-        document.querySelectorAll(
-          '.docs-main .content-blocks h2, .docs-main .content-blocks h3, .docs-main .prose h2, .docs-main .prose h3, .docs-main .code-block-heading, .docs-main .table-block-heading, .docs-main .callout-title',
-        ),
-      )
+    let items = []
+    const timer = window.setTimeout(() => {
+      items = collectHeadings()
+      setHeadings(items.map(({ id, text, level }) => ({ id, text, level })))
 
-      const items = []
-      headingEls.forEach((el) => {
-        if (!el.id) {
-          el.id = slugify(el.textContent)
-        }
-        if (el.id && el.textContent.trim()) {
-          items.push({
-            id: el.id,
-            text: el.textContent.replace(/^[#\s]+/, '').trim(),
-            level: el.tagName.toLowerCase() === 'h3' ? 'h3' : 'h2',
-          })
-        }
-      })
-
-      setHeadings(items)
-      if (items.length > 0 && !window.location.hash) {
-        setActiveId(items[0].id)
-      } else if (window.location.hash) {
-        setActiveId(window.location.hash.replace('#', ''))
-      }
-
-      if (headingEls.length === 0) return
-
-      const observer = new IntersectionObserver(
-        (entries) => {
-          const visible = entries.filter((e) => e.isIntersecting)
-          if (visible.length > 0) {
-            // Pick heading closest to top
-            visible.sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)
-            setActiveId(visible[0].target.id)
-          }
-        },
-        {
-          rootMargin: '-80px 0px -70% 0px',
-          threshold: [0, 0.5, 1],
-        },
-      )
-
-      headingEls.forEach((el) => observer.observe(el))
-
-      return () => {
-        observer.disconnect()
+      const wanted = searchParams.get('section')
+      const target = wanted && items.find((item) => item.id === wanted)
+      if (target) {
+        setActiveId(target.id)
+        target.el.scrollIntoView({ behavior: 'auto', block: 'start' })
+      } else if (items.length > 0) {
+        setActiveId(headingFromScroll(items) || items[0].id)
       }
     }, 50)
 
-    return () => clearTimeout(timer)
+    const onScroll = () => {
+      if (lockRef.current || items.length === 0) return
+      const next = headingFromScroll(items)
+      if (next) setActiveId(next)
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+
+    return () => {
+      window.clearTimeout(timer)
+      window.clearTimeout(lockTimerRef.current)
+      window.removeEventListener('scroll', onScroll)
+    }
   }, [docId, page])
 
   if (!page) return <Navigate to="/documentation/cli" replace />
@@ -135,11 +141,23 @@ export default function DocumentationPage() {
   const scrollToHeading = (id, e) => {
     if (e) e.preventDefault()
     const el = document.getElementById(id)
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      window.history.replaceState(null, '', `#${id}`)
-      setActiveId(id)
-    }
+    if (!el) return
+
+    lockRef.current = true
+    setActiveId(id)
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.set('section', id)
+        return next
+      },
+      { replace: true },
+    )
+    window.clearTimeout(lockTimerRef.current)
+    lockTimerRef.current = window.setTimeout(() => {
+      lockRef.current = false
+    }, 700)
   }
 
   return (
@@ -290,7 +308,7 @@ export default function DocumentationPage() {
                 {headings.map((h, i) => (
                   <a
                     key={`${h.id}-${i}`}
-                    href={`#${h.id}`}
+                    href={`#/documentation/${docId}?section=${encodeURIComponent(h.id)}`}
                     className={`docs-toc-link docs-toc-${h.level} ${activeId === h.id ? 'active' : ''}`}
                     onClick={(e) => scrollToHeading(h.id, e)}
                   >

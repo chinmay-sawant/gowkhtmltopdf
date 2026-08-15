@@ -89,6 +89,7 @@ Line counts are approximate from `wc -l`.
 | `layout_chrome.go` | 480 | Background/border op generation (`prependChrome`), deferred chrome merge, border lines (solid/dashed/dotted), `markOpsFixed`, radius |
 | `layout_images.go` | 317 | Replaced-element sizing: intrinsic ratio policy, `width`/`height` attrs + CSS, aspect-ratio preservation, `buildHR`, PNG/JPEG dimension sniffing |
 | `paint.go` | 981 | `Paint`/`PaintContext` (pagination orchestration), `PaintBand`/`PaintBandContext` (single-band, used by HF), op→PDF dispatch, `PaintStyle`/`StyleOf` (shared fill/stroke/fake-bold policy), `populateLocations`, `canvasToPDF`, `roundedRectPath` |
+| `tagging.go` | 516 | Tagged-PDF walk: structure tree from boxes when a profile is active. List nesting is `L` → `LI` → `LBody` → `Link` (ISO 32000 list model; `ensureInlineParent` wraps links/figures so they are not bare kids of `L`/`LI`) |
 | `paint_flow.go` | 1725 | Flow-index machinery (`shiftFlowY` etc.), page-break policies (`avoidInside`, `beforeAlways`, `afterBreaks`, `rowsIntact`, `keepHeadingWithNext`, `orphansWidows` + heuristic), thead repetition |
 | `paint_pagination.go` | 1502 | `paginateOps`, `paginationFixpoint`, `snapCrossingTextOps`, `splitCrossingRects` (op fragmentation w/ identity), `capTablePageBreaks` (border-gap sealing), `stripOrphanRowChrome` |
 | `paint_order.go` | — | `PaintOrder` — canonical z-order policy shared by PDF, band, and raster adapters |
@@ -549,5 +550,5 @@ Open questions worth a follow-up review:
 | [06-css.md](06-css.md) | CSS subsystem (parse, selectors, cascade) |
 | **07-layout.md** | **This document — layout engine & line breaking** |
 | [08-convert-pipeline.md](08-convert-pipeline.md) | PDF/Image job orchestration, HF/TOC/outline/links |
-| [09-pdf-writer.md](09-pdf-writer.md) | PDF writer (1.4 default / 1.7 & 2.0 opt-in), fonts, subsets |
+| [09-pdf-writer.md](09-pdf-writer.md) | PDF writer (1.4 default / 1.7 & 2.0 opt-in, `--pdf-profile` claims), fonts, subsets |
 | [10-imageout-svg.md](10-imageout-svg.md) | PNG/JPEG raster path & SVG rasterization |

@@ -221,6 +221,10 @@
   margin-top: 64px;
 }
 
+.bench-section .table-block + .table-block .table-block-heading {
+  margin-top: 40px;
+}
+
 .bench-section h2 {
   font-family: var(--serif);
   font-weight: 500;
@@ -276,13 +280,14 @@
 .bench-tab-btn {
   background: none;
   border: none;
-  padding: 6px 12px;
+  padding: 8px 12px;
+  min-height: 40px;
   border-radius: 6px;
-  font-family: var(--mono);
-  font-size: 11.5px;
+  font-family: var(--sans);
+  font-size: 13px;
   color: var(--muted);
   cursor: pointer;
-  transition: all 0.15s ease-in-out;
+  transition: color 0.15s, background 0.15s;
   white-space: nowrap;
 }
 

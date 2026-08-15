@@ -91,8 +91,9 @@ golden-update:
 # Regenerate the sample outputs in output/: one PDF per golden fixture, a
 # showcase PDF (TOC + headers/footers + outline), the library-API architecture
 # diagram PDF (output/architecture-diagram.pdf only; does not rewrite testdata/golden HTML),
-# image PNGs, and the optional live Wikipedia smoke (needs network; failure
-# does not fail the target).
+# image PNGs, version/compliance smokes under output/pdf-{1.7,2.0}{,-compliance}/
+# (fixture-21 and fixture-56), and the optional live Wikipedia smoke (needs
+# network; failure does not fail the target).
 samples:
 	# Wipe regenerable fixture samples only (wiki-*.pdf is rewritten below).
 	rm -f output/fixture-*.pdf output/fixture-*.png output/showcase-*.pdf output/architecture-diagram.pdf
@@ -112,6 +113,16 @@ samples:
 			HF_FLAGS="$$HF_FLAGS --footer-html testdata/golden/$$id-footer.html --margin-bottom -1"; \
 		fi; \
 		go run ./cmd/gowkhtmltopdf --enable-local-file-access $$FONT_FLAGS $$HF_FLAGS "$$f" "output/$$name.pdf"; \
+	done
+	# Version / compliance smokes (unreleased 0.2.2): same two fixtures in four dirs.
+	mkdir -p output/pdf-1.7 output/pdf-1.7-compliance output/pdf-2.0 output/pdf-2.0-compliance
+	rm -f output/pdf-1.7/*.pdf output/pdf-1.7-compliance/*.pdf output/pdf-2.0/*.pdf output/pdf-2.0-compliance/*.pdf
+	for f in testdata/golden/fixture-21-detailed-report.html testdata/golden/fixture-56-architecture-diagram.html; do \
+		name=$$(basename "$$f" .html); \
+		go run ./cmd/gowkhtmltopdf --pdf-version 1.7 --enable-local-file-access "$$f" "output/pdf-1.7/$$name.pdf"; \
+		go run ./cmd/gowkhtmltopdf --pdf-profile a3a-ua1 --enable-local-file-access "$$f" "output/pdf-1.7-compliance/$$name.pdf"; \
+		go run ./cmd/gowkhtmltopdf --pdf-version 2.0 --enable-local-file-access "$$f" "output/pdf-2.0/$$name.pdf"; \
+		go run ./cmd/gowkhtmltopdf --pdf-profile a4-ua2 --enable-local-file-access "$$f" "output/pdf-2.0-compliance/$$name.pdf"; \
 	done
 	go run ./cmd/gowkhtmltopdf --enable-local-file-access --outline --outline-depth 2 --header-left "gowkhtmltopdf demo - [title]" --header-right "page [page]/[topage]" --footer-center "[section]" toc testdata/golden/fixture-16-invoice-with-css.html output/showcase-toc-hf-outline.pdf
 	# Library-API architecture diagram → output/architecture-diagram.pdf only.
