@@ -50,10 +50,11 @@ of the installed `wkhtmltopdf` binary and the time to fetch remote HTML.
 | **What it is** | Process wrapper around `wkhtmltopdf` | Clean-room HTML to layout to PDF/image engine in pure Go |
 | **Runtime deps** | Must install `wkhtmltopdf` (and its Qt stack) | None: static binary, `CGO_ENABLED=0` |
 | **Go modules** | Thin library; still needs the native binary | Go-native dependencies; no browser or native converter process |
-| **Rendering** | Full (legacy) WebKit via wkhtmltopdf | In-repo pipeline: load, HTML, CSS subset, layout, paginate, paint, PDF write (1.4 default; 1.7 / 2.0 opt-in; `--pdf-profile` for PDF/A-3a+UA-1 and PDF/A-4+UA-2). `--pdf-version` is not a claim |
+| **Rendering** | Full (legacy) WebKit via wkhtmltopdf | In-repo print CSS subset: load, HTML, CSS, layout, paginate, paint, PDF write |
+| **PDF version / profiles** | Whatever the installed `wkhtmltopdf` emits (typically unclaimed 1.4; no first-class A-3a/A-4 or UA-1/UA-2) | PDF 1.4 default. **Unreleased 0.2.2:** opt-in `--pdf-version` 1.7 / 2.0 (not a claim) and `--pdf-profile` for PDF/A-3a, PDF/UA-1, PDF/A-4, PDF/UA-2 |
 | **Deployment** | OS package or static wkhtmltopdf binary plus PATH setup | Single self-contained Go binary |
 | **Security surface** | Spawned process and full browser engine; harder to bound | Explicit ACL, local files off by default, HTTP timeouts and body limits, documented threat model |
-| **Determinism** | Depends on binary version, fonts, and OS | Same input and settings yield the same PDF bytes (fixed creation time) |
+| **Determinism** | Depends on binary version, fonts, and OS | Repeatable **layout**. Default CLI **bytes** are not hash-stable (`CreationDate` / `[date]` / `[time]` use the wall clock unless the library injects `Now`) |
 | **Maintenance risk** | Tied to archived upstream `wkhtmltopdf` | Full stack owned in this repository |
 | **Fidelity** | Closer to "real browser" print for complex pages | Report-oriented CSS subset; no JavaScript; limited fonts today |
 | **Outputs** | PDF only (via the binary) | PDF and image mode (`gowkhtmltoimage`) |
@@ -80,9 +81,11 @@ of the installed `wkhtmltopdf` binary and the time to fetch remote HTML.
    gowkhtmltopdf can keep improving CSS, fonts, and pagination without waiting
    on Qt-era WebKit.
 
-5. **Deterministic, auditable PDFs**  
-   Pure Go writer, embedded Liberation font subset, fixed creation metadata.
-   That is useful for invoices, statements, and golden regression tests.
+5. **Auditable PDFs, including opt-in archival / tagged profiles**  
+   Pure Go writer and an embedded Liberation subset. Unreleased 0.2.2 can
+   claim PDF/A-3a / A-4 and PDF/UA-1 / UA-2. Default CLI bytes are still
+   not hash-stable (wall-clock dates). Golden tests check structure, not
+   file hashes.
 
 6. **Library plus CLI work-alike**  
    Idiomatic `NewConverter()` API and a wkhtmltopdf-style multi-object CLI
@@ -111,7 +114,8 @@ Use **SebastiaanKlippert/go-wkhtmltopdf** only if you need WebKit-level print
 fidelity and accept carrying a dead native toolchain.
 
 Use **gowkhtmltopdf** when deployability, zero native deps, security defaults,
-determinism, and long-term ownership matter more than full browser parity.
+long-term ownership, and (on 0.2.2) opt-in PDF/A + PDF/UA matter more than
+full browser parity.
 
 ## Related docs
 

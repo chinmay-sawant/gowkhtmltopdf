@@ -56,14 +56,15 @@
 <body>
 <main>
   <h1>gowkhtmltopdf vs the HTML-to-PDF landscape (2026)</h1>
-  <p class="sub">Research-backed comparison, Aug 2026. Sources include official docs, GitHub issues, and published benchmarks. Vendor benchmarks are identified as self-interested, and performance figures are directional rather than like-for-like measurements. Highlighted column = gowkhtmltopdf.</p>
+  <p class="sub">Research-backed comparison, updated Aug 2026 after PRs #45–#47. Sources include official docs, GitHub issues, and published benchmarks. Vendor benchmarks are identified as self-interested, and performance figures are directional rather than like-for-like measurements. Highlighted column = gowkhtmltopdf. Tagged release is v0.2.1; PDF 1.7/2.0 and PDF/A+UA profiles are <b>unreleased 0.2.2</b> on master. Scores assume that tree.</p>
 
   <h2>Score card</h2>
   <p class="score">
-    <strong>gowkhtmltopdf: 7.5/10 overall</strong> — a strong fit for authored HTML templates,
-    held back by partial CSS, no JavaScript, and the current default creation-time metadata. PDF/A-3a+UA-1 and PDF/A-4+UA-2 are opt-in via <code>--pdf-profile</code>.
-    <b>8.5/10 for HTML templates</b> and <b>5.5–6/10 as a general converter</b> are more useful
-    role-specific scores. A 9/10 niche score depends on making normal CLI output byte-stable.
+    <strong>gowkhtmltopdf: 8.0/10 overall</strong> (was 7.5) — the lift is standards support:
+    opt-in PDF/A-3a, PDF/A-4, PDF/UA-1, and PDF/UA-2 via <code>--pdf-profile</code>, with veraPDF-passing fixtures.
+    Still held back by a print CSS subset, no JavaScript, no forms/encryption, and CLI creation-time metadata.
+    <b>8.8/10 for authored HTML templates</b> (was 8.5) and <b>6.0/10 as a general website converter</b> (was 5.5–6).
+    A 9/10 template score still needs byte-stable default CLI output.
   </p>
 
   <h2>Core comparison</h2>
@@ -91,7 +92,7 @@
       </tr>
       <tr class="us">
         <td>CSS fidelity</td>
-        <td>Flex/grid/position <b>lite</b>; many modern properties missing</td>
+        <td>Documented <b>print CSS subset</b>: flex/grid stages, float lite, <code>:has()</code>, <code>@container</code>, multicol, print sticky. Not Chrome</td>
         <td>Full modern CSS; print pagination still needs testing</td>
         <td>No grid, broken flex</td>
         <td>Full flex, mostly grid, best free Paged Media</td>
@@ -158,7 +159,7 @@
       </tr>
       <tr class="us">
         <td>PDF standards</td>
-        <td>Opt-in PDF/A-3a+UA-1 and PDF/A-4+UA-2 via <code>--pdf-profile</code>; no forms or encryption</td>
+        <td><span class="ok"><b>Unreleased 0.2.2:</b></span> opt-in <code>--pdf-profile</code> for PDF/A-3a, PDF/UA-1, dual <code>a3a-ua1</code>; PDF/A-4, PDF/UA-2, dual <code>a4-ua2</code> (veraPDF on committed fixtures). No A-1/A-2, forms, encryption, or Factur-X. Version flags are not a claim</td>
         <td>No PDF/A/forms/encryption in the basic PDF API; tagged PDF and outlines are experimental</td>
         <td>No</td>
         <td><span class="ok"><b>PDF/A-1/2/3, PDF/UA, forms</b></span>; validity still needs validation</td>
@@ -182,7 +183,7 @@
       </tr>
       <tr class="us">
         <td>Score /10</td>
-        <td><span class="ok"><b>7.5 overall</b></span></td>
+        <td><span class="ok"><b>8.0 overall</b></span></td>
         <td>7.5</td>
         <td><span class="no">3.0</span></td>
         <td>7.5</td>
@@ -201,7 +202,7 @@
     <tbody>
       <tr class="us">
         <td><b>gowkhtmltopdf</b></td>
-        <td>Authored HTML templates (invoices, certificates, storybooks, posters, tables, statements) needing a small offline Go binary, predictable layout, no JavaScript, and controlled resource access — or migrating off wkhtmltopdf</td>
+        <td>Authored HTML templates in Go (invoices, certificates, storybooks, posters, tables, statements) needing a small offline binary, no JavaScript, controlled file/HTTP access, and — on unreleased 0.2.2 — opt-in PDF/A-3a / A-4 and PDF/UA-1 / UA-2. Also the path off archived wkhtmltopdf</td>
       </tr>
       <tr>
         <td><b>Puppeteer / Chromium</b></td>
@@ -213,7 +214,7 @@
       </tr>
       <tr>
         <td><b>WeasyPrint</b></td>
-        <td><b>PDF/A, PDF/UA, e-invoice (Factur-X)</b> compliance on a free budget</td>
+        <td>Free-budget <b>PDF/A-1/A-2</b>, AcroForm, or <b>Factur-X / e-invoice</b>. Overlap with this project on A-3 / UA; WeasyPrint still wider on older parts and forms</td>
       </tr>
       <tr>
         <td><b>Prince XML</b></td>
@@ -228,7 +229,7 @@
     <ul>
       <li>The normal conversion path currently calls <code>SetCreationTime(time.Now())</code>, so byte-identical output is not guaranteed by default. The deterministic PDF-writer fallback is useful for tests, but it is not the same as a stable CLI contract.</li>
       <li>“No JavaScript” is a meaningful security reduction, not a zero-attack-surface claim. The loader can fetch HTTP(S) and data subresources, and local-file access is an explicit but real capability. Treat untrusted HTML as able to drive network egress and resource consumption.</li>
-      <li>The score is a judgment call, not a universal benchmark. Capability, deployment footprint, security posture, standards support, and maintenance should be scored separately when the target workload is not authored HTML templates.</li>
+      <li>The 8.0 overall is a judgment call, not a universal benchmark. The 0.5 lift from 7.5 is the 0.2.2 compliance slice (claiming XMP, OutputIntent, tagged structure / MCR / UA list nesting), not a CSS or JS leap. Capability, deployment, security, standards, and maintenance should still be scored separately when the target is not controlled reports.</li>
       <li>Performance values must be reproduced with the same fixture, tool version, OS, cold/warm mode, and concurrency. The cited PDF4 benchmark, for example, separates cold and warm browser runs and reports five-run medians on macOS arm64; those values should not be merged with unrelated concurrency figures.</li>
     </ul>
   </div>
