@@ -45,8 +45,8 @@ grounded in the actual source (types, functions and `file:line` references).
                      ┌───────────────────────────┴──────────────────────────────┐
                      ▼                                                          ▼
          internal/pdf  (PDF writer: 1.4 default,             internal/imageout  (PNG/JPEG)
-         1.7 / 2.0 opt-in)                                  TTF outline AA (2× SS); SVG via
-         fonts, subsetting, outlines, annotations            internal/svg (tdewolff/canvas)
+         1.7 / 2.0 opt-in; --pdf-profile claims)            TTF outline AA (2× SS); SVG via
+         fonts, subsetting, outlines, tagged PDF             internal/svg (tdewolff/canvas)
 ```
 
 **Non-negotiable constraints** (enforced at the module boundary):
@@ -79,7 +79,7 @@ deploys to `docs/`), golden fixtures (`testdata/`), committed samples
 | CSS subsystem | `internal/css` | CSS subset parse, selectors, cascade, media queries, `:has`, container rules (`:target` never matches) | [06-css.md](06-css.md) |
 | Layout engine | `internal/layout` | Style cascade, block/inline/table/flex/grid/float/multicol, pagination, paint ops. `internal/line` is log severity, not wrapping | [07-layout.md](07-layout.md) |
 | Convert pipeline | `internal/convert` (+ `prepare/`, `render/`, `islands/`), `internal/outline` | Job orchestration: HF, TOC, outline, links, copies/collate; islands are benchmark-only | [08-convert-pipeline.md](08-convert-pipeline.md) |
-| PDF writer | `internal/pdf` (+ `assets/`) | PDF writer (default 1.4, opt-in 1.7 / 2.0 via `WriterPolicy`), font subsetting, Type0/CID, images, annotations, outlines | [09-pdf-writer.md](09-pdf-writer.md) |
+| PDF writer | `internal/pdf` (+ `assets/`), `internal/pdfprofile` | PDF writer (default 1.4, opt-in 1.7 / 2.0 via `WriterPolicy`; opt-in `--pdf-profile`), font subsetting, Type0/CID, images, annotations, outlines, tagged structure | [09-pdf-writer.md](09-pdf-writer.md) |
 | Image output & SVG | `internal/imageout`, `internal/svg` | PNG/JPEG raster path, TTF outline AA (2× supersample), SVG→raster | [10-imageout-svg.md](10-imageout-svg.md) |
 
 ---
@@ -105,7 +105,8 @@ cmd/* ─► internal/cli ─► internal/settings    │
    internal/outline   ◄── pure headings→outline; no layout/pdf types (locationReader seam)
    internal/convert   ◄── the hub; its subpackages prepare/, render/, islands/
                           never import convert (cycle rule)
-   internal/pdf       ◄── writer sink; layout/imageout reuse faces + shaping
+   internal/pdfprofile◄── leaf: canonical profile tokens / aliases (settings + pdf)
+   internal/pdf       ◄── writer sink; imports pdfprofile; layout/imageout reuse faces + shaping
    internal/imageout  ◄── image sink; Assemble is a no-op; one canvas
    internal/svg       ◄── leaf consumed by layout (SVG-as-image)
 ```
@@ -168,8 +169,10 @@ under mutation races (validated with `-race`).
   UTF-8 text strings on 2.0),
   Type0/CID + Identity-H for runes above U+00FF, Catalog outlines, URI + GoTo annotations,
   deterministic trailer `/ID` and non-claiming XMP metadata stream on 1.7 and 2.0.
-  PDF 2.0 is a **version**, not PDF/A-4 or PDF/UA-2. Info `/Title` comes from
-  `--title`, not `<title>`.
+  `--pdf-version` is a **version**, not a PDF/A or PDF/UA claim. `--pdf-profile`
+  is the claim: `a3a` / `ua1` / `a3a-ua1` (PDF 1.7) and `a4` / `ua2` / `a4-ua2`
+  (PDF 2.0); `Get("pdfprofile")` returns canonical tokens (`PDF/A-3a+PDF/UA-1`
+  after `a3a-ua1`). Info `/Title` comes from `--title`, not `<title>`.
 - Image mode: one canvas (`Assemble` is a no-op), `--transparent` support
   (only fill-alpha diverges from PDF paint semantics), no temp files; the
   only third-party raster call in the project is the allowlisted
@@ -208,7 +211,7 @@ Full model: [../THREAT-MODEL.md](../THREAT-MODEL.md) and
 | [06-css.md](06-css.md) | CSS subsystem | selector support, cascade, media/container queries, value parsing, degrade rules |
 | [07-layout.md](07-layout.md) | Layout engine | style cascade, all formatting contexts, line breaking/shaping, pagination, display list |
 | [08-convert-pipeline.md](08-convert-pipeline.md) | Convert pipeline | `Request`, 3-stage lifecycle, HF/TOC two-pass fixpoint, outline; page islands are **benchmark-only** |
-| [09-pdf-writer.md](09-pdf-writer.md) | PDF writer | PDF 1.4 default / 1.7 & 2.0 opt-in model, font subsetting, Type0/CID, outlines, byte stability |
+| [09-pdf-writer.md](09-pdf-writer.md) | PDF writer | PDF 1.4 default / 1.7 & 2.0 opt-in, `--pdf-profile` claims, tagging/MCR, font subsetting, Type0/CID, outlines, byte stability |
 | [10-imageout-svg.md](10-imageout-svg.md) | Image output & SVG | raster path, TTF outline AA, SVG rasterization, fidelity limits vs PDF |
 
 ---

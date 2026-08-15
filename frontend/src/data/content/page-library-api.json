@@ -21,7 +21,7 @@
      "heading": "Dotted names and defaults",
      "body": "Both GlobalSettings.Set and ObjectSettings.Set take wkhtmltopdf-style dotted keys: size.pagesize, orientation, margin.top, header.left, footer.right, load.* and web.*. Unknown names return an error, and Get reads a key back in canonical string form. NewGlobalSettings and NewObjectSettings start from the upstream wkhtmltopdf defaults (A4 portrait, 10 mm margins, background on), mirroring upstream where implemented. The same examples/pdf example drives these calls from CLI-style flags, including the identical local file ACL pair.",
      "bullets": [
-      "Global keys: size.pagesize, margin.top, orientation, title, outline, enablelocalfileaccess, and the web.* / load.* families.",
+      "Global keys: size.pagesize, margin.top, orientation, title, pdfversion, pdfprofile, outline, enablelocalfileaccess, and the web.* / load.* families.",
       "Object keys: page, web.images, header.left, footer.right, load.jsdelay, load.blocklocalfileaccess, and friends.",
       "web.images=false set globally disables <img> fetch and paint in both PDF and image mode."
      ]
@@ -37,9 +37,15 @@
     },
     {
      "heading": "Typed builders",
-     "body": "For compile-time-checked configuration, NewPdfGlobalOptions returns a typed builder with WithPageSize, WithMargins, WithTitle, WithCopies, WithOutline, WithSmartShrinking, WithBackground, WithCompression and WithResolveRelativeLinks; Build() yields GlobalSettings. PDFRequest plus RunPDF is the type-safe one-shot API, writing output to an io.Writer instead of returning bytes."
+     "body": "For compile-time-checked configuration, NewPdfGlobalOptions returns a typed builder with WithPageSize, WithPDFVersion, WithPDFProfile, WithMargins, WithTitle, WithCopies, WithOutline, WithSmartShrinking, WithBackground, WithCompression and WithResolveRelativeLinks; Build() yields GlobalSettings. PDFRequest plus RunPDF is the type-safe one-shot API, writing output to an io.Writer instead of returning bytes. WithPDFVersion accepts \"1.4\" (default), \"1.7\", or \"2.0\" and stores the canonical token on pdfversion; version alone is not a PDF/A or PDF/UA claim. WithPDFProfile accepts aliases such as a3a-ua1 / a3a / ua1 (PDF 1.7) and a4-ua2 / a4 / ua2 (PDF 2.0), or the canonical names, and stores the canonical token on pdfprofile. After WithPDFProfile(\"a3a-ua1\"), Get(\"pdfprofile\") is \"PDF/A-3a+PDF/UA-1\"."
     }
    ]
+  },
+  {
+   "type": "code",
+   "heading": "PDF version and profile",
+   "language": "go",
+   "code": "opts := gowkhtmltopdf.NewPdfGlobalOptions().\n\tWithPDFVersion(\"1.7\").    // optional: \"1.4\" (default), \"1.7\", or \"2.0\"\n\tWithPDFProfile(\"a3a-ua1\") // aliases a3a, ua1, a4-ua2, a4, ua2 also work\nglobal := opts.Build()\nname, _ := global.Get(\"pdfprofile\") // \"PDF/A-3a+PDF/UA-1\", not \"a3a-ua1\"\n\n// Dotted keys are equivalent:\n_ = global.Set(\"pdfversion\", \"2.0\")\n_ = global.Set(\"pdfprofile\", \"a4-ua2\")"
   },
   {
    "type": "code",

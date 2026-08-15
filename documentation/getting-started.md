@@ -80,6 +80,35 @@ page-scoped flags):
 **first real page**, not to a TOC object. Later pages stay blocked unless
 you repeat the flag or use `--allow`. Details: [cli.md](cli.md#local-files).
 
+## PDF version and profile
+
+Default output is **unclaimed PDF 1.4**. `--pdf-version` changes the file
+version only; it is **not** a PDF/A or PDF/UA claim.
+
+```sh
+# still unclaimed PDF 1.4
+./bin/gowkhtmltopdf --enable-local-file-access \
+  testdata/golden/fixture-01-simple-invoice.html /tmp/invoice.pdf
+
+# version only (header / strings / non-claiming XMP — not a profile)
+./bin/gowkhtmltopdf --pdf-version 1.7 --enable-local-file-access \
+  testdata/golden/fixture-01-simple-invoice.html /tmp/invoice-17.pdf
+./bin/gowkhtmltopdf --pdf-version 2.0 --enable-local-file-access \
+  testdata/golden/fixture-01-simple-invoice.html /tmp/invoice-20.pdf
+
+# opt-in profiles (imply PDF 1.7 and 2.0 respectively)
+./bin/gowkhtmltopdf --pdf-profile a3a-ua1 --enable-local-file-access \
+  testdata/golden/fixture-01-simple-invoice.html /tmp/invoice-a3a-ua1.pdf
+./bin/gowkhtmltopdf --pdf-profile a4-ua2 --enable-local-file-access \
+  testdata/golden/fixture-01-simple-invoice.html /tmp/invoice-a4-ua2.pdf
+```
+
+Library: `WithPDFVersion("1.7")` / `WithPDFVersion("2.0")`,
+`WithPDFProfile("a3a-ua1")` / `WithPDFProfile("a4-ua2")`.
+Aliases such as `a3a-ua1` normalize to a canonical name on `Get("pdfprofile")`
+(for example `"PDF/A-3a+PDF/UA-1"`). Full flag and key tables:
+[cli.md](cli.md), [library-api.md](library-api.md).
+
 ## First image
 
 ```sh

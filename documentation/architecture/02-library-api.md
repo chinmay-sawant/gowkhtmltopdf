@@ -102,12 +102,14 @@ All are declared in one `var` block at api.go:27-48.
 | `type PdfGlobalOptions` | Typed builder alternative to string `Set` | api.go:68 |
 | `NewPdfGlobalOptions() *PdfGlobalOptions` | Starts from engine defaults | api.go:73 |
 | `WithPageSize / WithMargins / WithTitle / WithCopies / WithOutline / WithSmartShrinking / WithBackground / WithCompression / WithResolveRelativeLinks` | One fluent setter per common option; nil-receiver safe | api.go:77-149 |
+| `WithPDFVersion` / `WithPDFProfile` | Version (`"1.4"` / `"1.7"` / `"2.0"`) vs conformance (`a3a-ua1`, `a4-ua2`, …). Version is not a claim; profile is. Invalid values fail at convert/validate | api.go:232 / api.go:241 |
 | `Build() *GlobalSettings` | Independent settings snapshot (slices/maps cloned) | api.go:151 |
 
 The underlying implementation is `settings.PdfGlobalOptions`
-(`internal/settings/options.go:6`), where `Build` (options.go:73) deep-copies
+(`internal/settings/options.go:6`), where `Build` (options.go:106) deep-copies
 `ExcludeFromOutline`, `FontPaths`, and `Ignored` so the builder can be reused
-safely.
+safely. `WithPDFProfile` stores the **canonical** token (`a3a-ua1` →
+`PDF/A-3a+PDF/UA-1`); dotted `Get("pdfprofile")` returns that same token.
 
 ### 3.5 PDF converter
 

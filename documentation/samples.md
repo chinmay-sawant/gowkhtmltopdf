@@ -222,6 +222,23 @@ These files are **viewer smoke artifacts**, not golden byte masters. CI
 asserts structure through `make golden`, not binary equality against
 `output/`.
 
+### Version and compliance folders
+
+Not part of `make samples`. Manual viewer-smoke artifacts for the opt-in
+PDF version and profile flags live in four sibling dirs (same two fixtures:
+`fixture-21-detailed-report`, `fixture-56-architecture-diagram`). Inventory
+and regenerate commands: [`output/README.md`](../output/README.md).
+
+| Dir | Produced with | Meaning |
+|-----|---------------|---------|
+| [`output/pdf-1.7/`](../output/pdf-1.7/) | `--pdf-version 1.7` | Unclaimed PDF 1.7 |
+| [`output/pdf-1.7-compliance/`](../output/pdf-1.7-compliance/) | `--pdf-profile a3a-ua1` | PDF/A-3a + PDF/UA-1 |
+| [`output/pdf-2.0/`](../output/pdf-2.0/) | `--pdf-version 2.0` | Unclaimed PDF 2.0 |
+| [`output/pdf-2.0-compliance/`](../output/pdf-2.0-compliance/) | `--pdf-profile a4-ua2` | PDF/A-4 + PDF/UA-2 |
+
+These are **artifacts**, not golden byte baselines. A version flag is not a
+conformance claim; only the `-compliance/` dirs were written with a profile.
+
 ### Optional live smoke (also via `make samples` — not `make test`)
 
 The Wikipedia artifact is an **operator recipe**, not a CSS-fidelity claim.

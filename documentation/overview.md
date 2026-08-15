@@ -44,6 +44,7 @@ Remaining gaps live in [deferred.md](deferred.md). Progressive post-MVP goals
 - Text and nested HTML headers/footers with `[page]` / `[topage]` placeholders
 - TOC objects and PDF document outlines (bookmarks)
 - In-process embedding from Go (`RunPDF` / `Converter`)
+- Opt-in PDF 1.7 / 2.0 (`--pdf-version` / `WithPDFVersion`) and opt-in PDF/A + PDF/UA profiles (`--pdf-profile` / `WithPDFProfile`). Default output is **unclaimed PDF 1.4**; a version flag is not a conformance claim
 
 Typical path:
 
@@ -69,6 +70,8 @@ Chrome-quality print. See [fidelity.md — Arbitrary websites](fidelity.md#arbit
   `go-text/typesetting` (GSUB) with a presentation-form fallback; Indic is
   Partial; CJK needs a capable face on `--font-path`. See [fonts.md](fonts.md).
 - Pixel-identical WebKit / wkhtmltopdf / Chrome output.
+- An archival or accessible PDF by default. PDF/A and PDF/UA are **opt-in
+  profiles**; `--pdf-version` / `WithPDFVersion` alone does not claim them.
 - A wrapper around the `wkhtmltopdf` binary. That is a different product
   category — see
   [comparison-with-others/sebastiaanklippert-go-wkhtmltopdf.md](comparison-with-others/sebastiaanklippert-go-wkhtmltopdf.md).
@@ -93,7 +96,7 @@ input (file / URL / inline HTML)
         ▼
    paginate + paint    multi-page geometry (layout-owned)
         │
-        ├──────────────► internal/pdf        PDF write (1.4 default / 1.7 & 2.0 opt-in)
+        ├──────────────► internal/pdf        PDF write (1.4 default; 1.7 / 2.0 opt-in; profiles opt-in)
         │
         └──────────────► internal/imageout   PNG/JPEG raster
 ```
@@ -110,9 +113,9 @@ Domain deep-dives: [architecture/](architecture/).
 
 | Surface | Entry | Output |
 |---------|--------|--------|
-| PDF CLI | `cmd/gowkhtmltopdf` → `gowkhtmltopdf` | PDF (1.4 default / 1.7 & 2.0 opt-in) |
+| PDF CLI | `cmd/gowkhtmltopdf` → `gowkhtmltopdf` | PDF (unclaimed 1.4 default; 1.7 / 2.0 and PDF/A+UA profiles opt-in) |
 | Image CLI | `cmd/gowkhtmltoimage` → `gowkhtmltoimage` | PNG or JPEG |
-| Go API | module root package `gowkhtmltopdf` | PDF (1.4 default / 1.7 & 2.0 opt-in) or image in memory / `io.Writer` |
+| Go API | module root package `gowkhtmltopdf` | PDF (same version/profile rules) or image in memory / `io.Writer` |
 
 Both CLIs share `internal/cli` and `internal/settings`. The library never
 imports `internal/cli`. `cmd/` never imports the root package.
@@ -130,6 +133,7 @@ Supported for report HTML:
 - Report-subset flex, grid, float, relative/absolute/fixed, print-scoped sticky
 - Multicol lite, `:has()`, `@container` size queries
 - Text / HTML headers and footers, TOC, PDF outlines, internal and external links
+- PDF 1.4 default (unclaimed). Opt-in `--pdf-version 1.7` / `2.0` (version only). Opt-in `--pdf-profile a3a-ua1` / `a4-ua2` (claiming XMP, OutputIntent, tagged structure)
 - Local files (deny by default) and HTTP(S) with timeouts, body caps, optional restricted network policy
 
 Authoritative rows: [compatibility-matrix.md](compatibility-matrix.md).

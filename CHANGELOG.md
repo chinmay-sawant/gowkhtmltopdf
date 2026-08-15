@@ -6,6 +6,53 @@ binaries at build time (see README "Versioning").
 
 ## Unreleased
 
+PDF version and conformance-profile work after [0.2.1](#021-2026-08-14).
+Default output remains **unclaimed PDF 1.4**. `--pdf-version` `1.4` / `1.7` /
+`2.0` is a version header, **not** a conformance claim. The claim is
+`--pdf-profile` / `WithPDFProfile`. Encryption, AcroForm, and JavaScript
+remain out of scope.
+
+PRs: [#45](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/45),
+[#46](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/46),
+[#47](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/47).
+
+### Added
+
+- **PDF 1.7 profiles ([#45](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/45)):**
+  Opt-in PDF/A-3a, PDF/UA-1, and dual `a3a-ua1` via `--pdf-profile` /
+  `WithPDFProfile` (implies PDF 1.7). Claiming XMP (`pdfaid:part=3`,
+  `pdfaid:conformance=A`, `pdfuaid:part=1`), sRGB OutputIntent, `/DefaultRGB`,
+  MarkInfo, and a logical structure tree. Multi-page structure elements emit
+  MCR dictionaries; CIDFontType2 `/FontName` matches parent `/BaseFont`.
+- **PDF 2.0 and 2.0 profiles ([#46](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/46)):**
+  Opt-in `%PDF-2.0` via `--pdf-version 2.0` / `WithPDFVersion("2.0")`
+  (trailer `/ID`, UTF-8 document strings, non-claiming XMP). Opt-in PDF/A-4,
+  PDF/UA-2, and dual `a4-ua2` via `--pdf-profile` / `WithPDFProfile` (implies
+  PDF 2.0). Claiming XMP (`pdfaid:part=4` / `rev=2020`, `pdfuaid:part=2` /
+  `rev=2024`), sRGB+Gray OutputIntent, structure `/Namespace`, ListNumbering,
+  and dual named destinations (`/D` page + `/SD` structure).
+
+### Changed
+
+- **Profile Get and sentinels ([#47](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/47)):**
+  `Get("pdfprofile")` returns the canonical token (`a3a-ua1` →
+  `PDF/A-3a+PDF/UA-1`; `ua1` → `PDF/UA-1`; `a4-ua2` → `PDF/A-4+PDF/UA-2`;
+  and so on). Profile + wrong-version conflicts use unified
+  `ErrConformanceRequiresPDF17` / `ErrConformanceRequiresPDF20` (with
+  `ErrProfileRequiresPDF17` / `ErrProfileRequiresPDF20` aliases).
+  `ErrProfilePDF20Unsupported` remains defined for source compatibility but
+  is never returned — 2.0 profiles are supported.
+
+### Fixed
+
+- **Tagged PDF wiring ([#45](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/45),
+  [#47](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/47)):**
+  Structure-tree and Arlington CIDFontType2 FontName issues on the 1.7 path;
+  cloned-page MCIDs, link/outline `/SD` identity, single `/Document`, and
+  header/footer isolation from the body tree. List tags nest
+  `L` → `LI` → `LBody` → `Link` (inline links inside `<li>` are no longer
+  siblings of `LI`).
+
 ## 0.2.1 (2026-08-14)
 
 Contracts, print layout, and verification release. Tightens embedder public

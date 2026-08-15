@@ -709,7 +709,7 @@ on, images on, resolve-relative-links on.
 |-----|--------|
 | `title` | PDF `/Title` (HTML `<title>` feeds `[doctitle]` only) |
 | `pdfversion` | PDF output version: `"1.4"` (default), `"1.7"`, or `"2.0"`. `1.7` emits `%PDF-1.7`, trailer `/ID`, Info with UTF-16BE + BOM strings, and XMP Metadata stream. `2.0` emits `%PDF-2.0`, trailer `/ID`, UTF-8 document strings, and XMP metadata stream. |
-| `pdfprofile` | Conformance profile: `"PDF/A-3a"`, `"PDF/UA-1"`, `"PDF/A-3a+PDF/UA-1"`, `"PDF/A-4"`, `"PDF/UA-2"`, or `"PDF/A-4+PDF/UA-2"` (also accepts aliases `"a3a"`, `"ua1"`, `"a3a-ua1"`, `"a4"`, `"ua2"`, `"a4-ua2"`). Implies the required base version (`1.7` for A-3a/UA-1, `2.0` for A-4/UA-2). |
+| `pdfprofile` | Conformance claim (version alone is not). Set accepts short aliases (`"a3a"`, `"ua1"`, `"a3a-ua1"`, `"a4"`, `"ua2"`, `"a4-ua2"`) and the canonical names. **`Get("pdfprofile")` always returns the canonical token:** `"PDF/A-3a"`, `"PDF/UA-1"`, `"PDF/A-3a+PDF/UA-1"`, `"PDF/A-4"`, `"PDF/UA-2"`, or `"PDF/A-4+PDF/UA-2"` (empty when unset). Implies the required base version (`1.7` for A-3a/UA-1, `2.0` for A-4/UA-2). Profile + explicit wrong version fails with `ErrConformanceRequiresPDF17` / `ErrConformanceRequiresPDF20`. Tagged lists nest `L` → `LI` → `LBody` → `Link`. |
 | `copies`, `collate` | copies must be ≥ 1 |
 | `pageoffset` | integer page offset |
 | `grayscale`, `colormode` | both write the same grayscale bit (`color` / `grayscale`) |
@@ -1050,6 +1050,16 @@ Match with `errors.Is`. Wrapping preserves the sentinel.
 | `ErrMissingPDFOutlineOutput` | `dumpoutline` without `OutlineOutput` |
 | `ErrMissingImageOutput` | typed image (or image `ConvertTo`) without a sink |
 | `ErrNilContext` | nil `context.Context` on a cancellation-aware entry |
+| `ErrInvalidPDFVersion` | `pdfversion` / `WithPDFVersion` not `1.4` / `1.7` / `2.0` |
+| `ErrInvalidPDFProfile` | `pdfprofile` / `WithPDFProfile` not a known alias or canonical name |
+| `ErrProfilePDFA1Unsupported` | PDF/A-1 requested (unsupported) |
+| `ErrConformanceRequiresPDF17` | A-3a / UA-1 / `a3a-ua1` with an explicit non-1.7 version (`ErrProfileRequiresPDF17` is an alias) |
+| `ErrConformanceRequiresPDF20` | A-4 / UA-2 / `a4-ua2` with an explicit non-2.0 version (`ErrProfileRequiresPDF20` is an alias) |
+| `ErrTitleRequired` | PDF/UA profile with an empty document title |
+| `ErrPDFUAMissingAlt` | PDF/UA profile with a figure/image that has no alt text |
+
+`ErrProfilePDF20Unsupported` is still exported for source compatibility. It is
+**never returned**; PDF 2.0 profiles are supported.
 
 `ErrNilPDFRequest` does **not** alias `ErrNilConverter`.
 `ErrNilImageRequest` does **not** alias `ErrNilImageConverter`.

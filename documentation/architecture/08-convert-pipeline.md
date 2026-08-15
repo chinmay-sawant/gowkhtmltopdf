@@ -43,7 +43,8 @@ The pipeline it drives (mirroring wkhtmltopdf's `PdfConverterPrivate`):
 4. for each object: **prepare** (load → parse → stylesheets → @font-face)
    → **layout** (with smart-shrink retry) → paint ops into the shared
    single `pdf.Document` (constructed via `pdf.NewDocumentWithPolicy` with
-   the request's `WriterPolicy`);
+   the request's `WriterPolicy` from `PolicyForGlobal` — version and optional
+   `--pdf-profile`);
 5. assemble: TOC (two-pass page-count fixpoint) → outline → links → document
    info → copies → headers/footers;
 6. write the finished PDF to the `io.Writer` sink.
@@ -230,11 +231,16 @@ api.go Converter.Convert(ctx)
     ├─ load.NewLoaderWithError(req.Global.Load)          proxy policy fails fast
     ├─ pdf.DefaultFont() + loadFontRegistry(...)         embedded font + --font-path
     ├─ runContext{ ... single pdf.NewDocumentWithPolicy(policy) ... }
-    │        policy := PolicyForGlobal(req.Global)        convert.go:229-260:
-    │                                                     "1.4"/"" → PDF14 (default),
+    │        policy := PolicyForGlobal(req.Global)        convert.go:254:
+    │                                                     empty version + empty profile
+    │                                                     → unclaimed PDF14 (default);
     │                                                     "1.7" → PDF17, "2.0" → PDF20;
-    │                                                     garbage → ErrInvalidPDFVersion
-    │                                                     before any document exists
+    │                                                     `--pdf-profile` / PdfProfile
+    │                                                     implies 1.7 (A-3a/UA-1) or 2.0
+    │                                                     (A-4/UA-2); version alone is
+    │                                                     not a claim; garbage version
+    │                                                     → ErrInvalidPDFVersion before
+    │                                                     any document exists
     └─ render.Run(ctx, &pdfPipeline{run})                render/pipeline.go:26
        ├─ stage 1 RenderObjects → run.renderObjects      convert.go:270
        │    ├─ per TOC object:  initTOCState (geometry, HF, effective TOC, margins)

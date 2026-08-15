@@ -28,7 +28,7 @@ and **[fidelity.md](fidelity.md)**.
 | Document | Purpose |
 |----------|---------|
 | [overview.md](overview.md) | Product overview, design principles, pipeline, binaries |
-| [getting-started.md](getting-started.md) | Install, first PDF/PNG, local files, HTTP URLs, tests |
+| [getting-started.md](getting-started.md) | Install, first PDF/PNG, local files, HTTP URLs, PDF version/profile, tests |
 | [cli.md](cli.md) | `gowkhtmltopdf` / `gowkhtmltoimage` grammar, flags, pitfalls |
 | [library-api.md](library-api.md) | Go API: `RunPDF` / `Converter`, settings, errors |
 | [fidelity.md](fidelity.md) | Tiers, claims language, degrade rules, Phase 21 URL print |

@@ -36,10 +36,18 @@ const CAPABILITIES = [
 ]
 
 const OUTPUTS = [
-  ['PDF', 'Multi-page documents with print-oriented layout'],
+  ['PDF', 'PDF 1.4 by default; opt-in 1.7, 2.0, and archival/accessible profiles'],
   ['PNG / JPEG', 'Raster output for previews and image workflows'],
   ['CLI + API', 'Drop-in command line ergonomics or native Go control'],
   ['CGO=0', 'Static, portable builds without a browser dependency'],
+]
+
+const OUTPUT_FLAVOURS = [
+  { id: 'default', label: 'Default 1.4', flag: null, write: 'write PDF 1.4' },
+  { id: '1.7', label: 'PDF 1.7', flag: '--pdf-version 1.7', write: 'write PDF 1.7 (unclaimed)' },
+  { id: '2.0', label: 'PDF 2.0', flag: '--pdf-version 2.0', write: 'write PDF 2.0 (unclaimed)' },
+  { id: 'a3a-ua1', label: 'PDF/A-3a+UA-1', flag: '--pdf-profile a3a-ua1', write: 'write PDF/A-3a+UA-1' },
+  { id: 'a4-ua2', label: 'PDF/A-4+UA-2', flag: '--pdf-profile a4-ua2', write: 'write PDF/A-4+UA-2' },
 ]
 
 export default function LandingPage() {
@@ -47,7 +55,10 @@ export default function LandingPage() {
   const [margins, setMargins] = useState('default')
   const [orientation, setOrientation] = useState('Portrait')
   const [security, setSecurity] = useState('safe')
+  const [outputFlavour, setOutputFlavour] = useState('default')
   const [copied, setCopied] = useState(false)
+
+  const flavour = OUTPUT_FLAVOURS.find((item) => item.id === outputFlavour) ?? OUTPUT_FLAVOURS[0]
 
   const commandLines = useMemo(() => {
     const lines = ['$ gowkhtmltopdf \\']
@@ -69,6 +80,10 @@ export default function LandingPage() {
       lines.push('  --enable-local-file-access \\')
     }
 
+    if (flavour.flag) {
+      lines.push(`  ${flavour.flag} \\`)
+    }
+
     lines.push('  report.html report.pdf')
     lines.push('')
 
@@ -76,12 +91,12 @@ export default function LandingPage() {
     const marginNote =
       margins === 'zero' ? '0mm margins' : margins === 'custom' ? '15mm margins' : '10mm margins'
     lines.push(`${secNote} -> parse -> style -> layout`)
-    lines.push(`paginate [${pageSize} ${orientation}, ${marginNote}] -> paint -> write PDF 1.4`)
+    lines.push(`paginate [${pageSize} ${orientation}, ${marginNote}] -> paint -> ${flavour.write}`)
     lines.push('')
     lines.push('wrote report.pdf')
 
     return lines.join('\n')
-  }, [pageSize, margins, orientation, security])
+  }, [pageSize, margins, orientation, security, flavour])
 
   const rawCommand = useMemo(() => {
     const parts = ['gowkhtmltopdf', `--page-size ${pageSize}`]
@@ -98,9 +113,12 @@ export default function LandingPage() {
     if (security === 'local') {
       parts.push('--enable-local-file-access')
     }
+    if (flavour.flag) {
+      parts.push(flavour.flag)
+    }
     parts.push('report.html report.pdf')
     return parts.join(' ')
-  }, [pageSize, margins, orientation, security])
+  }, [pageSize, margins, orientation, security, flavour])
 
   const handleCopy = () => {
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
@@ -237,6 +255,24 @@ export default function LandingPage() {
                     onClick={() => setSecurity(s.id)}
                   >
                     {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="sandbox-control-group">
+              <span className="sandbox-label">Output:</span>
+              <div className="sandbox-chips" role="radiogroup" aria-label="Output flavour selection">
+                {OUTPUT_FLAVOURS.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={outputFlavour === item.id}
+                    className={`sandbox-chip ${outputFlavour === item.id ? 'active' : ''}`}
+                    onClick={() => setOutputFlavour(item.id)}
+                  >
+                    {item.label}
                   </button>
                 ))}
               </div>

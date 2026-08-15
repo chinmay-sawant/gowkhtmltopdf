@@ -68,7 +68,7 @@
     },
     {
      "heading": "5. Write: internal/pdf or internal/imageout",
-     "body": "PDF mode writes PDF 1.4 with zlib Flate streams, an embedded Liberation Sans subset with /Widths in 1000 units/em, link annotations, and a valid xref. Image mode rasterizes the same display list to PNG or JPEG. Both paths are orchestrated by internal/convert."
+     "body": "PDF mode writes unclaimed PDF 1.4 by default, with zlib Flate streams, an embedded Liberation Sans subset with /Widths in 1000 units/em, link annotations, and a valid xref. Opt-in `--pdf-version 1.7` / `2.0` (or `WithPDFVersion`) change the file version only — that is not a PDF/A or PDF/UA claim. Opt-in `--pdf-profile` / `WithPDFProfile` (`a3a-ua1`, `a4-ua2`, and aliases) add claiming XMP, ICC OutputIntent, and tagging. Image mode rasterizes the same display list to PNG or JPEG. Both paths are orchestrated by internal/convert."
     }
    ]
   },

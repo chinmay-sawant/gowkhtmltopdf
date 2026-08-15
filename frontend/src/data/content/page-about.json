@@ -13,7 +13,7 @@
    "items": [
     {
      "title": "v0.2.1",
-     "body": "Phases 0-9 plus the print CSS subset (tiers 1-2) are implemented: load, parse, style, layout, paginate, paint, and PDF 1.4 write, plus PNG/JPEG image mode. The `VERSION` file is the single source of truth and is stamped into the CLI at build time."
+     "body": "Phases 0-9 plus the print CSS subset (tiers 1-2) are implemented: load, parse, style, layout, paginate, paint, and PDF write (unclaimed PDF 1.4 by default; opt-in 1.7 / 2.0 and opt-in PDF/A-3a, PDF/A-4, PDF/UA-1, PDF/UA-2, ICC OutputIntent on master), plus PNG/JPEG image mode. The `VERSION` file is still 0.2.1 and is stamped into the CLI at build time."
     },
     {
      "title": "Repeatable layout",
@@ -79,8 +79,13 @@
      "Not planned"
     ],
     [
-     "PDF encryption / PDF/A / ICC",
-     "Absent, out of original scope",
+     "PDF/A-3a, PDF/A-4, PDF/UA-1, PDF/UA-2, ICC OutputIntent",
+     "Shipped opt-in on master (`--pdf-profile` / `WithPDFProfile`; aliases `a3a-ua1`, `a3a`, `ua1`, `a4-ua2`, `a4`, `ua2`). Default remains unclaimed PDF 1.4; version alone is not a claim",
+     "On the current tree (not a 0.2.2 release)"
+    ],
+    [
+     "PDF encryption / signatures",
+     "Out of scope; no writer support on any version. AcroForm stays on the forms row",
      "Not planned"
     ],
     [
