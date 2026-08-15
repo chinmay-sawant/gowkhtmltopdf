@@ -35,15 +35,15 @@ func TestCanonicalProfileAndHelpers(t *testing.T) {
 		{input: "pdfa-3a", wantCanon: ProfilePDFA3a, wantPDFA3: true, wantPDFUA1: false, wantPDFA4: false, wantPDFUA2: false, wantCompl: true},
 		{input: "pdf-a-3a", wantCanon: ProfilePDFA3a, wantPDFA3: true, wantPDFUA1: false, wantPDFA4: false, wantPDFUA2: false, wantCompl: true},
 		{input: "a-3a", wantCanon: ProfilePDFA3a, wantPDFA3: true, wantPDFUA1: false, wantPDFA4: false, wantPDFUA2: false, wantCompl: true},
-		{input: "pdf/a-3", wantCanon: ProfilePDFA3a, wantPDFA3: true, wantPDFUA1: false, wantPDFA4: false, wantPDFUA2: false, wantCompl: true},
-		{input: "a3", wantCanon: ProfilePDFA3a, wantPDFA3: true, wantPDFUA1: false, wantPDFA4: false, wantPDFUA2: false, wantCompl: true},
+		{input: "pdf/a-3", wantCanon: "", wantPDFA3: false, wantPDFUA1: false, wantPDFA4: false, wantPDFUA2: false, wantCompl: false},
+		{input: "a3", wantCanon: "", wantPDFA3: false, wantPDFUA1: false, wantPDFA4: false, wantPDFUA2: false, wantCompl: false},
 		// PDF/UA-1 aliases
 		{input: "PDF/UA-1", wantCanon: ProfilePDFUA1, wantPDFA3: false, wantPDFUA1: true, wantPDFA4: false, wantPDFUA2: false, wantCompl: true},
 		{input: "pdf/ua-1", wantCanon: ProfilePDFUA1, wantPDFA3: false, wantPDFUA1: true, wantPDFA4: false, wantPDFUA2: false, wantCompl: true},
 		{input: "ua1", wantCanon: ProfilePDFUA1, wantPDFA3: false, wantPDFUA1: true, wantPDFA4: false, wantPDFUA2: false, wantCompl: true},
 		{input: "pdfua-1", wantCanon: ProfilePDFUA1, wantPDFA3: false, wantPDFUA1: true, wantPDFA4: false, wantPDFUA2: false, wantCompl: true},
 		{input: "ua-1", wantCanon: ProfilePDFUA1, wantPDFA3: false, wantPDFUA1: true, wantPDFA4: false, wantPDFUA2: false, wantCompl: true},
-		{input: "pdf/ua", wantCanon: ProfilePDFUA1, wantPDFA3: false, wantPDFUA1: true, wantPDFA4: false, wantPDFUA2: false, wantCompl: true},
+		{input: "pdf/ua", wantCanon: "", wantPDFA3: false, wantPDFUA1: false, wantPDFA4: false, wantPDFUA2: false, wantCompl: false},
 		// 1.7 Dual profile aliases
 		{input: "PDF/A-3a+PDF/UA-1", wantCanon: ProfilePDFA3aPDFUA1, wantPDFA3: true, wantPDFUA1: true, wantPDFA4: false, wantPDFUA2: false, wantCompl: true},
 		{input: "pdf/a-3a+pdf/ua-1", wantCanon: ProfilePDFA3aPDFUA1, wantPDFA3: true, wantPDFUA1: true, wantPDFA4: false, wantPDFUA2: false, wantCompl: true},

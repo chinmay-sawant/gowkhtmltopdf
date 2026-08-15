@@ -1,8 +1,8 @@
 // Package gowkhtmltopdf converts HTML documents to PDF (and to raster
 // images) from Go. It is a pure-Go reimplementation of the wkhtmltopdf
 // command-line tools: no cgo, no browser process, and no Qt/WebKit. The
-// engine produces PDF 1.4 by default, with opt-in support for PDF 1.7 and
-// PDF/A-3a + PDF/UA-1 compliance profiles. The runtime is the Go standard library
+// engine produces PDF 1.4 by default, with opt-in support for PDF 1.7, PDF 2.0,
+// and PDF/A-3a/4 + PDF/UA-1/2 compliance profiles. The runtime is the Go standard library
 // plus two allowlisted pure-Go modules — github.com/go-text/typesetting (OpenType shaping)
 // and github.com/tdewolff/canvas (SVG-as-image rasterization).
 //

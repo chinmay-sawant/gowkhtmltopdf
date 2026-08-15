@@ -27,11 +27,10 @@ testdata/golden/
   fixture-55-lantern-cooperative-report.html # self-contained pure HTML/CSS operations brief
   fixture-56-architecture-diagram.html      # 20-page architecture diagram, linked CSS
   fixture-56-architecture-diagram.css       # linked stylesheet for fixture-56
-  architecture-diagram.html                 # library-API architecture HTML mirror (from api/)
+  architecture-diagram.html                 # corpus fixture (5-page library-API diagram); not written by api/generate.go
   api/                                      # library-API generator (go run ./testdata/golden/api; also make samples)
-    architecture-diagram.html               # source template (5 pages)
-    architecture-diagram.pdf                # regenerated golden PDF beside the template
-    generate.go
+    architecture-diagram.html               # source template for the generator (5 pages)
+    generate.go                             # writes output/architecture-diagram.pdf only
   font-examples.html                        # 13 Google Fonts showcase (inline style; fonts not bundled; --font-path driven)
   out/                  # generated PDFs (gitignored)
 ```

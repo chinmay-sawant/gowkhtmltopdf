@@ -15,6 +15,7 @@ import (
 	"gowkhtmltopdf/internal/load"
 	"gowkhtmltopdf/internal/outline"
 	"gowkhtmltopdf/internal/pdf"
+	"gowkhtmltopdf/internal/pdfprofile"
 	"gowkhtmltopdf/internal/settings"
 )
 
@@ -174,7 +175,7 @@ func (r *Request) Validate() error {
 		return err
 	}
 
-	if _, err := policyForGlobal(r.Global); err != nil {
+	if _, err := PolicyForGlobal(r.Global); err != nil {
 		return err
 	}
 
@@ -189,36 +190,24 @@ const (
 
 // ErrProfileRequiresPDF17 indicates a 1.7-era compliance profile was requested
 // with a PDF version other than 1.7 (1.4 or 2.0).
-var ErrProfileRequiresPDF17 = errors.New("settings: compliance profiles require PDF 1.7")
+var ErrProfileRequiresPDF17 = pdf.ErrConformanceRequiresPDF17
 
 // ErrProfileRequiresPDF20 indicates a 2.0-era compliance profile was requested
 // with a PDF version other than 2.0 (1.4 or 1.7).
-var ErrProfileRequiresPDF20 = errors.New("settings: compliance profiles require PDF 2.0")
-
-func isPDF17ComplianceProfile(canonical string) bool {
-	return canonical == settings.ProfilePDFA3a ||
-		canonical == settings.ProfilePDFUA1 ||
-		canonical == settings.ProfilePDFA3aPDFUA1
-}
-
-func isPDF20ComplianceProfile(canonical string) bool {
-	return canonical == settings.ProfilePDFA4 ||
-		canonical == settings.ProfilePDFUA2 ||
-		canonical == settings.ProfilePDFA4PDFUA2
-}
+var ErrProfileRequiresPDF20 = pdf.ErrConformanceRequiresPDF20
 
 // policyForProfile builds a WriterPolicy for a known compliance profile,
 // rejecting explicit version strings that conflict with the profile base.
 func policyForProfile(glob settings.PdfGlobal, canonicalProfile string) (pdf.WriterPolicy, error) {
 	switch {
-	case isPDF17ComplianceProfile(canonicalProfile):
+	case pdfprofile.IsPDFA3(canonicalProfile) || pdfprofile.IsPDFUA1(canonicalProfile):
 		return compliancePolicy(
-			glob, canonicalProfile, pdf.PDF17, pdfVersion17, ErrProfileRequiresPDF17,
+			glob, canonicalProfile, pdf.PDF17, pdfVersion17, pdf.ErrConformanceRequiresPDF17,
 			pdfVersion14, pdfVersion20,
 		)
-	case isPDF20ComplianceProfile(canonicalProfile):
+	case pdfprofile.IsPDFA4(canonicalProfile) || pdfprofile.IsPDFUA2(canonicalProfile):
 		return compliancePolicy(
-			glob, canonicalProfile, pdf.PDF20, pdfVersion20, ErrProfileRequiresPDF20,
+			glob, canonicalProfile, pdf.PDF20, pdfVersion20, pdf.ErrConformanceRequiresPDF20,
 			pdfVersion14, pdfVersion17,
 		)
 	default:
@@ -231,19 +220,20 @@ func compliancePolicy(
 	glob settings.PdfGlobal,
 	canonicalProfile string,
 	version pdf.PDFVersion,
-	impliedVersion string,
+	_ string,
 	conflictErr error,
 	forbiddenVersions ...string,
 ) (pdf.WriterPolicy, error) {
-	for _, forbidden := range forbiddenVersions {
-		if glob.PdfVersion == forbidden {
-			return pdf.WriterPolicy{}, conflictErr
-		}
-	}
-
-	if glob.PdfVersion != "" && glob.PdfVersion != impliedVersion {
-		if _, err := settings.ParsePDFVersion(glob.PdfVersion); err != nil {
+	if glob.PdfVersion != "" {
+		parsedVersion, err := settings.ParsePDFVersion(glob.PdfVersion)
+		if err != nil {
 			return pdf.WriterPolicy{}, err //nolint:wrapcheck // sentinel error from settings
+		}
+
+		for _, forbidden := range forbiddenVersions {
+			if parsedVersion == forbidden {
+				return pdf.WriterPolicy{}, conflictErr
+			}
 		}
 	}
 
@@ -287,11 +277,6 @@ func PolicyForGlobal(glob settings.PdfGlobal) (pdf.WriterPolicy, error) {
 		return pdf.WriterPolicy{},
 			fmt.Errorf("%w: %q", settings.ErrInvalidPDFVersion, version)
 	}
-}
-
-// policyForGlobal maps the requested PDF version and profile to a pdf.WriterPolicy.
-func policyForGlobal(glob settings.PdfGlobal) (pdf.WriterPolicy, error) {
-	return PolicyForGlobal(glob)
 }
 
 // ValidateRenderableObjects applies the shared input invariant used by both
@@ -399,7 +384,7 @@ func Run(ctx context.Context, req *Request, log io.Writer, progress func(phase s
 		return fmt.Errorf("default font: %w", err)
 	}
 
-	policy, err := policyForGlobal(req.Global)
+	policy, err := PolicyForGlobal(req.Global)
 	if err != nil {
 		return fmt.Errorf("pdf policy: %w", err)
 	}

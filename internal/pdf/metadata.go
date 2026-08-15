@@ -8,7 +8,15 @@ import (
 )
 
 func xmlEscape(text string) string {
+	if !strings.ContainsAny(text, "&<>\"'") {
+		return text
+	}
+
+	const xmlSlack = 8
+
 	var buf strings.Builder
+
+	buf.Grow(len(text) + xmlSlack)
 
 	for _, rVal := range text {
 		switch rVal {
@@ -39,7 +47,11 @@ func (d *Document) buildXMPMetadata() []byte {
 
 	dateStr := now.UTC().Format("2006-01-02T15:04:05Z")
 
+	const xmpEstSize = 1024
+
 	var buf bytes.Buffer
+
+	buf.Grow(xmpEstSize)
 
 	buf.WriteString("<?xpacket begin=\"\xef\xbb\xbf\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?>\n")
 	buf.WriteString("<x:xmpmeta xmlns:x=\"adobe:ns:meta/\">\n")
@@ -49,8 +61,8 @@ func (d *Document) buildXMPMetadata() []byte {
 	buf.WriteString("    xmlns:pdf=\"http://ns.adobe.com/pdf/1.3/\"\n")
 	buf.WriteString("    xmlns:xmp=\"http://ns.adobe.com/xap/1.0/\"")
 
-	hasPDFA := d.policy.IsPDFA3() || d.policy.IsPDFA4()
-	hasPDFUA := d.policy.IsPDFUA1() || d.policy.IsPDFUA2()
+	hasPDFA := d.isPDFA3 || d.isPDFA4
+	hasPDFUA := d.isUA1 || d.isUA2
 
 	if hasPDFA {
 		buf.WriteString("\n    xmlns:pdfaid=\"http://www.aiim.org/pdfa/ns/id/\"")
@@ -105,17 +117,17 @@ func (d *Document) buildXMPMetadata() []byte {
 		fmt.Fprintf(&buf, "   <pdf:Keywords>%s</pdf:Keywords>\n", xmlEscape(keywords))
 	}
 
-	if d.policy.IsPDFA3() {
+	if d.isPDFA3 {
 		buf.WriteString("   <pdfaid:part>3</pdfaid:part>\n")
 		buf.WriteString("   <pdfaid:conformance>A</pdfaid:conformance>\n")
-	} else if d.policy.IsPDFA4() {
+	} else if d.isPDFA4 {
 		buf.WriteString("   <pdfaid:part>4</pdfaid:part>\n")
 		buf.WriteString("   <pdfaid:rev>2020</pdfaid:rev>\n")
 	}
 
-	if d.policy.IsPDFUA1() {
+	if d.isUA1 {
 		buf.WriteString("   <pdfuaid:part>1</pdfuaid:part>\n")
-	} else if d.policy.IsPDFUA2() {
+	} else if d.isUA2 {
 		buf.WriteString("   <pdfuaid:part>2</pdfuaid:part>\n")
 		buf.WriteString("   <pdfuaid:rev>2024</pdfuaid:rev>\n")
 	}
@@ -138,7 +150,7 @@ func (d *Document) buildXMPMetadata() []byte {
 			"</pdfaProperty:description>\n")
 		buf.WriteString("        </rdf:li>\n")
 
-		if d.policy.IsPDFUA2() {
+		if d.isUA2 {
 			buf.WriteString("        <rdf:li rdf:parseType=\"Resource\">\n")
 			buf.WriteString("         <pdfaProperty:name>rev</pdfaProperty:name>\n")
 			buf.WriteString("         <pdfaProperty:valueType>Integer</pdfaProperty:valueType>\n")

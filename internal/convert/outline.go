@@ -217,12 +217,34 @@ func bodyStateFor(bodies []*objectState, page int) *objectState {
 // Tree headings retain object-local Page and carry document-global DocPage.
 // For PDF/UA-2, heading StructElems are matched in document order so outline
 // items can carry /SD (structure destination) references.
+//
+//nolint:cyclop,varnamelen,wsl // outline tree construction and structure element matching
 func emitOutline(doc *pdf.Document, tree *outline.Node, bodies []*objectState, tocTotal int) *pdf.Outline {
 	root := &pdf.Outline{} //nolint:exhaustruct // intentional zero-value fields
 
-	// Collect heading StructElems for PDF/UA-2 structure destination binding.
+	allHeadings := flatHeadings(bodies)
 	headingElems := doc.HeadingStructElems()
-	headingIdx := 0
+	headingMap := make(map[*outline.Heading]*pdf.StructElem, len(allHeadings))
+
+	if len(allHeadings) == len(headingElems) {
+		for i, h := range allHeadings {
+			headingMap[h] = headingElems[i]
+		}
+	} else {
+		elemIdx := 0
+		for _, h := range allHeadings {
+			targetPage := tocTotal + h.DocPage
+			for elemIdx < len(headingElems) {
+				elem := headingElems[elemIdx]
+				elemIdx++
+				if elem.Page != nil && doc.PageAt(targetPage) == elem.Page {
+					headingMap[h] = elem
+
+					break
+				}
+			}
+		}
+	}
 
 	var conv func(n *outline.Node) *pdf.Outline
 
@@ -240,10 +262,8 @@ func emitOutline(doc *pdf.Document, tree *outline.Node, bodies []*objectState, t
 			obj.X, obj.Y = stVal.geom.pdfXY(loc)
 		}
 
-		// Match heading StructElem in document order for PDF/UA-2 /SD.
-		if headingIdx < len(headingElems) {
-			obj.StructElem = headingElems[headingIdx]
-			headingIdx++
+		if elem, ok := headingMap[hVal]; ok {
+			obj.StructElem = elem
 		}
 
 		for _, c := range num.Children {
@@ -252,6 +272,7 @@ func emitOutline(doc *pdf.Document, tree *outline.Node, bodies []*objectState, t
 
 		return obj
 	}
+
 	for _, c := range tree.Children {
 		root.Children = append(root.Children, conv(c))
 	}

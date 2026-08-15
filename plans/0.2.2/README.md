@@ -6,6 +6,7 @@
 | [pdf-1.7-compliance-plan/](pdf-1.7-compliance-plan/) | Highest **1.7** conformance: **PDF/A-3a + PDF/UA-1** — **completed** |
 | [pdf-2.0-plan/](pdf-2.0-plan/) | **[#32](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/32)** PDF 2.0 version support — **completed** |
 | [pdf-a4-ua2-compliance-plan.md](pdf-2.0-plan/pdf-a4-ua2-compliance-plan.md) | **[#33](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/33)** Highest **2.0** conformance: **PDF/A-4 + PDF/UA-2** — **completed** |
+| [criticality-optimization-checklist.md](criticality-optimization-checklist.md) | Post-#45/#46 criticality + optimization follow-up (no new claims) — **completed** |
 
 Workflow: [../../skills/phase-wise-checklist/SKILLS.md](../../skills/phase-wise-checklist/SKILLS.md)
 

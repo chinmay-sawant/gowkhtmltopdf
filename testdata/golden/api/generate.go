@@ -1,14 +1,18 @@
-// Command generate renders the library API architecture template to PDF and
-// keeps the sample / golden mirrors in sync.
+// Command generate renders the library API architecture template to PDF.
 //
 // Run from the repository root (also invoked by `make samples`):
 //
 //	go run ./testdata/golden/api
 //
 // Writes (overwriting if present):
-//  1. testdata/golden/api/architecture-diagram.pdf — beside the source template
-//  2. output/architecture-diagram.pdf — sample viewer artifact
-//  3. testdata/golden/architecture-diagram.html — golden corpus HTML mirror
+//  1. output/architecture-diagram.pdf — sample viewer artifact
+//
+// It does not write testdata/golden/architecture-diagram.html or
+// testdata/golden/api/architecture-diagram.pdf. The HTML corpus fixture is
+// separate. fixture-56-architecture-diagram.html is a third, 20-page
+// template. The only HTML this command reads is
+// testdata/golden/api/architecture-diagram.html. Pass -output to send the
+// PDF somewhere else; testdata/golden stays a source tree.
 package main
 
 import (
@@ -27,12 +31,10 @@ import (
 
 const (
 	apiDirectory    = "testdata/golden/api"
-	goldenDirectory = "testdata/golden"
 	sampleDirectory = "output"
 	inputName       = "architecture-diagram.html"
 	outputName      = "architecture-diagram.pdf"
 	pdfFileMode     = 0o600
-	htmlFileMode    = 0o600
 	wantPages       = 5
 )
 
@@ -52,7 +54,7 @@ func main() {
 
 func run(args []string) error { //nolint:cyclop,funlen // generator phases
 	flags := flag.NewFlagSet("generate", flag.ContinueOnError)
-	output := flags.String("output", "", "primary PDF output path (default: beside the template)")
+	output := flags.String("output", "", "PDF output path (default: output/architecture-diagram.pdf)")
 
 	if err := flags.Parse(args); err != nil {
 		return fmt.Errorf("parse flags: %w", err)
@@ -62,7 +64,7 @@ func run(args []string) error { //nolint:cyclop,funlen // generator phases
 		return fmt.Errorf("%w: %v", errUnexpectedArguments, flags.Args())
 	}
 
-	input, defaultOutput, repoRoot, err := resolveTemplatePaths()
+	input, defaultOutput, _, err := resolveTemplatePaths()
 	if err != nil {
 		return err
 	}
@@ -110,33 +112,12 @@ func run(args []string) error { //nolint:cyclop,funlen // generator phases
 		return fmt.Errorf("%w: %s pages = %d, want %d", errUnexpectedPageCount, input, got, wantPages)
 	}
 
-	pdfTargets := uniquePaths(*output, filepath.Join(repoRoot, sampleDirectory, outputName))
-	for _, target := range pdfTargets {
-		if err := writeFile(target, pdf, pdfFileMode); err != nil {
-			return fmt.Errorf("write PDF %s: %w", target, err)
-		}
-
-		if _, err := fmt.Fprintf(os.Stdout, "generated %s (%d pages, %d bytes)\n", target, wantPages, len(pdf)); err != nil {
-			return fmt.Errorf("report generation: %w", err)
-		}
+	if err := writeFile(*output, pdf, pdfFileMode); err != nil {
+		return fmt.Errorf("write PDF %s: %w", *output, err)
 	}
 
-	templateBytes, err := os.ReadFile(input)
-	if err != nil {
-		return fmt.Errorf("read template for golden mirror: %w", err)
-	}
-
-	goldenTemplate := filepath.Join(repoRoot, goldenDirectory, inputName)
-	if samePath(input, goldenTemplate) {
-		return nil
-	}
-
-	if err := writeFile(goldenTemplate, templateBytes, htmlFileMode); err != nil {
-		return fmt.Errorf("write golden template %s: %w", goldenTemplate, err)
-	}
-
-	if _, err := fmt.Fprintf(os.Stdout, "mirrored template %s -> %s\n", input, goldenTemplate); err != nil {
-		return fmt.Errorf("report template mirror: %w", err)
+	if _, err := fmt.Fprintf(os.Stdout, "generated %s (%d pages, %d bytes)\n", *output, wantPages, len(pdf)); err != nil {
+		return fmt.Errorf("report generation: %w", err)
 	}
 
 	return nil
@@ -194,6 +175,13 @@ func samePath(a, b string) bool {
 	return absA == absB
 }
 
+// isAPITemplate reports whether path is the library-API source
+// (testdata/golden/api/architecture-diagram.html), not the same-named
+// corpus fixture at testdata/golden/architecture-diagram.html.
+func isAPITemplate(path string) bool {
+	return filepath.Base(filepath.Dir(path)) == "api" && filepath.Base(path) == inputName
+}
+
 // resolveTemplatePaths accepts invocation from the repository root, the api
 // directory itself, or a compiled copy whose source directory is available.
 // The returned input is absolute so the loader cannot reinterpret it as an
@@ -247,11 +235,17 @@ func resolveTemplatePaths() (input, defaultOutput, repoRoot string, err error) {
 			return "", "", "", fmt.Errorf("%w: %s", errTemplateDirectory, absolute)
 		}
 
+		if !isAPITemplate(absolute) {
+			// testdata/golden/architecture-diagram.html shares the basename
+			// but is a corpus fixture, not this generator's source.
+			continue
+		}
+
 		apiDir := filepath.Dir(absolute)
 		// template lives at <repo>/testdata/golden/api/<file>
 		root := filepath.Dir(filepath.Dir(filepath.Dir(apiDir)))
 
-		return absolute, filepath.Join(apiDir, outputName), root, nil
+		return absolute, filepath.Join(root, sampleDirectory, outputName), root, nil
 	}
 
 	return "", "", "", fmt.Errorf("%w %q; checked %s", errTemplateNotFound, inputName, strings.Join(checked, ", "))

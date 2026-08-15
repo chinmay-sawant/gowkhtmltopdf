@@ -138,12 +138,11 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 
 	populateLocations(res, contentH, opPage)
 
-	opMap, err := buildStructureTree(doc, res)
-	if err != nil {
+	if err := buildStructureTree(doc, res); err != nil {
 		return err
 	}
 
-	return paintPages(ctx, doc, res, opts, contentH, fixedIdx, opMap)
+	return paintPages(ctx, doc, res, opts, contentH, fixedIdx)
 }
 
 // fixedOpIndices collects the indices of viewport-fixed ops, which are
@@ -257,28 +256,27 @@ func pageBuckets(ops []Op, contentH float64) ([]int, []int) {
 	return pageOf, counts
 }
 
-// contentSizeHint estimates the content-stream bytes a page's ops will emit:
-// a fixed per-op operator budget plus the escaped text payload (most runes
-// emit one byte, escaped to at most four).
-func contentSizeHint(ops []Op, groups ...[]int) int {
-	const opBudget = 64
+// contentSizeHint estimates initial Content buffer size from display list ops.
+func contentSizeHint(ops []Op, pageIdxs, fixedIdxs []int) int {
+	const (
+		bytesPerTextOp  = 128
+		bytesPerOtherOp = 64
+		minCapacity     = 1024
+	)
 
-	const avgEscapedRuneBytes = 2
+	estimate := (len(pageIdxs) + len(fixedIdxs)) * bytesPerOtherOp
 
-	size := 0
-
-	for _, group := range groups {
-		for _, idx := range group {
-			op := &ops[idx]
-			size += opBudget
-
-			if op.Kind == OpText || op.Kind == OpBullet {
-				size += len(op.Text) * avgEscapedRuneBytes
-			}
+	for _, idx := range pageIdxs {
+		if idx >= 0 && idx < len(ops) && ops[idx].Kind == OpText {
+			estimate += bytesPerTextOp
 		}
 	}
 
-	return size
+	if estimate < minCapacity {
+		return minCapacity
+	}
+
+	return estimate
 }
 
 // paintPages paints every page: page content ops first, then the fixed layer
@@ -289,7 +287,7 @@ func contentSizeHint(ops []Op, groups ...[]int) int {
 //nolint:funlen // one pass per page; shared paint/resName closures cover content and fixed layers
 func paintPages(
 	ctx context.Context, doc *pdf.Document, res *Result, opts PaintOptions,
-	contentH float64, fixedIdx []int, opMap map[int]*opTagInfo,
+	contentH float64, fixedIdx []int,
 ) error {
 	var paintErr error
 
@@ -306,6 +304,7 @@ func paintPages(
 	var page *pdf.Page
 
 	pageOrder := make([]int, 0)
+	isUA := doc != nil && doc.IsUA()
 
 	resName := func(face *pdf.Font) string {
 		if face == nil {
@@ -350,7 +349,7 @@ func paintPages(
 			resName:  resName,
 			nextImg:  0,
 			err:      paintErr,
-			opMap:    opMap,
+			isUA:     isUA,
 		}
 
 		for _, idx := range pageOrder {
@@ -358,7 +357,7 @@ func paintPages(
 				return fmt.Errorf("layout: paint context: %w", err)
 			}
 
-			painter.paintOp(idx, &res.Ops[idx])
+			painter.paintOp(&res.Ops[idx])
 		}
 		// Fixed layer: page-local coords (pageIdx 0 math on every page).
 		painter.pageN = 0
@@ -368,7 +367,7 @@ func paintPages(
 				return fmt.Errorf("layout: paint context: %w", err)
 			}
 
-			painter.paintOp(idx, &res.Ops[idx])
+			painter.paintOp(&res.Ops[idx])
 		}
 
 		paintErr = painter.err
@@ -387,27 +386,21 @@ type pagePainter struct {
 	resName  func(*pdf.Font) string
 	nextImg  int
 	err      error
-	opMap    map[int]*opTagInfo
+	isUA     bool
 }
 
-//nolint:cyclop,funlen,nestif,wsl // marked content and opacity/transform wrapping for ops
-func (p *pagePainter) paintOp(opIdx int, paintOp *Op) {
+//nolint:cyclop // marked content and opacity/transform wrapping for ops
+func (p *pagePainter) paintOp(paintOp *Op) {
 	if paintOp.Kind == opKindNoop {
 		return
 	}
 
-	tagInfo := p.opMap[opIdx]
+	elem := paintOp.StructElem
 
 	if paintOp.Kind == OpLinkURI {
 		ref := drawLinkXform(p.page, paintOp, p.pageN, p.contentH, p.opts)
-		if ref != 0 {
-			elem := paintOp.StructElem
-			if elem == nil && tagInfo != nil {
-				elem = tagInfo.elem
-			}
-			if elem != nil {
-				elem.SetObjRef(ref, p.page)
-			}
+		if ref != 0 && elem != nil {
+			elem.SetObjRef(ref, p.page)
 		}
 
 		return
@@ -427,23 +420,21 @@ func (p *pagePainter) paintOp(opIdx int, paintOp *Op) {
 		p.child.SetOpacity(paintOp.PaintOpacity)
 	}
 
-	isUA := p.page != nil && p.page.Doc() != nil && (p.page.Doc().Policy().IsPDFUA1() || p.page.Doc().Policy().IsPDFUA2())
-
 	switch {
-	case isUA && tagInfo != nil && paintOp.Kind != OpFillRect && paintOp.Kind != OpStrokeRect && paintOp.Kind != OpLine:
-		mcid := p.page.AllocMCID(tagInfo.elem)
-		p.child.BeginMarkedContent(string(tagInfo.tag), mcid)
+	case p.isUA && elem != nil && paintOp.Kind != OpFillRect && paintOp.Kind != OpStrokeRect && paintOp.Kind != OpLine:
+		mcid := p.page.AllocMCID(elem)
+		p.child.BeginMarkedContent(string(elem.Tag), mcid)
 		p.drawPageOp(paintOp)
 		p.child.EndMarkedContent()
-	case isUA && paintOp.Kind == OpFillRect:
+	case p.isUA && paintOp.Kind == OpFillRect:
 		p.child.BeginArtifact("Background")
 		p.drawPageOp(paintOp)
 		p.child.EndArtifact()
-	case isUA && (paintOp.Kind == OpStrokeRect || paintOp.Kind == OpLine):
+	case p.isUA && (paintOp.Kind == OpStrokeRect || paintOp.Kind == OpLine):
 		p.child.BeginArtifact("Layout")
 		p.drawPageOp(paintOp)
 		p.child.EndArtifact()
-	case isUA:
+	case p.isUA:
 		p.child.BeginArtifact("Layout")
 		p.drawPageOp(paintOp)
 		p.child.EndArtifact()

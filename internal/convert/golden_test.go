@@ -411,7 +411,7 @@ var fixturePageBounds = map[string]fixtureBounds{ //nolint:gochecknoglobals // i
 	"complex-css.html": { //nolint:exhaustruct // catalog stress fixture
 		minPages: 1, maxPages: 40, needles: []string{"Alexandria"},
 	},
-	"architecture-diagram.html": { //nolint:exhaustruct // library architecture template
+	"architecture-diagram.html": { //nolint:exhaustruct // corpus fixture; not written by testdata/golden/api
 		minPages: 1, maxPages: 12, needles: []string{"Architecture"},
 	},
 	"fixture-56-architecture-diagram.html": { //nolint:exhaustruct // intentional zero-value fields

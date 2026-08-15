@@ -708,7 +708,8 @@ on, images on, resolve-relative-links on.
 | Key | Notes |
 |-----|--------|
 | `title` | PDF `/Title` (HTML `<title>` feeds `[doctitle]` only) |
-| `pdfversion` | PDF output version: `"1.4"` (default), `"1.7"`, or `"2.0"`. `1.7` emits `%PDF-1.7`, trailer `/ID`, Info with UTF-16BE + BOM strings, and non-claiming XMP Metadata stream. `2.0` emits `%PDF-2.0`, trailer `/ID`, UTF-8 document strings, and non-claiming XMP. `2.0` is a version, **not** PDF/A-4 or PDF/UA-2 (#33) |
+| `pdfversion` | PDF output version: `"1.4"` (default), `"1.7"`, or `"2.0"`. `1.7` emits `%PDF-1.7`, trailer `/ID`, Info with UTF-16BE + BOM strings, and XMP Metadata stream. `2.0` emits `%PDF-2.0`, trailer `/ID`, UTF-8 document strings, and XMP metadata stream. |
+| `pdfprofile` | Conformance profile: `"PDF/A-3a"`, `"PDF/UA-1"`, `"PDF/A-3a+PDF/UA-1"`, `"PDF/A-4"`, `"PDF/UA-2"`, or `"PDF/A-4+PDF/UA-2"` (also accepts aliases `"a3a"`, `"ua1"`, `"a3a-ua1"`, `"a4"`, `"ua2"`, `"a4-ua2"`). Implies the required base version (`1.7` for A-3a/UA-1, `2.0` for A-4/UA-2). |
 | `copies`, `collate` | copies must be ≥ 1 |
 | `pageoffset` | integer page offset |
 | `grayscale`, `colormode` | both write the same grayscale bit (`color` / `grayscale`) |

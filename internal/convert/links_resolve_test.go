@@ -71,7 +71,8 @@ func TestBuildBodyIDIndexKeepsLaterDuplicate(t *testing.T) {
 			ids: map[string]layout.ElementLocation{
 				"duplicate": {Node: nil, Page: 0, X: 1, Y: 0, W: 0, H: 0},
 			},
-			links: nil,
+			idElems: nil,
+			links:   nil,
 		},
 	}
 	later := &objectState{ //nolint:exhaustruct // test needs only indexed destination
@@ -79,7 +80,8 @@ func TestBuildBodyIDIndexKeepsLaterDuplicate(t *testing.T) {
 			ids: map[string]layout.ElementLocation{
 				"duplicate": {Node: nil, Page: 1, X: 2, Y: 0, W: 0, H: 0},
 			},
-			links: nil,
+			idElems: nil,
+			links:   nil,
 		},
 	}
 

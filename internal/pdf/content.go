@@ -325,6 +325,10 @@ func (c *Content) SetFont(name string, size float64) {
 // with this font are subset-embedded into the PDF.
 func (c *Content) UseEmbeddedFont(name string, f *Font) {
 	c.fontFiles[name] = f
+	if c.doc != nil && f != nil {
+		c.doc.recordFontFace(name, f)
+	}
+
 	if c.fontUses[name] == "" {
 		c.fontUses[name] = ""
 	}

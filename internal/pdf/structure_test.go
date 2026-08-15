@@ -68,8 +68,8 @@ func TestTaggedPDFUA1Structure(t *testing.T) {
 
 	// Link
 	linkElem := docElem.NewChild(StructTypeLink)
-	page.AddLinkURI([4]float64{50, 400, 200, 420}, "https://example.com")
-	linkElem.SetAnnotation(page, 0)
+	linkRef := page.AddLinkURI([4]float64{50, 400, 200, 420}, "https://example.com")
+	linkElem.SetObjRef(linkRef, page)
 	mcidLink := page.AllocMCID(linkElem)
 
 	// Draw content stream with marked content sequences
@@ -938,5 +938,139 @@ func TestAnnotationComplianceFlagsAndOBJR(t *testing.T) {
 
 	if !strings.Contains(outStr, wantOBJR2) {
 		t.Errorf("StructElem missing OBJR 2 %q", wantOBJR2)
+	}
+}
+
+func TestDuplicatePagePDFUA(t *testing.T) {
+	t.Parallel()
+
+	doc, err := NewDocumentWithPolicy(WriterPolicy{
+		Version:            PDF17,
+		ConformanceProfile: "PDF/UA-1",
+	})
+	if err != nil {
+		t.Fatalf("NewDocumentWithPolicy: %v", err)
+	}
+
+	doc.SetInfo("Title", "Duplicate Page UA Test")
+	page := doc.AddPage(600, 800)
+
+	root := doc.CreateStructTreeRoot()
+	docElem := root.NewChild(StructTypeDocument)
+	h1 := docElem.NewChild(StructTypeH1)
+	mcidH1 := page.AllocMCID(h1)
+
+	pElem := docElem.NewChild(StructTypeP)
+	mcidP := page.AllocMCID(pElem)
+
+	c := page.Content()
+	c.BeginMarkedContent("H1", mcidH1)
+	c.TextAt(50, 700)
+	c.TextShow("Heading 1")
+	c.EndMarkedContent()
+
+	c.BeginMarkedContent("P", mcidP)
+	c.TextAt(50, 650)
+	c.TextShow("Paragraph")
+	c.EndMarkedContent()
+
+	cloned, err := doc.DuplicatePage(0)
+	if err != nil {
+		t.Fatalf("DuplicatePage: %v", err)
+	}
+
+	if len(cloned.mcids) != len(page.mcids) {
+		t.Fatalf("cloned.mcids len = %d, want %d", len(cloned.mcids), len(page.mcids))
+	}
+
+	var buf bytes.Buffer
+	if err := doc.Write(&buf); err != nil {
+		t.Fatalf("doc.Write: %v", err)
+	}
+
+	outStr := buf.String()
+
+	if !strings.Contains(outStr, "/StructParents 0") || !strings.Contains(outStr, "/StructParents 1") {
+		t.Errorf("Document missing StructParents for original and clone")
+	}
+
+	if !strings.Contains(outStr, "/Type /MCR /Pg") {
+		t.Errorf("Document missing MCR dictionary for multi-page structure elements")
+	}
+}
+
+func TestDuplicatePageDefault14Isolation(t *testing.T) {
+	t.Parallel()
+
+	doc := NewDocument()
+	doc.SetInfo("Title", "Duplicate Page 1.4 Test")
+	page := doc.AddPage(600, 800)
+
+	c := page.Content()
+	c.TextAt(50, 700)
+	c.TextShow("Hello 1.4")
+
+	page.AddLinkURI([4]float64{50, 700, 200, 720}, "https://example.com")
+
+	_, err := doc.DuplicatePage(0)
+	if err != nil {
+		t.Fatalf("DuplicatePage: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if err := doc.Write(&buf); err != nil {
+		t.Fatalf("doc.Write: %v", err)
+	}
+
+	outStr := buf.String()
+
+	if strings.Contains(outStr, "/StructTreeRoot") {
+		t.Errorf("Default 1.4 emitted /StructTreeRoot")
+	}
+	if strings.Contains(outStr, "/ParentTree") {
+		t.Errorf("Default 1.4 emitted /ParentTree")
+	}
+	if strings.Contains(outStr, "/StructParents") {
+		t.Errorf("Default 1.4 emitted /StructParents")
+	}
+	if strings.Contains(outStr, "/Tabs /S") {
+		t.Errorf("Default 1.4 with links leaked /Tabs /S")
+	}
+}
+
+func TestDefaultPathIsolation(t *testing.T) {
+	t.Parallel()
+
+	doc := NewDocument()
+	if root := doc.CreateStructTreeRoot(); root != nil {
+		t.Errorf("doc.CreateStructTreeRoot() on 1.4 = %v, want nil", root)
+	}
+
+	if elems := doc.HeadingStructElems(); elems != nil {
+		t.Errorf("doc.HeadingStructElems() on 1.4 = %v, want nil", elems)
+	}
+
+	page := doc.AddPage(600, 800)
+	dummyElem := &StructElem{Tag: StructTypeP} //nolint:exhaustruct // test dummy
+	if mcid := page.AllocMCID(dummyElem); mcid != -1 {
+		t.Errorf("page.AllocMCID() on 1.4 = %d, want -1", mcid)
+	}
+
+	page.AddLinkURI([4]float64{50, 500, 200, 520}, "https://example.com")
+
+	var buf bytes.Buffer
+	if err := doc.Write(&buf); err != nil {
+		t.Fatalf("doc.Write: %v", err)
+	}
+
+	outStr := buf.String()
+	if strings.Contains(outStr, "/StructTreeRoot") {
+		t.Errorf("Default 1.4 emitted /StructTreeRoot")
+	}
+	if strings.Contains(outStr, "/ParentTree") {
+		t.Errorf("Default 1.4 emitted /ParentTree")
+	}
+	if strings.Contains(outStr, "/Tabs /S") {
+		t.Errorf("Default 1.4 emitted /Tabs /S")
 	}
 }
