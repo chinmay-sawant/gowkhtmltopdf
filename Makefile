@@ -90,8 +90,9 @@ golden-update:
 
 # Regenerate the sample outputs in output/: one PDF per golden fixture, a
 # showcase PDF (TOC + headers/footers + outline), the library-API architecture
-# diagram (sample PDF + golden HTML mirror), image PNGs, and the optional live
-# Wikipedia smoke (needs network; failure does not fail the target).
+# diagram PDF (output/architecture-diagram.pdf only; does not rewrite testdata/golden HTML),
+# image PNGs, and the optional live Wikipedia smoke (needs network; failure
+# does not fail the target).
 samples:
 	# Wipe regenerable fixture samples only (wiki-*.pdf is rewritten below).
 	rm -f output/fixture-*.pdf output/fixture-*.png output/showcase-*.pdf output/architecture-diagram.pdf
@@ -113,8 +114,8 @@ samples:
 		go run ./cmd/gowkhtmltopdf --enable-local-file-access $$FONT_FLAGS $$HF_FLAGS "$$f" "output/$$name.pdf"; \
 	done
 	go run ./cmd/gowkhtmltopdf --enable-local-file-access --outline --outline-depth 2 --header-left "gowkhtmltopdf demo - [title]" --header-right "page [page]/[topage]" --footer-center "[section]" toc testdata/golden/fixture-16-invoice-with-css.html output/showcase-toc-hf-outline.pdf
-	# Library-API architecture diagram: golden PDF beside the template, sample
-	# PDF in output/, and HTML mirror at testdata/golden/architecture-diagram.html.
+	# Library-API architecture diagram → output/architecture-diagram.pdf only.
+	# testdata/golden HTML (corpus fixture and api/ template) is not rewritten.
 	go run ./testdata/golden/api
 	go run ./cmd/gowkhtmltoimage --enable-local-file-access testdata/golden/fixture-01-simple-invoice.html output/fixture-01-simple-invoice.png
 	go run ./examples/image --enable-local-file-access --width 1024 testdata/golden/fixture-21-detailed-report.html output/fixture-21-detailed-report.png

@@ -73,12 +73,13 @@ happen to share a `fixture-*` name.
 |------|------|----------|
 | [`font-examples.html`](../testdata/golden/font-examples.html) | Font-path showcase (faces not bundled; `--font-path` / `fontpath`) | 1–30 pages |
 | [`complex-css.html`](../testdata/golden/complex-css.html) | Large CSS surface / catalog stress (needle `Alexandria`) | 1–40 pages |
-| [`architecture-diagram.html`](../testdata/golden/architecture-diagram.html) | Library-API architecture template (needle `Architecture`); mirrored from `testdata/golden/api/` by `make samples` / `go run ./testdata/golden/api` | 1–12 pages |
+| [`architecture-diagram.html`](../testdata/golden/architecture-diagram.html) | Corpus fixture for the 5-page library-API architecture (needle `Architecture`). Distinct from `testdata/golden/api/architecture-diagram.html` and from fixture-56. | 1–12 pages |
 
 `testdata/golden/api/` holds the library-API architecture generator
 (`go run ./testdata/golden/api`). It is not part of the `*.html` walk at the
-corpus root, but `make samples` runs it to refresh the sample PDF, the
-golden PDF beside the template, and the HTML mirror above.
+corpus root. `make samples` runs it to refresh `output/architecture-diagram.pdf`
+only — it does not rewrite the corpus fixture above or write a PDF under
+`testdata/golden/`.
 
 ### Fixture groups
 
@@ -203,10 +204,10 @@ make samples
 4. Writes two PNGs:
    - `output/fixture-01-simple-invoice.png` via `gowkhtmltoimage`
    - `output/fixture-21-detailed-report.png` via `examples/image`
-5. Runs `go run ./testdata/golden/api` to refresh the library-API architecture
-   diagram: `output/architecture-diagram.pdf`,
-   `testdata/golden/api/architecture-diagram.pdf`, and the HTML mirror
-   `testdata/golden/architecture-diagram.html` (overwrites if present).
+5. Runs `go run ./testdata/golden/api` to refresh
+   `output/architecture-diagram.pdf` only. It does **not** rewrite
+   `testdata/golden/architecture-diagram.html` or write a PDF under
+   `testdata/golden/api/`.
 6. Optionally refreshes `output/wiki-ana-de-armas.pdf` from the live
    Wikipedia URL **without** `--simplify-dom`, with `--use-system-fonts` and
    `--zoom 0.666667`. Network is required; **soft-fail** if the fetch fails

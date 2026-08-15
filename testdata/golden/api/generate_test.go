@@ -20,9 +20,9 @@ func TestResolveTemplatePathsFromAPIDirectory(t *testing.T) {
 	}
 
 	wantInput := filepath.Join(workingDir, inputName)
-	wantOutput := filepath.Join(workingDir, outputName)
 	// go test runs with package directory as CWD: .../testdata/golden/api
 	wantRoot := filepath.Dir(filepath.Dir(filepath.Dir(workingDir)))
+	wantOutput := filepath.Join(wantRoot, sampleDirectory, outputName)
 
 	if input != wantInput || output != wantOutput {
 		t.Fatalf("resolved paths = %q, %q; want %q, %q", input, output, wantInput, wantOutput)
@@ -62,5 +62,20 @@ func TestSamePath(t *testing.T) {
 
 	if samePath(a, filepath.Join(dir, "other.html")) {
 		t.Fatal("samePath reported distinct files as equal")
+	}
+}
+
+func TestIsAPITemplateRejectsCorpusFixture(t *testing.T) {
+	t.Parallel()
+
+	apiHTML := filepath.Join("testdata", "golden", "api", inputName)
+	corpusHTML := filepath.Join("testdata", "golden", inputName)
+
+	if !isAPITemplate(apiHTML) {
+		t.Fatalf("isAPITemplate(%q) = false; want true", apiHTML)
+	}
+
+	if isAPITemplate(corpusHTML) {
+		t.Fatalf("isAPITemplate(%q) = true; want false", corpusHTML)
 	}
 }
