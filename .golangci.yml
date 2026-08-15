@@ -24,6 +24,10 @@ issues:
   # Report every finding (default caps hide most of an enable-all run).
   max-issues-per-linter: 0
   max-same-issues: 0
+  # npm install drops a vendored Go file under flatted; never lint that tree.
+  exclude-dirs:
+    - node_modules
+    - frontend/dist
 
 output:
   sort-results: true

@@ -93,7 +93,7 @@
     ],
     [
      "lint",
-     "golangci-lint run ./... with the pinned version (default v1.64.8); installs the pinned binary when missing"
+     "golangci-lint run ./... with the pinned version (default v1.64.8), then frontend npm run lint (ESLint plus src/data content and config checks)"
     ],
     [
      "fmt",

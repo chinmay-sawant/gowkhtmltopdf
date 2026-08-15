@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { SEVERITY_META, STATUS_META } from '../data/constants'
-import RichText, { highlightText } from './RichText'
+import RichText from './RichText'
+import { highlightText } from './highlightText'
 
 function SeverityBadge({ severity }) {
   const meta = SEVERITY_META[severity]
