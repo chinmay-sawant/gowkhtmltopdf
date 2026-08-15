@@ -19,8 +19,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/tdewolff/canvas"                      //nolint:depguard // sole SVG raster path, allowlisted (Makefile)
-	"github.com/tdewolff/canvas/renderers/rasterizer" //nolint:depguard // sole SVG raster path, allowlisted (Makefile)
+	"github.com/tdewolff/canvas"
+	"github.com/tdewolff/canvas/renderers/rasterizer"
 )
 
 const (
