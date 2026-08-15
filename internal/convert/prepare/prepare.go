@@ -68,6 +68,11 @@ func NewResourceContext(loader *load.Loader, base string, loadPage settings.Load
 	return resources
 }
 
+// Bound is the authoritative load seam (not the deprecated snapshot fields).
+func (r ResourceContext) Bound() load.ResourceContext {
+	return r.resource
+}
+
 // Fetch resolves and loads a document-relative subresource.
 //
 //nolint:wsl // resource validation flow

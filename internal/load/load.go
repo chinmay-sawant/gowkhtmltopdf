@@ -203,6 +203,21 @@ func (l *Loader) ForResource(res *Resource, pageLoad settings.LoadPage) Resource
 	return ResourceContext{loader: l, base: base, pageLoad: cloneLoadPage(pageLoad)}
 }
 
+// Loader is the owner of fetches for this document.
+func (c ResourceContext) Loader() *Loader {
+	return c.loader
+}
+
+// Base is the resolved document URL used for relative refs.
+func (c ResourceContext) Base() string {
+	return c.base
+}
+
+// PageLoad is the cloned per-page policy used for subresources.
+func (c ResourceContext) PageLoad() settings.LoadPage {
+	return c.pageLoad
+}
+
 // Fetch resolves ref against the document base and fetches it using the
 // document's load policy.
 func (c ResourceContext) Fetch(ctx context.Context, ref string) (*Resource, error) {

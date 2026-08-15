@@ -128,10 +128,11 @@ func TestPrepareDocumentBindsSharedResourceContext(t *testing.T) { //nolint:cycl
 		t.Fatal("preparation did not return the document")
 	}
 
-	if prep.Resources.Loader != loader ||
-		prep.Resources.Base != lineP.InlineBase ||
-		!reflect.DeepEqual(prep.Resources.Load, lineP) {
-		t.Fatalf("resource context = %+v, want loader/base/load binding", prep.Resources)
+	bound := prep.Resources.Bound()
+	if bound.Loader() != loader ||
+		bound.Base() != lineP.InlineBase ||
+		!reflect.DeepEqual(bound.PageLoad(), lineP) {
+		t.Fatalf("resource context = %+v, want loader/base/load binding", bound)
 	}
 
 	if len(prep.Sheets) != 1 || len(prep.Sheets[0].Rules) == 0 {

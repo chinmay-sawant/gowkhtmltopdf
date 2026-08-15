@@ -258,13 +258,11 @@ func loadHTMLHF(ctx context.Context, loader *load.Loader, font *pdf.Font, state 
 		return &htmlHFLayout{skip: true}, state.registry, nil //nolint:exhaustruct // intentional zero-value fields
 	}
 
-	if state.resources.Loader != nil {
-		loader = state.resources.Loader
-	}
-
 	lineP := state.lp
-	if state.resources.Loader != nil {
-		lineP = state.resources.Load
+
+	if bound := state.resources.Bound(); bound.Loader() != nil {
+		loader = bound.Loader()
+		lineP = bound.PageLoad()
 	}
 
 	res, err := loader.Load(ctx, rawOrURL, lineP)
