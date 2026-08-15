@@ -71,8 +71,8 @@
 }
 
 .statband-label {
-  font-family: var(--mono);
-  font-size: 11px;
+  font-family: var(--sans);
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--muted);
@@ -110,9 +110,9 @@
 }
 
 .bento-card p {
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.6;
-  color: var(--muted);
+  color: var(--ink-2);
   letter-spacing: -0.005em;
 }
 
@@ -310,7 +310,7 @@ html[data-theme='dark'] .callout-tip {
   font-weight: 500;
   cursor: pointer;
   backdrop-filter: blur(6px);
-  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
 .code-copy-btn:hover {

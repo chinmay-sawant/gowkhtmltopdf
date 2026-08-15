@@ -94,7 +94,7 @@ export default function SiteNav() {
               <circle cx="8.5" cy="8.5" r="5.5" />
               <path d="M13 13l4 4" />
             </svg>
-            <span className="nav-search-label">Search...</span>
+            <span className="nav-search-label">Search…</span>
             <kbd className="nav-search-kbd">{isMac ? '⌘K' : 'Ctrl+K'}</kbd>
           </button>
 
@@ -189,7 +189,7 @@ export default function SiteNav() {
               <circle cx="8.5" cy="8.5" r="5.5" />
               <path d="M13 13l4 4" />
             </svg>
-            <span>Search documentation & flags...</span>
+            <span>Search documentation & flags…</span>
             <kbd>{isMac ? '⌘K' : 'Ctrl+K'}</kbd>
           </button>
 

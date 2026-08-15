@@ -114,7 +114,7 @@
   border: 1px solid var(--line);
   border-radius: 9999px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: color 0.15s, background 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
 
 .coverage-stat-pill:hover {
@@ -259,9 +259,10 @@ html[data-theme='dark'] .coverage-segment.segment-not-implemented {
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-.dossier-search-input:focus {
+.dossier-search-input:focus-visible {
   border-color: var(--focus);
-  outline: none;
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 20%, transparent);
 }
 
@@ -275,8 +276,8 @@ html[data-theme='dark'] .coverage-segment.segment-not-implemented {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 32px;
+  height: 32px;
   border: none;
   background: var(--soft);
   color: var(--muted);
@@ -317,8 +318,8 @@ html[data-theme='dark'] .coverage-segment.segment-not-implemented {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-family: var(--mono);
-  font-size: 12px;
+  font-family: var(--sans);
+  font-size: 13px;
   color: var(--muted);
 }
 
@@ -331,9 +332,10 @@ html[data-theme='dark'] .coverage-segment.segment-not-implemented {
   border: 1px solid var(--line);
   border-radius: 6px;
   color: var(--ink);
-  font-family: var(--mono);
-  font-size: 12px;
-  padding: 6px 10px;
+  font-family: var(--sans);
+  font-size: 13px;
+  padding: 8px 10px;
+  min-height: 40px;
   cursor: pointer;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
@@ -342,9 +344,10 @@ html[data-theme='dark'] .coverage-segment.segment-not-implemented {
   border-color: var(--sep);
 }
 
-.sort-select:focus {
+.sort-select:focus-visible {
   border-color: var(--focus);
-  outline: none;
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent);
 }
 
@@ -791,15 +794,15 @@ html[data-theme='dark'] .page-btn.active {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 32px;
+  height: 32px;
   border: 1px solid transparent;
   border-radius: 4px;
   background: transparent;
   color: var(--muted);
   cursor: pointer;
   padding: 0;
-  transition: all 0.15s ease;
+  transition: color 0.15s, background 0.15s, border-color 0.15s, box-shadow 0.15s;
   position: relative;
 }
 

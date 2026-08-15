@@ -6,6 +6,11 @@
 
 html {
   scroll-behavior: smooth;
+  color-scheme: light;
+}
+
+html[data-theme='dark'] {
+  color-scheme: dark;
 }
 
 :focus-visible {
@@ -23,16 +28,18 @@ html {
   border-radius: 6px;
   background: var(--ink);
   color: var(--bg);
-  font-family: var(--mono);
-  font-size: 12px;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 600;
   text-decoration: none;
   border: none;
   cursor: pointer;
   line-height: normal;
+  min-height: 44px;
   transition: transform 0.2s ease-out;
 }
 
-.skip-link:focus {
+.skip-link:focus-visible {
   transform: translateY(0);
 }
 
@@ -40,11 +47,19 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--sans);
+  font-size: 16px;
   line-height: 1.65;
   font-weight: 400;
   letter-spacing: -0.005em;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+}
+
+button,
+a,
+[role='button'],
+[role='radio'] {
+  touch-action: manipulation;
 }
 
 button,

@@ -5,7 +5,7 @@
   --soft: #e8ece9;
   --ink: #1c2522;
   --ink-2: #3f4c47;
-  --muted: #617069;
+  --muted: #4a5a54;
   --sep: #b8c2bc;
   --line: #dce3de;
   --accent: #176b59;
@@ -24,9 +24,9 @@
   --nav-tint: #f8f9f8;
   --shadow: 0 14px 32px rgba(24, 37, 32, 0.07);
   --mix-base: white;
-  --serif: 'Newsreader', 'Playfair Display', 'Instrument Serif', Georgia, serif;
+  --serif: 'Newsreader', Georgia, 'Times New Roman', serif;
   --sans: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif;
-  --mono: 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 }
 
 html[data-theme='dark'] {

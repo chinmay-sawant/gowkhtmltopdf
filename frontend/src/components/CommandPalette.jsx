@@ -578,7 +578,7 @@ export default function CommandPalette() {
             ref={inputRef}
             type="text"
             className="palette-input"
-            placeholder="Search documentation, CLI flags, samples, actions..."
+            placeholder="Search documentation, CLI flags, samples, actions…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleInputKeyDown}
