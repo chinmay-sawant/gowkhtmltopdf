@@ -2,7 +2,7 @@
   <img src="docs/logo.png" width="168" height="168" alt="Go WKHTML to PDF" />
 </p>
 
-<h1 align="center">Go WKHTML to PDF</h1>
+<h1 align="center">gowkhtmltopdf</h1>
 
 gowkhtmltopdf is a no-cgo HTML→PDF and HTML→image converter and HTML template engine
 for **structured templates and documents**: invoices, receipts, certificates,
