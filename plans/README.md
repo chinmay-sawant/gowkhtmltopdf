@@ -8,6 +8,7 @@ Implementation plans and roadmaps for `gowkhtmltopdf`, partitioned by release ve
 | [0.2.0/](0.2.0/README.md) | **v0.2.0 Post-MVP, Performance & Reviews** — phases 10–23, performance optimizations, architecture audits, and frontend improvements | Shipped core; leftovers stay in 0.2.0 or move with a `[~]` pointer |
 | [0.2.1/](0.2.1/README.md) | **v0.2.1 Contracts, print layout, and verification** — phases 24–30 | Complete (Released 2026-08-14) |
 | [0.2.2/](0.2.2/README.md) | **v0.2.2 Newer PDF versions** — PDF 1.7 (#31), PDF 2.0 (#32), 1.7/2.0 compliance (#33); criticality/optimization follow-up | Complete; [release notes](0.2.2/PR/release-v0.2.2.md) |
+| [0.2.3/](0.2.3/README.md) | **v0.2.3** — same engine as 0.2.2; GitHub module path / `go install` | [release notes](0.2.3/PR/release-v0.2.3.md) |
 
 ---
 
@@ -44,3 +45,8 @@ Implementation plans and roadmaps for `gowkhtmltopdf`, partitioned by release ve
 - [pdf-1.7-compliance-plan/](0.2.2/pdf-1.7-compliance-plan/) — Highest 1.7 conformance: PDF/A-3a + PDF/UA-1
 - [pdf-2.0-plan/](0.2.2/pdf-2.0-plan/) — Issue #32 PDF 2.0 version support
 - [criticality-optimization-checklist.md](0.2.2/criticality-optimization-checklist.md) — Post-#45/#46 criticality and optimization follow-up
+
+## 0.2.3
+
+- [0.2.3 README](0.2.3/README.md)
+- [PR/release-v0.2.3.md](0.2.3/PR/release-v0.2.3.md) — GitHub release body

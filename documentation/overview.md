@@ -15,7 +15,7 @@ standard library plus
 shaping) and [`tdewolff/canvas`](https://github.com/tdewolff/canvas) (SVG
 rasterization). Builds are intended to run with `CGO_ENABLED=0`.
 
-**Status:** **v0.2.2** is the current release (`VERSION`). Phases 0–9 of the
+**Status:** **v0.2.3** is the current release (`VERSION`). Phases 0–9 of the
 [canonical plan](../plans/0.1.0/00-canonical-pure-go-rewrite.md) are implemented.
 Tier 1 and Tier 2 core (phases 10–20) are shipped as a print CSS subset.
 PRs #45–#47 add opt-in `--pdf-version` 1.7 / 2.0 and `--pdf-profile`
