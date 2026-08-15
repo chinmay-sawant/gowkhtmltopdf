@@ -1,4 +1,4 @@
-# <img src="docs/gopher.gif" width="48" height="48" alt="" /> gowkhtmltopdf
+# <img src="docs/gopher.gif" width="32" height="32" align="absmiddle" alt="" /> gowkhtmltopdf
 
 gowkhtmltopdf is a no-cgo HTML→PDF and HTML→image converter and HTML template engine
 for **structured templates and documents**: invoices, receipts, certificates,
