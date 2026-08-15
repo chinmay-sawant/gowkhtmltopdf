@@ -151,14 +151,15 @@ export default function Cardbox({ item, onClose }) {
   }, [])
 
   useEffect(() => {
+    const opener = openerRef.current
     const prevOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     closeRef.current?.focus()
 
     return () => {
       document.body.style.overflow = prevOverflow
-      if (openerRef.current && typeof openerRef.current.focus === 'function') {
-        openerRef.current.focus()
+      if (opener && typeof opener.focus === 'function') {
+        opener.focus()
       }
     }
   }, [])

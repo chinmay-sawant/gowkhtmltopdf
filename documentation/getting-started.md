@@ -236,7 +236,7 @@ Worked programs: [`examples/pdf`](../examples/pdf/) and
 
 ```sh
 make test      # go test ./...
-make lint      # golangci-lint (installs a pinned version if missing)
+make lint      # golangci-lint, then frontend npm run lint (installs a pinned Go linter if missing)
 make golden    # fixture structure + feature checks
 make samples   # regenerate output/*.pdf (network only for the wiki smoke)
 ```
@@ -249,7 +249,7 @@ See [samples.md](samples.md) and [CONTRIBUTING.md](../CONTRIBUTING.md).
 | Target | Action |
 |--------|--------|
 | `make test` | `go test ./...` |
-| `make lint` | `golangci-lint run` via [`.golangci.yml`](../.golangci.yml) |
+| `make lint` | `golangci-lint run` via [`.golangci.yml`](../.golangci.yml), then `npm run lint` in `frontend/` (ESLint plus `src/data` content/config checks) |
 | `make build` | `bin/gowkhtmltopdf`, `bin/gowkhtmltoimage` (stamps `VERSION`) |
 | `make golden` | Golden corpus tests |
 | `make golden-update GOLDEN_FIXTURE=fixture-NN-name.html GOLDEN_APPROVE=1` | One reviewed PDF under ignored `testdata/golden/out/` |

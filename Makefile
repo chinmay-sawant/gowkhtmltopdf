@@ -1,4 +1,4 @@
-.PHONY: test lint build fmt golden golden-update samples clean claim-scan bench bench-cli-compare
+.PHONY: test lint lint-frontend build fmt golden golden-update samples clean claim-scan bench bench-cli-compare
 
 # Pure-Go runtime: the standard library plus the allowlisted direct modules
 # below. No cgo, browser, or native converter process is required.
@@ -16,9 +16,10 @@ GOLANGCI_LINT_VERSION ?= v1.64.8
 test:
 	go test ./...
 
-# Runs every linter enabled in .golangci.yml (enable-all). Installs the pinned
-# binary into $(go env GOPATH)/bin when missing. Always builds with GOTOOLCHAIN=local
-# so the binary matches go.mod's go1.26 toolchain.
+# Runs every linter enabled in .golangci.yml (enable-all), then frontend
+# `npm run lint` (ESLint plus src/data content/config checks). Installs the
+# pinned golangci-lint binary into $(go env GOPATH)/bin when missing. Always
+# builds with GOTOOLCHAIN=local so the binary matches go.mod's go1.26 toolchain.
 lint:
 	@command -v golangci-lint >/dev/null 2>&1 || { \
 		echo "golangci-lint not found; installing $(GOLANGCI_LINT_VERSION) with local Go toolchain..."; \
@@ -26,6 +27,15 @@ lint:
 	}
 	golangci-lint version
 	golangci-lint run ./...
+	$(MAKE) lint-frontend
+
+lint-frontend:
+	@command -v npm >/dev/null 2>&1 || { echo "npm is required for frontend lint" >&2; exit 1; }
+	@if [ ! -d frontend/node_modules ]; then \
+		echo "frontend/node_modules missing; running npm ci..."; \
+		npm ci --prefix frontend; \
+	fi
+	npm --prefix frontend run lint
 
 CLI_VERSION_LDFLAGS := -X gowkhtmltopdf/internal/cli.Version=$(shell cat VERSION)
 

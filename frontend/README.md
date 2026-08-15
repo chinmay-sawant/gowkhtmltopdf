@@ -86,6 +86,7 @@ drop a `page-*.json` file, add a route in `App.jsx`, and a nav link in
 ```sh
 npm install
 npm run dev       # local dev server (http://localhost:5173/gowkhtmltopdf/)
+npm run lint      # ESLint (src, scripts, Vite config) plus src/data JSON/config checks
 npm run build     # build → dist/ then copy → ../docs (GitHub Pages)
 npm run preview   # preview the production build
 ```

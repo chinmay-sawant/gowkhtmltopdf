@@ -308,7 +308,7 @@ Contributor setup and PR expectations: [`CONTRIBUTING.md`](../CONTRIBUTING.md).
 | Target | Action |
 |--------|--------|
 | `make test` | `go test ./...` |
-| `make lint` | `golangci-lint run` (all linters via `.golangci.yml`) |
+| `make lint` | `golangci-lint run` (all linters via `.golangci.yml`), then `npm run lint` in `frontend/` |
 | `make build` | `bin/gowkhtmltopdf`, `bin/gowkhtmltoimage` (version stamped from `VERSION`) |
 | `make fmt` | `gofmt -w .` |
 | `make golden` | `TestGoldenCorpus*` — structure, page envelopes, needles (not binary PDF equality) |

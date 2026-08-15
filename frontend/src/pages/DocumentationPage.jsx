@@ -134,7 +134,7 @@ export default function DocumentationPage() {
       window.clearTimeout(lockTimerRef.current)
       window.removeEventListener('scroll', onScroll)
     }
-  }, [docId, page])
+  }, [docId, page, searchParams])
 
   if (!page) return <Navigate to="/documentation/cli" replace />
 
