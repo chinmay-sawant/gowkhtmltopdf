@@ -6,7 +6,8 @@ binaries at build time (see README "Versioning").
 
 ## Unreleased
 
-PDF version and conformance-profile work after [0.2.1](#021-2026-08-14).
+Unreleased **0.2.2** work. Not in the tagged [0.2.1](#021-2026-08-14) release.
+PDF version and conformance-profile work after 0.2.1.
 Default output remains **unclaimed PDF 1.4**. `--pdf-version` `1.4` / `1.7` /
 `2.0` is a version header, **not** a conformance claim. The claim is
 `--pdf-profile` / `WithPDFProfile`. Encryption, AcroForm, and JavaScript

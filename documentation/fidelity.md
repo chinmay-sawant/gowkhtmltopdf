@@ -21,11 +21,11 @@ is tracked in
 | Wikipedia / marketing “decent print” (readable title + body) | **Progressive goal** (Phase 21) — not MVP acceptance yet |
 | Full CSS (flex/grid as layout, absolute/fixed/sticky positioning) | **Partial** — flex (grow/shrink/basis/order/wrap), grid lite, relative/absolute/fixed; sticky print-scoped (page = scrollport); static 2D transforms (paint CTM); not full CSS3 |
 | JavaScript-driven pages | **Out of scope** (`<script>` stripped; JS CLI flags are unknown options) |
-| Archival / tagged PDF (PDF/A, PDF/UA) | **Opt-in** via `--pdf-profile` / `WithPDFProfile`. Default is unclaimed PDF 1.4. `--pdf-version` / `WithPDFVersion` is a version, not a claim |
+| Archival / tagged PDF (PDF/A, PDF/UA) | **Unreleased 0.2.2** (not in 0.2.1). Opt-in via `--pdf-profile` / `WithPDFProfile`. Default is unclaimed PDF 1.4. `--pdf-version` / `WithPDFVersion` is a version, not a claim |
 | Encryption / AcroForm / signatures | **Out of scope** (rejected on every version) |
 | Full Unicode / CJK typesetting | **Partial** — Type0/CID + `--font-path`; Arabic OT via `go-text/typesetting` (GSUB) + presentation-form fallback; Indic Partial; no CGO HarfBuzz; `writing-mode` vertical is parsed but lays out horizontal |
 
-**PDF claims:** empty version + empty profile is still unclaimed PDF 1.4.
+**PDF claims (unreleased 0.2.2, not in the 0.2.1 tag):** empty version + empty profile is still unclaimed PDF 1.4.
 `--pdf-version 1.7` / `2.0` sets the header (and related writer details);
 it does **not** claim PDF/A or PDF/UA. `--pdf-profile a3a-ua1` / `a3a` /
 `ua1` implies PDF 1.7 and emits claiming XMP, sRGB OutputIntent, and a

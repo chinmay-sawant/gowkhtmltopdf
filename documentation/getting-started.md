@@ -82,6 +82,7 @@ you repeat the flag or use `--allow`. Details: [cli.md](cli.md#local-files).
 
 ## PDF version and profile
 
+These flags are **unreleased 0.2.2** (on `master` after the 0.2.1 tag).
 Default output is **unclaimed PDF 1.4**. `--pdf-version` changes the file
 version only; it is **not** a PDF/A or PDF/UA claim.
 

@@ -5,7 +5,7 @@
   {
    "type": "hero",
    "title": "Pure-Go HTML to PDF, no browser",
-   "lede": "A clean-room, no-cgo HTML template engine and wkhtmltopdf CLI work-alike that turns authored HTML into multi-page PDFs (or PNG/JPEG) entirely in-process. Current release v0.2.1: phases 0-9 plus the print CSS subset (tiers 1-2) are implemented, with committed samples under output/."
+   "lede": "A clean-room, no-cgo HTML template engine and wkhtmltopdf CLI work-alike that turns authored HTML into multi-page PDFs (or PNG/JPEG) entirely in-process. Current tagged release v0.2.1: phases 0-9 plus the print CSS subset (tiers 1-2), with committed samples under output/. PDF/A and PDF/UA profiles are unreleased 0.2.2, not in 0.2.1."
   },
   {
    "type": "bullets",
@@ -68,7 +68,7 @@
     },
     {
      "heading": "5. Write: internal/pdf or internal/imageout",
-     "body": "PDF mode writes unclaimed PDF 1.4 by default, with zlib Flate streams, an embedded Liberation Sans subset with /Widths in 1000 units/em, link annotations, and a valid xref. Opt-in `--pdf-version 1.7` / `2.0` (or `WithPDFVersion`) change the file version only — that is not a PDF/A or PDF/UA claim. Opt-in `--pdf-profile` / `WithPDFProfile` (`a3a-ua1`, `a4-ua2`, and aliases) add claiming XMP, ICC OutputIntent, and tagging. Image mode rasterizes the same display list to PNG or JPEG. Both paths are orchestrated by internal/convert."
+     "body": "PDF mode writes unclaimed PDF 1.4 by default, with zlib Flate streams, an embedded Liberation Sans subset with /Widths in 1000 units/em, link annotations, and a valid xref. Unreleased 0.2.2 (not in 0.2.1): opt-in `--pdf-version 1.7` / `2.0` (or `WithPDFVersion`) change the file version only — that is not a PDF/A or PDF/UA claim. Opt-in `--pdf-profile` / `WithPDFProfile` (`a3a-ua1`, `a4-ua2`, and aliases) add claiming XMP, ICC OutputIntent, and tagging. Image mode rasterizes the same display list to PNG or JPEG. Both paths are orchestrated by internal/convert."
     }
    ]
   },

@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import GitHubStars from './GitHubStars'
 import useTheme from '../hooks/useTheme'
+import gopherGif from '../assets/brand/gopher.gif'
+import gopherStill from '../assets/brand/gopher-256.png'
 
 const LINKS = [
   { to: '/', label: 'Overview' },
@@ -53,6 +55,17 @@ export default function SiteNav() {
     <nav className="site-nav" aria-label="Primary" ref={navRef}>
       <div className="site-nav-bar">
         <NavLink to="/" end className="brand">
+          <picture>
+            <source srcSet={gopherStill} media="(prefers-reduced-motion: reduce)" />
+            <img
+              className="brand-gopher"
+              src={gopherGif}
+              width="32"
+              height="32"
+              alt=""
+              decoding="async"
+            />
+          </picture>
           gowkhtmltopdf
         </NavLink>
 

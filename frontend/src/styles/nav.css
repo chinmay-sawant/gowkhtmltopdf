@@ -27,8 +27,18 @@
   text-decoration: none;
   display: inline-flex;
   align-items: center;
+  gap: 10px;
   min-height: 44px;
   padding: 0 4px;
+}
+
+.brand-gopher {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  flex: none;
+  display: block;
+  background: #9fdeed;
 }
 
 .site-nav-desktop {

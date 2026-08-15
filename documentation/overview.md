@@ -15,12 +15,14 @@ standard library plus
 shaping) and [`tdewolff/canvas`](https://github.com/tdewolff/canvas) (SVG
 rasterization). Builds are intended to run with `CGO_ENABLED=0`.
 
-**Status:** **v0.2.1**. Phases 0–9 of the
+**Status:** **v0.2.1** is the current tagged release (`VERSION`). Phases 0–9 of the
 [canonical plan](../plans/0.1.0/00-canonical-pure-go-rewrite.md) are implemented.
 Tier 1 and Tier 2 core (phases 10–20) are shipped as a print CSS subset.
-Remaining gaps live in [deferred.md](deferred.md). Progressive post-MVP goals
-(including URL → decent print) are goals, not shipped feature claims — see
-[fidelity.md](fidelity.md).
+Unreleased **0.2.2** on `master` (PRs #45–#47) adds opt-in `--pdf-version`
+1.7 / 2.0 and `--pdf-profile` (PDF/A-3a, PDF/A-4, PDF/UA-1, PDF/UA-2). Those
+profiles are **not** in the 0.2.1 release. Remaining gaps live in
+[deferred.md](deferred.md). Progressive post-MVP goals (including URL → decent
+print) are goals, not shipped feature claims — see [fidelity.md](fidelity.md).
 
 ## Design principles
 
@@ -44,7 +46,7 @@ Remaining gaps live in [deferred.md](deferred.md). Progressive post-MVP goals
 - Text and nested HTML headers/footers with `[page]` / `[topage]` placeholders
 - TOC objects and PDF document outlines (bookmarks)
 - In-process embedding from Go (`RunPDF` / `Converter`)
-- Opt-in PDF 1.7 / 2.0 (`--pdf-version` / `WithPDFVersion`) and opt-in PDF/A + PDF/UA profiles (`--pdf-profile` / `WithPDFProfile`). Default output is **unclaimed PDF 1.4**; a version flag is not a conformance claim
+- Unreleased 0.2.2: opt-in PDF 1.7 / 2.0 (`--pdf-version` / `WithPDFVersion`) and opt-in PDF/A + PDF/UA profiles (`--pdf-profile` / `WithPDFProfile`). Default output is **unclaimed PDF 1.4**; a version flag is not a conformance claim. Not in the 0.2.1 release.
 
 Typical path:
 
@@ -133,7 +135,7 @@ Supported for report HTML:
 - Report-subset flex, grid, float, relative/absolute/fixed, print-scoped sticky
 - Multicol lite, `:has()`, `@container` size queries
 - Text / HTML headers and footers, TOC, PDF outlines, internal and external links
-- PDF 1.4 default (unclaimed). Opt-in `--pdf-version 1.7` / `2.0` (version only). Opt-in `--pdf-profile a3a-ua1` / `a4-ua2` (claiming XMP, OutputIntent, tagged structure)
+- PDF 1.4 default (unclaimed). Unreleased 0.2.2: opt-in `--pdf-version 1.7` / `2.0` (version only) and `--pdf-profile a3a-ua1` / `a4-ua2` (claiming XMP, OutputIntent, tagged structure). Not in 0.2.1.
 - Local files (deny by default) and HTTP(S) with timeouts, body caps, optional restricted network policy
 
 Authoritative rows: [compatibility-matrix.md](compatibility-matrix.md).
