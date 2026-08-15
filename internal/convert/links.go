@@ -23,21 +23,25 @@ type bodyLinkIntent struct {
 // complete display list, box tree, locations, and DOM be collected once paint
 // and heading collection have finished.
 type bodyNavigation struct {
-	ids   map[string]layout.ElementLocation
-	links []bodyLinkIntent
+	ids     map[string]layout.ElementLocation
+	idElems map[string]*pdf.StructElem
+	links   []bodyLinkIntent
 }
 
 // collectBodyNavigation copies the body navigation metadata that later
 // document-wide passes need. Later duplicate ids overwrite earlier ones,
 // matching the historical scan of Result.Locations. The copied locations have
 // nil Node pointers so they do not keep the parsed document alive.
+//
+//nolint:cyclop,varnamelen,wsl // element location and structure element collection
 func collectBodyNavigation(res *layout.Result) bodyNavigation {
 	if res == nil {
 		return bodyNavigation{} //nolint:exhaustruct // intentional zero-value projection
 	}
 
 	nav := bodyNavigation{ //nolint:exhaustruct // intentional zero-value projection
-		ids: make(map[string]layout.ElementLocation),
+		ids:     make(map[string]layout.ElementLocation),
+		idElems: make(map[string]*pdf.StructElem),
 	}
 
 	for _, loc := range res.Locations {
@@ -46,8 +50,19 @@ func collectBodyNavigation(res *layout.Result) bodyNavigation {
 		}
 
 		if id := loc.Node.Attribute("id"); id != "" {
+			node := loc.Node
 			loc.Node = nil
 			nav.ids[id] = loc
+
+			for i := range res.Ops {
+				op := &res.Ops[i]
+				if op.StructElem != nil && op.Y >= loc.Y && op.Y <= loc.Y+loc.H+20 {
+					nav.idElems[id] = op.StructElem
+
+					break
+				}
+			}
+			_ = node
 		}
 	}
 
@@ -106,7 +121,7 @@ func tocAnchorLocations(_ *html.Node, res *layout.Result) map[string]layout.Elem
 
 // attachLinkStructElem ensures a link annotation is referenced in the PDF/UA structure tree.
 func attachLinkStructElem(doc *pdf.Document, page *pdf.Page, elem *pdf.StructElem, annotRef pdf.ObjRef) {
-	if doc == nil || (!doc.Policy().IsPDFUA1() && !doc.Policy().IsPDFUA2()) || page == nil || annotRef == 0 {
+	if doc == nil || !doc.IsUA() || page == nil || annotRef == 0 {
 		return
 	}
 
@@ -144,7 +159,9 @@ func attachLinkStructElem(doc *pdf.Document, page *pdf.Page, elem *pdf.StructEle
 // applyInternalLinks: layout emits OpLinkURI with a "#frag" URI for inline
 // anchors that have a paint box (text runs), and convert resolves them to
 // GoTo destinations via element id / heading locations.
-func applyTOCLinks(doc *pdf.Document, tocs []*objectState, bodies []*objectState, tocTotal int, headings []*outline.Heading) { //nolint:gocognit,cyclop,lll // forward/back link passes over entry locations
+//
+//nolint:gocognit,cyclop,funlen,lll,wsl // forward/back link passes over entry locations
+func applyTOCLinks(doc *pdf.Document, tocs []*objectState, bodies []*objectState, tocTotal int, headings []*outline.Heading) {
 	if len(tocs) == 0 {
 		return
 	}
@@ -154,6 +171,18 @@ func applyTOCLinks(doc *pdf.Document, tocs []*objectState, bodies []*objectState
 	for _, h := range headings {
 		if h.Anchor != "" {
 			byAnchor[h.Anchor] = h
+		}
+	}
+
+	var headingMap map[*outline.Heading]*pdf.StructElem
+	if doc != nil && doc.IsUA() {
+		allHeadings := flatHeadings(bodies)
+		headingElems := doc.HeadingStructElems()
+		headingMap = make(map[*outline.Heading]*pdf.StructElem, len(allHeadings))
+		for i, h := range allHeadings {
+			if i < len(headingElems) {
+				headingMap[h] = headingElems[i]
+			}
 		}
 	}
 
@@ -181,6 +210,11 @@ func applyTOCLinks(doc *pdf.Document, tocs []*objectState, bodies []*objectState
 				destX, destY := headingDest(hVal, bodies)
 				annotRef := srcPage.AddLinkDest(trVal.geom.pdfRect(eloc), tocTotal+docPage, destX, destY)
 				attachLinkStructElem(doc, srcPage, nil, annotRef)
+				if headingMap != nil {
+					if targetElem := headingMap[hVal]; targetElem != nil {
+						srcPage.SetLinkDestStruct(targetElem)
+					}
+				}
 			}
 
 			if trVal.toc.BackLinks {
@@ -224,8 +258,9 @@ func headingDest(hVal *outline.Heading, bodies []*objectState) (float64, float64
 
 // bodyIDDest is one body element destination keyed by id attribute.
 type bodyIDDest struct {
-	st  *objectState
-	loc layout.ElementLocation
+	st   *objectState
+	loc  layout.ElementLocation
+	elem *pdf.StructElem
 }
 
 // buildBodyIDIndex maps element id attributes across body objects to their
@@ -240,7 +275,7 @@ func buildBodyIDIndex(bodies []*objectState) map[string]bodyIDDest {
 		}
 
 		for id, loc := range state.navigation.ids {
-			idLoc[id] = bodyIDDest{state, loc}
+			idLoc[id] = bodyIDDest{st: state, loc: loc, elem: state.navigation.idElems[id]}
 		}
 	}
 
@@ -268,10 +303,8 @@ func remapPageForCopies(srcPage, copies int, collate bool) int {
 	return plan.Remap(1, srcPage)
 }
 
-// applyInternalLinks turns OpLinkURI ops whose URI is a same-document
-// fragment (#id) into GoTo annotations. Destinations are element boxes with
-// a matching id attribute. When LocalLinks is false, fragment ops are skipped.
-func applyInternalLinks(doc *pdf.Document, bodies []*objectState, tocTotal int) { //nolint:cyclop,lll // per-state/per-op fragment resolution
+//nolint:cyclop,wsl // per-state/per-op fragment resolution
+func applyInternalLinks(doc *pdf.Document, bodies []*objectState, tocTotal int) {
 	if doc == nil {
 		return
 	}
@@ -319,6 +352,9 @@ func applyInternalLinks(doc *pdf.Document, bodies []*objectState, tocTotal int) 
 			dx, dy := dest.st.geom.pdfXY(dest.loc)
 			annotRef := srcPage.AddLinkDest(state.geom.pdfRect(srcLoc), destPage, dx, dy)
 			attachLinkStructElem(doc, srcPage, link.elem, annotRef)
+			if dest.elem != nil {
+				srcPage.SetLinkDestStruct(dest.elem)
+			}
 		}
 	}
 }

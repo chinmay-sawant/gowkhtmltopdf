@@ -6,218 +6,154 @@ import (
 	"strings"
 )
 
-// StructType identifies an ISO 32000-1 standard structure element type.
+// StructType represents standard structure type tags defined in ISO 32000-1 §14.8.4
+// and ISO 32000-2 §14.8.4.
 type StructType string
 
 const (
-	// StructTypeDocument is the root grouping element for the document content.
-	StructTypeDocument StructType = "Document"
-	// StructTypeH1 is a first-level heading.
-	StructTypeH1 StructType = "H1"
-	// StructTypeH2 is a second-level heading.
-	StructTypeH2 StructType = "H2"
-	// StructTypeH3 is a third-level heading.
-	StructTypeH3 StructType = "H3"
-	// StructTypeH4 is a fourth-level heading.
-	StructTypeH4 StructType = "H4"
-	// StructTypeH5 is a fifth-level heading.
-	StructTypeH5 StructType = "H5"
-	// StructTypeH6 is a sixth-level heading.
-	StructTypeH6 StructType = "H6"
-	// StructTypeP is a paragraph.
-	StructTypeP StructType = "P"
-	// StructTypeTable is a table.
-	StructTypeTable StructType = "Table"
-	// StructTypeTR is a table row.
-	StructTypeTR StructType = "TR"
-	// StructTypeTH is a table header cell.
-	StructTypeTH StructType = "TH"
-	// StructTypeTD is a table data cell.
-	StructTypeTD StructType = "TD"
-	// StructTypeL is a list.
-	StructTypeL StructType = "L"
-	// StructTypeLI is a list item.
-	StructTypeLI StructType = "LI"
-	// StructTypeLbl is a list item label (bullet or item number).
-	StructTypeLbl StructType = "Lbl"
-	// StructTypeLBody is a list item body container.
-	StructTypeLBody StructType = "LBody"
-	// StructTypeCaption is a caption element for a table or figure.
-	StructTypeCaption StructType = "Caption"
-	// StructTypeTHead is a table head row group.
-	StructTypeTHead StructType = "THead"
-	// StructTypeTBody is a table body row group.
-	StructTypeTBody StructType = "TBody"
-	// StructTypeTFoot is a table foot row group.
-	StructTypeTFoot StructType = "TFoot"
-	// StructTypeFigure is an illustration or graphic image.
-	StructTypeFigure StructType = "Figure"
-	// StructTypeLink is an interactive hypertext or internal link.
-	StructTypeLink StructType = "Link"
-	// StructTypeSpan is an inline text container.
-	StructTypeSpan StructType = "Span"
-	// StructTypeDiv is a generic block container.
-	StructTypeDiv StructType = "Div"
-	// StructTypeArtifact is non-structural pagination or background content.
-	StructTypeArtifact StructType = "Artifact"
+	StructTypeDocument   StructType = "Document"
+	StructTypePart       StructType = "Part"
+	StructTypeArt        StructType = "Art"
+	StructTypeSect       StructType = "Sect"
+	StructTypeDiv        StructType = "Div"
+	StructTypeH1         StructType = "H1"
+	StructTypeH2         StructType = "H2"
+	StructTypeH3         StructType = "H3"
+	StructTypeH4         StructType = "H4"
+	StructTypeH5         StructType = "H5"
+	StructTypeH6         StructType = "H6"
+	StructTypeP          StructType = "P"
+	StructTypeL          StructType = "L"
+	StructTypeLI         StructType = "LI"
+	StructTypeLbl        StructType = "Lbl"
+	StructTypeLBody      StructType = "LBody"
+	StructTypeTable      StructType = "Table"
+	StructTypeTR         StructType = "TR"
+	StructTypeTH         StructType = "TH"
+	StructTypeTD         StructType = "TD"
+	StructTypeTHead      StructType = "THead"
+	StructTypeTBody      StructType = "TBody"
+	StructTypeTFoot      StructType = "TFoot"
+	StructTypeCaption    StructType = "Caption"
+	StructTypeSpan       StructType = "Span"
+	StructTypeLink       StructType = "Link"
+	StructTypeFigure     StructType = "Figure"
+	StructTypeFormula    StructType = "Formula"
+	StructTypeQuote      StructType = "Quote"
+	StructTypeBlockQuote StructType = "BlockQuote"
+	StructTypeCode       StructType = "Code"
 )
 
-// Standard structure element type aliases.
+// StructType aliases for backwards compatibility.
 const (
-	StructDocument = StructTypeDocument
-	StructH1       = StructTypeH1
-	StructH2       = StructTypeH2
-	StructH3       = StructTypeH3
-	StructH4       = StructTypeH4
-	StructH5       = StructTypeH5
-	StructH6       = StructTypeH6
-	StructP        = StructTypeP
-	StructTable    = StructTypeTable
-	StructTR       = StructTypeTR
-	StructTH       = StructTypeTH
-	StructTD       = StructTypeTD
-	StructL        = StructTypeL
-	StructLI       = StructTypeLI
-	StructLbl      = StructTypeLbl
-	StructLBody    = StructTypeLBody
-	StructCaption  = StructTypeCaption
-	StructTHead    = StructTypeTHead
-	StructTBody    = StructTypeTBody
-	StructTFoot    = StructTypeTFoot
-	StructFigure   = StructTypeFigure
-	StructLink     = StructTypeLink
-	StructSpan     = StructTypeSpan
-	StructDiv      = StructTypeDiv
-	StructArtifact = StructTypeArtifact
+	StructDocument   = StructTypeDocument
+	StructPart       = StructTypePart
+	StructArt        = StructTypeArt
+	StructSect       = StructTypeSect
+	StructDiv        = StructTypeDiv
+	StructH1         = StructTypeH1
+	StructH2         = StructTypeH2
+	StructH3         = StructTypeH3
+	StructH4         = StructTypeH4
+	StructH5         = StructTypeH5
+	StructH6         = StructTypeH6
+	StructP          = StructTypeP
+	StructL          = StructTypeL
+	StructLI         = StructTypeLI
+	StructLbl        = StructTypeLbl
+	StructLBody      = StructTypeLBody
+	StructTable      = StructTypeTable
+	StructTR         = StructTypeTR
+	StructTH         = StructTypeTH
+	StructTD         = StructTypeTD
+	StructTHead      = StructTypeTHead
+	StructTBody      = StructTypeTBody
+	StructTFoot      = StructTypeTFoot
+	StructCaption    = StructTypeCaption
+	StructSpan       = StructTypeSpan
+	StructLink       = StructTypeLink
+	StructFigure     = StructTypeFigure
+	StructFormula    = StructTypeFormula
+	StructQuote      = StructTypeQuote
+	StructBlockQuote = StructTypeBlockQuote
+	StructCode       = StructTypeCode
 )
 
-// StructTreeRoot represents the root of a document's logical structure tree.
-type StructTreeRoot struct {
-	doc      *Document
-	ref      objRef
-	Children []*StructElem
-}
-
-// AddChild appends a top-level StructElem (typically /Document) to the root.
-func (r *StructTreeRoot) AddChild(child *StructElem) {
-	if child == nil {
-		return
-	}
-
-	child.doc = r.doc
-	child.parent = nil
-	r.Children = append(r.Children, child)
-}
-
-// NewChild creates and appends a top-level StructElem to the root.
-func (r *StructTreeRoot) NewChild(tag StructType) *StructElem {
-	elem := &StructElem{ //nolint:exhaustruct // intentional zero-value fields
-		doc: r.doc,
-		Tag: tag,
-	}
-	r.AddChild(elem)
-
-	return elem
-}
-
-// Ref returns the indirect object reference string for the structure tree root.
-func (r *StructTreeRoot) Ref() string {
-	return r.ref.String()
-}
-
-// contentRef is one marked-content sequence owned by a StructElem on a page.
-// MCIDs are page-local; multi-page elements must serialize as MCR dictionaries
-// (ISO 32000-1 §14.7.4.2) rather than bare integers under a single /Pg.
+// contentRef pairs an MCID integer with its owning page, ensuring multi-page
+// structure elements emit MCR (Marked Content Reference) dictionaries rather
+// than bare integers that would resolve against the element's single /Pg.
 type contentRef struct {
 	page *Page
 	mcid int
 }
 
-// StructElem represents a single structure element in the ISO 32000-1 structure tree.
+// StructElem represents a single logical structure element dictionary in the
+// PDF document logical structure tree (ISO 32000-1 §14.7.2).
 type StructElem struct {
-	doc        *Document
-	ref        objRef
-	parent     *StructElem
-	Tag        StructType
-	Page       *Page
-	Kids       []*StructElem
-	content    []contentRef
-	Alt        string
-	Lang       string
-	Title      string
-	ActualText string
-	AnnotRef   objRef
-	TableScope string
-	// ListNumbering is the PDF List attribute value for /L elements
-	// (Disc, Circle, Square, Decimal, UpperRoman, LowerRoman, UpperAlpha, LowerAlpha).
-	// Required by PDF/UA-2 when list items contain /Lbl children.
-	ListNumbering string
+	Tag           StructType
+	Alt           string
+	Lang          string
+	ActualText    string
+	Title         string
+	TableScope    string
+	ListNumbering string // PDF/UA-2 List attribute: "Disc", "Decimal", "Circle", "Square", "None"
+	Page          *Page
+	Kids          []*StructElem
+	AnnotRef      objRef
+	ref           objRef
+	parent        *StructElem
+	doc           *Document
+	content       []contentRef
 }
 
-// AddChild appends a child StructElem to this element.
-func (e *StructElem) AddChild(child *StructElem) {
-	if child == nil {
-		return
-	}
-
-	child.doc = e.doc
-	child.parent = e
-	e.Kids = append(e.Kids, child)
+// StructTreeRoot represents the root of the document logical structure tree
+// (ISO 32000-1 §14.7.2).
+type StructTreeRoot struct {
+	Children []*StructElem
+	ref      objRef
+	doc      *Document
 }
 
-// NewChild creates and appends a child StructElem with the given tag.
+// NewChild creates and appends a child StructElem under this structure element.
 func (e *StructElem) NewChild(tag StructType) *StructElem {
-	elem := &StructElem{ //nolint:exhaustruct // intentional zero-value fields
-		doc:    e.doc,
+	child := &StructElem{ //nolint:exhaustruct // intentional zero-value fields
 		Tag:    tag,
 		parent: e,
+		doc:    e.doc,
+		Page:   e.Page,
 	}
-	e.Kids = append(e.Kids, elem)
+	e.Kids = append(e.Kids, child)
+
+	return child
+}
+
+// NewChild creates and appends a top-level StructElem under the StructTreeRoot.
+func (r *StructTreeRoot) NewChild(tag StructType) *StructElem {
+	elem := &StructElem{ //nolint:exhaustruct // intentional zero-value fields
+		Tag: tag,
+		doc: r.doc,
+	}
+	r.Children = append(r.Children, elem)
 
 	return elem
 }
 
-// SetPage assigns the page where this element's content appears.
-func (e *StructElem) SetPage(page *Page) {
-	e.Page = page
-}
+// SetAlt sets the alternative text description (/Alt) for accessibility.
+func (e *StructElem) SetAlt(alt string) { e.Alt = alt }
 
-// SetAlt sets the alternative description text (for Figure, etc.).
-func (e *StructElem) SetAlt(alt string) {
-	e.Alt = alt
-}
+// SetLang sets the natural language override (/Lang) for this element subtree.
+func (e *StructElem) SetLang(lang string) { e.Lang = lang }
 
-// SetLang sets the natural language tag for this element.
-func (e *StructElem) SetLang(lang string) {
-	e.Lang = lang
-}
+// SetActualText sets the exact replacement text (/ActualText) for accessibility.
+func (e *StructElem) SetActualText(text string) { e.ActualText = text }
 
-// SetTitle sets the element title text.
-func (e *StructElem) SetTitle(title string) {
-	e.Title = title
-}
+// SetTitle sets the title text (/Title) for this structure element.
+func (e *StructElem) SetTitle(title string) { e.Title = title }
 
-// SetActualText sets the exact text replacement for accessibility tools.
-func (e *StructElem) SetActualText(text string) {
-	e.ActualText = text
-}
+// SetPage sets the owning page for this structure element.
+func (e *StructElem) SetPage(p *Page) { e.Page = p }
 
-// SetAnnotRef links a link annotation indirect object to this StructElem.
-func (e *StructElem) SetAnnotRef(ref objRef) {
-	e.AnnotRef = ref
-}
-
-// SetAnnotation links the annotation at annotIndex on page to this StructElem.
-func (e *StructElem) SetAnnotation(page *Page, annotIndex int) {
-	if page == nil || annotIndex < 0 || annotIndex >= len(page.annots) {
-		return
-	}
-
-	e.Page = page
-	e.AnnotRef = page.annots[annotIndex].annotRef
-}
-
-// SetObjRef links an annotation indirect object and page to this StructElem.
+// SetObjRef sets an indirect object reference (e.g. an annotation) as an OBJR child.
 func (e *StructElem) SetObjRef(ref objRef, page *Page) {
 	e.AnnotRef = ref
 	if page != nil {
@@ -225,9 +161,13 @@ func (e *StructElem) SetObjRef(ref objRef, page *Page) {
 	}
 }
 
-// AddAnnot links an annotation indirect object and page to this StructElem.
+// AddAnnot is an alias for SetObjRef.
 func (e *StructElem) AddAnnot(ref objRef, page *Page) {
-	e.AnnotRef = ref
+	e.SetObjRef(ref, page)
+}
+
+// SetAnnotation sets the annotation owning page on this structure element.
+func (e *StructElem) SetAnnotation(page *Page, _ int) {
 	if page != nil {
 		e.Page = page
 	}
@@ -245,8 +185,6 @@ func (e *StructElem) SetListNumbering(value string) {
 }
 
 // AddMCID appends a marked content identifier belonging to this element.
-// The MCID is associated with e.Page when set; prefer Page.AllocMCID so the
-// page is recorded correctly for multi-page elements.
 func (e *StructElem) AddMCID(mcid int) {
 	e.content = append(e.content, contentRef{page: e.Page, mcid: mcid})
 }
@@ -259,7 +197,7 @@ func (e *StructElem) Ref() string {
 // CreateStructTreeRoot creates (or returns) the document's structure tree root.
 // When the document policy does not specify PDF/UA-1 or PDF/UA-2, this returns nil.
 func (d *Document) CreateStructTreeRoot() *StructTreeRoot {
-	if !d.policy.IsPDFUA1() && !d.policy.IsPDFUA2() {
+	if !d.IsUA() {
 		return nil
 	}
 
@@ -287,27 +225,36 @@ func (d *Document) HeadingStructElems() []*StructElem {
 
 	var result []*StructElem
 
-	var walk func(e *StructElem)
-	walk = func(e *StructElem) {
-		if isHeadingTag(e.Tag) {
-			result = append(result, e)
+	var walk func(elem *StructElem)
+	walk = func(elem *StructElem) {
+		if elem == nil {
+			return
 		}
 
-		for _, kid := range e.Kids {
-			walk(kid)
+		if isHeadingTag(elem.Tag) {
+			result = append(result, elem)
+		}
+
+		for _, kid := range elem.Kids {
+			if kid != nil {
+				walk(kid)
+			}
 		}
 	}
 
 	for _, child := range d.structTreeRoot.Children {
-		walk(child)
+		if child != nil {
+			walk(child)
+		}
 	}
 
 	return result
 }
 
 // isHeadingTag reports whether tag is one of H1–H6.
+//
+//nolint:exhaustive // only heading tags H1–H6 are checked
 func isHeadingTag(tag StructType) bool {
-	//nolint:exhaustive // only H1–H6 matter; all other structure types return false
 	switch tag {
 	case StructTypeH1, StructTypeH2, StructTypeH3, StructTypeH4, StructTypeH5, StructTypeH6:
 		return true
@@ -320,7 +267,7 @@ func isHeadingTag(tag StructType) bool {
 // and associates it with the owning StructElem for ParentTree resolution.
 // Returns -1 if the document policy does not enable PDF/UA structure.
 func (p *Page) AllocMCID(elem *StructElem) int {
-	if elem == nil || p.doc == nil || (!p.doc.policy.IsPDFUA1() && !p.doc.policy.IsPDFUA2()) {
+	if elem == nil || p.doc == nil || !p.doc.IsUA() {
 		return -1
 	}
 
@@ -342,26 +289,36 @@ func (p *Page) MCIDCount() int {
 
 // assignStructElemRefs recursively allocates indirect object IDs for all StructElems.
 func assignStructElemRefs(doc *Document, elem *StructElem) {
+	if elem == nil {
+		return
+	}
+
 	elem.ref = doc.newObject()
 	for _, child := range elem.Kids {
-		assignStructElemRefs(doc, child)
+		if child != nil {
+			assignStructElemRefs(doc, child)
+		}
 	}
 }
 
 // pruneEmptyStructElems removes any unnecessary empty structure element subtree,
 // while preserving required document, table, and list structural tags.
+//
+//nolint:exhaustive,varnamelen,wsl // in-place filtering of kids array
 func pruneEmptyStructElems(elem *StructElem) bool {
-	validKids := make([]*StructElem, 0, len(elem.Kids))
-
-	for _, kid := range elem.Kids {
-		if !pruneEmptyStructElems(kid) {
-			validKids = append(validKids, kid)
-		}
+	if elem == nil {
+		return true
 	}
 
-	elem.Kids = validKids
+	n := 0
+	for _, kid := range elem.Kids {
+		if kid != nil && !pruneEmptyStructElems(kid) {
+			elem.Kids[n] = kid
+			n++
+		}
+	}
+	elem.Kids = elem.Kids[:n]
 
-	//nolint:exhaustive // explicit preserve list for table, list, and doc structural elements
 	switch elem.Tag {
 	case StructTypeDocument, StructTypeTable, StructTypeTR, StructTypeTH, StructTypeTD,
 		StructTypeL, StructTypeLI, StructTypeLBody, StructTypeCaption:
@@ -375,11 +332,11 @@ func pruneEmptyStructElems(elem *StructElem) bool {
 //
 //nolint:cyclop // structure root, namespace, prune, ParentTree, and serialize in one finalize pass
 func (d *Document) finalizeStructure() error {
-	if !d.policy.IsPDFUA1() && !d.policy.IsPDFUA2() {
+	if !d.isUA {
 		return nil
 	}
 
-	if d.policy.IsPDFUA2() {
+	if d.isUA2 {
 		d.namespaceRef = d.newObject()
 		d.setDict(d.namespaceRef, "<< /Type /Namespace /NS (http://iso.org/pdf2/ssn) >>")
 	}
@@ -392,7 +349,7 @@ func (d *Document) finalizeStructure() error {
 	validRootKids := make([]*StructElem, 0, len(d.structTreeRoot.Children))
 
 	for _, child := range d.structTreeRoot.Children {
-		if !pruneEmptyStructElems(child) {
+		if child != nil && !pruneEmptyStructElems(child) {
 			validRootKids = append(validRootKids, child)
 		}
 	}
@@ -408,15 +365,19 @@ func (d *Document) finalizeStructure() error {
 	d.structTreeRoot.ref = d.structTreeRootRef
 
 	for _, child := range d.structTreeRoot.Children {
-		assignStructElemRefs(d, child)
+		if child != nil {
+			assignStructElemRefs(d, child)
+		}
 	}
 
 	d.buildParentTree()
 	d.serializeStructTreeRoot()
 
 	for _, child := range d.structTreeRoot.Children {
-		if err := d.serializeStructElem(child, d.structTreeRootRef); err != nil {
-			return err
+		if child != nil {
+			if err := d.serializeStructElem(child, d.structTreeRootRef); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -427,7 +388,7 @@ func (d *Document) finalizeStructure() error {
 // page StructParents indices to arrays of StructElem object references per MCID,
 // and annotation StructParent indices to owning StructElem references.
 //
-//nolint:cyclop,funlen,gocognit // ParentTree number tree construction over pages and annotations
+//nolint:cyclop,funlen,gocognit,wsl // ParentTree number tree construction over pages and annotations
 func (d *Document) buildParentTree() {
 	for _, page := range d.pages {
 		for i := range page.annots {
@@ -439,19 +400,27 @@ func (d *Document) buildParentTree() {
 
 	annotToElem := make(map[objRef]*StructElem)
 
-	var collectAnnotElems func(e *StructElem)
-	collectAnnotElems = func(e *StructElem) {
-		if e.AnnotRef != 0 {
-			annotToElem[e.AnnotRef] = e
+	var collectAnnotElems func(elem *StructElem)
+	collectAnnotElems = func(elem *StructElem) {
+		if elem == nil {
+			return
 		}
 
-		for _, kid := range e.Kids {
-			collectAnnotElems(kid)
+		if elem.AnnotRef != 0 {
+			annotToElem[elem.AnnotRef] = elem
+		}
+
+		for _, kid := range elem.Kids {
+			if kid != nil {
+				collectAnnotElems(kid)
+			}
 		}
 	}
 
 	for _, child := range d.structTreeRoot.Children {
-		collectAnnotElems(child)
+		if child != nil {
+			collectAnnotElems(child)
+		}
 	}
 
 	var fallbackDocElem *StructElem
@@ -471,7 +440,7 @@ func (d *Document) buildParentTree() {
 		}
 	}
 
-	numsParts := make([]string, 0, len(d.pages)+len(d.pages))
+	var numsBuf strings.Builder
 	nextStructParents := 0
 
 	for _, page := range d.pages {
@@ -481,40 +450,60 @@ func (d *Document) buildParentTree() {
 			page.structParents = structParents
 			page.hasStructParents = true
 
-			elemRefs := make([]string, 0, len(page.mcids))
-			for _, elem := range page.mcids {
-				elemRefs = append(elemRefs, elem.ref.String())
+			if numsBuf.Len() > 0 {
+				numsBuf.WriteByte(' ')
 			}
 
-			numsParts = append(numsParts, fmt.Sprintf("%d [ %s ]", structParents, strings.Join(elemRefs, " ")))
+			numsBuf.WriteString(strconv.Itoa(structParents))
+			numsBuf.WriteString(" [ ")
+
+			for j, elem := range page.mcids {
+				if j > 0 {
+					numsBuf.WriteByte(' ')
+				}
+				if elem != nil {
+					numsBuf.WriteString(elem.ref.String())
+				}
+			}
+
+			numsBuf.WriteString(" ]")
 		}
 
 		for i := range page.annots {
 			a := &page.annots[i]
-			if elem, ok := annotToElem[a.annotRef]; ok {
+			if elem, ok := annotToElem[a.annotRef]; ok && elem != nil {
 				annotStructParent := nextStructParents
 				nextStructParents++
 				a.structParent = annotStructParent
 				a.hasStructParent = true
 
-				numsParts = append(numsParts, fmt.Sprintf("%d %s", annotStructParent, elem.ref.String()))
+				if numsBuf.Len() > 0 {
+					numsBuf.WriteByte(' ')
+				}
+
+				numsBuf.WriteString(strconv.Itoa(annotStructParent))
+				numsBuf.WriteByte(' ')
+				numsBuf.WriteString(elem.ref.String())
 			}
 		}
 	}
 
 	d.parentTreeNextKey = nextStructParents
 
-	if len(numsParts) > 0 {
+	if numsBuf.Len() > 0 {
 		d.parentTreeRef = d.newObject()
-		d.setDict(d.parentTreeRef, fmt.Sprintf("<< /Nums [ %s ] >>", strings.Join(numsParts, " ")))
+		d.setDict(d.parentTreeRef, fmt.Sprintf("<< /Nums [ %s ] >>", numsBuf.String()))
 	}
 }
 
 // serializeStructTreeRoot serializes the /StructTreeRoot dictionary.
 func (d *Document) serializeStructTreeRoot() {
 	rootKids := make([]string, 0, len(d.structTreeRoot.Children))
+
 	for _, child := range d.structTreeRoot.Children {
-		rootKids = append(rootKids, child.ref.String())
+		if child != nil {
+			rootKids = append(rootKids, child.ref.String())
+		}
 	}
 
 	var rootDict dict
@@ -531,18 +520,25 @@ func (d *Document) serializeStructTreeRoot() {
 			add("/ParentTreeNextKey", strconv.Itoa(d.parentTreeNextKey))
 	}
 
-	if d.policy.IsPDFUA2() && d.namespaceRef != 0 {
+	if d.isUA2 && d.namespaceRef != 0 {
 		rootDict = rootDict.add("/Namespaces", "["+d.namespaceRef.String()+"]")
 	}
 
 	d.setDict(d.structTreeRootRef, rootDict.String())
 }
 
-//nolint:cyclop // MCID vs MCR selection branches on elem content shape
+//nolint:cyclop,wsl // MCID vs MCR selection branches on elem content shape
 func (d *Document) formatStructKids(elem *StructElem) string {
-	kItems := make([]string, 0, len(elem.Kids)+len(elem.content)+1)
-	for _, kid := range elem.Kids {
-		kItems = append(kItems, kid.ref.String())
+	var kItems []string
+	if len(elem.Kids) > 0 {
+		kItems = make([]string, 0, len(elem.Kids)+len(elem.content)+1)
+		for _, kid := range elem.Kids {
+			if kid != nil {
+				kItems = append(kItems, kid.ref.String())
+			}
+		}
+	} else if len(elem.content) > 0 || elem.AnnotRef != 0 {
+		kItems = make([]string, 0, len(elem.content)+1)
 	}
 
 	// Bare MCID integers are only valid relative to the element's single /Pg.
@@ -558,27 +554,35 @@ func (d *Document) formatStructKids(elem *StructElem) string {
 		}
 
 		if useMCR || contentRef.page != elem.Page {
-			kItems = append(kItems, fmt.Sprintf(
-				"<< /Type /MCR /Pg %s /MCID %d >>", contentRef.page.ref.String(), contentRef.mcid,
-			))
+			var mcrBuilder strings.Builder
+			mcrBuilder.WriteString("<< /Type /MCR /Pg ")
+			mcrBuilder.WriteString(contentRef.page.ref.String())
+			mcrBuilder.WriteString(" /MCID ")
+			mcrBuilder.WriteString(strconv.Itoa(contentRef.mcid))
+			mcrBuilder.WriteString(" >>")
+			kItems = append(kItems, mcrBuilder.String())
 		} else {
 			kItems = append(kItems, strconv.Itoa(contentRef.mcid))
 		}
 	}
 
 	if elem.AnnotRef != 0 {
-		pgRef := ""
-
 		targetPage := elem.Page
 		if targetPage == nil && elem.parent != nil {
 			targetPage = elem.parent.Page
 		}
 
+		var objrBuilder strings.Builder
+		objrBuilder.WriteString("<< /Type /OBJR /Obj ")
+		objrBuilder.WriteString(elem.AnnotRef.String())
+
 		if targetPage != nil {
-			pgRef = " /Pg " + targetPage.ref.String()
+			objrBuilder.WriteString(" /Pg ")
+			objrBuilder.WriteString(targetPage.ref.String())
 		}
 
-		kItems = append(kItems, fmt.Sprintf("<< /Type /OBJR /Obj %s%s >>", elem.AnnotRef.String(), pgRef))
+		objrBuilder.WriteString(" >>")
+		kItems = append(kItems, objrBuilder.String())
 	}
 
 	if len(kItems) == 1 {
@@ -618,8 +622,6 @@ func contentNeedsMCR(elem *StructElem) bool {
 }
 
 // resolveListNumbering returns the ListNumbering name to emit on an /L element.
-// Explicit values win; otherwise under PDF/UA-2, lists that have Lbl children
-// default to Disc so validators do not see an implicit None.
 func resolveListNumbering(elem *StructElem) string {
 	if elem == nil || elem.Tag != StructTypeL {
 		return ""
@@ -629,7 +631,7 @@ func resolveListNumbering(elem *StructElem) string {
 		return elem.ListNumbering
 	}
 
-	if elem.doc == nil || !elem.doc.policy.IsPDFUA2() {
+	if elem.doc == nil || !elem.doc.isUA2 {
 		return ""
 	}
 
@@ -646,13 +648,17 @@ func listHasLbl(elem *StructElem) bool {
 	}
 
 	for _, kid := range elem.Kids {
+		if kid == nil {
+			continue
+		}
+
 		if kid.Tag == StructTypeLbl {
 			return true
 		}
 
 		if kid.Tag == StructTypeLI {
 			for _, grand := range kid.Kids {
-				if grand.Tag == StructTypeLbl {
+				if grand != nil && grand.Tag == StructTypeLbl {
 					return true
 				}
 			}
@@ -666,6 +672,10 @@ func listHasLbl(elem *StructElem) bool {
 //
 //nolint:cyclop // sequential structure element serialization
 func (d *Document) serializeStructElem(elem *StructElem, parentRef objRef) error {
+	if elem == nil {
+		return nil
+	}
+
 	var elemDict dict
 	elemDict = elemDict.add("/Type", "/StructElem").
 		add("/S", "/"+string(elem.Tag)).
@@ -682,7 +692,7 @@ func (d *Document) serializeStructElem(elem *StructElem, parentRef objRef) error
 
 	elemDict = elemDict.add("/K", kidsStr)
 
-	if d.policy.IsPDFUA2() && elem.Tag == StructTypeDocument && d.namespaceRef != 0 {
+	if d.isUA2 && elem.Tag == StructTypeDocument && d.namespaceRef != 0 {
 		elemDict = elemDict.add("/NS", d.namespaceRef.String())
 	}
 
@@ -707,15 +717,16 @@ func (d *Document) serializeStructElem(elem *StructElem, parentRef objRef) error
 	} else if elem.Tag == StructTypeTH {
 		elemDict = elemDict.add("/A", "<< /O /Table /Scope /Column >>")
 	} else if listNumbering := resolveListNumbering(elem); listNumbering != "" {
-		// PDF/UA-2 8.2.5.25: when LI contains Lbl, ListNumbering must be present and not None.
 		elemDict = elemDict.add("/A", fmt.Sprintf("<< /O /List /ListNumbering /%s >>", listNumbering))
 	}
 
 	d.setDict(elem.ref, elemDict.String())
 
 	for _, kid := range elem.Kids {
-		if err := d.serializeStructElem(kid, elem.ref); err != nil {
-			return err
+		if kid != nil {
+			if err := d.serializeStructElem(kid, elem.ref); err != nil {
+				return err
+			}
 		}
 	}
 

@@ -18,6 +18,7 @@ import (
 	"gowkhtmltopdf/internal/imageout"
 	"gowkhtmltopdf/internal/line"
 	"gowkhtmltopdf/internal/load"
+	"gowkhtmltopdf/internal/pdf"
 	"gowkhtmltopdf/internal/settings"
 )
 
@@ -78,18 +79,23 @@ var (
 	ErrInvalidPDFVersion = settings.ErrInvalidPDFVersion
 	// ErrInvalidPDFProfile reports an invalid or unsupported PDF profile string.
 	ErrInvalidPDFProfile = settings.ErrInvalidPDFProfile
-	// ErrProfilePDF20Unsupported reports PDF 2.0 conformance profiles (PDF/A-4, PDF/UA-2) are unsupported.
+	// ErrProfilePDF20Unsupported is a historical sentinel retained for source compatibility;
+	// PDF 2.0 profiles are supported.
 	ErrProfilePDF20Unsupported = settings.ErrProfilePDF20Unsupported
 	// ErrProfilePDFA1Unsupported reports PDF/A-1 is unsupported.
 	ErrProfilePDFA1Unsupported = settings.ErrProfilePDFA1Unsupported
 	// ErrConformanceRequiresPDF17 indicates a conformance profile was requested without PDF 1.7.
-	ErrConformanceRequiresPDF17 = convert.ErrProfileRequiresPDF17
+	ErrConformanceRequiresPDF17 = pdf.ErrConformanceRequiresPDF17
 	// ErrProfileRequiresPDF17 is an alias for ErrConformanceRequiresPDF17.
-	ErrProfileRequiresPDF17 = convert.ErrProfileRequiresPDF17
+	ErrProfileRequiresPDF17 = pdf.ErrConformanceRequiresPDF17
 	// ErrConformanceRequiresPDF20 indicates a conformance profile was requested without PDF 2.0.
-	ErrConformanceRequiresPDF20 = convert.ErrProfileRequiresPDF20
+	ErrConformanceRequiresPDF20 = pdf.ErrConformanceRequiresPDF20
 	// ErrProfileRequiresPDF20 is an alias for ErrConformanceRequiresPDF20.
-	ErrProfileRequiresPDF20 = convert.ErrProfileRequiresPDF20
+	ErrProfileRequiresPDF20 = pdf.ErrConformanceRequiresPDF20
+	// ErrTitleRequired indicates that PDF/UA requires a non-empty document title.
+	ErrTitleRequired = pdf.ErrTitleRequired
+	// ErrPDFUAMissingAlt indicates that PDF/UA requires non-empty alt text for figures (images).
+	ErrPDFUAMissingAlt = pdf.ErrPDFUAMissingAlt
 )
 
 // Version returns the library version banner.
@@ -645,8 +651,6 @@ func (c *Converter) Convert(ctx context.Context) error {
 // settings so later mutations of Global() / objects cannot change the
 // in-flight request. Callers do not need to call Output(); Convert() still
 // buffers for Output() compatibility.
-//
-//nolint:cyclop // sequential validation and setup steps
 func (c *Converter) ConvertTo(ctx context.Context, writer io.Writer) error {
 	if c == nil {
 		return ErrNilConverter
@@ -670,18 +674,6 @@ func (c *Converter) ConvertTo(ctx context.Context, writer io.Writer) error {
 	if global.PageSize != "" {
 		if _, _, err := settings.ParsePageSize(global.PageSize); err != nil {
 			return reportPreflight(c.OnError, fmt.Errorf("%w: %q", ErrInvalidPageSize, global.PageSize))
-		}
-	}
-
-	if global.PdfProfile != "" {
-		if _, err := settings.ParsePDFProfile(global.PdfProfile); err != nil {
-			return reportPreflight(c.OnError, err)
-		}
-	}
-
-	if global.PdfVersion != "" {
-		if _, err := settings.ParsePDFVersion(global.PdfVersion); err != nil {
-			return reportPreflight(c.OnError, err)
 		}
 	}
 
@@ -1143,8 +1135,6 @@ func (r *ImageRequest) EnableLocalFileAccess() *ImageRequest {
 // opened. The request must have a document sink, copies must be positive, and
 // at least one body object must be present; TOC-only and empty objects are
 // rejected.
-//
-//nolint:cyclop // sequential validation checks
 func (r *PDFRequest) ValidatePDF() error {
 	if r == nil {
 		return ErrNilPDFRequest
@@ -1169,20 +1159,8 @@ func (r *PDFRequest) ValidatePDF() error {
 		}
 	}
 
-	if global.PdfProfile != "" {
-		if _, err := settings.ParsePDFProfile(global.PdfProfile); err != nil {
-			return err //nolint:wrapcheck // sentinel error from settings package
-		}
-	}
-
-	if global.PdfVersion != "" {
-		if _, err := settings.ParsePDFVersion(global.PdfVersion); err != nil {
-			return err //nolint:wrapcheck // sentinel error from settings package
-		}
-	}
-
 	if _, err := convert.PolicyForGlobal(global); err != nil {
-		return err //nolint:wrapcheck // validation error from convert package
+		return fmt.Errorf("%w", err)
 	}
 
 	if global.Copies < 1 {

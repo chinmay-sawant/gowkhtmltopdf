@@ -69,13 +69,21 @@ func (o PdfGlobalOptions) WithResolveRelativeLinks(enabled bool) PdfGlobalOption
 }
 
 func (o PdfGlobalOptions) WithPDFVersion(version string) PdfGlobalOptions {
-	o.global.PdfVersion = version
+	if parsed, err := ParsePDFVersion(version); err == nil {
+		o.global.PdfVersion = parsed
+	} else {
+		o.global.PdfVersion = version
+	}
 
 	return o
 }
 
 func (o PdfGlobalOptions) WithPDFProfile(profile string) PdfGlobalOptions {
-	o.global.PdfProfile = profile
+	if parsed, err := ParsePDFProfile(profile); err == nil {
+		o.global.PdfProfile = parsed
+	} else {
+		o.global.PdfProfile = profile
+	}
 
 	return o
 }

@@ -1,11 +1,10 @@
 // Package pdf implements a pure-Go version-aware PDF writer (PDF 1.4 default,
-// opt-in PDF 1.7 and 2.0): indirect objects, xref, catalog/pages tree, content
-// streams (Flate), base-14 fonts, images, link annotations, named destinations,
-// outlines, trailer /ID, and non-claiming XMP metadata. The write path uses the
-// Go standard library plus one allowlisted exception for OpenType shaping
-// (go-text/typesetting). Deterministic output for golden tests (creation date
-// is injectable). PDF 2.0 is an opt-in version only — it is not PDF/A-4 or
-// PDF/UA-2 (issue #33).
+// opt-in PDF 1.7 and 2.0, PDF/A-3a/4, and PDF/UA-1/2): indirect objects, xref,
+// catalog/pages tree, content streams (Flate), base-14 fonts, images, link
+// annotations, named destinations, outlines, trailer /ID, and conformance XMP metadata.
+// The write path uses the Go standard library plus one allowlisted exception
+// for OpenType shaping (go-text/typesetting). Deterministic output for golden
+// tests (creation date is injectable).
 package pdf
 
 import (
@@ -126,6 +125,11 @@ func (d dict) String() string { return "<< " + strings.Join(d, " ") + " >>" }
 // concurrently; use one document per conversion when parallelism is needed.
 type Document struct {
 	policy            WriterPolicy
+	isUA              bool
+	isUA1             bool
+	isUA2             bool
+	isPDFA3           bool
+	isPDFA4           bool
 	objects           []*object
 	info              map[string]string
 	useCompression    bool
@@ -139,6 +143,7 @@ type Document struct {
 	fontRunes         map[string][]rune // font resource name -> document-wide rune union (finalize-time)
 	fontKeys          map[string]string // font resource name -> precomputed subset cache key
 	fontKeyFonts      map[string]*Font  // font resource name -> the face the precomputed key belongs to
+	fontFaces         map[string]*Font  // font resource name -> font face (registered during painting)
 	fontType0         map[string]bool   // font resource name -> precomputed needsType0(union)
 	catalogRef        objRef            // set by finalize
 	infoRef           objRef            // set by finalize
@@ -166,15 +171,50 @@ type namedDestEntry struct {
 	structR objRef // 0 when no structure destination
 }
 
+func (d *Document) updatePolicyFlags() {
+	d.isUA1 = d.policy.IsPDFUA1()
+	d.isUA2 = d.policy.IsPDFUA2()
+	d.isUA = d.isUA1 || d.isUA2
+	d.isPDFA3 = d.policy.IsPDFA3()
+	d.isPDFA4 = d.policy.IsPDFA4()
+}
+
+// IsUA reports whether the document is configured for PDF/UA-1 or PDF/UA-2.
+func (d *Document) IsUA() bool { return d.isUA }
+
+// IsUA1 reports whether the document is configured for PDF/UA-1.
+func (d *Document) IsUA1() bool { return d.isUA1 }
+
+// IsUA2 reports whether the document is configured for PDF/UA-2.
+func (d *Document) IsUA2() bool { return d.isUA2 }
+
+// IsPDFA3 reports whether the document is configured for PDF/A-3.
+func (d *Document) IsPDFA3() bool { return d.isPDFA3 }
+
+// IsPDFA4 reports whether the document is configured for PDF/A-4.
+func (d *Document) IsPDFA4() bool { return d.isPDFA4 }
+
+func (d *Document) recordFontFace(name string, f *Font) {
+	if d.fontFaces == nil {
+		d.fontFaces = map[string]*Font{}
+	}
+
+	d.fontFaces[name] = f
+}
+
 // NewDocument creates an empty PDF document with the default PDF 1.4 policy.
 func NewDocument() *Document {
-	return &Document{ //nolint:exhaustruct // intentional zero-value fields
+	doc := &Document{ //nolint:exhaustruct // intentional zero-value fields
 		policy:         WriterPolicy{Version: PDF14}, //nolint:exhaustruct // default policy
 		info:           map[string]string{},
 		useCompression: true,
 		fontCache:      map[string]objRef{},
 		fontRuneSet:    map[string]map[rune]struct{}{},
+		fontFaces:      map[string]*Font{},
 	}
+	doc.updatePolicyFlags()
+
+	return doc
 }
 
 // NewDocumentWithPolicy creates an empty PDF document configured with the given writer policy.
@@ -185,6 +225,7 @@ func NewDocumentWithPolicy(policy WriterPolicy) (*Document, error) {
 
 	doc := NewDocument()
 	doc.policy = policy
+	doc.updatePolicyFlags()
 
 	return doc, nil
 }
@@ -381,6 +422,15 @@ func (d *Document) DuplicatePage(idx int) (*Page, error) {
 
 	for i := range clonedPage.annots {
 		clonedPage.annots[i].annotRef = 0
+	}
+
+	if len(src.mcids) > 0 {
+		clonedPage.mcids = append([]*StructElem(nil), src.mcids...)
+		for i, elem := range clonedPage.mcids {
+			if elem != nil {
+				elem.content = append(elem.content, contentRef{page: clonedPage, mcid: i})
+			}
+		}
 	}
 
 	return clonedPage, nil
@@ -652,6 +702,48 @@ func (d *Document) writeTo(width io.Writer) (int64, error) {
 	return out.n, nil
 }
 
+// embedICC embeds an ICC profile stream object with compression.
+func (d *Document) embedICC(n int, alt string, rawFlated []byte) objRef {
+	ref := d.newObject()
+	d.setDict(ref, fmt.Sprintf("<< /N %d /Alternate /%s /Filter /FlateDecode /Length %d >>", n, alt, len(rawFlated)))
+	d.setStream(ref, rawFlated)
+
+	return ref
+}
+
+// embedOutputIntents creates output intent dictionary and embeds required ICC profiles.
+func (d *Document) embedOutputIntents() {
+	const (
+		rgbChannels  = 3
+		grayChannels = 1
+	)
+
+	if d.isPDFA3 {
+		d.iccRef = d.embedICC(rgbChannels, "DeviceRGB", FlatedSRGBICCProfile())
+		d.outputIntentRef = d.newObject()
+		d.setDict(d.outputIntentRef, outputIntentDict(d.iccRef))
+	} else if d.isPDFA4 {
+		d.iccRef = d.embedICC(rgbChannels, "DeviceRGB", FlatedSRGBICCProfile())
+		d.grayIccRef = d.embedICC(grayChannels, "DeviceGray", FlatedGrayICCProfile())
+		d.outputIntentRef = d.newObject()
+		d.setDict(d.outputIntentRef, outputIntentDict(d.iccRef))
+	}
+}
+
+// embedMetadata creates the document's XMP metadata object when Version >= PDF 1.7.
+func (d *Document) embedMetadata() objRef {
+	if d.policy.Version < PDF17 {
+		return 0
+	}
+
+	metadataRef := d.newObject()
+	xmpBytes := d.buildXMPMetadata()
+	d.setDict(metadataRef, fmt.Sprintf("<< /Type /Metadata /Subtype /XML /Length %d >>", len(xmpBytes)))
+	d.setStream(metadataRef, xmpBytes)
+
+	return metadataRef
+}
+
 // finalize builds catalog, pages tree, fonts, images, annots, outlines and
 // page objects once.
 //
@@ -669,7 +761,7 @@ func (d *Document) finalize() error {
 		return errPDFNoPages
 	}
 
-	if d.policy.IsPDFUA1() || d.policy.IsPDFUA2() {
+	if d.isUA {
 		title := strings.TrimSpace(d.info["Title"])
 		if title == "" {
 			return ErrTitleRequired
@@ -679,49 +771,13 @@ func (d *Document) finalize() error {
 	catalogRef := d.newObject()
 
 	var infoRef objRef
-
-	if !d.policy.IsPDFA4() {
+	if !d.isPDFA4 {
 		infoRef = d.newObject()
 	}
 
 	pagesRef := d.newObject()
-
-	var metadataRef objRef
-
-	if d.policy.Version >= PDF17 {
-		metadataRef = d.newObject()
-		xmpBytes := d.buildXMPMetadata()
-		d.setDict(metadataRef, fmt.Sprintf("<< /Type /Metadata /Subtype /XML /Length %d >>", len(xmpBytes)))
-		d.setStream(metadataRef, xmpBytes)
-	}
-
-	if d.policy.IsPDFA3() {
-		iccRef := d.newObject()
-		iccData := flateBytes(sRGBICCProfile())
-		d.setDict(iccRef, fmt.Sprintf("<< /N 3 /Alternate /DeviceRGB /Filter /FlateDecode /Length %d >>", len(iccData)))
-		d.setStream(iccRef, iccData)
-		d.iccRef = iccRef
-
-		outputIntentRef := d.newObject()
-		d.setDict(outputIntentRef, outputIntentDict(iccRef))
-		d.outputIntentRef = outputIntentRef
-	} else if d.policy.IsPDFA4() {
-		iccRef := d.newObject()
-		iccData := flateBytes(sRGBICCProfile())
-		d.setDict(iccRef, fmt.Sprintf("<< /N 3 /Alternate /DeviceRGB /Filter /FlateDecode /Length %d >>", len(iccData)))
-		d.setStream(iccRef, iccData)
-		d.iccRef = iccRef
-
-		grayRef := d.newObject()
-		grayData := flateBytes(grayICCProfile())
-		d.setDict(grayRef, fmt.Sprintf("<< /N 1 /Alternate /DeviceGray /Filter /FlateDecode /Length %d >>", len(grayData)))
-		d.setStream(grayRef, grayData)
-		d.grayIccRef = grayRef
-
-		outputIntentRef := d.newObject()
-		d.setDict(outputIntentRef, outputIntentDict(iccRef))
-		d.outputIntentRef = outputIntentRef
-	}
+	metadataRef := d.embedMetadata()
+	d.embedOutputIntents()
 
 	d.unionFontRunes()
 
@@ -794,10 +850,12 @@ func (d *Document) unionFontRunes() {
 		sort.Slice(runes, func(i, j int) bool { return runes[i] < runes[j] })
 		d.fontRunes[name] = runes
 
-		var fnt *Font
-		for _, page := range d.pages {
-			if fnt = page.content.fontFiles[name]; fnt != nil {
-				break
+		fnt := d.fontFaces[name]
+		if fnt == nil {
+			for _, page := range d.pages {
+				if fnt = page.content.fontFiles[name]; fnt != nil {
+					break
+				}
 			}
 		}
 
@@ -991,7 +1049,9 @@ func (d *Document) finalizePage(page *Page, pagesRef objRef) error {
 		}
 
 		parts = append(parts, "/Annots ["+strings.Join(refs, " ")+"]")
-		parts = append(parts, "/Tabs /S")
+		if d.policy.IsPDFUA1() || d.policy.IsPDFUA2() {
+			parts = append(parts, "/Tabs /S")
+		}
 	}
 
 	parts = append(parts, ">>")
@@ -1396,6 +1456,8 @@ func encodeTextString(text string, version PDFVersion) string {
 	return pdfString(text)
 }
 
+const hexUpperDigits = "0123456789ABCDEF"
+
 // encodeUTF8Hex renders text as a PDF 2.0 UTF-8 text string: ISO 32000-2
 // requires UTF-8 text strings to begin with U+FEFF (bytes EF BB BF), so the
 // hex string is the BOM followed by the UTF-8 encoding of text. Hex form
@@ -1409,7 +1471,8 @@ func encodeUTF8Hex(text string) string {
 	buf.WriteString("<EFBBBF")
 
 	for _, b := range utf8Bytes {
-		fmt.Fprintf(&buf, "%02X", b)
+		buf.WriteByte(hexUpperDigits[b>>4])
+		buf.WriteByte(hexUpperDigits[b&0x0F])
 	}
 
 	buf.WriteByte('>')
@@ -1417,6 +1480,7 @@ func encodeUTF8Hex(text string) string {
 	return buf.String()
 }
 
+//nolint:mnd // 4-bit nibble shift offsets for 16-bit hex conversion
 func encodeUTF16BEHex(text string) string {
 	const (
 		bomLen       = 2
@@ -1432,7 +1496,10 @@ func encodeUTF16BEHex(text string) string {
 	buf.WriteString(prefixBOMHex)
 
 	for _, unit := range u16 {
-		fmt.Fprintf(&buf, "%04X", unit)
+		buf.WriteByte(hexUpperDigits[(unit>>12)&0x0F])
+		buf.WriteByte(hexUpperDigits[(unit>>8)&0x0F])
+		buf.WriteByte(hexUpperDigits[(unit>>4)&0x0F])
+		buf.WriteByte(hexUpperDigits[unit&0x0F])
 	}
 
 	buf.WriteByte('>')

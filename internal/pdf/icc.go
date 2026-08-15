@@ -3,7 +3,28 @@ package pdf
 
 import (
 	"encoding/binary"
+	"sync"
 )
+
+//nolint:gochecknoglobals // precomputed Flate ICC profile byte caches
+var (
+	flatedSRGBOnce = sync.OnceValue(func() []byte {
+		return flateBytes(sRGBICCProfile())
+	})
+	flatedGrayOnce = sync.OnceValue(func() []byte {
+		return flateBytes(grayICCProfile())
+	})
+)
+
+// FlatedSRGBICCProfile returns precomputed Flate-compressed sRGB ICC profile bytes.
+func FlatedSRGBICCProfile() []byte {
+	return flatedSRGBOnce()
+}
+
+// FlatedGrayICCProfile returns precomputed Flate-compressed Gray ICC profile bytes.
+func FlatedGrayICCProfile() []byte {
+	return flatedGrayOnce()
+}
 
 const sRGBICCProfileSize = 472
 

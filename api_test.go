@@ -1810,8 +1810,8 @@ func TestPDFProfileAPI(t *testing.T) {
 	builder := NewPdfGlobalOptions().WithPDFProfile("a3a-ua1")
 	snap := builder.Build()
 
-	if got, ok := snap.Get("pdfprofile"); !ok || got != "a3a-ua1" {
-		t.Fatalf("snap.Get(pdfprofile) = %q, %v; want a3a-ua1, true", got, ok)
+	if got, ok := snap.Get("pdfprofile"); !ok || got != "PDF/A-3a+PDF/UA-1" {
+		t.Fatalf("snap.Get(pdfprofile) = %q, %v; want PDF/A-3a+PDF/UA-1, true", got, ok)
 	}
 
 	builderSetting, err := NewPdfGlobalOptions().WithSetting("pdfprofile", "a3a-ua1")

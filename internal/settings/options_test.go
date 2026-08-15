@@ -24,8 +24,8 @@ func TestPdfGlobalOptionsBuildsIndependentTypedSnapshot(t *testing.T) {
 	if got.PdfVersion != "1.7" {
 		t.Fatalf("pdf version = %q, want 1.7", got.PdfVersion)
 	}
-	if got.PdfProfile != "a3a-ua1" {
-		t.Fatalf("pdf profile = %q, want a3a-ua1", got.PdfProfile)
+	if got.PdfProfile != settings.ProfilePDFA3aPDFUA1 {
+		t.Fatalf("pdf profile = %q, want %q", got.PdfProfile, settings.ProfilePDFA3aPDFUA1)
 	}
 	if got.PageSize != pageSize {
 		t.Fatalf("page size = %q, want Letter", got.PageSize)

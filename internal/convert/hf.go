@@ -166,7 +166,7 @@ func drawTextHF(page *pdf.Page, hfVal settings.HeaderFooter, geom hfGeom, parms 
 		return
 	}
 
-	isUA := page.Doc() != nil && (page.Doc().Policy().IsPDFUA1() || page.Doc().Policy().IsPDFUA2())
+	isUA := page.Doc() != nil && page.Doc().IsUA()
 	if isUA {
 		cur.BeginArtifact("Pagination")
 	}
@@ -488,7 +488,7 @@ func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hfVal se
 	pageContent := page.Content()
 	pageContent.Save()
 
-	isUA := page.Doc() != nil && (page.Doc().Policy().IsPDFUA1() || page.Doc().Policy().IsPDFUA2())
+	isUA := page.Doc() != nil && page.Doc().IsUA()
 	if isUA {
 		pageContent.BeginArtifact("Pagination")
 	}
@@ -568,8 +568,7 @@ func paintLayoutOps(ctx context.Context, page *pdf.Page, c *pdf.Content, ops []l
 			}
 
 			dx, dy := dest.st.geom.pdfXY(dest.loc)
-			annotRef := page.AddLinkDest(rect, destPage, dx, dy)
-			attachLinkStructElem(page.Doc(), page, oper.StructElem, annotRef)
+			_ = page.AddLinkDest(rect, destPage, dx, dy)
 
 			continue
 		}
@@ -578,8 +577,7 @@ func paintLayoutOps(ctx context.Context, page *pdf.Page, c *pdf.Content, ops []l
 			continue
 		}
 
-		annotRef := page.AddLinkURI(rect, uri)
-		attachLinkStructElem(page.Doc(), page, oper.StructElem, annotRef)
+		_ = page.AddLinkURI(rect, uri)
 	}
 
 	return nil

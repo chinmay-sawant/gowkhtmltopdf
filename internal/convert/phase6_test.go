@@ -431,3 +431,72 @@ func TestPDFUA1LinkAnnotationOBJRCompliance(t *testing.T) {
 		t.Error("Missing /Type /OBJR /Obj in structure tree for link annotation")
 	}
 }
+
+func TestLinkMCIDAndOBJRIdentity(t *testing.T) {
+	t.Parallel()
+
+	body := `<!DOCTYPE html><html><head><title>Link Identity</title></head><body>
+		<p>Here is <a href="https://example.com">a test link</a> in a paragraph.</p>
+	</body></html>`
+
+	cmd, _ := newCommand(t, body, filepath.Join(t.TempDir(), "out.pdf"))
+	cmd.Global.PdfProfile = settings.ProfilePDFUA1
+	cmd.Global.Title = "Link Identity"
+	cmd.Global.UseCompression = false
+
+	data := runPDF(t, cmd)
+	outStr := string(data)
+
+	// In the structure tree, the /S /Link StructElem should contain both the MCID integer and the OBJR dictionary
+	re := regexp.MustCompile(
+		`<<\s*/Type\s*/StructElem\s*/S\s*/Link[^\n]*\s*/K\s*\[\s*(\d+)\s+<<\s*/Type\s*/OBJR[^\n]*>>\s*\]`,
+	)
+
+	if !re.MatchString(outStr) {
+		t.Errorf("StructElem for Link should contain both MCID and OBJR together in /K")
+	}
+}
+
+func TestSingleDocumentChildUnderStructTreeRoot(t *testing.T) {
+	t.Parallel()
+
+	body1 := `<!DOCTYPE html><html><head><title>Doc 1</title></head><body><p>Body 1</p></body></html>`
+	body2 := `<!DOCTYPE html><html><head><title>Doc 2</title></head><body><p>Body 2</p></body></html>`
+
+	cmd, _ := newCommand(t, body1, filepath.Join(t.TempDir(), "out.pdf"))
+	cmd.Objects = append(cmd.Objects, settings.PdfObject{ //nolint:exhaustruct // test object
+		Page: body2,
+	})
+	cmd.Global.PdfProfile = settings.ProfilePDFUA1
+	cmd.Global.Title = "Multi Object Doc"
+	cmd.Global.UseCompression = false
+
+	data := runPDF(t, cmd)
+	outStr := string(data)
+
+	// Count occurrences of /S /Document in the output
+	docCount := strings.Count(outStr, "/S /Document")
+	if docCount != 1 {
+		t.Errorf("/S /Document count = %d, want exactly 1", docCount)
+	}
+}
+
+func TestHFLinkIsolationFromDocumentStructureTree(t *testing.T) {
+	t.Parallel()
+
+	body := `<!DOCTYPE html><html><head><title>Body</title></head><body><p>Main content</p></body></html>`
+
+	cmd, _ := newCommand(t, body, filepath.Join(t.TempDir(), "out.pdf"))
+	cmd.Global.Header.Left = "Header Text"
+	cmd.Global.PdfProfile = settings.ProfilePDFUA1
+	cmd.Global.Title = "HF Isolation"
+	cmd.Global.UseCompression = false
+
+	data := runPDF(t, cmd)
+	outStr := string(data)
+
+	// No /S /Link should be emitted since body has no links
+	if strings.Contains(outStr, "/S /Link") {
+		t.Errorf("Emitted /S /Link when body had no links (header/footer artifact leak)")
+	}
+}

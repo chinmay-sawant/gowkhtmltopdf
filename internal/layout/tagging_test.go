@@ -33,13 +33,8 @@ th, td { border: 1px solid #ccc; padding: 4pt }
 `)
 	res := layoutHTML(t, htmlStr, cssSheet)
 
-	opMap, err := buildStructureTree(doc, res)
-	if err != nil {
+	if err := buildStructureTree(doc, res); err != nil {
 		t.Fatalf("buildStructureTree: %v", err)
-	}
-
-	if opMap == nil {
-		t.Fatal("expected non-nil opMap")
 	}
 
 	root := doc.StructTreeRoot()
@@ -142,12 +137,8 @@ func TestStructureTreeListTagging(t *testing.T) {
 	cssSheet := sheet(t, `ul { margin-left: 20pt } li { margin: 2pt 0 }`)
 	res := layoutHTML(t, htmlStr, cssSheet)
 
-	opMap, err := buildStructureTree(doc, res)
-	if err != nil {
+	if err := buildStructureTree(doc, res); err != nil {
 		t.Fatalf("buildStructureTree: %v", err)
-	}
-	if opMap == nil {
-		t.Fatal("expected non-nil opMap")
 	}
 
 	root := doc.StructTreeRoot()
@@ -266,8 +257,7 @@ func TestStructureTreeHeadingNormalization(t *testing.T) {
 			}
 
 			res := layoutHTML(t, tc.html, sheet(t, ""))
-			_, err = buildStructureTree(doc, res)
-			if err != nil {
+			if err := buildStructureTree(doc, res); err != nil {
 				t.Fatalf("buildStructureTree: %v", err)
 			}
 
@@ -290,6 +280,156 @@ func TestStructureTreeHeadingNormalization(t *testing.T) {
 				if gotTags[i] != tc.wantTags[i] {
 					t.Errorf("heading %d = %s, want %s", i, gotTags[i], tc.wantTags[i])
 				}
+			}
+		})
+	}
+}
+
+func dumpStructTree(elem *pdf.StructElem, indent string) string {
+	if elem == nil {
+		return indent + "<nil>\n"
+	}
+
+	out := indent + string(elem.Tag) + "\n"
+	for _, kid := range elem.Kids {
+		out += dumpStructTree(kid, indent+"  ")
+	}
+
+	return out
+}
+
+func dumpBoxTree(b *box, indent string) string {
+	if b == nil {
+		return indent + "<nil>\n"
+	}
+
+	name := "(anon)"
+	if b.node != nil {
+		name = b.node.Name
+		if name == "" {
+			name = "(text)"
+		}
+	}
+
+	out := indent + name + " kind=" + b.kind + "\n"
+	for _, child := range b.children {
+		out += dumpBoxTree(child, indent+"  ")
+	}
+
+	return out
+}
+
+func countStructTags(elem *pdf.StructElem, tag pdf.StructType) int {
+	if elem == nil {
+		return 0
+	}
+
+	n := 0
+	if elem.Tag == tag {
+		n++
+	}
+
+	for _, kid := range elem.Kids {
+		n += countStructTags(kid, tag)
+	}
+
+	return n
+}
+
+func assertListHierarchy(t *testing.T, elem *pdf.StructElem) {
+	t.Helper()
+
+	if elem == nil {
+		return
+	}
+
+	switch elem.Tag {
+	case pdf.StructL:
+		for i, kid := range elem.Kids {
+			switch kid.Tag {
+			case pdf.StructLI, pdf.StructL, pdf.StructCaption:
+			default:
+				t.Errorf("L child %d is %s, want LI, L, or Caption", i, kid.Tag)
+			}
+		}
+	case pdf.StructLI:
+		for i, kid := range elem.Kids {
+			switch kid.Tag {
+			case pdf.StructLbl, pdf.StructLBody, pdf.StructL:
+			default:
+				t.Errorf("LI child %d is %s, want Lbl, LBody, or L", i, kid.Tag)
+			}
+		}
+	}
+
+	for _, kid := range elem.Kids {
+		assertListHierarchy(t, kid)
+	}
+}
+
+//nolint:cyclop,funlen,varnamelen,wsl,lll,exhaustive,nlreturn,exhaustruct
+func TestStructureTreeListLinkHierarchy(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		html string
+		css  string
+	}{
+		{
+			name: "li wrapping a fragment link",
+			html: `<html><body>
+<ol>
+  <li><a href="#one">One</a></li>
+  <li><a href="#two">Two</a></li>
+</ol>
+</body></html>`,
+			css: `ol { margin-left: 20pt } li { margin: 2pt 0 }`,
+		},
+		{
+			name: "multicol toc list of links",
+			html: `<html><body>
+<ol class="toc-list">
+  <li><a href="#one">One</a></li>
+  <li><a href="#two">Two</a></li>
+  <li><a href="#three">Three</a></li>
+</ol>
+</body></html>`,
+			css: `.toc-list { columns: 2; column-gap: 30px; } .toc-list li { margin: 2px 0; }`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			doc, err := pdf.NewDocumentWithPolicy(pdf.WriterPolicy{
+				Version:            pdf.PDF17,
+				ConformanceProfile: pdf.ProfilePDFUA1,
+			})
+			if err != nil {
+				t.Fatalf("NewDocumentWithPolicy: %v", err)
+			}
+
+			res := layoutHTML(t, tc.html, sheet(t, tc.css))
+			if err := buildStructureTree(doc, res); err != nil {
+				t.Fatalf("buildStructureTree: %v", err)
+			}
+
+			root := doc.StructTreeRoot()
+			if root == nil || len(root.Children) == 0 {
+				t.Fatal("expected non-empty StructTreeRoot")
+			}
+
+			assertListHierarchy(t, root.Children[0])
+
+			if links := countStructTags(root.Children[0], pdf.StructLink); links == 0 {
+				t.Error("expected at least one Link in the structure tree")
+			}
+
+			if t.Failed() {
+				t.Logf("box tree:\n%s", dumpBoxTree(res.root, ""))
+				t.Logf("struct tree:\n%s", dumpStructTree(root.Children[0], ""))
 			}
 		})
 	}

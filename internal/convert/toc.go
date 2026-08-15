@@ -160,7 +160,9 @@ func paintOptions(geom hfGeom) layout.PaintOptions {
 // paintCount lays the result out into a scratch document and returns its
 // page count, leaving res untouched.
 func paintCount(ctx context.Context, policy pdf.WriterPolicy, res *layout.Result, geom hfGeom) (int, error) {
-	scratch, err := pdf.NewDocumentWithPolicy(policy)
+	scratchPolicy := pdf.WriterPolicy{Version: policy.Version} //nolint:exhaustruct // estimation scratch policy
+
+	scratch, err := pdf.NewDocumentWithPolicy(scratchPolicy)
 	if err != nil {
 		return 0, fmt.Errorf("toc: paintCount: %w", err)
 	}
