@@ -221,6 +221,10 @@
   margin-top: 64px;
 }
 
+.bench-section .table-block + .table-block .table-block-heading {
+  margin-top: 80px;
+}
+
 .bench-section h2 {
   font-family: var(--serif);
   font-weight: 500;
