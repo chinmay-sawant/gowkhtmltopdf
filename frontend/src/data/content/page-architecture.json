@@ -5,7 +5,7 @@
   {
    "type": "hero",
    "title": "A pipeline of small pure-Go packages",
-   "lede": "gowkhtmltopdf is a clean-room work-alike of wkhtmltopdf: HTML is loaded, parsed, laid out, paginated, and painted into a PDF (unclaimed 1.4 in the 0.2.1 release; unreleased 0.2.2 adds opt-in 1.7 / 2.0 and PDF/A / PDF/UA profiles) or a PNG/JPEG bitmap using the Go standard library plus two allowlisted pure-Go modules for OpenType shaping and SVG rasterization."
+   "lede": "gowkhtmltopdf is a clean-room work-alike of wkhtmltopdf: HTML is loaded, parsed, laid out, paginated, and painted into a PDF (unclaimed 1.4 by default; 0.2.2 adds opt-in 1.7 / 2.0 and PDF/A / PDF/UA profiles) or a PNG/JPEG bitmap using the Go standard library plus two allowlisted pure-Go modules for OpenType shaping and SVG rasterization."
   },
   {
    "type": "table",
@@ -122,7 +122,7 @@
     },
     {
      "heading": "10. Write",
-     "body": "`internal/pdf` writes the file: zlib Flate streams, the TTF font subset, and a correct xref table. Default output is unclaimed PDF 1.4. Unreleased 0.2.2 (not in 0.2.1): `WriterPolicy` can emit PDF 1.7 or 2.0, and an explicit profile can claim PDF/A-3a / PDF/UA-1 or PDF/A-4 / PDF/UA-2."
+     "body": "`internal/pdf` writes the file: zlib Flate streams, the TTF font subset, and a correct xref table. Default output is unclaimed PDF 1.4. In 0.2.2, `WriterPolicy` can emit PDF 1.7 or 2.0, and an explicit profile can claim PDF/A-3a / PDF/UA-1 or PDF/A-4 / PDF/UA-2."
     }
    ]
   },
@@ -130,11 +130,11 @@
    "type": "bullets",
    "heading": "PDF writer notes",
    "items": [
-    "Version-aware writer in pure Go: unclaimed PDF 1.4 by default. Unreleased 0.2.2 (not in 0.2.1): opt-in PDF 1.7 / 2.0 via `WriterPolicy` (`--pdf-version` / `WithPDFVersion`). Version alone is not a PDF/A or PDF/UA claim.",
+    "Version-aware writer in pure Go: unclaimed PDF 1.4 by default. 0.2.2: opt-in PDF 1.7 / 2.0 via `WriterPolicy` (`--pdf-version` / `WithPDFVersion`). Version alone is not a PDF/A or PDF/UA claim.",
     "Content streams use `/Filter /FlateDecode` via zlib (RFC 1950).",
     "Fonts are an embedded Liberation Sans subset: a simple font with WinAnsi-style Latin-1 codes, `/Widths` expressed in 1000 units per em.",
     "Outlines get the Catalog `/Outlines N 0 R` entry assigned only after the outline object references exist.",
-    "Unreleased 0.2.2: opt-in `--pdf-profile` / `WithPDFProfile` (`a3a-ua1`, `a4-ua2`, and aliases) emit claiming XMP, ICC OutputIntent, and a tagged structure tree. Encryption, AcroForm, and signatures stay out of scope.",
+    "0.2.2: opt-in `--pdf-profile` / `WithPDFProfile` (`a3a-ua1`, `a4-ua2`, and aliases) emit claiming XMP, ICC OutputIntent, and a tagged structure tree. Encryption, AcroForm, and signatures stay out of scope.",
     "CJK and complex-script output uses the Type0/CID path with `--font-path`, without HarfBuzz shaping."
    ]
   },

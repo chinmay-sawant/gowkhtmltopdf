@@ -37,7 +37,7 @@
     },
     {
      "heading": "Typed builders",
-     "body": "For compile-time-checked configuration, NewPdfGlobalOptions returns a typed builder with WithPageSize, WithPDFVersion, WithPDFProfile, WithMargins, WithTitle, WithCopies, WithOutline, WithSmartShrinking, WithBackground, WithCompression and WithResolveRelativeLinks; Build() yields GlobalSettings. PDFRequest plus RunPDF is the type-safe one-shot API, writing output to an io.Writer instead of returning bytes. WithPDFVersion / WithPDFProfile are unreleased 0.2.2 (not in 0.2.1). WithPDFVersion accepts \"1.4\" (default), \"1.7\", or \"2.0\" and stores the canonical token on pdfversion; version alone is not a PDF/A or PDF/UA claim. WithPDFProfile accepts aliases such as a3a-ua1 / a3a / ua1 (PDF 1.7) and a4-ua2 / a4 / ua2 (PDF 2.0), or the canonical names, and stores the canonical token on pdfprofile. After WithPDFProfile(\"a3a-ua1\"), Get(\"pdfprofile\") is \"PDF/A-3a+PDF/UA-1\"."
+     "body": "For compile-time-checked configuration, NewPdfGlobalOptions returns a typed builder with WithPageSize, WithPDFVersion, WithPDFProfile, WithMargins, WithTitle, WithCopies, WithOutline, WithSmartShrinking, WithBackground, WithCompression and WithResolveRelativeLinks; Build() yields GlobalSettings. PDFRequest plus RunPDF is the type-safe one-shot API, writing output to an io.Writer instead of returning bytes. WithPDFVersion / WithPDFProfile shipped in 0.2.2. WithPDFVersion accepts \"1.4\" (default), \"1.7\", or \"2.0\" and stores the canonical token on pdfversion; version alone is not a PDF/A or PDF/UA claim. WithPDFProfile accepts aliases such as a3a-ua1 / a3a / ua1 (PDF 1.7) and a4-ua2 / a4 / ua2 (PDF 2.0), or the canonical names, and stores the canonical token on pdfprofile. After WithPDFProfile(\"a3a-ua1\"), Get(\"pdfprofile\") is \"PDF/A-3a+PDF/UA-1\"."
     }
    ]
   },
@@ -98,7 +98,7 @@
    "type": "callout",
    "variant": "info",
    "title": "Module path and install",
-   "body": "go.mod declares the module path gowkhtmltopdf plus two allowlisted direct pure-Go modules: github.com/go-text/typesetting for OpenType shaping and github.com/tdewolff/canvas for SVG rasterization. Their transitive graph is resolved by Go; no cgo, browser, or native converter process is required. LibraryVersion tracks the upstream 0.12.x compatibility surface as 0.12.7-dev, while VERSION is the project's release number (currently 0.2.1). Until the module is published to a reachable path, point consumers at a checkout: go mod edit -replace gowkhtmltopdf=/path/to/gowkhtmltopdf, then go get gowkhtmltopdf@v0.0.0. Once tagged, go get gowkhtmltopdf@v0.2.1 works as normal."
+   "body": "go.mod declares the module path gowkhtmltopdf plus two allowlisted direct pure-Go modules: github.com/go-text/typesetting for OpenType shaping and github.com/tdewolff/canvas for SVG rasterization. Their transitive graph is resolved by Go; no cgo, browser, or native converter process is required. LibraryVersion tracks the upstream 0.12.x compatibility surface as 0.12.7-dev, while VERSION is the project's release number (currently 0.2.2). Until the module is published to a reachable path, point consumers at a checkout: go mod edit -replace gowkhtmltopdf=/path/to/gowkhtmltopdf, then go get gowkhtmltopdf@v0.0.0. Once tagged, go get gowkhtmltopdf@v0.2.2 works as normal."
   },
   {
    "type": "callout",

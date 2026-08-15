@@ -46,10 +46,10 @@ Check the stamp:
 ```sh
 ./bin/gowkhtmltopdf --version
 # Name: gowkhtmltopdf
-# Version: 0.2.1
+# Version: 0.2.2
 ```
 
-`VERSION` (currently `0.2.1`) is the project release. The library constant
+`VERSION` (currently `0.2.2`) is the project release. The library constant
 `LibraryVersion` (`0.12.7-dev`) is a **wkhtmltopdf settings-surface**
 compatibility id, not the release number. See [library-api.md](library-api.md#versioning).
 
@@ -82,7 +82,7 @@ you repeat the flag or use `--allow`. Details: [cli.md](cli.md#local-files).
 
 ## PDF version and profile
 
-These flags are **unreleased 0.2.2** (on `master` after the 0.2.1 tag).
+These flags shipped in **0.2.2**.
 Default output is **unclaimed PDF 1.4**. `--pdf-version` changes the file
 version only; it is **not** a PDF/A or PDF/UA claim.
 

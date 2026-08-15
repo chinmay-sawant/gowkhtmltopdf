@@ -21,7 +21,7 @@ Requires Go **1.26+** (the module pins `toolchain go1.26.4`). Build with
 
 ```sh
 # when published / tagged:
-go get gowkhtmltopdf@v0.2.1
+go get gowkhtmltopdf@v0.2.2
 
 # local checkout (this repo today):
 go mod edit -replace gowkhtmltopdf=/path/to/gowkhtmltopdf
@@ -708,8 +708,8 @@ on, images on, resolve-relative-links on.
 | Key | Notes |
 |-----|--------|
 | `title` | PDF `/Title` (HTML `<title>` feeds `[doctitle]` only) |
-| `pdfversion` | **Unreleased 0.2.2** (not in 0.2.1). PDF output version: `"1.4"` (default), `"1.7"`, or `"2.0"`. `1.7` emits `%PDF-1.7`, trailer `/ID`, Info with UTF-16BE + BOM strings, and XMP Metadata stream. `2.0` emits `%PDF-2.0`, trailer `/ID`, UTF-8 document strings, and XMP metadata stream. |
-| `pdfprofile` | **Unreleased 0.2.2** (not in 0.2.1). Conformance claim (version alone is not). Set accepts short aliases (`"a3a"`, `"ua1"`, `"a3a-ua1"`, `"a4"`, `"ua2"`, `"a4-ua2"`) and the canonical names. **`Get("pdfprofile")` always returns the canonical token:** `"PDF/A-3a"`, `"PDF/UA-1"`, `"PDF/A-3a+PDF/UA-1"`, `"PDF/A-4"`, `"PDF/UA-2"`, or `"PDF/A-4+PDF/UA-2"` (empty when unset). Implies the required base version (`1.7` for A-3a/UA-1, `2.0` for A-4/UA-2). Profile + explicit wrong version fails with `ErrConformanceRequiresPDF17` / `ErrConformanceRequiresPDF20`. Tagged lists nest `L` → `LI` → `LBody` → `Link`. |
+| `pdfversion` | **0.2.2.** PDF output version: `"1.4"` (default), `"1.7"`, or `"2.0"`. `1.7` emits `%PDF-1.7`, trailer `/ID`, Info with UTF-16BE + BOM strings, and XMP Metadata stream. `2.0` emits `%PDF-2.0`, trailer `/ID`, UTF-8 document strings, and XMP metadata stream. |
+| `pdfprofile` | **0.2.2.** Conformance claim (version alone is not). Set accepts short aliases (`"a3a"`, `"ua1"`, `"a3a-ua1"`, `"a4"`, `"ua2"`, `"a4-ua2"`) and the canonical names. **`Get("pdfprofile")` always returns the canonical token:** `"PDF/A-3a"`, `"PDF/UA-1"`, `"PDF/A-3a+PDF/UA-1"`, `"PDF/A-4"`, `"PDF/UA-2"`, or `"PDF/A-4+PDF/UA-2"` (empty when unset). Implies the required base version (`1.7` for A-3a/UA-1, `2.0` for A-4/UA-2). Profile + explicit wrong version fails with `ErrConformanceRequiresPDF17` / `ErrConformanceRequiresPDF20`. Tagged lists nest `L` → `LI` → `LBody` → `Link`. |
 | `copies`, `collate` | copies must be ≥ 1 |
 | `pageoffset` | integer page offset |
 | `grayscale`, `colormode` | both write the same grayscale bit (`color` / `grayscale`) |

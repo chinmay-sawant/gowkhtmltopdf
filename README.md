@@ -17,8 +17,8 @@ paint → write). Direct modules are allowlisted:
 shaping) and [`tdewolff/canvas`](https://github.com/tdewolff/canvas) (SVG
 rasterization). The product is HTML templates and documents, not Chrome visual parity.
 
-**Status:** **v0.2.1** (tagged release). Unreleased **0.2.2** on `master` adds
-opt-in PDF 1.7 / 2.0 and PDF/A + PDF/UA profiles. **License:** [MIT](LICENSE).
+**Status:** **v0.2.2** (current release). Opt-in PDF 1.7 / 2.0 and PDF/A +
+PDF/UA profiles. **License:** [MIT](LICENSE).
 
 ## What it is for
 
@@ -26,9 +26,9 @@ opt-in PDF 1.7 / 2.0 and PDF/A + PDF/UA profiles. **License:** [MIT](LICENSE).
 |-----------|----------------|
 | Invoices, tables, page breaks from Go | Yes |
 | Headers, footers, TOC, PDF bookmarks | Yes |
-| PDF 1.4 / PDF 1.7 / PDF 2.0 output | PDF 1.4 in **0.2.1**. Opt-in 1.7 / 2.0 via `--pdf-version` is **unreleased 0.2.2**. Version alone is **not** a PDF/A or PDF/UA claim |
-| PDF/A-3a & PDF/UA-1 compliance | **Unreleased 0.2.2** — opt-in via `--pdf-profile a3a-ua1` / `WithPDFProfile` (implies PDF 1.7) |
-| PDF/A-4 & PDF/UA-2 compliance | **Unreleased 0.2.2** — opt-in via `--pdf-profile a4-ua2` / `WithPDFProfile` (implies PDF 2.0) |
+| PDF 1.4 / PDF 1.7 / PDF 2.0 output | Default PDF 1.4. Opt-in 1.7 / 2.0 via `--pdf-version`. Version alone is **not** a PDF/A or PDF/UA claim |
+| PDF/A-3a & PDF/UA-1 compliance | Opt-in via `--pdf-profile a3a-ua1` / `WithPDFProfile` (implies PDF 1.7) |
+| PDF/A-4 & PDF/UA-2 compliance | Opt-in via `--pdf-profile a4-ua2` / `WithPDFProfile` (implies PDF 2.0) |
 | Offline static binaries; no browser / no cgo | Yes |
 | Full CSS, JavaScript, or Chrome parity | No — print CSS subset; no JS |
 | CJK / complex Unicode | Partial — Type0/CID + `--font-path`; see [fonts.md](documentation/fonts.md) |

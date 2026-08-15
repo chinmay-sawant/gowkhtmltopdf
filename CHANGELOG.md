@@ -6,16 +6,22 @@ binaries at build time (see README "Versioning").
 
 ## Unreleased
 
-Unreleased **0.2.2** work. Not in the tagged [0.2.1](#021-2026-08-14) release.
-PDF version and conformance-profile work after 0.2.1.
+## 0.2.2 (2026-08-15)
+
+PDF version and conformance-profile release after [0.2.1](#021-2026-08-14).
 Default output remains **unclaimed PDF 1.4**. `--pdf-version` `1.4` / `1.7` /
 `2.0` is a version header, **not** a conformance claim. The claim is
 `--pdf-profile` / `WithPDFProfile`. Encryption, AcroForm, and JavaScript
 remain out of scope.
 
-PRs: [#45](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/45),
+PRs: [#44](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/44),
+[#45](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/45),
 [#46](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/46),
-[#47](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/47).
+[#47](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/47),
+[#48](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/48),
+[#49](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/49).
+Compare:
+[v0.2.1...v0.2.2](https://github.com/chinmay-sawant/gowkhtmltopdf/compare/v0.2.1...v0.2.2).
 
 ### Added
 

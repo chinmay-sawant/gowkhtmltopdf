@@ -38,7 +38,7 @@
   },
   {
    "type": "code",
-   "heading": "PDF version and profile (unreleased 0.2.2, not in 0.2.1)",
+   "heading": "PDF version and profile (0.2.2)",
    "language": "sh",
    "code": "# Default is unclaimed PDF 1.4. --pdf-version is not a PDF/A or PDF/UA claim.\ngowkhtmltopdf --pdf-version 1.7 --enable-local-file-access report.html report.pdf\ngowkhtmltopdf --pdf-version 2.0 --enable-local-file-access report.html report.pdf\n\n# Opt-in conformance (implies the required version)\ngowkhtmltopdf --pdf-profile a3a-ua1 --enable-local-file-access report.html out.pdf\ngowkhtmltopdf --pdf-profile a4-ua2 --enable-local-file-access report.html out.pdf"
   },
@@ -46,7 +46,7 @@
    "type": "callout",
    "variant": "info",
    "title": "Version is not a claim",
-   "body": "These flags are unreleased 0.2.2, not in the 0.2.1 tag. `--pdf-version` (`1.4` default, `1.7`, `2.0`) only selects the file version. Claiming XMP, ICC OutputIntent, and tagging require `--pdf-profile` (`a3a-ua1` / `a3a` / `ua1` imply PDF 1.7; `a4-ua2` / `a4` / `ua2` imply PDF 2.0). Both flags are global and PDF-mode only."
+   "body": "These flags shipped in 0.2.2. `--pdf-version` (`1.4` default, `1.7`, `2.0`) only selects the file version. Claiming XMP, ICC OutputIntent, and tagging require `--pdf-profile` (`a3a-ua1` / `a3a` / `ua1` imply PDF 1.7; `a4-ua2` / `a4` / `ua2` imply PDF 2.0). Both flags are global and PDF-mode only."
   },
   {
    "type": "code",
