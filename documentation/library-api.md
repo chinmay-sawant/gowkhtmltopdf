@@ -21,7 +21,7 @@ Requires Go **1.26+** (the module pins `toolchain go1.26.4`). Build with
 
 ```sh
 # tagged release:
-go get github.com/chinmay-sawant/gowkhtmltopdf@v0.2.2
+go get github.com/chinmay-sawant/gowkhtmltopdf@v0.2.3
 
 # local checkout:
 go mod edit -replace github.com/chinmay-sawant/gowkhtmltopdf=/path/to/gowkhtmltopdf

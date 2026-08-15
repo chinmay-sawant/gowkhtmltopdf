@@ -12,7 +12,7 @@
    "heading": "Status at a glance",
    "items": [
     {
-     "title": "v0.2.2",
+     "title": "v0.2.3",
      "body": "The current release (`VERSION`, stamped into the CLI). Phases 0-9 plus the print CSS subset (tiers 1-2): load, parse, style, layout, paginate, paint, and PNG/JPEG image mode. Default write is unclaimed PDF 1.4. Opt-in `--pdf-version` 1.7 / 2.0 and `--pdf-profile` (PDF/A-3a, PDF/A-4, PDF/UA-1, PDF/UA-2) ship in this release."
     },
     {

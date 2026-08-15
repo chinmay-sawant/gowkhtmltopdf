@@ -6,6 +6,28 @@ binaries at build time (see README "Versioning").
 
 ## Unreleased
 
+## 0.2.3 (2026-08-15)
+
+Same engine as [0.2.2](#022-2026-08-15). Module path is
+`github.com/chinmay-sawant/gowkhtmltopdf` so `go install` works.
+
+```sh
+go install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltopdf@v0.2.3
+go install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltoimage@v0.2.3
+```
+
+PRs: [#50](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/50),
+[#51](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/51).
+Compare:
+[v0.2.2...v0.2.3](https://github.com/chinmay-sawant/gowkhtmltopdf/compare/v0.2.2...v0.2.3).
+
+### Changed
+
+- **Module path ([#51](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/51)):**
+  `go.mod` is `github.com/chinmay-sawant/gowkhtmltopdf`. Library import and
+  `go install` / `go get` use that path. Nested stub modules keep `frontend/`,
+  `output/`, and `docs/` out of the parent module zip.
+
 ## 0.2.2 (2026-08-15)
 
 PDF version and conformance-profile release after [0.2.1](#021-2026-08-14).

@@ -5,7 +5,7 @@
   {
    "type": "hero",
    "title": "Pure-Go HTML to PDF, no browser",
-   "lede": "A clean-room, no-cgo HTML template engine and wkhtmltopdf CLI work-alike that turns authored HTML into multi-page PDFs (or PNG/JPEG) entirely in-process. Current release v0.2.2: phases 0-9 plus the print CSS subset (tiers 1-2), with committed samples under output/. Opt-in PDF/A and PDF/UA profiles ship in this version."
+   "lede": "A clean-room, no-cgo HTML template engine and wkhtmltopdf CLI work-alike that turns authored HTML into multi-page PDFs (or PNG/JPEG) entirely in-process. Current release v0.2.3: phases 0-9 plus the print CSS subset (tiers 1-2), with committed samples under output/. Opt-in PDF/A and PDF/UA profiles ship in this version."
   },
   {
    "type": "bullets",

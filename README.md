@@ -17,7 +17,7 @@ paint → write). Direct modules are allowlisted:
 shaping) and [`tdewolff/canvas`](https://github.com/tdewolff/canvas) (SVG
 rasterization). The product is HTML templates and documents, not Chrome visual parity.
 
-**Status:** **v0.2.2** (current release). Opt-in PDF 1.7 / 2.0 and PDF/A +
+**Status:** **v0.2.3** (current release). Opt-in PDF 1.7 / 2.0 and PDF/A +
 PDF/UA profiles. **License:** [MIT](LICENSE).
 
 ## What it is for
