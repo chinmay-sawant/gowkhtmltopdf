@@ -1,6 +1,6 @@
 package convert
 
-import "gowkhtmltopdf/internal/layout"
+import "github.com/chinmay-sawant/gowkhtmltopdf/internal/layout"
 
 // hfGeom is the page geometry of one object, in points. contentW/contentH
 // are the content-area dimensions the object's layout was paginated with.

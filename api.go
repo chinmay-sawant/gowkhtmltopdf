@@ -13,13 +13,13 @@ import (
 	"strings"
 	"time"
 
-	"gowkhtmltopdf/internal/convert"
-	"gowkhtmltopdf/internal/errs"
-	"gowkhtmltopdf/internal/imageout"
-	"gowkhtmltopdf/internal/line"
-	"gowkhtmltopdf/internal/load"
-	"gowkhtmltopdf/internal/pdf"
-	"gowkhtmltopdf/internal/settings"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/errs"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/imageout"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/line"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/load"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 // LibraryVersion is the upstream wkhtmltopdf compatibility identifier

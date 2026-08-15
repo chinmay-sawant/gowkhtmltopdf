@@ -3,8 +3,8 @@ package css_test
 import (
 	"testing"
 
-	"gowkhtmltopdf/internal/css"
-	"gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
 // TestPseudoElementSelectorDoesNotApplyToHost: p::before { width:120pt } must

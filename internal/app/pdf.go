@@ -9,10 +9,10 @@ import (
 	"fmt"
 	"io"
 
-	"gowkhtmltopdf/internal/cli"
-	"gowkhtmltopdf/internal/convert"
-	"gowkhtmltopdf/internal/errs"
-	"gowkhtmltopdf/internal/settings"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/cli"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/errs"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 // DefaultTOCXSL returns the built-in TOC stylesheet description used by

@@ -271,7 +271,7 @@ is a **one-way dependency of layout**, not of imageout — PDF mode benefits too
 ### Imported by internal/svg
 
 `github.com/tdewolff/canvas` + `github.com/tdewolff/canvas/renderers/rasterizer`
-(sole SVG render path, allowlisted via `//nolint:depguard` and Makefile), plus
+(sole SVG render path, allowlisted in `TestDirectModuleAllowlist` and the Makefile), plus
 stdlib `encoding/xml`, `image/png`. **No imageout or layout import** — layout
 imports svg, making svg the lower layer.
 
@@ -337,8 +337,8 @@ contract (the P1-1 engine-seam goal).
    shell fallback — otherwise `svg` would grow an entire second render pipeline
    or reintroduce a native dependency. Accepts that exotic SVG may fail
    (cleanly, via `errNotSVG`/`errCanvasPanic`), in which case the `<img>` is
-   skipped. `//nolint:depguard` + Makefile comment make this an explicit,
-   auditable exception to the no-third-party-raster rule.
+   skipped. `TestDirectModuleAllowlist` plus the Makefile comment make this
+   an explicit, auditable exception to the no-third-party-raster rule.
 
 8. **Canvas panic containment.** Unknown paths in tdewolff/canvas can panic;
    the `defer recover()` in `rasterizeCanvas` converts that into `errCanvasPanic`

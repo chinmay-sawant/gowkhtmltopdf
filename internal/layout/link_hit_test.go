@@ -4,8 +4,8 @@ package layout
 import (
 	"testing"
 
-	"gowkhtmltopdf/internal/css"
-	"gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
 // TestLinkAnnotationHasHitHeight: URI link ops must cover the glyph box so

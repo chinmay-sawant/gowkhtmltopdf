@@ -9,14 +9,14 @@ import (
 	"strconv"
 	"strings"
 
-	"gowkhtmltopdf/internal/css"
-	"gowkhtmltopdf/internal/html"
-	"gowkhtmltopdf/internal/layout"
-	"gowkhtmltopdf/internal/line"
-	"gowkhtmltopdf/internal/load"
-	"gowkhtmltopdf/internal/outline"
-	"gowkhtmltopdf/internal/pdf"
-	"gowkhtmltopdf/internal/settings"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/layout"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/line"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/load"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/outline"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 // hfParms is the per-page substitution state for header/footer text. page,
@@ -258,13 +258,11 @@ func loadHTMLHF(ctx context.Context, loader *load.Loader, font *pdf.Font, state 
 		return &htmlHFLayout{skip: true}, state.registry, nil //nolint:exhaustruct // intentional zero-value fields
 	}
 
-	if state.resources.Loader != nil {
-		loader = state.resources.Loader
-	}
-
 	lineP := state.lp
-	if state.resources.Loader != nil {
-		lineP = state.resources.Load
+
+	if bound := state.resources.Bound(); bound.Loader() != nil {
+		loader = bound.Loader()
+		lineP = bound.PageLoad()
 	}
 
 	res, err := loader.Load(ctx, rawOrURL, lineP)

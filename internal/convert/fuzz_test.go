@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"gowkhtmltopdf/internal/convert"
-	"gowkhtmltopdf/internal/settings"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 func FuzzConvertHTML(f *testing.F) {

@@ -4,7 +4,7 @@ import (
 	"math"
 	"sort"
 
-	"gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
 // maxFlowPageIndex is the exclusive upper bound for the outer pagination-index

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"gowkhtmltopdf/internal/pdf"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 )
 
 // glyphInkBottom scans the columns in [x0, x1) for the lowest dark pixel row

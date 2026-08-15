@@ -59,7 +59,15 @@ These are **artifacts**, not golden byte baselines. A version flag is not a conf
 
 Cross-platform binaries are attached to this release (`gowkhtmltopdf` and `gowkhtmltoimage` for linux / windows / darwin × amd64 / arm64) plus `SHA256SUMS`.
 
-From source (Go 1.26+):
+Or install the CLIs with Go 1.26+ (puts them on `GOBIN` / `$(go env GOPATH)/bin`):
+
+```sh
+go install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltopdf@v0.2.2
+go install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltoimage@v0.2.2
+gowkhtmltopdf --version
+```
+
+From a source checkout:
 
 ```sh
 git clone https://github.com/chinmay-sawant/gowkhtmltopdf.git
@@ -99,7 +107,7 @@ import (
 	"context"
 	"os"
 
-	"gowkhtmltopdf"
+	"github.com/chinmay-sawant/gowkhtmltopdf"
 )
 
 func main() {

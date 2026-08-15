@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
 func bandEmSize(ops []Op, indices []int) float64 {

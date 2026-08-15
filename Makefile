@@ -37,7 +37,7 @@ lint-frontend:
 	fi
 	npm --prefix frontend run lint
 
-CLI_VERSION_LDFLAGS := -X gowkhtmltopdf/internal/cli.Version=$(shell cat VERSION)
+CLI_VERSION_LDFLAGS := -X github.com/chinmay-sawant/gowkhtmltopdf/internal/cli.Version=$(shell cat VERSION)
 
 build:
 	mkdir -p bin

@@ -8,12 +8,12 @@ import (
 	"strings"
 	"testing"
 
-	"gowkhtmltopdf/internal/app"
-	"gowkhtmltopdf/internal/cli"
-	"gowkhtmltopdf/internal/convert"
-	"gowkhtmltopdf/internal/errs"
-	"gowkhtmltopdf/internal/load"
-	"gowkhtmltopdf/internal/settings"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/app"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/cli"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/errs"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/load"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 func TestBuildPDFRequestPreservesEngineContract(t *testing.T) {

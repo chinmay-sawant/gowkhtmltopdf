@@ -18,8 +18,8 @@ import (
 	"testing"
 	"time"
 
-	"gowkhtmltopdf/internal/load"
-	"gowkhtmltopdf/internal/settings"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/load"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 func defaultLP() settings.LoadPage {
@@ -246,7 +246,7 @@ func TestLoadHTTPCustomHeadersAndAuth(t *testing.T) {
 		t.Errorf("headers/auth = %v", got)
 	}
 
-	if !strings.HasPrefix(got["ua"], "gowkhtmltopdf") {
+	if !strings.HasPrefix(got["ua"], "github.com/chinmay-sawant/gowkhtmltopdf") {
 		t.Errorf("ua = %q", got["ua"])
 	}
 }

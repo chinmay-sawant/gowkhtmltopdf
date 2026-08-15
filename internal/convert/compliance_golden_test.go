@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"gowkhtmltopdf/internal/pdf"
-	"gowkhtmltopdf/internal/settings"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 const complianceFooterPage = "Page [page]"

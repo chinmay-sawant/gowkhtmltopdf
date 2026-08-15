@@ -3,7 +3,7 @@ package css //nolint:testpackage // exercises unexported parseSelector
 import (
 	"testing"
 
-	"gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
 // :target must not degrade to the host selector. Wikipedia paints

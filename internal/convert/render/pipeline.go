@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"gowkhtmltopdf/internal/errs"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/errs"
 )
 
 // Pipeline is the narrow lifecycle seam for document rendering. The adapter

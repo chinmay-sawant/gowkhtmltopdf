@@ -5,7 +5,7 @@
   {
    "type": "hero",
    "title": "Your first PDF in five minutes",
-   "lede": "Build two static, pure-Go binaries with no cgo or browser process, then turn a local HTML file into a PDF with a single opt-in flag."
+   "lede": "Install the two CLIs with go install, or build them from a checkout. No cgo or browser process. Then turn a local HTML file into a PDF with a single opt-in flag."
   },
   {
    "type": "bullets",
@@ -19,9 +19,15 @@
   },
   {
    "type": "code",
+   "heading": "Install with Go",
+   "language": "sh",
+   "code": "go install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltopdf@v0.2.2\ngo install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltoimage@v0.2.2\ngowkhtmltopdf --version   # Name: gowkhtmltopdf / Version: 0.2.2"
+  },
+  {
+   "type": "code",
    "heading": "Build",
    "language": "sh",
-   "code": "# recommended: static binaries, version stamped from VERSION\nmake build\n# writes bin/gowkhtmltopdf and bin/gowkhtmltoimage\n\n# equivalent, explicit:\nCGO_ENABLED=0 go build -ldflags \"-X gowkhtmltopdf/internal/cli.Version=$(cat VERSION)\" \\\n  -o bin/gowkhtmltopdf ./cmd/gowkhtmltopdf\nCGO_ENABLED=0 go build -ldflags \"-X gowkhtmltopdf/internal/cli.Version=$(cat VERSION)\" \\\n  -o bin/gowkhtmltoimage ./cmd/gowkhtmltoimage\n\n./bin/gowkhtmltopdf --version   # Name: gowkhtmltopdf / Version: 0.2.2\n# VERSION is the project release. LibraryVersion (0.12.7-dev) is the\n# wkhtmltopdf settings-surface id, not the release number."
+   "code": "# recommended: static binaries, version stamped from VERSION\nmake build\n# writes bin/gowkhtmltopdf and bin/gowkhtmltoimage\n\n# equivalent, explicit:\nCGO_ENABLED=0 go build -ldflags \"-X github.com/chinmay-sawant/gowkhtmltopdf/internal/cli.Version=$(cat VERSION)\" \\\n  -o bin/gowkhtmltopdf ./cmd/gowkhtmltopdf\nCGO_ENABLED=0 go build -ldflags \"-X github.com/chinmay-sawant/gowkhtmltopdf/internal/cli.Version=$(cat VERSION)\" \\\n  -o bin/gowkhtmltoimage ./cmd/gowkhtmltoimage\n\n./bin/gowkhtmltopdf --version   # Name: gowkhtmltopdf / Version: 0.2.2\n# VERSION is the project release. LibraryVersion (0.12.7-dev) is the\n# wkhtmltopdf settings-surface id, not the release number."
   },
   {
    "type": "callout",

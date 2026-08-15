@@ -6,7 +6,7 @@ import (
 	"math"
 	"sync"
 
-	"gowkhtmltopdf/internal/pdf"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 )
 
 const (

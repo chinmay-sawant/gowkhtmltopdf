@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"gowkhtmltopdf/internal/imageout"
-	"gowkhtmltopdf/internal/settings"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/imageout"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 func TestRequestValidateRejectsMultipleInputs(t *testing.T) {

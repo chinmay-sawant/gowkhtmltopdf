@@ -4,7 +4,7 @@ package imageout
 import (
 	"testing"
 
-	"gowkhtmltopdf/internal/layout"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/layout"
 )
 
 func BenchmarkSupersamplePool(b *testing.B) {

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"gowkhtmltopdf/internal/css"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
 )
 
 func TestWikiPrintHideSelectorsParse(t *testing.T) {

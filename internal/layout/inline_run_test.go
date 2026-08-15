@@ -4,7 +4,7 @@ package layout
 import (
 	"testing"
 
-	"gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
 func TestCollectInlineRunUsesContiguousChildren(t *testing.T) {

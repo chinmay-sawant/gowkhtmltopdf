@@ -13,8 +13,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"gowkhtmltopdf/internal/convert"
-	"gowkhtmltopdf/internal/settings"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 const repeatedResourceReferencesPerPage = 8

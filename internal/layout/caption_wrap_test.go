@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"gowkhtmltopdf/internal/css"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
 )
 
 // Narrow figcaptions must wrap at spaces, not mid-word, when each word fits

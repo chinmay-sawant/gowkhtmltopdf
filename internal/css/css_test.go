@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
 const colorRed = "red"

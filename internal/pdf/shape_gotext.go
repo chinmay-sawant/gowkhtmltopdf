@@ -6,13 +6,9 @@ import (
 	"sync"
 	"unicode"
 
-	//nolint:depguard // go-text/typesetting is the repo's fixed text-shaping dependency
 	"github.com/go-text/typesetting/di"
-	//nolint:depguard // go-text/typesetting is the repo's fixed text-shaping dependency
 	gtfont "github.com/go-text/typesetting/font"
-	//nolint:depguard // go-text/typesetting is the repo's fixed text-shaping dependency
 	ot "github.com/go-text/typesetting/font/opentype"
-	//nolint:depguard // go-text/typesetting is the repo's fixed text-shaping dependency
 	"github.com/go-text/typesetting/shaping"
 )
 

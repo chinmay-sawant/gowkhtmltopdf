@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"gowkhtmltopdf/internal/css"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
 )
 
 // Long unbreakable tokens (URLs, paths) must not paint past the content edge.

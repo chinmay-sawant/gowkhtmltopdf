@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"testing"
 
-	"gowkhtmltopdf/internal/pdf"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 )
 
 //nolint:wsl // benchmark timing boundaries intentionally surround the loop.

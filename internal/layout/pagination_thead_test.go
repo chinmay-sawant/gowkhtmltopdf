@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"gowkhtmltopdf/internal/html"
-	"gowkhtmltopdf/internal/pdf"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 )
 
 func TestTheadRepeatOnContinuationPages(t *testing.T) { //nolint:cyclop

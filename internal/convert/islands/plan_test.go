@@ -3,8 +3,8 @@ package islands_test
 import (
 	"testing"
 
-	"gowkhtmltopdf/internal/convert/islands"
-	"gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert/islands"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
 //nolint:wsl // source and virtual-tree invariants are checked together.

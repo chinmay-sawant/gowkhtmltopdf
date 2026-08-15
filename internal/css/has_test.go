@@ -3,7 +3,7 @@ package css //nolint:testpackage // exercises unexported parseSelector and share
 import (
 	"testing"
 
-	"gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
 func byID(root *html.Node, idVal string) *html.Node {

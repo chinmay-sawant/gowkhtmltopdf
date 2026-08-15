@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"gowkhtmltopdf/internal/svg"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/svg"
 )
 
 func TestRasterizeWikiWordmark(t *testing.T) {

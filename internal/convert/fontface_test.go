@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"gowkhtmltopdf/internal/settings"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 // copyTestdataTTF copies a known TTF into dir as Custom.ttf for @font-face fixtures.

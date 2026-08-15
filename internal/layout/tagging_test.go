@@ -4,7 +4,7 @@ package layout
 import (
 	"testing"
 
-	"gowkhtmltopdf/internal/pdf"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 )
 
 //nolint:cyclop,funlen,varnamelen,wsl,lll,exhaustive,nlreturn,exhaustruct

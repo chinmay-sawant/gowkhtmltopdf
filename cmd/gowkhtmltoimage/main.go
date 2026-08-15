@@ -9,8 +9,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"gowkhtmltopdf/internal/app"
-	"gowkhtmltopdf/internal/cli"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/app"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/cli"
 )
 
 func main() {

@@ -5,8 +5,8 @@ import (
 	"io"
 	"testing"
 
-	"gowkhtmltopdf/internal/html"
-	"gowkhtmltopdf/internal/settings"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 //nolint:wsl // request construction and invariant assertions are intentionally adjacent.

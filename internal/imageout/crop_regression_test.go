@@ -5,7 +5,7 @@ import (
 	"image/color"
 	"testing"
 
-	"gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
 // TestCropWindowsStayInkful is the visual gate for representative headers.

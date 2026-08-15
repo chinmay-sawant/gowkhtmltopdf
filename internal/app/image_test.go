@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"gowkhtmltopdf/internal/app"
-	"gowkhtmltopdf/internal/cli"
-	"gowkhtmltopdf/internal/settings"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/app"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/cli"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 func TestRunImageDelegatesPreflightBeforeOpeningOutput(t *testing.T) {

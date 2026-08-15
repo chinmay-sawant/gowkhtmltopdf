@@ -1,4 +1,4 @@
-module gowkhtmltopdf
+module github.com/chinmay-sawant/gowkhtmltopdf
 
 go 1.26
 

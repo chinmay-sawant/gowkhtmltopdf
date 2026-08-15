@@ -3,7 +3,7 @@ package render_test
 import (
 	"testing"
 
-	"gowkhtmltopdf/internal/convert/render"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert/render"
 )
 
 //nolint:wsl // table-driven page-index assertions

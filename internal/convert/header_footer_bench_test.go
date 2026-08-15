@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"gowkhtmltopdf/internal/convert"
-	"gowkhtmltopdf/internal/settings"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 // headerFooterBenchmarkHTML makes page boundaries explicit so the benchmark

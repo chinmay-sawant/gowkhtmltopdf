@@ -3,7 +3,7 @@ package cli
 import (
 	"strconv"
 
-	"gowkhtmltopdf/internal/settings"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 // flagApplier receives (cmd, cur, vals) and mutates settings. Bool flags get

@@ -3,10 +3,10 @@ package convert
 import (
 	"strings"
 
-	"gowkhtmltopdf/internal/html"
-	"gowkhtmltopdf/internal/layout"
-	"gowkhtmltopdf/internal/outline"
-	"gowkhtmltopdf/internal/pdf"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/layout"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/outline"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 )
 
 // bodyLinkIntent is the information from a same-document link operation that

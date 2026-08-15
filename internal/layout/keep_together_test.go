@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"gowkhtmltopdf/internal/pdf"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 )
 
 // TestImplicitKeepTogetherCallout: an aside with its own chrome that starts

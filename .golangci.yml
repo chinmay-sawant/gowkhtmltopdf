@@ -19,6 +19,10 @@ linters:
     # reports; standalone gofumpt/gofmt on the same tree is clean). Prefer gofmt
     # (still enabled) until golangci-lint ships a gofumpt that supports go1.26.
     - gofumpt
+    # Import allow-list is TestDirectModuleAllowlist (internal/pdf). Default
+    # depguard only allows $gostd and then accidentally matched the old module
+    # path gowkhtmltopdf* via the stdlib prefix "go". Not worth //nolint noise.
+    - depguard
 
 issues:
   # Report every finding (default caps hide most of an enable-all run).

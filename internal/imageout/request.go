@@ -6,8 +6,8 @@ import (
 	"io"
 	"time"
 
-	"gowkhtmltopdf/internal/errs"
-	"gowkhtmltopdf/internal/settings"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/errs"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 // ErrMultipleInputs reports an image request that carries more than one

@@ -12,7 +12,6 @@ import (
 	"sync"
 	"unicode/utf16"
 
-	//nolint:depguard // go-text/typesetting is the repo's fixed text-shaping dependency
 	gtfont "github.com/go-text/typesetting/font"
 )
 

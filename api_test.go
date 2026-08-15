@@ -14,8 +14,8 @@ import (
 	"sync"
 	"testing"
 
-	"gowkhtmltopdf/internal/cli"
-	"gowkhtmltopdf/internal/settings"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/cli"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 // Shared literal values asserted across several tests.

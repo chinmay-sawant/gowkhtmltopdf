@@ -3,7 +3,7 @@ package css
 import (
 	"strings"
 
-	"gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
 // matchingParen returns the index of the ')' that matches str[open]=='('.

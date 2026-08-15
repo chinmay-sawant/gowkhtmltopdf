@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
 // Grid auto-flow keywords (grid-auto-flow longhand values).
