@@ -5,7 +5,7 @@
   {
    "type": "hero",
    "title": "All 1,329 open wkhtmltopdf issues, classified",
-   "lede": "Every open issue in the wkhtmltopdf/wkhtmltopdf repository, mapped against what gowkhtmltopdf can do. All 1,329 issues carry a verdict with evidence: 451 implemented, 285 partial, 593 not implemented."
+    "lede": "Every open issue in the wkhtmltopdf/wkhtmltopdf repository, mapped against what gowkhtmltopdf can do. All 1,329 issues carry a verdict with evidence: 469 implemented, 298 partial, 562 not implemented."
   },
   {
    "type": "callout",
@@ -19,7 +19,7 @@
    "sections": [
     {
      "heading": "A full scrape, fully classified",
-     "body": "The dossier starts from all 1,329 open issues scraped from the upstream wkhtmltopdf issue tracker, including title, body, labels, and dates. Every issue was read and classified against the gowkhtmltopdf codebase; there are no unassessed rows left. The first 100 were analyzed in depth with a full summary and category; the remaining 1,229 received a verdict plus evidence, with their raw metadata retained. The 601 rows originally marked not implemented were re-validated by subagents against the codebase; 8 moved: 1 to implemented (rowspan) and 7 to partial (CJK/Type0 glyph coverage, IPA registry fallback, nested-table pagination, textarea text)."
+      "body": "The dossier starts from all 1,329 open issues scraped from the upstream wkhtmltopdf issue tracker, including title, body, labels, and dates. Every issue was read and classified against the gowkhtmltopdf codebase; there are no unassessed rows left. The first 100 were analyzed in depth with a full summary and category; the remaining 1,229 received a verdict plus evidence, with their raw metadata retained. Three validation sweeps have been run: the first re-checked the not-implemented rows (8 moved); a second sweep on 2026-08-15 re-audited verdicts against 0.2.1/0.2.2 (30 rows moved); and a third sweep the same day used five subagents on the live 0.2.1 tree plus unreleased 0.2.2 on master. That pass rewrote Codebase status notes that still used pre-Policy A language (Ignored vs Rejected), stale rowspan / stdlib-only / VERSION 0.1.0 claims, and local-only @font-face. 18 rows changed verdict — e.g. Qt OLE/segfault sidesteps and CSS grid support to implemented, combined text+HTML footers and inline SVG paths to not implemented."
     },
     {
      "heading": "Every verdict cites evidence",
@@ -40,18 +40,18 @@
      "label": "open wkhtmltopdf issues tracked"
     },
     {
-     "value": "451",
-     "percent": "34%",
+     "value": "469",
+     "percent": "35%",
      "label": "implemented"
     },
     {
-     "value": "285",
-     "percent": "21%",
+     "value": "298",
+     "percent": "22%",
      "label": "partial"
     },
     {
-     "value": "593",
-     "percent": "45%",
+     "value": "562",
+     "percent": "42%",
      "label": "not implemented"
     }
    ]
@@ -66,11 +66,11 @@
     },
     {
      "title": "Partial",
-     "body": "The behavior is covered but not fully replicated. Typical residual edges: `--header-html`/`--footer-html` clipped to the margin band, `@font-face` restricted to local TTF/OTF/WOFF1 with WOFF2 and data: sources skipped, tables without `rowspan`, and complex-script shaping such as Thai or Arabic."
+      "body": "The behavior is covered but not fully replicated. Typical residual edges: `--header-html`/`--footer-html` clipped to the margin band, `@font-face` local and https TTF/OTF/WOFF1 with WOFF2 / eot / data: sources skipped, collapsed table borders, per-corner/% border-radius, and complex-script shaping such as Thai or Arabic."
     },
     {
      "title": "Not implemented",
-     "body": "Deliberately out of scope or absent, and the evidence names the missing piece. Common reasons: the behavior needs a JavaScript engine, MHTML parsing, PDF/X or older PDF/A-1 / A-2 (PDF/A-3a, PDF/A-4, PDF/UA-1, and PDF/UA-2 are unreleased 0.2.2 opt-in profiles on master, not in the 0.2.1 release), or a Qt/WebKit-specific failure that a static pure-Go binary cannot exhibit."
+     "body": "Deliberately out of scope or absent, and the evidence names the missing piece. Common reasons: the behavior needs a JavaScript engine, MHTML parsing, PDF/X or older PDF/A-1 / A-2 (PDF/A-3a, PDF/A-4, PDF/UA-1, and PDF/UA-2 are unreleased 0.2.2 opt-in profiles on master, not in the 0.2.1 release), or a rejected CLI flag (Policy A: unknown option) such as `--dpi` or `--javascript-delay`."
     }
    ]
   },
@@ -102,7 +102,7 @@
    "sections": [
     {
      "heading": "No scripts means a smaller attack surface",
-     "body": "A converter that never runs scripts cannot be hijacked through them, and the loader enforces that posture: local files are blocked by default and require `--enable-local-file-access` or an explicit `--allow` path, POST bodies go out only via `--post`, and fetches run under timeouts plus a redirect cap (compatibility matrix, section 6; integration-security.md). That reduces several attack classes a scripted engine would add, but it is not a full SSRF firewall: the loader still fetches `http://localhost` and RFC1918 hosts by design, and remote-HTML input is trusted, so SSRF-class issues such as CVE-2022-35583 (#5249) remain relevant and are mapped to not implemented."
+     "body": "A converter that never runs scripts cannot be hijacked through them, and the loader enforces that posture: local files are blocked by default and require `--enable-local-file-access` or an explicit `--allow` path, POST bodies go out only via `--post`, and fetches run under timeouts plus a redirect cap (compatibility matrix, section 6; integration-security.md). That reduces several attack classes a scripted engine would add, but it is not a full SSRF firewall: compatible mode still fetches `http://localhost` and RFC1918 hosts by design (`--restrict-network` blocks private dests), and remote-HTML input is trusted, so SSRF-class issues such as CVE-2022-35583 (#5249) remain relevant and are mapped to not implemented."
     },
     {
      "heading": "Pure Go removes the Qt crash class",

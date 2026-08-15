@@ -13,12 +13,12 @@ The site tells two stories:
    long-form content in `src/data/content/*.json` is grounded in the
    repository documentation and the checked-in benchmark snapshot.
 2. **What the open issue backlog looks like**: the **Issue Dossier** page
-   tracks **all 1,329 open issues** of `wkhtmltopdf/wkhtmltopdf`. The first 100
-   are tagged with whether **gowkhtmltopdf** already implements, partially
+   tracks **all 1,329 open issues** of `wkhtmltopdf/wkhtmltopdf`. Every row is
+   tagged with whether **gowkhtmltopdf** already implements, partially
    implements, or does not implement the underlying capability (green / amber /
-   red); the remaining 1,229 rows are unassessed raw metadata. The dossier is
-   filterable by coverage status and area, and paginated (10, 25, 50, or 100
-   per page).
+   red), with cited evidence; the first 100 also carry an in-depth summary and
+   category. The dossier is filterable by coverage status and area, and
+   paginated (10, 25, 50, or 100 per page).
 
 The site ships with a **light and dark theme** (persisted in
 `localStorage`, respecting `prefers-color-scheme` by default).
@@ -62,12 +62,15 @@ frontend/
     │   ├── BenchmarksPage.jsx # CLI vs wkhtmltopdf comparison
     │   └── DossierPage.jsx    # interactive, paginated issue dashboard
     └── data/
-        ├── issues.json        # all 1,329 open issues (100 analyzed deeply)
-        ├── issues.js          # data helpers
+        ├── issues.js          # data helpers (fetches public/data/issues.json)
         ├── benchmarks.js      # CLI vs wkhtmltopdf snapshot for the Benchmarks tab
         ├── constants.js       # status / severity / category metadata
         └── content/           # long-form page content (page-*.json)
 ```
+
+The dossier dataset itself lives in `frontend/public/data/issues.json` (fetched
+at runtime from `${BASE_URL}data/issues.json`); `copy-to-docs.mjs` ships the
+built site and data to `../docs` for GitHub Pages.
 
 ## Content block schema
 
@@ -97,7 +100,7 @@ npm run preview   # preview the production build
 
 ## Updating the data
 
-- **Dossier data:** replace the array in `src/data/issues.json` (shape:
+- **Dossier data:** replace the array in `public/data/issues.json` (shape:
   `number`, `title`, `summary`, `category`, `severity`, `status`,
   `workaround`, `key_detail`, `evidence`), then rebuild.
 - **Product content:** edit the matching `src/data/content/page-*.json`, then
