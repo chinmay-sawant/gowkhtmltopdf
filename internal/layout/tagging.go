@@ -242,6 +242,8 @@ func isStructuralContainer(tag pdf.StructType) bool {
 // inline content such as Link or Figure. ISO 32000-1 / ISO 32005 list
 // nesting allows only LI, L, or Caption under L, and only Lbl, LBody, or
 // L under LI.
+//
+//nolint:exhaustive // only list and table parents need inline wrapper elements
 func ensureInlineParent(parent *pdf.StructElem) *pdf.StructElem {
 	if parent == nil {
 		return nil
@@ -372,6 +374,8 @@ func tagListItem(b *box, parent *pdf.StructElem, ops []Op, doc *pdf.Document, sc
 }
 
 // mapSemanticOps maps display list ops belonging to box b to targetElem if not already mapped.
+//
+//nolint:varnamelen // b is conventional layout box receiver/param across layout package
 func mapSemanticOps(b *box, targetElem *pdf.StructElem, ops []Op) {
 	if targetElem == nil || isStructuralContainer(targetElem.Tag) {
 		return
