@@ -36,7 +36,7 @@ const CAPABILITIES = [
 ]
 
 const OUTPUTS = [
-  ['PDF', 'PDF 1.4 in 0.2.1; unreleased 0.2.2 adds opt-in 1.7, 2.0, and archival/accessible profiles'],
+  ['PDF', 'PDF 1.4 default; 0.2.2 adds opt-in 1.7, 2.0, and archival/accessible profiles'],
   ['PNG / JPEG', 'Raster output for previews and image workflows'],
   ['CLI + API', 'Drop-in command line ergonomics or native Go control'],
   ['CGO=0', 'Static, portable builds without a browser dependency'],

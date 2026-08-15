@@ -87,10 +87,10 @@ explicit `file://` / `http(s)://` URL.
 # Implicit first page (local file: ACL opt-in)
 gowkhtmltopdf --enable-local-file-access report.html report.pdf
 
-# PDF 1.7 output (unreleased 0.2.2; default is PDF 1.4)
+# PDF 1.7 output (0.2.2; default is PDF 1.4)
 gowkhtmltopdf --pdf-version 1.7 --enable-local-file-access report.html report.pdf
 
-# PDF 2.0 output (unreleased 0.2.2 — version only, NOT PDF/A-4 or PDF/UA-2)
+# PDF 2.0 output (0.2.2 — version only, NOT PDF/A-4 or PDF/UA-2)
 gowkhtmltopdf --pdf-version 2.0 --enable-local-file-access report.html report.pdf
 
 # Explicit page keyword (page-scoped flags after `page`)
@@ -275,8 +275,8 @@ smart-shrinking on, background on, outline on (depth 4).
 | `--margin-right` | `-R` | PDF | |
 | `--grayscale` | `-g` | PDF | Whole-document grayscale |
 | `--title` | `-t` | PDF | PDF `/Title` **and** `[title]`. HTML `<title>` is `[doctitle]` only |
-| `--pdf-version` | | PDF | **Unreleased 0.2.2** (not in 0.2.1). PDF output version: `1.4` (default), `1.7`, or `2.0`. Opt-in `1.7` emits `%PDF-1.7`, trailer `/ID`, Info with UTF-16BE + BOM strings, and non-claiming XMP Metadata stream. Opt-in `2.0` emits `%PDF-2.0`, trailer `/ID`, UTF-8 document strings, and non-claiming XMP (`dc:format`, `pdf:Producer`, dates — no `pdfaid`/`pdfuaid`). Version alone is **not** a PDF/A or PDF/UA claim; invalid values are a user error |
-| `--pdf-profile` | | PDF | **Unreleased 0.2.2** (not in 0.2.1). PDF conformance profile: `a3a-ua1` / `PDF/A-3a+PDF/UA-1`, `a3a` / `PDF/A-3a`, `ua1` / `PDF/UA-1` (imply PDF 1.7); `a4-ua2` / `PDF/A-4+PDF/UA-2`, `a4` / `PDF/A-4`, `ua2` / `PDF/UA-2` (imply PDF 2.0). Emits claiming XMP, OutputIntent (archival profiles), structure tree + namespaces (UA-2), and full tagging |
+| `--pdf-version` | | PDF | **0.2.2.** PDF output version: `1.4` (default), `1.7`, or `2.0`. Opt-in `1.7` emits `%PDF-1.7`, trailer `/ID`, Info with UTF-16BE + BOM strings, and non-claiming XMP Metadata stream. Opt-in `2.0` emits `%PDF-2.0`, trailer `/ID`, UTF-8 document strings, and non-claiming XMP (`dc:format`, `pdf:Producer`, dates — no `pdfaid`/`pdfuaid`). Version alone is **not** a PDF/A or PDF/UA claim; invalid values are a user error |
+| `--pdf-profile` | | PDF | **0.2.2.** PDF conformance profile: `a3a-ua1` / `PDF/A-3a+PDF/UA-1`, `a3a` / `PDF/A-3a`, `ua1` / `PDF/UA-1` (imply PDF 1.7); `a4-ua2` / `PDF/A-4+PDF/UA-2`, `a4` / `PDF/A-4`, `ua2` / `PDF/UA-2` (imply PDF 2.0). Emits claiming XMP, OutputIntent (archival profiles), structure tree + namespaces (UA-2), and full tagging |
 | `--no-pdf-compression` | | PDF | Uncompressed streams |
 | `--page-offset` | | PDF | Added to `[page]` and TOC numbers |
 | `--enable-smart-shrinking` | | PDF | Default is already on |

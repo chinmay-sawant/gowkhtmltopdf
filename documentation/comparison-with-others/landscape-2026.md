@@ -7,9 +7,8 @@ issues, and published benchmarks. Vendor benchmarks are identified as
 self-interested, and the performance figures below are directional rather than
 like-for-like measurements.
 
-The tagged release is **v0.2.1**. Opt-in PDF 1.7 / 2.0 and PDF/A + PDF/UA
-profiles are **unreleased 0.2.2** on `master`. Scores below assume that
-0.2.2 tree (the product you get from current `master`), not the 0.2.1 tag.
+The current release is **v0.2.2**. Opt-in PDF 1.7 / 2.0 and PDF/A + PDF/UA
+profiles ship in this version. Scores below assume that 0.2.2 tree.
 
 ## Score card
 
@@ -49,7 +48,7 @@ needs byte-stable default CLI output.
 | **Latency / PDF** | Repository fixtures: ms–low s; validate on target workload | Published figures vary: cold startup versus warm pooled rendering | Published figures vary by fixture and platform | Published figures vary by fixture and platform | Measure with the vendor's supported deployment |
 | **Memory** | Small process on repository fixtures; measure at target concurrency | Browser-plus-page memory varies substantially with browser version, pages, and concurrency | Published single-process figures are workload-dependent | Published figures are workload-dependent | Measure with the vendor's supported deployment |
 | **Footprint** | **~14 MB when released as a stripped `CGO_ENABLED=0` binary; no runtime shared libraries** | 100–450 MB + browser/system libs; Docker image size varies | ~15 MB plus aging Qt/runtime libraries | ~30–50 MB + system libs | Small executable plus commercial runtime/license model |
-| **PDF standards** | **Unreleased 0.2.2:** opt-in `--pdf-profile` for PDF/A-3a, PDF/UA-1, dual `a3a-ua1`; PDF/A-4, PDF/UA-2, dual `a4-ua2` (veraPDF on committed fixtures). No A-1/A-2, forms, encryption, or Factur-X. Version flags are not a claim | No PDF/A/forms/encryption in the basic PDF API; tagged PDF and outlines are experimental | No | **PDF/A-1/2/3, PDF/UA, forms, Factur-X**; validity still needs validation | Strong standards/commercial extras (PDF/A+X, forms, signatures); verify the required profile |
+| **PDF standards** | **0.2.2:** opt-in `--pdf-profile` for PDF/A-3a, PDF/UA-1, dual `a3a-ua1`; PDF/A-4, PDF/UA-2, dual `a4-ua2` (veraPDF on committed fixtures). No A-1/A-2, forms, encryption, or Factur-X. Version flags are not a claim | No PDF/A/forms/encryption in the basic PDF API; tagged PDF and outlines are experimental | No | **PDF/A-1/2/3, PDF/UA, forms, Factur-X**; validity still needs validation | Strong standards/commercial extras (PDF/A+X, forms, signatures); verify the required profile |
 | **Fonts / CJK** | Partial Type0/CID; pure-Go OpenType shaping where supported; Indic/CJK/vertical limits remain | Full + web fonts, OS-dependent | Poor | Good, fontconfig quirks | Best |
 | **License** | **MIT, free, active** | Apache-2.0, free | LGPL, **archived 2023** | BSD, free, active | Commercial site pricing is quoted; official FAQ says it starts around $2,000/year, while $3,800 is a separate per-server non-commercial tier |
 | **Score /10** | **8.0 overall** | 7.5 | 3.0 | 7.5 | 9.0 (at price) |
@@ -58,7 +57,7 @@ needs byte-stable default CLI output.
 
 | Tool | Choose when… |
 |---|---|
-| **gowkhtmltopdf** | Authored HTML templates in Go (invoices, certificates, storybooks, posters, tables, statements) needing a small offline binary, no JavaScript, controlled file/HTTP access, and — on unreleased 0.2.2 — opt-in PDF/A-3a / A-4 and PDF/UA-1 / UA-2. Also the path off archived wkhtmltopdf |
+| **gowkhtmltopdf** | Authored HTML templates in Go (invoices, certificates, storybooks, posters, tables, statements) needing a small offline binary, no JavaScript, controlled file/HTTP access, and opt-in PDF/A-3a / A-4 and PDF/UA-1 / UA-2. Also the path off archived wkhtmltopdf |
 | **Puppeteer / Chromium** | Templates need **modern CSS/JS** (charts, SPAs, arbitrary sites) and you can afford browser operations plus a materially larger resource budget |
 | **wkhtmltopdf** | Avoid for new deployments; it is archived and has a documented unpatched 9.8 SSRF vulnerability. Migrate legacy uses when practical |
 | **WeasyPrint** | Free-budget **PDF/A-1/A-2**, AcroForm, or **Factur-X / e-invoice**. Overlap with this project on A-3 / UA; WeasyPrint still wider on older parts and forms |

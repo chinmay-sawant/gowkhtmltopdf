@@ -56,7 +56,7 @@
 <body>
 <main>
   <h1>gowkhtmltopdf vs the HTML-to-PDF landscape (2026)</h1>
-  <p class="sub">Research-backed comparison, updated Aug 2026 after PRs #45–#47. Sources include official docs, GitHub issues, and published benchmarks. Vendor benchmarks are identified as self-interested, and performance figures are directional rather than like-for-like measurements. Highlighted column = gowkhtmltopdf. Tagged release is v0.2.1; PDF 1.7/2.0 and PDF/A+UA profiles are <b>unreleased 0.2.2</b> on master. Scores assume that tree.</p>
+  <p class="sub">Research-backed comparison, updated Aug 2026 after PRs #45–#47. Sources include official docs, GitHub issues, and published benchmarks. Vendor benchmarks are identified as self-interested, and performance figures are directional rather than like-for-like measurements. Highlighted column = gowkhtmltopdf. Current release is <b>v0.2.2</b>; PDF 1.7/2.0 and PDF/A+UA profiles ship in this version. Scores assume that tree.</p>
 
   <h2>Score card</h2>
   <p class="score">
@@ -159,7 +159,7 @@
       </tr>
       <tr class="us">
         <td>PDF standards</td>
-        <td><span class="ok"><b>Unreleased 0.2.2:</b></span> opt-in <code>--pdf-profile</code> for PDF/A-3a, PDF/UA-1, dual <code>a3a-ua1</code>; PDF/A-4, PDF/UA-2, dual <code>a4-ua2</code> (veraPDF on committed fixtures). No A-1/A-2, forms, encryption, or Factur-X. Version flags are not a claim</td>
+        <td><span class="ok"><b>0.2.2:</b></span> opt-in <code>--pdf-profile</code> for PDF/A-3a, PDF/UA-1, dual <code>a3a-ua1</code>; PDF/A-4, PDF/UA-2, dual <code>a4-ua2</code> (veraPDF on committed fixtures). No A-1/A-2, forms, encryption, or Factur-X. Version flags are not a claim</td>
         <td>No PDF/A/forms/encryption in the basic PDF API; tagged PDF and outlines are experimental</td>
         <td>No</td>
         <td><span class="ok"><b>PDF/A-1/2/3, PDF/UA, forms</b></span>; validity still needs validation</td>
@@ -202,7 +202,7 @@
     <tbody>
       <tr class="us">
         <td><b>gowkhtmltopdf</b></td>
-        <td>Authored HTML templates in Go (invoices, certificates, storybooks, posters, tables, statements) needing a small offline binary, no JavaScript, controlled file/HTTP access, and — on unreleased 0.2.2 — opt-in PDF/A-3a / A-4 and PDF/UA-1 / UA-2. Also the path off archived wkhtmltopdf</td>
+        <td>Authored HTML templates in Go (invoices, certificates, storybooks, posters, tables, statements) needing a small offline binary, no JavaScript, controlled file/HTTP access, and opt-in PDF/A-3a / A-4 and PDF/UA-1 / UA-2. Also the path off archived wkhtmltopdf</td>
       </tr>
       <tr>
         <td><b>Puppeteer / Chromium</b></td>

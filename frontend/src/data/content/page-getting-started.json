@@ -21,7 +21,7 @@
    "type": "code",
    "heading": "Build",
    "language": "sh",
-   "code": "# recommended: static binaries, version stamped from VERSION\nmake build\n# writes bin/gowkhtmltopdf and bin/gowkhtmltoimage\n\n# equivalent, explicit:\nCGO_ENABLED=0 go build -ldflags \"-X gowkhtmltopdf/internal/cli.Version=$(cat VERSION)\" \\\n  -o bin/gowkhtmltopdf ./cmd/gowkhtmltopdf\nCGO_ENABLED=0 go build -ldflags \"-X gowkhtmltopdf/internal/cli.Version=$(cat VERSION)\" \\\n  -o bin/gowkhtmltoimage ./cmd/gowkhtmltoimage\n\n./bin/gowkhtmltopdf --version   # Name: gowkhtmltopdf / Version: 0.2.1\n# VERSION is the project release. LibraryVersion (0.12.7-dev) is the\n# wkhtmltopdf settings-surface id, not the release number."
+   "code": "# recommended: static binaries, version stamped from VERSION\nmake build\n# writes bin/gowkhtmltopdf and bin/gowkhtmltoimage\n\n# equivalent, explicit:\nCGO_ENABLED=0 go build -ldflags \"-X gowkhtmltopdf/internal/cli.Version=$(cat VERSION)\" \\\n  -o bin/gowkhtmltopdf ./cmd/gowkhtmltopdf\nCGO_ENABLED=0 go build -ldflags \"-X gowkhtmltopdf/internal/cli.Version=$(cat VERSION)\" \\\n  -o bin/gowkhtmltoimage ./cmd/gowkhtmltoimage\n\n./bin/gowkhtmltopdf --version   # Name: gowkhtmltopdf / Version: 0.2.2\n# VERSION is the project release. LibraryVersion (0.12.7-dev) is the\n# wkhtmltopdf settings-surface id, not the release number."
   },
   {
    "type": "callout",
@@ -37,7 +37,7 @@
   },
   {
    "type": "code",
-   "heading": "Opt-in PDF version or profile (unreleased 0.2.2, not in 0.2.1)",
+   "heading": "Opt-in PDF version or profile (0.2.2)",
    "language": "sh",
    "code": "# Default is unclaimed PDF 1.4. --pdf-version is not a PDF/A or PDF/UA claim.\n./bin/gowkhtmltopdf --pdf-version 1.7 --enable-local-file-access \\\n  testdata/golden/fixture-01-simple-invoice.html \\\n  /tmp/invoice-1.7.pdf\n\n# Dual PDF/A-3a + PDF/UA-1 (implies PDF 1.7)\n./bin/gowkhtmltopdf --pdf-profile a3a-ua1 --enable-local-file-access \\\n  testdata/golden/fixture-01-simple-invoice.html \\\n  /tmp/invoice-a3a-ua1.pdf"
   },

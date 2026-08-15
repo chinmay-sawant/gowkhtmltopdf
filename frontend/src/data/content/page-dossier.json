@@ -19,7 +19,7 @@
    "sections": [
     {
      "heading": "A full scrape, fully classified",
-      "body": "The dossier starts from all 1,329 open issues scraped from the upstream wkhtmltopdf issue tracker, including title, body, labels, and dates. Every issue was read and classified against the gowkhtmltopdf codebase; there are no unassessed rows left. The first 100 were analyzed in depth with a full summary and category; the remaining 1,229 received a verdict plus evidence, with their raw metadata retained. Three validation sweeps have been run: the first re-checked the not-implemented rows (8 moved); a second sweep on 2026-08-15 re-audited verdicts against 0.2.1/0.2.2 (30 rows moved); and a third sweep the same day used five subagents on the live 0.2.1 tree plus unreleased 0.2.2 on master. That pass rewrote Codebase status notes that still used pre-Policy A language (Ignored vs Rejected), stale rowspan / stdlib-only / VERSION 0.1.0 claims, and local-only @font-face. 18 rows changed verdict — e.g. Qt OLE/segfault sidesteps and CSS grid support to implemented, combined text+HTML footers and inline SVG paths to not implemented."
+      "body": "The dossier starts from all 1,329 open issues scraped from the upstream wkhtmltopdf issue tracker, including title, body, labels, and dates. Every issue was read and classified against the gowkhtmltopdf codebase; there are no unassessed rows left. The first 100 were analyzed in depth with a full summary and category; the remaining 1,229 received a verdict plus evidence, with their raw metadata retained. Three validation sweeps have been run: the first re-checked the not-implemented rows (8 moved); a second sweep on 2026-08-15 re-audited verdicts against 0.2.1/0.2.2 (30 rows moved); and a third sweep the same day used five subagents on the live 0.2.1 tree plus 0.2.2 on master. That pass rewrote Codebase status notes that still used pre-Policy A language (Ignored vs Rejected), stale rowspan / stdlib-only / VERSION 0.1.0 claims, and local-only @font-face. 18 rows changed verdict — e.g. Qt OLE/segfault sidesteps and CSS grid support to implemented, combined text+HTML footers and inline SVG paths to not implemented."
     },
     {
      "heading": "Every verdict cites evidence",
@@ -70,7 +70,7 @@
     },
     {
      "title": "Not implemented",
-     "body": "Deliberately out of scope or absent, and the evidence names the missing piece. Common reasons: the behavior needs a JavaScript engine, MHTML parsing, PDF/X or older PDF/A-1 / A-2 (PDF/A-3a, PDF/A-4, PDF/UA-1, and PDF/UA-2 are unreleased 0.2.2 opt-in profiles on master, not in the 0.2.1 release), or a rejected CLI flag (Policy A: unknown option) such as `--dpi` or `--javascript-delay`."
+     "body": "Deliberately out of scope or absent, and the evidence names the missing piece. Common reasons: the behavior needs a JavaScript engine, MHTML parsing, PDF/X or older PDF/A-1 / A-2 (PDF/A-3a, PDF/A-4, PDF/UA-1, and PDF/UA-2 shipped in 0.2.2 as opt-in profiles), or a rejected CLI flag (Policy A: unknown option) such as `--dpi` or `--javascript-delay`."
     }
    ]
   },

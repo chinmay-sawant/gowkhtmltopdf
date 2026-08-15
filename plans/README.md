@@ -7,7 +7,7 @@ Implementation plans and roadmaps for `gowkhtmltopdf`, partitioned by release ve
 | [0.1.0/](0.1.0/README.md) | **v0.1.0 MVP Release** — pure-Go rewrite foundation, phases 00–09, exploration studies, and MVP PRs | Complete (Released 2026-08-03) |
 | [0.2.0/](0.2.0/README.md) | **v0.2.0 Post-MVP, Performance & Reviews** — phases 10–23, performance optimizations, architecture audits, and frontend improvements | Shipped core; leftovers stay in 0.2.0 or move with a `[~]` pointer |
 | [0.2.1/](0.2.1/README.md) | **v0.2.1 Contracts, print layout, and verification** — phases 24–30 | Complete (Released 2026-08-14) |
-| [0.2.2/](0.2.2/README.md) | **v0.2.2 Newer PDF versions** — PDF 1.7 (#31), PDF 2.0 (#32), 1.7/2.0 compliance (#33); criticality/optimization follow-up | Compliance completed; follow-up not started |
+| [0.2.2/](0.2.2/README.md) | **v0.2.2 Newer PDF versions** — PDF 1.7 (#31), PDF 2.0 (#32), 1.7/2.0 compliance (#33); criticality/optimization follow-up | Complete; [release notes](0.2.2/PR/release-v0.2.2.md) |
 
 ---
 

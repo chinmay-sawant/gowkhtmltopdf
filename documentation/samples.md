@@ -208,7 +208,7 @@ make samples
    `output/architecture-diagram.pdf` only. It does **not** rewrite
    `testdata/golden/architecture-diagram.html` or write a PDF under
    `testdata/golden/api/`.
-6. Writes version / compliance smokes (unreleased 0.2.2) for
+6. Writes version / compliance smokes (0.2.2) for
    `fixture-21-detailed-report` and `fixture-56-architecture-diagram` into
    `output/pdf-1.7/` (`--pdf-version 1.7`), `output/pdf-1.7-compliance/`
    (`--pdf-profile a3a-ua1`), `output/pdf-2.0/` (`--pdf-version 2.0`), and

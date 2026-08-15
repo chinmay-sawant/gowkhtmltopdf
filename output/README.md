@@ -105,7 +105,7 @@ files are skipped as bodies; fixture-36 attaches them as HTML header/footer.
 
 ## Version and compliance sample folders
 
-Part of `make samples` (unreleased 0.2.2 flags). Same two fixtures as the
+Part of `make samples` (0.2.2 flags). Same two fixtures as the
 1.7 / 2.0 smoke set:
 
 | Dir | How produced | Files |

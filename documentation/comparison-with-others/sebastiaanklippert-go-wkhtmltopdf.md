@@ -51,7 +51,7 @@ of the installed `wkhtmltopdf` binary and the time to fetch remote HTML.
 | **Runtime deps** | Must install `wkhtmltopdf` (and its Qt stack) | None: static binary, `CGO_ENABLED=0` |
 | **Go modules** | Thin library; still needs the native binary | Go-native dependencies; no browser or native converter process |
 | **Rendering** | Full (legacy) WebKit via wkhtmltopdf | In-repo print CSS subset: load, HTML, CSS, layout, paginate, paint, PDF write |
-| **PDF version / profiles** | Whatever the installed `wkhtmltopdf` emits (typically unclaimed 1.4; no first-class A-3a/A-4 or UA-1/UA-2) | PDF 1.4 default. **Unreleased 0.2.2:** opt-in `--pdf-version` 1.7 / 2.0 (not a claim) and `--pdf-profile` for PDF/A-3a, PDF/UA-1, PDF/A-4, PDF/UA-2 |
+| **PDF version / profiles** | Whatever the installed `wkhtmltopdf` emits (typically unclaimed 1.4; no first-class A-3a/A-4 or UA-1/UA-2) | PDF 1.4 default. **0.2.2:** opt-in `--pdf-version` 1.7 / 2.0 (not a claim) and `--pdf-profile` for PDF/A-3a, PDF/UA-1, PDF/A-4, PDF/UA-2 |
 | **Deployment** | OS package or static wkhtmltopdf binary plus PATH setup | Single self-contained Go binary |
 | **Security surface** | Spawned process and full browser engine; harder to bound | Explicit ACL, local files off by default, HTTP timeouts and body limits, documented threat model |
 | **Determinism** | Depends on binary version, fonts, and OS | Repeatable **layout**. Default CLI **bytes** are not hash-stable (`CreationDate` / `[date]` / `[time]` use the wall clock unless the library injects `Now`) |
@@ -82,7 +82,7 @@ of the installed `wkhtmltopdf` binary and the time to fetch remote HTML.
    on Qt-era WebKit.
 
 5. **Auditable PDFs, including opt-in archival / tagged profiles**  
-   Pure Go writer and an embedded Liberation subset. Unreleased 0.2.2 can
+   Pure Go writer and an embedded Liberation subset. 0.2.2 can
    claim PDF/A-3a / A-4 and PDF/UA-1 / UA-2. Default CLI bytes are still
    not hash-stable (wall-clock dates). Golden tests check structure, not
    file hashes.
