@@ -71,6 +71,14 @@
   min-width: 0;
 }
 
+.docs-main h1,
+.docs-main h2,
+.docs-main h3,
+.docs-main .code-block-heading,
+.docs-main .table-block-heading {
+  scroll-margin-top: 96px;
+}
+
 .docs-context {
   display: flex;
   align-items: center;
