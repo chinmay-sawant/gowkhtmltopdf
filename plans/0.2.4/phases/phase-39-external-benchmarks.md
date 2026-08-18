@@ -99,6 +99,7 @@ Default external matrix in `bench-external.sh`: pages **2 / 10 / 50 / 100**,
 - [x] `./scripts/bench-external.sh --engines=puppeteer --sizes=2 --runs=1` succeeds when node + `npm ci` + Chrome are available (or skips cleanly)
 - [x] `make bench-cli-compare` still produces `cli-compare*` when wkhtmltopdf is on PATH (or documented skip)
 - [x] `make bench-lib` passes the public PDF/image benchmark matrix without starting a CLI
+- [x] Public `Document.WritePDF` 500-page CPU and heap pprof report is generated at [`plans/0.2.4/pdf-generation-pprof.md`](../pdf-generation-pprof.md); both profile runs pass the PDF header and physical page-count checks
 - [x] No generated `node_modules` remains under the workspace; `.gitignore` covers `scripts/puppeteer/node_modules/` (Git status was intentionally not run)
 
 ### 39.7 Closure gates
@@ -130,5 +131,6 @@ Default external matrix in `bench-external.sh`: pages **2 / 10 / 50 / 100**,
 ## Validation record (2026-08-18)
 
 - `make bench-engine` passed the generic, certified-islands, template, and image matrices. `make bench-lib` passed the public PDF and image matrices through `Document.WritePDF` and `ImageDocument.WriteImage` without starting a CLI; its PDF workload now uses the exact external `report.html.tmpl` fixture and page-count contract. `make bench-cli-compare` passed across 2/5/10/20/50/100/200/250/500 pages with the new gowk CLI flags.
+- The public `BenchmarkLibraryPDF/500Pages` path was profiled with CPU and exact heap pprof runs. The report records layout/table/style hotspots, allocation sites, profile overhead, and the distinction from the non-profiled Snapshot G benchmark baseline.
 - `make build && ./scripts/bench-external.sh --engines=weasyprint --sizes=2 --runs=1` passed; Puppeteer passed with Chrome 143 and `puppeteer-core 24.43.1` using the same 2-page smoke. Refreshed `cli-compare*`, `weasyprint-compare*`, and `puppeteer-compare*` artifacts include host/tool notes and methodology.
 - `scripts/puppeteer/node_modules/` was used for the smoke and is ignored/generated; it is removed before handoff. The external script does not invoke wkhtmltopdf; `make bench` invokes the dedicated comparison target after the script completes.

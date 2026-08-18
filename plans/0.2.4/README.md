@@ -30,3 +30,8 @@ Engine layout and PDF writer stay; outer contract + bench harness paths change.
 | `make bench` | `scripts/bench-external.sh` → WeasyPrint/Puppeteer, then `bench-cli-compare` → wkhtmltopdf | `weasyprint-compare*`, `puppeteer-compare*`, `cli-compare*` |
 | `make bench-engine` | Internal conversion allocation matrix | documented in benchmarks README |
 | `make bench-lib` | Public `Document.WritePDF` / `ImageDocument.WriteImage` allocation matrix | documented in benchmarks README |
+
+The public 500-page PDF path is also profiled in
+[pdf-generation-pprof.md](pdf-generation-pprof.md). The report uses the same
+`report.html.tmpl` fixture and calls `Document.WritePDF` directly; raw pprof
+files are generated under `/tmp` during reproduction.
