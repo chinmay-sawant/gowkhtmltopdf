@@ -1,4 +1,4 @@
-.PHONY: test lint lint-frontend build fmt golden golden-update samples clean claim-scan bench bench-cli-compare
+.PHONY: test lint lint-frontend build fmt golden golden-update samples weasyprint clean claim-scan bench bench-cli-compare bench-external
 
 # Pure-Go runtime: the standard library plus the allowlisted direct modules
 # below. No cgo, browser, or native converter process is required.
@@ -12,6 +12,9 @@
 # Build with the local toolchain (go1.26.4): golangci-lint refuses to run when the
 # binary's Go version is lower than the module's targeted Go version.
 GOLANGCI_LINT_VERSION ?= v1.64.8
+
+# WeasyPrint CLI used by the `weasyprint` samples target.
+WEASYPRINT ?= weasyprint
 
 test:
 	go test ./...
@@ -148,6 +151,63 @@ samples:
 		output/wiki-ana-de-armas.pdf \
 		|| echo "warning: wiki-ana-de-armas.pdf live smoke skipped (network/fetch failed)"
 	ls -la output/ | awk '{print $$5, $$9}' | tail -30
+
+# Regenerate the WeasyPrint comparison samples in output/weasyprint/ from the
+# same golden fixtures as `make samples` (one PDF per body fixture, excluding
+# -header.html/-footer.html companions). WeasyPrint has no
+# --header-html/--footer-html; fixture-36's companion header/footer child docs
+# are approximated with @page margin boxes via a user stylesheet
+# (scripts/weasyprint/fixture-36-hf.css). Version / compliance smokes mirror
+# the samples target: fixture-21 and fixture-56 under
+# output/weasyprint/pdf-{1.7,2.0}{,-compliance}/ using --pdf-version and
+# --pdf-variant. Requires the weasyprint CLI: pip3 install --user weasyprint.
+weasyprint:
+	@command -v $(WEASYPRINT) >/dev/null 2>&1 || { \
+		echo "weasyprint not found; install with: pip3 install --user weasyprint" >&2; \
+		exit 1; \
+	}
+	# Wipe regenerable fixture samples only (like `make samples`).
+	mkdir -p output/weasyprint
+	rm -f output/weasyprint/fixture-*.pdf
+	for f in testdata/golden/fixture-*.html; do \
+		case "$$f" in *-header.html|*-footer.html) continue;; esac; \
+		name=$$(basename "$$f" .html); \
+		STYLE_FLAGS=""; \
+		if [ "$$name" = "fixture-36-hf-nested-flex" ]; then \
+			STYLE_FLAGS="-s scripts/weasyprint/fixture-36-hf.css"; \
+		fi; \
+		$(WEASYPRINT) $$STYLE_FLAGS "$$f" "output/weasyprint/$$name.pdf" \
+			|| echo "warning: $$name.pdf failed"; \
+	done
+	# Version / compliance smokes: same two fixtures in four dirs.
+	mkdir -p output/weasyprint/pdf-1.7 output/weasyprint/pdf-1.7-compliance \
+		output/weasyprint/pdf-2.0 output/weasyprint/pdf-2.0-compliance
+	rm -f output/weasyprint/pdf-1.7/*.pdf output/weasyprint/pdf-1.7-compliance/*.pdf \
+		output/weasyprint/pdf-2.0/*.pdf output/weasyprint/pdf-2.0-compliance/*.pdf
+	for f in testdata/golden/fixture-21-detailed-report.html testdata/golden/fixture-56-architecture-diagram.html; do \
+		name=$$(basename "$$f" .html); \
+		$(WEASYPRINT) --pdf-version 1.7 "$$f" "output/weasyprint/pdf-1.7/$$name.pdf"; \
+		$(WEASYPRINT) --pdf-variant pdf/a-2b "$$f" "output/weasyprint/pdf-1.7-compliance/$$name.pdf"; \
+		$(WEASYPRINT) --pdf-version 2.0 "$$f" "output/weasyprint/pdf-2.0/$$name.pdf"; \
+		$(WEASYPRINT) --pdf-variant pdf/ua-2 "$$f" "output/weasyprint/pdf-2.0-compliance/$$name.pdf"; \
+	done
+	ls -la output/weasyprint/ | awk '{print $$5, $$9}' | tail -30
+
+# Process-level CLI comparison against the installed WeasyPrint and Puppeteer
+# engines (same generated report fixture and median-of-3 methodology as
+# bench-cli-compare). The bench never runs engine commands itself: each engine
+# is driven through its print script (scripts/weasyprint/print.sh,
+# scripts/puppeteer/print.sh), so the measured command is exactly what that
+# script runs. Engines that are not installed are skipped.
+# Requires `make build`, /usr/bin/time and gs; Puppeteer additionally needs
+# node + google-chrome and scripts/puppeteer/node_modules (npm ci --prefix
+# scripts/puppeteer on first use), WeasyPrint needs the weasyprint CLI.
+# Writes testdata/golden/benchmarks/{weasyprint,puppeteer}-compare.md and
+# -results.csv. Default page matrix is 2/10/50/100; override with
+# --sizes=2,5,10,20,50,100,200,250,500 or select one engine with
+# --engines=weasyprint.
+bench-external: build
+	./scripts/bench-external.sh
 
 # In-process Go benchmark matrix (generic + certified-islands, images).
 bench:

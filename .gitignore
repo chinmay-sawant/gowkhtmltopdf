@@ -22,3 +22,7 @@ testdata/golden/out/
 compliance/
 verapdf/
 .pdf-validators/
+temps/
+
+# bench tooling
+scripts/puppeteer/node_modules/

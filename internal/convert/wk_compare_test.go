@@ -47,7 +47,7 @@ func TestCompareWithWkhtmltopdfBinary(t *testing.T) {
 		t.Skip("wkhtmltopdf binary not found in PATH")
 	}
 
-	gowkPath := filepath.Join("..", "..", "bin", "github.com/chinmay-sawant/gowkhtmltopdf")
+	gowkPath := filepath.Join("..", "..", "bin", "gowkhtmltopdf")
 	if _, statErr := os.Stat(gowkPath); statErr != nil {
 		t.Skip("bin/gowkhtmltopdf not found; run make build")
 	}
