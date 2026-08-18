@@ -77,14 +77,14 @@ export default function LandingPage() {
     }
 
     if (security === 'local') {
-      lines.push('  --enable-local-file-access \\')
+      lines.push('  --allow-local-files \\')
     }
 
     if (flavour.flag) {
       lines.push(`  ${flavour.flag} \\`)
     }
 
-    lines.push('  report.html report.pdf')
+    lines.push('  -o report.pdf report.html')
     lines.push('')
 
     const secNote = security === 'local' ? 'load [local fs permitted]' : 'load [safe sandbox]'
@@ -111,12 +111,12 @@ export default function LandingPage() {
       parts.push('--margin-top 10mm')
     }
     if (security === 'local') {
-      parts.push('--enable-local-file-access')
+      parts.push('--allow-local-files')
     }
     if (flavour.flag) {
       parts.push(flavour.flag)
     }
-    parts.push('report.html report.pdf')
+    parts.push('-o report.pdf report.html')
     return parts.join(' ')
   }, [pageSize, margins, orientation, security, flavour])
 
@@ -244,7 +244,7 @@ export default function LandingPage() {
               <div className="sandbox-chips" role="radiogroup" aria-label="Security selection">
                 {[
                   { id: 'safe', label: 'Default (safe)' },
-                  { id: 'local', label: '--enable-local-file-access' },
+                  { id: 'local', label: '--allow-local-files' },
                 ].map((s) => (
                   <button
                     key={s.id}

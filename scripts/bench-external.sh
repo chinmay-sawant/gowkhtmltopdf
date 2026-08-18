@@ -7,8 +7,8 @@
 # so the measured command is exactly what that script runs.
 #
 # Usage:
-#   scripts/bench-external.sh [--engines weasyprint,puppeteer]
-#                             [--sizes 2,10,50,100] [--runs 3]
+#   scripts/bench-external.sh [--engines=weasyprint,puppeteer]
+#                             [--sizes=2,10,50,100] [--runs=3]
 #
 # Requires: bin/gowkhtmltopdf (make build), /usr/bin/time, gs.
 # Puppeteer additionally requires node and scripts/puppeteer/node_modules
@@ -28,7 +28,7 @@ set -euo pipefail
 
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 GOWK_BIN="$ROOT/bin/gowkhtmltopdf"
-ARTIFACT_DIR="$ROOT/testdata/golden/benchmarks"
+ARTIFACT_DIR="${BENCH_ARTIFACT_DIR:-$ROOT/testdata/golden/benchmarks}"
 TEMPLATE="$ROOT/testdata/golden/benchmarks/templates/report.html.tmpl"
 POLL_INTERVAL=0.02
 RUN_TIMEOUT=300
@@ -37,36 +37,78 @@ ROWS_PER_PAGE=20
 sizes=(2 10 50 100)
 runs=3
 requested_engines=()
+engines_specified=0
 
 usage() {
   sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
 }
 
+die_usage() {
+  echo "bench-external: $1" >&2
+  usage >&2
+  exit 2
+}
+
+validate_positive_int() {
+  local label=$1 value=$2
+  if [[ ! "$value" =~ ^[1-9][0-9]*$ ]]; then
+    die_usage "$label must be a positive integer: $value"
+  fi
+}
+
+validate_sizes() {
+  local size
+  if [ "${#sizes[@]}" -eq 0 ]; then
+    die_usage "--sizes must contain at least one page count"
+  fi
+  for size in "${sizes[@]}"; do
+    validate_positive_int "page size" "$size"
+  done
+}
+
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --engines)
+      [ "$#" -ge 2 ] || die_usage "--engines requires a comma-separated value"
+      engines_specified=1
       IFS=',' read -r -a requested_engines <<<"$2"
       shift 2
       ;;
+    --engines=*)
+      engines_specified=1
+      IFS=',' read -r -a requested_engines <<<"${1#*=}"
+      shift
+      ;;
     --sizes)
+      [ "$#" -ge 2 ] || die_usage "--sizes requires a comma-separated value"
       IFS=',' read -r -a sizes <<<"$2"
       shift 2
       ;;
+    --sizes=*)
+      IFS=',' read -r -a sizes <<<"${1#*=}"
+      shift
+      ;;
     --runs)
+      [ "$#" -ge 2 ] || die_usage "--runs requires a value"
       runs=$2
       shift 2
+      ;;
+    --runs=*)
+      runs=${1#*=}
+      shift
       ;;
     -h | --help)
       usage
       exit 0
       ;;
     *)
-      echo "bench-external: unknown argument: $1" >&2
-      usage >&2
-      exit 2
+      die_usage "unknown argument: $1"
       ;;
   esac
 done
+
+validate_sizes
+validate_positive_int "--runs" "$runs"
 
 [ -x "$GOWK_BIN" ] || {
   echo "bench-external: $GOWK_BIN not found; run make build" >&2
@@ -75,6 +117,17 @@ done
 
 [ -x /usr/bin/time ] || {
   echo "bench-external: /usr/bin/time not found (GNU time package)" >&2
+  exit 1
+}
+
+TIMEOUT_CMD=$(command -v timeout || true)
+[ -n "$TIMEOUT_CMD" ] || {
+  echo "bench-external: timeout not found (GNU coreutils package)" >&2
+  exit 1
+}
+
+[ -r "$TEMPLATE" ] || {
+  echo "bench-external: benchmark template not readable: $TEMPLATE" >&2
   exit 1
 }
 
@@ -98,12 +151,26 @@ engine_available() { # name -> 0/1
     puppeteer)
       [ -x "$ROOT/scripts/puppeteer/print.sh" ] &&
         command -v node >/dev/null 2>&1 &&
-        [ -f "$ROOT/scripts/puppeteer/node_modules/puppeteer-core/package.json" ]
+        [ -f "$ROOT/scripts/puppeteer/node_modules/puppeteer-core/package.json" ] &&
+        executable_available "$(puppeteer_executable)"
       ;;
     *)
       return 1
       ;;
   esac
+}
+
+puppeteer_executable() {
+  printf '%s' "${PUPPETEER_EXECUTABLE_PATH:-/usr/bin/google-chrome}"
+}
+
+executable_available() { # path or PATH command -> 0/1
+  local executable=$1
+  if [[ "$executable" == */* ]]; then
+    [ -x "$executable" ]
+  else
+    command -v "$executable" >/dev/null 2>&1
+  fi
 }
 
 engine_display() { # name
@@ -123,14 +190,20 @@ engine_script() { # name
 engine_version() { # name
   case "$1" in
     weasyprint)
-      weasyprint --version | sed -n '1s/^[[:space:]]*//p' | sed -n '1p'
+      if command_version=$(weasyprint --version 2>/dev/null); then
+        printf '%s' "$command_version" | sed -n '1s/^[[:space:]]*//p'
+      else
+        printf 'unknown'
+      fi
       ;;
     puppeteer)
       local ver
       ver=$(awk -F'"' '/"version"/ { print $4; exit }' \
         "$ROOT/scripts/puppeteer/node_modules/puppeteer-core/package.json")
-      if command -v google-chrome >/dev/null 2>&1; then
-        printf 'puppeteer-core %s + %s' "$ver" "$(google-chrome --version | sed 's/[[:space:]]*$//')"
+      local chrome
+      chrome=$(puppeteer_executable)
+      if chrome_version=$("$chrome" --version 2>/dev/null); then
+        printf 'puppeteer-core %s + %s' "$ver" "$(printf '%s' "$chrome_version" | sed 's/[[:space:]]*$//')"
       else
         printf 'puppeteer-core %s' "$ver"
       fi
@@ -144,7 +217,7 @@ engine_flags_note() { # name
       printf 'weasyprint used `-q` (quiet)'
       ;;
     puppeteer)
-      printf 'Puppeteer printed via headless Chrome with `format: A4`, `printBackground: true`, `preferCSSPageSize: true`'
+      printf 'Puppeteer printed via headless Chrome (`%s`) with `format: A4`, `printBackground: true`, `preferCSSPageSize: true`' "$(puppeteer_executable)"
       ;;
   esac
 }
@@ -168,55 +241,81 @@ engine_tree_rss() { # name -> 0/1
 }
 
 # ---------------------------------------------------------------------------
-# Fixture generation (mirrors testdata/golden/benchmarks/templates/report.html.tmpl)
+# Fixture generation from testdata/golden/benchmarks/templates/report.html.tmpl
 # ---------------------------------------------------------------------------
 
 generate_report() { # pages outfile
-  local pages=$1 out=$2 p line sku qty amount
-  : >"$out"
-  cat >>"$out" <<'EOF'
-<!DOCTYPE html>
-<!-- generated for bench-external.sh; content mirrors report.html.tmpl -->
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Benchmark report</title>
-  <style>
-    body { color: #172033; font-family: sans-serif; font-size: 9pt; margin: 0; }
-    .benchmark-page { page-break-before: always; page-break-inside: avoid; padding: 2mm 0; }
-    .benchmark-page.first { page-break-before: auto; }
-    h1 { color: #174a7c; font-size: 16pt; margin: 0 0 3mm; }
-    p { margin: 0 0 3mm; }
-    table { border-collapse: collapse; width: 100%; }
-    tr { page-break-inside: avoid; break-inside: avoid; }
-    th, td { border: 1px solid #a8b5c5; padding: 1.5mm 2mm; white-space: nowrap; }
-    th { background: #e6eef7; text-align: left; }
-    td.amount { text-align: right; }
-  </style>
-</head>
-<body>
-EOF
-  for ((p = 1; p <= pages; p++)); do
+  local pages=$1 out=$2
+  awk -v target_pages="$pages" -v rows_per_page="$ROWS_PER_PAGE" '
+    function render_page(page, i, line, in_rows, row, sku, quantity, amount, row_line) {
+      in_rows = 0
+      for (i = 1; i <= page_line_count; i++) {
+        line = page_line[i]
+        if (line ~ /\{\{range \.Rows\}\}/) {
+          in_rows = 1
+          continue
+        }
+        if (in_rows) {
+          if (line ~ /^[[:space:]]*\{\{end\}\}[[:space:]]*$/) {
+            in_rows = 0
+            continue
+          }
+          for (row = 1; row <= rows_per_page; row++) {
+            row_line = line
+            sku = sprintf("SKU-%03d-%03d", page, row)
+            quantity = (row + page - 1) % 7 + 1
+            amount = sprintf("%d.%02d", page * row, (page - 1 + row) % 100)
+            gsub(/\{\{\.Number\}\}/, row, row_line)
+            gsub(/\{\{\.SKU\}\}/, sku, row_line)
+            gsub(/\{\{\.Description\}\}/, "Platform operations and support service " row, row_line)
+            gsub(/\{\{\.Quantity\}\}/, quantity, row_line)
+            gsub(/\{\{\.Amount\}\}/, amount, row_line)
+            print row_line
+          }
+          continue
+        }
+        if (page == 1) {
+          gsub(/\{\{if \.First\}\} first\{\{end\}\}/, " first", line)
+        } else {
+          gsub(/\{\{if \.First\}\} first\{\{end\}\}/, "", line)
+        }
+        gsub(/\{\{\.Number\}\}/, page, line)
+        print line
+      }
+    }
     {
-      if [ "$p" -eq 1 ]; then
-        printf '  <section class="benchmark-page first">\n'
-      else
-        printf '  <section class="benchmark-page">\n'
-      fi
-      printf '    <h1>Benchmark report — page %d</h1>\n' "$p"
-      printf '    <p>Representative invoice and operations data for the full HTML-to-PDF pipeline.</p>\n'
-      printf '    <table>\n      <thead>\n        <tr><th>Line</th><th>SKU</th><th>Description</th><th>Quantity</th><th>Amount</th></tr>\n      </thead>\n      <tbody>\n'
-      for ((line = 1; line <= ROWS_PER_PAGE; line++)); do
-        sku=$(printf 'SKU-%03d-%03d' "$p" "$line")
-        qty=$(((line + p - 1) % 7 + 1))
-        amount=$(printf '%d.%02d' $((p * line)) $(((p - 1 + line) % 100)))
-        printf '        <tr><td>%d</td><td>%s</td><td>Platform operations and support service %d</td><td>%d</td><td class="amount">%s</td></tr>\n' \
-          "$line" "$sku" "$line" "$qty" "$amount"
-      done
-      printf '      </tbody>\n    </table>\n  </section>\n'
-    } >>"$out"
-  done
-  printf '</body>\n</html>\n' >>"$out"
+      if (!in_pages) {
+        if ($0 ~ /\{\{range \.Pages\}\}/) {
+          in_pages = 1
+          page_depth = 1
+          next
+        }
+        print
+        next
+      }
+      if ($0 ~ /\{\{range \.Rows\}\}/) {
+        page_depth++
+        page_line[++page_line_count] = $0
+        next
+      }
+      if ($0 ~ /^[[:space:]]*\{\{end\}\}[[:space:]]*$/ && page_depth == 1) {
+        for (page = 1; page <= target_pages; page++) {
+          render_page(page)
+        }
+        in_pages = 0
+        next
+      }
+      if ($0 ~ /^[[:space:]]*\{\{end\}\}[[:space:]]*$/) {
+        page_depth--
+      }
+      page_line[++page_line_count] = $0
+    }
+  ' "$TEMPLATE" >"$out"
+
+  if grep -F '{{' "$out" >/dev/null 2>&1; then
+    echo "bench-external: template actions remained after rendering: $TEMPLATE" >&2
+    return 1
+  fi
 }
 
 # ---------------------------------------------------------------------------
@@ -273,10 +372,10 @@ time_command() {
   local tree_rss=$1 out_pdf=$2 name=$3
   shift 3
   local start end timefile rc elapsed rss pages bytes
-  timefile=$(mktemp)
+  timefile=$(mktemp "$tmp/time.XXXXXX")
   start=$(date +%s.%N)
   if [ "$tree_rss" -eq 1 ]; then
-    timeout "$RUN_TIMEOUT" /usr/bin/time -f '%e %M' -o "$timefile" -- "$@" &
+    "$TIMEOUT_CMD" "$RUN_TIMEOUT" /usr/bin/time -f '%e %M' -o "$timefile" -- "$@" &
     local pid=$!
     rss=$(poll_tree_rss "$pid")
     set +e
@@ -285,7 +384,7 @@ time_command() {
     set -e
   else
     set +e
-    timeout "$RUN_TIMEOUT" /usr/bin/time -f '%e %M' -o "$timefile" -- "$@"
+    "$TIMEOUT_CMD" "$RUN_TIMEOUT" /usr/bin/time -f '%e %M' -o "$timefile" -- "$@"
     rc=$?
     set -e
   fi
@@ -296,6 +395,11 @@ time_command() {
   fi
   if [ "$rc" -ne 0 ]; then
     echo "bench-external: $name failed (exit $rc)" >&2
+    rm -f "$timefile"
+    return 1
+  fi
+  if [ ! -s "$out_pdf" ]; then
+    echo "bench-external: $name produced no PDF: $out_pdf" >&2
     rm -f "$timefile"
     return 1
   fi
@@ -337,7 +441,7 @@ tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
 engines=()
-if [ ${#requested_engines[@]} -eq 0 ]; then
+if [ "$engines_specified" -eq 0 ]; then
   requested_engines=(weasyprint puppeteer)
 fi
 
@@ -345,13 +449,26 @@ for engine in "${requested_engines[@]}"; do
   if engine_available "$engine"; then
     engines+=("$engine")
   else
-    echo "bench-external: $engine not installed; skipping" >&2
+    echo "bench-external: $engine unavailable or unsupported; skipping" >&2
   fi
 done
 
 if [ ${#engines[@]} -eq 0 ]; then
   echo "bench-external: no external engine selected (--engines) or installed" >&2
-  exit 0
+  exit 1
+fi
+
+host=$(uname -srm 2>/dev/null || printf 'unknown host')
+cpu_count=$(getconf _NPROCESSORS_ONLN 2>/dev/null || printf 'unknown')
+toolchain=$(go version 2>/dev/null || printf 'Go toolchain unavailable')
+gowk_version=$(
+  "$GOWK_BIN" --version 2>/dev/null | awk '/^Version:/ { print $2; exit }'
+)
+gowk_version=${gowk_version:-unknown}
+if [ "$HAVE_GS" -eq 1 ]; then
+  page_count_note='Ghostscript `gs` was present; rendered page counts were checked against the requested size.'
+else
+  page_count_note='Ghostscript `gs` was absent; rendered page counts are reported as 0 and were not validated.'
 fi
 
 for engine in "${engines[@]}"; do
@@ -366,7 +483,7 @@ for engine in "${engines[@]}"; do
   echo "PROCESS CLI COMPARISON: gowkhtmltopdf vs $display"
   echo "gowk:    $GOWK_BIN"
   echo "engine:  $script ($version)"
-  echo "flags:   gowkhtmltopdf used \`--quiet --enable-local-file-access\`; $(engine_flags_note "$engine")."
+  echo "flags:   gowkhtmltopdf used \`--quiet --allow-local-files -o OUTPUT INPUT\`; $(engine_flags_note "$engine")."
   echo "rss:     $(engine_rss_note "$engine"); gowkhtmltopdf RSS is \`%M\`."
   echo "runs:    warmup + $runs timed (median)"
   echo "================================================================================================"
@@ -376,7 +493,7 @@ for engine in "${engines[@]}"; do
 
   for pages in "${sizes[@]}"; do
     html="$tmp/doc_${pages}.html"
-    generate_report "$pages" "$html"
+    generate_report "$pages" "$html" || exit 1
     gowk_out="$tmp/gowk_${pages}.pdf"
     engine_out="$tmp/${engine}_${pages}.pdf"
 
@@ -387,10 +504,10 @@ for engine in "${engines[@]}"; do
 
     echo "page size $pages: timing gowk..."
     RUN_LOG="$gowk_log"
-    time_command 0 "$gowk_out" "gowkhtmltopdf" "$GOWK_BIN" --quiet --enable-local-file-access "$html" "$gowk_out"
+    time_command 0 "$gowk_out" "gowkhtmltopdf" "$GOWK_BIN" --quiet --allow-local-files -o "$gowk_out" "$html"
     echo "  warmup: $(format_ms "$(awk 'NR == 1 {print $1}' "$gowk_log")") ($(awk 'NR == 1 {print $3}' "$gowk_log") pages)"
     for ((i = 1; i <= runs; i++)); do
-      time_command 0 "$gowk_out" "gowkhtmltopdf" "$GOWK_BIN" --quiet --enable-local-file-access "$html" "$gowk_out"
+      time_command 0 "$gowk_out" "gowkhtmltopdf" "$GOWK_BIN" --quiet --allow-local-files -o "$gowk_out" "$html"
       echo "  run $i/$runs: $(format_ms "$(awk 'NR == '"$((i + 1))"' {print $1}' "$gowk_log")")"
     done
 
@@ -405,19 +522,31 @@ for engine in "${engines[@]}"; do
 
     gowk_pages=$(awk 'NR == 1 {print $3}' "$gowk_log")
     engine_pages=$(awk 'NR == 1 {print $3}' "$engine_log")
-    if [ "$gowk_pages" -ne "$pages" ]; then
-      echo "  warning: gowk rendered $gowk_pages pages, requested $pages" >&2
-    fi
-    if [ "$engine_pages" -ne "$pages" ]; then
-      echo "  warning: $display rendered $engine_pages pages, requested $pages" >&2
+    if [ "$HAVE_GS" -eq 1 ]; then
+      if [ "$gowk_pages" -ne "$pages" ]; then
+        echo "  warning: gowk rendered $gowk_pages pages, requested $pages" >&2
+      fi
+      if [ "$engine_pages" -ne "$pages" ]; then
+        echo "  warning: $display rendered $engine_pages pages, requested $pages" >&2
+      fi
+      while read -r _ _ rendered_pages _; do
+        if [ "$rendered_pages" -ne "$pages" ]; then
+          echo "  warning: gowk rendered $rendered_pages pages in one run, requested $pages" >&2
+        fi
+      done <"$gowk_log"
+      while read -r _ _ rendered_pages _; do
+        if [ "$rendered_pages" -ne "$pages" ]; then
+          echo "  warning: $display rendered $rendered_pages pages in one run, requested $pages" >&2
+        fi
+      done <"$engine_log"
     fi
 
-    gowk_elapsed=$(awk '{print $1}' "$gowk_log" >"$gowk_log.elapsed" && median_value "$gowk_log.elapsed")
-    engine_elapsed=$(awk '{print $1}' "$engine_log" >"$engine_log.elapsed" && median_value "$engine_log.elapsed")
-    gowk_rss=$(awk '{print $2}' "$gowk_log" >"$gowk_log.rss" && median_value "$gowk_log.rss")
-    engine_rss=$(awk '{print $2}' "$engine_log" >"$engine_log.rss" && median_value "$engine_log.rss")
-    gowk_bytes=$(awk 'NR == 1 {print $4}' "$gowk_log")
-    engine_bytes=$(awk 'NR == 1 {print $4}' "$engine_log")
+    gowk_elapsed=$(awk 'NR > 1 {print $1}' "$gowk_log" >"$gowk_log.elapsed" && median_value "$gowk_log.elapsed")
+    engine_elapsed=$(awk 'NR > 1 {print $1}' "$engine_log" >"$engine_log.elapsed" && median_value "$engine_log.elapsed")
+    gowk_rss=$(awk 'NR > 1 {print $2}' "$gowk_log" >"$gowk_log.rss" && median_value "$gowk_log.rss")
+    engine_rss=$(awk 'NR > 1 {print $2}' "$engine_log" >"$engine_log.rss" && median_value "$engine_log.rss")
+    gowk_bytes=$(awk -v timed_runs="$runs" 'NR == timed_runs + 1 {print $4}' "$gowk_log")
+    engine_bytes=$(awk -v timed_runs="$runs" 'NR == timed_runs + 1 {print $4}' "$engine_log")
     speedup=$(awk -v e="$engine_elapsed" -v g="$gowk_elapsed" 'BEGIN { printf "%.2f", e / g }')
 
     printf '%-8d | %-12s | %-16s | %-8s | %-14s | %-20s | %-8d\n' \
@@ -456,7 +585,11 @@ for engine in "${engines[@]}"; do
     echo 'Process-level measurement. Each cell is the median of' \
       "$runs" 'timed runs after one warmup.'
     echo 'Wall time is measured around `/usr/bin/time`; RSS is peak resident set from `%M` (KiB).'
-    printf 'gowkhtmltopdf used `--quiet --enable-local-file-access`; %s.\n' "$(engine_flags_note "$engine")"
+    printf 'Fixture: `%s` (20 invoice rows per requested page).\n' "$TEMPLATE"
+    printf 'Host: %s (%s CPUs); toolchain: %s; gowkhtmltopdf: %s.\n' \
+      "$host" "$cpu_count" "$toolchain" "$gowk_version"
+    printf '%s\n' "$page_count_note"
+    printf 'gowkhtmltopdf used `--quiet --allow-local-files -o OUTPUT INPUT`; %s.\n' "$(engine_flags_note "$engine")"
     printf '%s; gowkhtmltopdf RSS is `%%M`.\n\n' "$(engine_rss_note "$engine")"
     printf -- '- gowkhtmltopdf: `%s` (generic CLI)\n' "$GOWK_BIN"
     printf -- '- %s: `%s` (%s)\n' "$display" "$script" "$version"

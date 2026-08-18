@@ -22,7 +22,7 @@ attack surface:
 **Stance: HTML is semi-trusted.** It may cause network egress (matching
 upstream wkhtmltopdf) and may read local files only where the operator
 explicitly enabled it. Treat HTML as fully trusted whenever
-`--enable-local-file-access` or `--allow` is used, or when the machine
+`--allow-local-files` or `--allow` is used, or when the machine
 running the conversion holds secrets reachable via arbitrary network
 fetches.
 
@@ -43,9 +43,9 @@ Implemented in `internal/load`: `AccessController.Allowed` and
 - **Default: deny.** `LoadPage.BlockLocalFileAccess` defaults to `true`
   (`settings.DefaultLoadPage`) and `PdfGlobal.EnableLocalFileAccess`
   defaults to `false` (`settings.DefaultPdfGlobal`).
-- `--enable-local-file-access` sets the global flag;
-  `--disable-local-file-access` sets the object flag. A blocked object wins
-  over an enabled global.
+- `--allow-local-files` sets the global flag and unblocks the parsed source;
+  a native `Document` uses `AllowLocalFiles`. A blocked object wins over an
+  enabled global in the internal engine seam.
 - `--allow <path>` adds allow prefixes. A path is readable when its real
   path equals a prefix or sits below it (boundary check at the directory
   separator, so `prefix-evil` does not match `prefix`).
@@ -103,7 +103,7 @@ processes. The trust envelope of any local reader applies.
   / `--restrict-network` blocks private destinations and cross-host
   redirects. Restricted dials pin the resolved IP (no second DNS lookup).
   Exact `--allow-host` entries may skip the private-IP check; wildcards do
-  not. `GlobalSettings.SetNetworkPolicy` is the library seam.
+  not. `Document.Network` / `ImageDocument.Network` are the library seams.
 
 ## 5. Data exfiltration channels
 
@@ -148,7 +148,7 @@ processes. The trust envelope of any local reader applies.
   sensitive filesystems or networks, no host credentials, no
   `--username/--password`, `--custom-header`, `--cookie` or `--proxy`
   credentials aimed at non-public hosts.
-- Keep the defaults: `--enable-local-file-access` off, no `--allow`.
+- Keep the defaults: `--allow-local-files` off, no `--allow`.
 - Rely on the built-in timeouts (30 s connect / 60 s response default) and
   the 100 MiB body cap; both are on by default.
 - Sanitise HTML before conversion, or convert only HTML you author.
@@ -192,4 +192,4 @@ substitute for not letting strangers drive server-side fetches.
 | Response timeout | `internal/load/load.go` - `loadHTTP` `client.Timeout`, `DefaultResponseTimeout` |
 | Context cancellation | `internal/load/load.go` - `http.NewRequestWithContext` in `loadHTTP` |
 | No JS / no exec | whole repo - no `os/exec`; JS-related CLI flags are unknown options |
-| NetworkPolicy | `internal/load` + `GlobalSettings.SetNetworkPolicy`; CLI `--restrict-network` / `--allow-host` |
+| NetworkPolicy | `internal/load` + `Document.Network`; CLI `--restrict-network` / `--allow-host` |

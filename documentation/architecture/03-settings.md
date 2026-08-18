@@ -1,5 +1,9 @@
 # Settings system & errors
 
+> This deep-dive documents the internal engine settings vocabulary. In v0.2.4
+> the root package exposes named `Document` / `ImageDocument` fields; callers
+> do not use the dotted `Set` / `Get` tables directly.
+
 ## 1. Responsibility & position in the pipeline
 
 The `internal/settings` package is the **single source of truth for every
@@ -21,7 +25,7 @@ internal/settings ── Set / Get / typed structs ──► internal/cli (Comma
       │  cli.Command carries PdfGlobal/PdfObject/      │
       │  ImageGlobal snapshots                         │
       ▼                                                ▼
-internal/app (command→request adapters)          api.go (Converter wrappers)
+internal/app (command→request adapters)          document.go (typed adapters)
       │                                                │
       ▼                                                ▼
 internal/convert (Request: Global, Objects, Image) ──► internal/load (NewLoader)
@@ -169,7 +173,7 @@ Supporting sub-structs (all in `settings.go`):
    `settings.DefaultPdfObject()` (`cli.go:169-170`, `cli.go:137`).
 3. Each CLI flag has a handler that calls the dotted `Set` surface — e.g.
    `--margin-top 25mm` → `c.Global.Set("margin.top", "25mm")`
-   (`internal/cli/flags.go:119`), `--enable-local-file-access` →
+   (`internal/cli/flags.go`), `--allow-local-files` →
    `g.Set("enablelocalfileaccess", val)` + per-object
    `o.Set("load.blocklocalfileaccess", negBool(val))` (`flags.go:176-177`).
    The `--no-` prefix form is recognized for booleans (`cli.go:510-514`).
@@ -179,24 +183,19 @@ Supporting sub-structs (all in `settings.go`):
 5. `internal/convert` reads the structs directly: `Request.Global`,
    `Request.Objects`, and (image mode) `Request.Image`.
 
-### 4.2 Library path (typed builder and/or dotted strings)
+### 4.2 Library path (typed public model)
 
-1. `api.go` wraps the same structs: `GlobalSettings` embeds
-   `settings.PdfGlobal` (`api.go:62`), `ObjectSettings` embeds
-   `settings.PdfObject` (`api.go:197`), `ImageConverter` embeds
-   `settings.ImageGlobal` (`api.go:510`).
-2. `GlobalSettings.Set(name, value)` delegates to `g.g.Set(...)`; the typed
-   `PdfGlobalOptions` builder routes through `settings.PdfGlobalOptions` and
-   `Build()`.
-3. `ImageConverter.Set` routes through `settings.ApplyImageKey` so
-   `background`/`web.background` lands on the shared `PdfGlobal.Background`
-   (`api.go:546`).
-4. `Converter.Convert(ctx)` deep-clones settings via `clonePdfGlobal` /
-   `clonePdfObject` / `cloneImageGlobal` (`api.go:326-401`) — copies/collate
-   re-use objects, so each `Convert` must not share mutable maps/slices with
-   the caller's `GlobalSettings`.
-5. Conversion executes through `convert.Run`/`RunTypedPDF` with the settings
-   snapshots (`api.go:697`, `internal/convert/request.go:66-71`).
+1. `document.go` owns the public `Document` and `ImageDocument` structs. Their
+   `Content` values name exactly one HTML, File, or URL source.
+2. `Validate` checks source cardinality, page geometry, profiles, formats, and
+   renderability before the adapter opens a sink.
+3. The unexported mappers clone HTML, option slices, headers, and network
+   policy before constructing internal `convert.PDFRequest` or
+   `imageout.Request` values.
+4. `Document.WritePDF` / `PDF` and `ImageDocument.WriteImage` / `Image` call
+   the corresponding engine seam with a caller-owned writer or byte buffer.
+5. Dotted settings remain available only inside `internal/settings` and the
+   CLI adapter; they are not part of the root package contract.
 
 ### 4.3 Engine consumption
 
@@ -239,7 +238,7 @@ imports only `errors`).
 | Package | Direction of use |
 |---------|------------------|
 | `internal/cli` | Imports `settings`; `cli.Command` *is* settings structs; flags call `Set` |
-| `api.go` (root) | Imports `settings` and `errs`; wraps structs; re-exports `errs` sentinels |
+| `document.go` / `api.go` (root) | Public model, validation, engine adapters, hooks, and stable sentinels |
 | `internal/app` | Imports `cli`, `convert`, `errs`; re-exports `ErrNilContext` |
 | `internal/convert` | Imports `settings`; `Request` embeds `PdfGlobal`/`PdfObject`/`*ImageGlobal`; typed `PDFRequest`/`ImageRequest` wrap it (`request.go`) |
 | `internal/load` | Imports `settings`; `NewLoader(settings.LoadGlobal)`, `Load(..., settings.LoadPage)`, emits `settings.HttpStatusError` |
@@ -336,10 +335,9 @@ keeping the settings layer unit-agnostic on output.
 
 All settings structs are **plain value types** (no pointers, no methods that
 mutate receivers) except the `Ignored` maps and slice fields. The library
-API deep-clones (`clonePdfGlobal` etc. in `api.go:326-401`) so repeated
-`Converter.Convert` calls — needed for copies/collate — cannot alias caller
-state. `PdfGlobalOptions.Build()` clones slices and maps for the same reason
-(`options.go:73-87`). CLI path gets fresh defaults per parse.
+API deep-clones HTML and option slices at the `Document` / `ImageDocument`
+adapter boundary, so engine requests cannot alias caller state. CLI parsing
+also gets fresh defaults per parse.
 
 ### 6.6 Errors as a shared leaf vocabulary
 
@@ -398,7 +396,7 @@ originate**:
   `DefaultPdfGlobal().Load.EnableLocalFileAccess` is false (zero value).
   The effective gate is `EnableLocalFileAccess && !BlockLocalFileAccess`
   enforced in `load.fileAccessAllowed` (`load.go:811-817`) — a global opt-in
-  (`--enable-local-file-access`) *and* a per-object opt-out that stays on by
+  (`--allow-local-files`) *and* a per-object opt-out that stays on by
   default.
 - **`Allow` prefixes** (`--allow` / `load.Allow`) are the only way to widen
   the local ACL; `NewLoader` clones them into an `AccessController`

@@ -40,11 +40,14 @@ or RSS guarantee.
 
 Generic `gowkhtmltopdf` 0.2.1 versus `wkhtmltopdf 0.12.6.1 (with patched qt)`.
 Same report fixture (20 invoice rows per requested page). Both binaries used
-`--quiet --enable-local-file-access`. Each cell is the median of three timed
+`--quiet --allow-local-files -o OUTPUT INPUT`. Each cell is the median of three timed
 process runs after one warmup.
 
 ```sh
 make bench-cli-compare
+
+# Optional WeasyPrint + Puppeteer process comparisons
+make bench
 ```
 
 | Pages | Gowk time | wkhtmltopdf time | Speedup | Gowk RSS | wkhtmltopdf RSS |

@@ -14,11 +14,11 @@ Deep-dives with `file:line` references live under
 
 | Package | Responsibility |
 |---------|----------------|
-| `gowkhtmltopdf` (root `api.go`) | Public library: `Converter` / `ImageConverter`, dotted `Set`/`Get`, typed `PDFRequest` / `ImageRequest`, `Convert(ctx)` |
+| `gowkhtmltopdf` (root `document.go`) | Public library: `Document` / `ImageDocument`, explicit `Content`, validation, writer-first conversion |
 | `cmd/gowkhtmltopdf` | PDF CLI (`internal/app` + `internal/cli` only) |
 | `cmd/gowkhtmltoimage` | Image CLI |
 | `internal/app` | Command → engine adapter: sinks, TOC dump, `RunPDF` / `RunImage` |
-| `internal/cli` | Argv parse, multi-object grammar (`page` / `cover` / `toc`), help, exit codes |
+| `internal/cli` | Document-shaped argv parse (`-o`, `--html`, `--url`, `--cover`, `--toc`), help, exit codes |
 | `internal/settings` | wkhtmltopdf-style dotted settings, `UnitReal`, page sizes, Policy-A ignored keys |
 | `internal/errs` | Shared sentinel errors (`ErrNilContext`, `ErrNilRequest`, …) |
 | `internal/load` | URL guess, HTTP(S)/file/`data:`/inline HTML, ACL, cookies, auth, POST, timeouts/caps. **No stdin HTML** |
@@ -71,7 +71,7 @@ canvas.
 
 ## `convert.Run` (PDF)
 
-`api.go` and `internal/app.RunPDF` build a `convert.Request` and call
+`Document` and `internal/app.RunPDF` build a `convert.Request` and call
 `convert.Run`. The function is a thin owner of request state; stage order
 lives in `internal/convert/render`:
 
@@ -199,7 +199,7 @@ Full model: [THREAT-MODEL.md](THREAT-MODEL.md),
 [integration-security.md](integration-security.md).
 
 - Local files are **denied by default**. Opt in with
-  `--enable-local-file-access` and/or `--allow` prefixes. Paths are
+  `--allow-local-files` and/or `--allow` prefixes. Paths are
   symlink-resolved before the prefix check.
 - HTTP: 30 s connect / 60 s response defaults, max 10 redirects, 100 MiB
   body cap on both `Content-Length` and the read side.
@@ -217,7 +217,7 @@ Start at [architecture/README.md](architecture/README.md), then:
 | Doc | Domain |
 |-----|--------|
 | [01-entrypoints-cli.md](architecture/01-entrypoints-cli.md) | CLI grammar, flags, exit codes |
-| [02-library-api.md](architecture/02-library-api.md) | `Converter` / typed requests |
+| [02-library-api.md](architecture/02-library-api.md) | `Document` / `ImageDocument` typed fields |
 | [03-settings.md](architecture/03-settings.md) | Dotted keys, `UnitReal`, ignored keys |
 | [04-load.md](architecture/04-load.md) | ACL, HTTP, `FetchSub` |
 | [05-html-parser.md](architecture/05-html-parser.md) | Allowlisted HTML |

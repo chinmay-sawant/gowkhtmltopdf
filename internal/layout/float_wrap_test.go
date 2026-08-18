@@ -125,6 +125,8 @@ img { display: block; width: 100pt; height: 120pt; }
 
 	if tail == nil {
 		t.Fatal("missing big time tail text")
+
+		return
 	}
 	// Full-width reclaim: left edge near content origin, not stuck at ~108pt
 	// (float width + margin).

@@ -1,4 +1,4 @@
-# Plans — v0.2.4 (Idiomatic Document API + CLI rethink)
+# Plans — v0.2.4 (Idiomatic Document API + CLI rethink) — Complete
 
 | File / Folder | Role |
 |---------------|------|

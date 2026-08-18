@@ -11,6 +11,11 @@ The top-level overview lives at [../architecture.md](../architecture.md).
 Each document here is a self-contained deep-dive into one architecture domain,
 grounded in the actual source (types, functions and `file:line` references).
 
+In v0.2.4 the public library entrypoint is `Document` / `ImageDocument` with
+explicit `Content` sources and writer-first methods. The former `Converter`,
+dotted settings, and typed request wrappers are removed from the root package;
+the dotted settings shown in engine tables below are internal only.
+
 ---
 
 ## 1. The system at a glance
@@ -18,10 +23,10 @@ grounded in the actual source (types, functions and `file:line` references).
 ```
                      ┌──────────────────────────────────────────────────────────┐
                      │                 Three entry points                       │
-                     │  cmd/gowkhtmltopdf   cmd/gowkhtmltoimage   api.go (lib)  │
+                     │  cmd/gowkhtmltopdf   cmd/gowkhtmltoimage   Document (lib)│
                      │        │                    │                   │        │
                      │        ▼                    ▼                   ▼        │
-                     │   internal/cli ──► internal/settings (dotted Set/Get)    │
+                     │   internal/cli ──► internal/settings (engine-only keys)  │
                      └───────────────────────────┬──────────────────────────────┘
                                                  │  job seam:
                                                  ▼
@@ -71,8 +76,8 @@ deploys to `docs/`), golden fixtures (`testdata/`), committed samples
 
 | Domain | Package(s) | Responsibility | Deep-dive |
 |--------|-----------|----------------|-----------|
-| Entrypoints & CLI | `cmd/gowkhtmltopdf`, `cmd/gowkhtmltoimage`, `internal/cli` | argv → `cli.Command` → settings; multi-object grammar (`page`/`cover`/`toc`) | [01-entrypoints-cli.md](01-entrypoints-cli.md) |
-| Public library API | root `api.go` | `Converter` / `ImageConverter`, dotted `Set`/`Get`, typed builders, `Convert(ctx)` | [02-library-api.md](02-library-api.md) |
+| Entrypoints & CLI | `cmd/gowkhtmltopdf`, `cmd/gowkhtmltoimage`, `internal/cli` | argv → `cli.Command` → engine settings; document grammar (`-o`, `--html`, `--url`, `--cover`, `--toc`) | [01-entrypoints-cli.md](01-entrypoints-cli.md) |
+| Public library API | root `document.go` + `api.go` | `Document` / `ImageDocument`, explicit `Content`, `WritePDF` / `WriteImage` | [02-library-api.md](02-library-api.md) |
 | Settings & errors | `internal/settings`, `internal/errs` | wkhtmltopdf-style dotted settings, `UnitReal`, page sizes, reflection-based key tables | [03-settings.md](03-settings.md) |
 | Load layer | `internal/load` | URL guessing, HTTP/file/`data:`/inline HTML, ACL, cookies, auth, POST, timeouts/caps. No stdin HTML | [04-load.md](04-load.md) |
 | HTML parser | `internal/html` | Tolerant tokenizer + tree (any tag accepted), entities, no JS | [05-html-parser.md](05-html-parser.md) |
@@ -138,7 +143,7 @@ Key rules that keep the architecture sound:
 |---------|-------|------------------|-----|
 | `gowkhtmltopdf` | `cmd/gowkhtmltopdf/main.go` | PDF | `internal/cli` → `internal/app.RunPDF` → settings/request engine |
 | `gowkhtmltoimage` | `cmd/gowkhtmltoimage/main.go` | PNG/JPEG | `internal/cli` → `internal/app.RunImage` → settings/request engine |
-| Library | `api.go` | PDF or image in memory | `Converter`/`ImageConverter` → `convertHooks` → `convert.Request` with a caller-supplied `Output` writer |
+| Library | `document.go` + `api.go` | PDF or image in memory | `Document`/`ImageDocument` → `convertHooks` → typed internal request with a caller-supplied `Output` writer |
 
 The library never imports `internal/cli`; `cmd/` never imports the root
 package. Deep-copy ownership (`AddObject`, `Output`) makes the library safe
@@ -186,7 +191,7 @@ Full model: [../THREAT-MODEL.md](../THREAT-MODEL.md) and
 [../integration-security.md](../integration-security.md).
 
 - **Local file access is denied by default**; enabled only via
-  `--enable-local-file-access` / settings, with `--allow` prefix expansion and
+  `--allow-local-files` / settings, with `--allow` prefix expansion and
   symlink resolution in `internal/load`.
 - **HTTP hardening**: connect/response timeouts (30 s / 60 s), max 10
   redirects, 100 MiB body cap enforced on both `Content-Length` and the read
@@ -203,14 +208,14 @@ Full model: [../THREAT-MODEL.md](../THREAT-MODEL.md) and
 
 | Doc | Domain | Highlights |
 |-----|--------|-----------|
-| [01-entrypoints-cli.md](01-entrypoints-cli.md) | Entrypoints & CLI | multi-object grammar, flag→setting mapping, PDF vs image binaries, exit codes |
-| [02-library-api.md](02-library-api.md) | Public library API | `Converter`/`ImageConverter`, dotted + typed dialects, deep-copy boundary, hooks |
+| [01-entrypoints-cli.md](01-entrypoints-cli.md) | Entrypoints & CLI | document grammar, flag→setting mapping, PDF vs image binaries, exit codes |
+| [02-library-api.md](02-library-api.md) | Public library API | `Document`/`ImageDocument`, typed fields, validation, deep-copy boundary, hooks |
 | [03-settings.md](03-settings.md) | Settings & errors | reflection key tables, `UnitReal`, page sizes, Policy-A ignored keys, leaf packages |
 | [04-load.md](04-load.md) | Load layer | ACL, URL guessing, network hardening, charset gate, `abort\|skip\|ignore` policy |
 | [05-html-parser.md](05-html-parser.md) | HTML parser | allowlisted tokenizer, tree model, entities, tolerance, no-JS policy |
 | [06-css.md](06-css.md) | CSS subsystem | selector support, cascade, media/container queries, value parsing, degrade rules |
 | [07-layout.md](07-layout.md) | Layout engine | style cascade, all formatting contexts, line breaking/shaping, pagination, display list |
-| [08-convert-pipeline.md](08-convert-pipeline.md) | Convert pipeline | `Request`, 3-stage lifecycle, HF/TOC two-pass fixpoint, outline; page islands are **benchmark-only** |
+| [08-convert-pipeline.md](08-convert-pipeline.md) | Convert pipeline | internal `Request`, 3-stage lifecycle, HF/TOC two-pass fixpoint, outline; page islands are **benchmark-only** |
 | [09-pdf-writer.md](09-pdf-writer.md) | PDF writer | PDF 1.4 default / 1.7 & 2.0 opt-in, `--pdf-profile` claims, tagging/MCR, font subsetting, Type0/CID, outlines, byte stability |
 | [10-imageout-svg.md](10-imageout-svg.md) | Image output & SVG | raster path, TTF outline AA, SVG rasterization, fidelity limits vs PDF |
 

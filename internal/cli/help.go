@@ -12,31 +12,40 @@ import (
 // The unstamped default matches the VERSION file so tests and local
 // `go test`/`go run` agree with the release number. It is not
 // LibraryVersion, which is the upstream wkhtmltopdf compatibility id.
-var Version = "0.2.3" //nolint:gochecknoglobals // ldflags-stamped build variable
+var Version = "0.2.4" //nolint:gochecknoglobals // ldflags-stamped build variable
 
 // PrintHelp writes usage text for the given Mode.
 func PrintHelp(writer io.Writer, mode Mode) {
 	output := "PDF"
+	command := "gowkhtmltopdf"
+	examples := fmt.Sprintf(
+		"  %s --page-size A4 --orientation Landscape -o report.pdf report.html\n"+
+			"  %s -o book.pdf --cover cover.html --toc chapter1.html chapter2.html\n"+
+			"  %s --html '<html><body><h1>Report</h1></body></html>' -o report.pdf",
+		command, command, command,
+	)
+
 	if mode == ModeImage {
 		output = "PNG/JPEG image"
+		command = "gowkhtmltoimage"
+		examples = fmt.Sprintf(
+			"  %s --width 800 --format png -o report.png report.html\n"+
+				"  %s --url https://example.test/preview -o preview.png\n"+
+				"  %s --html '<html><body><h1>Preview</h1></body></html>' -o preview.png",
+			command, command, command,
+		)
 	}
 
 	fmt.Fprintf(writer, `Name:
-  gowkhtmltopdf - Convert HTML to %s with the pure-Go report renderer
+  %s - Convert HTML to %s with the pure-Go report renderer
 
 Synopsis:
-  gowkhtmltopdf [GLOBAL OPTIONS] [OBJECT]... <output file>
-
-  OBJECT is one of:
-    [PAGE OPTIONS] page <input url>
-    [TOC OPTIONS] toc
-    [COVER OPTIONS] cover <input url>
-  The last positional argument is the output file; use "-" for stdout.
-  "page" is optional for the first object.
+  %s [GLOBAL OPTIONS] -o <output> [PAGE...]
+  %s [GLOBAL OPTIONS] --html <html> -o <output>
+  %s [GLOBAL OPTIONS] --url <url> -o <output>
 
 Examples:
-  gowkhtmltopdf --page-size A4 --orientation Landscape report.html report.pdf
-  gowkhtmltopdf cover cover.html toc page chapter1.html page chapter2.html book.pdf
+%s
 
 Description:
   Controlled HTML to %s conversion with a documented CSS subset
@@ -44,7 +53,7 @@ Description:
   or Qt/WebKit engine is used.
 
 %s
-`, output, output, flagList(mode))
+`, command, output, command, command, command, examples, output, flagList(mode))
 }
 
 // PrintVersion writes the version banner.
@@ -82,12 +91,23 @@ func flagList(mode Mode) string {
 
 	var buf strings.Builder
 
-	for _, n := range names {
-		spec := flagTable[n]
+	for _, name := range names {
+		spec := flagTable[name]
+
+		if isDocFlagName(name) {
+			continue
+		}
+
+		if name == "output" {
+			fmt.Fprintln(&buf, "  -o, --output <path>")
+
+			continue
+		}
+
 		if spec.kind == flagBool {
-			fmt.Fprintf(&buf, "  --%s\n", n)
+			fmt.Fprintf(&buf, "  --%s\n", name)
 		} else {
-			fmt.Fprintf(&buf, "  --%s <value>\n", n)
+			fmt.Fprintf(&buf, "  --%s <value>\n", name)
 		}
 	}
 

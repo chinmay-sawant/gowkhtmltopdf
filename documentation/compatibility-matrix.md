@@ -264,7 +264,7 @@ Status legend as in §2; evidence in `internal/css/css.go`.
 
 | Rule | Value |
 |------|-------|
-| Local file access | **Blocked by default** (`--enable-local-file-access` opt-in; `--allow` path allowlist walk) |
+| Local file access | **Blocked by default** (`--allow-local-files` opt-in; `--allow` path allowlist walk) |
 | Untrusted HTML | **Not supported** - same warning as upstream `docs/status.md`; use with HTML you control only |
 | Remote URL fetch | `net/http` defaults: connect + response timeouts, redirect limit. Compatible mode allows `http://localhost` / RFC1918; Restricted (`--restrict-network`) does not. `file://` is gated by the local-file ACL |
 | SSRF posture | No automatic form submission; POST only via explicit `--post` flags; no cookies auto-forwarded from site contexts |
@@ -342,7 +342,7 @@ They fail parse with `unknown option` (`TestStubFlagsRemoved`,
 | Flag | Mode | Status |
 |------|------|--------|
 | `--enable-javascript`, `--disable-javascript` | Both | **Rejected** (`unknown option`; no JS engine) |
-| `--enable-local-file-access`, `--disable-local-file-access` | Both | Supported (local-file ACL; security policy §6 + golden runner) |
+| `--allow-local-files`, `--no-allow-local-files` | Both | Supported (local-file ACL; security policy §6 + golden runner) |
 | `--allow` | PDF | Supported (ACL allow-prefix list). **Not registered** in image mode |
 | `--restrict-network` | Both | Supported (`RestrictedNetworkPolicy`: block private destinations and cross-host redirects) |
 | `--allow-host` | Both | Supported (exact or `*.example.com` host allowlist; exact entries may skip the private-IP check) |

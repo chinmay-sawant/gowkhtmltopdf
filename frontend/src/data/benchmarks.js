@@ -4,7 +4,7 @@ export const SNAPSHOT = {
   go: 'go1.26.4',
   gowk: 'gowkhtmltopdf 0.2.0, freshly built generic CLI',
   wkhtml: 'wkhtmltopdf 0.12.6.1 (with patched qt)',
-  flags: '--quiet --enable-local-file-access',
+  flags: '--quiet --allow-local-files -o OUTPUT INPUT',
   method: 'median of 3 timed process runs after 1 warmup',
   fixture: 'report.html.tmpl, 20 invoice rows per requested page',
 }

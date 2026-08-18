@@ -211,6 +211,8 @@ td { border: 1pt solid black; padding: 0 }
 
 	if xOp == nil {
 		t.Fatal("missing X text op")
+
+		return
 	}
 	// Row is tall; middle-aligned "X" should sit well below the top cell padding.
 	if xOp.Y < 25 {

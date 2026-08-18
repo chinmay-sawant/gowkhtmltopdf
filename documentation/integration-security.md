@@ -112,8 +112,9 @@ skipped.
 
 Defaults block local files. If the app enables:
 
-- CLI: `--enable-local-file-access` / `--allow …`
-- Library: `enablelocalfileaccess=true` and `load.blocklocalfileaccess=false`
+- CLI: `--allow-local-files`
+- Library: `Document.AllowLocalFiles = true` (prefer a dedicated worker and
+  narrow filesystem scope for untrusted input)
 
 …and the user can influence the path or HTML:
 
@@ -163,20 +164,18 @@ func invoicePDF(c *gin.Context) {
     path := writeTempHTML(html) // under e.g. /tmp/gowk-invoices/...
     defer os.Remove(path)
 
-    conv := gowkhtmltopdf.NewConverter()
-    _ = conv.Global().Set("enablelocalfileaccess", "true")
-    // Prefer --allow style prefix for the temp dir only (when exposed as setting)
-    obj := gowkhtmltopdf.NewObjectSettings().SetPage(path)
-    _ = obj.Set("load.blocklocalfileaccess", "false")
-    conv.AddObject(obj)
-
     ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
     defer cancel()
-    if err := conv.Convert(ctx); err != nil {
+    doc := gowkhtmltopdf.Document{
+        Pages: []gowkhtmltopdf.Page{{Source: gowkhtmltopdf.File(path)}},
+        AllowLocalFiles: true,
+    }
+    pdf, err := doc.PDF(ctx)
+    if err != nil {
         c.AbortWithError(500, err)
         return
     }
-    c.Data(200, "application/pdf", conv.Output())
+    c.Data(200, "application/pdf", pdf)
 }
 ```
 
@@ -204,7 +203,7 @@ both tools.
 ## Isolated worker profile (untrusted HTML)
 
 If you convert HTML you did not author, do not treat an in-process
-`Converter` as a complete SSRF/DoS boundary. Run each job in an isolated
+`Document` as a complete SSRF/DoS boundary. Run each job in an isolated
 worker:
 
 | Control | Recommendation |
@@ -218,6 +217,6 @@ worker:
 
 ## See also
 
-- [THREAT-MODEL.md](THREAT-MODEL.md) - ACL matrix, timeouts, `NetworkPolicy`  
-- [library-api.md](library-api.md) - typed `RunPDF` / `SetNetworkPolicy`  
-- [getting-started.md](getting-started.md) - local file opt-in  
+- [THREAT-MODEL.md](THREAT-MODEL.md) - ACL matrix, timeouts, `NetworkPolicy`
+- [library-api.md](library-api.md) - typed `Document` / `NetworkPolicy`
+- [getting-started.md](getting-started.md) - local file opt-in

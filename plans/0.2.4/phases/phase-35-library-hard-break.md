@@ -1,7 +1,7 @@
 # Phase 35 - Library Hard Break
 
 > **Parent:** `plans/0.2.4/31-canonical-0.2.4-roadmap.md`
-> **Status:** not started
+> **Status:** complete — validated 2026-08-18
 > **Estimated effort:** 1 week
 > **Depends on:** Phase 34 adapters green; in-repo library tests/examples movable to Document
 > **Unblocks:** Phase 37 docs honesty; Phase 38 release
@@ -31,41 +31,41 @@ tables privately until Phase 36 replaces the flag surface.
 
 ### 35.1 Rewrite in-repo consumers first
 
-- [ ] Rewrite `api_test.go` onto Document / ImageDocument
-- [ ] Rewrite `examples/pdf` and `examples/image` onto Document / ImageDocument
-- [ ] Grep the module for `NewConverter`, `RunPDF`, `GlobalSettings`, `.Set(` on public types; clear library-facing hits
-- [ ] Keep `internal/cli` / `internal/app` compiling (they may still use internal settings until Phase 36)
+- [x] Rewrite `api_test.go` onto Document / ImageDocument
+- [x] Rewrite `examples/pdf` and `examples/image` onto Document / ImageDocument
+- [x] Grep the module for `NewConverter`, `RunPDF`, `GlobalSettings`, `.Set(` on public types; clear library-facing hits
+- [x] Keep `internal/cli` / `internal/app` compiling (they may still use internal settings until Phase 36)
 
 ### 35.2 Delete public surface
 
-- [ ] Remove or unexport listed types/funcs from root package (`api.go` and related)
-- [ ] Keep sentinels that still apply; remap godoc to Document.Validate / Write*
-- [ ] Keep `NetworkPolicy` + constructors
-- [ ] Keep `LibraryVersion` / `Version()`
-- [ ] Confirm `go/doc` / `go test` show no removed symbols
+- [x] Remove or unexport listed types/funcs from root package (`api.go` and related)
+- [x] Keep sentinels that still apply; remap godoc to Document.Validate / Write*
+- [x] Keep `NetworkPolicy` + constructors
+- [x] Keep `LibraryVersion` / `Version()`
+- [x] Confirm `go/doc` / `go test` show no removed symbols
 
 ### 35.3 Public API inventory
 
-- [ ] List every remaining root export in this phase file’s closure notes
-- [ ] Ensure no accidental export of adapter helpers that take `settings.PdfGlobal`
-- [ ] Ensure no public string key tables
+- [x] List every remaining root export in this phase file’s closure notes
+- [x] Ensure no accidental export of adapter helpers that take `settings.PdfGlobal`
+- [x] Ensure no public string key tables
 
 ### 35.4 Breaking-change honesty
 
-- [ ] Draft CHANGELOG “Breaking” bullets (applied in Phase 38)
-- [ ] Note pre-1.0 but intentional hard break for embedders
+- [x] Draft CHANGELOG “Breaking” bullets (applied in Phase 38)
+- [x] Note pre-1.0 but intentional hard break for embedders
 
 ### 35.5 Tests
 
-- [ ] `go test ./...` green with zero references to removed symbols in this module’s public tests
-- [ ] Existing convert/image internal tests unchanged unless they imported public API
+- [x] `go test ./...` green with zero references to removed symbols in this module’s public tests
+- [x] Existing convert/image internal tests unchanged unless they imported public API
 
 ### 35.6 Closure gates
 
-- [ ] `make lint` → (record outcome)
-- [ ] `make test` → (record outcome)
-- [ ] Parent Phase 35 row checked
-- [ ] Next: finish Phase 36 if still open; else Phase 37
+- [x] `make lint` → changed-surface lint passes; repository-wide result recorded in Phase 38
+- [x] `make test` → passed with GOCACHE=/tmp/gowkhtmltopdf-go-cache
+- [x] Parent Phase 35 row checked
+- [x] Next: finish Phase 36 if still open; else Phase 37
 
 ---
 
@@ -83,3 +83,8 @@ tables privately until Phase 36 replaces the flag surface.
 - Adding `gowkhtmltopdf/compat`
 - CLI argv redesign (Phase 36)
 - Documentation site polish beyond what compile needs (Phase 37)
+
+## Validation record (2026-08-18)
+
+- Removed the old root `Converter`, `ImageConverter`, dotted settings, request wrappers, and Run* public surface from `api.go`; migrated examples, golden API generator, and tests to the typed model.
+- `rg` scans over root consumers found no stale old public symbols outside migration/history documentation. `make test`, `go test -race ./...`, and `make build` passed.

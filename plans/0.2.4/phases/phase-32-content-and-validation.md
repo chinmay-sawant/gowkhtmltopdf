@@ -1,7 +1,7 @@
 # Phase 32 - Content and Validation
 
 > **Parent:** `plans/0.2.4/31-canonical-0.2.4-roadmap.md`
-> **Status:** not started
+> **Status:** complete — validated 2026-08-18
 > **Estimated effort:** 3–5 days
 > **Depends on:** Phase 31 type freeze
 > **Unblocks:** Phases 33–34
@@ -30,39 +30,39 @@ Public callers must not use `inline:` / `data:` string prefixes or
 
 ### 32.1 Content invariants
 
-- [ ] Exactly one of `HTML`, `File`, `URL` may be set; zero or two+ → typed error (`ErrInvalidContent` or equivalent)
-- [ ] `Base` allowed only with `HTML`; ignored or rejected with `File`/`URL` (pick one policy and test it)
-- [ ] Empty `HTML` (len 0) → `ErrEmptyHTML` (or `ErrEmptyContent` that `errors.Is` to `ErrEmptyHTML`)
-- [ ] Empty `File` / `URL` strings do not count as a source
-- [ ] Helpers `HTML` / `File` / `URL` copy HTML bytes so caller mutation cannot change the stored Content
+- [x] Exactly one of `HTML`, `File`, `URL` may be set; zero or two+ → typed error (`ErrInvalidContent` or equivalent)
+- [x] `Base` allowed only with `HTML`; ignored or rejected with `File`/`URL` (pick one policy and test it)
+- [x] Empty `HTML` (len 0) → `ErrEmptyHTML` (or `ErrEmptyContent` that `errors.Is` to `ErrEmptyHTML`)
+- [x] Empty `File` / `URL` strings do not count as a source
+- [x] Helpers `HTML` / `File` / `URL` copy HTML bytes so caller mutation cannot change the stored Content
 
 ### 32.2 Document.Validate
 
-- [ ] Nil receiver → typed nil-document sentinel
-- [ ] At least one renderable body: non-empty `Pages` with valid Content, or `Cover` with valid Content
-- [ ] `TOC != nil` alone is not renderable (reject TOC-only)
-- [ ] Invalid nested Page Content fails Validate with a clear path in the error (`pages[i]`, `cover`)
-- [ ] `Copies < 1` when explicitly set fails with `ErrInvalidPDFCopies` (default 0 means “use engine default” — document in Phase 33 if Copies zero means default 1)
+- [x] Nil receiver → typed nil-document sentinel
+- [x] At least one renderable body: non-empty `Pages` with valid Content, or `Cover` with valid Content
+- [x] `TOC != nil` alone is not renderable (reject TOC-only)
+- [x] Invalid nested Page Content fails Validate with a clear path in the error (`pages[i]`, `cover`)
+- [x] Negative `Copies` fails with `ErrInvalidPDFCopies`; zero means “use the engine default” and positive values are preserved.
 
 ### 32.3 ImageDocument.Validate
 
-- [ ] Nil receiver → typed sentinel
-- [ ] Exactly one valid `Source`
-- [ ] Reject TOC-like / multi-page concepts (image mode is one document)
+- [x] Nil receiver → typed sentinel
+- [x] Exactly one valid `Source`
+- [x] Reject TOC-like / multi-page concepts (image mode is one document)
 
 ### 32.4 Tests
 
-- [ ] Table test: Content combinations (none / HTML / File / URL / HTML+File / …)
-- [ ] Table test: Document TOC-only, empty Pages, Cover-only, Pages-only
-- [ ] Test helpers copy HTML bytes
-- [ ] Test nil Document / ImageDocument Validate
+- [x] Table test: Content combinations (none / HTML / File / URL / HTML+File / …)
+- [x] Table test: Document TOC-only, empty Pages, Cover-only, Pages-only
+- [x] Test helpers copy HTML bytes
+- [x] Test nil Document / ImageDocument Validate
 
 ### 32.5 Closure gates
 
-- [ ] `make lint` → (record outcome)
-- [ ] `make test` → (record outcome)
-- [ ] Parent Phase 32 row checked
-- [ ] Next: Phase 33
+- [x] `make lint` → changed-surface lint passes; repository-wide result recorded in Phase 38
+- [x] `make test` → passed with GOCACHE=/tmp/gowkhtmltopdf-go-cache
+- [x] Parent Phase 32 row checked
+- [x] Next: Phase 33
 
 ---
 
@@ -80,3 +80,8 @@ Public callers must not use `inline:` / `data:` string prefixes or
 - Network fetch behavior (unchanged loader)
 - CLI source flags (Phase 36)
 - Deleting `SetBody` (Phase 35)
+
+## Validation record (2026-08-18)
+
+- `document_validate.go` enforces exact-one source, HTML-only Base, empty-source errors, nested path errors, renderability, image format, and typed nil receivers.
+- `document_test.go` covers source combinations, TOC-only / Cover-only / Pages-only cases, sentinel matching, and byte ownership. `GOCACHE=/tmp/gowkhtmltopdf-go-cache make test` passed.

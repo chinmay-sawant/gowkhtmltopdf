@@ -209,6 +209,8 @@ body { margin: 0; font-size: 10pt; }
 
 	if boxNode == nil {
 		t.Fatal("missing list-item box")
+
+		return
 	}
 
 	for _, op := range res.Ops[boxNode.opStart : boxNode.opEnd+1] {
@@ -333,6 +335,8 @@ body { margin: 0; font-size: 10pt; }
 	noteBox := fixture56BoxByNode(res.root, note)
 	if noteBox == nil {
 		t.Fatal("rounded callout has no box")
+
+		return
 	}
 	pageTop := math.Floor(noteBox.y/100+0.5) * 100
 	if math.Abs(noteBox.y-pageTop) > 0.01 {

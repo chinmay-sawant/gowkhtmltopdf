@@ -4,7 +4,24 @@ All notable changes to gowkhtmltopdf are recorded here. This project follows
 semantic versioning; `VERSION` holds the current release and is stamped into
 binaries at build time (see README "Versioning").
 
-## Unreleased
+## 0.2.4 (2026-08-18)
+
+### Breaking
+
+- Replaced the public wkhtml-shaped `Converter`, dotted settings, and typed
+  request wrappers with `Document` / `ImageDocument`, explicit `Content`
+  sources, validation, writer-first methods, and `PDF` / `Image` helpers.
+- Redesigned both command binaries around `-o/--output`, explicit
+  `--html`/`--url` sources, positional page files, and `--cover`/`--toc`.
+  The old `page`/`cover`/`toc` object grammar is no longer accepted.
+- Added [the 0.2.4 migration guide](documentation/MIGRATION-0.2.4.md).
+
+### Changed
+
+- External comparison paths are frozen as `bench-cli-compare` for
+  wkhtmltopdf and `bench` for WeasyPrint/Puppeteer; optional host tools are
+  skipped with explicit evidence.
+- The benchmark and sample commands now use the native 0.2.4 CLI grammar.
 
 ## 0.2.3 (2026-08-15)
 

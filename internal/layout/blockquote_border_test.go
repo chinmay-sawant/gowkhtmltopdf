@@ -160,6 +160,8 @@ func TestBlockquoteBorderLeftMatchesContentHeight(t *testing.T) {
 	blockquoteBox := findBlockquoteBox(res.root)
 	if blockquoteBox == nil {
 		t.Fatal("blockquote box missing")
+
+		return
 	}
 
 	preH, _ := findBorderLeftRail(res.Ops, blockquoteBox.x)

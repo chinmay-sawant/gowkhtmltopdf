@@ -29,6 +29,7 @@ var flagTable = buildFlagTable() //nolint:gochecknoglobals // static flag lookup
 // shortFlags maps single-char flags to their long-form specs. It must be
 // declared after flagTable so initialization dependencies resolve in order.
 var shortFlags = map[string]flagSpec{ //nolint:gochecknoglobals // static flag lookup table
+	"o": flagTable["output"],
 	"q": flagTable["quiet"],
 	"g": flagTable["grayscale"],
 	"O": flagTable["orientation"],
@@ -68,6 +69,7 @@ func buildFlagTable() map[string]flagSpec {
 	}
 
 	addDocFlags(add)
+	addDocumentFlags(add)
 	addGlobalFlags(add)
 	addOutlineFlags(add)
 	addLocalAccessFlags(add)
@@ -93,17 +95,17 @@ func addDocFlags(add flagAdder) {
 
 // addGlobalFlags registers global PDF flags (engine-consumed only; Policy A).
 func addGlobalFlags(add flagAdder) {
-	add("quiet", ModeBoth, flagBool, func(c *Command, _ *objectCtx, vals []string) error {
-		return c.Global.Set("quiet", vals[0])
+	add("quiet", ModeBoth, flagBool, func(command *Command, _ *objectCtx, vals []string) error {
+		return command.Global.Set("quiet", vals[0])
 	})
-	add("collate", ModePDF, flagBool, func(c *Command, _ *objectCtx, vals []string) error {
-		return c.Global.Set("collate", vals[0])
+	add("collate", ModePDF, flagBool, func(command *Command, _ *objectCtx, vals []string) error {
+		return command.Global.Set("collate", vals[0])
 	})
-	add("copies", ModePDF, flagValue, func(c *Command, _ *objectCtx, vals []string) error {
-		return c.Global.Set("copies", vals[0])
+	add("copies", ModePDF, flagValue, func(command *Command, _ *objectCtx, vals []string) error {
+		return command.Global.Set("copies", vals[0])
 	})
-	add("orientation", ModePDF, flagValue, func(c *Command, _ *objectCtx, vals []string) error {
-		return c.Global.Set("orientation", vals[0])
+	add("orientation", ModePDF, flagValue, func(command *Command, _ *objectCtx, vals []string) error {
+		return command.Global.Set("orientation", vals[0])
 	})
 	add("page-size", ModePDF, flagValue, func(c *Command, _ *objectCtx, vals []string) error {
 		return c.Global.Set("size.pagesize", vals[0])
@@ -154,6 +156,57 @@ func addGlobalFlags(add flagAdder) {
 	})
 }
 
+// addDocumentFlags registers the document-shaped source and output grammar.
+// These flags are deliberately separate from the private settings mapping so
+// the parser exposes a stable Document-like boundary to both binaries.
+func addDocumentFlags(add flagAdder) {
+	add("output", ModeBoth, flagValue, func(command *Command, _ *objectCtx, vals []string) error {
+		if command.outputSet {
+			return ErrDuplicateOutput
+		}
+
+		command.Output = vals[0]
+		command.outputSet = true
+
+		return nil
+	})
+	add("html", ModeBoth, flagValue, func(command *Command, _ *objectCtx, vals []string) error {
+		if command.htmlSet {
+			return errDuplicateSource
+		}
+
+		command.htmlSource = vals[0]
+		command.htmlSet = true
+
+		return nil
+	})
+	add("url", ModeBoth, flagValue, func(command *Command, _ *objectCtx, vals []string) error {
+		if command.urlSet {
+			return errDuplicateSource
+		}
+
+		command.urlSource = vals[0]
+		command.urlSet = true
+
+		return nil
+	})
+	add("cover", ModePDF, flagValue, func(command *Command, _ *objectCtx, vals []string) error {
+		if command.coverSet {
+			return errDuplicateSource
+		}
+
+		command.coverSource = vals[0]
+		command.coverSet = true
+
+		return nil
+	})
+	add("toc", ModePDF, flagBool, func(c *Command, _ *objectCtx, vals []string) error {
+		c.tocRequested = vals[0] == canonicalTrue
+
+		return nil
+	})
+}
+
 // addOutlineFlags registers outline flags.
 func addOutlineFlags(add flagAdder) {
 	add("outline", ModePDF, flagBool, func(c *Command, _ *objectCtx, vals []string) error {
@@ -178,17 +231,16 @@ func addOutlineFlags(add flagAdder) {
 // addLocalAccessFlags registers the local-file-access pair and the shared
 // background paint switch (page-scoped through the one router).
 func addLocalAccessFlags(add flagAdder) {
-	add("enable-local-file-access", ModeBoth, flagBool, func(c *Command, cur *objectCtx, vals []string) error {
+	add("allow-local-files", ModeBoth, flagBool, func(c *Command, cur *objectCtx, vals []string) error {
+		allowed := vals[0] == canonicalTrue
+
 		return cur.applyPage(c,
-			func(g *settings.PdfGlobal, _ string) error { return g.Set("enablelocalfileaccess", "true") },
-			func(o *settings.PdfObject, _ string) error { return o.Set("load.blocklocalfileaccess", "false") },
-			vals[0],
-		)
-	})
-	add("disable-local-file-access", ModeBoth, flagBool, func(c *Command, cur *objectCtx, vals []string) error {
-		return cur.applyPage(c,
-			func(g *settings.PdfGlobal, _ string) error { return g.Set("enablelocalfileaccess", "false") },
-			func(o *settings.PdfObject, _ string) error { return o.Set("load.blocklocalfileaccess", "true") },
+			func(g *settings.PdfGlobal, _ string) error {
+				return g.Set("enablelocalfileaccess", strconv.FormatBool(allowed))
+			},
+			func(o *settings.PdfObject, _ string) error {
+				return o.Set("load.blocklocalfileaccess", strconv.FormatBool(!allowed))
+			},
 			vals[0],
 		)
 	})
@@ -442,16 +494,7 @@ func printMediaFlag(enable bool) flagApplier {
 // on the first real page after a leading toc.
 func pageOnlyFlag(obj func(o *settings.PdfObject, val string) error) flagApplier {
 	return func(_ *Command, cur *objectCtx, vals []string) error {
-		if cur.obj != nil {
-			return obj(cur.obj, vals[0])
-		}
-
-		if cur.pending == nil {
-			pending := settings.DefaultPdfObject()
-			cur.pending = &pending
-		}
-
-		return obj(cur.pending, vals[0])
+		return obj(cur.object(nil), vals[0])
 	}
 }
 

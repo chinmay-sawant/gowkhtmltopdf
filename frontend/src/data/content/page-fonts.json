@@ -93,7 +93,7 @@
     },
     {
      "heading": "@font-face: local WOFF1 and TTF only",
-     "body": "`@font-face` is partial: local `url(...ttf|otf|woff)` under the loader ACL (`--enable-local-file-access` / `--allow`) is fetched via `FetchSub`, parsed (WOFF1 to SFNT via stdlib zlib), and registered for the document on both PDF and image paths (`convert.MergeFontFaces`).",
+     "body": "`@font-face` is partial: local `url(...ttf|otf|woff)` under the loader ACL (`--allow-local-files` / `--allow`) is fetched via `FetchSub`, parsed (WOFF1 to SFNT via stdlib zlib), and registered for the document on both PDF and image paths (`convert.MergeFontFaces`).",
      "bullets": [
       "WOFF1 is supported: decompress, then `ParseTTF`, TrueType outlines only.",
       "WOFF2, EOT, remote `https://`, and `data:` sources are skipped with a warning.",

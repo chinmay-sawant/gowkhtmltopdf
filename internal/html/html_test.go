@@ -443,6 +443,8 @@ func TestParseVoidElements(t *testing.T) {
 
 	if para == nil {
 		t.Fatalf("no <p>:\n%s", treeString(root))
+
+		return
 	}
 	// text a, br, text x, img, input, hr - br/img/input/hr must not consume the following content
 	if len(para.Children) != 6 {

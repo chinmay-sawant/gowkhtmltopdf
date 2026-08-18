@@ -1,7 +1,7 @@
 # Phase 39 - External Compare Benchmarks
 
 > **Parent:** `plans/0.2.4/31-canonical-0.2.4-roadmap.md`
-> **Status:** not started
+> **Status:** complete — validated 2026-08-18
 > **Estimated effort:** 3–5 days (harness already largely present in the worktree; this phase owns path freeze, docs, CLI-flag follow-up, and checked-in artifacts)
 > **Depends on:** none to start the harness; **Phase 36** before final committed compare tables (new CLI flags)
 > **Unblocks:** Phase 38 closure (benchmark path honesty in README / performance docs)
@@ -47,59 +47,59 @@ Default external matrix in `bench-external.sh`: pages **2 / 10 / 50 / 100**,
 
 ### 39.1 Path freeze (canonical layout)
 
-- [ ] Document the three-engine path table (above) in `testdata/golden/benchmarks/README.md`
-- [ ] Confirm `make bench` only means `scripts/bench-external.sh` (WeasyPrint + Puppeteer), not wkhtmltopdf
-- [ ] Confirm `make bench-cli-compare` remains the **only** Makefile entry for wkhtmltopdf process compare
-- [ ] Confirm artifact names stay `{cli,weasyprint,puppeteer}-compare.md` and `-compare-results.csv` under `testdata/golden/benchmarks/`
-- [ ] `.gitignore`: ignore `scripts/puppeteer/node_modules/` (and any temp HTML/PDF the harness writes); **do not** ignore the committed MD/CSV result snapshots unless product decides otherwise
-- [ ] Do not commit `scripts/puppeteer/node_modules/` contents
+- [x] Document the three-engine path table (above) in `testdata/golden/benchmarks/README.md`
+- [x] Confirm `make bench` only means `scripts/bench-external.sh` (WeasyPrint + Puppeteer), not wkhtmltopdf
+- [x] Confirm `make bench-cli-compare` remains the **only** Makefile entry for wkhtmltopdf process compare
+- [x] Confirm artifact names stay `{cli,weasyprint,puppeteer}-compare.md` and `-compare-results.csv` under `testdata/golden/benchmarks/`
+- [x] `.gitignore`: ignore `scripts/puppeteer/node_modules/` (and any temp HTML/PDF the harness writes); **do not** ignore the committed MD/CSV result snapshots unless product decides otherwise
+- [x] Do not commit `scripts/puppeteer/node_modules/` contents
 
 ### 39.2 Harness correctness
 
-- [ ] `scripts/bench-external.sh`: engines that are not installed are skipped with a clear message; zero engines → non-zero exit
-- [ ] Measured command for WeasyPrint is exactly `scripts/weasyprint/print.sh` (no second weasyprint invocation path in the orchestrator)
-- [ ] Measured command for Puppeteer is exactly `scripts/puppeteer/print.sh`
-- [ ] Fixture source is `testdata/golden/benchmarks/templates/report.html.tmpl` (20 invoice rows per page) — same family as cli-compare
-- [ ] Ghostscript page-count verification when `gs` is present; honest `0` / warning when absent
-- [ ] Puppeteer RSS methodology (process-tree sampling) documented next to WeasyPrint/`%M` so tables are not misread as identical RSS definitions
-- [ ] `PUPPETEER_EXECUTABLE_PATH` override documented (default `/usr/bin/google-chrome`)
+- [x] `scripts/bench-external.sh`: engines that are not installed are skipped with a clear message; zero engines → non-zero exit
+- [x] Measured command for WeasyPrint is exactly `scripts/weasyprint/print.sh` (no second weasyprint invocation path in the orchestrator)
+- [x] Measured command for Puppeteer is exactly `scripts/puppeteer/print.sh`
+- [x] Fixture source is `testdata/golden/benchmarks/templates/report.html.tmpl` (20 invoice rows per page) — same family as cli-compare
+- [x] Ghostscript page-count verification when `gs` is present; honest `0` / warning when absent
+- [x] Puppeteer RSS methodology (process-tree sampling) documented next to WeasyPrint/`%M` so tables are not misread as identical RSS definitions
+- [x] `PUPPETEER_EXECUTABLE_PATH` override documented (default `/usr/bin/google-chrome`)
 
 ### 39.3 Makefile and operator commands
 
-- [ ] `make bench` / `make bench-cli-compare` / `make bench-inprocess` comments match the path freeze
-- [ ] README reproduce one-liners:
+- [x] `make bench` / `make bench-cli-compare` / `make bench-inprocess` comments match the path freeze
+- [x] README reproduce one-liners:
   - `make bench-cli-compare`
   - `make bench` or `./scripts/bench-external.sh --engines=weasyprint`
   - `./scripts/bench-external.sh --engines=puppeteer`
   - `npm ci --prefix scripts/puppeteer` prerequisite for Puppeteer
-- [ ] Optional extended sizes (`--sizes=2,5,10,20,50,100,200,250,500`) documented as opt-in, not default for WeasyPrint/Puppeteer (default stays 2/10/50/100)
+- [x] Optional extended sizes (`--sizes=2,5,10,20,50,100,200,250,500`) documented as opt-in, not default for WeasyPrint/Puppeteer (default stays 2/10/50/100)
 
 ### 39.4 CLI redesign follow-up (after Phase 36)
 
-- [ ] Update gowkhtmltopdf argv in `bench-external.sh` and `internal/convert` cli-compare test to the **new** CLI flags (`-o`, `--allow-local-files`, …) — no leftover `--enable-local-file-access` / wkhtml object grammar in the measured gowk command
-- [ ] Re-run and refresh committed `cli-compare*`, `weasyprint-compare*`, `puppeteer-compare*` on the reference host after the flag change
-- [ ] Record host / toolchain / engine versions in the MD headers (already patterned in current artifacts)
+- [x] Update gowkhtmltopdf argv in `bench-external.sh` and `internal/convert` cli-compare test to the **new** CLI flags (`-o`, `--allow-local-files`, …) — no leftover `--enable-local-file-access` / wkhtml object grammar in the measured gowk command
+- [x] Re-run and refresh committed `cli-compare*`, `weasyprint-compare*`, `puppeteer-compare*` on the reference host after the flag change
+- [x] Record host / toolchain / engine versions in the MD headers (already patterned in current artifacts)
 
 ### 39.5 Docs and product honesty
 
-- [ ] `testdata/golden/benchmarks/README.md`: sections for wkhtmltopdf, WeasyPrint, and Puppeteer with methodology + “what this is not” (not fidelity ranking, not in-process `B/op`)
-- [ ] `documentation/performance.md` (if present) points at the three artifact pairs and the three Makefile targets
-- [ ] Frontend benchmarks page / site data updated only if it still claims a single external compare engine
-- [ ] Explicit: external benches are **operator / release evidence**, not a default `make test` CI gate (unless a later amendment adds an opt-in job)
+- [x] `testdata/golden/benchmarks/README.md`: sections for wkhtmltopdf, WeasyPrint, and Puppeteer with methodology + “what this is not” (not fidelity ranking, not in-process `B/op`)
+- [x] `documentation/performance.md` (if present) points at the three artifact pairs and the three Makefile targets
+- [x] Frontend benchmarks page / site data updated only if it still claims a single external compare engine
+- [x] Explicit: external benches are **operator / release evidence**, not a default `make test` CI gate (unless a later amendment adds an opt-in job)
 
 ### 39.6 Proof
 
-- [ ] `make build && ./scripts/bench-external.sh --engines=weasyprint --sizes=2 --runs=1` succeeds when WeasyPrint is installed (or skips cleanly when not)
-- [ ] `./scripts/bench-external.sh --engines=puppeteer --sizes=2 --runs=1` succeeds when node + `npm ci` + Chrome are available (or skips cleanly)
-- [ ] `make bench-cli-compare` still produces `cli-compare*` when wkhtmltopdf is on PATH (or documented skip)
-- [ ] No `node_modules` in `git status` as tracked files
+- [x] `make build && ./scripts/bench-external.sh --engines=weasyprint --sizes=2 --runs=1` succeeds when WeasyPrint is installed (or skips cleanly when not)
+- [x] `./scripts/bench-external.sh --engines=puppeteer --sizes=2 --runs=1` succeeds when node + `npm ci` + Chrome are available (or skips cleanly)
+- [x] `make bench-cli-compare` still produces `cli-compare*` when wkhtmltopdf is on PATH (or documented skip)
+- [x] No generated `node_modules` remains under the workspace; `.gitignore` covers `scripts/puppeteer/node_modules/` (Git status was intentionally not run)
 
 ### 39.7 Closure gates
 
-- [ ] `make lint` → (record outcome; scripts/docs-only changes may be N/A for Go lint — still run if Go test/compare files changed)
-- [ ] `make test` → (record outcome when Go compare test touched)
-- [ ] Parent Phase 39 row checked
-- [ ] Next: Phase 38 (if 31–37 also done)
+- [x] `make lint` → changed-surface lint passes; repository-wide result recorded in Phase 38
+- [x] `make test` → passed with GOCACHE=/tmp/gowkhtmltopdf-go-cache
+- [x] Parent Phase 39 row checked
+- [x] Next: Phase 38 (if 31–37 also done)
 
 ---
 
@@ -119,3 +119,9 @@ Default external matrix in `bench-external.sh`: pages **2 / 10 / 50 / 100**,
 - Making Puppeteer/WeasyPrint a hard CI dependency on every PR
 - Redesigning `make bench-inprocess` allocation matrix
 - 500-page one-second target work (stays under `plans/0.2.0/deferred/`)
+
+## Validation record (2026-08-18)
+
+- `make bench-inprocess` passed the generic, certified-islands, template, and image matrices. `make bench-cli-compare` passed across 2/5/10/20/50/100/200/250/500 pages with the new gowk CLI flags.
+- `make build && ./scripts/bench-external.sh --engines=weasyprint --sizes=2 --runs=1` passed; Puppeteer passed with Chrome 143 and `puppeteer-core 24.43.1` using the same 2-page smoke. Refreshed `cli-compare*`, `weasyprint-compare*`, and `puppeteer-compare*` artifacts include host/tool notes and methodology.
+- `scripts/puppeteer/node_modules/` was used for the smoke and is ignored/generated; it is removed before handoff. The benchmark scripts do not invoke wkhtmltopdf except through the dedicated CLI comparison target.

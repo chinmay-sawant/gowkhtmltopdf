@@ -276,7 +276,8 @@ func TestFixture56RendererSeams(t *testing.T) { //nolint:maintidx,paralleltest /
 	for _, node := range fixture56Nodes(root, func(node *html.Node) bool { return fixture56Class(node) == "dom-pkgs" }) {
 		boxNode := fixture56BoxByNode(res.root, node)
 		if boxNode == nil {
-			t.Fatalf("package grid has no layout box")
+			t.Errorf("package grid has no layout box")
+			continue
 		}
 
 		for _, child := range boxNode.children {
@@ -711,7 +712,8 @@ func TestFixture56SectionRailsFlushWithFrame(t *testing.T) { //nolint:cyclop,par
 		node := fixture56Node(root, func(node *html.Node) bool { return node.Attribute("id") == id })
 		box := fixture56BoxByNode(res.root, node)
 		if box == nil {
-			t.Fatalf("section %s has no layout box", id)
+			t.Errorf("section %s has no layout box", id)
+			continue
 		}
 
 		var rail *Op
@@ -723,7 +725,8 @@ func TestFixture56SectionRailsFlushWithFrame(t *testing.T) { //nolint:cyclop,par
 			}
 		}
 		if rail == nil {
-			t.Fatalf("section %s has no left rail", id)
+			t.Errorf("section %s has no left rail", id)
+			continue
 		}
 		if !nearLayout(rail.Y, box.y) || !nearLayout(rail.Y+rail.H, box.y+box.height) {
 			t.Fatalf("section %s left rail is inset from frame: rail=%+v box=%+v", id, *rail, *box)
@@ -749,7 +752,8 @@ func TestFixture56DomainRailsStartAtFrameTop(t *testing.T) { //nolint:cyclop,par
 		node := fixture56Node(root, func(node *html.Node) bool { return node.Attribute("id") == id })
 		box := fixture56BoxByNode(res.root, node)
 		if box == nil {
-			t.Fatalf("section %s has no layout box", id)
+			t.Errorf("section %s has no layout box", id)
+			continue
 		}
 
 		var firstRail *Op
@@ -945,7 +949,8 @@ func TestFixture56D04ACLMatrixDebug(t *testing.T) { //nolint:paralleltest // fix
 	table := fixture56Node(root, func(node *html.Node) bool { return fixture56Class(node) == "d04-matrix" })
 	tableBox := fixture56BoxByNode(res.root, table)
 	if tableBox == nil {
-		t.Fatal("ACL matrix has no layout box")
+		t.Error("ACL matrix has no layout box")
+		return
 	}
 
 	t.Logf("before table x=%.2f y=%.2f w=%.2f h=%.2f rows=%d children=%d", tableBox.x, tableBox.y, tableBox.w, tableBox.height, len(tableBox.rows), len(tableBox.children))
@@ -1051,7 +1056,8 @@ func TestFixture56D04ACLMatrixRowsStayContiguous(t *testing.T) { //nolint:parall
 	urlsNode := fixture56Node(root, func(node *html.Node) bool { return fixture56Class(node) == "d04-urls" })
 	urlsBox := fixture56BoxByNode(res.root, urlsNode)
 	if urlsBox == nil {
-		t.Fatal("ACL URL paragraph has no layout box")
+		t.Error("ACL URL paragraph has no layout box")
+		return
 	}
 
 	page := int(urlsBox.y / contentHeight)
@@ -1112,7 +1118,8 @@ func TestFixture56PaginationChromeAndWidgetGeometry(t *testing.T) { //nolint:par
 	for _, node := range fixture56Nodes(root, func(node *html.Node) bool { return fixture56Class(node) == "d02-engine" }) {
 		boxNode := fixture56BoxByNode(res.root, node)
 		if boxNode == nil {
-			t.Fatalf("D02 engine has no box: %q", node.Text)
+			t.Errorf("D02 engine has no box: %q", node.Text)
+			continue
 		}
 		var text Op
 		foundText := false
@@ -1139,7 +1146,8 @@ func TestFixture56PaginationChromeAndWidgetGeometry(t *testing.T) { //nolint:par
 		})
 		boxNode := fixture56BoxByNode(res.root, node)
 		if boxNode == nil {
-			t.Fatalf("widget %s has no box", id)
+			t.Errorf("widget %s has no box", id)
+			continue
 		}
 		foundFill := false
 		for i := boxNode.opStart; i <= boxNode.opEnd && i < len(res.Ops); i++ {
@@ -1198,7 +1206,8 @@ func TestFixture56PaginationChromeAndWidgetGeometry(t *testing.T) { //nolint:par
 		}
 	}
 	if noteBox == nil {
-		t.Fatal("security note has no box")
+		t.Error("security note has no box")
+		return
 	}
 	securityTextY := -1.0
 	for i := noteBox.opStart; i <= noteBox.opEnd && i < len(res.Ops); i++ {

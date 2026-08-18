@@ -1,4 +1,8 @@
-# Entrypoints & CLI (governs the multi-object document grammar)
+# Entrypoints & CLI (governs the Document-shaped grammar)
+
+> v0.2.4 uses `-o/--output` plus explicit `--html`/`--url`, positional page
+> files, and `--cover`/`--toc`. The former `page`/`cover`/`toc` object grammar
+> is rejected; internal settings remain an engine-only seam.
 
 ## 1. Responsibility & position in the pipeline
 
@@ -6,7 +10,7 @@ This domain is the **outermost shell** of `gowkhtmltopdf`: it converts raw
 process arguments into a fully validated, settings-shaped `cli.Command` and
 hands it to the application adapters that build engine requests. It is the
 only place that understands the wkhtmltopdf-compatible argument grammar
-(`page` / `cover` / `toc` objects, free positionals, output file, doc flags),
+(`-o` output, explicit sources, free page positionals, and doc flags),
 and it owns the **exit-code contract** (0 ok / 1 error / 2 HTTP 404 / 3
 HTTP 401) that wkhtmltopdf users expect from a drop-in CLI.
 
@@ -47,10 +51,10 @@ wkhtmltopdf-style surface.
 |------|---------------:|----------------|
 | `cmd/gowkhtmltopdf/main.go` | 83 | PDF binary entry: parse, doc-flag dispatch, `--dump-default-toc-xsl` shortcut, quiet/outline wiring, signals, exit code |
 | `cmd/gowkhtmltoimage/main.go` | 53 | Image binary entry: parse (ModeImage), doc-flag dispatch, signals, exit code |
-| `internal/cli/cli.go` | ~548 | Parser core: `Command` struct, `Parse` loop, object grammar (`page`/`cover`/`toc`), positionals/free resolution, value extraction, `ExitCode` mapping |
+| `internal/cli/cli.go` | current | Parser core: `Command` struct, `Parse` loop, document source flags, positionals/free resolution, value extraction, `ExitCode` mapping |
 | `internal/cli/flags.go` | ~495 | Flag table construction (`flagTable`), `Mode` constants, 71 registered flags grouped by policy (`add*Flags` helpers) and routing appliers (`pageOnlyFlag`, `hfFlag`, `tocFlag`, `printMediaFlag`, `applyPage`) |
 | `internal/cli/help.go` | ~71 | `PrintHelp` / `PrintVersion` / `PrintLicense`, the ldflags-stampable `Version` var, mode-filtered `flagList` |
-| `internal/cli/doc.go` | ~11 | Package doc: multi-object grammar; Phase 1 Policy A (only engine-consumed flags registered) |
+| `internal/cli/doc.go` | current | Package doc: document grammar and engine-only settings boundary |
 | `internal/cli/cli_test.go` | 838 | Table-driven parser tests: settings targets, grammar, modes, doc flags, exit codes, stub-flag rejection, output-writer precedence |
 
 The two `cmd` roots total ~136 lines and are intentionally thin: everything
@@ -222,21 +226,17 @@ A flag may be:
   `--allow`, `--font-path` → writes one Global field. Negated/aligned forms
   (`--no-background`, `--disable-smart-shrinking`) write the same home.
 - **Page-scoped with global twin** (`applyPage` router): `--zoom`,
-  `--enable-local-file-access`, `--media-type`, `--proxy`,
+  `--allow-local-files`, `--media-type`, `--proxy`,
   `--load-error-handling`, `--print-media-type`, `--simplify-dom`,
   `--print-link-underline`. The Global half is written **and** the object
-  half; before any object keyword the object half accumulates in
-  `objectCtx.pending` and is **promoted** into the first real page object
-  (`resolveFree`), matching wkhtmltopdf's “address remapping” so
-  `--zoom 0.67 url out.pdf` stamps the zoom on the first page.
+  half; the resolved document object receives the effective page settings.
 - **Page-only** (`pageOnlyFlag`): `--zoom`-class flags with no Global
   consumer write only the current object or pending, never Global.
 - **TOC-scoped** (`tocFlag`): on a current TOC object → `toc.*` object key;
   otherwise global (inherited by all TOCs via effective TOC resolution).
 
-Invariant guarded by tests: TOC objects do **not** consume `pending`, so
-`--enable-local-file-access toc page in.html out.pdf` leaves no ghost page
-prior to the TOC (TestPageScopedBeforeTOCNoGhost).
+The resolved sequence is optional cover, optional TOC, then body pages; legacy
+`page`, `cover`, and `toc` object tokens are rejected.
 
 ### 4.4 Value extraction
 
@@ -366,7 +366,7 @@ needs process-global stdout (all sinks are explicit `io.Writer`s).
 
 ## 8. Security considerations
 
-- **Local-file ACL is opt-in**: `--enable-local-file-access` flips
+- **Local-file ACL is opt-in**: `--allow-local-files` flips
   `Global.Load.EnableLocalFileAccess` *and* negates object-level
   `load.blocklocalfileaccess` (dual-write via `applyPage`,
   flags.go:173-200); `--allow <prefix>` adds ACL prefixes to

@@ -24,7 +24,7 @@ internal/load (fetch) → internal/html (parse) → internal/css (style)
 
 Position in the module graph:
 
-- **Above it:** `api.go` (library `Converter`) and `internal/app` (CLI
+- **Above it:** `document.go` (library `Document` / `ImageDocument`) and `internal/app` (CLI
   adapters) call `convert.Run` / `convert.RunTypedPDF` with a fully-built
   `Request`. The CLI parser (`internal/cli`) produces a `cli.Command`; app
   adapters perform the translation.
@@ -134,14 +134,14 @@ small `Location` projection).
 
 | Symbol | Location | Purpose |
 |--------|----------|---------|
-| `type Request struct` | convert.go:51 | The neutral pipeline input: `Global settings.PdfGlobal`, optional `Image *settings.ImageGlobal`, `Objects []settings.PdfObject`, `Now func() time.Time`, `Output io.Writer`, `OutlineOutput io.Writer`. Independent of the CLI parser; both `api.go` and `internal/app` build it. |
-| `type PDFRequest` / `type ImageRequest` | request.go:10 / request.go:37 | Type-safe, compile-time-checked mode-specific API. `ToRequest()` projects into the shared `Request` union. |
+| `type Request struct` | convert.go:51 | The internal neutral pipeline input: `Global settings.PdfGlobal`, optional `Image *settings.ImageGlobal`, `Objects []settings.PdfObject`, `Now func() time.Time`, `Output io.Writer`, `OutlineOutput io.Writer`. Independent of the CLI parser; adapters build it. |
+| `type PDFRequest` / `type ImageRequest` | request.go:10 / request.go:37 | Internal mode-specific request adapters. `ToRequest()` projects into the shared `Request` union. |
 | `func NewPDFRequest(...)` / `func NewImageRequest(...)` | convert.go:114 / convert.go:125 | Constructors for the union; image settings are copied so the request owns its snapshot. |
 | `func (r *Request) Validate()` | convert.go:137 | Explicit output-sink contract before any loading; canonical `PageSize`; object/copies limits; DumpOutline requires `OutlineOutput`. |
 | `func (r *Request) ValidatePDF()` / `ValidateImage()` | convert.go:172 / 182 | Mode invariants: PDF rejects non-nil `Image` (`ErrUnexpectedImageSettings`); image requires a non-nil `Image`. |
 | `func Run(ctx, req, log, progress)` | convert.go:310 | Full pipeline entry for callers with a writer: validate → loader → font/registry → `runContext` → `render.Run(ctx, &pdfPipeline{run})`. |
 | `func app.RunPDF(ctx, cmd, log, progress, outline)` | app/pdf.go | Application-boundary CLI adapter: validates before opening output, builds `Request`, owns document/outline sinks, and calls `convert.Run`. |
-| `func RunTypedPDF(ctx, req, log, progress)` | request.go:74 | Library entry from `api.go` for `PDFRequest`. |
+| `func RunTypedPDF(ctx, req, log, progress)` | request.go:74 | Internal typed request entry used by adapters. |
 
 ### 3.2 Execution state
 
@@ -222,10 +222,10 @@ small `Location` projection).
 
 ## 4. Data & control flow
 
-### 4.1 Typical library conversion (`Converter.Convert`)
+### 4.1 Typical library conversion (`Document.WritePDF`)
 
 ```text
-api.go Converter.Convert(ctx)
+document.go Document.WritePDF(ctx, writer)
  └─ convert.Run(ctx, req, lineLog, progress)            convert.go:310
     ├─ req.ValidatePDF()                                (sink + mode invariants first)
     ├─ load.NewLoaderWithError(req.Global.Load)          proxy policy fails fast
@@ -464,7 +464,7 @@ constructs, but it is the enforcement point for several security rules:
   runs at the top of `Run` (convert.go:317) *before* fonts/layout state so
   invalid proxy policy is reported immediately. All subresource fetches go
   through `ResourceContext` built on that loader, inheriting the ACL
-  (local-file denied unless `--enable-local-file-access`, `--allow`
+  (local-file denied unless `--allow-local-files`, `--allow`
   prefixes), timeouts, redirect limits, and body-size caps documented in
   [../THREAT-MODEL.md](../THREAT-MODEL.md).
 - **Raw markup vs URL disambiguation in HF.** `loadHTMLHF` treats a
@@ -549,9 +549,9 @@ constructs, but it is the enforcement point for several security rules:
 
 - [../architecture.md](../architecture.md) — high-level package map and
   pipeline (this document expands its `internal/convert` row).
-- [../library-api.md](../library-api.md) — how `api.go` builds `Request`s and
+- [../library-api.md](../library-api.md) — how `Document` builds internal `Request`s and
   calls `convert.Run`.
-- [../cli.md](../cli.md) — multi-object grammar (`page`/`cover`/`toc`),
+- [../cli.md](../cli.md) — document grammar (`-o`, `--html`, `--url`, `--cover`, `--toc`),
   headers/footers, TOC and outline flags routed into `settings`.
 - [../fidelity.md](../fidelity.md) — tiers and degrade rules that constrain
   what the pipeline must do.

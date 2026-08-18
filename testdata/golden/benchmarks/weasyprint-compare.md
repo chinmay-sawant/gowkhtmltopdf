@@ -1,8 +1,11 @@
 # Direct CLI comparison: gowkhtmltopdf vs WeasyPrint
 
-Process-level measurement. Each cell is the median of 3 timed runs after one warmup.
+Process-level measurement. Each cell is the median of 1 timed runs after one warmup.
 Wall time is measured around `/usr/bin/time`; RSS is peak resident set from `%M` (KiB).
-gowkhtmltopdf used `--quiet --enable-local-file-access`; weasyprint used `-q` (quiet).
+Fixture: `/home/chinmay/ChinmayPersonalProjects/gowkhtmltopdf/testdata/golden/benchmarks/templates/report.html.tmpl` (20 invoice rows per requested page).
+Host: Linux 6.6.87.2-microsoft-standard-WSL2 x86_64 (24 CPUs); toolchain: go version go1.26.4 linux/amd64; gowkhtmltopdf: 0.2.4.
+Ghostscript `gs` was present; rendered page counts were checked against the requested size.
+gowkhtmltopdf used `--quiet --allow-local-files -o OUTPUT INPUT`; weasyprint used `-q` (quiet).
 weasyprint RSS is the peak of the weasyprint CLI process from `%M`; gowkhtmltopdf RSS is `%M`.
 
 - gowkhtmltopdf: `/home/chinmay/ChinmayPersonalProjects/gowkhtmltopdf/bin/gowkhtmltopdf` (generic CLI)
@@ -11,7 +14,4 @@ weasyprint RSS is the peak of the weasyprint CLI process from `%M`; gowkhtmltopd
 
 | Pages | Gowk time | WeasyPrint time | Speedup | Gowk RSS | WeasyPrint RSS | Gowk PDF bytes | WeasyPrint PDF bytes |
 |---:|---:|---:|---:|---:|---:|---:|---:|
-| 2 | 21 ms | 726 ms | 33.78x | 23,616 KiB | 77,392 KiB | 34,068 | 15,583 |
-| 10 | 38 ms | 1.584 s | 41.66x | 27,072 KiB | 106,000 KiB | 56,607 | 45,171 |
-| 50 | 113 ms | 6.102 s | 53.77x | 42,240 KiB | 246,700 KiB | 164,461 | 190,543 |
-| 100 | 231 ms | 13.833 s | 59.78x | 60,864 KiB | 422,944 KiB | 300,249 | 372,868 |
+| 2 | 23 ms | 821 ms | 35.52x | 23,616 KiB | 77,408 KiB | 34,068 | 15,586 |

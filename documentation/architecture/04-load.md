@@ -391,7 +391,7 @@ user URL" without host allowlists and network isolation is an SSRF
 anti-pattern. Full scenarios in `documentation/integration-security.md`.
 
 **Recommended defaults for untrusted input (§7):** convert in an isolated
-container, keep `--enable-local-file-access` off, no `--allow`, rely on the
+container, keep `--allow-local-files` off, no `--allow`, rely on the
 built-in timeouts and 100 MiB cap, sanitise HTML or author it yourself.
 
 ## 9. Testing & verification
@@ -466,7 +466,7 @@ These tests are the enforcement point for the THREAT-MODEL controls inventory
 - [../fidelity.md](../fidelity.md) — encoding/feature fidelity tiers (why the charset gate and no-JS stance are claims, not bugs).
 - [../deferred.md](../deferred.md) — deferred items incl. encoding support.
 - [../compatibility-matrix.md](../compatibility-matrix.md) — per-flag/per-feature support including the accepted-but-inert load flags.
-- [../cli.md](../cli.md) — CLI flags that feed `LoadGlobal`/`LoadPage` (`--enable-local-file-access`, `--allow`, `--load-error-handling`, `--proxy`, `--timeout`, `--custom-header`, `--cookie`, `--username/--password`, POST flags).
+- [../cli.md](../cli.md) — CLI flags that feed `LoadGlobal`/`LoadPage` (`--allow-local-files`, `--allow`, `--load-error-handling`, `--proxy`, `--timeout`, `--custom-header`, `--cookie`, `--username/--password`, POST flags).
 - [../library-api.md](../library-api.md) — `ObjectSettings.SetBody` / inline HTML path (`LoadPage.InlineHTML`/`InlineBase`).
 
 Sibling architecture deep-dives in this directory:

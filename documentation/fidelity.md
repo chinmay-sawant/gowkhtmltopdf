@@ -63,7 +63,7 @@ Report templates can rely on: richer selectors (`:nth-child`, attribute, sibling
 
 ### Images in PDF (phase 14)
 
-PNG/JPEG logos and grids are a solid path (fixtures 07/20). JPEG bytes pass through as DCTDecode; PNG alpha → soft-mask. DPI/quality CLI knobs for PDF remain ignored (honest matrix). `GlobalSettings` / `web.images=false` disables painting.
+PNG/JPEG logos and grids are a solid path (fixtures 07/20). JPEG bytes pass through as DCTDecode; PNG alpha → soft-mask. DPI/quality CLI knobs for PDF remain ignored (honest matrix). `Document.Background` and image options control painting; inert wkhtml keys are not part of the public API.
 
 ---
 

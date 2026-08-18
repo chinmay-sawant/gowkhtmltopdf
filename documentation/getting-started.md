@@ -19,11 +19,11 @@ Pin the tagged release (Go 1.26+). Binaries land on `GOBIN` or
 `$(go env GOPATH)/bin`:
 
 ```sh
-go install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltopdf@v0.2.3
-go install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltoimage@v0.2.3
+go install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltopdf@v0.2.4
+go install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltoimage@v0.2.4
 gowkhtmltopdf --version
 # Name: gowkhtmltopdf
-# Version: 0.2.3
+# Version: 0.2.4
 ```
 
 ## Install prebuilt binaries
@@ -59,39 +59,26 @@ Check the stamp:
 ```sh
 ./bin/gowkhtmltopdf --version
 # Name: gowkhtmltopdf
-# Version: 0.2.3
+# Version: 0.2.4
 ```
 
-`VERSION` (currently `0.2.3`) is the project release. The library constant
+`VERSION` (currently `0.2.4`) is the project release. The library constant
 `LibraryVersion` (`0.12.7-dev`) is a **wkhtmltopdf settings-surface**
 compatibility id, not the release number. See [library-api.md](library-api.md#versioning).
 
 ## First local PDF
 
-Local files are **blocked by default**. Opt in with
-`--enable-local-file-access`:
+Local files are **blocked by default**. The 0.2.4 target uses
+`--allow-local-files`, named output, and no `page` keyword:
 
 ```sh
-./bin/gowkhtmltopdf --enable-local-file-access \
-  testdata/golden/fixture-01-simple-invoice.html \
-  /tmp/invoice.pdf
+./bin/gowkhtmltopdf --allow-local-files -o /tmp/invoice.pdf \
+  testdata/golden/fixture-01-simple-invoice.html
 ```
 
-Open `/tmp/invoice.pdf` in any PDF viewer. Committed samples live in
-[`output/`](../output/) — regenerate with `make samples`.
-
-The same conversion with an explicit `page` keyword (useful once you add
-page-scoped flags):
-
-```sh
-./bin/gowkhtmltopdf page --enable-local-file-access \
-  testdata/golden/fixture-01-simple-invoice.html \
-  /tmp/invoice.pdf
-```
-
-`--enable-local-file-access` before any `page`/`cover` attaches to the
-**first real page**, not to a TOC object. Later pages stay blocked unless
-you repeat the flag or use `--allow`. Details: [cli.md](cli.md#local-files).
+The target parser is present in the working tree, but the migration boundary
+and current validation status are documented in [cli.md](cli.md) and
+[MIGRATION-0.2.4.md](MIGRATION-0.2.4.md).
 
 ## PDF version and profile
 
@@ -101,35 +88,32 @@ version only; it is **not** a PDF/A or PDF/UA claim.
 
 ```sh
 # still unclaimed PDF 1.4
-./bin/gowkhtmltopdf --enable-local-file-access \
-  testdata/golden/fixture-01-simple-invoice.html /tmp/invoice.pdf
+./bin/gowkhtmltopdf --allow-local-files -o /tmp/invoice.pdf \
+  testdata/golden/fixture-01-simple-invoice.html
 
 # version only (header / strings / non-claiming XMP — not a profile)
-./bin/gowkhtmltopdf --pdf-version 1.7 --enable-local-file-access \
-  testdata/golden/fixture-01-simple-invoice.html /tmp/invoice-17.pdf
-./bin/gowkhtmltopdf --pdf-version 2.0 --enable-local-file-access \
-  testdata/golden/fixture-01-simple-invoice.html /tmp/invoice-20.pdf
+./bin/gowkhtmltopdf --pdf-version 1.7 --allow-local-files \
+  -o /tmp/invoice-17.pdf testdata/golden/fixture-01-simple-invoice.html
+./bin/gowkhtmltopdf --pdf-version 2.0 --allow-local-files \
+  -o /tmp/invoice-20.pdf testdata/golden/fixture-01-simple-invoice.html
 
 # opt-in profiles (imply PDF 1.7 and 2.0 respectively)
-./bin/gowkhtmltopdf --pdf-profile a3a-ua1 --enable-local-file-access \
-  testdata/golden/fixture-01-simple-invoice.html /tmp/invoice-a3a-ua1.pdf
-./bin/gowkhtmltopdf --pdf-profile a4-ua2 --enable-local-file-access \
-  testdata/golden/fixture-01-simple-invoice.html /tmp/invoice-a4-ua2.pdf
+./bin/gowkhtmltopdf --pdf-profile a3a-ua1 --allow-local-files \
+  -o /tmp/invoice-a3a-ua1.pdf testdata/golden/fixture-01-simple-invoice.html
+./bin/gowkhtmltopdf --pdf-profile a4-ua2 --allow-local-files \
+  -o /tmp/invoice-a4-ua2.pdf testdata/golden/fixture-01-simple-invoice.html
 ```
 
-Library: `WithPDFVersion("1.7")` / `WithPDFVersion("2.0")`,
-`WithPDFProfile("a3a-ua1")` / `WithPDFProfile("a4-ua2")`.
-Aliases such as `a3a-ua1` normalize to a canonical name on `Get("pdfprofile")`
-(for example `"PDF/A-3a+PDF/UA-1"`). Full flag and key tables:
+Target library fields are `PDFVersion: "1.7"` / `"2.0"` and
+`PDFProfile: "a3a-ua1"` / `"a4-ua2"`. Full target flag and API tables:
 [cli.md](cli.md), [library-api.md](library-api.md).
 
 ## First image
 
 ```sh
-./bin/gowkhtmltoimage --enable-local-file-access \
-  --width 1024 \
-  testdata/golden/fixture-01-simple-invoice.html \
-  /tmp/invoice.png
+./bin/gowkhtmltoimage --allow-local-files --width 1024 \
+  -o /tmp/invoice.png \
+  testdata/golden/fixture-01-simple-invoice.html
 ```
 
 Image mode renders one canvas (default viewport 1024 CSS px). Text uses the
@@ -138,9 +122,8 @@ same TTF outline raster path as PDF, with coverage anti-aliasing.
 ## Remote URL
 
 ```sh
-./bin/gowkhtmltopdf \
-  "https://example.com/report.html" \
-  /tmp/remote.pdf
+./bin/gowkhtmltopdf -o /tmp/remote.pdf \
+  --url "https://example.com/report.html"
 ```
 
 HTTP(S) fetch uses a 30 s connect timeout, 60 s response timeout (override
@@ -164,8 +147,8 @@ For untrusted HTML, prefer `--restrict-network` (blocks private/loopback
 destinations and cross-host redirects):
 
 ```sh
-./bin/gowkhtmltopdf --restrict-network \
-  'https://example.com/report.html' out.pdf
+./bin/gowkhtmltopdf --restrict-network -o out.pdf \
+  --url 'https://example.com/report.html'
 ```
 
 ## A slightly richer document
@@ -178,9 +161,8 @@ Headers, page numbers, outline bookmarks, and a generated TOC:
   --footer-center "[page] / [topage]" --footer-line \
   --toc-header-text "Report contents" --disable-dotted-lines \
   --outline --outline-depth 4 --title "Invoice Report" \
-  --enable-local-file-access \
-  toc page testdata/golden/fixture-16-invoice-with-css.html \
-  /tmp/book.pdf
+  --allow-local-files --toc \
+  -o /tmp/book.pdf testdata/golden/fixture-16-invoice-with-css.html
 ```
 
 Placeholders: `[page]`, `[topage]`, `[frompage]`, `[date]`, `[time]`,
@@ -190,55 +172,25 @@ Placeholders: `[page]`, `[topage]`, `[frompage]`, `[date]`, `[time]`,
 Outlines are **on by default** (depth 4). PDF `/Title` comes from `--title`,
 not from the HTML `<title>` (`<title>` feeds `[doctitle]` only).
 
-## Library (minimal)
+## Library (0.2.4 target)
 
 Module path is `github.com/chinmay-sawant/gowkhtmltopdf`.
 
 ```go
-package main
-
-import (
-	"context"
-	"os"
-
-	gowkhtmltopdf "github.com/chinmay-sawant/gowkhtmltopdf"
-)
-
-func main() {
-	c := gowkhtmltopdf.NewConverter()
-	_ = c.Global().Set("size.pagesize", "A4")
-	_ = c.Global().Set("enablelocalfileaccess", "true")
-
-	obj := gowkhtmltopdf.NewObjectSettings().SetPage("invoice.html")
-	_ = obj.Set("load.blocklocalfileaccess", "false")
-	c.AddObject(obj)
-
-	if err := c.Convert(context.Background()); err != nil {
-		panic(err)
-	}
-	_ = os.WriteFile("out.pdf", c.Output(), 0o644)
+doc := gowkhtmltopdf.Document{
+	Pages: []gowkhtmltopdf.Page{{Source: gowkhtmltopdf.Content{
+		HTML: html,
+	}}},
+	PageSize: "A4",
 }
+pdfBytes, err := doc.PDF(ctx)
 ```
 
-Both the global enable **and** the object-level unblock are required for a
-local path. That matches the CLI pair.
-
-Prefer the typed writer-first API when embedding:
-
-```go
-var out bytes.Buffer
-err := gowkhtmltopdf.RunPDF(ctx, &gowkhtmltopdf.PDFRequest{
-	Global: global,
-	Objects: []*gowkhtmltopdf.ObjectSettings{
-		gowkhtmltopdf.NewObjectSettings().SetBody(html, ""),
-	},
-	Now:    func() time.Time { return time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC) },
-	Output: &out,
-})
-```
-
-`Now` pins PDF metadata and `[date]`/`[time]`. Without it the writer uses
-the wall clock, so default CLI bytes are **not** hash-stable.
+The root package now exposes the v0.2.4 Document exports, so the examples
+remain under `examples/` until the hard break closes. See the full target
+contract and
+old-to-new table in [library-api.md](library-api.md) and
+[MIGRATION-0.2.4.md](MIGRATION-0.2.4.md).
 
 Worked programs: [`examples/pdf`](../examples/pdf/) and
 [`examples/image`](../examples/image/). Full surface:

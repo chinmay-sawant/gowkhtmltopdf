@@ -86,7 +86,7 @@ image** paths.
 | `.woff2`, `.eot` | **Skipped** (warning). WOFF2 needs Brotli; not allowlisted |
 | `data:` | **Skipped** (warning) |
 | `https://` / `http://` TTF, OTF, WOFF1 | **Fetched** via `Fetch` → `load.FetchSub` — **same ACL, network policy, timeout, and body cap** as CSS/images |
-| Local `url(...ttf\|otf\|woff)` | Fetched under `--enable-local-file-access` / `--allow` |
+| Local `url(...ttf\|otf\|woff)` | Fetched under `--allow-local-files` / `--allow` |
 | WOFF1 | Decompress → `ParseTTF` (TrueType outlines only) |
 
 `font-weight` / `font-style` on `@font-face` are parsed but **ignored at

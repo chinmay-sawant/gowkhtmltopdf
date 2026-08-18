@@ -58,11 +58,15 @@ body { margin: 0; }
 	arrow := transformedLineOp(res)
 	if arrow == nil {
 		t.Fatal("missing transformed arrow stroke")
+
+		return
 	}
 
 	transformed := transformedBox(res.root)
 	if transformed == nil {
 		t.Fatal("missing transformed arrow box")
+
+		return
 	}
 
 	before := arrow.Xform
@@ -198,6 +202,8 @@ func TestTransformRotateBadgeSiblingsUnmoved(t *testing.T) { //nolint:cyclop,fun
 
 	if badge == nil || plain == nil {
 		t.Fatal("missing text ops")
+
+		return
 	}
 
 	if !badge.XformSet {
@@ -210,6 +216,8 @@ func TestTransformRotateBadgeSiblingsUnmoved(t *testing.T) { //nolint:cyclop,fun
 
 	if plainFill == nil {
 		t.Fatal("plain sibling background missing")
+
+		return
 	}
 
 	if math.Abs(plainFill.X-(plain.X-8)) > 1 {

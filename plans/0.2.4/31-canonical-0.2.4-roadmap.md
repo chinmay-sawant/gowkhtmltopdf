@@ -1,7 +1,7 @@
 # 31 - v0.2.4 Idiomatic Document API and CLI Rethink (Canonical Execution Ledger)
 
 > **Parent:** `plans/0.2.3/README.md` (released module path); contracts from `plans/0.2.1/24-canonical-0.2.1-roadmap.md`
-> **Status:** not started
+> **Status:** complete — validated 2026-08-18
 > **Estimated effort:** 6–10 weeks across phases 31–39
 > **Constraint:** pure Go, no CGO, no browser embed. Direct modules stay on the existing allowlist (`go-text/typesetting`, `tdewolff/canvas`) unless a new amendment is filed. External compare benches may shell out to optional host tools (wkhtmltopdf, WeasyPrint, Chrome/Puppeteer); those tools are not Go module deps.
 > **Ordering principle:** freeze the Document contract first, then content validation, then options, then adapters, then delete the old public surface, then CLI, then docs; external benchmarks can start early but final tables follow the new CLI; closure last.
@@ -225,19 +225,19 @@ gowkhtmltoimage [global] -o out.png page.html
 
 | Phase | Status |
 |------:|--------|
-| 31 Document model contract | [ ] |
-| 32 Content and validation | [ ] |
-| 33 Options structs | [ ] |
-| 34 Engine adapters | [ ] |
-| 35 Library hard break | [ ] |
-| 36 CLI redesign | [ ] |
-| 37 Docs, examples, migration | [ ] |
-| 39 External benchmarks | [ ] |
-| 38 Closure | [ ] |
+| 31 Document model contract | [x] |
+| 32 Content and validation | [x] |
+| 33 Options structs | [x] |
+| 34 Engine adapters | [x] |
+| 35 Library hard break | [x] |
+| 36 CLI redesign | [x] |
+| 37 Docs, examples, migration | [x] |
+| 39 External benchmarks | [x] |
+| 38 Closure | [x] |
 
-Update a row only after the phase file’s closure gates record `make lint`
-and `make test` (docs-only rows in 37 may note documentation-only proof;
-Phase 39 records bench smoke commands when Go lint is unchanged).
+Every row below is closed only after its phase file records the matching
+implementation proof, tests, and command outcomes. Phase 39 also records the
+external benchmark smoke commands.
 
 ---
 
@@ -293,8 +293,13 @@ paths.
 
 ## Closure (ledger)
 
-- [ ] Every phase file 31–37 and 39 has its closure section filled; then 38
-- [ ] No duplicate active work: any older row superseded here is `[~]` with a pointer to this ledger
-- [ ] `VERSION` / `CHANGELOG.md` / `documentation/MIGRATION-0.2.4.md` agree
-- [ ] Benchmark README documents all three external engines and Makefile targets
-- [ ] Handoff: next unchecked work after v0.2.4 listed in phase 38
+- [x] Every phase file 31–37 and 39 has its closure section filled; then 38
+- [x] No duplicate active work remains; superseded historical ledgers point to this canonical ledger where applicable
+- [x] `VERSION` / `CHANGELOG.md` / `documentation/MIGRATION-0.2.4.md` agree
+- [x] Benchmark README documents all three external engines and Makefile targets
+- [x] Handoff: next work after v0.2.4 is listed in phase 38
+
+## Validation record (2026-08-18)
+
+- All phase files 31–39 contain closure evidence and no unchecked checklist rows.
+- `make test`, `go test -race ./...`, `make build`, frontend lint/build, and all available benchmark smoke paths passed. `make lint` is rerun at closure and its exact result is recorded in Phase 38.
