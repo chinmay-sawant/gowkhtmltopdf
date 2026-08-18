@@ -28,4 +28,5 @@ Engine layout and PDF writer stay; outer contract + bench harness paths change.
 |--------|---------------|--------------------------------------------|
 | `make bench-cli-compare` | wkhtmltopdf compare test | `cli-compare.md`, `cli-compare-results.csv` |
 | `make bench` | `scripts/bench-external.sh` → `scripts/weasyprint/print.sh`, `scripts/puppeteer/print.sh` | `weasyprint-compare*`, `puppeteer-compare*` |
-| `make bench-inprocess` | Go allocation matrix | documented in benchmarks README (not redesigned) |
+| `make bench-engine` | Internal conversion allocation matrix | documented in benchmarks README |
+| `make bench-lib` | Public `Document.WritePDF` / `ImageDocument.WriteImage` allocation matrix | documented in benchmarks README |

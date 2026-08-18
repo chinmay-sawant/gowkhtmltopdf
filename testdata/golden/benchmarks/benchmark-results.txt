@@ -258,3 +258,28 @@ CLICompare/200Pages   gowk=353ms   wkhtml=812ms   speedup=2.30   gowk_rss_kib=90
 CLICompare/250Pages   gowk=433ms   wkhtml=942ms   speedup=2.18   gowk_rss_kib=112704 wk_rss_kib=81636  gowk_pdf=715476  wk_pdf=1019315
 CLICompare/500Pages   gowk=1045ms  wkhtml=1641ms  speedup=1.57   gowk_rss_kib=199872 wk_rss_kib=123264 gowk_pdf=1398479 wk_pdf=2036776
 
+# Snapshot G: public library API matrix, one iteration per workload
+# (-benchtime=1x -count=1), 2026-08-18.
+# Command:
+#   GOCACHE=/tmp/gowkhtmltopdf-go-cache go test . -run '^$' -bench '^BenchmarkLibrary(PDF|Image)$' -benchmem -benchtime=1x -count=1
+# This benchmark calls Document.WritePDF and ImageDocument.WriteImage from an
+# external test package. Documents are built before timing; public validation,
+# mapping, loading, layout, painting, and PDF/PNG encoding are measured.
+BenchmarkLibraryPDF/2Pages-24         	       1	   7159643 ns/op	   1.44 MB/s	  8439672 B/op	    2397 allocs/op
+BenchmarkLibraryPDF/5Pages-24         	       1	   2311747 ns/op	   5.72 MB/s	  2147608 B/op	    3291 allocs/op
+BenchmarkLibraryPDF/10Pages-24        	       1	   3360624 ns/op	   5.38 MB/s	  3341648 B/op	    5960 allocs/op
+BenchmarkLibraryPDF/20Pages-24        	       1	   6058382 ns/op	   4.36 MB/s	  5659848 B/op	   11258 allocs/op
+BenchmarkLibraryPDF/50Pages-24        	       1	  13732164 ns/op	   3.78 MB/s	 12657560 B/op	   27455 allocs/op
+BenchmarkLibraryPDF/100Pages-24       	       1	  26130227 ns/op	   3.61 MB/s	 24345560 B/op	   54536 allocs/op
+BenchmarkLibraryPDF/200Pages-24       	       1	  54057322 ns/op	   3.31 MB/s	 47731176 B/op	  108950 allocs/op
+BenchmarkLibraryPDF/250Pages-24       	       1	  59239679 ns/op	   3.74 MB/s	 59281688 B/op	  136147 allocs/op
+BenchmarkLibraryPDF/500Pages-24       	       1	 121140397 ns/op	   3.61 MB/s	118424712 B/op	  273219 allocs/op
+BenchmarkLibraryImage/2Tiles-24       	       1	  15969246 ns/op	   0.25 MB/s	 11740944 B/op	     451 allocs/op
+BenchmarkLibraryImage/5Tiles-24       	       1	  16249808 ns/op	   0.30 MB/s	 12008456 B/op	     651 allocs/op
+BenchmarkLibraryImage/10Tiles-24      	       1	  12940681 ns/op	   0.57 MB/s	  4303728 B/op	    1029 allocs/op
+BenchmarkLibraryImage/20Tiles-24      	       1	  14375231 ns/op	   0.79 MB/s	  4431456 B/op	    1373 allocs/op
+BenchmarkLibraryImage/50Tiles-24      	       1	  18026445 ns/op	   1.28 MB/s	  4830248 B/op	    2393 allocs/op
+BenchmarkLibraryImage/100Tiles-24     	       1	  36047934 ns/op	   1.23 MB/s	 20697816 B/op	    4095 allocs/op
+BenchmarkLibraryImage/200Tiles-24     	       1	  68121238 ns/op	   1.29 MB/s	 37873760 B/op	    7473 allocs/op
+BenchmarkLibraryImage/250Tiles-24     	       1	  89136666 ns/op	   1.25 MB/s	 47719168 B/op	    9165 allocs/op
+BenchmarkLibraryImage/500Tiles-24     	       1	 165393663 ns/op	   1.37 MB/s	 91920496 B/op	   17611 allocs/op

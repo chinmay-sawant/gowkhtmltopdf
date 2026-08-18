@@ -19,9 +19,11 @@ CLI vs three engines on the same generated report fixture.
 | **WeasyPrint** | `make bench` → `scripts/bench-external.sh` → `scripts/weasyprint/print.sh` | `testdata/golden/benchmarks/weasyprint-compare.md`, `weasyprint-compare-results.csv` |
 | **Puppeteer / Chrome** | `make bench` → `scripts/bench-external.sh` → `scripts/puppeteer/print.sh` → `scripts/puppeteer_print.js` | `testdata/golden/benchmarks/puppeteer-compare.md`, `puppeteer-compare-results.csv` |
 
-In-process Go allocation benches (`make bench-inprocess`) stay documented
-but are **not** redesigned here; they remain the allocation/regression
-matrix under the same `testdata/golden/benchmarks/README.md`.
+Internal engine allocation benches use `make bench-engine`; the compatibility
+alias `make bench-inprocess` remains available. Public library allocation
+benches use `make bench-lib` and call `Document.WritePDF` /
+`ImageDocument.WriteImage` directly. All three matrices remain documented
+under the same `testdata/golden/benchmarks/README.md`.
 
 ## Executive Summary
 
@@ -34,7 +36,8 @@ matrix under the same `testdata/golden/benchmarks/README.md`.
 | `scripts/puppeteer/package.json` (+ lock) | `puppeteer-core` pin; install with `npm ci --prefix scripts/puppeteer` |
 | `Makefile` `bench` | `build` then `./scripts/bench-external.sh` |
 | `Makefile` `bench-cli-compare` | wkhtmltopdf process compare (existing Go test gate) |
-| `Makefile` `bench-inprocess` | Go `-bench` allocation matrix |
+| `Makefile` `bench-engine` | Internal `convert` `-bench` allocation matrix |
+| `Makefile` `bench-lib` | Public `Document` / `ImageDocument` `-bench` allocation matrix |
 | `testdata/golden/benchmarks/README.md` | Operator-facing methodology + tables for all three engines |
 
 Default external matrix in `bench-external.sh`: pages **2 / 10 / 50 / 100**,
@@ -66,11 +69,13 @@ Default external matrix in `bench-external.sh`: pages **2 / 10 / 50 / 100**,
 
 ### 39.3 Makefile and operator commands
 
-- [x] `make bench` / `make bench-cli-compare` / `make bench-inprocess` comments match the path freeze
+- [x] `make bench` / `make bench-cli-compare` / `make bench-engine` / `make bench-lib` comments match the path freeze
 - [x] README reproduce one-liners:
   - `make bench-cli-compare`
   - `make bench` or `./scripts/bench-external.sh --engines=weasyprint`
   - `./scripts/bench-external.sh --engines=puppeteer`
+  - `make bench-engine`
+  - `make bench-lib`
   - `npm ci --prefix scripts/puppeteer` prerequisite for Puppeteer
 - [x] Optional extended sizes (`--sizes=2,5,10,20,50,100,200,250,500`) documented as opt-in, not default for WeasyPrint/Puppeteer (default stays 2/10/50/100)
 
@@ -82,8 +87,8 @@ Default external matrix in `bench-external.sh`: pages **2 / 10 / 50 / 100**,
 
 ### 39.5 Docs and product honesty
 
-- [x] `testdata/golden/benchmarks/README.md`: sections for wkhtmltopdf, WeasyPrint, and Puppeteer with methodology + “what this is not” (not fidelity ranking, not in-process `B/op`)
-- [x] `documentation/performance.md` (if present) points at the three artifact pairs and the three Makefile targets
+- [x] `testdata/golden/benchmarks/README.md`: sections for wkhtmltopdf, WeasyPrint, Puppeteer, the internal engine matrix, and the public library matrix with methodology + “what this is not”
+- [x] `documentation/performance.md` (if present) points at the three artifact pairs and the benchmark target families
 - [x] Frontend benchmarks page / site data updated only if it still claims a single external compare engine
 - [x] Explicit: external benches are **operator / release evidence**, not a default `make test` CI gate (unless a later amendment adds an opt-in job)
 
@@ -92,6 +97,7 @@ Default external matrix in `bench-external.sh`: pages **2 / 10 / 50 / 100**,
 - [x] `make build && ./scripts/bench-external.sh --engines=weasyprint --sizes=2 --runs=1` succeeds when WeasyPrint is installed (or skips cleanly when not)
 - [x] `./scripts/bench-external.sh --engines=puppeteer --sizes=2 --runs=1` succeeds when node + `npm ci` + Chrome are available (or skips cleanly)
 - [x] `make bench-cli-compare` still produces `cli-compare*` when wkhtmltopdf is on PATH (or documented skip)
+- [x] `make bench-lib` passes the public PDF/image benchmark matrix without starting a CLI
 - [x] No generated `node_modules` remains under the workspace; `.gitignore` covers `scripts/puppeteer/node_modules/` (Git status was intentionally not run)
 
 ### 39.7 Closure gates
@@ -117,11 +123,11 @@ Default external matrix in `bench-external.sh`: pages **2 / 10 / 50 / 100**,
 
 - Changing layout/CSS to chase WeasyPrint or Chrome pixel parity
 - Making Puppeteer/WeasyPrint a hard CI dependency on every PR
-- Redesigning `make bench-inprocess` allocation matrix
+- Redesigning the internal `bench-engine` allocation matrix beyond its naming/ownership split
 - 500-page one-second target work (stays under `plans/0.2.0/deferred/`)
 
 ## Validation record (2026-08-18)
 
-- `make bench-inprocess` passed the generic, certified-islands, template, and image matrices. `make bench-cli-compare` passed across 2/5/10/20/50/100/200/250/500 pages with the new gowk CLI flags.
+- `make bench-engine` passed the generic, certified-islands, template, and image matrices. `make bench-lib` passed the public PDF and image matrices through `Document.WritePDF` and `ImageDocument.WriteImage` without starting a CLI. `make bench-cli-compare` passed across 2/5/10/20/50/100/200/250/500 pages with the new gowk CLI flags.
 - `make build && ./scripts/bench-external.sh --engines=weasyprint --sizes=2 --runs=1` passed; Puppeteer passed with Chrome 143 and `puppeteer-core 24.43.1` using the same 2-page smoke. Refreshed `cli-compare*`, `weasyprint-compare*`, and `puppeteer-compare*` artifacts include host/tool notes and methodology.
 - `scripts/puppeteer/node_modules/` was used for the smoke and is ignored/generated; it is removed before handoff. The benchmark scripts do not invoke wkhtmltopdf except through the dedicated CLI comparison target.

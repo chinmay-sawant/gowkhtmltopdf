@@ -115,7 +115,7 @@ three process runs after one warmup.
 
 Faster at every tested size. Peak RSS is lower through 100 pages and
 higher from 200 pages on the generic path. Full matrix, RSS, PDF sizes,
-in-process `go test -bench` rows, and historical snapshots:
+internal-engine and public-library `go test -bench` rows, and historical snapshots:
 
 - [testdata/golden/benchmarks/README.md](testdata/golden/benchmarks/README.md)
 - [documentation/performance.md](documentation/performance.md)
@@ -125,6 +125,8 @@ Reproduce:
 ```sh
 make bench-cli-compare
 make bench
+make bench-engine
+make bench-lib
 ```
 
 ## Development

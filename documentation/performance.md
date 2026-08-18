@@ -13,6 +13,7 @@ The tables further down keep older snapshots so reviews stay comparable.
 Related:
 
 - Benchmark implementation: [`internal/convert/benchmarks_test.go`](../internal/convert/benchmarks_test.go)
+- Public library benchmark: [`document_bench_test.go`](../document_bench_test.go)
 - CLI comparison: [`internal/convert/wk_compare_test.go`](../internal/convert/wk_compare_test.go)
 - Recorded results and templates: [`testdata/golden/benchmarks/README.md`](../testdata/golden/benchmarks/README.md)
 - Raw Go rows: [`testdata/golden/benchmarks/benchmark-results.txt`](../testdata/golden/benchmarks/benchmark-results.txt)
@@ -26,7 +27,8 @@ Related:
 | Kind | What it measures | Where |
 |------|------------------|-------|
 | Direct CLI `/usr/bin/time` | Process elapsed time and peak RSS vs wkhtmltopdf | **Current 2026-08-14 table below** |
-| In-process `go test -bench` | Go wall time, `B/op`, `allocs/op` inside the test process | **Current 2026-08-14 generic matrix below** |
+| Internal engine `go test -bench` | Direct `internal/convert` wall time, `B/op`, `allocs/op` | **Current 2026-08-14 generic matrix below** |
+| Public library `go test -bench` | `Document.WritePDF` / `ImageDocument.WriteImage` wall time, `B/op`, `allocs/op` | `make bench-lib` |
 | Phase 9.3 gate | Two full-pipeline runs of a 10-section invoice fixture; CI budget only | Historical timings below; CI still asserts **< 5 s** per run |
 
 Page islands (`convert.NewBenchmarkPDFRequest`) are an **internal benchmark
@@ -73,13 +75,13 @@ memory claim.
 
 ---
 
-## Current in-process matrix (2026-08-14, generic)
+## Current internal engine matrix (2026-08-14, generic)
 
 One iteration (`-benchtime=1x -count=1`). `B/op` is cumulative allocation
 traffic, not process RSS.
 
 ```sh
-make bench
+make bench-engine
 ```
 
 | Workload | 2 | 10 | 100 | 500 |
@@ -91,6 +93,18 @@ make bench
 
 Full size matrix and certified-islands rows: Snapshot F in
 [`benchmark-results.txt`](../testdata/golden/benchmarks/benchmark-results.txt).
+
+## Public library matrix
+
+The public library benchmark calls `Document.WritePDF` and
+`ImageDocument.WriteImage` directly. It constructs the public documents from
+in-memory HTML before timing; public validation, mapping, and the full
+renderer remain inside the timed calls. It does not start a CLI or read an
+HTML file from disk.
+
+```sh
+make bench-lib
+```
 
 ---
 
@@ -224,9 +238,11 @@ Current snapshot commands:
 ```sh
 make bench-cli-compare
 make bench
+make bench-engine
+make bench-lib
 ```
 
-In-process matrix (same as `make bench`):
+Internal engine matrix:
 
 ```sh
 go test ./internal/convert -run '^$' \

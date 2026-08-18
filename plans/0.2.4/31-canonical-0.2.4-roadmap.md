@@ -259,8 +259,11 @@ make bench
             → testdata/golden/benchmarks/puppeteer-compare.md
             → testdata/golden/benchmarks/puppeteer-compare-results.csv
 
-make bench-inprocess
-  → go test ./internal/convert (allocation matrix; not redesigned in 0.2.4)
+make bench-engine
+  → go test ./internal/convert (internal conversion allocation matrix)
+
+make bench-lib
+  → go test . (public Document.WritePDF / ImageDocument.WriteImage matrix)
 ```
 
 Shared fixture family: `testdata/golden/benchmarks/templates/report.html.tmpl`.

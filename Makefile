@@ -1,4 +1,4 @@
-.PHONY: test lint lint-frontend build fmt golden golden-update samples weasyprint clean claim-scan bench bench-inprocess bench-cli-compare
+.PHONY: test lint lint-frontend build fmt golden golden-update samples weasyprint clean claim-scan bench bench-engine bench-lib bench-inprocess bench-cli-compare
 
 # Pure-Go runtime: the standard library plus the allowlisted direct modules
 # below. No cgo, browser, or native converter process is required.
@@ -206,15 +206,25 @@ weasyprint:
 bench: build
 	./scripts/bench-external.sh
 
-# In-process Go allocation matrix (generic + certified-islands, images).
-# Measures only the conversion pipeline on in-memory HTML (no process or
-# disk overhead); it is independent of the external process targets and is
-# used for allocation/regression analysis. See
+# Internal engine allocation matrix (generic + certified-islands, images).
+# Measures the internal conversion pipeline directly; it is independent of
+# the public library API and external process targets. See
 # testdata/golden/benchmarks/README.md.
-bench-inprocess:
+bench-engine:
 	go test ./internal/convert -run '^$$' \
 		-bench 'Benchmark(PDFPages|TemplatePages|WebFetchImage|ImageAssets)$$' \
 		-benchmem -benchtime=1x -count=1
+
+# Compatibility alias for the former target name.
+bench-inprocess: bench-engine
+
+# Public library allocation matrix. Measures Document.WritePDF and
+# ImageDocument.WriteImage without starting a CLI or reading an HTML file from
+# disk. The benchmark constructs the public documents before the timer; public
+# validation, mapping, and the full renderer remain inside the timed calls.
+bench-lib:
+	go test . -run '^$$' -bench '^BenchmarkLibrary(PDF|Image)$$' \
+		-benchmem -benchtime=10x -count=1
 
 # The only Makefile entry for the process-level comparison against installed
 # wkhtmltopdf. Requires `make build` and wkhtmltopdf on PATH. Writes
