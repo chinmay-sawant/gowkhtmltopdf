@@ -5,12 +5,16 @@ import Footer from '../components/Footer'
 import {
   CHART_PAGES,
   CLI_ROWS,
+  externalSpeedup,
   HEADLINE,
+  INPROC_SNAPSHOT_DATE,
   INPROC_INLINE,
   INPROC_PDF_GENERIC,
   INPROC_TEMPLATE_GENERIC,
   INPROC_WEB_FETCH,
+  PUPPETEER_ROWS,
   SNAPSHOT,
+  WEASYPRINT_ROWS,
   formatKiB,
   formatMs,
   formatRssDelta,
@@ -210,6 +214,47 @@ function CompareTable({ activeFilter }) {
   )
 }
 
+function ExternalTable({ engine, rows, rssNote }) {
+  return (
+    <section className="table-block">
+      <h3 className="table-block-heading">gowkhtmltopdf vs {engine}</h3>
+      <div className="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Pages</th>
+              <th scope="col">gowk time</th>
+              <th scope="col">{engine} time</th>
+              <th scope="col">Speedup</th>
+              <th scope="col">gowk RSS</th>
+              <th scope="col">{engine} RSS</th>
+              <th scope="col">gowk PDF</th>
+              <th scope="col">{engine} PDF</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.pages}>
+                <th scope="row">{row.pages}</th>
+                <td>{formatMs(row.gowkMs)}</td>
+                <td>{formatMs(row.engineMs)}</td>
+                <td>
+                  <span className="bench-speedup">{formatSpeedup(externalSpeedup(row))}</span>
+                </td>
+                <td>{formatKiB(row.gowkRss)}</td>
+                <td>{formatKiB(row.engineRss)}</td>
+                <td>{formatPdfSize(row.gowkBytes)}</td>
+                <td>{formatPdfSize(row.engineBytes)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="section-aside">{rssNote}</p>
+    </section>
+  )
+}
+
 function InprocTable({ heading, rows, unit }) {
   return (
     <section className="table-block">
@@ -284,7 +329,7 @@ function HardwareSpecCard() {
           <div>
             <div className="bench-spec-title">Hardware & Test Environment Specification</div>
             <div className="bench-spec-subtitle">
-              AMD EPYC / x86_64 · Linux 6.x · cgo=0 (Pure Go) vs Qt WebKit 0.12.6.1
+              13th Gen Intel Core i7-13700HX · Linux WSL2 · cgo=0 (Pure Go) vs Qt WebKit 0.12.6.1
             </div>
           </div>
         </div>
@@ -312,7 +357,7 @@ function HardwareSpecCard() {
           <div className="bench-spec-grid">
             <div className="bench-spec-item">
               <span className="bench-spec-label">Host Processor</span>
-              <span className="bench-spec-value">AMD EPYC / x86_64 (24 dedicated CPU cores, AVX-512)</span>
+              <span className="bench-spec-value">13th Gen Intel Core i7-13700HX (24 CPUs, WSL2)</span>
             </div>
             <div className="bench-spec-item">
               <span className="bench-spec-label">Operating System</span>
@@ -321,7 +366,7 @@ function HardwareSpecCard() {
             <div className="bench-spec-item">
               <span className="bench-spec-label">gowkhtmltopdf Engine</span>
               <span className="bench-spec-value">
-                <code>CGO_ENABLED=0</code> Pure-Go generic binary (v0.2.0, go1.26.4), zero native C bindings
+                <code>CGO_ENABLED=0</code> Pure-Go generic binary (v0.2.4, go1.26.4), zero native C bindings
               </span>
             </div>
             <div className="bench-spec-item">
@@ -356,7 +401,7 @@ function HardwareSpecCard() {
           <div className="bench-spec-footnote">
             <span>Snapshot Tag: {SNAPSHOT.date}</span>
             <span>·</span>
-            <span>Reproduce locally with <code>make bench-cli-compare</code></span>
+            <span>Reproduce locally with <code>make bench</code></span>
           </div>
         </div>
       )}
@@ -520,6 +565,28 @@ export default function BenchmarksPage() {
         <CompareTable activeFilter={activeFilter} />
       </section>
 
+      <section className="bench-section" aria-labelledby="bench-external-heading">
+        <div className="section-heading-row">
+          <div>
+            <h2 id="bench-external-heading">External renderer comparisons</h2>
+            <p className="lede">
+              The same report fixture was printed through WeasyPrint and Puppeteer/Chrome. These
+              matrices use the external harness&apos;s 2, 10, 50, and 100 page sizes.
+            </p>
+          </div>
+        </div>
+        <ExternalTable
+          engine="WeasyPrint"
+          rows={WEASYPRINT_ROWS}
+          rssNote="WeasyPrint RSS is the measured process peak from /usr/bin/time %M."
+        />
+        <ExternalTable
+          engine="Puppeteer / Chrome"
+          rows={PUPPETEER_ROWS}
+          rssNote="Puppeteer RSS is the peak process-tree RSS for the Node driver and headless Chrome descendants; it is not directly equivalent to a single-process %M reading."
+        />
+      </section>
+
       <aside className="callout callout-info" role="note">
         <div className="callout-marker" aria-hidden="true">
           i
@@ -538,7 +605,7 @@ export default function BenchmarksPage() {
 
       <section className="bench-section" aria-labelledby="bench-inproc-heading">
         <div className="section-heading-row">
-          <h2 id="bench-inproc-heading">In-process Go benchmarks</h2>
+          <h2 id="bench-inproc-heading">Last recorded in-process Go benchmarks ({INPROC_SNAPSHOT_DATE})</h2>
           <p className="section-aside">
             <code>go test -bench</code> inside the test process. <code>B/op</code> is cumulative
             allocation traffic, not peak RSS.
@@ -561,7 +628,8 @@ export default function BenchmarksPage() {
             Host: {SNAPSHOT.host}. Toolchain: {SNAPSHOT.go}. Date: {SNAPSHOT.date}.
           </li>
           <li>
-            {SNAPSHOT.gowk} versus {SNAPSHOT.wkhtml}.
+            {SNAPSHOT.gowk} versus {SNAPSHOT.wkhtml} for the CLI matrix. WeasyPrint and Puppeteer
+            use the external print scripts documented in the benchmark README.
           </li>
           <li>
             Fixture: {SNAPSHOT.fixture}. Method: {SNAPSHOT.method}.
@@ -570,8 +638,9 @@ export default function BenchmarksPage() {
           <li>Numbers are a labeled snapshot, not an SLA. Reproduce on your machine.</li>
         </ul>
         <pre>
-          <code>{`make bench-cli-compare
-make bench`}</code>
+          <code>{`make bench
+make bench-engine
+make bench-lib`}</code>
         </pre>
         <p>
           Full tables, historical snapshots, and caveats live in the{' '}

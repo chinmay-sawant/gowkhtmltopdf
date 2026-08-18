@@ -1,8 +1,8 @@
 export const SNAPSHOT = {
-  date: '2026-08-14',
+  date: '2026-08-19',
   host: 'Linux amd64, 13th Gen Intel Core i7-13700HX (WSL2, 24 CPUs)',
   go: 'go1.26.4',
-  gowk: 'gowkhtmltopdf 0.2.0, freshly built generic CLI',
+  gowk: 'gowkhtmltopdf 0.2.4, freshly built generic CLI',
   wkhtml: 'wkhtmltopdf 0.12.6.1 (with patched qt)',
   flags: '--quiet --allow-local-files -o OUTPUT INPUT',
   method: 'median of 3 timed process runs after 1 warmup',
@@ -10,16 +10,32 @@ export const SNAPSHOT = {
 }
 
 export const CLI_ROWS = [
-  { pages: 2, gowkMs: 16, wkMs: 254, gowkRss: 24192, wkRss: 44852, gowkBytes: 42501, wkBytes: 18486 },
-  { pages: 5, gowkMs: 22, wkMs: 265, gowkRss: 24768, wkRss: 45396, gowkBytes: 50919, wkBytes: 30584 },
-  { pages: 10, gowkMs: 30, wkMs: 278, gowkRss: 26496, wkRss: 46200, gowkBytes: 65072, wkBytes: 50994 },
-  { pages: 20, gowkMs: 44, wkMs: 304, gowkRss: 29760, wkRss: 47156, gowkBytes: 91899, wkBytes: 90742 },
-  { pages: 50, gowkMs: 88, wkMs: 387, gowkRss: 41472, wkRss: 51824, gowkBytes: 172926, wkBytes: 210678 },
-  { pages: 100, gowkMs: 184, wkMs: 530, gowkRss: 58752, wkRss: 58976, gowkBytes: 308714, wkBytes: 411260 },
-  { pages: 200, gowkMs: 353, wkMs: 812, gowkRss: 90048, wkRss: 74336, gowkBytes: 579862, wkBytes: 816285 },
-  { pages: 250, gowkMs: 433, wkMs: 942, gowkRss: 112704, wkRss: 81636, gowkBytes: 715476, wkBytes: 1019315 },
-  { pages: 500, gowkMs: 1045, wkMs: 1641, gowkRss: 199872, wkRss: 123264, gowkBytes: 1398479, wkBytes: 2036776 },
+  { pages: 2, gowkMs: 17, wkMs: 259, speedup: 15.46, gowkRss: 23808, wkRss: 44192, gowkBytes: 34068, wkBytes: 18486 },
+  { pages: 5, gowkMs: 22, wkMs: 268, speedup: 12.36, gowkRss: 24960, wkRss: 44716, gowkBytes: 42467, wkBytes: 30584 },
+  { pages: 10, gowkMs: 30, wkMs: 276, speedup: 9.21, gowkRss: 27264, wkRss: 45992, gowkBytes: 56607, wkBytes: 50994 },
+  { pages: 20, gowkMs: 45, wkMs: 317, speedup: 7.06, gowkRss: 30528, wkRss: 47464, gowkBytes: 83434, wkBytes: 90742 },
+  { pages: 50, gowkMs: 112, wkMs: 406, speedup: 3.63, gowkRss: 43200, wkRss: 51856, gowkBytes: 164461, wkBytes: 210678 },
+  { pages: 100, gowkMs: 184, wkMs: 526, speedup: 2.85, gowkRss: 61248, wkRss: 59048, gowkBytes: 300249, wkBytes: 411260 },
+  { pages: 200, gowkMs: 376, wkMs: 811, speedup: 2.15, gowkRss: 96192, wkRss: 74192, gowkBytes: 571397, wkBytes: 816285 },
+  { pages: 250, gowkMs: 480, wkMs: 964, speedup: 2.01, gowkRss: 116736, wkRss: 81740, gowkBytes: 707011, wkBytes: 1019315 },
+  { pages: 500, gowkMs: 1042, wkMs: 1671, speedup: 1.60, gowkRss: 208128, wkRss: 123080, gowkBytes: 1390014, wkBytes: 2036776 },
 ]
+
+export const WEASYPRINT_ROWS = [
+  { pages: 2, gowkMs: 19, engineMs: 616, speedup: 32.15, gowkRss: 24576, engineRss: 77420, gowkBytes: 34068, engineBytes: 15587 },
+  { pages: 10, gowkMs: 31, engineMs: 1352, speedup: 43.65, gowkRss: 26880, engineRss: 106000, gowkBytes: 56607, engineBytes: 45174 },
+  { pages: 50, gowkMs: 100, engineMs: 5217, speedup: 52.01, gowkRss: 42624, engineRss: 246876, gowkBytes: 164461, engineBytes: 190546 },
+  { pages: 100, gowkMs: 186, engineMs: 10528, speedup: 56.62, gowkRss: 58560, engineRss: 423004, gowkBytes: 300249, engineBytes: 372868 },
+]
+
+export const PUPPETEER_ROWS = [
+  { pages: 2, gowkMs: 18, engineMs: 1411, speedup: 77.30, gowkRss: 23808, engineRss: 944056, gowkBytes: 34068, engineBytes: 102932 },
+  { pages: 10, gowkMs: 32, engineMs: 1548, speedup: 47.84, gowkRss: 27264, engineRss: 1019896, gowkBytes: 56607, engineBytes: 406557 },
+  { pages: 50, gowkMs: 121, engineMs: 2069, speedup: 17.06, gowkRss: 43008, engineRss: 1108580, gowkBytes: 164461, engineBytes: 1934728 },
+  { pages: 100, gowkMs: 199, engineMs: 2145, speedup: 10.78, gowkRss: 62016, engineRss: 1245988, gowkBytes: 300249, engineBytes: 3884017 },
+]
+
+export const INPROC_SNAPSHOT_DATE = '2026-08-14'
 
 export const CHART_PAGES = [2, 10, 50, 100, 500]
 
@@ -72,7 +88,11 @@ export const INPROC_INLINE = [
 ]
 
 export function speedup(row) {
-  return row.wkMs / row.gowkMs
+  return row.speedup ?? row.wkMs / row.gowkMs
+}
+
+export function externalSpeedup(row) {
+  return row.speedup ?? row.engineMs / row.gowkMs
 }
 
 export function rssDelta(row) {

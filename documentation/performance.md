@@ -4,7 +4,7 @@ Numbers on this page are **labeled snapshots**, not a live SLA. Host, GOCACHE
 state, and whether a run used the **generic** convert path or the
 **benchmark-only page-island** path all change wall time and RSS.
 
-**Current snapshot: 2026-08-14.** Freshly built generic CLI versus installed
+**Current snapshot: 2026-08-19.** Freshly built generic CLI versus installed
 wkhtmltopdf 0.12.6.1 (patched Qt) on Linux amd64, 13th Gen Intel Core
 i7-13700HX. Full matrices live in
 [`testdata/golden/benchmarks/README.md`](../testdata/golden/benchmarks/README.md).
@@ -18,6 +18,8 @@ Related:
 - Recorded results and templates: [`testdata/golden/benchmarks/README.md`](../testdata/golden/benchmarks/README.md)
 - Raw Go rows: [`testdata/golden/benchmarks/benchmark-results.txt`](../testdata/golden/benchmarks/benchmark-results.txt)
 - Process comparison CSV: [`testdata/golden/benchmarks/cli-compare-results.csv`](../testdata/golden/benchmarks/cli-compare-results.csv)
+- WeasyPrint comparison: [`testdata/golden/benchmarks/weasyprint-compare.md`](../testdata/golden/benchmarks/weasyprint-compare.md)
+- Puppeteer comparison: [`testdata/golden/benchmarks/puppeteer-compare.md`](../testdata/golden/benchmarks/puppeteer-compare.md)
 - Phase 9.3 gate: `TestTenPageTableReportPerformance` in `internal/convert/perf_test.go`
 
 ---
@@ -26,8 +28,9 @@ Related:
 
 | Kind | What it measures | Where |
 |------|------------------|-------|
-| Direct CLI `/usr/bin/time` | Process elapsed time and peak RSS vs wkhtmltopdf | **Current 2026-08-14 table below** |
-| Internal engine `go test -bench` | Direct `internal/convert` wall time, `B/op`, `allocs/op` | **Current 2026-08-14 generic matrix below** |
+| Direct CLI `/usr/bin/time` | Process elapsed time and peak RSS vs wkhtmltopdf | **Current 2026-08-19 table below** |
+| External engines | Process elapsed time and peak RSS vs WeasyPrint and Puppeteer/Chrome | **Current 2026-08-19 tables below** |
+| Internal engine `go test -bench` | Direct `internal/convert` wall time, `B/op`, `allocs/op` | Last recorded 2026-08-14 generic matrix below |
 | Public library `go test -bench` | `Document.WritePDF` / `ImageDocument.WriteImage` wall time, `B/op`, `allocs/op` | `make bench-lib` |
 | Phase 9.3 gate | Two full-pipeline runs of a 10-section invoice fixture; CI budget only | Historical timings below; CI still asserts **< 5 s** per run |
 
@@ -38,9 +41,9 @@ or RSS guarantee.
 
 ---
 
-## Current CLI comparison vs wkhtmltopdf (2026-08-14)
+## Current CLI comparison vs wkhtmltopdf (2026-08-19)
 
-Generic `gowkhtmltopdf` 0.2.1 versus `wkhtmltopdf 0.12.6.1 (with patched qt)`.
+Generic `gowkhtmltopdf` 0.2.4 versus `wkhtmltopdf 0.12.6.1 (with patched qt)`.
 Same report fixture (20 invoice rows per requested page). Both binaries used
 `--quiet --allow-local-files -o OUTPUT INPUT`. Each cell is the median of three timed
 process runs after one warmup.
@@ -54,15 +57,15 @@ make bench-cli-compare
 
 | Pages | Gowk time | wkhtmltopdf time | Speedup | Gowk RSS | wkhtmltopdf RSS |
 |------:|----------:|-----------------:|--------:|---------:|----------------:|
-| 2 | 16 ms | 254 ms | 15.95x | 24,192 KiB | 44,852 KiB |
-| 5 | 22 ms | 265 ms | 12.23x | 24,768 KiB | 45,396 KiB |
-| 10 | 30 ms | 278 ms | 9.41x | 26,496 KiB | 46,200 KiB |
-| 20 | 44 ms | 304 ms | 6.84x | 29,760 KiB | 47,156 KiB |
-| 50 | 88 ms | 387 ms | 4.40x | 41,472 KiB | 51,824 KiB |
-| 100 | 184 ms | 530 ms | 2.89x | 58,752 KiB | 58,976 KiB |
-| 200 | 353 ms | 812 ms | 2.30x | 90,048 KiB | 74,336 KiB |
-| 250 | 433 ms | 942 ms | 2.18x | 112,704 KiB | 81,636 KiB |
-| 500 | **1.045 s** | **1.641 s** | **1.57x** | **199,872 KiB** | **123,264 KiB** |
+| 2 | 17 ms | 259 ms | 15.46x | 23,808 KiB | 44,192 KiB |
+| 5 | 22 ms | 268 ms | 12.36x | 24,960 KiB | 44,716 KiB |
+| 10 | 30 ms | 276 ms | 9.21x | 27,264 KiB | 45,992 KiB |
+| 20 | 45 ms | 317 ms | 7.06x | 30,528 KiB | 47,464 KiB |
+| 50 | 112 ms | 406 ms | 3.63x | 43,200 KiB | 51,856 KiB |
+| 100 | 184 ms | 526 ms | 2.85x | 61,248 KiB | 59,048 KiB |
+| 200 | 376 ms | 811 ms | 2.15x | 96,192 KiB | 74,192 KiB |
+| 250 | 480 ms | 964 ms | 2.01x | 116,736 KiB | 81,740 KiB |
+| 500 | **1.042 s** | **1.671 s** | **1.60x** | **208,128 KiB** | **123,080 KiB** |
 
 gowkhtmltopdf was **faster at every tested size**. Short documents show the
 largest gap (about **16x** at 2 pages) because wkhtmltopdf pays a ~250 ms
@@ -73,9 +76,44 @@ this generic path. PDF output is smaller from 50 pages onward. The
 2026-08-09 island-era table later on this page is **not** a current
 memory claim.
 
+## Current external comparisons (2026-08-19)
+
+The external harness uses the same generated report fixture, with one warmup
+and three timed process runs. Its default matrix is 2, 10, 50, and 100 pages;
+Ghostscript checked the requested page count for every output.
+
+```sh
+make bench
+./scripts/bench-external.sh --engines=puppeteer
+```
+
+### WeasyPrint
+
+| Pages | Gowk time | WeasyPrint time | Speedup | Gowk RSS | WeasyPrint RSS |
+|------:|----------:|----------------:|--------:|---------:|----------------:|
+| 2 | 19 ms | 616 ms | 32.15x | 24,576 KiB | 77,420 KiB |
+| 10 | 31 ms | 1.352 s | 43.65x | 26,880 KiB | 106,000 KiB |
+| 50 | 100 ms | 5.217 s | 52.01x | 42,624 KiB | 246,876 KiB |
+| 100 | 186 ms | 10.528 s | 56.62x | 58,560 KiB | 423,004 KiB |
+
+### Puppeteer / Chrome
+
+| Pages | Gowk time | Puppeteer time | Speedup | Gowk RSS | Puppeteer RSS |
+|------:|----------:|----------------:|--------:|---------:|---------------:|
+| 2 | 18 ms | 1.411 s | 77.30x | 23,808 KiB | 944,056 KiB |
+| 10 | 32 ms | 1.548 s | 47.84x | 27,264 KiB | 1,019,896 KiB |
+| 50 | 121 ms | 2.069 s | 17.06x | 43,008 KiB | 1,108,580 KiB |
+| 100 | 199 ms | 2.145 s | 10.78x | 62,016 KiB | 1,245,988 KiB |
+
+WeasyPrint RSS is the measured process peak from `/usr/bin/time %M`.
+Puppeteer RSS is the peak process-tree RSS for the Node driver and headless
+Chrome descendants, so those RSS readings are not directly equivalent.
+Raw detail: [`weasyprint-compare.md`](../testdata/golden/benchmarks/weasyprint-compare.md),
+[`puppeteer-compare.md`](../testdata/golden/benchmarks/puppeteer-compare.md).
+
 ---
 
-## Current internal engine matrix (2026-08-14, generic)
+## Last recorded internal engine matrix (2026-08-14, generic)
 
 One iteration (`-benchtime=1x -count=1`). `B/op` is cumulative allocation
 traffic, not process RSS.

@@ -1,6 +1,6 @@
 # Direct CLI comparison: gowkhtmltopdf vs Puppeteer
 
-Process-level measurement. Each cell is the median of 1 timed runs after one warmup.
+Process-level measurement. Each cell is the median of 3 timed runs after one warmup.
 Wall time is measured around `/usr/bin/time`; RSS is peak resident set from `%M` (KiB).
 Fixture: `/home/chinmay/ChinmayPersonalProjects/gowkhtmltopdf/testdata/golden/benchmarks/templates/report.html.tmpl` (20 invoice rows per requested page).
 Host: Linux 6.6.87.2-microsoft-standard-WSL2 x86_64 (24 CPUs); toolchain: go version go1.26.4 linux/amd64; gowkhtmltopdf: 0.2.4.
@@ -14,4 +14,7 @@ Puppeteer RSS is the peak process-tree RSS (node driver + headless Chrome childr
 
 | Pages | Gowk time | Puppeteer time | Speedup | Gowk RSS | Puppeteer RSS | Gowk PDF bytes | Puppeteer PDF bytes |
 |---:|---:|---:|---:|---:|---:|---:|---:|
-| 2 | 24 ms | 1.495 s | 63.51x | 24,384 KiB | 967,240 KiB | 34,068 | 102,932 |
+| 2 | 18 ms | 1.411 s | 77.30x | 23,808 KiB | 944,056 KiB | 34,068 | 102,932 |
+| 10 | 32 ms | 1.548 s | 47.84x | 27,264 KiB | 1,019,896 KiB | 56,607 | 406,557 |
+| 50 | 121 ms | 2.069 s | 17.06x | 43,008 KiB | 1,108,580 KiB | 164,461 | 1,934,728 |
+| 100 | 199 ms | 2.145 s | 10.78x | 62,016 KiB | 1,245,988 KiB | 300,249 | 3,884,017 |

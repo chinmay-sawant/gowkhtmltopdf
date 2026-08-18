@@ -1,7 +1,7 @@
 # Phase 39 - External Compare Benchmarks
 
 > **Parent:** `plans/0.2.4/31-canonical-0.2.4-roadmap.md`
-> **Status:** complete — validated 2026-08-18
+> **Status:** complete — validated 2026-08-19
 > **Estimated effort:** 3–5 days (harness already largely present in the worktree; this phase owns path freeze, docs, CLI-flag follow-up, and checked-in artifacts)
 > **Depends on:** none to start the harness; **Phase 36** before final committed compare tables (new CLI flags)
 > **Unblocks:** Phase 38 closure (benchmark path honesty in README / performance docs)
@@ -128,9 +128,10 @@ Default external matrix in `bench-external.sh`: pages **2 / 10 / 50 / 100**,
 - Redesigning the internal `bench-engine` allocation matrix beyond its naming/ownership split
 - 500-page one-second target work (stays under `plans/0.2.0/deferred/`)
 
-## Validation record (2026-08-18)
+## Validation record (2026-08-19)
 
 - `make bench-engine` passed the generic, certified-islands, template, and image matrices. `make bench-lib` passed the public PDF and image matrices through `Document.WritePDF` and `ImageDocument.WriteImage` without starting a CLI; its PDF workload now uses the exact external `report.html.tmpl` fixture and page-count contract. `make bench-cli-compare` passed across 2/5/10/20/50/100/200/250/500 pages with the new gowk CLI flags.
 - The public `BenchmarkLibraryPDF/500Pages` path was profiled with CPU and exact heap pprof runs. The report records layout/table/style hotspots, allocation sites, profile overhead, and the distinction from the non-profiled Snapshot G benchmark baseline.
-- `make build && ./scripts/bench-external.sh --engines=weasyprint --sizes=2 --runs=1` passed; Puppeteer passed with Chrome 143 and `puppeteer-core 24.43.1` using the same 2-page smoke. Refreshed `cli-compare*`, `weasyprint-compare*`, and `puppeteer-compare*` artifacts include host/tool notes and methodology.
-- `scripts/puppeteer/node_modules/` was used for the smoke and is ignored/generated; it is removed before handoff. The external script does not invoke wkhtmltopdf; `make bench` invokes the dedicated comparison target after the script completes.
+- `make bench` completed the WeasyPrint and wkhtmltopdf comparisons. After installing the pinned local dependency with `npm ci --prefix scripts/puppeteer`, `./scripts/bench-external.sh --engines=puppeteer` passed the full default 2/10/50/100-page matrix with Chrome 143 and `puppeteer-core 24.43.1`. Refreshed `cli-compare*`, `weasyprint-compare*`, and `puppeteer-compare*` artifacts include host/tool notes and methodology.
+- `frontend/src/data/benchmarks.js` and the performance content now expose the 2026-08-19 CLI, WeasyPrint, and Puppeteer snapshots; `npm --prefix frontend run lint`, `npm --prefix frontend run build`, and `npm --prefix frontend run test` passed, refreshing `frontend/dist/` and `docs/`.
+- `scripts/puppeteer/node_modules/` was used for the run and is ignored/generated; it is removed before handoff. The external script does not invoke wkhtmltopdf; `make bench` invokes the dedicated comparison target after the script completes.
