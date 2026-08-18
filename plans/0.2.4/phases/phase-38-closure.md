@@ -3,15 +3,16 @@
 > **Parent:** `plans/0.2.4/31-canonical-0.2.4-roadmap.md`
 > **Status:** not started
 > **Estimated effort:** 2–3 days
-> **Depends on:** Phases 31–37
+> **Depends on:** Phases 31–37 and 39
 > **Unblocks:** v0.2.4 tag / release
 
 ---
 
 ## Overview
 
-Close the v0.2.4 ledger: version metadata, changelog, full gate evidence,
-and an explicit handoff for work that remains outside this release.
+Close the v0.2.4 ledger: version metadata, changelog, full gate evidence
+(including the three-engine benchmark path freeze), and an explicit handoff
+for work that remains outside this release.
 
 ## Executive Summary
 
@@ -41,10 +42,11 @@ and an explicit handoff for work that remains outside this release.
 
 ### 38.3 Ledger closure
 
-- [ ] Every phase file 31–37 has closure gates filled with commands/outcomes
-- [ ] Parent status board 31–38 all `[x]`
+- [ ] Every phase file 31–37 and 39 has closure gates filled with commands/outcomes
+- [ ] Parent status board 31–39 all `[x]` (38 last)
 - [ ] Canonical ledger Overview status → complete (date)
 - [ ] No duplicate active work left in older plans without `[~]` pointers
+- [ ] Benchmark README + Makefile comments agree with Phase 39 path map
 
 ### 38.4 Final gates
 
@@ -52,10 +54,11 @@ and an explicit handoff for work that remains outside this release.
 - [ ] `make test` → (record outcome)
 - [ ] Optional: `go run ./examples/pdf …` and `go run ./examples/image …` magic-byte check
 - [ ] Optional: new CLI smoke on one golden fixture
+- [ ] Optional: `make bench-cli-compare` / `./scripts/bench-external.sh --sizes=2 --runs=1` when host tools exist
 
 ### 38.5 Handoff
 
-- [ ] List next work **not** in 0.2.4 (fidelity leftovers under `plans/0.2.0/`, deferred.md items)
+- [ ] List next work **not** in 0.2.4 (fidelity leftovers under `plans/0.2.0/`, deferred.md items, 500-page deferred)
 - [ ] Explicitly state engine layout/CSS was not part of this release
 - [ ] Parent Phase 38 row checked
 

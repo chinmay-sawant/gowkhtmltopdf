@@ -2,9 +2,9 @@
 
 > **Parent:** `plans/0.2.3/README.md` (released module path); contracts from `plans/0.2.1/24-canonical-0.2.1-roadmap.md`
 > **Status:** not started
-> **Estimated effort:** 6–10 weeks across phases 31–38
-> **Constraint:** pure Go, no CGO, no browser embed. Direct modules stay on the existing allowlist (`go-text/typesetting`, `tdewolff/canvas`) unless a new amendment is filed.
-> **Ordering principle:** freeze the Document contract first, then content validation, then options, then adapters, then delete the old public surface, then CLI, then docs/release.
+> **Estimated effort:** 6–10 weeks across phases 31–39
+> **Constraint:** pure Go, no CGO, no browser embed. Direct modules stay on the existing allowlist (`go-text/typesetting`, `tdewolff/canvas`) unless a new amendment is filed. External compare benches may shell out to optional host tools (wkhtmltopdf, WeasyPrint, Chrome/Puppeteer); those tools are not Go module deps.
+> **Ordering principle:** freeze the Document contract first, then content validation, then options, then adapters, then delete the old public surface, then CLI, then docs; external benchmarks can start early but final tables follow the new CLI; closure last.
 > **Workflow:** [`skills/phase-wise-checklist/SKILLS.md`](../../skills/phase-wise-checklist/SKILLS.md)
 
 ---
@@ -29,7 +29,8 @@ break**: no `compat` subpackage, no public dotted keys, no
 3. Map Document → existing `internal/convert` / `internal/imageout` engines (internals may still use `settings.PdfGlobal`).
 4. Delete the wkhtml-shaped public library surface.
 5. Redesign `gowkhtmltopdf` / `gowkhtmltoimage` argv to Document-aligned flags.
-6. Docs, examples, migration guide, VERSION / CHANGELOG.
+6. Freeze and document the **three-engine external compare** paths (wkhtmltopdf, WeasyPrint, Puppeteer) under `testdata/golden/benchmarks/` and `scripts/`.
+7. Docs, examples, migration guide, VERSION / CHANGELOG.
 
 **Hard non-goals (unless this ledger is amended)**
 
@@ -39,6 +40,7 @@ break**: no `compat` subpackage, no public dotted keys, no
 - Changing PDF 1.7 / 2.0 / profile writer semantics (already shipped in 0.2.2)
 - Layout / CSS fidelity work
 - Pixel-diff goldens as the default gate
+- Making WeasyPrint/Puppeteer hard CI deps on every PR
 
 **Product decisions locked**
 
@@ -48,6 +50,7 @@ break**: no `compat` subpackage, no public dotted keys, no
 | Content shape | Full document model (cover, TOC, pages, HF, sink) |
 | Old API refuge | None in 0.2.4 |
 | CLI | Redesign in the same release |
+| External benches | All three engines: wkhtmltopdf (`bench-cli-compare`), WeasyPrint + Puppeteer (`make bench` / `bench-external.sh`) |
 
 ---
 
@@ -61,12 +64,15 @@ break**: no `compat` subpackage, no public dotted keys, no
           → 35 Library hard break
           → 36 CLI redesign
               → 37 Docs, examples, migration
-                  → 38 Closure
+                  ↘
+39 External benchmarks (harness anytime; final tables after 36) → 38 Closure
 ```
 
 Phases 35 and 36 both depend on 34. Prefer: adapters green → rewrite
 in-repo consumers to Document → delete old API → finish CLI → docs →
-closure.
+closure. Phase 39 may land harness/docs in parallel with 31–35; refresh
+committed compare tables after Phase 36 so measured gowk argv matches the
+new CLI.
 
 | Phase | File | Goal |
 |------:|------|------|
@@ -77,6 +83,7 @@ closure.
 | 35 | [phases/phase-35-library-hard-break.md](phases/phase-35-library-hard-break.md) | Remove Converter / dotted Set public surface |
 | 36 | [phases/phase-36-cli-redesign.md](phases/phase-36-cli-redesign.md) | New CLI grammar aligned with Document |
 | 37 | [phases/phase-37-docs-examples-migration.md](phases/phase-37-docs-examples-migration.md) | Docs, examples, MIGRATION-0.2.4 |
+| 39 | [phases/phase-39-external-benchmarks.md](phases/phase-39-external-benchmarks.md) | wk / WeasyPrint / Puppeteer compare paths + artifacts |
 | 38 | [phases/phase-38-closure.md](phases/phase-38-closure.md) | VERSION, CHANGELOG, ledger gates |
 
 ---
@@ -92,6 +99,7 @@ closure.
 | Engine already has rich structs (`settings.PdfGlobal`, `PdfObject`, `HeaderFooter`) | `internal/settings/settings.go` |
 | CLI is wkhtml multi-object (`page` / `cover` / `toc`) + dotted flags | `internal/cli/`, `documentation/cli.md` |
 | Project release is `0.2.3`; `LibraryVersion` remains `0.12.7-dev` settings-surface id | `VERSION`, `api.go` |
+| External compare paths (worktree): `make bench` → WeasyPrint/Puppeteer via `scripts/bench-external.sh`; `make bench-cli-compare` → wkhtmltopdf | `Makefile`, `scripts/{bench-external.sh,weasyprint/,puppeteer/}`, `testdata/golden/benchmarks/*-compare*` |
 
 ---
 
@@ -224,10 +232,38 @@ gowkhtmltoimage [global] -o out.png page.html
 | 35 Library hard break | [ ] |
 | 36 CLI redesign | [ ] |
 | 37 Docs, examples, migration | [ ] |
+| 39 External benchmarks | [ ] |
 | 38 Closure | [ ] |
 
 Update a row only after the phase file’s closure gates record `make lint`
-and `make test` (docs-only rows in 37 may note documentation-only proof).
+and `make test` (docs-only rows in 37 may note documentation-only proof;
+Phase 39 records bench smoke commands when Go lint is unchanged).
+
+---
+
+## External benchmark path map (Phase 39)
+
+```text
+make bench-cli-compare
+  → internal/convert TestCompareWithWkhtmltopdfBinary
+  → testdata/golden/benchmarks/cli-compare.md
+  → testdata/golden/benchmarks/cli-compare-results.csv
+
+make bench
+  → scripts/bench-external.sh
+       ├─ scripts/weasyprint/print.sh
+       │    → testdata/golden/benchmarks/weasyprint-compare.md
+       │    → testdata/golden/benchmarks/weasyprint-compare-results.csv
+       └─ scripts/puppeteer/print.sh
+            → scripts/puppeteer_print.js  (puppeteer-core under scripts/puppeteer/)
+            → testdata/golden/benchmarks/puppeteer-compare.md
+            → testdata/golden/benchmarks/puppeteer-compare-results.csv
+
+make bench-inprocess
+  → go test ./internal/convert (allocation matrix; not redesigned in 0.2.4)
+```
+
+Shared fixture family: `testdata/golden/benchmarks/templates/report.html.tmpl`.
 
 ---
 
@@ -240,7 +276,8 @@ and `make test` (docs-only rows in 37 may note documentation-only proof).
 | Phase 32–33 | Valid Document tree for 34 |
 | Phase 34 | Adapters for 35–36 |
 | Phase 35–36 | Surface for 37 docs |
-| Phase 37 | Evidence for 38 release |
+| Phase 36 | Final gowk argv for Phase 39 committed tables |
+| Phase 37 + 39 | Evidence for 38 release |
 
 ---
 
@@ -248,12 +285,16 @@ and `make test` (docs-only rows in 37 may note documentation-only proof).
 
 See Overview hard non-goals. Fidelity leftovers remain under
 `plans/0.2.0/` deferred / pending ledgers; do not reopen them here.
+500-page one-second deferred work stays under
+`plans/0.2.0/deferred/`; Phase 39 only freezes the three-engine compare
+paths.
 
 ---
 
 ## Closure (ledger)
 
-- [ ] Every phase file 31–38 has its closure section filled
+- [ ] Every phase file 31–37 and 39 has its closure section filled; then 38
 - [ ] No duplicate active work: any older row superseded here is `[~]` with a pointer to this ledger
 - [ ] `VERSION` / `CHANGELOG.md` / `documentation/MIGRATION-0.2.4.md` agree
+- [ ] Benchmark README documents all three external engines and Makefile targets
 - [ ] Handoff: next unchecked work after v0.2.4 listed in phase 38

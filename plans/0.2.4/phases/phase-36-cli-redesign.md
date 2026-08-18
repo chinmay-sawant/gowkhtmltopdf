@@ -93,3 +93,4 @@ gowkhtmltoimage [global] -o out.png page.html
 - Restoring `toc` / `cover` / `page` wkhtml object tokens as the default parser
 - `--read-args-from-stdin` batch loop
 - Stdin HTML `-` as a hidden GuessURL path (use `--html` or explicit stdin flag if added — document honestly)
+- Refreshing external compare result tables (Phase 39 owns `bench-external.sh` / `bench-cli-compare` argv follow-up after this phase)
