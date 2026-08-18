@@ -30,7 +30,7 @@ Related:
 |------|------------------|-------|
 | Direct CLI `/usr/bin/time` | Process elapsed time and peak RSS vs wkhtmltopdf | **Current 2026-08-19 table below** |
 | External engines | Process elapsed time and peak RSS vs WeasyPrint and Puppeteer/Chrome | **Current 2026-08-19 tables below** |
-| Internal engine `go test -bench` | Direct `internal/convert` wall time, `B/op`, `allocs/op` | Last recorded 2026-08-14 generic matrix below |
+| Internal engine `go test -bench` | Direct `internal/convert` wall time, `B/op`, `allocs/op` | Fresh requested 2026-08-19 samples below |
 | Public library `go test -bench` | `Document.WritePDF` / `ImageDocument.WriteImage` wall time, `B/op`, `allocs/op` | `make bench-lib` |
 | Phase 9.3 gate | Two full-pipeline runs of a 10-section invoice fixture; CI budget only | Historical timings below; CI still asserts **< 5 s** per run |
 
@@ -215,6 +215,41 @@ split fast path.
 
 ---
 
+## Fresh requested in-process and public API samples (2026-08-19)
+
+The requested `make bench-engine` and `make bench-inprocess` commands both
+completed. They invoke the same one-iteration internal matrix; the second
+sample is shown below because the first invocation had a materially slower
+one-shot 500-page PDF timing. Full raw output for both invocations is recorded
+in [`testdata/golden/benchmarks/benchmark-results.txt`](../testdata/golden/benchmarks/benchmark-results.txt)
+as Snapshots H, I, and J.
+
+| Workload | 2 | 10 | 100 | 500 |
+|----------|--:|--:|----:|----:|
+| PDF pages | 3.58ms | 14.9ms | 158ms | **1.010s** |
+| Template + PDF pages | 3.34ms | 14.9ms | 182ms | **1.033s** |
+| Web-fetch image tiles | 11.4ms | 13.4ms | 43.7ms | **171ms** |
+| Inline image tiles | 16.0ms | 11.1ms | 43.0ms | **174ms** |
+
+The same selected rows measured `B/op` of 2.2MB, 6.1MB, 48.7MB, and
+237.8MB for generic 500-page PDF, with 1.15M allocations/op. `B/op` is
+cumulative allocation traffic, not process RSS.
+
+The requested `make bench-lib` command also completed with ten iterations per
+workload:
+
+| Workload | 2 | 10 | 100 | 500 |
+|----------|--:|--:|----:|----:|
+| Public PDF | 3.77ms | 16.0ms | 161ms | **1.105s** |
+| Public image | 11.1ms | 14.6ms | 30.1ms | **143ms** |
+
+These runs measure gowkhtmltopdf's internal engine and public API only. They
+are not comparisons with another library, so they do not justify a `16x` or
+`20x` landing-page claim. Comparative claims remain limited to the separately
+measured external process snapshots.
+
+---
+
 ## Direct CLI comparison vs wkhtmltopdf (historical, island-era)
 
 The **2026-08-09** table below is **historical pre-CR-02 / island-era CLI**.
@@ -279,6 +314,7 @@ Current snapshot commands:
 make bench
 make bench-cli-compare  # standalone wkhtmltopdf comparison
 make bench-engine
+make bench-inprocess    # compatibility alias for bench-engine
 make bench-lib
 ```
 

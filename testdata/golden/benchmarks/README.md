@@ -224,26 +224,31 @@ Chrome descendants, so the two RSS columns are not directly equivalent.
 Raw rows: [`weasyprint-compare.md`](weasyprint-compare.md),
 [`puppeteer-compare.md`](puppeteer-compare.md), and their paired CSV files.
 
-### Last recorded internal engine matrix (generic, 2026-08-14)
+### Fresh internal engine matrix (generic, 2026-08-19)
 
 ```sh
 make bench-engine
+make bench-inprocess
 ```
 
 Request mode: **generic** (not certified-islands). One iteration
 (`-benchtime=1x -count=1`). This calls `internal/convert` directly and
 measures allocation traffic, not process RSS. `make bench-inprocess` remains a
-compatibility alias for this target.
+compatibility alias for this target. Both requested invocations completed;
+because each workload ran once, wall time varied materially between the two
+otherwise equivalent samples. The summary below uses the second
+(`make bench-inprocess`) sample; both complete raw outputs are recorded as
+Snapshots H and I in [`benchmark-results.txt`](benchmark-results.txt).
 
 | Workload | 2 | 10 | 100 | 500 |
 |---|---:|---:|---:|---:|
-| PDF pages | 3.66ms / 2.3MB / 5.8K | 15.0ms / 5.9MB / 24.1K | 149ms / 46.1MB / 230K | **966ms / 224.3MB / 1.15M** |
-| Template + PDF pages | 3.63ms / 2.3MB / 6.0K | 15.4ms / 6.1MB / 25.1K | 165ms / 47.3MB / 240K | **948ms / 228.9MB / 1.20M** |
-| Web-fetch image tiles | 10.7ms / 7.5MB / 2.0K | 13.8ms / 8.3MB / 2.6K | 42.6ms / 23.7MB / 6.9K | **166ms / 91.8MB / 25.5K** |
-| Inline image tiles | 14.6ms / 14.0MB / 2.1K | 10.1ms / 7.9MB / 2.1K | 38.6ms / 23.3MB / 6.3K | **178ms / 91.7MB / 25.0K** |
+| PDF pages | 3.58ms / 2.2MB / 5.8K | 14.9ms / 6.1MB / 24.1K | 158ms / 48.7MB / 230.5K | **1.010s / 237.8MB / 1.15M** |
+| Template + PDF pages | 3.34ms / 2.2MB / 6.0K | 14.9ms / 6.2MB / 25.1K | 182ms / 49.9MB / 240.8K | **1.033s / 242.7MB / 1.20M** |
+| Web-fetch image tiles | 11.4ms / 7.5MB / 2.0K | 13.4ms / 8.4MB / 2.7K | 43.7ms / 23.8MB / 6.9K | **171ms / 92.5MB / 25.5K** |
+| Inline image tiles | 16.0ms / 14.0MB / 2.1K | 11.1ms / 7.9MB / 2.1K | 43.0ms / 23.4MB / 6.3K | **174ms / 92.5MB / 25.0K** |
 
 Full one-iteration rows for every matrix size, including
-certified-islands, are Snapshot F in
+certified-islands, are Snapshots H and I in
 [`benchmark-results.txt`](benchmark-results.txt).
 
 ### Public library matrix
@@ -265,6 +270,17 @@ conversion API.
 The public matrix is intentionally separate from the internal engine matrix:
 the latter can include benchmark-only certified-island requests, while
 `bench-lib` measures the normal public API contract.
+
+Fresh `make bench-lib` sample (`-benchtime=10x -count=1`, 2026-08-19):
+
+| Workload | 2 | 10 | 100 | 500 |
+|---|---:|---:|---:|---:|
+| Public PDF | 3.77ms / 1.5MB / 5.7K | 16.0ms / 5.4MB / 24.1K | 161ms / 48.5MB / 230.5K | **1.105s / 236.8MB / 1.15M** |
+| Public image | 11.1ms / 4.2MB / 444 | 14.6ms / 6.8MB / 1.0K | 30.1ms / 8.3MB / 4.1K | **143ms / 52.0MB / 17.6K** |
+
+These are gowkhtmltopdf-only API measurements, not comparisons against
+wkhtmltopdf, WeasyPrint, Puppeteer, or another library. They therefore do not
+support a public `16x` or `20x` comparative claim.
 
 ## Historical generic snapshot (2026-08-12 post-remediation)
 
