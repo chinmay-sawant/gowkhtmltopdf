@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import PageTitle from '../components/PageTitle'
-import { CLI_ROWS, HEADLINE, formatMs, speedup } from '../data/benchmarks'
+import { CLI_ROWS, HEADLINE, LIBRARY_HEADLINE, formatMs, speedup } from '../data/benchmarks'
 
 const HOME_BENCH_PAGES = [2, 10, 100, 500]
 const HOME_BENCH = CLI_ROWS.filter((row) => HOME_BENCH_PAGES.includes(row.pages))
@@ -135,8 +135,8 @@ export default function LandingPage() {
       <section className="landing-hero" aria-labelledby="landing-title">
         <div className="landing-hero-copy">
           <h1 id="landing-title">Print-ready documents,<br /><em>from HTML you control.</em></h1>
-          <p className="landing-claim">
-            Up to {HEADLINE.smallSpeedup.toFixed(0)}x faster than wkhtmltopdf.
+          <p className="landing-claim landing-claim-primary">
+            Up to {LIBRARY_HEADLINE.displayMultiplier}x faster than wkhtmltopdf through the Go library.
           </p>
           <p className="landing-lede">
             gowkhtmltopdf turns controlled, server-generated HTML into dependable PDF and image output without starting a browser process.
@@ -308,15 +308,25 @@ export default function LandingPage() {
         <div className="landing-bench-copy">
           <p className="landing-bench-kicker">Measured against wkhtmltopdf 0.12.6.1</p>
           <h2 id="landing-bench-heading">
-            Up to {HEADLINE.smallSpeedup.toFixed(0)}x faster
+            Fast as a binary.
             <br />
-            on the same HTML.
+            Dramatically faster as a Go library.
           </h2>
           <p>
-            Generic CLI, identical HTML, median of three process runs. A 2-page invoice is{' '}
-            {formatMs(HEADLINE.smallGowk)} versus {formatMs(HEADLINE.smallWk)}; 500 pages still
-            finish first.
+            On identical HTML, the generic CLI renders a 2-page invoice in {formatMs(HEADLINE.smallGowk)}
+            versus {formatMs(HEADLINE.smallWk)} for wkhtmltopdf. The public Go library renders it
+            in {formatMs(LIBRARY_HEADLINE.ms)} by staying in the process.
           </p>
+          <div className="landing-bench-highlights" aria-label="CLI and library benchmark highlights">
+            <div>
+              <strong>{HEADLINE.smallSpeedup.toFixed(0)}x</strong>
+              <span>CLI · 2 pages</span>
+            </div>
+            <div>
+              <strong>~{LIBRARY_HEADLINE.displayMultiplier}x</strong>
+              <span>Go library · 2 pages</span>
+            </div>
+          </div>
           <Link className="text-link" to="/benchmarks">
             Full benchmark comparison <span aria-hidden="true">→</span>
           </Link>

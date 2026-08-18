@@ -251,6 +251,25 @@ Full one-iteration rows for every matrix size, including
 certified-islands, are Snapshots H and I in
 [`benchmark-results.txt`](benchmark-results.txt).
 
+#### In-process PDF timing relative to the wkhtmltopdf binary
+
+This ratio uses `wkhtmltopdf CLI time / in-process PDF time`. It is an
+indicative multiplier, not an identical-boundary comparison: the wkhtmltopdf
+value includes launching and driving a CLI process, while the in-process value
+calls `convert.Run` directly with inline HTML and a memory buffer.
+
+| Pages | wkhtmltopdf CLI | In-process PDF | Indicative multiplier |
+|---:|---:|---:|---:|
+| 2 | 259ms | 3.58ms | **72.43x** |
+| 5 | 268ms | 7.29ms | **36.74x** |
+| 10 | 276ms | 14.86ms | **18.58x** |
+| 20 | 317ms | 28.64ms | **11.07x** |
+| 50 | 406ms | 84.17ms | **4.82x** |
+| 100 | 526ms | 157.69ms | **3.34x** |
+| 200 | 811ms | 384.45ms | **2.11x** |
+| 250 | 964ms | 449.51ms | **2.14x** |
+| 500 | 1.671s | 1.010s | **1.65x** |
+
 ### Public library matrix
 
 ```sh
@@ -281,6 +300,24 @@ Fresh `make bench-lib` sample (`-benchtime=10x -count=1`, 2026-08-19):
 These are gowkhtmltopdf-only API measurements, not comparisons against
 wkhtmltopdf, WeasyPrint, Puppeteer, or another library. They therefore do not
 support a public `16x` or `20x` comparative claim.
+
+#### Public library PDF timing relative to the wkhtmltopdf binary
+
+This uses the same ratio, `wkhtmltopdf CLI time / public library PDF time`.
+The public library path calls `Document.WritePDF` directly and does not launch
+the gowkhtmltopdf CLI.
+
+| Pages | wkhtmltopdf CLI | Public library PDF | Indicative multiplier |
+|---:|---:|---:|---:|
+| 2 | 259ms | 3.77ms | **68.73x** |
+| 5 | 268ms | 8.33ms | **32.19x** |
+| 10 | 276ms | 16.03ms | **17.22x** |
+| 20 | 317ms | 31.19ms | **10.16x** |
+| 50 | 406ms | 74.83ms | **5.43x** |
+| 100 | 526ms | 160.94ms | **3.27x** |
+| 200 | 811ms | 337.38ms | **2.40x** |
+| 250 | 964ms | 441.40ms | **2.18x** |
+| 500 | 1.671s | 1.105s | **1.51x** |
 
 ## Historical generic snapshot (2026-08-12 post-remediation)
 

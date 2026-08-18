@@ -235,6 +235,25 @@ The same selected rows measured `B/op` of 2.2MB, 6.1MB, 48.7MB, and
 237.8MB for generic 500-page PDF, with 1.15M allocations/op. `B/op` is
 cumulative allocation traffic, not process RSS.
 
+### In-process PDF timing relative to the wkhtmltopdf binary
+
+This ratio is `wkhtmltopdf CLI time / in-process PDF time`. It is indicative,
+not an identical-boundary comparison: wkhtmltopdf includes CLI/process startup
+and file handling, while the in-process benchmark calls `convert.Run` with
+inline HTML and a memory buffer.
+
+| Pages | wkhtmltopdf CLI | In-process PDF | Indicative multiplier |
+|------:|----------------:|---------------:|----------------------:|
+| 2 | 259ms | 3.58ms | **72.43x** |
+| 5 | 268ms | 7.29ms | **36.74x** |
+| 10 | 276ms | 14.86ms | **18.58x** |
+| 20 | 317ms | 28.64ms | **11.07x** |
+| 50 | 406ms | 84.17ms | **4.82x** |
+| 100 | 526ms | 157.69ms | **3.34x** |
+| 200 | 811ms | 384.45ms | **2.11x** |
+| 250 | 964ms | 449.51ms | **2.14x** |
+| 500 | 1.671s | 1.010s | **1.65x** |
+
 The requested `make bench-lib` command also completed with ten iterations per
 workload:
 
@@ -247,6 +266,23 @@ These runs measure gowkhtmltopdf's internal engine and public API only. They
 are not comparisons with another library, so they do not justify a `16x` or
 `20x` landing-page claim. Comparative claims remain limited to the separately
 measured external process snapshots.
+
+### Public library PDF timing relative to the wkhtmltopdf binary
+
+This uses `wkhtmltopdf CLI time / public library PDF time`. The public path
+calls `Document.WritePDF` directly and does not launch the gowkhtmltopdf CLI.
+
+| Pages | wkhtmltopdf CLI | Public library PDF | Indicative multiplier |
+|------:|----------------:|-------------------:|----------------------:|
+| 2 | 259ms | 3.77ms | **68.73x** |
+| 5 | 268ms | 8.33ms | **32.19x** |
+| 10 | 276ms | 16.03ms | **17.22x** |
+| 20 | 317ms | 31.19ms | **10.16x** |
+| 50 | 406ms | 74.83ms | **5.43x** |
+| 100 | 526ms | 160.94ms | **3.27x** |
+| 200 | 811ms | 337.38ms | **2.40x** |
+| 250 | 964ms | 441.40ms | **2.18x** |
+| 500 | 1.671s | 1.105s | **1.51x** |
 
 ---
 
