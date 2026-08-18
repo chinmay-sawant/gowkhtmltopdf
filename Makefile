@@ -1,4 +1,4 @@
-.PHONY: test lint lint-frontend build fmt golden golden-update samples weasyprint clean claim-scan bench bench-cli-compare bench-external
+.PHONY: test lint lint-frontend build fmt golden golden-update samples weasyprint clean claim-scan bench bench-inprocess bench-cli-compare
 
 # Pure-Go runtime: the standard library plus the allowlisted direct modules
 # below. No cgo, browser, or native converter process is required.
@@ -193,24 +193,24 @@ weasyprint:
 	done
 	ls -la output/weasyprint/ | awk '{print $$5, $$9}' | tail -30
 
-# Process-level CLI comparison against the installed WeasyPrint and Puppeteer
-# engines (same generated report fixture and median-of-3 methodology as
-# bench-cli-compare). The bench never runs engine commands itself: each engine
-# is driven through its print script (scripts/weasyprint/print.sh,
-# scripts/puppeteer/print.sh), so the measured command is exactly what that
-# script runs. Engines that are not installed are skipped.
-# Requires `make build`, /usr/bin/time and gs; Puppeteer additionally needs
-# node + google-chrome and scripts/puppeteer/node_modules (npm ci --prefix
-# scripts/puppeteer on first use), WeasyPrint needs the weasyprint CLI.
-# Writes testdata/golden/benchmarks/{weasyprint,puppeteer}-compare.md and
+# Full-process benchmark against the actual binary. Builds the CLI first,
+# then times bin/gowkhtmltopdf (CLI parsing, startup, file I/O) against the
+# installed WeasyPrint and Puppeteer engines via their print scripts
+# (scripts/bench-external.sh), so the numbers include process and disk
+# overhead and are directly comparable to bench-cli-compare. Engines that
+# are not installed are skipped. Writes
+# testdata/golden/benchmarks/{weasyprint,puppeteer}-compare.md and
 # -results.csv. Default page matrix is 2/10/50/100; override with
 # --sizes=2,5,10,20,50,100,200,250,500 or select one engine with
 # --engines=weasyprint.
-bench-external: build
+bench: build
 	./scripts/bench-external.sh
 
-# In-process Go benchmark matrix (generic + certified-islands, images).
-bench:
+# In-process Go allocation matrix (generic + certified-islands, images).
+# Measures only the conversion pipeline on in-memory HTML (no process or
+# disk overhead); used for allocation/regression analysis. See
+# testdata/golden/benchmarks/README.md.
+bench-inprocess:
 	go test ./internal/convert -run '^$$' \
 		-bench 'Benchmark(PDFPages|TemplatePages|WebFetchImage|ImageAssets)$$' \
 		-benchmem -benchtime=1x -count=1

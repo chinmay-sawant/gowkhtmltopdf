@@ -460,7 +460,7 @@ for engine in "${engines[@]}"; do
     printf '%s; gowkhtmltopdf RSS is `%%M`.\n\n' "$(engine_rss_note "$engine")"
     printf -- '- gowkhtmltopdf: `%s` (generic CLI)\n' "$GOWK_BIN"
     printf -- '- %s: `%s` (%s)\n' "$display" "$script" "$version"
-    printf -- '- Reproduce: `./scripts/bench-external.sh --engines=%s` (or `make bench-external`)\n\n' "$engine"
+    printf -- '- Reproduce: `./scripts/bench-external.sh --engines=%s` (or `make bench`)\n\n' "$engine"
     printf '| Pages | Gowk time | %s time | Speedup | Gowk RSS |' "$display"
     printf ' %s RSS | Gowk PDF bytes | %s PDF bytes |\n' "$display" "$display"
     echo '|---:|---:|---:|---:|---:|---:|---:|---:|'

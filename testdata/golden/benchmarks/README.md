@@ -121,7 +121,7 @@ Raw rows: [`cli-compare-results.csv`](cli-compare-results.csv),
 ### In-process Go matrix (generic)
 
 ```sh
-make bench
+make bench-inprocess
 ```
 
 Request mode: **generic** (not certified-islands). One iteration
@@ -393,10 +393,19 @@ Timed `BenchmarkWebFetchImage` still uses an in-process `httptest` server so
 CI remains offline and the recorded timing matrix stays reproducible. Artifact
 generation intentionally hits the public CDN so samples match real-world fetch.
 
-Run the focused benchmarks with:
+Full-process benchmark against the actual binary (builds the CLI, then
+times `bin/gowkhtmltopdf` against the installed WeasyPrint and Puppeteer
+engines via their print scripts; median of three after warmup):
 
 ```sh
 make bench
+```
+
+In-process allocation matrix (conversion pipeline only, no process or disk
+overhead):
+
+```sh
+make bench-inprocess
 ```
 
 equivalent:
