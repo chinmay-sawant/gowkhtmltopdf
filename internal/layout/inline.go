@@ -778,7 +778,7 @@ func (e *engine) emitLine(
 	// advances match layout (avoids word-by-word Tj gaps). Skip when
 	// justifying — gaps are distributed between word items.
 	if textAlign != cssTextAlignJustify {
-		line = coalesceTextItems(line)
+		line = e.coalesceTextItems(line)
 	}
 
 	// line metrics
