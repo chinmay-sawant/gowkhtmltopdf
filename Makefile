@@ -1,4 +1,4 @@
-.PHONY: test lint lint-frontend build fmt golden golden-update samples weasyprint clean claim-scan bench bench-engine bench-lib bench-inprocess bench-cli-compare
+.PHONY: test lint lint-frontend build fmt golden golden-update samples screenshots weasyprint clean claim-scan bench bench-engine bench-lib bench-inprocess bench-cli-compare
 
 # Pure-Go runtime: the standard library plus the allowlisted direct modules
 # below. No cgo, browser, or native converter process is required.
@@ -151,6 +151,12 @@ samples:
 		-o output/wiki-ana-de-armas.pdf \
 		|| echo "warning: wiki-ana-de-armas.pdf live smoke skipped (network/fetch failed)"
 	ls -la output/ | awk '{print $$5, $$9}' | tail -30
+
+# Regenerate the committed frontend showcase screenshots and WebP thumbnails
+# from the PDFs currently present in output/. Use `make samples` first when the
+# source fixture PDFs themselves need to be refreshed.
+screenshots:
+	python3 scripts/screenshot_showcase.py
 
 # Regenerate the WeasyPrint comparison samples in output/weasyprint/ from the
 # same golden fixtures as `make samples` (one PDF per body fixture, excluding

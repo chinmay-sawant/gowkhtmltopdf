@@ -5,7 +5,7 @@
     {
       "type": "hero",
       "title": "Labeled snapshots, not an SLA",
-      "lede": "The current generic CLI is faster than wkhtmltopdf 0.12.6.1 at every tested report size. The largest gap is on short documents. Peak RSS is lower through 100 pages and higher from 200 pages. Open the Benchmarks page for the visual comparison."
+      "lede": "The current generic CLI is faster than wkhtmltopdf 0.12.6.1 at every tested report size. The public Go library path is about 70x faster than the wkhtmltopdf CLI at 2 pages. Peak RSS is lower through 100 pages and higher from 200 pages. Open the Benchmarks page for the visual comparison."
     },
     {
       "type": "stats",
@@ -55,6 +55,58 @@
       ]
     },
     {
+      "type": "table",
+      "heading": "In-process Go benchmark snapshot (2026-08-19)",
+      "headers": ["Workload", "2", "10", "100", "500"],
+      "rows": [
+        ["PDF pages (time / B/op / allocs)", "3.58 ms / 2.21 MB / 5.8K", "14.86 ms / 6.08 MB / 24.1K", "157.69 ms / 48.73 MB / 230.5K", "1.010 s / 237.76 MB / 1.15M"],
+        ["Template + PDF pages", "3.34 ms / 2.23 MB / 6.0K", "14.93 ms / 6.23 MB / 25.1K", "182.06 ms / 49.95 MB / 240.8K", "1.033 s / 242.68 MB / 1.20M"],
+        ["Web-fetch image tiles", "11.43 ms / 7.46 MB / 2.0K", "13.43 ms / 8.35 MB / 2.7K", "43.67 ms / 23.80 MB / 6.9K", "171.25 ms / 92.48 MB / 25.5K"],
+        ["Inline image tiles", "16.01 ms / 13.96 MB / 2.1K", "11.07 ms / 7.87 MB / 2.1K", "42.97 ms / 23.40 MB / 6.3K", "174.12 ms / 92.45 MB / 24.9K"]
+      ]
+    },
+    {
+      "type": "table",
+      "heading": "Public Go library snapshot (2026-08-19)",
+      "headers": ["Workload", "2", "10", "100", "500"],
+      "rows": [
+        ["Public PDF (time / B/op / allocs)", "3.77 ms / 1.48 MB / 5.7K", "16.03 ms / 5.38 MB / 24.1K", "160.94 ms / 48.46 MB / 230.5K", "1.105 s / 236.85 MB / 1.15M"],
+        ["Public image (time / B/op / allocs)", "11.07 ms / 4.17 MB / 444", "14.61 ms / 6.81 MB / 1.0K", "30.11 ms / 8.26 MB / 4.1K", "142.59 ms / 52.00 MB / 17.6K"]
+      ]
+    },
+    {
+      "type": "table",
+      "heading": "Public Go library PDF vs wkhtmltopdf CLI (indicative)",
+      "headers": ["Pages", "wkhtmltopdf CLI", "Public library PDF", "Multiplier"],
+      "rows": [
+        ["2", "259 ms", "3.77 ms", "68.73x"],
+        ["5", "268 ms", "8.33 ms", "32.19x"],
+        ["10", "276 ms", "16.03 ms", "17.22x"],
+        ["20", "317 ms", "31.19 ms", "10.16x"],
+        ["50", "406 ms", "74.83 ms", "5.43x"],
+        ["100", "526 ms", "160.94 ms", "3.27x"],
+        ["200", "811 ms", "337.38 ms", "2.40x"],
+        ["250", "964 ms", "441.40 ms", "2.18x"],
+        ["500", "1.671 s", "1.105 s", "1.51x"]
+      ]
+    },
+    {
+      "type": "table",
+      "heading": "In-process PDF vs wkhtmltopdf CLI (indicative)",
+      "headers": ["Pages", "wkhtmltopdf CLI", "In-process PDF", "Multiplier"],
+      "rows": [
+        ["2", "259 ms", "3.58 ms", "72.43x"],
+        ["5", "268 ms", "7.29 ms", "36.74x"],
+        ["10", "276 ms", "14.86 ms", "18.58x"],
+        ["20", "317 ms", "28.64 ms", "11.07x"],
+        ["50", "406 ms", "84.17 ms", "4.82x"],
+        ["100", "526 ms", "157.69 ms", "3.34x"],
+        ["200", "811 ms", "384.45 ms", "2.11x"],
+        ["250", "964 ms", "449.51 ms", "2.14x"],
+        ["500", "1.671 s", "1.010 s", "1.65x"]
+      ]
+    },
+    {
       "type": "callout",
       "variant": "info",
       "title": "Generic CLI, not the island-era path",
@@ -73,6 +125,7 @@
         "CLI comparison is process wall time plus peak RSS for freshly built gowkhtmltopdf versus the installed wkhtmltopdf binary.",
         "WeasyPrint and Puppeteer use the same generated report fixture; Puppeteer RSS includes the Node driver and headless Chrome process tree.",
         "In-process go test -bench rows measure conversion inside the test process. B/op is cumulative allocation traffic.",
+        "The public Go library rows call Document.WritePDF and ImageDocument.WriteImage directly. The approximately 70x landing claim is 259 ms divided by 3.77 ms at 2 pages, using the wkhtmltopdf CLI as the baseline.",
         "The report fixture is testdata/golden/benchmarks/templates/report.html.tmpl with 20 invoice rows per requested page.",
         "Page islands (convert.NewBenchmarkPDFRequest) are a benchmark-only opt-in. Ordinary CLI and library requests stay on the generic path.",
         "Full matrices, historical snapshots, and raw go test rows live in testdata/golden/benchmarks/ and documentation/performance.md."

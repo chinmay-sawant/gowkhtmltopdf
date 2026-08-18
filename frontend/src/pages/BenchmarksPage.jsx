@@ -254,7 +254,7 @@ function ExternalTable({ engine, rows, rssNote }) {
           </tbody>
         </table>
       </div>
-      <p className="section-aside">{rssNote}</p>
+      <p className="section-aside bench-explanation">{rssNote}</p>
     </section>
   )
 }
@@ -303,7 +303,7 @@ function RelativeTimingTable({ heading, rows, pathLabel }) {
   return (
     <section className="table-block">
       <h3 className="table-block-heading">{heading}</h3>
-      <p className="section-aside">
+      <p className="section-aside bench-explanation">
         Indicative ratio: <code>wkhtmltopdf CLI time / {pathLabel} time</code>. The CLI includes
         process startup and file handling; the Go path runs directly in the current process.
       </p>
@@ -540,7 +540,7 @@ export default function BenchmarksPage() {
         <div className="section-heading-row">
           <div>
             <h2 id="bench-chart-heading">Direct process comparison</h2>
-            <p className="section-aside">
+            <p className="section-aside bench-explanation">
               Same HTML, same flags (<code>{SNAPSHOT.flags}</code>), median of three timed runs after
               one warmup. {activeMetricObj.desc}.
             </p>

@@ -139,13 +139,12 @@ export default function LandingPage() {
             Up to {LIBRARY_HEADLINE.displayMultiplier}x faster than wkhtmltopdf through the Go library.
           </p>
           <p className="landing-lede">
-            gowkhtmltopdf turns controlled, server-generated HTML into dependable PDF and image output without starting a browser process.
+            An HTML template engine for invoices, certificates, storybooks, posters, statements, and tables without running chrome wrappers.
           </p>
           <div className="landing-actions">
             <Link className="button button-primary" to="/getting-started">Get started <span aria-hidden="true">→</span></Link>
             <Link className="button button-secondary" to="/benchmarks">See the benchmarks</Link>
           </div>
-          <p className="landing-note">An HTML template engine for invoices, certificates, storybooks, posters, statements, and tables. JavaScript is not executed.</p>
         </div>
 
         <div className="terminal-card" aria-label="Interactive CLI conversion sandbox">
