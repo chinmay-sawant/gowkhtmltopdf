@@ -193,18 +193,19 @@ weasyprint:
 	done
 	ls -la output/weasyprint/ | awk '{print $$5, $$9}' | tail -30
 
-# External process benchmark against the actual binary. Builds the CLI first,
-# then times bin/gowkhtmltopdf (CLI parsing, startup, file I/O) against only
-# the installed WeasyPrint and Puppeteer engines via
-# scripts/bench-external.sh. The numbers include process and disk overhead;
-# they are release/operator evidence, not a default `make test` gate. Missing
-# engines are skipped, but the target fails when none are available. Writes
-# testdata/golden/benchmarks/{weasyprint,puppeteer}-compare.md and
-# -results.csv. Default page matrix is 2/10/50/100; override with
+# External process benchmarks against the actual binary. `make bench` builds
+# the CLI, times bin/gowkhtmltopdf against WeasyPrint and Puppeteer through
+# scripts/bench-external.sh, then runs the dedicated wkhtmltopdf comparison.
+# The numbers include process and disk overhead; they are release/operator
+# evidence, not a default `make test` gate. Missing external engines are
+# skipped, but the target fails when none are available. Writes
+# testdata/golden/benchmarks/{weasyprint,puppeteer,cli}-compare.md and
+# -results.csv. Default external page matrix is 2/10/50/100; override with
 # --sizes=2,5,10,20,50,100,200,250,500 or select one engine with
-# --engines=weasyprint. `make bench` never invokes wkhtmltopdf.
+# --engines=weasyprint. `bench-cli-compare` remains available standalone.
 bench: build
 	./scripts/bench-external.sh
+	$(MAKE) bench-cli-compare
 
 # Internal engine allocation matrix (generic + certified-islands, images).
 # Measures the internal conversion pipeline directly; it is independent of

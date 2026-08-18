@@ -50,7 +50,7 @@ break**: no `compat` subpackage, no public dotted keys, no
 | Content shape | Full document model (cover, TOC, pages, HF, sink) |
 | Old API refuge | None in 0.2.4 |
 | CLI | Redesign in the same release |
-| External benches | All three engines: wkhtmltopdf (`bench-cli-compare`), WeasyPrint + Puppeteer (`make bench` / `bench-external.sh`) |
+| External benches | `make bench` runs WeasyPrint + Puppeteer and then wkhtmltopdf; `bench-cli-compare` remains standalone |
 
 ---
 
@@ -99,7 +99,7 @@ new CLI.
 | Engine already has rich structs (`settings.PdfGlobal`, `PdfObject`, `HeaderFooter`) | `internal/settings/settings.go` |
 | CLI is wkhtml multi-object (`page` / `cover` / `toc`) + dotted flags | `internal/cli/`, `documentation/cli.md` |
 | Project release is `0.2.3`; `LibraryVersion` remains `0.12.7-dev` settings-surface id | `VERSION`, `api.go` |
-| External compare paths (worktree): `make bench` → WeasyPrint/Puppeteer via `scripts/bench-external.sh`; `make bench-cli-compare` → wkhtmltopdf | `Makefile`, `scripts/{bench-external.sh,weasyprint/,puppeteer/}`, `testdata/golden/benchmarks/*-compare*` |
+| External compare paths (worktree): `make bench` → WeasyPrint/Puppeteer via `scripts/bench-external.sh` → `bench-cli-compare` → wkhtmltopdf | `Makefile`, `scripts/{bench-external.sh,weasyprint/,puppeteer/}`, `testdata/golden/benchmarks/*-compare*` |
 
 ---
 
@@ -258,6 +258,10 @@ make bench
             → scripts/puppeteer_print.js  (puppeteer-core under scripts/puppeteer/)
             → testdata/golden/benchmarks/puppeteer-compare.md
             → testdata/golden/benchmarks/puppeteer-compare-results.csv
+  → $(MAKE) bench-cli-compare
+       → internal/convert TestCompareWithWkhtmltopdfBinary
+       → testdata/golden/benchmarks/cli-compare.md
+       → testdata/golden/benchmarks/cli-compare-results.csv
 
 make bench-engine
   → go test ./internal/convert (internal conversion allocation matrix)

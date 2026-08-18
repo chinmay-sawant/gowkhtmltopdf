@@ -46,10 +46,10 @@ Same report fixture (20 invoice rows per requested page). Both binaries used
 process runs after one warmup.
 
 ```sh
-make bench-cli-compare
-
-# Optional WeasyPrint + Puppeteer process comparisons
 make bench
+
+# Run only the wkhtmltopdf comparison
+make bench-cli-compare
 ```
 
 | Pages | Gowk time | wkhtmltopdf time | Speedup | Gowk RSS | wkhtmltopdf RSS |
@@ -97,10 +97,12 @@ Full size matrix and certified-islands rows: Snapshot F in
 ## Public library matrix
 
 The public library benchmark calls `Document.WritePDF` and
-`ImageDocument.WriteImage` directly. It constructs the public documents from
-in-memory HTML before timing; public validation, mapping, and the full
-renderer remain inside the timed calls. It does not start a CLI or read an
-HTML file from disk.
+`ImageDocument.WriteImage` directly. Its PDF workload uses the same
+`templates/report.html.tmpl` fixture and 20-row page data as the CLI
+comparisons, constructs the public document from the resulting in-memory HTML
+before timing, and asserts the physical page count. Public validation, mapping,
+and the full renderer remain inside the timed calls. It does not start a CLI or
+read an HTML file from disk.
 
 ```sh
 make bench-lib
@@ -236,8 +238,8 @@ fidelity review without saying so.
 Current snapshot commands:
 
 ```sh
-make bench-cli-compare
 make bench
+make bench-cli-compare  # standalone wkhtmltopdf comparison
 make bench-engine
 make bench-lib
 ```

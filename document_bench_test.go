@@ -3,8 +3,11 @@ package gowkhtmltopdf_test
 import (
 	"bytes"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"text/template"
 
 	gowkhtmltopdf "github.com/chinmay-sawant/gowkhtmltopdf"
 )
@@ -17,10 +20,10 @@ var libraryBenchmarkImageSizes = []int{ //nolint:gochecknoglobals // fixed bench
 	2, 5, 10, 20, 50, 100, 200, 250, 500,
 }
 
-// BenchmarkLibraryPDF measures the public Document.WritePDF API with one
-// in-memory HTML source per public body page. Application-side HTML creation
-// happens before the timer; validation, public-to-engine mapping, loading,
-// layout, painting, and PDF encoding remain inside the measured call.
+// BenchmarkLibraryPDF measures the public Document.WritePDF API with the same
+// paginated report HTML used by the external CLI comparisons. Application-side
+// template expansion happens before the timer; validation, public-to-engine
+// mapping, loading, layout, painting, and PDF encoding remain inside the call.
 func BenchmarkLibraryPDF(b *testing.B) {
 	for _, pageCount := range libraryBenchmarkPageSizes {
 		b.Run(fmt.Sprintf("%dPages", pageCount), func(b *testing.B) {
@@ -43,6 +46,10 @@ func BenchmarkLibraryPDF(b *testing.B) {
 
 			if !bytes.HasPrefix(output.Bytes(), []byte("%PDF-")) {
 				b.Fatalf("Document.WritePDF output is not a PDF")
+			}
+
+			if got := bytes.Count(output.Bytes(), []byte("/Type /Page\n")); got != pageCount {
+				b.Fatalf("Document.WritePDF pages = %d, want %d", got, pageCount)
 			}
 
 			b.SetBytes(int64(output.Len()))
@@ -82,42 +89,80 @@ func BenchmarkLibraryImage(b *testing.B) {
 }
 
 func libraryBenchmarkPDFDocument(pageCount int) *gowkhtmltopdf.Document {
-	pages := make([]gowkhtmltopdf.Page, pageCount)
-	for index := range pages {
-		pages[index] = gowkhtmltopdf.Page{
-			Source:           gowkhtmltopdf.HTML(libraryBenchmarkPageHTML(index + 1)),
-			Header:           nil,
-			Footer:           nil,
-			IncludeInOutline: nil,
-			ExternalLinks:    nil,
-			LocalLinks:       nil,
+	return gowkhtmltopdf.NewDocument(gowkhtmltopdf.Page{
+		Source:           gowkhtmltopdf.HTML(libraryBenchmarkReportHTML(pageCount)),
+		Header:           nil,
+		Footer:           nil,
+		IncludeInOutline: nil,
+		ExternalLinks:    nil,
+		LocalLinks:       nil,
+	})
+}
+
+type libraryBenchmarkTemplateData struct {
+	Pages []libraryBenchmarkPage
+}
+
+type libraryBenchmarkPage struct {
+	Number int
+	First  bool
+	Rows   []libraryBenchmarkRow
+}
+
+type libraryBenchmarkRow struct {
+	Number      int
+	SKU         string
+	Description string
+	Quantity    int
+	Amount      string
+}
+
+func libraryBenchmarkReportHTML(pageCount int) []byte {
+	path := filepath.Join("testdata", "golden", "benchmarks", "templates", "report.html.tmpl")
+	source, err := os.ReadFile(path)
+
+	if err != nil {
+		panic(fmt.Sprintf("read benchmark template %s: %v", path, err))
+	}
+
+	tpl, err := template.New("report.html.tmpl").Parse(string(source))
+	if err != nil {
+		panic(fmt.Sprintf("parse benchmark template: %v", err))
+	}
+
+	var output bytes.Buffer
+	if err := tpl.Execute(&output, libraryBenchmarkTemplateData{
+		Pages: libraryBenchmarkPages(pageCount),
+	}); err != nil {
+		panic(fmt.Sprintf("execute benchmark template: %v", err))
+	}
+
+	return output.Bytes()
+}
+
+func libraryBenchmarkPages(pageCount int) []libraryBenchmarkPage {
+	pages := make([]libraryBenchmarkPage, pageCount)
+	for page := range pages {
+		rows := make([]libraryBenchmarkRow, 20)
+		for row := range rows {
+			line := row + 1
+			rows[row] = libraryBenchmarkRow{
+				Number:      line,
+				SKU:         fmt.Sprintf("SKU-%03d-%03d", page+1, line),
+				Description: fmt.Sprintf("Platform operations and support service %d", line),
+				Quantity:    (line+page)%7 + 1,
+				Amount:      fmt.Sprintf("%d.%02d", (page+1)*line, (page+line)%100),
+			}
+		}
+
+		pages[page] = libraryBenchmarkPage{
+			Number: page + 1,
+			First:  page == 0,
+			Rows:   rows,
 		}
 	}
 
-	return gowkhtmltopdf.NewDocument(pages...)
-}
-
-func libraryBenchmarkPageHTML(page int) []byte {
-	var source strings.Builder
-
-	source.WriteString(`<!doctype html><html><head><meta charset="utf-8"><style>
-body { font-family: sans-serif; font-size: 11pt; margin: 24mm; }
-h1 { color: #17324d; margin: 0 0 12pt; }
-.row { border-bottom: 1px solid #d9e2ec; padding: 5pt 0; }
-</style></head><body>`)
-	fmt.Fprintf(&source, "<h1>Library benchmark page %d</h1>", page)
-
-	for row := 1; row <= 12; row++ {
-		fmt.Fprintf(
-			&source,
-			"<div class=\"row\">Item %d: renderer input, layout, and PDF output work</div>",
-			row,
-		)
-	}
-
-	source.WriteString("</body></html>")
-
-	return []byte(source.String())
+	return pages
 }
 
 func libraryBenchmarkImageDocument(tileCount int) *gowkhtmltopdf.ImageDocument {
