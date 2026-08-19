@@ -10,6 +10,7 @@ Implementation plans and roadmaps for `gowkhtmltopdf`, partitioned by release ve
 | [0.2.2/](0.2.2/README.md) | **v0.2.2 Newer PDF versions** — PDF 1.7 (#31), PDF 2.0 (#32), 1.7/2.0 compliance (#33); criticality/optimization follow-up | Complete; [release notes](0.2.2/PR/release-v0.2.2.md) |
 | [0.2.3/](0.2.3/README.md) | **v0.2.3** — same engine as 0.2.2; GitHub module path / `go install` | [release notes](0.2.3/PR/release-v0.2.3.md) |
 | [0.2.4/](0.2.4/README.md) | **v0.2.4** — idiomatic Document API + CLI rethink + external benches (phases 31–39) | Complete; [release notes](0.2.4/PR/release-v0.2.4.md) |
+| [0.2.5/](0.2.5/README.md) | **v0.2.5** — font resolution, fallback, and compliance follow-up | Planned; [font track](0.2.5/font/README.md) |
 
 ---
 
@@ -58,3 +59,9 @@ Implementation plans and roadmaps for `gowkhtmltopdf`, partitioned by release ve
 - [31-canonical-0.2.4-roadmap.md](0.2.4/31-canonical-0.2.4-roadmap.md) — Canonical execution ledger for phases 31–39
 - [phases/](0.2.4/phases) — Atomic checklists for phases 31–39 (Phase 39: wk / WeasyPrint / Puppeteer compare paths)
 - [PR/release-v0.2.4.md](0.2.4/PR/release-v0.2.4.md) — GitHub release body
+
+## 0.2.5 (Font resolution follow-up)
+
+- [0.2.5 README](0.2.5/README.md)
+- [font/](0.2.5/font/README.md) — Canonical font resolution / fallback / compliance track (phases 01–08)
+- [00-canonical-font-resolution-plan.md](0.2.5/font/00-canonical-font-resolution-plan.md) — Contract and current-state findings
