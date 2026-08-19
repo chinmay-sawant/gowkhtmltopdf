@@ -77,12 +77,10 @@ Install, flags, and HTTP URLs: [getting-started.md](documentation/getting-starte
 | [plans/README.md](plans/README.md) | Implementation ledger index |
 | [LICENSE](LICENSE) | MIT license |
 
-## Library (0.2.4 target)
+## Library
 
-The 0.2.4 plan replaces the wkhtml-shaped public surface with
-`Document`/`ImageDocument`. The target symbols are present in the working tree
-and the current test suite is green; the old exports remain until the hard
-break closes. The following is the target shape.
+The supported Go API is `Document` / `ImageDocument` with explicit `Content`
+sources. The pre-0.2.4 wkhtml-shaped root exports are removed.
 
 ```go
 doc := gowkhtmltopdf.Document{
@@ -91,34 +89,50 @@ doc := gowkhtmltopdf.Document{
             HTML: []byte(`<html><body><h1>Invoice</h1></body></html>`),
         },
     }},
+    PageSize: "A4",
 }
 pdfBytes, err := doc.PDF(ctx)
 ```
 
 Local files, TOC/cover fields, network policy, and the migration table:
-[documentation/library-api.md](documentation/library-api.md).
+[documentation/library-api.md](documentation/library-api.md),
 [documentation/MIGRATION-0.2.4.md](documentation/MIGRATION-0.2.4.md).
 
 ## Performance
 
-**Current snapshot (2026-08-14):** freshly built generic `gowkhtmltopdf`
-0.2.1 versus installed **wkhtmltopdf 0.12.6.1 (patched Qt)** on Linux
-amd64, 13th Gen Intel Core i7-13700HX. Same report fixture, median of
-three process runs after one warmup.
+**Current snapshot (2026-08-19):** freshly built generic `gowkhtmltopdf`
+**0.2.4** versus installed **wkhtmltopdf 0.12.6.1 (patched Qt)** on Linux
+amd64, 13th Gen Intel Core i7-13700HX. Same report fixture (20 invoice rows
+per requested page), median of three process runs after one warmup.
 
 | Pages | gowkhtmltopdf | wkhtmltopdf | Faster by |
 |------:|--------------:|------------:|----------:|
-| 2 | 16 ms | 254 ms | **16x** |
-| 10 | 30 ms | 278 ms | **9.4x** |
-| 100 | 184 ms | 530 ms | **2.9x** |
-| 500 | 1.045 s | 1.641 s | **1.6x** |
+| 2 | 17 ms | 259 ms | **15.5x** |
+| 10 | 30 ms | 276 ms | **9.2x** |
+| 100 | 184 ms | 526 ms | **2.9x** |
+| 500 | 1.042 s | 1.671 s | **1.6x** |
 
 Faster at every tested size. Peak RSS is lower through 100 pages and
-higher from 200 pages on the generic path. Full matrix, RSS, PDF sizes,
-internal-engine and public-library `go test -bench` rows, and historical snapshots:
+higher from 200 pages on the generic path.
 
-- [testdata/golden/benchmarks/README.md](testdata/golden/benchmarks/README.md)
+Same host, same fixture family against other engines (default external
+matrix: 2 / 10 / 50 / 100 pages):
+
+| Pages | vs WeasyPrint | vs Puppeteer / Chrome |
+|------:|--------------:|----------------------:|
+| 2 | **32x** | **77x** |
+| 10 | **44x** | **48x** |
+| 50 | **52x** | **17x** |
+| 100 | **57x** | **11x** |
+
+Full matrices, RSS, PDF sizes, internal-engine and public-library
+`go test -bench` rows, and historical snapshots:
+
 - [documentation/performance.md](documentation/performance.md)
+- [testdata/golden/benchmarks/README.md](testdata/golden/benchmarks/README.md)
+- [cli-compare.md](testdata/golden/benchmarks/cli-compare.md)
+- [weasyprint-compare.md](testdata/golden/benchmarks/weasyprint-compare.md)
+- [puppeteer-compare.md](testdata/golden/benchmarks/puppeteer-compare.md)
 
 Reproduce:
 
