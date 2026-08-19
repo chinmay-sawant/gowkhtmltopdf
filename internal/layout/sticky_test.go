@@ -723,7 +723,7 @@ func TestStickyFixture31AfterSectionNotCovered(t *testing.T) { //nolint:cyclop,f
 	}
 }
 
-func TestStickyFixture31ContinuationChromeStopsAtBottomBorder(t *testing.T) {
+func TestStickyFixture31ContinuationChromeStopsAtBottomBorder(t *testing.T) { //nolint:cyclop,funlen
 	t.Parallel()
 
 	res, contentH, doc := paintFixture31(t)
@@ -735,27 +735,27 @@ func TestStickyFixture31ContinuationChromeStopsAtBottomBorder(t *testing.T) {
 	sideBottom := -1.0
 	fillBottom := -1.0
 
-	for _, op := range res.Ops {
-		if op.Fixed || int(op.Y/contentH) != 1 {
+	for _, paintOp := range res.Ops {
+		if paintOp.Fixed || int(paintOp.Y/contentH) != 1 {
 			continue
 		}
 
-		isSectionBottom := op.Kind == OpLine && op.H < 1 && op.W > 500 &&
-			nearRGB(&op, 0.271, 0.353, 0.392) && op.Y > bottomY
+		isSectionBottom := paintOp.Kind == OpLine && paintOp.H < 1 && paintOp.W > 500 &&
+			nearRGB(&paintOp, 0.271, 0.353, 0.392) && paintOp.Y > bottomY
 		if isSectionBottom {
-			bottomY = op.Y
+			bottomY = paintOp.Y
 		}
 
-		isSideRail := op.Kind == OpLine && op.W <= 1 && op.H > 40 &&
-			nearRGB(&op, 0.271, 0.353, 0.392) && op.Y+op.H > sideBottom
+		isSideRail := paintOp.Kind == OpLine && paintOp.W <= 1 && paintOp.H > 40 &&
+			nearRGB(&paintOp, 0.271, 0.353, 0.392) && paintOp.Y+paintOp.H > sideBottom
 		if isSideRail {
-			sideBottom = op.Y + op.H
+			sideBottom = paintOp.Y + paintOp.H
 		}
 
-		isSectionFill := op.Kind == OpFillRect && op.H > 40 &&
-			nearRGB(&op, 0.925, 0.937, 0.945) && op.Y+op.H > fillBottom
+		isSectionFill := paintOp.Kind == OpFillRect && paintOp.H > 40 &&
+			nearRGB(&paintOp, 0.925, 0.937, 0.945) && paintOp.Y+paintOp.H > fillBottom
 		if isSectionFill {
-			fillBottom = op.Y + op.H
+			fillBottom = paintOp.Y + paintOp.H
 		}
 	}
 

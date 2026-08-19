@@ -43,38 +43,54 @@ func TestLeadingSpaceBetweenInlines(t *testing.T) {
 // Inline backgrounds must stop at the decorated text. They must not cover
 // following plain text when a padded inline element is followed by punctuation
 // and another word on the same line.
-func TestInlineChromeDoesNotCoverFollowingText(t *testing.T) {
+func TestInlineChromeDoesNotCoverFollowingText(t *testing.T) { //nolint:cyclop
 	t.Parallel()
 
-	res := layoutHTML(t, `<html><body><p>Booleans coerce liberally (<samp>"" / true / 1 / yes / on</samp>); unknown keys fail loudly.</p></body></html>`, sheet(t, `
+	htmlSrc := `<html><body><p>Booleans coerce liberally ` +
+		`(<samp>"" / true / 1 / yes / on</samp>); unknown keys fail loudly.</p></body></html>`
+	cssSrc := `
 body { margin: 0; font-size: 10pt; }
 samp { font-family: monospace; background: #efe9dc; padding: 0.05em 0.3em; border-radius: 4px; }
-`))
+`
+	res := layoutHTML(t, htmlSrc, sheet(t, cssSrc))
 
 	var sampText, followingText, chrome Op
-	for _, op := range res.Ops {
+
+	for _, paintOp := range res.Ops {
 		switch {
-		case op.Kind == OpText && strings.Contains(op.Text, `"" / true / 1 / yes / on`):
-			sampText = op
-		case op.Kind == OpText && strings.Contains(op.Text, "); unknown"):
-			followingText = op
+		case paintOp.Kind == OpText && strings.Contains(paintOp.Text, `"" / true / 1 / yes / on`):
+			sampText = paintOp
+		case paintOp.Kind == OpText && strings.Contains(paintOp.Text, "); unknown"):
+			followingText = paintOp
 		}
 	}
-	for _, op := range res.Ops {
-		if op.Kind == OpFillRect && fixture56HasRGB(op, 0.9373, 0.9137, 0.8627) &&
-			op.X < sampText.X+0.1 && op.Y < sampText.Y && op.Y+op.H > sampText.Y-op.H {
-			chrome = op
 
-			break
+	for _, paintOp := range res.Ops {
+		matchesChrome := paintOp.Kind == OpFillRect &&
+			fixture56HasRGB(paintOp, 0.9373, 0.9137, 0.8627) &&
+			paintOp.X < sampText.X+0.1 &&
+			paintOp.Y < sampText.Y &&
+			paintOp.Y+paintOp.H > sampText.Y-paintOp.H
+		if !matchesChrome {
+			continue
 		}
+
+		chrome = paintOp
+
+		break
 	}
 
 	if sampText.Text == "" || followingText.Text == "" || chrome.W == 0 {
-		t.Fatalf("missing inline boundary ops: samp=%+v following=%+v chrome=%+v", sampText, followingText, chrome)
+		t.Fatalf("missing inline boundary ops: samp=%+v following=%+v chrome=%+v",
+			sampText, followingText, chrome)
 	}
 
 	if chrome.X+chrome.W > followingText.X+4 {
-		t.Fatalf("inline chrome overlaps following text: chrome right=%.2f following text x=%.2f", chrome.X+chrome.W, followingText.X)
+		t.Fatalf(
+			"inline chrome overlaps following text: chrome right=%.2f following text x=%.2f",
+			chrome.X+chrome.W,
+			followingText.X,
+		)
 	}
 }
 

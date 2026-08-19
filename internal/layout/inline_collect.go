@@ -771,6 +771,7 @@ func (e *engine) coalesceTextItems(line []inlineItem) []inlineItem {
 				// duplicate chrome contributed by the newly merged item.
 				prev.w -= e.inlineChromeLeft(prev.style) + e.inlineChromeRight(prev.style)
 			}
+
 			prev.marginR = cur.marginR
 
 			continue
