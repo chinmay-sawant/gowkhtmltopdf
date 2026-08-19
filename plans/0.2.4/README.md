@@ -4,7 +4,6 @@
 |---------------|------|
 | [31-canonical-0.2.4-roadmap.md](31-canonical-0.2.4-roadmap.md) | **Canonical v0.2.4 execution ledger** (phases 31–39) |
 | [phases/](phases) | Per-phase atomic checklists (API/CLI 31–38 + external benches 39) |
-| [font/](font) | Post-closure font-resolution, fallback, and compliance follow-up track |
 
 Workflow: [../../skills/phase-wise-checklist/SKILLS.md](../../skills/phase-wise-checklist/SKILLS.md)
 
