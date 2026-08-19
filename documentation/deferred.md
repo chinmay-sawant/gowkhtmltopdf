@@ -62,7 +62,7 @@ Do not treat a public SPA URL as the acceptance bar for report work.
 | Item | Status / reason | Next gate |
 |------|-----------------|-----------|
 | JavaScript / `--enable-javascript` | Flags **not registered** (unknown option). `<script>` is stripped at load; scripts are **not** executed. Related stubs (`--javascript-delay`, `--run-script`, `--window-status`, `--debug-javascript`, `--enable-plugins`) are also unknown. | Phase 22 |
-| Full CSS / Chrome print parity | Not a product goal for this HTML template engine. | Phase 23 deferred |
+| Full CSS / Chrome print parity | Not a product goal for this PDF engine based on HTML templates (without any wrappers). | Phase 23 deferred |
 | Full flex / grid / subgrid / masonry | **Partial** print CSS subset (fixtures 25/28/32–35). Joint subgrid intrinsic sizing and CSS Grid L3 masonry are out. | — |
 | Chrome sticky scroll parity | Print-scoped sticky: page content box is the scrollport; overflow boxes are scrollports at **offset 0**. No continuous scroll, no Chrome pixel match. | Non-goal |
 | CJK / complex scripts | Type0/CID + `--font-path`; Arabic OpenType (GSUB) with presentation-form fallback; Indic **Partial**. `writing-mode: vertical-rl` / `vertical-lr` are parsed but **not** implemented (horizontal layout only). | No CGO HarfBuzz |

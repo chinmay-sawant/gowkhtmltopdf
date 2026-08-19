@@ -109,7 +109,7 @@ Be honest about trade-offs:
 | | |
 |--|--|
 | **Their package** | A good ergonomic shell around an external, unmaintained converter |
-| **gowkhtmltopdf** | A pure-Go HTML template engine, not "make calling the binary nicer" |
+| **gowkhtmltopdf** | A pure-Go PDF engine based on HTML templates — without any wrappers — not "make calling the binary nicer" |
 
 Use **SebastiaanKlippert/go-wkhtmltopdf** only if you need WebKit-level print
 fidelity and accept carrying a dead native toolchain.

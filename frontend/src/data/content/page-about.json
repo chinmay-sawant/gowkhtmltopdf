@@ -5,7 +5,7 @@
   {
    "type": "hero",
    "title": "A pure-Go HTML to PDF converter",
-   "lede": "gowkhtmltopdf is a clean-room, pure-Go work-alike for wkhtmltopdf that turns server-generated HTML and templates into multi-page PDFs and images. It is built as an HTML template engine for styled documents: invoices, receipts, certificates, storybooks, posters, tables, and multi-page documents with headers, footers, TOCs, and PDF outlines."
+   "lede": "gowkhtmltopdf is a clean-room, pure-Go work-alike for wkhtmltopdf that turns server-generated HTML and templates into multi-page PDFs and images. It is a PDF engine based on HTML templates — without any wrappers — for styled documents: invoices, receipts, certificates, storybooks, posters, tables, and multi-page documents with headers, footers, TOCs, and PDF outlines."
   },
   {
    "type": "cards",
@@ -135,8 +135,8 @@
   {
    "type": "callout",
    "variant": "info",
-   "title": "Scope boundary: an HTML template engine, not a browser",
-   "body": "gowkhtmltopdf converts server-generated HTML and styled templates into multi-page PDFs without a browser process. There is no JavaScript, CSS support is a documented subset (flex, grid, and positioning are partial), and pixel parity with Chrome or WebKit is not a goal. Use it for invoices, certificates, storybooks, posters, tables, and multi-page documents with headers, footers, TOCs, and PDF outlines."
+   "title": "Scope boundary: a PDF engine based on HTML templates, not a browser",
+   "body": "gowkhtmltopdf converts server-generated HTML and styled templates into multi-page PDFs without any wrappers or a browser process. There is no JavaScript, CSS support is a documented subset (flex, grid, and positioning are partial), and pixel parity with Chrome or WebKit is not a goal. Use it for invoices, certificates, storybooks, posters, tables, and multi-page documents with headers, footers, TOCs, and PDF outlines."
   }
  ]
 }

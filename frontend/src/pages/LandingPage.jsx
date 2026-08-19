@@ -139,7 +139,7 @@ export default function LandingPage() {
             Up to {LIBRARY_HEADLINE.displayMultiplier}x faster than wkhtmltopdf through the Go library.
           </p>
           <p className="landing-lede">
-            An HTML template engine for invoices, certificates, storybooks, posters, statements, and tables without running chrome wrappers.
+            A PDF engine based on HTML templates for invoices, certificates, storybooks, posters, statements, and tables — without any wrappers.
           </p>
           <div className="landing-actions">
             <Link className="button button-primary" to="/getting-started">Get started <span aria-hidden="true">→</span></Link>

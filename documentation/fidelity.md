@@ -1,8 +1,9 @@
 # Fidelity guide
 
-**gowkhtmltopdf** is an HTML template engine that converts **authored HTML** to PDF
-and raster images. It is **not** a browser and does **not** target full WebKit
-or Chrome print parity under a pure-Go, no-cgo design.
+**gowkhtmltopdf** is a **PDF engine based on HTML templates** — without any
+wrappers — that converts **authored HTML** to PDF and raster images. It is
+**not** a browser and does **not** target full WebKit or Chrome print parity
+under a pure-Go, no-cgo design.
 
 This guide is the product-facing fidelity story. The normative per-feature
 contract is the [compatibility matrix](compatibility-matrix.md). Post-MVP work
@@ -15,7 +16,7 @@ is tracked in
 
 | You need… | Expectation |
 |-----------|-------------|
-| Invoices, certificates, storybooks, posters, statements, tables, headers/footers, TOC, outlines | **In scope** (HTML template engine) |
+| Invoices, certificates, storybooks, posters, statements, tables, headers/footers, TOC, outlines | **In scope** (PDF engine based on HTML templates — without any wrappers) |
 | Repeatable layout, static binary, no browser process | **In scope** |
 | Pixel-perfect clone of an arbitrary website | **Out of scope** |
 | Wikipedia / marketing “decent print” (readable title + body) | **Progressive goal** (Phase 21) — not MVP acceptance yet |
@@ -48,7 +49,7 @@ primary content, not a browser clone.
 
 | Tier | Goal | Rough phases | Good means… |
 |------|------|--------------|-------------|
-| **Tier 1** | Solid HTML template engine | 10–16 | Controlled HTML templates look correct in PDF/PNG; bold/italic/spacing usable; image mode not blocky 5×7 text |
+| **Tier 1** | Solid PDF engine for HTML templates | 10–16 | Controlled HTML templates look correct in PDF/PNG; bold/italic/spacing usable; image mode not blocky 5×7 text |
 | **Tier 2** | Leave wkhtmltopdf for most jobs | 17–20 | Broader CSS, pagination polish, multi-font/Unicode, HF/link edges |
 | **Tier 3** | Compete on the open web | 23 deferred | Not planned as a pure-Go HTML engine; Chrome/Playwright territory |
 

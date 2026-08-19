@@ -3,10 +3,10 @@
   gowkhtmltopdf
 </h1>
 
-gowkhtmltopdf is a no-cgo HTML→PDF and HTML→image converter and HTML template engine
+gowkhtmltopdf is a no-cgo **PDF engine based on HTML templates** (and HTML→image)
 for **structured templates and documents**: invoices, receipts, certificates,
 storybooks, posters, statements, tables, and multi-page documents with headers,
-footers, tables of contents, and PDF outlines.
+footers, tables of contents, and PDF outlines — without any wrappers.
 
 It is a clean-room work-alike of the [wkhtmltopdf](https://wkhtmltopdf.org/)
 CLI surface. There is **no browser**, **no cgo**, and no native converter
