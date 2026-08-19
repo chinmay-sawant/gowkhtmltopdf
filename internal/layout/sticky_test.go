@@ -723,6 +723,70 @@ func TestStickyFixture31AfterSectionNotCovered(t *testing.T) { //nolint:cyclop,f
 	}
 }
 
+func TestStickyFixture31ContinuationChromeStopsAtBottomBorder(t *testing.T) { //nolint:cyclop,funlen
+	t.Parallel()
+
+	res, contentH, doc := paintFixture31(t)
+	if doc.PageCount() < 2 {
+		t.Fatalf("fixture-31 expected ≥2 pages, got %d", doc.PageCount())
+	}
+
+	bottomY := -1.0
+	sideBottom := -1.0
+	fillBottom := -1.0
+
+	for _, paintOp := range res.Ops {
+		if paintOp.Fixed || int(paintOp.Y/contentH) != 1 {
+			continue
+		}
+
+		isSectionBottom := paintOp.Kind == OpLine && paintOp.H < 1 && paintOp.W > 500 &&
+			nearRGB(&paintOp, 0.271, 0.353, 0.392) && paintOp.Y > bottomY
+		if isSectionBottom {
+			bottomY = paintOp.Y
+		}
+
+		isSideRail := paintOp.Kind == OpLine && paintOp.W <= 1 && paintOp.H > 40 &&
+			nearRGB(&paintOp, 0.271, 0.353, 0.392) && paintOp.Y+paintOp.H > sideBottom
+		if isSideRail {
+			sideBottom = paintOp.Y + paintOp.H
+		}
+
+		isSectionFill := paintOp.Kind == OpFillRect && paintOp.H > 40 &&
+			nearRGB(&paintOp, 0.925, 0.937, 0.945) && paintOp.Y+paintOp.H > fillBottom
+		if isSectionFill {
+			fillBottom = paintOp.Y + paintOp.H
+		}
+	}
+
+	if bottomY < 0 || sideBottom < 0 || fillBottom < 0 {
+		t.Fatalf(
+			"missing continuation section chrome: bottomY=%.2f sideBottom=%.2f fillBottom=%.2f",
+			bottomY,
+			sideBottom,
+			fillBottom,
+		)
+	}
+
+	if sideBottom > bottomY+1 {
+		t.Errorf(
+			"section side rail extends %.2fpt below bottom border: sideBottom=%.2f bottomY=%.2f",
+			sideBottom-bottomY,
+			sideBottom,
+			bottomY,
+		)
+	}
+
+	if fillBottom > bottomY+1 {
+		t.Errorf(
+			"section fill extends %.2fpt below bottom border: fillBottom=%.2f bottomY=%.2f",
+			fillBottom-bottomY,
+			fillBottom,
+			bottomY,
+		)
+	}
+}
+
 func paintFixture31(t *testing.T) (*Result, float64, *pdf.Document) {
 	t.Helper()
 

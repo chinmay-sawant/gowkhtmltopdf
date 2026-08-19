@@ -57,8 +57,8 @@ func TestRunRejectsDumpOutlineWithPDFStdout(t *testing.T) {
 		return run([]string{
 			"--quiet",
 			"--dump-outline",
-			"inline:<html><body><h1>stdout conflict</h1></body></html>",
-			"-",
+			"--html", "<html><body><h1>stdout conflict</h1></body></html>",
+			"--output", "-",
 		})
 	})
 
@@ -77,8 +77,8 @@ func TestRunKeepsPDFFileAndOutlineXMLSeparate(t *testing.T) {
 		return run([]string{
 			"--quiet",
 			"--dump-outline",
-			"inline:<html><body><h1>separate outputs</h1></body></html>",
-			outputPath,
+			"--html", "<html><body><h1>separate outputs</h1></body></html>",
+			"--output", outputPath,
 		})
 	})
 

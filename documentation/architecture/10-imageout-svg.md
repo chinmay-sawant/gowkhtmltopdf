@@ -1,9 +1,13 @@
 # Image output (PNG/JPEG) & SVG raster
 
+> Public image conversion is `ImageDocument.WriteImage` /
+> `ImageDocument.Image` in v0.2.4. The internal `imageout.Request` seam below
+> is engine-only.
+
 ## 1. Responsibility & position in the pipeline
 
 `internal/imageout` is the **image-mode engine** behind the `gowkhtmltoimage`
-binary and the `ImageConverter` library API. Where `internal/convert` +
+binary and the `ImageDocument` library API. Where `internal/convert` +
 `internal/pdf` write a multi-page PDF, `imageout` renders the **same shared
 upstream pipeline** — load → parse → style → layout — and then **paints the
 layout display list into an in-memory `image.NRGBA` canvas** and encodes it as
@@ -97,7 +101,7 @@ resolution), `internal/layout/mnd_const.go:62` (`svgRasterMax = 1024`),
 | `Render(root, opts)` | `imageout.go:121` | Convenience wrapper over `RenderContext` with `context.Background()` |
 | `RenderContext(ctx, root, opts)` | `imageout.go:128` | The core library render: validate ctx → default font → `layoutResult` → `rasterizeContext` → `applyCrop` |
 | `Run(ctx, cmd, log)` | `imageout.go:1054` | CLI-facing adapter (P1-1): resolves format, validates request against a discard sink, opens `cmd.OpenOutput()`, delegates to `RunRequest` |
-| `RunRequest(ctx, req, log)` | `imageout.go:1094` | CLI-independent engine seam on a `convert.Request`; used by `api.go` hook `convertHooks.executeImage` (`api.go:720`) and `ImageRequest` (`api.go:903`) |
+| `RunRequest(ctx, req, log)` | `imageout.go:1094` | CLI-independent engine seam on an internal request; used by the root `ImageDocument` adapter |
 
 ### Layout & viewport logic
 
@@ -182,7 +186,7 @@ resolution), `internal/layout/mnd_const.go:62` (`svgRasterMax = 1024`),
    - `firstObject` — warns and ignores additional page objects and TOC
      (image mode renders exactly one page);
    - `load.NewLoader(imageLoadGlobal(req.Global, *req.Image))` — ACL =
-     Image.Load merged with Global.Load (`--allow` / `--enable-local-file-access`);
+     Image.Load merged with Global.Load (`--allow` / `--allow-local-files`);
    - `pdf.DefaultFont()` + `fontRegistry` (system + `--font-path`);
    - builds `imagePipeline` and runs `renderpipeline.Run` (the shared
      RenderObjects → Assemble → Finalize lifecycle with ctx checks between stages).
@@ -225,10 +229,8 @@ with `limitedImageBuffer` (bounds encoded bytes to 32 MiB) → `req.Output.Write
 
 ### 4.3 Library path
 
-`api.go` `ImageConverter.Convert` builds `convert.NewImageRequest`, then
-`convertHooks.executeImage` (`api.go:720`) sets `req.Output` to a `bytes.Buffer`
-and calls `imageout.RunRequest` directly — the CLI layer is not involved.
-`ImageRequest` (`api.go:903`) uses the same `RunRequest` seam. `Render` /
+The root `ImageDocument` adapter builds an internal image request and calls
+`imageout.RunRequest` directly — the CLI layer is not involved. `Render` /
 `RenderContext` are also independently callable on a parsed `html.Node` with an
 `Images` fetch function (used by tests and the `examples/image` demo).
 
@@ -375,13 +377,13 @@ contract (the P1-1 engine-seam goal).
   level at most and skipped; `--no-images` (`web.images=false`) returns a
   static error without crashing.
 - **Extension points:** intentionally small — the library API path is
-  `ImageConverter` + `ImageSettings` dotted `Set`, and the engine seam is
-  `convert.Request` + `RunRequest`; there is no plugin system.
+  `ImageDocument` typed fields, and the engine seam is `convert.Request` +
+  `RunRequest`; there is no plugin system.
 
 ## 8. Security considerations
 
 - **Local-file ACL** (`documentation/THREAT-MODEL.md`): local access denied
-  unless `--enable-local-file-access` / settings; `--allow` prefixes whitelist
+  unless `--allow-local-files` / settings; `--allow` prefixes whitelist
   paths. `imageLoadGlobal` merges `Global.Load` ACL into `Image.Load` so the
   image binary cannot bypass the PDF binary's policy via the loader.
 - **Subresource fetching:** images, stylesheets, fonts fetched via
@@ -483,7 +485,7 @@ contract (the P1-1 engine-seam goal).
   shipped TTF outline AA + 2× supersample; DPI/quality matrix honesty.
 - `documentation/cli.md` — `gowkhtmltoimage` flags: `--width/--height/--format/
   --quality/--transparent/--crop-x/y/w/h`, smart width behavior.
-- `documentation/library-api.md` — `ImageConverter` / `ImageSettings` usage.
+- `documentation/library-api.md` — `ImageDocument` usage.
 - `documentation/samples.md` — committed `output/*.png` and showcase fixtures.
 - `documentation/compatibility-matrix.md` — image-mode support matrix entries
   (images, transparency, quality knobs).

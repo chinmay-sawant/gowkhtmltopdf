@@ -18,6 +18,14 @@ var (
 	ErrVersion = errors.New("version requested")
 	ErrLicense = errors.New("license requested")
 	ErrExtHelp = errors.New("extended help requested")
+	// ErrMissingOutput reports a conversion invocation without -o/--output.
+	ErrMissingOutput = errors.New("output is required; use -o or --output")
+	// ErrConflictingInputs reports mutually exclusive document source flags.
+	ErrConflictingInputs = errors.New("document inputs are mutually exclusive")
+	// ErrDuplicateOutput reports more than one explicit output flag.
+	ErrDuplicateOutput = errors.New("output may be specified only once")
+	// ErrLegacyObjectSyntax reports the removed wkhtmltopdf object grammar.
+	ErrLegacyObjectSyntax = errors.New("legacy page/cover/toc object syntax is not supported; use document flags")
 	// ErrTerminalConflict reports conversion arguments combined with a
 	// terminal-only action such as --dump-default-toc-xsl.
 	ErrTerminalConflict = errors.New("cli: terminal action conflicts with conversion arguments")
@@ -35,6 +43,7 @@ var (
 	errOptionRequiresPair  = errors.New("option requires two values (name value)")
 	errUnknownFlagKind     = errors.New("internal: unknown flag kind for")
 	errInvalidBoolValue    = errors.New("invalid boolean value")
+	errDuplicateSource     = errors.New("document source may be specified only once")
 )
 
 // Exit codes (utilities.cc): 0 ok, 1 error, 2 HTTP 404, 3 HTTP 401.
@@ -48,7 +57,8 @@ type Command struct {
 	Global  settings.PdfGlobal
 	Image   settings.ImageGlobal
 	Objects []settings.PdfObject
-	// Output is a path or "-" (stdout). Ignored when OutputWriter is set.
+	// Output is a path or "-" (stdout). It is populated only by -o/--output
+	// for parsed commands and is ignored when OutputWriter is set.
 	Output string
 	// OutputWriter, when non-nil, receives PDF/image bytes directly (library
 	// path). Takes precedence over Output so embedders need no temp files.
@@ -59,6 +69,18 @@ type Command struct {
 	OutlineWriter io.Writer
 
 	DumpDefaultTOCXSL bool
+
+	// The fields below are the private CLI document seam. They are resolved to
+	// settings.PdfObject values once parsing is complete; the public Document
+	// model is intentionally not coupled to this package.
+	htmlSource   string
+	htmlSet      bool
+	urlSource    string
+	urlSet       bool
+	coverSource  string
+	coverSet     bool
+	tocRequested bool
+	outputSet    bool
 }
 
 // OpenOutput returns the writer for this command: OutputWriter (library bytes
@@ -100,12 +122,6 @@ type flagSpec struct {
 
 type objectCtx struct {
 	obj *settings.PdfObject
-	// pending holds page-scoped settings seen before any object keyword
-	// (upstream "address remapping"). It is promoted into a real object when
-	// the first page/cover is created or when free positionals resolve. TOC
-	// objects do not consume pending, so `--enable-local-file-access toc page
-	// in.html out.pdf` does not leave an empty ghost page.
-	pending *settings.PdfObject
 }
 
 // parseState groups the mutable parser lifecycle so flag helpers do not expose
@@ -119,42 +135,18 @@ type parseState struct {
 	free []string
 }
 
-// object returns the current object, creating one if needed (promoting
-// pending page-scoped settings when present).
-func (ctx *objectCtx) object(c *Command) *settings.PdfObject {
+// object returns the current page template, creating one if needed. The
+// template is materialized into Document.Pages during final resolution.
+func (ctx *objectCtx) object(_ *Command) *settings.PdfObject {
 	if ctx.obj == nil {
-		return ctx.newObject(c)
+		obj := settings.DefaultPdfObject()
+		ctx.obj = &obj
 	}
 
 	return ctx.obj
 }
 
-// newObject appends a page/cover object and makes it current. If page-scoped
-// flags were collected before any object keyword, they seed this object.
-func (ctx *objectCtx) newObject(cmd *Command) *settings.PdfObject {
-	if ctx.pending != nil {
-		cmd.Objects = append(cmd.Objects, *ctx.pending)
-		ctx.pending = nil
-	} else {
-		cmd.Objects = append(cmd.Objects, settings.DefaultPdfObject())
-	}
-
-	ctx.obj = &cmd.Objects[len(cmd.Objects)-1]
-
-	return ctx.obj
-}
-
-// newFreshObject appends a new object without consuming pending page-scoped
-// settings. Used for toc so pre-object page flags apply to the first real
-// page that follows, not to the TOC entry itself.
-func (ctx *objectCtx) newFreshObject(cmd *Command) *settings.PdfObject {
-	cmd.Objects = append(cmd.Objects, settings.DefaultPdfObject())
-	ctx.obj = &cmd.Objects[len(cmd.Objects)-1]
-
-	return ctx.obj
-}
-
-// Parse parses wkhtmltopdf-style arguments.
+// Parse parses the 0.2.4 document-oriented command grammar.
 //
 // The optional mode restricts the flags accepted by the parser. Omitting it
 // preserves the historical library behaviour and accepts the union of PDF
@@ -213,7 +205,11 @@ func (s *parseState) step(arg string) error {
 	case strings.HasPrefix(arg, "-") && arg != "-":
 		return fmt.Errorf("%w %s", errUnknownOption, arg)
 	default:
-		s.cmd.positional(arg, s.cur, &s.free)
+		if isLegacyObjectToken(arg) {
+			return fmt.Errorf("%w: %s", ErrLegacyObjectSyntax, arg)
+		}
+
+		s.free = append(s.free, arg)
 
 		return nil
 	}
@@ -315,45 +311,22 @@ func checkMode(name string, spec flagSpec, mode Mode) error {
 	return fmt.Errorf("option --%s is %w %s", name, errOptionNotSupported, modeName)
 }
 
-// positional handles object keywords and queues bare positionals.
-func (c *Command) positional(arg string, cur *objectCtx, free *[]string) {
+// isLegacyObjectToken identifies the removed multi-object grammar. A bare
+// path named "page", "cover", or "toc" is intentionally reserved so the
+// new CLI cannot silently interpret old invocations as different documents.
+func isLegacyObjectToken(arg string) bool {
 	switch arg {
-	case "page":
-		cur.newObject(c)
-
-		return
-	case "cover":
-		obj := cur.newObject(c)
-		obj.IsCover = true
-		obj.IncludeInOutline = false
-		obj.HeaderSet, obj.FooterSet = true, true
-		//nolint:exhaustruct // intentional zero/partial fields
-		obj.Header, obj.Footer = settings.HeaderFooter{}, settings.HeaderFooter{}
-
-		return
-	case "toc":
-		obj := cur.newFreshObject(c)
-		obj.IsTableOfContent = true
-		obj.UseOutline = false
-
-		return
+	case "page", "cover", "toc":
+		return true
+	default:
+		return false
 	}
-	// Fill an explicit empty page object first; else queue for resolution
-	// (last free arg is the output, the rest become implicit pages).
-	if cur.obj != nil && cur.obj.Page == "" && !cur.obj.IsTableOfContent {
-		cur.obj.Page = arg
-
-		return
-	}
-
-	*free = append(*free, arg)
 }
 
-// resolveFree assigns queued positionals: last → output, others → implicit
-// page objects. Pending page-scoped settings (from flags before any object
-// keyword) are applied to the first free page URL.
+// resolveFree turns the document source flags and positional page files into
+// ordered private engine objects: cover, TOC, then body pages.
 //
-//nolint:cyclop // compatibility positional resolution has distinct mode cases.
+//nolint:cyclop,funlen,wsl // source validation and ordered assembly are one parser boundary.
 func (c *Command) resolveFree(cur *objectCtx, free []string) error {
 	if c.Global.DumpDefaultTOCXSL {
 		if len(free) != 0 || len(c.Objects) != 0 {
@@ -367,31 +340,69 @@ func (c *Command) resolveFree(cur *objectCtx, free []string) error {
 		return nil
 	}
 
-	if len(free) == 0 {
-		return c.validate()
+	if !c.outputSet || strings.TrimSpace(c.Output) == "" {
+		return ErrMissingOutput
 	}
 
-	c.Output = free[len(free)-1]
+	sources := 0
+	if c.htmlSet {
+		sources++
+	}
+	if c.urlSet {
+		sources++
+	}
+	if len(free) > 0 {
+		sources++
+	}
+	if sources > 1 {
+		return fmt.Errorf("%w: use exactly one of --html, --url, or positional page files", ErrConflictingInputs)
+	}
+	if sources == 0 {
+		return errNeedInputFile
+	}
 
-	for _, pageURL := range free[:len(free)-1] {
-		// Prefer filling an already-opened empty page/cover object.
-		if cur.obj != nil && cur.obj.Page == "" && !cur.obj.IsTableOfContent {
-			cur.obj.Page = pageURL
+	template := settings.DefaultPdfObject()
+	if cur.obj != nil {
+		template = settings.ClonePdfObject(*cur.obj)
+	}
 
-			continue
+	c.Objects = nil
+	if c.coverSet {
+		cover := settings.ClonePdfObject(template)
+		cover.Page = c.coverSource
+		cover.IsCover = true
+		cover.IncludeInOutline = false
+		cover.HeaderSet, cover.FooterSet = true, true
+		var emptyHeader settings.HeaderFooter
+		cover.Header, cover.Footer = emptyHeader, emptyHeader
+		c.Objects = append(c.Objects, cover)
+	}
+	if c.tocRequested {
+		toc := settings.DefaultPdfObject()
+		toc.IsTableOfContent = true
+		toc.UseOutline = false
+		c.Objects = append(c.Objects, toc)
+	}
+
+	body := func(source string, inline bool) {
+		obj := settings.ClonePdfObject(template)
+		if inline {
+			obj.Load.InlineHTML = []byte(source)
+		} else {
+			obj.Page = source
 		}
-		// Next: promote pending pre-object page settings into this page.
-		if cur.pending != nil {
-			o := *cur.pending
-			o.Page = pageURL
-			c.Objects = append(c.Objects, o)
-			cur.pending = nil
-			cur.obj = &c.Objects[len(c.Objects)-1]
+		c.Objects = append(c.Objects, obj)
+	}
 
-			continue
+	switch {
+	case c.htmlSet:
+		body(c.htmlSource, true)
+	case c.urlSet:
+		body(c.urlSource, false)
+	default:
+		for _, page := range free {
+			body(page, false)
 		}
-
-		cur.newObject(c).Page = pageURL
 	}
 
 	return c.validate()
@@ -405,27 +416,15 @@ func (c *Command) validate() error {
 	return nil
 }
 
-// applyPage routes a page-ish flag: the global half first, then the current
-// object, else accumulates it as pending first-page settings (upstream
-// address remapping: page settings before any object keyword apply to the
-// first page).
-func (ctx *objectCtx) applyPage(c *Command, glob func(g *settings.PdfGlobal, val string) error,
+// applyPage routes a page-ish flag to both global and current-page settings.
+func (ctx *objectCtx) applyPage(command *Command, glob func(g *settings.PdfGlobal, val string) error,
 	obj func(o *settings.PdfObject, val string) error, val string,
 ) error {
-	if err := glob(&c.Global, val); err != nil {
+	if err := glob(&command.Global, val); err != nil {
 		return err
 	}
 
-	if ctx.obj != nil {
-		return obj(ctx.obj, val)
-	}
-
-	if ctx.pending == nil {
-		o := settings.DefaultPdfObject()
-		ctx.pending = &o
-	}
-
-	return obj(ctx.pending, val)
+	return obj(ctx.object(command), val)
 }
 
 // apply runs a flag with value extraction (next-arg or =value). Bool flags

@@ -12,8 +12,8 @@
    "heading": "Status at a glance",
    "items": [
     {
-     "title": "v0.2.3",
-     "body": "The current release (`VERSION`, stamped into the CLI). Phases 0-9 plus the print CSS subset (tiers 1-2): load, parse, style, layout, paginate, paint, and PNG/JPEG image mode. Default write is unclaimed PDF 1.4. Opt-in `--pdf-version` 1.7 / 2.0 and `--pdf-profile` (PDF/A-3a, PDF/A-4, PDF/UA-1, PDF/UA-2) ship in this release."
+     "title": "v0.2.4",
+     "body": "The current release (`VERSION`, stamped into the CLI). It includes the typed Document and ImageDocument APIs, explicit CLI source/output grammar, the established print CSS subset, and PNG/JPEG image mode. Default write is unclaimed PDF 1.4. Opt-in `--pdf-version` 1.7 / 2.0 and `--pdf-profile` (PDF/A-3a, PDF/A-4, PDF/UA-1, PDF/UA-2) remain available."
     },
     {
      "title": "Repeatable layout",
@@ -128,7 +128,7 @@
     },
     {
      "heading": "The OSS story",
-     "body": "gowkhtmltopdf is MIT licensed under Chinmay Sawant and requires Go 1.26+. It is an independent clean-room reimplementation of the wkhtmltopdf CLI and behavior, so it shares none of wkhtmltopdf's LGPL obligations and does not ship Qt or WebKit. The current generic CLI (2026-08-14) is faster than wkhtmltopdf 0.12.6.1 at every tested size (16x at 2 pages, 1.6x at 500 pages). Peak RSS is lower through 100 pages and higher from 200 pages."
+     "body": "gowkhtmltopdf is MIT licensed under Chinmay Sawant and requires Go 1.26+. It is an independent clean-room reimplementation of the wkhtmltopdf CLI and behavior, so it shares none of wkhtmltopdf's LGPL obligations and does not ship Qt or WebKit. The current generic CLI (2026-08-19) is faster than wkhtmltopdf 0.12.6.1 at every tested size (15.5x at 2 pages, 1.6x at 500 pages). Peak RSS is lower through 100 pages and higher from 200 pages."
     }
    ]
   },

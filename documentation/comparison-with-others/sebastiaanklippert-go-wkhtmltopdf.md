@@ -58,7 +58,7 @@ of the installed `wkhtmltopdf` binary and the time to fetch remote HTML.
 | **Maintenance risk** | Tied to archived upstream `wkhtmltopdf` | Full stack owned in this repository |
 | **Fidelity** | Closer to "real browser" print for complex pages | Report-oriented CSS subset; no JavaScript; limited fonts today |
 | **Outputs** | PDF only (via the binary) | PDF and image mode (`gowkhtmltoimage`) |
-| **CLI surface** | Caller builds options in Go; binary is the CLI | wkhtmltopdf-style multi-object CLI (`page` / `cover` / `toc`) plus library API |
+| **CLI surface** | Caller builds options in Go; binary is the CLI | Document-shaped `-o/--output`, `--html`/`--url`, positional pages, and `--cover`/`--toc` |
 
 ## How gowkhtmltopdf is better
 
@@ -87,9 +87,10 @@ of the installed `wkhtmltopdf` binary and the time to fetch remote HTML.
    not hash-stable (wall-clock dates). Golden tests check structure, not
    file hashes.
 
-6. **Library plus CLI work-alike**  
-   Idiomatic `NewConverter()` API and a wkhtmltopdf-style multi-object CLI
-   without shelling out to a separate process.
+6. **Library plus CLI work-alike**
+   `Document` / `ImageDocument` use typed structs without shelling out to a
+   separate process, and the CLI accepts the same explicit sources and output
+   model.
 
 ## Where SebastiaanKlippert/go-wkhtmltopdf still wins
 

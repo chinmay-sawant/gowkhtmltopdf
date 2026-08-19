@@ -16,7 +16,7 @@ and **[fidelity.md](fidelity.md)**.
 | Call the library from Go | [library-api.md](library-api.md) |
 | Check whether a CSS property or HTML tag is supported | [compatibility-matrix.md](compatibility-matrix.md) |
 | Understand fonts, CJK, Arabic, `@font-face` | [fonts.md](fonts.md) |
-| Embed the converter in a web app safely | [integration-security.md](integration-security.md), [THREAT-MODEL.md](THREAT-MODEL.md) |
+| Embed the document API in a web app safely | [integration-security.md](integration-security.md), [THREAT-MODEL.md](THREAT-MODEL.md) |
 | See sample PDFs and golden fixtures | [samples.md](samples.md), [`../output/`](../output/) |
 | Understand the pipeline and packages | [architecture.md](architecture.md), [architecture/](architecture/) |
 | Compare with wkhtmltopdf wrappers / browsers | [comparison-with-others/](comparison-with-others/) |
@@ -30,7 +30,8 @@ and **[fidelity.md](fidelity.md)**.
 | [overview.md](overview.md) | Product overview, design principles, pipeline, binaries |
 | [getting-started.md](getting-started.md) | Install, first PDF/PNG, local files, HTTP URLs, PDF version/profile, tests |
 | [cli.md](cli.md) | `gowkhtmltopdf` / `gowkhtmltoimage` grammar, flags, pitfalls |
-| [library-api.md](library-api.md) | Go API: `RunPDF` / `Converter`, settings, errors |
+| [library-api.md](library-api.md) | Go API target: `Document` / `ImageDocument`, sources, options, errors |
+| [MIGRATION-0.2.4.md](MIGRATION-0.2.4.md) | Migration from the v0.2.3 library and CLI |
 | [fidelity.md](fidelity.md) | Tiers, claims language, degrade rules, Phase 21 URL print |
 | [compatibility-matrix.md](compatibility-matrix.md) | Normative per-element / per-property / per-flag contract |
 | [fonts.md](fonts.md) | Bundled faces, `--font-path`, Type0/CID, shaping limits |

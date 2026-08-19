@@ -2142,17 +2142,17 @@ func clipSectionChromeOp(paintOp *Op, target stickySectionChromeTarget, closeY f
 	}
 }
 
-// isSectionChromeWash reports a page-leading section background wash that
-// runs past closeY.
+// isSectionChromeWash reports a page-leading section background wash whose
+// bottom does not align with closeY.
 func isSectionChromeWash(paintOp *Op, target stickySectionChromeTarget, closeY float64) bool {
 	return target.hasBackground && paintOp.H > 40 && sameRectFrame(paintOp, target) &&
-		sameRGB(paintOp, target.background) && paintOp.Y+paintOp.H < closeY
+		sameRGB(paintOp, target.background) && !nearLayout(paintOp.Y+paintOp.H, closeY)
 }
 
-// isSectionChromeSideBorder reports a page-leading section side border that
-// runs past closeY.
+// isSectionChromeSideBorder reports a page-leading section side border whose
+// bottom does not align with closeY.
 func isSectionChromeSideBorder(paintOp *Op, target stickySectionChromeTarget, closeY float64) bool {
-	return paintOp.H > 40 && target.sideMatches(paintOp) && paintOp.Y+paintOp.H < closeY
+	return paintOp.H > 40 && target.sideMatches(paintOp) && !nearLayout(paintOp.Y+paintOp.H, closeY)
 }
 
 type stickySectionChromeTarget struct {

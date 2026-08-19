@@ -252,6 +252,8 @@ func TestElementLocations(t *testing.T) { //nolint:gocognit,gocyclo,cyclop,funle
 
 	if hOne == nil {
 		t.Fatal("no h1 location")
+
+		return
 	}
 
 	if hOne.Page != 0 {
@@ -608,6 +610,8 @@ func TestLinkPseudoColor(t *testing.T) { //nolint:cyclop
 
 	if with == nil || bare == nil {
 		t.Fatalf("texts = %+v, want with+bare", texts)
+
+		return
 	}
 
 	if with.R > 0.05 || with.G < 0.35 || with.G > 0.45 || with.B < 0.75 {

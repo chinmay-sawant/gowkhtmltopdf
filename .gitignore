@@ -22,3 +22,13 @@ testdata/golden/out/
 compliance/
 verapdf/
 .pdf-validators/
+temps/
+
+# bench tooling
+scripts/puppeteer/node_modules/
+# bench-external normally uses mktemp and removes its inputs/outputs, but keep
+# accidental local copies out of the worktree. Result MD/CSV snapshots remain
+# intentionally trackable under testdata/golden/benchmarks/.
+scripts/bench-external-*.html
+scripts/bench-external-*.pdf
+testdata/golden/benchmarks/.bench-external/

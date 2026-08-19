@@ -237,6 +237,22 @@
   margin-bottom: 22px;
 }
 
+.bench-section .bench-explanation {
+  max-width: min(100%, 78ch);
+  color: var(--ink-2);
+  font-weight: 600;
+  line-height: 1.55;
+}
+
+.bench-section .section-heading-row .bench-explanation {
+  margin-top: 8px;
+  margin-bottom: 0;
+}
+
+.bench-section .table-block > .bench-explanation {
+  margin: 12px 0 18px;
+}
+
 /* Interactive Controls Toolbar */
 .bench-toolbar {
   display: flex;

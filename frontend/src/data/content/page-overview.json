@@ -5,7 +5,7 @@
   {
    "type": "hero",
    "title": "Pure-Go HTML to PDF, no browser",
-   "lede": "A clean-room, no-cgo HTML template engine and wkhtmltopdf CLI work-alike that turns authored HTML into multi-page PDFs (or PNG/JPEG) entirely in-process. Current release v0.2.3: phases 0-9 plus the print CSS subset (tiers 1-2), with committed samples under output/. Opt-in PDF/A and PDF/UA profiles ship in this version."
+   "lede": "A clean-room, no-cgo HTML template engine and wkhtmltopdf CLI work-alike that turns authored HTML into multi-page PDFs (or PNG/JPEG) entirely in-process. Current release v0.2.4 adds the native Document API, explicit CLI sources, and frozen external benchmark paths."
   },
   {
    "type": "bullets",
@@ -16,7 +16,7 @@
     "No browser, no cgo: no Chrome or WebKit process is spawned, and CGO_ENABLED=0 builds produce statically linked binaries with no runtime library requirements.",
     "Repeatable layout: the same HTML, settings, and fonts produce the same layout. Default CLI PDF bytes are not hash-stable because CreationDate and [date]/[time] use the wall clock unless you inject Now.",
     "Template-oriented scope: an allowlisted HTML model and a documented print CSS subset, with the compatibility matrix as the normative per-property contract.",
-    "Two surfaces: the gowkhtmltopdf and gowkhtmltoimage CLI binaries, plus an idiomatic Go library API in the root gowkhtmltopdf package (NewConverter, NewImageConverter)."
+    "Two surfaces: the gowkhtmltopdf and gowkhtmltoimage CLI binaries, plus an idiomatic Go library API in the root gowkhtmltopdf package (Document, ImageDocument)."
    ]
   },
   {
@@ -47,7 +47,7 @@
    "sections": [
     {
      "heading": "1. Load: internal/load",
-     "body": "Turns a file path, HTTP(S) URL, data: URI, or stdin into bytes. Local file access is denied by default and opens only with --enable-local-file-access or the equivalent settings key; --allow prefixes permit selective paths. HTTP fetches honor cookies and auth and enforce connect/response timeouts, a max redirect count, and a max body size."
+     "body": "Turns an explicit Content source into bytes. Local file access is denied by default and opens only with --allow-local-files or Document.AllowLocalFiles; NetworkPolicy can restrict HTTP(S) destinations. HTTP fetches enforce connect/response timeouts, a max redirect count, and a max body size."
     },
     {
      "heading": "2. Parse and style: internal/html and internal/css",
@@ -76,7 +76,7 @@
    "type": "stats",
    "items": [
     {
-     "value": "16x",
+     "value": "15.5x",
      "label": "faster than wkhtmltopdf at 2 pages"
     },
     {
@@ -84,7 +84,7 @@
      "label": "faster than wkhtmltopdf at 500 pages"
     },
     {
-     "value": "16 ms",
+     "value": "17 ms",
      "label": "2-page HTML, current generic CLI"
     },
     {

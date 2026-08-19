@@ -1,5 +1,5 @@
-// Command image converts one HTML file to a PNG (or JPEG) image through the
-// public gowkhtmltopdf library API.
+// Command image converts one HTML file to a PNG or JPEG through the target
+// ImageDocument API.
 //
 // Usage:
 //
@@ -9,7 +9,7 @@
 //
 //	--width <px>                  viewport width in pixels (default 1024)
 //	--format <png|jpg>            output format (default png)
-//	--enable-local-file-access    allow local files (needed for file inputs)
+//	--allow-local-files           allow local files (needed for file inputs)
 package main
 
 import (
@@ -18,6 +18,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
 
 	gowkhtmltopdf "github.com/chinmay-sawant/gowkhtmltopdf"
 )
@@ -28,7 +29,7 @@ func usage() {
 options:
   --width <px>                  viewport width in pixels (default 1024)
   --format <png|jpg>            output format (default png)
-  --enable-local-file-access    allow local files (needed for file inputs)
+  --allow-local-files           allow local files (needed for file inputs)
   --help                        show this help`)
 }
 
@@ -42,9 +43,9 @@ func main() {
 func run(argv []string) error {
 	fs := flag.NewFlagSet("image", flag.ContinueOnError)
 	fs.Usage = usage
-	width := fs.String("width", "", "viewport width in pixels (default 1024)")
+	widthText := fs.String("width", "", "viewport width in pixels (default 1024)")
 	format := fs.String("format", "png", "output format (png or jpg)")
-	localFiles := fs.Bool("enable-local-file-access", false, "allow local files (needed for file inputs)")
+	allowLocalFiles := fs.Bool("allow-local-files", false, "allow local files (needed for file inputs)")
 	if err := fs.Parse(argv); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
@@ -55,38 +56,36 @@ func run(argv []string) error {
 		usage()
 		return fmt.Errorf("need exactly one input and one output file")
 	}
-	input, output := fs.Arg(0), fs.Arg(1)
 	if *format != "png" && *format != "jpg" {
 		return fmt.Errorf("unsupported format %q (png or jpg)", *format)
 	}
 
-	c := gowkhtmltopdf.NewImageConverter()
-	mustSet := func(name, value string) error {
-		if err := c.Set(name, value); err != nil {
-			return fmt.Errorf("%s: %w", name, err)
+	var width int
+	if *widthText != "" {
+		parsed, err := strconv.Atoi(*widthText)
+		if err != nil {
+			return fmt.Errorf("width: %w", err)
 		}
-		return nil
-	}
-	if *width != "" {
-		if err := mustSet("width", *width); err != nil {
-			return err
-		}
-	}
-	if err := mustSet("format", *format); err != nil {
-		return err
-	}
-	c.AddObject(input)
-	if *localFiles {
-		c.Global().EnableLocalFileAccess()
-		c.Object().EnableLocalFileAccess()
+		width = parsed
 	}
 
-	if err := c.Convert(context.Background()); err != nil {
+	doc := gowkhtmltopdf.ImageDocument{
+		Source:          gowkhtmltopdf.Content{File: fs.Arg(0)},
+		Width:           width,
+		Format:          *format,
+		AllowLocalFiles: *allowLocalFiles,
+	}
+
+	output, err := os.Create(fs.Arg(1))
+	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(output, c.Output(), 0o644); err != nil {
+	defer output.Close()
+
+	if err := doc.WriteImage(context.Background(), output); err != nil {
 		return err
 	}
-	fmt.Printf("image: wrote %s (%d bytes)\n", output, len(c.Output()))
+
+	fmt.Printf("image: wrote %s\n", fs.Arg(1))
 	return nil
 }

@@ -31,12 +31,16 @@ func TestRegistryFindWithGlyphUsesStableFaceIdentityTieBreak(t *testing.T) {
 	if got := left.FindWithGlyph('A', 400, false); got != first {
 		if got == nil {
 			t.Fatal("left registry returned nil")
+
+			return
 		}
 		t.Fatalf("left registry selected %q, want FaceA", got.PostScriptName)
 	}
 	if got := right.FindWithGlyph('A', 400, false); got != first {
 		if got == nil {
 			t.Fatal("right registry returned nil")
+
+			return
 		}
 		t.Fatalf("right registry selected %q, want FaceA", got.PostScriptName)
 	}

@@ -111,6 +111,8 @@ func TestWritingModeInherits(t *testing.T) {
 
 	if textOp == nil {
 		t.Fatal("no OpText found for 'vertical'")
+
+		return
 	}
 
 	if textOp.RotateDeg != -90 {

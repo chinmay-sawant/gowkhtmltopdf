@@ -7,8 +7,8 @@ issues, and published benchmarks. Vendor benchmarks are identified as
 self-interested, and the performance figures below are directional rather than
 like-for-like measurements.
 
-The current release is **v0.2.3**. Opt-in PDF 1.7 / 2.0 and PDF/A + PDF/UA
-profiles ship in this version. Scores below assume that 0.2.3 tree.
+The current release is **v0.2.4**. Opt-in PDF 1.7 / 2.0 and PDF/A + PDF/UA
+profiles ship in this version. Scores below assume the v0.2.4 tree.
 
 ## Score card
 

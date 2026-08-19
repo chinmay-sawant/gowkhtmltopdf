@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import PageTitle from '../components/PageTitle'
-import { CLI_ROWS, HEADLINE, formatMs, speedup } from '../data/benchmarks'
+import { CLI_ROWS, HEADLINE, LIBRARY_HEADLINE, formatMs, speedup } from '../data/benchmarks'
 
 const HOME_BENCH_PAGES = [2, 10, 100, 500]
 const HOME_BENCH = CLI_ROWS.filter((row) => HOME_BENCH_PAGES.includes(row.pages))
@@ -77,14 +77,14 @@ export default function LandingPage() {
     }
 
     if (security === 'local') {
-      lines.push('  --enable-local-file-access \\')
+      lines.push('  --allow-local-files \\')
     }
 
     if (flavour.flag) {
       lines.push(`  ${flavour.flag} \\`)
     }
 
-    lines.push('  report.html report.pdf')
+    lines.push('  -o report.pdf report.html')
     lines.push('')
 
     const secNote = security === 'local' ? 'load [local fs permitted]' : 'load [safe sandbox]'
@@ -111,12 +111,12 @@ export default function LandingPage() {
       parts.push('--margin-top 10mm')
     }
     if (security === 'local') {
-      parts.push('--enable-local-file-access')
+      parts.push('--allow-local-files')
     }
     if (flavour.flag) {
       parts.push(flavour.flag)
     }
-    parts.push('report.html report.pdf')
+    parts.push('-o report.pdf report.html')
     return parts.join(' ')
   }, [pageSize, margins, orientation, security, flavour])
 
@@ -135,17 +135,16 @@ export default function LandingPage() {
       <section className="landing-hero" aria-labelledby="landing-title">
         <div className="landing-hero-copy">
           <h1 id="landing-title">Print-ready documents,<br /><em>from HTML you control.</em></h1>
-          <p className="landing-claim">
-            Up to {HEADLINE.smallSpeedup.toFixed(0)}x faster than wkhtmltopdf.
+          <p className="landing-claim landing-claim-primary">
+            Up to {LIBRARY_HEADLINE.displayMultiplier}x faster than wkhtmltopdf through the Go library.
           </p>
           <p className="landing-lede">
-            gowkhtmltopdf turns controlled, server-generated HTML into dependable PDF and image output without starting a browser process.
+            An HTML template engine for invoices, certificates, storybooks, posters, statements, and tables without running chrome wrappers.
           </p>
           <div className="landing-actions">
             <Link className="button button-primary" to="/getting-started">Get started <span aria-hidden="true">→</span></Link>
             <Link className="button button-secondary" to="/benchmarks">See the benchmarks</Link>
           </div>
-          <p className="landing-note">An HTML template engine for invoices, certificates, storybooks, posters, statements, and tables. JavaScript is not executed.</p>
         </div>
 
         <div className="terminal-card" aria-label="Interactive CLI conversion sandbox">
@@ -244,7 +243,7 @@ export default function LandingPage() {
               <div className="sandbox-chips" role="radiogroup" aria-label="Security selection">
                 {[
                   { id: 'safe', label: 'Default (safe)' },
-                  { id: 'local', label: '--enable-local-file-access' },
+                  { id: 'local', label: '--allow-local-files' },
                 ].map((s) => (
                   <button
                     key={s.id}
@@ -308,15 +307,25 @@ export default function LandingPage() {
         <div className="landing-bench-copy">
           <p className="landing-bench-kicker">Measured against wkhtmltopdf 0.12.6.1</p>
           <h2 id="landing-bench-heading">
-            Up to {HEADLINE.smallSpeedup.toFixed(0)}x faster
+            Fast as a binary.
             <br />
-            on the same HTML.
+            Dramatically faster as a Go library.
           </h2>
           <p>
-            Generic CLI, identical HTML, median of three process runs. A 2-page invoice is{' '}
-            {formatMs(HEADLINE.smallGowk)} versus {formatMs(HEADLINE.smallWk)}; 500 pages still
-            finish first.
+            On identical HTML, the generic CLI renders a 2-page invoice in {formatMs(HEADLINE.smallGowk)}
+            versus {formatMs(HEADLINE.smallWk)} for wkhtmltopdf. The public Go library renders it
+            in {formatMs(LIBRARY_HEADLINE.ms)} by staying in the process.
           </p>
+          <div className="landing-bench-highlights" aria-label="CLI and library benchmark highlights">
+            <div>
+              <strong>{HEADLINE.smallSpeedup.toFixed(0)}x</strong>
+              <span>CLI · 2 pages</span>
+            </div>
+            <div>
+              <strong>~{LIBRARY_HEADLINE.displayMultiplier}x</strong>
+              <span>Go library · 2 pages</span>
+            </div>
+          </div>
           <Link className="text-link" to="/benchmarks">
             Full benchmark comparison <span aria-hidden="true">→</span>
           </Link>

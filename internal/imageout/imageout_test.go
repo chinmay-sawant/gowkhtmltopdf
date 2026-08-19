@@ -443,7 +443,7 @@ func TestRunEndToEnd(t *testing.T) {
 
 	pngOut := filepath.Join(dir, "out.png")
 
-	cmd := runCommand(t, "--width", "200", "--format", "png", input, pngOut)
+	cmd := runCommand(t, "--width", "200", "--format", "png", "-o", pngOut, input)
 	if err := Run(t.Context(), cmd, io.Discard); err != nil {
 		t.Fatalf("Run png: %v", err)
 	}
@@ -466,7 +466,7 @@ func TestRunEndToEnd(t *testing.T) {
 
 	jpgOut := filepath.Join(dir, "out.jpg")
 
-	cmd = runCommand(t, "--width", "200", "--format", "jpg", "--quality", "30", input, jpgOut)
+	cmd = runCommand(t, "--width", "200", "--format", "jpg", "--quality", "30", "-o", jpgOut, input)
 	if err := Run(t.Context(), cmd, io.Discard); err != nil {
 		t.Fatalf("Run jpg: %v", err)
 	}

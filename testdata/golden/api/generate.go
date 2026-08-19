@@ -73,41 +73,24 @@ func run(args []string) error { //nolint:cyclop,funlen // generator phases
 		*output = defaultOutput
 	}
 
-	converter := gowkhtmltopdf.NewConverter()
-
-	for _, setting := range []struct {
-		name  string
-		value string
-	}{
-		{name: "size.pagesize", value: "A4"},
-		{name: "margin.top", value: "0"},
-		{name: "margin.right", value: "0"},
-		{name: "margin.bottom", value: "0"},
-		{name: "margin.left", value: "0"},
-		{name: "web.background", value: "true"},
-		{name: "smartshrinking", value: "false"},
-	} {
-		if err := converter.Global().Set(setting.name, setting.value); err != nil {
-			return fmt.Errorf("set global %q: %w", setting.name, err)
-		}
+	zero := 0.0
+	background := true
+	smartShrinking := false
+	document := gowkhtmltopdf.Document{
+		Pages:    []gowkhtmltopdf.Page{{Source: gowkhtmltopdf.File(input)}},
+		PageSize: "A4",
+		Margin: gowkhtmltopdf.Margin{
+			Top: zero, Right: zero, Bottom: zero, Left: zero,
+		},
+		Background:      &background,
+		SmartShrinking:  &smartShrinking,
+		AllowLocalFiles: true,
 	}
 
-	if err := converter.Global().Set("enablelocalfileaccess", "true"); err != nil {
-		return fmt.Errorf("enable local file access: %w", err)
-	}
-
-	page := gowkhtmltopdf.NewObjectSettings().SetPage(input)
-	if err := page.Set("load.blocklocalfileaccess", "false"); err != nil {
-		return fmt.Errorf("allow local template: %w", err)
-	}
-
-	converter.AddObject(page)
-
-	if err := converter.Convert(context.Background()); err != nil {
+	pdf, err := document.PDF(context.Background())
+	if err != nil {
 		return fmt.Errorf("convert template: %w", err)
 	}
-
-	pdf := converter.Output()
 	if got := pageCount(pdf); got != wantPages {
 		return fmt.Errorf("%w: %s pages = %d, want %d", errUnexpectedPageCount, input, got, wantPages)
 	}

@@ -116,6 +116,8 @@ func TestFixture49PosterMetaDoesNotOverlapCopy(t *testing.T) {
 
 	if copyBox == nil || meta == nil {
 		t.Fatal("poster copy/meta boxes missing")
+
+		return
 	}
 
 	var lastCopyBottom float64
@@ -144,7 +146,9 @@ func TestFixture52PassHeadersStayInsideCards(t *testing.T) {
 		passBox := passes[idx]
 		kindBox := kindNode
 		if passBox == nil || kindBox == nil {
-			t.Fatalf("pass %d missing layout box", idx)
+			t.Errorf("pass %d missing layout box", idx)
+
+			continue
 		}
 		for _, op := range res.Ops[passBox.opStart : passBox.opEnd+1] {
 			if op.Kind == OpText && strings.Contains(strings.ToLower(op.Text), "boarding pass") {
@@ -191,7 +195,9 @@ func TestFixture55StatusPillsStayInsideCells(t *testing.T) {
 		}
 		cellBox := fixture56BoxByNode(res.root, cellNode)
 		if cellBox == nil {
-			t.Fatalf("status %d missing pill/cell box", idx)
+			t.Errorf("status %d missing pill/cell box", idx)
+
+			continue
 		}
 		if statusBox.x < cellBox.x-0.01 || statusBox.x+statusBox.w > cellBox.x+cellBox.w+0.01 {
 			t.Fatalf("status %d overflows cell: status=%+v cell=%+v", idx, statusBox, cellBox)

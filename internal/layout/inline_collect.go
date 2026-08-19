@@ -735,7 +735,7 @@ func isAllWhitespace(s string) bool {
 // in place, returning the surviving prefix.
 //
 //nolint:cyclop // per-item merge decision: image/break/href/style compare plus in-place compaction
-func coalesceTextItems(line []inlineItem) []inlineItem {
+func (e *engine) coalesceTextItems(line []inlineItem) []inlineItem {
 	if len(line) < two {
 		return line
 	}
@@ -750,6 +750,7 @@ func coalesceTextItems(line []inlineItem) []inlineItem {
 		mergeable := writeIdx > 0 &&
 			!cur.img && !line[writeIdx-1].img && !cur.forceBreak &&
 			cur.href == line[writeIdx-1].href &&
+			cur.chrome == line[writeIdx-1].chrome &&
 			sameInlineStyle(line[writeIdx-1].style, cur.style)
 
 		if mergeable {
@@ -764,6 +765,13 @@ func coalesceTextItems(line []inlineItem) []inlineItem {
 			prev := &line[writeIdx-1]
 			// first item keeps marginL; last item's marginR wins
 			prev.w += cur.w
+			if prev.chrome {
+				// Each collected word includes its own inline padding/border in
+				// w. A coalesced run paints one shared chrome box, so remove the
+				// duplicate chrome contributed by the newly merged item.
+				prev.w -= e.inlineChromeLeft(prev.style) + e.inlineChromeRight(prev.style)
+			}
+
 			prev.marginR = cur.marginR
 
 			continue

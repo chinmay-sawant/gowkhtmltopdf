@@ -1,5 +1,4 @@
-// Command pdf converts one HTML file to PDF through the public
-// gowkhtmltopdf library API.
+// Command pdf converts one HTML file to PDF through the target Document API.
 //
 // Usage:
 //
@@ -7,10 +6,10 @@
 //
 // Options:
 //
-//	--page-size <name>            e.g. A4, Letter (default A4)
-//	--orientation <p|l>           portrait or landscape
-//	--margin-top <mm>             top margin in mm
-//	--enable-local-file-access    allow local files (needed for file inputs)
+//	--page-size <name>          e.g. A4, Letter (default A4)
+//	--orientation <p|l>         portrait or landscape
+//	--margin-top <mm>           top margin in mm
+//	--allow-local-files         allow local files (needed for file inputs)
 package main
 
 import (
@@ -19,6 +18,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
 
 	gowkhtmltopdf "github.com/chinmay-sawant/gowkhtmltopdf"
 )
@@ -27,11 +27,11 @@ func usage() {
 	fmt.Fprintln(os.Stderr, `usage: pdf [options] <input.html> <output.pdf>
 
 options:
-  --page-size <name>           e.g. A4, Letter (default A4)
-  --orientation <p|l>          portrait or landscape
-  --margin-top <mm>            top margin in mm
-  --enable-local-file-access   allow local files (needed for file inputs)
-  --help                       show this help`)
+  --page-size <name>          e.g. A4, Letter (default A4)
+  --orientation <p|l>         portrait or landscape
+  --margin-top <mm>           top margin in mm
+  --allow-local-files         allow local files (needed for file inputs)
+  --help                      show this help`)
 }
 
 func main() {
@@ -47,7 +47,7 @@ func run(argv []string) error {
 	pageSize := fs.String("page-size", "A4", "e.g. A4, Letter")
 	orientation := fs.String("orientation", "portrait", "portrait or landscape")
 	marginTop := fs.String("margin-top", "", "top margin in mm")
-	localFiles := fs.Bool("enable-local-file-access", false, "allow local files (needed for file inputs)")
+	allowLocalFiles := fs.Bool("allow-local-files", false, "allow local files (needed for file inputs)")
 	if err := fs.Parse(argv); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
@@ -58,40 +58,36 @@ func run(argv []string) error {
 		usage()
 		return fmt.Errorf("need exactly one input and one output file")
 	}
-	input, output := fs.Arg(0), fs.Arg(1)
 
-	c := gowkhtmltopdf.NewConverter()
-	mustSet := func(name, value string) error {
-		if err := c.Global().Set(name, value); err != nil {
-			return fmt.Errorf("%s: %w", name, err)
-		}
-		return nil
-	}
-	if err := mustSet("size.pagesize", *pageSize); err != nil {
-		return err
-	}
-	if err := mustSet("orientation", *orientation); err != nil {
-		return err
-	}
+	var topMargin float64
 	if *marginTop != "" {
-		if err := mustSet("margin.top", *marginTop); err != nil {
-			return err
+		parsed, err := strconv.ParseFloat(*marginTop, 64)
+		if err != nil {
+			return fmt.Errorf("margin-top: %w", err)
 		}
+		topMargin = parsed
 	}
 
-	obj := gowkhtmltopdf.NewObjectSettings().SetPage(input)
-	if *localFiles {
-		c.EnableLocalFileAccess()
-		obj.EnableLocalFileAccess()
+	doc := gowkhtmltopdf.Document{
+		Pages: []gowkhtmltopdf.Page{{
+			Source: gowkhtmltopdf.Content{File: fs.Arg(0)},
+		}},
+		PageSize:        *pageSize,
+		Orientation:     *orientation,
+		Margin:          gowkhtmltopdf.Margin{Top: topMargin},
+		AllowLocalFiles: *allowLocalFiles,
 	}
-	c.AddObject(obj)
 
-	if err := c.Convert(context.Background()); err != nil {
+	output, err := os.Create(fs.Arg(1))
+	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(output, c.Output(), 0o644); err != nil {
+	defer output.Close()
+
+	if err := doc.WritePDF(context.Background(), output); err != nil {
 		return err
 	}
-	fmt.Printf("pdf: wrote %s (%d bytes)\n", output, len(c.Output()))
+
+	fmt.Printf("pdf: wrote %s\n", fs.Arg(1))
 	return nil
 }

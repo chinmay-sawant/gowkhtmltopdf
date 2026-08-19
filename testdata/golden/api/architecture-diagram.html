@@ -343,13 +343,13 @@
     </header>
 
     <h2>The request path is explicit at every seam.</h2>
-    <p class="lede">The converter owns configuration and output. Each page object owns its source and local overrides. The context gives callers a cancellation and deadline boundary.</p>
+    <p class="lede">The Document owns typed configuration and the output boundary. Each Page owns its Content source and local overrides. The context gives callers a cancellation and deadline boundary.</p>
 
     <div class="diagram">
       <div class="diagram-row">
         <div class="diagram-box accent"><h3>Host service</h3><p>HTTP handler, job worker, or CLI wrapper</p></div>
         <div class="arrow">→</div>
-        <div class="diagram-box"><h3>Converter</h3><p>Global settings + ordered objects</p></div>
+        <div class="diagram-box"><h3>Document</h3><p>Typed options + ordered pages</p></div>
         <div class="arrow">→</div>
         <div class="diagram-box"><h3>Run context</h3><p>ctx, hooks, resource policy</p></div>
       </div>
@@ -371,9 +371,9 @@
       <section class="panel">
         <h3>Ownership rules</h3>
         <ul>
-          <li><code>AddObject</code> copies public settings before conversion.</li>
-          <li><code>Output</code> returns a copy of the completed bytes.</li>
-          <li>A converter is used by one conversion flow at a time.</li>
+          <li><code>Document.WritePDF</code> clones public data at the adapter boundary.</li>
+          <li><code>Document.PDF</code> returns a copy of the completed bytes.</li>
+          <li>A document is used by one conversion flow at a time.</li>
           <li>Failures return as errors before partial output is published.</li>
         </ul>
       </section>
@@ -452,7 +452,7 @@
       <section class="panel">
         <span class="tag">ACL</span>
         <h3>Local resources</h3>
-        <p>Local-file access is blocked by default. The global enable flag and object-level unblock form an explicit pair.</p>
+        <p>Local-file access is blocked by default. <code>AllowLocalFiles</code> is the explicit typed switch.</p>
       </section>
       <section class="panel">
         <span class="tag">CTX</span>
@@ -466,12 +466,11 @@
       </section>
     </div>
 
-    <div class="code"><span class="accent-text">converter</span> := gowkhtmltopdf.NewConverter()<br>
-      converter.Global().Set("enablelocalfileaccess", "true")<br>
-      <span class="accent-text">page</span> := gowkhtmltopdf.NewObjectSettings().SetPage(inputPath)<br>
-      page.Set("load.blocklocalfileaccess", "false")<br>
-      converter.AddObject(page)<br>
-      <span class="accent-text">err</span> := converter.Convert(ctx)</div>
+    <div class="code"><span class="accent-text">doc</span> := gowkhtmltopdf.Document{<br>
+      &nbsp;&nbsp;Pages: []gowkhtmltopdf.Page{{Source: gowkhtmltopdf.File(inputPath)}},<br>
+      &nbsp;&nbsp;AllowLocalFiles: true,<br>
+      }<br>
+      <span class="accent-text">err</span> := doc.WritePDF(ctx, output)</div>
 
     <h3>Failure boundaries</h3>
     <table>

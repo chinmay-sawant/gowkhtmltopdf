@@ -47,6 +47,7 @@ func TestFixture56Domain03HasNoBlueTopRail(t *testing.T) { //nolint:paralleltest
 	box := fixture56BoxByNode(res.root, d03)
 	if box == nil {
 		t.Fatal("domain-03 missing")
+		return
 	}
 
 	pageTop := float64(int(box.y/contentH)) * contentH
@@ -268,6 +269,7 @@ func checkDomain08ProgressGreen(t *testing.T, res *Result, root *html.Node) {
 	pbox := fixture56BoxByNode(res.root, progress)
 	if pbox == nil {
 		t.Fatal("d0n-progress missing")
+		return
 	}
 	for i := pbox.opStart; i <= pbox.opEnd && i < len(res.Ops); i++ {
 		paintOp := res.Ops[i]
@@ -287,6 +289,7 @@ func checkDomain09TopChromeSync(t *testing.T, res *Result, root *html.Node) {
 	}))
 	if d09 == nil {
 		t.Fatal("domain-09 missing")
+		return
 	}
 	if math.Abs(d09.y-res.Ops[d09.opStart].Y) <= 1 {
 		return

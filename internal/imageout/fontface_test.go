@@ -137,7 +137,7 @@ func TestFontFaceLocalUsesCustom(t *testing.T) {
 	}
 
 	pngOut := filepath.Join(dir, "out.png")
-	cmd := runCommand(t, "--width", "200", "--format", "png", htmlPath, pngOut)
+	cmd := runCommand(t, "--width", "200", "--format", "png", "-o", pngOut, htmlPath)
 
 	var log bytes.Buffer
 

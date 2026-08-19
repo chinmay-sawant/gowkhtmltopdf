@@ -17,7 +17,8 @@ paint → write). Direct modules are allowlisted:
 shaping) and [`tdewolff/canvas`](https://github.com/tdewolff/canvas) (SVG
 rasterization). The product is HTML templates and documents, not Chrome visual parity.
 
-**Status:** **v0.2.3** (current release). Opt-in PDF 1.7 / 2.0 and PDF/A +
+**Status:** **v0.2.4** (current release). The native Document API and explicit
+CLI grammar are now the supported surface. Opt-in PDF 1.7 / 2.0 and PDF/A +
 PDF/UA profiles. **License:** [MIT](LICENSE).
 
 ## What it is for
@@ -39,8 +40,8 @@ Requires Go 1.26+.
 
 ```sh
 make build
-./bin/gowkhtmltopdf --enable-local-file-access \
-  testdata/golden/fixture-01-simple-invoice.html /tmp/invoice.pdf
+./bin/gowkhtmltopdf --allow-local-files -o /tmp/invoice.pdf \
+  testdata/golden/fixture-01-simple-invoice.html
 ```
 
 Committed samples live in [output/](output/) (`make samples`).
@@ -55,6 +56,7 @@ Install, flags, and HTTP URLs: [getting-started.md](documentation/getting-starte
 | [documentation/getting-started.md](documentation/getting-started.md) | Install and first conversion |
 | [documentation/cli.md](documentation/cli.md) | CLI grammar and flags |
 | [documentation/library-api.md](documentation/library-api.md) | Go library API |
+| [documentation/MIGRATION-0.2.4.md](documentation/MIGRATION-0.2.4.md) | 0.2.3 library/CLI to the 0.2.4 Document API |
 | [documentation/architecture.md](documentation/architecture.md) | Package map and pipeline |
 | [documentation/architecture/README.md](documentation/architecture/README.md) | Deep-dive architecture notes |
 | [documentation/fidelity.md](documentation/fidelity.md) | Fidelity tiers and claims language |
@@ -75,21 +77,27 @@ Install, flags, and HTTP URLs: [getting-started.md](documentation/getting-starte
 | [plans/README.md](plans/README.md) | Implementation ledger index |
 | [LICENSE](LICENSE) | MIT license |
 
-## Library
+## Library (0.2.4 target)
+
+The 0.2.4 plan replaces the wkhtml-shaped public surface with
+`Document`/`ImageDocument`. The target symbols are present in the working tree
+and the current test suite is green; the old exports remain until the hard
+break closes. The following is the target shape.
 
 ```go
-var out bytes.Buffer
-err := gowkhtmltopdf.RunPDF(ctx, &gowkhtmltopdf.PDFRequest{
-    Objects: []*gowkhtmltopdf.ObjectSettings{
-        gowkhtmltopdf.NewObjectSettings().SetBody(
-            []byte(`<html><body><h1>Invoice</h1></body></html>`), ""),
-    },
-    Output: &out,
-})
+doc := gowkhtmltopdf.Document{
+    Pages: []gowkhtmltopdf.Page{{
+        Source: gowkhtmltopdf.Content{
+            HTML: []byte(`<html><body><h1>Invoice</h1></body></html>`),
+        },
+    }},
+}
+pdfBytes, err := doc.PDF(ctx)
 ```
 
-Local files, `Converter`, TOC objects, and network policy:
+Local files, TOC/cover fields, network policy, and the migration table:
 [documentation/library-api.md](documentation/library-api.md).
+[documentation/MIGRATION-0.2.4.md](documentation/MIGRATION-0.2.4.md).
 
 ## Performance
 
@@ -107,7 +115,7 @@ three process runs after one warmup.
 
 Faster at every tested size. Peak RSS is lower through 100 pages and
 higher from 200 pages on the generic path. Full matrix, RSS, PDF sizes,
-in-process `go test -bench` rows, and historical snapshots:
+internal-engine and public-library `go test -bench` rows, and historical snapshots:
 
 - [testdata/golden/benchmarks/README.md](testdata/golden/benchmarks/README.md)
 - [documentation/performance.md](documentation/performance.md)
@@ -117,6 +125,8 @@ Reproduce:
 ```sh
 make bench-cli-compare
 make bench
+make bench-engine
+make bench-lib
 ```
 
 ## Development

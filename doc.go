@@ -1,12 +1,19 @@
-// Package gowkhtmltopdf converts HTML documents to PDF (and to raster
-// images) from Go. It is a pure-Go reimplementation of the wkhtmltopdf
-// command-line tools: no cgo, no browser process, and no Qt/WebKit. The
-// engine produces PDF 1.4 by default, with opt-in support for PDF 1.7, PDF 2.0,
-// and PDF/A-3a/4 + PDF/UA-1/2 compliance profiles. The runtime is the Go standard library
-// plus two allowlisted pure-Go modules — github.com/go-text/typesetting (OpenType shaping)
-// and github.com/tdewolff/canvas (SVG-as-image rasterization).
+// Package gowkhtmltopdf converts authored HTML documents to PDF and raster
+// images through a pure-Go, no-cgo engine. It does not start a browser,
+// WebKit, Qt, or a native converter process.
 //
-// # Quick start (Preferred typed API)
+// # 0.2.4 library
+//
+// The 0.2.4 library models a PDF as a Document and an image render as an
+// ImageDocument. Content identifies exactly one source kind: in-memory HTML,
+// a local file, or an HTTP(S) URL. Document.WritePDF and Document.PDF validate
+// and render a PDF; ImageDocument.WriteImage and ImageDocument.Image do the
+// corresponding image work.
+//
+// The 0.2.4 migration is a hard break: the old root symbols are removed. See
+// documentation/MIGRATION-0.2.4.md when moving an embedder from 0.2.3.
+//
+// # Quick start (0.2.4)
 //
 //	import (
 //		"context"
@@ -14,69 +21,43 @@
 //		gowkhtmltopdf "github.com/chinmay-sawant/gowkhtmltopdf"
 //	)
 //
-//	out, err := os.Create("report.pdf")
-//	if err != nil {
-//		log.Fatal(err)
-//	}
-//	defer out.Close()
+//	func main() {
+//		out, err := os.Create("report.pdf")
+//		if err != nil {
+//			panic(err)
+//		}
+//		defer out.Close()
 //
-//	req := &gowkhtmltopdf.PDFRequest{
-//		Global: gowkhtmltopdf.NewPdfGlobalOptions().
-//			WithPageSize("A4").
-//			WithPDFVersion("1.7"). // optional: defaults to "1.4"
-//			WithPDFProfile("a3a-ua1"). // optional: "a3a-ua1", "a3a", "ua1"
-//			Build(),
-//		Objects: []*gowkhtmltopdf.ObjectSettings{
-//			gowkhtmltopdf.NewObjectSettings().SetPage("report.html"),
-//		},
-//		Output: out,
-//	}
-//	req.EnableLocalFileAccess() // allow reading local report.html and subresources
-//
-//	if err := gowkhtmltopdf.RunPDF(context.Background(), req); err != nil {
-//		log.Fatal(err)
+//		doc := gowkhtmltopdf.Document{
+//			Pages: []gowkhtmltopdf.Page{{
+//				Source: gowkhtmltopdf.Content{
+//					HTML: []byte("<h1>Report</h1>"),
+//				},
+//			}},
+//			PageSize: "A4",
+//		}
+//		if err := doc.WritePDF(context.Background(), out); err != nil {
+//			panic(err)
+//		}
 //	}
 //
-// # Settings
+// # Content and security
 //
-// Global and object settings can be configured via typed builders (such as
-// PdfGlobalOptions) or wkhtmltopdf-style dotted names (e.g. "size.pagesize",
-// "margin.top", "orientation", "pdfversion", "web.background", "header.left").
-// The exact dotted name list mirrors the CLI surface documented by
-// gowkhtmltopdf --help.
+// A Content value must have exactly one of HTML, File, or URL set. Base is
+// valid with HTML and resolves relative subresources. Local file reads are
+// disabled by default; Document.AllowLocalFiles is the one public switch for
+// enabling the local-file policy. NetworkPolicy controls remote fetches.
 //
-// # Local file access
+// # Validation and ownership
 //
-// The security ACL blocks local file reads by default. To convert a local
-// file, call EnableLocalFileAccess() on the request, converter, or settings:
+// Validate, WritePDF, PDF, WriteImage, and Image return errors for invalid
+// user configuration before the engine runs. The write boundary owns a copy
+// of caller-provided HTML and option slices. Use errors.Is with package
+// sentinels. A Document with a TOC but no cover or body page is invalid.
 //
-//	req.EnableLocalFileAccess()
+// # Versioning
 //
-// Or configure the dotted keys explicitly:
-//
-//	c.Global().Set("enablelocalfileaccess", "true")
-//	obj.Set("load.blocklocalfileaccess", "false")
-//
-// # In-memory HTML
-//
-// In-memory documents are an explicit source kind: SetBody (and the
-// ConvertHTML / AddHTML helpers) mark the object as inline HTML, so no URL
-// guessing is applied and an optional base URL resolves relative
-// subresources:
-//
-//	c.AddHTML([]byte("<html>…</html>"), "https://example.com/templates/")
-//
-// Image mode uses the same source kind on the page object:
-//
-//	img := gowkhtmltopdf.NewImageConverter()
-//	img.Object().SetBody([]byte("<html>…</html>"), "")
-//
-// An empty base leaves relative subresources unresolvable.
-//
-// # Thread safety
-//
-// A Converter (and ImageConverter) is not safe for concurrent Convert calls:
-// use one converter per conversion, or guard access with a mutex. Settings
-// may be freely read while idle. Each Convert run is fully context-aware;
-// cancel the context to abort an in-flight conversion.
+// LibraryVersion is the wkhtmltopdf compatibility identifier and is distinct
+// from the project release in VERSION. PDFVersion selects a file version; it
+// does not by itself claim PDF/A or PDF/UA conformance.
 package gowkhtmltopdf

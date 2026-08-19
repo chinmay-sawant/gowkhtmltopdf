@@ -401,7 +401,7 @@ attack path for hostile HTML, so its posture matters:
   `@font-face src` via `FontFaceURLs` (and only through the loader's policy);
   `background: url(...)` etc. are inert raw strings. Media queries cannot
   probe anything beyond the numbers the caller supplies.
-- **The `--enable-local-file-access` / `--allow` story applies at load, not
+- **The `--allow-local-files` / `--allow` story applies at load, not
   css**; css just consumes whatever sheets the loader delivers.
 - Fuzz-relevant surface: `Parse`, `ParseSelectors`, `ParseInline`,
   `ParseLength`, `ParseColor`, `LengthToPt`, `MediaMatches` — all pure string

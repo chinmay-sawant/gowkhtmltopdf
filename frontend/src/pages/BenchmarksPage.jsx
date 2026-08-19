@@ -5,16 +5,24 @@ import Footer from '../components/Footer'
 import {
   CHART_PAGES,
   CLI_ROWS,
+  externalSpeedup,
   HEADLINE,
+  LIBRARY_HEADLINE,
+  LIBRARY_IMAGE,
+  LIBRARY_PDF,
+  INPROC_SNAPSHOT_DATE,
   INPROC_INLINE,
   INPROC_PDF_GENERIC,
   INPROC_TEMPLATE_GENERIC,
   INPROC_WEB_FETCH,
+  PUPPETEER_ROWS,
   SNAPSHOT,
+  WEASYPRINT_ROWS,
   formatKiB,
   formatMs,
   formatRssDelta,
   formatSpeedup,
+  relativeMultiplier,
   rssDelta,
   speedup,
 } from '../data/benchmarks'
@@ -210,6 +218,47 @@ function CompareTable({ activeFilter }) {
   )
 }
 
+function ExternalTable({ engine, rows, rssNote }) {
+  return (
+    <section className="table-block">
+      <h3 className="table-block-heading">gowkhtmltopdf vs {engine}</h3>
+      <div className="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Pages</th>
+              <th scope="col">gowk time</th>
+              <th scope="col">{engine} time</th>
+              <th scope="col">Speedup</th>
+              <th scope="col">gowk RSS</th>
+              <th scope="col">{engine} RSS</th>
+              <th scope="col">gowk PDF</th>
+              <th scope="col">{engine} PDF</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.pages}>
+                <th scope="row">{row.pages}</th>
+                <td>{formatMs(row.gowkMs)}</td>
+                <td>{formatMs(row.engineMs)}</td>
+                <td>
+                  <span className="bench-speedup">{formatSpeedup(externalSpeedup(row))}</span>
+                </td>
+                <td>{formatKiB(row.gowkRss)}</td>
+                <td>{formatKiB(row.engineRss)}</td>
+                <td>{formatPdfSize(row.gowkBytes)}</td>
+                <td>{formatPdfSize(row.engineBytes)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="section-aside bench-explanation">{rssNote}</p>
+    </section>
+  )
+}
+
 function InprocTable({ heading, rows, unit }) {
   return (
     <section className="table-block">
@@ -243,6 +292,49 @@ function InprocTable({ heading, rows, unit }) {
                 <td key={row.n}>{row.allocs}</td>
               ))}
             </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  )
+}
+
+function RelativeTimingTable({ heading, rows, pathLabel }) {
+  return (
+    <section className="table-block">
+      <h3 className="table-block-heading">{heading}</h3>
+      <p className="section-aside bench-explanation">
+        Indicative ratio: <code>wkhtmltopdf CLI time / {pathLabel} time</code>. The CLI includes
+        process startup and file handling; the Go path runs directly in the current process.
+      </p>
+      <div className="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Pages</th>
+              <th scope="col">wkhtmltopdf CLI</th>
+              <th scope="col">{pathLabel}</th>
+              <th scope="col">Indicative multiplier</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => {
+              const baseline = CLI_ROWS.find((item) => item.pages === row.n)
+              const multiplier = relativeMultiplier(row)
+
+              return (
+                <tr key={row.n}>
+                  <th scope="row">{row.n}</th>
+                  <td>{baseline ? formatMs(baseline.wkMs) : '—'}</td>
+                  <td>{formatMs(row.ms)}</td>
+                  <td>
+                    <span className="bench-speedup">
+                      {multiplier === null ? '—' : formatSpeedup(multiplier)}
+                    </span>
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
@@ -284,7 +376,7 @@ function HardwareSpecCard() {
           <div>
             <div className="bench-spec-title">Hardware & Test Environment Specification</div>
             <div className="bench-spec-subtitle">
-              AMD EPYC / x86_64 · Linux 6.x · cgo=0 (Pure Go) vs Qt WebKit 0.12.6.1
+              13th Gen Intel Core i7-13700HX · Linux WSL2 · cgo=0 (Pure Go) vs Qt WebKit 0.12.6.1
             </div>
           </div>
         </div>
@@ -312,7 +404,7 @@ function HardwareSpecCard() {
           <div className="bench-spec-grid">
             <div className="bench-spec-item">
               <span className="bench-spec-label">Host Processor</span>
-              <span className="bench-spec-value">AMD EPYC / x86_64 (24 dedicated CPU cores, AVX-512)</span>
+              <span className="bench-spec-value">13th Gen Intel Core i7-13700HX (24 CPUs, WSL2)</span>
             </div>
             <div className="bench-spec-item">
               <span className="bench-spec-label">Operating System</span>
@@ -321,7 +413,7 @@ function HardwareSpecCard() {
             <div className="bench-spec-item">
               <span className="bench-spec-label">gowkhtmltopdf Engine</span>
               <span className="bench-spec-value">
-                <code>CGO_ENABLED=0</code> Pure-Go generic binary (v0.2.0, go1.26.4), zero native C bindings
+                <code>CGO_ENABLED=0</code> Pure-Go generic binary (v0.2.4, go1.26.4), zero native C bindings
               </span>
             </div>
             <div className="bench-spec-item">
@@ -356,7 +448,7 @@ function HardwareSpecCard() {
           <div className="bench-spec-footnote">
             <span>Snapshot Tag: {SNAPSHOT.date}</span>
             <span>·</span>
-            <span>Reproduce locally with <code>make bench-cli-compare</code></span>
+            <span>Reproduce locally with <code>make bench</code></span>
           </div>
         </div>
       )}
@@ -393,8 +485,8 @@ export default function BenchmarksPage() {
           <p className="lede">
             The current generic <code>gowkhtmltopdf</code> binary was timed against the installed
             wkhtmltopdf {SNAPSHOT.wkhtml.replace('wkhtmltopdf ', '')} on the same report fixture.
-            Faster at every tested size. The largest gap is on short documents, where WebKit pays
-            a cold-start tax that the in-process Go engine does not.
+            It is faster at every tested size. The public Go library removes the process boundary
+            altogether: its 2-page result is about 70x faster than the wkhtmltopdf CLI baseline.
           </p>
         </div>
         <div className="bench-hero-stats" aria-label="Headline comparison">
@@ -413,6 +505,10 @@ export default function BenchmarksPage() {
           <div>
             <strong>every size</strong>
             <span>2 through 500 pages, gowk was the faster process</span>
+          </div>
+          <div>
+            <strong>~{LIBRARY_HEADLINE.displayMultiplier}x</strong>
+            <span>2 pages · public Go library vs wkhtmltopdf CLI</span>
           </div>
         </div>
       </section>
@@ -444,7 +540,7 @@ export default function BenchmarksPage() {
         <div className="section-heading-row">
           <div>
             <h2 id="bench-chart-heading">Direct process comparison</h2>
-            <p className="section-aside">
+            <p className="section-aside bench-explanation">
               Same HTML, same flags (<code>{SNAPSHOT.flags}</code>), median of three timed runs after
               one warmup. {activeMetricObj.desc}.
             </p>
@@ -520,6 +616,28 @@ export default function BenchmarksPage() {
         <CompareTable activeFilter={activeFilter} />
       </section>
 
+      <section className="bench-section" aria-labelledby="bench-external-heading">
+        <div className="section-heading-row">
+          <div>
+            <h2 id="bench-external-heading">External renderer comparisons</h2>
+            <p className="lede">
+              The same report fixture was printed through WeasyPrint and Puppeteer/Chrome. These
+              matrices use the external harness&apos;s 2, 10, 50, and 100 page sizes.
+            </p>
+          </div>
+        </div>
+        <ExternalTable
+          engine="WeasyPrint"
+          rows={WEASYPRINT_ROWS}
+          rssNote="WeasyPrint RSS is the measured process peak from /usr/bin/time %M."
+        />
+        <ExternalTable
+          engine="Puppeteer / Chrome"
+          rows={PUPPETEER_ROWS}
+          rssNote="Puppeteer RSS is the peak process-tree RSS for the Node driver and headless Chrome descendants; it is not directly equivalent to a single-process %M reading."
+        />
+      </section>
+
       <aside className="callout callout-info" role="note">
         <div className="callout-marker" aria-hidden="true">
           i
@@ -538,13 +656,18 @@ export default function BenchmarksPage() {
 
       <section className="bench-section" aria-labelledby="bench-inproc-heading">
         <div className="section-heading-row">
-          <h2 id="bench-inproc-heading">In-process Go benchmarks</h2>
+          <h2 id="bench-inproc-heading">In-process Go benchmarks ({INPROC_SNAPSHOT_DATE})</h2>
           <p className="section-aside">
             <code>go test -bench</code> inside the test process. <code>B/op</code> is cumulative
             allocation traffic, not peak RSS.
           </p>
         </div>
         <InprocTable heading="PDF pages (generic request)" rows={INPROC_PDF_GENERIC} unit="Pages" />
+        <RelativeTimingTable
+          heading="In-process PDF multiplier vs wkhtmltopdf CLI"
+          rows={INPROC_PDF_GENERIC}
+          pathLabel="in-process Go PDF"
+        />
         <InprocTable
           heading="Template + PDF pages (generic request)"
           rows={INPROC_TEMPLATE_GENERIC}
@@ -554,6 +677,24 @@ export default function BenchmarksPage() {
         <InprocTable heading="Inline image tiles" rows={INPROC_INLINE} unit="Tiles" />
       </section>
 
+      <section className="bench-section" aria-labelledby="bench-library-heading">
+        <div className="section-heading-row">
+          <h2 id="bench-library-heading">Public Go library benchmarks ({INPROC_SNAPSHOT_DATE})</h2>
+          <p className="section-aside">
+            <code>make bench-lib</code> calls <code>Document.WritePDF</code> and{' '}
+            <code>ImageDocument.WriteImage</code> directly, without starting the CLI or reading
+            HTML from disk.
+          </p>
+        </div>
+        <InprocTable heading="Public PDF pages" rows={LIBRARY_PDF} unit="Pages" />
+        <RelativeTimingTable
+          heading="Public library PDF multiplier vs wkhtmltopdf CLI"
+          rows={LIBRARY_PDF}
+          pathLabel="public Go library PDF"
+        />
+        <InprocTable heading="Public image tiles" rows={LIBRARY_IMAGE} unit="Tiles" />
+      </section>
+
       <section className="bench-section bench-method" aria-labelledby="bench-method-heading">
         <h2 id="bench-method-heading">How this was measured</h2>
         <ul>
@@ -561,7 +702,8 @@ export default function BenchmarksPage() {
             Host: {SNAPSHOT.host}. Toolchain: {SNAPSHOT.go}. Date: {SNAPSHOT.date}.
           </li>
           <li>
-            {SNAPSHOT.gowk} versus {SNAPSHOT.wkhtml}.
+            {SNAPSHOT.gowk} versus {SNAPSHOT.wkhtml} for the CLI matrix. WeasyPrint and Puppeteer
+            use the external print scripts documented in the benchmark README.
           </li>
           <li>
             Fixture: {SNAPSHOT.fixture}. Method: {SNAPSHOT.method}.
@@ -570,8 +712,10 @@ export default function BenchmarksPage() {
           <li>Numbers are a labeled snapshot, not an SLA. Reproduce on your machine.</li>
         </ul>
         <pre>
-          <code>{`make bench-cli-compare
-make bench`}</code>
+          <code>{`make bench
+make bench-engine
+make bench-inprocess  # compatibility alias
+make bench-lib`}</code>
         </pre>
         <p>
           Full tables, historical snapshots, and caveats live in the{' '}

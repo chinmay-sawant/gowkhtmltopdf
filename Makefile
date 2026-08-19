@@ -1,4 +1,4 @@
-.PHONY: test lint lint-frontend build fmt golden golden-update samples clean claim-scan bench bench-cli-compare
+.PHONY: test lint lint-frontend build fmt golden golden-update samples screenshots weasyprint clean claim-scan bench bench-engine bench-lib bench-inprocess bench-cli-compare
 
 # Pure-Go runtime: the standard library plus the allowlisted direct modules
 # below. No cgo, browser, or native converter process is required.
@@ -12,6 +12,9 @@
 # Build with the local toolchain (go1.26.4): golangci-lint refuses to run when the
 # binary's Go version is lower than the module's targeted Go version.
 GOLANGCI_LINT_VERSION ?= v1.64.8
+
+# WeasyPrint CLI used by the `weasyprint` samples target.
+WEASYPRINT ?= weasyprint
 
 test:
 	go test ./...
@@ -94,8 +97,8 @@ golden-update:
 	mkdir -p testdata/golden/out; \
 	output="testdata/golden/out/$${fixture%.html}.pdf"; \
 	echo "Generating $$output from testdata/golden/$$fixture"; \
-	go run ./cmd/gowkhtmltopdf --enable-local-file-access \
-		"testdata/golden/$$fixture" "$$output"; \
+	go run ./cmd/gowkhtmltopdf --allow-local-files \
+		-o "$$output" "testdata/golden/$$fixture"; \
 	echo "Review $$output manually; this target never rewrites committed fixtures."
 
 # Regenerate the sample outputs in output/: one PDF per golden fixture, a
@@ -122,41 +125,118 @@ samples:
 		if [ -n "$$id" ] && [ -f "testdata/golden/$$id-footer.html" ]; then \
 			HF_FLAGS="$$HF_FLAGS --footer-html testdata/golden/$$id-footer.html --margin-bottom -1"; \
 		fi; \
-		go run ./cmd/gowkhtmltopdf --enable-local-file-access $$FONT_FLAGS $$HF_FLAGS "$$f" "output/$$name.pdf"; \
+		go run ./cmd/gowkhtmltopdf --allow-local-files $$FONT_FLAGS $$HF_FLAGS -o "output/$$name.pdf" "$$f"; \
 	done
 	# Version / compliance smokes (unreleased 0.2.2): same two fixtures in four dirs.
 	mkdir -p output/pdf-1.7 output/pdf-1.7-compliance output/pdf-2.0 output/pdf-2.0-compliance
 	rm -f output/pdf-1.7/*.pdf output/pdf-1.7-compliance/*.pdf output/pdf-2.0/*.pdf output/pdf-2.0-compliance/*.pdf
 	for f in testdata/golden/fixture-21-detailed-report.html testdata/golden/fixture-56-architecture-diagram.html; do \
 		name=$$(basename "$$f" .html); \
-		go run ./cmd/gowkhtmltopdf --pdf-version 1.7 --enable-local-file-access "$$f" "output/pdf-1.7/$$name.pdf"; \
-		go run ./cmd/gowkhtmltopdf --pdf-profile a3a-ua1 --enable-local-file-access "$$f" "output/pdf-1.7-compliance/$$name.pdf"; \
-		go run ./cmd/gowkhtmltopdf --pdf-version 2.0 --enable-local-file-access "$$f" "output/pdf-2.0/$$name.pdf"; \
-		go run ./cmd/gowkhtmltopdf --pdf-profile a4-ua2 --enable-local-file-access "$$f" "output/pdf-2.0-compliance/$$name.pdf"; \
+		go run ./cmd/gowkhtmltopdf --pdf-version 1.7 --allow-local-files -o "output/pdf-1.7/$$name.pdf" "$$f"; \
+		go run ./cmd/gowkhtmltopdf --pdf-profile a3a-ua1 --allow-local-files -o "output/pdf-1.7-compliance/$$name.pdf" "$$f"; \
+		go run ./cmd/gowkhtmltopdf --pdf-version 2.0 --allow-local-files -o "output/pdf-2.0/$$name.pdf" "$$f"; \
+		go run ./cmd/gowkhtmltopdf --pdf-profile a4-ua2 --allow-local-files -o "output/pdf-2.0-compliance/$$name.pdf" "$$f"; \
 	done
-	go run ./cmd/gowkhtmltopdf --enable-local-file-access --outline --outline-depth 2 --header-left "gowkhtmltopdf demo - [title]" --header-right "page [page]/[topage]" --footer-center "[section]" toc testdata/golden/fixture-16-invoice-with-css.html output/showcase-toc-hf-outline.pdf
+	go run ./cmd/gowkhtmltopdf --allow-local-files --outline --outline-depth 2 --header-left "gowkhtmltopdf demo - [title]" --header-right "page [page]/[topage]" --footer-center "[section]" --toc -o output/showcase-toc-hf-outline.pdf testdata/golden/fixture-16-invoice-with-css.html
 	# Library-API architecture diagram → output/architecture-diagram.pdf only.
 	# testdata/golden HTML (corpus fixture and api/ template) is not rewritten.
 	go run ./testdata/golden/api
-	go run ./cmd/gowkhtmltoimage --enable-local-file-access testdata/golden/fixture-01-simple-invoice.html output/fixture-01-simple-invoice.png
-	go run ./examples/image --enable-local-file-access --width 1024 testdata/golden/fixture-21-detailed-report.html output/fixture-21-detailed-report.png
+	go run ./cmd/gowkhtmltoimage --allow-local-files -o output/fixture-01-simple-invoice.png testdata/golden/fixture-01-simple-invoice.html
+	go run ./examples/image --allow-local-files --width 1024 testdata/golden/fixture-21-detailed-report.html output/fixture-21-detailed-report.png
 	# Live Wikipedia smoke (network, raw — no --simplify-dom). Soft-fail so offline/CI hosts still get fixture samples.
 	# Operator recipe (not CSS fidelity): --use-system-fonts for IPA fallback; optional --zoom 2/3 densifies
 	# author p{font-size:12pt} toward ~8pt; optional --print-link-underline / --simplify-dom-profile=mediawiki.
 	go run ./cmd/gowkhtmltopdf --use-system-fonts --zoom 0.666667 \
 		'https://en.wikipedia.org/wiki/Ana_de_Armas' \
-		output/wiki-ana-de-armas.pdf \
+		-o output/wiki-ana-de-armas.pdf \
 		|| echo "warning: wiki-ana-de-armas.pdf live smoke skipped (network/fetch failed)"
 	ls -la output/ | awk '{print $$5, $$9}' | tail -30
 
-# In-process Go benchmark matrix (generic + certified-islands, images).
-bench:
+# Regenerate the committed frontend showcase screenshots and WebP thumbnails
+# from the PDFs currently present in output/. Use `make samples` first when the
+# source fixture PDFs themselves need to be refreshed.
+screenshots:
+	python3 scripts/screenshot_showcase.py
+
+# Regenerate the WeasyPrint comparison samples in output/weasyprint/ from the
+# same golden fixtures as `make samples` (one PDF per body fixture, excluding
+# -header.html/-footer.html companions). WeasyPrint has no
+# --header-html/--footer-html; fixture-36's companion header/footer child docs
+# are approximated with @page margin boxes via a user stylesheet
+# (scripts/weasyprint/fixture-36-hf.css). Version / compliance smokes mirror
+# the samples target: fixture-21 and fixture-56 under
+# output/weasyprint/pdf-{1.7,2.0}{,-compliance}/ using --pdf-version and
+# --pdf-variant. Requires the weasyprint CLI: pip3 install --user weasyprint.
+weasyprint:
+	@command -v $(WEASYPRINT) >/dev/null 2>&1 || { \
+		echo "weasyprint not found; install with: pip3 install --user weasyprint" >&2; \
+		exit 1; \
+	}
+	# Wipe regenerable fixture samples only (like `make samples`).
+	mkdir -p output/weasyprint
+	rm -f output/weasyprint/fixture-*.pdf
+	for f in testdata/golden/fixture-*.html; do \
+		case "$$f" in *-header.html|*-footer.html) continue;; esac; \
+		name=$$(basename "$$f" .html); \
+		STYLE_FLAGS=""; \
+		if [ "$$name" = "fixture-36-hf-nested-flex" ]; then \
+			STYLE_FLAGS="-s scripts/weasyprint/fixture-36-hf.css"; \
+		fi; \
+		$(WEASYPRINT) $$STYLE_FLAGS "$$f" "output/weasyprint/$$name.pdf" \
+			|| echo "warning: $$name.pdf failed"; \
+	done
+	# Version / compliance smokes: same two fixtures in four dirs.
+	mkdir -p output/weasyprint/pdf-1.7 output/weasyprint/pdf-1.7-compliance \
+		output/weasyprint/pdf-2.0 output/weasyprint/pdf-2.0-compliance
+	rm -f output/weasyprint/pdf-1.7/*.pdf output/weasyprint/pdf-1.7-compliance/*.pdf \
+		output/weasyprint/pdf-2.0/*.pdf output/weasyprint/pdf-2.0-compliance/*.pdf
+	for f in testdata/golden/fixture-21-detailed-report.html testdata/golden/fixture-56-architecture-diagram.html; do \
+		name=$$(basename "$$f" .html); \
+		$(WEASYPRINT) --pdf-version 1.7 "$$f" "output/weasyprint/pdf-1.7/$$name.pdf"; \
+		$(WEASYPRINT) --pdf-variant pdf/a-2b "$$f" "output/weasyprint/pdf-1.7-compliance/$$name.pdf"; \
+		$(WEASYPRINT) --pdf-version 2.0 "$$f" "output/weasyprint/pdf-2.0/$$name.pdf"; \
+		$(WEASYPRINT) --pdf-variant pdf/ua-2 "$$f" "output/weasyprint/pdf-2.0-compliance/$$name.pdf"; \
+	done
+	ls -la output/weasyprint/ | awk '{print $$5, $$9}' | tail -30
+
+# External process benchmarks against the actual binary. `make bench` builds
+# the CLI, times bin/gowkhtmltopdf against WeasyPrint and Puppeteer through
+# scripts/bench-external.sh, then runs the dedicated wkhtmltopdf comparison.
+# The numbers include process and disk overhead; they are release/operator
+# evidence, not a default `make test` gate. Missing external engines are
+# skipped, but the target fails when none are available. Writes
+# testdata/golden/benchmarks/{weasyprint,puppeteer,cli}-compare.md and
+# -results.csv. Default external page matrix is 2/10/50/100; override with
+# --sizes=2,5,10,20,50,100,200,250,500 or select one engine with
+# --engines=weasyprint. `bench-cli-compare` remains available standalone.
+bench: build
+	./scripts/bench-external.sh
+	$(MAKE) bench-cli-compare
+
+# Internal engine allocation matrix (generic + certified-islands, images).
+# Measures the internal conversion pipeline directly; it is independent of
+# the public library API and external process targets. See
+# testdata/golden/benchmarks/README.md.
+bench-engine:
 	go test ./internal/convert -run '^$$' \
 		-bench 'Benchmark(PDFPages|TemplatePages|WebFetchImage|ImageAssets)$$' \
 		-benchmem -benchtime=1x -count=1
 
-# Process-level CLI comparison against installed wkhtmltopdf. Requires
-# `make build` and wkhtmltopdf on PATH. Writes testdata/golden/benchmarks/cli-compare*.
+# Compatibility alias for the former target name.
+bench-inprocess: bench-engine
+
+# Public library allocation matrix. Measures Document.WritePDF and
+# ImageDocument.WriteImage without starting a CLI or reading an HTML file from
+# disk. The benchmark constructs the public documents before the timer; public
+# validation, mapping, and the full renderer remain inside the timed calls.
+bench-lib:
+	go test . -run '^$$' -bench '^BenchmarkLibrary(PDF|Image)$$' \
+		-benchmem -benchtime=10x -count=1
+
+# The only Makefile entry for the process-level comparison against installed
+# wkhtmltopdf. Requires `make build` and wkhtmltopdf on PATH. Writes
+# testdata/golden/benchmarks/cli-compare*; a missing wkhtmltopdf is documented
+# as a skipped Go test.
 bench-cli-compare: build
 	GOWKHTMLTOPDF_CLI_COMPARE=1 go test ./internal/convert \
 		-run '^TestCompareWithWkhtmltopdfBinary$$' -count=1 -timeout 20m -v

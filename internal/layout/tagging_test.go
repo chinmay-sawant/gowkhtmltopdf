@@ -57,6 +57,8 @@ th, td { border: 1px solid #ccc; padding: 4pt }
 
 	if tableElem == nil {
 		t.Fatal("missing Table StructElem under Document")
+
+		return
 	}
 
 	// 1. Table must contain ONLY Caption and TR elements (NO direct TH or TD)
@@ -154,6 +156,8 @@ func TestStructureTreeListTagging(t *testing.T) {
 
 	if topList == nil {
 		t.Fatal("missing top-level L StructElem under Document")
+
+		return
 	}
 
 	// Top list must have 2 LI children
@@ -186,6 +190,8 @@ func TestStructureTreeListTagging(t *testing.T) {
 
 	if lbody1 == nil {
 		t.Fatal("LI 1 is missing LBody element")
+
+		return
 	}
 
 	var nestedL *pdf.StructElem
@@ -198,6 +204,8 @@ func TestStructureTreeListTagging(t *testing.T) {
 
 	if nestedL == nil {
 		t.Fatal("nested L must be inside LBody element under LI")
+
+		return
 	}
 
 	if len(nestedL.Kids) != 1 || nestedL.Kids[0].Tag != pdf.StructLI {

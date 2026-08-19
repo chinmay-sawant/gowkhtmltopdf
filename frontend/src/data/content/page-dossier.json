@@ -102,7 +102,7 @@
    "sections": [
     {
      "heading": "No scripts means a smaller attack surface",
-     "body": "A converter that never runs scripts cannot be hijacked through them, and the loader enforces that posture: local files are blocked by default and require `--enable-local-file-access` or an explicit `--allow` path, POST bodies go out only via `--post`, and fetches run under timeouts plus a redirect cap (compatibility matrix, section 6; integration-security.md). That reduces several attack classes a scripted engine would add, but it is not a full SSRF firewall: compatible mode still fetches `http://localhost` and RFC1918 hosts by design (`--restrict-network` blocks private dests), and remote-HTML input is trusted, so SSRF-class issues such as CVE-2022-35583 (#5249) remain relevant and are mapped to not implemented."
+     "body": "A renderer that never runs scripts cannot be hijacked through them, and the loader enforces that posture: local files are blocked by default and require `--allow-local-files` or an explicit `--allow` path, POST bodies go out only via operator configuration, and fetches run under timeouts plus a redirect cap. Compatible network mode can still fetch localhost and private destinations; use RestrictedNetworkPolicy for untrusted HTML. Remote HTML remains an egress request, so isolate jobs that accept content you did not author."
     },
     {
      "heading": "Pure Go removes the Qt crash class",

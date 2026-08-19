@@ -47,7 +47,7 @@ func TestCompareWithWkhtmltopdfBinary(t *testing.T) {
 		t.Skip("wkhtmltopdf binary not found in PATH")
 	}
 
-	gowkPath := filepath.Join("..", "..", "bin", "github.com/chinmay-sawant/gowkhtmltopdf")
+	gowkPath := filepath.Join("..", "..", "bin", "gowkhtmltopdf")
 	if _, statErr := os.Stat(gowkPath); statErr != nil {
 		t.Skip("bin/gowkhtmltopdf not found; run make build")
 	}
@@ -69,7 +69,10 @@ func TestCompareWithWkhtmltopdfBinary(t *testing.T) {
 	fmt.Println("PROCESS CLI COMPARISON: gowkhtmltopdf vs wkhtmltopdf")
 	fmt.Printf("gowk:    %s\n", gowkPath)
 	fmt.Printf("wkhtml:  %s (%s)\n", wkPath, wkVersion)
-	fmt.Printf("flags:   --quiet --enable-local-file-access\n")
+	fmt.Printf(
+		"flags:   gowk --quiet --allow-local-files -o OUTPUT INPUT; " +
+			"wkhtml --quiet --enable-local-file-access INPUT OUTPUT\n",
+	)
 	fmt.Printf("runs:    warmup + %d timed (median)\n", runs)
 	fmt.Println(strings.Repeat("=", 96))
 	fmt.Printf(
@@ -180,6 +183,16 @@ func timeCLIOnce(tb testing.TB, bin string, htmlFile string, outPDF string) cliT
 	tb.Helper()
 
 	timeFile := outPDF + ".time"
+	converterArgs := []string{
+		"--quiet",
+	}
+
+	if filepath.Base(bin) == "wkhtmltopdf" {
+		converterArgs = append(converterArgs, "--enable-local-file-access", htmlFile, outPDF)
+	} else {
+		converterArgs = append(converterArgs, "--allow-local-files", "-o", outPDF, htmlFile)
+	}
+
 	args := []string{
 		"-f",
 		cliCompareTimeFormat,
@@ -187,11 +200,8 @@ func timeCLIOnce(tb testing.TB, bin string, htmlFile string, outPDF string) cliT
 		timeFile,
 		"--",
 		bin,
-		"--quiet",
-		"--enable-local-file-access",
-		htmlFile,
-		outPDF,
 	}
+	args = append(args, converterArgs...)
 	cmd := exec.CommandContext(tb.Context(), "/usr/bin/time", args...)
 	cmd.Stderr = os.Stderr
 	start := time.Now()
@@ -354,7 +364,10 @@ func renderCLICompareMarkdown(rows []cliCompareRow, wkVersion string) []byte {
 	markdown.WriteString("Process-level measurement. Each cell is the median of three timed runs after one warmup.\n")
 	markdown.WriteString("Wall time is Go `time.Since` around `/usr/bin/time`; ")
 	markdown.WriteString("RSS is peak resident set from `%M` (KiB).\n")
-	markdown.WriteString("Both binaries used `--quiet --enable-local-file-access` ")
+	markdown.WriteString(
+		"gowkhtmltopdf used `--quiet --allow-local-files -o OUTPUT INPUT`; " +
+			"wkhtmltopdf used its native local-file flags. ",
+	)
 	markdown.WriteString("on the same generated report fixture.\n\n")
 	fmt.Fprintf(&markdown, "- gowkhtmltopdf: `%s` (generic CLI)\n", rows[0].gowkPath)
 	fmt.Fprintf(&markdown, "- wkhtmltopdf: `%s` (%s)\n", rows[0].wkhtmlBin, wkVersion)

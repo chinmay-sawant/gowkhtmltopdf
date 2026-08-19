@@ -40,6 +40,60 @@ func TestLeadingSpaceBetweenInlines(t *testing.T) {
 	}
 }
 
+// Inline backgrounds must stop at the decorated text. They must not cover
+// following plain text when a padded inline element is followed by punctuation
+// and another word on the same line.
+func TestInlineChromeDoesNotCoverFollowingText(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
+	htmlSrc := `<html><body><p>Booleans coerce liberally ` +
+		`(<samp>"" / true / 1 / yes / on</samp>); unknown keys fail loudly.</p></body></html>`
+	cssSrc := `
+body { margin: 0; font-size: 10pt; }
+samp { font-family: monospace; background: #efe9dc; padding: 0.05em 0.3em; border-radius: 4px; }
+`
+	res := layoutHTML(t, htmlSrc, sheet(t, cssSrc))
+
+	var sampText, followingText, chrome Op
+
+	for _, paintOp := range res.Ops {
+		switch {
+		case paintOp.Kind == OpText && strings.Contains(paintOp.Text, `"" / true / 1 / yes / on`):
+			sampText = paintOp
+		case paintOp.Kind == OpText && strings.Contains(paintOp.Text, "); unknown"):
+			followingText = paintOp
+		}
+	}
+
+	for _, paintOp := range res.Ops {
+		matchesChrome := paintOp.Kind == OpFillRect &&
+			fixture56HasRGB(paintOp, 0.9373, 0.9137, 0.8627) &&
+			paintOp.X < sampText.X+0.1 &&
+			paintOp.Y < sampText.Y &&
+			paintOp.Y+paintOp.H > sampText.Y-paintOp.H
+		if !matchesChrome {
+			continue
+		}
+
+		chrome = paintOp
+
+		break
+	}
+
+	if sampText.Text == "" || followingText.Text == "" || chrome.W == 0 {
+		t.Fatalf("missing inline boundary ops: samp=%+v following=%+v chrome=%+v",
+			sampText, followingText, chrome)
+	}
+
+	if chrome.X+chrome.W > followingText.X+4 {
+		t.Fatalf(
+			"inline chrome overlaps following text: chrome right=%.2f following text x=%.2f",
+			chrome.X+chrome.W,
+			followingText.X,
+		)
+	}
+}
+
 // page-break-after:avoid must not land a heading on top of body text that
 // already snapped to the next page (wiki Career subsection page-2 overlap).
 // The overlapping text is often a PRIOR paragraph's continuation, not the

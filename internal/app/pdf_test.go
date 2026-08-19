@@ -151,7 +151,7 @@ func TestRunPDFRestrictNetworkBlocksLoopback(t *testing.T) {
 		"--restrict-network",
 		"--quiet",
 		"http://127.0.0.1/",
-		filepath.Join(t.TempDir(), "out.pdf"),
+		"--output", filepath.Join(t.TempDir(), "out.pdf"),
 	}, cli.ModePDF)
 	if err != nil {
 		t.Fatalf("Parse: %v", err)

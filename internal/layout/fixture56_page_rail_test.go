@@ -39,6 +39,8 @@ func TestFixture56DomainSectionOmitsAccentTopRail(t *testing.T) { //nolint:paral
 	boxNode := fixture56BoxByNode(res.root, section)
 	if boxNode == nil {
 		t.Fatal("domain-04 has no layout box")
+
+		return
 	}
 
 	topRails := make([]Op, 0, 1)

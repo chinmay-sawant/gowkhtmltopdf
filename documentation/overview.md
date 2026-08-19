@@ -15,7 +15,7 @@ standard library plus
 shaping) and [`tdewolff/canvas`](https://github.com/tdewolff/canvas) (SVG
 rasterization). Builds are intended to run with `CGO_ENABLED=0`.
 
-**Status:** **v0.2.3** is the current release (`VERSION`). Phases 0–9 of the
+**Status:** **v0.2.4** is the current release (`VERSION`). Phases 0–9 of the
 [canonical plan](../plans/0.1.0/00-canonical-pure-go-rewrite.md) are implemented.
 Tier 1 and Tier 2 core (phases 10–20) are shipped as a print CSS subset.
 PRs #45–#47 add opt-in `--pdf-version` 1.7 / 2.0 and `--pdf-profile`
@@ -44,7 +44,7 @@ print) are goals, not shipped feature claims — see [fidelity.md](fidelity.md).
 - Local HTML files (ACL opt-in) and HTTP(S) URLs
 - Text and nested HTML headers/footers with `[page]` / `[topage]` placeholders
 - TOC objects and PDF document outlines (bookmarks)
-- In-process embedding from Go (`RunPDF` / `Converter`)
+- In-process embedding from Go (`Document.WritePDF` / `ImageDocument.WriteImage`)
 - Opt-in PDF 1.7 / 2.0 (`--pdf-version` / `WithPDFVersion`) and opt-in PDF/A + PDF/UA profiles (`--pdf-profile` / `WithPDFProfile`). Default output is **unclaimed PDF 1.4**; a version flag is not a conformance claim.
 
 Typical path:
@@ -103,8 +103,8 @@ input (file / URL / inline HTML)
 ```
 
 Orchestration for PDF lives in `internal/convert` (`RenderObjects` →
-`Assemble` → `Finalize`). The public library wraps that in `RunPDF` /
-`NewConverter`. Image mode shares load → parse → style → layout, then
+`Assemble` → `Finalize`). The public library wraps that in `Document` /
+`ImageDocument`. Image mode shares load → parse → style → layout, then
 rasterizes one canvas (no pagination, TOC, outline, copies, or headers).
 
 One-page package map: [architecture.md](architecture.md).
