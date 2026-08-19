@@ -67,16 +67,26 @@ func TestFaceResolveFamilyAliases(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// FaceSet.ResolveFamily is generics / Liberation names / system-ui only.
+	// Legacy display names are not rewritten here.
+	if got := faces.ResolveFamily([]string{"Georgia"}, 400, false); got != nil {
+		t.Error("Georgia alone must not alias to Liberation Serif via FaceSet")
+	}
+
 	if got := faces.ResolveFamily([]string{"Georgia", "serif"}, 400, false); got != faces.Serif {
-		t.Error("Georgia should select the bundled serif face")
+		t.Error("Georgia, serif → Liberation Serif via generic token only")
 	}
 
 	if got := faces.ResolveFamily([]string{"Courier New", "monospace"}, 700, false); got != faces.MonoBold {
-		t.Error("Courier New should select the bundled mono bold face")
+		t.Error("Courier New, monospace → Mono Bold via generic")
 	}
 
 	if got := faces.ResolveFamily([]string{"Arial", "sans-serif"}, 700, false); got != faces.Bold {
-		t.Error("Arial should select the bundled sans bold face")
+		t.Error("Arial, sans-serif → Sans Bold via generic")
+	}
+
+	if got := faces.ResolveFamily([]string{"liberation mono"}, 400, false); got != faces.Mono {
+		t.Error("real Liberation Mono name still resolves")
 	}
 }
 

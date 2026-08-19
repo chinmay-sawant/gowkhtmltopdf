@@ -624,6 +624,43 @@ func clampByte(fVal float64) int {
 	return int(fVal + roundHalfUp)
 }
 
+// ParseFontWeight parses a CSS font-weight descriptor for @font-face.
+// Accepts 100–900 (multiples of 100) and the keywords normal (400) and bold
+// (700). lighter/bolder and other keywords return ok=false.
+func ParseFontWeight(value string) (int, bool) {
+	value = strings.TrimSpace(strings.ToLower(value))
+	switch value {
+	case "normal":
+		return 400, true //nolint:mnd // CSS normal
+	case "bold":
+		return 700, true //nolint:mnd // CSS bold
+	}
+
+	weightNum, err := strconv.Atoi(value)
+	if err != nil {
+		return 0, false
+	}
+
+	if weightNum < 100 || weightNum > 900 || weightNum%100 != 0 {
+		return 0, false
+	}
+
+	return weightNum, true
+}
+
+// ParseFontStyleItalic parses a CSS font-style descriptor for @font-face.
+// normal → false; italic/oblique → true. Unknown values return ok=false.
+func ParseFontStyleItalic(value string) (bool, bool) {
+	switch strings.TrimSpace(strings.ToLower(value)) {
+	case "normal":
+		return false, true
+	case "italic", "oblique":
+		return true, true
+	default:
+		return false, false
+	}
+}
+
 // ParseFontFamily splits a font-family value on commas and trims quotes.
 func ParseFontFamily(value string) []string {
 	var out []string

@@ -21,6 +21,6 @@ claiming-profile gates.
 
 ## Status
 
-**Planned.** `VERSION` remains `0.2.4` until this track (or a sibling 0.2.5
-track) ships and release prep updates it. No checklist row in `font/` is
-complete until code, fixtures, compliance proof, and docs agree.
+**Complete (implementation validated 2026-08-19).** Checklist rows in
+`font/` are closed with `make test` / `make lint` and fixture-55 evidence.
+`VERSION` remains `0.2.4` until release prep tags 0.2.5.

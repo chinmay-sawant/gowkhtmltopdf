@@ -61,11 +61,18 @@ type PageStyle struct {
 	Size   string
 }
 
-// FontFace is one @font-face rule (local src subset).
-// Family and Src are consumed by convert.MergeFontFaces; weight/style are ignored.
+// FontFace is one @font-face rule.
+// Family, Src, Weight, and Italic are consumed by convert.MergeFontFaces.
 type FontFace struct {
 	Family string
 	Src    string // raw src value (may contain url(...) or local(...))
+	// Weight is the CSS font-weight (100–900). Zero means the descriptor was
+	// omitted; registration then keeps the face file's Bold() bit.
+	Weight int
+	// Italic is set when font-style is italic or oblique.
+	Italic bool
+	// HasStyle is true when a font-style descriptor was present.
+	HasStyle bool
 }
 
 // Rule is one rule set: selectors plus a declaration block.
@@ -382,6 +389,15 @@ func parseFontFace(block string) FontFace {
 			}
 		case "src":
 			fontFace.Src = data.Value
+		case "font-weight":
+			if w, ok := ParseFontWeight(data.Value); ok {
+				fontFace.Weight = w
+			}
+		case "font-style":
+			if italic, ok := ParseFontStyleItalic(data.Value); ok {
+				fontFace.Italic = italic
+				fontFace.HasStyle = true
+			}
 		}
 	}
 

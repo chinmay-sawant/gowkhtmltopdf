@@ -4,6 +4,20 @@ All notable changes to gowkhtmltopdf are recorded here. This project follows
 semantic versioning; `VERSION` holds the current release and is stamped into
 binaries at build time (see README "Versioning").
 
+## Unreleased
+
+### Changed
+
+- Font resolution now uses a central `FontResolver`: exact
+  `--font-path` / `@font-face` / registry matches first, author CSS stacks
+  continue in order, and only CSS generics map to bundled Liberation/DejaVu.
+  Legacy display names such as Georgia/Arial are no longer silently aliased.
+- `@font-face` retains `font-weight` / `font-style`; opt-in discovery reports
+  skip reasons; variable fonts (`fvar`) are rejected; embed preflight
+  re-lays-out when an optional face cannot subset/embed.
+- Docs: `documentation/fonts.md`, compatibility matrix, and deferred notes
+  aligned with the shipped contract (`plans/0.2.5/font/`).
+
 ## 0.2.4 (2026-08-18)
 
 ### Breaking

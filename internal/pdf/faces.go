@@ -151,16 +151,26 @@ func (fs *FaceSet) Resolve(weight int, italic bool) *Font {
 	return resolveFamilyFaces(fs.Regular, fs.Bold, fs.Italic, fs.BoldItalic, weight, italic)
 }
 
-// ResolveFamily selects the bundled family corresponding to CSS named and
-// generic families while preserving the first supported family in the list.
+// ResolveFamily selects a bundled face for CSS generics, real Liberation
+// family names, and system-ui only. Legacy display-name aliases such as
+// Georgia/Arial/Courier New are not rewritten — use FontResolver for the
+// full author-stack contract (exact registry → stack → generics → Liberation
+// Sans terminal default).
+//
+//nolint:goconst // CSS generic tokens are duplicated with FontResolver on purpose
+//nolint:goconst // shared CSS tokens with FontResolver
 func (fs *FaceSet) ResolveFamily(families []string, weight int, italic bool) *Font {
+	if fs == nil {
+		return nil
+	}
+
 	for _, family := range families {
 		switch strings.ToLower(strings.Trim(strings.TrimSpace(family), `"'`)) {
-		case "serif", "georgia", "times", "times new roman", "liberation serif":
+		case "serif", "liberation serif":
 			return resolveFamilyFaces(fs.Serif, fs.SerifBold, fs.SerifItalic, fs.SerifBoldItalic, weight, italic)
-		case "monospace", "courier", "courier new", "consolas", "monaco", "liberation mono":
+		case "monospace", "liberation mono":
 			return resolveFamilyFaces(fs.Mono, fs.MonoBold, fs.MonoItalic, fs.MonoBoldItalic, weight, italic)
-		case "sans-serif", "arial", "helvetica", "tahoma", "verdana", "calibri", "liberation sans":
+		case "sans-serif", "liberation sans":
 			return fs.Resolve(weight, italic)
 		case "system-ui":
 			return resolveFamilyFaces(fs.UnicodeFallback, fs.UnicodeFallbackBold, nil, fs.UnicodeFallbackBold, weight, italic)

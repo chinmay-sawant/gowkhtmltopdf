@@ -5,6 +5,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -76,5 +78,55 @@ func TestDocumentAdapterCopiesHTMLAtExecutionBoundary(t *testing.T) {
 	}
 	if got := string(document.Pages[0].Source.HTML); got == string(source) {
 		t.Fatal("document source aliases caller bytes")
+	}
+}
+
+func TestDocumentFontPathsReachPDF(t *testing.T) {
+	t.Parallel()
+
+	fontDir := t.TempDir()
+	src := filepath.Join("internal", "pdf", "assets", "LiberationSans-Regular.ttf")
+	data, err := os.ReadFile(src)
+	if err != nil {
+		t.Fatalf("read asset: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(fontDir, "Face.ttf"), data, 0o600); err != nil {
+		t.Fatalf("write face: %v", err)
+	}
+
+	document := NewDocument(Page{Source: HTML([]byte(
+		`<html><body style="font-family: 'Liberation Sans', sans-serif;"><p>DocFontPath</p></body></html>`,
+	), "")})
+	document.FontPaths = []string{fontDir}
+	document.AllowLocalFiles = true
+
+	pdf, err := document.PDF(t.Context())
+	if err != nil {
+		t.Fatalf("PDF: %v", err)
+	}
+	if !bytes.HasPrefix(pdf, []byte("%PDF-")) {
+		t.Fatal("not a PDF")
+	}
+	if !bytes.Contains(pdf, []byte("/FontFile2")) {
+		t.Fatal("expected embedded font")
+	}
+}
+
+func TestDocumentUseSystemFontsOption(t *testing.T) {
+	t.Parallel()
+
+	document := NewDocument(Page{Source: HTML([]byte(`<html><body><p>sys</p></body></html>`), "")})
+	document.UseSystemFonts = true
+
+	if err := document.Validate(); err != nil {
+		t.Fatalf("Validate: %v", err)
+	}
+
+	pdf, err := document.PDF(t.Context())
+	if err != nil {
+		t.Fatalf("PDF with UseSystemFonts: %v", err)
+	}
+	if !bytes.HasPrefix(pdf, []byte("%PDF-")) {
+		t.Fatal("not a PDF")
 	}
 }

@@ -8,7 +8,6 @@ import (
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/layout"
-	"github.com/chinmay-sawant/gowkhtmltopdf/internal/line"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
@@ -233,21 +232,17 @@ func resolveRelativeLinkURI(op layout.Op, base *url.URL) (string, bool) {
 
 // loadFontRegistry builds the opt-in font registry from --font-path and
 // optional --use-system-fonts. Returns nil when nothing was configured.
+// Discovery diagnostics (scanned paths, loaded/skipped counts, skip reasons)
+// go to log unless Quiet.
 func loadFontRegistry(glob settings.PdfGlobal, log io.Writer) *pdf.Registry {
 	if len(glob.FontPaths) == 0 && !glob.UseSystemFonts {
 		return nil
 	}
 
-	reg := pdf.RegistryFromPaths(glob.FontPaths, glob.UseSystemFonts)
-
+	var diag io.Writer
 	if log != nil && log != io.Discard && !glob.Quiet {
-		count := len(glob.FontPaths)
-		if glob.UseSystemFonts {
-			count += len(pdf.DefaultSystemFontDirs())
-		}
-
-		line.Emit(log, line.Info, "scanned %d font path(s)", count)
+		diag = log
 	}
 
-	return reg
+	return pdf.RegistryFromPathsLog(glob.FontPaths, glob.UseSystemFonts, diag)
 }

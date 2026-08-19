@@ -18,6 +18,7 @@ import (
 var (
 	errFontTooShort           = errors.New("font: file too short")
 	errFontCFFNotSupported    = errors.New("font: CFF/OTTO OpenType not supported (TrueType outlines only)")
+	errFontVariableRejected   = errors.New("font: variable fonts (fvar) are not supported; use a static face")
 	errFontNotTrueType        = errors.New("font: not a TrueType font")
 	errFontTruncatedDirectory = errors.New("font: truncated table directory")
 	errFontMissingHead        = errors.New("font: missing head table")
@@ -74,6 +75,12 @@ type Font struct {
 	rev      map[uint16]rune
 	nameOnce sync.Once
 	names    []string
+
+	// Optional CSS @font-face style override for Registry.Lookup / pickFace.
+	// When styleOverride is set, Bold()/Italic() use overrideBold/overrideItalic
+	// instead of the file macStyle bits.
+	styleOverride                bool
+	overrideBold, overrideItalic bool
 }
 
 // ParseTTF parses a TrueType (or OpenType with TrueType outlines) font file.
@@ -95,6 +102,13 @@ func ParseTTF(data []byte) (*Font, error) {
 	tables, err := parseTableDirectory(data)
 	if err != nil {
 		return nil, err
+	}
+
+	// Variable fonts: reject when fvar is present. Static SFNT without fvar
+	// (including variable-derived subsets such as the CI Noto KR fixture) is
+	// accepted. Named instances / axes are out of scope.
+	if _, hasFvar := tables["fvar"]; hasFvar {
+		return nil, errFontVariableRejected
 	}
 
 	font := &Font{ //nolint:exhaustruct // intentional zero-value fields
@@ -521,11 +535,37 @@ func (f *Font) PDFBBox() (int, int, int, int) {
 	return f.scaleToPDFEm(f.xMin), f.scaleToPDFEm(f.yMin), f.scaleToPDFEm(f.xMax), f.scaleToPDFEm(f.yMax)
 }
 
-// Bold reports whether the font declares a bold macStyle.
-func (f *Font) Bold() bool { return f.macStyle&1 != 0 }
+// Bold reports whether the font declares a bold macStyle, or the CSS
+// @font-face weight override when SetStyleOverride was applied.
+func (f *Font) Bold() bool {
+	if f != nil && f.styleOverride {
+		return f.overrideBold
+	}
 
-// Italic reports whether the font declares an italic macStyle.
-func (f *Font) Italic() bool { return f.macStyle&2 != 0 }
+	return f != nil && f.macStyle&1 != 0
+}
+
+// Italic reports whether the font declares an italic macStyle, or the CSS
+// @font-face style override when SetStyleOverride was applied.
+func (f *Font) Italic() bool {
+	if f != nil && f.styleOverride {
+		return f.overrideItalic
+	}
+
+	return f != nil && f.macStyle&2 != 0
+}
+
+// SetStyleOverride makes Bold()/Italic() follow CSS @font-face descriptors
+// for Registry.Lookup instead of the file macStyle bits.
+func (f *Font) SetStyleOverride(weight int, italic bool) {
+	if f == nil {
+		return
+	}
+
+	f.styleOverride = true
+	f.overrideBold = weight >= fontWeightBoldMin
+	f.overrideItalic = italic
+}
 
 // GlyphID maps a rune to its glyph id (0 = .notdef when missing).
 func (f *Font) GlyphID(r rune) uint16 {

@@ -122,10 +122,18 @@ forbidden. One job seam: library and CLI adapters build
 
 ## Workflow
 
-- Branch + PR flow per `CONTRIBUTING.md`. Update `CHANGELOG.md` and
-  `documentation/` with user-facing changes.
+- **No git commands unless the user explicitly asks in that turn.** Do not run
+  `git` for status, diff, add, commit, push, checkout, branch, rebase, merge,
+  stash, or any other git operation on the agent's own initiative. The human
+  owns version control; implement and validate in the working tree only until
+  they request a commit or push. This is restated every session for a reason.
+- Branch + PR flow per `CONTRIBUTING.md` when the user asks for git/PR work.
+  Update `CHANGELOG.md` and `documentation/` with user-facing changes.
 - Update `knowledge-base/` when architecture or features change materially
   (follow `knowledge-base/SCHEMA.md`; keep `wiki/index.md` and `wiki/log.md`
   current).
 - Verify before declaring done: run `make test && make lint`, and regenerate
   samples for layout changes.
+- Plan ledgers under `plans/`: mark a checklist row `[x]` only after command
+  outcomes or artifact evidence exist in that phase file. Do not leave required
+  rows as `[ ]` or `[~]` when closing a track the user asked to finish.

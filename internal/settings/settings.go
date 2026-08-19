@@ -446,7 +446,7 @@ type PdfGlobal struct {
 	// Load carries the shared load policy: Proxy, Allow (ACL prefixes) and
 	// EnableLocalFileAccess live on LoadGlobal, applied by load.NewLoader.
 	Load                 LoadGlobal
-	FontPaths            []string // --font-path directories (opt-in TTF discovery)
+	FontPaths            []string // --font-path dirs (or .ttf/.otf files); opt-in discovery
 	UseSystemFonts       bool     // --use-system-fonts
 	ResolveRelativeLinks bool     // resolve relative <a href> against page URL
 	// Ignored holds accepted-but-inert wkhtml keys (dpi, javascript, …).

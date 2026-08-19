@@ -1,6 +1,6 @@
 # v0.2.5 Font Resolution, Fallback, and Compliance Plan
 
-> **Status:** planned — codebase + knowledge-base reconciliation completed 2026-08-19
+> **Status:** complete — validated 2026-08-19
 > **Parent:** [`plans/0.2.5/README.md`](../README.md)
 > **Predecessor:** [`plans/0.2.4/31-canonical-0.2.4-roadmap.md`](../../0.2.4/31-canonical-0.2.4-roadmap.md)
 > (phases 31–39 remain closed; this track does not reopen them)
@@ -239,3 +239,31 @@ plan keeps WOFF2 as a documented skip with a clear diagnostic.
   docs, and `knowledge-base/` font pages agree with the shipped contract
   (including no remaining live `temps/font/` cites).
 - All phase files contain command outcomes before any row is marked complete.
+
+## Validation outcomes (2026-08-19)
+
+```
+$ CGO_ENABLED=0 make test
+go test ./...
+(ok — all packages)
+
+$ CGO_ENABLED=0 make lint
+golangci-lint run ./...
+(exit 0)
+
+$ CGO_ENABLED=0 go build -o /tmp/font-0.2.5-evidence/gowkhtmltopdf ./cmd/gowkhtmltopdf
+$ CGO_ENABLED=0 go build -o /tmp/font-0.2.5-evidence/gowkhtmltoimage ./cmd/gowkhtmltoimage
+$ gowkhtmltopdf -q --allow-local-files -o /tmp/font-0.2.5-evidence/f55-default.pdf \
+    testdata/golden/fixture-55-lantern-cooperative-report.html
+$ gowkhtmltopdf -q --allow-local-files -o /tmp/font-0.2.5-evidence/f55-default-b.pdf \
+    testdata/golden/fixture-55-lantern-cooperative-report.html
+$ cmp …/f55-default.pdf …/f55-default-b.pdf   # STABLE=yes
+# PDF 1.4, FontFile2 + ToUnicode + Liberation present, 4 page objects, ~60 KiB
+$ gowkhtmltopdf -q --allow-local-files --font-path internal/pdf/assets \
+    -o /tmp/font-0.2.5-evidence/f55-fontpath.pdf …/fixture-55-….html
+$ gowkhtmltoimage -q --allow-local-files -o /tmp/font-0.2.5-evidence/f55.png …/fixture-55-….html
+```
+
+Focused proofs: `go test ./internal/pdf ./internal/layout ./internal/convert ./internal/css ./internal/cli ./internal/imageout .`
+Cover FontResolver, discovery diagnostics, `@font-face` weight/style, preflight re-layout, CLI/library font-path.
+

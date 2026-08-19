@@ -176,6 +176,20 @@ func TestGoFriendlyGlobalFlags(t *testing.T) {
 	}
 }
 
+func TestFontPathFlagIsDirectoryOriented(t *testing.T) {
+	t.Parallel()
+
+	cmd := parsePDF(t, "--font-path", "/usr/share/fonts", "--use-system-fonts", "-o", outPDF, "input.html")
+	if len(cmd.Global.FontPaths) != 1 || cmd.Global.FontPaths[0] != "/usr/share/fonts" {
+		t.Fatalf("FontPaths = %v", cmd.Global.FontPaths)
+	}
+	if !cmd.Global.UseSystemFonts {
+		t.Fatal("UseSystemFonts not set")
+	}
+	// End-to-end PDF family visibility for --font-path is covered in
+	// internal/convert/fontpath_test.go (CLI package does not run convert).
+}
+
 func TestImageGrammarAndOptions(t *testing.T) {
 	t.Parallel()
 

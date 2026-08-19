@@ -2,11 +2,59 @@ package pdf
 
 import (
 	"bytes"
+	"errors"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 )
+
+// DiscoverySkip records one skipped path during opt-in font discovery.
+type DiscoverySkip struct {
+	Path   string
+	Reason string
+}
+
+// Discovery is the result of scanning --font-path / system font directories.
+// Skips never include font file bytes.
+type Discovery struct {
+	Registry     *Registry
+	ScannedPaths []string
+	Loaded       int
+	Skipped      int
+	Skips        []DiscoverySkip
+}
+
+// Log writes a compact discovery summary to writer (no font bytes). Quiet
+// callers pass io.Discard. Loaded/skipped counts and a few skip reasons are
+// included.
+func (d *Discovery) Log(writer io.Writer) {
+	if writer == nil || writer == io.Discard {
+		return
+	}
+
+	empty := d.Loaded == 0 && d.Skipped == 0 && len(d.ScannedPaths) == 0
+	if empty {
+		return
+	}
+
+	fmt.Fprintf(writer, "info: font discovery: scanned %d path(s), loaded %d face(s), skipped %d\n",
+		len(d.ScannedPaths), d.Loaded, d.Skipped)
+
+	const maxReasons = 8
+
+	for i, skip := range d.Skips {
+		if i >= maxReasons {
+			fmt.Fprintf(writer, "warning: font discovery: … %d more skip(s)\n", len(d.Skips)-maxReasons)
+
+			break
+		}
+
+		fmt.Fprintf(writer, "warning: font discovery: skip %s: %s\n", skip.Path, skip.Reason)
+	}
+}
 
 // Registry indexes discoverable TTF faces by CSS family name (lowercased).
 // Liberation defaults stay available via FaceSet; this holds opt-in folder fonts.
@@ -243,7 +291,7 @@ func pickFace(faces []*Font, weight int, italic bool) *Font {
 			score += 2
 		}
 
-		if score > bestScore {
+		if score > bestScore || (score == bestScore && fontIdentityLess(fnt, best)) {
 			bestScore = score
 			best = fnt
 		}
@@ -277,23 +325,39 @@ func DefaultSystemFontDirs() []string {
 	return dirs
 }
 
-// ScanFontDirs walks each directory non-recursively (and one level of
-// subdirectories under /usr/share/fonts style trees) collecting .ttf faces.
+// ScanFontDirs walks each directory (depth fontScanMaxDepth) collecting
+// .ttf/.otf faces. Bare file paths that are .ttf/.otf are loaded as a
+// convenience; other non-directories are skipped with a reason (never treated
+// as an empty directory). Prefer DiscoverFonts when diagnostics are needed.
 func ScanFontDirs(dirs []string) *Registry {
+	return DiscoverFonts(dirs).Registry
+}
+
+// DiscoverFonts scans dirs in order and returns loaded faces plus skip
+// diagnostics. Depth is fontScanMaxDepth for directories; extensions are
+// .ttf/.otf only. CFF/OTTO, variable (fvar), and parse failures are skipped.
+//
+//nolint:cyclop,funlen // directory vs file path branching is intentional and local
+func DiscoverFonts(dirs []string) Discovery {
 	out := NewRegistry()
 	seen := map[string]bool{}
+	report := Discovery{Registry: out} //nolint:exhaustruct // counters filled below
 
-	var scan func(string, int)
+	var scanDir func(string, int)
 
-	scan = func(dir string, depth int) {
+	scanDir = func(dir string, depth int) {
 		if dir == "" || seen[dir] {
 			return
 		}
 
 		seen[dir] = true
 
+		report.ScannedPaths = append(report.ScannedPaths, dir)
+
 		entries, err := os.ReadDir(dir)
 		if err != nil {
+			report.addSkip(dir, "read dir: "+err.Error())
+
 			return
 		}
 
@@ -302,25 +366,56 @@ func ScanFontDirs(dirs []string) *Registry {
 
 			if entry.IsDir() {
 				if depth > 0 {
-					scan(path, depth-1)
+					scanDir(path, depth-1)
 				}
 
 				continue
 			}
 
-			scanFontFile(out, path, entry)
+			scanFontFile(&report, out, path)
 		}
 	}
-	for _, d := range dirs {
-		scan(d, fontScanMaxDepth)
+
+	for _, path := range dirs {
+		if path == "" {
+			continue
+		}
+
+		info, err := os.Stat(path)
+		if err != nil {
+			report.addSkip(path, "stat: "+err.Error())
+
+			continue
+		}
+
+		if info.IsDir() {
+			scanDir(path, fontScanMaxDepth)
+
+			continue
+		}
+
+		// Explicit file path: accept .ttf/.otf; never silently empty-dir.
+		report.ScannedPaths = append(report.ScannedPaths, path)
+		if !isTTFOrOTFPath(path) {
+			report.addSkip(path, "font-path expects a directory or .ttf/.otf file")
+
+			continue
+		}
+
+		scanFontFile(&report, out, path)
 	}
 
-	return out
+	return report
 }
 
 // RegistryFromPaths builds an opt-in font registry from explicit font paths
 // and optional system font directories. Returns nil when nothing was configured.
 func RegistryFromPaths(fontPaths []string, useSystemFonts bool) *Registry {
+	return RegistryFromPathsLog(fontPaths, useSystemFonts, nil)
+}
+
+// RegistryFromPathsLog is RegistryFromPaths with discovery diagnostics on log.
+func RegistryFromPathsLog(fontPaths []string, useSystemFonts bool, log io.Writer) *Registry {
 	var dirs []string
 
 	dirs = append(dirs, fontPaths...)
@@ -333,30 +428,66 @@ func RegistryFromPaths(fontPaths []string, useSystemFonts bool) *Registry {
 		return nil
 	}
 
-	return ScanFontDirs(dirs)
+	report := DiscoverFonts(dirs)
+	(&report).Log(log)
+
+	return report.Registry
 }
 
-// scanFontFile parses a font file into the registry, skipping anything that
-// is not a TTF/OTF or fails to parse.
-func scanFontFile(out *Registry, path string, entry os.DirEntry) {
-	low := strings.ToLower(entry.Name())
-	if !strings.HasSuffix(low, ".ttf") && !strings.HasSuffix(low, ".otf") {
+func (d *Discovery) addSkip(path, reason string) {
+	d.Skipped++
+	d.Skips = append(d.Skips, DiscoverySkip{Path: path, Reason: reason})
+}
+
+func isTTFOrOTFPath(path string) bool {
+	low := strings.ToLower(path)
+
+	return strings.HasSuffix(low, ".ttf") || strings.HasSuffix(low, ".otf")
+}
+
+// scanFontFile parses a font file into the registry, recording skip reasons
+// for unsupported extensions, CFF/OTTO, variable fonts, and parse failures.
+func scanFontFile(report *Discovery, out *Registry, path string) {
+	if !isTTFOrOTFPath(path) {
 		return
 	}
 
 	data, err := os.ReadFile(path)
 	if err != nil {
+		report.addSkip(path, "read: "+err.Error())
+
 		return
 	}
 
 	fnt, err := ParseTTF(data)
 	if err != nil {
+		report.addSkip(path, discoverySkipReason(err))
+
 		return
 	}
 
+	// Prefer name-table PostScript name; fall back to the file stem only when
+	// the name table has none (LoadNames is a no-op when already set).
+	_ = fnt.LoadNames()
+
 	if fnt.PostScriptName == "" {
-		fnt.PostScriptName = strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
+		fnt.PostScriptName = strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 	}
 
 	out.AddFont(fnt)
+
+	report.Loaded++
+}
+
+func discoverySkipReason(err error) string {
+	switch {
+	case errors.Is(err, errFontCFFNotSupported):
+		return "CFF/OTTO OpenType not supported (TrueType outlines only)"
+	case errors.Is(err, errFontVariableRejected):
+		return "variable font (fvar) rejected; use a static face"
+	case err != nil:
+		return "parse: " + err.Error()
+	default:
+		return "parse failed"
+	}
 }

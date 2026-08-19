@@ -73,11 +73,15 @@ const (
 
 // Options controls a Layout run.
 type Options struct {
-	Width      float64 // viewport/content width in points
-	Height     float64 // viewport height in points (for % heights)
-	Font       *pdf.Font
-	Faces      *pdf.FaceSet  // optional Liberation family; defaults loaded when nil
-	Registry   *pdf.Registry // optional discovered fonts (--font-path)
+	Width    float64 // viewport/content width in points
+	Height   float64 // viewport height in points (for % heights)
+	Font     *pdf.Font
+	Faces    *pdf.FaceSet  // optional Liberation family; defaults loaded when nil
+	Registry *pdf.Registry // optional discovered fonts (--font-path)
+	// Resolver is an optional shared FontResolver. When set, layout reuses it
+	// so convert can MarkUnavailable across embed-preflight re-layout passes.
+	// When nil, layout constructs a fresh resolver from Faces+Registry.
+	Resolver   *pdf.FontResolver
 	Sheets     []*css.Stylesheet
 	Media      string // "print" or "screen"; "" = apply "all" rules only
 	Images     func(src string) ([]byte, error)
@@ -375,8 +379,7 @@ type engine struct {
 	ctx      context.Context //nolint:containedctx // ctx is checked at recursion boundaries (checkContext)
 	err      error
 	font     *pdf.Font // default/regular face (metrics fallback)
-	faces    *pdf.FaceSet
-	registry *pdf.Registry
+	resolver *pdf.FontResolver
 	// styles holds immutable resolved styles per node (from resolveStylesCtx).
 	// Transient layout sizes use styleOverrides; callers use stylePtr for
 	// shared *ResolvedStyle without a second copy.
@@ -470,9 +473,8 @@ type chromeEntry struct {
 	b   *box
 }
 
-// faceFor selects the TrueType face for a resolved style (bold/italic),
-// preferring CSS font-family matches from the opt-in registry, then the
-// bundled Liberation FaceSet.
+// faceFor selects the TrueType face for a resolved style (bold/italic)
+// through FontResolver (exact registry → author stack → generics → Liberation).
 func (e *engine) faceFor(sty ResolvedStyle) *pdf.Font {
 	key := faceStyleKey{
 		famHash: sty.famHash,
@@ -498,18 +500,8 @@ func (e *engine) faceFor(sty ResolvedStyle) *pdf.Font {
 
 // lookupFaceFor is the uncached faceFor path.
 func (e *engine) lookupFaceFor(sty ResolvedStyle) *pdf.Font {
-	if e.registry != nil {
-		if f := e.registry.Lookup(sty.FontFamily, sty.FontWeight, sty.FontItalic); f != nil {
-			return f
-		}
-	}
-
-	if e.faces != nil {
-		if f := e.faces.ResolveFamily(sty.FontFamily, sty.FontWeight, sty.FontItalic); f != nil {
-			return f
-		}
-
-		if f := e.faces.Resolve(sty.FontWeight, sty.FontItalic); f != nil {
+	if e.resolver != nil {
+		if f := e.resolver.ResolveFamilyStyle(sty.FontFamily, sty.FontWeight, sty.FontItalic); f != nil {
 			return f
 		}
 	}
@@ -567,89 +559,19 @@ func (e *engine) faceForRuneFallback(sty ResolvedStyle, runeValue rune, primary 
 
 // lookupFaceForRune is the uncached face resolution path.
 func (e *engine) lookupFaceForRune(sty ResolvedStyle, runeValue rune) *pdf.Font {
-	if f := e.registryFamilyWithGlyph(sty, runeValue); f != nil {
-		return f
+	primary := e.faceFor(sty)
+	if e.resolver != nil {
+		if f := e.resolver.ResolveRune(sty.FontFamily, sty.FontWeight, sty.FontItalic, runeValue, primary); f != nil {
+			return f
+		}
 	}
 
-	if f := e.facesWithGlyph(sty, runeValue); f != nil {
-		return f
-	}
-
-	if e.font != nil && e.font.GlyphID(runeValue) != 0 {
-		return e.font
-	}
-	// Last resort: any opt-in registry face that covers this codepoint
-	// (DejaVu/Noto when --font-path / --use-system-fonts scanned them).
-	if f := e.registryGlyphFallback(sty, runeValue); f != nil {
-		return f
-	}
-
-	return e.faceFor(sty)
+	return primary
 }
 
 // isRuneWhitespace reports whether r is a rune that inline layout trims.
 func isRuneWhitespace(r rune) bool {
 	return r == ' ' || r == '\t' || r == '\n' || r == '\r'
-}
-
-// registryGlyphFallback is the last-resort registry lookup: any opt-in face
-// covering r, regardless of CSS font-family.
-func (e *engine) registryGlyphFallback(st ResolvedStyle, r rune) *pdf.Font {
-	if e.registry == nil {
-		return nil
-	}
-
-	return e.registry.FindWithGlyph(r, st.FontWeight, st.FontItalic)
-}
-
-// registryFamilyWithGlyph looks up the first CSS font-family face that has a
-// glyph for runeValue.
-func (e *engine) registryFamilyWithGlyph(style ResolvedStyle, runeValue rune) *pdf.Font {
-	if e.registry == nil {
-		return nil
-	}
-
-	// Reuse a one-element slice header so Lookup does not allocate per family.
-	var one [1]string
-
-	for _, fam := range style.FontFamily {
-		one[0] = fam
-
-		f := e.registry.Lookup(one[:], style.FontWeight, style.FontItalic)
-		if f != nil && f.GlyphID(runeValue) != 0 {
-			return f
-		}
-	}
-
-	return nil
-}
-
-// facesWithGlyph resolves the default faces and returns the first that has a
-// glyph for runeValue.
-//
-//nolint:cyclop,lll // ordered fallback search is intentionally explicit
-func (e *engine) facesWithGlyph(style ResolvedStyle, runeValue rune) *pdf.Font {
-	if e.faces == nil {
-		return nil
-	}
-
-	if f := e.faces.ResolveFamily(style.FontFamily, style.FontWeight, style.FontItalic); f != nil && f.GlyphID(runeValue) != 0 {
-		return f
-	}
-
-	if f := e.faces.Resolve(style.FontWeight, style.FontItalic); f != nil && f.GlyphID(runeValue) != 0 {
-		return f
-	}
-
-	if style.FontWeight >= fontWeightBold && e.faces.UnicodeFallbackBold != nil && e.faces.UnicodeFallbackBold.GlyphID(runeValue) != 0 {
-		return e.faces.UnicodeFallbackBold
-	}
-
-	if e.faces.UnicodeFallback != nil && e.faces.UnicodeFallback.GlyphID(runeValue) != 0 {
-		return e.faces.UnicodeFallback
-	}
-
-	return nil
 }
 
 // scalePt applies the engine zoom factor to a style length in points.
@@ -810,12 +732,16 @@ func newEngine(
 	ctx context.Context, opts Options, faces *pdf.FaceSet, font *pdf.Font,
 	styles map[*html.Node]*ResolvedStyle, containers map[*html.Node]sizeContainer, ops []Op,
 ) *engine {
+	resolver := opts.Resolver
+	if resolver == nil {
+		resolver = pdf.NewFontResolver(faces, opts.Registry)
+	}
+
 	return &engine{ //nolint:exhaustruct // intentional zero fields
 		opts:       opts,
 		ctx:        ctx,
 		font:       font,
-		faces:      faces,
-		registry:   opts.Registry,
+		resolver:   resolver,
 		styles:     styles,
 		scale:      zoomScale(opts.Zoom),
 		containers: containers,

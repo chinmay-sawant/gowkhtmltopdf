@@ -574,9 +574,11 @@ func renderObject(ctx context.Context, run *runContext, obj *settings.PdfObject,
 		}
 	}
 
-	lres, err := layout.LayoutContext(ctx, root, state.bodyLayoutOpts(objectRender))
+	objectLabel := fmt.Sprintf("object %d (%s)", idx+1, obj.Page)
+
+	lres, err := layout.WithFontPreflight(ctx, root, state.bodyLayoutOpts(objectRender), run.log, objectLabel)
 	if err != nil {
-		return nil, fmt.Errorf("object %d (%s): layout: %w", idx+1, obj.Page, err)
+		return nil, fmt.Errorf("%s: layout: %w", objectLabel, err)
 	}
 
 	if run.req.Global.SmartShrinking { //nolint:nestif // sequential width-check/zoom/relayout steps
@@ -589,8 +591,8 @@ func renderObject(ctx context.Context, run *runContext, obj *settings.PdfObject,
 			zoom := contentW / contentW2
 			if zoom > 0 && zoom < 1 {
 				line.Emit(run.log, line.Info,
-					"object %d (%s): content width %.1fpt exceeds the %.1fpt content area; smart shrinking with zoom %.3f",
-					idx+1, obj.Page, contentW2, contentW, zoom)
+					"%s: content width %.1fpt exceeds the %.1fpt content area; smart shrinking with zoom %.3f",
+					objectLabel, contentW2, contentW, zoom)
 
 				effZoom := zoom
 				if zf := obj.Load.ZoomFactor; zf > 0 {
@@ -599,9 +601,9 @@ func renderObject(ctx context.Context, run *runContext, obj *settings.PdfObject,
 
 				objectRender.zoom = effZoom
 
-				lres, err = layout.LayoutContext(ctx, root, state.bodyLayoutOpts(objectRender))
+				lres, err = layout.WithFontPreflight(ctx, root, state.bodyLayoutOpts(objectRender), run.log, objectLabel)
 				if err != nil {
-					return nil, fmt.Errorf("object %d (%s): smart-shrink layout: %w", idx+1, obj.Page, err)
+					return nil, fmt.Errorf("%s: smart-shrink layout: %w", objectLabel, err)
 				}
 			}
 		}

@@ -175,7 +175,7 @@ func layoutResult(ctx context.Context, root *html.Node, opts RenderOptions, font
 		viewport = screenWidthDefault
 	}
 
-	res, err := layout.LayoutContext(ctx, root, layoutOptions(opts, font, viewport))
+	res, err := layout.WithFontPreflight(ctx, root, layoutOptions(opts, font, viewport), nil, "imageout")
 	if err != nil {
 		return nil, fmt.Errorf("imageout: layout: %w", err)
 	}
@@ -256,7 +256,7 @@ func layoutSmartWidth(
 
 		var err error
 
-		res, err = layout.LayoutContext(ctx, root, layoutOptions(opts, font, viewport))
+		res, err = layout.WithFontPreflight(ctx, root, layoutOptions(opts, font, viewport), nil, "imageout")
 		if err != nil {
 			return nil, fmt.Errorf("imageout: layout: %w", err)
 		}
@@ -1802,22 +1802,18 @@ func makeImageFetcher(
 }
 
 // fontRegistry builds a font registry from Global.FontPaths and system font
-// dirs, logging what was scanned (nil when nothing to scan).
+// dirs, logging discovery diagnostics (nil when nothing to scan).
 func fontRegistry(global settings.PdfGlobal, log io.Writer) *pdf.Registry {
 	if len(global.FontPaths) == 0 && !global.UseSystemFonts {
 		return nil
 	}
 
+	var diag io.Writer
 	if log != nil && log != io.Discard && !global.Quiet {
-		count := len(global.FontPaths)
-		if global.UseSystemFonts {
-			count += len(pdf.DefaultSystemFontDirs())
-		}
-
-		line.Emit(log, line.Info, "scanned %d font path(s)", count)
+		diag = log
 	}
 
-	return pdf.RegistryFromPaths(global.FontPaths, global.UseSystemFonts)
+	return pdf.RegistryFromPathsLog(global.FontPaths, global.UseSystemFonts, diag)
 }
 
 // imageLoadGlobal resolves the shared and image-owned load settings before

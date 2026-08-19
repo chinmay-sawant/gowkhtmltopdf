@@ -1,6 +1,6 @@
 # v0.2.5 Font Resolution and Compliance
 
-> **Status:** planned — implementation not started
+> **Status:** complete — validated 2026-08-19
 > **Parent:** [`plans/0.2.5/README.md`](../README.md)
 > **Predecessor:** completed v0.2.4 Document API / CLI work
 > ([`plans/0.2.4/README.md`](../../0.2.4/README.md), phases 31–39 closed)

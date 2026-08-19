@@ -146,6 +146,62 @@ func TestParseAtRulesSkipped(t *testing.T) {
 	}
 }
 
+func TestParseFontFaceWeightStyle(t *testing.T) {
+	t.Parallel()
+
+	str := mustSheet(t, `
+		@font-face {
+			font-family: "Styled";
+			src: url(regular.ttf);
+			font-weight: 400;
+			font-style: normal;
+		}
+		@font-face {
+			font-family: Styled;
+			src: url(bold.ttf);
+			font-weight: bold;
+			font-style: italic;
+		}
+	`)
+	if len(str.FontFaces) != 2 {
+		t.Fatalf("font-faces = %+v", str.FontFaces)
+	}
+
+	reg := str.FontFaces[0]
+	if reg.Family != "Styled" || reg.Weight != 400 || reg.Italic || !reg.HasStyle {
+		t.Fatalf("regular face = %+v", reg)
+	}
+
+	boldItalic := str.FontFaces[1]
+	if boldItalic.Family != "Styled" || boldItalic.Weight != 700 || !boldItalic.Italic || !boldItalic.HasStyle {
+		t.Fatalf("bold italic face = %+v", boldItalic)
+	}
+}
+
+func TestParseFontWeightAndStyleHelpers(t *testing.T) {
+	t.Parallel()
+
+	if w, ok := ParseFontWeight("700"); !ok || w != 700 {
+		t.Fatalf("ParseFontWeight(700) = %d, %v", w, ok)
+	}
+
+	if w, ok := ParseFontWeight("normal"); !ok || w != 400 {
+		t.Fatalf("ParseFontWeight(normal) = %d, %v", w, ok)
+	}
+
+	if _, ok := ParseFontWeight("bolder"); ok {
+		t.Fatal("ParseFontWeight(bolder) should fail")
+	}
+
+	if italic, ok := ParseFontStyleItalic("oblique"); !ok || !italic {
+		t.Fatalf("ParseFontStyleItalic(oblique) = %v, %v", italic, ok)
+	}
+
+	if italic, ok := ParseFontStyleItalic("normal"); !ok || italic {
+		t.Fatalf("ParseFontStyleItalic(normal) = %v, %v", italic, ok)
+	}
+}
+
 //nolint:varnamelen // short local mirrors the stylesheet vocabulary
 func TestParsePageStyle(t *testing.T) {
 	t.Parallel()

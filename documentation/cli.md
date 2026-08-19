@@ -105,8 +105,8 @@ expose a generic --set key=value escape hatch.
 | --enable-smart-shrinking, --disable-smart-shrinking | SmartShrinking |
 | --no-pdf-compression | Compression |
 | --keep-relative-links | ResolveRelLinks false |
-| --font-path PATH | Repeatable FontPaths entry |
-| --use-system-fonts | UseSystemFonts |
+| --font-path PATH | Repeatable FontPaths entry. Prefer a **directory** (scanned to depth 2 for `.ttf`/`.otf`). A bare `.ttf`/`.otf` file is accepted as one face; other files warn and skip |
+| --use-system-fonts | UseSystemFonts (opt-in OS font dirs; not Fontconfig aliases) |
 | --allow-local-files | AllowLocalFiles |
 | --restrict-network | Restricted network policy |
 | --allow-host HOST | Network host allowlist entry |

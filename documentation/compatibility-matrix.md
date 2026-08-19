@@ -79,7 +79,7 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 
 | Property | Status | Notes / verified by |
 |----------|--------|---------------------|
-| `font-family` (named + generic) | Partial | parsed + inherited; embedded Liberation Sans family (R/B/I/BI) plus **font registry** (`--font-path`, optional `--use-system-fonts`) and `@font-face` TTF/OTF/WOFF1 (local and `https://` via `FetchSub`) on **PDF and image** paths (see §4 / §5). Named families resolve as named; missing faces fall through the author’s comma stack, then Liberation; only CSS generics (`serif`/`sans-serif`/`monospace`) expand to Liberation |
+| `font-family` (named + generic) | Partial | parsed + inherited; `FontResolver`: exact registry/`@font-face`/`--font-path` match per token, then author stack, then CSS generics (`serif`/`sans-serif`/`monospace`/`system-ui`) → Liberation/DejaVu, then Liberation Sans terminal default. Legacy names (Georgia/Arial/…) are **not** aliased to Liberation unless supplied. See [fonts.md](fonts.md) |
 | `writing-mode` (`horizontal-tb\|vertical-rl\|vertical-lr`) | Partial (horizontal only) | Parsed; `vertical-rl` / `vertical-lr` still lay out as a normal horizontal block. Full CSS vertical typesetting is out of scope |
 | `font-size` | Implemented | `style.go` `fontSize` (px/pt/em/%/rem/in/cm/mm/pc + keywords); `%`/`em` resolve against parent; test `TestFontSizeEmInherit` |
 | `font-weight` (`normal\|bold\|100-900`) | Implemented | ≥700 selects Liberation Sans **Bold** (or BoldItalic); fake stroke bold only if a bold face is missing; tests `TestRealBoldFaceOps`, `TestBoldFaceInInvoicePDF` |
@@ -391,7 +391,7 @@ They fail parse with `unknown option` (`TestStubFlagsRemoved`,
 | `--header-font-size`, `--footer-font-size` | PDF | Supported |
 | `--header-spacing`, `--footer-spacing` | PDF | Supported (band measurement) |
 | `--header-line`, `--footer-line` | PDF | Supported (separator line) |
-| `--header-font-name`, `--footer-font-name` | PDF | Partial (stored; every font renders as the embedded Liberation Sans) |
+| `--header-font-name`, `--footer-font-name` | PDF | Partial (`resolveHFFont` uses the shared registry / `FontResolver` when the named family is available; otherwise Liberation Sans) |
 | `--header-html`, `--footer-html` | PDF | **Partial** nested HTML HF: child layout (body CSS subset, flex/grid/images, local `@font-face` via shared registry/ACL); clipped to margin band; URI + `#id` GoTo to **body** destinations only (HF-tree ids are not destinations). URL values; raw markup rejected. Tests: `TestHTMLHeader*`, `hf_links_test.go` |
 
 ### 7.8 TOC objects

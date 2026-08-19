@@ -10,9 +10,9 @@ Every default conversion can use:
 
 | Family | Faces | Role |
 |--------|-------|------|
-| **Liberation Sans** | Regular / Bold / Italic / BoldItalic | Default sans; `sans-serif`, Arial, Helvetica, … |
-| **Liberation Serif** | Regular / Bold / Italic / BoldItalic | `serif`, Times, Georgia, … |
-| **Liberation Mono** | Regular / Bold / Italic / BoldItalic | `monospace`, Courier, Consolas, … |
+| **Liberation Sans** | Regular / Bold / Italic / BoldItalic | Default sans; CSS `sans-serif` / terminal fallback |
+| **Liberation Serif** | Regular / Bold / Italic / BoldItalic | CSS `serif` |
+| **Liberation Mono** | Regular / Bold / Italic / BoldItalic | CSS `monospace` |
 | **DejaVu Sans** | Regular + Bold | Unicode fallback (`system-ui`, last-resort glyphs) |
 
 This is **not** Liberation Sans only. Faces live in `internal/pdf/assets/`
@@ -21,24 +21,32 @@ and are parsed by `pdf.LoadDefaultFaces`.
 Latin-1 text embeds as a simple TrueType subset with WinAnsi-style
 single-byte codes. Runes above U+00FF take the Type0 path below.
 
-## CSS generic / common-name mapping
+## Resolution contract (`pdf.FontResolver`)
 
-`pdf.FaceSet.ResolveFamily` (used by layout after the opt-in registry):
+Layout and header/footer selection go through one resolver:
 
-| CSS token | Bundled face |
-|-----------|----------------|
-| `serif`, `georgia`, `times`, `times new roman`, `liberation serif` | Liberation Serif |
-| `monospace`, `courier`, `courier new`, `consolas`, `monaco`, `liberation mono` | Liberation Mono |
-| `sans-serif`, `arial`, `helvetica`, `tahoma`, `verdana`, `calibri`, `liberation sans` | Liberation Sans |
-| `system-ui` | DejaVu Sans |
+1. Exact registered / `@font-face` / `--font-path` family match per CSS token
+   (internal name-table family).
+2. Continue the author comma stack when a named family is absent.
+3. Generics only: `serif` / `sans-serif` / `monospace` → Liberation Serif /
+   Sans / Mono; `system-ui` → DejaVu. Real Liberation family names also match.
+4. **Legacy display names** (`Georgia`, `Arial`, `Times`, `Courier New`, …)
+   are **not** rewritten to Liberation. They win only when a face with that
+   family name is supplied; otherwise the stack continues (e.g.
+   `Georgia, serif` → Liberation Serif via the generic). Host Fontconfig
+   aliases are never imported.
+5. Terminal default after an exhausted stack: Liberation Sans
+   (`FaceSet.Resolve`). No synthetic bold/italic.
+6. Missing glyphs: primary face when it covers the rune → family-stack /
+   Liberation weight-style → DejaVu → `Registry.FindWithGlyph`.
+7. Before paint, convert/imageout **embed-preflight** the used rune set
+   (`pdf.PreflightEmbed`). A failed optional face is marked unavailable and
+   the object is re-laid-out onto the next CSS/bundled fallback so metrics
+   stay consistent. Claiming profiles still fail closed if nothing embeddable
+   remains.
 
-Named families that are not in this table are **not** rewritten to Liberation.
-They resolve as named against the opt-in registry first; if nothing matches,
-layout falls through the author’s comma stack and then to Liberation Sans.
-
-Missing glyphs walk: CSS family (registry, then bundled) → Liberation
-weight/style → DejaVu Regular/Bold → any opt-in registry face that covers the
-codepoint (`FindWithGlyph`, prefers DejaVu/Noto names).
+`FaceSet.ResolveFamily` is generics / Liberation names / `system-ui` only.
+Do not treat Liberation Serif as “actual Georgia”.
 
 ## Opt-in discovery
 
@@ -47,11 +55,17 @@ operator asks.
 
 | Flag | Effect |
 |------|--------|
-| `--font-path DIR` | Scan `DIR` and children to **depth 2** for `.ttf` / `.otf`; repeatable |
-| `--use-system-fonts` | Also scan common OS font directories (e.g. `/usr/share/fonts`). Skips proprietary Windows/corefont trees |
+| `--font-path DIR` | Scan `DIR` and children to **depth 2** for `.ttf` / `.otf`; repeatable. Primary form is a **directory**. A bare `.ttf`/`.otf` **file** path is accepted as a convenience (loads that one face). Other file paths warn and are skipped — never treated as an empty directory. |
+| `--use-system-fonts` | Also scan common OS font directories (e.g. `/usr/share/fonts`). Skips proprietary Windows/corefont trees. Independent of Fontconfig alias rules. |
 
-`pdf.ScanFontDirs` reads `.ttf` and `.otf` only. **CFF / `OTTO` OpenType is
-rejected** (TrueType outlines only). A file that fails `ParseTTF` is skipped.
+`pdf.DiscoverFonts` / `ScanFontDirs` read `.ttf` and `.otf` only. Diagnostics
+report scanned paths, loaded-face count, skipped-file count, and skip reasons
+(no font bytes). **CFF / `OTTO`**, **variable fonts (`fvar`)**, and parse
+failures are skipped with a clear reason.
+
+Exact family matching: a directory that supplies a face named Georgia is
+selected for `font-family: Georgia`. Supplying only Gelasio does **not**
+rename it to Georgia.
 
 Example (CJK / Hangul):
 
@@ -66,6 +80,19 @@ gowkhtmltopdf --font-path /usr/share/fonts/truetype/droid \
 `testdata/fonts/NotoSansKR-HangulSubset.ttf` is a **tiny CI subset** for
 fixture-27 smoke — not a full CJK face. Full Noto CJK is not shipped.
 
+## Supported format matrix
+
+| Format | Behavior |
+|--------|----------|
+| TTF (TrueType outlines) | Accepted |
+| OTF with TrueType outlines (`0x00010000` / `true`) | Accepted |
+| WOFF1 → SFNT (TrueType) | Accepted (`DecodeWOFF`; size/overlap caps in `woff.go`) |
+| CFF / `OTTO` OpenType | Rejected / skipped with diagnostic |
+| WOFF2 | Skipped with diagnostic (Brotli not allowlisted; separate epic) |
+| EOT | Skipped with diagnostic |
+| `data:` `@font-face` src | Skipped with diagnostic |
+| Variable fonts (`fvar` table) | **Rejected** with clear diagnostic; use a static face. CI Noto KR subset has no `fvar` and remains valid SFNT. |
+
 ## Type0 / CID path
 
 When a text run contains code points above U+00FF (after punctuation
@@ -79,7 +106,8 @@ original face.
 ## `@font-face`
 
 `convert/prepare.MergeFontFaces` registers document faces on **both PDF and
-image** paths.
+image** paths (including nested HTML header/footer faces on the shared merge
+path).
 
 | `src` | Behavior |
 |-------|----------|
@@ -89,8 +117,13 @@ image** paths.
 | Local `url(...ttf\|otf\|woff)` | Fetched under `--allow-local-files` / `--allow` |
 | WOFF1 | Decompress → `ParseTTF` (TrueType outlines only) |
 
-`font-weight` / `font-style` on `@font-face` are parsed but **ignored at
-register time**. The alias is the family name only.
+`font-weight` / `font-style` descriptors are retained on `css.FontFace` and
+applied as style overrides for `Registry.Lookup` (regular / bold / italic /
+bold-italic). When omitted, the face file’s macStyle bits are kept. Multiple
+rules for the same family append in source order; equal style scores keep the
+earlier face. Unsupported or missing sources warn and fall through to the
+author CSS stack / Liberation — they are not conversion errors when a fallback
+exists.
 
 ## Honest shaping limits
 

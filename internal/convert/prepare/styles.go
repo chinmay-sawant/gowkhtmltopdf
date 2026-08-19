@@ -241,6 +241,7 @@ func mergeFontFace(ctx context.Context, resources load.ResourceContext, registry
 		if face.Family != "" {
 			font.PostScriptName = strings.ReplaceAll(face.Family, " ", "")
 		}
+		applyFontFaceStyle(font, face)
 		if registry == nil {
 			registry = pdf.NewRegistry()
 		}
@@ -250,6 +251,31 @@ func mergeFontFace(ctx context.Context, resources load.ResourceContext, registry
 		}
 	}
 	return registry
+}
+
+// applyFontFaceStyle overlays CSS font-weight / font-style onto the face so
+// Registry.Lookup can distinguish regular/bold/italic/bold-italic sources.
+// Omitted descriptors keep the file macStyle bits.
+func applyFontFaceStyle(font *pdf.Font, face css.FontFace) {
+	if font == nil || (face.Weight == 0 && !face.HasStyle) {
+		return
+	}
+
+	weight := face.Weight
+	if weight == 0 {
+		if font.Bold() {
+			weight = 700
+		} else {
+			weight = 400
+		}
+	}
+
+	italic := font.Italic()
+	if face.HasStyle {
+		italic = face.Italic
+	}
+
+	font.SetStyleOverride(weight, italic)
 }
 
 //nolint:wsl,nlreturn,lll // font-face collection flow

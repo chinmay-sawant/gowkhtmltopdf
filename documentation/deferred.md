@@ -78,7 +78,7 @@ Do not treat a public SPA URL as the acceptance bar for report work.
 | C ABI (`wkhtmltopdf_*` cgo exports) | CGO is forbidden on the main path. | Only if consumer demand |
 | `--read-args-from-stdin` | **Not implemented.** The flag is not a working batch loop (rejected / unused). | Not planned |
 | Stdin HTML input (`-`) | **Not implemented.** CLI parse stores `Page: "-"`, but `load.GuessURL("-")` falls through to **`http://-`**. Library callers should pass inline HTML; do not document CLI `-` as stdin. | Document honestly; not a hidden feature |
-| WOFF2 / `data:` `@font-face` | Skipped (WOFF2 needs Brotli, not allowlisted; `data:` src rejected). Local TTF/OTF/WOFF1 under ACL works. | No Brotli module |
+| WOFF2 / `data:` `@font-face` | Skipped (WOFF2 needs Brotli, not allowlisted; `data:` src rejected). Local **and `https://`** TTF/OTF/WOFF1 under ACL/`FetchSub` work. | No Brotli module; see pending `09-remote-webfonts.md` |
 | `[subject]` placeholder | Expands **empty** (no subject setting field). | Not planned |
 | HTML header / footer | **Partial** nested child layout (body CSS subset, flex/grid/images, local `@font-face`), clipped to the reserved margin band. Not a browser nested browsing context; no CSS running elements. | Browser HF out |
 | `:hover` / `:focus` / `:active` | Parsed onto the compound; `matchPseudo` **never matches** (print has no pointer/focus). | — |

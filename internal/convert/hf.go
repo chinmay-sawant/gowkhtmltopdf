@@ -115,11 +115,23 @@ func headerHasContent(hf settings.HeaderFooter) bool {
 
 //nolint:mnd // 400 is default normal font weight
 func resolveHFFont(name string, reg *pdf.Registry, fallback *pdf.Font) *pdf.Font {
-	if strings.TrimSpace(name) == "" || reg == nil {
+	name = strings.TrimSpace(name)
+	if name == "" {
 		return fallback
 	}
 
-	if f := reg.Lookup([]string{strings.TrimSpace(name)}, 400, false); f != nil {
+	faces, err := pdf.LoadDefaultFaces()
+	if err != nil || faces == nil {
+		if reg != nil {
+			if f := reg.Lookup([]string{name}, 400, false); f != nil {
+				return f
+			}
+		}
+
+		return fallback
+	}
+
+	if f := pdf.NewFontResolver(faces, reg).ResolveFamilyStyle([]string{name}, 400, false); f != nil {
 		return f
 	}
 
