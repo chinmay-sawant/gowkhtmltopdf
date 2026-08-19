@@ -1,11 +1,12 @@
 # Overview
 
-**gowkhtmltopdf** is a pure-Go, no-cgo HTML template engine that turns HTML into PDF
-(and optionally PNG/JPEG). It is a clean-room work-alike of the
-[wkhtmltopdf](https://wkhtmltopdf.org/) CLI surface, aimed at **controlled
+**gowkhtmltopdf** is a pure-Go, no-cgo **PDF engine based on HTML templates** that
+turns HTML into PDF (and optionally PNG/JPEG). It is a clean-room work-alike of
+the [wkhtmltopdf](https://wkhtmltopdf.org/) CLI surface, aimed at **controlled
 server-generated templates and documents** — invoices, receipts, certificates,
 storybooks, posters, statements, multi-page tables, headers and footers,
-table of contents, and PDF bookmarks — not full browser parity.
+table of contents, and PDF bookmarks — without any wrappers and not full
+browser parity.
 
 The entire pipeline (load → parse → style → layout → paginate → paint → write)
 is implemented in this repository. There is no Chrome/WebKit process, no Qt,

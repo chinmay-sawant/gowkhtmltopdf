@@ -14,8 +14,8 @@ gowkhtmltopdf argv → Document → Document.WritePDF
 gowkhtmltoimage argv → ImageDocument → ImageDocument.WriteImage
 ~~~
 
-The engine remains a pure-Go, no-cgo HTML template engine. It does not execute
-JavaScript and is not a browser.
+The engine remains a pure-Go, no-cgo PDF engine based on HTML templates —
+without any wrappers. It does not execute JavaScript and is not a browser.
 
 ## Binaries
 

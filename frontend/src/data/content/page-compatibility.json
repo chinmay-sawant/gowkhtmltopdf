@@ -6,7 +6,7 @@
    "type": "hero",
    "id": "intro",
    "title": "HTML & CSS Compatibility",
-   "lede": "gowkhtmltopdf converts controlled, server-generated HTML and print templates to PDF and PNG: invoices, receipts, certificates, storybooks, posters, and multi-page tables with headers and footers. It is an HTML template engine, not a browser, and the compatibility matrix is the normative contract."
+   "lede": "gowkhtmltopdf converts controlled, server-generated HTML and print templates to PDF and PNG: invoices, receipts, certificates, storybooks, posters, and multi-page tables with headers and footers. It is a PDF engine based on HTML templates — without any wrappers — not a browser, and the compatibility matrix is the normative contract."
   },
   {
    "type": "bullets",

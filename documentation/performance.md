@@ -318,8 +318,8 @@ at every tested size. At 500 pages it was approximately 1.9× faster and used
 56.3% less RSS. That observation does **not** license a claim that the
 current generic CLI is always faster than wkhtmltopdf. Use wkhtmltopdf when
 legacy wkhtmltopdf print compatibility is the primary requirement; use
-gowkhtmltopdf when you want an in-process HTML template engine and the documented
-CSS subset.
+gowkhtmltopdf when you want an in-process PDF engine based on HTML templates —
+without any wrappers — and the documented CSS subset.
 
 The full matrix, including PDF bytes, commands, and measurement caveats, is
 in the [benchmark documentation](../testdata/golden/benchmarks/README.md).

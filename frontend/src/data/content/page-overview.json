@@ -5,7 +5,7 @@
   {
    "type": "hero",
    "title": "Pure-Go HTML to PDF, no browser",
-   "lede": "A clean-room, no-cgo HTML template engine and wkhtmltopdf CLI work-alike that turns authored HTML into multi-page PDFs (or PNG/JPEG) entirely in-process. Current release v0.2.4 adds the native Document API, explicit CLI sources, and frozen external benchmark paths."
+   "lede": "A clean-room, no-cgo PDF engine based on HTML templates — without any wrappers — and a wkhtmltopdf CLI work-alike that turns authored HTML into multi-page PDFs (or PNG/JPEG) entirely in-process. Current release v0.2.4 adds the native Document API, explicit CLI sources, and frozen external benchmark paths."
   },
   {
    "type": "bullets",
@@ -97,7 +97,7 @@
    "type": "callout",
    "variant": "info",
    "title": "A kvetch: this is not a browser",
-   "body": "gowkhtmltopdf is an HTML template engine with a documented print CSS subset and deliberately has no JavaScript runtime. If you need full flexbox parity, interactive scripts, or pixel-identical WebKit output, use a real browser engine. This project is the fast, static-binary choice for authored HTML templates — invoices, certificates, storybooks, posters, and statements."
+   "body": "gowkhtmltopdf is a PDF engine based on HTML templates — without any wrappers — with a documented print CSS subset and deliberately has no JavaScript runtime. If you need full flexbox parity, interactive scripts, or pixel-identical WebKit output, use a real browser engine. This project is the fast, static-binary choice for authored HTML templates — invoices, certificates, storybooks, posters, and statements."
   }
  ]
 }
