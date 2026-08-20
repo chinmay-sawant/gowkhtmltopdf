@@ -105,8 +105,14 @@ func validatePDFOptions(document *Document) error {
 		}
 	}
 
-	if document.Copies < 0 {
-		return fmt.Errorf("%w: got %d", ErrInvalidPDFCopies, document.Copies)
+	return validateDocumentCopies(document.Copies)
+}
+
+func validateDocumentCopies(copies int) error {
+	// Zero means "use the engine default"; positive values must fit the
+	// convert maxConversionCopies ceiling.
+	if copies < 0 || copies > MaxDocumentCopies {
+		return fmt.Errorf("%w: got %d", ErrInvalidPDFCopies, copies)
 	}
 
 	return nil

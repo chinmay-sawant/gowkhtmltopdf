@@ -1209,7 +1209,7 @@ func applyTableProps(style *ResolvedStyle, prop, value string, fsize, viewportW 
 	case "border-spacing":
 		style.BorderSpacing = marginLen(value, fsize, viewportW)
 	case "table-layout":
-		if value == "fixed" || value == overflowAuto {
+		if value == positionFixed || value == overflowAuto {
 			style.TableLayout = value
 		}
 	default:

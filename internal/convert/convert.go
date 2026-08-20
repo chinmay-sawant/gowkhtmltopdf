@@ -7,6 +7,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert/prepare"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert/render"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/errs"
@@ -90,16 +91,6 @@ var ErrInvalidCopies = errors.New("convert: copies must be at least one")
 // can be loaded. Table-of-contents objects are metadata, not renderable page
 // input, and an object with neither a page nor inline HTML is empty.
 var ErrNoRenderableObjects = settings.ErrNoRenderableObjects
-
-// ErrUnexpectedImageSettings reports an image-mode union member passed to the
-// PDF engine. The shared Request remains the compatibility contract, while
-// these constructors and validators make each mode's invariant explicit at
-// its boundary.
-var ErrUnexpectedImageSettings = errors.New("convert: image settings are not valid for PDF")
-
-// ErrMissingImageSettings reports an image request sent through the image
-// adapter without its mode-specific settings.
-var ErrMissingImageSettings = errors.New("convert: image settings are required")
 
 // errNilRequest reports a nil Request at a method boundary.
 var errNilRequest = errs.ErrNilRequest
@@ -289,12 +280,6 @@ func ValidateRenderableObjects(objects []settings.PdfObject) error {
 	return settings.ValidateRenderableObjects(objects)
 }
 
-// ValidatePDF checks the PDF-specific request invariant before running the
-// document pipeline.
-func (r *Request) ValidatePDF() error {
-	return r.Validate()
-}
-
 // runContext owns the dependencies for one conversion lifecycle.
 type runContext struct {
 	req      *Request
@@ -363,7 +348,7 @@ func (run *runContext) renderObjects(ctx context.Context) ([]*objectState, []*ob
 // delegated to render.Pipeline; this package supplies the PDF-specific adapter
 // and keeps its private state out of the orchestration module.
 func Run(ctx context.Context, req *Request, log io.Writer, progress func(phase string, percent int)) error {
-	if err := req.ValidatePDF(); err != nil {
+	if err := req.Validate(); err != nil {
 		return err
 	}
 
@@ -394,7 +379,8 @@ func Run(ctx context.Context, req *Request, log io.Writer, progress func(phase s
 		return fmt.Errorf("initialize document: %w", err)
 	}
 
-	registry := loadFontRegistry(req.Global, log)
+	registry := pdf.RegistryFromGlobal(req.Global)
+	logFontRegistryScan(req.Global, log)
 	run := &runContext{
 		req:      req,
 		loader:   loader,
@@ -484,14 +470,22 @@ func renderObject(ctx context.Context, run *runContext, obj *settings.PdfObject,
 
 	media := mediaFor(run.req.Global, obj)
 
-	prep, err := PrepareDocument(ctx, run.loader, obj.Page, obj.Load, run.registry, PrepareOptions{
-		ViewportW:       geom.contentW,
-		ViewportH:       geom.contentH,
-		MediaType:       media,
-		ObjectIndex:     idx + 1,
-		SimplifyDOM:     SimplifyDOMEnabled(run.req.Global.Web, obj.Web),
-		SimplifyProfile: SimplifyDOMProfile(run.req.Global.Web, obj.Web),
-	}, run.log)
+	prep, err := prepare.Document(
+		ctx,
+		run.loader,
+		obj.Page,
+		obj.Load,
+		run.registry,
+		prepare.BuildOptions(
+			geom.contentW,
+			geom.contentH,
+			media,
+			idx+1,
+			run.req.Global.Web,
+			obj.Web,
+		),
+		run.log,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("object %d (%s): %w", idx+1, obj.Page, err)
 	}

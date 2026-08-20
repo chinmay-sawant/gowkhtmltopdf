@@ -137,11 +137,11 @@ resolution), `internal/layout/mnd_const.go:62` (`svgRasterMax = 1024`),
 | `imagePipeline` | `imageout.go:1152` | Adapter implementing `convert/render.Pipeline` (`RenderObjects`/`Assemble`/`Finalize`) with image-specific state |
 | `RenderObjects` | `imageout.go:1162` | `prepareImageDocument` → fetch func → `RenderContext`; stores the `image.Image` |
 | `Finalize` / `writeEncodedOutput` | `imageout.go:1209/1215` | Resolve format, composite transparent canvas onto white for JPEG (`onWhite`), encode, write to `req.Output` |
-| `prepareImageDocument` | `imageout.go:1247` | Resolves media + SimplifyDOM profile, runs `convert.PrepareDocument` with `defaultViewportW/H = 768×576` |
-| `makeImageFetcher` | `imageout.go:1288` | Wraps `prep.Resources.Fetch` with the `--no-images` gate and a bounded byte cache (64 fetches / 32 MiB) |
-| `fontRegistry` | `imageout.go:1321` | Builds `pdf.Registry` from global `FontPaths` + system dirs (`ScanFontDirs`); nil when nothing to scan |
+| `prepareImageDocument` | `imageout.go` | Resolves media + SimplifyDOM profile, runs `prepare.Document` with `defaultViewportW/H = 768×576` |
+| `makeImageFetcher` | `imageout.go` | Wraps `prep.Resources.Fetch` with the `--no-images` gate and a bounded byte cache (64 fetches / 32 MiB) |
+| `fontRegistry` | `imageout.go` | Builds `pdf.Registry` from global `FontPaths` + system dirs (`ScanFontDirs`); nil when nothing to scan |
 | `imageLoadGlobal` | `imageout.go` | ACL merge: `Image.Load` ⊕ `Global.Load.Allow` / `EnableLocalFileAccess` before `load.NewLoader` |
-| `firstObject` | `imageout.go` | Picks the first page-like object; warns and ignores extra pages/TOC (single-image mode) |
+| `imageout.Request` / `NewRequest` / `Validate` | `request.go` | Exactly one renderable object + non-nil `Output`; multiple objects are an error (`ErrMultipleInputs`), not “ignore extras” |
 | `resolveFormat` / `encode` / `onWhite` | `imageout.go` | PNG vs JPEG selection (`--format` wins, else `.jpg/.jpeg` extension, else PNG); JPEG quality clamp 1–100; JPEG transparency → warn + white composite |
 
 ### Glyph rasterizer (ttfraster.go)
@@ -172,20 +172,18 @@ resolution), `internal/layout/mnd_const.go:62` (`svgRasterMax = 1024`),
 1. `cmd/gowkhtmltoimage/main.go` → `cli.Parse(argv, cli.ModeImage)`; handles
    `ErrHelp` / `ErrVersion` / `ErrLicense`, then `app.RunImage` with a signal
    context (`os.Interrupt`, `SIGTERM`).
-2. `internal/app/image.go` `RunImage` validates first:
-   `convert.NewImageRequest(cmd.Global, cmd.Image, cmd.Objects, io.Discard)` +
-   `ValidateImage()` (no output truncation on bad input), then owns output
+2. `internal/app/image.go` `RunImage` resolves format, validates first with
+   `imageout.NewRequest(cmd.Global, cmd.Image, cmd.Objects, io.Discard)` +
+   `Request.Validate()` (no output truncation on bad input), then owns output
    opening and calls the request engine.
 3. `imageout.RunRequest`:
    - receives the already-normalized format and explicit output writer from
      `app.RunImage`;
    - validates the request again at the engine seam;
    - loads, lays out, rasterizes, and encodes into `req.Output`.
-4. `RunRequest` (`imageout.go:1094`):
-   - `req.ValidateImage()` again (seam contract);
-   - `firstObject` — warns and ignores additional page objects and TOC
-     (image mode renders exactly one page);
-   - `load.NewLoader(imageLoadGlobal(req.Global, *req.Image))` — ACL =
+4. `RunRequest`:
+   - `req.Validate()` again (exactly one input object; extras are rejected);
+   - `load.NewLoader(imageLoadGlobal(req.Global, req.Image))` — ACL =
      Image.Load merged with Global.Load (`--allow` / `--allow-local-files`);
    - `pdf.DefaultFont()` + `fontRegistry` (system + `--font-path`);
    - builds `imagePipeline` and runs `renderpipeline.Run` (the shared
@@ -197,11 +195,11 @@ resolution), `internal/layout/mnd_const.go:62` (`svgRasterMax = 1024`),
 RenderObjects
  ├─ prepareImageDocument(ctx, loader, obj, global, imgSet, registry, log)
  │    ├─ mediaFor(global, image, obj)          → "screen" default / print override
- │    ├─ SimplifyDOM profile resolution (convert.SimplifyDOMEnabled/Profile)
- │    └─ convert.PrepareDocument(ctx, loader, obj.Page, obj.Load, registry,
- │           PrepareOptions{ViewportW:768, ViewportH:576, MediaType, SimplifyDOM, ...})
+ │    ├─ SimplifyDOM profile resolution (prepare.SimplifyDOMEnabled/Profile)
+ │    └─ prepare.Document(ctx, loader, obj.Page, obj.Load, registry,
+ │           prepare.Options{ViewportW:768, ViewportH:576, MediaType, SimplifyDOM, ...})
  │           → load.Resource → html.ParseDocument → CollectSheets → MergeFontFaces
- │           → *PreparedDocument{Root, Sheets, Resources, Registry}
+ │           → *prepare.Prepared{Root, Sheets, Resources, Registry}
  │    (prep.Resource.Skip  →  error "load-error policy is skip; nothing to render")
  ├─ makeImageFetcher(ctx, imgSet, prep, cache)
  │    └─ --no-images gate (errImagesDisabled) → prep.Resources.Fetch (bounded cache)
@@ -258,17 +256,19 @@ is a **one-way dependency of layout**, not of imageout — PDF mode benefits too
 
 | Import | Why |
 |--------|-----|
-| `internal/cli` | `cli.Command`, `OpenOutput`, parse results in the `Run` compatibility adapter |
-| `internal/convert` | `Request`, `NewImageRequest`, `PreparedDocument`, `PrepareDocument`, `SimplifyDOM*` |
+| `internal/convert/prepare` | Shared load/parse/sheets/`@font-face` (`prepare.Document`) |
 | `internal/convert/render` | The shared `Pipeline` lifecycle (`renderpipeline.Run`) |
 | `internal/css` | `*css.Stylesheet` plumbing into layout |
-| `internal/html` | `html.Node` tree from `PrepareDocument` |
+| `internal/html` | `html.Node` tree from `prepare.Document` |
 | `internal/layout` | `LayoutContext`, `Options`, `Result`, `Op`, `PaintOrder`, `StyleOf`, `FakeBoldFor` |
 | `internal/line` | Structured log emission (`line.Emit`, severities) |
 | `internal/load` | `load.NewLoader` / policy application |
 | `internal/pdf` | `Font`, `Registry`, `DefaultFont`, `ShapeRun`, `GlyphContours`, `FlattenContour`, `ContourBounds`, `AdvanceInPoints`, `ScanFontDirs` |
 | `internal/settings` | `PdfGlobal`, `ImageGlobal`, `Web`, `LoadGlobal`, `LoadPage`, `PdfObject` |
 | stdlib `image`, `image/color`, `image/draw`, `image/png`, `image/jpeg` | Canvas, compositing, encoding — **no cgo, no external raster engine** |
+
+Production `imageout` does **not** import `internal/convert` (hub) or
+`internal/cli`; those appear only in tests / `app` adapters.
 
 ### Imported by internal/svg
 

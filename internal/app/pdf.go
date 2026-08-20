@@ -87,10 +87,6 @@ func RunPDF(
 		return ErrConflictingOutputSinks
 	}
 
-	if len(cmd.Objects) == 0 {
-		return ErrNoPageObjects
-	}
-
 	out, closeOut, err := cmd.OpenOutput()
 	if err != nil {
 		return fmt.Errorf("app: open output: %w", err)

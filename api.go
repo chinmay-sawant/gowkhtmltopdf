@@ -41,6 +41,10 @@ func RestrictedNetworkPolicy() NetworkPolicy {
 	return load.RestrictedNetworkPolicy()
 }
 
+// MaxDocumentCopies is the Document.Copies upper bound. It matches the
+// convert engine ceiling (maxConversionCopies).
+const MaxDocumentCopies = 1000
+
 // Static errors are stable errors.Is targets for the native Document API.
 var (
 	ErrNoPageObjects            = errors.New("gowkhtmltopdf: no page objects added")

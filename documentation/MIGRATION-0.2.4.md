@@ -110,7 +110,10 @@ Common mappings:
 | title | Title |
 | pdfversion | PDFVersion |
 | pdfprofile | PDFProfile |
-| copies / collate | Copies / Collate |
+| copies / collate | Copies / Collate (`*bool`; nil keeps engine default) |
+| grayscale / page-offset / exclude-from-outline | Grayscale / PageOffset / ExcludeFromOutline |
+| --allow prefixes | Allow []string (alongside AllowLocalFiles) |
+| --replace / --zoom | HeaderFooter.Replace / Page.Zoom (and ImageDocument.Zoom) |
 | outline / outline.depth | Outline / OutlineDepth |
 | web.background | Background |
 | smart shrinking settings | SmartShrinking |

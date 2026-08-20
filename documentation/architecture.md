@@ -31,7 +31,7 @@ Deep-dives with `file:line` references live under
 | `internal/convert/prepare` | Shared document prep: load, parse, sheets, `@font-face` |
 | `internal/convert/render` | Mode-neutral lifecycle: `RenderObjects` → `Assemble` → `Finalize` |
 | `internal/convert/islands` | Certified page-island recognition for the **benchmark fixture only** |
-| `internal/pdf` | PDF writer (default 1.4, opt-in 1.7 / 2.0 via `WriterPolicy`; opt-in `--pdf-profile` / `WithPDFProfile`), TTF subset, Type0/CID, images, annotations, outlines, tagged structure |
+| `internal/pdf` | PDF writer (default 1.4, opt-in 1.7 / 2.0 via `WriterPolicy`; opt-in `--pdf-profile` / `Document.PDFProfile`), TTF subset, Type0/CID, images, annotations, outlines, tagged structure |
 | `internal/pdfprofile` | Leaf: canonical profile tokens, aliases, `Parse` / `IsPDFA*` / `IsPDFUA*` |
 | `internal/imageout` | Raster path for one PNG/JPEG canvas |
 | `internal/svg` | SVG-as-`<img>` rasterization (`tdewolff/canvas`) |
@@ -76,8 +76,9 @@ canvas.
 lives in `internal/convert/render`:
 
 1. **`Validate` / `ValidatePDF`** — explicit `Output` sink, copies/object
-   limits, at least one renderable body object, no image settings on a PDF
-   request. Dump-outline also requires a separate `OutlineOutput`.
+   limits, at least one renderable body object. Dump-outline also requires a
+   separate `OutlineOutput`. Image jobs use `imageout.Request.Validate`
+   instead of the PDF request path.
 2. **Loader** — `load.NewLoaderWithError` so a bad proxy policy fails before
    fonts or the document exist.
 3. **Fonts** — bundled default face (`pdf.DefaultFont`) plus an opt-in
@@ -147,7 +148,7 @@ Image jobs use `imageout.Request` (`imageout.RunRequest`), also driven by
 Explicit out-of-scope boundaries: `--pdf-version` alone is a **version**
 choice, not a PDF/A or PDF/UA claim. Profiles (claiming XMP, OutputIntent +
 sRGB, `/MarkInfo`, structure tree, PDF 2.0 `/Namespace`) are opt-in via
-`--pdf-profile` / `WithPDFProfile`. Encryption, forms, signatures, and
+`--pdf-profile` / `Document.PDFProfile`. Encryption, forms, signatures, and
 object/xref streams are rejected. Do not claim flavours beyond the tokens
 above.
 
@@ -174,9 +175,9 @@ css      ──► html
 outline  ──► html, css                headings only (locationReader seam)
 layout   ──► html, css, pdf, errs     display list + PaintContext
 pdf      ──► pdfprofile             sink (also used by imageout for faces/shaping)
-imageout ──► convert, render, load, layout, pdf, settings
+imageout ──► prepare, render, load, layout, pdf, settings
 convert  ──► load, html, css, layout, line, outline, pdf, settings, prepare, render, islands
-                                      the hub
+                                      the PDF hub
 
 prepare / render / islands  ──► never import convert
 ```
@@ -184,14 +185,15 @@ prepare / render / islands  ──► never import convert
 Rules that keep this sound:
 
 1. **The engine never parses argv.** `internal/cli` writes through dotted
-   `Set`; `cli.Command` *is* the settings payload.
+   `Set`; `cli.Command` *is* the settings payload. Root `Document` fields are
+   the typed public overlay (no library dotted Set).
 2. **One job seam.** Library and CLI adapters build `convert.Request` (PDF)
    or `imageout.Request` (image). Nothing else invokes the pipeline.
 3. **Trust boundary.** Primary documents go through `load.Loader.Load`;
    CSS/images/fonts go through `load.ResourceContext.Fetch` → `FetchSub`
    (same ACL, timeout, and body cap).
-4. **Image mode is not a parallel engine.** It shares prepare + layout and
-   diverges at paint/write.
+4. **Image mode is not a parallel engine.** It shares `prepare` + layout and
+   diverges at paint/write; it does **not** climb into `convert`.
 
 ## Security (summary)
 

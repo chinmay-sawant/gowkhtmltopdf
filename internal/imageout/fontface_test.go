@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/cli"
-	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert/prepare"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/layout"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/load"
@@ -78,19 +78,19 @@ func collectFontLayout(
 		t.Fatalf("parse: %v", err)
 	}
 
-	sheets := convert.CollectSheets(
+	sheets := prepare.CollectSheets(
 		t.Context(),
 		loader,
 		root,
 		res.Base,
 		cmd.Objects[0].Load,
-		convert.SheetOptions{ //nolint:exhaustruct // intentional zero/partial fields
+		prepare.SheetOptions{ //nolint:exhaustruct // intentional zero/partial fields
 			ViewportW: 768, ViewportH: 576, MediaType: "screen",
 		},
 		io.Discard,
 	)
 
-	reg := convert.MergeFontFaces(t.Context(), loader, nil, sheets, res.Base, cmd.Objects[0].Load, 1, fontLog)
+	reg := prepare.MergeFontFaces(t.Context(), loader, nil, sheets, res.Base, cmd.Objects[0].Load, 1, fontLog)
 
 	def, err := pdf.DefaultFont()
 	if err != nil {

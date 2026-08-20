@@ -96,6 +96,7 @@ func libraryBenchmarkPDFDocument(pageCount int) *gowkhtmltopdf.Document {
 		IncludeInOutline: nil,
 		ExternalLinks:    nil,
 		LocalLinks:       nil,
+		Zoom:             0,
 	})
 }
 
@@ -190,6 +191,8 @@ body { margin: 0; font-family: sans-serif; }
 		SmartWidth:      nil,
 		Transparent:     false,
 		Crop:            nil,
+		Zoom:            0,
+		Allow:           nil,
 		AllowLocalFiles: false,
 		Background:      nil,
 		FontPaths:       nil,

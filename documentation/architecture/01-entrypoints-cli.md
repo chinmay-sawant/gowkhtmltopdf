@@ -84,8 +84,8 @@ decision-shaped lives in `internal/cli` plus the `internal/app` adapters
    stderr unconditionally).
 5. `signal.NotifyContext(SIGINT, SIGTERM)` so Ctrl-C cancels conversion
    cleanly (context propagated through `app.RunPDF` → `convert.Run`).
-6. `--dump-outline` (either `cmd.DumpOutline` or `cmd.Global.DumpOutline`)
-   routes the outline XML writer to stdout.
+6. `--dump-outline` (`cmd.Global.DumpOutline`) routes the outline XML writer
+   to stdout (passed into `app.RunPDF` as an explicit sink).
 7. Exit code: `cli.ExitCode(runErr)` (0 on success).
 
 ### 3.2 `cmd/gowkhtmltoimage/main.go` (image)
@@ -107,7 +107,7 @@ specific-decision logic (format sniffing, crop, quality) lives in
 | `ErrHelp`, `ErrVersion`, `ErrLicense`, `ErrExtHelp` | cli.go:16 | Sentinel **doc-flag** errors; caller prints and exits 0. Keeps `os.Exit` out of the library-parseable package. |
 | `errUnknownOption … errInvalidBoolValue` | cli.go:25 | Sentinel parse-stage errors, each wrapped with the offending token so callers can match with `errors.Is` |
 | `ExitOK = 0`, `ExitError = 1` | cli.go:38 | Exit-code constants (existing HTTP exit codes 2/3 are produced via `ExitCode`) |
-| `Command` | cli.go:44 | Parse result: `Global settings.PdfGlobal`, `Image settings.ImageGlobal`, `Objects []settings.PdfObject`, `Output string`, `OutputWriter io.Writer`, `OutlineWriter io.Writer`, `DumpDefaultTOCXSL bool`, `DumpOutline bool` |
+| `Command` | cli.go | Parse result: `Global settings.PdfGlobal`, `Image settings.ImageGlobal`, `Objects []settings.PdfObject`, `Output string`, `OutputWriter io.Writer`. Dump flags live on `Global` (`DumpOutline`, `DumpDefaultTOCXSL`); outline XML is an `app.RunPDF` sink argument, not a `Command` field. |
 | `(*Command).OpenOutput()` | cli.go:65 | Writer resolution: `OutputWriter` (library/embed path) → `Output` file → stdout; returns writer + closer (no-op for writer/stdout) |
 | `flagKind` / `flagSpec` | cli.go:83 / 93 | `flagBool` (one canonical `"true"`/`"false"`), `flagValue` (one token), `flagPair` (two tokens `name value`); `flagSpec{kind, mod, app}` |
 | `objectCtx` | cli.go:99 | Current object + `pending` buffer for page-scoped settings seen before any object keyword (upstream “address remapping”) |
@@ -167,31 +167,24 @@ specific-decision logic (format sniffing, crop, quality) lives in
 ### 4.1 Typical PDF invocation
 
 ```text
-$ gowkhtmltopdf --page-size A4 cover cover.html toc page ch1.html ch2.html out.pdf
+$ gowkhtmltopdf -o out.pdf --page-size A4 --cover cover.html --toc ch1.html ch2.html
 ```
 
 1. `main` → `run(os.Args[1:])`.
 2. `cli.Parse(argv, cli.ModePDF)` seeds `Command{Global: DefaultPdfGlobal(),
    Image: DefaultImageGlobal()}` and walks tokens:
-   - `--page-size A4` → long-flag: `splitFlag`, `lookupFlag`, `checkMode`
-     (ModePDF accepted), `apply` → `flagValue` consumes `A4` →
-     `c.Global.Set("size.pagesize", "A4")`.
-   - `cover` → `positional` → `newObject` appends a `DefaultPdfObject`,
-     stamps `IsCover=true`, `IncludeInOutline=false`, cleared
-     `Header/Footer` with `HeaderSet/FooterSet=true`.
-   - `cover.html` → fills the open cover object's `Page`.
-   - `toc` → `newFreshObject` (pending untouched): `IsTableOfContent=true`,
-     `UseOutline=false`.
-   - `page` → `newObject` (a fresh body object; pending consumed if any).
-   - `ch1.html` / `ch2.html` fill the body page objects.
-   - `out.pdf` → free positional queued.
-3. `resolveFree`: last free (`out.pdf`) → `Command.Output`; here all
-   positionals were consumed by explicit object keywords, so the loop adds
-   nothing; `validate()` passes (2 non-TOC objects with URLs).
+   - `-o out.pdf` → sets `Command.Output` / `outputSet`.
+   - `--page-size A4` → `c.Global.Set("size.pagesize", "A4")`.
+   - `--cover cover.html` → records `coverSource` (materialized later).
+   - `--toc` → records `tocRequested`.
+   - `ch1.html` / `ch2.html` → free body page inputs.
+3. `resolveFree` builds ordered objects via shared stamps:
+   `settings.StampCover` (empty HF + outline exclusion), `settings.StampTOC`,
+   then body pages; `validate()` requires at least one renderable body.
 4. `run` checks output, wires `--quiet`/dump-outline, builds a
    signal-cancellable context, calls `app.RunPDF(ctx, cmd, logw, nil,
    outline)`.
-5. `app.RunPDF` (internal/app/pdf.go:34):
+5. `app.RunPDF` (internal/app/pdf.go):
    - `BuildPDFRequest(cmd, io.Discard, outline)` → `convert.NewPDFRequest` +
      `req.Validate()` — **validation happens before any output file is
      created or truncated**;
@@ -210,13 +203,11 @@ $ gowkhtmltoimage --width 800 --crop-x 0 page.html out.png
 `cli.Parse(argv, cli.ModeImage)` rejects PDF-only flags at parse time
 (`--page-size` → `not supported in image mode`) but accepts image flags
 (`--width`, `crop-x` …) into `Command.Image`. `app.RunImage`
-(internal/app/image.go:24) validates a discard-sink
-`convert.NewImageRequest(cmd.Global, cmd.Image, cmd.Objects, io.Discard)`,
-then owns output opening and delegates to `imageout.RunRequest`
-(10-imageout-svg.md), which sniffs the format from `--format`/output
-extension (`imageout.ResolveFormat`), re-validates, opens the sink, and
-executes `imageout.RunRequest`. The command adapter owns this translation;
-the image engine does not import `internal/cli`.
+(internal/app/image.go) resolves format via `imageout.ResolveFormat`,
+validates a discard-sink `imageout.NewRequest(cmd.Global, cmd.Image,
+cmd.Objects, io.Discard)`, then owns output opening and delegates to
+`imageout.RunRequest` (10-imageout-svg.md). The command adapter owns this
+translation; the image engine does not import `internal/cli`.
 
 ### 4.3 Page-scoped flag routing (address remapping)
 
@@ -342,10 +333,9 @@ needs process-global stdout (all sinks are explicit `io.Writer`s).
   (03-settings.md). Direct field writes are reserved for structured values
   (cookie maps, post lists).
 - **“One home” rule**: each semantic setting has exactly one field home;
-  e.g. `--dump-default-toc-xsl` writes `Global.DumpDefaultTOCXSL` only; the
-  engine reads Global only, and legacy `Command.DumpOutline` is OR-ed into
-  `Global.DumpOutline` at the adapter boundary (app and convert do the same
-  OR). Comments in flags.go state this explicitly to prevent dual-home drift.
+  e.g. `--dump-default-toc-xsl` / `--dump-outline` write
+  `Global.DumpDefaultTOCXSL` / `Global.DumpOutline` only. There is no second
+  `Command.Dump*` home.
 - **`--no-<flag>` negation** resolved by `lookupFlag` (bool flags only),
   and **enable/disable pairs** for settings with no sensible bare form
   (e.g. smart-shrinking).
@@ -381,9 +371,10 @@ needs process-global stdout (all sinks are explicit `io.Writer`s).
   class for CLI users.
 - **Validation precedes file creation** so malformed flags cannot truncate
   an existing output file.
-- **Diagnostic streams stay separate**: outline/dump output never shares
-  the document sink (`OutlineWriter` vs `OutputWriter`), preventing mixed
-  formats and accidental exfiltration of dump data into a deliverable PDF.
+- **Diagnostic streams stay separate**: outline/dump output is an explicit
+  `app.RunPDF` writer argument and never shares the document sink
+  (`OutputWriter` / `OpenOutput`), preventing mixed formats and accidental
+  exfiltration of dump data into a deliverable PDF.
 - **No external process execution**: the CLI spawns no browser, no native
   converter, no network daemon (pure-Go engine), so argv cannot influence
   a subprocess command line.

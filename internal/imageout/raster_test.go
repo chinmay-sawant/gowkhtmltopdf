@@ -159,20 +159,14 @@ func TestFixture56UsesRoundedTopOverlayGeometry(t *testing.T) {
 
 	overlays := 0
 
-	for index, op := range res.Ops {
+	for _, op := range res.Ops {
 		if op.Kind == layout.OpStrokeRect && op.StrokeMask == layout.StrokeMaskTop && op.Radius > 0 {
-			overlays++
-
-			continue
-		}
-
-		if _, ok := roundedBorderLineOverlay(res.Ops, index); ok {
 			overlays++
 		}
 	}
 
 	if overlays == 0 {
-		t.Fatal("fixture 56 emitted no rounded top border overlays")
+		t.Fatal("fixture 56 emitted no rounded top StrokeMask overlays")
 	}
 }
 

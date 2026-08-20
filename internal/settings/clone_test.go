@@ -1,4 +1,4 @@
-package settings //nolint:testpackage // Build clones unexported builder fields.
+package settings //nolint:testpackage // exercises unexported clone helpers.
 
 import "testing"
 
@@ -7,29 +7,29 @@ const (
 	cloneMutated   = "mutated"
 )
 
-func TestPdfGlobalOptionsBuildClonesAllowNetworkAndHeaderReplace(t *testing.T) {
+func TestClonePdfGlobalIsolatesAllowNetworkAndHeaderReplace(t *testing.T) {
 	t.Parallel()
 
-	options, err := NewPdfGlobalOptions().WithSetting("allow", cloneAllowPath)
-	if err != nil {
-		t.Fatalf("WithSetting(allow): %v", err)
+	global := DefaultPdfGlobal()
+	if err := global.Set("allow", cloneAllowPath); err != nil {
+		t.Fatalf("Set(allow): %v", err)
 	}
 
-	options.global.Load.NetworkPolicySet = true
-	options.global.Load.NetworkAllowedHosts = []string{"reports.example.test"}
-	options.global.Load.NetworkAllowedSchemes = []string{"http"}
-	options.global.Header.Replace = map[string]string{"name": "before"}
-	options.global.Footer.Replace = map[string]string{"page": "before"}
+	global.Load.NetworkPolicySet = true
+	global.Load.NetworkAllowedHosts = []string{"reports.example.test"}
+	global.Load.NetworkAllowedSchemes = []string{"http"}
+	global.Header.Replace = map[string]string{"name": "before"}
+	global.Footer.Replace = map[string]string{"page": "before"}
 
-	got := options.Build()
+	got := ClonePdfGlobal(global)
 
-	if _, err := options.WithSetting("allow", "/tmp/mutated"); err != nil {
+	if err := global.Set("allow", "/tmp/mutated"); err != nil {
 		t.Fatalf("mutate allow: %v", err)
 	}
 
-	options.global.Load.NetworkAllowedHosts[0] = "mutated.example.test"
-	options.global.Header.Replace["name"] = "after"
-	options.global.Footer.Replace["page"] = "after"
+	global.Load.NetworkAllowedHosts[0] = "mutated.example.test"
+	global.Header.Replace["name"] = "after"
+	global.Footer.Replace["page"] = "after"
 
 	if len(got.Load.Allow) != 1 || got.Load.Allow[0] != cloneAllowPath {
 		t.Fatalf("Allow snapshot = %v, want [%s]", got.Load.Allow, cloneAllowPath)

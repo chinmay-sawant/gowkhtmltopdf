@@ -4,6 +4,7 @@
 |---------------|------|
 | [31-canonical-0.2.4-roadmap.md](31-canonical-0.2.4-roadmap.md) | **Canonical v0.2.4 execution ledger** (phases 31–39) |
 | [phases/](phases) | Per-phase atomic checklists (API/CLI 31–38 + external benches 39) |
+| [improve-codebase/](improve-codebase) | Post-0.2.4 architecture / extension / practices review ledgers |
 | [PR/release-v0.2.4.md](PR/release-v0.2.4.md) | GitHub release body (paste after `v0.2.4` tag) |
 | [PR/pr-0.2.4-document-api-refactor.md](PR/pr-0.2.4-document-api-refactor.md) | Integration PR body (#53) |
 

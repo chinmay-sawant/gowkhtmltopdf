@@ -803,6 +803,42 @@ func TestTableLayout(t *testing.T) {
 	}
 }
 
+// EXT-14: table-layout:fixed with a definite width ignores content max-content
+// when assigning column used widths (equal share of the table inner width).
+func TestTableLayoutFixedIgnoresContentMax(t *testing.T) {
+	t.Parallel()
+
+	const long = "supercalifragilisticexpialidocious"
+	fixed := layoutHTML(t, `<html><body>
+<table style="table-layout:fixed; width:200pt; border-collapse:collapse; border-spacing:0">
+<tr><td>a</td><td>`+long+`</td></tr>
+</table></body></html>`)
+	auto := layoutHTML(t, `<html><body>
+<table style="table-layout:auto; width:200pt; border-collapse:collapse; border-spacing:0">
+<tr><td>a</td><td>`+long+`</td></tr>
+</table></body></html>`)
+
+	fixedTexts := opsOfKind(fixed, OpText)
+	autoTexts := opsOfKind(auto, OpText)
+
+	if len(fixedTexts) < 2 || len(autoTexts) < 2 {
+		t.Fatalf("expected 2 text ops each, got fixed=%d auto=%d", len(fixedTexts), len(autoTexts))
+	}
+
+	fixedGap := fixedTexts[1].X - fixedTexts[0].X
+	autoGap := autoTexts[1].X - autoTexts[0].X
+	// Fixed equal-share columns start the long cell near the midpoint (~100pt).
+	// Auto shrinks the short first column to content, so the long cell starts
+	// earlier (smaller gap) and claims the remaining table width.
+	if fixedGap < 80 || fixedGap > 120 {
+		t.Fatalf("fixed col gap=%.2f, want ~100pt equal share", fixedGap)
+	}
+
+	if autoGap >= fixedGap-10 {
+		t.Fatalf("auto col gap=%.2f should be below fixed gap=%.2f (short first col)", autoGap, fixedGap)
+	}
+}
+
 func TestBorderSpacing(t *testing.T) {
 	t.Parallel()
 

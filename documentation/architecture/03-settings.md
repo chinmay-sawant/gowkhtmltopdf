@@ -17,28 +17,28 @@ package that understands the **wkhtmltopdf dotted-name vocabulary**
 Its position in the pipeline is upstream of everything:
 
 ```text
-argv / library calls
-      │  (string keys + values, or typed builder)
-      ▼
-internal/settings ── Set / Get / typed structs ──► internal/cli (Command)
-      │                                                │
-      │  cli.Command carries PdfGlobal/PdfObject/      │
-      │  ImageGlobal snapshots                         │
-      ▼                                                ▼
-internal/app (command→request adapters)          document.go (typed adapters)
-      │                                                │
-      ▼                                                ▼
-internal/convert (Request: Global, Objects, Image) ──► internal/load (NewLoader)
-      │                                                │
-      ├──► internal/layout / internal/pdf              ▼
-      └──► internal/imageout (mediaFor, imageLoad)   resource fetches honor
-                                                      LoadGlobal/LoadPage policy
+argv (CLI)                         Document / ImageDocument fields
+      │  dotted Set/Get                  │  typed public overlay
+      ▼                                  ▼
+internal/settings ── structs ──► internal/cli (Command)
+      │                                document.go mappers
+      │  cli.Command carries             │
+      │  PdfGlobal/PdfObject/            │
+      │  ImageGlobal values              │
+      ▼                                  ▼
+internal/app (command→request)     convert.Request / imageout.Request
+      │                                  │
+      ▼                                  ▼
+internal/convert (PDF) / imageout ──► internal/load (NewLoader)
+      │                                  │
+      ├──► internal/layout / internal/pdf ▼
+      └──► resource fetches honor LoadGlobal/LoadPage policy
 ```
 
-Nothing in the engine reads argv or library setters directly; everything
+Nothing in the engine reads argv or root-library setters directly; everything
 reads the typed settings structs (`settings.PdfGlobal`, `settings.PdfObject`,
-`settings.ImageGlobal`) that this package defines, default-initializes, and
-mutates through its descriptor tables.
+`settings.ImageGlobal`) that this package defines and that CLI/`Document`
+mappers populate. Dotted `Set` is CLI + engine only.
 
 A second, smaller package is in scope: `internal/errs`, which owns the shared
 domain **sentinel errors** (`ErrNilContext`, `ErrNilLoader`, `ErrNilCommand`,
@@ -54,13 +54,13 @@ nil-guard error identity stable across the library boundary.
 | `internal/pdfprofile/profile.go` | Leaf: canonical profile tokens (`PDF/A-3a`, `PDF/UA-1`, `PDF/A-3a+PDF/UA-1`, `PDF/A-4`, `PDF/UA-2`, `PDF/A-4+PDF/UA-2`), alias `Parse`, `IsPDFA*` / `IsPDFUA*` | 140 |
 | `internal/settings/reflect.go` | The descriptor engine: `keyTable`/`field` tables, dotted-key `Set`/`Get`, type-coercing setters (`setBool`, `setFloat`, `setInt`, `setUnitMm`, …), ignored-key tables (Policy A), `ApplyImageKey` | 881 |
 | `internal/settings/getters.go` | `Get` methods on the three settings types; canonical string formatting helpers (`fmtBool`, `fmtFloat`, `fmtInt`, `fmtStrings`) | 37 |
-| `internal/settings/options.go` | `PdfGlobalOptions` typed builder (`WithPageSize`, `WithMargins`, …) for the library API; independent-snapshot `Build()` | 93 |
+| `internal/settings/object_roles.go` | Shared cover/TOC stamps (`StampCover`, `StampEmptyHFOverride`, `StampTOC`) used by CLI and Document mappers | — |
 | `internal/settings/pagesize.go` | Static ISO/ANSI page-size table in points; `ParsePageSize(name) (w, h, err)` | 64 |
 | `internal/settings/unitreal.go` | `UnitReal` scalar with unit suffix (`10mm`, `1.5in`, `12pt`, `96px`, `100%`); `Points()` / `Mm()` conversion; `ErrInvalidUnitReal` | 94 |
 | `internal/settings/httperror.go` | `HttpStatusError` (load failure carrying HTTP status) and `HttpErrorCode` (status → wkhtmltopdf exit code: 404→2, 401→3, else 1) | 41 |
-| `internal/settings/doc.go` | Package doc: **Policy A (settings honesty)** — only engine-consumed options get typed fields; inert wkhtml keys sink into `Ignored` | 17 |
-| `internal/settings/settings_test.go` | Defaults snapshots, dotted Set/Get round-trips, ignored-key acceptance, unknown-key errors, `UnitReal`/`PageSize`/enum parsing, HTTP exit codes, header/footer inheritance, `ResolveMedia`, `ApplyImageKey` | 648 |
-| `internal/settings/options_test.go` | Typed builder produces an independent, correctly-populated snapshot | 32 |
+| `internal/settings/doc.go` | Package doc: Policy A + dotted Set is CLI/engine only; Document is the typed overlay | — |
+| `internal/settings/settings_test.go` | Defaults snapshots, dotted Set/Get round-trips, ignored-key acceptance, unknown-key errors, `UnitReal`/`PageSize`/enum parsing, HTTP exit codes, header/footer inheritance, `ResolveMedia`, `ApplyImageKey` | — |
+| `internal/settings/options_test.go` | Constructs `PdfGlobal` directly and asserts clone/Set behavior (no public builder) | — |
 | `internal/errs/errs.go` | Canonical sentinel errors shared across packages | 16 |
 
 Total package size: ~2,372 lines including tests.
@@ -142,15 +142,17 @@ Supporting sub-structs (all in `settings.go`):
 | `HttpErrorCode(status)` | 404 → 2, 401 → 3, else 1 (wkhtmltopdf `utilities.cc` convention) | `httperror.go:27` |
 | `(e *HttpStatusError) HttpErrorCode()` | Lets `cli.ExitCode` detect the exit code via an interface check | `httperror.go:39` |
 
-### 3.6 Typed builder
+### 3.6 Object role stamps
 
-| Symbol | Purpose | File:line |
-|--------|---------|-----------|
-| `PdfGlobalOptions` | Value-type builder for the library API; immutable (each `With*` returns a copy) | `options.go:6` |
-| `NewPdfGlobalOptions()` | Starts from `DefaultPdfGlobal()` | `options.go:11` |
-| `WithPageSize/WithMargins/WithTitle/WithCopies/WithOutline/WithSmartShrinking/WithBackground/WithCompression/WithResolveRelativeLinks` | Compile-time-discoverable setters | `options.go:15`–`options.go:68` (approx.) |
-| `WithPDFVersion` / `WithPDFProfile` | Normalize valid input to canonical tokens; invalid strings are stored as-is and fail later at `PolicyForGlobal` / `Validate` | `options.go:71` / `options.go:81` |
-| `(o PdfGlobalOptions) Build()` | Independent snapshot (clones slices and `Ignored` map) | `options.go:106` |
+| Symbol | Purpose | File |
+|--------|---------|------|
+| `StampEmptyHFOverride` | Empty header/footer with `HeaderSet`/`FooterSet` true (blocks global HF inherit) | `object_roles.go` |
+| `StampCover` | `IsCover`, outline exclusion, empty HF override | `object_roles.go` |
+| `StampTOC` | TOC object flags (`IsTableOfContent`, `UseOutline`/`IncludeInOutline` false) | `object_roles.go` |
+
+Public PDF version / profile knobs are `Document.PDFVersion` /
+`Document.PDFProfile` (CLI: `--pdf-version` / `--pdf-profile`). There is no
+library `WithPDFVersion` / `PdfGlobalOptions` builder.
 
 ### 3.7 Sentinel errors (`internal/errs`)
 
@@ -189,13 +191,15 @@ Supporting sub-structs (all in `settings.go`):
    `Content` values name exactly one HTML, File, or URL source.
 2. `Validate` checks source cardinality, page geometry, profiles, formats, and
    renderability before the adapter opens a sink.
-3. The unexported mappers clone HTML, option slices, headers, and network
-   policy before constructing internal `convert.PDFRequest` or
-   `imageout.Request` values.
+3. The unexported mappers build fresh `PdfGlobal` / `PdfObject` values and
+   clone selected slices/maps (HTML bytes, allowlists, font paths, replace
+   maps, network hosts) before constructing `convert.Request` or
+   `imageout.Request`. This is a single-goroutine Write* snapshot rule, not a
+   full deep clone of every nested field.
 4. `Document.WritePDF` / `PDF` and `ImageDocument.WriteImage` / `Image` call
    the corresponding engine seam with a caller-owned writer or byte buffer.
 5. Dotted settings remain available only inside `internal/settings` and the
-   CLI adapter; they are not part of the root package contract.
+   CLI/engine adapters; they are not part of the root package contract.
 
 ### 4.3 Engine consumption
 
@@ -334,10 +338,11 @@ keeping the settings layer unit-agnostic on output.
 ### 6.5 Value semantics and defensive cloning
 
 All settings structs are **plain value types** (no pointers, no methods that
-mutate receivers) except the `Ignored` maps and slice fields. The library
-API deep-clones HTML and option slices at the `Document` / `ImageDocument`
-adapter boundary, so engine requests cannot alias caller state. CLI parsing
-also gets fresh defaults per parse.
+mutate receivers) except the `Ignored` maps and slice fields. `Document` /
+`ImageDocument` mappers clone the slices and maps they pass into the engine
+request so caller mutation after Write* starts cannot alias those fields.
+Write* is single-goroutine; there is no concurrent Document snapshot API.
+CLI parsing also gets fresh defaults per parse.
 
 ### 6.6 Errors as a shared leaf vocabulary
 
@@ -380,8 +385,6 @@ carries *data* (status, URL) and its exit-code contract is exercised by
 - **Immutable tables:** `ignoredGlobalKeySet`/`ignoredObjectKeySet` are
   package-scope maps documented "immutable-by-convention"; the page-size
   table is a fixed array to avoid exposing a mutable map.
-- **Typed builder immutability:** `PdfGlobalOptions` is a value type; each
-  `With*` returns a copy, so chaining cannot corrupt a shared builder.
 - **Exit-code contract via interface, not type switch:** `cli.ExitCode`
   checks `interface{ HttpErrorCode() int }` — any future error type can join
   without touching cli (`cli.go:517-524`).
@@ -444,7 +447,7 @@ The package is validated by table-driven unit tests in
 | `TestGlobalGetSetRoundTripAndIgnored` | Get returns canonical strings; ignored keys readable; unknown keys `not-found` |
 | `TestKeyTableSetGetParity` | Every registered key has both apply and get descriptors (table completeness invariant) |
 | `TestResolveMedia` | Full precedence matrix (print-media-type > object > global > base) |
-| `TestPdfGlobalOptionsBuildsIndependentTypedSnapshot` (`options_test.go`, external test package) | Typed builder produces independent, correctly populated snapshot |
+| `TestPdfGlobalFieldSnapshotViaClone` (`options_test.go`) | Direct `PdfGlobal` field + `ClonePdfGlobal` snapshot |
 
 Downstream integration coverage: golden CLI tests (`internal/cli/cli_test.go`),
 convert seams tests (`internal/convert/seams_test.go`), load tests
@@ -474,9 +477,9 @@ added.
 - **`size.pagesize` uses one canonical field.** `PdfGlobal.PageSize` stores the
   named page geometry and `Size` stores only width/height measurements. The
   settings parity tests protect this single source of truth.
-- **`PdfGlobalOptions` builder covers only global PDF settings.** Object
-  options and image options have no typed builder; callers must use dotted
-  `Set` (`options.go`).
+- **Public library knobs are Document fields**, not a second settings builder.
+  Object/image options for CLI/engine still use dotted `Set` or typed struct
+  fields on `PdfObject` / `ImageGlobal`.
 - **`fontpath`/`allow` are append-only setters** — there is no way to clear
   previously appended values through the dotted surface (matches wkhtmltopdf
   flag accumulation semantics).
@@ -495,8 +498,8 @@ added.
 - **In this directory (sibling architecture deep-dives):**
   - [01-entrypoints-cli.md](01-entrypoints-cli.md) — where `Set` is called
     from flags; `cli.ExitCode` consumes `HttpErrorCode`
-  - [02-library-api.md](02-library-api.md) — typed builder + dotted wrappers
-    over the same structs; clone-on-convert
+  - [02-library-api.md](02-library-api.md) — Document / ImageDocument typed
+    overlay; selected-slice clone at Write*
   - [04-load.md](04-load.md) — how `LoadGlobal`/`LoadPage` policy is enforced
   - [05-html-parser.md](05-html-parser.md) — `InlineHTML`/`InlineBase` input
     seam
@@ -504,8 +507,8 @@ added.
     selection
   - [07-layout.md](07-layout.md) — unit conversion downstream of
     `UnitReal.Points` (font-relative units resolved in layout)
-  - [08-convert-pipeline.md](08-convert-pipeline.md) — `Request` carries
-    `PdfGlobal`/`PdfObject`/`ImageGlobal`; `ValidatePDF`/`ValidateImage`
+  - [08-convert-pipeline.md](08-convert-pipeline.md) — PDF `Request` carries
+    `PdfGlobal`/`PdfObject`; image jobs use `imageout.Request`
   - [09-pdf-writer.md](09-pdf-writer.md) — receives already-converted page
     geometry (points), never settings keys
   - [10-imageout-svg.md](10-imageout-svg.md) — `mediaFor`/`imageLoadGlobal`/

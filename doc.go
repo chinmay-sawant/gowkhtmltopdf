@@ -45,8 +45,8 @@
 //
 // A Content value must have exactly one of HTML, File, or URL set. Base is
 // valid with HTML and resolves relative subresources. Local file reads are
-// disabled by default; Document.AllowLocalFiles is the one public switch for
-// enabling the local-file policy. NetworkPolicy controls remote fetches.
+// disabled by default; Document.AllowLocalFiles enables broad local reads and
+// Document.Allow adds ACL path prefixes. NetworkPolicy controls remote fetches.
 //
 // # Validation and ownership
 //

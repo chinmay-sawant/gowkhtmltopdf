@@ -1,5 +1,10 @@
 // Package settings implements the wkhtmltopdf-compatible settings model and
-// dotted-name Set surface used by the CLI and library API.
+// the dotted-name Set/Get surface used by the CLI and engine adapters.
+//
+// The root library API is the typed Document / ImageDocument overlay in the
+// parent module; public callers do not use dotted Set. Document mappers build
+// PdfGlobal / PdfObject values for a single-goroutine Write*; selected slices
+// and maps are cloned at that boundary rather than deep-cloning every field.
 //
 // # Policy A (settings honesty)
 //

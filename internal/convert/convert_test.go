@@ -19,6 +19,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert/prepare"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/imageout"
@@ -220,31 +221,31 @@ func TestLinkStylesheetMediaMatches(t *testing.T) {
 
 	const viewW, viewH = 538.0, 785.0
 
-	if !linkStylesheet(mark(""), viewW, viewH, mediaPrint) {
+	if !prepare.LinkStylesheet(mark(""), viewW, viewH, mediaPrint) {
 		t.Error("empty media should load")
 	}
 
-	if !linkStylesheet(mark("print"), viewW, viewH, mediaPrint) {
+	if !prepare.LinkStylesheet(mark("print"), viewW, viewH, mediaPrint) {
 		t.Error("print should load")
 	}
 
-	if !linkStylesheet(mark("all"), viewW, viewH, mediaPrint) {
+	if !prepare.LinkStylesheet(mark("all"), viewW, viewH, mediaPrint) {
 		t.Error("all should load")
 	}
 
-	if linkStylesheet(mark("screen"), viewW, viewH, mediaPrint) {
+	if prepare.LinkStylesheet(mark("screen"), viewW, viewH, mediaPrint) {
 		t.Error("screen-only must be excluded for print")
 	}
 
-	if !linkStylesheet(mark("(min-width: 500px)"), viewW, viewH, mediaPrint) {
+	if !prepare.LinkStylesheet(mark("(min-width: 500px)"), viewW, viewH, mediaPrint) {
 		t.Error("min-width feature matching A4 content should load")
 	}
 
-	if linkStylesheet(mark("(min-width: 2000px)"), viewW, viewH, mediaPrint) {
+	if prepare.LinkStylesheet(mark("(min-width: 2000px)"), viewW, viewH, mediaPrint) {
 		t.Error("unmatched min-width must not load")
 	}
 
-	if !linkStylesheet(mark("screen"), viewW, viewH, "screen") {
+	if !prepare.LinkStylesheet(mark("screen"), viewW, viewH, "screen") {
 		t.Error("screen media type should accept screen stylesheets")
 	}
 }

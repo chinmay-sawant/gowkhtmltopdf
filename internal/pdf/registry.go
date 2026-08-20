@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 // Registry indexes discoverable TTF faces by CSS family name (lowercased).
@@ -334,6 +336,12 @@ func RegistryFromPaths(fontPaths []string, useSystemFonts bool) *Registry {
 	}
 
 	return ScanFontDirs(dirs)
+}
+
+// RegistryFromGlobal builds an opt-in font registry from PdfGlobal font
+// settings. Returns nil when nothing was configured. Callers own logging.
+func RegistryFromGlobal(global settings.PdfGlobal) *Registry {
+	return RegistryFromPaths(global.FontPaths, global.UseSystemFonts)
 }
 
 // scanFontFile parses a font file into the registry, skipping anything that

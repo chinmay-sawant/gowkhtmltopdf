@@ -71,9 +71,9 @@ Do not treat a public SPA URL as the acceptance bar for report work.
 | SVG image **output** (`--format svg`) | Image mode encodes PNG/JPEG only. | Not planned |
 | BMP output | No demand; PNG/JPEG cover `image/*`. | Not planned |
 | SOCKS5 proxy | `parseProxy` accepts `http` / `https` only. | Not planned |
-| PDF 1.7 + PDF/A-3a / PDF/UA-1 | **Shipped in 0.2.2** (#31, [#45](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/45)/[#47](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/47)): opt-in `--pdf-version 1.7` / `WithPDFVersion("1.7")` is a version, not a claim. Profiles `--pdf-profile a3a-ua1` / `a3a` / `ua1` (canonical Get: `PDF/A-3a+PDF/UA-1`, `PDF/A-3a`, `PDF/UA-1`) imply 1.7. Tagged lists nest `L` → `LI` → `LBody` → `Link`. | #31 done |
-| PDF 2.0 (ISO 32000-2) | **Shipped in 0.2.2** (#32, [#46](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/46)): opt-in version via `--pdf-version 2.0` / `WithPDFVersion("2.0")` — header, trailer `/ID`, UTF-8 document strings, non-claiming XMP. Version alone is **not** a PDF/A or PDF/UA claim. | #32 done |
-| PDF/A-4 / PDF/UA-2 (PDF 2.0 conformance profiles) | **Shipped in 0.2.2** (#33, [#46](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/46)/[#47](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/47)): opt-in via `--pdf-profile a4-ua2` / `WithPDFProfile("a4-ua2")` (also `a4`, `ua2`; canonical Get: `PDF/A-4+PDF/UA-2`, `PDF/A-4`, `PDF/UA-2`). Implies PDF 2.0. Emits claiming XMP (`pdfaid:part=4`, `pdfuaid:part=2`), OutputIntent, structure namespaces, and full tagging. | #33 done |
+| PDF 1.7 + PDF/A-3a / PDF/UA-1 | **Shipped in 0.2.2** (#31, [#45](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/45)/[#47](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/47)): opt-in `--pdf-version 1.7` / `Document.PDFVersion = "1.7"` is a version, not a claim. Profiles `--pdf-profile a3a-ua1` / `a3a` / `ua1` (or `Document.PDFProfile`) imply 1.7. Tagged lists nest `L` → `LI` → `LBody` → `Link`. | #31 done |
+| PDF 2.0 (ISO 32000-2) | **Shipped in 0.2.2** (#32, [#46](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/46)): opt-in version via `--pdf-version 2.0` / `Document.PDFVersion = "2.0"` — header, trailer `/ID`, UTF-8 document strings, non-claiming XMP. Version alone is **not** a PDF/A or PDF/UA claim. | #32 done |
+| PDF/A-4 / PDF/UA-2 (PDF 2.0 conformance profiles) | **Shipped in 0.2.2** (#33, [#46](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/46)/[#47](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/47)): opt-in via `--pdf-profile a4-ua2` / `Document.PDFProfile` (also `a4`, `ua2`). Implies PDF 2.0. Emits claiming XMP (`pdfaid:part=4`, `pdfuaid:part=2`), OutputIntent, structure namespaces, and full tagging. | #33 done |
 | PDF encryption / AcroForm / signatures | Out of scope; no writer support (rejected on every version, incl. 2.0). | Not planned |
 | C ABI (`wkhtmltopdf_*` cgo exports) | CGO is forbidden on the main path. | Only if consumer demand |
 | `--read-args-from-stdin` | **Not implemented.** The flag is not a working batch loop (rejected / unused). | Not planned |
@@ -83,7 +83,7 @@ Do not treat a public SPA URL as the acceptance bar for report work.
 | HTML header / footer | **Partial** nested child layout (body CSS subset, flex/grid/images, local `@font-face`), clipped to the reserved margin band. Not a browser nested browsing context; no CSS running elements. | Browser HF out |
 | `:hover` / `:focus` / `:active` | Parsed onto the compound; `matchPseudo` **never matches** (print has no pointer/focus). | — |
 | `table-layout: fixed` | Parsed; unused (auto table layout only). | — |
-| `@page size` | Parsed onto `PageStyle.Size`; **unused**. Unnamed `@page margin` **is** applied (`applyCSSPageMargins`). | — |
+| `@page size` | **Consumed** via `applyCSSPageMargins` (EXT-04); unnamed `@page margin` likewise. | #EXT-04 done |
 | `background-image` / gradients | Ignored (`background-color` is painted). | — |
 | Overflow clip | `overflow` is parsed for sticky scrollport selection. **Not** a general paint clip. | — |
 

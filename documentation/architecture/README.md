@@ -168,7 +168,7 @@ under mutation races (validated with `-race`).
 ```
 
 - PDF mode: PDF **1.4** (default), PDF **1.7**, or PDF **2.0** (opt-in via
-  `WriterPolicy`; `--pdf-version` / `WithPDFVersion`),
+  `WriterPolicy`; `--pdf-version` / `Document.PDFVersion`),
   zlib Flate streams, subset TTF (Liberation Sans/Serif/Mono + DejaVu fallback),
   `/Widths` in 1000-unit em, WinAnsi-style Latin-1 codes (UTF-16BE + BOM for 1.7 Unicode Info,
   UTF-8 text strings on 2.0),

@@ -22,7 +22,7 @@ is tracked in
 | Wikipedia / marketing “decent print” (readable title + body) | **Progressive goal** (Phase 21) — not MVP acceptance yet |
 | Full CSS (flex/grid as layout, absolute/fixed/sticky positioning) | **Partial** — flex (grow/shrink/basis/order/wrap), grid lite, relative/absolute/fixed; sticky print-scoped (page = scrollport); static 2D transforms (paint CTM); not full CSS3 |
 | JavaScript-driven pages | **Out of scope** (`<script>` stripped; JS CLI flags are unknown options) |
-| Archival / tagged PDF (PDF/A, PDF/UA) | **Shipped in 0.2.2.** Opt-in via `--pdf-profile` / `WithPDFProfile`. Default is unclaimed PDF 1.4. `--pdf-version` / `WithPDFVersion` is a version, not a claim |
+| Archival / tagged PDF (PDF/A, PDF/UA) | **Shipped in 0.2.2.** Opt-in via `--pdf-profile` / `Document.PDFProfile`. Default is unclaimed PDF 1.4. `--pdf-version` / `Document.PDFVersion` is a version, not a claim |
 | Encryption / AcroForm / signatures | **Out of scope** (rejected on every version) |
 | Full Unicode / CJK typesetting | **Partial** — Type0/CID + `--font-path`; Arabic OT via `go-text/typesetting` (GSUB) + presentation-form fallback; Indic Partial; no CGO HarfBuzz; `writing-mode` vertical is parsed but lays out horizontal |
 
