@@ -35,7 +35,7 @@ Authoritative project docs and plans win when wiki pages drift
 | [`knowledge-base/wiki/syntheses/fonts-and-typography.md`](../../../knowledge-base/wiki/syntheses/fonts-and-typography.md) | Compiled synthesis (path retargeted to this folder 2026-08-19) |
 | [`knowledge-base/wiki/syntheses/roadmap.md`](../../../knowledge-base/wiki/syntheses/roadmap.md) | Lists this track under `plans/0.2.5/font/` |
 | [`knowledge-base/raw/security-posture.md`](../../../knowledge-base/raw/security-posture.md) | `@font-face` as untrusted parse input; FetchSub SSRF/ACL |
-| [`plans/0.2.0/phases/pending-phase-items/09-remote-webfonts.md`](../../0.2.0/phases/pending-phase-items/09-remote-webfonts.md) | WOFF2/Brotli remains a separate epic |
+| [`plans/0.2.6/woff2-metric-aliases/`](../../0.2.6/woff2-metric-aliases/README.md) | Successor for WOFF2/Brotli + opt-in metric aliases (pending-09 remaining rows superseded) |
 | Code under `internal/pdf`, `internal/layout`, `internal/convert/prepare`, `internal/css` | Reality check 2026-08-19 |
 
 ## Package map (today)
@@ -210,12 +210,29 @@ plan keeps WOFF2 as a documented skip with a clear diagnostic.
 - Rebuilding the PDF writer or adding a second font subsetter.
 - Making Chrome, WeasyPrint, Pango, or Fontconfig runtime dependencies.
 - Making host system font discovery the default.
+- Importing Fontconfig metric substitutions into default resolution
+  (e.g. `Georgia → Gelasio`, `Courier New → Cousine`). WeasyPrint parity on
+  those substitutes is **intentionally out of scope**; Liberation via the
+  author stack / generics is the correct default after this track.
 - Claiming pixel parity with a browser whose installed fonts differ.
 - Bundling Microsoft Georgia without redistribution rights.
 - Reopening the completed 0.2.4 Document API phases for unrelated changes.
-- Implementing WOFF2/Brotli inside this track (separate pending item + allowlist amendment).
+- Implementing WOFF2/Brotli inside this track (successor:
+  `plans/0.2.6/woff2-metric-aliases/`).
 - Marking existing fixture goldens as updated before visual and compliance
   evidence is reviewed.
+
+## Deferred after this track (not a reopen of 01–08)
+
+Successor ledger:
+[`plans/0.2.6/woff2-metric-aliases/`](../../0.2.6/woff2-metric-aliases/README.md).
+
+- **WOFF2 / Brotli decode** (allowlist amendment + `DecodeWOFF2`).
+- **Opt-in metric-compatible alias map** (`--use-metric-font-aliases`): when
+  discovery/`@font-face` registers faces such as Gelasio/Cousine, an explicit
+  operator setting may accept CSS-name → discovered-family aliases for
+  WeasyPrint-like metrics. Must remain opt-in; must not become the no-flag
+  default.
 
 ## Definition of done
 

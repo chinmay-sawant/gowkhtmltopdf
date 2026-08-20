@@ -50,7 +50,10 @@ profiles, fixtures, documentation, and performance evidence agree.
   match `documentation/fonts.md`.
 - [x] Record deferred work explicitly, such as proprietary-font licensing,
   browser pixel parity, WOFF2/Brotli (pending `09-remote-webfonts.md`),
-  variable-font support, or synthetic bold/italic if Phase 1 rejected it.
+  variable-font support (rejected via `fvar`), synthetic bold/italic
+  (rejected in Phase 1), and **opt-in Fontconfig-style metric aliases**
+  (Gelasio/Cousine) as a possible future amendment — not a reopen of 01–08
+  and not a WeasyPrint-parity bug.
 
 ## Definition of done
 
@@ -96,4 +99,13 @@ Cover FontResolver, discovery diagnostics, `@font-face` weight/style, preflight 
 - Repository veraPDF wrapper: `verapdf` binary not present on this host
   (**documented skip**). Existing PDF profile unit tests remain green under
   `make test`; claiming-profile embed rules unchanged (FontFile2 + ToUnicode).
+
+### Post-closure product note (2026-08-20)
+
+Closing commit `ae49f3f` resolves fonts **away from** WeasyPrint Fontconfig
+parity. `Georgia, serif` without a supplied Georgia face → Liberation Serif
+is correct. Do not open a bug to adopt Gelasio/Cousine as the default; that
+opt-in path (plus WOFF2) is ledgered under
+[`plans/0.2.6/woff2-metric-aliases/`](../../0.2.6/woff2-metric-aliases/README.md)
+and must not reopen phases 01–08.
 

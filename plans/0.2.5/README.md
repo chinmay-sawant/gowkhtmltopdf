@@ -24,3 +24,9 @@ claiming-profile gates.
 **Complete (implementation validated 2026-08-19).** Checklist rows in
 `font/` are closed with `make test` / `make lint` and fixture-55 evidence.
 `VERSION` remains `0.2.4` until release prep tags 0.2.5.
+
+## Successor (do not reopen font phases 01–08)
+
+WOFF2 decode and opt-in metric aliases are tracked under
+[`plans/0.2.6/woff2-metric-aliases/`](../0.2.6/woff2-metric-aliases/README.md).
+The no-flag Liberation-via-stack contract from this folder stays the baseline.

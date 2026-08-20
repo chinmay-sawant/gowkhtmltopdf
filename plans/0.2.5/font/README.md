@@ -30,6 +30,27 @@ the resolution contract explicit:
 5. Every selected face remains parseable, subsettable, embeddable, and valid
    under the existing PDF/A and PDF/UA profiles.
 
+## Intentional divergence from WeasyPrint / Fontconfig (not a bug)
+
+`ae49f3f` closed this track **away from** WeasyPrint host parity, not toward
+it. Post-0.2.5 default behavior for `font-family: Georgia, serif` with no
+Georgia face supplied is **Liberation Serif via the `serif` generic**. That
+is the intended contract.
+
+| Engine | Typical Linux outcome for bare `Georgia` |
+|--------|------------------------------------------|
+| WeasyPrint | Fontconfig metric substitute (e.g. Gelasio) |
+| Chrome (with Georgia installed) | Real Georgia |
+| Gowkhtmltopdf (no font flags) | Author stack → `serif` → Liberation Serif |
+
+Do **not** treat Gelasio / Cousine differences vs WeasyPrint as a regression
+to fix in this ledger. Metric-compatible host substitution
+(`Georgia → Gelasio`, `Courier New → Cousine` when those faces are present)
+is a **separate opt-in feature** on top of v0.2.5 — see
+[`plans/0.2.6/woff2-metric-aliases/`](../../0.2.6/woff2-metric-aliases/README.md).
+Do not reopen phases 01–08 here. The 0.2.6 track must keep the no-flag
+Liberation-via-stack default.
+
 ## Start here
 
 - [00-canonical-font-resolution-plan.md](00-canonical-font-resolution-plan.md)
@@ -47,11 +68,10 @@ the resolution contract explicit:
 | Item | Location | Relationship |
 |------|----------|--------------|
 | HTTPS/local TTF/OTF/WOFF1 `@font-face` | already shipped | Reuse; do not re-plan as unimplemented |
-| WOFF2 / Brotli decode | [`plans/0.2.0/phases/pending-phase-items/09-remote-webfonts.md`](../../0.2.0/phases/pending-phase-items/09-remote-webfonts.md) | Separate allowlist-amendment epic; not required for resolution closure |
-| Normative operator docs | [`documentation/fonts.md`](../../../documentation/fonts.md) | Authoritative until Phase 7 lands |
-| Compiled KB synthesis | [`knowledge-base/wiki/syntheses/fonts-and-typography.md`](../../../knowledge-base/wiki/syntheses/fonts-and-typography.md) | Path retargeted to this folder; Phase 7 still syncs contract text after implementation |
+| WOFF2 / Brotli decode | [`plans/0.2.6/woff2-metric-aliases/`](../../0.2.6/woff2-metric-aliases/README.md) | Successor track (supersedes remaining pending-09 WOFF2 rows) |
+| Opt-in metric-compatible aliases (Gelasio/Cousine-style) | [`plans/0.2.6/woff2-metric-aliases/`](../../0.2.6/woff2-metric-aliases/README.md) | Same successor track; must stay opt-in and must not become default |
+| Normative operator docs | [`documentation/fonts.md`](../../../documentation/fonts.md) | Authoritative shipped contract |
+| Compiled KB synthesis | [`knowledge-base/wiki/syntheses/fonts-and-typography.md`](../../../knowledge-base/wiki/syntheses/fonts-and-typography.md) | Keep aligned with shipped resolver |
 
-All implementation checklist rows in this folder intentionally remain
-unchecked until the corresponding code, rendered artifacts, and compliance
-proof exist. Creating or relocating this plan does not constitute
-implementation evidence.
+Phases 01–08 are closed with implementation evidence in each phase file.
+Creating or amending this README is not new implementation evidence.

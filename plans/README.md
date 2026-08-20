@@ -10,7 +10,8 @@ Implementation plans and roadmaps for `gowkhtmltopdf`, partitioned by release ve
 | [0.2.2/](0.2.2/README.md) | **v0.2.2 Newer PDF versions** — PDF 1.7 (#31), PDF 2.0 (#32), 1.7/2.0 compliance (#33); criticality/optimization follow-up | Complete; [release notes](0.2.2/PR/release-v0.2.2.md) |
 | [0.2.3/](0.2.3/README.md) | **v0.2.3** — same engine as 0.2.2; GitHub module path / `go install` | [release notes](0.2.3/PR/release-v0.2.3.md) |
 | [0.2.4/](0.2.4/README.md) | **v0.2.4** — idiomatic Document API + CLI rethink + external benches (phases 31–39) | Complete; [release notes](0.2.4/PR/release-v0.2.4.md) |
-| [0.2.5/](0.2.5/README.md) | **v0.2.5** — font resolution, fallback, and compliance follow-up | Planned; [font track](0.2.5/font/README.md) |
+| [0.2.5/](0.2.5/README.md) | **v0.2.5** — font resolution, fallback, and compliance follow-up | Complete (implementation); [font track](0.2.5/font/README.md); `VERSION` still 0.2.4 until release tag |
+| [0.2.6/](0.2.6/README.md) | **v0.2.6** — WOFF2 decode + opt-in metric font aliases | Planned; [woff2-metric-aliases](0.2.6/woff2-metric-aliases/README.md) |
 
 ---
 
@@ -65,3 +66,10 @@ Implementation plans and roadmaps for `gowkhtmltopdf`, partitioned by release ve
 - [0.2.5 README](0.2.5/README.md)
 - [font/](0.2.5/font/README.md) — Canonical font resolution / fallback / compliance track (phases 01–08)
 - [00-canonical-font-resolution-plan.md](0.2.5/font/00-canonical-font-resolution-plan.md) — Contract and current-state findings
+
+## 0.2.6 (WOFF2 + opt-in metric aliases)
+
+- [0.2.6 README](0.2.6/README.md)
+- [woff2-metric-aliases/](0.2.6/woff2-metric-aliases/README.md) — WOFF2/Brotli decode + opt-in Fontconfig-style metric aliases (phases 01–08)
+- [00-canonical-woff2-metric-aliases-plan.md](0.2.6/woff2-metric-aliases/00-canonical-woff2-metric-aliases-plan.md) — Contract, non-goals, DoD
+- [amendments/2026-08-20-woff2-brotli-allowlist.md](0.2.6/woff2-metric-aliases/amendments/2026-08-20-woff2-brotli-allowlist.md) — Narrow `andybalholm/brotli` allowlist exception

@@ -48,7 +48,7 @@ above when relevant). Do not mark `[x]` without evidence.
 | 6 | [`06-selector-cascade-gaps.md`](06-selector-cascade-gaps.md) — skin selectors | Rules never match | Medium–hard | Selectors Partial; `:has` shipped | **in progress** (`:where`/`:is` + attr ops) |
 | 7 | [`07-layout-hard-edges.md`](07-layout-hard-edges.md) — flex/grid/float depth | Marketing + gadgets | Hard | flex-grid-remaining Partial | **in progress** (justify/float line exclusion) |
 | 8 | [`08-svg-images.md`](08-svg-images.md) — SVG-as-`img` | Wiki logo / icons | Hard | Matrix unsupported | **in progress** (must ship) |
-| 9 | [`09-remote-webfonts.md`](09-remote-webfonts.md) — WOFF2 / HTTPS `@font-face` | Chrome font faces | Hard + security | Phase 19 non-goal superseded | **in progress** (must ship) |
+| 9 | [`09-remote-webfonts.md`](09-remote-webfonts.md) — WOFF2 / HTTPS `@font-face` | Chrome font faces | Hard + security | Phase 19 non-goal superseded | **`[~]` superseded** — HTTPS WOFF1 shipped; remaining WOFF2 → [`plans/0.2.6/woff2-metric-aliases/`](../../../0.2.6/woff2-metric-aliases/README.md) |
 | 10 | [`10-javascript.md`](10-javascript.md) — JS / hydration | SPAs / class gates | Very hard | Phase 22 | **in progress** (subset here) |
 | 11 | [`11-chrome-parity.md`](11-chrome-parity.md) — Chrome compare harness | Print match metrics | Epic | Phase 23 | **in progress** (harness here) |
 | 12 | [`12-css-faithful-engine.md`](12-css-faithful-engine.md) — site-agnostic / CSS-faithful cleanup | Remove skin-shaped overrides | Medium | Phase 21 contract | **done** (2026-08-05) |
