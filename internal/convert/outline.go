@@ -4,6 +4,7 @@ import (
 	"io"
 	"sort"
 
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert/prepare"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/layout"
@@ -58,7 +59,7 @@ type objectState struct {
 	// effectiveMargins returns the HF-extended registry; callers assign it
 	// explicitly (see renderObject handshake).
 	registry      *pdf.Registry
-	resources     ResourceContext
+	resources     prepare.ResourceContext
 	imagesEnabled bool
 
 	base     string

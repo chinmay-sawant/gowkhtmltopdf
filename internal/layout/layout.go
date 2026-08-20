@@ -1089,7 +1089,7 @@ func (e *engine) build(node *html.Node, availW, posX, posY float64) *box {
 
 	switch node.Name {
 	case cssTagImg:
-		boxNode = e.buildImage(node, sty, posX, posY)
+		boxNode = e.buildImage(node, sty, posX, posY, true)
 	case "hr":
 		boxNode = e.buildHR(node, sty, availW, posX, posY)
 	}

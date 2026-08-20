@@ -125,6 +125,7 @@ type HeaderFooter struct {
     Line                bool
     Spacing             float64 // millimetres
     HTMLURL             string
+    Replace             map[string]string
 }
 
 type Page struct {
@@ -133,6 +134,7 @@ type Page struct {
     IncludeInOutline *bool         // nil means engine default
     ExternalLinks    *bool
     LocalLinks       *bool
+    Zoom             float64
 }
 
 type TOC struct {
@@ -158,16 +160,20 @@ type Document struct {
     PDFVersion  string
     PDFProfile  string
 
-    Copies          int
-    Collate         bool
-    Outline         *bool
-    OutlineDepth    int
-    Background      *bool
-    SmartShrinking  *bool
-    Compression     *bool
-    ResolveRelLinks *bool
-    Header, Footer  *HeaderFooter
+    Copies             int
+    Collate            *bool
+    Outline            *bool
+    OutlineDepth       int
+    Background         *bool
+    SmartShrinking     *bool
+    Compression        *bool
+    ResolveRelLinks    *bool
+    Grayscale          bool
+    PageOffset         int
+    ExcludeFromOutline []string
+    Header, Footer     *HeaderFooter
 
+    Allow           []string
     AllowLocalFiles bool
     FontPaths       []string
     UseSystemFonts  bool
@@ -182,9 +188,10 @@ type Document struct {
 
 Pointer booleans mean “unset; use the engine default.” A plain `bool` is an
 explicit value. A page-level non-nil header or footer overrides the document
-value; nil means inheritance. `AllowLocalFiles` is one public switch that
-maps to the two internal ACL decisions required for a local page and its
-subresources.
+value; nil means inheritance. `AllowLocalFiles` enables broad local-file
+reads; `Allow` adds ACL path prefixes (CLI `--allow`) that permit reads under
+those prefixes without turning on the broad switch. Cover pages do not inherit
+document headers or footers unless the cover carries its own.
 
 Common configuration:
 
@@ -247,9 +254,10 @@ type ImageDocument struct {
     Transparent bool
     Crop        *Crop
 
+    Allow           []string
     AllowLocalFiles bool
     Network         *NetworkPolicy
-    // Background, Now, and the conversion hooks use the same policy as Document.
+    // Background, Zoom, Now, and the conversion hooks use the same policy as Document.
 }
 ~~~
 
@@ -281,7 +289,7 @@ themselves.
 | Zero or multiple `Content` source kinds | Return `ErrInvalidContent`-compatible error |
 | Empty HTML | Return `ErrEmptyHTML`-compatible error |
 | Invalid nested page | Return an error identifying `pages[i]` or `cover` |
-| `Copies < 1` when explicitly set | Return `ErrInvalidPDFCopies` |
+| `Copies < 0` or `Copies > MaxDocumentCopies` (1000) | Return `ErrInvalidPDFCopies`; zero means engine default |
 | Missing PDF writer | Return `ErrMissingPDFOutput` |
 | Missing image writer | Return `ErrMissingImageOutput` |
 | Invalid page size/version/profile | Return an error matching the corresponding typed sentinel |
@@ -301,10 +309,10 @@ provides its own synchronization.
 
 ## Network and local-file policy
 
-Local files are denied by default. Set `AllowLocalFiles: true` only for
-trusted input and constrain the process or working directory as appropriate.
-For remote documents and subresources, `Network` optionally points to a
-`NetworkPolicy`:
+Local files are denied by default. Prefer narrow `Allow` prefixes for trusted
+template directories. Set `AllowLocalFiles: true` only for trusted input and
+constrain the process or working directory as appropriate. For remote
+documents and subresources, `Network` optionally points to a `NetworkPolicy`:
 
 ~~~go
 doc := pdf.Document{

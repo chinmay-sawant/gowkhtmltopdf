@@ -46,7 +46,7 @@ print) are goals, not shipped feature claims — see [fidelity.md](fidelity.md).
 - Text and nested HTML headers/footers with `[page]` / `[topage]` placeholders
 - TOC objects and PDF document outlines (bookmarks)
 - In-process embedding from Go (`Document.WritePDF` / `ImageDocument.WriteImage`)
-- Opt-in PDF 1.7 / 2.0 (`--pdf-version` / `WithPDFVersion`) and opt-in PDF/A + PDF/UA profiles (`--pdf-profile` / `WithPDFProfile`). Default output is **unclaimed PDF 1.4**; a version flag is not a conformance claim.
+- Opt-in PDF 1.7 / 2.0 (`--pdf-version` / `Document.PDFVersion`) and opt-in PDF/A + PDF/UA profiles (`--pdf-profile` / `Document.PDFProfile`). Default output is **unclaimed PDF 1.4**; a version flag is not a conformance claim.
 
 Typical path:
 
@@ -73,7 +73,7 @@ Chrome-quality print. See [fidelity.md — Arbitrary websites](fidelity.md#arbit
   Partial; CJK needs a capable face on `--font-path`. See [fonts.md](fonts.md).
 - Pixel-identical WebKit / wkhtmltopdf / Chrome output.
 - An archival or accessible PDF by default. PDF/A and PDF/UA are **opt-in
-  profiles**; `--pdf-version` / `WithPDFVersion` alone does not claim them.
+  profiles**; `--pdf-version` / `Document.PDFVersion` alone does not claim them.
 - A wrapper around the `wkhtmltopdf` binary. That is a different product
   category — see
   [comparison-with-others/sebastiaanklippert-go-wkhtmltopdf.md](comparison-with-others/sebastiaanklippert-go-wkhtmltopdf.md).

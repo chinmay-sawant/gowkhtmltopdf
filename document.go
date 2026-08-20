@@ -64,6 +64,7 @@ type HeaderFooter struct {
 	Line     bool
 	Spacing  float64
 	HTMLURL  string
+	Replace  map[string]string
 }
 
 // Page is one cover or body page in a Document.
@@ -74,6 +75,7 @@ type Page struct {
 	IncludeInOutline *bool
 	ExternalLinks    *bool
 	LocalLinks       *bool
+	Zoom             float64
 }
 
 // TOC configures the generated table-of-contents object.
@@ -110,17 +112,21 @@ type Document struct {
 	PDFVersion  string
 	PDFProfile  string
 
-	Copies          int
-	Collate         bool
-	Outline         *bool
-	OutlineDepth    int
-	Background      *bool
-	SmartShrinking  *bool
-	Compression     *bool
-	ResolveRelLinks *bool
-	Header          *HeaderFooter
-	Footer          *HeaderFooter
+	Copies             int
+	Collate            *bool
+	Outline            *bool
+	OutlineDepth       int
+	Background         *bool
+	SmartShrinking     *bool
+	Compression        *bool
+	ResolveRelLinks    *bool
+	Grayscale          bool
+	PageOffset         int
+	ExcludeFromOutline []string
+	Header             *HeaderFooter
+	Footer             *HeaderFooter
 
+	Allow           []string
 	AllowLocalFiles bool
 	FontPaths       []string
 	UseSystemFonts  bool
@@ -145,7 +151,9 @@ type ImageDocument struct {
 	SmartWidth  *bool
 	Transparent bool
 	Crop        *Crop
+	Zoom        float64
 
+	Allow           []string
 	AllowLocalFiles bool
 	Background      *bool
 	FontPaths       []string
@@ -225,7 +233,7 @@ func (d *Document) writePDF(
 		OnProgress: d.OnProgress,
 	}
 
-	return hooks.executePDFTo(ctx, req.ToRequest())
+	return hooks.executePDFTo(ctx, req)
 }
 
 // PDF returns the PDF bytes produced by the document.
@@ -303,7 +311,7 @@ func (d *ImageDocument) Image(ctx context.Context) ([]byte, error) {
 	return append([]byte(nil), output.Bytes()...), nil
 }
 
-func (d *Document) toPDFRequest(output, outline io.Writer, dumpOutline bool) *convert.PDFRequest {
+func (d *Document) toPDFRequest(output, outline io.Writer, dumpOutline bool) *convert.Request {
 	global := d.pdfGlobal(dumpOutline)
 	objects := make([]settings.PdfObject, 0, len(d.Pages)+documentObjectCapacity)
 
@@ -319,13 +327,10 @@ func (d *Document) toPDFRequest(output, outline io.Writer, dumpOutline bool) *co
 		objects = append(objects, d.mapPage(page, false))
 	}
 
-	return &convert.PDFRequest{
-		Global:        global,
-		Objects:       objects,
-		Now:           d.Now,
-		Output:        output,
-		OutlineOutput: outline,
-	}
+	req := convert.NewPDFRequest(global, objects, output, outline)
+	req.Now = d.Now
+
+	return req
 }
 
 //nolint:cyclop,funlen,wsl // one adapter mirrors the documented global options.
@@ -361,7 +366,9 @@ func (d *Document) pdfGlobal(dumpOutline bool) settings.PdfGlobal {
 	}
 	if d.Copies != 0 {
 		global.Copies = d.Copies
-		global.Collate = d.Collate
+	}
+	if d.Collate != nil {
+		global.Collate = *d.Collate
 	}
 	if d.Outline != nil {
 		global.Outline = *d.Outline
@@ -381,6 +388,9 @@ func (d *Document) pdfGlobal(dumpOutline bool) settings.PdfGlobal {
 	if d.ResolveRelLinks != nil {
 		global.ResolveRelativeLinks = *d.ResolveRelLinks
 	}
+	global.Grayscale = d.Grayscale
+	global.PageOffset = d.PageOffset
+	global.ExcludeFromOutline = documentCloneStrings(d.ExcludeFromOutline)
 	if d.Header != nil {
 		global.Header = mapHeaderFooter(*d.Header)
 	}
@@ -390,6 +400,7 @@ func (d *Document) pdfGlobal(dumpOutline bool) settings.PdfGlobal {
 	if d.AllowLocalFiles {
 		global.Load.EnableLocalFileAccess = true
 	}
+	global.Load.Allow = documentCloneStrings(d.Allow)
 	global.FontPaths = documentCloneStrings(d.FontPaths)
 	global.UseSystemFonts = d.UseSystemFonts
 	if d.Network != nil {
@@ -411,10 +422,16 @@ func (d *Document) mapPage(page Page, cover bool) settings.PdfObject {
 	object.ExternalLinks = boolValue(page.ExternalLinks, object.ExternalLinks)
 	object.LocalLinks = boolValue(page.LocalLinks, object.LocalLinks)
 	object.IncludeInOutline = boolValue(page.IncludeInOutline, object.IncludeInOutline)
-	object.IsCover = cover
+	if page.Zoom != 0 {
+		object.Load.ZoomFactor = page.Zoom
+	}
 
-	if cover && page.IncludeInOutline == nil {
-		object.IncludeInOutline = false
+	if cover {
+		// StampCover also stamps empty HF overrides (no document HF inherit).
+		settings.StampCover(&object)
+		if page.IncludeInOutline != nil {
+			object.IncludeInOutline = *page.IncludeInOutline
+		}
 	}
 	if page.Header != nil {
 		object.Header = mapHeaderFooter(*page.Header)
@@ -434,11 +451,8 @@ func (d *Document) mapPage(page Page, cover bool) settings.PdfObject {
 //nolint:wsl // TOC mapping follows the public option groups in order.
 func (d *Document) mapTOC(toc TOC) settings.PdfObject {
 	object := settings.DefaultPdfObject()
-	object.Page = ""
-	object.IsTableOfContent = true
-	object.UseOutline = false
+	settings.StampTOC(&object)
 	object.TOC = mapTOCSettings(toc)
-	object.IncludeInOutline = false
 	if d.AllowLocalFiles {
 		object.Load.BlockLocalFileAccess = false
 	}
@@ -457,6 +471,7 @@ func (d *ImageDocument) toImageRequest(output io.Writer) *imageout.Request {
 	if d.AllowLocalFiles {
 		global.Load.EnableLocalFileAccess = true
 	}
+	global.Load.Allow = documentCloneStrings(d.Allow)
 	global.FontPaths = documentCloneStrings(d.FontPaths)
 	global.UseSystemFonts = d.UseSystemFonts
 	if d.Network != nil {
@@ -490,6 +505,9 @@ func (d *ImageDocument) toImageRequest(output io.Writer) *imageout.Request {
 
 	object := settings.DefaultPdfObject()
 	mapContent(&object, d.Source)
+	if d.Zoom != 0 {
+		object.Load.ZoomFactor = d.Zoom
+	}
 	if d.AllowLocalFiles {
 		object.Load.BlockLocalFileAccess = false
 	}
@@ -534,7 +552,7 @@ func mapHeaderFooter(header HeaderFooter) settings.HeaderFooter {
 		Line:     header.Line,
 		Spacing:  header.Spacing,
 		HTMLURL:  header.HTMLURL,
-		Replace:  nil,
+		Replace:  documentCloneStringMap(header.Replace),
 	}
 }
 
@@ -586,6 +604,7 @@ func cloneHeaderFooter(header *HeaderFooter) *HeaderFooter {
 	}
 
 	clone := *header
+	clone.Replace = documentCloneStringMap(header.Replace)
 
 	return &clone
 }
@@ -597,6 +616,19 @@ func documentCloneStrings(src []string) []string {
 
 	dst := make([]string, len(src))
 	copy(dst, src)
+
+	return dst
+}
+
+func documentCloneStringMap(src map[string]string) map[string]string {
+	if src == nil {
+		return nil
+	}
+
+	dst := make(map[string]string, len(src))
+	for key, value := range src {
+		dst[key] = value
+	}
 
 	return dst
 }

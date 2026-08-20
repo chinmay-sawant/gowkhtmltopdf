@@ -113,8 +113,9 @@ skipped.
 Defaults block local files. If the app enables:
 
 - CLI: `--allow-local-files`
-- Library: `Document.AllowLocalFiles = true` (prefer a dedicated worker and
-  narrow filesystem scope for untrusted input)
+- Library: prefer `Document.Allow = []string{"/var/app/templates"}`; use
+  `AllowLocalFiles = true` only when a broad enable is unavoidable (prefer a
+  dedicated worker and narrow filesystem scope for untrusted input)
 
 …and the user can influence the path or HTML:
 

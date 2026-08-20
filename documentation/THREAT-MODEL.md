@@ -46,7 +46,8 @@ Implemented in `internal/load`: `AccessController.Allowed` and
 - `--allow-local-files` sets the global flag and unblocks the parsed source;
   a native `Document` uses `AllowLocalFiles`. A blocked object wins over an
   enabled global in the internal engine seam.
-- `--allow <path>` adds allow prefixes. A path is readable when its real
+- `--allow <path>` adds allow prefixes; the library equivalent is
+  `Document.Allow` / `ImageDocument.Allow`. A path is readable when its real
   path equals a prefix or sits below it (boundary check at the directory
   separator, so `prefix-evil` does not match `prefix`).
 - Both the requested path and each prefix are resolved to their real,

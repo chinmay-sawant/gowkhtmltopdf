@@ -36,14 +36,12 @@ func FuzzConvertHTML(f *testing.F) {
 		objects := []settings.PdfObject{obj}
 
 		var out bytes.Buffer
-		req := &convert.PDFRequest{
-			Global:        global,
-			Objects:       objects,
-			Now:           nil,
-			Output:        &out,
-			OutlineOutput: nil,
+		req := &convert.Request{ //nolint:exhaustruct // fuzz fills only PDF fields
+			Global:  global,
+			Objects: objects,
+			Output:  &out,
 		}
 
-		_ = convert.RunTypedPDF(ctx, req, io.Discard, nil)
+		_ = convert.Run(ctx, req, io.Discard, nil)
 	})
 }

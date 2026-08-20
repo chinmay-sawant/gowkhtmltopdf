@@ -9,4 +9,4 @@ Predecessor wave (closed):
 
 ## Status
 
-- [ ] Improve-codebase wave open (2026-08-20): [codebase-2026-08-20/phase-wise-checklist.md](codebase-2026-08-20/phase-wise-checklist.md) — **7.8 / 10**; 6 explore agents, 23 active IDs plus ARC-03/ARC-04 carry-forward. Implementation not started. Prior closed health baseline was **8.8 / 10**.
+- [x] Improve-codebase wave implemented (2026-08-20 audit → 2026-08-21 fix): [codebase-2026-08-20/phase-wise-checklist.md](codebase-2026-08-20/phase-wise-checklist.md) — **8.8 / 10** after implementation (pre-fix **7.8 / 10**). 23 IDs closed; `make lint` + `make test` green. Not committed/pushed yet.

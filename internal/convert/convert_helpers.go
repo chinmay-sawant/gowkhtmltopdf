@@ -231,23 +231,21 @@ func resolveRelativeLinkURI(op layout.Op, base *url.URL) (string, bool) {
 	return base.ResolveReference(ref).String(), true
 }
 
-// loadFontRegistry builds the opt-in font registry from --font-path and
-// optional --use-system-fonts. Returns nil when nothing was configured.
-func loadFontRegistry(glob settings.PdfGlobal, log io.Writer) *pdf.Registry {
+// logFontRegistryScan emits the shared font-path scan notice used by PDF and
+// image callers after pdf.RegistryFromGlobal.
+func logFontRegistryScan(glob settings.PdfGlobal, log io.Writer) {
+	if log == nil || log == io.Discard || glob.Quiet {
+		return
+	}
+
 	if len(glob.FontPaths) == 0 && !glob.UseSystemFonts {
-		return nil
+		return
 	}
 
-	reg := pdf.RegistryFromPaths(glob.FontPaths, glob.UseSystemFonts)
-
-	if log != nil && log != io.Discard && !glob.Quiet {
-		count := len(glob.FontPaths)
-		if glob.UseSystemFonts {
-			count += len(pdf.DefaultSystemFontDirs())
-		}
-
-		line.Emit(log, line.Info, "scanned %d font path(s)", count)
+	count := len(glob.FontPaths)
+	if glob.UseSystemFonts {
+		count += len(pdf.DefaultSystemFontDirs())
 	}
 
-	return reg
+	line.Emit(log, line.Info, "scanned %d font path(s)", count)
 }

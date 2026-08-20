@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert/prepare"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/layout"
@@ -231,7 +232,7 @@ type htmlHFLayout struct {
 	imagesFn  func(src string) ([]byte, error)
 	font      *pdf.Font
 	registry  *pdf.Registry
-	resources ResourceContext
+	resources prepare.ResourceContext
 	width     float64
 	height    float64
 	media     string
@@ -299,8 +300,8 @@ func loadHTMLHF(ctx context.Context, loader *load.Loader, font *pdf.Font, state 
 		media = mediaPrint
 	}
 
-	resources := NewResourceContext(loader, res.Base, lineP)
-	sheets := resources.CollectSheets(ctx, root, SheetOptions{
+	resources := prepare.NewResourceContext(loader, res.Base, lineP)
+	sheets := resources.CollectSheets(ctx, root, prepare.SheetOptions{
 		ViewportW:   state.geom.contentW,
 		ViewportH:   state.geom.contentH,
 		MediaType:   media,
