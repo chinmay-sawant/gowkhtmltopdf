@@ -153,15 +153,21 @@ samples:
 	ls -la output/ | awk '{print $$5, $$9}' | tail -30
 
 # Opt-in system fonts + metric aliases samples (separate from `make samples`).
-# Fixture-55 with --use-system-fonts --use-metric-font-aliases so Georgia→Gelasio
-# / Courier New→Cousine when those faces are discoverable. Does not rewrite the
-# default output/fixture-55-*.pdf from `make samples`.
+# Only fixture-55 and fixture-57 → output/metric-aliases/ with
+# --use-system-fonts --use-metric-font-aliases. Does not rewrite output/fixture-*.pdf.
 samples-metric-aliases:
-	mkdir -p output
-	go run ./cmd/gowkhtmltopdf --allow-local-files --use-system-fonts --use-metric-font-aliases \
-		-o output/fixture-55-lantern-cooperative-report-metric-aliases.pdf \
-		testdata/golden/fixture-55-lantern-cooperative-report.html
-	ls -la output/fixture-55-lantern-cooperative-report-metric-aliases.pdf
+	mkdir -p output/metric-aliases
+	rm -f output/metric-aliases/fixture-*.pdf
+	FONT_FLAGS="--use-system-fonts --use-metric-font-aliases"; \
+	if [ -d /usr/share/fonts/truetype/droid ]; then FONT_FLAGS="$$FONT_FLAGS --font-path /usr/share/fonts/truetype/droid"; fi; \
+	if [ -d testdata/fonts ]; then FONT_FLAGS="$$FONT_FLAGS --font-path testdata/fonts"; fi; \
+	go run ./cmd/gowkhtmltopdf --allow-local-files $$FONT_FLAGS \
+		-o output/metric-aliases/fixture-55-lantern-cooperative-report.pdf \
+		testdata/golden/fixture-55-lantern-cooperative-report.html; \
+	go run ./cmd/gowkhtmltopdf --allow-local-files $$FONT_FLAGS \
+		-o output/metric-aliases/fixture-57-font-resolution-showcase.pdf \
+		testdata/golden/fixture-57-font-resolution-showcase.html
+	ls -la output/metric-aliases/
 
 # Regenerate the committed frontend showcase screenshots and WebP thumbnails
 # from the PDFs currently present in output/. Use `make samples` first when the

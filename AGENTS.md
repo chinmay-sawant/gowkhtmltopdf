@@ -80,7 +80,7 @@ make lint         # golangci-lint (enable-all, see .golangci.yml)
 make fmt          # gofmt
 make golden       # golden fixture structure checks (GOLDEN_APPROVE=1 to update)
 make samples      # regenerate sample PDFs/PNG in output/
-make samples-metric-aliases  # fixture-55 with --use-system-fonts --use-metric-font-aliases
+make samples-metric-aliases  # fixture-55 + fixture-57 → output/metric-aliases/
 make bench        # engine benchmarks (also bench-engine, bench-lib, bench-cli-compare)
 make claim-scan   # scans docs for over-claims vs compatibility matrix
 make weasyprint   # external-engine comparison (needs weasyprint installed)

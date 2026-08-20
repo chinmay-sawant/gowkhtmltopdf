@@ -6,28 +6,30 @@ record.
 
 | File | License | Notes |
 |------|---------|-------|
-| `NotoSansKR-HangulSubset.ttf` | OFL (`OFL.txt`) | Tiny CI subset of Noto Sans KR for fixture-27. Family: **Noto Sans KR**. Static SFNT (no `fvar`). Covers Latin + Hangul (+ many CJK glyphs). Not a full CJK face. |
-| `OFL.txt` | — | SIL Open Font License text for the Noto subset. |
+| `NotoSansKR-HangulSubset.ttf` | OFL (`OFL.txt`) | Tiny CI subset of Noto Sans KR for fixture-27. |
+| `LiberationSans-Regular.woff2` | OFL | Liberation Sans as WOFF2 for DecodeWOFF2 / fixture-57. |
+| `AbrilFatface-Regular.ttf`, `Acme-Regular.ttf`, … | OFL | Curated static faces for fixture-57 `@font-face` gallery (display, script, mono, serif, sans). |
+| `Arimo-Regular.ttf`, `Tinos-Regular.ttf`, `Gelasio-Regular.ttf`, `Cousine-Regular.ttf` | OFL | Metric-compatible open faces used by fixture-57 exact + alias demos. |
+| `OFL.txt` | — | SIL Open Font License text. |
 
-## Catalog intent (phases 3–4)
+The same curated set is also installed under
+`~/.local/share/fonts/gowk-fixture57/` on developer machines so
+`--use-system-fonts` can discover them.
 
-Tests that need regular / bold / italic / bold-italic, Unicode, composite
-glyphs, or duplicate-family cases **reuse** Liberation faces from
-`internal/pdf/assets/` (bundled, already licensed) or synthesize temp copies
-with patched name tables (e.g. Georgia / Gelasio exact-match regressions).
-Those patched copies are created under `t.TempDir()` — they are not vendored
-here.
+## Fixture-57
 
-If a Georgia-compatible open font is ever evaluated for bundling, record
-license, static/variable status, name-table families, and visual rationale
-**before** adding it to this directory.
+`fixture-57-font-resolution-showcase.html` is a **10-page** showcase of:
 
-## Sample usage
+- exact `@font-face` (TTF + WOFF2) from this directory
+- CSS generics → Liberation
+- metric-alias stacks (`Georgia`, `Courier New`, `Arial`, `Times New Roman`)
 
-Some Simplified Chinese glyphs in fixture-27 (e.g. 汉, 圳) are **not** in the
-KR subset; samples may also pass `--font-path` to Droid Sans Fallback so CSS
-font-family fallback can supply them. Full Noto CJK is not vendored (size).
+Pair with `--font-path testdata/fonts`, and optionally
+`--use-system-fonts --use-metric-font-aliases` (or
+`make samples` / `make samples-metric-aliases`).
 
-## LiberationSans-Regular.woff2
+## Sample usage (CJK)
 
-OFL Liberation Sans Regular encoded as WOFF2 (fontTools) for @font-face / DecodeWOFF2 tests. Same face as `internal/pdf/assets/LiberationSans-Regular.ttf`.
+Some Simplified Chinese glyphs in fixture-27 are **not** in the KR subset;
+samples may also pass `--font-path` to Droid Sans Fallback. Full Noto CJK is
+not vendored (size).

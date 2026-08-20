@@ -42,7 +42,7 @@ make build
 | `make build` | `bin/gowkhtmltopdf`, `bin/gowkhtmltoimage` |
 | `make golden` | Golden fixture corpus (`internal/convert`) |
 | `make samples` | Regenerate `output/` fixtures + optional live wiki smoke |
-| `make samples-metric-aliases` | Fixture-55 with `--use-system-fonts --use-metric-font-aliases` (separate from `make samples`) |
+| `make samples-metric-aliases` | Fixture-55 + fixture-57 → `output/metric-aliases/` with `--use-system-fonts --use-metric-font-aliases` |
 | `make fmt` | `gofmt -w .` |
 
 Minimum: recent Go toolchain matching `go.mod`.

@@ -54,7 +54,7 @@ make golden-update GOLDEN_FIXTURE=fixture-01-simple-invoice.html GOLDEN_APPROVE=
 
 ## Golden HTML corpus (`testdata/golden/`)
 
-**Body fixtures:** `fixture-01` … `fixture-56`. Companion files matching
+**Body fixtures:** `fixture-01` … `fixture-57`. Companion files matching
 `*-header.html` / `*-footer.html` are **not** converted as bodies.
 
 When `fixture-NN-header.html` and/or `fixture-NN-footer.html` sit beside a
@@ -155,6 +155,7 @@ fixture header comments and [`testdata/golden/README.md`](../testdata/golden/REA
 | 54 | Ember Harbor storybook: cover + three chapter pages, shared print theme, local illustrations | 4 |
 | 55 | Self-contained operations brief: inline CSS, status cards, route table, action plan, and page breaks | 3 |
 | 56 | Architecture diagram: hero, pipeline strip, TOC, 10 domain sections (modern semantic tags and CSS with graceful-degrade fallbacks), linked `fixture-56-architecture-diagram.css` | 20 |
+| 57 | Font resolution showcase (10 pages): many local TTF + WOFF2 `@font-face` faces, CSS generics, metric-alias stacks; uses `testdata/fonts` | 10 |
 
 Supporting assets in the same directory: `logo.png`, `certificate-background.jpg`,
 `style-05.css`, `theme-print-stories.css`, `fixture-56-architecture-diagram.css`,
@@ -218,15 +219,12 @@ make samples
    `--zoom 0.666667`. Network is required; **soft-fail** if the fetch fails
    so offline hosts still get fixture samples.
 
-### Opt-in metric-alias sample (`make samples-metric-aliases`)
+### Opt-in metric-alias samples (`make samples-metric-aliases`)
 
-Separate from `make samples`. Regenerates only:
-
-`output/fixture-55-lantern-cooperative-report-metric-aliases.pdf`
-
-with `--use-system-fonts --use-metric-font-aliases` (Gelasio/Cousine when
-those faces are discoverable). Does **not** rewrite the default
-`output/fixture-55-lantern-cooperative-report.pdf`.
+Separate from `make samples`. Regenerates only fixture-55 and fixture-57 into
+`output/metric-aliases/` with `--use-system-fonts --use-metric-font-aliases`
+(plus optional droid / `testdata/fonts` `--font-path` entries when present).
+Does **not** rewrite `output/fixture-*.pdf`.
 
 ```sh
 make samples-metric-aliases

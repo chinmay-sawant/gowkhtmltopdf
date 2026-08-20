@@ -81,8 +81,19 @@ files are skipped as bodies; fixture-36 attaches them as HTML header/footer.
 | `fixture-53-asteria-observatory-poster.pdf` | Observatory poster |
 | `fixture-54-ember-harbor-storybook.pdf` | Ember Harbor storybook (4 pages) |
 | `fixture-55-lantern-cooperative-report.pdf` | Northline operations brief (default Liberation-via-stack; from `make samples`) |
-| `fixture-55-lantern-cooperative-report-metric-aliases.pdf` | Same fixture via `make samples-metric-aliases` (`--use-system-fonts --use-metric-font-aliases`; Gelasio/Cousine when discoverable) |
 | `fixture-56-architecture-diagram.pdf` | Architecture diagram (20 pages) |
+| `fixture-57-font-resolution-showcase.pdf` | 10-page font resolution showcase (many `@font-face` TTFs + WOFF2 + alias stacks) |
+
+## Metric-alias samples (`make samples-metric-aliases`)
+
+Separate target. Only fixture-55 and fixture-57 under `output/metric-aliases/`
+with `--use-system-fonts --use-metric-font-aliases` (Gelasio/Cousine when
+discoverable). Does not rewrite `output/fixture-*.pdf`.
+
+| Path | Note |
+|------|------|
+| `metric-aliases/fixture-55-lantern-cooperative-report.pdf` | Northline brief with metric aliases |
+| `metric-aliases/fixture-57-font-resolution-showcase.pdf` | Font showcase with metric aliases |
 
 ## Image smokes
 

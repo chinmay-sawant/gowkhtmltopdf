@@ -419,6 +419,9 @@ var fixturePageBounds = map[string]fixtureBounds{ //nolint:gochecknoglobals // i
 		// The explicit section page breaks make the architecture composition 20 pages.
 		minPages: 20, maxPages: 20,
 	},
+	"fixture-57-font-resolution-showcase.html": { //nolint:exhaustruct // intentional zero-value fields
+		minPages: 10, maxPages: 10, needles: []string{"FONTSHOW"},
+	},
 }
 
 // fixtureHeaderOK enforces the corpus hygiene rule: every fixture starts

@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<!--
+  fixture-57-font-resolution-showcase
+  Proves: post-0.2.5/0.2.6 font resolution — exact @font-face (many local TTFs
+  + WOFF2), CSS generics, and metric-alias stacks (Georgia / Courier New /
+  Arial / Times New Roman). Fonts live in testdata/fonts (also installed under
+  ~/.local/share/fonts/gowk-fixture57 for --use-system-fonts). Pair with
+  --font-path testdata/fonts and optionally --use-metric-font-aliases.
+  Expected: 10 pages; needle FONTSHOW.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Font Resolution Showcase</title>
+  <style>
+    @font-face {
+      font-family: "Showcase WOFF2";
+      src: url("../fonts/LiberationSans-Regular.woff2");
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: "Showcase Abril";
+      src: url("../fonts/AbrilFatface-Regular.ttf");
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: "Showcase Acme";
+      src: url("../fonts/Acme-Regular.ttf");
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: "Showcase Arimo";
+      src: url("../fonts/Arimo-Regular.ttf");
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: "Showcase Tinos";
+      src: url("../fonts/Tinos-Regular.ttf");
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: "Showcase Gelasio";
+      src: url("../fonts/Gelasio-Regular.ttf");
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: "Showcase Cousine";
+      src: url("../fonts/Cousine-Regular.ttf");
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: "Showcase Bebas";
+      src: url("../fonts/BebasNeue-Regular.ttf");
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: "Showcase Anton";
+      src: url("../fonts/Anton-Regular.ttf");
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: "Showcase BlackOps";
+      src: url("../fonts/BlackOpsOne-Regular.ttf");
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: "Showcase Audiowide";
+      src: url("../fonts/Audiowide-Regular.ttf");
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: "Showcase AlfaSlab";
+      src: url("../fonts/AlfaSlabOne-Regular.ttf");
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: "Showcase GreatVibes";
+      src: url("../fonts/GreatVibes-Regular.ttf");
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: "Showcase Parisienne";
+      src: url("../fonts/Parisienne-Regular.ttf");
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: "Showcase Marker";
+      src: url("../fonts/PermanentMarker-Regular.ttf");
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: "Showcase Yellowtail";
+      src: url("../fonts/Yellowtail-Regular.ttf");
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: "Showcase PressStart";
+      src: url("../fonts/PressStart2P-Regular.ttf");
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: "Showcase VT323";
+      src: url("../fonts/VT323-Regular.ttf");
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: "Showcase AnonymousPro";
+      src: url("../fonts/AnonymousPro-Regular.ttf");
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: "Showcase Volkhov";
+      src: url("../fonts/Volkhov-Regular.ttf");
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: "Showcase Alice";
+      src: url("../fonts/Alice-Regular.ttf");
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: "Showcase YoungSerif";
+      src: url("../fonts/YoungSerif-Regular.ttf");
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: "Showcase Zilla";
+      src: url("../fonts/ZillaSlab-Regular.ttf");
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: "Showcase ArchivoBlack";
+      src: url("../fonts/ArchivoBlack-Regular.ttf");
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: "Showcase Titillium";
+      src: url("../fonts/TitilliumWeb-Regular.ttf");
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: "Showcase Tomorrow";
+      src: url("../fonts/Tomorrow-Regular.ttf");
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: "Showcase Luckiest";
+      src: url("../fonts/LuckiestGuy-Regular.ttf");
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: "Showcase Monoton";
+      src: url("../fonts/Monoton-Regular.ttf");
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: "Showcase Fascinate";
+      src: url("../fonts/Fascinate-Regular.ttf");
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: "Showcase Glitch";
+      src: url("../fonts/RubikGlitch-Regular.ttf");
+      font-weight: 400;
+      font-style: normal;
+    }
+
+    @page { size: A4; margin: 12mm 14mm; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: #1c2430;
+      background: #f4f1ea;
+      font-family: "Showcase Arimo", Arial, Helvetica, sans-serif;
+      font-size: 10pt;
+      line-height: 1.4;
+    }
+    h1, h2, h3 { margin: 0 0 0.35em; line-height: 1.15; }
+    p { margin: 0 0 0.55em; }
+    .sheet {
+      background: #fffdf8;
+      border: 1px solid #d7d0c4;
+      padding: 10mm 9mm 8mm;
+      min-height: 262mm;
+      page-break-after: always;
+    }
+    .sheet:last-child { page-break-after: auto; }
+    .kicker {
+      font-family: "Showcase Acme", sans-serif;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      font-size: 8.5pt;
+      color: #6a5840;
+      margin-bottom: 4px;
+    }
+    .title {
+      font-family: "Showcase Abril", Georgia, serif;
+      font-size: 24pt;
+      font-weight: 400;
+      color: #142033;
+    }
+    .subtitle { color: #5b6573; margin-bottom: 10px; }
+    .grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 8px 0 10px;
+    }
+    .card {
+      flex: 1 1 45%;
+      border: 1px solid #ddd4c6;
+      background: #fbf7f0;
+      padding: 8px 10px;
+      min-height: 64px;
+    }
+    .card .label {
+      font-size: 7.5pt;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: #7a6a55;
+      margin-bottom: 3px;
+    }
+    .card .sample { font-size: 12pt; margin: 0 0 4px; }
+    .card .meta { font-size: 7pt; color: #8a8174; }
+    .ff-WOFF2 { font-family: "Showcase WOFF2", sans-serif; }
+    .ff-Abril { font-family: "Showcase Abril", sans-serif; }
+    .ff-Acme { font-family: "Showcase Acme", sans-serif; }
+    .ff-Arimo { font-family: "Showcase Arimo", sans-serif; }
+    .ff-Tinos { font-family: "Showcase Tinos", sans-serif; }
+    .ff-Gelasio { font-family: "Showcase Gelasio", sans-serif; }
+    .ff-Cousine { font-family: "Showcase Cousine", sans-serif; }
+    .ff-Bebas { font-family: "Showcase Bebas", sans-serif; }
+    .ff-Anton { font-family: "Showcase Anton", sans-serif; }
+    .ff-BlackOps { font-family: "Showcase BlackOps", sans-serif; }
+    .ff-Audiowide { font-family: "Showcase Audiowide", sans-serif; }
+    .ff-AlfaSlab { font-family: "Showcase AlfaSlab", sans-serif; }
+    .ff-GreatVibes { font-family: "Showcase GreatVibes", sans-serif; }
+    .ff-Parisienne { font-family: "Showcase Parisienne", sans-serif; }
+    .ff-Marker { font-family: "Showcase Marker", sans-serif; }
+    .ff-Yellowtail { font-family: "Showcase Yellowtail", sans-serif; }
+    .ff-PressStart { font-family: "Showcase PressStart", sans-serif; }
+    .ff-VT323 { font-family: "Showcase VT323", sans-serif; }
+    .ff-AnonymousPro { font-family: "Showcase AnonymousPro", sans-serif; }
+    .ff-Volkhov { font-family: "Showcase Volkhov", sans-serif; }
+    .ff-Alice { font-family: "Showcase Alice", sans-serif; }
+    .ff-YoungSerif { font-family: "Showcase YoungSerif", sans-serif; }
+    .ff-Zilla { font-family: "Showcase Zilla", sans-serif; }
+    .ff-ArchivoBlack { font-family: "Showcase ArchivoBlack", sans-serif; }
+    .ff-Titillium { font-family: "Showcase Titillium", sans-serif; }
+    .ff-Tomorrow { font-family: "Showcase Tomorrow", sans-serif; }
+    .ff-Luckiest { font-family: "Showcase Luckiest", sans-serif; }
+    .ff-Monoton { font-family: "Showcase Monoton", sans-serif; }
+    .ff-Fascinate { font-family: "Showcase Fascinate", sans-serif; }
+    .ff-Glitch { font-family: "Showcase Glitch", sans-serif; }
+    .alias-georgia { font-family: Georgia, "Times New Roman", serif; }
+    .alias-courier { font-family: "Courier New", monospace; }
+    .alias-arial { font-family: Arial, Helvetica, sans-serif; }
+    .alias-times { font-family: "Times New Roman", Times, serif; }
+    .generic-serif { font-family: serif; }
+    .generic-sans { font-family: sans-serif; }
+    .generic-mono { font-family: monospace; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 6px 0 10px;
+      font-size: 9pt;
+    }
+    th, td {
+      border: 1px solid #d9d1c4;
+      padding: 5px 7px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #efe7da; font-weight: 700; }
+    .note {
+      font-size: 8.5pt;
+      color: #5c6570;
+      border-left: 3px solid #c4b59a;
+      padding-left: 8px;
+      margin: 8px 0 0;
+    }
+    .footer {
+      margin-top: 10px;
+      padding-top: 6px;
+      border-top: 1px solid #ddd4c6;
+      font-size: 8pt;
+      color: #6b7380;
+    }
+  </style>
+</head>
+<body>
+  <div class="sheet">
+    <div class="kicker">FONTSHOW · fixture 57</div>
+    <h1 class="title">Font Resolution Showcase</h1>
+    <p class="subtitle">
+      Ten pages of exact <code>@font-face</code> faces (TTF + WOFF2), CSS
+      generics, and metric-alias stacks for the v0.2.5 resolver and v0.2.6
+      WOFF2 / opt-in aliases work.
+    </p>
+    <h2>What this fixture proves</h2>
+    <table>
+      <thead><tr><th>Surface</th><th>How to exercise it</th></tr></thead>
+      <tbody>
+        <tr><td>Exact <code>@font-face</code></td><td>Local TTF/WOFF2 under <code>testdata/fonts</code></td></tr>
+        <tr><td>Metric aliases</td><td><code>--use-metric-font-aliases</code> + discovered Gelasio/Cousine/Arimo/Tinos</td></tr>
+        <tr><td>System discovery</td><td><code>--use-system-fonts</code> (faces also in <code>~/.local/share/fonts/gowk-fixture57</code>)</td></tr>
+        <tr><td>Samples</td><td><code>make samples</code> and <code>make samples-metric-aliases</code></td></tr>
+      </tbody>
+    </table>
+    <p class="note">Needle text for golden checks: <strong>FONTSHOW</strong>.</p>
+    <div class="footer">Page 1 / 10 · FONTSHOW · cover</div>
+  </div>
+  <div class="sheet">
+    <div class="kicker">FONTSHOW · exact faces</div>
+    <h2>Exact @font-face gallery</h2>
+    <div class="grid">
+      <div class="card">
+        <div class="label">WOFF2 · WOFF2</div>
+        <p class="sample ff-WOFF2">Liberation Sans delivered as WOFF2.</p>
+        <div class="meta">LiberationSans-Regular.woff2</div>
+      </div>
+      <div class="card">
+        <div class="label">Display · Abril</div>
+        <p class="sample ff-Abril">Abril Fatface for mastheads.</p>
+        <div class="meta">AbrilFatface-Regular.ttf</div>
+      </div>
+      <div class="card">
+        <div class="label">Sans · Acme</div>
+        <p class="sample ff-Acme">Acme for compact labels.</p>
+        <div class="meta">Acme-Regular.ttf</div>
+      </div>
+      <div class="card">
+        <div class="label">Sans · Arimo</div>
+        <p class="sample ff-Arimo">Arimo is metric-friendly with Arial.</p>
+        <div class="meta">Arimo-Regular.ttf</div>
+      </div>
+      <div class="card">
+        <div class="label">Serif · Tinos</div>
+        <p class="sample ff-Tinos">Tinos stands in for Times New Roman.</p>
+        <div class="meta">Tinos-Regular.ttf</div>
+      </div>
+      <div class="card">
+        <div class="label">Serif · Gelasio</div>
+        <p class="sample ff-Gelasio">Gelasio stands in for Georgia.</p>
+        <div class="meta">Gelasio-Regular.ttf</div>
+      </div>
+    </div>
+    <div class="footer">Page 2 / 10 · FONTSHOW · @font-face</div>
+  </div>
+  <div class="sheet">
+    <div class="kicker">FONTSHOW · exact faces</div>
+    <h2>Exact @font-face gallery · continued</h2>
+    <div class="grid">
+      <div class="card">
+        <div class="label">Mono · Cousine</div>
+        <p class="sample ff-Cousine">Cousine stands in for Courier New.</p>
+        <div class="meta">Cousine-Regular.ttf</div>
+      </div>
+      <div class="card">
+        <div class="label">Display · Bebas</div>
+        <p class="sample ff-Bebas">BEBAS NEUE FOR POSTERS</p>
+        <div class="meta">BebasNeue-Regular.ttf</div>
+      </div>
+      <div class="card">
+        <div class="label">Display · Anton</div>
+        <p class="sample ff-Anton">Anton packs a heavy punch.</p>
+        <div class="meta">Anton-Regular.ttf</div>
+      </div>
+      <div class="card">
+        <div class="label">Display · BlackOps</div>
+        <p class="sample ff-BlackOps">Black Ops One for titles.</p>
+        <div class="meta">BlackOpsOne-Regular.ttf</div>
+      </div>
+      <div class="card">
+        <div class="label">Display · Audiowide</div>
+        <p class="sample ff-Audiowide">Audiowide feels futuristic.</p>
+        <div class="meta">Audiowide-Regular.ttf</div>
+      </div>
+      <div class="card">
+        <div class="label">Display · AlfaSlab</div>
+        <p class="sample ff-AlfaSlab">Alfa Slab One is bold slab.</p>
+        <div class="meta">AlfaSlabOne-Regular.ttf</div>
+      </div>
+    </div>
+    <div class="footer">Page 3 / 10 · FONTSHOW · @font-face</div>
+  </div>
+  <div class="sheet">
+    <div class="kicker">FONTSHOW · exact faces</div>
+    <h2>Exact @font-face gallery · continued</h2>
+    <div class="grid">
+      <div class="card">
+        <div class="label">Script · GreatVibes</div>
+        <p class="sample ff-GreatVibes">Great Vibes for invitations.</p>
+        <div class="meta">GreatVibes-Regular.ttf</div>
+      </div>
+      <div class="card">
+        <div class="label">Script · Parisienne</div>
+        <p class="sample ff-Parisienne">Parisienne keeps it elegant.</p>
+        <div class="meta">Parisienne-Regular.ttf</div>
+      </div>
+      <div class="card">
+        <div class="label">Hand · Marker</div>
+        <p class="sample ff-Marker">Permanent Marker notes.</p>
+        <div class="meta">PermanentMarker-Regular.ttf</div>
+      </div>
+      <div class="card">
+        <div class="label">Script · Yellowtail</div>
+        <p class="sample ff-Yellowtail">Yellowtail signature line.</p>
+        <div class="meta">Yellowtail-Regular.ttf</div>
+      </div>
+      <div class="card">
+        <div class="label">Pixel · PressStart</div>
+        <p class="sample ff-PressStart">PRESS START 2P</p>
+        <div class="meta">PressStart2P-Regular.ttf</div>
+      </div>
+      <div class="card">
+        <div class="label">Pixel · VT323</div>
+        <p class="sample ff-VT323">VT323 terminal readout</p>
+        <div class="meta">VT323-Regular.ttf</div>
+      </div>
+    </div>
+    <div class="footer">Page 4 / 10 · FONTSHOW · @font-face</div>
+  </div>
+  <div class="sheet">
+    <div class="kicker">FONTSHOW · exact faces</div>
+    <h2>Exact @font-face gallery · continued</h2>
+    <div class="grid">
+      <div class="card">
+        <div class="label">Mono · AnonymousPro</div>
+        <p class="sample ff-AnonymousPro">Anonymous Pro for code.</p>
+        <div class="meta">AnonymousPro-Regular.ttf</div>
+      </div>
+      <div class="card">
+        <div class="label">Serif · Volkhov</div>
+        <p class="sample ff-Volkhov">Volkhov for editorial body.</p>
+        <div class="meta">Volkhov-Regular.ttf</div>
+      </div>
+      <div class="card">
+        <div class="label">Serif · Alice</div>
+        <p class="sample ff-Alice">Alice softens long text.</p>
+        <div class="meta">Alice-Regular.ttf</div>
+      </div>
+      <div class="card">
+        <div class="label">Serif · YoungSerif</div>
+        <p class="sample ff-YoungSerif">Young Serif for pull quotes.</p>
+        <div class="meta">YoungSerif-Regular.ttf</div>
+      </div>
+      <div class="card">
+        <div class="label">Slab · Zilla</div>
+        <p class="sample ff-Zilla">Zilla Slab for UI chrome.</p>
+        <div class="meta">ZillaSlab-Regular.ttf</div>
+      </div>
+      <div class="card">
+        <div class="label">Display · ArchivoBlack</div>
+        <p class="sample ff-ArchivoBlack">Archivo Black headlines.</p>
+        <div class="meta">ArchivoBlack-Regular.ttf</div>
+      </div>
+    </div>
+    <div class="footer">Page 5 / 10 · FONTSHOW · @font-face</div>
+  </div>
+  <div class="sheet">
+    <div class="kicker">FONTSHOW · exact faces</div>
+    <h2>Exact @font-face gallery · continued</h2>
+    <div class="grid">
+      <div class="card">
+        <div class="label">Sans · Titillium</div>
+        <p class="sample ff-Titillium">Titillium Web for UI copy.</p>
+        <div class="meta">TitilliumWeb-Regular.ttf</div>
+      </div>
+      <div class="card">
+        <div class="label">Sans · Tomorrow</div>
+        <p class="sample ff-Tomorrow">Tomorrow looks geometric.</p>
+        <div class="meta">Tomorrow-Regular.ttf</div>
+      </div>
+      <div class="card">
+        <div class="label">Fun · Luckiest</div>
+        <p class="sample ff-Luckiest">Luckiest Guy for stickers.</p>
+        <div class="meta">LuckiestGuy-Regular.ttf</div>
+      </div>
+    </div>
+    <div class="footer">Page 6 / 10 · FONTSHOW · @font-face</div>
+  </div>
+  <div class="sheet">
+    <div class="kicker">FONTSHOW · exact faces</div>
+    <h2>Exact @font-face gallery · continued</h2>
+    <div class="grid">
+      <div class="card">
+        <div class="label">Fun · Monoton</div>
+        <p class="sample ff-Monoton">MONOTON NEON SIGN</p>
+        <div class="meta">Monoton-Regular.ttf</div>
+      </div>
+      <div class="card">
+        <div class="label">Fun · Fascinate</div>
+        <p class="sample ff-Fascinate">Fascinate decorative caps.</p>
+        <div class="meta">Fascinate-Regular.ttf</div>
+      </div>
+      <div class="card">
+        <div class="label">Fun · Glitch</div>
+        <p class="sample ff-Glitch">Rubik Glitch broken type.</p>
+        <div class="meta">RubikGlitch-Regular.ttf</div>
+      </div>
+    </div>
+    <div class="footer">Page 7 / 10 · FONTSHOW · @font-face</div>
+  </div>
+  <div class="sheet">
+    <div class="kicker">FONTSHOW · metric aliases</div>
+    <h2>Metric-alias CSS stacks</h2>
+    <p class="note">
+      With <code>--use-metric-font-aliases</code> / <code>UseMetricFontAliases</code>
+      and substitutes in the registry, these stacks pick Gelasio / Cousine /
+      Arimo / Tinos. Without the flag they continue to generics / Liberation.
+    </p>
+    <table>
+      <thead>
+        <tr><th>CSS stack</th><th>Sample</th><th>Opt-in face</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>Georgia, "Times New Roman", serif</code></td>
+          <td class="alias-georgia">Northline brief set in a Georgia stack.</td>
+          <td>Gelasio</td>
+        </tr>
+        <tr>
+          <td><code>"Courier New", monospace</code></td>
+          <td class="alias-courier">mono payload: ORDER-57-ALIAS</td>
+          <td>Cousine</td>
+        </tr>
+        <tr>
+          <td><code>Arial, Helvetica, sans-serif</code></td>
+          <td class="alias-arial">Sans stack aimed at Arimo when present.</td>
+          <td>Arimo</td>
+        </tr>
+        <tr>
+          <td><code>"Times New Roman", Times, serif</code></td>
+          <td class="alias-times">Serif stack aimed at Tinos when present.</td>
+          <td>Tinos</td>
+        </tr>
+      </tbody>
+    </table>
+    <h3>Exact substitute families (also via @font-face)</h3>
+    <div class="grid">
+      <div class="card"><div class="label">Gelasio exact</div><p class="sample ff-Gelasio">Gelasio loaded from testdata/fonts.</p></div>
+      <div class="card"><div class="label">Cousine exact</div><p class="sample ff-Cousine">Cousine loaded from testdata/fonts.</p></div>
+      <div class="card"><div class="label">Arimo exact</div><p class="sample ff-Arimo">Arimo loaded from testdata/fonts.</p></div>
+      <div class="card"><div class="label">Tinos exact</div><p class="sample ff-Tinos">Tinos loaded from testdata/fonts.</p></div>
+    </div>
+    <div class="footer">Page 8 / 10 · FONTSHOW · aliases</div>
+  </div>
+  <div class="sheet">
+    <div class="kicker">FONTSHOW · generics</div>
+    <h2>CSS generics (bundled Liberation / DejaVu)</h2>
+    <div class="grid">
+      <div class="card"><div class="label">serif</div><p class="sample generic-serif">Generic serif → Liberation Serif.</p></div>
+      <div class="card"><div class="label">sans-serif</div><p class="sample generic-sans">Generic sans → Liberation Sans.</p></div>
+      <div class="card"><div class="label">monospace</div><p class="sample generic-mono">Generic mono → Liberation Mono.</p></div>
+    </div>
+    <h2>Operator recipes</h2>
+    <table>
+      <thead><tr><th>Goal</th><th>Flags / API</th></tr></thead>
+      <tbody>
+        <tr><td>Deterministic default</td><td>No font flags</td></tr>
+        <tr><td>Load showcase faces + WOFF2</td><td><code>--font-path testdata/fonts</code> or <code>FontPaths</code></td></tr>
+        <tr><td>Host discovery</td><td><code>--use-system-fonts</code> / <code>UseSystemFonts</code></td></tr>
+        <tr><td>WeasyPrint-style substitutes</td><td><code>--use-metric-font-aliases</code> / <code>UseMetricFontAliases</code></td></tr>
+        <tr><td>Sample folders</td><td><code>make samples</code> · <code>make samples-metric-aliases</code></td></tr>
+      </tbody>
+    </table>
+    <p class="note">Variable fonts (<code>fvar</code>), EOT, and <code>data:</code> @font-face stay rejected/skipped. Exact matches beat aliases.</p>
+    <div class="footer">Page 9 / 10 · FONTSHOW · generics</div>
+  </div>
+  <div class="sheet">
+    <div class="kicker">FONTSHOW · closing</div>
+    <h1 class="title">Mixed composition</h1>
+    <p class="subtitle">One page mixing display, script, mono, and alias stacks.</p>
+    <p class="ff-Bebas" style="font-size:28pt;margin:0 0 6px;">BEBAS MASTHEAD</p>
+    <p class="ff-GreatVibes" style="font-size:20pt;">Signed with Great Vibes</p>
+    <p class="ff-PressStart" style="font-size:10pt;">SCORE 5700 · PRESS START</p>
+    <p class="alias-georgia">Georgia-stack paragraph for body copy comparison against WeasyPrint.</p>
+    <p class="alias-courier">Courier New stack: SKU-57-MIXED-CLOSE</p>
+    <p class="ff-Volkhov">Volkhov for a calmer editorial closing line on FONTSHOW.</p>
+    <div class="footer">Page 10 / 10 · FONTSHOW · mixed close</div>
+  </div>
+</body>
+</html>
