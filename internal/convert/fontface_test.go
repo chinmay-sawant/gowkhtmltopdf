@@ -140,7 +140,7 @@ func TestFontFaceWOFFEmbed(t *testing.T) {
 	}
 }
 
-func TestFontFaceWOFF2Skipped(t *testing.T) {
+func TestFontFaceBadWOFF2Skipped(t *testing.T) {
 	t.Parallel()
 
 	html := `<html><head><style>
@@ -157,7 +157,29 @@ body { font-family: Custom, sans-serif; }
 	data := runPDFWithLog(t, cmd, &log)
 
 	if bytes.Contains(data, []byte("/BaseFont /Custom")) {
-		t.Error("WOFF2 src must not register Custom")
+		t.Error("bad WOFF2 src must not register Custom")
+	}
+}
+
+func TestFontFaceWOFF2Embed(t *testing.T) {
+	t.Parallel()
+
+	cmd, dir := newCommand(t, fontFaceHTML("Custom.woff2"), filepath.Join(t.TempDir(), "out.pdf"))
+
+	src, err := os.ReadFile(filepath.Join("..", "..", "testdata", "fonts", "LiberationSans-Regular.woff2"))
+	if err != nil {
+		t.Fatalf("read woff2 fixture: %v", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(dir, "Custom.woff2"), src, 0o600); err != nil {
+		t.Fatalf("write woff2: %v", err)
+	}
+
+	var log bytes.Buffer
+
+	data := runPDFWithLog(t, cmd, &log)
+	if !bytes.Contains(data, []byte("/BaseFont /Custom")) {
+		t.Errorf("expected WOFF2 @font-face embed /BaseFont /Custom; log=%q", log.String())
 	}
 }
 

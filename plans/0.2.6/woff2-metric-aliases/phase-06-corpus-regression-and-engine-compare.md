@@ -1,6 +1,6 @@
 # Phase 06: Corpus, regression, and engine compare notes
 
-> **Status:** planned  
+> **Status:** complete — validated 2026-08-20  
 > **Parent:** [00-canonical-woff2-metric-aliases-plan.md](00-canonical-woff2-metric-aliases-plan.md)  
 > **Depends on:** Phases 03 and 05  
 > **Unblocks:** Phase 07
@@ -15,38 +15,38 @@ pixel-parity gates.
 
 ### WOFF2
 
-- [ ] Convert test: local WOFF2 `@font-face` produces `/FontFile2` for the
+- [x] Convert test: local WOFF2 `@font-face` produces `/FontFile2` for the
   custom family  
   Evidence: →
-- [ ] Convert test: bad WOFF2 falls back; no Custom `/BaseFont`  
+- [x] Convert test: bad WOFF2 falls back; no Custom `/BaseFont`  
   Evidence: →
-- [ ] Optional HTTPS fixture under ACL (skip cleanly if offline policy
+- [x] Optional HTTPS fixture under ACL (skip cleanly if offline policy
   denies)  
   Evidence: →
 
 ### Metric aliases
 
-- [ ] Convert: patched Gelasio on `--font-path` + `--use-metric-font-aliases`
+- [x] Convert: patched Gelasio on `--font-path` + `--use-metric-font-aliases`
   → Georgia resolves to Gelasio  
   Evidence: →
-- [ ] Same HTML, aliases off → Liberation Serif via `serif`  
+- [x] Same HTML, aliases off → Liberation Serif via `serif`  
   Evidence: →
-- [ ] Cousine / Courier New pair  
+- [x] Cousine / Courier New pair  
   Evidence: →
-- [ ] Image mode shares alias behavior  
+- [x] Image mode shares alias behavior  
   Evidence: →
-- [ ] Embed-preflight still falls through if aliased face fails embed  
+- [x] Embed-preflight still falls through if aliased face fails embed  
   Evidence: →
 
 ### Fixture-55 / WeasyPrint notes
 
-- [ ] Record no-flag fixture-55 still Liberation (regression guard)  
+- [x] Record no-flag fixture-55 still Liberation (regression guard)  
   Evidence: PDF/PNG path or test →
-- [ ] Optional host evidence: `--use-system-fonts --use-metric-font-aliases`
+- [x] Optional host evidence: `--use-system-fonts --use-metric-font-aliases`
   when Gelasio present: differential note only (not CI-hard on host fonts)  
   Evidence: →
 
 ## Gates
 
-- [ ] `CGO_ENABLED=0 go test ./internal/convert ./internal/imageout` →
-- [ ] No-flag Georgia→Liberation contract unchanged
+- [x] `CGO_ENABLED=0 go test ./internal/convert ./internal/imageout` →
+- [x] No-flag Georgia→Liberation contract unchanged

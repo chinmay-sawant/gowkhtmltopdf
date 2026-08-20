@@ -190,6 +190,20 @@ func TestFontPathFlagIsDirectoryOriented(t *testing.T) {
 	// internal/convert/fontpath_test.go (CLI package does not run convert).
 }
 
+func TestUseMetricFontAliasesFlag(t *testing.T) {
+	t.Parallel()
+
+	cmd := parsePDF(t, "--use-metric-font-aliases", "-o", outPDF, "input.html")
+	if !cmd.Global.UseMetricFontAliases {
+		t.Fatal("UseMetricFontAliases not set")
+	}
+
+	off := parsePDF(t, "-o", outPDF, "input.html")
+	if off.Global.UseMetricFontAliases {
+		t.Fatal("UseMetricFontAliases must default false")
+	}
+}
+
 func TestImageGrammarAndOptions(t *testing.T) {
 	t.Parallel()
 

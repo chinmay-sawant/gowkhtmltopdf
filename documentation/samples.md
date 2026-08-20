@@ -218,6 +218,20 @@ make samples
    `--zoom 0.666667`. Network is required; **soft-fail** if the fetch fails
    so offline hosts still get fixture samples.
 
+### Opt-in metric-alias sample (`make samples-metric-aliases`)
+
+Separate from `make samples`. Regenerates only:
+
+`output/fixture-55-lantern-cooperative-report-metric-aliases.pdf`
+
+with `--use-system-fonts --use-metric-font-aliases` (Gelasio/Cousine when
+those faces are discoverable). Does **not** rewrite the default
+`output/fixture-55-lantern-cooperative-report.pdf`.
+
+```sh
+make samples-metric-aliases
+```
+
 `font-examples.html` and `complex-css.html` are **not** part of the fixture
 loop. Leftover or manual PDFs that may sit in `output/`
 (`font-examples.pdf`, `chrome_ana.pdf`, `wkhtmltopdf/`) are documented in

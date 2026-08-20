@@ -1,6 +1,6 @@
 # Phase 04: Metric alias contract (resolver)
 
-> **Status:** planned  
+> **Status:** complete — validated 2026-08-20  
 > **Parent:** [00-canonical-woff2-metric-aliases-plan.md](00-canonical-woff2-metric-aliases-plan.md)  
 > **Depends on:** closed `plans/0.2.5/font/` resolver  
 > **Unblocks:** Phase 05  
@@ -24,24 +24,24 @@ before bundled generics. Alias targets consult **Registry only**.
 
 ## Checklist
 
-- [ ] Extend `FontResolver` with opt-in enablement (default off)  
+- [x] Extend `FontResolver` with opt-in enablement (default off)  
   Evidence: →
-- [ ] Implement alias step in `resolveToken` after exact `Registry.Lookup`  
+- [x] Implement alias step in `resolveToken` after exact `Registry.Lookup`  
   Evidence: →
-- [ ] Alias targets never bind bundled `FaceSet` Liberation names in v1  
+- [x] Alias targets never bind bundled `FaceSet` Liberation names in v1  
   Evidence: →
-- [ ] Keep default-path tests: `TestGelasioDoesNotRenameToGeorgia`,
+- [x] Keep default-path tests: `TestGelasioDoesNotRenameToGeorgia`,
   `TestFontResolverNoLegacyAliases`  
   Evidence: →
-- [ ] Unit positives: Gelasio + aliases on → Georgia; off → Liberation via
+- [x] Unit positives: Gelasio + aliases on → Georgia; off → Liberation via
   `serif`; absent Gelasio → stack continues; exact Georgia wins  
   Evidence: `go test ./internal/pdf -run 'Resolver|Alias|Gelasio'` →
-- [ ] Cousine / Courier New case  
+- [x] Cousine / Courier New case  
   Evidence: →
-- [ ] `ResolveRune` uses the same token path (no alias bypass)  
+- [x] `ResolveRune` uses the same token path (no alias bypass)  
   Evidence: →
 
 ## Gates
 
-- [ ] Flag-off behavior matches v0.2.5 contract for bare `Georgia, serif`
-- [ ] `CGO_ENABLED=0 go test ./internal/pdf ./internal/layout` →
+- [x] Flag-off behavior matches v0.2.5 contract for bare `Georgia, serif`
+- [x] `CGO_ENABLED=0 go test ./internal/pdf ./internal/layout` →

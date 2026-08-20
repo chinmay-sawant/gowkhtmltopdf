@@ -370,6 +370,9 @@ func addFontFlags(add flagAdder) {
 	add("use-system-fonts", ModeBoth, flagBool, func(c *Command, _ *objectCtx, vals []string) error {
 		return c.Global.Set("usesystemfonts", vals[0])
 	})
+	add("use-metric-font-aliases", ModeBoth, flagBool, func(c *Command, _ *objectCtx, vals []string) error {
+		return c.Global.Set("usemetricfontalias", vals[0])
+	})
 }
 
 // addPairFlags registers pair flags (two values: name value).

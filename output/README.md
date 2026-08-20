@@ -80,7 +80,8 @@ files are skipped as bodies; fixture-36 attaches them as HTML header/footer.
 | `fixture-52-airline-boarding-pass.pdf` | Boarding pass |
 | `fixture-53-asteria-observatory-poster.pdf` | Observatory poster |
 | `fixture-54-ember-harbor-storybook.pdf` | Ember Harbor storybook (4 pages) |
-| `fixture-55-lantern-cooperative-report.pdf` | Northline operations brief |
+| `fixture-55-lantern-cooperative-report.pdf` | Northline operations brief (default Liberation-via-stack; from `make samples`) |
+| `fixture-55-lantern-cooperative-report-metric-aliases.pdf` | Same fixture via `make samples-metric-aliases` (`--use-system-fonts --use-metric-font-aliases`; Gelasio/Cousine when discoverable) |
 | `fixture-56-architecture-diagram.pdf` | Architecture diagram (20 pages) |
 
 ## Image smokes

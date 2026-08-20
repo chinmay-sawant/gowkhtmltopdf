@@ -1,6 +1,6 @@
 # Phase 05: Settings, CLI, and library surface
 
-> **Status:** planned  
+> **Status:** complete — validated 2026-08-20  
 > **Parent:** [00-canonical-woff2-metric-aliases-plan.md](00-canonical-woff2-metric-aliases-plan.md)  
 > **Depends on:** Phase 04  
 > **Unblocks:** Phase 06
@@ -13,20 +13,20 @@ convert/layout `NewFontResolver`.
 
 ## Checklist
 
-- [ ] `PdfGlobal.UseMetricFontAliases` + reflect key `usemetricfontalias`  
+- [x] `PdfGlobal.UseMetricFontAliases` + reflect key `usemetricfontalias`  
   Evidence: →
-- [ ] CLI `--use-metric-font-aliases` on PDF and image (`ModeBoth`), beside
+- [x] CLI `--use-metric-font-aliases` on PDF and image (`ModeBoth`), beside
   `--use-system-fonts`  
   Evidence: →
-- [ ] `Document` / `ImageDocument` field `UseMetricFontAliases bool`  
+- [x] `Document` / `ImageDocument` field `UseMetricFontAliases bool`  
   Evidence: →
-- [ ] Convert / imageout plumbing passes the bit into `FontResolver`  
+- [x] Convert / imageout plumbing passes the bit into `FontResolver`  
   Evidence: →
-- [ ] Zero-value / default Document asserts false  
+- [x] Zero-value / default Document asserts false  
   Evidence: →
-- [ ] CLI parse test for the new flag  
+- [x] CLI parse test for the new flag  
   Evidence: →
-- [ ] Optional info diagnostic when flag on and registry empty (aliases
+- [x] Optional info diagnostic when flag on and registry empty (aliases
   cannot fire)  
   Evidence: →
 
@@ -37,5 +37,5 @@ engine does not run Fontconfig.
 
 ## Gates
 
-- [ ] `CGO_ENABLED=0 go test ./internal/cli ./internal/settings ./internal/convert` →
-- [ ] Public API godoc states default false and discovery independence
+- [x] `CGO_ENABLED=0 go test ./internal/cli ./internal/settings ./internal/convert` →
+- [x] Public API godoc states default false and discovery independence

@@ -202,6 +202,7 @@ func TestDirectModuleAllowlist(t *testing.T) {
 	allowed := map[string]bool{
 		"github.com/go-text/typesetting": true,
 		"github.com/tdewolff/canvas":     true,
+		"github.com/tdewolff/font":       true, // WOFF2 decode (ParseWOFF2); already canvas graph
 	}
 
 	for _, line := range strings.Split(string(out), "\n") {
@@ -211,7 +212,7 @@ func TestDirectModuleAllowlist(t *testing.T) {
 		}
 
 		if !allowed[line] {
-			t.Errorf("unexpected direct module %q (allowlist: typesetting + tdewolff/canvas; CGO HarfBuzz rejected)", line)
+			t.Errorf("unexpected direct module %q (allowlist: typesetting + canvas + font; CGO HarfBuzz rejected)", line)
 		}
 
 		if strings.Contains(strings.ToLower(line), "harfbuzz") {

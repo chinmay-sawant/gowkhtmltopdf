@@ -1,23 +1,22 @@
 # v0.2.6: WOFF2 decode + opt-in metric aliases
 
-> **Status:** planned (ledger filed 2026-08-20)
+> **Status:** complete — validated 2026-08-20
 > **Parent:** [`plans/0.2.6/README.md`](../README.md)
 > **Predecessor (closed):** [`plans/0.2.5/font/`](../../0.2.5/font/README.md)
 > **Supersedes (remaining work):**
 > [`plans/0.2.0/phases/pending-phase-items/09-remote-webfonts.md`](../../0.2.0/phases/pending-phase-items/09-remote-webfonts.md)
 > for unfinished WOFF2/Brotli decode only
-> **Constraint:** pure Go, `CGO_ENABLED=0`. A third direct module is allowed
-> only via the dated Brotli amendment in this folder.
+> **Constraint:** pure Go, `CGO_ENABLED=0`. Third direct module:
+> `tdewolff/font` (see dated amendment in this folder).
 
-Two gaps remain after the v0.2.5 font-resolution track:
+This track closed two gaps left after v0.2.5 font-resolution:
 
-1. **WOFF2.** Modern `@font-face` stacks serve `.woff2` first. Today the
-   engine skips them (`errWOFF2Unsupported` or a suffix short-circuit).
-   HTTPS TTF/OTF/WOFF1 already work.
-2. **Opt-in metric aliases.** WeasyPrint/Fontconfig may map `Georgia` to
-   `Gelasio` when Gelasio is installed. Gowkhtmltopdf’s default must stay
-   author stack → generics → Liberation. Operators who want the WeasyPrint-like
-   path need an explicit flag, not a silent default change.
+1. **WOFF2.** Local and HTTPS `@font-face` `.woff2` decode and register like
+   WOFF1 when ACL/network allow (`DecodeWOFF2` via `tdewolff/font`).
+2. **Opt-in metric aliases.** `--use-metric-font-aliases` /
+   `UseMetricFontAliases` (default false) can map Georgia→Gelasio-style
+   accepts when the substitute is already in the registry. No-flag default
+   stays author stack → generics → Liberation.
 
 ## Rules that do not move
 

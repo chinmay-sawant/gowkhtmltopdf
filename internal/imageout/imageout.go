@@ -97,17 +97,18 @@ const maxSmartWidthLayouts = 8
 // RenderOptions controls one Render call. Width/Height and Crop are in
 // output pixels; the layout viewport is Width CSS pixels at 96 dpi.
 type RenderOptions struct {
-	Width       int // viewport width in pixels; <= 0 means 1024
-	Height      int // minimum canvas height in pixels; 0 = content height
-	Font        *pdf.Font
-	Registry    *pdf.Registry // optional --font-path / system faces (CJK)
-	Sheets      []*css.Stylesheet
-	Media       string // "screen" (default), "print" or ""
-	Images      func(src string) ([]byte, error)
-	Background  bool // paint background colors
-	Transparent bool // PNG background: alpha 0 instead of white
-	Crop        image.Rectangle
-	SmartWidth  bool // grow the viewport until content fits (default on)
+	Width                int // viewport width in pixels; <= 0 means 1024
+	Height               int // minimum canvas height in pixels; 0 = content height
+	Font                 *pdf.Font
+	Registry             *pdf.Registry // optional --font-path / system faces (CJK)
+	UseMetricFontAliases bool          // --use-metric-font-aliases
+	Sheets               []*css.Stylesheet
+	Media                string // "screen" (default), "print" or ""
+	Images               func(src string) ([]byte, error)
+	Background           bool // paint background colors
+	Transparent          bool // PNG background: alpha 0 instead of white
+	Crop                 image.Rectangle
+	SmartWidth           bool // grow the viewport until content fits (default on)
 	// PrintLinkUnderline mirrors --print-link-underline (opt-in).
 	PrintLinkUnderline bool
 }
@@ -221,15 +222,16 @@ func layoutOptions(opts RenderOptions, font *pdf.Font, viewportPx float64) layou
 	}
 
 	return layout.Options{ //nolint:exhaustruct // intentional zero/partial fields
-		Width:              viewportPx * cssPxToPt,
-		Height:             heightPt,
-		Font:               font,
-		Registry:           opts.Registry,
-		Sheets:             opts.Sheets,
-		Media:              opts.Media,
-		Images:             opts.Images,
-		Background:         opts.Background,
-		PrintLinkUnderline: opts.PrintLinkUnderline,
+		Width:                viewportPx * cssPxToPt,
+		Height:               heightPt,
+		Font:                 font,
+		Registry:             opts.Registry,
+		UseMetricFontAliases: opts.UseMetricFontAliases,
+		Sheets:               opts.Sheets,
+		Media:                opts.Media,
+		Images:               opts.Images,
+		Background:           opts.Background,
+		PrintLinkUnderline:   opts.PrintLinkUnderline,
 	}
 }
 
@@ -1650,18 +1652,19 @@ func (p *imagePipeline) RenderObjects(ctx context.Context) error {
 	// Policy A: Quiet is Global.Quiet; body paint background is Global.Background
 	// only (single field for PDF + image; CLI --background / library Set).
 	img, err := RenderContext(ctx, root, RenderOptions{
-		Width:              imgSet.Width,
-		Height:             imgSet.Height,
-		Font:               p.font,
-		Registry:           p.registry,
-		Sheets:             sheets,
-		Media:              media,
-		Images:             imagesFn,
-		Background:         p.req.Global.Background,
-		Transparent:        imgSet.Transparent,
-		Crop:               cropRect(imgSet.Crop),
-		SmartWidth:         imgSet.SmartWidth,
-		PrintLinkUnderline: printLinkUnderline,
+		Width:                imgSet.Width,
+		Height:               imgSet.Height,
+		Font:                 p.font,
+		Registry:             p.registry,
+		UseMetricFontAliases: p.req.Global.UseMetricFontAliases,
+		Sheets:               sheets,
+		Media:                media,
+		Images:               imagesFn,
+		Background:           p.req.Global.Background,
+		Transparent:          imgSet.Transparent,
+		Crop:                 cropRect(imgSet.Crop),
+		SmartWidth:           imgSet.SmartWidth,
+		PrintLinkUnderline:   printLinkUnderline,
 	})
 	if err != nil {
 		return err

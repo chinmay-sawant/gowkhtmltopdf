@@ -78,6 +78,9 @@ type Options struct {
 	Font     *pdf.Font
 	Faces    *pdf.FaceSet  // optional Liberation family; defaults loaded when nil
 	Registry *pdf.Registry // optional discovered fonts (--font-path)
+	// UseMetricFontAliases enables Registry-only metric accept aliases on the
+	// FontResolver constructed when Resolver is nil. Default false.
+	UseMetricFontAliases bool
 	// Resolver is an optional shared FontResolver. When set, layout reuses it
 	// so convert can MarkUnavailable across embed-preflight re-layout passes.
 	// When nil, layout constructs a fresh resolver from Faces+Registry.
@@ -735,6 +738,7 @@ func newEngine(
 	resolver := opts.Resolver
 	if resolver == nil {
 		resolver = pdf.NewFontResolver(faces, opts.Registry)
+		resolver.UseMetricFontAliases = opts.UseMetricFontAliases
 	}
 
 	return &engine{ //nolint:exhaustruct // intentional zero fields

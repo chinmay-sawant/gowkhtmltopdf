@@ -13,8 +13,9 @@ is implemented in this repository. There is no Chrome/WebKit process, no Qt,
 and no remote HTML→PDF service. The Go module graph is allowlisted: the
 standard library plus
 [`go-text/typesetting`](https://github.com/go-text/typesetting) (OpenType
-shaping) and [`tdewolff/canvas`](https://github.com/tdewolff/canvas) (SVG
-rasterization). Builds are intended to run with `CGO_ENABLED=0`.
+shaping), [`tdewolff/canvas`](https://github.com/tdewolff/canvas) (SVG
+rasterization), and [`tdewolff/font`](https://github.com/tdewolff/font)
+(WOFF2 decode). Builds are intended to run with `CGO_ENABLED=0`.
 
 **Status:** **v0.2.4** is the current release (`VERSION`). Phases 0–9 of the
 [canonical plan](../plans/0.1.0/00-canonical-pure-go-rewrite.md) are implemented.
@@ -29,7 +30,7 @@ print) are goals, not shipped feature claims — see [fidelity.md](fidelity.md).
 | Principle | Meaning |
 |-----------|---------|
 | **From scratch** | The converter pipeline is implemented in this repo |
-| **Pure Go** | Build with `CGO_ENABLED=0`; two allowlisted Go modules provide shaping and SVG raster |
+| **Pure Go** | Build with `CGO_ENABLED=0`; allowlisted Go modules provide shaping, SVG raster, and WOFF2 decode |
 | **No browser** | No Chrome, WebKit, Qt, or headless browser process |
 | **No cgo** | Static binaries; no native converter library |
 | **No SaaS APIs** | No remote HTML→PDF services or SDKs |

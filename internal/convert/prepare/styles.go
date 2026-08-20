@@ -281,9 +281,9 @@ func applyFontFaceStyle(font *pdf.Font, face css.FontFace) {
 //nolint:wsl,nlreturn,lll // font-face collection flow
 func fetchFontFace(ctx context.Context, resources load.ResourceContext, uri string, idx int, log io.Writer) (*pdf.Font, bool) {
 	lower := strings.ToLower(uri)
-	if strings.HasSuffix(lower, ".woff2") || strings.HasSuffix(lower, ".eot") {
+	if strings.HasSuffix(lower, ".eot") {
 		line.Emit(log, line.Warn,
-			"object %d: @font-face src %q skipped (WOFF2/EOT unsupported; WOFF1/TTF/OTF only)", idx, uri)
+			"object %d: @font-face src %q skipped (EOT unsupported; WOFF2/WOFF1/TTF/OTF only)", idx, uri)
 		return nil, false
 	}
 	if strings.HasPrefix(lower, "data:") {

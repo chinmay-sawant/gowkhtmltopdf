@@ -448,17 +448,18 @@ func initTOCState(ctx context.Context, run *runContext, obj *settings.PdfObject,
 	}
 
 	state := &objectState{ //nolint:exhaustruct // intentional zero-value fields
-		obj:      obj,
-		idx:      idx,
-		isTOC:    true,
-		header:   obj.HeaderFor(run.req.Global),
-		footer:   obj.FooterFor(run.req.Global),
-		repl:     mergedReplaces(obj, run.req.Global),
-		toc:      effectiveTOC(*obj, run.req.Global),
-		registry: run.registry,
-		media:    mediaFor(run.req.Global, obj),
-		geom:     geom,
-		lp:       obj.Load,
+		obj:                  obj,
+		idx:                  idx,
+		isTOC:                true,
+		header:               obj.HeaderFor(run.req.Global),
+		footer:               obj.FooterFor(run.req.Global),
+		repl:                 mergedReplaces(obj, run.req.Global),
+		toc:                  effectiveTOC(*obj, run.req.Global),
+		registry:             run.registry,
+		useMetricFontAliases: run.req.Global.UseMetricFontAliases,
+		media:                mediaFor(run.req.Global, obj),
+		geom:                 geom,
+		lp:                   obj.Load,
 	}
 
 	reg, err := effectiveMargins(ctx, run.loader, run.font, run.req.Global, state, run.log)
@@ -523,20 +524,21 @@ func renderObject(ctx context.Context, run *runContext, obj *settings.PdfObject,
 
 	printUL := run.req.Global.Web.PrintLinkUnderline || obj.Web.PrintLinkUnderline
 	state := &objectState{ //nolint:exhaustruct // intentional zero-value fields
-		obj:           obj,
-		idx:           idx,
-		header:        obj.HeaderFor(run.req.Global),
-		footer:        obj.FooterFor(run.req.Global),
-		repl:          mergedReplaces(obj, run.req.Global),
-		base:          prep.Resource.Base,
-		lp:            obj.Load,
-		registry:      registry,
-		resources:     resources,
-		imagesEnabled: run.req.Global.Web.Images,
-		media:         media,
-		geom:          geom,
-		imagesFn:      imagesFn,
-		doctitle:      docTitle(root),
+		obj:                  obj,
+		idx:                  idx,
+		header:               obj.HeaderFor(run.req.Global),
+		footer:               obj.FooterFor(run.req.Global),
+		repl:                 mergedReplaces(obj, run.req.Global),
+		base:                 prep.Resource.Base,
+		lp:                   obj.Load,
+		registry:             registry,
+		useMetricFontAliases: run.req.Global.UseMetricFontAliases,
+		resources:            resources,
+		imagesEnabled:        run.req.Global.Web.Images,
+		media:                media,
+		geom:                 geom,
+		imagesFn:             imagesFn,
+		doctitle:             docTitle(root),
 	}
 
 	if run.doc.Policy().IsPDFUA1() || run.doc.Policy().IsPDFUA2() {
@@ -653,16 +655,17 @@ func (st *objectState) bodyLayoutOpts(render objectRenderContext) layout.Options
 	}
 
 	return layout.Options{ //nolint:exhaustruct // intentional zero-value fields
-		Width:              st.geom.contentW,
-		Height:             st.geom.contentH,
-		Font:               render.font,
-		Registry:           render.registry,
-		Sheets:             render.sheets,
-		Media:              media,
-		Zoom:               render.zoom,
-		Images:             render.imagesFn,
-		Background:         render.global.Background,
-		PrintLinkUnderline: render.printLinkUnderline,
+		Width:                st.geom.contentW,
+		Height:               st.geom.contentH,
+		Font:                 render.font,
+		Registry:             render.registry,
+		UseMetricFontAliases: render.global.UseMetricFontAliases,
+		Sheets:               render.sheets,
+		Media:                media,
+		Zoom:                 render.zoom,
+		Images:               render.imagesFn,
+		Background:           render.global.Background,
+		PrintLinkUnderline:   render.printLinkUnderline,
 	}
 }
 

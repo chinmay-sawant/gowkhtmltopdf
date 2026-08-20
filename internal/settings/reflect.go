@@ -564,6 +564,10 @@ func registerGlobalLoadKeys(keys keyTable[PdfGlobal]) {
 		func(dst *PdfGlobal, raw string) error { return setBool(&dst.UseSystemFonts)(raw) },
 		func(dst *PdfGlobal) (string, bool) { return fmtBool(dst.UseSystemFonts), true },
 	)
+	regGlobal("usemetricfontalias",
+		func(dst *PdfGlobal, raw string) error { return setBool(&dst.UseMetricFontAliases)(raw) },
+		func(dst *PdfGlobal) (string, bool) { return fmtBool(dst.UseMetricFontAliases), true },
+	)
 	regGlobal("resolverelativelinks",
 		func(dst *PdfGlobal, raw string) error { return setBool(&dst.ResolveRelativeLinks)(raw) },
 		func(dst *PdfGlobal) (string, bool) { return fmtBool(dst.ResolveRelativeLinks), true },

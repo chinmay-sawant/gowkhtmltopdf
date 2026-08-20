@@ -69,6 +69,8 @@ func WithFontPreflight(
 	resolver := opts.Resolver
 	if resolver == nil {
 		resolver = pdf.NewFontResolver(faces, opts.Registry)
+		resolver.UseMetricFontAliases = opts.UseMetricFontAliases
+
 		if log != nil && log != io.Discard {
 			resolver.Warn = func(msg string) {
 				line.Emit(log, line.Warn, "%s: %s", objectLabel, msg)

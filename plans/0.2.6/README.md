@@ -22,7 +22,7 @@ never becomes the no-flag default.
 
 ## Status
 
-Planned (ledger filed 2026-08-20). Implementation checklists start unchecked.
-Mark `[x]` only with command or artifact evidence in the phase file.
-`VERSION` remains `0.2.4` until 0.2.5 release prep. This track targets the
-minor after font-resolution ships.
+**Complete (implementation validated 2026-08-20).** WOFF2 decode via
+`tdewolff/font` and opt-in `--use-metric-font-aliases` are in tree.
+Evidence: `CGO_ENABLED=0 make test` and `CGO_ENABLED=0 make lint`.
+`VERSION` remains `0.2.4` until release prep.

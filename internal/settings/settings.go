@@ -448,6 +448,7 @@ type PdfGlobal struct {
 	Load                 LoadGlobal
 	FontPaths            []string // --font-path dirs (or .ttf/.otf files); opt-in discovery
 	UseSystemFonts       bool     // --use-system-fonts
+	UseMetricFontAliases bool     // --use-metric-font-aliases; Registry-only accept map
 	ResolveRelativeLinks bool     // resolve relative <a href> against page URL
 	// Ignored holds accepted-but-inert wkhtml keys (dpi, javascript, …).
 	// ponytail: Policy A sink — do not re-add typed stubs without engine consumers.

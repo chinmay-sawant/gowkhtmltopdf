@@ -8,6 +8,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -208,15 +209,40 @@ func TestDecodeWOFFRejectsOverlap(t *testing.T) {
 	}
 }
 
-func TestDecodeWOFF2Gap(t *testing.T) {
+func TestDecodeWOFF2RoundTrip(t *testing.T) {
 	t.Parallel()
-	// Concrete gap: WOFF2 needs Brotli; typesetting has no WOFF2 reader and we
-	// do not add direct modules. ParseFontBytes rejects wOF2 with a clear error.
+
+	woff2, err := os.ReadFile(filepath.Join("..", "..", "testdata", "fonts", "LiberationSans-Regular.woff2"))
+	if err != nil {
+		t.Fatalf("read woff2 fixture: %v", err)
+	}
+
+	f, err := ParseFontBytes(woff2)
+	if err != nil {
+		t.Fatalf("ParseFontBytes WOFF2: %v", err)
+	}
+
+	if f.GlyphID('B') == 0 {
+		t.Fatal("expected glyph B after WOFF2 decode")
+	}
+}
+
+func TestDecodeWOFF2RejectsGarbage(t *testing.T) {
+	t.Parallel()
+
 	buf := []byte("wOF2....fake...")
 
 	_, err := ParseFontBytes(buf)
-	if !errors.Is(err, errWOFF2Unsupported) {
-		t.Fatalf("ParseFontBytes WOFF2: got %v, want errWOFF2Unsupported", err)
+	if err == nil {
+		t.Fatal("expected error for garbage WOFF2")
+	}
+
+	if !errors.Is(err, errWOFF2Invalid) && !errors.Is(err, errWOFFBadSignature) &&
+		!errors.Is(err, errWOFF2Collection) {
+		// Accept any wrapped woff2 invalid error.
+		if !strings.Contains(strings.ToLower(err.Error()), "woff2") {
+			t.Fatalf("ParseFontBytes garbage WOFF2: %v", err)
+		}
 	}
 }
 

@@ -20,9 +20,14 @@ binaries at build time (see README "Versioning").
   re-lays-out when an optional face cannot subset/embed.
 - Docs: `documentation/fonts.md`, compatibility matrix, and deferred notes
   aligned with the shipped contract (`plans/0.2.5/font/`).
-- Planned (not shipped): WOFF2 decode + opt-in metric font aliases under
-  `plans/0.2.6/woff2-metric-aliases/` (Brotli allowlist amendment; default
-  Liberation-via-stack unchanged).
+- WOFF2 `@font-face` decode via allowlisted `tdewolff/font` (`DecodeWOFF2`);
+  local and `https://` `.woff2` sources register like WOFF1 when ACL allows.
+  EOT and `data:` remain skipped.
+- Opt-in `--use-metric-font-aliases` / `UseMetricFontAliases` (default false):
+  curated Registry accepts (Georgia→Gelasio, Courier New→Cousine, …). Exact
+  matches still win; no-flag Liberation-via-stack contract unchanged.
+- Direct module allowlist adds `tdewolff/font` (WOFF2); see
+  `plans/0.2.6/woff2-metric-aliases/amendments/2026-08-20-woff2-brotli-allowlist.md`.
 
 ## 0.2.4 (2026-08-18)
 

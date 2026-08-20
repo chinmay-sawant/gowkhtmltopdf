@@ -27,3 +27,7 @@ license, static/variable status, name-table families, and visual rationale
 Some Simplified Chinese glyphs in fixture-27 (e.g. 汉, 圳) are **not** in the
 KR subset; samples may also pass `--font-path` to Droid Sans Fallback so CSS
 font-family fallback can supply them. Full Noto CJK is not vendored (size).
+
+## LiberationSans-Regular.woff2
+
+OFL Liberation Sans Regular encoded as WOFF2 (fontTools) for @font-face / DecodeWOFF2 tests. Same face as `internal/pdf/assets/LiberationSans-Regular.ttf`.

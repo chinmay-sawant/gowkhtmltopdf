@@ -7,12 +7,16 @@ import (
 
 // FontResolver is the single family/glyph selection seam for layout and HF.
 // It walks the author CSS stack with exact registry matches first, then
-// generics / real Liberation names / system-ui, then Liberation Sans as the
-// terminal default. Legacy display-name aliases (Georgia, Arial, …) are never
-// rewritten.
+// optional metric aliases when enabled, then generics / real Liberation
+// names / system-ui, then Liberation Sans as the terminal default. Legacy
+// display names (Georgia, Arial, ...) are never rewritten unless
+// UseMetricFontAliases is true and a substitute face is already registered.
 type FontResolver struct {
 	Faces    *FaceSet
 	Registry *Registry
+	// UseMetricFontAliases enables the curated accept map (Georgia->Gelasio,
+	// ...) against Registry only. Default false.
+	UseMetricFontAliases bool
 	// Warn is an optional diagnostic sink. It is not on the hot layout path
 	// unless a caller marks faces unavailable.
 	Warn func(string)
@@ -20,9 +24,20 @@ type FontResolver struct {
 	unavailable map[[32]byte]struct{}
 }
 
+// metricFontAliases is the v1 opt-in accept map (Fontconfig 30-metric-aliases
+// subset). Targets resolve against Registry only, never bundled FaceSet.
+var metricFontAliases = map[string][]string{ //nolint:gochecknoglobals // static accept table
+	"georgia":         {"Gelasio"},
+	"courier new":     {"Cousine"},
+	"times new roman": {"Tinos"},
+	"arial":           {"Arimo"},
+	"cambria":         {"Caladea"},
+	"calibri":         {"Carlito"},
+}
+
 // NewFontResolver builds a resolver over bundled faces and an optional registry.
 func NewFontResolver(faces *FaceSet, reg *Registry) *FontResolver {
-	return &FontResolver{ //nolint:exhaustruct // intentional zero Warn / unavailable
+	return &FontResolver{ //nolint:exhaustruct // intentional zero Warn / unavailable / aliases
 		Faces:    faces,
 		Registry: reg,
 	}
@@ -145,9 +160,34 @@ func (r *FontResolver) resolveToken(fam string, weight int, italic bool) *Font {
 		if f := r.usable(r.Registry.Lookup([]string{fam}, weight, italic)); f != nil {
 			return f
 		}
+
+		if r.UseMetricFontAliases {
+			if f := r.resolveMetricAlias(key, weight, italic); f != nil {
+				return f
+			}
+		}
 	}
 
 	return r.resolveBundledToken(key, weight, italic)
+}
+
+func (r *FontResolver) resolveMetricAlias(key string, weight int, italic bool) *Font {
+	if r == nil || r.Registry == nil {
+		return nil
+	}
+
+	accepts, ok := metricFontAliases[key]
+	if !ok {
+		return nil
+	}
+
+	for _, accept := range accepts {
+		if f := r.usable(r.Registry.Lookup([]string{accept}, weight, italic)); f != nil {
+			return f
+		}
+	}
+
+	return nil
 }
 
 func (r *FontResolver) resolveBundledToken(key string, weight int, italic bool) *Font {

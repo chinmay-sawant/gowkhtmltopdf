@@ -233,20 +233,21 @@ func drawTextHF(page *pdf.Page, hfVal settings.HeaderFooter, geom hfGeom, parms 
 // the placeholder-free case lays out once and reuses the display list.
 // Fonts use the same Registry + MergeFontFaces path as the body.
 type htmlHFLayout struct {
-	raw       string
-	skip      bool // value looked like raw markup, not a URL
-	perPage   bool
-	base      string
-	lp        settings.LoadPage
-	sheets    []*css.Stylesheet
-	res       *layout.Result
-	imagesFn  func(src string) ([]byte, error)
-	font      *pdf.Font
-	registry  *pdf.Registry
-	resources ResourceContext
-	width     float64
-	height    float64
-	media     string
+	raw                  string
+	skip                 bool // value looked like raw markup, not a URL
+	perPage              bool
+	base                 string
+	lp                   settings.LoadPage
+	sheets               []*css.Stylesheet
+	res                  *layout.Result
+	imagesFn             func(src string) ([]byte, error)
+	font                 *pdf.Font
+	registry             *pdf.Registry
+	useMetricFontAliases bool
+	resources            ResourceContext
+	width                float64
+	height               float64
+	media                string
 }
 
 // loadHTMLHF loads an HTML header/footer as a nested child document: fetch
@@ -337,25 +338,27 @@ func loadHTMLHF(ctx context.Context, loader *load.Loader, font *pdf.Font, state 
 		return r.Body, nil
 	}
 	lst := &htmlHFLayout{ //nolint:exhaustruct // intentional zero-value fields
-		raw:       raw,
-		perPage:   perPage,
-		base:      res.Base,
-		lp:        lineP,
-		sheets:    sheets,
-		imagesFn:  imagesFn,
-		font:      font,
-		registry:  reg,
-		resources: resources,
-		width:     state.geom.contentW,
-		height:    state.geom.contentH,
-		media:     media,
+		raw:                  raw,
+		perPage:              perPage,
+		base:                 res.Base,
+		lp:                   lineP,
+		sheets:               sheets,
+		imagesFn:             imagesFn,
+		font:                 font,
+		registry:             reg,
+		useMetricFontAliases: state.useMetricFontAliases,
+		resources:            resources,
+		width:                state.geom.contentW,
+		height:               state.geom.contentH,
+		media:                media,
 	}
 	// Lay out once regardless: placeholder-free docs reuse this display list
 	// for every page; placeholder docs use it only for the natural height
 	// (auto margins) and re-layout per page at draw time.
 	lst.res, err = layout.LayoutContext(ctx, root, layout.Options{ //nolint:exhaustruct // intentional zero-value fields
 		Width: lst.width, Height: lst.height, Font: font, Registry: lst.registry,
-		Sheets: sheets, Media: media, Images: imagesFn,
+		UseMetricFontAliases: lst.useMetricFontAliases,
+		Sheets:               sheets, Media: media, Images: imagesFn,
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("header/footer html: layout: %w", err)
@@ -462,7 +465,8 @@ func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hfVal se
 
 		res, err = layout.LayoutContext(ctx, root, layout.Options{ //nolint:exhaustruct // intentional zero-value fields
 			Width: hfL.width, Height: hfL.height, Font: hfL.font, Registry: hfL.registry,
-			Sheets: hfL.sheets, Media: media, Images: hfL.imagesFn,
+			UseMetricFontAliases: hfL.useMetricFontAliases,
+			Sheets:               hfL.sheets, Media: media, Images: hfL.imagesFn,
 		})
 		if err != nil {
 			return fmt.Errorf("header/footer html: layout: %w", err)

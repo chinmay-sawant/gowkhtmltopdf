@@ -248,7 +248,7 @@ Status legend as in §2; evidence in `internal/css/css.go`.
 | `position: sticky` continuous scroll | Overflow boxes are sticky scrollports at **offset 0** only (PDF has no scroll). Page content box remains the print scrollport when no overflow ancestor. No scroll-offset > 0 animation |
 | `transform`, `filter`, `animation`, `transition` | Partial / out of scope | **Static 2D** `transform` + `transform-origin` Implemented (translate/scale/rotate/matrix/skew*; paint CTM; stacking + abs/fixed CB). Sibling flow unchanged. Overflow: no clip — ink may paint outside page box. **`filter`:** only `opacity()` (see `opacity` row); blur/drop-shadow/SVG filters = permanent print-engine non-goal. **`animation`/`transition`/`@keyframes`:** parse-ignored (static cascaded value only; no timelines). **3D / perspective:** permanent non-goal. Fixture-40; `transform.go` / `transform_test.go` |
 | `background-image` / gradients | Ignored (Phase 3+ candidate) |
-| `@font-face` (remote / WOFF2) | **Partial:** local **and `https://`** TTF/OTF/WOFF1 via `FetchSub` (same ACL + `NetworkPolicy` as other subresources) on PDF/image paths. **`.woff2` / `.eot` / `data:`** skipped. Missing faces fall back to registry / Liberation |
+| `@font-face` (remote / WOFF2) | **Partial:** local **and `https://`** TTF/OTF/WOFF1/WOFF2 via `FetchSub` (same ACL + `NetworkPolicy`) on PDF/image paths. **`.eot` / `data:`** skipped. Missing faces fall back to registry / Liberation |
 | Custom XSLT TOC (`--xsl-style-sheet`) | Not implemented (no XSLT in stdlib); Go templates instead (Phase 6) |
 | SVG-as-`<img>` | **Implemented** (raster via `internal/svg`) |
 | WebP, AVIF | Not implemented; broken-image placeholder or skip |

@@ -57,9 +57,10 @@ type objectState struct {
 	// shared with nested HTML HF layout so HF can resolve the same faces.
 	// effectiveMargins returns the HF-extended registry; callers assign it
 	// explicitly (see renderObject handshake).
-	registry      *pdf.Registry
-	resources     ResourceContext
-	imagesEnabled bool
+	registry             *pdf.Registry
+	useMetricFontAliases bool
+	resources            ResourceContext
+	imagesEnabled        bool
 
 	base     string
 	lp       settings.LoadPage

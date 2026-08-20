@@ -68,12 +68,9 @@ To get an exact named face today, supply it with `--font-path`,
 
 An **opt-in** metric-compatible alias map (inspired by Fontconfig
 `30-metric-aliases`, e.g. Georgia→Gelasio when Gelasio is already in the
-registry) is planned under
-[`plans/0.2.6/woff2-metric-aliases/`](../plans/0.2.6/woff2-metric-aliases/README.md)
-behind a dedicated flag (`--use-metric-font-aliases` /
-`UseMetricFontAliases`). It must not become the no-flag default. WOFF2
-`@font-face` decode (Brotli allowlist amendment) lives in the same track;
-until that ships, `.woff2` sources remain skipped while TTF/OTF/WOFF1 work.
+registry) is available behind `--use-metric-font-aliases` /
+`UseMetricFontAliases` (default **false**). Aliases consult the registry only;
+the flag alone does not scan disk. Exact family matches still win first.
 
 ## Opt-in discovery
 
@@ -84,6 +81,7 @@ operator asks.
 |------|--------|
 | `--font-path DIR` | Scan `DIR` and children to **depth 2** for `.ttf` / `.otf`; repeatable. Primary form is a **directory**. A bare `.ttf`/`.otf` **file** path is accepted as a convenience (loads that one face). Other file paths warn and are skipped — never treated as an empty directory. |
 | `--use-system-fonts` | Also scan common OS font directories (e.g. `/usr/share/fonts`). Skips proprietary Windows/corefont trees. Independent of Fontconfig alias rules. |
+| `--use-metric-font-aliases` | After an exact registry miss, try curated accepts (Georgia→Gelasio, Courier New→Cousine, …) against **registered** faces only. Default off. |
 
 `pdf.DiscoverFonts` / `ScanFontDirs` read `.ttf` and `.otf` only. Diagnostics
 report scanned paths, loaded-face count, skipped-file count, and skip reasons
@@ -115,7 +113,7 @@ fixture-27 smoke — not a full CJK face. Full Noto CJK is not shipped.
 | OTF with TrueType outlines (`0x00010000` / `true`) | Accepted |
 | WOFF1 → SFNT (TrueType) | Accepted (`DecodeWOFF`; size/overlap caps in `woff.go`) |
 | CFF / `OTTO` OpenType | Rejected / skipped with diagnostic |
-| WOFF2 | Skipped with diagnostic (Brotli not allowlisted; separate epic) |
+| WOFF2 | Accepted (`DecodeWOFF2` via `tdewolff/font.ParseWOFF2`; then `ParseTTF`) |
 | EOT | Skipped with diagnostic |
 | `data:` `@font-face` src | Skipped with diagnostic |
 | Variable fonts (`fvar` table) | **Rejected** with clear diagnostic; use a static face. CI Noto KR subset has no `fvar` and remains valid SFNT. |
@@ -138,11 +136,11 @@ path).
 
 | `src` | Behavior |
 |-------|----------|
-| `.woff2`, `.eot` | **Skipped** (warning). WOFF2 needs Brotli; not allowlisted |
+| `.eot` | **Skipped** (warning) |
 | `data:` | **Skipped** (warning) |
-| `https://` / `http://` TTF, OTF, WOFF1 | **Fetched** via `Fetch` → `load.FetchSub` — **same ACL, network policy, timeout, and body cap** as CSS/images |
-| Local `url(...ttf\|otf\|woff)` | Fetched under `--allow-local-files` / `--allow` |
-| WOFF1 | Decompress → `ParseTTF` (TrueType outlines only) |
+| `https://` / `http://` TTF, OTF, WOFF1, WOFF2 | **Fetched** via `Fetch` → `load.FetchSub` — **same ACL, network policy, timeout, and body cap** as CSS/images |
+| Local `url(...ttf\|otf\|woff\|woff2)` | Fetched under `--allow-local-files` / `--allow` |
+| WOFF1 / WOFF2 | Decompress → `ParseTTF` (TrueType outlines only; CFF/`fvar` still rejected) |
 
 `font-weight` / `font-style` descriptors are retained on `css.FontFace` and
 applied as style overrides for `Registry.Lookup` (regular / bold / italic /

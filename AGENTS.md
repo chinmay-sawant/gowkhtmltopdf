@@ -58,8 +58,9 @@ indexes them at task start.
 ## Ground rules
 
 - **No cgo.** Builds target `CGO_ENABLED=0`. Allowlisted modules only:
-  `go-text/typesetting` (OpenType shaping) and `tdewolff/canvas` (SVG raster).
-  Nothing else may be added to `go.mod`.
+  `go-text/typesetting` (OpenType shaping), `tdewolff/canvas` (SVG raster),
+  and `tdewolff/font` (WOFF2 → SFNT decode). Nothing else may be added to
+  `go.mod` without a dated allowlist amendment.
 - **No JS.** The engine never executes JavaScript. JS-related wkhtmltopdf
   flags are unknown options.
 - **No wrappers.** This is an in-process engine, not a binding to the
@@ -79,6 +80,7 @@ make lint         # golangci-lint (enable-all, see .golangci.yml)
 make fmt          # gofmt
 make golden       # golden fixture structure checks (GOLDEN_APPROVE=1 to update)
 make samples      # regenerate sample PDFs/PNG in output/
+make samples-metric-aliases  # fixture-55 with --use-system-fonts --use-metric-font-aliases
 make bench        # engine benchmarks (also bench-engine, bench-lib, bench-cli-compare)
 make claim-scan   # scans docs for over-claims vs compatibility matrix
 make weasyprint   # external-engine comparison (needs weasyprint installed)

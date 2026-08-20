@@ -14,8 +14,9 @@ process. Two static binaries (`gowkhtmltopdf`, `gowkhtmltoimage`) and a Go
 library run an in-repo pipeline (load → parse → style → layout → paginate →
 paint → write). Direct modules are allowlisted:
 [`go-text/typesetting`](https://github.com/go-text/typesetting) (OpenType
-shaping) and [`tdewolff/canvas`](https://github.com/tdewolff/canvas) (SVG
-rasterization). The product is HTML templates and documents, not Chrome visual parity.
+shaping), [`tdewolff/canvas`](https://github.com/tdewolff/canvas) (SVG
+rasterization), and [`tdewolff/font`](https://github.com/tdewolff/font)
+(WOFF2 decode). The product is HTML templates and documents, not Chrome visual parity.
 
 **Status:** **v0.2.4** (current release). The native Document API and explicit
 CLI grammar are now the supported surface. Opt-in PDF 1.7 / 2.0 and PDF/A +

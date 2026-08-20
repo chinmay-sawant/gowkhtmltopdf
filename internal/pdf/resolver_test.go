@@ -3,6 +3,7 @@ package pdf
 
 import (
 	"bytes"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -256,5 +257,82 @@ func TestFontResolverCacheIsolationSameDisplayName(t *testing.T) {
 
 	if bytes.Equal(got.fingerprint[:], got2.fingerprint[:]) {
 		t.Fatal("selected faces must keep distinct fingerprints")
+	}
+}
+
+func TestFontResolverMetricAliasesOptIn(t *testing.T) {
+	t.Parallel()
+
+	faces, err := LoadDefaultFaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dir := t.TempDir()
+	writePatchedLiberationSerif(t, filepath.Join(dir, "Gelasio.ttf"), "Gelasio")
+
+	reg := DiscoverFonts([]string{dir}).Registry
+	gelasio := reg.Lookup([]string{"Gelasio"}, 400, false)
+
+	if gelasio == nil {
+		t.Fatal("expected Gelasio in registry")
+	}
+
+	off := NewFontResolver(faces, reg)
+	if got := off.ResolveFamilyStyle([]string{"Georgia", "serif"}, 400, false); got != faces.Serif {
+		t.Fatal("aliases off: Georgia, serif must stay Liberation Serif")
+	}
+
+	on := NewFontResolver(faces, reg)
+	on.UseMetricFontAliases = true
+
+	if got := on.ResolveFamilyStyle([]string{"Georgia", "serif"}, 400, false); got != gelasio {
+		t.Fatalf("aliases on: Georgia should select Gelasio; got %v", got)
+	}
+
+	// Exact Georgia still wins over alias.
+	reg2 := NewRegistry()
+	reg2.AddFamilyAlias("Georgia", faces.Mono)
+	reg2.AddFont(gelasio)
+
+	exact := NewFontResolver(faces, reg2)
+	exact.UseMetricFontAliases = true
+
+	if got := exact.ResolveFamilyStyle([]string{"Georgia", "serif"}, 400, false); got != faces.Mono {
+		t.Fatal("exact Georgia must beat Gelasio alias")
+	}
+
+	// Alias on but substitute missing → stack continues.
+	empty := NewFontResolver(faces, NewRegistry())
+	empty.UseMetricFontAliases = true
+
+	if got := empty.ResolveFamilyStyle([]string{"Georgia", "serif"}, 400, false); got != faces.Serif {
+		t.Fatal("missing Gelasio with aliases on → Liberation Serif")
+	}
+}
+
+func TestFontResolverMetricAliasCousine(t *testing.T) {
+	t.Parallel()
+
+	faces, err := LoadDefaultFaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dir := t.TempDir()
+	writePatchedLiberationSerif(t, filepath.Join(dir, "Cousine.ttf"), "Cousine")
+
+	reg := DiscoverFonts([]string{dir}).Registry
+	cousine := reg.Lookup([]string{"Cousine"}, 400, false)
+
+	if cousine == nil {
+		t.Fatal("expected Cousine")
+	}
+
+	on := NewFontResolver(faces, reg)
+	on.UseMetricFontAliases = true
+
+	if got := on.ResolveFamilyStyle([]string{"Courier New", "monospace"}, 400, false); got != cousine {
+		t.Fatalf("Courier New → Cousine; got %v", got)
 	}
 }

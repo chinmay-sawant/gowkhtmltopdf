@@ -1,4 +1,4 @@
-.PHONY: test lint lint-frontend build fmt golden golden-update samples screenshots weasyprint clean claim-scan bench bench-engine bench-lib bench-inprocess bench-cli-compare
+.PHONY: test lint lint-frontend build fmt golden golden-update samples samples-metric-aliases screenshots weasyprint clean claim-scan bench bench-engine bench-lib bench-inprocess bench-cli-compare
 
 # Pure-Go runtime: the standard library plus the allowlisted direct modules
 # below. No cgo, browser, or native converter process is required.
@@ -151,6 +151,17 @@ samples:
 		-o output/wiki-ana-de-armas.pdf \
 		|| echo "warning: wiki-ana-de-armas.pdf live smoke skipped (network/fetch failed)"
 	ls -la output/ | awk '{print $$5, $$9}' | tail -30
+
+# Opt-in system fonts + metric aliases samples (separate from `make samples`).
+# Fixture-55 with --use-system-fonts --use-metric-font-aliases so Georgia→Gelasio
+# / Courier New→Cousine when those faces are discoverable. Does not rewrite the
+# default output/fixture-55-*.pdf from `make samples`.
+samples-metric-aliases:
+	mkdir -p output
+	go run ./cmd/gowkhtmltopdf --allow-local-files --use-system-fonts --use-metric-font-aliases \
+		-o output/fixture-55-lantern-cooperative-report-metric-aliases.pdf \
+		testdata/golden/fixture-55-lantern-cooperative-report.html
+	ls -la output/fixture-55-lantern-cooperative-report-metric-aliases.pdf
 
 # Regenerate the committed frontend showcase screenshots and WebP thumbnails
 # from the PDFs currently present in output/. Use `make samples` first when the

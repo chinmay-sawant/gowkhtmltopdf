@@ -121,10 +121,11 @@ type Document struct {
 	Header          *HeaderFooter
 	Footer          *HeaderFooter
 
-	AllowLocalFiles bool
-	FontPaths       []string
-	UseSystemFonts  bool
-	Network         *NetworkPolicy
+	AllowLocalFiles      bool
+	FontPaths            []string
+	UseSystemFonts       bool
+	UseMetricFontAliases bool
+	Network              *NetworkPolicy
 
 	Now        func() time.Time
 	OnInfo     func(string)
@@ -146,11 +147,12 @@ type ImageDocument struct {
 	Transparent bool
 	Crop        *Crop
 
-	AllowLocalFiles bool
-	Background      *bool
-	FontPaths       []string
-	UseSystemFonts  bool
-	Network         *NetworkPolicy
+	AllowLocalFiles      bool
+	Background           *bool
+	FontPaths            []string
+	UseSystemFonts       bool
+	UseMetricFontAliases bool
+	Network              *NetworkPolicy
 
 	Now        func() time.Time
 	OnInfo     func(string)
@@ -392,6 +394,7 @@ func (d *Document) pdfGlobal(dumpOutline bool) settings.PdfGlobal {
 	}
 	global.FontPaths = documentCloneStrings(d.FontPaths)
 	global.UseSystemFonts = d.UseSystemFonts
+	global.UseMetricFontAliases = d.UseMetricFontAliases
 	if d.Network != nil {
 		load.ApplyNetworkPolicy(&global.Load, *d.Network)
 	}
@@ -459,6 +462,7 @@ func (d *ImageDocument) toImageRequest(output io.Writer) *imageout.Request {
 	}
 	global.FontPaths = documentCloneStrings(d.FontPaths)
 	global.UseSystemFonts = d.UseSystemFonts
+	global.UseMetricFontAliases = d.UseMetricFontAliases
 	if d.Network != nil {
 		load.ApplyNetworkPolicy(&global.Load, *d.Network)
 	}
