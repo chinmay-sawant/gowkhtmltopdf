@@ -17,13 +17,15 @@ Run architecture reviews **after** (or in parallel with) ponytail Phase 0–1 de
 
 ## Status
 
-- [ ] Improve-codebase wave open (2026-08-13): [codebase-2026-08-13/phase-wise-checklist.md](codebase-2026-08-13/phase-wise-checklist.md) — 5 explore agents, 18 active IDs plus ARC-03/ARC-04 carry-forward. Implementation not started.
+- [x] Improve-codebase wave closed (2026-08-13): [codebase-2026-08-13/phase-wise-checklist.md](codebase-2026-08-13/phase-wise-checklist.md) — 5 explore agents, 18 active IDs; implementation complete.
+- [ ] Post-0.2.4 improve-codebase wave open (2026-08-20): [`../../../0.2.4/improve-codebase/codebase-2026-08-20/phase-wise-checklist.md`](../../../0.2.4/improve-codebase/codebase-2026-08-20/phase-wise-checklist.md) — **7.8 / 10**; 6 explore agents, 23 active IDs plus ARC-03/ARC-04 carry-forward. Implementation not started.
 - [x] Architecture review complete (2026-08-07): [architecture-review-2026-08-07/](architecture-review-2026-08-07) — 7 explore agents, 49 findings, 46-row phase-wise checklist.
 - [x] Ponytail baseline: [`../ponytail/ponytail-2026-08-06/ponytail-ultra-2026-08-06.md`](../ponytail/ponytail-2026-08-06/ponytail-ultra-2026-08-06.md) — **5.7 / 10** leanness.
 - [x] Critical Go contract remediation complete (2026-08-12): [critical-go-review-2026-08-12/](critical-go-review-2026-08-12) — CR-01 through CR-08 closed with current source/test evidence.
 - [~] Earlier same-day application ledger: [application-review-2026-08-12/app-review.md](application-review-2026-08-12/app-review.md) — historical **7.4 / 10** scorecard. Remaining work and the current rating live in the 3-lens health review below.
 - [x] Codebase health review closed (2026-08-12): [codebase-review-2026-08-12/phase-wise-checklist.md](codebase-review-2026-08-12/phase-wise-checklist.md) — implementation wave complete; recalculated score **8.8 / 10**.
 
-The 2026-08-07 architecture review and remediation are complete. Future architecture
-work should use a new dated ledger under this directory and preserve the separation
-from the ponytail leanness review.
+The 2026-08-07 and 2026-08-13 architecture waves are closed. New post-0.2.4
+architecture work lives under
+[`plans/0.2.4/improve-codebase/`](../../../0.2.4/improve-codebase/). Keep the
+separation from the ponytail leanness review.
