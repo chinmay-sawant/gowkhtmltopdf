@@ -12,11 +12,17 @@ binaries at build time (see README "Versioning").
   `--font-path` / `@font-face` / registry matches first, author CSS stacks
   continue in order, and only CSS generics map to bundled Liberation/DejaVu.
   Legacy display names such as Georgia/Arial are no longer silently aliased.
+  Default output deliberately does **not** follow WeasyPrint/Fontconfig
+  metric substitutes (e.g. Gelasio for Georgia); Liberation via the stack is
+  the intended contract.
 - `@font-face` retains `font-weight` / `font-style`; opt-in discovery reports
   skip reasons; variable fonts (`fvar`) are rejected; embed preflight
   re-lays-out when an optional face cannot subset/embed.
 - Docs: `documentation/fonts.md`, compatibility matrix, and deferred notes
   aligned with the shipped contract (`plans/0.2.5/font/`).
+- Planned (not shipped): WOFF2 decode + opt-in metric font aliases under
+  `plans/0.2.6/woff2-metric-aliases/` (Brotli allowlist amendment; default
+  Liberation-via-stack unchanged).
 
 ## 0.2.4 (2026-08-18)
 

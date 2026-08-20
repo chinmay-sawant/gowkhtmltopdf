@@ -41,7 +41,7 @@ Direct skills:
 | `/reflect` | Capture a long task's recipe as a skill edit |
 | `/teach` | Actually understand a change, built up diagram by diagram |
 | `/no-comments` | Strip comments before review |
-| `/unslop` | Remove AI tells from writing |
+| `/unslop` | Remove AI tells from writing (required on agent prose; see Workflow) |
 | `/technical-writing` | Docs, RFCs, readmes, PR descriptions, commit messages |
 | `/setup-pstack` | Configure pstack's per-role model choices |
 | `/recall` | Rebuild recent context on a topic into a current-state brief |
@@ -127,6 +127,14 @@ forbidden. One job seam: library and CLI adapters build
   stash, or any other git operation on the agent's own initiative. The human
   owns version control; implement and validate in the working tree only until
   they request a commit or push. This is restated every session for a reason.
+- **Unslop every agent-written prose artifact.** Before finishing a turn that
+  added or edited plans, `documentation/`, `knowledge-base/`, PR/issue text,
+  CHANGELOG entries, or other user-facing Markdown, apply `/unslop` (skill:
+  cut AI tells, puffery, chatbot filler, em-dash crutches). This is mandatory
+  on the writing, not a ritual slash typed into chat every turn. Engineering
+  ledgers stay plain and factual; do not add casual "voice" that fights
+  `documentation/` tone or checklist evidence rules. Code comments stay short
+  and factual per Conventions above.
 - Branch + PR flow per `CONTRIBUTING.md` when the user asks for git/PR work.
   Update `CHANGELOG.md` and `documentation/` with user-facing changes.
 - Update `knowledge-base/` when architecture or features change materially

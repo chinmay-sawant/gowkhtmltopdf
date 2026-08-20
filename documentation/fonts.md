@@ -48,6 +48,33 @@ Layout and header/footer selection go through one resolver:
 `FaceSet.ResolveFamily` is generics / Liberation names / `system-ui` only.
 Do not treat Liberation Serif as “actual Georgia”.
 
+### WeasyPrint / Fontconfig differences (by design)
+
+Same CSS family name does **not** imply the same installed face across
+engines:
+
+| Setup | Typical result for `Georgia, serif` |
+|-------|-------------------------------------|
+| WeasyPrint on Linux | Fontconfig may substitute Gelasio (metric-compatible) |
+| Chrome with Georgia installed | Real Georgia |
+| Gowkhtmltopdf, no font flags | Stack continues → `serif` → **Liberation Serif** |
+
+That Liberation outcome is the **shipped v0.2.5 contract**, not a regression
+against WeasyPrint. Gowkhtmltopdf does not import Fontconfig aliases
+(`Georgia → Gelasio`, `Courier New → Cousine`, …) into **default** resolution.
+To get an exact named face today, supply it with `--font-path`,
+`--use-system-fonts` (when the file’s internal family name matches), or
+`@font-face`.
+
+An **opt-in** metric-compatible alias map (inspired by Fontconfig
+`30-metric-aliases`, e.g. Georgia→Gelasio when Gelasio is already in the
+registry) is planned under
+[`plans/0.2.6/woff2-metric-aliases/`](../plans/0.2.6/woff2-metric-aliases/README.md)
+behind a dedicated flag (`--use-metric-font-aliases` /
+`UseMetricFontAliases`). It must not become the no-flag default. WOFF2
+`@font-face` decode (Brotli allowlist amendment) lives in the same track;
+until that ships, `.woff2` sources remain skipped while TTF/OTF/WOFF1 work.
+
 ## Opt-in discovery
 
 Discovery is **opt-in** (privacy + startup). Nothing is scanned unless the
