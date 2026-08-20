@@ -4,24 +4,24 @@
  "content": [
   {
    "type": "hero",
-   "title": "Fonts: embedded defaults, opt-in discovery",
-   "lede": "Every PDF embeds the Liberation Sans family by default, with no font scanning at all. Non-Latin runs switch to a Type0/CID path, and complex-script shaping goes only as far as the pure-Go engine can take it."
+   "title": "Fonts: bundled Liberation stack, opt-in discovery",
+   "lede": "Every conversion can use bundled Liberation Sans/Serif/Mono plus DejaVu Sans, with no font scanning unless you ask. Named CSS families resolve through pdf.FontResolver; legacy display names are not rewritten to Liberation unless you opt into metric aliases or supply the face."
   },
   {
    "type": "cards",
    "heading": "Bundled vs discovered faces",
    "items": [
     {
-     "title": "Bundled: Liberation Sans",
-     "body": "By default every PDF embeds the Liberation Sans family (Regular / Bold / Italic / BoldItalic). Latin-1 text uses a simple TrueType subset with WinAnsi-style single-byte codes; nothing is scanned and no directories are touched."
+     "title": "Bundled faces",
+     "body": "Default conversions embed Liberation Sans, Serif, and Mono (Regular / Bold / Italic / BoldItalic) plus DejaVu Sans for Unicode fallback and `system-ui`. Latin-1 uses a simple TrueType subset; nothing is scanned and no directories are touched."
     },
     {
      "title": "Opt-in: discovered faces",
-     "body": "`--font-path DIR` scans `DIR` (and shallow children) for `.ttf` and TrueType-flavored `.otf` files and is repeatable. `--use-system-fonts` also scans common OS font directories such as `/usr/share/fonts` while skipping proprietary Windows and corefont trees."
+     "body": "`--font-path DIR` scans `DIR` (and children to depth 2) for `.ttf` / `.otf` and is repeatable. `--use-system-fonts` also scans common OS font directories such as `/usr/share/fonts` while skipping proprietary Windows and corefont trees. Discovery does not import Fontconfig alias rules."
     },
     {
      "title": "Matching and fallback",
-     "body": "CSS `font-family` lists are matched against discovered family names (name table) before falling back to Liberation. Only the generic families `serif`, `sans-serif`, and `monospace` expand to Liberation by name."
+     "body": "`pdf.FontResolver` tries an exact registry / `@font-face` / `--font-path` match per CSS token, then continues the author stack, then expands only the generics `serif` / `sans-serif` / `monospace` / `system-ui`. Names such as Georgia or Arial are not rewritten to Liberation by default."
     },
     {
      "title": "CJK readiness",
@@ -39,23 +39,27 @@
    "rows": [
     [
      "`--font-path DIR`",
-     "Scan `DIR` (and shallow children) for `.ttf` / TrueType-flavored `.otf`; repeatable"
+     "Scan `DIR` (and children to depth 2) for `.ttf` / `.otf`; repeatable. A bare `.ttf`/`.otf` file path loads that one face."
     ],
     [
      "`--use-system-fonts`",
-     "Also scan common OS font directories (e.g. `/usr/share/fonts`); skips proprietary Windows/corefont trees"
+     "Also scan common OS font directories (e.g. `/usr/share/fonts`); skips proprietary Windows/corefont trees. Independent of Fontconfig aliases."
+    ],
+    [
+     "`--use-metric-font-aliases`",
+     "After an exact registry miss, try curated accepts (Georgia→Gelasio, Courier New→Cousine, …) against already-registered faces only. Default off; the flag alone does not scan disk."
     ],
     [
      "Family matching",
-     "Named CSS families resolve as named via the name table; only generics (`serif` / `sans-serif` / `monospace`) expand to Liberation"
+     "Exact name-table match first; generics expand to Liberation/DejaVu; legacy display names need a real face, `@font-face`, or the metric-alias opt-in"
     ],
     [
      "Glyph coverage fallback",
-     "Missing IPA / uncommon Unicode glyphs fall back to any face on the opt-in registry that covers the codepoint, preferring DejaVu and Noto family names"
+     "Missing IPA / uncommon Unicode glyphs fall back through the family stack and Liberation, then DejaVu, then any covering face on the opt-in registry"
     ],
     [
      "Default (no flags)",
-     "Liberation Sans Regular / Bold / Italic / BoldItalic embedded; Latin-1 uses a simple TrueType subset with WinAnsi-style single-byte codes"
+     "Bundled Liberation + DejaVu only; Latin-1 uses a simple TrueType subset with WinAnsi-style single-byte codes"
     ]
    ]
   },
@@ -67,7 +71,7 @@
   },
   {
    "type": "prose",
-   "heading": "Type0/CID path and complex-script limits",
+   "heading": "Type0/CID path, shaping, and @font-face",
    "sections": [
     {
      "heading": "Type0 / CID for code points above U+00FF",
@@ -92,13 +96,13 @@
      "body": "OpenType applies when the face and reverse-cmap succeed, but production Indic quality is not claimed beyond that. The fallback keeps combining marks after the base with no in-tree matra reordering."
     },
     {
-     "heading": "@font-face: local WOFF1 and TTF only",
-     "body": "`@font-face` is partial: local `url(...ttf|otf|woff)` under the loader ACL (`--allow-local-files` / `--allow`) is fetched via `FetchSub`, parsed (WOFF1 to SFNT via stdlib zlib), and registered for the document on both PDF and image paths (`convert.MergeFontFaces`).",
+     "heading": "@font-face: local and https TTF/OTF/WOFF1/WOFF2",
+     "body": "`convert.MergeFontFaces` registers document faces on both PDF and image paths. Supported `src` values are fetched via `FetchSub` under the same ACL, network policy, timeout, and body cap as CSS and images.",
      "bullets": [
-      "WOFF1 is supported: decompress, then `ParseTTF`, TrueType outlines only.",
-      "WOFF2, EOT, remote `https://`, and `data:` sources are skipped with a warning.",
-      "`font-weight` and `font-style` on `@font-face` are parsed but ignored at register time (the alias is the family name only).",
-      "`halt` / `palt` are requested via typesetting `FontFeatures` for CJK / East-Asian punctuation runs, and via `ParseFontFeatureSettings` / `ShapeTextFontWithFeatures` when CSS `font-feature-settings` is supplied."
+      "Local `url(...ttf|otf|woff|woff2)` under `--allow-local-files` / `--allow`, and `https://` / `http://` of those formats, decompress then `ParseTTF` (TrueType outlines only).",
+      "WOFF2 uses allowlisted `tdewolff/font.ParseWOFF2` (`DecodeWOFF2`), then the same TrueType path as WOFF1/TTF.",
+      "`.eot` and `data:` sources are skipped with a warning. CFF/`OTTO` and variable fonts (`fvar`) are rejected.",
+      "`font-weight` and `font-style` on `@font-face` are retained and applied as Registry style overrides; omitted descriptors keep the face file's macStyle bits."
      ]
     }
    ]
@@ -107,7 +111,7 @@
    "type": "callout",
    "variant": "warn",
    "title": "Rejected and skipped formats",
-   "body": "CFF / `OTTO` OpenType fonts are rejected outright: TrueType outlines only. WOFF2 is not supported (it needs Brotli, `go-text/typesetting` has WOFF1 only, and no new direct modules are added; the gap is tracked as `DecodeWOFF2` / `TestDecodeWOFF2Gap`). Remote `https://` and `data:` `@font-face` sources are skipped with a warning by design (ACL and no-webfont-CDN policy)."
+   "body": "CFF / `OTTO` OpenType and variable fonts (`fvar`) are rejected: TrueType outlines only, static faces. `.eot` and `data:` `@font-face` sources are skipped with a warning. HTTP `Content-Encoding: br` on ordinary fetches is still absent; that is separate from WOFF2's on-disk Brotli payload, which `DecodeWOFF2` already handles."
   }
  ]
 }

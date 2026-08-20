@@ -12,7 +12,7 @@
    "heading": "Design principles",
    "items": [
     "From scratch: the whole pipeline, load to PDF write, lives in this repository. No binding to wkhtmltopdf, Qt, or WebKit, and no third-party PDF/HTML/CSS API or SaaS service.",
-    "Stdlib by default: runtime deps are the Go standard library plus two allowlisted modules, github.com/go-text/typesetting for OpenType shaping and github.com/tdewolff/canvas for SVG rasterization.",
+    "Stdlib by default: runtime deps are the Go standard library plus three allowlisted modules, github.com/go-text/typesetting for OpenType shaping, github.com/tdewolff/canvas for SVG rasterization, and github.com/tdewolff/font for WOFF2 decode.",
     "No browser, no cgo: no Chrome or WebKit process is spawned, and CGO_ENABLED=0 builds produce statically linked binaries with no runtime library requirements.",
     "Repeatable layout: the same HTML, settings, and fonts produce the same layout. Default CLI PDF bytes are not hash-stable because CreationDate and [date]/[time] use the wall clock unless you inject Now.",
     "Template-oriented scope: an allowlisted HTML model and a documented print CSS subset, with the compatibility matrix as the normative per-property contract.",

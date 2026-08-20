@@ -11,10 +11,10 @@
    "type": "bullets",
    "heading": "Requirements",
    "items": [
-    "Go 1.26 or newer. The first build may download the two allowlisted direct modules and their transitive Go module graph; later builds can run offline with the cache populated.",
+    "Go 1.26 or newer. The first build may download the three allowlisted direct modules and their transitive Go module graph; later builds can run offline with the cache populated.",
     "No cgo and no native libraries. Build with CGO_ENABLED=0 to get statically linked ELF/Mach-O binaries with no runtime library requirements.",
     "No browser, WebKit, or third-party HTML-to-PDF service. The whole pipeline (load, parse, style, layout, paint, PDF write) is implemented in this repository.",
-    "The two allowlisted direct pure-Go modules are github.com/go-text/typesetting for OpenType shaping and github.com/tdewolff/canvas for SVG rasterization; there is no browser or native converter dependency."
+    "The three allowlisted direct pure-Go modules are github.com/go-text/typesetting for OpenType shaping, github.com/tdewolff/canvas for SVG rasterization, and github.com/tdewolff/font for WOFF2 decode; there is no browser or native converter dependency."
    ]
   },
   {

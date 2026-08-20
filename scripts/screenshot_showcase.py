@@ -9,7 +9,8 @@ Writes one PNG per PDF page with a solid white background:
 
 Default paths (repo root relative):
 
-  input:  output/*.pdf
+  input:  output/*.pdf, plus metric-alias PDFs for fixture-55 and fixture-57
+          from output/metric-aliases/ (preferred over the default copies)
   output: frontend/src/assets/showcase/
 
 Requires pymupdf:
@@ -21,6 +22,9 @@ Examples:
   python3 scripts/screenshot_showcase.py
   python3 scripts/screenshot_showcase.py --dpi 96
   python3 scripts/screenshot_showcase.py --pdf output/fixture-01-simple-invoice.pdf
+  python3 scripts/screenshot_showcase.py \\
+    --pdf output/metric-aliases/fixture-55-lantern-cooperative-report.pdf \\
+    --pdf output/metric-aliases/fixture-57-font-resolution-showcase.pdf
 """
 from __future__ import annotations
 
@@ -38,6 +42,13 @@ except ImportError:
 
 # Match the committed showcase thumbs (A4 @ 96 dpi ≈ 794×1123).
 DEFAULT_DPI = 96.0
+
+# Showcase thumbs for these stems come from output/metric-aliases/, not the
+# default Liberation-via-stack PDFs under output/.
+METRIC_ALIAS_SHOWCASE_STEMS = (
+    "fixture-55-lantern-cooperative-report",
+    "fixture-57-font-resolution-showcase",
+)
 
 
 def page_path(out_dir: Path, stem: str, page_num: int) -> Path:
@@ -141,9 +152,31 @@ def collect_pdfs(root: Path, only: list[Path] | None) -> list[Path]:
                 raise FileNotFoundError(f"PDF not found: {path}")
             pdfs.append(path.resolve())
         return pdfs
-    out = root / "output"
-    return sorted(p for p in out.glob("*.pdf") if p.is_file())
 
+    out = root / "output"
+    metric_dir = out / "metric-aliases"
+    pdfs: list[Path] = []
+    for path in sorted(p for p in out.glob("*.pdf") if p.is_file()):
+        if path.stem in METRIC_ALIAS_SHOWCASE_STEMS:
+            # Prefer the metric-aliases render for showcase thumbs.
+            continue
+        pdfs.append(path.resolve())
+
+    for stem in METRIC_ALIAS_SHOWCASE_STEMS:
+        candidate = metric_dir / f"{stem}.pdf"
+        if candidate.is_file():
+            pdfs.append(candidate.resolve())
+            continue
+        fallback = out / f"{stem}.pdf"
+        if fallback.is_file():
+            print(
+                f"warning: missing {candidate.relative_to(root)}; "
+                f"falling back to {fallback.relative_to(root)}",
+                file=sys.stderr,
+            )
+            pdfs.append(fallback.resolve())
+
+    return sorted(pdfs, key=lambda p: p.name)
 
 def main() -> int:
     root = Path(__file__).resolve().parents[1]

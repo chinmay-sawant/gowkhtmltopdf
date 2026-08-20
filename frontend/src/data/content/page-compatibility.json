@@ -144,7 +144,7 @@
      "Text",
      "font-family",
      "Partial",
-     "Embedded Liberation Sans family plus `--font-path`, `--use-system-fonts`, and local `@font-face` TTF/OTF/WOFF1; missing faces fall back to Liberation"
+     "`FontResolver`: exact registry/`@font-face`/`--font-path` match, then author stack, then generics → Liberation/DejaVu; local and https `@font-face` TTF/OTF/WOFF1/WOFF2; opt-in `--use-metric-font-aliases`; missing faces fall back to Liberation"
     ],
     [
      "Text",
@@ -253,7 +253,7 @@
     "Browser parity: full WebKit or Chrome print parity is an explicit non-milestone; banned claims include pixel-perfect output, full CSS, and browser replacement (`documentation/fidelity.md`, Claims language).",
     "WebP, AVIF, SVG-as-img: not decodable by the stdlib; the image is skipped or a broken-image placeholder is painted. The `internal/svg` subset (rect/circle/path) covers inline SVG logos and grids.",
     "PDF encryption, duplex, and AcroForm: out of scope; `--produce-forms` is rejected as an unknown option. PDF/A-3a, PDF/A-4, PDF/UA-1, and PDF/UA-2 shipped in 0.2.2 as opt-in `--pdf-profile` / `WithPDFProfile` (default remains unclaimed PDF 1.4; version alone is not a claim). Older PDF/A-1 / A-2 and PDF/X stay absent.",
-    "Remote and WOFF2 `@font-face` sources plus `data:` URLs: skipped by policy; only local TTF/OTF/WOFF1 load through the `FetchSub` ACL.",
+    "`.eot` and `data:` `@font-face` sources are skipped; local and `https://` TTF/OTF/WOFF1/WOFF2 load through the same `FetchSub` ACL and network policy as CSS/images. CFF/`fvar` faces are rejected.",
     "Complex-script shaping is partial: Arabic OT via `go-text/typesetting` (GSUB) with presentation-form fallback, CJK via Type0/CID; no CGO HarfBuzz."
    ]
   },

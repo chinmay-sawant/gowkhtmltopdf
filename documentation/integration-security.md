@@ -105,8 +105,8 @@ Even if the main page is “https://example.com/ok.html”, the HTML may contain
 The loader will attempt those fetches from **your** process. Treat any HTML
 you did not author as able to **drive egress**. `@font-face` `https://` is
 the same subresource hop as `img` / `link` (same ACL + `NetworkPolicy`)
-unless Restricted policy is set; `.woff2`, `.eot`, and `data:` font src are
-skipped.
+unless Restricted policy is set. `.eot` and `data:` font src are skipped;
+TTF/OTF/WOFF1/WOFF2 (local and `https://`) follow the same hop.
 
 ### D - Local files enabled + user input (high risk: file read)
 

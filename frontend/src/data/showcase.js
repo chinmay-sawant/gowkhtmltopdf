@@ -18,20 +18,21 @@ export const SHOWCASE_CATEGORY_COLORS = {
 }
 
 export const SHOWCASE = [
-  {
-    name: 'font-examples',
-    file: 'font-examples.pdf',
-    pages: 25,
-    title: 'Font examples — 1,125 Google Fonts',
-    desc: 'Randomized single-column sampler: every font exactly once, one line per style (bold, italic, underline, strikethrough, combinations). Fonts are not bundled — render with --font-path.',
-    category: 'Architecture & API',
-  },
+  
   {
     name: 'architecture-diagram',
     file: 'architecture-diagram.pdf',
     pages: 5,
     title: 'Library API architecture diagram',
     desc: 'Five-page architecture document for the public Go library API: rendering pipeline, layout domains, dependencies, output modes, and security boundaries.',
+    category: 'Architecture & API',
+  },
+   {
+    name: 'fixture-57-font-resolution-showcase',
+    file: 'metric-aliases/fixture-57-font-resolution-showcase.pdf',
+    pages: 10,
+    title: 'Font resolution showcase',
+    desc: 'Ten-page gallery of exact @font-face (TTF + WOFF2), CSS generics, and opt-in metric-alias stacks (Georgia→Gelasio, Courier New→Cousine, and more).',
     category: 'Architecture & API',
   },
   {
@@ -44,10 +45,10 @@ export const SHOWCASE = [
   },
   {
     name: 'fixture-55-lantern-cooperative-report',
-    file: 'fixture-55-lantern-cooperative-report.pdf',
+    file: 'metric-aliases/fixture-55-lantern-cooperative-report.pdf',
     pages: 3,
     title: 'Lantern Cooperative report',
-    desc: 'Self-contained operations brief: status cards, route table, action plan, and page breaks.',
+    desc: 'Operations brief rendered with --use-system-fonts --use-metric-font-aliases (Gelasio/Cousine when discoverable).',
     category: 'Reports & tables',
   },
   {
@@ -482,6 +483,14 @@ export const SHOWCASE = [
     desc: 'Minimal single-page invoice: headings, paragraphs, table, bold total.',
     category: 'Invoices & receipts',
   },
+  {
+    name: 'font-examples',
+    file: 'font-examples.pdf',
+    pages: 25,
+    title: 'Font examples — 1,125 Google Fonts',
+    desc: 'Randomized single-column sampler: every font exactly once, one line per style (bold, italic, underline, strikethrough, combinations). Fonts are not bundled — render with --font-path.',
+    category: 'Architecture & API',
+  }
 ]
 
 export const SHOWCASE_SPECIAL = [

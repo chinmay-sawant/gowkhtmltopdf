@@ -19,7 +19,7 @@
    "sections": [
     {
      "heading": "A full scrape, fully classified",
-      "body": "The dossier starts from all 1,329 open issues scraped from the upstream wkhtmltopdf issue tracker, including title, body, labels, and dates. Every issue was read and classified against the gowkhtmltopdf codebase; there are no unassessed rows left. The first 100 were analyzed in depth with a full summary and category; the remaining 1,229 received a verdict plus evidence, with their raw metadata retained. Three validation sweeps have been run: the first re-checked the not-implemented rows (8 moved); a second sweep on 2026-08-15 re-audited verdicts against 0.2.1/0.2.2 (30 rows moved); and a third sweep the same day used five subagents on the live 0.2.1 tree plus 0.2.2 on master. That pass rewrote Codebase status notes that still used pre-Policy A language (Ignored vs Rejected), stale rowspan / stdlib-only / VERSION 0.1.0 claims, and local-only @font-face. 18 rows changed verdict — e.g. Qt OLE/segfault sidesteps and CSS grid support to implemented, combined text+HTML footers and inline SVG paths to not implemented."
+      "body": "The dossier starts from all 1,329 open issues scraped from the upstream wkhtmltopdf issue tracker, including title, body, labels, and dates. Every issue was read and classified against the gowkhtmltopdf codebase; there are no unassessed rows left. The first 100 were analyzed in depth with a full summary and category; the remaining 1,229 received a verdict plus evidence, with their raw metadata retained. Three validation sweeps have been run: the first re-checked the not-implemented rows (8 moved); a second sweep on 2026-08-15 re-audited verdicts against 0.2.1/0.2.2 (30 rows moved); and a third sweep the same day used five subagents on the live 0.2.1 tree plus 0.2.2 on master. That pass rewrote Codebase status notes that still used pre-Policy A language (Ignored vs Rejected), stale rowspan / stdlib-only / VERSION 0.1.0 claims, and local-only @font-face. 18 rows changed verdict — e.g. Qt OLE/segfault sidesteps and CSS grid support to implemented, combined text+HTML footers and inline SVG paths to not implemented. A later font pass refreshed evidence for the 0.2.5 resolver contract and 0.2.6 WOFF2 / `@font-face` weight-style / opt-in metric aliases so rows no longer claim WOFF2 is skipped."
     },
     {
      "heading": "Every verdict cites evidence",
@@ -66,7 +66,7 @@
     },
     {
      "title": "Partial",
-      "body": "The behavior is covered but not fully replicated. Typical residual edges: `--header-html`/`--footer-html` clipped to the margin band, `@font-face` local and https TTF/OTF/WOFF1 with WOFF2 / eot / data: sources skipped, collapsed table borders, per-corner/% border-radius, and complex-script shaping such as Thai or Arabic."
+      "body": "The behavior is covered but not fully replicated. Typical residual edges: `--header-html`/`--footer-html` clipped to the margin band, `@font-face` `.eot` / `data:` skipped (local and https TTF/OTF/WOFF1/WOFF2 load), collapsed table borders, per-corner/% border-radius, and complex-script shaping such as Thai or Arabic."
     },
     {
      "title": "Not implemented",

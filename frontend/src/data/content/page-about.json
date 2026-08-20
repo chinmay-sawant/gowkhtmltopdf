@@ -115,7 +115,7 @@
     },
     {
      "heading": "Pure-Go runtime boundary",
-     "body": "Runtime code uses the Go standard library plus two allowlisted pure-Go direct modules: `github.com/go-text/typesetting` for OpenType shaping and `github.com/tdewolff/canvas` for SVG rasterization. There are no third-party PDF/HTML/CSS APIs, no Chrome/WebKit embedding, and no cgo. Retain upstream notices for these dependencies and bundled fonts when preparing a redistribution archive."
+     "body": "Runtime code uses the Go standard library plus three allowlisted pure-Go direct modules: `github.com/go-text/typesetting` for OpenType shaping, `github.com/tdewolff/canvas` for SVG rasterization, and `github.com/tdewolff/font` for WOFF2 decode. There are no third-party PDF/HTML/CSS APIs, no Chrome/WebKit embedding, and no cgo. Retain upstream notices for these dependencies and bundled fonts when preparing a redistribution archive."
     },
     {
      "heading": "AI-assisted development",

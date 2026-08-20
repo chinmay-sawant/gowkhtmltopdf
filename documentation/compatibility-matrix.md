@@ -237,7 +237,7 @@ Status legend as in §2; evidence in `internal/css/css.go`.
 | `:has()` | Partial | Relative selectors inside `:has(...)`; descendant/child/sibling + simple compounds; no forgiving-selector list / complex chrome edge cases. `has.go`; fixture-41 |
 | `@container` / `container-type` | Partial | Size queries only (`inline-size`/`width` + `and`/`or`/`not`); named containers; two-pass style after used inline size. No style/scroll-state queries; no `cq*` units. `container.go`; fixture-42 |
 | `@page` | Implemented | `@page { margin }` and `@page { size }` applied to page geometry (`applyCSSPageMargins`) |
-| `@font-face` | Partial | Parsed; `MergeFontFaces` loads TTF/OTF/WOFF1 via `FetchSub` (local **and** `https://`) under the same ACL + `NetworkPolicy` on PDF and image paths. `.woff2` / `.eot` / `data:` skipped. See §5 |
+| `@font-face` | Partial | Parsed; `MergeFontFaces` loads TTF/OTF/WOFF1/WOFF2 via `FetchSub` (local **and** `https://`) under the same ACL + `NetworkPolicy` on PDF and image paths. `.eot` / `data:` skipped; CFF/`fvar` rejected. See §5 / [fonts.md](fonts.md) |
 
 ## 5. Explicitly unsupported (MVP)
 

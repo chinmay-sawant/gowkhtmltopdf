@@ -365,7 +365,7 @@
   "status": "partial",
   "workaround": "",
   "key_detail": "Exit code 1 with ContentNotFoundError; used pdfkit with encoding 'utf-8' and an @font-face Persian font",
-  "evidence": "@font-face Partial: local and https TTF/OTF/WOFF1 via FetchSub under the loader ACL (matrix §4/§5); WOFF2, eot, and data: sources skipped; Arabic OT shaping when the face has GSUB.",
+  "evidence": "@font-face Partial: local and https TTF/OTF/WOFF1/WOFF2 via FetchSub under the loader ACL (matrix §4/§5); .eot and data: sources skipped; Arabic OT shaping when the face has GSUB.",
   "labels": [],
   "comments": 0,
   "created_at": "2022-11-12T04:38:58Z",
@@ -1096,7 +1096,7 @@
   "status": "partial",
   "workaround": "",
   "key_detail": "wkhtmltopdf 0.12.6-1; base64 'Playfair Display' @font-face falls back to Times; fonts such as Cormorant Garamond, Enriqueta, Noto Serif, Noticia Text via fonts.googleapis.com",
-  "evidence": "Google Fonts CSS is fetched; @font-face https TTF/OTF/WOFF1 register via MergeFontFaces/FetchSub. Typical fonts.googleapis.com WOFF2 and data: base64 faces are skipped, so many Google Fonts stay fallback Liberation.",
+  "evidence": "Google Fonts CSS is fetched; @font-face https TTF/OTF/WOFF1/WOFF2 register via MergeFontFaces/FetchSub (DecodeWOFF2). data: base64 faces are still skipped, so pure data: embeds stay on Liberation.",
   "labels": [],
   "comments": 0,
   "created_at": "2022-06-28T23:51:09Z",
@@ -1334,7 +1334,7 @@
   "status": "partial",
   "workaround": "",
   "key_detail": "Tried base64-embedded custom font on Mac M1; not working",
-  "evidence": "--font-path/--use-system-fonts + local @font-face work, but data: base64 @font-face skipped with warning.",
+  "evidence": "--font-path/--use-system-fonts + local @font-face (TTF/OTF/WOFF1/WOFF2) work, but data: base64 @font-face skipped with warning.",
   "labels": [],
   "comments": 0,
   "created_at": "2022-05-30T06:42:44Z",
@@ -1929,7 +1929,7 @@
   "status": "partial",
   "workaround": "",
   "key_detail": "0 labels, 1 comments",
-  "evidence": "@font-face Partial (matrix §4): local and https TTF/OTF/WOFF1 via FetchSub; WOFF2, eot, and data: sources skipped.",
+  "evidence": "@font-face Partial (matrix §4): local and https TTF/OTF/WOFF1/WOFF2 via FetchSub; .eot and data: sources skipped.",
   "labels": [],
   "comments": 1,
   "created_at": "2021-12-30T17:46:34Z",
@@ -3986,7 +3986,7 @@
   "status": "not-implemented",
   "workaround": "",
   "key_detail": "0 labels, 0 comments",
-  "evidence": "@font-face family/src load TTF/OTF/WOFF1 (local and https). unicode-range is not parsed or applied in css/layout, so Roboto+Noto CJK cascade by range does not work.",
+  "evidence": "@font-face family/src load TTF/OTF/WOFF1/WOFF2 (local and https). unicode-range is not parsed or applied in css/layout, so Roboto+Noto CJK cascade by range does not work.",
   "labels": [],
   "comments": 0,
   "created_at": "2021-05-23T11:01:11Z",
@@ -6383,7 +6383,7 @@
   "status": "partial",
   "workaround": "",
   "key_detail": "0 labels, 7 comments",
-  "evidence": "Icon webfonts work only if @font-face src is TTF/OTF/WOFF1 (local or https via FetchSub). Font Awesome-style WOFF2/eot/data: are skipped (matrix §5). ::before/::after quoted content is Partial.",
+  "evidence": "Icon webfonts work when @font-face src is TTF/OTF/WOFF1/WOFF2 (local or https via FetchSub). .eot/data: are skipped (matrix §5). ::before/::after quoted content is Partial.",
   "labels": [],
   "comments": 7,
   "created_at": "2020-09-02T07:55:06Z",
@@ -7383,7 +7383,7 @@
   "status": "partial",
   "workaround": "",
   "key_detail": "1 labels, 3 comments",
-  "evidence": "--header-html Partial (matrix §7.7); @font-face local+https only (§5)",
+  "evidence": "--header-html Partial (matrix §7.7); @font-face local+https TTF/OTF/WOFF1/WOFF2 (§5); .eot/data: skipped",
   "labels": [
    "NeedMinimalTestcase"
   ],
@@ -7727,7 +7727,7 @@
   "status": "partial",
   "workaround": "",
   "key_detail": "0 labels, 1 comments",
-  "evidence": "::before/::after generated content is Partial (quoted strings and attr(); matrix §4). @font-face loads local and https TTF/OTF/WOFF1; WOFF2/data: skipped. Icon fonts still need a registered face.",
+  "evidence": "::before/::after generated content is Partial (quoted strings and attr(); matrix §4). @font-face loads local and https TTF/OTF/WOFF1/WOFF2; data:/eot skipped. Icon fonts still need a registered face.",
   "labels": [],
   "comments": 1,
   "created_at": "2020-04-24T05:25:33Z",
@@ -8137,7 +8137,7 @@
   "status": "not-implemented",
   "workaround": "",
   "key_detail": "0 labels, 1 comments",
-  "evidence": "@font-face data: src is skipped with a warning (fonts.md, MergeFontFaces). Cross-OS base64-embedded fonts never register. File/https TTF/OTF/WOFF1 can load under ACL.",
+  "evidence": "@font-face data: src is skipped with a warning (fonts.md, MergeFontFaces). Cross-OS base64-embedded fonts never register. File/https TTF/OTF/WOFF1/WOFF2 can load under ACL.",
   "labels": [],
   "comments": 1,
   "created_at": "2020-03-03T14:53:22Z",
@@ -8613,7 +8613,7 @@
   "status": "not-implemented",
   "workaround": "",
   "key_detail": "0 labels, 4 comments",
-  "evidence": "Brandon Grotesque as data: or WOFF2 @font-face is skipped (matrix §4/§5). Fallback is Liberation. Local/https TTF/OTF/WOFF1 of the same family can register.",
+  "evidence": "Brandon Grotesque as data: @font-face is skipped (matrix §4/§5). Local/https TTF/OTF/WOFF1/WOFF2 of the same family can register; CFF/fvar faces are still rejected. Fallback is Liberation when no face registers.",
   "labels": [],
   "comments": 4,
   "created_at": "2020-01-15T12:03:03Z",
@@ -9185,7 +9185,7 @@
   "status": "partial",
   "workaround": "",
   "key_detail": "0 labels, 4 comments",
-  "evidence": "::before/::after is Partial (pseudo_content.go quoted strings/attr(); matrix §4). Font Awesome Duotone still usually ships WOFF2, which MergeFontFaces skips.",
+  "evidence": "::before/::after is Partial (pseudo_content.go quoted strings/attr(); matrix §4). Font Awesome Duotone WOFF2 can register via DecodeWOFF2 when the face is static TrueType; residual gaps are pseudo content and any CFF/variable FA builds.",
   "labels": [],
   "comments": 4,
   "created_at": "2019-11-06T07:33:44Z",
@@ -10570,7 +10570,7 @@
   "status": "partial",
   "workaround": "",
   "key_detail": "0 labels, 0 comments",
-  "evidence": "matrix 4 @font-face Partial (local/https TTF/OTF/WOFF1; WOFF2 skipped)",
+  "evidence": "matrix 4 @font-face Partial (local/https TTF/OTF/WOFF1/WOFF2; .eot/data: skipped)",
   "labels": [],
   "comments": 0,
   "created_at": "2019-05-15T06:58:30Z",
@@ -12140,7 +12140,7 @@
   "status": "partial",
   "workaround": "",
   "key_detail": "0 labels, 3 comments",
-  "evidence": "Image mode uses the same faces and pdf.ShapeRun path, then TTF outline raster (internal/imageout/ttfraster.go), not a 5x7 bitmap. Google Fonts work only for https TTF/OTF/WOFF1; WOFF2 skipped.",
+  "evidence": "Image mode uses the same faces and pdf.ShapeRun path, then TTF outline raster (internal/imageout/ttfraster.go), not a 5x7 bitmap. Google Fonts work for https TTF/OTF/WOFF1/WOFF2; data: skipped.",
   "labels": [],
   "comments": 3,
   "created_at": "2019-01-25T15:20:24Z",
@@ -12382,7 +12382,7 @@
   "status": "partial",
   "workaround": "",
   "key_detail": "0 labels, 3 comments",
-  "evidence": "@font-face Partial: local+https TTF/OTF/WOFF1, WOFF2 skipped (matrix S5)",
+  "evidence": "@font-face Partial: local+https TTF/OTF/WOFF1/WOFF2; .eot/data: skipped (matrix §5)",
   "labels": [],
   "comments": 3,
   "created_at": "2019-01-05T12:28:25Z",
@@ -13599,7 +13599,7 @@
   "status": "partial",
   "workaround": "",
   "key_detail": "1 labels, 10 comments",
-  "evidence": "Custom OTF/TTF load via --font-path or @font-face (local and https WOFF1/TTF/OTF). font-weight on @font-face is ignored at register time (fonts.md).",
+  "evidence": "Custom OTF/TTF load via --font-path or @font-face (local and https WOFF1/WOFF2/TTF/OTF). font-weight / font-style on @font-face are applied as Registry style overrides (fonts.md).",
   "labels": [
    "NeedInfo"
   ],
@@ -14466,7 +14466,7 @@
   "status": "partial",
   "workaround": "",
   "key_detail": "1 labels, 8 comments",
-  "evidence": "matrix §4 @font-face Partial: local and https TTF/OTF/WOFF1; WOFF2/eot/data: skipped. Arabic OT via go-text/typesetting when the face has GSUB.",
+  "evidence": "matrix §4 @font-face Partial: local and https TTF/OTF/WOFF1/WOFF2; .eot/data: skipped. Arabic OT via go-text/typesetting when the face has GSUB.",
   "labels": [
    "NeedInfo"
   ],
@@ -15873,7 +15873,7 @@
   "status": "partial",
   "workaround": "",
   "key_detail": "1 labels, 0 comments",
-  "evidence": "matrix sec.2.3 --font-path/--use-system-fonts; sec.5 @font-face local+https TTF/OTF/WOFF1",
+  "evidence": "matrix sec.2.3 --font-path/--use-system-fonts; sec.5 @font-face local+https TTF/OTF/WOFF1/WOFF2",
   "labels": [
    "NeedInfo"
   ],
@@ -16044,7 +16044,7 @@
   "status": "partial",
   "workaround": "",
   "key_detail": "1 labels, 9 comments",
-  "evidence": "matrix sec.5 @font-face Partial: https TTF/OTF/WOFF1 via FetchSub ACL; WOFF2 skipped",
+  "evidence": "matrix sec.5 @font-face Partial: https TTF/OTF/WOFF1/WOFF2 via FetchSub ACL; data:/eot skipped",
   "labels": [
    "NeedInfo"
   ],
@@ -16254,7 +16254,7 @@
   "status": "partial",
   "workaround": "",
   "key_detail": "1 labels, 9 comments",
-  "evidence": "matrix sec.5 @font-face Partial: https TTF/OTF/WOFF1; WOFF2 skipped; registry fallback",
+  "evidence": "matrix sec.5 @font-face Partial: https TTF/OTF/WOFF1/WOFF2; data:/eot skipped; registry fallback",
   "labels": [
    "NeedInfo"
   ],
@@ -16825,7 +16825,7 @@
   "status": "partial",
   "workaround": "",
   "key_detail": "1 labels, 5 comments",
-  "evidence": "matrix sec.5 @font-face Partial: https TTF/OTF/WOFF1 via FetchSub; WOFF2 (Font Awesome) skipped",
+  "evidence": "matrix sec.5 @font-face Partial: https TTF/OTF/WOFF1/WOFF2 via FetchSub; Font Awesome WOFF2 can register when static TrueType; data:/eot skipped",
   "labels": [
    "NeedInfo"
   ],
@@ -16939,7 +16939,7 @@
   "status": "not-implemented",
   "workaround": "",
   "key_detail": "1 labels, 1 comments",
-  "evidence": "No brotli decoder in internal/load; net/http fetch has no content-encoding br row in the matrix.",
+  "evidence": "No HTTP Content-Encoding: br decoder in internal/load; net/http fetch has no brotli row in the matrix. Separate from WOFF2 on-disk Brotli, which DecodeWOFF2 handles via tdewolff/font.",
   "labels": [
    "FeatureRequest"
   ],
@@ -17469,7 +17469,7 @@
   "status": "partial",
   "workaround": "",
   "key_detail": "1 labels, 7 comments",
-  "evidence": "@font-face Partial: local and https TTF/OTF/WOFF1. Glyphicon/icon PUA glyphs need that face; data: and WOFF2 skip. ::before content is Partial.",
+  "evidence": "@font-face Partial: local and https TTF/OTF/WOFF1/WOFF2. Glyphicon/icon PUA glyphs need that face; data: and eot skip. ::before content is Partial.",
   "labels": [
    "NeedToVerify"
   ],
@@ -17641,7 +17641,7 @@
   "status": "partial",
   "workaround": "",
   "key_detail": "2 labels, 3 comments",
-  "evidence": "@font-face registers a family alias from TTF/OTF/WOFF1 (local or https). Other named families still resolve via the author stack, registry, then Liberation (matrix §2.3). WOFF2/data: skipped.",
+  "evidence": "@font-face registers faces from TTF/OTF/WOFF1/WOFF2 (local or https). Other named families still resolve via the author stack, registry, then Liberation (matrix §2.3). data:/eot skipped.",
   "labels": [
    "MayWorkWith0.13",
    "NeedToVerify"
@@ -19575,7 +19575,7 @@
   "status": "partial",
   "workaround": "",
   "key_detail": "1 labels, 1 comments",
-  "evidence": "matrix sec.2.3 font-family Partial + sec.5 @font-face local TTF/OTF/WOFF1; icon-font ligature fidelity unclaimed",
+  "evidence": "matrix sec.2.3 font-family Partial + sec.5 @font-face local/https TTF/OTF/WOFF1/WOFF2; icon-font ligature fidelity unclaimed",
   "labels": [
    "NeedInfo"
   ],
@@ -21162,7 +21162,7 @@
   "status": "partial",
   "workaround": "",
   "key_detail": "1 labels, 2 comments",
-  "evidence": "matrix sec.5 @font-face local TTF/OTF/WOFF1 Partial; WOFF2 skipped",
+  "evidence": "matrix sec.5 @font-face local TTF/OTF/WOFF1/WOFF2 Partial; data:/eot skipped",
   "labels": [
    "NeedInfo"
   ],
@@ -21333,7 +21333,7 @@
   "status": "partial",
   "workaround": "",
   "key_detail": "1 labels, 2 comments",
-  "evidence": "matrix sec.5 @font-face local TTF/OTF/WOFF1 Partial; custom font loading exists",
+  "evidence": "matrix sec.5 @font-face local TTF/OTF/WOFF1/WOFF2 Partial; custom font loading exists",
   "labels": [
    "NeedInfo"
   ],
@@ -21638,7 +21638,7 @@
   "status": "partial",
   "workaround": "",
   "key_detail": "1 labels, 9 comments",
-  "evidence": "matrix §4 @font-face Partial (local TTF/OTF/WOFF1); fonts Partial §2.3",
+  "evidence": "matrix §4 @font-face Partial (local TTF/OTF/WOFF1/WOFF2); fonts Partial §2.3",
   "labels": [
    "NeedInfo"
   ],
@@ -23345,7 +23345,7 @@
   "status": "partial",
   "workaround": "",
   "key_detail": "1 labels, 16 comments",
-  "evidence": "matrix §4 @font-face Partial; WOFF2 skipped §5; icon fonts Partial",
+  "evidence": "matrix §4 @font-face Partial (TTF/OTF/WOFF1/WOFF2); data:/eot skipped §5; icon fonts Partial",
   "labels": [
    "Verified"
   ],
@@ -23383,7 +23383,7 @@
   "status": "partial",
   "workaround": "",
   "key_detail": "1 labels, 3 comments",
-  "evidence": "matrix §4 @font-face Partial (local TTF/OTF/WOFF1); fonts Partial",
+  "evidence": "matrix §4 @font-face Partial (local TTF/OTF/WOFF1/WOFF2); fonts Partial",
   "labels": [
    "NeedInfo"
   ],
