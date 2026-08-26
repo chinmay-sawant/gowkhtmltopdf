@@ -1,6 +1,6 @@
 ## Summary
 
-Close the post-v0.2.4 improve-codebase architecture ledger: deepen Document/CLI seams, collapse remaining convert/imageout forks, fix layout paint locality, and restore docs honesty. Health rating moves from **7.8 / 10** (audit) back to **8.8 / 10** after implementation.
+Close the post-v0.2.4 improve-codebase architecture ledger: deepen Document/CLI seams, collapse remaining convert/imageout forks, fix layout paint locality, and restore docs honesty. Health rating moves from **7.8 / 10** (audit) back to **8.8 / 10** after implementation. Also ships repo housekeeping: a `/feynman` agent skill and a README stability note about `master`.
 
 ---
 
@@ -38,6 +38,11 @@ Close the post-v0.2.4 improve-codebase architecture ledger: deepen Document/CLI 
 - Delete wiki thumb hairline Paint stripper; fix emission at chrome/inline
 - Emit `OpStrokeRect` + `StrokeMask*` for mixed rounded sides; remove imageout OpLine overlay rewrite
 - Consume `table-layout: fixed` in column sizing
+
+### Repo docs and agent tooling
+
+- Add `/feynman` agent skill (`skills/feynman/SKILLS.md`): plain-words explanation loop with self-audit, used to explain repo behavior from source
+- README: add a note that `master` tracks active development and stable builds come from the latest tagged release
 
 ### Docs honesty
 
