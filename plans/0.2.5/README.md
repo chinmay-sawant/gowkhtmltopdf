@@ -1,9 +1,11 @@
-# Plans - v0.2.5 (Python cgo c-shared bindings and PyPI + Font tracks) - Draft
+# Plans - v0.2.5 (Python cgo c-shared bindings and PyPI + Font tracks)
 
 | File / Folder | Role |
 |---------------|------|
 | [40-canonical-0.2.5-python-bindings.md](40-canonical-0.2.5-python-bindings.md) | **Canonical v0.2.5 execution ledger** for issue #35 python cgo `c-shared` bindings and PyPI (phases 40-47) |
 | [phases/](phases) | Per-phase atomic checklists for python bindings: C ABI and c-shared build (40), Python package and loader (41), Document parity and snippet (42), platform and wheel matrix (43), tests (44), docs and security (45), PyPI publish and versioning (46), closure (47) |
+| [PR/release-v0.2.5.md](PR/release-v0.2.5.md) | GitHub Release body for tag `v0.2.5` |
+| [../PR/pr-python-cgo-pypi.md](../PR/pr-python-cgo-pypi.md) | PR #58 body (feature branch) |
 | `font/` | **Complete** (2026-08-19) font resolution track phases 01-08 (`FontResolver`, discovery diagnostics, `@font-face` weight/style, preflight). Not in this repo worktree but cited in `knowledge-base/wiki/syntheses/roadmap.md` and `wiki/syntheses/fonts-and-typography.md`. `VERSION` stayed `0.2.4` until tag |
 | `woff2-metric-aliases/` lives under `plans/0.2.6/` | **Complete** (2026-08-20) WOFF2 decode plus opt-in metric aliases |
 
