@@ -85,6 +85,13 @@ inline as a fallback - still do not write a file.
    PR/issue text, commit messages, or user-facing replies, apply `/unslop`.
    Cut puffery, em dashes, chatbot filler, synonym cycling, title-case
    headings.
+9. **Feynman every explanation and document.** Whenever you respond with an
+   explanation or produce documentation (plans, `documentation/`,
+   knowledge-base pages, README sections, PR bodies, design notes), apply
+   `skills/feynman/SKILLS.md`: plain words a smart 12-year-old could retell,
+   grounded in real source (`file:line` citations), self-audited for jargon,
+   hand-waves, circularity, and name-dropping until zero findings remain.
+   Report the pass count when the loop runs as `/feynman`.
 
 ## Unslop (`/unslop`)
 
@@ -93,6 +100,15 @@ Apply to every prose surface: chat replies, `plans/`, `documentation/`,
 messages. Load the unslop skill, rewrite to plain human voice, then self-
 audit: "What makes this obviously AI generated?" Prefer concrete facts and
 file paths over vague summary language.
+
+## Feynman (`/feynman`)
+
+Apply to every response that explains something and to every documentation
+surface. Load `skills/feynman/SKILLS.md` and run its loop: explain in plain
+words, audit your own explanation for jargon / hand-waves / circularity /
+name-dropping, fill each gap from real source with `file:line` citations,
+repeat until zero findings. Never explain from memory alone; read the code
+or doc first. Report the pass count when invoked as `/feynman`.
 
 ## Knowledge base (local only)
 
@@ -236,8 +252,9 @@ PR bodies live in `plans/PR/`. Phase checklist format comes from
 ## Skills (this folder)
 
 - `skills/PR/` - templates for PRs, issues, review comments
-- `skills/feynman/` - plain-words explanation loop with self-audit; use for
-  "explain X simply"
+- `skills/feynman/` - plain-words explanation loop with self-audit;
+  mandatory default for every explanatory reply and documentation surface
+  (golden rule 9)
 - `skills/phase-wise-checklist/` - evidence-backed plan ledgers under
   `plans/`
 - `skills/improve-codebase/` - architecture/seams/go-practices audit pack
