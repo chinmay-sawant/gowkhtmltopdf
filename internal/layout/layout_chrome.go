@@ -461,20 +461,17 @@ func roundedAccentBorder(sty ResolvedStyle) bool {
 	return sty.BorderTop.Width > 0 && sty.BorderTop.Style == solidKeyword
 }
 
-const blueAccentStrokeScale = 0.75
+func squareSideBorderRadii(side border, radii [4]float64, left bool) [4]float64 {
+	const radiusWidthSlack = 0.25
+	if left {
+		if radii[0] <= borderPaint(side)+radiusWidthSlack && radii[3] <= borderPaint(side)+radiusWidthSlack {
+			return [4]float64{}
+		}
 
-func mixedLeftBorderPaintWidth(side border) float64 {
-	width := borderPaint(side)
-	if side.Color == [3]float64{37.0 / 255.0, 99.0 / 255.0, 235.0 / 255.0} {
-		return width * blueAccentStrokeScale
+		return radii
 	}
 
-	return width
-}
-
-func squareLeftBorderRadii(side border, radii [4]float64) [4]float64 {
-	const radiusWidthSlack = 0.25
-	if radii[0] <= borderPaint(side)+radiusWidthSlack && radii[3] <= borderPaint(side)+radiusWidthSlack {
+	if radii[1] <= borderPaint(side)+radiusWidthSlack && radii[2] <= borderPaint(side)+radiusWidthSlack {
 		return [4]float64{}
 	}
 
@@ -483,8 +480,8 @@ func squareLeftBorderRadii(side border, radii [4]float64) [4]float64 {
 
 // roundedBorderOps keeps the rounded outer geometry for a solid border whose
 // sides differ in width or color. The base stroke supplies the corner arcs;
-// differing sides are overlaid with their exact side paint so a thick rail
-// remains thick without degrading every corner to a square line box.
+// differing sides are overlaid as masked OpStrokeRect sides so accent rails
+// keep corner arcs without a second imageout OpLine rewrite.
 func (e *engine) roundedBorderOps(
 	sty ResolvedStyle, posX, posY, width, height float64, radii [4]float64,
 ) []Op {
@@ -500,55 +497,35 @@ func (e *engine) roundedBorderOps(
 		RadiusBottomRight: radii[2], RadiusBottomLeft: radii[3],
 	}}
 
-	sides := []struct {
-		border     border
-		x, y, w, h float64
-	}{
-		{border: sty.BorderTop, x: posX + radii[0], y: posY, w: width - radii[0] - radii[1], h: 0},
-		{border: sty.BorderRight, x: posX + width, y: posY + radii[1], w: 0, h: height - radii[1] - radii[2]},
-		{border: sty.BorderBottom, x: posX + radii[3], y: posY + height, w: width - radii[3] - radii[2], h: 0},
-		{border: sty.BorderLeft, x: posX, y: posY + radii[0], w: 0, h: height - radii[0] - radii[3]},
+	type mixedSide struct {
+		border border
+		mask   uint8
+	}
+
+	sides := []mixedSide{
+		{border: sty.BorderTop, mask: StrokeMaskTop},
+		{border: sty.BorderRight, mask: StrokeMaskRight},
+		{border: sty.BorderBottom, mask: StrokeMaskBottom},
+		{border: sty.BorderLeft, mask: StrokeMaskLeft},
 	}
 
 	for _, side := range sides {
-		if side.border == base {
+		if side.border == base || side.border.Style != solidKeyword {
 			continue
 		}
 
-		side.w = math.Max(side.w, 0)
-		side.h = math.Max(side.h, 0)
-
-		if side.h == 0 && side.border.Style == solidKeyword {
-			ops = append(ops, Op{ //nolint:exhaustruct // intentional zero fields
-				Kind: OpStrokeRect, X: posX, Y: posY, W: width, H: height,
-				R: side.border.Color[0], G: side.border.Color[1], B: side.border.Color[2],
-				Width: e.scalePt(borderPaint(side.border)), Radius: uniformRadius(radii),
-				RadiusTopLeft: radii[0], RadiusTopRight: radii[1],
-				RadiusBottomRight: radii[2], RadiusBottomLeft: radii[3],
-				StrokeMask: StrokeMaskTop,
-			})
-
-			continue
-		}
-
-		if side.w == 0 && side.border.Style == solidKeyword {
-			leftRadii := squareLeftBorderRadii(side.border, radii)
-			ops = append(ops, Op{ //nolint:exhaustruct // intentional zero fields
-				Kind: OpStrokeRect, X: posX, Y: posY, W: width, H: height,
-				R: side.border.Color[0], G: side.border.Color[1], B: side.border.Color[2],
-				Width: e.scalePt(mixedLeftBorderPaintWidth(side.border)), Radius: uniformRadius(leftRadii),
-				RadiusTopLeft: leftRadii[0], RadiusTopRight: leftRadii[1],
-				RadiusBottomRight: leftRadii[2], RadiusBottomLeft: leftRadii[3],
-				StrokeMask: StrokeMaskLeft,
-			})
-
-			continue
+		sideRadii := radii
+		if side.mask == StrokeMaskLeft || side.mask == StrokeMaskRight {
+			sideRadii = squareSideBorderRadii(side.border, radii, side.mask == StrokeMaskLeft)
 		}
 
 		ops = append(ops, Op{ //nolint:exhaustruct // intentional zero fields
-			Kind: OpLine, X: side.x, Y: side.y, W: side.w, H: side.h,
-			Width: e.scalePt(borderPaint(side.border)), R: side.border.Color[0],
-			G: side.border.Color[1], B: side.border.Color[2],
+			Kind: OpStrokeRect, X: posX, Y: posY, W: width, H: height,
+			R: side.border.Color[0], G: side.border.Color[1], B: side.border.Color[2],
+			Width: e.scalePt(borderPaint(side.border)), Radius: uniformRadius(sideRadii),
+			RadiusTopLeft: sideRadii[0], RadiusTopRight: sideRadii[1],
+			RadiusBottomRight: sideRadii[2], RadiusBottomLeft: sideRadii[3],
+			StrokeMask: side.mask,
 		})
 	}
 
@@ -557,8 +534,9 @@ func (e *engine) roundedBorderOps(
 
 // roundedAccentBorderOps keeps a solid top rail curved when the remaining
 // border sides use dotted or dashed styles. A complete rounded stroke cannot
-// represent those mixed styles, so the accent is a masked rounded path and
-// the other sides stop at the corner radii.
+// represent those mixed styles, so the accent is a masked rounded path.
+// Solid remnant sides use StrokeMask* overlays; dashed/dotted sides stay as
+// segmented OpLines that stop at the corner radii.
 func (e *engine) roundedAccentBorderOps(
 	sty ResolvedStyle,
 	posX, posY, width, height float64,
@@ -572,20 +550,42 @@ func (e *engine) roundedAccentBorderOps(
 		RadiusBottomRight: radii[2], RadiusBottomLeft: radii[3], StrokeMask: StrokeMaskTop,
 	}}
 
-	appendSide := func(
-		posX, posY, sideW, sideH float64,
-		border border,
-	) {
+	appendSolidMask := func(side border, mask uint8, sideRadii [4]float64) {
+		if borderPaint(side) <= 0 || side.Style != solidKeyword {
+			return
+		}
+
+		ops = append(ops, Op{ //nolint:exhaustruct // intentional zero fields
+			Kind: OpStrokeRect, X: posX, Y: posY, W: width, H: height,
+			R: side.Color[0], G: side.Color[1], B: side.Color[2],
+			Width: e.scalePt(borderPaint(side)), Radius: uniformRadius(sideRadii),
+			RadiusTopLeft: sideRadii[0], RadiusTopRight: sideRadii[1],
+			RadiusBottomRight: sideRadii[2], RadiusBottomLeft: sideRadii[3],
+			StrokeMask: mask,
+		})
+	}
+
+	appendDashedSide := func(sideX, sideY, sideW, sideH float64, side border) {
+		if side.Style == solidKeyword {
+			return
+		}
+
 		ops = appendBorderLineOps(
-			ops, posX, posY, sideW, sideH,
-			e.scalePt(borderPaint(border)), border.Style,
-			border.Color[0], border.Color[1], border.Color[2],
+			ops, sideX, sideY, sideW, sideH,
+			e.scalePt(borderPaint(side)), side.Style,
+			side.Color[0], side.Color[1], side.Color[2],
 		)
 	}
 
-	appendSide(posX+width, posY+radii[1], 0, math.Max(height-radii[1]-radii[2], 0), sty.BorderRight)
-	appendSide(posX+radii[3], posY+height, math.Max(width-radii[3]-radii[2], 0), 0, sty.BorderBottom)
-	appendSide(posX, posY+radii[0], 0, math.Max(height-radii[0]-radii[3], 0), sty.BorderLeft)
+	rightRadii := squareSideBorderRadii(sty.BorderRight, radii, false)
+	leftRadii := squareSideBorderRadii(sty.BorderLeft, radii, true)
+	appendSolidMask(sty.BorderRight, StrokeMaskRight, rightRadii)
+	appendSolidMask(sty.BorderBottom, StrokeMaskBottom, radii)
+	appendSolidMask(sty.BorderLeft, StrokeMaskLeft, leftRadii)
+
+	appendDashedSide(posX+width, posY+radii[1], 0, math.Max(height-radii[1]-radii[2], 0), sty.BorderRight)
+	appendDashedSide(posX+radii[3], posY+height, math.Max(width-radii[3]-radii[2], 0), 0, sty.BorderBottom)
+	appendDashedSide(posX, posY+radii[0], 0, math.Max(height-radii[0]-radii[3], 0), sty.BorderLeft)
 
 	return ops
 }

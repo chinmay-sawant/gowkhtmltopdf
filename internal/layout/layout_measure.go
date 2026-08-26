@@ -772,6 +772,9 @@ type tableColumnEnv struct {
 	availW float64
 	// tableW is a definite table border-box width when >= 0; -1 means auto.
 	tableW float64
+	// fixed is table-layout:fixed with a definite table width: columns are
+	// sized from width hints / equal shares, not content max-content.
+	fixed bool
 }
 
 // sizeTableColumns resolves used column widths and the table border-box width
@@ -806,6 +809,12 @@ func sizeTableColumns(env tableColumnEnv) ([]float64, float64) {
 		}
 	}
 
+	if env.fixed && definiteTable {
+		sizeFixedTableColumns(colW, colPct, colAbs, tableW, chrome, nCols)
+
+		return colW, tableW
+	}
+
 	distributeColumnWidths(colW, colMin, colPct, colAbs, tableW, chrome, definiteTable, sumMax, sumMin, nCols)
 
 	// Auto tables: border box covers used columns. Definite width keeps tableW.
@@ -816,6 +825,64 @@ func sizeTableColumns(env tableColumnEnv) ([]float64, float64) {
 	}
 
 	return colW, tableW
+}
+
+// sizeFixedTableColumns applies table-layout:fixed column used widths for a
+// definite table border box: hinted columns take their share, remaining
+// columns split the leftover evenly (content max-content is ignored).
+func sizeFixedTableColumns(colW, colPct, colAbs []float64, tableW, chrome float64, nCols int) {
+	inner := tableW - chrome
+	if inner < 0 {
+		inner = 0
+	}
+
+	used, autoN := applyFixedColumnHints(colW, colPct, colAbs, inner)
+	remain := inner - used
+
+	if remain < 0 {
+		remain = 0
+	}
+
+	fillFixedColumnRemainder(colW, colPct, colAbs, remain, autoN, nCols)
+}
+
+func applyFixedColumnHints(colW, colPct, colAbs []float64, inner float64) (float64, int) {
+	var (
+		used  float64
+		autoN int
+	)
+
+	for idx := range colW {
+		switch {
+		case colPct[idx] >= 0:
+			colW[idx] = inner * colPct[idx] / cssPercent
+			used += colW[idx]
+		case colAbs[idx] >= 0:
+			colW[idx] = colAbs[idx]
+			used += colW[idx]
+		default:
+			autoN++
+		}
+	}
+
+	return used, autoN
+}
+
+func fillFixedColumnRemainder(
+	colW, colPct, colAbs []float64, remain float64, autoN, nCols int,
+) {
+	switch {
+	case autoN > 0:
+		share := remain / float64(autoN)
+
+		for idx := range colW {
+			if colPct[idx] < 0 && colAbs[idx] < 0 {
+				colW[idx] = share
+			}
+		}
+	case remain > 0:
+		spreadRemainderOverHinted(colW, colPct, remain, nCols)
+	}
 }
 
 // distributeColumnWidths applies the hint/extra/shrink strategy to the used

@@ -274,7 +274,47 @@ body { margin: 0; }
 	t.Fatal("mixed rounded border fell back to square edge lines")
 }
 
-//nolint:cyclop // regression accepts either the legacy line or rounded overlay representation
+// EXT-08: left-rail paint width follows CSS border width for any accent color,
+// not only fixture-56's #2563eb.
+func TestMixedRoundedLeftRailWidthIgnoresAccentHex(t *testing.T) {
+	t.Parallel()
+
+	leftWidth := func(color string) float64 {
+		t.Helper()
+
+		res := layoutHTML(t, `<html><body><div class="card">card</div></body></html>`, sheet(t, `
+body { margin: 0; }
+.card {
+ width: 120pt;
+ height: 40pt;
+ border: 1pt solid #cbd5e1;
+ border-left: 4pt solid `+color+`;
+ border-radius: 6pt;
+}
+`))
+		for _, paintOp := range res.Ops {
+			if paintOp.Kind == OpStrokeRect && paintOp.StrokeMask == StrokeMaskLeft && paintOp.Width > 2 {
+				return paintOp.Width
+			}
+		}
+
+		t.Fatalf("missing left StrokeMask rail for accent %s", color)
+
+		return 0
+	}
+
+	blue := leftWidth("#2563eb")
+	red := leftWidth("#dc2626")
+
+	if math.Abs(blue-red) > 1e-9 {
+		t.Fatalf("left rail width gated by accent hex: #2563eb=%.4f #dc2626=%.4f", blue, red)
+	}
+
+	if blue < 3.9 || blue > 4.1 {
+		t.Fatalf("left rail width=%.4f, want CSS 4pt (no color scale)", blue)
+	}
+}
+
 func TestMixedRoundedBorderKeepsTopAccentOnTopEdge(t *testing.T) {
 	t.Parallel()
 
@@ -294,14 +334,9 @@ body { margin: 0; }
 			paintOp.Radius > 0 && paintOp.R > 0.5 && paintOp.G < 0.5 && paintOp.B < 0.3 && paintOp.Width > 2 {
 			return
 		}
-
-		if paintOp.Kind == OpLine && paintOp.H == 0 && paintOp.W > 50 &&
-			paintOp.R > 0.5 && paintOp.G < 0.5 && paintOp.B < 0.3 && paintOp.Width > 2 {
-			return
-		}
 	}
 
-	t.Fatal("mixed rounded border lost the accented top edge")
+	t.Fatal("mixed rounded border lost the accented top StrokeMask edge")
 }
 
 //nolint:cyclop,wsl // regression keeps the complete page-fragment assertion together

@@ -3,7 +3,7 @@
 > **Parent:** `plans/0.1.0/00-canonical-pure-go-rewrite.md` (Phase 0.1); post-MVP updates under `plans/0.2.0/10-canonical-post-mvp-roadmap.md`  
 > **Status:** living contract - amendments go through plan review  
 > **Target:** authored HTML templates → PDF. **Not** a browser.  
-> **Last honesty audit:** 2026-08-13 · fidelity guide: [fidelity.md](fidelity.md)  
+> **Last honesty audit:** 2026-08-21 · fidelity guide: [fidelity.md](fidelity.md)  
 > **Phase 21 note:** arbitrary-website / “decent print” work does **not** expand this matrix. CSS remains a **print CSS subset** (Partial flex/grid/position; many properties Not implemented). No new Implemented rows until code + tests ship — see [fidelity.md § Arbitrary websites](fidelity.md#arbitrary-websites-phase-21).
 
 This document is the **contract** the layout engine is allowed to implement.
@@ -80,13 +80,13 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 | Property | Status | Notes / verified by |
 |----------|--------|---------------------|
 | `font-family` (named + generic) | Partial | parsed + inherited; embedded Liberation Sans family (R/B/I/BI) plus **font registry** (`--font-path`, optional `--use-system-fonts`) and `@font-face` TTF/OTF/WOFF1 (local and `https://` via `FetchSub`) on **PDF and image** paths (see §4 / §5). Named families resolve as named; missing faces fall through the author’s comma stack, then Liberation; only CSS generics (`serif`/`sans-serif`/`monospace`) expand to Liberation |
-| `writing-mode` (`horizontal-tb\|vertical-rl\|vertical-lr`) | Partial (horizontal only) | Parsed; `vertical-rl` / `vertical-lr` still lay out as a normal horizontal block. Full CSS vertical typesetting is out of scope |
+| `writing-mode` (`horizontal-tb\|vertical-rl\|vertical-lr`) | Partial (glyph rotate) | Parsed + inherited (`TestWritingModeInherits`). `vertical-rl` / `vertical-lr` still use horizontal block/line layout; body text ops set `RotateDeg == -90` (not full CSS vertical typesetting / upright glyph stacking) |
 | `font-size` | Implemented | `style.go` `fontSize` (px/pt/em/%/rem/in/cm/mm/pc + keywords); `%`/`em` resolve against parent; test `TestFontSizeEmInherit` |
 | `font-weight` (`normal\|bold\|100-900`) | Implemented | ≥700 selects Liberation Sans **Bold** (or BoldItalic); fake stroke bold only if a bold face is missing; tests `TestRealBoldFaceOps`, `TestBoldFaceInInvoicePDF` |
 | `font-style` (`italic\|oblique`) | Implemented | selects Liberation Sans Italic / BoldItalic (`pdf.FaceSet.Resolve`); test `TestRealBoldFaceOps` |
 | `text-align` (`left\|right\|center\|justify`) | Implemented (justify lite) | left/right/center; `justify` distributes leftover space between word items on non-final lines (`inline.go`); test `TestTextAlignJustify` |
 | `text-decoration` (`none\|underline\|line-through`) | Implemented | drawn in `inline.go`; test `TestBoldUnderline` |
-| `text-indent` | Not implemented | parsed, never consumed |
+| `text-indent` | Implemented | Inherited and applied to the first line (`inline.go`); test `TestTextIndentInheritsAndShiftsFirstLine` |
 | `line-height` (number, length, `normal`) | Implemented | consumed in line metrics; test `TestMarginCollapse` |
 | `letter-spacing` | Implemented | consumed in run width |
 | `word-spacing` | Not implemented | absent from `applyRestProps` |
@@ -253,11 +253,11 @@ Status legend as in §2; evidence in `internal/css/css.go`.
 | SVG-as-`<img>` | **Implemented** (raster via `internal/svg`) |
 | WebP, AVIF | Not implemented; broken-image placeholder or skip |
 | Fixed CSS headers/footers via `position: fixed` alone | Prefer CLI `--header-*` / `--footer-*` for repeating chrome; CSS `fixed` lite paints on every page but is not a full running-element model |
-| Complex-script shaping (Indic, Arabic, CJK) | **Type0/CID Identity-H** for BMP Unicode (CJK with a capable face); **Arabic OT** via `go-text/typesetting` when the face has GSUB (+ presentation-form `ShapeText` fallback); Hangul needs a Hangul face. `writing-mode` vertical keywords are parsed; **layout stays horizontal**. **Indic Partial** (OT when face/cmap allow; not production-claimed). Optional OT **`halt`/`palt`** for CJK punctuation via `ShapeTextFont` FontFeatures |
-| PDF version (1.4 / 1.7 / 2.0) | **Supported:** PDF 1.4 is default; PDF 1.7 and PDF 2.0 are opt-in via `--pdf-version 1.7` / `--pdf-version 2.0` or library API `WithPDFVersion`. Emits `%PDF-1.7` (trailer `/ID`, Info with UTF-16BE + BOM strings, non-claiming XMP Metadata stream) or `%PDF-2.0` (trailer `/ID`, UTF-8 document strings, non-claiming XMP with `dc:format`, `pdf:Producer`, dates). PDF 2.0 output is a **version**, not a conformance claim |
-| PDF/A-3a, PDF/UA-1 (ISO 19005-3 / ISO 14289-1) | **Supported:** Opt-in via `--pdf-profile a3a-ua1` / `WithPDFProfile("a3a-ua1")`, `"a3a"`, `"ua1"`. Implies PDF 1.7. Emits claiming XMP metadata (`pdfaid:part=3`, `pdfaid:conformance=A`, `pdfuaid:part=1`), sRGB OutputIntent, `/DefaultRGB`, and full logical structure tree (`H1`..`H6`, `P`, `Table` > `TR` > `TH`/`TD`, `L` > `LI` > `LBody` > `Link`, `Figure` + `alt`, `/Artifact /Pagination`) |
-| PDF 2.0 (ISO 32000-2) | **Shipped as opt-in version** (#32): `--pdf-version 2.0` / `WithPDFVersion("2.0")`. Version alone is **not** a PDF/A or PDF/UA claim |
-| PDF/A-4, PDF/UA-2 (PDF 2.0 conformance profiles) | **Supported** (#33): Opt-in via `--pdf-profile a4-ua2` / `WithPDFProfile("a4-ua2")`, `"a4"`, `"ua2"`. Implies PDF 2.0. Emits claiming XMP (`pdfaid:part=4`, `pdfaid:rev=2020`, `pdfuaid:part=2`, `pdfuaid:rev=2024`), sRGB+Gray OutputIntent / Default* ICCBased, structure `/Namespace`, `ListNumbering` on lists, structure destinations on internal links, and full logical structure tree (`L` > `LI` > `LBody` > `Link`) |
+| Complex-script shaping (Indic, Arabic, CJK) | **Type0/CID Identity-H** for BMP Unicode (CJK with a capable face); **Arabic OT** via `go-text/typesetting` when the face has GSUB (+ presentation-form `ShapeText` fallback); Hangul needs a Hangul face. `writing-mode` vertical keywords inherit and rotate glyphs (`RotateDeg == -90`); block/line layout stays horizontal. **Indic Partial** (OT when face/cmap allow; not production-claimed). Optional OT **`halt`/`palt`** for CJK punctuation via `ShapeTextFont` FontFeatures |
+| PDF version (1.4 / 1.7 / 2.0) | **Supported:** PDF 1.4 is default; PDF 1.7 and PDF 2.0 are opt-in via `--pdf-version 1.7` / `--pdf-version 2.0` or library field `Document.PDFVersion`. Emits `%PDF-1.7` (trailer `/ID`, Info with UTF-16BE + BOM strings, non-claiming XMP Metadata stream) or `%PDF-2.0` (trailer `/ID`, UTF-8 document strings, non-claiming XMP with `dc:format`, `pdf:Producer`, dates). PDF 2.0 output is a **version**, not a conformance claim |
+| PDF/A-3a, PDF/UA-1 (ISO 19005-3 / ISO 14289-1) | **Supported:** Opt-in via `--pdf-profile a3a-ua1` / library field `Document.PDFProfile` (`"a3a-ua1"`, `"a3a"`, `"ua1"`). Implies PDF 1.7. Emits claiming XMP metadata (`pdfaid:part=3`, `pdfaid:conformance=A`, `pdfuaid:part=1`), sRGB OutputIntent, `/DefaultRGB`, and full logical structure tree (`H1`..`H6`, `P`, `Table` > `TR` > `TH`/`TD`, `L` > `LI` > `LBody` > `Link`, `Figure` + `alt`, `/Artifact /Pagination`) |
+| PDF 2.0 (ISO 32000-2) | **Shipped as opt-in version** (#32): `--pdf-version 2.0` / `Document.PDFVersion = "2.0"`. Version alone is **not** a PDF/A or PDF/UA claim |
+| PDF/A-4, PDF/UA-2 (PDF 2.0 conformance profiles) | **Supported** (#33): Opt-in via `--pdf-profile a4-ua2` / `Document.PDFProfile` (`"a4-ua2"`, `"a4"`, `"ua2"`). Implies PDF 2.0. Emits claiming XMP (`pdfaid:part=4`, `pdfaid:rev=2020`, `pdfuaid:part=2`, `pdfuaid:rev=2024`), sRGB+Gray OutputIntent / Default* ICCBased, structure `/Namespace`, `ListNumbering` on lists, structure destinations on internal links, and full logical structure tree (`L` > `LI` > `LBody` > `Link`) |
 | PDF encryption, duplex, AcroForm | Out of scope (not in original wkhtmltopdf either) |
 
 ## 6. Security policy (frozen defaults)

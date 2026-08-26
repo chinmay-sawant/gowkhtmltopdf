@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert/prepare"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/load"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
@@ -82,27 +83,24 @@ func TestModeSpecificRequestConstructors(t *testing.T) {
 	t.Parallel()
 
 	global := settings.DefaultPdfGlobal()
-	//nolint:exhaustruct // intentional zero-value fields
-	objects := []settings.PdfObject{
-		{Page: "inline:<html><body>test</body></html>"},
-	}
+	objects := []settings.PdfObject{{ //nolint:exhaustruct // intentional zero-value fields
+		Page: "inline:<html><body>test</body></html>",
+	}}
 
 	pdfReq := NewPDFRequest(global, objects, &bytes.Buffer{}, &bytes.Buffer{})
-	if err := pdfReq.ValidatePDF(); err != nil {
+	if err := pdfReq.Validate(); err != nil {
 		t.Fatalf("PDF request validation: %v", err)
 	}
 
 	var out bytes.Buffer
-	typedReq := &PDFRequest{
-		Global:        global,
-		Objects:       objects,
-		Now:           nil,
-		Output:        &out,
-		OutlineOutput: nil,
+	req := &Request{ //nolint:exhaustruct // intentional zero-value fields
+		Global:  global,
+		Objects: objects,
+		Output:  &out,
 	}
 
-	if err := RunTypedPDF(t.Context(), typedReq, io.Discard, nil); err != nil {
-		t.Fatalf("RunTypedPDF: %v", err)
+	if err := Run(t.Context(), req, io.Discard, nil); err != nil {
+		t.Fatalf("Run: %v", err)
 	}
 }
 
@@ -114,7 +112,7 @@ func TestPrepareDocumentBindsSharedResourceContext(t *testing.T) { //nolint:cycl
 	lineP.InlineBase = "https://example.test/reports/"
 	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero-value fields
 
-	prep, err := PrepareDocument(t.Context(), loader, "ignored", lineP, nil, PrepareOptions{ //nolint:exhaustruct,lll // intentional zero-value fields
+	prep, err := prepare.Document(t.Context(), loader, "ignored", lineP, nil, prepare.Options{ //nolint:exhaustruct,lll // intentional zero-value fields
 		ViewportW:   500,
 		ViewportH:   700,
 		MediaType:   mediaPrint,
@@ -162,8 +160,8 @@ func TestPrepareDocumentPreservesSkipForCallerPolicy(t *testing.T) {
 	lp := settings.DefaultLoadPage()
 	lp.LoadErrorHandling = settings.LoadErrorSkip
 
-	prep, err := PrepareDocument(
-		t.Context(), loader, srv.URL, lp, nil, PrepareOptions{}, //nolint:exhaustruct // intentional zero-value fields
+	prep, err := prepare.Document(
+		t.Context(), loader, srv.URL, lp, nil, prepare.Options{}, //nolint:exhaustruct // intentional zero-value fields
 		io.Discard,
 	)
 	if err != nil {

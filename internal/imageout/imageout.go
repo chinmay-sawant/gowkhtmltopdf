@@ -370,12 +370,6 @@ func rasterizeContext(ctx context.Context, res *layout.Result, height float64, t
 			return nil, fmt.Errorf("imageout: context: %w", err)
 		}
 
-		if overlay, ok := roundedBorderLineOverlay(res.Ops, opIndex); ok {
-			paintStrokeRect(img, &overlay, layout.StyleOf(&overlay), pxPerPt)
-
-			continue
-		}
-
 		paint(img, &res.Ops[opIndex], pxPerPt, atlas, imageCache)
 	}
 
@@ -396,53 +390,6 @@ func rasterizeContext(ctx context.Context, res *layout.Result, height float64, t
 	}
 
 	return downscaled, nil
-}
-
-// roundedBorderLineOverlay identifies a side-specific OpLine emitted beside
-// a rounded base OpStrokeRect. Layout emits the base stroke immediately before
-// its horizontal side line, so checking that predecessor preserves the paint
-// operation contract without scanning the entire operation prefix.
-func roundedBorderLineOverlay(ops []layout.Op, index int) (layout.Op, bool) {
-	if index <= 0 || index >= len(ops) || ops[index].Kind != layout.OpLine || ops[index].W <= 0 || ops[index].H != 0 {
-		return layout.Op{}, false //nolint:exhaustruct // sentinel operation
-	}
-
-	line := ops[index]
-	stroke := ops[index-1]
-
-	if stroke.Kind != layout.OpStrokeRect || stroke.StrokeMask != 0 || !hasRoundedStroke(&stroke) {
-		return layout.Op{}, false //nolint:exhaustruct // sentinel operation
-	}
-
-	radii := scaledRadii(&stroke, 1)
-	if !sameRoundedTopGeometry(line, stroke, radii) {
-		return layout.Op{}, false //nolint:exhaustruct // sentinel operation
-	}
-
-	overlay := stroke
-	overlay.R, overlay.G, overlay.B = line.R, line.G, line.B
-	overlay.Width = line.Width
-	overlay.Alpha = line.Alpha
-	overlay.PaintOpacity = line.PaintOpacity
-	overlay.StrokeMask = layout.StrokeMaskTop
-
-	return overlay, true
-}
-
-func hasRoundedStroke(op *layout.Op) bool {
-	return op.Radius > 0 || op.RadiusTopLeft > 0 || op.RadiusTopRight > 0 ||
-		op.RadiusBottomRight > 0 || op.RadiusBottomLeft > 0
-}
-
-func sameRoundedTopGeometry(line, stroke layout.Op, radii [4]float64) bool {
-	const geometryEpsilon = 0.01
-
-	wantX := stroke.X + radii[0]
-	wantW := stroke.W - radii[0] - radii[1]
-
-	return math.Abs(line.X-wantX) <= geometryEpsilon &&
-		math.Abs(line.Y-stroke.Y) <= geometryEpsilon &&
-		math.Abs(line.W-wantW) <= geometryEpsilon
 }
 
 func rasterDimension(value float64, maxVal int) (int, error) {
@@ -797,7 +744,7 @@ func downscaleBox2(src *image.NRGBA) *image.NRGBA {
 // transparent canvas (Transparent) can show through. FakeBold + stroke width
 // still follow the shared table.
 //
-// Page assembly: prologue already shares convert.CollectSheets +
+// Page assembly: prologue already shares prepare.CollectSheets +
 // MergeFontFaces; multi-page PDF assembly remains convert-specific (P5-02).
 //
 //nolint:cyclop // raster op paint dispatcher
@@ -1599,7 +1546,8 @@ func RunRequest(ctx context.Context, req *Request, log io.Writer) error {
 		return fmt.Errorf("default font: %w", err)
 	}
 
-	registry := fontRegistry(req.Global, log)
+	registry := pdf.RegistryFromGlobal(req.Global)
+	logFontRegistryScan(req.Global, log)
 
 	pipeline := &imagePipeline{ //nolint:exhaustruct // image is populated during RenderObjects
 		req:      req,
@@ -1712,8 +1660,8 @@ func writeEncodedOutput(req *Request, img image.Image, log io.Writer) error {
 	return nil
 }
 
-// prepareImageDocument resolves the media/SimplifyDOM profile and runs
-// PrepareDocument for image mode (single page).
+// prepareImageDocument resolves viewport/media/SimplifyDOM via prepare.BuildOptions
+// and runs prepare.Document for image mode (single page).
 func prepareImageDocument(
 	ctx context.Context,
 	loader *load.Loader,
@@ -1729,15 +1677,6 @@ func prepareImageDocument(
 	}
 
 	media := mediaFor(global, imageSet, obj)
-	enabled := prepare.SimplifyDOMEnabled(imageSet.Web, obj.Web) || global.Web.SimplifyDOM
-
-	profile := prepare.SimplifyDOMProfile(imageSet.Web, obj.Web)
-	if profile == "" {
-		profile = prepare.SimplifyDOMProfile(
-			global.Web,
-			settings.Web{}, //nolint:exhaustruct // intentional zero/partial fields
-		)
-	}
 
 	viewportW := defaultViewportW
 	if imageSet.Width > 0 {
@@ -1749,14 +1688,23 @@ func prepareImageDocument(
 		viewportH = float64(imageSet.Height)
 	}
 
-	prep, err := prepare.Document(ctx, loader, obj.Page, obj.Load, registry, prepare.Options{
-		ViewportW:       viewportW,
-		ViewportH:       viewportH,
-		MediaType:       media,
-		SimplifyDOM:     enabled,
-		SimplifyProfile: profile,
-		ObjectIndex:     1,
-	}, log)
+	prep, err := prepare.Document(
+		ctx,
+		loader,
+		obj.Page,
+		obj.Load,
+		registry,
+		prepare.BuildOptions(
+			viewportW,
+			viewportH,
+			media,
+			1,
+			global.Web,
+			imageSet.Web,
+			obj.Web,
+		),
+		log,
+	)
 	if err != nil {
 		return nil, "", fmt.Errorf("imageout: prepare: %w", err)
 	}
@@ -1801,23 +1749,23 @@ func makeImageFetcher(
 	}
 }
 
-// fontRegistry builds a font registry from Global.FontPaths and system font
-// dirs, logging what was scanned (nil when nothing to scan).
-func fontRegistry(global settings.PdfGlobal, log io.Writer) *pdf.Registry {
+// logFontRegistryScan emits the shared font-path scan notice after
+// pdf.RegistryFromGlobal.
+func logFontRegistryScan(global settings.PdfGlobal, log io.Writer) {
+	if log == nil || log == io.Discard || global.Quiet {
+		return
+	}
+
 	if len(global.FontPaths) == 0 && !global.UseSystemFonts {
-		return nil
+		return
 	}
 
-	if log != nil && log != io.Discard && !global.Quiet {
-		count := len(global.FontPaths)
-		if global.UseSystemFonts {
-			count += len(pdf.DefaultSystemFontDirs())
-		}
-
-		line.Emit(log, line.Info, "scanned %d font path(s)", count)
+	count := len(global.FontPaths)
+	if global.UseSystemFonts {
+		count += len(pdf.DefaultSystemFontDirs())
 	}
 
-	return pdf.RegistryFromPaths(global.FontPaths, global.UseSystemFonts)
+	line.Emit(log, line.Info, "scanned %d font path(s)", count)
 }
 
 // imageLoadGlobal resolves the shared and image-owned load settings before

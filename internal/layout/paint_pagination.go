@@ -1198,52 +1198,6 @@ func lastInFlowChildBottom(boxNode *box) float64 {
 	return bottom
 }
 
-type thumbImgRect struct{ x, y, w, h float64 }
-
-func collectThumbImages(ops []Op) []thumbImgRect {
-	images := make([]thumbImgRect, 0)
-
-	for _, operation := range ops {
-		if operation.Kind == OpImage && operation.W > 8 && operation.H > 8 {
-			images = append(images, thumbImgRect{operation.X, operation.Y, operation.W, operation.H})
-		}
-	}
-
-	return images
-}
-
-func isHairlineUnderImage(paintOp *Op, images []thumbImgRect) bool {
-	if paintOp.Kind != OpLine || paintOp.H != 0 || paintOp.W < 8 || paintOp.Width > 0.55 {
-		return false
-	}
-
-	for _, img := range images {
-		bottom := img.y + img.h
-		if math.Abs(paintOp.Y-bottom) <= 1 && math.Abs(paintOp.X-img.x) <= 2 && math.Abs(paintOp.W-img.w) <= 4 {
-			return true
-		}
-	}
-
-	return false
-}
-
-// stripThumbImageHairlines drops the stray underline-weight rule that lands
-// on the bottom edge of a wiki thumb image (the wrapping file <a> is a link).
-func stripThumbImageHairlines(res *Result) {
-	if res == nil || res.root == nil {
-		return
-	}
-
-	images := collectThumbImages(res.Ops)
-
-	for i := range res.Ops {
-		paintOp := &res.Ops[i]
-		if isHairlineUnderImage(paintOp, images) {
-			paintOp.Kind = opKindNoop
-		}
-	}
-}
-
 //nolint:wsl // border ownership checks are intentionally explicit
 func hasOwnVerticalChrome(ops []Op, boxNode *box) bool {
 	if boxNode == nil || boxNode.style == nil {

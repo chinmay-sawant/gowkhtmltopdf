@@ -193,7 +193,7 @@ func (e *engine) imageMaxWidth(style ResolvedStyle, cssW bool) float64 {
 	return maxW
 }
 
-func (e *engine) buildImage(node *html.Node, sty ResolvedStyle, posX, posY float64) *box {
+func (e *engine) buildImage(node *html.Node, sty ResolvedStyle, posX, posY float64, paint bool) *box {
 	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
 		node: node, style: e.stylePtr(node), kind: "replaced", x: posX, y: posY,
 	}
@@ -211,7 +211,8 @@ func (e *engine) buildImage(node *html.Node, sty ResolvedStyle, posX, posY float
 
 	if thumbImg {
 		// Figure already owns the outer rails; keep the bitmap flush so a
-		// second inset frame does not double the thumb edge.
+		// second inset frame does not double the thumb edge. The bottom
+		// separator is painted when the image is placed on a line.
 		boxNode.w, boxNode.height = size.w, size.h
 	} else {
 		boxNode.w = size.w + padL + padR + borderL + borderR
@@ -219,10 +220,11 @@ func (e *engine) buildImage(node *html.Node, sty ResolvedStyle, posX, posY float
 	}
 
 	// Paint replaced images that are not deferred to the inline line box.
-	// Inline/inline-block <img> is collected by collectInline and painted in
-	// emitLine; block-level and floated images paint here (wiki logo tagline
-	// uses display:block and must stack under the wordmark).
-	e.paintReplacedImage(boxNode, sty, posX, posY, size, thumbImg, borderL, padL, borderT, padT)
+	// collectImageItem passes paint=false so emitInlineImage owns placement
+	// (including display:block thumbs nested in inline <a href>).
+	if paint {
+		e.paintReplacedImage(boxNode, sty, posX, posY, size, thumbImg, borderL, padL, borderT, padT)
+	}
 
 	return boxNode
 }
@@ -267,9 +269,29 @@ func (e *engine) paintReplacedImage(
 		Alt:    alt,
 	})
 
-	if !thumbImg {
-		e.prependChrome(len(e.ops)-1, boxNode, sty, posX, posY, boxNode.w, boxNode.height)
+	if thumbImg {
+		e.emitThumbImageBottomSeparator(sty, posX, posY, size.w, size.h)
+
+		return
 	}
+
+	e.prependChrome(len(e.ops)-1, boxNode, sty, posX, posY, boxNode.w, boxNode.height)
+}
+
+// emitThumbImageBottomSeparator paints the single bottom rule between a
+// collapsed figure thumb bitmap and its caption. Left/right/top belong to the
+// figure frame; emitting them again doubles the rails.
+func (e *engine) emitThumbImageBottomSeparator(sty ResolvedStyle, posX, posY, width, height float64) {
+	bottom := sty.BorderBottom
+	if borderPaint(bottom) <= 0 || bottom.Style == cssDisplayNone {
+		return
+	}
+
+	e.emitBorderLine(
+		posX, posY+height, width, 0,
+		e.scalePt(borderPaint(bottom)), bottom.Style,
+		bottom.Color[0], bottom.Color[1], bottom.Color[2],
+	)
 }
 
 func (e *engine) buildHR(n *html.Node, sty ResolvedStyle, availW, posX, posY float64) *box {

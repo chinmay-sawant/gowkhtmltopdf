@@ -38,9 +38,11 @@ func (e *engine) buildTable(node *html.Node, style ResolvedStyle, availW, posX, 
 		e.scalePt(style.BorderLeft.Width) + e.scalePt(style.BorderRight.Width) +
 		e.scalePt(style.PaddingLeft) + e.scalePt(style.PaddingRight)
 
+	tableHint := e.tableWidthHint(style, availW)
 	colW, tableW := sizeTableColumns(tableColumnEnv{
 		colMin: colMin, colW: colW, colPct: colPct, colAbs: colAbs,
-		chrome: chrome, availW: availW, tableW: e.tableWidthHint(style, availW),
+		chrome: chrome, availW: availW, tableW: tableHint,
+		fixed: style.TableLayout == positionFixed && tableHint >= 0,
 	})
 	tableBox.w = tableW
 

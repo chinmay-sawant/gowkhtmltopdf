@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert/prepare"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/layout"
@@ -27,6 +28,8 @@ const chromeHTML = `<!DOCTYPE html>
     <p>Body paragraph UNIQUEBODY for the print path.</p>
   </main>
 </body></html>`
+
+const mediawikiProfile = "mediawiki"
 
 func TestSimplifyDOMOffKeepsChrome(t *testing.T) {
 	t.Parallel()
@@ -79,9 +82,9 @@ func TestSimplifyDOMMediaWikiProfile(t *testing.T) {
 	cmd, _ := newCommand(t, chromeHTML, filepath.Join(t.TempDir(), "mw.pdf"))
 	cmd.Global.UseCompression = false
 	cmd.Global.Web.SimplifyDOM = true
-	cmd.Global.Web.SimplifyDOMProfile = profileMediaWiki
+	cmd.Global.Web.SimplifyDOMProfile = mediawikiProfile
 	cmd.Objects[0].Web.SimplifyDOM = true
-	cmd.Objects[0].Web.SimplifyDOMProfile = profileMediaWiki
+	cmd.Objects[0].Web.SimplifyDOMProfile = mediawikiProfile
 
 	data := runPDF(t, cmd)
 	if !bytes.Contains(data, []byte("UNIQUEBODY")) {
@@ -98,7 +101,7 @@ func TestSimplifyDOMMediaWikiProfile(t *testing.T) {
 func TestSimplifyChromeCSSParsesAndMatches(t *testing.T) {
 	t.Parallel()
 
-	sheet, err := css.Parse(SimplifyChromeCSS)
+	sheet, err := css.Parse(prepare.SimplifyChromeCSS)
 	if err != nil || sheet == nil {
 		t.Fatalf("parse SimplifyChromeCSS: %v", err)
 	}
@@ -138,17 +141,17 @@ func TestSimplifyChromeCSSParsesAndMatches(t *testing.T) {
 func TestAppendSimplifySheetNoopWhenOff(t *testing.T) {
 	t.Parallel()
 
-	got := AppendSimplifySheet(nil, false, "")
+	got := prepare.AppendSimplifySheet(nil, false, "")
 	if got != nil {
 		t.Fatalf("want nil, got %d sheets", len(got))
 	}
 
-	got = AppendSimplifySheet(nil, true, "")
+	got = prepare.AppendSimplifySheet(nil, true, "")
 	if len(got) != 1 {
 		t.Fatalf("want 1 sheet, got %d", len(got))
 	}
 
-	got = AppendSimplifySheet(nil, true, profileMediaWiki)
+	got = prepare.AppendSimplifySheet(nil, true, mediawikiProfile)
 	if len(got) != 2 {
 		t.Fatalf("want 2 sheets (landmarks+mw), got %d", len(got))
 	}
@@ -157,15 +160,15 @@ func TestAppendSimplifySheetNoopWhenOff(t *testing.T) {
 func TestSimplifyDOMEnabled(t *testing.T) {
 	t.Parallel()
 
-	if SimplifyDOMEnabled(settings.Web{}, settings.Web{}) { //nolint:exhaustruct // intentional zero-value fields
+	if prepare.SimplifyDOMEnabled(settings.Web{}, settings.Web{}) { //nolint:exhaustruct // intentional zero-value fields
 		t.Fatal("default must be off")
 	}
 
-	if !SimplifyDOMEnabled(settings.Web{SimplifyDOM: true}, settings.Web{}) { //nolint:exhaustruct,lll // intentional zero-value fields
+	if !prepare.SimplifyDOMEnabled(settings.Web{SimplifyDOM: true}, settings.Web{}) { //nolint:exhaustruct,lll // intentional zero-value fields
 		t.Fatal("global on")
 	}
 
-	if !SimplifyDOMEnabled(settings.Web{}, settings.Web{ //nolint:exhaustruct // intentional zero-value fields
+	if !prepare.SimplifyDOMEnabled(settings.Web{}, settings.Web{ //nolint:exhaustruct // intentional zero-value fields
 		SimplifyDOM: true,
 	}) {
 		t.Fatal("object on")
@@ -175,20 +178,21 @@ func TestSimplifyDOMEnabled(t *testing.T) {
 func TestSimplifyDOMProfile(t *testing.T) {
 	t.Parallel()
 
-	if SimplifyDOMProfile(settings.Web{}, settings.Web{}) != "" { //nolint:exhaustruct // intentional zero-value fields
+	empty := settings.Web{} //nolint:exhaustruct // intentional zero-value fields
+	if prepare.SimplifyDOMProfile(empty, empty) != "" {
 		t.Fatal("default profile empty")
 	}
 
-	if SimplifyDOMProfile(settings.Web{ //nolint:exhaustruct // intentional zero-value fields
-		SimplifyDOMProfile: profileMediaWiki,
+	if prepare.SimplifyDOMProfile(settings.Web{ //nolint:exhaustruct // intentional zero-value fields
+		SimplifyDOMProfile: mediawikiProfile,
 	}, settings.Web{}, //nolint:exhaustruct // intentional zero-value fields
-	) != profileMediaWiki {
+	) != mediawikiProfile {
 		t.Fatal("global mediawiki")
 	}
 
-	if SimplifyDOMProfile(settings.Web{}, settings.Web{ //nolint:exhaustruct // intentional zero-value fields
+	if prepare.SimplifyDOMProfile(settings.Web{}, settings.Web{ //nolint:exhaustruct // intentional zero-value fields
 		SimplifyDOMProfile: "wiki",
-	}) != profileMediaWiki {
+	}) != mediawikiProfile {
 		t.Fatal("object wiki alias")
 	}
 }

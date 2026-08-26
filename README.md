@@ -21,6 +21,9 @@ rasterization). The product is HTML templates and documents, not Chrome visual p
 CLI grammar are now the supported surface. Opt-in PDF 1.7 / 2.0 and PDF/A +
 PDF/UA profiles. **License:** [MIT](LICENSE).
 
+> **Note on `master`:** `master` tracks active development and may be broken
+> at times. For a stable build, use the [latest tagged release](https://github.com/chinmay-sawant/gowkhtmltopdf/releases).
+
 ## What it is for
 
 | You need… | This project |

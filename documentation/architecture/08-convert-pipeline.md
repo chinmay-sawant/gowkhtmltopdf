@@ -134,14 +134,11 @@ small `Location` projection).
 
 | Symbol | Location | Purpose |
 |--------|----------|---------|
-| `type Request struct` | convert.go:51 | The internal neutral pipeline input: `Global settings.PdfGlobal`, optional `Image *settings.ImageGlobal`, `Objects []settings.PdfObject`, `Now func() time.Time`, `Output io.Writer`, `OutlineOutput io.Writer`. Independent of the CLI parser; adapters build it. |
-| `type PDFRequest` / `type ImageRequest` | request.go:10 / request.go:37 | Internal mode-specific request adapters. `ToRequest()` projects into the shared `Request` union. |
-| `func NewPDFRequest(...)` / `func NewImageRequest(...)` | convert.go:114 / convert.go:125 | Constructors for the union; image settings are copied so the request owns its snapshot. |
-| `func (r *Request) Validate()` | convert.go:137 | Explicit output-sink contract before any loading; canonical `PageSize`; object/copies limits; DumpOutline requires `OutlineOutput`. |
-| `func (r *Request) ValidatePDF()` / `ValidateImage()` | convert.go:172 / 182 | Mode invariants: PDF rejects non-nil `Image` (`ErrUnexpectedImageSettings`); image requires a non-nil `Image`. |
-| `func Run(ctx, req, log, progress)` | convert.go:310 | Full pipeline entry for callers with a writer: validate → loader → font/registry → `runContext` → `render.Run(ctx, &pdfPipeline{run})`. |
+| `type Request struct` | convert.go | PDF pipeline input: `Global settings.PdfGlobal`, `Objects []settings.PdfObject`, `Now func() time.Time`, `Output io.Writer`, `OutlineOutput io.Writer`. Independent of the CLI parser; adapters build it. Image jobs use `imageout.Request` instead. |
+| `func NewPDFRequest(...)` | convert.go | PDF request constructor used by `Document` and `app.BuildPDFRequest`. |
+| `func (r *Request) Validate()` / `ValidatePDF()` | convert.go | Explicit output-sink contract before any loading; canonical `PageSize`; object/copies limits; DumpOutline requires `OutlineOutput`. |
+| `func Run(ctx, req, log, progress)` | convert.go | Full PDF pipeline entry: validate → loader → font/registry → `runContext` → `render.Run(ctx, &pdfPipeline{run})`. |
 | `func app.RunPDF(ctx, cmd, log, progress, outline)` | app/pdf.go | Application-boundary CLI adapter: validates before opening output, builds `Request`, owns document/outline sinks, and calls `convert.Run`. |
-| `func RunTypedPDF(ctx, req, log, progress)` | request.go:74 | Internal typed request entry used by adapters. |
 
 ### 3.2 Execution state
 
@@ -282,13 +279,12 @@ the CLI-independent `convert.Run` seam.
 
 ### 4.3 Image-mode divergence
 
-`api.go` builds a `Request` and calls `imageout.RunRequest(ctx, req, log)`.
-`internal/imageout` reuses the same `prepare` phase
-(`prepare.Document`/`ResourceContext`) and `internal/layout`, but rasterizes
-the display list instead of painting into a `pdf.Document`. `convert` is not
-in the image-mode call path — the shared seam is the `Request` + `prepare`
-package. The `ValidateImage` / `ErrMissingImageSettings` contract documents
-this boundary.
+`Document` / `app.RunImage` build an `imageout.Request` and call
+`imageout.RunRequest(ctx, req, log)`. `internal/imageout` reuses the same
+`prepare` phase (`prepare.Document` / `ResourceContext`) and
+`internal/layout`, but rasterizes the display list instead of painting into
+a `pdf.Document`. `convert` is not in the image-mode call path — the shared
+seam is `prepare` + `render`, not a convert image request type.
 
 ### 4.4 Cross-domain interfaces (the seams)
 
@@ -300,7 +296,7 @@ this boundary.
 | `layout.Options` / `layout.Result` / `layout.PaintContext` / `layout.PaintBandContext` | internal/layout | layout engine | `renderObject`, TOC, HF draw |
 | `outline.Heading` / `outline.BuildTreeBy` / `DumpOutlineXMLBy` | internal/outline | pure tree code | TOC/outline/links/HF section placeholders |
 | `pdf.Document` (paint, ReorderPages, DuplicatePage, Write, Outline) | internal/pdf | PDF writer | all passes |
-| `settings.PdfGlobal` / `PdfObject` / `TableOfContent` / `HeaderFooter` | internal/settings | settings model | every pass (dotted `Get`/`Set` from CLI and API) |
+| `settings.PdfGlobal` / `PdfObject` / `TableOfContent` / `HeaderFooter` | internal/settings | settings model | every pass (dotted `Get`/`Set` from CLI/engine; Document fields are the public overlay) |
 
 ## 5. Cross-package dependencies
 
@@ -363,11 +359,11 @@ Who depends on `convert` (i.e. the callers above the seam):
    is indirection: readers must jump between `pdf_pipeline.go` and
    `render/pipeline.go` to see the full flow.
 
-3. **Neutral `Request` union + type-safe wrappers.** The engine consumes one
-   `Request`; `PDFRequest`/`ImageRequest` give compile-time mode safety to
-   external callers (`request.go`). The union carries the wkhtmltopdf
-   compatibility baggage (a single settings model for both modes), while the
-   wrappers draw hard mode boundaries (ValidatePDF/ValidateImage).
+3. **PDF `Request` + separate image request.** PDF mode consumes
+   `convert.Request` via `NewPDFRequest`. Image mode uses `imageout.Request`
+   and never enters `convert.Run`. Shared prep lives in `prepare`; mode
+   boundaries are package seams, not a validate-image method on the PDF
+   request.
 
 4. **TOC two-pass fixed point instead of a full solver.** Page numbers inside
    TOC entries depend on how many pages the TOC itself occupies. The engine
@@ -491,9 +487,9 @@ constructs, but it is the enforcement point for several security rules:
   missing file, copies collate/non-collate, three-object job, progress/quiet,
   context cancellation, smart-shrinking zoom correctness.
 - **Seam contract tests** (seams_test.go): `Run` requires explicit output and
-  outline sinks; writer errors propagate; `PDFRequest`/`ImageRequest`
-  constructors and `ValidatePDF`/`ValidateImage` invariants; `PrepareDocument`
-  binds the shared resource context.
+  outline sinks; writer errors propagate; `NewPDFRequest` / `ValidatePDF`
+  invariants; `PrepareDocument` binds the shared resource context. Image
+  request validation lives under `internal/imageout`.
 - **Phase-6 behavior tests** (phase6_test.go): text HF, `[page]`/`[frompage]`
   placeholders, section/subsection, TOC, outline on/off, internal link
   destinations, HTML header with per-page placeholders, raw-markup rejection,

@@ -84,3 +84,16 @@ func cloneBytes(src []byte) []byte {
 
 	return dst
 }
+
+func cloneStringMap(source map[string]string) map[string]string {
+	if source == nil {
+		return nil
+	}
+
+	clone := make(map[string]string, len(source))
+	for key, value := range source {
+		clone[key] = value
+	}
+
+	return clone
+}

@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -69,12 +70,138 @@ func TestDocumentAdapterCopiesHTMLAtExecutionBoundary(t *testing.T) {
 
 	source := []byte("<html><body>before</body></html>")
 	document := NewDocument(Page{Source: HTML(source, "")})
+	document.FontPaths = []string{"fonts-a"}
 	source[15] = 'X'
 
-	if err := document.Validate(); err != nil {
-		t.Fatalf("Validate: %v", err)
+	req := document.toPDFRequest(&bytes.Buffer{}, nil, false)
+	document.Pages[0].Source.HTML[0] = 'Z'
+	document.FontPaths[0] = "fonts-b"
+
+	if got := string(req.Objects[0].Load.InlineHTML); got != "<html><body>before</body></html>" {
+		t.Fatalf("request HTML = %q after document mutation", got)
 	}
-	if got := string(document.Pages[0].Source.HTML); got == string(source) {
-		t.Fatal("document source aliases caller bytes")
+	if got := req.Global.FontPaths; len(got) != 1 || got[0] != "fonts-a" {
+		t.Fatalf("request FontPaths = %v after document mutation", got)
 	}
+
+	var output bytes.Buffer
+	if err := document.WritePDF(t.Context(), &output); err != nil {
+		t.Fatalf("WritePDF: %v", err)
+	}
+	if !bytes.HasPrefix(output.Bytes(), []byte("%PDF-")) {
+		t.Fatalf("WritePDF prefix = %q", output.Bytes()[:min(len(output.Bytes()), 8)])
+	}
+}
+
+func TestDocumentValidationErrorsReachOnError(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil context", func(t *testing.T) {
+		t.Parallel()
+
+		var messages []string
+		document := NewDocument(Page{Source: HTML([]byte("<p>ok</p>"), "")})
+		document.OnError = func(message string) { messages = append(messages, message) }
+
+		err := document.WritePDF(nil, &bytes.Buffer{}) //nolint:staticcheck // intentional nil ctx
+		if !errors.Is(err, ErrNilContext) {
+			t.Fatalf("WritePDF(nil ctx) = %v, want ErrNilContext", err)
+		}
+		if len(messages) != 1 || !strings.Contains(messages[0], ErrNilContext.Error()) {
+			t.Fatalf("OnError messages = %v", messages)
+		}
+	})
+
+	t.Run("nil writer", func(t *testing.T) {
+		t.Parallel()
+
+		var messages []string
+		document := NewDocument(Page{Source: HTML([]byte("<p>ok</p>"), "")})
+		document.OnError = func(message string) { messages = append(messages, message) }
+
+		err := document.WritePDF(t.Context(), nil)
+		if !errors.Is(err, ErrMissingPDFOutput) {
+			t.Fatalf("WritePDF(nil writer) = %v, want ErrMissingPDFOutput", err)
+		}
+		if len(messages) != 1 {
+			t.Fatalf("OnError messages = %v", messages)
+		}
+	})
+
+	t.Run("validate failure", func(t *testing.T) {
+		t.Parallel()
+
+		var messages []string
+		document := &Document{
+			Pages:   []Page{{Source: HTML([]byte("<p>ok</p>"), "")}},
+			Copies:  -1,
+			OnError: func(message string) { messages = append(messages, message) },
+		}
+
+		err := document.WritePDF(t.Context(), &bytes.Buffer{})
+		if !errors.Is(err, ErrInvalidPDFCopies) {
+			t.Fatalf("WritePDF(invalid) = %v, want ErrInvalidPDFCopies", err)
+		}
+		if len(messages) != 1 {
+			t.Fatalf("OnError messages = %v", messages)
+		}
+	})
+}
+
+func TestImageDocumentValidationErrorsReachOnError(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil context", func(t *testing.T) {
+		t.Parallel()
+
+		var messages []string
+		document := &ImageDocument{
+			Source:  HTML([]byte("<p>ok</p>"), ""),
+			OnError: func(message string) { messages = append(messages, message) },
+		}
+
+		err := document.WriteImage(nil, &bytes.Buffer{}) //nolint:staticcheck // intentional nil ctx
+		if !errors.Is(err, ErrNilContext) {
+			t.Fatalf("WriteImage(nil ctx) = %v, want ErrNilContext", err)
+		}
+		if len(messages) != 1 || !strings.Contains(messages[0], ErrNilContext.Error()) {
+			t.Fatalf("OnError messages = %v", messages)
+		}
+	})
+
+	t.Run("nil writer", func(t *testing.T) {
+		t.Parallel()
+
+		var messages []string
+		document := &ImageDocument{
+			Source:  HTML([]byte("<p>ok</p>"), ""),
+			OnError: func(message string) { messages = append(messages, message) },
+		}
+
+		err := document.WriteImage(t.Context(), nil)
+		if !errors.Is(err, ErrMissingImageOutput) {
+			t.Fatalf("WriteImage(nil writer) = %v, want ErrMissingImageOutput", err)
+		}
+		if len(messages) != 1 {
+			t.Fatalf("OnError messages = %v", messages)
+		}
+	})
+
+	t.Run("validate failure", func(t *testing.T) {
+		t.Parallel()
+
+		var messages []string
+		document := &ImageDocument{
+			Source:  Content{},
+			OnError: func(message string) { messages = append(messages, message) },
+		}
+
+		err := document.WriteImage(t.Context(), &bytes.Buffer{})
+		if !errors.Is(err, ErrInvalidContent) {
+			t.Fatalf("WriteImage(invalid) = %v, want ErrInvalidContent", err)
+		}
+		if len(messages) != 1 {
+			t.Fatalf("OnError messages = %v", messages)
+		}
+	})
 }

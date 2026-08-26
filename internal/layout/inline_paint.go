@@ -60,7 +60,14 @@ func (e *engine) emitInlineBlock(
 
 func (e *engine) applyInlineImageBorders(item *inlineItem, leftX, top float64) (float64, float64, float64, float64) {
 	imgX, imgY, imgW, imgH := leftX, top, item.w, item.h
-	if item.style == nil || !inlineHasBorder(*item.style) || item.thumbImg {
+	if item.style == nil || !inlineHasBorder(*item.style) {
+		return imgX, imgY, imgW, imgH
+	}
+
+	if item.thumbImg {
+		// Collapsed figure owns L/R/T; only the image/caption separator paints.
+		e.emitThumbImageBottomSeparator(*item.style, leftX, top, item.w, item.h)
+
 		return imgX, imgY, imgW, imgH
 	}
 
@@ -81,7 +88,8 @@ func (e *engine) applyInlineImageBorders(item *inlineItem, leftX, top float64) (
 }
 
 // emitInlineImage places an image (or inline-block) item on the line and
-// returns the updated x cursor.
+// returns the updated x cursor. Replaced content never receives the href
+// force-underline used for text links (that was the thumb hairline source).
 func (e *engine) emitInlineImage(
 	item *inlineItem, leftX, lineY, lineH, baseline, justifyGap float64,
 	gapAfter bool, und *undRun,

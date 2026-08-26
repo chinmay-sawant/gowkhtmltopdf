@@ -63,12 +63,6 @@ type Command struct {
 	// OutputWriter, when non-nil, receives PDF/image bytes directly (library
 	// path). Takes precedence over Output so embedders need no temp files.
 	OutputWriter io.Writer
-	// OutlineWriter receives dump-outline XML when the internal request adapter
-	// is used. A nil writer means discard; application adapters may inject
-	// stdout explicitly without making the parser depend on process globals.
-	OutlineWriter io.Writer
-
-	DumpDefaultTOCXSL bool
 
 	// The fields below are the private CLI document seam. They are resolved to
 	// settings.PdfObject values once parsing is complete; the public Document
@@ -370,17 +364,12 @@ func (c *Command) resolveFree(cur *objectCtx, free []string) error {
 	if c.coverSet {
 		cover := settings.ClonePdfObject(template)
 		cover.Page = c.coverSource
-		cover.IsCover = true
-		cover.IncludeInOutline = false
-		cover.HeaderSet, cover.FooterSet = true, true
-		var emptyHeader settings.HeaderFooter
-		cover.Header, cover.Footer = emptyHeader, emptyHeader
+		settings.StampCover(&cover)
 		c.Objects = append(c.Objects, cover)
 	}
 	if c.tocRequested {
 		toc := settings.DefaultPdfObject()
-		toc.IsTableOfContent = true
-		toc.UseOutline = false
+		settings.StampTOC(&toc)
 		c.Objects = append(c.Objects, toc)
 	}
 

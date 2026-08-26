@@ -127,7 +127,6 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 	// continuation clones.
 	applyStickyPrint(res, contentH)
 	stretchPaginatedChrome(res)
-	stripThumbImageHairlines(res)
 
 	if err := validatePaintPageIndices(res.Ops, contentH); err != nil {
 		return err
@@ -463,7 +462,10 @@ func (p *pagePainter) drawPageOp(paintOp *Op) {
 		name := "I" + strconv.Itoa(p.nextImg)
 		p.nextImg++
 
-		if err := drawImage(p.page, p.child, paintOp, p.pageN, p.contentH, p.opts, name); err != nil && p.err == nil {
+		err := drawImage(
+			p.page, p.child, paintOp, p.pageN, p.contentH, p.opts, p.pageH, name,
+		)
+		if err != nil && p.err == nil {
 			p.err = err
 		}
 	case OpLinkURI, opKindNoop:
@@ -537,12 +539,12 @@ type BandOptions struct {
 	Margins  PaintOptions // MarginLeft/Top used when ContentH > 0
 }
 
-// PaintBand paints ops onto an existing page's content stream. Same dispatch
-// as Paint for fill/stroke/line/text/image (colors, opacity, transforms,
-// embedded fonts, fake-bold policy). Pagination and fixed stamps are skipped;
-// z-sorting uses the shared PaintOrder policy. Link ops are left to the caller
-// (annotations need document context). Returns the first image-embed error, if
-// any.
+// PaintBand paints ops onto an existing page's content stream. Body and HF
+// share one draw* table (radius, StrokeMask, RotateDeg, opacity, transforms,
+// fake-bold). BandOptions only map the canvas origin (or full page margins
+// when ContentH > 0). Pagination and fixed stamps are skipped; z-sorting uses
+// PaintOrder. Link ops are left to the caller (annotations need document
+// context). Returns the first image-embed error, if any.
 func PaintBand(p *pdf.Page, c *pdf.Content, ops []Op, opts BandOptions) error {
 	return PaintBandContext(context.Background(), p, c, ops, opts)
 }
@@ -587,6 +589,27 @@ func PaintBandContext(ctx context.Context, page *pdf.Page, chld *pdf.Content, op
 	return paintBandOps(ctx, page, chld, ops, opts, resName)
 }
 
+// bandPaintGeom maps BandOptions onto the shared canvasToPDF / draw* inputs.
+// When ContentH is unset (HF origin-only bands), OriginX/OriginY become the
+// margin and page-height so PDF_y = OriginY - canvas_y.
+func bandPaintGeom(opts BandOptions, page *pdf.Page) (float64, float64, PaintOptions) {
+	contentH := opts.ContentH
+	if contentH > 0 {
+		pageH := opts.PageH
+		if pageH <= 0 && page != nil {
+			pageH = page.Height()
+		}
+
+		return contentH, pageH, opts.Margins
+	}
+
+	margins := PaintOptions{ //nolint:exhaustruct // origin-only band mapping
+		MarginLeft: opts.OriginX,
+	}
+
+	return 0, opts.OriginY, margins
+}
+
 // paintBandOps dispatches every op onto the band content stream in the same
 // PaintOrder used by the paginated body and raster adapter. Link operations
 // are still skipped here because annotations need document context and are
@@ -596,15 +619,7 @@ func paintBandOps(
 	resName func(*pdf.Font) string,
 ) error {
 	nextImg := 0
-	contentH := opts.ContentH
-
-	pageH := opts.PageH
-	if pageH <= 0 {
-		pageH = page.Height()
-	}
-	// Band mode without full page geometry: map canvas (y down) to PDF using
-	// OriginY as the top edge and OriginX as left origin.
-	useSimple := contentH <= 0
+	contentH, pageH, margins := bandPaintGeom(opts, page)
 
 	var firstErr error
 
@@ -618,7 +633,7 @@ func paintBandOps(
 			continue
 		}
 
-		paintBandOp(chld, page, paintOp, opts, contentH, pageH, useSimple, resName, &nextImg, &firstErr)
+		paintBandOp(chld, page, paintOp, contentH, pageH, margins, resName, &nextImg, &firstErr)
 	}
 
 	return firstErr
@@ -629,16 +644,16 @@ func paintBandOps(
 //
 //nolint:cyclop,wsl // band op opacity, transform and artifact wrapping
 func paintBandOp(
-	chld *pdf.Content, page *pdf.Page, paintOp *Op, opts BandOptions, contentH, pageH float64,
-	useSimple bool, resName func(*pdf.Font) string, nextImg *int, firstErr *error,
+	chld *pdf.Content, page *pdf.Page, paintOp *Op, contentH, pageH float64,
+	margins PaintOptions, resName func(*pdf.Font) string, nextImg *int, firstErr *error,
 ) {
 	needGS := paintOp.XformSet || (paintOp.PaintOpacity > 0 && paintOp.PaintOpacity < 1)
 	if needGS {
 		chld.Save()
 	}
 
-	if paintOp.XformSet && !useSimple {
-		a, b, cc, d, e, f := pdfCTMFromCSS(paintOp.Xform, 0, contentH, opts.Margins, pageH)
+	if paintOp.XformSet {
+		a, b, cc, d, e, f := pdfCTMFromCSS(paintOp.Xform, 0, contentH, margins, pageH)
 		chld.Transform(a, b, cc, d, e, f)
 	}
 
@@ -652,7 +667,7 @@ func paintBandOp(
 		chld.BeginArtifact("Pagination")
 	}
 
-	drawBandOp(chld, page, paintOp, opts, contentH, pageH, useSimple, resName, nextImg, firstErr)
+	drawBandOp(chld, page, paintOp, contentH, pageH, margins, resName, nextImg, firstErr)
 
 	if needArtifact {
 		chld.EndArtifact()
@@ -663,32 +678,25 @@ func paintBandOp(
 	}
 }
 
-// drawBandOp dispatches one band op to the simple band path or the shared
-// draw routines.
+// drawBandOp dispatches one band op through the same draw* routines as body Paint.
 func drawBandOp(
-	chld *pdf.Content, page *pdf.Page, paintOp *Op, opts BandOptions, contentH, pageH float64,
-	useSimple bool, resName func(*pdf.Font) string, nextImg *int, firstErr *error,
+	chld *pdf.Content, page *pdf.Page, paintOp *Op, contentH, pageH float64,
+	margins PaintOptions, resName func(*pdf.Font) string, nextImg *int, firstErr *error,
 ) {
-	if useSimple {
-		recordBandError(firstErr, paintOpBandSimple(chld, page, paintOp, opts, resName(paintOp.Font), nextImg))
-
-		return
-	}
-
 	switch paintOp.Kind {
 	case OpFillRect:
-		drawFill(chld, paintOp, 0, contentH, opts.Margins, pageH)
+		drawFill(chld, paintOp, 0, contentH, margins, pageH)
 	case OpStrokeRect:
-		drawStroke(chld, paintOp, 0, contentH, opts.Margins, pageH)
+		drawStroke(chld, paintOp, 0, contentH, margins, pageH)
 	case OpLine:
-		drawLine(chld, paintOp, 0, contentH, opts.Margins, pageH)
+		drawLine(chld, paintOp, 0, contentH, margins, pageH)
 	case OpText, OpBullet:
-		drawText(chld, paintOp, 0, contentH, opts.Margins, pageH, resName(paintOp.Font))
+		drawText(chld, paintOp, 0, contentH, margins, pageH, resName(paintOp.Font))
 	case OpImage:
 		name := "I" + strconv.Itoa(*nextImg)
 		*nextImg++
 
-		recordBandError(firstErr, drawImage(page, chld, paintOp, 0, contentH, opts.Margins, name))
+		recordBandError(firstErr, drawImage(page, chld, paintOp, 0, contentH, margins, pageH, name))
 	case OpLinkURI, opKindNoop:
 	}
 }
@@ -698,109 +706,6 @@ func recordBandError(firstErr *error, err error) {
 	if err != nil && *firstErr == nil {
 		*firstErr = err
 	}
-}
-
-func paintOpBandSimple(
-	chld *pdf.Content, _ *pdf.Page, paintOp *Op, opts BandOptions, fontName string, nextImg *int,
-) error {
-	posX := opts.OriginX + paintOp.X
-
-	switch paintOp.Kind {
-	case OpFillRect:
-		bandFillRect(chld, opts, paintOp, posX)
-	case OpStrokeRect:
-		bandStrokeRect(chld, opts, paintOp, posX)
-	case OpLine:
-		bandStrokeLine(chld, opts, paintOp, posX)
-	case OpText, OpBullet:
-		bandText(chld, opts, paintOp, posX, fontName)
-
-	case OpImage:
-		return bandImage(chld, opts, paintOp, posX, nextImg)
-	case OpLinkURI, opKindNoop:
-	}
-
-	return nil
-}
-
-func bandFillRect(chld *pdf.Content, opts BandOptions, paintOp *Op, posX float64) {
-	ps := StyleOf(paintOp)
-	y := opts.OriginY - (paintOp.Y + paintOp.H)
-
-	chld.SetFillColor(ps.FillR, ps.FillG, ps.FillB)
-	chld.Rect(posX, y, paintOp.W, paintOp.H)
-	chld.Fill()
-}
-
-func bandStrokeRect(chld *pdf.Content, opts BandOptions, paintOp *Op, posX float64) {
-	y := opts.OriginY - (paintOp.Y + paintOp.H)
-	chld.SetStrokeColor(paintOp.R, paintOp.G, paintOp.B)
-	chld.SetLineWidth(1)
-	chld.Rect(posX, y, paintOp.W, paintOp.H)
-	chld.Stroke()
-}
-
-func bandStrokeLine(chld *pdf.Content, opts BandOptions, paintOp *Op, posX float64) {
-	yEnd := opts.OriginY - paintOp.Y
-	yTwo := opts.OriginY - (paintOp.Y + paintOp.H)
-
-	width := paintOp.Width
-	if width <= 0 {
-		width = 1
-	}
-
-	chld.SetStrokeColor(paintOp.R, paintOp.G, paintOp.B)
-	chld.SetLineWidth(width)
-	chld.MoveTo(posX, yEnd)
-	chld.LineTo(opts.OriginX+paintOp.X+paintOp.W, yTwo)
-	chld.Stroke()
-}
-
-func bandText(chld *pdf.Content, opts BandOptions, paintOp *Op, posX float64, fontName string) {
-	posY := opts.OriginY - paintOp.Y
-	chld.SetFillColor(paintOp.R, paintOp.G, paintOp.B)
-
-	if fontName == "" {
-		fontName = "F0"
-	}
-
-	chld.SetFont(fontName, paintOp.Size)
-	chld.BeginText()
-	chld.TextAt(posX, posY)
-	chld.SetCharSpacing(paintOp.LetterSpacing)
-
-	if FakeBoldFor(paintOp) {
-		chld.SetLineWidth(paintOp.Size * outlineStrokeRatio)
-		chld.TextRenderMode(two)
-	}
-
-	chld.TextShow(transformInlineText(paintOp.Text, paintOp.TextTransform))
-
-	if FakeBoldFor(paintOp) {
-		chld.TextRenderMode(0)
-	}
-
-	chld.EndText()
-}
-
-func bandImage(chld *pdf.Content, opts BandOptions, paintOp *Op, posX float64, nextImg *int) error {
-	name := "I" + strconv.Itoa(*nextImg)
-	*nextImg++
-
-	posY := opts.OriginY - (paintOp.Y + paintOp.H)
-	if paintOp.IsJPEG {
-		if err := chld.AddJPEGImage(name, posX, posY, paintOp.W, paintOp.H, paintOp.Image); err != nil {
-			return fmt.Errorf("layout: band image %s: %w", name, err)
-		}
-
-		return nil
-	}
-
-	if err := chld.AddPNGImage(name, posX, posY, paintOp.W, paintOp.H, paintOp.Image); err != nil {
-		return fmt.Errorf("layout: band image %s: %w", name, err)
-	}
-
-	return nil
 }
 
 func populateLocations(res *Result, contentH float64, opPage []int) {
@@ -1239,9 +1144,10 @@ func drawText(
 }
 
 func drawImage(
-	page *pdf.Page, chld *pdf.Content, paintOp *Op, pageIdx int, contentH float64, opts PaintOptions, name string,
+	_ *pdf.Page, chld *pdf.Content, paintOp *Op, pageIdx int, contentH float64,
+	opts PaintOptions, pageH float64, name string,
 ) error {
-	posX, posY := canvasToPDF(paintOp.X, paintOp.Y+paintOp.H, pageIdx, contentH, opts, page.Height())
+	posX, posY := canvasToPDF(paintOp.X, paintOp.Y+paintOp.H, pageIdx, contentH, opts, pageH)
 
 	if name == "" {
 		name = "I0"

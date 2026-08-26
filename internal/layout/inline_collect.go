@@ -324,7 +324,8 @@ func (e *engine) collectInlineElement(node *html.Node, sty ResolvedStyle, out *[
 
 // collectImageItem flattens an <img> element into one inline item.
 func (e *engine) collectImageItem(node *html.Node, sty ResolvedStyle, out *[]inlineItem) {
-	imgBox := e.buildImage(node, sty, 0, 0)
+	// Measure only: emitInlineImage places the bitmap (and thumb separator).
+	imgBox := e.buildImage(node, sty, 0, 0, false)
 	*out = append(*out, inlineItem{ //nolint:exhaustruct // intentional zero fields
 		img:      true,
 		thumbImg: e.thumbImageInsideFigure(node),

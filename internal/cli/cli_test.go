@@ -39,6 +39,8 @@ func parseImage(t *testing.T, args ...string) *Command {
 	return cmd
 }
 
+const testReportTitle = "Report"
+
 func TestDocumentGrammarBuildsPagesFromPositionalFiles(t *testing.T) {
 	t.Parallel()
 
@@ -62,7 +64,7 @@ func TestDocumentGrammarBuildsPagesFromPositionalFiles(t *testing.T) {
 	if cmd.Global.PageSize != "Letter" || cmd.Global.Orientation != settings.OrientationLandscape {
 		t.Fatalf("geometry = %+v", cmd.Global)
 	}
-	if cmd.Global.Margin.Top != 20 || cmd.Global.Title != "Report" || cmd.Global.OutlineDepth != 2 {
+	if cmd.Global.Margin.Top != 20 || cmd.Global.Title != testReportTitle || cmd.Global.OutlineDepth != 2 {
 		t.Fatalf("global settings = %+v", cmd.Global)
 	}
 	if !cmd.Global.Load.EnableLocalFileAccess || cmd.Objects[0].Load.BlockLocalFileAccess {
@@ -92,19 +94,36 @@ func TestCoverTOCAndBodyOrdering(t *testing.T) {
 		"-o", outPDF,
 		"--toc",
 		"--cover", "cover.html",
+		"--header-left", testReportTitle,
 		"chapter-1.html", "chapter-2.html",
 	)
 	if len(cmd.Objects) != 4 {
 		t.Fatalf("objects = %d, want cover, toc, and two pages: %+v", len(cmd.Objects), cmd.Objects)
 	}
-	if !cmd.Objects[0].IsCover || cmd.Objects[0].Page != "cover.html" {
-		t.Fatalf("cover = %+v", cmd.Objects[0])
+	cover := cmd.Objects[0]
+	if !cover.IsCover || cover.Page != "cover.html" {
+		t.Fatalf("cover = %+v", cover)
 	}
-	if !cmd.Objects[1].IsTableOfContent {
-		t.Fatalf("toc = %+v", cmd.Objects[1])
+	if cover.IncludeInOutline {
+		t.Fatal("cover must be excluded from outline by default")
+	}
+	if !cover.HeaderSet || !cover.FooterSet {
+		t.Fatalf("cover HF override bits = header:%v footer:%v", cover.HeaderSet, cover.FooterSet)
+	}
+	if cover.Header.Left != "" || cover.Header.Center != "" || cover.Header.Right != "" ||
+		cover.Footer.Left != "" || cover.Footer.Center != "" || cover.Footer.Right != "" ||
+		len(cover.Header.Replace) != 0 || len(cover.Footer.Replace) != 0 {
+		t.Fatalf("cover must stamp empty HF (no global inherit): header=%+v footer=%+v", cover.Header, cover.Footer)
+	}
+	toc := cmd.Objects[1]
+	if !toc.IsTableOfContent || toc.UseOutline || toc.IncludeInOutline {
+		t.Fatalf("toc defaults = %+v", toc)
 	}
 	if cmd.Objects[2].Page != "chapter-1.html" || cmd.Objects[3].Page != "chapter-2.html" {
 		t.Fatalf("body pages = %+v", cmd.Objects[2:])
+	}
+	if cmd.Global.Header.Left != testReportTitle {
+		t.Fatalf("global header should remain set for body inherit: %+v", cmd.Global.Header)
 	}
 }
 
@@ -154,7 +173,7 @@ func TestGoFriendlyGlobalFlags(t *testing.T) {
 	cmd := parsePDF(t,
 		"--pdf-version", "1.7",
 		"--pdf-profile", "a3a",
-		"--header-left", "Report",
+		"--header-left", testReportTitle,
 		"--footer-center", "[page]/[topage]",
 		"--font-path", "/fonts/one",
 		"--font-path", "/fonts/two",
@@ -168,7 +187,7 @@ func TestGoFriendlyGlobalFlags(t *testing.T) {
 	if cmd.Global.PdfVersion != "1.7" || cmd.Global.PdfProfile != settings.ProfilePDFA3a {
 		t.Fatalf("pdf settings = %+v", cmd.Global)
 	}
-	if cmd.Global.Header.Left != "Report" || cmd.Global.Footer.Center != "[page]/[topage]" {
+	if cmd.Global.Header.Left != testReportTitle || cmd.Global.Footer.Center != "[page]/[topage]" {
 		t.Fatalf("header/footer = %+v / %+v", cmd.Global.Header, cmd.Global.Footer)
 	}
 	if len(cmd.Global.FontPaths) != 2 || cmd.Global.Outline || !cmd.Global.Grayscale || !cmd.Global.Quiet {
@@ -244,6 +263,9 @@ func TestTerminalActionsAndModeValidation(t *testing.T) {
 	}
 	if _, err := Parse([]string{"--dump-default-toc-xsl", "-o", outPDF, "input.html"}, ModePDF); !errors.Is(err, ErrTerminalConflict) {
 		t.Fatalf("terminal conflict = %v", err)
+	}
+	if _, err := Parse([]string{"--dump-default-toc-xsl", "--dump-outline"}, ModePDF); !errors.Is(err, ErrTerminalConflict) {
+		t.Fatalf("dump-outline conflict = %v", err)
 	}
 	if _, err := Parse([]string{"--dump-default-toc-xsl"}, ModeImage); err == nil {
 		t.Fatal("PDF terminal action accepted in image mode")
