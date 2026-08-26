@@ -36,6 +36,7 @@ testdata/golden/
     generate.py                             # file HTML -> output/python/architecture-diagram.pdf
     generate_inline.py                      # inline HTML Document sample -> output/python/invoice-inline.pdf
     generate_compliance.py                  # architecture -> output/python/pdf-{1.7,2.0}{,-compliance}/
+    generate_samples.py                     # all fixture-*.html bodies -> output/python/ (+ 21/56 compliance)
     test_generate.py                        # path-resolution tests (no shared library required)
   font-examples.html                        # 13 Google Fonts showcase (inline style; fonts not bundled; --font-path driven)
   out/                  # generated PDFs (gitignored)

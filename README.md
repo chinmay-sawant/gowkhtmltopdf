@@ -48,6 +48,8 @@ make build
 ```
 
 Committed samples live in [output/](output/) (`make samples`).
+Python API samples land under [output/python/](output/python/)
+(`make samples-python`; needs `CGO_ENABLED=1`).
 Install, flags, and HTTP URLs: [getting-started.md](documentation/getting-started.md).
 
 ## Documentation

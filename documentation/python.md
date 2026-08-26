@@ -375,19 +375,24 @@ GOWKHTMLTOPDF_BENCH_SIZES=2,10,50 GOWKHTMLTOPDF_BENCH_RUNS=10 make python-benchm
 Python API samples regenerate with:
 
 ```sh
+make samples-python
+# writes output/python/fixture-*.pdf for every golden body fixture
+# writes output/python/pdf-{1.7,2.0}{,-compliance}/ for fixture-21, fixture-56,
+#   and the python_api architecture diagram
+# writes output/python/architecture-diagram.pdf and invoice-inline.pdf
+
 make python-api
-# writes output/python/architecture-diagram.pdf
-# writes output/python/invoice-inline.pdf
-# writes output/python/pdf-{1.7,2.0}{,-compliance}/architecture-diagram.pdf
+# smaller subset: architecture + inline invoice + architecture compliance only
 ```
 
-`generate.py` loads `architecture-diagram.html` the way `testdata/golden/api`
-loads its template. `generate_inline.py` is the usual Python utility shape:
-HTML as bytes in the program, pass page size / margins / flags on `Document`,
-call `.pdf()`, write with `open(..., "wb")`. `generate_compliance.py` repeats
-the architecture template with `pdf_version` / `pdf_profile` into
-`output/python/pdf-{1.7,2.0}{,-compliance}/` (same four-way split as the Go
-`make samples` compliance folders, nested under `python/`).
+`generate_samples.py` is the Python twin of the `make samples` fixture loop:
+each `testdata/golden/fixture-*.html` body becomes
+`output/python/<name>.pdf` through `convert_file_to_pdf`. `generate.py` loads
+`architecture-diagram.html` the way `testdata/golden/api` loads its template.
+`generate_inline.py` is the usual Python utility shape: HTML as bytes, pass
+options on `Document`, call `.pdf()`, write with `open(..., "wb")`.
+`generate_compliance.py` repeats the architecture template with
+`pdf_version` / `pdf_profile`.
 
 Both targets rebuild `dist/libgowkhtmltopdf.so` first (`CGO_ENABLED=1`).
 Numbers and methodology live in [performance.md](performance.md).

@@ -25,6 +25,14 @@ bindings/**/*.dll
 bindings/python/**/*.egg-info/
 *.egg-info/
 
+# make samples-python regenerates corpus PDFs under output/python/. Ignore the
+# bulk fixture-*.pdf set; keep top-level fixture-55 / fixture-56 as committed
+# smoke exceptions (plus architecture-diagram.pdf / invoice-inline.pdf).
+output/python/fixture-*.pdf
+!output/python/fixture-55-*.pdf
+!output/python/fixture-56-*.pdf
+output/python/pdf-*/fixture-*.pdf
+
 # editor / OS noise
 .DS_Store
 *.swp

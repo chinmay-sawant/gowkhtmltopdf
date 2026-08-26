@@ -1,5 +1,4 @@
-.PHONY: test lint lint-frontend build fmt golden golden-update samples screenshots weasyprint clean claim-scan bench bench-engine bench-lib bench-inprocess bench-cli-compare c-shared bindings-clean check-versions python-binding-test python-benchmarks python-api
-
+.PHONY: test lint lint-frontend build fmt golden golden-update samples samples-python screenshots weasyprint clean claim-scan bench bench-engine bench-lib bench-inprocess bench-cli-compare c-shared bindings-clean check-versions python-binding-test python-benchmarks python-api
 # Pure-Go runtime: the standard library plus the allowlisted direct modules
 # below. No cgo, browser, or native converter process is required.
 # Direct third-party requires must stay ⊆ {
@@ -298,3 +297,21 @@ python-api:
 		python3 testdata/golden/python_api/generate_inline.py
 	PYTHONPATH=bindings/python/src \
 		python3 testdata/golden/python_api/generate_compliance.py
+
+# Full Python sample refresh into output/python/: every golden body fixture
+# (skip *-header/*-footer), fixture-21/56 version+profile smokes under
+# output/python/pdf-{1.7,2.0}{,-compliance}/, then the python_api generators
+# (architecture, inline invoice, architecture compliance). Requires
+# CGO_ENABLED=1 for the shared library. Not part of make samples / make test.
+samples-python:
+	python3 testdata/golden/python_api/test_generate.py
+	CGO_ENABLED=1 $(MAKE) c-shared
+	PYTHONPATH=bindings/python/src \
+		python3 testdata/golden/python_api/generate_samples.py
+	PYTHONPATH=bindings/python/src \
+		python3 testdata/golden/python_api/generate.py
+	PYTHONPATH=bindings/python/src \
+		python3 testdata/golden/python_api/generate_inline.py
+	PYTHONPATH=bindings/python/src \
+		python3 testdata/golden/python_api/generate_compliance.py
+	ls -la output/python/ | awk '{print $$5, $$9}' | tail -40
