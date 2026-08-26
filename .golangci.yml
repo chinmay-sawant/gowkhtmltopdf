@@ -29,9 +29,13 @@ issues:
   max-issues-per-linter: 0
   max-same-issues: 0
   # npm install drops a vendored Go file under flatted; never lint that tree.
+  # bindings/c is cgo glue for the Python shared library (Phase 40); its C
+  # interop, unsafe, and struct-mirroring patterns are validated via go vet
+  # + c-shared build + tests, not via enable-all style linters.
   exclude-dirs:
     - node_modules
     - frontend/dist
+    - bindings
 
 output:
   sort-results: true

@@ -31,6 +31,7 @@ and **[fidelity.md](fidelity.md)**.
 | [getting-started.md](getting-started.md) | Install, first PDF/PNG, local files, HTTP URLs, PDF version/profile, tests |
 | [cli.md](cli.md) | `gowkhtmltopdf` / `gowkhtmltoimage` grammar, flags, pitfalls |
 | [library-api.md](library-api.md) | Go API target: `Document` / `ImageDocument`, sources, options, errors |
+| [python.md](python.md) | Python bindings: install, quickstart, security, ABI |
 | [MIGRATION-0.2.4.md](MIGRATION-0.2.4.md) | Migration from the v0.2.3 library and CLI |
 | [fidelity.md](fidelity.md) | Tiers, claims language, degrade rules, Phase 21 URL print |
 | [compatibility-matrix.md](compatibility-matrix.md) | Normative per-element / per-property / per-flag contract |
@@ -55,6 +56,7 @@ and include `file:line` references. Prefer them when changing engine code.
 |----------|---------|
 | [THREAT-MODEL.md](THREAT-MODEL.md) | Trust boundary, local-file ACL, network policy, timeouts |
 | [integration-security.md](integration-security.md) | Gin / HTTP embedding: SSRF, preferred patterns, isolated workers |
+| [python.md](python.md) | Python binding: same ACL and network rules, in-process caller |
 
 ## Comparisons
 

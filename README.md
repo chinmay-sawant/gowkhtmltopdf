@@ -59,6 +59,7 @@ Install, flags, and HTTP URLs: [getting-started.md](documentation/getting-starte
 | [documentation/getting-started.md](documentation/getting-started.md) | Install and first conversion |
 | [documentation/cli.md](documentation/cli.md) | CLI grammar and flags |
 | [documentation/library-api.md](documentation/library-api.md) | Go library API |
+| [documentation/python.md](documentation/python.md) | Python bindings: in-process `pip install gowkhtmltopdf` |
 | [documentation/MIGRATION-0.2.4.md](documentation/MIGRATION-0.2.4.md) | 0.2.3 library/CLI to the 0.2.4 Document API |
 | [documentation/architecture.md](documentation/architecture.md) | Package map and pipeline |
 | [documentation/architecture/README.md](documentation/architecture/README.md) | Deep-dive architecture notes |
@@ -100,6 +101,18 @@ pdfBytes, err := doc.PDF(ctx)
 Local files, TOC/cover fields, network policy, and the migration table:
 [documentation/library-api.md](documentation/library-api.md),
 [documentation/MIGRATION-0.2.4.md](documentation/MIGRATION-0.2.4.md).
+
+Python callers get the same engine in-process through an opt-in shared
+library: [documentation/python.md](documentation/python.md).
+
+```python
+from gowkhtmltopdf import PDFOptions, convert_html_to_pdf
+
+pdf_bytes = convert_html_to_pdf(
+    b"<html><body><h1>Invoice</h1></body></html>",
+    options=PDFOptions(page_size="A4"),
+)
+```
 
 ## Performance
 

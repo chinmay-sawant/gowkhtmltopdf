@@ -1,4 +1,4 @@
-.PHONY: test lint lint-frontend build fmt golden golden-update samples screenshots weasyprint clean claim-scan bench bench-engine bench-lib bench-inprocess bench-cli-compare
+.PHONY: test lint lint-frontend build fmt golden golden-update samples screenshots weasyprint clean claim-scan bench bench-engine bench-lib bench-inprocess bench-cli-compare c-shared bindings-clean check-versions python-binding-test
 
 # Pure-Go runtime: the standard library plus the allowlisted direct modules
 # below. No cgo, browser, or native converter process is required.
@@ -41,6 +41,11 @@ lint-frontend:
 	npm --prefix frontend run lint
 
 CLI_VERSION_LDFLAGS := -X github.com/chinmay-sawant/gowkhtmltopdf/internal/cli.Version=$(shell cat VERSION)
+
+# Stamps the c-shared library (bindings/c) with the repo VERSION. Kept separate
+# from CLI_VERSION_LDFLAGS so the opt-in cgo build never touches the pure-Go
+# default targets.
+BINDINGS_VERSION_LDFLAGS := -X github.com/chinmay-sawant/gowkhtmltopdf/bindings/c.libVersion=$(shell cat VERSION)
 
 build:
 	mkdir -p bin
@@ -243,3 +248,28 @@ bench-cli-compare: build
 
 clean:
 	rm -rf testdata/golden/out
+	rm -rf dist
+
+# --- Python cgo bindings (opt-in only; never part of build/test/golden) -----
+
+# Builds the C ABI shared library for the Python bindings. Requires an
+# explicit CGO_ENABLED=1; the guard refuses to run otherwise so the default
+# pure-Go targets can never drift into a cgo build. Emits dist/libgowkhtmltopdf.so
+# plus the generated header, then smokes exports via nm (grep -c fails on 0).
+c-shared:
+	[ "$(CGO_ENABLED)" = "1" ] || { echo "refusing: c-shared needs CGO_ENABLED=1 (pure-Go default stays CGO_ENABLED=0)" >&2; exit 2; }
+	mkdir -p dist && CGO_ENABLED=1 go build -buildmode=c-shared -ldflags "$(BINDINGS_VERSION_LDFLAGS) -s -w" -o dist/libgowkhtmltopdf.so ./bindings/c && file dist/libgowkhtmltopdf.so && nm -D dist/libgowkhtmltopdf.so | grep -c gowkhtmltopdf_
+
+bindings-clean:
+	rm -rf dist
+
+# VERSION vs bindings/python/pyproject.toml alignment gate (Phase 46).
+check-versions:
+	bash scripts/check_versions.sh
+
+# Convenience: rebuild the shared library, then run the Python stdlib unittest
+# suite against it. Needs a working C toolchain (CGO_ENABLED=1) and python3;
+# the tests load the dist/libgowkhtmltopdf.* artifact produced by c-shared.
+python-binding-test:
+	CGO_ENABLED=1 $(MAKE) c-shared
+	python3 -m unittest discover -s bindings/python/tests -t . -v

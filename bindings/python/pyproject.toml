@@ -1,0 +1,74 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gowkhtmltopdf"
+version = "0.2.4"
+description = "In-process Python bindings for the gowkhtmltopdf HTML-to-PDF engine via a ctypes-loaded c-shared library"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [{ name = "Chinmay Sawant" }]
+keywords = ["html", "pdf", "wkhtmltopdf", "ctypes", "invoice"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Text Processing :: Markup :: HTML",
+    "Topic :: Printing",
+]
+
+[project.urls]
+Homepage = "https://github.com/chinmay-sawant/gowkhtmltopdf"
+Issues = "https://github.com/chinmay-sawant/gowkhtmltopdf/issues"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+zip-safe = false
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+gowkhtmltopdf = ["libgowkhtmltopdf.*", "py.typed"]
+
+# cibuildwheel config (Phase 43). The c-shared Go library is built inside
+# each wheel container and lands next to the Python modules in src/, so
+# auditwheel can vendor it into the manylinux wheel.
+[tool.cibuildwheel]
+build = "cp38-* cp39-* cp310-* cp311-* cp312-* cp313-*"
+archs = "x86_64 aarch64"
+manylinux-x86_64-image = "manylinux_2_28"
+manylinux-aarch64-image = "manylinux_2_28"
+repair-wheel-command = "auditwheel repair --strip -w {dest_dir} {wheel}"
+
+before-build = '''
+set -eux
+ARCH="$(uname -m)"
+case "$ARCH" in
+  x86_64|amd64) GOPLAT=amd64 ;;
+  aarch64|arm64) GOPLAT=arm64 ;;
+  *) echo "unsupported architecture: $ARCH" >&2; exit 1 ;;
+esac
+curl -fsSL "https://go.dev/dl/go1.26.0.linux-${GOPLAT}.tar.gz" -o /tmp/gowk-go.tar.gz
+rm -rf /usr/local/go
+tar -C /usr/local -xzf /tmp/gowk-go.tar.gz
+export PATH="/usr/local/go/bin:$PATH"
+ROOT="$(cd ../.. && pwd)"
+(
+  cd "$ROOT" && CGO_ENABLED=1 go build -buildmode=c-shared \
+    -ldflags "-X github.com/chinmay-sawant/gowkhtmltopdf/bindings/c.libVersion=$(cat VERSION)" \
+    -o bindings/python/src/gowkhtmltopdf/libgowkhtmltopdf.so ./bindings/c
+)
+'''

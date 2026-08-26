@@ -12,6 +12,15 @@ cmd/gowkhtmltoimage/gowkhtmltoimage
 /coverage.html
 testdata/golden/out/
 
+# c-shared / python binding build artifacts (Phase 40.4). The committed
+# vendored header include/gowkhtmltopdf.h stays trackable: no include/*.h
+# rule is added here.
+/dist/
+bindings/c/libgowkhtmltopdf.h
+bindings/**/*.so
+bindings/**/*.dylib
+bindings/**/*.dll
+
 # editor / OS noise
 .DS_Store
 *.swp

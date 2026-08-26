@@ -1,0 +1,150 @@
+name: publish-pypi
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+
+jobs:
+  build-wheels:
+    name: wheels (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            cibw_arch: x86_64
+          - os: ubuntu-22.04
+            cibw_arch: aarch64
+          - os: macos-13
+          - os: macos-14
+          - os: windows-2019
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      # cgo on windows needs a gcc; the choco mingw package shims gcc.exe
+      # onto PATH for later steps.
+      - name: Install mingw (windows)
+        if: runner.os == 'Windows'
+        run: choco install mingw -y --no-progress
+      # aarch64 manylinux wheels build inside an emulated container.
+      - name: Set up QEMU (aarch64 emulation)
+        if: matrix.cibw_arch == 'aarch64'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+      - name: Install cibuildwheel
+        run: python -m pip install "cibuildwheel==2.23.*"
+
+      # BEFORE-BUILD SPLIT (why there are two build steps):
+      # bindings/python/pyproject.toml [tool.cibuildwheel] before-build is
+      # written for LINUX CONTAINERS only: it downloads a Go toolchain inside
+      # the manylinux image and builds libgowkhtmltopdf.so there, then
+      # auditwheel repair vendors it. Ubuntu jobs therefore run cibuildwheel
+      # with no CIBW_BEFORE_BUILD override so the library is built exactly
+      # once per wheel. macos/windows have no container step, so those jobs
+      # point CIBW_BEFORE_BUILD at scripts/build_cshared_for_wheel.sh, which
+      # uses the setup-go toolchain installed above and picks the right
+      # shared-library extension (.dylib / .dll). The empty
+      # CIBW_REPAIR_WHEEL_COMMAND skips repair off linux because the
+      # pyproject-wide auditwheel command does not exist there and the ctypes
+      # loader resolves the library by file path, not by rpath.
+      - name: Build wheels (linux, pyproject before-build)
+        if: runner.os == 'Linux'
+        env:
+          CIBW_ARCHS_LINUX: ${{ matrix.cibw_arch }}
+        run: python -m cibuildwheel bindings/python --output-dir dist
+      - name: Build wheels (macos/windows, host before-build)
+        if: runner.os != 'Linux'
+        env:
+          CIBW_BEFORE_BUILD: bash scripts/build_cshared_for_wheel.sh
+          CIBW_REPAIR_WHEEL_COMMAND: ""
+        run: python -m cibuildwheel bindings/python --output-dir dist
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          # Non-linux matrix entries build their single native arch, so the
+          # fallback label keeps artifact names unique and non-empty.
+          name: wheels-${{ matrix.os }}-${{ matrix.cibw_arch || 'native' }}
+          path: dist/*.whl
+          if-no-files-found: error
+
+  sdist:
+    name: sdist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install build tooling
+        run: python -m pip install build twine
+      - name: Build sdist
+        run: python3 -m build --sdist bindings/python --outdir dist
+      - name: Upload sdist
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  check:
+    name: version gate + twine check
+    needs: [build-wheels, sdist]
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout so scripts/check_versions.sh (a repo file) is available.
+      - uses: actions/checkout@v4
+      - name: Download all artifacts into dist/
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: dist
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install twine
+        run: python -m pip install twine
+      - name: Version gate + twine check
+        run: |
+          bash scripts/check_versions.sh
+          python3 -m twine check --strict dist/*
+          ls -lh dist
+
+  publish:
+    name: publish to PyPI
+    needs: check
+    runs-on: ubuntu-latest
+    environment: pypi
+    # ONE-TIME OPERATOR STEP before the first tag push (Trusted Publishing):
+    # register the project at https://pypi.org/manage/account/publishing -
+    #   PyPI project name: gowkhtmltopdf
+    #   owner:             chinmay-sawant
+    #   repository:        gowkhtmltopdf
+    #   workflow:          publish-pypi.yml
+    #   environment:       pypi
+    # Without that entry PyPI rejects the OIDC token minted by this job.
+    steps:
+      - name: Download all artifacts into dist/
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: dist
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist
+          attestations: true
