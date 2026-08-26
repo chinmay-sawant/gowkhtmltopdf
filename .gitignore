@@ -42,3 +42,5 @@ scripts/bench-external-*.html
 scripts/bench-external-*.pdf
 testdata/golden/benchmarks/.bench-external/
 knowledge-base
+
+__pycache__
