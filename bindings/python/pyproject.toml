@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gowkhtmltopdf"
-version = "0.2.4"
+version = "0.2.5"
 description = "In-process Python bindings for the gowkhtmltopdf HTML-to-PDF engine via a ctypes-loaded c-shared library"
 readme = "README.md"
 requires-python = ">=3.8"

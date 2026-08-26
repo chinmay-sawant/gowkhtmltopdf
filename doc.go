@@ -2,9 +2,9 @@
 // images through a pure-Go, no-cgo engine. It does not start a browser,
 // WebKit, Qt, or a native converter process.
 //
-// # 0.2.4 library
+// # 0.2.5 library
 //
-// The 0.2.4 library models a PDF as a Document and an image render as an
+// The 0.2.5 library models a PDF as a Document and an image render as an
 // ImageDocument. Content identifies exactly one source kind: in-memory HTML,
 // a local file, or an HTTP(S) URL. Document.WritePDF and Document.PDF validate
 // and render a PDF; ImageDocument.WriteImage and ImageDocument.Image do the
@@ -13,7 +13,7 @@
 // The 0.2.4 migration is a hard break: the old root symbols are removed. See
 // documentation/MIGRATION-0.2.4.md when moving an embedder from 0.2.3.
 //
-// # Quick start (0.2.4)
+// # Quick start (0.2.5)
 //
 //	import (
 //		"context"

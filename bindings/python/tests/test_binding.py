@@ -113,7 +113,7 @@ class BindingTest(unittest.TestCase):
         self.assertTrue(png_bytes.startswith(b"\x89PNG\r\n\x1a\n"))
 
     def test_version_and_abi_reported(self):
-        self.assertEqual(gowkhtmltopdf.__version__, "0.2.4")
+        self.assertEqual(gowkhtmltopdf.__version__, "0.2.5")
         self.assertEqual(gowkhtmltopdf.library_version, "0.12.7-dev")
         self.assertEqual(gowkhtmltopdf.abi_version(), 1)
         reported = gowkhtmltopdf.library_version_string()

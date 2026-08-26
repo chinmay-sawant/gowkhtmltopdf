@@ -65,7 +65,7 @@ from .api import (
     convert_url_to_pdf,
 )
 
-__version__ = "0.2.4"
+__version__ = "0.2.5"
 
 #: Upstream settings-surface identifier (api.go LibraryVersion), distinct
 #: from the project release in __version__.
