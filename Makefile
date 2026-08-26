@@ -285,8 +285,9 @@ python-benchmarks:
 		python3 bindings/python/tests/bench_library.py
 
 # Python-API samples under output/python/:
-#   generate.py        -> architecture-diagram.pdf (HTML file on disk)
-#   generate_inline.py -> invoice-inline.pdf (inline HTML bytes + Document options)
+#   generate.py            -> architecture-diagram.pdf (HTML file on disk)
+#   generate_inline.py     -> invoice-inline.pdf (inline HTML + Document options)
+#   generate_compliance.py -> pdf-{1.7,2.0}{,-compliance}/architecture-diagram.pdf
 # Requires the c-shared library.
 python-api:
 	python3 testdata/golden/python_api/test_generate.py
@@ -295,3 +296,5 @@ python-api:
 		python3 testdata/golden/python_api/generate.py
 	PYTHONPATH=bindings/python/src \
 		python3 testdata/golden/python_api/generate_inline.py
+	PYTHONPATH=bindings/python/src \
+		python3 testdata/golden/python_api/generate_compliance.py

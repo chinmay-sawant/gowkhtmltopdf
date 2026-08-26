@@ -376,14 +376,18 @@ Python API samples regenerate with:
 
 ```sh
 make python-api
-# writes output/python/architecture-diagram.pdf  (HTML file on disk)
-# writes output/python/invoice-inline.pdf        (inline HTML + Document options)
+# writes output/python/architecture-diagram.pdf
+# writes output/python/invoice-inline.pdf
+# writes output/python/pdf-{1.7,2.0}{,-compliance}/architecture-diagram.pdf
 ```
 
 `generate.py` loads `architecture-diagram.html` the way `testdata/golden/api`
 loads its template. `generate_inline.py` is the usual Python utility shape:
 HTML as bytes in the program, pass page size / margins / flags on `Document`,
-call `.pdf()`, write with `open(..., "wb")`.
+call `.pdf()`, write with `open(..., "wb")`. `generate_compliance.py` repeats
+the architecture template with `pdf_version` / `pdf_profile` into
+`output/python/pdf-{1.7,2.0}{,-compliance}/` (same four-way split as the Go
+`make samples` compliance folders, nested under `python/`).
 
 Both targets rebuild `dist/libgowkhtmltopdf.so` first (`CGO_ENABLED=1`).
 Numbers and methodology live in [performance.md](performance.md).
