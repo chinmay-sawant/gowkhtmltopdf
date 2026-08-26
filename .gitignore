@@ -57,3 +57,5 @@ knowledge-base
 
 __pycache__/
 bindings/python/**/__pycache__/
+
+.vscode
