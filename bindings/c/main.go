@@ -11,8 +11,8 @@ import (
 )
 
 // libVersion is reported by gowkhtmltopdf_version. Release builds stamp it
-// via -ldflags "-X github.com/chinmay-sawant/gowkhtmltopdf/bindings/c.libVersion=$(cat VERSION)"
-// (the Makefile BINDINGS_VERSION_LDFLAGS value).
+// via -ldflags "-X main.libVersion=$(cat VERSION)"
+// (the Makefile BINDINGS_VERSION_LDFLAGS value; bindings/c is package main).
 //
 //nolint:gochecknoglobals // ldflags injection target shared by both build modes
 var libVersion = "dev"

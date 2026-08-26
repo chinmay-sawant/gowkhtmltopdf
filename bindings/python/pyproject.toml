@@ -68,7 +68,7 @@ export PATH="/usr/local/go/bin:$PATH"
 ROOT="$(cd ../.. && pwd)"
 (
   cd "$ROOT" && CGO_ENABLED=1 go build -buildmode=c-shared \
-    -ldflags "-X github.com/chinmay-sawant/gowkhtmltopdf/bindings/c.libVersion=$(cat VERSION)" \
+    -ldflags "-X main.libVersion=$(cat VERSION)" \
     -o bindings/python/src/gowkhtmltopdf/libgowkhtmltopdf.so ./bindings/c
 )
 '''

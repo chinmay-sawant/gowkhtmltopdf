@@ -18,7 +18,7 @@ esac
 mkdir -p "$OUT_DIR"
 cd "$ROOT"
 CGO_ENABLED=1 go build -buildmode=c-shared \
-	-ldflags "-X github.com/chinmay-sawant/gowkhtmltopdf/bindings/c.libVersion=$(cat VERSION) -s -w" \
+	-ldflags "-X main.libVersion=$(cat VERSION) -s -w" \
 	-o "$OUT_DIR/libgowkhtmltopdf$EXT" ./bindings/c
 
 echo "built $OUT_DIR/libgowkhtmltopdf$EXT"

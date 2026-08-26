@@ -44,8 +44,8 @@ CLI_VERSION_LDFLAGS := -X github.com/chinmay-sawant/gowkhtmltopdf/internal/cli.V
 
 # Stamps the c-shared library (bindings/c) with the repo VERSION. Kept separate
 # from CLI_VERSION_LDFLAGS so the opt-in cgo build never touches the pure-Go
-# default targets.
-BINDINGS_VERSION_LDFLAGS := -X github.com/chinmay-sawant/gowkhtmltopdf/bindings/c.libVersion=$(shell cat VERSION)
+# default targets. bindings/c is package main, so X must target main.libVersion.
+BINDINGS_VERSION_LDFLAGS := -X main.libVersion=$(shell cat VERSION)
 
 build:
 	mkdir -p bin
