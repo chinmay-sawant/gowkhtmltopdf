@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -48,7 +48,10 @@ gowkhtmltopdf = ["libgowkhtmltopdf.*", "py.typed"]
 # inside the manylinux container via before-build; macOS/Windows override
 # CIBW_BEFORE_BUILD in publish-pypi.yml to scripts/build_cshared_for_wheel.sh.
 [tool.cibuildwheel]
-build = "cp38-* cp39-* cp310-* cp311-* cp312-* cp313-*"
+# Wheels are tagged py3-none-<plat> (ctypes-loaded native lib, not a CPython
+# extension), so one CPython build per platform is enough for requires-python
+# >=3.8. Building cp38..cp313 would only overwrite the same tag repeatedly.
+build = "cp311-*"
 
 [tool.cibuildwheel.linux]
 # Per-job CIBW_ARCHS_LINUX in the workflow selects x86_64 or aarch64.

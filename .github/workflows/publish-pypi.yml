@@ -66,6 +66,8 @@ jobs:
         env:
           CIBW_BEFORE_BUILD: bash scripts/build_cshared_for_wheel.sh
           CIBW_REPAIR_WHEEL_COMMAND: ""
+          # Default Windows matrix otherwise picks win32; we only ship amd64.
+          CIBW_ARCHS_WINDOWS: AMD64
         run: python -m cibuildwheel bindings/python --output-dir dist
 
       - name: Upload wheels
@@ -122,6 +124,9 @@ jobs:
   publish:
     name: publish to PyPI
     needs: check
+    # Tag pushes only. workflow_dispatch builds + checks wheels without
+    # publishing, so we can validate cibuildwheel before cutting v*.
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     environment: pypi
     # ONE-TIME OPERATOR STEP before the first tag push (Trusted Publishing):
