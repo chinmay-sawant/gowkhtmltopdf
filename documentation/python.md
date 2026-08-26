@@ -359,6 +359,30 @@ The sdist carries the Go sources and the contract header, so any platform
 with Go and a C toolchain can rebuild the library locally using the commands
 above.
 
+## Benchmarks and architecture sample
+
+The public Python library matrix uses the same dirty report template as
+`make bench-lib` (`testdata/golden/benchmarks/templates/report.html.tmpl`,
+20 invoice rows per page). Template expansion is outside the timer;
+`Document.pdf()` and `ImageDocument.image()` stay inside it.
+
+```sh
+make python-benchmarks
+# optional:
+GOWKHTMLTOPDF_BENCH_SIZES=2,10,50 GOWKHTMLTOPDF_BENCH_RUNS=10 make python-benchmarks
+```
+
+The five-page Python architecture diagram (Python-syntax twin of
+`testdata/golden/api`) regenerates with:
+
+```sh
+make python-api
+# writes output/python/architecture-diagram.pdf
+```
+
+Both targets rebuild `dist/libgowkhtmltopdf.so` first (`CGO_ENABLED=1`).
+Numbers and methodology live in [performance.md](performance.md).
+
 ## Troubleshooting
 
 | Symptom | Fix |

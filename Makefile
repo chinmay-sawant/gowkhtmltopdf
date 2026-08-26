@@ -1,4 +1,4 @@
-.PHONY: test lint lint-frontend build fmt golden golden-update samples screenshots weasyprint clean claim-scan bench bench-engine bench-lib bench-inprocess bench-cli-compare c-shared bindings-clean check-versions python-binding-test
+.PHONY: test lint lint-frontend build fmt golden golden-update samples screenshots weasyprint clean claim-scan bench bench-engine bench-lib bench-inprocess bench-cli-compare c-shared bindings-clean check-versions python-binding-test python-benchmarks python-api
 
 # Pure-Go runtime: the standard library plus the allowlisted direct modules
 # below. No cgo, browser, or native converter process is required.
@@ -273,3 +273,22 @@ check-versions:
 python-binding-test:
 	CGO_ENABLED=1 $(MAKE) c-shared
 	python3 -m unittest discover -s bindings/python/tests -t . -v
+
+# Public Python API library matrix. Same dirty report.html.tmpl fixture as
+# `make bench-lib` (20 invoice rows per requested page). Template expansion
+# happens before the timer; Document.pdf / ImageDocument.image stay inside
+# the timed calls. Rebuilds the c-shared library first. Optional overrides:
+# GOWKHTMLTOPDF_BENCH_SIZES=2,10,50 GOWKHTMLTOPDF_BENCH_RUNS=10
+python-benchmarks:
+	CGO_ENABLED=1 $(MAKE) c-shared
+	PYTHONPATH=bindings/python/src \
+		python3 bindings/python/tests/bench_library.py
+
+# Python-API architecture diagram -> output/python/architecture-diagram.pdf.
+# Mirrors `go run ./testdata/golden/api` but drives the python_api template
+# through Document.pdf(). Requires the c-shared library.
+python-api:
+	python3 testdata/golden/python_api/test_generate.py
+	CGO_ENABLED=1 $(MAKE) c-shared
+	PYTHONPATH=bindings/python/src \
+		python3 testdata/golden/python_api/generate.py

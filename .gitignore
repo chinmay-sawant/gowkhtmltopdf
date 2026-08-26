@@ -21,6 +21,10 @@ bindings/**/*.so
 bindings/**/*.dylib
 bindings/**/*.dll
 
+# Python packaging / editable-install noise (pip install -e bindings/python)
+bindings/python/**/*.egg-info/
+*.egg-info/
+
 # editor / OS noise
 .DS_Store
 *.swp
@@ -43,4 +47,5 @@ scripts/bench-external-*.pdf
 testdata/golden/benchmarks/.bench-external/
 knowledge-base
 
-__pycache__
+__pycache__/
+bindings/python/**/__pycache__/

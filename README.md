@@ -157,7 +157,16 @@ make bench-cli-compare
 make bench
 make bench-engine
 make bench-lib
+make python-benchmarks
 ```
+
+`make python-benchmarks` rebuilds `dist/libgowkhtmltopdf.so` (`CGO_ENABLED=1`)
+and times the in-process Python `Document.pdf()` / `ImageDocument.image()`
+path on the same `report.html.tmpl` fixture (20 invoice rows per page) that
+`make bench-lib` uses. Override sizes with
+`GOWKHTMLTOPDF_BENCH_SIZES=2,10,50`. The Python architecture sample is
+`make python-api` (`testdata/golden/python_api` ->
+`output/python/architecture-diagram.pdf`).
 
 ## Development
 
