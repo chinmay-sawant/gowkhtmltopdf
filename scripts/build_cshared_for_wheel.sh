@@ -1,13 +1,18 @@
 #!/bin/sh
 # Builds the c-shared Go library into the Python source tree for cibuildwheel
 # runs OUTSIDE linux containers (macos and windows hosts). The linux wheels
-# keep using the [tool.cibuildwheel] before-build in
-# bindings/python/pyproject.toml, which downloads Go inside the manylinux
-# image; this script covers the hosts where that container path does not run.
+# keep using [tool.cibuildwheel.linux] before-build in
+# bindings/python/pyproject.toml (uses {project} as the repo root and
+# downloads Go inside the manylinux image). This script covers hosts where
+# that container path does not run.
 set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 OUT_DIR="$ROOT/bindings/python/src/gowkhtmltopdf"
+
+test -f "$ROOT/VERSION"
+test -f "$ROOT/go.mod"
+test -d "$ROOT/bindings/c"
 
 case "$(uname -s)" in
 	Darwin) EXT=.dylib ;;
