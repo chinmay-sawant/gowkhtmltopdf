@@ -22,7 +22,7 @@ Default output is still **unclaimed PDF 1.4**. `--pdf-version` / `Document.PDFVe
 | **C ABI** | Frozen header `bindings/c/include/gowkhtmltopdf.h`: `GOWKHTMLTOPDF_ABI_VERSION 1`, size-gated option structs, status codes 0-6, `gowkhtmltopdf_html_to_pdf` / `html_to_image` + free helpers. |
 | **c-shared build** | Opt-in only: `CGO_ENABLED=1 make c-shared` writes `dist/libgowkhtmltopdf.so` (or `.dylib` / `.dll`). Pure-Go `make build` / `make test` stay `CGO_ENABLED=0`. |
 | **Python package** | `pip install gowkhtmltopdf`: `Document` / `ImageDocument` snake_case parity, `convert_html_to_pdf` / `convert_file_to_pdf` / `convert_html_to_image`, typed errors, zero runtime deps (`ctypes`). |
-| **Wheels** | `manylinux_2_28` x86_64 + aarch64 first; macOS / Windows via the publish workflow. Tag `v*` triggers Trusted Publishing. |
+| **Wheels** | `manylinux_2_28` x86_64 + aarch64; macOS arm64 (`macos-latest`); Windows. Tag `v*` triggers Trusted Publishing. |
 | **Samples** | `make samples-python` regenerates `output/python/`; `make python-api` for architecture / inline / compliance; `make python-benchmarks` on the same dirty report template as `make bench-lib`. |
 | **Version stamp** | `VERSION` / `internal/cli.Version` / Python package / header macro **0.2.5**. Dated `CHANGELOG` **0.2.5 (2026-08-26)**. |
 

@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   build-wheels:
-    name: wheels (${{ matrix.os }})
+    name: wheels (${{ matrix.os }}${{ matrix.cibw_arch && format(' {0}', matrix.cibw_arch) || '' }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -23,9 +23,9 @@ jobs:
             cibw_arch: x86_64
           - os: ubuntu-22.04
             cibw_arch: aarch64
-          - os: macos-13
-          - os: macos-14
-          - os: windows-2019
+          # One latest macOS runner (Apple Silicon). Ships arm64 wheels.
+          - os: macos-latest
+          - os: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -48,19 +48,14 @@ jobs:
       - name: Install cibuildwheel
         run: python -m pip install "cibuildwheel==2.23.*"
 
-      # BEFORE-BUILD SPLIT (why there are two build steps):
-      # bindings/python/pyproject.toml [tool.cibuildwheel] before-build is
-      # written for LINUX CONTAINERS only: it downloads a Go toolchain inside
-      # the manylinux image and builds libgowkhtmltopdf.so there, then
-      # auditwheel repair vendors it. Ubuntu jobs therefore run cibuildwheel
-      # with no CIBW_BEFORE_BUILD override so the library is built exactly
-      # once per wheel. macos/windows have no container step, so those jobs
-      # point CIBW_BEFORE_BUILD at scripts/build_cshared_for_wheel.sh, which
-      # uses the setup-go toolchain installed above and picks the right
-      # shared-library extension (.dylib / .dll). The empty
-      # CIBW_REPAIR_WHEEL_COMMAND skips repair off linux because the
-      # pyproject-wide auditwheel command does not exist there and the ctypes
-      # loader resolves the library by file path, not by rpath.
+      # BEFORE-BUILD SPLIT:
+      # Linux uses [tool.cibuildwheel.linux] before-build in
+      # bindings/python/pyproject.toml: downloads Go inside the manylinux
+      # image and builds libgowkhtmltopdf.so with {project} as the repo root,
+      # then auditwheel repair vendors it. macOS/Windows have no container
+      # step, so those jobs set CIBW_BEFORE_BUILD to
+      # scripts/build_cshared_for_wheel.sh (host Go from setup-go). Empty
+      # CIBW_REPAIR_WHEEL_COMMAND skips auditwheel off linux.
       - name: Build wheels (linux, pyproject before-build)
         if: runner.os == 'Linux'
         env:

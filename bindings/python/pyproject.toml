@@ -43,16 +43,20 @@ where = ["src"]
 [tool.setuptools.package-data]
 gowkhtmltopdf = ["libgowkhtmltopdf.*", "py.typed"]
 
-# cibuildwheel config (Phase 43). The c-shared Go library is built inside
-# each wheel container and lands next to the Python modules in src/, so
-# auditwheel can vendor it into the manylinux wheel.
+# cibuildwheel (Phase 43). Archs are per-platform: never set a global archs
+# list (macOS rejects Linux's aarch64 name). Linux builds the c-shared library
+# inside the manylinux container via before-build; macOS/Windows override
+# CIBW_BEFORE_BUILD in publish-pypi.yml to scripts/build_cshared_for_wheel.sh.
 [tool.cibuildwheel]
 build = "cp38-* cp39-* cp310-* cp311-* cp312-* cp313-*"
-archs = "x86_64 aarch64"
+
+[tool.cibuildwheel.linux]
+# Per-job CIBW_ARCHS_LINUX in the workflow selects x86_64 or aarch64.
 manylinux-x86_64-image = "manylinux_2_28"
 manylinux-aarch64-image = "manylinux_2_28"
 repair-wheel-command = "auditwheel repair --strip -w {dest_dir} {wheel}"
-
+# {project} is the repo root (cwd where cibuildwheel was invoked). Relative
+# ../.. from the package cwd is wrong and can resolve to /.
 before-build = '''
 set -eux
 ARCH="$(uname -m)"
@@ -65,10 +69,24 @@ curl -fsSL "https://go.dev/dl/go1.26.0.linux-${GOPLAT}.tar.gz" -o /tmp/gowk-go.t
 rm -rf /usr/local/go
 tar -C /usr/local -xzf /tmp/gowk-go.tar.gz
 export PATH="/usr/local/go/bin:$PATH"
-ROOT="$(cd ../.. && pwd)"
+ROOT="{project}"
+test -f "$ROOT/VERSION"
+test -f "$ROOT/go.mod"
+test -d "$ROOT/bindings/c"
+OUT="$ROOT/bindings/python/src/gowkhtmltopdf/libgowkhtmltopdf.so"
+mkdir -p "$(dirname "$OUT")"
 (
   cd "$ROOT" && CGO_ENABLED=1 go build -buildmode=c-shared \
-    -ldflags "-X main.libVersion=$(cat VERSION)" \
-    -o bindings/python/src/gowkhtmltopdf/libgowkhtmltopdf.so ./bindings/c
+    -ldflags "-X main.libVersion=$(cat VERSION) -s -w" \
+    -o "$OUT" ./bindings/c
 )
+test -f "$OUT"
 '''
+
+[tool.cibuildwheel.macos]
+# Native arch on macos-latest (Apple Silicon). Workflow sets
+# CIBW_BEFORE_BUILD=bash scripts/build_cshared_for_wheel.sh.
+archs = "arm64"
+
+[tool.cibuildwheel.windows]
+# Workflow sets CIBW_BEFORE_BUILD for the host Go + mingw build.

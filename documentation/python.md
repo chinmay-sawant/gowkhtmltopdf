@@ -25,9 +25,10 @@ Two facts frame everything else on this page:
 pip install gowkhtmltopdf
 ```
 
-Linux x86_64 wheels (`manylinux_2_28`) ship first. macOS and Windows wheels
-follow on later releases (built by the `publish-pypi.yml` workflow). If no
-wheel matches your platform yet, install the sdist after building the shared
+Linux x86_64 and aarch64 wheels (`manylinux_2_28`), macOS arm64
+(`macos-latest`), and Windows wheels are built by the `publish-pypi.yml`
+workflow on each `v*` tag. If no wheel matches your platform yet, install the
+sdist after building the shared
 library yourself: see [Build the shared library yourself](#build-the-shared-library-yourself).
 
 From a repo checkout:
@@ -351,9 +352,9 @@ Wheels come from the repo's `publish-pypi.yml` workflow:
 | Platform | Availability |
 |----------|--------------|
 | Linux x86_64, `manylinux_2_28` | Day 1 |
-| Linux aarch64 | Follows |
-| macOS 13+ / 14+, x86_64 / arm64 | Follows |
-| Windows x86_64 | Follows |
+| Linux aarch64 (`manylinux_2_28`) | Tag `v*` wheels |
+| macOS arm64 (`macos-latest`) | Tag `v*` wheels |
+| Windows x86_64 | Tag `v*` wheels |
 
 The sdist carries the Go sources and the contract header, so any platform
 with Go and a C toolchain can rebuild the library locally using the commands
