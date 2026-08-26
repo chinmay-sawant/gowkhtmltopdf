@@ -146,6 +146,23 @@ read an HTML file from disk.
 make bench-lib
 ```
 
+### Python public API (`make python-benchmarks`)
+
+Same fixture family as `make bench-lib` (`testdata/golden/benchmarks/templates/report.html.tmpl`,
+20 invoice rows per page), timed through the in-process Python binding
+(`Document.pdf()` / `ImageDocument.image()` via `ctypes`). Rebuilds
+`dist/libgowkhtmltopdf.so` first. Not part of `make test`.
+
+```sh
+make python-benchmarks
+# optional matrix override:
+GOWKHTMLTOPDF_BENCH_SIZES=2,10,50 GOWKHTMLTOPDF_BENCH_RUNS=10 make python-benchmarks
+```
+
+The Go public-library 2-page row is about **3.8 ms** on the 2026-08-19
+snapshot (`make bench-lib`). Use `make python-benchmarks` on the same host
+to measure the Python ctypes path against that baseline.
+
 ---
 
 ## Phase 9.3 gate (historical timings)

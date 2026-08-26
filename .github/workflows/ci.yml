@@ -63,6 +63,28 @@ jobs:
           echo "binary:       ${got}"
           test -n "${got}"
           test "${got}" = "${want}"
+      - name: Purity guard (cgo only allowed in bindings/c)
+        # Phase 40.4 drift guard: under CGO_ENABLED=0 no package may carry
+        # CgoFiles except the opt-in bindings/c facade.
+        run: |
+          set -euo pipefail
+          offenders=$(CGO_ENABLED=0 go list -json ./... \
+            | jq -r 'select(.CgoFiles and (.CgoFiles|length>0)) | .ImportPath')
+          status=0
+          while IFS= read -r pkg; do
+            [ -z "${pkg}" ] && continue
+            case "${pkg}" in
+              github.com/chinmay-sawant/gowkhtmltopdf/bindings/c) ;;
+              *)
+                echo "purity guard: cgo files outside bindings/c: ${pkg}" >&2
+                status=1
+                ;;
+            esac
+          done <<< "${offenders}"
+          if [ "${status}" -eq 0 ]; then
+            echo "purity guard ok: cgo confined to bindings/c"
+          fi
+          exit "${status}"
 
   race:
     name: race (hot packages)
@@ -96,3 +118,67 @@ jobs:
             git status --porcelain -- docs frontend/dist
             exit 1
           fi
+
+  # --- Phases 40.5 / 44.4: opt-in cgo CI. These jobs never feed back into
+  # the pure-Go default targets above; CGO_ENABLED=1 is set per step only.
+  build-shared:
+    name: c-shared build (CGO_ENABLED=1)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache: true
+      - name: Build c-shared library
+        env:
+          CGO_ENABLED: "1"
+        run: make c-shared
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify ABI and version stamp via ctypes
+        # Loads dist/libgowkhtmltopdf.so out-of-process from Python and pins
+        # the frozen contract: gowkhtmltopdf_abi_version() == 1 and
+        # gowkhtmltopdf_version() == trimmed VERSION file contents.
+        run: |
+          python3 - <<'PY'
+          import ctypes
+          import pathlib
+
+          lib = ctypes.CDLL("dist/libgowkhtmltopdf.so")
+          lib.gowkhtmltopdf_abi_version.argtypes = []
+          lib.gowkhtmltopdf_abi_version.restype = ctypes.c_int32
+          lib.gowkhtmltopdf_version.argtypes = []
+          lib.gowkhtmltopdf_version.restype = ctypes.c_char_p
+
+          abi = lib.gowkhtmltopdf_abi_version()
+          got = lib.gowkhtmltopdf_version().decode("utf-8")
+          want = pathlib.Path("VERSION").read_text().strip()
+
+          assert abi == 1, f"abi_version() = {abi}, want 1"
+          assert got == want, f"version() = {got!r}, want {want!r}"
+          print(f"c-shared ok: abi={abi} version={got}")
+          PY
+
+  python-binding:
+    name: python binding suite
+    needs: build-shared
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Build c-shared library
+        env:
+          CGO_ENABLED: "1"
+        run: make c-shared
+      - name: Install python binding (editable)
+        run: pip install -e ./bindings/python
+      - name: Run unittest suite
+        run: python3 -m unittest discover -s bindings/python/tests -t . -v

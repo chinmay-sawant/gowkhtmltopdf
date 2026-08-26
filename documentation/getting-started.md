@@ -176,6 +176,11 @@ not from the HTML `<title>` (`<title>` feeds `[doctitle]` only).
 
 Module path is `github.com/chinmay-sawant/gowkhtmltopdf`.
 
+> **Python user?** The same engine runs in-process from Python through an
+> opt-in shared library (`pip install gowkhtmltopdf`). Install steps,
+> quickstart snippets, the security rules, and the ABI promise are in
+> [python.md](python.md).
+
 ```go
 doc := gowkhtmltopdf.Document{
 	Pages: []gowkhtmltopdf.Page{{Source: gowkhtmltopdf.Content{

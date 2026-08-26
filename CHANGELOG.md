@@ -4,6 +4,20 @@ All notable changes to gowkhtmltopdf are recorded here. This project follows
 semantic versioning; `VERSION` holds the current release and is stamped into
 binaries at build time (see README "Versioning").
 
+## 0.2.5 (2026-08-26)
+
+### Added
+
+- **Python bindings (in-process, [#35](https://github.com/chinmay-sawant/gowkhtmltopdf/issues/35)):** new `bindings/c` frozen C ABI v1 (`GOWKHTMLTOPDF_VERSION 0.2.5`, `GOWKHTMLTOPDF_ABI_VERSION 1`, 7 status codes, `abi_version`+`struct_size` gate, borrowed inputs, `malloc`/`free` ownership) and `bindings/c/include/gowkhtmltopdf.h` as committed header. `CGO_ENABLED=1 -buildmode=c-shared` exports `gowkhtmltopdf_html_to_pdf` / `html_to_image` over `Document.WritePDF` / `ImageDocument.WriteImage` with timeout/context.
+- **Python package `gowkhtmltopdf` on PyPI:** `bindings/python` (`pyproject.toml`, `src` layout, `setup.py` `VERSION` shim, `py.typed`, zero runtime deps, `requires-python >=3.8`) with `ctypes` loader (`_lib.py` search `GOWKHTMLTOPDF_LIBRARY_PATH` then wheel then `dist/`, `RTLD_LOCAL`, pinned `argtypes`, `ABI_VERSION` check, keepalive, `GIL` released during render), `Document`/`ImageDocument` snake_case parity plus `PDFOptions`/`ImageOptions`, `convert_html_to_pdf` / `convert_file_to_pdf` (file parent `file://` base for linked CSS) / `convert_html_to_image`, and typed errors with sentinels. `make c-shared`, `make python-binding-test`, and `scripts/build_cshared_for_wheel.sh` for wheels.
+- **Wheels and publish:** `tool.cibuildwheel` `manylinux_2_28` `x86_64`+`aarch64` (+ `macos-13/14`, `windows-2019`) in `.github/workflows/publish-pypi.yml` (tag `v*` + `workflow_dispatch`, `id-token: write` Trusted Publishing, `check` with `scripts/check_versions.sh` + `twine check --strict` before `pypa/gh-action-pypi-publish`).
+- **Docs:** new `documentation/python.md` (install, both snippet styles, options/mapping, errors 0-6, timeouts, security, ABI stability, self-build, platforms) plus `README.md` teaser and `documentation/README.md` / `getting-started.md` / `deferred.md` updates.
+
+### Changed
+
+- Bumped `VERSION` / `internal/cli.Version` / `bindings/python` / `bindings/c/include/gowkhtmltopdf.h` to `0.2.5` and aligned `scripts/check_versions.sh` single source.
+- `Makefile` now has `BINDINGS_VERSION_LDFLAGS`, guarded `c-shared` / `bindings-clean` / `check-versions` / `python-binding-test` targets; `.golangci.yml` excludes `bindings` (cgo glue via `go vet`); `.gitignore` ignores `dist/` and `bindings/**/*.so/.dylib/.dll`; `ci.yml` adds purity guard and `build-shared` + `python-binding` jobs.
+
 ## 0.2.4 (2026-08-18)
 
 ### Breaking

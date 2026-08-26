@@ -1,0 +1,7 @@
+include README.md
+include src/gowkhtmltopdf/py.typed
+recursive-include tests *.py
+recursive-include examples *.py
+prune docs
+prune frontend
+prune testdata

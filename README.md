@@ -17,7 +17,7 @@ paint → write). Direct modules are allowlisted:
 shaping) and [`tdewolff/canvas`](https://github.com/tdewolff/canvas) (SVG
 rasterization). The product is HTML templates and documents, not Chrome visual parity.
 
-**Status:** **v0.2.4** (current release). The native Document API and explicit
+**Status:** **v0.2.5** (current release). The native Document API and explicit
 CLI grammar are now the supported surface. Opt-in PDF 1.7 / 2.0 and PDF/A +
 PDF/UA profiles. **License:** [MIT](LICENSE).
 
@@ -48,6 +48,8 @@ make build
 ```
 
 Committed samples live in [output/](output/) (`make samples`).
+Python API samples land under [output/python/](output/python/)
+(`make samples-python`; needs `CGO_ENABLED=1`).
 Install, flags, and HTTP URLs: [getting-started.md](documentation/getting-started.md).
 
 ## Documentation
@@ -59,6 +61,7 @@ Install, flags, and HTTP URLs: [getting-started.md](documentation/getting-starte
 | [documentation/getting-started.md](documentation/getting-started.md) | Install and first conversion |
 | [documentation/cli.md](documentation/cli.md) | CLI grammar and flags |
 | [documentation/library-api.md](documentation/library-api.md) | Go library API |
+| [documentation/python.md](documentation/python.md) | Python bindings: in-process `pip install gowkhtmltopdf` |
 | [documentation/MIGRATION-0.2.4.md](documentation/MIGRATION-0.2.4.md) | 0.2.3 library/CLI to the 0.2.4 Document API |
 | [documentation/architecture.md](documentation/architecture.md) | Package map and pipeline |
 | [documentation/architecture/README.md](documentation/architecture/README.md) | Deep-dive architecture notes |
@@ -100,6 +103,18 @@ pdfBytes, err := doc.PDF(ctx)
 Local files, TOC/cover fields, network policy, and the migration table:
 [documentation/library-api.md](documentation/library-api.md),
 [documentation/MIGRATION-0.2.4.md](documentation/MIGRATION-0.2.4.md).
+
+Python callers get the same engine in-process through an opt-in shared
+library: [documentation/python.md](documentation/python.md).
+
+```python
+from gowkhtmltopdf import PDFOptions, convert_html_to_pdf
+
+pdf_bytes = convert_html_to_pdf(
+    b"<html><body><h1>Invoice</h1></body></html>",
+    options=PDFOptions(page_size="A4"),
+)
+```
 
 ## Performance
 
@@ -144,7 +159,16 @@ make bench-cli-compare
 make bench
 make bench-engine
 make bench-lib
+make python-benchmarks
 ```
+
+`make python-benchmarks` rebuilds `dist/libgowkhtmltopdf.so` (`CGO_ENABLED=1`)
+and times the in-process Python `Document.pdf()` / `ImageDocument.image()`
+path on the same `report.html.tmpl` fixture (20 invoice rows per page) that
+`make bench-lib` uses. Override sizes with
+`GOWKHTMLTOPDF_BENCH_SIZES=2,10,50`. The Python architecture sample is
+`make python-api` (`testdata/golden/python_api` ->
+`output/python/architecture-diagram.pdf`).
 
 ## Development
 

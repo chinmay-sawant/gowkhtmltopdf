@@ -314,6 +314,7 @@ Contributor setup and PR expectations: [`CONTRIBUTING.md`](../CONTRIBUTING.md).
 | `make golden` | `TestGoldenCorpus*` — structure, page envelopes, needles (not binary PDF equality) |
 | `make golden-update GOLDEN_FIXTURE=fixture-NN-name.html GOLDEN_APPROVE=1` | Generate one explicitly approved fixture PDF under ignored `testdata/golden/out/`; never rewrites fixture sources |
 | `make samples` | Refresh `output/fixture-*.pdf`, `showcase-toc-hf-outline.pdf`, the two PNGs, `output/pdf-{1.7,2.0}{,-compliance}/` (fixture-21 and fixture-56), and the optional live wiki PDF |
+| `make samples-python` | Refresh `output/python/fixture-*.pdf` via the Python API, plus `output/python/pdf-{1.7,2.0}{,-compliance}/` (fixture-21, fixture-56, architecture-diagram) and the python_api generators. Needs `CGO_ENABLED=1`. |
 | `make clean` | Remove `testdata/golden/out` |
 | `make claim-scan` | Fail if forbidden over-claim phrases appear in user-facing docs |
 
