@@ -59,3 +59,6 @@ __pycache__/
 bindings/python/**/__pycache__/
 
 .vscode
+# local python package build trees
+bindings/python/build/
+bindings/python/dist/
