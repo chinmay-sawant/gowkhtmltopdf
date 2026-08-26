@@ -372,13 +372,18 @@ make python-benchmarks
 GOWKHTMLTOPDF_BENCH_SIZES=2,10,50 GOWKHTMLTOPDF_BENCH_RUNS=10 make python-benchmarks
 ```
 
-The five-page Python architecture diagram (Python-syntax twin of
-`testdata/golden/api`) regenerates with:
+Python API samples regenerate with:
 
 ```sh
 make python-api
-# writes output/python/architecture-diagram.pdf
+# writes output/python/architecture-diagram.pdf  (HTML file on disk)
+# writes output/python/invoice-inline.pdf        (inline HTML + Document options)
 ```
+
+`generate.py` loads `architecture-diagram.html` the way `testdata/golden/api`
+loads its template. `generate_inline.py` is the usual Python utility shape:
+HTML as bytes in the program, pass page size / margins / flags on `Document`,
+call `.pdf()`, write with `open(..., "wb")`.
 
 Both targets rebuild `dist/libgowkhtmltopdf.so` first (`CGO_ENABLED=1`).
 Numbers and methodology live in [performance.md](performance.md).

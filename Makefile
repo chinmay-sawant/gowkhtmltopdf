@@ -284,11 +284,14 @@ python-benchmarks:
 	PYTHONPATH=bindings/python/src \
 		python3 bindings/python/tests/bench_library.py
 
-# Python-API architecture diagram -> output/python/architecture-diagram.pdf.
-# Mirrors `go run ./testdata/golden/api` but drives the python_api template
-# through Document.pdf(). Requires the c-shared library.
+# Python-API samples under output/python/:
+#   generate.py        -> architecture-diagram.pdf (HTML file on disk)
+#   generate_inline.py -> invoice-inline.pdf (inline HTML bytes + Document options)
+# Requires the c-shared library.
 python-api:
 	python3 testdata/golden/python_api/test_generate.py
 	CGO_ENABLED=1 $(MAKE) c-shared
 	PYTHONPATH=bindings/python/src \
 		python3 testdata/golden/python_api/generate.py
+	PYTHONPATH=bindings/python/src \
+		python3 testdata/golden/python_api/generate_inline.py

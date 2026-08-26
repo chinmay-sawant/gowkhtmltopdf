@@ -31,9 +31,10 @@ testdata/golden/
   api/                                      # library-API generator (go run ./testdata/golden/api; also make samples)
     architecture-diagram.html               # source template for the generator (5 pages)
     generate.go                             # writes output/architecture-diagram.pdf only
-  python_api/                               # Python-API generator (make python-api)
+  python_api/                               # Python-API generators (make python-api)
     architecture-diagram.html               # Python-syntax variant of the api/ template (5 pages)
-    generate.py                             # writes output/python/architecture-diagram.pdf only
+    generate.py                             # file HTML -> output/python/architecture-diagram.pdf
+    generate_inline.py                      # inline HTML Document sample -> output/python/invoice-inline.pdf
     test_generate.py                        # path-resolution tests (no shared library required)
   font-examples.html                        # 13 Google Fonts showcase (inline style; fonts not bundled; --font-path driven)
   out/                  # generated PDFs (gitignored)

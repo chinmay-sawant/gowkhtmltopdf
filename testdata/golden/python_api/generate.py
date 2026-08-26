@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
 """Render the Python API architecture template to PDF.
 
+This is the file-on-disk twin of ``testdata/golden/api/generate.go``: resolve
+``architecture-diagram.html``, build a ``Document`` with the same option bag
+(page size, zero margins, background, smart_shrinking, allow_local_files),
+convert, assert page count, write bytes.
+
+For the typical Python utility shape (HTML as in-memory bytes, no template
+file), see ``generate_inline.py``.
+
 Run from the repository root (also invoked by ``make python-api``):
 
     python3 testdata/golden/python_api/generate.py
@@ -9,16 +17,11 @@ Writes (overwriting if present):
 
   1. output/python/architecture-diagram.pdf
 
-It does not write testdata/golden/architecture-diagram.html or any PDF under
-testdata/golden/. The only HTML this command reads is
-testdata/golden/python_api/architecture-diagram.html. Pass --output to send
-the PDF somewhere else; testdata/golden stays a source tree.
-
-The v1 one-shot ABI accepts inline HTML only, so the generator reads the
-template file and passes Content.from_html with a file:// base URL (same
-pattern as convert_file_to_pdf).
+The v1 one-shot ABI accepts inline HTML only, so this reads the template
+file and passes ``Content.from_html`` with a ``file://`` base URL (same
+pattern as ``convert_file_to_pdf``). Go's generator can use ``File(path)``
+directly; Python cannot until the handle-based ABI lands.
 """
-
 import argparse
 import os
 import sys
