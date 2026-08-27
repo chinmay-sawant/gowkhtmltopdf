@@ -313,7 +313,9 @@ func (e *engine) flowMulticolSegment(
 			break
 		}
 
-		curY += e.placeMulticolLine(parent, batch, nCols, colW, gap, contentX, yPos, curY, maxColH, balance, totalH)
+		curY += e.placeMulticolLine(
+			parent, batch, style, nCols, colW, gap, contentX, yPos, curY, maxColH, balance, totalH,
+		)
 	}
 
 	return curY
@@ -425,7 +427,7 @@ func collectMulticolBatch(items []multicolItem, idx int, maxColH, capacity float
 // placeMulticolLine assigns items into columns (balance or auto fill) and
 // builds them. Returns the line's used height (max column stack).
 func (e *engine) placeMulticolLine(
-	parent *box, items []multicolItem, nCols int, colW, gap, contentX, yPos, curY, maxColH float64,
+	parent *box, items []multicolItem, style ResolvedStyle, nCols int, colW, gap, contentX, yPos, curY, maxColH float64,
 	balance bool, totalH float64,
 ) float64 {
 	colX := func(c int) float64 {
@@ -463,6 +465,8 @@ func (e *engine) placeMulticolLine(
 			lineH = h
 		}
 	}
+
+	e.paintColumnRules(style, nCols, colW, gap, contentX, yPos+curY, lineH)
 
 	return lineH
 }

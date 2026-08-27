@@ -136,7 +136,7 @@ Highest frequency gap: utility sheets wrap rules in `:is()` / `:where()`. Those 
 - [x] 49.1 `:is()` matches, specificity is the most specific argument. Proof: `go test ./internal/css -run TestIsPseudo`.
 - [x] 49.2 `:where()` matches, specificity 0. Proof: `go test ./internal/css -run TestWherePseudo`.
 - [x] 49.3 `@import` fetches under the same ACL as `<link>`. Proof: `TestImportStylesheet`.
-- [~] 49.4 Optional of-type: no fixture this session.
+- [x] 49.4 `:first-of-type` / `:nth-of-type` / `:nth-last-of-type` and attr `i` flag. Proof: `TestFirstOfType`, `TestNthOfType`, `TestAttrIFlag`.
 - [x] 49.5 `:hover`/`:focus`/`:active` still never-match. `go test ./internal/css` green.
 
 Out: forgiving selector lists, shadow DOM, `@supports` evaluation of the full CSS grammar, `@layer` cascade if a later amendment wants it. `@supports` may land as a tiny parse that treats unknown features as false so nested rules are not dropped blindly. That decision is a 49 row, not a promise.
@@ -148,7 +148,7 @@ Out: forgiving selector lists, shadow DOM, `@supports` evaluation of the full CS
 - [x] 50.1 `clamp()` computes; removed from `supportedDeclaration`. Proof: `TestClampLength`. Fixture-56 is 21 pages.
 - [x] 50.2 `hsl()` / `hsla()` in `ParseColor`. Proof: `TestParseColorHsl`.
 - [x] 50.3 Logical box longhands for horizontal-tb. Proof: `TestLogical*`. Mapping `--write`.
-- [x] 50.4 `ex`/`ch` Partial 0.5em in the matrix.
+- [x] 50.4 `ex` Partial 0.5em; `ch` default-face U+0030 advance (`style_ch.go`). Proof: `TestChUsesZeroGlyphAdvance`.
 - [x] 50.5 Matrix still documents `vw`/`vh` as width/height/min/max only.
 
 Out: `oklch()`, `color-mix()`, `light-dark()` stay cascade-dropped unless a later row takes them. `cq*` units stay out until `@container` used size is wired into length resolve.
@@ -161,7 +161,7 @@ Invoice and report CSS already writes these. They currently no-op.
 
 - [x] 51.1 `word-spacing`. Proof: `TestWordSpacingInherits`, `TestWordSpacingWidensRuns`.
 - [x] 51.2 `visibility: hidden`. Proof: `TestVisibilityHidden`.
-- [x] 51.3 `caption-side: bottom`. Proof: `TestCaptionSideBottom`.
+- [x] 51.3 `caption-side: top`/`bottom`/`left`/`right`. Proof: `TestCaptionSideBottom`, `TestCaptionSideLeft`, `TestCaptionSideRight`.
 - [x] 51.4 `pre-wrap` / `pre-line`. Proof: `TestWhiteSpacePreWrap`.
 - [x] 51.5 Matrix table-layout + `TestTableLayoutFixed`.
 
@@ -171,9 +171,9 @@ Invoice and report CSS already writes these. They currently no-op.
 
 - [x] 52.1 `background-image: url(...)` first layer, no-repeat at box origin. Proof: `TestBackgroundImageLayoutPaints`. No new golden this session.
 - [x] 52.2 Outline stroke outside the border edge. Proof: `TestOutlineStroke`.
-- [x] 52.3 Radius longhands. Proof: `TestRadiusLonghand`.
+- [x] 52.3 Radius longhands and `rx / ry` slash. Proof: `TestRadiusLonghand`, `TestRadiusSlash`.
 - [x] 52.4 Overflow clip for hidden/clip/auto/scroll. Proof: `TestOverflowClip`; `TestStickyOverflow*` green.
-- [x] 52.5 Lite un-inset `box-shadow` offset fill. Blur stored, not rasterized. Proof: `TestBoxShadowParse`, `TestBoxShadowPaints`.
+- [x] 52.5 Lite un-inset `box-shadow` offset fill plus stacked-rect blur. Proof: `TestBoxShadowParse`, `TestBoxShadowPaints`, `TestBoxShadowBlurPaints`.
 
 Gradients are a second slice, not required to close 52. Filter blur stays a non-goal.
 
@@ -190,9 +190,9 @@ Gradients are a second slice, not required to close 52. Filter blur stays a non-
 
 ## Phase 54: Paged media and fragmentation
 
-- [x] 54.1 Named `@page` parse; `:first` margins on page 1. Size unnamed-only. `:left`/`:right`/named parse only. Proof: `TestParsePageSelectors`, `TestPageFirstMargins`. `page: ident` `[~]` no named-page model.
+- [x] 54.1 Named `@page` parse; `:first` margins on page 1; `:left`/`:right` even/odd; `page: ident` sibling break plus named margin. Size unnamed-only. Proof: `TestParsePageSelectors`, `TestPageFirstMargins`, `TestPageLeftRightMargins`, `TestPageNamedMargins`.
 - [x] 54.2 Break values documented in matrix §2.6: `left`/`right`/`page`/`column` -> `always`; `avoid-page` -> `avoid`; `avoid-column` ignored. Writer has no even/odd or left/right page side; alias kept, not faked. `recto`/`verso` are ignored (not in the apply switch). Proof: `documentation/compatibility-matrix.md` §2.6.
-- [~] 54.3 `@page` margin boxes (`@top-center` and friends). Reason: CLI `--header-*` / `--footer-*` is the repeating chrome. No named fixture that cannot use CLI headers. Not implemented.
+- [x] 54.3 `@page` margin boxes lite: unnamed quoted `@top-*`/`@bottom-*` fill empty CLI header/footer slots. Proof: `TestPageMarginBoxes`. Corners / `running()` still out.
 
 GCPM `running()` / named strings stay out. That is browser header territory.
 
@@ -212,7 +212,7 @@ Candidates already known:
 - float infobox wrap from `02-openweb-css-residuals.md`
 
 - [x] 55.1 `flex-flow`, `place-*`, `grid`/`grid-template` shorthands. Proof: `TestFlexFlowShorthand`, `TestPlaceShorthands`, `TestGridTemplateShorthand`. `vmin`/`vmax` Partial via `vminVmaxPt`. Proof: `TestVminVmax`.
-- [~] 55.2 No named failing fixture this session for stretch, column-rule, inline-grid, or float wrap.
+- [x] 55.2 `align-content: stretch`, `column-rule*`, `display: inline-grid` inline-level. Proof: `TestAlignContentStretch`, `TestColumnRulePaints`, `TestInlineGridIsInlineLevel`. Float wrap still `[~]` (no unit-test hole; live Ana skipped).
 - [~] 55.3 `paint_flow.go` (2367) and `paint_pagination.go` (2244) already over the 2000-line soft cap. This slice did not grow them.
 - [x] 55.4 Mapping Partial for new shorthands. Proof: `python3 scripts/css-catalog-map.py --check`.
 

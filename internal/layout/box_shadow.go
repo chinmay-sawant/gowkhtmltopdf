@@ -7,6 +7,7 @@ const (
 	insetKeyword        = "inset"
 	boxShadowMaxTokens  = 6 // inset + x y blur spread + color
 	boxShadowMaxLengths = 4 // x y blur spread
+	boxShadowBlurSteps  = 4 // stacked expanding fills approximating blur
 )
 
 type parsedBoxShadow struct {
@@ -16,7 +17,7 @@ type parsedBoxShadow struct {
 
 // parseBoxShadowLayer reads offset-x offset-y [blur [spread]] [color].
 // Inset layers are dropped. Spread is accepted and ignored. Blur is stored
-// for callers; paint uses a single un-inset opaque offset fill.
+// and painted as stacked expanding fills with decreasing alpha.
 func parseBoxShadowLayer(value string, current [3]float64, fsize float64) (parsedBoxShadow, bool) {
 	var tokens [boxShadowMaxTokens]string
 
@@ -86,7 +87,8 @@ func boxShadowFromLengths(
 }
 
 // appendBoxShadow paints one opaque fill the size of the border box, offset
-// by BoxShadowX/Y. Layout size is unchanged. Blur is not rasterized.
+// by BoxShadowX/Y. When blur > 0 it first paints stacked expanding fills with
+// decreasing alpha. Layout size is unchanged. Inset and spread stay ignored.
 func (e *engine) appendBoxShadow(
 	dst []Op, sty ResolvedStyle, posX, posY, width, height float64,
 ) []Op {
@@ -94,14 +96,50 @@ func (e *engine) appendBoxShadow(
 		return dst
 	}
 
+	originX := posX + e.scalePt(sty.BoxShadowX)
+	originY := posY + e.scalePt(sty.BoxShadowY)
+	dst = appendBoxShadowBlur(
+		dst, originX, originY, width, height, e.scalePt(sty.BoxShadowBlur), sty.BoxShadowColor,
+	)
+
 	return append(dst, Op{ //nolint:exhaustruct // intentional zero fields
 		Kind: OpFillRect,
-		X:    posX + e.scalePt(sty.BoxShadowX),
-		Y:    posY + e.scalePt(sty.BoxShadowY),
+		X:    originX,
+		Y:    originY,
 		W:    width,
 		H:    height,
 		R:    sty.BoxShadowColor[0],
 		G:    sty.BoxShadowColor[1],
 		B:    sty.BoxShadowColor[2],
 	})
+}
+
+// appendBoxShadowBlur approximates CSS blur with expanding rects. Outer rings
+// use lower alpha; the caller paints the opaque core afterward. PDF StyleOf
+// pre-composites translucent fills against white, so the rings read as
+// stepped gray. This is not a Gaussian raster of descendants.
+func appendBoxShadowBlur(
+	dst []Op, originX, originY, width, height, blur float64, color [3]float64,
+) []Op {
+	if blur <= 0 {
+		return dst
+	}
+
+	for step := boxShadowBlurSteps; step >= 1; step-- {
+		expand := blur * float64(step) / float64(boxShadowBlurSteps)
+		alpha := float64(boxShadowBlurSteps-step+1) / float64(boxShadowBlurSteps+1)
+		dst = append(dst, Op{ //nolint:exhaustruct // intentional zero fields
+			Kind:  OpFillRect,
+			X:     originX - expand,
+			Y:     originY - expand,
+			W:     width + expand*two,
+			H:     height + expand*two,
+			R:     color[0],
+			G:     color[1],
+			B:     color[2],
+			Alpha: alpha,
+		})
+	}
+
+	return dst
 }

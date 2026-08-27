@@ -1081,3 +1081,57 @@ func TestStripMasonryKeyword(t *testing.T) {
 		t.Fatal("non-masonry tracks must stay")
 	}
 }
+
+// TestInlineGridIsInlineLevel keeps display:inline-grid in the paragraph's
+// inline formatting context. display:grid still breaks to a block.
+func TestInlineGridIsInlineLevel(t *testing.T) {
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+p { margin: 0; font-size: 12pt }
+.ig { display: inline-grid; width: 24pt; background: #f00 }
+.g { display: grid; width: 24pt; background: #00f }
+`)
+	res := layoutHTML(t, `<html><body>
+<p>AAA<span class="ig">I</span>BBB</p>
+<p>CCC<span class="g">G</span>DDD</p>
+</body></html>`, cssSheet)
+
+	posX := map[string]float64{}
+	posY := map[string]float64{}
+
+	for _, op := range res.Ops {
+		if op.Kind != OpText {
+			continue
+		}
+
+		for _, key := range []string{"AAA", "BBB", "CCC", "DDD"} {
+			if op.Text == key || (len(op.Text) >= len(key) && op.Text[:len(key)] == key) {
+				posX[key] = op.X
+				posY[key] = op.Y
+			}
+		}
+	}
+
+	for _, key := range []string{"AAA", "BBB", "CCC", "DDD"} {
+		if _, ok := posX[key]; !ok {
+			t.Fatalf("missing text %s", key)
+		}
+	}
+
+	if posY["BBB"] > posY["AAA"]+4 {
+		t.Fatalf("inline-grid broke the line: AAA.y=%.1f BBB.y=%.1f", posY["AAA"], posY["BBB"])
+	}
+
+	if posX["BBB"] <= posX["AAA"]+10 {
+		t.Fatalf("inline-grid: BBB.x=%.1f should sit after AAA.x=%.1f", posX["BBB"], posX["AAA"])
+	}
+
+	if posY["DDD"] <= posY["CCC"]+4 {
+		t.Fatalf("display:grid should block-break: CCC.y=%.1f DDD.y=%.1f", posY["CCC"], posY["DDD"])
+	}
+
+	if posX["DDD"] > posX["CCC"]+20 {
+		t.Fatalf("display:grid DDD.x=%.1f should restart at the line start (CCC.x=%.1f)", posX["DDD"], posX["CCC"])
+	}
+}

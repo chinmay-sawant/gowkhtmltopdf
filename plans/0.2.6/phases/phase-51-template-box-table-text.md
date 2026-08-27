@@ -15,7 +15,7 @@ These properties show up in invoices, contracts, and tables. They have no apply 
 
 - `word-spacing`: matrix §2.3 Not implemented. Absent from `applyTextGroup`.
 - `visibility`: no field. `hidden` should skip paint and keep the box.
-- `caption-side`: captions always above (`layout_tables.go:49-57`).
+- `caption-side`: top/bottom plus CSS 2.0 left/right beside the grid (`layout_tables.go`).
 - `white-space: pre-wrap` / `pre-line` become `pre` (`style_properties.go:1086-1092`).
 - `table-layout: fixed` is already consumed lite (`layout_tables.go:45`). Matrix is wrong.
 
@@ -40,7 +40,7 @@ Land the missing text/box/table properties reports already write. Fix the matrix
 ### 51.3 caption-side
 
 - [x] 51.3.1 Bottom caption below the grid. Proof: `TestCaptionSideBottom`.
-- [~] 51.3.2 `left` / `right` not implemented.
+- [x] 51.3.2 `left` / `right` beside the grid. Proof: `TestCaptionSideLeft`, `TestCaptionSideRight`.
 - [x] 51.3.3 Matrix caption-side Partial.
 
 ### 51.4 white-space
@@ -68,7 +68,7 @@ Tests named above. Matrix diffs.
 
 ## Out of scope
 
-Full CSS2 table-layout algorithm. `empty-cells`. Caption left/right.
+Full CSS2 table-layout algorithm. `empty-cells`.
 
 ## Handoff
 

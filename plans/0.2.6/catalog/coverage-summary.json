@@ -13,8 +13,8 @@
     "properties_by_engine_status": {
       "ignored": 247,
       "implemented": 75,
-      "partial": 95,
-      "unsupported": 401
+      "partial": 100,
+      "unsupported": 396
     },
     "properties_print_relevant": 571,
     "properties_goal_implement": 571,
@@ -27,9 +27,9 @@
     "selectors": 158,
     "selectors_by_engine_status": {
       "partial": 5,
-      "unsupported": 124,
+      "unsupported": 120,
       "ignored": 21,
-      "implemented": 8
+      "implemented": 12
     },
     "functions": 162,
     "functions_by_engine_status": {

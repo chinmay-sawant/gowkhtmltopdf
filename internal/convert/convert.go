@@ -516,11 +516,12 @@ func renderObject(ctx context.Context, run *runContext, obj *settings.PdfObject,
 	}
 
 	printUL := run.req.Global.Web.PrintLinkUnderline || obj.Web.PrintLinkUnderline
+	header, footer := applyPageMarginBoxes(obj.HeaderFor(run.req.Global), obj.FooterFor(run.req.Global), sheets)
 	state := &objectState{ //nolint:exhaustruct // intentional zero-value fields
 		obj:           obj,
 		idx:           idx,
-		header:        obj.HeaderFor(run.req.Global),
-		footer:        obj.FooterFor(run.req.Global),
+		header:        header,
+		footer:        footer,
 		repl:          mergedReplaces(obj, run.req.Global),
 		base:          prep.Resource.Base,
 		lp:            obj.Load,

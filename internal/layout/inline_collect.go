@@ -379,7 +379,8 @@ func (e *engine) collectInlineElement(node *html.Node, sty ResolvedStyle, out *[
 		return
 	}
 
-	if sty.Display == cssDisplayInlineBlock {
+	if sty.Display == cssDisplayInlineBlock || sty.Display == displayInlineFlex ||
+		sty.Display == displayInlineGrid {
 		e.collectInlineBlockItem(node, sty, out)
 
 		return

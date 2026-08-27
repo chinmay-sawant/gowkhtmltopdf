@@ -226,12 +226,14 @@ func (e *engine) paintInlineChrome(style *ResolvedStyle, leftX, baseline, ascent
 
 	if style.BGColor[3] > 0 && e.opts.Background {
 		radii := usedBorderRadii(*style, boxW, boxH)
-		e.add(Op{ //nolint:exhaustruct // intentional zero fields
+		fill := Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpFillRect, X: leftX, Y: boxY, W: boxW, H: boxH,
 			R: style.BGColor[0], G: style.BGColor[1], B: style.BGColor[2], Alpha: style.BGColor[3],
 			Radius: uniformRadius(radii), RadiusTopLeft: radii[0], RadiusTopRight: radii[1],
 			RadiusBottomRight: radii[2], RadiusBottomLeft: radii[3],
-		})
+		}
+		stampOneOpRadiiY(&fill, usedBorderRadiiY(*style, boxW, boxH))
+		e.add(fill)
 	}
 
 	if !inlineHasBorder(*style) {
@@ -243,11 +245,13 @@ func (e *engine) paintInlineChrome(style *ResolvedStyle, leftX, baseline, ascent
 
 	if hasRoundedRadii(radii) && uniformRoundedBorder(*style) {
 		b := style.BorderTop
-		e.add(Op{ //nolint:exhaustruct // intentional zero fields
+		stroke := Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpStrokeRect, X: leftX, Y: boxY, W: boxW, H: boxH,
 			R: b.Color[0], G: b.Color[1], B: b.Color[2], Width: e.scalePt(borderPaint(b)), Radius: radius,
 			RadiusTopLeft: radii[0], RadiusTopRight: radii[1], RadiusBottomRight: radii[2], RadiusBottomLeft: radii[3],
-		})
+		}
+		stampOneOpRadiiY(&stroke, usedBorderRadiiY(*style, boxW, boxH))
+		e.add(stroke)
 
 		return
 	}

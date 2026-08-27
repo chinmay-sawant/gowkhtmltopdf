@@ -43,8 +43,8 @@ Keep the never-match rule for `:hover` / `:focus` / `:active` / `:target`. Print
 
 ### 49.4 Optional, fixture-gated
 
-- [~] 49.4.1 `:first-of-type` / `:nth-of-type`: no failing fixture this session.
-- [~] 49.4.2 Attribute `i` flag: no failing fixture this session.
+- [x] 49.4.1 `:first-of-type` / `:last-of-type` / `:nth-of-type()` / `:nth-last-of-type()`: same-tag sibling index; an+b via `parseNthArg`/`matchNth`. Proof: `go test ./internal/css -run 'TestNthOfType|TestFirstOfType|TestLastOfType|TestNthLastOfType'`.
+- [x] 49.4.2 Attribute ASCII `i` flag on valued selectors (`=` `~=` `*=` `^=` `$=` `|=`). Proof: `go test ./internal/css -run TestAttrIFlag`.
 
 ### 49.5 Honesty and gates
 

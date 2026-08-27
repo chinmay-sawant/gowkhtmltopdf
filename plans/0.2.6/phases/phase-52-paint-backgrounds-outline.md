@@ -1,7 +1,7 @@
 # Phase 52: Paint, backgrounds, outline, overflow clip
 
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 52
-> **Status:** in progress (background-image, outline, radius longhands, overflow clip landed; box-shadow `[~]`)
+> **Status:** in progress (background-image, outline, radius longhands + slash, overflow clip, box-shadow blur lite landed)
 > **Estimated effort:** 1-2 weeks
 > **Owner:** `internal/layout` paint/chrome, `internal/convert` image fetch
 > **Depends on:** Phase 51 not strictly required
@@ -48,7 +48,7 @@ Watch the 2000-line file cap. If `paint.go` or `layout_chrome.go` is near the li
 ### 52.3 radius longhands
 
 - [x] 52.3.1 Radius longhands. Proof: `TestRadiusLonghand`.
-- [~] 52.3.2 Elliptical `/` syntax still Partial.
+- [x] 52.3.2 Elliptical `/` syntax. Shorthand `r / s` and longhands `10pt / 5pt` or `10pt 5pt`. Paint uses unequal rx/ry Bezier arcs. Percent slash still uniform. Proof: `TestRadiusSlash`, `TestRadiusEllipticalLonghand`.
 
 ### 52.4 overflow clip
 
@@ -58,7 +58,7 @@ Watch the 2000-line file cap. If `paint.go` or `layout_chrome.go` is near the li
 
 ### 52.5 box-shadow optional
 
-- [~] 52.5.1 `box-shadow` not this session. Next gate: a named report fixture that needs a single un-inset shadow.
+- [x] 52.5.1 Lite un-inset `box-shadow` offset fill plus stacked expanding-rect blur. Inset and spread ignored. Layout size unchanged. Proof: `TestBoxShadowParse`, `TestBoxShadowPaints`, `TestBoxShadowBlurPaints`.
 
 ### 52.6 gates
 

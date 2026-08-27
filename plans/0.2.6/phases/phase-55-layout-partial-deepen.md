@@ -1,7 +1,7 @@
 # Phase 55: Layout Partial deepen (fixture-driven)
 
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 55
-> **Status:** complete for 55.1 shorthands; 55.2 fixture-gated `[~]`
+> **Status:** 55.1 shorthands done; 55.2.1-55.2.3 done; 55.2.4 float wrap still `[~]`
 > **Estimated effort:** as required by failing fixtures, cap one week unless amended
 > **Owner:** `internal/layout` flex.go, grid.go, multicol.go, float.go
 > **Depends on:** Phases 49-54 shipped or explicitly `[~]`
@@ -17,11 +17,8 @@ Copy this rule onto every row: fixture name, expected box, proof command.
 
 Known leftovers, not automatic work:
 
-- `align-content: stretch` packs at start
-- `flex-flow`, `place-content`, `place-items`, `place-self` missing
-- `grid` / `grid-template` / `grid-auto-columns` / `grid-auto-rows` missing
-- `column-rule*` missing
-- `display: inline-grid` is not inline-level (`layout_flow.go:85-87`)
+- `flex-flow`, `place-content`, `place-items`, `place-self` (55.1 shipped the parse)
+- `grid` / `grid-template` / `grid-auto-columns` / `grid-auto-rows` (55.1 shipped the parse)
 - Live infobox wrap from `plans/0.2.0/phases/pending-phase-items/02-openweb-css-residuals.md`
 
 Joint subgrid intrinsic and Grid L3 masonry stay out.
@@ -40,9 +37,9 @@ Close only evidenced Partial holes. Leave the rest Partial in the matrix.
 
 ### 55.2 fixture-gated layout
 
-- [~] 55.2.1 No named failing fixture for align-content stretch.
-- [~] 55.2.2 No named failing fixture for column-rule.
-- [~] 55.2.3 No named failing fixture for inline-grid.
+- [x] 55.2.1 `align-content: stretch` grows wrapped line cross sizes. Proof: `TestAlignContentStretch`.
+- [x] 55.2.2 `column-rule*`. Proof: `TestColumnRuleParse`, `TestColumnRulePaints`.
+- [x] 55.2.3 `display: inline-grid` is inline-level. Proof: `TestInlineGridIsInlineLevel`.
 - [~] 55.2.4 No vendored float-wrap fixture this session.
 
 ### 55.3 file size

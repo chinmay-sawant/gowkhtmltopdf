@@ -268,6 +268,9 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 	var chrome []Op
 	radii := usedBorderRadii(sty, width, height)
 	radius := uniformRadius(radii)
+	// Outset box-shadow paints behind the background so blur rings do not
+	// cover the border box.
+	chrome = e.appendBoxShadow(chrome, sty, posX, posY, width, height)
 	if sty.BGColor[3] > 0 && e.opts.Background {
 		chrome = append(chrome, Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpFillRect, X: posX, Y: posY, W: width, H: height,
@@ -276,7 +279,6 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 		})
 	}
 	chrome = e.appendBackgroundImage(chrome, sty, posX, posY, width, height)
-	chrome = e.appendBoxShadow(chrome, sty, posX, posY, width, height)
 
 	switch {
 	case hasRoundedRadii(radii) && roundedSolidBorder(sty):
@@ -287,6 +289,7 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 		chrome = append(chrome, e.collapsedOrFullBorderOps(boxNode, sty, posX, posY, width, height)...)
 	}
 	chrome = append(chrome, e.outlineOps(sty, posX, posY, width, height)...)
+	stampOpRadiiY(chrome, usedBorderRadiiY(sty, width, height))
 	if len(chrome) == 0 {
 		return
 	}

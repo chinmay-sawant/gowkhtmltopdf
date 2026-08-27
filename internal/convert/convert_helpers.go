@@ -19,36 +19,60 @@ import (
 // rather than cascaded as ordinary element padding.
 //
 // Unnamed @page (sheet.Page and Pages with Sel "") sets the default geometry
-// for every page. @page :first overrides margin for page 1 only. Size is
-// unnamed-only: the writer paints one page size for the document, so a
-// :first size that differs from unnamed is ignored.
+// for every page. @page :left / :right override even / odd pages (LTR: page 1
+// is :right). @page :first then overrides page 1. Named @page ident rules
+// store per-name margins for pages that start with that name. Size is
+// unnamed-only: the writer paints one page size for the document.
 func applyCSSPageMargins(geom hfGeom, sheets []*css.Stylesheet) hfGeom {
 	box := collectPageBox(sheets)
 	geom = applyPageSize(geom, box.size)
 	geom = applyPageMargin(geom, box.margin)
 	geom.recomputeContent()
-
-	if box.firstMargin == "" {
-		return geom
-	}
-
-	firsted, ok := tryApplyPageMargin(geom, box.firstMargin)
-	if !ok {
-		return geom
-	}
-
-	geom.first = &hfPageMargins{
-		top:    firsted.marginTop,
-		right:  firsted.marginRight,
-		bottom: firsted.marginBottom,
-		left:   firsted.marginLeft,
-	}
+	geom.first = pageMarginOverride(geom, box.firstMargin)
+	geom.left = pageMarginOverride(geom, box.leftMargin)
+	geom.right = pageMarginOverride(geom, box.rightMargin)
+	geom.named = namedPageMarginOverrides(geom, box.named)
 
 	return geom
 }
 
+func pageMarginOverride(geom hfGeom, raw string) *hfPageMargins {
+	applied, ok := tryApplyPageMargin(geom, raw)
+	if !ok {
+		return nil
+	}
+
+	return &hfPageMargins{
+		top:    applied.marginTop,
+		right:  applied.marginRight,
+		bottom: applied.marginBottom,
+		left:   applied.marginLeft,
+	}
+}
+
+func namedPageMarginOverrides(geom hfGeom, raw map[string]string) map[string]*hfPageMargins {
+	if len(raw) == 0 {
+		return nil
+	}
+
+	out := make(map[string]*hfPageMargins, len(raw))
+
+	for name, margin := range raw {
+		if over := pageMarginOverride(geom, margin); over != nil {
+			out[name] = over
+		}
+	}
+
+	if len(out) == 0 {
+		return nil
+	}
+
+	return out
+}
+
 type pageBoxRaw struct {
-	margin, size, firstMargin string
+	margin, size, firstMargin, leftMargin, rightMargin string
+	named                                              map[string]string
 }
 
 func collectPageBox(sheets []*css.Stylesheet) pageBoxRaw {
@@ -84,23 +108,48 @@ func applyUnnamedPageBox(box pageBoxRaw, page *css.PageStyle) pageBoxRaw {
 
 func applyPageRules(box pageBoxRaw, rules []css.PageRule) pageBoxRaw {
 	for _, rule := range rules {
-		margin := strings.TrimSpace(rule.Margin)
-		size := strings.TrimSpace(rule.Size)
+		box = applyOnePageRule(box, rule)
+	}
 
-		switch strings.ToLower(strings.TrimSpace(rule.Sel)) {
-		case "":
-			if margin != "" {
-				box.margin = margin
-			}
+	return box
+}
 
-			if size != "" {
-				box.size = size
-			}
-		case ":first":
-			if margin != "" {
-				box.firstMargin = margin
-			}
+func applyOnePageRule(box pageBoxRaw, rule css.PageRule) pageBoxRaw {
+	margin := strings.TrimSpace(rule.Margin)
+	size := strings.TrimSpace(rule.Size)
+	sel := strings.ToLower(strings.TrimSpace(rule.Sel))
+
+	switch sel {
+	case "":
+		if margin != "" {
+			box.margin = margin
 		}
+
+		if size != "" {
+			box.size = size
+		}
+	case ":first":
+		if margin != "" {
+			box.firstMargin = margin
+		}
+	case ":left":
+		if margin != "" {
+			box.leftMargin = margin
+		}
+	case ":right":
+		if margin != "" {
+			box.rightMargin = margin
+		}
+	default:
+		if strings.HasPrefix(sel, ":") || margin == "" {
+			return box
+		}
+
+		if box.named == nil {
+			box.named = map[string]string{}
+		}
+
+		box.named[sel] = margin
 	}
 
 	return box

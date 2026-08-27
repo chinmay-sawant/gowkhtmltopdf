@@ -58,7 +58,7 @@ Status legend (verified against `applyRestProps` in
 | `padding` / `padding-top\|right\|bottom\|left` | Implemented | `style.go:350-359`; test `TestPaddingBorderBox` |
 | `border` / `border-top\|right\|bottom\|left` | Implemented | `style.go:360-379` (`parseBorder` `style.go:521`); styles `solid\|dashed\|dotted\|none`, width + color; test `TestPaddingBorderBox` |
 | `border-width`, `border-style`, `border-color` | Implemented | `style.go:380-401`; `thin\|medium\|thick` widths `style.go:546` |
-| `border-radius` | Partial | Shorthand `setBorderRadius` (`style_properties.go:731`). Paint via `usedBorderRadius` (`layout_chrome.go:346`). Percent corners use a uniform fallback. Longhands `border-top-left-radius` and siblings are not applied. |
+| `border-radius` | Partial | Shorthand including `rx / ry` slash (`setBorderRadius` `border_radius.go`). Longhands `border-top-left-radius` and siblings, including `10pt / 5pt` and `10pt 5pt`. Paint uses elliptical Bezier arcs when rx != ry (`roundedRectPathCorners` `paint.go`). Percent corners still use a uniform fallback. Tests `TestRadiusLonghand`, `TestRadiusSlash`, `TestRadiusEllipticalLonghand`. |
 | `width`, `height` | Implemented | `style.go:316-323`; consumed in `layout.go:176-191` (block) and `layout.go:315-320` (images) |
 | `min-width`, `min-height`, `max-width`, `max-height` | Implemented | `style.go:324-339`; enforced `layout.go:181-186, 321-328`; `%` resolves against viewport approximation |
 | `box-sizing` (`content-box\|border-box`) | Implemented | parsed `style.go`; default `content-box` (specified width is content width); `border-box` makes width include padding+border (`layout.go` `buildBlock`); test `TestBoxSizingBorderBox` |
@@ -111,6 +111,7 @@ Status legend (verified against `applyRestProps` in
 | `background` (shorthand) | Partial | Color token plus optional first `url(...)` (`BackgroundImage`). Gradients ignored. Tests `TestBackgroundImageParse` |
 | `background-image` | Partial | First `url(...)` layer, no-repeat at box origin, sized to the box (`background_image.go`). Missing image skipped. Gradients ignored. Test `TestBackgroundImageLayoutPaints` |
 | `outline` / `outline-width` / `outline-style` / `outline-color` / `outline-offset` | Partial | Stroke outside the border edge; does not affect layout size. solid/dashed/dotted. Tests `TestOutlineParse`, `TestOutlineStroke` |
+| `box-shadow` | Partial | First un-inset layer. Offset fill plus lite blur as stacked expanding `OpFillRect`s with decreasing alpha (`appendBoxShadow` `box_shadow.go`). Inset and spread ignored. Does not change layout size. Tests `TestBoxShadowParse`, `TestBoxShadowPaints`, `TestBoxShadowBlurPaints` |
 | `opacity` | Partial | Parsed in `applyRestProps`; paint via PDF ExtGState (`SetOpacity`). Nested opacities multiply. Also accepts `filter: opacity()`; other filter functions ignored (permanent print non-goal for blur/shadow). |
 | `accent-color` | Partial | Parsed `style_properties.go:928`; inherited. Fill color for native `progress`/`meter` (`widgetValueColor` `layout.go:1417`). Other form controls ignore it. Test `widget_color_test.go` |
 
@@ -120,7 +121,7 @@ Status legend (verified against `applyRestProps` in
 |----------|--------|---------------------|
 | `border-collapse` (`collapse\|separate`) | Partial | `collapse` ≈ `border-spacing: 0` plus a collapsed grid emitter (`emitCollapsedRowGrid`); not a full CSS collapse engine |
 | `border-spacing` | Implemented | `style.go`; used by `tableSpacing` (suppressed when collapse); test `TestBorderSpacing` |
-| `caption-side` | Partial | `top` (default) above the grid; `bottom` below (`CaptionSide` + `buildTable`). `left`/`right` out. Tests `TestCaptionSideParse`, `TestCaptionSideBottom` |
+| `caption-side` | Partial | `top` (default) above the grid; `bottom` below; `left`/`right` sit beside the grid (CSS 2.0 lite: caption shrink-to-fit capped at 40% of table width, grid gets the rest). Tests `TestCaptionSideParse`, `TestCaptionSideBottom`, `TestCaptionSideLeft`, `TestCaptionSideRight` |
 | `table-layout` (`auto\|fixed`) | Partial (fixed lite) | Consumed when `fixed` and the table width is definite (`layout_tables.go:45`: `style.TableLayout == positionFixed && tableHint >= 0`). Column used widths from hints, leftover split evenly; content max-content ignored (`sizeFixedTableColumns` `layout_measure.go:830`). `auto` remains the default path. Test `TestTableLayoutFixedIgnoresContentMax` |
 
 ### 2.6 Print / paged media
@@ -130,9 +131,10 @@ Status legend (verified against `applyRestProps` in
 | `page-break-before/after/inside` and `break-before/after/inside` | Implemented (print pipeline) with Partial aliases | Same apply arms (`applyPageBreakProps` `style_properties.go:1467`). Stored as `style.PageBreak*` `always` / `avoid` / unset. Paginator honors them as canvas-Y flow shifts: `avoidInside` `paint_flow.go:488`, `beforeAlways` `paint_flow.go:822`, `afterBreaks` `paint_flow.go:1037`. Tests `TestPageBreakParsing`, `TestPageBreakBeforeAlways`, `TestPageBreakInsideAvoid`. Alias table below. |
 | `orphans`, `widows` | Partial | CSS `orphans` / `widows` **parsed** (integer ≥1, inherit, initial 2) in `applyRestProps`; Fragmentation Rule 3 enforced when line boxes are countable (`paint_flow.go` `orphansWidows`). Geometric short-block **heuristic** remains as fallback when line counts are unavailable (fixture-30). See fixture-37. |
 | `@page` unnamed `margin` / `size` | Implemented | Last unnamed `@page` still fills `Stylesheet.Page`. Convert applies that box to every page (`applyCSSPageMargins`). |
-| `@page :first` | Partial | Parsed onto `Pages` with `Sel ":first"`. Page 1 can use a different **margin**. Size stays unnamed-only (one page size per document). Proof: `TestParsePageSelectors`, `TestPageFirstMargins`. |
-| `@page :left` / `:right` / named pages | Partial (parse only) | Stored on `Pages`. Not applied. The writer has no even/odd or named-page model. |
-| `@page` margin boxes (`@top-center` and friends) | Not implemented | No `@top-*` / `@bottom-*` / `@left-*` / `@right-*` parse. Repeating chrome is CLI `--header-*` / `--footer-*` (§7.7). |
+| `@page :first` | Partial | Parsed onto `Pages` with `Sel ":first"`. Page 1 can use a different **margin**. Size stays unnamed-only (one page size per document). `:first` wins over `:left`/`:right` on page 1. Proof: `TestParsePageSelectors`, `TestPageFirstMargins`, `TestPageFirstWinsOverLeftRight`. |
+| `@page :left` / `:right` | Partial | Margins applied. Honest LTR print: page 1 is `:right` (recto), even pages `:left`, odd pages `:right`. Not a duplex sheet; `break-before: left` still aliases to `always`. Size unnamed-only. Proof: `TestPageLeftRightMargins`. |
+| `page` (`auto` / ident) | Partial | Used value stored on `ResolvedStyle.PageName`. Unspecified/`auto` keeps the parent used name. A sibling whose used name changes gets `break-before: always`. `@page ident { margin }` applies on pages that overlap a box with that name. Size unnamed-only. Proof: `TestPageNameInherits`, `TestPageNameBreak`, `TestPageNamedMargins`. |
+| `@page` margin boxes (`@top-center` and friends) | Partial (lite) | Parses `@top-left/center/right` and `@bottom-left/center/right` quoted `content` strings (`css/page_margin.go`). Unnamed `@page` boxes fill empty CLI header/footer slots. Occupied CLI slots and `--header-html` win. `counter()` / `running()` drop. Proof: `TestParsePageMarginBoxes`, `TestPageMarginBoxes`, `TestPageMarginBoxesCLIWins`. |
 
 **Break aliases (54.2).** `page-break-*` and `break-*` share one store. The PDF writer has no left/right or even/odd page side (duplex is out of scope, §5). `break-before: left` does **not** force a left page; it aliases to page `always`.
 
@@ -177,7 +179,7 @@ Evidence: `internal/layout/flex.go`, `style_cascade.go` (`applyRestProps`) and `
 | `justify-content` (`flex-start` \| `flex-end` \| `center` \| `space-between` \| `space-around` \| `space-evenly`) | [x] Implemented | Row + column (definite height); `TestFlexSpaceEvenly` |
 | `align-items` (`stretch` \| `flex-start` \| `center` \| `flex-end`) | [x] Implemented | Row cross-axis stretch sizes auto-height items to the flex line (fixture-33); start/center/end honored; `TestFlexAlignItemsStretchRow` |
 | `align-self` | [x] Implemented | Overrides container; stretch follows same rules; `TestFlexAlignSelf` |
-| `align-content` (multi-line) | [~] Partial | Distributes free cross space when container height is definite and wrap produced ≥2 lines; `stretch` = pack at start |
+| `align-content` (multi-line) | [x] Implemented | Distributes free cross space when container height is definite and wrap produced ≥2 lines. `stretch` grows each line's cross size; auto-height items with `align-items`/`align-self` stretch fill the grown line. Height:auto packs at start. Row wrap only. `TestAlignContentStretch` |
 | `gap` / `row-gap` / `column-gap` | [x] Implemented | Independent longhands; shorthand fills both when longhands unset (`flexGaps`) |
 | `flex` shorthand (`none` \| `auto` \| grow/shrink/basis) | [x] Implemented | `parseFlexShorthand` |
 | `flex-grow` / `flex-shrink` / `flex-basis` | [x] Implemented | Length/%/auto basis; post grow/shrink min/max-width clamp; column grow/shrink when height definite |
@@ -192,7 +194,7 @@ Evidence: `internal/layout/grid.go`, `style.go`; fixtures 28/32/34/35; `grid_tes
 
 | Property | Status | Notes / verified by |
 |----------|--------|---------------------|
-| `display: grid` / `inline-grid` | [x] Implemented | Routed to `buildGrid`; nested grids OK |
+| `display: grid` / `inline-grid` | [x] Implemented | Routed to `buildGrid`. `inline-grid` is inline-level (`isInlineChild`) and stays in the paragraph IFC; `display:grid` still block-breaks. `TestInlineGridIsInlineLevel` |
 | `display: subgrid` | [~] Partial | `inheritSubgridFromParent` copy-inherits parent template columns (and unspecified gaps); tracks re-resolve against the subgrid's own content box. Joint Resolve Intrinsic / full subgrid L1 out of scope |
 | `grid-template-columns` | [x] Implemented | Lengths, `fr`, `repeat(N, …)`, `minmax(...)`; gap subtracted before `fr` distribute |
 | `grid-template-rows` | [x] Implemented | Consumed when height definite; fixed mins on auto-height; fixture-32 |
@@ -222,7 +224,8 @@ Evidence: `internal/layout/multicol.go`, `style_cascade.go` (`applyRestProps`) a
 | `column-fill` (`balance` \| `auto`) | [x] Implemented | Balance packs to equal stacks; auto fills to page/definite height |
 | Column box pagination | [x] Implemented | Column boxes do not cross page boundaries; new multicol line on next page — `TestMulticolLinesDoNotStraddlePages` |
 | `break-*: column \| avoid-column` | [~] Partial | `column` on before/after aliases to page `always` (`applyBreakBeforeProps` `style_properties.go:1486`). `avoid-column` is **ignored** (not page `avoid`). See §2.6 alias table. |
-| `column-rule*`, L2 integer spans, overflow columns | [ ] Missing | Deferred (see `plans/0.2.0/phases/tier-2-pending-3/multicol.md` out of scope) |
+| `column-rule` / `column-rule-width` / `column-rule-style` / `column-rule-color` | [x] Implemented | Border-style subset (`solid` / `dashed` / `dotted` / `none`); width `thin` / `medium` / `thick` plus lengths; color `currentColor`. Vertical rule centered in `column-gap`; gap 0 or `none` paints nothing. No column-axis (horizontal) rule. `TestColumnRuleParse`, `TestColumnRulePaints` |
+| L2 integer spans, overflow columns | [ ] Missing | Deferred (see `plans/0.2.0/phases/tier-2-pending-3/multicol.md` out of scope) |
 
 ## 3. Supported units
 
@@ -242,7 +245,8 @@ Status legend as in §2; resolution sites: `LengthToPt`
 | `rem` | Implemented | 16 px reference (`style.go:593, 657, 694`) |
 | `%` | Implemented | containing block for box/margins; parent font-size for `font-size` |
 | `vw`, `vh` | Partial | resolved for width/height/min/max (`lengthBox` `style.go:662-663`) only; ignored for margins/padding/font-size |
-| `ex`, `ch` | Partial | Resolved as 0.5em (`LengthToPt` `internal/css/container.go:133-134`, `exChToEmFactor`). Not font-metric x-height or advance width. |
+| `ex` | Partial | Resolved as 0.5em (`LengthToPt` `internal/css/container.go:133-134`, `exChToEmFactor`). Not font-metric x-height. |
+| `ch` | Partial | Layout uses the default Liberation face U+0030 DIGIT ZERO advance at the element's font-size (`lengthToPt` / `GlyphAdvancePoints`). Falls back to 0.5em when the face is missing or the advance is 0. Media/container queries still use `LengthToPt` 0.5em. Test `TestChUsesZeroGlyphAdvance`. |
 | `calc()` | Partial | Three-token subset only: `calc(A + B)`, `calc(A - B)`, `calc(A * N)` (`calcLength` `style_values.go:763`), used from `lengthBox` / `marginLen`. Longer or nested calc stays invalid so a fallback can win. |
 | `clamp()` | Partial | `clamp(min, pref, max)` via `clampLength`; no longer dropped from cascade. Nested calc inside clamp out. Test `TestClampLength`. `color-mix(` / `light-dark(` / `oklch(` still excluded. |
 | `vmin`, `vmax` | Partial | Layout `vminVmaxPt` (`style_values.go:668`) on `lengthBox` / `marginLen`. `css.ParseLength` still rejects them; used values are parsed in layout. Test `TestVminVmax`. |
@@ -258,8 +262,9 @@ Status legend as in §2; evidence in `internal/css/css.go`.
 | Universal (`*`) | Implemented | `css.go:456-459` |
 | Descendant (`div p`), child (`ul > li`) | Implemented | combinators `css.go:356-362`; matching `css.go:528-543` |
 | Sibling (`a + b`, `a ~ b`) | Implemented | next-sibling `+` and subsequent-sibling `~` (`css.Match`); test `TestSiblingCombinators` |
-| Attribute (`[href]`, `[href="…"]`) | Partial | presence, exact `=`, word `~=`, substring `*=`, prefix `^=`, suffix `$=`, dash `|=`; `TestAttrWordAndSubstring`, `TestAttrPrefixSuffixDash` |
+| Attribute (`[href]`, `[href="…"]`) | Partial | presence, exact `=`, word `~=`, substring `*=`, prefix `^=`, suffix `$=`, dash `|=`; ASCII `i` flag on valued selectors (`[attr=value i]`); no `s` flag. Tests `TestAttrWordAndSubstring`, `TestAttrPrefixSuffixDash`, `TestAttrIFlag` |
 | `:first-child`, `:last-child`, `:nth-child(n)` | Implemented | `odd`/`even`/`an+b`/integer; tests `TestMatch`, `TestNthChildZebraSheet` |
+| `:first-of-type`, `:last-of-type`, `:nth-of-type()`, `:nth-last-of-type()` | Implemented | 1-based index among same-tag siblings; `odd`/`even`/`an+b`/integer via `parseNthArg`/`matchNth`; invalid an+b never matches. Tests `TestFirstOfType`, `TestLastOfType`, `TestNthOfType`, `TestNthLastOfType` |
 | `:link`, `:visited` | Partial | Print semantics: match any `a` with non-empty `href` (no visit history; `:visited` ≡ `:link`). Specificity counts as a class-level pseudo. Proof: `TestLinkVisitedPseudos`, `TestLinkPseudoColor` |
 | `:hover`, `:active`, `:focus` | Not implemented (accepted, never match) | Parsed onto the compound but `matchPseudo` returns false so `a:hover` does not degrade to bare `a` |
 | `::before` / `::after` | Partial / Implemented | `MatchPseudo` plus generated content (`pseudo_content.go`): quoted strings and `attr()`. Host-element rules do not apply to the host |
@@ -275,7 +280,7 @@ Status legend as in §2; evidence in `internal/css/css.go`.
 | `var()` / `--*` custom properties | Partial | `--*` inherit then overlay (`mergeCustomProps` `style_cascade.go:18`); `var()` expanded before apply (`resolveRawVars` `style_cascade.go:45`; `ResolveCustomProps` `values.go:514`). Cycles resolve empty. Tests `cssvar_font_test.go`, `TestResolveCustomProps*` |
 | `@container` | Partial | Size queries only (`inline-size`/`width` + `and`/`or`/`not`); named containers; two-pass style after used inline size. No style/scroll-state queries; no `cq*` units. `internal/css/container.go`; fixture-42 |
 | `container-type` / `container-name` / `container` | Partial | Parsed `applyContainerProps` (`style_properties.go:1296`). Size containers measured in `layout/container.go:43`. `container-type` honors `normal`/`size`/`inline-size` only. No `cq*` units; no style/scroll-state. Fixture-42 |
-| `@page` | Partial | Unnamed `margin`/`size` on every page. `@page :first` can override **margin** on page 1 (`TestPageFirstMargins`). `:left`/`:right`/named pages parse only. Margin boxes (`@top-center`) not painted; CLI `--header-*` is repeating chrome. See §2.6. |
+| `@page` | Partial | Unnamed `margin`/`size` on every page. `:first` / `:left` / `:right` override **margin** (LTR page 1 is `:right`; `:first` wins on page 1). `page: ident` used-value inherit plus sibling break; named `@page` margin on pages that overlap that name. Size unnamed-only. Margin boxes: unnamed quoted `@top-*` / `@bottom-*` map to CLI HF empty slots. See §2.6. |
 | `@font-face` | Partial | Parsed; `MergeFontFaces` loads TTF/OTF/WOFF1 via `FetchSub` (local **and** `https://`) under the same ACL + `NetworkPolicy` on PDF and image paths. `.woff2` / `.eot` / `data:` skipped. See §5 |
 | `@import` | Partial | Parsed onto `Stylesheet.Imports`; `CollectSheets` fetches under the same ACL as `<link>`, depth cap 8, cycle skip, failed fetch skipped. Media prelude uses `MediaMatches`. Tests `TestParseImport`, `TestImportStylesheet` |
 

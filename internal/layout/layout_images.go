@@ -240,7 +240,7 @@ func (e *engine) paintReplacedImage(
 	}
 
 	inlineLevel := sty.Display == cssDisplayInline || sty.Display == cssDisplayInlineBlock ||
-		sty.Display == displayInlineFlex || sty.Display == ""
+		sty.Display == displayInlineFlex || sty.Display == displayInlineGrid || sty.Display == ""
 	if sty.Float == cssDisplayNone && inlineLevel {
 		return
 	}

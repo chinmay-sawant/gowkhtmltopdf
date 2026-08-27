@@ -156,16 +156,52 @@ func paintOptions(geom hfGeom) layout.PaintOptions {
 		MarginRight:  geom.marginRight,
 	}
 
-	if geom.first != nil {
-		opts.First = &layout.PageMargins{
-			Top:    geom.first.top,
-			Right:  geom.first.right,
-			Bottom: geom.first.bottom,
-			Left:   geom.first.left,
+	opts.First = layoutPageMargins(geom.first)
+	opts.Left = layoutPageMargins(geom.left)
+	opts.Right = layoutPageMargins(geom.right)
+	opts.Named = layoutNamedPageMargins(geom.named)
+
+	return opts
+}
+
+func layoutPageMargins(src *hfPageMargins) *layout.PageMargins {
+	if src == nil {
+		return nil
+	}
+
+	return &layout.PageMargins{
+		Top:    src.top,
+		Right:  src.right,
+		Bottom: src.bottom,
+		Left:   src.left,
+	}
+}
+
+func layoutNamedPageMargins(src map[string]*hfPageMargins) map[string]layout.PageMargins {
+	if len(src) == 0 {
+		return nil
+	}
+
+	out := make(map[string]layout.PageMargins, len(src))
+
+	for name, margins := range src {
+		if margins == nil {
+			continue
+		}
+
+		out[name] = layout.PageMargins{
+			Top:    margins.top,
+			Right:  margins.right,
+			Bottom: margins.bottom,
+			Left:   margins.left,
 		}
 	}
 
-	return opts
+	if len(out) == 0 {
+		return nil
+	}
+
+	return out
 }
 
 // paintCount lays the result out into a scratch document and returns its

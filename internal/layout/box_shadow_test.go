@@ -59,6 +59,79 @@ func TestBoxShadowPaints(t *testing.T) {
 	t.Run("layout-size-unchanged", testBoxShadowLayoutSizeUnchanged)
 }
 
+func TestBoxShadowBlurPaints(t *testing.T) {
+	t.Parallel()
+
+	t.Run("stacked-fills", testBoxShadowBlurStackedFills)
+	t.Run("layout-size-unchanged", testBoxShadowBlurLayoutSizeUnchanged)
+}
+
+func testBoxShadowBlurStackedFills(t *testing.T) {
+	t.Parallel()
+
+	eng := &engine{scale: 1, opts: Options{Background: true}} //nolint:exhaustruct // chrome probe
+	sharp := ResolvedStyle{                                   //nolint:exhaustruct // shadow fields under test
+		BoxShadowX:     2,
+		BoxShadowY:     2,
+		BoxShadowColor: [3]float64{0, 0, 0},
+		BoxShadowSet:   true,
+	}
+	soft := sharp
+	soft.BoxShadowBlur = 4
+	boxNode := &box{style: &sharp, w: 100, height: 50} //nolint:exhaustruct // geometry probe
+
+	eng.prependChrome(0, boxNode, sharp, 10, 20, 100, 50)
+	sharpFills := countBlackFills(eng.deferredChrome[0].ops)
+
+	eng.deferredChrome = nil
+	boxNode.style = &soft
+	eng.prependChrome(0, boxNode, soft, 10, 20, 100, 50)
+	softOps := eng.deferredChrome[0].ops
+	softFills := countBlackFills(softOps)
+
+	if sharpFills != 1 {
+		t.Fatalf("blur=0 black fills = %d, want 1", sharpFills)
+	}
+
+	if softFills <= sharpFills {
+		t.Fatalf("blur>0 black fills = %d, want more than blur=0 (%d)", softFills, sharpFills)
+	}
+
+	if !hasOffsetShadowFill(softOps, 12, 22, 100, 50) {
+		t.Fatalf("missing core shadow fill at 12,22 100x50 in %+v", softOps)
+	}
+
+	if !hasExpandedShadowFill(softOps, 12, 22, 100, 50) {
+		t.Fatalf("missing expanded blur fill larger than 100x50 in %+v", softOps)
+	}
+}
+
+func testBoxShadowBlurLayoutSizeUnchanged(t *testing.T) {
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+body { margin: 0 }
+.box { width: 100pt; height: 40pt; background: #fff; box-shadow: 2pt 2pt 4pt #000 }
+`)
+	res := layoutHTML(t, `<html><body><div class="box">x</div></body></html>`, cssSheet)
+	boxNode := findBoxByClass(t, res, "box")
+	if !near(boxNode.w, 100) {
+		t.Fatalf("box width = %.3f, want 100 (blur must not grow layout)", boxNode.w)
+	}
+
+	if !near(boxNode.height, 40) {
+		t.Fatalf("box height = %.3f, want 40 (blur must not grow layout)", boxNode.height)
+	}
+
+	if !hasOffsetShadowFill(res.Ops, boxNode.x+2, boxNode.y+2, boxNode.w, boxNode.height) {
+		t.Fatalf("missing core shadow fill at offset of box %+v in ops", boxNode)
+	}
+
+	if countBlackFills(res.Ops) <= 1 {
+		t.Fatalf("blur>0 should paint more than the core fill, got %d black fills", countBlackFills(res.Ops))
+	}
+}
+
 func testBoxShadowOffsetFill(t *testing.T) {
 	t.Parallel()
 
@@ -134,4 +207,30 @@ func hasOffsetShadowFill(ops []Op, x, y, w, h float64) bool {
 	}
 
 	return false
+}
+
+func hasExpandedShadowFill(ops []Op, x, y, w, h float64) bool {
+	for _, op := range ops {
+		if op.Kind != OpFillRect || op.R != 0 || op.G != 0 || op.B != 0 {
+			continue
+		}
+
+		if op.W > w+0.01 && op.H > h+0.01 && op.X < x-0.01 && op.Y < y-0.01 {
+			return true
+		}
+	}
+
+	return false
+}
+
+func countBlackFills(ops []Op) int {
+	count := 0
+
+	for _, op := range ops {
+		if op.Kind == OpFillRect && op.R == 0 && op.G == 0 && op.B == 0 {
+			count++
+		}
+	}
+
+	return count
 }

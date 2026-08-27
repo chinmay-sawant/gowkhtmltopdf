@@ -52,6 +52,48 @@ caption { caption-side: bottom; }
 	}
 }
 
+func TestCaptionSideLeft(t *testing.T) {
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+body { margin: 0; font-size: 12pt; }
+table { caption-side: left; border-collapse: collapse; }
+caption { caption-side: left; }
+`)
+	left := layoutCaptionSide(t, captionFixture, floatLeft, cssSheet)
+	capBox := findNamedBox(left.root, "caption")
+	cell := findNamedBox(left.root, "td")
+	if capBox == nil || cell == nil {
+		t.Fatal("caption-side:left table missing caption or body cell")
+	}
+
+	if capBox.x >= cell.x-1 {
+		t.Fatalf("caption-side:left should sit left of the grid: caption.x=%.2f cell.x=%.2f",
+			capBox.x, cell.x)
+	}
+}
+
+func TestCaptionSideRight(t *testing.T) {
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+body { margin: 0; font-size: 12pt; }
+table { caption-side: right; border-collapse: collapse; }
+caption { caption-side: right; }
+`)
+	right := layoutCaptionSide(t, captionFixture, floatRight, cssSheet)
+	capBox := findNamedBox(right.root, "caption")
+	cell := findNamedBox(right.root, "td")
+	if capBox == nil || cell == nil {
+		t.Fatal("caption-side:right table missing caption or body cell")
+	}
+
+	if capBox.x <= cell.x+1 {
+		t.Fatalf("caption-side:right should sit right of the grid: caption.x=%.2f cell.x=%.2f",
+			capBox.x, cell.x)
+	}
+}
+
 func layoutCaptionSide(t *testing.T, src, side string, sheets ...*css.Stylesheet) *Result {
 	t.Helper()
 

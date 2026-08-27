@@ -21,4 +21,4 @@ Catalog-driven print CSS coverage: download the spec property list, map it onto 
 
 - `make test`, `make lint`, `make claim-scan`, `make golden`, `make build` green 2026-08-27 on `feature/026-extended-css-support`
 - Mapping counts: `catalog/coverage-summary.json`
-- VERSION still 0.2.5. Leftovers are `[~]` in the canonical ledger (`page: ident`, `@page` margin boxes, fixture-gated flex/float depth)
+- VERSION still 0.2.5. Leftovers are `[~]` in the canonical ledger (fixture-gated flex/float depth). Phase 54 `page: ident` and `@page` margin boxes shipped lite (see phase-54).

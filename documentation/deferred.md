@@ -89,11 +89,12 @@ Do not treat a public SPA URL as the acceptance bar for report work.
 | `@page size` | **Consumed** via `applyCSSPageMargins` (EXT-04); unnamed `@page margin` likewise. | #EXT-04 done |
 | `background-image` / gradients | **Partial** first `url(...)` layer (`background_image.go`); gradients still ignored. | Phase 52 |
 | Overflow clip | **Partial**: `hidden`/`clip`/`auto`/`scroll` clip descendant paint to the padding box (`overflow_clip.go`). Sticky still uses overflow as scrollport at offset 0. | Phase 52 |
-| Leftover print CSS | Active ledger: [`plans/0.2.6/48-canonical-0.2.6-css-coverage.md`](../plans/0.2.6/48-canonical-0.2.6-css-coverage.md). Do not treat `plans/0.2.0/phases/pending-phase-items/` as the live CSS list. | 0.2.6 phases 54-56 |
-| `box-shadow` | No apply arm in `style_properties.go`. No shadow paint op. | 52.5 `[~]`; next gate is a named report fixture that needs one un-inset shadow |
-| `list-style-image` | No apply arm. List markers stay disc/decimal/alpha/roman text (`markerText`). | 53.4 `[~]` |
-| `@page :first` / `:left` / `:right` | `:first` margins apply on page 1 (`TestPageFirstMargins`). `:left`/`:right`/named pages parse onto `Pages` and are not applied. Size is unnamed-only. | 54.1.3 `page: ident` `[~]` |
-| `@page` margin boxes (`@top-center`) | Not parsed. Repeating chrome is CLI `--header-*` / `--footer-*`. | 54.3 `[~]` |
+| Leftover print CSS | Active ledger: [`plans/0.2.6/48-canonical-0.2.6-css-coverage.md`](../plans/0.2.6/48-canonical-0.2.6-css-coverage.md). Do not treat `plans/0.2.0/phases/pending-phase-items/` as the live CSS list. | 0.2.6 leftovers: float wrap, duplex size, GCPM |
+| `box-shadow` | **Partial** un-inset offset fill plus lite stacked-rect blur (`box_shadow.go`). Inset and spread ignored. | 52.5 `[x]` |
+| `list-style-image` | Paints via the img fetch path; type marker fallback. | 53.4 `[x]` |
+| `@page :first` / `:left` / `:right` | Margins applied. LTR page 1 is `:right`; `:first` wins on page 1. Size unnamed-only. | 54.1.2 `[x]` |
+| `page: ident` | Used-value inherit; sibling name change breaks; named `@page` margin on overlapping pages. No per-page size. | 54.1.3 `[x]` lite |
+| `@page` margin boxes (`@top-center`) | Unnamed quoted `@top-*` / `@bottom-*` fill empty CLI header/footer slots. `running()` / corners out. | 54.3 `[x]` lite |
 
 ---
 

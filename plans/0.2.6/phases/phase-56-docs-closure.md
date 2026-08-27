@@ -43,7 +43,7 @@ Unshipped rows from 49-55 must be `[~]` with reason. Do not `[x]` this phase whi
 
 - [x] 56.3.1 plans/README.md 0.2.6 row.
 - [x] 56.3.2 KB log/roadmap/css-engine updated this session.
-- [x] 56.3.3 Remaining open work is `[~]` with pointers (page:ident, margin boxes, fixture-gated flex leftovers).
+- [x] 56.3.3 Remaining open work is `[~]` with pointers (fixture-gated flex leftovers). Phase 54 `page: ident` and margin boxes shipped lite.
 
 ## Dependencies
 

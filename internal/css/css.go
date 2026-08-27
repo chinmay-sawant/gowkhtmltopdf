@@ -3,8 +3,9 @@
 // specificity ordering, and value helpers (lengths, colors, font families).
 //
 // Scope: `*`, type, `.class`, `#id`, attribute selectors (`[attr]`, `=`, `~=`,
-// `*=`, `^=`, `$=`, `|=`),
-// :first-child/:last-child/:nth-child/:has()/:not()/:is()/:where(),
+// `*=`, `^=`, `$=`, `|=`, ASCII `i` flag),
+// :first-child/:last-child/:nth-child/:first-of-type/:last-of-type/
+// :nth-of-type/:nth-last-of-type/:has()/:not()/:is()/:where(),
 // descendant/child/sibling combinators, `@media` type + size-feature matching
 // (see MediaMatches),
 // `@container` size queries (inline-size/width + and/or/not), `!important`,
@@ -49,14 +50,18 @@ const (
 
 // Pseudo-class and pseudo-element names shared across selector parsing.
 const (
-	pseudoClassHas   = "has"
-	pseudoClassIs    = "is"
-	pseudoClassWhere = "where"
-	pseudoElemBefore = "before"
-	pseudoElemAfter  = "after"
-	nthChildPseudo   = "nth-child"
-	firstChildPseudo = "first-child"
-	lastChildPseudo  = "last-child"
+	pseudoClassHas      = "has"
+	pseudoClassIs       = "is"
+	pseudoClassWhere    = "where"
+	pseudoElemBefore    = "before"
+	pseudoElemAfter     = "after"
+	nthChildPseudo      = "nth-child"
+	firstChildPseudo    = "first-child"
+	lastChildPseudo     = "last-child"
+	nthOfTypePseudo     = "nth-of-type"
+	nthLastOfTypePseudo = "nth-last-of-type"
+	firstOfTypePseudo   = "first-of-type"
+	lastOfTypePseudo    = "last-of-type"
 )
 
 // Stylesheet is a parsed stylesheet. Rules keep their source order.
@@ -89,11 +94,13 @@ type PageStyle struct {
 }
 
 // PageRule is one @page block. Sel is "" (unnamed), ":first", ":left",
-// ":right", or a page name ident.
+// ":right", or a page name ident. Boxes holds lite margin-box content
+// strings (@top-center and friends); empty slots were not declared.
 type PageRule struct {
 	Sel    string
 	Margin string
 	Size   string
+	Boxes  PageMarginBoxes
 }
 
 // FontFace is one @font-face rule (local src subset).
@@ -139,11 +146,13 @@ type SelectorPart struct {
 
 // AttrSelector is [name], [name=value] (exact), [name~=word] (space-separated
 // word), [name*=substr] (substring), [name^=prefix], [name$=suffix], or
-// [name|=ident] (exact or prefix-plus-hyphen).
+// [name|=ident] (exact or prefix-plus-hyphen). IgnoreCase is the Selectors 4
+// ASCII i flag on valued selectors ([attr=value i]).
 type AttrSelector struct {
-	Name  string
-	Op    string // "", "=", "~=", "*=", "^=", "$=", "|="
-	Value string
+	Name       string
+	Op         string // "", "=", "~=", "*=", "^=", "$=", "|="
+	Value      string
+	IgnoreCase bool
 }
 
 // RelativeSelector is a complex selector interpreted relative to a subject
@@ -153,16 +162,16 @@ type RelativeSelector struct {
 	Parts   []SelectorPart
 }
 
-// PseudoClass is :first-child, :last-child, :nth-child(...), :has(...),
-// :not(...), :is(...), or :where(...).
+// PseudoClass is :first-child, :last-child, :nth-child(...), :nth-of-type(...),
+// :has(...), :not(...), :is(...), or :where(...).
 type PseudoClass struct {
 	Name string // lower-case, without leading ':'
-	Arg  string // nth-child argument, lower-case, trimmed
+	Arg  string // nth-child / nth-of-type argument, lower-case, trimmed
 	Has  []RelativeSelector
 	Not  []Selector
 	Is   []Selector // :is() / :where() argument list
-	// nth caches the parsed :nth-child argument (see nthForm) so matching is
-	// pure integer arithmetic; kind zero (unparseable) never matches.
+	// nth caches the parsed :nth-child / :nth-of-type argument (see nthForm)
+	// so matching is pure integer arithmetic; kind zero (unparseable) never matches.
 	nth nthForm `exhaustruct:"optional"`
 }
 
@@ -238,6 +247,7 @@ func parsePageRule(src string, str *Stylesheet) (string, error) {
 		return "", err
 	}
 
+	boxes := extractPageMarginBoxes(block)
 	block = stripNestedAtRules(block)
 	sel := parsePageSelector(src[len("@page"):open])
 
@@ -256,6 +266,7 @@ func parsePageRule(src string, str *Stylesheet) (string, error) {
 		Sel:    sel,
 		Margin: margin,
 		Size:   size,
+		Boxes:  boxes,
 	})
 
 	if sel == "" {
@@ -301,6 +312,13 @@ func parsePageSelector(prelude string) string {
 	}
 
 	return pageIdent(prelude)
+}
+
+// IsIdentToken reports that s is a single CSS ident with no leftover tokens.
+func IsIdentToken(s string) bool {
+	s = strings.TrimSpace(s)
+
+	return s != "" && pageIdent(s) == s
 }
 
 // pageIdent returns the leading CSS ident in src, or "" if src does not start with one.
@@ -1255,7 +1273,8 @@ func appendIsWherePseudo(part SelectorPart, name, argRaw string, insideHas bool)
 // CSS2 single-colon pseudo-elements.
 func appendSimplePseudo(part SelectorPart, name, arg string) (SelectorPart, bool) {
 	switch name {
-	case firstChildPseudo, lastChildPseudo, nthChildPseudo:
+	case firstChildPseudo, lastChildPseudo, nthChildPseudo,
+		firstOfTypePseudo, lastOfTypePseudo, nthOfTypePseudo, nthLastOfTypePseudo:
 		part.Pseudos = append(part.Pseudos, pseudoClass(name, arg, nil, nil))
 	case "link", "visited":
 		// Print semantics: both mean "a[href]" (no browsing history).
@@ -1285,7 +1304,7 @@ func appendSimplePseudo(part SelectorPart, name, arg string) (SelectorPart, bool
 func pseudoClass(name, arg string, has []RelativeSelector, not []Selector) PseudoClass {
 	pseudo := PseudoClass{Name: name, Arg: arg, Has: has, Not: not, Is: nil}
 
-	if name == nthChildPseudo {
+	if isNthArgPseudo(name) {
 		pseudo.nth = parseNthArg(arg)
 	}
 
@@ -1321,7 +1340,9 @@ func parseAttrSelector(sel string) (AttrSelector, bool) {
 	}
 
 	name := strings.TrimSpace(inner[:nameEnd])
-	val := stripAttrQuotes(strings.TrimSpace(inner[nameEnd+len(oper):]))
+	rawVal := strings.TrimSpace(inner[nameEnd+len(oper):])
+	rawVal, ignoreCase := splitAttrIFlag(rawVal)
+	val := stripAttrQuotes(rawVal)
 
 	if !validIdent(name) {
 		return AttrSelector{}, false //nolint:exhaustruct // intentional zero-value fields
@@ -1329,7 +1350,12 @@ func parseAttrSelector(sel string) (AttrSelector, bool) {
 
 	switch oper {
 	case "=", "~=", "*=", "^=", "$=", "|=":
-		return AttrSelector{Name: strings.ToLower(name), Op: oper, Value: val}, true
+		return AttrSelector{
+			Name:       strings.ToLower(name),
+			Op:         oper,
+			Value:      val,
+			IgnoreCase: ignoreCase,
+		}, true
 	default:
 		return AttrSelector{}, false //nolint:exhaustruct // intentional zero-value fields
 	}
@@ -1515,7 +1541,7 @@ func matchAttrs(part SelectorPart, node *html.Node) bool {
 			return false
 		}
 
-		if !attrValueMatches(arg.Op, val, arg.Value) {
+		if !attrValueMatches(arg.Op, val, arg.Value, arg.IgnoreCase) {
 			return false
 		}
 	}
@@ -1524,7 +1550,13 @@ func matchAttrs(part SelectorPart, node *html.Node) bool {
 }
 
 // attrValueMatches evaluates one attribute operator against a value.
-func attrValueMatches(oper, val, want string) bool {
+// ignoreCase is the Selectors 4 ASCII i flag; comparison uses ToLower.
+func attrValueMatches(oper, val, want string, ignoreCase bool) bool {
+	if ignoreCase {
+		val = strings.ToLower(val)
+		want = strings.ToLower(want)
+	}
+
 	switch oper {
 	case "=":
 		return val == want
@@ -1586,7 +1618,8 @@ func containsWord(val, want string) bool {
 
 func matchPseudo(pseudo PseudoClass, node *html.Node) bool {
 	switch pseudo.Name {
-	case firstChildPseudo, lastChildPseudo, nthChildPseudo, "root":
+	case firstChildPseudo, lastChildPseudo, nthChildPseudo, "root",
+		firstOfTypePseudo, lastOfTypePseudo, nthOfTypePseudo, nthLastOfTypePseudo:
 		return matchTreePseudo(pseudo, node)
 	case pseudoClassHas:
 		return matchAnyRelative(pseudo.Has, node)
@@ -1617,7 +1650,7 @@ func matchTreePseudo(pseudo PseudoClass, node *html.Node) bool {
 	case "root":
 		return isRootElement(node)
 	default:
-		return false
+		return matchOfTypePseudo(pseudo, node)
 	}
 }
 
@@ -1751,7 +1784,7 @@ func elementIndex(count *html.Node) int {
 type nthKind int
 
 const (
-	nthInvalid nthKind = iota // unparseable, or not a :nth-child pseudo
+	nthInvalid nthKind = iota // unparseable, or not an nth-* pseudo
 	nthOdd
 	nthEven
 	nthInt

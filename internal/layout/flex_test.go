@@ -2,6 +2,7 @@
 package layout
 
 import (
+	"math"
 	"strings"
 	"testing"
 
@@ -457,6 +458,76 @@ func TestFlexAlignItemsStretchRow(t *testing.T) { //nolint:cyclop
 	for i, h := range itemH {
 		if h < 34 || h > 38 {
 			t.Errorf("item[%d] fill h=%.2f, want ~36pt (stretched to row height)", i, h)
+		}
+	}
+}
+
+// TestAlignContentStretch grows wrapped flex lines into leftover cross space
+// (and stretch items with auto height). Height:auto still packs at start.
+func TestAlignContentStretch(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: stretch;
+  width: 100pt;
+  height: 100pt;
+  gap: 0;
+}
+.row > div { width: 80pt; background: #90caf9; font-size: 10pt }
+.auto {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: stretch;
+  width: 100pt;
+  gap: 0;
+}
+.auto > div { width: 80pt; background: #ffcc80; font-size: 10pt }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="row"><div>A</div><div>B</div></div>
+<div class="auto"><div>C</div><div>D</div></div>
+</body></html>`, cssSheet)
+
+	var stretchH, autoH []float64
+
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpFillRect {
+			continue
+		}
+
+		if paintOp.R > 0.5 && paintOp.R < 0.7 && paintOp.B > 0.9 && paintOp.W > 60 {
+			stretchH = append(stretchH, paintOp.H)
+		}
+
+		if paintOp.R > 0.9 && paintOp.G > 0.7 && paintOp.G < 0.9 && paintOp.W > 60 {
+			autoH = append(autoH, paintOp.H)
+		}
+	}
+
+	if len(stretchH) < 2 {
+		t.Fatalf("stretch item fills = %d, want 2", len(stretchH))
+	}
+
+	for i, h := range stretchH {
+		if h < 40 {
+			t.Errorf("stretch item[%d] h=%.2f, want ~50pt (free cross space split across 2 lines)", i, h)
+		}
+	}
+
+	if math.Abs(stretchH[0]-stretchH[1]) > 4 {
+		t.Errorf("stretch line heights %.2f vs %.2f, want roughly equal", stretchH[0], stretchH[1])
+	}
+
+	if len(autoH) < 2 {
+		t.Fatalf("height:auto item fills = %d, want 2", len(autoH))
+	}
+
+	for i, h := range autoH {
+		if h > 30 {
+			t.Errorf("height:auto item[%d] h=%.2f, want content-sized pack-at-start", i, h)
 		}
 	}
 }

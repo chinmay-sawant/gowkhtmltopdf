@@ -244,3 +244,188 @@ body { margin: 0 }
 		t.Fatalf("expected multi-page multicol, got pages %v", pages)
 	}
 }
+
+func TestColumnRuleParse(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+.a { column-rule: 4pt dashed red }
+.outer { color: blue }
+.b { column-rule-width: medium; column-rule-style: solid; column-rule-color: currentColor }
+.c { column-rule-width: thin }
+.d { column-rule-width: thick }
+.e { column-rule-style: none }
+.f { column-rule: dotted }
+`)
+	root := mustParse(t, `<html><body>
+<div class="a">A</div>
+<div class="outer"><div class="b">B</div></div>
+<div class="c">C</div>
+<div class="d">D</div>
+<div class="e">E</div>
+<div class="f">F</div>
+</body></html>`)
+	styles := resolveStyles(root, []*css.Stylesheet{cssSheet}, "print", 500, 800)
+
+	a := styleByClass(t, styles, "a")
+	if !near(a.ColumnRuleWidth, 4) {
+		t.Fatalf("a width=%.3f, want 4pt", a.ColumnRuleWidth)
+	}
+
+	if a.ColumnRuleStyle != borderStyleDashed {
+		t.Fatalf("a style=%q, want dashed", a.ColumnRuleStyle)
+	}
+
+	if a.ColumnRuleColor != ([3]float64{1, 0, 0}) {
+		t.Fatalf("a color=%v, want red", a.ColumnRuleColor)
+	}
+
+	b := styleByClass(t, styles, "b")
+	if !near(b.ColumnRuleWidth, borderWidth(mediumKeyword, defaultFontSizePt)) {
+		t.Fatalf("b width:medium = %.3f", b.ColumnRuleWidth)
+	}
+
+	if b.ColumnRuleStyle != solidKeyword {
+		t.Fatalf("b style=%q, want solid", b.ColumnRuleStyle)
+	}
+
+	if b.ColumnRuleColor != ([3]float64{0, 0, 1}) {
+		t.Fatalf("b currentColor=%v, want blue", b.ColumnRuleColor)
+	}
+
+	if !near(styleByClass(t, styles, "c").ColumnRuleWidth, borderWidth(thinKeyword, defaultFontSizePt)) {
+		t.Fatalf("c thin width=%.3f", styleByClass(t, styles, "c").ColumnRuleWidth)
+	}
+
+	if !near(styleByClass(t, styles, "d").ColumnRuleWidth, borderWidth(thickKeyword, defaultFontSizePt)) {
+		t.Fatalf("d thick width=%.3f", styleByClass(t, styles, "d").ColumnRuleWidth)
+	}
+
+	if styleByClass(t, styles, "e").ColumnRuleStyle != cssDisplayNone {
+		t.Fatalf("e style=%q, want none", styleByClass(t, styles, "e").ColumnRuleStyle)
+	}
+
+	f := styleByClass(t, styles, "f")
+	if f.ColumnRuleStyle != borderStyleDotted {
+		t.Fatalf("f shorthand style=%q, want dotted", f.ColumnRuleStyle)
+	}
+
+	if !near(f.ColumnRuleWidth, borderWidth(mediumKeyword, defaultFontSizePt)) {
+		t.Fatalf("f shorthand width=%.3f, want medium", f.ColumnRuleWidth)
+	}
+}
+
+func TestColumnRulePaints(t *testing.T) { //nolint:cyclop
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+body { margin: 0 }
+.mc {
+  column-count: 2;
+  column-gap: 20pt;
+  column-rule: 2pt solid red;
+  width: 220pt;
+  column-fill: balance;
+}
+.mc p { margin: 0 0 4pt 0; font-size: 10pt }
+.nogap {
+  column-count: 2;
+  column-gap: 0;
+  column-rule: 2pt solid red;
+  width: 220pt;
+}
+.nogap p { margin: 0; font-size: 10pt }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="mc">
+  <p>Alpha left column line one.</p>
+  <p>Bravo more text for height.</p>
+  <p>Charlie right column start.</p>
+  <p>Delta trailing paragraph.</p>
+</div>
+<div class="nogap">
+  <p>Left nogap text here.</p>
+  <p>Right nogap text here.</p>
+</div>
+</body></html>`, cssSheet)
+
+	pos := map[string]float64{}
+
+	for _, op := range res.Ops {
+		if op.Kind != OpText {
+			continue
+		}
+
+		for _, key := range []string{"Alpha", "Charlie"} {
+			if len(op.Text) >= len(key) && op.Text[:len(key)] == key {
+				pos[key] = op.X
+			}
+		}
+	}
+
+	if _, ok := pos["Alpha"]; !ok {
+		t.Fatal("missing Alpha")
+	}
+
+	if _, ok := pos["Charlie"]; !ok {
+		t.Fatal("missing Charlie")
+	}
+
+	left, right := pos["Alpha"], pos["Charlie"]
+	if right < left {
+		left, right = right, left
+	}
+
+	var rule Op
+
+	found := false
+
+	for _, op := range res.Ops {
+		isStroke := op.Kind == OpLine || op.Kind == OpStrokeRect || op.Kind == OpFillRect
+		if !isStroke || op.R < 0.9 || op.G > 0.2 || op.B > 0.2 {
+			continue
+		}
+
+		mid := op.X
+		if op.W > 0 {
+			mid += op.W / 2
+		}
+
+		if mid > left && mid < right && op.H > 4 {
+			rule = op
+			found = true
+
+			break
+		}
+	}
+
+	if !found {
+		t.Fatalf("no red rule between columns (left=%.1f right=%.1f)", left, right)
+	}
+
+	// Gap sits after the left column box (≈100pt of 220pt) and before the
+	// right column start. The rule is centered in that 20pt gutter.
+	if rule.X < left+80 || rule.X > right+2 {
+		t.Fatalf("rule x=%.1f not in column-gap (left=%.1f right=%.1f)", rule.X, left, right)
+	}
+
+	redBetweenNogap := 0
+
+	for _, op := range res.Ops {
+		if op.Kind != OpLine && op.Kind != OpStrokeRect {
+			continue
+		}
+
+		if op.R < 0.9 || op.G > 0.2 || op.B > 0.2 {
+			continue
+		}
+
+		if op.Y > rule.Y+rule.H+8 {
+			redBetweenNogap++
+		}
+	}
+
+	if redBetweenNogap != 0 {
+		t.Fatalf("column-gap:0 painted %d red rules, want 0", redBetweenNogap)
+	}
+}

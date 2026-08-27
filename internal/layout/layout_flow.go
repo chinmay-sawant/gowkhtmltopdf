@@ -83,7 +83,7 @@ func (e *engine) isInlineChild(node *html.Node) bool {
 	}
 
 	return cstate.Display == cssDisplayInline || cstate.Display == cssDisplayInlineBlock ||
-		cstate.Display == displayInlineFlex
+		cstate.Display == displayInlineFlex || cstate.Display == displayInlineGrid
 }
 
 // blockishDisplay reports display values that force a block formatting

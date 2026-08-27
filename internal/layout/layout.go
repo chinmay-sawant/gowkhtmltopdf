@@ -370,8 +370,11 @@ type Op struct {
 	// 0 or unset (≥1) means fully opaque. Nested opacities are multiplied.
 	PaintOpacity float64
 	// Radius is the uniform border radius for rounded fill/stroke rectangles.
-	Radius                                                             float64
-	RadiusTopLeft, RadiusTopRight, RadiusBottomRight, RadiusBottomLeft float64
+	// RadiusY is the vertical radius when corners are elliptical; 0 means ry=rx.
+	Radius                                                                 float64
+	RadiusTopLeft, RadiusTopRight, RadiusBottomRight, RadiusBottomLeft     float64
+	RadiusY                                                                float64
+	RadiusTopLeftY, RadiusTopRightY, RadiusBottomRightY, RadiusBottomLeftY float64
 
 	// StructElem is the PDF/UA-1 logical structure element associated with this op.
 	StructElem *pdf.StructElem

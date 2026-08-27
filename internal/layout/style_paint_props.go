@@ -167,13 +167,13 @@ func applyOutlineToken(style *ResolvedStyle, token string, fsize float64) {
 func applyRadiusLonghand(style *ResolvedStyle, prop, value string, fsize float64) bool {
 	switch prop {
 	case "border-top-left-radius":
-		setCornerRadius(style, &style.BorderRadiusTopLeft, value, fsize)
+		setCornerRadius(style, &style.BorderRadiusTopLeft, &style.BorderRadiusTopLeftY, value, fsize)
 	case "border-top-right-radius":
-		setCornerRadius(style, &style.BorderRadiusTopRight, value, fsize)
+		setCornerRadius(style, &style.BorderRadiusTopRight, &style.BorderRadiusTopRightY, value, fsize)
 	case "border-bottom-right-radius":
-		setCornerRadius(style, &style.BorderRadiusBottomRight, value, fsize)
+		setCornerRadius(style, &style.BorderRadiusBottomRight, &style.BorderRadiusBottomRightY, value, fsize)
 	case "border-bottom-left-radius":
-		setCornerRadius(style, &style.BorderRadiusBottomLeft, value, fsize)
+		setCornerRadius(style, &style.BorderRadiusBottomLeft, &style.BorderRadiusBottomLeftY, value, fsize)
 	default:
 		return false
 	}
@@ -181,44 +181,68 @@ func applyRadiusLonghand(style *ResolvedStyle, prop, value string, fsize float64
 	return true
 }
 
-func setCornerRadius(style *ResolvedStyle, dest *float64, value string, fsize float64) {
-	token := firstRadiusToken(value)
+func setCornerRadius(style *ResolvedStyle, destX, destY *float64, value string, fsize float64) {
+	rxTok, ryTok, hasY := splitCornerRadiusTokens(value)
+	if rxTok == "" {
+		return
+	}
+
+	if applyCornerRadiusPercent(style, destX, destY, rxTok) {
+		return
+	}
+
+	if !applyCornerRadiusX(style, destX, destY, rxTok, fsize) {
+		return
+	}
+
+	if hasY {
+		applyCornerRadiusY(destY, ryTok, fsize)
+	}
+}
+
+func applyCornerRadiusX(style *ResolvedStyle, destX, destY *float64, token string, fsize float64) bool {
+	radius, ok := lengthBox(token, fsize, 0, cssDisplayNone)
+	if !ok || radius < 0 {
+		return false
+	}
+
+	*destX = radius
+	*destY = 0
+	style.BorderRadius = 0
+	style.BorderRadiusPercent = -1
+
+	return true
+}
+
+func applyCornerRadiusY(destY *float64, token string, fsize float64) {
 	if token == "" {
 		return
 	}
 
-	if v, unit, ok := css.ParseLength(token); ok && unit == "%" {
-		if v >= 0 {
-			*dest = v
-			style.BorderRadius = 0
-			style.BorderRadiusPercent = v
-		}
-
+	if _, unit, parsed := css.ParseLength(token); parsed && unit == "%" {
 		return
 	}
 
-	radius, ok := lengthBox(token, fsize, 0, cssDisplayNone)
-	if !ok || radius < 0 {
+	radiusY, ok := lengthBox(token, fsize, 0, cssDisplayNone)
+	if !ok || radiusY < 0 {
 		return
 	}
 
-	*dest = radius
-	style.BorderRadius = 0
-	style.BorderRadiusPercent = -1
+	*destY = radiusY
 }
 
-func firstRadiusToken(value string) string {
-	value = strings.TrimSpace(value)
-	if before, _, ok := strings.Cut(value, "/"); ok {
-		value = strings.TrimSpace(before)
+func applyCornerRadiusPercent(style *ResolvedStyle, destX, destY *float64, token string) bool {
+	percent, unit, ok := css.ParseLength(token)
+	if !ok || unit != "%" || percent < 0 {
+		return false
 	}
 
-	token, _, ok := nextSpaceToken(value, 0)
-	if !ok {
-		return ""
-	}
+	*destX = percent
+	*destY = 0
+	style.BorderRadius = 0
+	style.BorderRadiusPercent = percent
 
-	return token
+	return true
 }
 
 func applyBackgroundShorthand(style *ResolvedStyle, value string) {

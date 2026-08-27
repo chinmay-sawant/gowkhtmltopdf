@@ -376,7 +376,7 @@ func parseBorder(value string, fsize float64, current [3]float64) (border, bool)
 				boxNode.Color = [3]float64{float64(r) / 255, float64(g) / 255, float64(bb) / 255}
 			} else if v, unit, ok := css.ParseLength(face); ok {
 				boxNode.Width = v
-				if pt, converted := css.LengthToPt(v, unit, fsize); converted {
+				if pt, converted := lengthToPt(v, unit, fsize); converted {
 					boxNode.PaintWidth = pt
 				}
 			}
@@ -463,7 +463,7 @@ func borderPaintWidth(value string, fsize float64) float64 {
 	}
 
 	if v, unit, ok := css.ParseLength(value); ok {
-		if pt, converted := css.LengthToPt(v, unit, fsize); converted {
+		if pt, converted := lengthToPt(v, unit, fsize); converted {
 			return pt
 		}
 	}
@@ -499,7 +499,7 @@ func fontSize(value string, parent, remBase float64) float64 {
 		case remUnit:
 			return remBase * val
 		default:
-			if pt, ok := css.LengthToPt(val, unit, parent); ok {
+			if pt, ok := lengthToPt(val, unit, parent); ok {
 				return pt
 			}
 		}
@@ -548,7 +548,7 @@ func lineHeight(value string, fsize float64) float64 {
 			return fsize * v / cssPercent
 		}
 
-		if pt, ok := css.LengthToPt(v, unit, fsize); ok {
+		if pt, ok := lengthToPt(v, unit, fsize); ok {
 			return pt
 		}
 	}
@@ -742,7 +742,7 @@ func lengthBoxFromUnit(value string, fsize, containing float64) (float64, bool) 
 	case "%", "vw", "vh":
 		return containing * val / cssPercent, true
 	default:
-		point, converted := css.LengthToPt(val, unit, fsize)
+		point, converted := lengthToPt(val, unit, fsize)
 		if !converted {
 			return 0, false
 		}
@@ -806,7 +806,7 @@ func marginLenFromUnit(value string, fsize, ctxW float64) float64 {
 		return pxToPt(cssPxRoot) * val
 	}
 
-	if pt, converted := css.LengthToPt(val, unit, fsize); converted {
+	if pt, converted := lengthToPt(val, unit, fsize); converted {
 		return pt
 	}
 
@@ -889,7 +889,7 @@ func resolvedLength(value string, fsize, containing float64) (float64, bool) {
 	case remUnit:
 		return pxToPt(cssPxRoot) * val, true
 	default:
-		return css.LengthToPt(val, unit, fsize)
+		return lengthToPt(val, unit, fsize)
 	}
 }
 
@@ -952,7 +952,7 @@ func plainLength(value string, fsize, containing float64) (float64, bool) {
 		return pxToPt(cssPxRoot) * val, true
 	}
 
-	return css.LengthToPt(val, unit, fsize)
+	return lengthToPt(val, unit, fsize)
 }
 
 func pxToPt(px float64) float64 { return px * pxToPtFactor }

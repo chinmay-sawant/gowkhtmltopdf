@@ -39,12 +39,6 @@ func (e *engine) buildTable(node *html.Node, style ResolvedStyle, availW, posX, 
 		e.scalePt(style.PaddingLeft) + e.scalePt(style.PaddingRight)
 
 	tableHint := e.tableWidthHint(style, availW)
-	colW, tableW := sizeTableColumns(tableColumnEnv{
-		colMin: colMin, colW: colW, colPct: colPct, colAbs: colAbs,
-		chrome: chrome, availW: availW, tableW: tableHint,
-		fixed: style.TableLayout == positionFixed && tableHint >= 0,
-	})
-	tableBox.w = tableW
 
 	capNode := e.tableCaptionNode(node)
 
@@ -52,21 +46,31 @@ func (e *engine) buildTable(node *html.Node, style ResolvedStyle, availW, posX, 
 	if capNode != nil {
 		capStyle = e.styles[capNode]
 	}
-	// caption-side:bottom paints after the table grid; top/empty stay above.
-	// left/right are out of scope and keep the top placement.
-	captionBelow := captionSideIsBottom(style, capStyle)
+
+	side := captionSideValue(style, capStyle)
+	gridHint, gridAvail, captionW := e.sideCaptionGridBudget(capNode, capStyle, side, tableHint, availW)
+	colW, gridW := sizeTableColumns(tableColumnEnv{
+		colMin: colMin, colW: colW, colPct: colPct, colAbs: colAbs,
+		chrome: chrome, availW: gridAvail, tableW: gridHint,
+		fixed: style.TableLayout == positionFixed && gridHint >= 0,
+	})
+	tableBox.w = gridW
+
+	gridX := posX
+	if side == floatLeft && captionW > 0 {
+		gridX = posX + captionW
+	}
 
 	tableY := posY
 
-	if !captionBelow {
-		tableY = e.attachCaption(tableBox, capNode, tableW, posX, posY)
+	if !captionSideHorizontal(side) && side != cssVerticalAlignBottom {
+		if caption := e.attachCaption(tableBox, capNode, gridW, posX, posY); caption != nil {
+			tableY = posY + caption.height
+		}
 	}
 
-	e.layoutTableGrid(tableBox, style, rows, cellData, colW, spacing, nCols, posX, tableY)
-
-	if captionBelow {
-		_ = e.attachCaption(tableBox, capNode, tableW, posX, posY+tableBox.height)
-	}
+	e.layoutTableGrid(tableBox, style, rows, cellData, colW, spacing, nCols, gridX, tableY)
+	e.placeTableCaption(tableBox, capNode, side, captionW, gridW, posX, posY)
 
 	return tableBox
 }
@@ -92,29 +96,119 @@ func (e *engine) layoutTableGrid(
 	e.emitTableCells(tableBox, style, posX, tableY, tableHeight, padL, colW, rowTops, rowHeights, cellData)
 }
 
-func (e *engine) attachCaption(tableBox *box, capNode *html.Node, tableW, posX, posY float64) float64 {
+func (e *engine) attachCaption(tableBox *box, capNode *html.Node, tableW, posX, posY float64) *box {
 	caption := e.buildCaptionAt(capNode, tableW, posX, posY)
 	if caption == nil {
-		return posY
+		return nil
 	}
 
 	tableBox.children = append(tableBox.children, caption)
 
-	if posY == tableBox.y {
-		return posY + caption.height
-	}
-
-	tableBox.height += caption.height
-
-	return posY
+	return caption
 }
 
-func captionSideIsBottom(tableStyle ResolvedStyle, captionStyle *ResolvedStyle) bool {
-	if tableStyle.CaptionSide == cssVerticalAlignBottom {
-		return true
+func captionSideValue(tableStyle ResolvedStyle, captionStyle *ResolvedStyle) string {
+	if tableStyle.CaptionSide != "" {
+		return tableStyle.CaptionSide
 	}
 
-	return captionStyle != nil && captionStyle.CaptionSide == cssVerticalAlignBottom
+	if captionStyle != nil {
+		return captionStyle.CaptionSide
+	}
+
+	return ""
+}
+
+func captionSideHorizontal(side string) bool {
+	return side == floatLeft || side == floatRight
+}
+
+func (e *engine) sideCaptionGridBudget(
+	capNode *html.Node, capStyle *ResolvedStyle, side string, tableHint, availW float64,
+) (float64, float64, float64) {
+	gridHint, gridAvail := tableHint, availW
+	if !captionSideHorizontal(side) || capNode == nil {
+		return gridHint, gridAvail, 0
+	}
+
+	outer := tableHint
+	if outer < 0 {
+		outer = availW
+	}
+
+	captionW := e.sideCaptionUsedWidth(capNode, capStyle, outer)
+	if captionW <= 0 {
+		return gridHint, gridAvail, 0
+	}
+
+	if gridHint >= 0 {
+		gridHint -= captionW
+		if gridHint < 0 {
+			gridHint = 0
+		}
+	}
+
+	gridAvail -= captionW
+	if gridAvail < 0 {
+		gridAvail = 0
+	}
+
+	return gridHint, gridAvail, captionW
+}
+
+func (e *engine) sideCaptionUsedWidth(capNode *html.Node, capStyle *ResolvedStyle, outerW float64) float64 {
+	if capNode == nil || outerW <= 0 {
+		return 0
+	}
+
+	maxW := outerW * captionSideMaxFrac
+
+	if capStyle != nil && capStyle.Width >= 0 {
+		used := e.scalePt(capStyle.Width)
+		if used > maxW {
+			return maxW
+		}
+
+		return used
+	}
+
+	st := initialStyle()
+	if capStyle != nil {
+		st = *capStyle
+	}
+
+	_, maxC := e.measureCellMinMax(capNode, st)
+	if maxC > maxW {
+		return maxW
+	}
+
+	return maxC
+}
+
+func (e *engine) placeTableCaption(
+	tableBox *box, capNode *html.Node, side string, captionW, gridW, posX, posY float64,
+) {
+	switch {
+	case side == cssVerticalAlignBottom:
+		if caption := e.attachCaption(tableBox, capNode, tableBox.w, posX, posY+tableBox.height); caption != nil {
+			tableBox.height += caption.height
+		}
+	case captionSideHorizontal(side) && captionW > 0:
+		capX := posX
+		if side == floatRight {
+			capX = posX + gridW
+		}
+
+		caption := e.attachCaption(tableBox, capNode, captionW, capX, posY)
+		if caption == nil {
+			return
+		}
+
+		tableBox.w = gridW + captionW
+		if caption.height > tableBox.height {
+			tableBox.height = caption.height
+		}
+	}
 }
 
 func (e *engine) tableCaptionNode(node *html.Node) *html.Node {
@@ -173,7 +267,7 @@ func (e *engine) emitTableCells(
 	if collapse {
 		// Column boundaries are the same for every row; compute once instead
 		// of reallocating nCols+1 floats per row inside emitCollapsedRowGrid.
-		xList := gridColumnEdges(tableBox.x+padL, colW)
+		xList := gridColumnEdges(posX+padL, colW)
 
 		for rowIdx, cells := range cellData {
 			for _, cell := range cells {

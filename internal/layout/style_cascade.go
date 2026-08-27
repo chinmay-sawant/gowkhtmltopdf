@@ -200,6 +200,9 @@ var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inheri
 	},
 	{[]string{"orphans"}, func(dst, src *ResolvedStyle) { dst.Orphans = src.Orphans }},
 	{[]string{"widows"}, func(dst, src *ResolvedStyle) { dst.Widows = src.Widows }},
+	// CSS page is not inherited at computed-value time, but auto uses the
+	// parent used value. Copying when the property is unspecified matches that.
+	{[]string{pageKeyword}, func(dst, src *ResolvedStyle) { dst.PageName = src.PageName }},
 	{[]string{"writing-mode"}, func(dst, src *ResolvedStyle) { dst.WritingMode = src.WritingMode }},
 	{[]string{"text-indent"}, func(dst, src *ResolvedStyle) { dst.TextIndent = src.TextIndent }},
 }
@@ -710,7 +713,7 @@ var restShorthandProps = [...]string{ //nolint:gochecknoglobals // static apply 
 	borderWidthKeyword, borderStyleKeyword,
 	borderColorKeyword, gapKeyword, flexKeyword, containerKeyword,
 	cssPropMarginInline, cssPropMarginBlock, cssPropPaddingInline, cssPropPaddingBlock,
-	insetKeyword, cssPropInsetBlock, cssPropInsetInline,
+	insetKeyword, cssPropInsetBlock, cssPropInsetInline, "column-rule",
 }
 
 // applyRestProps resolves every non-font property once the font size is known.
@@ -746,7 +749,7 @@ func applyRestProps(
 			borderWidthKeyword, borderStyleKeyword,
 			borderColorKeyword, gapKeyword, flexKeyword, containerKeyword,
 			cssPropMarginInline, cssPropMarginBlock, cssPropPaddingInline, cssPropPaddingBlock,
-			insetKeyword, cssPropInsetBlock, cssPropInsetInline:
+			insetKeyword, cssPropInsetBlock, cssPropInsetInline, "column-rule":
 			continue
 		}
 

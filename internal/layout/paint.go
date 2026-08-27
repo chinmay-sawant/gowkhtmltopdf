@@ -42,26 +42,18 @@ type PaintOptions struct {
 	MarginRight  float64
 	// First, when non-nil, is the page-0 margin box from @page :first.
 	First *PageMargins `exhaustruct:"optional"`
+	// Left / Right are @page :left / :right. LTR: page 1 is :right.
+	Left  *PageMargins `exhaustruct:"optional"`
+	Right *PageMargins `exhaustruct:"optional"`
+	// Named maps lower-case @page ident margins. Size stays unnamed.
+	Named map[string]PageMargins `exhaustruct:"optional"`
+	// pageNames is filled at paint after pagination: page index -> page ident.
+	pageNames []string `exhaustruct:"optional"`
 }
 
 // PageMargins is one page-box margin set in points.
 type PageMargins struct {
 	Top, Right, Bottom, Left float64
-}
-
-// forPage returns geometry for one output page. Page 0 uses First when set;
-// later pages keep the unnamed margins. Pagination still uses one contentH.
-func (opts PaintOptions) forPage(pageIdx int) PaintOptions {
-	if pageIdx != 0 || opts.First == nil {
-		return opts
-	}
-
-	opts.MarginTop = opts.First.Top
-	opts.MarginBottom = opts.First.Bottom
-	opts.MarginLeft = opts.First.Left
-	opts.MarginRight = opts.First.Right
-
-	return opts
 }
 
 // Paint paginates the display list across pages and paints it into doc.
@@ -124,6 +116,8 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 		return nil
 	}
 
+	applyNamedPageBreaks(res)
+
 	opPage := paginateOps(res, contentH)
 	stretchPaginatedChrome(res)
 
@@ -162,6 +156,8 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 	if err := buildStructureTree(doc, res); err != nil {
 		return err
 	}
+
+	opts.pageNames = namedPageNames(res, contentH)
 
 	return paintPages(ctx, doc, res, opts, contentH, fixedIdx)
 }
@@ -790,7 +786,8 @@ func drawFill(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintO
 	ps := StyleOf(op)
 	c.SetFillColor(ps.FillR, ps.FillG, ps.FillB)
 	if op.Radius > 0 || opHasRoundedCorners(op) {
-		roundedRectPathCorners(c, x, y, op.W, op.H, opRadii(op))
+		rx, ry := opRadiiXY(op)
+		roundedRectPathCorners(c, x, y, op.W, op.H, rx, ry)
 	} else {
 		c.Rect(x, y, op.W, op.H)
 	}
@@ -799,15 +796,16 @@ func drawFill(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintO
 
 //nolint:varnamelen,wsl // PDF path helpers use compact graphics-state names
 func drawMaskedStroke(c *pdf.Content, op *Op, x, y, width float64) {
+	rx, ry := opRadiiXY(op)
 	if op.StrokeMask&StrokeMaskTop != 0 {
 		c.SetLineCap(1)
-		roundedTopPath(c, x, y, op.W, op.H, width, opRadii(op))
+		roundedTopPath(c, x, y, op.W, op.H, width, rx, ry)
 		c.Stroke()
 		c.SetLineCap(0)
 	}
 	if op.StrokeMask&StrokeMaskBottom != 0 {
 		c.SetLineCap(1)
-		roundedBottomPath(c, x, y, op.W, width, opRadii(op))
+		roundedBottomPath(c, x, y, op.W, width, rx, ry)
 		c.Stroke()
 		c.SetLineCap(0)
 	}
@@ -815,7 +813,7 @@ func drawMaskedStroke(c *pdf.Content, op *Op, x, y, width float64) {
 		if opHasRoundedCorners(op) {
 			c.SetLineCap(1)
 		}
-		roundedLeftPath(c, x, y, op.H, width, opRadii(op))
+		roundedLeftPath(c, x, y, op.H, width, rx, ry)
 		c.Stroke()
 		c.SetLineCap(0)
 	}
@@ -823,7 +821,7 @@ func drawMaskedStroke(c *pdf.Content, op *Op, x, y, width float64) {
 		if opHasRoundedCorners(op) {
 			c.SetLineCap(1)
 		}
-		roundedRightPath(c, x, y, op.W, op.H, width, opRadii(op))
+		roundedRightPath(c, x, y, op.W, op.H, width, rx, ry)
 		c.Stroke()
 		c.SetLineCap(0)
 	}
@@ -845,7 +843,8 @@ func drawStroke(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts Pain
 		return
 	}
 	if op.Radius > 0 || opHasRoundedCorners(op) {
-		roundedRectPathCorners(c, x, y, op.W, op.H, opRadii(op))
+		rx, ry := opRadiiXY(op)
+		roundedRectPathCorners(c, x, y, op.W, op.H, rx, ry)
 	} else {
 		c.Rect(x, y, op.W, op.H)
 	}
@@ -860,34 +859,36 @@ func drawStroke(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts Pain
 func roundedTopPath(
 	c *pdf.Content,
 	originX, originY, boxWidth, boxHeight, strokeWidth float64,
-	radii [4]float64,
+	rx, ry [4]float64,
 ) {
 	const kappa = 0.5522847498
 
 	strokeInset := strokeWidth / 2 //nolint:mnd // half the stroke width insets the centerline radius
-	leftRadius := math.Max(radii[0]-strokeInset, 0)
-	rightRadius := math.Max(radii[1]-strokeInset, 0)
+	leftRX := math.Max(rx[0]-strokeInset, 0)
+	leftRY := math.Max(ry[0]-strokeInset, 0)
+	rightRX := math.Max(rx[1]-strokeInset, 0)
+	rightRY := math.Max(ry[1]-strokeInset, 0)
 	topY := originY + boxHeight
 	rightX := originX + boxWidth
 
-	if leftRadius <= 0 {
+	if leftRX <= 0 || leftRY <= 0 {
 		c.MoveTo(originX, topY)
 	} else {
-		c.MoveTo(originX, topY-leftRadius)
+		c.MoveTo(originX, topY-leftRY)
 		c.CurveTo(
-			originX, topY-leftRadius+kappa*leftRadius,
-			originX+leftRadius-kappa*leftRadius, topY,
-			originX+leftRadius, topY,
+			originX, topY-leftRY+kappa*leftRY,
+			originX+leftRX-kappa*leftRX, topY,
+			originX+leftRX, topY,
 		)
 	}
 
-	c.LineTo(rightX-rightRadius, topY)
+	c.LineTo(rightX-rightRX, topY)
 
-	if rightRadius > 0 {
+	if rightRX > 0 && rightRY > 0 {
 		c.CurveTo(
-			rightX-rightRadius+kappa*rightRadius, topY,
-			rightX, topY-rightRadius+kappa*rightRadius,
-			rightX, topY-rightRadius,
+			rightX-rightRX+kappa*rightRX, topY,
+			rightX, topY-rightRY+kappa*rightRY,
+			rightX, topY-rightRY,
 		)
 	} else {
 		c.LineTo(rightX, topY)
@@ -901,34 +902,36 @@ func roundedTopPath(
 func roundedLeftPath(
 	c *pdf.Content,
 	originX, originY, boxHeight, strokeWidth float64,
-	radii [4]float64,
+	rx, ry [4]float64,
 ) {
 	const kappa = 0.5522847498
 
 	strokeInset := strokeWidth / 2 //nolint:mnd // half the stroke width insets the centerline radius
 	originX += strokeInset
-	topRadius := math.Max(radii[0]-strokeInset, 0)
-	bottomRadius := math.Max(radii[3]-strokeInset, 0)
+	topRX := math.Max(rx[0]-strokeInset, 0)
+	topRY := math.Max(ry[0]-strokeInset, 0)
+	bottomRX := math.Max(rx[3]-strokeInset, 0)
+	bottomRY := math.Max(ry[3]-strokeInset, 0)
 	topY := originY + boxHeight
 
-	if bottomRadius > 0 {
-		c.MoveTo(originX+bottomRadius, originY)
+	if bottomRX > 0 && bottomRY > 0 {
+		c.MoveTo(originX+bottomRX, originY)
 		c.CurveTo(
-			originX+bottomRadius-kappa*bottomRadius, originY,
-			originX, originY+bottomRadius-kappa*bottomRadius,
-			originX, originY+bottomRadius,
+			originX+bottomRX-kappa*bottomRX, originY,
+			originX, originY+bottomRY-kappa*bottomRY,
+			originX, originY+bottomRY,
 		)
 	} else {
 		c.MoveTo(originX, originY)
 	}
 
-	c.LineTo(originX, topY-topRadius)
+	c.LineTo(originX, topY-topRY)
 
-	if topRadius > 0 {
+	if topRX > 0 && topRY > 0 {
 		c.CurveTo(
-			originX, topY-topRadius+kappa*topRadius,
-			originX+topRadius-kappa*topRadius, topY,
-			originX+topRadius, topY,
+			originX, topY-topRY+kappa*topRY,
+			originX+topRX-kappa*topRX, topY,
+			originX+topRX, topY,
 		)
 	} else {
 		c.LineTo(originX, topY)
@@ -941,33 +944,35 @@ func roundedLeftPath(
 func roundedBottomPath(
 	c *pdf.Content,
 	originX, originY, boxWidth, strokeWidth float64,
-	radii [4]float64,
+	rx, ry [4]float64,
 ) {
 	const kappa = 0.5522847498
 
 	strokeInset := strokeWidth / 2 //nolint:mnd // half the stroke width insets the centerline radius
-	leftRadius := math.Max(radii[3]-strokeInset, 0)
-	rightRadius := math.Max(radii[2]-strokeInset, 0)
+	leftRX := math.Max(rx[3]-strokeInset, 0)
+	leftRY := math.Max(ry[3]-strokeInset, 0)
+	rightRX := math.Max(rx[2]-strokeInset, 0)
+	rightRY := math.Max(ry[2]-strokeInset, 0)
 	rightX := originX + boxWidth
 
-	if leftRadius <= 0 {
+	if leftRX <= 0 || leftRY <= 0 {
 		c.MoveTo(originX, originY)
 	} else {
-		c.MoveTo(originX, originY+leftRadius)
+		c.MoveTo(originX, originY+leftRY)
 		c.CurveTo(
-			originX, originY+leftRadius-kappa*leftRadius,
-			originX+leftRadius-kappa*leftRadius, originY,
-			originX+leftRadius, originY,
+			originX, originY+leftRY-kappa*leftRY,
+			originX+leftRX-kappa*leftRX, originY,
+			originX+leftRX, originY,
 		)
 	}
 
-	c.LineTo(rightX-rightRadius, originY)
+	c.LineTo(rightX-rightRX, originY)
 
-	if rightRadius > 0 {
+	if rightRX > 0 && rightRY > 0 {
 		c.CurveTo(
-			rightX-rightRadius+kappa*rightRadius, originY,
-			rightX, originY+rightRadius-kappa*rightRadius,
-			rightX, originY+rightRadius,
+			rightX-rightRX+kappa*rightRX, originY,
+			rightX, originY+rightRY-kappa*rightRY,
+			rightX, originY+rightRY,
 		)
 	} else {
 		c.LineTo(rightX, originY)
@@ -980,34 +985,36 @@ func roundedBottomPath(
 func roundedRightPath(
 	c *pdf.Content,
 	originX, originY, boxWidth, boxHeight, strokeWidth float64,
-	radii [4]float64,
+	rx, ry [4]float64,
 ) {
 	const kappa = 0.5522847498
 
 	strokeInset := strokeWidth / 2 //nolint:mnd // half the stroke width insets the centerline radius
 	rightX := originX + boxWidth - strokeInset
-	topRadius := math.Max(radii[1]-strokeInset, 0)
-	bottomRadius := math.Max(radii[2]-strokeInset, 0)
+	topRX := math.Max(rx[1]-strokeInset, 0)
+	topRY := math.Max(ry[1]-strokeInset, 0)
+	bottomRX := math.Max(rx[2]-strokeInset, 0)
+	bottomRY := math.Max(ry[2]-strokeInset, 0)
 	topY := originY + boxHeight
 
-	if topRadius > 0 {
-		c.MoveTo(rightX-topRadius, topY)
+	if topRX > 0 && topRY > 0 {
+		c.MoveTo(rightX-topRX, topY)
 		c.CurveTo(
-			rightX-topRadius+kappa*topRadius, topY,
-			rightX, topY-topRadius+kappa*topRadius,
-			rightX, topY-topRadius,
+			rightX-topRX+kappa*topRX, topY,
+			rightX, topY-topRY+kappa*topRY,
+			rightX, topY-topRY,
 		)
 	} else {
 		c.MoveTo(rightX, topY)
 	}
 
-	c.LineTo(rightX, originY+bottomRadius)
+	c.LineTo(rightX, originY+bottomRY)
 
-	if bottomRadius > 0 {
+	if bottomRX > 0 && bottomRY > 0 {
 		c.CurveTo(
-			rightX, originY+bottomRadius-kappa*bottomRadius,
-			rightX-bottomRadius+kappa*bottomRadius, originY,
-			rightX-bottomRadius, originY,
+			rightX, originY+bottomRY-kappa*bottomRY,
+			rightX-bottomRX+kappa*bottomRX, originY,
+			rightX-bottomRX, originY,
 		)
 	} else {
 		c.LineTo(rightX, originY)
@@ -1036,63 +1043,75 @@ func opHasRoundedCorners(op *Op) bool {
 // top-right, bottom-right, bottom-left. PDF's origin is bottom-left here.
 //
 //nolint:varnamelen // PDF path helper mirrors the standard Bezier approximation
-func roundedRectPathCorners(c *pdf.Content, originX, originY, width, height float64, radii [4]float64) {
+func roundedRectPathCorners(c *pdf.Content, originX, originY, width, height float64, rx, ry [4]float64) {
 	const (
 		kappa = 0.5522847498
 		half  = 2.0
 	)
 
-	if !opRadiiPositive(radii) {
+	if !opRadiiPositive(rx) {
 		c.Rect(originX, originY, width, height)
 
 		return
 	}
 
-	for i := range radii {
-		if radii[i] < 0 {
-			radii[i] = 0
+	clampEllipseRadii(rx[:], ry[:], width, height, half)
+
+	topLeftX, topLeftY := rx[0], ry[0]
+	topRightX, topRightY := rx[1], ry[1]
+	bottomRightX, bottomRightY := rx[2], ry[2]
+	bottomLeftX, bottomLeftY := rx[3], ry[3]
+	c.MoveTo(originX+bottomLeftX, originY)
+	c.LineTo(originX+width-bottomRightX, originY)
+	c.CurveTo(
+		originX+width-bottomRightX+kappa*bottomRightX, originY,
+		originX+width, originY+bottomRightY-kappa*bottomRightY,
+		originX+width, originY+bottomRightY,
+	)
+	c.LineTo(originX+width, originY+height-topRightY)
+	c.CurveTo(
+		originX+width, originY+height-topRightY+kappa*topRightY,
+		originX+width-topRightX+kappa*topRightX, originY+height,
+		originX+width-topRightX, originY+height,
+	)
+	c.LineTo(originX+topLeftX, originY+height)
+	c.CurveTo(
+		originX+topLeftX-kappa*topLeftX, originY+height,
+		originX, originY+height-topLeftY+kappa*topLeftY,
+		originX, originY+height-topLeftY,
+	)
+	c.LineTo(originX, originY+bottomLeftY)
+	c.CurveTo(
+		originX, originY+bottomLeftY-kappa*bottomLeftY,
+		originX+bottomLeftX-kappa*bottomLeftX, originY,
+		originX+bottomLeftX, originY,
+	)
+}
+
+func clampEllipseRadii(radiusX, radiusY []float64, width, height, half float64) {
+	for idx := range radiusX {
+		if radiusX[idx] < 0 {
+			radiusX[idx] = 0
+		}
+
+		if radiusY[idx] < 0 {
+			radiusY[idx] = 0
+		}
+
+		if radiusX[idx] > width/half {
+			radiusX[idx] = width / half
+		}
+
+		if radiusY[idx] > height/half {
+			radiusY[idx] = height / half
+		}
+
+		if radiusX[idx] <= 0 {
+			radiusY[idx] = 0
+		} else if radiusY[idx] <= 0 {
+			radiusY[idx] = radiusX[idx]
 		}
 	}
-
-	// Clamp each corner to the local box dimensions. Layout already applies
-	// CSS's adjacent-radii scaling; this protects hand-built ops as well.
-	for i := range radii {
-		if radii[i] > width/half {
-			radii[i] = width / half
-		}
-
-		if radii[i] > height/half {
-			radii[i] = height / half
-		}
-	}
-
-	topLeft, topRight := radii[0], radii[1]
-	bottomRight, bottomLeft := radii[2], radii[3]
-	c.MoveTo(originX+bottomLeft, originY)
-	c.LineTo(originX+width-bottomRight, originY)
-	c.CurveTo(
-		originX+width-bottomRight+kappa*bottomRight, originY,
-		originX+width, originY+bottomRight-kappa*bottomRight,
-		originX+width, originY+bottomRight,
-	)
-	c.LineTo(originX+width, originY+height-topRight)
-	c.CurveTo(
-		originX+width, originY+height-topRight+kappa*topRight,
-		originX+width-topRight+kappa*topRight, originY+height,
-		originX+width-topRight, originY+height,
-	)
-	c.LineTo(originX+topLeft, originY+height)
-	c.CurveTo(
-		originX+topLeft-kappa*topLeft, originY+height,
-		originX, originY+height-topLeft+kappa*topLeft,
-		originX, originY+height-topLeft,
-	)
-	c.LineTo(originX, originY+bottomLeft)
-	c.CurveTo(
-		originX, originY+bottomLeft-kappa*bottomLeft,
-		originX+bottomLeft-kappa*bottomLeft, originY,
-		originX+bottomLeft, originY,
-	)
 }
 
 func opRadiiPositive(radii [4]float64) bool {

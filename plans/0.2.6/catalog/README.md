@@ -4,9 +4,9 @@ Counts from `coverage-summary.json`, generated 2026-08-27 by walking `webref-css
 
 | Kind | Total | implemented | partial | unsupported | ignored |
 |------|------:|------------:|--------:|------------:|--------:|
-| Properties | 818 | 75 | 95 | 401 | 247 |
+| Properties | 818 | 75 | 100 | 396 | 247 |
 | At-rules | 55 | 0 | 4 | 41 | 10 |
-| Selectors | 158 | 8 | 5 | 124 | 21 |
+| Selectors | 158 | 12 | 5 | 120 | 21 |
 | Functions | 162 | 3 | 7 | 128 | 24 |
 | Units | 30 | 7 | 6 | 17 | 0 |
 

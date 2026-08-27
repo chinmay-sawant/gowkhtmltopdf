@@ -310,6 +310,22 @@ func TestCaptionSideParse(t *testing.T) {
 	if got := styleByClass(t, topStyles, "top").CaptionSide; got != cssVerticalAlignTop {
 		t.Fatalf("caption-side:top = %q", got)
 	}
+
+	sideRoot := mustParse(t, `<html><body>
+		<table class="left"><tr><td>x</td></tr></table>
+		<table class="right"><tr><td>y</td></tr></table>
+	</body></html>`)
+	sideStyles := resolveStyles(sideRoot, []*css.Stylesheet{sheet(t, `
+		.left { caption-side: left }
+		.right { caption-side: right }
+	`)}, "print", testViewport, 800)
+	if got := styleByClass(t, sideStyles, "left").CaptionSide; got != floatLeft {
+		t.Fatalf("caption-side:left = %q", got)
+	}
+
+	if got := styleByClass(t, sideStyles, "right").CaptionSide; got != floatRight {
+		t.Fatalf("caption-side:right = %q", got)
+	}
 }
 
 func styleByClass(t *testing.T, styles map[*html.Node]*ResolvedStyle, class string) *ResolvedStyle {

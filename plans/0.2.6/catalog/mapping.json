@@ -13,8 +13,8 @@
     "properties_by_engine_status": {
       "ignored": 247,
       "implemented": 75,
-      "partial": 95,
-      "unsupported": 401
+      "partial": 99,
+      "unsupported": 397
     },
     "properties_print_relevant": 571,
     "properties_goal_implement": 571,
@@ -5742,8 +5742,8 @@
       "groups": [
         "CSS Multi-column Layout"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -5786,8 +5786,8 @@
       "groups": [
         "CSS Multi-column Layout"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -6015,8 +6015,8 @@
       "groups": [
         "CSS Multi-column Layout"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -6059,8 +6059,8 @@
       "groups": [
         "CSS Multi-column Layout"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -13191,9 +13191,9 @@
       "groups": [
         "CSS Paged Media"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go applyPageNameProp",
+      "notes": "used-value inherit; sibling name change breaks; named @page margin on overlapping pages"
     },
     {
       "property": "page-break-after",
@@ -20295,8 +20295,8 @@
       "spec_href": "https://drafts.csswg.org/selectors-4/#first-of-type-pseudo",
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "notes": ""
+      "engine_status": "implemented",
+      "notes": "nth_type.go"
     },
     {
       "name": ":focus",
@@ -20487,8 +20487,8 @@
       "spec_href": "https://drafts.csswg.org/selectors-4/#last-of-type-pseudo",
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "notes": ""
+      "engine_status": "implemented",
+      "notes": "nth_type.go"
     },
     {
       "name": ":left",
@@ -20607,8 +20607,8 @@
       "spec_href": "https://drafts.csswg.org/selectors-4/#nth-last-of-type-pseudo",
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "notes": ""
+      "engine_status": "implemented",
+      "notes": "nth_type.go"
     },
     {
       "name": ":nth-of-page()",
@@ -20623,8 +20623,8 @@
       "spec_href": "https://drafts.csswg.org/selectors-4/#nth-of-type-pseudo",
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "notes": ""
+      "engine_status": "implemented",
+      "notes": "nth_type.go"
     },
     {
       "name": ":nth()",

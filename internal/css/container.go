@@ -99,13 +99,15 @@ const (
 	mmPerInch      = 25.4
 	pointsPerPica  = 12.0
 	rootFontSizePx = 16.0 // CSS initial font-size for rem
-	exChToEmFactor = 0.5  // approximate ex/ch as half an em
+	exChToEmFactor = 0.5  // approximate ex as half an em; ch fallback without a face
 )
 
 // LengthToPt converts a parsed length to points. basePt is the em/rem base
 // (the element's font size). Same conversions as the former internal helper;
 // % and viewport units are unsupported (return false). Unknown units return
 // false so callers can apply their own policy (e.g. line-height inherits).
+// ex is 0.5em. ch is also 0.5em here (no face); layout lengthToPt uses the
+// default face U+0030 advance instead.
 //
 // Physical units use multiply-then-divide (val * 72 / 25.4) so values like
 // 25.4mm cancel cleanly to 72pt in IEEE float arithmetic. Precomputing
@@ -130,7 +132,11 @@ func LengthToPt(val float64, unit string, basePt float64) (float64, bool) {
 		return val * basePt, true
 	case unitRem:
 		return val * rootFontSizePx * pxToPt, true
-	case "ex", "ch":
+	case "ex":
+		return val * basePt * exChToEmFactor, true
+	case "ch":
+		// No face here (media/container queries). Layout resolves ch from
+		// the default face U+0030 advance and falls back to this 0.5em.
 		return val * basePt * exChToEmFactor, true
 	default:
 		return 0, false

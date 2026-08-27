@@ -9,9 +9,15 @@ type hfGeom struct {
 	marginTop, marginBottom float64
 	marginLeft, marginRight float64
 	contentW, contentH      float64
-	// first is the @page :first margin box. Nil means every page uses the
-	// unnamed margins. Size stays unnamed: the writer paints one page size.
+	// first is the @page :first margin box. Nil means page 1 uses unnamed or
+	// :right. Size stays unnamed: the writer paints one page size.
 	first *hfPageMargins `exhaustruct:"optional"`
+	// left / right are @page :left / :right. LTR: page 1 is :right, even
+	// pages :left, odd pages :right. :first wins on page 1.
+	left  *hfPageMargins `exhaustruct:"optional"`
+	right *hfPageMargins `exhaustruct:"optional"`
+	// named maps lower-case page names from @page ident { margin }.
+	named map[string]*hfPageMargins `exhaustruct:"optional"`
 }
 
 // hfPageMargins is one page-box margin set in points.
@@ -31,12 +37,26 @@ func (g *hfGeom) recomputeContent() {
 }
 
 // pageMargins returns the page-box left and top margins for locPage.
+// Cascade: unnamed, then :left/:right by page side, then :first on page 1.
+// Named @page margins are applied at paint (layout.PaintOptions); link
+// destinations here use the side/:first cascade only.
 func (g *hfGeom) pageMargins(locPage int) (float64, float64) {
+	left, top := g.marginLeft, g.marginTop
+	pageNum := locPage + 1
+
+	if pageNum%2 == 0 && g.left != nil {
+		left, top = g.left.left, g.left.top
+	}
+
+	if pageNum%2 == 1 && g.right != nil {
+		left, top = g.right.left, g.right.top
+	}
+
 	if locPage == 0 && g.first != nil {
 		return g.first.left, g.first.top
 	}
 
-	return g.marginLeft, g.marginTop
+	return left, top
 }
 
 // pdfY converts a y-down canvas coordinate on object-local page locPage into

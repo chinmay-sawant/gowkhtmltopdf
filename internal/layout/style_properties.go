@@ -415,7 +415,81 @@ func applyMulticolGroup(
 		return true
 	}
 
+	if applyColumnRuleProps(style, prop, value, fsize) {
+		return true
+	}
+
 	return applyColumnFillSpanProps(style, prop, value)
+}
+
+func applyColumnRuleProps(style *ResolvedStyle, prop, value string, fsize float64) bool {
+	switch prop {
+	case "column-rule":
+		applyColumnRuleShorthand(style, value, fsize)
+	case "column-rule-width":
+		if width, parsed := parseOutlineWidth(value, fsize); parsed {
+			style.ColumnRuleWidth = width
+		}
+	case "column-rule-style":
+		if ruleStyle, parsed := parseOutlineStyle(value); parsed {
+			style.ColumnRuleStyle = ruleStyle
+		}
+	case "column-rule-color":
+		if color, parsed := parseUsedColor(value, style.Color); parsed {
+			style.ColumnRuleColor = color
+			style.ColumnRuleColorSet = true
+		}
+	default:
+		return false
+	}
+
+	return true
+}
+
+func applyColumnRuleShorthand(style *ResolvedStyle, value string, fsize float64) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return
+	}
+
+	style.ColumnRuleWidth = borderWidth(mediumKeyword, fsize)
+	style.ColumnRuleStyle = cssDisplayNone
+	style.ColumnRuleColor = style.Color
+	style.ColumnRuleColorSet = true
+
+	if strings.EqualFold(value, cssDisplayNone) {
+		return
+	}
+
+	for start := 0; ; {
+		token, next, ok := nextSpaceToken(value, start)
+		if !ok {
+			return
+		}
+
+		applyColumnRuleToken(style, token, fsize)
+
+		start = next
+	}
+}
+
+func applyColumnRuleToken(style *ResolvedStyle, token string, fsize float64) {
+	if ruleStyle, ok := parseOutlineStyle(token); ok {
+		style.ColumnRuleStyle = ruleStyle
+
+		return
+	}
+
+	if width, ok := parseOutlineWidth(token, fsize); ok {
+		style.ColumnRuleWidth = width
+
+		return
+	}
+
+	if color, ok := parseUsedColor(token, style.Color); ok {
+		style.ColumnRuleColor = color
+		style.ColumnRuleColorSet = true
+	}
 }
 
 func applyColumnCountWidthProps(style *ResolvedStyle, prop, value string, fsize, viewportW float64) bool {
@@ -1014,65 +1088,6 @@ func applyBorderGroup(
 	}
 }
 
-//nolint:cyclop // CSS shorthand parsing and expansion are one atomic property operation
-func setBorderRadius(style *ResolvedStyle, value string, fsize float64) bool {
-	parts := strings.Fields(value)
-	if len(parts) == 0 {
-		return true
-	}
-
-	values := make([]float64, 0, len(parts))
-
-	for _, part := range parts {
-		if _, unit, ok := css.ParseLength(part); ok && unit == "%" {
-			// Percentage corner radii retain the existing uniform fallback;
-			// absolute asymmetric radii are represented independently below.
-			if v, _, ok := css.ParseLength(part); ok && v >= 0 {
-				style.BorderRadius = 0
-				style.BorderRadiusPercent = v
-			}
-
-			return true
-		}
-
-		radius, ok := lengthBox(part, fsize, 0, cssDisplayNone)
-		if !ok || radius < 0 {
-			return true
-		}
-
-		values = append(values, radius)
-	}
-
-	if len(values) == 0 {
-		return true
-	}
-
-	for len(values) < borderRadiusValueCount {
-		switch len(values) {
-		case 1:
-			values = append(values, values[0], values[0], values[0])
-		case borderRadiusPairCount:
-			values = append(values, values[0], values[1])
-		case borderRadiusTripleCount:
-			values = append(values, values[1])
-		}
-	}
-
-	style.BorderRadiusTopLeft = values[0]
-	style.BorderRadiusTopRight = values[1]
-	style.BorderRadiusBottomRight = values[2]
-	style.BorderRadiusBottomLeft = values[3]
-	style.BorderRadiusPercent = -1
-
-	if values[0] == values[1] && values[1] == values[2] && values[2] == values[3] {
-		style.BorderRadius = values[0]
-	} else {
-		style.BorderRadius = 0
-	}
-
-	return true
-}
-
 func applyBorderAllSides(style *ResolvedStyle, value string, fsize float64) bool {
 	if strings.EqualFold(strings.TrimSpace(value), cssDisplayNone) || strings.TrimSpace(value) == "0" {
 		zero := border{Width: 0, PaintWidth: 0, Style: "", Color: [3]float64{0, 0, 0}}
@@ -1479,7 +1494,7 @@ func applyTextSpacingProps(style *ResolvedStyle, prop, value string, fsize float
 
 // applyTableBreakGroup handles table borders/spacing and page-break props.
 func applyTableBreakGroup(
-	style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext, _ *ResolvedStyle, _ bool,
+	style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext, parent *ResolvedStyle, _ bool,
 ) bool {
 	switch prop {
 	case "border-collapse", "border-spacing", "table-layout", "caption-side":
@@ -1487,6 +1502,8 @@ func applyTableBreakGroup(
 	case "page-break-before", "break-before", "page-break-after", "break-after",
 		"page-break-inside", "break-inside":
 		return applyPageBreakProps(style, prop, value)
+	case pageKeyword:
+		return applyPageNameProp(style, value, parent)
 	case "orphans", "widows":
 		return applyOrphansWidowsProps(style, prop, value)
 	case "container-type", "container-name", containerKeyword:
@@ -1518,8 +1535,9 @@ func applyTableProps(style *ResolvedStyle, prop, value string, fsize, viewportW 
 }
 
 func applyCaptionSideValue(style *ResolvedStyle, value string) {
+	value = strings.ToLower(strings.TrimSpace(value))
 	switch value {
-	case cssVerticalAlignTop, cssVerticalAlignBottom:
+	case cssVerticalAlignTop, cssVerticalAlignBottom, floatLeft, floatRight:
 		style.CaptionSide = value
 	}
 }
@@ -1577,6 +1595,35 @@ func applyBreakInsideProps(style *ResolvedStyle, value string) bool {
 	default:
 		return false
 	}
+
+	return true
+}
+
+func applyPageNameProp(style *ResolvedStyle, value string, parent *ResolvedStyle) bool {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return true
+	}
+
+	low := strings.ToLower(value)
+	switch low {
+	case "auto", inheritKeyword:
+		if parent != nil {
+			style.PageName = parent.PageName
+		}
+
+		return true
+	case "initial", "unset":
+		style.PageName = ""
+
+		return true
+	}
+
+	if !css.IsIdentToken(value) {
+		return false
+	}
+
+	style.PageName = low
 
 	return true
 }
