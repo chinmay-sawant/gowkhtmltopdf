@@ -1,0 +1,62 @@
+{
+  "generated": "2026-08-27",
+  "sources": {
+    "webref": "@webref/css (css.json via unpkg, captured 2026-08-27)",
+    "all_properties": "https://www.w3.org/Style/CSS/all-properties.en.json",
+    "mdn_units": "mdn/data css/units.json",
+    "mdn_properties": "mdn/data css/properties.json (overlay for mdn_url/groups)",
+    "engine": "internal/layout/style_properties.go apply groups + applyFontProps + css.go at-rules, inventory 2026-08-27"
+  },
+  "counts": {
+    "webref_properties": 818,
+    "mapped_properties": 818,
+    "properties_by_engine_status": {
+      "ignored": 210,
+      "implemented": 75,
+      "partial": 45,
+      "unsupported": 488
+    },
+    "properties_print_relevant": 608,
+    "properties_goal_implement": 608,
+    "atrules": 55,
+    "atrules_by_engine_status": {
+      "ignored": 10,
+      "unsupported": 41,
+      "partial": 4
+    },
+    "selectors": 158,
+    "selectors_by_engine_status": {
+      "partial": 5,
+      "unsupported": 124,
+      "ignored": 21,
+      "implemented": 8
+    },
+    "functions": 162,
+    "functions_by_engine_status": {
+      "ignored": 24,
+      "unsupported": 128,
+      "partial": 7,
+      "implemented": 3
+    },
+    "units": 30,
+    "units_by_engine_status": {
+      "unsupported": 17,
+      "partial": 6,
+      "implemented": 7
+    }
+  },
+  "policy": {
+    "product": "print-oriented HTML to PDF, not a browser",
+    "no_javascript": true,
+    "no_chrome_print_parity": true,
+    "permanent_ignore": [
+      "animation",
+      "transition",
+      "3d-transforms",
+      "filter-blur",
+      "scroll-snap",
+      "anchor-positioning",
+      "speech"
+    ]
+  }
+}
