@@ -10,40 +10,41 @@ import (
 const contentNormal = "normal"
 
 // pseudoContent cascades the CSS content property for ::before/::after on n.
-// Supports string literals, attr(name), and none/normal (empty). Wiki hlist
-// separators use li::after{content:"\a0 · "}; print external links use
+// Supports string literals, attr(name), counter()/counters(), open-quote /
+// close-quote, and none/normal (empty). Wiki hlist separators use
+// li::after{content:"\a0 · "}; print external links use
 // a.external::after{content:' (' attr(href) ')'}.
 func (e *engine) pseudoContent(node *html.Node, pseudoEl string) string {
 	if e == nil || node == nil || (pseudoEl != "before" && pseudoEl != "after") {
 		return ""
 	}
 
+	ctx := e.pseudoStyleContext()
+	best := selectContentDecl(ctx, node, pseudoEl)
+	if best == nil {
+		return ""
+	}
+
+	return evalContentValue(best.value, node, e.contentEnvAt(node, pseudoEl))
+}
+
+// pseudoStyleContext is the cascade context used to re-walk sheets for
+// generated content (media + @container gates). When e.styles came from a
+// container pass, non-matching container content is suppressed here the same
+// way colors are.
+func (e *engine) pseudoStyleContext() *styleContext {
 	media := e.opts.Media
 	if media == "" {
 		media = "print"
 	}
-	// Shared cascade walk (media + @container gates). Containers are nil on
-	// the engine's style map path; when styles were re-cascaded with size
-	// containers, content under non-matching @container is already absent
-	// from ResolvedStyle — but pseudo content re-walks sheets, so pass the
-	// same gate via a styleContext without containers (pass-1 semantics:
-	// skip @container rules) matching cascadeRaw's first pass. When
-	// e.styles came from a container pass, non-matching container content
-	// is suppressed here the same way colors are.
-	ctx := &styleContext{ //nolint:exhaustruct // intentional zero fields
+
+	return &styleContext{ //nolint:exhaustruct // generated-content cascade context
 		sheets:     e.opts.Sheets,
 		media:      media,
 		viewportW:  e.opts.Width,
 		viewportH:  e.opts.Height,
 		containers: e.containers,
 	}
-
-	best := selectContentDecl(ctx, node, pseudoEl)
-	if best == nil {
-		return ""
-	}
-
-	return parseContentValue(best.value, node)
 }
 
 // pseudoStyle resolves the used style of generated content against the host
@@ -54,19 +55,7 @@ func (e *engine) pseudoStyle(node *html.Node, pseudoEl string, host ResolvedStyl
 		return &host
 	}
 
-	media := e.opts.Media
-	if media == "" {
-		media = "print"
-	}
-
-	ctx := &styleContext{ //nolint:exhaustruct // generated-content cascade context
-		sheets:     e.opts.Sheets,
-		media:      media,
-		viewportW:  e.opts.Width,
-		viewportH:  e.opts.Height,
-		containers: e.containers,
-	}
-
+	ctx := e.pseudoStyleContext()
 	raw := cascadePseudoRaw(ctx, node, pseudoEl)
 
 	if len(raw) == 0 {
@@ -137,9 +126,14 @@ func betterContentHit(candidate contentHit, best *contentHit) bool {
 }
 
 // parseContentValue evaluates a CSS content list: quoted strings, attr(name),
-// and none/normal. Unsupported tokens (counter(), url(), …) are skipped so we
-// never paint the literal source text "attr(href)".
+// counter()/counters(), open-quote/close-quote, and none/normal. Unsupported
+// tokens (url(), …) are skipped so we never paint the literal source text
+// "attr(href)".
 func parseContentValue(value string, node *html.Node) string {
+	return evalContentValue(value, node, nil)
+}
+
+func evalContentValue(value string, node *html.Node, env *contentEnv) string {
 	value = strings.TrimSpace(value)
 	low := strings.ToLower(value)
 
@@ -151,11 +145,15 @@ func parseContentValue(value string, node *html.Node) string {
 		return decodeCSSString(content)
 	}
 
+	if env == nil {
+		env = defaultContentEnv()
+	}
+
 	var boxNode strings.Builder
 
 	idx := 0
 	for idx < len(value) {
-		next, ok := scanContentToken(value, idx, node, &boxNode)
+		next, ok := scanContentToken(value, idx, node, env, &boxNode)
 		if !ok {
 			break
 		}
@@ -169,7 +167,9 @@ func parseContentValue(value string, node *html.Node) string {
 // scanContentToken consumes one token of a content list at idx, appending any
 // text to boxNode, and returns the index just past it. ok is false when
 // scanning must stop (unbalanced quote).
-func scanContentToken(value string, idx int, node *html.Node, boxNode *strings.Builder) (int, bool) {
+func scanContentToken(
+	value string, idx int, node *html.Node, env *contentEnv, boxNode *strings.Builder,
+) (int, bool) {
 	idx = skipCSSWhitespace(value, idx)
 	if idx >= len(value) {
 		return idx, false
@@ -185,23 +185,70 @@ func scanContentToken(value string, idx int, node *html.Node, boxNode *strings.B
 
 		return idx, false
 	}
-	// attr(name) or attr(name, …) — only the attribute name is used.
-	if strings.HasPrefix(strings.ToLower(value[idx:]), "attr(") {
+
+	if next, ok := scanContentFunction(value, idx, node, env, boxNode); ok {
+		return next, true
+	}
+
+	if isIdentStart(value[idx]) {
+		return scanContentIdent(value, idx, env, boxNode), true
+	}
+
+	return idx + 1, true
+}
+
+func scanContentFunction(
+	value string, idx int, node *html.Node, env *contentEnv, boxNode *strings.Builder,
+) (int, bool) {
+	if !isIdentStart(value[idx]) {
+		return 0, false
+	}
+
+	nameEnd := skipCSSIdent(value, idx)
+	paren := skipCSSWhitespace(value, nameEnd)
+	if paren >= len(value) || value[paren] != '(' {
+		return 0, false
+	}
+
+	name := strings.ToLower(value[idx:nameEnd])
+
+	switch name {
+	case "attr":
 		val, next := parseAttrToken(value, idx, node)
 		boxNode.WriteString(val)
 
 		return next, true
+	case "counters":
+		text, next := evalCountersFn(value, idx, env)
+		boxNode.WriteString(text)
+
+		return next, true
+	case "counter":
+		text, next := evalCounterFn(value, idx, env)
+		boxNode.WriteString(text)
+
+		return next, true
+	default:
+		return skipCSSFunction(value, paren+1), true
 	}
-	// Skip unknown function tokens: counter(...), counters(...), url(...).
-	if j := strings.IndexByte(value[idx:], '('); j > 0 && isIdentStart(value[idx]) {
-		return skipCSSFunction(value, idx+j+1), true
-	}
-	// Bare ident (open-quote, etc.) — skip one word.
-	if isIdentStart(value[idx]) {
-		return skipCSSIdent(value, idx), true
+}
+
+func scanContentIdent(value string, idx int, env *contentEnv, boxNode *strings.Builder) int {
+	end := skipCSSIdent(value, idx)
+	ident := strings.ToLower(value[idx:end])
+
+	switch ident {
+	case cssContentOpenQuote:
+		boxNode.WriteString(env.takeOpenQuote())
+	case cssContentCloseQuote:
+		boxNode.WriteString(env.takeCloseQuote())
+	case cssContentNoOpenQuote:
+		env.skipOpenQuote()
+	case cssContentNoCloseQuote:
+		env.skipCloseQuote()
 	}
 
-	return idx + 1, true
+	return end
 }
 
 // singleQuotedContent returns the inner text when value is exactly one quoted

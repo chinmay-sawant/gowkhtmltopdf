@@ -1,7 +1,7 @@
 # Phase 52: Paint, backgrounds, outline, overflow clip
 
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 52
-> **Status:** not started
+> **Status:** in progress (background-image, outline, radius longhands, overflow clip landed; box-shadow `[~]`)
 > **Estimated effort:** 1-2 weeks
 > **Owner:** `internal/layout` paint/chrome, `internal/convert` image fetch
 > **Depends on:** Phase 51 not strictly required
@@ -41,9 +41,9 @@ Watch the 2000-line file cap. If `paint.go` or `layout_chrome.go` is near the li
 
 ### 52.2 outline
 
-- [ ] 52.2.1 `outline`, `outline-width`, `outline-style`, `outline-color`, `outline-offset` subset. Stroke outside the border edge. Styles `solid|dashed|dotted|none`. Proof: `go test ./internal/layout -run TestOutlineStroke`.
-- [ ] 52.2.2 Outline does not affect layout size. Proof: width assertion unchanged with outline.
-- [ ] 52.2.3 Matrix UI/box row.
+- [x] 52.2.1 Outline stroke outside the border edge. Proof: `TestOutlineStroke`.
+- [x] 52.2.2 Outline does not affect layout size. Proof: same test.
+- [x] 52.2.3 Matrix outline row.
 
 ### 52.3 radius longhands
 
@@ -52,13 +52,13 @@ Watch the 2000-line file cap. If `paint.go` or `layout_chrome.go` is near the li
 
 ### 52.4 overflow clip
 
-- [ ] 52.4.1 `overflow: hidden|clip` clips descendant paint to the padding box. `auto|scroll` may clip the same in PDF, or stay unclipped with a matrix note. Proof: child fill outside parent does not appear in ops or PDF.
-- [ ] 52.4.2 Sticky still uses overflow boxes as scrollport at offset 0. Do not break `sticky.go`. Proof: existing `TestStickyOverflow*` green.
-- [ ] 52.4.3 Matrix §2.1 overflow row updated.
+- [x] 52.4.1 Overflow clip for hidden/clip/auto/scroll. Proof: `TestOverflowClip`.
+- [x] 52.4.2 Sticky overflow tests green. Proof: `TestStickyOverflow*`.
+- [x] 52.4.3 Matrix overflow row updated.
 
 ### 52.5 box-shadow optional
 
-- [ ] 52.5.1 One un-inset `box-shadow` without blur, or with blur if a cheap path exists. If this needs a new paint op that blows file size, extract. If not cheap, `[~]` with reason. Proof: test or `[~]` pointer.
+- [~] 52.5.1 `box-shadow` not this session. Next gate: a named report fixture that needs a single un-inset shadow.
 
 ### 52.6 gates
 

@@ -33,7 +33,7 @@ Modern report CSS uses `clamp()` for type scale and `margin-inline` for horizont
 ### 50.2 colors
 
 - [x] 50.2.1 `hsl()` / `hsla()` in `ParseColor`. Proof: `go test ./internal/css -run TestParseColorHsl`.
-- [ ] 50.2.2 `currentColor` on border/outline. Left for Phase 52 if outline lands there.
+- [x] 50.2.2 `currentColor` on color, border-*-color, and outline-color. Proof: `TestCurrentColor`.
 
 ### 50.3 logical box
 

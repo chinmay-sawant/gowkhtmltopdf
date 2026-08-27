@@ -281,7 +281,7 @@ func setFour(_ *ResolvedStyle, value string, top, right, bottom, left *float64, 
 	*left = marginLen(val[3], fsVal, ctxW)
 }
 
-func parseBorder(value string, fsize float64) (border, bool) { //nolint:cyclop
+func parseBorder(value string, fsize float64, current [3]float64) (border, bool) { //nolint:cyclop
 	var boxNode border
 
 	for start := 0; ; {
@@ -296,7 +296,9 @@ func parseBorder(value string, fsize float64) (border, bool) { //nolint:cyclop
 		case cssDisplayNone, overflowHidden:
 			boxNode.Style = cssDisplayNone
 		default:
-			if r, g, bb, _, ok := css.ParseColor(face); ok {
+			if isCurrentColor(face) {
+				boxNode.Color = current
+			} else if r, g, bb, _, ok := css.ParseColor(face); ok {
 				boxNode.Color = [3]float64{float64(r) / 255, float64(g) / 255, float64(bb) / 255}
 			} else if v, unit, ok := css.ParseLength(face); ok {
 				boxNode.Width = v
@@ -501,6 +503,81 @@ func parseListStyleType(value string) string {
 	}
 
 	return ""
+}
+
+func parseListStylePosition(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "inside", "outside":
+		return strings.ToLower(strings.TrimSpace(value))
+	}
+
+	return ""
+}
+
+func parseOutlineStyle(value string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case solidKeyword, "dashed", "dotted", cssDisplayNone:
+		return strings.ToLower(strings.TrimSpace(value)), true
+	}
+
+	return "", false
+}
+
+func parseOutlineWidth(value string, fsize float64) (float64, bool) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "thin", mediumKeyword, "thick":
+		return borderWidth(value, fsize), true
+	}
+
+	if _, _, ok := css.ParseLength(value); ok {
+		return borderWidth(value, fsize), true
+	}
+
+	return 0, false
+}
+
+// parseQuotesPair reads the first two CSS strings from a quotes value.
+// quotes: none yields empty open/close with ok true.
+func parseQuotesPair(value string) (string, string, bool) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", "", false
+	}
+
+	if strings.EqualFold(value, cssDisplayNone) {
+		return "", "", true
+	}
+
+	open, next, ok := nextQuotedCSSString(value, 0)
+	if !ok {
+		return "", "", false
+	}
+
+	close, _, ok := nextQuotedCSSString(value, next)
+	if !ok {
+		return "", "", false
+	}
+
+	return open, close, true
+}
+
+func nextQuotedCSSString(value string, start int) (string, int, bool) {
+	start = skipCSSWhitespace(value, start)
+	if start >= len(value) {
+		return "", start, false
+	}
+
+	quote := value[start]
+	if quote != '"' && quote != '\'' {
+		return "", start, false
+	}
+
+	end, ok := scanQuotedContent(value, start+1, quote)
+	if !ok {
+		return "", start, false
+	}
+
+	return decodeCSSString(value[start+1 : end]), end + 1, true
 }
 
 // overflowCreatesStickyScrollport reports whether overflow establishes a sticky

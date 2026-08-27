@@ -55,6 +55,7 @@ APPLY_FONT = re.compile(
 )
 IDENT_BEFORE = re.compile(r"[A-Za-z0-9_]$")
 STYLE_PROPERTIES = Path("internal/layout/style_properties.go")
+STYLE_PAINT_PROPS = Path("internal/layout/style_paint_props.go")
 STYLE_CASCADE = Path("internal/layout/style_cascade.go")
 CATALOG_DIR = Path("plans/0.2.6/catalog")
 ENGINE_PATH = "internal/layout/style_properties.go"
@@ -141,6 +142,9 @@ def switch_prop_case_names(src: str) -> set[str]:
 def apply_arm_names(root: Path) -> set[str]:
     """Quoted case "foo" names plus applyFontProps raw lookups."""
     names = switch_prop_case_names((root / STYLE_PROPERTIES).read_text())
+    paint = root / STYLE_PAINT_PROPS
+    if paint.is_file():
+        names.update(switch_prop_case_names(paint.read_text()))
     font_body = apply_font_body((root / STYLE_CASCADE).read_text())
     names.update(RAW_LOOKUP.findall(font_body))
     return names

@@ -196,6 +196,20 @@ type ResolvedStyle struct {
 	HasTransform    bool
 	TransformOrigin transformOriginSpec
 	Opacity         float64 // 0..1; initial 1; also from filter:opacity()
+	// Outline* is CSS outline. Empty OutlineStyle means none. Does not affect layout size.
+	OutlineWidth    float64
+	OutlineStyle    string
+	OutlineColor    [3]float64
+	OutlineColorSet bool
+	OutlineOffset   float64
+	// BackgroundImage is a raw url(...) target for the first layer, empty if none.
+	BackgroundImage string
+	// ListStylePosition is "inside" or "outside"; empty means outside.
+	ListStylePosition string
+	QuotesOpen        string
+	QuotesClose       string
+	CounterReset      string
+	CounterIncrement  string
 	// CustomProps holds resolved CSS custom properties (--*) for this element
 	// (inherited). Shared with the parent map when the element declares none.
 	CustomProps map[string]string
@@ -644,6 +658,15 @@ type comparableResolvedStyle struct {
 	HasTransform                                                                               bool
 	TransformOrigin                                                                            transformOriginSpec
 	Opacity                                                                                    float64
+	OutlineWidth                                                                               float64
+	OutlineStyle                                                                               string
+	OutlineColor                                                                               [3]float64
+	OutlineColorSet                                                                            bool
+	OutlineOffset                                                                              float64
+	BackgroundImage                                                                            string
+	ListStylePosition                                                                          string
+	QuotesOpen, QuotesClose                                                                    string
+	CounterReset, CounterIncrement                                                             string
 }
 
 func comparableResolvedStyleFor(style ResolvedStyle) comparableResolvedStyle {
@@ -692,6 +715,11 @@ func comparableResolvedStyleFor(style ResolvedStyle) comparableResolvedStyle {
 		Widows: style.Widows, ContainerType: style.ContainerType, ContainerName: style.ContainerName,
 		Transform: style.Transform, HasTransform: style.HasTransform, TransformOrigin: style.TransformOrigin,
 		Opacity: style.Opacity,
+		OutlineWidth: style.OutlineWidth, OutlineStyle: style.OutlineStyle,
+		OutlineColor: style.OutlineColor, OutlineColorSet: style.OutlineColorSet,
+		OutlineOffset: style.OutlineOffset, BackgroundImage: style.BackgroundImage,
+		ListStylePosition: style.ListStylePosition, QuotesOpen: style.QuotesOpen, QuotesClose: style.QuotesClose,
+		CounterReset: style.CounterReset, CounterIncrement: style.CounterIncrement,
 	}
 }
 

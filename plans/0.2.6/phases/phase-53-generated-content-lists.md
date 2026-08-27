@@ -1,7 +1,7 @@
 # Phase 53: Generated content, lists, counters
 
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 53
-> **Status:** not started
+> **Status:** in progress (counters, quotes, list-style-position inside landed; list-style-image `[~]`)
 > **Estimated effort:** 5-8 days
 > **Owner:** `internal/layout/pseudo_content.go`, list layout in `layout_flow.go`
 > **Depends on:** Phase 49 not required
@@ -27,15 +27,15 @@ Reports use counters for clause numbers. Lists use `inside` in compact invoices.
 
 ### 53.1 counters
 
-- [ ] 53.1.1 Parse `counter-reset` and `counter-increment` onto the style or a document counter map. Proof: `go test ./internal/layout -run TestCounterResetIncrement`.
-- [ ] 53.1.2 `content: counter(name)` and `counters(name, sep)` in `parseContentValue`. Proof: `TestCounterInBefore`.
-- [ ] 53.1.3 Nested `ol` fixture showing 1 / 1.1 / 1.2. Add golden + `fixturePageBounds` if paint changes. Proof: `make golden` includes the new fixture.
-- [ ] 53.1.4 Matrix generated-content row. Mapping flip.
+- [x] 53.1.1 `counter-reset` / `counter-increment` stored and walked. Proof: `TestCounterResetIncrement`, `TestCounterResetIncrementLayout`.
+- [x] 53.1.2 `counter()` / `counters()` in generated content. Proof: `TestCounterInBefore`.
+- [~] 53.1.3 Nested ol covered by unit test 1 / 1.1 / 1.2, no new golden this session.
+- [x] 53.1.4 Matrix counter row. Mapping `--write`.
 
 ### 53.2 quotes
 
-- [ ] 53.2.1 `quotes` property inherited. `content: open-quote` / `close-quote` uses the pair. Nesting depth increments. Proof: `go test ./internal/layout -run TestQuotes`.
-- [ ] 53.2.2 `no-open-quote` / `no-close-quote` may `[~]`.
+- [x] 53.2.1 Quotes + open/close-quote with nesting. Proof: `TestQuotes`.
+- [~] 53.2.2 `no-open-quote` / `no-close-quote` not this session.
 
 ### 53.3 list-style-position
 

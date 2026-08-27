@@ -476,8 +476,9 @@ func (e *engine) popBFCFloats(enclose bool) {
 	e.bfcStack = e.bfcStack[:stackLen-1]
 }
 
-// emitListMarker paints the list marker in the marker area to the left of
-// the content edge so it does not overlap the principal text.
+// emitListMarker paints the list marker for an <li>.
+// list-style-position:inside places it at contentX (start of the first line
+// box). outside and empty hang in the gutter at contentX - gap - minW.
 func (e *engine) emitListMarker(node *html.Node, style ResolvedStyle, contentX, baseline float64) {
 	typ := style.ListStyleType
 	if typ == "" {
@@ -504,12 +505,15 @@ func (e *engine) emitListMarker(node *html.Node, style ResolvedStyle, contentX, 
 	if minW <= 0 {
 		minW = size * float64(len([]rune(text))) * halfRatio
 	}
-	// Outside marker: sit in the padding/margin gutter left of contentX.
-	gap := size * bulletGapRatio
 
-	posX := contentX - gap - minW
-	if posX < 0 {
-		posX = 0
+	posX := contentX
+	if style.ListStylePosition != "inside" {
+		// Outside marker: sit in the padding/margin gutter left of contentX.
+		gap := size * bulletGapRatio
+		posX = contentX - gap - minW
+		if posX < 0 {
+			posX = 0
+		}
 	}
 
 	e.add(Op{ //nolint:exhaustruct // intentional zero fields

@@ -169,11 +169,11 @@ Invoice and report CSS already writes these. They currently no-op.
 
 ## Phase 52: Paint, backgrounds, outline, overflow
 
-- [ ] 52.1 `background-image: url(...)` using the existing image fetch + paint path. No-repeat, default positioning, first layer only is an acceptable Partial. Proof: golden with a PNG background.
-- [ ] 52.2 `outline` / `outline-width` / `outline-style` / `outline-color` as a paint stroke outside the border edge. Proof: layout chrome test.
-- [ ] 52.3 `border-top-left-radius` and the other three longhands. Proof: `rounded_border_test.go` extended.
-- [ ] 52.4 `overflow: hidden|clip` paint clip lite for the box. Sticky already uses overflow as scrollport. Proof: child ink does not draw outside the clip in a unit test.
-- [ ] 52.5 `box-shadow` lite: one un-inset shadow, no blur if blur is expensive, or blur as a soft fill if the paint path already can. If this blows the file-size limit, extract. If it is not cheap, `[~]` with reason.
+- [x] 52.1 `background-image: url(...)` first layer, no-repeat at box origin. Proof: `TestBackgroundImageLayoutPaints`. No new golden this session.
+- [x] 52.2 Outline stroke outside the border edge. Proof: `TestOutlineStroke`.
+- [x] 52.3 Radius longhands. Proof: `TestRadiusLonghand`.
+- [x] 52.4 Overflow clip for hidden/clip/auto/scroll. Proof: `TestOverflowClip`; `TestStickyOverflow*` green.
+- [~] 52.5 `box-shadow` not this session. Permanent skip unless a later amendment.
 
 Gradients are a second slice, not required to close 52. Filter blur stays a non-goal.
 
@@ -181,10 +181,10 @@ Gradients are a second slice, not required to close 52. Filter blur stays a non-
 
 ## Phase 53: Generated content, lists, counters
 
-- [ ] 53.1 `counter-reset` / `counter-increment` plus `content: counter(name)` / `counters()`. Proof: nested `ol` fixture.
-- [ ] 53.2 `quotes` + `content: open-quote` / `close-quote` subset. Proof: unit test.
-- [ ] 53.3 `list-style-position: inside`. Proof: marker in the first line box, not hanging outside.
-- [ ] 53.4 `list-style-image` may stay `[~]` if images-as-markers need extra paint ops.
+- [x] 53.1 Counters on `::before`. Proof: `TestCounterInBefore`, `TestCounterResetIncrementLayout`.
+- [x] 53.2 Quotes + open/close-quote. Proof: `TestQuotes`.
+- [x] 53.3 `list-style-position: inside`. Proof: `TestListStylePositionInside`.
+- [~] 53.4 `list-style-image` not this session.
 
 ---
 

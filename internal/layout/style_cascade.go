@@ -180,6 +180,17 @@ var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inheri
 		func(dst, src *ResolvedStyle) { dst.ListStyleType = src.ListStyleType },
 	},
 	{
+		[]string{"list-style-position", "list-style"},
+		func(dst, src *ResolvedStyle) { dst.ListStylePosition = src.ListStylePosition },
+	},
+	{
+		[]string{"quotes"},
+		func(dst, src *ResolvedStyle) {
+			dst.QuotesOpen = src.QuotesOpen
+			dst.QuotesClose = src.QuotesClose
+		},
+	},
+	{
 		[]string{"border-collapse"},
 		func(dst, src *ResolvedStyle) { dst.BorderCollapse = src.BorderCollapse },
 	},

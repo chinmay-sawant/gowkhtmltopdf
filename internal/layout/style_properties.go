@@ -935,6 +935,14 @@ func logicalPair(value string) (string, string, bool) {
 func applyBorderGroup(
 	style *ResolvedStyle, prop, value string, fsize float64, _ *styleContext, _ *ResolvedStyle, _ bool,
 ) bool {
+	if applyOutlineProps(style, prop, value, fsize) {
+		return true
+	}
+
+	if applyRadiusLonghand(style, prop, value, fsize) {
+		return true
+	}
+
 	switch prop {
 	case "border":
 		return applyBorderAllSides(style, value, fsize)
@@ -1019,7 +1027,7 @@ func applyBorderAllSides(style *ResolvedStyle, value string, fsize float64) bool
 		return true
 	}
 
-	if b, ok := parseBorder(value, fsize); ok {
+	if b, ok := parseBorder(value, fsize, style.Color); ok {
 		style.BorderTop, style.BorderRight, style.BorderBottom, style.BorderLeft = b, b, b, b
 	}
 
@@ -1043,14 +1051,14 @@ func applyBorderOneSide(style *ResolvedStyle, prop, value string, fsize float64)
 	return true
 }
 
-func setBorderSide(_ *ResolvedStyle, side *border, value string, fsize float64) {
+func setBorderSide(style *ResolvedStyle, side *border, value string, fsize float64) {
 	if strings.EqualFold(strings.TrimSpace(value), cssDisplayNone) || strings.TrimSpace(value) == "0" {
 		*side = border{Width: 0, PaintWidth: 0, Style: "", Color: [3]float64{0, 0, 0}}
 
 		return
 	}
 
-	if b, ok := parseBorder(value, fsize); ok {
+	if b, ok := parseBorder(value, fsize, style.Color); ok {
 		*side = b
 	}
 }
@@ -1095,18 +1103,17 @@ func applyBorderStyleColorProps(style *ResolvedStyle, prop, value string) bool {
 
 		style.BorderTop.Style, style.BorderRight.Style, style.BorderBottom.Style, style.BorderLeft.Style = s, s, s, s
 	case borderColorKeyword:
-		if r, g, b, _, ok := css.ParseColor(value); ok {
-			c := [3]float64{float64(r) / 255, float64(g) / 255, float64(b) / 255}
+		if c, ok := parseUsedColor(value, style.Color); ok {
 			style.BorderTop.Color, style.BorderRight.Color, style.BorderBottom.Color, style.BorderLeft.Color = c, c, c, c
 		}
 	case "border-top-color":
-		setBorderColor(&style.BorderTop, value)
+		setBorderColor(&style.BorderTop, value, style.Color)
 	case "border-right-color":
-		setBorderColor(&style.BorderRight, value)
+		setBorderColor(&style.BorderRight, value, style.Color)
 	case "border-bottom-color":
-		setBorderColor(&style.BorderBottom, value)
+		setBorderColor(&style.BorderBottom, value, style.Color)
 	case "border-left-color":
-		setBorderColor(&style.BorderLeft, value)
+		setBorderColor(&style.BorderLeft, value, style.Color)
 	default:
 		return false
 	}
@@ -1114,9 +1121,9 @@ func applyBorderStyleColorProps(style *ResolvedStyle, prop, value string) bool {
 	return true
 }
 
-func setBorderColor(side *border, value string) {
-	if r, g, b, _, ok := css.ParseColor(value); ok {
-		side.Color = [3]float64{float64(r) / 255, float64(g) / 255, float64(b) / 255}
+func setBorderColor(side *border, value string, current [3]float64) {
+	if c, ok := parseUsedColor(value, current); ok {
+		side.Color = c
 	}
 }
 
@@ -1135,12 +1142,12 @@ func applyColorGroup(
 func applyColorForegroundProps(style *ResolvedStyle, prop, value string, parent *ResolvedStyle, hasParent bool) bool {
 	switch prop {
 	case "color":
-		if value == inheritKeyword {
+		if value == inheritKeyword || isCurrentColor(value) {
 			if hasParent && parent != nil {
 				style.Color = parent.Color
 			}
-		} else if r, g, b, _, ok := css.ParseColor(value); ok {
-			style.Color = [3]float64{float64(r) / 255, float64(g) / 255, float64(b) / 255}
+		} else if c, ok := parseUsedColor(value, style.Color); ok {
+			style.Color = c
 		}
 	case "accent-color":
 		if value == inheritKeyword {
@@ -1170,9 +1177,9 @@ func applyColorBackgroundProps(style *ResolvedStyle, prop, value string) bool {
 			style.BGColor = [4]float64{float64(r) / 255, float64(g) / 255, float64(b) / 255, a}
 		}
 	case "background":
-		if r, g, b, a, ok := firstBackgroundColor(value); ok {
-			style.BGColor = [4]float64{float64(r) / 255, float64(g) / 255, float64(b) / 255, a}
-		}
+		applyBackgroundShorthand(style, value)
+	case "background-image":
+		applyBackgroundImageValue(style, value)
 	default:
 		return false
 	}
@@ -1239,6 +1246,10 @@ func applyTextGroup(
 	}
 
 	if applyListProps(style, prop, value) {
+		return true
+	}
+
+	if applyGeneratedContentProps(style, prop, value) {
 		return true
 	}
 
@@ -1370,11 +1381,18 @@ func applyListProps(style *ResolvedStyle, prop, value string) bool {
 		if t := parseListStyleType(value); t != "" {
 			style.ListStyleType = t
 		}
+	case "list-style-position":
+		if pos := parseListStylePosition(value); pos != "" {
+			style.ListStylePosition = pos
+		}
 	case "list-style":
-		// Shorthand: accept type keywords; ignore position/image for now.
 		for _, tok := range strings.Fields(value) {
 			if t := parseListStyleType(tok); t != "" {
 				style.ListStyleType = t
+			}
+
+			if pos := parseListStylePosition(tok); pos != "" {
+				style.ListStylePosition = pos
 			}
 		}
 	default:

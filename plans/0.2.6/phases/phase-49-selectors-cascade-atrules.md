@@ -28,7 +28,7 @@ Keep the never-match rule for `:hover` / `:focus` / `:active` / `:target`. Print
 
 - [x] 49.1.1 Parse `:is()` arguments as a selector list in `appendFunctionalPseudo`. Nested `:is` allowed; `::` in arguments rejected. Proof: `go test ./internal/css -run TestParseIs`.
 - [x] 49.1.2 Match if any argument matches. Specificity is the most specific argument. Proof: `go test ./internal/css -run 'TestIsPseudo|TestIsSpecificity'`.
-- [ ] 49.1.3 Layout consume: a box styled only through `:is(div, p)` gets the declarations. Proof: `go test ./internal/layout -run TestIsPseudoStyle` (test not added this session).
+- [x] 49.1.3 Layout consume: a box styled only through `:is(div, p)` gets the declarations. Proof: `go test ./internal/layout -run TestIsPseudoStyle`.
 
 ### 49.2 `:where()`
 

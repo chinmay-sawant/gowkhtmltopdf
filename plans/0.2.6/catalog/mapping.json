@@ -13,8 +13,8 @@
     "properties_by_engine_status": {
       "ignored": 247,
       "implemented": 75,
-      "partial": 73,
-      "unsupported": 423
+      "partial": 87,
+      "unsupported": 409
     },
     "properties_print_relevant": 571,
     "properties_goal_implement": 571,
@@ -2464,8 +2464,8 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -3546,8 +3546,8 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -3593,8 +3593,8 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -4882,8 +4882,8 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -4929,8 +4929,8 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -7309,8 +7309,8 @@
       "groups": [
         "CSS Lists and Counters"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -7332,8 +7332,8 @@
       "groups": [
         "CSS Lists and Counters"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -10691,8 +10691,8 @@
       "groups": [
         "CSS Lists and Counters"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -12263,8 +12263,8 @@
       "groups": [
         "CSS Basic User Interface"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -12286,8 +12286,8 @@
       "groups": [
         "CSS Basic User Interface"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -12309,8 +12309,8 @@
       "groups": [
         "CSS Basic User Interface"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -12332,8 +12332,8 @@
       "groups": [
         "CSS Basic User Interface"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -12355,8 +12355,8 @@
       "groups": [
         "CSS Basic User Interface"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -13795,8 +13795,8 @@
       "groups": [
         "CSS Generated Content"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {

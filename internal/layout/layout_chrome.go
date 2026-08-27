@@ -261,6 +261,10 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 		sty.BorderTop = sty.BorderBottom
 	}
 
+	if overflowClipsPaint(sty.Overflow) && insertAt >= 0 && insertAt <= len(e.ops) {
+		clipOpsSlice(e.ops[insertAt:], e.paddingBoxRect(posX, posY, width, height, sty))
+	}
+
 	var chrome []Op
 	radii := usedBorderRadii(sty, width, height)
 	radius := uniformRadius(radii)
@@ -271,6 +275,7 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 			RadiusTopLeft: radii[0], RadiusTopRight: radii[1], RadiusBottomRight: radii[2], RadiusBottomLeft: radii[3],
 		})
 	}
+	chrome = e.appendBackgroundImage(chrome, sty, posX, posY, width, height)
 
 	switch {
 	case hasRoundedRadii(radii) && roundedSolidBorder(sty):
@@ -280,6 +285,7 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 	default:
 		chrome = append(chrome, e.collapsedOrFullBorderOps(boxNode, sty, posX, posY, width, height)...)
 	}
+	chrome = append(chrome, e.outlineOps(sty, posX, posY, width, height)...)
 	if len(chrome) == 0 {
 		return
 	}
@@ -595,26 +601,26 @@ func (e *engine) roundedAccentBorderOps(
 // at the same index matches immediate-splice nesting: later (outer) entries
 // paint first.
 func (e *engine) finalizeChrome(root *box) {
-	if len(e.deferredChrome) == 0 {
-		return
+	if len(e.deferredChrome) > 0 {
+		entries := e.deferredChrome
+		e.deferredChrome = nil
+
+		out, oldToNew, ownerChrome := mergeDeferredChrome(e.ops, entries)
+
+		e.ops = out
+
+		// Remap content op ranges, expand owners with their chrome, then union
+		// parent ranges over children so ancestor ranges still cover nested chrome.
+		remapBoxRangesWithChrome(root, oldToNew, ownerChrome)
+		unionChildOpRanges(root)
+
+		// Deferred chrome under sticky ancestors never received StickyID at build
+		// time; re-stamp from the box tree. Fixed content already marked Fixed -
+		// expand Fixed onto chrome in the same range when any op is Fixed.
+		restampStickyFixed(root, e.ops)
 	}
 
-	entries := e.deferredChrome
-	e.deferredChrome = nil
-
-	out, oldToNew, ownerChrome := mergeDeferredChrome(e.ops, entries)
-
-	e.ops = out
-
-	// Remap content op ranges, expand owners with their chrome, then union
-	// parent ranges over children so ancestor ranges still cover nested chrome.
-	remapBoxRangesWithChrome(root, oldToNew, ownerChrome)
-	unionChildOpRanges(root)
-
-	// Deferred chrome under sticky ancestors never received StickyID at build
-	// time; re-stamp from the box tree. Fixed content already marked Fixed —
-	// expand Fixed onto chrome in the same range when any op is Fixed.
-	restampStickyFixed(root, e.ops)
+	e.applyOverflowClips(root)
 }
 
 // chromeSpan is an inclusive op range owned by one box's chrome.

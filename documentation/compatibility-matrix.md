@@ -62,7 +62,7 @@ Status legend (verified against `applyRestProps` in
 | `width`, `height` | Implemented | `style.go:316-323`; consumed in `layout.go:176-191` (block) and `layout.go:315-320` (images) |
 | `min-width`, `min-height`, `max-width`, `max-height` | Implemented | `style.go:324-339`; enforced `layout.go:181-186, 321-328`; `%` resolves against viewport approximation |
 | `box-sizing` (`content-box\|border-box`) | Implemented | parsed `style.go`; default `content-box` (specified width is content width); `border-box` makes width include padding+border (`layout.go` `buildBlock`); test `TestBoxSizingBorderBox` |
-| `overflow` (`visible\|hidden\|auto\|scroll\|clip`) | Partial | Parsed for sticky scrollport selection (`style.go`). **Not** general paint clipping. Sticky inside `auto\|scroll\|hidden\|clip` clamps to that box at scroll offset 0 (`sticky.go`) |
+| `overflow` (`visible\|hidden\|auto\|scroll\|clip`) | Partial | Sticky scrollport selection (`sticky.go`) plus paint clip of descendant fill/text/line/image to the padding box for `hidden\|clip\|auto\|scroll` (`overflow_clip.go`). `visible` does not clip. Tests `TestOverflowClip`, `TestStickyOverflow*` |
 
 ### 2.2 Display & flow
 
@@ -98,6 +98,9 @@ Status legend (verified against `applyRestProps` in
 | `white-space` (`normal\|nowrap\|pre\|pre-wrap\|pre-line`) | Partial | `pre-wrap` preserves spaces and wraps; `pre-line` collapses spaces, keeps newlines, wraps (`setWhiteSpaceValue`, `collectPreservingNewlines`). Tests `TestWhiteSpacePre`, `TestWhiteSpacePreWrap` |
 | `visibility` (`visible\|hidden\|collapse`) | Partial | `hidden`/`collapse` skip paint, keep layout size (`hidesPaint`). Descendants inherit. Table-row collapse not implemented. Test `TestVisibilityHidden` |
 | `overflow-wrap` / `word-wrap` / `word-break` | Partial | Parsed `applyTextWrapProps` (`style_properties.go:1095`). Used by `wordBreakOf` (`layout_measure.go:461`). `word-wrap` is the overflow-wrap alias. `anywhere` / `break-all` mid-break; `break-word` soft wrap; `keep-all` is stored then treated as normal. Tests `overflow_wrap_test.go` |
+| `list-style-position` | Partial | `inside` puts the marker in the first line; `outside` (default) hangs in the gutter. Test `TestListStylePositionInside` |
+| `quotes` | Partial | Two-string pair inherited; `content: open-quote` / `close-quote` with nesting depth. Test `TestQuotes` |
+| `counter-reset` / `counter-increment` / `counter()` | Partial | Decimal counters on `::before`/`::after`. Nested `counters(name, ".")`. Tests `TestCounterInBefore`, `TestCounterResetIncrementLayout` |
 
 ### 2.4 Color & background
 
@@ -105,7 +108,9 @@ Status legend (verified against `applyRestProps` in
 |----------|--------|---------------------|
 | `color` | Implemented | `style.go:402-405`; consumed `inline.go:152-155`; test `TestCascadeAndInline`. `hsl()`/`hsla()` parse in `ParseColor` (`values.go`; `TestParseColorHsl`) |
 | `background-color` | Implemented | `style.go:406-409`; painted `layout.go:234-237, 504-507, 531-534` (gated by `Background`); tests `TestBackgroundFill`, `TestRunPDFStyleTableImage` |
-| `background` (shorthand) | Partial | Color token only (`firstBackgroundColor`); `url(...)` / gradients ignored |
+| `background` (shorthand) | Partial | Color token plus optional first `url(...)` (`BackgroundImage`). Gradients ignored. Tests `TestBackgroundImageParse` |
+| `background-image` | Partial | First `url(...)` layer, no-repeat at box origin, sized to the box (`background_image.go`). Missing image skipped. Gradients ignored. Test `TestBackgroundImageLayoutPaints` |
+| `outline` / `outline-width` / `outline-style` / `outline-color` / `outline-offset` | Partial | Stroke outside the border edge; does not affect layout size. solid/dashed/dotted. Tests `TestOutlineParse`, `TestOutlineStroke` |
 | `opacity` | Partial | Parsed in `applyRestProps`; paint via PDF ExtGState (`SetOpacity`). Nested opacities multiply. Also accepts `filter: opacity()`; other filter functions ignored (permanent print non-goal for blur/shadow). |
 | `accent-color` | Partial | Parsed `style_properties.go:928`; inherited. Fill color for native `progress`/`meter` (`widgetValueColor` `layout.go:1417`). Other form controls ignore it. Test `widget_color_test.go` |
 
@@ -263,8 +268,8 @@ Status legend as in §2; evidence in `internal/css/css.go`.
 | JavaScript / `<script>` / DOM APIs | **Stripped at load.** No JS engine. `--enable-javascript` and other JS flags are **unknown options** (Policy A) |
 | Full CSS Grid / full Flexbox | Stage A/B print CSS subset **shipped** (§2.7 / §2.8); Stage C lite + flex min-size polish + Partial subgrid/masonry span (`tier-2-pending-3/flex-grid-remaining.md`). **Not** Bootstrap/Tailwind / Chrome layout-test parity |
 | `position: sticky` continuous scroll | Overflow boxes are sticky scrollports at **offset 0** only (PDF has no scroll). Page content box remains the print scrollport when no overflow ancestor. No scroll-offset > 0 animation |
-| `transform`, `filter`, `animation`, `transition` | Partial / out of scope | **Static 2D** `transform` + `transform-origin` Implemented (translate/scale/rotate/matrix/skew*; paint CTM; stacking + abs/fixed CB). Sibling flow unchanged. Overflow: no clip — ink may paint outside page box. **`filter`:** only `opacity()` (see `opacity` row); blur/drop-shadow/SVG filters = permanent print-engine non-goal. **`animation`/`transition`/`@keyframes`:** parse-ignored (static cascaded value only; no timelines). **3D / perspective:** permanent non-goal. Fixture-40; `transform.go` / `transform_test.go` |
-| `background-image` / gradients | Ignored (Phase 3+ candidate) |
+| `transform`, `filter`, `animation`, `transition` | Partial / out of scope | **Static 2D** `transform` + `transform-origin` Implemented (translate/scale/rotate/matrix/skew*; paint CTM; stacking + abs/fixed CB). Sibling flow unchanged. Overflow clip of descendants is Partial (`overflow_clip.go`). Ink may still paint outside the page box for `visible` overflow. **`filter`:** only `opacity()` (see `opacity` row); blur/drop-shadow/SVG filters = permanent print-engine non-goal. **`animation`/`transition`/`@keyframes`:** parse-ignored (static cascaded value only; no timelines). **3D / perspective:** permanent non-goal. Fixture-40; `transform.go` / `transform_test.go` |
+| `background-image` / gradients | **Partial** first `url(...)` layer (`background_image.go`); gradients still ignored |
 | `@font-face` (remote / WOFF2) | **Partial:** local **and `https://`** TTF/OTF/WOFF1 via `FetchSub` (same ACL + `NetworkPolicy` as other subresources) on PDF/image paths. **`.woff2` / `.eot` / `data:`** skipped. Missing faces fall back to registry / Liberation |
 | Custom XSLT TOC (`--xsl-style-sheet`) | Not implemented (no XSLT in stdlib); Go templates instead (Phase 6) |
 | SVG-as-`<img>` | **Implemented** (raster via `internal/svg`) |
