@@ -6,6 +6,7 @@
 | [phases/](phases) | Per-phase atomic checklists |
 | [catalog/](catalog) | Frozen CSS catalogs plus `mapping.json` vs current engine |
 | [AGENTS.md](AGENTS.md) | Agent rules for this ledger |
+| [review/](review) | Post-ship architecture + ponytail ledger for commit `48e06dbc` |
 
 Workflow: [`../../skills/phase-wise-checklist/SKILLS.md`](../../skills/phase-wise-checklist/SKILLS.md)
 
