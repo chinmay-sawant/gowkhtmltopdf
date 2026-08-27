@@ -33,7 +33,7 @@ type bodyNavigation struct {
 // matching the historical scan of Result.Locations. The copied locations have
 // nil Node pointers so they do not keep the parsed document alive.
 //
-//nolint:cyclop,varnamelen,wsl // element location and structure element collection
+//nolint:cyclop,varnamelen // element location and structure element collection
 func collectBodyNavigation(res *layout.Result) bodyNavigation {
 	if res == nil {
 		return bodyNavigation{} //nolint:exhaustruct // intentional zero-value projection
@@ -50,7 +50,6 @@ func collectBodyNavigation(res *layout.Result) bodyNavigation {
 		}
 
 		if id := loc.Node.Attribute("id"); id != "" {
-			node := loc.Node
 			loc.Node = nil
 			nav.ids[id] = loc
 
@@ -62,7 +61,6 @@ func collectBodyNavigation(res *layout.Result) bodyNavigation {
 					break
 				}
 			}
-			_ = node
 		}
 	}
 

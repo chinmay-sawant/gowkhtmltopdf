@@ -90,11 +90,12 @@ func isVerticalWritingMode(mode string) bool {
 // frame and inflate the item's measured size.
 func (e *engine) inlineChromeApplies(node *html.Node) bool {
 	parent := node.Parent
-	if parent == nil || parent.Type != html.ElementNode || e.styleVal(parent).Display != cssDisplayInline {
+	if parent == nil || parent.Type != html.ElementNode {
 		return false
 	}
 
-	if e.styleVal(parent).Position != "static" || isVerticalWritingMode(e.styleVal(parent).WritingMode) {
+	pStyle := e.stylePtr(parent)
+	if pStyle.Display != cssDisplayInline || pStyle.Position != "static" || isVerticalWritingMode(pStyle.WritingMode) {
 		return false
 	}
 
@@ -103,7 +104,7 @@ func (e *engine) inlineChromeApplies(node *html.Node) bool {
 		return true
 	}
 
-	switch e.styleVal(container).Display {
+	switch e.stylePtr(container).Display {
 	case displayFlex, displayInlineFlex, displayGrid, displayInlineGrid, displaySubgrid:
 		return false
 	default:

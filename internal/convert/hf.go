@@ -384,9 +384,6 @@ type hfDrawResult struct {
 // Err returns the aggregate failure for strict conversion callers. The
 // compatibility adapter may still emit warnings, but the primary PDF engine
 // must not report success when required header/footer content was omitted.
-// Err returns the aggregate failure for strict conversion callers. The
-// compatibility adapter may still emit warnings, but the primary PDF engine
-// must not report success when required header/footer content was omitted.
 func (r *hfDrawResult) Err() error {
 	if len(r.warnings) == 0 {
 		return nil

@@ -147,6 +147,8 @@ const maxPooledInlineItems = 256
 // acquireInlineItems returns a reusable temporary item slice for one inline
 // formatting context. Nested contexts consume separate entries from the same
 // engine-local stack.
+const initialInlineItemCapacity = 32
+
 func (e *engine) acquireInlineItems() []inlineItem {
 	if n := len(e.inlineItemPool); n > 0 {
 		items := e.inlineItemPool[n-1]
@@ -155,7 +157,7 @@ func (e *engine) acquireInlineItems() []inlineItem {
 		return items[:0]
 	}
 
-	return make([]inlineItem, 0)
+	return make([]inlineItem, 0, initialInlineItemCapacity)
 }
 
 // releaseInlineItems returns a temporary item slice to the engine-local pool.

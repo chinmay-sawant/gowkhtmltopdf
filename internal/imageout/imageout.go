@@ -350,7 +350,13 @@ func rasterizeContext(ctx context.Context, res *layout.Result, height float64, t
 		clear(pBuf.b)
 	}
 
-	defer supersamplePixPool.Put(pBuf)
+	const maxPooledRasterBytes = 32 << 20 // 32 MiB
+
+	defer func() {
+		if cap(pBuf.b) <= maxPooledRasterBytes {
+			supersamplePixPool.Put(pBuf)
+		}
+	}()
 
 	img := &image.NRGBA{
 		Pix:    pBuf.b,

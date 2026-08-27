@@ -378,15 +378,15 @@ func dumpNode(node *Node, buf *strings.Builder, depth, pageOffset int, pageOf Pa
 		buf.WriteString(heading.Anchor)
 
 		if len(child.Children) == 0 {
-			buf.WriteString("\"/>\node")
+			buf.WriteString("\"/>\n")
 
 			continue
 		}
 
-		buf.WriteString("\">\node")
+		buf.WriteString("\">\n")
 		dumpNode(child, buf, depth+1, pageOffset, pageOf)
 		buf.WriteString(pad)
-		buf.WriteString("</item>\node")
+		buf.WriteString("</item>\n")
 	}
 }
 

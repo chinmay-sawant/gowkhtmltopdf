@@ -54,8 +54,6 @@ func BuildPDFRequest(cmd *cli.Command, output, outline io.Writer) (*convert.Requ
 // opening the document sink and receives the optional outline sink explicitly.
 // convert.Run only receives explicit writers and never reaches into
 // process-global stdout.
-//
-//nolint:cyclop // command preflight must remain before sink creation.
 func RunPDF(
 	ctx context.Context,
 	cmd *cli.Command,
@@ -93,14 +91,12 @@ func RunPDF(
 	}
 
 	defer func() {
-		if closeErr := closeOut(); closeErr != nil && err == nil {
-			err = closeErr
-		}
+		err = errors.Join(err, closeOut())
 	}()
 
 	req.Output = out
 
-	if err := convert.Run(ctx, req, log, progress); err != nil {
+	if err = convert.Run(ctx, req, log, progress); err != nil {
 		return fmt.Errorf("app: pdf conversion: %w", err)
 	}
 

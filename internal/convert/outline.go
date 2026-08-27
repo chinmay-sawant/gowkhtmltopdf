@@ -132,9 +132,8 @@ func docLang(root *html.Node) string {
 // collectObjectHeadings gathers the h1..h6 elements of one painted object and
 // matches them against the layout locations. Page stays object-local (from
 // Lookup); DocPage is filled once in flatHeadings. Objects opted out of the
-// outline (UseOutline/IncludeInOutline false) are dropped here;
-// --exclude-from-outline is applied later via outline.BuildTree Options.Exclude.
-func collectObjectHeadings(root *html.Node, res *layout.Result, _ int, _ settings.PdfGlobal, obj settings.PdfObject, _ io.Writer) []*outline.Heading { //nolint:lll // shared heading collection signature
+// outline (UseOutline/IncludeInOutline false) are dropped here.
+func collectObjectHeadings(root *html.Node, res *layout.Result, obj settings.PdfObject) []*outline.Heading {
 	if !obj.UseOutline || !obj.IncludeInOutline {
 		return nil
 	}

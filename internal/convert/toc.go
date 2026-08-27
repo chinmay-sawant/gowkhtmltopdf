@@ -111,7 +111,8 @@ func genTOCHTML(toc settings.TableOfContent, entries []*outline.Node, pageOf fun
 		size := baseSize * scale
 		pad := indentPt * float64(hVal.Level-1)
 		pageNum := strconv.Itoa(pageOf(hVal))
-		entry := hVal.Title + "  " + pageNum
+		escapedTitle := stdlibhtml.EscapeString(hVal.Title)
+		entry := escapedTitle + "  " + pageNum
 
 		if toc.DottedLines {
 			titleW := measureHF(font, hVal.Title, size)
@@ -119,19 +120,19 @@ func genTOCHTML(toc settings.TableOfContent, entries []*outline.Node, pageOf fun
 
 			avail := contentW - pad - titleW - pageW - float64(tocDotGapFactor)*size
 			if dots := int(avail / (tocDotAdvanceFactor * size)); dots > 0 {
-				entry = hVal.Title + " " + strings.Repeat(".", dots) + " " + pageNum
+				entry = escapedTitle + " " + strings.Repeat(".", dots) + " " + pageNum
 			}
 		}
 
 		start, end := "", ""
 		if toc.ForwardLinks {
-			start = `<a href="#` + hVal.Anchor + `">`
+			start = `<a href="#` + stdlibhtml.EscapeString(hVal.Anchor) + `">`
 			end = "</a>"
 		}
 
 		fmt.Fprintf(&buf,
 			`<div data-wk-target="%s" style="padding-left:%gpt;font-size:%gpt;">%s%s%s</div>`,
-			hVal.Anchor, pad, size, start, entry, end)
+			stdlibhtml.EscapeString(hVal.Anchor), pad, size, start, entry, end)
 	}
 
 	buf.WriteString("</body></html>")

@@ -118,7 +118,7 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 
 	applyNamedPageBreaks(res)
 
-	opPage := paginateOps(res, contentH)
+	paginateOps(res, contentH)
 	stretchPaginatedChrome(res)
 
 	if err := validatePaintPageIndices(res.Ops, contentH); err != nil {
@@ -129,7 +129,7 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 
 	// Split rect ops at page boundaries first so sticky clamps the natural
 	// fragment geometry that will actually be painted (fixture-31).
-	splitCrossingRects(res, contentH, opPage)
+	splitCrossingRects(res, contentH)
 
 	// Drop row shells left behind when text snapped to the next page
 	// (fixture-31: empty white rows after Row 27 on page 1).
@@ -149,7 +149,7 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 	}
 
 	// Re-derive pages after splits and sticky (new ops / Y shifts).
-	opPage = buildPagesAfterSplits(res, contentH, fixedIdx)
+	opPage := buildPagesAfterSplits(res, contentH, fixedIdx)
 
 	populateLocations(res, contentH, opPage)
 

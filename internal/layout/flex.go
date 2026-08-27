@@ -1341,7 +1341,7 @@ func (e *engine) flexColumnItems(kids []*html.Node, contentW, contentH float64) 
 	}
 
 	sort.SliceStable(items, func(i, j int) bool {
-		return e.styles[items[i].n].FlexOrder < e.styles[items[j].n].FlexOrder
+		return e.stylePtr(items[i].n).FlexOrder < e.stylePtr(items[j].n).FlexOrder
 	})
 
 	return items

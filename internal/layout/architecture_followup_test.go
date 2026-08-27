@@ -38,7 +38,7 @@ func TestSplitCrossingRectsRemapsBoxRangeAndPreservesIdentity(t *testing.T) {
 			{Kind: OpFillRect, X: 10, Y: 40, W: 20, H: 30}, //nolint:exhaustruct // intentional zero fields
 		},
 	}
-	splitCrossingRects(res, 50, nil)
+	splitCrossingRects(res, 50)
 
 	if len(res.Ops) != 2 {
 		t.Fatalf("split produced %d ops, want 2", len(res.Ops))

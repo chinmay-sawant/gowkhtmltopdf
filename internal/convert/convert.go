@@ -621,7 +621,7 @@ func renderObject(ctx context.Context, run *runContext, obj *settings.PdfObject,
 	state.geom.pageNames = layout.PageNames(lres, state.geom.contentH)
 	state.pages = run.doc.PageCount() - before
 	state.offset = before
-	state.headings = collectObjectHeadings(root, lres, before, run.req.Global, *obj, run.log)
+	state.headings = collectObjectHeadings(root, lres, *obj)
 	state.navigation = collectBodyNavigation(lres)
 
 	return state, nil

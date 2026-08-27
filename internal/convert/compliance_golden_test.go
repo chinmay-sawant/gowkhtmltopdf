@@ -411,9 +411,13 @@ func TestVeraPDFOptionalValidation(t *testing.T) {
 	t.Parallel()
 
 	verapdfBin := resolveVeraPDFBinary(t)
-	if verOut, err := exec.CommandContext(t.Context(), verapdfBin, "--version").CombinedOutput(); err == nil {
-		t.Logf("running with verapdf version: %s", strings.TrimSpace(string(verOut)))
+
+	verOut, err := exec.CommandContext(t.Context(), verapdfBin, "--version").CombinedOutput()
+	if err != nil {
+		t.Skipf("optional validator verapdf failed --version (%v): %s", err, string(verOut))
 	}
+
+	t.Logf("running with verapdf version: %s", strings.TrimSpace(string(verOut)))
 
 	htmlContent := `<!DOCTYPE html>
 <html lang="en">

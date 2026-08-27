@@ -269,7 +269,7 @@ func (collector *sheetCollector) fetchRef(ctx context.Context, base, ref string)
 
 	resource, err := resources.Fetch(ctx, ref)
 	if err != nil {
-		return nil, fmt.Errorf("%w", err)
+		return nil, fmt.Errorf("fetch imported stylesheet %q: %w", ref, err)
 	}
 
 	return resource, nil

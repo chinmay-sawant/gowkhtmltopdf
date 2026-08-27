@@ -49,7 +49,7 @@ func validatePDFRange(opts pdfOptions) (string, bool) {
 //nolint:exhaustruct // optional Document fields stay zero to inherit engine defaults.
 func buildPDFDocument(html []byte, opts pdfOptions) *gowkhtmltopdf.Document {
 	doc := &gowkhtmltopdf.Document{
-		Pages: []gowkhtmltopdf.Page{{Source: gowkhtmltopdf.HTML(html)}},
+		Pages: []gowkhtmltopdf.Page{{Source: gowkhtmltopdf.Content{HTML: html}}},
 	}
 
 	if opts.pageSize != "" {

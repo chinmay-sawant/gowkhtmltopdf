@@ -964,6 +964,24 @@ func (e *engine) styleVal(node *html.Node) ResolvedStyle {
 	return *e.stylePtr(node)
 }
 
+// HorizChrome returns unscaled horizontal padding plus border width.
+func (s *ResolvedStyle) HorizChrome() float64 {
+	if s == nil {
+		return 0
+	}
+
+	return s.PaddingLeft + s.PaddingRight + s.BorderLeft.Width + s.BorderRight.Width
+}
+
+// VertChrome returns unscaled vertical padding plus border width.
+func (s *ResolvedStyle) VertChrome() float64 {
+	if s == nil {
+		return 0
+	}
+
+	return s.PaddingTop + s.PaddingBottom + s.BorderTop.Width + s.BorderBottom.Width
+}
+
 // buildWithStyle builds node with an engine-local style override. The override
 // remains live through the complete recursive build, so boxes created for node
 // can safely retain its pointer while descendants continue to read their own

@@ -44,7 +44,7 @@ func (e *engine) buildTable(node *html.Node, style ResolvedStyle, availW, posX, 
 
 	var capStyle *ResolvedStyle
 	if capNode != nil {
-		capStyle = e.styles[capNode]
+		capStyle = e.stylePtr(capNode)
 	}
 
 	side := captionSideValue(style, capStyle)
@@ -217,8 +217,8 @@ func (e *engine) tableCaptionNode(node *html.Node) *html.Node {
 			continue
 		}
 
-		style := e.styles[child]
-		if style != nil && style.Display != cssDisplayNone &&
+		style := e.stylePtr(child)
+		if style.Display != cssDisplayNone &&
 			(child.Name == htmlCaption || style.Display == displayTableCaption) {
 			return child
 		}
@@ -317,7 +317,7 @@ func (e *engine) collectTableRows(node *html.Node) ([][]*html.Node, int) {
 				continue
 			}
 
-			cstate := e.styles[child]
+			cstate := e.stylePtr(child)
 			if cstate.Display == cssDisplayNone {
 				continue
 			}
@@ -346,7 +346,7 @@ func rowCellNodes(tr *html.Node, e *engine) []*html.Node {
 	cells := make([]*html.Node, 0, len(tr.Children))
 
 	for _, cell := range tr.Children {
-		if cell.Type == html.ElementNode && e.styles[cell].Display == displayTableCell {
+		if cell.Type == html.ElementNode && e.stylePtr(cell).Display == displayTableCell {
 			cells = append(cells, cell)
 		}
 	}
@@ -1078,8 +1078,8 @@ func (e *engine) cellBG(cell *box) (float64, float64, float64, float64, bool) {
 	}
 
 	if cell.node != nil && cell.node.Parent != nil {
-		ps, has := e.styles[cell.node.Parent]
-		if has && ps.Display == displayTableRow && ps.BGColor[3] > 0 {
+		ps := e.stylePtr(cell.node.Parent)
+		if ps.Display == displayTableRow && ps.BGColor[3] > 0 {
 			return ps.BGColor[0], ps.BGColor[1], ps.BGColor[2], ps.BGColor[3], true
 		}
 	}

@@ -73,7 +73,7 @@ func (e *engine) isInlineChild(node *html.Node) bool {
 		return false
 	}
 
-	cstate := e.styles[node]
+	cstate := e.stylePtr(node)
 	if cstate.Display == cssDisplayNone || cstate.Float != cssDisplayNone ||
 		cstate.Position == positionAbsolute || cstate.Position == positionFixed {
 		return false
@@ -213,7 +213,7 @@ func (e *engine) flowOneChild(
 	node := children[idx]
 	// Fetch the child's resolved style once; all flow-child predicates and
 	// the float branch reuse it (was four e.styles map lookups per child).
-	cst := e.styles[node]
+	cst := e.stylePtr(node)
 
 	switch {
 	case isSkippableFlowNode(node, cst):
@@ -323,14 +323,14 @@ func collectInlineRun(children []*html.Node, idx int, engine *engine) ([]*html.N
 
 	for idx < len(children) {
 		child := children[idx]
-		if child.Type == html.ElementNode && engine.styles[child].Display == cssDisplayNone {
+		if child.Type == html.ElementNode && engine.stylePtr(child).Display == cssDisplayNone {
 			hasDisplayNone = true
 			idx++
 
 			continue
 		}
 
-		if child.Type == html.ElementNode && engine.styles[child].Float != cssDisplayNone {
+		if child.Type == html.ElementNode && engine.stylePtr(child).Float != cssDisplayNone {
 			break
 		}
 
@@ -356,7 +356,7 @@ func collectInlineRun(children []*html.Node, idx int, engine *engine) ([]*html.N
 	run := make([]*html.Node, 0, idx-start)
 
 	for _, child := range children[start:idx] {
-		if child.Type == html.ElementNode && engine.styles[child].Display == cssDisplayNone {
+		if child.Type == html.ElementNode && engine.stylePtr(child).Display == cssDisplayNone {
 			continue
 		}
 

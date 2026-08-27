@@ -125,10 +125,7 @@ func (island pageIslandRenderContext) render(ctx context.Context, section *html.
 	for _, heading := range collectObjectHeadings(
 		islandRoot,
 		res,
-		before,
-		island.renderCtx.global,
 		*island.renderCtx.obj,
-		island.log,
 	) {
 		heading.Page += pageOffset
 		island.state.headings = append(island.state.headings, heading)
