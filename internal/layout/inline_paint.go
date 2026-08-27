@@ -129,7 +129,7 @@ func (e *engine) emitInlineText( //nolint:funlen // text measurement, face-run e
 ) float64 {
 	child := item.style.Color
 	size := item.style.FontSize * e.scale
-	ascent, descent := e.inlineFontMetrics(item.text, *item.style)
+	ascent, descent := e.inlineFontMetrics(item.text, item.style)
 
 	if ascent+descent < size*0.5 {
 		// Fallback when font metrics are missing — keep hit targets usable.
@@ -166,7 +166,7 @@ func (e *engine) emitInlineText( //nolint:funlen // text measurement, face-run e
 
 	var runSpan float64
 
-	if run, ok := e.primaryFaceRun(item.text, *item.style); ok {
+	if run, ok := e.primaryFaceRun(item.text, item.style); ok {
 		e.emitInlineTextRun(
 			item,
 			run,
@@ -180,7 +180,7 @@ func (e *engine) emitInlineText( //nolint:funlen // text measurement, face-run e
 		leftX += run.w
 		runSpan = run.w
 	} else {
-		for _, run := range e.splitTextByFace(item.text, *item.style) {
+		for _, run := range e.splitTextByFace(item.text, item.style) {
 			e.emitInlineTextRun(
 				item,
 				run,
@@ -308,7 +308,7 @@ func (e *engine) emitInlineTextRun(
 	text := transformInlineText(run.text, item.style.TextTransform)
 	textWidth := run.w
 	if text != run.text {
-		textWidth = e.measureTextFace(text, *item.style)
+		textWidth = e.measureTextFace(text, item.style)
 	}
 
 	textX := leftX
@@ -522,8 +522,8 @@ func nearUndY(a, b float64) bool {
 // Primary-face fast path: resolve the style face once and only consult the
 // fallback cache when a glyph is missing — Latin report text almost never
 // leaves the primary face.
-func (e *engine) measureTextFace(cssSheet string, sty ResolvedStyle) float64 {
-	if cssSheet == "" {
+func (e *engine) measureTextFace(cssSheet string, sty *ResolvedStyle) float64 {
+	if cssSheet == "" || sty == nil {
 		return 0
 	}
 
@@ -550,7 +550,7 @@ func (e *engine) measureTextFace(cssSheet string, sty ResolvedStyle) float64 {
 }
 
 func (e *engine) accumulateTextFaceWidth(
-	cssSheet string, sty ResolvedStyle, primary *pdf.Font, size float64,
+	cssSheet string, sty *ResolvedStyle, primary *pdf.Font, size float64,
 ) (float64, int, int) {
 	var total float64
 
@@ -579,7 +579,11 @@ func (e *engine) accumulateTextFaceWidth(
 
 // measureRuneFace measures a single rune with the same face selection as
 // measureTextFace, without allocating string(r).
-func (e *engine) measureRuneFace(curRune rune, sty ResolvedStyle) float64 {
+func (e *engine) measureRuneFace(curRune rune, sty *ResolvedStyle) float64 {
+	if sty == nil {
+		return 0
+	}
+
 	size := sty.FontSize * e.scale
 	face := e.faceForRune(sty, curRune)
 
@@ -609,8 +613,8 @@ type faceRun struct {
 // under CSS font-family fallback.
 //
 //nolint:cyclop,funlen,wsl // hot path: per-rune face-fallback run splitting
-func (e *engine) splitTextByFace(cssSheet string, sty ResolvedStyle) []faceRun {
-	if cssSheet == "" {
+func (e *engine) splitTextByFace(cssSheet string, sty *ResolvedStyle) []faceRun {
+	if cssSheet == "" || sty == nil {
 		return nil
 	}
 
@@ -687,8 +691,8 @@ func (e *engine) splitTextByFace(cssSheet string, sty ResolvedStyle) []faceRun {
 }
 
 //nolint:wsl // hot path keeps the primary-face fast path compact
-func (e *engine) primaryFaceRun(cssSheet string, sty ResolvedStyle) (faceRun, bool) {
-	if cssSheet == "" {
+func (e *engine) primaryFaceRun(cssSheet string, sty *ResolvedStyle) (faceRun, bool) {
+	if cssSheet == "" || sty == nil {
 		return faceRun{}, false //nolint:exhaustruct // intentional zero fields
 	}
 
@@ -727,17 +731,13 @@ func (e *engine) primaryFaceRun(cssSheet string, sty ResolvedStyle) (faceRun, bo
 
 // faceRunAllPrimary reports that every non-whitespace rune in s is covered by
 // primary (so splitTextByFace can emit a single run).
-func faceRunAllPrimary(s string, primary *pdf.Font) bool {
+func faceRunAllPrimary(cssSheet string, primary *pdf.Font) bool {
 	if primary == nil {
 		return false
 	}
 
-	for _, r := range s {
-		if isRuneWhitespace(r) {
-			continue
-		}
-
-		if primary.GlyphID(r) == 0 {
+	for _, runic := range cssSheet {
+		if !isRuneWhitespace(runic) && primary.GlyphID(runic) == 0 {
 			return false
 		}
 	}
@@ -769,7 +769,11 @@ func (e *engine) fontDescentFace(face *pdf.Font, size float64) float64 {
 // item. A line can contain a mix of sans, serif, mono, and fallback faces;
 // using the engine default face for all of them shifts baselines and gives
 // inline chrome the wrong height.
-func (e *engine) inlineFontMetrics(text string, style ResolvedStyle) (float64, float64) {
+func (e *engine) inlineFontMetrics(text string, style *ResolvedStyle) (float64, float64) {
+	if style == nil {
+		return 0, 0
+	}
+
 	size := style.FontSize * e.scale
 	runs := e.splitTextByFace(text, style)
 

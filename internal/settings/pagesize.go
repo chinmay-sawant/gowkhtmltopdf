@@ -43,7 +43,7 @@ var pageSizes = [...]pageSizeEntry{
 }
 
 // errUnknownPageSize is returned by ParsePageSize for unrecognized names.
-var errUnknownPageSize = errors.New("unknown page size")
+var errUnknownPageSize = errors.New("settings: unknown page size")
 
 // ParsePageSize resolves a page size name to width/height in points
 // (portrait orientation; caller swaps for landscape). "Custom" and

@@ -498,7 +498,7 @@ func (e *engine) emitListMarker(node *html.Node, style ResolvedStyle, contentX, 
 		return
 	}
 
-	face := e.faceFor(style)
+	face := e.faceFor(&style)
 
 	text := markerText(node, typ)
 

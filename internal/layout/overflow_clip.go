@@ -149,7 +149,7 @@ func (e *engine) clipOwnContentOps(ops []Op, boxNode *box, clip clipRect) {
 	}
 
 	for i := boxNode.opStart; i <= boxNode.opEnd && i < len(ops); i++ {
-		if opInChildRange(boxNode, i) || e.isOwnChromeOp(ops[i], boxNode) {
+		if opInChildRange(boxNode, i) || e.isOwnChromeOp(&ops[i], boxNode) {
 			continue
 		}
 
@@ -175,8 +175,8 @@ func opInChildRange(boxNode *box, idx int) bool {
 	return false
 }
 
-func (e *engine) isOwnChromeOp(op Op, boxNode *box) bool {
-	if boxNode == nil {
+func (e *engine) isOwnChromeOp(op *Op, boxNode *box) bool {
+	if op == nil || boxNode == nil {
 		return false
 	}
 
@@ -196,8 +196,8 @@ func (e *engine) isOwnChromeOp(op Op, boxNode *box) bool {
 	}
 }
 
-func (e *engine) isOwnOutlineLine(op Op, boxNode *box) bool {
-	if e == nil || boxNode == nil || boxNode.style == nil || !outlinePaints(*boxNode.style) {
+func (e *engine) isOwnOutlineLine(op *Op, boxNode *box) bool {
+	if e == nil || op == nil || boxNode == nil || boxNode.style == nil || !outlinePaints(boxNode.style) {
 		return false
 	}
 
@@ -212,15 +212,19 @@ func (e *engine) isOwnOutlineLine(op Op, boxNode *box) bool {
 	)
 }
 
-func nearRectOp(op Op, x, y, w, h float64) bool {
+func nearRectOp(op *Op, x, y, w, h float64) bool {
+	if op == nil {
+		return false
+	}
+
 	return math.Abs(op.X-x) <= layoutSlack &&
 		math.Abs(op.Y-y) <= layoutSlack &&
 		math.Abs(op.W-w) <= layoutSlack &&
 		math.Abs(op.H-h) <= layoutSlack
 }
 
-func lineOnRectEdges(op Op, x, y, w, h float64) bool {
-	if op.Kind != OpLine {
+func lineOnRectEdges(op *Op, x, y, w, h float64) bool {
+	if op == nil || op.Kind != OpLine {
 		return false
 	}
 
@@ -235,7 +239,11 @@ func lineOnRectEdges(op Op, x, y, w, h float64) bool {
 	return false
 }
 
-func horizontalOnRectEdges(op Op, x, y, w, h float64) bool {
+func horizontalOnRectEdges(op *Op, x, y, w, h float64) bool {
+	if op == nil {
+		return false
+	}
+
 	onTop := math.Abs(op.Y-y) <= layoutSlack
 	onBot := math.Abs(op.Y-(y+h)) <= layoutSlack
 
@@ -246,7 +254,11 @@ func horizontalOnRectEdges(op Op, x, y, w, h float64) bool {
 	return op.X+op.W >= x-layoutSlack && op.X <= x+w+layoutSlack
 }
 
-func verticalOnRectEdges(op Op, x, y, w, h float64) bool {
+func verticalOnRectEdges(op *Op, x, y, w, h float64) bool {
+	if op == nil {
+		return false
+	}
+
 	onLeft := math.Abs(op.X-x) <= layoutSlack
 	onRight := math.Abs(op.X-(x+w)) <= layoutSlack
 

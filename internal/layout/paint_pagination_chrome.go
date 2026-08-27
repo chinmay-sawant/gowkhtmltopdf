@@ -181,7 +181,11 @@ func normalizeOwnVerticalChrome(ops []Op, boxNode *box) {
 	leftBorder := boxNode.style.BorderLeft.Width > 0 && boxNode.style.BorderLeft.Style != cssDisplayNone
 	rightBorder := boxNode.style.BorderRight.Width > 0 && boxNode.style.BorderRight.Style != cssDisplayNone
 	minY := math.Inf(1)
-	verticalIndexes := make([]int, 0)
+	countHint := 0
+	if boxNode.opEnd >= boxNode.opStart {
+		countHint = boxNode.opEnd - boxNode.opStart + 1
+	}
+	verticalIndexes := make([]int, 0, countHint)
 	for idx := boxNode.opStart; idx <= boxNode.opEnd && idx < len(ops); idx++ {
 		if isVerticalChromeForBox(ops[idx], boxNode, leftBorder, rightBorder) {
 			verticalIndexes = append(verticalIndexes, idx)

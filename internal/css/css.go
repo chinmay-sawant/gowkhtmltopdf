@@ -260,7 +260,7 @@ func parsePageRule(src string, str *Stylesheet) (string, error) {
 	})
 
 	if sel == "" {
-		applyPageDescriptors(&str.Page, margin, size)
+		str.Page = applyPageDescriptors(str.Page, margin, size)
 	}
 
 	return rest, nil
@@ -281,18 +281,20 @@ func pageDescriptors(declarations string) (string, string) {
 	return margin, size
 }
 
-func applyPageDescriptors(page **PageStyle, margin, size string) {
-	if *page == nil {
-		*page = &PageStyle{} //nolint:exhaustruct // zero values represent omitted @page properties
+func applyPageDescriptors(page *PageStyle, margin, size string) *PageStyle {
+	if page == nil {
+		page = &PageStyle{} //nolint:exhaustruct // zero values represent omitted @page properties
 	}
 
 	if margin != "" {
-		(*page).Margin = margin
+		page.Margin = margin
 	}
 
 	if size != "" {
-		(*page).Size = size
+		page.Size = size
 	}
+
+	return page
 }
 
 // parsePageSelector reads the @page prelude. Empty is unnamed; :first, :left,

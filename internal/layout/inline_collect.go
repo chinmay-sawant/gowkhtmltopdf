@@ -540,7 +540,7 @@ func (e *engine) inlineBlockAvail(nodeN *html.Node, sty ResolvedStyle, cbW float
 func availWForInline() float64 { return 1 << maxIntShift }
 
 func (e *engine) textItem(text string, style *ResolvedStyle) inlineItem {
-	textWidth := e.measureTextFace(transformInlineText(text, style.TextTransform), *style)
+	textWidth := e.measureTextFace(transformInlineText(text, style.TextTransform), style)
 	lineHeight := lineHeightOf(style) * e.scale
 
 	if isVerticalWritingMode(style.WritingMode) {
@@ -567,7 +567,7 @@ func (e *engine) enableInlineChrome(item *inlineItem) {
 }
 
 func (e *engine) inlineTextWidth(text string, st *ResolvedStyle, chrome bool) float64 {
-	w := e.measureTextFace(text, *st)
+	w := e.measureTextFace(text, st)
 	if chrome {
 		w += e.inlineChromeLeft(st) + e.inlineChromeRight(st)
 	}

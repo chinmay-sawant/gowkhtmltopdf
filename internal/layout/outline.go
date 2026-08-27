@@ -4,8 +4,8 @@ const outlineSideHint = 4 // four sides of a rectangular outline
 
 // outlinePaints reports a CSS outline that should stroke. Empty or "none"
 // OutlineStyle means no outline. Outline never changes the layout box size.
-func outlinePaints(sty ResolvedStyle) bool {
-	if sty.OutlineWidth <= 0 {
+func outlinePaints(sty *ResolvedStyle) bool {
+	if sty == nil || sty.OutlineWidth <= 0 {
 		return false
 	}
 
@@ -17,7 +17,11 @@ func outlinePaints(sty ResolvedStyle) bool {
 	return false
 }
 
-func outlineStrokeColor(sty ResolvedStyle) (float64, float64, float64) {
+func outlineStrokeColor(sty *ResolvedStyle) (float64, float64, float64) {
+	if sty == nil {
+		return 0, 0, 0
+	}
+
 	if sty.OutlineColorSet {
 		return sty.OutlineColor[0], sty.OutlineColor[1], sty.OutlineColor[2]
 	}
@@ -65,7 +69,7 @@ func appendOutlineOps(
 	return dst
 }
 
-func (e *engine) outlineOps(sty ResolvedStyle, posX, posY, width, height float64) []Op {
+func (e *engine) outlineOps(sty *ResolvedStyle, posX, posY, width, height float64) []Op {
 	if e == nil || !outlinePaints(sty) {
 		return nil
 	}

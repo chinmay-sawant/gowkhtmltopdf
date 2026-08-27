@@ -320,7 +320,7 @@ func paintPages(
 
 	var page *pdf.Page
 
-	pageOrder := make([]int, 0)
+	pageOrder := make([]int, 0, len(res.Pages))
 	isUA := doc != nil && doc.IsUA()
 
 	resName := func(face *pdf.Font) string {

@@ -534,7 +534,7 @@ func (e *engine) breakToken(cssSheet string, sty ResolvedStyle, firstMax, restMa
 		return []string{cssSheet}
 	}
 
-	return e.splitTextToWidth(cssSheet, sty, firstMax, restMax, softModeOf(pol))
+	return e.splitTextToWidth(cssSheet, &sty, firstMax, restMax, softModeOf(pol))
 }
 
 // preferFloatClearForTail reports whether remaining inline content from i
@@ -665,23 +665,22 @@ const (
 // splitTextToWidth breaks s into substrings that each fit max widths.
 // firstMax is for the first chunk (remaining space on the current line);
 // restMax is for subsequent chunks (full line content width).
+//
+//nolint:cyclop // multi-chunk text width splitting
 func (e *engine) splitTextToWidth(
-	text string, style ResolvedStyle, firstMax, restMax float64, mode softBreakMode,
+	text string, style *ResolvedStyle, firstMax, restMax float64, mode softBreakMode,
 ) []string {
-	if text == "" {
+	if text == "" || style == nil {
 		return nil
 	}
 
 	runes := []rune(text)
-	if len(runes) <= 1 {
-		return []string{text}
-	}
 
-	var out []string
+	var chunks []string
 
 	for len(runes) > 0 {
 		limit := restMax
-		if len(out) == 0 {
+		if len(chunks) == 0 && firstMax > 0 {
 			limit = firstMax
 		}
 
@@ -698,16 +697,21 @@ func (e *engine) splitTextToWidth(
 			}
 		}
 
-		out = append(out, string(runes[:node]))
+		chunks = append(chunks, string(runes[:node]))
 		runes = runes[node:]
 	}
 
-	return out
+	return chunks
 }
 
 // fittingPrefix returns the rune count of the longest prefix of runes that
-// fits within limit, always at least 1 so splitting makes progress.
-func (e *engine) fittingPrefix(runes []rune, limit float64, style ResolvedStyle) int {
+// fits within limit using the style's font-size. Takes at least 1 rune so
+// we always make progress.
+func (e *engine) fittingPrefix(runes []rune, limit float64, style *ResolvedStyle) int {
+	if style == nil {
+		return 1
+	}
+
 	node := 0
 	width := 0.0
 
@@ -873,7 +877,7 @@ func (e *engine) trimTrailingSpace(line []inlineItem) {
 	if trimmed != last.text {
 		spaceCount := len(last.text) - len(trimmed)
 		last.text = trimmed
-		last.w -= float64(spaceCount) * e.measureRuneFace(' ', *last.style)
+		last.w -= float64(spaceCount) * e.measureRuneFace(' ', last.style)
 	}
 }
 
@@ -902,7 +906,7 @@ func (e *engine) lineMetrics(line []inlineItem, lineY float64) (float64, float64
 			continue
 		}
 
-		ascent, descent := e.inlineFontMetrics(item.text, *item.style)
+		ascent, descent := e.inlineFontMetrics(item.text, item.style)
 		lh := lineHeightOf(item.style) * e.scale
 
 		extra := (lh - ascent - descent) / two

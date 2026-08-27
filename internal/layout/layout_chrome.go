@@ -288,7 +288,7 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 	default:
 		chrome = append(chrome, e.collapsedOrFullBorderOps(boxNode, sty, posX, posY, width, height)...)
 	}
-	chrome = append(chrome, e.outlineOps(sty, posX, posY, width, height)...)
+	chrome = append(chrome, e.outlineOps(&sty, posX, posY, width, height)...)
 	stampOpRadiiY(chrome, radiiY)
 	if len(chrome) == 0 {
 		return

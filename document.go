@@ -344,8 +344,9 @@ func (d *Document) pdfGlobal(dumpOutline bool) settings.PdfGlobal {
 		global.Size = settings.Size{Width: d.WidthMM, Height: d.HeightMM}
 	}
 	if d.Orientation != "" {
-		orientation, _ := settings.ParseOrientation(d.Orientation)
-		global.Orientation = orientation
+		if orientation, err := settings.ParseOrientation(d.Orientation); err == nil {
+			global.Orientation = orientation
+		}
 	}
 	if d.Margin != (Margin{Top: 0, Right: 0, Bottom: 0, Left: 0}) {
 		global.Margin = settings.Margin{
@@ -359,10 +360,14 @@ func (d *Document) pdfGlobal(dumpOutline bool) settings.PdfGlobal {
 		global.Title = d.Title
 	}
 	if d.PDFVersion != "" {
-		global.PdfVersion, _ = settings.ParsePDFVersion(d.PDFVersion)
+		if v, err := settings.ParsePDFVersion(d.PDFVersion); err == nil {
+			global.PdfVersion = v
+		}
 	}
 	if d.PDFProfile != "" {
-		global.PdfProfile, _ = settings.ParsePDFProfile(d.PDFProfile)
+		if p, err := settings.ParsePDFProfile(d.PDFProfile); err == nil {
+			global.PdfProfile = p
+		}
 	}
 	if d.Copies != 0 {
 		global.Copies = d.Copies

@@ -24,9 +24,9 @@ type Location struct {
 	X, Y, W, H float64
 }
 
-// locationReader is implemented by layout metadata and by tests or other
+// LocationReader is implemented by layout metadata and by tests or other
 // callers that already have a compatible location value.
-type locationReader interface {
+type LocationReader interface {
 	NodeRef() *html.Node
 	PageIndex() int
 	Bounds() (float64, float64, float64, float64)
@@ -142,7 +142,7 @@ func CollectHeadings(root *html.Node) []*Heading {
 // (matched by node pointer) and returns the headings that have a location.
 // Headings without a location are skipped: they were laid out as display:none
 // or never emitted a box.
-func Lookup[T locationReader](headings []*Heading, locs []T) []*Heading {
+func Lookup[T LocationReader](headings []*Heading, locs []T) []*Heading {
 	byNode := make(map[*html.Node]Location, len(locs))
 
 	for _, l := range locs {

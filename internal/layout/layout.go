@@ -483,12 +483,17 @@ type chromeEntry struct {
 // faceFor selects the TrueType face for a resolved style (bold/italic),
 // preferring CSS font-family matches from the opt-in registry, then the
 // bundled Liberation FaceSet.
-func (e *engine) faceFor(sty ResolvedStyle) *pdf.Font {
+func (e *engine) faceFor(sty *ResolvedStyle) *pdf.Font {
+	if sty == nil {
+		return e.font
+	}
+
 	key := faceStyleKey{
 		famHash: sty.famHash,
 		weight:  sty.FontWeight,
 		italic:  sty.FontItalic,
 	}
+
 	if e.faceByStyle != nil {
 		if f, ok := e.faceByStyle[key]; ok {
 			return f
@@ -507,7 +512,11 @@ func (e *engine) faceFor(sty ResolvedStyle) *pdf.Font {
 }
 
 // lookupFaceFor is the uncached faceFor path.
-func (e *engine) lookupFaceFor(sty ResolvedStyle) *pdf.Font {
+func (e *engine) lookupFaceFor(sty *ResolvedStyle) *pdf.Font {
+	if sty == nil {
+		return e.font
+	}
+
 	if e.registry != nil {
 		if f := e.registry.Lookup(sty.FontFamily, sty.FontWeight, sty.FontItalic); f != nil {
 			return f
@@ -534,8 +543,13 @@ func (e *engine) lookupFaceFor(sty ResolvedStyle) *pdf.Font {
 // Fast path: when the primary face covers r (common for Latin/report text),
 // return it without a map lookup. Fallback faces are cached under a hash key
 // that does not allocate a joined family string.
-func (e *engine) faceForRune(sty ResolvedStyle, runeValue rune) *pdf.Font {
+func (e *engine) faceForRune(sty *ResolvedStyle, runeValue rune) *pdf.Font {
+	if sty == nil {
+		return e.font
+	}
+
 	primary := e.faceFor(sty)
+
 	if isRuneWhitespace(runeValue) {
 		return primary
 	}
@@ -548,13 +562,18 @@ func (e *engine) faceForRune(sty ResolvedStyle, runeValue rune) *pdf.Font {
 }
 
 // faceForRuneFallback resolves and caches a non-primary face for a missing glyph.
-func (e *engine) faceForRuneFallback(sty ResolvedStyle, runeValue rune, primary *pdf.Font) *pdf.Font {
+func (e *engine) faceForRuneFallback(sty *ResolvedStyle, runeValue rune, primary *pdf.Font) *pdf.Font {
+	if sty == nil {
+		return primary
+	}
+
 	key := faceRuneKey{
 		famHash: sty.famHash,
 		weight:  sty.FontWeight,
 		italic:  sty.FontItalic,
 		r:       runeValue,
 	}
+
 	if e.faceByRune != nil {
 		if f, ok := e.faceByRune[key]; ok {
 			return f
@@ -576,7 +595,11 @@ func (e *engine) faceForRuneFallback(sty ResolvedStyle, runeValue rune, primary 
 }
 
 // lookupFaceForRune is the uncached face resolution path.
-func (e *engine) lookupFaceForRune(sty ResolvedStyle, runeValue rune) *pdf.Font {
+func (e *engine) lookupFaceForRune(sty *ResolvedStyle, runeValue rune) *pdf.Font {
+	if sty == nil {
+		return e.font
+	}
+
 	if f := e.registryFamilyWithGlyph(sty, runeValue); f != nil {
 		return f
 	}
@@ -588,6 +611,7 @@ func (e *engine) lookupFaceForRune(sty ResolvedStyle, runeValue rune) *pdf.Font 
 	if e.font != nil && e.font.GlyphID(runeValue) != 0 {
 		return e.font
 	}
+
 	// Last resort: any opt-in registry face that covers this codepoint
 	// (DejaVu/Noto when --font-path / --use-system-fonts scanned them).
 	if f := e.registryGlyphFallback(sty, runeValue); f != nil {
@@ -604,8 +628,8 @@ func isRuneWhitespace(r rune) bool {
 
 // registryGlyphFallback is the last-resort registry lookup: any opt-in face
 // covering r, regardless of CSS font-family.
-func (e *engine) registryGlyphFallback(st ResolvedStyle, r rune) *pdf.Font {
-	if e.registry == nil {
+func (e *engine) registryGlyphFallback(st *ResolvedStyle, r rune) *pdf.Font {
+	if e.registry == nil || st == nil {
 		return nil
 	}
 
@@ -614,8 +638,8 @@ func (e *engine) registryGlyphFallback(st ResolvedStyle, r rune) *pdf.Font {
 
 // registryFamilyWithGlyph looks up the first CSS font-family face that has a
 // glyph for runeValue.
-func (e *engine) registryFamilyWithGlyph(style ResolvedStyle, runeValue rune) *pdf.Font {
-	if e.registry == nil {
+func (e *engine) registryFamilyWithGlyph(style *ResolvedStyle, runeValue rune) *pdf.Font {
+	if e.registry == nil || style == nil {
 		return nil
 	}
 
@@ -638,8 +662,8 @@ func (e *engine) registryFamilyWithGlyph(style ResolvedStyle, runeValue rune) *p
 // glyph for runeValue.
 //
 //nolint:cyclop,lll // ordered fallback search is intentionally explicit
-func (e *engine) facesWithGlyph(style ResolvedStyle, runeValue rune) *pdf.Font {
-	if e.faces == nil {
+func (e *engine) facesWithGlyph(style *ResolvedStyle, runeValue rune) *pdf.Font {
+	if e.faces == nil || style == nil {
 		return nil
 	}
 
@@ -1318,7 +1342,7 @@ func (e *engine) paintPositionedPseudo( //nolint:cyclop
 		return
 	}
 
-	face := e.faceFor(*style)
+	face := e.faceFor(style)
 	size := style.FontSize * e.scale
 
 	if face == nil || size <= 0 {
@@ -1331,7 +1355,7 @@ func (e *engine) paintPositionedPseudo( //nolint:cyclop
 	if !style.LeftAuto {
 		pseudoX = contentX + e.scalePt(style.Left)
 	} else if !style.RightAuto {
-		pseudoX = contentX + contentW - e.measureTextFace(text, *style) - e.scalePt(style.Right)
+		pseudoX = contentX + contentW - e.measureTextFace(text, style) - e.scalePt(style.Right)
 	}
 
 	staticAfter := pseudoElem == pseudoAfter && style.TopAuto && style.BottomAuto
@@ -1359,7 +1383,7 @@ func (e *engine) paintPositionedPseudo( //nolint:cyclop
 
 	prevZ, prevSet, prevPositioned := e.pushZ(*style)
 	e.add(Op{ //nolint:exhaustruct // generated pseudo text has no DOM box
-		Kind: OpText, X: pseudoX, Y: baseline, W: e.measureTextFace(text, *style),
+		Kind: OpText, X: pseudoX, Y: baseline, W: e.measureTextFace(text, style),
 		H: style.LineHeight * e.scale, Text: text, Font: face, Size: size,
 		InkDescent: e.fontDescentFace(face, size),
 		R:          style.Color[0], G: style.Color[1], B: style.Color[2],

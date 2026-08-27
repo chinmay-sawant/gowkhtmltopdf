@@ -424,12 +424,16 @@ func (ctx *objectCtx) applyPage(command *Command, glob func(g *settings.PdfGloba
 func (s *parseState) apply(name string, spec flagSpec, negated bool, inlineVal string, hasInline bool) error {
 	switch spec.kind {
 	case flagBool:
-		b, err := parseBool(inlineVal, negated, hasInline)
+		flagBoolVal, err := parseBoolFlag(boolFlagState{
+			inlineVal: inlineVal,
+			hasInline: hasInline,
+			negated:   negated,
+		})
 		if err != nil {
 			return err
 		}
 
-		return spec.app(s.cmd, s.cur, []string{strconv.FormatBool(b)})
+		return spec.app(s.cmd, s.cur, []string{strconv.FormatBool(flagBoolVal)})
 	case flagValue:
 		vals := []string{inlineVal}
 
@@ -471,21 +475,27 @@ func (s *parseState) apply(name string, spec flagSpec, negated bool, inlineVal s
 	return fmt.Errorf("%w --%s", errUnknownFlagKind, name)
 }
 
-// parseBool turns the bool-flag contract into a real bool: an inline value
+type boolFlagState struct {
+	inlineVal string
+	hasInline bool
+	negated   bool
+}
+
+// parseBoolFlag turns the bool-flag contract into a real bool: an inline value
 // (--flag=x) wins, otherwise --no-flag negates. Unknown inline values error.
-func parseBool(inlineVal string, negated, hasInline bool) (bool, error) {
-	if hasInline {
-		switch strings.ToLower(inlineVal) {
+func parseBoolFlag(state boolFlagState) (bool, error) {
+	if state.hasInline {
+		switch strings.ToLower(state.inlineVal) {
 		case "true", "1", "yes", "on":
 			return true, nil
 		case "false", "0", "no", "off":
 			return false, nil
 		}
 
-		return false, fmt.Errorf("%w %q", errInvalidBoolValue, inlineVal)
+		return false, fmt.Errorf("%w %q", errInvalidBoolValue, state.inlineVal)
 	}
 
-	return !negated, nil
+	return !state.negated, nil
 }
 
 func splitFlag(name string) (string, string, bool) {

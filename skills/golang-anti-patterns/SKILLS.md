@@ -1,11 +1,11 @@
 ---
 name: golang-anti-patterns
-description: Comprehensive catalog of the top 50 Go anti-patterns, detection heuristics, and their idiomatic Golang pattern replacements. Covers concurrency, error handling, memory allocation, nil safety, context lifecycle, API ergonomics, and stdlib performance.
+description: Comprehensive catalog of the top 70 Go anti-patterns, detection heuristics, and their idiomatic Golang pattern replacements. Covers concurrency, error handling, memory allocation, nil safety, double pointers, context lifecycle, API ergonomics, and stdlib performance.
 ---
 
-# Top 50 Golang Anti-Patterns and Idiomatic Patterns Guide
+# Top 70 Golang Anti-Patterns and Idiomatic Patterns Guide
 
-This skill provides a comprehensive reference catalog of the top 50 Go anti-patterns, detection heuristics, flawed code examples, and idiomatic Go pattern replacements. Use this skill to audit, review, refactor, and write robust, high-performance, and idiomatic Go code.
+This skill provides a comprehensive reference catalog of the top 70 Go anti-patterns, detection heuristics, flawed code examples, and idiomatic Go pattern replacements. Use this skill to audit, review, refactor, and write robust, high-performance, and idiomatic Go code.
 
 ---
 
@@ -20,7 +20,8 @@ This skill provides a comprehensive reference catalog of the top 50 Go anti-patt
 | **5. Context & Cancellation Lifecycle** | 6 | Context in structs, uncancelled timers, missing cancellation checks |
 | **6. API Design & Package Seams** | 5 | Boolean blindness, unexported return types, stuttering packages |
 | **7. Performance & Stdlib Pitfalls** | 5 | time.After in loops, hot regex compilation, string concat |
-| **Total** | **50** | **Complete Codebase Audit Scope** |
+| **8. Advanced Pointer, Flow & Type Design** | 20 | Double pointer out-params, naked returns, enum exhaustiveness, receiver consistency |
+| **Total** | **70** | **Complete Codebase Audit Scope** |
 
 ---
 
@@ -1043,16 +1044,355 @@ This skill provides a comprehensive reference catalog of the top 50 Go anti-patt
 
 ---
 
+## Category 8: Advanced Pointer, Control Flow, Mutability & Type Design
+
+### Anti-Pattern 51: C-Style Double Pointer (`**T`) and Pointer-to-Slice (`*[]T`) Out-Parameters
+- **Danger:** Passing double pointers `**T` or pointer-to-slices `*[]T` as function out-parameters mimics C idioms, creating awkward dereferencing syntax `(*p).Field`, obscuring data flow, and preventing clean compiler optimizations.
+- **Flawed Code:**
+  ```go
+  func applyStyle(page **PageStyle, margin string) {
+      if *page == nil {
+          *page = &PageStyle{}
+      }
+      (*page).Margin = margin
+  }
+  ```
+- **Idiomatic Pattern:** Pass and return pointers or slices directly.
+  ```go
+  func applyStyle(page *PageStyle, margin string) *PageStyle {
+      if page == nil {
+          page = &PageStyle{}
+      }
+      page.Margin = margin
+      return page
+  }
+  ```
+
+### Anti-Pattern 52: Naked Returns in Long Functions Obscuring Return Values
+- **Danger:** Named return parameters paired with naked `return` statements in functions longer than 15-20 lines obscure which variables are returned, increasing maintenance bugs.
+- **Flawed Code:**
+  ```go
+  func computeComplexLayout(node *Node) (w float64, h float64, err error) {
+      // 80 lines of calculations modifying w, h, and intermediate vars
+      if invalid {
+          return // what are w and h here?
+      }
+      return // naked return
+  }
+  ```
+- **Idiomatic Pattern:** Explicitly specify return expressions in return statements.
+  ```go
+  func computeComplexLayout(node *Node) (float64, float64, error) {
+      // 80 lines of calculations
+      if invalid {
+          return 0, 0, ErrInvalidNode
+      }
+      return width, height, nil
+  }
+  ```
+
+### Anti-Pattern 53: Slice Mutation During Range Iteration Leading to Corrupted State
+- **Danger:** Re-slicing, appending to, or deleting from a slice while iterating over it via `for i, v := range slice` causes skipped elements, index out-of-bounds panics, or duplicate processing.
+- **Flawed Code:**
+  ```go
+  for i, item := range items {
+      if item.Expired {
+          items = append(items[:i], items[i+1:]...) // corrupts iteration index!
+      }
+  }
+  ```
+- **Idiomatic Pattern:** Use the standard 2-pointer filtering pattern or `slices.DeleteFunc`.
+  ```go
+  n := 0
+  for _, item := range items {
+      if !item.Expired {
+          items[n] = item
+          n++
+      }
+  }
+  items = items[:n]
+  ```
+
+### Anti-Pattern 54: Nil Slice vs Empty Slice Allocation Ambiguity
+- **Danger:** Confusing `var s []string` (nil slice, marshals to JSON `null`) with `s := []string{}` (empty non-nil slice, marshals to JSON `[]`) creates API discrepancies and unexpected equality test failures.
+- **Flawed Code:**
+  ```go
+  func GetTags() []string {
+      return []string{} // allocates empty slice on heap when empty
+  }
+  ```
+- **Idiomatic Pattern:** Prefer `var s []T` (nil slice) when returning empty slices from Go functions (zero allocations), unless explicit non-nil JSON array output is required.
+  ```go
+  func GetTags() []string {
+      var tags []string
+      return tags // zero allocations, safe for len(), append(), and range
+  }
+  ```
+
+### Anti-Pattern 55: Missing Enum Exhaustiveness in Type/Value Switches
+- **Danger:** Switch statements over typed enumerations that omit handling for known enum cases or lack explicit fallback handling silently drop operations when new enum values are added.
+- **Flawed Code:**
+  ```go
+  type Severity int
+  const (Info Severity = iota; Warn; Error)
+  func (s Severity) String() string {
+      switch s {
+      case Warn: return "warning"
+      case Error: return "error"
+      }
+      return "info" // Info is not explicitly checked; compiler exhaustive linters flag this
+  }
+  ```
+- **Idiomatic Pattern:** Explicitly list every declared enum variant and include a defensive default branch.
+  ```go
+  func (s Severity) String() string {
+      switch s {
+      case Info:
+          return "info"
+      case Warn:
+          return "warning"
+      case Error:
+          return "error"
+      default:
+          return "info"
+      }
+  }
+  ```
+
+### Anti-Pattern 56: Type Embedding Leaking Implementation Internals or Shadowing Methods
+- **Danger:** Embedding a concrete struct (like `sync.Mutex` or `bytes.Buffer`) inside an exported struct exposes all its public methods on the outer type, leaking encapsulation.
+- **Flawed Code:**
+  ```go
+  type Server struct {
+      sync.Mutex // exports Lock() and Unlock() on Server to external callers!
+  }
+  ```
+- **Idiomatic Pattern:** Use an unexported named field for encapsulated components.
+  ```go
+  type Server struct {
+      mu sync.Mutex // internal synchronization field
+  }
+  ```
+
+### Anti-Pattern 57: Calling `os.Exit()` in Library or Core Engine Submodules
+- **Danger:** Calling `os.Exit()` or `log.Fatal()` in library packages immediately terminates the host process without running deferred functions, preventing cleanup in calling applications.
+- **Flawed Code:**
+  ```go
+  package convert
+  func Process(doc *Document) {
+      if doc == nil {
+          os.Exit(1) // library terminates host process!
+      }
+  }
+  ```
+- **Idiomatic Pattern:** Return structured errors from library packages and reserve `os.Exit()` strictly for `main()` in the `cmd/` package.
+  ```go
+  package convert
+  func Process(doc *Document) error {
+      if doc == nil {
+          return ErrNilDocument
+      }
+      return nil
+  }
+  ```
+
+### Anti-Pattern 58: Inconsistent Method Receiver Types Across the Same Type
+- **Danger:** Mixing value receivers `(t MyType)` and pointer receivers `(t *MyType)` across methods of the same struct causes method set discrepancies when satisfying interfaces.
+- **Flawed Code:**
+  ```go
+  type Document struct{ ... }
+  func (d Document) Title() string { return d.title }  // value receiver
+  func (d *Document) SetTitle(t string) { d.title = t } // pointer receiver
+  ```
+- **Idiomatic Pattern:** Keep receiver types consistent across all methods of a type. If any method mutates state or the struct is non-trivial in size, use pointer receivers exclusively.
+  ```go
+  func (d *Document) Title() string { return d.title }
+  func (d *Document) SetTitle(t string) { d.title = t }
+  ```
+
+### Anti-Pattern 59: Copying Slices with `copy()` onto Zero-Length Destination
+- **Danger:** Built-in `copy(dst, src)` copies only `min(len(dst), len(src))` elements. Calling `copy` on a destination slice allocated with length 0 copies zero bytes.
+- **Flawed Code:**
+  ```go
+  dst := make([]byte, 0, len(src)) // len is 0, cap is len(src)
+  copy(dst, src) // copies ZERO bytes! dst remains empty
+  ```
+- **Idiomatic Pattern:** Allocate destination slice with matching length, or use `append([]T(nil), src...)` or `bytes.Clone(src)`.
+  ```go
+  dst := make([]byte, len(src))
+  copy(dst, src)
+  ```
+
+### Anti-Pattern 60: Using `fmt.Sprintf` for Simple Integer-to-String Conversions
+- **Danger:** Using `fmt.Sprintf("%d", n)` performs reflection, interface boxing, and parsing on every call, incurring ~10x slower execution than direct converters.
+- **Flawed Code:**
+  ```go
+  pageStr := fmt.Sprintf("%d", pageNumber) // slow reflection formatting
+  ```
+- **Idiomatic Pattern:** Use `strconv.Itoa(n)` or `strconv.FormatInt(n, 10)`.
+  ```go
+  pageStr := strconv.Itoa(pageNumber)
+  ```
+
+### Anti-Pattern 61: Non-Deterministic Map Iteration in Output-Generating Passes
+- **Danger:** Map iteration order in Go is randomized by the runtime. Iterating over maps when generating PDF objects, CSS rules, or HTML output causes non-deterministic build artifacts and flaky golden tests.
+- **Flawed Code:**
+  ```go
+  func emitStyles(styles map[string]string) string {
+      var b strings.Builder
+      for k, v := range styles { // randomized iteration order!
+          b.WriteString(k + ":" + v + ";")
+      }
+      return b.String()
+  }
+  ```
+- **Idiomatic Pattern:** Extract keys into a slice, sort them, and iterate deterministically.
+  ```go
+  keys := make([]string, 0, len(styles))
+  for k := range styles {
+      keys = append(keys, k)
+  }
+  sort.Strings(keys)
+  for _, k := range keys {
+      b.WriteString(k + ":" + styles[k] + ";")
+  }
+  ```
+
+### Anti-Pattern 62: Unchecked File/Directory Traversal (`..`) Path Vulnerabilities
+- **Danger:** Resolving relative paths without `filepath.Clean` and prefix boundary validation allows malicious user input to read sensitive system files (e.g. `/etc/passwd`).
+- **Flawed Code:**
+  ```go
+  func loadLocalAsset(baseDir, userPath string) ([]byte, error) {
+      return os.ReadFile(filepath.Join(baseDir, userPath)) // vulnerable to ../../../etc/passwd
+  }
+  ```
+- **Idiomatic Pattern:** Clean paths and enforce that the resolved absolute path starts within allowed base directories.
+  ```go
+  cleanPath := filepath.Clean(filepath.Join(baseDir, userPath))
+  if !strings.HasPrefix(cleanPath, filepath.Clean(baseDir)+string(filepath.Separator)) {
+      return nil, ErrAccessDenied
+  }
+  return os.ReadFile(cleanPath)
+  ```
+
+### Anti-Pattern 63: Premature Custom Memory Bit-Packing Obscuring Type Safety
+- **Danger:** Packing multiple boolean flags and small integers into uint32 bitmasks manually creates fragile bit-shift code and eliminates compile-time type checking for negligible memory gains.
+- **Flawed Code:**
+  ```go
+  type FlagSet uint32
+  const (FlagBold FlagSet = 1 << 0; FlagItalic FlagSet = 1 << 1)
+  ```
+- **Idiomatic Pattern:** Use typed booleans and explicit structs, letting the Go compiler handle struct alignment and packing.
+
+### Anti-Pattern 64: Channel Used as a Mutex Lock Instead of `sync.Mutex`
+- **Danger:** Using a 1-element buffered channel (`ch := make(chan struct{}, 1)`) solely as a mutual exclusion lock allocates channel runtime queues and executes slower than `sync.Mutex`.
+- **Flawed Code:**
+  ```go
+  type Lock struct {
+      ch chan struct{}
+  }
+  func (l *Lock) Lock() { l.ch <- struct{}{} }
+  func (l *Lock) Unlock() { <-l.ch }
+  ```
+- **Idiomatic Pattern:** Use `sync.Mutex` or `sync.RWMutex` directly for in-memory state locking.
+
+### Anti-Pattern 65: Discarding Subprocess / Executable Command Exit Errors
+- **Danger:** Invoking `cmd.Run()` or `exec.Command` without inspecting returned error and stderr output leaves failed subprocesses undetected.
+- **Flawed Code:**
+  ```go
+  cmd := exec.Command("pdftoppm", "-png", pdfPath, outPath)
+  _ = cmd.Run() // failure is completely silent
+  ```
+- **Idiomatic Pattern:** Capture stderr and check exit error status.
+  ```go
+  cmd := exec.Command("pdftoppm", "-png", pdfPath, outPath)
+  out, err := cmd.CombinedOutput()
+  if err != nil {
+      return fmt.Errorf("pdftoppm failed (%w): %s", err, string(out))
+  }
+  ```
+
+### Anti-Pattern 66: Leaking Open Directory Iterators on Early Error
+- **Danger:** Opening directory readers without deferred closure leaks OS file descriptors if an error occurs during iteration.
+- **Flawed Code:**
+  ```go
+  dir, err := os.Open(path)
+  if err != nil { return err }
+  // missing defer dir.Close() before processing entries
+  ```
+- **Idiomatic Pattern:** Use `os.ReadDir` which automatically closes directory descriptors, or register `defer dir.Close()`.
+
+### Anti-Pattern 67: Magic Constants and Unnamed Literals in Geometry or Protocol Layout
+- **Danger:** Scattering bare numeric literals (e.g. `72.0`, `25.4`, `0.75`, `96.0`) across layout math without named constants obscures units (DPI, points, millimeters, twips).
+- **Flawed Code:**
+  ```go
+  widthPt := widthMM * 72.0 / 25.4 // magic numbers
+  ```
+- **Idiomatic Pattern:** Define named package constants with explicit unit semantics.
+  ```go
+  const (
+      PointsPerInch = 72.0
+      MMPerInch     = 25.4
+      PointsPerMM   = PointsPerInch / MMPerInch
+  )
+  widthPt := widthMM * PointsPerMM
+  ```
+
+### Anti-Pattern 68: Mutating Map Keys After Insertion into Hash Map
+- **Danger:** Using mutable pointers or structs as map keys and mutating their fields after insertion causes map lookups to fail because the hash code changes.
+- **Flawed Code:**
+  ```go
+  type Key struct{ ID string }
+  m := map[*Key]string{}
+  k := &Key{ID: "v1"}
+  m[k] = "data"
+  k.ID = "v2" // key mutation breaks lookup semantics
+  ```
+- **Idiomatic Pattern:** Use immutable scalar types (`string`, `int`, `uint64`) as map keys.
+
+### Anti-Pattern 69: Exported Global Variables Mutated by Internal Methods
+- **Danger:** Declaring an exported package `var` that internal methods mutate allows external callers to accidentally break internal invariants.
+- **Flawed Code:**
+  ```go
+  package layout
+  var DefaultFontSize = 12.0 // external callers can mutate this global!
+  ```
+- **Idiomatic Pattern:** Use unexported constants or configurable constructor options.
+  ```go
+  const defaultFontSize = 12.0
+  ```
+
+### Anti-Pattern 70: Allocating Slices Inside Tight Inner Loops Instead of Reusing Buffers
+- **Danger:** Creating fresh slices on every iteration of a tight loop processing thousands of elements triggers frequent GC cycles.
+- **Flawed Code:**
+  ```go
+  for _, line := range lines {
+      words := make([]string, 0, 16) // fresh allocation every line
+      processLine(line, words)
+  }
+  ```
+- **Idiomatic Pattern:** Allocate a reusable slice outside the loop and reset length (`words = words[:0]`) per iteration.
+  ```go
+  words := make([]string, 0, 16)
+  for _, line := range lines {
+      words = words[:0]
+      processLine(line, words)
+  }
+  ```
+
+---
+
 ## Multi-Agent Review Prompt Integration
 
 When conducting a codebase audit using this skill, dispatch specialized reviewers referencing these anti-pattern IDs:
-- **Track 1: Concurrency & Lifecycle**: Detect AP-01 through AP-09, AP-35 through AP-40.
-- **Track 2: Error Handling & Correctness**: Detect AP-10 through AP-18, AP-27 through AP-34.
-- **Track 3: Memory & Allocations**: Detect AP-19 through AP-26, AP-46 through AP-50.
-- **Track 4: API & Architecture Ergonomics**: Detect AP-41 through AP-45.
+- **Track 1: Concurrency & Lifecycle**: Detect AP-01 through AP-09, AP-35 through AP-40, AP-64.
+- **Track 2: Error Handling & Correctness**: Detect AP-10 through AP-18, AP-27, AP-52, AP-55, AP-57, AP-65.
+- **Track 3: Memory & Allocations**: Detect AP-19 through AP-26, AP-46 through AP-50, AP-54, AP-59, AP-60, AP-70.
+- **Track 4: API & Architecture Ergonomics**: Detect AP-28 through AP-34, AP-41 through AP-45, AP-51, AP-53, AP-56, AP-58, AP-61, AP-62, AP-63, AP-66, AP-67, AP-68, AP-69.
 
 Every reported finding must cite:
 1. `AP-XX` identifier and rule name.
 2. Exact `file:line` citation.
 3. Current flawed code snippet.
 4. Idiomatic Go replacement snippet.
+

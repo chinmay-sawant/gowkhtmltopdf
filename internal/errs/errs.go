@@ -14,7 +14,7 @@ var (
 	// ErrNilRequest is returned when a conversion operation is executed with a nil request.
 	ErrNilRequest = errors.New("gowkhtmltopdf: nil request")
 	// ErrImagesDisabled is returned when an image load or rasterization is skipped because images are disabled.
-	ErrImagesDisabled = errors.New("images disabled")
+	ErrImagesDisabled = errors.New("gowkhtmltopdf: images disabled")
 	// ErrMissingImageOutput is returned when an image conversion request has no output sink.
 	ErrMissingImageOutput = errors.New("imageout: nil Output writer")
 )

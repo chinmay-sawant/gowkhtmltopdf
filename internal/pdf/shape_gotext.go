@@ -157,7 +157,12 @@ func collectShapedRunes(
 	features []shaping.FontFeature,
 	rev map[uint16]rune,
 ) ([]rune, bool) {
-	outRunes := make([]rune, 0)
+	totalGlyphsHint := 0
+	for _, inVal := range inputs {
+		totalGlyphsHint += len(inVal.Text)
+	}
+
+	outRunes := make([]rune, 0, totalGlyphsHint)
 
 	for _, inVal := range inputs {
 		if inVal.Face == nil {
