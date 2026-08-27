@@ -7,6 +7,7 @@
 | [catalog/](catalog) | Frozen CSS catalogs plus `mapping.json` vs current engine |
 | [AGENTS.md](AGENTS.md) | Agent rules for this ledger |
 | [review/](review) | Post-ship architecture + ponytail ledger for commit `48e06dbc` |
+| [agy-review/](agy-review) | Go Design Patterns and Go Code Style review ledgers |
 
 Workflow: [`../../skills/phase-wise-checklist/SKILLS.md`](../../skills/phase-wise-checklist/SKILLS.md)
 
