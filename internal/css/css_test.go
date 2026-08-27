@@ -144,6 +144,44 @@ func TestParseAtRulesSkipped(t *testing.T) {
 	if len(urls) != 1 || urls[0] != "x.woff" {
 		t.Fatalf("font-face urls = %v", urls)
 	}
+
+	if len(str.Imports) != 1 || str.Imports[0].URL != "other.css" || str.Imports[0].Media != "" {
+		t.Fatalf("imports = %+v", str.Imports)
+	}
+}
+
+func TestParseImport(t *testing.T) {
+	t.Parallel()
+
+	str := mustSheet(t, `
+		@import url("a.css");
+		@import url('b.css') print;
+		@import "c.css" screen and (max-width: 600px);
+		@import url(d.css);
+		@import ;
+		@import not-a-url;
+		@import url("");
+		p { color: red }
+	`)
+	if len(str.Rules) != 1 || str.Rules[0].Selectors[0].Parts[0].Tag != "p" {
+		t.Fatalf("rules = %+v", str.Rules)
+	}
+
+	want := []ImportRule{
+		{URL: "a.css", Media: ""},
+		{URL: "b.css", Media: "print"},
+		{URL: "c.css", Media: "screen and (max-width: 600px)"},
+		{URL: "d.css", Media: ""},
+	}
+	if len(str.Imports) != len(want) {
+		t.Fatalf("imports = %+v, want %+v", str.Imports, want)
+	}
+
+	for i, w := range want {
+		if str.Imports[i] != w {
+			t.Errorf("import %d = %+v, want %+v", i, str.Imports[i], w)
+		}
+	}
 }
 
 //nolint:varnamelen // short local mirrors the stylesheet vocabulary
@@ -764,6 +802,41 @@ func TestParseColor(t *testing.T) {
 		{"#12", 0, 0, 0, 0, false},
 		{"rgb(1,2)", 0, 0, 0, 0, false},
 		{"", 0, 0, 0, 0, false},
+	}
+	for _, tc := range cases {
+		r, g, b, a, ok := ParseColor(tc.src)
+		if ok != tc.ok || (ok && (r != tc.r || g != tc.g || b != tc.b || a != tc.alpha)) {
+			t.Errorf("ParseColor(%q) = (%d,%d,%d,%v,%v), want (%d,%d,%d,%v,%v)",
+				tc.src, r, g, b, a, ok, tc.r, tc.g, tc.b, tc.alpha, tc.ok)
+		}
+	}
+}
+
+func TestParseColorHsl(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		src     string
+		r, g, b int
+		alpha   float64
+		ok      bool
+	}{
+		{"hsl(0, 100%, 50%)", 255, 0, 0, 1, true},
+		{"hsl(120, 100%, 50%)", 0, 255, 0, 1, true},
+		{"hsl(240, 100%, 50%)", 0, 0, 255, 1, true},
+		{"hsl(60, 100%, 50%)", 255, 255, 0, 1, true},
+		{"hsl(0deg, 100%, 50%)", 255, 0, 0, 1, true},
+		{"hsl(0, 0%, 0%)", 0, 0, 0, 1, true},
+		{"hsl(0, 0%, 100%)", 255, 255, 255, 1, true},
+		{"hsl(0, 0%, 50%)", 128, 128, 128, 1, true},
+		{"hsla(0, 100%, 50%, 0.5)", 255, 0, 0, 0.5, true},
+		{"hsla(0, 100%, 50%, 50%)", 255, 0, 0, 0.5, true},
+		{"HSL(0, 100%, 50%)", 255, 0, 0, 1, true},
+		{"hsl(480, 100%, 50%)", 0, 255, 0, 1, true},
+		{"hsl(-120, 100%, 50%)", 0, 0, 255, 1, true},
+		{"hsl(0, 100%)", 0, 0, 0, 0, false},
+		{"hsl(0, 100, 50)", 0, 0, 0, 0, false},
+		{"hsl()", 0, 0, 0, 0, false},
 	}
 	for _, tc := range cases {
 		r, g, b, a, ok := ParseColor(tc.src)

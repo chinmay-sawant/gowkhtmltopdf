@@ -197,6 +197,7 @@ type cellMeasure struct {
 	spaceItalic   bool
 	spaceFontSize float64
 	spaceLSpacing float64
+	spaceWSpacing float64
 	spaceW        float64
 }
 
@@ -234,7 +235,8 @@ func (m *cellMeasure) spaceWidth(sty ResolvedStyle) float64 {
 		m.spaceWeight == sty.FontWeight &&
 		m.spaceItalic == sty.FontItalic &&
 		m.spaceFontSize == sty.FontSize &&
-		m.spaceLSpacing == sty.LetterSpacing {
+		m.spaceLSpacing == sty.LetterSpacing &&
+		m.spaceWSpacing == sty.WordSpacing {
 		return m.spaceW
 	}
 
@@ -245,6 +247,7 @@ func (m *cellMeasure) spaceWidth(sty ResolvedStyle) float64 {
 	m.spaceItalic = sty.FontItalic
 	m.spaceFontSize = sty.FontSize
 	m.spaceLSpacing = sty.LetterSpacing
+	m.spaceWSpacing = sty.WordSpacing
 
 	return m.spaceW
 }

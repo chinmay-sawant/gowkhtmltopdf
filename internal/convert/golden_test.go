@@ -415,9 +415,10 @@ var fixturePageBounds = map[string]fixtureBounds{ //nolint:gochecknoglobals // i
 		minPages: 1, maxPages: 12, needles: []string{"Architecture"},
 	},
 	"fixture-56-architecture-diagram.html": { //nolint:exhaustruct // intentional zero-value fields
-		// Unitless line-height now scales with each descendant's font size;
-		// The explicit section page breaks make the architecture composition 20 pages.
-		minPages: 20, maxPages: 20,
+		// clamp() and logical margin/padding now apply, so type scale and
+		// inline spacing no longer use the old fallback-first drop. Explicit
+		// section page breaks still dominate; page count is 21.
+		minPages: 21, maxPages: 21,
 	},
 }
 

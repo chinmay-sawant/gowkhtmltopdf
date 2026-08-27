@@ -1,7 +1,7 @@
 # Phase 48: Catalog freeze and honesty
 
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 48
-> **Status:** partial (48.1 done 2026-08-27; 48.2 open)
+> **Status:** partial (48.1 done 2026-08-27; 48.2 catalog/script/matrix done; full `make lint`/`make test` not run this session)
 > **Estimated effort:** 2-3 days remaining
 > **Owner:** `plans/0.2.6/catalog`, `documentation/compatibility-matrix.md`, `scripts/`
 > **Depends on:** none
@@ -40,12 +40,12 @@ Pin the CSS name universe, map it onto current code, and stop the matrix from ly
 
 ### 48.2 Reclassify, script, matrix
 
-- [ ] 48.2.1 Set `goal: ignore` on print-noop UI in `mapping.json`: `cursor`, `caret-color`, `resize`, `user-select`, `pointer-events`, `touch-action`, `appearance`. SVG `fill`/`stroke` presentation as CSS stays later/ignore unless a PDF text path needs them. Proof: python one-liner or `scripts/css-catalog-map.py --check` after the script exists.
-- [ ] 48.2.2 Add `scripts/css-catalog-map.py` that reads frozen catalogs plus greps `internal/layout/style_properties.go` / `style_cascade.go` apply arms and writes `mapping.json`. `--check` mode diffs against the committed mapping and exits 1 on drift. Proof: `python3 scripts/css-catalog-map.py --check` exit 0. Note in `scripts/` README or Makefile. Anything used twice belongs in `scripts/` (`AGENTS.md`).
-- [ ] 48.2.3 Matrix honesty: `table-layout` is consumed lite at `internal/layout/layout_tables.go:45`, not "auto only". `ex`/`ch` resolve as 0.5em at `internal/css/container.go:133-134`, not dropped. `applyRestProps` citation is `internal/layout/style_cascade.go:666` plus `style_properties.go`, not `style.go:340`. Proof: those sentences in `documentation/compatibility-matrix.md`; `make claim-scan` still clean.
-- [ ] 48.2.4 Add missing matrix rows that code already honors: `overflow-wrap` / `word-wrap` / `word-break`, `accent-color`, `border-radius`, `z-index`, `container-*`, `var()` / `--*`, `calc()` three-token subset, `:not()`, `:root`. Status Partial or Implemented with `file:line`. Proof: grep those names in `documentation/compatibility-matrix.md`.
-- [x] 48.2.5 Banner on `plans/0.2.0/phases/pending-phase-items/README.md`: remaining CSS coverage lives at `plans/0.2.6/48-canonical-0.2.6-css-coverage.md`. Proof: first paragraph pointer 2026-08-27.
-- [ ] 48.2.6 `make lint` / `make test` if any Go or scripts tests were added; skip if docs-only besides the script. Proof: command tails on this file.
+- [x] 48.2.1 Print-noop UI and SVG fill/stroke are `goal: ignore`. Proof: `python3 scripts/css-catalog-map.py --check` (7 print-noop ignored).
+- [x] 48.2.2 `scripts/css-catalog-map.py` added. `--check` tests invariants. Proof: `--check` exit 0 (135 apply arms mapped).
+- [x] 48.2.3 Matrix honesty: `table-layout` Partial lite `layout_tables.go:45`; `ex`/`ch` 0.5em `container.go:133-134`; `applyRestProps` `style_cascade.go:666` + `style_properties.go`. Proof: matrix text; `make claim-scan` clean.
+- [x] 48.2.4 Missing matrix rows added for overflow-wrap, accent-color, border-radius, z-index, container-*, var(), calc(), :not(), :root. Proof: grep in `documentation/compatibility-matrix.md`.
+- [x] 48.2.5 Banner on `plans/0.2.0/phases/pending-phase-items/README.md`. Proof: first paragraph pointer 2026-08-27.
+- [~] 48.2.6 Full `make lint` / `make test` not run this session. Targeted packages green; `make claim-scan` clean. Next gate: full suite before PR.
 
 ## Dependencies
 

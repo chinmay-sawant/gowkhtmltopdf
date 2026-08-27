@@ -1,20 +1,22 @@
 # Catalog snapshot for v0.2.6 CSS coverage
 
-Counts from `coverage-summary.json`, generated 2026-08-27 by walking `webref-css.json` plus the apply handlers in `internal/layout/style_properties.go` and `internal/layout/style_cascade.go`.
+Counts from `coverage-summary.json`, generated 2026-08-27 by walking `webref-css.json` plus the apply handlers in `internal/layout/style_properties.go` and `internal/layout/style_cascade.go`. Phase 48.2 reclassified print-noop UI and SVG fill/stroke.
 
 | Kind | Total | implemented | partial | unsupported | ignored |
 |------|------:|------------:|--------:|------------:|--------:|
-| Properties | 818 | 75 | 45 | 488 | 210 |
+| Properties | 818 | 75 | 73 | 423 | 247 |
 | At-rules | 55 | 0 | 4 | 41 | 10 |
 | Selectors | 158 | 8 | 5 | 124 | 21 |
 | Functions | 162 | 3 | 7 | 128 | 24 |
 | Units | 30 | 7 | 6 | 17 | 0 |
 
-`ignored` is permanent for this engine: animation, transition, 3D transforms, filter blur, scroll snap, anchor positioning, speech, vendor prefixes.
+`ignored` is permanent for this engine: animation, transition, 3D transforms, filter blur, scroll snap, anchor positioning, speech, vendor prefixes, print-noop UI (`cursor`, `caret-color`, `resize`, `user-select`, `pointer-events`, `touch-action`, `appearance`), and SVG presentation `fill`/`stroke` (plus `fill-*` and `stroke-*`). A PDF has no mouse pointer, caret, or drag handle, so those names stay out of the work list.
 
-`unsupported` is the work list. The first pass marked 608 properties `goal: implement`. That is generous. It still includes print-noop UI (`cursor`, `resize`, `user-select`) and SVG fill/stroke. Phase 48 reclassifies those to `ignored` or a later bucket before anyone implements them.
+`unsupported` is the work list. `goal: implement` is 571 properties after Phase 48.2 (was 608 on the first pass; 37 print-noop and SVG rows moved to `ignored`).
 
-Engine apply handlers: about 120 named properties. Custom properties (`--*`) are a separate map.
+Engine apply handlers: 135 named properties after the first layout slice (`word-spacing`, `visibility`, logical box, `caption-side`). Custom properties (`--*`) are a separate map.
+
+Check the mapping against apply arms: `python3 scripts/css-catalog-map.py --check`. After a reclassify, rewrite mapping counts with `--write`.
 
 How to add a property: see `plans/0.2.6/AGENTS.md` and the pipeline notes in the canonical ledger. Parser already keeps unknown names. Layout must grow a `ResolvedStyle` field, an apply arm, and a consumer.
 

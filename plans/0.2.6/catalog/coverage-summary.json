@@ -11,13 +11,13 @@
     "webref_properties": 818,
     "mapped_properties": 818,
     "properties_by_engine_status": {
-      "ignored": 210,
+      "ignored": 247,
       "implemented": 75,
-      "partial": 45,
-      "unsupported": 488
+      "partial": 73,
+      "unsupported": 423
     },
-    "properties_print_relevant": 608,
-    "properties_goal_implement": 608,
+    "properties_print_relevant": 571,
+    "properties_goal_implement": 571,
     "atrules": 55,
     "atrules_by_engine_status": {
       "ignored": 10,

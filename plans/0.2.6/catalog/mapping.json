@@ -11,13 +11,13 @@
     "webref_properties": 818,
     "mapped_properties": 818,
     "properties_by_engine_status": {
-      "ignored": 210,
+      "ignored": 247,
       "implemented": 75,
-      "partial": 45,
-      "unsupported": 488
+      "partial": 73,
+      "unsupported": 423
     },
-    "properties_print_relevant": 608,
-    "properties_goal_implement": 608,
+    "properties_print_relevant": 571,
+    "properties_goal_implement": 571,
     "atrules": 55,
     "atrules_by_engine_status": {
       "ignored": 10,
@@ -2842,8 +2842,8 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -5320,8 +5320,8 @@
       "groups": [
         "CSS Table"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -5386,14 +5386,14 @@
       "spec": "css-ui-4",
       "spec_href": "https://drafts.csswg.org/css-ui-4/#propdef-caret-color",
       "spec_status": "REC",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/caret-color",
       "mdn_status": "standard",
       "groups": [
         "CSS Basic User Interface"
       ],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -7437,14 +7437,14 @@
       "spec": "css-ui-4",
       "spec_href": "https://drafts.csswg.org/css-ui-4/#propdef-cursor",
       "spec_status": "REC",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/cursor",
       "mdn_status": "standard",
       "groups": [
         "CSS Basic User Interface"
       ],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -7731,14 +7731,14 @@
       "spec": "svg2-draft",
       "spec_href": "https://w3c.github.io/svgwg/svg2-draft/painting.html#FillProperty",
       "spec_status": "FPWD",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/fill",
       "mdn_status": "standard",
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -7754,12 +7754,12 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-fill-break",
       "spec_status": "FPWD",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/fill-break",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -7775,12 +7775,12 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-fill-color",
       "spec_status": "FPWD",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/fill-color",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -7796,12 +7796,12 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-fill-image",
       "spec_status": "FPWD",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/fill-image",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -7817,14 +7817,14 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-fill-opacity",
       "spec_status": "FPWD",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/fill-opacity",
       "mdn_status": "standard",
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -7840,12 +7840,12 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-fill-origin",
       "spec_status": "FPWD",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/fill-origin",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -7861,12 +7861,12 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-fill-position",
       "spec_status": "FPWD",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/fill-position",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -7882,12 +7882,12 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-fill-repeat",
       "spec_status": "FPWD",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/fill-repeat",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -7903,14 +7903,14 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-fill-rule",
       "spec_status": "FPWD",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/fill-rule",
       "mdn_status": "standard",
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -7926,12 +7926,12 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-fill-size",
       "spec_status": "FPWD",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/fill-size",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -9913,8 +9913,8 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -9984,8 +9984,8 @@
         "CSS Logical Properties and Values",
         "CSS Positioned Layout"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -10011,8 +10011,8 @@
         "CSS Logical Properties and Values",
         "CSS Positioned Layout"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -10035,8 +10035,8 @@
         "CSS Logical Properties and Values",
         "CSS Positioned Layout"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -10059,8 +10059,8 @@
         "CSS Logical Properties and Values",
         "CSS Positioned Layout"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -10086,8 +10086,8 @@
         "CSS Logical Properties and Values",
         "CSS Positioned Layout"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -10110,8 +10110,8 @@
         "CSS Logical Properties and Values",
         "CSS Positioned Layout"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -10134,8 +10134,8 @@
         "CSS Logical Properties and Values",
         "CSS Positioned Layout"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -10768,8 +10768,8 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -10791,8 +10791,8 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -10814,8 +10814,8 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -10885,8 +10885,8 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -10908,8 +10908,8 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -10931,8 +10931,8 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -11642,8 +11642,8 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -11688,8 +11688,8 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -11757,8 +11757,8 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -11803,8 +11803,8 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -12958,8 +12958,8 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -12981,8 +12981,8 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -13004,8 +13004,8 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -13053,8 +13053,8 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -13076,8 +13076,8 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -13099,8 +13099,8 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -13512,14 +13512,14 @@
       "spec": "svg2-draft",
       "spec_href": "https://w3c.github.io/svgwg/svg2-draft/interact.html#PointerEventsProperty",
       "spec_status": "WD",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/pointer-events",
       "mdn_status": "standard",
       "groups": [
         "CSS Basic User Interface"
       ],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -13901,14 +13901,14 @@
       "spec": "css-ui-4",
       "spec_href": "https://drafts.csswg.org/css-ui-4/#propdef-resize",
       "spec_status": "REC",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/resize",
       "mdn_status": "standard",
       "groups": [
         "CSS Basic User Interface"
       ],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -16019,14 +16019,14 @@
       "spec": "svg2-draft",
       "spec_href": "https://w3c.github.io/svgwg/svg2-draft/painting.html#StrokeProperty",
       "spec_status": "FPWD",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke",
       "mdn_status": "standard",
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -16042,12 +16042,12 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-stroke-align",
       "spec_status": "FPWD",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-align",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -16063,12 +16063,12 @@
       "spec": "strokes",
       "spec_href": "https://svgwg.org/specs/strokes/#StrokeAlignmentProperty",
       "spec_status": "FPWD",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-alignment",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -16084,12 +16084,12 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-stroke-break",
       "spec_status": "FPWD",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-break",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -16105,14 +16105,14 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-stroke-color",
       "spec_status": "FPWD",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-color",
       "mdn_status": "experimental",
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -16128,12 +16128,12 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-stroke-dash-corner",
       "spec_status": "FPWD",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-dash-corner",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -16149,12 +16149,12 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-stroke-dash-justify",
       "spec_status": "FPWD",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-dash-justify",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -16170,12 +16170,12 @@
       "spec": "strokes",
       "spec_href": "https://svgwg.org/specs/strokes/#StrokeDashadjustProperty",
       "spec_status": "FPWD",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-dashadjust",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -16191,14 +16191,14 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-stroke-dasharray",
       "spec_status": "FPWD",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-dasharray",
       "mdn_status": "standard",
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -16214,12 +16214,12 @@
       "spec": "strokes",
       "spec_href": "https://svgwg.org/specs/strokes/#StrokeDashcornerProperty",
       "spec_status": "FPWD",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-dashcorner",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -16235,14 +16235,14 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-stroke-dashoffset",
       "spec_status": "FPWD",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-dashoffset",
       "mdn_status": "standard",
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -16258,12 +16258,12 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-stroke-image",
       "spec_status": "FPWD",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-image",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -16279,14 +16279,14 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-stroke-linecap",
       "spec_status": "FPWD",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-linecap",
       "mdn_status": "standard",
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -16302,14 +16302,14 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-stroke-linejoin",
       "spec_status": "FPWD",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-linejoin",
       "mdn_status": "standard",
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -16325,14 +16325,14 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-stroke-miterlimit",
       "spec_status": "FPWD",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-miterlimit",
       "mdn_status": "standard",
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -16348,14 +16348,14 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-stroke-opacity",
       "spec_status": "FPWD",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-opacity",
       "mdn_status": "standard",
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -16371,12 +16371,12 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-stroke-origin",
       "spec_status": "FPWD",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-origin",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -16392,12 +16392,12 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-stroke-position",
       "spec_status": "FPWD",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-position",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -16413,12 +16413,12 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-stroke-repeat",
       "spec_status": "FPWD",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-repeat",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -16434,12 +16434,12 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-stroke-size",
       "spec_status": "FPWD",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-size",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -16455,14 +16455,14 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-stroke-width",
       "spec_status": "FPWD",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-width",
       "mdn_status": "standard",
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -17764,14 +17764,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef-touch-action",
       "spec_status": null,
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/touch-action",
       "mdn_status": "standard",
       "groups": [
         "Pointer Events"
       ],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -18092,14 +18092,14 @@
       "spec": "css-ui-4",
       "spec_href": "https://drafts.csswg.org/css-ui-4/#propdef-user-select",
       "spec_status": "WD",
-      "print_relevant": true,
-      "goal": "implement",
+      "print_relevant": false,
+      "goal": "ignore",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/user-select",
       "mdn_status": "standard",
       "groups": [
         "CSS Basic User Interface"
       ],
-      "engine_status": "unsupported",
+      "engine_status": "ignored",
       "code_path": "",
       "notes": ""
     },
@@ -18358,8 +18358,8 @@
         "CSS Display",
         "Scalable Vector Graphics"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -18753,8 +18753,8 @@
       "groups": [
         "CSS Text"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {

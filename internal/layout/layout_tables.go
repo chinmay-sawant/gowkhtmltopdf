@@ -46,14 +46,24 @@ func (e *engine) buildTable(node *html.Node, style ResolvedStyle, availW, posX, 
 	})
 	tableBox.w = tableW
 
-	caption := e.buildTableCaption(node, tableW, posX, posY)
-	if caption != nil {
-		tableBox.children = append(tableBox.children, caption)
-	}
+	capNode := e.tableCaptionNode(node)
 
+	var capStyle *ResolvedStyle
+	if capNode != nil {
+		capStyle = e.styles[capNode]
+	}
+	// caption-side:bottom paints after the table grid; top/empty stay above.
+	// left/right are out of scope and keep the top placement.
+	captionBelow := captionSideIsBottom(style, capStyle)
+
+	var caption *box
 	tableY := posY
-	if caption != nil {
-		tableY += caption.height
+	if !captionBelow {
+		caption = e.buildCaptionAt(capNode, tableW, posX, posY)
+		if caption != nil {
+			tableBox.children = append(tableBox.children, caption)
+			tableY += caption.height
+		}
 	}
 
 	padL := e.scalePt(style.PaddingLeft) + e.scalePt(style.BorderLeft.Width)
@@ -72,10 +82,26 @@ func (e *engine) buildTable(node *html.Node, style ResolvedStyle, availW, posX, 
 
 	e.emitTableCells(tableBox, style, posX, tableY, tableHeight, padL, colW, rowTops, rowHeights, cellData)
 
+	if captionBelow {
+		caption = e.buildCaptionAt(capNode, tableW, posX, posY+tableBox.height)
+		if caption != nil {
+			tableBox.children = append(tableBox.children, caption)
+			tableBox.height += caption.height
+		}
+	}
+
 	return tableBox
 }
 
-func (e *engine) buildTableCaption(node *html.Node, width, posX, posY float64) *box {
+func captionSideIsBottom(tableStyle ResolvedStyle, captionStyle *ResolvedStyle) bool {
+	if tableStyle.CaptionSide == cssVerticalAlignBottom {
+		return true
+	}
+
+	return captionStyle != nil && captionStyle.CaptionSide == cssVerticalAlignBottom
+}
+
+func (e *engine) tableCaptionNode(node *html.Node) *html.Node {
 	for _, child := range node.Children {
 		if child.Type != html.ElementNode {
 			continue
@@ -84,11 +110,19 @@ func (e *engine) buildTableCaption(node *html.Node, width, posX, posY float64) *
 		style := e.styles[child]
 		if style != nil && style.Display != cssDisplayNone &&
 			(child.Name == htmlCaption || style.Display == displayTableCaption) {
-			return e.build(child, width, posX, posY)
+			return child
 		}
 	}
 
 	return nil
+}
+
+func (e *engine) buildCaptionAt(capNode *html.Node, width, posX, posY float64) *box {
+	if capNode == nil {
+		return nil
+	}
+
+	return e.build(capNode, width, posX, posY)
 }
 
 // tableSpacing is the inter-cell gap: border-collapse suppresses it.

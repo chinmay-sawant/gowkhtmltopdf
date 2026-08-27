@@ -67,65 +67,68 @@ const asciiFoldBit = 0x20
 //
 //nolint:lll // the resolved-style table keeps field comments beside each property
 type ResolvedStyle struct {
-	Display                                                                                    string
-	Position                                                                                   string  // "static" | "relative" | "absolute" | "fixed" | "sticky"
-	Float                                                                                      string  // cssDisplayNone | floatLeft | floatRight
-	Clear                                                                                      string  // cssDisplayNone | floatLeft | floatRight | "both"
-	BoxSizing                                                                                  string  // "content-box" | "border-box"
-	Top                                                                                        float64 // position offsets (pt); 0 = unset for absolute uses Auto flags
-	Right                                                                                      float64
-	Bottom                                                                                     float64
-	Left                                                                                       float64
-	TopAuto                                                                                    bool
-	RightAuto                                                                                  bool
-	BottomAuto                                                                                 bool
-	LeftAuto                                                                                   bool
-	FlexDirection                                                                              string  // "row" | fxCol | "row-reverse" | "column-reverse"
-	FlexWrap                                                                                   string  // "nowrap" | "wrap" | "wrap-reverse"
-	JustifyContent                                                                             string  // flex-start | flex-end | center | space-between | space-around | space-evenly
-	AlignItems                                                                                 string  // stretch | flex-start | center | flex-end
-	AlignContent                                                                               string  // flex-start | flex-end | center | space-between | space-around | space-evenly | stretch
-	AlignSelf                                                                                  string  // auto | stretch | flex-start | flex-end | center | start | end
-	JustifyItems                                                                               string  // grid: stretch | start | end | center
-	JustifySelf                                                                                string  // grid item: auto | stretch | start | end | center
-	Gap                                                                                        float64 // flex/grid gap shorthand (pt); kept for backward compat
-	RowGap                                                                                     float64 // pt; 0 with ColumnGap 0 → layout falls back to Gap
-	ColumnGap                                                                                  float64
-	ColumnGapNormal                                                                            bool    // true when column-gap is normal/initial (multicol → 1em; flex/grid → 0)
-	ColumnCount                                                                                int     // 0 = auto; ≥1 = used count hint
-	ColumnWidth                                                                                float64 // -1 = auto; else length in pt
-	ColumnSpan                                                                                 string  // cssDisplayNone | "all" (multicol spanner)
-	ColumnFill                                                                                 string  // "balance" | overflowAuto
-	FlexGrow                                                                                   float64
-	FlexShrink                                                                                 float64 // default 1; 0 disables shrink
-	FlexBasis                                                                                  float64 // -1 = auto
-	FlexBasisPercent                                                                           float64 // >=0 means % of flex container content main size (width/height)
-	FlexOrder                                                                                  int
-	ZIndex                                                                                     int
-	ZIndexSet                                                                                  bool
-	WritingMode                                                                                string // "" | "horizontal-tb" | "vertical-rl" | "vertical-lr"
-	GridTemplateColumns                                                                        string // raw grid-template-columns value
-	GridTemplateRows                                                                           string
-	GridTemplateAreas                                                                          string  // raw grid-template-areas value
-	GridArea                                                                                   string  // named area (custom-ident); empty = line-based placement
-	GridAutoFlow                                                                               string  // "row" | fxCol | "dense" | "row dense" | "column dense"
-	GridColumnSpan                                                                             int     // from grid-column: span N (default 1)
-	GridColumnStart                                                                            int     // 1-based; 0 = auto
-	GridRowSpan                                                                                int     // from grid-row: span N (default 1)
-	GridRowStart                                                                               int     // 1-based; 0 = auto
-	Width                                                                                      float64 // -1 = auto; absolute length in pt when WidthPercent < 0
-	WidthPercent                                                                               float64 // >=0 means width is that % of the containing block at layout time
-	Height                                                                                     float64 // -1 = auto; absolute length in pt when HeightPercent < 0
-	HeightPercent                                                                              float64 // >=0 means height is that % of the CB; indefinite CB → auto (cyclic honesty)
-	MinWidth                                                                                   float64 // absolute pt when MinWidthPercent < 0; 0 = auto (content min for flex)
-	MinWidthPercent                                                                            float64 // >=0 means % of containing block (deferred like WidthPercent)
-	MinWidthSet                                                                                bool    // true when min-width was explicitly declared, including 0
-	MaxWidth                                                                                   float64
-	MaxWidthPercent                                                                            float64 // >=0 means % of containing block / img clamp context
-	MinHeight                                                                                  float64
-	MinHeightPercent                                                                           float64 // >=0 means % of CB height; indefinite → ignore
-	MaxHeight                                                                                  float64
-	Overflow                                                                                   string // "visible" | "hidden" | "scroll" | "auto" | "clip" (non-visible = sticky scrollport)
+	Display             string
+	Position            string  // "static" | "relative" | "absolute" | "fixed" | "sticky"
+	Float               string  // cssDisplayNone | floatLeft | floatRight
+	Clear               string  // cssDisplayNone | floatLeft | floatRight | "both"
+	BoxSizing           string  // "content-box" | "border-box"
+	Top                 float64 // position offsets (pt); 0 = unset for absolute uses Auto flags
+	Right               float64
+	Bottom              float64
+	Left                float64
+	TopAuto             bool
+	RightAuto           bool
+	BottomAuto          bool
+	LeftAuto            bool
+	FlexDirection       string  // "row" | fxCol | "row-reverse" | "column-reverse"
+	FlexWrap            string  // "nowrap" | "wrap" | "wrap-reverse"
+	JustifyContent      string  // flex-start | flex-end | center | space-between | space-around | space-evenly
+	AlignItems          string  // stretch | flex-start | center | flex-end
+	AlignContent        string  // flex-start | flex-end | center | space-between | space-around | space-evenly | stretch
+	AlignSelf           string  // auto | stretch | flex-start | flex-end | center | start | end
+	JustifyItems        string  // grid: stretch | start | end | center
+	JustifySelf         string  // grid item: auto | stretch | start | end | center
+	Gap                 float64 // flex/grid gap shorthand (pt); kept for backward compat
+	RowGap              float64 // pt; 0 with ColumnGap 0 → layout falls back to Gap
+	ColumnGap           float64
+	ColumnGapNormal     bool    // true when column-gap is normal/initial (multicol → 1em; flex/grid → 0)
+	ColumnCount         int     // 0 = auto; ≥1 = used count hint
+	ColumnWidth         float64 // -1 = auto; else length in pt
+	ColumnSpan          string  // cssDisplayNone | "all" (multicol spanner)
+	ColumnFill          string  // "balance" | overflowAuto
+	FlexGrow            float64
+	FlexShrink          float64 // default 1; 0 disables shrink
+	FlexBasis           float64 // -1 = auto
+	FlexBasisPercent    float64 // >=0 means % of flex container content main size (width/height)
+	FlexOrder           int
+	ZIndex              int
+	ZIndexSet           bool
+	WritingMode         string // "" | "horizontal-tb" | "vertical-rl" | "vertical-lr"
+	GridTemplateColumns string // raw grid-template-columns value
+	GridTemplateRows    string
+	GridTemplateAreas   string  // raw grid-template-areas value
+	GridArea            string  // named area (custom-ident); empty = line-based placement
+	GridAutoFlow        string  // "row" | fxCol | "dense" | "row dense" | "column dense"
+	GridColumnSpan      int     // from grid-column: span N (default 1)
+	GridColumnStart     int     // 1-based; 0 = auto
+	GridRowSpan         int     // from grid-row: span N (default 1)
+	GridRowStart        int     // 1-based; 0 = auto
+	Width               float64 // -1 = auto; absolute length in pt when WidthPercent < 0
+	WidthPercent        float64 // >=0 means width is that % of the containing block at layout time
+	Height              float64 // -1 = auto; absolute length in pt when HeightPercent < 0
+	HeightPercent       float64 // >=0 means height is that % of the CB; indefinite CB → auto (cyclic honesty)
+	MinWidth            float64 // absolute pt when MinWidthPercent < 0; 0 = auto (content min for flex)
+	MinWidthPercent     float64 // >=0 means % of containing block (deferred like WidthPercent)
+	MinWidthSet         bool    // true when min-width was explicitly declared, including 0
+	MaxWidth            float64
+	MaxWidthPercent     float64 // >=0 means % of containing block / img clamp context
+	MinHeight           float64
+	MinHeightPercent    float64 // >=0 means % of CB height; indefinite → ignore
+	MaxHeight           float64
+	Overflow            string // "visible" | "hidden" | "scroll" | "auto" | "clip" (non-visible = sticky scrollport)
+	// Visibility is CSS visibility: "visible" | "hidden" | "collapse".
+	// Empty means visible. hidden and collapse skip paint and keep layout size.
+	Visibility                                                                                 string
 	MarginTop                                                                                  float64
 	MarginRight                                                                                float64
 	MarginBottom                                                                               float64
@@ -165,18 +168,21 @@ type ResolvedStyle struct {
 	TextTransform      string  // "none" | "uppercase" | "lowercase" | "capitalize"
 	VerticalAlign      string  // "baseline" | "top" | "middle" | cssVerticalAlignBottom
 	VerticalAlignShift float64 // pt; CSS length vertical-align (positive raises)
-	WhiteSpace         string  // "normal" | "nowrap" | "pre"
+	WhiteSpace         string  // "normal" | "nowrap" | "pre" | "pre-wrap" | "pre-line"
 	// OverflowWrap is CSS overflow-wrap / word-wrap: "normal" | "break-word" | "anywhere".
 	OverflowWrap string
 	// WordBreak is CSS word-break: "normal" | "break-all" | "keep-all".
-	WordBreak       string
-	TextDecoration  string // cssDisplayNone | "underline" | "line-through"
-	LetterSpacing   float64
+	WordBreak      string
+	TextDecoration string // cssDisplayNone | "underline" | "line-through"
+	LetterSpacing  float64
+	// WordSpacing is CSS word-spacing in points; 0 is normal.
+	WordSpacing     float64
 	TextIndent      float64
 	ListStyleType   string // "disc" | "circle" | "square" | "decimal" | cssDisplayNone | …
 	BorderCollapse  string // "separate" | "collapse"
 	BorderSpacing   float64
 	TableLayout     string // overflowAuto | "fixed"
+	CaptionSide     string // "top" | "bottom"; empty means top
 	IsReplaced      bool   // img, hr
 	PageBreakBefore string // "" | "always" | "avoid"
 	PageBreakAfter  string // "" | "always" | "avoid"
@@ -242,6 +248,7 @@ func initialStyle() ResolvedStyle { //nolint:funlen // complete CSS initial-valu
 		MinHeightPercent: -1,
 		MaxHeight:        -1,
 		Overflow:         "visible",
+		Visibility:       visibleKeyword,
 		Color:            [3]float64{0, 0, 0},
 		BGColor:          [4]float64{0, 0, 0, 0},
 		FontFamily:       nil,
@@ -262,7 +269,7 @@ func initialStyle() ResolvedStyle { //nolint:funlen // complete CSS initial-valu
 		TableLayout:     overflowAuto,
 		GridColumnSpan:  1,
 		GridRowSpan:     1,
-		WritingMode:     "horizontal-tb",
+		WritingMode:     writingModeHorizontalTB,
 		Orphans:         two,
 		Widows:          two,
 		Transform:       IdentityMatrix(),
@@ -606,7 +613,7 @@ type comparableResolvedStyle struct {
 	MinWidth, MinWidthPercent, MaxWidth, MaxWidthPercent                                       float64
 	MinWidthSet                                                                                bool
 	MinHeight, MinHeightPercent, MaxHeight                                                     float64
-	Overflow                                                                                   string
+	Overflow, Visibility                                                                       string
 	MarginTop, MarginRight, MarginBottom, MarginLeft                                           float64
 	MarginTopAuto, MarginBottomAuto, MarginLeftAuto, MarginRightAuto                           bool
 	PaddingTop, PaddingRight, PaddingBottom, PaddingLeft                                       float64
@@ -625,10 +632,10 @@ type comparableResolvedStyle struct {
 	TextAlign, TextTransform, VerticalAlign, WhiteSpace, OverflowWrap, WordBreak               string
 	VerticalAlignShift                                                                         float64
 	TextDecoration                                                                             string
-	LetterSpacing, TextIndent                                                                  float64
+	LetterSpacing, WordSpacing, TextIndent                                                     float64
 	ListStyleType, BorderCollapse                                                              string
 	BorderSpacing                                                                              float64
-	TableLayout                                                                                string
+	TableLayout, CaptionSide                                                                   string
 	IsReplaced                                                                                 bool
 	PageBreakBefore, PageBreakAfter, PageBreakInside                                           string
 	Orphans, Widows                                                                            int
@@ -660,7 +667,8 @@ func comparableResolvedStyleFor(style ResolvedStyle) comparableResolvedStyle {
 		MaxWidthPercent: style.MaxWidthPercent, MinHeight: style.MinHeight,
 		MinWidthSet:      style.MinWidthSet,
 		MinHeightPercent: style.MinHeightPercent, MaxHeight: style.MaxHeight, Overflow: style.Overflow,
-		MarginTop: style.MarginTop, MarginRight: style.MarginRight, MarginBottom: style.MarginBottom,
+		Visibility: style.Visibility,
+		MarginTop:  style.MarginTop, MarginRight: style.MarginRight, MarginBottom: style.MarginBottom,
 		MarginLeft: style.MarginLeft, MarginTopAuto: style.MarginTopAuto, MarginBottomAuto: style.MarginBottomAuto,
 		MarginLeftAuto: style.MarginLeftAuto, MarginRightAuto: style.MarginRightAuto,
 		PaddingTop: style.PaddingTop, PaddingRight: style.PaddingRight, PaddingBottom: style.PaddingBottom,
@@ -676,9 +684,10 @@ func comparableResolvedStyleFor(style ResolvedStyle) comparableResolvedStyle {
 		TextAlign: style.TextAlign, TextTransform: style.TextTransform,
 		VerticalAlign: style.VerticalAlign, VerticalAlignShift: style.VerticalAlignShift,
 		WhiteSpace: style.WhiteSpace, OverflowWrap: style.OverflowWrap, WordBreak: style.WordBreak,
-		TextDecoration: style.TextDecoration, LetterSpacing: style.LetterSpacing, TextIndent: style.TextIndent,
+		TextDecoration: style.TextDecoration, LetterSpacing: style.LetterSpacing,
+		WordSpacing: style.WordSpacing, TextIndent: style.TextIndent,
 		ListStyleType: style.ListStyleType, BorderCollapse: style.BorderCollapse, BorderSpacing: style.BorderSpacing,
-		TableLayout: style.TableLayout, IsReplaced: style.IsReplaced, PageBreakBefore: style.PageBreakBefore,
+		TableLayout: style.TableLayout, CaptionSide: style.CaptionSide, IsReplaced: style.IsReplaced, PageBreakBefore: style.PageBreakBefore,
 		PageBreakAfter: style.PageBreakAfter, PageBreakInside: style.PageBreakInside, Orphans: style.Orphans,
 		Widows: style.Widows, ContainerType: style.ContainerType, ContainerName: style.ContainerName,
 		Transform: style.Transform, HasTransform: style.HasTransform, TransformOrigin: style.TransformOrigin,

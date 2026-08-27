@@ -525,6 +525,7 @@ func (e *engine) measureTextFace(cssSheet string, sty ResolvedStyle) float64 {
 
 	size := sty.FontSize * e.scale
 	lstyle := sty.LetterSpacing * e.scale
+	wstyle := sty.WordSpacing * e.scale
 	primary := e.faceFor(sty)
 
 	if primary == nil {
@@ -534,6 +535,7 @@ func (e *engine) measureTextFace(cssSheet string, sty ResolvedStyle) float64 {
 	var total float64
 
 	runeCount := 0
+	spaceCount := 0
 
 	for _, runic := range cssSheet {
 		face := primary
@@ -546,10 +548,18 @@ func (e *engine) measureTextFace(cssSheet string, sty ResolvedStyle) float64 {
 
 		total += face.GlyphAdvancePoints(runic, size)
 		runeCount++
+
+		if runic == ' ' {
+			spaceCount++
+		}
 	}
 
 	if lstyle != 0 && runeCount > 0 {
 		total += lstyle * float64(runeCount)
+	}
+
+	if wstyle != 0 && spaceCount > 0 {
+		total += wstyle * float64(spaceCount)
 	}
 
 	return total
@@ -568,6 +578,10 @@ func (e *engine) measureRuneFace(curRune rune, sty ResolvedStyle) float64 {
 	w := face.GlyphAdvancePoints(curRune, size)
 	if sty.LetterSpacing != 0 {
 		w += sty.LetterSpacing * e.scale
+	}
+
+	if curRune == ' ' && sty.WordSpacing != 0 {
+		w += sty.WordSpacing * e.scale
 	}
 
 	return w
@@ -609,6 +623,7 @@ func (e *engine) splitTextByFace(cssSheet string, sty ResolvedStyle) []faceRun {
 
 	var width float64
 	runeCount := 0
+	spaceCount := 0
 
 	for idx, runic := range cssSheet {
 		face := primary
@@ -625,11 +640,13 @@ func (e *engine) splitTextByFace(cssSheet string, sty ResolvedStyle) []faceRun {
 			runs = append(runs, faceRun{
 				text: cssSheet[start:idx],
 				face: current,
-				w:    width + sty.LetterSpacing*e.scale*float64(runeCount),
+				w: width + sty.LetterSpacing*e.scale*float64(runeCount) +
+					sty.WordSpacing*e.scale*float64(spaceCount),
 			})
 			start = idx
 			width = 0
 			runeCount = 0
+			spaceCount = 0
 		}
 
 		if current == nil {
@@ -639,13 +656,18 @@ func (e *engine) splitTextByFace(cssSheet string, sty ResolvedStyle) []faceRun {
 		current = face
 		width += face.AdvanceInPoints(runic, size)
 		runeCount++
+
+		if runic == ' ' {
+			spaceCount++
+		}
 	}
 
 	if current != nil {
 		runs = append(runs, faceRun{
 			text: cssSheet[start:],
 			face: current,
-			w:    width + sty.LetterSpacing*e.scale*float64(runeCount),
+			w: width + sty.LetterSpacing*e.scale*float64(runeCount) +
+				sty.WordSpacing*e.scale*float64(spaceCount),
 		})
 	}
 
@@ -672,16 +694,22 @@ func (e *engine) primaryFaceRun(cssSheet string, sty ResolvedStyle) (faceRun, bo
 
 	var width float64
 	runeCount := 0
+	spaceCount := 0
 
 	for _, runic := range paintText {
 		width += primary.AdvanceInPoints(runic, size)
 		runeCount++
+
+		if runic == ' ' {
+			spaceCount++
+		}
 	}
 
 	return faceRun{
 		text: cssSheet,
 		face: primary,
-		w:    width + sty.LetterSpacing*e.scale*float64(runeCount),
+		w: width + sty.LetterSpacing*e.scale*float64(runeCount) +
+			sty.WordSpacing*e.scale*float64(spaceCount),
 	}, true
 }
 

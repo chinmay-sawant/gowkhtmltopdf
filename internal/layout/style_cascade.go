@@ -170,6 +170,12 @@ var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inheri
 		func(dst, src *ResolvedStyle) { dst.LetterSpacing = src.LetterSpacing },
 	},
 	{
+		[]string{"word-spacing"},
+		func(dst, src *ResolvedStyle) { dst.WordSpacing = src.WordSpacing },
+	},
+	{[]string{"visibility"}, func(dst, src *ResolvedStyle) { dst.Visibility = src.Visibility }},
+	{[]string{"caption-side"}, func(dst, src *ResolvedStyle) { dst.CaptionSide = src.CaptionSide }},
+	{
 		[]string{"list-style-type", "list-style"},
 		func(dst, src *ResolvedStyle) { dst.ListStyleType = src.ListStyleType },
 	},
@@ -514,13 +520,14 @@ func expandBoxShorthand(prop, value string) ([4]string, bool) {
 	return values, true
 }
 
-// supportedDeclaration rejects modern value functions that this lite renderer
+// supportedDeclaration rejects modern color functions that this lite renderer
 // cannot compute. Excluding them from the cascade preserves an earlier valid
 // fallback declaration, matching the fixture's fallback-first contract.
+// clamp() is computed by clampLength and is therefore allowed.
 func supportedDeclaration(value string) bool {
 	value = strings.ToLower(value)
 
-	for _, unsupported := range []string{"clamp(", "color-mix(", "light-dark(", "oklch("} {
+	for _, unsupported := range []string{"color-mix(", "light-dark(", "oklch("} {
 		if strings.Contains(value, unsupported) {
 			return false
 		}
@@ -608,7 +615,16 @@ func applyFontProps(style *ResolvedStyle, raw map[string]string, parentSize floa
 	}
 
 	if v, ok := raw["font-size"]; ok {
-		style.FontSize = fontSize(v, parentSize, remBase)
+		containing := 0.0
+		if ctx != nil {
+			containing = ctx.viewportW
+		}
+
+		if pt, ok := clampLength(v, parentSize, containing); ok {
+			style.FontSize = pt
+		} else {
+			style.FontSize = fontSize(v, parentSize, remBase)
+		}
 	}
 
 	if v, ok := raw["font-family"]; ok {
@@ -657,6 +673,8 @@ var restShorthandProps = [...]string{ //nolint:gochecknoglobals // static apply 
 	"margin", "padding", borderProperty, borderTopProperty, borderRightProperty, borderBottomProperty, borderLeftProperty,
 	borderWidthKeyword, borderStyleKeyword,
 	borderColorKeyword, gapKeyword, flexKeyword, containerKeyword,
+	"margin-inline", "margin-block", "padding-inline", "padding-block",
+	"inset", "inset-block", "inset-inline",
 }
 
 // applyRestProps resolves every non-font property once the font size is known.
@@ -690,7 +708,9 @@ func applyRestProps(
 		case "margin", "padding", borderProperty, borderTopProperty,
 			borderRightProperty, borderBottomProperty, borderLeftProperty,
 			borderWidthKeyword, borderStyleKeyword,
-			borderColorKeyword, gapKeyword, flexKeyword, containerKeyword:
+			borderColorKeyword, gapKeyword, flexKeyword, containerKeyword,
+			"margin-inline", "margin-block", "padding-inline", "padding-block",
+			"inset", "inset-block", "inset-inline":
 			continue
 		}
 

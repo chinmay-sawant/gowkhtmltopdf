@@ -4,8 +4,9 @@
 //
 // Scope: `*`, type, `.class`, `#id`, attribute selectors (`[attr]`, `=`, `~=`,
 // `*=`, `^=`, `$=`, `|=`),
-// :first-child/:last-child/:nth-child/:has()/:not(), descendant/child/sibling
-// combinators, `@media` type + size-feature matching (see MediaMatches),
+// :first-child/:last-child/:nth-child/:has()/:not()/:is()/:where(),
+// descendant/child/sibling combinators, `@media` type + size-feature matching
+// (see MediaMatches),
 // `@container` size queries (inline-size/width + and/or/not), `!important`,
 // inline style attributes. Unsupported constructs degrade without panicking.
 package css
@@ -35,11 +36,16 @@ const (
 	hexLetterBase     = 10 // 'a'/'A' → 10 in hex
 	roundHalfUp       = 0.5
 	nonASCIIStart     = 0x80
+	hslChannelCount   = 3
+	hslCircleDeg      = 360
+	hslSectorDeg      = 60
 )
 
 // Pseudo-class and pseudo-element names shared across selector parsing.
 const (
 	pseudoClassHas   = "has"
+	pseudoClassIs    = "is"
+	pseudoClassWhere = "where"
 	pseudoElemBefore = "before"
 	pseudoElemAfter  = "after"
 	nthChildPseudo   = "nth-child"
@@ -50,6 +56,16 @@ type Stylesheet struct {
 	Rules     []Rule
 	FontFaces []FontFace
 	Page      *PageStyle
+	// Imports are @import url/media pairs in source order. Parse fills this;
+	// convert.prepare fetches each under the same ACL as <link rel=stylesheet>.
+	Imports []ImportRule
+}
+
+// ImportRule is one @import. URL is the raw url("...") or unquoted path.
+// Media is the optional prelude after the URL (empty means the sheet's media).
+type ImportRule struct {
+	URL   string
+	Media string
 }
 
 // PageStyle stores the unnamed @page declarations that affect the print
@@ -118,13 +134,14 @@ type RelativeSelector struct {
 	Parts   []SelectorPart
 }
 
-// PseudoClass is :first-child, :last-child, :nth-child(...), :has(...), or
-// :not(...). :is()/:where() are not implemented (unknown, never match).
+// PseudoClass is :first-child, :last-child, :nth-child(...), :has(...),
+// :not(...), :is(...), or :where(...).
 type PseudoClass struct {
 	Name string // lower-case, without leading ':'
 	Arg  string // nth-child argument, lower-case, trimmed
 	Has  []RelativeSelector
 	Not  []Selector
+	Is   []Selector // :is() / :where() argument list
 	// nth caches the parsed :nth-child argument (see nthForm) so matching is
 	// pure integer arithmetic; kind zero (unparseable) never matches.
 	nth nthForm `exhaustruct:"optional"`
@@ -184,6 +201,8 @@ func parseAtRule(src string, str *Stylesheet, order *int) (string, error) {
 		return skipAtRule(src)
 	case strings.HasPrefix(low, "@font-face"):
 		return parseFontFaceRule(src, str)
+	case strings.HasPrefix(low, "@import"):
+		return parseImportRule(src, str)
 	default:
 		return skipAtRule(src)
 	}
@@ -348,11 +367,13 @@ func parseOneRule(selText, block, media string, contQ *ContainerQuery, order *in
 	return rVal, true
 }
 
-// skipAtRule consumes one at-rule from src: its braced block when present,
-// otherwise a ';'-terminated statement (or everything when neither exists).
-// Returns the remaining source.
+// skipAtRule consumes one at-rule from src. A ';' before the first '{' is a
+// statement at-rule (@charset, malformed @import); otherwise a braced block
+// is consumed. Returns the remaining source.
 func skipAtRule(src string) (string, error) {
-	if open := strings.IndexByte(src, '{'); open >= 0 {
+	semi := strings.IndexByte(src, ';')
+	open := strings.IndexByte(src, '{')
+	if open >= 0 && (semi < 0 || open < semi) {
 		_, rest, err := takeBlock(src, open)
 		if err != nil {
 			return "", err
@@ -361,8 +382,8 @@ func skipAtRule(src string) (string, error) {
 		return rest, nil
 	}
 
-	if end := strings.IndexByte(src, ';'); end >= 0 {
-		return src[end+1:], nil
+	if semi >= 0 {
+		return src[semi+1:], nil
 	}
 
 	return "", nil
@@ -1038,47 +1059,72 @@ func appendCompoundPseudo(part SelectorPart, name, arg, argRaw string, hasParen,
 		}
 	}
 
-	if name == pseudoClassHas || name == condKindNot {
+	switch name {
+	case pseudoClassHas, condKindNot, pseudoClassIs, pseudoClassWhere:
 		return appendFunctionalPseudo(part, name, argRaw, hasParen, insideHas)
+	default:
+		return appendSimplePseudo(part, name, arg)
 	}
-
-	return appendSimplePseudo(part, name, arg)
 }
 
-// appendFunctionalPseudo handles :has(...) and :not(...).
+// appendFunctionalPseudo handles :has(...), :not(...), :is(...), and :where(...).
 func appendFunctionalPseudo(part SelectorPart, name, argRaw string, hasParen, insideHas bool) (SelectorPart, bool) {
 	if !hasParen || strings.TrimSpace(argRaw) == "" {
 		return part, false
 	}
 
-	if name == pseudoClassHas {
-		lowArg := strings.ToLower(argRaw)
-		if strings.Contains(lowArg, ":has(") || strings.Contains(argRaw, "::") {
-			return part, false
-		}
+	switch name {
+	case pseudoClassHas:
+		return appendHasPseudo(part, argRaw)
+	case condKindNot:
+		return appendNotPseudo(part, argRaw, insideHas)
+	case pseudoClassIs, pseudoClassWhere:
+		return appendIsWherePseudo(part, name, argRaw, insideHas)
+	default:
+		return part, false
+	}
+}
 
-		rels, ok := parseRelativeSelectorList(argRaw)
-		if !ok {
-			return part, false
-		}
-
-		part.Pseudos = append(part.Pseudos, pseudoClass(pseudoClassHas, "", rels, nil))
-
-		return part, true
+func appendHasPseudo(part SelectorPart, argRaw string) (SelectorPart, bool) {
+	lowArg := strings.ToLower(argRaw)
+	if strings.Contains(lowArg, ":has(") || strings.Contains(argRaw, "::") {
+		return part, false
 	}
 
-	if name == condKindNot {
-		sels, ok := parseSelectorListStrict(argRaw, insideHas)
-		if !ok {
-			return part, false
-		}
-
-		part.Pseudos = append(part.Pseudos, pseudoClass(condKindNot, "", nil, sels))
-
-		return part, true
+	rels, ok := parseRelativeSelectorList(argRaw)
+	if !ok {
+		return part, false
 	}
 
-	return part, false
+	part.Pseudos = append(part.Pseudos, pseudoClass(pseudoClassHas, "", rels, nil))
+
+	return part, true
+}
+
+func appendNotPseudo(part SelectorPart, argRaw string, insideHas bool) (SelectorPart, bool) {
+	sels, ok := parseSelectorListStrict(argRaw, insideHas)
+	if !ok {
+		return part, false
+	}
+
+	part.Pseudos = append(part.Pseudos, pseudoClass(condKindNot, "", nil, sels))
+
+	return part, true
+}
+
+func appendIsWherePseudo(part SelectorPart, name, argRaw string, insideHas bool) (SelectorPart, bool) {
+	if strings.Contains(argRaw, "::") {
+		return part, false
+	}
+
+	sels, ok := parseSelectorListStrict(argRaw, insideHas)
+	if !ok {
+		return part, false
+	}
+
+	part.Pseudos = append(part.Pseudos, isWherePseudo(name, sels))
+
+	return part, true
 }
 
 // appendSimplePseudo handles the non-functional pseudo-classes and the
@@ -1110,14 +1156,21 @@ func appendSimplePseudo(part SelectorPart, name, arg string) (SelectorPart, bool
 	return part, true
 }
 
-// pseudoClass builds a PseudoClass with explicit zero Has/Not slices so the
+// pseudoClass builds a PseudoClass with explicit zero Has/Not/Is slices so the
 // literal stays exhaustive without per-use nolint comments.
 func pseudoClass(name, arg string, has []RelativeSelector, not []Selector) PseudoClass {
-	pseudo := PseudoClass{Name: name, Arg: arg, Has: has, Not: not}
+	pseudo := PseudoClass{Name: name, Arg: arg, Has: has, Not: not, Is: nil}
 
 	if name == nthChildPseudo {
 		pseudo.nth = parseNthArg(arg)
 	}
+
+	return pseudo
+}
+
+func isWherePseudo(name string, sels []Selector) PseudoClass {
+	pseudo := pseudoClass(name, "", nil, nil)
+	pseudo.Is = sels
 
 	return pseudo
 }
@@ -1421,6 +1474,8 @@ func matchPseudo(pseudo PseudoClass, node *html.Node) bool {
 		return matchAnyRelative(pseudo.Has, node)
 	case condKindNot:
 		return matchNone(pseudo.Not, node)
+	case pseudoClassIs, pseudoClassWhere:
+		return matchAnySelector(pseudo.Is, node)
 	case "link", "visited":
 		// Print: no link history — both match any anchor with an href.
 		return isLinkAnchor(node)
@@ -1455,6 +1510,17 @@ func matchNone(sels []Selector, node *html.Node) bool {
 	}
 
 	return true
+}
+
+// matchAnySelector reports whether any selector of the list matches node.
+func matchAnySelector(sels []Selector, node *html.Node) bool {
+	for _, sel := range sels {
+		if Match(sel, node) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // isRootElement reports whether node is the document element (html in HTML).
@@ -1731,10 +1797,10 @@ func isClassSpace(value byte) bool {
 }
 
 // Specificity returns (a, b, c): ID count, class/attribute/pseudo count, type count.
-// :has() / :not() contribute the specificity of their most specific argument
-// (Selectors 4), not a flat class-level count for the pseudo itself. Parsed
-// selectors return their cached triple; selectors built by hand (or by
-// wrappers that recombine parts) compute it on the fly.
+// :has() / :not() / :is() contribute the specificity of their most specific
+// argument (Selectors 4); :where() contributes 0. Parsed selectors return
+// their cached triple; selectors built by hand (or by wrappers that recombine
+// parts) compute it on the fly.
 func Specificity(s Selector) (int, int, int) {
 	if s.specValid {
 		return s.spec[0], s.spec[1], s.spec[2]
@@ -1774,6 +1840,13 @@ func computeSpecificity(s Selector) (int, int, int) {
 				idCount += a2
 				classCount += b2
 				typeCount += c2
+			case pseudoClassIs:
+				a2, b2, c2 := maxSelectorSpecificity(pageSize.Is)
+				idCount += a2
+				classCount += b2
+				typeCount += c2
+			case pseudoClassWhere:
+				continue // :where() contributes 0 specificity
 			default:
 				classCount++
 			}

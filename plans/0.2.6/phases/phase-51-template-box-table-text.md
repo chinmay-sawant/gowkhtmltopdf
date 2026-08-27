@@ -1,7 +1,7 @@
 # Phase 51: Template box, table, text
 
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 51
-> **Status:** not started
+> **Status:** in progress (word-spacing, visibility, caption-side, pre-wrap, table-layout test landed; full gates open)
 > **Estimated effort:** 4-6 days
 > **Owner:** `internal/layout`
 > **Depends on:** Phase 50 for lengths if `word-spacing` uses `marginLen`
@@ -27,36 +27,36 @@ Land the missing text/box/table properties reports already write. Fix the matrix
 
 ### 51.1 word-spacing
 
-- [ ] 51.1.1 `ResolvedStyle.WordSpacing` plus intern + inherit (`inheritableProps`). Apply in `applyTextGroup`. Proof: `go test ./internal/layout -run TestWordSpacingInherits`.
-- [ ] 51.1.2 Consume in inline measure like `letter-spacing`. Proof: `TestWordSpacingWidensRuns`.
-- [ ] 51.1.3 Matrix §2.3 row Implemented with `file:line`. Mapping flip.
+- [x] 51.1.1 `ResolvedStyle.WordSpacing` intern + inherit. Proof: `TestWordSpacingInherits`.
+- [x] 51.1.2 Consume in inline measure. Proof: `TestWordSpacingWidensRuns`.
+- [x] 51.1.3 Matrix §2.3 Implemented. Mapping `--write` flipped `word-spacing` to partial/implemented family.
 
 ### 51.2 visibility
 
-- [ ] 51.2.1 Parse `visible` / `hidden` / `collapse`. `hidden` paints nothing, layout size unchanged. `collapse` on non-tables aliases `hidden` unless table-row collapse is implemented. Proof: `go test ./internal/layout -run TestVisibilityHidden`.
-- [ ] 51.2.2 Descendants of `hidden` do not paint. Proof: nested test.
-- [ ] 51.2.3 Matrix row Partial or Implemented.
+- [x] 51.2.1 `hidden`/`collapse` skip paint, keep size. Proof: `TestVisibilityHidden`.
+- [x] 51.2.2 Nested hidden content not painted. Proof: same test.
+- [x] 51.2.3 Matrix visibility Partial.
 
 ### 51.3 caption-side
 
-- [ ] 51.3.1 `caption-side: top | bottom`. Bottom paints after the table grid. Proof: `go test ./internal/layout -run TestCaptionSideBottom`.
-- [ ] 51.3.2 `left` / `right` `[~]` unless a fixture needs them.
-- [ ] 51.3.3 Matrix §2.5 row.
+- [x] 51.3.1 Bottom caption below the grid. Proof: `TestCaptionSideBottom`.
+- [~] 51.3.2 `left` / `right` not implemented.
+- [x] 51.3.3 Matrix caption-side Partial.
 
 ### 51.4 white-space
 
-- [ ] 51.4.1 `pre-wrap`: preserve newlines and wrap. `pre-line`: collapse spaces, preserve newlines, wrap. Stop folding both to `pre` at `style_properties.go:1090`. Proof: `go test ./internal/layout -run TestWhiteSpacePreWrap`.
-- [ ] 51.4.2 Existing `pre` / `nowrap` tests stay green.
-- [ ] 51.4.3 Matrix §2.3 `white-space` row updated.
+- [x] 51.4.1 `pre-wrap` / `pre-line` no longer fold to `pre`. Proof: `TestWhiteSpacePreWrap`.
+- [x] 51.4.2 Existing `TestWhiteSpacePre` green (`go test ./internal/layout`).
+- [x] 51.4.3 Matrix white-space row updated.
 
 ### 51.5 table-layout honesty
 
-- [ ] 51.5.1 Matrix §2.5: `table-layout: fixed` Partial/Implemented lite, cite `layout_tables.go:45`. Proof: matrix text.
-- [ ] 51.5.2 Golden or unit test that fixed layout uses the first-row / width hints the code already honors. If none exists, add one. Proof: test name.
+- [x] 51.5.1 Matrix table-layout Partial lite. Proof: matrix row.
+- [x] 51.5.2 `TestTableLayoutFixed` / `TestTableLayoutFixedIgnoresContentMax`.
 
 ### 51.6 gates
 
-- [ ] 51.6.1 Mapping flips. `make lint`, `make test`, `make golden` if wrap/table paint changes. Record tails.
+- [~] 51.6.1 Mapping `--check` green. Full `make lint`/`make test`/`make golden` not run. `go test ./internal/layout` and fixture-56 golden exit 0.
 
 ## Dependencies
 

@@ -103,12 +103,12 @@ func setOverflowKeyword(style *ResolvedStyle, prop, value string) {
 
 func setWritingModeKeyword(style *ResolvedStyle, value string) {
 	switch value {
-	case "horizontal-tb", writingModeVerticalRL, writingModeVerticalLR:
+	case writingModeHorizontalTB, writingModeVerticalRL, writingModeVerticalLR:
 		style.WritingMode = value
 	}
 }
 
-// applyDisplayEffectProps owns z-index, opacity and filter:opacity().
+// applyDisplayEffectProps owns z-index, opacity, filter:opacity() and visibility.
 func applyDisplayEffectProps(style *ResolvedStyle, prop, value string) bool {
 	switch prop {
 	case "z-index":
@@ -117,6 +117,8 @@ func applyDisplayEffectProps(style *ResolvedStyle, prop, value string) bool {
 		setOpacityValue(style, value)
 	case "filter":
 		setFilterValue(style, value)
+	case "visibility":
+		setVisibilityValue(style, value)
 	default:
 		return false
 	}
@@ -147,10 +149,21 @@ func setFilterValue(style *ResolvedStyle, value string) {
 	}
 }
 
+func setVisibilityValue(style *ResolvedStyle, value string) {
+	switch value {
+	case visibleKeyword, overflowHidden, borderCollapseValue:
+		style.Visibility = value
+	}
+}
+
 // applyPositionGroup handles the top/right/bottom/left offsets.
 func applyPositionGroup(
 	style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext, _ *ResolvedStyle, _ bool,
 ) bool {
+	if applyLogicalInset(style, prop, value, fsize, ctx) {
+		return true
+	}
+
 	switch prop {
 	case cssVerticalAlignTop:
 		style.Top, style.TopAuto = marginLenAuto(value, fsize, ctx.viewportH)
@@ -502,6 +515,10 @@ func applyBoxGroup(
 		return true
 	}
 
+	if applyLogicalBoxProps(style, prop, value, fsize, ctx) {
+		return true
+	}
+
 	return applyBoxSpacingProps(style, prop, value, fsize, ctx.viewportW)
 }
 
@@ -712,6 +729,206 @@ func applyPaddingSideProps(style *ResolvedStyle, prop, value string, fsize, view
 	}
 
 	return true
+}
+
+func mapsLogicalToPhysical(style *ResolvedStyle) bool {
+	return style.WritingMode == "" || style.WritingMode == writingModeHorizontalTB
+}
+
+func applyLogicalBoxProps(style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext) bool {
+	switch prop {
+	case "margin-inline", "margin-inline-start", "margin-inline-end",
+		"margin-block", "margin-block-start", "margin-block-end":
+		return applyLogicalMargin(style, prop, value, fsize, ctx.viewportW)
+	case "padding-inline", "padding-inline-start", "padding-inline-end",
+		"padding-block", "padding-block-start", "padding-block-end":
+		return applyLogicalPadding(style, prop, value, fsize, ctx.viewportW)
+	case "inline-size", "block-size",
+		"min-inline-size", "max-inline-size",
+		"min-block-size", "max-block-size":
+		return applyLogicalSize(style, prop, value, fsize, ctx)
+	default:
+		return false
+	}
+}
+
+func applyLogicalMargin(style *ResolvedStyle, prop, value string, fsize, viewportW float64) bool {
+	if !mapsLogicalToPhysical(style) {
+		return true
+	}
+
+	switch prop {
+	case "margin-inline-start":
+		style.MarginLeft, style.MarginLeftAuto = marginLenAuto(value, fsize, viewportW)
+	case "margin-inline-end":
+		style.MarginRight, style.MarginRightAuto = marginLenAuto(value, fsize, viewportW)
+	case "margin-block-start":
+		style.MarginTop, style.MarginTopAuto = marginLenAuto(value, fsize, viewportW)
+	case "margin-block-end":
+		style.MarginBottom, style.MarginBottomAuto = marginLenAuto(value, fsize, viewportW)
+	case "margin-inline":
+		start, end, ok := logicalPair(value)
+		if !ok {
+			return true
+		}
+
+		style.MarginLeft, style.MarginLeftAuto = marginLenAuto(start, fsize, viewportW)
+		style.MarginRight, style.MarginRightAuto = marginLenAuto(end, fsize, viewportW)
+	case "margin-block":
+		start, end, ok := logicalPair(value)
+		if !ok {
+			return true
+		}
+
+		style.MarginTop, style.MarginTopAuto = marginLenAuto(start, fsize, viewportW)
+		style.MarginBottom, style.MarginBottomAuto = marginLenAuto(end, fsize, viewportW)
+	default:
+		return false
+	}
+
+	return true
+}
+
+func applyLogicalPadding(style *ResolvedStyle, prop, value string, fsize, viewportW float64) bool {
+	if !mapsLogicalToPhysical(style) {
+		return true
+	}
+
+	switch prop {
+	case "padding-inline-start":
+		style.PaddingLeft = marginLen(value, fsize, viewportW)
+	case "padding-inline-end":
+		style.PaddingRight = marginLen(value, fsize, viewportW)
+	case "padding-block-start":
+		style.PaddingTop = marginLen(value, fsize, viewportW)
+	case "padding-block-end":
+		style.PaddingBottom = marginLen(value, fsize, viewportW)
+	case "padding-inline":
+		start, end, ok := logicalPair(value)
+		if !ok {
+			return true
+		}
+
+		style.PaddingLeft = marginLen(start, fsize, viewportW)
+		style.PaddingRight = marginLen(end, fsize, viewportW)
+	case "padding-block":
+		start, end, ok := logicalPair(value)
+		if !ok {
+			return true
+		}
+
+		style.PaddingTop = marginLen(start, fsize, viewportW)
+		style.PaddingBottom = marginLen(end, fsize, viewportW)
+	default:
+		return false
+	}
+
+	return true
+}
+
+func applyLogicalSize(style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext) bool {
+	if !mapsLogicalToPhysical(style) {
+		return true
+	}
+
+	switch prop {
+	case "inline-size":
+		return setWidthValue(style, value, fsize, ctx.viewportW)
+	case "block-size":
+		return setHeightValue(style, value, fsize, ctx.viewportH)
+	case "min-inline-size":
+		return setMinWidthValue(style, value, fsize, ctx.viewportW)
+	case "max-inline-size":
+		return setMaxWidthValue(style, value, fsize, ctx.viewportW)
+	case "min-block-size":
+		return setMinHeightValue(style, value, fsize, ctx.viewportH)
+	case "max-block-size":
+		return setMaxHeightValue(style, value, fsize, ctx.viewportH)
+	default:
+		return false
+	}
+}
+
+func applyLogicalInset(style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext) bool {
+	switch prop {
+	case "inset", "inset-block", "inset-inline",
+		"inset-block-start", "inset-block-end",
+		"inset-inline-start", "inset-inline-end":
+		if mapsLogicalToPhysical(style) {
+			assignLogicalInset(style, prop, value, fsize, ctx.viewportW, ctx.viewportH)
+		}
+
+		return true
+	default:
+		return false
+	}
+}
+
+func assignLogicalInset(style *ResolvedStyle, prop, value string, fsize, vw, vh float64) {
+	switch prop {
+	case "inset":
+		applyInsetShorthand(style, value, fsize, vw, vh)
+	case "inset-block":
+		start, end, ok := logicalPair(value)
+		if ok {
+			style.Top, style.TopAuto = marginLenAuto(start, fsize, vh)
+			style.Bottom, style.BottomAuto = marginLenAuto(end, fsize, vh)
+		}
+	case "inset-inline":
+		start, end, ok := logicalPair(value)
+		if ok {
+			style.Left, style.LeftAuto = marginLenAuto(start, fsize, vw)
+			style.Right, style.RightAuto = marginLenAuto(end, fsize, vw)
+		}
+	case "inset-block-start":
+		style.Top, style.TopAuto = marginLenAuto(value, fsize, vh)
+	case "inset-block-end":
+		style.Bottom, style.BottomAuto = marginLenAuto(value, fsize, vh)
+	case "inset-inline-start":
+		style.Left, style.LeftAuto = marginLenAuto(value, fsize, vw)
+	case "inset-inline-end":
+		style.Right, style.RightAuto = marginLenAuto(value, fsize, vw)
+	}
+}
+
+func applyInsetShorthand(style *ResolvedStyle, value string, fsize, vw, vh float64) {
+	var val [4]string
+
+	n := splitSpaceTokens(value, val[:])
+	if n == 0 {
+		return
+	}
+
+	top, right, bottom, left := val[0], val[0], val[0], val[0]
+
+	switch {
+	case n > three:
+		top, right, bottom, left = val[0], val[1], val[2], val[3]
+	case n == three:
+		top, right, bottom, left = val[0], val[1], val[2], val[1]
+	case n == two:
+		top, right, bottom, left = val[0], val[1], val[0], val[1]
+	}
+
+	style.Top, style.TopAuto = marginLenAuto(top, fsize, vh)
+	style.Right, style.RightAuto = marginLenAuto(right, fsize, vw)
+	style.Bottom, style.BottomAuto = marginLenAuto(bottom, fsize, vh)
+	style.Left, style.LeftAuto = marginLenAuto(left, fsize, vw)
+}
+
+func logicalPair(value string) (string, string, bool) {
+	var tok [2]string
+
+	n := splitSpaceTokens(value, tok[:])
+	if n == 0 {
+		return "", "", false
+	}
+
+	if n == 1 {
+		return tok[0], tok[0], true
+	}
+
+	return tok[0], tok[1], true
 }
 
 // applyBorderGroup handles the border shorthand and per-side props.
@@ -1085,10 +1302,9 @@ func setVerticalAlignValue(style *ResolvedStyle, value string) {
 
 func setWhiteSpaceValue(style *ResolvedStyle, value string) {
 	switch value {
-	case contentNormal, "nowrap":
+	case contentNormal, cssWhiteSpaceNowrap, cssWhiteSpacePre,
+		cssWhiteSpacePreWrap, cssWhiteSpacePreLine:
 		style.WhiteSpace = value
-	case "pre", "pre-wrap", "pre-line":
-		style.WhiteSpace = "pre"
 	}
 }
 
@@ -1172,6 +1388,12 @@ func applyTextSpacingProps(style *ResolvedStyle, prop, value string, fsize float
 	switch prop {
 	case "letter-spacing":
 		style.LetterSpacing = marginLen(value, fsize, ctx.viewportW)
+	case "word-spacing":
+		if value == contentNormal {
+			style.WordSpacing = 0
+		} else {
+			style.WordSpacing = marginLen(value, fsize, ctx.viewportW)
+		}
 	case "text-indent":
 		style.TextIndent = marginLen(value, fsize, ctx.viewportW)
 	default:
@@ -1186,7 +1408,7 @@ func applyTableBreakGroup(
 	style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext, _ *ResolvedStyle, _ bool,
 ) bool {
 	switch prop {
-	case "border-collapse", "border-spacing", "table-layout":
+	case "border-collapse", "border-spacing", "table-layout", "caption-side":
 		return applyTableProps(style, prop, value, fsize, ctx.viewportW)
 	case "page-break-before", "break-before", "page-break-after", "break-after",
 		"page-break-inside", "break-inside":
@@ -1211,6 +1433,11 @@ func applyTableProps(style *ResolvedStyle, prop, value string, fsize, viewportW 
 	case "table-layout":
 		if value == positionFixed || value == overflowAuto {
 			style.TableLayout = value
+		}
+	case "caption-side":
+		switch value {
+		case cssVerticalAlignTop, cssVerticalAlignBottom:
+			style.CaptionSide = value
 		}
 	default:
 		return false

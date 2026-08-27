@@ -3,7 +3,7 @@
 > **Parent:** `plans/0.1.0/00-canonical-pure-go-rewrite.md` (Phase 0.1); post-MVP updates under `plans/0.2.0/10-canonical-post-mvp-roadmap.md`  
 > **Status:** living contract - amendments go through plan review  
 > **Target:** authored HTML templates → PDF. **Not** a browser.  
-> **Last honesty audit:** 2026-08-21 · fidelity guide: [fidelity.md](fidelity.md)  
+> **Last honesty audit:** 2026-08-27 · fidelity guide: [fidelity.md](fidelity.md)  
 > **Phase 21 note:** arbitrary-website / “decent print” work does **not** expand this matrix. CSS remains a **print CSS subset** (Partial flex/grid/position; many properties Not implemented). No new Implemented rows until code + tests ship — see [fidelity.md § Arbitrary websites](fidelity.md#arbitrary-websites-phase-21).
 
 This document is the **contract** the layout engine is allowed to implement.
@@ -38,10 +38,11 @@ as its inline text (per the note column).
 
 ## 2. Supported CSS properties
 
-Status legend (verified against `internal/layout/style.go` `applyRestProps` +
-`uaRules`, `internal/css/css.go`, `internal/layout/layout.go`, `inline.go`,
-`paint.go`, and the tests in `internal/layout/layout_test.go` /
-`internal/convert/golden_test.go` as of Phase 4):
+Status legend (verified against `applyRestProps` in
+`internal/layout/style_cascade.go:666` plus dispatch in
+`style_properties.go`, `uaRules` in `style_values.go`, `internal/css/css.go`,
+`internal/layout/layout.go`, `inline.go`, `paint.go`, and the tests in
+`internal/layout/layout_test.go` / `internal/convert/golden_test.go`):
 
 - **Implemented** - parsed and consumed by layout.
 - **Partial** - parsed and used in a subset of the declared cases; the rest
@@ -53,10 +54,11 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 
 | Property | Status | Notes / verified by |
 |----------|--------|---------------------|
-| `margin` / `margin-top\|right\|bottom\|left` | Implemented | `style.go:340-349` (`setFour`, `marginLen`); sibling margin collapsing `layout.go:263`; tests `TestBlockWidthsAndMargins`, `TestMarginCollapse` |
+| `margin` / `margin-top\|right\|bottom\|left` | Implemented | `setFour` / `marginLen` (`style_values.go:246`, `style_values.go:564`) via `applyRestProps` (`style_cascade.go:666`) and `style_properties.go`; sibling margin collapsing `layout.go:263`; tests `TestBlockWidthsAndMargins`, `TestMarginCollapse` |
 | `padding` / `padding-top\|right\|bottom\|left` | Implemented | `style.go:350-359`; test `TestPaddingBorderBox` |
 | `border` / `border-top\|right\|bottom\|left` | Implemented | `style.go:360-379` (`parseBorder` `style.go:521`); styles `solid\|dashed\|dotted\|none`, width + color; test `TestPaddingBorderBox` |
 | `border-width`, `border-style`, `border-color` | Implemented | `style.go:380-401`; `thin\|medium\|thick` widths `style.go:546` |
+| `border-radius` | Partial | Shorthand `setBorderRadius` (`style_properties.go:731`). Paint via `usedBorderRadius` (`layout_chrome.go:346`). Percent corners use a uniform fallback. Longhands `border-top-left-radius` and siblings are not applied. |
 | `width`, `height` | Implemented | `style.go:316-323`; consumed in `layout.go:176-191` (block) and `layout.go:315-320` (images) |
 | `min-width`, `min-height`, `max-width`, `max-height` | Implemented | `style.go:324-339`; enforced `layout.go:181-186, 321-328`; `%` resolves against viewport approximation |
 | `box-sizing` (`content-box\|border-box`) | Implemented | parsed `style.go`; default `content-box` (specified width is content width); `border-box` makes width include padding+border (`layout.go` `buildBlock`); test `TestBoxSizingBorderBox` |
@@ -74,6 +76,7 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 | `clear` (`left\|right\|both`) | Implemented (lite) | advances past named float bottoms (`float.go`); test `TestFloatLeftRightClear` |
 | `position` (`static\|relative\|absolute\|fixed\|sticky`) | Partial | static in-flow; `relative`/`absolute`/`fixed` lite via `buildAbsolute` / `buildFixed` / `applyRelativeOffset` (fixtures 26/28). `sticky` = print-scoped clamp (page content box = scrollport; `sticky.go`, fixture-31, `TestSticky*`) plus overflow-box scrollport at offset 0 |
 | `position: sticky` | Partial (print + overflow@0) | Default scrollport = page content box (`contentH`); clamps `top`/`bottom`/`left`/`right` within the containing block; natural fragment only, with no fixed-style continuation-page clones. Inside `overflow:auto\|scroll\|hidden\|clip`, that box is the scrollport at **scroll offset 0** (PDF has no scroll; no page clones). **Not** `position:fixed`. Path: `sticky.go` / `applyStickyPrint`; fixture-31; `TestSticky*` / `TestStickyOverflow*` |
+| `z-index` | Implemented (lite) | Integer or `auto` (`setZIndexValue` `style_properties.go:114`). Copied onto ops (`pushZ` `layout.go:715`) and sorted (`sortPaintIndices` `paint_order.go:32`). Not a full CSS stacking-context tree. Test `TestZIndexPaintOrder` |
 
 ### 2.3 Text & fonts
 
@@ -89,19 +92,22 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 | `text-indent` | Implemented | Inherited and applied to the first line (`inline.go`); test `TestTextIndentInheritsAndShiftsFirstLine` |
 | `line-height` (number, length, `normal`) | Implemented | consumed in line metrics; test `TestMarginCollapse` |
 | `letter-spacing` | Implemented | consumed in run width |
-| `word-spacing` | Not implemented | absent from `applyRestProps` |
+| `word-spacing` | Implemented | Inherited; extra width per ASCII space (`style_properties.go` apply + `inline_paint.go`). Tests `TestWordSpacingInherits`, `TestWordSpacingWidensRuns` |
 | `text-transform` | Implemented | `none` \| `uppercase` \| `lowercase` \| `capitalize` (`setTextTransformValue`; applied at measure and paint) |
 | `vertical-align` (`baseline\|top\|middle\|bottom`) | Partial | table cells: top/middle/bottom offset within row (`emitCell`); inline replaced: top/middle/bottom vs baseline; test `TestTableCellVerticalAlignMiddle` |
-| `white-space` (`normal\|nowrap\|pre\|pre-wrap`) | Partial | normal/nowrap/pre implemented; `pre-wrap`/`pre-line` collapse to `pre`; test `TestWhiteSpacePre` |
+| `white-space` (`normal\|nowrap\|pre\|pre-wrap\|pre-line`) | Partial | `pre-wrap` preserves spaces and wraps; `pre-line` collapses spaces, keeps newlines, wraps (`setWhiteSpaceValue`, `collectPreservingNewlines`). Tests `TestWhiteSpacePre`, `TestWhiteSpacePreWrap` |
+| `visibility` (`visible\|hidden\|collapse`) | Partial | `hidden`/`collapse` skip paint, keep layout size (`hidesPaint`). Descendants inherit. Table-row collapse not implemented. Test `TestVisibilityHidden` |
+| `overflow-wrap` / `word-wrap` / `word-break` | Partial | Parsed `applyTextWrapProps` (`style_properties.go:1095`). Used by `wordBreakOf` (`layout_measure.go:461`). `word-wrap` is the overflow-wrap alias. `anywhere` / `break-all` mid-break; `break-word` soft wrap; `keep-all` is stored then treated as normal. Tests `overflow_wrap_test.go` |
 
 ### 2.4 Color & background
 
 | Property | Status | Notes / verified by |
 |----------|--------|---------------------|
-| `color` | Implemented | `style.go:402-405`; consumed `inline.go:152-155`; test `TestCascadeAndInline` |
+| `color` | Implemented | `style.go:402-405`; consumed `inline.go:152-155`; test `TestCascadeAndInline`. `hsl()`/`hsla()` parse in `ParseColor` (`values.go`; `TestParseColorHsl`) |
 | `background-color` | Implemented | `style.go:406-409`; painted `layout.go:234-237, 504-507, 531-534` (gated by `Background`); tests `TestBackgroundFill`, `TestRunPDFStyleTableImage` |
 | `background` (shorthand) | Partial | Color token only (`firstBackgroundColor`); `url(...)` / gradients ignored |
 | `opacity` | Partial | Parsed in `applyRestProps`; paint via PDF ExtGState (`SetOpacity`). Nested opacities multiply. Also accepts `filter: opacity()`; other filter functions ignored (permanent print non-goal for blur/shadow). |
+| `accent-color` | Partial | Parsed `style_properties.go:928`; inherited. Fill color for native `progress`/`meter` (`widgetValueColor` `layout.go:1417`). Other form controls ignore it. Test `widget_color_test.go` |
 
 ### 2.5 Table subset
 
@@ -109,8 +115,8 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 |----------|--------|---------------------|
 | `border-collapse` (`collapse\|separate`) | Partial | `collapse` ≈ `border-spacing: 0` plus a collapsed grid emitter (`emitCollapsedRowGrid`); not a full CSS collapse engine |
 | `border-spacing` | Implemented | `style.go`; used by `tableSpacing` (suppressed when collapse); test `TestBorderSpacing` |
-| `caption-side` | Not implemented | not consumed; captions always paint above the table |
-| `table-layout` (`auto\|fixed`) | Not implemented (auto only) | parsed (`style.go:452-455`), never consumed |
+| `caption-side` | Partial | `top` (default) above the grid; `bottom` below (`CaptionSide` + `buildTable`). `left`/`right` out. Tests `TestCaptionSideParse`, `TestCaptionSideBottom` |
+| `table-layout` (`auto\|fixed`) | Partial (fixed lite) | Consumed when `fixed` and the table width is definite (`layout_tables.go:45`: `style.TableLayout == positionFixed && tableHint >= 0`). Column used widths from hints, leftover split evenly; content max-content ignored (`sizeFixedTableColumns` `layout_measure.go:830`). `auto` remains the default path. Test `TestTableLayoutFixedIgnoresContentMax` |
 
 ### 2.6 Print / paged media
 
@@ -139,7 +145,7 @@ Status legend (verified against `internal/layout/style.go` `applyRestProps` +
 
 ### 2.7 Flexbox (Stage A — print CSS subset)
 
-Evidence: `internal/layout/flex.go`, `style.go` (`applyRestProps` + `parseFlexShorthand`); fixtures 25/28/32/33; `flex_test.go`. Status uses the §2 legend (Implemented / Partial / Not implemented). Checklist form: **[x]** Implemented · **[~]** Partial · **[ ]** Missing.
+Evidence: `internal/layout/flex.go`, `style_cascade.go` (`applyRestProps`) and `style_properties.go` / `style_values.go` (`parseFlexShorthand`); fixtures 25/28/32/33; `flex_test.go`. Status uses the §2 legend (Implemented / Partial / Not implemented). Checklist form: **[x]** Implemented · **[~]** Partial · **[ ]** Missing.
 
 | Property | Status | Notes / verified by |
 |----------|--------|---------------------|
@@ -182,7 +188,7 @@ Evidence: `internal/layout/grid.go`, `style.go`; fixtures 28/32/34/35; `grid_tes
 
 ### 2.9 CSS Multi-column (report lite)
 
-Evidence: `internal/layout/multicol.go`, `style.go` (`applyRestProps`); fixture-39; `multicol_test.go`. **Not** full Multicol L1 / L2 / Chrome balancing with floats.
+Evidence: `internal/layout/multicol.go`, `style_cascade.go` (`applyRestProps`) and `style_properties.go`; fixture-39; `multicol_test.go`. **Not** full Multicol L1 / L2 / Chrome balancing with floats.
 
 | Property | Status | Notes / verified by |
 |----------|--------|---------------------|
@@ -198,9 +204,11 @@ Evidence: `internal/layout/multicol.go`, `style.go` (`applyRestProps`); fixture-
 
 ## 3. Supported units
 
-Status legend as in §2; resolution sites: `fontSize` `style.go:561`,
-`lengthBox` `style.go:634` (width/height/min/max), `marginLen`
-`style.go:671` (margins/padding/letter-spacing), parse gate `css.go:706`.
+Status legend as in §2; resolution sites: `LengthToPt`
+`internal/css/container.go:113` (`ex`/`ch` as 0.5em at lines 133-134),
+`lengthBox` `style_values.go:521` (width/height/min/max), `marginLen`
+`style_values.go:564` (margins/padding/letter-spacing), parse gate
+`ParseLength` `values.go:108`.
 
 | Unit | Status | Notes |
 |------|--------|-------|
@@ -212,7 +220,9 @@ Status legend as in §2; resolution sites: `fontSize` `style.go:561`,
 | `rem` | Implemented | 16 px reference (`style.go:593, 657, 694`) |
 | `%` | Implemented | containing block for box/margins; parent font-size for `font-size` |
 | `vw`, `vh` | Partial | resolved for width/height/min/max (`lengthBox` `style.go:662-663`) only; ignored for margins/padding/font-size |
-| `ex`, `ch` | Not implemented | accepted by the parser (`css.go:731`) but never resolved by `style.go` - declaration dropped |
+| `ex`, `ch` | Partial | Resolved as 0.5em (`LengthToPt` `internal/css/container.go:133-134`, `exChToEmFactor`). Not font-metric x-height or advance width. |
+| `calc()` | Partial | Three-token subset only: `calc(A + B)`, `calc(A - B)`, `calc(A * N)` (`calcLength` `style_values.go:598`), used from `lengthBox` / `marginLen`. Longer or nested calc stays invalid so a fallback can win. |
+| `clamp()` | Partial | `clamp(min, pref, max)` via `clampLength`; no longer dropped from cascade. Nested calc inside clamp out. Test `TestClampLength`. `color-mix(` / `light-dark(` / `oklch(` still excluded. |
 | `vmin`, `vmax`, `dpi`-style | Not implemented | rejected at parse |
 
 ## 4. Supported selector syntax (cascade)
@@ -235,9 +245,16 @@ Status legend as in §2; evidence in `internal/css/css.go`.
 | `@media print` / `screen` filtering | Implemented | `MediaMatches` (`css/media.go`); cascade `style.go`; convert `Media: "print"` (PDF) or `"screen"` (Image); only `print` and `screen` are evaluated (all other media types and unsupported feature queries evaluate to false); tests `TestParseMedia`, `TestMediaMatches*` |
 | `@media` feature queries (`(min-width: …)`) | Partial | size features + orientation vs viewport; unknown features → false; `TestMediaMatchesSizeFeatures` |
 | `:has()` | Partial | Relative selectors inside `:has(...)`; descendant/child/sibling + simple compounds; no forgiving-selector list / complex chrome edge cases. `has.go`; fixture-41 |
-| `@container` / `container-type` | Partial | Size queries only (`inline-size`/`width` + `and`/`or`/`not`); named containers; two-pass style after used inline size. No style/scroll-state queries; no `cq*` units. `container.go`; fixture-42 |
+| `:not()` | Implemented | `appendFunctionalPseudo` (`css.go:1058`); match `matchNone` (`css.go:1459`). Argument list is strict (empty items fail). Specificity of the most specific argument (`css.go:1744`). Tests `has_test.go` |
+| `:is()` | Implemented | Strict selector-list arguments; nested `:is` allowed; `::` in args rejected. Match any argument. Specificity of the most specific argument. Tests `TestParseIs`, `TestIsPseudo`, `TestIsSpecificity` |
+| `:where()` | Implemented | Same matching as `:is()`; specificity contribution 0. Test `TestWherePseudo` |
+| `:root` | Implemented | Matches the document element (`<html>`), not the synthetic `#document` wrapper (`matchPseudo` `css.go:1437`; `isRootElement` `css.go:1473`). Test `TestRootPseudo` |
+| `var()` / `--*` custom properties | Partial | `--*` inherit then overlay (`mergeCustomProps` `style_cascade.go:18`); `var()` expanded before apply (`resolveRawVars` `style_cascade.go:45`; `ResolveCustomProps` `values.go:514`). Cycles resolve empty. Tests `cssvar_font_test.go`, `TestResolveCustomProps*` |
+| `@container` | Partial | Size queries only (`inline-size`/`width` + `and`/`or`/`not`); named containers; two-pass style after used inline size. No style/scroll-state queries; no `cq*` units. `internal/css/container.go`; fixture-42 |
+| `container-type` / `container-name` / `container` | Partial | Parsed `applyContainerProps` (`style_properties.go:1296`). Size containers measured in `layout/container.go:43`. `container-type` honors `normal`/`size`/`inline-size` only. No `cq*` units; no style/scroll-state. Fixture-42 |
 | `@page` | Implemented | `@page { margin }` and `@page { size }` applied to page geometry (`applyCSSPageMargins`) |
 | `@font-face` | Partial | Parsed; `MergeFontFaces` loads TTF/OTF/WOFF1 via `FetchSub` (local **and** `https://`) under the same ACL + `NetworkPolicy` on PDF and image paths. `.woff2` / `.eot` / `data:` skipped. See §5 |
+| `@import` | Partial | Parsed onto `Stylesheet.Imports`; `CollectSheets` fetches under the same ACL as `<link>`, depth cap 8, cycle skip, failed fetch skipped. Media prelude uses `MediaMatches`. Tests `TestParseImport`, `TestImportStylesheet` |
 
 ## 5. Explicitly unsupported (MVP)
 

@@ -15,6 +15,9 @@ const (
 	cssDisplayNone               = "none"
 	cssWhiteSpaceNowrap          = "nowrap"
 	cssWhiteSpacePre             = "pre"
+	cssWhiteSpacePreWrap         = "pre-wrap"
+	cssWhiteSpacePreLine         = "pre-line"
+	writingModeHorizontalTB      = "horizontal-tb"
 	cssTextAlignJustify          = "justify"
 	cssVerticalAlignBottom       = "bottom"
 	cssVerticalAlignMiddle       = "middle"
@@ -754,6 +757,19 @@ func isSoftWrapRune(r rune, mode softBreakMode) bool {
 	return false
 }
 
+func hidesPaint(style *ResolvedStyle) bool {
+	if style == nil {
+		return false
+	}
+
+	switch style.Visibility {
+	case overflowHidden, borderCollapseValue:
+		return true
+	default:
+		return false
+	}
+}
+
 // emitLine renders items[start:end) as one line and returns its height.
 // lastLine is true for the final line of the inline formatting context (used
 // so text-align:justify leaves the last line start-aligned).
@@ -812,6 +828,18 @@ func (e *engine) emitLineItems(boxNode *box, line []inlineItem, leftX, baseline,
 		}
 
 		leftX += item.marginL
+
+		if hidesPaint(item.style) {
+			und.flush(e)
+
+			leftX += item.w + item.marginR
+
+			if idx < len(line)-1 && isJustifyGapAfter(*item) {
+				leftX += justifyGap
+			}
+
+			continue
+		}
 
 		switch {
 		case item.blockBox != nil:

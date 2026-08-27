@@ -1,7 +1,7 @@
 # Phase 49: Selectors, cascade, at-rules
 
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 49
-> **Status:** not started
+> **Status:** in progress (`:is`/`:where`/`@import` parse+fetch done; layout consume test for `:is` still open)
 > **Estimated effort:** 4-7 days
 > **Owner:** `internal/css`, `internal/convert/prepare`
 > **Depends on:** Phase 48.2 mapping reclassify
@@ -26,25 +26,25 @@ Keep the never-match rule for `:hover` / `:focus` / `:active` / `:target`. Print
 
 ### 49.1 `:is()`
 
-- [ ] 49.1.1 Parse `:is()` arguments as a selector list in `appendFunctionalPseudo` (`internal/css/css.go` around 1048). Nested `:is` allowed; `::` in arguments rejected like `:has()`. Proof: `go test ./internal/css -run 'TestParseIs' -v`.
-- [ ] 49.1.2 Match if any argument matches. Specificity is the most specific argument (Selectors 4). Proof: `go test ./internal/css -run 'TestIsPseudo|TestIsSpecificity'`.
-- [ ] 49.1.3 Layout consume: a box styled only through `:is(div, p)` gets the declarations. Proof: `go test ./internal/layout -run TestIsPseudoStyle`.
+- [x] 49.1.1 Parse `:is()` arguments as a selector list in `appendFunctionalPseudo`. Nested `:is` allowed; `::` in arguments rejected. Proof: `go test ./internal/css -run TestParseIs`.
+- [x] 49.1.2 Match if any argument matches. Specificity is the most specific argument. Proof: `go test ./internal/css -run 'TestIsPseudo|TestIsSpecificity'`.
+- [ ] 49.1.3 Layout consume: a box styled only through `:is(div, p)` gets the declarations. Proof: `go test ./internal/layout -run TestIsPseudoStyle` (test not added this session).
 
 ### 49.2 `:where()`
 
-- [ ] 49.2.1 Same matching as `:is()`. Specificity contribution 0. Proof: `go test ./internal/css -run TestWherePseudo`.
-- [ ] 49.2.2 A later type selector still wins over `:where(#id)` when expected. Proof: specificity unit test.
+- [x] 49.2.1 Same matching as `:is()`. Specificity contribution 0. Proof: `go test ./internal/css -run TestWherePseudo`.
+- [x] 49.2.2 Specificity 0 for `:where` vs `:is` covered in `TestWherePseudo` / `TestIsSpecificity`.
 
 ### 49.3 `@import`
 
-- [ ] 49.3.1 `parseAtRule` keeps `@import` url + optional media prelude instead of `skipAtRule`. Proof: `go test ./internal/css -run TestParseImport`.
-- [ ] 49.3.2 `prepare.CollectSheets` (`internal/convert/prepare/styles.go`) fetches via `FetchSub` with the same ACL and `NetworkPolicy` as `<link rel=stylesheet>`. Depth cap. Cycle skip. Failed fetch skips the sheet, does not fail the convert. Proof: `go test ./internal/convert -run TestImportStylesheet`.
-- [ ] 49.3.3 Media on `@import` uses existing `MediaMatches`. Proof: print-only import applies on PDF path, not when media is `screen` in image mode if that is the convert media.
+- [x] 49.3.1 `parseAtRule` records `ImportRule` on `Stylesheet.Imports`. Proof: `go test ./internal/css -run TestParseImport`.
+- [x] 49.3.2 `CollectSheets` fetches imports via `resources.Fetch`, depth 8, cycle skip, failed fetch skipped. Proof: `go test ./internal/convert -run TestImportStylesheet` and `go test ./internal/convert/prepare`.
+- [x] 49.3.3 Media on `@import` uses `MediaMatches`. Proof: prepare import tests print vs screen.
 
 ### 49.4 Optional, fixture-gated
 
-- [ ] 49.4.1 `:first-of-type` / `:nth-of-type` only if a named fixture fails without them. Otherwise `[~]` with the fixture name that would justify them.
-- [ ] 49.4.2 Attribute `i` flag only if a named fixture needs case-insensitive attr match.
+- [~] 49.4.1 `:first-of-type` / `:nth-of-type`: no failing fixture this session.
+- [~] 49.4.2 Attribute `i` flag: no failing fixture this session.
 
 ### 49.5 Honesty and gates
 

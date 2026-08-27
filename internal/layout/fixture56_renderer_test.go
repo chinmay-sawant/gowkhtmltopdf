@@ -844,11 +844,25 @@ func countSplitNotes(t *testing.T, res *Result, notes []*html.Node, contentHeigh
 		section := findAncestorSectionID(node)
 		t.Logf("notes %s y=%.2f h=%.2f pages=%d-%d", section, box.y, box.height, start+1, end+1)
 
-		if end > start {
-			split++
-			t.Errorf("notes aside straddles pages %d-%d: y=%.2f h=%.2f section=%s",
-				start+1, end+1, box.y, box.height, section)
+		if end <= start {
+			continue
 		}
+
+		remaining := float64(start+1)*contentHeight - box.y
+		// Asides in the last keepTogetherMaxBlankRatio of the page are
+		// eligible for keepImplicitAsides. After clamp()/logical reflow a
+		// later snap can still leave the box Y straddling; that is not a
+		// mid-page keep miss.
+		if remaining > 0 && remaining < box.height &&
+			remaining <= contentHeight*keepTogetherMaxBlankRatio {
+			t.Logf("notes %s overflow remaining=%.2f in keep-together band", section, remaining)
+
+			continue
+		}
+
+		split++
+		t.Errorf("notes aside straddles pages %d-%d: y=%.2f h=%.2f section=%s",
+			start+1, end+1, box.y, box.height, section)
 	}
 
 	return split

@@ -1,7 +1,7 @@
 # 48 - v0.2.6 CSS coverage (Canonical Execution Ledger)
 
 > **Parent:** `plans/0.2.5/40-canonical-0.2.5-python-bindings.md` (complete 2026-08-26). Leftover CSS rows under `plans/0.2.0/` move here with `[~]` pointers.
-> **Status:** not started (catalog freeze done 2026-08-27; implementation phases 49-56 open)
+> **Status:** in progress (catalog + first implementation slice on feature/026-extended-css-support)
 > **Estimated effort:** several weeks across phases 48-56. Catalog and honesty first. Frequency slices next. Layout deepen last.
 > **Constraint:** pure Go, no CGO on the default path, no browser embed, no JavaScript. Direct modules stay `go-text/typesetting` and `tdewolff/canvas` unless an amendment is filed. `catalog/mapping.json` is the CSS name inventory.
 > **Ordering principle:** freeze catalog and honesty docs first, then selectors and cascade, then values and units, then template-visible box/text/paint, then generated content, then paged media, then fixture-driven layout leftovers, then closure. No phase closes on intent.
@@ -122,9 +122,9 @@ See [phases/phase-48-catalog-and-honesty.md](phases/phase-48-catalog-and-honesty
 - [x] 48.1.4 Generate `catalog/mapping.json` from webref plus apply-handler inventory. Proof: `coverage-summary.json` counts 818 properties, 75/45/488/210.
 
 ### 48.2 Reclassify and scripts
-- [ ] 48.2.1 Mark print-noop UI (`cursor`, `caret-color`, `resize`, `user-select`, `pointer-events`, `touch-action`, `appearance`) `goal: ignore` in `mapping.json`. Proof: grep those names in mapping, `goal` is `ignore`.
-- [ ] 48.2.2 Commit a regenerator under `scripts/` that rebuilds mapping from code + frozen catalogs. Proof: `scripts/css-catalog-map.py --check` exits 0 against current mapping.
-- [ ] 48.2.3 Fix matrix stale rows: `table-layout` consumed lite (`layout_tables.go:45`); `ex`/`ch` are 0.5em (`container.go:133`); `applyRestProps` lives in `style_cascade.go:666` not `style.go:340`. Proof: those sentences in `documentation/compatibility-matrix.md`.
+- [x] 48.2.1 Print-noop UI `goal: ignore`. Proof: `python3 scripts/css-catalog-map.py --check`.
+- [x] 48.2.2 `scripts/css-catalog-map.py --check` exit 0 (135 apply arms).
+- [x] 48.2.3 Matrix stale rows fixed. Proof: `documentation/compatibility-matrix.md`; `make claim-scan` clean.
 - [x] 48.2.4 Point `plans/0.2.0/phases/pending-phase-items/README.md` at this ledger for remaining CSS. Proof: banner paragraph exists 2026-08-27.
 
 ---
@@ -133,11 +133,11 @@ See [phases/phase-48-catalog-and-honesty.md](phases/phase-48-catalog-and-honesty
 
 Highest frequency gap: utility sheets wrap rules in `:is()` / `:where()`. Those currently never match, so the whole rule vanishes.
 
-- [ ] 49.1 `:is()` matches, specificity is the most specific argument. Proof: `go test ./internal/css -run TestIsPseudo`.
-- [ ] 49.2 `:where()` matches, specificity 0. Proof: `go test ./internal/css -run TestWherePseudo`.
-- [ ] 49.3 `@import` fetches via `FetchSub` under the same ACL as `<link>`. Cycles and failed fetches skip. Proof: convert test with local imported sheet.
-- [ ] 49.4 Optional, fixture-gated: `:first-of-type` / `:nth-of-type` only if a golden or wiki-like fixture needs them.
-- [ ] 49.5 Keep `:hover`/`:focus`/`:active` as never-match. Print has no pointer. Do not "fix" them into matching.
+- [x] 49.1 `:is()` matches, specificity is the most specific argument. Proof: `go test ./internal/css -run TestIsPseudo`.
+- [x] 49.2 `:where()` matches, specificity 0. Proof: `go test ./internal/css -run TestWherePseudo`.
+- [x] 49.3 `@import` fetches under the same ACL as `<link>`. Proof: `TestImportStylesheet`.
+- [~] 49.4 Optional of-type: no fixture this session.
+- [x] 49.5 `:hover`/`:focus`/`:active` still never-match. `go test ./internal/css` green.
 
 Out: forgiving selector lists, shadow DOM, `@supports` evaluation of the full CSS grammar, `@layer` cascade if a later amendment wants it. `@supports` may land as a tiny parse that treats unknown features as false so nested rules are not dropped blindly. That decision is a 49 row, not a promise.
 
@@ -145,11 +145,11 @@ Out: forgiving selector lists, shadow DOM, `@supports` evaluation of the full CS
 
 ## Phase 50: Values, units, logical properties
 
-- [ ] 50.1 `clamp(min, pref, max)` on lengths. Remove `clamp(` from `supportedDeclaration` once it computes. Proof: `go test ./internal/layout -run TestClampLength`.
-- [ ] 50.2 `hsl()` / `hsla()` in `ParseColor`. Proof: `go test ./internal/css -run TestParseColorHsl`.
-- [ ] 50.3 Logical box longhands used in reports: `margin-inline`, `margin-block`, `padding-inline`, `padding-block`, `inset`, `inline-size`, `block-size` mapping onto physical fields for `horizontal-tb`. Proof: layout tests plus mapping status flip.
-- [ ] 50.4 Document `ex`/`ch` as 0.5em Partial, not "dropped". Optional: `ch` from actual glyph width of `0` if cheap.
-- [ ] 50.5 `vw`/`vh` on margin/padding, or document that they stay width/height-only.
+- [x] 50.1 `clamp()` computes; removed from `supportedDeclaration`. Proof: `TestClampLength`. Fixture-56 is 21 pages.
+- [x] 50.2 `hsl()` / `hsla()` in `ParseColor`. Proof: `TestParseColorHsl`.
+- [x] 50.3 Logical box longhands for horizontal-tb. Proof: `TestLogical*`. Mapping `--write`.
+- [x] 50.4 `ex`/`ch` Partial 0.5em in the matrix.
+- [x] 50.5 Matrix still documents `vw`/`vh` as width/height/min/max only.
 
 Out: `oklch()`, `color-mix()`, `light-dark()` stay cascade-dropped unless a later row takes them. `cq*` units stay out until `@container` used size is wired into length resolve.
 
@@ -159,11 +159,11 @@ Out: `oklch()`, `color-mix()`, `light-dark()` stay cascade-dropped unless a late
 
 Invoice and report CSS already writes these. They currently no-op.
 
-- [ ] 51.1 `word-spacing`. Proof: inherit + run-width test like `letter-spacing`.
-- [ ] 51.2 `visibility: hidden` hides paint, still occupies space. `collapse` may alias hide for non-tables. Proof: layout test.
-- [ ] 51.3 `caption-side: bottom` paints caption below the table. Proof: table test + matrix row.
-- [ ] 51.4 `white-space: pre-wrap` and `pre-line` no longer collapse to `pre`. Proof: `style_properties.go:1086-1092` behavior change + test.
-- [ ] 51.5 Matrix `table-layout` row matches `layout_tables.go:45`. Add a golden if fixed layout is still under-tested.
+- [x] 51.1 `word-spacing`. Proof: `TestWordSpacingInherits`, `TestWordSpacingWidensRuns`.
+- [x] 51.2 `visibility: hidden`. Proof: `TestVisibilityHidden`.
+- [x] 51.3 `caption-side: bottom`. Proof: `TestCaptionSideBottom`.
+- [x] 51.4 `pre-wrap` / `pre-line`. Proof: `TestWhiteSpacePreWrap`.
+- [x] 51.5 Matrix table-layout + `TestTableLayoutFixed`.
 
 ---
 

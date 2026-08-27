@@ -60,8 +60,10 @@ func (e *engine) collectInlineText(node *html.Node, sty ResolvedStyle, out *[]in
 			atomicStyle := sty
 			atomicStyle.WhiteSpace = cssWhiteSpaceNowrap
 			e.collectWrappedText(node, atomicStyle, out)
-		case sty.WhiteSpace == cssWhiteSpacePre:
-			e.collectPreText(node, sty, out)
+		case sty.WhiteSpace == cssWhiteSpacePre,
+			sty.WhiteSpace == cssWhiteSpacePreWrap,
+			sty.WhiteSpace == cssWhiteSpacePreLine:
+			e.collectPreservingNewlines(node, sty, out)
 		default:
 			e.collectWrappedText(node, sty, out)
 		}
@@ -128,31 +130,111 @@ func (e *engine) inlineChromeIsAtomic(node *html.Node) bool {
 	return style.PaddingLeft > 0 || style.PaddingRight > 0 || inlineHasBorder(style)
 }
 
-// collectPreText splits a white-space:pre node on newlines.
-func (e *engine) collectPreText(node *html.Node, _ ResolvedStyle, out *[]inlineItem) {
+// collectPreservingNewlines splits on newlines for pre / pre-wrap / pre-line.
+// pre keeps each line as one unbreakable run; pre-wrap preserves spaces and
+// wraps; pre-line collapses spaces, preserves newlines, and wraps.
+func (e *engine) collectPreservingNewlines(node *html.Node, sty ResolvedStyle, out *[]inlineItem) {
 	style := e.stylePtr(node)
 	text := node.Text
+	collapse := sty.WhiteSpace == cssWhiteSpacePreLine
+	wrap := sty.WhiteSpace != cssWhiteSpacePre
 
 	for start := 0; ; {
 		end := strings.IndexByte(text[start:], '\n')
-		if end < 0 {
-			p := text[start:]
-			if p != "" {
-				*out = append(*out, e.textItem(p, style))
-			}
+		last := end < 0
 
+		var line string
+		if last {
+			line = text[start:]
+		} else {
+			line = text[start : start+end]
+		}
+
+		e.emitWhiteSpaceLine(line, style, collapse, wrap, out)
+
+		if last {
 			return
 		}
 
-		end += start
+		*out = append(*out, inlineItem{forceBreak: true}) //nolint:exhaustruct // intentional zero fields
+		start += end + 1
+	}
+}
 
-		p := text[start:end]
-		if p != "" {
-			*out = append(*out, e.textItem(p, style))
+func (e *engine) emitWhiteSpaceLine(line string, style *ResolvedStyle, collapse, wrap bool, out *[]inlineItem) {
+	if collapse {
+		line = collapseWS(line)
+	}
+
+	if line == "" {
+		return
+	}
+
+	if !wrap {
+		*out = append(*out, e.textItem(line, style))
+
+		return
+	}
+
+	if collapse {
+		e.emitCollapsedWords(line, style, out)
+
+		return
+	}
+
+	e.emitPreservedWrap(line, style, out)
+}
+
+func (e *engine) emitCollapsedWords(text string, style *ResolvedStyle, out *[]inlineItem) {
+	wordStart := 0
+
+	for wordStart < len(text) {
+		for wordStart < len(text) && text[wordStart] == ' ' {
+			wordStart++
 		}
 
-		*out = append(*out, inlineItem{forceBreak: true}) //nolint:exhaustruct // intentional zero fields
-		start = end + 1
+		if wordStart >= len(text) {
+			break
+		}
+
+		wordEnd := wordStart
+		for wordEnd < len(text) && text[wordEnd] != ' ' {
+			wordEnd++
+		}
+
+		end := wordEnd
+		if wordEnd < len(text) {
+			end = wordEnd + 1
+		}
+
+		*out = append(*out, e.textItem(text[wordStart:end], style))
+		wordStart = end
+	}
+}
+
+func (e *engine) emitPreservedWrap(line string, style *ResolvedStyle, out *[]inlineItem) {
+	idx := 0
+
+	for idx < len(line) {
+		if line[idx] == ' ' || line[idx] == '\t' {
+			end := idx + 1
+			for end < len(line) && (line[end] == ' ' || line[end] == '\t') {
+				end++
+			}
+
+			*out = append(*out, e.textItem(line[idx:end], style))
+			idx = end
+
+			continue
+		}
+
+		end := idx + 1
+		for end < len(line) && line[end] != ' ' && line[end] != '\t' {
+			end++
+		}
+
+		*out = append(*out, e.textItem(line[idx:end], style))
+		idx = end
 	}
 }
 
@@ -808,6 +890,8 @@ func sameInlineStyle(acc, boxN *ResolvedStyle) bool { //nolint:cyclop
 		acc.LineHeight == boxN.LineHeight &&
 		acc.TextTransform == boxN.TextTransform &&
 		acc.LetterSpacing == boxN.LetterSpacing &&
+		acc.WordSpacing == boxN.WordSpacing &&
+		acc.Visibility == boxN.Visibility &&
 		acc.Color == boxN.Color &&
 		acc.BGColor == boxN.BGColor &&
 		acc.PaddingTop == boxN.PaddingTop && acc.PaddingRight == boxN.PaddingRight &&

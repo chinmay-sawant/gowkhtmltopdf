@@ -527,6 +527,10 @@ func lengthBox(value string, fsize, containing float64, autoValue string) (float
 		return point, true
 	}
 
+	if point, ok := clampLength(value, fsize, containing); ok {
+		return point, true
+	}
+
 	val, unit, ok := css.ParseLength(value)
 	if !ok {
 		return 0, false
@@ -570,6 +574,10 @@ func marginLen(value string, fsize, ctxW float64) float64 {
 		return point
 	}
 
+	if point, ok := clampLength(value, fsize, ctxW); ok {
+		return point
+	}
+
 	val, unit, ok := css.ParseLength(value)
 	if !ok {
 		return 0
@@ -588,6 +596,86 @@ func marginLen(value string, fsize, ctxW float64) float64 {
 	}
 
 	return 0
+}
+
+const clampPrefix = "clamp("
+
+// clampLength evaluates clamp(min, pref, max) on lengths. Nested calc() in an
+// argument is accepted when calcLength can compute it. Unparseable clamps stay
+// invalid so a later fallback can win.
+func clampLength(value string, fsize, containing float64) (float64, bool) {
+	value = strings.TrimSpace(value)
+	if len(value) < len("clamp()") ||
+		!strings.EqualFold(value[:len(clampPrefix)], clampPrefix) ||
+		value[len(value)-1] != ')' {
+		return 0, false
+	}
+
+	args := splitCommaArgs(value[len(clampPrefix) : len(value)-1])
+	if len(args) != three {
+		return 0, false
+	}
+
+	minLen, minOK := resolvedLength(strings.TrimSpace(args[0]), fsize, containing)
+	prefLen, prefOK := resolvedLength(strings.TrimSpace(args[1]), fsize, containing)
+	maxLen, maxOK := resolvedLength(strings.TrimSpace(args[2]), fsize, containing)
+
+	if !minOK || !prefOK || !maxOK {
+		return 0, false
+	}
+
+	used := prefLen
+	if used > maxLen {
+		used = maxLen
+	}
+
+	if used < minLen {
+		used = minLen
+	}
+
+	return used, true
+}
+
+func splitCommaArgs(value string) []string {
+	parts := make([]string, 0, three)
+	depth := 0
+	start := 0
+
+	for idx := 0; idx < len(value); idx++ {
+		switch value[idx] {
+		case '(':
+			depth++
+		case ')':
+			depth--
+		case ',':
+			if depth == 0 {
+				parts = append(parts, value[start:idx])
+				start = idx + 1
+			}
+		}
+	}
+
+	return append(parts, value[start:])
+}
+
+func resolvedLength(value string, fsize, containing float64) (float64, bool) {
+	if point, ok := calcLength(value, fsize, containing); ok {
+		return point, true
+	}
+
+	val, unit, ok := css.ParseLength(value)
+	if !ok {
+		return 0, false
+	}
+
+	switch unit {
+	case "%", "vw", "vh":
+		return containing * val / cssPercent, true
+	case remUnit:
+		return pxToPt(cssPxRoot) * val, true
+	default:
+		return css.LengthToPt(val, unit, fsize)
+	}
 }
 
 // calcLength evaluates the small arithmetic subset needed by the print CSS:

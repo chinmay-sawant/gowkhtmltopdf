@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"strings"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
@@ -15,7 +16,10 @@ import (
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
-const maxStylesheetRules = 1_000_000
+const (
+	maxStylesheetRules = 1_000_000
+	maxImportDepth     = 8
+)
 
 var errStylesheetLimit = errors.New("convert: stylesheet rule limit exceeded")
 
@@ -56,6 +60,7 @@ type sheetCollector struct {
 	opts      SheetOptions
 	log       io.Writer
 	sheets    []*css.Stylesheet
+	seen      map[string]struct{}
 	rules     int
 	visits    uint32
 	err       error
@@ -63,7 +68,9 @@ type sheetCollector struct {
 
 //nolint:wsl,lll // stylesheet collection flow
 func collectSheets(ctx context.Context, resources load.ResourceContext, root *html.Node, opts SheetOptions, log io.Writer) ([]*css.Stylesheet, error) {
-	collector := sheetCollector{resources: resources, opts: opts, log: log} //nolint:exhaustruct // empty result state
+	collector := sheetCollector{ //nolint:exhaustruct // empty result state
+		resources: resources, opts: opts, log: log, seen: make(map[string]struct{}),
+	}
 	if root != nil {
 		root.Walk(func(node *html.Node) { collector.visit(ctx, node) })
 	}
@@ -96,14 +103,14 @@ func (collector *sheetCollector) visit(ctx context.Context, node *html.Node) {
 
 	switch node.Name {
 	case "style":
-		collector.collectStyle(node)
+		collector.collectStyle(ctx, node)
 	case "link":
 		collector.collectLink(ctx, node)
 	}
 }
 
 //nolint:wsl,nlreturn // collector traversal flow
-func (collector *sheetCollector) collectStyle(node *html.Node) {
+func (collector *sheetCollector) collectStyle(ctx context.Context, node *html.Node) {
 	if collector.err != nil {
 		return
 	}
@@ -113,7 +120,7 @@ func (collector *sheetCollector) collectStyle(node *html.Node) {
 		collector.warn("skipping <style>: %v", err)
 		return
 	}
-	collector.add(sheet)
+	collector.addWithImports(ctx, sheet, collector.resources.Base(), 0)
 }
 
 //nolint:wsl,nlreturn // collector traversal flow
@@ -142,7 +149,152 @@ func (collector *sheetCollector) collectLink(ctx context.Context, node *html.Nod
 		collector.warn("skipping <link href=%q>: %v", node.Attribute("href"), err)
 		return
 	}
+	collector.noteSeen(resource.URL)
+	collector.addWithImports(ctx, sheet, resourceBase(resource), 0)
+}
+
+// addWithImports appends imported sheets (recursively) before sheet so @import
+// rules precede the importer, matching CSS cascade order.
+//
+//nolint:wsl,nlreturn // collector import flow
+func (collector *sheetCollector) addWithImports(ctx context.Context, sheet *css.Stylesheet, base string, depth int) {
+	if sheet == nil || collector.err != nil {
+		return
+	}
+	collector.fetchImports(ctx, sheet, base, depth)
+	if collector.err != nil {
+		return
+	}
 	collector.add(sheet)
+}
+
+//nolint:wsl,nlreturn // collector import flow
+func (collector *sheetCollector) fetchImports(ctx context.Context, sheet *css.Stylesheet, base string, depth int) {
+	if collector.err != nil || sheet == nil || len(sheet.Imports) == 0 {
+		return
+	}
+	if depth >= maxImportDepth {
+		collector.warn("skipping nested @import: depth exceeds %d", maxImportDepth)
+		return
+	}
+	for _, rule := range sheet.Imports {
+		collector.fetchOneImport(ctx, rule, base, depth)
+	}
+}
+
+//nolint:wsl,nlreturn,lll // collector import flow
+func (collector *sheetCollector) fetchOneImport(ctx context.Context, rule css.ImportRule, base string, depth int) {
+	if collector.err != nil {
+		return
+	}
+	if err := ctx.Err(); err != nil {
+		collector.err = err
+		return
+	}
+
+	ref := importRef(rule.URL)
+	if ref == "" {
+		return
+	}
+	if rule.Media != "" && !css.MediaMatches(rule.Media, collector.opts.MediaType, collector.opts.ViewportW, collector.opts.ViewportH) {
+		return
+	}
+
+	resolved := resolvedRef(base, ref)
+	if collector.seenURL(resolved) {
+		return
+	}
+	collector.noteSeen(resolved)
+
+	resource, err := collector.fetchRef(ctx, base, ref)
+	if err != nil {
+		collector.warn("skipping @import %q: %v", ref, err)
+		return
+	}
+	if resource == nil || resource.Skip {
+		collector.warn("skipping @import %q: resource skipped", ref)
+		return
+	}
+	collector.noteSeen(resource.URL)
+
+	sheet, err := css.Parse(string(resource.Body))
+	if err != nil {
+		collector.warn("skipping @import %q: %v", ref, err)
+		return
+	}
+	collector.addWithImports(ctx, sheet, resourceBase(resource), depth+1)
+}
+
+// fetchRef loads ref with the same ACL as <link rel=stylesheet>. Relative
+// imports resolve against the current sheet base, not the document base.
+//
+//nolint:wsl,nlreturn // collector import flow
+func (collector *sheetCollector) fetchRef(ctx context.Context, base, ref string) (*load.Resource, error) {
+	resources := collector.resources
+	if base != "" && base != resources.Base() {
+		if loader := resources.Loader(); loader != nil {
+			resources = loader.ForResource(&load.Resource{Base: base}, resources.PageLoad()) //nolint:exhaustruct,lll // base-only resource reference
+		}
+	}
+
+	return resources.Fetch(ctx, ref)
+}
+
+func (collector *sheetCollector) seenURL(raw string) bool {
+	if raw == "" || collector.seen == nil {
+		return false
+	}
+	_, ok := collector.seen[raw]
+
+	return ok
+}
+
+func (collector *sheetCollector) noteSeen(raw string) {
+	if raw == "" {
+		return
+	}
+	if collector.seen == nil {
+		collector.seen = make(map[string]struct{})
+	}
+
+	collector.seen[raw] = struct{}{}
+}
+
+func resourceBase(resource *load.Resource) string {
+	if resource == nil {
+		return ""
+	}
+	if resource.Base != "" {
+		return resource.Base
+	}
+
+	return resource.URL
+}
+
+func importRef(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if len(raw) >= 4 && strings.EqualFold(raw[:4], "url(") && strings.HasSuffix(raw, ")") {
+		raw = strings.TrimSpace(raw[4 : len(raw)-1])
+	}
+
+	return strings.Trim(raw, `"' `)
+}
+
+func resolvedRef(base, ref string) string {
+	parsed, err := url.Parse(strings.TrimSpace(ref))
+	if err != nil {
+		return strings.TrimSpace(ref)
+	}
+	if parsed.IsAbs() || strings.TrimSpace(base) == "" {
+		return parsed.String()
+	}
+
+	baseURL, err := url.Parse(base)
+	if err != nil {
+		return parsed.String()
+	}
+
+	return baseURL.ResolveReference(parsed).String()
 }
 
 //nolint:wsl,nlreturn // collector accumulation flow
